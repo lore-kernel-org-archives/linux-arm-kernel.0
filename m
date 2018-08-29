@@ -1,51 +1,86 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 29 Aug 2018 10:36:49 +0800
-Subject: [PATCH 1/2] usb: mtu3: fix error of xhci port id when enable U3 dual
- role
-Message-ID: <c4279eccff765006b78f87bf3c8c9ac94a06c04d.1535509922.git.chunfeng.yun@mediatek.com>
+Date: Wed, 29 Aug 2018 10:36:50 +0800
+Subject: [PATCH 2/2] usb: mtu3: disable vbus rise/fall interrupts of ltssm
+In-Reply-To: <c4279eccff765006b78f87bf3c8c9ac94a06c04d.1535509922.git.chunfeng.yun@mediatek.com>
+References: <c4279eccff765006b78f87bf3c8c9ac94a06c04d.1535509922.git.chunfeng.yun@mediatek.com>
+Message-ID: <72ee83112167ceb394ec5d89a824be866a7a21f0.1535509922.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If dual role mode is enabled, when switch u3port0 to device mode,
-it will affect port id calculation of host(xHCI), specially when
-host supports multi U2 ports or U3 ports, so need enable its dual
-role mode, and fix it here.
+The vbus rise & fall interrupts are used to enable and disable
+U3 function of device automatically, this cause some issues when
+class driver is initialized as deactivated, and will skip over
+software-controlled connect by pullup(), but UDC wants to keep
+disconnect until usb_gadget_activate() is called which calls
+pullup() if needed. So we disable vbus rise & fall interrupts
+and just use pullup() to enable & disable U3 function, and reset
+mtu3 state when disconnect instead when vbus fall.
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- drivers/usb/mtu3/mtu3_core.c    | 6 +++++-
- drivers/usb/mtu3/mtu3_hw_regs.h | 1 +
- 2 files changed, 6 insertions(+), 1 deletion(-)
+ drivers/usb/mtu3/mtu3_core.c   |  4 ++--
+ drivers/usb/mtu3/mtu3_gadget.c | 22 ++++++++++++++--------
+ 2 files changed, 16 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/usb/mtu3/mtu3_core.c b/drivers/usb/mtu3/mtu3_core.c
-index eecfd06..d045d84 100644
+index d045d84..ae70b9b 100644
 --- a/drivers/usb/mtu3/mtu3_core.c
 +++ b/drivers/usb/mtu3/mtu3_core.c
-@@ -107,8 +107,12 @@ static int mtu3_device_enable(struct mtu3 *mtu)
- 		(SSUSB_U2_PORT_DIS | SSUSB_U2_PORT_PDN |
- 		SSUSB_U2_PORT_HOST_SEL));
+@@ -185,8 +185,8 @@ static void mtu3_intr_enable(struct mtu3 *mtu)
  
--	if (mtu->ssusb->dr_mode == USB_DR_MODE_OTG)
-+	if (mtu->ssusb->dr_mode == USB_DR_MODE_OTG) {
- 		mtu3_setbits(ibase, SSUSB_U2_CTRL(0), SSUSB_U2_PORT_OTG_SEL);
-+		if (mtu->is_u3_ip)
-+			mtu3_setbits(ibase, SSUSB_U3_CTRL(0),
-+				     SSUSB_U3_PORT_DUAL_MODE);
-+	}
+ 	if (mtu->is_u3_ip) {
+ 		/* Enable U3 LTSSM interrupts */
+-		value = HOT_RST_INTR | WARM_RST_INTR | VBUS_RISE_INTR |
+-		    VBUS_FALL_INTR | ENTER_U3_INTR | EXIT_U3_INTR;
++		value = HOT_RST_INTR | WARM_RST_INTR |
++			ENTER_U3_INTR | EXIT_U3_INTR;
+ 		mtu3_writel(mbase, U3D_LTSSM_INTR_ENABLE, value);
+ 	}
  
- 	return ssusb_check_clocks(mtu->ssusb, check_clk);
+diff --git a/drivers/usb/mtu3/mtu3_gadget.c b/drivers/usb/mtu3/mtu3_gadget.c
+index 5c60a8c..bbcd333 100644
+--- a/drivers/usb/mtu3/mtu3_gadget.c
++++ b/drivers/usb/mtu3/mtu3_gadget.c
+@@ -585,6 +585,17 @@ static int mtu3_gadget_stop(struct usb_gadget *g)
+ 	.udc_stop = mtu3_gadget_stop,
+ };
+ 
++static void mtu3_state_reset(struct mtu3 *mtu)
++{
++	mtu->address = 0;
++	mtu->ep0_state = MU3D_EP0_STATE_SETUP;
++	mtu->may_wakeup = 0;
++	mtu->u1_enable = 0;
++	mtu->u2_enable = 0;
++	mtu->delayed_status = false;
++	mtu->test_mode = false;
++}
++
+ static void init_hw_ep(struct mtu3 *mtu, struct mtu3_ep *mep,
+ 		u32 epnum, u32 is_in)
+ {
+@@ -702,6 +713,7 @@ void mtu3_gadget_disconnect(struct mtu3 *mtu)
+ 		spin_lock(&mtu->lock);
+ 	}
+ 
++	mtu3_state_reset(mtu);
+ 	usb_gadget_set_state(&mtu->g, USB_STATE_NOTATTACHED);
  }
-diff --git a/drivers/usb/mtu3/mtu3_hw_regs.h b/drivers/usb/mtu3/mtu3_hw_regs.h
-index 6ee3714..a45bb25 100644
---- a/drivers/usb/mtu3/mtu3_hw_regs.h
-+++ b/drivers/usb/mtu3/mtu3_hw_regs.h
-@@ -459,6 +459,7 @@
  
- /* U3D_SSUSB_U3_CTRL_0P */
- #define SSUSB_U3_PORT_SSP_SPEED	BIT(9)
-+#define SSUSB_U3_PORT_DUAL_MODE	BIT(7)
- #define SSUSB_U3_PORT_HOST_SEL		BIT(2)
- #define SSUSB_U3_PORT_PDN		BIT(1)
- #define SSUSB_U3_PORT_DIS		BIT(0)
+@@ -712,12 +724,6 @@ void mtu3_gadget_reset(struct mtu3 *mtu)
+ 	/* report disconnect, if we didn't flush EP state */
+ 	if (mtu->g.speed != USB_SPEED_UNKNOWN)
+ 		mtu3_gadget_disconnect(mtu);
+-
+-	mtu->address = 0;
+-	mtu->ep0_state = MU3D_EP0_STATE_SETUP;
+-	mtu->may_wakeup = 0;
+-	mtu->u1_enable = 0;
+-	mtu->u2_enable = 0;
+-	mtu->delayed_status = false;
+-	mtu->test_mode = false;
++	else
++		mtu3_state_reset(mtu);
+ }
 -- 
 1.9.1
