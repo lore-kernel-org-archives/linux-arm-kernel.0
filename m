@@ -1,428 +1,225 @@
 From: andreyknvl@google.com (Andrey Konovalov)
-Date: Wed, 29 Aug 2018 13:35:07 +0200
-Subject: [PATCH v6 03/18] khwasan: add CONFIG_KASAN_GENERIC and CONFIG_KASAN_HW
+Date: Wed, 29 Aug 2018 13:35:11 +0200
+Subject: [PATCH v6 07/18] khwasan: add tag related helper functions
 In-Reply-To: <cover.1535462971.git.andreyknvl@google.com>
 References: <cover.1535462971.git.andreyknvl@google.com>
-Message-ID: <868c9168481ff5103034ac1e37b830d28ed5f4ee.1535462971.git.andreyknvl@google.com>
+Message-ID: <6cd298a90d02068969713f2fd440eae21227467b.1535462971.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit splits the current CONFIG_KASAN config option into two:
-1. CONFIG_KASAN_GENERIC, that enables the generic software-only KASAN
-   version (the one that exists now);
-2. CONFIG_KASAN_HW, that enables KHWASAN.
-
-With CONFIG_KASAN_HW enabled, compiler options are changed to instrument
-kernel files wiht -fsantize=hwaddress (except the ones for which
-KASAN_SANITIZE := n is set).
-
-Both CONFIG_KASAN_GENERIC and CONFIG_KASAN_HW support both
-CONFIG_KASAN_INLINE and CONFIG_KASAN_OUTLINE instrumentation modes.
-
-This commit also adds empty placeholder (for now) implementation of
-KHWASAN specific hooks inserted by the compiler and adjusts common hooks
-implementation to compile correctly with each of the config options.
+This commit adds a few helper functions, that are meant to be used to
+work with tags embedded in the top byte of kernel pointers: to set, to
+get or to reset (set to 0xff) the top byte.
 
 Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
 ---
- arch/arm64/Kconfig             |  1 +
- include/linux/compiler-clang.h |  3 +-
- include/linux/compiler-gcc.h   |  4 ++
- include/linux/compiler.h       |  3 +-
- include/linux/kasan.h          | 16 +++++--
- lib/Kconfig.kasan              | 77 ++++++++++++++++++++++++++--------
- mm/kasan/Makefile              |  6 ++-
- mm/kasan/kasan.h               |  3 +-
- mm/kasan/khwasan.c             | 75 +++++++++++++++++++++++++++++++++
- mm/slub.c                      |  2 +-
- scripts/Makefile.kasan         | 27 +++++++++++-
- 11 files changed, 188 insertions(+), 29 deletions(-)
- create mode 100644 mm/kasan/khwasan.c
+ arch/arm64/mm/kasan_init.c |  2 ++
+ include/linux/kasan.h      | 29 +++++++++++++++++
+ mm/kasan/kasan.h           | 55 ++++++++++++++++++++++++++++++++
+ mm/kasan/khwasan.c         | 65 ++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 151 insertions(+)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 29e75b47becd..991564148f54 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -105,6 +105,7 @@ config ARM64
- 	select HAVE_ARCH_HUGE_VMAP
- 	select HAVE_ARCH_JUMP_LABEL
- 	select HAVE_ARCH_KASAN if !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
-+	select HAVE_ARCH_KASAN_HW if !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
- 	select HAVE_ARCH_KGDB
- 	select HAVE_ARCH_MMAP_RND_BITS
- 	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
-diff --git a/include/linux/compiler-clang.h b/include/linux/compiler-clang.h
-index b1ce500fe8b3..2c258a9d4c67 100644
---- a/include/linux/compiler-clang.h
-+++ b/include/linux/compiler-clang.h
-@@ -17,11 +17,12 @@
- #define KASAN_ABI_VERSION 5
+diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
+index 7a31e8ccbad2..e7f37c0b7e14 100644
+--- a/arch/arm64/mm/kasan_init.c
++++ b/arch/arm64/mm/kasan_init.c
+@@ -250,6 +250,8 @@ void __init kasan_init(void)
+ 	memset(kasan_zero_page, KASAN_SHADOW_INIT, PAGE_SIZE);
+ 	cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
  
- /* emulate gcc's __SANITIZE_ADDRESS__ flag */
--#if __has_feature(address_sanitizer)
-+#if __has_feature(address_sanitizer) || __has_feature(hwaddress_sanitizer)
- #define __SANITIZE_ADDRESS__
- #endif
- 
- #define __no_sanitize_address __attribute__((no_sanitize("address")))
-+#define __no_sanitize_hwaddress __attribute__((no_sanitize("hwaddress")))
- 
- /*
-  * Not all versions of clang implement the the type-generic versions
-diff --git a/include/linux/compiler-gcc.h b/include/linux/compiler-gcc.h
-index 763bbad1e258..a186b55c8c4c 100644
---- a/include/linux/compiler-gcc.h
-+++ b/include/linux/compiler-gcc.h
-@@ -227,6 +227,10 @@
- #define __no_sanitize_address
- #endif
- 
-+#if !defined(__no_sanitize_hwaddress)
-+#define __no_sanitize_hwaddress	/* gcc doesn't support KHWASAN */
-+#endif
++	khwasan_init();
 +
- /*
-  * Turn individual warnings and errors on and off locally, depending
-  * on version.
-diff --git a/include/linux/compiler.h b/include/linux/compiler.h
-index 681d866efb1e..3f2ba192d57d 100644
---- a/include/linux/compiler.h
-+++ b/include/linux/compiler.h
-@@ -195,7 +195,8 @@ void __read_once_size(const volatile void *p, void *res, int size)
-  * 	https://gcc.gnu.org/bugzilla/show_bug.cgi?id=67368
-  * '__maybe_unused' allows us to avoid defined-but-not-used warnings.
-  */
--# define __no_kasan_or_inline __no_sanitize_address __maybe_unused
-+# define __no_kasan_or_inline __no_sanitize_address __no_sanitize_hwaddress \
-+			      __maybe_unused
- #else
- # define __no_kasan_or_inline __always_inline
- #endif
+ 	/* At this point kasan is fully initialized. Enable error messages */
+ 	init_task.kasan_depth = 0;
+ 	pr_info("KernelAddressSanitizer initialized\n");
 diff --git a/include/linux/kasan.h b/include/linux/kasan.h
-index 54d577ad2181..beb56a26fe9b 100644
+index 1c31bb089154..1f852244e739 100644
 --- a/include/linux/kasan.h
 +++ b/include/linux/kasan.h
-@@ -45,8 +45,6 @@ void kasan_free_pages(struct page *page, unsigned int order);
+@@ -166,6 +166,35 @@ static inline void kasan_cache_shutdown(struct kmem_cache *cache) {}
  
- void kasan_cache_create(struct kmem_cache *cache, unsigned int *size,
- 			slab_flags_t *flags);
--void kasan_cache_shrink(struct kmem_cache *cache);
--void kasan_cache_shutdown(struct kmem_cache *cache);
+ #define KASAN_SHADOW_INIT 0xFF
  
- void kasan_poison_slab(struct page *page);
- void kasan_unpoison_object_data(struct kmem_cache *cache, void *object);
-@@ -97,8 +95,6 @@ static inline void kasan_free_pages(struct page *page, unsigned int order) {}
- static inline void kasan_cache_create(struct kmem_cache *cache,
- 				      unsigned int *size,
- 				      slab_flags_t *flags) {}
--static inline void kasan_cache_shrink(struct kmem_cache *cache) {}
--static inline void kasan_cache_shutdown(struct kmem_cache *cache) {}
++void khwasan_init(void);
++
++void *khwasan_reset_tag(const void *addr);
++
++void *khwasan_preset_slub_tag(struct kmem_cache *cache, const void *addr);
++void *khwasan_preset_slab_tag(struct kmem_cache *cache, unsigned int idx,
++					const void *addr);
++
++#else /* CONFIG_KASAN_HW */
++
++static inline void khwasan_init(void) { }
++
++static inline void *khwasan_reset_tag(const void *addr)
++{
++	return (void *)addr;
++}
++
++static inline void *khwasan_preset_slub_tag(struct kmem_cache *cache,
++						const void *addr)
++{
++	return (void *)addr;
++}
++
++static inline void *khwasan_preset_slab_tag(struct kmem_cache *cache,
++					unsigned int idx, const void *addr)
++{
++	return (void *)addr;
++}
++
+ #endif /* CONFIG_KASAN_HW */
  
- static inline void kasan_poison_slab(struct page *page) {}
- static inline void kasan_unpoison_object_data(struct kmem_cache *cache,
-@@ -152,4 +148,16 @@ static inline size_t kasan_metadata_size(struct kmem_cache *cache) { return 0; }
- 
- #endif /* CONFIG_KASAN */
- 
-+#ifdef CONFIG_KASAN_GENERIC
-+
-+void kasan_cache_shrink(struct kmem_cache *cache);
-+void kasan_cache_shutdown(struct kmem_cache *cache);
-+
-+#else /* CONFIG_KASAN_GENERIC */
-+
-+static inline void kasan_cache_shrink(struct kmem_cache *cache) {}
-+static inline void kasan_cache_shutdown(struct kmem_cache *cache) {}
-+
-+#endif /* CONFIG_KASAN_GENERIC */
-+
  #endif /* LINUX_KASAN_H */
-diff --git a/lib/Kconfig.kasan b/lib/Kconfig.kasan
-index befb127507c0..5a22629f30e7 100644
---- a/lib/Kconfig.kasan
-+++ b/lib/Kconfig.kasan
-@@ -1,34 +1,75 @@
- config HAVE_ARCH_KASAN
- 	bool
- 
-+config HAVE_ARCH_KASAN_HW
-+	bool
-+
- if HAVE_ARCH_KASAN
- 
- config KASAN
--	bool "KASan: runtime memory debugger"
-+	bool "KASAN: runtime memory debugger"
-+	help
-+	  Enables KASAN (KernelAddressSANitizer) - runtime memory debugger,
-+	  designed to find out-of-bounds accesses and use-after-free bugs.
-+
-+choice
-+	prompt "KASAN mode"
-+	depends on KASAN
-+	default KASAN_GENERIC
-+	help
-+	  KASAN has two modes: KASAN (a classic version, similar to userspace
-+	  ASan, enabled with CONFIG_KASAN_GENERIC) and KHWASAN (a version
-+	  based on pointer tagging, only for arm64, similar to userspace
-+	  HWASan, enabled with CONFIG_KASAN_HW).
-+
-+config KASAN_GENERIC
-+	bool "KASAN: the generic mode"
- 	depends on (SLUB && SYSFS) || (SLAB && !DEBUG_SLAB)
- 	select SLUB_DEBUG if SLUB
- 	select CONSTRUCTORS
- 	select STACKDEPOT
- 	help
--	  Enables kernel address sanitizer - runtime memory debugger,
--	  designed to find out-of-bounds accesses and use-after-free bugs.
--	  This is strictly a debugging feature and it requires a gcc version
--	  of 4.9.2 or later. Detection of out of bounds accesses to stack or
--	  global variables requires gcc 5.0 or later.
--	  This feature consumes about 1/8 of available memory and brings about
--	  ~x3 performance slowdown.
-+	  Enables the generic mode of KASAN.
-+	  This is strictly a debugging feature and it requires a GCC version
-+	  of 4.9.2 or later. Detection of out-of-bounds accesses to stack or
-+	  global variables requires GCC 5.0 or later.
-+	  This mode consumes about 1/8 of available memory at kernel start
-+	  and introduces an overhead of ~x1.5 for the rest of the allocations.
-+	  The performance slowdown is ~x3.
- 	  For better error detection enable CONFIG_STACKTRACE.
--	  Currently CONFIG_KASAN doesn't work with CONFIG_DEBUG_SLAB
-+	  Currently CONFIG_KASAN_GENERIC doesn't work with CONFIG_DEBUG_SLAB
- 	  (the resulting kernel does not boot).
- 
-+if HAVE_ARCH_KASAN_HW
-+
-+config KASAN_HW
-+	bool "KHWASAN: the hardware assisted mode"
-+	depends on (SLUB && SYSFS) || (SLAB && !DEBUG_SLAB)
-+	select SLUB_DEBUG if SLUB
-+	select CONSTRUCTORS
-+	select STACKDEPOT
-+	help
-+	  Enabled KHWASAN (KASAN mode based on pointer tagging).
-+	  This mode requires Top Byte Ignore support by the CPU and therefore
-+	  only supported for arm64.
-+	  This feature requires clang revision 330044 or later.
-+	  This mode consumes about 1/16 of available memory at kernel start
-+	  and introduces an overhead of ~20% for the rest of the allocations.
-+	  For better error detection enable CONFIG_STACKTRACE.
-+	  Currently CONFIG_KASAN_HW doesn't work with CONFIG_DEBUG_SLAB
-+	  (the resulting kernel does not boot).
-+
-+endif
-+
-+endchoice
-+
- config KASAN_EXTRA
--	bool "KAsan: extra checks"
--	depends on KASAN && DEBUG_KERNEL && !COMPILE_TEST
-+	bool "KASAN: extra checks"
-+	depends on KASAN_GENERIC && DEBUG_KERNEL && !COMPILE_TEST
- 	help
--	  This enables further checks in the kernel address sanitizer, for now
--	  it only includes the address-use-after-scope check that can lead
--	  to excessive kernel stack usage, frame size warnings and longer
--	  compile time.
-+	  This enables further checks in KASAN, for now it only includes the
-+	  address-use-after-scope check that can lead to excessive kernel
-+	  stack usage, frame size warnings and longer compile time.
- 	  https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81715 has more
- 
- 
-@@ -53,16 +94,16 @@ config KASAN_INLINE
- 	  memory accesses. This is faster than outline (in some workloads
- 	  it gives about x2 boost over outline instrumentation), but
- 	  make kernel's .text size much bigger.
--	  This requires a gcc version of 5.0 or later.
-+	  For CONFIG_KASAN_GENERIC this requires GCC 5.0 or later.
- 
- endchoice
- 
- config TEST_KASAN
--	tristate "Module for testing kasan for bug detection"
-+	tristate "Module for testing KASAN for bug detection"
- 	depends on m && KASAN
- 	help
- 	  This is a test module doing various nasty things like
- 	  out of bounds accesses, use after free. It is useful for testing
--	  kernel debugging features like kernel address sanitizer.
-+	  kernel debugging features like KASAN.
- 
- endif
-diff --git a/mm/kasan/Makefile b/mm/kasan/Makefile
-index a6df14bffb6b..14955add96d3 100644
---- a/mm/kasan/Makefile
-+++ b/mm/kasan/Makefile
-@@ -2,6 +2,7 @@
- KASAN_SANITIZE := n
- UBSAN_SANITIZE_common.o := n
- UBSAN_SANITIZE_kasan.o := n
-+UBSAN_SANITIZE_khwasan.o := n
- KCOV_INSTRUMENT := n
- 
- CFLAGS_REMOVE_kasan.o = -pg
-@@ -10,5 +11,8 @@ CFLAGS_REMOVE_kasan.o = -pg
- 
- CFLAGS_common.o := $(call cc-option, -fno-conserve-stack -fno-stack-protector)
- CFLAGS_kasan.o := $(call cc-option, -fno-conserve-stack -fno-stack-protector)
-+CFLAGS_khwasan.o := $(call cc-option, -fno-conserve-stack -fno-stack-protector)
- 
--obj-y := common.o kasan.o report.o kasan_init.o quarantine.o
-+obj-$(CONFIG_KASAN) := common.o kasan_init.o report.o
-+obj-$(CONFIG_KASAN_GENERIC) += kasan.o quarantine.o
-+obj-$(CONFIG_KASAN_HW) += khwasan.o
 diff --git a/mm/kasan/kasan.h b/mm/kasan/kasan.h
-index 659463800f10..19b950eaccff 100644
+index 19b950eaccff..a7cc27d96608 100644
 --- a/mm/kasan/kasan.h
 +++ b/mm/kasan/kasan.h
-@@ -114,7 +114,8 @@ void kasan_report(unsigned long addr, size_t size,
- 		bool is_write, unsigned long ip);
- void kasan_report_invalid_free(void *object, unsigned long ip);
+@@ -8,6 +8,10 @@
+ #define KASAN_SHADOW_SCALE_SIZE (1UL << KASAN_SHADOW_SCALE_SHIFT)
+ #define KASAN_SHADOW_MASK       (KASAN_SHADOW_SCALE_SIZE - 1)
  
--#if defined(CONFIG_SLAB) || defined(CONFIG_SLUB)
-+#if defined(CONFIG_KASAN_GENERIC) && \
-+	(defined(CONFIG_SLAB) || defined(CONFIG_SLUB))
- void quarantine_put(struct kasan_free_meta *info, struct kmem_cache *cache);
- void quarantine_reduce(void);
- void quarantine_remove_cache(struct kmem_cache *cache);
++#define KHWASAN_TAG_KERNEL	0xFF /* native kernel pointers tag */
++#define KHWASAN_TAG_INVALID	0xFE /* inaccessible memory tag */
++#define KHWASAN_TAG_MAX		0xFD /* maximum value for random tags */
++
+ #define KASAN_FREE_PAGE         0xFF  /* page was freed */
+ #define KASAN_PAGE_REDZONE      0xFE  /* redzone for kmalloc_large allocations */
+ #define KASAN_KMALLOC_REDZONE   0xFC  /* redzone inside slub object */
+@@ -126,6 +130,57 @@ static inline void quarantine_reduce(void) { }
+ static inline void quarantine_remove_cache(struct kmem_cache *cache) { }
+ #endif
+ 
++#ifdef CONFIG_KASAN_HW
++
++#define KHWASAN_TAG_SHIFT 56
++#define KHWASAN_TAG_MASK (0xFFUL << KHWASAN_TAG_SHIFT)
++
++u8 random_tag(void);
++
++static inline void *set_tag(const void *addr, u8 tag)
++{
++	u64 a = (u64)addr;
++
++	a &= ~KHWASAN_TAG_MASK;
++	a |= ((u64)tag << KHWASAN_TAG_SHIFT);
++
++	return (void *)a;
++}
++
++static inline u8 get_tag(const void *addr)
++{
++	return (u8)((u64)addr >> KHWASAN_TAG_SHIFT);
++}
++
++static inline void *reset_tag(const void *addr)
++{
++	return set_tag(addr, KHWASAN_TAG_KERNEL);
++}
++
++#else /* CONFIG_KASAN_HW */
++
++static inline u8 random_tag(void)
++{
++	return 0;
++}
++
++static inline void *set_tag(const void *addr, u8 tag)
++{
++	return (void *)addr;
++}
++
++static inline u8 get_tag(const void *addr)
++{
++	return 0;
++}
++
++static inline void *reset_tag(const void *addr)
++{
++	return (void *)addr;
++}
++
++#endif /* CONFIG_KASAN_HW */
++
+ /*
+  * Exported functions for interfaces called from assembly or from generated
+  * code. Declarations here to avoid warning about missing declarations.
 diff --git a/mm/kasan/khwasan.c b/mm/kasan/khwasan.c
-new file mode 100644
-index 000000000000..e2c3a7f7fd1f
---- /dev/null
+index e2c3a7f7fd1f..9d91bf3c8246 100644
+--- a/mm/kasan/khwasan.c
 +++ b/mm/kasan/khwasan.c
-@@ -0,0 +1,75 @@
+@@ -38,6 +38,71 @@
+ #include "kasan.h"
+ #include "../slab.h"
+ 
++static DEFINE_PER_CPU(u32, prng_state);
++
++void khwasan_init(void)
++{
++	int cpu;
++
++	for_each_possible_cpu(cpu)
++		per_cpu(prng_state, cpu) = get_random_u32();
++}
++
 +/*
-+ * This file contains core KHWASAN code.
++ * If a preemption happens between this_cpu_read and this_cpu_write, the only
++ * side effect is that we'll give a few allocated in different contexts objects
++ * the same tag. Since KHWASAN is meant to be used a probabilistic bug-detection
++ * debug feature, this doesn?t have significant negative impact.
 + *
-+ * Copyright (c) 2018 Google, Inc.
-+ * Author: Andrey Konovalov <andreyknvl@google.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
++ * Ideally the tags use strong randomness to prevent any attempts to predict
++ * them during explicit exploit attempts. But strong randomness is expensive,
++ * and we did an intentional trade-off to use a PRNG. This non-atomic RMW
++ * sequence has in fact positive effect, since interrupts that randomly skew
++ * PRNG at unpredictable points do only good.
 + */
-+
-+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-+#define DISABLE_BRANCH_PROFILING
-+
-+#include <linux/export.h>
-+#include <linux/interrupt.h>
-+#include <linux/init.h>
-+#include <linux/kasan.h>
-+#include <linux/kernel.h>
-+#include <linux/kmemleak.h>
-+#include <linux/linkage.h>
-+#include <linux/memblock.h>
-+#include <linux/memory.h>
-+#include <linux/mm.h>
-+#include <linux/module.h>
-+#include <linux/printk.h>
-+#include <linux/random.h>
-+#include <linux/sched.h>
-+#include <linux/sched/task_stack.h>
-+#include <linux/slab.h>
-+#include <linux/stacktrace.h>
-+#include <linux/string.h>
-+#include <linux/types.h>
-+#include <linux/vmalloc.h>
-+#include <linux/bug.h>
-+
-+#include "kasan.h"
-+#include "../slab.h"
-+
-+void check_memory_region(unsigned long addr, size_t size, bool write,
-+				unsigned long ret_ip)
++u8 random_tag(void)
 +{
++	u32 state = this_cpu_read(prng_state);
++
++	state = 1664525 * state + 1013904223;
++	this_cpu_write(prng_state, state);
++
++	return (u8)(state % (KHWASAN_TAG_MAX + 1));
 +}
 +
-+#define DEFINE_HWASAN_LOAD_STORE(size)					\
-+	void __hwasan_load##size##_noabort(unsigned long addr)		\
-+	{								\
-+	}								\
-+	EXPORT_SYMBOL(__hwasan_load##size##_noabort);			\
-+	void __hwasan_store##size##_noabort(unsigned long addr)		\
-+	{								\
-+	}								\
-+	EXPORT_SYMBOL(__hwasan_store##size##_noabort)
-+
-+DEFINE_HWASAN_LOAD_STORE(1);
-+DEFINE_HWASAN_LOAD_STORE(2);
-+DEFINE_HWASAN_LOAD_STORE(4);
-+DEFINE_HWASAN_LOAD_STORE(8);
-+DEFINE_HWASAN_LOAD_STORE(16);
-+
-+void __hwasan_loadN_noabort(unsigned long addr, unsigned long size)
++void *khwasan_reset_tag(const void *addr)
 +{
++	return reset_tag(addr);
 +}
-+EXPORT_SYMBOL(__hwasan_loadN_noabort);
 +
-+void __hwasan_storeN_noabort(unsigned long addr, unsigned long size)
++void *khwasan_preset_slub_tag(struct kmem_cache *cache, const void *addr)
 +{
++	/*
++	 * Since it's desirable to only call object contructors ones during
++	 * slab allocation, we preassign tags to all such objects.
++	 * Also preassign tags for SLAB_TYPESAFE_BY_RCU slabs to avoid
++	 * use-after-free reports.
++	 */
++	if (cache->ctor || cache->flags & SLAB_TYPESAFE_BY_RCU)
++		return set_tag(addr, random_tag());
++	return (void *)addr;
 +}
-+EXPORT_SYMBOL(__hwasan_storeN_noabort);
 +
-+void __hwasan_tag_memory(unsigned long addr, u8 tag, unsigned long size)
++void *khwasan_preset_slab_tag(struct kmem_cache *cache, unsigned int idx,
++				const void *addr)
 +{
++	/*
++	 * See comment in khwasan_preset_slub_tag.
++	 * For SLAB allocator we can't preassign tags randomly since the
++	 * freelist is stored as an array of indexes instead of a linked
++	 * list. Assign tags based on objects indexes, so that objects that
++	 * are next to each other get different tags.
++	 */
++	if (cache->ctor || cache->flags & SLAB_TYPESAFE_BY_RCU)
++		return set_tag(addr, (u8)idx);
++	return (void *)addr;
 +}
-+EXPORT_SYMBOL(__hwasan_tag_memory);
-diff --git a/mm/slub.c b/mm/slub.c
-index 30b9bf777bab..4206e1b616e7 100644
---- a/mm/slub.c
-+++ b/mm/slub.c
-@@ -2955,7 +2955,7 @@ static __always_inline void slab_free(struct kmem_cache *s, struct page *page,
- 		do_slab_free(s, page, head, tail, cnt, addr);
- }
- 
--#ifdef CONFIG_KASAN
-+#ifdef CONFIG_KASAN_GENERIC
- void ___cache_free(struct kmem_cache *cache, void *x, unsigned long addr)
++
+ void check_memory_region(unsigned long addr, size_t size, bool write,
+ 				unsigned long ret_ip)
  {
- 	do_slab_free(cache, virt_to_head_page(x), x, NULL, 1, addr);
-diff --git a/scripts/Makefile.kasan b/scripts/Makefile.kasan
-index 69552a39951d..49c6e056c697 100644
---- a/scripts/Makefile.kasan
-+++ b/scripts/Makefile.kasan
-@@ -1,5 +1,5 @@
- # SPDX-License-Identifier: GPL-2.0
--ifdef CONFIG_KASAN
-+ifdef CONFIG_KASAN_GENERIC
- ifdef CONFIG_KASAN_INLINE
- 	call_threshold := 10000
- else
-@@ -42,6 +42,29 @@ ifdef CONFIG_KASAN_EXTRA
- CFLAGS_KASAN += $(call cc-option, -fsanitize-address-use-after-scope)
- endif
- 
--CFLAGS_KASAN_NOSANITIZE := -fno-builtin
-+endif
-+
-+ifdef CONFIG_KASAN_HW
-+
-+ifdef CONFIG_KASAN_INLINE
-+    instrumentation_flags := -mllvm -hwasan-mapping-offset=$(KASAN_SHADOW_OFFSET)
-+else
-+    instrumentation_flags := -mllvm -hwasan-instrument-with-calls=1
-+endif
- 
-+CFLAGS_KASAN := -fsanitize=kernel-hwaddress \
-+		-mllvm -hwasan-instrument-stack=0 \
-+		$(instrumentation_flags)
-+
-+ifeq ($(call cc-option, $(CFLAGS_KASAN) -Werror),)
-+    ifneq ($(CONFIG_COMPILE_TEST),y)
-+        $(warning Cannot use CONFIG_KASAN_HW: \
-+            -fsanitize=hwaddress is not supported by compiler)
-+    endif
-+endif
-+
-+endif
-+
-+ifdef CONFIG_KASAN
-+CFLAGS_KASAN_NOSANITIZE := -fno-builtin
- endif
 -- 
 2.19.0.rc0.228.g281dcd1b4d0-goog
