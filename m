@@ -1,23 +1,22 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 29 Aug 2018 14:03:56 +0200
-Subject: [PATCH] drm/rockchip: vop: fix some register define error for px30
-In-Reply-To: <1535445150-40296-1-git-send-email-hjc@rock-chips.com>
-References: <1535445150-40296-1-git-send-email-hjc@rock-chips.com>
-Message-ID: <11292257.FZhH7mPKX6@phil>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 29 Aug 2018 14:07:12 +0200
+Subject: [PATCH] pinctrl: Convert to using %pOFn instead of
+ device_node.name
+In-Reply-To: <20180828015252.28511-40-robh@kernel.org>
+References: <20180828015252.28511-1-robh@kernel.org>
+ <20180828015252.28511-40-robh@kernel.org>
+Message-ID: <CACRpkdY-ChkLS39vz6rDUdnR7zuxfu=aD7tky__26fjMP+th1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 28. August 2018, 10:32:30 CEST schrieb Sandy Huang:
-> 1. interrupt register define error lead to enable interrupt failed;
-> 2. px30 unsupport hdmi output;
-> 3. there are some hardware designed bug, we must swap win2 gate and
->    enable offset, otherwise will appear vop iommu pagefault.
-> 
-> Signed-off-by: Sandy Huang <hjc@rock-chips.com>
+On Tue, Aug 28, 2018 at 3:55 AM Rob Herring <robh@kernel.org> wrote:
 
-applied to drm-misc-next, as the px30 dts support is not part of 4.19
-so this will only be an issue for future kernels.
+> In preparation to remove the node name pointer from struct device_node,
+> convert printf users to use the %pOFn format specifier.
+>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
 
+Patch applied along with the thundering hoard of ACKs.
 
-Thanks
-Heiko
+Yours,
+Linus Walleij
