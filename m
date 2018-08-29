@@ -1,30 +1,71 @@
-From: codrin.ciubotariu@microchip.com (Codrin Ciubotariu)
-Date: Wed, 29 Aug 2018 17:47:25 +0300
-Subject: [PATCH 0/2] ASoC: Add support for MikroElektronika PROTO codec
-Message-ID: <20180829144727.13757-1-codrin.ciubotariu@microchip.com>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 29 Aug 2018 16:46:31 +0200
+Subject: [RFC] Rename socfpga_cyclone5_de0_sockit.dts to
+ socfpga_cyclone5_de0_nano_soc.dts
+In-Reply-To: <BA1B5AF7D118E146A437E44412B829131564F1F5@fmsmsx122.amr.corp.intel.com>
+References: <fd0f01e5-41a2-6a24-2ce4-482b30b348b6@denx.de>
+ <73bm9lwn3t.fsf@pengutronix.de>
+ <b29e529a-f7bd-71d2-615e-9f850858ed4d@denx.de>
+ <BA1B5AF7D118E146A437E44412B829131564F1F5@fmsmsx122.amr.corp.intel.com>
+Message-ID: <9bdee446-5bc6-1171-eded-3c01623de820@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset is based on Florian's initial PROTO driver:
-https://lkml.org/lkml/2013/5/22/342
+On 08/29/2018 04:40 PM, Nguyen, Dinh wrote:
+> 
+> 
+>> -----Original Message-----
+>> From: Marek Vasut <marex@denx.de>
+>> Sent: Wednesday, August 29, 2018 5:34 AM
+>> To: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+>> Cc: linux ARM <linux-arm-kernel@lists.infradead.org>; Dinh Nguyen
+>> <dingnuyen@kernel.org>; Jan Kiszka <jan.kiszka@siemens.com>; Rob Herring
+>> <robh+dt@kernel.org>; See, Chin Liang <chin.liang.see@intel.com>; Tan, Ley
+>> Foon <ley.foon.tan@intel.com>; Nguyen, Dinh <dinh.nguyen@intel.com>
+>> Subject: Re: [RFC] Rename socfpga_cyclone5_de0_sockit.dts to
+>> socfpga_cyclone5_de0_nano_soc.dts
+>>
+>> On 08/29/2018 11:14 AM, Steffen Trumtrar wrote:
+>>>
+>>> Marek Vasut <marex@denx.de> writes:
+>>>
+>>>> Hi,
+>>>>
+>>>> I was recently experimenting with the DE0 Nano SoC / Atlas SoC . I
+>>>> had a hard time finding the right DT for the board, but then was
+>>>> suggested that the DT for the board is
+>>>> socfpga_cyclone5_de0_sockit.dts . This did not make sense to me,
+>>>> since SoCKit is a different board altogether. But the DTS seems to be indeed
+>> for the DE0 Nano SoC.
+>>>>
+>>>> To fix up this confusion, I'd propose renaming of the
+>>>> socfpga_cyclone5_de0_sockit.dts to socfpga_cyclone5_de0_nano_soc.dts
+>>>> to match the label on the package .
+>>>>
+>>>> What do you think ?
+>>>
+>>> Ack. This confusion came up multiple times. The barebox-specific dts
+>>> "overlay"
+>>> is already named socfpga_cyclone5_de0_nano_soc.dts because of this.
+>>
+>> The DT in U-Boot is also called socfpga_cyclone5_de0_nano_soc.dts since
+>> forever. I'd be happy to send a patch if the Altera folks are fine with it?
+>>
+> 
+> I'm fine with it. But this is the commit message when this board was originally create:
+> 
+>     The Terasic DE0 Atlas board is also known as the DE0-Nano board.
+>     This patch adds the DTS board file for the DE0-Nano Sockit board, and not
+>     the DE0 Nano "Development Board".
 
-My changes made the driver more generic, so that we could connect other
-I2S CPU DAIs, by using device-tree.
+But it was never called SoCkit anywhere , no documentation lists it as
+sockit. It is either DE0-Nano-SoC or Atlas-SoC , but that's it.
 
-Tested with sama5d2 I2S driver.
+Note that there is a DE0-Nano board (without the -SoC suffix) with
+Cyclone IV , but that one doesn't have the ARM cores and has different FPGA.
 
-Codrin Ciubotariu (2):
-  ASoC: Add driver for PROTO Audio CODEC (with a WM8731)
-  ASoC: mikroe-proto: dt-bindings: add DT bindings for PROTO board
-
- .../bindings/sound/mikroe,mikroe-proto.txt    |  23 +++
- .../devicetree/bindings/vendor-prefixes.txt   |   1 +
- sound/soc/atmel/Kconfig                       |   7 +
- sound/soc/atmel/Makefile                      |   2 +
- sound/soc/atmel/mikroe-proto.c                | 189 ++++++++++++++++++
- 5 files changed, 222 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/mikroe,mikroe-proto.txt
- create mode 100644 sound/soc/atmel/mikroe-proto.c
+So if that's clear, I'll just send a patch ?
 
 -- 
-2.17.1
+Best regards,
+Marek Vasut
