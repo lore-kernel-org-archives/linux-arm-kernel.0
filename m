@@ -1,77 +1,92 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Wed, 29 Aug 2018 22:58:00 +0800
-Subject: [PATCH RESEND] arm64: don't dump stack for usermode address in
- show_regs
-In-Reply-To: <20180829115402.GB1125@arm.com>
-References: <0003f02c-fc35-b4e9-3d3d-82ee8d02acb7@huawei.com>
- <20180829115402.GB1125@arm.com>
-Message-ID: <e5f4011a-e0a0-b5be-599f-5adc32155d87@huawei.com>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 29 Aug 2018 17:03:26 +0200
+Subject: [RFC] Rename socfpga_cyclone5_de0_sockit.dts to
+ socfpga_cyclone5_de0_nano_soc.dts
+In-Reply-To: <BA1B5AF7D118E146A437E44412B829131564F225@fmsmsx122.amr.corp.intel.com>
+References: <fd0f01e5-41a2-6a24-2ce4-482b30b348b6@denx.de>
+ <73bm9lwn3t.fsf@pengutronix.de>
+ <b29e529a-f7bd-71d2-615e-9f850858ed4d@denx.de>
+ <BA1B5AF7D118E146A437E44412B829131564F1F5@fmsmsx122.amr.corp.intel.com>
+ <9bdee446-5bc6-1171-eded-3c01623de820@denx.de>
+ <BA1B5AF7D118E146A437E44412B829131564F225@fmsmsx122.amr.corp.intel.com>
+Message-ID: <2a991ba5-9746-007b-720a-91e4c4615d4d@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will:
-
-On 2018/8/29 19:54, Will Deacon wrote:
-> Hi Ding, [+James]
+On 08/29/2018 04:54 PM, Nguyen, Dinh wrote:
 > 
-> On Wed, Aug 29, 2018 at 06:17:30PM +0800, Ding Tianhong wrote:
->> I met this problem when do some testcase on my arm64 board system:
+> 
+>> -----Original Message-----
+>> From: Marek Vasut <marex@denx.de>
+>> Sent: Wednesday, August 29, 2018 9:47 AM
+>> To: Nguyen, Dinh <dinh.nguyen@intel.com>; Steffen Trumtrar
+>> <s.trumtrar@pengutronix.de>
+>> Cc: linux ARM <linux-arm-kernel@lists.infradead.org>; Dinh Nguyen
+>> <dingnuyen@kernel.org>; Jan Kiszka <jan.kiszka@siemens.com>; Rob Herring
+>> <robh+dt@kernel.org>; Westergreen, Dalon <dalon.westergreen@intel.com>
+>> Subject: Re: [RFC] Rename socfpga_cyclone5_de0_sockit.dts to
+>> socfpga_cyclone5_de0_nano_soc.dts
 >>
->> 160935.412546] BUG: soft lockup - CPU#0 stuck for 116s! [cce_hlt_no_shar:12141]
->> [160935.413292] CPU: 0 PID: 12141 Comm: cce_hlt_no_shar Tainted: G
->> [160935.413429] Hardware name: Hisilicon Phosphorxxxx ESL (DT)
->> [160935.413571] task: ffff800024efe300 ti: ffff80001670c000 task.ti: ffff80001670c000
->> [160935.413711] PC is at 0xffffa0bf76b0
->> [160935.413818] LR is at 0xffffa0c003a8
->> [160935.413936] pc : [<0000ffffa0bf76b0>] lr : [<0000ffffa0c003a8>] pstate: 20000000
->> [160935.414060] sp : 0000ffff9ed56d00
->> [160935.414157] x29: 0000ffff9ed56d00 x28: 0000ffffa0eae6f0
->> [160935.414307] x27: 0000ffff9ed57c60 x26: 0000000000000000
->> [160935.414456] x25: 0000ffffa0a33250 x24: 0000000000001000
->> [160935.414605] x23: 0000ffffa0a37320 x22: 0000ffffa0eae000
->> [160935.414754] x21: 0000000000002d2a x20: 0000ffff9ed58840
->> [160935.414903] x19: 0000000000000005 x18: 0000ffffcda37490
->> [160935.415053] x17: 0000ffffa0c0033c x16: 0000ffffa0c4cc60
->> [160935.415206] x15: 00312d6898000000 x14: 0000ffffa0c2670e
->> [160935.415354] x13: 000000000000016e x12: 0000000000000000
->> [160935.415502] x11: 0000ffff9ed56e00 x10: 0000000000000020
->> [160935.415652] x9 : 2079726f00000000 x8 : 0000000000000040
->> [160935.415796] x7 : 0000000000000000 x6 : 0000ffff9ed58290
->> [160935.415943] x5 : 0000000000000000 x4 : 0000000000000000
->> [160935.416089] x3 : 0000000000000000 x2 : 0000000000000000
->> [160935.416236] x1 : 00000000ffff0000 x0 : 0000000000000005
->> [160935.416371] Call trace:
->> [160935.416477] Unable to handle kernel paging request at virtual address ffff9ed56d00
->> [160935.416604] pgd = ffff800011991000
->> [160935.416705] [ffff9ed56d00] *pgd=00000000193a0003, *pud=000000001e447003, ....
->> [160935.416954] Internal error: Oops: 9600000f [#1] SMP
+>> On 08/29/2018 04:40 PM, Nguyen, Dinh wrote:
+>>>
+>>>
+>>>> -----Original Message-----
+>>>> From: Marek Vasut <marex@denx.de>
+>>>> Sent: Wednesday, August 29, 2018 5:34 AM
+>>>> To: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+>>>> Cc: linux ARM <linux-arm-kernel@lists.infradead.org>; Dinh Nguyen
+>>>> <dingnuyen@kernel.org>; Jan Kiszka <jan.kiszka@siemens.com>; Rob
+>>>> Herring <robh+dt@kernel.org>; See, Chin Liang
+>>>> <chin.liang.see@intel.com>; Tan, Ley Foon <ley.foon.tan@intel.com>;
+>>>> Nguyen, Dinh <dinh.nguyen@intel.com>
+>>>> Subject: Re: [RFC] Rename socfpga_cyclone5_de0_sockit.dts to
+>>>> socfpga_cyclone5_de0_nano_soc.dts
+>>>>
+>>>> On 08/29/2018 11:14 AM, Steffen Trumtrar wrote:
+>>>>>
+>>>>> Marek Vasut <marex@denx.de> writes:
+>>>>>
+>>>>>> Hi,
+>>>>>>
+>>>>>> I was recently experimenting with the DE0 Nano SoC / Atlas SoC . I
+>>>>>> had a hard time finding the right DT for the board, but then was
+>>>>>> suggested that the DT for the board is
+>>>>>> socfpga_cyclone5_de0_sockit.dts . This did not make sense to me,
+>>>>>> since SoCKit is a different board altogether. But the DTS seems to
+>>>>>> be indeed
+>>>> for the DE0 Nano SoC.
+>>>>>>
+>>>>>> To fix up this confusion, I'd propose renaming of the
+>>>>>> socfpga_cyclone5_de0_sockit.dts to
+>>>>>> socfpga_cyclone5_de0_nano_soc.dts to match the label on the package .
+>>>>>>
+>>>>>> What do you think ?
+>>>>>
+>>>>> Ack. This confusion came up multiple times. The barebox-specific dts
+>>>>> "overlay"
+>>>>> is already named socfpga_cyclone5_de0_nano_soc.dts because of this.
+>>>>
+>>>> The DT in U-Boot is also called socfpga_cyclone5_de0_nano_soc.dts
+>>>> since forever. I'd be happy to send a patch if the Altera folks are fine with it?
+>>>>
+>>>
+>>> I'm fine with it. But this is the commit message when this board was originally
+>> create:
+>>>
+>>>     The Terasic DE0 Atlas board is also known as the DE0-Nano board.
+>>>     This patch adds the DTS board file for the DE0-Nano Sockit board, and not
+>>>     the DE0 Nano "Development Board".
+>>
+>> But it was never called SoCkit anywhere , no documentation lists it as sockit. It is
+>> either DE0-Nano-SoC or Atlas-SoC , but that's it.
 > 
-> This looks like we're somehow dereferencing the user frame-pointer from the
-> READ_ONCE_NOCHECK in unwind_frame(). However, I really don't see how that
-> can happen, since the kernel entry code pushes a dummy frame record or
-> zeroes, which will terminate any backtrace before we hit the user
-> addresses. Furthermore, we explicitly check that the frame pointer points
-> to an accessible stack before we dereference it. Hmm.
-> 
+> https://www.terasic.com.tw/cgi-bin/page/archive.pl?Language=English&No=941
 
-I found the patch 12964443e8d1 ("arm64: add on_accessible_stack()") already fix this in kernel v4.14, my kernel version is older
-than this and miss this patch for a long time, so I think this is the reason that I met this problem, thanks for remind me.
+Half of the boards from terasic have this "kit" suffix in the listing,
+but with a space in front of it. The SoCkit (without space) is:
 
-> I also tried to reproduce this locally using sysrq+l to trigger backtracing
-> in IRQ context, but I haven't managed to hit any problems.
-> 
+https://www.terasic.com.tw/cgi-bin/page/archive.pl?Language=English&CategoryNo=167&No=816
 
-I reproduce this bug in the arm fast model system, the application was not developed by me, and it is really hard to reproduce, looks
-like the application was already has some issues, it will call some syscall to trap to kernel before the loop, but my interest is focus
-on the oops, not the softlockup, looks like I found what I want, thanks.
-
-Ding
-> Can you give me some hints as to how to reproduce this with mainline,
-> please?
-> 
-> Will
-> 
-> .
-
-
-> 
+-- 
+Best regards,
+Marek Vasut
