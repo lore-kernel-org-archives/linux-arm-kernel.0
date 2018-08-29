@@ -1,85 +1,38 @@
 From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Wed, 29 Aug 2018 16:31:45 +0200
-Subject: [PATCH 09/11] MAINTAINERS: remove the / ATMEL string from MICROCHIP
- entries
+Date: Wed, 29 Aug 2018 16:31:44 +0200
+Subject: [PATCH 08/11] MAINTAINERS: iio: add co-maintainer to
+ SAMA5D2-compatible ADC driver
 In-Reply-To: <cover.1535552609.git.nicolas.ferre@microchip.com>
 References: <cover.1535552609.git.nicolas.ferre@microchip.com>
-Message-ID: <9952380c6c76d898c9cf72979efbe6b50360660f.1535552609.git.nicolas.ferre@microchip.com>
+Message-ID: <377944526957bba407e7b1cd53201063493c7d8d.1535552609.git.nicolas.ferre@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No need to keep this additional string as it can puzzle people
-while adding new driver's entries.
-Move the NAND entry to keep it alphabetically ordered.
+Add Eugen as co-maintainer with Ludovic of Microchip SAMA5D2-compatible
+ADC driver.
+Also add the binding documentation/include as file pattern.
 
 Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 ---
- MAINTAINERS | 22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
+ MAINTAINERS | 3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index 3f5494b33d89..4e9b9a52bc6e 100644
+index fca67dcb84e0..3f5494b33d89 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -9501,13 +9501,13 @@ T:	git git://git.monstr.eu/linux-2.6-microblaze.git
- S:	Supported
- F:	arch/microblaze/
+@@ -2521,9 +2521,12 @@ F:	drivers/input/touchscreen/atmel_mxt_ts.c
  
--MICROCHIP / ATMEL AT91 SERIAL DRIVER
-+MICROCHIP AT91 SERIAL DRIVER
- M:	Richard Genoud <richard.genoud@gmail.com>
- S:	Maintained
- F:	drivers/tty/serial/atmel_serial.c
- F:	drivers/tty/serial/atmel_serial.h
- 
--MICROCHIP / ATMEL DMA DRIVER
-+MICROCHIP DMA DRIVER
+ ATMEL SAMA5D2 ADC DRIVER
  M:	Ludovic Desroches <ludovic.desroches@microchip.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- L:	dmaengine at vger.kernel.org
-@@ -9518,13 +9518,13 @@ F:	include/linux/platform_data/dma-atmel.h
- F:	Documentation/devicetree/bindings/dma/atmel-dma.txt
- F:	include/dt-bindings/dma/at91.h
- 
--MICROCHIP / ATMEL ECC DRIVER
-+MICROCHIP ECC DRIVER
- M:	Tudor Ambarus <tudor.ambarus@microchip.com>
- L:	linux-crypto at vger.kernel.org
- S:	Maintained
- F:	drivers/crypto/atmel-ecc.*
- 
--MICROCHIP / ATMEL ISC DRIVER
-+MICROCHIP ISC DRIVER
- M:	Eugen Hristev <eugen.hristev@microchip.com>
- L:	linux-media at vger.kernel.org
++M:	Eugen Hristev <eugen.hristev@microchip.com>
+ L:	linux-iio at vger.kernel.org
  S:	Supported
-@@ -9532,13 +9532,6 @@ F:	drivers/media/platform/atmel/atmel-isc.c
- F:	drivers/media/platform/atmel/atmel-isc-regs.h
- F:	devicetree/bindings/media/atmel-isc.txt
+ F:	drivers/iio/adc/at91-sama5d2_adc.c
++F:	Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
++F:	include/dt-bindings/iio/adc/at91-sama5d2_adc.h
  
--MICROCHIP / ATMEL NAND DRIVER
--M:	Tudor Ambarus <tudor.ambarus@microchip.com>
--L:	linux-mtd at lists.infradead.org
--S:	Supported
--F:	drivers/mtd/nand/raw/atmel/*
--F:	Documentation/devicetree/bindings/mtd/atmel-nand.txt
--
- MICROCHIP KSZ SERIES ETHERNET SWITCH DRIVER
- M:	Woojung Huh <Woojung.Huh@microchip.com>
- M:	Microchip Linux Driver Support <UNGLinuxDriver@microchip.com>
-@@ -9556,6 +9549,13 @@ L:	netdev at vger.kernel.org
- S:	Maintained
- F:	drivers/net/ethernet/microchip/lan743x_*
- 
-+MICROCHIP NAND DRIVER
-+M:	Tudor Ambarus <tudor.ambarus@microchip.com>
-+L:	linux-mtd at lists.infradead.org
-+S:	Supported
-+F:	drivers/mtd/nand/raw/atmel/*
-+F:	Documentation/devicetree/bindings/mtd/atmel-nand.txt
-+
- MICROCHIP PWM DRIVER
- M:	Claudiu Beznea <claudiu.beznea@microchip.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ ATMEL SDMMC DRIVER
+ M:	Ludovic Desroches <ludovic.desroches@microchip.com>
 -- 
 2.17.1
