@@ -1,40 +1,94 @@
-From: colin.king@canonical.com (Colin King)
-Date: Wed, 29 Aug 2018 10:27:46 +0100
-Subject: [PATCH] fsl: remove redundant pointer 'priv'
-Message-ID: <20180829092746.30674-1-colin.king@canonical.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 29 Aug 2018 11:31:09 +0200
+Subject: [PATCH] mfd: ti-lmu: constify mfd_cell tables
+Message-ID: <20180829093108.GB22065@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+From: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
 
-Pointer 'priv' is being assigned but is never used hence it is
-redundant and can be removed.
+mfd: ti-lmu: constify mfd_cell tables
+    
+Add const attribute to all mfd_cell structures.
+    
+Signed-off-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
 
-Cleans up clang warning:
-variable 'priv' set but not used [-Wunused-but-set-variable]
-
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- drivers/soc/fsl/dpio/dpio-driver.c | 3 ---
- 1 file changed, 3 deletions(-)
-
-diff --git a/drivers/soc/fsl/dpio/dpio-driver.c b/drivers/soc/fsl/dpio/dpio-driver.c
-index b60b77bfaffa..e58fcc9096e8 100644
---- a/drivers/soc/fsl/dpio/dpio-driver.c
-+++ b/drivers/soc/fsl/dpio/dpio-driver.c
-@@ -50,13 +50,10 @@ static void unregister_dpio_irq_handlers(struct fsl_mc_device *dpio_dev)
+diff --git a/drivers/mfd/ti-lmu.c b/drivers/mfd/ti-lmu.c
+index cfb411c..990437e 100644
+--- a/drivers/mfd/ti-lmu.c
++++ b/drivers/mfd/ti-lmu.c
+@@ -25,7 +25,7 @@
+ #include <linux/slab.h>
  
- static int register_dpio_irq_handlers(struct fsl_mc_device *dpio_dev, int cpu)
- {
--	struct dpio_priv *priv;
- 	int error;
- 	struct fsl_mc_device_irq *irq;
- 	cpumask_t mask;
+ struct ti_lmu_data {
+-	struct mfd_cell *cells;
++	const struct mfd_cell *cells;
+ 	int num_cells;
+ 	unsigned int max_register;
+ };
+@@ -63,7 +63,7 @@ static void ti_lmu_disable_hw(struct ti_lmu *lmu)
+ 		gpio_set_value(lmu->en_gpio, 0);
+ }
  
--	priv = dev_get_drvdata(&dpio_dev->dev);
--
- 	irq = dpio_dev->irqs[0];
- 	error = devm_request_irq(&dpio_dev->dev,
- 				 irq->msi_desc->irq,
+-static struct mfd_cell lm3532_devices[] = {
++static const struct mfd_cell lm3532_devices[] = {
+ 	{
+ 		.name          = "ti-lmu-backlight",
+ 		.id            = LM3532,
+@@ -78,7 +78,7 @@ static struct mfd_cell lm3532_devices[] = {
+ 	.of_compatible = "ti,lm363x-regulator",	\
+ }						\
+ 
+-static struct mfd_cell lm3631_devices[] = {
++static const struct mfd_cell lm3631_devices[] = {
+ 	LM363X_REGULATOR(LM3631_BOOST),
+ 	LM363X_REGULATOR(LM3631_LDO_CONT),
+ 	LM363X_REGULATOR(LM3631_LDO_OREF),
+@@ -91,7 +91,7 @@ static struct mfd_cell lm3631_devices[] = {
+ 	},
+ };
+ 
+-static struct mfd_cell lm3632_devices[] = {
++static const struct mfd_cell lm3632_devices[] = {
+ 	LM363X_REGULATOR(LM3632_BOOST),
+ 	LM363X_REGULATOR(LM3632_LDO_POS),
+ 	LM363X_REGULATOR(LM3632_LDO_NEG),
+@@ -102,7 +102,7 @@ static struct mfd_cell lm3632_devices[] = {
+ 	},
+ };
+ 
+-static struct mfd_cell lm3633_devices[] = {
++static const struct mfd_cell lm3633_devices[] = {
+ 	{
+ 		.name          = "ti-lmu-backlight",
+ 		.id            = LM3633,
+@@ -120,7 +120,7 @@ static struct mfd_cell lm3633_devices[] = {
+ 	},
+ };
+ 
+-static struct mfd_cell lm3695_devices[] = {
++static const struct mfd_cell lm3695_devices[] = {
+ 	{
+ 		.name          = "ti-lmu-backlight",
+ 		.id            = LM3695,
+@@ -128,7 +128,7 @@ static struct mfd_cell lm3695_devices[] = {
+ 	},
+ };
+ 
+-static struct mfd_cell lm3697_devices[] = {
++static const struct mfd_cell lm3697_devices[] = {
+ 	{
+ 		.name          = "ti-lmu-backlight",
+ 		.id            = LM3697,
+
 -- 
-2.17.1
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180829/f1f7c8fe/attachment.sig>
