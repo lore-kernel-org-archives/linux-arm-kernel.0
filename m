@@ -1,57 +1,51 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Wed, 29 Aug 2018 15:49:07 +0200
-Subject: [PATCH] ARM: configs: add generic resistive touchscreen
-In-Reply-To: <1535525577-21148-1-git-send-email-eugen.hristev@microchip.com>
-References: <1535525577-21148-1-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <20180829134907.GF16561@piout.net>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Wed, 29 Aug 2018 08:49:43 -0500
+Subject: [PATCH v2] perf: Support for Arm A32/T32 instruction sets in
+ CoreSight trace
+In-Reply-To: <1535535863-1818-1-git-send-email-robert.walker@arm.com>
+References: <1535535863-1818-1-git-send-email-robert.walker@arm.com>
+Message-ID: <20180829084943.eca3716eb2a2141e5eb8e6ee@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 29 Aug 2018 10:44:23 +0100
+Robert Walker <robert.walker@arm.com> wrote:
 
-Hello Eugen,
-
-On 29/08/2018 09:52:57+0300, Eugen Hristev wrote:
-> Add generic resistive touchscreen CONFIG_TOUCHSCREEN_ADC to defconfigs
+> This patch adds support for generating instruction samples from trace of
+> AArch32 programs using the A32 and T32 instruction sets.
 > 
-> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+> T32 has variable 2 or 4 byte instruction size, so the conversion between
+> addresses and instruction counts requires extra information from the trace
+> decoder, requiring version 0.9.1 of OpenCSD.  A check for the new struct
+> member has been added to the feature check for OpenCSD.
+> 
+> Signed-off-by: Robert Walker <robert.walker@arm.com>
 > ---
->  arch/arm/configs/multi_v7_defconfig | 1 +
->  arch/arm/configs/sama5_defconfig    | 1 +
+...
+> +++ b/tools/build/feature/test-libopencsd.c
+> @@ -3,6 +3,13 @@
+>  
+>  int main(void)
+>  {
+> +	/*
+> +	 * Requires ocsd_generic_trace_elem.num_instr_range introduced in
+> +	 * OpenCSD 0.9
 
-I would make two separate patches because multi_v7 has a high chance of
-conflicting while sama5_defconfig will not.
+0.9 != 0.9.1 in the above commit text: which is it?
 
->  2 files changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index fc33444..a1b2cfa 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -282,6 +282,7 @@ CONFIG_MOUSE_PS2_ELANTECH=y
->  CONFIG_MOUSE_CYAPA=m
->  CONFIG_MOUSE_ELAN_I2C=y
->  CONFIG_INPUT_TOUCHSCREEN=y
-> +CONFIG_TOUCHSCREEN_ADC=m
->  CONFIG_TOUCHSCREEN_ATMEL_MXT=m
->  CONFIG_TOUCHSCREEN_MMS114=m
->  CONFIG_TOUCHSCREEN_WM97XX=m
-> diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
-> index 2080025..ead6826 100644
-> --- a/arch/arm/configs/sama5_defconfig
-> +++ b/arch/arm/configs/sama5_defconfig
-> @@ -116,6 +116,7 @@ CONFIG_KEYBOARD_QT1070=y
->  CONFIG_KEYBOARD_GPIO=y
->  # CONFIG_INPUT_MOUSE is not set
->  CONFIG_INPUT_TOUCHSCREEN=y
-> +CONFIG_TOUCHSCREEN_ADC=y
->  CONFIG_TOUCHSCREEN_ATMEL_MXT=y
->  # CONFIG_SERIO is not set
->  CONFIG_LEGACY_PTY_COUNT=4
-> -- 
-> 2.7.4
-> 
+> +	 */
+> +	ocsd_generic_trace_elem elem;
+> +	(void)elem.num_instr_range;
+> +
 
--- 
-Alexandre Belloni, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+This breaks building against older versions of OpenCSD, right?
+
+>  	(void)ocsd_get_version();
+
+Why don't we maintain building against older versions of the library,
+and use the version information to make the decision on whether to use
+the new feature being introduced in this patch?
+
+Thanks,
+
+Kim
