@@ -1,65 +1,33 @@
 From: Anson.Huang@nxp.com (Anson Huang)
-Date: Wed, 29 Aug 2018 13:00:46 +0800
-Subject: [PATCH 1/2] ARM: dts: imx7s: enable cpuidle driver
-Message-ID: <1535518847-24417-1-git-send-email-Anson.Huang@nxp.com>
+Date: Wed, 29 Aug 2018 13:00:47 +0800
+Subject: [PATCH 2/2] ARM: imx_v6_v7_defconfig: select CONFIG_ARM_CPUIDLE by
+ default
+In-Reply-To: <1535518847-24417-1-git-send-email-Anson.Huang@nxp.com>
+References: <1535518847-24417-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <1535518847-24417-2-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable cpuidle for i.MX7S/D using generic ARM cpuidle
-driver, below 2 idle states enabled:
-
-1. ARM WFI;
-2. SoC WAIT mode.
+Some i.MX platforms like i.MX7S/D uses generic ARM cpuidle
+driver and psci method to support cpuidle feature, select
+CONFIG_ARM_CPUIDLE by default for such platforms.
 
 Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 ---
- arch/arm/boot/dts/imx7d.dtsi |  1 +
- arch/arm/boot/dts/imx7s.dtsi | 14 ++++++++++++++
- 2 files changed, 15 insertions(+)
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-index 7cbc2ff..4d0d0f6 100644
---- a/arch/arm/boot/dts/imx7d.dtsi
-+++ b/arch/arm/boot/dts/imx7d.dtsi
-@@ -20,6 +20,7 @@
- 			reg = <1>;
- 			clock-frequency = <996000000>;
- 			operating-points-v2 = <&cpu0_opp_table>;
-+			cpu-idle-states = <&CPU_SLEEP>;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index 93884ce..cf5570b 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -54,6 +54,19 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
-+		idle-states {
-+			entry-method = "psci";
-+
-+			CPU_SLEEP: WAIT {
-+				compatible = "arm,idle-state";
-+				arm,psci-suspend-param = <0x0010000>;
-+				local-timer-stop;
-+				entry-latency-us = <100>;
-+				exit-latency-us = <50>;
-+				min-residency-us = <1000>;
-+			};
-+		};
-+
- 		cpu0: cpu at 0 {
- 			compatible = "arm,cortex-a7";
- 			device_type = "cpu";
-@@ -61,6 +74,7 @@
- 			clock-frequency = <792000000>;
- 			clock-latency = <61036>; /* two CLK32 periods */
- 			clocks = <&clks IMX7D_CLK_ARM>;
-+			cpu-idle-states = <&CPU_SLEEP>;
- 		};
- 	};
- 
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index e2c1276..65df4b2 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -62,6 +62,7 @@ CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
+ CONFIG_CPUFREQ_DT=y
+ CONFIG_ARM_IMX6Q_CPUFREQ=y
+ CONFIG_CPU_IDLE=y
++CONFIG_ARM_CPUIDLE=y
+ CONFIG_VFP=y
+ CONFIG_NEON=y
+ CONFIG_BINFMT_MISC=m
 -- 
 2.7.4
