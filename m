@@ -1,19 +1,32 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 29 Aug 2018 10:31:51 +0200
-Subject: [PATCH] pinctrl: Convert to using %pOFn instead of
- device_node.name
-In-Reply-To: <20180828015252.28511-40-robh@kernel.org>
-References: <20180828015252.28511-1-robh@kernel.org>
- <20180828015252.28511-40-robh@kernel.org>
-Message-ID: <4627271.TU6sX7boZt@diego>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Wed, 29 Aug 2018 16:29:32 +0800
+Subject: [PATCH 4/5] net: mvneta: enable NETIF_F_RXCSUM by default
+In-Reply-To: <20180829162456.2bd69796@xhacker.debian>
+References: <20180829162456.2bd69796@xhacker.debian>
+Message-ID: <20180829162932.6015e89d@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 28. August 2018, 03:52:41 CEST schrieb Rob Herring:
-> In preparation to remove the node name pointer from struct device_node,
-> convert printf users to use the %pOFn format specifier.
+The code and HW supports NETIF_F_RXCSUM, so let's enable it by default.
 
->  drivers/pinctrl/pinctrl-rockchip.c            |  8 ++---
+Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+---
+ drivers/net/ethernet/marvell/mvneta.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-For the Rockchip-part
-Acked-by: Heiko Stuebner <heiko@sntech.de>
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index 06634d4f9b94..7d98f7828a30 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -4591,7 +4591,8 @@ static int mvneta_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
+-	dev->features = NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM | NETIF_F_TSO;
++	dev->features = NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
++			NETIF_F_TSO | NETIF_F_RXCSUM;
+ 	dev->hw_features |= dev->features;
+ 	dev->vlan_features |= dev->features;
+ 	dev->priv_flags |= IFF_LIVE_ADDR_CHANGE;
+-- 
+2.18.0
