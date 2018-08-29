@@ -1,39 +1,32 @@
 From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Wed, 29 Aug 2018 16:31:37 +0200
-Subject: [PATCH 01/11] MAINTAINERS: ARM: at91: add co-maintainer for
- ARM/Microchip
+Date: Wed, 29 Aug 2018 16:31:41 +0200
+Subject: [PATCH 05/11] MAINTAINERS: USB: change maintainer for Microchip USBA
+ gadget driver
 In-Reply-To: <cover.1535552609.git.nicolas.ferre@microchip.com>
 References: <cover.1535552609.git.nicolas.ferre@microchip.com>
-Message-ID: <8c4937512d9535441b9f0aa4c27aeb4edf526489.1535552609.git.nicolas.ferre@microchip.com>
+Message-ID: <79a0a7c99a4b60717b20a1523b73adaed972e6b6.1535552609.git.nicolas.ferre@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Ludovic as a new co-maintainer for the AT91 Microchip ARM
-sub-architecture.
-Add the newly created kernel.org group git tree that we will use
-from now on.
+Hand over this USB gadget driver to Cristian: atmel_usba.
 
-Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
 Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 ---
- MAINTAINERS | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ MAINTAINERS | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index a5b256b25905..7f97f1f83398 100644
+index 686822714e6b..fe1280b92a2e 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -1703,9 +1703,10 @@ S:	Odd Fixes
- ARM/Microchip (AT91) SoC support
- M:	Nicolas Ferre <nicolas.ferre@microchip.com>
- M:	Alexandre Belloni <alexandre.belloni@bootlin.com>
-+M:	Ludovic Desroches <ludovic.desroches@microchip.com>
+@@ -2551,7 +2551,7 @@ F:	drivers/misc/atmel_tclib.c
+ F:	drivers/clocksource/tcb_clksrc.c
+ 
+ ATMEL USBA UDC DRIVER
+-M:	Nicolas Ferre <nicolas.ferre@microchip.com>
++M:	Cristian Birsan <cristian.birsan@microchip.com>
  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- W:	http://www.linux4sam.org
--T:	git git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git
-+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/at91/linux.git
  S:	Supported
- N:	at91
- N:	atmel
+ F:	drivers/usb/gadget/udc/atmel_usba_udc.*
 -- 
 2.17.1
