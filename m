@@ -1,158 +1,35 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 29 Aug 2018 17:22:03 +0200
-Subject: [PATCH V5 4/4] video: simplefb: switch to use clk_bulk API to
- simplify clock operations
-In-Reply-To: <1535553669-30250-5-git-send-email-aisheng.dong@nxp.com>
-References: <1535553669-30250-1-git-send-email-aisheng.dong@nxp.com>
- <1535553669-30250-5-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <7261200d-e3df-494b-a41d-5c6d301617bb@redhat.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 29 Aug 2018 17:23:17 +0200
+Subject: [PATCH] clocksource: Convert to using %pOFn instead of
+ device_node.name
+In-Reply-To: <20180828015252.28511-13-robh@kernel.org>
+References: <20180828015252.28511-1-robh@kernel.org>
+ <20180828015252.28511-13-robh@kernel.org>
+Message-ID: <ab53c967-c399-414e-86ef-daff04fbd56a@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 29-08-18 16:41, Dong Aisheng wrote:
-> Switching to use clk_bulk API to simplify clock operations.
+On 28/08/2018 03:52, Rob Herring wrote:
+> In preparation to remove the node name pointer from struct device_node,
+> convert printf users to use the %pOFn format specifier.
 > 
-> Cc: Hans de Goede <hdegoede@redhat.com>
-> Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Cc: linux-fbdev at vger.kernel.org
-> Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Tested-by: Thor Thayer <thor.thayer@linux.intel.com>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Rob Herring <robh@kernel.org>
 > ---
-> v4->v5:
->   * fix wrong setting of par->clks_enabled
-> v3->v4:
->   * no changes
-> v2->v3:
->   * fix a build warning on x86 platform due to a wrong
->     of the prototype of simplefb_clocks_enable
-> v1->v2:
->   * switch to clk_bulk_get_all from of_clk_bulk_get_all
-> ---
->   drivers/video/fbdev/simplefb.c | 68 +++++++++---------------------------------
->   1 file changed, 14 insertions(+), 54 deletions(-)
-> 
-> diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
-> index 9a9d748..8d1fbd6 100644
-> --- a/drivers/video/fbdev/simplefb.c
-> +++ b/drivers/video/fbdev/simplefb.c
-> @@ -182,7 +182,7 @@ struct simplefb_par {
->   #if defined CONFIG_OF && defined CONFIG_COMMON_CLK
->   	bool clks_enabled;
->   	unsigned int clk_count;
-> -	struct clk **clks;
-> +	struct clk_bulk_data *clks;
->   #endif
->   #if defined CONFIG_OF && defined CONFIG_REGULATOR
->   	bool regulators_enabled;
-> @@ -214,37 +214,13 @@ static int simplefb_clocks_get(struct simplefb_par *par,
->   			       struct platform_device *pdev)
->   {
->   	struct device_node *np = pdev->dev.of_node;
-> -	struct clk *clock;
-> -	int i;
->   
->   	if (dev_get_platdata(&pdev->dev) || !np)
->   		return 0;
->   
-> -	par->clk_count = of_clk_get_parent_count(np);
-> -	if (!par->clk_count)
-> -		return 0;
-> -
-> -	par->clks = kcalloc(par->clk_count, sizeof(struct clk *), GFP_KERNEL);
-> -	if (!par->clks)
-> -		return -ENOMEM;
-> -
-> -	for (i = 0; i < par->clk_count; i++) {
-> -		clock = of_clk_get(np, i);
-> -		if (IS_ERR(clock)) {
-> -			if (PTR_ERR(clock) == -EPROBE_DEFER) {
-> -				while (--i >= 0) {
-> -					if (par->clks[i])
-> -						clk_put(par->clks[i]);
-> -				}
-> -				kfree(par->clks);
-> -				return -EPROBE_DEFER;
-> -			}
-> -			dev_err(&pdev->dev, "%s: clock %d not found: %ld\n",
-> -				__func__, i, PTR_ERR(clock));
-> -			continue;
-> -		}
-> -		par->clks[i] = clock;
-> -	}
-> +	par->clk_count = clk_bulk_get_all(&pdev->dev, &par->clks);
-> +	if ((par->clk_count < 0) && (par->clk_count == -EPROBE_DEFER))
-> +		return -EPROBE_DEFER;
 
-I just noticed this now, but clk_count is unsigned so it will never
-be < 0, please make it signed.
+Applied for 4.20
 
-Also there is no need to check for < 0 just (par->clk_count == -EPROBE_DEFER)
-is enough (if that is true < 0 also always is true).
+Thanks!
 
->   
->   	return 0;
->   }
-> @@ -252,39 +228,23 @@ static int simplefb_clocks_get(struct simplefb_par *par,
->   static void simplefb_clocks_enable(struct simplefb_par *par,
->   				   struct platform_device *pdev)
->   {
-> -	int i, ret;
-> +	int ret;
->   
-> -	for (i = 0; i < par->clk_count; i++) {
-> -		if (par->clks[i]) {
-> -			ret = clk_prepare_enable(par->clks[i]);
-> -			if (ret) {
-> -				dev_err(&pdev->dev,
-> -					"%s: failed to enable clock %d: %d\n",
-> -					__func__, i, ret);
-> -				clk_put(par->clks[i]);
-> -				par->clks[i] = NULL;
-> -			}
-> -		}
-> +	ret = clk_bulk_prepare_enable(par->clk_count, par->clks);
+  -- Daniel
 
-Hmm, what happens if par->clk_count < 0 (another <0 value then
--EPROBEDEFER) ?
 
-> +	if (ret) {
-> +		par->clks_enabled = false;
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-No need to set false here.
-
-> +		dev_warn(&pdev->dev, "failed to enable clocks\n");
-> +	} else {
-> +		par->clks_enabled = true;
->   	}
-> -	par->clks_enabled = true;
->   }
->   
->   static void simplefb_clocks_destroy(struct simplefb_par *par)
->   {
-> -	int i;
-> -
-> -	if (!par->clks)
-> -		return;
-> -
-> -	for (i = 0; i < par->clk_count; i++) {
-> -		if (par->clks[i]) {
-> -			if (par->clks_enabled)
-> -				clk_disable_unprepare(par->clks[i]);
-> -			clk_put(par->clks[i]);
-> -		}
-> -	}
-> +	if (par->clks_enabled)
-> +		clk_bulk_disable_unprepare(par->clk_count, par->clks);
->   
-> -	kfree(par->clks);
-> +	clk_bulk_put_all(par->clk_count, par->clks);
-
-Again what about par->clk_count < 0 ?
-
-Regards,
-
-Hans
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
