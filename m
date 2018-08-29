@@ -1,21 +1,46 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 29 Aug 2018 14:49:01 +0200
-Subject: [PATCH] arm64: dts: rockchip: Add idle-states to device tree for
- rk3399
-In-Reply-To: <1535104980-8456-2-git-send-email-tony.xie@rock-chips.com>
-References: <1535104980-8456-1-git-send-email-tony.xie@rock-chips.com>
- <1535104980-8456-2-git-send-email-tony.xie@rock-chips.com>
-Message-ID: <6981249.NsEWD2NKQx@phil>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Wed, 29 Aug 2018 20:51:36 +0800
+Subject: [PATCH V4 0/4] clk: new APIs to handle all available clocks
+Message-ID: <1535547100-25634-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+This patch series is a continue of discussion from here,
+https://patchwork.kernel.org/patch/9986293/
+that some users may want to handle all available clocks from device
+tree without need to know the detailed clock information likes clock
+numbers and names. This is useful in writing some generic drivers to
+handle clock part.
 
-Am Freitag, 24. August 2018, 12:03:00 CEST schrieb Tony Xie:
-> Signed-off-by: Tony Xie <tony.xie@rock-chips.com>
+Note:
+This patch series is tested on MX6Q SDB cpufreq driver with a minor change
+to switch to use clk_bulk_get_all.
+But patch 4 only test compiling. Hopefully someone could help test
+the function.
 
-I've added a commit message and applied the patch for 4.20.
+v3->v4:
+ * improve 'devres->clks = *clks' according to Stephen's suggestion
+v2->v3:
+ * address all comments from Stephen
+ * fix build warnings on other architectures.
+v1->v2:
+ * add clk_bulk_{get|put}_all() which only supports DT platform currently
+ * remove _all variants and the wrapper struct clk_bulk
+ * make of_clk_bulk_get and of_clk_bulk_get_all private until someone
+   proves they need it because they don't have a struct device pointer.
 
+Dong Aisheng (4):
+  clk: bulk: add of_clk_bulk_get()
+  clk: add new APIs to operate on all available clocks
+  clk: add managed version of clk_bulk_get_all
+  video: simplefb: switch to use clk_bulk API to simplify clock
+    operations
 
-Thanks
-Heiko
+ drivers/clk/clk-bulk.c         | 80 ++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/clk-devres.c       | 24 +++++++++++++
+ drivers/video/fbdev/simplefb.c | 66 +++++++---------------------------
+ include/linux/clk.h            | 65 +++++++++++++++++++++++++++++++++-
+ 4 files changed, 180 insertions(+), 55 deletions(-)
+
+-- 
+2.7.4
