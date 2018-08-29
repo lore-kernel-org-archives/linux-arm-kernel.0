@@ -1,44 +1,41 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 29 Aug 2018 17:09:42 +0200
-Subject: [PATCH] arm64: dts: add support for SolidRun Clearfog GT 8K
-In-Reply-To: <8736uxxmai.fsf@tkos.co.il>
-References: <3276b82491c1eda1e05a0e6b94560cfa451cf8d4.1535544789.git.baruch@tkos.co.il>
- <20180829141159.GB22270@lunn.ch> <8736uxxmai.fsf@tkos.co.il>
-Message-ID: <20180829150942.GD22270@lunn.ch>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 29 Aug 2018 17:15:04 +0200
+Subject: [PATCH] ARM: dts: socfpga: Rename socfpga_cyclone5_de0_{sockit,
+ nano_soc}
+Message-ID: <20180829151504.12013-1-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The schematics say "AP Reset Switch". So it is probably meant to be a
-> software controlled "back to default" button. Is there a suitable
-> linux,code for that?
+Rename DT source for DE0 Nano SoC . The board name is really DE0-Nano-SoC
+or Atlas SoC, and it is not to be confused with SoCkit board, which is a
+different one. Rename the DT source file to match the board name and to
+avoid this possible mixup with another different board.
 
-There is a reset code.
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Dinh Nguyen <dinguyen@kernel.org>
+Cc: Jan Kiszka <jan.kiszka@siemens.com>
+---
+ arch/arm/boot/dts/Makefile                                      | 2 +-
+ ...yclone5_de0_sockit.dts => socfpga_cyclone5_de0_nano_soc.dts} | 0
+ 2 files changed, 1 insertion(+), 1 deletion(-)
+ rename arch/arm/boot/dts/{socfpga_cyclone5_de0_sockit.dts => socfpga_cyclone5_de0_nano_soc.dts} (100%)
 
-> It is not assembled here so I could not test. The schematics say SLB9670.
-
-I think the standard SPI TPM TIS driver should work for that. But if
-it is not populated, you cannot test it.
-
-> >> +			port at 5 {
-> >> +				reg = <5>;
-> >> +				label = "cpu";
-> >> +				ethernet = <&cp1_eth2>;
-> >> +			};
-> >
-> > No fixed-link? It correctly defaults to 2.5G? I've never tested that.
-> 
-> Seems to work here
-
-It would be good to test it really is using 2.5G, not 1G.
-
-. There is also a patch from Rabeeh (which I did not
-> apply while testing) to make it the default:
-> 
->   https://github.com/SolidRun/openwrt/blob/openwrt-18.06-sr/target/linux/mvebu/patches-4.14/533-fix-88e6141-cpu-max-speed.patch
-
-Which is why i don't think it actually is using 2.5G.
-
-This patch will need a little rework, but it basically O.K. Change
-mv88e6x41 to mv88e6341. We use the family name in function names.
-
-	  Andrew
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 92dc4f05cf23..af881dce7ab4 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -892,7 +892,7 @@ dtb-$(CONFIG_ARCH_SOCFPGA) += \
+ 	socfpga_arria10_socdk_sdmmc.dtb \
+ 	socfpga_cyclone5_mcvevk.dtb \
+ 	socfpga_cyclone5_socdk.dtb \
+-	socfpga_cyclone5_de0_sockit.dtb \
++	socfpga_cyclone5_de0_nano_soc.dtb \
+ 	socfpga_cyclone5_sockit.dtb \
+ 	socfpga_cyclone5_socrates.dtb \
+ 	socfpga_cyclone5_sodia.dtb \
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_de0_nano_soc.dts
+similarity index 100%
+rename from arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
+rename to arch/arm/boot/dts/socfpga_cyclone5_de0_nano_soc.dts
+-- 
+2.18.0
