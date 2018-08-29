@@ -1,37 +1,41 @@
 From: andreyknvl@google.com (Andrey Konovalov)
-Date: Wed, 29 Aug 2018 13:35:15 +0200
-Subject: [PATCH v6 11/18] khwasan,
- mm: perform untagged pointers comparison in krealloc
+Date: Wed, 29 Aug 2018 13:35:13 +0200
+Subject: [PATCH v6 09/18] khwasan, arm64: fix up fault handling logic
 In-Reply-To: <cover.1535462971.git.andreyknvl@google.com>
 References: <cover.1535462971.git.andreyknvl@google.com>
-Message-ID: <a13a41e3ca65116eb5614c4dd396b23182e98fed.1535462971.git.andreyknvl@google.com>
+Message-ID: <4da4495dc20525db1654d3dd9d578b7965d98507.1535462971.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The krealloc function checks where the same buffer was reused or a new one
-allocated by comparing kernel pointers. KHWASAN changes memory tag on the
-krealloc'ed chunk of memory and therefore also changes the pointer tag of
-the returned pointer. Therefore we need to perform comparison on untagged
-(with tags reset) pointers to check whether it's the same memory region or
-not.
+show_pte in arm64 fault handling relies on the fact that the top byte of
+a kernel pointer is 0xff, which isn't always the case with KHWASAN enabled.
+Reset the top byte.
 
 Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
 ---
- mm/slab_common.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/mm/fault.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/mm/slab_common.c b/mm/slab_common.c
-index 3abfa0f86118..0d588dfebd7d 100644
---- a/mm/slab_common.c
-+++ b/mm/slab_common.c
-@@ -1513,7 +1513,7 @@ void *krealloc(const void *p, size_t new_size, gfp_t flags)
- 	}
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 50b30ff30de4..35feee78a9bd 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -32,6 +32,7 @@
+ #include <linux/perf_event.h>
+ #include <linux/preempt.h>
+ #include <linux/hugetlb.h>
++#include <linux/kasan.h>
  
- 	ret = __do_krealloc(p, new_size, flags);
--	if (ret && p != ret)
-+	if (ret && khwasan_reset_tag(p) != khwasan_reset_tag(ret))
- 		kfree(p);
+ #include <asm/bug.h>
+ #include <asm/cmpxchg.h>
+@@ -134,6 +135,8 @@ void show_pte(unsigned long addr)
+ 	pgd_t *pgdp;
+ 	pgd_t pgd;
  
- 	return ret;
++	addr = (unsigned long)khwasan_reset_tag((void *)addr);
++
+ 	if (addr < TASK_SIZE) {
+ 		/* TTBR0 */
+ 		mm = current->active_mm;
 -- 
 2.19.0.rc0.228.g281dcd1b4d0-goog
