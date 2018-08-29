@@ -1,411 +1,49 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 29 Aug 2018 10:55:17 +0800
-Subject: [PATCH 5/6] usb: xhci-mtk: supports bandwidth scheduling with multi-TT
-In-Reply-To: <3bcc220aa54bfebc39cea54cd736388ad37ee0c5.1535510898.git.chunfeng.yun@mediatek.com>
-References: <3bcc220aa54bfebc39cea54cd736388ad37ee0c5.1535510898.git.chunfeng.yun@mediatek.com>
-Message-ID: <57f6f53d29d6adef7e12ed958ed29688fe37f7e0.1535510898.git.chunfeng.yun@mediatek.com>
+From: prabhakar.kushwaha@nxp.com (Prabhakar Kushwaha)
+Date: Wed, 29 Aug 2018 02:55:47 +0000
+Subject: [PATCH 1/2][RESEND] ARM: dts: Add big-endian in nor node for
+ ls1021a
+In-Reply-To: <CAOMZO5BVrK98ksQ2KBiXTy6O-nXjOG8_fFueRRXHZOwCMJ1UGg@mail.gmail.com>
+References: <20180828065936.8040-1-prabhakar.kushwaha@nxp.com>
+ <20180828065936.8040-2-prabhakar.kushwaha@nxp.com>
+ <CAOMZO5BVrK98ksQ2KBiXTy6O-nXjOG8_fFueRRXHZOwCMJ1UGg@mail.gmail.com>
+Message-ID: <VI1PR0402MB3854E14A0468CEFBDFDFE48B97090@VI1PR0402MB3854.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Supports LowSpeed and FullSpeed INT/ISOC bandwidth scheduling
-with USB multi-TT
+Dear Fabio,
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- drivers/usb/host/xhci-mtk-sch.c | 247 ++++++++++++++++++++++++++++++++++++++--
- drivers/usb/host/xhci-mtk.h     |  21 ++++
- 2 files changed, 258 insertions(+), 10 deletions(-)
+> -----Original Message-----
+> From: Fabio Estevam <festevam@gmail.com>
+> Sent: Wednesday, August 29, 2018 3:56 AM
+> To: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
+> Cc: open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS
+> <devicetree@vger.kernel.org>; Rob Herring <robh@kernel.org>; Mark
+> Rutland <mark.rutland@arm.com>; Shawn Guo <shawnguo@kernel.org>;
+> moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE <linux-arm-
+> kernel at lists.infradead.org>; Leo Li <leoyang.li@nxp.com>
+> Subject: Re: [PATCH 1/2][RESEND] ARM: dts: Add big-endian in nor node for
+> ls1021a
+> 
+> On Tue, Aug 28, 2018 at 3:59 AM, Prabhakar Kushwaha
+> <prabhakar.kushwaha@nxp.com> wrote:
+> 
+> > diff --git a/arch/arm/boot/dts/ls1021a-qds.dts
+> > b/arch/arm/boot/dts/ls1021a-qds.dts
+> > index 499f41a2c6f0..923a25760516 100644
+> > --- a/arch/arm/boot/dts/ls1021a-qds.dts
+> > +++ b/arch/arm/boot/dts/ls1021a-qds.dts
+> > @@ -1,5 +1,6 @@
+> >  /*
+> >   * Copyright 2013-2014 Freescale Semiconductor, Inc.
+> > + * Copyright 2018 NXP
+> 
+> This line is unrelated to the big-endian change.
 
-diff --git a/drivers/usb/host/xhci-mtk-sch.c b/drivers/usb/host/xhci-mtk-sch.c
-index 7efd890..36050a1 100644
---- a/drivers/usb/host/xhci-mtk-sch.c
-+++ b/drivers/usb/host/xhci-mtk-sch.c
-@@ -80,10 +80,98 @@ static u32 get_esit(struct xhci_ep_ctx *ep_ctx)
- 	return esit;
- }
- 
-+static struct mu3h_sch_tt *find_tt(struct usb_device *udev)
-+{
-+	struct usb_tt *utt = udev->tt;
-+	struct mu3h_sch_tt *tt, **tt_index, **ptt;
-+	unsigned int port;
-+	bool allocated_index = false;
-+
-+	if (!utt)
-+		return NULL;	/* Not below a TT */
-+
-+	/*
-+	 * Find/create our data structure.
-+	 * For hubs with a single TT, we get it directly.
-+	 * For hubs with multiple TTs, there's an extra level of pointers.
-+	 */
-+	tt_index = NULL;
-+	if (utt->multi) {
-+		tt_index = utt->hcpriv;
-+		if (!tt_index) {	/* Create the index array */
-+			tt_index = kcalloc(utt->hub->maxchild,
-+					sizeof(*tt_index), GFP_KERNEL);
-+			if (!tt_index)
-+				return ERR_PTR(-ENOMEM);
-+			utt->hcpriv = tt_index;
-+			allocated_index = true;
-+		}
-+		port = udev->ttport - 1;
-+		ptt = &tt_index[port];
-+	} else {
-+		port = 0;
-+		ptt = (struct mu3h_sch_tt **) &utt->hcpriv;
-+	}
-+
-+	tt = *ptt;
-+	if (!tt) {	/* Create the mu3h_sch_tt */
-+		tt = kzalloc(sizeof(*tt), GFP_KERNEL);
-+		if (!tt) {
-+			if (allocated_index) {
-+				utt->hcpriv = NULL;
-+				kfree(tt_index);
-+			}
-+			return ERR_PTR(-ENOMEM);
-+		}
-+		INIT_LIST_HEAD(&tt->ep_list);
-+		tt->usb_tt = utt;
-+		tt->tt_port = port;
-+		*ptt = tt;
-+	}
-+
-+	return tt;
-+}
-+
-+/* Release the TT above udev, if it's not in use */
-+static void drop_tt(struct usb_device *udev)
-+{
-+	struct usb_tt *utt = udev->tt;
-+	struct mu3h_sch_tt *tt, **tt_index, **ptt;
-+	int i, cnt;
-+
-+	if (!utt || !utt->hcpriv)
-+		return;		/* Not below a TT, or never allocated */
-+
-+	cnt = 0;
-+	if (utt->multi) {
-+		tt_index = utt->hcpriv;
-+		ptt = &tt_index[udev->ttport - 1];
-+		/*  How many entries are left in tt_index? */
-+		for (i = 0; i < utt->hub->maxchild; ++i)
-+			cnt += !!tt_index[i];
-+	} else {
-+		tt_index = NULL;
-+		ptt = (struct mu3h_sch_tt **)&utt->hcpriv;
-+	}
-+
-+	tt = *ptt;
-+	if (!tt || !list_empty(&tt->ep_list))
-+		return;		/* never allocated , or still in use*/
-+
-+	*ptt = NULL;
-+	kfree(tt);
-+
-+	if (cnt == 1) {
-+		utt->hcpriv = NULL;
-+		kfree(tt_index);
-+	}
-+}
-+
- static struct mu3h_sch_ep_info *create_sch_ep(struct usb_device *udev,
- 	struct usb_host_endpoint *ep, struct xhci_ep_ctx *ep_ctx)
- {
- 	struct mu3h_sch_ep_info *sch_ep;
-+	struct mu3h_sch_tt *tt = NULL;
- 	u32 len_bw_budget_table;
- 	size_t mem_size;
- 
-@@ -101,6 +189,15 @@ static struct mu3h_sch_ep_info *create_sch_ep(struct usb_device *udev,
- 	if (!sch_ep)
- 		return ERR_PTR(-ENOMEM);
- 
-+	if (is_fs_or_ls(udev->speed)) {
-+		tt = find_tt(udev);
-+		if (IS_ERR(tt)) {
-+			kfree(sch_ep);
-+			return ERR_PTR(-ENOMEM);
-+		}
-+	}
-+
-+	sch_ep->sch_tt = tt;
- 	sch_ep->ep = ep;
- 
- 	return sch_ep;
-@@ -128,6 +225,8 @@ static void setup_sch_info(struct usb_device *udev,
- 		 CTX_TO_MAX_ESIT_PAYLOAD(le32_to_cpu(ep_ctx->tx_info));
- 
- 	sch_ep->esit = get_esit(ep_ctx);
-+	sch_ep->ep_type = ep_type;
-+	sch_ep->maxpkt = maxpkt;
- 	sch_ep->offset = 0;
- 	sch_ep->burst_mode = 0;
- 	sch_ep->repeat = 0;
-@@ -197,8 +296,13 @@ static void setup_sch_info(struct usb_device *udev,
- 		}
- 	} else if (is_fs_or_ls(udev->speed)) {
- 		sch_ep->pkts = 1; /* at most one packet for each microframe */
-+
-+		/*
-+		 * num_budget_microframes and cs_count will be updated when
-+		 * check TT for INT_OUT_EP, ISOC/INT_IN_EP type
-+		 */
- 		sch_ep->cs_count = DIV_ROUND_UP(maxpkt, FS_PAYLOAD_MAX);
--		sch_ep->num_budget_microframes = sch_ep->cs_count + 2;
-+		sch_ep->num_budget_microframes = sch_ep->cs_count;
- 		sch_ep->bw_cost_per_microframe =
- 			(maxpkt < FS_PAYLOAD_MAX) ? maxpkt : FS_PAYLOAD_MAX;
- 
-@@ -212,7 +316,13 @@ static void setup_sch_info(struct usb_device *udev,
- 		} else { /* INT_IN_EP or ISOC_IN_EP */
- 			bwb_table[0] = 0; /* start split */
- 			bwb_table[1] = 0; /* idle */
--			for (i = 2; i < sch_ep->num_budget_microframes; i++)
-+			/*
-+			 * due to cs_count will be updated according to cs
-+			 * position, assign all remainder budget array
-+			 * elements as @bw_cost_per_microframe, but only first
-+			 * @num_budget_microframes elements will be used later
-+			 */
-+			for (i = 2; i < TT_MICROFRAMES_MAX; i++)
- 				bwb_table[i] =	sch_ep->bw_cost_per_microframe;
- 		}
- 	}
-@@ -264,6 +374,96 @@ static void update_bus_bw(struct mu3h_sch_bw_info *sch_bw,
- 	}
- }
- 
-+static int check_sch_tt(struct usb_device *udev,
-+	struct mu3h_sch_ep_info *sch_ep, u32 offset)
-+{
-+	struct mu3h_sch_tt *tt = sch_ep->sch_tt;
-+	u32 extra_cs_count;
-+	u32 fs_budget_start;
-+	u32 start_ss, last_ss;
-+	u32 start_cs, last_cs;
-+	int i;
-+
-+	start_ss = offset % 8;
-+	fs_budget_start = (start_ss + 1) % 8;
-+
-+	if (sch_ep->ep_type == ISOC_OUT_EP) {
-+		last_ss = start_ss + sch_ep->cs_count - 1;
-+
-+		/*
-+		 * usb_20 spec section11.18:
-+		 * must never schedule Start-Split in Y6
-+		 */
-+		if (!(start_ss == 7 || last_ss < 6))
-+			return -ERANGE;
-+
-+		for (i = 0; i < sch_ep->cs_count; i++)
-+			if (test_bit(offset + i, tt->split_bit_map))
-+				return -ERANGE;
-+
-+	} else {
-+		u32 cs_count = DIV_ROUND_UP(sch_ep->maxpkt, FS_PAYLOAD_MAX);
-+
-+		/*
-+		 * usb_20 spec section11.18:
-+		 * must never schedule Start-Split in Y6
-+		 */
-+		if (start_ss == 6)
-+			return -ERANGE;
-+
-+		/* one uframe for ss + one uframe for idle */
-+		start_cs = (start_ss + 2) % 8;
-+		last_cs = start_cs + cs_count - 1;
-+
-+		if (last_cs > 7)
-+			return -ERANGE;
-+
-+		if (sch_ep->ep_type == ISOC_IN_EP)
-+			extra_cs_count = (last_cs == 7) ? 1 : 2;
-+		else /*  ep_type : INTR IN / INTR OUT */
-+			extra_cs_count = (fs_budget_start == 6) ? 1 : 2;
-+
-+		cs_count += extra_cs_count;
-+		if (cs_count > 7)
-+			cs_count = 7; /* HW limit */
-+
-+		for (i = 0; i < cs_count + 2; i++) {
-+			if (test_bit(offset + i, tt->split_bit_map))
-+				return -ERANGE;
-+		}
-+
-+		sch_ep->cs_count = cs_count;
-+		/* one for ss, the other for idle */
-+		sch_ep->num_budget_microframes = cs_count + 2;
-+
-+		/*
-+		 * if interval=1, maxp >752, num_budge_micoframe is larger
-+		 * than sch_ep->esit, will overstep boundary
-+		 */
-+		if (sch_ep->num_budget_microframes > sch_ep->esit)
-+			sch_ep->num_budget_microframes = sch_ep->esit;
-+	}
-+
-+	return 0;
-+}
-+
-+static void update_sch_tt(struct usb_device *udev,
-+	struct mu3h_sch_ep_info *sch_ep)
-+{
-+	struct mu3h_sch_tt *tt = sch_ep->sch_tt;
-+	u32 base, num_esit;
-+	int i, j;
-+
-+	num_esit = XHCI_MTK_MAX_ESIT / sch_ep->esit;
-+	for (i = 0; i < num_esit; i++) {
-+		base = sch_ep->offset + i * sch_ep->esit;
-+		for (j = 0; j < sch_ep->num_budget_microframes; j++)
-+			set_bit(base + j, tt->split_bit_map);
-+	}
-+
-+	list_add_tail(&sch_ep->tt_endpoint, &tt->ep_list);
-+}
-+
- static int check_sch_bw(struct usb_device *udev,
- 	struct mu3h_sch_bw_info *sch_bw, struct mu3h_sch_ep_info *sch_ep)
- {
-@@ -273,6 +473,10 @@ static int check_sch_bw(struct usb_device *udev,
- 	u32 min_index;
- 	u32 worst_bw;
- 	u32 bw_boundary;
-+	u32 min_num_budget;
-+	u32 min_cs_count;
-+	bool tt_offset_ok = false;
-+	int ret;
- 
- 	esit = sch_ep->esit;
- 
-@@ -282,26 +486,30 @@ static int check_sch_bw(struct usb_device *udev,
- 	 */
- 	min_bw = ~0;
- 	min_index = 0;
-+	min_cs_count = sch_ep->cs_count;
-+	min_num_budget = sch_ep->num_budget_microframes;
- 	for (offset = 0; offset < esit; offset++) {
-+		if (is_fs_or_ls(udev->speed)) {
-+			ret = check_sch_tt(udev, sch_ep, offset);
-+			if (ret)
-+				continue;
-+			else
-+				tt_offset_ok = true;
-+		}
-+
- 		if ((offset + sch_ep->num_budget_microframes) > sch_ep->esit)
- 			break;
- 
--		/*
--		 * usb_20 spec section11.18:
--		 * must never schedule Start-Split in Y6
--		 */
--		if (is_fs_or_ls(udev->speed) && (offset % 8 == 6))
--			continue;
--
- 		worst_bw = get_max_bw(sch_bw, sch_ep, offset);
- 		if (min_bw > worst_bw) {
- 			min_bw = worst_bw;
- 			min_index = offset;
-+			min_cs_count = sch_ep->cs_count;
-+			min_num_budget = sch_ep->num_budget_microframes;
- 		}
- 		if (min_bw == 0)
- 			break;
- 	}
--	sch_ep->offset = min_index;
- 
- 	bw_boundary = (udev->speed == USB_SPEED_SUPER)
- 				? SS_BW_BOUNDARY : HS_BW_BOUNDARY;
-@@ -310,6 +518,18 @@ static int check_sch_bw(struct usb_device *udev,
- 	if (min_bw > bw_boundary)
- 		return -ERANGE;
- 
-+	sch_ep->offset = min_index;
-+	sch_ep->cs_count = min_cs_count;
-+	sch_ep->num_budget_microframes = min_num_budget;
-+
-+	if (is_fs_or_ls(udev->speed)) {
-+		/* all offset for tt is not ok*/
-+		if (!tt_offset_ok)
-+			return -ERANGE;
-+
-+		update_sch_tt(udev, sch_ep);
-+	}
-+
- 	/* update bus bandwidth info */
- 	update_bus_bw(sch_bw, sch_ep, 1);
- 
-@@ -415,6 +635,9 @@ int xhci_mtk_add_ep_quirk(struct usb_hcd *hcd, struct usb_device *udev,
- 	ret = check_sch_bw(udev, sch_bw, sch_ep);
- 	if (ret) {
- 		xhci_err(xhci, "Not enough bandwidth!\n");
-+		if (is_fs_or_ls(udev->speed))
-+			drop_tt(udev);
-+
- 		kfree(sch_ep);
- 		return -ENOSPC;
- 	}
-@@ -466,6 +689,10 @@ void xhci_mtk_drop_ep_quirk(struct usb_hcd *hcd, struct usb_device *udev,
- 		if (sch_ep->ep == ep) {
- 			update_bus_bw(sch_bw, sch_ep, 0);
- 			list_del(&sch_ep->endpoint);
-+			if (is_fs_or_ls(udev->speed)) {
-+				list_del(&sch_ep->tt_endpoint);
-+				drop_tt(udev);
-+			}
- 			kfree(sch_ep);
- 			break;
- 		}
-diff --git a/drivers/usb/host/xhci-mtk.h b/drivers/usb/host/xhci-mtk.h
-index f8864fc..8be8c5f 100644
---- a/drivers/usb/host/xhci-mtk.h
-+++ b/drivers/usb/host/xhci-mtk.h
-@@ -20,6 +20,19 @@
- #define XHCI_MTK_MAX_ESIT	64
- 
- /**
-+ * @split_bit_map: used to avoid split microframes overlay
-+ * @ep_list: Endpoints using this TT
-+ * @usb_tt: usb TT related
-+ * @tt_port: TT port number
-+ */
-+struct mu3h_sch_tt {
-+	DECLARE_BITMAP(split_bit_map, XHCI_MTK_MAX_ESIT);
-+	struct list_head ep_list;
-+	struct usb_tt *usb_tt;
-+	int tt_port;
-+};
-+
-+/**
-  * struct mu3h_sch_bw_info: schedule information for bandwidth domain
-  *
-  * @bus_bw: array to keep track of bandwidth already used at each uframes
-@@ -41,6 +54,10 @@ struct mu3h_sch_bw_info {
-  *		(@repeat==1) scheduled within the interval
-  * @bw_cost_per_microframe: bandwidth cost per microframe
-  * @endpoint: linked into bandwidth domain which it belongs to
-+ * @tt_endpoint: linked into mu3h_sch_tt's list which it belongs to
-+ * @sch_tt: mu3h_sch_tt linked into
-+ * @ep_type: endpoint type
-+ * @maxpkt: max packet size of endpoint
-  * @ep: address of usb_host_endpoint struct
-  * @offset: which uframe of the interval that transfer should be
-  *		scheduled first time within the interval
-@@ -64,6 +81,10 @@ struct mu3h_sch_ep_info {
- 	u32 num_budget_microframes;
- 	u32 bw_cost_per_microframe;
- 	struct list_head endpoint;
-+	struct list_head tt_endpoint;
-+	struct mu3h_sch_tt *sch_tt;
-+	u32 ep_type;
-+	u32 maxpkt;
- 	void *ep;
- 	/*
- 	 * mtk xHCI scheduling information put into reserved DWs
--- 
-1.9.1
+Yes, this line is unrelated to this change.
+
+Freeescale has been acquired by NXP in 2016. 
+We want to add NXP copyright wherever freescale's copyright is present. But it is not possible in one-go.
+
+So we are adding NXP copyright as and when any file having freescale's copyright  being touched.  
+
+--pk
