@@ -1,57 +1,63 @@
-From: oss@buserror.net (Scott Wood)
-Date: Tue, 28 Aug 2018 19:18:50 -0500
-Subject: [PATCH 3/5] drivers: clk-qoriq: Add clockgen support for lx2160a
-In-Reply-To: <1534747636-20064-4-git-send-email-vabhav.sharma@nxp.com>
-References: <1534747636-20064-1-git-send-email-vabhav.sharma@nxp.com>
- <1534747636-20064-4-git-send-email-vabhav.sharma@nxp.com>
-Message-ID: <4a9ea6b451683ec98c92e86a5ae6b91213a6afcf.camel@buserror.net>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 29 Aug 2018 09:28:00 +0900
+Subject: [PATCH v13 03/16] s390, kexec_file: drop arch_kexec_mem_walk()
+In-Reply-To: <20180828134347.GB12178@dhcp-128-65.nay.redhat.com>
+References: <20180801075820.3753-1-takahiro.akashi@linaro.org>
+ <20180801075820.3753-4-takahiro.akashi@linaro.org>
+ <20180801102951.527cfc57@ThinkPad>
+ <20180802000150.GN11258@linaro.org>
+ <20180806055047.GC4246@dhcp-128-65.nay.redhat.com>
+ <20180809033416.GA5069@dhcp-128-65.nay.redhat.com>
+ <1235507889.17337085.1533788045597.JavaMail.zimbra@redhat.com>
+ <20180828052107.GE12252@linaro.org>
+ <20180828134347.GB12178@dhcp-128-65.nay.redhat.com>
+Message-ID: <20180829002759.GG12252@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-08-20 at 12:17 +0530, Vabhav Sharma wrote:
-> From: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
+On Tue, Aug 28, 2018 at 09:43:47PM +0800, Dave Young wrote:
+> Hi AKASHI,
+> On 08/28/18 at 02:21pm, AKASHI Takahiro wrote:
+> > Hi Dave,
+> > 
+> > On Thu, Aug 09, 2018 at 12:14:05AM -0400, Pingfan Liu wrote:
+> > > 
+> > > 
+> > > 
+> > > 
+> > > ----- Original Message -----
+> > > > From: "Dave Young" <dyoung@redhat.com>
+> > > > To: "AKASHI Takahiro" <takahiro.akashi@linaro.org>, "Philipp Rudo" <prudo@linux.ibm.com>, "catalin marinas"
+> > > > <catalin.marinas@arm.com>, "will deacon" <will.deacon@arm.com>, dhowells at redhat.com, vgoyal at redhat.com,
+> > > > herbert at gondor.apana.org.au, davem at davemloft.net, bhe at redhat.com, arnd at arndb.de, schwidefsky at de.ibm.com, "heiko
+> > > > carstens" <heiko.carstens@de.ibm.com>, "ard biesheuvel" <ard.biesheuvel@linaro.org>, "james morse"
+> > > > <james.morse@arm.com>, bhsharma at redhat.com, kexec at lists.infradead.org, linux-arm-kernel at lists.infradead.org,
+> > > > linux-kernel at vger.kernel.org, "piliu at redhat.com Thiago Jung Bauermann" <bauerman@linux.vnet.ibm.com>
+> > > > Sent: Thursday, August 9, 2018 11:34:16 AM
+> > > > Subject: Re: [PATCH v13 03/16] s390, kexec_file: drop arch_kexec_mem_walk()
+> > > > 
+> > > > Add more cc. Pingfan Liu confirmed ppc does not use 0 as valid address,
+> > > > if so it should be safe.
+> > > > 
+> > > > Pingfan, can you add more words?
+> > > > 
+> > > 
+> > > ppc64 uses a few KB starting from 0 for exception handler.
+> > 
+> > It assures that 0 (zero) is valid, but won't be assigned as a result of
+> > kexec_add_buffer().
+> > 
+> > So do you think that yet I should submit another patch set, introducing
+> > explicit KEXEC_BUF_MEM_UNKNOWN, while assuming 0 by default is safe for now?
+> > 
+> > Now that this is the only comment against my v13, it's up to you.
 > 
-> Add clockgen support for lx2160a.
-> Added entry for compat 'fsl,lx2160a-clockgen'.
-> As LX2160A is 16 core, so modified value for NUM_CMUX
-> 
-> Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
-> Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
-> Signed-off-by: Vabhav Sharma <vabhav.sharma@nxp.com>
-> ---
->  drivers/clk/clk-qoriq.c         | 14 +++++++++++++-
->  drivers/cpufreq/qoriq-cpufreq.c |  1 +
->  2 files changed, 14 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/clk-qoriq.c b/drivers/clk/clk-qoriq.c
-> index 3a1812f..fc6e308 100644
-> --- a/drivers/clk/clk-qoriq.c
-> +++ b/drivers/clk/clk-qoriq.c
-> @@ -60,7 +60,7 @@ struct clockgen_muxinfo {
->  };
->  
->  #define NUM_HWACCEL	5
-> -#define NUM_CMUX	8
-> +#define NUM_CMUX	16
->  
->  struct clockgen;
->  
-> @@ -570,6 +570,17 @@ static const struct clockgen_chipinfo chipinfo[] = {
->  		.flags = CG_VER3 | CG_LITTLE_ENDIAN,
->  	},
->  	{
-> +		.compat = "fsl,lx2160a-clockgen",
-> +		.cmux_groups = {
-> +			&clockgen2_cmux_cga12, &clockgen2_cmux_cgb
-> +		},
-> +		.cmux_to_group = {
-> +			0, 0, 0, 0, 1, 1, 1, 1, -1
-> +		},
-> +		.pll_mask = 0x37,
-> +		.flags = CG_VER3 | CG_LITTLE_ENDIAN,
-> +	},
+> I'm fine with your proposal.  It is simple enough, and we can look into
+> it when it becomes a problem in the future which is unlikely.
 
-Why are you increasing NUM_CMUX beyond 8 for a chip that only has 8 entries in
-cmux_to_group?
+Ok, thank you for this confirmation.
 
--Scott
+-Takahiro AKASHI
+
+> Thanks
+> Dave
