@@ -1,28 +1,30 @@
 From: codrin.ciubotariu@microchip.com (Codrin Ciubotariu)
-Date: Wed, 29 Aug 2018 19:47:54 +0300
-Subject: [PATCH 1/2] ARM: configs: at91: Add I2S driver to sama5
-Message-ID: <20180829164755.4690-1-codrin.ciubotariu@microchip.com>
+Date: Wed, 29 Aug 2018 19:47:55 +0300
+Subject: [PATCH 2/2] ARM: multi_v7_defconfig: add Atmel I2S driver
+In-Reply-To: <20180829164755.4690-1-codrin.ciubotariu@microchip.com>
+References: <20180829164755.4690-1-codrin.ciubotariu@microchip.com>
+Message-ID: <20180829164755.4690-2-codrin.ciubotariu@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add I2S CONFIG_SND_ATMEL_SOC_I2S to sama5_defconfig.
+Add atmel-i2s driver CONFIG_SND_ATMEL_SOC_I2S.
 
 Signed-off-by: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
 ---
- arch/arm/configs/sama5_defconfig | 1 +
+ arch/arm/configs/multi_v7_defconfig | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
-index 2080025556b5..b6d73055a854 100644
---- a/arch/arm/configs/sama5_defconfig
-+++ b/arch/arm/configs/sama5_defconfig
-@@ -167,6 +167,7 @@ CONFIG_SND_ATMEL_SOC_WM8904=y
- # CONFIG_HID_GENERIC is not set
- CONFIG_SND_ATMEL_SOC_PDMIC=y
- CONFIG_SND_ATMEL_SOC_TSE850_PCM5142=m
-+CONFIG_SND_ATMEL_SOC_I2S=y
- CONFIG_USB=y
- CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
- CONFIG_USB_EHCI_HCD=y
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index fc33444e94f0..037a19d9802f 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -650,6 +650,7 @@ CONFIG_SND_SOC=m
+ CONFIG_SND_ATMEL_SOC=m
+ CONFIG_SND_ATMEL_SOC_WM8904=m
+ CONFIG_SND_ATMEL_SOC_PDMIC=m
++CONFIG_SND_ATMEL_SOC_I2S=m
+ CONFIG_SND_BCM2835_SOC_I2S=m
+ CONFIG_SND_SOC_FSL_SAI=m
+ CONFIG_SND_SOC_ROCKCHIP=m
 -- 
 2.17.1
