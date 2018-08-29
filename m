@@ -1,144 +1,470 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Wed, 29 Aug 2018 14:16:25 +0200
-Subject: [PATCH 1/2] drm/bridge: Add virtual display DT bindings
-In-Reply-To: <20180829110045.GN907@e110455-lin.cambridge.arm.com>
-References: <CGME20180824122324epcas3p2922f3e5415dacf4c89cfb136fa5c77b2@epcas3p2.samsung.com>
- <20180824122308.3092-1-linus.walleij@linaro.org>
- <20180827115302eucas1p24d36cfaf9835ccb217ac81e508484aa1~Ou5eTkYW-3006130061eucas1p2Z@eucas1p2.samsung.com>
- <CACRpkdaGNhxY-xAAEL1Bu4EMr8x7qTGoM9s-At2v7Ev8PwOTDw@mail.gmail.com>
- <20180829095822eucas1p1fe4336ca7944765c01fc6ad1e941b8b0~PUn7YujBw3056130561eucas1p1_@eucas1p1.samsung.com>
- <20180829100152.GL907@e110455-lin.cambridge.arm.com>
- <20180829102320eucas1p28f05f1c765eb85195a06199bb68b87ce~PU9ukgvXA1734817348eucas1p2L@eucas1p2.samsung.com>
- <20180829110045.GN907@e110455-lin.cambridge.arm.com>
-Message-ID: <20180829121627eucas1p2f41ba35016ce90185f3cc08af1a67e23~PWge4MaXN2588725887eucas1p2h@eucas1p2.samsung.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 29 Aug 2018 15:13:09 +0300
+Subject: [PATCH] arm64: dts: add support for SolidRun Clearfog GT 8K
+Message-ID: <3276b82491c1eda1e05a0e6b94560cfa451cf8d4.1535544789.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.08.2018 13:00, Liviu Dudau wrote:
-> On Wed, Aug 29, 2018 at 12:23:18PM +0200, Andrzej Hajda wrote:
->> On 29.08.2018 12:01, Liviu Dudau wrote:
->>> On Wed, Aug 29, 2018 at 11:58:20AM +0200, Andrzej Hajda wrote:
->>>> On 28.08.2018 15:45, Linus Walleij wrote:
->>>>> On Mon, Aug 27, 2018 at 1:53 PM Andrzej Hajda <a.hajda@samsung.com> wrote:
->>>>>
->>>>>> On 24.08.2018 14:23, Linus Walleij wrote:
->>>>>>> This adds bindings for a virtual display to be used with displays
->>>>>>> inside entirely virtual environments which do not emulate things
->>>>>>> like monitors but just need timing information to be supplied to
->>>>>>> its display controller.
->>>>>>>
->>>>>>> This is inspired by earlier work by Liviu Dudau.
->>>>>> If this is pure virtual then it should be connected to other pure
->>>>>> virtual components.
->>>>> OK it's a bit of half-half but outside of my grasp, I am just trying
->>>>> to support legacy systems.
->>>>>
->>>>> The device tree is there:
->>>>> arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
->>>>> arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi
->>>>>
->>>>> The latter contains the CLCD which is the display driver.
->>>>>
->>>>> In RTSM, which is an ARM product I do not develop and
->>>>> cannot make changes to, there is an emulated CLCD. So
->>>>> that part appear as if it was real hardware. Like in QEMU.
->>>>>
->>>>> But the display does not have any emulation. The raw
->>>>> output from the CLCD is latched out to the screen.
->>>>>
->>>>> I do not know exactly know how the RTSM emulator
->>>>> actually works, but I suspect that the little graphic window
->>>>> on the screeen adapts to what gets written into the
->>>>> CLCD control registers, so anything goes, more or less.
->>>>>
->>>>> To satisfy the CLCD with some timings and resolution,
->>>>> this bridge gives it that, from the device tree, in a way
->>>>> that clearly conveys that "this is not a real thing".
->>>>>
->>>>> The old code uses DPI. This is not DPI, not even close
->>>>> to it. It worked simply because all the DPI really does is
->>>>> what this patch does: provide timings.
->>>>>
->>>>> By contrast on QEMU I have patches the emulator to
->>>>> properly represent the I2C DDC link and provide EDID
->>>>> so that is all fine.
->>>>>
->>>>> I cannot patch RTSM to emulate I2C and DDC. It's not
->>>>> open source. But the device tree in the kernel supports
->>>>> this "machine" and so, I have to maintain it when modernizng
->>>>> the fbdev driver to a DRM driver.
->>>>>
->>>>> I'm sorry RTSM is half/half. Not my fault. I can't fix...
->>>> I do not know the platform, so I? I have dug little bit, but I wan't
->>>> call it? thorough research. Just please be kind if I wrote sth stupid.
->>>> What I have found:
->>>> 1. DTS shows CLCD is pl111.
->>>> 2. pl111 documentation says it's output interface supports STN and TFT
->>>> up to 24-bit bus. I do not know STN, but TFT seems to be compatible with
->>>> DPI.
->>>>
->>>> If it is correct, dpi panel seems to be OK. And I think it is less
->>>> important how the emulator works, more important is that it should
->>>> emulate pl111, including it's output interfaces.
->>> Yeah, unfortunately that ship has sailed a long time ago. The emulator
->>> people thought emulating the register interface is good enough and took
->>> liberties on how the behaviour was "emulated". End result: output
->>> interfaces are not the same.
->> So what is wrong/missing with dpi panel?
-> Linus explained in the links he quoted below. I'll let him add more if
-> he has additional information.
+The SolidRun Clearfog GT-8K is based on Marvell Armada 8040 SoC.
 
-In links below Linus proposed VGA, for me it seems incorrect pl111, does
-not produce analog VGA signal. Why do you (or Linus) want to use it. It
-does not make sense.
-SVGA and XGA are worse, they do not identify video signal standard, they
-identify only resolution.
+  https://wiki.solid-run.com/doku.php?id=products:a8040:clearfoggt8k
 
-My question still stands: what is wrong/missing with dpi panel?
+The following devices were tested with this DT on top of kernel
+v4.19-rc1:
 
-I did not analyze details, but pl111 output seems to be DPI compatible.
-Please note that DPI standard (unlike DSI) is a kind of
-post-implementation standard - it was created to describe existing
-display parallel interfaces, which are identified using different names:
-RGB, parallel, TFT(?), LCD, panel,... So even if documentation says
-nothing about DPI it does not mean it is not DPI 'compliant'. Usually
-most digital interfaces with 24-lines for RGB data, VSYNC, HSYNC, PCLK
-and DE signals can be treated as DPI interfaces.
+  * 1GB Ethernet WAN
 
-Regards
-Andrzej
+  * 4 ports 1GB Ethernet switch (2.5GB uplink)
 
+  * USB3 type A port
 
->
-> Best regards,
-> Liviu
->
->> Regards
->> Andrzej
->>
->>> Best regards,
->>> Liviu
->>>
->>>> Regards
->>>> Andrzej
->>>>>> And one more thing, you are defining virtual panel but you are using
->>>>>> drm_bridge framework, why not drm_panel?
->>>>> This was discussed before in the previous patch set:
->>>>> https://lists.freedesktop.org/archives/dri-devel/2018-July/183516.html
->>>>>
->>>>> Essentially, it's because the display driver is just connected
->>>>> to "something" not a panel and a bridge is likely the best I
->>>>> can come up with - a bridge over to a virtual display.
->>>>>
->>>>> A patch to add "VGA", "SGA" and "XGA" to the simple panels
->>>>> was NACKed (sort of, politely):
->>>>> https://lists.freedesktop.org/archives/dri-devel/2018-July/183698.html
->>>>>
->>>>> Also it was noted that it would be nice to have something that
->>>>> would make it easy to change resolutions on these virtual
->>>>> display things. Voila.
->>>>
->>>>> Yours,
->>>>> Linus Walleij
->>>>>
->>>>>
+  * SD card and eMMC
+
+  * 2 LEDs
+
+  * 2 push buttons
+
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+ arch/arm64/boot/dts/marvell/Makefile          |   1 +
+ .../marvell/armada-8040-clearfog-gt-8k.dts    | 417 ++++++++++++++++++
+ 2 files changed, 418 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts
+
+diff --git a/arch/arm64/boot/dts/marvell/Makefile b/arch/arm64/boot/dts/marvell/Makefile
+index ea9d49f2a911..eca8bac6303a 100644
+--- a/arch/arm64/boot/dts/marvell/Makefile
++++ b/arch/arm64/boot/dts/marvell/Makefile
+@@ -3,6 +3,7 @@
+ dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-db.dtb
+ dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-espressobin.dtb
+ dtb-$(CONFIG_ARCH_MVEBU) += armada-7040-db.dtb
++dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-clearfog-gt-8k.dtb
+ dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-db.dtb
+ dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-mcbin.dtb
+ dtb-$(CONFIG_ARCH_MVEBU) += armada-8080-db.dtb
+diff --git a/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts b/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts
+new file mode 100644
+index 000000000000..7ae6fb4530f2
+--- /dev/null
++++ b/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts
+@@ -0,0 +1,417 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Copyright (C) 2018 SolidRun ltd.
++ * Based on Marvell MACCHIATOBin board
++ *
++ * Device Tree file for SolidRun's ClearFog GT 8K
++ */
++
++#include "armada-8040.dtsi"
++
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++	model = "SolidRun ClearFog GT 8K";
++	compatible = "solidrun,clearfog-gt-8k", "marvell,armada8040",
++			"marvell,armada-ap806-quad", "marvell,armada-ap806";
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory at 00000000 {
++		device_type = "memory";
++		reg = <0x0 0x0 0x0 0x80000000>;
++	};
++
++	aliases {
++		ethernet0 = &cp1_eth1;
++		ethernet1 = &cp0_eth0;
++		ethernet2 = &cp1_eth2;
++	};
++
++	v_3_3: regulator-3-3v {
++		compatible = "regulator-fixed";
++		regulator-name = "v_3_3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++		status = "okay";
++	};
++
++	v_5v0_usb3_hst_vbus: regulator-usb3-vbus0 {
++		compatible = "regulator-fixed";
++		gpio = <&cp0_gpio2 15 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&cp0_xhci_vbus_pins>;
++		regulator-name = "v_5v0_usb3_hst_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		status = "okay";
++	};
++
++	usb3h0_phy: usb3_phy0 {
++		compatible = "usb-nop-xceiv";
++		vcc-supply = <&v_5v0_usb3_hst_vbus>;
++	};
++
++	sfp_cp0_eth0: sfp-cp0-eth0 {
++		compatible = "sff,sfp";
++		i2c-bus = <&cp0_i2c1>;
++		mod-def0-gpio = <&cp0_gpio2 17 GPIO_ACTIVE_LOW>;
++		tx-disable-gpio = <&cp1_gpio1 29 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&cp0_sfp_present_pins &cp1_sfp_tx_disable_pins>;
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-0 = <&cp0_led0_pins
++			     &cp0_led1_pins>;
++		pinctrl-names = "default";
++		led0 {
++			label = "led0";
++			gpios = <&cp0_gpio2 8 GPIO_ACTIVE_LOW>;
++			default-state = "on";
++		};
++		led1 {
++			label = "led1";
++			gpios = <&cp0_gpio2 9 GPIO_ACTIVE_LOW>;
++			default-state = "on";
++		};
++	};
++
++	keys {
++		compatible = "gpio-keys";
++		pinctrl-0 = <&cp0_gpio_reset_pins &cp1_wps_button_pins>;
++		pinctrl-names = "default";
++
++		button_0 {
++			/* The rear button */
++			label = "Rear Button";
++			gpios = <&cp0_gpio2 7 GPIO_ACTIVE_LOW>;
++			linux,can-disable;
++			linux,code = <BTN_0>;
++		};
++
++		button_1 {
++			/* The wps button */
++			label = "WPS Button";
++			gpios = <&cp1_gpio1 30 GPIO_ACTIVE_LOW>;
++			linux,can-disable;
++			linux,code = <BTN_1>;
++		};
++	};
++};
++
++&uart0 {
++	status = "okay";
++	pinctrl-0 = <&uart0_pins>;
++	pinctrl-names = "default";
++};
++
++&ap_sdhci0 {
++	bus-width = <8>;
++	no-1-8-v;
++	no-sd;
++	no-sdio;
++	non-removable;
++	status = "okay";
++	vqmmc-supply = <&v_3_3>;
++};
++
++&cp0_i2c0 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&cp0_i2c0_pins>;
++	status = "okay";
++};
++
++&cp0_i2c1 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&cp0_i2c1_pins>;
++	status = "okay";
++};
++
++&cp0_pinctrl {
++	/*
++	* MPP Bus:
++	* [0-31] = 0xff: Keep default CP0_shared_pins:
++	* [11] CLKOUT_MPP_11 (out)
++	* [23] LINK_RD_IN_CP2CP (in)
++	* [25] CLKOUT_MPP_25 (out)
++	* [29] AVS_FB_IN_CP2CP (in)
++	* [32, 33, 34] pci0/1/2 reset
++	* [35-38] CP0 I2C1 and I2C0
++	* [39] GPIO reset button
++	* [40,41] LED0 and LED1
++	* [43] 1512 phy reset
++	* [47] USB VBUS EN (active low)
++	* [48] FAN PWM
++	* [49] SFP+ present signal
++	* [50] TPM interrupt
++	* [51] WLAN0 disable
++	* [52] WLAN1 disable
++	* [53] LTE disable
++	* [54] NFC reset
++	* [55] Micro SD card detect
++	* [56-61] Micro SD
++	*/
++
++	cp0_pci0_reset_pins: pci0-reset-pins {
++		marvell,pins = "mpp32";
++		marvell,function = "gpio";
++	};
++
++	cp0_pci1_reset_pins: pci1-reset-pins {
++		marvell,pins = "mpp33";
++		marvell,function = "gpio";
++	};
++
++	cp0_pci2_reset_pins: pci2-reset-pins {
++		marvell,pins = "mpp34";
++		marvell,function = "gpio";
++	};
++
++	cp0_i2c1_pins: i2c1-pins {
++		marvell,pins = "mpp35", "mpp36";
++		marvell,function = "i2c1";
++	};
++
++	cp0_i2c0_pins: i2c0-pins {
++		marvell,pins = "mpp37", "mpp38";
++		marvell,function = "i2c0";
++	};
++
++	cp0_gpio_reset_pins: gpio-reset-pins {
++		marvell,pins = "mpp39";
++		marvell,function = "gpio";
++	};
++
++	cp0_led0_pins: led0-pins {
++		marvell,pins = "mpp40";
++		marvell,function = "gpio";
++	};
++
++	cp0_led1_pins: led1-pins {
++		marvell,pins = "mpp41";
++		marvell,function = "gpio";
++	};
++
++	cp0_copper_eth_phy_reset: copper-eth-phy-reset {
++		marvell,pins = "mpp43";
++		marvell,function = "gpio";
++	};
++
++	cp0_xhci_vbus_pins: xhci0-vbus-pins {
++		marvell,pins = "mpp47";
++		marvell,function = "gpio";
++	};
++
++	cp0_fan_pwm_pins: fan-pwm-pins {
++		marvell,pins = "mpp48";
++		marvell,function = "gpio";
++	};
++
++	cp0_sfp_present_pins: sfp-present-pins {
++		marvell,pins = "mpp49";
++		marvell,function = "gpio";
++	};
++
++	cp0_tpm_irq_pins: tpm-irq-pins {
++		marvell,pins = "mpp50";
++		marvell,function = "gpio";
++	};
++
++	cp0_sdhci_pins: sdhci-pins {
++		marvell,pins = "mpp55", "mpp56", "mpp57", "mpp58", "mpp59",
++			       "mpp60", "mpp61";
++		marvell,function = "sdio";
++	};
++};
++
++&cp0_ethernet {
++	status = "okay";
++};
++
++/* SFP */
++&cp0_eth0 {
++	status = "okay";
++	phy-mode = "10gbase-kr";
++	managed = "in-band-status";
++	phys = <&cp0_comphy2 0>;
++	sfp = <&sfp_cp0_eth0>;
++};
++
++&cp0_sdhci0 {
++	broken-cd;
++	bus-width = <4>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&cp0_sdhci_pins>;
++	status = "okay";
++	vqmmc-supply = <&v_3_3>;
++};
++
++&cp1_pinctrl {
++	/*
++	 * MPP Bus:
++	 * [0-5] TDM
++	 * [6]   VHV Enable
++	 * [7]   CP1 SPI0 CSn1 (FXS)
++	 * [8]   CP1 SPI0 CSn0 (TPM)
++	 * [9.11]CP1 SPI0 MOSI/MISO/CLK
++	 * [13]  CP1 SPI1 MISO (TDM and SPI ROM shared)
++	 * [14]  CP1 SPI1 CS0n (64Mb SPI ROM)
++	 * [15]  CP1 SPI1 MOSI (TDM and SPI ROM shared)
++	 * [16]  CP1 SPI1 CLK (TDM and SPI ROM shared)
++	 * [24]  Topaz switch reset
++	 * [26]  Buzzer
++	 * [27]  CP1 SMI MDIO
++	 * [28]  CP1 SMI MDC
++	 * [29]  CP0 10G SFP TX Disable
++	 * [30]  WPS button
++	 * [31]  Front panel button
++	 */
++
++	cp1_spi1_pins: spi1-pins {
++		marvell,pins = "mpp13", "mpp14", "mpp15", "mpp16";
++		marvell,function = "spi1";
++	};
++
++	cp1_switch_reset_pins: switch-reset-pins {
++		marvell,pins = "mpp24";
++		marvell,function = "gpio";
++	};
++
++	cp1_ge_mdio_pins: ge-mdio-pins {
++		marvell,pins = "mpp27", "mpp28";
++		marvell,function = "ge";
++	};
++
++	cp1_sfp_tx_disable_pins: sfp-tx-disable-pins {
++		marvell,pins = "mpp29";
++		marvell,function = "gpio";
++	};
++
++	cp1_wps_button_pins: wps-button-pins {
++		marvell,pins = "mpp30";
++		marvell,function = "gpio";
++	};
++};
++
++&cp1_sata0 {
++	status = "okay";
++};
++
++&cp1_mdio {
++	pinctrl-names = "default";
++	pinctrl-0 = <&cp1_ge_mdio_pins>;
++	status = "okay";
++
++	ge_phy: ethernet-phy at 0 {
++		marvell,reg-init = <3 16 0 0x1017>;
++		reg = <0>;
++	};
++
++	switch0: switch0 at 4 {
++		compatible = "marvell,mv88e6085";
++		reg = <4>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&cp1_switch_reset_pins>;
++		reset-gpios = <&cp1_gpio1 24 GPIO_ACTIVE_LOW>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 1 {
++				reg = <1>;
++				label = "lan2";
++				phy-handle = <&switch0phy0>;
++			};
++
++			port at 2 {
++				reg = <2>;
++				label = "lan1";
++				phy-handle = <&switch0phy1>;
++			};
++
++			port at 3 {
++				reg = <3>;
++				label = "lan4";
++				phy-handle = <&switch0phy2>;
++			};
++
++			port at 4 {
++				reg = <4>;
++				label = "lan3";
++				phy-handle = <&switch0phy3>;
++			};
++
++			port at 5 {
++				reg = <5>;
++				label = "cpu";
++				ethernet = <&cp1_eth2>;
++			};
++		};
++
++		mdio {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			switch0phy0: switch0phy0 at 11 {
++				reg = <0x11>;
++			};
++			switch0phy1: switch0phy1 at 12 {
++				reg = <0x12>;
++			};
++			switch0phy2: switch0phy2 at 13 {
++				reg = <0x13>;
++			};
++			switch0phy3: switch0phy3 at 14 {
++				reg = <0x14>;
++			};
++		};
++	};
++};
++
++&cp1_ethernet {
++	status = "okay";
++};
++
++/* 1G copper */
++&cp1_eth1 {
++	status = "okay";
++	phy-mode = "sgmii";
++	phy = <&ge_phy>;
++	phys = <&cp1_comphy3 1>;
++};
++
++/* Switch uplink */
++&cp1_eth2 {
++	status = "okay";
++	phy-mode = "2500base-x";
++	phys = <&cp1_comphy5 2>;
++	fixed-link {
++		speed = <2500>;
++		full-duplex;
++	};
++};
++
++&cp1_spi1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&cp1_spi1_pins>;
++	status = "okay";
++
++	spi-flash at 0 {
++		compatible = "st,w25q32";
++		spi-max-frequency = <50000000>;
++		reg = <0>;
++	};
++};
++
++&cp1_usb3_0 {
++	usb-phy = <&usb3h0_phy>;
++	status = "okay";
++};
+-- 
+2.18.0
