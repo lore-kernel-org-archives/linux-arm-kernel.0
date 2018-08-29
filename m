@@ -1,64 +1,85 @@
-From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
-Date: Wed, 29 Aug 2018 08:18:02 +0200
-Subject: [PATCH 00/11] Reform EP93xx GPIO
-In-Reply-To: <20180822204111.9581-1-linus.walleij@linaro.org>
-References: <20180822204111.9581-1-linus.walleij@linaro.org>
-Message-ID: <20180829081802.d2172615b79337b7f71dc804@gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 29 Aug 2018 08:53:46 +0200
+Subject: [PATCH V5 0/5] soc: imx: add scu firmware api support
+In-Reply-To: <AM0PR04MB4211A6BC038A141BA25B638A800A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1534781305-4770-1-git-send-email-aisheng.dong@nxp.com>
+ <AM0PR04MB4211F68CCD399243613F8D7B80320@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <AM0PR04MB4211F748DBD1FE64A2B2136980360@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <20180827083310.omqa3kpmj542fu3b@pengutronix.de>
+ <AM0PR04MB4211E5D66FD8502278765EC8800B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <AM0PR04MB42113BB0FA9E54629339F872800B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <20180828062113.khmkvsj3ofc7muu6@pengutronix.de>
+ <AM0PR04MB4211A6BC038A141BA25B638A800A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <20180829065346.zi6v6me7ufft7ntt@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Linus,
+On Tue, Aug 28, 2018 at 08:53:34AM +0000, A.s. Dong wrote:
+> > -----Original Message-----
+> > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+> > Sent: Tuesday, August 28, 2018 2:21 PM
+> > To: A.s. Dong <aisheng.dong@nxp.com>
+> > Cc: Jassi Brar <jassisinghbrar@gmail.com>; dongas86 at gmail.com;
+> > kernel at pengutronix.de; shawnguo at kernel.org; Fabio Estevam
+> > <fabio.estevam@nxp.com>; dl-linux-imx <linux-imx@nxp.com>;
+> > linux-arm-kernel at lists.infradead.org
+> > Subject: Re: [PATCH V5 0/5] soc: imx: add scu firmware api support
+> > 
+> > On Mon, Aug 27, 2018 at 10:21:37AM +0000, A.s. Dong wrote:
+> > > > From: A.s. Dong
+> > > > > From: Sascha Hauer [mailto:s.hauer at pengutronix.de] On Fri, Aug 24,
+> > > > > 2018 at 07:36:38AM +0000, A.s. Dong wrote:
+> > > > > > Hi Jassi & Sasha,
+> > > > > >
+> > > > > > Do you have some suggestions about this patch series?
+> > > > >
+> > > > > I still think that the users like clk and pinctrl should directly
+> > > > > call sc_call_rpc(), no need for this shim at all.
+> > > > >
+> > > >
+> > > > Sorry, I'm a bit confuse.
+> > > > What specific shim do you mean not needed?
+> > > >
+> > > > Do you mean we don't need all the SCU SVC APIs (clk/pm/pinctrl/misc
+> > > > and etc) Implemented in this patch series and instead directly
+> > > > implement them in client driver?
+> > > > For example:
+> > > > drivers/soc/imx/sc/svc/pm/rpc_clnt.c
+> > > > sc_err_t sc_pm_get_clock_rate(sc_ipc_t ipc, sc_rsrc_t resource,
+> > > >                               sc_pm_clk_t clk, sc_pm_clock_rate_t
+> > > > *rate) Change to:
+> > > > drivers/clk/imx/scu/scu_clock.c ?
+> > > > sc_err_t sc_pm_get_clock_rate(sc_ipc_t ipc, sc_rsrc_t resource,
+> > > >                               sc_pm_clk_t clk, sc_pm_clock_rate_t
+> > > > *rate)
+> > > >
+> > >
+> > > I thought even make client driver to directly to sc_call_rpc(), it may
+> > > still better to Make them into a serrate function call like
+> > > sc_pm_get_clock_rate() but just put In client driver instead of in the central
+> > SCU SVC place.
+> > > Not sure the point to do that.
+> > > Would you please help clarify a bit more?
+> > 
+> > I think translating the sc message setup into a function only adds additional
+> > overhead that the reader has to follow. I do not see the point for doing this.
+> > 
+> 
+> The original point is to separate the SCU service API implementation from the client
+> drivers. Client drivers don't have to know the internal details of the API implementation,
+> they just use the service API provided by SCU firmware. API implementation and client
+> users will be maintained independently.
 
-On Wed, 22 Aug 2018 22:41:00 +0200
-Linus Walleij <linus.walleij@linaro.org> wrote:
+I would buy this argument if the 'API implementation' was more than a
+shim layer that directly translates between function arguments and a
+message struct. With this you effectively can't change the API
+implementation without changing the API you provide to the client
+drivers.
 
-> This series is a spin-off of a patch from Arnd that started to
-> decouple the EP93xx GPIO driver from the code inside
-> arch/arm.
-> 
-> The driver needed some modernization and in the end I managed
-> to convert two of the banks to use GPIOLIB_IRQCHIP and use
-> a proper irqdomain.
-> 
-> The F bank presents a special problem that I need to think
-> about, because since there is one IRQ per GPIO line it is
-> essentially a hierarchical irqdomain.
-> 
-> This was tested on the SIM.ONE where I rigged lines on some
-> of the GPIOs on a board connector. It's crude but gives
-> interrupts and behave as expected before and after these
-> changes, the main visible change being that the hardware
-> IRQ line on each port appears in /proc/interrupts.
-> 
-> It would be great if some EP93xx users could test this
-> (especially something using bank F) so I can get it into
-> shape and merge as a baseline for further refactorings.
-
-I've tested only the basic GPIO functionality (as my
-applications do not use IRQs as of now), but the whole
-series looks good to me:
-
-Acked-by: Alexander Sverdlin <alexander.sverdlin@gmail.com>
-
-> Arnd Bergmann (1):
->   ARM/gpio: ep93xx: build standalone
-> 
-> Linus Walleij (10):
->   gpio: ep93xx: Cut down variable names
->   gpio: ep93xx: Switch to SPDX license tag
->   gpio: ep93xx: Pass around struct gpio_chip
->   gpio: ep93xx: Rename has_debounce to has_irq
->   gpio: ep93xx: Properly call the chained IRQ handler
->   gpio: ep93xx: Do not pingpong irq numbers
->   gpio: ep93xx: Use the hwirq and port
->   gpio: ep93xx: Use for_each_set_bit() in IRQ handler
->   gpio: ep93xx: Cut gpio_to_irq() usage
->   gpio: ep93xx: Switch A and B to use GPIOLIB_IRQCHIP
-> 
->  arch/arm/mach-ep93xx/core.c |   9 ++
->  drivers/gpio/Kconfig        |   1 +
->  drivers/gpio/gpio-ep93xx.c  | 297 +++++++++++++++++++++---------------
->  3 files changed, 181 insertions(+), 126 deletions(-)
+Sascha
 
 -- 
-Alexander Sverdlin.
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
