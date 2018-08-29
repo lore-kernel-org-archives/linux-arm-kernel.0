@@ -1,35 +1,32 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Wed, 29 Aug 2018 20:11:21 +0300
-Subject: [PATCH v4 0/2] clk: Add functions to get optional clocks
-In-Reply-To: <1533039060-18779-1-git-send-email-phil.edworthy@renesas.com>
-References: <1533039060-18779-1-git-send-email-phil.edworthy@renesas.com>
-Message-ID: <20180829171121.GE11447@smile.fi.intel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 29 Aug 2018 18:11:32 +0100
+Subject: [PATCH RESEND] arm64: don't dump stack for usermode address in
+ show_regs
+In-Reply-To: <e5f4011a-e0a0-b5be-599f-5adc32155d87@huawei.com>
+References: <0003f02c-fc35-b4e9-3d3d-82ee8d02acb7@huawei.com>
+ <20180829115402.GB1125@arm.com>
+ <e5f4011a-e0a0-b5be-599f-5adc32155d87@huawei.com>
+Message-ID: <20180829171131.GA11160@brain-police>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2018 at 01:10:58PM +0100, Phil Edworthy wrote:
-> Quite a few drivers get an optional clock, e.g. a bus clock required to 
-> access peripheral's registers that is always enabled on some devices.
+On Wed, Aug 29, 2018 at 10:58:00PM +0800, Ding Tianhong wrote:
+> On 2018/8/29 19:54, Will Deacon wrote:
+> > This looks like we're somehow dereferencing the user frame-pointer from the
+> > READ_ONCE_NOCHECK in unwind_frame(). However, I really don't see how that
+> > can happen, since the kernel entry code pushes a dummy frame record or
+> > zeroes, which will terminate any backtrace before we hit the user
+> > addresses. Furthermore, we explicitly check that the frame pointer points
+> > to an accessible stack before we dereference it. Hmm.
+> > 
 > 
+> I found the patch 12964443e8d1 ("arm64: add on_accessible_stack()")
+> already fix this in kernel v4.14, my kernel version is older than this and
+> miss this patch for a long time, so I think this is the reason that I met
+> this problem, thanks for remind me.
 
-Didn't see any updates so far.
-Anyway, this one LGTM,
+Ok, but in future please state up-front if you're reporting an issue that
+you're seeing on something older than mainline. I spent an hour reading
+through this code today looking for a bug we'd already fixed :(
 
-Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-
-> Phil Edworthy (2):
->   clk: Add of_clk_get_by_name_optional() function
->   clk: Add functions to get optional clocks
-> 
->  drivers/clk/clk-devres.c | 18 +++++++++++++--
->  drivers/clk/clkdev.c     | 58 +++++++++++++++++++++++++++++++++++++++++++-----
->  include/linux/clk.h      | 35 +++++++++++++++++++++++++++++
->  3 files changed, 104 insertions(+), 7 deletions(-)
-> 
-> -- 
-> 2.7.4
-> 
-
--- 
-With Best Regards,
-Andy Shevchenko
+Will
