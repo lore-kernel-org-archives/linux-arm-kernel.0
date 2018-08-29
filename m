@@ -1,35 +1,24 @@
-From: steve.capper@arm.com (Steve Capper)
-Date: Wed, 29 Aug 2018 13:45:43 +0100
-Subject: [PATCH 5/5] arm64: mm: Activate 52-bit userspace VA support
-In-Reply-To: <20180829124543.25314-1-steve.capper@arm.com>
-References: <20180829124543.25314-1-steve.capper@arm.com>
-Message-ID: <20180829124543.25314-6-steve.capper@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 29 Aug 2018 07:46:10 -0500
+Subject: [PATCH v7 2/4] dt-bindings: arm: Document emtrion emCON-MX6
+ bindings
+In-Reply-To: <20180829100811.55836-2-jan.tuerk@emtrion.com>
+References: <20180824132617.43975-1-jan.tuerk@emtrion.com>
+ <20180829100811.55836-1-jan.tuerk@emtrion.com>
+ <20180829100811.55836-2-jan.tuerk@emtrion.com>
+Message-ID: <20180829124610.GA6123@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have all the pieces in place now to support a 52-bit userspace VA.
-This patch enables this logic for systems running with a 48-bit VA and a
-64KB PAGE_SIZE.
+On Wed, Aug 29, 2018 at 12:07:58PM +0200, Jan Tuerk wrote:
+> Document the compatible strings for emtrion emCON-MX6 SoM's.
+> 
+> Signed-off-by: Jan Tuerk <jan.tuerk@emtrion.com>
+> ---
+>  Documentation/devicetree/bindings/arm/emtrion.txt | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/emtrion.txt
+> 
+> Unchanged since v6 (rebased)
 
-Signed-off-by: Steve Capper <steve.capper@arm.com>
----
- arch/arm64/Kconfig | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 29e75b47becd..2561b541c9df 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -691,6 +691,10 @@ config ARM64_PA_BITS_52
- 
- endchoice
- 
-+config ARM64_TRY_52BIT_VA
-+	def_bool y
-+	depends on ARM64_VA_BITS_48 && ARM64_64K_PAGES
-+
- config ARM64_PA_BITS
- 	int
- 	default 48 if ARM64_PA_BITS_48
--- 
-2.11.0
+Please add acks/reviewed-bys when posting new versions.
