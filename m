@@ -1,41 +1,40 @@
-From: sudhanshu.gupta@nxp.com (Sudhanshu Gupta)
-Date: Wed, 29 Aug 2018 20:47:26 +0530
-Subject: [PATCH] dt-bindings: Add compatible string for LS1028A-QDS
-Message-ID: <1535555846-7817-1-git-send-email-sudhanshu.gupta@nxp.com>
+From: colin.king@canonical.com (Colin King)
+Date: Wed, 29 Aug 2018 10:27:46 +0100
+Subject: [PATCH] fsl: remove redundant pointer 'priv'
+Message-ID: <20180829092746.30674-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
+From: Colin Ian King <colin.king@canonical.com>
 
-Signed-off-by: Sudhanshu Gupta <sudhanshu.gupta@nxp.com>
-Signed-off-by: Rai Harninder <harninder.rai@nxp.com>
-Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
+Pointer 'priv' is being assigned but is never used hence it is
+redundant and can be removed.
+
+Cleans up clang warning:
+variable 'priv' set but not used [-Wunused-but-set-variable]
+
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
 ---
- Documentation/devicetree/bindings/arm/fsl.txt | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ drivers/soc/fsl/dpio/dpio-driver.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-index ea08bf2..3e44804 100644
---- a/Documentation/devicetree/bindings/arm/fsl.txt
-+++ b/Documentation/devicetree/bindings/arm/fsl.txt
-@@ -163,6 +163,18 @@ LS1012A ARMv8 based QDS Board
- Required root node properties:
-     - compatible = "fsl,ls1012a-qds", "fsl,ls1012a";
+diff --git a/drivers/soc/fsl/dpio/dpio-driver.c b/drivers/soc/fsl/dpio/dpio-driver.c
+index b60b77bfaffa..e58fcc9096e8 100644
+--- a/drivers/soc/fsl/dpio/dpio-driver.c
++++ b/drivers/soc/fsl/dpio/dpio-driver.c
+@@ -50,13 +50,10 @@ static void unregister_dpio_irq_handlers(struct fsl_mc_device *dpio_dev)
  
-+LS1028A SoC
-+Required root node properties:
-+    - compatible = "fsl,ls1028a";
-+
-+LS1028A ARMv8 based RDB Board
-+Required root node properties:
-+    - compatible = "fsl,ls1028a-rdb", "fsl,ls1028a"
-+
-+LS1028A ARMv8 based QDS Board
-+Required root node properties:
-+    - compatible = "fsl,ls1028a-qds", "fsl,ls1028a";
-+
- LS1043A SoC
- Required root node properties:
-     - compatible = "fsl,ls1043a";
+ static int register_dpio_irq_handlers(struct fsl_mc_device *dpio_dev, int cpu)
+ {
+-	struct dpio_priv *priv;
+ 	int error;
+ 	struct fsl_mc_device_irq *irq;
+ 	cpumask_t mask;
+ 
+-	priv = dev_get_drvdata(&dpio_dev->dev);
+-
+ 	irq = dpio_dev->irqs[0];
+ 	error = devm_request_irq(&dpio_dev->dev,
+ 				 irq->msi_desc->irq,
 -- 
-1.9.1
+2.17.1
