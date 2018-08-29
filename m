@@ -1,33 +1,22 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Wed, 29 Aug 2018 13:00:47 +0800
-Subject: [PATCH 2/2] ARM: imx_v6_v7_defconfig: select CONFIG_ARM_CPUIDLE by
- default
-In-Reply-To: <1535518847-24417-1-git-send-email-Anson.Huang@nxp.com>
-References: <1535518847-24417-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1535518847-24417-2-git-send-email-Anson.Huang@nxp.com>
+From: Jason@zx2c4.com (Jason A. Donenfeld)
+Date: Tue, 28 Aug 2018 23:06:42 -0600
+Subject: [PATCH v2 15/17] zinc: Curve25519 ARM implementation
+In-Reply-To: <CAKv+Gu-WVOBZ1sQwOKo29P_jWL86wOnzd1-sB_6mTbPX1Lz0NQ@mail.gmail.com>
+References: <20180824213849.23647-1-Jason@zx2c4.com>
+ <20180824213849.23647-16-Jason@zx2c4.com>
+ <CAKv+Gu-WVOBZ1sQwOKo29P_jWL86wOnzd1-sB_6mTbPX1Lz0NQ@mail.gmail.com>
+Message-ID: <CAHmME9rs+8kynZym=E4btqOu+Sh7MFn3kq7EPDXP27WzC9j_ZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some i.MX platforms like i.MX7S/D uses generic ARM cpuidle
-driver and psci method to support cpuidle feature, select
-CONFIG_ARM_CPUIDLE by default for such platforms.
+Hey Ard,
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Thanks for the thorough review. Very much appreciated. I've
+incorporated nearly all of your suggestions into my development tree:
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index e2c1276..65df4b2 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -62,6 +62,7 @@ CONFIG_CPU_FREQ_GOV_CONSERVATIVE=y
- CONFIG_CPUFREQ_DT=y
- CONFIG_ARM_IMX6Q_CPUFREQ=y
- CONFIG_CPU_IDLE=y
-+CONFIG_ARM_CPUIDLE=y
- CONFIG_VFP=y
- CONFIG_NEON=y
- CONFIG_BINFMT_MISC=m
--- 
-2.7.4
+https://git.kernel.org/pub/scm/linux/kernel/git/zx2c4/linux.git/tree/lib/zinc/curve25519/curve25519-arm.S?h=jd/wireguard
+
+These changes will be part of v3.
+
+Regards,
+Jason
