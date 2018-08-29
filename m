@@ -1,98 +1,65 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 29 Aug 2018 16:22:13 -0700
-Subject: mmotm 2018-08-23-17-26 uploaded
-In-Reply-To: <049c3fa9-f888-6a2d-413b-872992b269f9@gmail.com>
-References: <20180824002731.XMNCl%akpm@linux-foundation.org>
- <049c3fa9-f888-6a2d-413b-872992b269f9@gmail.com>
-Message-ID: <20180829162213.fa1c7c54c801a036e64bacd2@linux-foundation.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 30 Aug 2018 07:43:30 +0800
+Subject: [PATCH 1/2] ASoC: Add driver for PROTO Audio CODEC (with a WM8731)
+In-Reply-To: <20180829144727.13757-2-codrin.ciubotariu@microchip.com>
+References: <20180829144727.13757-2-codrin.ciubotariu@microchip.com>
+Message-ID: <201808300705.abCHwamP%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 28 Aug 2018 12:20:46 +0800 Jia He <hejianet@gmail.com> wrote:
+Hi Codrin,
 
-> Hi Andrew
-> FYI,I watched a lockdep warning based on your mmotm master branch[1]
+Thank you for the patch! Yet something to improve:
 
-Thanks.  We'll need help from ARM peeps on this please.
+[auto build test ERROR on at91/at91-next]
+[also build test ERROR on v4.19-rc1 next-20180829]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-> [    6.692731] ------------[ cut here ]------------
-> [    6.696391] DEBUG_LOCKS_WARN_ON(!current->hardirqs_enabled)
-> [    6.696404] WARNING: CPU: 3 PID: 320 at kernel/locking/lockdep.c:3845
-> check_flags.part.38+0x9c/0x16c
-> [    6.711082] Modules linked in:
-> [    6.714101] CPU: 3 PID: 320 Comm: modprobe Not tainted 4.18.0-rc4-mm1+ #56
-> [    6.720956] Hardware name: WIWYNN HXT REP-1 System H001-00001-0/HXT REP-1
-> CRB, BIOS 0ACJA530 03/20/2018
-> [    6.730332] pstate: 60400085 (nZCv daIf +PAN -UAO)
-> [    6.735106] pc : check_flags.part.38+0x9c/0x16c
-> [    6.739619] lr : check_flags.part.38+0x9c/0x16c
-> [    6.744133] sp : ffff80178536fbf0
-> [    6.747432] x29: ffff80178536fbf0 x28: ffff8017905a1b00
-> [    6.752727] x27: 0000000000000002 x26: 0000000000000000
-> [    6.758022] x25: ffff000008abeb14 x24: 0000000000000000
-> [    6.763317] x23: 0000000000000001 x22: 0000000000000001
-> [    6.768612] x21: 0000000000000001 x20: 0000000000000000
-> [    6.773908] x19: ffff00000a041000 x18: 0000000000000000
-> [    6.779202] x17: 0000000000000000 x16: 0000000000000000
-> [    6.784498] x15: 0000000000000000 x14: 0000000000000000
-> [    6.789793] x13: ffff000008d6b190 x12: 752ce9eb60de3f00
-> [    6.795088] x11: ffff80178536f7f0 x10: ffff80178536f7f0
-> [    6.800383] x9 : 00000000ffffffd0 x8 : 0000000000000000
-> [    6.805678] x7 : ffff00000816fe48 x6 : ffff801794ba62b8
-> [    6.810973] x5 : 0000000000000000 x4 : 0000000000000000
-> [    6.816269] x3 : ffffffffffffffff x2 : ffff0000091ed988
-> [    6.821564] x1 : 752ce9eb60de3f00 x0 : 752ce9eb60de3f00
-> [    6.826859] Call trace:
-> [    6.829290]  check_flags.part.38+0x9c/0x16c
-> [    6.833457]  lock_acquire+0x12c/0x280
-> [    6.837104]  down_read_trylock+0x78/0x98
-> [    6.841011]  do_page_fault+0x150/0x480
-> [    6.844742]  do_translation_fault+0x74/0x80
-> [    6.848909]  do_mem_abort+0x60/0x108
-> [    6.852467]  el0_da+0x24/0x28
-> [    6.855418] irq event stamp: 250
-> [    6.858633] hardirqs last  enabled at (249): [<ffff00000830e518>]
-> mem_cgroup_commit_charge+0x9c/0x13c
-> [    6.867833] hardirqs last disabled at (250): [<ffff000008095f40>]
-> el0_svc_handler+0xc4/0x16c
-> [    6.876252] softirqs last  enabled at (242): [<ffff000008081c48>]
-> __do_softirq+0x2f8/0x554
-> [    6.884501] softirqs last disabled at (229): [<ffff0000080f1bec>]
-> irq_exit+0x180/0x194
-> [    6.892399] ---[ end trace b45768f94a7b7d9f ]---
-> [    6.896998] possible reason: unannotated irqs-on.
-> [    6.901685] irq event stamp: 250
-> [    6.904898] hardirqs last  enabled at (249): [<ffff00000830e518>]
-> mem_cgroup_commit_charge+0x9c/0x13c
-> [    6.914100] hardirqs last disabled at (250): [<ffff000008095f40>]
-> el0_svc_handler+0xc4/0x16c
-> [    6.922519] softirqs last  enabled at (242): [<ffff000008081c48>]
-> __do_softirq+0x2f8/0x554
-> [    6.930766] softirqs last disabled at (229): [<ffff0000080f1bec>]
-> irq_exit+0x180/0x194
-> [    7.023827] Initialise system trusted keyrings
-> [    7.027414] workingset: timestamp_bits=45 max_order=25 bucket_order=0
+url:    https://github.com/0day-ci/linux/commits/Codrin-Ciubotariu/ASoC-Add-driver-for-PROTO-Audio-CODEC-with-a-WM8731/20180830-060610
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git at91-next
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-Lockdep says current->hardirqs_enabled is false and that is indeed an
-error.  arch/arm64/kernel/entry.S:el0_da does enable_daif which might
-be an attempt to enable hardirqs, but how does that get propagated into
-lockdep's ->hardirqs_enabled?  By calling
-local_irq_enable()->trace_hardirqs_on(), but that's C, not assembler.
+All errors (new ones prefixed by >>):
 
-And what changed to cause this?
+   sound/soc/atmel/mikroe-proto.c: In function 'snd_proto_init':
+>> sound/soc/atmel/mikroe-proto.c:49:35: error: 'struct snd_soc_pcm_runtime' has no member named 'codec'
+     struct snd_soc_codec *codec = rtd->codec;
+                                      ^~
+>> sound/soc/atmel/mikroe-proto.c:56:16: error: dereferencing pointer to incomplete type 'struct snd_soc_codec'
+      dev_err(codec->dev, "Failed to set WM8731 SYSCLK: %d\n", ret);
+                   ^~
 
-I dunno anything.  Help!
+vim +49 sound/soc/atmel/mikroe-proto.c
 
-> I thought the root cause might be at [2] which seems not in your branch yet.
-> 
-> [1] http://git.cmpxchg.org/cgit.cgi/linux-mmotm.git
-> [2]
-> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit?id=efd112
+    46	
+    47	static int snd_proto_init(struct snd_soc_pcm_runtime *rtd)
+    48	{
+  > 49		struct snd_soc_codec *codec = rtd->codec;
+    50		struct snd_soc_dai *codec_dai = rtd->codec_dai;
+    51	
+    52		/* Set proto sysclk */
+    53		int ret = snd_soc_dai_set_sysclk(codec_dai, WM8731_SYSCLK_XTAL,
+    54						 XTAL_RATE, SND_SOC_CLOCK_IN);
+    55		if (ret < 0) {
+  > 56			dev_err(codec->dev, "Failed to set WM8731 SYSCLK: %d\n", ret);
+    57			return ret;
+    58		}
+    59	
+    60		return 0;
+    61	}
+    62	
 
-I agree, that doesn't look like the culprit.  But something may well
-have gone wrong in "the recent conversion of the syscall entry/exit
-code to C".
-
->
-> ...
->
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 64126 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180830/71379246/attachment-0001.gz>
