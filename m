@@ -1,125 +1,65 @@
-From: liviu.dudau@arm.com (Liviu Dudau)
-Date: Wed, 29 Aug 2018 11:01:52 +0100
-Subject: [PATCH 1/2] drm/bridge: Add virtual display DT bindings
-In-Reply-To: <20180829095822eucas1p1fe4336ca7944765c01fc6ad1e941b8b0~PUn7YujBw3056130561eucas1p1_@eucas1p1.samsung.com>
-References: <CGME20180824122324epcas3p2922f3e5415dacf4c89cfb136fa5c77b2@epcas3p2.samsung.com>
- <20180824122308.3092-1-linus.walleij@linaro.org>
- <20180827115302eucas1p24d36cfaf9835ccb217ac81e508484aa1~Ou5eTkYW-3006130061eucas1p2Z@eucas1p2.samsung.com>
- <CACRpkdaGNhxY-xAAEL1Bu4EMr8x7qTGoM9s-At2v7Ev8PwOTDw@mail.gmail.com>
- <20180829095822eucas1p1fe4336ca7944765c01fc6ad1e941b8b0~PUn7YujBw3056130561eucas1p1_@eucas1p1.samsung.com>
-Message-ID: <20180829100152.GL907@e110455-lin.cambridge.arm.com>
+From: liang.yang@amlogic.com (Liang Yang)
+Date: Wed, 29 Aug 2018 18:08:05 +0800
+Subject: [RFC PATCH v2 2/2] mtd: rawnand: meson: add support for Amlogic
+ NAND flash controller
+In-Reply-To: <20180828152645.457dab5c@bbrezillon>
+References: <20180719094612.5833-1-yixun.lan@amlogic.com>
+ <20180719094612.5833-3-yixun.lan@amlogic.com>
+ <20180801235045.5b4d8211@bbrezillon>
+ <42877a0d-9830-0626-3f64-e49a326eaa3c@amlogic.com>
+ <20180817155608.5929b37a@bbrezillon>
+ <96e538a5-1232-11f2-8b9e-5ddb09dcc2de@amlogic.com>
+ <20180824144810.31c929a5@bbrezillon>
+ <fdea2d54-7a68-64ec-8bb4-4a94677a3293@amlogic.com>
+ <20180828152645.457dab5c@bbrezillon>
+Message-ID: <9abf0461-159b-db45-9ded-3d6cb2cc64db@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 29, 2018 at 11:58:20AM +0200, Andrzej Hajda wrote:
-> On 28.08.2018 15:45, Linus Walleij wrote:
-> > On Mon, Aug 27, 2018 at 1:53 PM Andrzej Hajda <a.hajda@samsung.com> wrote:
-> >
-> >> On 24.08.2018 14:23, Linus Walleij wrote:
-> >>> This adds bindings for a virtual display to be used with displays
-> >>> inside entirely virtual environments which do not emulate things
-> >>> like monitors but just need timing information to be supplied to
-> >>> its display controller.
-> >>>
-> >>> This is inspired by earlier work by Liviu Dudau.
-> >> If this is pure virtual then it should be connected to other pure
-> >> virtual components.
-> > OK it's a bit of half-half but outside of my grasp, I am just trying
-> > to support legacy systems.
-> >
-> > The device tree is there:
-> > arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
-> > arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi
-> >
-> > The latter contains the CLCD which is the display driver.
-> >
-> > In RTSM, which is an ARM product I do not develop and
-> > cannot make changes to, there is an emulated CLCD. So
-> > that part appear as if it was real hardware. Like in QEMU.
-> >
-> > But the display does not have any emulation. The raw
-> > output from the CLCD is latched out to the screen.
-> >
-> > I do not know exactly know how the RTSM emulator
-> > actually works, but I suspect that the little graphic window
-> > on the screeen adapts to what gets written into the
-> > CLCD control registers, so anything goes, more or less.
-> >
-> > To satisfy the CLCD with some timings and resolution,
-> > this bridge gives it that, from the device tree, in a way
-> > that clearly conveys that "this is not a real thing".
-> >
-> > The old code uses DPI. This is not DPI, not even close
-> > to it. It worked simply because all the DPI really does is
-> > what this patch does: provide timings.
-> >
-> > By contrast on QEMU I have patches the emulator to
-> > properly represent the I2C DDC link and provide EDID
-> > so that is all fine.
-> >
-> > I cannot patch RTSM to emulate I2C and DDC. It's not
-> > open source. But the device tree in the kernel supports
-> > this "machine" and so, I have to maintain it when modernizng
-> > the fbdev driver to a DRM driver.
-> >
-> > I'm sorry RTSM is half/half. Not my fault. I can't fix...
-> 
-> I do not know the platform, so I? I have dug little bit, but I wan't
-> call it? thorough research. Just please be kind if I wrote sth stupid.
-> What I have found:
-> 1. DTS shows CLCD is pl111.
-> 2. pl111 documentation says it's output interface supports STN and TFT
-> up to 24-bit bus. I do not know STN, but TFT seems to be compatible with
-> DPI.
-> 
-> If it is correct, dpi panel seems to be OK. And I think it is less
-> important how the emulator works, more important is that it should
-> emulate pl111, including it's output interfaces.
 
-Yeah, unfortunately that ship has sailed a long time ago. The emulator
-people thought emulating the register interface is good enough and took
-liberties on how the behaviour was "emulated". End result: output
-interfaces are not the same.
-
-Best regards,
-Liviu
-
+On 8/28/2018 9:26 PM, Boris Brezillon wrote:
+> On Tue, 28 Aug 2018 21:21:48 +0800
+> Liang Yang <liang.yang@amlogic.com> wrote:
 > 
-> Regards
-> Andrzej
-> >
-> >> And one more thing, you are defining virtual panel but you are using
-> >> drm_bridge framework, why not drm_panel?
-> > This was discussed before in the previous patch set:
-> > https://lists.freedesktop.org/archives/dri-devel/2018-July/183516.html
-> >
-> > Essentially, it's because the display driver is just connected
-> > to "something" not a panel and a bridge is likely the best I
-> > can come up with - a bridge over to a virtual display.
-> >
-> > A patch to add "VGA", "SGA" and "XGA" to the simple panels
-> > was NACKed (sort of, politely):
-> > https://lists.freedesktop.org/archives/dri-devel/2018-July/183698.html
-> >
-> > Also it was noted that it would be nice to have something that
-> > would make it easy to change resolutions on these virtual
-> > display things. Voila.
+>> Hi Boris,
+>>
+>> On 8/24/2018 8:48 PM, Boris Brezillon wrote:
+>>> On Wed, 22 Aug 2018 22:08:42 +0800
+>>> Liang Yang <liang.yang@amlogic.com> wrote:
+>>>    
+>>>>> You have to wait tWB, that's for sure.
+>>>>>       
+>>>> we have a maximum 32 commands fifo. when command is written into
+>>>> NFC_REG_CMD, it doesn't mean that command is executing right now, maybe
+>>>> it is buffering on the queue.Assume one ERASE operation, when 2nd
+>>>> command(0xd0) is written into NFC_REG_CMD and then come into
+>>>> NAND_OP_WAITRDY_INSTR, if I read the RB status by register, it may be
+>>>> wrong because 0xd0 may not being executed. it is unusual unless
+>>>> buffering two many command.
+>>>
+>>> You should flush the queue and wait for it to empty at the end of
+>>> ->exec_op().
+>>>    
+>>>> so it seems that i still need to use nand_soft_waitrdy or wait cmd is
+>>>> executed somewhere.
+>>>
+>>> Don't you have a WAIT_FOR_RB instruction? What is NFC_CMD_RB for? Also,
+>>> NFC_CMD_IDLE seems to allow you to add an arbitrary delay, and that's
+>>> probably what you should use for tWB.
+>>>
+>>> em, I can wait for RB by reading the status from register now. but when
+>> calling nand_soft_waitrdy, i really met a problem. One *jiffies* is
+>> about 4ms. When programming, it pass 1ms to
+>> instr->ctx.waitrdy.timeout_ms and nand_soft_waitrdy will be only one
+>> *jiffies* to reach timeout. And then calling nand_soft_waitrdy maybe at
+>> the tail of 4ms interval, it may only wait 100us and next jiffies
+>> arrive. Is it correct?
 > 
+> Hm, no. If you initialize the time you compare to (using time_before()
+> or time_after()) correctly it should not happen. Anyway, I keep thinking
+> this is not how it should be done. Did you try NFC_CMD_RB? Did you ask
+> HW designers what it was created for?
 > 
+I am using NFC_CMD_RB and checking with irq. it is ok now.
+> .
 > 
-> >
-> > Yours,
-> > Linus Walleij
-> >
-> >
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
