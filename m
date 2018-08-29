@@ -1,104 +1,66 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 29 Aug 2018 11:31:04 +0200
-Subject: [PATCH] mfd: motorola-cpcap: Add audio-codec support
-Message-ID: <20180829093104.GA22065@amd>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Wed, 29 Aug 2018 11:37:14 +0200
+Subject: [PATCH 3/5] net: mvneta: Don't check NETIF_F_GRO ourself
+In-Reply-To: <20180829162836.2551ba46@xhacker.debian> (Jisheng Zhang's message
+ of "Wed, 29 Aug 2018 16:28:36 +0800")
+References: <20180829162456.2bd69796@xhacker.debian>
+ <20180829162836.2551ba46@xhacker.debian>
+Message-ID: <875zztjyyd.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sebastian Reichel <sre@kernel.org>
-    
-Add support for the audio-codec node by converting from
-devm_of_platform_populate() to devm_mfd_add_devices().
-   
-Tested-by: Pavel Machek <pavel@ucw.cz>
-Acked-by: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
+Hi Jisheng,
+ 
+ On mer., ao?t 29 2018, Jisheng Zhang <Jisheng.Zhang@synaptics.com> wrote:
 
-diff --git a/drivers/mfd/motorola-cpcap.c b/drivers/mfd/motorola-cpcap.c
-index 5276911..20d9692 100644
---- a/drivers/mfd/motorola-cpcap.c
-+++ b/drivers/mfd/motorola-cpcap.c
-@@ -18,6 +18,7 @@
- #include <linux/regmap.h>
- #include <linux/sysfs.h>
- 
-+#include <linux/mfd/core.h>
- #include <linux/mfd/motorola-cpcap.h>
- #include <linux/spi/spi.h>
- 
-@@ -216,6 +217,53 @@ static const struct regmap_config cpcap_regmap_config = {
- 	.val_format_endian = REGMAP_ENDIAN_LITTLE,
- };
- 
-+static const struct mfd_cell cpcap_mfd_devices[] = {
-+	{
-+		.name          = "cpcap_adc",
-+		.of_compatible = "motorola,mapphone-cpcap-adc",
-+	}, {
-+		.name          = "cpcap_battery",
-+		.of_compatible = "motorola,cpcap-battery",
-+	}, {
-+		.name          = "cpcap-charger",
-+		.of_compatible = "motorola,mapphone-cpcap-charger",
-+	}, {
-+		.name          = "cpcap-regulator",
-+		.of_compatible = "motorola,mapphone-cpcap-regulator",
-+	}, {
-+		.name          = "cpcap-rtc",
-+		.of_compatible = "motorola,cpcap-rtc",
-+	}, {
-+		.name          = "cpcap-pwrbutton",
-+		.of_compatible = "motorola,cpcap-pwrbutton",
-+	}, {
-+		.name          = "cpcap-usb-phy",
-+		.of_compatible = "motorola,mapphone-cpcap-usb-phy",
-+	}, {
-+		.name          = "cpcap-led",
-+		.id            = 0,
-+		.of_compatible = "motorola,cpcap-led-red",
-+	}, {
-+		.name          = "cpcap-led",
-+		.id            = 1,
-+		.of_compatible = "motorola,cpcap-led-green",
-+	}, {
-+		.name          = "cpcap-led",
-+		.id            = 2,
-+		.of_compatible = "motorola,cpcap-led-blue",
-+	}, {
-+		.name          = "cpcap-led",
-+		.id            = 3,
-+		.of_compatible = "motorola,cpcap-led-adl",
-+	}, {
-+		.name          = "cpcap-led",
-+		.id            = 4,
-+		.of_compatible = "motorola,cpcap-led-cp",
-+	}, {
-+		.name          = "cpcap-codec",
-+	}
-+};
-+
- static int cpcap_probe(struct spi_device *spi)
- {
- 	const struct of_device_id *match;
-@@ -260,7 +308,8 @@ static int cpcap_probe(struct spi_device *spi)
- 	if (ret)
- 		return ret;
- 
--	return devm_of_platform_populate(&cpcap->spi->dev);
-+	return devm_mfd_add_devices(&spi->dev, 0, cpcap_mfd_devices,
-+				    ARRAY_SIZE(cpcap_mfd_devices), NULL, 0, NULL);
- }
- 
- static struct spi_driver cpcap_driver = {
+> napi_gro_receive() checks NETIF_F_GRO bit as well, if the bit is not
+> set, we will go through GRO_NORMAL in napi_skb_finish(), so fall back
+> to netif_receive_skb_internal(), so we don't need to check NETIF_F_GRO
+> ourself.
+
+this one is not a fix and it should go to net-next.
+
+And for the patch it looks OK:
+
+Reviewed-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+
+Thanks,
+
+Gregory
+
+
+>
+> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+> ---
+>  drivers/net/ethernet/marvell/mvneta.c | 5 +----
+>  1 file changed, 1 insertion(+), 4 deletions(-)
+>
+> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+> index d9206094fce3..06634d4f9b94 100644
+> --- a/drivers/net/ethernet/marvell/mvneta.c
+> +++ b/drivers/net/ethernet/marvell/mvneta.c
+> @@ -2065,10 +2065,7 @@ static int mvneta_rx_swbm(struct napi_struct *napi,
+>  		/* Linux processing */
+>  		rxq->skb->protocol = eth_type_trans(rxq->skb, dev);
+>  
+> -		if (dev->features & NETIF_F_GRO)
+> -			napi_gro_receive(napi, rxq->skb);
+> -		else
+> -			netif_receive_skb(rxq->skb);
+> +		napi_gro_receive(napi, rxq->skb);
+>  
+>  		/* clean uncomplete skb pointer in queue */
+>  		rxq->skb = NULL;
+> -- 
+> 2.18.0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180829/3c3e43c7/attachment.sig>
+Gregory Clement, Bootlin
+Embedded Linux and Kernel engineering
+http://bootlin.com
