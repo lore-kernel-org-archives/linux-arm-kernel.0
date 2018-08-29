@@ -1,32 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 29 Aug 2018 18:11:32 +0100
-Subject: [PATCH RESEND] arm64: don't dump stack for usermode address in
- show_regs
-In-Reply-To: <e5f4011a-e0a0-b5be-599f-5adc32155d87@huawei.com>
-References: <0003f02c-fc35-b4e9-3d3d-82ee8d02acb7@huawei.com>
- <20180829115402.GB1125@arm.com>
- <e5f4011a-e0a0-b5be-599f-5adc32155d87@huawei.com>
-Message-ID: <20180829171131.GA11160@brain-police>
+From: scott.branden@broadcom.com (Scott Branden)
+Date: Wed, 29 Aug 2018 10:21:27 -0700
+Subject: [PATCH] arm64: defconfig: enable EFI_ARMSTUB_DTB_LOADER
+Message-ID: <1535563287-24803-1-git-send-email-scott.branden@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 29, 2018 at 10:58:00PM +0800, Ding Tianhong wrote:
-> On 2018/8/29 19:54, Will Deacon wrote:
-> > This looks like we're somehow dereferencing the user frame-pointer from the
-> > READ_ONCE_NOCHECK in unwind_frame(). However, I really don't see how that
-> > can happen, since the kernel entry code pushes a dummy frame record or
-> > zeroes, which will terminate any backtrace before we hit the user
-> > addresses. Furthermore, we explicitly check that the frame pointer points
-> > to an accessible stack before we dereference it. Hmm.
-> > 
-> 
-> I found the patch 12964443e8d1 ("arm64: add on_accessible_stack()")
-> already fix this in kernel v4.14, my kernel version is older than this and
-> miss this patch for a long time, so I think this is the reason that I met
-> this problem, thanks for remind me.
+Enable EFI_ARMSTUB_DTB_LOADER to add support for the dtb= command line
+parameter to function with efi loader.
 
-Ok, but in future please state up-front if you're reporting an issue that
-you're seeing on something older than mainline. I spent an hour reading
-through this code today looking for a bug we'd already fixed :(
+Required to boot on existing bootloaders that do not support devicetree
+provided by the platform or by the bootloader.
 
-Will
+Fixes: 3d7ee348aa41 ("efi/libstub/arm: Add opt-in Kconfig option for the DTB loader")
+Signed-off-by: Scott Branden <scott.branden@broadcom.com>
+---
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index f67e8d5..157cac9 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -114,6 +114,7 @@ CONFIG_ARM_ARMADA_37XX_CPUFREQ=y
+ CONFIG_ARM_BIG_LITTLE_CPUFREQ=y
+ CONFIG_ARM_SCPI_CPUFREQ=y
+ CONFIG_ARM_TEGRA186_CPUFREQ=y
++CONFIG_EFI_ARMSTUB_DTB_LOADER=y
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+ CONFIG_UNIX=y
+-- 
+2.5.0
