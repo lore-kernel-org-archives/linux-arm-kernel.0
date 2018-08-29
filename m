@@ -1,32 +1,20 @@
-From: eugen.hristev@microchip.com (Eugen Hristev)
-Date: Wed, 29 Aug 2018 17:17:43 +0300
-Subject: [PATCH v2 1/2] ARM: configs: at91: add generic resistive touchscreen
- to sama5
-Message-ID: <1535552264-8923-1-git-send-email-eugen.hristev@microchip.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 29 Aug 2018 22:30:38 +0800
+Subject: [PATCH 2/2] ARM: dts: imx6sll: add gpio clocks
+In-Reply-To: <DB3PR0402MB39163FACD5AE40052010B390F5090@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+References: <1529649154-5724-1-git-send-email-Anson.Huang@nxp.com>
+ <1529649154-5724-2-git-send-email-Anson.Huang@nxp.com>
+ <20180712025203.GQ6959@dragon>
+ <DB3PR0402MB39163FACD5AE40052010B390F5090@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+Message-ID: <20180829143032.GO3850@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add generic resistive touchscreen CONFIG_TOUCHSCREEN_ADC to sama5_defconfig
+On Wed, Aug 29, 2018 at 01:12:04AM +0000, Anson Huang wrote:
+> Hi, Shawn
+> 	I saw v4.19-rc1 is created, can you please apply this patch?
+> 
 
-Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
----
-Changes in v2:
-- split config change into two commits, per defconfig
+Applied.  Thanks for reminding.
 
- arch/arm/configs/sama5_defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
-index 2080025..ead6826 100644
---- a/arch/arm/configs/sama5_defconfig
-+++ b/arch/arm/configs/sama5_defconfig
-@@ -116,6 +116,7 @@ CONFIG_KEYBOARD_QT1070=y
- CONFIG_KEYBOARD_GPIO=y
- # CONFIG_INPUT_MOUSE is not set
- CONFIG_INPUT_TOUCHSCREEN=y
-+CONFIG_TOUCHSCREEN_ADC=y
- CONFIG_TOUCHSCREEN_ATMEL_MXT=y
- # CONFIG_SERIO is not set
- CONFIG_LEGACY_PTY_COUNT=4
--- 
-2.7.4
+Shawn
