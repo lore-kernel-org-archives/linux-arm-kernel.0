@@ -1,193 +1,109 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 29 Aug 2018 15:19:12 +0200
-Subject: [RFC PATCH 4/4] sched/topology: remove unused sd param from
- arch_scale_cpu_capacity()
-In-Reply-To: <1535548752-4434-1-git-send-email-vincent.guittot@linaro.org>
-References: <1535548752-4434-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1535548752-4434-5-git-send-email-vincent.guittot@linaro.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 29 Aug 2018 15:31:47 +0200
+Subject: [PATCH 1/7] dt-bindings: Add DT bindings documentation for
+ Allwinner Thermal Sensor Controller
+In-Reply-To: <20180824215921.59d060b54eb3a1e7d1552bde@bidouilliste.com>
+References: <20180804070355.14857-1-manu@freebsd.org>
+ <20180820111755.rzg7l2lznmbpuf2e@flea>
+ <CAL_JsqLVQDRH1esAXghfQdxmp+iorWVCArM2qTwjbgmQzmhzQw@mail.gmail.com>
+ <20180820140737.xmqhu5ndqzehvkql@flea>
+ <20180820162715.49e6d8a469ece983f3c1d288@bidouilliste.com>
+ <20180824145840.isdcg3fr6mw4ntzg@flea>
+ <20180824215921.59d060b54eb3a1e7d1552bde@bidouilliste.com>
+Message-ID: <20180829133147.e5pcu2rzd67fd6nm@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-struct sched_domain *sd parameter is no more used in arch_scale_cpu_capacity()
-so we can remote it.
+On Fri, Aug 24, 2018 at 09:59:21PM +0200, Emmanuel Vadot wrote:
+> 
+>  Hi,
+> 
+> On Fri, 24 Aug 2018 16:58:40 +0200
+> Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> 
+> > Hi,
+> > 
+> > On Mon, Aug 20, 2018 at 04:27:15PM +0200, Emmanuel Vadot wrote:
+> > > On Mon, 20 Aug 2018 16:07:37 +0200
+> > > Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> > > 
+> > > > On Mon, Aug 20, 2018 at 07:41:22AM -0600, Rob Herring wrote:
+> > > > > On Mon, Aug 20, 2018 at 5:17 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> > > > > >
+> > > > > > On Sat, Aug 04, 2018 at 09:03:49AM +0200, Emmanuel Vadot wrote:
+> > > > > > > This patch adds documentation for Device-Tree bindings for the Allwinner
+> > > > > > > Thermal Sensor Controller found on the H3, H5 and A64 SoCs
+> > > > > > >
+> > > > > > > Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
+> > > > > >
+> > > > > > I'm not going to merge a binding for a device that doesn't have any
+> > > > > > driver implemented at the moment in Linux.
+> > > > > 
+> > > > > I'll take it then. Linux is not the only DT client.
+> > > > 
+> > > > Then don't complain if we ever have to break the ABI. We never tested
+> > > > that hardware, never had any code running on it, and it *will* cause
+> > > > some issues. For example, the calibration data have never been used
+> > > > and how they should be represented have never been described, since no
+> > > > one ever actually tried to use it.
+> > > > 
+> > > > And sure, Linux is not the only DT client. Just like FreeBSD isn't.
+> > > 
+> > >  What kind of data would you need for me to make things better ?
+> > >  We have the driver in FreeBSD for almost two years now, whne I started
+> > > to see how to upstream it I noticed a lot of problems and spent 4 or 5
+> > > days to try on all the SoCs mentionned in the serie, the only SoC I
+> > > didn't include it the A83T as for some reason I couldn't make the
+> > > driver work.
+> > 
+> > Do you have a link to that driver? 
+> 
+>  https://github.com/freebsd/freebsd/blob/master/sys/arm/allwinner/aw_thermal.c
+> 
+> > How and how much did you test it?
+> 
+>  Using a cheap IR thermometer as it's all I can afford.
+>  Then running multiples cpufreq-a53 process and comparing the result.
+>  Did the same without using the calibration data, result where closer
+> when I used them.
 
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: "Rafael J. Wysocki" <rafael@kernel.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+Ok.
 
----
- arch/arm/kernel/topology.c       | 2 +-
- drivers/base/arch_topology.c     | 6 +++---
- include/linux/arch_topology.h    | 2 +-
- kernel/sched/cpufreq_schedutil.c | 2 +-
- kernel/sched/deadline.c          | 2 +-
- kernel/sched/fair.c              | 8 ++++----
- kernel/sched/pelt.c              | 2 +-
- kernel/sched/sched.h             | 4 ++--
- 8 files changed, 14 insertions(+), 14 deletions(-)
+> > Are you using the calibration data stored in the SID?
+> 
+>  Yes, which is why the serie contain the nvmem cell for the SID.
 
-diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-index 24ac3ca..d3d75c5 100644
---- a/arch/arm/kernel/topology.c
-+++ b/arch/arm/kernel/topology.c
-@@ -175,7 +175,7 @@ static void update_cpu_capacity(unsigned int cpu)
- 	topology_set_cpu_scale(cpu, cpu_capacity(cpu) / middle_capacity);
- 
- 	pr_info("CPU%u: update cpu_capacity %lu\n",
--		cpu, topology_get_cpu_scale(NULL, cpu));
-+		cpu, topology_get_cpu_scale(cpu));
- }
- 
- #else
-diff --git a/drivers/base/arch_topology.c b/drivers/base/arch_topology.c
-index e7cb0c6..6dc9339 100644
---- a/drivers/base/arch_topology.c
-+++ b/drivers/base/arch_topology.c
-@@ -44,7 +44,7 @@ static ssize_t cpu_capacity_show(struct device *dev,
- {
- 	struct cpu *cpu = container_of(dev, struct cpu, dev);
- 
--	return sprintf(buf, "%lu\n", topology_get_cpu_scale(NULL, cpu->dev.id));
-+	return sprintf(buf, "%lu\n", topology_get_cpu_scale(cpu->dev.id));
- }
- 
- static ssize_t cpu_capacity_store(struct device *dev,
-@@ -124,7 +124,7 @@ void topology_normalize_cpu_scale(void)
- 			/ capacity_scale;
- 		topology_set_cpu_scale(cpu, capacity);
- 		pr_debug("cpu_capacity: CPU%d cpu_capacity=%lu\n",
--			cpu, topology_get_cpu_scale(NULL, cpu));
-+			cpu, topology_get_cpu_scale(cpu));
- 	}
- 	mutex_unlock(&cpu_scale_mutex);
- }
-@@ -194,7 +194,7 @@ init_cpu_capacity_callback(struct notifier_block *nb,
- 	cpumask_andnot(cpus_to_visit, cpus_to_visit, policy->related_cpus);
- 
- 	for_each_cpu(cpu, policy->related_cpus) {
--		raw_capacity[cpu] = topology_get_cpu_scale(NULL, cpu) *
-+		raw_capacity[cpu] = topology_get_cpu_scale(cpu) *
- 				    policy->cpuinfo.max_freq / 1000UL;
- 		capacity_scale = max(raw_capacity[cpu], capacity_scale);
- 	}
-diff --git a/include/linux/arch_topology.h b/include/linux/arch_topology.h
-index 2b70941..5df6773 100644
---- a/include/linux/arch_topology.h
-+++ b/include/linux/arch_topology.h
-@@ -17,7 +17,7 @@ DECLARE_PER_CPU(unsigned long, cpu_scale);
- 
- struct sched_domain;
- static inline
--unsigned long topology_get_cpu_scale(struct sched_domain *sd, int cpu)
-+unsigned long topology_get_cpu_scale(int cpu)
- {
- 	return per_cpu(cpu_scale, cpu);
- }
-diff --git a/kernel/sched/cpufreq_schedutil.c b/kernel/sched/cpufreq_schedutil.c
-index 3fffad3..01b95057 100644
---- a/kernel/sched/cpufreq_schedutil.c
-+++ b/kernel/sched/cpufreq_schedutil.c
-@@ -202,7 +202,7 @@ static unsigned long sugov_get_util(struct sugov_cpu *sg_cpu)
- 	struct rq *rq = cpu_rq(sg_cpu->cpu);
- 	unsigned long util, irq, max;
- 
--	sg_cpu->max = max = arch_scale_cpu_capacity(NULL, sg_cpu->cpu);
-+	sg_cpu->max = max = arch_scale_cpu_capacity(sg_cpu->cpu);
- 	sg_cpu->bw_dl = cpu_bw_dl(rq);
- 
- 	if (rt_rq_is_runnable(&rq->rt))
-diff --git a/kernel/sched/deadline.c b/kernel/sched/deadline.c
-index 997ea7b..5f763b1 100644
---- a/kernel/sched/deadline.c
-+++ b/kernel/sched/deadline.c
-@@ -1196,7 +1196,7 @@ static void update_curr_dl(struct rq *rq)
- 						 &curr->dl);
- 	} else {
- 		unsigned long scale_freq = arch_scale_freq_capacity(cpu);
--		unsigned long scale_cpu = arch_scale_cpu_capacity(NULL, cpu);
-+		unsigned long scale_cpu = arch_scale_cpu_capacity(cpu);
- 
- 		scaled_delta_exec = cap_scale(delta_exec, scale_freq);
- 		scaled_delta_exec = cap_scale(scaled_delta_exec, scale_cpu);
-diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index cff1682..2eeac7c 100644
---- a/kernel/sched/fair.c
-+++ b/kernel/sched/fair.c
-@@ -748,7 +748,7 @@ void post_init_entity_util_avg(struct sched_entity *se)
- {
- 	struct cfs_rq *cfs_rq = cfs_rq_of(se);
- 	struct sched_avg *sa = &se->avg;
--	long cpu_scale = arch_scale_cpu_capacity(NULL, cpu_of(rq_of(cfs_rq)));
-+	long cpu_scale = arch_scale_cpu_capacity(cpu_of(rq_of(cfs_rq)));
- 	long cap = (long)(cpu_scale - cfs_rq->avg.util_avg) / 2;
- 
- 	if (cap > 0) {
-@@ -3175,7 +3175,7 @@ update_tg_cfs_runnable(struct cfs_rq *cfs_rq, struct sched_entity *se, struct cf
- 	 * is not we rescale running_sum 1st
- 	 */
- 	running_sum = se->avg.util_sum /
--		arch_scale_cpu_capacity(NULL, cpu_of(rq_of(cfs_rq)));
-+		arch_scale_cpu_capacity(cpu_of(rq_of(cfs_rq)));
- 	runnable_sum = max(runnable_sum, running_sum);
- 
- 	load_sum = (s64)se_weight(se) * runnable_sum;
-@@ -7462,7 +7462,7 @@ static inline int get_sd_load_idx(struct sched_domain *sd,
- static unsigned long scale_rt_capacity(int cpu)
- {
- 	struct rq *rq = cpu_rq(cpu);
--	unsigned long max = arch_scale_cpu_capacity(NULL, cpu);
-+	unsigned long max = arch_scale_cpu_capacity(cpu);
- 	unsigned long used, free;
- 	unsigned long irq;
- 
-@@ -7487,7 +7487,7 @@ static void update_cpu_capacity(struct sched_domain *sd, int cpu)
- 	unsigned long capacity = scale_rt_capacity(cpu);
- 	struct sched_group *sdg = sd->groups;
- 
--	cpu_rq(cpu)->cpu_capacity_orig = arch_scale_cpu_capacity(sd, cpu);
-+	cpu_rq(cpu)->cpu_capacity_orig = arch_scale_cpu_capacity(cpu);
- 
- 	if (!capacity)
- 		capacity = 1;
-diff --git a/kernel/sched/pelt.c b/kernel/sched/pelt.c
-index 35475c0..5efa152 100644
---- a/kernel/sched/pelt.c
-+++ b/kernel/sched/pelt.c
-@@ -114,7 +114,7 @@ accumulate_sum(u64 delta, int cpu, struct sched_avg *sa,
- 	u64 periods;
- 
- 	scale_freq = arch_scale_freq_capacity(cpu);
--	scale_cpu = arch_scale_cpu_capacity(NULL, cpu);
-+	scale_cpu = arch_scale_cpu_capacity(cpu);
- 
- 	delta += sa->period_contrib;
- 	periods = delta / 1024; /* A period is 1024us (~1ms) */
-diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
-index b1715b8..8b306ce 100644
---- a/kernel/sched/sched.h
-+++ b/kernel/sched/sched.h
-@@ -1756,7 +1756,7 @@ unsigned long arch_scale_freq_capacity(int cpu)
- #ifdef CONFIG_SMP
- #ifndef arch_scale_cpu_capacity
- static __always_inline
--unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
-+unsigned long arch_scale_cpu_capacity(int cpu)
- {
- 	return SCHED_CAPACITY_SCALE;
- }
-@@ -1764,7 +1764,7 @@ unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
- #else
- #ifndef arch_scale_cpu_capacity
- static __always_inline
--unsigned long arch_scale_cpu_capacity(void __always_unused *sd, int cpu)
-+unsigned long arch_scale_cpu_capacity(int cpu)
- {
- 	return SCHED_CAPACITY_SCALE;
- }
+Ok.
+
+> > 
+> > > I just hope that you understand that we cannot wait for Linux to
+> > > have a driver to have some bindings.
+> > 
+> > Just like I'm sure you can understand that just merging the DT bits
+> > without testing anything caused some troubles in the past, and I don't
+> > want to discover it in a year from now.
+> 
+>  I do, I don't like wrong DT info as much as you do I think. I had
+> the unfortunate event to find that the sun4i-a10-timer compatible used
+> in every soc is plain wrong for !A10 and !A13, patches comming soon.
+>  I want those bits merged but I also want that they reflect reality,
+> this is not a hard driver to do, NetBSD also have one I think, maybe
+> OpenBSD do to.
+
+I guess these one went un-noticed because they are not the default
+source of time keeping and events in the kernel.
+
+Thanks!
+Maxime
+
 -- 
-2.7.4
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180829/bcf29057/attachment-0001.sig>
