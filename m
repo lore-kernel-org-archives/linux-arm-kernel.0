@@ -1,51 +1,43 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Wed, 29 Aug 2018 08:49:43 -0500
-Subject: [PATCH v2] perf: Support for Arm A32/T32 instruction sets in
- CoreSight trace
-In-Reply-To: <1535535863-1818-1-git-send-email-robert.walker@arm.com>
-References: <1535535863-1818-1-git-send-email-robert.walker@arm.com>
-Message-ID: <20180829084943.eca3716eb2a2141e5eb8e6ee@arm.com>
+From: anurag.kumar.vulisha@xilinx.com (Anurag Kumar Vulisha)
+Date: Wed, 29 Aug 2018 19:37:26 +0530
+Subject: [PATCH 0/2] phy: zynqmp: Add phy driver for xilinx zynqmp phy core 
+Message-ID: <1535551648-29534-1-git-send-email-anurag.kumar.vulisha@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 Aug 2018 10:44:23 +0100
-Robert Walker <robert.walker@arm.com> wrote:
+ZynqMP serial input output unit (SIOU) is a high-speed serial interface block
+that acts as a phy interface for the PCIe, USB 3.0, DisplayPort, SATA, and
+Ethernet controllers. These controllers use any one among the available four
+multigigabit transceivers for high-speed communication with their link partners
+outside the SOC
 
-> This patch adds support for generating instruction samples from trace of
-> AArch32 programs using the A32 and T32 instruction sets.
-> 
-> T32 has variable 2 or 4 byte instruction size, so the conversion between
-> addresses and instruction counts requires extra information from the trace
-> decoder, requiring version 0.9.1 of OpenCSD.  A check for the new struct
-> member has been added to the feature check for OpenCSD.
-> 
-> Signed-off-by: Robert Walker <robert.walker@arm.com>
-> ---
-...
-> +++ b/tools/build/feature/test-libopencsd.c
-> @@ -3,6 +3,13 @@
->  
->  int main(void)
->  {
-> +	/*
-> +	 * Requires ocsd_generic_trace_elem.num_instr_range introduced in
-> +	 * OpenCSD 0.9
+ZynqMP SIOU supports multiple protocols working at different reference clock
+frequencies to operate simultaneously. Each of the four lanes will be having
+a dedicated PLL associated which generates the desired frequency required by
+the protocol configured based on the reference clock input given. Using this
+driver, user can select the desired reference clock frequency for each of
+lane 0, lane 1, lane 2, and lane 3 respectively. Each lane can be programmed
+to have its own reference clock or can share reference clock from its
+neighboring lane, this is called as "Clock Sharing". This driver supports
+clock sharing aswell.
 
-0.9 != 0.9.1 in the above commit text: which is it?
+These set of patches add support SIOU support by adding zynqmp-phy driver to
+linux.
 
-> +	 */
-> +	ocsd_generic_trace_elem elem;
-> +	(void)elem.num_instr_range;
-> +
+Anurag Kumar Vulisha (2):
+  phy: zynqmp: Add phy driver for xilinx zynqmp phy core
+  phy: zynqmp: Add dt bindings for ZynqMP phy
 
-This breaks building against older versions of OpenCSD, right?
+ .../devicetree/bindings/phy/phy-zynqmp.txt         |  104 ++
+ drivers/phy/Kconfig                                |    8 +
+ drivers/phy/Makefile                               |    1 +
+ drivers/phy/phy-zynqmp.c                           | 1579 ++++++++++++++++++++
+ include/dt-bindings/phy/phy.h                      |    2 +
+ include/linux/phy/phy-zynqmp.h                     |   52 +
+ 6 files changed, 1746 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-zynqmp.txt
+ create mode 100644 drivers/phy/phy-zynqmp.c
+ create mode 100644 include/linux/phy/phy-zynqmp.h
 
->  	(void)ocsd_get_version();
-
-Why don't we maintain building against older versions of the library,
-and use the version information to make the decision on whether to use
-the new feature being introduced in this patch?
-
-Thanks,
-
-Kim
+-- 
+2.1.1
