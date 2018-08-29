@@ -1,22 +1,26 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 28 Aug 2018 19:28:19 -0500
-Subject: [PATCH v3 4/5] dt-bindings: drm/bridge Document Cadence MHDP
- DPI/DP bridge bindings
-In-Reply-To: <1535451894-2518-5-git-send-email-dkos@cadence.com>
-References: <1535451894-2518-1-git-send-email-dkos@cadence.com>
- <1535451894-2518-5-git-send-email-dkos@cadence.com>
-Message-ID: <20180829002819.GA12330@bogus>
+From: oss@buserror.net (Scott Wood)
+Date: Tue, 28 Aug 2018 19:28:06 -0500
+Subject: [PATCH 5/5] arm64: dts: add LX2160ARDB board support
+In-Reply-To: <CAL_JsqKH4haGy2F2_2EP=evC8ip7DmGR8J4wzrO0wWnOLsaZqA@mail.gmail.com>
+References: <1534747636-20064-1-git-send-email-vabhav.sharma@nxp.com>
+ <1534747636-20064-6-git-send-email-vabhav.sharma@nxp.com>
+ <CAL_JsqKH4haGy2F2_2EP=evC8ip7DmGR8J4wzrO0wWnOLsaZqA@mail.gmail.com>
+Message-ID: <1dd3074eabb496155c4d1abb83c82c52529a656a.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 28 Aug 2018 11:24:47 +0100, Damian Kos wrote:
-> From: Quentin Schulz <quentin.schulz@bootlin.com>
+On Tue, 2018-08-21 at 15:45 -0500, Rob Herring wrote:
+> On Mon, Aug 20, 2018 at 1:52 PM Vabhav Sharma <vabhav.sharma@nxp.com> wrote:
+> > +/ {
+> > +       model = "NXP Layerscape LX2160ARDB";
+> > +       compatible = "fsl,lx2160a-rdb", "fsl,lx2160a";
+> > +
+> > +       aliases {
+> > +               crypto = &crypto;
 > 
-> Signed-off-by: Damian Kos <dkos@cadence.com>
-> ---
->  .../bindings/display/bridge/cdns,mhdp.txt     | 43 +++++++++++++++++++
->  1 file changed, 43 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt
-> 
+> Drop this. Aliases should be numbered, and this is not a standard
+> alias name either.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Is this a new rule?  In any case, U-Boot looks for a "crypto" alias.
+
+-Scott
