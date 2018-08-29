@@ -1,63 +1,77 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 29 Aug 2018 22:55:13 +0800
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Make usbnet drivers builtin
- for boot
-In-Reply-To: <ab02224d560e09e96af2e41fbfa155e40e8bbb75.1535373073.git.leonard.crestez@nxp.com>
-References: <ab02224d560e09e96af2e41fbfa155e40e8bbb75.1535373073.git.leonard.crestez@nxp.com>
-Message-ID: <20180829145511.GQ3850@dragon>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Wed, 29 Aug 2018 22:58:00 +0800
+Subject: [PATCH RESEND] arm64: don't dump stack for usermode address in
+ show_regs
+In-Reply-To: <20180829115402.GB1125@arm.com>
+References: <0003f02c-fc35-b4e9-3d3d-82ee8d02acb7@huawei.com>
+ <20180829115402.GB1125@arm.com>
+Message-ID: <e5f4011a-e0a0-b5be-599f-5adc32155d87@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2018 at 03:32:39PM +0300, Leonard Crestez wrote:
-> Chips such as imx6sll and imx7ulp have no ethernet support so the common
-> development usecase of nfs boot is supported via usb ethernet dongles.
-> 
-> Add drivers for additional usbnet device directly into the kernel image
-> image produced by the imx defconfig.
-  ^^^^^
+Hi Will:
 
-Redundant 'image'.  I fixed it up and applied the patch.
+On 2018/8/29 19:54, Will Deacon wrote:
+> Hi Ding, [+James]
+> 
+> On Wed, Aug 29, 2018 at 06:17:30PM +0800, Ding Tianhong wrote:
+>> I met this problem when do some testcase on my arm64 board system:
+>>
+>> 160935.412546] BUG: soft lockup - CPU#0 stuck for 116s! [cce_hlt_no_shar:12141]
+>> [160935.413292] CPU: 0 PID: 12141 Comm: cce_hlt_no_shar Tainted: G
+>> [160935.413429] Hardware name: Hisilicon Phosphorxxxx ESL (DT)
+>> [160935.413571] task: ffff800024efe300 ti: ffff80001670c000 task.ti: ffff80001670c000
+>> [160935.413711] PC is at 0xffffa0bf76b0
+>> [160935.413818] LR is at 0xffffa0c003a8
+>> [160935.413936] pc : [<0000ffffa0bf76b0>] lr : [<0000ffffa0c003a8>] pstate: 20000000
+>> [160935.414060] sp : 0000ffff9ed56d00
+>> [160935.414157] x29: 0000ffff9ed56d00 x28: 0000ffffa0eae6f0
+>> [160935.414307] x27: 0000ffff9ed57c60 x26: 0000000000000000
+>> [160935.414456] x25: 0000ffffa0a33250 x24: 0000000000001000
+>> [160935.414605] x23: 0000ffffa0a37320 x22: 0000ffffa0eae000
+>> [160935.414754] x21: 0000000000002d2a x20: 0000ffff9ed58840
+>> [160935.414903] x19: 0000000000000005 x18: 0000ffffcda37490
+>> [160935.415053] x17: 0000ffffa0c0033c x16: 0000ffffa0c4cc60
+>> [160935.415206] x15: 00312d6898000000 x14: 0000ffffa0c2670e
+>> [160935.415354] x13: 000000000000016e x12: 0000000000000000
+>> [160935.415502] x11: 0000ffff9ed56e00 x10: 0000000000000020
+>> [160935.415652] x9 : 2079726f00000000 x8 : 0000000000000040
+>> [160935.415796] x7 : 0000000000000000 x6 : 0000ffff9ed58290
+>> [160935.415943] x5 : 0000000000000000 x4 : 0000000000000000
+>> [160935.416089] x3 : 0000000000000000 x2 : 0000000000000000
+>> [160935.416236] x1 : 00000000ffff0000 x0 : 0000000000000005
+>> [160935.416371] Call trace:
+>> [160935.416477] Unable to handle kernel paging request at virtual address ffff9ed56d00
+>> [160935.416604] pgd = ffff800011991000
+>> [160935.416705] [ffff9ed56d00] *pgd=00000000193a0003, *pud=000000001e447003, ....
+>> [160935.416954] Internal error: Oops: 9600000f [#1] SMP
+> 
+> This looks like we're somehow dereferencing the user frame-pointer from the
+> READ_ONCE_NOCHECK in unwind_frame(). However, I really don't see how that
+> can happen, since the kernel entry code pushes a dummy frame record or
+> zeroes, which will terminate any backtrace before we hit the user
+> addresses. Furthermore, we explicitly check that the frame pointer points
+> to an accessible stack before we dereference it. Hmm.
+> 
 
-Shawn
+I found the patch 12964443e8d1 ("arm64: add on_accessible_stack()") already fix this in kernel v4.14, my kernel version is older
+than this and miss this patch for a long time, so I think this is the reason that I met this problem, thanks for remind me.
+
+> I also tried to reproduce this locally using sysrq+l to trigger backtracing
+> in IRQ context, but I haven't managed to hit any problems.
+> 
+
+I reproduce this bug in the arm fast model system, the application was not developed by me, and it is really hard to reproduce, looks
+like the application was already has some issues, it will call some syscall to trap to kernel before the loop, but my interest is focus
+on the oops, not the softlockup, looks like I found what I want, thanks.
+
+Ding
+> Can you give me some hints as to how to reproduce this with mainline,
+> please?
+> 
+> Will
+> 
+> .
+
 
 > 
-> This list is based on the usbnet devices supported by uboot.
-> 
-> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-> 
-> ---
-> This is not a very pretty solution but very convenient.
-> ---
->  arch/arm/configs/imx_v6_v7_defconfig | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-> index e2c127608bcc..7474bb5b3a6f 100644
-> --- a/arch/arm/configs/imx_v6_v7_defconfig
-> +++ b/arch/arm/configs/imx_v6_v7_defconfig
-> @@ -147,13 +147,16 @@ CONFIG_SMSC911X=y
->  CONFIG_AT803X_PHY=y
->  CONFIG_MICREL_PHY=y
->  CONFIG_SMSC_PHY=y
->  CONFIG_USB_PEGASUS=m
->  CONFIG_USB_RTL8150=m
-> -CONFIG_USB_RTL8152=m
-> +CONFIG_USB_RTL8152=y
-> +CONFIG_USB_LAN78XX=y
->  CONFIG_USB_USBNET=y
->  CONFIG_USB_NET_CDC_EEM=m
-> +CONFIG_USB_NET_SMSC95XX=y
-> +CONFIG_USB_NET_MCS7830=y
->  CONFIG_BRCMFMAC=m
->  CONFIG_MWIFIEX=m
->  CONFIG_MWIFIEX_SDIO=m
->  CONFIG_MWIFIEX_PCIE=m
->  CONFIG_WL12XX=m
-> -- 
-> 2.17.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
