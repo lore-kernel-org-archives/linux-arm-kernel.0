@@ -1,43 +1,91 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 29 Aug 2018 15:53:55 +0100
-Subject: [PATCH 1/2] ASoC: Add driver for PROTO Audio CODEC (with a WM8731)
-In-Reply-To: <20180829144727.13757-2-codrin.ciubotariu@microchip.com>
-References: <20180829144727.13757-1-codrin.ciubotariu@microchip.com>
- <20180829144727.13757-2-codrin.ciubotariu@microchip.com>
-Message-ID: <20180829145355.GD27808@sirena.org.uk>
+From: dinh.nguyen@intel.com (Nguyen, Dinh)
+Date: Wed, 29 Aug 2018 14:54:39 +0000
+Subject: [RFC] Rename socfpga_cyclone5_de0_sockit.dts to
+ socfpga_cyclone5_de0_nano_soc.dts
+In-Reply-To: <9bdee446-5bc6-1171-eded-3c01623de820@denx.de>
+References: <fd0f01e5-41a2-6a24-2ce4-482b30b348b6@denx.de>
+ <73bm9lwn3t.fsf@pengutronix.de>
+ <b29e529a-f7bd-71d2-615e-9f850858ed4d@denx.de>
+ <BA1B5AF7D118E146A437E44412B829131564F1F5@fmsmsx122.amr.corp.intel.com>
+ <9bdee446-5bc6-1171-eded-3c01623de820@denx.de>
+Message-ID: <BA1B5AF7D118E146A437E44412B829131564F225@fmsmsx122.amr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 29, 2018 at 05:47:26PM +0300, Codrin Ciubotariu wrote:
 
-> +static const unsigned int wm8731_rates_12288000[] = {
-> +	8000, 32000, 48000, 96000,
-> +};
-> +
-> +static struct snd_pcm_hw_constraint_list wm8731_constraints_12288000 = {
-> +	.list = wm8731_rates_12288000,
-> +	.count = ARRAY_SIZE(wm8731_rates_12288000),
-> +};
-> +
-> +static int snd_proto_startup(struct snd_pcm_substream *substream)
-> +{
-> +	/* Setup constraints, because there is a 12.288 MHz XTAL on the board */
-> +	snd_pcm_hw_constraint_list(substream->runtime, 0,
-> +				   SNDRV_PCM_HW_PARAM_RATE,
-> +				   &wm8731_constraints_12288000);
-> +	return 0;
-> +}
 
-This bit is better added to the CODEC driver since it'll apply to any
-system where there's this clock rate (someone else could come in and add
-other rates, no need to do that yourself though it'd be nice of course).
+> -----Original Message-----
+> From: Marek Vasut <marex@denx.de>
+> Sent: Wednesday, August 29, 2018 9:47 AM
+> To: Nguyen, Dinh <dinh.nguyen@intel.com>; Steffen Trumtrar
+> <s.trumtrar@pengutronix.de>
+> Cc: linux ARM <linux-arm-kernel@lists.infradead.org>; Dinh Nguyen
+> <dingnuyen@kernel.org>; Jan Kiszka <jan.kiszka@siemens.com>; Rob Herring
+> <robh+dt@kernel.org>; Westergreen, Dalon <dalon.westergreen@intel.com>
+> Subject: Re: [RFC] Rename socfpga_cyclone5_de0_sockit.dts to
+> socfpga_cyclone5_de0_nano_soc.dts
+> 
+> On 08/29/2018 04:40 PM, Nguyen, Dinh wrote:
+> >
+> >
+> >> -----Original Message-----
+> >> From: Marek Vasut <marex@denx.de>
+> >> Sent: Wednesday, August 29, 2018 5:34 AM
+> >> To: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> >> Cc: linux ARM <linux-arm-kernel@lists.infradead.org>; Dinh Nguyen
+> >> <dingnuyen@kernel.org>; Jan Kiszka <jan.kiszka@siemens.com>; Rob
+> >> Herring <robh+dt@kernel.org>; See, Chin Liang
+> >> <chin.liang.see@intel.com>; Tan, Ley Foon <ley.foon.tan@intel.com>;
+> >> Nguyen, Dinh <dinh.nguyen@intel.com>
+> >> Subject: Re: [RFC] Rename socfpga_cyclone5_de0_sockit.dts to
+> >> socfpga_cyclone5_de0_nano_soc.dts
+> >>
+> >> On 08/29/2018 11:14 AM, Steffen Trumtrar wrote:
+> >>>
+> >>> Marek Vasut <marex@denx.de> writes:
+> >>>
+> >>>> Hi,
+> >>>>
+> >>>> I was recently experimenting with the DE0 Nano SoC / Atlas SoC . I
+> >>>> had a hard time finding the right DT for the board, but then was
+> >>>> suggested that the DT for the board is
+> >>>> socfpga_cyclone5_de0_sockit.dts . This did not make sense to me,
+> >>>> since SoCKit is a different board altogether. But the DTS seems to
+> >>>> be indeed
+> >> for the DE0 Nano SoC.
+> >>>>
+> >>>> To fix up this confusion, I'd propose renaming of the
+> >>>> socfpga_cyclone5_de0_sockit.dts to
+> >>>> socfpga_cyclone5_de0_nano_soc.dts to match the label on the package .
+> >>>>
+> >>>> What do you think ?
+> >>>
+> >>> Ack. This confusion came up multiple times. The barebox-specific dts
+> >>> "overlay"
+> >>> is already named socfpga_cyclone5_de0_nano_soc.dts because of this.
+> >>
+> >> The DT in U-Boot is also called socfpga_cyclone5_de0_nano_soc.dts
+> >> since forever. I'd be happy to send a patch if the Altera folks are fine with it?
+> >>
+> >
+> > I'm fine with it. But this is the commit message when this board was originally
+> create:
+> >
+> >     The Terasic DE0 Atlas board is also known as the DE0-Nano board.
+> >     This patch adds the DTS board file for the DE0-Nano Sockit board, and not
+> >     the DE0 Nano "Development Board".
+> 
+> But it was never called SoCkit anywhere , no documentation lists it as sockit. It is
+> either DE0-Nano-SoC or Atlas-SoC , but that's it.
 
-That also has the nice bonus that with that I think you'd be able to use
-the graph card rather than a custom driver?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180829/7bf525a1/attachment.sig>
+https://www.terasic.com.tw/cgi-bin/page/archive.pl?Language=English&No=941
+
+> 
+> Note that there is a DE0-Nano board (without the -SoC suffix) with Cyclone IV ,
+> but that one doesn't have the ARM cores and has different FPGA.
+> 
+> So if that's clear, I'll just send a patch ?
+> 
+> --
+> Best regards,
+> Marek Vasut
