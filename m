@@ -1,34 +1,37 @@
 From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Wed, 29 Aug 2018 16:31:38 +0200
-Subject: [PATCH 02/11] MAINTAINERS: update entry for Microchip NAND driver
- support
-In-Reply-To: <cover.1535552609.git.nicolas.ferre@microchip.com>
-References: <cover.1535552609.git.nicolas.ferre@microchip.com>
-Message-ID: <364c788f6a7cf2ab70ce57e8d24709eb4d9fd563.1535552609.git.nicolas.ferre@microchip.com>
+Date: Wed, 29 Aug 2018 16:31:36 +0200
+Subject: [PATCH 00/11] MAINTAINERS: update of of some Microchip entries
+Message-ID: <cover.1535552609.git.nicolas.ferre@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the Microchip/Atmel NAND controller driver maintainer
-by removing Josh and adding Tudor.
+Hi,
 
-Cc: Josh Wu <rainyfeeling@outlook.com>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
----
- MAINTAINERS | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This is an update of most of Microchip MAINTAINERS' entries. I took advantage
+of the addition of Ludovic as co-maintainer to go through some of the entries
+that were outdated.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 7f97f1f83398..43fa2ebb292e 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -9528,7 +9528,7 @@ F:	drivers/media/platform/atmel/atmel-isc-regs.h
- F:	devicetree/bindings/media/atmel-isc.txt
- 
- MICROCHIP / ATMEL NAND DRIVER
--M:	Josh Wu <rainyfeeling@outlook.com>
-+M:	Tudor Ambarus <tudor.ambarus@microchip.com>
- L:	linux-mtd at lists.infradead.org
- S:	Supported
- F:	drivers/mtd/nand/raw/atmel/*
+There are moves of entries in the 3 last patches of this series. You can drop
+them if they introduce too much headaches while updating this MAINTAINERS
+file.
+
+Series based on v4.19-rc1.
+
+Nicolas Ferre (11):
+  MAINTAINERS: ARM: at91: add co-maintainer for ARM/Microchip
+  MAINTAINERS: update entry for Microchip NAND driver support
+  MAINTAINERS: media: change Microchip ISI, ISC maintainers
+  MAINTAINERS: ASoC: change maintainer for Microchip ALSA drivers
+  MAINTAINERS: USB: change maintainer for Microchip USBA gadget driver
+  MAINTAINERS: dmaengine: add files to Microchip dma entry
+  MAINTAINERS: pwm: add entry for Microchip pwm driver
+  MAINTAINERS: iio: add co-maintainer to SAMA5D2-compatible ADC driver
+  MAINTAINERS: remove the / ATMEL string from MICROCHIP entries
+  MAINTAINERS: move former ATMEL entries to proper MICROCHIP location
+  MAINTAINERS: sdhci: move the Microchip entry to proper location
+
+ MAINTAINERS | 196 ++++++++++++++++++++++++++++------------------------
+ 1 file changed, 105 insertions(+), 91 deletions(-)
+
 -- 
 2.17.1
