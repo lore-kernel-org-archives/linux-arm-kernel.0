@@ -1,70 +1,51 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 29 Aug 2018 10:15:20 +0800
-Subject: [PATCH] pinctrl: Convert to using %pOFn instead of
- device_node.name
-In-Reply-To: <20180828015252.28511-40-robh@kernel.org>
-References: <20180828015252.28511-1-robh@kernel.org>
- <20180828015252.28511-40-robh@kernel.org>
-Message-ID: <CAGb2v64Hy-RQiXBhYrcy7FtNnqRUOhwGNZc8jko=FVrDDUH_hQ@mail.gmail.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Wed, 29 Aug 2018 10:36:49 +0800
+Subject: [PATCH 1/2] usb: mtu3: fix error of xhci port id when enable U3 dual
+ role
+Message-ID: <c4279eccff765006b78f87bf3c8c9ac94a06c04d.1535509922.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2018 at 9:55 AM Rob Herring <robh@kernel.org> wrote:
->
-> In preparation to remove the node name pointer from struct device_node,
-> convert printf users to use the %pOFn format specifier.
->
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Dong Aisheng <aisheng.dong@nxp.com>
-> Cc: Fabio Estevam <festevam@gmail.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Stefan Agner <stefan@agner.ch>
-> Cc: Pengutronix Kernel Team <kernel@pengutronix.de>
-> Cc: Sean Wang <sean.wang@mediatek.com>
-> Cc: Matthias Brugger <matthias.bgg@gmail.com>
-> Cc: Carlo Caione <carlo@caione.org>
-> Cc: Kevin Hilman <khilman@baylibre.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory Clement <gregory.clement@bootlin.com>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
-> Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Haojian Zhuang <haojian.zhuang@linaro.org>
-> Cc: Patrice Chotard <patrice.chotard@st.com>
-> Cc: Barry Song <baohua@kernel.org>
-> Cc: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-> Cc: Alexandre Torgue <alexandre.torgue@st.com>
-> Cc: Maxime Ripard <maxime.ripard@bootlin.com>
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Cc: linux-gpio at vger.kernel.org
-> Cc: linux-mediatek at lists.infradead.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-amlogic at lists.infradead.org
-> Cc: linux-rockchip at lists.infradead.org
-> Cc: linux-omap at vger.kernel.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
->  drivers/pinctrl/berlin/berlin.c               |  6 ++--
->  drivers/pinctrl/freescale/pinctrl-imx.c       |  7 ++--
->  drivers/pinctrl/freescale/pinctrl-imx1-core.c | 12 +++----
->  drivers/pinctrl/mediatek/pinctrl-mtk-common.c |  4 +--
->  drivers/pinctrl/meson/pinctrl-meson.c         |  2 +-
->  drivers/pinctrl/mvebu/pinctrl-mvebu.c         |  4 +--
->  drivers/pinctrl/nomadik/pinctrl-nomadik.c     |  6 ++--
->  drivers/pinctrl/pinctrl-at91.c                |  8 ++---
->  drivers/pinctrl/pinctrl-lantiq.c              |  8 ++---
->  drivers/pinctrl/pinctrl-rockchip.c            |  8 ++---
->  drivers/pinctrl/pinctrl-rza1.c                |  8 ++---
->  drivers/pinctrl/pinctrl-single.c              | 32 +++++++++----------
->  drivers/pinctrl/pinctrl-st.c                  |  6 ++--
->  drivers/pinctrl/sirf/pinctrl-atlas7.c         |  4 +--
->  drivers/pinctrl/stm32/pinctrl-stm32.c         |  4 +--
->  drivers/pinctrl/sunxi/pinctrl-sunxi.c         |  8 ++---
+If dual role mode is enabled, when switch u3port0 to device mode,
+it will affect port id calculation of host(xHCI), specially when
+host supports multi U2 ports or U3 ports, so need enable its dual
+role mode, and fix it here.
 
-For sunxi:
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+ drivers/usb/mtu3/mtu3_core.c    | 6 +++++-
+ drivers/usb/mtu3/mtu3_hw_regs.h | 1 +
+ 2 files changed, 6 insertions(+), 1 deletion(-)
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+diff --git a/drivers/usb/mtu3/mtu3_core.c b/drivers/usb/mtu3/mtu3_core.c
+index eecfd06..d045d84 100644
+--- a/drivers/usb/mtu3/mtu3_core.c
++++ b/drivers/usb/mtu3/mtu3_core.c
+@@ -107,8 +107,12 @@ static int mtu3_device_enable(struct mtu3 *mtu)
+ 		(SSUSB_U2_PORT_DIS | SSUSB_U2_PORT_PDN |
+ 		SSUSB_U2_PORT_HOST_SEL));
+ 
+-	if (mtu->ssusb->dr_mode == USB_DR_MODE_OTG)
++	if (mtu->ssusb->dr_mode == USB_DR_MODE_OTG) {
+ 		mtu3_setbits(ibase, SSUSB_U2_CTRL(0), SSUSB_U2_PORT_OTG_SEL);
++		if (mtu->is_u3_ip)
++			mtu3_setbits(ibase, SSUSB_U3_CTRL(0),
++				     SSUSB_U3_PORT_DUAL_MODE);
++	}
+ 
+ 	return ssusb_check_clocks(mtu->ssusb, check_clk);
+ }
+diff --git a/drivers/usb/mtu3/mtu3_hw_regs.h b/drivers/usb/mtu3/mtu3_hw_regs.h
+index 6ee3714..a45bb25 100644
+--- a/drivers/usb/mtu3/mtu3_hw_regs.h
++++ b/drivers/usb/mtu3/mtu3_hw_regs.h
+@@ -459,6 +459,7 @@
+ 
+ /* U3D_SSUSB_U3_CTRL_0P */
+ #define SSUSB_U3_PORT_SSP_SPEED	BIT(9)
++#define SSUSB_U3_PORT_DUAL_MODE	BIT(7)
+ #define SSUSB_U3_PORT_HOST_SEL		BIT(2)
+ #define SSUSB_U3_PORT_PDN		BIT(1)
+ #define SSUSB_U3_PORT_DIS		BIT(0)
+-- 
+1.9.1
