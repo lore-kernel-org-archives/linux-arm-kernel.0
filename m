@@ -1,18 +1,19 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Wed, 29 Aug 2018 10:13:23 +0800
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 29 Aug 2018 10:15:20 +0800
 Subject: [PATCH] pinctrl: Convert to using %pOFn instead of
  device_node.name
 In-Reply-To: <20180828015252.28511-40-robh@kernel.org>
 References: <20180828015252.28511-1-robh@kernel.org>
  <20180828015252.28511-40-robh@kernel.org>
-Message-ID: <1535508803.28775.4.camel@mtkswgap22>
+Message-ID: <CAGb2v64Hy-RQiXBhYrcy7FtNnqRUOhwGNZc8jko=FVrDDUH_hQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-08-27 at 20:52 -0500, Rob Herring wrote:
+On Tue, Aug 28, 2018 at 9:55 AM Rob Herring <robh@kernel.org> wrote:
+>
 > In preparation to remove the node name pointer from struct device_node,
 > convert printf users to use the %pOFn format specifier.
-> 
+>
 > Cc: Linus Walleij <linus.walleij@linaro.org>
 > Cc: Dong Aisheng <aisheng.dong@nxp.com>
 > Cc: Fabio Estevam <festevam@gmail.com>
@@ -51,6 +52,19 @@ On Mon, 2018-08-27 at 20:52 -0500, Rob Herring wrote:
 >  drivers/pinctrl/freescale/pinctrl-imx.c       |  7 ++--
 >  drivers/pinctrl/freescale/pinctrl-imx1-core.c | 12 +++----
 >  drivers/pinctrl/mediatek/pinctrl-mtk-common.c |  4 +--
+>  drivers/pinctrl/meson/pinctrl-meson.c         |  2 +-
+>  drivers/pinctrl/mvebu/pinctrl-mvebu.c         |  4 +--
+>  drivers/pinctrl/nomadik/pinctrl-nomadik.c     |  6 ++--
+>  drivers/pinctrl/pinctrl-at91.c                |  8 ++---
+>  drivers/pinctrl/pinctrl-lantiq.c              |  8 ++---
+>  drivers/pinctrl/pinctrl-rockchip.c            |  8 ++---
+>  drivers/pinctrl/pinctrl-rza1.c                |  8 ++---
+>  drivers/pinctrl/pinctrl-single.c              | 32 +++++++++----------
+>  drivers/pinctrl/pinctrl-st.c                  |  6 ++--
+>  drivers/pinctrl/sirf/pinctrl-atlas7.c         |  4 +--
+>  drivers/pinctrl/stm32/pinctrl-stm32.c         |  4 +--
+>  drivers/pinctrl/sunxi/pinctrl-sunxi.c         |  8 ++---
 
-For mediatek,
-Acked-by: Sean Wang <sean.wang@mediatek.com>
+For sunxi:
+
+Acked-by: Chen-Yu Tsai <wens@csie.org>
