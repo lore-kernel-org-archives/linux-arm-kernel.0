@@ -1,43 +1,32 @@
 From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Wed, 29 Aug 2018 16:31:39 +0200
-Subject: [PATCH 03/11] MAINTAINERS: media: change Microchip ISI,
- ISC maintainers
+Date: Wed, 29 Aug 2018 16:31:42 +0200
+Subject: [PATCH 06/11] MAINTAINERS: dmaengine: add files to Microchip dma entry
 In-Reply-To: <cover.1535552609.git.nicolas.ferre@microchip.com>
 References: <cover.1535552609.git.nicolas.ferre@microchip.com>
-Message-ID: <f5c7302265c8d5df4398359f5056faedabfa0fb0.1535552609.git.nicolas.ferre@microchip.com>
+Message-ID: <4ea0eee147d544e781e46778d3abe35d63a9db69.1535552609.git.nicolas.ferre@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For ISC, Songjun is not with Microchip anymore, his address shouldn't be
-reachable.
-For ISI, Eugen can handle the maintenance now.
+In Microchip DMA (HDMA actually) entry, add the missing files for
+better matching with get_maintainer.pl tool.
 
 Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 ---
- MAINTAINERS | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ MAINTAINERS | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/MAINTAINERS b/MAINTAINERS
-index 43fa2ebb292e..6eaf54960c1c 100644
+index fe1280b92a2e..414324563009 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -2494,7 +2494,7 @@ S:	Supported
- F:	drivers/i2c/busses/i2c-at91.c
+@@ -9512,6 +9512,8 @@ S:	Supported
+ F:	drivers/dma/at_hdmac.c
+ F:	drivers/dma/at_hdmac_regs.h
+ F:	include/linux/platform_data/dma-atmel.h
++F:	Documentation/devicetree/bindings/dma/atmel-dma.txt
++F:	include/dt-bindings/dma/at91.h
  
- ATMEL ISI DRIVER
--M:	Ludovic Desroches <ludovic.desroches@microchip.com>
-+M:	Eugen Hristev <eugen.hristev@microchip.com>
- L:	linux-media at vger.kernel.org
- S:	Supported
- F:	drivers/media/platform/atmel/atmel-isi.c
-@@ -9520,7 +9520,7 @@ S:	Maintained
- F:	drivers/crypto/atmel-ecc.*
- 
- MICROCHIP / ATMEL ISC DRIVER
--M:	Songjun Wu <songjun.wu@microchip.com>
-+M:	Eugen Hristev <eugen.hristev@microchip.com>
- L:	linux-media at vger.kernel.org
- S:	Supported
- F:	drivers/media/platform/atmel/atmel-isc.c
+ MICROCHIP / ATMEL ECC DRIVER
+ M:	Tudor Ambarus <tudor.ambarus@microchip.com>
 -- 
 2.17.1
