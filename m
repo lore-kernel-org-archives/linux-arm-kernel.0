@@ -1,59 +1,162 @@
-From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Wed, 29 Aug 2018 10:15:09 +0200
-Subject: [PATCH] MAINTAINERS: replace free-electrons.com by bootlin.com for
- Thomas Petazzoni
-Message-ID: <20180829081509.20437-1-thomas.petazzoni@bootlin.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Wed, 29 Aug 2018 10:16:34 +0200
+Subject: [PATCH 1/2] drm/bridge: Add virtual display DT bindings
+In-Reply-To: <20180828143546.GG907@e110455-lin.cambridge.arm.com>
+References: <CGME20180824122324epcas3p2922f3e5415dacf4c89cfb136fa5c77b2@epcas3p2.samsung.com>
+ <20180824122308.3092-1-linus.walleij@linaro.org>
+ <20180827115302eucas1p24d36cfaf9835ccb217ac81e508484aa1~Ou5eTkYW-3006130061eucas1p2Z@eucas1p2.samsung.com>
+ <20180828143546.GG907@e110455-lin.cambridge.arm.com>
+Message-ID: <20180829081637eucas1p21ebead8d65d823a3cb2bec8839600573~PTPFKjnEJ1080610806eucas1p23@eucas1p2.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Free Electrons is now called Bootlin, and my e-mail address was
-changed as well, so this commit updates the entries in the MAINTAINERS
-file accordingly.
+On 28.08.2018 16:35, Liviu Dudau wrote:
+> Hi Andrzej,
+>
+> Chirping in, as it was originally my work that Linus is adopting.
+>
+> On Mon, Aug 27, 2018 at 01:53:00PM +0200, Andrzej Hajda wrote:
+>> On 24.08.2018 14:23, Linus Walleij wrote:
+>>> This adds bindings for a virtual display to be used with displays
+>>> inside entirely virtual environments which do not emulate things
+>>> like monitors but just need timing information to be supplied to
+>>> its display controller.
+>>>
+>>> This is inspired by earlier work by Liviu Dudau.
+>> If this is pure virtual then it should be connected to other pure
+>> virtual components.
+> Any reason why you think this is the only way this should be connected?
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
----
- MAINTAINERS | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+I think pure virtual sink device cannot be connected to real pins of
+source device :)
+Either source exposes some virtual interfaces either its output will go
+to /dev/null, it would be good to know which case author want to address
+with these patches.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 1820f2e4d5f4..b716ad6b1900 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -8777,7 +8777,7 @@ S:	Maintained
- F:	drivers/net/phy/marvell10g.c
- 
- MARVELL MVNETA ETHERNET DRIVER
--M:	Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+M:	Thomas Petazzoni <thomas.petazzoni@bootlin.com>
- L:	netdev at vger.kernel.org
- S:	Maintained
- F:	drivers/net/ethernet/marvell/mvneta.*
-@@ -11026,7 +11026,7 @@ S:	Maintained
- F:	drivers/firmware/pcdp.*
- 
- PCI DRIVER FOR AARDVARK (Marvell Armada 3700)
--M:	Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+M:	Thomas Petazzoni <thomas.petazzoni@bootlin.com>
- L:	linux-pci at vger.kernel.org
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
-@@ -11058,7 +11058,7 @@ F:	Documentation/devicetree/bindings/pci/versatile.txt
- F:	drivers/pci/controller/pci-versatile.c
- 
- PCI DRIVER FOR ARMADA 8K
--M:	Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+M:	Thomas Petazzoni <thomas.petazzoni@bootlin.com>
- L:	linux-pci at vger.kernel.org
- L:	linux-arm-kernel at lists.infradead.org
- S:	Maintained
-@@ -11120,7 +11120,7 @@ F:	include/linux/switchtec.h
- F:	drivers/ntb/hw/mscc/
- 
- PCI DRIVER FOR MVEBU (Marvell Armada 370 and Armada XP SOC support)
--M:	Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+M:	Thomas Petazzoni <thomas.petazzoni@bootlin.com>
- M:	Jason Cooper <jason@lakedaemon.net>
- L:	linux-pci at vger.kernel.org
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
--- 
-2.14.4
+> My original implementation (and I haven't seen anything in this patch
+> that would invalidate it) assumed that the virtual bridge can be used by
+> any driver that uses the component framework. Hiding implementation
+> details is one of the benefits of using the component framework, so I
+> don't see what you gain by restricting connection to only other pure
+> virtual components.
+
+I suppose these patches were created for some reason, so more
+explanation will be helpful.
+
+>
+>> What will be this virtual bridge attached to? I expect some virtual
+>> encoder, virtual crtc? If yes then why don't you create whole virtual
+>> drm pipeline in one patchset?
+> This comment is probably more relevant to patch 2/2, but I agree that
+> it probably needs a virtual encoder. As for the CRTC, it should work
+> with any real DRM driver, AFAICT.
+
+I do not think so, I guess it could work with sources which do not
+communicate with sinks, ie. they have only output pins - in such case
+video stream will not be visible, is this something we want? Why?
+In case source expects some signals on pins connected to sink, it could
+be problematic.
+
+>
+>> Could you describe more what do you want to do.
+> He wants to enable the PL110 DRM driver on systems that lack a way of
+> detecting the actual encoder and connector being used (either because
+> there is none and they are emulated in software that doesn't mimic the
+> HW behaviour, or because the way you access the HW is done in a way that
+> doesn't model easily in the current DRM framework: by firmware, for
+> example).
+
+And finally here is real reason to cope with. Since Linus also explained
+it in separate mail I will continue the thread with answering to his mail.
+
+
+Regards
+Andrzej
+
+>
+> Best regards,
+> Liviu
+>
+>> And one more thing, you are defining virtual panel but you are using
+>> drm_bridge framework, why not drm_panel?
+>>
+>> Regards
+>> Andrzej
+>>
+>>> Cc: Liviu Dudau <Liviu.Dudau@arm.com>
+>>> Cc: Ryan Harkin <ryan.harkin@linaro.org>
+>>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>>> ---
+>>>  .../display/bridge/virtual-display-bridge.txt | 62 +++++++++++++++++++
+>>>  1 file changed, 62 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/display/bridge/virtual-display-bridge.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/display/bridge/virtual-display-bridge.txt b/Documentation/devicetree/bindings/display/bridge/virtual-display-bridge.txt
+>>> new file mode 100644
+>>> index 000000000000..ea4f5a91ab94
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/display/bridge/virtual-display-bridge.txt
+>>> @@ -0,0 +1,62 @@
+>>> +Virtual Display Bridge
+>>> +
+>>> +This represents a display that is contained within an emulated
+>>> +environment.
+>>> +
+>>> +This means that the display engine mainly expects some timing
+>>> +parameters to be written into it, and after that the emulator will
+>>> +respond by creating a virtual display with the requested
+>>> +resolution characteristics.
+>>> +
+>>> +As the operating system cannot "detect" such a display, rather the
+>>> +emulator will respond to what the controller outputs, a
+>>> +chicken-and-egg problem needs to be solved: the resolution and
+>>> +timing characteristics need to be defined and set up somewhere.
+>>> +
+>>> +The virtual display bridge solves this by defining a bridge with
+>>> +all timing characteristics encoded into the device tree node.
+>>> +
+>>> +Required properies:
+>>> +- compatible: shall be "virtual-display-bridge"
+>>> +
+>>> +Required subnodes:
+>>> +- display-timings: contains in turn a display timing node
+>>> +  see display-timing.txt
+>>> +- ports: contains the display ports, see media/video-interfaces.txt
+>>> +
+>>> +Example:
+>>> +
+>>> +bridge {
+>>> +	compatible = "virtual-display-bridge";
+>>> +	#address-cells = <1>;
+>>> +	#size-cells = <0>;
+>>> +
+>>> +	display-timings {
+>>> +		/* Some standard VGA timing */
+>>> +		timing0 {
+>>> +			clock-frequency = <23750>;
+>>> +			hactive = <640>;
+>>> +			vactive = <480>;
+>>> +			hfront-porch = <48>;
+>>> +			hback-porch = <16>;
+>>> +			hsync-len = <96>;
+>>> +			vfront-porch = <33>;
+>>> +			vback-porch = <9>;
+>>> +			vsync-len = <3>;
+>>> +			vrefresh = <60>;
+>>> +		};
+>>> +	};
+>>> +
+>>> +	ports {
+>>> +		#address-cells = <1>;
+>>> +		#size-cells = <0>;
+>>> +
+>>> +		port at 0 {
+>>> +			reg = <0>;
+>>> +
+>>> +			display_bridge_in: endpoint {
+>>> +				remote-endpoint = <&foo>;
+>>> +			};
+>>> +		};
+>>> +	};
+>>> +};
+>>
