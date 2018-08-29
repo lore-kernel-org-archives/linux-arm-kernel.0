@@ -1,135 +1,21 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Wed, 29 Aug 2018 20:51:40 +0800
-Subject: [PATCH V4 4/4] video: simplefb: switch to use clk_bulk API to
- simplify clock operations
-In-Reply-To: <1535547100-25634-1-git-send-email-aisheng.dong@nxp.com>
-References: <1535547100-25634-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1535547100-25634-5-git-send-email-aisheng.dong@nxp.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 29 Aug 2018 14:56:01 +0200
+Subject: [PATCH] MAINTAINERS: replace free-electrons.com by bootlin.com
+ for Thomas Petazzoni
+In-Reply-To: <20180829081509.20437-1-thomas.petazzoni@bootlin.com>
+References: <20180829081509.20437-1-thomas.petazzoni@bootlin.com>
+Message-ID: <20180829125601.GC1955@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switching to use clk_bulk API to simplify clock operations.
+On Wed, Aug 29, 2018 at 10:15:09AM +0200, Thomas Petazzoni wrote:
+> Free Electrons is now called Bootlin, and my e-mail address was
+> changed as well, so this commit updates the entries in the MAINTAINERS
+> file accordingly.
 
-Cc: Hans de Goede <hdegoede@redhat.com>
-Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Cc: linux-fbdev at vger.kernel.org
-Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Tested-by: Thor Thayer <thor.thayer@linux.intel.com>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
-v3->v4:
- * no changes
-v2->v3:
- * fix a build warning on x86 platform due to a wrong
-   of the prototype of simplefb_clocks_enable
-v1->v2:
- * switch to clk_bulk_get_all from of_clk_bulk_get_all
----
- drivers/video/fbdev/simplefb.c | 66 ++++++++----------------------------------
- 1 file changed, 12 insertions(+), 54 deletions(-)
+Hi Thomas
 
-diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
-index 9a9d748..ed9a4c8 100644
---- a/drivers/video/fbdev/simplefb.c
-+++ b/drivers/video/fbdev/simplefb.c
-@@ -182,7 +182,7 @@ struct simplefb_par {
- #if defined CONFIG_OF && defined CONFIG_COMMON_CLK
- 	bool clks_enabled;
- 	unsigned int clk_count;
--	struct clk **clks;
-+	struct clk_bulk_data *clks;
- #endif
- #if defined CONFIG_OF && defined CONFIG_REGULATOR
- 	bool regulators_enabled;
-@@ -214,37 +214,13 @@ static int simplefb_clocks_get(struct simplefb_par *par,
- 			       struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
--	struct clk *clock;
--	int i;
- 
- 	if (dev_get_platdata(&pdev->dev) || !np)
- 		return 0;
- 
--	par->clk_count = of_clk_get_parent_count(np);
--	if (!par->clk_count)
--		return 0;
--
--	par->clks = kcalloc(par->clk_count, sizeof(struct clk *), GFP_KERNEL);
--	if (!par->clks)
--		return -ENOMEM;
--
--	for (i = 0; i < par->clk_count; i++) {
--		clock = of_clk_get(np, i);
--		if (IS_ERR(clock)) {
--			if (PTR_ERR(clock) == -EPROBE_DEFER) {
--				while (--i >= 0) {
--					if (par->clks[i])
--						clk_put(par->clks[i]);
--				}
--				kfree(par->clks);
--				return -EPROBE_DEFER;
--			}
--			dev_err(&pdev->dev, "%s: clock %d not found: %ld\n",
--				__func__, i, PTR_ERR(clock));
--			continue;
--		}
--		par->clks[i] = clock;
--	}
-+	par->clk_count = clk_bulk_get_all(&pdev->dev, &par->clks);
-+	if ((par->clk_count < 0) && (par->clk_count == -EPROBE_DEFER))
-+		return -EPROBE_DEFER;
- 
- 	return 0;
- }
-@@ -252,39 +228,21 @@ static int simplefb_clocks_get(struct simplefb_par *par,
- static void simplefb_clocks_enable(struct simplefb_par *par,
- 				   struct platform_device *pdev)
- {
--	int i, ret;
-+	int ret;
-+
-+	ret = clk_bulk_prepare_enable(par->clk_count, par->clks);
-+	if (ret)
-+		dev_warn(&pdev->dev, "failed to enable clocks\n");
- 
--	for (i = 0; i < par->clk_count; i++) {
--		if (par->clks[i]) {
--			ret = clk_prepare_enable(par->clks[i]);
--			if (ret) {
--				dev_err(&pdev->dev,
--					"%s: failed to enable clock %d: %d\n",
--					__func__, i, ret);
--				clk_put(par->clks[i]);
--				par->clks[i] = NULL;
--			}
--		}
--	}
- 	par->clks_enabled = true;
- }
- 
- static void simplefb_clocks_destroy(struct simplefb_par *par)
- {
--	int i;
--
--	if (!par->clks)
--		return;
--
--	for (i = 0; i < par->clk_count; i++) {
--		if (par->clks[i]) {
--			if (par->clks_enabled)
--				clk_disable_unprepare(par->clks[i]);
--			clk_put(par->clks[i]);
--		}
--	}
-+	if (par->clks_enabled)
-+		clk_bulk_disable_unprepare(par->clk_count, par->clks);
- 
--	kfree(par->clks);
-+	clk_bulk_put_all(par->clk_count, par->clks);
- }
- #else
- static int simplefb_clocks_get(struct simplefb_par *par,
--- 
-2.7.4
+How about changing Antoine Tenart entry at the same time. That seems
+to be the last free-electrons.com entry.
+
+    Andrew
