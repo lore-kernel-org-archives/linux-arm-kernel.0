@@ -1,99 +1,149 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Wed, 29 Aug 2018 13:35:22 +0200
-Subject: [PATCH v6 18/18] kasan: add SPDX-License-Identifier mark to source
- files
-In-Reply-To: <cover.1535462971.git.andreyknvl@google.com>
-References: <cover.1535462971.git.andreyknvl@google.com>
-Message-ID: <878e719ff82dd0e43d9ede66856f2f76d072c417.1535462971.git.andreyknvl@google.com>
+From: mbenes@suse.cz (Miroslav Benes)
+Date: Wed, 29 Aug 2018 13:37:00 +0200 (CEST)
+Subject: [PATCH 2/3] arm64: implement live patching
+In-Reply-To: <20180810160306.2954D68C76@newverein.lst.de>
+References: <20180810160043.9E45568C76@newverein.lst.de>
+ <20180810160306.2954D68C76@newverein.lst.de>
+Message-ID: <alpine.LSU.2.21.1808291313170.30704@pobox.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a "SPDX-License-Identifier: GPL-2.0" mark to all source
-files under mm/kasan.
+On Fri, 10 Aug 2018, Torsten Duwe wrote:
 
-Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
----
- mm/kasan/common.c         | 1 +
- mm/kasan/kasan.c          | 1 +
- mm/kasan/kasan_init.c     | 1 +
- mm/kasan/kasan_report.c   | 1 +
- mm/kasan/khwasan.c        | 1 +
- mm/kasan/khwasan_report.c | 1 +
- mm/kasan/quarantine.c     | 1 +
- mm/kasan/report.c         | 1 +
- 8 files changed, 8 insertions(+)
+> Based on ftrace with regs, do the usual thing. Also allocate a
+> task flag for whatever consistency handling is implemented.
+> Watch out for interactions with the graph tracer.
+> This code has been compile-tested, but has not yet seen any
+> heavy livepatching.
+> 
+> Signed-off-by: Torsten Duwe <duwe@suse.de>
 
-diff --git a/mm/kasan/common.c b/mm/kasan/common.c
-index e5648f4218eb..f2576d93e74c 100644
---- a/mm/kasan/common.c
-+++ b/mm/kasan/common.c
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * This file contains common KASAN and KHWASAN code.
-  *
-diff --git a/mm/kasan/kasan.c b/mm/kasan/kasan.c
-index 44ec228de0a2..128a865c9e05 100644
---- a/mm/kasan/kasan.c
-+++ b/mm/kasan/kasan.c
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * This file contains core KASAN code.
-  *
-diff --git a/mm/kasan/kasan_init.c b/mm/kasan/kasan_init.c
-index 7a2a2f13f86f..b3c068ab2a85 100644
---- a/mm/kasan/kasan_init.c
-+++ b/mm/kasan/kasan_init.c
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * This file contains some kasan initialization code.
-  *
-diff --git a/mm/kasan/kasan_report.c b/mm/kasan/kasan_report.c
-index fdf2d77e3125..48da73f4ef7c 100644
---- a/mm/kasan/kasan_report.c
-+++ b/mm/kasan/kasan_report.c
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * This file contains KASAN specific error reporting code.
-  *
-diff --git a/mm/kasan/khwasan.c b/mm/kasan/khwasan.c
-index 6b1309278e39..934f80b2d22e 100644
---- a/mm/kasan/khwasan.c
-+++ b/mm/kasan/khwasan.c
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * This file contains core KHWASAN code.
-  *
-diff --git a/mm/kasan/khwasan_report.c b/mm/kasan/khwasan_report.c
-index 51238b404b08..4e193546d94e 100644
---- a/mm/kasan/khwasan_report.c
-+++ b/mm/kasan/khwasan_report.c
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * This file contains KHWASAN specific error reporting code.
-  *
-diff --git a/mm/kasan/quarantine.c b/mm/kasan/quarantine.c
-index 3a8ddf8baf7d..0e4dc1a22615 100644
---- a/mm/kasan/quarantine.c
-+++ b/mm/kasan/quarantine.c
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * KASAN quarantine.
-  *
-diff --git a/mm/kasan/report.c b/mm/kasan/report.c
-index e031c78f2e52..633b4b245798 100644
---- a/mm/kasan/report.c
-+++ b/mm/kasan/report.c
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * This file contains common KASAN and KHWASAN error reporting code.
-  *
--- 
-2.19.0.rc0.228.g281dcd1b4d0-goog
+There is one thing missing. Livepatch is able to automatically resolve 
+relocations pointing to SHN_LIVEPATCH symbols. Arch-specific 
+apply_relocate_add() is called for the purpose. It needs all 
+arch-specific info preserved because of that. Usually it means to keep 
+at least mod_arch_specific struct also after a module is loaded. It 
+depends on its content. See f31e0960f395 ("module: s390: keep 
+mod_arch_specific for livepatch modules") for example.
+
+We discussed the issue in 2016 when you submitted the arm64 support 
+originally. It was more or less ok back then. Jessica only proposed to 
+update count_plts(). However, a lot has changed since then and the code 
+must be inspected again. If everything is ok, there should be at least a 
+note in the changelog.
+ 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 28c8c03..31df287 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -117,6 +117,7 @@ config ARM64
+>  	select HAVE_GENERIC_DMA_COHERENT
+>  	select HAVE_HW_BREAKPOINT if PERF_EVENTS
+>  	select HAVE_IRQ_TIME_ACCOUNTING
+> +	select HAVE_LIVEPATCH
+>  	select HAVE_MEMBLOCK
+>  	select HAVE_MEMBLOCK_NODE_MAP if NUMA
+>  	select HAVE_NMI
+> @@ -1343,4 +1344,6 @@ if CRYPTO
+>  source "arch/arm64/crypto/Kconfig"
+>  endif
+>  
+> +source "kernel/livepatch/Kconfig"
+> +
+>  source "lib/Kconfig"
+> --- a/arch/arm64/include/asm/thread_info.h
+> +++ b/arch/arm64/include/asm/thread_info.h
+> @@ -76,6 +76,7 @@ void arch_release_task_struct(struct tas
+>  #define TIF_FOREIGN_FPSTATE	3	/* CPU's FP state is not current's */
+>  #define TIF_UPROBE		4	/* uprobe breakpoint or singlestep */
+>  #define TIF_FSCHECK		5	/* Check FS is USER_DS on return */
+> +#define TIF_PATCH_PENDING	6
+>  #define TIF_NOHZ		7
+>  #define TIF_SYSCALL_TRACE	8
+>  #define TIF_SYSCALL_AUDIT	9
+> @@ -94,6 +95,7 @@ void arch_release_task_struct(struct tas
+>  #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
+>  #define _TIF_NOTIFY_RESUME	(1 << TIF_NOTIFY_RESUME)
+>  #define _TIF_FOREIGN_FPSTATE	(1 << TIF_FOREIGN_FPSTATE)
+> +#define _TIF_PATCH_PENDING	(1 << TIF_PATCH_PENDING)
+>  #define _TIF_NOHZ		(1 << TIF_NOHZ)
+>  #define _TIF_SYSCALL_TRACE	(1 << TIF_SYSCALL_TRACE)
+>  #define _TIF_SYSCALL_AUDIT	(1 << TIF_SYSCALL_AUDIT)
+> @@ -106,7 +108,8 @@ void arch_release_task_struct(struct tas
+>  
+>  #define _TIF_WORK_MASK		(_TIF_NEED_RESCHED | _TIF_SIGPENDING | \
+>  				 _TIF_NOTIFY_RESUME | _TIF_FOREIGN_FPSTATE | \
+> -				 _TIF_UPROBE | _TIF_FSCHECK)
+> +				 _TIF_UPROBE | _TIF_FSCHECK | \
+> +				 _TIF_PATCH_PENDING)
+
+We're ok if _TIF_WORK_MASK is processed in the syscall return path and in 
+irq return to user space. It looks like it is the case, but I'd welcome a 
+confirmation.
+
+Anyway, one piece is still missing. _TIF_PATCH_PENDING must be cleared 
+somewhere. I think something like
+
+                        if (thread_flags & _TIF_PATCH_PENDING)
+				klp_update_patch_state(current);
+
+in do_notify_resume() (arch/arm64/kernel/signal.c) before 
+_TIF_SIGPENDING processing should do the trick.
+  
+>  #define _TIF_SYSCALL_WORK	(_TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT | \
+>  				 _TIF_SYSCALL_TRACEPOINT | _TIF_SECCOMP | \
+> diff --git a/arch/arm64/include/asm/livepatch.h b/arch/arm64/include/asm/livepatch.h
+> new file mode 100644
+> index 0000000..6b9a3d1
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/livepatch.h
+> @@ -0,0 +1,38 @@
+> +/* SPDX-License-Identifier: GPL-2.0
+> + *
+> + * livepatch.h - arm64-specific Kernel Live Patching Core
+> + *
+> + * Copyright (C) 2016 SUSE
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * as published by the Free Software Foundation; either version 2
+> + * of the License, or (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, see <http://www.gnu.org/licenses/>.
+> + */
+
+Someone could argue that GPL boilerplate is superfluous thanks to SPDX 
+identifier. I don't, so thanks for putting it there.
+
+> +#ifndef _ASM_ARM64_LIVEPATCH_H
+> +#define _ASM_ARM64_LIVEPATCH_H
+> +
+> +#include <linux/module.h>
+> +#include <linux/ftrace.h>
+> +
+> +#ifdef CONFIG_LIVEPATCH
+
+The guard is unnecessary, I think. The header file is included from 
+include/linux/livepatch.h only. Right after the guard there.
+
+> +static inline int klp_check_compiler_support(void)
+> +{
+> +	return 0;
+> +}
+> +
+> +static inline void klp_arch_set_pc(struct pt_regs *regs, unsigned long ip)
+> +{
+> +	regs->pc = ip;
+> +}
+> +#endif /* CONFIG_LIVEPATCH */
+> +
+> +#endif /* _ASM_ARM64_LIVEPATCH_H */
+
+Regards,
+Miroslav
