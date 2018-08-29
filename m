@@ -1,60 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 29 Aug 2018 14:30:49 -0700
-Subject: [GIT PULL] omap fixes for v4.19-rc cycle
-Message-ID: <pull-1535578186-113331@atomide.com>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Wed, 29 Aug 2018 14:35:48 -0700 (PDT)
+Subject: [PATCH v5 07/27] arm64: xen: Use existing helper to check
+ interrupt status
+In-Reply-To: <1535471497-38854-8-git-send-email-julien.thierry@arm.com>
+References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
+ <1535471497-38854-8-git-send-email-julien.thierry@arm.com>
+Message-ID: <alpine.DEB.2.10.1808291132570.14449@sstabellini-ThinkPad-X260>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Tony Lindgren" <tony@atomide.com>
+On Tue, 28 Aug 2018, Julien Thierry wrote:
+> The status of interrupts might depend on more than just pstate. Use
+> interrupts_disabled() instead of raw_irqs_disabled_flags() to take the full
+> context into account.
+> 
+> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> Cc: Stefano Stabellini <sstabellini@kernel.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
 
-The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+Acked-by: Stefano Stabellini <sstabellini@kernel.org>
 
-  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
 
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.19/fixes-v2-signed
-
-for you to fetch changes up to 2d59bb602314a4b2593fde267734266b5e872dd0:
-
-  ARM: dts: omap4-droid4: Fix emmc errors seen on some devices (2018-08-28 09:59:46 -0700)
-
-----------------------------------------------------------------
-Fixes for omap variants against v4.19-rc1
-
-These are mostly fixes related to using ti-sysc interconnect target module
-driver for accessing right register offsets for sgx and cpsw and for
-no_console_suspend regression.
-
-There is also a droid4 emmc fix where emmc may not get detected for some
-models, and vibrator dts mismerge fix.
-
-And we have a file permission fix for am335x-osd3358-sm-red.dts that
-just got added. And we must tag RTC as system-power-controller for
-am437x for PMIC to shut down during poweroff.
-
-----------------------------------------------------------------
-Keerthy (1):
-      arm: dts: am4372: setup rtc as system-power-controller
-
-Neeraj Dantu (1):
-      ARM: dts: Fix file permission for am335x-osd3358-sm-red.dts
-
-Pavel Machek (1):
-      ARM: dts: omap4-droid4: fix vibrations on Droid 4
-
-Tony Lindgren (6):
-      ARM: OMAP2+: Fix null hwmod for ti-sysc debug
-      ARM: OMAP2+: Fix module address for modules using mpu_rt_idx
-      bus: ti-sysc: Fix module register ioremap for larger offsets
-      bus: ti-sysc: Fix no_console_suspend handling
-      Merge branch 'perm-fix' into omap-for-v4.19/fixes-v2
-      ARM: dts: omap4-droid4: Fix emmc errors seen on some devices
-
- arch/arm/boot/dts/am335x-osd3358-sm-red.dts |  0
- arch/arm/boot/dts/am4372.dtsi               |  1 +
- arch/arm/boot/dts/omap4-droid4-xt894.dts    | 20 +++++++--------
- arch/arm/mach-omap2/omap_hwmod.c            | 39 ++++++++++++++++++++++++++++-
- drivers/bus/ti-sysc.c                       | 37 +++++++++++++--------------
- 5 files changed, 66 insertions(+), 31 deletions(-)
- mode change 100755 => 100644 arch/arm/boot/dts/am335x-osd3358-sm-red.dts
+> ---
+>  arch/arm64/include/asm/xen/events.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/xen/events.h b/arch/arm64/include/asm/xen/events.h
+> index 4e22b7a..2788e95 100644
+> --- a/arch/arm64/include/asm/xen/events.h
+> +++ b/arch/arm64/include/asm/xen/events.h
+> @@ -14,7 +14,7 @@ enum ipi_vector {
+>  
+>  static inline int xen_irqs_disabled(struct pt_regs *regs)
+>  {
+> -	return raw_irqs_disabled_flags((unsigned long) regs->pstate);
+> +	return !interrupts_enabled(regs);
+>  }
+>  
+>  #define xchg_xen_ulong(ptr, val) xchg((ptr), (val))
+> -- 
+> 1.9.1
+> 
