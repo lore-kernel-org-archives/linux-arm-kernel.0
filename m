@@ -1,89 +1,57 @@
-From: nicholas.piggin@gmail.com (Nicholas Piggin)
-Date: Wed, 29 Aug 2018 13:53:40 +1000
-Subject: Oops running iptables -F OUTPUT
-In-Reply-To: <20180829132827.6dbc4352@roar.ozlabs.ibm.com>
-References: <87bm9n68gq.fsf@igel.home>
- <20180828140632.593291cf@roar.ozlabs.ibm.com>
- <20180829132827.6dbc4352@roar.ozlabs.ibm.com>
-Message-ID: <20180829135341.629b147f@roar.ozlabs.ibm.com>
+From: vkoul@kernel.org (Vinod)
+Date: Wed, 29 Aug 2018 09:31:11 +0530
+Subject: [PATCH 3/3] dmaengine: xilinx_dma: Fix 64-bit simple CDMA transfer
+In-Reply-To: <MWHPR0201MB362803E975383398B361330FC70A0@MWHPR0201MB3628.namprd02.prod.outlook.com>
+References: <1532688639-32230-1-git-send-email-radhey.shyam.pandey@xilinx.com>
+ <1532688639-32230-4-git-send-email-radhey.shyam.pandey@xilinx.com>
+ <20180821155553.GI2388@vkoul-mobl>
+ <MWHPR0201MB362803E975383398B361330FC70A0@MWHPR0201MB3628.namprd02.prod.outlook.com>
+Message-ID: <20180829040111.GD2388@vkoul-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 Aug 2018 13:28:27 +1000
-Nicholas Piggin <npiggin@gmail.com> wrote:
-
-> On Tue, 28 Aug 2018 14:06:32 +1000
-> Nicholas Piggin <nicholas.piggin@gmail.com> wrote:
-> 
-> > On Mon, 27 Aug 2018 19:11:01 +0200
-> > Andreas Schwab <schwab@linux-m68k.org> wrote:
-> >   
-> > > I'm getting this Oops when running iptables -F OUTPUT:
-> > > 
-> > > [   91.139409] Unable to handle kernel paging request for data at address 0xd0000001fff12f34
-> > > [   91.139414] Faulting instruction address: 0xd0000000016a5718
-> > > [   91.139419] Oops: Kernel access of bad area, sig: 11 [#1]
-> > > [   91.139426] BE SMP NR_CPUS=2 PowerMac
-> > > [   91.139434] Modules linked in: iptable_filter ip_tables x_tables bpfilter nfsd auth_rpcgss lockd grace nfs_acl sunrpc tun af_packet snd_aoa_codec_tas snd_aoa_fabric_layout snd_aoa snd_aoa_i2sbus snd_aoa_soundbus snd_pcm_oss snd_pcm snd_seq snd_timer snd_seq_device snd_mixer_oss snd sungem sr_mod firewire_ohci cdrom sungem_phy soundcore firewire_core pata_macio crc_itu_t sg hid_generic usbhid linear md_mod ohci_pci ohci_hcd ehci_pci ehci_hcd usbcore usb_common dm_snapshot dm_bufio dm_mirror dm_region_hash dm_log dm_mod sata_svw
-> > > [   91.139522] CPU: 1 PID: 3620 Comm: iptables Not tainted 4.19.0-rc1 #1
-> > > [   91.139526] NIP:  d0000000016a5718 LR: d0000000016a569c CTR: c0000000006f560c
-> > > [   91.139531] REGS: c0000001fa577670 TRAP: 0300   Not tainted  (4.19.0-rc1)
-> > > [   91.139534] MSR:  900000000200b032 <SF,HV,VEC,EE,FP,ME,IR,DR,RI>  CR: 84002484  XER: 20000000
-> > > [   91.139553] DAR: d0000001fff12f34 DSISR: 40000000 IRQMASK: 0 
-> > > GPR00: d0000000016a569c c0000001fa5778f0 d0000000016b0400 0000000000000000 
-> > > GPR04: 0000000000000002 0000000000000000 80000001fa46418e c0000001fa0d05c8 
-> > > GPR08: d0000000016b0400 d00037fffff13000 00000001ff3e7000 d0000000016a6fb8 
-> > > GPR12: c0000000006f560c c00000000ffff780 0000000000000000 0000000000000000 
-> > > GPR16: 0000000011635010 00003fffa1b7aa68 0000000000000000 0000000000000000 
-> > > GPR20: 0000000000000003 0000000010013918 00000000116350c0 c000000000b88990 
-> > > GPR24: c000000000b88ba4 0000000000000000 d0000001fff12f34 0000000000000000 
-> > > GPR28: d0000000016b8000 c0000001fa20f400 c0000001fa20f440 0000000000000000 
-> > > [   91.139627] NIP [d0000000016a5718] .alloc_counters.isra.10+0xbc/0x140 [ip_tables]
-> > > [   91.139634] LR [d0000000016a569c] .alloc_counters.isra.10+0x40/0x140 [ip_tables]
-> > > [   91.139638] Call Trace:
-> > > [   91.139645] [c0000001fa5778f0] [d0000000016a569c] .alloc_counters.isra.10+0x40/0x140 [ip_tables] (unreliable)
-> > > [   91.139655] [c0000001fa5779b0] [d0000000016a5b54] .do_ipt_get_ctl+0x110/0x2ec [ip_tables]
-> > > [   91.139666] [c0000001fa577aa0] [c0000000006233e0] .nf_getsockopt+0x68/0x88
-> > > [   91.139674] [c0000001fa577b40] [c000000000631608] .ip_getsockopt+0xbc/0x128
-> > > [   91.139682] [c0000001fa577bf0] [c00000000065adf4] .raw_getsockopt+0x18/0x5c
-> > > [   91.139690] [c0000001fa577c60] [c0000000005b5f60] .sock_common_getsockopt+0x2c/0x40
-> > > [   91.139697] [c0000001fa577cd0] [c0000000005b3394] .__sys_getsockopt+0xa4/0xd0
-> > > [   91.139704] [c0000001fa577d80] [c0000000005b5ab0] .__se_sys_socketcall+0x238/0x2b4
-> > > [   91.139712] [c0000001fa577e30] [c00000000000a31c] system_call+0x5c/0x70
-> > > [   91.139716] Instruction dump:
-> > > [   91.139721] 39290040 7d3d4a14 7fbe4840 409cff98 81380000 2b890001 419d000c 393e0060 
-> > > [   91.139736] 48000010 7d57c82a e93e0060 7d295214 <815a0000> 794807e1 41e20010 7c210b78 
-> > > [   91.139752] ---[ end trace f5d1d5431651845d ]---    
+On 28-08-18, 14:03, Radhey Shyam Pandey wrote:
+> > On 27-07-18, 16:20, Radhey Shyam Pandey wrote:
+> > > In AXI CDMA simple mode also pass MSB bits of source and destination
+> > > address to xilinx_write function. This fixes simple CDMA operation
+> > > mode using 64-bit addressing.
+> > >
+> > > Signed-off-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
+> > > Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> > > ---
+> > >  drivers/dma/xilinx/xilinx_dma.c |    6 ++++--
+> > >  1 files changed, 4 insertions(+), 2 deletions(-)
+> > >
+> > > diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
+> > > index a37871e..2e15d86 100644
+> > > --- a/drivers/dma/xilinx/xilinx_dma.c
+> > > +++ b/drivers/dma/xilinx/xilinx_dma.c
+> > > @@ -1245,8 +1245,10 @@ static void xilinx_cdma_start_transfer(struct
+> > xilinx_dma_chan *chan)
+> > >
+> > >  		hw = &segment->hw;
+> > >
+> > > -		xilinx_write(chan, XILINX_CDMA_REG_SRCADDR, hw-
+> > >src_addr);
+> > > -		xilinx_write(chan, XILINX_CDMA_REG_DSTADDR, hw-
+> > >dest_addr);
+> > > +		xilinx_write(chan, XILINX_CDMA_REG_SRCADDR,
+> > (dma_addr_t)
+> > > +			     ((u64)hw->src_addr_msb << 32 | hw->src_addr));
 > > 
-> > This is due to 7290d58095 ("module: use relative references for
-> > __ksymtab entries"). This part of kernel/module.c -
+> > so this is:
+> >         (dma_addr_t)((u64)hw->src_addr_msb << 32 | hw->src_addr)
 > > 
-> >    /* Divert to percpu allocation if a percpu var. */
-> >    if (sym[i].st_shndx == info->index.pcpu)
-> >        secbase = (unsigned long)mod_percpu(mod);
-> >    else
-> >        secbase = info->sechdrs[sym[i].st_shndx].sh_addr;
-> >    sym[i].st_value += secbase;
-> > 
-> > Causes the distance to the target to exceed 32-bits on powerpc, so
-> > it doesn't fit in a rel32 reloc. Not sure how other archs cope.  
+> > what is src_addr data type? I think its u32. It would be better to
+> > update xilinx_write() to take u64 and not dma_addr_t.
 > 
-> Any progress on this one? I had a bit of a look but can't see a really
-> trivial fix and don't have a lot of time to work on it. Maybe use 64
-> bit relative offsets for per-cpu exports, or better might be apply the
-> per-cpu fixup when linking against the symbol rather than when writing
-> the module symbol table.
-> 
-> Until then I'd like to just remove HAVE_ARCH_PREL32_RELOCATIONS from
-> powerpc/Kconfig, but if other archs are going to have issues too, we
-> could just revert
-> 
-> 271ca788774aa ("arch: enable relative relocations for arm64, power and x86")
-> 
-> arm64, x86 -- can the distance between your module percpu data link
-> location -> module percpu runtime allocation location exceed 31 bits?
+> Yes, src_addr_msb and src_addr BD fields are u32. To explain: There is no
+> prob in xilinx_write it takes dma_addr_t as an arg which is 32/64 bit 
+> depending on _DMA_ADDR_T_64BIT. In 64bit CDMA transfer, there was a bug
+> i.e in the call to xilinx_write src_addr_msb 32 bits were not passed. To fix
+> that combine MSB and LSB 32 bits before passing it to xilinx_write.
 
-[Sorry ignore this, I missed some mail, will reply in the thread]
+Yeah that part was clear but the implementation can be better..
 
-Thanks,
-Nick
+-- 
+~Vinod
