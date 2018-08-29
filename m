@@ -1,65 +1,86 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 29 Aug 2018 18:33:39 +0300
-Subject: [PATCH] arm64: dts: add support for SolidRun Clearfog GT 8K
-In-Reply-To: <20180829150942.GD22270@lunn.ch>
-References: <3276b82491c1eda1e05a0e6b94560cfa451cf8d4.1535544789.git.baruch@tkos.co.il>
- <20180829141159.GB22270@lunn.ch> <8736uxxmai.fsf@tkos.co.il>
- <20180829150942.GD22270@lunn.ch>
-Message-ID: <871sahxk4s.fsf@tkos.co.il>
+From: mhkelley58@gmail.com (mhkelley58 at gmail.com)
+Date: Wed, 29 Aug 2018 08:22:24 -0700
+Subject: [PATCH v2 0/4] Enable Linux guests on Hyper-V on ARM64
+Message-ID: <1535556148-10452-1-git-send-email-mikelley@microsoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+From: Michael Kelley <mikelley@microsoft.com>
 
-Andrew Lunn writes:
->> The schematics say "AP Reset Switch". So it is probably meant to be a
->> software controlled "back to default" button. Is there a suitable
->> linux,code for that?
->
-> There is a reset code.
+This series enables Linux guests running on Hyper-V on ARM64
+hardware. New ARM64-specific code in arch/arm64/hyperv initializes
+Hyper-V, including its synthetic clocks and hypercall mechanism.
+Existing architecture independent drivers for Hyper-V's VMbus and
+synthetic devices just work when built for ARM64. Hyper-V code is
+built and included in the image and modules only if CONFIG_HYPERV
+is enabled.
 
-I can't find it. The only match for RESET in
-include/uapi/linux/input-event-codes.h is KEY_ZOOMRESET, which is most
-likely not what you meant.
+The four patches are organized as follows:
+1) Add include files that define the Hyper-V interface as
+   described in the Hyper-V Top Level Functional Spec (TLFS), plus
+   additional definitions specific to Linux running on Hyper-V.
 
->> It is not assembled here so I could not test. The schematics say SLB9670.
->
-> I think the standard SPI TPM TIS driver should work for that. But if
-> it is not populated, you cannot test it.
->
->> >> +			port at 5 {
->> >> +				reg = <5>;
->> >> +				label = "cpu";
->> >> +				ethernet = <&cp1_eth2>;
->> >> +			};
->> >
->> > No fixed-link? It correctly defaults to 2.5G? I've never tested that.
->> 
->> Seems to work here
->
-> It would be good to test it really is using 2.5G, not 1G.
->
->> There is also a patch from Rabeeh (which I did not
->> apply while testing) to make it the default:
->> 
->>   https://github.com/SolidRun/openwrt/blob/openwrt-18.06-sr/target/linux/mvebu/patches-4.14/533-fix-88e6141-cpu-max-speed.patch
->
-> Which is why i don't think it actually is using 2.5G.
+2) Add core Hyper-V support on ARM64, including hypercalls,
+   synthetic clock initialization, and interrupt handlers.
 
-I see this from phylink_mac_config():
+3) Update the existing VMbus driver to generalize interrupt
+   management across x86/x64 and ARM64.
 
-[  511.043783] mvpp2 f4000000.ethernet eth2: phylink_mac_config: mode=fixed/2500base-x/2.5Gbps/Full adv=00000,00008200 pause=10 link=1 an=1
+4) Make CONFIG_HYPERV selectable on ARM64 in addition to x86/x64.
 
-Is that enough for a test?
+Some areas of Linux guests on Hyper-V on ARM64 are a work-
+in-progress, primarily due to work still being done in Hyper-V:
 
-> This patch will need a little rework, but it basically O.K. Change
-> mv88e6x41 to mv88e6341. We use the family name in function names.
+* Hyper-V on ARM64 currently runs with a 4 Kbyte page size, and only
+  supports guests with a 4 Kbyte page size. Because Hyper-V uses
+  shared pages to communicate between the guest and the hypervisor,
+  there are open design decisions on the page size to use when
+  the guest is using 16K/64K pages.  Once those issues are
+  resolved and Hyper-V fully supports 16K/64K guest pages, changes
+  may be needed in the Linux drivers for Hyper-V synthetic devices.
 
-Thanks again for reviewing this not-yet-posted patch.
+* Hyper-V on ARM64 does not currently support mapping PCI devices
+  into the guest address space. The Hyper-V PCI driver at
+  drivers/pci/host/pci-hyperv.c has x86/x64-specific code and is
+  not being built for ARM64.
 
-baruch
+In a few cases, terminology from the x86/x64 world has been carried
+over into the ARM64 code ("MSR", "TSC").  Hyper-V still uses the
+x86/x64 terminology and has not replaced it with something more
+generic, so the code uses the Hyper-V terminology.  This will be
+fixed when Hyper-V updates the usage in the TLFS.
+
+Changes in v2:
+* Remove patch to implement slow_virt_to_phys() on ARM64.
+  Use of slow_virt_to_phys() in arch independent Hyper-V
+  drivers has been eliminated by commit 6ba34171bcbd
+  ("Drivers: hv: vmbus: Remove use of slow_virt_to_phys()")
+* Minor tweaks to rebase to latest linux-next code
+
+Michael Kelley (4):
+  arm64: hyperv: Add core Hyper-V include files
+  arm64: hyperv: Add support for Hyper-V as a hypervisor
+  Drivers: hv: vmbus: Add hooks for per-CPU IRQ
+  Drivers: hv: Enable CONFIG_HYPERV on ARM64
+
+ MAINTAINERS                          |   3 +
+ arch/arm64/Makefile                  |   1 +
+ arch/arm64/hyperv/Makefile           |   2 +
+ arch/arm64/hyperv/hv_hvc.S           |  54 +++++
+ arch/arm64/hyperv/hv_init.c          | 437 +++++++++++++++++++++++++++++++++++
+ arch/arm64/hyperv/mshyperv.c         | 178 ++++++++++++++
+ arch/arm64/include/asm/hyperv-tlfs.h | 338 +++++++++++++++++++++++++++
+ arch/arm64/include/asm/mshyperv.h    | 295 +++++++++++++++++++++++
+ arch/x86/include/asm/mshyperv.h      |   4 +
+ drivers/hv/Kconfig                   |   3 +-
+ drivers/hv/hv.c                      |   2 +
+ 11 files changed, 1316 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/hyperv/Makefile
+ create mode 100644 arch/arm64/hyperv/hv_hvc.S
+ create mode 100644 arch/arm64/hyperv/hv_init.c
+ create mode 100644 arch/arm64/hyperv/mshyperv.c
+ create mode 100644 arch/arm64/include/asm/hyperv-tlfs.h
+ create mode 100644 arch/arm64/include/asm/mshyperv.h
 
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+1.8.3.1
