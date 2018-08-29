@@ -1,44 +1,94 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Wed, 29 Aug 2018 01:12:04 +0000
-Subject: [PATCH 2/2] ARM: dts: imx6sll: add gpio clocks
-In-Reply-To: <20180712025203.GQ6959@dragon>
-References: <1529649154-5724-1-git-send-email-Anson.Huang@nxp.com>
- <1529649154-5724-2-git-send-email-Anson.Huang@nxp.com>
- <20180712025203.GQ6959@dragon>
-Message-ID: <DB3PR0402MB39163FACD5AE40052010B390F5090@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+From: petrcvekcz@gmail.com (Petr Cvek)
+Date: Wed, 29 Aug 2018 03:32:26 +0200
+Subject: ASoC: pxa: remove pxa2xx-pcm driver, which caused regression
+In-Reply-To: <878t4u96wq.fsf@belgarion.home>
+References: <f12148b7c9102c67d92a0467f1d653e37c6548ee.1534534854.git.petrcvekcz@gmail.com>
+ <87r2iwau3u.fsf@belgarion.home>
+ <4deb5304-8efc-3093-7f8e-0dfe50781790@gmail.com>
+ <87mutjbidr.fsf@belgarion.home>
+ <16bb94b6-089d-f78e-1bb7-2550414be2fb@gmail.com>
+ <878t4u96wq.fsf@belgarion.home>
+Message-ID: <1e1c5084-840d-a378-7c57-def6d6c0a096@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Shawn
-	I saw v4.19-rc1 is created, can you please apply this patch?
-
-Anson Huang
-Best Regards!
-
-
-> -----Original Message-----
-> From: Shawn Guo <shawnguo@kernel.org>
-> Sent: Thursday, July 12, 2018 10:52 AM
-> To: Anson Huang <anson.huang@nxp.com>
-> Cc: s.hauer at pengutronix.de; kernel at pengutronix.de; Fabio Estevam
-> <fabio.estevam@nxp.com>; robh+dt at kernel.org; mark.rutland at arm.com;
-> mturquette at baylibre.com; sboyd at kernel.org; A.s. Dong
-> <aisheng.dong@nxp.com>; Jacky Bai <ping.bai@nxp.com>; dl-linux-imx
-> <linux-imx@nxp.com>; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
-> linux-clk at vger.kernel.org
-> Subject: Re: [PATCH 2/2] ARM: dts: imx6sll: add gpio clocks
+Dne 25.8.2018 v 10:39 Robert Jarzmik napsal(a):
+> Petr Cvek <petrcvekcz@gmail.com> writes:
 > 
-> On Fri, Jun 22, 2018 at 02:32:34PM +0800, Anson Huang wrote:
-> > i.MX6SLL has GPIO clock gates in CCM CCGR, add clock property for GPIO
-> > driver to make sure all GPIO banks work as expected.
-> >
-> > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+>> Dne 18.8.2018 v 21:10 Robert Jarzmik napsal(a):
+>>> Petr Cvek <petrcvekcz@gmail.com> writes:
+>>>
+>>>> My bad I've forgot to add "select SND_PXA2XX_LIB" from removed
+>>>> SND_PXA2XX_SOC, now it should compile, can you test it if it works now?
+>>>> fixed patch in [1].
+>>> Still NAK.
+>>>
+>>> You must realise that as long as you will delete sound/soc/pxa/pxa2xx-pcm.c,
+>>> I'll block the patch, as it is being used for music playback on several pxa
+>>> platforms, at least the AC97 based ones.
+>>>
+>> I know I will send the magician only patch. I've just wanted to know how
+>> it is working with AC97 ;-) (+ it is still a good test for possible
+>> future changes).
+>>
+>>>> BTW can you try insmod-aplay-stop-rmmod with the current -next on your
+>>>> board?
 > 
-> I tried to create a topic branch for this patch with dependent clk branch merged
-> in.  But it turns out to be difficult and not worth the effort, because too many
-> imx6sll patches need to be moved out from imx/dt branch, and some imx6sll
-> changes are mixed with other SoCs.
-> Let's apply this in next cycle.  Ping me when 4.19-rc1 is available.
+> Ok, I just did that.
+> I based my work on linux-next, plus one extra patch which
+> was lost in my last submissions :
+> https://groups.google.com/forum/#!topic/linux.kernel/0iw-VDxIyZk
 > 
-> Shawn
+> I insmoded the modules, called aplay, heard the music, rmmoded all the modules,
+> then insmoded again, called aplay, and rmmoded again. Everything worked
+> smoothly.
+
+Hi guys,
+
+...the continuation of a sound fix for (not only) HTC magician
+
+I think I got it now. It seems mioa701_wm9713 calls snd_pcm_new() twice
+(once in pxa2xx-ac97.c and once in mioa701_wm9713.c by
+devm_snd_soc_register_card() . This doesn't cause a double DMA
+allocation (as both will be for the different "card"). Still you should
+have allocated unused DMA resources somewhere on mioa by
+pxa2xx_soc_pcm_new() from pxa2xx-pcm.c (= dead code).
+
+Problem on non AC97 boards is as follows:
+
+As defined in machine's struct snd_soc_dai_link the individual
+components' .pcm_new() gets called. The first will be the component
+.cpu_dai_name="pxa-ssp-dai.0" and by definition in pxa-ssp.c this calls
+pxa2xx_soc_pcm_new() which allocates DMA.
+
+The problem is when the second component's .pcm_new() is called by the
+definition .platform_name = "pxa-pcm-audio" which calls again
+pxa2xx_soc_pcm_new() which allocates the DMA for the second time.
+
+This problem should be same for the most of the PXA boards, which are
+using SSP.
+
+A trivial comment-out of .platform_name works sometimes works, as
+drivers without .platform_name record gets supplied by snd-soc-dummy.
+And this solution has yet another problem.
+
+The PXA27x DMA controller doesn't support a full 8192 bytes per
+transmission (limited by .period_bytes_max), but only up to 8191 bytes
+(o_O), so any DMA buffer request must be in multiples of like 8160 bytes
+(or less, 8160 itself must be in the multiples of 32). This hw
+constraint gets set by calling pxa2xx_pcm_open(). The problem is
+snd-soc-dummy registers its own dummy_dma_open() and indeed it gets
+called after pxa2xx_pcm_open() and rewrites the values by its own dummy
+data. (Un)luckily the value gets overwritten to 8192 bytes and DMA
+allocation fails.
+
+Can somebody give me suggestions how to fix this? Changing the
+.period_bytes_max value in snd-soc-dummy works, deleting
+dummy_dma_open() works, changing pxa2xx_soc_platform_probe() to just
+return works too (that's why I've decided pxa2xx-pcm.c could be
+removed). But all these changes are ugly and not usable.
+
+Thanks for help.
+
+best regards,
+Petr
