@@ -1,39 +1,55 @@
 From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Wed, 29 Aug 2018 15:34:10 +0200
-Subject: Atmel AT91 support in mainstream kernel 4.4
-In-Reply-To: <20180821123047.GB3159@1wt.eu>
-References: <CAK3Qp=UAex-68+oCk4v6WOERHiWtB5CEqDtQJvGj+xv2GonOhg@mail.gmail.com>
- <20180821123047.GB3159@1wt.eu>
-Message-ID: <20180829133410.GE16561@piout.net>
+Date: Wed, 29 Aug 2018 15:49:07 +0200
+Subject: [PATCH] ARM: configs: add generic resistive touchscreen
+In-Reply-To: <1535525577-21148-1-git-send-email-eugen.hristev@microchip.com>
+References: <1535525577-21148-1-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <20180829134907.GF16561@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On 21/08/2018 14:30:47+0200, Willy Tarreau wrote:
-> Hi,
-> 
-> On Tue, Aug 21, 2018 at 02:10:14PM +0200, Fernando AE wrote:
-> > Hello all,
-> > 
-> > I'd like to know if AT91 boards (more specifically AT91SAM9G20) is
-> > well supported in mainstream Kernel 4.4.
-> > 
-> > In more details, I'm working in a project of bringing up Linux 4.4 in
-> > a iMX6 based board, while trying to keep the same sources for our
-> > legacy AT91 based board. So, I'm wondering if it's a good idea to take
-> > Freescale's repo based on 4.4 as reference and compiling both for iMX
-> > and AT91.
-> 
-> FWIW I remember having been running an AT91 board (linuxstamp 2) on
-> 2.6.35 with a single patch by then, the one needed to create the board.
-> Everything else used to work out of the box. I don't see why anything
-> would have regressed since then without anyone complaining loud, so I'd
-> be inclined to think it's well supported.
-> 
+Hello Eugen,
 
-I confirm we don't have any out of tree patch for the at91sam9g20 so you
-will get the best support there is using a mainline kernel.
+On 29/08/2018 09:52:57+0300, Eugen Hristev wrote:
+> Add generic resistive touchscreen CONFIG_TOUCHSCREEN_ADC to defconfigs
+> 
+> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+> ---
+>  arch/arm/configs/multi_v7_defconfig | 1 +
+>  arch/arm/configs/sama5_defconfig    | 1 +
+
+I would make two separate patches because multi_v7 has a high chance of
+conflicting while sama5_defconfig will not.
+
+>  2 files changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index fc33444..a1b2cfa 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -282,6 +282,7 @@ CONFIG_MOUSE_PS2_ELANTECH=y
+>  CONFIG_MOUSE_CYAPA=m
+>  CONFIG_MOUSE_ELAN_I2C=y
+>  CONFIG_INPUT_TOUCHSCREEN=y
+> +CONFIG_TOUCHSCREEN_ADC=m
+>  CONFIG_TOUCHSCREEN_ATMEL_MXT=m
+>  CONFIG_TOUCHSCREEN_MMS114=m
+>  CONFIG_TOUCHSCREEN_WM97XX=m
+> diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
+> index 2080025..ead6826 100644
+> --- a/arch/arm/configs/sama5_defconfig
+> +++ b/arch/arm/configs/sama5_defconfig
+> @@ -116,6 +116,7 @@ CONFIG_KEYBOARD_QT1070=y
+>  CONFIG_KEYBOARD_GPIO=y
+>  # CONFIG_INPUT_MOUSE is not set
+>  CONFIG_INPUT_TOUCHSCREEN=y
+> +CONFIG_TOUCHSCREEN_ADC=y
+>  CONFIG_TOUCHSCREEN_ATMEL_MXT=y
+>  # CONFIG_SERIO is not set
+>  CONFIG_LEGACY_PTY_COUNT=4
+> -- 
+> 2.7.4
+> 
 
 -- 
 Alexandre Belloni, Bootlin
