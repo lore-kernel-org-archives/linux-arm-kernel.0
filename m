@@ -1,85 +1,118 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Wed, 29 Aug 2018 15:33:29 +0300
-Subject: [PATCH v7 2/8] dt-bindings: Introduce interconnect provider
- bindings
-In-Reply-To: <20180827151140.luysp2kfbcq6patg@flea>
-References: <20180731161340.13000-1-georgi.djakov@linaro.org>
- <20180731161340.13000-3-georgi.djakov@linaro.org>
- <CABGGisxq+hf91R18pnZ=VZ9f99GssWWPhpPCjNAROJmKg5-udA@mail.gmail.com>
- <e114ed83-fd54-4952-f375-e1d94826ac6e@linaro.org>
- <20180820153207.xx5outviph7ec76p@flea>
- <672e6c6c-222f-5e7f-5d0c-acc8da68b1ab@linaro.org>
- <CAL_JsqKMPm=qmfYMQH99_gqSv0-ynUSvbkoNjjeDKtyxfgE1tg@mail.gmail.com>
- <20180827151140.luysp2kfbcq6patg@flea>
-Message-ID: <ec22950d-ae18-0cec-3bef-a4840618eb7d@linaro.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 29 Aug 2018 14:38:35 +0200
+Subject: [PATCH 1/7] dt-bindings: Add DT bindings documentation for
+ Allwinner Thermal Sensor Controller
+In-Reply-To: <20180825174352.68de8a2720f4c91b987be914@bidouilliste.com>
+References: <20180804070355.14857-1-manu@freebsd.org>
+ <20180820111755.rzg7l2lznmbpuf2e@flea>
+ <CAL_JsqLVQDRH1esAXghfQdxmp+iorWVCArM2qTwjbgmQzmhzQw@mail.gmail.com>
+ <20180820140737.xmqhu5ndqzehvkql@flea>
+ <20180820162715.49e6d8a469ece983f3c1d288@bidouilliste.com>
+ <20180824145840.isdcg3fr6mw4ntzg@flea>
+ <20180824215921.59d060b54eb3a1e7d1552bde@bidouilliste.com>
+ <20180824230338.GA19399@localhost.localdomain>
+ <20180825174352.68de8a2720f4c91b987be914@bidouilliste.com>
+Message-ID: <20180829123835.pe674l7kwwtq3nm5@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob and Maxime,
-
-On 08/27/2018 06:11 PM, Maxime Ripard wrote:
-> On Fri, Aug 24, 2018 at 10:35:23AM -0500, Rob Herring wrote:
->> On Fri, Aug 24, 2018 at 9:51 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
->>>
->>> Hi Maxime,
->>>
->>> On 08/20/2018 06:32 PM, Maxime Ripard wrote:
->>>> Hi Georgi,
->>>>
->>>> On Tue, Aug 07, 2018 at 05:54:38PM +0300, Georgi Djakov wrote:
->>>>>> There is also a patch series from Maxime Ripard that's addressing the
->>>>>> same general area. See "dt-bindings: Add a dma-parent property". We
->>>>>> don't need multiple ways to address describing the device to memory
->>>>>> paths, so you all had better work out a common solution.
->>>>>
->>>>> Looks like this fits exactly into the interconnect API concept. I see
->>>>> MBUS as interconnect provider and display/camera as consumers, that
->>>>> report their bandwidth needs. I am also planning to add support for
->>>>> priority.
->>>>
->>>> Thanks for working on this. After looking at your serie, the one thing
->>>> I'm a bit uncertain about (and the most important one to us) is how we
->>>> would be able to tell through which interconnect the DMA are done.
->>>>
->>>> This is important to us since our topology is actually quite simple as
->>>> you've seen, but the RAM is not mapped on that bus and on the CPU's,
->>>> so we need to apply an offset to each buffer being DMA'd.
->>>
->>> Ok, i see - your problem is not about bandwidth scaling but about using
->>> different memory ranges by the driver to access the same location. So
->>> this is not really the same and your problem is different. Also the
->>> interconnect bindings are describing a path and endpoints. However i am
->>> open to any ideas.
->>
->> It may be different things you need, but both are related to the path
->> between a bus master and memory. We can't have each 'problem'
->> described in a different way. Well, we could as long as each platform
->> has different problems, but that's unlikely.
->>
->> It could turn out that the only commonality is property naming
->> convention, but that's still better than 2 independent solutions.
+On Sat, Aug 25, 2018 at 05:43:52PM +0200, Emmanuel Vadot wrote:
 > 
-> Yeah, I really don't think the two issues are unrelated. Can we maybe
-> have a particular interconnect-names value to mark the interconnect
-> being used to perform DMA?
-
-We can call one of the paths "dma" and use it to perform DMA for the
-current device. I don't see a problem with this. The name of the path is
-descriptive and makes sense. And by doing we avoid adding more DT
-properties, which would be an other option.
-
-This also makes me think that it might be a good idea to have a standard
-name for the path to memory as i expect some people will call it "mem",
-others "ddr" etc.
-
-Thanks,
-Georgi
-
->> I know you each want to just fix your issues, but the fact that DT
->> doesn't model the DMA side of the bus structure has been an issue at
->> least since the start of DT on ARM. Either we should address this in a
->> flexible way or we can just continue to manage without. So I'm not
->> inclined to take something that only addresses one SoC family.
+>  Hi,
 > 
-> I'd really like to have it addressed. We're getting bit by this, and
-> the hacks we have don't work well anymore.
+> On Fri, 24 Aug 2018 16:03:40 -0700
+> Eduardo Valentin <edubezval@gmail.com> wrote:
+> 
+> > On Fri, Aug 24, 2018 at 09:59:21PM +0200, Emmanuel Vadot wrote:
+> > > 
+> > >  Hi,
+> > > 
+> > > On Fri, 24 Aug 2018 16:58:40 +0200
+> > > Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> > > 
+> > > > Hi,
+> > > > 
+> > > > On Mon, Aug 20, 2018 at 04:27:15PM +0200, Emmanuel Vadot wrote:
+> > > > > On Mon, 20 Aug 2018 16:07:37 +0200
+> > > > > Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> > > > > 
+> > > > > > On Mon, Aug 20, 2018 at 07:41:22AM -0600, Rob Herring wrote:
+> > > > > > > On Mon, Aug 20, 2018 at 5:17 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> > > > > > > >
+> > > > > > > > On Sat, Aug 04, 2018 at 09:03:49AM +0200, Emmanuel Vadot wrote:
+> > > > > > > > > This patch adds documentation for Device-Tree bindings for the Allwinner
+> > > > > > > > > Thermal Sensor Controller found on the H3, H5 and A64 SoCs
+> > > > > > > > >
+> > > > > > > > > Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
+> > > > > > > >
+> > > > > > > > I'm not going to merge a binding for a device that doesn't have any
+> > > > > > > > driver implemented at the moment in Linux.
+> > > > > > > 
+> > > > > > > I'll take it then. Linux is not the only DT client.
+> > > > > > 
+> > > > > > Then don't complain if we ever have to break the ABI. We never tested
+> > > > > > that hardware, never had any code running on it, and it *will* cause
+> > > > > > some issues. For example, the calibration data have never been used
+> > > > > > and how they should be represented have never been described, since no
+> > > > > > one ever actually tried to use it.
+> > > > > > 
+> > > > > > And sure, Linux is not the only DT client. Just like FreeBSD isn't.
+> > > > > 
+> > > > >  What kind of data would you need for me to make things better ?
+> > > > >  We have the driver in FreeBSD for almost two years now, whne I started
+> > > > > to see how to upstream it I noticed a lot of problems and spent 4 or 5
+> > > > > days to try on all the SoCs mentionned in the serie, the only SoC I
+> > > > > didn't include it the A83T as for some reason I couldn't make the
+> > > > > driver work.
+> > > > 
+> > > > Do you have a link to that driver? 
+> > > 
+> > >  https://github.com/freebsd/freebsd/blob/master/sys/arm/allwinner/aw_thermal.c
+> > > 
+> > > > How and how much did you test it?
+> > > 
+> > >  Using a cheap IR thermometer as it's all I can afford.
+> > >  Then running multiples cpufreq-a53 process and comparing the result.
+> > >  Did the same without using the calibration data, result where closer
+> > > when I used them.
+> > > 
+> > > > Are you using the calibration data stored in the SID?
+> > > 
+> > >  Yes, which is why the serie contain the nvmem cell for the SID.
+> > > 
+> > > > 
+> > > > > I just hope that you understand that we cannot wait for Linux to
+> > > > > have a driver to have some bindings.
+> > > > 
+> > > > Just like I'm sure you can understand that just merging the DT bits
+> > > > without testing anything caused some troubles in the past, and I don't
+> > > > want to discover it in a year from now.
+> > > 
+> > >  I do, I don't like wrong DT info as much as you do I think. I had
+> > > the unfortunate event to find that the sun4i-a10-timer compatible used
+> > > in every soc is plain wrong for !A10 and !A13, patches comming soon.
+> > >  I want those bits merged but I also want that they reflect reality,
+> > > this is not a hard driver to do, NetBSD also have one I think, maybe
+> > > OpenBSD do to.
+> > 
+> > 
+> > I would prefer to see a series of DT bindings + driver. Can you send
+> > your next iteration with the driver so we can review both together?
+> 
+>  You mean a link to the FreeBSD driver (and OpenBSD since they have one
+> too) in the cover letter ?
+
+That would definitely be valuable, yes, thanks!
+Maxime
+
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180829/4f5f10f7/attachment.sig>
