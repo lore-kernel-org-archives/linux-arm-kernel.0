@@ -1,72 +1,39 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Wed, 29 Aug 2018 12:31:14 +0200
-Subject: [RFC PATCH v2 2/2] mtd: rawnand: meson: add support for Amlogic
- NAND flash controller
-In-Reply-To: <5061c929-8db0-3f4c-ec34-303fc351dfdd@amlogic.com>
-References: <20180719094612.5833-1-yixun.lan@amlogic.com>
- <20180719094612.5833-3-yixun.lan@amlogic.com>
- <20180801235045.5b4d8211@bbrezillon>
- <42877a0d-9830-0626-3f64-e49a326eaa3c@amlogic.com>
- <20180817155608.5929b37a@bbrezillon>
- <96e538a5-1232-11f2-8b9e-5ddb09dcc2de@amlogic.com>
- <20180824144810.31c929a5@bbrezillon>
- <fdea2d54-7a68-64ec-8bb4-4a94677a3293@amlogic.com>
- <20180828152645.457dab5c@bbrezillon>
- <9abf0461-159b-db45-9ded-3d6cb2cc64db@amlogic.com>
- <5061c929-8db0-3f4c-ec34-303fc351dfdd@amlogic.com>
-Message-ID: <20180829123114.4b67314b@bbrezillon>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 29 Aug 2018 12:33:35 +0200
+Subject: [RFC] Rename socfpga_cyclone5_de0_sockit.dts to
+ socfpga_cyclone5_de0_nano_soc.dts
+In-Reply-To: <73bm9lwn3t.fsf@pengutronix.de>
+References: <fd0f01e5-41a2-6a24-2ce4-482b30b348b6@denx.de>
+ <73bm9lwn3t.fsf@pengutronix.de>
+Message-ID: <b29e529a-f7bd-71d2-615e-9f850858ed4d@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 Aug 2018 18:29:05 +0800
-Liang Yang <liang.yang@amlogic.com> wrote:
+On 08/29/2018 11:14 AM, Steffen Trumtrar wrote:
+> 
+> Marek Vasut <marex@denx.de> writes:
+> 
+>> Hi,
+>>
+>> I was recently experimenting with the DE0 Nano SoC / Atlas SoC . I had a
+>> hard time finding the right DT for the board, but then was suggested
+>> that the DT for the board is socfpga_cyclone5_de0_sockit.dts . This did
+>> not make sense to me, since SoCKit is a different board altogether. But
+>> the DTS seems to be indeed for the DE0 Nano SoC.
+>>
+>> To fix up this confusion, I'd propose renaming of the
+>> socfpga_cyclone5_de0_sockit.dts to socfpga_cyclone5_de0_nano_soc.dts to
+>> match the label on the package .
+>>
+>> What do you think ?
+> 
+> Ack. This confusion came up multiple times. The barebox-specific dts
+> "overlay"
+> is already named socfpga_cyclone5_de0_nano_soc.dts because of this.
 
-> On 8/29/2018 6:08 PM, Liang Yang wrote:
-> > 
-> > On 8/28/2018 9:26 PM, Boris Brezillon wrote:  
-> >> On Tue, 28 Aug 2018 21:21:48 +0800
-> >> Liang Yang <liang.yang@amlogic.com> wrote:
-> >>  
-> >>> Hi Boris,
-> >>>
-> >>> On 8/24/2018 8:48 PM, Boris Brezillon wrote:  
-> >>>> On Wed, 22 Aug 2018 22:08:42 +0800
-> >>>> Liang Yang <liang.yang@amlogic.com> wrote:  
-> >>>>>> You have to wait tWB, that's for sure.  
-> >>>>> we have a maximum 32 commands fifo. when command is written into
-> >>>>> NFC_REG_CMD, it doesn't mean that command is executing right now, 
-> >>>>> maybe
-> >>>>> it is buffering on the queue.Assume one ERASE operation, when 2nd
-> >>>>> command(0xd0) is written into NFC_REG_CMD and then come into
-> >>>>> NAND_OP_WAITRDY_INSTR, if I read the RB status by register, it may be
-> >>>>> wrong because 0xd0 may not being executed. it is unusual unless
-> >>>>> buffering two many command.  
-> >>>>
-> >>>> You should flush the queue and wait for it to empty at the end of  
-> >>>> ->exec_op().
-> >>>>> so it seems that i still need to use nand_soft_waitrdy or wait cmd is
-> >>>>> executed somewhere.  
-> >>>>
-> >>>> Don't you have a WAIT_FOR_RB instruction? What is NFC_CMD_RB for? Also,
-> >>>> NFC_CMD_IDLE seems to allow you to add an arbitrary delay, and that's
-> >>>> probably what you should use for tWB.
-> >>>>
-> >>>> em, I can wait for RB by reading the status from register now. but when  
-> >>> calling nand_soft_waitrdy, i really met a problem. One *jiffies* is
-> >>> about 4ms. When programming, it pass 1ms to
-> >>> instr->ctx.waitrdy.timeout_ms and nand_soft_waitrdy will be only one
-> >>> *jiffies* to reach timeout. And then calling nand_soft_waitrdy maybe at
-> >>> the tail of 4ms interval, it may only wait 100us and next jiffies
-> >>> arrive. Is it correct?  
-> >>
-> >> Hm, no. If you initialize the time you compare to (using time_before()
-> >> or time_after()) correctly it should not happen. Anyway, I keep thinking
-> >> this is not how it should be done. Did you try NFC_CMD_RB? Did you ask
-> >> HW designers what it was created for?
-> >>  
-> > I am using NFC_CMD_RB and checking with irq. it is ok now.  
-> there are two usages for NFC_CMD_RB. One reads the data status 
-> continuously by hardware after sending 0x70 command; the other checks 
-> the r/b IO status continuously.both can send irq when r/b is ready.
+The DT in U-Boot is also called socfpga_cyclone5_de0_nano_soc.dts since
+forever. I'd be happy to send a patch if the Altera folks are fine with it?
 
-Both should do what you expect, so I guess you're good.
+-- 
+Best regards,
+Marek Vasut
