@@ -1,37 +1,47 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Wed, 29 Aug 2018 11:10:14 +0900
-Subject: [PATCH] devfreq: Convert to using %pOFn instead of
- device_node.name
-In-Reply-To: <5B84AE40.50305@samsung.com>
-References: <5B84AE40.50305@samsung.com>
- <20180828015252.28511-1-robh@kernel.org>
- <20180828015252.28511-15-robh@kernel.org>
- <CGME20180828015312epcas2p2fdb2ee1d1b292f212ec773dd8fb4bfc7@epcms1p8>
-Message-ID: <20180829021014epcms1p85b74efd54e73039e5a81629d8079e02e@epcms1p8>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Wed, 29 Aug 2018 10:10:48 +0800
+Subject: [PATCH v2] usb: core: phy: fix return value checking about
+ devm_of_phy_get_by_index()
+Message-ID: <8263a8d0f87d595dd35efa5432d294d9f7b38719.1535507412.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Dear Rob,
-> 
-> On 2018? 08? 28? 10:52, Rob Herring wrote:
-> > In preparation to remove the node name pointer from struct device_node,
-> > convert printf users to use the %pOFn format specifier.
-> > 
-> > Cc: Chanwoo Choi <cw00.choi@samsung.com>
-> > Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
-> > Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> > Cc: Kukjin Kim <kgene@kernel.org>
-> > Cc: Krzysztof Kozlowski <krzk@kernel.org>
-> > Cc: linux-pm at vger.kernel.org
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: linux-samsung-soc at vger.kernel.org
-> > Signed-off-by: Rob Herring <robh@kernel.org>
-> > ---
-> >  drivers/devfreq/event/exynos-ppmu.c | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > 
-[]
-> 
-> Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
+Use IS_ERR() instead of IS_ERR_OR_NULL() because devm_of_phy_get_by_index()
+never return NULL value;
+But still need ignore the error of -ENODEV, for more information, please
+refer to:
+[0] https://lkml.org/lkml/2018/4/19/88
+[1] https://patchwork.kernel.org/patch/10160181/
 
-Acked-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+V2: keep the -ENODEV check
+---
+ drivers/usb/core/phy.c | 11 ++++-------
+ 1 file changed, 4 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/usb/core/phy.c b/drivers/usb/core/phy.c
+index 9879767..e3cc743 100644
+--- a/drivers/usb/core/phy.c
++++ b/drivers/usb/core/phy.c
+@@ -23,14 +23,11 @@ static int usb_phy_roothub_add_phy(struct device *dev, int index,
+ 				   struct list_head *list)
+ {
+ 	struct usb_phy_roothub *roothub_entry;
+-	struct phy *phy = devm_of_phy_get_by_index(dev, dev->of_node, index);
++	struct phy *phy;
+ 
+-	if (IS_ERR_OR_NULL(phy)) {
+-		if (!phy || PTR_ERR(phy) == -ENODEV)
+-			return 0;
+-		else
+-			return PTR_ERR(phy);
+-	}
++	phy = devm_of_phy_get_by_index(dev, dev->of_node, index);
++	if (IS_ERR(phy))
++		return (PTR_ERR(phy) == -ENODEV) ? 0 : PTR_ERR(phy);
+ 
+ 	roothub_entry = devm_kzalloc(dev, sizeof(*roothub_entry), GFP_KERNEL);
+ 	if (!roothub_entry)
+-- 
+1.9.1
