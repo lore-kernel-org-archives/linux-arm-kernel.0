@@ -1,50 +1,193 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 29 Aug 2018 13:15:50 +0000
-Subject: [PATCH V4 4/4] video: simplefb: switch to use clk_bulk API to
- simplify clock operations
-In-Reply-To: <66eb6870-3674-0fdb-f5fb-4915a76191f6@redhat.com>
-References: <1535547100-25634-1-git-send-email-aisheng.dong@nxp.com>
- <1535547100-25634-5-git-send-email-aisheng.dong@nxp.com>
- <66eb6870-3674-0fdb-f5fb-4915a76191f6@redhat.com>
-Message-ID: <AM0PR04MB4211E934272EE1A212711FAE80090@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Wed, 29 Aug 2018 15:19:12 +0200
+Subject: [RFC PATCH 4/4] sched/topology: remove unused sd param from
+ arch_scale_cpu_capacity()
+In-Reply-To: <1535548752-4434-1-git-send-email-vincent.guittot@linaro.org>
+References: <1535548752-4434-1-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1535548752-4434-5-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Hans de Goede [mailto:hdegoede at redhat.com]
-> Sent: Wednesday, August 29, 2018 9:01 PM
+struct sched_domain *sd parameter is no more used in arch_scale_cpu_capacity()
+so we can remote it.
 
-[...]
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: "Rafael J. Wysocki" <rafael@kernel.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 
-> > @@ -252,39 +228,21 @@ static int simplefb_clocks_get(struct simplefb_par
-> *par,
-> >   static void simplefb_clocks_enable(struct simplefb_par *par,
-> >   				   struct platform_device *pdev)
-> >   {
-> > -	int i, ret;
-> > +	int ret;
-> > +
-> > +	ret = clk_bulk_prepare_enable(par->clk_count, par->clks);
-> > +	if (ret)
-> > +		dev_warn(&pdev->dev, "failed to enable clocks\n");
-> 
-> If clk_bulk_prepare_enable() fails, it leaves all clocks disabled, so you should
-> not set par->clks_enabled = true; then.
-> 
+---
+ arch/arm/kernel/topology.c       | 2 +-
+ drivers/base/arch_topology.c     | 6 +++---
+ include/linux/arch_topology.h    | 2 +-
+ kernel/sched/cpufreq_schedutil.c | 2 +-
+ kernel/sched/deadline.c          | 2 +-
+ kernel/sched/fair.c              | 8 ++++----
+ kernel/sched/pelt.c              | 2 +-
+ kernel/sched/sched.h             | 4 ++--
+ 8 files changed, 14 insertions(+), 14 deletions(-)
 
-Thanks for spotting this.
-The original code wanted to keep the behavior as before.
-But a bit more thinking that unlike the exist code, clk_bulk_prepare_enable will
-automatically do reverse clean up once it fails.
-So no need to set par->clks_enabled = true anymore.
-
-Will fix it and resend.
-
-Regards
-Dong Aisheng
-
-> Otherwise this patch looks good.
-> 
-> Regards,
-> 
-> Hans
+diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+index 24ac3ca..d3d75c5 100644
+--- a/arch/arm/kernel/topology.c
++++ b/arch/arm/kernel/topology.c
+@@ -175,7 +175,7 @@ static void update_cpu_capacity(unsigned int cpu)
+ 	topology_set_cpu_scale(cpu, cpu_capacity(cpu) / middle_capacity);
+ 
+ 	pr_info("CPU%u: update cpu_capacity %lu\n",
+-		cpu, topology_get_cpu_scale(NULL, cpu));
++		cpu, topology_get_cpu_scale(cpu));
+ }
+ 
+ #else
+diff --git a/drivers/base/arch_topology.c b/drivers/base/arch_topology.c
+index e7cb0c6..6dc9339 100644
+--- a/drivers/base/arch_topology.c
++++ b/drivers/base/arch_topology.c
+@@ -44,7 +44,7 @@ static ssize_t cpu_capacity_show(struct device *dev,
+ {
+ 	struct cpu *cpu = container_of(dev, struct cpu, dev);
+ 
+-	return sprintf(buf, "%lu\n", topology_get_cpu_scale(NULL, cpu->dev.id));
++	return sprintf(buf, "%lu\n", topology_get_cpu_scale(cpu->dev.id));
+ }
+ 
+ static ssize_t cpu_capacity_store(struct device *dev,
+@@ -124,7 +124,7 @@ void topology_normalize_cpu_scale(void)
+ 			/ capacity_scale;
+ 		topology_set_cpu_scale(cpu, capacity);
+ 		pr_debug("cpu_capacity: CPU%d cpu_capacity=%lu\n",
+-			cpu, topology_get_cpu_scale(NULL, cpu));
++			cpu, topology_get_cpu_scale(cpu));
+ 	}
+ 	mutex_unlock(&cpu_scale_mutex);
+ }
+@@ -194,7 +194,7 @@ init_cpu_capacity_callback(struct notifier_block *nb,
+ 	cpumask_andnot(cpus_to_visit, cpus_to_visit, policy->related_cpus);
+ 
+ 	for_each_cpu(cpu, policy->related_cpus) {
+-		raw_capacity[cpu] = topology_get_cpu_scale(NULL, cpu) *
++		raw_capacity[cpu] = topology_get_cpu_scale(cpu) *
+ 				    policy->cpuinfo.max_freq / 1000UL;
+ 		capacity_scale = max(raw_capacity[cpu], capacity_scale);
+ 	}
+diff --git a/include/linux/arch_topology.h b/include/linux/arch_topology.h
+index 2b70941..5df6773 100644
+--- a/include/linux/arch_topology.h
++++ b/include/linux/arch_topology.h
+@@ -17,7 +17,7 @@ DECLARE_PER_CPU(unsigned long, cpu_scale);
+ 
+ struct sched_domain;
+ static inline
+-unsigned long topology_get_cpu_scale(struct sched_domain *sd, int cpu)
++unsigned long topology_get_cpu_scale(int cpu)
+ {
+ 	return per_cpu(cpu_scale, cpu);
+ }
+diff --git a/kernel/sched/cpufreq_schedutil.c b/kernel/sched/cpufreq_schedutil.c
+index 3fffad3..01b95057 100644
+--- a/kernel/sched/cpufreq_schedutil.c
++++ b/kernel/sched/cpufreq_schedutil.c
+@@ -202,7 +202,7 @@ static unsigned long sugov_get_util(struct sugov_cpu *sg_cpu)
+ 	struct rq *rq = cpu_rq(sg_cpu->cpu);
+ 	unsigned long util, irq, max;
+ 
+-	sg_cpu->max = max = arch_scale_cpu_capacity(NULL, sg_cpu->cpu);
++	sg_cpu->max = max = arch_scale_cpu_capacity(sg_cpu->cpu);
+ 	sg_cpu->bw_dl = cpu_bw_dl(rq);
+ 
+ 	if (rt_rq_is_runnable(&rq->rt))
+diff --git a/kernel/sched/deadline.c b/kernel/sched/deadline.c
+index 997ea7b..5f763b1 100644
+--- a/kernel/sched/deadline.c
++++ b/kernel/sched/deadline.c
+@@ -1196,7 +1196,7 @@ static void update_curr_dl(struct rq *rq)
+ 						 &curr->dl);
+ 	} else {
+ 		unsigned long scale_freq = arch_scale_freq_capacity(cpu);
+-		unsigned long scale_cpu = arch_scale_cpu_capacity(NULL, cpu);
++		unsigned long scale_cpu = arch_scale_cpu_capacity(cpu);
+ 
+ 		scaled_delta_exec = cap_scale(delta_exec, scale_freq);
+ 		scaled_delta_exec = cap_scale(scaled_delta_exec, scale_cpu);
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index cff1682..2eeac7c 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -748,7 +748,7 @@ void post_init_entity_util_avg(struct sched_entity *se)
+ {
+ 	struct cfs_rq *cfs_rq = cfs_rq_of(se);
+ 	struct sched_avg *sa = &se->avg;
+-	long cpu_scale = arch_scale_cpu_capacity(NULL, cpu_of(rq_of(cfs_rq)));
++	long cpu_scale = arch_scale_cpu_capacity(cpu_of(rq_of(cfs_rq)));
+ 	long cap = (long)(cpu_scale - cfs_rq->avg.util_avg) / 2;
+ 
+ 	if (cap > 0) {
+@@ -3175,7 +3175,7 @@ update_tg_cfs_runnable(struct cfs_rq *cfs_rq, struct sched_entity *se, struct cf
+ 	 * is not we rescale running_sum 1st
+ 	 */
+ 	running_sum = se->avg.util_sum /
+-		arch_scale_cpu_capacity(NULL, cpu_of(rq_of(cfs_rq)));
++		arch_scale_cpu_capacity(cpu_of(rq_of(cfs_rq)));
+ 	runnable_sum = max(runnable_sum, running_sum);
+ 
+ 	load_sum = (s64)se_weight(se) * runnable_sum;
+@@ -7462,7 +7462,7 @@ static inline int get_sd_load_idx(struct sched_domain *sd,
+ static unsigned long scale_rt_capacity(int cpu)
+ {
+ 	struct rq *rq = cpu_rq(cpu);
+-	unsigned long max = arch_scale_cpu_capacity(NULL, cpu);
++	unsigned long max = arch_scale_cpu_capacity(cpu);
+ 	unsigned long used, free;
+ 	unsigned long irq;
+ 
+@@ -7487,7 +7487,7 @@ static void update_cpu_capacity(struct sched_domain *sd, int cpu)
+ 	unsigned long capacity = scale_rt_capacity(cpu);
+ 	struct sched_group *sdg = sd->groups;
+ 
+-	cpu_rq(cpu)->cpu_capacity_orig = arch_scale_cpu_capacity(sd, cpu);
++	cpu_rq(cpu)->cpu_capacity_orig = arch_scale_cpu_capacity(cpu);
+ 
+ 	if (!capacity)
+ 		capacity = 1;
+diff --git a/kernel/sched/pelt.c b/kernel/sched/pelt.c
+index 35475c0..5efa152 100644
+--- a/kernel/sched/pelt.c
++++ b/kernel/sched/pelt.c
+@@ -114,7 +114,7 @@ accumulate_sum(u64 delta, int cpu, struct sched_avg *sa,
+ 	u64 periods;
+ 
+ 	scale_freq = arch_scale_freq_capacity(cpu);
+-	scale_cpu = arch_scale_cpu_capacity(NULL, cpu);
++	scale_cpu = arch_scale_cpu_capacity(cpu);
+ 
+ 	delta += sa->period_contrib;
+ 	periods = delta / 1024; /* A period is 1024us (~1ms) */
+diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
+index b1715b8..8b306ce 100644
+--- a/kernel/sched/sched.h
++++ b/kernel/sched/sched.h
+@@ -1756,7 +1756,7 @@ unsigned long arch_scale_freq_capacity(int cpu)
+ #ifdef CONFIG_SMP
+ #ifndef arch_scale_cpu_capacity
+ static __always_inline
+-unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
++unsigned long arch_scale_cpu_capacity(int cpu)
+ {
+ 	return SCHED_CAPACITY_SCALE;
+ }
+@@ -1764,7 +1764,7 @@ unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
+ #else
+ #ifndef arch_scale_cpu_capacity
+ static __always_inline
+-unsigned long arch_scale_cpu_capacity(void __always_unused *sd, int cpu)
++unsigned long arch_scale_cpu_capacity(int cpu)
+ {
+ 	return SCHED_CAPACITY_SCALE;
+ }
+-- 
+2.7.4
