@@ -1,241 +1,150 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Wed, 29 Aug 2018 13:58:16 +0100
-Subject: [PATCH v5 00/27] arm64: provide pseudo NMI with GICv3
-In-Reply-To: <20180829113734.evdvs46in6j6xksx@holly.lan>
-References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
- <20180829113734.evdvs46in6j6xksx@holly.lan>
-Message-ID: <4dedbcd1-1919-4643-b152-641ec3367757@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 29 Aug 2018 15:00:39 +0200
+Subject: [PATCH V4 4/4] video: simplefb: switch to use clk_bulk API to
+ simplify clock operations
+In-Reply-To: <1535547100-25634-5-git-send-email-aisheng.dong@nxp.com>
+References: <1535547100-25634-1-git-send-email-aisheng.dong@nxp.com>
+ <1535547100-25634-5-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <66eb6870-3674-0fdb-f5fb-4915a76191f6@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
-On 29/08/18 12:37, Daniel Thompson wrote:
-> On Tue, Aug 28, 2018 at 04:51:10PM +0100, Julien Thierry wrote:
->> Hi,
->>
->> This series is a continuation of the work started by Daniel [1]. The goal
->> is to use GICv3 interrupt priorities to simulate an NMI.
->>
->> The patches depend on the core API for NMIs patches [2].
+On 29-08-18 14:51, Dong Aisheng wrote:
+> Switching to use clk_bulk API to simplify clock operations.
 > 
-> As before... is there a git tree? With the NMI core API I think I might
-> be able to get some of my old pseudo-NMI demos working.
+> Cc: Hans de Goede <hdegoede@redhat.com>
+> Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Cc: linux-fbdev at vger.kernel.org
+> Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Tested-by: Thor Thayer <thor.thayer@linux.intel.com>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> ---
+> v3->v4:
+>   * no changes
+> v2->v3:
+>   * fix a build warning on x86 platform due to a wrong
+>     of the prototype of simplefb_clocks_enable
+> v1->v2:
+>   * switch to clk_bulk_get_all from of_clk_bulk_get_all
+> ---
+>   drivers/video/fbdev/simplefb.c | 66 ++++++++----------------------------------
+>   1 file changed, 12 insertions(+), 54 deletions(-)
 > 
+> diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
+> index 9a9d748..ed9a4c8 100644
+> --- a/drivers/video/fbdev/simplefb.c
+> +++ b/drivers/video/fbdev/simplefb.c
+> @@ -182,7 +182,7 @@ struct simplefb_par {
+>   #if defined CONFIG_OF && defined CONFIG_COMMON_CLK
+>   	bool clks_enabled;
+>   	unsigned int clk_count;
+> -	struct clk **clks;
+> +	struct clk_bulk_data *clks;
+>   #endif
+>   #if defined CONFIG_OF && defined CONFIG_REGULATOR
+>   	bool regulators_enabled;
+> @@ -214,37 +214,13 @@ static int simplefb_clocks_get(struct simplefb_par *par,
+>   			       struct platform_device *pdev)
+>   {
+>   	struct device_node *np = pdev->dev.of_node;
+> -	struct clk *clock;
+> -	int i;
+>   
+>   	if (dev_get_platdata(&pdev->dev) || !np)
+>   		return 0;
+>   
+> -	par->clk_count = of_clk_get_parent_count(np);
+> -	if (!par->clk_count)
+> -		return 0;
+> -
+> -	par->clks = kcalloc(par->clk_count, sizeof(struct clk *), GFP_KERNEL);
+> -	if (!par->clks)
+> -		return -ENOMEM;
+> -
+> -	for (i = 0; i < par->clk_count; i++) {
+> -		clock = of_clk_get(np, i);
+> -		if (IS_ERR(clock)) {
+> -			if (PTR_ERR(clock) == -EPROBE_DEFER) {
+> -				while (--i >= 0) {
+> -					if (par->clks[i])
+> -						clk_put(par->clks[i]);
+> -				}
+> -				kfree(par->clks);
+> -				return -EPROBE_DEFER;
+> -			}
+> -			dev_err(&pdev->dev, "%s: clock %d not found: %ld\n",
+> -				__func__, i, PTR_ERR(clock));
+> -			continue;
+> -		}
+> -		par->clks[i] = clock;
+> -	}
+> +	par->clk_count = clk_bulk_get_all(&pdev->dev, &par->clks);
+> +	if ((par->clk_count < 0) && (par->clk_count == -EPROBE_DEFER))
+> +		return -EPROBE_DEFER;
+>   
+>   	return 0;
+>   }
+> @@ -252,39 +228,21 @@ static int simplefb_clocks_get(struct simplefb_par *par,
+>   static void simplefb_clocks_enable(struct simplefb_par *par,
+>   				   struct platform_device *pdev)
+>   {
+> -	int i, ret;
+> +	int ret;
+> +
+> +	ret = clk_bulk_prepare_enable(par->clk_count, par->clks);
+> +	if (ret)
+> +		dev_warn(&pdev->dev, "failed to enable clocks\n");
 
-Here is the git:
+If clk_bulk_prepare_enable() fails, it leaves all clocks disabled,
+so you should not set par->clks_enabled = true; then.
 
-git://linux-arm.org/linux-jt.git v4.19-nmi-pmu-public
+Otherwise this patch looks good.
 
-there are also a few patches to make the PMU interrupt into an NMI.
+Regards,
 
+Hans
+
+
+
+>   
+> -	for (i = 0; i < par->clk_count; i++) {
+> -		if (par->clks[i]) {
+> -			ret = clk_prepare_enable(par->clks[i]);
+> -			if (ret) {
+> -				dev_err(&pdev->dev,
+> -					"%s: failed to enable clock %d: %d\n",
+> -					__func__, i, ret);
+> -				clk_put(par->clks[i]);
+> -				par->clks[i] = NULL;
+> -			}
+> -		}
+> -	}
+>   	par->clks_enabled = true;
+>   }
+>   
+>   static void simplefb_clocks_destroy(struct simplefb_par *par)
+>   {
+> -	int i;
+> -
+> -	if (!par->clks)
+> -		return;
+> -
+> -	for (i = 0; i < par->clk_count; i++) {
+> -		if (par->clks[i]) {
+> -			if (par->clks_enabled)
+> -				clk_disable_unprepare(par->clks[i]);
+> -			clk_put(par->clks[i]);
+> -		}
+> -	}
+> +	if (par->clks_enabled)
+> +		clk_bulk_disable_unprepare(par->clk_count, par->clks);
+>   
+> -	kfree(par->clks);
+> +	clk_bulk_put_all(par->clk_count, par->clks);
+>   }
+>   #else
+>   static int simplefb_clocks_get(struct simplefb_par *par,
 > 
->> To achieve this, set two priorities, one for standard interrupts and
->> another, higher priority, for NMIs. Whenever we want to disable interrupts,
->> we mask the standard priority instead so NMIs can still be raised. Some
->> corner cases though still require to actually mask all interrupts
->> effectively disabling the NMI.
->>
->> Daniel Thompson ran some benchmarks [3] on the previous version showing a
->> small (<1%) performance drop when using interrupt priorities.
-> 
-> IMHO it is very important to disclose which micro-architecture (in this
-> case I think I was using C-A53 and GIC-500) the performance drop is
-> observed with.
-> 
-> We know from both micro- and macro-benchmarks that the performance delta
-> is deeply dependant on core implementation. In fact, my own work in this
-> area stalled largely because the main device that justified my spending
-> working-hours on pseudo-NMI was too badly impacted to see it enabled by
-> default.
-> 
-
-Yes, you're right, I haven't had many boards to test on, the one I 
-tested on had 8 C-A57. Not sure about the GIC (it implemented GICv3 
-architecture, that's all I know). I had similar results to yours.
-
-I did not have the opportunity to re-run the benchmarks on real hardware 
-for this spin however.
-
-Thanks,
-
-Julien
-
-> 
-> Daniel.
-> 
-> 
->> Currently, only PPIs and SPIs can be set as NMIs. IPIs being currently
->> hardcoded IRQ numbers, there isn't a generic interface to set SGIs as NMI
->> for now. LPIs being controlled by the ITS cannot be delivered as NMI.
->> When an NMI is active on a CPU, no other NMI can be triggered on the CPU.
->>
->> Requirements to use this:
->> - Have GICv3
->> - SCR_EL3.FIQ is set to 1 when linux runs or have single security state
->> - Select Kernel Feature -> Use ICC system registers for IRQ masking
->>
->>
->> * Patches 1 to 3 aim at applying some alternatives early in the boot
->>    process.
->>
->> * Patches 4 to 7 ensure the logic of daifflags remains valid
->>    after arch_local_irq flags use ICC_PMR_EL1.
->>
->> * Patches 8 and 9 clean up GIC current priority definition to make it
->>    easier to introduce a new priority
->>
->> * Patches 10 to 16 prepare arch code for the use of priorities, saving and
->>    restoring ICC_PMR_EL1 appropriately
->>
->> * Patches 17 to 20 add the support to GICv3 driver to use priority masking
->>    if required by the architecture
->>
->> * Patches 21 to 23 make arm64 code use ICC_PMR_EL1 to enable/disable
->>    interrupts, leaving PSR.I as often as possible
->>
->> * Patches 24 to 27 add the support for NMIs to GICv3 driver
->>
->>
->> Changes since V4[4]:
->> * Rebased to v4.19-rc1
->> * Adapted GIC driver to the core NMI API
->> * Added option to disable priority masking on command line
->> * Added Daniel's Tested-by on patches related replacing PSR.I toggling with
->>    PMR masking
->> * Fix scope matching for alternative features.
->> * Spotted some more places using PSR.I or daif and replaced with generic
->>    interrupt functions
->>
->> Changes since V3[5]:
->> * Big refactoring. As suggested by Marc Z., some of the bigger patches
->>    needed to be split into smaller one.
->> * Try to reduce the amount of #ifdef for the new feature by introducing
->>    an individual cpufeature for priority masking
->> * Do not track which alternatives have been applied (was a bit dodgy
->>    anyway), and use an alternative for VHE cpu_enable callback
->> * Fix a build failure with arm by adding the correct RPR accessors
->> * Added Suggested-by tags for changes from comming or inspired by Daniel's
->>    series. Do let me know if you feel I missed something and am not giving
->>    you due credit.
->>
->> Changes since V2[6]:
->> * Series rebase to v4.17-rc6
->> * Adapt pathces 1 and 2 to the rework of cpufeatures framework
->> * Use the group0 detection scheme in the GICv3 driver to identify
->>    the priority view, and drop the use of a fake interrupt
->> * Add the case for a GIC configured in a single security state
->> * Use local_daif_restore instead of local_irq_enable the first time
->>    we enable interrupts after a bp hardening in the handling of a kernel
->>    entry. Otherwise PRS.I remains set...
->>
->> Changes since V1[7]:
->> * Series rebased to v4.15-rc8.
->> * Check for arm64_early_features in this_cpu_has_cap (spotted by Suzuki).
->> * Fix issue where debug exception were not masked when enabling debug in
->>    mdscr_el1.
->>
->> Changes since RFC[8]:
->> * The series was rebased to v4.15-rc2 which implied some changes mainly
->>    related to the work on exception entries and daif flags by James Morse.
->>    - The first patch in the previous series was dropped because no longer
->>      applicable.
->>    - With the semantics James introduced of "inheriting" daif flags,
->>      handling of PMR on exception entry is simplified as PMR is not altered
->>      by taking an exception and already inherited from previous state.
->>    - James pointed out that taking a PseudoNMI before reading the FAR_EL1
->>      register should not be allowed as per the TRM (D10.2.29):
->>      "FAR_EL1 is made UNKNOWN on an exception return from EL1."
->>      So in this submission PSR.I bit is cleared only after FAR_EL1 is read.
->> * For KVM, only deal with PMR unmasking/restoring in common code, and VHE
->>    specific code makes sure PSR.I bit is set when necessary.
->> * When detecting the GIC priority view (patch 5), wait for an actual
->>    interrupt instead of trying only once.
->>
->>
->> [1] http://www.spinics.net/lists/arm-kernel/msg525077.html
->> [2] https://lkml.org/lkml/2018/8/28/661
->> [3] https://lkml.org/lkml/2018/7/20/803
->> [4] https://lkml.org/lkml/2018/7/24/321
->> [5] https://lkml.org/lkml/2018/5/21/276
->> [6] https://lkml.org/lkml/2018/1/17/335
->> [7] https://www.spinics.net/lists/arm-kernel/msg620763.html
->> [8] https://www.spinics.net/lists/arm-kernel/msg610736.html
->>
->> Cheers,
->>
->> Julien
->>
->> -->
->>
->> Daniel Thompson (1):
->>    arm64: alternative: Apply alternatives early in boot process
->>
->> Julien Thierry (26):
->>    arm64: cpufeature: Set SYSREG_GIC_CPUIF as a boot system feature
->>    arm64: cpufeature: Use alternatives for VHE cpu_enable
->>    arm64: daifflags: Use irqflags functions for daifflags
->>    arm64: Use daifflag_restore after bp_hardening
->>    arm64: Delay daif masking for user return
->>    arm64: xen: Use existing helper to check interrupt status
->>    irqchip/gic: Unify GIC priority definitions
->>    irqchip/gic: Lower priority of GIC interrupts
->>    arm64: cpufeature: Add cpufeature for IRQ priority masking
->>    arm64: Make PMR part of task context
->>    arm64: Unmask PMR before going idle
->>    arm/arm64: gic-v3: Add helper functions to manage IRQ priorities
->>    arm64: kvm: Unmask PMR before entering guest
->>    arm64: irqflags: Use ICC_PMR_EL1 for interrupt masking
->>    arm64: daifflags: Include PMR in daifflags restore operations
->>    irqchip/gic-v3: Factor group0 detection into functions
->>    irqchip/gic-v3: Do not overwrite PMR value
->>    irqchip/gic-v3: Remove acknowledge loop
->>    irqchip/gic-v3: Switch to PMR masking after IRQ acknowledge
->>    arm64: Switch to PMR masking when starting CPUs
->>    arm64: Add build option for IRQ masking via priority
->>    arm64: Handle serror in NMI context
->>    irqchip/gic-v3: Detect current view of GIC priorities
->>    irqchip/gic-v3: Add base support for pseudo-NMI
->>    irqchip/gic: Add functions to access irq priorities
->>    irqchip/gic-v3: Allow interrupts to be set as pseudo-NMI
->>
->>   Documentation/admin-guide/kernel-parameters.txt |   3 +
->>   Documentation/arm64/booting.txt                 |   5 +
->>   arch/arm/include/asm/arch_gicv3.h               |  33 +++
->>   arch/arm64/Kconfig                              |  15 ++
->>   arch/arm64/include/asm/alternative.h            |   3 +-
->>   arch/arm64/include/asm/arch_gicv3.h             |  33 +++
->>   arch/arm64/include/asm/assembler.h              |  17 +-
->>   arch/arm64/include/asm/cpucaps.h                |   3 +-
->>   arch/arm64/include/asm/cpufeature.h             |   2 +
->>   arch/arm64/include/asm/daifflags.h              |  29 ++-
->>   arch/arm64/include/asm/efi.h                    |   3 +-
->>   arch/arm64/include/asm/irqflags.h               | 100 +++++++--
->>   arch/arm64/include/asm/kvm_host.h               |  12 +
->>   arch/arm64/include/asm/processor.h              |   1 +
->>   arch/arm64/include/asm/ptrace.h                 |  13 +-
->>   arch/arm64/include/asm/xen/events.h             |   2 +-
->>   arch/arm64/kernel/alternative.c                 |  28 ++-
->>   arch/arm64/kernel/asm-offsets.c                 |   1 +
->>   arch/arm64/kernel/cpufeature.c                  |  51 ++++-
->>   arch/arm64/kernel/entry.S                       |  63 +++++-
->>   arch/arm64/kernel/head.S                        |  35 +++
->>   arch/arm64/kernel/process.c                     |   2 +
->>   arch/arm64/kernel/smp.c                         |  12 +
->>   arch/arm64/kernel/traps.c                       |   8 +-
->>   arch/arm64/kvm/hyp/switch.c                     |  17 ++
->>   arch/arm64/mm/fault.c                           |   5 +-
->>   arch/arm64/mm/proc.S                            |  18 ++
->>   drivers/irqchip/irq-gic-common.c                |  10 +
->>   drivers/irqchip/irq-gic-common.h                |   2 +
->>   drivers/irqchip/irq-gic-v3-its.c                |   2 +-
->>   drivers/irqchip/irq-gic-v3.c                    | 279 +++++++++++++++++++-----
->>   include/linux/irqchip/arm-gic-common.h          |   6 +
->>   include/linux/irqchip/arm-gic.h                 |   5 -
->>   33 files changed, 699 insertions(+), 119 deletions(-)
->>
->> --
->> 1.9.1
-
--- 
-Julien Thierry
