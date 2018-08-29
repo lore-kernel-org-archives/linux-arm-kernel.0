@@ -1,86 +1,48 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 29 Aug 2018 10:36:50 +0800
-Subject: [PATCH 2/2] usb: mtu3: disable vbus rise/fall interrupts of ltssm
-In-Reply-To: <c4279eccff765006b78f87bf3c8c9ac94a06c04d.1535509922.git.chunfeng.yun@mediatek.com>
-References: <c4279eccff765006b78f87bf3c8c9ac94a06c04d.1535509922.git.chunfeng.yun@mediatek.com>
-Message-ID: <72ee83112167ceb394ec5d89a824be866a7a21f0.1535509922.git.chunfeng.yun@mediatek.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 29 Aug 2018 10:44:43 +0800
+Subject: [nomadik:ep93xx 2/13] arch/arm/mach-ep93xx/simone.c:73:20: warning:
+ initialization discards 'const' qualifier from pointer target type
+Message-ID: <201808291039.ofWeJy3i%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The vbus rise & fall interrupts are used to enable and disable
-U3 function of device automatically, this cause some issues when
-class driver is initialized as deactivated, and will skip over
-software-controlled connect by pullup(), but UDC wants to keep
-disconnect until usb_gadget_activate() is called which calls
-pullup() if needed. So we disable vbus rise & fall interrupts
-and just use pullup() to enable & disable U3 function, and reset
-mtu3 state when disconnect instead when vbus fall.
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git ep93xx
+head:   79832e2c71ea990991254b87532e0c54953ae72f
+commit: 89a90d59f41088d36e8c97a82e324c31093df4d3 [2/13] Hack in keys
+config: arm-ep93xx_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 89a90d59f41088d36e8c97a82e324c31093df4d3
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=arm 
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+All warnings (new ones prefixed by >>):
+
+>> arch/arm/mach-ep93xx/simone.c:73:20: warning: initialization discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+      .platform_data = &simone_keys_pdata,
+                       ^
+
+vim +/const +73 arch/arm/mach-ep93xx/simone.c
+
+    68	
+    69	static struct platform_device simone_keys_device = {
+    70		.name = "gpio-keys",
+    71		.id = -1,
+    72		.dev = {
+  > 73			.platform_data = &simone_keys_pdata,
+    74		},
+    75	};
+    76	
+
 ---
- drivers/usb/mtu3/mtu3_core.c   |  4 ++--
- drivers/usb/mtu3/mtu3_gadget.c | 22 ++++++++++++++--------
- 2 files changed, 16 insertions(+), 10 deletions(-)
-
-diff --git a/drivers/usb/mtu3/mtu3_core.c b/drivers/usb/mtu3/mtu3_core.c
-index d045d84..ae70b9b 100644
---- a/drivers/usb/mtu3/mtu3_core.c
-+++ b/drivers/usb/mtu3/mtu3_core.c
-@@ -185,8 +185,8 @@ static void mtu3_intr_enable(struct mtu3 *mtu)
- 
- 	if (mtu->is_u3_ip) {
- 		/* Enable U3 LTSSM interrupts */
--		value = HOT_RST_INTR | WARM_RST_INTR | VBUS_RISE_INTR |
--		    VBUS_FALL_INTR | ENTER_U3_INTR | EXIT_U3_INTR;
-+		value = HOT_RST_INTR | WARM_RST_INTR |
-+			ENTER_U3_INTR | EXIT_U3_INTR;
- 		mtu3_writel(mbase, U3D_LTSSM_INTR_ENABLE, value);
- 	}
- 
-diff --git a/drivers/usb/mtu3/mtu3_gadget.c b/drivers/usb/mtu3/mtu3_gadget.c
-index 5c60a8c..bbcd333 100644
---- a/drivers/usb/mtu3/mtu3_gadget.c
-+++ b/drivers/usb/mtu3/mtu3_gadget.c
-@@ -585,6 +585,17 @@ static int mtu3_gadget_stop(struct usb_gadget *g)
- 	.udc_stop = mtu3_gadget_stop,
- };
- 
-+static void mtu3_state_reset(struct mtu3 *mtu)
-+{
-+	mtu->address = 0;
-+	mtu->ep0_state = MU3D_EP0_STATE_SETUP;
-+	mtu->may_wakeup = 0;
-+	mtu->u1_enable = 0;
-+	mtu->u2_enable = 0;
-+	mtu->delayed_status = false;
-+	mtu->test_mode = false;
-+}
-+
- static void init_hw_ep(struct mtu3 *mtu, struct mtu3_ep *mep,
- 		u32 epnum, u32 is_in)
- {
-@@ -702,6 +713,7 @@ void mtu3_gadget_disconnect(struct mtu3 *mtu)
- 		spin_lock(&mtu->lock);
- 	}
- 
-+	mtu3_state_reset(mtu);
- 	usb_gadget_set_state(&mtu->g, USB_STATE_NOTATTACHED);
- }
- 
-@@ -712,12 +724,6 @@ void mtu3_gadget_reset(struct mtu3 *mtu)
- 	/* report disconnect, if we didn't flush EP state */
- 	if (mtu->g.speed != USB_SPEED_UNKNOWN)
- 		mtu3_gadget_disconnect(mtu);
--
--	mtu->address = 0;
--	mtu->ep0_state = MU3D_EP0_STATE_SETUP;
--	mtu->may_wakeup = 0;
--	mtu->u1_enable = 0;
--	mtu->u2_enable = 0;
--	mtu->delayed_status = false;
--	mtu->test_mode = false;
-+	else
-+		mtu3_state_reset(mtu);
- }
--- 
-1.9.1
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 15712 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180829/0ef84142/attachment-0001.gz>
