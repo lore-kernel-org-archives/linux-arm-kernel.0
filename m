@@ -1,71 +1,69 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 29 Aug 2018 12:26:04 +0000
-Subject: [PATCH V3 0/4] clk: new APIs to handle all available clocks
-In-Reply-To: <153551211897.129321.14630649454821319736@swboyd.mtv.corp.google.com>
-References: <1527244643-10736-1-git-send-email-aisheng.dong@nxp.com>
- <AM0PR04MB421114F8AFAE56B6D7C2D1E480770@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <AM0PR04MB4211368561A415B255782CBE803D0@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <153551211897.129321.14630649454821319736@swboyd.mtv.corp.google.com>
-Message-ID: <AM0PR04MB421119CF9432C8D87DFC226080090@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Wed, 29 Aug 2018 15:31:16 +0300
+Subject: [PATCH v7 2/8] dt-bindings: Introduce interconnect provider
+ bindings
+In-Reply-To: <20180827150836.shl7einpuvuw42p7@flea>
+References: <20180731161340.13000-1-georgi.djakov@linaro.org>
+ <20180731161340.13000-3-georgi.djakov@linaro.org>
+ <CABGGisxq+hf91R18pnZ=VZ9f99GssWWPhpPCjNAROJmKg5-udA@mail.gmail.com>
+ <e114ed83-fd54-4952-f375-e1d94826ac6e@linaro.org>
+ <20180820153207.xx5outviph7ec76p@flea>
+ <672e6c6c-222f-5e7f-5d0c-acc8da68b1ab@linaro.org>
+ <20180827150836.shl7einpuvuw42p7@flea>
+Message-ID: <75f1d8f8-84e8-e621-b91d-84b4d15edfa1@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Stephen Boyd [mailto:sboyd at kernel.org]
-> Sent: Wednesday, August 29, 2018 11:09 AM
-> To: A.s. Dong <aisheng.dong@nxp.com>
-> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> mturquette at baylibre.com; shawnguo at kernel.org; dl-linux-imx
-> <linux-imx@nxp.com>; thor.thayer at linux.intel.com; linux-clk at vger.kernel.org
-> Subject: RE: [PATCH V3 0/4] clk: new APIs to handle all available clocks
-> 
-> Quoting A.s. Dong (2018-08-16 19:33:52)
-> > Hi Stephen,
-> >
-> > Do you want me to resend this series for review?
-> > It seems have been pending for quite a long time.
-> >
-> > Thor just pinged me for its status as he wants to use it.
-> >
-> 
-> I was waiting for someone to try them out or review them. Good that it
-> happened!
-> 
-> I've taken a look at the patches and I'm slightly annoyed with the API that
-> passes in a double pointer to clk_bulk_data and returns a count of the number
-> of clks found. I guess it's ok though. It's really just this
-> line:
-> 
-> 	devres->clks = *clks;
-> 
-> which makes my brain all confused and go think about what's being assigned
-> and if it's a struct copy or not.
-> 
-> Maybe this on top would make it easier to take? I'll think about it tonight.
-> 
+Hi Maxime,
 
-Looks like a good idea to me.
-Will update and resend.
-Thanks for the suggestion.
-
-Regards
-Dong Aisheng
-
-> ---8<---
-> diff --git a/drivers/clk/clk-devres.c b/drivers/clk/clk-devres.c index
-> 6d3ca5ec5de8..12c87457eca1 100644
-> --- a/drivers/clk/clk-devres.c
-> +++ b/drivers/clk/clk-devres.c
-> @@ -81,9 +81,9 @@ int __must_check devm_clk_bulk_get_all(struct device
-> *dev,
->  	if (!devres)
->  		return -ENOMEM;
+On 08/27/2018 06:08 PM, Maxime Ripard wrote:
+> Hi!
 > 
-> -	ret = clk_bulk_get_all(dev, clks);
-> +	ret = clk_bulk_get_all(dev, &devres->clks);
->  	if (ret > 0) {
-> -		devres->clks = *clks;
-> +		*clks = devres->clks;
->  		devres->num_clks = ret;
->  		devres_add(dev, devres);
->  	} else {
+> On Fri, Aug 24, 2018 at 05:51:37PM +0300, Georgi Djakov wrote:
+>> Hi Maxime,
+>>
+>> On 08/20/2018 06:32 PM, Maxime Ripard wrote:
+>>> Hi Georgi,
+>>>
+>>> On Tue, Aug 07, 2018 at 05:54:38PM +0300, Georgi Djakov wrote:
+>>>>> There is also a patch series from Maxime Ripard that's addressing the
+>>>>> same general area. See "dt-bindings: Add a dma-parent property". We
+>>>>> don't need multiple ways to address describing the device to memory
+>>>>> paths, so you all had better work out a common solution.
+>>>>
+>>>> Looks like this fits exactly into the interconnect API concept. I see
+>>>> MBUS as interconnect provider and display/camera as consumers, that
+>>>> report their bandwidth needs. I am also planning to add support for
+>>>> priority.
+>>>
+>>> Thanks for working on this. After looking at your serie, the one thing
+>>> I'm a bit uncertain about (and the most important one to us) is how we
+>>> would be able to tell through which interconnect the DMA are done.
+>>>
+>>> This is important to us since our topology is actually quite simple as
+>>> you've seen, but the RAM is not mapped on that bus and on the CPU's,
+>>> so we need to apply an offset to each buffer being DMA'd.
+>>
+>> Ok, i see - your problem is not about bandwidth scaling but about using
+>> different memory ranges by the driver to access the same location.
+> 
+> Well, it turns out that the problem we are bitten by at the moment is
+> the memory range one, but the controller it goes through also provides
+> bandwidth scaling, priorities and so on, so it's not too far off.
+
+Thanks for the clarification. Alright, so this will fit nicely into the
+model as a provider. I agree that we should try to use the same binding
+to describe a path from a master to memory in DT.
+
+>> So this is not really the same and your problem is different. Also
+>> the interconnect bindings are describing a path and
+>> endpoints. However i am open to any ideas.
+> 
+> It's describing a path and endpoints, but it can describe multiple of
+> them for the same device, right? If so, we'd need to provide
+> additional information to distinguish which path is used for DMA.
+
+Sure, multiple paths are supported.
+
+BR,
+Georgi
