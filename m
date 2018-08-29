@@ -1,53 +1,63 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Tue, 28 Aug 2018 20:08:38 -0700
-Subject: [PATCH V3 0/4] clk: new APIs to handle all available clocks
-In-Reply-To: <AM0PR04MB4211368561A415B255782CBE803D0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1527244643-10736-1-git-send-email-aisheng.dong@nxp.com>
- <AM0PR04MB421114F8AFAE56B6D7C2D1E480770@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <AM0PR04MB4211368561A415B255782CBE803D0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <153551211897.129321.14630649454821319736@swboyd.mtv.corp.google.com>
+From: prabhakar.kushwaha@nxp.com (Prabhakar Kushwaha)
+Date: Wed, 29 Aug 2018 08:57:49 +0530
+Subject: [PATCH][v2] arm64: dts: remove big-endian filed from IFC controller
+Message-ID: <20180829032749.9309-1-prabhakar.kushwaha@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting A.s. Dong (2018-08-16 19:33:52)
-> Hi Stephen,
-> 
-> Do you want me to resend this series for review?
-> It seems have been pending for quite a long time.
-> 
-> Thor just pinged me for its status as he wants to use it.
-> 
+As per IFC binding, Absence of "little-endian" field causes registers
+access in big-endian mode.
+So no need to set explicit big-endian field IFC node for LS1043A and
+LS1046A.
 
-I was waiting for someone to try them out or review them. Good that it
-happened!
+Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
+---
+Changes for v2: Incorporated Leo's comments
+	- Remove new line between copyrights
 
-I've taken a look at the patches and I'm slightly annoyed with the API
-that passes in a double pointer to clk_bulk_data and returns a count of
-the number of clks found. I guess it's ok though. It's really just this
-line:
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 2 +-
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-	devres->clks = *clks;
-
-which makes my brain all confused and go think about what's being
-assigned and if it's a struct copy or not.
-
-Maybe this on top would make it easier to take? I'll think about it
-tonight.
-
----8<---
-diff --git a/drivers/clk/clk-devres.c b/drivers/clk/clk-devres.c
-index 6d3ca5ec5de8..12c87457eca1 100644
---- a/drivers/clk/clk-devres.c
-+++ b/drivers/clk/clk-devres.c
-@@ -81,9 +81,9 @@ int __must_check devm_clk_bulk_get_all(struct device *dev,
- 	if (!devres)
- 		return -ENOMEM;
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+index b9f5d2ff4ff2..68af84a8ade8 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+@@ -3,6 +3,7 @@
+  * Device Tree Include file for Freescale Layerscape-1043A family SoC.
+  *
+  * Copyright 2014-2015 Freescale Semiconductor, Inc.
++ * Copyright 2018 NXP
+  *
+  * Mingkai Hu <Mingkai.hu@freescale.com>
+  */
+@@ -280,7 +281,6 @@
+ 		ifc: ifc at 1530000 {
+ 			compatible = "fsl,ifc", "simple-bus";
+ 			reg = <0x0 0x1530000 0x0 0x10000>;
+-			big-endian;
+ 			interrupts = <0 43 0x4>;
+ 		};
  
--	ret = clk_bulk_get_all(dev, clks);
-+	ret = clk_bulk_get_all(dev, &devres->clks);
- 	if (ret > 0) {
--		devres->clks = *clks;
-+		*clks = devres->clks;
- 		devres->num_clks = ret;
- 		devres_add(dev, devres);
- 	} else {
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+index 65ce1c3cb568..ae4ca865131b 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+@@ -3,6 +3,7 @@
+  * Device Tree Include file for Freescale Layerscape-1046A family SoC.
+  *
+  * Copyright 2016 Freescale Semiconductor, Inc.
++ * Copyright 2018 NXP
+  *
+  * Mingkai Hu <mingkai.hu@nxp.com>
+  */
+@@ -198,7 +199,6 @@
+ 		ifc: ifc at 1530000 {
+ 			compatible = "fsl,ifc", "simple-bus";
+ 			reg = <0x0 0x1530000 0x0 0x10000>;
+-			big-endian;
+ 			interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
+ 		};
+ 
+-- 
+2.14.1
