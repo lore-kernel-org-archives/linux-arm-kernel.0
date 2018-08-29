@@ -1,83 +1,103 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Wed, 29 Aug 2018 11:44:39 +0200
-Subject: [PATCH 5/5] net: mvneta: reduce smp_processor_id() calling in
- mvneta_tx_done_gbe
-In-Reply-To: <20180829163021.70ce99ab@xhacker.debian> (Jisheng Zhang's message
- of "Wed, 29 Aug 2018 16:30:21 +0800")
-References: <20180829162456.2bd69796@xhacker.debian>
- <20180829163021.70ce99ab@xhacker.debian>
-Message-ID: <87wos9ik1k.fsf@bootlin.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Wed, 29 Aug 2018 11:58:20 +0200
+Subject: [PATCH 1/2] drm/bridge: Add virtual display DT bindings
+In-Reply-To: <CACRpkdaGNhxY-xAAEL1Bu4EMr8x7qTGoM9s-At2v7Ev8PwOTDw@mail.gmail.com>
+References: <CGME20180824122324epcas3p2922f3e5415dacf4c89cfb136fa5c77b2@epcas3p2.samsung.com>
+ <20180824122308.3092-1-linus.walleij@linaro.org>
+ <20180827115302eucas1p24d36cfaf9835ccb217ac81e508484aa1~Ou5eTkYW-3006130061eucas1p2Z@eucas1p2.samsung.com>
+ <CACRpkdaGNhxY-xAAEL1Bu4EMr8x7qTGoM9s-At2v7Ev8PwOTDw@mail.gmail.com>
+Message-ID: <20180829095822eucas1p1fe4336ca7944765c01fc6ad1e941b8b0~PUn7YujBw3056130561eucas1p1_@eucas1p1.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jisheng,
- 
- On mer., ao?t 29 2018, Jisheng Zhang <Jisheng.Zhang@synaptics.com> wrote:
-
-> In the loop of mvneta_tx_done_gbe(), we call the smp_processor_id()
-> each time, move the call out of the loop to optimize the code a bit.
+On 28.08.2018 15:45, Linus Walleij wrote:
+> On Mon, Aug 27, 2018 at 1:53 PM Andrzej Hajda <a.hajda@samsung.com> wrote:
 >
-> Before the patch, the loop looks like(under arm64):
+>> On 24.08.2018 14:23, Linus Walleij wrote:
+>>> This adds bindings for a virtual display to be used with displays
+>>> inside entirely virtual environments which do not emulate things
+>>> like monitors but just need timing information to be supplied to
+>>> its display controller.
+>>>
+>>> This is inspired by earlier work by Liviu Dudau.
+>> If this is pure virtual then it should be connected to other pure
+>> virtual components.
+> OK it's a bit of half-half but outside of my grasp, I am just trying
+> to support legacy systems.
 >
->         ldr     x1, [x29,#120]
->         ...
->         ldr     w24, [x1,#36]
->         ...
->         bl      0 <_raw_spin_lock>
->         str     w24, [x27,#132]
->         ...
+> The device tree is there:
+> arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts
+> arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi
 >
-> After the patch, the loop looks like(under arm64):
+> The latter contains the CLCD which is the display driver.
 >
->         ...
->         bl      0 <_raw_spin_lock>
->         str     w23, [x28,#132]
->         ...
-> where w23 is loaded so be ready before the loop.
+> In RTSM, which is an ARM product I do not develop and
+> cannot make changes to, there is an emulated CLCD. So
+> that part appear as if it was real hardware. Like in QEMU.
 >
-> From another side, mvneta_tx_done_gbe() is called from mvneta_poll()
-> which is in non-preemptible context, so it's safe to call the
-> smp_processor_id() function once.
+> But the display does not have any emulation. The raw
+> output from the CLCD is latched out to the screen.
+>
+> I do not know exactly know how the RTSM emulator
+> actually works, but I suspect that the little graphic window
+> on the screeen adapts to what gets written into the
+> CLCD control registers, so anything goes, more or less.
+>
+> To satisfy the CLCD with some timings and resolution,
+> this bridge gives it that, from the device tree, in a way
+> that clearly conveys that "this is not a real thing".
+>
+> The old code uses DPI. This is not DPI, not even close
+> to it. It worked simply because all the DPI really does is
+> what this patch does: provide timings.
+>
+> By contrast on QEMU I have patches the emulator to
+> properly represent the I2C DDC link and provide EDID
+> so that is all fine.
+>
+> I cannot patch RTSM to emulate I2C and DDC. It's not
+> open source. But the device tree in the kernel supports
+> this "machine" and so, I have to maintain it when modernizng
+> the fbdev driver to a DRM driver.
+>
+> I'm sorry RTSM is half/half. Not my fault. I can't fix...
 
-This improvement should go to net-next. Besides this patch looks nice:
+I do not know the platform, so I? I have dug little bit, but I wan't
+call it? thorough research. Just please be kind if I wrote sth stupid.
+What I have found:
+1. DTS shows CLCD is pl111.
+2. pl111 documentation says it's output interface supports STN and TFT
+up to 24-bit bus. I do not know STN, but TFT seems to be compatible with
+DPI.
 
-Reviewed-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+If it is correct, dpi panel seems to be OK. And I think it is less
+important how the emulator works, more important is that it should
+emulate pl111, including it's output interfaces.
 
-Thanks,
+Regards
+Andrzej
+>
+>> And one more thing, you are defining virtual panel but you are using
+>> drm_bridge framework, why not drm_panel?
+> This was discussed before in the previous patch set:
+> https://lists.freedesktop.org/archives/dri-devel/2018-July/183516.html
+>
+> Essentially, it's because the display driver is just connected
+> to "something" not a panel and a bridge is likely the best I
+> can come up with - a bridge over to a virtual display.
+>
+> A patch to add "VGA", "SGA" and "XGA" to the simple panels
+> was NACKed (sort of, politely):
+> https://lists.freedesktop.org/archives/dri-devel/2018-July/183698.html
+>
+> Also it was noted that it would be nice to have something that
+> would make it easy to change resolutions on these virtual
+> display things. Voila.
 
-Gregory
 
 
 >
-> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
-> ---
->  drivers/net/ethernet/marvell/mvneta.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+> Yours,
+> Linus Walleij
 >
-> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-> index 7d98f7828a30..62e81e267e13 100644
-> --- a/drivers/net/ethernet/marvell/mvneta.c
-> +++ b/drivers/net/ethernet/marvell/mvneta.c
-> @@ -2507,12 +2507,13 @@ static void mvneta_tx_done_gbe(struct mvneta_port *pp, u32 cause_tx_done)
->  {
->  	struct mvneta_tx_queue *txq;
->  	struct netdev_queue *nq;
-> +	int cpu = smp_processor_id();
->  
->  	while (cause_tx_done) {
->  		txq = mvneta_tx_done_policy(pp, cause_tx_done);
->  
->  		nq = netdev_get_tx_queue(pp->dev, txq->id);
-> -		__netif_tx_lock(nq, smp_processor_id());
-> +		__netif_tx_lock(nq, cpu);
->  
->  		if (txq->count)
->  			mvneta_txq_done(pp, txq);
-> -- 
-> 2.18.0
 >
-
--- 
-Gregory Clement, Bootlin
-Embedded Linux and Kernel engineering
-http://bootlin.com
