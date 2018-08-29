@@ -1,62 +1,75 @@
-From: codrin.ciubotariu@microchip.com (Codrin Ciubotariu)
-Date: Wed, 29 Aug 2018 17:47:27 +0300
-Subject: [PATCH 2/2] ASoC: mikroe-proto: dt-bindings: add DT bindings for
- PROTO board
-In-Reply-To: <20180829144727.13757-1-codrin.ciubotariu@microchip.com>
-References: <20180829144727.13757-1-codrin.ciubotariu@microchip.com>
-Message-ID: <20180829144727.13757-3-codrin.ciubotariu@microchip.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Wed, 29 Aug 2018 17:57:43 +0200
+Subject: [PATCH v2 2/2] PCI: meson: add the Amlogic Meson PCIe phy driver
+In-Reply-To: <1535096006-152091-3-git-send-email-hanjie.lin@amlogic.com>
+References: <1535096006-152091-1-git-send-email-hanjie.lin@amlogic.com>
+ <1535096006-152091-3-git-send-email-hanjie.lin@amlogic.com>
+Message-ID: <c21a2e25c934d19f913f625542f505cf45754f23.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT binding documentation for this new ASoC driver.
+On Fri, 2018-08-24 at 15:33 +0800, Hanjie Lin wrote:
+> +static int meson_pcie_phy_probe(struct platform_device *pdev)
+> +{
+> +       struct device *dev = &pdev->dev;
+> +       struct meson_pcie_phy *mphy;
+> +       struct meson_pcie_reset *mrst;
+> +       struct phy *generic_phy;
+> +       struct phy_provider *phy_provider;
+> +       struct resource *res;
+> +       const struct meson_pcie_phy_data *data;
+> +
+> +       data = of_device_get_match_data(dev);
+> +       if (!data)
+> +               return -ENODEV;
+> +
+> +       mphy = devm_kzalloc(dev, sizeof(*mphy), GFP_KERNEL);
+> +       if (!mphy)
+> +               return -ENOMEM;
+> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       mphy->phy_base = devm_ioremap_resource(dev, res);
+> +       if (IS_ERR(mphy->phy_base))
+> +               return PTR_ERR(mphy->phy_base);
+> +
+> +       mrst = &mphy->reset;
+> +
+> +       mrst->phy = devm_reset_control_get_shared(dev, "phy");
 
-Signed-off-by: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
----
- .../bindings/sound/mikroe,mikroe-proto.txt    | 23 +++++++++++++++++++
- .../devicetree/bindings/vendor-prefixes.txt   |  1 +
- 2 files changed, 24 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/mikroe,mikroe-proto.txt
+I thought you said there was only phy on this platform.
+If that's the case, what is this reset shared with ?
 
-diff --git a/Documentation/devicetree/bindings/sound/mikroe,mikroe-proto.txt b/Documentation/devicetree/bindings/sound/mikroe,mikroe-proto.txt
-new file mode 100644
-index 000000000000..912f8fae11c5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/mikroe,mikroe-proto.txt
-@@ -0,0 +1,23 @@
-+Mikroe-PROTO audio board
-+
-+Required properties:
-+  - compatible: "mikroe,mikroe-proto"
-+  - dai-format: Must be "i2s".
-+  - i2s-controller: The phandle of the I2S controller.
-+  - audio-codec: The phandle of the WM8731 audio codec.
-+Optional properties:
-+  - model: The user-visible name of this sound complex.
-+  - bitclock-master: Indicates dai-link bit clock master; for details see simple-card.txt (1).
-+  - frame-master: Indicates dai-link frame master; for details see simple-card.txt (1).
-+
-+(1) : There must be the same master for both bit and frame clocks.
-+
-+Example:
-+	sound {
-+		compatible = "mikroe,mikroe-proto";
-+		model = "wm8731 @ sama5d2_xplained";
-+		i2s-controller = <&i2s0>;
-+		audio-codec = <&wm8731>;
-+		dai-format = "i2s";
-+        };
-+};
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index f4a98c85340a..8ac3ec1f36e5 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -210,6 +210,7 @@ micron	Micron Technology Inc.
- minix	MINIX Technology Ltd.
- miramems	MiraMEMS Sensing Technology Co., Ltd.
- mitsubishi	Mitsubishi Electric Corporation
-+mikroe		MikroElektronika d.o.o.
- mosaixtech	Mosaix Technologies, Inc.
- motorola	Motorola, Inc.
- moxa	Moxa Inc.
--- 
-2.17.1
+> +       if (IS_ERR(mrst->phy)) {
+> +               if (PTR_ERR(mrst->phy) != -EPROBE_DEFER)
+> +                       dev_err(dev, "couldn't get phy reset\n");
+> +
+> +               return PTR_ERR(mrst->phy);
+> +       }
+> +
+> +       reset_control_deassert(mrst->phy);
+
+Is it really necessary before init() is called by the consumer ?
+
+> +
+> +       mphy->data = data;
+> +
+> +       generic_phy = devm_phy_create(dev, dev->of_node, mphy->data->ops);
+> +       if (IS_ERR(generic_phy)) {
+> +               if (PTR_ERR(generic_phy) != -EPROBE_DEFER)
+> +                       dev_err(dev, "failed to create PHY\n");
+> +
+> +               return PTR_ERR(generic_phy);
+> +       }
+> +
+> +       phy_set_drvdata(generic_phy, mphy);
+> +       phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
+> +
+> +       return PTR_ERR_OR_ZERO(phy_provider);
+> +}
+> +
+> +static struct platform_driver meson_pcie_phy_driver = {
+> +       .probe  = meson_pcie_phy_probe,
+> +       .driver = {
+> +               .of_match_table = meson_pcie_phy_match,
+> +               .name           = "meson-pcie-phy",
+> +       }
+> +};
