@@ -1,70 +1,48 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Wed, 29 Aug 2018 16:51:31 +0800
-Subject: [PATCH 0/5] net: mvneta: some bug fix and trivial improvement
-In-Reply-To: <20180829164024.41e8439d@xhacker.debian>
-References: <20180829162456.2bd69796@xhacker.debian>
- <20180829164024.41e8439d@xhacker.debian>
-Message-ID: <20180829165131.52798cd6@xhacker.debian>
+From: qiang.zhao@nxp.com (Qiang Zhao)
+Date: Wed, 29 Aug 2018 08:57:40 +0000
+Subject: [PATCH] soc: Convert to using %pOFn instead of device_node.name
+In-Reply-To: <20180828015252.28511-43-robh@kernel.org>
+References: <20180828015252.28511-1-robh@kernel.org>
+ <20180828015252.28511-43-robh@kernel.org>
+Message-ID: <VI1PR04MB3247DA20AA7C6242B90FA6DA91090@VI1PR04MB3247.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 Aug 2018 16:40:24 +0800 Jisheng Zhang wrote:
+From: Rob Herring <robh@kernel.org>
+Date: 2018?8?28? 9:53
+> To: linux-kernel at vger.kernel.org
+> Cc: Qiang Zhao <qiang.zhao@nxp.com>; Leo Li <leoyang.li@nxp.com>; Andy
+> Gross <andy.gross@linaro.org>; David Brown <david.brown@linaro.org>; Heiko
+> Stuebner <heiko@sntech.de>; Thierry Reding <thierry.reding@gmail.com>;
+> Jonathan Hunter <jonathanh@nvidia.com>; Santosh Shilimkar
+> <ssantosh@kernel.org>; linuxppc-dev at lists.ozlabs.org;
+> linux-arm-kernel at lists.infradead.org; linux-soc at vger.kernel.org
+> Subject: [PATCH] soc: Convert to using %pOFn instead of device_node.name
+> 
+> In preparation to remove the node name pointer from struct device_node,
+> convert printf users to use the %pOFn format specifier.
+> 
+> Cc: Qiang Zhao <qiang.zhao@nxp.com>
+> Cc: Li Yang <leoyang.li@nxp.com>
+> Cc: Andy Gross <andy.gross@linaro.org>
+> Cc: David Brown <david.brown@linaro.org>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Jonathan Hunter <jonathanh@nvidia.com>
+> Cc: Santosh Shilimkar <ssantosh@kernel.org>
+> Cc: linuxppc-dev at lists.ozlabs.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-soc at vger.kernel.org
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> ---
+>  drivers/soc/dove/pmu.c            |  8 +++---
+>  drivers/soc/fsl/qe/qe_tdm.c       |  4 +--
+>  drivers/soc/qcom/apr.c            |  2 +-
+>  drivers/soc/rockchip/pm_domains.c | 44 +++++++++++++++----------------
+>  drivers/soc/tegra/pmc.c           | 12 ++++-----
+>  drivers/soc/ti/knav_dma.c         |  8 +++---
+>  drivers/soc/ti/knav_qmss_queue.c  |  8 +++---
+>  7 files changed, 43 insertions(+), 43 deletions(-)
 
-> On Wed, 29 Aug 2018 16:25:57 +0800
-> Jisheng Zhang wrote:
-> 
-> > patch1 fixes rx_offset_correction set and usage. Because the
-> > rx_offset_correction is RX packet offset correction for platforms,
-> > it's not related with SW BM, instead, it's only related with the
-> > platform's NET_SKB_PAD.
-> > 
-> > patch2 fixes the wrong function to unmap rx buf  
-> 
-> I have question about the following two commits:
-> 
-> 7e47fd84b56b ("net: mvneta: Allocate page for the descriptor"), it cause
-> a waste, for normal 1500 MTU, before this patch we allocate 1920Bytes for rx
-> after this patch, we always allocate PAGE_SIZE bytes, if PAGE_SIZE=4096, we
-> waste 53% memory for each rx buf. I'm not sure whether the performance
-> improvement deserve the pay.
-> 
-> 562e2f467e71 ("net: mvneta: Improve the buffer allocation method for SWBM")
-> mentions that "With system having a small memory (around 256MB), the state
-> "cannot allocate memory to refill with new buffer" is reach pretty quickly"
-> is it due to the memory waste as said above? Anyway, by this commit, we
-> want to improve the situation on a small memory system, so should we firstly
-> revert commit 7e47fd84b56b ("net: mvneta: Allocate page for the descriptor")?
-> 
-
-If maintainers decide to revert the two commits: 7e47fd84b56b and 562e2f467e71
-then, patch1,2,3 are useless, we can drop them. Only patch4 and patch5 are
-still useful.
-
-Thanks
-
-> Any comments are welcome!
-> 
-> Thanks
-> 
-> 
-> > 
-> > patch3 removes the NETIF_F_GRO check ourself, because the net subsystem
-> > will handle it for us.
-> > 
-> > patch4 enables NETIF_F_RXCSUM by default, since the driver and HW
-> > supports the feature.
-> > 
-> > patch5 is a trivial optimization, to reduce smp_processor_id() calling
-> > in mvneta_tx_done_gbe.
-> > 
-> > Jisheng Zhang (5):
-> >   net: mvneta: fix rx_offset_correction set and usage
-> >   net: mvneta: fix the wrong function to unmap rx buf
-> >   net: mvneta: Don't check NETIF_F_GRO ourself
-> >   net: mvneta: enable NETIF_F_RXCSUM by default
-> >   net: mvneta: reduce smp_processor_id() calling in mvneta_tx_done_gbe
-> > 
-> >  drivers/net/ethernet/marvell/mvneta.c | 49 ++++++++++++---------------
-> >  1 file changed, 22 insertions(+), 27 deletions(-)
-> >   
-> 
+For qe_tdm part
+Acked-by: Qiang Zhao <qiang.zhao@nxp.com>
