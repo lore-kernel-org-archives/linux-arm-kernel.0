@@ -1,39 +1,30 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 29 Aug 2018 12:33:35 +0200
-Subject: [RFC] Rename socfpga_cyclone5_de0_sockit.dts to
- socfpga_cyclone5_de0_nano_soc.dts
-In-Reply-To: <73bm9lwn3t.fsf@pengutronix.de>
-References: <fd0f01e5-41a2-6a24-2ce4-482b30b348b6@denx.de>
- <73bm9lwn3t.fsf@pengutronix.de>
-Message-ID: <b29e529a-f7bd-71d2-615e-9f850858ed4d@denx.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 29 Aug 2018 11:41:15 +0100
+Subject: [PATCH 1/2] arm/arm64: smccc-1.1: Make return values unsigned long
+In-Reply-To: <20180824140830.12747-2-marc.zyngier@arm.com>
+References: <20180824140830.12747-1-marc.zyngier@arm.com>
+ <20180824140830.12747-2-marc.zyngier@arm.com>
+Message-ID: <20180829104114.GB23979@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/29/2018 11:14 AM, Steffen Trumtrar wrote:
+On Fri, Aug 24, 2018 at 03:08:29PM +0100, Marc Zyngier wrote:
+> An unfortunate consequence of having a strong typing for the input
+> values to the SMC call is that it also affects the type of the
+> return values, limiting r0 to 32 bits and r{1,2,3} to whatever
+> was passed as an input.
 > 
-> Marek Vasut <marex@denx.de> writes:
+> Let's turn everything into "unsigned long", which satisfies the
+> requirements of both architectures, and allows for the full
+> range of return values.
 > 
->> Hi,
->>
->> I was recently experimenting with the DE0 Nano SoC / Atlas SoC . I had a
->> hard time finding the right DT for the board, but then was suggested
->> that the DT for the board is socfpga_cyclone5_de0_sockit.dts . This did
->> not make sense to me, since SoCKit is a different board altogether. But
->> the DTS seems to be indeed for the DE0 Nano SoC.
->>
->> To fix up this confusion, I'd propose renaming of the
->> socfpga_cyclone5_de0_sockit.dts to socfpga_cyclone5_de0_nano_soc.dts to
->> match the label on the package .
->>
->> What do you think ?
-> 
-> Ack. This confusion came up multiple times. The barebox-specific dts
-> "overlay"
-> is already named socfpga_cyclone5_de0_nano_soc.dts because of this.
+> Reported-by: Julien Grall <julien.grall@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  include/linux/arm-smccc.h | 20 ++++++++++----------
+>  1 file changed, 10 insertions(+), 10 deletions(-)
 
-The DT in U-Boot is also called socfpga_cyclone5_de0_nano_soc.dts since
-forever. I'd be happy to send a patch if the Altera folks are fine with it?
+Does this need a Cc stable, or do no current callers need the upper bits of
+the return values on arm64?
 
--- 
-Best regards,
-Marek Vasut
+Will
