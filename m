@@ -1,47 +1,31 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Wed, 29 Aug 2018 11:40:58 -0700
-Subject: [PATCH 0/7] ARM32/64: DT overlay build support
-In-Reply-To: <1535459532-17211-1-git-send-email-t-kristo@ti.com>
-References: <1535459532-17211-1-git-send-email-t-kristo@ti.com>
-Message-ID: <f9562e36-ef04-fb14-74a1-6a67feaa97a8@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 29 Aug 2018 11:44:58 -0700
+Subject: [PATCH] arm64: defconfig: enable EFI_ARMSTUB_DTB_LOADER
+In-Reply-To: <1535563287-24803-1-git-send-email-scott.branden@broadcom.com>
+References: <1535563287-24803-1-git-send-email-scott.branden@broadcom.com>
+Message-ID: <CAOesGMhjcJ1p3QcEYb9fsx3fMXAOsgR2njOq=VKgEbWGwJi36g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Mark Rutland, just in case he is interested
+Hi,
 
-On 08/28/18 05:32, Tero Kristo wrote:
-> Hi,
-> 
-> This series introduces devicetree overlay building support for ARM
-> platforms. The .dtbo target is introduced globally, then makefile
-> changes for both arm32/64 for supporting the .dtbo target, changes
-> to support sub-dir makefile flags, and finally adding the DTC flags
-> override for TI platforms, as that is where we want to introduce
-> the DT overlay support initially.
-> 
-> The ARM makefile changes for supporting DTS sub-makefiles don't look
-> too clean, but that was the only way I could figure out how to
-> get it done.
-> 
-> -Tero
-> 
-> --
-> Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
-> 
+On Wed, Aug 29, 2018 at 10:21 AM, Scott Branden
+<scott.branden@broadcom.com> wrote:
+> Enable EFI_ARMSTUB_DTB_LOADER to add support for the dtb= command line
+> parameter to function with efi loader.
+>
+> Required to boot on existing bootloaders that do not support devicetree
+> provided by the platform or by the bootloader.
+>
+> Fixes: 3d7ee348aa41 ("efi/libstub/arm: Add opt-in Kconfig option for the DTB loader")
+> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
 
-This series does three unrelated things:
+Why did Ard create an option for this if it's just going be turned on
+in default configs? Doesn't make sense to me.
 
-(1) create a ti specific dts subdirectory arch/arm/boot/dts/ti/
+It would help to know what firmware still is crippled and how common
+it is, since it's been a few years that this has been a requirement by
+now.
 
-(2) create a rule for creating a .dtbo from a .dtso
 
-(3) add a dtc compile flag to add phandle symbol information to
-    all .dtb files created from arch/arm/boot/dts/ti/ and
-    arch/arm64/boot/dts/ti/
-
-Please split the patches into three independent series so that
-each of the three concepts can be discussed separately.
-
-Thanks,
-
-Frank
+-Olof
