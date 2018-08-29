@@ -1,149 +1,215 @@
-From: mbenes@suse.cz (Miroslav Benes)
-Date: Wed, 29 Aug 2018 13:37:00 +0200 (CEST)
-Subject: [PATCH 2/3] arm64: implement live patching
-In-Reply-To: <20180810160306.2954D68C76@newverein.lst.de>
-References: <20180810160043.9E45568C76@newverein.lst.de>
- <20180810160306.2954D68C76@newverein.lst.de>
-Message-ID: <alpine.LSU.2.21.1808291313170.30704@pobox.suse.cz>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Wed, 29 Aug 2018 12:37:34 +0100
+Subject: [PATCH v5 00/27] arm64: provide pseudo NMI with GICv3
+In-Reply-To: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
+References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <20180829113734.evdvs46in6j6xksx@holly.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 10 Aug 2018, Torsten Duwe wrote:
-
-> Based on ftrace with regs, do the usual thing. Also allocate a
-> task flag for whatever consistency handling is implemented.
-> Watch out for interactions with the graph tracer.
-> This code has been compile-tested, but has not yet seen any
-> heavy livepatching.
+On Tue, Aug 28, 2018 at 04:51:10PM +0100, Julien Thierry wrote:
+> Hi,
 > 
-> Signed-off-by: Torsten Duwe <duwe@suse.de>
+> This series is a continuation of the work started by Daniel [1]. The goal
+> is to use GICv3 interrupt priorities to simulate an NMI.
+> 
+> The patches depend on the core API for NMIs patches [2].
 
-There is one thing missing. Livepatch is able to automatically resolve 
-relocations pointing to SHN_LIVEPATCH symbols. Arch-specific 
-apply_relocate_add() is called for the purpose. It needs all 
-arch-specific info preserved because of that. Usually it means to keep 
-at least mod_arch_specific struct also after a module is loaded. It 
-depends on its content. See f31e0960f395 ("module: s390: keep 
-mod_arch_specific for livepatch modules") for example.
+As before... is there a git tree? With the NMI core API I think I might
+be able to get some of my old pseudo-NMI demos working.
 
-We discussed the issue in 2016 when you submitted the arm64 support 
-originally. It was more or less ok back then. Jessica only proposed to 
-update count_plts(). However, a lot has changed since then and the code 
-must be inspected again. If everything is ok, there should be at least a 
-note in the changelog.
- 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 28c8c03..31df287 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -117,6 +117,7 @@ config ARM64
->  	select HAVE_GENERIC_DMA_COHERENT
->  	select HAVE_HW_BREAKPOINT if PERF_EVENTS
->  	select HAVE_IRQ_TIME_ACCOUNTING
-> +	select HAVE_LIVEPATCH
->  	select HAVE_MEMBLOCK
->  	select HAVE_MEMBLOCK_NODE_MAP if NUMA
->  	select HAVE_NMI
-> @@ -1343,4 +1344,6 @@ if CRYPTO
->  source "arch/arm64/crypto/Kconfig"
->  endif
->  
-> +source "kernel/livepatch/Kconfig"
-> +
->  source "lib/Kconfig"
-> --- a/arch/arm64/include/asm/thread_info.h
-> +++ b/arch/arm64/include/asm/thread_info.h
-> @@ -76,6 +76,7 @@ void arch_release_task_struct(struct tas
->  #define TIF_FOREIGN_FPSTATE	3	/* CPU's FP state is not current's */
->  #define TIF_UPROBE		4	/* uprobe breakpoint or singlestep */
->  #define TIF_FSCHECK		5	/* Check FS is USER_DS on return */
-> +#define TIF_PATCH_PENDING	6
->  #define TIF_NOHZ		7
->  #define TIF_SYSCALL_TRACE	8
->  #define TIF_SYSCALL_AUDIT	9
-> @@ -94,6 +95,7 @@ void arch_release_task_struct(struct tas
->  #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
->  #define _TIF_NOTIFY_RESUME	(1 << TIF_NOTIFY_RESUME)
->  #define _TIF_FOREIGN_FPSTATE	(1 << TIF_FOREIGN_FPSTATE)
-> +#define _TIF_PATCH_PENDING	(1 << TIF_PATCH_PENDING)
->  #define _TIF_NOHZ		(1 << TIF_NOHZ)
->  #define _TIF_SYSCALL_TRACE	(1 << TIF_SYSCALL_TRACE)
->  #define _TIF_SYSCALL_AUDIT	(1 << TIF_SYSCALL_AUDIT)
-> @@ -106,7 +108,8 @@ void arch_release_task_struct(struct tas
->  
->  #define _TIF_WORK_MASK		(_TIF_NEED_RESCHED | _TIF_SIGPENDING | \
->  				 _TIF_NOTIFY_RESUME | _TIF_FOREIGN_FPSTATE | \
-> -				 _TIF_UPROBE | _TIF_FSCHECK)
-> +				 _TIF_UPROBE | _TIF_FSCHECK | \
-> +				 _TIF_PATCH_PENDING)
 
-We're ok if _TIF_WORK_MASK is processed in the syscall return path and in 
-irq return to user space. It looks like it is the case, but I'd welcome a 
-confirmation.
+> To achieve this, set two priorities, one for standard interrupts and
+> another, higher priority, for NMIs. Whenever we want to disable interrupts,
+> we mask the standard priority instead so NMIs can still be raised. Some
+> corner cases though still require to actually mask all interrupts
+> effectively disabling the NMI.
+> 
+> Daniel Thompson ran some benchmarks [3] on the previous version showing a
+> small (<1%) performance drop when using interrupt priorities.
 
-Anyway, one piece is still missing. _TIF_PATCH_PENDING must be cleared 
-somewhere. I think something like
+IMHO it is very important to disclose which micro-architecture (in this
+case I think I was using C-A53 and GIC-500) the performance drop is
+observed with.
 
-                        if (thread_flags & _TIF_PATCH_PENDING)
-				klp_update_patch_state(current);
+We know from both micro- and macro-benchmarks that the performance delta
+is deeply dependant on core implementation. In fact, my own work in this
+area stalled largely because the main device that justified my spending
+working-hours on pseudo-NMI was too badly impacted to see it enabled by
+default.
 
-in do_notify_resume() (arch/arm64/kernel/signal.c) before 
-_TIF_SIGPENDING processing should do the trick.
-  
->  #define _TIF_SYSCALL_WORK	(_TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT | \
->  				 _TIF_SYSCALL_TRACEPOINT | _TIF_SECCOMP | \
-> diff --git a/arch/arm64/include/asm/livepatch.h b/arch/arm64/include/asm/livepatch.h
-> new file mode 100644
-> index 0000000..6b9a3d1
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/livepatch.h
-> @@ -0,0 +1,38 @@
-> +/* SPDX-License-Identifier: GPL-2.0
-> + *
-> + * livepatch.h - arm64-specific Kernel Live Patching Core
-> + *
-> + * Copyright (C) 2016 SUSE
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version 2
-> + * of the License, or (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, see <http://www.gnu.org/licenses/>.
-> + */
 
-Someone could argue that GPL boilerplate is superfluous thanks to SPDX 
-identifier. I don't, so thanks for putting it there.
+Daniel.
 
-> +#ifndef _ASM_ARM64_LIVEPATCH_H
-> +#define _ASM_ARM64_LIVEPATCH_H
-> +
-> +#include <linux/module.h>
-> +#include <linux/ftrace.h>
-> +
-> +#ifdef CONFIG_LIVEPATCH
 
-The guard is unnecessary, I think. The header file is included from 
-include/linux/livepatch.h only. Right after the guard there.
-
-> +static inline int klp_check_compiler_support(void)
-> +{
-> +	return 0;
-> +}
-> +
-> +static inline void klp_arch_set_pc(struct pt_regs *regs, unsigned long ip)
-> +{
-> +	regs->pc = ip;
-> +}
-> +#endif /* CONFIG_LIVEPATCH */
-> +
-> +#endif /* _ASM_ARM64_LIVEPATCH_H */
-
-Regards,
-Miroslav
+> Currently, only PPIs and SPIs can be set as NMIs. IPIs being currently
+> hardcoded IRQ numbers, there isn't a generic interface to set SGIs as NMI
+> for now. LPIs being controlled by the ITS cannot be delivered as NMI.
+> When an NMI is active on a CPU, no other NMI can be triggered on the CPU.
+> 
+> Requirements to use this:
+> - Have GICv3
+> - SCR_EL3.FIQ is set to 1 when linux runs or have single security state
+> - Select Kernel Feature -> Use ICC system registers for IRQ masking
+> 
+> 
+> * Patches 1 to 3 aim at applying some alternatives early in the boot
+>   process.
+> 
+> * Patches 4 to 7 ensure the logic of daifflags remains valid
+>   after arch_local_irq flags use ICC_PMR_EL1.
+> 
+> * Patches 8 and 9 clean up GIC current priority definition to make it
+>   easier to introduce a new priority
+> 
+> * Patches 10 to 16 prepare arch code for the use of priorities, saving and
+>   restoring ICC_PMR_EL1 appropriately
+> 
+> * Patches 17 to 20 add the support to GICv3 driver to use priority masking
+>   if required by the architecture
+> 
+> * Patches 21 to 23 make arm64 code use ICC_PMR_EL1 to enable/disable
+>   interrupts, leaving PSR.I as often as possible
+> 
+> * Patches 24 to 27 add the support for NMIs to GICv3 driver
+> 
+> 
+> Changes since V4[4]:
+> * Rebased to v4.19-rc1
+> * Adapted GIC driver to the core NMI API
+> * Added option to disable priority masking on command line
+> * Added Daniel's Tested-by on patches related replacing PSR.I toggling with
+>   PMR masking
+> * Fix scope matching for alternative features.
+> * Spotted some more places using PSR.I or daif and replaced with generic
+>   interrupt functions
+> 
+> Changes since V3[5]:
+> * Big refactoring. As suggested by Marc Z., some of the bigger patches
+>   needed to be split into smaller one.
+> * Try to reduce the amount of #ifdef for the new feature by introducing
+>   an individual cpufeature for priority masking
+> * Do not track which alternatives have been applied (was a bit dodgy
+>   anyway), and use an alternative for VHE cpu_enable callback
+> * Fix a build failure with arm by adding the correct RPR accessors
+> * Added Suggested-by tags for changes from comming or inspired by Daniel's
+>   series. Do let me know if you feel I missed something and am not giving
+>   you due credit.
+> 
+> Changes since V2[6]:
+> * Series rebase to v4.17-rc6
+> * Adapt pathces 1 and 2 to the rework of cpufeatures framework
+> * Use the group0 detection scheme in the GICv3 driver to identify
+>   the priority view, and drop the use of a fake interrupt
+> * Add the case for a GIC configured in a single security state
+> * Use local_daif_restore instead of local_irq_enable the first time
+>   we enable interrupts after a bp hardening in the handling of a kernel
+>   entry. Otherwise PRS.I remains set...
+> 
+> Changes since V1[7]:
+> * Series rebased to v4.15-rc8.
+> * Check for arm64_early_features in this_cpu_has_cap (spotted by Suzuki).
+> * Fix issue where debug exception were not masked when enabling debug in
+>   mdscr_el1.
+> 
+> Changes since RFC[8]:
+> * The series was rebased to v4.15-rc2 which implied some changes mainly
+>   related to the work on exception entries and daif flags by James Morse.
+>   - The first patch in the previous series was dropped because no longer
+>     applicable.
+>   - With the semantics James introduced of "inheriting" daif flags,
+>     handling of PMR on exception entry is simplified as PMR is not altered
+>     by taking an exception and already inherited from previous state.
+>   - James pointed out that taking a PseudoNMI before reading the FAR_EL1
+>     register should not be allowed as per the TRM (D10.2.29):
+>     "FAR_EL1 is made UNKNOWN on an exception return from EL1."
+>     So in this submission PSR.I bit is cleared only after FAR_EL1 is read.
+> * For KVM, only deal with PMR unmasking/restoring in common code, and VHE
+>   specific code makes sure PSR.I bit is set when necessary.
+> * When detecting the GIC priority view (patch 5), wait for an actual
+>   interrupt instead of trying only once.
+> 
+> 
+> [1] http://www.spinics.net/lists/arm-kernel/msg525077.html
+> [2] https://lkml.org/lkml/2018/8/28/661
+> [3] https://lkml.org/lkml/2018/7/20/803
+> [4] https://lkml.org/lkml/2018/7/24/321
+> [5] https://lkml.org/lkml/2018/5/21/276
+> [6] https://lkml.org/lkml/2018/1/17/335
+> [7] https://www.spinics.net/lists/arm-kernel/msg620763.html
+> [8] https://www.spinics.net/lists/arm-kernel/msg610736.html
+> 
+> Cheers,
+> 
+> Julien
+> 
+> -->
+> 
+> Daniel Thompson (1):
+>   arm64: alternative: Apply alternatives early in boot process
+> 
+> Julien Thierry (26):
+>   arm64: cpufeature: Set SYSREG_GIC_CPUIF as a boot system feature
+>   arm64: cpufeature: Use alternatives for VHE cpu_enable
+>   arm64: daifflags: Use irqflags functions for daifflags
+>   arm64: Use daifflag_restore after bp_hardening
+>   arm64: Delay daif masking for user return
+>   arm64: xen: Use existing helper to check interrupt status
+>   irqchip/gic: Unify GIC priority definitions
+>   irqchip/gic: Lower priority of GIC interrupts
+>   arm64: cpufeature: Add cpufeature for IRQ priority masking
+>   arm64: Make PMR part of task context
+>   arm64: Unmask PMR before going idle
+>   arm/arm64: gic-v3: Add helper functions to manage IRQ priorities
+>   arm64: kvm: Unmask PMR before entering guest
+>   arm64: irqflags: Use ICC_PMR_EL1 for interrupt masking
+>   arm64: daifflags: Include PMR in daifflags restore operations
+>   irqchip/gic-v3: Factor group0 detection into functions
+>   irqchip/gic-v3: Do not overwrite PMR value
+>   irqchip/gic-v3: Remove acknowledge loop
+>   irqchip/gic-v3: Switch to PMR masking after IRQ acknowledge
+>   arm64: Switch to PMR masking when starting CPUs
+>   arm64: Add build option for IRQ masking via priority
+>   arm64: Handle serror in NMI context
+>   irqchip/gic-v3: Detect current view of GIC priorities
+>   irqchip/gic-v3: Add base support for pseudo-NMI
+>   irqchip/gic: Add functions to access irq priorities
+>   irqchip/gic-v3: Allow interrupts to be set as pseudo-NMI
+> 
+>  Documentation/admin-guide/kernel-parameters.txt |   3 +
+>  Documentation/arm64/booting.txt                 |   5 +
+>  arch/arm/include/asm/arch_gicv3.h               |  33 +++
+>  arch/arm64/Kconfig                              |  15 ++
+>  arch/arm64/include/asm/alternative.h            |   3 +-
+>  arch/arm64/include/asm/arch_gicv3.h             |  33 +++
+>  arch/arm64/include/asm/assembler.h              |  17 +-
+>  arch/arm64/include/asm/cpucaps.h                |   3 +-
+>  arch/arm64/include/asm/cpufeature.h             |   2 +
+>  arch/arm64/include/asm/daifflags.h              |  29 ++-
+>  arch/arm64/include/asm/efi.h                    |   3 +-
+>  arch/arm64/include/asm/irqflags.h               | 100 +++++++--
+>  arch/arm64/include/asm/kvm_host.h               |  12 +
+>  arch/arm64/include/asm/processor.h              |   1 +
+>  arch/arm64/include/asm/ptrace.h                 |  13 +-
+>  arch/arm64/include/asm/xen/events.h             |   2 +-
+>  arch/arm64/kernel/alternative.c                 |  28 ++-
+>  arch/arm64/kernel/asm-offsets.c                 |   1 +
+>  arch/arm64/kernel/cpufeature.c                  |  51 ++++-
+>  arch/arm64/kernel/entry.S                       |  63 +++++-
+>  arch/arm64/kernel/head.S                        |  35 +++
+>  arch/arm64/kernel/process.c                     |   2 +
+>  arch/arm64/kernel/smp.c                         |  12 +
+>  arch/arm64/kernel/traps.c                       |   8 +-
+>  arch/arm64/kvm/hyp/switch.c                     |  17 ++
+>  arch/arm64/mm/fault.c                           |   5 +-
+>  arch/arm64/mm/proc.S                            |  18 ++
+>  drivers/irqchip/irq-gic-common.c                |  10 +
+>  drivers/irqchip/irq-gic-common.h                |   2 +
+>  drivers/irqchip/irq-gic-v3-its.c                |   2 +-
+>  drivers/irqchip/irq-gic-v3.c                    | 279 +++++++++++++++++++-----
+>  include/linux/irqchip/arm-gic-common.h          |   6 +
+>  include/linux/irqchip/arm-gic.h                 |   5 -
+>  33 files changed, 699 insertions(+), 119 deletions(-)
+> 
+> --
+> 1.9.1
