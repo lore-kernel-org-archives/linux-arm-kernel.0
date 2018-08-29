@@ -1,48 +1,39 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 29 Aug 2018 15:01:11 -0500
-Subject: [PATCH] usb: gadget: atmel: remove pointless retrieval of DT name
- property
-Message-ID: <20180829200111.11891-1-robh@kernel.org>
+Date: Wed, 29 Aug 2018 15:04:25 -0500
+Subject: [PATCH] soc: fsl/qe: Use of_get_child_by_name helper
+Message-ID: <20180829200425.16435-1-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The name is always non-NULL and then is not used anywhere in this function,
-so remove it.
+Use the of_get_child_by_name() helper instead of open coding searching
+for the 'firmware' child node. This removes directly accessing the name
+pointer as well.
 
-Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
-Cc: Felipe Balbi <balbi@kernel.org>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
+Cc: Qiang Zhao <qiang.zhao@nxp.com>
+Cc: Li Yang <leoyang.li@nxp.com>
+Cc: linuxppc-dev at lists.ozlabs.org
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-usb at vger.kernel.org
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
- drivers/usb/gadget/udc/atmel_usba_udc.c | 6 ------
- 1 file changed, 6 deletions(-)
+ drivers/soc/fsl/qe/qe.c | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
-diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-index 17147b8c771e..5729935c5eb2 100644
---- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-@@ -2004,7 +2004,6 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
- 						    struct usba_udc *udc)
- {
- 	u32 val;
--	const char *name;
- 	struct device_node *np = pdev->dev.of_node;
- 	const struct of_device_id *match;
- 	struct device_node *pp;
-@@ -2094,11 +2093,6 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
- 		ep->can_dma = of_property_read_bool(pp, "atmel,can-dma");
- 		ep->can_isoc = of_property_read_bool(pp, "atmel,can-isoc");
+diff --git a/drivers/soc/fsl/qe/qe.c b/drivers/soc/fsl/qe/qe.c
+index 2ef6fc6487c1..612d9c551be5 100644
+--- a/drivers/soc/fsl/qe/qe.c
++++ b/drivers/soc/fsl/qe/qe.c
+@@ -588,11 +588,7 @@ struct qe_firmware_info *qe_get_firmware_info(void)
+ 	}
  
--		ret = of_property_read_string(pp, "name", &name);
--		if (ret) {
--			dev_err(&pdev->dev, "of_probe: name error(%d)\n", ret);
--			goto err;
--		}
- 		sprintf(ep->name, "ep%d", ep->index);
- 		ep->ep.name = ep->name;
+ 	/* Find the 'firmware' child node */
+-	for_each_child_of_node(qe, fw) {
+-		if (strcmp(fw->name, "firmware") == 0)
+-			break;
+-	}
+-
++	fw = of_get_child_by_name(qe, "firmware");
+ 	of_node_put(qe);
  
+ 	/* Did we find the 'firmware' node? */
 -- 
 2.17.1
