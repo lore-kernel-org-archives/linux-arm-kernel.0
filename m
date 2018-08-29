@@ -1,61 +1,25 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Wed, 29 Aug 2018 16:30:21 +0800
-Subject: [PATCH 5/5] net: mvneta: reduce smp_processor_id() calling in
- mvneta_tx_done_gbe
-In-Reply-To: <20180829162456.2bd69796@xhacker.debian>
-References: <20180829162456.2bd69796@xhacker.debian>
-Message-ID: <20180829163021.70ce99ab@xhacker.debian>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 29 Aug 2018 10:34:30 +0200
+Subject: [PATCH v3 1/2] documentation: pinctrl: Add compatibles for
+ Amlogic Meson G12A pin controllers
+In-Reply-To: <20180807020634.18182-2-yixun.lan@amlogic.com>
+References: <20180807020634.18182-1-yixun.lan@amlogic.com>
+ <20180807020634.18182-2-yixun.lan@amlogic.com>
+Message-ID: <CACRpkdY+FRs0xbyrK1szAFLsLKz4uDRUJs-1U=brs8M92NJTUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the loop of mvneta_tx_done_gbe(), we call the smp_processor_id()
-each time, move the call out of the loop to optimize the code a bit.
+On Tue, Aug 7, 2018 at 4:07 AM Yixun Lan <yixun.lan@amlogic.com> wrote:
 
-Before the patch, the loop looks like(under arm64):
+> Add new compatible name for Amlogic's Meson-G12A pin controllers,
+> add a dt-binding header file which document the detail pin names.
+>
+> Acked-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Xingyu Chen <xingyu.chen@amlogic.com>
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
 
-        ldr     x1, [x29,#120]
-        ...
-        ldr     w24, [x1,#36]
-        ...
-        bl      0 <_raw_spin_lock>
-        str     w24, [x27,#132]
-        ...
+Patch applied for v4.20.
 
-After the patch, the loop looks like(under arm64):
-
-        ...
-        bl      0 <_raw_spin_lock>
-        str     w23, [x28,#132]
-        ...
-where w23 is loaded so be ready before the loop.
-
->From another side, mvneta_tx_done_gbe() is called from mvneta_poll()
-which is in non-preemptible context, so it's safe to call the
-smp_processor_id() function once.
-
-Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
----
- drivers/net/ethernet/marvell/mvneta.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index 7d98f7828a30..62e81e267e13 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -2507,12 +2507,13 @@ static void mvneta_tx_done_gbe(struct mvneta_port *pp, u32 cause_tx_done)
- {
- 	struct mvneta_tx_queue *txq;
- 	struct netdev_queue *nq;
-+	int cpu = smp_processor_id();
- 
- 	while (cause_tx_done) {
- 		txq = mvneta_tx_done_policy(pp, cause_tx_done);
- 
- 		nq = netdev_get_tx_queue(pp->dev, txq->id);
--		__netif_tx_lock(nq, smp_processor_id());
-+		__netif_tx_lock(nq, cpu);
- 
- 		if (txq->count)
- 			mvneta_txq_done(pp, txq);
--- 
-2.18.0
+Yours,
+Linus Walleij
