@@ -1,48 +1,57 @@
-From: leoyang.li@nxp.com (Li Yang)
-Date: Tue, 28 Aug 2018 17:49:25 -0500
-Subject: [PATCH 1/2] soc: fsl: qbman: qman_portal: defer probing when qman
- is not available
-In-Reply-To: <DB6PR0402MB27276B417034E7356B0CFA5886360@DB6PR0402MB2727.eurprd04.prod.outlook.com>
-References: <20180823213600.23426-1-alexandre.belloni@bootlin.com>
- <DB6PR0402MB27276B417034E7356B0CFA5886360@DB6PR0402MB2727.eurprd04.prod.outlook.com>
-Message-ID: <CADRPPNRJFii=ybTVm=NMGMT8U02JKsjYsgA6PR52owK=Bc3cgA@mail.gmail.com>
+From: oss@buserror.net (Scott Wood)
+Date: Tue, 28 Aug 2018 19:18:50 -0500
+Subject: [PATCH 3/5] drivers: clk-qoriq: Add clockgen support for lx2160a
+In-Reply-To: <1534747636-20064-4-git-send-email-vabhav.sharma@nxp.com>
+References: <1534747636-20064-1-git-send-email-vabhav.sharma@nxp.com>
+ <1534747636-20064-4-git-send-email-vabhav.sharma@nxp.com>
+Message-ID: <4a9ea6b451683ec98c92e86a5ae6b91213a6afcf.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 24, 2018 at 9:54 AM Roy Pledge <roy.pledge@nxp.com> wrote:
->
-> On 8/23/2018 5:36 PM, Alexandre Belloni wrote:
-> > If the qman driver (qman_ccsr) doesn't probe or fail to probe before
-> > qman_portal, qm_ccsr_start will be either NULL or a stale pointer to an
-> > unmapped page.
-> >
-> > This leads to a crash when probing  qman_portal as the init_pcfg function
-> > calls qman_liodn_fixup that tries to read qman registers.
-> >
-> > Assume that qman didn't probe when the pool mask is 0.
-> >
-> > Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+On Mon, 2018-08-20 at 12:17 +0530, Vabhav Sharma wrote:
+> From: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
+> 
+> Add clockgen support for lx2160a.
+> Added entry for compat 'fsl,lx2160a-clockgen'.
+> As LX2160A is 16 core, so modified value for NUM_CMUX
+> 
+> Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
+> Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
+> Signed-off-by: Vabhav Sharma <vabhav.sharma@nxp.com>
+> ---
+>  drivers/clk/clk-qoriq.c         | 14 +++++++++++++-
+>  drivers/cpufreq/qoriq-cpufreq.c |  1 +
+>  2 files changed, 14 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/clk-qoriq.c b/drivers/clk/clk-qoriq.c
+> index 3a1812f..fc6e308 100644
+> --- a/drivers/clk/clk-qoriq.c
+> +++ b/drivers/clk/clk-qoriq.c
+> @@ -60,7 +60,7 @@ struct clockgen_muxinfo {
+>  };
+>  
+>  #define NUM_HWACCEL	5
+> -#define NUM_CMUX	8
+> +#define NUM_CMUX	16
+>  
+>  struct clockgen;
+>  
+> @@ -570,6 +570,17 @@ static const struct clockgen_chipinfo chipinfo[] = {
+>  		.flags = CG_VER3 | CG_LITTLE_ENDIAN,
+>  	},
+>  	{
+> +		.compat = "fsl,lx2160a-clockgen",
+> +		.cmux_groups = {
+> +			&clockgen2_cmux_cga12, &clockgen2_cmux_cgb
+> +		},
+> +		.cmux_to_group = {
+> +			0, 0, 0, 0, 1, 1, 1, 1, -1
+> +		},
+> +		.pll_mask = 0x37,
+> +		.flags = CG_VER3 | CG_LITTLE_ENDIAN,
+> +	},
 
-Series applied to the fix branch of soc/fsl.
+Why are you increasing NUM_CMUX beyond 8 for a chip that only has 8 entries in
+cmux_to_group?
 
-> > ---
-> >  drivers/soc/fsl/qbman/qman_portal.c | 2 ++
-> >  1 file changed, 2 insertions(+)
-> >
-> > diff --git a/drivers/soc/fsl/qbman/qman_portal.c b/drivers/soc/fsl/qbman/qman_portal.c
-> > index a120002b630e..4fc80d2c8feb 100644
-> > --- a/drivers/soc/fsl/qbman/qman_portal.c
-> > +++ b/drivers/soc/fsl/qbman/qman_portal.c
-> > @@ -277,6 +277,8 @@ static int qman_portal_probe(struct platform_device *pdev)
-> >       }
-> >
-> >       pcfg->pools = qm_get_pools_sdqcr();
-> > +     if (pcfg->pools == 0)
-> > +             return -EPROBE_DEFER;
-> >
-> >       spin_lock(&qman_lock);
-> >       cpu = cpumask_next_zero(-1, &portal_cpus);
->
-> Reviewed-by: Roy Pledge <roy.pledge@nxp.com>
->
->
+-Scott
