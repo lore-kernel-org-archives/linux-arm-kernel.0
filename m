@@ -1,37 +1,43 @@
 From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Wed, 29 Aug 2018 16:31:36 +0200
-Subject: [PATCH 00/11] MAINTAINERS: update of of some Microchip entries
-Message-ID: <cover.1535552609.git.nicolas.ferre@microchip.com>
+Date: Wed, 29 Aug 2018 16:31:39 +0200
+Subject: [PATCH 03/11] MAINTAINERS: media: change Microchip ISI,
+ ISC maintainers
+In-Reply-To: <cover.1535552609.git.nicolas.ferre@microchip.com>
+References: <cover.1535552609.git.nicolas.ferre@microchip.com>
+Message-ID: <f5c7302265c8d5df4398359f5056faedabfa0fb0.1535552609.git.nicolas.ferre@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+For ISC, Songjun is not with Microchip anymore, his address shouldn't be
+reachable.
+For ISI, Eugen can handle the maintenance now.
 
-This is an update of most of Microchip MAINTAINERS' entries. I took advantage
-of the addition of Ludovic as co-maintainer to go through some of the entries
-that were outdated.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+---
+ MAINTAINERS | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-There are moves of entries in the 3 last patches of this series. You can drop
-them if they introduce too much headaches while updating this MAINTAINERS
-file.
-
-Series based on v4.19-rc1.
-
-Nicolas Ferre (11):
-  MAINTAINERS: ARM: at91: add co-maintainer for ARM/Microchip
-  MAINTAINERS: update entry for Microchip NAND driver support
-  MAINTAINERS: media: change Microchip ISI, ISC maintainers
-  MAINTAINERS: ASoC: change maintainer for Microchip ALSA drivers
-  MAINTAINERS: USB: change maintainer for Microchip USBA gadget driver
-  MAINTAINERS: dmaengine: add files to Microchip dma entry
-  MAINTAINERS: pwm: add entry for Microchip pwm driver
-  MAINTAINERS: iio: add co-maintainer to SAMA5D2-compatible ADC driver
-  MAINTAINERS: remove the / ATMEL string from MICROCHIP entries
-  MAINTAINERS: move former ATMEL entries to proper MICROCHIP location
-  MAINTAINERS: sdhci: move the Microchip entry to proper location
-
- MAINTAINERS | 196 ++++++++++++++++++++++++++++------------------------
- 1 file changed, 105 insertions(+), 91 deletions(-)
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 43fa2ebb292e..6eaf54960c1c 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2494,7 +2494,7 @@ S:	Supported
+ F:	drivers/i2c/busses/i2c-at91.c
+ 
+ ATMEL ISI DRIVER
+-M:	Ludovic Desroches <ludovic.desroches@microchip.com>
++M:	Eugen Hristev <eugen.hristev@microchip.com>
+ L:	linux-media at vger.kernel.org
+ S:	Supported
+ F:	drivers/media/platform/atmel/atmel-isi.c
+@@ -9520,7 +9520,7 @@ S:	Maintained
+ F:	drivers/crypto/atmel-ecc.*
+ 
+ MICROCHIP / ATMEL ISC DRIVER
+-M:	Songjun Wu <songjun.wu@microchip.com>
++M:	Eugen Hristev <eugen.hristev@microchip.com>
+ L:	linux-media at vger.kernel.org
+ S:	Supported
+ F:	drivers/media/platform/atmel/atmel-isc.c
 -- 
 2.17.1
