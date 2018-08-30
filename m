@@ -1,87 +1,58 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 30 Aug 2018 20:02:05 +0200
-Subject: [PATCH v3] dt-bindings: arm: Explicitly mark Samsung Exynos SoC as
- unstable
-Message-ID: <20180830180205.18121-1-krzk@kernel.org>
+From: digetx@gmail.com (Dmitry Osipenko)
+Date: Thu, 30 Aug 2018 21:04:13 +0300
+Subject: [PATCH v3 0/8] Support Trusted Foundations firmware on Tegra30
+Message-ID: <20180830180421.6415-1-digetx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Samsung Exynos SoCs and boards related bindings evolved since the initial
-introduction, but initially the bindings were minimal and a bit incomplete
-(they never described all the hardware modules available in the SoCs).
-Since then some significant (not fully compatible) changes have been
-already committed a few times (like gpio replaced by pinctrl, display ddc,
-mfc reserved memory, some core clocks added to various hardware modules,
-added more required nodes).
+Hello,
 
-On the other side there are no boards which have device tree embedded in
-the bootloader. Device tree blob is always compiled from the kernel tree
-and updated together with the kernel image.
+All consumer-grade Tegra30 devices, like Nexus 7 tablet; Ouya console and
+others, use Trusted Foundations firmware that doesn't allow CPU to access
+secure registers directly from the Linux kernel, these accesses shall be
+done via the firmware calls. This patch-series adds a full-featured support
+of the Trusted Foundations firmware that opens the door for supporting of
+various Tegra30-based devices in the upstream Linux kernel.
 
-Thus to avoid further adding a bunch of workarounds for old/missing
-bindings, make development of new platforms easier and allow to make
-cleanup of the existing code and device tree files, lets mark some
-Samsung Exynos SoC platform bindings as unstable. This means that
-bindings can may change at any time and users should use the dtb file
-compiled from the same kernel source tree as the kernel image.
+Changelog:
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-[krzk: Explicitly list unstable bindings instead of marking entire
-Exynos]
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+v3:	- Implemented suspend-resume support.
 
----
+	- Reworked arm/firmware/trusted_foundations.c a tad. Now cache
+	  is getting properly initialized, cache enabling / disabling is
+	  supported.
 
-Changes since v2:
-1. Add tags.
+v2:
+	- The "Don't apply CPU erratas in insecure mode" patch got some
+	  cleanup, in particular resolved the messiness in
+	  __tegra_cpu_reset_handler_data.
 
-Changes since v1:
-1. Rebase
-2. Add specific compatibles to mark unstable.
+	- Added a comment to tf_cache_write_sec(), justifying the warning
+	  message.
 
-v1 is here:
-https://patchwork.kernel.org/patch/9477963/
+Dmitry Osipenko (8):
+  ARM: trusted_foundations: Implement L2 cache initialization callback
+  ARM: trusted_foundations: Make prepare_idle call to take mode argument
+  ARM: trusted_foundations: Provide information about whether firmware
+    is registered
+  ARM: tegra: Setup L2 cache using Trusted Foundations firmware
+  ARM: tegra: Don't apply CPU erratas in insecure mode
+  ARM: tegra: Always boot CPU in ARM-mode
+  ARM: tegra: Support L2 cache maintenance done via firmware
+  ARM: tegra: Add firmware calls required for suspend-resume
 
-Previous tags (not applying due to change in contents):
-Reviewed-by: Pankaj Dubey <pankaj.dubey@samsung.com>
----
- .../devicetree/bindings/arm/samsung/exynos.txt     | 26 ++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/samsung/exynos.txt
+ arch/arm/firmware/trusted_foundations.c    | 80 +++++++++++++++++++++-
+ arch/arm/include/asm/firmware.h            |  2 +-
+ arch/arm/include/asm/trusted_foundations.h | 13 ++++
+ arch/arm/mach-tegra/cpuidle-tegra114.c     |  3 +-
+ arch/arm/mach-tegra/pm.c                   | 43 ++++++++++++
+ arch/arm/mach-tegra/reset-handler.S        | 66 ++++++++++++++----
+ arch/arm/mach-tegra/reset.c                |  3 +
+ arch/arm/mach-tegra/reset.h                |  9 ++-
+ arch/arm/mach-tegra/sleep-tegra20.S        |  4 ++
+ arch/arm/mach-tegra/sleep.S                |  4 ++
+ arch/arm/mach-tegra/tegra.c                | 10 +++
+ 11 files changed, 216 insertions(+), 21 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos.txt b/Documentation/devicetree/bindings/arm/samsung/exynos.txt
-new file mode 100644
-index 000000000000..7410cb79e4b2
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/samsung/exynos.txt
-@@ -0,0 +1,26 @@
-+Samsung Exynos SoC Family Device Tree Bindings
-+---------------------------------------------------------------
-+
-+Work in progress statement:
-+
-+Following Device Tree files and bindings applying to Samsung Exynos SoCs and
-+boards are considered "unstable":
-+
-+ - samsung,exynos5433* (all compatibles related to Exynos5433)
-+ - samsung,exynos7* (all compatibles related to Exynos7)
-+ - samsung,tm2-audio
-+ - samsung,mfc-v10
-+ - samsung,exynos*-mipi-dsi
-+ - samsung,exynos5-dp
-+ - samsung,exynos*-hdmi
-+ - samsung,exynos*-hdmiddc
-+ - samsung,exynos*-hdmiphy
-+ - samsung,exynos*-mixer
-+ - samsung,exynos*-fimd
-+
-+Any Samsung Exynos device tree binding mentioned may change at any time. Be
-+sure to use a device tree binary and a kernel image generated from the same
-+source tree.
-+
-+Please refer to Documentation/devicetree/bindings/ABI.txt for a definition of a
-+stable binding/ABI.
 -- 
-2.14.1
+2.18.0
