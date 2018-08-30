@@ -1,41 +1,41 @@
-From: baicar.tyler@gmail.com (Tyler Baicar)
-Date: Thu, 30 Aug 2018 15:18:04 -0400
-Subject: [PATCH v2] EDAC, ghes: use CPER module handles to locate DIMMs
-In-Reply-To: <1535654266-40053-1-git-send-email-wufan@codeaurora.org>
-References: <1535654266-40053-1-git-send-email-wufan@codeaurora.org>
-Message-ID: <CABo9ajCui0y9HMBzgKWeNtrbu4de+mLh=d9Qdkyo4zhU9az6hw@mail.gmail.com>
+From: jacek.anaszewski@gmail.com (Jacek Anaszewski)
+Date: Thu, 30 Aug 2018 21:20:18 +0200
+Subject: [PATCH] leds: add TI LMU backlight driver
+In-Reply-To: <20180830082219.GA10133@amd>
+References: <20180829212032.GB15786@amd> <20180830082219.GA10133@amd>
+Message-ID: <c72eb0ff-b54c-4670-580c-e31625b3c275@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fan,
+Hi Pavel,
 
-On Thu, Aug 30, 2018 at 2:37 PM, Fan Wu <wufan@codeaurora.org> wrote:
-> For platforms whose firmwares provide valid module handles
-> (SMBIOS type 17) in error records, this patch uses the module
-> handles to locate corresponding DIMMs and enables per-DIMM
-> error counter update.
->
-> Signed-off-by: Fan Wu <wufan@codeaurora.org>
+Thank you for the patch.
 
-> diff --git a/drivers/edac/ghes_edac.c b/drivers/edac/ghes_edac.c
-> index 473aeec..949f603 100644
-> --- a/drivers/edac/ghes_edac.c
-> +++ b/drivers/edac/ghes_edac.c
-> @@ -81,6 +81,20 @@ static void ghes_edac_count_dimms(const struct dmi_header *dh, void *arg)
->                 (*num_dimm)++;
->  }
->
-> +static int get_dimm_smbios_index(u16 handle)
-> +{
-> +       struct mem_ctl_info *mci;
-> +       int i;
-> +
-> +       mci = ghes_pvt->mci;
-> +
+Looking for DT bindings I can find the following
 
-Minor nit: you could define and set mci in the same line to save some
-space here.
+Documentation/devicetree/bindings/mfd/ti-lmu.txt,
 
-Otherwise this patch looks good to me.
+which for LED bindings redirects to:
 
-Reviewed-by: Tyler Baicar <baicar.tyler@gmail.com>
+"[2] ../leds/leds-lm3633.txt",
+
+but it is not present in the mainline.
+
+Best regards,
+Jacek Anaszewski
+
+On 08/30/2018 10:22 AM, Pavel Machek wrote:
+> 
+> This adds backlight support for the following TI LMU
+> chips: LM3532, LM3631, LM3632, LM3633, LM3695 and LM3697.
+> 
+> It controls LEDs on Droid 4
+> smartphone, including keyboard and screen backlights.
+> 
+> Signed-off-by: Milo Kim <milo.kim@ti.com>
+> [add LED subsystem support for keyboard backlight and rework DT
+> binding according to Rob Herrings feedback]
+> Signed-off-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
+> [remove backlight subsystem support for now]
+> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+[...]
