@@ -1,113 +1,211 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 30 Aug 2018 17:25:00 +0100
-Subject: A crash on ARM64 in move_freepages_block due to uninitialized
- pages in reserved memory
-In-Reply-To: <alpine.LRH.2.02.1808301148260.18300@file01.intranet.prod.int.rdu2.redhat.com>
-References: <alpine.LRH.2.02.1808171527220.2385@file01.intranet.prod.int.rdu2.redhat.com>
- <20180821104418.GA16611@dhcp22.suse.cz>
- <e35b7c14-c7ea-412d-2763-c961b74576f3@arm.com>
- <alpine.LRH.2.02.1808220808050.17906@file01.intranet.prod.int.rdu2.redhat.com>
- <c823eace-8710-9bf5-6e76-d01b139c0859@arm.com>
- <20180824114158.GJ29735@dhcp22.suse.cz>
- <541193a6-2bce-f042-5bb2-88913d5f1047@arm.com>
- <alpine.LRH.2.02.1808301148260.18300@file01.intranet.prod.int.rdu2.redhat.com>
-Message-ID: <27f10f29-8e38-1f42-8431-9db66aed2d1e@arm.com>
+From: megous@megous.com (=?utf-8?Q?Ond=C5=99ej?= Jirman)
+Date: Thu, 30 Aug 2018 18:27:34 +0200
+Subject: [linux-sunxi] [PATCH v3 21/30] iio: adc: sun4i-gpadc-iio: add
+ support for H3 thermal sensor
+In-Reply-To: <20180830154518.29507-22-embed3d@gmail.com>
+References: <20180830154518.29507-1-embed3d@gmail.com>
+ <20180830154518.29507-22-embed3d@gmail.com>
+Message-ID: <20180830162734.uq65l6ox6uwrmulo@core>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mikulas,
+Hello,
 
-On 30/08/18 16:58, Mikulas Patocka wrote:
-> On Wed, 29 Aug 2018, James Morse wrote:
->> On 24/08/18 12:41, Michal Hocko wrote:
->>> On Thu 23-08-18 15:06:08, James Morse wrote:
->>> [...]
->>>> My best-guess is that pfn_valid_within() shouldn't be optimised out if
->>> ARCH_HAS_HOLES_MEMORYMODEL, even if HOLES_IN_ZONE isn't set.
->>>>
->>>> Does something like this solve the problem?:
->>>> ============================%<============================
->>>> diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
->>>> index 32699b2dc52a..5e27095a15f4 100644
->>>> --- a/include/linux/mmzone.h
->>>> +++ b/include/linux/mmzone.h
->>>> @@ -1295,7 +1295,7 @@ void memory_present(int nid, unsigned long start, unsigned
->>>> long end);
->>>>   * pfn_valid_within() should be used in this case; we optimise this away
->>>>   * when we have no holes within a MAX_ORDER_NR_PAGES block.
->>>>   */
->>>> -#ifdef CONFIG_HOLES_IN_ZONE
->>>> +#if defined(CONFIG_HOLES_IN_ZONE) || defined(CONFIG_ARCH_HAS_HOLES_MEMORYMODEL)
->>>>  #define pfn_valid_within(pfn) pfn_valid(pfn)
->>>>  #else
->>>>  #define pfn_valid_within(pfn) (1)
->>>> ============================%<============================
->>
->> After plenty of greping, git-archaeology and help from others, I think I've a
->> clearer picture of what these options do.
->>
->>
->> Please correct me if I've explained something wrong here:
->>
->>> This is the first time I hear about CONFIG_ARCH_HAS_HOLES_MEMORYMODEL.
->>
->> The comment in include/linux/mmzone.h describes this as relevant when parts the
->> memmap have been free()d. This would happen on systems where memory is smaller
->> than a sparsemem-section, and the extra struct pages are expensive.
->> pfn_valid() on these systems returns true for the whole sparsemem-section, so an
->> extra memmap_valid_within() check is needed.
->>
->> This is independent of nomap, and isn't relevant on arm64 as our pfn_valid()
->> always tests the page in memblock due to nomap pages, which can occur anywhere.
->> (I will propose a patch removing ARCH_HAS_HOLES_MEMORYMODEL for arm64.)
->>
->>
->> HOLES_IN_ZONE is similar, if some memory is smaller than MAX_ORDER_NR_PAGES,
->> possibly due to nomap holes.
->>
->> 6d526ee26ccd only enabled it for NUMA systems on arm64, because the NUMA code
->> was first to fall foul of this, but there is nothing NUMA specific about nomap
->> holes within a MAX_ORDER_NR_PAGES region.
->>
->> I'm convinced arm64 should always enable HOLES_IN_ZONE because nomap pages can
->> occur anywhere. I'll post a fix.
+On Thu, Aug 30, 2018 at 05:45:09PM +0200, Philipp Rossak wrote:
+> This patch adds support for the H3 ths sensor.
 > 
-> But x86 had the same bug -
-> https://bugzilla.redhat.com/show_bug.cgi?id=1598462
+> The H3 supports interrupts. The interrupt is configured to update the
+> the sensor values every second. The calibration data is writen at the
+> begin of the init process.
+> 
+> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+> ---
+>  drivers/iio/adc/sun4i-gpadc-iio.c   | 91 +++++++++++++++++++++++++++++++++++++
+>  include/linux/iio/adc/sun4i-gpadc.h | 18 ++++++++
+>  2 files changed, 109 insertions(+)
+> 
+> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
+> index c7b46c82e3e5..d5c7971b2558 100644
+> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
+> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
+> @@ -72,6 +72,7 @@ struct gpadc_data {
+>  	u32		temp_data_base;
+>  	int		sensor_count;
+>  	bool		supports_nvmem;
+> +	u32		ths_irq_clear;
+>  };
+>  
+>  static irqreturn_t sun4i_gpadc_data_irq_handler(int irq, void *dev_id);
+> @@ -79,6 +80,10 @@ static irqreturn_t sun4i_gpadc_data_irq_handler(int irq, void *dev_id);
+>  static int sun4i_ths_resume(struct sun4i_gpadc_iio *info);
+>  static int sun4i_ths_suspend(struct sun4i_gpadc_iio *info);
+>  
+> +static int sun8i_h3_ths_resume(struct sun4i_gpadc_iio *info);
+> +static int sun8i_h3_ths_suspend(struct sun4i_gpadc_iio *info);
+> +static irqreturn_t sunx8i_h3_irq_thread(int irq, void *data);
+> +
+>  static const struct gpadc_data sun4i_gpadc_data = {
+>  	.temp_offset = -1932,
+>  	.temp_scale = 133,
+> @@ -137,6 +142,22 @@ static const struct gpadc_data sun8i_a33_gpadc_data = {
+>  	.sensor_count = 1,
+>  };
+>  
+> +static const struct gpadc_data sun8i_h3_ths_data = {
+> +	.temp_offset = -1791,
+> +	.temp_scale = -121,
+> +	.temp_data_base = SUN8I_H3_THS_TDATA0,
+> +	.ths_irq_thread = sunx8i_h3_irq_thread,
+> +	.support_irq = true,
+> +	.has_bus_clk = true,
+> +	.has_bus_rst = true,
+> +	.has_mod_clk = true,
+> +	.sensor_count = 1,
+> +	.supports_nvmem = true,
+> +	.ths_resume = sun8i_h3_ths_resume,
+> +	.ths_suspend = sun8i_h3_ths_suspend,
+> +	.ths_irq_clear = SUN8I_H3_THS_INTS_TDATA_IRQ_0,
+> +};
+> +
+>  struct sun4i_sensor_tzd {
+>  	struct sun4i_gpadc_iio		*info;
+>  	struct thermal_zone_device	*tzd;
+> @@ -409,6 +430,31 @@ static irqreturn_t sun4i_gpadc_data_irq_handler(int irq, void *dev_id)
+>  	return IRQ_HANDLED;
+>  }
+>  
+> +static irqreturn_t sunx8i_h3_irq_thread(int irq, void *data)
+> +{
+> +	struct sun4i_gpadc_iio *info = data;
+> +	int i;
+> +
+> +	regmap_write(info->regmap, SUN8I_H3_THS_STAT,
+> +			info->data->ths_irq_clear);
+> +
+> +	for (i = 0; i < info->data->sensor_count; i++)
+> +		thermal_zone_device_update(info->tzds[i].tzd,
+> +						THERMAL_EVENT_TEMP_SAMPLE);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static int sun8i_h3_calibrate(struct sun4i_gpadc_iio *info)
+> +{
+> +//	regmap_write(info->regmap, SUNXI_THS_CDATA_0_1,
+> +//			info->calibration_data[0]);
+> +//	regmap_write(info->regmap, SUNXI_THS_CDATA_2_3,
+> +//			info->calibration_data[1]);
 
-(Context: e181ae0c5db "mm: zero unavailable pages before memmap init")
+This should probably be implemented, or left out completely.
 
-Its the same symptom, but not quite the same bug.
+regards,
+  o.
 
-
-> And x86 fixed it without enabling HOLES_IN_ZONE. On x86, the BIOS can also 
-> reserve any memory range - so you can have arbitrary holes there that are 
-> not predictable when the kernel is compiled.
-
-x86's pfn_valid() says the struct-page is accessible, the problem was it wasn't
-initialized correctly.
-
-On arm64 pfn_valid() says these struct-pages are not accessible. The problem was
-the pfn_valid_within()->pfn_valid() calls being removed, causing the
-uninitialized struct-page to be accessed.
-
-
-> Currently HOLES_IN_ZONE is selected only for ia64, mips/octeon - so does 
-> it mean that all the other architectures don't have holes in the memory 
-> map?
-
-I think there is just more than way of handling these, depending on whether
-holes have struct-pages and what pfn_valid() reports for them.
-
-
-> What should be architecture-independent way how to handle the holes?
-
-We already diverge with e820/memblock. I'm not sure what the x86 holes
-correspond to, but on arm64 these are holes in the linear-map because the
-corresponding memory needs mapping with particular attributes, and we can't
-mix-and-match.
-
-
-Thanks,
-
-James
+> +	return 0;
+> +}
+> +
+>  static int sun4i_gpadc_runtime_suspend(struct device *dev)
+>  {
+>  	struct sun4i_gpadc_iio *info = iio_priv(dev_get_drvdata(dev));
+> @@ -428,6 +474,16 @@ static int sun4i_ths_suspend(struct sun4i_gpadc_iio *info)
+>  	return 0;
+>  }
+>  
+> +static int sun8i_h3_ths_suspend(struct sun4i_gpadc_iio *info)
+> +{
+> +	/* Disable ths interrupt */
+> +	regmap_write(info->regmap, SUN8I_H3_THS_INTC, 0x0);
+> +	/* Disable temperature sensor */
+> +	regmap_write(info->regmap, SUN8I_H3_THS_CTRL2, 0x0);
+> +
+> +	return 0;
+> +}
+> +
+>  static int sun4i_gpadc_runtime_resume(struct device *dev)
+>  {
+>  	struct sun4i_gpadc_iio *info = iio_priv(dev_get_drvdata(dev));
+> @@ -454,6 +510,37 @@ static int sun4i_ths_resume(struct sun4i_gpadc_iio *info)
+>  	return 0;
+>  }
+>  
+> +static int sun8i_h3_ths_resume(struct sun4i_gpadc_iio *info)
+> +{
+> +	u32 value;
+> +
+> +	sun8i_h3_calibrate(info);
+> +
+> +	regmap_write(info->regmap, SUN8I_H3_THS_CTRL0,
+> +			SUN4I_GPADC_CTRL0_T_ACQ(0xff));
+> +
+> +	regmap_write(info->regmap, SUN8I_H3_THS_CTRL2,
+> +			SUN8I_H3_THS_ACQ1(0x3f));
+> +
+> +	regmap_write(info->regmap, SUN8I_H3_THS_STAT,
+> +			SUN8I_H3_THS_INTS_TDATA_IRQ_0);
+> +
+> +	regmap_write(info->regmap, SUN8I_H3_THS_FILTER,
+> +			SUN4I_GPADC_CTRL3_FILTER_EN |
+> +			SUN4I_GPADC_CTRL3_FILTER_TYPE(0x2));
+> +
+> +	regmap_write(info->regmap, SUN8I_H3_THS_INTC,
+> +			SUN8I_H3_THS_INTC_TDATA_IRQ_EN0 |
+> +			SUN8I_H3_THS_TEMP_PERIOD(0x55));
+> +
+> +	regmap_read(info->regmap, SUN8I_H3_THS_CTRL2, &value);
+> +
+> +	regmap_write(info->regmap, SUN8I_H3_THS_CTRL2,
+> +			SUN8I_H3_THS_TEMP_SENSE_EN0 | value);
+> +
+> +	return 0;
+> +}
+> +
+>  static int sun4i_gpadc_get_temp(void *data, int *temp)
+>  {
+>  	struct sun4i_sensor_tzd *tzd = data;
+> @@ -497,6 +584,10 @@ static const struct of_device_id sun4i_gpadc_of_id[] = {
+>  		.compatible = "allwinner,sun6i-a31-gpadc",
+>  		.data = &sun6i_gpadc_data
+>  	},
+> +	{
+> +		.compatible = "allwinner,sun8i-h3-ths",
+> +		.data = &sun8i_h3_ths_data,
+> +	},
+>  	{ /* sentinel */ }
+>  };
+>  
+> diff --git a/include/linux/iio/adc/sun4i-gpadc.h b/include/linux/iio/adc/sun4i-gpadc.h
+> index 99feeba28105..169b4de9a34d 100644
+> --- a/include/linux/iio/adc/sun4i-gpadc.h
+> +++ b/include/linux/iio/adc/sun4i-gpadc.h
+> @@ -100,6 +100,24 @@
+>  }
+>  
+>  /* SUNXI_THS COMMON REGISTERS + DEFINES */
+> +#define SUN8I_H3_THS_CTRL0				0x00
+> +
+> +#define SUN8I_H3_THS_CTRL2				0x40
+> +#define SUN8I_H3_THS_ACQ1(x)			(GENMASK(31, 16) & ((x) << 16))
+> +#define SUN8I_H3_THS_TEMP_SENSE_EN0			BIT(0)
+> +
+> +#define SUN8I_H3_THS_INTC				0x44
+> +#define SUN8I_H3_THS_TEMP_PERIOD(x)		(GENMASK(31, 12) & ((x) << 12))
+> +#define SUN8I_H3_THS_INTC_TDATA_IRQ_EN0			BIT(8)
+> +
+> +#define SUN8I_H3_THS_STAT				0x48
+> +#define SUN8I_H3_THS_INTS_TDATA_IRQ_0			BIT(8)
+> +
+> +#define SUN8I_H3_THS_FILTER				0x70
+> +#define SUNXI_THS_CDATA_0_1				0x74
+> +#define SUNXI_THS_CDATA_2_3				0x78
+> +#define SUN8I_H3_THS_TDATA0				0x80
+> +
+>  #define MAX_SENSOR_COUNT				4
+>  
+>  #endif
+> -- 
+> 2.11.0
+> 
+> -- 
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
