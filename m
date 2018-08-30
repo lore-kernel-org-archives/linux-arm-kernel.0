@@ -1,38 +1,54 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Thu, 30 Aug 2018 21:01:13 +0200
-Subject: [PATCH v4 06/13] dt-bindings: ata: update ahci_sunxi bindings
+Date: Thu, 30 Aug 2018 21:01:16 +0200
+Subject: [PATCH v4 09/13] ARM: dts: sun8i: r40: add sata node
 In-Reply-To: <20180830190120.722-1-clabbe.montjoie@gmail.com>
 References: <20180830190120.722-1-clabbe.montjoie@gmail.com>
-Message-ID: <20180830190120.722-7-clabbe.montjoie@gmail.com>
+Message-ID: <20180830190120.722-10-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since phy code is moved from ahci_sunxi to a dedicated driver, the
-binding need to be updated with the new phy node requirement.
+R40 have a sata controller which is the same as A20.
+This patch adds a DT node for it.
 
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- Documentation/devicetree/bindings/ata/ahci-platform.txt | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/sun8i-r40.dtsi | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-index f495774c8af9..aa6f4c745097 100644
---- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
-+++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-@@ -50,6 +50,14 @@ And at least one of the following properties:
- - phys		    : reference to the SATA PHY node
- - target-supply     : regulator for SATA target power
+diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
+index 852c2ccc3268..d6b5820da850 100644
+--- a/arch/arm/boot/dts/sun8i-r40.dtsi
++++ b/arch/arm/boot/dts/sun8i-r40.dtsi
+@@ -550,6 +550,29 @@
+ 			#size-cells = <0>;
+ 		};
  
-+Required properties for:
-+* allwinner,sun4i-a10-ahci
-+* allwinner,sun8i-r40-ahci
-+A port sub-node must be present and linked to a sata_phy.
++		ahci: sata at 1c18000 {
++			compatible = "allwinner,sun8i-r40-ahci";
++			reg = <0x01c18000 0x1000>;
++			interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_SATA>, <&ccu CLK_SATA>;
++			resets = <&ccu RST_BUS_SATA>;
++			resets-name = "ahci";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
 +
-+Required properties for allwinner,sun8i-r40-ahci
-+The reset and ahci-supply properties must be present.
++			sata_port: sata-port at 0 {
++				reg = <0>;
++				phys = <&sata_phy>;
++			};
++		};
 +
- Examples:
-         sata at ffe08000 {
- 		compatible = "snps,spear-ahci";
++		sata_phy: sata-phy at 1c180c0  {
++			compatible = "allwinner,sun8i-r40-sata-phy";
++			reg = <0x1c180c0 0x200>;
++			#phy-cells = <0>;
++		};
++
+ 		gmac: ethernet at 1c50000 {
+ 			compatible = "allwinner,sun8i-r40-gmac";
+ 			syscon = <&ccu>;
 -- 
 2.16.4
