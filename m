@@ -1,33 +1,43 @@
-From: leoyang.li@nxp.com (Li Yang)
-Date: Thu, 30 Aug 2018 12:04:48 -0500
-Subject: [PATCH] soc: fsl/qe: Use of_get_child_by_name helper
-In-Reply-To: <VI1PR04MB32475E7E36BA8467FC07B01D91080@VI1PR04MB3247.eurprd04.prod.outlook.com>
-References: <20180829200425.16435-1-robh@kernel.org>
- <VI1PR04MB32475E7E36BA8467FC07B01D91080@VI1PR04MB3247.eurprd04.prod.outlook.com>
-Message-ID: <CADRPPNTWQP7kgB8O4LJ67H237z=o8KEscT0i7nveNVFvodb+AA@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 31 Aug 2018 01:05:12 +0800
+Subject: [PATCH v5 5/5] arm64: dts: actions: Add pinctrl node for Actions
+ Semi S700
+In-Reply-To: <20180829082413.2512005-6-sravanhome@gmail.com>
+References: <20180829082413.2512005-6-sravanhome@gmail.com>
+Message-ID: <201808302331.VZAH3yDm%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 29, 2018 at 9:49 PM Qiang Zhao <qiang.zhao@nxp.com> wrote:
->
-> From: Rob Herring <robh@kernel.org>
-> date: 2018/8/30 4:04
->
-> > To: Qiang Zhao <qiang.zhao@nxp.com>
-> > Cc: linux-kernel at vger.kernel.org; Leo Li <leoyang.li@nxp.com>;
-> > linuxppc-dev at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org
-> > Subject: [PATCH] soc: fsl/qe: Use of_get_child_by_name helper
-> >
-> > Use the of_get_child_by_name() helper instead of open coding searching for the
-> > 'firmware' child node. This removes directly accessing the name pointer as well.
-> >
-> > Cc: Qiang Zhao <qiang.zhao@nxp.com>
-> > Cc: Li Yang <leoyang.li@nxp.com>
-> > Cc: linuxppc-dev at lists.ozlabs.org
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Signed-off-by: Rob Herring <robh@kernel.org>
+Hi Saravanan,
 
-Merged for next.  Thanks.
+Thank you for the patch! Yet something to improve:
 
-Regards,
-Leo
+[auto build test ERROR on pinctrl/devel]
+[also build test ERROR on v4.19-rc1 next-20180830]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Saravanan-Sekar/Add-Actions-Semi-S700-pinctrl-support/20180830-134355
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git devel
+config: arm64-allmodconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
+
+All errors (new ones prefixed by >>):
+
+   Error: arch/arm64/boot/dts/actions/s700.dtsi:172.19-20 syntax error
+>> FATAL ERROR: Unable to parse input tree
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 60987 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180831/e87a9fb0/attachment-0001.gz>
