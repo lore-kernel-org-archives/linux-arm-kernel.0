@@ -1,35 +1,39 @@
 From: andreyknvl@google.com (Andrey Konovalov)
-Date: Thu, 30 Aug 2018 13:41:11 +0200
-Subject: [PATCH v6 06/11] arm64: untag user address in __do_user_fault
+Date: Thu, 30 Aug 2018 13:41:07 +0200
+Subject: [PATCH v6 02/11] uaccess: add untagged_addr definition for other
+ arches
 In-Reply-To: <cover.1535629099.git.andreyknvl@google.com>
 References: <cover.1535629099.git.andreyknvl@google.com>
-Message-ID: <b0f447bbf035a5b0a6cffa9035f1f922266a9f35.1535629099.git.andreyknvl@google.com>
+Message-ID: <bf96f9150ad04fc8db64ddc02fd81ec7568f5c39.1535629099.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In __do_user_fault the fault address is being compared to TASK_SIZE to
-find out whether the address lies in the kernel or in user space. Since
-the fault address is coming from a user it can be tagged.
+To allow arm64 syscalls accept tagged pointers from userspace, we must
+untag them when they are passed to the kernel. Since untagging is done in
+generic parts of the kernel, the untagged_addr macro needs to be defined
+for all architectures.
 
-Untag the pointer before comparing.
+Define it as a noop for other architectures besides arm64.
 
 Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
 ---
- arch/arm64/mm/fault.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ include/linux/uaccess.h | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 50b30ff30de4..871fb3c38b23 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -313,7 +313,7 @@ static void __do_user_fault(struct siginfo *info, unsigned int esr)
- 	 * type", so we ignore this wrinkle and just return the translation
- 	 * fault.)
- 	 */
--	if (current->thread.fault_address >= TASK_SIZE) {
-+	if (untagged_addr(current->thread.fault_address) >= TASK_SIZE) {
- 		switch (ESR_ELx_EC(esr)) {
- 		case ESR_ELx_EC_DABT_LOW:
- 			/*
+diff --git a/include/linux/uaccess.h b/include/linux/uaccess.h
+index efe79c1cdd47..c045b4eff95e 100644
+--- a/include/linux/uaccess.h
++++ b/include/linux/uaccess.h
+@@ -13,6 +13,10 @@
+ 
+ #include <asm/uaccess.h>
+ 
++#ifndef untagged_addr
++#define untagged_addr(addr) addr
++#endif
++
+ /*
+  * Architectures should provide two primitives (raw_copy_{to,from}_user())
+  * and get rid of their private instances of copy_{to,from}_user() and
 -- 
 2.19.0.rc0.228.g281dcd1b4d0-goog
