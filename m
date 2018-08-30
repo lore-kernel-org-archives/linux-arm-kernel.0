@@ -1,29 +1,49 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 29 Aug 2018 19:46:28 -0700 (PDT)
-Subject: [PATCH net-next 0/2] ethtool: drop get_settings and
- set_settings ops
-In-Reply-To: <cover.1535477409.git.mkubecek@suse.cz>
-References: <cover.1535477409.git.mkubecek@suse.cz>
-Message-ID: <20180829.194628.1640012269371401850.davem@davemloft.net>
+From: qiang.zhao@nxp.com (Qiang Zhao)
+Date: Thu, 30 Aug 2018 02:47:31 +0000
+Subject: [PATCH] soc: fsl/qe: Use of_get_child_by_name helper
+In-Reply-To: <20180829200425.16435-1-robh@kernel.org>
+References: <20180829200425.16435-1-robh@kernel.org>
+Message-ID: <VI1PR04MB32475E7E36BA8467FC07B01D91080@VI1PR04MB3247.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Michal Kubecek <mkubecek@suse.cz>
-Date: Tue, 28 Aug 2018 19:56:48 +0200 (CEST)
+From: Rob Herring <robh@kernel.org>
+date: 2018/8/30 4:04
 
-> As Andrew Lunn pointed out in recent discussion, there is only one in tree
-> driver left which still defines deprecated callbacks get_settings() and
-> set_settings() in ethtool_ops. First patch converts this driver to
-> get_link_ksettings() and set_link_ksettings(). Second patch then removes
-> the deprecated callbacks from struct ethtool_ops and ethtool code which
-> falls back to them.
+> To: Qiang Zhao <qiang.zhao@nxp.com>
+> Cc: linux-kernel at vger.kernel.org; Leo Li <leoyang.li@nxp.com>;
+> linuxppc-dev at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org
+> Subject: [PATCH] soc: fsl/qe: Use of_get_child_by_name helper
 > 
-> This doesn't break old versions of ethtool or any other userspace code
-> using ETHTOOL_{G,S}SET. We still implement both (old) ETHTOOL_{G,S}SET and
-> (new) ETHTOOL_{G,S}LINKSETTINGS ioctl commands but after this series both
-> will be implemented only using {g,s}et_link_ksettings(). The only affected
-> code would be out of tree NIC drivers which have not been converted yet.
+> Use the of_get_child_by_name() helper instead of open coding searching for the
+> 'firmware' child node. This removes directly accessing the name pointer as well.
+> 
+> Cc: Qiang Zhao <qiang.zhao@nxp.com>
+> Cc: Li Yang <leoyang.li@nxp.com>
+> Cc: linuxppc-dev at lists.ozlabs.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> ---
+>  drivers/soc/fsl/qe/qe.c | 6 +-----
+>  1 file changed, 1 insertion(+), 5 deletions(-)
+> 
+> diff --git a/drivers/soc/fsl/qe/qe.c b/drivers/soc/fsl/qe/qe.c index
+> 2ef6fc6487c1..612d9c551be5 100644
+> --- a/drivers/soc/fsl/qe/qe.c
+> +++ b/drivers/soc/fsl/qe/qe.c
+> @@ -588,11 +588,7 @@ struct qe_firmware_info *qe_get_firmware_info(void)
+>  	}
+> 
+>  	/* Find the 'firmware' child node */
+> -	for_each_child_of_node(qe, fw) {
+> -		if (strcmp(fw->name, "firmware") == 0)
+> -			break;
+> -	}
+> -
+> +	fw = of_get_child_by_name(qe, "firmware");
+>  	of_node_put(qe);
+> 
+>  	/* Did we find the 'firmware' node? */
+> --
 
-Nice, thanks for following up on this.
-
-Series applied.
+Acked-by: Qiang Zhao <qiang.zhao@nxp.com>
