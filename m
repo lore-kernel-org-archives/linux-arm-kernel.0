@@ -1,43 +1,33 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Aug 2018 17:15:41 +0100
-Subject: [PATCH 07/12] asm-generic/tlb: Guard with #ifdef CONFIG_MMU
-In-Reply-To: <1535645747-9823-1-git-send-email-will.deacon@arm.com>
-References: <1535645747-9823-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1535645747-9823-8-git-send-email-will.deacon@arm.com>
+Date: Thu, 30 Aug 2018 17:16:01 +0100
+Subject: [PATCH 1/7] arm64: Fix silly typo in comment
+In-Reply-To: <1535645767-9901-1-git-send-email-will.deacon@arm.com>
+References: <1535645767-9901-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1535645767-9901-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The inner workings of the mmu_gather-based TLB invalidation mechanism
-are not relevant to nommu configurations, so guard them with an #ifdef.
-This allows us to implement future functions using static inlines
-without breaking the build.
+I was passing through and figuered I'd fix this up:
+
+	featuer -> feature
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- include/asm-generic/tlb.h | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm64/include/asm/cpufeature.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/include/asm-generic/tlb.h b/include/asm-generic/tlb.h
-index b3353e21f3b3..a25e236f7a7f 100644
---- a/include/asm-generic/tlb.h
-+++ b/include/asm-generic/tlb.h
-@@ -20,6 +20,8 @@
- #include <asm/pgalloc.h>
- #include <asm/tlbflush.h>
- 
-+#ifdef CONFIG_MMU
-+
- #ifdef CONFIG_HAVE_RCU_TABLE_FREE
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 1717ba1db35d..9079715794af 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -262,7 +262,7 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
  /*
-  * Semi RCU freeing of the page directories.
-@@ -310,6 +312,8 @@ static inline void tlb_remove_check_page_size_change(struct mmu_gather *tlb,
- #endif
- #endif
- 
-+#endif /* CONFIG_MMU */
-+
- #define tlb_migrate_finish(mm) do {} while (0)
- 
- #endif /* _ASM_GENERIC__TLB_H */
+  * CPU feature detected at boot time based on system-wide value of a
+  * feature. It is safe for a late CPU to have this feature even though
+- * the system hasn't enabled it, although the featuer will not be used
++ * the system hasn't enabled it, although the feature will not be used
+  * by Linux in this case. If the system has enabled this feature already,
+  * then every late CPU must have it.
+  */
 -- 
 2.1.4
