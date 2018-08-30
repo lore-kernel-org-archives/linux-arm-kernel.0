@@ -1,73 +1,26 @@
-From: leoyang.li@nxp.com (Li Yang)
-Date: Thu, 30 Aug 2018 12:09:30 -0500
-Subject: [PATCH][v2] arm64: dts: remove big-endian filed from IFC
- controller
-In-Reply-To: <20180829032749.9309-1-prabhakar.kushwaha@nxp.com>
-References: <20180829032749.9309-1-prabhakar.kushwaha@nxp.com>
-Message-ID: <CADRPPNTPrEuE46UwGo=RrDYvxanY0mGo4EowMJNty==58HzKAw@mail.gmail.com>
+From: wufan@codeaurora.org (wufan)
+Date: Thu, 30 Aug 2018 11:11:27 -0600
+Subject: [PATCH] EDAC, ghes: use CPER module handles to locate DIMMs
+In-Reply-To: <CABo9ajDf09BHsq0NOs99NSD6zOV5N-CDvgvQrGi9p_wLjpJ24g@mail.gmail.com>
+References: <1535567632-18089-1-git-send-email-wufan@codeaurora.org>
+ <c70fa799-bc9f-64c8-e151-088ca8c3ed3e@arm.com>
+ <000f01d4406f$6ce8f160$46bad420$@codeaurora.org>
+ <1ac15a80-6f9a-cf9d-8e79-37d10549a4ca@arm.com>
+ <CABo9ajDf09BHsq0NOs99NSD6zOV5N-CDvgvQrGi9p_wLjpJ24g@mail.gmail.com>
+Message-ID: <001301d44084$7dc63730$7952a590$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2018 at 10:28 PM Prabhakar Kushwaha
-<prabhakar.kushwaha@nxp.com> wrote:
->
-> As per IFC binding, Absence of "little-endian" field causes registers
-> access in big-endian mode.
-> So no need to set explicit big-endian field IFC node for LS1043A and
-> LS1046A.
->
-> Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
+Hi Tyler, 
 
-Acked-by: Li Yang <leoyang.li@nxp.com>
+> > Is printing the handle to the kernel log critical?
+> >
+> 
+> I don't see why we would need this print. The bank/device print is enough to
+> map what is shown in dmesg to an SMBIOS entry if that's really needed.
 
-> ---
-> Changes for v2: Incorporated Leo's comments
->         - Remove new line between copyrights
->
->  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 2 +-
->  arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> index b9f5d2ff4ff2..68af84a8ade8 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> @@ -3,6 +3,7 @@
->   * Device Tree Include file for Freescale Layerscape-1043A family SoC.
->   *
->   * Copyright 2014-2015 Freescale Semiconductor, Inc.
-> + * Copyright 2018 NXP
->   *
->   * Mingkai Hu <Mingkai.hu@freescale.com>
->   */
-> @@ -280,7 +281,6 @@
->                 ifc: ifc at 1530000 {
->                         compatible = "fsl,ifc", "simple-bus";
->                         reg = <0x0 0x1530000 0x0 0x10000>;
-> -                       big-endian;
->                         interrupts = <0 43 0x4>;
->                 };
->
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-> index 65ce1c3cb568..ae4ca865131b 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-> @@ -3,6 +3,7 @@
->   * Device Tree Include file for Freescale Layerscape-1046A family SoC.
->   *
->   * Copyright 2016 Freescale Semiconductor, Inc.
-> + * Copyright 2018 NXP
->   *
->   * Mingkai Hu <mingkai.hu@nxp.com>
->   */
-> @@ -198,7 +199,6 @@
->                 ifc: ifc at 1530000 {
->                         compatible = "fsl,ifc", "simple-bus";
->                         reg = <0x0 0x1530000 0x0 0x10000>;
-> -                       big-endian;
->                         interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
->                 };
->
-> --
-> 2.14.1
->
+This change is mostly for convenience. I'll revert it since we have two votes
+against it now. 
+
+Thanks,
+Fan
