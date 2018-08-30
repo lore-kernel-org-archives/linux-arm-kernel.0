@@ -1,67 +1,35 @@
-From: eajames@linux.vnet.ibm.com (Eddie James)
-Date: Thu, 30 Aug 2018 10:40:21 -0500
-Subject: [PATCH 4/4] media: platform: Add Aspeed Video Engine driver
-In-Reply-To: <CAAEAJfBpmFPLTMAr+Azc-53JXHPkCU4bjtwqE6nDWUvm=J_x-A@mail.gmail.com>
-References: <1535576973-8067-1-git-send-email-eajames@linux.vnet.ibm.com>
- <1535576973-8067-5-git-send-email-eajames@linux.vnet.ibm.com>
- <CAAEAJfBpmFPLTMAr+Azc-53JXHPkCU4bjtwqE6nDWUvm=J_x-A@mail.gmail.com>
-Message-ID: <7cb0c2f0-cc12-81a6-a858-40776ec5904c@linux.vnet.ibm.com>
+From: embed3d@gmail.com (Philipp Rossak)
+Date: Thu, 30 Aug 2018 17:44:54 +0200
+Subject: [PATCH v3 06/30] iio: adc: remove ofnode options
+In-Reply-To: <20180830154518.29507-1-embed3d@gmail.com>
+References: <20180830154518.29507-1-embed3d@gmail.com>
+Message-ID: <20180830154518.29507-7-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Since we are merging the mfd dirver into the adc driver we don't need
+two different probing functions. Thus we remove the ofnode options
 
+Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+---
+ drivers/iio/adc/sun4i-gpadc-iio.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
-On 08/29/2018 07:52 PM, Ezequiel Garcia wrote:
-> Hi Eddie,
->
-> On 29 August 2018 at 18:09, Eddie James <eajames@linux.vnet.ibm.com> wrote:
->> The Video Engine (VE) embedded in the Aspeed AST2400 and AST2500 SOCs
->> can capture and compress video data from digital or analog sources. With
->> the Aspeed chip acting a service processor, the Video Engine can capture
->> the host processor graphics output.
->>
->> Add a V4L2 driver to capture video data and compress it to JPEG images,
->> making the data available through a standard read interface.
->>
->> Signed-off-by: Eddie James <eajames@linux.vnet.ibm.com>
->> ---
->>   drivers/media/platform/Kconfig        |    8 +
->>   drivers/media/platform/Makefile       |    1 +
->>   drivers/media/platform/aspeed-video.c | 1307 +++++++++++++++++++++++++++++++++
->>   3 files changed, 1316 insertions(+)
->>   create mode 100644 drivers/media/platform/aspeed-video.c
->>
->> diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
->> index 94c1fe0..e599245 100644
->> --- a/drivers/media/platform/Kconfig
->> +++ b/drivers/media/platform/Kconfig
->> @@ -32,6 +32,14 @@ source "drivers/media/platform/davinci/Kconfig"
->>
->>   source "drivers/media/platform/omap/Kconfig"
->>
->> +config VIDEO_ASPEED
->> +       tristate "Aspeed AST2400 and AST2500 Video Engine driver"
->> +       depends on VIDEO_V4L2
-> It seems you are not using videobuf2. I think it should simplify the read
-> I/O part and at the same time expose the other capture methods.
-
-Hi,
-
-Well I'm not sure it would simplify the read interface; it's quite 
-simple as it is, both in the driver and to set up in user-space.
-
-I did get streaming I/O working but found the performance significantly 
-worse than simple read calls, and therefore not worth the additional 
-complexity.
-
-Is it required that I support streaming?
-
-Thanks,
-Eddie
-
->
-> There are plenty of examples to follow.
->
-> Regards,
-> Eze
->
+diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
+index 666329940e1e..d6f00d3b802d 100644
+--- a/drivers/iio/adc/sun4i-gpadc-iio.c
++++ b/drivers/iio/adc/sun4i-gpadc-iio.c
+@@ -622,10 +622,7 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
+ 	indio_dev->info = &sun4i_gpadc_iio_info;
+ 	indio_dev->modes = INDIO_DIRECT_MODE;
+ 
+-	if (pdev->dev.of_node)
+-		ret = sun4i_gpadc_probe_dt(pdev, indio_dev);
+-	else
+-		ret = sun4i_gpadc_probe_mfd(pdev, indio_dev);
++	ret = sun4i_gpadc_probe_dt(pdev, indio_dev);
+ 
+ 	if (ret)
+ 		return ret;
+-- 
+2.11.0
