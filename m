@@ -1,60 +1,58 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Thu, 30 Aug 2018 17:44:53 +0200
-Subject: [PATCH v3 05/30] iio: adc: move SUN4I_GPADC_CHANNEL define to header
- file
+Date: Thu, 30 Aug 2018 17:44:57 +0200
+Subject: [PATCH v3 09/30] iio: adc: Threat A33 as thermal sensor and remove
+ non thermal sun4i channel
 In-Reply-To: <20180830154518.29507-1-embed3d@gmail.com>
 References: <20180830154518.29507-1-embed3d@gmail.com>
-Message-ID: <20180830154518.29507-6-embed3d@gmail.com>
+Message-ID: <20180830154518.29507-10-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are moving the SUN4I_GPADC_CHANNEL define to the header file.
+We want to use this driver mostly as thermal sensor, that still supports
+the adc for the older chips, thus we threat the A33 as thermal sensor.
+We also remove the adc channel without thermal support.
 
 Signed-off-by: Philipp Rossak <embed3d@gmail.com>
 ---
- drivers/iio/adc/sun4i-gpadc-iio.c | 9 ---------
- include/linux/mfd/sun4i-gpadc.h   | 9 +++++++++
- 2 files changed, 9 insertions(+), 9 deletions(-)
+ drivers/iio/adc/sun4i-gpadc-iio.c | 19 -------------------
+ 1 file changed, 19 deletions(-)
 
 diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-index d95dd0fde2a6..666329940e1e 100644
+index ab474ce86fb6..658a7e3e3370 100644
 --- a/drivers/iio/adc/sun4i-gpadc-iio.c
 +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-@@ -109,15 +109,6 @@ struct sun4i_gpadc_iio {
- 	struct device			*sensor_device;
+@@ -123,23 +123,6 @@ static const struct iio_chan_spec sun4i_gpadc_channels[] = {
+ 	},
  };
  
--#define SUN4I_GPADC_ADC_CHANNEL(_channel, _name) {		\
--	.type = IIO_VOLTAGE,					\
--	.indexed = 1,						\
--	.channel = _channel,					\
--	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),		\
--	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),	\
--	.datasheet_name = _name,				\
--}
+-static const struct iio_chan_spec sun4i_gpadc_channels_no_temp[] = {
+-	SUN4I_GPADC_ADC_CHANNEL(0, "adc_chan0"),
+-	SUN4I_GPADC_ADC_CHANNEL(1, "adc_chan1"),
+-	SUN4I_GPADC_ADC_CHANNEL(2, "adc_chan2"),
+-	SUN4I_GPADC_ADC_CHANNEL(3, "adc_chan3"),
+-};
 -
- static struct iio_map sun4i_gpadc_hwmon_maps[] = {
- 	{
- 		.adc_channel_label = "temp_adc",
-diff --git a/include/linux/mfd/sun4i-gpadc.h b/include/linux/mfd/sun4i-gpadc.h
-index 139872c2e0fe..54c7c9375c1b 100644
---- a/include/linux/mfd/sun4i-gpadc.h
-+++ b/include/linux/mfd/sun4i-gpadc.h
-@@ -90,6 +90,15 @@
- /* 10s delay before suspending the IP */
- #define SUN4I_GPADC_AUTOSUSPEND_DELAY			10000
+-static const struct iio_chan_spec sun8i_a33_gpadc_channels[] = {
+-	{
+-		.type = IIO_TEMP,
+-		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |
+-				      BIT(IIO_CHAN_INFO_SCALE) |
+-				      BIT(IIO_CHAN_INFO_OFFSET),
+-		.datasheet_name = "temp_adc",
+-	},
+-};
+-
+ static const struct regmap_config sun4i_gpadc_regmap_config = {
+ 	.reg_bits = 32,
+ 	.val_bits = 32,
+@@ -444,8 +427,6 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
+ 		return -ENODEV;
  
-+#define SUN4I_GPADC_ADC_CHANNEL(_channel, _name) {		\
-+	.type = IIO_VOLTAGE,					\
-+	.indexed = 1,						\
-+	.channel = _channel,					\
-+	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),		\
-+	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),	\
-+	.datasheet_name = _name,				\
-+}
-+
- struct sun4i_gpadc_dev {
- 	struct device			*dev;
- 	struct regmap			*regmap;
+ 	info->no_irq = true;
+-	indio_dev->num_channels = ARRAY_SIZE(sun8i_a33_gpadc_channels);
+-	indio_dev->channels = sun8i_a33_gpadc_channels;
+ 
+ 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	base = devm_ioremap_resource(&pdev->dev, mem);
 -- 
 2.11.0
