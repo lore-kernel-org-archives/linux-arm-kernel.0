@@ -1,25 +1,18 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 30 Aug 2018 14:26:49 +0200
-Subject: [PATCH] arm64: dts: renesas: r8a774a1: Add CAN nodes
-In-Reply-To: <20180827095335.poe5kwl6ca35ntrz@verge.net.au>
-References: <1535034166-24798-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <20180827095335.poe5kwl6ca35ntrz@verge.net.au>
-Message-ID: <20180830122649.smz2mjmunwav4o6i@verge.net.au>
+Date: Thu, 30 Aug 2018 14:28:08 +0200
+Subject: [PATCH 1/3] arm64: dts: renesas: r8a774a1: Add USB2.0 phy and
+ host(EHCI/OHCI) device nodes
+In-Reply-To: <1535107429-5458-2-git-send-email-biju.das@bp.renesas.com>
+References: <1535107429-5458-1-git-send-email-biju.das@bp.renesas.com>
+ <1535107429-5458-2-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <20180830122808.4eiaiedjpenm6u7k@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2018 at 11:53:35AM +0200, Simon Horman wrote:
-> On Thu, Aug 23, 2018 at 03:22:46PM +0100, Fabrizio Castro wrote:
-> > From: Chris Paterson <chris.paterson2@renesas.com>
-> > 
-> > Add the device nodes for both RZ/G2M CAN channels.
-> > 
-> > Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
-> > Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+On Fri, Aug 24, 2018 at 11:43:47AM +0100, Biju Das wrote:
+> Add USB2.0 phy and host (EHCI/OHCI) device nodes on RZ/G2M SoC dtsi.
 > 
-> Thanks,
-> 
-> This looks fine to me but I will wait to see if there are other reviews
-> before applying.
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-Thanks again, applied for v4.20.
+Thanks, applied for v4.20.
