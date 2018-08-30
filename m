@@ -1,87 +1,38 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Aug 2018 17:15:45 +0100
-Subject: [PATCH 11/12] arm64: tlb: Avoid synchronous TLBIs when freeing page
- tables
-In-Reply-To: <1535645747-9823-1-git-send-email-will.deacon@arm.com>
-References: <1535645747-9823-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1535645747-9823-12-git-send-email-will.deacon@arm.com>
+Date: Thu, 30 Aug 2018 17:16:03 +0100
+Subject: [PATCH 3/7] arm64: ssbd: Drop #ifdefs for PR_SPEC_STORE_BYPASS
+In-Reply-To: <1535645767-9901-1-git-send-email-will.deacon@arm.com>
+References: <1535645767-9901-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1535645767-9901-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By selecting HAVE_RCU_TABLE_INVALIDATE, we can rely on tlb_flush() being
-called if we fail to batch table pages for freeing. This in turn allows
-us to postpone walk-cache invalidation until tlb_finish_mmu(), which
-avoids lots of unnecessary DSBs and means we can shoot down the ASID if
-the range is large enough.
+Now that we're all merged nicely into mainline, there's no need to check
+to see if PR_SPEC_STORE_BYPASS is defined.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/Kconfig                |  1 +
- arch/arm64/include/asm/tlb.h      |  3 ---
- arch/arm64/include/asm/tlbflush.h | 11 -----------
- 3 files changed, 1 insertion(+), 14 deletions(-)
+ arch/arm64/kernel/ssbd.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 29e75b47becd..89059ee1eccc 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -142,6 +142,7 @@ config ARM64
- 	select HAVE_PERF_USER_STACK_DUMP
- 	select HAVE_REGS_AND_STACK_ACCESS_API
- 	select HAVE_RCU_TABLE_FREE
-+	select HAVE_RCU_TABLE_INVALIDATE
- 	select HAVE_RSEQ
- 	select HAVE_STACKPROTECTOR
- 	select HAVE_SYSCALL_TRACEPOINTS
-diff --git a/arch/arm64/include/asm/tlb.h b/arch/arm64/include/asm/tlb.h
-index b078fdec10d5..106fdc951b6e 100644
---- a/arch/arm64/include/asm/tlb.h
-+++ b/arch/arm64/include/asm/tlb.h
-@@ -54,7 +54,6 @@ static inline void tlb_flush(struct mmu_gather *tlb)
- static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
- 				  unsigned long addr)
- {
--	__flush_tlb_pgtable(tlb->mm, addr);
- 	pgtable_page_dtor(pte);
- 	tlb_remove_table(tlb, pte);
- }
-@@ -63,7 +62,6 @@ static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
- static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
- 				  unsigned long addr)
- {
--	__flush_tlb_pgtable(tlb->mm, addr);
- 	tlb_remove_table(tlb, virt_to_page(pmdp));
- }
- #endif
-@@ -72,7 +70,6 @@ static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
- static inline void __pud_free_tlb(struct mmu_gather *tlb, pud_t *pudp,
- 				  unsigned long addr)
- {
--	__flush_tlb_pgtable(tlb->mm, addr);
- 	tlb_remove_table(tlb, virt_to_page(pudp));
- }
- #endif
-diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
-index 37ccdb246b20..c98ed8871030 100644
---- a/arch/arm64/include/asm/tlbflush.h
-+++ b/arch/arm64/include/asm/tlbflush.h
-@@ -215,17 +215,6 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
-  * Used to invalidate the TLB (walk caches) corresponding to intermediate page
-  * table levels (pgd/pud/pmd).
+diff --git a/arch/arm64/kernel/ssbd.c b/arch/arm64/kernel/ssbd.c
+index 3432e5ef9f41..07b12c034ec2 100644
+--- a/arch/arm64/kernel/ssbd.c
++++ b/arch/arm64/kernel/ssbd.c
+@@ -11,9 +11,7 @@
+ 
+ /*
+  * prctl interface for SSBD
+- * FIXME: Drop the below ifdefery once merged in 4.18.
   */
--static inline void __flush_tlb_pgtable(struct mm_struct *mm,
--				       unsigned long uaddr)
--{
--	unsigned long addr = __TLBI_VADDR(uaddr, ASID(mm));
--
--	dsb(ishst);
--	__tlbi(vae1is, addr);
--	__tlbi_user(vae1is, addr);
--	dsb(ish);
--}
--
- static inline void __flush_tlb_kernel_pgtable(unsigned long kaddr)
+-#ifdef PR_SPEC_STORE_BYPASS
+ static int ssbd_prctl_set(struct task_struct *task, unsigned long ctrl)
  {
- 	unsigned long addr = __TLBI_VADDR(kaddr, 0);
+ 	int state = arm64_get_ssbd_state();
+@@ -107,4 +105,3 @@ int arch_prctl_spec_ctrl_get(struct task_struct *task, unsigned long which)
+ 		return -ENODEV;
+ 	}
+ }
+-#endif	/* PR_SPEC_STORE_BYPASS */
 -- 
 2.1.4
