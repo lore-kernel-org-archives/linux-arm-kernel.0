@@ -1,30 +1,32 @@
 From: mirq-linux@rere.qmqm.pl (=?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?=)
-Date: Thu, 30 Aug 2018 23:00:07 +0200
-Subject: [PATCH v2 05/12] drm/bochs: use simpler
+Date: Thu, 30 Aug 2018 23:00:08 +0200
+Subject: [PATCH v2 08/12] drm/radeon: use simpler
  remove_conflicting_pci_framebuffers()
 In-Reply-To: <cover.1535656077.git.mirq-linux@rere.qmqm.pl>
 References: <cover.1535656077.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <a290d295c473ebe7c9c78dd02133d8bfbb99504c.1535656077.git.mirq-linux@rere.qmqm.pl>
+Message-ID: <3b6a06b61458471bdecb40fa0af052a75d5a8222.1535656077.git.mirq-linux@rere.qmqm.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
+Acked-by: Alex Deucher <alexander.deucher@amd.com>
 Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
 ---
- drivers/gpu/drm/bochs/bochs_drv.c | 18 +-----------------
- 1 file changed, 1 insertion(+), 17 deletions(-)
+ drivers/gpu/drm/radeon/radeon_drv.c | 23 +----------------------
+ 1 file changed, 1 insertion(+), 22 deletions(-)
 
-diff --git a/drivers/gpu/drm/bochs/bochs_drv.c b/drivers/gpu/drm/bochs/bochs_drv.c
-index 7b20318483e4..c61b40c72b62 100644
---- a/drivers/gpu/drm/bochs/bochs_drv.c
-+++ b/drivers/gpu/drm/bochs/bochs_drv.c
-@@ -143,22 +143,6 @@ static const struct dev_pm_ops bochs_pm_ops = {
- /* ---------------------------------------------------------------------- */
- /* pci interface                                                          */
+diff --git a/drivers/gpu/drm/radeon/radeon_drv.c b/drivers/gpu/drm/radeon/radeon_drv.c
+index b28288a781ef..36c98a0ec991 100644
+--- a/drivers/gpu/drm/radeon/radeon_drv.c
++++ b/drivers/gpu/drm/radeon/radeon_drv.c
+@@ -311,27 +311,6 @@ static struct drm_driver kms_driver;
  
--static int bochs_kick_out_firmware_fb(struct pci_dev *pdev)
+ bool radeon_device_is_virtual(void);
+ 
+-static int radeon_kick_out_firmware_fb(struct pci_dev *pdev)
 -{
 -	struct apertures_struct *ap;
+-	bool primary = false;
 -
 -	ap = alloc_apertures(1);
 -	if (!ap)
@@ -32,21 +34,25 @@ index 7b20318483e4..c61b40c72b62 100644
 -
 -	ap->ranges[0].base = pci_resource_start(pdev, 0);
 -	ap->ranges[0].size = pci_resource_len(pdev, 0);
--	drm_fb_helper_remove_conflicting_framebuffers(ap, "bochsdrmfb", false);
+-
+-#ifdef CONFIG_X86
+-	primary = pdev->resource[PCI_ROM_RESOURCE].flags & IORESOURCE_ROM_SHADOW;
+-#endif
+-	drm_fb_helper_remove_conflicting_framebuffers(ap, "radeondrmfb", primary);
 -	kfree(ap);
 -
 -	return 0;
 -}
 -
- static int bochs_pci_probe(struct pci_dev *pdev,
- 			   const struct pci_device_id *ent)
+ static int radeon_pci_probe(struct pci_dev *pdev,
+ 			    const struct pci_device_id *ent)
  {
-@@ -171,7 +155,7 @@ static int bochs_pci_probe(struct pci_dev *pdev,
- 		return -ENOMEM;
- 	}
+@@ -341,7 +320,7 @@ static int radeon_pci_probe(struct pci_dev *pdev,
+ 		return -EPROBE_DEFER;
  
--	ret = bochs_kick_out_firmware_fb(pdev);
-+	ret = drm_fb_helper_remove_conflicting_pci_framebuffers(pdev, 0, "bochsdrmfb");
+ 	/* Get rid of things like offb */
+-	ret = radeon_kick_out_firmware_fb(pdev);
++	ret = drm_fb_helper_remove_conflicting_pci_framebuffers(pdev, 0, "radeondrmfb");
  	if (ret)
  		return ret;
  
