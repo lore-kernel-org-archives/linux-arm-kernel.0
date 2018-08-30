@@ -1,72 +1,43 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Thu, 30 Aug 2018 11:42:27 +0200
-Subject: [PATCH v4 06/20] arm64: Add a helper for PARange to physical
- shift conversion
-In-Reply-To: <1531905547-25478-7-git-send-email-suzuki.poulose@arm.com>
-References: <1531905547-25478-1-git-send-email-suzuki.poulose@arm.com>
- <1531905547-25478-7-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180830094227.GB4029@e113682-lin.lund.arm.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 30 Aug 2018 11:44:11 +0200
+Subject: Patch "asm-generic/bitops/lock.h: Rewrite using atomic_fetch_"
+ causes kernel crash
+In-Reply-To: <C2D7FE5348E1B147BCA15975FBA23075012B090BEA@us01wembx1.internal.synopsys.com>
+References: <1535567633.4465.23.camel@synopsys.com>
+ <C2D7FE5348E1B147BCA15975FBA23075012B090BEA@us01wembx1.internal.synopsys.com>
+Message-ID: <20180830094411.GX24124@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2018 at 10:18:49AM +0100, Suzuki K Poulose wrote:
-> On arm64, ID_AA64MMFR0_EL1.PARange encodes the maximum Physical
-> Address range supported by the CPU. Add a helper to decode this
-> to actual physical shift. If we hit an unallocated value, return
-> the maximum range supported by the kernel.
-> This will be used by KVM to set the VTCR_EL2.T0SZ, as it
-> is about to move its place. Having this helper keeps the code
-> movement cleaner.
+On Wed, Aug 29, 2018 at 09:16:43PM +0000, Vineet Gupta wrote:
+> On 08/29/2018 11:33 AM, Eugeniy Paltsev wrote:
+> > Hi Guys,
+> > Since v4.19-rc1 we are getting a serious regression on platforms with ARC architecture.
+> > The kernel have become unstable and spontaneously crashes on LTP tests execution / IO tests or
+> > even on boot.
+> >
+> > I don't know exactly what breaks but bisect clearly assign the blame to this commit:
+> > 84c6591103db ("locking/atomics, asm-generic/bitops/lock.h: Rewrite using atomic_fetch_*()")
+> > https://github.com/torvalds/linux/commit/84c6591103dbeaf393a092a3fc7b09510825f6b9
+> >
+> > Reverting the commit solves this problem.
+> >
+> > I tested v4.19-rc1 on ARM (wandboard, i.mx6, 32bit, quard core, ARMv7) which uses same
+> > generic bitops implementation and it works fine.
+> >
+> > Do you have any ideas what went wrong?
 > 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: James Morse <james.morse@arm.com>
-> Cc: Christoffer Dall <cdall@kernel.org>
-> Reviewed-by: Eric Auger <eric.auger@redhat.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
-> Changes since V2:
->  - Split the patch
->  - Limit the physical shift only for values unrecognized.
-> ---
->  arch/arm64/include/asm/cpufeature.h | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
+> Back in 2016, Peter had fixed this file due to a problem I reported on ARC. See
+> commit f75d48644c56a ("bitops: Do not default to __clear_bit() for
+> __clear_bit_unlock()")
+> That made __clear_bit_unlock() use the atomic clear_bit() vs. non-atomic
+> __clear_bit(), effectively making clear_bit_unlock() and __clear_bit_unlock() same.
 > 
-> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> index 1717ba1..855cf0e 100644
-> --- a/arch/arm64/include/asm/cpufeature.h
-> +++ b/arch/arm64/include/asm/cpufeature.h
-> @@ -530,6 +530,19 @@ void arm64_set_ssbd_mitigation(bool state);
->  static inline void arm64_set_ssbd_mitigation(bool state) {}
->  #endif
->  
-> +static inline u32 id_aa64mmfr0_parange_to_phys_shift(int parange)
-> +{
-> +	switch (parange) {
-> +	case 0: return 32;
-> +	case 1: return 36;
-> +	case 2: return 40;
-> +	case 3: return 42;
-> +	case 4: return 44;
-> +	case 5: return 48;
-> +	case 6: return 52;
-> +	default: return CONFIG_ARM64_PA_BITS;
+> This patch undoes that which could explain the issues you see. @Peter, @Will ?
 
-I don't understand this case?  Shouldn't this include at least a WARN()
-?
+Right, so the thinking is that on platforms that suffer that issue,
+atomic_set*() should DTRT. And if you look at your spinlock based atomic
+implementation, you'll note that atomic_set() does indeed do the right
+thing.
 
-Thanks,
-    Christoffer
-
-> +	}
-> +}
->  #endif /* __ASSEMBLY__ */
->  
->  #endif
-> -- 
-> 2.7.4
-> 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+arch/arc/include/asm/atomic.h:108
