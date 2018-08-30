@@ -1,58 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 30 Aug 2018 09:40:57 -0700
-Subject: [PATCH] leds: add TI LMU backlight driver
-In-Reply-To: <20180830082219.GA10133@amd>
-References: <20180829212032.GB15786@amd>
- <20180830082219.GA10133@amd>
-Message-ID: <20180830164057.GV7523@atomide.com>
+From: wufan@codeaurora.org (wufan)
+Date: Thu, 30 Aug 2018 10:45:03 -0600
+Subject: [PATCH] EDAC, ghes: use CPER module handles to locate DIMMs
+In-Reply-To: <1ac15a80-6f9a-cf9d-8e79-37d10549a4ca@arm.com>
+References: <1535567632-18089-1-git-send-email-wufan@codeaurora.org>
+ <c70fa799-bc9f-64c8-e151-088ca8c3ed3e@arm.com>
+ <000f01d4406f$6ce8f160$46bad420$@codeaurora.org>
+ <1ac15a80-6f9a-cf9d-8e79-37d10549a4ca@arm.com>
+Message-ID: <001101d44080$cd2a73d0$677f5b70$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [180830 08:26]:
-> This adds backlight support for the following TI LMU
-> chips: LM3532, LM3631, LM3632, LM3633, LM3695 and LM3697.
-...
-> +struct ti_lmu_bank {
-> +	struct device *dev;
-> +	int bank_id;
-> +	const struct ti_lmu_bl_cfg *cfg;
-> +	struct ti_lmu *lmu;
-> +	const char *label;
-> +	int leds;
-> +	int current_brightness;
-> +	u32 default_brightness;
-> +	u32 ramp_up_msec;
-> +	u32 ramp_down_msec;
-> +
-> +	struct notifier_block nb;
-> +
-> +	struct led_classdev *led;
-> +};
-> +
-> +static int ti_lmu_bl_enable(struct ti_lmu_bank *lmu_bank, bool enable)
-> +{
-> +	struct regmap *regmap = lmu_bank->lmu->regmap;
-> +	unsigned long enable_time = lmu_bank->cfg->reginfo->enable_usec;
-> +	u8 *reg = lmu_bank->cfg->reginfo->enable;
-> +	u8 mask = BIT(lmu_bank->bank_id);
-> +	u8 val = (enable == true) ? mask : 0;
-> +	int ret;
-> +
-> +	if (!reg)
-> +		return -EINVAL;
-> +
-> +	ret = regmap_update_bits(regmap, *reg, mask, val);
-> +	if (ret)
-> +		return ret;
-> +
-> +	if (enable_time > 0)
-> +		usleep_range(enable_time, enable_time + 100);
-> +
-> +	return 0;
-> +}
+Hi James,
 
-If it's a led driver, should you just s/ti_lmu_bl/ti_lmu_led/g?
+> > For ghes_edac the bank/device is informational, and nothing would go
+> > wrong if the bank/device numbers are the same as another entry. But
+> > the handle is now critical for DIMM lookup, thus pull it out.
+> 
+> Is printing the handle to the kernel log critical?
+> 
+> I'd expect something collecting errors to read from sysfs, not dmesg. I
+> thought the whole point here was to update the per-dimm counters in sysfs.
 
-Regards,
+No, printing out the handle is not critical. What I meant is because the 
+information is critical it would be nice to have it available for debugging 
+purpose. Otherwise it would be hard to find the handle if bank/device
+is not accurate. 
 
-Tony
+Thanks,
+Fan
