@@ -1,187 +1,142 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Aug 2018 17:16:02 +0100
-Subject: [PATCH 2/7] arm64: cpufeature: Detect SSBS and advertise to userspace
+Date: Thu, 30 Aug 2018 17:16:07 +0100
+Subject: [PATCH 7/7] arm64: cpu: Move errata and feature enable callbacks
+ closer to callers
 In-Reply-To: <1535645767-9901-1-git-send-email-will.deacon@arm.com>
 References: <1535645767-9901-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1535645767-9901-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1535645767-9901-8-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Armv8.5 introduces a new PSTATE bit known as Speculative Store Bypass
-Safe (SSBS) which can be used as a mitigation against Spectre variant 4.
+The cpu errata and feature enable callbacks are only called via their
+respective arm64_cpu_capabilities structure and therefore shouldn't
+exist in the global namespace.
 
-Additionally, a CPU may provide instructions to manipulate PSTATE.SSBS
-directly, so that userspace can toggle the SSBS control without trapping
-to the kernel.
-
-This patch probes for the existence of SSBS and advertise the new instructions
-to userspace if they exist.
+Move the PAN, RAS and cache maintenance emulation enable callbacks into
+the same files as their corresponding arm64_cpu_capabilities structures,
+making them static in the process.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/cpucaps.h    |  3 ++-
- arch/arm64/include/asm/sysreg.h     | 16 ++++++++++++----
- arch/arm64/include/uapi/asm/hwcap.h |  1 +
- arch/arm64/kernel/cpufeature.c      | 19 +++++++++++++++++--
- arch/arm64/kernel/cpuinfo.c         |  1 +
- 5 files changed, 33 insertions(+), 7 deletions(-)
+ arch/arm64/include/asm/processor.h |  4 ----
+ arch/arm64/kernel/cpu_errata.c     |  6 ++++++
+ arch/arm64/kernel/cpufeature.c     | 28 ++++++++++++++++++++++------
+ arch/arm64/kernel/traps.c          |  5 -----
+ arch/arm64/mm/fault.c              | 14 --------------
+ 5 files changed, 28 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index ae1f70450fb2..650d90462aec 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -51,7 +51,8 @@
- #define ARM64_SSBD				30
- #define ARM64_MISMATCHED_CACHE_TYPE		31
- #define ARM64_HAS_STAGE2_FWB			32
-+#define ARM64_SSBS				33
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index f6835374ed9f..2bf6691371c2 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -251,10 +251,6 @@ static inline void spin_lock_prefetch(const void *ptr)
  
--#define ARM64_NCAPS				33
-+#define ARM64_NCAPS				34
+ #endif
  
- #endif /* __ASM_CPUCAPS_H */
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index c1470931b897..2fc6242baf11 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -419,6 +419,7 @@
- #define SYS_ICH_LR15_EL2		__SYS__LR8_EL2(7)
+-void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused);
+-void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused);
+-void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused);
+-
+ extern unsigned long __ro_after_init signal_minsigstksz; /* sigframe size */
+ extern void __init minsigstksz_setup(void);
  
- /* Common SCTLR_ELx flags. */
-+#define SCTLR_ELx_DSSBS	(1UL << 44)
- #define SCTLR_ELx_EE    (1 << 25)
- #define SCTLR_ELx_IESB	(1 << 21)
- #define SCTLR_ELx_WXN	(1 << 19)
-@@ -439,7 +440,7 @@
- 			 (1 << 10) | (1 << 13) | (1 << 14) | (1 << 15) | \
- 			 (1 << 17) | (1 << 20) | (1 << 24) | (1 << 26) | \
- 			 (1 << 27) | (1 << 30) | (1 << 31) | \
--			 (0xffffffffUL << 32))
-+			 (0xffffefffUL << 32))
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index c063490d7b51..8900cb0615f8 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -433,6 +433,12 @@ static bool has_ssbd_mitigation(const struct arm64_cpu_capabilities *entry,
+ }
+ #endif	/* CONFIG_ARM64_SSBD */
  
- #ifdef CONFIG_CPU_BIG_ENDIAN
- #define ENDIAN_SET_EL2		SCTLR_ELx_EE
-@@ -453,7 +454,7 @@
- #define SCTLR_EL2_SET	(SCTLR_ELx_IESB   | ENDIAN_SET_EL2   | SCTLR_EL2_RES1)
- #define SCTLR_EL2_CLEAR	(SCTLR_ELx_M      | SCTLR_ELx_A    | SCTLR_ELx_C   | \
- 			 SCTLR_ELx_SA     | SCTLR_ELx_I    | SCTLR_ELx_WXN | \
--			 ENDIAN_CLEAR_EL2 | SCTLR_EL2_RES0)
-+			 SCTLR_ELx_DSSBS | ENDIAN_CLEAR_EL2 | SCTLR_EL2_RES0)
- 
- #if (SCTLR_EL2_SET ^ SCTLR_EL2_CLEAR) != 0xffffffffffffffff
- #error "Inconsistent SCTLR_EL2 set/clear bits"
-@@ -477,7 +478,7 @@
- 			 (1 << 29))
- #define SCTLR_EL1_RES0  ((1 << 6)  | (1 << 10) | (1 << 13) | (1 << 17) | \
- 			 (1 << 27) | (1 << 30) | (1 << 31) | \
--			 (0xffffffffUL << 32))
-+			 (0xffffefffUL << 32))
- 
- #ifdef CONFIG_CPU_BIG_ENDIAN
- #define ENDIAN_SET_EL1		(SCTLR_EL1_E0E | SCTLR_ELx_EE)
-@@ -494,7 +495,7 @@
- 			 ENDIAN_SET_EL1 | SCTLR_EL1_UCI  | SCTLR_EL1_RES1)
- #define SCTLR_EL1_CLEAR	(SCTLR_ELx_A   | SCTLR_EL1_CP15BEN | SCTLR_EL1_ITD    |\
- 			 SCTLR_EL1_UMA | SCTLR_ELx_WXN     | ENDIAN_CLEAR_EL1 |\
--			 SCTLR_EL1_RES0)
-+			 SCTLR_ELx_DSSBS | SCTLR_EL1_RES0)
- 
- #if (SCTLR_EL1_SET ^ SCTLR_EL1_CLEAR) != 0xffffffffffffffff
- #error "Inconsistent SCTLR_EL1 set/clear bits"
-@@ -544,6 +545,13 @@
- #define ID_AA64PFR0_EL0_64BIT_ONLY	0x1
- #define ID_AA64PFR0_EL0_32BIT_64BIT	0x2
- 
-+/* id_aa64pfr1 */
-+#define ID_AA64PFR1_SSBS_SHIFT		4
++static void __maybe_unused
++cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused)
++{
++	sysreg_clear_set(sctlr_el1, SCTLR_EL1_UCI, 0);
++}
 +
-+#define ID_AA64PFR1_SSBS_PSTATE_NI	0
-+#define ID_AA64PFR1_SSBS_PSTATE_ONLY	1
-+#define ID_AA64PFR1_SSBS_PSTATE_INSNS	2
-+
- /* id_aa64mmfr0 */
- #define ID_AA64MMFR0_TGRAN4_SHIFT	28
- #define ID_AA64MMFR0_TGRAN64_SHIFT	24
-diff --git a/arch/arm64/include/uapi/asm/hwcap.h b/arch/arm64/include/uapi/asm/hwcap.h
-index 17c65c8f33cb..2bcd6e4f3474 100644
---- a/arch/arm64/include/uapi/asm/hwcap.h
-+++ b/arch/arm64/include/uapi/asm/hwcap.h
-@@ -48,5 +48,6 @@
- #define HWCAP_USCAT		(1 << 25)
- #define HWCAP_ILRCPC		(1 << 26)
- #define HWCAP_FLAGM		(1 << 27)
-+#define HWCAP_SSBS		(1 << 28)
- 
- #endif /* _UAPI__ASM_HWCAP_H */
+ #define CAP_MIDR_RANGE(model, v_min, r_min, v_max, r_max)	\
+ 	.matches = is_affected_midr_range,			\
+ 	.midr_range = MIDR_RANGE(model, v_min, r_min, v_max, r_max)
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index e238b7932096..fac844ee1e24 100644
+index ada72b9f2718..67abf11a9b26 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -164,6 +164,11 @@ static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
- 	ARM64_FTR_END,
- };
+@@ -1081,6 +1081,28 @@ static void cpu_enable_ssbs(const struct arm64_cpu_capabilities *__unused)
+ }
+ #endif /* CONFIG_ARM64_SSBD */
  
-+static const struct arm64_ftr_bits ftr_id_aa64pfr1[] = {
-+	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR1_SSBS_SHIFT, 4, ID_AA64PFR1_SSBS_PSTATE_NI),
-+	ARM64_FTR_END,
-+};
++#ifdef CONFIG_ARM64_PAN
++static void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused)
++{
++	/*
++	 * We modify PSTATE. This won't work from irq context as the PSTATE
++	 * is discarded once we return from the exception.
++	 */
++	WARN_ON_ONCE(in_interrupt());
 +
- static const struct arm64_ftr_bits ftr_id_aa64mmfr0[] = {
- 	S_ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR0_TGRAN4_SHIFT, 4, ID_AA64MMFR0_TGRAN4_NI),
- 	S_ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64MMFR0_TGRAN64_SHIFT, 4, ID_AA64MMFR0_TGRAN64_NI),
-@@ -371,7 +376,7 @@ static const struct __ftr_reg_entry {
++	sysreg_clear_set(sctlr_el1, SCTLR_EL1_SPAN, 0);
++	asm(SET_PSTATE_PAN(1));
++}
++#endif /* CONFIG_ARM64_PAN */
++
++#ifdef CONFIG_ARM64_RAS_EXTN
++static void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused)
++{
++	/* Firmware may have left a deferred SError in this register. */
++	write_sysreg_s(0, SYS_DISR_EL1);
++}
++#endif /* CONFIG_ARM64_RAS_EXTN */
++
+ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 	{
+ 		.desc = "GIC system register CPU interface",
+@@ -1815,9 +1837,3 @@ static int __init enable_mrs_emulation(void)
+ }
  
- 	/* Op1 = 0, CRn = 0, CRm = 4 */
- 	ARM64_FTR_REG(SYS_ID_AA64PFR0_EL1, ftr_id_aa64pfr0),
--	ARM64_FTR_REG(SYS_ID_AA64PFR1_EL1, ftr_raz),
-+	ARM64_FTR_REG(SYS_ID_AA64PFR1_EL1, ftr_id_aa64pfr1),
- 	ARM64_FTR_REG(SYS_ID_AA64ZFR0_EL1, ftr_raz),
+ core_initcall(enable_mrs_emulation);
+-
+-void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused)
+-{
+-	/* Firmware may have left a deferred SError in this register. */
+-	write_sysreg_s(0, SYS_DISR_EL1);
+-}
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index b9da093e0341..148de417ed3e 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -412,11 +412,6 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
+ 	BUG_ON(!user_mode(regs));
+ }
  
- 	/* Op1 = 0, CRn = 0, CRm = 5 */
-@@ -657,7 +662,6 @@ void update_cpu_features(int cpu,
- 
- 	/*
- 	 * EL3 is not our concern.
--	 * ID_AA64PFR1 is currently RES0.
- 	 */
- 	taint |= check_update_ftr_reg(SYS_ID_AA64PFR0_EL1, cpu,
- 				      info->reg_id_aa64pfr0, boot->reg_id_aa64pfr0);
-@@ -1222,6 +1226,16 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 		.cpu_enable = cpu_enable_hw_dbm,
- 	},
- #endif
-+	{
-+		.desc = "Speculative Store Bypassing Safe (SSBS)",
-+		.capability = ARM64_SSBS,
-+		.type = ARM64_CPUCAP_WEAK_LOCAL_CPU_FEATURE,
-+		.matches = has_cpuid_feature,
-+		.sys_reg = SYS_ID_AA64PFR1_EL1,
-+		.field_pos = ID_AA64PFR1_SSBS_SHIFT,
-+		.sign = FTR_UNSIGNED,
-+		.min_field_value = ID_AA64PFR1_SSBS_PSTATE_ONLY,
-+	},
- 	{},
- };
- 
-@@ -1267,6 +1281,7 @@ static const struct arm64_cpu_capabilities arm64_elf_hwcaps[] = {
- #ifdef CONFIG_ARM64_SVE
- 	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_SVE_SHIFT, FTR_UNSIGNED, ID_AA64PFR0_SVE, CAP_HWCAP, HWCAP_SVE),
- #endif
-+	HWCAP_CAP(SYS_ID_AA64PFR1_EL1, ID_AA64PFR1_SSBS_SHIFT, FTR_UNSIGNED, ID_AA64PFR1_SSBS_PSTATE_INSNS, CAP_HWCAP, HWCAP_SSBS),
- 	{},
- };
- 
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index e9ab7b3ed317..dce971f2c167 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -81,6 +81,7 @@ static const char *const hwcap_str[] = {
- 	"uscat",
- 	"ilrcpc",
- 	"flagm",
-+	"ssbs",
- 	NULL
- };
- 
+-void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused)
+-{
+-	sysreg_clear_set(sctlr_el1, SCTLR_EL1_UCI, 0);
+-}
+-
+ #define __user_cache_maint(insn, address, res)			\
+ 	if (address >= user_addr_max()) {			\
+ 		res = -EFAULT;					\
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 50b30ff30de4..6342f1793c70 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -864,17 +864,3 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
+ 	return rv;
+ }
+ NOKPROBE_SYMBOL(do_debug_exception);
+-
+-#ifdef CONFIG_ARM64_PAN
+-void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused)
+-{
+-	/*
+-	 * We modify PSTATE. This won't work from irq context as the PSTATE
+-	 * is discarded once we return from the exception.
+-	 */
+-	WARN_ON_ONCE(in_interrupt());
+-
+-	sysreg_clear_set(sctlr_el1, SCTLR_EL1_SPAN, 0);
+-	asm(SET_PSTATE_PAN(1));
+-}
+-#endif /* CONFIG_ARM64_PAN */
 -- 
 2.1.4
