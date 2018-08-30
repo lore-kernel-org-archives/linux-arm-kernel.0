@@ -1,81 +1,41 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Thu, 30 Aug 2018 17:45:13 +0200
-Subject: [PATCH v3 25/30] ARM: dts: sun8i: h3: add thermal zone to H3
+Date: Thu, 30 Aug 2018 17:45:16 +0200
+Subject: [PATCH v3 28/30] ARM: dts: sun8i: a83t: add support for the thermal
+ sensor in A83T
 In-Reply-To: <20180830154518.29507-1-embed3d@gmail.com>
 References: <20180830154518.29507-1-embed3d@gmail.com>
-Message-ID: <20180830154518.29507-26-embed3d@gmail.com>
+Message-ID: <20180830154518.29507-29-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the thermal zones to the H3. We have only one sensor and
-that is placed in the cpu.
+As we have gained the support for the thermal sensor in A83T,
+we can now add its device nodes to the device tree.
+
+The A83T seems to have a broken IRQ 31, thus we use here IRQ 41.
 
 Signed-off-by: Philipp Rossak <embed3d@gmail.com>
 ---
- arch/arm/boot/dts/sun8i-h3.dtsi    | 31 +++++++++++++++++++++++++++++++
- arch/arm/boot/dts/sunxi-h3-h5.dtsi |  1 +
- 2 files changed, 32 insertions(+)
+ arch/arm/boot/dts/sun8i-a83t.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index 5b7994cb1471..954848d5df50 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -78,6 +78,8 @@
- 			clock-names = "cpu";
- 			operating-points-v2 = <&cpu0_opp_table>;
- 			#cooling-cells = <2>;
-+			cooling-min-level = <0>;
-+			cooling-max-level = <15>;
+diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+index 2be23d600957..f2f745930b08 100644
+--- a/arch/arm/boot/dts/sun8i-a83t.dtsi
++++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+@@ -757,6 +757,14 @@
+ 			clocks = <&osc24M>;
  		};
  
- 		cpu at 1 {
-@@ -102,6 +104,35 @@
- 		};
- 	};
- 
-+	thermal-zones {
-+		cpu-thermal {
-+			/* milliseconds */
-+			polling-delay-passive = <250>;
-+			polling-delay = <1000>;
-+			thermal-sensors = <&ths>;
-+
-+			trips {
-+				cpu_hot_trip: cpu-warm {
-+					temperature = <65000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+				cpu_very_hot_trip: cpu-very-hot {
-+					temperature = <90000>;
-+					hysteresis = <2000>;
-+					type = "critical";
-+				};
-+			};
-+
-+			cooling-maps {
-+				cpu-warm-limit {
-+					trip = <&cpu_hot_trip>;
-+					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-+				};
-+			};
++		ths: thermal-sensor at 1f04000 {
++			compatible = "allwinner,sun8i-a83t-ths";
++			reg = <0x01f04000 0x100>;
++			interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
++			#thermal-sensor-cells = <1>;
++			#io-channel-cells = <0>;
 +		};
-+	};
 +
- 	timer {
- 		compatible = "arm,armv7-timer";
- 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-index 3520e4ad6042..2c83f4893757 100644
---- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-+++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-@@ -47,6 +47,7 @@
- #include <dt-bindings/reset/sun8i-de2.h>
- #include <dt-bindings/reset/sun8i-h3-ccu.h>
- #include <dt-bindings/reset/sun8i-r-ccu.h>
-+#include <dt-bindings/thermal/thermal.h>
- 
- / {
- 	interrupt-parent = <&gic>;
+ 		watchdog at 1c20ca0 {
+ 			compatible = "allwinner,sun6i-a31-wdt";
+ 			reg = <0x01c20ca0 0x20>;
 -- 
 2.11.0
