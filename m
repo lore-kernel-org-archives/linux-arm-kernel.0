@@ -1,43 +1,26 @@
 From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Thu, 30 Aug 2018 13:31:14 +0300
-Subject: [PATCH v1 2/2] irqchip/alpine-msi: Switch to bitmap_zalloc()
-In-Reply-To: <20180830103114.60601-1-andriy.shevchenko@linux.intel.com>
-References: <20180830103114.60601-1-andriy.shevchenko@linux.intel.com>
-Message-ID: <20180830103114.60601-2-andriy.shevchenko@linux.intel.com>
+Date: Thu, 30 Aug 2018 13:39:33 +0300
+Subject: [PATCH v4 1/2] clk: Add of_clk_get_by_name_optional() function
+In-Reply-To: <TY1PR01MB176960BEDC23EA64095EF6F2F5080@TY1PR01MB1769.jpnprd01.prod.outlook.com>
+References: <1533039060-18779-1-git-send-email-phil.edworthy@renesas.com>
+ <1533039060-18779-2-git-send-email-phil.edworthy@renesas.com>
+ <20180829171039.GD11447@smile.fi.intel.com>
+ <TY1PR01MB176960BEDC23EA64095EF6F2F5080@TY1PR01MB1769.jpnprd01.prod.outlook.com>
+Message-ID: <20180830103933.GJ11447@smile.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch to bitmap_zalloc() to show clearly what we are allocating.
-Besides that it returns pointer of bitmap type instead of opaque void *.
+On Thu, Aug 30, 2018 at 08:30:59AM +0000, Phil Edworthy wrote:
+> On 29 August 2018 18:11 Andy Shevchenko wrote:
+> > On Tue, Jul 31, 2018 at 01:10:59PM +0100, Phil Edworthy wrote:
 
-Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
----
- drivers/irqchip/irq-alpine-msi.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+> Thanks for the review. I'm not particularly happy with the patch as is, it's
+> pretty messy. I was in rush trying to get things done before holidays - always
+> a mistake.
+> Would you mind if I sent a v5 that I feel is somewhat clearer?
 
-diff --git a/drivers/irqchip/irq-alpine-msi.c b/drivers/irqchip/irq-alpine-msi.c
-index 23a3b877f7f1..3340324c7a02 100644
---- a/drivers/irqchip/irq-alpine-msi.c
-+++ b/drivers/irqchip/irq-alpine-msi.c
-@@ -268,9 +268,7 @@ static int alpine_msix_init(struct device_node *node,
- 		goto err_priv;
- 	}
- 
--	priv->msi_map = kcalloc(BITS_TO_LONGS(priv->num_spis),
--				sizeof(*priv->msi_map),
--				GFP_KERNEL);
-+	priv->msi_map = bitmap_zalloc(priv->num_spis, GFP_KERNEL);
- 	if (!priv->msi_map) {
- 		ret = -ENOMEM;
- 		goto err_priv;
-@@ -286,7 +284,7 @@ static int alpine_msix_init(struct device_node *node,
- 	return 0;
- 
- err_map:
--	kfree(priv->msi_map);
-+	bitmap_free(priv->msi_map);
- err_priv:
- 	kfree(priv);
- 	return ret;
+That's definitely preferable!
+
 -- 
-2.18.0
+With Best Regards,
+Andy Shevchenko
