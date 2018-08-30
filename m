@@ -1,96 +1,79 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 30 Aug 2018 16:05:32 +0100
-Subject: [PATCH] arm64: mm: always enable CONFIG_HOLES_IN_ZONE
-Message-ID: <20180830150532.22745-1-james.morse@arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 30 Aug 2018 08:06:36 -0700
+Subject: [PATCH] arm64: defconfig: enable EFI_ARMSTUB_DTB_LOADER
+In-Reply-To: <CAKv+Gu-R7eX=aj=O2-gpzmp0K4t0T4s536UiqJZs0WuxRjkYwQ@mail.gmail.com>
+References: <1535563287-24803-1-git-send-email-scott.branden@broadcom.com>
+ <CAOesGMhjcJ1p3QcEYb9fsx3fMXAOsgR2njOq=VKgEbWGwJi36g@mail.gmail.com>
+ <fb07b89d-d427-5e59-9f17-b12df26284ec@broadcom.com>
+ <CAKv+Gu-R7eX=aj=O2-gpzmp0K4t0T4s536UiqJZs0WuxRjkYwQ@mail.gmail.com>
+Message-ID: <CAOesGMho8CfT7iDXadmkB5=7DoOi6n8qXcS9X643vf+Y0BbD6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 6d526ee26ccd ("arm64: mm: enable CONFIG_HOLES_IN_ZONE for NUMA")
-only enabled HOLES_IN_ZONE for NUMA systems because the NUMA code was
-choking on the missing zone for nomap pages. This problem doesn't just
-apply to NUMA systems.
+On Wed, Aug 29, 2018 at 10:54 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 29 August 2018 at 20:59, Scott Branden <scott.branden@broadcom.com> wrote:
+>> Hi Olof,
+>>
+>>
+>> On 18-08-29 11:44 AM, Olof Johansson wrote:
+>>>
+>>> Hi,
+>>>
+>>> On Wed, Aug 29, 2018 at 10:21 AM, Scott Branden
+>>> <scott.branden@broadcom.com> wrote:
+>>>>
+>>>> Enable EFI_ARMSTUB_DTB_LOADER to add support for the dtb= command line
+>>>> parameter to function with efi loader.
+>>>>
+>>>> Required to boot on existing bootloaders that do not support devicetree
+>>>> provided by the platform or by the bootloader.
+>>>>
+>>>> Fixes: 3d7ee348aa41 ("efi/libstub/arm: Add opt-in Kconfig option for the
+>>>> DTB loader")
+>>>> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
+>>>
+>>> Why did Ard create an option for this if it's just going be turned on
+>>> in default configs? Doesn't make sense to me.
+>>>
+>>> It would help to know what firmware still is crippled and how common
+>>> it is, since it's been a few years that this has been a requirement by
+>>> now.
+>>
+>> Broadcom NS2 and Stingray in current development and production need this
+>> option in the kernel enabled in order to boot.
+>
+> And these production systems run mainline kernels in a defconfig configuration?
+>
+> The simply reality is that the DTB loader has been deprecated for a
+> good reason: it was only ever intended as a development hack anyway,
+> and if we need to treat the EFI stub provided DTB as a first class
+> citizen, there are things we need to fix to make things works as
+> expected. For instance, GRUB will put a property in the /chosen node
+> for the initramfs which will get dropped if you boot with dtb=.
+>
+> Don't be surprised if some future enhancements of the EFI stub code
+> depend on !EFI_ARMSTUB_DTB_LOADER. On UEFI systems, DTBs [or ACPI
+> tables] are used by the firmware to describe itself and the underlying
+> platform to the OS, and the practice of booting with DTB file images
+> (taken from the kernel build as well) conflicts with that view. Note
+> that GRUB still permits you to load DTBs from files (and supports more
+> sources than just the file system the kernel Image was loaded from).
 
-If the architecture doesn't set HAVE_ARCH_PFN_VALID, pfn_valid() will
-return true if the pfn is part of a valid sparsemem section.
+Ard,
 
-When working with multiple pages, the mm code uses pfn_valid_within()
-to test each page it uses within the sparsemem section is valid. On
-most systems memory comes in MAX_ORDER_NR_PAGES chunks which all
-have valid/initialised struct pages. In this case pfn_valid_within()
-is optimised out.
+Maybe a WARN() splat would be more useful as a phasing-out method than
+removing functionality for them that needs to be reinstated through
+changing the config?
 
-Systems where this isn't true (e.g. due to nomap) should set
-HOLES_IN_ZONE and provide HAVE_ARCH_PFN_VALID so that mm tests each
-page as it works with it.
+Once the stub and the boot method is there, it's hard to undo as we
+can see here. Being loud and warn might be more useful, and set a
+timeline for hard removal (12 months?).
 
-Currently non-NUMA arm64 systems can't enable HOLES_IN_ZONE, leading to
-VM_BUG_ON():
-| page:fffffdff802e1780 is uninitialized and poisoned
-| raw: ffffffffffffffff ffffffffffffffff ffffffffffffffff ffffffffffffffff
-| raw: ffffffffffffffff ffffffffffffffff ffffffffffffffff ffffffffffffffff
-| page dumped because: VM_BUG_ON_PAGE(PagePoisoned(p))
-| ------------[ cut here ]------------
-| kernel BUG at include/linux/mm.h:978!
-| Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
-[...]
-| CPU: 1 PID: 25236 Comm: dd Not tainted 4.18.0 #7
-| Hardware name: QEMU KVM Virtual Machine, BIOS 0.0.0 02/06/2015
-| pstate: 40000085 (nZcv daIf -PAN -UAO)
-| pc : move_freepages_block+0x144/0x248
-| lr : move_freepages_block+0x144/0x248
-| sp : fffffe0071177680
-[...]
-| Process dd (pid: 25236, stack limit = 0x0000000094cc07fb)
-| Call trace:
-|  move_freepages_block+0x144/0x248
-|  steal_suitable_fallback+0x100/0x16c
-|  get_page_from_freelist+0x440/0xb20
-|  __alloc_pages_nodemask+0xe8/0x838
-|  new_slab+0xd4/0x418
-|  ___slab_alloc.constprop.27+0x380/0x4a8
-|  __slab_alloc.isra.21.constprop.26+0x24/0x34
-|  kmem_cache_alloc+0xa8/0x180
-|  alloc_buffer_head+0x1c/0x90
-|  alloc_page_buffers+0x68/0xb0
-|  create_empty_buffers+0x20/0x1ec
-|  create_page_buffers+0xb0/0xf0
-|  __block_write_begin_int+0xc4/0x564
-|  __block_write_begin+0x10/0x18
-|  block_write_begin+0x48/0xd0
-|  blkdev_write_begin+0x28/0x30
-|  generic_perform_write+0x98/0x16c
-|  __generic_file_write_iter+0x138/0x168
-|  blkdev_write_iter+0x80/0xf0
-|  __vfs_write+0xe4/0x10c
-|  vfs_write+0xb4/0x168
-|  ksys_write+0x44/0x88
-|  sys_write+0xc/0x14
-|  el0_svc_naked+0x30/0x34
-| Code: aa1303e0 90001a01 91296421 94008902 (d4210000)
-| ---[ end trace 1601ba47f6e883fe ]---
+Scott; an alternative for you is to do a boot wrapper that bundles a
+DT and kernel, and boot that instead of the kernel image (outside of
+the kernel tree). Some 32-bit platforms from Marvell use that. That
+way the kernel will just see it as a normally passed in DT.
 
-Remove the NUMA dependency.
 
-Reported-by: Mikulas Patocka <mpatocka@redhat.com>
-Link: https://www.spinics.net/lists/arm-kernel/msg671851.html
-Fixes: 6d526ee26ccd ("arm64: mm: enable CONFIG_HOLES_IN_ZONE for NUMA")
-CC: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Signed-off-by: James Morse <james.morse@arm.com>
----
- arch/arm64/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 29e75b47becd..1b1a0e95c751 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -763,7 +763,6 @@ config NEED_PER_CPU_EMBED_FIRST_CHUNK
- 
- config HOLES_IN_ZONE
- 	def_bool y
--	depends on NUMA
- 
- source kernel/Kconfig.hz
- 
--- 
-2.18.0
+-Olof
