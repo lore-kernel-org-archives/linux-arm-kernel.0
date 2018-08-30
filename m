@@ -1,60 +1,26 @@
-From: mirq-linux@rere.qmqm.pl (=?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?=)
-Date: Thu, 30 Aug 2018 23:00:09 +0200
-Subject: [PATCH v2 09/12] drm/virtio: use simpler
- remove_conflicting_pci_framebuffers()
-In-Reply-To: <cover.1535656077.git.mirq-linux@rere.qmqm.pl>
-References: <cover.1535656077.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <4f4a5b7472a7161dc0fc7a1a9be746d18fc8a7b1.1535656077.git.mirq-linux@rere.qmqm.pl>
+From: toshi.kani@hpe.com (Kani, Toshi)
+Date: Thu, 30 Aug 2018 21:29:04 +0000
+Subject: [PATCH v2] EDAC, ghes: use CPER module handles to locate DIMMs
+In-Reply-To: <1535654266-40053-1-git-send-email-wufan@codeaurora.org>
+References: <1535654266-40053-1-git-send-email-wufan@codeaurora.org>
+Message-ID: <a2b7b914120f1c2e7020d18d7c7d824413e06304.camel@hpe.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
-Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
----
- drivers/gpu/drm/virtio/virtgpu_drm_bus.c | 24 +++---------------------
- 1 file changed, 3 insertions(+), 21 deletions(-)
+On Thu, 2018-08-30 at 18:37 +0000, Fan Wu wrote:
+> For platforms whose firmwares provide valid module handles
+> (SMBIOS type 17) in error records, this patch uses the module
+> handles to locate corresponding DIMMs and enables per-DIMM
+> error counter update.
+> 
+> Signed-off-by: Fan Wu <wufan@codeaurora.org>
 
-diff --git a/drivers/gpu/drm/virtio/virtgpu_drm_bus.c b/drivers/gpu/drm/virtio/virtgpu_drm_bus.c
-index 7df8d0c9026a..115ed546ca4e 100644
---- a/drivers/gpu/drm/virtio/virtgpu_drm_bus.c
-+++ b/drivers/gpu/drm/virtio/virtgpu_drm_bus.c
-@@ -28,26 +28,6 @@
- 
- #include "virtgpu_drv.h"
- 
--static void virtio_pci_kick_out_firmware_fb(struct pci_dev *pci_dev)
--{
--	struct apertures_struct *ap;
--	bool primary;
--
--	ap = alloc_apertures(1);
--	if (!ap)
--		return;
--
--	ap->ranges[0].base = pci_resource_start(pci_dev, 0);
--	ap->ranges[0].size = pci_resource_len(pci_dev, 0);
--
--	primary = pci_dev->resource[PCI_ROM_RESOURCE].flags
--		& IORESOURCE_ROM_SHADOW;
--
--	drm_fb_helper_remove_conflicting_framebuffers(ap, "virtiodrmfb", primary);
--
--	kfree(ap);
--}
--
- int drm_virtio_init(struct drm_driver *driver, struct virtio_device *vdev)
- {
- 	struct drm_device *dev;
-@@ -69,7 +49,9 @@ int drm_virtio_init(struct drm_driver *driver, struct virtio_device *vdev)
- 			 pname);
- 		dev->pdev = pdev;
- 		if (vga)
--			virtio_pci_kick_out_firmware_fb(pdev);
-+			drm_fb_helper_remove_conflicting_pci_framebuffers(pdev,
-+									  0,
-+									  "virtiodrmfb");
- 
- 		snprintf(unique, sizeof(unique), "pci:%s", pname);
- 		ret = drm_dev_set_unique(dev, unique);
--- 
-2.18.0
+Tested on an HPE x86 server. It turns out that mem_err->mem_dev_handle
+was set to  0 with this FW, and get_dimm_smbios_index() returned -1. But
+the code handles this case fine. dimm->smbios_handle's were initialized
+properly. So:
+
+Tested-by: Toshi Kani <toshi.kani@hpe.com>
+
+Thanks,
+-Toshi
