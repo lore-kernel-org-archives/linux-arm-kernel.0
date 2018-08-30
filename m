@@ -1,69 +1,50 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Fri, 31 Aug 2018 00:09:04 +0530
-Subject: [PATCH 10/15] soc: octeontx2: Reconfig MSIX base with IOVA
-In-Reply-To: <CAK8P3a1BRvhQ9iQWP2hTrJOu+Z+vmmek-Uobw6zX0dM4zFe_gQ@mail.gmail.com>
-References: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
- <1535453838-12154-11-git-send-email-sunil.kovvuri@gmail.com>
- <CAK8P3a1Vdy-VsLWJMer-Z96E4Trhi0WJXJ3fTzyOGny2Mn6RAA@mail.gmail.com>
- <CA+sq2Cf2BLKsV=gY-MPnygV1ufpvmnw6ETh90JX_uKQBk3Sduw@mail.gmail.com>
- <CAK8P3a0+zJRxEYWZpYShRJo-3oqMaC9TJADugaRTiBnjw7ssPA@mail.gmail.com>
- <CA+sq2Cfd_jk=JzcLmPYiW1iGqKrJRrv5vrsmeZfY4W+qi5GLgw@mail.gmail.com>
- <CAK8P3a1BRvhQ9iQWP2hTrJOu+Z+vmmek-Uobw6zX0dM4zFe_gQ@mail.gmail.com>
-Message-ID: <CA+sq2CepUamZzjc8XS7gPALW3=19W2uv3hq=SUa86+i-oGsGnw@mail.gmail.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 30 Aug 2018 14:45:31 -0400
+Subject: [PATCH v9 4/4] perf probe: Support SDT markers having reference
+ counter (semaphore)
+In-Reply-To: <20180820044250.11659-5-ravi.bangoria@linux.ibm.com>
+References: <20180820044250.11659-1-ravi.bangoria@linux.ibm.com>
+ <20180820044250.11659-5-ravi.bangoria@linux.ibm.com>
+Message-ID: <20180830144531.3011e185@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 30, 2018 at 7:23 PM Arnd Bergmann <arnd@arndb.de> wrote:
->
-> On Tue, Aug 28, 2018 at 3:17 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
-> > On Tue, Aug 28, 2018 at 6:27 PM Arnd Bergmann <arnd@arndb.de> wrote:
-> > > On Tue, Aug 28, 2018 at 2:42 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
-> > > > On Tue, Aug 28, 2018 at 5:39 PM Arnd Bergmann <arnd@arndb.de> wrote:
-> > > > > On Tue, Aug 28, 2018 at 12:58 PM <sunil.kovvuri@gmail.com> wrote:
-> > > >
-> > > > This admin function is a PCI device which is capable of provisioning
-> > > > HW blocks to other PCIe SRIOV devices in the system. Each HW block
-> > > > (eg memory buffer pools, NIC dewscriptors, crypto engines e.t.c) needs
-> > > > certain no of MSIX vectors. Admin function has a set of 32K MSIX vectors
-> > > > in memory (not on-chip) which based on HW block provisioning to a PCI device
-> > > > attaches the required number of vectors to that device. Some part of this
-> > > > configuration is done by low level firmware.
-> > > >
-> > > > RVU_AF_MSIXTR_BASE points to the memory region allocated for 32K MSIX
-> > > > vectors. If kernel is booted with IOMMU enabled and admin function device
-> > > > is attached to SMMU, HW will go through translation to access this MSIX
-> > > > vector memory region. Hence the mapping done in this patch.
-> > >
-> > > Do you mean this is not a regular PCIe MSI-X interrupt to the GIC, but
-> > > something internal to your device that gets routed through the IOMMU
-> > > back into the device?
-> > >
-> >
-> > This is a regular PCIe MSI-X interrupt, the difference is that the
-> > bunch of PCI devices
-> > here doesn't have a fixed set of MSIX vectors. Admin function has a
-> > memory region with
-> > 32K MSIX vectors which it provisions to PCI devices based on the HW
-> > functional blocks
-> > attached to them. A PCI device which works as a ethernet device needs
-> > X number of vectors
-> > and a crypto device needs Y number of vectors.
-> >
-> > Since the admin function owns the whole MSIX vector region, HW uses
-> > this device's stream ID
-> > to access the vectors. Hence the IOMMU mapping. Once MSIX vectors are
-> > provisioned to
-> > a PCI device they work as normal MSIX interrupt like any other device.
->
-> Ok, I think I got it now, just to confirm: the MSIX vectors you allocate
-> in the admin device refer to memory backing the BAR that contains
-> the MSI-X entries of the other functions, right?
 
-Yes, that's correct.
+Arnaldo,
 
->
-> I was a bit confused here and assumed that you were mapping
-> the MMIO area of an interrupt controller that receives the interupt
-> transactions.
->
->          Arnd
+I'm going to be playing with some of the probe code which may conflict
+with these patches, so I would like to pull these in my tree. But this
+patch requires an Acked-by from you before I can pull it in.
+
+You OK with this?
+
+Thanks!
+
+-- Steve
+
+
+On Mon, 20 Aug 2018 10:12:50 +0530
+Ravi Bangoria <ravi.bangoria@linux.ibm.com> wrote:
+
+> With this, perf buildid-cache will save SDT markers with reference
+> counter in probe cache. Perf probe will be able to probe markers
+> having reference counter. Ex,
+> 
+>   # readelf -n /tmp/tick | grep -A1 loop2
+>     Name: loop2
+>     ... Semaphore: 0x0000000010020036
+> 
+>   # ./perf buildid-cache --add /tmp/tick
+>   # ./perf probe sdt_tick:loop2
+>   # ./perf stat -e sdt_tick:loop2 /tmp/tick
+>     hi: 0
+>     hi: 1
+>     hi: 2
+>     ^C
+>      Performance counter stats for '/tmp/tick':
+>                  3      sdt_tick:loop2
+>        2.561851452 seconds time elapsed
+> 
+> Signed-off-by: Ravi Bangoria <ravi.bangoria@linux.ibm.com>
+> Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
+> Acked-by: Srikar Dronamraju <srikar@linux.vnet.ibm.com>
