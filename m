@@ -1,45 +1,29 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Thu, 30 Aug 2018 09:16:40 +0800
-Subject: [PATCH v3] usb: core: phy: fix return value checking about
- devm_of_phy_get_by_index()
-Message-ID: <626cea85395e3a1f002ef0a241bb508d770a33c0.1535536218.git.chunfeng.yun@mediatek.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 29 Aug 2018 19:46:28 -0700 (PDT)
+Subject: [PATCH net-next 0/2] ethtool: drop get_settings and
+ set_settings ops
+In-Reply-To: <cover.1535477409.git.mkubecek@suse.cz>
+References: <cover.1535477409.git.mkubecek@suse.cz>
+Message-ID: <20180829.194628.1640012269371401850.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use IS_ERR() instead of IS_ERR_OR_NULL() because devm_of_phy_get_by_index()
-never return NULL value;
-But still need ignore the error of -ENODEV, for more information, please
-refer to:
-[0] https://lkml.org/lkml/2018/4/19/88
-[1] https://patchwork.kernel.org/patch/10160181/
+From: Michal Kubecek <mkubecek@suse.cz>
+Date: Tue, 28 Aug 2018 19:56:48 +0200 (CEST)
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
-V3: abandon the ternary operator suggested by Johan
+> As Andrew Lunn pointed out in recent discussion, there is only one in tree
+> driver left which still defines deprecated callbacks get_settings() and
+> set_settings() in ethtool_ops. First patch converts this driver to
+> get_link_ksettings() and set_link_ksettings(). Second patch then removes
+> the deprecated callbacks from struct ethtool_ops and ethtool code which
+> falls back to them.
+> 
+> This doesn't break old versions of ethtool or any other userspace code
+> using ETHTOOL_{G,S}SET. We still implement both (old) ETHTOOL_{G,S}SET and
+> (new) ETHTOOL_{G,S}LINKSETTINGS ioctl commands but after this series both
+> will be implemented only using {g,s}et_link_ksettings(). The only affected
+> code would be out of tree NIC drivers which have not been converted yet.
 
-V2: keep the -ENODEV check
----
- drivers/usb/core/phy.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+Nice, thanks for following up on this.
 
-diff --git a/drivers/usb/core/phy.c b/drivers/usb/core/phy.c
-index 9879767..38b2c77 100644
---- a/drivers/usb/core/phy.c
-+++ b/drivers/usb/core/phy.c
-@@ -23,10 +23,11 @@ static int usb_phy_roothub_add_phy(struct device *dev, int index,
- 				   struct list_head *list)
- {
- 	struct usb_phy_roothub *roothub_entry;
--	struct phy *phy = devm_of_phy_get_by_index(dev, dev->of_node, index);
-+	struct phy *phy;
- 
--	if (IS_ERR_OR_NULL(phy)) {
--		if (!phy || PTR_ERR(phy) == -ENODEV)
-+	phy = devm_of_phy_get_by_index(dev, dev->of_node, index);
-+	if (IS_ERR(phy)) {
-+		if (PTR_ERR(phy) == -ENODEV)
- 			return 0;
- 		else
- 			return PTR_ERR(phy);
--- 
-1.9.1
+Series applied.
