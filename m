@@ -1,36 +1,41 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 30 Aug 2018 16:09:24 +0800
-Subject: [PATCH 1/3] ARM: dts: sun8i: h3: bpi-m2-plus: Fix address for
- external RGMII Ethernet PHY
-In-Reply-To: <20180830080926.15027-1-wens@csie.org>
-References: <20180830080926.15027-1-wens@csie.org>
-Message-ID: <20180830080926.15027-2-wens@csie.org>
+From: hanjie.lin@amlogic.com (Hanjie Lin)
+Date: Thu, 30 Aug 2018 16:13:47 +0800
+Subject: [PATCH v3 0/2] add the Amlogic Meson PCIe controller driver
+Message-ID: <1535616829-167936-1-git-send-email-hanjie.lin@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The external RTL8211E RGMII Ethernet PHY is configured via external
-resistors to use the address 0x1. The 0x0 address is a broadcast address
-for this family of PHYs, and should not be used explicitly.
+The Amlogic Meson PCIe host controller is based on the Synopsys DesignWare
+PCI core. This patchset add the driver and dt-bindings of the controller.
 
-Fixes: 8c7ba536e709 ("ARM: sun8i: bananapi-m2-plus: Enable dwmac-sun8i")
-Fixes: 4904337fe34f ("ARM: dts: sunxi: Restore EMAC changes (boards)")
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Till patch v2, we have a dedicated phy driver which only process reset job.
+It's too overkill so we integrate phy driver into the controller.
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-index 30540dc8e0c5..bdda0d99128e 100644
---- a/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts
-@@ -140,7 +140,7 @@
- &external_mdio {
- 	ext_rgmii_phy: ethernet-phy at 1 {
- 		compatible = "ethernet-phy-ieee802.3-c22";
--		reg = <0>;
-+		reg = <1>;
- 	};
- };
- 
+Changes since v2: [1]
+ - abandon phy driver, move reset to the controller
+ - use devm_add_action_or_reset() to use clock res
+ - format correcting
+
+Changes since v1: [0]
+ - use gpio lib instead open code 
+ - move 'apb' and 'port' reset from phy driver
+ - format correcting
+
+[0] :  https://lkml.kernel.org/r/1534227522-186798-1-git-send-email-hanjie.lin at amlogic.com
+[1] :  https://lkml.kernel.org/r/1535096165-45827-1-git-send-email-hanjie.lin at amlogic.com 
+
+Yue Wang (2):
+  dt-bindings: PCI: meson: add DT bindings for Amlogic Meson PCIe
+    controller
+  PCI: meson: add the Amlogic Meson PCIe controller driver
+
+ .../devicetree/bindings/pci/amlogic,meson-pcie.txt |  70 +++
+ drivers/pci/controller/dwc/Kconfig                 |  12 +
+ drivers/pci/controller/dwc/Makefile                |   1 +
+ drivers/pci/controller/dwc/pci-meson.c             | 617 +++++++++++++++++++++
+ 4 files changed, 700 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
+ create mode 100644 drivers/pci/controller/dwc/pci-meson.c
+
 -- 
-2.18.0
+2.7.4
