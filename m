@@ -1,53 +1,36 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 30 Aug 2018 20:12:50 +0300
-Subject: [PATCH 0/7] ARM32/64: DT overlay build support
-In-Reply-To: <f9562e36-ef04-fb14-74a1-6a67feaa97a8@gmail.com>
-References: <1535459532-17211-1-git-send-email-t-kristo@ti.com>
- <f9562e36-ef04-fb14-74a1-6a67feaa97a8@gmail.com>
-Message-ID: <183d979a-3849-7199-417f-3572b00dca5b@ti.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 30 Aug 2018 19:15:10 +0200
+Subject: Patch "asm-generic/bitops/lock.h: Rewrite using atomic_fetch_"
+ causes kernel crash
+In-Reply-To: <1535640375.4465.68.camel@synopsys.com>
+References: <1535567633.4465.23.camel@synopsys.com>
+ <C2D7FE5348E1B147BCA15975FBA23075012B090BEA@us01wembx1.internal.synopsys.com>
+ <20180830094411.GX24124@hirez.programming.kicks-ass.net>
+ <20180830095148.GB5942@arm.com>
+ <1535629996.4465.44.camel@synopsys.com>
+ <20180830141713.GN24082@hirez.programming.kicks-ass.net>
+ <1535640375.4465.68.camel@synopsys.com>
+Message-ID: <20180830171510.GQ24082@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/08/18 21:40, Frank Rowand wrote:
-> + Mark Rutland, just in case he is interested
+On Thu, Aug 30, 2018 at 02:46:16PM +0000, Eugeniy Paltsev wrote:
+> On Thu, 2018-08-30 at 16:17 +0200, Peter Zijlstra wrote:
+> > On Thu, Aug 30, 2018 at 11:53:17AM +0000, Eugeniy Paltsev wrote:
+> > > I can see crashes with LLSC enabled in both SMP running on 4 cores
+> > > and SMP running on 1 core.
+> > 
+> > So you're running on LL/SC enabled hardware; that would make Will's
+> > patch irrelevant (although still a good idea for the hardware that does
+> > care about that spinlocked atomic crud).
+> > 
+> > Does something like the below cure things? That would confirm the
+> > suggestion that the change to __clear_bit_unlock() is the curprit.
 > 
-> On 08/28/18 05:32, Tero Kristo wrote:
->> Hi,
->>
->> This series introduces devicetree overlay building support for ARM
->> platforms. The .dtbo target is introduced globally, then makefile
->> changes for both arm32/64 for supporting the .dtbo target, changes
->> to support sub-dir makefile flags, and finally adding the DTC flags
->> override for TI platforms, as that is where we want to introduce
->> the DT overlay support initially.
->>
->> The ARM makefile changes for supporting DTS sub-makefiles don't look
->> too clean, but that was the only way I could figure out how to
->> get it done.
->>
->> -Tero
->>
->> --
->>
-> 
-> This series does three unrelated things:
+> I tested it - this doesn't change anything, the problem still reproduces.
 
-Well, I was kind of trying to show the whole solution here but...
+OK, 'good' :-)
 
-> (1) create a ti specific dts subdirectory arch/arm/boot/dts/ti/
-> 
-> (2) create a rule for creating a .dtbo from a .dtso
-> 
-> (3) add a dtc compile flag to add phandle symbol information to
->      all .dtb files created from arch/arm/boot/dts/ti/ and
->      arch/arm64/boot/dts/ti/
-> 
-> Please split the patches into three independent series so that
-> each of the three concepts can be discussed separately. 
+> I'll test it with last Will fix.
 
-Ok will do that, hopefully tomorrow. Didn't manage to squeeze in time to 
-do it today.
-
--Tero
---
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+Yes, that missing "bnz 1b" is very very suspect.
