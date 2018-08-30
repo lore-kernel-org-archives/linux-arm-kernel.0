@@ -1,41 +1,32 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Thu, 30 Aug 2018 17:44:59 +0200
-Subject: [PATCH v3 11/30] iio: adc: add new compatibles
+Date: Thu, 30 Aug 2018 17:44:49 +0200
+Subject: [PATCH v3 01/30] mfd: Makefile: Remove build option for
+ MFD:sun4i-gpadc
 In-Reply-To: <20180830154518.29507-1-embed3d@gmail.com>
 References: <20180830154518.29507-1-embed3d@gmail.com>
-Message-ID: <20180830154518.29507-12-embed3d@gmail.com>
+Message-ID: <20180830154518.29507-2-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are now adding the new compatibles.
+Since we are merging the mfd driver into the sun4i-gpadc driver we need
+to remove the build options for the sun4i-gpadc driver.
 
 Signed-off-by: Philipp Rossak <embed3d@gmail.com>
 ---
- drivers/iio/adc/sun4i-gpadc-iio.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ drivers/mfd/Makefile | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-index a2027614ee0c..79b8efdab803 100644
---- a/drivers/iio/adc/sun4i-gpadc-iio.c
-+++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-@@ -435,6 +435,18 @@ static const struct of_device_id sun4i_gpadc_of_id[] = {
- 		.compatible = "allwinner,sun8i-a33-ths",
- 		.data = &sun8i_a33_gpadc_data,
- 	},
-+	{
-+		.compatible = "allwinner,sun4i-a10-gpadc",
-+		.data = &sun4i_gpadc_data
-+	},
-+	{
-+		.compatible = "allwinner,sun5i-a13-gpadc",
-+		.data = &sun5i_gpadc_data
-+	},
-+	{
-+		.compatible = "allwinner,sun6i-a31-gpadc",
-+		.data = &sun6i_gpadc_data
-+	},
- 	{ /* sentinel */ }
- };
+diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+index e9fd20dba18d..c680994db988 100644
+--- a/drivers/mfd/Makefile
++++ b/drivers/mfd/Makefile
+@@ -220,7 +220,6 @@ obj-$(CONFIG_INTEL_SOC_PMIC_CHTDC_TI)	+= intel_soc_pmic_chtdc_ti.o
+ obj-$(CONFIG_MFD_MT6397)	+= mt6397-core.o
  
+ obj-$(CONFIG_MFD_ALTERA_A10SR)	+= altera-a10sr.o
+-obj-$(CONFIG_MFD_SUN4I_GPADC)	+= sun4i-gpadc.o
+ 
+ obj-$(CONFIG_MFD_STM32_LPTIMER)	+= stm32-lptimer.o
+ obj-$(CONFIG_MFD_STM32_TIMERS) 	+= stm32-timers.o
 -- 
 2.11.0
