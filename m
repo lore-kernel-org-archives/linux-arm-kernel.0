@@ -1,93 +1,27 @@
-From: megous@megous.com (=?utf-8?Q?Ond=C5=99ej?= Jirman)
-Date: Thu, 30 Aug 2018 18:38:33 +0200
-Subject: [linux-sunxi] [PATCH v3 30/30] ARM: sun8i: a83t: full range OPP
- tables and CPUfreq
-In-Reply-To: <20180830154518.29507-31-embed3d@gmail.com>
-References: <20180830154518.29507-1-embed3d@gmail.com>
- <20180830154518.29507-31-embed3d@gmail.com>
-Message-ID: <20180830163833.v7zvmaz2vsxvzhur@core>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Thu, 30 Aug 2018 09:39:38 -0700
+Subject: [PATCH 00/12] Avoid synchronous TLB invalidation for intermediate
+ page-table entries on arm64
+In-Reply-To: <1535645747-9823-1-git-send-email-will.deacon@arm.com>
+References: <1535645747-9823-1-git-send-email-will.deacon@arm.com>
+Message-ID: <CA+55aFzMMU5RBhn52Lbzf-FXvx3inh5VPVZL613srY+dVU+Lxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thu, Aug 30, 2018 at 9:15 AM Will Deacon <will.deacon@arm.com> wrote:
+>
+> It's also had a lot more testing, but has held up nicely so far on arm64.
+> I haven't figured out how to merge this yet, but I'll probably end up pulling
+> the core changes out onto a separate branch.
 
-On Thu, Aug 30, 2018 at 05:45:18PM +0200, Philipp Rossak wrote:
-> Since we have now thermal trotteling enabeled we can now add the full
-> range of the OPP table.
+This looks fine, and I'm actually ok getting the core changes through
+the arm64 branch, since this has been discussed across architectures,
+and I think "whoever does the work gets to drive the car".
 
-I'm not sure we can. I have a tablet with A83T SoC and it gets unstable
-at these frequencies even with thermal throttling on mainline kernel. (Though
-I have my own THS driver, but I doubt a different driver will change much.)
+After all, a lot of the core changes originally came from x86 people
+(pretty much all of it, historically). No reason why arm64 can't get
+some of that too.
 
-There might be some other issue left in the cpufreq code. I'll let others
-test this on a better cooled boards though.
+But with the glory comes the blame when something breaks ;)
 
-Did you/someone test this?
-
-regards,
-  o.
-
-> The operating points were found in Allwinner BSP and fex files.
-> 
-> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
-> ---
->  arch/arm/boot/dts/sun8i-a83t.dtsi | 32 ++++++++++++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> index 78aa448e869f..ddcf404f9c80 100644
-> --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> @@ -250,6 +250,22 @@
->  			opp-microvolt = <840000>;
->  			clock-latency-ns = <244144>; /* 8 32k periods */
->  		};
-> +
-> +		opp-1608000000 {
-> +			opp-hz = /bits/ 64 <1608000000>;
-> +			opp-microvolt = <920000>;
-> +			clock-latency-ns = <244144>; /* 8 32k periods */
-> +		};
-> +		opp-1800000000 { /* BOOT FREQ */
-> +			opp-hz = /bits/ 64 <1800000000>;
-> +			opp-microvolt = <1000000>;
-> +			clock-latency-ns = <244144>; /* 8 32k periods */
-> +		};
-> +		opp-2016000000 {
-> +			opp-hz = /bits/ 64 <2016000000>;
-> +			opp-microvolt = <1080000>;
-> +			clock-latency-ns = <244144>; /* 8 32k periods */
-> +		};
->  	};
->  
->  	cpu1_opp_table: opp_table1 {
-> @@ -303,6 +319,22 @@
->  			opp-microvolt = <840000>;
->  			clock-latency-ns = <244144>; /* 8 32k periods */
->  		};
-> +
-> +		opp-1608000000 {
-> +			opp-hz = /bits/ 64 <1608000000>;
-> +			opp-microvolt = <920000>;
-> +			clock-latency-ns = <244144>; /* 8 32k periods */
-> +		};
-> +		opp-1800000000 { /* BOOT FREQ */
-> +			opp-hz = /bits/ 64 <1800000000>;
-> +			opp-microvolt = <1000000>;
-> +			clock-latency-ns = <244144>; /* 8 32k periods */
-> +		};
-> +		opp-2016000000 {
-> +			opp-hz = /bits/ 64 <2016000000>;
-> +			opp-microvolt = <1080000>;
-> +			clock-latency-ns = <244144>; /* 8 32k periods */
-> +		};
->  	};
->  
->  	soc {
-> -- 
-> 2.11.0
-> 
-> -- 
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+                Linus
