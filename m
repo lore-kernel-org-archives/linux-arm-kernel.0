@@ -1,65 +1,33 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Thu, 30 Aug 2018 09:35:32 +0200
-Subject: [PATCH v5 11/14] dt-bindings/interrupt-controller: add documentation
- for Marvell SEI controller
+Date: Thu, 30 Aug 2018 09:35:29 +0200
+Subject: [PATCH v5 08/14] arm64: marvell: enable SEI driver
 In-Reply-To: <20180830073535.10710-1-miquel.raynal@bootlin.com>
 References: <20180830073535.10710-1-miquel.raynal@bootlin.com>
-Message-ID: <20180830073535.10710-12-miquel.raynal@bootlin.com>
+Message-ID: <20180830073535.10710-9-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe the System Error Interrupt (SEI) controller. It aggregates two
-types of interrupts, wired and MSIs from respectively the AP and the
-CPs, into a single SPI interrupt.
+Enable the newly introduced Marvell SEI driver for the 64-bit Marvell
+EBU platforms.
 
 Suggested-by: Haim Boot <hayim@marvell.com>
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+Reviewed-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- .../interrupt-controller/marvell,sei.txt      | 36 +++++++++++++++++++
- 1 file changed, 36 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,sei.txt
+ arch/arm64/Kconfig.platforms | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,sei.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,sei.txt
-new file mode 100644
-index 000000000000..0beafed502f5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,sei.txt
-@@ -0,0 +1,36 @@
-+Marvell SEI (System Error Interrupt) Controller
-+-----------------------------------------------
-+
-+Marvell SEI (System Error Interrupt) controller is an interrupt
-+aggregator. It receives interrupts from several sources and aggregates
-+them to a single interrupt line (an SPI) on the parent interrupt
-+controller.
-+
-+This interrupt controller can handle up to 64 SEIs, a set comes from the
-+AP and is wired while a second set comes from the CPs by the mean of
-+MSIs.
-+
-+Required properties:
-+
-+- compatible: should be one of:
-+              * "marvell,ap806-sei"
-+- reg: SEI registers location and length.
-+- interrupts: identifies the parent IRQ that will be triggered.
-+- #interrupt-cells: number of cells to define an SEI wired interrupt
-+                    coming from the AP, should be 1. The cell is the IRQ
-+                    number.
-+- interrupt-controller: identifies the node as an interrupt controller
-+                        for AP interrupts.
-+- msi-controller: identifies the node as an MSI controller for the CPs
-+                  interrupts.
-+
-+Example:
-+
-+        sei: interrupt-controller at 3f0200 {
-+                compatible = "marvell,ap806-sei";
-+                reg = <0x3f0200 0x40>;
-+                interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
-+                #interrupt-cells = <1>;
-+                interrupt-controller;
-+                msi-controller;
-+        };
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 393d2b524284..5a89a957641b 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -128,6 +128,7 @@ config ARCH_MVEBU
+ 	select MVEBU_ICU
+ 	select MVEBU_ODMI
+ 	select MVEBU_PIC
++	select MVEBU_SEI
+ 	select OF_GPIO
+ 	select PINCTRL
+ 	select PINCTRL_ARMADA_37XX
 -- 
 2.17.1
