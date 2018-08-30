@@ -1,35 +1,69 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Thu, 30 Aug 2018 15:38:36 -0300
-Subject: [PATCH] perf annotate: Handle arm64 move instructions
-In-Reply-To: <7b5ea377-91a6-d3f3-56a1-a836d5aaa7c5@linux.ibm.com>
-References: <20180827150807.304110d2e9919a17c832ca48@arm.com>
- <7b5ea377-91a6-d3f3-56a1-a836d5aaa7c5@linux.ibm.com>
-Message-ID: <20180830183836.GF6097@kernel.org>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Fri, 31 Aug 2018 00:09:04 +0530
+Subject: [PATCH 10/15] soc: octeontx2: Reconfig MSIX base with IOVA
+In-Reply-To: <CAK8P3a1BRvhQ9iQWP2hTrJOu+Z+vmmek-Uobw6zX0dM4zFe_gQ@mail.gmail.com>
+References: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
+ <1535453838-12154-11-git-send-email-sunil.kovvuri@gmail.com>
+ <CAK8P3a1Vdy-VsLWJMer-Z96E4Trhi0WJXJ3fTzyOGny2Mn6RAA@mail.gmail.com>
+ <CA+sq2Cf2BLKsV=gY-MPnygV1ufpvmnw6ETh90JX_uKQBk3Sduw@mail.gmail.com>
+ <CAK8P3a0+zJRxEYWZpYShRJo-3oqMaC9TJADugaRTiBnjw7ssPA@mail.gmail.com>
+ <CA+sq2Cfd_jk=JzcLmPYiW1iGqKrJRrv5vrsmeZfY4W+qi5GLgw@mail.gmail.com>
+ <CAK8P3a1BRvhQ9iQWP2hTrJOu+Z+vmmek-Uobw6zX0dM4zFe_gQ@mail.gmail.com>
+Message-ID: <CA+sq2CepUamZzjc8XS7gPALW3=19W2uv3hq=SUa86+i-oGsGnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Tue, Aug 28, 2018 at 08:22:40AM +0200, Thomas-Mich Richter escreveu:
-> On 08/27/2018 10:08 PM, Kim Phillips wrote:
-> > Add default handler for non-jump instructions.  This really only has an
-> > effect on instructions that compute a PC-relative address, such as 'adrp,'
-> > as seen in these couple of examples:
-> > 
-> > BEFORE: adrp   x0, ffff20000aa11000 <kallsyms_token_index+0xce000>
-> > AFTER:  adrp   x0, kallsyms_token_index+0xce000
-> > 
-> > BEFORE: adrp   x23, ffff20000ae94000 <__per_cpu_load>
-> > AFTER:  adrp   x23, __per_cpu_load
-> > 
-> > The implementation is identical to that of s390, but with a slight
-> > adjustment for objdump whitespace propagation (arm64 objdump puts
-> > spaces after commas, whereas s390's presumably doesn't).
-> > 
-> > The mov__scnprintf() declaration is moved from s390's to arm64's
-> > instructions.c because arm64's gets included before s390's.
-> > 
-> 
-> Tested-by: Thomas Richter <tmricht@linux.ibm.com>
+On Thu, Aug 30, 2018 at 7:23 PM Arnd Bergmann <arnd@arndb.de> wrote:
+>
+> On Tue, Aug 28, 2018 at 3:17 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
+> > On Tue, Aug 28, 2018 at 6:27 PM Arnd Bergmann <arnd@arndb.de> wrote:
+> > > On Tue, Aug 28, 2018 at 2:42 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
+> > > > On Tue, Aug 28, 2018 at 5:39 PM Arnd Bergmann <arnd@arndb.de> wrote:
+> > > > > On Tue, Aug 28, 2018 at 12:58 PM <sunil.kovvuri@gmail.com> wrote:
+> > > >
+> > > > This admin function is a PCI device which is capable of provisioning
+> > > > HW blocks to other PCIe SRIOV devices in the system. Each HW block
+> > > > (eg memory buffer pools, NIC dewscriptors, crypto engines e.t.c) needs
+> > > > certain no of MSIX vectors. Admin function has a set of 32K MSIX vectors
+> > > > in memory (not on-chip) which based on HW block provisioning to a PCI device
+> > > > attaches the required number of vectors to that device. Some part of this
+> > > > configuration is done by low level firmware.
+> > > >
+> > > > RVU_AF_MSIXTR_BASE points to the memory region allocated for 32K MSIX
+> > > > vectors. If kernel is booted with IOMMU enabled and admin function device
+> > > > is attached to SMMU, HW will go through translation to access this MSIX
+> > > > vector memory region. Hence the mapping done in this patch.
+> > >
+> > > Do you mean this is not a regular PCIe MSI-X interrupt to the GIC, but
+> > > something internal to your device that gets routed through the IOMMU
+> > > back into the device?
+> > >
+> >
+> > This is a regular PCIe MSI-X interrupt, the difference is that the
+> > bunch of PCI devices
+> > here doesn't have a fixed set of MSIX vectors. Admin function has a
+> > memory region with
+> > 32K MSIX vectors which it provisions to PCI devices based on the HW
+> > functional blocks
+> > attached to them. A PCI device which works as a ethernet device needs
+> > X number of vectors
+> > and a crypto device needs Y number of vectors.
+> >
+> > Since the admin function owns the whole MSIX vector region, HW uses
+> > this device's stream ID
+> > to access the vectors. Hence the IOMMU mapping. Once MSIX vectors are
+> > provisioned to
+> > a PCI device they work as normal MSIX interrupt like any other device.
+>
+> Ok, I think I got it now, just to confirm: the MSIX vectors you allocate
+> in the admin device refer to memory backing the BAR that contains
+> the MSI-X entries of the other functions, right?
 
-Thanks, applied.
+Yes, that's correct.
 
-- Arnaldo
+>
+> I was a bit confused here and assumed that you were mapping
+> the MMIO area of an interrupt controller that receives the interupt
+> transactions.
+>
+>          Arnd
