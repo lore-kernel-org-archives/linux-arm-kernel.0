@@ -1,94 +1,53 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Thu, 30 Aug 2018 08:49:33 +0530
-Subject: [PATCH v3 0/9] Add Reset Controller support for Actions Semi Owl
- SoCs
-In-Reply-To: <20180810095113.25292-1-manivannan.sadhasivam@linaro.org>
-References: <20180810095113.25292-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180830031933.GD8565@Mani-XPS-13-9360>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Thu, 30 Aug 2018 11:27:58 +0800
+Subject: [PATCH 4/5] net: mvneta: enable NETIF_F_RXCSUM by default
+In-Reply-To: <20180829130836.GD1955@lunn.ch>
+References: <20180829162456.2bd69796@xhacker.debian>
+ <20180829162932.6015e89d@xhacker.debian>
+ <20180829130836.GD1955@lunn.ch>
+Message-ID: <20180830112745.61502abf@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 10, 2018 at 03:21:04PM +0530, Manivannan Sadhasivam wrote:
-> This patchset adds Reset Controller (RMU) support for Actions Semi
-> Owl SoCs, S900 and S700. For the Owl SoCs, RMU has been integrated into
-> the clock subsystem in hardware. Hence, in software we integrate RMU
-> support into common clock driver inorder to maintain compatibility. The
-> syscon approach is not taken into account based on the review by Rob.
-> 
-> This patch series depends on the recently posted S700 clk series:
-> "[PATCH v7 0/5] Add clock driver for Actions S700 SoC". For the S700 clk
-> series, driver and bindings patches are applied through the clk tree.
-> But the DTS patches are not yet picked up by the platform maintainer,
-> Andreas.
-> 
-> Hence, Andreas is expected to pick the DTS patches in this series once
-> reviewed by the maintainers along with S700 clk DTS patches.
-> 
-> Because of the absence of the S500 SoC clk support, the reset controller
-> registration code is added to both S700 and S900 SoC clk drivers for now.
-> But once S500 clk support is added, the reset controller registration part
-> will be moved to Owl SoCs common clk code.
->
+Hi Andrew,
 
-Hi Pavel,
+On Wed, 29 Aug 2018 15:08:36 +0200 Andrew Lunn wrote:
 
-Just a ping on this patchset!
+> On Wed, Aug 29, 2018 at 04:29:32PM +0800, Jisheng Zhang wrote:
+> > The code and HW supports NETIF_F_RXCSUM, so let's enable it by default.  
+> 
+> Hi Jisheng
+> 
+> I've never studied what all these different flags mean. Does
+> NETIF_F_RXCSUM mean Ethernet FCS? Or does it also include IPv4, IPv6,
+> UDP, TCP... checksums?
 
-Thanks,
-Mani
+Per my understanding, it means RX checksumming. And it only supports IPv4
+RX checksum, the code will
 
-> Thanks,
-> Mani
 > 
-> Changes in v3:
+> I've seen network interfaces get checksum'ing wrong when used with an
+> Ethernet switch with DSA. The extra header DSA uses means the hardware
+> cannot parse the packet correctly, and so cannot find these headers.
+
+The network interface is mvneta? Do you mean after this patch, we would
+see errors as the following?
+
+"bad rx status 0xabcdefgh (crc error)"
+
+So for DSA, we should disable RXCSUM? I'm not sure how to handle this case.
+I believe other drivers(with RXCSUM enabled by deafult) also have this problem
+with DSA.
+
+Thanks
+
 > 
-> * Reverted back the syscon approach based on the review by Rob Herring
-> * Dropped the MAINTAINERS patch
-> * Converted reset_map struct definitions to const based on the review by
->   Philipp
-> * Fixed S700 header in DT spotted by Parthiban
-> * Added Reviewed-by tags from Rob for 3 bindings patches
+> If this is just for FCS, then it is not a problem.
 > 
-> Changes in v2:
+>    Thanks
+> 	Andrew
 > 
-> * Converted the CMU and RMU drivers to syscon for a more cleaner
->   approach
-> * Declared the owl_reset_map structs to const
-> * Used regmap_update_bits instead of a combined regmap_read and write
-> * Removed unused headers in RMU drivers
-> * Added MAINTAINERS entry for the RMU driver and bindings
-> 
-> Manivannan Sadhasivam (9):
->   clk: actions: Cache regmap info in private clock descriptor
->   dt-bindings: clock: Add reset controller bindings for Actions Semi Owl
->     SoCs
->   dt-bindings: reset: Add binding constants for Actions Semi S700 RMU
->   dt-bindings: reset: Add binding constants for Actions Semi S900 RMU
->   arm64: dts: actions: Add Reset Controller support for S700 SoC
->   arm64: dts: actions: Add Reset Controller support for S900 SoC
->   clk: actions: Add Actions Semi Owl SoCs Reset Management Unit support
->   clk: actions: Add Actions Semi S700 SoC Reset Management Unit support
->   clk: actions: Add Actions Semi S900 SoC Reset Management Unit support
-> 
->  .../bindings/clock/actions,owl-cmu.txt        |  2 +
->  arch/arm64/boot/dts/actions/s700.dtsi         |  2 +
->  arch/arm64/boot/dts/actions/s900.dtsi         |  2 +
->  drivers/clk/actions/Kconfig                   |  1 +
->  drivers/clk/actions/Makefile                  |  1 +
->  drivers/clk/actions/owl-common.c              |  3 +-
->  drivers/clk/actions/owl-common.h              |  5 +-
->  drivers/clk/actions/owl-reset.c               | 66 ++++++++++++++
->  drivers/clk/actions/owl-reset.h               | 31 +++++++
->  drivers/clk/actions/owl-s700.c                | 55 +++++++++++-
->  drivers/clk/actions/owl-s900.c                | 86 ++++++++++++++++++-
->  .../dt-bindings/reset/actions,s700-reset.h    | 34 ++++++++
->  .../dt-bindings/reset/actions,s900-reset.h    | 65 ++++++++++++++
->  13 files changed, 347 insertions(+), 6 deletions(-)
->  create mode 100644 drivers/clk/actions/owl-reset.c
->  create mode 100644 drivers/clk/actions/owl-reset.h
->  create mode 100644 include/dt-bindings/reset/actions,s700-reset.h
->  create mode 100644 include/dt-bindings/reset/actions,s900-reset.h
-> 
-> -- 
-> 2.17.1
-> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
