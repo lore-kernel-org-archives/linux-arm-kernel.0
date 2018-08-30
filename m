@@ -1,93 +1,77 @@
-From: richard.gong@linux.intel.com (Richard Gong)
-Date: Thu, 30 Aug 2018 09:05:55 -0500
-Subject: [PATCHv8 7/9] defconfig: enable fpga and service layer
-In-Reply-To: <54ccf9d5-1cf4-edf6-47c6-be7cc5badb3e@kernel.org>
-References: <1535464245-11638-1-git-send-email-richard.gong@linux.intel.com>
- <1535464245-11638-8-git-send-email-richard.gong@linux.intel.com>
- <54ccf9d5-1cf4-edf6-47c6-be7cc5badb3e@kernel.org>
-Message-ID: <18b2948c-07dc-dc23-6a36-04e8295705f3@linux.intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 Aug 2018 16:07:39 +0200
+Subject: [PATCH 11/15] soc: octeontx2: Add Marvell OcteonTX2 CGX driver
+In-Reply-To: <CA+sq2Ce3ew0X+RMm7fQ+iUZF0HKptzBr1dBk3NuRL8o82wBTjg@mail.gmail.com>
+References: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
+ <1535453838-12154-12-git-send-email-sunil.kovvuri@gmail.com>
+ <CAK8P3a0q0P-FuG6cTgMNkeZbtXE4pMk1iJq36_x20WRddtwaDg@mail.gmail.com>
+ <CA+sq2Cc1CSKmuEjKt8psR7Zyv9PzLkN10hzy8mrai136SF4-qA@mail.gmail.com>
+ <CAK8P3a2CMcYg6vMmRAc4N80BpFwczGiPnaLNCDZYXCsRydtPQw@mail.gmail.com>
+ <CA+sq2Ce3ew0X+RMm7fQ+iUZF0HKptzBr1dBk3NuRL8o82wBTjg@mail.gmail.com>
+Message-ID: <CAK8P3a1oeOFVYc2xH+KO1gV0m9utHziGpNtQLAEv-RBxKkB7Og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Aug 28, 2018 at 3:10 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
+>
+> > > > If this is a regular PCI ethernet driver, why do you put it into driver/soc
+> > > > rather than drivers/net/ethernet/ ?
+> > >
+> > > No, this is not a ethernet driver, as mentioned in the cover letter
+> > > this driver and AF driver doesn't
+> > > handle any IO. There will be a separate ethernet driver (will submit
+> > > that as well in future) which will
+> > > communicate with these drivers for configuring hardware.
+> > >
+> > > The driver in question here is for a serdes controller which handles
+> > > physical ethernet interfaces.
+> > > Admin function driver gathers info w.r.t current state of physical
+> > > ethernet interfaces from this driver
+> > > and notifies actual ethernet driver about changes, if any.
+> >
+> > Ok. Can you describe the structure that the PCI devices appear
+> > in? It might help to be make the connection between the differnet
+> > patches to understand how things fit together. In the final
+> > picture, how many different pci_driver instances do you have,
+> > and what part are they for?
+>
+> List of PCI devices are CGX, RVU PF0-PFn SRIOV physical functions
+> and RVU VF0-VFn SRIOV virtual functions. No of VFs per PF is configurable
+> and done by low level firmware.
+>
+> List of PCI driver instances would be CGX driver, RVU PF0 (i.e admin
+> function) driver,
+> PF1-PFn either netdev driver or crypto driver, VF0-VFn functionality would be
+> same as their PF.
+>
+> The current plan is to have CGX driver, Admin function driver, PF
+> netdev driver,
+> VF netdev driver and PF/VF crypto drivers.
 
+Ok, I think I understand the PF/VF distinction now. One (to me)
+surprising aspect here is that you not just have one physical function
+that you can use to assign resources to multiple virtual functions,
+but also a second level of virtualization that is used to assign
+resources to "physical functions" that are less physical than the
+name suggests.
 
-On 08/28/2018 09:11 AM, Dinh Nguyen wrote:
-> 
-> 
-> On 08/28/2018 08:50 AM, richard.gong at linux.intel.com wrote:
->> From: Richard Gong <richard.gong@intel.com>
->>
->> Enable fpga framework, Stratix 10 SoC FPGA manager and Stratix10
->> Service Layer
->>
-> 
-> Please update your commit header be "arm64: defconfig: enable fpga and
-> service layer"
+The part that I have not grasped yet is what the split between
+the CGX and the AF is for, how they relate to one another, and
+what the software abstraction for the two is going to be.
 
-Ok, I will make update in the next submission.
+> > Is the idea that an ethernet device driver always attaches to a
+> > virtual function that gets created by the main driver, and that
+> > the two drivers share no interfaces on the kernel side, or do
+> > you have multiple drivers linking to each other?
+>
+> Ethernet device driver can attach to both physical function and virtual function
+> whose HW resources are provisioned by admin function driver.
+>
+> Yes the PF/VF ethernet drivers and these drivers won't share any
+> kernel interfaces.
+> Physical ethernet interface is owned by ethernet driver only, this driver just
+> configures which ethernet driver instance uses which physcial interface.
 
-> 
-> 
->> Signed-off-by: Richard Gong <richard.gong@intel.com>
->> Signed-off-by: Alan Tull <atull@kernel.org>
->> ---
->> v2: this patch is added in patch set version 2
->> v3: no change
->> v4: s/CONFIG_INTEL_SERVICE/CONFIG_STRATIX10_SERVICE/
->>      add CONFIG_OF_FPGA_REGION=y
->>      s/Intel/Stratix10/ in subject line
->> v5: no change
->> v6: no change
->> v7: no change
->> v8: no change
->> ---
->>   arch/arm64/configs/defconfig | 7 +++++++
->>   1 file changed, 7 insertions(+)
->>
->> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
->> index f67e8d5..2ad50a5 100644
->> --- a/arch/arm64/configs/defconfig
->> +++ b/arch/arm64/configs/defconfig
->> @@ -185,6 +185,7 @@ CONFIG_BLK_DEV_LOOP=y
->>   CONFIG_BLK_DEV_NBD=m
->>   CONFIG_VIRTIO_BLK=y
->>   CONFIG_BLK_DEV_NVME=m
->> +CONFIG_STRATIX10_SERVICE=y
-> 
-> Can this be a module?
+Ok.
 
-No, Service layer driver need be compiled as part of kernel image.
-
-Service layer driver provides services for service clients, it must be 
-loaded & initialized before service clients (FPGA manager and remote 
-status update drivers).
-
-> 
->>   CONFIG_SRAM=y
->>   CONFIG_EEPROM_AT25=m
->>   # CONFIG_SCSI_PROC_FS is not set
->> @@ -642,6 +643,12 @@ CONFIG_PHY_TEGRA_XUSB=y
->>   CONFIG_HISI_PMU=y
->>   CONFIG_QCOM_L2_PMU=y
->>   CONFIG_QCOM_L3_PMU=y
->> +CONFIG_MESON_EFUSE=m
-> 
-> What does this change have to do with this patch?
-
-My mistake, I will fix in the next submission.
-
-> 
->> +CONFIG_FPGA=y
->> +CONFIG_FPGA_MGR_STRATIX10_SOC=y
->> +CONFIG_FPGA_REGION=y
->> +CONFIG_FPGA_BRIDGE=y
->> +CONFIG_OF_FPGA_REGION=y
-> 
-> Can these be modules?
-
-CONFIG_FPGA_MGR_STRATIX10_SOC could be module, but the remaining 
-components need be compiled as part of kernel image.
-
-> 
-> Dinh
-> 
+         Arnd
