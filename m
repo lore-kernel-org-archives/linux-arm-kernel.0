@@ -1,18 +1,17 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 30 Aug 2018 14:28:36 +0200
-Subject: [PATCH 2/3] arm64: dts: renesas: r8a774a1: Add USB-DMAC and
- HSUSB device nodes
-In-Reply-To: <20180828131738.rqhiamruboaggxfz@verge.net.au>
+Date: Thu, 30 Aug 2018 14:28:52 +0200
+Subject: [PATCH 3/3] arm64: dts: renesas: r8a774a1: Add USB3.0 device nodes
+In-Reply-To: <20180828134201.npegmd2js66db5rt@verge.net.au>
 References: <1535107429-5458-1-git-send-email-biju.das@bp.renesas.com>
- <1535107429-5458-3-git-send-email-biju.das@bp.renesas.com>
- <20180828131738.rqhiamruboaggxfz@verge.net.au>
-Message-ID: <20180830122836.5ojmysha2pvtpujq@verge.net.au>
+ <1535107429-5458-4-git-send-email-biju.das@bp.renesas.com>
+ <20180828134201.npegmd2js66db5rt@verge.net.au>
+Message-ID: <20180830122852.y5qls5qgiilogypj@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2018 at 03:17:39PM +0200, Simon Horman wrote:
-> On Fri, Aug 24, 2018 at 11:43:48AM +0100, Biju Das wrote:
-> > Add usb dmac and hsusb device nodes on RZ/G2M SoC dtsi.
+On Tue, Aug 28, 2018 at 03:42:05PM +0200, Simon Horman wrote:
+> On Fri, Aug 24, 2018 at 11:43:49AM +0100, Biju Das wrote:
+> > Add usb3.0 phy, host and function device nodes on RZ/G2M SoC dtsi.
 > > 
 > > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
 > > Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
