@@ -1,32 +1,56 @@
 From: manish.narani@xilinx.com (Manish Narani)
-Date: Thu, 30 Aug 2018 15:52:16 +0530
-Subject: [PATCH 0/3] Add Xilinx AMS Driver
-Message-ID: <1535624539-7839-1-git-send-email-manish.narani@xilinx.com>
+Date: Thu, 30 Aug 2018 15:52:19 +0530
+Subject: [PATCH 3/3] arm64: zynqmp: DT: Add Xilinx AMS node
+In-Reply-To: <1535624539-7839-1-git-send-email-manish.narani@xilinx.com>
+References: <1535624539-7839-1-git-send-email-manish.narani@xilinx.com>
+Message-ID: <1535624539-7839-4-git-send-email-manish.narani@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Xilinx AMS driver which is used for Xilinx's ZynqMP AMS controller.
-This AMS driver is used to report various interface voltages and
-temperatures across the system.
-This driver handles AMS module including PS-Sysmon & PL-Sysmon. The
-binding documentation is added for understanding of AMS, PS, PL Sysmon
-Channels.
+The Xilinx AMS includes an ADC as well as on-chip sensors that can be
+used to sample external and monitor on-die operating conditions, such as
+temperature and supply voltage levels.
 
-Manish Narani (3):
-  dt-bindings: iio: adc: Add Xilinx AMS binding documentation
-  iio: adc: Add Xilinx AMS driver
-  arm64: zynqmp: DT: Add Xilinx AMS node
+Signed-off-by: Manish Narani <manish.narani@xilinx.com>
+---
+ arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
- .../devicetree/bindings/iio/adc/xilinx-ams.txt     |  159 +++
- arch/arm64/boot/dts/xilinx/zynqmp.dtsi             |   26 +
- drivers/iio/adc/Kconfig                            |   10 +
- drivers/iio/adc/Makefile                           |    1 +
- drivers/iio/adc/xilinx-ams.c                       | 1081 ++++++++++++++++++++
- drivers/iio/adc/xilinx-ams.h                       |  281 +++++
- 6 files changed, 1558 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/iio/adc/xilinx-ams.txt
- create mode 100644 drivers/iio/adc/xilinx-ams.c
- create mode 100644 drivers/iio/adc/xilinx-ams.h
-
+diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+index 29ce234..6e42ca2 100644
+--- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
++++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+@@ -617,5 +617,31 @@
+ 			reg = <0x0 0xfd4d0000 0x0 0x1000>;
+ 			timeout-sec = <10>;
+ 		};
++
++		xilinx_ams: ams at ffa50000 {
++			compatible = "xlnx,zynqmp-ams";
++			status = "disabled";
++			interrupt-parent = <&gic>;
++			interrupts = <0 56 4>;
++			interrupt-names = "ams-irq";
++			reg = <0x0 0xffa50000 0x0 0x800>;
++			reg-names = "ams-base";
++			#address-cells = <2>;
++			#size-cells = <2>;
++			#io-channel-cells = <1>;
++			ranges;
++
++			ams_ps: ams_ps at ffa50800 {
++				compatible = "xlnx,zynqmp-ams-ps";
++				status = "disabled";
++				reg = <0x0 0xffa50800 0x0 0x400>;
++			};
++
++			ams_pl: ams_pl at ffa50c00 {
++				compatible = "xlnx,zynqmp-ams-pl";
++				status = "disabled";
++				reg = <0x0 0xffa50c00 0x0 0x400>;
++			};
++		};
+ 	};
+ };
 -- 
 2.1.1
