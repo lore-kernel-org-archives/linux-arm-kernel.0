@@ -1,91 +1,100 @@
-From: oss@buserror.net (Scott Wood)
-Date: Thu, 30 Aug 2018 12:42:41 -0500
-Subject: [PATCH 3/5] drivers: clk-qoriq: Add clockgen support for lx2160a
-In-Reply-To: <d2cfd49eb33a3ce74f0e78f2b53d3954d2cb3e76.camel@buserror.net>
-References: <1534747636-20064-1-git-send-email-vabhav.sharma@nxp.com>
- <1534747636-20064-4-git-send-email-vabhav.sharma@nxp.com>
- <4a9ea6b451683ec98c92e86a5ae6b91213a6afcf.camel@buserror.net>
- <VI1PR04MB4800E8B1E8541FCA9221A1CFF3080@VI1PR04MB4800.eurprd04.prod.outlook.com>
- <d2cfd49eb33a3ce74f0e78f2b53d3954d2cb3e76.camel@buserror.net>
-Message-ID: <b31ae8e788fb93971167faa9b55b497e838532c4.camel@buserror.net>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Thu, 30 Aug 2018 23:25:33 +0530
+Subject: [PATCH 11/15] soc: octeontx2: Add Marvell OcteonTX2 CGX driver
+In-Reply-To: <CAK8P3a1oeOFVYc2xH+KO1gV0m9utHziGpNtQLAEv-RBxKkB7Og@mail.gmail.com>
+References: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
+ <1535453838-12154-12-git-send-email-sunil.kovvuri@gmail.com>
+ <CAK8P3a0q0P-FuG6cTgMNkeZbtXE4pMk1iJq36_x20WRddtwaDg@mail.gmail.com>
+ <CA+sq2Cc1CSKmuEjKt8psR7Zyv9PzLkN10hzy8mrai136SF4-qA@mail.gmail.com>
+ <CAK8P3a2CMcYg6vMmRAc4N80BpFwczGiPnaLNCDZYXCsRydtPQw@mail.gmail.com>
+ <CA+sq2Ce3ew0X+RMm7fQ+iUZF0HKptzBr1dBk3NuRL8o82wBTjg@mail.gmail.com>
+ <CAK8P3a1oeOFVYc2xH+KO1gV0m9utHziGpNtQLAEv-RBxKkB7Og@mail.gmail.com>
+Message-ID: <CA+sq2CfAvasZoNmnNQadhdsEz-eyXQPBtXbDmvt1nM0DQsm+8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-08-30 at 12:39 -0500, Scott Wood wrote:
-> On Thu, 2018-08-30 at 07:36 +0000, Vabhav Sharma wrote:
-> > > -----Original Message-----
-> > > From: linux-kernel-owner at vger.kernel.org <linux-kernel-
-> > > owner at vger.kernel.org> On Behalf Of Scott Wood
-> > > Sent: Wednesday, August 29, 2018 5:49 AM
-> > > To: Vabhav Sharma <vabhav.sharma@nxp.com>; linux-
-> > > kernel at vger.kernel.org; devicetree at vger.kernel.org; robh+dt at kernel.org;
-> > > mark.rutland at arm.com; linuxppc-dev at lists.ozlabs.org; linux-arm-
-> > > kernel at lists.infradead.org; mturquette at baylibre.com; sboyd at kernel.org;
-> > > rjw at rjwysocki.net; viresh.kumar at linaro.org; linux-clk at vger.kernel.org;
-> > > linux-pm at vger.kernel.org; linux-kernel-owner at vger.kernel.org;
-> > > catalin.marinas at arm.com; will.deacon at arm.com;
-> > > gregkh at linuxfoundation.org; arnd at arndb.de;
-> > > kstewart at linuxfoundation.org; yamada.masahiro at socionext.com
-> > > Cc: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>; Andy Tang
-> > > <andy.tang@nxp.com>; Udit Kumar <udit.kumar@nxp.com>;
-> > > linux at armlinux.org.uk; Varun Sethi <V.Sethi@nxp.com>
-> > > Subject: Re: [PATCH 3/5] drivers: clk-qoriq: Add clockgen support for
-> > > lx2160a
-> > > 
-> > > On Mon, 2018-08-20 at 12:17 +0530, Vabhav Sharma wrote:
-> > > > From: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
-> > > > 
-> > > > Add clockgen support for lx2160a.
-> > > > Added entry for compat 'fsl,lx2160a-clockgen'.
-> > > > As LX2160A is 16 core, so modified value for NUM_CMUX
-> > > > 
-> > > > Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
-> > > > Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
-> > > > Signed-off-by: Vabhav Sharma <vabhav.sharma@nxp.com>
-> > > > ---
-> > > >  drivers/clk/clk-qoriq.c         | 14 +++++++++++++-
-> > > >  drivers/cpufreq/qoriq-cpufreq.c |  1 +
-> > > >  2 files changed, 14 insertions(+), 1 deletion(-)
-> > > > 
-> > > > diff --git a/drivers/clk/clk-qoriq.c b/drivers/clk/clk-qoriq.c index
-> > > > 3a1812f..fc6e308 100644
-> > > > --- a/drivers/clk/clk-qoriq.c
-> > > > +++ b/drivers/clk/clk-qoriq.c
-> > > > @@ -60,7 +60,7 @@ struct clockgen_muxinfo {  };
-> > > > 
-> > > >  #define NUM_HWACCEL	5
-> > > > -#define NUM_CMUX	8
-> > > > +#define NUM_CMUX	16
-> > > > 
-> > > >  struct clockgen;
-> > > > 
-> > > > @@ -570,6 +570,17 @@ static const struct clockgen_chipinfo chipinfo[]
-> > > > =
-> > > > {
-> > > >  		.flags = CG_VER3 | CG_LITTLE_ENDIAN,
-> > > >  	},
-> > > >  	{
-> > > > +		.compat = "fsl,lx2160a-clockgen",
-> > > > +		.cmux_groups = {
-> > > > +			&clockgen2_cmux_cga12, &clockgen2_cmux_cgb
-> > > > +		},
-> > > > +		.cmux_to_group = {
-> > > > +			0, 0, 0, 0, 1, 1, 1, 1, -1
-> > > > +		},
-> > > > +		.pll_mask = 0x37,
-> > > > +		.flags = CG_VER3 | CG_LITTLE_ENDIAN,
-> > > > +	},
-> > > 
-> > > Why are you increasing NUM_CMUX beyond 8 for a chip that only has 8
-> > > entries in cmux_to_group?
-> > 
-> > Configuration is 16 cores,8 cluster with 2 cores in each cluster
-> 
-> So?  This is about cmuxes, not cores.  You're increasing the array without
-> ever using the new size.
+On Thu, Aug 30, 2018 at 7:37 PM Arnd Bergmann <arnd@arndb.de> wrote:
+>
+> On Tue, Aug 28, 2018 at 3:10 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
+> >
+> > > > > If this is a regular PCI ethernet driver, why do you put it into driver/soc
+> > > > > rather than drivers/net/ethernet/ ?
+> > > >
+> > > > No, this is not a ethernet driver, as mentioned in the cover letter
+> > > > this driver and AF driver doesn't
+> > > > handle any IO. There will be a separate ethernet driver (will submit
+> > > > that as well in future) which will
+> > > > communicate with these drivers for configuring hardware.
+> > > >
+> > > > The driver in question here is for a serdes controller which handles
+> > > > physical ethernet interfaces.
+> > > > Admin function driver gathers info w.r.t current state of physical
+> > > > ethernet interfaces from this driver
+> > > > and notifies actual ethernet driver about changes, if any.
+> > >
+> > > Ok. Can you describe the structure that the PCI devices appear
+> > > in? It might help to be make the connection between the differnet
+> > > patches to understand how things fit together. In the final
+> > > picture, how many different pci_driver instances do you have,
+> > > and what part are they for?
+> >
+> > List of PCI devices are CGX, RVU PF0-PFn SRIOV physical functions
+> > and RVU VF0-VFn SRIOV virtual functions. No of VFs per PF is configurable
+> > and done by low level firmware.
+> >
+> > List of PCI driver instances would be CGX driver, RVU PF0 (i.e admin
+> > function) driver,
+> > PF1-PFn either netdev driver or crypto driver, VF0-VFn functionality would be
+> > same as their PF.
+> >
+> > The current plan is to have CGX driver, Admin function driver, PF
+> > netdev driver, VF netdev driver and PF/VF crypto drivers.
+>
+> Ok, I think I understand the PF/VF distinction now. One (to me)
+> surprising aspect here is that you not just have one physical function
+> that you can use to assign resources to multiple virtual functions,
+> but also a second level of virtualization that is used to assign
+> resources to "physical functions" that are less physical than the
+> name suggests.
 
-Oh, and you also broke p4080 which has 8 cmuxes but no -1 terminator, because
-the array was of length 8.  Probably the array should be changed to NUM_CMUX+1
-so every array can be -1 terminated.
+Yes, PF is just for name sake, on-boot there is no difference between
+PFs/VFs as such.
+PF0 has privilege access to assign resources to all PFs and their VFs.
+This admin function driver loads for PF0.
 
--Scott
+>
+> The part that I have not grasped yet is what the split between
+> the CGX and the AF is for, how they relate to one another, and
+> what the software abstraction for the two is going to be.
+
+In HW, CGX is a separate PCI device which handles the serdes and
+physical ethernet interface.
+Ethernet driver in drivers/net/ethernet can only communicate to
+admin function driver since they share a mailbox memory.
+So we had to bind both CGX and admin function drivers to almost work as one,
+inorder to provide relavent info to ethernet drivers. That's why we
+have many functions
+from CGX driver which AF uses.
+
+eg: Firmware gets to know about a physical interface status change,
+which CGX driver gets
+to know and it uses AF's mailbox communication to inform ethernet
+driver about the event.
+
+>
+> > > Is the idea that an ethernet device driver always attaches to a
+> > > virtual function that gets created by the main driver, and that
+> > > the two drivers share no interfaces on the kernel side, or do
+> > > you have multiple drivers linking to each other?
+> >
+> > Ethernet device driver can attach to both physical function and virtual function
+> > whose HW resources are provisioned by admin function driver.
+> >
+> > Yes the PF/VF ethernet drivers and these drivers won't share any
+> > kernel interfaces.
+> > Physical ethernet interface is owned by ethernet driver only, this driver just
+> > configures which ethernet driver instance uses which physcial interface.
+>
+> Ok.
+>
+>          Arnd
