@@ -1,20 +1,28 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 30 Aug 2018 14:32:53 +0200
-Subject: [PATCH v3 2/2] arm64: dts: renesas: condor: add PCIe support
-In-Reply-To: <259d65c0-5fb8-e426-3452-c5109a687c15@cogentembedded.com>
-References: <fb4eb097-40aa-82df-68c7-9b727c858a8b@cogentembedded.com>
- <259d65c0-5fb8-e426-3452-c5109a687c15@cogentembedded.com>
-Message-ID: <20180830123252.fyniw2jzw2phf5bb@verge.net.au>
+Date: Thu, 30 Aug 2018 14:19:52 +0200
+Subject: [PATCH 2/9] arm64: dts: renesas: r8a774a1: Add I2C and IIC-DVFS
+ support
+In-Reply-To: <20180827085135.bjzbiws7tdtig5kd@verge.net.au>
+References: <1535031788-19907-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <1535031788-19907-3-git-send-email-fabrizio.castro@bp.renesas.com>
+ <20180827085135.bjzbiws7tdtig5kd@verge.net.au>
+Message-ID: <20180830121952.sr3hjtx6focfidrf@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2018 at 09:54:35PM +0300, Sergei Shtylyov wrote:
-> Enable PCIe PHY and PCIEC and specify the PCIe bus clock for the Condor
-> board.
+On Mon, Aug 27, 2018 at 10:51:35AM +0200, Simon Horman wrote:
+> On Thu, Aug 23, 2018 at 02:43:01PM +0100, Fabrizio Castro wrote:
+> > From: Biju Das <biju.das@bp.renesas.com>
+> > 
+> > Add the I2C[0-6] and IIC Bus Interface for DVFS (IIC for DVFS)
+> > devices nodes to the r8a774a1 device tree.
+> > 
+> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> > Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 > 
-> Based on the original (and large) patch by Vladimir Barinov.
+> Thanks,
 > 
-> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> This looks fine to me but I will wait to see if there are other reviews
+> before applying.
 
-Thanks Sergei, applied for v4.20.
+Thanks again, applied for v4.20.
