@@ -1,123 +1,184 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Aug 2018 17:15:46 +0100
-Subject: [PATCH 12/12] arm64: tlb: Rewrite stale comment in asm/tlbflush.h
+Date: Thu, 30 Aug 2018 17:15:43 +0100
+Subject: [PATCH 09/12] asm-generic/tlb: Track which levels of the page tables
+ have been cleared
 In-Reply-To: <1535645747-9823-1-git-send-email-will.deacon@arm.com>
 References: <1535645747-9823-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1535645747-9823-13-git-send-email-will.deacon@arm.com>
+Message-ID: <1535645747-9823-10-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter Z asked me to justify the barrier usage in asm/tlbflush.h, but
-actually that whole block comment needs to be rewritten.
+It is common for architectures with hugepage support to require only a
+single TLB invalidation operation per hugepage during unmap(), rather than
+iterating through the mapping at a PAGE_SIZE increment. Currently,
+however, the level in the page table where the unmap() operation occurs
+is not stored in the mmu_gather structure, therefore forcing
+architectures to issue additional TLB invalidation operations or to give
+up and over-invalidate by e.g. invalidating the entire TLB.
 
-Reported-by: Peter Zijlstra <peterz@infradead.org>
+Ideally, we could add an interval rbtree to the mmu_gather structure,
+which would allow us to associate the correct mapping granule with the
+various sub-mappings within the range being invalidated. However, this
+is costly in terms of book-keeping and memory management, so instead we
+approximate by keeping track of the page table levels that are cleared
+and provide a means to query the smallest granule required for invalidation.
+
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/tlbflush.h | 80 +++++++++++++++++++++++++++------------
- 1 file changed, 55 insertions(+), 25 deletions(-)
+ include/asm-generic/tlb.h | 58 ++++++++++++++++++++++++++++++++++++++++-------
+ mm/memory.c               |  4 +++-
+ 2 files changed, 53 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
-index c98ed8871030..c3c0387aee18 100644
---- a/arch/arm64/include/asm/tlbflush.h
-+++ b/arch/arm64/include/asm/tlbflush.h
-@@ -70,43 +70,73 @@
- 	})
+diff --git a/include/asm-generic/tlb.h b/include/asm-generic/tlb.h
+index 2b444ad94566..9791e98122a0 100644
+--- a/include/asm-generic/tlb.h
++++ b/include/asm-generic/tlb.h
+@@ -116,6 +116,14 @@ struct mmu_gather {
+ 	 */
+ 	unsigned int		freed_tables : 1;
  
++	/*
++	 * at which levels have we cleared entries?
++	 */
++	unsigned int		cleared_ptes : 1;
++	unsigned int		cleared_pmds : 1;
++	unsigned int		cleared_puds : 1;
++	unsigned int		cleared_p4ds : 1;
++
+ 	struct mmu_gather_batch *active;
+ 	struct mmu_gather_batch	local;
+ 	struct page		*__pages[MMU_GATHER_BUNDLE];
+@@ -150,6 +158,10 @@ static inline void __tlb_reset_range(struct mmu_gather *tlb)
+ 		tlb->end = 0;
+ 	}
+ 	tlb->freed_tables = 0;
++	tlb->cleared_ptes = 0;
++	tlb->cleared_pmds = 0;
++	tlb->cleared_puds = 0;
++	tlb->cleared_p4ds = 0;
+ }
+ 
+ static inline void tlb_flush_mmu_tlbonly(struct mmu_gather *tlb)
+@@ -199,6 +211,25 @@ static inline void tlb_remove_check_page_size_change(struct mmu_gather *tlb,
+ }
+ #endif
+ 
++static inline unsigned long tlb_get_unmap_shift(struct mmu_gather *tlb)
++{
++	if (tlb->cleared_ptes)
++		return PAGE_SHIFT;
++	if (tlb->cleared_pmds)
++		return PMD_SHIFT;
++	if (tlb->cleared_puds)
++		return PUD_SHIFT;
++	if (tlb->cleared_p4ds)
++		return P4D_SHIFT;
++
++	return PAGE_SHIFT;
++}
++
++static inline unsigned long tlb_get_unmap_size(struct mmu_gather *tlb)
++{
++	return 1UL << tlb_get_unmap_shift(tlb);
++}
++
  /*
-- *	TLB Management
-- *	==============
-+ *	TLB Invalidation
-+ *	================
-  *
-- *	The TLB specific code is expected to perform whatever tests it needs
-- *	to determine if it should invalidate the TLB for each call.  Start
-- *	addresses are inclusive and end addresses are exclusive; it is safe to
-- *	round these addresses down.
-+ * 	This header file implements the low-level TLB invalidation routines
-+ *	(sometimes referred to as "flushing" in the kernel) for arm64.
-  *
-- *	flush_tlb_all()
-+ *	Every invalidation operation uses the following template:
-+ *
-+ *	DSB ISHST	// Ensure prior page-table updates have completed
-+ *	TLBI ...	// Invalidate the TLB
-+ *	DSB ISH		// Ensure the TLB invalidation has completed
-+ *      if (invalidated kernel mappings)
-+ *		ISB	// Discard any instructions fetched from the old mapping
-+ *
-+ *
-+ *	The following functions form part of the "core" TLB invalidation API,
-+ *	as documented in Documentation/core-api/cachetlb.rst:
-  *
-- *		Invalidate the entire TLB.
-+ *	flush_tlb_all()
-+ *		Invalidate the entire TLB (kernel + user) on all CPUs
-  *
-  *	flush_tlb_mm(mm)
-+ *		Invalidate an entire user address space on all CPUs.
-+ *		The 'mm' argument identifies the ASID to invalidate.
-+ *
-+ *	flush_tlb_range(vma, start, end)
-+ *		Invalidate the virtual-address range '[start, end)' on all
-+ *		CPUs for the user address space corresponding to 'vma->mm'.
-+ *		Note that this operation also invalidates any walk-cache
-+ *		entries associated with translations for the specified address
-+ *		range.
-+ *
-+ *	flush_tlb_kernel_range(start, end)
-+ *		Same as flush_tlb_range(..., start, end), but applies to
-+ * 		kernel mappings rather than a particular user address space.
-+ *		Whilst not explicitly documented, this function is used when
-+ *		unmapping pages from vmalloc/io space.
-+ *
-+ *	flush_tlb_page(vma, addr)
-+ *		Invalidate a single user mapping for address 'addr' in the
-+ *		address space corresponding to 'vma->mm'.  Note that this
-+ *		operation only invalidates a single, last-level page-table
-+ *		entry and therefore does not affect any walk-caches.
-  *
-- *		Invalidate all TLB entries in a particular address space.
-- *		- mm	- mm_struct describing address space
-  *
-- *	flush_tlb_range(mm,start,end)
-+ *	Next, we have some undocumented invalidation routines that you probably
-+ *	don't want to call unless you know what you're doing:
-  *
-- *		Invalidate a range of TLB entries in the specified address
-- *		space.
-- *		- mm	- mm_struct describing address space
-- *		- start - start address (may not be aligned)
-- *		- end	- end address (exclusive, may not be aligned)
-+ *	local_flush_tlb_all()
-+ *		Same as flush_tlb_all(), but only applies to the calling CPU.
-  *
-- *	flush_tlb_page(vaddr,vma)
-+ *	__flush_tlb_kernel_pgtable(addr)
-+ *		Invalidate a single kernel mapping for address 'addr' on all
-+ *		CPUs, ensuring that any walk-cache entries associated with the
-+ *		translation are also invalidated.
-  *
-- *		Invalidate the specified page in the specified address range.
-- *		- vaddr - virtual address (may not be aligned)
-- *		- vma	- vma_struct describing address range
-+ *	__flush_tlb_range(vma, start, end, stride, last_level)
-+ *		Invalidate the virtual-address range '[start, end)' on all
-+ *		CPUs for the user address space corresponding to 'vma->mm'.
-+ *		The invalidation operations are issued at a granularity
-+ *		determined by 'stride' and only affect any walk-cache entries
-+ *		if 'last_level' is equal to false.
-  *
-- *	flush_kern_tlb_page(kaddr)
-  *
-- *		Invalidate the TLB entry for the specified page.  The address
-- *		will be in the kernels virtual memory space.  Current uses
-- *		only require the D-TLB to be invalidated.
-- *		- kaddr - Kernel virtual memory address
-+ *	Finally, take a look at asm/tlb.h to see how tlb_flush() is implemented
-+ *	on top of these routines, since that is our interface to the mmu_gather
-+ *	API as used by munmap() and friends.
-  */
- static inline void local_flush_tlb_all(void)
+  * In the case of tlb vma handling, we can optimise these away in the
+  * case where we're doing a full MM flush.  When we're doing a munmap,
+@@ -232,13 +263,19 @@ static inline void tlb_remove_check_page_size_change(struct mmu_gather *tlb,
+ #define tlb_remove_tlb_entry(tlb, ptep, address)		\
+ 	do {							\
+ 		__tlb_adjust_range(tlb, address, PAGE_SIZE);	\
++		tlb->cleared_ptes = 1;				\
+ 		__tlb_remove_tlb_entry(tlb, ptep, address);	\
+ 	} while (0)
+ 
+-#define tlb_remove_huge_tlb_entry(h, tlb, ptep, address)	     \
+-	do {							     \
+-		__tlb_adjust_range(tlb, address, huge_page_size(h)); \
+-		__tlb_remove_tlb_entry(tlb, ptep, address);	     \
++#define tlb_remove_huge_tlb_entry(h, tlb, ptep, address)	\
++	do {							\
++		unsigned long _sz = huge_page_size(h);		\
++		__tlb_adjust_range(tlb, address, _sz);		\
++		if (_sz == PMD_SIZE)				\
++			tlb->cleared_pmds = 1;			\
++		else if (_sz == PUD_SIZE)			\
++			tlb->cleared_puds = 1;			\
++		__tlb_remove_tlb_entry(tlb, ptep, address);	\
+ 	} while (0)
+ 
+ /**
+@@ -252,6 +289,7 @@ static inline void tlb_remove_check_page_size_change(struct mmu_gather *tlb,
+ #define tlb_remove_pmd_tlb_entry(tlb, pmdp, address)			\
+ 	do {								\
+ 		__tlb_adjust_range(tlb, address, HPAGE_PMD_SIZE);	\
++		tlb->cleared_pmds = 1;					\
+ 		__tlb_remove_pmd_tlb_entry(tlb, pmdp, address);		\
+ 	} while (0)
+ 
+@@ -266,6 +304,7 @@ static inline void tlb_remove_check_page_size_change(struct mmu_gather *tlb,
+ #define tlb_remove_pud_tlb_entry(tlb, pudp, address)			\
+ 	do {								\
+ 		__tlb_adjust_range(tlb, address, HPAGE_PUD_SIZE);	\
++		tlb->cleared_puds = 1;					\
+ 		__tlb_remove_pud_tlb_entry(tlb, pudp, address);		\
+ 	} while (0)
+ 
+@@ -291,7 +330,8 @@ static inline void tlb_remove_check_page_size_change(struct mmu_gather *tlb,
+ #define pte_free_tlb(tlb, ptep, address)			\
+ 	do {							\
+ 		__tlb_adjust_range(tlb, address, PAGE_SIZE);	\
+-		tlb->freed_tables = 1;			\
++		tlb->freed_tables = 1;				\
++		tlb->cleared_pmds = 1;				\
+ 		__pte_free_tlb(tlb, ptep, address);		\
+ 	} while (0)
+ #endif
+@@ -300,7 +340,8 @@ static inline void tlb_remove_check_page_size_change(struct mmu_gather *tlb,
+ #define pmd_free_tlb(tlb, pmdp, address)			\
+ 	do {							\
+ 		__tlb_adjust_range(tlb, address, PAGE_SIZE);	\
+-		tlb->freed_tables = 1;			\
++		tlb->freed_tables = 1;				\
++		tlb->cleared_puds = 1;				\
+ 		__pmd_free_tlb(tlb, pmdp, address);		\
+ 	} while (0)
+ #endif
+@@ -310,7 +351,8 @@ static inline void tlb_remove_check_page_size_change(struct mmu_gather *tlb,
+ #define pud_free_tlb(tlb, pudp, address)			\
+ 	do {							\
+ 		__tlb_adjust_range(tlb, address, PAGE_SIZE);	\
+-		tlb->freed_tables = 1;			\
++		tlb->freed_tables = 1;				\
++		tlb->cleared_p4ds = 1;				\
+ 		__pud_free_tlb(tlb, pudp, address);		\
+ 	} while (0)
+ #endif
+@@ -321,7 +363,7 @@ static inline void tlb_remove_check_page_size_change(struct mmu_gather *tlb,
+ #define p4d_free_tlb(tlb, pudp, address)			\
+ 	do {							\
+ 		__tlb_adjust_range(tlb, address, PAGE_SIZE);	\
+-		tlb->freed_tables = 1;			\
++		tlb->freed_tables = 1;				\
+ 		__p4d_free_tlb(tlb, pudp, address);		\
+ 	} while (0)
+ #endif
+diff --git a/mm/memory.c b/mm/memory.c
+index c467102a5cbc..9135f48e8d84 100644
+--- a/mm/memory.c
++++ b/mm/memory.c
+@@ -267,8 +267,10 @@ void arch_tlb_finish_mmu(struct mmu_gather *tlb,
  {
+ 	struct mmu_gather_batch *batch, *next;
+ 
+-	if (force)
++	if (force) {
++		__tlb_reset_range(tlb);
+ 		__tlb_adjust_range(tlb, start, end - start);
++	}
+ 
+ 	tlb_flush_mmu(tlb);
+ 
 -- 
 2.1.4
