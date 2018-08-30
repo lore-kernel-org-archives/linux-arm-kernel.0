@@ -1,94 +1,92 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Thu, 30 Aug 2018 11:39:53 +0200
-Subject: [PATCH v4 05/20] kvm: arm64: Add helper for loading the stage2
- setting for a VM
-In-Reply-To: <1531905547-25478-6-git-send-email-suzuki.poulose@arm.com>
-References: <1531905547-25478-1-git-send-email-suzuki.poulose@arm.com>
- <1531905547-25478-6-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180830093953.GA4029@e113682-lin.lund.arm.com>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Thu, 30 Aug 2018 15:10:26 +0530
+Subject: [PATCH 00/15] soc: octeontx2: Add RVU admin function driver
+In-Reply-To: <CA+sq2Cd3R0V5hcaF+ESfkOEBHgBwOB6b8Uwx7K+CeUN6gLFTOg@mail.gmail.com>
+References: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
+ <CAK8P3a1xC6XjwDAmocpE5TZO7j6uVGtvBtWLPVcYwKqN6Z+seQ@mail.gmail.com>
+ <CA+sq2Cd3R0V5hcaF+ESfkOEBHgBwOB6b8Uwx7K+CeUN6gLFTOg@mail.gmail.com>
+Message-ID: <CA+sq2CfbpQKas7TbQfrcw=Drpb7yO_gqH31iXabjNEQEG4xYrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2018 at 10:18:48AM +0100, Suzuki K Poulose wrote:
-> We load the stage2 context of a guest for different operations,
-> including running the guest and tlb maintenance on behalf of the
-> guest. As of now only the vttbr is private to the guest, but this
-> is about to change with IPA per VM. Add a helper to load the stage2
-> configuration for a VM, which could do the right thing with the
-> future changes.
-> 
-> Cc: Christoffer Dall <cdall@kernel.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Reviewed-by: Eric Auger <eric.auger@redhat.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
-> Changes since v2:
->  - New patch
-> ---
->  arch/arm64/include/asm/kvm_hyp.h | 6 ++++++
->  arch/arm64/kvm/hyp/switch.c      | 2 +-
->  arch/arm64/kvm/hyp/tlb.c         | 4 ++--
->  3 files changed, 9 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
-> index 384c343..82f9994 100644
-> --- a/arch/arm64/include/asm/kvm_hyp.h
-> +++ b/arch/arm64/include/asm/kvm_hyp.h
-> @@ -155,5 +155,11 @@ void deactivate_traps_vhe_put(void);
->  u64 __guest_enter(struct kvm_vcpu *vcpu, struct kvm_cpu_context *host_ctxt);
->  void __noreturn __hyp_do_panic(unsigned long, ...);
->  
-> +/* Must be called from hyp code running at EL2 */
+On Tue, Aug 28, 2018 at 6:54 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
+>
+> On Tue, Aug 28, 2018 at 5:53 PM Arnd Bergmann <arnd@arndb.de> wrote:
+> >
+> > On Tue, Aug 28, 2018 at 12:57 PM <sunil.kovvuri@gmail.com> wrote:
+> > >
+> > > From: Sunil Goutham <sgoutham@marvell.com>
+> > >
+> > > Resource virtualization unit (RVU) on Marvell's OcteonTX2 SOC supports
+> > > multiple PCIe SRIOV physical functions (PFs) and virtual functions (VFs).
+> > > PF0 is called administrative / admin function (AF) and has privilege access
+> > > to registers to provision different RVU functional blocks to each of
+> > > PF/VF.
+> > >
+> > > This admin function (AF) driver acts as a configuration / administrative
+> > > software which provisions functional blocks to a PF/VF on demand for them
+> > > to work as one of the following
+> > >  - A basic network controller (i.e NIC).
+> > >  - NIC with packet filtering, shaping and scheduling capabilities.
+> > >  - A crypto device.
+> > >  - A combination of above etc.
+> > >
+> > > PF/VFs communicate with admin function via a shared memory region.
+> > > This patch series adds logic for the following
+> > >  - RVU AF driver with functional blocks provisioning support
+> > >  - Mailbox infrastructure for communication between AF and PFs.
+> > >  - CGX driver which provides information about physcial network
+> > >    interfaces which AF processes and forwards required info to
+> > >    PF/VF drivers.
+> > >
+> > > This is the first set of patches out of 70 odd patches.
+> > >
+> > > Note: This driver neither receives any data nor processes it i.e no I/O,
+> > >       just does the hardware configuration.
+> >
+> > Hi Sunil,
+> >
+> > Thanks for posting this first series, I'm glad we're seeing support for this
+> > chip family making some progress.
+>
+> Thanks.
+>
+> >
+> > My feeling overall is that we need a review from the network driver
+> > folks more than the arm-soc team etc, and that maybe the driver
+> > as a whole should go into drivers/net/ethernet.
+>
+> This driver doesn't handle any network IO and moreever this driver has to handle
+> configuration requests from crypto driver as well. There will be
+> separate network and
+> crypto drivers which will be upstreamed into drivers/net/ethernet and
+> drivers/crypto.
+> And in future silicons there will be different types of functional
+> blocks which will be
+> added into this resource virtualization unit (RVU). Hence i thought
+> this driver is not a
+> right fit in drivers/net/ethernet.
+>
+> >
+> > We support some couple of similar hardware already that has
+> > both support for virtual functions and for crypto offload, including
+> > the Chelsio cxgb4, Mellanox mlx5, NXP DPAA and probably others,
+>
+> I agree, but i guess that is done to support inline crypto.
+> Here this driver has to handle requests from normal crypto driver
+> (drivers/crypto) as well.
+>
+> > and we need to ensure that the exposed interfaces are all
+> > compatible, and that you use the correct subsystems and
+> > in-kernel abstractions for thing that are common.
+> >
+> >       Arnd
 
-more importantly than having to run this at EL2, is that it must have
-gone through the proper sequence of update_vttbr() and disabling
-interrupts to avoid using a stale VMID.
+Hi Arnd,
 
-> +static __always_inline void __hyp_text __load_guest_stage2(struct kvm *kvm)
-> +{
-> +	write_sysreg(kvm->arch.vttbr, vttbr_el2);
-> +}
-> +
->  #endif /* __ARM64_KVM_HYP_H__ */
->  
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index d496ef5..355fb25 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -195,7 +195,7 @@ void deactivate_traps_vhe_put(void)
->  
->  static void __hyp_text __activate_vm(struct kvm *kvm)
->  {
-> -	write_sysreg(kvm->arch.vttbr, vttbr_el2);
-> +	__load_guest_stage2(kvm);
->  }
->  
->  static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
-> diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
-> index 131c777..4dbd9c6 100644
-> --- a/arch/arm64/kvm/hyp/tlb.c
-> +++ b/arch/arm64/kvm/hyp/tlb.c
-> @@ -30,7 +30,7 @@ static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm)
->  	 * bits. Changing E2H is impossible (goodbye TTBR1_EL2), so
->  	 * let's flip TGE before executing the TLB operation.
->  	 */
-> -	write_sysreg(kvm->arch.vttbr, vttbr_el2);
-> +	__load_guest_stage2(kvm);
->  	val = read_sysreg(hcr_el2);
->  	val &= ~HCR_TGE;
->  	write_sysreg(val, hcr_el2);
-> @@ -39,7 +39,7 @@ static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm)
->  
->  static void __hyp_text __tlb_switch_to_guest_nvhe(struct kvm *kvm)
->  {
-> -	write_sysreg(kvm->arch.vttbr, vttbr_el2);
-> +	__load_guest_stage2(kvm);
->  	isb();
->  }
->  
-> -- 
-> 2.7.4
-> 
+I hope i have answered your queries.
+Let us know if you have any more queries or feedback w.r.t to a
+individual patch or the patchset on the whole.
 
 Thanks,
--Christoffer
+Sunil.
