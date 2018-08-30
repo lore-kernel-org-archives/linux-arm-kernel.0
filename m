@@ -1,102 +1,113 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 30 Aug 2018 18:23:00 +0200
-Subject: [PATCH] arm64: defconfig: enable EFI_ARMSTUB_DTB_LOADER
-In-Reply-To: <CAOesGMho8CfT7iDXadmkB5=7DoOi6n8qXcS9X643vf+Y0BbD6w@mail.gmail.com>
-References: <1535563287-24803-1-git-send-email-scott.branden@broadcom.com>
- <CAOesGMhjcJ1p3QcEYb9fsx3fMXAOsgR2njOq=VKgEbWGwJi36g@mail.gmail.com>
- <fb07b89d-d427-5e59-9f17-b12df26284ec@broadcom.com>
- <CAKv+Gu-R7eX=aj=O2-gpzmp0K4t0T4s536UiqJZs0WuxRjkYwQ@mail.gmail.com>
- <CAOesGMho8CfT7iDXadmkB5=7DoOi6n8qXcS9X643vf+Y0BbD6w@mail.gmail.com>
-Message-ID: <CAKv+Gu_mKU+RdPgg2Dfezy4-L+KDEEBx02R49ObomRhEkJJ6Mw@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 30 Aug 2018 17:25:00 +0100
+Subject: A crash on ARM64 in move_freepages_block due to uninitialized
+ pages in reserved memory
+In-Reply-To: <alpine.LRH.2.02.1808301148260.18300@file01.intranet.prod.int.rdu2.redhat.com>
+References: <alpine.LRH.2.02.1808171527220.2385@file01.intranet.prod.int.rdu2.redhat.com>
+ <20180821104418.GA16611@dhcp22.suse.cz>
+ <e35b7c14-c7ea-412d-2763-c961b74576f3@arm.com>
+ <alpine.LRH.2.02.1808220808050.17906@file01.intranet.prod.int.rdu2.redhat.com>
+ <c823eace-8710-9bf5-6e76-d01b139c0859@arm.com>
+ <20180824114158.GJ29735@dhcp22.suse.cz>
+ <541193a6-2bce-f042-5bb2-88913d5f1047@arm.com>
+ <alpine.LRH.2.02.1808301148260.18300@file01.intranet.prod.int.rdu2.redhat.com>
+Message-ID: <27f10f29-8e38-1f42-8431-9db66aed2d1e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 August 2018 at 17:06, Olof Johansson <olof@lixom.net> wrote:
-> On Wed, Aug 29, 2018 at 10:54 PM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
->> On 29 August 2018 at 20:59, Scott Branden <scott.branden@broadcom.com> wrote:
->>> Hi Olof,
->>>
->>>
->>> On 18-08-29 11:44 AM, Olof Johansson wrote:
+Hi Mikulas,
+
+On 30/08/18 16:58, Mikulas Patocka wrote:
+> On Wed, 29 Aug 2018, James Morse wrote:
+>> On 24/08/18 12:41, Michal Hocko wrote:
+>>> On Thu 23-08-18 15:06:08, James Morse wrote:
+>>> [...]
+>>>> My best-guess is that pfn_valid_within() shouldn't be optimised out if
+>>> ARCH_HAS_HOLES_MEMORYMODEL, even if HOLES_IN_ZONE isn't set.
 >>>>
->>>> Hi,
->>>>
->>>> On Wed, Aug 29, 2018 at 10:21 AM, Scott Branden
->>>> <scott.branden@broadcom.com> wrote:
->>>>>
->>>>> Enable EFI_ARMSTUB_DTB_LOADER to add support for the dtb= command line
->>>>> parameter to function with efi loader.
->>>>>
->>>>> Required to boot on existing bootloaders that do not support devicetree
->>>>> provided by the platform or by the bootloader.
->>>>>
->>>>> Fixes: 3d7ee348aa41 ("efi/libstub/arm: Add opt-in Kconfig option for the
->>>>> DTB loader")
->>>>> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
->>>>
->>>> Why did Ard create an option for this if it's just going be turned on
->>>> in default configs? Doesn't make sense to me.
->>>>
->>>> It would help to know what firmware still is crippled and how common
->>>> it is, since it's been a few years that this has been a requirement by
->>>> now.
->>>
->>> Broadcom NS2 and Stingray in current development and production need this
->>> option in the kernel enabled in order to boot.
+>>>> Does something like this solve the problem?:
+>>>> ============================%<============================
+>>>> diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
+>>>> index 32699b2dc52a..5e27095a15f4 100644
+>>>> --- a/include/linux/mmzone.h
+>>>> +++ b/include/linux/mmzone.h
+>>>> @@ -1295,7 +1295,7 @@ void memory_present(int nid, unsigned long start, unsigned
+>>>> long end);
+>>>>   * pfn_valid_within() should be used in this case; we optimise this away
+>>>>   * when we have no holes within a MAX_ORDER_NR_PAGES block.
+>>>>   */
+>>>> -#ifdef CONFIG_HOLES_IN_ZONE
+>>>> +#if defined(CONFIG_HOLES_IN_ZONE) || defined(CONFIG_ARCH_HAS_HOLES_MEMORYMODEL)
+>>>>  #define pfn_valid_within(pfn) pfn_valid(pfn)
+>>>>  #else
+>>>>  #define pfn_valid_within(pfn) (1)
+>>>> ============================%<============================
 >>
->> And these production systems run mainline kernels in a defconfig configuration?
+>> After plenty of greping, git-archaeology and help from others, I think I've a
+>> clearer picture of what these options do.
 >>
->> The simply reality is that the DTB loader has been deprecated for a
->> good reason: it was only ever intended as a development hack anyway,
->> and if we need to treat the EFI stub provided DTB as a first class
->> citizen, there are things we need to fix to make things works as
->> expected. For instance, GRUB will put a property in the /chosen node
->> for the initramfs which will get dropped if you boot with dtb=.
 >>
->> Don't be surprised if some future enhancements of the EFI stub code
->> depend on !EFI_ARMSTUB_DTB_LOADER. On UEFI systems, DTBs [or ACPI
->> tables] are used by the firmware to describe itself and the underlying
->> platform to the OS, and the practice of booting with DTB file images
->> (taken from the kernel build as well) conflicts with that view. Note
->> that GRUB still permits you to load DTBs from files (and supports more
->> sources than just the file system the kernel Image was loaded from).
->
-> Ard,
->
-> Maybe a WARN() splat would be more useful as a phasing-out method than
-> removing functionality for them that needs to be reinstated through
-> changing the config?
->
+>> Please correct me if I've explained something wrong here:
+>>
+>>> This is the first time I hear about CONFIG_ARCH_HAS_HOLES_MEMORYMODEL.
+>>
+>> The comment in include/linux/mmzone.h describes this as relevant when parts the
+>> memmap have been free()d. This would happen on systems where memory is smaller
+>> than a sparsemem-section, and the extra struct pages are expensive.
+>> pfn_valid() on these systems returns true for the whole sparsemem-section, so an
+>> extra memmap_valid_within() check is needed.
+>>
+>> This is independent of nomap, and isn't relevant on arm64 as our pfn_valid()
+>> always tests the page in memblock due to nomap pages, which can occur anywhere.
+>> (I will propose a patch removing ARCH_HAS_HOLES_MEMORYMODEL for arm64.)
+>>
+>>
+>> HOLES_IN_ZONE is similar, if some memory is smaller than MAX_ORDER_NR_PAGES,
+>> possibly due to nomap holes.
+>>
+>> 6d526ee26ccd only enabled it for NUMA systems on arm64, because the NUMA code
+>> was first to fall foul of this, but there is nothing NUMA specific about nomap
+>> holes within a MAX_ORDER_NR_PAGES region.
+>>
+>> I'm convinced arm64 should always enable HOLES_IN_ZONE because nomap pages can
+>> occur anywhere. I'll post a fix.
+> 
+> But x86 had the same bug -
+> https://bugzilla.redhat.com/show_bug.cgi?id=1598462
 
-We don't have any of that in the stub, and inventing new ways to pass
-such information between the stub and the kernel proper seems like a
-cart-before-horse kind of thing to me. The EFI stub diagnostic
-messages you get on the serial console are not recorded in the kernel
-log buffer, so they only appear if you actually look at the serial
-output.
+(Context: e181ae0c5db "mm: zero unavailable pages before memmap init")
 
-> Once the stub and the boot method is there, it's hard to undo as we
-> can see here. Being loud and warn might be more useful, and set a
-> timeline for hard removal (12 months?).
->
+Its the same symptom, but not quite the same bug.
 
-The dtb= handling is still there, it is just not enabled by default.
-We can keep it around if people are still using it. But as I pointed
-out, we may decide to make new functionality available only if it is
-disabled, and at that point, we'll have to choose between one or the
-other in defconfig, which is annoying.
 
-> Scott; an alternative for you is to do a boot wrapper that bundles a
-> DT and kernel, and boot that instead of the kernel image (outside of
-> the kernel tree). Some 32-bit platforms from Marvell use that. That
-> way the kernel will just see it as a normally passed in DT.
->
+> And x86 fixed it without enabling HOLES_IN_ZONE. On x86, the BIOS can also 
+> reserve any memory range - so you can have arbitrary holes there that are 
+> not predictable when the kernel is compiled.
 
-Or use GRUB. It comes wired up in all the distros, and let's you load
-a DT binary from anywhere you can imagine, as opposed to the EFI stub
-which can only load it if it happens to reside in the same file system
-(or even directory - I can't remember) as the kernel image. Note that
-the same reservations apply to doing that - the firmware is no longer
-able to describe itself to the OS via the DT, which is really the only
-conduit it has available on an arm64 system..
+x86's pfn_valid() says the struct-page is accessible, the problem was it wasn't
+initialized correctly.
+
+On arm64 pfn_valid() says these struct-pages are not accessible. The problem was
+the pfn_valid_within()->pfn_valid() calls being removed, causing the
+uninitialized struct-page to be accessed.
+
+
+> Currently HOLES_IN_ZONE is selected only for ia64, mips/octeon - so does 
+> it mean that all the other architectures don't have holes in the memory 
+> map?
+
+I think there is just more than way of handling these, depending on whether
+holes have struct-pages and what pfn_valid() reports for them.
+
+
+> What should be architecture-independent way how to handle the holes?
+
+We already diverge with e820/memblock. I'm not sure what the x86 holes
+correspond to, but on arm64 these are holes in the linear-map because the
+corresponding memory needs mapping with particular attributes, and we can't
+mix-and-match.
+
+
+Thanks,
+
+James
