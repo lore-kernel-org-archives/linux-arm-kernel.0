@@ -1,34 +1,81 @@
 From: mirq-linux@rere.qmqm.pl (=?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?=)
-Date: Thu, 30 Aug 2018 23:00:12 +0200
-Subject: [PATCH v2 12/12] drm/tegra: kick out simplefb
+Date: Thu, 30 Aug 2018 23:00:08 +0200
+Subject: [PATCH v2 07/12] drm/mgag200: use simpler
+ remove_conflicting_pci_framebuffers()
 In-Reply-To: <cover.1535656077.git.mirq-linux@rere.qmqm.pl>
 References: <cover.1535656077.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <985a03e73608bcab0ec84b67edb69e334bd012fe.1535656077.git.mirq-linux@rere.qmqm.pl>
+Message-ID: <66888ed290bb80f8c529af2583611a383e2430f3.1535656077.git.mirq-linux@rere.qmqm.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kick out firmware fb when loading Tegra driver.
+Remove duplicated call, while at it.
 
 Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
 Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
 ---
- drivers/gpu/drm/tegra/drm.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/gpu/drm/mgag200/mgag200_drv.c  | 21 +--------------------
+ drivers/gpu/drm/mgag200/mgag200_main.c |  9 ---------
+ 2 files changed, 1 insertion(+), 29 deletions(-)
 
-diff --git a/drivers/gpu/drm/tegra/drm.c b/drivers/gpu/drm/tegra/drm.c
-index 7afe2f635f74..b51ec138fed2 100644
---- a/drivers/gpu/drm/tegra/drm.c
-+++ b/drivers/gpu/drm/tegra/drm.c
-@@ -1203,6 +1203,10 @@ static int host1x_drm_probe(struct host1x_device *dev)
+diff --git a/drivers/gpu/drm/mgag200/mgag200_drv.c b/drivers/gpu/drm/mgag200/mgag200_drv.c
+index 74cdde2ee474..ac6af4bd9df6 100644
+--- a/drivers/gpu/drm/mgag200/mgag200_drv.c
++++ b/drivers/gpu/drm/mgag200/mgag200_drv.c
+@@ -42,29 +42,10 @@ static const struct pci_device_id pciidlist[] = {
  
- 	dev_set_drvdata(&dev->dev, drm);
+ MODULE_DEVICE_TABLE(pci, pciidlist);
  
-+	err = drm_fb_helper_remove_conflicting_framebuffers(NULL, "tegradrmfb", false);
-+	if (err < 0)
-+		goto unref;
-+
- 	err = drm_dev_register(drm, 0);
- 	if (err < 0)
- 		goto unref;
+-static void mgag200_kick_out_firmware_fb(struct pci_dev *pdev)
+-{
+-	struct apertures_struct *ap;
+-	bool primary = false;
+-
+-	ap = alloc_apertures(1);
+-	if (!ap)
+-		return;
+-
+-	ap->ranges[0].base = pci_resource_start(pdev, 0);
+-	ap->ranges[0].size = pci_resource_len(pdev, 0);
+-
+-#ifdef CONFIG_X86
+-	primary = pdev->resource[PCI_ROM_RESOURCE].flags & IORESOURCE_ROM_SHADOW;
+-#endif
+-	drm_fb_helper_remove_conflicting_framebuffers(ap, "mgag200drmfb", primary);
+-	kfree(ap);
+-}
+-
+ 
+ static int mga_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+ {
+-	mgag200_kick_out_firmware_fb(pdev);
++	drm_fb_helper_remove_conflicting_pci_framebuffers(pdev, 0, "mgag200drmfb");
+ 
+ 	return drm_get_pci_dev(pdev, ent, &driver);
+ }
+diff --git a/drivers/gpu/drm/mgag200/mgag200_main.c b/drivers/gpu/drm/mgag200/mgag200_main.c
+index 780f983b0294..79d54103d470 100644
+--- a/drivers/gpu/drm/mgag200/mgag200_main.c
++++ b/drivers/gpu/drm/mgag200/mgag200_main.c
+@@ -124,20 +124,11 @@ static int mga_probe_vram(struct mga_device *mdev, void __iomem *mem)
+ static int mga_vram_init(struct mga_device *mdev)
+ {
+ 	void __iomem *mem;
+-	struct apertures_struct *aper = alloc_apertures(1);
+-	if (!aper)
+-		return -ENOMEM;
+ 
+ 	/* BAR 0 is VRAM */
+ 	mdev->mc.vram_base = pci_resource_start(mdev->dev->pdev, 0);
+ 	mdev->mc.vram_window = pci_resource_len(mdev->dev->pdev, 0);
+ 
+-	aper->ranges[0].base = mdev->mc.vram_base;
+-	aper->ranges[0].size = mdev->mc.vram_window;
+-
+-	drm_fb_helper_remove_conflicting_framebuffers(aper, "mgafb", true);
+-	kfree(aper);
+-
+ 	if (!devm_request_mem_region(mdev->dev->dev, mdev->mc.vram_base, mdev->mc.vram_window,
+ 				"mgadrmfb_vram")) {
+ 		DRM_ERROR("can't reserve VRAM\n");
 -- 
 2.18.0
