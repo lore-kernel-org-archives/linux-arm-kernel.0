@@ -1,30 +1,23 @@
-From: wufan@codeaurora.org (wufan)
-Date: Thu, 30 Aug 2018 13:45:19 -0600
-Subject: [PATCH v2] EDAC, ghes: use CPER module handles to locate DIMMs
-In-Reply-To: <CABo9ajCui0y9HMBzgKWeNtrbu4de+mLh=d9Qdkyo4zhU9az6hw@mail.gmail.com>
-References: <1535654266-40053-1-git-send-email-wufan@codeaurora.org>
- <CABo9ajCui0y9HMBzgKWeNtrbu4de+mLh=d9Qdkyo4zhU9az6hw@mail.gmail.com>
-Message-ID: <001901d44099$fc8d7550$f5a85ff0$@codeaurora.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 30 Aug 2018 21:52:23 +0200
+Subject: [PATCH] ARM: dts: pxa: change serial node names
+In-Reply-To: <20180715202153.7233-1-robert.jarzmik@free.fr> (Robert Jarzmik's
+ message of "Sun, 15 Jul 2018 22:21:53 +0200")
+References: <20180715202153.7233-1-robert.jarzmik@free.fr>
+Message-ID: <87k1o77hu0.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler, 
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-> > +static int get_dimm_smbios_index(u16 handle) {
-> > +       struct mem_ctl_info *mci;
-> > +       int i;
-> > +
-> > +       mci = ghes_pvt->mci;
-> > +
-> 
-> Minor nit: you could define and set mci in the same line to save some space
-> here.
-> 
-> Otherwise this patch looks good to me.
+> Change from xxuart to serial to normalize the devicetree pxa serial
+> support.
+>
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> ---
+>  arch/arm/boot/dts/pxa2xx.dtsi | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+Queued to pxa/dt.
 
-Good catch Tyler! I'll fix it.
-
-Thanks,
-Fan
-
-> Reviewed-by: Tyler Baicar <baicar.tyler@gmail.com>
+--
+Robert
