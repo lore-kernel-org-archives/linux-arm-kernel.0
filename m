@@ -1,141 +1,139 @@
-From: john.garry@huawei.com (John Garry)
-Date: Thu, 30 Aug 2018 12:18:21 +0100
-Subject: [PATCH v4 2/2] iommu/arm-smmu-v3: avoid redundant CMD_SYNCs if
- possible
-In-Reply-To: <1534665071-7976-3-git-send-email-thunder.leizhen@huawei.com>
-References: <1534665071-7976-1-git-send-email-thunder.leizhen@huawei.com>
- <1534665071-7976-3-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <992a5e9a-ba0c-e25f-b881-89aa914d3a36@huawei.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Thu, 30 Aug 2018 13:41:05 +0200
+Subject: [PATCH v6 00/11] arm64: untag user pointers passed to the kernel
+Message-ID: <cover.1535629099.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/08/2018 08:51, Zhen Lei wrote:
-> More than two CMD_SYNCs maybe adjacent in the command queue, and the first
-> one has done what others want to do. Drop the redundant CMD_SYNCs can
-> improve IO performance especially under the pressure scene.
->
-> I did the statistics in my test environment, the number of CMD_SYNCs can
-> be reduced about 1/3. See below:
-> CMD_SYNCs reduced:	19542181
-> CMD_SYNCs total:	58098548	(include reduced)
-> CMDs total:		116197099	(TLBI:SYNC about 1:1)
->
-> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> ---
->  drivers/iommu/arm-smmu-v3.c | 22 +++++++++++++++++++---
->  1 file changed, 19 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index ac6d6df..f3a56e1 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -567,6 +567,7 @@ struct arm_smmu_device {
->  	int				gerr_irq;
->  	int				combined_irq;
->  	u32				sync_nr;
-> +	u8				prev_cmd_opcode;
->
->  	unsigned long			ias; /* IPA */
->  	unsigned long			oas; /* PA */
-> @@ -786,6 +787,11 @@ void arm_smmu_cmdq_build_sync_msi_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
->  	cmd[1]  = ent->sync.msiaddr & CMDQ_SYNC_1_MSIADDR_MASK;
->  }
->
-> +static inline u8 arm_smmu_cmd_opcode_get(u64 *cmd)
-> +{
-> +	return cmd[0] & CMDQ_0_OP;
-> +}
-> +
->  /* High-level queue accessors */
->  static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
->  {
-> @@ -906,6 +912,8 @@ static void arm_smmu_cmdq_insert_cmd(struct arm_smmu_device *smmu, u64 *cmd)
->  	struct arm_smmu_queue *q = &smmu->cmdq.q;
->  	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
->
-> +	smmu->prev_cmd_opcode = arm_smmu_cmd_opcode_get(cmd);
-> +
->  	while (queue_insert_raw(q, cmd) == -ENOSPC) {
->  		if (queue_poll_cons(q, false, wfe))
->  			dev_err_ratelimited(smmu->dev, "CMDQ timeout\n");
-> @@ -958,9 +966,17 @@ static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
->  	};
->
->  	spin_lock_irqsave(&smmu->cmdq.lock, flags);
-> -	ent.sync.msidata = ++smmu->sync_nr;
-> -	arm_smmu_cmdq_build_sync_msi_cmd(cmd, &ent);
-> -	arm_smmu_cmdq_insert_cmd(smmu, cmd);
-> +	if (smmu->prev_cmd_opcode == CMDQ_OP_CMD_SYNC) {
-> +		/*
-> +		 * Previous command is CMD_SYNC also, there is no need to add
-> +		 * one more. Just poll it.
-> +		 */
-> +		ent.sync.msidata = smmu->sync_nr;
-> +	} else {
-> +		ent.sync.msidata = ++smmu->sync_nr;
-> +		arm_smmu_cmdq_build_sync_msi_cmd(cmd, &ent);
-> +		arm_smmu_cmdq_insert_cmd(smmu, cmd);
-> +	}
->  	spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
+arm64 has a feature called Top Byte Ignore, which allows to embed pointer
+tags into the top byte of each pointer. Userspace programs (such as
+HWASan, a memory debugging tool [1]) might use this feature and pass
+tagged user pointers to the kernel through syscalls or other interfaces.
 
-I find something like this adds support for combining CMD_SYNC commands 
-for regular polling mode:
+This patch makes a few of the kernel interfaces accept tagged user
+pointers. The kernel is already able to handle user faults with tagged
+pointers and has the untagged_addr macro, which this patchset reuses.
 
-@@ -569,6 +569,7 @@ struct arm_smmu_device {
-         int                             combined_irq;
-         u32                             sync_nr;
-         u8                              prev_cmd_opcode;
-+       int                             prev_cmd_sync_res;
+Thanks!
 
-         unsigned long                   ias; /* IPA */
-         unsigned long                   oas; /* PA */
-@@ -985,17 +986,33 @@ static int __arm_smmu_cmdq_issue_sync_msi(struct 
-arm_smmu_device *smmu)
+[1] http://clang.llvm.org/docs/HardwareAssistedAddressSanitizerDesign.html
 
-  static int __arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
-  {
--       u64 cmd[CMDQ_ENT_DWORDS];
-+       static u64 cmd[CMDQ_ENT_DWORDS] = {
-+               _FIELD_PREP(CMDQ_0_OP, CMDQ_OP_CMD_SYNC) |
-+               _FIELD_PREP(CMDQ_SYNC_0_CS, CMDQ_SYNC_0_CS_SEV) |
-+               _FIELD_PREP(CMDQ_SYNC_0_MSH, ARM_SMMU_SH_ISH) |
-+               _FIELD_PREP(CMDQ_SYNC_0_MSIATTR, ARM_SMMU_MEMATTR_OIWB)
-+       };
-         unsigned long flags;
-         bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
--       struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
--       int ret;
-+       int ret = 0;
+Changes in v6:
+- Added annotations for user pointer casts found by sparse.
+- Rebased onto 050cdc6c (4.19-rc1+).
 
--       arm_smmu_cmdq_build_cmd(cmd, &ent);
+Changes in v5:
+- Added 3 new patches that add untagging to places found with static
+  analysis.
+- Rebased onto 44c929e1 (4.18-rc8).
 
-         spin_lock_irqsave(&smmu->cmdq.lock, flags);
--       arm_smmu_cmdq_insert_cmd(smmu, cmd);
--       ret = queue_poll_cons(&smmu->cmdq.q, true, wfe);
-+       if (smmu->prev_cmd_opcode != CMDQ_OP_CMD_SYNC ||
-+               smmu->prev_cmd_sync_res != 0) {
-+               arm_smmu_cmdq_insert_cmd(smmu, cmd);
-+               smmu->prev_cmd_sync_res = ret =
-+                       queue_poll_cons(&smmu->cmdq.q, true, wfe);
-+       }
+Changes in v4:
+- Added a selftest for checking that passing tagged pointers to the
+  kernel succeeds.
+- Rebased onto 81e97f013 (4.18-rc1+).
 
-I tested iperf on a 1G network link and was seeing 6-10% CMD_SYNC 
-commands combined. I would really need to test this on a faster 
-connection to see any throughout difference.
+Changes in v3:
+- Rebased onto e5c51f30 (4.17-rc6+).
+- Added linux-arch@ to the list of recipients.
 
- From the above figures, I think leizhen was seeing 25% combine rate, right?
+Changes in v2:
+- Rebased onto 2d618bdf (4.17-rc3+).
+- Removed excessive untagging in gup.c.
+- Removed untagging pointers returned from __uaccess_mask_ptr.
 
-As for this code, it could be neatened...
+Changes in v1:
+- Rebased onto 4.17-rc1.
 
-Cheers,
-John
+Changes in RFC v2:
+- Added "#ifndef untagged_addr..." fallback in linux/uaccess.h instead of
+  defining it for each arch individually.
+- Updated Documentation/arm64/tagged-pointers.txt.
+- Dropped "mm, arm64: untag user addresses in memory syscalls".
+- Rebased onto 3eb2ce82 (4.16-rc7).
 
->
->  	return __arm_smmu_sync_poll_msi(smmu, ent.sync.msidata);
-> --
-> 1.8.3
->
->
->
-> .
->
+Andrey Konovalov (11):
+  arm64: add type casts to untagged_addr macro
+  uaccess: add untagged_addr definition for other arches
+  arm64: untag user addresses in access_ok and __uaccess_mask_ptr
+  mm, arm64: untag user addresses in mm/gup.c
+  lib, arm64: untag addrs passed to strncpy_from_user and strnlen_user
+  arm64: untag user address in __do_user_fault
+  fs, arm64: untag user address in copy_mount_options
+  usb, arm64: untag user addresses in devio
+  arm64: update Documentation/arm64/tagged-pointers.txt
+  selftests, arm64: add a selftest for passing tagged pointers to kernel
+  arm64: annotate user pointers casts detected by sparse
+
+ Documentation/arm64/tagged-pointers.txt       |  5 +--
+ arch/arm64/include/asm/compat.h               |  2 +-
+ arch/arm64/include/asm/uaccess.h              | 16 ++++++----
+ arch/arm64/kernel/perf_callchain.c            |  4 +--
+ arch/arm64/kernel/signal.c                    | 16 +++++-----
+ arch/arm64/kernel/signal32.c                  |  6 ++--
+ arch/arm64/mm/fault.c                         |  4 +--
+ block/compat_ioctl.c                          | 15 +++++----
+ drivers/ata/libata-scsi.c                     |  2 +-
+ drivers/block/loop.c                          |  2 +-
+ drivers/gpio/gpiolib.c                        |  8 +++--
+ drivers/input/evdev.c                         |  2 +-
+ drivers/media/dvb-core/dvb_frontend.c         |  3 +-
+ drivers/media/v4l2-core/v4l2-compat-ioctl32.c |  9 +++---
+ drivers/mmc/core/block.c                      |  6 ++--
+ drivers/mtd/mtdchar.c                         |  2 +-
+ drivers/net/tap.c                             |  2 +-
+ drivers/net/tun.c                             |  2 +-
+ drivers/spi/spidev.c                          |  6 ++--
+ drivers/tty/tty_ioctl.c                       |  3 +-
+ drivers/tty/vt/vt_ioctl.c                     |  5 +--
+ drivers/usb/core/devio.c                      | 10 ++++--
+ drivers/vfio/vfio.c                           |  6 ++--
+ drivers/video/fbdev/core/fbmem.c              |  4 +--
+ drivers/xen/gntdev.c                          |  6 ++--
+ drivers/xen/privcmd.c                         |  4 +--
+ fs/aio.c                                      |  2 +-
+ fs/autofs/dev-ioctl.c                         |  3 +-
+ fs/autofs/root.c                              |  2 +-
+ fs/binfmt_elf.c                               | 10 +++---
+ fs/btrfs/ioctl.c                              |  2 +-
+ fs/compat_ioctl.c                             | 32 ++++++++++---------
+ fs/ext2/ioctl.c                               |  2 +-
+ fs/ext4/ioctl.c                               |  2 +-
+ fs/fat/file.c                                 |  3 +-
+ fs/fuse/file.c                                |  2 +-
+ fs/namespace.c                                |  2 +-
+ fs/readdir.c                                  |  4 +--
+ fs/signalfd.c                                 | 10 +++---
+ include/linux/mm.h                            |  2 +-
+ include/linux/pagemap.h                       |  8 ++---
+ include/linux/socket.h                        |  2 +-
+ include/linux/uaccess.h                       |  4 +++
+ ipc/shm.c                                     |  4 +--
+ kernel/futex.c                                |  6 ++--
+ kernel/futex_compat.c                         |  2 +-
+ kernel/power/user.c                           |  2 +-
+ kernel/signal.c                               |  2 +-
+ lib/iov_iter.c                                | 16 +++++-----
+ lib/strncpy_from_user.c                       |  4 ++-
+ lib/strnlen_user.c                            |  6 ++--
+ lib/test_kasan.c                              |  2 +-
+ mm/gup.c                                      |  4 +++
+ mm/memory.c                                   |  2 +-
+ mm/migrate.c                                  |  4 +--
+ mm/process_vm_access.c                        | 13 ++++----
+ net/bluetooth/hidp/sock.c                     |  2 +-
+ net/compat.c                                  | 12 ++++---
+ sound/core/control_compat.c                   |  5 +--
+ sound/core/pcm_native.c                       |  5 +--
+ sound/core/timer_compat.c                     |  3 +-
+ tools/testing/selftests/arm64/.gitignore      |  1 +
+ tools/testing/selftests/arm64/Makefile        | 11 +++++++
+ .../testing/selftests/arm64/run_tags_test.sh  | 12 +++++++
+ tools/testing/selftests/arm64/tags_test.c     | 19 +++++++++++
+ 65 files changed, 232 insertions(+), 147 deletions(-)
+ create mode 100644 tools/testing/selftests/arm64/.gitignore
+ create mode 100644 tools/testing/selftests/arm64/Makefile
+ create mode 100755 tools/testing/selftests/arm64/run_tags_test.sh
+ create mode 100644 tools/testing/selftests/arm64/tags_test.c
+
+-- 
+2.19.0.rc0.228.g281dcd1b4d0-goog
