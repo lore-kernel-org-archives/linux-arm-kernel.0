@@ -1,89 +1,62 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Thu, 30 Aug 2018 17:45:02 +0200
-Subject: [PATCH v3 14/30] dt-bindings: update the Allwinner GPADC device tree
- binding for H3 & A83T
+Date: Thu, 30 Aug 2018 17:45:03 +0200
+Subject: [PATCH v3 15/30] iio: adc: sun4i-gpadc-iio: rename A33-specified
+ registers to contain A33
 In-Reply-To: <20180830154518.29507-1-embed3d@gmail.com>
 References: <20180830154518.29507-1-embed3d@gmail.com>
-Message-ID: <20180830154518.29507-15-embed3d@gmail.com>
+Message-ID: <20180830154518.29507-16-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner H3 features a thermal sensor like the one in A33, but has its
-register re-arranged, the clock divider moved to CCU (originally the
-clock divider is in ADC) and added a pair of bus clock and reset.
+From: Icenowy Zheng <icenowy@aosc.io>
 
-Allwinner A83T features a thermal sensor similar to the H3, the ths clock,
-the bus clock and the reset was removed from the CCU. The THS in A83T
-has a clock that is directly connected and runs with 24 MHz.
+As the H3 SoC, which is also in sun8i line, has totally different
+register map for the thermal sensor (a cut down version of GPADC), we
+should rename A23/A33-specified registers to contain A33, in order to
+prevent obfuscation with H3 registers. Currently these registers are
+only prefixed "SUN8I", not "SUN8I_A33".
 
-Update the binding document to cover H3 and A83T.
+Add "_A33" after "SUN8I" on the register names.
 
-Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Lee Jones <lee.jones@linaro.org>
+Acked-by: Jonathan Cameron <jonathan.cameron@huawei.com>
 ---
- .../devicetree/bindings/iio/adc/sun4i-gpadc.txt    | 41 ++++++++++++++++++++--
- 1 file changed, 38 insertions(+), 3 deletions(-)
+ drivers/iio/adc/sun4i-gpadc-iio.c   | 2 +-
+ include/linux/iio/adc/sun4i-gpadc.h | 6 +++---
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/iio/adc/sun4i-gpadc.txt b/Documentation/devicetree/bindings/iio/adc/sun4i-gpadc.txt
-index a7ef9dd21f04..9116ad308cf1 100644
---- a/Documentation/devicetree/bindings/iio/adc/sun4i-gpadc.txt
-+++ b/Documentation/devicetree/bindings/iio/adc/sun4i-gpadc.txt
-@@ -4,12 +4,35 @@ The Allwinner SoCs all have an ADC that can also act as a thermal sensor
- and sometimes as a touchscreen controller.
+diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
+index e1fe5e8e9dc0..d48f338af563 100644
+--- a/drivers/iio/adc/sun4i-gpadc-iio.c
++++ b/drivers/iio/adc/sun4i-gpadc-iio.c
+@@ -106,7 +106,7 @@ static const struct gpadc_data sun6i_gpadc_data = {
+ static const struct gpadc_data sun8i_a33_gpadc_data = {
+ 	.temp_offset = -1662,
+ 	.temp_scale = 162,
+-	.tp_mode_en = SUN8I_GPADC_CTRL1_CHOP_TEMP_EN,
++	.tp_mode_en = SUN8I_A33_GPADC_CTRL1_CHOP_TEMP_EN,
+ };
  
- Required properties:
--  - compatible: "allwinner,sun8i-a33-ths",
-+  - compatible: must contain one of the following compatibles:
-+		- "allwinner,sun8i-a33-ths"
-+		- "allwinner,sun8i-h3-ths"
-+		- "allwinner,sun8i-a83t-ths"
-   - reg: mmio address range of the chip,
--  - #thermal-sensor-cells: shall be 0,
-+  - #thermal-sensor-cells:
-+		Please refer <devicetree/bindings/thermal/thermal.txt>,
-   - #io-channel-cells: shall be 0,
+ struct sun4i_gpadc_iio {
+diff --git a/include/linux/iio/adc/sun4i-gpadc.h b/include/linux/iio/adc/sun4i-gpadc.h
+index ca59336f246b..d6850f39dcfb 100644
+--- a/include/linux/iio/adc/sun4i-gpadc.h
++++ b/include/linux/iio/adc/sun4i-gpadc.h
+@@ -38,9 +38,9 @@
+ #define SUN6I_GPADC_CTRL1_ADC_CHAN_SELECT(x)		(GENMASK(3, 0) & BIT(x))
+ #define SUN6I_GPADC_CTRL1_ADC_CHAN_MASK			GENMASK(3, 0)
  
--Example:
-+Required properties for the following compatibles:
-+		- "allwinner,sun8i-h3-ths"
-+		- "allwinner,sun8i-a83t-ths"
-+  - interrupts: the sampling interrupt of the ADC,
-+
-+Required properties for the following compatibles:
-+		- "allwinner,sun8i-h3-ths"
-+  - clocks: the bus clock and the input clock of the ADC,
-+  - clock-names: should be "bus" and "mod",
-+  - resets: the bus reset of the ADC,
-+
-+Optional properties for the following compatibles:
-+		- "allwinner,sun8i-h3-ths"
-+		- "allwinner,sun8i-a83t-ths"
-+  - nvmem-cells: A phandle to the calibration data provided by a nvmem device.
-+  - nvmem-cell-names: Should be "calibration".
-+
-+Details see: bindings/nvmem/nvmem.txt
-+
-+Example for A33:
- 	ths: ths at 1c25000 {
- 		compatible = "allwinner,sun8i-a33-ths";
- 		reg = <0x01c25000 0x100>;
-@@ -17,6 +40,18 @@ Example:
- 		#io-channel-cells = <0>;
- 	};
+-/* TP_CTRL1 bits for sun8i SoCs */
+-#define SUN8I_GPADC_CTRL1_CHOP_TEMP_EN			BIT(8)
+-#define SUN8I_GPADC_CTRL1_GPADC_CALI_EN			BIT(7)
++/* TP_CTRL1 bits for A33 */
++#define SUN8I_A33_GPADC_CTRL1_CHOP_TEMP_EN		BIT(8)
++#define SUN8I_A33_GPADC_CTRL1_GPADC_CALI_EN		BIT(7)
  
-+Example for H3:
-+	ths: thermal-sensor at 1c25000 {
-+		compatible = "allwinner,sun8i-h3-ths";
-+		reg = <0x01c25000 0x400>;
-+		clocks = <&ccu CLK_BUS_THS>, <&ccu CLK_THS>;
-+		clock-names = "bus", "mod";
-+		resets = <&ccu RST_BUS_THS>;
-+		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
-+		#thermal-sensor-cells = <0>;
-+		#io-channel-cells = <0>;
-+	};
-+
- sun4i, sun5i and sun6i SoCs are also supported via these bindings:
+ #define SUN4I_GPADC_CTRL2				0x08
  
- Required properties:
 -- 
 2.11.0
