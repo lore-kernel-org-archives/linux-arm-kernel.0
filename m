@@ -1,57 +1,57 @@
 From: mirq-linux@rere.qmqm.pl (=?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?=)
-Date: Thu, 30 Aug 2018 23:00:07 +0200
-Subject: [PATCH v2 06/12] drm/cirrus: use simpler
- remove_conflicting_pci_framebuffers()
+Date: Thu, 30 Aug 2018 23:00:11 +0200
+Subject: [PATCH v2 11/12] drm/sun4i: use simpler
+ remove_conflicting_framebuffers(NULL)
 In-Reply-To: <cover.1535656077.git.mirq-linux@rere.qmqm.pl>
 References: <cover.1535656077.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <8a330a00dad89889550ff9fb7d7309d58d64181c.1535656077.git.mirq-linux@rere.qmqm.pl>
+Message-ID: <e0e320790633e821a9d926ea727f280e59791e75.1535656077.git.mirq-linux@rere.qmqm.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Use remove_conflicting_framebuffers(NULL) instead of duplicating it.
+
 Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
 ---
- drivers/gpu/drm/cirrus/cirrus_drv.c | 23 +----------------------
- 1 file changed, 1 insertion(+), 22 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_drv.c | 18 +-----------------
+ 1 file changed, 1 insertion(+), 17 deletions(-)
 
-diff --git a/drivers/gpu/drm/cirrus/cirrus_drv.c b/drivers/gpu/drm/cirrus/cirrus_drv.c
-index 69c4e352dd78..85ed8657c862 100644
---- a/drivers/gpu/drm/cirrus/cirrus_drv.c
-+++ b/drivers/gpu/drm/cirrus/cirrus_drv.c
-@@ -42,33 +42,12 @@ static const struct pci_device_id pciidlist[] = {
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index 50d19605c38f..555b5db8036f 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -60,22 +60,6 @@ static struct drm_driver sun4i_drv_driver = {
+ 	/* Frame Buffer Operations */
  };
  
- 
--static int cirrus_kick_out_firmware_fb(struct pci_dev *pdev)
+-static void sun4i_remove_framebuffers(void)
 -{
 -	struct apertures_struct *ap;
--	bool primary = false;
 -
 -	ap = alloc_apertures(1);
 -	if (!ap)
--		return -ENOMEM;
+-		return;
 -
--	ap->ranges[0].base = pci_resource_start(pdev, 0);
--	ap->ranges[0].size = pci_resource_len(pdev, 0);
+-	/* The framebuffer can be located anywhere in RAM */
+-	ap->ranges[0].base = 0;
+-	ap->ranges[0].size = ~0;
 -
--#ifdef CONFIG_X86
--	primary = pdev->resource[PCI_ROM_RESOURCE].flags & IORESOURCE_ROM_SHADOW;
--#endif
--	drm_fb_helper_remove_conflicting_framebuffers(ap, "cirrusdrmfb", primary);
+-	drm_fb_helper_remove_conflicting_framebuffers(ap, "sun4i-drm-fb", false);
 -	kfree(ap);
--
--	return 0;
 -}
 -
- static int cirrus_pci_probe(struct pci_dev *pdev,
- 			    const struct pci_device_id *ent)
+ static int sun4i_drv_bind(struct device *dev)
  {
- 	int ret;
+ 	struct drm_device *drm;
+@@ -118,7 +102,7 @@ static int sun4i_drv_bind(struct device *dev)
+ 	drm->irq_enabled = true;
  
--	ret = cirrus_kick_out_firmware_fb(pdev);
-+	ret = drm_fb_helper_remove_conflicting_pci_framebuffers(pdev, 0, "cirrusdrmfb");
- 	if (ret)
- 		return ret;
+ 	/* Remove early framebuffers (ie. simplefb) */
+-	sun4i_remove_framebuffers();
++	drm_fb_helper_remove_conflicting_framebuffers(NULL, "sun4i-drm-fb", false);
  
+ 	/* Create our framebuffer */
+ 	ret = sun4i_framebuffer_init(drm);
 -- 
 2.18.0
