@@ -1,112 +1,41 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Thu, 30 Aug 2018 21:01:09 +0200
-Subject: [PATCH v4 02/13] ata: ahci_platform: add support for AHCI controller
- regulator
-In-Reply-To: <20180830190120.722-1-clabbe.montjoie@gmail.com>
-References: <20180830190120.722-1-clabbe.montjoie@gmail.com>
-Message-ID: <20180830190120.722-3-clabbe.montjoie@gmail.com>
+From: baicar.tyler@gmail.com (Tyler Baicar)
+Date: Thu, 30 Aug 2018 15:18:04 -0400
+Subject: [PATCH v2] EDAC, ghes: use CPER module handles to locate DIMMs
+In-Reply-To: <1535654266-40053-1-git-send-email-wufan@codeaurora.org>
+References: <1535654266-40053-1-git-send-email-wufan@codeaurora.org>
+Message-ID: <CABo9ajCui0y9HMBzgKWeNtrbu4de+mLh=d9Qdkyo4zhU9az6hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SoC R40 AHCI controller need a regulator to work.
-So this patch add a way to add an optional regulator on AHCI controller.
+Hi Fan,
 
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
----
- drivers/ata/ahci.h             |  1 +
- drivers/ata/libahci_platform.c | 26 ++++++++++++++++++++++++--
- 2 files changed, 25 insertions(+), 2 deletions(-)
+On Thu, Aug 30, 2018 at 2:37 PM, Fan Wu <wufan@codeaurora.org> wrote:
+> For platforms whose firmwares provide valid module handles
+> (SMBIOS type 17) in error records, this patch uses the module
+> handles to locate corresponding DIMMs and enables per-DIMM
+> error counter update.
+>
+> Signed-off-by: Fan Wu <wufan@codeaurora.org>
 
-diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
-index 6a1515f0da40..1415f1012de5 100644
---- a/drivers/ata/ahci.h
-+++ b/drivers/ata/ahci.h
-@@ -352,6 +352,7 @@ struct ahci_host_priv {
- 	struct clk		*clks[AHCI_MAX_CLKS]; /* Optional */
- 	struct reset_control	*rsts;		/* Optional */
- 	struct regulator	**target_pwrs;	/* Optional */
-+	struct regulator	*ahci_regulator;/* Optional */
- 	/*
- 	 * If platform uses PHYs. There is a 1:1 relation between the port number and
- 	 * the PHY position in this array.
-diff --git a/drivers/ata/libahci_platform.c b/drivers/ata/libahci_platform.c
-index c92c10d55374..a886b61476a3 100644
---- a/drivers/ata/libahci_platform.c
-+++ b/drivers/ata/libahci_platform.c
-@@ -139,7 +139,7 @@ EXPORT_SYMBOL_GPL(ahci_platform_disable_clks);
-  * ahci_platform_enable_regulators - Enable regulators
-  * @hpriv: host private area to store config values
-  *
-- * This function enables all the regulators found in
-+ * This function enables all the regulators found in controller and
-  * hpriv->target_pwrs, if any.  If a regulator fails to be enabled, it
-  * disables all the regulators already enabled in reverse order and
-  * returns an error.
-@@ -151,6 +151,12 @@ int ahci_platform_enable_regulators(struct ahci_host_priv *hpriv)
- {
- 	int rc, i;
- 
-+	if (hpriv->ahci_regulator) {
-+		rc = regulator_enable(hpriv->ahci_regulator);
-+		if (rc)
-+			return rc;
-+	}
-+
- 	for (i = 0; i < hpriv->nports; i++) {
- 		if (!hpriv->target_pwrs[i])
- 			continue;
-@@ -167,6 +173,8 @@ int ahci_platform_enable_regulators(struct ahci_host_priv *hpriv)
- 		if (hpriv->target_pwrs[i])
- 			regulator_disable(hpriv->target_pwrs[i]);
- 
-+	if (hpriv->ahci_regulator)
-+		regulator_disable(hpriv->ahci_regulator);
- 	return rc;
- }
- EXPORT_SYMBOL_GPL(ahci_platform_enable_regulators);
-@@ -175,7 +183,8 @@ EXPORT_SYMBOL_GPL(ahci_platform_enable_regulators);
-  * ahci_platform_disable_regulators - Disable regulators
-  * @hpriv: host private area to store config values
-  *
-- * This function disables all regulators found in hpriv->target_pwrs.
-+ * This function disables all regulators found in hpriv->target_pwrs and
-+ * AHCI controller.
-  */
- void ahci_platform_disable_regulators(struct ahci_host_priv *hpriv)
- {
-@@ -186,6 +195,9 @@ void ahci_platform_disable_regulators(struct ahci_host_priv *hpriv)
- 			continue;
- 		regulator_disable(hpriv->target_pwrs[i]);
- 	}
-+
-+	if (hpriv->ahci_regulator)
-+		regulator_disable(hpriv->ahci_regulator);
- }
- EXPORT_SYMBOL_GPL(ahci_platform_disable_regulators);
- /**
-@@ -351,6 +363,7 @@ static int ahci_platform_get_regulator(struct ahci_host_priv *hpriv, u32 port,
-  *
-  * 1) mmio registers (IORESOURCE_MEM 0, mandatory)
-  * 2) regulator for controlling the targets power (optional)
-+ *    regulator for controlling the AHCI controller (optional)
-  * 3) 0 - AHCI_MAX_CLKS clocks, as specified in the devs devicetree node,
-  *    or for non devicetree enabled platforms a single clock
-  * 4) resets, if flags has AHCI_PLATFORM_GET_RESETS (optional)
-@@ -408,6 +421,15 @@ struct ahci_host_priv *ahci_platform_get_resources(struct platform_device *pdev,
- 		hpriv->clks[i] = clk;
- 	}
- 
-+	hpriv->ahci_regulator = devm_regulator_get_optional(dev, "ahci");
-+	if (IS_ERR(hpriv->ahci_regulator)) {
-+		rc = PTR_ERR(hpriv->ahci_regulator);
-+		if (rc == -EPROBE_DEFER)
-+			goto err_out;
-+		rc = 0;
-+		hpriv->ahci_regulator = NULL;
-+	}
-+
- 	if (flags & AHCI_PLATFORM_GET_RESETS) {
- 		hpriv->rsts = devm_reset_control_array_get_optional_shared(dev);
- 		if (IS_ERR(hpriv->rsts)) {
--- 
-2.16.4
+> diff --git a/drivers/edac/ghes_edac.c b/drivers/edac/ghes_edac.c
+> index 473aeec..949f603 100644
+> --- a/drivers/edac/ghes_edac.c
+> +++ b/drivers/edac/ghes_edac.c
+> @@ -81,6 +81,20 @@ static void ghes_edac_count_dimms(const struct dmi_header *dh, void *arg)
+>                 (*num_dimm)++;
+>  }
+>
+> +static int get_dimm_smbios_index(u16 handle)
+> +{
+> +       struct mem_ctl_info *mci;
+> +       int i;
+> +
+> +       mci = ghes_pvt->mci;
+> +
+
+Minor nit: you could define and set mci in the same line to save some
+space here.
+
+Otherwise this patch looks good to me.
+
+Reviewed-by: Tyler Baicar <baicar.tyler@gmail.com>
