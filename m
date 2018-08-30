@@ -1,58 +1,45 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Thu, 30 Aug 2018 17:44:57 +0200
-Subject: [PATCH v3 09/30] iio: adc: Threat A33 as thermal sensor and remove
- non thermal sun4i channel
+Date: Thu, 30 Aug 2018 17:44:52 +0200
+Subject: [PATCH v3 04/30] iio: adc: Kconfig: Update Kconfig to new build
+ options
 In-Reply-To: <20180830154518.29507-1-embed3d@gmail.com>
 References: <20180830154518.29507-1-embed3d@gmail.com>
-Message-ID: <20180830154518.29507-10-embed3d@gmail.com>
+Message-ID: <20180830154518.29507-5-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We want to use this driver mostly as thermal sensor, that still supports
-the adc for the older chips, thus we threat the A33 as thermal sensor.
-We also remove the adc channel without thermal support.
+Since we are merging the mfd driver into the iio adc driver we need to
+update the Kconfig build options.
 
 Signed-off-by: Philipp Rossak <embed3d@gmail.com>
 ---
- drivers/iio/adc/sun4i-gpadc-iio.c | 19 -------------------
- 1 file changed, 19 deletions(-)
+ drivers/iio/adc/Kconfig | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-index ab474ce86fb6..658a7e3e3370 100644
---- a/drivers/iio/adc/sun4i-gpadc-iio.c
-+++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-@@ -123,23 +123,6 @@ static const struct iio_chan_spec sun4i_gpadc_channels[] = {
- 	},
- };
+diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
+index 9da79070357c..5d0cffd6d2e4 100644
+--- a/drivers/iio/adc/Kconfig
++++ b/drivers/iio/adc/Kconfig
+@@ -713,13 +713,16 @@ config STX104
+ 	  array module parameter.
  
--static const struct iio_chan_spec sun4i_gpadc_channels_no_temp[] = {
--	SUN4I_GPADC_ADC_CHANNEL(0, "adc_chan0"),
--	SUN4I_GPADC_ADC_CHANNEL(1, "adc_chan1"),
--	SUN4I_GPADC_ADC_CHANNEL(2, "adc_chan2"),
--	SUN4I_GPADC_ADC_CHANNEL(3, "adc_chan3"),
--};
--
--static const struct iio_chan_spec sun8i_a33_gpadc_channels[] = {
--	{
--		.type = IIO_TEMP,
--		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |
--				      BIT(IIO_CHAN_INFO_SCALE) |
--				      BIT(IIO_CHAN_INFO_OFFSET),
--		.datasheet_name = "temp_adc",
--	},
--};
--
- static const struct regmap_config sun4i_gpadc_regmap_config = {
- 	.reg_bits = 32,
- 	.val_bits = 32,
-@@ -444,8 +427,6 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
- 		return -ENODEV;
+ config SUN4I_GPADC
+-	tristate "Support for the Allwinner SoCs GPADC"
++	tristate "Allwinner sunxi platforms' GPADC/Thermal driver"
++	select REGMAP_MMIO
++	select REGMAP_IRQ
+ 	depends on IIO
+-	depends on MFD_SUN4I_GPADC || MACH_SUN8I
+-	depends on THERMAL || !THERMAL_OF
++	depends on ARCH_SUNXI || MACH_SUN8I
++	depends on THERMAL && THERMAL_OF
+ 	help
+ 	  Say yes here to build support for Allwinner (A10, A13 and A31) SoCs
+-	  GPADC. This ADC provides 4 channels which can be used as an ADC or as
++	  GPADC or newer SOCs (A33, H3, A83T, ...) Thermal sensor driver.
++	  This ADC provides 4 channels which can be used as an ADC or as
+ 	  a touchscreen input and one channel for thermal sensor.
  
- 	info->no_irq = true;
--	indio_dev->num_channels = ARRAY_SIZE(sun8i_a33_gpadc_channels);
--	indio_dev->channels = sun8i_a33_gpadc_channels;
- 
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	base = devm_ioremap_resource(&pdev->dev, mem);
+ 	  The thermal sensor slows down ADC readings and can be disabled by
 -- 
 2.11.0
