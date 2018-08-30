@@ -1,24 +1,54 @@
 From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Thu, 30 Aug 2018 15:47:06 -0300
-Subject: [PATCH v2] perf annotate: fix parsing aarch64 branch
- instructions after objdump update
-In-Reply-To: <20180827125340.a2f7e291901d17cea05daba4@arm.com>
-References: <20180823191047.9260992844205984b75e6721@arm.com>
- <20180827125049.GD22309@kernel.org>
- <20180827125340.a2f7e291901d17cea05daba4@arm.com>
-Message-ID: <20180830184706.GH6097@kernel.org>
+Date: Thu, 30 Aug 2018 15:50:27 -0300
+Subject: [PATCH v9 4/4] perf probe: Support SDT markers having reference
+ counter (semaphore)
+In-Reply-To: <20180830144531.3011e185@gandalf.local.home>
+References: <20180820044250.11659-1-ravi.bangoria@linux.ibm.com>
+ <20180820044250.11659-5-ravi.bangoria@linux.ibm.com>
+ <20180830144531.3011e185@gandalf.local.home>
+Message-ID: <20180830185026.GI6097@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Mon, Aug 27, 2018 at 12:53:40PM -0500, Kim Phillips escreveu:
-> v2: address acme's comments:
->     - consolidate into a validate_comma()
->     - call from an additional couple of places necessary
->     - don't listen to checkpatch wrt reflowing jump__parse definition
->       line to less than 80 characters, just rm the __maybe_unused
->     - re-tested no diff on x86_64 and power arch, arm64 conditional
->       branches fixed.
+Em Thu, Aug 30, 2018 at 02:45:31PM -0400, Steven Rostedt escreveu:
+> 
+> Arnaldo,
+> 
+> I'm going to be playing with some of the probe code which may conflict
+> with these patches, so I would like to pull these in my tree. But this
+> patch requires an Acked-by from you before I can pull it in.
+> 
+> You OK with this?
 
-Thanks for taking into account my comments, applied.
-
-- Arnaldo
+Acked-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+ 
+> Thanks!
+> 
+> -- Steve
+> 
+> 
+> On Mon, 20 Aug 2018 10:12:50 +0530
+> Ravi Bangoria <ravi.bangoria@linux.ibm.com> wrote:
+> 
+> > With this, perf buildid-cache will save SDT markers with reference
+> > counter in probe cache. Perf probe will be able to probe markers
+> > having reference counter. Ex,
+> > 
+> >   # readelf -n /tmp/tick | grep -A1 loop2
+> >     Name: loop2
+> >     ... Semaphore: 0x0000000010020036
+> > 
+> >   # ./perf buildid-cache --add /tmp/tick
+> >   # ./perf probe sdt_tick:loop2
+> >   # ./perf stat -e sdt_tick:loop2 /tmp/tick
+> >     hi: 0
+> >     hi: 1
+> >     hi: 2
+> >     ^C
+> >      Performance counter stats for '/tmp/tick':
+> >                  3      sdt_tick:loop2
+> >        2.561851452 seconds time elapsed
+> > 
+> > Signed-off-by: Ravi Bangoria <ravi.bangoria@linux.ibm.com>
+> > Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
+> > Acked-by: Srikar Dronamraju <srikar@linux.vnet.ibm.com>
