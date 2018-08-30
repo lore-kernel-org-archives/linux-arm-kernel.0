@@ -1,43 +1,73 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 31 Aug 2018 01:05:12 +0800
-Subject: [PATCH v5 5/5] arm64: dts: actions: Add pinctrl node for Actions
- Semi S700
-In-Reply-To: <20180829082413.2512005-6-sravanhome@gmail.com>
-References: <20180829082413.2512005-6-sravanhome@gmail.com>
-Message-ID: <201808302331.VZAH3yDm%fengguang.wu@intel.com>
+From: leoyang.li@nxp.com (Li Yang)
+Date: Thu, 30 Aug 2018 12:09:30 -0500
+Subject: [PATCH][v2] arm64: dts: remove big-endian filed from IFC
+ controller
+In-Reply-To: <20180829032749.9309-1-prabhakar.kushwaha@nxp.com>
+References: <20180829032749.9309-1-prabhakar.kushwaha@nxp.com>
+Message-ID: <CADRPPNTPrEuE46UwGo=RrDYvxanY0mGo4EowMJNty==58HzKAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Saravanan,
+On Tue, Aug 28, 2018 at 10:28 PM Prabhakar Kushwaha
+<prabhakar.kushwaha@nxp.com> wrote:
+>
+> As per IFC binding, Absence of "little-endian" field causes registers
+> access in big-endian mode.
+> So no need to set explicit big-endian field IFC node for LS1043A and
+> LS1046A.
+>
+> Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
 
-Thank you for the patch! Yet something to improve:
+Acked-by: Li Yang <leoyang.li@nxp.com>
 
-[auto build test ERROR on pinctrl/devel]
-[also build test ERROR on v4.19-rc1 next-20180830]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Saravanan-Sekar/Add-Actions-Semi-S700-pinctrl-support/20180830-134355
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git devel
-config: arm64-allmodconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
-
-All errors (new ones prefixed by >>):
-
-   Error: arch/arm64/boot/dts/actions/s700.dtsi:172.19-20 syntax error
->> FATAL ERROR: Unable to parse input tree
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 60987 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180831/e87a9fb0/attachment-0001.gz>
+> ---
+> Changes for v2: Incorporated Leo's comments
+>         - Remove new line between copyrights
+>
+>  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 2 +-
+>  arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+> index b9f5d2ff4ff2..68af84a8ade8 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+> @@ -3,6 +3,7 @@
+>   * Device Tree Include file for Freescale Layerscape-1043A family SoC.
+>   *
+>   * Copyright 2014-2015 Freescale Semiconductor, Inc.
+> + * Copyright 2018 NXP
+>   *
+>   * Mingkai Hu <Mingkai.hu@freescale.com>
+>   */
+> @@ -280,7 +281,6 @@
+>                 ifc: ifc at 1530000 {
+>                         compatible = "fsl,ifc", "simple-bus";
+>                         reg = <0x0 0x1530000 0x0 0x10000>;
+> -                       big-endian;
+>                         interrupts = <0 43 0x4>;
+>                 };
+>
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+> index 65ce1c3cb568..ae4ca865131b 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+> @@ -3,6 +3,7 @@
+>   * Device Tree Include file for Freescale Layerscape-1046A family SoC.
+>   *
+>   * Copyright 2016 Freescale Semiconductor, Inc.
+> + * Copyright 2018 NXP
+>   *
+>   * Mingkai Hu <mingkai.hu@nxp.com>
+>   */
+> @@ -198,7 +199,6 @@
+>                 ifc: ifc at 1530000 {
+>                         compatible = "fsl,ifc", "simple-bus";
+>                         reg = <0x0 0x1530000 0x0 0x10000>;
+> -                       big-endian;
+>                         interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
+>                 };
+>
+> --
+> 2.14.1
+>
