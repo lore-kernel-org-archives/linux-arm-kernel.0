@@ -1,55 +1,117 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Aug 2018 10:51:49 +0100
-Subject: Patch "asm-generic/bitops/lock.h: Rewrite using atomic_fetch_"
- causes kernel crash
-In-Reply-To: <20180830094411.GX24124@hirez.programming.kicks-ass.net>
-References: <1535567633.4465.23.camel@synopsys.com>
- <C2D7FE5348E1B147BCA15975FBA23075012B090BEA@us01wembx1.internal.synopsys.com>
- <20180830094411.GX24124@hirez.programming.kicks-ass.net>
-Message-ID: <20180830095148.GB5942@arm.com>
+From: phil.edworthy@renesas.com (Phil Edworthy)
+Date: Thu, 30 Aug 2018 10:52:22 +0100
+Subject: [PATCH] ARM: dts: r9a06g032: Correct UART and add all other UARTs
+Message-ID: <1535622742-6237-1-git-send-email-phil.edworthy@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 30, 2018 at 11:44:11AM +0200, Peter Zijlstra wrote:
-> On Wed, Aug 29, 2018 at 09:16:43PM +0000, Vineet Gupta wrote:
-> > On 08/29/2018 11:33 AM, Eugeniy Paltsev wrote:
-> > > Hi Guys,
-> > > Since v4.19-rc1 we are getting a serious regression on platforms with ARC architecture.
-> > > The kernel have become unstable and spontaneously crashes on LTP tests execution / IO tests or
-> > > even on boot.
-> > >
-> > > I don't know exactly what breaks but bisect clearly assign the blame to this commit:
-> > > 84c6591103db ("locking/atomics, asm-generic/bitops/lock.h: Rewrite using atomic_fetch_*()")
-> > > https://github.com/torvalds/linux/commit/84c6591103dbeaf393a092a3fc7b09510825f6b9
-> > >
-> > > Reverting the commit solves this problem.
-> > >
-> > > I tested v4.19-rc1 on ARM (wandboard, i.mx6, 32bit, quard core, ARMv7) which uses same
-> > > generic bitops implementation and it works fine.
-> > >
-> > > Do you have any ideas what went wrong?
-> > 
-> > Back in 2016, Peter had fixed this file due to a problem I reported on ARC. See
-> > commit f75d48644c56a ("bitops: Do not default to __clear_bit() for
-> > __clear_bit_unlock()")
-> > That made __clear_bit_unlock() use the atomic clear_bit() vs. non-atomic
-> > __clear_bit(), effectively making clear_bit_unlock() and __clear_bit_unlock() same.
-> > 
-> > This patch undoes that which could explain the issues you see. @Peter, @Will ?
-> 
-> Right, so the thinking is that on platforms that suffer that issue,
-> atomic_set*() should DTRT. And if you look at your spinlock based atomic
-> implementation, you'll note that atomic_set() does indeed do the right
-> thing.
-> 
-> arch/arc/include/asm/atomic.h:108
+- UART0 was missing the bus clock ("apb_pclk").
+- Now that the relevant rzn1 bindings have been added, replace the Synopsys
+  compat string with the rzn1 strings.
+- Add all the other UARTs.
 
-Yeah, the bit_spin_lock()/__bit_spin_unlock() race described in f75d48644c56a
-boils down to concurrent atomic_long_set_release() vs
-atomic_long_fetch_or_acquire(), which really needs to work.
+Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+---
+ arch/arm/boot/dts/r9a06g032.dtsi | 83 ++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 80 insertions(+), 3 deletions(-)
 
-I'll keep digging. In the meantime, Vineet, do you have any useful crash
-logs and do you only see the crashes in certain configurations (e.g. SMP but
-!CONFIG_ARC_HAS_LLSC)?
-
-Will
+diff --git a/arch/arm/boot/dts/r9a06g032.dtsi b/arch/arm/boot/dts/r9a06g032.dtsi
+index 3e45375..1bc1f36 100644
+--- a/arch/arm/boot/dts/r9a06g032.dtsi
++++ b/arch/arm/boot/dts/r9a06g032.dtsi
+@@ -78,13 +78,90 @@
+ 		};
+ 
+ 		uart0: serial at 40060000 {
+-			compatible = "snps,dw-apb-uart";
++			compatible = "renesas,r9a06g032-uart", "renesas,rzn1-uart";
+ 			reg = <0x40060000 0x400>;
+ 			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clocks = <&sysctrl R9A06G032_CLK_UART0>;
+-			clock-names = "baudclk";
++			clocks = <&sysctrl R9A06G032_CLK_UART0>, <&sysctrl R9A06G032_HCLK_UART0>;
++			clock-names = "baudclk", "apb_pclk";
++			status = "disabled";
++		};
++
++		uart1: serial at 40061000 {
++			compatible = "renesas,r9a06g032-uart", "renesas,rzn1-uart";
++			reg = <0x40061000 0x400>;
++			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&sysctrl R9A06G032_CLK_UART1>, <&sysctrl R9A06G032_HCLK_UART1>;
++			clock-names = "baudclk", "apb_pclk";
++			status = "disabled";
++		};
++
++		uart2: serial at 40062000 {
++			compatible = "renesas,r9a06g032-uart", "renesas,rzn1-uart";
++			reg = <0x40062000 0x400>;
++			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&sysctrl R9A06G032_CLK_UART2>, <&sysctrl R9A06G032_HCLK_UART2>;
++			clock-names = "baudclk", "apb_pclk";
++			status = "disabled";
++		};
++
++		uart3: serial at 50000000 {
++			compatible = "renesas,r9a06g032-uart", "renesas,rzn1-uart";
++			reg = <0x50000000 0x400>;
++			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&sysctrl R9A06G032_CLK_UART3>, <&sysctrl R9A06G032_HCLK_UART3>;
++			clock-names = "baudclk", "apb_pclk";
++			status = "disabled";
++		};
++
++		uart4: serial at 50001000 {
++			compatible = "renesas,r9a06g032-uart", "renesas,rzn1-uart";
++			reg = <0x50001000 0x400>;
++			interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&sysctrl R9A06G032_CLK_UART4>, <&sysctrl R9A06G032_HCLK_UART4>;
++			clock-names = "baudclk", "apb_pclk";
++			status = "disabled";
++		};
++
++		uart5: serial at 50002000 {
++			compatible = "renesas,r9a06g032-uart", "renesas,rzn1-uart";
++			reg = <0x50002000 0x400>;
++			interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&sysctrl R9A06G032_CLK_UART5>, <&sysctrl R9A06G032_HCLK_UART5>;
++			clock-names = "baudclk", "apb_pclk";
++			status = "disabled";
++		};
++
++		uart6: serial at 50003000 {
++			compatible = "renesas,r9a06g032-uart", "renesas,rzn1-uart";
++			reg = <0x50003000 0x400>;
++			interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&sysctrl R9A06G032_CLK_UART6>, <&sysctrl R9A06G032_HCLK_UART6>;
++			clock-names = "baudclk", "apb_pclk";
++			status = "disabled";
++		};
++
++		uart7: serial at 50004000 {
++			compatible = "renesas,r9a06g032-uart", "renesas,rzn1-uart";
++			reg = <0x50004000 0x400>;
++			interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&sysctrl R9A06G032_CLK_UART7>, <&sysctrl R9A06G032_HCLK_UART7>;
++			clock-names = "baudclk", "apb_pclk";
+ 			status = "disabled";
+ 		};
+ 
+-- 
+2.7.4
