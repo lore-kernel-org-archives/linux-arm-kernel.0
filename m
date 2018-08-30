@@ -1,17 +1,23 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Thu, 30 Aug 2018 14:42:55 -0700
-Subject: [PATCH 2/6] clk: imx: vf610: Add CRC clock
-In-Reply-To: <20180830171539.20008-3-krzk@kernel.org>
-References: <20180830171539.20008-1-krzk@kernel.org>
- <20180830171539.20008-3-krzk@kernel.org>
-Message-ID: <153566537518.129321.12109490238775167072@swboyd.mtv.corp.google.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Thu, 30 Aug 2018 23:53:15 +0200
+Subject: [PATCH 1/2] ARM: configs: at91: Add I2S driver to sama5
+In-Reply-To: <20180829164755.4690-1-codrin.ciubotariu@microchip.com>
+References: <20180829164755.4690-1-codrin.ciubotariu@microchip.com>
+Message-ID: <20180830215315.GK16561@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Krzysztof Kozlowski (2018-08-30 10:15:35)
-> Add the clock for CRC block allowing it to be enabled by HW CRC driver.
+On 29/08/2018 19:47:54+0300, Codrin Ciubotariu wrote:
+> Add I2S CONFIG_SND_ATMEL_SOC_I2S to sama5_defconfig.
 > 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Signed-off-by: Codrin Ciubotariu <codrin.ciubotariu@microchip.com>
 > ---
+>  arch/arm/configs/sama5_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+Both applied, thanks.
 
-Acked-by: Stephen Boyd <sboyd@kernel.org>
+-- 
+Alexandre Belloni, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
