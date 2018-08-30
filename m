@@ -1,33 +1,71 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Aug 2018 17:16:01 +0100
-Subject: [PATCH 1/7] arm64: Fix silly typo in comment
-In-Reply-To: <1535645767-9901-1-git-send-email-will.deacon@arm.com>
-References: <1535645767-9901-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1535645767-9901-2-git-send-email-will.deacon@arm.com>
+Date: Thu, 30 Aug 2018 17:15:40 +0100
+Subject: [PATCH 06/12] arm64: tlb: Remove redundant
+ !CONFIG_HAVE_RCU_TABLE_FREE code
+In-Reply-To: <1535645747-9823-1-git-send-email-will.deacon@arm.com>
+References: <1535645747-9823-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1535645747-9823-7-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I was passing through and figuered I'd fix this up:
+If there's one thing the RCU-based table freeing doesn't need, it's more
+ifdeffery.
 
-	featuer -> feature
+Remove the redundant !CONFIG_HAVE_RCU_TABLE_FREE code, since this option
+is unconditionally selected in our Kconfig.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/cpufeature.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/include/asm/tlb.h | 12 +++---------
+ 1 file changed, 3 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 1717ba1db35d..9079715794af 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -262,7 +262,7 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
- /*
-  * CPU feature detected at boot time based on system-wide value of a
-  * feature. It is safe for a late CPU to have this feature even though
-- * the system hasn't enabled it, although the featuer will not be used
-+ * the system hasn't enabled it, although the feature will not be used
-  * by Linux in this case. If the system has enabled this feature already,
-  * then every late CPU must have it.
-  */
+diff --git a/arch/arm64/include/asm/tlb.h b/arch/arm64/include/asm/tlb.h
+index 1e1f68ce28f4..bd00017d529a 100644
+--- a/arch/arm64/include/asm/tlb.h
++++ b/arch/arm64/include/asm/tlb.h
+@@ -22,16 +22,10 @@
+ #include <linux/pagemap.h>
+ #include <linux/swap.h>
+ 
+-#ifdef CONFIG_HAVE_RCU_TABLE_FREE
+-
+-#define tlb_remove_entry(tlb, entry)	tlb_remove_table(tlb, entry)
+ static inline void __tlb_remove_table(void *_table)
+ {
+ 	free_page_and_swap_cache((struct page *)_table);
+ }
+-#else
+-#define tlb_remove_entry(tlb, entry)	tlb_remove_page(tlb, entry)
+-#endif /* CONFIG_HAVE_RCU_TABLE_FREE */
+ 
+ static void tlb_flush(struct mmu_gather *tlb);
+ 
+@@ -61,7 +55,7 @@ static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
+ {
+ 	__flush_tlb_pgtable(tlb->mm, addr);
+ 	pgtable_page_dtor(pte);
+-	tlb_remove_entry(tlb, pte);
++	tlb_remove_table(tlb, pte);
+ }
+ 
+ #if CONFIG_PGTABLE_LEVELS > 2
+@@ -69,7 +63,7 @@ static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
+ 				  unsigned long addr)
+ {
+ 	__flush_tlb_pgtable(tlb->mm, addr);
+-	tlb_remove_entry(tlb, virt_to_page(pmdp));
++	tlb_remove_table(tlb, virt_to_page(pmdp));
+ }
+ #endif
+ 
+@@ -78,7 +72,7 @@ static inline void __pud_free_tlb(struct mmu_gather *tlb, pud_t *pudp,
+ 				  unsigned long addr)
+ {
+ 	__flush_tlb_pgtable(tlb->mm, addr);
+-	tlb_remove_entry(tlb, virt_to_page(pudp));
++	tlb_remove_table(tlb, virt_to_page(pudp));
+ }
+ #endif
+ 
 -- 
 2.1.4
