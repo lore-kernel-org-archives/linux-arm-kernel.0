@@ -1,26 +1,63 @@
-From: axboe@kernel.dk (Jens Axboe)
-Date: Thu, 30 Aug 2018 14:31:34 -0600
-Subject: [PATCH v4 00/13] ata: ahci_platform: support allwinner R40 AHCI
-In-Reply-To: <20180830190120.722-1-clabbe.montjoie@gmail.com>
-References: <20180830190120.722-1-clabbe.montjoie@gmail.com>
-Message-ID: <f5838eae-fa6c-8699-14a4-95d0daa8a960@kernel.dk>
+From: Vineet.Gupta1@synopsys.com (Vineet Gupta)
+Date: Thu, 30 Aug 2018 20:31:59 +0000
+Subject: Patch "asm-generic/bitops/lock.h: Rewrite using atomic_fetch_"
+ causes kernel crash
+References: <1535567633.4465.23.camel@synopsys.com>
+ <C2D7FE5348E1B147BCA15975FBA23075012B090BEA@us01wembx1.internal.synopsys.com>
+ <20180830094411.GX24124@hirez.programming.kicks-ass.net>
+ <20180830095148.GB5942@arm.com> <1535629996.4465.44.camel@synopsys.com>
+ <20180830141713.GN24082@hirez.programming.kicks-ass.net>
+ <20180830142354.GB13005@arm.com>
+ <20180830142920.GO24082@hirez.programming.kicks-ass.net>
+Message-ID: <C2D7FE5348E1B147BCA15975FBA23075012B090EA4@us01wembx1.internal.synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/30/18 1:01 PM, Corentin Labbe wrote:
-> Hello
-> 
-> This patchset add support for allwinner R40 AHCI controller.
-> 
-> The whole patchset is tested on sun8i-r40-bananapi-m2-ultra and
-> on sun7i-a20-cubieboard2 which doesnt have any of the ressources added
-> by this serie, so no regression should come with it.
-> 
-> The last patch(ata: ahci_sunxi: remove PHY code) should not be merged,
-> but will be resent for inclustion when all patchs will have hit linus
-> tree.
+On 08/30/2018 07:29 AM, Peter Zijlstra wrote:
+> On Thu, Aug 30, 2018 at 03:23:55PM +0100, Will Deacon wrote:
+>
+>> Yes, that would be worth trying. However, I also just noticed that the
+>> fetch-ops (which are now used to implement test_and_set_bit_lock()) seem
+>> to be missing the backwards branch in the LL/SC case. Yet another diff
+>> below.
+>>
+>> Will
+>>
+>> --->8
+>>
+>> diff --git a/arch/arc/include/asm/atomic.h b/arch/arc/include/asm/atomic.h
+>> index 4e0072730241..f06c5ed672b3 100644
+>> --- a/arch/arc/include/asm/atomic.h
+>> +++ b/arch/arc/include/asm/atomic.h
+>> @@ -84,7 +84,7 @@ static inline int atomic_fetch_##op(int i, atomic_t *v)			\
+>>  	"1:	llock   %[orig], [%[ctr]]		\n"		\
+>>  	"	" #asm_op " %[val], %[orig], %[i]	\n"		\
+>>  	"	scond   %[val], [%[ctr]]		\n"		\
+>> -	"						\n"		\
+>> +	"	bnz	1b				\n"		\
+>>  	: [val]	"=&r"	(val),						\
+>>  	  [orig] "=&r" (orig)						\
+>>  	: [ctr]	"r"	(&v->counter),					\
+> ACK!! sorry about that, no idea how I messed that up.
+>
+> Also, once it all works, they should look at switching to _relaxed
+> atomics for LL/SC.
 
-Applied 1-12 with Hans's blessing, thanks Corentin.
+Indeed this is the mother of all issues, I tried and system is clearly hosed with
+and works after.
+What's amazing is the commit 4aef66c8ae9 which introduced it is from 2016 ;-)
+Back then we had a retry branch with backoff stuff which I'd reverted for new
+cores and the merge conflict somehow missed it.
 
--- 
-Jens Axboe
+@PeterZ I'll create a patch with you as author ? do I need any formal sign offs,
+acks etc ?
+
+So after this there are 2 other things to be addresses / looked at still while we
+are still here.
+
+1. After 84c6591103db __clear_bit_lock() implementation will be broken (or atleast
+not consistent with what we had after), do we need to reinstate it.
+2. Will's proposed change to remove the underlying issue, but the issue in #1
+remains ?
+
+-Vineet
