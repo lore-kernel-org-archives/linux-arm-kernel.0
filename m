@@ -1,44 +1,89 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Thu, 30 Aug 2018 13:48:15 +0200
-Subject: [PATCH v6 00/11] arm64: untag user pointers passed to the kernel
-In-Reply-To: <cover.1535629099.git.andreyknvl@google.com>
-References: <cover.1535629099.git.andreyknvl@google.com>
-Message-ID: <CAAeHK+yyX95aBzzXRoSUYj1QF8c-7uwGNeuwfBU8zOjOWyO_Wg@mail.gmail.com>
+From: claudiu.beznea@microchip.com (Claudiu Beznea)
+Date: Thu, 30 Aug 2018 14:50:08 +0300
+Subject: [PATCH 3/6] power: reset: at91-poweroff: make mpddrc_base part of
+ struct shdwc
+In-Reply-To: <1535629811-13403-1-git-send-email-claudiu.beznea@microchip.com>
+References: <1535629811-13403-1-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <1535629811-13403-4-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 30, 2018 at 1:41 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
-> arm64 has a feature called Top Byte Ignore, which allows to embed pointer
-> tags into the top byte of each pointer. Userspace programs (such as
-> HWASan, a memory debugging tool [1]) might use this feature and pass
-> tagged user pointers to the kernel through syscalls or other interfaces.
->
-> This patch makes a few of the kernel interfaces accept tagged user
-> pointers. The kernel is already able to handle user faults with tagged
-> pointers and has the untagged_addr macro, which this patchset reuses.
->
-> Thanks!
->
-> [1] http://clang.llvm.org/docs/HardwareAssistedAddressSanitizerDesign.html
->
-> Changes in v6:
-> - Added annotations for user pointer casts found by sparse.
+Make mpddrc_base part of struct shdwc since there is also only one
+instance of struct shdwc *at91_shdwc in system and to have all data
+specific to SHDWC grouped together.
 
-Hi Catalin,
+Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+---
+ drivers/power/reset/at91-sama5d2_shdwc.c | 19 ++++++++++---------
+ 1 file changed, 10 insertions(+), 9 deletions(-)
 
-I've added annotations for the user pointer casts pointed by the new
-sparse flag -Wcast-from-as as you asked. I've used __force casts
-instead of adding specialized macros.
-
-There are also non annotated casts for other pointer types (iomem,
-rcu) which are detected with the new flag, should I annotate those as
-well?
-
-I'm not sure though what value would that bring though, as there are
-~3000 various sparse warnings produced with the default flags anyway.
-
-WDYT?
-
-Thanks!
-
-[1] https://github.com/lucvoo/sparse-dev/commit/5f960cb10f56ec2017c128ef9d16060e0145f292
+diff --git a/drivers/power/reset/at91-sama5d2_shdwc.c b/drivers/power/reset/at91-sama5d2_shdwc.c
+index 94ad79d0d82e..c9994103248e 100644
+--- a/drivers/power/reset/at91-sama5d2_shdwc.c
++++ b/drivers/power/reset/at91-sama5d2_shdwc.c
+@@ -71,6 +71,7 @@ struct shdwc_config {
+ struct shdwc {
+ 	const struct shdwc_config *cfg;
+ 	void __iomem *at91_shdwc_base;
++	void __iomem *mpddrc_base;
+ 	void __iomem *pmc_base;
+ };
+ 
+@@ -80,7 +81,6 @@ struct shdwc {
+  */
+ static struct shdwc *at91_shdwc;
+ static struct clk *sclk;
+-static void __iomem *mpddrc_base;
+ 
+ static const unsigned long long sdwc_dbc_period[] = {
+ 	0, 3, 32, 512, 4096, 32768,
+@@ -136,7 +136,7 @@ static void at91_poweroff(void)
+ 
+ 		"	b	.\n\t"
+ 		:
+-		: "r" (mpddrc_base),
++		: "r" (at91_shdwc->mpddrc_base),
+ 		  "r" cpu_to_le32(AT91_DDRSDRC_LPDDR2_PWOFF),
+ 		  "r" (at91_shdwc->at91_shdwc_base),
+ 		  "r" cpu_to_le32(AT91_SHDW_KEY | AT91_SHDW_SHDW),
+@@ -305,21 +305,22 @@ static int __init at91_shdwc_probe(struct platform_device *pdev)
+ 		goto unmap;
+ 	}
+ 
+-	mpddrc_base = of_iomap(np, 0);
++	at91_shdwc->mpddrc_base = of_iomap(np, 0);
+ 	of_node_put(np);
+ 
+-	if (!mpddrc_base) {
++	if (!at91_shdwc->mpddrc_base) {
+ 		ret = -ENOMEM;
+ 		goto unmap;
+ 	}
+ 
+ 	pm_power_off = at91_poweroff;
+ 
+-	ddr_type = readl(mpddrc_base + AT91_DDRSDRC_MDR) & AT91_DDRSDRC_MD;
++	ddr_type = readl(at91_shdwc->mpddrc_base + AT91_DDRSDRC_MDR) &
++			 AT91_DDRSDRC_MD;
+ 	if (ddr_type != AT91_DDRSDRC_MD_LPDDR2 &&
+ 	    ddr_type != AT91_DDRSDRC_MD_LPDDR3) {
+-		iounmap(mpddrc_base);
+-		mpddrc_base = NULL;
++		iounmap(at91_shdwc->mpddrc_base);
++		at91_shdwc->mpddrc_base = NULL;
+ 	}
+ 
+ 	return 0;
+@@ -343,8 +344,8 @@ static int __exit at91_shdwc_remove(struct platform_device *pdev)
+ 	writel(0, shdw->at91_shdwc_base + AT91_SHDW_MR);
+ 	writel(0, shdw->at91_shdwc_base + AT91_SHDW_WUIR);
+ 
+-	if (mpddrc_base)
+-		iounmap(mpddrc_base);
++	if (shdw->mpddrc_base)
++		iounmap(shdw->mpddrc_base);
+ 	iounmap(shdw->pmc_base);
+ 
+ 	clk_disable_unprepare(sclk);
+-- 
+2.7.4
