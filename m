@@ -1,78 +1,61 @@
 From: mirq-linux@rere.qmqm.pl (=?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?=)
-Date: Thu, 30 Aug 2018 23:00:05 +0200
-Subject: [PATCH v2 02/12] fbdev: allow apertures == NULL in
- remove_conflicting_framebuffers()
+Date: Thu, 30 Aug 2018 23:00:06 +0200
+Subject: [PATCH v2 04/12] drm/amdgpu: use simpler
+ remove_conflicting_pci_framebuffers()
 In-Reply-To: <cover.1535656077.git.mirq-linux@rere.qmqm.pl>
 References: <cover.1535656077.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <7e3a48e397298b38d7ddc7f45d48226d1f5db3e4.1535656077.git.mirq-linux@rere.qmqm.pl>
+Message-ID: <e59320ab73adae4664d6e9c8b03e90d6ddf8c285.1535656077.git.mirq-linux@rere.qmqm.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Interpret (otherwise-invalid) NULL apertures argument to mean all-memory
-range. This will allow to remove several duplicates of this code from
-drivers in following patches.
-
 Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
-[for v1]
-Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-
+Acked-by: Alex Deucher <alexander.deucher@amd.com>
+Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
 ---
-v2: added kerneldoc to corresponding DRM helper
----
- drivers/video/fbdev/core/fbmem.c | 14 ++++++++++++++
- include/drm/drm_fb_helper.h      | 10 ++++++++++
- 2 files changed, 24 insertions(+)
+ drivers/gpu/drm/amd/amdgpu/amdgpu_drv.c | 24 +-----------------------
+ 1 file changed, 1 insertion(+), 23 deletions(-)
 
-diff --git a/drivers/video/fbdev/core/fbmem.c b/drivers/video/fbdev/core/fbmem.c
-index 30a18d4c9de4..0df148eb4699 100644
---- a/drivers/video/fbdev/core/fbmem.c
-+++ b/drivers/video/fbdev/core/fbmem.c
-@@ -1779,11 +1779,25 @@ int remove_conflicting_framebuffers(struct apertures_struct *a,
- 				    const char *name, bool primary)
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_drv.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_drv.c
+index 0b19482b36b8..9b6e037719db 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_drv.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_drv.c
+@@ -560,28 +560,6 @@ MODULE_DEVICE_TABLE(pci, pciidlist);
+ 
+ static struct drm_driver kms_driver;
+ 
+-static int amdgpu_kick_out_firmware_fb(struct pci_dev *pdev)
+-{
+-	struct apertures_struct *ap;
+-	bool primary = false;
+-
+-	ap = alloc_apertures(1);
+-	if (!ap)
+-		return -ENOMEM;
+-
+-	ap->ranges[0].base = pci_resource_start(pdev, 0);
+-	ap->ranges[0].size = pci_resource_len(pdev, 0);
+-
+-#ifdef CONFIG_X86
+-	primary = pdev->resource[PCI_ROM_RESOURCE].flags & IORESOURCE_ROM_SHADOW;
+-#endif
+-	drm_fb_helper_remove_conflicting_framebuffers(ap, "amdgpudrmfb", primary);
+-	kfree(ap);
+-
+-	return 0;
+-}
+-
+-
+ static int amdgpu_pci_probe(struct pci_dev *pdev,
+ 			    const struct pci_device_id *ent)
  {
- 	int ret;
-+	bool do_free = false;
-+
-+	if (!a) {
-+		a = alloc_apertures(1);
-+		if (!a)
-+			return -ENOMEM;
-+
-+		a->ranges[0].base = 0;
-+		a->ranges[0].size = ~0;
-+		do_free = true;
-+	}
+@@ -609,7 +587,7 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
+ 		return ret;
  
- 	mutex_lock(&registration_lock);
- 	ret = do_remove_conflicting_framebuffers(a, name, primary);
- 	mutex_unlock(&registration_lock);
+ 	/* Get rid of things like offb */
+-	ret = amdgpu_kick_out_firmware_fb(pdev);
++	ret = drm_fb_helper_remove_conflicting_pci_framebuffers(pdev, 0, "amdgpudrmfb");
+ 	if (ret)
+ 		return ret;
  
-+	if (do_free)
-+		kfree(a);
-+
- 	return ret;
- }
- EXPORT_SYMBOL(remove_conflicting_framebuffers);
-diff --git a/include/drm/drm_fb_helper.h b/include/drm/drm_fb_helper.h
-index b069433e7fc1..1c1e53abb25d 100644
---- a/include/drm/drm_fb_helper.h
-+++ b/include/drm/drm_fb_helper.h
-@@ -566,6 +566,16 @@ static inline void drm_fb_helper_output_poll_changed(struct drm_device *dev)
- 
- #endif
- 
-+/**
-+ * drm_fb_helper_remove_conflicting_framebuffers - remove firmware framebuffers
-+ * @a: memory range, users of which are to be removed
-+ * @name: requesting driver name
-+ * @primary: also kick vga16fb if present
-+ *
-+ * This function removes framebuffer devices (eg. initialized by firmware)
-+ * which use memory range described by @a. If @a is NULL all such devices are
-+ * removed.
-+ */
- static inline int
- drm_fb_helper_remove_conflicting_framebuffers(struct apertures_struct *a,
- 					      const char *name, bool primary)
 -- 
 2.18.0
