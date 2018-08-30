@@ -1,24 +1,50 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu, 30 Aug 2018 10:56:05 +0200
-Subject: [PATCH v2 2/2] PCI: meson: add the Amlogic Meson PCIe phy driver
-In-Reply-To: <b8deb2ef-5e73-b508-616e-b0303a0adc78@amlogic.com>
-References: <1535096006-152091-1-git-send-email-hanjie.lin@amlogic.com>
- <1535096006-152091-3-git-send-email-hanjie.lin@amlogic.com>
- <c21a2e25c934d19f913f625542f505cf45754f23.camel@baylibre.com>
- <b8deb2ef-5e73-b508-616e-b0303a0adc78@amlogic.com>
-Message-ID: <2558005d0cad11feb9d6775b2ed237351098fa06.camel@baylibre.com>
+From: kurt@linutronix.de (Kurt Kanzenbach)
+Date: Thu, 30 Aug 2018 11:00:38 +0200
+Subject: [PATCH] arm64: dts: ls208xa: add second duart
+Message-ID: <20180830090038.6956-1-kurt@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-08-30 at 16:02 +0800, Hanjie Lin wrote:
-> > I thought you said there was only phy on this platform.
-> > If that's the case, what is this reset shared with ?
-> 
-> Amlogic axg soc includes two pcie controllers and they share the same pcie phy.
-> Because of two pcie controllers, meson_pcie_phy_probe() will be called two times.
-> So, the phy reset must be shared.
+The NXP LS208xA SoCs have two dual uarts. Thus, add the second one.
 
-You are abusing the API then.
-The phy should have exclusive control of its *own* reset line, not other device
-should claim this reset. 
-I should then manage the fact that it may have more than one consumer.
+Signed-off-by: Kurt Kanzenbach <kurt@linutronix.de>
+---
+ arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+index 8cb78dd99672..547a86ec7cd2 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+@@ -22,6 +22,8 @@
+ 		crypto = &crypto;
+ 		serial0 = &serial0;
+ 		serial1 = &serial1;
++		serial2 = &serial2;
++		serial3 = &serial3;
+ 	};
+ 
+ 	cpu: cpus {
+@@ -221,6 +223,20 @@
+ 			interrupts = <0 32 0x4>; /* Level high type */
+ 		};
+ 
++		serial2: serial at 21d0500 {
++			compatible = "fsl,ns16550", "ns16550a";
++			reg = <0x0 0x21d0500 0x0 0x100>;
++			clocks = <&clockgen 4 3>;
++			interrupts = <0 33 0x4>; /* Level high type */
++		};
++
++		serial3: serial at 21d0600 {
++			compatible = "fsl,ns16550", "ns16550a";
++			reg = <0x0 0x21d0600 0x0 0x100>;
++			clocks = <&clockgen 4 3>;
++			interrupts = <0 33 0x4>; /* Level high type */
++		};
++
+ 		cluster1_core0_watchdog: wdt at c000000 {
+ 			compatible = "arm,sp805-wdt", "arm,primecell";
+ 			reg = <0x0 0xc000000 0x0 0x1000>;
+-- 
+2.11.0
