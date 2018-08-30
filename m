@@ -1,163 +1,91 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Thu, 30 Aug 2018 17:44:55 +0200
-Subject: [PATCH v3 07/30] iio: adc: remove mfd_probe & sunwi_irq_init function
+Date: Thu, 30 Aug 2018 17:45:04 +0200
+Subject: [PATCH v3 16/30] iio: adc: sun4i-gpadc-iio: rework: readout temp_data
 In-Reply-To: <20180830154518.29507-1-embed3d@gmail.com>
 References: <20180830154518.29507-1-embed3d@gmail.com>
-Message-ID: <20180830154518.29507-8-embed3d@gmail.com>
+Message-ID: <20180830154518.29507-17-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the previous commit we removed the function call, now we remove the
-unused functions.
+For adding newer sensor some basic rework of the code is necessary.
+
+This commit reworks the code and uses regmap field to read out
+temp_data.
 
 Signed-off-by: Philipp Rossak <embed3d@gmail.com>
 ---
- drivers/iio/adc/sun4i-gpadc-iio.c | 126 --------------------------------------
- 1 file changed, 126 deletions(-)
+ drivers/iio/adc/sun4i-gpadc-iio.c | 21 +++++++++++++--------
+ 1 file changed, 13 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-index d6f00d3b802d..f787442a9e5f 100644
+index d48f338af563..c278e165e161 100644
 --- a/drivers/iio/adc/sun4i-gpadc-iio.c
 +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-@@ -431,55 +431,6 @@ static const struct dev_pm_ops sun4i_gpadc_pm_ops = {
- 	.runtime_resume = &sun4i_gpadc_runtime_resume,
+@@ -63,6 +63,7 @@ struct gpadc_data {
+ 	int		(*ths_suspend)(struct sun4i_gpadc_iio *info);
+ 	int		(*ths_resume)(struct sun4i_gpadc_iio *info);
+ 	bool		support_irq;
++	u32		temp_data_base;
  };
  
--static int sun4i_irq_init(struct platform_device *pdev, const char *name,
--			  irq_handler_t handler, const char *devname,
--			  unsigned int *irq, atomic_t *atomic)
--{
--	int ret;
--	struct sun4i_gpadc_dev *mfd_dev = dev_get_drvdata(pdev->dev.parent);
--	struct sun4i_gpadc_iio *info = iio_priv(dev_get_drvdata(&pdev->dev));
--
--	/*
--	 * Once the interrupt is activated, the IP continuously performs
--	 * conversions thus throws interrupts. The interrupt is activated right
--	 * after being requested but we want to control when these interrupts
--	 * occur thus we disable it right after being requested. However, an
--	 * interrupt might occur between these two instructions and we have to
--	 * make sure that does not happen, by using atomic flags. We set the
--	 * flag before requesting the interrupt and unset it right after
--	 * disabling the interrupt. When an interrupt occurs between these two
--	 * instructions, reading the atomic flag will tell us to ignore the
--	 * interrupt.
--	 */
--	atomic_set(atomic, 1);
--
--	ret = platform_get_irq_byname(pdev, name);
--	if (ret < 0) {
--		dev_err(&pdev->dev, "no %s interrupt registered\n", name);
--		return ret;
+ static irqreturn_t sun4i_gpadc_data_irq_handler(int irq, void *dev_id);
+@@ -77,6 +78,7 @@ static const struct gpadc_data sun4i_gpadc_data = {
+ 	.adc_channel = true,
+ 	.ths_irq_thread = sun4i_gpadc_data_irq_handler,
+ 	.support_irq = true,
++	.temp_data_base = SUN4I_GPADC_TEMP_DATA,
+ };
+ 
+ static const struct gpadc_data sun5i_gpadc_data = {
+@@ -89,6 +91,7 @@ static const struct gpadc_data sun5i_gpadc_data = {
+ 	.adc_channel = true,
+ 	.ths_irq_thread = sun4i_gpadc_data_irq_handler,
+ 	.support_irq = true,
++	.temp_data_base = SUN4I_GPADC_TEMP_DATA,
+ };
+ 
+ static const struct gpadc_data sun6i_gpadc_data = {
+@@ -101,12 +104,14 @@ static const struct gpadc_data sun6i_gpadc_data = {
+ 	.adc_channel = true,
+ 	.ths_irq_thread = sun4i_gpadc_data_irq_handler,
+ 	.support_irq = true,
++	.temp_data_base = SUN4I_GPADC_TEMP_DATA,
+ };
+ 
+ static const struct gpadc_data sun8i_a33_gpadc_data = {
+ 	.temp_offset = -1662,
+ 	.temp_scale = 162,
+ 	.tp_mode_en = SUN8I_A33_GPADC_CTRL1_CHOP_TEMP_EN,
++	.temp_data_base = SUN4I_GPADC_TEMP_DATA,
+ };
+ 
+ struct sun4i_gpadc_iio {
+@@ -271,18 +276,18 @@ static int sun4i_gpadc_temp_read(struct iio_dev *indio_dev, int *val)
+ {
+ 	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
+ 
+-	if (!info->data->support_irq) {
+-		pm_runtime_get_sync(indio_dev->dev.parent);
++	if (info->data->adc_channel)
++		return sun4i_gpadc_read(indio_dev, 0, val,
++				SUN4I_GPADC_IRQ_TEMP_DATA);
+ 
+-		regmap_read(info->regmap, SUN4I_GPADC_TEMP_DATA, val);
++	pm_runtime_get_sync(indio_dev->dev.parent);
+ 
+-		pm_runtime_mark_last_busy(indio_dev->dev.parent);
+-		pm_runtime_put_autosuspend(indio_dev->dev.parent);
++	regmap_read(info->regmap, info->data->temp_data_base, val);
+ 
+-		return 0;
 -	}
--
--	ret = regmap_irq_get_virq(mfd_dev->regmap_irqc, ret);
--	if (ret < 0) {
--		dev_err(&pdev->dev, "failed to get virq for irq %s\n", name);
--		return ret;
--	}
--
--	*irq = ret;
--	ret = devm_request_any_context_irq(&pdev->dev, *irq, handler, 0,
--					   devname, info);
--	if (ret < 0) {
--		dev_err(&pdev->dev, "could not request %s interrupt: %d\n",
--			name, ret);
--		return ret;
--	}
--
--	disable_irq(*irq);
--	atomic_set(atomic, 0);
--
--	return 0;
--}
--
- static const struct of_device_id sun4i_gpadc_of_id[] = {
- 	{
- 		.compatible = "allwinner,sun8i-a33-ths",
-@@ -523,83 +474,6 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
- 	return 0;
++	pm_runtime_mark_last_busy(indio_dev->dev.parent);
++	pm_runtime_put_autosuspend(indio_dev->dev.parent);
+ 
+-	return sun4i_gpadc_read(indio_dev, 0, val, SUN4I_GPADC_IRQ_TEMP_DATA);
++	return 0;
  }
  
--static int sun4i_gpadc_probe_mfd(struct platform_device *pdev,
--				 struct iio_dev *indio_dev)
--{
--	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
--	struct sun4i_gpadc_dev *sun4i_gpadc_dev =
--		dev_get_drvdata(pdev->dev.parent);
--	int ret;
--
--	info->no_irq = false;
--	info->regmap = sun4i_gpadc_dev->regmap;
--
--	indio_dev->num_channels = ARRAY_SIZE(sun4i_gpadc_channels);
--	indio_dev->channels = sun4i_gpadc_channels;
--
--	info->data = (struct gpadc_data *)platform_get_device_id(pdev)->driver_data;
--
--	/*
--	 * Since the controller needs to be in touchscreen mode for its thermal
--	 * sensor to operate properly, and that switching between the two modes
--	 * needs a delay, always registering in the thermal framework will
--	 * significantly slow down the conversion rate of the ADCs.
--	 *
--	 * Therefore, instead of depending on THERMAL_OF in Kconfig, we only
--	 * register the sensor if that option is enabled, eventually leaving
--	 * that choice to the user.
--	 */
--
--	if (IS_ENABLED(CONFIG_THERMAL_OF)) {
--		/*
--		 * This driver is a child of an MFD which has a node in the DT
--		 * but not its children, because of DT backward compatibility
--		 * for A10, A13 and A31 SoCs. Therefore, the resulting devices
--		 * of this driver do not have an of_node variable.
--		 * However, its parent (the MFD driver) has an of_node variable
--		 * and since devm_thermal_zone_of_sensor_register uses its first
--		 * argument to match the phandle defined in the node of the
--		 * thermal driver with the of_node of the device passed as first
--		 * argument and the third argument to call ops from
--		 * thermal_zone_of_device_ops, the solution is to use the parent
--		 * device as first argument to match the phandle with its
--		 * of_node, and the device from this driver as third argument to
--		 * return the temperature.
--		 */
--		info->sensor_device = pdev->dev.parent;
--	} else {
--		indio_dev->num_channels =
--			ARRAY_SIZE(sun4i_gpadc_channels_no_temp);
--		indio_dev->channels = sun4i_gpadc_channels_no_temp;
--	}
--
--	if (IS_ENABLED(CONFIG_THERMAL_OF)) {
--		ret = sun4i_irq_init(pdev, "TEMP_DATA_PENDING",
--				     sun4i_gpadc_temp_data_irq_handler,
--				     "temp_data", &info->temp_data_irq,
--				     &info->ignore_temp_data_irq);
--		if (ret < 0)
--			return ret;
--	}
--
--	ret = sun4i_irq_init(pdev, "FIFO_DATA_PENDING",
--			     sun4i_gpadc_fifo_data_irq_handler, "fifo_data",
--			     &info->fifo_data_irq, &info->ignore_fifo_data_irq);
--	if (ret < 0)
--		return ret;
--
--	if (IS_ENABLED(CONFIG_THERMAL_OF)) {
--		ret = iio_map_array_register(indio_dev, sun4i_gpadc_hwmon_maps);
--		if (ret < 0) {
--			dev_err(&pdev->dev,
--				"failed to register iio map array\n");
--			return ret;
--		}
--	}
--
--	return 0;
--}
--
- static int sun4i_gpadc_probe(struct platform_device *pdev)
- {
- 	struct sun4i_gpadc_iio *info;
+ static int sun4i_gpadc_temp_offset(struct iio_dev *indio_dev, int *val)
 -- 
 2.11.0
