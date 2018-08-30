@@ -1,77 +1,88 @@
 From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Fri, 31 Aug 2018 00:01:11 +0530
-Subject: [PATCH 00/15] soc: octeontx2: Add RVU admin function driver
-In-Reply-To: <20180830132658.GA27566@lunn.ch>
+Date: Fri, 31 Aug 2018 00:06:51 +0530
+Subject: [PATCH 04/15] soc: octeontx2: Add mailbox support infra
+In-Reply-To: <CAK8P3a1W2D5YWEC-VDkvQ8y3W8257g6X7B8_At7g8f9iE73a8w@mail.gmail.com>
 References: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
- <CAK8P3a1xC6XjwDAmocpE5TZO7j6uVGtvBtWLPVcYwKqN6Z+seQ@mail.gmail.com>
- <CA+sq2Cd3R0V5hcaF+ESfkOEBHgBwOB6b8Uwx7K+CeUN6gLFTOg@mail.gmail.com>
- <CA+sq2CfbpQKas7TbQfrcw=Drpb7yO_gqH31iXabjNEQEG4xYrQ@mail.gmail.com>
- <20180830132658.GA27566@lunn.ch>
-Message-ID: <CA+sq2CfX+BGE1Ub0H9G21Vqg+vmQSukZj4gwz=B8wsqTLgE7mg@mail.gmail.com>
+ <1535453838-12154-5-git-send-email-sunil.kovvuri@gmail.com>
+ <CAK8P3a2fgAVB0+uns9f5MH+2OyZbwvReo9j-=u3=30QoK=2Ksw@mail.gmail.com>
+ <CA+sq2CeyQ8r7bj3vK=cfriif=HhUu36ZUPWqxXm1e0DktHG+Fg@mail.gmail.com>
+ <CAK8P3a1CvX1V8h20s_=XUUYfR-zYNwETg5p6dCtpVUqZ89K-tg@mail.gmail.com>
+ <CA+sq2Cdn6ut3kdTWoOgCayO2evQrD9TjBaUpVUR3_rWZFxYeig@mail.gmail.com>
+ <CAK8P3a1W2D5YWEC-VDkvQ8y3W8257g6X7B8_At7g8f9iE73a8w@mail.gmail.com>
+Message-ID: <CA+sq2CfjJjswOwypNMtro+g8TeHGoBqAeKpFrf2ys-1=Xg+qHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 30, 2018 at 6:57 PM Andrew Lunn <andrew@lunn.ch> wrote:
+On Thu, Aug 30, 2018 at 7:27 PM Arnd Bergmann <arnd@arndb.de> wrote:
 >
-> > > > My feeling overall is that we need a review from the network driver
-> > > > folks more than the arm-soc team etc, and that maybe the driver
-> > > > as a whole should go into drivers/net/ethernet.
+> On Tue, Aug 28, 2018 at 3:23 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
+> >
+> > On Tue, Aug 28, 2018 at 6:22 PM Arnd Bergmann <arnd@arndb.de> wrote:
 > > >
-> > > This driver doesn't handle any network IO and moreever this driver has to handle
-> > > configuration requests from crypto driver as well. There will be
-> > > separate network and
-> > > crypto drivers which will be upstreamed into drivers/net/ethernet and
-> > > drivers/crypto.
-> > > And in future silicons there will be different types of functional
-> > > blocks which will be
-> > > added into this resource virtualization unit (RVU). Hence i thought
-> > > this driver is not a
-> > > right fit in drivers/net/ethernet.
+> > > On Tue, Aug 28, 2018 at 2:48 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
+> > > >
+> > > > On Tue, Aug 28, 2018 at 5:33 PM Arnd Bergmann <arnd@arndb.de> wrote:
+> > > > >
+> > > > > On Tue, Aug 28, 2018 at 12:57 PM <sunil.kovvuri@gmail.com> wrote:
+> > > > > >
+> > > > > > From: Aleksey Makarov <amakarov@marvell.com>
+> > > > > >
+> > > > > > This patch adds mailbox support infrastructure APIs.
+> > > > > > Each RVU device has a dedicated 64KB mailbox region
+> > > > > > shared with it's peer for communication. RVU AF has
+> > > > > > a separate mailbox region shared with each of RVU PFs
+> > > > > > and a RVU PF has a separate region shared with each of
+> > > > > > it's VF.
+> > > > > >
+> > > > > > These set of APIs are used by this driver (RVU AF) and
+> > > > > > other RVU PF/VF drivers eg netdev, crypto e.t.c.
+> > > > > >
+> > > > > > Signed-off-by: Aleksey Makarov <amakarov@marvell.com>
+> > > > > > Signed-off-by: Sunil Goutham <sgoutham@marvell.com>
+> > > > > > Signed-off-by: Lukasz Bartosik <lbartosik@marvell.com>
+> > > > >
+> > > > > Why does this driver not use the drivers/mailbox/ infrastructure?
+> > > > >
+> > > > This is a common administrative software driver which will be handling requests
+> > > > from kernel drivers and as well as drivers in userspace applications.
+> > > > We had to keep mailbox communication infrastructure same across all usages.
+> > >
+> > > Can you explain more about the usage of userspace applications
+> > > and what interface you plan to use into the kernel?
+> >
+> > Any PCI device here irrespective in what domain (kernel or userspace)
+> > they are in
+> > use common mailbox communication. Which is
+> > # Write a mailbox msg (format is agreed between all parties) into
+> > shared (between AF and other PF/VFs)
+> >    memory region and trigger a interrupt to admin function.
+> > # Admin function processes the msg and puts reply in the same memory
+> > region and trigger
+> >    IRQ to the requesting device. If the device has a driver instance
+> > in kernel then it uses
+> >    IRQ and userspace applications does polling on the IRQ status bit.
 >
-> Hi Sunil
->
-> Do you have a git branch for everything? I would like to look at the
-> actual Ethernet driver, and the full API this driver exports to other
-> drivers.
+> Ok, so the mailbox here is a communication mechanism between
+> two device drivers that may run on the same kernel, or in different
+> instances (user space, virtual machine, ...), but each driver
+> only talks to the mailbox visible in its own device, right?
 
-Hi Andrew,
-
-I have pushed all patches into a github repo for your reference.
-These are not the final patches, i still need to do some minor changes
-before submitting
-(i mean otherthan the ones i already submitted).
-
-AF driver & CGX drivers:
-https://github.com/sunilkovvuri/rvu_drivers/tree/master/drivers/soc/marvell/octeontx2
-
-Ethernet drivers PF and VF
-https://github.com/sunilkovvuri/rvu_drivers/tree/master/drivers/net/ethernet/marvell/octeontx2
-
-Info exported/shared by AF driver with other drivers is
-# Mailbox communication APIs, message IDs, message structs e.t.c
-   https://github.com/sunilkovvuri/rvu_drivers/blob/master/drivers/soc/marvell/octeontx2/mbox.c
-   https://github.com/sunilkovvuri/rvu_drivers/blob/master/drivers/soc/marvell/octeontx2/mbox.h
-# Other structs and APIs
-    https://github.com/sunilkovvuri/rvu_drivers/blob/master/drivers/soc/marvell/octeontx2/common.h
-    https://github.com/sunilkovvuri/rvu_drivers/blob/master/drivers/soc/marvell/octeontx2/rvu_struct.h
+Yes.
 
 >
-> I think there real question here is, do you have split between this
-> driver and the actual device drivers in the right place? For me, link
-> up/down detection should be in the Ethernet driver, since it is not
-> shared with the crypto driver.
+> What is the purpose of the exported interface then? Is this
+> just an abstraction so each of the drivers can talk to its own
+> mailbox using a set of common helper functions?
 >
+>       Arnd
 
-As mentioned in the patch '[PATCH 13/15] soc: octeontx2: Add support
-for CGX link management',
-link up/down is detected by firmware. And firmware triggers a IRQ to
-CGX driver, which then
-takes the new status and sends a update to ethernet driver via a
+Yes, that's correct.
+
+In kernel there will be a minimum of 3 drivers which will use this
 mailbox communication.
+So instead of duplicating APIs and structures in every driver, we
+thought of adding them
+in this AF driver and export them to ethernet and crypto drivers.
 
-Ethernet driver detects the link change and does the necessary stuff.
-https://github.com/sunilkovvuri/rvu_drivers/blob/master/drivers/net/ethernet/marvell/octeontx2/otx2_pf.c#L116
-
-
->        Thanks
->         Andrew
+Thanks,
+Sunil.
