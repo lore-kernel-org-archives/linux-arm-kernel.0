@@ -1,43 +1,94 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Aug 2018 10:35:13 +0100
-Subject: Patch "asm-generic/bitops/lock.h: Rewrite using atomic_fetch_"
- causes kernel crash
-In-Reply-To: <C2D7FE5348E1B147BCA15975FBA23075012B090BEA@us01wembx1.internal.synopsys.com>
-References: <1535567633.4465.23.camel@synopsys.com>
- <C2D7FE5348E1B147BCA15975FBA23075012B090BEA@us01wembx1.internal.synopsys.com>
-Message-ID: <20180830093513.GA5942@arm.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Thu, 30 Aug 2018 11:39:53 +0200
+Subject: [PATCH v4 05/20] kvm: arm64: Add helper for loading the stage2
+ setting for a VM
+In-Reply-To: <1531905547-25478-6-git-send-email-suzuki.poulose@arm.com>
+References: <1531905547-25478-1-git-send-email-suzuki.poulose@arm.com>
+ <1531905547-25478-6-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180830093953.GA4029@e113682-lin.lund.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 29, 2018 at 09:16:43PM +0000, Vineet Gupta wrote:
-> On 08/29/2018 11:33 AM, Eugeniy Paltsev wrote:
-> > Hi Guys,
-> > Since v4.19-rc1 we are getting a serious regression on platforms with ARC architecture.
-> > The kernel have become unstable and spontaneously crashes on LTP tests execution / IO tests or
-> > even on boot.
-> >
-> > I don't know exactly what breaks but bisect clearly assign the blame to this commit:
-> > 84c6591103db ("locking/atomics, asm-generic/bitops/lock.h: Rewrite using atomic_fetch_*()")
-> > https://github.com/torvalds/linux/commit/84c6591103dbeaf393a092a3fc7b09510825f6b9
-> >
-> > Reverting the commit solves this problem.
-> >
-> > I tested v4.19-rc1 on ARM (wandboard, i.mx6, 32bit, quard core, ARMv7) which uses same
-> > generic bitops implementation and it works fine.
-> >
-> > Do you have any ideas what went wrong?
+On Wed, Jul 18, 2018 at 10:18:48AM +0100, Suzuki K Poulose wrote:
+> We load the stage2 context of a guest for different operations,
+> including running the guest and tlb maintenance on behalf of the
+> guest. As of now only the vttbr is private to the guest, but this
+> is about to change with IPA per VM. Add a helper to load the stage2
+> configuration for a VM, which could do the right thing with the
+> future changes.
 > 
-> Back in 2016, Peter had fixed this file due to a problem I reported on ARC. See
-> commit f75d48644c56a ("bitops: Do not default to __clear_bit() for
-> __clear_bit_unlock()")
-> That made __clear_bit_unlock() use the atomic clear_bit() vs. non-atomic
-> __clear_bit(), effectively making clear_bit_unlock() and __clear_bit_unlock() same.
+> Cc: Christoffer Dall <cdall@kernel.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Reviewed-by: Eric Auger <eric.auger@redhat.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+> Changes since v2:
+>  - New patch
+> ---
+>  arch/arm64/include/asm/kvm_hyp.h | 6 ++++++
+>  arch/arm64/kvm/hyp/switch.c      | 2 +-
+>  arch/arm64/kvm/hyp/tlb.c         | 4 ++--
+>  3 files changed, 9 insertions(+), 3 deletions(-)
 > 
-> This patch undoes that which could explain the issues you see. @Peter, @Will ?
+> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+> index 384c343..82f9994 100644
+> --- a/arch/arm64/include/asm/kvm_hyp.h
+> +++ b/arch/arm64/include/asm/kvm_hyp.h
+> @@ -155,5 +155,11 @@ void deactivate_traps_vhe_put(void);
+>  u64 __guest_enter(struct kvm_vcpu *vcpu, struct kvm_cpu_context *host_ctxt);
+>  void __noreturn __hyp_do_panic(unsigned long, ...);
+>  
+> +/* Must be called from hyp code running at EL2 */
 
-/me grabs arc toolchain (incidentally, make.cross fuzzy matches "arc" to
-"sparc", so that was fun for a few minutes).
+more importantly than having to run this at EL2, is that it must have
+gone through the proper sequence of update_vttbr() and disabling
+interrupts to avoid using a stale VMID.
 
-I'll take a look today, thanks for the report.
+> +static __always_inline void __hyp_text __load_guest_stage2(struct kvm *kvm)
+> +{
+> +	write_sysreg(kvm->arch.vttbr, vttbr_el2);
+> +}
+> +
+>  #endif /* __ARM64_KVM_HYP_H__ */
+>  
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index d496ef5..355fb25 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -195,7 +195,7 @@ void deactivate_traps_vhe_put(void)
+>  
+>  static void __hyp_text __activate_vm(struct kvm *kvm)
+>  {
+> -	write_sysreg(kvm->arch.vttbr, vttbr_el2);
+> +	__load_guest_stage2(kvm);
+>  }
+>  
+>  static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
+> diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
+> index 131c777..4dbd9c6 100644
+> --- a/arch/arm64/kvm/hyp/tlb.c
+> +++ b/arch/arm64/kvm/hyp/tlb.c
+> @@ -30,7 +30,7 @@ static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm)
+>  	 * bits. Changing E2H is impossible (goodbye TTBR1_EL2), so
+>  	 * let's flip TGE before executing the TLB operation.
+>  	 */
+> -	write_sysreg(kvm->arch.vttbr, vttbr_el2);
+> +	__load_guest_stage2(kvm);
+>  	val = read_sysreg(hcr_el2);
+>  	val &= ~HCR_TGE;
+>  	write_sysreg(val, hcr_el2);
+> @@ -39,7 +39,7 @@ static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm)
+>  
+>  static void __hyp_text __tlb_switch_to_guest_nvhe(struct kvm *kvm)
+>  {
+> -	write_sysreg(kvm->arch.vttbr, vttbr_el2);
+> +	__load_guest_stage2(kvm);
+>  	isb();
+>  }
+>  
+> -- 
+> 2.7.4
+> 
 
-Will
+Thanks,
+-Christoffer
