@@ -1,49 +1,49 @@
-From: qiang.zhao@nxp.com (Qiang Zhao)
-Date: Thu, 30 Aug 2018 02:47:31 +0000
-Subject: [PATCH] soc: fsl/qe: Use of_get_child_by_name helper
-In-Reply-To: <20180829200425.16435-1-robh@kernel.org>
-References: <20180829200425.16435-1-robh@kernel.org>
-Message-ID: <VI1PR04MB32475E7E36BA8467FC07B01D91080@VI1PR04MB3247.eurprd04.prod.outlook.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Thu, 30 Aug 2018 08:44:49 +0530
+Subject: [PATCH 0/4] Add HiSilicon Hi3670 SoC and HiKey970 board
+In-Reply-To: <20180810175339.25421-1-manivannan.sadhasivam@linaro.org>
+References: <20180810175339.25421-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180830031449.GC8565@Mani-XPS-13-9360>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <robh@kernel.org>
-date: 2018/8/30 4:04
+On Fri, Aug 10, 2018 at 11:23:35PM +0530, Manivannan Sadhasivam wrote:
+> This patchset adds support for Hi3670 SoC and HiKey970 board. Hi3670 SoC
+> is very similar to the Hi3660 SoC with additional NPU support. For now,
+> only UART6 has been enabled which is configured by the bootloader for
+> console support.
+> 
+> HiKey970 board is one of the 96Boards Consumer Edition and AI platform
+> based on the Hi3670 SoC.
+> 
+> With this patchset, the Hikey970 board is able to boot into ramdisk with
+> 8 cores.
+>
 
-> To: Qiang Zhao <qiang.zhao@nxp.com>
-> Cc: linux-kernel at vger.kernel.org; Leo Li <leoyang.li@nxp.com>;
-> linuxppc-dev at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org
-> Subject: [PATCH] soc: fsl/qe: Use of_get_child_by_name helper
-> 
-> Use the of_get_child_by_name() helper instead of open coding searching for the
-> 'firmware' child node. This removes directly accessing the name pointer as well.
-> 
-> Cc: Qiang Zhao <qiang.zhao@nxp.com>
-> Cc: Li Yang <leoyang.li@nxp.com>
-> Cc: linuxppc-dev at lists.ozlabs.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
->  drivers/soc/fsl/qe/qe.c | 6 +-----
->  1 file changed, 1 insertion(+), 5 deletions(-)
-> 
-> diff --git a/drivers/soc/fsl/qe/qe.c b/drivers/soc/fsl/qe/qe.c index
-> 2ef6fc6487c1..612d9c551be5 100644
-> --- a/drivers/soc/fsl/qe/qe.c
-> +++ b/drivers/soc/fsl/qe/qe.c
-> @@ -588,11 +588,7 @@ struct qe_firmware_info *qe_get_firmware_info(void)
->  	}
-> 
->  	/* Find the 'firmware' child node */
-> -	for_each_child_of_node(qe, fw) {
-> -		if (strcmp(fw->name, "firmware") == 0)
-> -			break;
-> -	}
-> -
-> +	fw = of_get_child_by_name(qe, "firmware");
->  	of_node_put(qe);
-> 
->  	/* Did we find the 'firmware' node? */
-> --
+Hi Wei,
 
-Acked-by: Qiang Zhao <qiang.zhao@nxp.com>
+Any update on this patchset?
+
+Thanks,
+Mani
+
+> Thanks,
+> Mani
+> 
+> Manivannan Sadhasivam (4):
+>   dt-bindings: arm: hisilicon: Add binding for Hi3670 SoC
+>   arm64: dts: Add devicetree for Hisilicon Hi3670 SoC
+>   dt-bindings: arm: hisilicon: Add binding for HiKey970 board
+>   arm64: dts: Add devicetree support for HiKey970 board
+> 
+>  .../bindings/arm/hisilicon/hisilicon.txt      |   8 +
+>  arch/arm64/boot/dts/hisilicon/Makefile        |   1 +
+>  .../boot/dts/hisilicon/hi3670-hikey970.dts    |  35 ++++
+>  arch/arm64/boot/dts/hisilicon/hi3670.dtsi     | 162 ++++++++++++++++++
+>  4 files changed, 206 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/hisilicon/hi3670-hikey970.dts
+>  create mode 100644 arch/arm64/boot/dts/hisilicon/hi3670.dtsi
+> 
+> -- 
+> 2.17.1
+> 
