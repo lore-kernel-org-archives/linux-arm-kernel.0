@@ -1,28 +1,38 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Thu, 30 Aug 2018 08:44:49 +0530
-Subject: [PATCH 0/4] Add HiSilicon Hi3670 SoC and HiKey970 board
-In-Reply-To: <20180810175339.25421-1-manivannan.sadhasivam@linaro.org>
-References: <20180810175339.25421-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180830031449.GC8565@Mani-XPS-13-9360>
+Date: Thu, 30 Aug 2018 08:49:33 +0530
+Subject: [PATCH v3 0/9] Add Reset Controller support for Actions Semi Owl
+ SoCs
+In-Reply-To: <20180810095113.25292-1-manivannan.sadhasivam@linaro.org>
+References: <20180810095113.25292-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180830031933.GD8565@Mani-XPS-13-9360>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 10, 2018 at 11:23:35PM +0530, Manivannan Sadhasivam wrote:
-> This patchset adds support for Hi3670 SoC and HiKey970 board. Hi3670 SoC
-> is very similar to the Hi3660 SoC with additional NPU support. For now,
-> only UART6 has been enabled which is configured by the bootloader for
-> console support.
+On Fri, Aug 10, 2018 at 03:21:04PM +0530, Manivannan Sadhasivam wrote:
+> This patchset adds Reset Controller (RMU) support for Actions Semi
+> Owl SoCs, S900 and S700. For the Owl SoCs, RMU has been integrated into
+> the clock subsystem in hardware. Hence, in software we integrate RMU
+> support into common clock driver inorder to maintain compatibility. The
+> syscon approach is not taken into account based on the review by Rob.
 > 
-> HiKey970 board is one of the 96Boards Consumer Edition and AI platform
-> based on the Hi3670 SoC.
+> This patch series depends on the recently posted S700 clk series:
+> "[PATCH v7 0/5] Add clock driver for Actions S700 SoC". For the S700 clk
+> series, driver and bindings patches are applied through the clk tree.
+> But the DTS patches are not yet picked up by the platform maintainer,
+> Andreas.
 > 
-> With this patchset, the Hikey970 board is able to boot into ramdisk with
-> 8 cores.
+> Hence, Andreas is expected to pick the DTS patches in this series once
+> reviewed by the maintainers along with S700 clk DTS patches.
+> 
+> Because of the absence of the S500 SoC clk support, the reset controller
+> registration code is added to both S700 and S900 SoC clk drivers for now.
+> But once S500 clk support is added, the reset controller registration part
+> will be moved to Owl SoCs common clk code.
 >
 
-Hi Wei,
+Hi Pavel,
 
-Any update on this patchset?
+Just a ping on this patchset!
 
 Thanks,
 Mani
@@ -30,19 +40,54 @@ Mani
 > Thanks,
 > Mani
 > 
-> Manivannan Sadhasivam (4):
->   dt-bindings: arm: hisilicon: Add binding for Hi3670 SoC
->   arm64: dts: Add devicetree for Hisilicon Hi3670 SoC
->   dt-bindings: arm: hisilicon: Add binding for HiKey970 board
->   arm64: dts: Add devicetree support for HiKey970 board
+> Changes in v3:
 > 
->  .../bindings/arm/hisilicon/hisilicon.txt      |   8 +
->  arch/arm64/boot/dts/hisilicon/Makefile        |   1 +
->  .../boot/dts/hisilicon/hi3670-hikey970.dts    |  35 ++++
->  arch/arm64/boot/dts/hisilicon/hi3670.dtsi     | 162 ++++++++++++++++++
->  4 files changed, 206 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/hisilicon/hi3670-hikey970.dts
->  create mode 100644 arch/arm64/boot/dts/hisilicon/hi3670.dtsi
+> * Reverted back the syscon approach based on the review by Rob Herring
+> * Dropped the MAINTAINERS patch
+> * Converted reset_map struct definitions to const based on the review by
+>   Philipp
+> * Fixed S700 header in DT spotted by Parthiban
+> * Added Reviewed-by tags from Rob for 3 bindings patches
+> 
+> Changes in v2:
+> 
+> * Converted the CMU and RMU drivers to syscon for a more cleaner
+>   approach
+> * Declared the owl_reset_map structs to const
+> * Used regmap_update_bits instead of a combined regmap_read and write
+> * Removed unused headers in RMU drivers
+> * Added MAINTAINERS entry for the RMU driver and bindings
+> 
+> Manivannan Sadhasivam (9):
+>   clk: actions: Cache regmap info in private clock descriptor
+>   dt-bindings: clock: Add reset controller bindings for Actions Semi Owl
+>     SoCs
+>   dt-bindings: reset: Add binding constants for Actions Semi S700 RMU
+>   dt-bindings: reset: Add binding constants for Actions Semi S900 RMU
+>   arm64: dts: actions: Add Reset Controller support for S700 SoC
+>   arm64: dts: actions: Add Reset Controller support for S900 SoC
+>   clk: actions: Add Actions Semi Owl SoCs Reset Management Unit support
+>   clk: actions: Add Actions Semi S700 SoC Reset Management Unit support
+>   clk: actions: Add Actions Semi S900 SoC Reset Management Unit support
+> 
+>  .../bindings/clock/actions,owl-cmu.txt        |  2 +
+>  arch/arm64/boot/dts/actions/s700.dtsi         |  2 +
+>  arch/arm64/boot/dts/actions/s900.dtsi         |  2 +
+>  drivers/clk/actions/Kconfig                   |  1 +
+>  drivers/clk/actions/Makefile                  |  1 +
+>  drivers/clk/actions/owl-common.c              |  3 +-
+>  drivers/clk/actions/owl-common.h              |  5 +-
+>  drivers/clk/actions/owl-reset.c               | 66 ++++++++++++++
+>  drivers/clk/actions/owl-reset.h               | 31 +++++++
+>  drivers/clk/actions/owl-s700.c                | 55 +++++++++++-
+>  drivers/clk/actions/owl-s900.c                | 86 ++++++++++++++++++-
+>  .../dt-bindings/reset/actions,s700-reset.h    | 34 ++++++++
+>  .../dt-bindings/reset/actions,s900-reset.h    | 65 ++++++++++++++
+>  13 files changed, 347 insertions(+), 6 deletions(-)
+>  create mode 100644 drivers/clk/actions/owl-reset.c
+>  create mode 100644 drivers/clk/actions/owl-reset.h
+>  create mode 100644 include/dt-bindings/reset/actions,s700-reset.h
+>  create mode 100644 include/dt-bindings/reset/actions,s900-reset.h
 > 
 > -- 
 > 2.17.1
