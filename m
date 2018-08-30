@@ -1,32 +1,30 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 30 Aug 2018 15:43:39 -0400
-Subject: [PATCH v9 4/4] perf probe: Support SDT markers having reference
- counter (semaphore)
-In-Reply-To: <20180830185026.GI6097@kernel.org>
-References: <20180820044250.11659-1-ravi.bangoria@linux.ibm.com>
- <20180820044250.11659-5-ravi.bangoria@linux.ibm.com>
- <20180830144531.3011e185@gandalf.local.home>
- <20180830185026.GI6097@kernel.org>
-Message-ID: <20180830154339.1a14e4bf@gandalf.local.home>
+From: wufan@codeaurora.org (wufan)
+Date: Thu, 30 Aug 2018 13:45:19 -0600
+Subject: [PATCH v2] EDAC, ghes: use CPER module handles to locate DIMMs
+In-Reply-To: <CABo9ajCui0y9HMBzgKWeNtrbu4de+mLh=d9Qdkyo4zhU9az6hw@mail.gmail.com>
+References: <1535654266-40053-1-git-send-email-wufan@codeaurora.org>
+ <CABo9ajCui0y9HMBzgKWeNtrbu4de+mLh=d9Qdkyo4zhU9az6hw@mail.gmail.com>
+Message-ID: <001901d44099$fc8d7550$f5a85ff0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 30 Aug 2018 15:50:27 -0300
-Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
+Hi Tyler, 
 
-> Em Thu, Aug 30, 2018 at 02:45:31PM -0400, Steven Rostedt escreveu:
-> > 
-> > Arnaldo,
-> > 
-> > I'm going to be playing with some of the probe code which may conflict
-> > with these patches, so I would like to pull these in my tree. But this
-> > patch requires an Acked-by from you before I can pull it in.
-> > 
-> > You OK with this?  
+> > +static int get_dimm_smbios_index(u16 handle) {
+> > +       struct mem_ctl_info *mci;
+> > +       int i;
+> > +
+> > +       mci = ghes_pvt->mci;
+> > +
 > 
-> Acked-by: Arnaldo Carvalho de Melo <acme@redhat.com>
->  
+> Minor nit: you could define and set mci in the same line to save some space
+> here.
+> 
+> Otherwise this patch looks good to me.
 
-Awesome, thanks Arnaldo,
+Good catch Tyler! I'll fix it.
 
--- Steve
+Thanks,
+Fan
+
+> Reviewed-by: Tyler Baicar <baicar.tyler@gmail.com>
