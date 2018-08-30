@@ -1,108 +1,117 @@
-From: wufan@codeaurora.org (wufan)
-Date: Thu, 30 Aug 2018 08:40:40 -0600
-Subject: [PATCH] EDAC, ghes: use CPER module handles to locate DIMMs
-In-Reply-To: <c70fa799-bc9f-64c8-e151-088ca8c3ed3e@arm.com>
-References: <1535567632-18089-1-git-send-email-wufan@codeaurora.org>
- <c70fa799-bc9f-64c8-e151-088ca8c3ed3e@arm.com>
-Message-ID: <000f01d4406f$6ce8f160$46bad420$@codeaurora.org>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 30 Aug 2018 16:43:44 +0200
+Subject: Patch "asm-generic/bitops/lock.h: Rewrite using atomic_fetch_"
+ causes kernel crash
+In-Reply-To: <20180830142920.GO24082@hirez.programming.kicks-ass.net>
+References: <1535567633.4465.23.camel@synopsys.com>
+ <C2D7FE5348E1B147BCA15975FBA23075012B090BEA@us01wembx1.internal.synopsys.com>
+ <20180830094411.GX24124@hirez.programming.kicks-ass.net>
+ <20180830095148.GB5942@arm.com>
+ <1535629996.4465.44.camel@synopsys.com>
+ <20180830141713.GN24082@hirez.programming.kicks-ass.net>
+ <20180830142354.GB13005@arm.com>
+ <20180830142920.GO24082@hirez.programming.kicks-ass.net>
+Message-ID: <20180830144344.GW24142@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+On Thu, Aug 30, 2018 at 04:29:20PM +0200, Peter Zijlstra wrote:
 
-> > The current ghes_edac driver does not update per-dimm error counters
-> > when reporting memory errors, because there is no platform-independent
-> > way to find DIMMs based on the error information provided by firmware.
-> 
-> I'd argue there is: its in the CPER records, we just didn't do anything useful
-> with the information in the past!
+> Also, once it all works, they should look at switching to _relaxed
+> atomics for LL/SC.
 
-Agreed. Will update the wording. 
+A little something like so.. should save a few smp_mb().
+
+---
+
+diff --git a/arch/arc/include/asm/atomic.h b/arch/arc/include/asm/atomic.h
+index 4e0072730241..714b54c308b0 100644
+--- a/arch/arc/include/asm/atomic.h
++++ b/arch/arc/include/asm/atomic.h
+@@ -44,7 +44,7 @@ static inline void atomic_##op(int i, atomic_t *v)			\
+ }									\
  
-> > +static int ghes_edac_dimm_index(u16 handle) {
-> > +	struct mem_ctl_info *mci;
-> > +	int i;
-> > +
-> > +	if (!ghes_pvt)
-> > +		return -1;
-> 
-> ghes_edac_report_mem_error() already checked this, as its the only caller
-> there is no need to check it again.
-
-Will remove.
+ #define ATOMIC_OP_RETURN(op, c_op, asm_op)				\
+-static inline int atomic_##op##_return(int i, atomic_t *v)		\
++static inline int atomic_##op##_return_relaxed(int i, atomic_t *v)	\
+ {									\
+ 	unsigned int val;						\
+ 									\
+@@ -69,8 +69,11 @@ static inline int atomic_##op##_return(int i, atomic_t *v)		\
+ 	return val;							\
+ }
  
-> 
-> > +	mci = ghes_pvt->mci;
-> > +
-> > +	if (!mci)
-> > +		return -1;
-> 
-> Can this happen? ghes_edac_report_mem_error() would have
-> dereferenced this already!
-> 
-> If you need the struct mem_ctl_info, you may as well pass it in as the only
-> caller has it to hand.
-
-Will remove.
-> 
-> > +
-> > +	for (i = 0; i < mci->tot_dimms; i++) {
-> > +		if (mci->dimms[i]->smbios_handle == handle)
-> > +			return i;
-> > +	}
-> > +	return -1;
-> > +}
-> > +
-> >  static void ghes_edac_dmidecode(const struct dmi_header *dh, void
-> > *arg)  {
-> >  	struct ghes_edac_dimm_fill *dimm_fill = arg; @@ -177,6 +197,8 @@
-> > static void ghes_edac_dmidecode(const struct dmi_header *dh, void *arg)
-> >  				entry->total_width, entry->data_width);
-> >  		}
-> >
-> > +		dimm->smbios_handle = entry->handle;
-> 
-> We aren't checking for duplicate handles, (e.g. they're all zero). I think this is
-> fine as chances are firmware on those systems won't set
-> CPER_MEM_VALID_MODULE_HANDLE. If it does, the handle it gives us is
-> ambiguous, and we pick a dimm, instead of whine-ing about broken
-> firmware tables.
-> 
-> (I'm just drawing attention to it in case someone disagrees)
-
-SBMIOS tables are typically automatically generated so chances for duplicate
-handles are small. 
-
-> 
-> >  		dimm_fill->count++;
-> >  	}
-> >  }
-> > @@ -327,12 +349,20 @@ void ghes_edac_report_mem_error(int sev,
-> struct cper_sec_mem_err *mem_err)
-> >  		p += sprintf(p, "bit_pos:%d ", mem_err->bit_pos);
-> >  	if (mem_err->validation_bits &
-> CPER_MEM_VALID_MODULE_HANDLE) {
-> >  		const char *bank = NULL, *device = NULL;
-> > +		int index = -1;
-> > +
-> >  		dmi_memdev_name(mem_err->mem_dev_handle, &bank,
-> &device);
-> 
-> > +		p += sprintf(p, "DIMM DMI handle: 0x%.4x ",
-> > +			     mem_err->mem_dev_handle);
-> >  		if (bank != NULL && device != NULL)
-> >  			p += sprintf(p, "DIMM location:%s %s ", bank, device);
-> > -		else
-> > -			p += sprintf(p, "DIMM DMI handle: 0x%.4x ",
-> > -				     mem_err->mem_dev_handle);
-> 
-> Why do we now print the handle every time? The handle is pretty
-> meaningless, it can only be used to find the location-strings, if we get those
-> we print them instead.
-
-For ghes_edac the bank/device is informational, and nothing would go wrong
-if the bank/device numbers are the same as another entry. But the handle
-is now critical for DIMM lookup, thus pull it out.
-
-Thanks!
-Fan
++#define atomic_add_return_relaxed	atomic_add_return_relaxed
++#define atomic_sub_return_relaxed	atomic_sub_return_relaxed
++
+ #define ATOMIC_FETCH_OP(op, c_op, asm_op)				\
+-static inline int atomic_fetch_##op(int i, atomic_t *v)			\
++static inline int atomic_fetch_##op##_relaxed(int i, atomic_t *v)	\
+ {									\
+ 	unsigned int val, orig;						\
+ 									\
+@@ -96,6 +99,14 @@ static inline int atomic_fetch_##op(int i, atomic_t *v)			\
+ 	return orig;							\
+ }
+ 
++#define atomic_fetch_add_relaxed	atomic_fetch_add_relaxed
++#define atomic_fetch_sub_relaxed	atomic_fetch_sub_relaxed
++
++#define atomic_fetch_and_relaxed	atomic_fetch_and_relaxed
++#define atomic_fetch_andnot_relaxed	atomic_fetch_andnot_relaxed
++#define atomic_fetch_or_relaxed		atomic_fetch_or_relaxed
++#define atomic_fetch_xor_relaxed	atomic_fetch_xor_relaxed
++
+ #else	/* !CONFIG_ARC_HAS_LLSC */
+ 
+ #ifndef CONFIG_SMP
+@@ -379,7 +390,7 @@ static inline void atomic64_##op(long long a, atomic64_t *v)		\
+ }									\
+ 
+ #define ATOMIC64_OP_RETURN(op, op1, op2)		        	\
+-static inline long long atomic64_##op##_return(long long a, atomic64_t *v)	\
++static inline long long atomic64_##op##_return_relaxed(long long a, atomic64_t *v)	\
+ {									\
+ 	unsigned long long val;						\
+ 									\
+@@ -401,8 +412,11 @@ static inline long long atomic64_##op##_return(long long a, atomic64_t *v)	\
+ 	return val;							\
+ }
+ 
++#define atomic64_add_return_relaxed	atomic64_add_return_relaxed
++#define atomic64_sub_return_relaxed	atomic64_sub_return_relaxed
++
+ #define ATOMIC64_FETCH_OP(op, op1, op2)		        		\
+-static inline long long atomic64_fetch_##op(long long a, atomic64_t *v)	\
++static inline long long atomic64_fetch_##op##_relaxed(long long a, atomic64_t *v)	\
+ {									\
+ 	unsigned long long val, orig;					\
+ 									\
+@@ -424,6 +438,14 @@ static inline long long atomic64_fetch_##op(long long a, atomic64_t *v)	\
+ 	return orig;							\
+ }
+ 
++#define atomic64_fetch_add_relaxed	atomic64_fetch_add_relaxed
++#define atomic64_fetch_sub_relaxed	atomic64_fetch_sub_relaxed
++
++#define atomic64_fetch_and_relaxed	atomic64_fetch_and_relaxed
++#define atomic64_fetch_andnot_relaxed	atomic64_fetch_andnot_relaxed
++#define atomic64_fetch_or_relaxed	atomic64_fetch_or_relaxed
++#define atomic64_fetch_xor_relaxed	atomic64_fetch_xor_relaxed
++
+ #define ATOMIC64_OPS(op, op1, op2)					\
+ 	ATOMIC64_OP(op, op1, op2)					\
+ 	ATOMIC64_OP_RETURN(op, op1, op2)				\
+@@ -434,6 +456,12 @@ static inline long long atomic64_fetch_##op(long long a, atomic64_t *v)	\
+ 
+ ATOMIC64_OPS(add, add.f, adc)
+ ATOMIC64_OPS(sub, sub.f, sbc)
++
++#undef ATOMIC64_OPS
++#define ATOMIC64_OPS(op, op1, op2)					\
++	ATOMIC64_OP(op, op1, op2)					\
++	ATOMIC64_FETCH_OP(op, op1, op2)
++
+ ATOMIC64_OPS(and, and, and)
+ ATOMIC64_OPS(andnot, bic, bic)
+ ATOMIC64_OPS(or, or, or)
