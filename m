@@ -1,66 +1,82 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Thu, 30 Aug 2018 12:28:15 +0200
-Subject: [RFC PATCH] EDAC, ghes: Enable per-layer error reporting for ARM
-In-Reply-To: <2e7b984a-8f8f-dad7-4ee5-043dd236a9b1@arm.com>
-References: <20180719140102.GB25185@nazgul.tnic>
- <94e3a0fb-9b7d-045f-733b-9f063dcb39e4@arm.com>
- <45fefe7d-c6ea-5791-4477-13ecce39ce48@codeaurora.org>
- <b568fdcc-ca39-67ea-2799-8ed246c8ffb6@arm.com>
- <CABo9ajA7SPrVE-oiG=RicH+nL9_pp7fVATCdMugY5fuNAPzHaQ@mail.gmail.com>
- <68a800c7-446e-9b6b-1847-6e45a1d17262@arm.com>
- <20180824120102.GB29751@nazgul.tnic>
- <0a94db2a-2569-ac46-1a79-a05f46a4ea6f@arm.com>
- <20180829073804.GA6843@nazgul.tnic>
- <2e7b984a-8f8f-dad7-4ee5-043dd236a9b1@arm.com>
-Message-ID: <20180830102815.GB20005@nazgul.tnic>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Thu, 30 Aug 2018 13:31:13 +0300
+Subject: [PATCH v1 1/2] irqchip/gic-v3: Switch to bitmap_zalloc()
+Message-ID: <20180830103114.60601-1-andriy.shevchenko@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 29, 2018 at 11:20:48AM +0100, James Morse wrote:
-> Right. I'd like ghes-edac to work in the same way for both architectures.
-> 
-> I think this is best done by stuffing the dmi-handle in struct dimm_info during
-> ghes_edac_dmidecode(), then populating the struct edac_raw_error_desc layers
-> from the matching mci->dimms 'location'.
-> 
-> For EDAC_MC_LAYER_ALL_MEM this boils down to a flat index, so pointer arithmetic
-> on mci->dimms is an appropriate short cut.
+Switch to bitmap_zalloc() to show clearly what we are allocating.
+Besides that it returns pointer of bitmap type instead of opaque void *.
 
-It all sounds nice on paper but you should try it on a couple of
-machines first. See whether/how it actually works there.
+Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+---
+ drivers/irqchip/irq-gic-v3-its.c | 9 ++++-----
+ drivers/irqchip/irq-gic-v3-mbi.c | 5 ++---
+ 2 files changed, 6 insertions(+), 8 deletions(-)
 
-Also, this probably would need to not change x86 unless you wanna fix it
-there too. I'd think twice before I attempt such a thing though :)
-
-> (We should probably 'FIXME: It shouldn't be hard to also fill the DIMM labels'
-> at the same time so that no-one is tempted to interpret the edac:dimm-idx)
-
-See above.
-
-> > In an ideal world, I'd like to be able to query the SPD chips on the
-> 
-> (oh, that can be done?)
-
-There was some talk initially and I've seen BIOS read SPD chips and
-showing DIMM info but I've heard the word "proprietary" a couple of
-times. Haven't dug any deeper though.
-
-> I got educated by the people who look after specifications last time I touched
-> this [0]. SMBIOS tables are required by Arm's 'Server Base Boot Requirements',
-> It lists the memory-device and physical-memory-array as required.
-
-It is always better to have certification on your side. Should make ARM
-vendors dance.
-
-> I will drop them a note that we will be depending on the handle, and it should
-> go on the list too... if its not populated on today's systems we can fall back
-> to !e->enable_per_layer_report as we do today.
-
-Right.
-
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 316a57530f6d..497589ebd950 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -1577,7 +1577,7 @@ static unsigned long *its_lpi_alloc(int nr_irqs, u32 *base, int *nr_ids)
+ 	if (err)
+ 		goto out;
+ 
+-	bitmap = kcalloc(BITS_TO_LONGS(nr_irqs), sizeof (long), GFP_ATOMIC);
++	bitmap = bitmap_zalloc(nr_irqs, GFP_ATOMIC);
+ 	if (!bitmap)
+ 		goto out;
+ 
+@@ -1593,7 +1593,7 @@ static unsigned long *its_lpi_alloc(int nr_irqs, u32 *base, int *nr_ids)
+ static void its_lpi_free(unsigned long *bitmap, u32 base, u32 nr_ids)
+ {
+ 	WARN_ON(free_lpi_range(base, nr_ids));
+-	kfree(bitmap);
++	bitmap_free(bitmap);
+ }
+ 
+ static struct page *its_allocate_prop_table(gfp_t gfp_flags)
+@@ -2215,8 +2215,7 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+ 	if (alloc_lpis) {
+ 		lpi_map = its_lpi_alloc(nvecs, &lpi_base, &nr_lpis);
+ 		if (lpi_map)
+-			col_map = kcalloc(nr_lpis, sizeof(*col_map),
+-					  GFP_KERNEL);
++			col_map = kcalloc(nr_lpis, sizeof(*col_map), GFP_KERNEL);
+ 	} else {
+ 		col_map = kcalloc(nr_ites, sizeof(*col_map), GFP_KERNEL);
+ 		nr_lpis = 0;
+@@ -2226,7 +2225,7 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+ 	if (!dev || !itt ||  !col_map || (!lpi_map && alloc_lpis)) {
+ 		kfree(dev);
+ 		kfree(itt);
+-		kfree(lpi_map);
++		bitmap_free(lpi_map);
+ 		kfree(col_map);
+ 		return NULL;
+ 	}
+diff --git a/drivers/irqchip/irq-gic-v3-mbi.c b/drivers/irqchip/irq-gic-v3-mbi.c
+index ad70e7c416e3..7d783fc56169 100644
+--- a/drivers/irqchip/irq-gic-v3-mbi.c
++++ b/drivers/irqchip/irq-gic-v3-mbi.c
+@@ -284,8 +284,7 @@ int __init mbi_init(struct fwnode_handle *fwnode, struct irq_domain *parent)
+ 		if (ret)
+ 			goto err_free_mbi;
+ 
+-		mbi_ranges[n].bm = kcalloc(BITS_TO_LONGS(mbi_ranges[n].nr_spis),
+-					   sizeof(long), GFP_KERNEL);
++		mbi_ranges[n].bm = bitmap_zalloc(mbi_ranges[n].nr_spis, GFP_KERNEL);
+ 		if (!mbi_ranges[n].bm) {
+ 			ret = -ENOMEM;
+ 			goto err_free_mbi;
+@@ -323,7 +322,7 @@ int __init mbi_init(struct fwnode_handle *fwnode, struct irq_domain *parent)
+ err_free_mbi:
+ 	if (mbi_ranges) {
+ 		for (n = 0; n < mbi_range_nr; n++)
+-			kfree(mbi_ranges[n].bm);
++			bitmap_free(mbi_ranges[n].bm);
+ 		kfree(mbi_ranges);
+ 	}
+ 
 -- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
---
+2.18.0
