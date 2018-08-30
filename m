@@ -1,48 +1,45 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu, 30 Aug 2018 17:32:08 +0100
+Date: Thu, 30 Aug 2018 17:34:30 +0100
 Subject: [PATCH] EDAC, ghes: use CPER module handles to locate DIMMs
-In-Reply-To: <000f01d4406f$6ce8f160$46bad420$@codeaurora.org>
+In-Reply-To: <20180830104307.GC20005@nazgul.tnic>
 References: <1535567632-18089-1-git-send-email-wufan@codeaurora.org>
- <c70fa799-bc9f-64c8-e151-088ca8c3ed3e@arm.com>
- <000f01d4406f$6ce8f160$46bad420$@codeaurora.org>
-Message-ID: <1ac15a80-6f9a-cf9d-8e79-37d10549a4ca@arm.com>
+ <20180830104307.GC20005@nazgul.tnic>
+Message-ID: <150ad0e4-e84a-565b-95ac-e7135e98bdc0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fan,
+Hi Boris,
 
-On 30/08/18 15:40, wufan wrote:
->>> @@ -327,12 +349,20 @@ void ghes_edac_report_mem_error(int sev,
->> struct cper_sec_mem_err *mem_err)
->>>  		p += sprintf(p, "bit_pos:%d ", mem_err->bit_pos);
->>>  	if (mem_err->validation_bits &
->> CPER_MEM_VALID_MODULE_HANDLE) {
->>>  		const char *bank = NULL, *device = NULL;
->>> +		int index = -1;
->>> +
->>>  		dmi_memdev_name(mem_err->mem_dev_handle, &bank,
->> &device);
->>
->>> +		p += sprintf(p, "DIMM DMI handle: 0x%.4x ",
->>> +			     mem_err->mem_dev_handle);
->>>  		if (bank != NULL && device != NULL)
->>>  			p += sprintf(p, "DIMM location:%s %s ", bank, device);
->>> -		else
->>> -			p += sprintf(p, "DIMM DMI handle: 0x%.4x ",
->>> -				     mem_err->mem_dev_handle);
->>
->> Why do we now print the handle every time? The handle is pretty
->> meaningless, it can only be used to find the location-strings, if we get those
->> we print them instead.
-> 
-> For ghes_edac the bank/device is informational, and nothing would go wrong
-> if the bank/device numbers are the same as another entry. But the handle
-> is now critical for DIMM lookup, thus pull it out.
+On 30/08/18 11:43, Borislav Petkov wrote:
+> On Wed, Aug 29, 2018 at 06:33:52PM +0000, Fan Wu wrote:
+>> The current ghes_edac driver does not update per-dimm error
+>> counters when reporting memory errors, because there is no
+>> platform-independent way to find DIMMs based on the error
+>> information provided by firmware. This patch offers a solution
+>> for platforms whose firmwares provide valid module handles
+>> (SMBIOS type 17) in error records. In this case ghes_edac will
+>> use the module handles to locate DIMMs and thus makes per-dimm
+>> error reporting possible.
 
-Is printing the handle to the kernel log critical?
+> If we're going to do this, it needs to be tested on an x86 box which loads
+> ghes_edac. Adding Toshi to Cc.
 
-I'd expect something collecting errors to read from sysfs, not dmesg. I thought
-the whole point here was to update the per-dimm counters in sysfs.
+Good point, thanks.
+
+
+> Otherwise it must remain ARM-specific.
+
+Hmmm, that would be a shame.
+
+This should only be a problem if HPE Servers set CPER_MEM_VALID_MODULE_HANDLE,
+but don't actually provide module handles, or if firmware has a different idea
+of what they are.
+
+If firmware never sets CPER_MEM_VALID_MODULE_HANDLE, this patch shouldn't change
+anything.
+
+(Someone must have an x86 that sets CPER_MEM_VALID_MODULE_HANDLE, otherwise the
+code wouldn't be there right?!)
 
 
 Thanks,
