@@ -1,59 +1,65 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Thu, 30 Aug 2018 11:16:33 +0200
-Subject: [PATCH] usb: gadget: atmel: remove pointless retrieval of DT name
- property
-In-Reply-To: <20180829200111.11891-1-robh@kernel.org>
-References: <20180829200111.11891-1-robh@kernel.org>
-Message-ID: <339c8176-2260-ce97-1890-d1488866e515@microchip.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 30 Aug 2018 10:22:20 +0100
+Subject: mmotm 2018-08-23-17-26 uploaded
+In-Reply-To: <cf4acbb6-2815-56e2-829c-4e4c3a549e21@gmail.com>
+References: <20180824002731.XMNCl%akpm@linux-foundation.org>
+ <049c3fa9-f888-6a2d-413b-872992b269f9@gmail.com>
+ <20180829162213.fa1c7c54c801a036e64bacd2@linux-foundation.org>
+ <7ae81ca1-46ca-af47-8260-c52736aa4453@gmail.com>
+ <cf4acbb6-2815-56e2-829c-4e4c3a549e21@gmail.com>
+Message-ID: <20180830092219.GA5352@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/08/2018 at 22:01, Rob Herring wrote:
-> The name is always non-NULL and then is not used anywhere in this function,
-> so remove it.
+On Thu, Aug 30, 2018 at 02:26:51PM +0800, Jia He wrote:
+> On 8/30/2018 9:00 AM, Jia He Wrote:
+> > On 8/30/2018 7:22 AM, Andrew Morton Wrote:
+> >> On Tue, 28 Aug 2018 12:20:46 +0800 Jia He <hejianet@gmail.com> wrote:
+> >>> FYI,I watched a lockdep warning based on your mmotm master branch[1]
+> >>
+> >> Thanks.  We'll need help from ARM peeps on this please.
+> >>
+> >>> [    6.692731] ------------[ cut here ]------------
+> >>> [    6.696391] DEBUG_LOCKS_WARN_ON(!current->hardirqs_enabled)
 
-Indeed.
+[...]
 
-> Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
-
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-
-> Cc: Felipe Balbi <balbi@kernel.org>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-usb at vger.kernel.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
->   drivers/usb/gadget/udc/atmel_usba_udc.c | 6 ------
->   1 file changed, 6 deletions(-)
+> >>> I thought the root cause might be at [2] which seems not in your branch yet.
+> >>>
+> >>> [1] http://git.cmpxchg.org/cgit.cgi/linux-mmotm.git
+> >>> [2]
+> >>> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit?id=efd112
+> >>
+> >> I agree, that doesn't look like the culprit.  But something may well
+> >> have gone wrong in "the recent conversion of the syscall entry/exit
+> >> code to C".
+> > Sorry for my unclearly previously description.
+> > 1. no such lockdep warning in latest mainline kernel git tree.
+> > 2. there is a 100% producible warning based on your latest mmotm tree
+> > 3. after applying the commit efd112 based on your mmotm tree, the warning
+> > disappearred
+> > 
+> > I will do some further digging to answer your question if no other experts' help
+> > 
+> 1. in el0_svc->el0_svc_common, without commit efd112
+> 		local_daif_mask();   //disable the irq and trace irq off
+> 		flags = current_thread_info()->flags;
+> 		if (!has_syscall_work(flags))
+> 			------------    //1
+> 			return;
+> If el0_svc_common enters the logic at line 1, the irq is disabled and
+> current->hardirqs_enabled is 0.
 > 
-> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> index 17147b8c771e..5729935c5eb2 100644
-> --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> @@ -2004,7 +2004,6 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
->   						    struct usba_udc *udc)
->   {
->   	u32 val;
-> -	const char *name;
->   	struct device_node *np = pdev->dev.of_node;
->   	const struct of_device_id *match;
->   	struct device_node *pp;
-> @@ -2094,11 +2093,6 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
->   		ep->can_dma = of_property_read_bool(pp, "atmel,can-dma");
->   		ep->can_isoc = of_property_read_bool(pp, "atmel,can-isoc");
->   
-> -		ret = of_property_read_string(pp, "name", &name);
-> -		if (ret) {
-> -			dev_err(&pdev->dev, "of_probe: name error(%d)\n", ret);
-> -			goto err;
-> -		}
->   		sprintf(ep->name, "ep%d", ep->index);
->   		ep->ep.name = ep->name;
->   
+> 2. then it goes to el0_da
+> in el0_da, it enables the irq without changing current->hardirqs_enabled to 1
 > 
+> 3. goes to el0_da->do_mem_abort->... the lockdep warning happens
+> 
+> The commit efd112 fixes it by invoking trace_hardirqs_off at line 1.
+> It closes the inconsistency window.
 
+Right, we fixed this last month in commit efd112353bf7 ("arm64: svc: Ensure
+hardirq tracing is updated before return"). Is there anything more you need
+from us on the Arm side?
 
--- 
-Nicolas Ferre
+Will
