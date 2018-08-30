@@ -1,147 +1,315 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Thu, 30 Aug 2018 09:35:31 +0200
-Subject: [PATCH v5 10/14] dt-bindings/interrupt-controller: update Marvell ICU
- bindings
+Date: Thu, 30 Aug 2018 09:35:30 +0200
+Subject: [PATCH v5 09/14] irqchip/irq-mvebu-icu: add support for System Error
+ Interrupts (SEI)
 In-Reply-To: <20180830073535.10710-1-miquel.raynal@bootlin.com>
 References: <20180830073535.10710-1-miquel.raynal@bootlin.com>
-Message-ID: <20180830073535.10710-11-miquel.raynal@bootlin.com>
+Message-ID: <20180830073535.10710-10-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the documentation to reflect the new bindings used for Marvell
-ICU. This involves describing each interrupt group as a subnode of the
-ICU node. Each of them having their own compatible.
+So far the ICU only handled NSR interrupts through GICP. An SEI driver
+provides an MSI domain through which it is possible to raise SEI, so
+let's add SEI support to the ICU driver.
 
-The DT binding documentation still documents the legacy binding, where
-there was a single node with no subnode.
+Handle the NSR probe function in a more generic way to support other
+type of interrupts.
+
+Each interrupt domain is a tree domain to avoid allocation the 207
+entries each time. Instead an ICU-wide bitmap is used to follow ICU
+slot allocations.
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- .../interrupt-controller/marvell,icu.txt      | 85 ++++++++++++++++---
- 1 file changed, 73 insertions(+), 12 deletions(-)
+ drivers/irqchip/irq-mvebu-icu.c | 136 +++++++++++++++++++++++++++-----
+ 1 file changed, 117 insertions(+), 19 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
-index 649b7ec9d9b1..1c94a57a661e 100644
---- a/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
-+++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
-@@ -5,6 +5,8 @@ The Marvell ICU (Interrupt Consolidation Unit) controller is
- responsible for collecting all wired-interrupt sources in the CP and
- communicating them to the GIC in the AP, the unit translates interrupt
- requests on input wires to MSG memory mapped transactions to the GIC.
-+These messages will access a different GIC memory area depending on
-+their type (NSR, SR, SEI, REI, etc).
+diff --git a/drivers/irqchip/irq-mvebu-icu.c b/drivers/irqchip/irq-mvebu-icu.c
+index c79d2cb787a0..9234b802b346 100644
+--- a/drivers/irqchip/irq-mvebu-icu.c
++++ b/drivers/irqchip/irq-mvebu-icu.c
+@@ -27,6 +27,10 @@
+ #define ICU_SETSPI_NSR_AH	0x14
+ #define ICU_CLRSPI_NSR_AL	0x18
+ #define ICU_CLRSPI_NSR_AH	0x1c
++#define ICU_SET_SEI_AL		0x50
++#define ICU_SET_SEI_AH		0x54
++#define ICU_CLR_SEI_AL		0x58
++#define ICU_CLR_SEI_AH		0x5C
+ #define ICU_INT_CFG(x)          (0x100 + 4 * (x))
+ #define   ICU_INT_ENABLE	BIT(24)
+ #define   ICU_IS_EDGE		BIT(28)
+@@ -37,11 +41,28 @@
+ #define ICU_SATA0_ICU_ID	109
+ #define ICU_SATA1_ICU_ID	107
  
- Required properties:
- 
-@@ -12,20 +14,23 @@ Required properties:
- 
- - reg: Should contain ICU registers location and length.
- 
-+Subnodes: Each group of interrupt is declared as a subnode of the ICU,
-+with their own compatible.
-+
-+Required properties for the icu_nsr/icu_sei subnodes:
-+
-+- compatible: Should be one of:
-+              * "marvell,cp110-icu-nsr"
-+	      * "marvell,cp110-icu-sr"
-+	      * "marvell,cp110-icu-sei"
-+	      * "marvell,cp110-icu-rei"
-+
- - #interrupt-cells: Specifies the number of cells needed to encode an
--  interrupt source. The value shall be 3.
-+  interrupt source. The value shall be 2.
- 
--  The 1st cell is the group type of the ICU interrupt. Possible group
--  types are:
-+  The 1st cell is the index of the interrupt in the ICU unit.
- 
--   ICU_GRP_NSR (0x0) : Shared peripheral interrupt, non-secure
--   ICU_GRP_SR  (0x1) : Shared peripheral interrupt, secure
--   ICU_GRP_SEI (0x4) : System error interrupt
--   ICU_GRP_REI (0x5) : RAM error interrupt
--
--  The 2nd cell is the index of the interrupt in the ICU unit.
--
--  The 3rd cell is the type of the interrupt. See arm,gic.txt for
-+  The 2nd cell is the type of the interrupt. See arm,gic.txt for
-   details.
- 
- - interrupt-controller: Identifies the node as an interrupt
-@@ -35,17 +40,73 @@ Required properties:
-   that allows to trigger interrupts using MSG memory mapped
-   transactions.
- 
-+Note: each 'interrupts' property referring to any 'icu_xxx' node shall
-+      have a different number within [0:206].
-+
- Example:
- 
- icu: interrupt-controller at 1e0000 {
- 	compatible = "marvell,cp110-icu";
- 	reg = <0x1e0000 0x440>;
-+
-+	CP110_LABEL(icu_nsr): interrupt-controller at 10 {
-+		compatible = "marvell,cp110-icu-nsr";
-+		reg = <0x10 0x20>;
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+		msi-parent = <&gicp>;
-+	};
-+
-+	CP110_LABEL(icu_sei): interrupt-controller at 50 {
-+		compatible = "marvell,cp110-icu-sei";
-+		reg = <0x50 0x10>;
-+		#interrupt-cells = <2>;
-+		interrupt-controller;
-+		msi-parent = <&sei>;
-+	};
++struct mvebu_icu_subset_data {
++	unsigned int icu_group;
++	unsigned int offset_set_ah;
++	unsigned int offset_set_al;
++	unsigned int offset_clr_ah;
++	unsigned int offset_clr_al;
 +};
 +
-+node1 {
-+	interrupt-parent = <&icu_nsr>;
-+	interrupts = <106 IRQ_TYPE_LEVEL_HIGH>;
+ struct mvebu_icu {
+ 	struct irq_chip irq_chip;
+ 	void __iomem *base;
+ 	struct device *dev;
++
++	/* Lock on interrupt allocations/releases */
++	struct mutex msi_lock;
++	DECLARE_BITMAP(msi_bitmap, ICU_MAX_IRQS);
 +};
 +
-+node2 {
-+	interrupt-parent = <&icu_sei>;
-+	interrupts = <107 IRQ_TYPE_LEVEL_HIGH>;
-+};
-+
-+/* Would not work with the above nodes */
-+node3 {
-+	interrupt-parent = <&icu_nsr>;
-+	interrupts = <107 IRQ_TYPE_LEVEL_HIGH>;
-+};
-+
-+The legacy bindings were different in this way:
-+
-+- #interrupt-cells: The value was 3.
-+	The 1st cell was the group type of the ICU interrupt. Possible
-+	group types were:
-+	ICU_GRP_NSR (0x0) : Shared peripheral interrupt, non-secure
-+	ICU_GRP_SR  (0x1) : Shared peripheral interrupt, secure
-+	ICU_GRP_SEI (0x4) : System error interrupt
-+	ICU_GRP_REI (0x5) : RAM error interrupt
-+	The 2nd cell was the index of the interrupt in the ICU unit.
-+	The 3rd cell was the type of the interrupt. See arm,gic.txt for
-+	details.
-+
-+Example:
-+
-+icu: interrupt-controller at 1e0000 {
-+	compatible = "marvell,cp110-icu";
-+	reg = <0x1e0000 0x440>;
-+
- 	#interrupt-cells = <3>;
- 	interrupt-controller;
- 	msi-parent = <&gicp>;
++struct mvebu_icu_msi_data {
++	struct mvebu_icu *icu;
+ 	atomic_t initialized;
++	const struct mvebu_icu_subset_data *subset_data;
  };
  
--usb3h0: usb3 at 500000 {
-+node1 {
- 	interrupt-parent = <&icu>;
- 	interrupts = <ICU_GRP_NSR 106 IRQ_TYPE_LEVEL_HIGH>;
+ struct mvebu_icu_irq_data {
+@@ -52,28 +73,38 @@ struct mvebu_icu_irq_data {
+ 
+ DEFINE_STATIC_KEY_FALSE(legacy_bindings);
+ 
+-static void mvebu_icu_init(struct mvebu_icu *icu, struct msi_msg *msg)
++static void mvebu_icu_init(struct mvebu_icu *icu,
++			   struct mvebu_icu_msi_data *msi_data,
++			   struct msi_msg *msg)
+ {
+-	if (atomic_cmpxchg(&icu->initialized, false, true))
++	const struct mvebu_icu_subset_data *subset = msi_data->subset_data;
++
++	if (atomic_cmpxchg(&msi_data->initialized, false, true))
++		return;
++
++	/* Set 'SET' ICU SPI message address in AP */
++	writel_relaxed(msg[0].address_hi, icu->base + subset->offset_set_ah);
++	writel_relaxed(msg[0].address_lo, icu->base + subset->offset_set_al);
++
++	if (subset->icu_group != ICU_GRP_NSR)
+ 		return;
+ 
+-	/* Set Clear/Set ICU SPI message address in AP */
+-	writel_relaxed(msg[0].address_hi, icu->base + ICU_SETSPI_NSR_AH);
+-	writel_relaxed(msg[0].address_lo, icu->base + ICU_SETSPI_NSR_AL);
+-	writel_relaxed(msg[1].address_hi, icu->base + ICU_CLRSPI_NSR_AH);
+-	writel_relaxed(msg[1].address_lo, icu->base + ICU_CLRSPI_NSR_AL);
++	/* Set 'CLEAR' ICU SPI message address in AP (level-MSI only) */
++	writel_relaxed(msg[1].address_hi, icu->base + subset->offset_clr_ah);
++	writel_relaxed(msg[1].address_lo, icu->base + subset->offset_clr_al);
+ }
+ 
+ static void mvebu_icu_write_msg(struct msi_desc *desc, struct msi_msg *msg)
+ {
+ 	struct irq_data *d = irq_get_irq_data(desc->irq);
++	struct mvebu_icu_msi_data *msi_data = platform_msi_get_host_data(d->domain);
+ 	struct mvebu_icu_irq_data *icu_irqd = d->chip_data;
+ 	struct mvebu_icu *icu = icu_irqd->icu;
+ 	unsigned int icu_int;
+ 
+ 	if (msg->address_lo || msg->address_hi) {
+-		/* One off initialization */
+-		mvebu_icu_init(icu, msg);
++		/* One off initialization per domain */
++		mvebu_icu_init(icu, msi_data, msg);
+ 		/* Configure the ICU with irq number & type */
+ 		icu_int = msg->data | ICU_INT_ENABLE;
+ 		if (icu_irqd->type & IRQ_TYPE_EDGE_RISING)
+@@ -107,6 +138,7 @@ static int
+ mvebu_icu_irq_domain_translate(struct irq_domain *d, struct irq_fwspec *fwspec,
+ 			       unsigned long *hwirq, unsigned int *type)
+ {
++	struct mvebu_icu_msi_data *msi_data = platform_msi_get_host_data(d);
+ 	struct mvebu_icu *icu = platform_msi_get_host_data(d);
+ 	unsigned int param_count = static_branch_unlikely(&legacy_bindings) ? 3 : 2;
+ 
+@@ -128,6 +160,14 @@ mvebu_icu_irq_domain_translate(struct irq_domain *d, struct irq_fwspec *fwspec,
+ 	} else {
+ 		*hwirq = fwspec->param[0];
+ 		*type = fwspec->param[1] & IRQ_TYPE_SENSE_MASK;
++
++		/*
++		 * The ICU receives level interrupts. While the NSR are also
++		 * level interrupts, SEI are edge interrupts. Force the type
++		 * here in this case.
++		 */
++		if (msi_data->subset_data->icu_group == ICU_GRP_SEI)
++			*type = IRQ_TYPE_EDGE_RISING;
+ 	}
+ 
+ 	if (*hwirq >= ICU_MAX_IRQS) {
+@@ -138,6 +178,25 @@ mvebu_icu_irq_domain_translate(struct irq_domain *d, struct irq_fwspec *fwspec,
+ 	return 0;
+ }
+ 
++static int mvebu_icu_msi_bitmap_region_alloc(struct mvebu_icu *icu, int hwirq)
++{
++	int ret;
++
++	mutex_lock(&icu->msi_lock);
++	ret = test_and_set_bit(hwirq, icu->msi_bitmap);
++	mutex_unlock(&icu->msi_lock);
++
++	return ret;
++}
++
++static void mvebu_icu_msi_bitmap_region_release(struct mvebu_icu *icu,
++						int hwirq)
++{
++	mutex_lock(&icu->msi_lock);
++	clear_bit(hwirq, icu->msi_bitmap);
++	mutex_unlock(&icu->msi_lock);
++}
++
+ static int
+ mvebu_icu_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+ 			   unsigned int nr_irqs, void *args)
+@@ -145,7 +204,8 @@ mvebu_icu_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+ 	int err;
+ 	unsigned long hwirq;
+ 	struct irq_fwspec *fwspec = args;
+-	struct mvebu_icu *icu = platform_msi_get_host_data(domain);
++	struct mvebu_icu_msi_data *msi_data = platform_msi_get_host_data(domain);
++	struct mvebu_icu *icu = msi_data->icu;
+ 	struct mvebu_icu_irq_data *icu_irqd;
+ 
+ 	icu_irqd = kmalloc(sizeof(*icu_irqd), GFP_KERNEL);
+@@ -159,16 +219,20 @@ mvebu_icu_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+ 		goto free_irqd;
+ 	}
+ 
++	err = mvebu_icu_msi_bitmap_region_alloc(icu, hwirq);
++	if (err)
++		goto free_irqd;
++
+ 	if (static_branch_unlikely(&legacy_bindings))
+ 		icu_irqd->icu_group = fwspec->param[0];
+ 	else
+-		icu_irqd->icu_group = ICU_GRP_NSR;
++		icu_irqd->icu_group = msi_data->subset_data->icu_group;
+ 	icu_irqd->icu = icu;
+ 
+ 	err = platform_msi_domain_alloc(domain, virq, nr_irqs);
+ 	if (err) {
+ 		dev_err(icu->dev, "failed to allocate ICU interrupt in parent domain\n");
+-		goto free_irqd;
++		goto free_bitmap;
+ 	}
+ 
+ 	/* Make sure there is no interrupt left pending by the firmware */
+@@ -187,6 +251,8 @@ mvebu_icu_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+ 
+ free_msi:
+ 	platform_msi_domain_free(domain, virq, nr_irqs);
++free_bitmap:
++	mvebu_icu_msi_bitmap_region_release(icu, hwirq);
+ free_irqd:
+ 	kfree(icu_irqd);
+ 	return err;
+@@ -196,12 +262,16 @@ static void
+ mvebu_icu_irq_domain_free(struct irq_domain *domain, unsigned int virq,
+ 			  unsigned int nr_irqs)
+ {
++	struct mvebu_icu_msi_data *msi_data = platform_msi_get_host_data(domain);
++	struct mvebu_icu *icu = msi_data->icu;
+ 	struct irq_data *d = irq_get_irq_data(virq);
+ 	struct mvebu_icu_irq_data *icu_irqd = d->chip_data;
+ 
+ 	kfree(icu_irqd);
+ 
+ 	platform_msi_domain_free(domain, virq, nr_irqs);
++
++	mvebu_icu_msi_bitmap_region_release(icu, d->hwirq);
+ }
+ 
+ static const struct irq_domain_ops mvebu_icu_domain_ops = {
+@@ -210,28 +280,54 @@ static const struct irq_domain_ops mvebu_icu_domain_ops = {
+ 	.free      = mvebu_icu_irq_domain_free,
  };
+ 
++static const struct mvebu_icu_subset_data mvebu_icu_nsr_subset_data = {
++	.icu_group = ICU_GRP_NSR,
++	.offset_set_ah = ICU_SETSPI_NSR_AH,
++	.offset_set_al = ICU_SETSPI_NSR_AL,
++	.offset_clr_ah = ICU_CLRSPI_NSR_AH,
++	.offset_clr_al = ICU_CLRSPI_NSR_AL,
++};
++
++static const struct mvebu_icu_subset_data mvebu_icu_sei_subset_data = {
++	.icu_group = ICU_GRP_SEI,
++	.offset_set_ah = ICU_SET_SEI_AH,
++	.offset_set_al = ICU_SET_SEI_AL,
++};
++
+ static const struct of_device_id mvebu_icu_subset_of_match[] = {
+ 	{
+ 		.compatible = "marvell,cp110-icu-nsr",
++		.data = &mvebu_icu_nsr_subset_data,
++	},
++	{
++		.compatible = "marvell,cp110-icu-sei",
++		.data = &mvebu_icu_sei_subset_data,
+ 	},
+ 	{},
+ };
+ 
+ static int mvebu_icu_subset_probe(struct platform_device *pdev)
+ {
++	struct mvebu_icu_msi_data *msi_data;
+ 	struct device_node *msi_parent_dn;
+ 	struct device *dev = &pdev->dev;
+ 	struct irq_domain *irq_domain;
+-	struct mvebu_icu *icu;
++
++	msi_data = devm_kzalloc(dev, sizeof(*msi_data), GFP_KERNEL);
++	if (!msi_data)
++		return -ENOMEM;
+ 
+ 	/*
+ 	 * Device data being populated means we are using the legacy bindings.
+ 	 * Using the parent device data means we are using the new bindings.
+ 	 */
+-	if (dev_get_drvdata(dev))
+-		icu = dev_get_drvdata(dev);
+-	else
+-		icu = dev_get_drvdata(dev->parent);
++	if (dev_get_drvdata(dev)) {
++		msi_data->icu = dev_get_drvdata(dev);
++		msi_data->subset_data = &mvebu_icu_nsr_subset_data;
++	} else {
++		msi_data->icu = dev_get_drvdata(dev->parent);
++		msi_data->subset_data = of_device_get_match_data(dev);
++	}
+ 
+ 	dev->msi_domain = of_msi_get_domain(dev, dev->of_node,
+ 					    DOMAIN_BUS_PLATFORM_MSI);
+@@ -245,7 +341,7 @@ static int mvebu_icu_subset_probe(struct platform_device *pdev)
+ 	irq_domain = platform_msi_create_device_tree_domain(dev, ICU_MAX_IRQS,
+ 							    mvebu_icu_write_msg,
+ 							    &mvebu_icu_domain_ops,
+-							    icu);
++							    msi_data);
+ 	if (!irq_domain) {
+ 		dev_err(dev, "Failed to create ICU MSI domain\n");
+ 		return -ENOMEM;
+@@ -283,6 +379,8 @@ static int mvebu_icu_probe(struct platform_device *pdev)
+ 		return PTR_ERR(icu->base);
+ 	}
+ 
++	mutex_init(&icu->msi_lock);
++
+ 	icu->irq_chip.name = devm_kasprintf(&pdev->dev, GFP_KERNEL,
+ 					    "ICU.%x",
+ 					    (unsigned int)res->start);
+@@ -308,7 +406,7 @@ static int mvebu_icu_probe(struct platform_device *pdev)
+ #endif
+ 
+ 	/*
+-	 * Clean all ICU interrupts with type SPI_NSR, required to
++	 * Clean all ICU interrupts of type NSR and SEI, required to
+ 	 * avoid unpredictable SPI assignments done by firmware.
+ 	 */
+ 	for (i = 0 ; i < ICU_MAX_IRQS ; i++) {
 -- 
 2.17.1
