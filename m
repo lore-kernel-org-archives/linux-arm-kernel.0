@@ -1,29 +1,59 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 30 Aug 2018 11:05:43 +0200
-Subject: [PATCH v2] gpio: brcmstb: allow 0 width GPIO banks
-In-Reply-To: <1534549659-15883-1-git-send-email-justinpopo6@gmail.com>
-References: <1534549659-15883-1-git-send-email-justinpopo6@gmail.com>
-Message-ID: <CACRpkdYu8F6hzw4sHsqBbziYSQQK5Ppb+dwi1AqYZXbzAumw6w@mail.gmail.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Thu, 30 Aug 2018 11:16:33 +0200
+Subject: [PATCH] usb: gadget: atmel: remove pointless retrieval of DT name
+ property
+In-Reply-To: <20180829200111.11891-1-robh@kernel.org>
+References: <20180829200111.11891-1-robh@kernel.org>
+Message-ID: <339c8176-2260-ce97-1890-d1488866e515@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 18, 2018 at 1:47 AM <justinpopo6@gmail.com> wrote:
+On 29/08/2018 at 22:01, Rob Herring wrote:
+> The name is always non-NULL and then is not used anywhere in this function,
+> so remove it.
 
-> From: Justin Chen <justinpopo6@gmail.com>
->
-> Sometimes we have empty banks within the GPIO block. This commit allows
-> proper handling of 0 width GPIO banks. We handle 0 width GPIO banks by
-> incrementing the bank and number of GPIOs, but not initializing them.
-> This will mean a call into the non-existent GPIOs will return an error.
->
-> Also remove "GPIO registered" dev print. This information is misleading
-> since the incremented banks and gpio_base do not reflect the actual GPIOs
-> that get initialized. We leave this information out since it is already
-> printed with dev_dbg.
->
-> Signed-off-by: Justin Chen <justinpopo6@gmail.com>
+Indeed.
 
-Patch applied with Florian's ACK.
+> Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
 
-Yours,
-Linus Walleij
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+
+> Cc: Felipe Balbi <balbi@kernel.org>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-usb at vger.kernel.org
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> ---
+>   drivers/usb/gadget/udc/atmel_usba_udc.c | 6 ------
+>   1 file changed, 6 deletions(-)
+> 
+> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+> index 17147b8c771e..5729935c5eb2 100644
+> --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
+> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+> @@ -2004,7 +2004,6 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
+>   						    struct usba_udc *udc)
+>   {
+>   	u32 val;
+> -	const char *name;
+>   	struct device_node *np = pdev->dev.of_node;
+>   	const struct of_device_id *match;
+>   	struct device_node *pp;
+> @@ -2094,11 +2093,6 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
+>   		ep->can_dma = of_property_read_bool(pp, "atmel,can-dma");
+>   		ep->can_isoc = of_property_read_bool(pp, "atmel,can-isoc");
+>   
+> -		ret = of_property_read_string(pp, "name", &name);
+> -		if (ret) {
+> -			dev_err(&pdev->dev, "of_probe: name error(%d)\n", ret);
+> -			goto err;
+> -		}
+>   		sprintf(ep->name, "ep%d", ep->index);
+>   		ep->ep.name = ep->name;
+>   
+> 
+
+
+-- 
+Nicolas Ferre
