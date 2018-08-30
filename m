@@ -1,24 +1,67 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 30 Aug 2018 14:28:52 +0200
-Subject: [PATCH 3/3] arm64: dts: renesas: r8a774a1: Add USB3.0 device nodes
-In-Reply-To: <20180828134201.npegmd2js66db5rt@verge.net.au>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 30 Aug 2018 14:29:02 +0200
+Subject: [PATCH 1/3] arm64: dts: renesas: r8a774a1: Add USB2.0 phy and
+ host(EHCI/OHCI) device nodes
+In-Reply-To: <1535107429-5458-2-git-send-email-biju.das@bp.renesas.com>
 References: <1535107429-5458-1-git-send-email-biju.das@bp.renesas.com>
- <1535107429-5458-4-git-send-email-biju.das@bp.renesas.com>
- <20180828134201.npegmd2js66db5rt@verge.net.au>
-Message-ID: <20180830122852.y5qls5qgiilogypj@verge.net.au>
+ <1535107429-5458-2-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <CAMuHMdVWE7F84BdbiqLBfKZLwb9QNg8chsUgWsKtPdikGWeXJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2018 at 03:42:05PM +0200, Simon Horman wrote:
-> On Fri, Aug 24, 2018 at 11:43:49AM +0100, Biju Das wrote:
-> > Add usb3.0 phy, host and function device nodes on RZ/G2M SoC dtsi.
-> > 
-> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> > Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> 
-> Thanks,
-> 
-> This looks fine to me but I will wait to see if there are other reviews
-> before applying.
+On Fri, Aug 24, 2018 at 12:50 PM Biju Das <biju.das@bp.renesas.com> wrote:
+> Add USB2.0 phy and host (EHCI/OHCI) device nodes on RZ/G2M SoC dtsi.
+>
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> ---
+>  arch/arm64/boot/dts/renesas/r8a774a1.dtsi | 73 +++++++++++++++++++++++++++++++
+>  1 file changed, 73 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+> index cd204f5..a794089 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
 
-Thanks again, applied for v4.20.
+> +               ehci0: usb at ee080100 {
+> +                       compatible = "generic-ehci";
+> +                       reg = <0 0xee080100 0 0x100>;
+> +                       interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
+> +                       clocks = <&cpg CPG_MOD 703>;
+> +                       phys = <&usb2_phy0>;
+> +                       phy-names = "usb";
+> +                       companion= <&ohci0>;
+
+Please insert a space before the "=".
+
+> +                       power-domains = <&sysc 32>;
+> +                       resets = <&cpg 703>;
+> +                       status = "disabled";
+> +               };
+> +
+> +               ehci1: usb at ee0a0100 {
+> +                       compatible = "generic-ehci";
+> +                       reg = <0 0xee0a0100 0 0x100>;
+> +                       interrupts = <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>;
+> +                       clocks = <&cpg CPG_MOD 702>;
+> +                       phys = <&usb2_phy1>;
+> +                       phy-names = "usb";
+> +                       companion= <&ohci1>;
+
+Likewise.
+
+> +                       power-domains = <&sysc 32>;
+> +                       resets = <&cpg 702>;
+> +                       status = "disabled";
+> +               };
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
