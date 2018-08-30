@@ -1,74 +1,38 @@
 From: claudiu.beznea@microchip.com (Claudiu Beznea)
-Date: Thu, 30 Aug 2018 14:50:09 +0300
-Subject: [PATCH 4/6] power: reset: at91-poweroff: make sclk part of struct
- shdwc
-In-Reply-To: <1535629811-13403-1-git-send-email-claudiu.beznea@microchip.com>
-References: <1535629811-13403-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <1535629811-13403-5-git-send-email-claudiu.beznea@microchip.com>
+Date: Thu, 30 Aug 2018 14:50:05 +0300
+Subject: [PATCH 0/6] shutdown procedure verification for SAMA5D2
+Message-ID: <1535629811-13403-1-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sclk part of struct shdwc to have all the data specific to SHDWC
-grouped together in one structure.
+Hi,
 
-Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
----
- drivers/power/reset/at91-sama5d2_shdwc.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+Patch 1 from this series implement a fix for shutdown procedure
+for SAMA5D2.
 
-diff --git a/drivers/power/reset/at91-sama5d2_shdwc.c b/drivers/power/reset/at91-sama5d2_shdwc.c
-index c9994103248e..945b41b4086a 100644
---- a/drivers/power/reset/at91-sama5d2_shdwc.c
-+++ b/drivers/power/reset/at91-sama5d2_shdwc.c
-@@ -70,6 +70,7 @@ struct shdwc_config {
- 
- struct shdwc {
- 	const struct shdwc_config *cfg;
-+	struct clk *sclk;
- 	void __iomem *at91_shdwc_base;
- 	void __iomem *mpddrc_base;
- 	void __iomem *pmc_base;
-@@ -80,7 +81,6 @@ struct shdwc {
-  * since pm_power_off itself is global.
-  */
- static struct shdwc *at91_shdwc;
--static struct clk *sclk;
- 
- static const unsigned long long sdwc_dbc_period[] = {
- 	0, 3, 32, 512, 4096, 32768,
-@@ -271,11 +271,11 @@ static int __init at91_shdwc_probe(struct platform_device *pdev)
- 	match = of_match_node(at91_shdwc_of_match, pdev->dev.of_node);
- 	at91_shdwc->cfg = match->data;
- 
--	sclk = devm_clk_get(&pdev->dev, NULL);
--	if (IS_ERR(sclk))
--		return PTR_ERR(sclk);
-+	at91_shdwc->sclk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(at91_shdwc->sclk))
-+		return PTR_ERR(at91_shdwc->sclk);
- 
--	ret = clk_prepare_enable(sclk);
-+	ret = clk_prepare_enable(at91_shdwc->sclk);
- 	if (ret) {
- 		dev_err(&pdev->dev, "Could not enable slow clock\n");
- 		return ret;
-@@ -328,7 +328,7 @@ static int __init at91_shdwc_probe(struct platform_device *pdev)
- unmap:
- 	iounmap(at91_shdwc->pmc_base);
- clk_disable:
--	clk_disable_unprepare(sclk);
-+	clk_disable_unprepare(at91_shdwc->sclk);
- 
- 	return ret;
- }
-@@ -348,7 +348,7 @@ static int __exit at91_shdwc_remove(struct platform_device *pdev)
- 		iounmap(shdw->mpddrc_base);
- 	iounmap(shdw->pmc_base);
- 
--	clk_disable_unprepare(sclk);
-+	clk_disable_unprepare(shdw->sclk);
- 
- 	return 0;
- }
+The rest of the patch are improvements as follows:
+patch 2 - use only one function for poweroff
+patches 3-6 - cosmetic improvements
+
+The patches are based on latest sys-reset/for-next [1].
+
+Thank you,
+Claudiu Beznea
+
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/sre/linux-power-supply.git
+
+Claudiu Beznea (6):
+  power: reset: at91-poweroff: switch to slow clock before shutdown
+  power: reset: at91-poweroff: use only one poweroff function
+  power: reset: at91-poweroff: make mpddrc_base part of struct shdwc
+  power: reset: at91-poweroff: make sclk part of struct shdwc
+  power: reset: at91-poweroff: rename at91_shdwc_base member of struct
+    shdwc
+  power: reset: at91-poweroff: do not procede if at91_shdwc is allocated
+
+ arch/arm/mach-at91/pm_suspend.S          |   8 +++
+ drivers/power/reset/at91-sama5d2_shdwc.c | 119 +++++++++++++++++++++----------
+ 2 files changed, 88 insertions(+), 39 deletions(-)
+
 -- 
 2.7.4
