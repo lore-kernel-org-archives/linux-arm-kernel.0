@@ -1,63 +1,71 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Aug 2018 15:53:25 +0200
-Subject: [PATCH 10/15] soc: octeontx2: Reconfig MSIX base with IOVA
-In-Reply-To: <CA+sq2Cfd_jk=JzcLmPYiW1iGqKrJRrv5vrsmeZfY4W+qi5GLgw@mail.gmail.com>
+Date: Thu, 30 Aug 2018 15:56:47 +0200
+Subject: [PATCH 04/15] soc: octeontx2: Add mailbox support infra
+In-Reply-To: <CA+sq2Cdn6ut3kdTWoOgCayO2evQrD9TjBaUpVUR3_rWZFxYeig@mail.gmail.com>
 References: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
- <1535453838-12154-11-git-send-email-sunil.kovvuri@gmail.com>
- <CAK8P3a1Vdy-VsLWJMer-Z96E4Trhi0WJXJ3fTzyOGny2Mn6RAA@mail.gmail.com>
- <CA+sq2Cf2BLKsV=gY-MPnygV1ufpvmnw6ETh90JX_uKQBk3Sduw@mail.gmail.com>
- <CAK8P3a0+zJRxEYWZpYShRJo-3oqMaC9TJADugaRTiBnjw7ssPA@mail.gmail.com>
- <CA+sq2Cfd_jk=JzcLmPYiW1iGqKrJRrv5vrsmeZfY4W+qi5GLgw@mail.gmail.com>
-Message-ID: <CAK8P3a1BRvhQ9iQWP2hTrJOu+Z+vmmek-Uobw6zX0dM4zFe_gQ@mail.gmail.com>
+ <1535453838-12154-5-git-send-email-sunil.kovvuri@gmail.com>
+ <CAK8P3a2fgAVB0+uns9f5MH+2OyZbwvReo9j-=u3=30QoK=2Ksw@mail.gmail.com>
+ <CA+sq2CeyQ8r7bj3vK=cfriif=HhUu36ZUPWqxXm1e0DktHG+Fg@mail.gmail.com>
+ <CAK8P3a1CvX1V8h20s_=XUUYfR-zYNwETg5p6dCtpVUqZ89K-tg@mail.gmail.com>
+ <CA+sq2Cdn6ut3kdTWoOgCayO2evQrD9TjBaUpVUR3_rWZFxYeig@mail.gmail.com>
+Message-ID: <CAK8P3a1W2D5YWEC-VDkvQ8y3W8257g6X7B8_At7g8f9iE73a8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2018 at 3:17 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
-> On Tue, Aug 28, 2018 at 6:27 PM Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tue, Aug 28, 2018 at 2:42 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
-> > > On Tue, Aug 28, 2018 at 5:39 PM Arnd Bergmann <arnd@arndb.de> wrote:
-> > > > On Tue, Aug 28, 2018 at 12:58 PM <sunil.kovvuri@gmail.com> wrote:
-> > >
-> > > This admin function is a PCI device which is capable of provisioning
-> > > HW blocks to other PCIe SRIOV devices in the system. Each HW block
-> > > (eg memory buffer pools, NIC dewscriptors, crypto engines e.t.c) needs
-> > > certain no of MSIX vectors. Admin function has a set of 32K MSIX vectors
-> > > in memory (not on-chip) which based on HW block provisioning to a PCI device
-> > > attaches the required number of vectors to that device. Some part of this
-> > > configuration is done by low level firmware.
-> > >
-> > > RVU_AF_MSIXTR_BASE points to the memory region allocated for 32K MSIX
-> > > vectors. If kernel is booted with IOMMU enabled and admin function device
-> > > is attached to SMMU, HW will go through translation to access this MSIX
-> > > vector memory region. Hence the mapping done in this patch.
-> >
-> > Do you mean this is not a regular PCIe MSI-X interrupt to the GIC, but
-> > something internal to your device that gets routed through the IOMMU
-> > back into the device?
-> >
+On Tue, Aug 28, 2018 at 3:23 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
 >
-> This is a regular PCIe MSI-X interrupt, the difference is that the
-> bunch of PCI devices
-> here doesn't have a fixed set of MSIX vectors. Admin function has a
-> memory region with
-> 32K MSIX vectors which it provisions to PCI devices based on the HW
-> functional blocks
-> attached to them. A PCI device which works as a ethernet device needs
-> X number of vectors
-> and a crypto device needs Y number of vectors.
+> On Tue, Aug 28, 2018 at 6:22 PM Arnd Bergmann <arnd@arndb.de> wrote:
+> >
+> > On Tue, Aug 28, 2018 at 2:48 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
+> > >
+> > > On Tue, Aug 28, 2018 at 5:33 PM Arnd Bergmann <arnd@arndb.de> wrote:
+> > > >
+> > > > On Tue, Aug 28, 2018 at 12:57 PM <sunil.kovvuri@gmail.com> wrote:
+> > > > >
+> > > > > From: Aleksey Makarov <amakarov@marvell.com>
+> > > > >
+> > > > > This patch adds mailbox support infrastructure APIs.
+> > > > > Each RVU device has a dedicated 64KB mailbox region
+> > > > > shared with it's peer for communication. RVU AF has
+> > > > > a separate mailbox region shared with each of RVU PFs
+> > > > > and a RVU PF has a separate region shared with each of
+> > > > > it's VF.
+> > > > >
+> > > > > These set of APIs are used by this driver (RVU AF) and
+> > > > > other RVU PF/VF drivers eg netdev, crypto e.t.c.
+> > > > >
+> > > > > Signed-off-by: Aleksey Makarov <amakarov@marvell.com>
+> > > > > Signed-off-by: Sunil Goutham <sgoutham@marvell.com>
+> > > > > Signed-off-by: Lukasz Bartosik <lbartosik@marvell.com>
+> > > >
+> > > > Why does this driver not use the drivers/mailbox/ infrastructure?
+> > > >
+> > > This is a common administrative software driver which will be handling requests
+> > > from kernel drivers and as well as drivers in userspace applications.
+> > > We had to keep mailbox communication infrastructure same across all usages.
+> >
+> > Can you explain more about the usage of userspace applications
+> > and what interface you plan to use into the kernel?
 >
-> Since the admin function owns the whole MSIX vector region, HW uses
-> this device's stream ID
-> to access the vectors. Hence the IOMMU mapping. Once MSIX vectors are
-> provisioned to
-> a PCI device they work as normal MSIX interrupt like any other device.
+> Any PCI device here irrespective in what domain (kernel or userspace)
+> they are in
+> use common mailbox communication. Which is
+> # Write a mailbox msg (format is agreed between all parties) into
+> shared (between AF and other PF/VFs)
+>    memory region and trigger a interrupt to admin function.
+> # Admin function processes the msg and puts reply in the same memory
+> region and trigger
+>    IRQ to the requesting device. If the device has a driver instance
+> in kernel then it uses
+>    IRQ and userspace applications does polling on the IRQ status bit.
 
-Ok, I think I got it now, just to confirm: the MSIX vectors you allocate
-in the admin device refer to memory backing the BAR that contains
-the MSI-X entries of the other functions, right?
+Ok, so the mailbox here is a communication mechanism between
+two device drivers that may run on the same kernel, or in different
+instances (user space, virtual machine, ...), but each driver
+only talks to the mailbox visible in its own device, right?
 
-I was a bit confused here and assumed that you were mapping
-the MMIO area of an interrupt controller that receives the interupt
-transactions.
+What is the purpose of the exported interface then? Is this
+just an abstraction so each of the drivers can talk to its own
+mailbox using a set of common helper functions?
 
-         Arnd
+      Arnd
