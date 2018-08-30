@@ -1,45 +1,43 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Thu, 30 Aug 2018 21:01:12 +0200
-Subject: [PATCH v4 05/13] dt-bindings: phy: document sun4i-a10-sata-phy
+Date: Thu, 30 Aug 2018 21:01:18 +0200
+Subject: [PATCH v4 11/13] ARM: dts: sun7i: a20: add sata-port/sata-phy nodes
 In-Reply-To: <20180830190120.722-1-clabbe.montjoie@gmail.com>
 References: <20180830190120.722-1-clabbe.montjoie@gmail.com>
-Message-ID: <20180830190120.722-6-clabbe.montjoie@gmail.com>
+Message-ID: <20180830190120.722-12-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch document the sun4i-a10-sata-phy bindings.
+This patch convert sun7i-a20 sata to the new binding which use a sata
+phy node.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- .../devicetree/bindings/phy/sun4i-sata-phy.txt       | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/sun4i-sata-phy.txt
+ arch/arm/boot/dts/sun7i-a20.dtsi | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/phy/sun4i-sata-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-sata-phy.txt
-new file mode 100644
-index 000000000000..f031542717c1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/sun4i-sata-phy.txt
-@@ -0,0 +1,20 @@
-+Allwinner sun4i SATA PHY
-+-----------------------
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 8f7e1e29841f..8ff28f7afa85 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -667,6 +667,19 @@
+ 			interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&ccu CLK_AHB_SATA>, <&ccu CLK_SATA>;
+ 			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
 +
-+Required properties:
-+- compatible : should be one of
-+  * allwinner,sun4i-a10-sata-phy
-+  * allwinner,sun8i-r40-sata-phy
-+- reg : a list of offset + length pairs
-+- #phy-cells : from the generic phy bindings, must be 0
++			sata_port: sata-port at 0 {
++				reg = <0>;
++				phys = <&sata_phy>;
++			};
++		};
 +
-+Optional properties:
-+- phy-supply : from the generic phy bindings, a phandle to a regulator that
-+	       provides power to the PHY.
-+
-+Example:
-+	sata_phy0: sata-phy at a01800 {
-+		compatible = "allwinner,sun8i-r40-sata-phy";
-+		reg = <0x00a01800 0x4>;
-+		#phy-cells = <0>;
-+	};
++		sata_phy: sata-phy at 1c180c0  {
++			compatible = "allwinner,sun4i-a10-sata-phy";
++			reg = <0x1c180c0 0x200>;
++			#phy-cells = <0>;
+ 		};
+ 
+ 		ehci1: usb at 1c1c000 {
 -- 
 2.16.4
