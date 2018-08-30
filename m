@@ -1,78 +1,91 @@
-From: vabhav.sharma@nxp.com (Vabhav Sharma)
-Date: Thu, 30 Aug 2018 07:36:48 +0000
-Subject: [PATCH 3/5] drivers: clk-qoriq: Add clockgen support for lx2160a
-In-Reply-To: <4a9ea6b451683ec98c92e86a5ae6b91213a6afcf.camel@buserror.net>
-References: <1534747636-20064-1-git-send-email-vabhav.sharma@nxp.com>
- <1534747636-20064-4-git-send-email-vabhav.sharma@nxp.com>
- <4a9ea6b451683ec98c92e86a5ae6b91213a6afcf.camel@buserror.net>
-Message-ID: <VI1PR04MB4800E8B1E8541FCA9221A1CFF3080@VI1PR04MB4800.eurprd04.prod.outlook.com>
+From: hanjie.lin@amlogic.com (Hanjie Lin)
+Date: Thu, 30 Aug 2018 15:37:30 +0800
+Subject: [PATCH v2 1/2] dt-bindings: PCI: meson: add DT bindings for
+ Amlogic Meson PCIe controller
+In-Reply-To: <20180829004122.GA25928@bogus>
+References: <1535096165-45827-1-git-send-email-hanjie.lin@amlogic.com>
+ <1535096165-45827-2-git-send-email-hanjie.lin@amlogic.com>
+ <8c48964151d24758298ba935da336c0829e2b287.camel@baylibre.com>
+ <11d7547b-feb4-6ecb-cef3-db46ce8ee2ef@amlogic.com>
+ <20180829004122.GA25928@bogus>
+Message-ID: <84d5399c-67d4-f8a4-3613-00d91f21292f@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-> -----Original Message-----
-> From: linux-kernel-owner at vger.kernel.org <linux-kernel-
-> owner at vger.kernel.org> On Behalf Of Scott Wood
-> Sent: Wednesday, August 29, 2018 5:49 AM
-> To: Vabhav Sharma <vabhav.sharma@nxp.com>; linux-
-> kernel at vger.kernel.org; devicetree at vger.kernel.org; robh+dt at kernel.org;
-> mark.rutland at arm.com; linuxppc-dev at lists.ozlabs.org; linux-arm-
-> kernel at lists.infradead.org; mturquette at baylibre.com; sboyd at kernel.org;
-> rjw at rjwysocki.net; viresh.kumar at linaro.org; linux-clk at vger.kernel.org;
-> linux-pm at vger.kernel.org; linux-kernel-owner at vger.kernel.org;
-> catalin.marinas at arm.com; will.deacon at arm.com;
-> gregkh at linuxfoundation.org; arnd at arndb.de;
-> kstewart at linuxfoundation.org; yamada.masahiro at socionext.com
-> Cc: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>; Andy Tang
-> <andy.tang@nxp.com>; Udit Kumar <udit.kumar@nxp.com>;
-> linux at armlinux.org.uk; Varun Sethi <V.Sethi@nxp.com>
-> Subject: Re: [PATCH 3/5] drivers: clk-qoriq: Add clockgen support for lx2160a
+On 2018/8/29 8:41, Rob Herring wrote:
+> On Mon, Aug 27, 2018 at 04:55:20PM +0800, Hanjie Lin wrote:
+>>
+>>
+>> On 2018/8/24 16:22, Jerome Brunet wrote:
+>>> On Fri, 2018-08-24 at 15:36 +0800, Hanjie Lin wrote:
+>>>> From: Yue Wang <yue.wang@amlogic.com>
+>>>>
+>>>> The Amlogic Meson PCIe host controller is based on the Synopsys DesignWare
+>>>> PCI core. This patch adds documentation for the DT bindings in Meson PCIe
+>>>> controller.
+>>>>
+>>>> Signed-off-by: Yue Wang <yue.wang@amlogic.com>
+>>>> Signed-off-by: Hanjie Lin <hanjie.lin@amlogic.com>
+>>>> ---
+>>>>  .../devicetree/bindings/pci/amlogic,meson-pcie.txt | 63 ++++++++++++++++++++++
+>>>>  1 file changed, 63 insertions(+)
+>>>>  create mode 100644 Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt b/Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
+>>>> new file mode 100644
+>>>> index 0000000..8a831d1
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
+>>>> @@ -0,0 +1,63 @@
+>>>> +Amlogic Meson AXG DWC PCIE SoC controller
+>>>> +
+>>>> +Amlogic Meson PCIe host controller is based on the Synopsys DesignWare PCI core.
+>>>> +It shares common functions with the PCIe DesignWare core driver and
+>>>> +inherits common properties defined in
+>>>> +Documentation/devicetree/bindings/pci/designware-pci.txt.
+>>>> +
+>>>> +Additional properties are described here:
+>>>> +
+>>>> +Required properties:
+>>>> +- compatible:
+>>>> +	should contain "amlogic,axg-pcie" to identify the core.
+>>>> +- reg:
+>>>> +	Should contain the configuration address space.
+>>>> +- reg-names: Must be
+>>>> +	- "elbi"	External local bus interface registers
+>>>> +	- "cfg"		Meson specific registers
+>>>> +	- "config"	PCIe configuration space
+>>>> +- reset-gpios: The GPIO to generate PCIe PERST# assert and deassert signal.
+>>>> +- clocks: Must contain an entry for each entry in clock-names.
+>>>> +- clock-names: Must include the following entries:
+>>>> +	- "pclk"       PCIe GEN 100M PLL clock
+>>>> +	- "port"       PCIe_x(A or B) RC clock gate
+>>>> +	- "general"    PCIe Phy clock
+>>>> +	- "mipi"       PCIe_x(A or B) 100M ref clock gate
+>>>> +- resets: phandle to the reset lines.
+>>>> +- reset-names: must contain "phy" and "peripheral"
+>>>> +       - "port" Port A or B reset
+>>>> +       - "apb" APB reset
+>>>
+>>> The above description is not coherent (phy <=> port)
+>>>
+>>
+>> Yes, this should be port and apb here.
+>> We'll integrate phy driver into ctrl driver, and move phy reset to here also.
 > 
-> On Mon, 2018-08-20 at 12:17 +0530, Vabhav Sharma wrote:
-> > From: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
-> >
-> > Add clockgen support for lx2160a.
-> > Added entry for compat 'fsl,lx2160a-clockgen'.
-> > As LX2160A is 16 core, so modified value for NUM_CMUX
-> >
-> > Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
-> > Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
-> > Signed-off-by: Vabhav Sharma <vabhav.sharma@nxp.com>
-> > ---
-> >  drivers/clk/clk-qoriq.c         | 14 +++++++++++++-
-> >  drivers/cpufreq/qoriq-cpufreq.c |  1 +
-> >  2 files changed, 14 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/clk/clk-qoriq.c b/drivers/clk/clk-qoriq.c index
-> > 3a1812f..fc6e308 100644
-> > --- a/drivers/clk/clk-qoriq.c
-> > +++ b/drivers/clk/clk-qoriq.c
-> > @@ -60,7 +60,7 @@ struct clockgen_muxinfo {  };
-> >
-> >  #define NUM_HWACCEL	5
-> > -#define NUM_CMUX	8
-> > +#define NUM_CMUX	16
-> >
-> >  struct clockgen;
-> >
-> > @@ -570,6 +570,17 @@ static const struct clockgen_chipinfo chipinfo[] = {
-> >  		.flags = CG_VER3 | CG_LITTLE_ENDIAN,
-> >  	},
-> >  	{
-> > +		.compat = "fsl,lx2160a-clockgen",
-> > +		.cmux_groups = {
-> > +			&clockgen2_cmux_cga12, &clockgen2_cmux_cgb
-> > +		},
-> > +		.cmux_to_group = {
-> > +			0, 0, 0, 0, 1, 1, 1, 1, -1
-> > +		},
-> > +		.pll_mask = 0x37,
-> > +		.flags = CG_VER3 | CG_LITTLE_ENDIAN,
-> > +	},
+> Why? That's the wrong thing to do if they are separate h/w blocks. You 
+> can do whatever you like in the drivers, but the DT should reflect the 
+> h/w.
 > 
-> Why are you increasing NUM_CMUX beyond 8 for a chip that only has 8
-> entries in cmux_to_group?
-Configuration is 16 cores,8 cluster with 2 cores in each cluster
+> Rob
 > 
-> -Scott
+> .
+> 
+
+We have the dedicated phy driver which only process reset job,
+and we consider that it's too overkill to do just these things .
+So we will integrate phy reset job into the controller driver int the next version.  
+
+thanks. 
