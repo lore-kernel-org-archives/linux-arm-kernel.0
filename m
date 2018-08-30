@@ -1,63 +1,58 @@
 From: andreyknvl@google.com (Andrey Konovalov)
-Date: Thu, 30 Aug 2018 13:41:08 +0200
-Subject: [PATCH v6 03/11] arm64: untag user addresses in access_ok and
- __uaccess_mask_ptr
+Date: Thu, 30 Aug 2018 13:41:13 +0200
+Subject: [PATCH v6 08/11] usb, arm64: untag user addresses in devio
 In-Reply-To: <cover.1535629099.git.andreyknvl@google.com>
 References: <cover.1535629099.git.andreyknvl@google.com>
-Message-ID: <7a37e7363328f4aa10706c0294242eaa5e4e9e89.1535629099.git.andreyknvl@google.com>
+Message-ID: <c0396442f9143244bdfdf0ea3bfab55b583a328f.1535629099.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-copy_from_user (and a few other similar functions) are used to copy data
-from user memory into the kernel memory or vice versa. Since a user can
-provided a tagged pointer to one of the syscalls that use copy_from_user,
-we need to correctly handle such pointers.
+devio allows to mmap memory regions and keeps them in a list. It also
+accepts a user address through an ioctl call and searches the memory
+region list for the region that contains this address. Since the addresses
+provided to mmap must not be tagged, and the addresses provided to ioctl
+might be tagged, we might compare tagged and untagged addresses during the
+search.
 
-Do this by untagging user pointers in access_ok and in __uaccess_mask_ptr,
-before performing access validity checks.
+Untag the provided addresses before searching.
 
 Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
 ---
- arch/arm64/include/asm/uaccess.h | 11 +++++++----
- 1 file changed, 7 insertions(+), 4 deletions(-)
+ drivers/usb/core/devio.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index 2d6451cbaa86..fa7318d3d7d5 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -105,7 +105,8 @@ static inline unsigned long __range_ok(const void __user *addr, unsigned long si
- #define untagged_addr(addr)		\
- 	((__typeof__(addr))sign_extend64((__u64)(addr), 55))
+diff --git a/drivers/usb/core/devio.c b/drivers/usb/core/devio.c
+index 6ce77b33da61..ed5ab7c8100b 100644
+--- a/drivers/usb/core/devio.c
++++ b/drivers/usb/core/devio.c
+@@ -1405,7 +1405,7 @@ find_memory_area(struct usb_dev_state *ps, const struct usbdevfs_urb *uurb)
+ {
+ 	struct usb_memory *usbm = NULL, *iter;
+ 	unsigned long flags;
+-	unsigned long uurb_start = (unsigned long)uurb->buffer;
++	unsigned long uurb_start = (unsigned long)untagged_addr(uurb->buffer);
  
--#define access_ok(type, addr, size)	__range_ok(addr, size)
-+#define access_ok(type, addr, size)	\
-+	__range_ok(untagged_addr(addr), size)
- #define user_addr_max			get_fs
+ 	spin_lock_irqsave(&ps->lock, flags);
+ 	list_for_each_entry(iter, &ps->memory_list, memlist) {
+@@ -1634,7 +1634,8 @@ static int proc_do_submiturb(struct usb_dev_state *ps, struct usbdevfs_urb *uurb
+ 		}
+ 	} else if (uurb->buffer_length > 0) {
+ 		if (as->usbm) {
+-			unsigned long uurb_start = (unsigned long)uurb->buffer;
++			unsigned long uurb_start =
++				(unsigned long)untagged_addr(uurb->buffer);
  
- #define _ASM_EXTABLE(from, to)						\
-@@ -237,7 +238,8 @@ static inline void uaccess_enable_not_uao(void)
+ 			as->urb->transfer_buffer = as->usbm->mem +
+ 					(uurb_start - as->usbm->vm_start);
+@@ -1713,7 +1714,8 @@ static int proc_do_submiturb(struct usb_dev_state *ps, struct usbdevfs_urb *uurb
+ 	as->ps = ps;
+ 	as->userurb = arg;
+ 	if (as->usbm) {
+-		unsigned long uurb_start = (unsigned long)uurb->buffer;
++		unsigned long uurb_start =
++			(unsigned long)untagged_addr(uurb->buffer);
  
- /*
-  * Sanitise a uaccess pointer such that it becomes NULL if above the
-- * current addr_limit.
-+ * current addr_limit. In case the pointer is tagged (has the top byte set),
-+ * untag the pointer before checking.
-  */
- #define uaccess_mask_ptr(ptr) (__typeof__(ptr))__uaccess_mask_ptr(ptr)
- static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
-@@ -245,10 +247,11 @@ static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
- 	void __user *safe_ptr;
- 
- 	asm volatile(
--	"	bics	xzr, %1, %2\n"
-+	"	bics	xzr, %3, %2\n"
- 	"	csel	%0, %1, xzr, eq\n"
- 	: "=&r" (safe_ptr)
--	: "r" (ptr), "r" (current_thread_info()->addr_limit)
-+	: "r" (ptr), "r" (current_thread_info()->addr_limit),
-+	  "r" (untagged_addr(ptr))
- 	: "cc");
- 
- 	csdb();
+ 		as->urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
+ 		as->urb->transfer_dma = as->usbm->dma_handle +
 -- 
 2.19.0.rc0.228.g281dcd1b4d0-goog
