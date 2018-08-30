@@ -1,92 +1,72 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Thu, 30 Aug 2018 15:10:26 +0530
-Subject: [PATCH 00/15] soc: octeontx2: Add RVU admin function driver
-In-Reply-To: <CA+sq2Cd3R0V5hcaF+ESfkOEBHgBwOB6b8Uwx7K+CeUN6gLFTOg@mail.gmail.com>
-References: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
- <CAK8P3a1xC6XjwDAmocpE5TZO7j6uVGtvBtWLPVcYwKqN6Z+seQ@mail.gmail.com>
- <CA+sq2Cd3R0V5hcaF+ESfkOEBHgBwOB6b8Uwx7K+CeUN6gLFTOg@mail.gmail.com>
-Message-ID: <CA+sq2CfbpQKas7TbQfrcw=Drpb7yO_gqH31iXabjNEQEG4xYrQ@mail.gmail.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Thu, 30 Aug 2018 11:42:27 +0200
+Subject: [PATCH v4 06/20] arm64: Add a helper for PARange to physical
+ shift conversion
+In-Reply-To: <1531905547-25478-7-git-send-email-suzuki.poulose@arm.com>
+References: <1531905547-25478-1-git-send-email-suzuki.poulose@arm.com>
+ <1531905547-25478-7-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180830094227.GB4029@e113682-lin.lund.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2018 at 6:54 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
->
-> On Tue, Aug 28, 2018 at 5:53 PM Arnd Bergmann <arnd@arndb.de> wrote:
-> >
-> > On Tue, Aug 28, 2018 at 12:57 PM <sunil.kovvuri@gmail.com> wrote:
-> > >
-> > > From: Sunil Goutham <sgoutham@marvell.com>
-> > >
-> > > Resource virtualization unit (RVU) on Marvell's OcteonTX2 SOC supports
-> > > multiple PCIe SRIOV physical functions (PFs) and virtual functions (VFs).
-> > > PF0 is called administrative / admin function (AF) and has privilege access
-> > > to registers to provision different RVU functional blocks to each of
-> > > PF/VF.
-> > >
-> > > This admin function (AF) driver acts as a configuration / administrative
-> > > software which provisions functional blocks to a PF/VF on demand for them
-> > > to work as one of the following
-> > >  - A basic network controller (i.e NIC).
-> > >  - NIC with packet filtering, shaping and scheduling capabilities.
-> > >  - A crypto device.
-> > >  - A combination of above etc.
-> > >
-> > > PF/VFs communicate with admin function via a shared memory region.
-> > > This patch series adds logic for the following
-> > >  - RVU AF driver with functional blocks provisioning support
-> > >  - Mailbox infrastructure for communication between AF and PFs.
-> > >  - CGX driver which provides information about physcial network
-> > >    interfaces which AF processes and forwards required info to
-> > >    PF/VF drivers.
-> > >
-> > > This is the first set of patches out of 70 odd patches.
-> > >
-> > > Note: This driver neither receives any data nor processes it i.e no I/O,
-> > >       just does the hardware configuration.
-> >
-> > Hi Sunil,
-> >
-> > Thanks for posting this first series, I'm glad we're seeing support for this
-> > chip family making some progress.
->
-> Thanks.
->
-> >
-> > My feeling overall is that we need a review from the network driver
-> > folks more than the arm-soc team etc, and that maybe the driver
-> > as a whole should go into drivers/net/ethernet.
->
-> This driver doesn't handle any network IO and moreever this driver has to handle
-> configuration requests from crypto driver as well. There will be
-> separate network and
-> crypto drivers which will be upstreamed into drivers/net/ethernet and
-> drivers/crypto.
-> And in future silicons there will be different types of functional
-> blocks which will be
-> added into this resource virtualization unit (RVU). Hence i thought
-> this driver is not a
-> right fit in drivers/net/ethernet.
->
-> >
-> > We support some couple of similar hardware already that has
-> > both support for virtual functions and for crypto offload, including
-> > the Chelsio cxgb4, Mellanox mlx5, NXP DPAA and probably others,
->
-> I agree, but i guess that is done to support inline crypto.
-> Here this driver has to handle requests from normal crypto driver
-> (drivers/crypto) as well.
->
-> > and we need to ensure that the exposed interfaces are all
-> > compatible, and that you use the correct subsystems and
-> > in-kernel abstractions for thing that are common.
-> >
-> >       Arnd
+On Wed, Jul 18, 2018 at 10:18:49AM +0100, Suzuki K Poulose wrote:
+> On arm64, ID_AA64MMFR0_EL1.PARange encodes the maximum Physical
+> Address range supported by the CPU. Add a helper to decode this
+> to actual physical shift. If we hit an unallocated value, return
+> the maximum range supported by the kernel.
+> This will be used by KVM to set the VTCR_EL2.T0SZ, as it
+> is about to move its place. Having this helper keeps the code
+> movement cleaner.
+> 
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: James Morse <james.morse@arm.com>
+> Cc: Christoffer Dall <cdall@kernel.org>
+> Reviewed-by: Eric Auger <eric.auger@redhat.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+> Changes since V2:
+>  - Split the patch
+>  - Limit the physical shift only for values unrecognized.
+> ---
+>  arch/arm64/include/asm/cpufeature.h | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> index 1717ba1..855cf0e 100644
+> --- a/arch/arm64/include/asm/cpufeature.h
+> +++ b/arch/arm64/include/asm/cpufeature.h
+> @@ -530,6 +530,19 @@ void arm64_set_ssbd_mitigation(bool state);
+>  static inline void arm64_set_ssbd_mitigation(bool state) {}
+>  #endif
+>  
+> +static inline u32 id_aa64mmfr0_parange_to_phys_shift(int parange)
+> +{
+> +	switch (parange) {
+> +	case 0: return 32;
+> +	case 1: return 36;
+> +	case 2: return 40;
+> +	case 3: return 42;
+> +	case 4: return 44;
+> +	case 5: return 48;
+> +	case 6: return 52;
+> +	default: return CONFIG_ARM64_PA_BITS;
 
-Hi Arnd,
-
-I hope i have answered your queries.
-Let us know if you have any more queries or feedback w.r.t to a
-individual patch or the patchset on the whole.
+I don't understand this case?  Shouldn't this include at least a WARN()
+?
 
 Thanks,
-Sunil.
+    Christoffer
+
+> +	}
+> +}
+>  #endif /* __ASSEMBLY__ */
+>  
+>  #endif
+> -- 
+> 2.7.4
+> 
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
