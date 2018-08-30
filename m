@@ -1,69 +1,87 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Aug 2018 17:16:06 +0100
-Subject: [PATCH 6/7] KVM: arm64: Set SCTLR_EL2.DSSBS if SSBD is forcefully
- disabled and !vhe
-In-Reply-To: <1535645767-9901-1-git-send-email-will.deacon@arm.com>
-References: <1535645767-9901-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1535645767-9901-7-git-send-email-will.deacon@arm.com>
+Date: Thu, 30 Aug 2018 17:15:45 +0100
+Subject: [PATCH 11/12] arm64: tlb: Avoid synchronous TLBIs when freeing page
+ tables
+In-Reply-To: <1535645747-9823-1-git-send-email-will.deacon@arm.com>
+References: <1535645747-9823-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1535645747-9823-12-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When running without VHE, it is necessary to set SCTLR_EL2.DSSBS if SSBD
-has been forcefully disabled on the kernel command-line.
+By selecting HAVE_RCU_TABLE_INVALIDATE, we can rely on tlb_flush() being
+called if we fail to batch table pages for freeing. This in turn allows
+us to postpone walk-cache invalidation until tlb_finish_mmu(), which
+avoids lots of unnecessary DSBs and means we can shoot down the ASID if
+the range is large enough.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/kvm_host.h | 11 +++++++++++
- arch/arm64/kvm/hyp/sysreg-sr.c    | 11 +++++++++++
- 2 files changed, 22 insertions(+)
+ arch/arm64/Kconfig                |  1 +
+ arch/arm64/include/asm/tlb.h      |  3 ---
+ arch/arm64/include/asm/tlbflush.h | 11 -----------
+ 3 files changed, 1 insertion(+), 14 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index f26055f2306e..15501921fc75 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -389,6 +389,8 @@ struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
- 
- DECLARE_PER_CPU(kvm_cpu_context_t, kvm_host_cpu_state);
- 
-+void __kvm_enable_ssbs(void);
-+
- static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
- 				       unsigned long hyp_stack_ptr,
- 				       unsigned long vector_ptr)
-@@ -409,6 +411,15 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
- 	 */
- 	BUG_ON(!static_branch_likely(&arm64_const_caps_ready));
- 	__kvm_call_hyp((void *)pgd_ptr, hyp_stack_ptr, vector_ptr, tpidr_el2);
-+
-+	/*
-+	 * Disabling SSBD on a non-VHE system requires us to enable SSBS
-+	 * at EL2.
-+	 */
-+	if (!has_vhe() && this_cpu_has_cap(ARM64_SSBS) &&
-+	    arm64_get_ssbd_state() == ARM64_SSBD_FORCE_DISABLE) {
-+		kvm_call_hyp(__kvm_enable_ssbs);
-+	}
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 29e75b47becd..89059ee1eccc 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -142,6 +142,7 @@ config ARM64
+ 	select HAVE_PERF_USER_STACK_DUMP
+ 	select HAVE_REGS_AND_STACK_ACCESS_API
+ 	select HAVE_RCU_TABLE_FREE
++	select HAVE_RCU_TABLE_INVALIDATE
+ 	select HAVE_RSEQ
+ 	select HAVE_STACKPROTECTOR
+ 	select HAVE_SYSCALL_TRACEPOINTS
+diff --git a/arch/arm64/include/asm/tlb.h b/arch/arm64/include/asm/tlb.h
+index b078fdec10d5..106fdc951b6e 100644
+--- a/arch/arm64/include/asm/tlb.h
++++ b/arch/arm64/include/asm/tlb.h
+@@ -54,7 +54,6 @@ static inline void tlb_flush(struct mmu_gather *tlb)
+ static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
+ 				  unsigned long addr)
+ {
+-	__flush_tlb_pgtable(tlb->mm, addr);
+ 	pgtable_page_dtor(pte);
+ 	tlb_remove_table(tlb, pte);
  }
- 
- static inline bool kvm_arch_check_sve_has_vhe(void)
-diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-index 9ce223944983..76d016b446b2 100644
---- a/arch/arm64/kvm/hyp/sysreg-sr.c
-+++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-@@ -288,3 +288,14 @@ void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu)
- 
- 	vcpu->arch.sysregs_loaded_on_cpu = false;
+@@ -63,7 +62,6 @@ static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
+ static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
+ 				  unsigned long addr)
+ {
+-	__flush_tlb_pgtable(tlb->mm, addr);
+ 	tlb_remove_table(tlb, virt_to_page(pmdp));
  }
-+
-+void __hyp_text __kvm_enable_ssbs(void)
-+{
-+	u64 tmp;
-+
-+	asm volatile(
-+	"mrs	%0, sctlr_el2\n"
-+	"orr	%0, %0, %1\n"
-+	"msr	sctlr_el2, %0"
-+	: "=&r" (tmp) : "L" (SCTLR_ELx_DSSBS));
-+}
+ #endif
+@@ -72,7 +70,6 @@ static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
+ static inline void __pud_free_tlb(struct mmu_gather *tlb, pud_t *pudp,
+ 				  unsigned long addr)
+ {
+-	__flush_tlb_pgtable(tlb->mm, addr);
+ 	tlb_remove_table(tlb, virt_to_page(pudp));
+ }
+ #endif
+diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+index 37ccdb246b20..c98ed8871030 100644
+--- a/arch/arm64/include/asm/tlbflush.h
++++ b/arch/arm64/include/asm/tlbflush.h
+@@ -215,17 +215,6 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
+  * Used to invalidate the TLB (walk caches) corresponding to intermediate page
+  * table levels (pgd/pud/pmd).
+  */
+-static inline void __flush_tlb_pgtable(struct mm_struct *mm,
+-				       unsigned long uaddr)
+-{
+-	unsigned long addr = __TLBI_VADDR(uaddr, ASID(mm));
+-
+-	dsb(ishst);
+-	__tlbi(vae1is, addr);
+-	__tlbi_user(vae1is, addr);
+-	dsb(ish);
+-}
+-
+ static inline void __flush_tlb_kernel_pgtable(unsigned long kaddr)
+ {
+ 	unsigned long addr = __TLBI_VADDR(kaddr, 0);
 -- 
 2.1.4
