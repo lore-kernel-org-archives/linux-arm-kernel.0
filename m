@@ -1,16 +1,15 @@
 From: hch@infradead.org (Christoph Hellwig)
-Date: Thu, 30 Aug 2018 10:58:50 -0700
-Subject: [RFC 2/3] USB: core: Add non-coherent buffer allocation helpers
-In-Reply-To: <20180830172030.23344-3-ezequiel@collabora.com>
+Date: Thu, 30 Aug 2018 10:59:37 -0700
+Subject: [RFC 3/3] stk1160: Use non-coherent buffers for USB transfers
+In-Reply-To: <20180830172030.23344-4-ezequiel@collabora.com>
 References: <20180830172030.23344-1-ezequiel@collabora.com>
- <20180830172030.23344-3-ezequiel@collabora.com>
-Message-ID: <20180830175850.GA11521@infradead.org>
+ <20180830172030.23344-4-ezequiel@collabora.com>
+Message-ID: <20180830175937.GB11521@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please don't introduce new DMA_ATTR_NON_CONSISTENT users, it is
-a rather horrible interface, and I plan to kill it off rather sooner
-than later.  I plan to post some patches for a better interface
-that can reuse the normal dma_sync_single_* interfaces for ownership
-transfers.  I can happily include usb in that initial patch set based
-on your work here if that helps.
+> +	dma_sync_single_for_cpu(&urb->dev->dev, urb->transfer_dma,
+> +		urb->transfer_buffer_length, DMA_FROM_DEVICE);
+
+You can't ue dma_sync_single_for_cpu on non-coherent dma buffers,
+which is one of the major issues with them.
