@@ -1,108 +1,77 @@
-From: mpatocka@redhat.com (Mikulas Patocka)
-Date: Thu, 30 Aug 2018 14:23:56 -0400 (EDT)
-Subject: [PATCH] arm64: mm: always enable CONFIG_HOLES_IN_ZONE
-In-Reply-To: <20180830150532.22745-1-james.morse@arm.com>
-References: <20180830150532.22745-1-james.morse@arm.com>
-Message-ID: <alpine.LRH.2.02.1808301422590.17830@file01.intranet.prod.int.rdu2.redhat.com>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Fri, 31 Aug 2018 00:01:11 +0530
+Subject: [PATCH 00/15] soc: octeontx2: Add RVU admin function driver
+In-Reply-To: <20180830132658.GA27566@lunn.ch>
+References: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
+ <CAK8P3a1xC6XjwDAmocpE5TZO7j6uVGtvBtWLPVcYwKqN6Z+seQ@mail.gmail.com>
+ <CA+sq2Cd3R0V5hcaF+ESfkOEBHgBwOB6b8Uwx7K+CeUN6gLFTOg@mail.gmail.com>
+ <CA+sq2CfbpQKas7TbQfrcw=Drpb7yO_gqH31iXabjNEQEG4xYrQ@mail.gmail.com>
+ <20180830132658.GA27566@lunn.ch>
+Message-ID: <CA+sq2CfX+BGE1Ub0H9G21Vqg+vmQSukZj4gwz=B8wsqTLgE7mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Aug 30, 2018 at 6:57 PM Andrew Lunn <andrew@lunn.ch> wrote:
+>
+> > > > My feeling overall is that we need a review from the network driver
+> > > > folks more than the arm-soc team etc, and that maybe the driver
+> > > > as a whole should go into drivers/net/ethernet.
+> > >
+> > > This driver doesn't handle any network IO and moreever this driver has to handle
+> > > configuration requests from crypto driver as well. There will be
+> > > separate network and
+> > > crypto drivers which will be upstreamed into drivers/net/ethernet and
+> > > drivers/crypto.
+> > > And in future silicons there will be different types of functional
+> > > blocks which will be
+> > > added into this resource virtualization unit (RVU). Hence i thought
+> > > this driver is not a
+> > > right fit in drivers/net/ethernet.
+>
+> Hi Sunil
+>
+> Do you have a git branch for everything? I would like to look at the
+> actual Ethernet driver, and the full API this driver exports to other
+> drivers.
+
+Hi Andrew,
+
+I have pushed all patches into a github repo for your reference.
+These are not the final patches, i still need to do some minor changes
+before submitting
+(i mean otherthan the ones i already submitted).
+
+AF driver & CGX drivers:
+https://github.com/sunilkovvuri/rvu_drivers/tree/master/drivers/soc/marvell/octeontx2
+
+Ethernet drivers PF and VF
+https://github.com/sunilkovvuri/rvu_drivers/tree/master/drivers/net/ethernet/marvell/octeontx2
+
+Info exported/shared by AF driver with other drivers is
+# Mailbox communication APIs, message IDs, message structs e.t.c
+   https://github.com/sunilkovvuri/rvu_drivers/blob/master/drivers/soc/marvell/octeontx2/mbox.c
+   https://github.com/sunilkovvuri/rvu_drivers/blob/master/drivers/soc/marvell/octeontx2/mbox.h
+# Other structs and APIs
+    https://github.com/sunilkovvuri/rvu_drivers/blob/master/drivers/soc/marvell/octeontx2/common.h
+    https://github.com/sunilkovvuri/rvu_drivers/blob/master/drivers/soc/marvell/octeontx2/rvu_struct.h
+
+>
+> I think there real question here is, do you have split between this
+> driver and the actual device drivers in the right place? For me, link
+> up/down detection should be in the Ethernet driver, since it is not
+> shared with the crypto driver.
+>
+
+As mentioned in the patch '[PATCH 13/15] soc: octeontx2: Add support
+for CGX link management',
+link up/down is detected by firmware. And firmware triggers a IRQ to
+CGX driver, which then
+takes the new status and sends a update to ethernet driver via a
+mailbox communication.
+
+Ethernet driver detects the link change and does the necessary stuff.
+https://github.com/sunilkovvuri/rvu_drivers/blob/master/drivers/net/ethernet/marvell/octeontx2/otx2_pf.c#L116
 
 
-On Thu, 30 Aug 2018, James Morse wrote:
-
-> Commit 6d526ee26ccd ("arm64: mm: enable CONFIG_HOLES_IN_ZONE for NUMA")
-> only enabled HOLES_IN_ZONE for NUMA systems because the NUMA code was
-> choking on the missing zone for nomap pages. This problem doesn't just
-> apply to NUMA systems.
-> 
-> If the architecture doesn't set HAVE_ARCH_PFN_VALID, pfn_valid() will
-> return true if the pfn is part of a valid sparsemem section.
-> 
-> When working with multiple pages, the mm code uses pfn_valid_within()
-> to test each page it uses within the sparsemem section is valid. On
-> most systems memory comes in MAX_ORDER_NR_PAGES chunks which all
-> have valid/initialised struct pages. In this case pfn_valid_within()
-> is optimised out.
-> 
-> Systems where this isn't true (e.g. due to nomap) should set
-> HOLES_IN_ZONE and provide HAVE_ARCH_PFN_VALID so that mm tests each
-> page as it works with it.
-> 
-> Currently non-NUMA arm64 systems can't enable HOLES_IN_ZONE, leading to
-> VM_BUG_ON():
-> | page:fffffdff802e1780 is uninitialized and poisoned
-> | raw: ffffffffffffffff ffffffffffffffff ffffffffffffffff ffffffffffffffff
-> | raw: ffffffffffffffff ffffffffffffffff ffffffffffffffff ffffffffffffffff
-> | page dumped because: VM_BUG_ON_PAGE(PagePoisoned(p))
-> | ------------[ cut here ]------------
-> | kernel BUG at include/linux/mm.h:978!
-> | Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
-> [...]
-> | CPU: 1 PID: 25236 Comm: dd Not tainted 4.18.0 #7
-> | Hardware name: QEMU KVM Virtual Machine, BIOS 0.0.0 02/06/2015
-> | pstate: 40000085 (nZcv daIf -PAN -UAO)
-> | pc : move_freepages_block+0x144/0x248
-> | lr : move_freepages_block+0x144/0x248
-> | sp : fffffe0071177680
-> [...]
-> | Process dd (pid: 25236, stack limit = 0x0000000094cc07fb)
-> | Call trace:
-> |  move_freepages_block+0x144/0x248
-> |  steal_suitable_fallback+0x100/0x16c
-> |  get_page_from_freelist+0x440/0xb20
-> |  __alloc_pages_nodemask+0xe8/0x838
-> |  new_slab+0xd4/0x418
-> |  ___slab_alloc.constprop.27+0x380/0x4a8
-> |  __slab_alloc.isra.21.constprop.26+0x24/0x34
-> |  kmem_cache_alloc+0xa8/0x180
-> |  alloc_buffer_head+0x1c/0x90
-> |  alloc_page_buffers+0x68/0xb0
-> |  create_empty_buffers+0x20/0x1ec
-> |  create_page_buffers+0xb0/0xf0
-> |  __block_write_begin_int+0xc4/0x564
-> |  __block_write_begin+0x10/0x18
-> |  block_write_begin+0x48/0xd0
-> |  blkdev_write_begin+0x28/0x30
-> |  generic_perform_write+0x98/0x16c
-> |  __generic_file_write_iter+0x138/0x168
-> |  blkdev_write_iter+0x80/0xf0
-> |  __vfs_write+0xe4/0x10c
-> |  vfs_write+0xb4/0x168
-> |  ksys_write+0x44/0x88
-> |  sys_write+0xc/0x14
-> |  el0_svc_naked+0x30/0x34
-> | Code: aa1303e0 90001a01 91296421 94008902 (d4210000)
-> | ---[ end trace 1601ba47f6e883fe ]---
-> 
-> Remove the NUMA dependency.
-> 
-> Reported-by: Mikulas Patocka <mpatocka@redhat.com>
-> Link: https://www.spinics.net/lists/arm-kernel/msg671851.html
-> Fixes: 6d526ee26ccd ("arm64: mm: enable CONFIG_HOLES_IN_ZONE for NUMA")
-> CC: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Signed-off-by: James Morse <james.morse@arm.com>
-> ---
->  arch/arm64/Kconfig | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 29e75b47becd..1b1a0e95c751 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -763,7 +763,6 @@ config NEED_PER_CPU_EMBED_FIRST_CHUNK
->  
->  config HOLES_IN_ZONE
->  	def_bool y
-> -	depends on NUMA
->  
->  source kernel/Kconfig.hz
->  
-> -- 
-> 2.18.0
-
-I confirm that this patch works.
-
-Tested-by: Mikulas Patocka <mpatocka@redhat.com>
-
-Mikulas
+>        Thanks
+>         Andrew
