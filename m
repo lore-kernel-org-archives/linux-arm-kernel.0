@@ -1,39 +1,35 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Thu, 30 Aug 2018 14:59:39 +0800
-Subject: [PATCH] ARM: dts: imx6sx-sdb: enable gpio buttons as wakeup source
-Message-ID: <1535612379-8793-1-git-send-email-Anson.Huang@nxp.com>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Thu, 30 Aug 2018 09:35:23 +0200
+Subject: [PATCH v5 02/14] dt-bindings/interrupt-controller: fix Marvell ICU
+ length in the example
+In-Reply-To: <20180830073535.10710-1-miquel.raynal@bootlin.com>
+References: <20180830073535.10710-1-miquel.raynal@bootlin.com>
+Message-ID: <20180830073535.10710-3-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables i.MX6SX SDB board's below GPIO buttons
-as wakeup sources:
+ICU size in CP110 is not 0x10 but at least 0x440 bytes long (from the
+specification).
 
-SW4(FUNC1): KEY_VOLUMEUP
-SW5(FUNC2): KEY_VOLUMEDOWN
-
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
 ---
- arch/arm/boot/dts/imx6sx-sdb.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+ .../devicetree/bindings/interrupt-controller/marvell,icu.txt    | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx6sx-sdb.dtsi b/arch/arm/boot/dts/imx6sx-sdb.dtsi
-index f8f3187..53b3408 100644
---- a/arch/arm/boot/dts/imx6sx-sdb.dtsi
-+++ b/arch/arm/boot/dts/imx6sx-sdb.dtsi
-@@ -40,12 +40,14 @@
- 			label = "Volume Up";
- 			gpios = <&gpio1 18 GPIO_ACTIVE_LOW>;
- 			linux,code = <KEY_VOLUMEUP>;
-+			wakeup-source;
- 		};
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
+index aa8bf2ec8905..649b7ec9d9b1 100644
+--- a/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
++++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
+@@ -39,7 +39,7 @@ Example:
  
- 		volume-down {
- 			label = "Volume Down";
- 			gpios = <&gpio1 19 GPIO_ACTIVE_LOW>;
- 			linux,code = <KEY_VOLUMEDOWN>;
-+			wakeup-source;
- 		};
- 	};
- 
+ icu: interrupt-controller at 1e0000 {
+ 	compatible = "marvell,cp110-icu";
+-	reg = <0x1e0000 0x10>;
++	reg = <0x1e0000 0x440>;
+ 	#interrupt-cells = <3>;
+ 	interrupt-controller;
+ 	msi-parent = <&gicp>;
 -- 
-2.7.4
+2.17.1
