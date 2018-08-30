@@ -1,34 +1,58 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Thu, 30 Aug 2018 10:55:17 +0530
-Subject: [PATCH v1] arm64: dts: sdm845: enable tsens thermal zones
-In-Reply-To: <f416d38c-b91f-f58e-8cde-d4ad09a0a726@linaro.org>
-References: <cover.1531899325.git.amit.kucheria@linaro.org>
- <b3c25cedfa3a9b8a4b481e714992afe62b84ca3b.1531899325.git.amit.kucheria@linaro.org>
- <f416d38c-b91f-f58e-8cde-d4ad09a0a726@linaro.org>
-Message-ID: <CAP245DX7tBdOBfB-gZ8+MvdF3bsnNVWys4bjaDf0zObWJV38+Q@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 30 Aug 2018 07:54:52 +0200
+Subject: [PATCH] arm64: defconfig: enable EFI_ARMSTUB_DTB_LOADER
+In-Reply-To: <fb07b89d-d427-5e59-9f17-b12df26284ec@broadcom.com>
+References: <1535563287-24803-1-git-send-email-scott.branden@broadcom.com>
+ <CAOesGMhjcJ1p3QcEYb9fsx3fMXAOsgR2njOq=VKgEbWGwJi36g@mail.gmail.com>
+ <fb07b89d-d427-5e59-9f17-b12df26284ec@broadcom.com>
+Message-ID: <CAKv+Gu-R7eX=aj=O2-gpzmp0K4t0T4s536UiqJZs0WuxRjkYwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 29, 2018 at 3:09 PM Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
+On 29 August 2018 at 20:59, Scott Branden <scott.branden@broadcom.com> wrote:
+> Hi Olof,
 >
-> On 18/07/2018 09:49, Amit Kucheria wrote:
-> > One thermal zone per cpu is defined
 >
-> The thermal zones are very close, especially when the CPUs belong to the
-> same 'cluster'. Very likely the temperature will propagate from one core
-> to another core, so when one core reaches the trip0, there is good
-> chance the other cores will be close and cross the trip0 threshold too.
+> On 18-08-29 11:44 AM, Olof Johansson wrote:
+>>
+>> Hi,
+>>
+>> On Wed, Aug 29, 2018 at 10:21 AM, Scott Branden
+>> <scott.branden@broadcom.com> wrote:
+>>>
+>>> Enable EFI_ARMSTUB_DTB_LOADER to add support for the dtb= command line
+>>> parameter to function with efi loader.
+>>>
+>>> Required to boot on existing bootloaders that do not support devicetree
+>>> provided by the platform or by the bootloader.
+>>>
+>>> Fixes: 3d7ee348aa41 ("efi/libstub/arm: Add opt-in Kconfig option for the
+>>> DTB loader")
+>>> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
+>>
+>> Why did Ard create an option for this if it's just going be turned on
+>> in default configs? Doesn't make sense to me.
+>>
+>> It would help to know what firmware still is crippled and how common
+>> it is, since it's been a few years that this has been a requirement by
+>> now.
+>
+> Broadcom NS2 and Stingray in current development and production need this
+> option in the kernel enabled in order to boot.
 
-Agreed. Once we have all the thermal and cpufreq bits in place, I'd
-like to examine optimisations such as a virtual sensor, using the
-coefficients to add weights, etc.
+And these production systems run mainline kernels in a defconfig configuration?
 
-> Having multiple thermal zones, one per CPU, may trigger an interrupts
-> storm with the passive polling timer delay.
+The simply reality is that the DTB loader has been deprecated for a
+good reason: it was only ever intended as a development hack anyway,
+and if we need to treat the EFI stub provided DTB as a first class
+citizen, there are things we need to fix to make things works as
+expected. For instance, GRUB will put a property in the /chosen node
+for the initramfs which will get dropped if you boot with dtb=.
 
-I'm working on irq support for tsens that should alleviate that.
-
-> Does this board have a cooling device per CPU also ?
-
-As Matthias mentioned, DVFS is per cluster (4 cpus to a cluster).
+Don't be surprised if some future enhancements of the EFI stub code
+depend on !EFI_ARMSTUB_DTB_LOADER. On UEFI systems, DTBs [or ACPI
+tables] are used by the firmware to describe itself and the underlying
+platform to the OS, and the practice of booting with DTB file images
+(taken from the kernel build as well) conflicts with that view. Note
+that GRUB still permits you to load DTBs from files (and supports more
+sources than just the file system the kernel Image was loaded from).
