@@ -1,67 +1,58 @@
-From: megous@megous.com (=?utf-8?Q?Ond=C5=99ej?= Jirman)
-Date: Thu, 30 Aug 2018 18:40:17 +0200
-Subject: [linux-sunxi] [PATCH v3 09/30] iio: adc: Threat A33 as thermal
- sensor and remove non thermal sun4i channel
-In-Reply-To: <20180830154518.29507-10-embed3d@gmail.com>
-References: <20180830154518.29507-1-embed3d@gmail.com>
- <20180830154518.29507-10-embed3d@gmail.com>
-Message-ID: <20180830164017.n7rcxcy2jj4mijpr@core>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 30 Aug 2018 09:40:57 -0700
+Subject: [PATCH] leds: add TI LMU backlight driver
+In-Reply-To: <20180830082219.GA10133@amd>
+References: <20180829212032.GB15786@amd>
+ <20180830082219.GA10133@amd>
+Message-ID: <20180830164057.GV7523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 30, 2018 at 05:44:57PM +0200, Philipp Rossak wrote:
-> We want to use this driver mostly as thermal sensor, that still supports
-> the adc for the older chips, thus we threat the A33 as thermal sensor.
-> We also remove the adc channel without thermal support.
+* Pavel Machek <pavel@ucw.cz> [180830 08:26]:
+> This adds backlight support for the following TI LMU
+> chips: LM3532, LM3631, LM3632, LM3633, LM3695 and LM3697.
+...
+> +struct ti_lmu_bank {
+> +	struct device *dev;
+> +	int bank_id;
+> +	const struct ti_lmu_bl_cfg *cfg;
+> +	struct ti_lmu *lmu;
+> +	const char *label;
+> +	int leds;
+> +	int current_brightness;
+> +	u32 default_brightness;
+> +	u32 ramp_up_msec;
+> +	u32 ramp_down_msec;
+> +
+> +	struct notifier_block nb;
+> +
+> +	struct led_classdev *led;
+> +};
+> +
+> +static int ti_lmu_bl_enable(struct ti_lmu_bank *lmu_bank, bool enable)
+> +{
+> +	struct regmap *regmap = lmu_bank->lmu->regmap;
+> +	unsigned long enable_time = lmu_bank->cfg->reginfo->enable_usec;
+> +	u8 *reg = lmu_bank->cfg->reginfo->enable;
+> +	u8 mask = BIT(lmu_bank->bank_id);
+> +	u8 val = (enable == true) ? mask : 0;
+> +	int ret;
+> +
+> +	if (!reg)
+> +		return -EINVAL;
+> +
+> +	ret = regmap_update_bits(regmap, *reg, mask, val);
+> +	if (ret)
+> +		return ret;
+> +
+> +	if (enable_time > 0)
+> +		usleep_range(enable_time, enable_time + 100);
+> +
+> +	return 0;
+> +}
 
-Threat -> treat (in the title and in the message body too)
+If it's a led driver, should you just s/ti_lmu_bl/ti_lmu_led/g?
 
-> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
-> ---
->  drivers/iio/adc/sun4i-gpadc-iio.c | 19 -------------------
->  1 file changed, 19 deletions(-)
-> 
-> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-> index ab474ce86fb6..658a7e3e3370 100644
-> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
-> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-> @@ -123,23 +123,6 @@ static const struct iio_chan_spec sun4i_gpadc_channels[] = {
->  	},
->  };
->  
-> -static const struct iio_chan_spec sun4i_gpadc_channels_no_temp[] = {
-> -	SUN4I_GPADC_ADC_CHANNEL(0, "adc_chan0"),
-> -	SUN4I_GPADC_ADC_CHANNEL(1, "adc_chan1"),
-> -	SUN4I_GPADC_ADC_CHANNEL(2, "adc_chan2"),
-> -	SUN4I_GPADC_ADC_CHANNEL(3, "adc_chan3"),
-> -};
-> -
-> -static const struct iio_chan_spec sun8i_a33_gpadc_channels[] = {
-> -	{
-> -		.type = IIO_TEMP,
-> -		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |
-> -				      BIT(IIO_CHAN_INFO_SCALE) |
-> -				      BIT(IIO_CHAN_INFO_OFFSET),
-> -		.datasheet_name = "temp_adc",
-> -	},
-> -};
-> -
->  static const struct regmap_config sun4i_gpadc_regmap_config = {
->  	.reg_bits = 32,
->  	.val_bits = 32,
-> @@ -444,8 +427,6 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
->  		return -ENODEV;
->  
->  	info->no_irq = true;
-> -	indio_dev->num_channels = ARRAY_SIZE(sun8i_a33_gpadc_channels);
-> -	indio_dev->channels = sun8i_a33_gpadc_channels;
->  
->  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	base = devm_ioremap_resource(&pdev->dev, mem);
-> -- 
-> 2.11.0
-> 
-> -- 
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+Regards,
+
+Tony
