@@ -1,63 +1,74 @@
-From: Vineet.Gupta1@synopsys.com (Vineet Gupta)
-Date: Thu, 30 Aug 2018 20:31:59 +0000
-Subject: Patch "asm-generic/bitops/lock.h: Rewrite using atomic_fetch_"
- causes kernel crash
-References: <1535567633.4465.23.camel@synopsys.com>
- <C2D7FE5348E1B147BCA15975FBA23075012B090BEA@us01wembx1.internal.synopsys.com>
- <20180830094411.GX24124@hirez.programming.kicks-ass.net>
- <20180830095148.GB5942@arm.com> <1535629996.4465.44.camel@synopsys.com>
- <20180830141713.GN24082@hirez.programming.kicks-ass.net>
- <20180830142354.GB13005@arm.com>
- <20180830142920.GO24082@hirez.programming.kicks-ass.net>
-Message-ID: <C2D7FE5348E1B147BCA15975FBA23075012B090EA4@us01wembx1.internal.synopsys.com>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Thu, 30 Aug 2018 13:32:28 -0700
+Subject: [PATCH 0/7] ARM32/64: DT overlay build support
+In-Reply-To: <183d979a-3849-7199-417f-3572b00dca5b@ti.com>
+References: <1535459532-17211-1-git-send-email-t-kristo@ti.com>
+ <f9562e36-ef04-fb14-74a1-6a67feaa97a8@gmail.com>
+ <183d979a-3849-7199-417f-3572b00dca5b@ti.com>
+Message-ID: <a137359f-f836-c8eb-61b4-9d1d4907ad93@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/30/2018 07:29 AM, Peter Zijlstra wrote:
-> On Thu, Aug 30, 2018 at 03:23:55PM +0100, Will Deacon wrote:
->
->> Yes, that would be worth trying. However, I also just noticed that the
->> fetch-ops (which are now used to implement test_and_set_bit_lock()) seem
->> to be missing the backwards branch in the LL/SC case. Yet another diff
->> below.
+Hi Tero,
+
+(Really adding Mark as a cc: this time.  Last time I added him as
+a bcc: by mistake.)
+
+
+On 08/30/18 10:12, Tero Kristo wrote:
+> On 29/08/18 21:40, Frank Rowand wrote:
+>> + Mark Rutland, just in case he is interested
 >>
->> Will
+>> On 08/28/18 05:32, Tero Kristo wrote:
+>>> Hi,
+>>>
+>>> This series introduces devicetree overlay building support for ARM
+>>> platforms. The .dtbo target is introduced globally, then makefile
+>>> changes for both arm32/64 for supporting the .dtbo target, changes
+>>> to support sub-dir makefile flags, and finally adding the DTC flags
+>>> override for TI platforms, as that is where we want to introduce
+>>> the DT overlay support initially.
+>>>
+>>> The ARM makefile changes for supporting DTS sub-makefiles don't look
+>>> too clean, but that was the only way I could figure out how to
+>>> get it done.
+>>>
+>>> -Tero
+>>>
+>>> -- 
+>>>
 >>
->> --->8
+>> This series does three unrelated things:
+> 
+> Well, I was kind of trying to show the whole solution here but...
+
+That actually makes sense, and normally I wouldn't have asked for the
+split.  It might be the case that I am being too cautious, and maybe
+there won't be much discussion at all.  I was just concerned that in
+this case some of the concepts might get overlooked due to discussion
+of other concepts.  I'm also expecting different people to care
+about each of the concepts.
+
+> 
+>> (1) create a ti specific dts subdirectory arch/arm/boot/dts/ti/
 >>
->> diff --git a/arch/arc/include/asm/atomic.h b/arch/arc/include/asm/atomic.h
->> index 4e0072730241..f06c5ed672b3 100644
->> --- a/arch/arc/include/asm/atomic.h
->> +++ b/arch/arc/include/asm/atomic.h
->> @@ -84,7 +84,7 @@ static inline int atomic_fetch_##op(int i, atomic_t *v)			\
->>  	"1:	llock   %[orig], [%[ctr]]		\n"		\
->>  	"	" #asm_op " %[val], %[orig], %[i]	\n"		\
->>  	"	scond   %[val], [%[ctr]]		\n"		\
->> -	"						\n"		\
->> +	"	bnz	1b				\n"		\
->>  	: [val]	"=&r"	(val),						\
->>  	  [orig] "=&r" (orig)						\
->>  	: [ctr]	"r"	(&v->counter),					\
-> ACK!! sorry about that, no idea how I messed that up.
->
-> Also, once it all works, they should look at switching to _relaxed
-> atomics for LL/SC.
+>> (2) create a rule for creating a .dtbo from a .dtso
+>>
+>> (3) add a dtc compile flag to add phandle symbol information to
+>> ???? all .dtb files created from arch/arm/boot/dts/ti/ and
+>> ???? arch/arm64/boot/dts/ti/
+>>
+>> Please split the patches into three independent series so that
+>> each of the three concepts can be discussed separately. 
+> 
+> Ok will do that, hopefully tomorrow. Didn't manage to squeeze in time to do it today.
 
-Indeed this is the mother of all issues, I tried and system is clearly hosed with
-and works after.
-What's amazing is the commit 4aef66c8ae9 which introduced it is from 2016 ;-)
-Back then we had a retry branch with backoff stuff which I'd reverted for new
-cores and the merge conflict somehow missed it.
+Thanks, I appreciate your flexibility.
 
-@PeterZ I'll create a patch with you as author ? do I need any formal sign offs,
-acks etc ?
+-Frank
 
-So after this there are 2 other things to be addresses / looked at still while we
-are still here.
-
-1. After 84c6591103db __clear_bit_lock() implementation will be broken (or atleast
-not consistent with what we had after), do we need to reinstate it.
-2. Will's proposed change to remove the underlying issue, but the issue in #1
-remains ?
-
--Vineet
+> 
+> -Tero
+> -- 
+> Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+> 
