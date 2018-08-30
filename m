@@ -1,29 +1,49 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 30 Aug 2018 16:17:59 +0200
-Subject: [PATCH v2 2/2] arm64: renesas: Remove the ARCH_SHMOBILE Kconfig
- symbol
-In-Reply-To: <20180828151011.14065-3-geert+renesas@glider.be>
-References: <20180828151011.14065-1-geert+renesas@glider.be>
- <20180828151011.14065-3-geert+renesas@glider.be>
-Message-ID: <20180830141758.2eo2fijrdn2pbovy@verge.net.au>
+From: wufan@codeaurora.org (wufan)
+Date: Thu, 30 Aug 2018 08:20:32 -0600
+Subject: [PATCH] EDAC, ghes: use CPER module handles to locate DIMMs
+In-Reply-To: <20180830104307.GC20005@nazgul.tnic>
+References: <1535567632-18089-1-git-send-email-wufan@codeaurora.org>
+ <20180830104307.GC20005@nazgul.tnic>
+Message-ID: <000901d4406c$9d04f360$d70eda20$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2018 at 05:10:11PM +0200, Geert Uytterhoeven wrote:
-> The Kconfig symbol for Renesas 64-bit ARM SoCs has always been
-> ARCH_RENESAS, with ARCH_SHMOBILE being selected to reuse drivers shared
-> with Renesas 32-bit ARM and/or Renesas SuperH SH-Mobile SoCs.
+Hi Boris, 
+ 
+> If we're going to do this, it needs to be tested on an x86 box which loads
+> ghes_edac. Adding Toshi to Cc.
 > 
-> Commit 9b5ba0df4ea4f940 ("ARM: shmobile: Introduce ARCH_RENESAS")
-> started the conversion from ARCH_SHMOBILE to ARCH_RENESAS for Renesas
-> 32-bit SoCs.  Now all drivers for Renesas ARM SoCs have gained proper
-> ARCH_RENESAS platform dependencies, there is no longer a need to select
-> ARCH_SHMOBILE.
-> 
-> With ARCH_SHMOBILE gone, move the ARCH_RENESAS section up, to restore
-> alphabetical sort order.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Otherwise it must remain ARM-specific.
 
-Thanks Geert, applied for v4.20.
+Toshi it would be great if you can help! I'll also test the change in x86 but
+not sure if the firmware updates module_handle.
+
+> > +static int ghes_edac_dimm_index(u16 handle)
+> 
+> get_dimm_smbios_handle()
+
+This function returns an index. So how about get_dimm_smbios_index()?
+
+> > +{
+> > +	struct mem_ctl_info *mci;
+> > +	int i;
+> > +
+> > +	if (!ghes_pvt)
+> > +		return -1;
+> 
+> You don't need that test.
+
+Will remove.
+ 
+> > +
+> > +	mci = ghes_pvt->mci;
+> > +
+> > +	if (!mci)
+> > +		return -1;
+> 
+> Ditto.
+
+Will remove
+
+Thanks,
+Fan
