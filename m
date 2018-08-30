@@ -1,228 +1,89 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Thu, 30 Aug 2018 17:45:00 +0200
-Subject: [PATCH v3 12/30] mfd: Remove old mfd driver & Move sun4i-gpadc.h to
- iio/adc/
+Date: Thu, 30 Aug 2018 17:45:02 +0200
+Subject: [PATCH v3 14/30] dt-bindings: update the Allwinner GPADC device tree
+ binding for H3 & A83T
 In-Reply-To: <20180830154518.29507-1-embed3d@gmail.com>
 References: <20180830154518.29507-1-embed3d@gmail.com>
-Message-ID: <20180830154518.29507-13-embed3d@gmail.com>
+Message-ID: <20180830154518.29507-15-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we reworked the sun4i-gpadc iio driver we can now remove the mfd
-driver and move it's header to include/linux/iio/adc.
+Allwinner H3 features a thermal sensor like the one in A33, but has its
+register re-arranged, the clock divider moved to CCU (originally the
+clock divider is in ADC) and added a pair of bus clock and reset.
+
+Allwinner A83T features a thermal sensor similar to the H3, the ths clock,
+the bus clock and the reset was removed from the CCU. The THS in A83T
+has a clock that is directly connected and runs with 24 MHz.
+
+Update the binding document to cover H3 and A83T.
 
 Signed-off-by: Philipp Rossak <embed3d@gmail.com>
 ---
- drivers/iio/adc/sun4i-gpadc-iio.c            |   2 +-
- drivers/mfd/sun4i-gpadc.c                    | 181 ---------------------------
- include/linux/{mfd => iio/adc}/sun4i-gpadc.h |   0
- 3 files changed, 1 insertion(+), 182 deletions(-)
- delete mode 100644 drivers/mfd/sun4i-gpadc.c
- rename include/linux/{mfd => iio/adc}/sun4i-gpadc.h (100%)
+ .../devicetree/bindings/iio/adc/sun4i-gpadc.txt    | 41 ++++++++++++++++++++--
+ 1 file changed, 38 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-index 79b8efdab803..e1fe5e8e9dc0 100644
---- a/drivers/iio/adc/sun4i-gpadc-iio.c
-+++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-@@ -37,7 +37,7 @@
- #include <linux/iio/iio.h>
- #include <linux/iio/driver.h>
- #include <linux/iio/machine.h>
--#include <linux/mfd/sun4i-gpadc.h>
-+#include <linux/iio/adc/sun4i-gpadc.h>
+diff --git a/Documentation/devicetree/bindings/iio/adc/sun4i-gpadc.txt b/Documentation/devicetree/bindings/iio/adc/sun4i-gpadc.txt
+index a7ef9dd21f04..9116ad308cf1 100644
+--- a/Documentation/devicetree/bindings/iio/adc/sun4i-gpadc.txt
++++ b/Documentation/devicetree/bindings/iio/adc/sun4i-gpadc.txt
+@@ -4,12 +4,35 @@ The Allwinner SoCs all have an ADC that can also act as a thermal sensor
+ and sometimes as a touchscreen controller.
  
- static unsigned int sun4i_gpadc_chan_select(unsigned int chan)
- {
-diff --git a/drivers/mfd/sun4i-gpadc.c b/drivers/mfd/sun4i-gpadc.c
-deleted file mode 100644
-index 9cfc88134d03..000000000000
---- a/drivers/mfd/sun4i-gpadc.c
-+++ /dev/null
-@@ -1,181 +0,0 @@
--/* ADC MFD core driver for sunxi platforms
-- *
-- * Copyright (c) 2016 Quentin Schulz <quentin.schulz@free-electrons.com>
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License version 2 as published by
-- * the Free Software Foundation.
-- */
--
--#include <linux/interrupt.h>
--#include <linux/kernel.h>
--#include <linux/mfd/core.h>
--#include <linux/module.h>
--#include <linux/of_device.h>
--#include <linux/of_irq.h>
--#include <linux/regmap.h>
--
--#include <linux/mfd/sun4i-gpadc.h>
--
--#define ARCH_SUN4I_A10 0
--#define ARCH_SUN5I_A13 1
--#define ARCH_SUN6I_A31 2
--
--static struct resource adc_resources[] = {
--	DEFINE_RES_IRQ_NAMED(SUN4I_GPADC_IRQ_FIFO_DATA, "FIFO_DATA_PENDING"),
--	DEFINE_RES_IRQ_NAMED(SUN4I_GPADC_IRQ_TEMP_DATA, "TEMP_DATA_PENDING"),
--};
--
--static const struct regmap_irq sun4i_gpadc_regmap_irq[] = {
--	REGMAP_IRQ_REG(SUN4I_GPADC_IRQ_FIFO_DATA, 0,
--		       SUN4I_GPADC_INT_FIFOC_TP_DATA_IRQ_EN),
--	REGMAP_IRQ_REG(SUN4I_GPADC_IRQ_TEMP_DATA, 0,
--		       SUN4I_GPADC_INT_FIFOC_TEMP_IRQ_EN),
--};
--
--static const struct regmap_irq_chip sun4i_gpadc_regmap_irq_chip = {
--	.name = "sun4i_gpadc_irq_chip",
--	.status_base = SUN4I_GPADC_INT_FIFOS,
--	.ack_base = SUN4I_GPADC_INT_FIFOS,
--	.mask_base = SUN4I_GPADC_INT_FIFOC,
--	.init_ack_masked = true,
--	.mask_invert = true,
--	.irqs = sun4i_gpadc_regmap_irq,
--	.num_irqs = ARRAY_SIZE(sun4i_gpadc_regmap_irq),
--	.num_regs = 1,
--};
--
--static struct mfd_cell sun4i_gpadc_cells[] = {
--	{
--		.name	= "sun4i-a10-gpadc-iio",
--		.resources = adc_resources,
--		.num_resources = ARRAY_SIZE(adc_resources),
--	},
--	{ .name = "iio_hwmon" }
--};
--
--static struct mfd_cell sun5i_gpadc_cells[] = {
--	{
--		.name	= "sun5i-a13-gpadc-iio",
--		.resources = adc_resources,
--		.num_resources = ARRAY_SIZE(adc_resources),
--	},
--	{ .name = "iio_hwmon" },
--};
--
--static struct mfd_cell sun6i_gpadc_cells[] = {
--	{
--		.name	= "sun6i-a31-gpadc-iio",
--		.resources = adc_resources,
--		.num_resources = ARRAY_SIZE(adc_resources),
--	},
--	{ .name = "iio_hwmon" },
--};
--
--static const struct regmap_config sun4i_gpadc_regmap_config = {
--	.reg_bits = 32,
--	.val_bits = 32,
--	.reg_stride = 4,
--	.fast_io = true,
--};
--
--static const struct of_device_id sun4i_gpadc_of_match[] = {
--	{
--		.compatible = "allwinner,sun4i-a10-ts",
--		.data = (void *)ARCH_SUN4I_A10,
--	}, {
--		.compatible = "allwinner,sun5i-a13-ts",
--		.data = (void *)ARCH_SUN5I_A13,
--	}, {
--		.compatible = "allwinner,sun6i-a31-ts",
--		.data = (void *)ARCH_SUN6I_A31,
--	}, { /* sentinel */ }
--};
--
--MODULE_DEVICE_TABLE(of, sun4i_gpadc_of_match);
--
--static int sun4i_gpadc_probe(struct platform_device *pdev)
--{
--	struct sun4i_gpadc_dev *dev;
--	struct resource *mem;
--	const struct of_device_id *of_id;
--	const struct mfd_cell *cells;
--	unsigned int irq, size;
--	int ret;
--
--	of_id = of_match_node(sun4i_gpadc_of_match, pdev->dev.of_node);
--	if (!of_id)
--		return -EINVAL;
--
--	switch ((long)of_id->data) {
--	case ARCH_SUN4I_A10:
--		cells = sun4i_gpadc_cells;
--		size = ARRAY_SIZE(sun4i_gpadc_cells);
--		break;
--	case ARCH_SUN5I_A13:
--		cells = sun5i_gpadc_cells;
--		size = ARRAY_SIZE(sun5i_gpadc_cells);
--		break;
--	case ARCH_SUN6I_A31:
--		cells = sun6i_gpadc_cells;
--		size = ARRAY_SIZE(sun6i_gpadc_cells);
--		break;
--	default:
--		return -EINVAL;
--	}
--
--	dev = devm_kzalloc(&pdev->dev, sizeof(*dev), GFP_KERNEL);
--	if (!dev)
--		return -ENOMEM;
--
--	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	dev->base = devm_ioremap_resource(&pdev->dev, mem);
--	if (IS_ERR(dev->base))
--		return PTR_ERR(dev->base);
--
--	dev->dev = &pdev->dev;
--	dev_set_drvdata(dev->dev, dev);
--
--	dev->regmap = devm_regmap_init_mmio(dev->dev, dev->base,
--					    &sun4i_gpadc_regmap_config);
--	if (IS_ERR(dev->regmap)) {
--		ret = PTR_ERR(dev->regmap);
--		dev_err(&pdev->dev, "failed to init regmap: %d\n", ret);
--		return ret;
--	}
--
--	/* Disable all interrupts */
--	regmap_write(dev->regmap, SUN4I_GPADC_INT_FIFOC, 0);
--
--	irq = platform_get_irq(pdev, 0);
--	ret = devm_regmap_add_irq_chip(&pdev->dev, dev->regmap, irq,
--				       IRQF_ONESHOT, 0,
--				       &sun4i_gpadc_regmap_irq_chip,
--				       &dev->regmap_irqc);
--	if (ret) {
--		dev_err(&pdev->dev, "failed to add irq chip: %d\n", ret);
--		return ret;
--	}
--
--	ret = devm_mfd_add_devices(dev->dev, 0, cells, size, NULL, 0, NULL);
--	if (ret) {
--		dev_err(&pdev->dev, "failed to add MFD devices: %d\n", ret);
--		return ret;
--	}
--
--	return 0;
--}
--
--static struct platform_driver sun4i_gpadc_driver = {
--	.driver = {
--		.name = "sun4i-gpadc",
--		.of_match_table = of_match_ptr(sun4i_gpadc_of_match),
--	},
--	.probe = sun4i_gpadc_probe,
--};
--
--module_platform_driver(sun4i_gpadc_driver);
--
--MODULE_DESCRIPTION("Allwinner sunxi platforms' GPADC MFD core driver");
--MODULE_AUTHOR("Quentin Schulz <quentin.schulz@free-electrons.com>");
--MODULE_LICENSE("GPL v2");
-diff --git a/include/linux/mfd/sun4i-gpadc.h b/include/linux/iio/adc/sun4i-gpadc.h
-similarity index 100%
-rename from include/linux/mfd/sun4i-gpadc.h
-rename to include/linux/iio/adc/sun4i-gpadc.h
+ Required properties:
+-  - compatible: "allwinner,sun8i-a33-ths",
++  - compatible: must contain one of the following compatibles:
++		- "allwinner,sun8i-a33-ths"
++		- "allwinner,sun8i-h3-ths"
++		- "allwinner,sun8i-a83t-ths"
+   - reg: mmio address range of the chip,
+-  - #thermal-sensor-cells: shall be 0,
++  - #thermal-sensor-cells:
++		Please refer <devicetree/bindings/thermal/thermal.txt>,
+   - #io-channel-cells: shall be 0,
+ 
+-Example:
++Required properties for the following compatibles:
++		- "allwinner,sun8i-h3-ths"
++		- "allwinner,sun8i-a83t-ths"
++  - interrupts: the sampling interrupt of the ADC,
++
++Required properties for the following compatibles:
++		- "allwinner,sun8i-h3-ths"
++  - clocks: the bus clock and the input clock of the ADC,
++  - clock-names: should be "bus" and "mod",
++  - resets: the bus reset of the ADC,
++
++Optional properties for the following compatibles:
++		- "allwinner,sun8i-h3-ths"
++		- "allwinner,sun8i-a83t-ths"
++  - nvmem-cells: A phandle to the calibration data provided by a nvmem device.
++  - nvmem-cell-names: Should be "calibration".
++
++Details see: bindings/nvmem/nvmem.txt
++
++Example for A33:
+ 	ths: ths at 1c25000 {
+ 		compatible = "allwinner,sun8i-a33-ths";
+ 		reg = <0x01c25000 0x100>;
+@@ -17,6 +40,18 @@ Example:
+ 		#io-channel-cells = <0>;
+ 	};
+ 
++Example for H3:
++	ths: thermal-sensor at 1c25000 {
++		compatible = "allwinner,sun8i-h3-ths";
++		reg = <0x01c25000 0x400>;
++		clocks = <&ccu CLK_BUS_THS>, <&ccu CLK_THS>;
++		clock-names = "bus", "mod";
++		resets = <&ccu RST_BUS_THS>;
++		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
++		#thermal-sensor-cells = <0>;
++		#io-channel-cells = <0>;
++	};
++
+ sun4i, sun5i and sun6i SoCs are also supported via these bindings:
+ 
+ Required properties:
 -- 
 2.11.0
