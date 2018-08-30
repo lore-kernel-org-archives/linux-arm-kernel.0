@@ -1,83 +1,45 @@
 From: ezequiel@collabora.com (Ezequiel Garcia)
-Date: Thu, 30 Aug 2018 14:20:30 -0300
-Subject: [RFC 3/3] stk1160: Use non-coherent buffers for USB transfers
-In-Reply-To: <20180830172030.23344-1-ezequiel@collabora.com>
-References: <20180830172030.23344-1-ezequiel@collabora.com>
-Message-ID: <20180830172030.23344-4-ezequiel@collabora.com>
+Date: Thu, 30 Aug 2018 14:20:27 -0300
+Subject: [RFC 0/3] Introduce usb_{alloc,free}_noncoherent API
+Message-ID: <20180830172030.23344-1-ezequiel@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Platforms without hardware coherency can benefit a lot
-from using non-coherent buffers. Moreover, platforms
-with hardware coherency aren't impacted by this change.
+Following the discussion on PWC [1] and UVC [2] drivers, where
+use non-consistent mappings for the URB transfer buffers was
+shown to improve transfer speed significantly, here's a proposal
+for a non-coherent USB helpers.
 
-For instance, on AM335x, while it's still not possible
-to capture full resolution frames, this patch enables
-half-resolution frame streams to work.
+With this pachset, it's possible to get 360x288 raw analog video
+using stk1160 and a AM335x Beaglebone Black board. This isn't
+possible in mainline, for the same reasons Matwey has explained [1].
 
-Signed-off-by: Ezequiel Garcia <ezequiel@collabora.com>
----
- drivers/media/usb/stk1160/stk1160-video.c | 22 ++++++----------------
- 1 file changed, 6 insertions(+), 16 deletions(-)
+First patch is a hack, obviously incomplete, to add support for
+non-consistent mappings on ARM.
 
-diff --git a/drivers/media/usb/stk1160/stk1160-video.c b/drivers/media/usb/stk1160/stk1160-video.c
-index 2811f612820f..aeb4264d1998 100644
---- a/drivers/media/usb/stk1160/stk1160-video.c
-+++ b/drivers/media/usb/stk1160/stk1160-video.c
-@@ -240,6 +240,9 @@ static void stk1160_process_isoc(struct stk1160 *dev, struct urb *urb)
- 		return;
- 	}
- 
-+	dma_sync_single_for_cpu(&urb->dev->dev, urb->transfer_dma,
-+		urb->transfer_buffer_length, DMA_FROM_DEVICE);
-+
- 	for (i = 0; i < urb->number_of_packets; i++) {
- 		status = urb->iso_frame_desc[i].status;
- 		if (status < 0) {
-@@ -379,16 +382,11 @@ void stk1160_free_isoc(struct stk1160 *dev)
- 		urb = dev->isoc_ctl.urb[i];
- 		if (urb) {
- 
--			if (dev->isoc_ctl.transfer_buffer[i]) {
--#ifndef CONFIG_DMA_NONCOHERENT
--				usb_free_coherent(dev->udev,
-+			if (dev->isoc_ctl.transfer_buffer[i])
-+				usb_free_noncoherent(dev->udev,
- 					urb->transfer_buffer_length,
- 					dev->isoc_ctl.transfer_buffer[i],
- 					urb->transfer_dma);
--#else
--				kfree(dev->isoc_ctl.transfer_buffer[i]);
--#endif
--			}
- 			usb_free_urb(urb);
- 			dev->isoc_ctl.urb[i] = NULL;
- 		}
-@@ -461,12 +459,8 @@ int stk1160_alloc_isoc(struct stk1160 *dev)
- 			goto free_i_bufs;
- 		dev->isoc_ctl.urb[i] = urb;
- 
--#ifndef CONFIG_DMA_NONCOHERENT
--		dev->isoc_ctl.transfer_buffer[i] = usb_alloc_coherent(dev->udev,
-+		dev->isoc_ctl.transfer_buffer[i] = usb_alloc_noncoherent(dev->udev,
- 			sb_size, GFP_KERNEL, &urb->transfer_dma);
--#else
--		dev->isoc_ctl.transfer_buffer[i] = kmalloc(sb_size, GFP_KERNEL);
--#endif
- 		if (!dev->isoc_ctl.transfer_buffer[i]) {
- 			stk1160_err("cannot alloc %d bytes for tx[%d] buffer\n",
- 				sb_size, i);
-@@ -490,11 +484,7 @@ int stk1160_alloc_isoc(struct stk1160 *dev)
- 		urb->interval = 1;
- 		urb->start_frame = 0;
- 		urb->number_of_packets = max_packets;
--#ifndef CONFIG_DMA_NONCOHERENT
- 		urb->transfer_flags = URB_ISO_ASAP | URB_NO_TRANSFER_DMA_MAP;
--#else
--		urb->transfer_flags = URB_ISO_ASAP;
--#endif
- 
- 		k = 0;
- 		for (j = 0; j < max_packets; j++) {
+The second patch introduces the usb_{alloc,free}_noncoherent API,
+while the third patch is an example on stk1160.
+
+I'm sending this patchset as RFC, just to get the ball rolling.
+
+[1] https://lkml.org/lkml/2018/8/21/663
+[2] https://lkml.org/lkml/2018/6/27/188
+
+Ezequiel Garcia (3):
+  HACK: ARM: dma-mapping: Get writeback memory for non-consistent
+    mappings
+  USB: core: Add non-coherent buffer allocation helpers
+  stk1160: Use non-coherent buffers for USB transfers
+
+ arch/arm/include/asm/pgtable.h            |  3 ++
+ arch/arm/mm/dma-mapping.c                 |  9 ++--
+ drivers/media/usb/stk1160/stk1160-video.c | 22 +++------
+ drivers/usb/core/buffer.c                 | 29 +++++++-----
+ drivers/usb/core/hcd.c                    |  5 +-
+ drivers/usb/core/usb.c                    | 56 ++++++++++++++++++++++-
+ include/linux/usb.h                       |  5 ++
+ include/linux/usb/hcd.h                   |  4 +-
+ 8 files changed, 97 insertions(+), 36 deletions(-)
+
 -- 
 2.18.0
