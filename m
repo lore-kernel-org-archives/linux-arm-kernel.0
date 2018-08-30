@@ -1,65 +1,43 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Aug 2018 10:22:20 +0100
-Subject: mmotm 2018-08-23-17-26 uploaded
-In-Reply-To: <cf4acbb6-2815-56e2-829c-4e4c3a549e21@gmail.com>
-References: <20180824002731.XMNCl%akpm@linux-foundation.org>
- <049c3fa9-f888-6a2d-413b-872992b269f9@gmail.com>
- <20180829162213.fa1c7c54c801a036e64bacd2@linux-foundation.org>
- <7ae81ca1-46ca-af47-8260-c52736aa4453@gmail.com>
- <cf4acbb6-2815-56e2-829c-4e4c3a549e21@gmail.com>
-Message-ID: <20180830092219.GA5352@arm.com>
+Date: Thu, 30 Aug 2018 10:35:13 +0100
+Subject: Patch "asm-generic/bitops/lock.h: Rewrite using atomic_fetch_"
+ causes kernel crash
+In-Reply-To: <C2D7FE5348E1B147BCA15975FBA23075012B090BEA@us01wembx1.internal.synopsys.com>
+References: <1535567633.4465.23.camel@synopsys.com>
+ <C2D7FE5348E1B147BCA15975FBA23075012B090BEA@us01wembx1.internal.synopsys.com>
+Message-ID: <20180830093513.GA5942@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 30, 2018 at 02:26:51PM +0800, Jia He wrote:
-> On 8/30/2018 9:00 AM, Jia He Wrote:
-> > On 8/30/2018 7:22 AM, Andrew Morton Wrote:
-> >> On Tue, 28 Aug 2018 12:20:46 +0800 Jia He <hejianet@gmail.com> wrote:
-> >>> FYI,I watched a lockdep warning based on your mmotm master branch[1]
-> >>
-> >> Thanks.  We'll need help from ARM peeps on this please.
-> >>
-> >>> [    6.692731] ------------[ cut here ]------------
-> >>> [    6.696391] DEBUG_LOCKS_WARN_ON(!current->hardirqs_enabled)
-
-[...]
-
-> >>> I thought the root cause might be at [2] which seems not in your branch yet.
-> >>>
-> >>> [1] http://git.cmpxchg.org/cgit.cgi/linux-mmotm.git
-> >>> [2]
-> >>> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit?id=efd112
-> >>
-> >> I agree, that doesn't look like the culprit.  But something may well
-> >> have gone wrong in "the recent conversion of the syscall entry/exit
-> >> code to C".
-> > Sorry for my unclearly previously description.
-> > 1. no such lockdep warning in latest mainline kernel git tree.
-> > 2. there is a 100% producible warning based on your latest mmotm tree
-> > 3. after applying the commit efd112 based on your mmotm tree, the warning
-> > disappearred
-> > 
-> > I will do some further digging to answer your question if no other experts' help
-> > 
-> 1. in el0_svc->el0_svc_common, without commit efd112
-> 		local_daif_mask();   //disable the irq and trace irq off
-> 		flags = current_thread_info()->flags;
-> 		if (!has_syscall_work(flags))
-> 			------------    //1
-> 			return;
-> If el0_svc_common enters the logic at line 1, the irq is disabled and
-> current->hardirqs_enabled is 0.
+On Wed, Aug 29, 2018 at 09:16:43PM +0000, Vineet Gupta wrote:
+> On 08/29/2018 11:33 AM, Eugeniy Paltsev wrote:
+> > Hi Guys,
+> > Since v4.19-rc1 we are getting a serious regression on platforms with ARC architecture.
+> > The kernel have become unstable and spontaneously crashes on LTP tests execution / IO tests or
+> > even on boot.
+> >
+> > I don't know exactly what breaks but bisect clearly assign the blame to this commit:
+> > 84c6591103db ("locking/atomics, asm-generic/bitops/lock.h: Rewrite using atomic_fetch_*()")
+> > https://github.com/torvalds/linux/commit/84c6591103dbeaf393a092a3fc7b09510825f6b9
+> >
+> > Reverting the commit solves this problem.
+> >
+> > I tested v4.19-rc1 on ARM (wandboard, i.mx6, 32bit, quard core, ARMv7) which uses same
+> > generic bitops implementation and it works fine.
+> >
+> > Do you have any ideas what went wrong?
 > 
-> 2. then it goes to el0_da
-> in el0_da, it enables the irq without changing current->hardirqs_enabled to 1
+> Back in 2016, Peter had fixed this file due to a problem I reported on ARC. See
+> commit f75d48644c56a ("bitops: Do not default to __clear_bit() for
+> __clear_bit_unlock()")
+> That made __clear_bit_unlock() use the atomic clear_bit() vs. non-atomic
+> __clear_bit(), effectively making clear_bit_unlock() and __clear_bit_unlock() same.
 > 
-> 3. goes to el0_da->do_mem_abort->... the lockdep warning happens
-> 
-> The commit efd112 fixes it by invoking trace_hardirqs_off at line 1.
-> It closes the inconsistency window.
+> This patch undoes that which could explain the issues you see. @Peter, @Will ?
 
-Right, we fixed this last month in commit efd112353bf7 ("arm64: svc: Ensure
-hardirq tracing is updated before return"). Is there anything more you need
-from us on the Arm side?
+/me grabs arc toolchain (incidentally, make.cross fuzzy matches "arc" to
+"sparc", so that was fun for a few minutes).
+
+I'll take a look today, thanks for the report.
 
 Will
