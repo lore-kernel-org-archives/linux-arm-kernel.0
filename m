@@ -1,52 +1,58 @@
-From: baicar.tyler@gmail.com (Tyler Baicar)
-Date: Thu, 30 Aug 2018 12:46:10 -0400
-Subject: [PATCH] EDAC, ghes: use CPER module handles to locate DIMMs
-In-Reply-To: <1ac15a80-6f9a-cf9d-8e79-37d10549a4ca@arm.com>
-References: <1535567632-18089-1-git-send-email-wufan@codeaurora.org>
- <c70fa799-bc9f-64c8-e151-088ca8c3ed3e@arm.com>
- <000f01d4406f$6ce8f160$46bad420$@codeaurora.org>
- <1ac15a80-6f9a-cf9d-8e79-37d10549a4ca@arm.com>
-Message-ID: <CABo9ajDf09BHsq0NOs99NSD6zOV5N-CDvgvQrGi9p_wLjpJ24g@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 30 Aug 2018 18:47:01 +0200
+Subject: assembly syntax
+In-Reply-To: <CAKwvOdkDoTJYSxxXDHoLZ_BdyR_aL9eE28Q=U5SYKXeTadyi9g@mail.gmail.com>
+References: <CAKwvOdkr4UCvxVYLoCamUkYKj5ZszW=zxrwG243-Jk6P_DKUGQ@mail.gmail.com>
+ <CAKv+Gu8ztQ0mhyKJjT4Q2USF6G5VoBco2Ngv=aWz9DqQCEVOiQ@mail.gmail.com>
+ <CAKwvOdkDoTJYSxxXDHoLZ_BdyR_aL9eE28Q=U5SYKXeTadyi9g@mail.gmail.com>
+Message-ID: <CAKv+Gu_0tA5M_bSjTh8Y4gDPLdfygdRbtobPY59OO8Y0w7Y5=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 30, 2018 at 12:32 PM, James Morse <james.morse@arm.com> wrote:
-> Hi Fan,
->
-> On 30/08/18 15:40, wufan wrote:
->>>> @@ -327,12 +349,20 @@ void ghes_edac_report_mem_error(int sev,
->>> struct cper_sec_mem_err *mem_err)
->>>>             p += sprintf(p, "bit_pos:%d ", mem_err->bit_pos);
->>>>     if (mem_err->validation_bits &
->>> CPER_MEM_VALID_MODULE_HANDLE) {
->>>>             const char *bank = NULL, *device = NULL;
->>>> +           int index = -1;
->>>> +
->>>>             dmi_memdev_name(mem_err->mem_dev_handle, &bank,
->>> &device);
->>>
->>>> +           p += sprintf(p, "DIMM DMI handle: 0x%.4x ",
->>>> +                        mem_err->mem_dev_handle);
->>>>             if (bank != NULL && device != NULL)
->>>>                     p += sprintf(p, "DIMM location:%s %s ", bank, device);
->>>> -           else
->>>> -                   p += sprintf(p, "DIMM DMI handle: 0x%.4x ",
->>>> -                                mem_err->mem_dev_handle);
->>>
->>> Why do we now print the handle every time? The handle is pretty
->>> meaningless, it can only be used to find the location-strings, if we get those
->>> we print them instead.
+On 28 August 2018 at 00:44, Nick Desaulniers <ndesaulniers@google.com> wrote:
+> On Mon, Aug 27, 2018 at 3:41 PM Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
 >>
->> For ghes_edac the bank/device is informational, and nothing would go wrong
->> if the bank/device numbers are the same as another entry. But the handle
->> is now critical for DIMM lookup, thus pull it out.
+>> On 28 August 2018 at 00:33, Nick Desaulniers <ndesaulniers@google.com> wrote:
+>> > Hi Ard,
+>> > Trying to file bugs for clang's integrated assembler, I'm hitting a
+>> > syntax error with clang, but I don't understand how the notation is
+>> > supposed to work.
+>> >
+>> > arch/arm64/kernel/reloc_test_syms.S
+>> > 39: movz x0, #:abs_g3:sym64_abs
+>> >
+>> > arch/arm64/include/asm/assembler.h
+>> > 504: movz \reg, :abs_g3:\val
+>> >
+>> > Clang is not happy with :abs_g3:, but I'm not sure how that code is
+>> > supposed to work? Is it supposed to be a prefix for a relocation?
+>> >
+>> > I *think* R_AARCH64_MOVW_UABS_G3 is somehow related, but I'm
+>> > unfamiliar with this syntax.  Your name was on the `git blame` for
+>> > those lines but I still don't understand, even while looking at
+>> > commit 214fad550772 ("arm64: relocation testing module").
+>> >
+>> > Are there docs you can point me at for this?
+>>
+>> As you have guessed, it is used to annotate the instruction with the
+>> correct relocation. You'll have to dig into the binutils sources for
+>> the details, I'm afraid.
 >
-> Is printing the handle to the kernel log critical?
+> Ah, this has everything I need:
+> https://stackoverflow.com/questions/38570495/aarch64-relocation-prefixes
+>
+>>
+>> But if I may ask, what is the point of using Clang's integrated
+>> assembler? Surely, you don't need it for things like CFI and other
+>> Clang goodies?
+>
+> Just trying to improve Clang's assembler.
 >
 
-I don't see why we would need this print. The bank/device
-print is enough to map what is shown in dmesg to an SMBIOS
-entry if that's really needed.
+Ah excellent - that is actually very useful, given that there
+shouldn't be much philosophical debate about asm code that basically
+maps 1:1 to object code, and so any differences between the two should
+be accidental.
 
-Thanks,
-Tyler
+Thanks for taking charge of that.
