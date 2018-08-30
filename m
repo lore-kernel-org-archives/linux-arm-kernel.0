@@ -1,88 +1,97 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Fri, 31 Aug 2018 00:06:51 +0530
-Subject: [PATCH 04/15] soc: octeontx2: Add mailbox support infra
-In-Reply-To: <CAK8P3a1W2D5YWEC-VDkvQ8y3W8257g6X7B8_At7g8f9iE73a8w@mail.gmail.com>
-References: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
- <1535453838-12154-5-git-send-email-sunil.kovvuri@gmail.com>
- <CAK8P3a2fgAVB0+uns9f5MH+2OyZbwvReo9j-=u3=30QoK=2Ksw@mail.gmail.com>
- <CA+sq2CeyQ8r7bj3vK=cfriif=HhUu36ZUPWqxXm1e0DktHG+Fg@mail.gmail.com>
- <CAK8P3a1CvX1V8h20s_=XUUYfR-zYNwETg5p6dCtpVUqZ89K-tg@mail.gmail.com>
- <CA+sq2Cdn6ut3kdTWoOgCayO2evQrD9TjBaUpVUR3_rWZFxYeig@mail.gmail.com>
- <CAK8P3a1W2D5YWEC-VDkvQ8y3W8257g6X7B8_At7g8f9iE73a8w@mail.gmail.com>
-Message-ID: <CA+sq2CfjJjswOwypNMtro+g8TeHGoBqAeKpFrf2ys-1=Xg+qHw@mail.gmail.com>
+From: wufan@codeaurora.org (Fan Wu)
+Date: Thu, 30 Aug 2018 18:37:46 +0000
+Subject: [PATCH v2] EDAC, ghes: use CPER module handles to locate DIMMs
+Message-ID: <1535654266-40053-1-git-send-email-wufan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 30, 2018 at 7:27 PM Arnd Bergmann <arnd@arndb.de> wrote:
->
-> On Tue, Aug 28, 2018 at 3:23 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
-> >
-> > On Tue, Aug 28, 2018 at 6:22 PM Arnd Bergmann <arnd@arndb.de> wrote:
-> > >
-> > > On Tue, Aug 28, 2018 at 2:48 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
-> > > >
-> > > > On Tue, Aug 28, 2018 at 5:33 PM Arnd Bergmann <arnd@arndb.de> wrote:
-> > > > >
-> > > > > On Tue, Aug 28, 2018 at 12:57 PM <sunil.kovvuri@gmail.com> wrote:
-> > > > > >
-> > > > > > From: Aleksey Makarov <amakarov@marvell.com>
-> > > > > >
-> > > > > > This patch adds mailbox support infrastructure APIs.
-> > > > > > Each RVU device has a dedicated 64KB mailbox region
-> > > > > > shared with it's peer for communication. RVU AF has
-> > > > > > a separate mailbox region shared with each of RVU PFs
-> > > > > > and a RVU PF has a separate region shared with each of
-> > > > > > it's VF.
-> > > > > >
-> > > > > > These set of APIs are used by this driver (RVU AF) and
-> > > > > > other RVU PF/VF drivers eg netdev, crypto e.t.c.
-> > > > > >
-> > > > > > Signed-off-by: Aleksey Makarov <amakarov@marvell.com>
-> > > > > > Signed-off-by: Sunil Goutham <sgoutham@marvell.com>
-> > > > > > Signed-off-by: Lukasz Bartosik <lbartosik@marvell.com>
-> > > > >
-> > > > > Why does this driver not use the drivers/mailbox/ infrastructure?
-> > > > >
-> > > > This is a common administrative software driver which will be handling requests
-> > > > from kernel drivers and as well as drivers in userspace applications.
-> > > > We had to keep mailbox communication infrastructure same across all usages.
-> > >
-> > > Can you explain more about the usage of userspace applications
-> > > and what interface you plan to use into the kernel?
-> >
-> > Any PCI device here irrespective in what domain (kernel or userspace)
-> > they are in
-> > use common mailbox communication. Which is
-> > # Write a mailbox msg (format is agreed between all parties) into
-> > shared (between AF and other PF/VFs)
-> >    memory region and trigger a interrupt to admin function.
-> > # Admin function processes the msg and puts reply in the same memory
-> > region and trigger
-> >    IRQ to the requesting device. If the device has a driver instance
-> > in kernel then it uses
-> >    IRQ and userspace applications does polling on the IRQ status bit.
->
-> Ok, so the mailbox here is a communication mechanism between
-> two device drivers that may run on the same kernel, or in different
-> instances (user space, virtual machine, ...), but each driver
-> only talks to the mailbox visible in its own device, right?
+For platforms whose firmwares provide valid module handles
+(SMBIOS type 17) in error records, this patch uses the module
+handles to locate corresponding DIMMs and enables per-DIMM
+error counter update.
 
-Yes.
+Signed-off-by: Fan Wu <wufan@codeaurora.org>
+---
 
->
-> What is the purpose of the exported interface then? Is this
-> just an abstraction so each of the drivers can talk to its own
-> mailbox using a set of common helper functions?
->
->       Arnd
+Changes from v1:
+*  Changed the new function name to get_dimm_smbios_index
+*  Removed unnecessary checks inside get_dimm_smbios_index
+*  Reverted the change of the DMI handle print
+*  Updated commit message
 
-Yes, that's correct.
+---
+ drivers/edac/ghes_edac.c | 25 +++++++++++++++++++++++++
+ include/linux/edac.h     |  2 ++
+ 2 files changed, 27 insertions(+)
 
-In kernel there will be a minimum of 3 drivers which will use this
-mailbox communication.
-So instead of duplicating APIs and structures in every driver, we
-thought of adding them
-in this AF driver and export them to ethernet and crypto drivers.
-
-Thanks,
-Sunil.
+diff --git a/drivers/edac/ghes_edac.c b/drivers/edac/ghes_edac.c
+index 473aeec..949f603 100644
+--- a/drivers/edac/ghes_edac.c
++++ b/drivers/edac/ghes_edac.c
+@@ -81,6 +81,20 @@ static void ghes_edac_count_dimms(const struct dmi_header *dh, void *arg)
+ 		(*num_dimm)++;
+ }
+ 
++static int get_dimm_smbios_index(u16 handle)
++{
++	struct mem_ctl_info *mci;
++	int i;
++
++	mci = ghes_pvt->mci;
++
++	for (i = 0; i < mci->tot_dimms; i++) {
++		if (mci->dimms[i]->smbios_handle == handle)
++			return i;
++	}
++	return -1;
++}
++
+ static void ghes_edac_dmidecode(const struct dmi_header *dh, void *arg)
+ {
+ 	struct ghes_edac_dimm_fill *dimm_fill = arg;
+@@ -177,6 +191,8 @@ static void ghes_edac_dmidecode(const struct dmi_header *dh, void *arg)
+ 				entry->total_width, entry->data_width);
+ 		}
+ 
++		dimm->smbios_handle = entry->handle;
++
+ 		dimm_fill->count++;
+ 	}
+ }
+@@ -327,12 +343,21 @@ void ghes_edac_report_mem_error(int sev, struct cper_sec_mem_err *mem_err)
+ 		p += sprintf(p, "bit_pos:%d ", mem_err->bit_pos);
+ 	if (mem_err->validation_bits & CPER_MEM_VALID_MODULE_HANDLE) {
+ 		const char *bank = NULL, *device = NULL;
++		int index = -1;
++
+ 		dmi_memdev_name(mem_err->mem_dev_handle, &bank, &device);
+ 		if (bank != NULL && device != NULL)
+ 			p += sprintf(p, "DIMM location:%s %s ", bank, device);
+ 		else
+ 			p += sprintf(p, "DIMM DMI handle: 0x%.4x ",
+ 				     mem_err->mem_dev_handle);
++
++		index = get_dimm_smbios_index(mem_err->mem_dev_handle);
++		if (index >= 0) {
++			e->top_layer = index;
++			e->enable_per_layer_report = true;
++		}
++
+ 	}
+ 	if (p > e->location)
+ 		*(p - 1) = '\0';
+diff --git a/include/linux/edac.h b/include/linux/edac.h
+index bffb978..a45ce1f 100644
+--- a/include/linux/edac.h
++++ b/include/linux/edac.h
+@@ -451,6 +451,8 @@ struct dimm_info {
+ 	u32 nr_pages;			/* number of pages on this dimm */
+ 
+ 	unsigned csrow, cschannel;	/* Points to the old API data */
++
++	u16 smbios_handle;              /* Handle for SMBIOS type 17 */
+ };
+ 
+ /**
+-- 
+2.7.4
