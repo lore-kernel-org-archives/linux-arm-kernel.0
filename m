@@ -1,88 +1,89 @@
 From: claudiu.beznea@microchip.com (Claudiu Beznea)
-Date: Thu, 30 Aug 2018 14:50:07 +0300
-Subject: [PATCH 2/6] power: reset: at91-poweroff: use only one poweroff
- function
+Date: Thu, 30 Aug 2018 14:50:10 +0300
+Subject: [PATCH 5/6] power: reset: at91-poweroff: rename at91_shdwc_base
+ member of struct shdwc
 In-Reply-To: <1535629811-13403-1-git-send-email-claudiu.beznea@microchip.com>
 References: <1535629811-13403-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <1535629811-13403-3-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <1535629811-13403-6-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use only one poweroff function for sama5d2 and adapt it to work for both
-scenarios (having LPDDR or not).
+Rename at91_shdwc_base member of struct shdwc to shdwc_base. There is
+already an "at91" string in at91_shdwc object.
 
 Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
 ---
- drivers/power/reset/at91-sama5d2_shdwc.c | 29 ++++++++---------------------
- 1 file changed, 8 insertions(+), 21 deletions(-)
+ drivers/power/reset/at91-sama5d2_shdwc.c | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/power/reset/at91-sama5d2_shdwc.c b/drivers/power/reset/at91-sama5d2_shdwc.c
-index dd6297bd7b6a..94ad79d0d82e 100644
+index 945b41b4086a..ad6e2796690a 100644
 --- a/drivers/power/reset/at91-sama5d2_shdwc.c
 +++ b/drivers/power/reset/at91-sama5d2_shdwc.c
-@@ -110,18 +110,6 @@ static void __init at91_wakeup_status(struct platform_device *pdev)
+@@ -71,7 +71,7 @@ struct shdwc_config {
+ struct shdwc {
+ 	const struct shdwc_config *cfg;
+ 	struct clk *sclk;
+-	void __iomem *at91_shdwc_base;
++	void __iomem *shdwc_base;
+ 	void __iomem *mpddrc_base;
+ 	void __iomem *pmc_base;
+ };
+@@ -92,7 +92,7 @@ static void __init at91_wakeup_status(struct platform_device *pdev)
+ 	u32 reg;
+ 	char *reason = "unknown";
  
- static void at91_poweroff(void)
- {
--	/* Switch the master clock source to slow clock. */
--	writel(readl(at91_shdwc->pmc_base + AT91_PMC_MCKR) & ~AT91_PMC_CSS,
--	       at91_shdwc->pmc_base + AT91_PMC_MCKR);
--	while (!(readl(at91_shdwc->pmc_base + AT91_PMC_SR) & AT91_PMC_MCKRDY))
--		;
--
--	writel(AT91_SHDW_KEY | AT91_SHDW_SHDW,
--	       at91_shdwc->at91_shdwc_base + AT91_SHDW_CR);
--}
--
--static void at91_lpddr_poweroff(void)
--{
- 	asm volatile(
- 		/* Align to cache lines */
- 		".balign 32\n\t"
-@@ -130,16 +118,18 @@ static void at91_lpddr_poweroff(void)
- 		"	ldr	r6, [%2, #" __stringify(AT91_SHDW_CR) "]\n\t"
+-	reg = readl(shdw->at91_shdwc_base + AT91_SHDW_SR);
++	reg = readl(shdw->shdwc_base + AT91_SHDW_SR);
  
- 		/* Power down SDRAM0 */
-+		"	tst	%0, #0\n\t"
-+		"	beq	1f\n\t"
- 		"	str	%1, [%0, #" __stringify(AT91_DDRSDRC_LPR) "]\n\t"
+ 	dev_dbg(&pdev->dev, "%s: status = %#x\n", __func__, reg);
  
- 		/* Switch the master clock source to slow clock. */
--		"	ldr	r6, [%4, #" __stringify(AT91_PMC_MCKR) "]\n\t"
-+		"1:	ldr	r6, [%4, #" __stringify(AT91_PMC_MCKR) "]\n\t"
- 		"	bic	r6, r6,  #" __stringify(AT91_PMC_CSS) "\n\t"
- 		"	str	r6, [%4, #" __stringify(AT91_PMC_MCKR) "]\n\t"
- 		/* Wait for clock switch. */
--		"1:	ldr	r6, [%4, #" __stringify(AT91_PMC_SR) "]\n\t"
-+		"2:	ldr	r6, [%4, #" __stringify(AT91_PMC_SR) "]\n\t"
- 		"	tst	r6, #"	    __stringify(AT91_PMC_MCKRDY) "\n\t"
--		"	beq	1b\n\t"
-+		"	beq	2b\n\t"
+@@ -138,7 +138,7 @@ static void at91_poweroff(void)
+ 		:
+ 		: "r" (at91_shdwc->mpddrc_base),
+ 		  "r" cpu_to_le32(AT91_DDRSDRC_LPDDR2_PWOFF),
+-		  "r" (at91_shdwc->at91_shdwc_base),
++		  "r" (at91_shdwc->shdwc_base),
+ 		  "r" cpu_to_le32(AT91_SHDW_KEY | AT91_SHDW_SHDW),
+ 		  "r" (at91_shdwc->pmc_base)
+ 		: "r6");
+@@ -222,10 +222,10 @@ static void at91_shdwc_dt_configure(struct platform_device *pdev)
+ 		mode |= SHDW_RTCWKEN(shdw->cfg);
  
- 		/* Shutdown CPU */
- 		"	str	%3, [%2, #" __stringify(AT91_SHDW_CR) "]\n\t"
-@@ -326,10 +316,8 @@ static int __init at91_shdwc_probe(struct platform_device *pdev)
- 	pm_power_off = at91_poweroff;
+ 	dev_dbg(&pdev->dev, "%s: mode = %#x\n", __func__, mode);
+-	writel(mode, shdw->at91_shdwc_base + AT91_SHDW_MR);
++	writel(mode, shdw->shdwc_base + AT91_SHDW_MR);
  
- 	ddr_type = readl(mpddrc_base + AT91_DDRSDRC_MDR) & AT91_DDRSDRC_MD;
--	if ((ddr_type == AT91_DDRSDRC_MD_LPDDR2) ||
--	    (ddr_type == AT91_DDRSDRC_MD_LPDDR3)) {
--		pm_power_off = at91_lpddr_poweroff;
--	} else {
-+	if (ddr_type != AT91_DDRSDRC_MD_LPDDR2 &&
-+	    ddr_type != AT91_DDRSDRC_MD_LPDDR3) {
- 		iounmap(mpddrc_base);
- 		mpddrc_base = NULL;
+ 	input = at91_shdwc_get_wakeup_input(pdev, np);
+-	writel(input, shdw->at91_shdwc_base + AT91_SHDW_WUIR);
++	writel(input, shdw->shdwc_base + AT91_SHDW_WUIR);
+ }
+ 
+ static const struct shdwc_config sama5d2_shdwc_config = {
+@@ -262,10 +262,10 @@ static int __init at91_shdwc_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, at91_shdwc);
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	at91_shdwc->at91_shdwc_base = devm_ioremap_resource(&pdev->dev, res);
+-	if (IS_ERR(at91_shdwc->at91_shdwc_base)) {
++	at91_shdwc->shdwc_base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(at91_shdwc->shdwc_base)) {
+ 		dev_err(&pdev->dev, "Could not map reset controller address\n");
+-		return PTR_ERR(at91_shdwc->at91_shdwc_base);
++		return PTR_ERR(at91_shdwc->shdwc_base);
  	}
-@@ -348,8 +336,7 @@ static int __exit at91_shdwc_remove(struct platform_device *pdev)
- {
- 	struct shdwc *shdw = platform_get_drvdata(pdev);
  
--	if (pm_power_off == at91_poweroff ||
--	    pm_power_off == at91_lpddr_poweroff)
-+	if (pm_power_off == at91_poweroff)
+ 	match = of_match_node(at91_shdwc_of_match, pdev->dev.of_node);
+@@ -341,8 +341,8 @@ static int __exit at91_shdwc_remove(struct platform_device *pdev)
  		pm_power_off = NULL;
  
  	/* Reset values to disable wake-up features  */
+-	writel(0, shdw->at91_shdwc_base + AT91_SHDW_MR);
+-	writel(0, shdw->at91_shdwc_base + AT91_SHDW_WUIR);
++	writel(0, shdw->shdwc_base + AT91_SHDW_MR);
++	writel(0, shdw->shdwc_base + AT91_SHDW_WUIR);
+ 
+ 	if (shdw->mpddrc_base)
+ 		iounmap(shdw->mpddrc_base);
 -- 
 2.7.4
