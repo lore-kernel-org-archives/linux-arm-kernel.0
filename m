@@ -1,44 +1,37 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Thu, 30 Aug 2018 17:44:51 +0200
-Subject: [PATCH v3 03/30] iio: adc: Remove ID table
+Date: Thu, 30 Aug 2018 17:44:56 +0200
+Subject: [PATCH v3 08/30] iio: adc: remove hwmon structure
 In-Reply-To: <20180830154518.29507-1-embed3d@gmail.com>
 References: <20180830154518.29507-1-embed3d@gmail.com>
-Message-ID: <20180830154518.29507-4-embed3d@gmail.com>
+Message-ID: <20180830154518.29507-9-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To disable the driver we are removing the compatibles.
+We remove the hwmon structure that was requiered for the mfd driver.
 
 Signed-off-by: Philipp Rossak <embed3d@gmail.com>
 ---
- drivers/iio/adc/sun4i-gpadc-iio.c | 9 ---------
- 1 file changed, 9 deletions(-)
+ drivers/iio/adc/sun4i-gpadc-iio.c | 8 --------
+ 1 file changed, 8 deletions(-)
 
 diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-index 04d7147e0110..d95dd0fde2a6 100644
+index f787442a9e5f..ab474ce86fb6 100644
 --- a/drivers/iio/adc/sun4i-gpadc-iio.c
 +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-@@ -698,21 +698,12 @@ static int sun4i_gpadc_remove(struct platform_device *pdev)
- 	return 0;
- }
+@@ -109,14 +109,6 @@ struct sun4i_gpadc_iio {
+ 	struct device			*sensor_device;
+ };
  
--static const struct platform_device_id sun4i_gpadc_id[] = {
--	{ "sun4i-a10-gpadc-iio", (kernel_ulong_t)&sun4i_gpadc_data },
--	{ "sun5i-a13-gpadc-iio", (kernel_ulong_t)&sun5i_gpadc_data },
--	{ "sun6i-a31-gpadc-iio", (kernel_ulong_t)&sun6i_gpadc_data },
+-static struct iio_map sun4i_gpadc_hwmon_maps[] = {
+-	{
+-		.adc_channel_label = "temp_adc",
+-		.consumer_dev_name = "iio_hwmon.0",
+-	},
 -	{ /* sentinel */ },
 -};
--MODULE_DEVICE_TABLE(platform, sun4i_gpadc_id);
 -
- static struct platform_driver sun4i_gpadc_driver = {
- 	.driver = {
- 		.name = "sun4i-gpadc-iio",
- 		.of_match_table = sun4i_gpadc_of_id,
- 		.pm = &sun4i_gpadc_pm_ops,
- 	},
--	.id_table = sun4i_gpadc_id,
- 	.probe = sun4i_gpadc_probe,
- 	.remove = sun4i_gpadc_remove,
- };
+ static const struct iio_chan_spec sun4i_gpadc_channels[] = {
+ 	SUN4I_GPADC_ADC_CHANNEL(0, "adc_chan0"),
+ 	SUN4I_GPADC_ADC_CHANNEL(1, "adc_chan1"),
 -- 
 2.11.0
