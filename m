@@ -1,485 +1,434 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 30 Aug 2018 19:15:39 +0200
-Subject: [PATCH 6/6] crypto: vf-crc - Add new driver for Freescale Vybrid CRC
+Date: Thu, 30 Aug 2018 19:15:37 +0200
+Subject: [PATCH 4/6] crypto: testmgr - Add CRC16 test tables
 In-Reply-To: <20180830171539.20008-1-krzk@kernel.org>
 References: <20180830171539.20008-1-krzk@kernel.org>
-Message-ID: <20180830171539.20008-7-krzk@kernel.org>
+Message-ID: <20180830171539.20008-5-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add driver for using the Freescale/NXP Vybrid processor CRC block for
-CRC16 and CRC32 offloading.  The driver implements shash_alg and was
-tested using internal testmgr tests and libkcapi.
+Add test tables for CRC16. Use similar input data as for existing CRC32
+test vectors.
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- MAINTAINERS               |   7 +
- drivers/crypto/Kconfig    |  10 ++
- drivers/crypto/Makefile   |   1 +
- drivers/crypto/vf-crc.c   | 387 ++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/crc32poly.h |   7 +
- 5 files changed, 412 insertions(+)
- create mode 100644 drivers/crypto/vf-crc.c
+ crypto/testmgr.c |   6 +
+ crypto/testmgr.h | 386 +++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 392 insertions(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 0a340f680230..e84fa829a4e4 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -15388,6 +15388,13 @@ S:	Maintained
- F:	Documentation/fb/uvesafb.txt
- F:	drivers/video/fbdev/uvesafb.*
- 
-+VF500/VF610 HW CRC DRIVER
-+M:	Krzysztof Kozlowski <krzk@kernel.org>
-+L:	linux-crypto at vger.kernel.org
-+S:	Maintained
-+F:	drivers/crypto/vf-crc.c
-+F:	Documentation/devicetree/bindings/crypto/fsl-vf610-crc.txt
-+
- VF610 NAND DRIVER
- M:	Stefan Agner <stefan@agner.ch>
- L:	linux-mtd at lists.infradead.org
-diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
-index 20314d7a7b58..0ade940ac79c 100644
---- a/drivers/crypto/Kconfig
-+++ b/drivers/crypto/Kconfig
-@@ -418,6 +418,16 @@ config CRYPTO_DEV_MXS_DCP
- 	  To compile this driver as a module, choose M here: the module
- 	  will be called mxs-dcp.
- 
-+config CRYPTO_DEV_VF_CRC
-+	tristate "Support for Freescale/NXP Vybrid CRC HW accelerator"
-+	select CRYPTO_HASH
-+	help
-+	  This option enables support for the CRC16/32 hardware accelerator
-+	  on Freescale/NXP Vybrid VF500/VF610 SoCs.
-+
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called vf-crc.
-+
- config CRYPTO_DEV_EXYNOS_RNG
- 	tristate "EXYNOS HW pseudo random number generator support"
- 	depends on ARCH_EXYNOS || COMPILE_TEST
-diff --git a/drivers/crypto/Makefile b/drivers/crypto/Makefile
-index c23396f32c8a..418c08bdc19c 100644
---- a/drivers/crypto/Makefile
-+++ b/drivers/crypto/Makefile
-@@ -41,6 +41,7 @@ obj-$(CONFIG_ARCH_STM32) += stm32/
- obj-$(CONFIG_CRYPTO_DEV_SUN4I_SS) += sunxi-ss/
- obj-$(CONFIG_CRYPTO_DEV_TALITOS) += talitos.o
- obj-$(CONFIG_CRYPTO_DEV_UX500) += ux500/
-+obj-$(CONFIG_CRYPTO_DEV_VF_CRC) += vf-crc.o
- obj-$(CONFIG_CRYPTO_DEV_VIRTIO) += virtio/
- obj-$(CONFIG_CRYPTO_DEV_VMX) += vmx/
- obj-$(CONFIG_CRYPTO_DEV_BCM_SPU) += bcm/
-diff --git a/drivers/crypto/vf-crc.c b/drivers/crypto/vf-crc.c
-new file mode 100644
-index 000000000000..2223b2e0f014
---- /dev/null
-+++ b/drivers/crypto/vf-crc.c
-@@ -0,0 +1,387 @@
-+// SPDX-License-Identifier: GPL-2.0
-+//
-+// Freescale/NXP VF500/VF610 hardware CRC driver
-+//
-+// Copyright (c) 2018 Krzysztof Kozlowski <krzk@kernel.org>
-+
-+#include <linux/bitrev.h>
-+#include <linux/clk.h>
-+#include <linux/crc32poly.h>
-+#include <linux/module.h>
-+#include <linux/mutex.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+
-+#include <crypto/internal/hash.h>
-+
-+#include <asm/unaligned.h>
-+
-+#define DRIVER_NAME             "vf-crc"
-+#define CHKSUM_DIGEST_SIZE	4
-+#define CHKSUM_BLOCK_SIZE       1
-+
-+/* Register offsets */
-+#define CRC_DATA		0x00
-+#define CRC_POLY		0x04
-+#define CRC_CTRL		0x08
-+
-+/* CTRL bit fields */
-+/* Width of CRC (0 - 16 bit, 1 - 32 bit) */
-+#define CRC_CTRL_TCRC		BIT(24)
-+/* Write CRC Data register as Seed (0 - data, 1 - seed) */
-+#define CRC_CTRL_WAS		BIT(25)
-+/* Final XOR on checksum */
-+#define CRC_CTRL_FXOR		BIT(26)
-+
-+#define CRC_INIT_DEFAULT        0x0
-+
-+struct vf_crc {
-+	struct clk		*clk;
-+	struct device		*dev;
-+	void __iomem		*iobase;
-+
-+	/*
-+	 * Request currently processed in HW so consecutive update() and final()
-+	 * will not need to reinit the HW.
-+	 */
-+	struct vf_crc_desc_ctx	*processed_desc;
-+
-+	/* Lock protecting access to HW registers and processed_desc. */
-+	struct mutex		lock;
-+};
-+
-+struct vf_crc_desc_ctx {
-+	struct vf_crc		*crc;
-+	/*
-+	 * Current state of computed CRC (used for re-init on subsequent
-+	 * requests).
-+	 */
-+	u32			state;
-+};
-+
-+struct vf_crc_tfm_ctx {
-+	unsigned int		align;
-+	u32			ctrl_init;
-+	bool			is_16_bit;
-+	u32			key;
-+	u32			poly;
-+};
-+
-+static struct vf_crc *vf_crc_data;
-+
-+static int vf_crc_cra_init32(struct crypto_tfm *tfm)
-+{
-+	struct vf_crc_tfm_ctx *mctx = crypto_tfm_ctx(tfm);
-+
-+	mctx->align = sizeof(u32);
-+	/* 32 bit, no XOR */
-+	mctx->ctrl_init = CRC_CTRL_TCRC;
-+	mctx->is_16_bit = false;
-+	mctx->key = CRC_INIT_DEFAULT;
-+	mctx->poly = CRC32_POLY_BE;
-+
-+	return 0;
-+}
-+
-+static int vf_crc_cra_init16(struct crypto_tfm *tfm)
-+{
-+	struct vf_crc_tfm_ctx *mctx = crypto_tfm_ctx(tfm);
-+
-+	mctx->align = sizeof(u16);
-+	/* 16 bit, no XOR */
-+	mctx->ctrl_init = 0;
-+	mctx->is_16_bit = true;
-+	mctx->key = CRC_INIT_DEFAULT;
-+	mctx->poly = CRC16_POLY_BE;
-+
-+	return 0;
-+}
-+
-+static int vf_crc_setkey(struct crypto_shash *tfm, const u8 *key,
-+			 unsigned int keylen)
-+{
-+	struct vf_crc_tfm_ctx *mctx = crypto_shash_ctx(tfm);
-+
-+	if (keylen != mctx->align) {
-+		crypto_shash_set_flags(tfm, CRYPTO_TFM_RES_BAD_KEY_LEN);
-+		return -EINVAL;
-+	}
-+
-+	if (mctx->is_16_bit)
-+		mctx->key = bitrev16(get_unaligned_le16(key));
-+	else
-+		mctx->key = bitrev32(get_unaligned_le32(key));
-+
-+	return 0;
-+}
-+
-+static int vf_crc_init(struct shash_desc *desc)
-+{
-+	struct vf_crc_desc_ctx *desc_ctx = shash_desc_ctx(desc);
-+	struct vf_crc_tfm_ctx *mctx = crypto_shash_ctx(desc->tfm);
-+
-+	desc_ctx->crc = vf_crc_data;
-+	desc_ctx->state = mctx->key;
-+
-+	return 0;
-+}
-+
-+static void vf_crc_initialize_regs(struct vf_crc_tfm_ctx *mctx,
-+				   struct vf_crc_desc_ctx *desc_ctx)
-+{
-+	struct vf_crc *crc = desc_ctx->crc;
-+
-+	/* Init and write-as-seed (next data write will be the seed) */
-+	writel(mctx->ctrl_init, crc->iobase + CRC_CTRL);
-+	writel(mctx->poly, crc->iobase + CRC_POLY);
-+	writel(mctx->ctrl_init | CRC_CTRL_WAS, crc->iobase + CRC_CTRL);
-+
-+	/* Initialize engine with either key or state from previous rounds */
-+	writel(desc_ctx->state, crc->iobase + CRC_DATA);
-+
-+	/* Clear write-as-seed */
-+	writel(mctx->ctrl_init, crc->iobase + CRC_CTRL);
-+}
-+
-+static void vf_crc_write_bytes(void __iomem *addr, const u8 *data,
-+			       unsigned int len)
-+{
-+	unsigned int i;
-+	u8 value;
-+
-+	for (i = 0; i < len; i++) {
-+		value = bitrev8(data[i]);
-+		writeb(value, addr);
-+	}
-+}
-+
-+static int vf_crc_update_prepare(struct vf_crc_tfm_ctx *mctx,
-+				 struct vf_crc_desc_ctx *desc_ctx)
-+{
-+	struct vf_crc *crc = desc_ctx->crc;
-+	int ret;
-+
-+	ret = clk_prepare_enable(crc->clk);
-+	if (ret) {
-+		dev_err(crc->dev, "Failed to enable clock\n");
-+		return ret;
-+	}
-+
-+	mutex_lock(&crc->lock);
-+
-+	/*
-+	 * Check if we are continuing to process request already configured
-+	 * in HW. HW has to be re-initialized only on first update() for given
-+	 * request or if new request was processed after last call to update().
-+	 */
-+	if (crc->processed_desc == desc_ctx)
-+		return 0;
-+
-+	vf_crc_initialize_regs(mctx, desc_ctx);
-+
-+	return 0;
-+}
-+
-+static void vf_crc_update_unprepare(struct vf_crc_tfm_ctx *mctx,
-+				    struct vf_crc_desc_ctx *desc_ctx)
-+{
-+	struct vf_crc *crc = desc_ctx->crc;
-+
-+	if (mctx->is_16_bit)
-+		desc_ctx->state = readw(crc->iobase + CRC_DATA);
-+	else
-+		desc_ctx->state = readl(crc->iobase + CRC_DATA);
-+
-+	mutex_unlock(&crc->lock);
-+
-+	clk_disable_unprepare(crc->clk);
-+}
-+
-+static int vf_crc_update(struct shash_desc *desc, const u8 *data,
-+			 unsigned int len)
-+{
-+	struct vf_crc_desc_ctx *desc_ctx = shash_desc_ctx(desc);
-+	struct vf_crc_tfm_ctx *mctx = crypto_shash_ctx(desc->tfm);
-+	unsigned int i, len_align;
-+	int ret;
-+
-+	ret = vf_crc_update_prepare(mctx, desc_ctx);
-+	if (ret)
-+		return ret;
-+
-+	len_align = ALIGN_DOWN(len, mctx->align);
-+	if (mctx->is_16_bit) {
-+		u16 value;
-+
-+		for (i = 0; i < len_align; i += mctx->align) {
-+			value = bitrev16(get_unaligned_le16(data + i));
-+			writew(value, desc_ctx->crc->iobase + CRC_DATA);
+diff --git a/crypto/testmgr.c b/crypto/testmgr.c
+index a1d42245082a..aa04218aa019 100644
+--- a/crypto/testmgr.c
++++ b/crypto/testmgr.c
+@@ -2707,6 +2707,12 @@ static const struct alg_test_desc alg_test_descs[] = {
+ 	}, {
+ 		.alg = "compress_null",
+ 		.test = alg_test_null,
++	}, {
++		.alg = "crc16",
++		.test = alg_test_hash,
++		.suite = {
++			.hash = __VECS(crc16_tv_template)
 +		}
-+	} else {
-+		u32 value;
-+
-+		for (i = 0; i < len_align; i += mctx->align) {
-+			value = bitrev32(get_unaligned_le32(data + i));
-+			writel(value, desc_ctx->crc->iobase + CRC_DATA);
-+		}
-+	}
-+
-+	if (len != len_align)
-+		vf_crc_write_bytes(desc_ctx->crc->iobase + CRC_DATA,
-+				   &data[len_align], len - len_align);
-+
-+	vf_crc_update_unprepare(mctx, desc_ctx);
-+
-+	return 0;
-+}
-+
-+static int vf_crc_final(struct shash_desc *desc, u8 *out)
-+{
-+	struct vf_crc_desc_ctx *desc_ctx = shash_desc_ctx(desc);
-+	struct vf_crc_tfm_ctx *mctx = crypto_shash_ctx(desc->tfm);
-+
-+	if (mctx->is_16_bit)
-+		put_unaligned_le16(bitrev16(desc_ctx->state), out);
-+	else
-+		put_unaligned_le32(bitrev32(desc_ctx->state), out);
-+
-+	mutex_lock(&desc_ctx->crc->lock);
-+	/* No more processing of this request */
-+	desc_ctx->crc->processed_desc = NULL;
-+	mutex_unlock(&desc_ctx->crc->lock);
-+
-+	return 0;
-+}
-+
-+static int vf_crc_finup(struct shash_desc *desc, const u8 *data,
-+			unsigned int len, u8 *out)
-+{
-+	return vf_crc_update(desc, data, len) ?:
-+	       vf_crc_final(desc, out);
-+}
-+
-+static int vf_crc_digest(struct shash_desc *desc, const u8 *data,
-+			 unsigned int leng, u8 *out)
-+{
-+	return vf_crc_init(desc) ?: vf_crc_finup(desc, data, leng, out);
-+}
-+
-+static struct shash_alg algs[] = {
-+	{
-+		.setkey         = vf_crc_setkey,
-+		.init           = vf_crc_init,
-+		.update         = vf_crc_update,
-+		.final          = vf_crc_final,
-+		.finup          = vf_crc_finup,
-+		.digest         = vf_crc_digest,
-+		.descsize       = sizeof(struct vf_crc_desc_ctx),
-+		.digestsize     = CHKSUM_DIGEST_SIZE,
-+		.base           = {
-+			.cra_name               = "crc32",
-+			.cra_driver_name        = DRIVER_NAME,
-+			.cra_priority           = 200,
-+			.cra_flags		= CRYPTO_ALG_OPTIONAL_KEY,
-+			.cra_blocksize          = CHKSUM_BLOCK_SIZE,
-+			.cra_ctxsize            = sizeof(struct vf_crc_tfm_ctx),
-+			.cra_module             = THIS_MODULE,
-+			.cra_init               = vf_crc_cra_init32,
-+		}
-+	},
-+	{
-+		.setkey         = vf_crc_setkey,
-+		.init           = vf_crc_init,
-+		.update         = vf_crc_update,
-+		.final          = vf_crc_final,
-+		.finup          = vf_crc_finup,
-+		.digest         = vf_crc_digest,
-+		.descsize       = sizeof(struct vf_crc_desc_ctx),
-+		.digestsize     = (CHKSUM_DIGEST_SIZE / 2),
-+		.base           = {
-+			.cra_name               = "crc16",
-+			.cra_driver_name        = DRIVER_NAME,
-+			.cra_priority           = 200,
-+			.cra_flags		= CRYPTO_ALG_OPTIONAL_KEY,
-+			.cra_blocksize          = CHKSUM_BLOCK_SIZE,
-+			.cra_ctxsize            = sizeof(struct vf_crc_tfm_ctx),
-+			.cra_module             = THIS_MODULE,
-+			.cra_init               = vf_crc_cra_init16,
-+		}
-+	}
-+};
-+
-+static int vf_crc_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct resource *res;
-+	struct vf_crc *crc;
-+	int ret;
-+
-+	if (vf_crc_data) {
-+		dev_err(dev, "Device already registered (only one instance allowed)\n");
-+		return -EINVAL;
-+	}
-+
-+	crc = devm_kzalloc(dev, sizeof(*crc), GFP_KERNEL);
-+	if (!crc)
-+		return -ENOMEM;
-+
-+	crc->dev = dev;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	crc->iobase = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(crc->iobase))
-+		return PTR_ERR(crc->iobase);
-+
-+	crc->clk = devm_clk_get(dev, "crc");
-+	if (IS_ERR(crc->clk)) {
-+		dev_err(dev, "Could not get clock\n");
-+		return PTR_ERR(crc->clk);
-+	}
-+
-+	vf_crc_data = crc;
-+
-+	ret = crypto_register_shashes(algs, ARRAY_SIZE(algs));
-+	if (ret) {
-+		dev_err(dev, "Failed to register crypto algorithms\n");
-+		goto err;
-+	}
-+
-+	mutex_init(&crc->lock);
-+	dev_dbg(dev, "HW CRC accelerator initialized\n");
-+
-+	return 0;
-+
-+err:
-+	vf_crc_data = NULL;
-+
-+	return ret;
-+}
-+
-+static int vf_crc_remove(struct platform_device *pdev)
-+{
-+	crypto_unregister_shashes(algs, ARRAY_SIZE(algs));
-+	vf_crc_data = NULL;
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id vf_crc_dt_match[] = {
-+	{ .compatible = "fsl,vf610-crc", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, vf_crc_dt_match);
-+
-+static struct platform_driver vf_crc_driver = {
-+	.probe  = vf_crc_probe,
-+	.remove = vf_crc_remove,
-+	.driver = {
-+		.name           = DRIVER_NAME,
-+		.of_match_table = vf_crc_dt_match,
-+	},
-+};
-+
-+module_platform_driver(vf_crc_driver);
-+
-+MODULE_AUTHOR("Krzysztof Kozlowski <krzk@kernel.org>");
-+MODULE_DESCRIPTION("Freescale/NXP Vybrid CRC32 hardware driver");
-+MODULE_LICENSE("GPL v2");
-diff --git a/include/linux/crc32poly.h b/include/linux/crc32poly.h
-index 62c4b7790a28..ca06942ba75b 100644
---- a/include/linux/crc32poly.h
-+++ b/include/linux/crc32poly.h
-@@ -17,4 +17,11 @@
-  */
- #define CRC32C_POLY_LE 0x82F63B78
+ 	}, {
+ 		.alg = "crc32",
+ 		.test = alg_test_hash,
+diff --git a/crypto/testmgr.h b/crypto/testmgr.h
+index 173111c70746..88282968eb67 100644
+--- a/crypto/testmgr.h
++++ b/crypto/testmgr.h
+@@ -31806,6 +31806,392 @@ static const struct hash_testvec michael_mic_tv_template[] = {
+ 	}
+ };
  
 +/*
-+ * CRC16 polynomial as defined by ITU-T V.41 (ITU Telecommunication
-+ * Standardization Sector recommendations)
-+ * x^16 + x^12 + x^5 + x^0
++ * CRC16 test vectors
 + */
-+#define CRC16_POLY_BE 0x1021
++static const struct hash_testvec crc16_tv_template[] = {
++	{
++		.psize = 0,
++		.digest = "\x00\x00",
++	},
++	{
++		.plaintext = "abcdefg",
++		.psize = 7,
++		.digest = "\x0c\xf9",
++	},
++	{
++		.key = "\x87\xa9",
++		.ksize = 2,
++		.psize = 0,
++		.digest = "\x87\xa9",
++	},
++	{
++		.key = "\xff\xff",
++		.ksize = 2,
++		.plaintext = "\x01\x02\x03\x04\x05\x06\x07\x08"
++			     "\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10"
++			     "\x11\x12\x13\x14\x15\x16\x17\x18"
++			     "\x19\x1a\x1b\x1c\x1d\x1e\x1f\x20"
++			     "\x21\x22\x23\x24\x25\x26\x27\x28",
++		.psize = 40,
++		.digest = "\xd5\x98",
++	},
++	{
++		.key = "\xff\xff",
++		.ksize = 2,
++		.plaintext = "\x29\x2a\x2b\x2c\x2d\x2e\x2f\x30"
++			     "\x31\x32\x33\x34\x35\x36\x37\x38"
++			     "\x39\x3a\x3b\x3c\x3d\x3e\x3f\x40"
++			     "\x41\x42\x43\x44\x45\x46\x47\x48"
++			     "\x49\x4a\x4b\x4c\x4d\x4e\x4f\x50",
++		.psize = 40,
++		.digest = "\x3b\x46",
++	},
++	{
++		.key = "\xff\xff",
++		.ksize = 2,
++		.plaintext = "\x51\x52\x53\x54\x55\x56\x57\x58"
++			     "\x59\x5a\x5b\x5c\x5d\x5e\x5f\x60"
++			     "\x61\x62\x63\x64\x65\x66\x67\x68"
++			     "\x69\x6a\x6b\x6c\x6d\x6e\x6f\x70"
++			     "\x71\x72\x73\x74\x75\x76\x77\x78",
++		.psize = 40,
++		.digest = "\x7e\x3c",
++	},
++	{
++		.key = "\xff\xff",
++		.ksize = 2,
++		.plaintext = "\x79\x7a\x7b\x7c\x7d\x7e\x7f\x80"
++			     "\x81\x82\x83\x84\x85\x86\x87\x88"
++			     "\x89\x8a\x8b\x8c\x8d\x8e\x8f\x90"
++			     "\x91\x92\x93\x94\x95\x96\x97\x98"
++			     "\x99\x9a\x9b\x9c\x9d\x9e\x9f\xa0",
++		.psize = 40,
++		.digest = "\x96\xf0",
++	},
++	{
++		.key = "\xff\xff",
++		.ksize = 2,
++		.plaintext = "\xa1\xa2\xa3\xa4\xa5\xa6\xa7\xa8"
++			     "\xa9\xaa\xab\xac\xad\xae\xaf\xb0"
++			     "\xb1\xb2\xb3\xb4\xb5\xb6\xb7\xb8"
++			     "\xb9\xba\xbb\xbc\xbd\xbe\xbf\xc0"
++			     "\xc1\xc2\xc3\xc4\xc5\xc6\xc7\xc8",
++		.psize = 40,
++		.digest = "\x5c\x73",
++	},
++	{
++		.key = "\xff\xff",
++		.ksize = 2,
++		.plaintext = "\xc9\xca\xcb\xcc\xcd\xce\xcf\xd0"
++			     "\xd1\xd2\xd3\xd4\xd5\xd6\xd7\xd8"
++			     "\xd9\xda\xdb\xdc\xdd\xde\xdf\xe0"
++			     "\xe1\xe2\xe3\xe4\xe5\xe6\xe7\xe8"
++			     "\xe9\xea\xeb\xec\xed\xee\xef\xf0",
++		.psize = 40,
++		.digest = "\x7e\xf7",
++	},
++	{
++		.key = "\xff\xff",
++		.ksize = 2,
++		.plaintext = "\x01\x02\x03\x04\x05\x06\x07\x08"
++			     "\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10"
++			     "\x11\x12\x13\x14\x15\x16\x17\x18"
++			     "\x19\x1a\x1b\x1c\x1d\x1e\x1f\x20"
++			     "\x21\x22\x23\x24\x25\x26\x27\x28"
++			     "\x29\x2a\x2b\x2c\x2d\x2e\x2f\x30"
++			     "\x31\x32\x33\x34\x35\x36\x37\x38"
++			     "\x39\x3a\x3b\x3c\x3d\x3e\x3f\x40"
++			     "\x41\x42\x43\x44\x45\x46\x47\x48"
++			     "\x49\x4a\x4b\x4c\x4d\x4e\x4f\x50"
++			     "\x51\x52\x53\x54\x55\x56\x57\x58"
++			     "\x59\x5a\x5b\x5c\x5d\x5e\x5f\x60"
++			     "\x61\x62\x63\x64\x65\x66\x67\x68"
++			     "\x69\x6a\x6b\x6c\x6d\x6e\x6f\x70"
++			     "\x71\x72\x73\x74\x75\x76\x77\x78"
++			     "\x79\x7a\x7b\x7c\x7d\x7e\x7f\x80"
++			     "\x81\x82\x83\x84\x85\x86\x87\x88"
++			     "\x89\x8a\x8b\x8c\x8d\x8e\x8f\x90"
++			     "\x91\x92\x93\x94\x95\x96\x97\x98"
++			     "\x99\x9a\x9b\x9c\x9d\x9e\x9f\xa0"
++			     "\xa1\xa2\xa3\xa4\xa5\xa6\xa7\xa8"
++			     "\xa9\xaa\xab\xac\xad\xae\xaf\xb0"
++			     "\xb1\xb2\xb3\xb4\xb5\xb6\xb7\xb8"
++			     "\xb9\xba\xbb\xbc\xbd\xbe\xbf\xc0"
++			     "\xc1\xc2\xc3\xc4\xc5\xc6\xc7\xc8"
++			     "\xc9\xca\xcb\xcc\xcd\xce\xcf\xd0"
++			     "\xd1\xd2\xd3\xd4\xd5\xd6\xd7\xd8"
++			     "\xd9\xda\xdb\xdc\xdd\xde\xdf\xe0"
++			     "\xe1\xe2\xe3\xe4\xe5\xe6\xe7\xe8"
++			     "\xe9\xea\xeb\xec\xed\xee\xef\xf0",
++		.psize = 240,
++		.digest = "\x07\xab",
++		.np = 2,
++		.tap = { 31, 209 }
++	}, {
++		.key = "\xff\xff",
++		.ksize = 2,
++		.plaintext =	"\x6e\x05\x79\x10\xa7\x1b\xb2\x49"
++				"\xe0\x54\xeb\x82\x19\x8d\x24\xbb"
++				"\x2f\xc6\x5d\xf4\x68\xff\x96\x0a"
++				"\xa1\x38\xcf\x43\xda\x71\x08\x7c"
++				"\x13\xaa\x1e\xb5\x4c\xe3\x57\xee"
++				"\x85\x1c\x90\x27\xbe\x32\xc9\x60"
++				"\xf7\x6b\x02\x99\x0d\xa4\x3b\xd2"
++				"\x46\xdd\x74\x0b\x7f\x16\xad\x21"
++				"\xb8\x4f\xe6\x5a\xf1\x88\x1f\x93"
++				"\x2a\xc1\x35\xcc\x63\xfa\x6e\x05"
++				"\x9c\x10\xa7\x3e\xd5\x49\xe0\x77"
++				"\x0e\x82\x19\xb0\x24\xbb\x52\xe9"
++				"\x5d\xf4\x8b\x22\x96\x2d\xc4\x38"
++				"\xcf\x66\xfd\x71\x08\x9f\x13\xaa"
++				"\x41\xd8\x4c\xe3\x7a\x11\x85\x1c"
++				"\xb3\x27\xbe\x55\xec\x60\xf7\x8e"
++				"\x02\x99\x30\xc7\x3b\xd2\x69\x00"
++				"\x74\x0b\xa2\x16\xad\x44\xdb\x4f"
++				"\xe6\x7d\x14\x88\x1f\xb6\x2a\xc1"
++				"\x58\xef\x63\xfa\x91\x05\x9c\x33"
++				"\xca\x3e\xd5\x6c\x03\x77\x0e\xa5"
++				"\x19\xb0\x47\xde\x52\xe9\x80\x17"
++				"\x8b\x22\xb9\x2d\xc4\x5b\xf2\x66"
++				"\xfd\x94\x08\x9f\x36\xcd\x41\xd8"
++				"\x6f\x06\x7a\x11\xa8\x1c\xb3\x4a"
++				"\xe1\x55\xec\x83\x1a\x8e\x25\xbc"
++				"\x30\xc7\x5e\xf5\x69\x00\x97\x0b"
++				"\xa2\x39\xd0\x44\xdb\x72\x09\x7d"
++				"\x14\xab\x1f\xb6\x4d\xe4\x58\xef"
++				"\x86\x1d\x91\x28\xbf\x33\xca\x61"
++				"\xf8\x6c\x03\x9a\x0e\xa5\x3c\xd3"
++				"\x47\xde\x75\x0c\x80\x17\xae\x22"
++				"\xb9\x50\xe7\x5b\xf2\x89\x20\x94"
++				"\x2b\xc2\x36\xcd\x64\xfb\x6f\x06"
++				"\x9d\x11\xa8\x3f\xd6\x4a\xe1\x78"
++				"\x0f\x83\x1a\xb1\x25\xbc\x53\xea"
++				"\x5e\xf5\x8c\x00\x97\x2e\xc5\x39"
++				"\xd0\x67\xfe\x72\x09\xa0\x14\xab"
++				"\x42\xd9\x4d\xe4\x7b\x12\x86\x1d"
++				"\xb4\x28\xbf\x56\xed\x61\xf8\x8f"
++				"\x03\x9a\x31\xc8\x3c\xd3\x6a\x01"
++				"\x75\x0c\xa3\x17\xae\x45\xdc\x50"
++				"\xe7\x7e\x15\x89\x20\xb7\x2b\xc2"
++				"\x59\xf0\x64\xfb\x92\x06\x9d\x34"
++				"\xcb\x3f\xd6\x6d\x04\x78\x0f\xa6"
++				"\x1a\xb1\x48\xdf\x53\xea\x81\x18"
++				"\x8c\x23\xba\x2e\xc5\x5c\xf3\x67"
++				"\xfe\x95\x09\xa0\x37\xce\x42\xd9"
++				"\x70\x07\x7b\x12\xa9\x1d\xb4\x4b"
++				"\xe2\x56\xed\x84\x1b\x8f\x26\xbd"
++				"\x31\xc8\x5f\xf6\x6a\x01\x98\x0c"
++				"\xa3\x3a\xd1\x45\xdc\x73\x0a\x7e"
++				"\x15\xac\x20\xb7\x4e\xe5\x59\xf0"
++				"\x87\x1e\x92\x29\xc0\x34\xcb\x62"
++				"\xf9\x6d\x04\x9b\x0f\xa6\x3d\xd4"
++				"\x48\xdf\x76\x0d\x81\x18\xaf\x23"
++				"\xba\x51\xe8\x5c\xf3\x8a\x21\x95"
++				"\x2c\xc3\x37\xce\x65\xfc\x70\x07"
++				"\x9e\x12\xa9\x40\xd7\x4b\xe2\x79"
++				"\x10\x84\x1b\xb2\x26\xbd\x54\xeb"
++				"\x5f\xf6\x8d\x01\x98\x2f\xc6\x3a"
++				"\xd1\x68\xff\x73\x0a\xa1\x15\xac"
++				"\x43\xda\x4e\xe5\x7c\x13\x87\x1e"
++				"\xb5\x29\xc0\x57\xee\x62\xf9\x90"
++				"\x04\x9b\x32\xc9\x3d\xd4\x6b\x02"
++				"\x76\x0d\xa4\x18\xaf\x46\xdd\x51"
++				"\xe8\x7f\x16\x8a\x21\xb8\x2c\xc3"
++				"\x5a\xf1\x65\xfc\x93\x07\x9e\x35"
++				"\xcc\x40\xd7\x6e\x05\x79\x10\xa7"
++				"\x1b\xb2\x49\xe0\x54\xeb\x82\x19"
++				"\x8d\x24\xbb\x2f\xc6\x5d\xf4\x68"
++				"\xff\x96\x0a\xa1\x38\xcf\x43\xda"
++				"\x71\x08\x7c\x13\xaa\x1e\xb5\x4c"
++				"\xe3\x57\xee\x85\x1c\x90\x27\xbe"
++				"\x32\xc9\x60\xf7\x6b\x02\x99\x0d"
++				"\xa4\x3b\xd2\x46\xdd\x74\x0b\x7f"
++				"\x16\xad\x21\xb8\x4f\xe6\x5a\xf1"
++				"\x88\x1f\x93\x2a\xc1\x35\xcc\x63"
++				"\xfa\x6e\x05\x9c\x10\xa7\x3e\xd5"
++				"\x49\xe0\x77\x0e\x82\x19\xb0\x24"
++				"\xbb\x52\xe9\x5d\xf4\x8b\x22\x96"
++				"\x2d\xc4\x38\xcf\x66\xfd\x71\x08"
++				"\x9f\x13\xaa\x41\xd8\x4c\xe3\x7a"
++				"\x11\x85\x1c\xb3\x27\xbe\x55\xec"
++				"\x60\xf7\x8e\x02\x99\x30\xc7\x3b"
++				"\xd2\x69\x00\x74\x0b\xa2\x16\xad"
++				"\x44\xdb\x4f\xe6\x7d\x14\x88\x1f"
++				"\xb6\x2a\xc1\x58\xef\x63\xfa\x91"
++				"\x05\x9c\x33\xca\x3e\xd5\x6c\x03"
++				"\x77\x0e\xa5\x19\xb0\x47\xde\x52"
++				"\xe9\x80\x17\x8b\x22\xb9\x2d\xc4"
++				"\x5b\xf2\x66\xfd\x94\x08\x9f\x36"
++				"\xcd\x41\xd8\x6f\x06\x7a\x11\xa8"
++				"\x1c\xb3\x4a\xe1\x55\xec\x83\x1a"
++				"\x8e\x25\xbc\x30\xc7\x5e\xf5\x69"
++				"\x00\x97\x0b\xa2\x39\xd0\x44\xdb"
++				"\x72\x09\x7d\x14\xab\x1f\xb6\x4d"
++				"\xe4\x58\xef\x86\x1d\x91\x28\xbf"
++				"\x33\xca\x61\xf8\x6c\x03\x9a\x0e"
++				"\xa5\x3c\xd3\x47\xde\x75\x0c\x80"
++				"\x17\xae\x22\xb9\x50\xe7\x5b\xf2"
++				"\x89\x20\x94\x2b\xc2\x36\xcd\x64"
++				"\xfb\x6f\x06\x9d\x11\xa8\x3f\xd6"
++				"\x4a\xe1\x78\x0f\x83\x1a\xb1\x25"
++				"\xbc\x53\xea\x5e\xf5\x8c\x00\x97"
++				"\x2e\xc5\x39\xd0\x67\xfe\x72\x09"
++				"\xa0\x14\xab\x42\xd9\x4d\xe4\x7b"
++				"\x12\x86\x1d\xb4\x28\xbf\x56\xed"
++				"\x61\xf8\x8f\x03\x9a\x31\xc8\x3c"
++				"\xd3\x6a\x01\x75\x0c\xa3\x17\xae"
++				"\x45\xdc\x50\xe7\x7e\x15\x89\x20"
++				"\xb7\x2b\xc2\x59\xf0\x64\xfb\x92"
++				"\x06\x9d\x34\xcb\x3f\xd6\x6d\x04"
++				"\x78\x0f\xa6\x1a\xb1\x48\xdf\x53"
++				"\xea\x81\x18\x8c\x23\xba\x2e\xc5"
++				"\x5c\xf3\x67\xfe\x95\x09\xa0\x37"
++				"\xce\x42\xd9\x70\x07\x7b\x12\xa9"
++				"\x1d\xb4\x4b\xe2\x56\xed\x84\x1b"
++				"\x8f\x26\xbd\x31\xc8\x5f\xf6\x6a"
++				"\x01\x98\x0c\xa3\x3a\xd1\x45\xdc"
++				"\x73\x0a\x7e\x15\xac\x20\xb7\x4e"
++				"\xe5\x59\xf0\x87\x1e\x92\x29\xc0"
++				"\x34\xcb\x62\xf9\x6d\x04\x9b\x0f"
++				"\xa6\x3d\xd4\x48\xdf\x76\x0d\x81"
++				"\x18\xaf\x23\xba\x51\xe8\x5c\xf3"
++				"\x8a\x21\x95\x2c\xc3\x37\xce\x65"
++				"\xfc\x70\x07\x9e\x12\xa9\x40\xd7"
++				"\x4b\xe2\x79\x10\x84\x1b\xb2\x26"
++				"\xbd\x54\xeb\x5f\xf6\x8d\x01\x98"
++				"\x2f\xc6\x3a\xd1\x68\xff\x73\x0a"
++				"\xa1\x15\xac\x43\xda\x4e\xe5\x7c"
++				"\x13\x87\x1e\xb5\x29\xc0\x57\xee"
++				"\x62\xf9\x90\x04\x9b\x32\xc9\x3d"
++				"\xd4\x6b\x02\x76\x0d\xa4\x18\xaf"
++				"\x46\xdd\x51\xe8\x7f\x16\x8a\x21"
++				"\xb8\x2c\xc3\x5a\xf1\x65\xfc\x93"
++				"\x07\x9e\x35\xcc\x40\xd7\x6e\x05"
++				"\x79\x10\xa7\x1b\xb2\x49\xe0\x54"
++				"\xeb\x82\x19\x8d\x24\xbb\x2f\xc6"
++				"\x5d\xf4\x68\xff\x96\x0a\xa1\x38"
++				"\xcf\x43\xda\x71\x08\x7c\x13\xaa"
++				"\x1e\xb5\x4c\xe3\x57\xee\x85\x1c"
++				"\x90\x27\xbe\x32\xc9\x60\xf7\x6b"
++				"\x02\x99\x0d\xa4\x3b\xd2\x46\xdd"
++				"\x74\x0b\x7f\x16\xad\x21\xb8\x4f"
++				"\xe6\x5a\xf1\x88\x1f\x93\x2a\xc1"
++				"\x35\xcc\x63\xfa\x6e\x05\x9c\x10"
++				"\xa7\x3e\xd5\x49\xe0\x77\x0e\x82"
++				"\x19\xb0\x24\xbb\x52\xe9\x5d\xf4"
++				"\x8b\x22\x96\x2d\xc4\x38\xcf\x66"
++				"\xfd\x71\x08\x9f\x13\xaa\x41\xd8"
++				"\x4c\xe3\x7a\x11\x85\x1c\xb3\x27"
++				"\xbe\x55\xec\x60\xf7\x8e\x02\x99"
++				"\x30\xc7\x3b\xd2\x69\x00\x74\x0b"
++				"\xa2\x16\xad\x44\xdb\x4f\xe6\x7d"
++				"\x14\x88\x1f\xb6\x2a\xc1\x58\xef"
++				"\x63\xfa\x91\x05\x9c\x33\xca\x3e"
++				"\xd5\x6c\x03\x77\x0e\xa5\x19\xb0"
++				"\x47\xde\x52\xe9\x80\x17\x8b\x22"
++				"\xb9\x2d\xc4\x5b\xf2\x66\xfd\x94"
++				"\x08\x9f\x36\xcd\x41\xd8\x6f\x06"
++				"\x7a\x11\xa8\x1c\xb3\x4a\xe1\x55"
++				"\xec\x83\x1a\x8e\x25\xbc\x30\xc7"
++				"\x5e\xf5\x69\x00\x97\x0b\xa2\x39"
++				"\xd0\x44\xdb\x72\x09\x7d\x14\xab"
++				"\x1f\xb6\x4d\xe4\x58\xef\x86\x1d"
++				"\x91\x28\xbf\x33\xca\x61\xf8\x6c"
++				"\x03\x9a\x0e\xa5\x3c\xd3\x47\xde"
++				"\x75\x0c\x80\x17\xae\x22\xb9\x50"
++				"\xe7\x5b\xf2\x89\x20\x94\x2b\xc2"
++				"\x36\xcd\x64\xfb\x6f\x06\x9d\x11"
++				"\xa8\x3f\xd6\x4a\xe1\x78\x0f\x83"
++				"\x1a\xb1\x25\xbc\x53\xea\x5e\xf5"
++				"\x8c\x00\x97\x2e\xc5\x39\xd0\x67"
++				"\xfe\x72\x09\xa0\x14\xab\x42\xd9"
++				"\x4d\xe4\x7b\x12\x86\x1d\xb4\x28"
++				"\xbf\x56\xed\x61\xf8\x8f\x03\x9a"
++				"\x31\xc8\x3c\xd3\x6a\x01\x75\x0c"
++				"\xa3\x17\xae\x45\xdc\x50\xe7\x7e"
++				"\x15\x89\x20\xb7\x2b\xc2\x59\xf0"
++				"\x64\xfb\x92\x06\x9d\x34\xcb\x3f"
++				"\xd6\x6d\x04\x78\x0f\xa6\x1a\xb1"
++				"\x48\xdf\x53\xea\x81\x18\x8c\x23"
++				"\xba\x2e\xc5\x5c\xf3\x67\xfe\x95"
++				"\x09\xa0\x37\xce\x42\xd9\x70\x07"
++				"\x7b\x12\xa9\x1d\xb4\x4b\xe2\x56"
++				"\xed\x84\x1b\x8f\x26\xbd\x31\xc8"
++				"\x5f\xf6\x6a\x01\x98\x0c\xa3\x3a"
++				"\xd1\x45\xdc\x73\x0a\x7e\x15\xac"
++				"\x20\xb7\x4e\xe5\x59\xf0\x87\x1e"
++				"\x92\x29\xc0\x34\xcb\x62\xf9\x6d"
++				"\x04\x9b\x0f\xa6\x3d\xd4\x48\xdf"
++				"\x76\x0d\x81\x18\xaf\x23\xba\x51"
++				"\xe8\x5c\xf3\x8a\x21\x95\x2c\xc3"
++				"\x37\xce\x65\xfc\x70\x07\x9e\x12"
++				"\xa9\x40\xd7\x4b\xe2\x79\x10\x84"
++				"\x1b\xb2\x26\xbd\x54\xeb\x5f\xf6"
++				"\x8d\x01\x98\x2f\xc6\x3a\xd1\x68"
++				"\xff\x73\x0a\xa1\x15\xac\x43\xda"
++				"\x4e\xe5\x7c\x13\x87\x1e\xb5\x29"
++				"\xc0\x57\xee\x62\xf9\x90\x04\x9b"
++				"\x32\xc9\x3d\xd4\x6b\x02\x76\x0d"
++				"\xa4\x18\xaf\x46\xdd\x51\xe8\x7f"
++				"\x16\x8a\x21\xb8\x2c\xc3\x5a\xf1"
++				"\x65\xfc\x93\x07\x9e\x35\xcc\x40"
++				"\xd7\x6e\x05\x79\x10\xa7\x1b\xb2"
++				"\x49\xe0\x54\xeb\x82\x19\x8d\x24"
++				"\xbb\x2f\xc6\x5d\xf4\x68\xff\x96"
++				"\x0a\xa1\x38\xcf\x43\xda\x71\x08"
++				"\x7c\x13\xaa\x1e\xb5\x4c\xe3\x57"
++				"\xee\x85\x1c\x90\x27\xbe\x32\xc9"
++				"\x60\xf7\x6b\x02\x99\x0d\xa4\x3b"
++				"\xd2\x46\xdd\x74\x0b\x7f\x16\xad"
++				"\x21\xb8\x4f\xe6\x5a\xf1\x88\x1f"
++				"\x93\x2a\xc1\x35\xcc\x63\xfa\x6e"
++				"\x05\x9c\x10\xa7\x3e\xd5\x49\xe0"
++				"\x77\x0e\x82\x19\xb0\x24\xbb\x52"
++				"\xe9\x5d\xf4\x8b\x22\x96\x2d\xc4"
++				"\x38\xcf\x66\xfd\x71\x08\x9f\x13"
++				"\xaa\x41\xd8\x4c\xe3\x7a\x11\x85"
++				"\x1c\xb3\x27\xbe\x55\xec\x60\xf7"
++				"\x8e\x02\x99\x30\xc7\x3b\xd2\x69"
++				"\x00\x74\x0b\xa2\x16\xad\x44\xdb"
++				"\x4f\xe6\x7d\x14\x88\x1f\xb6\x2a"
++				"\xc1\x58\xef\x63\xfa\x91\x05\x9c"
++				"\x33\xca\x3e\xd5\x6c\x03\x77\x0e"
++				"\xa5\x19\xb0\x47\xde\x52\xe9\x80"
++				"\x17\x8b\x22\xb9\x2d\xc4\x5b\xf2"
++				"\x66\xfd\x94\x08\x9f\x36\xcd\x41"
++				"\xd8\x6f\x06\x7a\x11\xa8\x1c\xb3"
++				"\x4a\xe1\x55\xec\x83\x1a\x8e\x25"
++				"\xbc\x30\xc7\x5e\xf5\x69\x00\x97"
++				"\x0b\xa2\x39\xd0\x44\xdb\x72\x09"
++				"\x7d\x14\xab\x1f\xb6\x4d\xe4\x58"
++				"\xef\x86\x1d\x91\x28\xbf\x33\xca"
++				"\x61\xf8\x6c\x03\x9a\x0e\xa5\x3c"
++				"\xd3\x47\xde\x75\x0c\x80\x17\xae"
++				"\x22\xb9\x50\xe7\x5b\xf2\x89\x20"
++				"\x94\x2b\xc2\x36\xcd\x64\xfb\x6f"
++				"\x06\x9d\x11\xa8\x3f\xd6\x4a\xe1"
++				"\x78\x0f\x83\x1a\xb1\x25\xbc\x53"
++				"\xea\x5e\xf5\x8c\x00\x97\x2e\xc5"
++				"\x39\xd0\x67\xfe\x72\x09\xa0\x14"
++				"\xab\x42\xd9\x4d\xe4\x7b\x12\x86"
++				"\x1d\xb4\x28\xbf\x56\xed\x61\xf8"
++				"\x8f\x03\x9a\x31\xc8\x3c\xd3\x6a"
++				"\x01\x75\x0c\xa3\x17\xae\x45\xdc"
++				"\x50\xe7\x7e\x15\x89\x20\xb7\x2b"
++				"\xc2\x59\xf0\x64\xfb\x92\x06\x9d"
++				"\x34\xcb\x3f\xd6\x6d\x04\x78\x0f"
++				"\xa6\x1a\xb1\x48\xdf\x53\xea\x81"
++				"\x18\x8c\x23\xba\x2e\xc5\x5c\xf3"
++				"\x67\xfe\x95\x09\xa0\x37\xce\x42"
++				"\xd9\x70\x07\x7b\x12\xa9\x1d\xb4"
++				"\x4b\xe2\x56\xed\x84\x1b\x8f\x26"
++				"\xbd\x31\xc8\x5f\xf6\x6a\x01\x98",
++		.psize = 2048,
++		.digest = "\xf7\xe3",
++	}
++};
 +
- #endif /* _LINUX_CRC32_POLY_H */
+ /*
+  * CRC32 test vectors
+  */
 -- 
 2.14.1
