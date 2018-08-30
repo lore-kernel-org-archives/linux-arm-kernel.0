@@ -1,91 +1,97 @@
 From: embed3d@gmail.com (Philipp Rossak)
-Date: Thu, 30 Aug 2018 17:45:04 +0200
-Subject: [PATCH v3 16/30] iio: adc: sun4i-gpadc-iio: rework: readout temp_data
+Date: Thu, 30 Aug 2018 17:45:08 +0200
+Subject: [PATCH v3 20/30] iio: adc: sun4i-gpadc-iio: rework: device specific
+ suspend & resume
 In-Reply-To: <20180830154518.29507-1-embed3d@gmail.com>
 References: <20180830154518.29507-1-embed3d@gmail.com>
-Message-ID: <20180830154518.29507-17-embed3d@gmail.com>
+Message-ID: <20180830154518.29507-21-embed3d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For adding newer sensor some basic rework of the code is necessary.
+Different sensors will have different suspend and resume functions. So
+we are modularize the suspend and resume functions.
 
-This commit reworks the code and uses regmap field to read out
-temp_data.
+The resume function configures and initializes the thermal sensor and
+the suspend function disables the sensors.
 
 Signed-off-by: Philipp Rossak <embed3d@gmail.com>
 ---
- drivers/iio/adc/sun4i-gpadc-iio.c | 21 +++++++++++++--------
- 1 file changed, 13 insertions(+), 8 deletions(-)
+ drivers/iio/adc/sun4i-gpadc-iio.c | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
 diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-index d48f338af563..c278e165e161 100644
+index 2fd73d143815..c7b46c82e3e5 100644
 --- a/drivers/iio/adc/sun4i-gpadc-iio.c
 +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-@@ -63,6 +63,7 @@ struct gpadc_data {
- 	int		(*ths_suspend)(struct sun4i_gpadc_iio *info);
- 	int		(*ths_resume)(struct sun4i_gpadc_iio *info);
- 	bool		support_irq;
-+	u32		temp_data_base;
- };
+@@ -76,6 +76,9 @@ struct gpadc_data {
  
  static irqreturn_t sun4i_gpadc_data_irq_handler(int irq, void *dev_id);
-@@ -77,6 +78,7 @@ static const struct gpadc_data sun4i_gpadc_data = {
- 	.adc_channel = true,
+ 
++static int sun4i_ths_resume(struct sun4i_gpadc_iio *info);
++static int sun4i_ths_suspend(struct sun4i_gpadc_iio *info);
++
+ static const struct gpadc_data sun4i_gpadc_data = {
+ 	.temp_offset = -1932,
+ 	.temp_scale = 133,
+@@ -87,6 +90,8 @@ static const struct gpadc_data sun4i_gpadc_data = {
  	.ths_irq_thread = sun4i_gpadc_data_irq_handler,
  	.support_irq = true,
-+	.temp_data_base = SUN4I_GPADC_TEMP_DATA,
+ 	.temp_data_base = SUN4I_GPADC_TEMP_DATA,
++	.ths_resume = sun4i_ths_resume,
++	.ths_suspend = sun4i_ths_suspend,
+ 	.sensor_count = 1,
  };
  
- static const struct gpadc_data sun5i_gpadc_data = {
-@@ -89,6 +91,7 @@ static const struct gpadc_data sun5i_gpadc_data = {
- 	.adc_channel = true,
+@@ -101,6 +106,8 @@ static const struct gpadc_data sun5i_gpadc_data = {
  	.ths_irq_thread = sun4i_gpadc_data_irq_handler,
  	.support_irq = true,
-+	.temp_data_base = SUN4I_GPADC_TEMP_DATA,
+ 	.temp_data_base = SUN4I_GPADC_TEMP_DATA,
++	.ths_resume = sun4i_ths_resume,
++	.ths_suspend = sun4i_ths_suspend,
+ 	.sensor_count = 1,
  };
  
- static const struct gpadc_data sun6i_gpadc_data = {
-@@ -101,12 +104,14 @@ static const struct gpadc_data sun6i_gpadc_data = {
- 	.adc_channel = true,
+@@ -115,6 +122,8 @@ static const struct gpadc_data sun6i_gpadc_data = {
  	.ths_irq_thread = sun4i_gpadc_data_irq_handler,
  	.support_irq = true,
-+	.temp_data_base = SUN4I_GPADC_TEMP_DATA,
+ 	.temp_data_base = SUN4I_GPADC_TEMP_DATA,
++	.ths_resume = sun4i_ths_resume,
++	.ths_suspend = sun4i_ths_suspend,
+ 	.sensor_count = 1,
  };
  
- static const struct gpadc_data sun8i_a33_gpadc_data = {
- 	.temp_offset = -1662,
+@@ -123,6 +132,8 @@ static const struct gpadc_data sun8i_a33_gpadc_data = {
  	.temp_scale = 162,
  	.tp_mode_en = SUN8I_A33_GPADC_CTRL1_CHOP_TEMP_EN,
-+	.temp_data_base = SUN4I_GPADC_TEMP_DATA,
+ 	.temp_data_base = SUN4I_GPADC_TEMP_DATA,
++	.ths_resume = sun4i_ths_resume,
++	.ths_suspend = sun4i_ths_suspend,
+ 	.sensor_count = 1,
  };
  
- struct sun4i_gpadc_iio {
-@@ -271,18 +276,18 @@ static int sun4i_gpadc_temp_read(struct iio_dev *indio_dev, int *val)
+@@ -401,6 +412,11 @@ static irqreturn_t sun4i_gpadc_data_irq_handler(int irq, void *dev_id)
+ static int sun4i_gpadc_runtime_suspend(struct device *dev)
  {
- 	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
+ 	struct sun4i_gpadc_iio *info = iio_priv(dev_get_drvdata(dev));
++	return info->data->ths_suspend(info);
++}
++
++static int sun4i_ths_suspend(struct sun4i_gpadc_iio *info)
++{
  
--	if (!info->data->support_irq) {
--		pm_runtime_get_sync(indio_dev->dev.parent);
-+	if (info->data->adc_channel)
-+		return sun4i_gpadc_read(indio_dev, 0, val,
-+				SUN4I_GPADC_IRQ_TEMP_DATA);
+ 	/* Disable the ADC on IP */
+ 	regmap_write(info->regmap, SUN4I_GPADC_CTRL1, 0);
+@@ -415,7 +431,11 @@ static int sun4i_gpadc_runtime_suspend(struct device *dev)
+ static int sun4i_gpadc_runtime_resume(struct device *dev)
+ {
+ 	struct sun4i_gpadc_iio *info = iio_priv(dev_get_drvdata(dev));
++	return info->data->ths_resume(info);
++}
  
--		regmap_read(info->regmap, SUN4I_GPADC_TEMP_DATA, val);
-+	pm_runtime_get_sync(indio_dev->dev.parent);
- 
--		pm_runtime_mark_last_busy(indio_dev->dev.parent);
--		pm_runtime_put_autosuspend(indio_dev->dev.parent);
-+	regmap_read(info->regmap, info->data->temp_data_base, val);
- 
--		return 0;
--	}
-+	pm_runtime_mark_last_busy(indio_dev->dev.parent);
-+	pm_runtime_put_autosuspend(indio_dev->dev.parent);
- 
--	return sun4i_gpadc_read(indio_dev, 0, val, SUN4I_GPADC_IRQ_TEMP_DATA);
-+	return 0;
- }
- 
- static int sun4i_gpadc_temp_offset(struct iio_dev *indio_dev, int *val)
++static int sun4i_ths_resume(struct sun4i_gpadc_iio *info)
++{
+ 	/* clkin = 6MHz */
+ 	regmap_write(info->regmap, SUN4I_GPADC_CTRL0,
+ 		     SUN4I_GPADC_CTRL0_ADC_CLK_DIVIDER(2) |
 -- 
 2.11.0
