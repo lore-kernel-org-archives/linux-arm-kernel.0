@@ -1,194 +1,309 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Thu, 30 Aug 2018 09:35:27 +0200
-Subject: [PATCH v5 06/14] irqchip/irq-mvebu-icu: support ICU subnodes
+Date: Thu, 30 Aug 2018 09:35:34 +0200
+Subject: [PATCH v5 13/14] arm64: dts: marvell: use new bindings for CP110
+ interrupts
 In-Reply-To: <20180830073535.10710-1-miquel.raynal@bootlin.com>
 References: <20180830073535.10710-1-miquel.raynal@bootlin.com>
-Message-ID: <20180830073535.10710-7-miquel.raynal@bootlin.com>
+Message-ID: <20180830073535.10710-14-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ICU can handle several type of interrupt, each of them being handled
-differently on AP side. On CP side, the ICU should be able to make the
-distinction between each interrupt group by pointing to the right parent.
-
-This is done through the introduction of new bindings, presenting the ICU
-node as the parent of multiple ICU sub-nodes, each of them being an
-interrupt type with a different interrupt parent. ICU interrupt 'clients'
-now directly point to the right sub-node, avoiding the need for the extra
-ICU_GRP_* parameter.
-
-ICU subnodes are probed automatically with devm_platform_populate(). If
-the node as no child, the probe function for NSRs will still be called
-'manually' in order to preserve backward compatibility with DT using the
-old binding.
+Create an ICU subnode for the NSR interrupts. This subnode becomes the
+CP110 interrupt parent, removing the need for the ICU_GRP_NSR parameter.
+Move all DT110 nodes to use these new bindings.
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/irqchip/irq-mvebu-icu.c | 77 ++++++++++++++++++++++++++-------
- 1 file changed, 61 insertions(+), 16 deletions(-)
+ arch/arm64/boot/dts/marvell/armada-cp110.dtsi | 117 ++++++++++--------
+ 1 file changed, 62 insertions(+), 55 deletions(-)
 
-diff --git a/drivers/irqchip/irq-mvebu-icu.c b/drivers/irqchip/irq-mvebu-icu.c
-index d09f220a2701..c79d2cb787a0 100644
---- a/drivers/irqchip/irq-mvebu-icu.c
-+++ b/drivers/irqchip/irq-mvebu-icu.c
-@@ -13,6 +13,7 @@
- #include <linux/irq.h>
- #include <linux/irqchip.h>
- #include <linux/irqdomain.h>
-+#include <linux/jump_label.h>
- #include <linux/kernel.h>
- #include <linux/msi.h>
- #include <linux/of_irq.h>
-@@ -49,6 +50,8 @@ struct mvebu_icu_irq_data {
- 	unsigned int type;
- };
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+index 840c8454d03e..261c35855ce3 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+@@ -25,7 +25,7 @@
+ 	#address-cells = <2>;
+ 	#size-cells = <2>;
+ 	compatible = "simple-bus";
+-	interrupt-parent = <&CP110_LABEL(icu)>;
++	interrupt-parent = <&CP110_LABEL(icu_nsr)>;
+ 	ranges;
  
-+DEFINE_STATIC_KEY_FALSE(legacy_bindings);
+ 	config-space at CP110_BASE {
+@@ -47,12 +47,12 @@
+ 			dma-coherent;
+ 
+ 			CP110_LABEL(eth0): eth0 {
+-				interrupts = <ICU_GRP_NSR 39 IRQ_TYPE_LEVEL_HIGH>,
+-					<ICU_GRP_NSR 43 IRQ_TYPE_LEVEL_HIGH>,
+-					<ICU_GRP_NSR 47 IRQ_TYPE_LEVEL_HIGH>,
+-					<ICU_GRP_NSR 51 IRQ_TYPE_LEVEL_HIGH>,
+-					<ICU_GRP_NSR 55 IRQ_TYPE_LEVEL_HIGH>,
+-					<ICU_GRP_NSR 129 IRQ_TYPE_LEVEL_HIGH>;
++				interrupts = <39 IRQ_TYPE_LEVEL_HIGH>,
++					     <43 IRQ_TYPE_LEVEL_HIGH>,
++					     <47 IRQ_TYPE_LEVEL_HIGH>,
++					     <51 IRQ_TYPE_LEVEL_HIGH>,
++					     <55 IRQ_TYPE_LEVEL_HIGH>,
++					     <129 IRQ_TYPE_LEVEL_HIGH>;
+ 				interrupt-names = "tx-cpu0", "tx-cpu1", "tx-cpu2",
+ 					"tx-cpu3", "rx-shared", "link";
+ 				port-id = <0>;
+@@ -61,12 +61,12 @@
+ 			};
+ 
+ 			CP110_LABEL(eth1): eth1 {
+-				interrupts = <ICU_GRP_NSR 40 IRQ_TYPE_LEVEL_HIGH>,
+-					<ICU_GRP_NSR 44 IRQ_TYPE_LEVEL_HIGH>,
+-					<ICU_GRP_NSR 48 IRQ_TYPE_LEVEL_HIGH>,
+-					<ICU_GRP_NSR 52 IRQ_TYPE_LEVEL_HIGH>,
+-					<ICU_GRP_NSR 56 IRQ_TYPE_LEVEL_HIGH>,
+-					<ICU_GRP_NSR 128 IRQ_TYPE_LEVEL_HIGH>;
++				interrupts = <40 IRQ_TYPE_LEVEL_HIGH>,
++					     <44 IRQ_TYPE_LEVEL_HIGH>,
++					     <48 IRQ_TYPE_LEVEL_HIGH>,
++					     <52 IRQ_TYPE_LEVEL_HIGH>,
++					     <56 IRQ_TYPE_LEVEL_HIGH>,
++					     <128 IRQ_TYPE_LEVEL_HIGH>;
+ 				interrupt-names = "tx-cpu0", "tx-cpu1", "tx-cpu2",
+ 					"tx-cpu3", "rx-shared", "link";
+ 				port-id = <1>;
+@@ -75,12 +75,12 @@
+ 			};
+ 
+ 			CP110_LABEL(eth2): eth2 {
+-				interrupts = <ICU_GRP_NSR 41 IRQ_TYPE_LEVEL_HIGH>,
+-					<ICU_GRP_NSR 45 IRQ_TYPE_LEVEL_HIGH>,
+-					<ICU_GRP_NSR 49 IRQ_TYPE_LEVEL_HIGH>,
+-					<ICU_GRP_NSR 53 IRQ_TYPE_LEVEL_HIGH>,
+-					<ICU_GRP_NSR 57 IRQ_TYPE_LEVEL_HIGH>,
+-					<ICU_GRP_NSR 127 IRQ_TYPE_LEVEL_HIGH>;
++				interrupts = <41 IRQ_TYPE_LEVEL_HIGH>,
++					     <45 IRQ_TYPE_LEVEL_HIGH>,
++					     <49 IRQ_TYPE_LEVEL_HIGH>,
++					     <53 IRQ_TYPE_LEVEL_HIGH>,
++					     <57 IRQ_TYPE_LEVEL_HIGH>,
++					     <127 IRQ_TYPE_LEVEL_HIGH>;
+ 				interrupt-names = "tx-cpu0", "tx-cpu1", "tx-cpu2",
+ 					"tx-cpu3", "rx-shared", "link";
+ 				port-id = <2>;
+@@ -150,16 +150,23 @@
+ 		CP110_LABEL(icu): interrupt-controller at 1e0000 {
+ 			compatible = "marvell,cp110-icu";
+ 			reg = <0x1e0000 0x440>;
+-			#interrupt-cells = <3>;
+-			interrupt-controller;
+-			msi-parent = <&gicp>;
++			#address-cells = <1>;
++			#size-cells = <1>;
 +
- static void mvebu_icu_init(struct mvebu_icu *icu, struct msi_msg *msg)
- {
- 	if (atomic_cmpxchg(&icu->initialized, false, true))
-@@ -105,32 +108,33 @@ mvebu_icu_irq_domain_translate(struct irq_domain *d, struct irq_fwspec *fwspec,
- 			       unsigned long *hwirq, unsigned int *type)
- {
- 	struct mvebu_icu *icu = platform_msi_get_host_data(d);
--	unsigned int icu_group;
-+	unsigned int param_count = static_branch_unlikely(&legacy_bindings) ? 3 : 2;
++			CP110_LABEL(icu_nsr): interrupt-controller at 10 {
++				compatible = "marvell,cp110-icu-nsr";
++				reg = <0x10 0x20>;
++				#interrupt-cells = <2>;
++				interrupt-controller;
++				msi-parent = <&gicp>;
++			};
+ 		};
  
- 	/* Check the count of the parameters in dt */
--	if (WARN_ON(fwspec->param_count < 3)) {
-+	if (WARN_ON(fwspec->param_count != param_count)) {
- 		dev_err(icu->dev, "wrong ICU parameter count %d\n",
- 			fwspec->param_count);
- 		return -EINVAL;
- 	}
+ 		CP110_LABEL(rtc): rtc at 284000 {
+ 			compatible = "marvell,armada-8k-rtc";
+ 			reg = <0x284000 0x20>, <0x284080 0x24>;
+ 			reg-names = "rtc", "rtc-soc";
+-			interrupts = <ICU_GRP_NSR 77 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <77 IRQ_TYPE_LEVEL_HIGH>;
+ 		};
  
--	/* Only ICU group type is handled */
--	icu_group = fwspec->param[0];
--	if (icu_group != ICU_GRP_NSR && icu_group != ICU_GRP_SR &&
--	    icu_group != ICU_GRP_SEI && icu_group != ICU_GRP_REI) {
--		dev_err(icu->dev, "wrong ICU group type %x\n", icu_group);
--		return -EINVAL;
-+	if (static_branch_unlikely(&legacy_bindings)) {
-+		*hwirq = fwspec->param[1];
-+		*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
-+		if (fwspec->param[0] != ICU_GRP_NSR) {
-+			dev_err(icu->dev, "wrong ICU group type %x\n",
-+				fwspec->param[0]);
-+			return -EINVAL;
-+		}
-+	} else {
-+		*hwirq = fwspec->param[0];
-+		*type = fwspec->param[1] & IRQ_TYPE_SENSE_MASK;
- 	}
+ 		CP110_LABEL(thermal): thermal at 400078 {
+@@ -185,10 +192,10 @@
+ 				#gpio-cells = <2>;
+ 				gpio-ranges = <&CP110_LABEL(pinctrl) 0 0 32>;
+ 				interrupt-controller;
+-				interrupts = <ICU_GRP_NSR 86 IRQ_TYPE_LEVEL_HIGH>,
+-					<ICU_GRP_NSR 85 IRQ_TYPE_LEVEL_HIGH>,
+-					<ICU_GRP_NSR 84 IRQ_TYPE_LEVEL_HIGH>,
+-					<ICU_GRP_NSR 83 IRQ_TYPE_LEVEL_HIGH>;
++				interrupts = <86 IRQ_TYPE_LEVEL_HIGH>,
++					     <85 IRQ_TYPE_LEVEL_HIGH>,
++					     <84 IRQ_TYPE_LEVEL_HIGH>,
++					     <83 IRQ_TYPE_LEVEL_HIGH>;
+ 				status = "disabled";
+ 			};
  
--	*hwirq = fwspec->param[1];
- 	if (*hwirq >= ICU_MAX_IRQS) {
- 		dev_err(icu->dev, "invalid interrupt number %ld\n", *hwirq);
- 		return -EINVAL;
- 	}
+@@ -200,10 +207,10 @@
+ 				#gpio-cells = <2>;
+ 				gpio-ranges = <&CP110_LABEL(pinctrl) 0 32 31>;
+ 				interrupt-controller;
+-				interrupts = <ICU_GRP_NSR 82 IRQ_TYPE_LEVEL_HIGH>,
+-					<ICU_GRP_NSR 81 IRQ_TYPE_LEVEL_HIGH>,
+-					<ICU_GRP_NSR 80 IRQ_TYPE_LEVEL_HIGH>,
+-					<ICU_GRP_NSR 79 IRQ_TYPE_LEVEL_HIGH>;
++				interrupts = <82 IRQ_TYPE_LEVEL_HIGH>,
++					     <81 IRQ_TYPE_LEVEL_HIGH>,
++					     <80 IRQ_TYPE_LEVEL_HIGH>,
++					     <79 IRQ_TYPE_LEVEL_HIGH>;
+ 				status = "disabled";
+ 			};
+ 		};
+@@ -213,7 +220,7 @@
+ 			"generic-xhci";
+ 			reg = <0x500000 0x4000>;
+ 			dma-coherent;
+-			interrupts = <ICU_GRP_NSR 106 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <106 IRQ_TYPE_LEVEL_HIGH>;
+ 			clock-names = "core", "reg";
+ 			clocks = <&CP110_LABEL(clk) 1 22>,
+ 				 <&CP110_LABEL(clk) 1 16>;
+@@ -225,7 +232,7 @@
+ 			"generic-xhci";
+ 			reg = <0x510000 0x4000>;
+ 			dma-coherent;
+-			interrupts = <ICU_GRP_NSR 105 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <105 IRQ_TYPE_LEVEL_HIGH>;
+ 			clock-names = "core", "reg";
+ 			clocks = <&CP110_LABEL(clk) 1 23>,
+ 				 <&CP110_LABEL(clk) 1 16>;
+@@ -237,7 +244,7 @@
+ 			"generic-ahci";
+ 			reg = <0x540000 0x30000>;
+ 			dma-coherent;
+-			interrupts = <ICU_GRP_NSR 107 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <107 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&CP110_LABEL(clk) 1 15>,
+ 				 <&CP110_LABEL(clk) 1 16>;
+ 			status = "disabled";
+@@ -290,7 +297,7 @@
+ 			reg = <0x701000 0x20>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+-			interrupts = <ICU_GRP_NSR 120 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <120 IRQ_TYPE_LEVEL_HIGH>;
+ 			clock-names = "core", "reg";
+ 			clocks = <&CP110_LABEL(clk) 1 21>,
+ 				 <&CP110_LABEL(clk) 1 17>;
+@@ -302,7 +309,7 @@
+ 			reg = <0x701100 0x20>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+-			interrupts = <ICU_GRP_NSR 121 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <121 IRQ_TYPE_LEVEL_HIGH>;
+ 			clock-names = "core", "reg";
+ 			clocks = <&CP110_LABEL(clk) 1 21>,
+ 				 <&CP110_LABEL(clk) 1 17>;
+@@ -313,7 +320,7 @@
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x702000 0x100>;
+ 			reg-shift = <2>;
+-			interrupts = <ICU_GRP_NSR 122 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <122 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-io-width = <1>;
+ 			clock-names = "baudclk", "apb_pclk";
+ 			clocks = <&CP110_LABEL(clk) 1 21>,
+@@ -325,7 +332,7 @@
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x702100 0x100>;
+ 			reg-shift = <2>;
+-			interrupts = <ICU_GRP_NSR 123 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <123 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-io-width = <1>;
+ 			clock-names = "baudclk", "apb_pclk";
+ 			clocks = <&CP110_LABEL(clk) 1 21>,
+@@ -337,7 +344,7 @@
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x702200 0x100>;
+ 			reg-shift = <2>;
+-			interrupts = <ICU_GRP_NSR 124 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <124 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-io-width = <1>;
+ 			clock-names = "baudclk", "apb_pclk";
+ 			clocks = <&CP110_LABEL(clk) 1 21>,
+@@ -349,7 +356,7 @@
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x702300 0x100>;
+ 			reg-shift = <2>;
+-			interrupts = <ICU_GRP_NSR 125 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <125 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-io-width = <1>;
+ 			clock-names = "baudclk", "apb_pclk";
+ 			clocks = <&CP110_LABEL(clk) 1 21>,
+@@ -368,7 +375,7 @@
+ 			reg = <0x720000 0x54>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+-			interrupts = <ICU_GRP_NSR 115 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <115 IRQ_TYPE_LEVEL_HIGH>;
+ 			clock-names = "core", "reg";
+ 			clocks = <&CP110_LABEL(clk) 1 2>,
+ 				 <&CP110_LABEL(clk) 1 17>;
+@@ -380,7 +387,7 @@
+ 			compatible = "marvell,armada-8k-rng",
+ 			"inside-secure,safexcel-eip76";
+ 			reg = <0x760000 0x7d>;
+-			interrupts = <ICU_GRP_NSR 95 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <95 IRQ_TYPE_LEVEL_HIGH>;
+ 			clock-names = "core", "reg";
+ 			clocks = <&CP110_LABEL(clk) 1 25>,
+ 				 <&CP110_LABEL(clk) 1 17>;
+@@ -390,7 +397,7 @@
+ 		CP110_LABEL(sdhci0): sdhci at 780000 {
+ 			compatible = "marvell,armada-cp110-sdhci";
+ 			reg = <0x780000 0x300>;
+-			interrupts = <ICU_GRP_NSR 27 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <27 IRQ_TYPE_LEVEL_HIGH>;
+ 			clock-names = "core", "axi";
+ 			clocks = <&CP110_LABEL(clk) 1 4>, <&CP110_LABEL(clk) 1 18>;
+ 			dma-coherent;
+@@ -400,12 +407,12 @@
+ 		CP110_LABEL(crypto): crypto at 800000 {
+ 			compatible = "inside-secure,safexcel-eip197b";
+ 			reg = <0x800000 0x200000>;
+-			interrupts = <ICU_GRP_NSR 87 IRQ_TYPE_LEVEL_HIGH>,
+-				<ICU_GRP_NSR 88 IRQ_TYPE_LEVEL_HIGH>,
+-				<ICU_GRP_NSR 89 IRQ_TYPE_LEVEL_HIGH>,
+-				<ICU_GRP_NSR 90 IRQ_TYPE_LEVEL_HIGH>,
+-				<ICU_GRP_NSR 91 IRQ_TYPE_LEVEL_HIGH>,
+-				<ICU_GRP_NSR 92 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <87 IRQ_TYPE_LEVEL_HIGH>,
++				     <88 IRQ_TYPE_LEVEL_HIGH>,
++				     <89 IRQ_TYPE_LEVEL_HIGH>,
++				     <90 IRQ_TYPE_LEVEL_HIGH>,
++				     <91 IRQ_TYPE_LEVEL_HIGH>,
++				     <92 IRQ_TYPE_LEVEL_HIGH>;
+ 			interrupt-names = "mem", "ring0", "ring1",
+ 				"ring2", "ring3", "eip";
+ 			clock-names = "core", "reg";
+@@ -434,8 +441,8 @@
+ 		/* non-prefetchable memory */
+ 		0x82000000 0 CP110_PCIEx_MEM_BASE(0) 0  CP110_PCIEx_MEM_BASE(0) 0 0xf00000>;
+ 		interrupt-map-mask = <0 0 0 0>;
+-		interrupt-map = <0 0 0 0 &CP110_LABEL(icu) ICU_GRP_NSR 22 IRQ_TYPE_LEVEL_HIGH>;
+-		interrupts = <ICU_GRP_NSR 22 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-map = <0 0 0 0 &CP110_LABEL(icu_nsr) 22 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <22 IRQ_TYPE_LEVEL_HIGH>;
+ 		num-lanes = <1>;
+ 		clock-names = "core", "reg";
+ 		clocks = <&CP110_LABEL(clk) 1 13>, <&CP110_LABEL(clk) 1 14>;
+@@ -461,8 +468,8 @@
+ 		/* non-prefetchable memory */
+ 		0x82000000 0 CP110_PCIEx_MEM_BASE(1) 0  CP110_PCIEx_MEM_BASE(1) 0 0xf00000>;
+ 		interrupt-map-mask = <0 0 0 0>;
+-		interrupt-map = <0 0 0 0 &CP110_LABEL(icu) ICU_GRP_NSR 24 IRQ_TYPE_LEVEL_HIGH>;
+-		interrupts = <ICU_GRP_NSR 24 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-map = <0 0 0 0 &CP110_LABEL(icu_nsr) 24 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <24 IRQ_TYPE_LEVEL_HIGH>;
  
--	/* Mask the type to prevent wrong DT configuration */
--	*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
--
- 	return 0;
- }
+ 		num-lanes = <1>;
+ 		clock-names = "core", "reg";
+@@ -489,8 +496,8 @@
+ 		/* non-prefetchable memory */
+ 		0x82000000 0 CP110_PCIEx_MEM_BASE(2) 0  CP110_PCIEx_MEM_BASE(2) 0 0xf00000>;
+ 		interrupt-map-mask = <0 0 0 0>;
+-		interrupt-map = <0 0 0 0 &CP110_LABEL(icu) ICU_GRP_NSR 23 IRQ_TYPE_LEVEL_HIGH>;
+-		interrupts = <ICU_GRP_NSR 23 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-map = <0 0 0 0 &CP110_LABEL(icu_nsr) 23 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <23 IRQ_TYPE_LEVEL_HIGH>;
  
-@@ -155,7 +159,10 @@ mvebu_icu_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
- 		goto free_irqd;
- 	}
- 
--	icu_irqd->icu_group = fwspec->param[0];
-+	if (static_branch_unlikely(&legacy_bindings))
-+		icu_irqd->icu_group = fwspec->param[0];
-+	else
-+		icu_irqd->icu_group = ICU_GRP_NSR;
- 	icu_irqd->icu = icu;
- 
- 	err = platform_msi_domain_alloc(domain, virq, nr_irqs);
-@@ -203,6 +210,13 @@ static const struct irq_domain_ops mvebu_icu_domain_ops = {
- 	.free      = mvebu_icu_irq_domain_free,
- };
- 
-+static const struct of_device_id mvebu_icu_subset_of_match[] = {
-+	{
-+		.compatible = "marvell,cp110-icu-nsr",
-+	},
-+	{},
-+};
-+
- static int mvebu_icu_subset_probe(struct platform_device *pdev)
- {
- 	struct device_node *msi_parent_dn;
-@@ -210,7 +224,14 @@ static int mvebu_icu_subset_probe(struct platform_device *pdev)
- 	struct irq_domain *irq_domain;
- 	struct mvebu_icu *icu;
- 
--	icu = dev_get_drvdata(dev);
-+	/*
-+	 * Device data being populated means we are using the legacy bindings.
-+	 * Using the parent device data means we are using the new bindings.
-+	 */
-+	if (dev_get_drvdata(dev))
-+		icu = dev_get_drvdata(dev);
-+	else
-+		icu = dev_get_drvdata(dev->parent);
- 
- 	dev->msi_domain = of_msi_get_domain(dev, dev->of_node,
- 					    DOMAIN_BUS_PLATFORM_MSI);
-@@ -233,6 +254,15 @@ static int mvebu_icu_subset_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static struct platform_driver mvebu_icu_subset_driver = {
-+	.probe  = mvebu_icu_subset_probe,
-+	.driver = {
-+		.name = "mvebu-icu-subset",
-+		.of_match_table = mvebu_icu_subset_of_match,
-+	},
-+};
-+builtin_platform_driver(mvebu_icu_subset_driver);
-+
- static int mvebu_icu_probe(struct platform_device *pdev)
- {
- 	struct mvebu_icu *icu;
-@@ -259,6 +289,16 @@ static int mvebu_icu_probe(struct platform_device *pdev)
- 	if (!icu->irq_chip.name)
- 		return -ENOMEM;
- 
-+	/*
-+	 * Legacy bindings: ICU is one node with one MSI parent: force manually
-+	 *                  the probe of the NSR interrupts side.
-+	 * New bindings: ICU node has children, one per interrupt controller
-+	 *               having its own MSI parent: call platform_populate().
-+	 * All ICU instances should use the same bindings.
-+	 */
-+	if (!of_get_child_count(pdev->dev.of_node))
-+		static_branch_enable(&legacy_bindings);
-+
- 	icu->irq_chip.irq_mask = irq_chip_mask_parent;
- 	icu->irq_chip.irq_unmask = irq_chip_unmask_parent;
- 	icu->irq_chip.irq_eoi = irq_chip_eoi_parent;
-@@ -277,13 +317,18 @@ static int mvebu_icu_probe(struct platform_device *pdev)
- 		icu_int = readl_relaxed(icu->base + ICU_INT_CFG(i));
- 		icu_grp = icu_int >> ICU_GROUP_SHIFT;
- 
--		if (icu_grp == ICU_GRP_NSR)
-+		if (icu_grp == ICU_GRP_NSR ||
-+		    (icu_grp == ICU_GRP_SEI &&
-+		     !static_branch_unlikely(&legacy_bindings)))
- 			writel_relaxed(0x0, icu->base + ICU_INT_CFG(i));
- 	}
- 
- 	platform_set_drvdata(pdev, icu);
- 
--	return mvebu_icu_subset_probe(pdev);
-+	if (static_branch_unlikely(&legacy_bindings))
-+		return mvebu_icu_subset_probe(pdev);
-+	else
-+		return devm_of_platform_populate(&pdev->dev);
- }
- 
- static const struct of_device_id mvebu_icu_of_match[] = {
+ 		num-lanes = <1>;
+ 		clock-names = "core", "reg";
 -- 
 2.17.1
