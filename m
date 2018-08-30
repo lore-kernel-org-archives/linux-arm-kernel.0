@@ -1,71 +1,106 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Aug 2018 17:15:40 +0100
-Subject: [PATCH 06/12] arm64: tlb: Remove redundant
- !CONFIG_HAVE_RCU_TABLE_FREE code
+Date: Thu, 30 Aug 2018 17:15:42 +0100
+Subject: [PATCH 08/12] asm-generic/tlb: Track freeing of page-table
+ directories in struct mmu_gather
 In-Reply-To: <1535645747-9823-1-git-send-email-will.deacon@arm.com>
 References: <1535645747-9823-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1535645747-9823-7-git-send-email-will.deacon@arm.com>
+Message-ID: <1535645747-9823-9-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If there's one thing the RCU-based table freeing doesn't need, it's more
-ifdeffery.
+From: Peter Zijlstra <peterz@infradead.org>
 
-Remove the redundant !CONFIG_HAVE_RCU_TABLE_FREE code, since this option
-is unconditionally selected in our Kconfig.
+Some architectures require different TLB invalidation instructions
+depending on whether it is only the last-level of page table being
+changed, or whether there are also changes to the intermediate
+(directory) entries higher up the tree.
 
+Add a new bit to the flags bitfield in struct mmu_gather so that the
+architecture code can operate accordingly if it's the intermediate
+levels being invalidated.
+
+Signed-off-by: Peter Zijlstra <peterz@infradead.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/tlb.h | 12 +++---------
- 1 file changed, 3 insertions(+), 9 deletions(-)
+ include/asm-generic/tlb.h | 31 +++++++++++++++++++++++--------
+ 1 file changed, 23 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/include/asm/tlb.h b/arch/arm64/include/asm/tlb.h
-index 1e1f68ce28f4..bd00017d529a 100644
---- a/arch/arm64/include/asm/tlb.h
-+++ b/arch/arm64/include/asm/tlb.h
-@@ -22,16 +22,10 @@
- #include <linux/pagemap.h>
- #include <linux/swap.h>
- 
--#ifdef CONFIG_HAVE_RCU_TABLE_FREE
--
--#define tlb_remove_entry(tlb, entry)	tlb_remove_table(tlb, entry)
- static inline void __tlb_remove_table(void *_table)
- {
- 	free_page_and_swap_cache((struct page *)_table);
- }
--#else
--#define tlb_remove_entry(tlb, entry)	tlb_remove_page(tlb, entry)
--#endif /* CONFIG_HAVE_RCU_TABLE_FREE */
- 
- static void tlb_flush(struct mmu_gather *tlb);
- 
-@@ -61,7 +55,7 @@ static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
- {
- 	__flush_tlb_pgtable(tlb->mm, addr);
- 	pgtable_page_dtor(pte);
--	tlb_remove_entry(tlb, pte);
-+	tlb_remove_table(tlb, pte);
- }
- 
- #if CONFIG_PGTABLE_LEVELS > 2
-@@ -69,7 +63,7 @@ static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
- 				  unsigned long addr)
- {
- 	__flush_tlb_pgtable(tlb->mm, addr);
--	tlb_remove_entry(tlb, virt_to_page(pmdp));
-+	tlb_remove_table(tlb, virt_to_page(pmdp));
- }
+diff --git a/include/asm-generic/tlb.h b/include/asm-generic/tlb.h
+index a25e236f7a7f..2b444ad94566 100644
+--- a/include/asm-generic/tlb.h
++++ b/include/asm-generic/tlb.h
+@@ -99,12 +99,22 @@ struct mmu_gather {
  #endif
+ 	unsigned long		start;
+ 	unsigned long		end;
+-	/* we are in the middle of an operation to clear
+-	 * a full mm and can make some optimizations */
+-	unsigned int		fullmm : 1,
+-	/* we have performed an operation which
+-	 * requires a complete flush of the tlb */
+-				need_flush_all : 1;
++	/*
++	 * we are in the middle of an operation to clear
++	 * a full mm and can make some optimizations
++	 */
++	unsigned int		fullmm : 1;
++
++	/*
++	 * we have performed an operation which
++	 * requires a complete flush of the tlb
++	 */
++	unsigned int		need_flush_all : 1;
++
++	/*
++	 * we have removed page directories
++	 */
++	unsigned int		freed_tables : 1;
  
-@@ -78,7 +72,7 @@ static inline void __pud_free_tlb(struct mmu_gather *tlb, pud_t *pudp,
- 				  unsigned long addr)
- {
- 	__flush_tlb_pgtable(tlb->mm, addr);
--	tlb_remove_entry(tlb, virt_to_page(pudp));
-+	tlb_remove_table(tlb, virt_to_page(pudp));
+ 	struct mmu_gather_batch *active;
+ 	struct mmu_gather_batch	local;
+@@ -139,6 +149,7 @@ static inline void __tlb_reset_range(struct mmu_gather *tlb)
+ 		tlb->start = TASK_SIZE;
+ 		tlb->end = 0;
+ 	}
++	tlb->freed_tables = 0;
  }
- #endif
  
+ static inline void tlb_flush_mmu_tlbonly(struct mmu_gather *tlb)
+@@ -280,6 +291,7 @@ static inline void tlb_remove_check_page_size_change(struct mmu_gather *tlb,
+ #define pte_free_tlb(tlb, ptep, address)			\
+ 	do {							\
+ 		__tlb_adjust_range(tlb, address, PAGE_SIZE);	\
++		tlb->freed_tables = 1;			\
+ 		__pte_free_tlb(tlb, ptep, address);		\
+ 	} while (0)
+ #endif
+@@ -287,7 +299,8 @@ static inline void tlb_remove_check_page_size_change(struct mmu_gather *tlb,
+ #ifndef pmd_free_tlb
+ #define pmd_free_tlb(tlb, pmdp, address)			\
+ 	do {							\
+-		__tlb_adjust_range(tlb, address, PAGE_SIZE);		\
++		__tlb_adjust_range(tlb, address, PAGE_SIZE);	\
++		tlb->freed_tables = 1;			\
+ 		__pmd_free_tlb(tlb, pmdp, address);		\
+ 	} while (0)
+ #endif
+@@ -297,6 +310,7 @@ static inline void tlb_remove_check_page_size_change(struct mmu_gather *tlb,
+ #define pud_free_tlb(tlb, pudp, address)			\
+ 	do {							\
+ 		__tlb_adjust_range(tlb, address, PAGE_SIZE);	\
++		tlb->freed_tables = 1;			\
+ 		__pud_free_tlb(tlb, pudp, address);		\
+ 	} while (0)
+ #endif
+@@ -306,7 +320,8 @@ static inline void tlb_remove_check_page_size_change(struct mmu_gather *tlb,
+ #ifndef p4d_free_tlb
+ #define p4d_free_tlb(tlb, pudp, address)			\
+ 	do {							\
+-		__tlb_adjust_range(tlb, address, PAGE_SIZE);		\
++		__tlb_adjust_range(tlb, address, PAGE_SIZE);	\
++		tlb->freed_tables = 1;			\
+ 		__p4d_free_tlb(tlb, pudp, address);		\
+ 	} while (0)
+ #endif
 -- 
 2.1.4
