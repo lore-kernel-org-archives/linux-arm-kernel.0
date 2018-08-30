@@ -1,27 +1,25 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Thu, 30 Aug 2018 23:53:50 +0200
-Subject: [PATCH v2 1/2] ARM: configs: at91: add generic resistive
- touchscreen to sama5
-In-Reply-To: <1535552264-8923-1-git-send-email-eugen.hristev@microchip.com>
-References: <1535552264-8923-1-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <20180830215350.GL16561@piout.net>
+From: ezequiel@collabora.com (Ezequiel Garcia)
+Date: Thu, 30 Aug 2018 19:11:35 -0300
+Subject: [RFC 2/3] USB: core: Add non-coherent buffer allocation helpers
+In-Reply-To: <20180830175850.GA11521@infradead.org>
+References: <20180830172030.23344-1-ezequiel@collabora.com>
+ <20180830172030.23344-3-ezequiel@collabora.com>
+ <20180830175850.GA11521@infradead.org>
+Message-ID: <4fc5107f93871599ead017af7ad50f22535a7683.camel@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/08/2018 17:17:43+0300, Eugen Hristev wrote:
-> Add generic resistive touchscreen CONFIG_TOUCHSCREEN_ADC to sama5_defconfig
-> 
-> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
-> ---
-> Changes in v2:
-> - split config change into two commits, per defconfig
-> 
->  arch/arm/configs/sama5_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-Both applied, thanks.
+On Thu, 2018-08-30 at 10:58 -0700, Christoph Hellwig wrote:
+> Please don't introduce new DMA_ATTR_NON_CONSISTENT users, it is
+> a rather horrible interface, and I plan to kill it off rather sooner
+> than later.  I plan to post some patches for a better interface
+> that can reuse the normal dma_sync_single_* interfaces for ownership
+> transfers.  I can happily include usb in that initial patch set based
+> on your work here if that helps.
 
--- 
-Alexandre Belloni, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Please do. Until we have proper allocators that go thru the DMA API,
+drivers will have to kmalloc the USB transfer buffers, and have
+streaming mappings. Which in turns mean not using IOMMU or CMA.
+
+Regards,
+Eze
