@@ -1,35 +1,102 @@
 From: hanjie.lin@amlogic.com (Hanjie Lin)
-Date: Thu, 30 Aug 2018 15:50:19 +0800
-Subject: [PATCH v2 1/2] dt-bindings: phy: add DT bindings for Amlogic
- Meson PCIe Phy controller
-In-Reply-To: <20180829003722.GA25763@bogus>
+Date: Thu, 30 Aug 2018 16:02:53 +0800
+Subject: [PATCH v2 2/2] PCI: meson: add the Amlogic Meson PCIe phy driver
+In-Reply-To: <c21a2e25c934d19f913f625542f505cf45754f23.camel@baylibre.com>
 References: <1535096006-152091-1-git-send-email-hanjie.lin@amlogic.com>
- <1535096006-152091-2-git-send-email-hanjie.lin@amlogic.com>
- <20180829003722.GA25763@bogus>
-Message-ID: <82b460e6-0cfe-b5c4-f4ed-d339c579453e@amlogic.com>
+ <1535096006-152091-3-git-send-email-hanjie.lin@amlogic.com>
+ <c21a2e25c934d19f913f625542f505cf45754f23.camel@baylibre.com>
+Message-ID: <b8deb2ef-5e73-b508-616e-b0303a0adc78@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 2018/8/29 8:37, Rob Herring wrote:
-> On Fri, 24 Aug 2018 15:33:25 +0800, Hanjie Lin wrote:
->> From: Yue Wang <yue.wang@amlogic.com>
->>
->> The Meson-PCIE-PHY controller supports the 5-Gbps data rate
->> of the PCI Express Gen 2 specification and is backward compatible
->> with the 2.5-Gbps Gen 1.1 specification with only
->> inferred idle detection supported on Amlogic SoCs.
->>
->> Signed-off-by: Hanjie Lin <hanjie.lin@amlogic.com>
->> Signed-off-by: Yue Wang <yue.wang@amlogic.com>
->> ---
->>  .../bindings/phy/amlogic,meson-pcie-phy.txt         | 21 +++++++++++++++++++++
->>  1 file changed, 21 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/phy/amlogic,meson-pcie-phy.txt
->>
+On 2018/8/29 23:57, Jerome Brunet wrote:
+> On Fri, 2018-08-24 at 15:33 +0800, Hanjie Lin wrote:
+>> +static int meson_pcie_phy_probe(struct platform_device *pdev)
+>> +{
+>> +       struct device *dev = &pdev->dev;
+>> +       struct meson_pcie_phy *mphy;
+>> +       struct meson_pcie_reset *mrst;
+>> +       struct phy *generic_phy;
+>> +       struct phy_provider *phy_provider;
+>> +       struct resource *res;
+>> +       const struct meson_pcie_phy_data *data;
+>> +
+>> +       data = of_device_get_match_data(dev);
+>> +       if (!data)
+>> +               return -ENODEV;
+>> +
+>> +       mphy = devm_kzalloc(dev, sizeof(*mphy), GFP_KERNEL);
+>> +       if (!mphy)
+>> +               return -ENOMEM;
+>> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +       mphy->phy_base = devm_ioremap_resource(dev, res);
+>> +       if (IS_ERR(mphy->phy_base))
+>> +               return PTR_ERR(mphy->phy_base);
+>> +
+>> +       mrst = &mphy->reset;
+>> +
+>> +       mrst->phy = devm_reset_control_get_shared(dev, "phy");
 > 
-> Reviewed-by: Rob Herring <robh@kernel.org>
+> I thought you said there was only phy on this platform.
+> If that's the case, what is this reset shared with ?
+
+Amlogic axg soc includes two pcie controllers and they share the same pcie phy.
+Because of two pcie controllers, meson_pcie_phy_probe() will be called two times.
+So, the phy reset must be shared.
+
+> 
+>> +       if (IS_ERR(mrst->phy)) {
+>> +               if (PTR_ERR(mrst->phy) != -EPROBE_DEFER)
+>> +                       dev_err(dev, "couldn't get phy reset\n");
+>> +
+>> +               return PTR_ERR(mrst->phy);
+>> +       }
+>> +
+>> +       reset_control_deassert(mrst->phy);
+> 
+> Is it really necessary before init() is called by the consumer ?
+> 
+
+For shared reset we must deassert first before do assert,
+currently if we don't do this deassert, we will get the below warning when
+controller driver do the share reset.
+
+int reset_control_assert(struct reset_control *rstc)
+{
+...
+	if (rstc->shared) {
+		if (WARN_ON(atomic_read(&rstc->deassert_count) == 0))
+
+
+
+
+>> +
+>> +       mphy->data = data;
+>> +
+>> +       generic_phy = devm_phy_create(dev, dev->of_node, mphy->data->ops);
+>> +       if (IS_ERR(generic_phy)) {
+>> +               if (PTR_ERR(generic_phy) != -EPROBE_DEFER)
+>> +                       dev_err(dev, "failed to create PHY\n");
+>> +
+>> +               return PTR_ERR(generic_phy);
+>> +       }
+>> +
+>> +       phy_set_drvdata(generic_phy, mphy);
+>> +       phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
+>> +
+>> +       return PTR_ERR_OR_ZERO(phy_provider);
+>> +}
+>> +
+>> +static struct platform_driver meson_pcie_phy_driver = {
+>> +       .probe  = meson_pcie_phy_probe,
+>> +       .driver = {
+>> +               .of_match_table = meson_pcie_phy_match,
+>> +               .name           = "meson-pcie-phy",
+>> +       }
+>> +};
+> 
 > 
 > .
 > 
