@@ -1,77 +1,29 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 30 Aug 2018 21:59:12 +0200
-Subject: [PATCH] ARM: dts: pxa: add pincontrol helpers
-Message-ID: <20180830195912.6025-1-robert.jarzmik@free.fr>
+From: embed3d@gmail.com (Philipp Rossak)
+Date: Thu, 30 Aug 2018 22:00:36 +0200
+Subject: [linux-sunxi] [PATCH v3 21/30] iio: adc: sun4i-gpadc-iio: add
+ support for H3 thermal sensor
+In-Reply-To: <20180830162734.uq65l6ox6uwrmulo@core>
+References: <20180830154518.29507-1-embed3d@gmail.com>
+ <20180830154518.29507-22-embed3d@gmail.com>
+ <20180830162734.uq65l6ox6uwrmulo@core>
+Message-ID: <e919cbdd-a874-4b46-a505-9412d093f54a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add 3 helpers so that pincontrol definitions for pxa25x and pxa27x are
-easier, and can be easily converted from old mfp mach-pxa code to
-devicetree.
+On 30.08.2018 18:27, Ond?ej Jirman wrote:
+>> +static int sun8i_h3_calibrate(struct sun4i_gpadc_iio *info)
+>> +{
+>> +//	regmap_write(info->regmap, SUNXI_THS_CDATA_0_1,
+>> +//			info->calibration_data[0]);
+>> +//	regmap_write(info->regmap, SUNXI_THS_CDATA_2_3,
+>> +//			info->calibration_data[1]);
+> This should probably be implemented, or left out completely.
+> 
+> regards,
+>    o.
+> 
+Thanks you are right!
+This should be implemented! I will fix this in the next version!
 
-An example of such conversion would be :
-static unsigned long mioa701_pin_config[] = {
-	GPIO32_MMC_CLK,
-	GPIO92_MMC_DAT_0,
-	GPIO109_MMC_DAT_1,
-	GPIO110_MMC_DAT_2,
-	GPIO111_MMC_DAT_3,
-	GPIO112_MMC_CMD,
-	MIO_CFG_IN(GPIO78_SDIO_RO, AF0),
-	MIO_CFG_IN(GPIO15_SDIO_INSERT, AF0),
-	MIO_CFG_OUT(GPIO91_SDIO_EN, AF0, DRIVE_LOW),
-};
-into:
-	pinctrl_mmc_default: mmc-default {
-		PMMUX(sd-insert, 15, gpio_in);
-		PMMUX(mmclk, 32, MMCLK);
-		PMMUX(sd-ro, 78, gpio_in);
-		PMMUX_LPM_LOW(sd-enable, 91, gpio_out);
-		PMMUX(mmdat0, 92, MMDAT<0>);
-		PMMUX(mmdat1, 109, MMDAT<1>);
-		PMMUX(mmdat2, 110, MMDAT<2>);
-		PMMUX(mmdat3, 111, MMDAT<3>);
-		PMMUX(mmcmd, 112, MMCMD);
-	};
-
-The third column of PMMUX*() helpers can be found in pincontrol muxing
-functions, either in pinctrl-pxa27x.c (or pinctrl-pxa25x.c), or by
-inspecting the pincontrol once booted in debugfs.
-
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- arch/arm/boot/dts/pxa2xx.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
-
-diff --git a/arch/arm/boot/dts/pxa2xx.dtsi b/arch/arm/boot/dts/pxa2xx.dtsi
-index a520b4c14ea9..81312a9813f6 100644
---- a/arch/arm/boot/dts/pxa2xx.dtsi
-+++ b/arch/arm/boot/dts/pxa2xx.dtsi
-@@ -9,6 +9,25 @@
- #include "skeleton.dtsi"
- #include "dt-bindings/clock/pxa-clock.h"
- 
-+#define PMGROUP(pin) #pin
-+#define PMMUX(func, pin, af)			\
-+	mux- ## func {				\
-+		groups = PMGROUP(P ## pin);	\
-+		function = #af;			\
-+	}
-+#define PMMUX_LPM_LOW(func, pin, af)		\
-+	mux- ## func {				\
-+		groups = PMGROUP(P ## pin);	\
-+		function = #af;			\
-+		low-power-disable;		\
-+	}
-+#define PMMUX_LPM_HIGH(func, pin, af)		\
-+	mux- ## func {				\
-+		groups = PMGROUP(P ## pin);	\
-+		function = #af;			\
-+		low-power-enable;		\
-+	}
-+
- / {
- 	model = "Marvell PXA2xx family SoC";
- 	compatible = "marvell,pxa2xx";
--- 
-2.11.0
+Thanks,
+Philipp
