@@ -1,39 +1,46 @@
-From: axboe@kernel.dk (Jens Axboe)
-Date: Thu, 30 Aug 2018 20:52:52 -0600
-Subject: [PATCH v4 00/13] ata: ahci_platform: support allwinner R40 AHCI
-In-Reply-To: <CAGb2v67miUjqeKeDh_E_XPee_0Hq1C6YrfXxsOp_=NtQY+LLmQ@mail.gmail.com>
-References: <20180830190120.722-1-clabbe.montjoie@gmail.com>
- <f5838eae-fa6c-8699-14a4-95d0daa8a960@kernel.dk>
- <CAGb2v67miUjqeKeDh_E_XPee_0Hq1C6YrfXxsOp_=NtQY+LLmQ@mail.gmail.com>
-Message-ID: <8fa866c5-6800-505f-53bc-5c1b27582ca6@kernel.dk>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 31 Aug 2018 05:06:57 +0200
+Subject: [PATCH 0/2] ARM: dts: socfpga: Add support for PMU on
+ Arria5/Cyclone5
+In-Reply-To: <d723d5df-a700-3781-e8a5-4e57185585f8@kernel.org>
+References: <1488297132-21553-1-git-send-email-florian.vaussard@heig-vd.ch>
+ <d723d5df-a700-3781-e8a5-4e57185585f8@kernel.org>
+Message-ID: <b575b848-ffaa-43cd-ee70-8538ede3eca8@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/30/18 8:32 PM, Chen-Yu Tsai wrote:
-> Hi,
+On 03/08/2017 04:19 PM, Dinh Nguyen wrote:
 > 
-> On Fri, Aug 31, 2018 at 4:31 AM Jens Axboe <axboe@kernel.dk> wrote:
->>
->> On 8/30/18 1:01 PM, Corentin Labbe wrote:
->>> Hello
->>>
->>> This patchset add support for allwinner R40 AHCI controller.
->>>
->>> The whole patchset is tested on sun8i-r40-bananapi-m2-ultra and
->>> on sun7i-a20-cubieboard2 which doesnt have any of the ressources added
->>> by this serie, so no regression should come with it.
->>>
->>> The last patch(ata: ahci_sunxi: remove PHY code) should not be merged,
->>> but will be resent for inclustion when all patchs will have hit linus
->>> tree.
->>
->> Applied 1-12 with Hans's blessing, thanks Corentin.
 > 
-> Please don't merge device tree ("dts") patches, i.e. patches 9-12. We will
-> merge them through the sunxi / armsoc tree. Having them in separate trees
-> introduces conflicts when we have other stuff going through our tree.
+> On 02/28/2017 09:52 AM, Florian Vaussard wrote:
+>> Hi,
+>>
+>> These patches add suport for ARM Performance Monitor Units on Arria5 and
+>> Cyclone5 SoCFPGA. This was tested on a Cyclone 5 SoC DK board.
+>>
+>> Side note: the same change can be probably applied to Arria10 as well,
+>> but we do not have the hardware here to test.
+>>
+>> Regards,
+>> Florian
+>>
+>> Florian Vaussard (2):
+>>   ARM: dts: socfpga: Add labels for CPU nodes
+>>   ARM: dts: socfpga: Add support for PMU
+>>
+>>  arch/arm/boot/dts/socfpga.dtsi | 13 +++++++++++--
+>>  1 file changed, 11 insertions(+), 2 deletions(-)
+>>
+> 
+> Applied!
 
-OK, fair enough, I can drop those.
+I have to wonder how this was tested. I tried this on 4.14.y, but when I
+do "perf record -e cycles", I get no samples. Moreover, when I check the
+PMU interrupts, "grep pmu /proc/interrupts", it shows 0 interrupts from
+the ARM PMU all the time.
+
+Why am I not getting any PMU interrupts when using perf ?
 
 -- 
-Jens Axboe
+Best regards,
+Marek Vasut
