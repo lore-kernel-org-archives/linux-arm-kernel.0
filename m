@@ -1,73 +1,50 @@
 From: venture@google.com (Patrick Venture)
-Date: Fri, 31 Aug 2018 13:54:05 -0700
-Subject: [PATCH 2/2] ARM: dts: aspeed: quanta-q7l1: Add four PSUs
-In-Reply-To: <20180822171238.227972-1-venture@google.com>
-References: <20180822171238.227972-1-venture@google.com>
-Message-ID: <CAO=notzJMPnN=uZLxrN4BPfCwUhQZoQk0msGS6qOApqjv=5kgQ@mail.gmail.com>
+Date: Fri, 31 Aug 2018 13:58:39 -0700
+Subject: [PATCH v2 1/2] ARM: dts: aspeed: quanta-q71l: add aliases for i2c
+Message-ID: <20180831205839.241666-1-venture@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 22, 2018 at 10:12 AM Patrick Venture <venture@google.com> wrote:
->
-> Enable the four PSUs via generic PMBUS.
->
-> Signed-off-by: Patrick Venture <venture@google.com>
-> ---
->  arch/arm/boot/dts/aspeed-bmc-quanta-q71l.dts | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/aspeed-bmc-quanta-q71l.dts b/arch/arm/boot/dts/aspeed-bmc-quanta-q71l.dts
-> index 586050e1c0e6..c655564e6c6d 100644
-> --- a/arch/arm/boot/dts/aspeed-bmc-quanta-q71l.dts
-> +++ b/arch/arm/boot/dts/aspeed-bmc-quanta-q71l.dts
-> @@ -318,24 +318,44 @@
->                         #address-cells = <1>;
->                         #size-cells = <0>;
->                         reg = <0>;
-> +
-> +                       psu at 59 {
-> +                               compatible = "pmbus";
-> +                               reg = <0x59>;
-> +                       };
->                 };
->
->                 i2c_psu1: i2c at 1 {
->                         #address-cells = <1>;
->                         #size-cells = <0>;
->                         reg = <1>;
-> +
-> +                       psu at 58 {
-> +                               compatible = "pmbus";
-> +                               reg = <0x58>;
-> +                       };
->                 };
->
->                 i2c_psu3: i2c at 2 {
->                         #address-cells = <1>;
->                         #size-cells = <0>;
->                         reg = <2>;
-> +
-> +                       psu at 58 {
-> +                               compatible = "pmbus";
-> +                               reg = <0x58>;
-> +                       };
->                 };
->
->                 i2c_psu2: i2c at 3 {
->                         #address-cells = <1>;
->                         #size-cells = <0>;
->                         reg = <3>;
-> +
-> +                       psu at 59 {
-> +                               compatible = "pmbus";
-> +                               reg = <0x59>;
-> +                       };
->                 };
->         };
->
-> --
-> 2.18.0.1017.ga543ac7ca45-goog
->
+Provide aliases to each i2c bus per labels added for
+each PCIe slot, etc, that are downstream beyond a mux.
 
-Just noticed I typo'd q7l1 and q71l.  I'll send this patch as a new
-version with the correction.
+Signed-off-by: Patrick Venture <venture@google.com>
+---
+Changes for v2:
+ - No changes.
+---
+ arch/arm/boot/dts/aspeed-bmc-quanta-q71l.dts | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/arch/arm/boot/dts/aspeed-bmc-quanta-q71l.dts b/arch/arm/boot/dts/aspeed-bmc-quanta-q71l.dts
+index 76aa6ea1f988..586050e1c0e6 100644
+--- a/arch/arm/boot/dts/aspeed-bmc-quanta-q71l.dts
++++ b/arch/arm/boot/dts/aspeed-bmc-quanta-q71l.dts
+@@ -7,6 +7,25 @@
+ 	model = "Quanta Q71L BMC";
+ 	compatible = "quanta,q71l-bmc", "aspeed,ast2400";
+ 
++	aliases {
++		i2c14 = &i2c_pcie2;
++		i2c15 = &i2c_pcie3;
++		i2c16 = &i2c_pcie6;
++		i2c17 = &i2c_pcie7;
++		i2c18 = &i2c_pcie1;
++		i2c19 = &i2c_pcie4;
++		i2c20 = &i2c_pcie5;
++		i2c21 = &i2c_pcie8;
++		i2c22 = &i2c_pcie9;
++		i2c23 = &i2c_pcie10;
++		i2c24 = &i2c_ssd1;
++		i2c25 = &i2c_ssd2;
++		i2c26 = &i2c_psu4;
++		i2c27 = &i2c_psu1;
++		i2c28 = &i2c_psu3;
++		i2c29 = &i2c_psu2;
++	};
++
+ 	chosen {
+ 		stdout-path = &uart5;
+ 		bootargs = "console=ttyS4,115200 earlyprintk";
+-- 
+2.18.0.1017.ga543ac7ca45-goog
