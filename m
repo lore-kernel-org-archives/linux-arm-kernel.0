@@ -1,29 +1,41 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri, 31 Aug 2018 17:02:15 +0200
-Subject: [PATCH 0/3] arm64: dts: meson-axg: add pdm support
-Message-ID: <20180831150218.8307-1-jbrunet@baylibre.com>
+Date: Fri, 31 Aug 2018 17:02:16 +0200
+Subject: [PATCH 1/3] arm64: dts: meson-axg: add pdm
+In-Reply-To: <20180831150218.8307-1-jbrunet@baylibre.com>
+References: <20180831150218.8307-1-jbrunet@baylibre.com>
+Message-ID: <20180831150218.8307-2-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds pdm support for amlogic AXG SoC.
-It applies on top of the DT clean-up [0] I sent earlier
+Add the PDM device of the axg audio subsystem
 
-The related ASoC PDM patches can be found here [1]. While the ASoC patches
-[2] are obviously needed to for the PDM to work, this series can be safely
-applied without it.
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-[0]: https://lkml.kernel.org/r/20180829154551.26729-1-jbrunet at baylibre.com
-[1]: https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git/log/?h=for-4.20
-[2]: https://lkml.kernel.org/r/20180829150051.18190-1-jbrunet at baylibre.com
-
-Jerome Brunet (3):
-  arm64: dts: meson-axg: add pdm
-  arm64: dts: meson-axg: s400: add dmic codec
-  arm64: dts: meson-axg: s400: add pdm to the sound card
-
- .../arm64/boot/dts/amlogic/meson-axg-s400.dts | 27 +++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi    | 12 +++++++++
- 2 files changed, 39 insertions(+)
-
+diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+index 36be63d69e7f..883ddfce2374 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+@@ -152,6 +152,18 @@
+ 			status = "disabled";
+ 		};
+ 
++		pdm: audio-controller at ff632000 {
++			compatible = "amlogic,axg-pdm";
++			reg = <0x0 0xff632000 0x0 0x34>;
++			#sound-dai-cells = <0>;
++			sound-name-prefix = "PDM";
++			clocks = <&clkc_audio AUD_CLKID_PDM>,
++				 <&clkc_audio AUD_CLKID_PDM_DCLK>,
++				 <&clkc_audio AUD_CLKID_PDM_SYSCLK>;
++			clock-names = "pclk", "dclk", "sysclk";
++			status = "disabled";
++		};
++
+ 		periphs: bus at ff634000 {
+ 			compatible = "simple-bus";
+ 			reg = <0x0 0xff634000 0x0 0x2000>;
 -- 
 2.17.1
