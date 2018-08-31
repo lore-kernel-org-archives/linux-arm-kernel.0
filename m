@@ -1,33 +1,39 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 31 Aug 2018 13:39:34 +0100
-Subject: [PATCH 2/7] arm64: cpufeature: Detect SSBS and advertise to
- userspace
-In-Reply-To: <1535645767-9901-3-git-send-email-will.deacon@arm.com>
-References: <1535645767-9901-1-git-send-email-will.deacon@arm.com>
- <1535645767-9901-3-git-send-email-will.deacon@arm.com>
-Message-ID: <dff5885f-de95-5aab-0d47-daf20d9a63c2@arm.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 31 Aug 2018 15:41:09 +0300
+Subject: [PATCHv2] kbuild: add support for building %.dtbo targets
+Message-ID: <1535719269-13492-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/08/18 17:16, Will Deacon wrote:
-> Armv8.5 introduces a new PSTATE bit known as Speculative Store Bypass
-> Safe (SSBS) which can be used as a mitigation against Spectre variant 4.
-> 
-> Additionally, a CPU may provide instructions to manipulate PSTATE.SSBS
-> directly, so that userspace can toggle the SSBS control without trapping
-> to the kernel.
-> 
-> This patch probes for the existence of SSBS and advertise the new instructions
-> to userspace if they exist.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->   arch/arm64/include/asm/cpucaps.h    |  3 ++-
->   arch/arm64/include/asm/sysreg.h     | 16 ++++++++++++----
->   arch/arm64/include/uapi/asm/hwcap.h |  1 +
->   arch/arm64/kernel/cpufeature.c      | 19 +++++++++++++++++--
->   arch/arm64/kernel/cpuinfo.c         |  1 +
->   5 files changed, 33 insertions(+), 7 deletions(-)
-> 
+Add support for building DT overlay targets, which can be applied
+either runtime or statically on top of base devicetree blobs. The
+only supported runtime application of overlays right now is during
+bootloader execution; if the bootloader in question supports this.
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v2: no changes, just split up the series into parts
+
+ scripts/Makefile.lib | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
+index 61e5966..527aab9 100644
+--- a/scripts/Makefile.lib
++++ b/scripts/Makefile.lib
+@@ -292,6 +292,9 @@ cmd_dtc = mkdir -p $(dir ${dtc-tmp}) ; \
+ $(obj)/%.dtb: $(src)/%.dts $(DTC) FORCE
+ 	$(call if_changed_dep,dtc)
+ 
++$(obj)/%.dtbo: $(src)/%.dtso $(DTC) FORCE
++	$(call if_changed_dep,dtc)
++
+ dtc-tmp = $(subst $(comma),_,$(dot-target).dts.tmp)
+ 
+ # Bzip2
+-- 
+1.9.1
+
+--
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
