@@ -1,86 +1,74 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 31 Aug 2018 16:19:43 +0100
-Subject: [PATCH] arm64: Kconfig: Remove ARCH_HAS_HOLES_MEMORYMODEL
-Message-ID: <20180831151943.9281-1-james.morse@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 31 Aug 2018 16:21:31 +0100
+Subject: [PATCH net-next v3 02/10] net: mvpp2: phylink support
+In-Reply-To: <20180831143721.GB19733@lunn.ch>
+References: <20180517082939.14598-1-antoine.tenart@bootlin.com>
+ <20180517082939.14598-3-antoine.tenart@bootlin.com>
+ <20180827165058.GD30658@n2100.armlinux.org.uk>
+ <20180831133651.GB32574@kwain>
+ <20180831141123.GM30658@n2100.armlinux.org.uk>
+ <20180831143721.GB19733@lunn.ch>
+Message-ID: <20180831152131.GN30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-include/linux/mmzone.h describes ARCH_HAS_HOLES_MEMORYMODEL as
-relevant when parts the memmap have been free()d. This would
-happen on systems where memory is smaller than a sparsemem-section,
-and the extra struct pages are expensive. pfn_valid() on these
-systems returns true for the whole sparsemem-section, so an extra
-memmap_valid_within() check is needed.
+On Fri, Aug 31, 2018 at 04:37:21PM +0200, Andrew Lunn wrote:
+> > Can you see any down-sides to moving the netif_carrier_off() in
+> > mvneta_open() to phylink_start() ?
+> 
+> This sounds like a good idea.
+> 
+> What happens on the resume path?
 
-On arm64 we have nomap memory, so always provide pfn_valid() to test
-for nomap pages. This means ARCH_HAS_HOLES_MEMORYMODEL's extra checks
-are already rolled up into pfn_valid().
+Suspend/resume should be safe, because we force the link down when
+phylink_stop() is called.
 
-Remove it.
+Looking at mvneta again, mvneta_stop_dev() is called in the suspend
+path, which then calls phylink_stop().  This causes us to call
+mac_link_down() and netif_carrier_off().  So, at the point of suspend,
+the netdev carrier is set down and the mac taken down.
 
-Signed-off-by: James Morse <james.morse@arm.com>
----
- arch/arm64/Kconfig            | 5 +----
- arch/arm64/include/asm/page.h | 2 --
- arch/arm64/mm/init.c          | 2 --
- 3 files changed, 1 insertion(+), 8 deletions(-)
+When resuming, mvneta_start_dev() calls phylink_start(), which undoes
+the changes above, calling mac_link_up() if the link is now up.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 1b1a0e95c751..6082d47bfc32 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -769,9 +769,6 @@ source kernel/Kconfig.hz
- config ARCH_SUPPORTS_DEBUG_PAGEALLOC
- 	def_bool y
- 
--config ARCH_HAS_HOLES_MEMORYMODEL
--	def_bool y if SPARSEMEM
--
- config ARCH_SPARSEMEM_ENABLE
- 	def_bool y
- 	select SPARSEMEM_VMEMMAP_ENABLE
-@@ -786,7 +783,7 @@ config ARCH_FLATMEM_ENABLE
- 	def_bool !NUMA
- 
- config HAVE_ARCH_PFN_VALID
--	def_bool ARCH_HAS_HOLES_MEMORYMODEL || !SPARSEMEM
-+	def_bool y
- 
- config HW_PERF_EVENTS
- 	def_bool y
-diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
-index 60d02c81a3a2..c88a3cb117a1 100644
---- a/arch/arm64/include/asm/page.h
-+++ b/arch/arm64/include/asm/page.h
-@@ -37,9 +37,7 @@ extern void clear_page(void *to);
- 
- typedef struct page *pgtable_t;
- 
--#ifdef CONFIG_HAVE_ARCH_PFN_VALID
- extern int pfn_valid(unsigned long);
--#endif
- 
- #include <asm/memory.h>
- 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 787e27964ab9..3cf87341859f 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -284,7 +284,6 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max)
- 
- #endif /* CONFIG_NUMA */
- 
--#ifdef CONFIG_HAVE_ARCH_PFN_VALID
- int pfn_valid(unsigned long pfn)
- {
- 	phys_addr_t addr = pfn << PAGE_SHIFT;
-@@ -294,7 +293,6 @@ int pfn_valid(unsigned long pfn)
- 	return memblock_is_map_memory(addr);
- }
- EXPORT_SYMBOL(pfn_valid);
--#endif
- 
- #ifndef CONFIG_SPARSEMEM
- static void __init arm64_memory_present(void)
+So, as long as netdevs don't mess with the carrier state in their
+suspend/resume functions, and they call phylink_start()/phylink_stop()
+there, everything will work as intended - and that's really the key
+issue here.
+
+> I've not looked at any code.... Just thinking aloud. Can we suspend
+> with the link up? When we resume, so long as we were not doing WoL,
+> the link is down. If phylink_start() is not called, we have this miss
+> match again.
+
+It depends what you mean by "link up".  Are you talking about the PHYs
+link to the external world (which is normally what's responsible for
+handling WOL) or are you talking about keeping the MAC and its rings
+alive so it can process packets while suspended.
+
+If the former, that's the responsibility of phylib to manage, if the
+latter, the netdev must not call phylink_stop() in its suspend function.
+
+Either way, not messing with the netdev's carrier state is key.
+
+The only exception to this is that the carrier should be down at open()
+time.  However, I don't see anything in net/core that fiddles with the
+carrier state for a net device, so the default state at boot should be
+carrier-off.
+
+I think some questions for Antoine are:
+
+- what is the state of the carrier at the start of mvpp2_start() ?
+- when does the missing call to mac_link_up() occur - is it the first
+  time the netdev is brought up, or a subsequent time?
+- is the carrier always off at the end of mvpp2_stop()?
+
+Having a local reproducer may help, so if you can point to a DT fragment
+and set of steps to reproduce, it could be helpful.
+
+Thanks.
+
 -- 
-2.18.0
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
