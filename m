@@ -1,52 +1,138 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 31 Aug 2018 16:52:46 +0200
-Subject: [PATCH] arm64: dts: renesas: r8a774a1: Add CAN nodes
-In-Reply-To: <CAMuHMdUL0Ck=6er8rvx_kCSi7KR9kjBqjNRiLOL41nxeJXQG-w@mail.gmail.com>
-References: <1535034166-24798-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <CAMuHMdUL0Ck=6er8rvx_kCSi7KR9kjBqjNRiLOL41nxeJXQG-w@mail.gmail.com>
-Message-ID: <20180831145241.7ahp77jrlpievtmw@verge.net.au>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 31 Aug 2018 18:01:23 +0300
+Subject: [PATCH] ARM: omap2+: hwmod_core: improve the support for clkctrl
+ clocks
+Message-ID: <1535727683-23930-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2018 at 10:44:10AM +0200, Geert Uytterhoeven wrote:
-> Hi Fabrizio,
-> 
-> On Thu, Aug 23, 2018 at 4:22 PM Fabrizio Castro
-> <fabrizio.castro@bp.renesas.com> wrote:
-> > From: Chris Paterson <chris.paterson2@renesas.com>
-> >
-> > Add the device nodes for both RZ/G2M CAN channels.
-> >
-> > Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
-> > Reviewed-by: Biju Das <biju.das@bp.renesas.com>
-> > ---
-> >
-> > This patch depends on:
-> > https://lkml.org/lkml/2018/8/23/1049
-> > https://www.mail-archive.com/linux-renesas-soc at vger.kernel.org/msg30550.html
-> >
-> >
-> >  arch/arm64/boot/dts/renesas/r8a774a1.dtsi | 24 ++++++++++++++++++++++++
-> >  1 file changed, 24 insertions(+)
-> >
-> > diff --git a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-> > index 5d0109a..cd204f5 100644
-> > --- a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-> > +++ b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-> > @@ -816,6 +816,30 @@
-> >                         status = "disabled";
-> >                 };
-> >
-> > +               can0: can at e6c30000 {
-> > +                       compatible = "renesas,can-r8a774a1",
-> > +                                    "renesas,rzg-gen2-can";
-> 
-> Please don't introduce "renesas,rzg-gen2-can", cfr. my comments in
-> https://lore.kernel.org/lkml/CAMuHMdWPuqfXOgh_-qp8q6wATU3Lj_WpX0bAOxPBX76SKvyXCQ at mail.gmail.com/
+This patch adds support for split memory ranges for clkctrl providers.
+This is necessary to support the coming clockdomain based split of
+clkctrl provider ranges, instead of the current CM instance based one.
 
-Thanks Geert,
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+Note: This patch can be applied independently, the only hard dependency
+with the clkctrl data split is with the DT changes, those must follow
+everything else.
 
-I was ok with the compat string but it was unwise to pick up this patch
-before that discussion had concluded. I have dropped this patch accordingly.
+ arch/arm/mach-omap2/omap_hwmod.c | 72 ++++++++++++++++++++++++----------------
+ 1 file changed, 43 insertions(+), 29 deletions(-)
 
-Fabrizio, please post a v2 once the binding is agreed on.
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 2ceffd8..23819bb 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -188,16 +188,16 @@
+ 
+ /**
+  * struct clkctrl_provider - clkctrl provider mapping data
+- * @addr: base address for the provider
+- * @size: size of the provider address space
+- * @offset: offset of the provider from PRCM instance base
++ * @num_addrs: number of base address ranges for the provider
++ * @addr: base address(es) for the provider
++ * @size: size(s) of the provider address space(s)
+  * @node: device node associated with the provider
+  * @link: list link
+  */
+ struct clkctrl_provider {
+-	u32			addr;
+-	u32			size;
+-	u16			offset;
++	int			num_addrs;
++	u32			*addr;
++	u32			*size;
+ 	struct device_node	*node;
+ 	struct list_head	link;
+ };
+@@ -724,23 +724,34 @@ static int __init _setup_clkctrl_provider(struct device_node *np)
+ 	const __be32 *addrp;
+ 	struct clkctrl_provider *provider;
+ 	u64 size;
++	int i;
+ 
+ 	provider = memblock_virt_alloc(sizeof(*provider), 0);
+ 	if (!provider)
+ 		return -ENOMEM;
+ 
+-	addrp = of_get_address(np, 0, &size, NULL);
+-	provider->addr = (u32)of_translate_address(np, addrp);
+-	addrp = of_get_address(np->parent, 0, NULL, NULL);
+-	provider->offset = provider->addr -
+-			   (u32)of_translate_address(np->parent, addrp);
+-	provider->addr &= ~0xff;
+-	provider->size = size | 0xff;
+ 	provider->node = np;
+ 
+-	pr_debug("%s: %s: %x...%x [+%x]\n", __func__, np->parent->name,
+-		 provider->addr, provider->addr + provider->size,
+-		 provider->offset);
++	provider->num_addrs =
++		of_property_count_elems_of_size(np, "reg", sizeof(u32)) / 2;
++
++	provider->addr =
++		memblock_virt_alloc(sizeof(void *) * provider->num_addrs, 0);
++	if (!provider->addr)
++		return -ENOMEM;
++
++	provider->size =
++		memblock_virt_alloc(sizeof(u32) * provider->num_addrs, 0);
++	if (!provider->size)
++		return -ENOMEM;
++
++	for (i = 0; i < provider->num_addrs; i++) {
++		addrp = of_get_address(np, i, &size, NULL);
++		provider->addr[i] = (u32)of_translate_address(np, addrp);
++		provider->size[i] = size;
++		pr_debug("%s: %pOF: %x...%x\n", __func__, np, provider->addr[i],
++			 provider->addr[i] + provider->size[i]);
++	}
+ 
+ 	list_add(&provider->link, &clkctrl_providers);
+ 
+@@ -787,23 +798,26 @@ static struct clk *_lookup_clkctrl_clk(struct omap_hwmod *oh)
+ 	pr_debug("%s: %s: addr=%x\n", __func__, oh->name, addr);
+ 
+ 	list_for_each_entry(provider, &clkctrl_providers, link) {
+-		if (provider->addr <= addr &&
+-		    provider->addr + provider->size >= addr) {
+-			struct of_phandle_args clkspec;
++		int i;
+ 
+-			clkspec.np = provider->node;
+-			clkspec.args_count = 2;
+-			clkspec.args[0] = addr - provider->addr -
+-					  provider->offset;
+-			clkspec.args[1] = 0;
++		for (i = 0; i < provider->num_addrs; i++) {
++			if (provider->addr[i] <= addr &&
++			    provider->addr[i] + provider->size[i] > addr) {
++				struct of_phandle_args clkspec;
+ 
+-			clk = of_clk_get_from_provider(&clkspec);
++				clkspec.np = provider->node;
++				clkspec.args_count = 2;
++				clkspec.args[0] = addr - provider->addr[0];
++				clkspec.args[1] = 0;
+ 
+-			pr_debug("%s: %s got %p (offset=%x, provider=%s)\n",
+-				 __func__, oh->name, clk, clkspec.args[0],
+-				 provider->node->parent->name);
++				clk = of_clk_get_from_provider(&clkspec);
+ 
+-			return clk;
++				pr_debug("%s: %s got %p (offset=%x, provider=%pOF)\n",
++					 __func__, oh->name, clk,
++					 clkspec.args[0], provider->node);
++
++				return clk;
++			}
+ 		}
+ 	}
+ 
+-- 
+1.9.1
+
+--
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
