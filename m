@@ -1,40 +1,29 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri, 31 Aug 2018 17:02:17 +0200
-Subject: [PATCH 2/3] arm64: dts: meson-axg: s400: add dmic codec
-In-Reply-To: <20180831150218.8307-1-jbrunet@baylibre.com>
-References: <20180831150218.8307-1-jbrunet@baylibre.com>
-Message-ID: <20180831150218.8307-3-jbrunet@baylibre.com>
+Date: Fri, 31 Aug 2018 17:02:15 +0200
+Subject: [PATCH 0/3] arm64: dts: meson-axg: add pdm support
+Message-ID: <20180831150218.8307-1-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are 7 digital mics on the MIC daughter board attached
-to the s400 board, so add the digital microphone codec to
-its DTS
+This patchset adds pdm support for amlogic AXG SoC.
+It applies on top of the DT clean-up [0] I sent earlier
 
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/meson-axg-s400.dts | 9 +++++++++
- 1 file changed, 9 insertions(+)
+The related ASoC PDM patches can be found here [1]. While the ASoC patches
+[2] are obviously needed to for the PDM to work, this series can be safely
+applied without it.
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-index ff64c429d432..f3e16cbbc61e 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-@@ -86,6 +86,15 @@
- 		sound-name-prefix = "DIT";
- 	};
- 
-+	dmics: audio-codec at 3 {
-+		#sound-dai-cells = <0>;
-+		compatible = "dmic-codec";
-+		num-channels = <7>;
-+		wakeup-delay-ms = <50>;
-+		status = "okay";
-+		sound-name-prefix = "MIC";
-+	};
-+
- 	emmc_pwrseq: emmc-pwrseq {
- 		compatible = "mmc-pwrseq-emmc";
- 		reset-gpios = <&gpio BOOT_9 GPIO_ACTIVE_LOW>;
+[0]: https://lkml.kernel.org/r/20180829154551.26729-1-jbrunet at baylibre.com
+[1]: https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git/log/?h=for-4.20
+[2]: https://lkml.kernel.org/r/20180829150051.18190-1-jbrunet at baylibre.com
+
+Jerome Brunet (3):
+  arm64: dts: meson-axg: add pdm
+  arm64: dts: meson-axg: s400: add dmic codec
+  arm64: dts: meson-axg: s400: add pdm to the sound card
+
+ .../arm64/boot/dts/amlogic/meson-axg-s400.dts | 27 +++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi    | 12 +++++++++
+ 2 files changed, 39 insertions(+)
+
 -- 
 2.17.1
