@@ -1,44 +1,17 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 31 Aug 2018 10:45:30 -0700
-Subject: [PATCH 00/16] clk: at91: Rework DT bindings
-In-Reply-To: <20180816114755.GH21707@piout.net>
-References: <20180717222757.10253-1-alexandre.belloni@bootlin.com>
- <153271100280.48062.2538655794734424353@swboyd.mtv.corp.google.com>
- <20180816114755.GH21707@piout.net>
-Message-ID: <153573753043.93865.2420370848457480370@swboyd.mtv.corp.google.com>
+Date: Fri, 31 Aug 2018 10:56:39 -0700
+Subject: [PATCH 2/4] clock: aspeed: Setup video engine clocking
+In-Reply-To: <1535576973-8067-3-git-send-email-eajames@linux.vnet.ibm.com>
+References: <1535576973-8067-1-git-send-email-eajames@linux.vnet.ibm.com>
+ <1535576973-8067-3-git-send-email-eajames@linux.vnet.ibm.com>
+Message-ID: <153573819934.93865.9948361566635476864@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Alexandre Belloni (2018-08-16 04:47:55)
-> On 27/07/2018 10:03:22-0700, Stephen Boyd wrote:
-> > Quoting Alexandre Belloni (2018-07-17 15:27:41)
-> > > This is the promised rework of the at91 PMC clocks driver. It is mainly
-> > > necessary to remove the DTC warnings but it also complies with the CCF
-> > > rule that there should be one node per controller instead of one node
-> > > per clock.
-> > > 
-> > > This only handles the PMC, I'm planning to also rework the SCKC bindings
-> > > later (without breaking the DT ABI).
-> > > 
-> > > The series is based on top of clk-next plus at91-dt so I don't think it
-> > > is convenient to have it this cycle. However, I would really like to
-> > > ensure we agree on the new bindings this cycle before converting all the
-> > > other platforms as this is a bit tedious.
-> > > 
-> > > The first two patches are actually fixes and may be considered for this
-> > > cycle.
-> > > 
-> > > One nice note:
-> > > at91-sama5d2_xplained.dtb goes from 29351 bytes to 22082 bytes
-> > 
-> > Patches look mostly good. Rob is happy with the bindings and so am I.
-> > 
-> > One general question is why the drivers can't be moved to real platform
-> > drivers instead of using OF_CLK_DECLARE?
-> > 
+Quoting Eddie James (2018-08-29 14:09:31)
+> Add the video engine reset bit. Add eclk mux and clock divider table.
 > 
-> I tried, this makes the clocksource drivers fail with -EPROBE_DEFER and
-> so the kernel just stops there.
-> 
+> Signed-off-by: Eddie James <eajames@linux.vnet.ibm.com>
+> ---
 
-Ok. We have CLK_OF_DECLARE_DRIVER for that. Can you use that?
+Acked-by: Stephen Boyd <sboyd@kernel.org>
