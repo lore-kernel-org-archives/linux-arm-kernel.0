@@ -1,132 +1,85 @@
 From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Fri, 31 Aug 2018 17:01:47 +0300
-Subject: [PATCH v9 4/8] interconnect: Add debugfs support
+Date: Fri, 31 Aug 2018 17:01:45 +0300
+Subject: [PATCH v9 2/8] dt-bindings: Introduce interconnect binding
 In-Reply-To: <20180831140151.13972-1-georgi.djakov@linaro.org>
 References: <20180831140151.13972-1-georgi.djakov@linaro.org>
-Message-ID: <20180831140151.13972-5-georgi.djakov@linaro.org>
+Message-ID: <20180831140151.13972-3-georgi.djakov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a functionality to provide information about the current constraints
-per each node and provider.
+This binding is intended to represent the relations between the interconnect
+controllers (providers) and consumer device nodes. It will allow creating links
+between consumers and interconnect paths (exposed by interconnect providers).
 
 Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
-Reviewed-by: Evan Green <evgreen@chromium.org>
 ---
- drivers/interconnect/core.c | 78 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 78 insertions(+)
+ .../bindings/interconnect/interconnect.txt    | 60 +++++++++++++++++++
+ 1 file changed, 60 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interconnect/interconnect.txt
 
-diff --git a/drivers/interconnect/core.c b/drivers/interconnect/core.c
-index ed0a6783ffc4..2740f1a441d8 100644
---- a/drivers/interconnect/core.c
-+++ b/drivers/interconnect/core.c
-@@ -6,6 +6,7 @@
-  * Author: Georgi Djakov <georgi.djakov@linaro.org>
-  */
- 
-+#include <linux/debugfs.h>
- #include <linux/device.h>
- #include <linux/idr.h>
- #include <linux/init.h>
-@@ -17,10 +18,12 @@
- #include <linux/slab.h>
- #include <linux/of.h>
- #include <linux/overflow.h>
-+#include <linux/uaccess.h>
- 
- static DEFINE_IDR(icc_idr);
- static LIST_HEAD(icc_provider_list);
- static DEFINE_MUTEX(icc_lock);
-+static struct dentry *icc_debugfs_dir;
- 
- /**
-  * struct icc_req - constraints that are attached to each node
-@@ -49,6 +52,62 @@ struct icc_path {
- 	struct icc_req reqs[];
- };
- 
-+#ifdef CONFIG_DEBUG_FS
+diff --git a/Documentation/devicetree/bindings/interconnect/interconnect.txt b/Documentation/devicetree/bindings/interconnect/interconnect.txt
+new file mode 100644
+index 000000000000..5cb7d3c8d44d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interconnect/interconnect.txt
+@@ -0,0 +1,60 @@
++Interconnect Provider Device Tree Bindings
++=========================================
 +
-+static void icc_summary_show_one(struct seq_file *s, struct icc_node *n)
-+{
-+	if (!n)
-+		return;
++The purpose of this document is to define a common set of generic interconnect
++providers/consumers properties.
 +
-+	seq_printf(s, "%-30s %12d %12d\n",
-+		   n->name, n->avg_bw, n->peak_bw);
-+}
 +
-+static int icc_summary_show(struct seq_file *s, void *data)
-+{
-+	struct icc_provider *provider;
++= interconnect providers =
 +
-+	seq_puts(s, " node                                   avg         peak\n");
-+	seq_puts(s, "--------------------------------------------------------\n");
++The interconnect provider binding is intended to represent the interconnect
++controllers in the system. Each provider registers a set of interconnect
++nodes, which expose the interconnect related capabilities of the interconnect
++to consumer drivers. These capabilities can be throughput, latency, priority
++etc. The consumer drivers set constraints on interconnect path (or endpoints)
++depending on the use case. Interconnect providers can also be interconnect
++consumers, such as in the case where two network-on-chip fabrics interface
++directly
 +
-+	mutex_lock(&icc_lock);
++Required properties:
++- compatible : contains the interconnect provider compatible string
++- #interconnect-cells : number of cells in a interconnect specifier needed to
++			encode the interconnect node id
 +
-+	list_for_each_entry(provider, &icc_provider_list, provider_list) {
-+		struct icc_node *n;
++Example:
 +
-+		list_for_each_entry(n, &provider->nodes, node_list) {
-+			struct icc_req *r;
++		snoc: snoc at 580000 {
++			compatible = "qcom,msm8916-snoc";
++			#interconnect-cells = <1>;
++			reg = <0x580000 0x14000>;
++			clock-names = "bus_clk", "bus_a_clk";
++			clocks = <&rpmcc RPM_SMD_SNOC_CLK>,
++				 <&rpmcc RPM_SMD_SNOC_A_CLK>;
++		};
 +
-+			icc_summary_show_one(s, n);
-+			hlist_for_each_entry(r, &n->req_list, req_node) {
-+				if (!r->dev)
-+					continue;
 +
-+				seq_printf(s, "    %-26s %12d %12d\n",
-+					   dev_name(r->dev), r->avg_bw,
-+					   r->peak_bw);
-+			}
-+		}
-+	}
++= interconnect consumers =
 +
-+	mutex_unlock(&icc_lock);
++The interconnect consumers are device nodes which dynamically express their
++bandwidth requirements along interconnect paths they are connected to. There
++can be multiple interconnect providers on a SoC and the consumer may consume
++multiple paths from different providers depending on use case and the
++components it has to interact with.
 +
-+	return 0;
-+}
++Required properties:
++interconnects : Pairs of phandles and interconnect provider specifier to denote
++	        the edge source and destination ports of the interconnect path.
 +
-+static int icc_summary_open(struct inode *inode, struct file *file)
-+{
-+	return single_open(file, icc_summary_show, inode->i_private);
-+}
++Optional properties:
++interconnect-names : List of interconnect path name strings sorted in the same
++		     order as the interconnects property. Consumers drivers will use
++		     interconnect-names to match interconnect paths with interconnect
++		     specifiers.
 +
-+static const struct file_operations icc_summary_fops = {
-+	.open		= icc_summary_open,
-+	.read		= seq_read,
-+	.llseek		= seq_lseek,
-+	.release	= single_release,
-+};
-+#endif
++Example:
 +
- static struct icc_node *node_find(const int id)
- {
- 	return idr_find(&icc_idr, id);
-@@ -646,6 +705,25 @@ int icc_provider_del(struct icc_provider *provider)
- }
- EXPORT_SYMBOL_GPL(icc_provider_del);
- 
-+static int __init icc_init(void)
-+{
-+#ifdef CONFIG_DEBUG_FS
-+	icc_debugfs_dir = debugfs_create_dir("interconnect", NULL);
-+	debugfs_create_file("interconnect_summary", 0444,
-+			    icc_debugfs_dir, NULL, &icc_summary_fops);
-+#endif
-+	return 0;
-+}
-+
-+static void __exit icc_exit(void)
-+{
-+#ifdef CONFIG_DEBUG_FS
-+	debugfs_remove_recursive(icc_debugfs_dir);
-+#endif
-+}
-+module_init(icc_init);
-+module_exit(icc_exit);
-+
- MODULE_AUTHOR("Georgi Djakov <georgi.djakov@linaro.org");
- MODULE_DESCRIPTION("Interconnect Driver Core");
- MODULE_LICENSE("GPL v2");
++	sdhci at 7864000 {
++		...
++		interconnects = <&pnoc MASTER_SDCC_1 &bimc SLAVE_EBI_CH0>;
++		interconnect-names = "ddr";
++	};
