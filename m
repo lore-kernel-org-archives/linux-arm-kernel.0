@@ -1,114 +1,139 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Fri, 31 Aug 2018 14:28:21 -0700
-Subject: [PATCH] arm64: defconfig: enable EFI_ARMSTUB_DTB_LOADER
-In-Reply-To: <CAKv+Gu_mKU+RdPgg2Dfezy4-L+KDEEBx02R49ObomRhEkJJ6Mw@mail.gmail.com>
-References: <1535563287-24803-1-git-send-email-scott.branden@broadcom.com>
- <CAOesGMhjcJ1p3QcEYb9fsx3fMXAOsgR2njOq=VKgEbWGwJi36g@mail.gmail.com>
- <fb07b89d-d427-5e59-9f17-b12df26284ec@broadcom.com>
- <CAKv+Gu-R7eX=aj=O2-gpzmp0K4t0T4s536UiqJZs0WuxRjkYwQ@mail.gmail.com>
- <CAOesGMho8CfT7iDXadmkB5=7DoOi6n8qXcS9X643vf+Y0BbD6w@mail.gmail.com>
- <CAKv+Gu_mKU+RdPgg2Dfezy4-L+KDEEBx02R49ObomRhEkJJ6Mw@mail.gmail.com>
-Message-ID: <fa0a06bc-2a4d-000e-66ec-852e6ff3012e@broadcom.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 31 Aug 2018 23:30:31 +0200
+Subject: [rfc] leds: add TI LMU backlight driver
+In-Reply-To: <ec7c9624-c1c3-df35-3593-704ac1dc9a4d@ti.com>
+References: <20180829212032.GB15786@amd>
+ <a0906253-44e3-5a01-73ca-67c7cb124eb0@ti.com>
+ <20180830201825.GA1936@amd>
+ <ec7c9624-c1c3-df35-3593-704ac1dc9a4d@ti.com>
+Message-ID: <20180831213030.GA23447@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof/Ard,
+Hi!
 
+> > Aha. I did not realize that was for same hardware... I should have
+> > cc-ed you, I guess.
+> 
+> No worries Jacek cc'd me.
 
-On 18-08-30 09:23 AM, Ard Biesheuvel wrote:
-> On 30 August 2018 at 17:06, Olof Johansson <olof@lixom.net> wrote:
->> On Wed, Aug 29, 2018 at 10:54 PM, Ard Biesheuvel
->> <ard.biesheuvel@linaro.org> wrote:
->>> On 29 August 2018 at 20:59, Scott Branden <scott.branden@broadcom.com> wrote:
->>>> Hi Olof,
->>>>
->>>>
->>>> On 18-08-29 11:44 AM, Olof Johansson wrote:
->>>>> Hi,
->>>>>
->>>>> On Wed, Aug 29, 2018 at 10:21 AM, Scott Branden
->>>>> <scott.branden@broadcom.com> wrote:
->>>>>> Enable EFI_ARMSTUB_DTB_LOADER to add support for the dtb= command line
->>>>>> parameter to function with efi loader.
->>>>>>
->>>>>> Required to boot on existing bootloaders that do not support devicetree
->>>>>> provided by the platform or by the bootloader.
->>>>>>
->>>>>> Fixes: 3d7ee348aa41 ("efi/libstub/arm: Add opt-in Kconfig option for the
->>>>>> DTB loader")
->>>>>> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
->>>>> Why did Ard create an option for this if it's just going be turned on
->>>>> in default configs? Doesn't make sense to me.
->>>>>
->>>>> It would help to know what firmware still is crippled and how common
->>>>> it is, since it's been a few years that this has been a requirement by
->>>>> now.
->>>> Broadcom NS2 and Stingray in current development and production need this
->>>> option in the kernel enabled in order to boot.
->>> And these production systems run mainline kernels in a defconfig configuration?
->>>
->>> The simply reality is that the DTB loader has been deprecated for a
->>> good reason: it was only ever intended as a development hack anyway,
->>> and if we need to treat the EFI stub provided DTB as a first class
->>> citizen, there are things we need to fix to make things works as
->>> expected. For instance, GRUB will put a property in the /chosen node
->>> for the initramfs which will get dropped if you boot with dtb=.
->>>
->>> Don't be surprised if some future enhancements of the EFI stub code
->>> depend on !EFI_ARMSTUB_DTB_LOADER. On UEFI systems, DTBs [or ACPI
->>> tables] are used by the firmware to describe itself and the underlying
->>> platform to the OS, and the practice of booting with DTB file images
->>> (taken from the kernel build as well) conflicts with that view. Note
->>> that GRUB still permits you to load DTBs from files (and supports more
->>> sources than just the file system the kernel Image was loaded from).
->> Ard,
->>
->> Maybe a WARN() splat would be more useful as a phasing-out method than
->> removing functionality for them that needs to be reinstated through
->> changing the config?
->>
-> We don't have any of that in the stub, and inventing new ways to pass
-> such information between the stub and the kernel proper seems like a
-> cart-before-horse kind of thing to me. The EFI stub diagnostic
-> messages you get on the serial console are not recorded in the kernel
-> log buffer, so they only appear if you actually look at the serial
-> output.
+Good.
+
+> >> I do not like this driver.
+> >> I don't like that it smashes numerous devices into some structure with varying register maps.
+> >>
+> > 
+> > Can you elaborate? The chips are similar enough that single driver
+> > makes sense, and we certainly want to maintain one driver, not 6
+> > drivers differing only in .. what exactly?
+> 
+> Well I think it is justified to have independent drivers as each device has different features from
+> this basic LED driver.  If we are just looking for basic support then yes this driver is fine.
+
+> But here is where a single driver will start getting messy and support difficult
+> 
+> LM3533 has ALS and an ADC for an ALS analog sensor
+> LM3631 has no ALS functionality
+> LM3632 has strobe functionality and no ramp support
+> LM3633 has indicator support coupled with the hvled support
+> LM3695 does not even appear to be available publicly
+> LM3697 is the only device that that this driver could be used for as is.
+
+Ok, so ... yes, I'm really interested in basic support. But drivers
+seem to have a lot in common, voltage limits, for example. 
+
+> In addition if I wanted to only support a single device I have to pull in the full data
+> file that defines all the other devices.  That is pretty bad to increase the size of the kernel
+> image to have support for devices that are not even on the target product.  The ti-lmu data file
+> alone is ~15k, the ti-lmu code does not even build with this patch (So this is a nack on the patch as it is.)
+> but commenting out the offending code gives me at least ~23k more data on top
+> of the ti-lmu MFD framework which is ~33k.  That is ~71k of code just to support 1 LED device
+> that is 3x what we have now.  That is not good for IoT devices.
+
+> The LM3697 is 22k without ramp support.
+
+Well, I don't think object file size is huge problem. First,
+"distribution" kernel with support for 6 different chips will be ~71k,
+while your proposal will result in ~136k. Second, yes, we could put
+ifdefs into ti-lmu data file to make it smaller.
+
+Anyway, clean source code and easy maintainance is more important.
+
+> 
+> And I will continue. TI LMU really means nothing unless you know what LMU stands for.  But this
+> also now implies support for all of TI's lighting products which will confuse the heck out of
+> customers and TI support staff.  We have a similar issue in our SoC sound CODECs code that we are
+> attempting to clean up.  We have a generic driver that is supposed to support a common set of features
+> but when extending support for other features the code gets very complicated and it is almost more
+> beneficial to re-write and create a new driver.
+> 
+> I would be OK with creating a ti-lmu framework that commonizes the functionality and create children that
+> register to that framework but even that is over kill.
 >
->> Once the stub and the boot method is there, it's hard to undo as we
->> can see here. Being loud and warn might be more useful, and set a
->> timeline for hard removal (12 months?).
->>
-> The dtb= handling is still there, it is just not enabled by default.
-> We can keep it around if people are still using it. But as I pointed
-> out, we may decide to make new functionality available only if it is
-> disabled, and at that point, we'll have to choose between one or the
-> other in defconfig, which is annoying.
-dtb= handling does need to be enabled in the only defconfig
-upstreamed though.? ARM64 maintainers have mandated a single
-defconfig upstreamed up this point.? If another incompatible
-efistub is needed in the future then 2 kernel images would need
-to be built to support booting on all platforms.
->
->> Scott; an alternative for you is to do a boot wrapper that bundles a
->> DT and kernel, and boot that instead of the kernel image (outside of
->> the kernel tree). Some 32-bit platforms from Marvell use that. That
->> way the kernel will just see it as a normally passed in DT.
-The EFI stub is the boot wrapper?? Everything works perfectly today
-with the upstream kernel (with the defconfig fix of the efistub regression).
-We support a single kernel image booting with multiple DTs
-(selected in UEFI and passed in via dtb= on command line).
->>
-> Or use GRUB. It comes wired up in all the distros, and let's you load
-> a DT binary from anywhere you can imagine, as opposed to the EFI stub
-> which can only load it if it happens to reside in the same file system
-> (or even directory - I can't remember) as the kernel image. Note that
-> the same reservations apply to doing that - the firmware is no longer
-> able to describe itself to the OS via the DT, which is really the only
-> conduit it has available on an arm64 system..
-Ard, GRUB is not a requirement to boot the kernel.? But, it sounds like
-using GRUB may be a solution to your problem?? You could use GRUB
-and leave the efistub alone then (or at least leave dtb= in the upstream
-defconfg).
 
-Regards,
- ?Scott
+I believe there's quite a lot of code that could be shared. 
+
+> >> Not only that but it appears that you just pulled this driver from a repo and posted it without clean up.
+> >>
+> > 
+> > a) No I did not, feel free to generate a diff.
+> > 
+> 
+> No I looked at this driver before and determined a re-write was a waste of time.
+> If you look that the LM3697 driver I submitted it configures the banks via the config file.
+> 
+> Only the ramp code is missing and the code is much simpler in nature.  We could adopt that
+> code to extend out to the other devices as well and base the register map deltas on the 
+> device configuration file.  I am already using the fwnode calls and setting up the banks.
+
+Well, you may know that hardware better than I do. But if you generate
+a diff...
+
+> > b) Even if I did, why would that be a problem?
+> 
+> So what you are saying is all I have to do is look for other peoples work pull it in to a branch
+> slap a new copyright on it, push to a list and claim support?
+
+...you'll see I did quite some changes.
+
+> I don't think you checked with the original author on pushing it upstream.  Milo has not updated
+> his email with a public one unless you sent him a private email and received and ack on pushing
+>
+
+Tony Lindgren asked me to get support merged, and that's what I'm
+trying to do. I have Milo's sign off, that means he is/was ok with
+upstreaming that code; no, I did not have reason to contact him.
+
+> > Well all 6 chips this driver supports seem to be similar enough, so
+> > that single driver makes sense.
+> 
+> See above on device differentiation. So in my opinion a single driver that supports
+> basic functionality is good but when adding additional support this driver will get very
+> complicated as to only allow different features for different devices.
+
+Well, the devices seem to have quite a lot in common. Yes, single
+driver for all of them will be somehow complex; but I believe that's
+still better than copy&pasting code.
+
+Anyway, I showed my proposal. I need support for ti,lm3532, but I can
+get basic support for many other chips with very little code.
+
+Do you plan basic support for support other chips in near future? Is
+TI willing to maintain the LED drivers?
+
+What is your proposal for lm3532 support? Should I just cp lm3697
+lm3532, then adjust register map? (Will not that cause rather ugly
+code duplication?)
+
+Best regards,
+								Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180831/a34a33d9/attachment.sig>
