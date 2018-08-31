@@ -1,81 +1,25 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Fri, 31 Aug 2018 15:50:28 -0700
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Fri, 31 Aug 2018 16:01:25 -0700
 Subject: [PATCH 1/3] ARM: dts: qcom: Add SPMI PMIC Arbiter nodes for
  APQ8084 and MSM8974
 In-Reply-To: <550311ad-8f93-3e80-9706-1321482b8c19@gmail.com>
 References: <1422965880-11047-1-git-send-email-iivanov@mm-sol.com>
  <1422965880-11047-2-git-send-email-iivanov@mm-sol.com>
  <550311ad-8f93-3e80-9706-1321482b8c19@gmail.com>
-Message-ID: <f9b942a2-073d-5f28-81d1-63be02829fef@gmail.com>
+Message-ID: <20180831230125.GU2523@minitux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
-
-The email for Ivan is no longer valid.  Can anyone else help me with
-my question?
-
-Thanks,
-
-Frank
-
-
-On 08/31/18 15:46, Frank Rowand wrote:
-> Hi Ivan,
+On Fri 31 Aug 15:46 PDT 2018, Frank Rowand wrote:
+> > +		spmi_bus: spmi at fc4cf000 {
+> > +			compatible = "qcom,spmi-pmic-arb";
+> > +			reg-names = "core", "intr", "cnfg";
+> > +			reg = <0xfc4cf000 0x1000>,
+> > +			      <0xfc4cb000 0x1000>,
+> > +			      <0xfc4ca000 0x1000>;
+> > +			interrupt-names = "periph_irq";
 > 
-> 
-> On 02/03/15 04:17, Ivan T. Ivanov wrote:
->> Add SPMI PMIC Arbiter configuration nodes for APQ8084 and MSM8974.
->>
->> Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
->> ---
->>  arch/arm/boot/dts/qcom-apq8084.dtsi | 16 ++++++++++++++++
->>  arch/arm/boot/dts/qcom-msm8974.dtsi | 16 ++++++++++++++++
->>  2 files changed, 32 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
->> index 1f130bc..dbedf64 100644
->> --- a/arch/arm/boot/dts/qcom-apq8084.dtsi
->> +++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
->> @@ -226,5 +226,21 @@
->>  			clock-names = "core", "iface";
->>  			status = "disabled";
->>  		};
->> +
->> +		spmi_bus: spmi at fc4cf000 {
->> +			compatible = "qcom,spmi-pmic-arb";
->> +			reg-names = "core", "intr", "cnfg";
->> +			reg = <0xfc4cf000 0x1000>,
->> +			      <0xfc4cb000 0x1000>,
->> +			      <0xfc4ca000 0x1000>;
->> +			interrupt-names = "periph_irq";
->> +			interrupts = <0 190 0>;> +			qcom,ee = <0>;
->> +			qcom,channel = <0>;
->> +			#address-cells = <2>;
->> +			#size-cells = <0>;
->> +			interrupt-controller;
->> +			#interrupt-cells = <4>;
->> +		};
->>  	};
->>  };
->> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
->> index e265ec1..2d11641 100644
->> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
->> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
->> @@ -247,5 +247,21 @@
->>  			#address-cells = <1>;
->>  			#size-cells = <0>;
->>  		};
->> +
->> +		spmi_bus: spmi at fc4cf000 {
->> +			compatible = "qcom,spmi-pmic-arb";
->> +			reg-names = "core", "intr", "cnfg";
->> +			reg = <0xfc4cf000 0x1000>,
->> +			      <0xfc4cb000 0x1000>,
->> +			      <0xfc4ca000 0x1000>;
->> +			interrupt-names = "periph_irq";
-> 
->> +			interrupts = <0 190 0>;
+> > +			interrupts = <0 190 0>;
 > 
 > The final value in this interrupts property means IRQ_TYPE_NONE.
 > 
@@ -91,28 +35,15 @@ On 08/31/18 15:46, Frank Rowand wrote:
 > or implementation of this interrupt controller.  Is an IRQ_TYPE_NONE
 > valid in this case, or should a specific type be provided?
 > 
-> Thanks!
-> 
-> -Frank
-> 
-> 
->> +			qcom,ee = <0>;
->> +			qcom,channel = <0>;
->> +			#address-cells = <2>;
->> +			#size-cells = <0>;
->> +			interrupt-controller;
->> +			#interrupt-cells = <4>;
->> +		};
->>  	};
->>  };
->> --
->> 1.9.1
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
-> 
-> .
-> 
+
+No, IRQ_TYPE_NONE isn't valid and the WARN_ON() is reasonable.
+
+Please change it to IRQ_TYPE_LEVEL_HIGH. And while you're at it, replace
+the first 0 with GIC_SPI.
+
+
+If you have more of these warnings you can most likely look at e.g.
+msm8916 (arm64) to find the right flags.
+
+Regards,
+Bjorn
