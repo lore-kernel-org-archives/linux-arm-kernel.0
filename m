@@ -1,72 +1,204 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Fri, 31 Aug 2018 11:04:39 +0200
-Subject: [PATCH v2 00/12] remove_conflicting_framebuffers() cleanup
-In-Reply-To: <cover.1535656077.git.mirq-linux@rere.qmqm.pl>
-References: <cover.1511544782.git.mirq-linux@rere.qmqm.pl>
- <cover.1535656077.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <20180831090439.GT21634@phenom.ffwll.local>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 31 Aug 2018 11:05:56 +0200
+Subject: [PATCH v3 18/30] iio: adc: sun4i-gpadc-iio: rework: support
+ multiple sensors
+In-Reply-To: <20180830154518.29507-19-embed3d@gmail.com>
+References: <20180830154518.29507-1-embed3d@gmail.com>
+ <20180830154518.29507-19-embed3d@gmail.com>
+Message-ID: <20180831090556.amfyixpv2shdrrlp@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 30, 2018 at 11:00:01PM +0200, Micha? Miros?aw wrote:
-> This series cleans up duplicated code for replacing firmware FB
-> driver with proper DRI driver and adds handover support to
-> Tegra driver.
+On Thu, Aug 30, 2018 at 05:45:06PM +0200, Philipp Rossak wrote:
+> For adding newer sensor some basic rework of the code is necessary.
 > 
-> This is a sligtly updated version of a series sent on 24 Nov 2017.
+> This patch reworks the driver to be able to handle more than one
+> thermal sensor. Newer SoC like the A80 have 4 thermal sensors.
+> Because of this the maximal sensor count value was set to 4.
 > 
-> v2:
->  - rebased on current drm-next
->  - dropped staging/sm750fb changes
->  - added kernel docs for DRM helpers
+> The sensor_id value is set during sensor registration and is for each
+> registered sensor indiviual. This makes it able to differntiate the
+> sensors when the value is read from the register.
 > 
-> Micha? Miros?aw (12):
->   fbdev: show fbdev number for debugging
->   fbdev: allow apertures == NULL in remove_conflicting_framebuffers()
->   fbdev: add remove_conflicting_pci_framebuffers()
->   drm/amdgpu: use simpler remove_conflicting_pci_framebuffers()
->   drm/bochs: use simpler remove_conflicting_pci_framebuffers()
->   drm/cirrus: use simpler remove_conflicting_pci_framebuffers()
->   drm/mgag200: use simpler remove_conflicting_pci_framebuffers()
->   drm/radeon: use simpler remove_conflicting_pci_framebuffers()
->   drm/virtio: use simpler remove_conflicting_pci_framebuffers()
->   drm/vc4: use simpler remove_conflicting_framebuffers(NULL)
->   drm/sun4i: use simpler remove_conflicting_framebuffers(NULL)
->   drm/tegra: kick out simplefb
+> In function sun4i_gpadc_read_raw(), the sensor number of the ths sensor
+> was directly set to 0 (sun4i_gpadc_temp_read(x,x,0)). This selects
+> in the temp_read function automatically sensor 0. A check for the
+> sensor_id is here not required since the old sensors only have one
+> thermal sensor. In addition to that is the sun4i_gpadc_read_raw()
+> function only used by the "older" sensors (before A33) where the
+> thermal sensor was a cobination of an adc and a thermal sensor.
+> 
+> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+> ---
+>  drivers/iio/adc/sun4i-gpadc-iio.c   | 63 +++++++++++++++++++++++++------------
+>  include/linux/iio/adc/sun4i-gpadc.h |  3 ++
+>  2 files changed, 46 insertions(+), 20 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
+> index c12de48c4e86..18ab72e52d78 100644
+> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
+> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
+> @@ -69,6 +69,7 @@ struct gpadc_data {
+>  	bool		has_bus_rst;
+>  	bool		has_mod_clk;
+>  	u32		temp_data_base;
+> +	int		sensor_count;
+>  };
+>  
+>  static irqreturn_t sun4i_gpadc_data_irq_handler(int irq, void *dev_id);
+> @@ -84,6 +85,7 @@ static const struct gpadc_data sun4i_gpadc_data = {
+>  	.ths_irq_thread = sun4i_gpadc_data_irq_handler,
+>  	.support_irq = true,
+>  	.temp_data_base = SUN4I_GPADC_TEMP_DATA,
+> +	.sensor_count = 1,
+>  };
+>  
+>  static const struct gpadc_data sun5i_gpadc_data = {
+> @@ -97,6 +99,7 @@ static const struct gpadc_data sun5i_gpadc_data = {
+>  	.ths_irq_thread = sun4i_gpadc_data_irq_handler,
+>  	.support_irq = true,
+>  	.temp_data_base = SUN4I_GPADC_TEMP_DATA,
+> +	.sensor_count = 1,
+>  };
+>  
+>  static const struct gpadc_data sun6i_gpadc_data = {
+> @@ -110,6 +113,7 @@ static const struct gpadc_data sun6i_gpadc_data = {
+>  	.ths_irq_thread = sun4i_gpadc_data_irq_handler,
+>  	.support_irq = true,
+>  	.temp_data_base = SUN4I_GPADC_TEMP_DATA,
+> +	.sensor_count = 1,
+>  };
+>  
+>  static const struct gpadc_data sun8i_a33_gpadc_data = {
+> @@ -117,6 +121,13 @@ static const struct gpadc_data sun8i_a33_gpadc_data = {
+>  	.temp_scale = 162,
+>  	.tp_mode_en = SUN8I_A33_GPADC_CTRL1_CHOP_TEMP_EN,
+>  	.temp_data_base = SUN4I_GPADC_TEMP_DATA,
+> +	.sensor_count = 1,
+> +};
+> +
+> +struct sun4i_sensor_tzd {
+> +	struct sun4i_gpadc_iio		*info;
+> +	struct thermal_zone_device	*tzd;
+> +	unsigned int			sensor_id;
+>  };
+>  
+>  struct sun4i_gpadc_iio {
+> @@ -130,7 +141,7 @@ struct sun4i_gpadc_iio {
+>  	const struct gpadc_data		*data;
+>  	/* prevents concurrent reads of temperature and ADC */
+>  	struct mutex			mutex;
+> -	struct thermal_zone_device	*tzd;
+> +	struct sun4i_sensor_tzd		tzds[MAX_SENSOR_COUNT];
+>  	struct device			*sensor_device;
+>  	struct clk			*bus_clk;
+>  	struct clk			*mod_clk;
+> @@ -280,7 +291,8 @@ static int sun4i_gpadc_adc_read(struct iio_dev *indio_dev, int channel,
+>  			SUN4I_GPADC_IRQ_FIFO_DATA);
+>  }
+>  
+> -static int sun4i_gpadc_temp_read(struct iio_dev *indio_dev, int *val)
+> +static int sun4i_gpadc_temp_read(struct iio_dev *indio_dev, int *val,
+> +				int sensor)
+>  {
+>  	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
+>  
+> @@ -290,7 +302,8 @@ static int sun4i_gpadc_temp_read(struct iio_dev *indio_dev, int *val)
+>  
+>  	pm_runtime_get_sync(indio_dev->dev.parent);
+>  
+> -	regmap_read(info->regmap, info->data->temp_data_base, val);
+> +	regmap_read(info->regmap, info->data->temp_data_base + 0x4 * sensor,
+> +			val);
+>  
+>  	pm_runtime_mark_last_busy(indio_dev->dev.parent);
+>  	pm_runtime_put_autosuspend(indio_dev->dev.parent);
+> @@ -334,7 +347,7 @@ static int sun4i_gpadc_read_raw(struct iio_dev *indio_dev,
+>  			ret = sun4i_gpadc_adc_read(indio_dev, chan->channel,
+>  						   val);
+>  		else
+> -			ret = sun4i_gpadc_temp_read(indio_dev, val);
+> +			ret = sun4i_gpadc_temp_read(indio_dev, val, 0);
+>  
+>  		if (ret)
+>  			return ret;
+> @@ -420,10 +433,11 @@ static int sun4i_gpadc_runtime_resume(struct device *dev)
+>  
+>  static int sun4i_gpadc_get_temp(void *data, int *temp)
+>  {
+> -	struct sun4i_gpadc_iio *info = data;
+> +	struct sun4i_sensor_tzd *tzd = data;
+> +	struct sun4i_gpadc_iio *info = tzd->info;
+>  	int val, scale, offset;
+>  
+> -	if (sun4i_gpadc_temp_read(info->indio_dev, &val))
+> +	if (sun4i_gpadc_temp_read(info->indio_dev, &val, tzd->sensor_id))
+>  		return -ETIMEDOUT;
+>  
+>  	sun4i_gpadc_temp_scale(info->indio_dev, &scale);
+> @@ -569,7 +583,7 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
+>  {
+>  	struct sun4i_gpadc_iio *info;
+>  	struct iio_dev *indio_dev;
+> -	int ret;
+> +	int ret, i;
+>  
+>  	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*info));
+>  	if (!indio_dev)
+> @@ -603,18 +617,24 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
+>  	pm_runtime_set_suspended(&pdev->dev);
+>  	pm_runtime_enable(&pdev->dev);
+>  
+> -	info->tzd = thermal_zone_of_sensor_register(info->sensor_device,
+> -						    0, info,
+> -						    &sun4i_ts_tz_ops);
+> -	/*
+> -	 * Do not fail driver probing when failing to register in
+> -	 * thermal because no thermal DT node is found.
+> -	 */
+> -	if (IS_ERR(info->tzd) && PTR_ERR(info->tzd) != -ENODEV) {
+> -		dev_err(&pdev->dev,
+> -			"could not register thermal sensor: %ld\n",
+> -			PTR_ERR(info->tzd));
+> -		return PTR_ERR(info->tzd);
+> +	for (i = 0; i < info->data->sensor_count; i++) {
+> +		info->tzds[i].info = info;
+> +		info->tzds[i].sensor_id = i;
+> +
+> +		info->tzds[i].tzd = thermal_zone_of_sensor_register(
 
-Looks very neat. A bit confused about the drm changes in the fbdev-titled
-patches 1&3, but I guess we can merge as-is. Up to you whether you want to
-split or not I'd say.
+This isn't where should wrap your line.
 
-Bartlomiej, ack for pullin in this entire pile through drm-misc?
+> +				info->sensor_device,
+> +				i, &info->tzds[i], &sun4i_ts_tz_ops);
+> +		/*
+> +		 * Do not fail driver probing when failing to register in
+> +		 * thermal because no thermal DT node is found.
+> +		 */
+> +		if (IS_ERR(info->tzds[i].tzd) && \
 
-Thanks, Daniel
+And you don't need the \ here.
 
-> 
->  drivers/gpu/drm/amd/amdgpu/amdgpu_drv.c  | 24 +-------------
->  drivers/gpu/drm/bochs/bochs_drv.c        | 18 +----------
->  drivers/gpu/drm/cirrus/cirrus_drv.c      | 23 +-------------
->  drivers/gpu/drm/mgag200/mgag200_drv.c    | 21 +------------
->  drivers/gpu/drm/mgag200/mgag200_main.c   |  9 ------
->  drivers/gpu/drm/radeon/radeon_drv.c      | 23 +-------------
->  drivers/gpu/drm/sun4i/sun4i_drv.c        | 18 +----------
->  drivers/gpu/drm/tegra/drm.c              |  4 +++
->  drivers/gpu/drm/vc4/vc4_drv.c            | 20 +-----------
->  drivers/gpu/drm/virtio/virtgpu_drm_bus.c | 24 ++------------
->  drivers/video/fbdev/core/fbmem.c         | 40 ++++++++++++++++++++++--
->  include/drm/drm_fb_helper.h              | 34 ++++++++++++++++++++
->  include/linux/fb.h                       |  2 ++
->  13 files changed, 88 insertions(+), 172 deletions(-)
-> 
-> -- 
-> 2.18.0
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> +				PTR_ERR(info->tzds[i].tzd) != -ENODEV) {
+> +			dev_err(&pdev->dev,
+> +				"could not register thermal sensor: %ld\n",
+> +				PTR_ERR(info->tzds[i].tzd));
+> +			return PTR_ERR(info->tzds[i].tzd);
+> +		}
+
+If you're failing half way through the registration, you won't free
+the first sensors registered.
+
+Maxime
 
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180831/cb7221cd/attachment.sig>
