@@ -1,25 +1,23 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 31 Aug 2018 20:57:56 +0800
+Date: Fri, 31 Aug 2018 20:58:33 +0800
 Subject: [PATCH v4 09/13] ARM: dts: sun8i: r40: add sata node
-In-Reply-To: <CAGb2v65H_Aog294NYAmcTGARGiOiyCDy=MT9g8ed=Cxr8Bm3Qg@mail.gmail.com>
+In-Reply-To: <CAGb2v65m73mZkQ9qbYne-utZPujEvRftYGz5kYCx=8t-C-=DJQ@mail.gmail.com>
 References: <20180830190120.722-1-clabbe.montjoie@gmail.com>
  <20180830190120.722-10-clabbe.montjoie@gmail.com>
  <20180831073500.zubqpvar4yhjqrge@flea> <20180831075631.GB16301@Red>
- <CAGb2v65dWmFxacx16taTdDf0WO4vCJfJLrf=7Vh6RtJEjHdH5A@mail.gmail.com>
- <20180831092934.GC16301@Red>
- <CAGb2v65H_Aog294NYAmcTGARGiOiyCDy=MT9g8ed=Cxr8Bm3Qg@mail.gmail.com>
-Message-ID: <f742ef4cd28c4dd3be6b0c64fcb8b8a33635ec8e.camel@aosc.io>
+ <20180831102021.idz42sfgldihpkrp@flea> <20180831105412.GD16301@Red>
+ <CAGb2v65m73mZkQ9qbYne-utZPujEvRftYGz5kYCx=8t-C-=DJQ@mail.gmail.com>
+Message-ID: <726cc22e89b058a708df0f3fc2523af42b8c3518.camel@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2018-08-31?? 19:10 +0800?Chen-Yu Tsai???
-> On Fri, Aug 31, 2018 at 5:29 PM Corentin Labbe
+? 2018-08-31?? 19:31 +0800?Chen-Yu Tsai???
+> On Fri, Aug 31, 2018 at 6:54 PM Corentin Labbe
 > <clabbe.montjoie@gmail.com> wrote:
 > > 
-> > On Fri, Aug 31, 2018 at 03:58:34PM +0800, Chen-Yu Tsai wrote:
-> > > On Fri, Aug 31, 2018 at 3:56 PM Corentin Labbe
-> > > <clabbe.montjoie@gmail.com> wrote:
-> > > > 
+> > On Fri, Aug 31, 2018 at 12:20:21PM +0200, maxime.ripard at bootlin.com
+> >  wrote:
+> > > On Fri, Aug 31, 2018 at 09:56:31AM +0200, Corentin Labbe wrote:
 > > > > On Fri, Aug 31, 2018 at 09:35:00AM +0200, Maxime Ripard wrote:
 > > > > > On Thu, Aug 30, 2018 at 09:01:16PM +0200, Corentin Labbe
 > > > > > wrote:
@@ -39,66 +37,63 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > > > > > > --- a/arch/arm/boot/dts/sun8i-r40.dtsi
 > > > > > > +++ b/arch/arm/boot/dts/sun8i-r40.dtsi
 > > > > > > @@ -550,6 +550,29 @@
-> > > > > >                     #size-cells = <0>;
-> > > > > >             };
+> > > > > >                         #size-cells = <0>;
+> > > > > >                 };
 > > > > > > 
-> > > > > > +           ahci: sata at 1c18000 {
-> > > > > > +                   compatible = "allwinner,sun8i-r40-
+> > > > > > +               ahci: sata at 1c18000 {
+> > > > > > +                       compatible = "allwinner,sun8i-r40-
 > > > > > > ahci";
-> > > > > > +                   reg = <0x01c18000 0x1000>;
-> > > > > > +                   interrupts = <GIC_SPI 56
+> > > > > > +                       reg = <0x01c18000 0x1000>;
+> > > > > > +                       interrupts = <GIC_SPI 56
 > > > > > > IRQ_TYPE_LEVEL_HIGH>;
-> > > > > > +                   clocks = <&ccu CLK_BUS_SATA>, <&ccu
+> > > > > > +                       clocks = <&ccu CLK_BUS_SATA>, <&ccu
 > > > > > > CLK_SATA>;
-> > > > > > +                   resets = <&ccu RST_BUS_SATA>;
-> > > > > > +                   resets-name = "ahci";
-> > > > > > +                   #address-cells = <1>;
-> > > > > > +                   #size-cells = <0>;
-> > > > > > +                   status = "disabled";
+> > > > > > +                       resets = <&ccu RST_BUS_SATA>;
+> > > > > > +                       resets-name = "ahci";
+> > > > > > +                       #address-cells = <1>;
+> > > > > > +                       #size-cells = <0>;
+> > > > > > +                       status = "disabled";
 > > > > > > +
-> > > > > > +                   sata_port: sata-port at 0 {
-> > > > > > +                           reg = <0>;
-> > > > > > +                           phys = <&sata_phy>;
-> > > > > > +                   };
-> > > > > > +           };
+> > > > > > +                       sata_port: sata-port at 0 {
+> > > > > > +                               reg = <0>;
+> > > > > > +                               phys = <&sata_phy>;
+> > > > > > +                       };
+> > > > > > +               };
 > > > > > > +
-> > > > > > +           sata_phy: sata-phy at 1c180c0  {
-> > > > > > +                   compatible = "allwinner,sun8i-r40-sata-
-> > > > > > phy";
-> > > > > > +                   reg = <0x1c180c0 0x200>;
+> > > > > > +               sata_phy: sata-phy at 1c180c0  {
+> > > > > > +                       compatible = "allwinner,sun8i-r40-
+> > > > > > sata-phy";
+> > > > > > +                       reg = <0x1c180c0 0x200>;
 > > > > > 
 > > > > > Overlapping devices in the DTS is not ok.
 > > > > > 
 > > > > 
-> > > > I do the same than arch/arm/boot/dts/berlin2.dtsi (sata at e90000 
+> > > > I do the same than arch/arm/boot/dts/berlin2.dtsi (sata at e90000
 > > > > phy at e900a0)
+> > > > 
 > > > > But since it is not a good justification, it seems that regmap
-> > > > is my only solution ?
+> > > > is my
+> > > > only solution ?
 > > > 
-> > > Since you are effectively splitting one device node into two, you
-> > > should
-> > > adjust the original (ahci) device nodes register range.
+> > > I'm not even sure why you are moving the phy out of its original
+> > > node
+> > > (and driver).
 > > > 
 > > 
-> > I cannot do that if I remove patch 13, iow If I keep phy init code
-> > in both place as you requested.
+> > For using the phy-supply already handled by the code.
+> > The other choice is to add another xxx-supply to ahci_platform.
+> > Or to use hackily port_regulator for this regulator.
 > 
-> Then you need to split the phy handling between a10 and r40. A10
-> doesn't
-> need phy-supply at the moment anyway. And migrating A10 to newer
-> binding
-> is only causing you problems anyway. Just drop that part, and handle
-> the
-> R40.
+> The PHY registers are in the AHCI's "vendor specific registers"
+> region. Following that are the per-port registers, which the ahci
+> driver will need access to. This doesn't look like it should
+> deserve a separate device node.
+> 
+> What's wrong with handling the regulator directly in the ahci-sunxi
+> PHY init code?
 
->From the hardware perspective, they're the same. The A10/A20 has also
-two dedicated VDD pins for SATA, although on boards they're usually
-always on.
+I remember I sent a patch that did this some times ago, and gets
+rejected.
 
 > 
 > ChenYu
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
