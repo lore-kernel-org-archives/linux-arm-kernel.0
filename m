@@ -1,35 +1,37 @@
-From: yogeshnarayan.gaur@nxp.com (Yogesh Gaur)
-Date: Fri, 31 Aug 2018 16:00:04 +0530
-Subject: [PATCH 7/7] MAINTAINERS: add maintainers for the NXP FlexSPI driver
-In-Reply-To: <1535711404-29528-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-References: <1535711404-29528-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-Message-ID: <1535711404-29528-8-git-send-email-yogeshnarayan.gaur@nxp.com>
+From: andi@etezian.org (Andi Shyti)
+Date: Fri, 31 Aug 2018 13:40:48 +0300
+Subject: [PATCH v3] dt-bindings: arm: Explicitly mark Samsung Exynos SoC
+ as unstable
+In-Reply-To: <20180830180205.18121-1-krzk@kernel.org>
+References: <20180830180205.18121-1-krzk@kernel.org>
+Message-ID: <20180831104048.GA6545@jack.zhora.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add maintainers for the NXP FlexSPI driver
+Hi Krzysztof,
 
-Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
----
- MAINTAINERS | 6 ++++++
- 1 file changed, 6 insertions(+)
+On Thu, Aug 30, 2018 at 08:02:05PM +0200, Krzysztof Kozlowski wrote:
+> Samsung Exynos SoCs and boards related bindings evolved since the initial
+> introduction, but initially the bindings were minimal and a bit incomplete
+> (they never described all the hardware modules available in the SoCs).
+> Since then some significant (not fully compatible) changes have been
+> already committed a few times (like gpio replaced by pinctrl, display ddc,
+> mfc reserved memory, some core clocks added to various hardware modules,
+> added more required nodes).
+> 
+> On the other side there are no boards which have device tree embedded in
+> the bootloader. Device tree blob is always compiled from the kernel tree
+> and updated together with the kernel image.
+> 
+> Thus to avoid further adding a bunch of workarounds for old/missing
+> bindings, make development of new platforms easier and allow to make
+> cleanup of the existing code and device tree files, lets mark some
+> Samsung Exynos SoC platform bindings as unstable. This means that
+> bindings can may change at any time and users should use the dtb file
+           ^^^^^^^
+you have a typo here, other than that I agree with the patch:
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 9d5eeff..2696898 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -10228,6 +10228,12 @@ L:	linux-nfc at lists.01.org (moderated for non-subscribers)
- S:	Supported
- F:	drivers/nfc/nxp-nci
- 
-+NXP FSPI DRIVER
-+M:	Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
-+L:	linux-spi at vger.kernel.org
-+S:	Maintained
-+F:	drivers/spi/spi-nxp-fspi.c
-+
- OBJTOOL
- M:	Josh Poimboeuf <jpoimboe@redhat.com>
- M:	Peter Zijlstra <peterz@infradead.org>
--- 
-2.7.4
+Acked-by: Andi Shyti <andi@etezian.org>
+
+Thanks,
+Andi
