@@ -1,52 +1,32 @@
-From: axboe@kernel.dk (Jens Axboe)
-Date: Fri, 31 Aug 2018 08:35:23 -0600
-Subject: [PATCH v4 00/13] ata: ahci_platform: support allwinner R40 AHCI
-In-Reply-To: <20180831074024.w7yicj5y4imy57e2@flea>
-References: <20180830190120.722-1-clabbe.montjoie@gmail.com>
- <f5838eae-fa6c-8699-14a4-95d0daa8a960@kernel.dk>
- <CAGb2v67miUjqeKeDh_E_XPee_0Hq1C6YrfXxsOp_=NtQY+LLmQ@mail.gmail.com>
- <8fa866c5-6800-505f-53bc-5c1b27582ca6@kernel.dk>
- <20180831074024.w7yicj5y4imy57e2@flea>
-Message-ID: <39f89b9d-f5bf-7c4a-8e68-252bfc0b91a4@kernel.dk>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 31 Aug 2018 16:37:21 +0200
+Subject: [PATCH net-next v3 02/10] net: mvpp2: phylink support
+In-Reply-To: <20180831141123.GM30658@n2100.armlinux.org.uk>
+References: <20180517082939.14598-1-antoine.tenart@bootlin.com>
+ <20180517082939.14598-3-antoine.tenart@bootlin.com>
+ <20180827165058.GD30658@n2100.armlinux.org.uk>
+ <20180831133651.GB32574@kwain>
+ <20180831141123.GM30658@n2100.armlinux.org.uk>
+Message-ID: <20180831143721.GB19733@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/31/18 1:40 AM, Maxime Ripard wrote:
-> Hi Jens,
-> 
-> On Thu, Aug 30, 2018 at 08:52:52PM -0600, Jens Axboe wrote:
->> On 8/30/18 8:32 PM, Chen-Yu Tsai wrote:
->>> Hi,
->>>
->>> On Fri, Aug 31, 2018 at 4:31 AM Jens Axboe <axboe@kernel.dk> wrote:
->>>>
->>>> On 8/30/18 1:01 PM, Corentin Labbe wrote:
->>>>> Hello
->>>>>
->>>>> This patchset add support for allwinner R40 AHCI controller.
->>>>>
->>>>> The whole patchset is tested on sun8i-r40-bananapi-m2-ultra and
->>>>> on sun7i-a20-cubieboard2 which doesnt have any of the ressources added
->>>>> by this serie, so no regression should come with it.
->>>>>
->>>>> The last patch(ata: ahci_sunxi: remove PHY code) should not be merged,
->>>>> but will be resent for inclustion when all patchs will have hit linus
->>>>> tree.
->>>>
->>>> Applied 1-12 with Hans's blessing, thanks Corentin.
->>>
->>> Please don't merge device tree ("dts") patches, i.e. patches 9-12. We will
->>> merge them through the sunxi / armsoc tree. Having them in separate trees
->>> introduces conflicts when we have other stuff going through our tree.
->>
->> OK, fair enough, I can drop those.
-> 
-> And the DT bits actually have some issues that would need to change
-> the code significantly.
-> 
-> Can you drop all of them please?
+> Can you see any down-sides to moving the netif_carrier_off() in
+> mvneta_open() to phylink_start() ?
 
-OK, can do. Corentin, please resend when everybody is happy with it.
+This sounds like a good idea.
 
--- 
-Jens Axboe
+What happens on the resume path?
+
+I've not looked at any code.... Just thinking aloud. Can we suspend
+with the link up? When we resume, so long as we were not doing WoL,
+the link is down. If phylink_start() is not called, we have this miss
+match again.
+
+And what about the WoL case? The link is up. What happens if you do a
+netif_carrier_off() in phylink_start(), you again have a miss match.
+But that case is pretty common with us developers, tftpbooting the
+box, with uboot setting the link up before handing over the Linux. So
+that case probably works already.
+
+    Andrew
