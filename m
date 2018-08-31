@@ -1,200 +1,107 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Fri, 31 Aug 2018 11:00:34 +0200
-Subject: [PATCH 0/4] Add Amlogic video decoder driver
-In-Reply-To: <20180831085205.14760-1-mjourdan@baylibre.com>
-References: <20180831085205.14760-1-mjourdan@baylibre.com>
-Message-ID: <386d4bc2-96a7-826f-392f-e54d3367e217@xs4all.nl>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Fri, 31 Aug 2018 11:01:26 +0200
+Subject: [PATCH v2 02/12] fbdev: allow apertures == NULL in
+ remove_conflicting_framebuffers()
+In-Reply-To: <20180831085656.GR21634@phenom.ffwll.local>
+References: <cover.1535656077.git.mirq-linux@rere.qmqm.pl>
+ <7e3a48e397298b38d7ddc7f45d48226d1f5db3e4.1535656077.git.mirq-linux@rere.qmqm.pl>
+ <20180831085656.GR21634@phenom.ffwll.local>
+Message-ID: <20180831090126.GS21634@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/31/2018 10:52 AM, Maxime Jourdan wrote:
-> Hi everyone,
+On Fri, Aug 31, 2018 at 10:56:56AM +0200, Daniel Vetter wrote:
+> On Thu, Aug 30, 2018 at 11:00:05PM +0200, Micha? Miros?aw wrote:
+> > Interpret (otherwise-invalid) NULL apertures argument to mean all-memory
+> > range. This will allow to remove several duplicates of this code from
+> > drivers in following patches.
+> > 
+> > Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
+> > [for v1]
+> > Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> > 
+> > ---
+> > v2: added kerneldoc to corresponding DRM helper
+> > ---
+> >  drivers/video/fbdev/core/fbmem.c | 14 ++++++++++++++
+> >  include/drm/drm_fb_helper.h      | 10 ++++++++++
+> >  2 files changed, 24 insertions(+)
+> > 
+> > diff --git a/drivers/video/fbdev/core/fbmem.c b/drivers/video/fbdev/core/fbmem.c
+> > index 30a18d4c9de4..0df148eb4699 100644
+> > --- a/drivers/video/fbdev/core/fbmem.c
+> > +++ b/drivers/video/fbdev/core/fbmem.c
+> > @@ -1779,11 +1779,25 @@ int remove_conflicting_framebuffers(struct apertures_struct *a,
+> >  				    const char *name, bool primary)
+> >  {
+> >  	int ret;
+> > +	bool do_free = false;
+> > +
+> > +	if (!a) {
+> > +		a = alloc_apertures(1);
+> > +		if (!a)
+> > +			return -ENOMEM;
+> > +
+> > +		a->ranges[0].base = 0;
+> > +		a->ranges[0].size = ~0;
+> > +		do_free = true;
+> > +	}
+> >  
+> >  	mutex_lock(&registration_lock);
+> >  	ret = do_remove_conflicting_framebuffers(a, name, primary);
+> >  	mutex_unlock(&registration_lock);
+> >  
+> > +	if (do_free)
+> > +		kfree(a);
+> > +
+> >  	return ret;
+> >  }
+> >  EXPORT_SYMBOL(remove_conflicting_framebuffers);
+> > diff --git a/include/drm/drm_fb_helper.h b/include/drm/drm_fb_helper.h
+> > index b069433e7fc1..1c1e53abb25d 100644
+> > --- a/include/drm/drm_fb_helper.h
+> > +++ b/include/drm/drm_fb_helper.h
+> > @@ -566,6 +566,16 @@ static inline void drm_fb_helper_output_poll_changed(struct drm_device *dev)
+> >  
+> >  #endif
+> >  
+> > +/**
+> > + * drm_fb_helper_remove_conflicting_framebuffers - remove firmware framebuffers
+> > + * @a: memory range, users of which are to be removed
+> > + * @name: requesting driver name
+> > + * @primary: also kick vga16fb if present
+> > + *
+> > + * This function removes framebuffer devices (eg. initialized by firmware)
+> > + * which use memory range described by @a. If @a is NULL all such devices are
+> > + * removed.
+> > + */
 > 
-> This patch series adds support for the Amlogic video decoder,
-> as well as the corresponding dt bindings for GXBB/GXL/GXM chips.
-> 
-> It features decoding for the following formats:
-> - MPEG 1
-> - MPEG 2
-> 
-> The following formats will be added in future patches:
-> - MJPEG
-> - MPEG 4 (incl. Xvid, H.263)
-> - H.264
-> - HEVC (incl. 10-bit)
-> 
-> The following formats' development has still not started, but they are
-> supported by the hardware:
-> - VC1
-> - VP9
-> 
-> The code was made in such a way to allow easy inclusion of those formats
-> in the future.
-> 
-> The decoder is single instance.
-> 
-> Files:
->  - vdec.c handles the V4L2 M2M logic
->  - esparser.c manages the hardware bitstream parser
->  - vdec_helpers.c provides helpers to DONE the dst buffers as well as
->  various common code used by the codecs
->  - vdec_1.c manages the VDEC_1 block of the vdec IP
->  - codec_mpeg12.c enables decoding for MPEG 1/2.
->  - vdec_platform.c links codec units with vdec units
->  (e.g vdec_1 with codec_mpeg12) and lists all the available
->  src/dst formats and requirements (max width/height, etc.),
->  per compatible chip.
-> 
-> Firmwares are necessary to run the vdec. They can currently be found at:
-> https://github.com/chewitt/meson-firmware
-> 
-> It was tested primarily with ffmpeg's v4l2-m2m implementation. For instance:
-> $ ffmpeg -c:v mpeg2_v4l2m2m -i sample_mpeg2.mkv -f null -
-> 
-> Note: This patch series depends on
-> "[PATCH v3 0/3] soc: amlogic: add meson-canvas"
-> https://patchwork.kernel.org/cover/10573763/
-> 
-> The v4l2-compliance results are available below the patch diff.
-> 
-> Maxime Jourdan (4):
->   dt-bindings: media: add Amlogic Video Decoder Bindings
->   media: meson: add v4l2 m2m video decoder driver
->   ARM64: dts: meson-gx: add vdec entry
->   ARM64: dts: meson: add vdec entries
-> 
->  .../bindings/media/amlogic,vdec.txt           |  63 ++
->  arch/arm64/boot/dts/amlogic/meson-gx.dtsi     |  13 +
->  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi   |  11 +
->  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi    |  11 +
->  arch/arm64/boot/dts/amlogic/meson-gxm.dtsi    |   4 +
->  drivers/media/platform/Kconfig                |  10 +
->  drivers/media/platform/meson/Makefile         |   1 +
->  drivers/media/platform/meson/vdec/Makefile    |   8 +
->  .../media/platform/meson/vdec/codec_mpeg12.c  | 169 +++
->  .../media/platform/meson/vdec/codec_mpeg12.h  |  13 +
->  drivers/media/platform/meson/vdec/dos_regs.h  |  97 ++
->  drivers/media/platform/meson/vdec/esparser.c  | 367 +++++++
->  drivers/media/platform/meson/vdec/esparser.h  |  27 +
->  drivers/media/platform/meson/vdec/vdec.c      | 987 ++++++++++++++++++
->  drivers/media/platform/meson/vdec/vdec.h      | 233 +++++
->  drivers/media/platform/meson/vdec/vdec_1.c    | 227 ++++
->  drivers/media/platform/meson/vdec/vdec_1.h    |  13 +
->  .../media/platform/meson/vdec/vdec_helpers.c  | 353 +++++++
->  .../media/platform/meson/vdec/vdec_helpers.h  |  44 +
->  .../media/platform/meson/vdec/vdec_platform.c | 100 ++
->  .../media/platform/meson/vdec/vdec_platform.h |  29 +
->  21 files changed, 2780 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/amlogic,vdec.txt
->  create mode 100644 drivers/media/platform/meson/vdec/Makefile
->  create mode 100644 drivers/media/platform/meson/vdec/codec_mpeg12.c
->  create mode 100644 drivers/media/platform/meson/vdec/codec_mpeg12.h
->  create mode 100644 drivers/media/platform/meson/vdec/dos_regs.h
->  create mode 100644 drivers/media/platform/meson/vdec/esparser.c
->  create mode 100644 drivers/media/platform/meson/vdec/esparser.h
->  create mode 100644 drivers/media/platform/meson/vdec/vdec.c
->  create mode 100644 drivers/media/platform/meson/vdec/vdec.h
->  create mode 100644 drivers/media/platform/meson/vdec/vdec_1.c
->  create mode 100644 drivers/media/platform/meson/vdec/vdec_1.h
->  create mode 100644 drivers/media/platform/meson/vdec/vdec_helpers.c
->  create mode 100644 drivers/media/platform/meson/vdec/vdec_helpers.h
->  create mode 100644 drivers/media/platform/meson/vdec/vdec_platform.c
->  create mode 100644 drivers/media/platform/meson/vdec/vdec_platform.h
-> 
-> root at libretech-cc:~/v4l-utils# v4l2-compliance -d /dev/video0 
-> v4l2-compliance SHA: not available, 64 bits
+> This looks like misplaced copypasta. You only need this once I think.
 
-I see that there is no SHA, so you probably didn't compile this from a
-checked-out git repo. Please do so, since without a SHA I don't know
-whether or not you used the latest v4l2-compliance version.
+Ah no, just a fixup for the lack of kerneldoc we have. Can you pls split
+this out into a separate patch?
 
-Regards,
+Thanks, Daniel
 
-	Hans
+> -Daniel
+> 
+> >  static inline int
+> >  drm_fb_helper_remove_conflicting_framebuffers(struct apertures_struct *a,
+> >  					      const char *name, bool primary)
+> > -- 
+> > 2.18.0
+> > 
+> > _______________________________________________
+> > dri-devel mailing list
+> > dri-devel at lists.freedesktop.org
+> > https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> 
+> -- 
+> Daniel Vetter
+> Software Engineer, Intel Corporation
+> http://blog.ffwll.ch
 
-> 
-> Compliance test for device /dev/video0:
-> 
-> Driver Info:
-> 	Driver name      : meson-vdec
-> 	Card type        : Amlogic Video Decoder
-> 	Bus info         : platform:meson-vdec
-> 	Driver version   : 4.18.0
-> 	Capabilities     : 0x84204000
-> 		Video Memory-to-Memory Multiplanar
-> 		Streaming
-> 		Extended Pix Format
-> 		Device Capabilities
-> 	Device Caps      : 0x04204000
-> 		Video Memory-to-Memory Multiplanar
-> 		Streaming
-> 		Extended Pix Format
-> 
-> Required ioctls:
-> 	test VIDIOC_QUERYCAP: OK
-> 
-> Allow for multiple opens:
-> 	test second /dev/video0 open: OK
-> 	test VIDIOC_QUERYCAP: OK
-> 	test VIDIOC_G/S_PRIORITY: OK
-> 	test for unlimited opens: OK
-> 
-> Debug ioctls:
-> 	test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
-> 	test VIDIOC_LOG_STATUS: OK (Not Supported)
-> 
-> Input ioctls:
-> 	test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
-> 	test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
-> 	test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
-> 	test VIDIOC_ENUMAUDIO: OK (Not Supported)
-> 	test VIDIOC_G/S/ENUMINPUT: OK (Not Supported)
-> 	test VIDIOC_G/S_AUDIO: OK (Not Supported)
-> 	Inputs: 0 Audio Inputs: 0 Tuners: 0
-> 
-> Output ioctls:
-> 	test VIDIOC_G/S_MODULATOR: OK (Not Supported)
-> 	test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
-> 	test VIDIOC_ENUMAUDOUT: OK (Not Supported)
-> 	test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
-> 	test VIDIOC_G/S_AUDOUT: OK (Not Supported)
-> 	Outputs: 0 Audio Outputs: 0 Modulators: 0
-> 
-> Input/Output configuration ioctls:
-> 	test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
-> 	test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
-> 	test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
-> 	test VIDIOC_G/S_EDID: OK (Not Supported)
-> 
-> Control ioctls:
-> 	test VIDIOC_QUERY_EXT_CTRL/QUERYMENU: OK (Not Supported)
-> 	test VIDIOC_QUERYCTRL: OK (Not Supported)
-> 	test VIDIOC_G/S_CTRL: OK (Not Supported)
-> 	test VIDIOC_G/S/TRY_EXT_CTRLS: OK (Not Supported)
-> 	test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK (Not Supported)
-> 	test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
-> 	Standard Controls: 0 Private Controls: 0
-> 
-> Format ioctls:
-> 	test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
-> 	test VIDIOC_G/S_PARM: OK (Not Supported)
-> 	test VIDIOC_G_FBUF: OK (Not Supported)
-> 	test VIDIOC_G_FMT: OK
-> 	test VIDIOC_TRY_FMT: OK
-> 	test VIDIOC_S_FMT: OK
-> 	test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
-> 	test Cropping: OK (Not Supported)
-> 	test Composing: OK (Not Supported)
-> 	test Scaling: OK
-> 
-> Codec ioctls:
-> 	test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
-> 	test VIDIOC_G_ENC_INDEX: OK (Not Supported)
-> 	test VIDIOC_(TRY_)DECODER_CMD: OK
-> 
-> Buffer ioctls:
-> 	test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
-> 	test VIDIOC_EXPBUF: OK
-> 
-> Total: 43, Succeeded: 43, Failed: 0, Warnings: 0
-> 
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
