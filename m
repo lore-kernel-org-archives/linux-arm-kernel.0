@@ -1,68 +1,63 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 31 Aug 2018 12:20:37 -0700
-Subject: [PATCH v3 1/3] ARM: dts: NSP: Enable SFP on bcm958625hr
+Date: Fri, 31 Aug 2018 12:20:39 -0700
+Subject: [PATCH v3 3/3] ARM: dts: NSP: Wire up switch interrupts
 In-Reply-To: <20180831192039.11842-1-f.fainelli@gmail.com>
 References: <20180831192039.11842-1-f.fainelli@gmail.com>
-Message-ID: <20180831192039.11842-2-f.fainelli@gmail.com>
+Message-ID: <20180831192039.11842-4-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the SFP connected to port 5 of the switch and wire up all GPIOs
-to the SFP cage. Because of a hardware limitation of the i2c controller
-on the iProc SoCs which prevents large i2c (> 63 bytes) transactions to
-work, we use the i2c-gpio interface instead, which does not have that
-limitation. This allows us to read the SFP module EEPROM, which would
-not be possible otherwise since it exceeds that size during a single
-read transfer.
+The Switch Register Access Block (SRAB) has one interrupt for link state
+change on each ports (0-5, 7-8) a PHY interrupt, timestamping interrupt
+and sleep timer interrupts for each management ports (5,7,8). Wire those
+up so we can utilize them to speed up link resolution.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- arch/arm/boot/dts/bcm958625hr.dts | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ arch/arm/boot/dts/bcm-nsp.dtsi | 31 ++++++++++++++++++++++++++++++-
+ 1 file changed, 30 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/bcm958625hr.dts b/arch/arm/boot/dts/bcm958625hr.dts
-index ea3fc194f8f3..a53a2f629d74 100644
---- a/arch/arm/boot/dts/bcm958625hr.dts
-+++ b/arch/arm/boot/dts/bcm958625hr.dts
-@@ -58,6 +58,24 @@
- 		open-source;
- 		priority = <200>;
- 	};
-+
-+	/* Hardware I2C block cannot do more than 63 bytes per transfer,
-+	 * which would prevent reading from a SFP's EEPROM (256 byte).
-+	 */
-+	i2c1: i2c {
-+		compatible = "i2c-gpio";
-+		sda-gpios = <&gpioa 5 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
-+		scl-gpios = <&gpioa 4 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
-+	};
-+
-+	sfp: sfp {
-+		compatible = "sff,sfp";
-+		i2c-bus = <&i2c1>;
-+		mod-def0-gpios = <&gpioa 28 GPIO_ACTIVE_LOW>;
-+		los-gpios = <&gpioa 24 GPIO_ACTIVE_HIGH>;
-+		tx-fault-gpios = <&gpioa 30 GPIO_ACTIVE_HIGH>;
-+		tx-disable-gpios = <&gpioa 26 GPIO_ACTIVE_HIGH>;
-+	};
- };
+diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
+index 09ba85046322..ec869a80f9ba 100644
+--- a/arch/arm/boot/dts/bcm-nsp.dtsi
++++ b/arch/arm/boot/dts/bcm-nsp.dtsi
+@@ -377,7 +377,36 @@
  
- &amac0 {
-@@ -210,6 +228,14 @@
- 			reg = <4>;
- 		};
+ 		srab: srab at 36000 {
+ 			compatible = "brcm,nsp-srab";
+-			reg = <0x36000 0x1000>;
++			reg = <0x36000 0x1000>,
++			      <0x3f308 0x8>,
++			      <0x3f410 0xc>;
++			reg-names = "srab", "mux_config", "sgmii";
++			interrupts = <GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "link_state_p0",
++					  "link_state_p1",
++					  "link_state_p2",
++					  "link_state_p3",
++					  "link_state_p4",
++					  "link_state_p5",
++					  "link_state_p7",
++					  "link_state_p8",
++					  "phy",
++					  "ts",
++					  "imp_sleep_timer_p5",
++					  "imp_sleep_timer_p7",
++					  "imp_sleep_timer_p8";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
  
-+		port at 5 {
-+			label = "sfp";
-+			phy-mode = "sgmii";
-+			reg = <5>;
-+			sfp = <&sfp>;
-+			managed = "in-band-status";
-+		};
-+
- 		port at 8 {
- 			ethernet = <&amac2>;
- 			label = "cpu";
 -- 
 2.17.1
