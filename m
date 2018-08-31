@@ -1,178 +1,47 @@
-From: phil.edworthy@renesas.com (Phil Edworthy)
-Date: Fri, 31 Aug 2018 15:07:23 +0100
-Subject: [PATCH v5 2/2] clk: Add functions to get optional clocks
-In-Reply-To: <1535724443-21150-1-git-send-email-phil.edworthy@renesas.com>
-References: <1535724443-21150-1-git-send-email-phil.edworthy@renesas.com>
-Message-ID: <1535724443-21150-3-git-send-email-phil.edworthy@renesas.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 31 Aug 2018 15:11:23 +0100
+Subject: [PATCH net-next v3 02/10] net: mvpp2: phylink support
+In-Reply-To: <20180831133651.GB32574@kwain>
+References: <20180517082939.14598-1-antoine.tenart@bootlin.com>
+ <20180517082939.14598-3-antoine.tenart@bootlin.com>
+ <20180827165058.GD30658@n2100.armlinux.org.uk>
+ <20180831133651.GB32574@kwain>
+Message-ID: <20180831141123.GM30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Behaves the same as (devm_)clk_get except where there is no clock
-producer. In this case, instead of returning -ENOENT, the function
-returns NULL. This makes error checking simpler and allows
-clk_prepare_enable, etc to be called on the returned reference
-without additional checks.
+On Fri, Aug 31, 2018 at 03:36:51PM +0200, Antoine Tenart wrote:
+> With the above code remove one case did not worked anymore: when the
+> port is configured as a fixed-link because the SFP cage can't be
+> described and used (on the 7040-db and 8040-db boards). In such cases
+> phylink is called, mac_config() is called, but link_up() is never
+> called. I'm not sure this is actually an issue in phylink, but the PPv2
+> driver should probably take care of this weird case itself (by calling
+> explicitly link_up()). What do you think?
 
-Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
----
-v5:
- - No changes.
-v4:
- - No changes.
-v3:
- - No changes.
----
- drivers/clk/clk-devres.c | 18 ++++++++++++++++--
- drivers/clk/clkdev.c     | 17 +++++++++++++++--
- include/linux/clk.h      | 29 +++++++++++++++++++++++++++++
- 3 files changed, 60 insertions(+), 4 deletions(-)
+Fixed link should work:
 
-diff --git a/drivers/clk/clk-devres.c b/drivers/clk/clk-devres.c
-index d854e26..a2bb01a 100644
---- a/drivers/clk/clk-devres.c
-+++ b/drivers/clk/clk-devres.c
-@@ -14,7 +14,7 @@ static void devm_clk_release(struct device *dev, void *res)
- 	clk_put(*(struct clk **)res);
- }
- 
--struct clk *devm_clk_get(struct device *dev, const char *id)
-+static struct clk *__devm_clk_get(struct device *dev, const char *id, bool optional)
- {
- 	struct clk **ptr, *clk;
- 
-@@ -22,7 +22,10 @@ struct clk *devm_clk_get(struct device *dev, const char *id)
- 	if (!ptr)
- 		return ERR_PTR(-ENOMEM);
- 
--	clk = clk_get(dev, id);
-+	if (!optional)
-+		clk = clk_get(dev, id);
-+	else
-+		clk = clk_get_optional(dev, id);
- 	if (!IS_ERR(clk)) {
- 		*ptr = clk;
- 		devres_add(dev, ptr);
-@@ -32,8 +35,19 @@ struct clk *devm_clk_get(struct device *dev, const char *id)
- 
- 	return clk;
- }
-+
-+struct clk *devm_clk_get(struct device *dev, const char *id)
-+{
-+	return __devm_clk_get(dev, id, false);
-+}
- EXPORT_SYMBOL(devm_clk_get);
- 
-+struct clk *devm_clk_get_optional(struct device *dev, const char *id)
-+{
-+	return __devm_clk_get(dev, id, true);
-+}
-+EXPORT_SYMBOL(devm_clk_get_optional);
-+
- struct clk_bulk_devres {
- 	struct clk_bulk_data *clks;
- 	int num_clks;
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index 4adb99e..6355573 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -222,21 +222,34 @@ struct clk *clk_get_sys(const char *dev_id, const char *con_id)
- }
- EXPORT_SYMBOL(clk_get_sys);
- 
--struct clk *clk_get(struct device *dev, const char *con_id)
-+static struct clk *internal_clk_get(struct device *dev, const char *con_id,
-+				    bool optional)
- {
- 	const char *dev_id = dev ? dev_name(dev) : NULL;
- 	struct clk *clk;
- 
- 	if (dev && dev->of_node) {
--		clk = __of_clk_get_by_name(dev->of_node, dev_id, con_id, false);
-+		clk = __of_clk_get_by_name(dev->of_node, dev_id, con_id,
-+					   optional);
- 		if (!IS_ERR(clk) || PTR_ERR(clk) == -EPROBE_DEFER)
- 			return clk;
- 	}
- 
- 	return clk_get_sys(dev_id, con_id);
- }
-+
-+struct clk *clk_get(struct device *dev, const char *con_id)
-+{
-+	return internal_clk_get(dev, con_id, false);
-+}
- EXPORT_SYMBOL(clk_get);
- 
-+struct clk *clk_get_optional(struct device *dev, const char *con_id)
-+{
-+	return internal_clk_get(dev, con_id, true);
-+}
-+EXPORT_SYMBOL(clk_get_optional);
-+
- void clk_put(struct clk *clk)
- {
- 	__clk_put(clk);
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index de0e5e0..58ec7bc 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -291,6 +291,16 @@ static inline void clk_bulk_unprepare(int num_clks, struct clk_bulk_data *clks)
- struct clk *clk_get(struct device *dev, const char *id);
- 
- /**
-+ * clk_get_optional - lookup and obtain a reference to optional clock producer.
-+ * @dev: device for clock "consumer"
-+ * @id: clock consumer ID
-+ *
-+ * Behaves the same as clk_get except where there is no clock producer. In this
-+ * case, instead of returning -ENOENT, the function returns NULL.
-+ */
-+struct clk *clk_get_optional(struct device *dev, const char *id);
-+
-+/**
-  * clk_bulk_get - lookup and obtain a number of references to clock producer.
-  * @dev: device for clock "consumer"
-  * @num_clks: the number of clk_bulk_data
-@@ -349,6 +359,14 @@ int __must_check devm_clk_bulk_get(struct device *dev, int num_clks,
- struct clk *devm_clk_get(struct device *dev, const char *id);
- 
- /**
-+ * devm_clk_get_optional - lookup and obtain a managed reference to an optional
-+ *			   clock producer.
-+ * Behaves the same as devm_clk_get except where there is no clock producer. In
-+ * this case, instead of returning -ENOENT, the function returns NULL.
-+ */
-+struct clk *devm_clk_get_optional(struct device *dev, const char *id);
-+
-+/**
-  * devm_get_clk_from_child - lookup and obtain a managed reference to a
-  *			     clock producer from child node.
-  * @dev: device for clock "consumer"
-@@ -636,6 +654,11 @@ static inline struct clk *clk_get(struct device *dev, const char *id)
- 	return NULL;
- }
- 
-+static inline struct clk *clk_get_optional(struct device *dev, const char *id)
-+{
-+	return NULL;
-+}
-+
- static inline int __must_check clk_bulk_get(struct device *dev, int num_clks,
- 					    struct clk_bulk_data *clks)
- {
-@@ -647,6 +670,12 @@ static inline struct clk *devm_clk_get(struct device *dev, const char *id)
- 	return NULL;
- }
- 
-+static inline struct clk *devm_clk_get_optional(struct device *dev,
-+						const char *id)
-+{
-+	return NULL;
-+}
-+
- static inline int __must_check devm_clk_bulk_get(struct device *dev, int num_clks,
- 						 struct clk_bulk_data *clks)
- {
+- when a fixed link is configured, link_config.link is set true.
+- when phylink_start() is called, mac_config() will be called to do the
+  initial setup, and a resolve is triggered.
+- phylink_resolve() will read the fixed link state, which in the case
+  of no GPIO, will inherit link_config.link.
+  - you will then see another mac_config() call.
+
+Now what happens depends whether you've set the netdev's carrier state
+in the driver - if you haven't, the netdev's carrier state should be
+off.  Since the state mismatches the link_state.link (which will be
+true), you will get a mac_link_up() call.
+
+mvneta ensures this state by always calling netif_carrier_off() in
+mvneta_open(), maybe that ought to be in phylink_start() as that's the
+state that phylink expects when phylink_start() has been called.  So,
+maybe it's a phylink bug.
+
+Can you see any down-sides to moving the netif_carrier_off() in
+mvneta_open() to phylink_start() ?
+
 -- 
-2.7.4
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
