@@ -1,79 +1,44 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 31 Aug 2018 10:34:22 -0700
-Subject: [PATCH v3 5/5] clk: RK808: add RK809 and RK817 support.
-In-Reply-To: <1535081762-20844-1-git-send-email-tony.xie@rock-chips.com>
-References: <1535081441-20718-1-git-send-email-tony.xie@rock-chips.com>
- <1535081762-20844-1-git-send-email-tony.xie@rock-chips.com>
-Message-ID: <153573686206.93865.11806745452503167124@swboyd.mtv.corp.google.com>
+Date: Fri, 31 Aug 2018 10:45:30 -0700
+Subject: [PATCH 00/16] clk: at91: Rework DT bindings
+In-Reply-To: <20180816114755.GH21707@piout.net>
+References: <20180717222757.10253-1-alexandre.belloni@bootlin.com>
+ <153271100280.48062.2538655794734424353@swboyd.mtv.corp.google.com>
+ <20180816114755.GH21707@piout.net>
+Message-ID: <153573753043.93865.2420370848457480370@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tony Xie (2018-08-23 20:36:02)
-> diff --git a/drivers/clk/clk-rk808.c b/drivers/clk/clk-rk808.c
-> index 6461f28..c5d3492 100644
-> --- a/drivers/clk/clk-rk808.c
-> +++ b/drivers/clk/clk-rk808.c
-> @@ -96,6 +96,66 @@ static int rk808_clkout2_is_prepared(struct clk_hw *hw)
-> +
-> +static int rk817_clkout2_is_prepared(struct clk_hw *hw)
-> +{
-> +       struct rk808_clkout *rk808_clkout = container_of(hw,
-> +                                                        struct rk808_clkout,
-> +                                                        clkout2_hw);
-> +       struct rk808 *rk808 = rk808_clkout->rk808;
-> +       unsigned int val;
-> +
-> +       int ret = regmap_read(rk808->regmap, RK817_SYS_CFG(1), &val);
-> +
-> +       if (ret < 0)
-> +               return ret;
-
-The clk core handles the return value here as true or false. Probably
-should return 0 here.
-
-> +
-> +       return (val & RK817_CLK32KOUT2_EN) ? 1 : 0;
-> +}
-> +
-> +static const struct clk_ops rk817_clkout2_ops = {
-> +       .prepare = rk817_clkout2_prepare,
-> +       .unprepare = rk817_clkout2_unprepare,
-> +       .is_prepared = rk817_clkout2_is_prepared,
-> +       .recalc_rate = rk808_clkout_recalc_rate,
-> +};
-> +
-> +static const struct clk_ops *rkpmic_get_ops(long variant)
-
-Use the enum here for 'variant'? Then the case statement here will
-complain loudly for unhandled cases.
-
-> +{
-> +       switch (variant) {
-> +       case RK809_ID:
-> +       case RK817_ID:
-> +               return &rk817_clkout2_ops;
-> +       case RK805_ID:
-> +       case RK808_ID:
-> +       case RK818_ID:
-> +               return &rk808_clkout2_ops;
-> +       }
-> +
-> +       return &rk808_clkout2_ops;
-> +}
-> +
->  static int rk808_clkout_probe(struct platform_device *pdev)
->  {
->         struct rk808 *rk808 = dev_get_drvdata(pdev->dev.parent);
-> @@ -127,7 +187,7 @@ static int rk808_clkout_probe(struct platform_device *pdev)
->                 return ret;
->  
->         init.name = "rk808-clkout2";
-> -       init.ops = &rk808_clkout2_ops;
-> +       init.ops = rkpmic_get_ops(rk808->variant);
->         rk808_clkout->clkout2_hw.init = &init;
->  
->         /* optional override of the clockname */
-> -- 
-> 1.9.1
+Quoting Alexandre Belloni (2018-08-16 04:47:55)
+> On 27/07/2018 10:03:22-0700, Stephen Boyd wrote:
+> > Quoting Alexandre Belloni (2018-07-17 15:27:41)
+> > > This is the promised rework of the at91 PMC clocks driver. It is mainly
+> > > necessary to remove the DTC warnings but it also complies with the CCF
+> > > rule that there should be one node per controller instead of one node
+> > > per clock.
+> > > 
+> > > This only handles the PMC, I'm planning to also rework the SCKC bindings
+> > > later (without breaking the DT ABI).
+> > > 
+> > > The series is based on top of clk-next plus at91-dt so I don't think it
+> > > is convenient to have it this cycle. However, I would really like to
+> > > ensure we agree on the new bindings this cycle before converting all the
+> > > other platforms as this is a bit tedious.
+> > > 
+> > > The first two patches are actually fixes and may be considered for this
+> > > cycle.
+> > > 
+> > > One nice note:
+> > > at91-sama5d2_xplained.dtb goes from 29351 bytes to 22082 bytes
+> > 
+> > Patches look mostly good. Rob is happy with the bindings and so am I.
+> > 
+> > One general question is why the drivers can't be moved to real platform
+> > drivers instead of using OF_CLK_DECLARE?
+> > 
 > 
+> I tried, this makes the clocksource drivers fail with -EPROBE_DEFER and
+> so the kernel just stops there.
 > 
+
+Ok. We have CLK_OF_DECLARE_DRIVER for that. Can you use that?
