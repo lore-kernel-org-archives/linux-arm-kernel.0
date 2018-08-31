@@ -1,97 +1,98 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 31 Aug 2018 11:07:22 +0200
-Subject: [PATCH v3 19/30] iio: adc: sun4i-gpadc-iio: rework: support
- nvmem calibration data
-In-Reply-To: <20180830154518.29507-20-embed3d@gmail.com>
-References: <20180830154518.29507-1-embed3d@gmail.com>
- <20180830154518.29507-20-embed3d@gmail.com>
-Message-ID: <20180831090722.zf65lkozjpozngu5@flea>
+From: chris@chris-wilson.co.uk (Chris Wilson)
+Date: Fri, 31 Aug 2018 10:07:42 +0100
+Subject: [PATCH v2 00/12] remove_conflicting_framebuffers() cleanup
+In-Reply-To: <20180831090439.GT21634@phenom.ffwll.local>
+References: <cover.1511544782.git.mirq-linux@rere.qmqm.pl>
+ <cover.1535656077.git.mirq-linux@rere.qmqm.pl>
+ <20180831090439.GT21634@phenom.ffwll.local>
+Message-ID: <153570646209.15613.3061584574975657074@skylake-alporthouse-com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 30, 2018 at 05:45:07PM +0200, Philipp Rossak wrote:
-> This patch reworks the driver to support nvmem calibration cells.
-> The driver checks if the nvmem calibration is supported and reads out
-> the nvmem.
+Quoting Daniel Vetter (2018-08-31 10:04:39)
+> On Thu, Aug 30, 2018 at 11:00:01PM +0200, Micha? Miros?aw wrote:
+> > This series cleans up duplicated code for replacing firmware FB
+> > driver with proper DRI driver and adds handover support to
+> > Tegra driver.
+> > 
+> > This is a sligtly updated version of a series sent on 24 Nov 2017.
+> > 
+> > v2:
+> >  - rebased on current drm-next
+> >  - dropped staging/sm750fb changes
+> >  - added kernel docs for DRM helpers
+> > 
+> > Micha? Miros?aw (12):
+> >   fbdev: show fbdev number for debugging
+> >   fbdev: allow apertures == NULL in remove_conflicting_framebuffers()
+> >   fbdev: add remove_conflicting_pci_framebuffers()
+> >   drm/amdgpu: use simpler remove_conflicting_pci_framebuffers()
+> >   drm/bochs: use simpler remove_conflicting_pci_framebuffers()
+> >   drm/cirrus: use simpler remove_conflicting_pci_framebuffers()
+> >   drm/mgag200: use simpler remove_conflicting_pci_framebuffers()
+> >   drm/radeon: use simpler remove_conflicting_pci_framebuffers()
+> >   drm/virtio: use simpler remove_conflicting_pci_framebuffers()
+> >   drm/vc4: use simpler remove_conflicting_framebuffers(NULL)
+> >   drm/sun4i: use simpler remove_conflicting_framebuffers(NULL)
+> >   drm/tegra: kick out simplefb
 > 
-> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
-> ---
->  drivers/iio/adc/sun4i-gpadc-iio.c | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
-> 
-> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-> index 18ab72e52d78..2fd73d143815 100644
-> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
-> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-> @@ -27,6 +27,7 @@
->  #include <linux/interrupt.h>
->  #include <linux/io.h>
->  #include <linux/module.h>
-> +#include <linux/nvmem-consumer.h>
->  #include <linux/of.h>
->  #include <linux/of_device.h>
->  #include <linux/platform_device.h>
-> @@ -70,6 +71,7 @@ struct gpadc_data {
->  	bool		has_mod_clk;
->  	u32		temp_data_base;
->  	int		sensor_count;
-> +	bool		supports_nvmem;
->  };
->  
->  static irqreturn_t sun4i_gpadc_data_irq_handler(int irq, void *dev_id);
-> @@ -146,6 +148,7 @@ struct sun4i_gpadc_iio {
->  	struct clk			*bus_clk;
->  	struct clk			*mod_clk;
->  	struct reset_control		*reset;
-> +	u32				calibration_data[2];
->  };
->  
->  static const struct iio_chan_spec sun4i_gpadc_channels[] = {
-> @@ -484,6 +487,9 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
->  	struct resource *mem;
->  	void __iomem *base;
->  	int ret;
-> +	struct nvmem_cell *cell;
-> +	ssize_t cell_size;
-> +	u32 *cell_data;
->  
->  	info->data = of_device_get_match_data(&pdev->dev);
->  	if (!info->data)
-> @@ -494,6 +500,24 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
->  	if (IS_ERR(base))
->  		return PTR_ERR(base);
->  
-> +	if (info->data->supports_nvmem) {
-> +
-> +		cell = nvmem_cell_get(&pdev->dev, "calibration");
-> +		if (IS_ERR(cell)) {
-> +			if (PTR_ERR(cell) == -EPROBE_DEFER)
-> +				return PTR_ERR(cell);
+> Looks very neat. A bit confused about the drm changes in the fbdev-titled
+> patches 1&3, but I guess we can merge as-is. Up to you whether you want to
+> split or not I'd say.
 
-You're masking real errors here, if the issue isn't that the property
-isn't found.
+Ahah, someone is looking at remove_conflicting_framebuffers(). May I
+interest you in a use-after-free?
 
-> +		} else {
-> +			cell_data = (u32 *)nvmem_cell_read(cell, &cell_size);
-> +			if (cell_size != 8)
-> +				dev_err(&pdev->dev,
-> +					"Calibration data has wrong size\n");
-> +			else {
-> +				info->calibration_data[0] = cell_data[0];
-> +				info->calibration_data[1] = cell_data[1];
+[  378.423513] stack segment: 0000 [#1] PREEMPT SMP PTI
+[  378.423530] CPU: 1 PID: 4338 Comm: pm_rpm Tainted: G     U            4.19.0-rc1-CI-CI_DRM_4746+ #1
+[  378.423548] Hardware name: To Be Filled By O.E.M. To Be Filled By O.E.M./J4205-ITX, BIOS P1.10 09/29/2016
+[  378.423570] RIP: 0010:do_remove_conflicting_framebuffers+0x56/0x170
+[  378.423587] Code: 49 8b 45 00 48 85 c0 74 50 f6 40 0a 08 74 4a 4d 85 e4 48 8b a8 78 04 00 00 74 1f 48 85 ed 74 1a 41 8b 0c 24 31 db 85 c9 74 10 <8b> 55 00 85 d2 75 42 83 c3 01 41 39 1c 24 77 f0 48 85 ed 74 1a 45
+[  378.423620] RSP: 0018:ffffc900001dfa88 EFLAGS: 00010202
+[  378.423632] RAX: ffff880274470008 RBX: 0000000000000000 RCX: 0000000000000001
+[  378.423646] RDX: 0000000000000001 RSI: ffffffffa025c634 RDI: ffff88025cc3b428
+[  378.423660] RBP: 6b6b6b6b6b6b6b6b R08: 000000001edaddfa R09: ffffffffa025c634
+[  378.423673] R10: ffffc900001dfae8 R11: ffffffff820de938 R12: ffff88025cc3b428
+[  378.423687] R13: ffffffff8234ca20 R14: ffffffff8234cb20 R15: 0000000000000001
+[  378.423701] FS:  00007fcf03d0a980(0000) GS:ffff880277e80000(0000) knlGS:0000000000000000
+[  378.423717] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+[  378.423729] CR2: 00007fffece1fdb8 CR3: 00000001fe32e000 CR4: 00000000003406e0
+[  378.423742] Call Trace:
+[  378.423756]  remove_conflicting_framebuffers+0x28/0x40
+[  378.423856]  i915_driver_load+0x7f5/0x10c0 [i915]
+[  378.423873]  ? _raw_spin_unlock_irqrestore+0x4c/0x60
+[  378.423887]  ? lockdep_hardirqs_on+0xe0/0x1b0
+[  378.423962]  i915_pci_probe+0x29/0xa0 [i915]
+[  378.423977]  pci_device_probe+0xa1/0x130
+[  378.423990]  really_probe+0x25d/0x3c0
+[  378.424002]  driver_probe_device+0x10a/0x120
+[  378.424013]  __driver_attach+0xdb/0x100
+[  378.424025]  ? driver_probe_device+0x120/0x120
+[  378.424037]  bus_for_each_dev+0x74/0xc0
+[  378.424048]  bus_add_driver+0x15f/0x250
+[  378.424060]  ? 0xffffffffa069d000
+[  378.424070]  driver_register+0x56/0xe0
+[  378.424080]  ? 0xffffffffa069d000
+[  378.424090]  do_one_initcall+0x58/0x2e0
+[  378.424101]  ? rcu_lockdep_current_cpu_online+0x8f/0xd0
+[  378.424116]  ? do_init_module+0x1d/0x1ea
+[  378.424127]  ? rcu_read_lock_sched_held+0x6f/0x80
+[  378.424141]  ? kmem_cache_alloc_trace+0x264/0x290
+[  378.424154]  do_init_module+0x56/0x1ea
+[  378.424167]  load_module+0x26ba/0x29a0
+[  378.424182]  ? vfs_read+0x122/0x140
+[  378.424199]  ? __se_sys_finit_module+0xd3/0xf0
+[  378.424210]  __se_sys_finit_module+0xd3/0xf0
+[  378.424226]  do_syscall_64+0x55/0x190
+[  378.424237]  entry_SYSCALL_64_after_hwframe+0x49/0xbe
+[  378.424249] RIP: 0033:0x7fcf02f9b839
+[  378.424258] Code: 00 f3 c3 66 2e 0f 1f 84 00 00 00 00 00 0f 1f 40 00 48 89 f8 48 89 f7 48 89 d6 48 89 ca 4d 89 c2 4d 89 c8 4c 8b 4c 24 08 0f 05 <48> 3d 01 f0 ff ff 73 01 c3 48 8b 0d 1f f6 2c 00 f7 d8 64 89 01 48
+[  378.424290] RSP: 002b:00007fffece21f58 EFLAGS: 00000246 ORIG_RAX: 0000000000000139
+[  378.424307] RAX: ffffffffffffffda RBX: 000056344e1a4d80 RCX: 00007fcf02f9b839
+[  378.424321] RDX: 0000000000000000 RSI: 00007fcf026470e5 RDI: 0000000000000003
+[  378.424336] RBP: 00007fcf026470e5 R08: 0000000000000000 R09: 0000000000000000
+[  378.424349] R10: 0000000000000003 R11: 0000000000000246 R12: 0000000000000000
+[  378.424363] R13: 000056344e1a0000 R14: 0000000000000000 R15: 000056344e1a4d80
 
-How are those calibration data organized when there is multiple channels?
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180831/3242dca9/attachment.sig>
+https://intel-gfx-ci.01.org/tree/drm-tip/IGT_4613/fi-bxt-j4205/dmesg0.log
+-Chris
