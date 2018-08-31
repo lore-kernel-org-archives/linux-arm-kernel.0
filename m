@@ -1,37 +1,39 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 31 Aug 2018 15:41:09 +0300
-Subject: [PATCHv2] kbuild: add support for building %.dtbo targets
-Message-ID: <1535719269-13492-1-git-send-email-t-kristo@ti.com>
+Date: Fri, 31 Aug 2018 15:47:46 +0300
+Subject: [PATCHv2 4/4] arm64: dts: add support for per sub-dir makefiles for
+ DT building
+In-Reply-To: <1535719666-13595-1-git-send-email-t-kristo@ti.com>
+References: <1535719666-13595-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1535719666-13595-5-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for building DT overlay targets, which can be applied
-either runtime or statically on top of base devicetree blobs. The
-only supported runtime application of overlays right now is during
-bootloader execution; if the bootloader in question supports this.
+Currently the makefile for arm64 builds all the DT files based on
+rules in the arch/arm64/boot/dts/Makefile, as this is statically
+passed via the $(build)= parameter. Change the $(build) parameter
+to actually point to the subdir itself, so the makefile from
+that subdir can be used to set-up build flags etc., for example
+setting up DTC_FLAGS. The patsubst magic is used to strip the
+trailing "/" from the path, as that confuses the kbuild system.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
-v2: no changes, just split up the series into parts
+ arch/arm64/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- scripts/Makefile.lib | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
-index 61e5966..527aab9 100644
---- a/scripts/Makefile.lib
-+++ b/scripts/Makefile.lib
-@@ -292,6 +292,9 @@ cmd_dtc = mkdir -p $(dir ${dtc-tmp}) ; \
- $(obj)/%.dtb: $(src)/%.dts $(DTC) FORCE
- 	$(call if_changed_dep,dtc)
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index f04c814..2ac4358 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -128,7 +128,7 @@ zinstall install:
+ 	$(Q)$(MAKE) $(build)=$(boot) $@
  
-+$(obj)/%.dtbo: $(src)/%.dtso $(DTC) FORCE
-+	$(call if_changed_dep,dtc)
-+
- dtc-tmp = $(subst $(comma),_,$(dot-target).dts.tmp)
+ %.dtb %.dtbo: scripts
+-	$(Q)$(MAKE) $(build)=$(boot)/dts $(boot)/dts/$@
++	$(Q)$(MAKE) $(build)=$(patsubst %/,%,$(boot)/dts/$(dir $@)) $(boot)/dts/$@
  
- # Bzip2
+ PHONY += dtbs dtbs_install
+ 
 -- 
 1.9.1
 
