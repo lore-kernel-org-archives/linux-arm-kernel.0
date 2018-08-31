@@ -1,83 +1,71 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Fri, 31 Aug 2018 15:53:18 +0800
-Subject: [PATCH 7/7] ARM: dts: imx6: add mmdc ipg clock
-In-Reply-To: <1535701998-20443-1-git-send-email-Anson.Huang@nxp.com>
-References: <1535701998-20443-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1535701998-20443-8-git-send-email-Anson.Huang@nxp.com>
+From: jerome.forissier@linaro.org (Jerome Forissier)
+Date: Fri, 31 Aug 2018 10:01:44 +0200
+Subject: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
+In-Reply-To: <153567894721.93865.4092113232222931488@swboyd.mtv.corp.google.com>
+References: <1533703167-26583-1-git-send-email-Anson.Huang@nxp.com>
+ <1533703167-26583-2-git-send-email-Anson.Huang@nxp.com>
+ <AM0PR04MB4481FC2BAD71B75D7BE84C0788260@AM0PR04MB4481.eurprd04.prod.outlook.com>
+ <DB3PR0402MB3916F8BC381BBA01DB21D1C0F5260@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+ <AM0PR04MB44813C7A3E0AF4F3BCFFCF0088390@AM0PR04MB4481.eurprd04.prod.outlook.com>
+ <153567894721.93865.4092113232222931488@swboyd.mtv.corp.google.com>
+Message-ID: <a6489bda-703f-207c-0b24-60f4044fe89f@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6 SoCs has MMDC clock gates in CCM CCGR, add
-clock property for MMDC driver's clock operation.
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- arch/arm/boot/dts/imx6qdl.dtsi | 1 +
- arch/arm/boot/dts/imx6sl.dtsi  | 1 +
- arch/arm/boot/dts/imx6sll.dtsi | 1 +
- arch/arm/boot/dts/imx6sx.dtsi  | 1 +
- arch/arm/boot/dts/imx6ul.dtsi  | 1 +
- 5 files changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 61d2d26..5d33729 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -1115,6 +1115,7 @@
- 			mmdc0: mmdc at 21b0000 { /* MMDC0 */
- 				compatible = "fsl,imx6q-mmdc";
- 				reg = <0x021b0000 0x4000>;
-+				clocks = <&clks IMX6QDL_CLK_MMDC_P0_IPG>;
- 			};
- 
- 			mmdc1: mmdc at 21b4000 { /* MMDC1 */
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index 7a4f5da..63a18e1 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -921,6 +921,7 @@
- 			mmdc: mmdc at 21b0000 {
- 				compatible = "fsl,imx6sl-mmdc", "fsl,imx6q-mmdc";
- 				reg = <0x021b0000 0x4000>;
-+				clocks = <&clks IMX6SL_CLK_MMDC_P0_IPG>;
- 			};
- 
- 			rngb: rngb at 21b4000 {
-diff --git a/arch/arm/boot/dts/imx6sll.dtsi b/arch/arm/boot/dts/imx6sll.dtsi
-index ed9a980..e462f76 100644
---- a/arch/arm/boot/dts/imx6sll.dtsi
-+++ b/arch/arm/boot/dts/imx6sll.dtsi
-@@ -770,6 +770,7 @@
- 			mmdc: memory-controller at 21b0000 {
- 				compatible = "fsl,imx6sll-mmdc", "fsl,imx6q-mmdc";
- 				reg = <0x021b0000 0x4000>;
-+				clocks = <&clks IMX6SLL_CLK_MMDC_P0_IPG>;
- 			};
- 
- 			ocotp: ocotp-ctrl at 21bc000 {
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index 844caa3..ba4ab79 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -1002,6 +1002,7 @@
- 			mmdc: mmdc at 21b0000 {
- 				compatible = "fsl,imx6sx-mmdc", "fsl,imx6q-mmdc";
- 				reg = <0x021b0000 0x4000>;
-+				clocks = <&clks IMX6SX_CLK_MMDC_P0_IPG>;
- 			};
- 
- 			fec2: ethernet at 21b4000 {
-diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index 448d765..2019ad5 100644
---- a/arch/arm/boot/dts/imx6ul.dtsi
-+++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -916,6 +916,7 @@
- 			mmdc: mmdc at 21b0000 {
- 				compatible = "fsl,imx6ul-mmdc", "fsl,imx6q-mmdc";
- 				reg = <0x021b0000 0x4000>;
-+				clocks = <&clks IMX6UL_CLK_MMDC_P0_IPG>;
- 			};
- 
- 			weim: weim at 21b8000 {
--- 
-2.7.4
+On 08/31/2018 03:29 AM, Stephen Boyd wrote:
+> Quoting Peng Fan (2018-08-12 18:15:41)
+>> Hi Anson,
+>>
+>>>>> -----Original Message-----
+>>>>> From: Anson Huang
+>>>>> Sent: 2018?8?8? 12:39
+>>>>> To: shawnguo at kernel.org; s.hauer at pengutronix.de;
+>>>>> kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>;
+>>>>> mturquette at baylibre.com; sboyd at kernel.org;
+>>>>> linux-arm-kernel at lists.infradead.org;
+>>>>> linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org
+>>>>> Cc: dl-linux-imx <linux-imx@nxp.com>
+>>>>> Subject: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
+>>>>>
+>>>>> Clock framework will enable those clocks registered with
+>>>>> CLK_IS_CRITICAL flag, so no need to have clks_init_on array during
+>>>>> clock
+>>>> initialization now.
+>>>>
+>>>> Will it be more flexible to parse dts saying "critical-clocks = <xxx>"
+>>>> or "init-on-arrary=<xxx>"
+>>>> and enable those clocks?
+>>>
+>>> Parsing the clocks arrays from dtb is another way of enabling critical clocks, but
+>>> for current i.MX6/7 platforms, we implement it in same way as most of other
+>>> SoCs, currently I did NOT see any necessity of putting them in dtb, just adding
+>>> flag during clock registering is more simple, if there is any special requirement
+>>> for different clocks set to be enabled, then we can add support to enable the
+>>> method of parsing critical-clocks from dtb. Just my two cents.
+>>
+>> Thinking about OP-TEE want to use one device, but it's clocks are registered
+>> by Linux, because there is no module in Linux side use it, it will shutdown the clock,
+>> which cause OP-TEE could not access the device.
+>>
+>> Then people have to modify clk code to add CLK_IS_CRITICAL flag to make sure
+>> the clocks are not shutdown by Linux.
+>>
+>> However adding a new property in clk node and let driver code parse the dts,
+>> there is no need to modify clk driver code when OP-TEE needs another device clock.
+>>
+> 
+> If OP-TEE needs linux to keep things on then why can't the OP-TEE driver
+> in Linux probe, acquire clocks, and keep the clks enabled forever?
+
+Sounds reasonable, but how could this be done without introducing
+platform-specific stuff in the OP-TEE driver?
+
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
