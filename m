@@ -1,101 +1,131 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 31 Aug 2018 09:24:44 +0200
-Subject: __clear_bit_lock to use atomic clear_bit (was Re: Patch
- "asm-generic/bitops/lock.h)
-In-Reply-To: <C2D7FE5348E1B147BCA15975FBA23075012B090FE0@us01wembx1.internal.synopsys.com>
-References: <1535567633.4465.23.camel@synopsys.com>
- <C2D7FE5348E1B147BCA15975FBA23075012B090BEA@us01wembx1.internal.synopsys.com>
- <20180830094411.GX24124@hirez.programming.kicks-ass.net>
- <C2D7FE5348E1B147BCA15975FBA23075012B090FE0@us01wembx1.internal.synopsys.com>
-Message-ID: <20180831072444.GD24124@hirez.programming.kicks-ass.net>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 31 Aug 2018 09:25:37 +0200
+Subject: [PATCH v2] ARM: dts: rockchip: add rk3188 lcd controller nodes
+Message-ID: <20180831072537.15785-1-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2018 at 12:29:27AM +0000, Vineet Gupta wrote:
-> On 08/30/2018 02:44 AM, Peter Zijlstra wrote:
-> >> Back in 2016, Peter had fixed this file due to a problem I reported on ARC. See
-> >> commit f75d48644c56a ("bitops: Do not default to __clear_bit() for
-> >> __clear_bit_unlock()")
-> >> That made __clear_bit_unlock() use the atomic clear_bit() vs. non-atomic
-> >> __clear_bit(), effectively making clear_bit_unlock() and __clear_bit_unlock() same.
-> >>
-> >> This patch undoes that which could explain the issues you see. @Peter, @Will ?
-> > Right, so the thinking is that on platforms that suffer that issue,
-> > atomic_set*() should DTRT. And if you look at your spinlock based atomic
-> > implementation, you'll note that atomic_set() does indeed do the right
-> > thing.
-> >
-> > arch/arc/include/asm/atomic.h:108
-> 
-> For !LLSC atomics, ARC has always had atomic_set() DTRT even in the git revision
-> of 2016. The problem was not in atomics, but the asymmetric way slub bit lock etc
-> worked (haven't checked if this changed), i.e.
-> 
->      slab_lock() -> bit_spin_lock() -> test_and_set_bit()    # atomic
->      slab_unlock() -> __bit_spin_unlock() -> __clear_bit()    # non-atomic
-> 
-> And with v4.19-rc1, we have essentially reverted f75d48644c56a due to 84c6591103db
-> ("locking/atomics, asm-generic/bitops/lock.h: Rewrite using atomic_fetch_*()")
-> 
-> So what we have with 4.19-rc1 is
-> 
->    static inline void __clear_bit_unlock(unsigned int nr, volatile unsigned long *p)
->    {
->      unsigned long old;
->      p += ((nr) / 32);
->      old = // some typecheck magic on *p
->      old &= ~(1UL << ((nr) % 32));
->      atomic_long_set_release((atomic_long_t *)p, old);
->    }
-> 
-> So @p is being r-m-w non atomically. The lock variant uses atomic op...
-> 
->    int test_and_set_bit_lock(unsigned int nr, volatile unsigned long *p)
->    { 
->       ...
->       old = atomic_long_fetch_or_acquire(mask, (atomic_long_t *)p);
->       ....
->    }
-> 
-> Now I don't know why we don't see the issue with LLSC atomics, perhaps race window
-> reduces due to less verbose code itself etc..
-> 
-> Am I missing something still ?
+Add the core display subsystem and vop nodes to rk3188.
+Vop0 has a fully dedicated set of pins and only vop1 needs to
+do pinctrl to have display output, so also add the necessary
+pinctrl entries for it.
 
-Yes :-) So there are 2 things to consider:
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+changes in v2:
+- drop default pinctrl setting
+  Boards may use different output signals not needing
+  all pins.
 
- 1) this whole test_and_set_bit() + __clear_bit() combo only works if we
-    have the guarantee that no other bit will change while we have our
-    'lock' bit set.
+ arch/arm/boot/dts/rk3188.dtsi | 84 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 84 insertions(+)
 
-    This means that @old is invariant.
-
- 2) atomic ops and stores work as 'expected' -- which is true for all
-    hardware LL/SC or CAS implementations, but not for spinlock based
-    atomics.
-
-The bug in f75d48644c56a was the atomic test_and_set loosing the
-__clear_bit() store.
-
-With LL/SC this cannot happen, because the competing store (__clear_bit)
-will cause the SC to fail, then we'll retry, the second LL observes the
-new value.
-
-So the main point is that test_and_set must not loose a store.
-atomic_fetch_or() vs atomic_set() ensures this.
-
-
-NOTE: another possible solution for spinlock based bitops is making
-test_and_set 'smarter':
-
-	spin_lock();
-	val = READ_ONCE(word);
-	if (!(val & bit)) {
-		val |= bit;
-		WRITE_ONCE(word, val);
-	}
-	spin_unlock();
-
-But that is not something that works in generic (the other atomic ops),
-and therefore atomic_set() is required to take the spinlock too, which
-also cures the problem.
+diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
+index aa123f93f181..ff607f11f5b0 100644
+--- a/arch/arm/boot/dts/rk3188.dtsi
++++ b/arch/arm/boot/dts/rk3188.dtsi
+@@ -56,6 +56,11 @@
+ 		};
+ 	};
+ 
++	display-subsystem {
++		compatible = "rockchip,display-subsystem";
++		ports = <&vop0_out>, <&vop1_out>;
++	};
++
+ 	sram: sram at 10080000 {
+ 		compatible = "mmio-sram";
+ 		reg = <0x10080000 0x8000>;
+@@ -69,6 +74,38 @@
+ 		};
+ 	};
+ 
++	vop0: vop at 1010c000 {
++		compatible = "rockchip,rk3188-vop";
++		reg = <0x1010c000 0x1000>;
++		interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru ACLK_LCDC0>, <&cru DCLK_LCDC0>, <&cru HCLK_LCDC0>;
++		clock-names = "aclk_vop", "dclk_vop", "hclk_vop";
++		resets = <&cru SRST_LCDC0_AXI>, <&cru SRST_LCDC0_AHB>, <&cru SRST_LCDC0_DCLK>;
++		reset-names = "axi", "ahb", "dclk";
++		status = "disabled";
++
++		vop0_out: port {
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++	};
++
++	vop1: vop at 1010e000 {
++		compatible = "rockchip,rk3188-vop";
++		reg = <0x1010e000 0x1000>;
++		interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru ACLK_LCDC1>, <&cru DCLK_LCDC1>, <&cru HCLK_LCDC1>;
++		clock-names = "aclk_vop", "dclk_vop", "hclk_vop";
++		resets = <&cru SRST_LCDC1_AXI>, <&cru SRST_LCDC1_AHB>, <&cru SRST_LCDC1_DCLK>;
++		reset-names = "axi", "ahb", "dclk";
++		status = "disabled";
++
++		vop1_out: port {
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++	};
++
+ 	timer3: timer at 2000e000 {
+ 		compatible = "rockchip,rk3188-timer", "rockchip,rk3288-timer";
+ 		reg = <0x2000e000 0x20>;
+@@ -309,6 +348,51 @@
+ 			};
+ 		};
+ 
++		lcdc1 {
++			lcdc1_dclk: lcdc1-dclk {
++				rockchip,pins = <2 RK_PD0 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			lcdc1_den: lcdc1-den {
++				rockchip,pins = <2 RK_PD1 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			lcdc1_hsync: lcdc1-hsync {
++				rockchip,pins = <2 RK_PD2 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			lcdc1_vsync: lcdc1-vsync {
++				rockchip,pins = <2 RK_PD3 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			lcdc1_rgb24: ldcd1-rgb24 {
++				rockchip,pins = <2 RK_PA0 RK_FUNC_1 &pcfg_pull_none>,
++						<2 RK_PA1 RK_FUNC_1 &pcfg_pull_none>,
++						<2 RK_PA2 RK_FUNC_1 &pcfg_pull_none>,
++						<2 RK_PA3 RK_FUNC_1 &pcfg_pull_none>,
++						<2 RK_PA4 RK_FUNC_1 &pcfg_pull_none>,
++						<2 RK_PA5 RK_FUNC_1 &pcfg_pull_none>,
++						<2 RK_PA6 RK_FUNC_1 &pcfg_pull_none>,
++						<2 RK_PA7 RK_FUNC_1 &pcfg_pull_none>,
++						<2 RK_PB0 RK_FUNC_1 &pcfg_pull_none>,
++						<2 RK_PB1 RK_FUNC_1 &pcfg_pull_none>,
++						<2 RK_PB2 RK_FUNC_1 &pcfg_pull_none>,
++						<2 RK_PB3 RK_FUNC_1 &pcfg_pull_none>,
++						<2 RK_PB4 RK_FUNC_1 &pcfg_pull_none>,
++						<2 RK_PB5 RK_FUNC_1 &pcfg_pull_none>,
++						<2 RK_PB6 RK_FUNC_1 &pcfg_pull_none>,
++						<2 RK_PB7 RK_FUNC_1 &pcfg_pull_none>,
++						<2 RK_PC0 RK_FUNC_1 &pcfg_pull_none>,
++						<2 RK_PC1 RK_FUNC_1 &pcfg_pull_none>,
++						<2 RK_PC2 RK_FUNC_1 &pcfg_pull_none>,
++						<2 RK_PC3 RK_FUNC_1 &pcfg_pull_none>,
++						<2 RK_PC4 RK_FUNC_1 &pcfg_pull_none>,
++						<2 RK_PC5 RK_FUNC_1 &pcfg_pull_none>,
++						<2 RK_PC6 RK_FUNC_1 &pcfg_pull_none>,
++						<2 RK_PC7 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
+ 		pwm0 {
+ 			pwm0_out: pwm0-out {
+ 				rockchip,pins = <RK_GPIO3 27 RK_FUNC_1 &pcfg_pull_none>;
+-- 
+2.17.0
