@@ -1,68 +1,48 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 31 Aug 2018 12:20:38 -0700
-Subject: [PATCH v3 2/3] dt-bindings: net: dsa: Document B53 SRAB interrupts
- and registers
-In-Reply-To: <20180831192039.11842-1-f.fainelli@gmail.com>
-References: <20180831192039.11842-1-f.fainelli@gmail.com>
-Message-ID: <20180831192039.11842-3-f.fainelli@gmail.com>
+From: eajames@linux.vnet.ibm.com (Eddie James)
+Date: Fri, 31 Aug 2018 14:30:02 -0500
+Subject: [PATCH 0/4] media: platform: Add Aspeed Video Engine driver
+In-Reply-To: <153573819126.93865.1884182656081956202@swboyd.mtv.corp.google.com>
+References: <1535576973-8067-1-git-send-email-eajames@linux.vnet.ibm.com>
+ <153573819126.93865.1884182656081956202@swboyd.mtv.corp.google.com>
+Message-ID: <a959a032-6817-dcb4-2c5f-b4bd17fc1c8b@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the Broadcom roboswitch Switch Register Access Block interrupt
-lines and additional register base addresses for port mux configuration
-and SGMII status/configuration registers.
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- .../devicetree/bindings/net/dsa/b53.txt       | 36 +++++++++++++++++++
- 1 file changed, 36 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/net/dsa/b53.txt b/Documentation/devicetree/bindings/net/dsa/b53.txt
-index 1811e1972a7a..5201bc15fdd6 100644
---- a/Documentation/devicetree/bindings/net/dsa/b53.txt
-+++ b/Documentation/devicetree/bindings/net/dsa/b53.txt
-@@ -46,6 +46,42 @@ Required properties:
-       "brcm,bcm6328-switch"
-       "brcm,bcm6368-switch" and the mandatory "brcm,bcm63xx-switch"
- 
-+Required properties for BCM585xx/586xx/88312 SoCs:
-+
-+ - reg: a total of 3 register base addresses, the first one must be the
-+   Switch Register Access block base, the second is the port 5/4 mux
-+   configuration register and the third one is the SGMII configuration
-+   and status register base address.
-+
-+ - interrupts: a total of 13 interrupts must be specified, in the following
-+   order: port 0-5, 7-8 link status change, then the integrated PHY interrupt,
-+   then the timestamping interrupt and the sleep timer interrupts for ports
-+   5,7,8.
-+
-+Optional properties for BCM585xx/586xx/88312 SoCs:
-+
-+  - reg-names: a total of 3 names matching the 3 base register address, must
-+    be in the following order:
-+	"srab"
-+	"mux_config"
-+	"sgmii_config"
-+
-+  - interrupt-names: a total of 13 names matching the 13 interrupts specified
-+    must be in the following order:
-+	"link_state_p0"
-+	"link_state_p1"
-+	"link_state_p2"
-+	"link_state_p3"
-+	"link_state_p4"
-+	"link_state_p5"
-+	"link_state_p7"
-+	"link_state_p8"
-+	"phy"
-+	"ts"
-+	"imp_sleep_timer_p5"
-+	"imp_sleep_timer_p7"
-+	"imp_sleep_timer_p8"
-+
- See Documentation/devicetree/bindings/net/dsa/dsa.txt for a list of additional
- required and optional properties.
- 
--- 
-2.17.1
+On 08/31/2018 12:56 PM, Stephen Boyd wrote:
+> Quoting Eddie James (2018-08-29 14:09:29)
+>> The Video Engine (VE) embedded in the Aspeed AST2400 and AST2500 SOCs
+>> can capture and compress video data from digital or analog sources. With
+>> the Aspeed chip acting as a service processor, the Video Engine can
+>> capture the host processor graphics output.
+>>
+>> This series adds a V4L2 driver for the VE, providing a read() interface
+>> only. The driver triggers the hardware to capture the host graphics output
+>> and compress it to JPEG format.
+>>
+>> Testing on an AST2500 determined that the videobuf/streaming/mmap interface
+>> was significantly slower than the simple read() interface, so I have not
+>> included the streaming part.
+>>
+>> It's also possible to use an automatic mode for the VE such that
+>> re-triggering the HW every frame isn't necessary. However this wasn't
+>> reliable on the AST2400, and probably used more CPU anyway due to excessive
+>> interrupts. It was approximately 15% faster.
+>>
+>> The series also adds the necessary parent clock definitions to the Aspeed
+>> clock driver, with both a mux and clock divider.
+> Please let me know your merge strategy here. I can ack the clk patches
+> because they look fine from high-level clk driver perspective (maybe
+> Joel can take a closer look) or I can merge the patches into clk-next
+> and get them into next release while the video driver gets reviewed.
+
+Thanks for taking a look! Probably preferable to get the clk patches 
+into clk-next first (though Joel reviewing would be great). I just put 
+everything in the same set for the sake of explaining the necessity of 
+the clk changes.
+
+Thanks,
+Eddie
+
+>
