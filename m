@@ -1,84 +1,63 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 31 Aug 2018 19:31:37 +0800
-Subject: [PATCH v4 09/13] ARM: dts: sun8i: r40: add sata node
-In-Reply-To: <20180831105412.GD16301@Red>
-References: <20180830190120.722-1-clabbe.montjoie@gmail.com>
- <20180830190120.722-10-clabbe.montjoie@gmail.com>
- <20180831073500.zubqpvar4yhjqrge@flea>
- <20180831075631.GB16301@Red> <20180831102021.idz42sfgldihpkrp@flea>
- <20180831105412.GD16301@Red>
-Message-ID: <CAGb2v65m73mZkQ9qbYne-utZPujEvRftYGz5kYCx=8t-C-=DJQ@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 31 Aug 2018 13:41:06 +0200
+Subject: [PATCH 1/7] spi: add slave device size in spi_device struct
+In-Reply-To: <1535711404-29528-2-git-send-email-yogeshnarayan.gaur@nxp.com>
+References: <1535711404-29528-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <1535711404-29528-2-git-send-email-yogeshnarayan.gaur@nxp.com>
+Message-ID: <CAMuHMdWbqEkARvSuMxSRusCj0yi7GUYTyQouRhOi+iYJq9R-Kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2018 at 6:54 PM Corentin Labbe
-<clabbe.montjoie@gmail.com> wrote:
+Hi Yogesh,
+
+Thanks for your patch!
+
+On Fri, Aug 31, 2018 at 12:33 PM Yogesh Gaur <yogeshnarayan.gaur@nxp.com> wrote:
+> Add 'size' data variable in spi_device struct.
+> This is to save the size of the connected slave device.
+
+What is the "size" of an SPI slave device?
+
+> After slave device scan, spi_nor_scan, size being assigned to this
+> from MTD layer.
+
+Ah, this is MTD specific?
+
+> SFDP read is being requested before completion of spi_nor_scan()
+> routine, thus populate device size before making read request
+> to the SPI controller.
 >
-> On Fri, Aug 31, 2018 at 12:20:21PM +0200, maxime.ripard at bootlin.com wrote:
-> > On Fri, Aug 31, 2018 at 09:56:31AM +0200, Corentin Labbe wrote:
-> > > On Fri, Aug 31, 2018 at 09:35:00AM +0200, Maxime Ripard wrote:
-> > > > On Thu, Aug 30, 2018 at 09:01:16PM +0200, Corentin Labbe wrote:
-> > > > > R40 have a sata controller which is the same as A20.
-> > > > > This patch adds a DT node for it.
-> > > > >
-> > > > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> > > > > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> > > > > ---
-> > > > >  arch/arm/boot/dts/sun8i-r40.dtsi | 23 +++++++++++++++++++++++
-> > > > >  1 file changed, 23 insertions(+)
-> > > > >
-> > > > > diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
-> > > > > index 852c2ccc3268..d6b5820da850 100644
-> > > > > --- a/arch/arm/boot/dts/sun8i-r40.dtsi
-> > > > > +++ b/arch/arm/boot/dts/sun8i-r40.dtsi
-> > > > > @@ -550,6 +550,29 @@
-> > > > >                         #size-cells = <0>;
-> > > > >                 };
-> > > > >
-> > > > > +               ahci: sata at 1c18000 {
-> > > > > +                       compatible = "allwinner,sun8i-r40-ahci";
-> > > > > +                       reg = <0x01c18000 0x1000>;
-> > > > > +                       interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
-> > > > > +                       clocks = <&ccu CLK_BUS_SATA>, <&ccu CLK_SATA>;
-> > > > > +                       resets = <&ccu RST_BUS_SATA>;
-> > > > > +                       resets-name = "ahci";
-> > > > > +                       #address-cells = <1>;
-> > > > > +                       #size-cells = <0>;
-> > > > > +                       status = "disabled";
-> > > > > +
-> > > > > +                       sata_port: sata-port at 0 {
-> > > > > +                               reg = <0>;
-> > > > > +                               phys = <&sata_phy>;
-> > > > > +                       };
-> > > > > +               };
-> > > > > +
-> > > > > +               sata_phy: sata-phy at 1c180c0  {
-> > > > > +                       compatible = "allwinner,sun8i-r40-sata-phy";
-> > > > > +                       reg = <0x1c180c0 0x200>;
-> > > >
-> > > > Overlapping devices in the DTS is not ok.
-> > > >
-> > >
-> > > I do the same than arch/arm/boot/dts/berlin2.dtsi (sata at e90000
-> > > phy at e900a0)
-> > >
-> > > But since it is not a good justification, it seems that regmap is my
-> > > only solution ?
-> >
-> > I'm not even sure why you are moving the phy out of its original node
-> > (and driver).
-> >
+> Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
+
+> --- a/include/linux/spi/spi.h
+> +++ b/include/linux/spi/spi.h
+> @@ -127,6 +127,7 @@ void spi_statistics_add_transfer_stats(struct spi_statistics *stats,
+>   *     for driver coldplugging, and in uevents used for hotplugging
+>   * @cs_gpio: gpio number of the chipselect line (optional, -ENOENT when
+>   *     not using a GPIO line)
+> + * @size: size of the connected slave device
+
+Please document what is the meaning of "size".
+
+>   *
+>   * @statistics: statistics for the spi_device
+>   *
+> @@ -168,6 +169,7 @@ struct spi_device {
+>         void                    *controller_data;
+>         char                    modalias[SPI_NAME_SIZE];
+>         int                     cs_gpio;        /* chip select gpio */
+> +       u32                     size;           /* size of slave device */
 >
-> For using the phy-supply already handled by the code.
-> The other choice is to add another xxx-supply to ahci_platform.
-> Or to use hackily port_regulator for this regulator.
+>         /* the statistics */
+>         struct spi_statistics   statistics;
 
-The PHY registers are in the AHCI's "vendor specific registers"
-region. Following that are the per-port registers, which the ahci
-driver will need access to. This doesn't look like it should
-deserve a separate device node.
+Gr{oetje,eeting}s,
 
-What's wrong with handling the regulator directly in the ahci-sunxi
-PHY init code?
+                        Geert
 
-ChenYu
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
