@@ -1,36 +1,47 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Fri, 31 Aug 2018 21:23:28 +0300
-Subject: [PATCH v5 0/2] clk: Add functions to get optional clocks
-In-Reply-To: <1535724443-21150-1-git-send-email-phil.edworthy@renesas.com>
-References: <1535724443-21150-1-git-send-email-phil.edworthy@renesas.com>
-Message-ID: <20180831182328.GF11447@smile.fi.intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 31 Aug 2018 20:29:29 +0200
+Subject: [PATCH 11/15] soc: octeontx2: Add Marvell OcteonTX2 CGX driver
+In-Reply-To: <CA+sq2CfL-eBWPcu1H9UkvKuL4kPeKnL1qkiG0tLZa_GW8LEqXA@mail.gmail.com>
+References: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
+ <1535453838-12154-12-git-send-email-sunil.kovvuri@gmail.com>
+ <CAK8P3a0q0P-FuG6cTgMNkeZbtXE4pMk1iJq36_x20WRddtwaDg@mail.gmail.com>
+ <CA+sq2Cc1CSKmuEjKt8psR7Zyv9PzLkN10hzy8mrai136SF4-qA@mail.gmail.com>
+ <CAK8P3a2CMcYg6vMmRAc4N80BpFwczGiPnaLNCDZYXCsRydtPQw@mail.gmail.com>
+ <CA+sq2Ce3ew0X+RMm7fQ+iUZF0HKptzBr1dBk3NuRL8o82wBTjg@mail.gmail.com>
+ <CAK8P3a1oeOFVYc2xH+KO1gV0m9utHziGpNtQLAEv-RBxKkB7Og@mail.gmail.com>
+ <CA+sq2CfAvasZoNmnNQadhdsEz-eyXQPBtXbDmvt1nM0DQsm+8g@mail.gmail.com>
+ <CAK8P3a0wdXRmZOw+yyws00GU=xYAFkGm81xKTF3-DjNmjjZH5g@mail.gmail.com>
+ <CA+sq2CfL-eBWPcu1H9UkvKuL4kPeKnL1qkiG0tLZa_GW8LEqXA@mail.gmail.com>
+Message-ID: <CAK8P3a0p2PdjVS+QVMtiYK+5=ToeLSfjvf5X85S0HK2Om4fZ1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2018 at 03:07:21PM +0100, Phil Edworthy wrote:
-> Quite a few drivers get an optional clock, e.g. a bus clock required to 
-> access peripheral's registers that is always enabled on some devices.
-> 
+On Fri, Aug 31, 2018 at 6:01 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
+> On Fri, Aug 31, 2018 at 7:50 PM Arnd Bergmann <arnd@arndb.de> wrote:
 
-Looks good to me
+>
+> Thanks for the suggestion, that does makes sense.
+> Actually i did thought about it, but i was skeptical if it would be
+> acceptable to make
+> a single module out of drivers registering for two different PCI devices.
 
-Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+I don't think it matters much whether there is one module or two
+(others might have a strong opinion one way or the other).
 
-Perhaps, you may convert 8250_dw to this one later on as an example...
+What is important though are these two points:
 
-> Phil Edworthy (2):
->   clk: Add of_clk_get_by_name_optional() function
->   clk: Add functions to get optional clocks
-> 
->  drivers/clk/clk-devres.c | 18 ++++++++++--
->  drivers/clk/clkdev.c     | 74 ++++++++++++++++++++++++++++++++++++++----------
->  include/linux/clk.h      | 35 +++++++++++++++++++++++
->  3 files changed, 110 insertions(+), 17 deletions(-)
-> 
-> -- 
-> 2.7.4
-> 
+- How to represent the two PCI devices to user space: You should only
+  have one interface to user space I think, and this should be similar
+  to how other drivers manage similar cases (I don't actually know what they
+  do, but I assume you've done some research here)
 
--- 
-With Best Regards,
-Andy Shevchenko
+- How you connect find the pair of devices: Generally speaking while
+  the SoC might only have one of each, you shouldn't make that assumption
+  in the code, but instead have a reliable way of having one driver wait
+  for the other driver to finish probing so you can match the pair.
+
+> Will wait for few more days for more feedback from anyone and port v2 series.
+
+Ok.
+
+      Arnd
