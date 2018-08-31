@@ -1,154 +1,91 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 31 Aug 2018 15:36:53 +0200
-Subject: [PATCH 6/6] crypto: vf-crc - Add new driver for Freescale Vybrid
- CRC
-In-Reply-To: <CAJKOXPcR-h0s7h01HnizV1xZeEmv4Mwgpmrm-LqMo9fD95v7RA@mail.gmail.com>
-References: <20180830171539.20008-1-krzk@kernel.org>
- <20180830171539.20008-7-krzk@kernel.org>
- <20180831073918.bcmonixmeehvr42h@pengutronix.de>
- <CAJKOXPcR-h0s7h01HnizV1xZeEmv4Mwgpmrm-LqMo9fD95v7RA@mail.gmail.com>
-Message-ID: <20180831133653.2dxhzg73lqk7p6b7@pengutronix.de>
+From: radu.pirea@microchip.com (Radu Pirea)
+Date: Fri, 31 Aug 2018 16:41:35 +0300
+Subject: [RESEND PATCH v11 0/6] Driver for at91 usart in spi mode
+Message-ID: <20180831134141.9335-1-radu.pirea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2018 at 01:07:39PM +0200, Krzysztof Kozlowski wrote:
-> On Fri, 31 Aug 2018 at 09:39, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> >
-> > Hi Krzysztof,
-> >
-> > Some comments inline.
-> >
-> > On Thu, Aug 30, 2018 at 07:15:39PM +0200, Krzysztof Kozlowski wrote:
-> > > Add driver for using the Freescale/NXP Vybrid processor CRC block for
-> > > CRC16 and CRC32 offloading.  The driver implements shash_alg and was
-> > > tested using internal testmgr tests and libkcapi.
-> > >
-> > > Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> > > ---
-> > >  MAINTAINERS               |   7 +
-> > >  drivers/crypto/Kconfig    |  10 ++
-> > >  drivers/crypto/Makefile   |   1 +
-> > >  drivers/crypto/vf-crc.c   | 387 ++++++++++++++++++++++++++++++++++++++++++++++
-> > >  include/linux/crc32poly.h |   7 +
-> > >  5 files changed, 412 insertions(+)
-> > >  create mode 100644 drivers/crypto/vf-crc.c
-> > >
-> > > diff --git a/MAINTAINERS b/MAINTAINERS
-> > > index 0a340f680230..e84fa829a4e4 100644
-> > > --- a/MAINTAINERS
-> > > +++ b/MAINTAINERS
-> > > @@ -15388,6 +15388,13 @@ S:   Maintained
-> > >  F:   Documentation/fb/uvesafb.txt
-> > >  F:   drivers/video/fbdev/uvesafb.*
-> > >
-> > > +VF500/VF610 HW CRC DRIVER
-> > > +M:   Krzysztof Kozlowski <krzk@kernel.org>
-> > > +L:   linux-crypto at vger.kernel.org
-> > > +S:   Maintained
-> > > +F:   drivers/crypto/vf-crc.c
-> > > +F:   Documentation/devicetree/bindings/crypto/fsl-vf610-crc.txt
-> > > +
-> > >  VF610 NAND DRIVER
-> > >  M:   Stefan Agner <stefan@agner.ch>
-> > >  L:   linux-mtd at lists.infradead.org
-> > > diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
-> > > index 20314d7a7b58..0ade940ac79c 100644
-> > > --- a/drivers/crypto/Kconfig
-> > > +++ b/drivers/crypto/Kconfig
-> > > @@ -418,6 +418,16 @@ config CRYPTO_DEV_MXS_DCP
-> > >         To compile this driver as a module, choose M here: the module
-> > >         will be called mxs-dcp.
-> > >
-> > > +config CRYPTO_DEV_VF_CRC
-> > > +     tristate "Support for Freescale/NXP Vybrid CRC HW accelerator"
-> > > +     select CRYPTO_HASH
-> > > +     help
-> > > +       This option enables support for the CRC16/32 hardware accelerator
-> > > +       on Freescale/NXP Vybrid VF500/VF610 SoCs.
-> > > +
-> > > +       To compile this driver as a module, choose M here: the module
-> > > +       will be called vf-crc.
-> > > +
-> > >  config CRYPTO_DEV_EXYNOS_RNG
-> > >       tristate "EXYNOS HW pseudo random number generator support"
-> > >       depends on ARCH_EXYNOS || COMPILE_TEST
-> > > diff --git a/drivers/crypto/Makefile b/drivers/crypto/Makefile
-> > > index c23396f32c8a..418c08bdc19c 100644
-> > > --- a/drivers/crypto/Makefile
-> > > +++ b/drivers/crypto/Makefile
-> > > @@ -41,6 +41,7 @@ obj-$(CONFIG_ARCH_STM32) += stm32/
-> > >  obj-$(CONFIG_CRYPTO_DEV_SUN4I_SS) += sunxi-ss/
-> > >  obj-$(CONFIG_CRYPTO_DEV_TALITOS) += talitos.o
-> > >  obj-$(CONFIG_CRYPTO_DEV_UX500) += ux500/
-> > > +obj-$(CONFIG_CRYPTO_DEV_VF_CRC) += vf-crc.o
-> > >  obj-$(CONFIG_CRYPTO_DEV_VIRTIO) += virtio/
-> > >  obj-$(CONFIG_CRYPTO_DEV_VMX) += vmx/
-> > >  obj-$(CONFIG_CRYPTO_DEV_BCM_SPU) += bcm/
-> > > +static int vf_crc_update_prepare(struct vf_crc_tfm_ctx *mctx,
-> > > +                              struct vf_crc_desc_ctx *desc_ctx)
-> > > +{
-> > > +     struct vf_crc *crc = desc_ctx->crc;
-> > > +     int ret;
-> > > +
-> > > +     ret = clk_prepare_enable(crc->clk);
-> > > +     if (ret) {
-> > > +             dev_err(crc->dev, "Failed to enable clock\n");
-> > > +             return ret;
-> > > +     }
-> >
-> > Generally have you measured the performance of this driver? Is it faster
-> > than the software implementation?
-> 
-> I wanted to replace our in-house out-of-tree, hacky ioctl-based driver
-> with something more upstreamable. I run few simple user-space
-> performance tests and in fact SW implementation is faster. Around 5x
-> faster for this version of driver. However it depends highly on size
-> of message (buffer) because there is big overhead of libkcapi.
+Hello,
 
-Well, I meant comparing the hardware vs. software implementation directly
-in the kernel. Of course when a userspace API is involved the comparison
-is not fair.
+This is the 11th version of driver. I added a mfd driver which by
+default probes atmel_serial driver and if in dt is specified to probe
+the spi driver, then the spi-at91-usart driver will be probed. The
+compatible for atmel_serial is now the compatible for at91-usart mfd
+driver and compatilbe for atmel_serial driver was changed in order to
+keep the bindings for serial as they are.
 
-> 
-> The typical SW implementation (with lookup tables) is just fetching of
-> data from memory and computing. Usage of libkcapi is at least three
-> library function calls on user-space side and a bunch of other code on
-> kernel side.
-> 
-> There are two benefits:
-> 1. CPU could be offloaded and do something in parallel. However for
-> this I should probably implement asymmetric hash. Otherwise wastes
-> cycles on reading from CRC registers... and of course on clk prepare
-> and mutex handing.
+@Lee, could you take this patch series into your tree? I addressed all Mark
+remarks.
 
-The CPU can only do something in parallel when it's otherwise idle. In
-your driver the CPU is 100% busy, so no time to do something else.
+In this resend I changed my email address from MAINTAINERS file.
 
-> 2. Theoretically it could lower energy consumption... as CPU would not
-> be that busy. I found 3% lower power usage (0.18 A -> 0.175 A) but if
-> you multiply it per time then total energy spent would be higher.
-> 
-> Does this driver makes sense in such case? In fact I have doubts...
-> 
-> It was nice exercise for me though. :)
-> 
-> >
-> > Under certain circumstances a clk_prepare_enable might become expensive,
-> > so it could happen that all this clk enabling/disabling takes longer
-> > than the action you do in between. Using pm_runtime might help here.
-> 
-> I should convert them to just clk_enable/disable. The pm_runtime is
-> also a huge framework and adds its own overhead. Using it just to
-> toggle one clock is a lot.
+Changes in v11:
+- removed "depends on HAS_DMA" from drivers/spi/Kconfig because the driver has
+no dma support
+- changed "selects MFD_AT91_USART" to "depends on MFD_AT91_USART" in
+drivers/spi/Kconfig
+- changed comment style in spi-at91-usart.c
 
-There are probably more drivers in your system that make use of
-pm_runtime, so no need to add it only for this one driver.
+Changes in v10:
+-fixed kbuild test robot warning
 
-Sascha
+Changes in v9:
+- minor changes
+- rebased on top of broonie/for-4.19
 
+Changes in v8:
+- fixed passing an empty mfd cell if "atmel,usart-mode" value is invalid
+
+Changes in v7:
+- synced up  SPDIX license with module license
+- numbering of usart modes starts from 0 insteand of 1
+
+Changes in v6:
+- removed unused compatible strings from serial and spi drivers
+
+Changes in v5:
+- fixed usage of stdout-path property with atmel_serial driver
+
+Changes in v4:
+- modified the spi driver to use cs gpio support form spi subsystem
+- fixed dma transfers for serial driver
+- squashed binding for spi and serial and moved them to mfd/atmel-usart.txt
+
+Changes in v3:
+- fixed spi slaves probing
+
+Changes in v2:
+- added at91-usart mfd driver
+- modified spi-at91-usart driver to work as mfd driver child
+- modified atmel_serial driver to work as mfd driver child
+
+Changes in v1:
+- added spi-at91-usart driver
+
+Radu Pirea (6):
+  MAINTAINERS: add at91 usart mfd driver
+  dt-bindings: add binding for atmel-usart in SPI mode
+  mfd: at91-usart: added mfd driver for usart
+  MAINTAINERS: add at91 usart spi driver
+  spi: at91-usart: add driver for at91-usart as spi
+  tty/serial: atmel: change the driver to work under at91-usart mfd
+
+ .../bindings/{serial => mfd}/atmel-usart.txt  |  25 +-
+ MAINTAINERS                                   |  16 +
+ drivers/mfd/Kconfig                           |   9 +
+ drivers/mfd/Makefile                          |   1 +
+ drivers/mfd/at91-usart.c                      |  71 +++
+ drivers/spi/Kconfig                           |   8 +
+ drivers/spi/Makefile                          |   1 +
+ drivers/spi/spi-at91-usart.c                  | 432 ++++++++++++++++++
+ drivers/tty/serial/Kconfig                    |   1 +
+ drivers/tty/serial/atmel_serial.c             |  42 +-
+ include/dt-bindings/mfd/at91-usart.h          |  17 +
+ 11 files changed, 606 insertions(+), 17 deletions(-)
+ rename Documentation/devicetree/bindings/{serial => mfd}/atmel-usart.txt (76%)
+ create mode 100644 drivers/mfd/at91-usart.c
+ create mode 100644 drivers/spi/spi-at91-usart.c
+ create mode 100644 include/dt-bindings/mfd/at91-usart.h
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+2.18.0
