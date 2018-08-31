@@ -1,47 +1,50 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 31 Aug 2018 13:58:07 +0200
-Subject: [PATCH 1/7] spi: add slave device size in spi_device struct
-In-Reply-To: <1535711404-29528-2-git-send-email-yogeshnarayan.gaur@nxp.com>
-References: <1535711404-29528-1-git-send-email-yogeshnarayan.gaur@nxp.com>
- <1535711404-29528-2-git-send-email-yogeshnarayan.gaur@nxp.com>
-Message-ID: <20180831135807.22255bce@karo-electronics.de>
+From: embed3d@gmail.com (Philipp Rossak)
+Date: Fri, 31 Aug 2018 13:58:52 +0200
+Subject: [linux-sunxi] Re: [PATCH v3 21/30] iio: adc: sun4i-gpadc-iio: add
+ support for H3 thermal sensor
+In-Reply-To: <f01ec2f202c7e2e5a7e0c822b2f9a8f0c55a9ea4.camel@aosc.io>
+References: <20180830154518.29507-1-embed3d@gmail.com>
+ <20180830154518.29507-22-embed3d@gmail.com>
+ <20180831091137.wkbbipssyd6mqfbt@flea>
+ <f01ec2f202c7e2e5a7e0c822b2f9a8f0c55a9ea4.camel@aosc.io>
+Message-ID: <247ac301-0f33-29d1-ead4-d76f54a226f9@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, 31 Aug 2018 15:59:58 +0530 Yogesh Gaur wrote:
-> Add 'size' data variable in spi_device struct.
-> This is to save the size of the connected slave device.
-> 
-> After slave device scan, spi_nor_scan, size being assigned to this
-> from MTD layer.
-> 
-> SFDP read is being requested before completion of spi_nor_scan()
-> routine, thus populate device size before making read request
-> to the SPI controller.
-> 
-> Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
-> ---
->  drivers/mtd/devices/m25p80.c  | 6 ++++++
->  drivers/mtd/spi-nor/spi-nor.c | 2 ++
->  include/linux/spi/spi.h       | 2 ++
->  3 files changed, 10 insertions(+)
-> 
-> diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
-> index fe260cc..6c7ad86 100644
-> --- a/drivers/mtd/devices/m25p80.c
-> +++ b/drivers/mtd/devices/m25p80.c
-> @@ -124,6 +124,10 @@ static ssize_t m25p80_read(struct spi_nor *nor, loff_t from, size_t len,
->  	/* convert the dummy cycles to the number of bytes */
->  	op.dummy.nbytes = (nor->read_dummy * op.dummy.buswidth) / 8;
->  
-> +	/* for case of SFDP header read commands, populate spi device size */
-> +	if (flash->spimem->spi->size == 0)
-> +		flash->spimem->spi->size = nor->mtd.size;
-> +
-If the 'size' is an spimem specific variable it should be added to the
-spi_mem struct rather than the spi_device struct.
 
 
-Lothar Wa?mann
+On 31.08.2018 11:51, Icenowy Zheng wrote:
+> Personally I suggest to leave out all SID or calibration related
+> patches here.
+> 
+> Currently we seems to be wrongly converting SID to big endian, however,
+> the orgnization of the THS calibration data on H6 shows that it's
+> surely little endian:
+> 
+> It consists a temperature value in 1/10 celsuis as unit, and some
+> thermal register readout values, which are the values read out at the
+> given temperature, and every value here (the temperature and the
+> readout) are all half word length.
+> 
+> Let the temperature value be AABB, the two readout values be XXYY and
+> ZZWW, the oragnization is:
+> BB AA YY XX WW ZZ ** ** .
+> 
+> When converting the SID to big endian, it becomes:
+> XX YY AA BB ** ** ZZ WW ,
+> which is non-sense, and not able to do sub-word cell addressing.
+> 
+> Maxime, should I drop the LE2BE conversion in SID driver? (I doubt
+> whether it will break compatibility.)
+> 
+> Philipp, could you delay to send any code that uses SID?
+
+Yes for sure! I will move the related patches to the end of the series 
+and add a DO-NOT-MERGE flag in the title. So I can get those also 
+ready/reviewed but not merged.
+
+Icenowy, do you know more about the A83T SID? From the general specs it 
+could be the same like on the A64 or the H3.
+
+Thanks,
+Philipp
