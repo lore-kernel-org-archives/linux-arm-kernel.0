@@ -1,70 +1,57 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 31 Aug 2018 12:54:12 +0200
-Subject: [PATCH v4 09/13] ARM: dts: sun8i: r40: add sata node
-In-Reply-To: <20180831102021.idz42sfgldihpkrp@flea>
-References: <20180830190120.722-1-clabbe.montjoie@gmail.com>
- <20180830190120.722-10-clabbe.montjoie@gmail.com>
- <20180831073500.zubqpvar4yhjqrge@flea> <20180831075631.GB16301@Red>
- <20180831102021.idz42sfgldihpkrp@flea>
-Message-ID: <20180831105412.GD16301@Red>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 31 Aug 2018 12:03:57 +0100
+Subject: [PATCH] Documentation/arm64/sve: Couple of improvements and typoes
+In-Reply-To: <20180814103332.28836-1-julien.grall@arm.com>
+References: <20180814103332.28836-1-julien.grall@arm.com>
+Message-ID: <20180831110347.GA17801@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2018 at 12:20:21PM +0200, maxime.ripard at bootlin.com wrote:
-> On Fri, Aug 31, 2018 at 09:56:31AM +0200, Corentin Labbe wrote:
-> > On Fri, Aug 31, 2018 at 09:35:00AM +0200, Maxime Ripard wrote:
-> > > On Thu, Aug 30, 2018 at 09:01:16PM +0200, Corentin Labbe wrote:
-> > > > R40 have a sata controller which is the same as A20.
-> > > > This patch adds a DT node for it.
-> > > > 
-> > > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> > > > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> > > > ---
-> > > >  arch/arm/boot/dts/sun8i-r40.dtsi | 23 +++++++++++++++++++++++
-> > > >  1 file changed, 23 insertions(+)
-> > > > 
-> > > > diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
-> > > > index 852c2ccc3268..d6b5820da850 100644
-> > > > --- a/arch/arm/boot/dts/sun8i-r40.dtsi
-> > > > +++ b/arch/arm/boot/dts/sun8i-r40.dtsi
-> > > > @@ -550,6 +550,29 @@
-> > > >  			#size-cells = <0>;
-> > > >  		};
-> > > >  
-> > > > +		ahci: sata at 1c18000 {
-> > > > +			compatible = "allwinner,sun8i-r40-ahci";
-> > > > +			reg = <0x01c18000 0x1000>;
-> > > > +			interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
-> > > > +			clocks = <&ccu CLK_BUS_SATA>, <&ccu CLK_SATA>;
-> > > > +			resets = <&ccu RST_BUS_SATA>;
-> > > > +			resets-name = "ahci";
-> > > > +			#address-cells = <1>;
-> > > > +			#size-cells = <0>;
-> > > > +			status = "disabled";
-> > > > +
-> > > > +			sata_port: sata-port at 0 {
-> > > > +				reg = <0>;
-> > > > +				phys = <&sata_phy>;
-> > > > +			};
-> > > > +		};
-> > > > +
-> > > > +		sata_phy: sata-phy at 1c180c0  {
-> > > > +			compatible = "allwinner,sun8i-r40-sata-phy";
-> > > > +			reg = <0x1c180c0 0x200>;
-> > > 
-> > > Overlapping devices in the DTS is not ok.
-> > > 
-> > 
-> > I do the same than arch/arm/boot/dts/berlin2.dtsi (sata at e90000
-> > phy at e900a0)
-> >
-> > But since it is not a good justification, it seems that regmap is my
-> > only solution ?
+On Tue, Aug 14, 2018 at 11:33:32AM +0100, Julien Grall wrote:
+>     - Fix mismatch between SVE registers (Z) and FPSIMD register (V)
+>     - Don't prefix the path for [3] with Linux to stay consistent with
+>     [1] and [2].
 > 
-> I'm not even sure why you are moving the phy out of its original node
-> (and driver).
-> 
+> Signed-off-by: Julien Grall <julien.grall@arm.com>
 
-For using the phy-supply already handled by the code.
-The other choice is to add another xxx-supply to ahci_platform.
-Or to use hackily port_regulator for this regulator.
+Acked-by: Dave Martin <Dave.Martin@arm.com>
+
+(in case nobody picked this up yet).
+
+Cheers
+---Dave
+
+> ---
+>  Documentation/arm64/sve.txt | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/arm64/sve.txt b/Documentation/arm64/sve.txt
+> index f128f736b4a5..7169a0ec41d8 100644
+> --- a/Documentation/arm64/sve.txt
+> +++ b/Documentation/arm64/sve.txt
+> @@ -200,7 +200,7 @@ prctl(PR_SVE_SET_VL, unsigned long arg)
+>        thread.
+>  
+>      * Changing the vector length causes all of P0..P15, FFR and all bits of
+> -      Z0..V31 except for Z0 bits [127:0] .. Z31 bits [127:0] to become
+> +      Z0..Z31 except for Z0 bits [127:0] .. Z31 bits [127:0] to become
+>        unspecified.  Calling PR_SVE_SET_VL with vl equal to the thread's current
+>        vector length, or calling PR_SVE_SET_VL with the PR_SVE_SET_VL_ONEXEC
+>        flag, does not constitute a change to the vector length for this purpose.
+> @@ -500,7 +500,7 @@ References
+>  [2] arch/arm64/include/uapi/asm/ptrace.h
+>      AArch64 Linux ptrace ABI definitions
+>  
+> -[3] linux/Documentation/arm64/cpu-feature-registers.txt
+> +[3] Documentation/arm64/cpu-feature-registers.txt
+>  
+>  [4] ARM IHI0055C
+>      http://infocenter.arm.com/help/topic/com.arm.doc.ihi0055c/IHI0055C_beta_aapcs64.pdf
+> -- 
+> 2.11.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
