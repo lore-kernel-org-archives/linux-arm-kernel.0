@@ -1,27 +1,93 @@
-From: embed3d@gmail.com (Philipp Rossak)
-Date: Fri, 31 Aug 2018 14:05:59 +0200
-Subject: [PATCH v3 20/30] iio: adc: sun4i-gpadc-iio: rework: device
- specific suspend & resume
-In-Reply-To: <20180831090915.agbldint76ngj5jf@flea>
-References: <20180830154518.29507-1-embed3d@gmail.com>
- <20180830154518.29507-21-embed3d@gmail.com>
- <20180831090915.agbldint76ngj5jf@flea>
-Message-ID: <ddd06c43-026e-2801-dc36-053d469e43f3@gmail.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Fri, 31 Aug 2018 14:08:04 +0200
+Subject: [PATCH v4 09/13] ARM: dts: sun8i: r40: add sata node
+In-Reply-To: <CAGb2v65m73mZkQ9qbYne-utZPujEvRftYGz5kYCx=8t-C-=DJQ@mail.gmail.com>
+References: <20180830190120.722-1-clabbe.montjoie@gmail.com>
+ <20180830190120.722-10-clabbe.montjoie@gmail.com>
+ <20180831073500.zubqpvar4yhjqrge@flea> <20180831075631.GB16301@Red>
+ <20180831102021.idz42sfgldihpkrp@flea> <20180831105412.GD16301@Red>
+ <CAGb2v65m73mZkQ9qbYne-utZPujEvRftYGz5kYCx=8t-C-=DJQ@mail.gmail.com>
+Message-ID: <20180831120804.GA11340@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Aug 31, 2018 at 07:31:37PM +0800, Chen-Yu Tsai wrote:
+> On Fri, Aug 31, 2018 at 6:54 PM Corentin Labbe
+> <clabbe.montjoie@gmail.com> wrote:
+> >
+> > On Fri, Aug 31, 2018 at 12:20:21PM +0200, maxime.ripard at bootlin.com wrote:
+> > > On Fri, Aug 31, 2018 at 09:56:31AM +0200, Corentin Labbe wrote:
+> > > > On Fri, Aug 31, 2018 at 09:35:00AM +0200, Maxime Ripard wrote:
+> > > > > On Thu, Aug 30, 2018 at 09:01:16PM +0200, Corentin Labbe wrote:
+> > > > > > R40 have a sata controller which is the same as A20.
+> > > > > > This patch adds a DT node for it.
+> > > > > >
+> > > > > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> > > > > > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> > > > > > ---
+> > > > > >  arch/arm/boot/dts/sun8i-r40.dtsi | 23 +++++++++++++++++++++++
+> > > > > >  1 file changed, 23 insertions(+)
+> > > > > >
+> > > > > > diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
+> > > > > > index 852c2ccc3268..d6b5820da850 100644
+> > > > > > --- a/arch/arm/boot/dts/sun8i-r40.dtsi
+> > > > > > +++ b/arch/arm/boot/dts/sun8i-r40.dtsi
+> > > > > > @@ -550,6 +550,29 @@
+> > > > > >                         #size-cells = <0>;
+> > > > > >                 };
+> > > > > >
+> > > > > > +               ahci: sata at 1c18000 {
+> > > > > > +                       compatible = "allwinner,sun8i-r40-ahci";
+> > > > > > +                       reg = <0x01c18000 0x1000>;
+> > > > > > +                       interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
+> > > > > > +                       clocks = <&ccu CLK_BUS_SATA>, <&ccu CLK_SATA>;
+> > > > > > +                       resets = <&ccu RST_BUS_SATA>;
+> > > > > > +                       resets-name = "ahci";
+> > > > > > +                       #address-cells = <1>;
+> > > > > > +                       #size-cells = <0>;
+> > > > > > +                       status = "disabled";
+> > > > > > +
+> > > > > > +                       sata_port: sata-port at 0 {
+> > > > > > +                               reg = <0>;
+> > > > > > +                               phys = <&sata_phy>;
+> > > > > > +                       };
+> > > > > > +               };
+> > > > > > +
+> > > > > > +               sata_phy: sata-phy at 1c180c0  {
+> > > > > > +                       compatible = "allwinner,sun8i-r40-sata-phy";
+> > > > > > +                       reg = <0x1c180c0 0x200>;
+> > > > >
+> > > > > Overlapping devices in the DTS is not ok.
+> > > > >
+> > > >
+> > > > I do the same than arch/arm/boot/dts/berlin2.dtsi (sata at e90000
+> > > > phy at e900a0)
+> > > >
+> > > > But since it is not a good justification, it seems that regmap is my
+> > > > only solution ?
+> > >
+> > > I'm not even sure why you are moving the phy out of its original node
+> > > (and driver).
+> > >
+> >
+> > For using the phy-supply already handled by the code.
+> > The other choice is to add another xxx-supply to ahci_platform.
+> > Or to use hackily port_regulator for this regulator.
+> 
+> The PHY registers are in the AHCI's "vendor specific registers"
+> region. Following that are the per-port registers, which the ahci
+> driver will need access to. This doesn't look like it should
+> deserve a separate device node.
+> 
+> What's wrong with handling the regulator directly in the ahci-sunxi
+> PHY init code?
+> 
 
+The reason are that I didnt wanted to use the port-regulator, and I didnt want to add new code to ahci_platform.
+I tried to place a phy-supply in the ahci node, but it doesnt work (with or without a phy subnode).
 
-On 31.08.2018 11:09, Maxime Ripard wrote:
->> +static int sun4i_ths_suspend(struct sun4i_gpadc_iio *info)
-> suspend is already a hook in the kernel, which hasn't the same meaning
-> than runtime_suspend (and the same applies to resume), so we'd rather
-> pick a better name. And all the functions (and the driver) use gpadc,
-> please continue to use that prefix.
+Moving PHy code in a dedicated driver seemed to be good, but with all your comments and Maxime's one, it seems not.
 
-I agree.
-For the newer sensors (from H3) the Sensor is referenced in the 
-datasheets as Thermal Sensor short THS. So I would like to use for the 
-newer sensors that prefix. Is that ok?
+I will keep ahci_sunxi as-is and will try to found how to add the needed phy-supply.
 
-Philipp
+Regards
