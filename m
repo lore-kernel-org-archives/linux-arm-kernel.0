@@ -1,37 +1,41 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Fri, 31 Aug 2018 17:01:51 +0300
-Subject: [PATCH v9 8/8] MAINTAINERS: add a maintainer for the interconnect API
-In-Reply-To: <20180831140151.13972-1-georgi.djakov@linaro.org>
-References: <20180831140151.13972-1-georgi.djakov@linaro.org>
-Message-ID: <20180831140151.13972-9-georgi.djakov@linaro.org>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 31 Aug 2018 16:02:00 +0200
+Subject: [PATCH v3] dt-bindings: arm: Explicitly mark Samsung Exynos SoC
+ as unstable
+In-Reply-To: <20180831104048.GA6545@jack.zhora.eu>
+References: <20180830180205.18121-1-krzk@kernel.org>
+ <20180831104048.GA6545@jack.zhora.eu>
+Message-ID: <CAJKOXPfi8_G9LcjVCJU+N6BNwQSvkVOrBuqeqxsx_EihzU+cpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add myself as a maintainer of the interconnect API.
+On Fri, 31 Aug 2018 at 13:18, Andi Shyti <andi@etezian.org> wrote:
+>
+> Hi Krzysztof,
+>
+> On Thu, Aug 30, 2018 at 08:02:05PM +0200, Krzysztof Kozlowski wrote:
+> > Samsung Exynos SoCs and boards related bindings evolved since the initial
+> > introduction, but initially the bindings were minimal and a bit incomplete
+> > (they never described all the hardware modules available in the SoCs).
+> > Since then some significant (not fully compatible) changes have been
+> > already committed a few times (like gpio replaced by pinctrl, display ddc,
+> > mfc reserved memory, some core clocks added to various hardware modules,
+> > added more required nodes).
+> >
+> > On the other side there are no boards which have device tree embedded in
+> > the bootloader. Device tree blob is always compiled from the kernel tree
+> > and updated together with the kernel image.
+> >
+> > Thus to avoid further adding a bunch of workarounds for old/missing
+> > bindings, make development of new platforms easier and allow to make
+> > cleanup of the existing code and device tree files, lets mark some
+> > Samsung Exynos SoC platform bindings as unstable. This means that
+> > bindings can may change at any time and users should use the dtb file
+>            ^^^^^^^
+> you have a typo here, other than that I agree with the patch:
+>
+> Acked-by: Andi Shyti <andi@etezian.org>
 
-Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
----
- MAINTAINERS | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Thanks for spotting this.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index a5b256b25905..bdbab6a90c93 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -7578,6 +7578,16 @@ L:	linux-gpio at vger.kernel.org
- S:	Maintained
- F:	drivers/gpio/gpio-intel-mid.c
- 
-+INTERCONNECT API
-+M:	Georgi Djakov <georgi.djakov@linaro.org>
-+S:	Maintained
-+F:	Documentation/interconnect/
-+F:	Documentation/devicetree/bindings/interconnect/
-+F:	drivers/interconnect/
-+F:	include/dt-bindings/interconnect/
-+F:	include/linux/interconnect-provider.h
-+F:	include/linux/interconnect.h
-+
- INVENSENSE MPU-3050 GYROSCOPE DRIVER
- M:	Linus Walleij <linus.walleij@linaro.org>
- L:	linux-iio at vger.kernel.org
+Krzysztof
