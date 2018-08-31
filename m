@@ -1,31 +1,70 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 31 Aug 2018 12:49:45 +0200
-Subject: [PATCH 00/12] Avoid synchronous TLB invalidation for
- intermediate page-table entries on arm64
-In-Reply-To: <20180831203234.7b8f4d13@roar.ozlabs.ibm.com>
-References: <1535645747-9823-1-git-send-email-will.deacon@arm.com>
- <CA+55aFzMMU5RBhn52Lbzf-FXvx3inh5VPVZL613srY+dVU+Lxw@mail.gmail.com>
- <20180831110054.475a3534@roar.ozlabs.ibm.com>
- <CA+55aFyweLwdAeeLnPv1ceje2y9Qc2AkM+LdMzK_z29fFb96ug@mail.gmail.com>
- <20180831095417.GF13166@arm.com>
- <20180831101014.GG24124@hirez.programming.kicks-ass.net>
- <20180831203234.7b8f4d13@roar.ozlabs.ibm.com>
-Message-ID: <20180831104945.GI24124@hirez.programming.kicks-ass.net>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Fri, 31 Aug 2018 12:54:12 +0200
+Subject: [PATCH v4 09/13] ARM: dts: sun8i: r40: add sata node
+In-Reply-To: <20180831102021.idz42sfgldihpkrp@flea>
+References: <20180830190120.722-1-clabbe.montjoie@gmail.com>
+ <20180830190120.722-10-clabbe.montjoie@gmail.com>
+ <20180831073500.zubqpvar4yhjqrge@flea> <20180831075631.GB16301@Red>
+ <20180831102021.idz42sfgldihpkrp@flea>
+Message-ID: <20180831105412.GD16301@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2018 at 08:32:34PM +1000, Nicholas Piggin wrote:
-> Oh gee, I suppose. powerpc hash is kind of interesting because it's
-> crazy, Aneesh knows that code a lot better than I do. radix modulo
-> some minor details of exact instructions is fairly like x86 
+On Fri, Aug 31, 2018 at 12:20:21PM +0200, maxime.ripard at bootlin.com wrote:
+> On Fri, Aug 31, 2018 at 09:56:31AM +0200, Corentin Labbe wrote:
+> > On Fri, Aug 31, 2018 at 09:35:00AM +0200, Maxime Ripard wrote:
+> > > On Thu, Aug 30, 2018 at 09:01:16PM +0200, Corentin Labbe wrote:
+> > > > R40 have a sata controller which is the same as A20.
+> > > > This patch adds a DT node for it.
+> > > > 
+> > > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> > > > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> > > > ---
+> > > >  arch/arm/boot/dts/sun8i-r40.dtsi | 23 +++++++++++++++++++++++
+> > > >  1 file changed, 23 insertions(+)
+> > > > 
+> > > > diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
+> > > > index 852c2ccc3268..d6b5820da850 100644
+> > > > --- a/arch/arm/boot/dts/sun8i-r40.dtsi
+> > > > +++ b/arch/arm/boot/dts/sun8i-r40.dtsi
+> > > > @@ -550,6 +550,29 @@
+> > > >  			#size-cells = <0>;
+> > > >  		};
+> > > >  
+> > > > +		ahci: sata at 1c18000 {
+> > > > +			compatible = "allwinner,sun8i-r40-ahci";
+> > > > +			reg = <0x01c18000 0x1000>;
+> > > > +			interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
+> > > > +			clocks = <&ccu CLK_BUS_SATA>, <&ccu CLK_SATA>;
+> > > > +			resets = <&ccu RST_BUS_SATA>;
+> > > > +			resets-name = "ahci";
+> > > > +			#address-cells = <1>;
+> > > > +			#size-cells = <0>;
+> > > > +			status = "disabled";
+> > > > +
+> > > > +			sata_port: sata-port at 0 {
+> > > > +				reg = <0>;
+> > > > +				phys = <&sata_phy>;
+> > > > +			};
+> > > > +		};
+> > > > +
+> > > > +		sata_phy: sata-phy at 1c180c0  {
+> > > > +			compatible = "allwinner,sun8i-r40-sata-phy";
+> > > > +			reg = <0x1c180c0 0x200>;
+> > > 
+> > > Overlapping devices in the DTS is not ok.
+> > > 
+> > 
+> > I do the same than arch/arm/boot/dts/berlin2.dtsi (sata at e90000
+> > phy at e900a0)
+> >
+> > But since it is not a good justification, it seems that regmap is my
+> > only solution ?
+> 
+> I'm not even sure why you are moving the phy out of its original node
+> (and driver).
+> 
 
-The whole TLB broadcast vs explicit IPIs is a fairly big difference in
-my book.
-
-Anyway, have you guys tried the explicit IPI approach? Depending on how
-IPIs are routed vs broadcasts it might save a little bus traffic. No
-point in getting all CPUs to process the TLBI when there's only a hand
-full that really need it.
-
-OTOH, I suppose the broadcast thing has been optimized to death on the
-hardware side, so who knows..
+For using the phy-supply already handled by the code.
+The other choice is to add another xxx-supply to ahci_platform.
+Or to use hackily port_regulator for this regulator.
