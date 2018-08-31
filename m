@@ -1,31 +1,54 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 31 Aug 2018 10:35:29 +0200
-Subject: [PATCH v3 09/30] iio: adc: Threat A33 as thermal sensor and
- remove non thermal sun4i channel
-In-Reply-To: <20180830154518.29507-10-embed3d@gmail.com>
-References: <20180830154518.29507-1-embed3d@gmail.com>
- <20180830154518.29507-10-embed3d@gmail.com>
-Message-ID: <20180831083529.tdbgwlkchrr3j6py@flea>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 31 Aug 2018 10:44:10 +0200
+Subject: [PATCH] arm64: dts: renesas: r8a774a1: Add CAN nodes
+In-Reply-To: <1535034166-24798-1-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1535034166-24798-1-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <CAMuHMdUL0Ck=6er8rvx_kCSi7KR9kjBqjNRiLOL41nxeJXQG-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 30, 2018 at 05:44:57PM +0200, Philipp Rossak wrote:
-> We want to use this driver mostly as thermal sensor, that still supports
-> the adc for the older chips, thus we threat the A33 as thermal sensor.
-> We also remove the adc channel without thermal support.
+Hi Fabrizio,
 
-The A33 can definitely be used as an ADC, so we need to keep that support.
+On Thu, Aug 23, 2018 at 4:22 PM Fabrizio Castro
+<fabrizio.castro@bp.renesas.com> wrote:
+> From: Chris Paterson <chris.paterson2@renesas.com>
+>
+> Add the device nodes for both RZ/G2M CAN channels.
+>
+> Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+> Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+> ---
+>
+> This patch depends on:
+> https://lkml.org/lkml/2018/8/23/1049
+> https://www.mail-archive.com/linux-renesas-soc at vger.kernel.org/msg30550.html
+>
+>
+>  arch/arm64/boot/dts/renesas/r8a774a1.dtsi | 24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+> index 5d0109a..cd204f5 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+> @@ -816,6 +816,30 @@
+>                         status = "disabled";
+>                 };
+>
+> +               can0: can at e6c30000 {
+> +                       compatible = "renesas,can-r8a774a1",
+> +                                    "renesas,rzg-gen2-can";
 
-Maxime
+Please don't introduce "renesas,rzg-gen2-can", cfr. my comments in
+https://lore.kernel.org/lkml/CAMuHMdWPuqfXOgh_-qp8q6wATU3Lj_WpX0bAOxPBX76SKvyXCQ at mail.gmail.com/
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180831/d29f313a/attachment.sig>
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
