@@ -1,38 +1,48 @@
 From: manish.narani@xilinx.com (Manish Narani)
-Date: Fri, 31 Aug 2018 18:57:50 +0530
-Subject: [PATCH v5 4/4] arm64: zynqmp: Add DDRC node
-In-Reply-To: <1535722070-10394-1-git-send-email-manish.narani@xilinx.com>
-References: <1535722070-10394-1-git-send-email-manish.narani@xilinx.com>
-Message-ID: <1535722070-10394-5-git-send-email-manish.narani@xilinx.com>
+Date: Fri, 31 Aug 2018 18:57:46 +0530
+Subject: [PATCH v5 0/4] EDAC: Enhancements to Synopsys EDAC driver
+Message-ID: <1535722070-10394-1-git-send-email-manish.narani@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ddrc memory controller node in dts. The size mentioned in dts is
-0x30000, because we need to access DDR_QOS INTR registers located at
-0xFD090208 from this driver.
+This patch series enhances the current EDAC driver to support different
+platforms. This series adds support for ZynqMP DDRC controller in synopsys
+EDAC driver. This series also adds Device tree properties and relevant
+binding documentation.
 
-Signed-off-by: Manish Narani <manish.narani@xilinx.com>
----
- arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+Changes in v2:
+	- Moved checking of DDR_ECC_INTR_SUPPORT from (1/4) to (3/4) as it is
+	  a feature of ZynqMP DDRC
+	- The Binding Documentation in (2/4) is modified as per the review
+	  comments
 
-diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-index 29ce234..a81d3b16 100644
---- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-+++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-@@ -355,6 +355,13 @@
- 			xlnx,bus-width = <64>;
- 		};
- 
-+		mc: memory-controller at fd070000 {
-+			compatible = "xlnx,zynqmp-ddrc-2.40a";
-+			reg = <0x0 0xfd070000 0x0 0x30000>;
-+			interrupt-parent = <&gic>;
-+			interrupts = <0 112 4>;
-+		};
-+
- 		gem0: ethernet at ff0b0000 {
- 			compatible = "cdns,zynqmp-gem", "cdns,gem";
- 			status = "disabled";
+Changes in v3:
+	- The commit message in (2/4) is modified (Synopsys EDAC Driver -->
+	  ZynqMP DDRC)
+
+Changes in v4:
+	- Updated the commit message in (1/4)
+	- Renamed function pointer names removing 'synps_' in (1/4)
+	- Shortened unnecessary long lines as per the review comment on (1/4)
+
+Changes in v5:
+	- Updated the commit message in (2/4) and (4/4).
+	- Removed the unnecessary check for match data in probe() in (1/4)
+	- Some Indentation changes for better readability in (1/4) and (3/4)
+	- Removed repeated code in (3/4)
+	- Used 'zynq' and 'zynqmp' instead of 'synps_enh_edac' in function names
+
+Manish Narani (4):
+  edac: synps: Add platform specific structures for ddrc controller
+  dt: bindings: Document ZynqMP DDRC in Synopsys documentation
+  edac: synopsys: Add EDAC ECC support for ZynqMP DDRC
+  arm64: zynqmp: Add DDRC node
+
+ .../bindings/memory-controllers/synopsys.txt       |   27 +-
+ arch/arm64/boot/dts/xilinx/zynqmp.dtsi             |    7 +
+ drivers/edac/Kconfig                               |    2 +-
+ drivers/edac/synopsys_edac.c                       | 1086 ++++++++++++++++++--
+ 4 files changed, 1002 insertions(+), 120 deletions(-)
+
 -- 
 2.1.1
