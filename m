@@ -1,22 +1,84 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Thu, 30 Aug 2018 18:29:58 -0700
-Subject: [PATCH] clk: mediatek: remove unused array audio_parents
-In-Reply-To: <20180806134402.1055-1-colin.king@canonical.com>
-References: <20180806134402.1055-1-colin.king@canonical.com>
-Message-ID: <153567899849.93865.4205043107104480951@swboyd.mtv.corp.google.com>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Fri, 31 Aug 2018 01:40:21 +0000
+Subject: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
+In-Reply-To: <153567894721.93865.4092113232222931488@swboyd.mtv.corp.google.com>
+References: <1533703167-26583-1-git-send-email-Anson.Huang@nxp.com>
+ <1533703167-26583-2-git-send-email-Anson.Huang@nxp.com>
+ <AM0PR04MB4481FC2BAD71B75D7BE84C0788260@AM0PR04MB4481.eurprd04.prod.outlook.com>
+ <DB3PR0402MB3916F8BC381BBA01DB21D1C0F5260@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+ <AM0PR04MB44813C7A3E0AF4F3BCFFCF0088390@AM0PR04MB4481.eurprd04.prod.outlook.com>
+ <153567894721.93865.4092113232222931488@swboyd.mtv.corp.google.com>
+Message-ID: <DB3PR0402MB3916D437C4BB42A612CE5A19F50F0@DB3PR0402MB3916.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Colin King (2018-08-06 06:44:02)
-> From: Colin Ian King <colin.king@canonical.com>
-> 
-> Array audio_parents is declared but never used, hence it is redundant
-> and can be removed.
-> 
-> Cleans up clang warning:
-> warning: 'audio_parents' defined but not used [-Wunused-const-variable=]
-> 
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
-> ---
+Hi, Stephen
 
-Applied to clk-next
+Anson Huang
+Best Regards!
+
+
+> -----Original Message-----
+> From: Stephen Boyd <sboyd@kernel.org>
+> Sent: Friday, August 31, 2018 9:29 AM
+> To: kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org;
+> linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org;
+> mturquette at baylibre.com; s.hauer at pengutronix.de; shawnguo at kernel.org;
+> Anson Huang <anson.huang@nxp.com>; Fabio Estevam
+> <fabio.estevam@nxp.com>; Peng Fan <peng.fan@nxp.com>; Rob Herring
+> <robh@kernel.org>
+> Cc: dl-linux-imx <linux-imx@nxp.com>
+> Subject: RE: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
+> 
+> Quoting Peng Fan (2018-08-12 18:15:41)
+> > Hi Anson,
+> >
+> > > > > -----Original Message-----
+> > > > > From: Anson Huang
+> > > > > Sent: 2018?8?8? 12:39
+> > > > > To: shawnguo at kernel.org; s.hauer at pengutronix.de;
+> > > > > kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>;
+> > > > > mturquette at baylibre.com; sboyd at kernel.org;
+> > > > > linux-arm-kernel at lists.infradead.org;
+> > > > > linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org
+> > > > > Cc: dl-linux-imx <linux-imx@nxp.com>
+> > > > > Subject: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
+> > > > >
+> > > > > Clock framework will enable those clocks registered with
+> > > > > CLK_IS_CRITICAL flag, so no need to have clks_init_on array
+> > > > > during clock
+> > > > initialization now.
+> > > >
+> > > > Will it be more flexible to parse dts saying "critical-clocks = <xxx>"
+> > > > or "init-on-arrary=<xxx>"
+> > > > and enable those clocks?
+> > >
+> > > Parsing the clocks arrays from dtb is another way of enabling
+> > > critical clocks, but for current i.MX6/7 platforms, we implement it
+> > > in same way as most of other SoCs, currently I did NOT see any
+> > > necessity of putting them in dtb, just adding flag during clock
+> > > registering is more simple, if there is any special requirement for
+> > > different clocks set to be enabled, then we can add support to enable the
+> method of parsing critical-clocks from dtb. Just my two cents.
+> >
+> > Thinking about OP-TEE want to use one device, but it's clocks are
+> > registered by Linux, because there is no module in Linux side use it,
+> > it will shutdown the clock, which cause OP-TEE could not access the device.
+> >
+> > Then people have to modify clk code to add CLK_IS_CRITICAL flag to
+> > make sure the clocks are not shutdown by Linux.
+> >
+> > However adding a new property in clk node and let driver code parse
+> > the dts, there is no need to modify clk driver code when OP-TEE needs
+> another device clock.
+> >
+> 
+> If OP-TEE needs linux to keep things on then why can't the OP-TEE driver in
+> Linux probe, acquire clocks, and keep the clks enabled forever?
+ 
+Yes, I agree with you, OP-TEE should maintain its clocks when OP-TEE is enabled.
+
+This is ONLY a concern raised by Peng, all platforms' current clock driver does NOT consider
+this case, so I think this patch should be fine for now? Thanks.
+
+Anson.
