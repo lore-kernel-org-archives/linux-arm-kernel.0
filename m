@@ -1,57 +1,56 @@
-From: joe@perches.com (Joe Perches)
-Date: Sun, 30 Sep 2018 16:48:20 -0700
-Subject: [PATCH] ARM: disable ARMv6 for Clang older than 8.0
-In-Reply-To: <20180930222230.24167-1-stefan@agner.ch>
-References: <20180930222230.24167-1-stefan@agner.ch>
-Message-ID: <aa1fbf64fc1190674abb9ecae3ffe1a39e1e60c0.camel@perches.com>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Sat, 1 Sep 2018 00:05:10 +0530
+Subject: [PATCH 11/15] soc: octeontx2: Add Marvell OcteonTX2 CGX driver
+In-Reply-To: <CAK8P3a0p2PdjVS+QVMtiYK+5=ToeLSfjvf5X85S0HK2Om4fZ1Q@mail.gmail.com>
+References: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
+ <1535453838-12154-12-git-send-email-sunil.kovvuri@gmail.com>
+ <CAK8P3a0q0P-FuG6cTgMNkeZbtXE4pMk1iJq36_x20WRddtwaDg@mail.gmail.com>
+ <CA+sq2Cc1CSKmuEjKt8psR7Zyv9PzLkN10hzy8mrai136SF4-qA@mail.gmail.com>
+ <CAK8P3a2CMcYg6vMmRAc4N80BpFwczGiPnaLNCDZYXCsRydtPQw@mail.gmail.com>
+ <CA+sq2Ce3ew0X+RMm7fQ+iUZF0HKptzBr1dBk3NuRL8o82wBTjg@mail.gmail.com>
+ <CAK8P3a1oeOFVYc2xH+KO1gV0m9utHziGpNtQLAEv-RBxKkB7Og@mail.gmail.com>
+ <CA+sq2CfAvasZoNmnNQadhdsEz-eyXQPBtXbDmvt1nM0DQsm+8g@mail.gmail.com>
+ <CAK8P3a0wdXRmZOw+yyws00GU=xYAFkGm81xKTF3-DjNmjjZH5g@mail.gmail.com>
+ <CA+sq2CfL-eBWPcu1H9UkvKuL4kPeKnL1qkiG0tLZa_GW8LEqXA@mail.gmail.com>
+ <CAK8P3a0p2PdjVS+QVMtiYK+5=ToeLSfjvf5X85S0HK2Om4fZ1Q@mail.gmail.com>
+Message-ID: <CA+sq2Cc_fdTjSJx1BdietRThfK=gn3Sy__=K4iQNQDCBTa+JyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-10-01 at 00:22 +0200, Stefan Agner wrote:
-> The kernel passes the ArmV6K architecture to the compiler when
-> using the multi platform selection and enabling ARMv6. Clang
-> older than version 8.0 emit assembly with an non-existing CPU,
-> which then makes the assembler fail. Prevent the user from
-> selecting ARMv6 when using Clang before 8.0.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> Link: https://github.com/ClangBuiltLinux/linux/issues/55
-> ---
->  arch/arm/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index e8cd55a5b04c..8da160757381 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -671,6 +671,7 @@ config ARCH_MULTI_V4_V5
->  
->  config ARCH_MULTI_V6
->  	bool "ARMv6 based platforms (ARM11)"
-> +	depends on !CC_IS_CLANG || CLANG_VERSION>=80000
->  	select ARCH_MULTI_V6_V7
->  	select CPU_V6K
->  
+On Fri, Aug 31, 2018 at 11:59 PM Arnd Bergmann <arnd@arndb.de> wrote:
+>
+> On Fri, Aug 31, 2018 at 6:01 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
+> > On Fri, Aug 31, 2018 at 7:50 PM Arnd Bergmann <arnd@arndb.de> wrote:
+>
+> >
+> > Thanks for the suggestion, that does makes sense.
+> > Actually i did thought about it, but i was skeptical if it would be
+> > acceptable to make
+> > a single module out of drivers registering for two different PCI devices.
+>
+> I don't think it matters much whether there is one module or two
+> (others might have a strong opinion one way or the other).
+>
+> What is important though are these two points:
+>
+> - How to represent the two PCI devices to user space: You should only
+>   have one interface to user space I think, and this should be similar
+>   to how other drivers manage similar cases (I don't actually know what they
+>   do, but I assume you've done some research here)
+>
+> - How you connect find the pair of devices: Generally speaking while
+>   the SoC might only have one of each, you shouldn't make that assumption
+>   in the code, but instead have a reliable way of having one driver wait
+>   for the other driver to finish probing so you can match the pair.
+>
 
-Perhaps it'd be better to avoid this in selection
-criteria in Kconfig and instead add this to
-include/linux/compiler_clang.h
----
- include/linux/compiler-clang.h | 4 ++++
- 1 file changed, 4 insertions(+)
+Agreed.
+I do have a patch in works for that, i.e to defer AF driver probe till
+CGX driver is loaded.
+https://github.com/sunilkovvuri/rvu_drivers/commit/27b449087c16224a9e93dd91d6d9f734b5210bed
 
-diff --git a/include/linux/compiler-clang.h b/include/linux/compiler-clang.h
-index b1ce500fe8b3..90fd16c85359 100644
---- a/include/linux/compiler-clang.h
-+++ b/include/linux/compiler-clang.h
-@@ -3,6 +3,10 @@
- #error "Please don't include <linux/compiler-clang.h> directly, include <linux/compiler.h> instead."
- #endif
- 
-+#if defined(CONFIG_ARCH_MULTI_V6) && CLANG_VERSION < 80000
-+# error Sorry, your compiler is too old - please upgrade it.
-+#endif
-+
- /* Some compiler specific definitions are overwritten here
-  * for Clang compiler
-  */
+> > Will wait for few more days for more feedback from anyone and port v2 series.
+>
+> Ok.
+>
+>       Arnd
