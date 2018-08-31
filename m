@@ -1,116 +1,43 @@
-From: hanjie.lin@amlogic.com (Hanjie Lin)
-Date: Fri, 31 Aug 2018 09:47:09 +0800
-Subject: [PATCH v2 1/2] dt-bindings: PCI: meson: add DT bindings for
- Amlogic Meson PCIe controller
-In-Reply-To: <CAL_JsqJPzfp1OimYXa26tEqTexyiuKMeKszveobHN3rKP8+RYQ@mail.gmail.com>
-References: <1535096165-45827-1-git-send-email-hanjie.lin@amlogic.com>
- <1535096165-45827-2-git-send-email-hanjie.lin@amlogic.com>
- <8c48964151d24758298ba935da336c0829e2b287.camel@baylibre.com>
- <11d7547b-feb4-6ecb-cef3-db46ce8ee2ef@amlogic.com>
- <20180829004122.GA25928@bogus>
- <84d5399c-67d4-f8a4-3613-00d91f21292f@amlogic.com>
- <CAL_JsqJPzfp1OimYXa26tEqTexyiuKMeKszveobHN3rKP8+RYQ@mail.gmail.com>
-Message-ID: <12ce60a8-accc-3c8f-4d38-9bf31346b775@amlogic.com>
+From: yuehaibing@huawei.com (YueHaibing)
+Date: Fri, 31 Aug 2018 02:09:06 +0000
+Subject: [PATCH -next] pinctrl: sirf: atlas7: remove set but not used
+ variables 'conf, bank'
+Message-ID: <1535681346-152447-1-git-send-email-yuehaibing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Fixes gcc '-Wunused-but-set-variable' warning:
 
+drivers/pinctrl/sirf/pinctrl-atlas7.c: In function 'atlas7_pinmux_resume_noirq':
+drivers/pinctrl/sirf/pinctrl-atlas7.c:5545:6: warning:
+ variable 'bank' set but not used [-Wunused-but-set-variable]
+  u32 bank;
 
-On 2018/8/30 21:59, Rob Herring wrote:
-> On Thu, Aug 30, 2018 at 2:37 AM Hanjie Lin <hanjie.lin@amlogic.com> wrote:
->>
->>
->>
->> On 2018/8/29 8:41, Rob Herring wrote:
->>> On Mon, Aug 27, 2018 at 04:55:20PM +0800, Hanjie Lin wrote:
->>>>
->>>>
->>>> On 2018/8/24 16:22, Jerome Brunet wrote:
->>>>> On Fri, 2018-08-24 at 15:36 +0800, Hanjie Lin wrote:
->>>>>> From: Yue Wang <yue.wang@amlogic.com>
->>>>>>
->>>>>> The Amlogic Meson PCIe host controller is based on the Synopsys DesignWare
->>>>>> PCI core. This patch adds documentation for the DT bindings in Meson PCIe
->>>>>> controller.
->>>>>>
->>>>>> Signed-off-by: Yue Wang <yue.wang@amlogic.com>
->>>>>> Signed-off-by: Hanjie Lin <hanjie.lin@amlogic.com>
->>>>>> ---
->>>>>>  .../devicetree/bindings/pci/amlogic,meson-pcie.txt | 63 ++++++++++++++++++++++
->>>>>>  1 file changed, 63 insertions(+)
->>>>>>  create mode 100644 Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
->>>>>>
->>>>>> diff --git a/Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt b/Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
->>>>>> new file mode 100644
->>>>>> index 0000000..8a831d1
->>>>>> --- /dev/null
->>>>>> +++ b/Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
->>>>>> @@ -0,0 +1,63 @@
->>>>>> +Amlogic Meson AXG DWC PCIE SoC controller
->>>>>> +
->>>>>> +Amlogic Meson PCIe host controller is based on the Synopsys DesignWare PCI core.
->>>>>> +It shares common functions with the PCIe DesignWare core driver and
->>>>>> +inherits common properties defined in
->>>>>> +Documentation/devicetree/bindings/pci/designware-pci.txt.
->>>>>> +
->>>>>> +Additional properties are described here:
->>>>>> +
->>>>>> +Required properties:
->>>>>> +- compatible:
->>>>>> +  should contain "amlogic,axg-pcie" to identify the core.
->>>>>> +- reg:
->>>>>> +  Should contain the configuration address space.
->>>>>> +- reg-names: Must be
->>>>>> +  - "elbi"        External local bus interface registers
->>>>>> +  - "cfg"         Meson specific registers
->>>>>> +  - "config"      PCIe configuration space
->>>>>> +- reset-gpios: The GPIO to generate PCIe PERST# assert and deassert signal.
->>>>>> +- clocks: Must contain an entry for each entry in clock-names.
->>>>>> +- clock-names: Must include the following entries:
->>>>>> +  - "pclk"       PCIe GEN 100M PLL clock
->>>>>> +  - "port"       PCIe_x(A or B) RC clock gate
->>>>>> +  - "general"    PCIe Phy clock
->>>>>> +  - "mipi"       PCIe_x(A or B) 100M ref clock gate
->>>>>> +- resets: phandle to the reset lines.
->>>>>> +- reset-names: must contain "phy" and "peripheral"
->>>>>> +       - "port" Port A or B reset
->>>>>> +       - "apb" APB reset
->>>>>
->>>>> The above description is not coherent (phy <=> port)
->>>>>
->>>>
->>>> Yes, this should be port and apb here.
->>>> We'll integrate phy driver into ctrl driver, and move phy reset to here also.
->>>
->>> Why? That's the wrong thing to do if they are separate h/w blocks. You
->>> can do whatever you like in the drivers, but the DT should reflect the
->>> h/w.
->>>
->>> Rob
->>>
->>> .
->>>
->>
->> We have the dedicated phy driver which only process reset job,
->> and we consider that it's too overkill to do just these things .
->> So we will integrate phy reset job into the controller driver int the next version.
-> 
-> What's in the separate register space you had for the phy?
-> 
-> Rob
-> 
-> .
-> 
+drivers/pinctrl/sirf/pinctrl-atlas7.c:5543:28: warning:
+ variable 'conf' set but not used [-Wunused-but-set-variable]
+  struct atlas7_pad_config *conf;
 
-As described with 'phy' reg in ctrl patch v3 thread [0]
+Signed-off-by: YueHaibing <yuehaibing@huawei.com>
+---
+ drivers/pinctrl/sirf/pinctrl-atlas7.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-- reg-names: Must be
-	- "elbi"	External local bus interface registers
-	- "cfg"		Meson specific registers
-	- "phy"		Meson PCIE PHY registers
-	- "config"	PCIe configuration space
-
-When each controller driver probe, we powerup phy by write phy register like below: 
-writel(MESON_PCIE_PHY_POWERUP, mp->mem_res.phy_base);
-
-[0] https://lkml.kernel.org/r/1535616829-167936-1-git-send-email-hanjie.lin at amlogic.com
+diff --git a/drivers/pinctrl/sirf/pinctrl-atlas7.c b/drivers/pinctrl/sirf/pinctrl-atlas7.c
+index 1d16df1..ee1063f 100644
+--- a/drivers/pinctrl/sirf/pinctrl-atlas7.c
++++ b/drivers/pinctrl/sirf/pinctrl-atlas7.c
+@@ -5540,14 +5540,10 @@ static int atlas7_pinmux_resume_noirq(struct device *dev)
+ {
+ 	struct atlas7_pmx *pmx = dev_get_drvdata(dev);
+ 	struct atlas7_pad_status *status;
+-	struct atlas7_pad_config *conf;
+ 	int idx;
+-	u32 bank;
+ 
+ 	for (idx = 0; idx < pmx->pctl_desc.npins; idx++) {
+ 		/* Get this Pad's descriptor from PINCTRL */
+-		conf = &pmx->pctl_data->confs[idx];
+-		bank = atlas7_pin_to_bank(idx);
+ 		status = &pmx->sleep_data[idx];
+ 
+ 		/* Restore Function selector */
