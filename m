@@ -1,45 +1,64 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Fri, 31 Aug 2018 15:53:17 +0800
-Subject: [PATCH 6/7] clk: imx6q: add mmdc0 ipg clock
-In-Reply-To: <1535701998-20443-1-git-send-email-Anson.Huang@nxp.com>
-References: <1535701998-20443-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1535701998-20443-7-git-send-email-Anson.Huang@nxp.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 31 Aug 2018 15:58:34 +0800
+Subject: [PATCH v4 09/13] ARM: dts: sun8i: r40: add sata node
+In-Reply-To: <20180831075631.GB16301@Red>
+References: <20180830190120.722-1-clabbe.montjoie@gmail.com>
+ <20180830190120.722-10-clabbe.montjoie@gmail.com>
+ <20180831073500.zubqpvar4yhjqrge@flea> <20180831075631.GB16301@Red>
+Message-ID: <CAGb2v65dWmFxacx16taTdDf0WO4vCJfJLrf=7Vh6RtJEjHdH5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6Q has MMDC0 ipg clock in CCM CCGR, add it into
-clock tree for clock management.
+On Fri, Aug 31, 2018 at 3:56 PM Corentin Labbe
+<clabbe.montjoie@gmail.com> wrote:
+>
+> On Fri, Aug 31, 2018 at 09:35:00AM +0200, Maxime Ripard wrote:
+> > On Thu, Aug 30, 2018 at 09:01:16PM +0200, Corentin Labbe wrote:
+> > > R40 have a sata controller which is the same as A20.
+> > > This patch adds a DT node for it.
+> > >
+> > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> > > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> > > ---
+> > >  arch/arm/boot/dts/sun8i-r40.dtsi | 23 +++++++++++++++++++++++
+> > >  1 file changed, 23 insertions(+)
+> > >
+> > > diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
+> > > index 852c2ccc3268..d6b5820da850 100644
+> > > --- a/arch/arm/boot/dts/sun8i-r40.dtsi
+> > > +++ b/arch/arm/boot/dts/sun8i-r40.dtsi
+> > > @@ -550,6 +550,29 @@
+> > >                     #size-cells = <0>;
+> > >             };
+> > >
+> > > +           ahci: sata at 1c18000 {
+> > > +                   compatible = "allwinner,sun8i-r40-ahci";
+> > > +                   reg = <0x01c18000 0x1000>;
+> > > +                   interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
+> > > +                   clocks = <&ccu CLK_BUS_SATA>, <&ccu CLK_SATA>;
+> > > +                   resets = <&ccu RST_BUS_SATA>;
+> > > +                   resets-name = "ahci";
+> > > +                   #address-cells = <1>;
+> > > +                   #size-cells = <0>;
+> > > +                   status = "disabled";
+> > > +
+> > > +                   sata_port: sata-port at 0 {
+> > > +                           reg = <0>;
+> > > +                           phys = <&sata_phy>;
+> > > +                   };
+> > > +           };
+> > > +
+> > > +           sata_phy: sata-phy at 1c180c0  {
+> > > +                   compatible = "allwinner,sun8i-r40-sata-phy";
+> > > +                   reg = <0x1c180c0 0x200>;
+> >
+> > Overlapping devices in the DTS is not ok.
+> >
+>
+> I do the same than arch/arm/boot/dts/berlin2.dtsi (sata at e90000 phy at e900a0)
+> But since it is not a good justification, it seems that regmap is my only solution ?
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- drivers/clk/imx/clk-imx6q.c               | 1 +
- include/dt-bindings/clock/imx6qdl-clock.h | 3 ++-
- 2 files changed, 3 insertions(+), 1 deletion(-)
+Since you are effectively splitting one device node into two, you should
+adjust the original (ahci) device nodes register range.
 
-diff --git a/drivers/clk/imx/clk-imx6q.c b/drivers/clk/imx/clk-imx6q.c
-index 8c7c2fc..bbe0c60 100644
---- a/drivers/clk/imx/clk-imx6q.c
-+++ b/drivers/clk/imx/clk-imx6q.c
-@@ -789,6 +789,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 		clk[IMX6QDL_CLK_MLB] = imx_clk_gate2("mlb",            "axi",               base + 0x74, 18);
- 	clk[IMX6QDL_CLK_MMDC_CH0_AXI] = imx_clk_gate2_flags("mmdc_ch0_axi",  "mmdc_ch0_axi_podf", base + 0x74, 20, CLK_IS_CRITICAL);
- 	clk[IMX6QDL_CLK_MMDC_CH1_AXI] = imx_clk_gate2("mmdc_ch1_axi",  "mmdc_ch1_axi_podf", base + 0x74, 22);
-+	clk[IMX6QDL_CLK_MMDC_P0_IPG]  = imx_clk_gate2_flags("mmdc_p0_ipg",   "ipg",         base + 0x74, 24, CLK_IS_CRITICAL);
- 	clk[IMX6QDL_CLK_OCRAM]        = imx_clk_gate2("ocram",         "ahb",               base + 0x74, 28);
- 	clk[IMX6QDL_CLK_OPENVG_AXI]   = imx_clk_gate2("openvg_axi",    "axi",               base + 0x74, 30);
- 	clk[IMX6QDL_CLK_PCIE_AXI]     = imx_clk_gate2("pcie_axi",      "pcie_axi_sel",      base + 0x78, 0);
-diff --git a/include/dt-bindings/clock/imx6qdl-clock.h b/include/dt-bindings/clock/imx6qdl-clock.h
-index 7ad171b..87b068f 100644
---- a/include/dt-bindings/clock/imx6qdl-clock.h
-+++ b/include/dt-bindings/clock/imx6qdl-clock.h
-@@ -273,6 +273,7 @@
- #define IMX6QDL_CLK_MLB_PODF			260
- #define IMX6QDL_CLK_EPIT1			261
- #define IMX6QDL_CLK_EPIT2			262
--#define IMX6QDL_CLK_END				263
-+#define IMX6QDL_CLK_MMDC_P0_IPG			263
-+#define IMX6QDL_CLK_END				264
- 
- #endif /* __DT_BINDINGS_CLOCK_IMX6QDL_H */
--- 
-2.7.4
+ChenYu
