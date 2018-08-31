@@ -1,47 +1,58 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 31 Aug 2018 15:11:23 +0100
-Subject: [PATCH net-next v3 02/10] net: mvpp2: phylink support
-In-Reply-To: <20180831133651.GB32574@kwain>
-References: <20180517082939.14598-1-antoine.tenart@bootlin.com>
- <20180517082939.14598-3-antoine.tenart@bootlin.com>
- <20180827165058.GD30658@n2100.armlinux.org.uk>
- <20180831133651.GB32574@kwain>
-Message-ID: <20180831141123.GM30658@n2100.armlinux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 31 Aug 2018 16:16:04 +0200
+Subject: [PATCH 04/15] soc: octeontx2: Add mailbox support infra
+In-Reply-To: <CA+sq2CfjJjswOwypNMtro+g8TeHGoBqAeKpFrf2ys-1=Xg+qHw@mail.gmail.com>
+References: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
+ <1535453838-12154-5-git-send-email-sunil.kovvuri@gmail.com>
+ <CAK8P3a2fgAVB0+uns9f5MH+2OyZbwvReo9j-=u3=30QoK=2Ksw@mail.gmail.com>
+ <CA+sq2CeyQ8r7bj3vK=cfriif=HhUu36ZUPWqxXm1e0DktHG+Fg@mail.gmail.com>
+ <CAK8P3a1CvX1V8h20s_=XUUYfR-zYNwETg5p6dCtpVUqZ89K-tg@mail.gmail.com>
+ <CA+sq2Cdn6ut3kdTWoOgCayO2evQrD9TjBaUpVUR3_rWZFxYeig@mail.gmail.com>
+ <CAK8P3a1W2D5YWEC-VDkvQ8y3W8257g6X7B8_At7g8f9iE73a8w@mail.gmail.com>
+ <CA+sq2CfjJjswOwypNMtro+g8TeHGoBqAeKpFrf2ys-1=Xg+qHw@mail.gmail.com>
+Message-ID: <CAK8P3a3q_rY6VHwX9xQ9VMNC_4EmJLKzzDPL28SE13qNHX7=aA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2018 at 03:36:51PM +0200, Antoine Tenart wrote:
-> With the above code remove one case did not worked anymore: when the
-> port is configured as a fixed-link because the SFP cage can't be
-> described and used (on the 7040-db and 8040-db boards). In such cases
-> phylink is called, mac_config() is called, but link_up() is never
-> called. I'm not sure this is actually an issue in phylink, but the PPv2
-> driver should probably take care of this weird case itself (by calling
-> explicitly link_up()). What do you think?
+On Thu, Aug 30, 2018 at 8:37 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
+> On Thu, Aug 30, 2018 at 7:27 PM Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Tue, Aug 28, 2018 at 3:23 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
+> > > On Tue, Aug 28, 2018 at 6:22 PM Arnd Bergmann <arnd@arndb.de> wrote:
+> > > > On Tue, Aug 28, 2018 at 2:48 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
+> > > Any PCI device here irrespective in what domain (kernel or userspace)
+> > > they are in
+> > > use common mailbox communication. Which is
+> > > # Write a mailbox msg (format is agreed between all parties) into
+> > > shared (between AF and other PF/VFs)
+> > >    memory region and trigger a interrupt to admin function.
+> > > # Admin function processes the msg and puts reply in the same memory
+> > > region and trigger
+> > >    IRQ to the requesting device. If the device has a driver instance
+> > > in kernel then it uses
+> > >    IRQ and userspace applications does polling on the IRQ status bit.
+> >
+> > What is the purpose of the exported interface then? Is this
+> > just an abstraction so each of the drivers can talk to its own
+> > mailbox using a set of common helper functions?
+> >
+>
+> Yes, that's correct.
+>
+> In kernel there will be a minimum of 3 drivers which will use this
+> mailbox communication.
+> So instead of duplicating APIs and structures in every driver, we
+> thought of adding them in this AF driver and export them to ethernet
+> and crypto drivers.
 
-Fixed link should work:
+Ok. My feeling is then that the API is fine, but that it should not
+be part of the AF module but rather be a standalone module.
 
-- when a fixed link is configured, link_config.link is set true.
-- when phylink_start() is called, mac_config() will be called to do the
-  initial setup, and a resolve is triggered.
-- phylink_resolve() will read the fixed link state, which in the case
-  of no GPIO, will inherit link_config.link.
-  - you will then see another mac_config() call.
+My comment about the generic mailbox API no longer applies
+here: you don't have a single shared mailbox hardware interface,
+but each device has its own mailbox register set, so there
+is no point in setting up a separate device for it, but I see
+no need for creating an artificial dependency on the AF
+driver. E.g. in a virtual machine that only has one ethernet
+interface, you otherwise wouldn't load that driver, right?
 
-Now what happens depends whether you've set the netdev's carrier state
-in the driver - if you haven't, the netdev's carrier state should be
-off.  Since the state mismatches the link_state.link (which will be
-true), you will get a mac_link_up() call.
-
-mvneta ensures this state by always calling netif_carrier_off() in
-mvneta_open(), maybe that ought to be in phylink_start() as that's the
-state that phylink expects when phylink_start() has been called.  So,
-maybe it's a phylink bug.
-
-Can you see any down-sides to moving the netif_carrier_off() in
-mvneta_open() to phylink_start() ?
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-According to speedtest.net: 13Mbps down 490kbps up
+         Arnd
