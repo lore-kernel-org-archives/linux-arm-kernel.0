@@ -1,205 +1,43 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Fri, 31 Aug 2018 02:09:14 +0000
-Subject: [PATCH V5 4/4] video: simplefb: switch to use clk_bulk API to
- simplify clock operations
-In-Reply-To: <7261200d-e3df-494b-a41d-5c6d301617bb@redhat.com>
-References: <1535553669-30250-1-git-send-email-aisheng.dong@nxp.com>
- <1535553669-30250-5-git-send-email-aisheng.dong@nxp.com>
- <7261200d-e3df-494b-a41d-5c6d301617bb@redhat.com>
-Message-ID: <AM0PR04MB42118FCAB7A4BE4D08C455DD800F0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 31 Aug 2018 10:32:53 +0800
+Subject: [PATCH v4 00/13] ata: ahci_platform: support allwinner R40 AHCI
+In-Reply-To: <f5838eae-fa6c-8699-14a4-95d0daa8a960@kernel.dk>
+References: <20180830190120.722-1-clabbe.montjoie@gmail.com>
+ <f5838eae-fa6c-8699-14a4-95d0daa8a960@kernel.dk>
+Message-ID: <CAGb2v67miUjqeKeDh_E_XPee_0Hq1C6YrfXxsOp_=NtQY+LLmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Hans de Goede [mailto:hdegoede at redhat.com]
-> Sent: Wednesday, August 29, 2018 11:22 PM
+Hi,
 
-[...]
-
-> On 29-08-18 16:41, Dong Aisheng wrote:
-> > Switching to use clk_bulk API to simplify clock operations.
+On Fri, Aug 31, 2018 at 4:31 AM Jens Axboe <axboe@kernel.dk> wrote:
+>
+> On 8/30/18 1:01 PM, Corentin Labbe wrote:
+> > Hello
 > >
-> > Cc: Hans de Goede <hdegoede@redhat.com>
-> > Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > Cc: linux-fbdev at vger.kernel.org
-> > Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
-> > Cc: Stephen Boyd <sboyd@codeaurora.org>
-> > Tested-by: Thor Thayer <thor.thayer@linux.intel.com>
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > ---
-> > v4->v5:
-> >   * fix wrong setting of par->clks_enabled
-> > v3->v4:
-> >   * no changes
-> > v2->v3:
-> >   * fix a build warning on x86 platform due to a wrong
-> >     of the prototype of simplefb_clocks_enable
-> > v1->v2:
-> >   * switch to clk_bulk_get_all from of_clk_bulk_get_all
-> > ---
-> >   drivers/video/fbdev/simplefb.c | 68 +++++++++---------------------------------
-> >   1 file changed, 14 insertions(+), 54 deletions(-)
+> > This patchset add support for allwinner R40 AHCI controller.
 > >
-> > diff --git a/drivers/video/fbdev/simplefb.c
-> > b/drivers/video/fbdev/simplefb.c index 9a9d748..8d1fbd6 100644
-> > --- a/drivers/video/fbdev/simplefb.c
-> > +++ b/drivers/video/fbdev/simplefb.c
-> > @@ -182,7 +182,7 @@ struct simplefb_par {
-> >   #if defined CONFIG_OF && defined CONFIG_COMMON_CLK
-> >   	bool clks_enabled;
-> >   	unsigned int clk_count;
-> > -	struct clk **clks;
-> > +	struct clk_bulk_data *clks;
-> >   #endif
-> >   #if defined CONFIG_OF && defined CONFIG_REGULATOR
-> >   	bool regulators_enabled;
-> > @@ -214,37 +214,13 @@ static int simplefb_clocks_get(struct simplefb_par
-> *par,
-> >   			       struct platform_device *pdev)
-> >   {
-> >   	struct device_node *np = pdev->dev.of_node;
-> > -	struct clk *clock;
-> > -	int i;
+> > The whole patchset is tested on sun8i-r40-bananapi-m2-ultra and
+> > on sun7i-a20-cubieboard2 which doesnt have any of the ressources added
+> > by this serie, so no regression should come with it.
 > >
-> >   	if (dev_get_platdata(&pdev->dev) || !np)
-> >   		return 0;
-> >
-> > -	par->clk_count = of_clk_get_parent_count(np);
-> > -	if (!par->clk_count)
-> > -		return 0;
-> > -
-> > -	par->clks = kcalloc(par->clk_count, sizeof(struct clk *), GFP_KERNEL);
-> > -	if (!par->clks)
-> > -		return -ENOMEM;
-> > -
-> > -	for (i = 0; i < par->clk_count; i++) {
-> > -		clock = of_clk_get(np, i);
-> > -		if (IS_ERR(clock)) {
-> > -			if (PTR_ERR(clock) == -EPROBE_DEFER) {
-> > -				while (--i >= 0) {
-> > -					if (par->clks[i])
-> > -						clk_put(par->clks[i]);
-> > -				}
-> > -				kfree(par->clks);
-> > -				return -EPROBE_DEFER;
-> > -			}
-> > -			dev_err(&pdev->dev, "%s: clock %d not found: %ld\n",
-> > -				__func__, i, PTR_ERR(clock));
-> > -			continue;
-> > -		}
-> > -		par->clks[i] = clock;
-> > -	}
-> > +	par->clk_count = clk_bulk_get_all(&pdev->dev, &par->clks);
-> > +	if ((par->clk_count < 0) && (par->clk_count == -EPROBE_DEFER))
-> > +		return -EPROBE_DEFER;
-> 
-> I just noticed this now, but clk_count is unsigned so it will never be < 0, please
-> make it signed.
-> 
+> > The last patch(ata: ahci_sunxi: remove PHY code) should not be merged,
+> > but will be resent for inclustion when all patchs will have hit linus
+> > tree.
+>
+> Applied 1-12 with Hans's blessing, thanks Corentin.
 
-Good findings.
+Please don't merge device tree ("dts") patches, i.e. patches 9-12. We will
+merge them through the sunxi / armsoc tree. Having them in separate trees
+introduces conflicts when we have other stuff going through our tree.
 
-> Also there is no need to check for < 0 just (par->clk_count == -EPROBE_DEFER)
-> is enough (if that is true < 0 also always is true).
-> 
+Corentin, it's best to lay out the plan to get patches merges in the cover
+letter, specifically which maintainer should take which patches, or if an
+immutable tag/branch is preferred, when things can't be separated cleanly.
+This helps other subsystem maintainers that don't routinely deal with armsoc.
 
-Yes, you're right.
+Also, we probably can't merge the last patch that removes the PHY code,
+since we have to support old device trees.
 
-> >
-> >   	return 0;
-> >   }
-> > @@ -252,39 +228,23 @@ static int simplefb_clocks_get(struct simplefb_par
-> *par,
-> >   static void simplefb_clocks_enable(struct simplefb_par *par,
-> >   				   struct platform_device *pdev)
-> >   {
-> > -	int i, ret;
-> > +	int ret;
-> >
-> > -	for (i = 0; i < par->clk_count; i++) {
-> > -		if (par->clks[i]) {
-> > -			ret = clk_prepare_enable(par->clks[i]);
-> > -			if (ret) {
-> > -				dev_err(&pdev->dev,
-> > -					"%s: failed to enable clock %d: %d\n",
-> > -					__func__, i, ret);
-> > -				clk_put(par->clks[i]);
-> > -				par->clks[i] = NULL;
-> > -			}
-> > -		}
-> > +	ret = clk_bulk_prepare_enable(par->clk_count, par->clks);
-> 
-> Hmm, what happens if par->clk_count < 0 (another <0 value then
-> -EPROBEDEFER) ?
-> 
-
-Good catch. I will add a checking of it.
-diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
-index 477e008..89fb1e7 100644
---- a/drivers/video/fbdev/simplefb.c
-+++ b/drivers/video/fbdev/simplefb.c
-@@ -230,6 +230,9 @@ static void simplefb_clocks_enable(struct simplefb_par *par,
- {
-        int ret;
- 
-+       if (par->clk_count <= 0)
-+               return;
-+
-        ret = clk_bulk_prepare_enable(par->clk_count, par->clks);
-        if (ret)
-                dev_warn(&pdev->dev, "failed to enable clocks\n");
-@@ -239,6 +242,9 @@ static void simplefb_clocks_enable(struct simplefb_par *par,
- 
- static void simplefb_clocks_destroy(struct simplefb_par *par)
- {
-+       if (par->clk_count <= 0)
-+               return;
-+
-        if (par->clks_enabled)
-                clk_bulk_disable_unprepare(par->clk_count, par->clks);
-
-> > +	if (ret) {
-> > +		par->clks_enabled = false;
-> 
-> No need to set false here.
-> 
-
-Got it. Then let's reply on the kzalloc
-
-> > +		dev_warn(&pdev->dev, "failed to enable clocks\n");
-> > +	} else {
-> > +		par->clks_enabled = true;
-> >   	}
-> > -	par->clks_enabled = true;
-> >   }
-> >
-> >   static void simplefb_clocks_destroy(struct simplefb_par *par)
-> >   {
-> > -	int i;
-> > -
-> > -	if (!par->clks)
-> > -		return;
-> > -
-> > -	for (i = 0; i < par->clk_count; i++) {
-> > -		if (par->clks[i]) {
-> > -			if (par->clks_enabled)
-> > -				clk_disable_unprepare(par->clks[i]);
-> > -			clk_put(par->clks[i]);
-> > -		}
-> > -	}
-> > +	if (par->clks_enabled)
-> > +		clk_bulk_disable_unprepare(par->clk_count, par->clks);
-> >
-> > -	kfree(par->clks);
-> > +	clk_bulk_put_all(par->clk_count, par->clks);
-> 
-> Again what about par->clk_count < 0 ?
-> 
-> Regards,
-> 
-> Hans
-
-Will resend a new patch series. Thanks for the carefully review.
-
-Regards
-Dong Aisheng
+Thanks
+ChenYu
