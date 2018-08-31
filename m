@@ -1,30 +1,72 @@
-From: yogeshnarayan.gaur@nxp.com (Yogesh Gaur)
-Date: Fri, 31 Aug 2018 16:00:03 +0530
-Subject: [PATCH 6/7] arm64: defconfig: enable NXP FlexSPI driver
-In-Reply-To: <1535711404-29528-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-References: <1535711404-29528-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-Message-ID: <1535711404-29528-7-git-send-email-yogeshnarayan.gaur@nxp.com>
+From: npiggin@gmail.com (Nicholas Piggin)
+Date: Fri, 31 Aug 2018 20:32:34 +1000
+Subject: [PATCH 00/12] Avoid synchronous TLB invalidation for
+ intermediate page-table entries on arm64
+In-Reply-To: <20180831101014.GG24124@hirez.programming.kicks-ass.net>
+References: <1535645747-9823-1-git-send-email-will.deacon@arm.com>
+ <CA+55aFzMMU5RBhn52Lbzf-FXvx3inh5VPVZL613srY+dVU+Lxw@mail.gmail.com>
+ <20180831110054.475a3534@roar.ozlabs.ibm.com>
+ <CA+55aFyweLwdAeeLnPv1ceje2y9Qc2AkM+LdMzK_z29fFb96ug@mail.gmail.com>
+ <20180831095417.GF13166@arm.com>
+ <20180831101014.GG24124@hirez.programming.kicks-ass.net>
+Message-ID: <20180831203234.7b8f4d13@roar.ozlabs.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable driver support of NXP FlexSPI controller.
+On Fri, 31 Aug 2018 12:10:14 +0200
+Peter Zijlstra <peterz@infradead.org> wrote:
 
-Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+> On Fri, Aug 31, 2018 at 10:54:18AM +0100, Will Deacon wrote:
+> 
+> > Proposal below (omitted Linus because that seems to be the pattern elsewhere
+> > in the file and he's not going to shout at himself when things break :)
+> > Anybody I've missed?
+> > 
+> > Will
+> >   
+> > --->8  
+> > 
+> > diff --git a/MAINTAINERS b/MAINTAINERS
+> > index a5b256b25905..7224b5618883 100644
+> > --- a/MAINTAINERS
+> > +++ b/MAINTAINERS
+> > @@ -9681,6 +9681,15 @@ S:	Maintained
+> >  F:	arch/arm/boot/dts/mmp*
+> >  F:	arch/arm/mach-mmp/
+> >  
+> > +MMU GATHER AND TLB INVALIDATION
+> > +M:	Will Deacon <will.deacon@arm.com>
+> > +M:	Nick Piggin <npiggin@gmail.com>
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 3cfa8ca..75ceddf 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -335,6 +335,7 @@ CONFIG_SPI_QUP=y
- CONFIG_SPI_ROCKCHIP=y
- CONFIG_SPI_S3C64XX=y
- CONFIG_SPI_SPIDEV=m
-+CONFIG_SPI_NXP_FLEXSPI=y
- CONFIG_SPMI=y
- CONFIG_PINCTRL_IPQ8074=y
- CONFIG_PINCTRL_SINGLE=y
--- 
-2.7.4
+Oh gee, I suppose. powerpc hash is kind of interesting because it's
+crazy, Aneesh knows that code a lot better than I do. radix modulo
+some minor details of exact instructions is fairly like x86 (he 
+wrote a lot of that code too AFAIK).
+
+> > +M:	Peter Zijlstra <peterz@infradead.org>
+> > +L:	linux-arch at vger.kernel.org
+
+Maybe put linux-mm as well? Or should there just be one list?
+
+> > +S:	Maintained
+> > +F:	include/asm-generic/tlb.h
+> > +F:	arch/*/include/asm/tlb.h
+> > +
+> >  MN88472 MEDIA DRIVER
+> >  M:	Antti Palosaari <crope@iki.fi>
+> >  L:	linux-media at vger.kernel.org  
+> 
+> If we're going to do that (and I'm not opposed); it might make sense to
+> do something like the below and add:
+> 
+>  F:  mm/mmu_gather.c
+
+I think that is a good idea regardless. How do feel about calling it
+tlb.c? Easier to type and autocompletes sooner.
+
+> 
+> ---
+>  b/mm/mmu_gather.c         |  250 ++++++++++++++++++++++++++++++++++++++++++++++
+>  include/asm-generic/tlb.h |    2 
+>  mm/Makefile               |    2 
+>  mm/memory.c               |  247 ---------------------------------------------
