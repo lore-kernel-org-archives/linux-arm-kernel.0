@@ -1,74 +1,45 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 31 Aug 2018 16:21:31 +0100
-Subject: [PATCH net-next v3 02/10] net: mvpp2: phylink support
-In-Reply-To: <20180831143721.GB19733@lunn.ch>
-References: <20180517082939.14598-1-antoine.tenart@bootlin.com>
- <20180517082939.14598-3-antoine.tenart@bootlin.com>
- <20180827165058.GD30658@n2100.armlinux.org.uk>
- <20180831133651.GB32574@kwain>
- <20180831141123.GM30658@n2100.armlinux.org.uk>
- <20180831143721.GB19733@lunn.ch>
-Message-ID: <20180831152131.GN30658@n2100.armlinux.org.uk>
+From: vigneshr@ti.com (Vignesh R)
+Date: Fri, 31 Aug 2018 20:56:22 +0530
+Subject: [PATCH] arm64: dts: ti: k3-am65: Change #address-cells and
+ #size-cells of interconnect to 2
+In-Reply-To: <20180828162556.GQ7523@atomide.com>
+References: <20180828102642.26482-1-kishon@ti.com>
+ <20180828162556.GQ7523@atomide.com>
+Message-ID: <6f5f8747-46c2-6133-d31a-6c441c24bcd4@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2018 at 04:37:21PM +0200, Andrew Lunn wrote:
-> > Can you see any down-sides to moving the netif_carrier_off() in
-> > mvneta_open() to phylink_start() ?
+Kishon,
+
+On 28-Aug-18 9:55 PM, Tony Lindgren wrote:
+> * Kishon Vijay Abraham I <kishon@ti.com> [180828 10:31]:
+>> AM65 has two PCIe controllers and each PCIe controller has '2' address
+>> spaces one within the 4GB address space of the SoC and the other above
+>> the 4GB address space of the SoC in addition to the register space. The
+>> size of the address space above the 4GB SoC address space is 4GB. These
+>> address ranges will be used by CPU/DMA to access the PCIe address space.
+>> In order to represent the address space above the 4GB SoC address space
+>> and to represent the size of this address space as 4GB, change
+>> address-cells and size-cells of interconnect to 2.
+> ...
+>>  		cbass_mcu: interconnect at 28380000 {
+>>  			compatible = "simple-bus";
+>>  			#address-cells = <1>;
+>>  			#size-cells = <1>;
 > 
-> This sounds like a good idea.
-> 
-> What happens on the resume path?
 
-Suspend/resume should be safe, because we force the link down when
-phylink_stop() is called.
+Looking at Table 2-2. MCU Domain Memory Map in TRM, OSPI has similar
+need. There are two address ranges to access OSPI flash in memory mapped
+mode:
+MCU_FSS0_DAT_REG1 0x0050000000 0x0058000000 128 MB(32bit space)
+MCU_FSS0_DAT_REG0 0x0400000000 0x0500000000 4 GB(64bit space with ECC)
+MCU_FSS0_DAT_REG3 0x0500000000 0x0600000000 4 GB(64bit space w/o ECC)
 
-Looking at mvneta again, mvneta_stop_dev() is called in the suspend
-path, which then calls phylink_stop().  This causes us to call
-mac_link_down() and netif_carrier_off().  So, at the point of suspend,
-the netdev carrier is set down and the mac taken down.
+Since, there are already OSPI flashes with size > 128MB, we would need
+to use 4GB address space in kernel (which is above 32 bit space)
 
-When resuming, mvneta_start_dev() calls phylink_start(), which undoes
-the changes above, calling mac_link_up() if the link is now up.
+Therefore, could you also change cbass_mcu also to have
+#address-cells = <2>?
 
-So, as long as netdevs don't mess with the carrier state in their
-suspend/resume functions, and they call phylink_start()/phylink_stop()
-there, everything will work as intended - and that's really the key
-issue here.
-
-> I've not looked at any code.... Just thinking aloud. Can we suspend
-> with the link up? When we resume, so long as we were not doing WoL,
-> the link is down. If phylink_start() is not called, we have this miss
-> match again.
-
-It depends what you mean by "link up".  Are you talking about the PHYs
-link to the external world (which is normally what's responsible for
-handling WOL) or are you talking about keeping the MAC and its rings
-alive so it can process packets while suspended.
-
-If the former, that's the responsibility of phylib to manage, if the
-latter, the netdev must not call phylink_stop() in its suspend function.
-
-Either way, not messing with the netdev's carrier state is key.
-
-The only exception to this is that the carrier should be down at open()
-time.  However, I don't see anything in net/core that fiddles with the
-carrier state for a net device, so the default state at boot should be
-carrier-off.
-
-I think some questions for Antoine are:
-
-- what is the state of the carrier at the start of mvpp2_start() ?
-- when does the missing call to mac_link_up() occur - is it the first
-  time the netdev is brought up, or a subsequent time?
-- is the carrier always off at the end of mvpp2_stop()?
-
-Having a local reproducer may help, so if you can point to a DT fragment
-and set of steps to reproduce, it could be helpful.
-
-Thanks.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-According to speedtest.net: 13Mbps down 490kbps up
+Regards
+Vignesh
