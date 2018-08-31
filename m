@@ -1,42 +1,43 @@
-From: antoine.tenart@bootlin.com (Antoine Tenart)
-Date: Fri, 31 Aug 2018 16:23:10 +0200
-Subject: [PATCH net-next v3 02/10] net: mvpp2: phylink support
-In-Reply-To: <20180831141851.GA19733@lunn.ch>
-References: <20180517082939.14598-1-antoine.tenart@bootlin.com>
- <20180517082939.14598-3-antoine.tenart@bootlin.com>
- <20180827165058.GD30658@n2100.armlinux.org.uk>
- <20180831133651.GB32574@kwain> <20180831141851.GA19733@lunn.ch>
-Message-ID: <20180831142310.GC32574@kwain>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 31 Aug 2018 23:30:47 +0900
+Subject: [PATCH 1/2] i2c: uniphier: issue STOP only for last message or
+ I2C_M_STOP
+Message-ID: <1535725848-4076-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+This driver currently emits a STOP if the next message is not
+I2C_MD_RD.  It should not do it because it disturbs the I2C_RDWR
+ioctl, where read/write transactions are combined without STOP
+between.
 
-On Fri, Aug 31, 2018 at 04:18:51PM +0200, Andrew Lunn wrote:
-> > @@ -4691,6 +4685,9 @@ static int mvpp2_port_probe(struct platform_device *pdev,
-> >  	if (fwnode_property_read_bool(port_fwnode, "marvell,loopback"))
-> >  		port->flags |= MVPP2_F_LOOPBACK;
-> >  
-> > +	if (fwnode_property_present(port_fwnode, "fixed-link"))
-> > +		port->flags |= MVPP2_F_FIXED_LINK;
-> > +
-> 
-> There is no need to go look in device tree. When phylink calls
-> mac_config() it passes mode == MLO_AN_FIXED, when it is using a fixed
-> link.
+Issue STOP only when the message is the last one _or_ flagged with
+I2C_M_STOP.
 
-Sure. This was a proposal to have a workaround when phylink does not
-call link_up(), so that we know which mode to pass to the function.
+Fixes: dd6fd4a32793 ("i2c: uniphier: add UniPhier FIFO-less I2C driver")
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-In the meantime Russell explained an assumption about the carrier link
-state made by phylink, and a proposal to avoid doing this kind of hack
-in the driver. I'll test his solution which will probably means we can
-drop this piece of code.
+ drivers/i2c/busses/i2c-uniphier.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
 
-Thanks!
-Antoine
-
+diff --git a/drivers/i2c/busses/i2c-uniphier.c b/drivers/i2c/busses/i2c-uniphier.c
+index bb181b0..454f914 100644
+--- a/drivers/i2c/busses/i2c-uniphier.c
++++ b/drivers/i2c/busses/i2c-uniphier.c
+@@ -248,11 +248,8 @@ static int uniphier_i2c_master_xfer(struct i2c_adapter *adap,
+ 		return ret;
+ 
+ 	for (msg = msgs; msg < emsg; msg++) {
+-		/* If next message is read, skip the stop condition */
+-		bool stop = !(msg + 1 < emsg && msg[1].flags & I2C_M_RD);
+-		/* but, force it if I2C_M_STOP is set */
+-		if (msg->flags & I2C_M_STOP)
+-			stop = true;
++		/* Emit STOP if it is the last message or I2C_M_STOP is set. */
++		bool stop = (msg + 1 == emsg) || (msg->flags & I2C_M_STOP);
+ 
+ 		ret = uniphier_i2c_master_xfer_one(adap, msg, stop);
+ 		if (ret)
 -- 
-Antoine T?nart, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+2.7.4
