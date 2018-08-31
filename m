@@ -1,91 +1,162 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 31 Aug 2018 11:09:15 +0200
-Subject: [PATCH v3 20/30] iio: adc: sun4i-gpadc-iio: rework: device
- specific suspend & resume
-In-Reply-To: <20180830154518.29507-21-embed3d@gmail.com>
+Date: Fri, 31 Aug 2018 11:11:37 +0200
+Subject: [PATCH v3 21/30] iio: adc: sun4i-gpadc-iio: add support for H3
+ thermal sensor
+In-Reply-To: <20180830154518.29507-22-embed3d@gmail.com>
 References: <20180830154518.29507-1-embed3d@gmail.com>
- <20180830154518.29507-21-embed3d@gmail.com>
-Message-ID: <20180831090915.agbldint76ngj5jf@flea>
+ <20180830154518.29507-22-embed3d@gmail.com>
+Message-ID: <20180831091137.wkbbipssyd6mqfbt@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 30, 2018 at 05:45:08PM +0200, Philipp Rossak wrote:
-> Different sensors will have different suspend and resume functions. So
-> we are modularize the suspend and resume functions.
+On Thu, Aug 30, 2018 at 05:45:09PM +0200, Philipp Rossak wrote:
+> This patch adds support for the H3 ths sensor.
 > 
-> The resume function configures and initializes the thermal sensor and
-> the suspend function disables the sensors.
+> The H3 supports interrupts. The interrupt is configured to update the
+> the sensor values every second. The calibration data is writen at the
+> begin of the init process.
 > 
 > Signed-off-by: Philipp Rossak <embed3d@gmail.com>
 > ---
->  drivers/iio/adc/sun4i-gpadc-iio.c | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
+>  drivers/iio/adc/sun4i-gpadc-iio.c   | 91 +++++++++++++++++++++++++++++++++++++
+>  include/linux/iio/adc/sun4i-gpadc.h | 18 ++++++++
+>  2 files changed, 109 insertions(+)
 > 
 > diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-> index 2fd73d143815..c7b46c82e3e5 100644
+> index c7b46c82e3e5..d5c7971b2558 100644
 > --- a/drivers/iio/adc/sun4i-gpadc-iio.c
 > +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-> @@ -76,6 +76,9 @@ struct gpadc_data {
+> @@ -72,6 +72,7 @@ struct gpadc_data {
+>  	u32		temp_data_base;
+>  	int		sensor_count;
+>  	bool		supports_nvmem;
+> +	u32		ths_irq_clear;
+>  };
 >  
 >  static irqreturn_t sun4i_gpadc_data_irq_handler(int irq, void *dev_id);
+> @@ -79,6 +80,10 @@ static irqreturn_t sun4i_gpadc_data_irq_handler(int irq, void *dev_id);
+>  static int sun4i_ths_resume(struct sun4i_gpadc_iio *info);
+>  static int sun4i_ths_suspend(struct sun4i_gpadc_iio *info);
 >  
-> +static int sun4i_ths_resume(struct sun4i_gpadc_iio *info);
-> +static int sun4i_ths_suspend(struct sun4i_gpadc_iio *info);
+> +static int sun8i_h3_ths_resume(struct sun4i_gpadc_iio *info);
+> +static int sun8i_h3_ths_suspend(struct sun4i_gpadc_iio *info);
+> +static irqreturn_t sunx8i_h3_irq_thread(int irq, void *data);
 > +
 >  static const struct gpadc_data sun4i_gpadc_data = {
 >  	.temp_offset = -1932,
 >  	.temp_scale = 133,
-> @@ -87,6 +90,8 @@ static const struct gpadc_data sun4i_gpadc_data = {
->  	.ths_irq_thread = sun4i_gpadc_data_irq_handler,
->  	.support_irq = true,
->  	.temp_data_base = SUN4I_GPADC_TEMP_DATA,
-> +	.ths_resume = sun4i_ths_resume,
-> +	.ths_suspend = sun4i_ths_suspend,
+> @@ -137,6 +142,22 @@ static const struct gpadc_data sun8i_a33_gpadc_data = {
 >  	.sensor_count = 1,
 >  };
 >  
-> @@ -101,6 +106,8 @@ static const struct gpadc_data sun5i_gpadc_data = {
->  	.ths_irq_thread = sun4i_gpadc_data_irq_handler,
->  	.support_irq = true,
->  	.temp_data_base = SUN4I_GPADC_TEMP_DATA,
-> +	.ths_resume = sun4i_ths_resume,
-> +	.ths_suspend = sun4i_ths_suspend,
->  	.sensor_count = 1,
->  };
+> +static const struct gpadc_data sun8i_h3_ths_data = {
+> +	.temp_offset = -1791,
+> +	.temp_scale = -121,
+> +	.temp_data_base = SUN8I_H3_THS_TDATA0,
+> +	.ths_irq_thread = sunx8i_h3_irq_thread,
+> +	.support_irq = true,
+> +	.has_bus_clk = true,
+> +	.has_bus_rst = true,
+> +	.has_mod_clk = true,
+> +	.sensor_count = 1,
+> +	.supports_nvmem = true,
+> +	.ths_resume = sun8i_h3_ths_resume,
+> +	.ths_suspend = sun8i_h3_ths_suspend,
+> +	.ths_irq_clear = SUN8I_H3_THS_INTS_TDATA_IRQ_0,
+> +};
+> +
+>  struct sun4i_sensor_tzd {
+>  	struct sun4i_gpadc_iio		*info;
+>  	struct thermal_zone_device	*tzd;
+> @@ -409,6 +430,31 @@ static irqreturn_t sun4i_gpadc_data_irq_handler(int irq, void *dev_id)
+>  	return IRQ_HANDLED;
+>  }
 >  
-> @@ -115,6 +122,8 @@ static const struct gpadc_data sun6i_gpadc_data = {
->  	.ths_irq_thread = sun4i_gpadc_data_irq_handler,
->  	.support_irq = true,
->  	.temp_data_base = SUN4I_GPADC_TEMP_DATA,
-> +	.ths_resume = sun4i_ths_resume,
-> +	.ths_suspend = sun4i_ths_suspend,
->  	.sensor_count = 1,
->  };
->  
-> @@ -123,6 +132,8 @@ static const struct gpadc_data sun8i_a33_gpadc_data = {
->  	.temp_scale = 162,
->  	.tp_mode_en = SUN8I_A33_GPADC_CTRL1_CHOP_TEMP_EN,
->  	.temp_data_base = SUN4I_GPADC_TEMP_DATA,
-> +	.ths_resume = sun4i_ths_resume,
-> +	.ths_suspend = sun4i_ths_suspend,
->  	.sensor_count = 1,
->  };
->  
-> @@ -401,6 +412,11 @@ static irqreturn_t sun4i_gpadc_data_irq_handler(int irq, void *dev_id)
+> +static irqreturn_t sunx8i_h3_irq_thread(int irq, void *data)
+> +{
+> +	struct sun4i_gpadc_iio *info = data;
+> +	int i;
+> +
+> +	regmap_write(info->regmap, SUN8I_H3_THS_STAT,
+> +			info->data->ths_irq_clear);
+> +
+> +	for (i = 0; i < info->data->sensor_count; i++)
+> +		thermal_zone_device_update(info->tzds[i].tzd,
+> +						THERMAL_EVENT_TEMP_SAMPLE);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static int sun8i_h3_calibrate(struct sun4i_gpadc_iio *info)
+> +{
+> +//	regmap_write(info->regmap, SUNXI_THS_CDATA_0_1,
+> +//			info->calibration_data[0]);
+> +//	regmap_write(info->regmap, SUNXI_THS_CDATA_2_3,
+> +//			info->calibration_data[1]);
+
+Don't put commented code.
+
+> +
+> +	return 0;
+> +}
+> +
 >  static int sun4i_gpadc_runtime_suspend(struct device *dev)
 >  {
 >  	struct sun4i_gpadc_iio *info = iio_priv(dev_get_drvdata(dev));
-> +	return info->data->ths_suspend(info);
+> @@ -428,6 +474,16 @@ static int sun4i_ths_suspend(struct sun4i_gpadc_iio *info)
+>  	return 0;
+>  }
+>  
+> +static int sun8i_h3_ths_suspend(struct sun4i_gpadc_iio *info)
+> +{
+> +	/* Disable ths interrupt */
+> +	regmap_write(info->regmap, SUN8I_H3_THS_INTC, 0x0);
+> +	/* Disable temperature sensor */
+> +	regmap_write(info->regmap, SUN8I_H3_THS_CTRL2, 0x0);
+> +
+> +	return 0;
 > +}
 > +
-> +static int sun4i_ths_suspend(struct sun4i_gpadc_iio *info)
+>  static int sun4i_gpadc_runtime_resume(struct device *dev)
+>  {
+>  	struct sun4i_gpadc_iio *info = iio_priv(dev_get_drvdata(dev));
+> @@ -454,6 +510,37 @@ static int sun4i_ths_resume(struct sun4i_gpadc_iio *info)
+>  	return 0;
+>  }
+>  
+> +static int sun8i_h3_ths_resume(struct sun4i_gpadc_iio *info)
+> +{
+> +	u32 value;
+> +
+> +	sun8i_h3_calibrate(info);
+> +
+> +	regmap_write(info->regmap, SUN8I_H3_THS_CTRL0,
+> +			SUN4I_GPADC_CTRL0_T_ACQ(0xff));
+> +
+> +	regmap_write(info->regmap, SUN8I_H3_THS_CTRL2,
+> +			SUN8I_H3_THS_ACQ1(0x3f));
+> +
+> +	regmap_write(info->regmap, SUN8I_H3_THS_STAT,
+> +			SUN8I_H3_THS_INTS_TDATA_IRQ_0);
+> +
+> +	regmap_write(info->regmap, SUN8I_H3_THS_FILTER,
+> +			SUN4I_GPADC_CTRL3_FILTER_EN |
+> +			SUN4I_GPADC_CTRL3_FILTER_TYPE(0x2));
+> +
+> +	regmap_write(info->regmap, SUN8I_H3_THS_INTC,
+> +			SUN8I_H3_THS_INTC_TDATA_IRQ_EN0 |
+> +			SUN8I_H3_THS_TEMP_PERIOD(0x55));
+> +
+> +	regmap_read(info->regmap, SUN8I_H3_THS_CTRL2, &value);
+> +
+> +	regmap_write(info->regmap, SUN8I_H3_THS_CTRL2,
+> +			SUN8I_H3_THS_TEMP_SENSE_EN0 | value);
 
-suspend is already a hook in the kernel, which hasn't the same meaning
-than runtime_suspend (and the same applies to resume), so we'd rather
-pick a better name. And all the functions (and the driver) use gpadc,
-please continue to use that prefix.
+Ideally, all these values should have a comment explaining what they
+are.
 
-Maxime
+And we really start to have a lot of registers defines. We'd be better
+off using regmap_fields.
 
 -- 
 Maxime Ripard, Bootlin
@@ -97,4 +168,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180831/99c4c49b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180831/3846c194/attachment.sig>
