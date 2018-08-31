@@ -1,93 +1,55 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 31 Aug 2018 14:08:04 +0200
-Subject: [PATCH v4 09/13] ARM: dts: sun8i: r40: add sata node
-In-Reply-To: <CAGb2v65m73mZkQ9qbYne-utZPujEvRftYGz5kYCx=8t-C-=DJQ@mail.gmail.com>
-References: <20180830190120.722-1-clabbe.montjoie@gmail.com>
- <20180830190120.722-10-clabbe.montjoie@gmail.com>
- <20180831073500.zubqpvar4yhjqrge@flea> <20180831075631.GB16301@Red>
- <20180831102021.idz42sfgldihpkrp@flea> <20180831105412.GD16301@Red>
- <CAGb2v65m73mZkQ9qbYne-utZPujEvRftYGz5kYCx=8t-C-=DJQ@mail.gmail.com>
-Message-ID: <20180831120804.GA11340@Red>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 31 Aug 2018 08:18:36 -0400
+Subject: [PATCH 2/3] dt-bindings: firmware: coreboot: document board
+ variant properties
+In-Reply-To: <20180822120214.11848-2-heiko@sntech.de>
+References: <20180822120214.11848-1-heiko@sntech.de>
+ <20180822120214.11848-2-heiko@sntech.de>
+Message-ID: <20180831121836.GA23441@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2018 at 07:31:37PM +0800, Chen-Yu Tsai wrote:
-> On Fri, Aug 31, 2018 at 6:54 PM Corentin Labbe
-> <clabbe.montjoie@gmail.com> wrote:
-> >
-> > On Fri, Aug 31, 2018 at 12:20:21PM +0200, maxime.ripard at bootlin.com wrote:
-> > > On Fri, Aug 31, 2018 at 09:56:31AM +0200, Corentin Labbe wrote:
-> > > > On Fri, Aug 31, 2018 at 09:35:00AM +0200, Maxime Ripard wrote:
-> > > > > On Thu, Aug 30, 2018 at 09:01:16PM +0200, Corentin Labbe wrote:
-> > > > > > R40 have a sata controller which is the same as A20.
-> > > > > > This patch adds a DT node for it.
-> > > > > >
-> > > > > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> > > > > > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> > > > > > ---
-> > > > > >  arch/arm/boot/dts/sun8i-r40.dtsi | 23 +++++++++++++++++++++++
-> > > > > >  1 file changed, 23 insertions(+)
-> > > > > >
-> > > > > > diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
-> > > > > > index 852c2ccc3268..d6b5820da850 100644
-> > > > > > --- a/arch/arm/boot/dts/sun8i-r40.dtsi
-> > > > > > +++ b/arch/arm/boot/dts/sun8i-r40.dtsi
-> > > > > > @@ -550,6 +550,29 @@
-> > > > > >                         #size-cells = <0>;
-> > > > > >                 };
-> > > > > >
-> > > > > > +               ahci: sata at 1c18000 {
-> > > > > > +                       compatible = "allwinner,sun8i-r40-ahci";
-> > > > > > +                       reg = <0x01c18000 0x1000>;
-> > > > > > +                       interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
-> > > > > > +                       clocks = <&ccu CLK_BUS_SATA>, <&ccu CLK_SATA>;
-> > > > > > +                       resets = <&ccu RST_BUS_SATA>;
-> > > > > > +                       resets-name = "ahci";
-> > > > > > +                       #address-cells = <1>;
-> > > > > > +                       #size-cells = <0>;
-> > > > > > +                       status = "disabled";
-> > > > > > +
-> > > > > > +                       sata_port: sata-port at 0 {
-> > > > > > +                               reg = <0>;
-> > > > > > +                               phys = <&sata_phy>;
-> > > > > > +                       };
-> > > > > > +               };
-> > > > > > +
-> > > > > > +               sata_phy: sata-phy at 1c180c0  {
-> > > > > > +                       compatible = "allwinner,sun8i-r40-sata-phy";
-> > > > > > +                       reg = <0x1c180c0 0x200>;
-> > > > >
-> > > > > Overlapping devices in the DTS is not ok.
-> > > > >
-> > > >
-> > > > I do the same than arch/arm/boot/dts/berlin2.dtsi (sata at e90000
-> > > > phy at e900a0)
-> > > >
-> > > > But since it is not a good justification, it seems that regmap is my
-> > > > only solution ?
-> > >
-> > > I'm not even sure why you are moving the phy out of its original node
-> > > (and driver).
-> > >
-> >
-> > For using the phy-supply already handled by the code.
-> > The other choice is to add another xxx-supply to ahci_platform.
-> > Or to use hackily port_regulator for this regulator.
+On Wed, Aug 22, 2018 at 02:02:13PM +0200, Heiko Stuebner wrote:
+> Since at least 2014 coreboot exports board specific variant ids for
+> board-revision, used ram-modules and component variants on the same board
+> into the loaded devicetree.
 > 
-> The PHY registers are in the AHCI's "vendor specific registers"
-> region. Following that are the per-port registers, which the ahci
-> driver will need access to. This doesn't look like it should
-> deserve a separate device node.
+> These are set on all devicetree-based Chromebooks since then, so at
+> least we can make the effort to document these long-used properties.
+
+Long used, but never reviewed, so that doesn't really matter.
+
 > 
-> What's wrong with handling the regulator directly in the ahci-sunxi
-> PHY init code?
+> A case where these are used is for example to determine the touchscreen
+> type that is only identifyable via the sku-id when updating its firmware
+> on the Scarlet tablet from the Gru ChromeOS family.
 > 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  Documentation/devicetree/bindings/firmware/coreboot.txt | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/firmware/coreboot.txt b/Documentation/devicetree/bindings/firmware/coreboot.txt
+> index 4c955703cea8..cfc7623e2577 100644
+> --- a/Documentation/devicetree/bindings/firmware/coreboot.txt
+> +++ b/Documentation/devicetree/bindings/firmware/coreboot.txt
+> @@ -21,6 +21,12 @@ Required properties:
+>  	0xc0389481 that resides in the topmost 8 bytes of the area.
+>  	See coreboot's src/include/imd.h for details.
+>  
+> +Board variant properties determined via strapping measures (like gpios):
+> + - board-id: board-specific id indicating the board-revision
+> + - ram-code: board-specific id identifying the used ram-module
+> + - sku-id: board-specific id indicating a variant (using different
+> +           display panels for example)
 
-The reason are that I didnt wanted to use the port-regulator, and I didnt want to add new code to ahci_platform.
-I tried to place a phy-supply in the ahci node, but it doesnt work (with or without a phy subnode).
+The appear to be consumed by coreboot, but the purpose of the /firmware 
+nodes has describing firmware interfaces provided by the platform. 
 
-Moving PHy code in a dedicated driver seemed to be good, but with all your comments and Maxime's one, it seems not.
+Not saying we can't put things to configure the firmware there, but it 
+would be a departure and something we should consider. These properties 
+aren't really coreboot specific and probably belong at the root node. 
+Though I think we already discussed a 'board-id' property for QCom (and 
+ended up with a compatible string approach instead.
 
-I will keep ahci_sunxi as-is and will try to found how to add the needed phy-supply.
-
-Regards
+Rob
