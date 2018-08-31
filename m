@@ -1,31 +1,23 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Fri, 31 Aug 2018 16:08:10 +0800
-Subject: [PATCH net-next v2 0/3] net: mvneta: some small improvements
-Message-ID: <20180831160810.2539ef4c@xhacker.debian>
+From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
+Date: Fri, 31 Aug 2018 10:11:24 +0200
+Subject: [PATCH v6 11/11] arm64: annotate user pointers casts detected by
+ sparse
+In-Reply-To: <5d54526e5ff2e5ad63d0dfdd9ab17cf359afa4f2.1535629099.git.andreyknvl@google.com>
+References: <cover.1535629099.git.andreyknvl@google.com>
+ <5d54526e5ff2e5ad63d0dfdd9ab17cf359afa4f2.1535629099.git.andreyknvl@google.com>
+Message-ID: <20180831081123.6mo62xnk54pvlxmc@ltop.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-patch1 removes the NETIF_F_GRO check ourself, because the net subsystem
-will handle it for us.
+On Thu, Aug 30, 2018 at 01:41:16PM +0200, Andrey Konovalov wrote:
+> This patch adds __force annotations for __user pointers casts detected by
+> sparse with the -Wcast-from-as flag enabled (added in [1]).
+> 
+> [1] https://github.com/lucvoo/sparse-dev/commit/5f960cb10f56ec2017c128ef9d16060e0145f292
 
-patch2 enables NETIF_F_RXCSUM by default, since the driver and HW
-supports the feature.
+Hi,
 
-patch3 is a small optimization, to reduce smp_processor_id() calling
-in mvneta_tx_done_gbe.
+It would be nice to have some explanation for why these added __force
+are useful.
 
-since v1:
- - based on net-next tree
- - remove the fix patches, since they should be based on net branch.
- - Add Gregory's Reviewed-by tag
-
-Jisheng Zhang (3):
-  net: mvneta: Don't check NETIF_F_GRO ourself
-  net: mvneta: enable NETIF_F_RXCSUM by default
-  net: mvneta: reduce smp_processor_id() calling in mvneta_tx_done_gbe
-
- drivers/net/ethernet/marvell/mvneta.c | 11 +++++------
- 1 file changed, 5 insertions(+), 6 deletions(-)
-
--- 
-2.18.0
+-- Luc Van Oostenryck
