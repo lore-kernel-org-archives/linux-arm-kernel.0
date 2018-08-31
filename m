@@ -1,58 +1,51 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 31 Aug 2018 09:56:31 +0200
-Subject: [PATCH v4 09/13] ARM: dts: sun8i: r40: add sata node
-In-Reply-To: <20180831073500.zubqpvar4yhjqrge@flea>
-References: <20180830190120.722-1-clabbe.montjoie@gmail.com>
- <20180830190120.722-10-clabbe.montjoie@gmail.com>
- <20180831073500.zubqpvar4yhjqrge@flea>
-Message-ID: <20180831075631.GB16301@Red>
+From: Anson.Huang@nxp.com (Anson Huang)
+Date: Fri, 31 Aug 2018 15:53:11 +0800
+Subject: [PATCH 0/7] Add i.MX6 SoCs mmdc ipg clocks management
+Message-ID: <1535701998-20443-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2018 at 09:35:00AM +0200, Maxime Ripard wrote:
-> On Thu, Aug 30, 2018 at 09:01:16PM +0200, Corentin Labbe wrote:
-> > R40 have a sata controller which is the same as A20.
-> > This patch adds a DT node for it.
-> > 
-> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> > ---
-> >  arch/arm/boot/dts/sun8i-r40.dtsi | 23 +++++++++++++++++++++++
-> >  1 file changed, 23 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
-> > index 852c2ccc3268..d6b5820da850 100644
-> > --- a/arch/arm/boot/dts/sun8i-r40.dtsi
-> > +++ b/arch/arm/boot/dts/sun8i-r40.dtsi
-> > @@ -550,6 +550,29 @@
-> >  			#size-cells = <0>;
-> >  		};
-> >  
-> > +		ahci: sata at 1c18000 {
-> > +			compatible = "allwinner,sun8i-r40-ahci";
-> > +			reg = <0x01c18000 0x1000>;
-> > +			interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
-> > +			clocks = <&ccu CLK_BUS_SATA>, <&ccu CLK_SATA>;
-> > +			resets = <&ccu RST_BUS_SATA>;
-> > +			resets-name = "ahci";
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +			status = "disabled";
-> > +
-> > +			sata_port: sata-port at 0 {
-> > +				reg = <0>;
-> > +				phys = <&sata_phy>;
-> > +			};
-> > +		};
-> > +
-> > +		sata_phy: sata-phy at 1c180c0  {
-> > +			compatible = "allwinner,sun8i-r40-sata-phy";
-> > +			reg = <0x1c180c0 0x200>;
-> 
-> Overlapping devices in the DTS is not ok.
-> 
+i.MX6 SoCs have MMDC driver which will access MMDC registers, and the
+register access need to have MMDC IPG clocks enabled, current MMDC
+driver does NOT handle the MMDC IPG clocks at all, most of the i.MX6
+SoCs clock tree have MMDC0 IPG clock registered and have flag
+CLK_IS_CRITICAL set, but some i.MX6 SoCs does NOT register the MMDC IPG
+clock at all, it depends on default HW status which is NOT reliable.
 
-I do the same than arch/arm/boot/dts/berlin2.dtsi (sata at e90000 phy at e900a0)
-But since it is not a good justification, it seems that regmap is my only solution ?
+To make it more formal, this patch set add all available MMDC IPG clocks
+into clock tree, and add optional clocks enable operation in MMDC driver
+to make sure IPG clock is enabled before accessing registers, and passing
+MMDC IPG clock info from device tree MMDC node.
 
-Regards
+In order to NOT break old device tree, this patch set does NOT remove
+the CLK_IS_CRITIAL flag for MMDC0 IPG clock.
+
+Anson Huang (7):
+  ARM: imx: add mmdc ipg clock operation for mmdc
+  clk: imx6ul: add mmdc1 ipg clock
+  clk: imx6sx: add mmdc1 ipg clock
+  clk: imx6sll: add mmdc1 ipg clock
+  clk: imx6sl: add mmdc ipg clocks
+  clk: imx6q: add mmdc0 ipg clock
+  ARM: dts: imx6: add mmdc ipg clock
+
+ arch/arm/boot/dts/imx6qdl.dtsi            |  1 +
+ arch/arm/boot/dts/imx6sl.dtsi             |  1 +
+ arch/arm/boot/dts/imx6sll.dtsi            |  1 +
+ arch/arm/boot/dts/imx6sx.dtsi             |  1 +
+ arch/arm/boot/dts/imx6ul.dtsi             |  1 +
+ arch/arm/mach-imx/mmdc.c                  | 14 ++++++++++++++
+ drivers/clk/imx/clk-imx6q.c               |  1 +
+ drivers/clk/imx/clk-imx6sl.c              |  2 ++
+ drivers/clk/imx/clk-imx6sll.c             |  1 +
+ drivers/clk/imx/clk-imx6sx.c              |  1 +
+ drivers/clk/imx/clk-imx6ul.c              |  1 +
+ include/dt-bindings/clock/imx6qdl-clock.h |  3 ++-
+ include/dt-bindings/clock/imx6sl-clock.h  |  4 +++-
+ include/dt-bindings/clock/imx6sll-clock.h |  3 ++-
+ include/dt-bindings/clock/imx6sx-clock.h  |  3 ++-
+ include/dt-bindings/clock/imx6ul-clock.h  |  3 ++-
+ 16 files changed, 36 insertions(+), 5 deletions(-)
+
+-- 
+2.7.4
