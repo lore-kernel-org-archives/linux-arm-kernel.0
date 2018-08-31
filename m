@@ -1,67 +1,40 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 31 Aug 2018 12:21:10 +0200
-Subject: [PATCH v4 12/13] ARM: dts: sun4i: a10: add sata-port/sata-phy
- nodes
-In-Reply-To: <20180831075350.GA16301@Red>
-References: <20180830190120.722-1-clabbe.montjoie@gmail.com>
- <20180830190120.722-13-clabbe.montjoie@gmail.com>
- <20180831073724.kuw5tb6yypb4pmkp@flea> <20180831075350.GA16301@Red>
-Message-ID: <20180831102110.pskz6jy47elwxguw@flea>
+From: matti.vaittinen@fi.rohmeurope.com (Matti Vaittinen)
+Date: Fri, 31 Aug 2018 13:21:23 +0300
+Subject: [PATCH 2/2] clk: bd718x7: Initial support for ROHM
+ bd71837/bd71847 PMIC clock
+In-Reply-To: <201808310820.GfPfChXp%fengguang.wu@intel.com>
+References: <0e6f19f99a4321d37472635c9210f6c13ac53147.1535630942.git.matti.vaittinen@fi.rohmeurope.com>
+ <201808310820.GfPfChXp%fengguang.wu@intel.com>
+Message-ID: <20180831102123.GA2472@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2018 at 09:53:50AM +0200, Corentin Labbe wrote:
-> On Fri, Aug 31, 2018 at 09:37:24AM +0200, Maxime Ripard wrote:
-> > On Thu, Aug 30, 2018 at 09:01:19PM +0200, Corentin Labbe wrote:
-> > > This patch convert sun4i-a10 sata to the new binding which use a sata
-> > > phy node.
-> > > 
-> > > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> > > ---
-> > >  arch/arm/boot/dts/sun4i-a10.dtsi | 13 +++++++++++++
-> > >  1 file changed, 13 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-> > > index 3d62a8950720..52d5c2e79499 100644
-> > > --- a/arch/arm/boot/dts/sun4i-a10.dtsi
-> > > +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-> > > @@ -556,7 +556,20 @@
-> > >  			reg = <0x01c18000 0x1000>;
-> > >  			interrupts = <56>;
-> > >  			clocks = <&ccu CLK_AHB_SATA>, <&ccu CLK_SATA>;
-> > > +			#address-cells = <1>;
-> > > +			#size-cells = <0>;
-> > >  			status = "disabled";
-> > > +
-> > > +			sata_port: sata-port at 0 {
-> > > +				reg = <0>;
-> > > +				phys = <&sata_phy>;
-> > > +			};
-> > > +		};
-> > > +
-> > > +		sata_phy: sata_phy at 1c180c0 {
-> > > +			compatible = "allwinner,sun4i-a10-sata-phy";
-> > > +			reg = <0x01c180c0 0x200>;
-> > > +			#phy-cells = <0>;
-> > >  		};
-> > 
-> > This patch, together with the following one, breaks the DT ABI, this
-> > isn't something we can do anymore.
+Hello All,
+
+Just wanted to point out for the reviewers that this patch depends on
+not yet accepted MFD/regulator patch. (struct/defines in
+include/linux/mfd/rohm-bd718x7.h were changed)
+https://lore.kernel.org/lkml/cover.1535545377.git.matti.vaittinen at fi.rohmeurope.com/
+
+On Fri, Aug 31, 2018 at 09:18:19AM +0800, kbuild test robot wrote:
+> Hi Matti,
 > 
-> So what can I do ?
+> Thank you for the patch! Yet something to improve:
+> 
+> [auto build test ERROR on clk/clk-next]
+> [also build test ERROR on v4.19-rc1 next-20180830]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Well, you always have the option of not doing anything.
+Thus this error was expected. What is the generally best way to work
+when there is changes to more than one subsystem? With this approach
+the patch set here won't compile until MFD part gets applied. But if
+I use old definitions/structs here, then clk tree gets broken when
+MFD/regulator part changes defines. I see only bad and worse options =)
+Anyways, I guess sending this patch with new defines (and applying it
+only after MFD) is still better than applying this with old defines and
+breaking it when MFD changes. (Assuming all of the patches get applied
+at some point).
 
-Maxime
-
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180831/2948c599/attachment-0001.sig>
+Br,
+	Matti Vaittinen
+> 
