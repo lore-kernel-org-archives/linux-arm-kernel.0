@@ -1,36 +1,43 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 31 Aug 2018 09:53:50 +0200
-Subject: [PATCH v4 12/13] ARM: dts: sun4i: a10: add sata-port/sata-phy
- nodes
-In-Reply-To: <20180831073724.kuw5tb6yypb4pmkp@flea>
+Date: Fri, 31 Aug 2018 09:56:31 +0200
+Subject: [PATCH v4 09/13] ARM: dts: sun8i: r40: add sata node
+In-Reply-To: <20180831073500.zubqpvar4yhjqrge@flea>
 References: <20180830190120.722-1-clabbe.montjoie@gmail.com>
- <20180830190120.722-13-clabbe.montjoie@gmail.com>
- <20180831073724.kuw5tb6yypb4pmkp@flea>
-Message-ID: <20180831075350.GA16301@Red>
+ <20180830190120.722-10-clabbe.montjoie@gmail.com>
+ <20180831073500.zubqpvar4yhjqrge@flea>
+Message-ID: <20180831075631.GB16301@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2018 at 09:37:24AM +0200, Maxime Ripard wrote:
-> On Thu, Aug 30, 2018 at 09:01:19PM +0200, Corentin Labbe wrote:
-> > This patch convert sun4i-a10 sata to the new binding which use a sata
-> > phy node.
+On Fri, Aug 31, 2018 at 09:35:00AM +0200, Maxime Ripard wrote:
+> On Thu, Aug 30, 2018 at 09:01:16PM +0200, Corentin Labbe wrote:
+> > R40 have a sata controller which is the same as A20.
+> > This patch adds a DT node for it.
 > > 
+> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 > > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 > > ---
-> >  arch/arm/boot/dts/sun4i-a10.dtsi | 13 +++++++++++++
-> >  1 file changed, 13 insertions(+)
+> >  arch/arm/boot/dts/sun8i-r40.dtsi | 23 +++++++++++++++++++++++
+> >  1 file changed, 23 insertions(+)
 > > 
-> > diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-> > index 3d62a8950720..52d5c2e79499 100644
-> > --- a/arch/arm/boot/dts/sun4i-a10.dtsi
-> > +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-> > @@ -556,7 +556,20 @@
-> >  			reg = <0x01c18000 0x1000>;
-> >  			interrupts = <56>;
-> >  			clocks = <&ccu CLK_AHB_SATA>, <&ccu CLK_SATA>;
+> > diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
+> > index 852c2ccc3268..d6b5820da850 100644
+> > --- a/arch/arm/boot/dts/sun8i-r40.dtsi
+> > +++ b/arch/arm/boot/dts/sun8i-r40.dtsi
+> > @@ -550,6 +550,29 @@
+> >  			#size-cells = <0>;
+> >  		};
+> >  
+> > +		ahci: sata at 1c18000 {
+> > +			compatible = "allwinner,sun8i-r40-ahci";
+> > +			reg = <0x01c18000 0x1000>;
+> > +			interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
+> > +			clocks = <&ccu CLK_BUS_SATA>, <&ccu CLK_SATA>;
+> > +			resets = <&ccu RST_BUS_SATA>;
+> > +			resets-name = "ahci";
 > > +			#address-cells = <1>;
 > > +			#size-cells = <0>;
-> >  			status = "disabled";
+> > +			status = "disabled";
 > > +
 > > +			sata_port: sata-port at 0 {
 > > +				reg = <0>;
@@ -38,17 +45,14 @@ On Fri, Aug 31, 2018 at 09:37:24AM +0200, Maxime Ripard wrote:
 > > +			};
 > > +		};
 > > +
-> > +		sata_phy: sata_phy at 1c180c0 {
-> > +			compatible = "allwinner,sun4i-a10-sata-phy";
-> > +			reg = <0x01c180c0 0x200>;
-> > +			#phy-cells = <0>;
-> >  		};
+> > +		sata_phy: sata-phy at 1c180c0  {
+> > +			compatible = "allwinner,sun8i-r40-sata-phy";
+> > +			reg = <0x1c180c0 0x200>;
 > 
-> This patch, together with the following one, breaks the DT ABI, this
-> isn't something we can do anymore.
+> Overlapping devices in the DTS is not ok.
 > 
 
-So what can I do ?
-Keep the DT in place and drop the patch 13 like wens suggested ?
+I do the same than arch/arm/boot/dts/berlin2.dtsi (sata at e90000 phy at e900a0)
+But since it is not a good justification, it seems that regmap is my only solution ?
 
 Regards
