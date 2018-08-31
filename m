@@ -1,99 +1,94 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 31 Aug 2018 20:58:33 +0800
-Subject: [PATCH v4 09/13] ARM: dts: sun8i: r40: add sata node
-In-Reply-To: <CAGb2v65m73mZkQ9qbYne-utZPujEvRftYGz5kYCx=8t-C-=DJQ@mail.gmail.com>
-References: <20180830190120.722-1-clabbe.montjoie@gmail.com>
- <20180830190120.722-10-clabbe.montjoie@gmail.com>
- <20180831073500.zubqpvar4yhjqrge@flea> <20180831075631.GB16301@Red>
- <20180831102021.idz42sfgldihpkrp@flea> <20180831105412.GD16301@Red>
- <CAGb2v65m73mZkQ9qbYne-utZPujEvRftYGz5kYCx=8t-C-=DJQ@mail.gmail.com>
-Message-ID: <726cc22e89b058a708df0f3fc2523af42b8c3518.camel@aosc.io>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 31 Aug 2018 10:07:46 -0300
+Subject: [PATCH 2/3] ARM: mxs_defconfig: Re-sync defconfig
+In-Reply-To: <1535720867-4714-1-git-send-email-festevam@gmail.com>
+References: <1535720867-4714-1-git-send-email-festevam@gmail.com>
+Message-ID: <1535720867-4714-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2018-08-31?? 19:31 +0800?Chen-Yu Tsai???
-> On Fri, Aug 31, 2018 at 6:54 PM Corentin Labbe
-> <clabbe.montjoie@gmail.com> wrote:
-> > 
-> > On Fri, Aug 31, 2018 at 12:20:21PM +0200, maxime.ripard at bootlin.com
-> >  wrote:
-> > > On Fri, Aug 31, 2018 at 09:56:31AM +0200, Corentin Labbe wrote:
-> > > > On Fri, Aug 31, 2018 at 09:35:00AM +0200, Maxime Ripard wrote:
-> > > > > On Thu, Aug 30, 2018 at 09:01:16PM +0200, Corentin Labbe
-> > > > > wrote:
-> > > > > > R40 have a sata controller which is the same as A20.
-> > > > > > This patch adds a DT node for it.
-> > > > > > 
-> > > > > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> > > > > > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> > > > > > ---
-> > > > > >  arch/arm/boot/dts/sun8i-r40.dtsi | 23
-> > > > > > +++++++++++++++++++++++
-> > > > > >  1 file changed, 23 insertions(+)
-> > > > > > 
-> > > > > > diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi
-> > > > > > b/arch/arm/boot/dts/sun8i-r40.dtsi
-> > > > > > index 852c2ccc3268..d6b5820da850 100644
-> > > > > > --- a/arch/arm/boot/dts/sun8i-r40.dtsi
-> > > > > > +++ b/arch/arm/boot/dts/sun8i-r40.dtsi
-> > > > > > @@ -550,6 +550,29 @@
-> > > > > >                         #size-cells = <0>;
-> > > > > >                 };
-> > > > > > 
-> > > > > > +               ahci: sata at 1c18000 {
-> > > > > > +                       compatible = "allwinner,sun8i-r40-
-> > > > > > ahci";
-> > > > > > +                       reg = <0x01c18000 0x1000>;
-> > > > > > +                       interrupts = <GIC_SPI 56
-> > > > > > IRQ_TYPE_LEVEL_HIGH>;
-> > > > > > +                       clocks = <&ccu CLK_BUS_SATA>, <&ccu
-> > > > > > CLK_SATA>;
-> > > > > > +                       resets = <&ccu RST_BUS_SATA>;
-> > > > > > +                       resets-name = "ahci";
-> > > > > > +                       #address-cells = <1>;
-> > > > > > +                       #size-cells = <0>;
-> > > > > > +                       status = "disabled";
-> > > > > > +
-> > > > > > +                       sata_port: sata-port at 0 {
-> > > > > > +                               reg = <0>;
-> > > > > > +                               phys = <&sata_phy>;
-> > > > > > +                       };
-> > > > > > +               };
-> > > > > > +
-> > > > > > +               sata_phy: sata-phy at 1c180c0  {
-> > > > > > +                       compatible = "allwinner,sun8i-r40-
-> > > > > > sata-phy";
-> > > > > > +                       reg = <0x1c180c0 0x200>;
-> > > > > 
-> > > > > Overlapping devices in the DTS is not ok.
-> > > > > 
-> > > > 
-> > > > I do the same than arch/arm/boot/dts/berlin2.dtsi (sata at e90000
-> > > > phy at e900a0)
-> > > > 
-> > > > But since it is not a good justification, it seems that regmap
-> > > > is my
-> > > > only solution ?
-> > > 
-> > > I'm not even sure why you are moving the phy out of its original
-> > > node
-> > > (and driver).
-> > > 
-> > 
-> > For using the phy-supply already handled by the code.
-> > The other choice is to add another xxx-supply to ahci_platform.
-> > Or to use hackily port_regulator for this regulator.
-> 
-> The PHY registers are in the AHCI's "vendor specific registers"
-> region. Following that are the per-port registers, which the ahci
-> driver will need access to. This doesn't look like it should
-> deserve a separate device node.
-> 
-> What's wrong with handling the regulator directly in the ahci-sunxi
-> PHY init code?
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-I remember I sent a patch that did this some times ago, and gets
-rejected.
+Re-sync the defconfig by doing:
+    
+make savedefconfig
+cp defconfig arch/arm/configs/mxs_defconfig
 
-> 
-> ChenYu
+This helps making further mxs_defconfig changes to be cleaner.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/configs/mxs_defconfig | 19 ++++++++-----------
+ 1 file changed, 8 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
+index 7b82128..3848059 100644
+--- a/arch/arm/configs/mxs_defconfig
++++ b/arch/arm/configs/mxs_defconfig
+@@ -1,6 +1,7 @@
+ CONFIG_SYSVIPC=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
++CONFIG_PREEMPT_VOLUNTARY=y
+ CONFIG_TASKSTATS=y
+ CONFIG_TASK_DELAY_ACCT=y
+ CONFIG_TASK_XACCT=y
+@@ -15,6 +16,9 @@ CONFIG_CGROUPS=y
+ CONFIG_BLK_DEV_INITRD=y
+ CONFIG_PERF_EVENTS=y
+ # CONFIG_COMPAT_BRK is not set
++# CONFIG_ARCH_MULTI_V7 is not set
++CONFIG_ARCH_MXS=y
++CONFIG_AEABI=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_FORCE_LOAD=y
+ CONFIG_MODULE_UNLOAD=y
+@@ -23,11 +27,6 @@ CONFIG_MODVERSIONS=y
+ CONFIG_BLK_DEV_INTEGRITY=y
+ # CONFIG_IOSCHED_DEADLINE is not set
+ # CONFIG_IOSCHED_CFQ is not set
+-# CONFIG_ARCH_MULTI_V7 is not set
+-CONFIG_ARCH_MXS=y
+-# CONFIG_ARM_THUMB is not set
+-CONFIG_PREEMPT_VOLUNTARY=y
+-CONFIG_AEABI=y
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+ CONFIG_UNIX=y
+@@ -80,7 +79,6 @@ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+ CONFIG_SERIAL_MXS_AUART=y
+ # CONFIG_HW_RANDOM is not set
+-CONFIG_I2C=y
+ # CONFIG_I2C_COMPAT is not set
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_MXS=y
+@@ -102,7 +100,6 @@ CONFIG_BACKLIGHT_LCD_SUPPORT=y
+ CONFIG_LCD_CLASS_DEVICE=y
+ CONFIG_BACKLIGHT_CLASS_DEVICE=y
+ CONFIG_BACKLIGHT_PWM=y
+-CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_LOGO=y
+ CONFIG_SOUND=y
+ CONFIG_SND=y
+@@ -163,6 +160,10 @@ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_CODEPAGE_850=y
+ CONFIG_NLS_ISO8859_1=y
+ CONFIG_NLS_ISO8859_15=y
++CONFIG_CRYPTO_DEV_MXS_DCP=y
++CONFIG_CRC_ITU_T=m
++CONFIG_CRC7=m
++CONFIG_FONTS=y
+ CONFIG_PRINTK_TIME=y
+ CONFIG_DEBUG_INFO=y
+ CONFIG_FRAME_WARN=2048
+@@ -174,7 +175,3 @@ CONFIG_PROVE_LOCKING=y
+ CONFIG_BLK_DEV_IO_TRACE=y
+ CONFIG_STRICT_DEVMEM=y
+ CONFIG_DEBUG_USER=y
+-CONFIG_CRYPTO_DEV_MXS_DCP=y
+-CONFIG_CRC_ITU_T=m
+-CONFIG_CRC7=m
+-CONFIG_FONTS=y
+-- 
+2.7.4
