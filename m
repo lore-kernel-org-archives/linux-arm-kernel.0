@@ -1,47 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 31 Aug 2018 20:29:29 +0200
-Subject: [PATCH 11/15] soc: octeontx2: Add Marvell OcteonTX2 CGX driver
-In-Reply-To: <CA+sq2CfL-eBWPcu1H9UkvKuL4kPeKnL1qkiG0tLZa_GW8LEqXA@mail.gmail.com>
-References: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
- <1535453838-12154-12-git-send-email-sunil.kovvuri@gmail.com>
- <CAK8P3a0q0P-FuG6cTgMNkeZbtXE4pMk1iJq36_x20WRddtwaDg@mail.gmail.com>
- <CA+sq2Cc1CSKmuEjKt8psR7Zyv9PzLkN10hzy8mrai136SF4-qA@mail.gmail.com>
- <CAK8P3a2CMcYg6vMmRAc4N80BpFwczGiPnaLNCDZYXCsRydtPQw@mail.gmail.com>
- <CA+sq2Ce3ew0X+RMm7fQ+iUZF0HKptzBr1dBk3NuRL8o82wBTjg@mail.gmail.com>
- <CAK8P3a1oeOFVYc2xH+KO1gV0m9utHziGpNtQLAEv-RBxKkB7Og@mail.gmail.com>
- <CA+sq2CfAvasZoNmnNQadhdsEz-eyXQPBtXbDmvt1nM0DQsm+8g@mail.gmail.com>
- <CAK8P3a0wdXRmZOw+yyws00GU=xYAFkGm81xKTF3-DjNmjjZH5g@mail.gmail.com>
- <CA+sq2CfL-eBWPcu1H9UkvKuL4kPeKnL1qkiG0tLZa_GW8LEqXA@mail.gmail.com>
-Message-ID: <CAK8P3a0p2PdjVS+QVMtiYK+5=ToeLSfjvf5X85S0HK2Om4fZ1Q@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 31 Aug 2018 12:20:36 -0700
+Subject: [PATCH v3 0/3] ARM: NSP updates to support switch interrupts/SFP
+Message-ID: <20180831192039.11842-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2018 at 6:01 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
-> On Fri, Aug 31, 2018 at 7:50 PM Arnd Bergmann <arnd@arndb.de> wrote:
+Hi all,
 
->
-> Thanks for the suggestion, that does makes sense.
-> Actually i did thought about it, but i was skeptical if it would be
-> acceptable to make
-> a single module out of drivers registering for two different PCI devices.
+This patch series updates the ARM NSP DTS and BCM958625HR in order to
+support the SFP connected to port 5 on these reference boards.
 
-I don't think it matters much whether there is one module or two
-(others might have a strong opinion one way or the other).
+I will be submitting the functional changes to drivers/net/dsa/b53 once
+net-next opens back up, but this is largely independent from getting
+these 3 patches out.
 
-What is important though are these two points:
+Thank you
 
-- How to represent the two PCI devices to user space: You should only
-  have one interface to user space I think, and this should be similar
-  to how other drivers manage similar cases (I don't actually know what they
-  do, but I assume you've done some research here)
+Changes in v3:
 
-- How you connect find the pair of devices: Generally speaking while
-  the SoC might only have one of each, you shouldn't make that assumption
-  in the code, but instead have a reliable way of having one driver wait
-  for the other driver to finish probing so you can match the pair.
+- changes i2c controller node name from i2c to i2c (Ray)
+- updated binding patch to have bulleted reg-names and interrupt-names
+  (Rob)
 
-> Will wait for few more days for more feedback from anyone and port v2 series.
 
-Ok.
+Changes in v2:
 
-      Arnd
+- added missing managed = "in-band-status" property
+- reworded the commit message to explain the limitation of i2c-proc
+  is of 63 bytes per transfer, not 256 bytes
+
+Florian Fainelli (3):
+  ARM: dts: NSP: Enable SFP on bcm958625hr
+  dt-bindings: net: dsa: Document B53 SRAB interrupts and registers
+  ARM: dts: NSP: Wire up switch interrupts
+
+ .../devicetree/bindings/net/dsa/b53.txt       | 36 +++++++++++++++++++
+ arch/arm/boot/dts/bcm-nsp.dtsi                | 31 +++++++++++++++-
+ arch/arm/boot/dts/bcm958625hr.dts             | 26 ++++++++++++++
+ 3 files changed, 92 insertions(+), 1 deletion(-)
+
+-- 
+2.17.1
