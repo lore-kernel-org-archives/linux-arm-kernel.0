@@ -1,42 +1,70 @@
 From: mjourdan@baylibre.com (Maxime Jourdan)
-Date: Fri, 31 Aug 2018 10:52:04 +0200
-Subject: [PATCH 3/4] ARM64: dts: meson-gx: add vdec entry
+Date: Fri, 31 Aug 2018 10:52:05 +0200
+Subject: [PATCH 4/4] ARM64: dts: meson: add vdec entries
 In-Reply-To: <20180831085205.14760-1-mjourdan@baylibre.com>
 References: <20180831085205.14760-1-mjourdan@baylibre.com>
-Message-ID: <20180831085205.14760-4-mjourdan@baylibre.com>
+Message-ID: <20180831085205.14760-5-mjourdan@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the video decoder dts entry
+This enables the video decoder for gxbb, gxl and gxm chips
 
 Signed-off-by: Maxime Jourdan <mjourdan@baylibre.com>
 ---
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 11 +++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 11 +++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxm.dtsi  |  4 ++++
+ 3 files changed, 26 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-index 737b741df035..d9e0fea71dbe 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-@@ -410,6 +410,19 @@
- 			};
- 		};
- 
-+		vdec: video-decoder at c8820000 {
-+			compatible = "amlogic,gx-vdec";
-+			reg = <0x0 0xc8820000 0x0 0x10000>,
-+			      <0x0 0xc110a580 0x0 0xe4>;
-+			reg-names = "dos", "esparser";
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index 98cbba6809ca..daee53a755d7 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -774,3 +774,14 @@
+ 	compatible = "amlogic,meson-gxbb-vpu", "amlogic,meson-gx-vpu";
+ 	power-domains = <&pwrc_vpu>;
+ };
 +
-+			interrupts = <GIC_SPI 44 IRQ_TYPE_EDGE_RISING>,
-+				     <GIC_SPI 32 IRQ_TYPE_EDGE_RISING>;
++&vdec {
++	compatible = "amlogic,gxbb-vdec";
++	clocks = <&clkc CLKID_DOS_PARSER>,
++		 <&clkc CLKID_DOS>,
++		 <&clkc CLKID_VDEC_1>,
++		 <&clkc CLKID_VDEC_HEVC>;
++	clock-names = "dos_parser", "dos", "vdec_1", "vdec_hevc";
++	resets = <&reset RESET_PARSER>;
++	reset-names = "esparser";
++};
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+index c87a80e9bcc6..bfd65d1a8959 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+@@ -775,3 +775,14 @@
+ 	compatible = "amlogic,meson-gxl-vpu", "amlogic,meson-gx-vpu";
+ 	power-domains = <&pwrc_vpu>;
+ };
 +
-+			amlogic,ao-sysctrl = <&sysctrl_AO>;
-+			amlogic,canvas = <&canvas>;
-+		};
++&vdec {
++	compatible = "amlogic,gxl-vdec";
++	clocks = <&clkc CLKID_DOS_PARSER>,
++		 <&clkc CLKID_DOS>,
++		 <&clkc CLKID_VDEC_1>,
++		 <&clkc CLKID_VDEC_HEVC>;
++	clock-names = "dos_parser", "dos", "vdec_1", "vdec_hevc";
++	resets = <&reset RESET_PARSER>;
++	reset-names = "esparser";
++};
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxm.dtsi
+index 247888d68a3a..2f356495be5e 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxm.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxm.dtsi
+@@ -117,3 +117,7 @@
+ &dwc3 {
+ 	phys = <&usb3_phy>, <&usb2_phy0>, <&usb2_phy1>, <&usb2_phy2>;
+ };
 +
- 		periphs: periphs at c8834000 {
- 			compatible = "simple-bus";
- 			reg = <0x0 0xc8834000 0x0 0x2000>;
++&vdec {
++	compatible = "amlogic,gxm-vdec";
++};
 -- 
 2.18.0
