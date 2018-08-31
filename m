@@ -1,130 +1,103 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Fri, 31 Aug 2018 14:33:22 -0700
-Subject: [PATCH 2/4] clock: aspeed: Setup video engine clocking
-In-Reply-To: <1535576973-8067-3-git-send-email-eajames@linux.vnet.ibm.com>
-References: <1535576973-8067-1-git-send-email-eajames@linux.vnet.ibm.com>
- <1535576973-8067-3-git-send-email-eajames@linux.vnet.ibm.com>
-Message-ID: <CACPK8Xe+aSgFvysXFJaGdSMjG4CsEL6-iy5d79ou1+VFTV_aQw@mail.gmail.com>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Fri, 31 Aug 2018 15:46:53 -0700
+Subject: [PATCH 1/3] ARM: dts: qcom: Add SPMI PMIC Arbiter nodes for
+ APQ8084 and MSM8974
+In-Reply-To: <1422965880-11047-2-git-send-email-iivanov@mm-sol.com>
+References: <1422965880-11047-1-git-send-email-iivanov@mm-sol.com>
+ <1422965880-11047-2-git-send-email-iivanov@mm-sol.com>
+Message-ID: <550311ad-8f93-3e80-9706-1321482b8c19@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 Aug 2018 at 14:09, Eddie James <eajames@linux.vnet.ibm.com> wrote:
->
-> Add the video engine reset bit. Add eclk mux and clock divider table.
->
-> Signed-off-by: Eddie James <eajames@linux.vnet.ibm.com>
+Hi Ivan,
 
-I'm travelling this week, so I'll be able to take a closer look next week.
 
-At a glance it looks okay.
-
-Cheers,
-
-Joel
-
+On 02/03/15 04:17, Ivan T. Ivanov wrote:
+> Add SPMI PMIC Arbiter configuration nodes for APQ8084 and MSM8974.
+> 
+> Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
 > ---
->  drivers/clk/clk-aspeed.c | 41 +++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 39 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/clk/clk-aspeed.c b/drivers/clk/clk-aspeed.c
-> index 5961367..f16ce7d 100644
-> --- a/drivers/clk/clk-aspeed.c
-> +++ b/drivers/clk/clk-aspeed.c
-> @@ -87,7 +87,7 @@ struct aspeed_clk_gate {
->  /* TODO: ask Aspeed about the actual parent data */
->  static const struct aspeed_gate_data aspeed_gates[] = {
->         /*                               clk rst   name                 parent  flags */
-> -       [ASPEED_CLK_GATE_ECLK] =        {  0, -1, "eclk-gate",          "eclk", 0 }, /* Video Engine */
-> +       [ASPEED_CLK_GATE_ECLK] =        {  0,  6, "eclk-gate",          "eclk", 0 }, /* Video Engine */
->         [ASPEED_CLK_GATE_GCLK] =        {  1,  7, "gclk-gate",          NULL,   0 }, /* 2D engine */
->         [ASPEED_CLK_GATE_MCLK] =        {  2, -1, "mclk-gate",          "mpll", CLK_IS_CRITICAL }, /* SDRAM */
->         [ASPEED_CLK_GATE_VCLK] =        {  3,  6, "vclk-gate",          NULL,   0 }, /* Video Capture */
-> @@ -113,6 +113,24 @@ struct aspeed_clk_gate {
->         [ASPEED_CLK_GATE_LHCCLK] =      { 28, -1, "lhclk-gate",         "lhclk", 0 }, /* LPC master/LPC+ */
->  };
->
-> +static const char * const eclk_parent_names[] = {
-> +       "mpll",
-> +       "hpll",
-> +       "dpll",
-> +};
+>  arch/arm/boot/dts/qcom-apq8084.dtsi | 16 ++++++++++++++++
+>  arch/arm/boot/dts/qcom-msm8974.dtsi | 16 ++++++++++++++++
+>  2 files changed, 32 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
+> index 1f130bc..dbedf64 100644
+> --- a/arch/arm/boot/dts/qcom-apq8084.dtsi
+> +++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
+> @@ -226,5 +226,21 @@
+>  			clock-names = "core", "iface";
+>  			status = "disabled";
+>  		};
 > +
-> +static const struct clk_div_table ast2500_eclk_div_table[] = {
-> +       { 0x0, 2 },
-> +       { 0x1, 2 },
-> +       { 0x2, 3 },
-> +       { 0x3, 4 },
-> +       { 0x4, 5 },
-> +       { 0x5, 6 },
-> +       { 0x6, 7 },
-> +       { 0x7, 8 },
-> +       { 0 }
-> +};
-> +
->  static const struct clk_div_table ast2500_mac_div_table[] = {
->         { 0x0, 4 }, /* Yep, really. Aspeed confirmed this is correct */
->         { 0x1, 4 },
-> @@ -192,18 +210,21 @@ static struct clk_hw *aspeed_ast2500_calc_pll(const char *name, u32 val)
->
->  struct aspeed_clk_soc_data {
->         const struct clk_div_table *div_table;
-> +       const struct clk_div_table *eclk_div_table;
->         const struct clk_div_table *mac_div_table;
->         struct clk_hw *(*calc_pll)(const char *name, u32 val);
+> +		spmi_bus: spmi at fc4cf000 {
+> +			compatible = "qcom,spmi-pmic-arb";
+> +			reg-names = "core", "intr", "cnfg";
+> +			reg = <0xfc4cf000 0x1000>,
+> +			      <0xfc4cb000 0x1000>,
+> +			      <0xfc4ca000 0x1000>;
+> +			interrupt-names = "periph_irq";
+> +			interrupts = <0 190 0>;> +			qcom,ee = <0>;
+> +			qcom,channel = <0>;
+> +			#address-cells = <2>;
+> +			#size-cells = <0>;
+> +			interrupt-controller;
+> +			#interrupt-cells = <4>;
+> +		};
+>  	};
 >  };
->
->  static const struct aspeed_clk_soc_data ast2500_data = {
->         .div_table = ast2500_div_table,
-> +       .eclk_div_table = ast2500_eclk_div_table,
->         .mac_div_table = ast2500_mac_div_table,
->         .calc_pll = aspeed_ast2500_calc_pll,
->  };
->
->  static const struct aspeed_clk_soc_data ast2400_data = {
->         .div_table = ast2400_div_table,
-> +       .eclk_div_table = ast2400_div_table,
->         .mac_div_table = ast2400_div_table,
->         .calc_pll = aspeed_ast2400_calc_pll,
->  };
-> @@ -317,6 +338,7 @@ struct aspeed_reset {
->         [ASPEED_RESET_PECI]     = 10,
->         [ASPEED_RESET_I2C]      =  2,
->         [ASPEED_RESET_AHB]      =  1,
-> +       [ASPEED_RESET_VIDEO]    =  6,
->
->         /*
->          * SCUD4 resets start at an offset to separate them from
-> @@ -522,6 +544,22 @@ static int aspeed_clk_probe(struct platform_device *pdev)
->                 return PTR_ERR(hw);
->         aspeed_clk_data->hws[ASPEED_CLK_24M] = hw;
->
-> +       hw = clk_hw_register_mux(dev, "eclk-mux", eclk_parent_names,
-> +                                ARRAY_SIZE(eclk_parent_names), 0,
-> +                                scu_base + ASPEED_CLK_SELECTION, 2, 0x3, 0,
-> +                                &aspeed_clk_lock);
-> +       if (IS_ERR(hw))
-> +               return PTR_ERR(hw);
-> +       aspeed_clk_data->hws[ASPEED_CLK_ECLK_MUX] = hw;
+> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+> index e265ec1..2d11641 100644
+> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
+> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+> @@ -247,5 +247,21 @@
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+>  		};
 > +
-> +       hw = clk_hw_register_divider_table(dev, "eclk", "eclk-mux", 0,
-> +                                          scu_base + ASPEED_CLK_SELECTION, 28,
-> +                                          3, 0, soc_data->eclk_div_table,
-> +                                          &aspeed_clk_lock);
-> +       if (IS_ERR(hw))
-> +               return PTR_ERR(hw);
-> +       aspeed_clk_data->hws[ASPEED_CLK_ECLK] = hw;
-> +
->         /*
->          * TODO: There are a number of clocks that not included in this driver
->          * as more information is required:
-> @@ -531,7 +569,6 @@ static int aspeed_clk_probe(struct platform_device *pdev)
->          *   RGMII
->          *   RMII
->          *   UART[1..5] clock source mux
-> -        *   Video Engine (ECLK) mux and clock divider
->          */
->
->         for (i = 0; i < ARRAY_SIZE(aspeed_gates); i++) {
+> +		spmi_bus: spmi at fc4cf000 {
+> +			compatible = "qcom,spmi-pmic-arb";
+> +			reg-names = "core", "intr", "cnfg";
+> +			reg = <0xfc4cf000 0x1000>,
+> +			      <0xfc4cb000 0x1000>,
+> +			      <0xfc4ca000 0x1000>;
+> +			interrupt-names = "periph_irq";
+
+> +			interrupts = <0 190 0>;
+
+The final value in this interrupts property means IRQ_TYPE_NONE.
+
+A WARN_ON() was added early this year to complain about use of
+IRQ_TYPE_NONE: 83a86fbb5b56 "irqchip/gic: Loudly complain about
+the use of IRQ_TYPE_NONE", resulting in many warnings spewing
+forth when I boot an APQ8074 Dragonboard.  I am trying to
+determine whether the warning is overly aggressive, or whether
+the IRQ TYPE is incorrectly specified for the spmi node.
+
+The interrupt-parent for the spmi node is intc: interrupt-controller at f9000000,
+which has compatible = "qcom,msm-qgic2".  I do not know the architecture
+or implementation of this interrupt controller.  Is an IRQ_TYPE_NONE
+valid in this case, or should a specific type be provided?
+
+Thanks!
+
+-Frank
+
+
+> +			qcom,ee = <0>;
+> +			qcom,channel = <0>;
+> +			#address-cells = <2>;
+> +			#size-cells = <0>;
+> +			interrupt-controller;
+> +			#interrupt-cells = <4>;
+> +		};
+>  	};
+>  };
 > --
-> 1.8.3.1
->
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
