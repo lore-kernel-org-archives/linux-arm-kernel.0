@@ -1,56 +1,55 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Sat, 1 Sep 2018 00:05:10 +0530
-Subject: [PATCH 11/15] soc: octeontx2: Add Marvell OcteonTX2 CGX driver
-In-Reply-To: <CAK8P3a0p2PdjVS+QVMtiYK+5=ToeLSfjvf5X85S0HK2Om4fZ1Q@mail.gmail.com>
-References: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
- <1535453838-12154-12-git-send-email-sunil.kovvuri@gmail.com>
- <CAK8P3a0q0P-FuG6cTgMNkeZbtXE4pMk1iJq36_x20WRddtwaDg@mail.gmail.com>
- <CA+sq2Cc1CSKmuEjKt8psR7Zyv9PzLkN10hzy8mrai136SF4-qA@mail.gmail.com>
- <CAK8P3a2CMcYg6vMmRAc4N80BpFwczGiPnaLNCDZYXCsRydtPQw@mail.gmail.com>
- <CA+sq2Ce3ew0X+RMm7fQ+iUZF0HKptzBr1dBk3NuRL8o82wBTjg@mail.gmail.com>
- <CAK8P3a1oeOFVYc2xH+KO1gV0m9utHziGpNtQLAEv-RBxKkB7Og@mail.gmail.com>
- <CA+sq2CfAvasZoNmnNQadhdsEz-eyXQPBtXbDmvt1nM0DQsm+8g@mail.gmail.com>
- <CAK8P3a0wdXRmZOw+yyws00GU=xYAFkGm81xKTF3-DjNmjjZH5g@mail.gmail.com>
- <CA+sq2CfL-eBWPcu1H9UkvKuL4kPeKnL1qkiG0tLZa_GW8LEqXA@mail.gmail.com>
- <CAK8P3a0p2PdjVS+QVMtiYK+5=ToeLSfjvf5X85S0HK2Om4fZ1Q@mail.gmail.com>
-Message-ID: <CA+sq2Cc_fdTjSJx1BdietRThfK=gn3Sy__=K4iQNQDCBTa+JyA@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 1 Sep 2018 06:37:34 +0800
+Subject: [PATCH 2/4] media: meson: add v4l2 m2m video decoder driver
+In-Reply-To: <20180831085205.14760-3-mjourdan@baylibre.com>
+References: <20180831085205.14760-3-mjourdan@baylibre.com>
+Message-ID: <201809010545.xve78pjt%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2018 at 11:59 PM Arnd Bergmann <arnd@arndb.de> wrote:
->
-> On Fri, Aug 31, 2018 at 6:01 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
-> > On Fri, Aug 31, 2018 at 7:50 PM Arnd Bergmann <arnd@arndb.de> wrote:
->
-> >
-> > Thanks for the suggestion, that does makes sense.
-> > Actually i did thought about it, but i was skeptical if it would be
-> > acceptable to make
-> > a single module out of drivers registering for two different PCI devices.
->
-> I don't think it matters much whether there is one module or two
-> (others might have a strong opinion one way or the other).
->
-> What is important though are these two points:
->
-> - How to represent the two PCI devices to user space: You should only
->   have one interface to user space I think, and this should be similar
->   to how other drivers manage similar cases (I don't actually know what they
->   do, but I assume you've done some research here)
->
-> - How you connect find the pair of devices: Generally speaking while
->   the SoC might only have one of each, you shouldn't make that assumption
->   in the code, but instead have a reliable way of having one driver wait
->   for the other driver to finish probing so you can match the pair.
->
+Hi Maxime,
 
-Agreed.
-I do have a patch in works for that, i.e to defer AF driver probe till
-CGX driver is loaded.
-https://github.com/sunilkovvuri/rvu_drivers/commit/27b449087c16224a9e93dd91d6d9f734b5210bed
+Thank you for the patch! Yet something to improve:
 
-> > Will wait for few more days for more feedback from anyone and port v2 series.
->
-> Ok.
->
->       Arnd
+[auto build test ERROR on linuxtv-media/master]
+[also build test ERROR on v4.19-rc1 next-20180831]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Maxime-Jourdan/Add-Amlogic-video-decoder-driver/20180901-033653
+base:   git://linuxtv.org/media_tree.git master
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-16) 7.3.0
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
+
+All errors (new ones prefixed by >>):
+
+   In file included from drivers/media/platform/meson/vdec/esparser.h:10:0,
+                    from drivers/media/platform/meson/vdec/esparser.c:21:
+>> drivers/media/platform/meson/vdec/vdec.h:18:10: fatal error: linux/soc/amlogic/meson-canvas.h: No such file or directory
+    #include <linux/soc/amlogic/meson-canvas.h>
+             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   compilation terminated.
+
+vim +18 drivers/media/platform/meson/vdec/vdec.h
+
+    12	
+    13	#include <linux/regmap.h>
+    14	#include <linux/list.h>
+    15	#include <media/videobuf2-v4l2.h>
+    16	#include <media/v4l2-ctrls.h>
+    17	#include <media/v4l2-device.h>
+  > 18	#include <linux/soc/amlogic/meson-canvas.h>
+    19	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 65146 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180901/69109668/attachment-0001.gz>
