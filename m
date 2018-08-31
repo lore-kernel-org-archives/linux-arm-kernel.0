@@ -1,37 +1,31 @@
-From: andi@etezian.org (Andi Shyti)
-Date: Fri, 31 Aug 2018 13:40:48 +0300
-Subject: [PATCH v3] dt-bindings: arm: Explicitly mark Samsung Exynos SoC
- as unstable
-In-Reply-To: <20180830180205.18121-1-krzk@kernel.org>
-References: <20180830180205.18121-1-krzk@kernel.org>
-Message-ID: <20180831104048.GA6545@jack.zhora.eu>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 31 Aug 2018 12:49:45 +0200
+Subject: [PATCH 00/12] Avoid synchronous TLB invalidation for
+ intermediate page-table entries on arm64
+In-Reply-To: <20180831203234.7b8f4d13@roar.ozlabs.ibm.com>
+References: <1535645747-9823-1-git-send-email-will.deacon@arm.com>
+ <CA+55aFzMMU5RBhn52Lbzf-FXvx3inh5VPVZL613srY+dVU+Lxw@mail.gmail.com>
+ <20180831110054.475a3534@roar.ozlabs.ibm.com>
+ <CA+55aFyweLwdAeeLnPv1ceje2y9Qc2AkM+LdMzK_z29fFb96ug@mail.gmail.com>
+ <20180831095417.GF13166@arm.com>
+ <20180831101014.GG24124@hirez.programming.kicks-ass.net>
+ <20180831203234.7b8f4d13@roar.ozlabs.ibm.com>
+Message-ID: <20180831104945.GI24124@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+On Fri, Aug 31, 2018 at 08:32:34PM +1000, Nicholas Piggin wrote:
+> Oh gee, I suppose. powerpc hash is kind of interesting because it's
+> crazy, Aneesh knows that code a lot better than I do. radix modulo
+> some minor details of exact instructions is fairly like x86 
 
-On Thu, Aug 30, 2018 at 08:02:05PM +0200, Krzysztof Kozlowski wrote:
-> Samsung Exynos SoCs and boards related bindings evolved since the initial
-> introduction, but initially the bindings were minimal and a bit incomplete
-> (they never described all the hardware modules available in the SoCs).
-> Since then some significant (not fully compatible) changes have been
-> already committed a few times (like gpio replaced by pinctrl, display ddc,
-> mfc reserved memory, some core clocks added to various hardware modules,
-> added more required nodes).
-> 
-> On the other side there are no boards which have device tree embedded in
-> the bootloader. Device tree blob is always compiled from the kernel tree
-> and updated together with the kernel image.
-> 
-> Thus to avoid further adding a bunch of workarounds for old/missing
-> bindings, make development of new platforms easier and allow to make
-> cleanup of the existing code and device tree files, lets mark some
-> Samsung Exynos SoC platform bindings as unstable. This means that
-> bindings can may change at any time and users should use the dtb file
-           ^^^^^^^
-you have a typo here, other than that I agree with the patch:
+The whole TLB broadcast vs explicit IPIs is a fairly big difference in
+my book.
 
-Acked-by: Andi Shyti <andi@etezian.org>
+Anyway, have you guys tried the explicit IPI approach? Depending on how
+IPIs are routed vs broadcasts it might save a little bus traffic. No
+point in getting all CPUs to process the TLBI when there's only a hand
+full that really need it.
 
-Thanks,
-Andi
+OTOH, I suppose the broadcast thing has been optimized to death on the
+hardware side, so who knows..
