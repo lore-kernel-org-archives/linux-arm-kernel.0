@@ -1,22 +1,36 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 31 Aug 2018 15:47:42 +0300
-Subject: [PATCHv2 0/4] ARM build infra changes to support building .dtbos
-Message-ID: <1535719666-13595-1-git-send-email-t-kristo@ti.com>
+Date: Fri, 31 Aug 2018 15:47:43 +0300
+Subject: [PATCHv2 1/4] ARM: dts: add support for building DT overlays
+In-Reply-To: <1535719666-13595-1-git-send-email-t-kristo@ti.com>
+References: <1535719666-13595-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1535719666-13595-2-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add simple support for building DT overlays. This just compiles any
+given .dtso file under the base arch/arm/boot/dts directory into
+a .dtbo.
 
-This v2 is just a split of the v1 series, adding support for building
-DT overlays to ARM build infra. The series also adds support for
-individual Makefiles under boot/dts hierarchy, so that per-dir
-flags or rules can be introduced (patch #2, #4.)
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ arch/arm/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Depends on the kbuild change for adding support for building .dtbo files [1].
-
-[1] https://marc.info/?l=linux-arm-kernel&m=153571933518229&w=2
-
--Tero
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index d1516f8..ab555a0 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -339,7 +339,7 @@ $(BOOT_TARGETS): vmlinux
+ $(INSTALL_TARGETS):
+ 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
+ 
+-%.dtb: | scripts
++%.dtb %.dtbo: | scripts
+ 	$(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) $(boot)/dts/$@
+ 
+ PHONY += dtbs dtbs_install
+-- 
+1.9.1
 
 --
 Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
