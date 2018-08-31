@@ -1,67 +1,79 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Fri, 31 Aug 2018 22:55:25 +0530
-Subject: [PATCH 04/15] soc: octeontx2: Add mailbox support infra
-In-Reply-To: <CAK8P3a3q_rY6VHwX9xQ9VMNC_4EmJLKzzDPL28SE13qNHX7=aA@mail.gmail.com>
-References: <1535453838-12154-1-git-send-email-sunil.kovvuri@gmail.com>
- <1535453838-12154-5-git-send-email-sunil.kovvuri@gmail.com>
- <CAK8P3a2fgAVB0+uns9f5MH+2OyZbwvReo9j-=u3=30QoK=2Ksw@mail.gmail.com>
- <CA+sq2CeyQ8r7bj3vK=cfriif=HhUu36ZUPWqxXm1e0DktHG+Fg@mail.gmail.com>
- <CAK8P3a1CvX1V8h20s_=XUUYfR-zYNwETg5p6dCtpVUqZ89K-tg@mail.gmail.com>
- <CA+sq2Cdn6ut3kdTWoOgCayO2evQrD9TjBaUpVUR3_rWZFxYeig@mail.gmail.com>
- <CAK8P3a1W2D5YWEC-VDkvQ8y3W8257g6X7B8_At7g8f9iE73a8w@mail.gmail.com>
- <CA+sq2CfjJjswOwypNMtro+g8TeHGoBqAeKpFrf2ys-1=Xg+qHw@mail.gmail.com>
- <CAK8P3a3q_rY6VHwX9xQ9VMNC_4EmJLKzzDPL28SE13qNHX7=aA@mail.gmail.com>
-Message-ID: <CA+sq2CdrNDDhsfHoGiXzrJgfUXirEZjkxYcBOvi07jvJgtnnHQ@mail.gmail.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Fri, 31 Aug 2018 10:34:22 -0700
+Subject: [PATCH v3 5/5] clk: RK808: add RK809 and RK817 support.
+In-Reply-To: <1535081762-20844-1-git-send-email-tony.xie@rock-chips.com>
+References: <1535081441-20718-1-git-send-email-tony.xie@rock-chips.com>
+ <1535081762-20844-1-git-send-email-tony.xie@rock-chips.com>
+Message-ID: <153573686206.93865.11806745452503167124@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2018 at 7:46 PM Arnd Bergmann <arnd@arndb.de> wrote:
->
-> On Thu, Aug 30, 2018 at 8:37 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
-> > On Thu, Aug 30, 2018 at 7:27 PM Arnd Bergmann <arnd@arndb.de> wrote:
-> > > On Tue, Aug 28, 2018 at 3:23 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
-> > > > On Tue, Aug 28, 2018 at 6:22 PM Arnd Bergmann <arnd@arndb.de> wrote:
-> > > > > On Tue, Aug 28, 2018 at 2:48 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
-> > > > Any PCI device here irrespective in what domain (kernel or userspace)
-> > > > they are in
-> > > > use common mailbox communication. Which is
-> > > > # Write a mailbox msg (format is agreed between all parties) into
-> > > > shared (between AF and other PF/VFs)
-> > > >    memory region and trigger a interrupt to admin function.
-> > > > # Admin function processes the msg and puts reply in the same memory
-> > > > region and trigger
-> > > >    IRQ to the requesting device. If the device has a driver instance
-> > > > in kernel then it uses
-> > > >    IRQ and userspace applications does polling on the IRQ status bit.
-> > >
-> > > What is the purpose of the exported interface then? Is this
-> > > just an abstraction so each of the drivers can talk to its own
-> > > mailbox using a set of common helper functions?
-> > >
-> >
-> > Yes, that's correct.
-> >
-> > In kernel there will be a minimum of 3 drivers which will use this
-> > mailbox communication.
-> > So instead of duplicating APIs and structures in every driver, we
-> > thought of adding them in this AF driver and export them to ethernet
-> > and crypto drivers.
->
-> Ok. My feeling is then that the API is fine, but that it should not
-> be part of the AF module but rather be a standalone module.
->
-> My comment about the generic mailbox API no longer applies
-> here: you don't have a single shared mailbox hardware interface,
-> but each device has its own mailbox register set, so there
-> is no point in setting up a separate device for it, but I see
-> no need for creating an artificial dependency on the AF
-> driver. E.g. in a virtual machine that only has one ethernet
-> interface, you otherwise wouldn't load that driver, right?
->
->          Arnd
+Quoting Tony Xie (2018-08-23 20:36:02)
+> diff --git a/drivers/clk/clk-rk808.c b/drivers/clk/clk-rk808.c
+> index 6461f28..c5d3492 100644
+> --- a/drivers/clk/clk-rk808.c
+> +++ b/drivers/clk/clk-rk808.c
+> @@ -96,6 +96,66 @@ static int rk808_clkout2_is_prepared(struct clk_hw *hw)
+> +
+> +static int rk817_clkout2_is_prepared(struct clk_hw *hw)
+> +{
+> +       struct rk808_clkout *rk808_clkout = container_of(hw,
+> +                                                        struct rk808_clkout,
+> +                                                        clkout2_hw);
+> +       struct rk808 *rk808 = rk808_clkout->rk808;
+> +       unsigned int val;
+> +
+> +       int ret = regmap_read(rk808->regmap, RK817_SYS_CFG(1), &val);
+> +
+> +       if (ret < 0)
+> +               return ret;
 
-Good point, thanks for catching this.
-Will look into this and post a v2 series.
+The clk core handles the return value here as true or false. Probably
+should return 0 here.
 
-Thanks,
-Sunil.
+> +
+> +       return (val & RK817_CLK32KOUT2_EN) ? 1 : 0;
+> +}
+> +
+> +static const struct clk_ops rk817_clkout2_ops = {
+> +       .prepare = rk817_clkout2_prepare,
+> +       .unprepare = rk817_clkout2_unprepare,
+> +       .is_prepared = rk817_clkout2_is_prepared,
+> +       .recalc_rate = rk808_clkout_recalc_rate,
+> +};
+> +
+> +static const struct clk_ops *rkpmic_get_ops(long variant)
+
+Use the enum here for 'variant'? Then the case statement here will
+complain loudly for unhandled cases.
+
+> +{
+> +       switch (variant) {
+> +       case RK809_ID:
+> +       case RK817_ID:
+> +               return &rk817_clkout2_ops;
+> +       case RK805_ID:
+> +       case RK808_ID:
+> +       case RK818_ID:
+> +               return &rk808_clkout2_ops;
+> +       }
+> +
+> +       return &rk808_clkout2_ops;
+> +}
+> +
+>  static int rk808_clkout_probe(struct platform_device *pdev)
+>  {
+>         struct rk808 *rk808 = dev_get_drvdata(pdev->dev.parent);
+> @@ -127,7 +187,7 @@ static int rk808_clkout_probe(struct platform_device *pdev)
+>                 return ret;
+>  
+>         init.name = "rk808-clkout2";
+> -       init.ops = &rk808_clkout2_ops;
+> +       init.ops = rkpmic_get_ops(rk808->variant);
+>         rk808_clkout->clkout2_hw.init = &init;
+>  
+>         /* optional override of the clockname */
+> -- 
+> 1.9.1
+> 
+> 
