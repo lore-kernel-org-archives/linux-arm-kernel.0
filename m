@@ -1,45 +1,72 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Fri, 31 Aug 2018 11:13:23 +0200
-Subject: [PATCH 00/11] MAINTAINERS: update of of some Microchip entries
-In-Reply-To: <cover.1535552609.git.nicolas.ferre@microchip.com>
-References: <cover.1535552609.git.nicolas.ferre@microchip.com>
-Message-ID: <20180831091323.GM16561@piout.net>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 31 Aug 2018 11:14:05 +0200
+Subject: [PATCH v3 25/30] ARM: dts: sun8i: h3: add thermal zone to H3
+In-Reply-To: <20180830154518.29507-26-embed3d@gmail.com>
+References: <20180830154518.29507-1-embed3d@gmail.com>
+ <20180830154518.29507-26-embed3d@gmail.com>
+Message-ID: <20180831091405.qr5daepgmx3otq7m@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/08/2018 16:31:36+0200, Nicolas Ferre wrote:
-> Hi,
+On Thu, Aug 30, 2018 at 05:45:13PM +0200, Philipp Rossak wrote:
+> This patch adds the thermal zones to the H3. We have only one sensor and
+> that is placed in the cpu.
 > 
-> This is an update of most of Microchip MAINTAINERS' entries. I took advantage
-> of the addition of Ludovic as co-maintainer to go through some of the entries
-> that were outdated.
+> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+> ---
+>  arch/arm/boot/dts/sun8i-h3.dtsi    | 31 +++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/sunxi-h3-h5.dtsi |  1 +
+>  2 files changed, 32 insertions(+)
 > 
-> There are moves of entries in the 3 last patches of this series. You can drop
-> them if they introduce too much headaches while updating this MAINTAINERS
-> file.
-> 
-> Series based on v4.19-rc1.
-> 
-> Nicolas Ferre (11):
->   MAINTAINERS: ARM: at91: add co-maintainer for ARM/Microchip
->   MAINTAINERS: update entry for Microchip NAND driver support
->   MAINTAINERS: media: change Microchip ISI, ISC maintainers
->   MAINTAINERS: ASoC: change maintainer for Microchip ALSA drivers
->   MAINTAINERS: USB: change maintainer for Microchip USBA gadget driver
->   MAINTAINERS: dmaengine: add files to Microchip dma entry
->   MAINTAINERS: pwm: add entry for Microchip pwm driver
->   MAINTAINERS: iio: add co-maintainer to SAMA5D2-compatible ADC driver
->   MAINTAINERS: remove the / ATMEL string from MICROCHIP entries
->   MAINTAINERS: move former ATMEL entries to proper MICROCHIP location
->   MAINTAINERS: sdhci: move the Microchip entry to proper location
-> 
->  MAINTAINERS | 196 ++++++++++++++++++++++++++++------------------------
->  1 file changed, 105 insertions(+), 91 deletions(-)
-> 
+> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+> index 5b7994cb1471..954848d5df50 100644
+> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+> @@ -78,6 +78,8 @@
+>  			clock-names = "cpu";
+>  			operating-points-v2 = <&cpu0_opp_table>;
+>  			#cooling-cells = <2>;
+> +			cooling-min-level = <0>;
+> +			cooling-max-level = <15>;
+>  		};
+>  
+>  		cpu at 1 {
+> @@ -102,6 +104,35 @@
+>  		};
+>  	};
+>  
+> +	thermal-zones {
+> +		cpu-thermal {
+> +			/* milliseconds */
+> +			polling-delay-passive = <250>;
+> +			polling-delay = <1000>;
+> +			thermal-sensors = <&ths>;
+> +
+> +			trips {
+> +				cpu_hot_trip: cpu-warm {
+> +					temperature = <65000>;
+> +					hysteresis = <2000>;
+> +					type = "passive";
+> +				};
+> +				cpu_very_hot_trip: cpu-very-hot {
+> +					temperature = <90000>;
+> +					hysteresis = <2000>;
+> +					type = "critical";
+> +				};
+> +			};
 
-All applied now.
+Where are those trip points coming from?
+
+Maxime
 
 -- 
-Alexandre Belloni, Bootlin
+Maxime Ripard, Bootlin
 Embedded Linux and Kernel engineering
 https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180831/8d9a39ee/attachment.sig>
