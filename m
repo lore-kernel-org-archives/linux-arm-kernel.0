@@ -1,107 +1,158 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Fri, 31 Aug 2018 11:01:26 +0200
-Subject: [PATCH v2 02/12] fbdev: allow apertures == NULL in
- remove_conflicting_framebuffers()
-In-Reply-To: <20180831085656.GR21634@phenom.ffwll.local>
-References: <cover.1535656077.git.mirq-linux@rere.qmqm.pl>
- <7e3a48e397298b38d7ddc7f45d48226d1f5db3e4.1535656077.git.mirq-linux@rere.qmqm.pl>
- <20180831085656.GR21634@phenom.ffwll.local>
-Message-ID: <20180831090126.GS21634@phenom.ffwll.local>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 31 Aug 2018 11:03:07 +0200
+Subject: [PATCH v3 17/30] iio: adc: sun4i-gpadc-iio: rework: support
+ clocks and reset
+In-Reply-To: <20180830154518.29507-18-embed3d@gmail.com>
+References: <20180830154518.29507-1-embed3d@gmail.com>
+ <20180830154518.29507-18-embed3d@gmail.com>
+Message-ID: <20180831090307.v3bp445sgugquh6f@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2018 at 10:56:56AM +0200, Daniel Vetter wrote:
-> On Thu, Aug 30, 2018 at 11:00:05PM +0200, Micha? Miros?aw wrote:
-> > Interpret (otherwise-invalid) NULL apertures argument to mean all-memory
-> > range. This will allow to remove several duplicates of this code from
-> > drivers in following patches.
-> > 
-> > Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
-> > [for v1]
-> > Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > 
-> > ---
-> > v2: added kerneldoc to corresponding DRM helper
-> > ---
-> >  drivers/video/fbdev/core/fbmem.c | 14 ++++++++++++++
-> >  include/drm/drm_fb_helper.h      | 10 ++++++++++
-> >  2 files changed, 24 insertions(+)
-> > 
-> > diff --git a/drivers/video/fbdev/core/fbmem.c b/drivers/video/fbdev/core/fbmem.c
-> > index 30a18d4c9de4..0df148eb4699 100644
-> > --- a/drivers/video/fbdev/core/fbmem.c
-> > +++ b/drivers/video/fbdev/core/fbmem.c
-> > @@ -1779,11 +1779,25 @@ int remove_conflicting_framebuffers(struct apertures_struct *a,
-> >  				    const char *name, bool primary)
-> >  {
-> >  	int ret;
-> > +	bool do_free = false;
-> > +
-> > +	if (!a) {
-> > +		a = alloc_apertures(1);
-> > +		if (!a)
-> > +			return -ENOMEM;
-> > +
-> > +		a->ranges[0].base = 0;
-> > +		a->ranges[0].size = ~0;
-> > +		do_free = true;
-> > +	}
-> >  
-> >  	mutex_lock(&registration_lock);
-> >  	ret = do_remove_conflicting_framebuffers(a, name, primary);
-> >  	mutex_unlock(&registration_lock);
-> >  
-> > +	if (do_free)
-> > +		kfree(a);
-> > +
-> >  	return ret;
-> >  }
-> >  EXPORT_SYMBOL(remove_conflicting_framebuffers);
-> > diff --git a/include/drm/drm_fb_helper.h b/include/drm/drm_fb_helper.h
-> > index b069433e7fc1..1c1e53abb25d 100644
-> > --- a/include/drm/drm_fb_helper.h
-> > +++ b/include/drm/drm_fb_helper.h
-> > @@ -566,6 +566,16 @@ static inline void drm_fb_helper_output_poll_changed(struct drm_device *dev)
-> >  
-> >  #endif
-> >  
-> > +/**
-> > + * drm_fb_helper_remove_conflicting_framebuffers - remove firmware framebuffers
-> > + * @a: memory range, users of which are to be removed
-> > + * @name: requesting driver name
-> > + * @primary: also kick vga16fb if present
-> > + *
-> > + * This function removes framebuffer devices (eg. initialized by firmware)
-> > + * which use memory range described by @a. If @a is NULL all such devices are
-> > + * removed.
-> > + */
+On Thu, Aug 30, 2018 at 05:45:05PM +0200, Philipp Rossak wrote:
+> For adding newer sensor some basic rework of the code is necessary.
 > 
-> This looks like misplaced copypasta. You only need this once I think.
-
-Ah no, just a fixup for the lack of kerneldoc we have. Can you pls split
-this out into a separate patch?
-
-Thanks, Daniel
-
-> -Daniel
+> The SoCs after H3 has newer thermal sensor ADCs, which have two clock
+> inputs (bus clock and sampling clock) and a reset. The registers are
+> also re-arranged.
 > 
-> >  static inline int
-> >  drm_fb_helper_remove_conflicting_framebuffers(struct apertures_struct *a,
-> >  					      const char *name, bool primary)
-> > -- 
-> > 2.18.0
-> > 
-> > _______________________________________________
-> > dri-devel mailing list
-> > dri-devel at lists.freedesktop.org
-> > https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> This commit reworks the code, adds the process of the clocks and resets.
 > 
-> -- 
-> Daniel Vetter
-> Software Engineer, Intel Corporation
-> http://blog.ffwll.ch
+> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+> ---
+>  drivers/iio/adc/sun4i-gpadc-iio.c | 72 +++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 70 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
+> index c278e165e161..c12de48c4e86 100644
+> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
+> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
+> @@ -22,6 +22,7 @@
+>   * shutdown for not being used.
+>   */
+>  
+> +#include <linux/clk.h>
+>  #include <linux/completion.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/io.h>
+> @@ -31,6 +32,7 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/regmap.h>
+> +#include <linux/reset.h>
+>  #include <linux/thermal.h>
+>  #include <linux/delay.h>
+>  
+> @@ -63,6 +65,9 @@ struct gpadc_data {
+>  	int		(*ths_suspend)(struct sun4i_gpadc_iio *info);
+>  	int		(*ths_resume)(struct sun4i_gpadc_iio *info);
+>  	bool		support_irq;
+> +	bool		has_bus_clk;
+> +	bool		has_bus_rst;
+> +	bool		has_mod_clk;
+>  	u32		temp_data_base;
+>  };
+>  
+> @@ -127,6 +132,9 @@ struct sun4i_gpadc_iio {
+>  	struct mutex			mutex;
+>  	struct thermal_zone_device	*tzd;
+>  	struct device			*sensor_device;
+> +	struct clk			*bus_clk;
+> +	struct clk			*mod_clk;
+> +	struct reset_control		*reset;
+>  };
+>  
+>  static const struct iio_chan_spec sun4i_gpadc_channels[] = {
+> @@ -472,8 +480,13 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
+>  	if (IS_ERR(base))
+>  		return PTR_ERR(base);
+>  
+> -	info->regmap = devm_regmap_init_mmio(&pdev->dev, base,
+> -					     &sun4i_gpadc_regmap_config);
+> +	if (info->data->has_bus_clk)
+> +		info->regmap = devm_regmap_init_mmio_clk(&pdev->dev, "bus",
+> +				base, &sun4i_gpadc_regmap_config);
+> +	else
+> +		info->regmap = devm_regmap_init_mmio(&pdev->dev, base,
+> +				&sun4i_gpadc_regmap_config);
+> +
+>  	if (IS_ERR(info->regmap)) {
+>  		ret = PTR_ERR(info->regmap);
+>  		dev_err(&pdev->dev, "failed to init regmap: %d\n", ret);
+> @@ -498,9 +511,58 @@ static int sun4i_gpadc_probe_dt(struct platform_device *pdev,
+>  		}
+>  	}
+>  
+> +	if (info->data->has_bus_rst) {
+> +		info->reset = devm_reset_control_get(&pdev->dev, NULL);
+> +		if (IS_ERR(info->reset)) {
+> +			ret = PTR_ERR(info->reset);
+> +			return ret;
+> +		}
+> +
+> +		ret = reset_control_deassert(info->reset);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+> +	if (info->data->has_bus_clk) {
+> +		info->bus_clk = devm_clk_get(&pdev->dev, "bus");
+> +		if (IS_ERR(info->bus_clk)) {
+> +			ret = PTR_ERR(info->bus_clk);
+> +			goto assert_reset;
+> +		}
+> +
+> +		ret = clk_prepare_enable(info->bus_clk);
+> +		if (ret)
+> +			goto assert_reset;
+
+That should be done in the runtime_resume hook
+
+> +	}
+> +
+> +	if (info->data->has_mod_clk) {
+> +		info->mod_clk = devm_clk_get(&pdev->dev, "mod");
+> +		if (IS_ERR(info->mod_clk)) {
+> +			ret = PTR_ERR(info->mod_clk);
+> +			goto disable_bus_clk;
+> +		}
+> +
+> +		/* Running at 4MHz */
+> +		ret = clk_set_rate(info->mod_clk, 4000000);
+> +		if (ret)
+> +			goto disable_bus_clk;
+
+Why?
+
+> +		ret = clk_prepare_enable(info->mod_clk);
+> +		if (ret)
+> +			goto disable_bus_clk;
+> +	}
+> +
+>  	info->sensor_device = &pdev->dev;
+>  
+>  	return 0;
+> +
+> +disable_bus_clk:
+> +	clk_disable_unprepare(info->bus_clk);
+> +
+> +assert_reset:
+> +	reset_control_assert(info->reset);
+
+You should check for the variables here before calling those
+functions, if you end up here with your variable not set, you'll have
+improper refcounting.
+
+Maxime
 
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180831/8743f680/attachment-0001.sig>
