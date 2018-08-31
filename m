@@ -1,45 +1,52 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 31 Aug 2018 23:30:48 +0900
-Subject: [PATCH 2/2] i2c: uniphier-f: issue STOP only for last message or
- I2C_M_STOP
-In-Reply-To: <1535725848-4076-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1535725848-4076-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1535725848-4076-2-git-send-email-yamada.masahiro@socionext.com>
+From: axboe@kernel.dk (Jens Axboe)
+Date: Fri, 31 Aug 2018 08:35:23 -0600
+Subject: [PATCH v4 00/13] ata: ahci_platform: support allwinner R40 AHCI
+In-Reply-To: <20180831074024.w7yicj5y4imy57e2@flea>
+References: <20180830190120.722-1-clabbe.montjoie@gmail.com>
+ <f5838eae-fa6c-8699-14a4-95d0daa8a960@kernel.dk>
+ <CAGb2v67miUjqeKeDh_E_XPee_0Hq1C6YrfXxsOp_=NtQY+LLmQ@mail.gmail.com>
+ <8fa866c5-6800-505f-53bc-5c1b27582ca6@kernel.dk>
+ <20180831074024.w7yicj5y4imy57e2@flea>
+Message-ID: <39f89b9d-f5bf-7c4a-8e68-252bfc0b91a4@kernel.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver currently emits a STOP if the next message is not
-I2C_MD_RD.  It should not do it because it disturbs the I2C_RDWR
-ioctl, where read/write transactions are combined without STOP
-between.
+On 8/31/18 1:40 AM, Maxime Ripard wrote:
+> Hi Jens,
+> 
+> On Thu, Aug 30, 2018 at 08:52:52PM -0600, Jens Axboe wrote:
+>> On 8/30/18 8:32 PM, Chen-Yu Tsai wrote:
+>>> Hi,
+>>>
+>>> On Fri, Aug 31, 2018 at 4:31 AM Jens Axboe <axboe@kernel.dk> wrote:
+>>>>
+>>>> On 8/30/18 1:01 PM, Corentin Labbe wrote:
+>>>>> Hello
+>>>>>
+>>>>> This patchset add support for allwinner R40 AHCI controller.
+>>>>>
+>>>>> The whole patchset is tested on sun8i-r40-bananapi-m2-ultra and
+>>>>> on sun7i-a20-cubieboard2 which doesnt have any of the ressources added
+>>>>> by this serie, so no regression should come with it.
+>>>>>
+>>>>> The last patch(ata: ahci_sunxi: remove PHY code) should not be merged,
+>>>>> but will be resent for inclustion when all patchs will have hit linus
+>>>>> tree.
+>>>>
+>>>> Applied 1-12 with Hans's blessing, thanks Corentin.
+>>>
+>>> Please don't merge device tree ("dts") patches, i.e. patches 9-12. We will
+>>> merge them through the sunxi / armsoc tree. Having them in separate trees
+>>> introduces conflicts when we have other stuff going through our tree.
+>>
+>> OK, fair enough, I can drop those.
+> 
+> And the DT bits actually have some issues that would need to change
+> the code significantly.
+> 
+> Can you drop all of them please?
 
-Issue STOP only when the message is the last one _or_ flagged with
-I2C_M_STOP.
+OK, can do. Corentin, please resend when everybody is happy with it.
 
-Fixes: 6a62974b667f ("i2c: uniphier_f: add UniPhier FIFO-builtin I2C driver")
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
-
- drivers/i2c/busses/i2c-uniphier-f.c | 7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/i2c/busses/i2c-uniphier-f.c b/drivers/i2c/busses/i2c-uniphier-f.c
-index 9918bdd..a403e85 100644
---- a/drivers/i2c/busses/i2c-uniphier-f.c
-+++ b/drivers/i2c/busses/i2c-uniphier-f.c
-@@ -401,11 +401,8 @@ static int uniphier_fi2c_master_xfer(struct i2c_adapter *adap,
- 		return ret;
- 
- 	for (msg = msgs; msg < emsg; msg++) {
--		/* If next message is read, skip the stop condition */
--		bool stop = !(msg + 1 < emsg && msg[1].flags & I2C_M_RD);
--		/* but, force it if I2C_M_STOP is set */
--		if (msg->flags & I2C_M_STOP)
--			stop = true;
-+		/* Emit STOP if it is the last message or I2C_M_STOP is set. */
-+		bool stop = (msg + 1 == emsg) || (msg->flags & I2C_M_STOP);
- 
- 		ret = uniphier_fi2c_master_xfer_one(adap, msg, stop);
- 		if (ret)
 -- 
-2.7.4
+Jens Axboe
