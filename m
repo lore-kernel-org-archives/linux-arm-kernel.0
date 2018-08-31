@@ -1,172 +1,144 @@
 From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Fri, 31 Aug 2018 17:01:49 +0300
-Subject: [PATCH v9 6/8] dt-bindings: interconnect: Document qcom,
- msm8916 NoC bindings
+Date: Fri, 31 Aug 2018 17:01:46 +0300
+Subject: [PATCH v9 3/8] interconnect: Allow endpoints translation via DT
 In-Reply-To: <20180831140151.13972-1-georgi.djakov@linaro.org>
 References: <20180831140151.13972-1-georgi.djakov@linaro.org>
-Message-ID: <20180831140151.13972-7-georgi.djakov@linaro.org>
+Message-ID: <20180831140151.13972-4-georgi.djakov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the device-tree bindings of the Network-On-Chip interconnect
-hardware found on Qualcomm msm8916 platforms.
+Currently we support only platform data for specifying the interconnect
+endpoints. As now the endpoints are hard-coded into the consumer driver
+this may lead to complications when a single driver is used by multiple
+SoCs, which may have different interconnect topology.
+To avoid cluttering the consumer drivers, introduce a translation function
+to help us get the board specific interconnect data from device-tree.
 
 Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+Reviewed-by: Evan Green <evgreen@chromium.org>
 ---
- .../bindings/interconnect/qcom-msm8916.txt    | 41 ++++++++
- include/dt-bindings/interconnect/qcom.h       | 98 +++++++++++++++++++
- 2 files changed, 139 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/interconnect/qcom-msm8916.txt
- create mode 100644 include/dt-bindings/interconnect/qcom.h
+ drivers/interconnect/core.c  | 78 ++++++++++++++++++++++++++++++++++++
+ include/linux/interconnect.h |  7 ++++
+ 2 files changed, 85 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/interconnect/qcom-msm8916.txt b/Documentation/devicetree/bindings/interconnect/qcom-msm8916.txt
-new file mode 100644
-index 000000000000..744df51df4ed
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interconnect/qcom-msm8916.txt
-@@ -0,0 +1,41 @@
-+Qualcomm MSM8916 Network-On-Chip interconnect driver binding
-+----------------------------------------------------
-+
-+Required properties :
-+- compatible : shall contain only one of the following:
-+			"qcom,msm8916-bimc"
-+			"qcom,msm8916-pnoc"
-+			"qcom,msm8916-snoc"
-+- #interconnect-cells : should contain 1
-+- reg : shall contain base register location and length
-+
-+Optional properties :
-+clocks : list of phandles and specifiers to all interconnect bus clocks
-+clock-names : clock names should include both "bus_clk" and "bus_a_clk"
-+
-+Examples:
-+
-+		snoc: snoc at 580000 {
-+			compatible = "qcom,msm8916-snoc";
-+			#interconnect-cells = <1>;
-+			reg = <0x580000 0x14000>;
-+			clock-names = "bus_clk", "bus_a_clk";
-+			clocks = <&rpmcc RPM_SMD_SNOC_CLK>,
-+				 <&rpmcc RPM_SMD_SNOC_A_CLK>;
-+		};
-+		bimc: bimc at 400000 {
-+			compatible = "qcom,msm8916-bimc";
-+			#interconnect-cells = <1>;
-+			reg = <0x400000 0x62000>;
-+			clock-names = "bus_clk", "bus_a_clk";
-+			clocks = <&rpmcc RPM_SMD_BIMC_CLK>,
-+				 <&rpmcc RPM_SMD_BIMC_A_CLK>;
-+		};
-+		pnoc: pnoc at 500000 {
-+			compatible = "qcom,msm8916-pnoc";
-+			#interconnect-cells = <1>;
-+			reg = <0x500000 0x11000>;
-+			clock-names = "bus_clk", "bus_a_clk";
-+			clocks = <&rpmcc RPM_SMD_PCNOC_CLK>,
-+				 <&rpmcc RPM_SMD_PCNOC_A_CLK>;
-+		};
-diff --git a/include/dt-bindings/interconnect/qcom.h b/include/dt-bindings/interconnect/qcom.h
-new file mode 100644
-index 000000000000..48f944b30e5d
---- /dev/null
-+++ b/include/dt-bindings/interconnect/qcom.h
-@@ -0,0 +1,98 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * Qualcomm interconnect IDs
+diff --git a/drivers/interconnect/core.c b/drivers/interconnect/core.c
+index 6d932245a610..ed0a6783ffc4 100644
+--- a/drivers/interconnect/core.c
++++ b/drivers/interconnect/core.c
+@@ -15,6 +15,7 @@
+ #include <linux/module.h>
+ #include <linux/mutex.h>
+ #include <linux/slab.h>
++#include <linux/of.h>
+ #include <linux/overflow.h>
+ 
+ static DEFINE_IDR(icc_idr);
+@@ -192,6 +193,83 @@ static int apply_constraints(struct icc_path *path)
+ 	return ret;
+ }
+ 
++/**
++ * of_icc_get() - get a path handle from a DT node based on name
++ * @dev: device pointer for the consumer device
++ * @name: interconnect path name
 + *
-+ * Copyright (c) 2018, Linaro Ltd.
-+ * Author: Georgi Djakov <georgi.djakov@linaro.org>
++ * This function will search for a path two endpoints and return an
++ * icc_path handle on success. Use icc_put() to release constraints when
++ * they are not needed anymore.
++ * If the interconnect API is disabled, NULL is returned and the consumer
++ * drivers will still build. Drivers are free to handle this specifically,
++ * but they don't have to. NULL is also returned when the "interconnects"
++ * DT property is missing.
++ *
++ * Return: icc_path pointer on success or ERR_PTR() on error. NULL is returned
++ * when the API is disabled or the "interconnects" DT property is missing.
 + */
++struct icc_path *of_icc_get(struct device *dev, const char *name)
++{
++	struct device_node *np = NULL;
++	struct of_phandle_args src_args, dst_args;
++	u32 src_id, dst_id;
++	int idx = 0;
++	int ret;
 +
-+#ifndef __DT_BINDINGS_INTERCONNECT_QCOM_H
-+#define __DT_BINDINGS_INTERCONNECT_QCOM_H
++	if (!dev || !dev->of_node)
++		return ERR_PTR(-ENODEV);
 +
-+#define BIMC_SNOC_MAS			1
-+#define BIMC_SNOC_SLV			2
-+#define MASTER_AMPSS_M0			3
-+#define MASTER_BLSP_1			4
-+#define MASTER_CRYPTO_CORE0		5
-+#define MASTER_DEHR			6
-+#define MASTER_GRAPHICS_3D		7
-+#define MASTER_JPEG			8
-+#define MASTER_LPASS			9
-+#define MASTER_MDP_PORT0		10
-+#define MASTER_QDSS_BAM			11
-+#define MASTER_QDSS_ETR			12
-+#define MASTER_SDCC_1			13
-+#define MASTER_SDCC_2			14
-+#define MASTER_SNOC_CFG			15
-+#define MASTER_SPDM			16
-+#define MASTER_TCU_0			17
-+#define MASTER_TCU_1			18
-+#define MASTER_USB_HS			19
-+#define MASTER_VFE			20
-+#define MASTER_VIDEO_P0			21
-+#define PNOC_INT_0			22
-+#define PNOC_INT_1			23
-+#define PNOC_M_0			24
-+#define PNOC_M_1			25
-+#define PNOC_SLV_0			26
-+#define PNOC_SLV_1			27
-+#define PNOC_SLV_2			28
-+#define PNOC_SLV_3			29
-+#define PNOC_SLV_4			30
-+#define PNOC_SLV_8			31
-+#define PNOC_SLV_9			32
-+#define PNOC_SNOC_MAS			33
-+#define PNOC_SNOC_SLV			34
-+#define SLAVE_AMPSS_L2			35
-+#define SLAVE_BIMC_CFG			36
-+#define SLAVE_BLSP_1			37
-+#define SLAVE_BOOT_ROM			38
-+#define SLAVE_CAMERA_CFG		39
-+#define SLAVE_CATS_128			40
-+#define SLAVE_CLK_CTL			41
-+#define SLAVE_CRYPTO_0_CFG		42
-+#define SLAVE_DEHR_CFG			43
-+#define SLAVE_DISPLAY_CFG		44
-+#define SLAVE_EBI_CH0			45
-+#define SLAVE_GRAPHICS_3D_CFG		46
-+#define SLAVE_IMEM_CFG			47
-+#define SLAVE_LPASS			48
-+#define SLAVE_MPM			49
-+#define SLAVE_MSM_PDM			50
-+#define SLAVE_MSM_TCSR			51
-+#define SLAVE_MSS			52
-+#define SLAVE_OCMEM_64			53
-+#define SLAVE_PMIC_ARB			54
-+#define SLAVE_PNOC_CFG			55
-+#define SLAVE_PRNG			56
-+#define SLAVE_QDSS_CFG			57
-+#define SLAVE_QDSS_STM			58
-+#define SLAVE_RBCPR_CFG			59
-+#define SLAVE_RPM_MSG_RAM		60
-+#define SLAVE_SDCC_1			61
-+#define SLAVE_SDCC_4			62
-+#define SLAVE_SECURITY			63
-+#define SLAVE_SERVICE_SNOC		64
-+#define SLAVE_SNOC_CFG			65
-+#define SLAVE_SPDM			66
-+#define SLAVE_SYSTEM_IMEM		67
-+#define SLAVE_TLMM			68
-+#define SLAVE_USB_HS			69
-+#define SLAVE_VENUS_CFG			70
-+#define SNOC_BIMC_0_MAS			71
-+#define SNOC_BIMC_0_SLV			72
-+#define SNOC_BIMC_1_MAS			73
-+#define SNOC_BIMC_1_SLV			74
-+#define SNOC_INT_0			75
-+#define SNOC_INT_1			76
-+#define SNOC_INT_BIMC			77
-+#define SNOC_MM_INT_0			78
-+#define SNOC_MM_INT_1			79
-+#define SNOC_MM_INT_2			80
-+#define SNOC_MM_INT_BIMC		81
-+#define SNOC_PNOC_MAS			82
-+#define SNOC_PNOC_SLV			83
-+#define SNOC_QDSS_INT			84
-+#define SYSTEM_SLAVE_FAB_APPS		85
++	np = dev->of_node;
 +
-+#endif
++	/*
++	 * When the consumer DT node do not have "interconnects" property
++	 * return a NULL path to skip setting constraints.
++	 */
++	if (!of_find_property(np, "interconnects", NULL))
++		return NULL;
++
++	/*
++	 * We use a combination of phandle and specifier for endpoint. For now
++	 * lets support only global ids and extend this is the future if needed
++	 * without breaking DT compatibility.
++	 */
++	if (name) {
++		idx = of_property_match_string(np, "interconnect-names", name);
++		if (idx < 0)
++			return ERR_PTR(idx);
++	}
++
++	ret = of_parse_phandle_with_args(np, "interconnects",
++					 "#interconnect-cells", idx * 2,
++					 &src_args);
++	if (ret)
++		return ERR_PTR(ret);
++
++	of_node_put(src_args.np);
++
++	if (!src_args.args_count || src_args.args_count > 1)
++		return ERR_PTR(-EINVAL);
++
++	src_id = src_args.args[0];
++
++	ret = of_parse_phandle_with_args(np, "interconnects",
++					 "#interconnect-cells", idx * 2 + 1,
++					 &dst_args);
++	if (ret)
++		return ERR_PTR(ret);
++
++	of_node_put(dst_args.np);
++
++	if (!dst_args.args_count || dst_args.args_count > 1)
++		return ERR_PTR(-EINVAL);
++
++	dst_id = dst_args.args[0];
++
++	return icc_get(dev, src_id, dst_id);
++}
++EXPORT_SYMBOL_GPL(of_icc_get);
++
+ /**
+  * icc_set() - set constraints on an interconnect path between two endpoints
+  * @path: reference to the path returned by icc_get()
+diff --git a/include/linux/interconnect.h b/include/linux/interconnect.h
+index 7fd6e8d0696c..dc48e441d005 100644
+--- a/include/linux/interconnect.h
++++ b/include/linux/interconnect.h
+@@ -17,6 +17,7 @@ struct device;
+ 
+ struct icc_path *icc_get(struct device *dev, const int src_id,
+ 			 const int dst_id);
++struct icc_path *of_icc_get(struct device *dev, const char *name);
+ void icc_put(struct icc_path *path);
+ int icc_set(struct icc_path *path, u32 avg_bw, u32 peak_bw);
+ 
+@@ -28,6 +29,12 @@ static inline struct icc_path *icc_get(struct device *dev, const int src_id,
+ 	return NULL;
+ }
+ 
++static inline struct icc_path *of_icc_get(struct device *dev,
++					  const char *name)
++{
++	return NULL;
++}
++
+ static inline void icc_put(struct icc_path *path)
+ {
+ }
