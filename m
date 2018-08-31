@@ -1,35 +1,18 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 31 Aug 2018 10:56:31 -0700
-Subject: [PATCH 0/4] media: platform: Add Aspeed Video Engine driver
-In-Reply-To: <1535576973-8067-1-git-send-email-eajames@linux.vnet.ibm.com>
+Date: Fri, 31 Aug 2018 10:56:35 -0700
+Subject: [PATCH 1/4] clock: aspeed: Add VIDEO reset index definition
+In-Reply-To: <1535576973-8067-2-git-send-email-eajames@linux.vnet.ibm.com>
 References: <1535576973-8067-1-git-send-email-eajames@linux.vnet.ibm.com>
-Message-ID: <153573819126.93865.1884182656081956202@swboyd.mtv.corp.google.com>
+ <1535576973-8067-2-git-send-email-eajames@linux.vnet.ibm.com>
+Message-ID: <153573819579.93865.16877422358186375613@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Eddie James (2018-08-29 14:09:29)
-> The Video Engine (VE) embedded in the Aspeed AST2400 and AST2500 SOCs
-> can capture and compress video data from digital or analog sources. With
-> the Aspeed chip acting as a service processor, the Video Engine can
-> capture the host processor graphics output.
+Quoting Eddie James (2018-08-29 14:09:30)
+> Add an index into the array of resets kept in the Aspeed clock driver.
+> This isn't a HW bit definition.
 > 
-> This series adds a V4L2 driver for the VE, providing a read() interface
-> only. The driver triggers the hardware to capture the host graphics output
-> and compress it to JPEG format.
-> 
-> Testing on an AST2500 determined that the videobuf/streaming/mmap interface
-> was significantly slower than the simple read() interface, so I have not
-> included the streaming part.
-> 
-> It's also possible to use an automatic mode for the VE such that
-> re-triggering the HW every frame isn't necessary. However this wasn't
-> reliable on the AST2400, and probably used more CPU anyway due to excessive
-> interrupts. It was approximately 15% faster.
-> 
-> The series also adds the necessary parent clock definitions to the Aspeed
-> clock driver, with both a mux and clock divider.
+> Signed-off-by: Eddie James <eajames@linux.vnet.ibm.com>
+> ---
 
-Please let me know your merge strategy here. I can ack the clk patches
-because they look fine from high-level clk driver perspective (maybe
-Joel can take a closer look) or I can merge the patches into clk-next
-and get them into next release while the video driver gets reviewed.
+Acked-by: Stephen Boyd <sboyd@kernel.org>
