@@ -1,41 +1,56 @@
-From: npiggin@gmail.com (Nicholas Piggin)
-Date: Fri, 31 Aug 2018 11:23:48 +1000
-Subject: [PATCH 09/12] asm-generic/tlb: Track which levels of the page
- tables have been cleared
-In-Reply-To: <1535645747-9823-10-git-send-email-will.deacon@arm.com>
-References: <1535645747-9823-1-git-send-email-will.deacon@arm.com>
- <1535645747-9823-10-git-send-email-will.deacon@arm.com>
-Message-ID: <20180831112348.55d3d2ec@roar.ozlabs.ibm.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Thu, 30 Aug 2018 18:29:07 -0700
+Subject: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
+In-Reply-To: <AM0PR04MB44813C7A3E0AF4F3BCFFCF0088390@AM0PR04MB4481.eurprd04.prod.outlook.com>
+References: <1533703167-26583-1-git-send-email-Anson.Huang@nxp.com>
+ <1533703167-26583-2-git-send-email-Anson.Huang@nxp.com>
+ <AM0PR04MB4481FC2BAD71B75D7BE84C0788260@AM0PR04MB4481.eurprd04.prod.outlook.com>
+ <DB3PR0402MB3916F8BC381BBA01DB21D1C0F5260@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+ <AM0PR04MB44813C7A3E0AF4F3BCFFCF0088390@AM0PR04MB4481.eurprd04.prod.outlook.com>
+Message-ID: <153567894721.93865.4092113232222931488@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 30 Aug 2018 17:15:43 +0100
-Will Deacon <will.deacon@arm.com> wrote:
-
-> It is common for architectures with hugepage support to require only a
-> single TLB invalidation operation per hugepage during unmap(), rather than
-> iterating through the mapping at a PAGE_SIZE increment. Currently,
-> however, the level in the page table where the unmap() operation occurs
-> is not stored in the mmu_gather structure, therefore forcing
-> architectures to issue additional TLB invalidation operations or to give
-> up and over-invalidate by e.g. invalidating the entire TLB.
+Quoting Peng Fan (2018-08-12 18:15:41)
+> Hi Anson,
 > 
-> Ideally, we could add an interval rbtree to the mmu_gather structure,
-> which would allow us to associate the correct mapping granule with the
-> various sub-mappings within the range being invalidated. However, this
-> is costly in terms of book-keeping and memory management, so instead we
-> approximate by keeping track of the page table levels that are cleared
-> and provide a means to query the smallest granule required for invalidation.
+> > > > -----Original Message-----
+> > > > From: Anson Huang
+> > > > Sent: 2018?8?8? 12:39
+> > > > To: shawnguo at kernel.org; s.hauer at pengutronix.de;
+> > > > kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>;
+> > > > mturquette at baylibre.com; sboyd at kernel.org;
+> > > > linux-arm-kernel at lists.infradead.org;
+> > > > linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org
+> > > > Cc: dl-linux-imx <linux-imx@nxp.com>
+> > > > Subject: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
+> > > >
+> > > > Clock framework will enable those clocks registered with
+> > > > CLK_IS_CRITICAL flag, so no need to have clks_init_on array during
+> > > > clock
+> > > initialization now.
+> > >
+> > > Will it be more flexible to parse dts saying "critical-clocks = <xxx>"
+> > > or "init-on-arrary=<xxx>"
+> > > and enable those clocks?
+> > 
+> > Parsing the clocks arrays from dtb is another way of enabling critical clocks, but
+> > for current i.MX6/7 platforms, we implement it in same way as most of other
+> > SoCs, currently I did NOT see any necessity of putting them in dtb, just adding
+> > flag during clock registering is more simple, if there is any special requirement
+> > for different clocks set to be enabled, then we can add support to enable the
+> > method of parsing critical-clocks from dtb. Just my two cents.
+> 
+> Thinking about OP-TEE want to use one device, but it's clocks are registered
+> by Linux, because there is no module in Linux side use it, it will shutdown the clock,
+> which cause OP-TEE could not access the device.
+> 
+> Then people have to modify clk code to add CLK_IS_CRITICAL flag to make sure
+> the clocks are not shutdown by Linux.
+> 
+> However adding a new property in clk node and let driver code parse the dts,
+> there is no need to modify clk driver code when OP-TEE needs another device clock.
+> 
 
-Actually the generic patches are pretty simple, and they look okay to
-me. powerpc *should* be able to switch to Peter's patch with a few
-lines of code with unchanged functionality as far as I can see.
-
-These flags we may use as well, but even if not if x86 and arm64 are
-using it, it seems reasonable to go in generic code for now. For the
-3 generic patches,
-
-Acked-by: Nicholas Piggin <npiggin@gmail.com>
-
-Thanks,
-Nick
+If OP-TEE needs linux to keep things on then why can't the OP-TEE driver
+in Linux probe, acquire clocks, and keep the clks enabled forever?
