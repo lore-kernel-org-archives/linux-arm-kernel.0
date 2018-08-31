@@ -1,52 +1,95 @@
-From: npiggin@gmail.com (Nicholas Piggin)
-Date: Fri, 31 Aug 2018 21:50:04 +1000
-Subject: [PATCH 00/12] Avoid synchronous TLB invalidation for
- intermediate page-table entries on arm64
-In-Reply-To: <20180831104945.GI24124@hirez.programming.kicks-ass.net>
-References: <1535645747-9823-1-git-send-email-will.deacon@arm.com>
- <CA+55aFzMMU5RBhn52Lbzf-FXvx3inh5VPVZL613srY+dVU+Lxw@mail.gmail.com>
- <20180831110054.475a3534@roar.ozlabs.ibm.com>
- <CA+55aFyweLwdAeeLnPv1ceje2y9Qc2AkM+LdMzK_z29fFb96ug@mail.gmail.com>
- <20180831095417.GF13166@arm.com>
- <20180831101014.GG24124@hirez.programming.kicks-ass.net>
- <20180831203234.7b8f4d13@roar.ozlabs.ibm.com>
- <20180831104945.GI24124@hirez.programming.kicks-ass.net>
-Message-ID: <20180831215004.0ae58904@roar.ozlabs.ibm.com>
+From: nipun.gupta@nxp.com (Nipun Gupta)
+Date: Fri, 31 Aug 2018 11:57:48 +0000
+Subject: [PATCH 0/7 v6] Support for fsl-mc bus and its devices in SMMU
+In-Reply-To: <1531135103-10699-1-git-send-email-nipun.gupta@nxp.com>
+References: <1531135103-10699-1-git-send-email-nipun.gupta@nxp.com>
+Message-ID: <VI1PR04MB4480D192810E7DEB38895F0AE60F0@VI1PR04MB4480.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 31 Aug 2018 12:49:45 +0200
-Peter Zijlstra <peterz@infradead.org> wrote:
+Hi Joerg/Robin,
 
-> On Fri, Aug 31, 2018 at 08:32:34PM +1000, Nicholas Piggin wrote:
-> > Oh gee, I suppose. powerpc hash is kind of interesting because it's
-> > crazy, Aneesh knows that code a lot better than I do. radix modulo
-> > some minor details of exact instructions is fairly like x86   
-> 
-> The whole TLB broadcast vs explicit IPIs is a fairly big difference in
-> my book.
-
-That's true I guess. Maybe arm64 is closer.
-
-> Anyway, have you guys tried the explicit IPI approach? Depending on how
-> IPIs are routed vs broadcasts it might save a little bus traffic. No
-> point in getting all CPUs to process the TLBI when there's only a hand
-> full that really need it.
-
-It has been looked at now and again there's a lot of variables to
-weigh. And things are also sized and speced to cover various
-hypervisors, OSes, hash and radix, etc. This is something we need to
-evaluate on radix a bit better.
-
-> 
-> OTOH, I suppose the broadcast thing has been optimized to death on the
-> hardware side, so who knows..
-
-There are some advantages of doing it in hardware. Also some of doing
-IPIs though. The "problem" is actually Linux is well optimised and it
-can be hard to notice much impact until you get to big systems. At
-least I don't know of any problem workloads outside micro benchmarks or
-stress tests.
+Can you please let me know when these patches will be applied onto the tree.
+Is there anything else pending from my side.
 
 Thanks,
-Nick
+Nipun
+
+> -----Original Message-----
+> From: Nipun Gupta
+> Sent: Monday, July 9, 2018 4:48 PM
+> To: robin.murphy at arm.com; will.deacon at arm.com; robh+dt at kernel.org;
+> robh at kernel.org; mark.rutland at arm.com; catalin.marinas at arm.com;
+> gregkh at linuxfoundation.org; Laurentiu Tudor <laurentiu.tudor@nxp.com>;
+> bhelgaas at google.com; hch at lst.de
+> Cc: joro at 8bytes.org; m.szyprowski at samsung.com; shawnguo at kernel.org;
+> frowand.list at gmail.com; iommu at lists.linux-foundation.org; linux-
+> kernel at vger.kernel.org; devicetree at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linuxppc-dev at lists.ozlabs.org; linux-
+> pci at vger.kernel.org; Bharat Bhushan <bharat.bhushan@nxp.com>;
+> stuyoder at gmail.com; Leo Li <leoyang.li@nxp.com>; Nipun Gupta
+> <nipun.gupta@nxp.com>
+> Subject: [PATCH 0/7 v6] Support for fsl-mc bus and its devices in SMMU
+> 
+> This patchset defines IOMMU DT binding for fsl-mc bus and adds
+> support in SMMU for fsl-mc bus.
+> 
+> The patch series is based on top of dma-mapping tree (for-next branch):
+> http://git.infradead.org/users/hch/dma-mapping.git
+> 
+> These patches
+>   - Define property 'iommu-map' for fsl-mc bus (patch 1)
+>   - Integrates the fsl-mc bus with the SMMU using this
+>     IOMMU binding (patch 2,3,4)
+>   - Adds the dma configuration support for fsl-mc bus (patch 5, 6)
+>   - Updates the fsl-mc device node with iommu/dma related changes (patch 7)
+> 
+> Changes in v2:
+>   - use iommu-map property for fsl-mc bus
+>   - rebase over patchset https://patchwork.kernel.org/patch/10317337/
+>     and make corresponding changes for dma configuration of devices on
+>     fsl-mc bus
+> 
+> Changes in v3:
+>   - move of_map_rid in drivers/of/address.c
+> 
+> Changes in v4:
+>   - move of_map_rid in drivers/of/base.c
+> 
+> Changes in v5:
+>   - break patch 5 in two separate patches (now patch 5/7 and patch 6/7)
+>   - add changelog text in patch 3/7 and patch 5/7
+>   - typo fix
+> 
+> Changes in v6:
+>   - Updated fsl_mc_device_group() API to be more rational
+>   - Added dma-coherent property in the LS2 smmu device node
+>   - Minor fixes in the device-tree documentation
+> 
+> Nipun Gupta (7):
+>   Documentation: fsl-mc: add iommu-map device-tree binding for fsl-mc
+>     bus
+>   iommu/of: make of_pci_map_rid() available for other devices too
+>   iommu/of: support iommu configuration for fsl-mc devices
+>   iommu/arm-smmu: Add support for the fsl-mc bus
+>   bus: fsl-mc: support dma configure for devices on fsl-mc bus
+>   bus: fsl-mc: set coherent dma mask for devices on fsl-mc bus
+>   arm64: dts: ls208xa: comply with the iommu map binding for fsl_mc
+> 
+>  .../devicetree/bindings/misc/fsl,qoriq-mc.txt      |  39 ++++++++
+>  arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi     |   7 +-
+>  drivers/bus/fsl-mc/fsl-mc-bus.c                    |  16 +++-
+>  drivers/iommu/arm-smmu.c                           |   7 ++
+>  drivers/iommu/iommu.c                              |  13 +++
+>  drivers/iommu/of_iommu.c                           |  25 ++++-
+>  drivers/of/base.c                                  | 102 +++++++++++++++++++++
+>  drivers/of/irq.c                                   |   5 +-
+>  drivers/pci/of.c                                   | 101 --------------------
+>  include/linux/fsl/mc.h                             |   8 ++
+>  include/linux/iommu.h                              |   2 +
+>  include/linux/of.h                                 |  11 +++
+>  include/linux/of_pci.h                             |  10 --
+>  13 files changed, 224 insertions(+), 122 deletions(-)
+> 
+> --
+> 1.9.1
