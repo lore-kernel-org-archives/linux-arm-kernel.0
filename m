@@ -1,40 +1,32 @@
-From: Vineet.Gupta1@synopsys.com (Vineet Gupta)
-Date: Fri, 31 Aug 2018 00:42:46 +0000
-Subject: Patch "asm-generic/bitops/lock.h: Rewrite using atomic_fetch_"
- causes kernel crash
-References: <1535567633.4465.23.camel@synopsys.com>
- <C2D7FE5348E1B147BCA15975FBA23075012B090BEA@us01wembx1.internal.synopsys.com>
- <20180830094411.GX24124@hirez.programming.kicks-ass.net>
- <20180830095148.GB5942@arm.com>
-Message-ID: <C2D7FE5348E1B147BCA15975FBA23075012B091016@us01wembx1.internal.synopsys.com>
+From: npiggin@gmail.com (Nicholas Piggin)
+Date: Fri, 31 Aug 2018 11:00:54 +1000
+Subject: [PATCH 00/12] Avoid synchronous TLB invalidation for
+ intermediate page-table entries on arm64
+In-Reply-To: <CA+55aFzMMU5RBhn52Lbzf-FXvx3inh5VPVZL613srY+dVU+Lxw@mail.gmail.com>
+References: <1535645747-9823-1-git-send-email-will.deacon@arm.com>
+ <CA+55aFzMMU5RBhn52Lbzf-FXvx3inh5VPVZL613srY+dVU+Lxw@mail.gmail.com>
+Message-ID: <20180831110054.475a3534@roar.ozlabs.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/30/2018 02:51 AM, Will Deacon wrote:
-> Yeah, the bit_spin_lock()/__bit_spin_unlock() race described in f75d48644c56a
-> boils down to concurrent atomic_long_set_release() vs
-> atomic_long_fetch_or_acquire(), which really needs to work.
+On Thu, 30 Aug 2018 09:39:38 -0700
+Linus Torvalds <torvalds@linux-foundation.org> wrote:
 
-I don't see how: __clear_bit_unlock() reads @old, flips a bit and then calls
-atomic_long_set_release() so the race is not just with set_release.
+> On Thu, Aug 30, 2018 at 9:15 AM Will Deacon <will.deacon@arm.com> wrote:
+> >
+> > It's also had a lot more testing, but has held up nicely so far on arm64.
+> > I haven't figured out how to merge this yet, but I'll probably end up pulling
+> > the core changes out onto a separate branch.  
+> 
+> This looks fine, and I'm actually ok getting the core changes through
+> the arm64 branch, since this has been discussed across architectures,
+> and I think "whoever does the work gets to drive the car".
 
-    static inline int test_and_set_bit_lock(unsigned int nr, volatile unsigned
-long *p)
-    {
-      long old;
-      unsigned long mask = (1UL << ((nr) % 32));
+Well it would help if powerpc say wanted to start using them without a
+merge cycle lag. Not a huge issue because powerpc already does
+reasonably well here and there's other work that can be done.
 
-      p += ((nr) / 32);
-      old = atomic_long_fetch_or_acquire(mask, (atomic_long_t *)p);
-      return !!(old & mask);
-    }
+I will try to review the core changes carefully next week.
 
-    static inline void __clear_bit_unlock(unsigned int nr, volatile unsigned long *p)
-    {
-       unsigned long old;
-
-     p += ((nr) / 32);
-    old = // soem typecheck magic on *p
-    old &= ~(1UL << ((nr) % 32));
-    atomic_long_set_release((atomic_long_t *)p, old);
-  }
+Thanks,
+Nick
