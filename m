@@ -1,33 +1,58 @@
 From: mirq-linux@rere.qmqm.pl (=?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?=)
-Date: Sat, 01 Sep 2018 16:08:44 +0200
-Subject: [PATCH v3 01/13] fbdev: show fbdev number for debugging
-In-Reply-To: <cover.1535810304.git.mirq-linux@rere.qmqm.pl>
-References: <cover.1535810304.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <ef584ecd8642e8b1a04f28d6d9c1864b5aa507bb.1535810304.git.mirq-linux@rere.qmqm.pl>
+Date: Sat, 01 Sep 2018 16:08:41 +0200
+Subject: [PATCH v3 00/13] remove_conflicting_framebuffers() cleanup
+In-Reply-To: <cover.1535656077.git.mirq-linux@rere.qmqm.pl>
+References: <cover.1535656077.git.mirq-linux@rere.qmqm.pl>
+Message-ID: <cover.1535810304.git.mirq-linux@rere.qmqm.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
-Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
----
- drivers/video/fbdev/core/fbmem.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+This series cleans up duplicated code for replacing firmware FB
+driver with proper DRI driver and adds handover support to
+Tegra driver.
 
-diff --git a/drivers/video/fbdev/core/fbmem.c b/drivers/video/fbdev/core/fbmem.c
-index f741ba8df01b..30a18d4c9de4 100644
---- a/drivers/video/fbdev/core/fbmem.c
-+++ b/drivers/video/fbdev/core/fbmem.c
-@@ -1618,8 +1618,8 @@ static int do_remove_conflicting_framebuffers(struct apertures_struct *a,
- 			(primary && gen_aper && gen_aper->count &&
- 			 gen_aper->ranges[0].base == VGA_FB_PHYS)) {
- 
--			printk(KERN_INFO "fb: switching to %s from %s\n",
--			       name, registered_fb[i]->fix.id);
-+			printk(KERN_INFO "fb%d: switching to %s from %s\n",
-+			       i, name, registered_fb[i]->fix.id);
- 			ret = do_unregister_framebuffer(registered_fb[i]);
- 			if (ret)
- 				return ret;
+This is a sligtly updated version of a series sent on 24 Nov 2017.
+
+---
+v2:
+ - rebased on current drm-next
+ - dropped staging/sm750fb changes
+ - added kernel docs for DRM helpers
+v3:
+ - move kerneldoc to fbdev, where functions are implemented
+ - split kerneldoc for remove_conflicting_framebuffers()
+ - propagate return value in remove_conflicting_pci_framebuffers()
+
+---
+Micha? Miros?aw (13):
+  fbdev: show fbdev number for debugging
+  fbdev: allow apertures == NULL in remove_conflicting_framebuffers()
+  fbdev: add kerneldoc do remove_conflicting_framebuffers()
+  fbdev: add remove_conflicting_pci_framebuffers()
+  drm/amdgpu: use simpler remove_conflicting_pci_framebuffers()
+  drm/bochs: use simpler remove_conflicting_pci_framebuffers()
+  drm/cirrus: use simpler remove_conflicting_pci_framebuffers()
+  drm/mgag200: use simpler remove_conflicting_pci_framebuffers()
+  drm/radeon: use simpler remove_conflicting_pci_framebuffers()
+  drm/virtio: use simpler remove_conflicting_pci_framebuffers()
+  drm/vc4: use simpler remove_conflicting_framebuffers(NULL)
+  drm/sun4i: use simpler remove_conflicting_framebuffers(NULL)
+  drm/tegra: kick out simplefb
+
+ drivers/gpu/drm/amd/amdgpu/amdgpu_drv.c  | 24 +--------
+ drivers/gpu/drm/bochs/bochs_drv.c        | 18 +------
+ drivers/gpu/drm/cirrus/cirrus_drv.c      | 23 +--------
+ drivers/gpu/drm/mgag200/mgag200_drv.c    | 21 +-------
+ drivers/gpu/drm/mgag200/mgag200_main.c   |  9 ----
+ drivers/gpu/drm/radeon/radeon_drv.c      | 23 +--------
+ drivers/gpu/drm/sun4i/sun4i_drv.c        | 18 +------
+ drivers/gpu/drm/tegra/drm.c              |  4 ++
+ drivers/gpu/drm/vc4/vc4_drv.c            | 20 +-------
+ drivers/gpu/drm/virtio/virtgpu_drm_bus.c | 24 ++-------
+ drivers/video/fbdev/core/fbmem.c         | 63 +++++++++++++++++++++++-
+ include/drm/drm_fb_helper.h              | 12 +++++
+ include/linux/fb.h                       |  2 +
+ 13 files changed, 89 insertions(+), 172 deletions(-)
+
 -- 
 2.18.0
