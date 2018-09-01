@@ -1,81 +1,59 @@
 From: mirq-linux@rere.qmqm.pl (=?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?=)
-Date: Sat, 01 Sep 2018 16:08:48 +0200
-Subject: [PATCH v3 08/13] drm/mgag200: use simpler
- remove_conflicting_pci_framebuffers()
+Date: Sat, 01 Sep 2018 16:08:50 +0200
+Subject: [PATCH v3 11/13] drm/vc4: use simpler
+ remove_conflicting_framebuffers(NULL)
 In-Reply-To: <cover.1535810304.git.mirq-linux@rere.qmqm.pl>
 References: <cover.1535810304.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <90fc954f90de44157d6cc1c782147db6252c71e4.1535810304.git.mirq-linux@rere.qmqm.pl>
+Message-ID: <be7e6396e6e7159695a5bccc109c6ab49a51e0d8.1535810304.git.mirq-linux@rere.qmqm.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove duplicated call, while at it.
+Use remove_conflicting_framebuffers(NULL) instead of open-coding it.
 
 Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
+Acked-by: Eric Anholt <eric@anholt.net>
 Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
 ---
- drivers/gpu/drm/mgag200/mgag200_drv.c  | 21 +--------------------
- drivers/gpu/drm/mgag200/mgag200_main.c |  9 ---------
- 2 files changed, 1 insertion(+), 29 deletions(-)
+ drivers/gpu/drm/vc4/vc4_drv.c | 20 +-------------------
+ 1 file changed, 1 insertion(+), 19 deletions(-)
 
-diff --git a/drivers/gpu/drm/mgag200/mgag200_drv.c b/drivers/gpu/drm/mgag200/mgag200_drv.c
-index 74cdde2ee474..ac6af4bd9df6 100644
---- a/drivers/gpu/drm/mgag200/mgag200_drv.c
-+++ b/drivers/gpu/drm/mgag200/mgag200_drv.c
-@@ -42,29 +42,10 @@ static const struct pci_device_id pciidlist[] = {
+diff --git a/drivers/gpu/drm/vc4/vc4_drv.c b/drivers/gpu/drm/vc4/vc4_drv.c
+index 94b99c90425a..96bb90325995 100644
+--- a/drivers/gpu/drm/vc4/vc4_drv.c
++++ b/drivers/gpu/drm/vc4/vc4_drv.c
+@@ -246,24 +246,6 @@ static void vc4_match_add_drivers(struct device *dev,
+ 	}
+ }
  
- MODULE_DEVICE_TABLE(pci, pciidlist);
- 
--static void mgag200_kick_out_firmware_fb(struct pci_dev *pdev)
+-static void vc4_kick_out_firmware_fb(void)
 -{
 -	struct apertures_struct *ap;
--	bool primary = false;
 -
 -	ap = alloc_apertures(1);
 -	if (!ap)
 -		return;
 -
--	ap->ranges[0].base = pci_resource_start(pdev, 0);
--	ap->ranges[0].size = pci_resource_len(pdev, 0);
+-	/* Since VC4 is a UMA device, the simplefb node may have been
+-	 * located anywhere in memory.
+-	 */
+-	ap->ranges[0].base = 0;
+-	ap->ranges[0].size = ~0;
 -
--#ifdef CONFIG_X86
--	primary = pdev->resource[PCI_ROM_RESOURCE].flags & IORESOURCE_ROM_SHADOW;
--#endif
--	drm_fb_helper_remove_conflicting_framebuffers(ap, "mgag200drmfb", primary);
+-	drm_fb_helper_remove_conflicting_framebuffers(ap, "vc4drmfb", false);
 -	kfree(ap);
 -}
 -
- 
- static int mga_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+ static int vc4_drm_bind(struct device *dev)
  {
--	mgag200_kick_out_firmware_fb(pdev);
-+	drm_fb_helper_remove_conflicting_pci_framebuffers(pdev, 0, "mgag200drmfb");
+ 	struct platform_device *pdev = to_platform_device(dev);
+@@ -296,7 +278,7 @@ static int vc4_drm_bind(struct device *dev)
+ 	if (ret)
+ 		goto gem_destroy;
  
- 	return drm_get_pci_dev(pdev, ent, &driver);
- }
-diff --git a/drivers/gpu/drm/mgag200/mgag200_main.c b/drivers/gpu/drm/mgag200/mgag200_main.c
-index 780f983b0294..79d54103d470 100644
---- a/drivers/gpu/drm/mgag200/mgag200_main.c
-+++ b/drivers/gpu/drm/mgag200/mgag200_main.c
-@@ -124,20 +124,11 @@ static int mga_probe_vram(struct mga_device *mdev, void __iomem *mem)
- static int mga_vram_init(struct mga_device *mdev)
- {
- 	void __iomem *mem;
--	struct apertures_struct *aper = alloc_apertures(1);
--	if (!aper)
--		return -ENOMEM;
+-	vc4_kick_out_firmware_fb();
++	drm_fb_helper_remove_conflicting_framebuffers(NULL, "vc4drmfb", false);
  
- 	/* BAR 0 is VRAM */
- 	mdev->mc.vram_base = pci_resource_start(mdev->dev->pdev, 0);
- 	mdev->mc.vram_window = pci_resource_len(mdev->dev->pdev, 0);
- 
--	aper->ranges[0].base = mdev->mc.vram_base;
--	aper->ranges[0].size = mdev->mc.vram_window;
--
--	drm_fb_helper_remove_conflicting_framebuffers(aper, "mgafb", true);
--	kfree(aper);
--
- 	if (!devm_request_mem_region(mdev->dev->dev, mdev->mc.vram_base, mdev->mc.vram_window,
- 				"mgadrmfb_vram")) {
- 		DRM_ERROR("can't reserve VRAM\n");
+ 	ret = drm_dev_register(drm, 0);
+ 	if (ret < 0)
 -- 
 2.18.0
