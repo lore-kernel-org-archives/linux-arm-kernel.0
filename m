@@ -1,58 +1,60 @@
 From: mirq-linux@rere.qmqm.pl (=?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?=)
-Date: Sat, 01 Sep 2018 16:08:41 +0200
-Subject: [PATCH v3 00/13] remove_conflicting_framebuffers() cleanup
-In-Reply-To: <cover.1535656077.git.mirq-linux@rere.qmqm.pl>
-References: <cover.1535656077.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <cover.1535810304.git.mirq-linux@rere.qmqm.pl>
+Date: Sat, 01 Sep 2018 16:08:48 +0200
+Subject: [PATCH v3 09/13] drm/radeon: use simpler
+ remove_conflicting_pci_framebuffers()
+In-Reply-To: <cover.1535810304.git.mirq-linux@rere.qmqm.pl>
+References: <cover.1535810304.git.mirq-linux@rere.qmqm.pl>
+Message-ID: <b61a2e458b6a2964039693d724cc75b4fcfb3ddb.1535810304.git.mirq-linux@rere.qmqm.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series cleans up duplicated code for replacing firmware FB
-driver with proper DRI driver and adds handover support to
-Tegra driver.
-
-This is a sligtly updated version of a series sent on 24 Nov 2017.
-
+Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
+Acked-by: Alex Deucher <alexander.deucher@amd.com>
+Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
 ---
-v2:
- - rebased on current drm-next
- - dropped staging/sm750fb changes
- - added kernel docs for DRM helpers
-v3:
- - move kerneldoc to fbdev, where functions are implemented
- - split kerneldoc for remove_conflicting_framebuffers()
- - propagate return value in remove_conflicting_pci_framebuffers()
+ drivers/gpu/drm/radeon/radeon_drv.c | 23 +----------------------
+ 1 file changed, 1 insertion(+), 22 deletions(-)
 
----
-Micha? Miros?aw (13):
-  fbdev: show fbdev number for debugging
-  fbdev: allow apertures == NULL in remove_conflicting_framebuffers()
-  fbdev: add kerneldoc do remove_conflicting_framebuffers()
-  fbdev: add remove_conflicting_pci_framebuffers()
-  drm/amdgpu: use simpler remove_conflicting_pci_framebuffers()
-  drm/bochs: use simpler remove_conflicting_pci_framebuffers()
-  drm/cirrus: use simpler remove_conflicting_pci_framebuffers()
-  drm/mgag200: use simpler remove_conflicting_pci_framebuffers()
-  drm/radeon: use simpler remove_conflicting_pci_framebuffers()
-  drm/virtio: use simpler remove_conflicting_pci_framebuffers()
-  drm/vc4: use simpler remove_conflicting_framebuffers(NULL)
-  drm/sun4i: use simpler remove_conflicting_framebuffers(NULL)
-  drm/tegra: kick out simplefb
-
- drivers/gpu/drm/amd/amdgpu/amdgpu_drv.c  | 24 +--------
- drivers/gpu/drm/bochs/bochs_drv.c        | 18 +------
- drivers/gpu/drm/cirrus/cirrus_drv.c      | 23 +--------
- drivers/gpu/drm/mgag200/mgag200_drv.c    | 21 +-------
- drivers/gpu/drm/mgag200/mgag200_main.c   |  9 ----
- drivers/gpu/drm/radeon/radeon_drv.c      | 23 +--------
- drivers/gpu/drm/sun4i/sun4i_drv.c        | 18 +------
- drivers/gpu/drm/tegra/drm.c              |  4 ++
- drivers/gpu/drm/vc4/vc4_drv.c            | 20 +-------
- drivers/gpu/drm/virtio/virtgpu_drm_bus.c | 24 ++-------
- drivers/video/fbdev/core/fbmem.c         | 63 +++++++++++++++++++++++-
- include/drm/drm_fb_helper.h              | 12 +++++
- include/linux/fb.h                       |  2 +
- 13 files changed, 89 insertions(+), 172 deletions(-)
-
+diff --git a/drivers/gpu/drm/radeon/radeon_drv.c b/drivers/gpu/drm/radeon/radeon_drv.c
+index b28288a781ef..36c98a0ec991 100644
+--- a/drivers/gpu/drm/radeon/radeon_drv.c
++++ b/drivers/gpu/drm/radeon/radeon_drv.c
+@@ -311,27 +311,6 @@ static struct drm_driver kms_driver;
+ 
+ bool radeon_device_is_virtual(void);
+ 
+-static int radeon_kick_out_firmware_fb(struct pci_dev *pdev)
+-{
+-	struct apertures_struct *ap;
+-	bool primary = false;
+-
+-	ap = alloc_apertures(1);
+-	if (!ap)
+-		return -ENOMEM;
+-
+-	ap->ranges[0].base = pci_resource_start(pdev, 0);
+-	ap->ranges[0].size = pci_resource_len(pdev, 0);
+-
+-#ifdef CONFIG_X86
+-	primary = pdev->resource[PCI_ROM_RESOURCE].flags & IORESOURCE_ROM_SHADOW;
+-#endif
+-	drm_fb_helper_remove_conflicting_framebuffers(ap, "radeondrmfb", primary);
+-	kfree(ap);
+-
+-	return 0;
+-}
+-
+ static int radeon_pci_probe(struct pci_dev *pdev,
+ 			    const struct pci_device_id *ent)
+ {
+@@ -341,7 +320,7 @@ static int radeon_pci_probe(struct pci_dev *pdev,
+ 		return -EPROBE_DEFER;
+ 
+ 	/* Get rid of things like offb */
+-	ret = radeon_kick_out_firmware_fb(pdev);
++	ret = drm_fb_helper_remove_conflicting_pci_framebuffers(pdev, 0, "radeondrmfb");
+ 	if (ret)
+ 		return ret;
+ 
 -- 
 2.18.0
