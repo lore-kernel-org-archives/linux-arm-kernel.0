@@ -1,57 +1,34 @@
 From: mirq-linux@rere.qmqm.pl (=?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?=)
-Date: Sat, 01 Sep 2018 16:08:47 +0200
-Subject: [PATCH v3 07/13] drm/cirrus: use simpler
- remove_conflicting_pci_framebuffers()
+Date: Sat, 01 Sep 2018 16:08:51 +0200
+Subject: [PATCH v3 13/13] drm/tegra: kick out simplefb
 In-Reply-To: <cover.1535810304.git.mirq-linux@rere.qmqm.pl>
 References: <cover.1535810304.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <a9a4691b6eea789664edd6b85a85b7990953a222.1535810304.git.mirq-linux@rere.qmqm.pl>
+Message-ID: <b5c3972e5774d0d1f8887054a993bbc54e9dbe2a.1535810304.git.mirq-linux@rere.qmqm.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Kick out firmware fb when loading Tegra driver.
 
 Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
 Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
 ---
- drivers/gpu/drm/cirrus/cirrus_drv.c | 23 +----------------------
- 1 file changed, 1 insertion(+), 22 deletions(-)
+ drivers/gpu/drm/tegra/drm.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/gpu/drm/cirrus/cirrus_drv.c b/drivers/gpu/drm/cirrus/cirrus_drv.c
-index 69c4e352dd78..85ed8657c862 100644
---- a/drivers/gpu/drm/cirrus/cirrus_drv.c
-+++ b/drivers/gpu/drm/cirrus/cirrus_drv.c
-@@ -42,33 +42,12 @@ static const struct pci_device_id pciidlist[] = {
- };
+diff --git a/drivers/gpu/drm/tegra/drm.c b/drivers/gpu/drm/tegra/drm.c
+index 7afe2f635f74..b51ec138fed2 100644
+--- a/drivers/gpu/drm/tegra/drm.c
++++ b/drivers/gpu/drm/tegra/drm.c
+@@ -1203,6 +1203,10 @@ static int host1x_drm_probe(struct host1x_device *dev)
  
+ 	dev_set_drvdata(&dev->dev, drm);
  
--static int cirrus_kick_out_firmware_fb(struct pci_dev *pdev)
--{
--	struct apertures_struct *ap;
--	bool primary = false;
--
--	ap = alloc_apertures(1);
--	if (!ap)
--		return -ENOMEM;
--
--	ap->ranges[0].base = pci_resource_start(pdev, 0);
--	ap->ranges[0].size = pci_resource_len(pdev, 0);
--
--#ifdef CONFIG_X86
--	primary = pdev->resource[PCI_ROM_RESOURCE].flags & IORESOURCE_ROM_SHADOW;
--#endif
--	drm_fb_helper_remove_conflicting_framebuffers(ap, "cirrusdrmfb", primary);
--	kfree(ap);
--
--	return 0;
--}
--
- static int cirrus_pci_probe(struct pci_dev *pdev,
- 			    const struct pci_device_id *ent)
- {
- 	int ret;
- 
--	ret = cirrus_kick_out_firmware_fb(pdev);
-+	ret = drm_fb_helper_remove_conflicting_pci_framebuffers(pdev, 0, "cirrusdrmfb");
- 	if (ret)
- 		return ret;
- 
++	err = drm_fb_helper_remove_conflicting_framebuffers(NULL, "tegradrmfb", false);
++	if (err < 0)
++		goto unref;
++
+ 	err = drm_dev_register(drm, 0);
+ 	if (err < 0)
+ 		goto unref;
 -- 
 2.18.0
