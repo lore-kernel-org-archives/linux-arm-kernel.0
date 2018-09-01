@@ -1,50 +1,38 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Fri, 31 Aug 2018 17:05:11 -0700
-Subject: [PATCH 1/3] ARM: dts: qcom: Add SPMI PMIC Arbiter nodes for
- APQ8084 and MSM8974
-In-Reply-To: <20180831230125.GU2523@minitux>
-References: <1422965880-11047-1-git-send-email-iivanov@mm-sol.com>
- <1422965880-11047-2-git-send-email-iivanov@mm-sol.com>
- <550311ad-8f93-3e80-9706-1321482b8c19@gmail.com>
- <20180831230125.GU2523@minitux>
-Message-ID: <9ff8c04f-80b7-88fa-956a-d0f61809d639@gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 31 Aug 2018 21:44:29 -0500
+Subject: [PATCH] arm64: dts: ti: k3-am65: Change #address-cells and
+ #size-cells of interconnect to 2
+In-Reply-To: <20180828102642.26482-1-kishon@ti.com>
+References: <20180828102642.26482-1-kishon@ti.com>
+Message-ID: <20180901024429.fwnzriuqan3v55dj@akan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/31/18 16:01, Bjorn Andersson wrote:
-> On Fri 31 Aug 15:46 PDT 2018, Frank Rowand wrote:
->>> +		spmi_bus: spmi at fc4cf000 {
->>> +			compatible = "qcom,spmi-pmic-arb";
->>> +			reg-names = "core", "intr", "cnfg";
->>> +			reg = <0xfc4cf000 0x1000>,
->>> +			      <0xfc4cb000 0x1000>,
->>> +			      <0xfc4ca000 0x1000>;
->>> +			interrupt-names = "periph_irq";
->>
->>> +			interrupts = <0 190 0>;
->>
->> The final value in this interrupts property means IRQ_TYPE_NONE.
->>
->> A WARN_ON() was added early this year to complain about use of
->> IRQ_TYPE_NONE: 83a86fbb5b56 "irqchip/gic: Loudly complain about
->> the use of IRQ_TYPE_NONE", resulting in many warnings spewing
->> forth when I boot an APQ8074 Dragonboard.  I am trying to
->> determine whether the warning is overly aggressive, or whether
->> the IRQ TYPE is incorrectly specified for the spmi node.
->>
->> The interrupt-parent for the spmi node is intc: interrupt-controller at f9000000,
->> which has compatible = "qcom,msm-qgic2".  I do not know the architecture
->> or implementation of this interrupt controller.  Is an IRQ_TYPE_NONE
->> valid in this case, or should a specific type be provided?
->>
-> 
-> No, IRQ_TYPE_NONE isn't valid and the WARN_ON() is reasonable.
-> 
-> Please change it to IRQ_TYPE_LEVEL_HIGH. And while you're at it, replace
-> the first 0 with GIC_SPI.
-> 
-> 
-> If you have more of these warnings you can most likely look at e.g.
-> msm8916 (arm64) to find the right flags.
+On 15:56-20180828, Kishon Vijay Abraham I wrote:
+[...]
+>  		cbass_mcu: interconnect at 28380000 {
+>  			compatible = "simple-bus";
+>  			#address-cells = <1>;
+>  			#size-cells = <1>;
+> -			ranges = <0x28380000 0x28380000 0x03880000>, /* MCU NAVSS*/
+> -				 <0x40200000 0x40200000 0x00900100>, /* First peripheral window */
+> -				 <0x42040000 0x42040000 0x03ac2400>, /* WKUP */
+> -				 <0x45100000 0x45100000 0x00c24000>, /* MMRs, remaining NAVSS */
+> -				 <0x46000000 0x46000000 0x00200000>, /* CPSW */
+> -				 <0x47000000 0x47000000 0x00068400>; /* OSPI space 1 */
+> +			ranges = <0x28380000 0x00 0x28380000 0x03880000>, /* MCU NAVSS*/
+> +				 <0x40200000 0x00 0x40200000 0x00900100>, /* First peripheral window */
+> +				 <0x42040000 0x00 0x42040000 0x03ac2400>, /* WKUP */
+> +				 <0x45100000 0x00 0x45100000 0x00c24000>, /* MMRs, remaining NAVSS */
+> +				 <0x46000000 0x00 0x46000000 0x00200000>, /* CPSW */
+> +				 <0x47000000 0x00 0x47000000 0x00068400>; /* OSPI space 1 */
+>  
 
-Thanks, I'll create a patch.
+
+You might need #address-cells and #size-cells as 2 in MCU as
+well.. Could you refer to response from Vignesh?
+https://marc.info/?l=linux-arm-kernel&m=153572924921895&w=2
+
+-- 
+Regards,
+Nishanth Menon
