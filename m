@@ -1,36 +1,38 @@
 From: mirq-linux@rere.qmqm.pl (=?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?=)
-Date: Sat, 01 Sep 2018 16:08:46 +0200
-Subject: [PATCH v3 05/13] drm/amdgpu: use simpler
+Date: Sat, 01 Sep 2018 16:08:48 +0200
+Subject: [PATCH v3 08/13] drm/mgag200: use simpler
  remove_conflicting_pci_framebuffers()
 In-Reply-To: <cover.1535810304.git.mirq-linux@rere.qmqm.pl>
 References: <cover.1535810304.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <fe59ab587ef4ef799b525fcc03d87800c5dc26d9.1535810304.git.mirq-linux@rere.qmqm.pl>
+Message-ID: <90fc954f90de44157d6cc1c782147db6252c71e4.1535810304.git.mirq-linux@rere.qmqm.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Remove duplicated call, while at it.
+
 Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
-Acked-by: Alex Deucher <alexander.deucher@amd.com>
 Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
 ---
- drivers/gpu/drm/amd/amdgpu/amdgpu_drv.c | 24 +-----------------------
- 1 file changed, 1 insertion(+), 23 deletions(-)
+ drivers/gpu/drm/mgag200/mgag200_drv.c  | 21 +--------------------
+ drivers/gpu/drm/mgag200/mgag200_main.c |  9 ---------
+ 2 files changed, 1 insertion(+), 29 deletions(-)
 
-diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_drv.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_drv.c
-index 0b19482b36b8..9b6e037719db 100644
---- a/drivers/gpu/drm/amd/amdgpu/amdgpu_drv.c
-+++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_drv.c
-@@ -560,28 +560,6 @@ MODULE_DEVICE_TABLE(pci, pciidlist);
+diff --git a/drivers/gpu/drm/mgag200/mgag200_drv.c b/drivers/gpu/drm/mgag200/mgag200_drv.c
+index 74cdde2ee474..ac6af4bd9df6 100644
+--- a/drivers/gpu/drm/mgag200/mgag200_drv.c
++++ b/drivers/gpu/drm/mgag200/mgag200_drv.c
+@@ -42,29 +42,10 @@ static const struct pci_device_id pciidlist[] = {
  
- static struct drm_driver kms_driver;
+ MODULE_DEVICE_TABLE(pci, pciidlist);
  
--static int amdgpu_kick_out_firmware_fb(struct pci_dev *pdev)
+-static void mgag200_kick_out_firmware_fb(struct pci_dev *pdev)
 -{
 -	struct apertures_struct *ap;
 -	bool primary = false;
 -
 -	ap = alloc_apertures(1);
 -	if (!ap)
--		return -ENOMEM;
+-		return;
 -
 -	ap->ranges[0].base = pci_resource_start(pdev, 0);
 -	ap->ranges[0].size = pci_resource_len(pdev, 0);
@@ -38,24 +40,42 @@ index 0b19482b36b8..9b6e037719db 100644
 -#ifdef CONFIG_X86
 -	primary = pdev->resource[PCI_ROM_RESOURCE].flags & IORESOURCE_ROM_SHADOW;
 -#endif
--	drm_fb_helper_remove_conflicting_framebuffers(ap, "amdgpudrmfb", primary);
+-	drm_fb_helper_remove_conflicting_framebuffers(ap, "mgag200drmfb", primary);
 -	kfree(ap);
--
--	return 0;
 -}
 -
--
- static int amdgpu_pci_probe(struct pci_dev *pdev,
- 			    const struct pci_device_id *ent)
+ 
+ static int mga_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
  {
-@@ -609,7 +587,7 @@ static int amdgpu_pci_probe(struct pci_dev *pdev,
- 		return ret;
+-	mgag200_kick_out_firmware_fb(pdev);
++	drm_fb_helper_remove_conflicting_pci_framebuffers(pdev, 0, "mgag200drmfb");
  
- 	/* Get rid of things like offb */
--	ret = amdgpu_kick_out_firmware_fb(pdev);
-+	ret = drm_fb_helper_remove_conflicting_pci_framebuffers(pdev, 0, "amdgpudrmfb");
- 	if (ret)
- 		return ret;
+ 	return drm_get_pci_dev(pdev, ent, &driver);
+ }
+diff --git a/drivers/gpu/drm/mgag200/mgag200_main.c b/drivers/gpu/drm/mgag200/mgag200_main.c
+index 780f983b0294..79d54103d470 100644
+--- a/drivers/gpu/drm/mgag200/mgag200_main.c
++++ b/drivers/gpu/drm/mgag200/mgag200_main.c
+@@ -124,20 +124,11 @@ static int mga_probe_vram(struct mga_device *mdev, void __iomem *mem)
+ static int mga_vram_init(struct mga_device *mdev)
+ {
+ 	void __iomem *mem;
+-	struct apertures_struct *aper = alloc_apertures(1);
+-	if (!aper)
+-		return -ENOMEM;
  
+ 	/* BAR 0 is VRAM */
+ 	mdev->mc.vram_base = pci_resource_start(mdev->dev->pdev, 0);
+ 	mdev->mc.vram_window = pci_resource_len(mdev->dev->pdev, 0);
+ 
+-	aper->ranges[0].base = mdev->mc.vram_base;
+-	aper->ranges[0].size = mdev->mc.vram_window;
+-
+-	drm_fb_helper_remove_conflicting_framebuffers(aper, "mgafb", true);
+-	kfree(aper);
+-
+ 	if (!devm_request_mem_region(mdev->dev->dev, mdev->mc.vram_base, mdev->mc.vram_window,
+ 				"mgadrmfb_vram")) {
+ 		DRM_ERROR("can't reserve VRAM\n");
 -- 
 2.18.0
