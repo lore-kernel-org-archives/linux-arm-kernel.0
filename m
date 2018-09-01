@@ -1,47 +1,34 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat,  1 Sep 2018 21:29:41 +0200
-Subject: [PATCH] ARM: dts: bcm283x-rpi-lan7515: Enable Ethernet LEDs
-Message-ID: <1535830181-17254-1-git-send-email-stefan.wahren@i2se.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 1 Sep 2018 18:24:38 -0300
+Subject: [PATCH 2/3] arm64: dts: meson-axg: s400: add dmic codec
+In-Reply-To: <20180831150218.8307-3-jbrunet@baylibre.com>
+References: <20180831150218.8307-1-jbrunet@baylibre.com>
+ <20180831150218.8307-3-jbrunet@baylibre.com>
+Message-ID: <CAOMZO5BOMOB6LaRs1fnmm-Ghu7pMkXW=sH_NOEWK3pqHAbUMCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the LAN7515 on Raspberry Pi 3B+ doesn't have an EEPROM and the OTP
-is empty, we need to enable the Ethernet LEDs via Device Tree.
+Hi Jerome,
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- arch/arm/boot/dts/bcm283x-rpi-lan7515.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+On Fri, Aug 31, 2018 at 12:02 PM, Jerome Brunet <jbrunet@baylibre.com> wrote:
+> There are 7 digital mics on the MIC daughter board attached
+> to the s400 board, so add the digital microphone codec to
+> its DTS
+>
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> ---
+>  arch/arm64/boot/dts/amlogic/meson-axg-s400.dts | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+> index ff64c429d432..f3e16cbbc61e 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+> @@ -86,6 +86,15 @@
+>                 sound-name-prefix = "DIT";
+>         };
+>
+> +       dmics: audio-codec at 3 {
 
-diff --git a/arch/arm/boot/dts/bcm283x-rpi-lan7515.dtsi b/arch/arm/boot/dts/bcm283x-rpi-lan7515.dtsi
-index 9403da0..70bece6 100644
---- a/arch/arm/boot/dts/bcm283x-rpi-lan7515.dtsi
-+++ b/arch/arm/boot/dts/bcm283x-rpi-lan7515.dtsi
-@@ -1,4 +1,6 @@
- // SPDX-License-Identifier: GPL-2.0
-+#include <dt-bindings/net/microchip-lan78xx.h>
-+
- / {
- 	aliases {
- 		ethernet0 = &ethernet;
-@@ -21,6 +23,18 @@
- 			ethernet: ethernet at 1 {
- 				compatible = "usb424,7800";
- 				reg = <1>;
-+
-+				mdio {
-+					#address-cells = <0x1>;
-+					#size-cells = <0x0>;
-+					eth_phy: ethernet-phy at 1 {
-+						reg = <1>;
-+						microchip,led-modes = <
-+							LAN78XX_LINK_1000_ACTIVITY
-+							LAN78XX_LINK_10_100_ACTIVITY
-+						>;
-+					};
-+				};
- 			};
- 		};
- 	};
--- 
-2.7.4
+You pass @3 without a corresponding reg = <3>, which causes dtc
+warnings with W=1.
