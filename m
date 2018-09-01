@@ -1,432 +1,191 @@
-From: ebiggers@kernel.org (Eric Biggers)
-Date: Sat,  1 Sep 2018 00:17:07 -0700
-Subject: [PATCH v2] crypto: arm/chacha20 - faster 8-bit rotations and other
- optimizations
-Message-ID: <20180901071707.14712-1-ebiggers@kernel.org>
+From: agraf@suse.de (Alexander Graf)
+Date: Sat, 1 Sep 2018 12:03:12 +0200
+Subject: [PATCH v3 7/9] KVM: arm/arm64: Only clean the dcache on
+ translation fault
+In-Reply-To: <1efbf386-d9c9-9a23-f2d5-3cf8cddf95e3@arm.com>
+References: <20171023161122.15291-1-marc.zyngier@arm.com>
+ <20171023161122.15291-8-marc.zyngier@arm.com>
+ <bfeee11e-f8bf-78f2-ab61-27e43781e2e3@suse.de>
+ <9fa7efdf-1c21-7b07-edb9-0c7d0d91eaed@arm.com>
+ <2686ddfc-935a-18e0-46bd-0cb608ae44e1@suse.de>
+ <4d1c7d3b-4abe-fa8d-31ac-7a98ec349db1@arm.com>
+ <a92a365f-3ad1-587e-4919-3814aebe85b0@suse.de>
+ <1f59ea80-a88e-e09d-bb55-cd1a514bc957@arm.com>
+ <51b376d9-6339-66e3-bda2-06f8bbff8888@suse.de>
+ <1efbf386-d9c9-9a23-f2d5-3cf8cddf95e3@arm.com>
+Message-ID: <9fa3b978-39a9-1e1f-6e2f-2c22a447090e@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Biggers <ebiggers@google.com>
 
-Optimize ChaCha20 NEON performance by:
 
-- Implementing the 8-bit rotations using the 'vtbl.8' instruction.
-- Streamlining the part that adds the original state and XORs the data.
-- Making some other small tweaks.
+On 23.08.18 14:43, Marc Zyngier wrote:
+> On 23/08/18 13:24, Alexander Graf wrote:
+>> On 08/23/2018 01:16 PM, Marc Zyngier wrote:
+>>> On 21/08/18 17:54, Alexander Graf wrote:
+>>>> On 08/21/2018 05:08 PM, Marc Zyngier wrote:
+>>>>> On 21/08/18 15:08, Alexander Graf wrote:
+>>>>>> On 08/21/2018 03:57 PM, Marc Zyngier wrote:
+>>>>>>> On 21/08/18 14:35, Alexander Graf wrote:
+>>>>>>>> On 10/23/2017 06:11 PM, Marc Zyngier wrote:
+>>>>>>>>> The only case where we actually need to perform a dcache maintenance
+>>>>>>>>> is when we map the page for the first time, and subsequent permission
+>>>>>>>>> faults do not require cache maintenance. Let's make it conditional
+>>>>>>>>> on not being a permission fault (and thus a translation fault).
+>>>>>>>>>
+>>>>>>>>> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+>>>>>>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>>>>>> This patch unfortunately breaks something on Hi1616 SoCs when running
+>>>>>>>> 32bit guests. With this patch applied (and thus with 4.18) I get random
+>>>>>>>> illegal instruction warnings from 32bit code inside VMs. I do not know
+>>>>>>>> at this point whether this affects other CPUs as well.
+>>>>>>> Can you please give a few more details?
+>>>>>>>
+>>>>>>> - what are the CPUs on this Hi1616? At least a /proc/cpuinfo would help
+>>>>>> These are A72s:
+>>>>>>
+>>>>>> processor??? : 0
+>>>>>> BogoMIPS??? : 100.00
+>>>>>> Features??? : fp asimd evtstrm aes pmull sha1 sha2 crc32 cpuid
+>>>>>> CPU implementer??? : 0x41
+>>>>>> CPU architecture: 8
+>>>>>> CPU variant??? : 0x0
+>>>>>> CPU part??? : 0xd08
+>>>>>> CPU revision??? : 2
+>>>>>>
+>>>>>>> - an example of the crash? Is it within the decompressor? After? This
+>>>>>>> things do matter, given the number of crazy things the 32bit kernel does
+>>>>>> They are always in user space. My current reproducer is this:
+>>>>>>
+>>>>>>    ? $ while rpm -qa > /dev/null; do :; done
+>>>>>>
+>>>>>> If I run this in parallel with something that just populates RAM (dd
+>>>>>> if=/dev/nvme0n1 of=/dev/null bs=10G) I get an illegal instruction fault
+>>>>>> within seconds:
+>>>>>>
+>>>>>> sh-4.4# while rpm -qa > /dev/null; do true; done
+>>>>>> Illegal instruction (core dumped)
+>>>>>>
+>>>>>>
+>>>>>>> - a host kernel configuration?
+>>>>>> Host kernel configuration is just the normal openSUSE one:
+>>>>>>
+>>>>>> https://kernel.opensuse.org/cgit/kernel-source/plain/config/arm64/default?h=stable
+>>>>>>
+>>>>>>>> If anyone is interested in a reproducer, I have something handy. But for
+>>>>>>>> now I believe we should just revert this patch.
+>>>>>>> Before we revert anything, I'd like to understand what is happening.
+>>>>>> Yeah, I didn't realize the commit is already in since 4.16, so I agree.
+>>>>>> I'll bisect a bit, but it may take a while.
+>>>>> Do you mind giving this a try?
+>>>>>
+>>>>> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+>>>>> index 1d90d79706bd..df8f3d5eaa22 100644
+>>>>> --- a/virt/kvm/arm/mmu.c
+>>>>> +++ b/virt/kvm/arm/mmu.c
+>>>>> @@ -1531,7 +1536,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>>>>    			kvm_set_pfn_dirty(pfn);
+>>>>>    		}
+>>>>>    
+>>>>> -		if (fault_status != FSC_PERM)
+>>>>> +		if (fault_status != FSC_PERM || write_fault)
+>>>>>    			clean_dcache_guest_page(pfn, PMD_SIZE);
+>>>>>    
+>>>>>    		if (exec_fault) {
+>>>>> @@ -1553,7 +1558,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>>>>    			mark_page_dirty(kvm, gfn);
+>>>>>    		}
+>>>>>    
+>>>>> -		if (fault_status != FSC_PERM)
+>>>>> +		if (fault_status != FSC_PERM || write_fault)
+>>>>>    			clean_dcache_guest_page(pfn, PAGE_SIZE);
+>>>>>    
+>>>>>    		if (exec_fault) {
+>>>>>
+>>>>>
+>>>>> The missing logic is that a write from the guest could have triggered
+>>>>> a CoW, meaning we definitely need to flush it in that case too. It
+>>>>> fixes a kvm-unit-test regression here.
+>>>> This patch unfortunately does not fix the issue. I still see illegal
+>>>> instructions.
+>>> [+Dave]
+>>>
+>>> That's because what you're observing has nothing to do with caching, but
+>>> with FP/SIMD trapping instead. Thanks to the guest image you've provided,
+>>> I've been able to extract the following:
+>>>
+>>> [    3.944273] systemd-udevd (266): undefined instruction: pc=(ptrval)
+>>> [    3.945396] CPU: 0 PID: 266 Comm: systemd-udevd Not tainted 4.17.14-2-lpae #1 openSUSE Tumbleweed (unreleased)
+>>> [    3.947130] Hardware name: Generic DT based system
+>>> [    3.947976] PC is at 0xb6b9397a
+>>> [    3.948547] LR is at 0xb6e9a1b0
+>>> [    3.958291] pc : [<b6b9397a>]    lr : [<b6e9a1b0>]    psr: 20070030
+>>> [    3.959664] sp : bebe36a0  ip : b6f6ad50  fp : 005e8784
+>>> [    3.960601] r10: bebe3814  r9 : bebe36c0  r8 : bebe36bc
+>>> [    3.961522] r7 : bebe3814  r6 : 00000074  r5 : 00000000  r4 : 00000000
+>>> [    3.962661] r3 : 005f2b60  r2 : 00000074  r1 : 00000000  r0 : bebe3814
+>>> [    3.963801] Flags: nzCv  IRQs on  FIQs on  Mode USER_32  ISA Thumb  Segment user
+>>> [    4.000606] Control: 30c5383d  Table: 6a8e7400  DAC: fffffffd
+>>> [    4.001659] Code: d1f9 f1a0 0001 4770 (eee0) 1b10
+>>>
+>>> maz at flakes:~/armv7-build-fail$ (echo .thumb; echo .inst.w 0xeee01b10) > x.S &&  arm-linux-gnueabihf-gcc -c x.S && arm-linux-gnueabihf-objdump -d x.o
+>>>
+>>> x.o:     file format elf32-littlearm
+>>>
+>>>
+>>> Disassembly of section .text:
+>>>
+>>> 00000000 <.text>:
+>>>     0:	eee0 1b10 	vdup.8	q0, r1
+>>>
+>>> A VFP instruction. Given that you've reported that things worked in
+>>> 4.17 and broke in 4.18, I strongly suspect the new lazy FPSIMD code.
+>>> Upon inspection, the way we setup trapping for 32bit is a tiny bit
+>>> suspect.
+>>>
+>>> Could you please give this patch a go? My Seattle has been running
+>>> with it for 30 minutes now, and it is still running (instead of
+>>> failing with seconds).
+>>>
+>>> Thanks,
+>>>
+>>> 	M.
+>>>
+>>>  From f2d1d43e2429f9269ab6c565440e095ab3a9be89 Mon Sep 17 00:00:00 2001
+>>> From: Marc Zyngier <marc.zyngier@arm.com>
+>>> Date: Thu, 23 Aug 2018 11:51:43 +0100
+>>> Subject: [PATCH] arm64: KVM: Only force FPEXC32_EL2.EN if trapping FPSIMD
+>>>
+>>> If trapping FPSIMD in the context of an AArch32 guest, it is critical
+>>> to set FPEXC32_EL2.EN to 1 so that the trapping is taken to EL2 and
+>>> not EL1.
+>>>
+>>> Conversely, it is just as critical *not* to set FPEXC32_EL2.EN to 1
+>>> if we're not going to trap FPSIMD, as we then corrupt the existing
+>>> VFP state.
+>>>
+>>> Moving the call to __activate_traps_fpsimd32 to the point where we
+>>> know for sure that we are going to trap ensures that we don't set that
+>>> bit spuriously.
+>>>
+>>> Fixes: e6b673b741ea ("KVM: arm64: Optimise FPSIMD handling to reduce guest/host thrashing")
+>>> Cc: Dave Martin <dave.martin@arm.com>
+>>> Reported-by: Alexander Graf <agraf@suse.de>
+>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>
+>> Very good catch. This patch does indeed fix it. I'm still puzzled why 
+>> reverting the dcache patch actually had any positive effect, but oh well 
+>> ... :)
+> 
+> Well, there is still a bug in that dcache patch, which I've fixed
+> separately (in a better way than what I sent before), so you may have
+> hit that as well, but that's not the most visible bug.
+> 
+>> Tested-by: Alexander Graf <agraf@suse.de>
+> 
+> Thanks for that.
 
-On ARM Cortex-A7, these optimizations improve ChaCha20 performance from
-about 12.08 cycles per byte to about 11.37 -- a 5.9% improvement.
+Can I expect to see your patch in 4.19 and 4.18-stable? :)
 
-There is a tradeoff involved with the 'vtbl.8' rotation method since
-there is at least one CPU (Cortex-A53) where it's not fastest.  But it
-seems to be a better default; see the added comment.  Overall, this
-patch reduces Cortex-A53 performance by less than 0.5%.
 
-Signed-off-by: Eric Biggers <ebiggers@google.com>
----
- arch/arm/crypto/chacha20-neon-core.S | 277 ++++++++++++++-------------
- 1 file changed, 143 insertions(+), 134 deletions(-)
-
-diff --git a/arch/arm/crypto/chacha20-neon-core.S b/arch/arm/crypto/chacha20-neon-core.S
-index 451a849ad5186..50e7b98968189 100644
---- a/arch/arm/crypto/chacha20-neon-core.S
-+++ b/arch/arm/crypto/chacha20-neon-core.S
-@@ -18,6 +18,34 @@
-  * (at your option) any later version.
-  */
- 
-+ /*
-+  * NEON doesn't have a rotate instruction.  The alternatives are, more or less:
-+  *
-+  * (a)  vshl.u32 + vsri.u32		(needs temporary register)
-+  * (b)  vshl.u32 + vshr.u32 + vorr	(needs temporary register)
-+  * (c)  vrev32.16			(16-bit rotations only)
-+  * (d)  vtbl.8 + vtbl.8		(multiple of 8 bits rotations only,
-+  *					 needs index vector)
-+  *
-+  * ChaCha20 has 16, 12, 8, and 7-bit rotations.  For the 12 and 7-bit
-+  * rotations, the only choices are (a) and (b).  We use (a) since it takes
-+  * two-thirds the cycles of (b) on both Cortex-A7 and Cortex-A53.
-+  *
-+  * For the 16-bit rotation, we use vrev32.16 since it's consistently fastest
-+  * and doesn't need a temporary register.
-+  *
-+  * For the 8-bit rotation, we use vtbl.8 + vtbl.8.  On Cortex-A7, this sequence
-+  * is twice as fast as (a), even when doing (a) on multiple registers
-+  * simultaneously to eliminate the stall between vshl and vsri.  Also, it
-+  * parallelizes better when temporary registers are scarce.
-+  *
-+  * A disadvantage is that on Cortex-A53, the vtbl sequence is the same speed as
-+  * (a), so the need to load the rotation table actually makes the vtbl method
-+  * slightly slower overall on that CPU (~1.3% slower ChaCha20).  Still, it
-+  * seems to be a good compromise to get a more significant speed boost on some
-+  * CPUs, e.g. ~4.8% faster ChaCha20 on Cortex-A7.
-+  */
-+
- #include <linux/linkage.h>
- 
- 	.text
-@@ -46,7 +74,9 @@ ENTRY(chacha20_block_xor_neon)
- 	vmov		q10, q2
- 	vmov		q11, q3
- 
-+	adr		ip, .Lrol8_table
- 	mov		r3, #10
-+	vld1.8		{d10}, [ip, :64]
- 
- .Ldoubleround:
- 	// x0 += x1, x3 = rotl32(x3 ^ x0, 16)
-@@ -62,9 +92,9 @@ ENTRY(chacha20_block_xor_neon)
- 
- 	// x0 += x1, x3 = rotl32(x3 ^ x0, 8)
- 	vadd.i32	q0, q0, q1
--	veor		q4, q3, q0
--	vshl.u32	q3, q4, #8
--	vsri.u32	q3, q4, #24
-+	veor		q3, q3, q0
-+	vtbl.8		d6, {d6}, d10
-+	vtbl.8		d7, {d7}, d10
- 
- 	// x2 += x3, x1 = rotl32(x1 ^ x2, 7)
- 	vadd.i32	q2, q2, q3
-@@ -92,9 +122,9 @@ ENTRY(chacha20_block_xor_neon)
- 
- 	// x0 += x1, x3 = rotl32(x3 ^ x0, 8)
- 	vadd.i32	q0, q0, q1
--	veor		q4, q3, q0
--	vshl.u32	q3, q4, #8
--	vsri.u32	q3, q4, #24
-+	veor		q3, q3, q0
-+	vtbl.8		d6, {d6}, d10
-+	vtbl.8		d7, {d7}, d10
- 
- 	// x2 += x3, x1 = rotl32(x1 ^ x2, 7)
- 	vadd.i32	q2, q2, q3
-@@ -139,13 +169,17 @@ ENTRY(chacha20_block_xor_neon)
- 	bx		lr
- ENDPROC(chacha20_block_xor_neon)
- 
-+	.align		4
-+.Lctrinc:	.word	0, 1, 2, 3
-+.Lrol8_table:	.byte	3, 0, 1, 2, 7, 4, 5, 6
-+
- 	.align		5
- ENTRY(chacha20_4block_xor_neon)
--	push		{r4-r6, lr}
--	mov		ip, sp			// preserve the stack pointer
--	sub		r3, sp, #0x20		// allocate a 32 byte buffer
--	bic		r3, r3, #0x1f		// aligned to 32 bytes
--	mov		sp, r3
-+	push		{r4-r5}
-+	mov		r4, sp			// preserve the stack pointer
-+	sub		ip, sp, #0x20		// allocate a 32 byte buffer
-+	bic		ip, ip, #0x1f		// aligned to 32 bytes
-+	mov		sp, ip
- 
- 	// r0: Input state matrix, s
- 	// r1: 4 data blocks output, o
-@@ -155,25 +189,24 @@ ENTRY(chacha20_4block_xor_neon)
- 	// This function encrypts four consecutive ChaCha20 blocks by loading
- 	// the state matrix in NEON registers four times. The algorithm performs
- 	// each operation on the corresponding word of each state matrix, hence
--	// requires no word shuffling. For final XORing step we transpose the
--	// matrix by interleaving 32- and then 64-bit words, which allows us to
--	// do XOR in NEON registers.
-+	// requires no word shuffling. The words are re-interleaved before the
-+	// final addition of the original state and the XORing step.
- 	//
- 
--	// x0..15[0-3] = s0..3[0..3]
--	add		r3, r0, #0x20
-+	// x0..15[0-3] = s0..15[0-3]
-+	add		ip, r0, #0x20
- 	vld1.32		{q0-q1}, [r0]
--	vld1.32		{q2-q3}, [r3]
-+	vld1.32		{q2-q3}, [ip]
- 
--	adr		r3, CTRINC
-+	adr		r5, .Lctrinc
- 	vdup.32		q15, d7[1]
- 	vdup.32		q14, d7[0]
--	vld1.32		{q11}, [r3, :128]
-+	vld1.32		{q4}, [r5, :128]
- 	vdup.32		q13, d6[1]
- 	vdup.32		q12, d6[0]
--	vadd.i32	q12, q12, q11		// x12 += counter values 0-3
- 	vdup.32		q11, d5[1]
- 	vdup.32		q10, d5[0]
-+	vadd.u32	q12, q12, q4		// x12 += counter values 0-3
- 	vdup.32		q9, d4[1]
- 	vdup.32		q8, d4[0]
- 	vdup.32		q7, d3[1]
-@@ -185,9 +218,13 @@ ENTRY(chacha20_4block_xor_neon)
- 	vdup.32		q1, d0[1]
- 	vdup.32		q0, d0[0]
- 
-+	adr		ip, .Lrol8_table
- 	mov		r3, #10
-+	b		1f
- 
- .Ldoubleround4:
-+	vld1.32		{q8-q9}, [sp, :256]
-+1:
- 	// x0 += x4, x12 = rotl32(x12 ^ x0, 16)
- 	// x1 += x5, x13 = rotl32(x13 ^ x1, 16)
- 	// x2 += x6, x14 = rotl32(x14 ^ x2, 16)
-@@ -236,24 +273,25 @@ ENTRY(chacha20_4block_xor_neon)
- 	// x1 += x5, x13 = rotl32(x13 ^ x1, 8)
- 	// x2 += x6, x14 = rotl32(x14 ^ x2, 8)
- 	// x3 += x7, x15 = rotl32(x15 ^ x3, 8)
-+	vld1.8		{d16}, [ip, :64]
- 	vadd.i32	q0, q0, q4
- 	vadd.i32	q1, q1, q5
- 	vadd.i32	q2, q2, q6
- 	vadd.i32	q3, q3, q7
- 
--	veor		q8, q12, q0
--	veor		q9, q13, q1
--	vshl.u32	q12, q8, #8
--	vshl.u32	q13, q9, #8
--	vsri.u32	q12, q8, #24
--	vsri.u32	q13, q9, #24
-+	veor		q12, q12, q0
-+	veor		q13, q13, q1
-+	veor		q14, q14, q2
-+	veor		q15, q15, q3
- 
--	veor		q8, q14, q2
--	veor		q9, q15, q3
--	vshl.u32	q14, q8, #8
--	vshl.u32	q15, q9, #8
--	vsri.u32	q14, q8, #24
--	vsri.u32	q15, q9, #24
-+	vtbl.8		d24, {d24}, d16
-+	vtbl.8		d25, {d25}, d16
-+	vtbl.8		d26, {d26}, d16
-+	vtbl.8		d27, {d27}, d16
-+	vtbl.8		d28, {d28}, d16
-+	vtbl.8		d29, {d29}, d16
-+	vtbl.8		d30, {d30}, d16
-+	vtbl.8		d31, {d31}, d16
- 
- 	vld1.32		{q8-q9}, [sp, :256]
- 
-@@ -332,24 +370,25 @@ ENTRY(chacha20_4block_xor_neon)
- 	// x1 += x6, x12 = rotl32(x12 ^ x1, 8)
- 	// x2 += x7, x13 = rotl32(x13 ^ x2, 8)
- 	// x3 += x4, x14 = rotl32(x14 ^ x3, 8)
-+	vld1.8		{d16}, [ip, :64]
- 	vadd.i32	q0, q0, q5
- 	vadd.i32	q1, q1, q6
- 	vadd.i32	q2, q2, q7
- 	vadd.i32	q3, q3, q4
- 
--	veor		q8, q15, q0
--	veor		q9, q12, q1
--	vshl.u32	q15, q8, #8
--	vshl.u32	q12, q9, #8
--	vsri.u32	q15, q8, #24
--	vsri.u32	q12, q9, #24
-+	veor		q15, q15, q0
-+	veor		q12, q12, q1
-+	veor		q13, q13, q2
-+	veor		q14, q14, q3
- 
--	veor		q8, q13, q2
--	veor		q9, q14, q3
--	vshl.u32	q13, q8, #8
--	vshl.u32	q14, q9, #8
--	vsri.u32	q13, q8, #24
--	vsri.u32	q14, q9, #24
-+	vtbl.8		d30, {d30}, d16
-+	vtbl.8		d31, {d31}, d16
-+	vtbl.8		d24, {d24}, d16
-+	vtbl.8		d25, {d25}, d16
-+	vtbl.8		d26, {d26}, d16
-+	vtbl.8		d27, {d27}, d16
-+	vtbl.8		d28, {d28}, d16
-+	vtbl.8		d29, {d29}, d16
- 
- 	vld1.32		{q8-q9}, [sp, :256]
- 
-@@ -379,104 +418,76 @@ ENTRY(chacha20_4block_xor_neon)
- 	vsri.u32	q6, q9, #25
- 
- 	subs		r3, r3, #1
--	beq		0f
--
--	vld1.32		{q8-q9}, [sp, :256]
--	b		.Ldoubleround4
--
--	// x0[0-3] += s0[0]
--	// x1[0-3] += s0[1]
--	// x2[0-3] += s0[2]
--	// x3[0-3] += s0[3]
--0:	ldmia		r0!, {r3-r6}
--	vdup.32		q8, r3
--	vdup.32		q9, r4
--	vadd.i32	q0, q0, q8
--	vadd.i32	q1, q1, q9
--	vdup.32		q8, r5
--	vdup.32		q9, r6
--	vadd.i32	q2, q2, q8
--	vadd.i32	q3, q3, q9
--
--	// x4[0-3] += s1[0]
--	// x5[0-3] += s1[1]
--	// x6[0-3] += s1[2]
--	// x7[0-3] += s1[3]
--	ldmia		r0!, {r3-r6}
--	vdup.32		q8, r3
--	vdup.32		q9, r4
--	vadd.i32	q4, q4, q8
--	vadd.i32	q5, q5, q9
--	vdup.32		q8, r5
--	vdup.32		q9, r6
--	vadd.i32	q6, q6, q8
--	vadd.i32	q7, q7, q9
--
--	// interleave 32-bit words in state n, n+1
--	vzip.32		q0, q1
--	vzip.32		q2, q3
--	vzip.32		q4, q5
--	vzip.32		q6, q7
--
--	// interleave 64-bit words in state n, n+2
-+	bne		.Ldoubleround4
-+
-+	// x0..7[0-3] are in q0-q7, x10..15[0-3] are in q10-q15.
-+	// x8..9[0-3] are on the stack.
-+
-+	// Re-interleave the words in the first two rows of each block (x0..7).
-+	// Also add the counter values 0-3 to x12[0-3].
-+	  vld1.32	{q8}, [r5, :128]	// load counter values 0-3
-+	vzip.32		q0, q1			// => (0 1 0 1) (0 1 0 1)
-+	vzip.32		q2, q3			// => (2 3 2 3) (2 3 2 3)
-+	vzip.32		q4, q5			// => (4 5 4 5) (4 5 4 5)
-+	vzip.32		q6, q7			// => (6 7 6 7) (6 7 6 7)
-+	  vadd.u32	q12, q8			// x12 += counter values 0-3
- 	vswp		d1, d4
- 	vswp		d3, d6
-+	  vld1.32	{q8-q9}, [r0]!		// load s0..7
- 	vswp		d9, d12
- 	vswp		d11, d14
- 
--	// xor with corresponding input, write to output
-+	// Swap q1 and q4 so that we'll free up consecutive registers (q0-q1)
-+	// after XORing the first 32 bytes.
-+	vswp		q1, q4
-+
-+	// First two rows of each block are (q0 q1) (q2 q6) (q4 q5) (q3 q7)
-+
-+	// x0..3[0-3] += s0..3[0-3]	(add orig state to 1st row of each block)
-+	vadd.u32	q0, q0, q8
-+	vadd.u32	q2, q2, q8
-+	vadd.u32	q4, q4, q8
-+	vadd.u32	q3, q3, q8
-+
-+	// x4..7[0-3] += s4..7[0-3]	(add orig state to 2nd row of each block)
-+	vadd.u32	q1, q1, q9
-+	vadd.u32	q6, q6, q9
-+	vadd.u32	q5, q5, q9
-+	vadd.u32	q7, q7, q9
-+
-+	// XOR first 32 bytes using keystream from first two rows of first block
- 	vld1.8		{q8-q9}, [r2]!
- 	veor		q8, q8, q0
--	veor		q9, q9, q4
-+	veor		q9, q9, q1
- 	vst1.8		{q8-q9}, [r1]!
- 
-+	// Re-interleave the words in the last two rows of each block (x8..15).
- 	vld1.32		{q8-q9}, [sp, :256]
--
--	// x8[0-3] += s2[0]
--	// x9[0-3] += s2[1]
--	// x10[0-3] += s2[2]
--	// x11[0-3] += s2[3]
--	ldmia		r0!, {r3-r6}
--	vdup.32		q0, r3
--	vdup.32		q4, r4
--	vadd.i32	q8, q8, q0
--	vadd.i32	q9, q9, q4
--	vdup.32		q0, r5
--	vdup.32		q4, r6
--	vadd.i32	q10, q10, q0
--	vadd.i32	q11, q11, q4
--
--	// x12[0-3] += s3[0]
--	// x13[0-3] += s3[1]
--	// x14[0-3] += s3[2]
--	// x15[0-3] += s3[3]
--	ldmia		r0!, {r3-r6}
--	vdup.32		q0, r3
--	vdup.32		q4, r4
--	adr		r3, CTRINC
--	vadd.i32	q12, q12, q0
--	vld1.32		{q0}, [r3, :128]
--	vadd.i32	q13, q13, q4
--	vadd.i32	q12, q12, q0		// x12 += counter values 0-3
--
--	vdup.32		q0, r5
--	vdup.32		q4, r6
--	vadd.i32	q14, q14, q0
--	vadd.i32	q15, q15, q4
--
--	// interleave 32-bit words in state n, n+1
--	vzip.32		q8, q9
--	vzip.32		q10, q11
--	vzip.32		q12, q13
--	vzip.32		q14, q15
--
--	// interleave 64-bit words in state n, n+2
--	vswp		d17, d20
--	vswp		d19, d22
-+	vzip.32		q12, q13	// => (12 13 12 13) (12 13 12 13)
-+	vzip.32		q14, q15	// => (14 15 14 15) (14 15 14 15)
-+	vzip.32		q8, q9		// => (8 9 8 9) (8 9 8 9)
-+	vzip.32		q10, q11	// => (10 11 10 11) (10 11 10 11)
-+	  vld1.32	{q0-q1}, [r0]	// load s8..15
- 	vswp		d25, d28
- 	vswp		d27, d30
-+	vswp		d17, d20
-+	vswp		d19, d22
-+
-+	// Last two rows of each block are (q8 q12) (q10 q14) (q9 q13) (q11 q15)
-+
-+	// x8..11[0-3] += s8..11[0-3]	(add orig state to 3rd row of each block)
-+	vadd.u32	q8,  q8,  q0
-+	vadd.u32	q10, q10, q0
-+	vadd.u32	q9,  q9,  q0
-+	vadd.u32	q11, q11, q0
-+
-+	// x12..15[0-3] += s12..15[0-3] (add orig state to 4th row of each block)
-+	vadd.u32	q12, q12, q1
-+	vadd.u32	q14, q14, q1
-+	vadd.u32	q13, q13, q1
-+	vadd.u32	q15, q15, q1
- 
--	vmov		q4, q1
-+	// XOR the rest of the data with the keystream
- 
- 	vld1.8		{q0-q1}, [r2]!
- 	veor		q0, q0, q8
-@@ -509,13 +520,11 @@ ENTRY(chacha20_4block_xor_neon)
- 	vst1.8		{q0-q1}, [r1]!
- 
- 	vld1.8		{q0-q1}, [r2]
-+	  mov		sp, r4		// restore original stack pointer
- 	veor		q0, q0, q11
- 	veor		q1, q1, q15
- 	vst1.8		{q0-q1}, [r1]
- 
--	mov		sp, ip
--	pop		{r4-r6, pc}
-+	pop		{r4-r5}
-+	bx		lr
- ENDPROC(chacha20_4block_xor_neon)
--
--	.align		4
--CTRINC:	.word		0, 1, 2, 3
--- 
-2.18.0
+Alex
