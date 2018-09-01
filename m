@@ -1,90 +1,28 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Fri, 31 Aug 2018 19:45:49 -0700
-Subject: [PATCH v5 1/2] clk: Add of_clk_get_by_name_optional() function
-In-Reply-To: <1535724443-21150-2-git-send-email-phil.edworthy@renesas.com>
-References: <1535724443-21150-1-git-send-email-phil.edworthy@renesas.com>
- <1535724443-21150-2-git-send-email-phil.edworthy@renesas.com>
-Message-ID: <153576994987.19113.11376893046599589648@swboyd.mtv.corp.google.com>
+Date: Fri, 31 Aug 2018 19:46:54 -0700
+Subject: [PATCH 0/4] media: platform: Add Aspeed Video Engine driver
+In-Reply-To: <a959a032-6817-dcb4-2c5f-b4bd17fc1c8b@linux.vnet.ibm.com>
+References: <1535576973-8067-1-git-send-email-eajames@linux.vnet.ibm.com>
+ <153573819126.93865.1884182656081956202@swboyd.mtv.corp.google.com>
+ <a959a032-6817-dcb4-2c5f-b4bd17fc1c8b@linux.vnet.ibm.com>
+Message-ID: <153577001451.19113.16924655760277630355@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Phil Edworthy (2018-08-31 07:07:22)
-> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-> index 9ab3db8..4adb99e 100644
-> --- a/drivers/clk/clkdev.c
-> +++ b/drivers/clk/clkdev.c
-> @@ -54,30 +54,29 @@ EXPORT_SYMBOL(of_clk_get);
->  
->  static struct clk *__of_clk_get_by_name(struct device_node *np,
->                                         const char *dev_id,
-> -                                       const char *name)
-> +                                       const char *name,
-> +                                       bool optional)
->  {
->         struct clk *clk = ERR_PTR(-ENOENT);
-> +       struct device_node *child = np;
-> +       int index = 0;
->  
->         /* Walk up the tree of devices looking for a clock that matches */
->         while (np) {
-> -               int index = 0;
->  
->                 /*
->                  * For named clocks, first look up the name in the
->                  * "clock-names" property.  If it cannot be found, then
-> -                * index will be an error code, and of_clk_get() will fail.
-> +                * index will be an error code.
->                  */
->                 if (name)
->                         index = of_property_match_string(np, "clock-names", name);
-> -               clk = __of_clk_get(np, index, dev_id, name);
-> -               if (!IS_ERR(clk)) {
-> -                       break;
-> -               } else if (name && index >= 0) {
-> -                       if (PTR_ERR(clk) != -EPROBE_DEFER)
-> -                               pr_err("ERROR: could not get clock %pOF:%s(%i)\n",
-> -                                       np, name ? name : "", index);
-> +               if (index >= 0)
-> +                       clk = __of_clk_get(np, index, dev_id, name);
-> +               if (!IS_ERR(clk))
+Quoting Eddie James (2018-08-31 12:30:02)
+> 
+> 
+> On 08/31/2018 12:56 PM, Stephen Boyd wrote:
+> > Quoting Eddie James (2018-08-29 14:09:29)
+> > Please let me know your merge strategy here. I can ack the clk patches
+> > because they look fine from high-level clk driver perspective (maybe
+> > Joel can take a closer look) or I can merge the patches into clk-next
+> > and get them into next release while the video driver gets reviewed.
+> 
+> Thanks for taking a look! Probably preferable to get the clk patches 
+> into clk-next first (though Joel reviewing would be great). I just put 
+> everything in the same set for the sake of explaining the necessity of 
+> the clk changes.
+> 
 
-Was this change necessary? It looks like we can leave it all alone and
-keep passing a negative number to __of_clk_get() and have that return an
-error pointer which we then return immediately as an error. But, if the
-clock is optional and we've passed a name here, shouldn't we treat an
-error from of_property_match_string() as success too? This is all
-looking pretty fragile so maybe it can be better commented and also more
-explicit instead of relying on the reader to jump through all the
-function calls to figure out what the return value is in some cases.
-
->                         return clk;
-> -               }
-> +               if (name && index >= 0)
-> +                       break;
-
-And this causes us to duplicate logic down below because we have to
-check it again if it's not optional or some other error condition?
-
->  
->                 /*
->                  * No matching clock found on this node.  If the parent node
-> @@ -89,6 +88,16 @@ static struct clk *__of_clk_get_by_name(struct device_node *np,
->                         break;
->         }
->  
-> +       /* The clock is not valid, but it could be optional or deferred */
-> +       if (optional && PTR_ERR(clk) == -ENOENT) {
-> +               clk = NULL;
-> +               pr_info("no optional clock %pOF:%s\n", child,
-> +                       name ? name : "");
-
-Is this intentionally pr_info?
-
-> +       } else if (name && index >= 0 && PTR_ERR(clk) != -EPROBE_DEFER) {
-> +               pr_err("ERROR: could not get clock %pOF:%s(%i)\n",
-> +                       child, name, index);
-> +       }
-> +
->         return clk;
->  }
->  
+Ok. If Joel is able to review then I can easily merge it into clk-next.
