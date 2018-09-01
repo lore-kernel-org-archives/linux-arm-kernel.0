@@ -1,87 +1,42 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Sat, 1 Sep 2018 15:11:05 +0200
-Subject: [PATCH v2 02/29] Documentation: nvmem: document lookup entries
-In-Reply-To: <20180831203028.GC62862@ban.mtv.corp.google.com>
-References: <20180810080526.27207-1-brgl@bgdev.pl>
- <20180810080526.27207-3-brgl@bgdev.pl>
- <20180831203028.GC62862@ban.mtv.corp.google.com>
-Message-ID: <CAMRc=MdergeeYO9HLiFX5_n=SJr22dOJBG2y3+DwkB29XeaFJA@mail.gmail.com>
+From: mirq-linux@rere.qmqm.pl (=?iso-8859-2?Q?Micha=B3_Miros=B3aw?=)
+Date: Sat, 1 Sep 2018 15:45:31 +0200
+Subject: [PATCH v2 00/12] remove_conflicting_framebuffers() cleanup
+In-Reply-To: <153570646209.15613.3061584574975657074@skylake-alporthouse-com>
+References: <cover.1511544782.git.mirq-linux@rere.qmqm.pl>
+ <cover.1535656077.git.mirq-linux@rere.qmqm.pl>
+ <20180831090439.GT21634@phenom.ffwll.local>
+ <153570646209.15613.3061584574975657074@skylake-alporthouse-com>
+Message-ID: <20180901134531.GA23402@qmqm.qmqm.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-08-31 22:30 GMT+02:00 Brian Norris <computersforpeace@gmail.com>:
-> On Fri, Aug 10, 2018 at 10:04:59AM +0200, Bartosz Golaszewski wrote:
->> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>
->> Describe the usage of nvmem cell lookup tables.
->>
->> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->> ---
->>  Documentation/nvmem/nvmem.txt | 28 ++++++++++++++++++++++++++++
->>  1 file changed, 28 insertions(+)
->>
->> diff --git a/Documentation/nvmem/nvmem.txt b/Documentation/nvmem/nvmem.txt
->> index 8d8d8f58f96f..9d5e3ca2b4f3 100644
->> --- a/Documentation/nvmem/nvmem.txt
->> +++ b/Documentation/nvmem/nvmem.txt
->> @@ -58,6 +58,34 @@ static int qfprom_probe(struct platform_device *pdev)
->>  It is mandatory that the NVMEM provider has a regmap associated with its
->>  struct device. Failure to do would return error code from nvmem_register().
->>
->> +Additionally it is possible to create nvmem cell lookup entries and register
->> +them with the nvmem framework from machine code as shown in the example below:
->
-> Maybe it's partially a lacking in the existing documentation, but what
-> does the "name" and the "nvmem_name" mean here? AFAICT, "nvmem_name" is
-> akin to a provider identifier; and "name" is a key to match with the
-> consumer. It feels like this should be in either the header / kerneldoc
-> or this file. Or maybe both.
->
-> Does this mean there can only be a single "mac-address" cell in the
-> system? I have systems where there are multiple MACs provided in flash
-> storage, and we need to map them to ethernet0 and ethernet1. Is that
-> supported here?
->
+On Fri, Aug 31, 2018 at 10:07:42AM +0100, Chris Wilson wrote:
+[...]
+> Ahah, someone is looking at remove_conflicting_framebuffers(). May I
+> interest you in a use-after-free?
 
-This is a shortcoming of the nvmem subsystem we discussed under
-another patch in this series with Boris and Srinivas. I will try to
-post a series addressing this next week. Basically there's a global
-list of nvmem cells referenced only by name and unless you're using DT
-you can only have a single cell with given name. I will address it by
-introducing the standard dev_id/con_id resource association.
+> [  378.423513] stack segment: 0000 [#1] PREEMPT SMP PTI
+> [  378.423530] CPU: 1 PID: 4338 Comm: pm_rpm Tainted: G     U            4.19.0-rc1-CI-CI_DRM_4746+ #1
+> [  378.423548] Hardware name: To Be Filled By O.E.M. To Be Filled By O.E.M./J4205-ITX, BIOS P1.10 09/29/2016
+> [  378.423570] RIP: 0010:do_remove_conflicting_framebuffers+0x56/0x170
+> [  378.423587] Code: 49 8b 45 00 48 85 c0 74 50 f6 40 0a 08 74 4a 4d 85 e4 48 8b a8 78 04 00 00 74 1f 48 85 ed 74 1a 41 8b 0c 24 31 db 85 c9 74 10 <8b> 55 00 85 d2 75 42 83 c3 01 41 39 1c 24 77 f0 48 85 ed 74 1a 45
+> [  378.423620] RSP: 0018:ffffc900001dfa88 EFLAGS: 00010202
+> [  378.423632] RAX: ffff880274470008 RBX: 0000000000000000 RCX: 0000000000000001
+> [  378.423646] RDX: 0000000000000001 RSI: ffffffffa025c634 RDI: ffff88025cc3b428
+> [  378.423660] RBP: 6b6b6b6b6b6b6b6b R08: 000000001edaddfa R09: ffffffffa025c634
+> [  378.423673] R10: ffffc900001dfae8 R11: ffffffff820de938 R12: ffff88025cc3b428
+> [  378.423687] R13: ffffffff8234ca20 R14: ffffffff8234cb20 R15: 0000000000000001
+> [  378.423701] FS:  00007fcf03d0a980(0000) GS:ffff880277e80000(0000) knlGS:0000000000000000
+> [  378.423717] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+> [  378.423729] CR2: 00007fffece1fdb8 CR3: 00000001fe32e000 CR4: 00000000003406e0
+> [  378.423742] Call Trace:
+> [  378.423756]  remove_conflicting_framebuffers+0x28/0x40
+> [  378.423856]  i915_driver_load+0x7f5/0x10c0 [i915]
+[...]
 
-Bart
+Looks like registered_fb[] entry is pointing to (partially?) freed or
+corrupted fb_info, but I can't see how this could be an effect of
+remove_conflicting_framebuffers().
 
-> Brian
->
->> +static struct nvmem_cell_lookup foobar_lookup = {
->> +     .info = {
->> +             .name = "mac-address",
->> +             .offset = 0xd000,
->> +             .bytes = ERH_ALEN,
->> +     },
->> +     .nvmem_name = "foobar",
->> +};
->> +
->> +static void foobar_register(void)
->> +{
->> +     ...
->> +     nvmem_add_lookup_table(&foobar_lookup, 1);
->> +     ...
->> +}
->> +
->> +A lookup entry table can be later removed if needed:
->> +
->> +static void foobar_fini(void)
->> +{
->> +     ...
->> +     nvmem_del_lookup_table(&foobar_lookup, 1);
->> +     ...
->> +}
->> +
->>  NVMEM Consumers
->>  +++++++++++++++
->>
->> --
->> 2.18.0
->>
+Best Regards,
+Micha? Miros?aw
