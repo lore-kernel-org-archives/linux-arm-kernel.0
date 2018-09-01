@@ -1,28 +1,56 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 1 Sep 2018 18:23:06 -0700
-Subject: [GIT PULL] omap fixes for v4.19-rc cycle
-In-Reply-To: <pull-1535578186-113331@atomide.com>
-References: <pull-1535578186-113331@atomide.com>
-Message-ID: <CAOesGMgPnFuPzBY2azCUFNcOMEmhNSYtNBeR9famYM=JncWSyQ@mail.gmail.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Sun, 2 Sep 2018 05:23:50 +0800
+Subject: [RFC PATCH] spi: at91-usart: at91_usart_spi_transfer_one() can be
+ static
+In-Reply-To: <20180831134141.9335-6-radu.pirea@microchip.com>
+References: <20180831134141.9335-6-radu.pirea@microchip.com>
+Message-ID: <20180901212350.GA89606@lkp-ib04>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 29, 2018 at 2:30 PM, Tony Lindgren <tony@atomide.com> wrote:
-> From: "Tony Lindgren" <tony@atomide.com>
->
-> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
->
->   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
->
-> are available in the Git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.19/fixes-v2-signed
->
-> for you to fetch changes up to 2d59bb602314a4b2593fde267734266b5e872dd0:
->
->   ARM: dts: omap4-droid4: Fix emmc errors seen on some devices (2018-08-28 09:59:46 -0700)
 
-Merged, thanks.
+Fixes: 5890bab41187 ("spi: at91-usart: add driver for at91-usart as spi")
+Signed-off-by: kbuild test robot <fengguang.wu@intel.com>
+---
+ spi-at91-usart.c |   14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-
--Olof
+diff --git a/drivers/spi/spi-at91-usart.c b/drivers/spi/spi-at91-usart.c
+index 4712bd4..a924657 100644
+--- a/drivers/spi/spi-at91-usart.c
++++ b/drivers/spi/spi-at91-usart.c
+@@ -215,9 +215,9 @@ static int at91_usart_spi_setup(struct spi_device *spi)
+ 	return 0;
+ }
+ 
+-int at91_usart_spi_transfer_one(struct spi_controller *ctlr,
+-				struct spi_device *spi,
+-				struct spi_transfer *xfer)
++static int at91_usart_spi_transfer_one(struct spi_controller *ctlr,
++				       struct spi_device *spi,
++				       struct spi_transfer *xfer)
+ {
+ 	struct at91_usart_spi *aus = spi_master_get_devdata(ctlr);
+ 
+@@ -242,8 +242,8 @@ int at91_usart_spi_transfer_one(struct spi_controller *ctlr,
+ 	return 0;
+ }
+ 
+-int at91_usart_spi_prepare_message(struct spi_controller *ctlr,
+-				   struct spi_message *message)
++static int at91_usart_spi_prepare_message(struct spi_controller *ctlr,
++					  struct spi_message *message)
+ {
+ 	struct at91_usart_spi *aus = spi_master_get_devdata(ctlr);
+ 	struct spi_device *spi = message->spi;
+@@ -256,8 +256,8 @@ int at91_usart_spi_prepare_message(struct spi_controller *ctlr,
+ 	return 0;
+ }
+ 
+-int at91_usart_spi_unprepare_message(struct spi_controller *ctlr,
+-				     struct spi_message *message)
++static int at91_usart_spi_unprepare_message(struct spi_controller *ctlr,
++					    struct spi_message *message)
+ {
+ 	struct at91_usart_spi *aus = spi_master_get_devdata(ctlr);
+ 
