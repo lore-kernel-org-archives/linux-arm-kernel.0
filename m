@@ -1,261 +1,111 @@
-From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sun,  2 Sep 2018 09:26:42 +0200
-Subject: [PATCH 26/27] arm64: dts: sun50i: h6: Add HDMI pipeline
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sun, 2 Sep 2018 17:31:50 +0800
+Subject: [PATCH 00/27] Allwinner H6 DE3 and HDMI support
 In-Reply-To: <20180902072643.4917-1-jernej.skrabec@siol.net>
 References: <20180902072643.4917-1-jernej.skrabec@siol.net>
-Message-ID: <20180902072643.4917-27-jernej.skrabec@siol.net>
+Message-ID: <CAGb2v66coQW2vNgEkcLeN0VuV4r18baqYVrgqspLA5FvRfgcEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds all entries needed for HDMI to function properly.
+On Sun, Sep 2, 2018 at 3:27 PM Jernej Skrabec <jernej.skrabec@siol.net> wrote:
+>
+> This series adds support for Display Engine 3.0 and HDMI 2.0a, which
+> can be found on H6 SoC.
+>
+> Display Engine 3.0 in comparison to 2.0 mostly adds features needed for
+> displaying and processing 10-bit and AFBC formats, which are not yet
+> supported by this series.
+>
+> This series is based on linux-next at next-20180828, which has working
+> R40 display pipeline support. I'll rebase series on later linux-next, if
+> needed, once R40 display pipeline support is reintroduced.
+>
+> I suggest all patches go through allwinner tree, except DRM patches,
+> which should go through drm-misc tree.
+>
+> Last detail, PineH64 model A schematic has DDC_EN signal, which enables
+> DDC voltage level shifter. TL Lim, PINE64 founder, said that this
+> signal is not actually present on PineH64 model A board. It is, however
+> present on PineH64 model B engineering samples, but it will be removed
+> in production version. Because of that, I didn't include any code for
+> it.
+>
+> Please take a look.
+>
+> Best regards,
+> Jernej
+>
+> Icenowy Zheng (7):
+>   dt-bindings: sunxi-sram: add binding for Allwinner H6 SRAM C
+>   arm64: allwinner: h6: add system controller device tree node
 
-Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-[added DE3 bus]
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 201 +++++++++++++++++++
- 1 file changed, 201 insertions(+)
+Prefix should be "arm64: dts: allwinner: h6: ".
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-index 040828d2e2c0..59dda8f89d23 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-@@ -6,8 +6,11 @@
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/clock/sun50i-h6-ccu.h>
- #include <dt-bindings/clock/sun50i-h6-r-ccu.h>
-+#include <dt-bindings/clock/sun8i-de2.h>
-+#include <dt-bindings/clock/sun8i-tcon-top.h>
- #include <dt-bindings/reset/sun50i-h6-ccu.h>
- #include <dt-bindings/reset/sun50i-h6-r-ccu.h>
-+#include <dt-bindings/reset/sun8i-de2.h>
- 
- / {
- 	interrupt-parent = <&gic>;
-@@ -86,12 +89,63 @@
- 			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
- 	};
- 
-+	de: display-engine {
-+		compatible = "allwinner,sun50i-h6-display-engine";
-+		allwinner,pipelines = <&mixer0>;
-+		status = "disabled";
-+	};
-+
- 	soc {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 		ranges;
- 
-+		de3 at 1000000 {
-+			compatible = "allwinner,sun50i-h6-de3",
-+				     "allwinner,sun50i-a64-de2";
-+			reg = <0x1000000 0x400000>;
-+			allwinner,sram = <&de2_sram 1>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 0x1000000 0x400000>;
-+
-+			display_clocks: clock at 0 {
-+				compatible = "allwinner,sun50i-h6-de3-clk";
-+				reg = <0x0 0x10000>;
-+				clocks = <&ccu CLK_DE>,
-+					 <&ccu CLK_BUS_DE>;
-+				clock-names = "mod",
-+					      "bus";
-+				resets = <&ccu RST_BUS_DE>;
-+				#clock-cells = <1>;
-+				#reset-cells = <1>;
-+			};
-+
-+			mixer0: mixer at 100000 {
-+				compatible = "allwinner,sun50i-h6-de3-mixer-0";
-+				reg = <0x100000 0x100000>;
-+				clocks = <&display_clocks CLK_BUS_MIXER0>,
-+					 <&display_clocks CLK_MIXER0>;
-+				clock-names = "bus",
-+					      "mod";
-+				resets = <&display_clocks RST_MIXER0>;
-+
-+				ports {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+
-+					mixer0_out: port at 1 {
-+						reg = <1>;
-+
-+						mixer0_out_tcon_top_mixer0: endpoint {
-+							remote-endpoint = <&tcon_top_mixer0_in_mixer0>;
-+						};
-+					};
-+				};
-+			};
-+		};
-+
- 		syscon: syscon at 3000000 {
- 			compatible = "allwinner,sun50i-h6-system-control",
- 				     "allwinner,sun50i-a64-system-control";
-@@ -149,6 +203,11 @@
- 			interrupt-controller;
- 			#interrupt-cells = <3>;
- 
-+			hdmi_pins: hdmi-pins {
-+				pins = "PH8", "PH9", "PH10";
-+				function = "hdmi";
-+			};
-+
- 			mmc0_pins: mmc0-pins {
- 				pins = "PF0", "PF1", "PF2", "PF3",
- 				       "PF4", "PF5";
-@@ -258,6 +317,148 @@
- 			status = "disabled";
- 		};
- 
-+		hdmi: hdmi at 6000000 {
-+			compatible = "allwinner,sun50i-h6-dw-hdmi";
-+			reg = <0x06000000 0x10000>;
-+			reg-io-width = <1>;
-+			interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI_SLOW>,
-+				 <&ccu CLK_HDMI>, <&ccu CLK_HDMI_CEC>,
-+				 <&ccu CLK_HDCP>, <&ccu CLK_BUS_HDCP>;
-+			clock-names = "iahb", "isfr", "tmds", "cec", "hdcp",
-+				      "hdcp-bus";
-+			resets = <&ccu RST_BUS_HDMI_SUB>, <&ccu RST_BUS_HDCP>;
-+			reset-names = "ctrl", "hdcp";
-+			phys = <&hdmi_phy>;
-+			phy-names = "hdmi-phy";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&hdmi_pins>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				hdmi_in: port at 0 {
-+					reg = <0>;
-+
-+					hdmi_in_tcon_top: endpoint {
-+						remote-endpoint = <&tcon_top_hdmi_out_hdmi>;
-+					};
-+				};
-+
-+				hdmi_out: port at 1 {
-+					reg = <1>;
-+				};
-+			};
-+		};
-+
-+		hdmi_phy: hdmi-phy at 6010000 {
-+			compatible = "allwinner,sun50i-h6-hdmi-phy";
-+			reg = <0x06010000 0x10000>;
-+			clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI_SLOW>;
-+			clock-names = "bus", "mod";
-+			resets = <&ccu RST_BUS_HDMI>;
-+			reset-names = "phy";
-+			#phy-cells = <0>;
-+		};
-+
-+		tcon_top: tcon-top at 6510000 {
-+			compatible = "allwinner,sun50i-h6-tcon-top";
-+			reg = <0x06510000 0x1000>;
-+			clocks = <&ccu CLK_BUS_TCON_TOP>,
-+				 <&ccu CLK_TCON_TV0>;
-+			clock-names = "bus",
-+				      "tcon-tv0";
-+			clock-output-names = "tcon-top-tv0";
-+			resets = <&ccu RST_BUS_TCON_TOP>;
-+			reset-names = "rst";
-+			#clock-cells = <1>;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				tcon_top_mixer0_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+
-+					tcon_top_mixer0_in_mixer0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&mixer0_out_tcon_top_mixer0>;
-+					};
-+				};
-+
-+				tcon_top_mixer0_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					tcon_top_mixer0_out_tcon_tv: endpoint at 2 {
-+						reg = <2>;
-+						remote-endpoint = <&tcon_tv_in_tcon_top_mixer0>;
-+					};
-+				};
-+
-+				tcon_top_hdmi_in: port at 4 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <4>;
-+
-+					tcon_top_hdmi_in_tcon_tv: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&tcon_tv_out_tcon_top>;
-+					};
-+				};
-+
-+				tcon_top_hdmi_out: port at 5 {
-+					reg = <5>;
-+
-+					tcon_top_hdmi_out_hdmi: endpoint {
-+						remote-endpoint = <&hdmi_in_tcon_top>;
-+					};
-+				};
-+			};
-+		};
-+
-+		tcon_tv: lcd-controller at 6515000 {
-+			compatible = "allwinner,sun50i-h6-tcon-tv",
-+				     "allwinner,sun8i-r40-tcon-tv";
-+			reg = <0x06515000 0x1000>;
-+			interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_TCON_TV0>,
-+				 <&tcon_top CLK_TCON_TOP_TV0>;
-+			clock-names = "ahb",
-+				      "tcon-ch1";
-+			resets = <&ccu RST_BUS_TCON_TV0>;
-+			reset-names = "lcd";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				tcon_tv_in: port at 0 {
-+					reg = <0>;
-+
-+					tcon_tv_in_tcon_top_mixer0: endpoint {
-+						remote-endpoint = <&tcon_top_mixer0_out_tcon_tv>;
-+					};
-+				};
-+
-+				tcon_tv_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					tcon_tv_out_tcon_top: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&tcon_top_hdmi_in_tcon_tv>;
-+					};
-+				};
-+			};
-+		};
-+
- 		r_ccu: clock at 7010000 {
- 			compatible = "allwinner,sun50i-h6-r-ccu";
- 			reg = <0x07010000 0x400>;
--- 
-2.18.0
+>   dt-bindings: bus: add H6 DE3 bus binding
+>   dt-bindings: display: sunxi: add DT binding for Allwinner H6 DW HDMI
+>   drm: sun4i: add quirks for TCON TOP
+>   dt-bindings: display: sun4i-drm: document H6 TCON TOP
+>   drm: sun4i: add support for H6 TCON TOP
+>
+> Jernej Skrabec (20):
+>   clk: sunxi-ng: Adjust MP clock parent rate when allowed
+>   clk: sunxi-ng: Use u64 for calculation of NM rate
+>   clk: sunxi-ng: h6: Set video PLLs limits
+>   dt-bindings: clock: sun8i-de2: Add H6 DE3 clock description
+>   clk: sunxi-ng: Add support for H6 DE3 clocks
+>   dt-bindings: display: sun4i-drm: Add H6 display engine compatibles
+>   drm/sun4i: Add compatible for H6 display engine
+>   drm/sun4i: Rework DE2 register defines
+>   drm/sun4i: Add basic support for DE3
+>   drm/sun4i: Add support for H6 DE3 mixer 0
+>   drm/bridge/synopsys: dw-hdmi: Enable workaround for v2.12a
+>   drm/sun4i: Not all DW HDMI controllers has scrambled addresses
+>   drm/sun4i: dw-hdmi: Make mode_valid function configurable
+>   drm/sun4i: dw-hdmi: Add quirk for setting TMDS clock
+>   drm/sun4i: Add support for H6 DW HDMI controller
+>   drm/sun4i: Add support for Synopsys HDMI PHY
+>   drm/sun4i: Add support for H6 HDMI PHY
+>   drm/sun4i: Initialize registers in tcon-top driver
+>   arm64: dts: sun50i: h6: Add HDMI pipeline
+>   arm64: dts: sun50i: h6: Enable HDMI output on Pine H64 board
+
+Same here.
+
+ChenYu
+
+>
+>  .../bindings/bus/sun50i-de2-bus.txt           |   9 +-
+>  .../devicetree/bindings/clock/sun8i-de2.txt   |   5 +-
+>  .../bindings/display/sunxi/sun4i-drm.txt      |  30 ++-
+>  .../devicetree/bindings/sram/sunxi-sram.txt   |   4 +
+>  .../boot/dts/allwinner/sun50i-h6-pine-h64.dts |  25 ++
+>  arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi  | 224 ++++++++++++++++++
+>  drivers/clk/sunxi-ng/ccu-sun50i-h6.c          |   4 +
+>  drivers/clk/sunxi-ng/ccu-sun8i-de2.c          |  65 +++++
+>  drivers/clk/sunxi-ng/ccu-sun8i-de2.h          |   1 +
+>  drivers/clk/sunxi-ng/ccu_mp.c                 |  64 ++++-
+>  drivers/clk/sunxi-ng/ccu_nm.c                 |  18 +-
+>  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c     |   1 +
+>  drivers/gpu/drm/sun4i/sun4i_drv.c             |   1 +
+>  drivers/gpu/drm/sun4i/sun8i_csc.c             |  96 +++++++-
+>  drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c         |  45 +++-
+>  drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h         |  14 +-
+>  drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c        | 178 +++++++++++++-
+>  drivers/gpu/drm/sun4i/sun8i_mixer.c           |  44 +++-
+>  drivers/gpu/drm/sun4i/sun8i_mixer.h           |  61 +++--
+>  drivers/gpu/drm/sun4i/sun8i_tcon_top.c        |  58 ++++-
+>  drivers/gpu/drm/sun4i/sun8i_ui_layer.c        |  47 ++--
+>  drivers/gpu/drm/sun4i/sun8i_ui_layer.h        |  37 +--
+>  drivers/gpu/drm/sun4i/sun8i_ui_scaler.c       |  45 ++--
+>  drivers/gpu/drm/sun4i/sun8i_ui_scaler.h       |  28 +--
+>  drivers/gpu/drm/sun4i/sun8i_vi_layer.c        |  55 +++--
+>  drivers/gpu/drm/sun4i/sun8i_vi_layer.h        |  25 +-
+>  drivers/gpu/drm/sun4i/sun8i_vi_scaler.c       |  85 +++++--
+>  drivers/gpu/drm/sun4i/sun8i_vi_scaler.h       |  68 ++++--
+>  include/dt-bindings/clock/sun8i-de2.h         |   3 +
+>  include/dt-bindings/reset/sun8i-de2.h         |   1 +
+>  30 files changed, 1127 insertions(+), 214 deletions(-)
+>
+> --
+> 2.18.0
+>
