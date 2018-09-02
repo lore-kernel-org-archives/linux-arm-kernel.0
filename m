@@ -1,60 +1,32 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 2 Sep 2018 18:26:44 +0200 (CEST)
-Subject: [PATCH RFC 0/2] hwmon: Add RPi PoE HAT fan driver
-In-Reply-To: <99ca4f6d-d2b2-36e7-9f27-189df379cfaf@roeck-us.net>
-References: <1535887251-29515-1-git-send-email-stefan.wahren@i2se.com>
- <99ca4f6d-d2b2-36e7-9f27-189df379cfaf@roeck-us.net>
-Message-ID: <67224834.51159.1535905604770@email.1und1.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun,  2 Sep 2018 18:29:10 +0200
+Subject: [PATCH 0/2] SFF support for ZII CFU1 and devel C.
+Message-ID: <1535905752-17730-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
+Both the ZII CFU1 and Devel C have SFF modules. These patches add some
+of them to the device tree description of these boards.
 
-> Guenter Roeck <linux@roeck-us.net> hat am 2. September 2018 um 16:23 geschrieben:
-> 
-> 
-> On 09/02/2018 04:20 AM, Stefan Wahren wrote:
-> > This series is an early stage of the hwmon driver for the fan on the
-> > Raspberry Pi Power over Ethernet HAT [1]. At the end this should use a
-> > Device Tree Overlay.
-> > 
-> > Changes by Stefan based on [2]:
-> > - reformat the downstream patches for submission
-> > - drop reboot notification
-> > - fix remaining checkpatch issues
-> > - add COMPILE_TEST to Kconfig
-> > 
-> > The driver is mostly copy & paste from pwm-fan, which isn't good. Personally
-> > i see two options:
-> > 
-> > 1) integrate the driver function into the pwm-fan driver (new compatible)
-> > 2) implement the core function as a PWM driver and use the pwm-fan driver on top
-> > 
-> 
-> I don't really see the point of thise driver. Why not implement either of those ?
+In order for the CFU1 to fully work, it requires patches submitted in
+net-next. Without those patches, the link partner must already be up
+when the SFF interface is configured up. There are no build time
+dependencies, so merging them via different trees is not a problem.
 
-i'm not sure about your question. Since the fan is placed over the SoC, the fan should takes care of the SoC temperature. AFAIK the firmware should have exclusive access to the I2C. So why we need this mailbox interface instead of a I2C driver.
+Devel C generally has 2 SFF modules populated. The patch here adds
+full support for SFF2. All the needed driver code is already present.
+SFF3 is not yet supported by the mv88e6xxx driver. So the SFF3 device
+itself is added to DT, but the module is not linked to a port.
 
-> 2) sounds like a perfect fit to me.
-> 
-> Guenter
-> 
-> > [1] - https://www.raspberrypi.org/products/poe-hat/
-> > [2] - https://github.com/raspberrypi/linux/commit/0f937c8dc3201ebffa6c617c616fd7c65db65959
-> > 
-> > Serge Schneider (2):
-> >    dt-bindings: hwmon: Add RPi PoE HAT documentation
-> >    hwmon: Add RPi PoE HAT fan driver
-> > 
-> >   .../devicetree/bindings/hwmon/rpi-poe-fan.txt      |  55 +++
-> >   Documentation/hwmon/rpi-poe-fan                    |  15 +
-> >   drivers/hwmon/Kconfig                              |  11 +
-> >   drivers/hwmon/Makefile                             |   1 +
-> >   drivers/hwmon/rpi-poe-fan.c                        | 414 +++++++++++++++++++++
-> >   include/soc/bcm2835/raspberrypi-firmware.h         |   2 +
-> >   6 files changed, 498 insertions(+)
-> >   create mode 100644 Documentation/devicetree/bindings/hwmon/rpi-poe-fan.txt
-> >   create mode 100644 Documentation/hwmon/rpi-poe-fan
-> >   create mode 100644 drivers/hwmon/rpi-poe-fan.c
-> > 
->
+Andrew Lunn (1):
+  ARM: dts: vf610-zii-cfu1: Add SFF interface to switch
+
+Russell King (1):
+  ARM: dts: vf610-zii-dev-rev-c: add support for one SFF module
+
+ arch/arm/boot/dts/vf610-zii-cfu1.dts      | 27 ++++++++++++++
+ arch/arm/boot/dts/vf610-zii-dev-rev-c.dts | 44 +++++++++++++----------
+ 2 files changed, 52 insertions(+), 19 deletions(-)
+
+-- 
+2.19.0.rc1
