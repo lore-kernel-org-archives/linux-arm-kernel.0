@@ -1,50 +1,47 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sun,  2 Sep 2018 09:26:17 +0200
-Subject: [PATCH 01/27] dt-bindings: sunxi-sram: add binding for Allwinner H6
- SRAM C
+Date: Sun,  2 Sep 2018 09:26:19 +0200
+Subject: [PATCH 03/27] dt-bindings: bus: add H6 DE3 bus binding
 In-Reply-To: <20180902072643.4917-1-jernej.skrabec@siol.net>
 References: <20180902072643.4917-1-jernej.skrabec@siol.net>
-Message-ID: <20180902072643.4917-2-jernej.skrabec@siol.net>
+Message-ID: <20180902072643.4917-4-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Icenowy Zheng <icenowy@aosc.io>
 
-The Allwinner H6 SoC's DE3 needs the SRAM C section being claimed in the
-system controller to work, like A64 DE2.
+The Allwinner H6 DE3 bus is similar to the A64 DE2 one.
 
-As H6 and A64 system controller are quite similar, code is reused now,
-and the A64 fallback compatible string is added after the H6 compatible
-string.
+Add its compatible string with the A64 string as fallback to the
+binding.
+
+Some description of the binding is modified to make it more generic.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-[fixed typo in compatible string]
-Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- Documentation/devicetree/bindings/sram/sunxi-sram.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+ Documentation/devicetree/bindings/bus/sun50i-de2-bus.txt | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/sram/sunxi-sram.txt b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
-index c51ade86578c..62dd0748f0ef 100644
---- a/Documentation/devicetree/bindings/sram/sunxi-sram.txt
-+++ b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
-@@ -18,6 +18,7 @@ Required properties:
-     - "allwinner,sun8i-h3-system-control"
-     - "allwinner,sun50i-a64-sram-controller" (deprecated)
-     - "allwinner,sun50i-a64-system-control"
-+    - "allwinner,sun50i-h6-system-control", "allwinner,sun50i-a64-system-control"
- - reg : sram controller register offset + length
+diff --git a/Documentation/devicetree/bindings/bus/sun50i-de2-bus.txt b/Documentation/devicetree/bindings/bus/sun50i-de2-bus.txt
+index 87dfb33fb3be..ac1445b95f41 100644
+--- a/Documentation/devicetree/bindings/bus/sun50i-de2-bus.txt
++++ b/Documentation/devicetree/bindings/bus/sun50i-de2-bus.txt
+@@ -1,11 +1,14 @@
+-Device tree bindings for Allwinner A64 DE2 bus
++Device tree bindings for Allwinner DE2/3 bus
  
- SRAM nodes
-@@ -54,6 +55,9 @@ The valid sections compatible for H3 are:
- The valid sections compatible for A64 are:
-     - allwinner,sun50i-a64-sram-c
+ The Allwinner A64 DE2 is on a special bus, which needs a SRAM region (SRAM C)
+-to be claimed for enabling the access.
++to be claimed for enabling the access. The DE3 on Allwinner H6 is at the same
++situation, and the binding also applies.
  
-+The valid sections compatible for H6 are:
-+    - allwinner,sun50i-h6-sram-c, allwinner,sun50i-a64-sram-c
-+
- Devices using SRAM sections
- ---------------------------
+ Required properties:
  
+- - compatible:		Should contain "allwinner,sun50i-a64-de2"
++ - compatible:		Should be one of:
++				- "allwinner,sun50i-a64-de2"
++				- "allwinner,sun50i-a6-de3", "allwinner,sun50i-a64-de2"
+  - reg:			A resource specifier for the register space
+  - #address-cells:	Must be set to 1
+  - #size-cells:		Must be set to 1
 -- 
 2.18.0
