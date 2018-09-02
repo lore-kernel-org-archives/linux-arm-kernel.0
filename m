@@ -1,56 +1,55 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 2 Sep 2018 20:58:08 +0100
-Subject: [PATCH v3 02/30] mfd: Kconfig: Remove MFD_SUN4I_GPADC config
- option
-In-Reply-To: <20180830154518.29507-3-embed3d@gmail.com>
+Date: Sun, 2 Sep 2018 20:58:46 +0100
+Subject: [PATCH v3 01/30] mfd: Makefile: Remove build option for
+ MFD:sun4i-gpadc
+In-Reply-To: <20180831082545.z6oilsmizliin3li@flea>
 References: <20180830154518.29507-1-embed3d@gmail.com>
- <20180830154518.29507-3-embed3d@gmail.com>
-Message-ID: <20180902205808.49cbc19a@archlinux>
+ <20180830154518.29507-2-embed3d@gmail.com>
+ <20180831082545.z6oilsmizliin3li@flea>
+Message-ID: <20180902205846.7a08846c@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 30 Aug 2018 17:44:50 +0200
-Philipp Rossak <embed3d@gmail.com> wrote:
+On Fri, 31 Aug 2018 10:25:45 +0200
+Maxime Ripard <maxime.ripard@bootlin.com> wrote:
 
-> We are merging the mfd:sun4i-gpadc driver into the
-> iio/adc/sun4i-gpadc driver. So we need to remove the MFD_SUN4I_GPADC
-> config option.
+> Hi Philipp,
 > 
-> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
-Do need to separate this and patch 1 as they are really two
-facets of the same thing.
+> First, thanks for doing that rework. It was needed, and it's very much
+> appreciated :)
+> 
+> As you can imagine though, I have a bunch of comments.
+> 
+> On Thu, Aug 30, 2018 at 05:44:49PM +0200, Philipp Rossak wrote:
+> > Since we are merging the mfd driver into the sun4i-gpadc driver we need
+> > to remove the build options for the sun4i-gpadc driver.
+> > 
+> > Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+> > ---
+> >  drivers/mfd/Makefile | 1 -
+> >  1 file changed, 1 deletion(-)
+> > 
+> > diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+> > index e9fd20dba18d..c680994db988 100644
+> > --- a/drivers/mfd/Makefile
+> > +++ b/drivers/mfd/Makefile
+> > @@ -220,7 +220,6 @@ obj-$(CONFIG_INTEL_SOC_PMIC_CHTDC_TI)	+= intel_soc_pmic_chtdc_ti.o
+> >  obj-$(CONFIG_MFD_MT6397)	+= mt6397-core.o
+> >  
+> >  obj-$(CONFIG_MFD_ALTERA_A10SR)	+= altera-a10sr.o
+> > -obj-$(CONFIG_MFD_SUN4I_GPADC)	+= sun4i-gpadc.o  
+> 
+> One of the things we should strive for is bisectability, which means
+> being able to have a working driver at every point in time while
+> introducing the features.
+> 
+> In this particular case, this isn't really a problem since you're
+> removing part of code that were never really enabled, but you should
+> at least document why in your commit log.
+> 
+Agreed. I for one don't know / can't remember why this would make sense!
 
 Jonathan
-
-> ---
->  drivers/mfd/Kconfig | 17 -----------------
->  1 file changed, 17 deletions(-)
+> Thanks!
+> Maxime
 > 
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index b860eb5aa194..c7ab57d65610 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -40,23 +40,6 @@ config MFD_ACT8945A
->  	  linear regulators, along with a complete ActivePath battery
->  	  charger.
->  
-> -config MFD_SUN4I_GPADC
-> -	tristate "Allwinner sunxi platforms' GPADC MFD driver"
-> -	select MFD_CORE
-> -	select REGMAP_MMIO
-> -	select REGMAP_IRQ
-> -	depends on ARCH_SUNXI || COMPILE_TEST
-> -	depends on !TOUCHSCREEN_SUN4I
-> -	help
-> -	  Select this to get support for Allwinner SoCs (A10, A13 and A31) ADC.
-> -	  This driver will only map the hardware interrupt and registers, you
-> -	  have to select individual drivers based on this MFD to be able to use
-> -	  the ADC or the thermal sensor. This will try to probe the ADC driver
-> -	  sun4i-gpadc-iio and the hwmon driver iio_hwmon.
-> -
-> -	  To compile this driver as a module, choose M here: the module will be
-> -	  called sun4i-gpadc.
-> -
->  config MFD_AS3711
->  	bool "AMS AS3711"
->  	select MFD_CORE
