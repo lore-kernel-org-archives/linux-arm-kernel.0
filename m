@@ -1,55 +1,157 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sun,  2 Sep 2018 09:26:25 +0200
-Subject: [PATCH 09/27] dt-bindings: display: sun4i-drm: Add H6 display engine
- compatibles
+Date: Sun,  2 Sep 2018 09:26:24 +0200
+Subject: [PATCH 08/27] clk: sunxi-ng: Add support for H6 DE3 clocks
 In-Reply-To: <20180902072643.4917-1-jernej.skrabec@siol.net>
 References: <20180902072643.4917-1-jernej.skrabec@siol.net>
-Message-ID: <20180902072643.4917-10-jernej.skrabec@siol.net>
+Message-ID: <20180902072643.4917-9-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds compatibles used in H6 display pipeline, namely for
-display engine, mixer and TV TCON.
-
-H6 display engine is somewhat similar to R40, just less TCONs and
-mixer support more features.
+Support for mixer0, mixer1, writeback and rotation units is added.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- .../devicetree/bindings/display/sunxi/sun4i-drm.txt          | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ drivers/clk/sunxi-ng/ccu-sun8i-de2.c | 65 ++++++++++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu-sun8i-de2.h |  1 +
+ 2 files changed, 66 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index f8773ecb7525..dec2f8a6da9c 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -151,6 +151,7 @@ Required properties:
-    * allwinner,sun8i-v3s-tcon
-    * allwinner,sun9i-a80-tcon-lcd
-    * allwinner,sun9i-a80-tcon-tv
-+   * allwinner,sun50i-h6-tcon-tv, allwinner,sun8i-r40-tcon-tv
-  - reg: base address and size of memory-mapped region
-  - interrupts: interrupt associated to this IP
-  - clocks: phandles to the clocks feeding the TCON.
-@@ -370,6 +371,7 @@ Required properties:
-     * allwinner,sun8i-a83t-de2-mixer-1
-     * allwinner,sun8i-h3-de2-mixer-0
-     * allwinner,sun8i-v3s-de2-mixer
-+    * allwinner,sun50i-h6-de3-mixer-0
-   - reg: base address and size of the memory-mapped region.
-   - clocks: phandles to the clocks feeding the mixer
-     * bus: the mixer interface clock
-@@ -403,9 +405,10 @@ Required properties:
-     * allwinner,sun8i-r40-display-engine
-     * allwinner,sun8i-v3s-display-engine
-     * allwinner,sun9i-a80-display-engine
-+    * allwinner,sun50i-h6-display-engine
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-de2.c b/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
+index bae5ee67a797..4535c1c27d27 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
+@@ -31,6 +31,8 @@ static SUNXI_CCU_GATE(bus_mixer1_clk,	"bus-mixer1",	"bus-de",
+ 		      0x04, BIT(1), 0);
+ static SUNXI_CCU_GATE(bus_wb_clk,	"bus-wb",	"bus-de",
+ 		      0x04, BIT(2), 0);
++static SUNXI_CCU_GATE(bus_rot_clk,	"bus-rot",	"bus-de",
++		      0x04, BIT(3), 0);
  
-   - allwinner,pipelines: list of phandle to the display engine
--    frontends (DE 1.0) or mixers (DE 2.0) available.
-+    frontends (DE 1.0) or mixers (DE 2.0/3.0) available.
+ static SUNXI_CCU_GATE(mixer0_clk,	"mixer0",	"mixer0-div",
+ 		      0x00, BIT(0), CLK_SET_RATE_PARENT);
+@@ -38,6 +40,8 @@ static SUNXI_CCU_GATE(mixer1_clk,	"mixer1",	"mixer1-div",
+ 		      0x00, BIT(1), CLK_SET_RATE_PARENT);
+ static SUNXI_CCU_GATE(wb_clk,		"wb",		"wb-div",
+ 		      0x00, BIT(2), CLK_SET_RATE_PARENT);
++static SUNXI_CCU_GATE(rot_clk,		"rot",		"rot-div",
++		      0x00, BIT(3), CLK_SET_RATE_PARENT);
  
- Example:
+ static SUNXI_CCU_M(mixer0_div_clk, "mixer0-div", "de", 0x0c, 0, 4,
+ 		   CLK_SET_RATE_PARENT);
+@@ -45,6 +49,8 @@ static SUNXI_CCU_M(mixer1_div_clk, "mixer1-div", "de", 0x0c, 4, 4,
+ 		   CLK_SET_RATE_PARENT);
+ static SUNXI_CCU_M(wb_div_clk, "wb-div", "de", 0x0c, 8, 4,
+ 		   CLK_SET_RATE_PARENT);
++static SUNXI_CCU_M(rot_div_clk, "rot-div", "de", 0x0c, 0x0c, 4,
++		   CLK_SET_RATE_PARENT);
+ 
+ static SUNXI_CCU_M(mixer0_div_a83_clk, "mixer0-div", "pll-de", 0x0c, 0, 4,
+ 		   CLK_SET_RATE_PARENT);
+@@ -53,6 +59,24 @@ static SUNXI_CCU_M(mixer1_div_a83_clk, "mixer1-div", "pll-de", 0x0c, 4, 4,
+ static SUNXI_CCU_M(wb_div_a83_clk, "wb-div", "pll-de", 0x0c, 8, 4,
+ 		   CLK_SET_RATE_PARENT);
+ 
++static struct ccu_common *sun50i_h6_de3_clks[] = {
++	&mixer0_clk.common,
++	&mixer1_clk.common,
++	&wb_clk.common,
++
++	&bus_mixer0_clk.common,
++	&bus_mixer1_clk.common,
++	&bus_wb_clk.common,
++
++	&mixer0_div_clk.common,
++	&mixer1_div_clk.common,
++	&wb_div_clk.common,
++
++	&bus_rot_clk.common,
++	&rot_clk.common,
++	&rot_div_clk.common,
++};
++
+ static struct ccu_common *sun8i_a83t_de2_clks[] = {
+ 	&mixer0_clk.common,
+ 	&mixer1_clk.common,
+@@ -92,6 +116,26 @@ static struct ccu_common *sun8i_v3s_de2_clks[] = {
+ 	&wb_div_clk.common,
+ };
+ 
++static struct clk_hw_onecell_data sun50i_h6_de3_hw_clks = {
++	.hws	= {
++		[CLK_MIXER0]		= &mixer0_clk.common.hw,
++		[CLK_MIXER1]		= &mixer1_clk.common.hw,
++		[CLK_WB]		= &wb_clk.common.hw,
++		[CLK_ROT]		= &rot_clk.common.hw,
++
++		[CLK_BUS_MIXER0]	= &bus_mixer0_clk.common.hw,
++		[CLK_BUS_MIXER1]	= &bus_mixer1_clk.common.hw,
++		[CLK_BUS_WB]		= &bus_wb_clk.common.hw,
++		[CLK_BUS_ROT]		= &bus_rot_clk.common.hw,
++
++		[CLK_MIXER0_DIV]	= &mixer0_div_clk.common.hw,
++		[CLK_MIXER1_DIV]	= &mixer1_div_clk.common.hw,
++		[CLK_WB_DIV]		= &wb_div_clk.common.hw,
++		[CLK_ROT_DIV]		= &rot_div_clk.common.hw,
++	},
++	.num	= 12,
++};
++
+ static struct clk_hw_onecell_data sun8i_a83t_de2_hw_clks = {
+ 	.hws	= {
+ 		[CLK_MIXER0]		= &mixer0_clk.common.hw,
+@@ -156,6 +200,13 @@ static struct ccu_reset_map sun50i_a64_de2_resets[] = {
+ 	[RST_WB]	= { 0x08, BIT(2) },
+ };
+ 
++static struct ccu_reset_map sun50i_h6_de3_resets[] = {
++	[RST_MIXER0]	= { 0x08, BIT(0) },
++	[RST_MIXER1]	= { 0x08, BIT(1) },
++	[RST_WB]	= { 0x08, BIT(2) },
++	[RST_ROT]	= { 0x08, BIT(3) },
++};
++
+ static const struct sunxi_ccu_desc sun8i_a83t_de2_clk_desc = {
+ 	.ccu_clks	= sun8i_a83t_de2_clks,
+ 	.num_ccu_clks	= ARRAY_SIZE(sun8i_a83t_de2_clks),
+@@ -186,6 +237,16 @@ static const struct sunxi_ccu_desc sun50i_a64_de2_clk_desc = {
+ 	.num_resets	= ARRAY_SIZE(sun50i_a64_de2_resets),
+ };
+ 
++static const struct sunxi_ccu_desc sun50i_h6_de3_clk_desc = {
++	.ccu_clks	= sun50i_h6_de3_clks,
++	.num_ccu_clks	= ARRAY_SIZE(sun50i_h6_de3_clks),
++
++	.hw_clks	= &sun50i_h6_de3_hw_clks,
++
++	.resets		= sun50i_h6_de3_resets,
++	.num_resets	= ARRAY_SIZE(sun50i_h6_de3_resets),
++};
++
+ static const struct sunxi_ccu_desc sun8i_v3s_de2_clk_desc = {
+ 	.ccu_clks	= sun8i_v3s_de2_clks,
+ 	.num_ccu_clks	= ARRAY_SIZE(sun8i_v3s_de2_clks),
+@@ -296,6 +357,10 @@ static const struct of_device_id sunxi_de2_clk_ids[] = {
+ 		.compatible = "allwinner,sun50i-h5-de2-clk",
+ 		.data = &sun50i_a64_de2_clk_desc,
+ 	},
++	{
++		.compatible = "allwinner,sun50i-h6-de3-clk",
++		.data = &sun50i_h6_de3_clk_desc,
++	},
+ 	{ }
+ };
+ 
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-de2.h b/drivers/clk/sunxi-ng/ccu-sun8i-de2.h
+index 530c006e0ae9..27bd88539f42 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-de2.h
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-de2.h
+@@ -22,6 +22,7 @@
+ #define CLK_MIXER0_DIV	3
+ #define CLK_MIXER1_DIV	4
+ #define CLK_WB_DIV	5
++#define CLK_ROT_DIV	11
+ 
+ #define CLK_NUMBER	(CLK_WB + 1)
  
 -- 
 2.18.0
