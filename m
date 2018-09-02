@@ -1,48 +1,62 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sun,  2 Sep 2018 09:26:41 +0200
-Subject: [PATCH 25/27] drm: sun4i: add support for H6 TCON TOP
+Date: Sun,  2 Sep 2018 09:26:43 +0200
+Subject: [PATCH 27/27] arm64: dts: sun50i: h6: Enable HDMI output on Pine H64
+ board
 In-Reply-To: <20180902072643.4917-1-jernej.skrabec@siol.net>
 References: <20180902072643.4917-1-jernej.skrabec@siol.net>
-Message-ID: <20180902072643.4917-26-jernej.skrabec@siol.net>
+Message-ID: <20180902072643.4917-28-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Icenowy Zheng <icenowy@aosc.io>
+Pine H64 board has HDMI type A connector.
 
-The TCON TOP on Allwinner H6 SoC is a cut down version of the R40 TCON
-TOP, which dropped TCON_TV1 and DSI (which do not exist on H6).
-
-Add support for it.
-
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_tcon_top.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ .../boot/dts/allwinner/sun50i-h6-pine-h64.dts | 25 +++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_tcon_top.c b/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
-index ed13233cad88..d0f1767ec6fc 100644
---- a/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
-@@ -279,12 +279,20 @@ const struct sun8i_tcon_top_quirks sun8i_r40_tcon_top_quirks = {
- 	.has_dsi	= true,
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+index 48daec7f78ba..36db21314996 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
+@@ -21,6 +21,17 @@
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
++	connector {
++		compatible = "hdmi-connector";
++		type = "a";
++
++		port {
++			hdmi_con_in: endpoint {
++				remote-endpoint = <&hdmi_out_con>;
++			};
++		};
++	};
++
+ 	leds {
+ 		compatible = "gpio-leds";
+ 
+@@ -41,6 +52,20 @@
+ 	};
  };
  
-+const struct sun8i_tcon_top_quirks sun50i_h6_tcon_top_quirks = {
-+	/* Nothing special */
++&de {
++	status = "okay";
 +};
 +
- /* sun4i_drv uses this list to check if a device node is a TCON TOP */
- const struct of_device_id sun8i_tcon_top_of_table[] = {
- 	{
- 		.compatible = "allwinner,sun8i-r40-tcon-top",
- 		.data = &sun8i_r40_tcon_top_quirks
- 	},
-+	{
-+		.compatible = "allwinner,sun50i-h6-tcon-top",
-+		.data = &sun50i_h6_tcon_top_quirks
-+	},
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, sun8i_tcon_top_of_table);
++&hdmi {
++	status = "okay";
++};
++
++&hdmi_out {
++	hdmi_out_con: endpoint {
++		remote-endpoint = <&hdmi_con_in>;
++	};
++};
++
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins>;
 -- 
 2.18.0
