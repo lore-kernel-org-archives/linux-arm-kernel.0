@@ -1,73 +1,55 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sun,  2 Sep 2018 09:26:21 +0200
-Subject: [PATCH 05/27] clk: sunxi-ng: Use u64 for calculation of NM rate
+Date: Sun,  2 Sep 2018 09:26:25 +0200
+Subject: [PATCH 09/27] dt-bindings: display: sun4i-drm: Add H6 display engine
+ compatibles
 In-Reply-To: <20180902072643.4917-1-jernej.skrabec@siol.net>
 References: <20180902072643.4917-1-jernej.skrabec@siol.net>
-Message-ID: <20180902072643.4917-6-jernej.skrabec@siol.net>
+Message-ID: <20180902072643.4917-10-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner H6 SoC has multiplier N range between 1 and 254. Since parent
-rate is 24MHz, intermediate result when calculating final rate easily
-overflows 32 bit variable.
+This commit adds compatibles used in H6 display pipeline, namely for
+display engine, mixer and TV TCON.
 
-Because of that, introduce function for calculating clock rate which
-uses 64 bit variable for intermediate result.
+H6 display engine is somewhat similar to R40, just less TCONs and
+mixer support more features.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/clk/sunxi-ng/ccu_nm.c | 18 +++++++++++++++---
- 1 file changed, 15 insertions(+), 3 deletions(-)
+ .../devicetree/bindings/display/sunxi/sun4i-drm.txt          | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/sunxi-ng/ccu_nm.c b/drivers/clk/sunxi-ng/ccu_nm.c
-index 6fe3c14f7b2d..424d8635b053 100644
---- a/drivers/clk/sunxi-ng/ccu_nm.c
-+++ b/drivers/clk/sunxi-ng/ccu_nm.c
-@@ -19,6 +19,17 @@ struct _ccu_nm {
- 	unsigned long	m, min_m, max_m;
- };
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index f8773ecb7525..dec2f8a6da9c 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -151,6 +151,7 @@ Required properties:
+    * allwinner,sun8i-v3s-tcon
+    * allwinner,sun9i-a80-tcon-lcd
+    * allwinner,sun9i-a80-tcon-tv
++   * allwinner,sun50i-h6-tcon-tv, allwinner,sun8i-r40-tcon-tv
+  - reg: base address and size of memory-mapped region
+  - interrupts: interrupt associated to this IP
+  - clocks: phandles to the clocks feeding the TCON.
+@@ -370,6 +371,7 @@ Required properties:
+     * allwinner,sun8i-a83t-de2-mixer-1
+     * allwinner,sun8i-h3-de2-mixer-0
+     * allwinner,sun8i-v3s-de2-mixer
++    * allwinner,sun50i-h6-de3-mixer-0
+   - reg: base address and size of the memory-mapped region.
+   - clocks: phandles to the clocks feeding the mixer
+     * bus: the mixer interface clock
+@@ -403,9 +405,10 @@ Required properties:
+     * allwinner,sun8i-r40-display-engine
+     * allwinner,sun8i-v3s-display-engine
+     * allwinner,sun9i-a80-display-engine
++    * allwinner,sun50i-h6-display-engine
  
-+static unsigned long ccu_nm_calc_rate(unsigned long parent,
-+				      unsigned long n, unsigned long m)
-+{
-+	u64 rate = parent;
-+
-+	rate *= n;
-+	do_div(rate, m);
-+
-+	return rate;
-+}
-+
- static void ccu_nm_find_best(unsigned long parent, unsigned long rate,
- 			     struct _ccu_nm *nm)
- {
-@@ -28,7 +39,8 @@ static void ccu_nm_find_best(unsigned long parent, unsigned long rate,
+   - allwinner,pipelines: list of phandle to the display engine
+-    frontends (DE 1.0) or mixers (DE 2.0) available.
++    frontends (DE 1.0) or mixers (DE 2.0/3.0) available.
  
- 	for (_n = nm->min_n; _n <= nm->max_n; _n++) {
- 		for (_m = nm->min_m; _m <= nm->max_m; _m++) {
--			unsigned long tmp_rate = parent * _n  / _m;
-+			unsigned long tmp_rate = ccu_nm_calc_rate(parent,
-+								  _n, _m);
+ Example:
  
- 			if (tmp_rate > rate)
- 				continue;
-@@ -100,7 +112,7 @@ static unsigned long ccu_nm_recalc_rate(struct clk_hw *hw,
- 	if (ccu_sdm_helper_is_enabled(&nm->common, &nm->sdm))
- 		rate = ccu_sdm_helper_read_rate(&nm->common, &nm->sdm, m, n);
- 	else
--		rate = parent_rate * n / m;
-+		rate = ccu_nm_calc_rate(parent_rate, n, m);
- 
- 	if (nm->common.features & CCU_FEATURE_FIXED_POSTDIV)
- 		rate /= nm->fixed_post_div;
-@@ -149,7 +161,7 @@ static long ccu_nm_round_rate(struct clk_hw *hw, unsigned long rate,
- 	_nm.max_m = nm->m.max ?: 1 << nm->m.width;
- 
- 	ccu_nm_find_best(*parent_rate, rate, &_nm);
--	rate = *parent_rate * _nm.n / _nm.m;
-+	rate = ccu_nm_calc_rate(*parent_rate, _nm.n, _nm.m);
- 
- 	if (nm->common.features & CCU_FEATURE_FIXED_POSTDIV)
- 		rate /= nm->fixed_post_div;
 -- 
 2.18.0
