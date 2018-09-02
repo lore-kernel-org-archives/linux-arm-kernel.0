@@ -1,58 +1,66 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sun,  2 Sep 2018 09:26:18 +0200
-Subject: [PATCH 02/27] arm64: allwinner: h6: add system controller device tree
- node
+Date: Sun,  2 Sep 2018 09:26:23 +0200
+Subject: [PATCH 07/27] dt-bindings: clock: sun8i-de2: Add H6 DE3 clock
+ description
 In-Reply-To: <20180902072643.4917-1-jernej.skrabec@siol.net>
 References: <20180902072643.4917-1-jernej.skrabec@siol.net>
-Message-ID: <20180902072643.4917-3-jernej.skrabec@siol.net>
+Message-ID: <20180902072643.4917-8-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Icenowy Zheng <icenowy@aosc.io>
+This commit adds necessary description and dt includes for H6 DE3 clock.
+It is very similar to others, but memory region has some additional
+registers not found in DE2.
 
-As we have already binding for the H6 system controller, add its node
-to the device tree.
-
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-[fixed compatible string]
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 23 ++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ Documentation/devicetree/bindings/clock/sun8i-de2.txt | 5 +++--
+ include/dt-bindings/clock/sun8i-de2.h                 | 3 +++
+ include/dt-bindings/reset/sun8i-de2.h                 | 1 +
+ 3 files changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-index cfa5fffcf62b..040828d2e2c0 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-@@ -92,6 +92,29 @@
- 		#size-cells = <1>;
- 		ranges;
+diff --git a/Documentation/devicetree/bindings/clock/sun8i-de2.txt b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
+index e94582e8b8a9..41a52c2acffd 100644
+--- a/Documentation/devicetree/bindings/clock/sun8i-de2.txt
++++ b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
+@@ -1,5 +1,5 @@
+-Allwinner Display Engine 2.0 Clock Control Binding
+---------------------------------------------------
++Allwinner Display Engine 2.0/3.0 Clock Control Binding
++------------------------------------------------------
  
-+		syscon: syscon at 3000000 {
-+			compatible = "allwinner,sun50i-h6-system-control",
-+				     "allwinner,sun50i-a64-system-control";
-+			reg = <0x03000000 0x1000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
+ Required properties :
+ - compatible: must contain one of the following compatibles:
+@@ -8,6 +8,7 @@ Required properties :
+ 		- "allwinner,sun8i-v3s-de2-clk"
+ 		- "allwinner,sun50i-a64-de2-clk"
+ 		- "allwinner,sun50i-h5-de2-clk"
++		- "allwinner,sun50i-h6-de3-clk"
+ 
+ - reg: Must contain the registers base address and length
+ - clocks: phandle to the clocks feeding the display engine subsystem.
+diff --git a/include/dt-bindings/clock/sun8i-de2.h b/include/dt-bindings/clock/sun8i-de2.h
+index 3bed63b524aa..7768f73b051e 100644
+--- a/include/dt-bindings/clock/sun8i-de2.h
++++ b/include/dt-bindings/clock/sun8i-de2.h
+@@ -15,4 +15,7 @@
+ #define CLK_MIXER1		7
+ #define CLK_WB			8
+ 
++#define CLK_BUS_ROT		9
++#define CLK_ROT			10
 +
-+			sram_c: sram at 28000 {
-+				compatible = "mmio-sram";
-+				reg = <0x00028000 0x1e000>;
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges = <0 0x00028000 0x1e000>;
-+
-+				de2_sram: sram-section at 0 {
-+					compatible = "allwinner,sun50i-h6-sram-c",
-+						     "allwinner,sun50i-a64-sram-c";
-+					reg = <0x0000 0x1e000>;
-+				};
-+			};
-+		};
-+
- 		ccu: clock at 3001000 {
- 			compatible = "allwinner,sun50i-h6-ccu";
- 			reg = <0x03001000 0x1000>;
+ #endif /* _DT_BINDINGS_CLOCK_SUN8I_DE2_H_ */
+diff --git a/include/dt-bindings/reset/sun8i-de2.h b/include/dt-bindings/reset/sun8i-de2.h
+index 9526017432f0..1c36a6ac86d6 100644
+--- a/include/dt-bindings/reset/sun8i-de2.h
++++ b/include/dt-bindings/reset/sun8i-de2.h
+@@ -10,5 +10,6 @@
+ #define RST_MIXER0	0
+ #define RST_MIXER1	1
+ #define RST_WB		2
++#define RST_ROT		3
+ 
+ #endif /* _DT_BINDINGS_RESET_SUN8I_DE2_H_ */
 -- 
 2.18.0
