@@ -1,72 +1,76 @@
-From: petrcvekcz@gmail.com (Petr Cvek)
-Date: Sun, 2 Sep 2018 18:40:20 +0200
-Subject: ASoC: pxa: remove pxa2xx-pcm driver, which caused regression
-In-Reply-To: <87sh2r6gv8.fsf@belgarion.home>
-References: <f12148b7c9102c67d92a0467f1d653e37c6548ee.1534534854.git.petrcvekcz@gmail.com>
- <87r2iwau3u.fsf@belgarion.home>
- <4deb5304-8efc-3093-7f8e-0dfe50781790@gmail.com>
- <87mutjbidr.fsf@belgarion.home>
- <16bb94b6-089d-f78e-1bb7-2550414be2fb@gmail.com>
- <878t4u96wq.fsf@belgarion.home>
- <1e1c5084-840d-a378-7c57-def6d6c0a096@gmail.com>
- <87y3cp6z5q.fsf@belgarion.home>
- <5bdc752d-d112-470a-151e-c40cf4ad97df@gmail.com>
- <87sh2r6gv8.fsf@belgarion.home>
-Message-ID: <bc0292ff-f703-9cca-10f5-c441d7155930@gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sun, 2 Sep 2018 09:49:54 -0700
+Subject: [PATCH RFC 0/2] hwmon: Add RPi PoE HAT fan driver
+In-Reply-To: <67224834.51159.1535905604770@email.1und1.de>
+References: <1535887251-29515-1-git-send-email-stefan.wahren@i2se.com>
+ <99ca4f6d-d2b2-36e7-9f27-189df379cfaf@roeck-us.net>
+ <67224834.51159.1535905604770@email.1und1.de>
+Message-ID: <e8d4e69c-2668-2794-6474-79749bf8b577@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-Dne 2.9.2018 v 17:47 Robert Jarzmik napsal(a):
-> Petr Cvek <petrcvekcz@gmail.com> writes:
+On 09/02/2018 09:26 AM, Stefan Wahren wrote:
+> Hi Guenter,
 > 
->> Dne 29.8.2018 v 16:11 Robert Jarzmik napsal(a):
->>> Petr Cvek <petrcvekcz@gmail.com> writes:
->>> If that's the case, Daniel would you have a look into it please ?
+>> Guenter Roeck <linux@roeck-us.net> hat am 2. September 2018 um 16:23 geschrieben:
+>>
+>>
+>> On 09/02/2018 04:20 AM, Stefan Wahren wrote:
+>>> This series is an early stage of the hwmon driver for the fan on the
+>>> Raspberry Pi Power over Ethernet HAT [1]. At the end this should use a
+>>> Device Tree Overlay.
 >>>
->> I've put printks in almost every sound function by now ;-). It gets
->> I got this log:
-> ...zip...
-> I got this log :
-> [14540.460575]  ac97-0: adapter registered by pxa2xx-ac97
-> [14540.474726]  ac97-0: snd_ac97_bus_scan_one(codec_num=0): vendor_id=0x574d4c13
-> [14541.003160] mioa701-wm9713 mioa701-wm9713: ASoC: CODEC DAI wm9713-hifi not registered
-> [14541.978576] wm97xx-core pxa2xx-ac97:0: wm97xx core found, id=0x574d4c13
-> [14542.010897] wm9713-codec wm9713-codec: Control not supported for path Mic B Source -> [MPB] -> Mic B Pre Amp
-> [14542.096874] wm9713-codec wm9713-codec: ASoC: no dapm match for Mic B Source --> MPB --> Mic B Pre Amp
-> [14542.149488] wm9713-codec wm9713-codec: ASoC: Failed to add route Mic B Source -> MPB -> Mic B Pre Amp
-> [14542.195525] TEST component: 5c700a04 pxa2xx-ac97
-> [14542.201547] actually called=0
-> [14542.205938] TEST component: 3b89ec70 wm9713-codec
-> [14542.209549] TEST component: 58f79ee1 pxa-pcm-audio
-> [14542.215826] actually called=0
-> [14542.219567] mioa701-wm9713 mioa701-wm9713: wm9713-hifi <-> pxa2xx-ac97 mapping ok
-> [14542.227201] TEST component: 5c700a04 pxa2xx-ac97
-> [14542.232090] actually called=0
-> [14542.236140] TEST component: 3b89ec70 wm9713-codec
-> [14542.239595] TEST component: 58f79ee1 pxa-pcm-audio
-> [14542.244281] actually called=0
-> [14542.247944] mioa701-wm9713 mioa701-wm9713: wm9713-aux <-> pxa2xx-ac97-aux mapping ok
-> [14542.255778] wm9713-codec wm9713-codec: ASoC: mux Sidetone Mux has no paths
-> [14542.312582] mioa701-wm9713 mioa701-wm9713: Be warned that incorrect mixers/muxes setup will lead to overheating and possible destruction of your device. Do not use without a good knowledge of mio's board design!
+>>> Changes by Stefan based on [2]:
+>>> - reformat the downstream patches for submission
+>>> - drop reboot notification
+>>> - fix remaining checkpatch issues
+>>> - add COMPILE_TEST to Kconfig
+>>>
+>>> The driver is mostly copy & paste from pwm-fan, which isn't good. Personally
+>>> i see two options:
+>>>
+>>> 1) integrate the driver function into the pwm-fan driver (new compatible)
+>>> 2) implement the core function as a PWM driver and use the pwm-fan driver on top
+>>>
+>>
+>> I don't really see the point of thise driver. Why not implement either of those ?
+> 
+> i'm not sure about your question. Since the fan is placed over the SoC, the fan should takes care of the SoC temperature. AFAIK the firmware should have exclusive access to the I2C. So why we need this mailbox interface instead of a I2C driver.
 > 
 
-So it does call pxa2xx_pcm_preallocate_dma_buffer() twice on pxa2xx-ac97
-too. The weird thing is it doesn't cause warning at rmmod or playback close.
+The driver sets pwm values. The pwm-fan driver sets pwm values. A pwm driver
+sets pwm values. The pwm-fan driver uses a pwm driver to set pwm values.
+You appear to be arguing that the pwm-fan driver for Rpi is different than
+a pwm-fan driver for all other hardware and should _not_ use a pwm driver
+to set pwm values.
 
->> It may be possible to remove the block bellow from SSP and I2S drivers
->> but it will change the situation for every platform which uses SSP or I2S:
+As you don't understand my question, I don't understand your rationale either.
+I will require detailed explanations why 2) is not feasible, and why 1) is not
+feasible either. Until then, NACK.
+
+Guenter
+
+>> 2) sounds like a perfect fit to me.
 >>
->> 	.ops		= &pxa2xx_pcm_ops,
->> 	.pcm_new	= pxa2xx_soc_pcm_new,
->> 	.pcm_free	= pxa2xx_pcm_free_dma_buffers,
+>> Guenter
 >>
->> The generic functions would be then called just from pxa-pcm-audio
->> component.
-> That's up to Daniel and you.
+>>> [1] - https://www.raspberrypi.org/products/poe-hat/
+>>> [2] - https://github.com/raspberrypi/linux/commit/0f937c8dc3201ebffa6c617c616fd7c65db65959
+>>>
+>>> Serge Schneider (2):
+>>>     dt-bindings: hwmon: Add RPi PoE HAT documentation
+>>>     hwmon: Add RPi PoE HAT fan driver
+>>>
+>>>    .../devicetree/bindings/hwmon/rpi-poe-fan.txt      |  55 +++
+>>>    Documentation/hwmon/rpi-poe-fan                    |  15 +
+>>>    drivers/hwmon/Kconfig                              |  11 +
+>>>    drivers/hwmon/Makefile                             |   1 +
+>>>    drivers/hwmon/rpi-poe-fan.c                        | 414 +++++++++++++++++++++
+>>>    include/soc/bcm2835/raspberrypi-firmware.h         |   2 +
+>>>    6 files changed, 498 insertions(+)
+>>>    create mode 100644 Documentation/devicetree/bindings/hwmon/rpi-poe-fan.txt
+>>>    create mode 100644 Documentation/hwmon/rpi-poe-fan
+>>>    create mode 100644 drivers/hwmon/rpi-poe-fan.c
+>>>
+>>
 > 
-OK, I will send patches soon, with AC97 patched too... Thanks for helping.
-
-Best regards,
-Petr
