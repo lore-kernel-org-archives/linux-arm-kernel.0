@@ -1,120 +1,191 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sun,  2 Sep 2018 09:26:36 +0200
-Subject: [PATCH 20/27] drm/sun4i: Add support for Synopsys HDMI PHY
+Date: Sun,  2 Sep 2018 09:26:37 +0200
+Subject: [PATCH 21/27] drm/sun4i: Add support for H6 HDMI PHY
 In-Reply-To: <20180902072643.4917-1-jernej.skrabec@siol.net>
 References: <20180902072643.4917-1-jernej.skrabec@siol.net>
-Message-ID: <20180902072643.4917-21-jernej.skrabec@siol.net>
+Message-ID: <20180902072643.4917-22-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently sun8i-hdmi-phy driver supports only custom PHYs connected to
-DW HDMI controller. Since newest Allwinner SoCs have unmodified Synopsys
-PHY, driver has to be reorganized to support them.
+H6 has Synopsys DWC HDMI 2.0 TX PHY.
 
-Variant structure is expanded to allow differentiation between custom
-and Sysnopsys PHYs and to hold Synopsys PHY settings.
-
-Since DW HDMI bridge platform data has different fields for custom and
-Sysnopsys PHY, function sun8i_hdmi_phy_get_ops() is replaced with
-sun8i_hdmi_phy_set_ops().
+mpll settings were calculated from specifications of similar Synopsys
+HDMI PHY found in i.MX6. Other PHY settings were derived from BSP PHY
+driver code.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c  |  4 +---
- drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h  |  7 ++++++-
- drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c | 18 ++++++++++++++++--
- 3 files changed, 23 insertions(+), 6 deletions(-)
+ drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c | 137 +++++++++++++++++++++++++
+ 1 file changed, 137 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
-index 44143c9f20d0..bf35975dd100 100644
---- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
-@@ -172,9 +172,7 @@ static int sun8i_dw_hdmi_bind(struct device *dev, struct device *master,
- 	sun8i_hdmi_phy_init(hdmi->phy);
- 
- 	plat_data->mode_valid = hdmi->quirks->mode_valid;
--	plat_data->phy_ops = sun8i_hdmi_phy_get_ops();
--	plat_data->phy_name = "sun8i_dw_hdmi_phy";
--	plat_data->phy_data = hdmi->phy;
-+	sun8i_hdmi_phy_set_ops(hdmi->phy, plat_data);
- 
- 	platform_set_drvdata(pdev, hdmi);
- 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
-index 94cf13d09abe..e48cd9b3cce3 100644
---- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
-+++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
-@@ -149,6 +149,10 @@ struct sun8i_hdmi_phy;
- struct sun8i_hdmi_phy_variant {
- 	bool has_phy_clk;
- 	bool has_second_pll;
-+	bool is_custom_phy;
-+	const struct dw_hdmi_curr_ctrl *cur_ctr;
-+	const struct dw_hdmi_mpll_config *mpll_cfg;
-+	const struct dw_hdmi_phy_config *phy_cfg;
- 	void (*phy_init)(struct sun8i_hdmi_phy *phy);
- 	void (*phy_disable)(struct dw_hdmi *hdmi,
- 			    struct sun8i_hdmi_phy *phy);
-@@ -196,7 +200,8 @@ int sun8i_hdmi_phy_probe(struct sun8i_dw_hdmi *hdmi, struct device_node *node);
- void sun8i_hdmi_phy_remove(struct sun8i_dw_hdmi *hdmi);
- 
- void sun8i_hdmi_phy_init(struct sun8i_hdmi_phy *phy);
--const struct dw_hdmi_phy_ops *sun8i_hdmi_phy_get_ops(void);
-+void sun8i_hdmi_phy_set_ops(struct sun8i_hdmi_phy *phy,
-+			    struct dw_hdmi_plat_data *plat_data);
- 
- int sun8i_phy_clk_create(struct sun8i_hdmi_phy *phy, struct device *dev,
- 			 bool second_parent);
 diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-index ad4ba1cc83b4..ee2bf61cd4d2 100644
+index ee2bf61cd4d2..2f5499bd35ec 100644
 --- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
 +++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-@@ -390,9 +390,20 @@ void sun8i_hdmi_phy_init(struct sun8i_hdmi_phy *phy)
- 	phy->variant->phy_init(phy);
- }
+@@ -14,6 +14,122 @@
+  */
+ #define I2C_ADDR	0x69
  
--const struct dw_hdmi_phy_ops *sun8i_hdmi_phy_get_ops(void)
-+void sun8i_hdmi_phy_set_ops(struct sun8i_hdmi_phy *phy,
-+			    struct dw_hdmi_plat_data *plat_data)
- {
--	return &sun8i_hdmi_phy_ops;
-+	struct sun8i_hdmi_phy_variant *variant = phy->variant;
-+
-+	if (variant->is_custom_phy) {
-+		plat_data->phy_ops = &sun8i_hdmi_phy_ops;
-+		plat_data->phy_name = "sun8i_dw_hdmi_phy";
-+		plat_data->phy_data = phy;
-+	} else {
-+		plat_data->mpll_cfg = variant->mpll_cfg;
-+		plat_data->cur_ctr = variant->cur_ctr;
-+		plat_data->phy_config = variant->phy_cfg;
++static const struct dw_hdmi_mpll_config sun50i_h6_mpll_cfg[] = {
++	{
++		30666000, {
++			{ 0x00b3, 0x0000 },
++			{ 0x2153, 0x0000 },
++			{ 0x40f3, 0x0000 },
++		},
++	},  {
++		36800000, {
++			{ 0x00b3, 0x0000 },
++			{ 0x2153, 0x0000 },
++			{ 0x40a2, 0x0001 },
++		},
++	},  {
++		46000000, {
++			{ 0x00b3, 0x0000 },
++			{ 0x2142, 0x0001 },
++			{ 0x40a2, 0x0001 },
++		},
++	},  {
++		61333000, {
++			{ 0x0072, 0x0001 },
++			{ 0x2142, 0x0001 },
++			{ 0x40a2, 0x0001 },
++		},
++	},  {
++		73600000, {
++			{ 0x0072, 0x0001 },
++			{ 0x2142, 0x0001 },
++			{ 0x4061, 0x0002 },
++		},
++	},  {
++		92000000, {
++			{ 0x0072, 0x0001 },
++			{ 0x2145, 0x0002 },
++			{ 0x4061, 0x0002 },
++		},
++	},  {
++		122666000, {
++			{ 0x0051, 0x0002 },
++			{ 0x2145, 0x0002 },
++			{ 0x4061, 0x0002 },
++		},
++	},  {
++		147200000, {
++			{ 0x0051, 0x0002 },
++			{ 0x2145, 0x0002 },
++			{ 0x4064, 0x0003 },
++		},
++	},  {
++		184000000, {
++			{ 0x0051, 0x0002 },
++			{ 0x214c, 0x0003 },
++			{ 0x4064, 0x0003 },
++		},
++	},  {
++		226666000, {
++			{ 0x0040, 0x0003 },
++			{ 0x214c, 0x0003 },
++			{ 0x4064, 0x0003 },
++		},
++	},  {
++		272000000, {
++			{ 0x0040, 0x0003 },
++			{ 0x214c, 0x0003 },
++			{ 0x5a64, 0x0003 },
++		},
++	},  {
++		340000000, {
++			{ 0x0040, 0x0003 },
++			{ 0x3b4c, 0x0003 },
++			{ 0x5a64, 0x0003 },
++		},
++	},  {
++		600000000, {
++			{ 0x1a40, 0x0003 },
++			{ 0x3b4c, 0x0003 },
++			{ 0x5a64, 0x0003 },
++		},
++	}, {
++		~0UL, {
++			{ 0x0000, 0x0000 },
++			{ 0x0000, 0x0000 },
++			{ 0x0000, 0x0000 },
++		},
 +	}
++};
++
++static const struct dw_hdmi_curr_ctrl sun50i_h6_cur_ctr[] = {
++	/* pixelclk    bpp8    bpp10   bpp12 */
++	{ 25175000,  { 0x0000, 0x0000, 0x0000 }, },
++	{ 27000000,  { 0x0012, 0x0000, 0x0000 }, },
++	{ 59400000,  { 0x0008, 0x0008, 0x0008 }, },
++	{ 72000000,  { 0x0008, 0x0008, 0x001b }, },
++	{ 74250000,  { 0x0013, 0x0013, 0x0013 }, },
++	{ 90000000,  { 0x0008, 0x001a, 0x001b }, },
++	{ 118800000, { 0x001b, 0x001a, 0x001b }, },
++	{ 144000000, { 0x001b, 0x001a, 0x0034 }, },
++	{ 180000000, { 0x001b, 0x0033, 0x0034 }, },
++	{ 216000000, { 0x0036, 0x0033, 0x0034 }, },
++	{ 237600000, { 0x0036, 0x0033, 0x001b }, },
++	{ 288000000, { 0x0036, 0x001b, 0x001b }, },
++	{ 297000000, { 0x0019, 0x001b, 0x0019 }, },
++	{ 330000000, { 0x0036, 0x001b, 0x001b }, },
++	{ 600000000, { 0x003f, 0x001b, 0x001b }, },
++	{ ~0UL,      { 0x0000, 0x0000, 0x0000 }, }
++};
++
++static const struct dw_hdmi_phy_config sun50i_h6_phy_config[] = {
++	/*pixelclk   symbol   term   vlev*/
++	{ 74250000,  0x8009, 0x0004, 0x0232},
++	{ 148500000, 0x8029, 0x0004, 0x0273},
++	{ 600000000, 0x8039, 0x0004, 0x014a},
++	{ ~0UL,	     0x0000, 0x0000, 0x0000}
++};
++
+ static int sun8i_hdmi_phy_config_a83t(struct dw_hdmi *hdmi,
+ 				      struct sun8i_hdmi_phy *phy,
+ 				      unsigned int clk_rate)
+@@ -290,6 +406,16 @@ static void sun8i_hdmi_phy_unlock(struct sun8i_hdmi_phy *phy)
+ 		     SUN8I_HDMI_PHY_UNSCRAMBLE_MAGIC);
  }
  
- static struct regmap_config sun8i_hdmi_phy_regmap_config = {
-@@ -405,6 +416,7 @@ static struct regmap_config sun8i_hdmi_phy_regmap_config = {
- 
- static const struct sun8i_hdmi_phy_variant sun50i_a64_hdmi_phy = {
- 	.has_phy_clk = true,
-+	.is_custom_phy = true,
- 	.has_second_pll = true,
- 	.phy_init = &sun8i_hdmi_phy_init_h3,
- 	.phy_disable = &sun8i_hdmi_phy_disable_h3,
-@@ -412,6 +424,7 @@ static const struct sun8i_hdmi_phy_variant sun50i_a64_hdmi_phy = {
++static void sun50i_hdmi_phy_init_h6(struct sun8i_hdmi_phy *phy)
++{
++	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_REXT_CTRL_REG,
++			   SUN8I_HDMI_PHY_REXT_CTRL_REXT_EN,
++			   SUN8I_HDMI_PHY_REXT_CTRL_REXT_EN);
++
++	regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_REXT_CTRL_REG,
++			   0xffff0000, 0x80c00000);
++}
++
+ static void sun8i_hdmi_phy_init_a83t(struct sun8i_hdmi_phy *phy)
+ {
+ 	sun8i_hdmi_phy_unlock(phy);
+@@ -423,6 +549,13 @@ static const struct sun8i_hdmi_phy_variant sun50i_a64_hdmi_phy = {
+ 	.phy_config = &sun8i_hdmi_phy_config_h3,
  };
  
++static const struct sun8i_hdmi_phy_variant sun50i_h6_hdmi_phy = {
++	.cur_ctr  = sun50i_h6_cur_ctr,
++	.mpll_cfg = sun50i_h6_mpll_cfg,
++	.phy_cfg  = sun50i_h6_phy_config,
++	.phy_init = &sun50i_hdmi_phy_init_h6,
++};
++
  static const struct sun8i_hdmi_phy_variant sun8i_a83t_hdmi_phy = {
-+	.is_custom_phy = true,
+ 	.is_custom_phy = true,
  	.phy_init = &sun8i_hdmi_phy_init_a83t,
- 	.phy_disable = &sun8i_hdmi_phy_disable_a83t,
- 	.phy_config = &sun8i_hdmi_phy_config_a83t,
-@@ -419,6 +432,7 @@ static const struct sun8i_hdmi_phy_variant sun8i_a83t_hdmi_phy = {
- 
- static const struct sun8i_hdmi_phy_variant sun8i_h3_hdmi_phy = {
- 	.has_phy_clk = true,
-+	.is_custom_phy = true,
- 	.phy_init = &sun8i_hdmi_phy_init_h3,
- 	.phy_disable = &sun8i_hdmi_phy_disable_h3,
- 	.phy_config = &sun8i_hdmi_phy_config_h3,
+@@ -443,6 +576,10 @@ static const struct of_device_id sun8i_hdmi_phy_of_table[] = {
+ 		.compatible = "allwinner,sun50i-a64-hdmi-phy",
+ 		.data = &sun50i_a64_hdmi_phy,
+ 	},
++	{
++		.compatible = "allwinner,sun50i-h6-hdmi-phy",
++		.data = &sun50i_h6_hdmi_phy,
++	},
+ 	{
+ 		.compatible = "allwinner,sun8i-a83t-hdmi-phy",
+ 		.data = &sun8i_a83t_hdmi_phy,
 -- 
 2.18.0
