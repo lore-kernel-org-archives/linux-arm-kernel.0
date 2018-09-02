@@ -1,133 +1,98 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 1 Sep 2018 19:54:34 -0700
-Subject: [PATCH] arm64: defconfig: enable EFI_ARMSTUB_DTB_LOADER
-In-Reply-To: <CAKv+Gu_mKU+RdPgg2Dfezy4-L+KDEEBx02R49ObomRhEkJJ6Mw@mail.gmail.com>
-References: <1535563287-24803-1-git-send-email-scott.branden@broadcom.com>
- <CAOesGMhjcJ1p3QcEYb9fsx3fMXAOsgR2njOq=VKgEbWGwJi36g@mail.gmail.com>
- <fb07b89d-d427-5e59-9f17-b12df26284ec@broadcom.com>
- <CAKv+Gu-R7eX=aj=O2-gpzmp0K4t0T4s536UiqJZs0WuxRjkYwQ@mail.gmail.com>
- <CAOesGMho8CfT7iDXadmkB5=7DoOi6n8qXcS9X643vf+Y0BbD6w@mail.gmail.com>
- <CAKv+Gu_mKU+RdPgg2Dfezy4-L+KDEEBx02R49ObomRhEkJJ6Mw@mail.gmail.com>
-Message-ID: <CAOesGMgLHx3+j1bWEsMWsN-yjGNZyLOpAjLg0Jut8gG=ADE25g@mail.gmail.com>
+From: jernej.skrabec@siol.net (Jernej Skrabec)
+Date: Sun,  2 Sep 2018 09:26:16 +0200
+Subject: [PATCH 00/27] Allwinner H6 DE3 and HDMI support
+Message-ID: <20180902072643.4917-1-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 30, 2018 at 9:23 AM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> On 30 August 2018 at 17:06, Olof Johansson <olof@lixom.net> wrote:
->> On Wed, Aug 29, 2018 at 10:54 PM, Ard Biesheuvel
->> <ard.biesheuvel@linaro.org> wrote:
->>> On 29 August 2018 at 20:59, Scott Branden <scott.branden@broadcom.com> wrote:
->>>> Hi Olof,
->>>>
->>>>
->>>> On 18-08-29 11:44 AM, Olof Johansson wrote:
->>>>>
->>>>> Hi,
->>>>>
->>>>> On Wed, Aug 29, 2018 at 10:21 AM, Scott Branden
->>>>> <scott.branden@broadcom.com> wrote:
->>>>>>
->>>>>> Enable EFI_ARMSTUB_DTB_LOADER to add support for the dtb= command line
->>>>>> parameter to function with efi loader.
->>>>>>
->>>>>> Required to boot on existing bootloaders that do not support devicetree
->>>>>> provided by the platform or by the bootloader.
->>>>>>
->>>>>> Fixes: 3d7ee348aa41 ("efi/libstub/arm: Add opt-in Kconfig option for the
->>>>>> DTB loader")
->>>>>> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
->>>>>
->>>>> Why did Ard create an option for this if it's just going be turned on
->>>>> in default configs? Doesn't make sense to me.
->>>>>
->>>>> It would help to know what firmware still is crippled and how common
->>>>> it is, since it's been a few years that this has been a requirement by
->>>>> now.
->>>>
->>>> Broadcom NS2 and Stingray in current development and production need this
->>>> option in the kernel enabled in order to boot.
->>>
->>> And these production systems run mainline kernels in a defconfig configuration?
->>>
->>> The simply reality is that the DTB loader has been deprecated for a
->>> good reason: it was only ever intended as a development hack anyway,
->>> and if we need to treat the EFI stub provided DTB as a first class
->>> citizen, there are things we need to fix to make things works as
->>> expected. For instance, GRUB will put a property in the /chosen node
->>> for the initramfs which will get dropped if you boot with dtb=.
->>>
->>> Don't be surprised if some future enhancements of the EFI stub code
->>> depend on !EFI_ARMSTUB_DTB_LOADER. On UEFI systems, DTBs [or ACPI
->>> tables] are used by the firmware to describe itself and the underlying
->>> platform to the OS, and the practice of booting with DTB file images
->>> (taken from the kernel build as well) conflicts with that view. Note
->>> that GRUB still permits you to load DTBs from files (and supports more
->>> sources than just the file system the kernel Image was loaded from).
->>
->> Ard,
->>
->> Maybe a WARN() splat would be more useful as a phasing-out method than
->> removing functionality for them that needs to be reinstated through
->> changing the config?
->>
->
-> We don't have any of that in the stub, and inventing new ways to pass
-> such information between the stub and the kernel proper seems like a
-> cart-before-horse kind of thing to me. The EFI stub diagnostic
-> messages you get on the serial console are not recorded in the kernel
-> log buffer, so they only appear if you actually look at the serial
-> output.
+This series adds support for Display Engine 3.0 and HDMI 2.0a, which
+can be found on H6 SoC.
 
-Ah yeah. I suppose you could do it in the kernel later if you detect
-you've booted through EFI with dtb= on the command line though.
+Display Engine 3.0 in comparison to 2.0 mostly adds features needed for
+displaying and processing 10-bit and AFBC formats, which are not yet
+supported by this series.
 
->
->> Once the stub and the boot method is there, it's hard to undo as we
->> can see here. Being loud and warn might be more useful, and set a
->> timeline for hard removal (12 months?).
->>
->
-> The dtb= handling is still there, it is just not enabled by default.
-> We can keep it around if people are still using it. But as I pointed
-> out, we may decide to make new functionality available only if it is
-> disabled, and at that point, we'll have to choose between one or the
-> other in defconfig, which is annoying.
->
->> Scott; an alternative for you is to do a boot wrapper that bundles a
->> DT and kernel, and boot that instead of the kernel image (outside of
->> the kernel tree). Some 32-bit platforms from Marvell use that. That
->> way the kernel will just see it as a normally passed in DT.
->>
->
-> Or use GRUB. It comes wired up in all the distros, and let's you load
-> a DT binary from anywhere you can imagine, as opposed to the EFI stub
-> which can only load it if it happens to reside in the same file system
-> (or even directory - I can't remember) as the kernel image. Note that
-> the same reservations apply to doing that - the firmware is no longer
-> able to describe itself to the OS via the DT, which is really the only
-> conduit it has available on an arm64 system..
+This series is based on linux-next at next-20180828, which has working
+R40 display pipeline support. I'll rebase series on later linux-next, if
+needed, once R40 display pipeline support is reintroduced.
 
-So, I've looked at the history here a bit, and dtb= support was
-introduced in 2014. Nowhere does it say that it isn't a recommended
-way of booting.
+I suggest all patches go through allwinner tree, except DRM patches,
+which should go through drm-misc tree.
 
-There are some firmware stacks today that modify and provide a
-runtime-updated devicetree to the kernel, but there are also a bunch
-who don't. Most "real" products will want a firmware that knows how to
-pass in things such as firmware environment variables, or MAC
-addresses, etc, to the kernel, but not all of them need it.
+Last detail, PineH64 model A schematic has DDC_EN signal, which enables
+DDC voltage level shifter. TL Lim, PINE64 founder, said that this
+signal is not actually present on PineH64 model A board. It is, however
+present on PineH64 model B engineering samples, but it will be removed
+in production version. Because of that, I didn't include any code for
+it.
 
-In particular, in a world where you want EFI to be used on embedded
-platforms, requiring another bootloader step such as GRUB to be able
-to reasonably boot said platforms seems like a significant and
-unfortunate new limitation. Documentation/efi-stub.txt has absolutely
-no indication that it is a second-class option that isn't expected to
-be available everywhere. It doesn't really matter what _your_
-intention was around it, if those who use it never found out and now
-rely on it.
+Please take a look.
 
-Unfortunately the way forward here is to revert 3d7ee348aa4127a.
+Best regards,
+Jernej
 
+Icenowy Zheng (7):
+  dt-bindings: sunxi-sram: add binding for Allwinner H6 SRAM C
+  arm64: allwinner: h6: add system controller device tree node
+  dt-bindings: bus: add H6 DE3 bus binding
+  dt-bindings: display: sunxi: add DT binding for Allwinner H6 DW HDMI
+  drm: sun4i: add quirks for TCON TOP
+  dt-bindings: display: sun4i-drm: document H6 TCON TOP
+  drm: sun4i: add support for H6 TCON TOP
 
--Olof
+Jernej Skrabec (20):
+  clk: sunxi-ng: Adjust MP clock parent rate when allowed
+  clk: sunxi-ng: Use u64 for calculation of NM rate
+  clk: sunxi-ng: h6: Set video PLLs limits
+  dt-bindings: clock: sun8i-de2: Add H6 DE3 clock description
+  clk: sunxi-ng: Add support for H6 DE3 clocks
+  dt-bindings: display: sun4i-drm: Add H6 display engine compatibles
+  drm/sun4i: Add compatible for H6 display engine
+  drm/sun4i: Rework DE2 register defines
+  drm/sun4i: Add basic support for DE3
+  drm/sun4i: Add support for H6 DE3 mixer 0
+  drm/bridge/synopsys: dw-hdmi: Enable workaround for v2.12a
+  drm/sun4i: Not all DW HDMI controllers has scrambled addresses
+  drm/sun4i: dw-hdmi: Make mode_valid function configurable
+  drm/sun4i: dw-hdmi: Add quirk for setting TMDS clock
+  drm/sun4i: Add support for H6 DW HDMI controller
+  drm/sun4i: Add support for Synopsys HDMI PHY
+  drm/sun4i: Add support for H6 HDMI PHY
+  drm/sun4i: Initialize registers in tcon-top driver
+  arm64: dts: sun50i: h6: Add HDMI pipeline
+  arm64: dts: sun50i: h6: Enable HDMI output on Pine H64 board
+
+ .../bindings/bus/sun50i-de2-bus.txt           |   9 +-
+ .../devicetree/bindings/clock/sun8i-de2.txt   |   5 +-
+ .../bindings/display/sunxi/sun4i-drm.txt      |  30 ++-
+ .../devicetree/bindings/sram/sunxi-sram.txt   |   4 +
+ .../boot/dts/allwinner/sun50i-h6-pine-h64.dts |  25 ++
+ arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi  | 224 ++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu-sun50i-h6.c          |   4 +
+ drivers/clk/sunxi-ng/ccu-sun8i-de2.c          |  65 +++++
+ drivers/clk/sunxi-ng/ccu-sun8i-de2.h          |   1 +
+ drivers/clk/sunxi-ng/ccu_mp.c                 |  64 ++++-
+ drivers/clk/sunxi-ng/ccu_nm.c                 |  18 +-
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi.c     |   1 +
+ drivers/gpu/drm/sun4i/sun4i_drv.c             |   1 +
+ drivers/gpu/drm/sun4i/sun8i_csc.c             |  96 +++++++-
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c         |  45 +++-
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h         |  14 +-
+ drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c        | 178 +++++++++++++-
+ drivers/gpu/drm/sun4i/sun8i_mixer.c           |  44 +++-
+ drivers/gpu/drm/sun4i/sun8i_mixer.h           |  61 +++--
+ drivers/gpu/drm/sun4i/sun8i_tcon_top.c        |  58 ++++-
+ drivers/gpu/drm/sun4i/sun8i_ui_layer.c        |  47 ++--
+ drivers/gpu/drm/sun4i/sun8i_ui_layer.h        |  37 +--
+ drivers/gpu/drm/sun4i/sun8i_ui_scaler.c       |  45 ++--
+ drivers/gpu/drm/sun4i/sun8i_ui_scaler.h       |  28 +--
+ drivers/gpu/drm/sun4i/sun8i_vi_layer.c        |  55 +++--
+ drivers/gpu/drm/sun4i/sun8i_vi_layer.h        |  25 +-
+ drivers/gpu/drm/sun4i/sun8i_vi_scaler.c       |  85 +++++--
+ drivers/gpu/drm/sun4i/sun8i_vi_scaler.h       |  68 ++++--
+ include/dt-bindings/clock/sun8i-de2.h         |   3 +
+ include/dt-bindings/reset/sun8i-de2.h         |   1 +
+ 30 files changed, 1127 insertions(+), 214 deletions(-)
+
+-- 
+2.18.0
