@@ -1,109 +1,58 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sun,  2 Sep 2018 09:26:20 +0200
-Subject: [PATCH 04/27] clk: sunxi-ng: Adjust MP clock parent rate when allowed
+Date: Sun,  2 Sep 2018 09:26:18 +0200
+Subject: [PATCH 02/27] arm64: allwinner: h6: add system controller device tree
+ node
 In-Reply-To: <20180902072643.4917-1-jernej.skrabec@siol.net>
 References: <20180902072643.4917-1-jernej.skrabec@siol.net>
-Message-ID: <20180902072643.4917-5-jernej.skrabec@siol.net>
+Message-ID: <20180902072643.4917-3-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently MP clocks don't consider adjusting parent rate even if they
-are allowed to do so. Such behaviour considerably lowers amount of
-possible rates, which is very inconvenient when such clock is used for
-pixel clock, for example.
+From: Icenowy Zheng <icenowy@aosc.io>
 
-In order to improve the situation, adjusting parent rate is considered
-when allowed.
+As we have already binding for the H6 system controller, add its node
+to the device tree.
 
-This code is inspired by clk_divider_bestdiv() function, which does
-basically the same thing for different clock type.
-
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+[fixed compatible string]
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/clk/sunxi-ng/ccu_mp.c | 64 +++++++++++++++++++++++++++++++++--
- 1 file changed, 62 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 23 ++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-diff --git a/drivers/clk/sunxi-ng/ccu_mp.c b/drivers/clk/sunxi-ng/ccu_mp.c
-index 5d0af4051737..0357349eb767 100644
---- a/drivers/clk/sunxi-ng/ccu_mp.c
-+++ b/drivers/clk/sunxi-ng/ccu_mp.c
-@@ -40,6 +40,61 @@ static void ccu_mp_find_best(unsigned long parent, unsigned long rate,
- 	*p = best_p;
- }
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+index cfa5fffcf62b..040828d2e2c0 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+@@ -92,6 +92,29 @@
+ 		#size-cells = <1>;
+ 		ranges;
  
-+static unsigned long ccu_mp_find_best_with_parent_adj(struct clk_hw *hw,
-+						      unsigned long *parent,
-+						      unsigned long rate,
-+						      unsigned int max_m,
-+						      unsigned int max_p)
-+{
-+	unsigned long parent_rate_saved;
-+	unsigned long parent_rate, now;
-+	unsigned long best_rate = 0;
-+	unsigned int _m, _p, div;
-+	unsigned long maxdiv;
++		syscon: syscon at 3000000 {
++			compatible = "allwinner,sun50i-h6-system-control",
++				     "allwinner,sun50i-a64-system-control";
++			reg = <0x03000000 0x1000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
 +
-+	parent_rate_saved = *parent;
++			sram_c: sram at 28000 {
++				compatible = "mmio-sram";
++				reg = <0x00028000 0x1e000>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges = <0 0x00028000 0x1e000>;
 +
-+	/*
-+	 * The maximum divider we can use without overflowing
-+	 * unsigned long in rate * m * p below
-+	 */
-+	maxdiv = max_m * max_p;
-+	maxdiv = min(ULONG_MAX / rate, maxdiv);
++				de2_sram: sram-section at 0 {
++					compatible = "allwinner,sun50i-h6-sram-c",
++						     "allwinner,sun50i-a64-sram-c";
++					reg = <0x0000 0x1e000>;
++				};
++			};
++		};
 +
-+	for (_p = 1; _p <= max_p; _p <<= 1) {
-+		for (_m = 1; _m <= max_m; _m++) {
-+			div = _m * _p;
-+
-+			if (div > maxdiv)
-+				break;
-+
-+			if (rate * div == parent_rate_saved) {
-+				/*
-+				 * It's the most ideal case if the requested
-+				 * rate can be divided from parent clock without
-+				 * needing to change parent rate, so return the
-+				 * divider immediately.
-+				 */
-+				*parent = parent_rate_saved;
-+				return rate;
-+			}
-+
-+			parent_rate = clk_hw_round_rate(hw, rate * div);
-+			now = parent_rate / div;
-+
-+			if (now <= rate && now > best_rate) {
-+				best_rate = now;
-+				*parent = parent_rate;
-+
-+				if (now == rate)
-+					return rate;
-+			}
-+		}
-+	}
-+
-+	return best_rate;
-+}
-+
- static unsigned long ccu_mp_round_rate(struct ccu_mux_internal *mux,
- 				       struct clk_hw *hw,
- 				       unsigned long *parent_rate,
-@@ -56,8 +111,13 @@ static unsigned long ccu_mp_round_rate(struct ccu_mux_internal *mux,
- 	max_m = cmp->m.max ?: 1 << cmp->m.width;
- 	max_p = cmp->p.max ?: 1 << ((1 << cmp->p.width) - 1);
- 
--	ccu_mp_find_best(*parent_rate, rate, max_m, max_p, &m, &p);
--	rate = *parent_rate / p / m;
-+	if (!(clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT)) {
-+		ccu_mp_find_best(*parent_rate, rate, max_m, max_p, &m, &p);
-+		rate = *parent_rate / p / m;
-+	} else {
-+		rate = ccu_mp_find_best_with_parent_adj(hw, parent_rate, rate,
-+							max_m, max_p);
-+	}
- 
- 	if (cmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
- 		rate /= cmp->fixed_post_div;
+ 		ccu: clock at 3001000 {
+ 			compatible = "allwinner,sun50i-h6-ccu";
+ 			reg = <0x03001000 0x1000>;
 -- 
 2.18.0
