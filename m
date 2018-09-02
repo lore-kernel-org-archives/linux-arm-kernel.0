@@ -1,46 +1,30 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sun,  2 Sep 2018 09:26:22 +0200
-Subject: [PATCH 06/27] clk: sunxi-ng: h6: Set video PLLs limits
+Date: Sun,  2 Sep 2018 09:26:26 +0200
+Subject: [PATCH 10/27] drm/sun4i: Add compatible for H6 display engine
 In-Reply-To: <20180902072643.4917-1-jernej.skrabec@siol.net>
 References: <20180902072643.4917-1-jernej.skrabec@siol.net>
-Message-ID: <20180902072643.4917-7-jernej.skrabec@siol.net>
+Message-ID: <20180902072643.4917-11-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Video PLL factors can be set in a way that final PLL rate is outside
-stable range. H6 user manual specifically says that N factor should not
-be below 12. While it doesn't says anything about maximum stable rate, it
-is clear that PLL doesn't work at 6.096 GHz (254 * 24 MHz).
-
-Set minimum allowed PLL video rate to 288 MHz (12 * 24 MHz) and maximum
-to 2.4 GHz, which is maximum in BSP driver.
+H6 is first Allwinner SoC which supports 10 bit colors, HDR and AFBC.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/clk/sunxi-ng/ccu-sun50i-h6.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_drv.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-h6.c b/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
-index 2193e1495086..f44d314b2285 100644
---- a/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun50i-h6.c
-@@ -120,6 +120,8 @@ static struct ccu_nm pll_video0_clk = {
- 	.n		= _SUNXI_CCU_MULT_MIN(8, 8, 12),
- 	.m		= _SUNXI_CCU_DIV(1, 1), /* input divider */
- 	.fixed_post_div	= 4,
-+	.min_rate	= 288000000,
-+	.max_rate	= 2400000000,
- 	.common		= {
- 		.reg		= 0x040,
- 		.features	= CCU_FEATURE_FIXED_POSTDIV,
-@@ -136,6 +138,8 @@ static struct ccu_nm pll_video1_clk = {
- 	.n		= _SUNXI_CCU_MULT_MIN(8, 8, 12),
- 	.m		= _SUNXI_CCU_DIV(1, 1), /* input divider */
- 	.fixed_post_div	= 4,
-+	.min_rate	= 288000000,
-+	.max_rate	= 2400000000,
- 	.common		= {
- 		.reg		= 0x048,
- 		.features	= CCU_FEATURE_FIXED_POSTDIV,
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index dd19d674055c..e5731d092e1a 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -410,6 +410,7 @@ static int sun4i_drv_remove(struct platform_device *pdev)
+ 
+ static const struct of_device_id sun4i_drv_of_table[] = {
+ 	{ .compatible = "allwinner,sun4i-a10-display-engine" },
++	{ .compatible = "allwinner,sun50i-h6-display-engine" },
+ 	{ .compatible = "allwinner,sun5i-a10s-display-engine" },
+ 	{ .compatible = "allwinner,sun5i-a13-display-engine" },
+ 	{ .compatible = "allwinner,sun6i-a31-display-engine" },
 -- 
 2.18.0
