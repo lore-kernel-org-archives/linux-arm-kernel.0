@@ -1,55 +1,69 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 2 Sep 2018 20:58:46 +0100
-Subject: [PATCH v3 01/30] mfd: Makefile: Remove build option for
- MFD:sun4i-gpadc
-In-Reply-To: <20180831082545.z6oilsmizliin3li@flea>
+Date: Sun, 2 Sep 2018 21:01:09 +0100
+Subject: [PATCH v3 05/30] iio: adc: move SUN4I_GPADC_CHANNEL define to
+ header file
+In-Reply-To: <20180830154518.29507-6-embed3d@gmail.com>
 References: <20180830154518.29507-1-embed3d@gmail.com>
- <20180830154518.29507-2-embed3d@gmail.com>
- <20180831082545.z6oilsmizliin3li@flea>
-Message-ID: <20180902205846.7a08846c@archlinux>
+ <20180830154518.29507-6-embed3d@gmail.com>
+Message-ID: <20180902210109.7bd4a567@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 31 Aug 2018 10:25:45 +0200
-Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+On Thu, 30 Aug 2018 17:44:53 +0200
+Philipp Rossak <embed3d@gmail.com> wrote:
 
-> Hi Philipp,
-> 
-> First, thanks for doing that rework. It was needed, and it's very much
-> appreciated :)
-> 
-> As you can imagine though, I have a bunch of comments.
-> 
-> On Thu, Aug 30, 2018 at 05:44:49PM +0200, Philipp Rossak wrote:
-> > Since we are merging the mfd driver into the sun4i-gpadc driver we need
-> > to remove the build options for the sun4i-gpadc driver.
-> > 
-> > Signed-off-by: Philipp Rossak <embed3d@gmail.com>
-> > ---
-> >  drivers/mfd/Makefile | 1 -
-> >  1 file changed, 1 deletion(-)
-> > 
-> > diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-> > index e9fd20dba18d..c680994db988 100644
-> > --- a/drivers/mfd/Makefile
-> > +++ b/drivers/mfd/Makefile
-> > @@ -220,7 +220,6 @@ obj-$(CONFIG_INTEL_SOC_PMIC_CHTDC_TI)	+= intel_soc_pmic_chtdc_ti.o
-> >  obj-$(CONFIG_MFD_MT6397)	+= mt6397-core.o
-> >  
-> >  obj-$(CONFIG_MFD_ALTERA_A10SR)	+= altera-a10sr.o
-> > -obj-$(CONFIG_MFD_SUN4I_GPADC)	+= sun4i-gpadc.o  
-> 
-> One of the things we should strive for is bisectability, which means
-> being able to have a working driver at every point in time while
-> introducing the features.
-> 
-> In this particular case, this isn't really a problem since you're
-> removing part of code that were never really enabled, but you should
-> at least document why in your commit log.
-> 
-Agreed. I for one don't know / can't remember why this would make sense!
+> We are moving the SUN4I_GPADC_CHANNEL define to the header file.
+Maxime has raised this point in other patches...
+
+Why?  Obvious what but I have no idea why you are doing this.
+
+Thanks,
 
 Jonathan
-> Thanks!
-> Maxime
 > 
+> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+> ---
+>  drivers/iio/adc/sun4i-gpadc-iio.c | 9 ---------
+>  include/linux/mfd/sun4i-gpadc.h   | 9 +++++++++
+>  2 files changed, 9 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
+> index d95dd0fde2a6..666329940e1e 100644
+> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
+> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
+> @@ -109,15 +109,6 @@ struct sun4i_gpadc_iio {
+>  	struct device			*sensor_device;
+>  };
+>  
+> -#define SUN4I_GPADC_ADC_CHANNEL(_channel, _name) {		\
+> -	.type = IIO_VOLTAGE,					\
+> -	.indexed = 1,						\
+> -	.channel = _channel,					\
+> -	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),		\
+> -	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),	\
+> -	.datasheet_name = _name,				\
+> -}
+> -
+>  static struct iio_map sun4i_gpadc_hwmon_maps[] = {
+>  	{
+>  		.adc_channel_label = "temp_adc",
+> diff --git a/include/linux/mfd/sun4i-gpadc.h b/include/linux/mfd/sun4i-gpadc.h
+> index 139872c2e0fe..54c7c9375c1b 100644
+> --- a/include/linux/mfd/sun4i-gpadc.h
+> +++ b/include/linux/mfd/sun4i-gpadc.h
+> @@ -90,6 +90,15 @@
+>  /* 10s delay before suspending the IP */
+>  #define SUN4I_GPADC_AUTOSUSPEND_DELAY			10000
+>  
+> +#define SUN4I_GPADC_ADC_CHANNEL(_channel, _name) {		\
+> +	.type = IIO_VOLTAGE,					\
+> +	.indexed = 1,						\
+> +	.channel = _channel,					\
+> +	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),		\
+> +	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),	\
+> +	.datasheet_name = _name,				\
+> +}
+> +
+>  struct sun4i_gpadc_dev {
+>  	struct device			*dev;
+>  	struct regmap			*regmap;
