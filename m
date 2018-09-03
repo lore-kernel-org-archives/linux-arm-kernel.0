@@ -1,125 +1,52 @@
-From: tony.xie@rock-chips.com (Tony Xie)
-Date: Mon,  3 Sep 2018 18:04:00 +0800
-Subject: [PATCH v4 5/5] clk: RK808: add RK809 and RK817 support.
-In-Reply-To: <1535968829-19418-1-git-send-email-tony.xie@rock-chips.com>
-References: <1535968829-19418-1-git-send-email-tony.xie@rock-chips.com>
-Message-ID: <1535969040-19528-1-git-send-email-tony.xie@rock-chips.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 3 Sep 2018 11:03:25 +0100
+Subject: [PATCH v4 05/20] kvm: arm64: Add helper for loading the stage2
+ setting for a VM
+In-Reply-To: <20180830093953.GA4029@e113682-lin.lund.arm.com>
+References: <1531905547-25478-1-git-send-email-suzuki.poulose@arm.com>
+ <1531905547-25478-6-git-send-email-suzuki.poulose@arm.com>
+ <20180830093953.GA4029@e113682-lin.lund.arm.com>
+Message-ID: <d0349651-6c29-26d4-012e-01df601494e7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RK809 and RK817 are power management IC chips for multimedia products.
-most of their functions and registers are same, including the clkout
-funciton.
+On 30/08/18 10:39, Christoffer Dall wrote:
+> On Wed, Jul 18, 2018 at 10:18:48AM +0100, Suzuki K Poulose wrote:
+>> We load the stage2 context of a guest for different operations,
+>> including running the guest and tlb maintenance on behalf of the
+>> guest. As of now only the vttbr is private to the guest, but this
+>> is about to change with IPA per VM. Add a helper to load the stage2
+>> configuration for a VM, which could do the right thing with the
+>> future changes.
+>>
+>> Cc: Christoffer Dall <cdall@kernel.org>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Reviewed-by: Eric Auger <eric.auger@redhat.com>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>> Changes since v2:
+>>   - New patch
+>> ---
+>>   arch/arm64/include/asm/kvm_hyp.h | 6 ++++++
+>>   arch/arm64/kvm/hyp/switch.c      | 2 +-
+>>   arch/arm64/kvm/hyp/tlb.c         | 4 ++--
+>>   3 files changed, 9 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+>> index 384c343..82f9994 100644
+>> --- a/arch/arm64/include/asm/kvm_hyp.h
+>> +++ b/arch/arm64/include/asm/kvm_hyp.h
+>> @@ -155,5 +155,11 @@ void deactivate_traps_vhe_put(void);
+>>   u64 __guest_enter(struct kvm_vcpu *vcpu, struct kvm_cpu_context *host_ctxt);
+>>   void __noreturn __hyp_do_panic(unsigned long, ...);
+>>   
+>> +/* Must be called from hyp code running at EL2 */
+> 
+> more importantly than having to run this at EL2, is that it must have
+> gone through the proper sequence of update_vttbr() and disabling
+> interrupts to avoid using a stale VMID.
 
-Signed-off-by: Tony Xie <tony.xie@rock-chips.com>
----
- drivers/clk/Kconfig     |  9 ++++---
- drivers/clk/clk-rk808.c | 64 ++++++++++++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 67 insertions(+), 6 deletions(-)
+Right, I will update the comment.
 
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index 721572a..92cf5ad 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -46,13 +46,12 @@ config COMMON_CLK_MAX77686
- 	  clock.
- 
- config COMMON_CLK_RK808
--	tristate "Clock driver for RK805/RK808/RK818"
-+	tristate "Clock driver for RK805/RK808/RK809/RK817/RK818"
- 	depends on MFD_RK808
- 	---help---
--	  This driver supports RK805, RK808 and RK818 crystal oscillator clock. These
--	  multi-function devices have two fixed-rate oscillators,
--	  clocked at 32KHz each. Clkout1 is always on, Clkout2 can off
--	  by control register.
-+	  This driver supports RK805, RK809 and RK817, RK808 and RK818 crystal oscillator clock.
-+	  These multi-function devices have two fixed-rate oscillators, clocked at 32KHz each.
-+	  Clkout1 is always on, Clkout2 can off by control register.
- 
- config COMMON_CLK_HI655X
- 	tristate "Clock driver for Hi655x" if EXPERT
-diff --git a/drivers/clk/clk-rk808.c b/drivers/clk/clk-rk808.c
-index 6461f28..7f9a56b 100644
---- a/drivers/clk/clk-rk808.c
-+++ b/drivers/clk/clk-rk808.c
-@@ -96,6 +96,68 @@ static int rk808_clkout2_is_prepared(struct clk_hw *hw)
- 	return idx ? &rk808_clkout->clkout2_hw : &rk808_clkout->clkout1_hw;
- }
- 
-+static int rk817_clkout2_enable(struct clk_hw *hw, bool enable)
-+{
-+	struct rk808_clkout *rk808_clkout = container_of(hw,
-+							 struct rk808_clkout,
-+							 clkout2_hw);
-+	struct rk808 *rk808 = rk808_clkout->rk808;
-+
-+	return regmap_update_bits(rk808->regmap, RK817_SYS_CFG(1),
-+				  RK817_CLK32KOUT2_EN,
-+				  enable ? RK817_CLK32KOUT2_EN : 0);
-+}
-+
-+static int rk817_clkout2_prepare(struct clk_hw *hw)
-+{
-+	return rk817_clkout2_enable(hw, true);
-+}
-+
-+static void rk817_clkout2_unprepare(struct clk_hw *hw)
-+{
-+	rk817_clkout2_enable(hw, false);
-+}
-+
-+static int rk817_clkout2_is_prepared(struct clk_hw *hw)
-+{
-+	struct rk808_clkout *rk808_clkout = container_of(hw,
-+							 struct rk808_clkout,
-+							 clkout2_hw);
-+	struct rk808 *rk808 = rk808_clkout->rk808;
-+	unsigned int val;
-+
-+	int ret = regmap_read(rk808->regmap, RK817_SYS_CFG(1), &val);
-+
-+	if (ret < 0)
-+		return 0;
-+
-+	return (val & RK817_CLK32KOUT2_EN) ? 1 : 0;
-+}
-+
-+static const struct clk_ops rk817_clkout2_ops = {
-+	.prepare = rk817_clkout2_prepare,
-+	.unprepare = rk817_clkout2_unprepare,
-+	.is_prepared = rk817_clkout2_is_prepared,
-+	.recalc_rate = rk808_clkout_recalc_rate,
-+};
-+
-+static const struct clk_ops *rkpmic_get_ops(long variant)
-+{
-+	switch (variant) {
-+	case RK809_ID:
-+	case RK817_ID:
-+		return &rk817_clkout2_ops;
-+	/*
-+	 * For the default case, it match the following PMIC type.
-+	 * RK805_ID
-+	 * RK808_ID
-+	 * RK818_ID
-+	 */
-+	default:
-+		return &rk808_clkout2_ops;
-+	}
-+}
-+
- static int rk808_clkout_probe(struct platform_device *pdev)
- {
- 	struct rk808 *rk808 = dev_get_drvdata(pdev->dev.parent);
-@@ -127,7 +189,7 @@ static int rk808_clkout_probe(struct platform_device *pdev)
- 		return ret;
- 
- 	init.name = "rk808-clkout2";
--	init.ops = &rk808_clkout2_ops;
-+	init.ops = rkpmic_get_ops(rk808->variant);
- 	rk808_clkout->clkout2_hw.init = &init;
- 
- 	/* optional override of the clockname */
--- 
-1.9.1
+Cheers
+Suzuki
