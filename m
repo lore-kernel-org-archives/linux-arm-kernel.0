@@ -1,57 +1,100 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 3 Sep 2018 17:57:26 +0100
-Subject: [PATCH] arm64/ptrace: add PTRACE_SYSEMU and
- PTRACE_SYSEMU_SINGLESTEP support
-In-Reply-To: <102400624.EOB2phcGqB@blindfold>
-References: <20180903062310.GA4524@haibo-VirtualBox>
- <20180903163103.GC6954@arm.com> <102400624.EOB2phcGqB@blindfold>
-Message-ID: <20180903165726.GJ6954@arm.com>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Mon, 3 Sep 2018 10:26:21 -0700
+Subject: [PATCH 0/7] ARM32/64: DT overlay build support
+In-Reply-To: <76ff8aa9-129b-403d-8ef0-fb000f697097@ti.com>
+References: <1535459532-17211-1-git-send-email-t-kristo@ti.com>
+ <f9562e36-ef04-fb14-74a1-6a67feaa97a8@gmail.com>
+ <183d979a-3849-7199-417f-3572b00dca5b@ti.com>
+ <a137359f-f836-c8eb-61b4-9d1d4907ad93@gmail.com>
+ <76ff8aa9-129b-403d-8ef0-fb000f697097@ti.com>
+Message-ID: <a6db14b8-66df-ee47-e76b-8a03cb4dce17@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+Hi Tero,
 
-On Mon, Sep 03, 2018 at 06:40:51PM +0200, Richard Weinberger wrote:
-> Am Montag, 3. September 2018, 18:31:03 CEST schrieb Will Deacon:
-> > On Mon, Sep 03, 2018 at 02:23:17PM +0800, Haibo.Xu wrote:
-> > > Add PTRACE_SYSEMU and PTRACE_SYSEMU_SINGLESTEP support on ARM64.
-> > > This copies the x86 semantics for invoking ptrace hooks, and have
-> > > been verified on ARM64 machine.
-> > > 
-> > > Signed-off-by: Haibo.Xu <haibo.xu@arm.com>
-> > > Signed-off-by: Bin.Lu <bin.lu@arm.com>
-> > > ---
-> > >  arch/arm64/include/asm/thread_info.h |  5 ++++-
-> > >  arch/arm64/include/uapi/asm/ptrace.h |  2 ++
-> > >  arch/arm64/kernel/ptrace.c           | 17 +++++++++++++++++
-> > >  3 files changed, 23 insertions(+), 1 deletion(-)
-> > 
-> > What is PTRACE_SYSEMU and what is its semantics? Why isn't it done in the
-> > core ptrace code?
+On 09/03/18 02:03, Tero Kristo wrote:
+> On 30/08/18 23:32, Frank Rowand wrote:
+>> Hi Tero,
+>>
+>> (Really adding Mark as a cc: this time.? Last time I added him as
+>> a bcc: by mistake.)
+>>
+>>
+>> On 08/30/18 10:12, Tero Kristo wrote:
+>>> On 29/08/18 21:40, Frank Rowand wrote:
+>>>> + Mark Rutland, just in case he is interested
+>>>>
+>>>> On 08/28/18 05:32, Tero Kristo wrote:
+>>>>> Hi,
+>>>>>
+>>>>> This series introduces devicetree overlay building support for ARM
+>>>>> platforms. The .dtbo target is introduced globally, then makefile
+>>>>> changes for both arm32/64 for supporting the .dtbo target, changes
+>>>>> to support sub-dir makefile flags, and finally adding the DTC flags
+>>>>> override for TI platforms, as that is where we want to introduce
+>>>>> the DT overlay support initially.
+>>>>>
+>>>>> The ARM makefile changes for supporting DTS sub-makefiles don't look
+>>>>> too clean, but that was the only way I could figure out how to
+>>>>> get it done.
+>>>>>
+>>>>> -Tero
+>>>>>
+>>>>> --?
+>>>>>
+>>>>
+>>>> This series does three unrelated things:
+>>>
+>>> Well, I was kind of trying to show the whole solution here but...
+>>
+>> That actually makes sense, and normally I wouldn't have asked for the
+>> split.? It might be the case that I am being too cautious, and maybe
+>> there won't be much discussion at all.? I was just concerned that in
+>> this case some of the concepts might get overlooked due to discussion
+>> of other concepts.? I'm also expecting different people to care
+>> about each of the concepts.
+>>
+>>>
+>>>> (1) create a ti specific dts subdirectory arch/arm/boot/dts/ti/
+>>>>
+>>>> (2) create a rule for creating a .dtbo from a .dtso
+>>>>
+>>>> (3) add a dtc compile flag to add phandle symbol information to
+>>>> ????? all .dtb files created from arch/arm/boot/dts/ti/ and
+>>>> ????? arch/arm64/boot/dts/ti/
+>>>>
+>>>> Please split the patches into three independent series so that
+>>>> each of the three concepts can be discussed separately.
+>>>
+>>> Ok will do that, hopefully tomorrow. Didn't manage to squeeze in time to do it today.
+>>
+>> Thanks, I appreciate your flexibility.
 > 
-> It is an optimization added for UserModeLinux many years ago.
-> PTRACE_SYSEMU basically allows you to handle system calls in user space
-> without the kernel seeing them.
-> Before that UML had to render every system call into a no-op, e.h. getpid().
-> This was complicated and slow.
-
-Ok, thanks for the insight!
-
-> The ptrace() manpage has a section on PTRACE_SYSEMU, more documentation on the
-> semantics is not available.
-
-:( We already have tracehook, seccomp, tracepoint and audit fighting with
-each other on syscall entry, so I'm really not keen to add another player to
-the game unless we really have to.
-
-Has anybody tried implementing this using tracehook?
-
-> And yes, I think this should also done in the core. Like many other ptrace() areas
-> this needs a cleanup. ;-)
+> Hi Frank,
 > 
-> I wonder what Haibo Xu want to do with PTRACE_SYSEMU on arm64.
-> Are you porting UML or gvisor to arm64?
+> I did post v2 as a split series on Friday, but seems I missed adding
+> you in the delivery for those by accident... sorry about that. Do you
+> want me to repost or can you pick those from the devicetree list?
 
-That's a good question. Haibo?
+Yes, please repost to be sure I see all the replys.
 
-Will
+Thanks,
+
+Frank
+
+
+> -Tero
+> 
+>>
+>> -Frank
+>>
+>>>
+>>> -Tero
+>>> --?
+>>>
+>>
+> 
+> -- 
+> Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+> 
