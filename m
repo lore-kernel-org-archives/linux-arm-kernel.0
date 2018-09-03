@@ -1,48 +1,56 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Mon,  3 Sep 2018 12:01:52 +0200
-Subject: [PATCH v5 0/9] ata: ahci_platform: support allwinner R40 AHCI
-Message-ID: <20180903100201.23131-1-clabbe.montjoie@gmail.com>
+Date: Mon,  3 Sep 2018 12:02:01 +0200
+Subject: [PATCH v5 9/9] ARM: dts: sun8i: sun8i-r40-bananapi-m2-ultra: enable
+ AHCI
+In-Reply-To: <20180903100201.23131-1-clabbe.montjoie@gmail.com>
+References: <20180903100201.23131-1-clabbe.montjoie@gmail.com>
+Message-ID: <20180903100201.23131-10-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset add support for allwinner R40 AHCI controller.
+This patch enable the AHCI controller.
+Since this controller need two regulator, this patch add them.
 
-The whole patchset is tested on sun8i-r40-bananapi-m2-ultra and
-on sun7i-a20-cubieboard2 which doesnt have any of the ressources added
-by this serie, so no regression should come with it.
+Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+---
+ arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-Patchs 1-7 should go via the ata tree
-Patchs 8,9 should go via the sunxi tree
-
-Changes since v4:
-- dropped PHY dedicated driver
-- added the optionnal phy-supply
-
-Changes since v3:
-- Moved PHY code to a new sun4i-a10-phy-sata driver
-- Removed reset code since ahci_platform support now reset controller.
-
-Changes since V2
-- Moved all ressources management to ahci_platform
-
-Corentin Labbe (9):
-  dt-bindings: ata: ahci-platform: fix indentation of target-supply
-  ata: ahci_platform: add support for AHCI controller regulator
-  dt-bindings: ata: ahci-platform: document ahci-supply
-  ata: ahci_platform: add support for PHY controller regulator
-  dt-bindings: ata: ahci-platform: document phy-supply
-  ata: ahci_sunxi: add support for r40
-  dt-bindings: ata: update ahci_sunxi bindings
-  ARM: dts: sun8i: r40: add sata node
-  ARM: dts: sun8i: sun8i-r40-bananapi-m2-ultra: enable AHCI
-
- .../devicetree/bindings/ata/ahci-platform.txt      |  6 ++-
- arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts  | 18 +++++++++
- arch/arm/boot/dts/sun8i-r40.dtsi                   | 13 ++++++
- drivers/ata/ahci.h                                 |  2 +
- drivers/ata/ahci_sunxi.c                           |  3 +-
- drivers/ata/libahci_platform.c                     | 46 +++++++++++++++++++++-
- 6 files changed, 84 insertions(+), 4 deletions(-)
-
+diff --git a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
+index a891a387e8f1..438b7b44dab3 100644
+--- a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
++++ b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
+@@ -105,6 +105,12 @@
+ 	};
+ };
+ 
++&ahci {
++	ahci-supply = <&reg_dldo4>;
++	phy-supply = <&reg_eldo3>;
++	status = "okay";
++};
++
+ &de {
+ 	status = "okay";
+ };
+@@ -250,6 +256,18 @@
+ 	regulator-name = "vcc-wifi";
+ };
+ 
++&reg_dldo4 {
++	regulator-min-microvolt = <2500000>;
++	regulator-max-microvolt = <2500000>;
++	regulator-name = "vdd2v5-sata";
++};
++
++&reg_eldo3 {
++	regulator-min-microvolt = <1200000>;
++	regulator-max-microvolt = <1200000>;
++	regulator-name = "vdd1v2-sata";
++};
++
+ &tcon_tv0 {
+ 	status = "okay";
+ };
 -- 
 2.16.4
