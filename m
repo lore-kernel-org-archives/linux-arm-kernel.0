@@ -1,166 +1,76 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Mon,  3 Sep 2018 15:45:15 +0200
-Subject: [PULL 3/4] KVM: Remove obsolete kvm_unmap_hva notifier backend
-In-Reply-To: <20180903134516.17796-1-christoffer.dall@arm.com>
-References: <20180903134516.17796-1-christoffer.dall@arm.com>
-Message-ID: <20180903134516.17796-4-christoffer.dall@arm.com>
+From: vincenzo.frascino@arm.com (Vincenzo Frascino)
+Date: Mon, 3 Sep 2018 14:49:38 +0100
+Subject: [PATCH v6 11/11] arm64: annotate user pointers casts detected by
+ sparse
+In-Reply-To: <CAAeHK+w86m6YztnTGhuZPKRczb-+znZ1hiJskPXeQok4SgcaOw@mail.gmail.com>
+References: <cover.1535629099.git.andreyknvl@google.com>
+ <5d54526e5ff2e5ad63d0dfdd9ab17cf359afa4f2.1535629099.git.andreyknvl@google.com>
+ <20180831081123.6mo62xnk54pvlxmc@ltop.local>
+ <20180831134244.GB19965@ZenIV.linux.org.uk>
+ <CAAeHK+w86m6YztnTGhuZPKRczb-+znZ1hiJskPXeQok4SgcaOw@mail.gmail.com>
+Message-ID: <01cadefd-c929-cb45-500d-7043cf3943f6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+On 03/09/18 13:34, Andrey Konovalov wrote:
+> On Fri, Aug 31, 2018 at 3:42 PM, Al Viro <viro@zeniv.linux.org.uk> wrote:
+>> On Fri, Aug 31, 2018 at 10:11:24AM +0200, Luc Van Oostenryck wrote:
+>>> On Thu, Aug 30, 2018 at 01:41:16PM +0200, Andrey Konovalov wrote:
+>>>> This patch adds __force annotations for __user pointers casts detected by
+>>>> sparse with the -Wcast-from-as flag enabled (added in [1]).
+>>>>
+>>>> [1] https://github.com/lucvoo/sparse-dev/commit/5f960cb10f56ec2017c128ef9d16060e0145f292
+>>>
+>>> Hi,
+>>>
+>>> It would be nice to have some explanation for why these added __force
+>>> are useful.
+> 
+> I'll add this in the next version, thanks!
+> 
+>>         It would be even more useful if that series would either deal with
+>> the noise for real ("that's what we intend here, that's what we intend there,
+>> here's a primitive for such-and-such kind of cases, here we actually
+>> ought to pass __user pointer instead of unsigned long", etc.) or left it
+>> unmasked.
+>>
+>>         As it is, __force says only one thing: "I know the code is doing
+>> the right thing here".  That belongs in primitives, and I do *not* mean the
+>> #define cast_to_ulong(x) ((__force unsigned long)(x))
+>> kind.
+>>
+>>         Folks, if you don't want to deal with that - leave the warnings be.
+>> They do carry more information than "someone has slapped __force in that place".
+>>
+>> Al, very annoyed by that kind of information-hiding crap...
+> 
+> This patch only adds __force to hide the reports I've looked at and
+> decided that the code does the right thing. The cases where this is
+> not the case are handled by the previous patches in the patchset. I'll
+> this to the patch description as well. Is that OK?
+> 
+I think as well that we should make explicit the information that
+__force is hiding.
+A possible solution could be defining some new address spaces and use
+them where it is relevant in the kernel. Something like:
 
-kvm_unmap_hva is long gone, and we only have kvm_unmap_hva_range to
-deal with. Drop the now obsolete code.
+# define __compat_ptr __attribute__((noderef, address_space(5)))
+# define __tagged_ptr __attribute__((noderef, address_space(6)))
 
-Fixes: fb1522e099f0 ("KVM: update to new mmu_notifier semantic v2")
-Cc: James Hogan <jhogan@kernel.org>
-Reviewed-by: Paolo Bonzini <pbonzini@redhat.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
----
- arch/arm/include/asm/kvm_host.h   |  1 -
- arch/arm64/include/asm/kvm_host.h |  1 -
- arch/mips/include/asm/kvm_host.h  |  1 -
- arch/mips/kvm/mmu.c               | 10 ----------
- arch/x86/include/asm/kvm_host.h   |  1 -
- arch/x86/kvm/mmu.c                |  5 -----
- virt/kvm/arm/mmu.c                | 12 ------------
- virt/kvm/arm/trace.h              | 15 ---------------
- 8 files changed, 46 deletions(-)
+In this way sparse can still identify the casting and trigger a warning.
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 79906cecb091..3ad482d2f1eb 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -223,7 +223,6 @@ int __kvm_arm_vcpu_set_events(struct kvm_vcpu *vcpu,
- 			      struct kvm_vcpu_events *events);
- 
- #define KVM_ARCH_WANT_MMU_NOTIFIER
--int kvm_unmap_hva(struct kvm *kvm, unsigned long hva);
- int kvm_unmap_hva_range(struct kvm *kvm,
- 			unsigned long start, unsigned long end);
- void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte);
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index f26055f2306e..8e6d46df38aa 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -357,7 +357,6 @@ int __kvm_arm_vcpu_set_events(struct kvm_vcpu *vcpu,
- 			      struct kvm_vcpu_events *events);
- 
- #define KVM_ARCH_WANT_MMU_NOTIFIER
--int kvm_unmap_hva(struct kvm *kvm, unsigned long hva);
- int kvm_unmap_hva_range(struct kvm *kvm,
- 			unsigned long start, unsigned long end);
- void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte);
-diff --git a/arch/mips/include/asm/kvm_host.h b/arch/mips/include/asm/kvm_host.h
-index a9af1d2dcd69..2c1c53d12179 100644
---- a/arch/mips/include/asm/kvm_host.h
-+++ b/arch/mips/include/asm/kvm_host.h
-@@ -931,7 +931,6 @@ enum kvm_mips_fault_result kvm_trap_emul_gva_fault(struct kvm_vcpu *vcpu,
- 						   bool write);
- 
- #define KVM_ARCH_WANT_MMU_NOTIFIER
--int kvm_unmap_hva(struct kvm *kvm, unsigned long hva);
- int kvm_unmap_hva_range(struct kvm *kvm,
- 			unsigned long start, unsigned long end);
- void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte);
-diff --git a/arch/mips/kvm/mmu.c b/arch/mips/kvm/mmu.c
-index ee64db032793..d8dcdb350405 100644
---- a/arch/mips/kvm/mmu.c
-+++ b/arch/mips/kvm/mmu.c
-@@ -512,16 +512,6 @@ static int kvm_unmap_hva_handler(struct kvm *kvm, gfn_t gfn, gfn_t gfn_end,
- 	return 1;
- }
- 
--int kvm_unmap_hva(struct kvm *kvm, unsigned long hva)
--{
--	unsigned long end = hva + PAGE_SIZE;
--
--	handle_hva_to_gpa(kvm, hva, end, &kvm_unmap_hva_handler, NULL);
--
--	kvm_mips_callbacks->flush_shadow_all(kvm);
--	return 0;
--}
--
- int kvm_unmap_hva_range(struct kvm *kvm, unsigned long start, unsigned long end)
- {
- 	handle_hva_to_gpa(kvm, start, end, &kvm_unmap_hva_handler, NULL);
-diff --git a/arch/x86/include/asm/kvm_host.h b/arch/x86/include/asm/kvm_host.h
-index 00ddb0c9e612..e6a33420b871 100644
---- a/arch/x86/include/asm/kvm_host.h
-+++ b/arch/x86/include/asm/kvm_host.h
-@@ -1450,7 +1450,6 @@ asmlinkage void kvm_spurious_fault(void);
- 	____kvm_handle_fault_on_reboot(insn, "")
- 
- #define KVM_ARCH_WANT_MMU_NOTIFIER
--int kvm_unmap_hva(struct kvm *kvm, unsigned long hva);
- int kvm_unmap_hva_range(struct kvm *kvm, unsigned long start, unsigned long end);
- int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end);
- int kvm_test_age_hva(struct kvm *kvm, unsigned long hva);
-diff --git a/arch/x86/kvm/mmu.c b/arch/x86/kvm/mmu.c
-index a282321329b5..d440154e8938 100644
---- a/arch/x86/kvm/mmu.c
-+++ b/arch/x86/kvm/mmu.c
-@@ -1853,11 +1853,6 @@ static int kvm_handle_hva(struct kvm *kvm, unsigned long hva,
- 	return kvm_handle_hva_range(kvm, hva, hva + 1, data, handler);
- }
- 
--int kvm_unmap_hva(struct kvm *kvm, unsigned long hva)
--{
--	return kvm_handle_hva(kvm, hva, 0, kvm_unmap_rmapp);
--}
--
- int kvm_unmap_hva_range(struct kvm *kvm, unsigned long start, unsigned long end)
- {
- 	return kvm_handle_hva_range(kvm, start, end, 0, kvm_unmap_rmapp);
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 111a660be3be..ed162a6c57c5 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -1817,18 +1817,6 @@ static int kvm_unmap_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *dat
- 	return 0;
- }
- 
--int kvm_unmap_hva(struct kvm *kvm, unsigned long hva)
--{
--	unsigned long end = hva + PAGE_SIZE;
--
--	if (!kvm->arch.pgd)
--		return 0;
--
--	trace_kvm_unmap_hva(hva);
--	handle_hva_to_gpa(kvm, hva, end, &kvm_unmap_hva_handler, NULL);
--	return 0;
--}
--
- int kvm_unmap_hva_range(struct kvm *kvm,
- 			unsigned long start, unsigned long end)
- {
-diff --git a/virt/kvm/arm/trace.h b/virt/kvm/arm/trace.h
-index e53b596f483b..57b3edebbb40 100644
---- a/virt/kvm/arm/trace.h
-+++ b/virt/kvm/arm/trace.h
-@@ -134,21 +134,6 @@ TRACE_EVENT(kvm_mmio_emulate,
- 		  __entry->vcpu_pc, __entry->instr, __entry->cpsr)
- );
- 
--TRACE_EVENT(kvm_unmap_hva,
--	TP_PROTO(unsigned long hva),
--	TP_ARGS(hva),
--
--	TP_STRUCT__entry(
--		__field(	unsigned long,	hva		)
--	),
--
--	TP_fast_assign(
--		__entry->hva		= hva;
--	),
--
--	TP_printk("mmu notifier unmap hva: %#08lx", __entry->hva)
--);
--
- TRACE_EVENT(kvm_unmap_hva_range,
- 	TP_PROTO(unsigned long start, unsigned long end),
- 	TP_ARGS(start, end),
+We could at that point modify sparse to ignore these conversions when a
+specific flag is passed (i.e. -Wignore-compat-ptr, -Wignore-tagged-ptr)
+to exclude from the generated warnings the ones we have already dealt
+with.
+
+What do you think about this approach?
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
 -- 
-2.18.0
+Regards,
+Vincenzo
