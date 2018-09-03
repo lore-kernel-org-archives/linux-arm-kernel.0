@@ -1,116 +1,45 @@
-From: haibo.xu@arm.com (Haibo.Xu)
-Date: Mon, 3 Sep 2018 14:23:17 +0800
-Subject: [PATCH] arm64/ptrace: add PTRACE_SYSEMU and PTRACE_SYSEMU_SINGLESTEP
- support
-Message-ID: <20180903062310.GA4524@haibo-VirtualBox>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 3 Sep 2018 11:54:15 +0530
+Subject: [PATCH v2] ARM: dts: spear: fix stmpe811 interrupt properties
+In-Reply-To: <20180814073949.27392-1-marcel@ziswiler.com>
+References: <20180814073949.27392-1-marcel@ziswiler.com>
+Message-ID: <20180903062415.xlzipo3mvpcorkk4@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add PTRACE_SYSEMU and PTRACE_SYSEMU_SINGLESTEP support on ARM64.
-This copies the x86 semantics for invoking ptrace hooks, and have
-been verified on ARM64 machine.
+On 14-08-18, 09:39, Marcel Ziswiler wrote:
+> From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> 
+> The property "irq-over-gpio" simply does not exist (this is nowadays
+> actually auto detected) and the property "irq-gpios" is actually called
+> "irq-gpio".
+> 
+> Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> 
+> ---
+> 
+> Changes in v2:
+> - Fix commit message as pointed out by Viresh.
+> 
+>  arch/arm/boot/dts/spear320-hmi.dts | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/spear320-hmi.dts b/arch/arm/boot/dts/spear320-hmi.dts
+> index 0d0da1f65f0e..d2d1fe944407 100644
+> --- a/arch/arm/boot/dts/spear320-hmi.dts
+> +++ b/arch/arm/boot/dts/spear320-hmi.dts
+> @@ -241,8 +241,7 @@
+>  					#address-cells = <1>;
+>  					#size-cells = <0>;
+>  					reg = <0x41>;
+> -					irq-over-gpio;
+> -					irq-gpios = <&gpiopinctrl 29 0x4>;
+> +					irq-gpio = <&gpiopinctrl 29 0x4>;
+>  					id = <0>;
+>  					blocks = <0x5>;
+>  					irq-trigger = <0x1>;
 
-Signed-off-by: Haibo.Xu <haibo.xu@arm.com>
-Signed-off-by: Bin.Lu <bin.lu@arm.com>
----
- arch/arm64/include/asm/thread_info.h |  5 ++++-
- arch/arm64/include/uapi/asm/ptrace.h |  2 ++
- arch/arm64/kernel/ptrace.c           | 17 +++++++++++++++++
- 3 files changed, 23 insertions(+), 1 deletion(-)
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index 46c3b93..5060d2d 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -75,6 +75,7 @@ struct thread_info {
-  *  TIF_SYSCALL_TRACE  - syscall trace active
-  *  TIF_SYSCALL_TRACEPOINT - syscall tracepoint for ftrace
-  *  TIF_SYSCALL_AUDIT  - syscall auditing
-+ *  TIF_SYSCALL_EMU    - syscall emulation active
-  *  TIF_SECOMP         - syscall secure computing
-  *  TIF_SIGPENDING     - signal pending
-  *  TIF_NEED_RESCHED   - rescheduling necessary
-@@ -91,6 +92,7 @@ struct thread_info {
- #define TIF_SYSCALL_AUDIT      9
- #define TIF_SYSCALL_TRACEPOINT 10
- #define TIF_SECCOMP            11
-+#define TIF_SYSCALL_EMU                12
- #define TIF_MEMDIE             18      /* is terminating due to OOM killer */
- #define TIF_FREEZE             19
- #define TIF_RESTORE_SIGMASK    20
-@@ -106,6 +108,7 @@ struct thread_info {
- #define _TIF_SYSCALL_AUDIT     (1 << TIF_SYSCALL_AUDIT)
- #define _TIF_SYSCALL_TRACEPOINT        (1 << TIF_SYSCALL_TRACEPOINT)
- #define _TIF_SECCOMP           (1 << TIF_SECCOMP)
-+#define _TIF_SYSCALL_EMU       (1 << TIF_SYSCALL_EMU)
- #define _TIF_UPROBE            (1 << TIF_UPROBE)
- #define _TIF_32BIT             (1 << TIF_32BIT)
-
-@@ -115,7 +118,7 @@ struct thread_info {
-
- #define _TIF_SYSCALL_WORK      (_TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT | \
-                                 _TIF_SYSCALL_TRACEPOINT | _TIF_SECCOMP | \
--                                _TIF_NOHZ)
-+                                _TIF_NOHZ | _TIF_SYSCALL_EMU)
-
- #endif /* __KERNEL__ */
- #endif /* __ASM_THREAD_INFO_H */
-diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
-index b5c3933..04ab06f 100644
---- a/arch/arm64/include/uapi/asm/ptrace.h
-+++ b/arch/arm64/include/uapi/asm/ptrace.h
-@@ -23,6 +23,8 @@
-
- #include <asm/hwcap.h>
-
-+#define PTRACE_SYSEMU                  31
-+#define PTRACE_SYSEMU_SINGLESTEP       32
-
- /*
-  * PSR bits
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index fc35e06..ff3e322 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -165,6 +165,9 @@ void ptrace_disable(struct task_struct *child)
-         * is likely to cause regressions on obscure architectures.
-         */
-        user_disable_single_step(child);
-+#ifdef TIF_SYSCALL_EMU
-+       clear_tsk_thread_flag(child, TIF_SYSCALL_EMU);
-+#endif
- }
-
- #ifdef CONFIG_HAVE_HW_BREAKPOINT
-@@ -1351,6 +1354,11 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs)
-        if (test_thread_flag(TIF_SYSCALL_TRACE))
-                tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
-
-+       if (test_thread_flag(TIF_SYSCALL_EMU)) {
-+               tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
-+               return -1;
-+       }
-+
-        /* Do the secure computing after ptrace; failures should be fast. */
-        if (secure_computing(NULL) == -1)
-                return -1;
-@@ -1373,6 +1381,15 @@ asmlinkage void syscall_trace_exit(struct pt_regs *regs)
-
-        if (test_thread_flag(TIF_SYSCALL_TRACE))
-                tracehook_report_syscall(regs, PTRACE_SYSCALL_EXIT);
-+
-+       /*
-+        * We only get here because of TIF_SINGLESTEP,
-+        * for PTRACE_SYSEMU_SINGLESTEP, we already reported
-+        * the syscall instruction in syscall_trace_enter().
-+        */
-+       if (test_thread_flag(TIF_SINGLESTEP) &&
-+                       !test_thread_flag(TIF_SYSCALL_EMU))
-+               tracehook_report_syscall_exit(regs, 1);
- }
-
- /*
---
-2.7.4
-
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+-- 
+viresh
