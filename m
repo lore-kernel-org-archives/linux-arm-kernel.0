@@ -1,101 +1,113 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Mon, 3 Sep 2018 09:57:11 +0000
-Subject: [PATCH] pinctrl: Convert to using %pOFn instead of
- device_node.name
-In-Reply-To: <20180828015252.28511-40-robh@kernel.org>
-References: <20180828015252.28511-1-robh@kernel.org>
- <20180828015252.28511-40-robh@kernel.org>
-Message-ID: <3335422d-0b46-fde6-d172-005ba9b60d76@st.com>
+From: tony.xie@rock-chips.com (Tony Xie)
+Date: Mon,  3 Sep 2018 18:00:27 +0800
+Subject: [PATCH v4 3/5] dt-bindings: mfd: rk808: Add binding information for
+ RK809 and RK817.
+In-Reply-To: <1535968829-19418-1-git-send-email-tony.xie@rock-chips.com>
+References: <1535968829-19418-1-git-send-email-tony.xie@rock-chips.com>
+Message-ID: <1535968829-19418-4-git-send-email-tony.xie@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob
+Add device tree bindings documentation for Rockchip's RK809 & RK817 PMIC.
 
-On 08/28/2018 03:52 AM, Rob Herring wrote:
-> In preparation to remove the node name pointer from struct device_node,
-> convert printf users to use the %pOFn format specifier.
-> 
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Dong Aisheng <aisheng.dong@nxp.com>
-> Cc: Fabio Estevam <festevam@gmail.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Stefan Agner <stefan@agner.ch>
-> Cc: Pengutronix Kernel Team <kernel@pengutronix.de>
-> Cc: Sean Wang <sean.wang@mediatek.com>
-> Cc: Matthias Brugger <matthias.bgg@gmail.com>
-> Cc: Carlo Caione <carlo@caione.org>
-> Cc: Kevin Hilman <khilman@baylibre.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Gregory Clement <gregory.clement@bootlin.com>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
-> Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Haojian Zhuang <haojian.zhuang@linaro.org>
-> Cc: Patrice Chotard <patrice.chotard@st.com>
-> Cc: Barry Song <baohua@kernel.org>
-> Cc: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-> Cc: Alexandre Torgue <alexandre.torgue@st.com>
-> Cc: Maxime Ripard <maxime.ripard@bootlin.com>
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Cc: linux-gpio at vger.kernel.org
-> Cc: linux-mediatek at lists.infradead.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-amlogic at lists.infradead.org
-> Cc: linux-rockchip at lists.infradead.org
-> Cc: linux-omap at vger.kernel.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
->   drivers/pinctrl/berlin/berlin.c               |  6 ++--
->   drivers/pinctrl/freescale/pinctrl-imx.c       |  7 ++--
->   drivers/pinctrl/freescale/pinctrl-imx1-core.c | 12 +++----
->   drivers/pinctrl/mediatek/pinctrl-mtk-common.c |  4 +--
->   drivers/pinctrl/meson/pinctrl-meson.c         |  2 +-
->   drivers/pinctrl/mvebu/pinctrl-mvebu.c         |  4 +--
->   drivers/pinctrl/nomadik/pinctrl-nomadik.c     |  6 ++--
->   drivers/pinctrl/pinctrl-at91.c                |  8 ++---
->   drivers/pinctrl/pinctrl-lantiq.c              |  8 ++---
->   drivers/pinctrl/pinctrl-rockchip.c            |  8 ++---
->   drivers/pinctrl/pinctrl-rza1.c                |  8 ++---
->   drivers/pinctrl/pinctrl-single.c              | 32 +++++++++----------
->   drivers/pinctrl/pinctrl-st.c                  |  6 ++--
->   drivers/pinctrl/sirf/pinctrl-atlas7.c         |  4 +--
->   drivers/pinctrl/stm32/pinctrl-stm32.c         |  4 +--
->   drivers/pinctrl/sunxi/pinctrl-sunxi.c         |  8 ++---
->   drivers/pinctrl/ti/pinctrl-ti-iodelay.c       |  8 ++---
->   17 files changed, 66 insertions(+), 69 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
-> index 0966bb0bf71f..e66af93f2cbf 100644
-> --- a/drivers/pinctrl/pinctrl-st.c
-> +++ b/drivers/pinctrl/pinctrl-st.c
-> @@ -817,8 +817,8 @@ static int st_pctl_dt_node_to_map(struct pinctrl_dev *pctldev,
->   
->   	grp = st_pctl_find_group_by_name(info, np->name);
->   	if (!grp) {
-> -		dev_err(info->dev, "unable to find group for node %s\n",
-> -			np->name);
-> +		dev_err(info->dev, "unable to find group for node %pOFn\n",
-> +			np);
->   		return -EINVAL;
->   	}
->   
-> @@ -1184,7 +1184,7 @@ static int st_pctl_dt_parse_groups(struct device_node *np,
->   		if (pp->length / sizeof(__be32) >= OF_GPIO_ARGS_MIN) {
->   			npins++;
->   		} else {
-> -			pr_warn("Invalid st,pins in %s node\n", np->name);
-> +			pr_warn("Invalid st,pins in %pOFn node\n", np);
->   			return -EINVAL;
->   		}
->   	}
+Signed-off-by: Tony Xie <tony.xie@rock-chips.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/mfd/rk808.txt | 56 +++++++++++++++++++++++++
+ 1 file changed, 56 insertions(+)
 
-For pinctrl-st:
-
-Acked-by: Patrice Chotard <patrice.chotard@st.com>
-
-Thanks
-Patrice
+diff --git a/Documentation/devicetree/bindings/mfd/rk808.txt b/Documentation/devicetree/bindings/mfd/rk808.txt
+index 91b6522..c025a99 100644
+--- a/Documentation/devicetree/bindings/mfd/rk808.txt
++++ b/Documentation/devicetree/bindings/mfd/rk808.txt
+@@ -3,11 +3,15 @@ RK8XX Power Management Integrated Circuit
+ The rk8xx family current members:
+ rk805
+ rk808
++rk809
++rk817
+ rk818
+ 
+ Required properties:
+ - compatible: "rockchip,rk805"
+ - compatible: "rockchip,rk808"
++- compatible: "rockchip,rk809"
++- compatible: "rockchip,rk817"
+ - compatible: "rockchip,rk818"
+ - reg: I2C slave address
+ - interrupt-parent: The parent interrupt controller.
+@@ -46,6 +50,28 @@ Optional RK808 properties:
+   the gpio controller. If DVS GPIOs aren't present, voltage changes will happen
+   very quickly with no slow ramp time.
+ 
++Optional RK809 properties:
++- vcc1-supply:  The input supply for DCDC_REG1
++- vcc2-supply:  The input supply for DCDC_REG2
++- vcc3-supply:  The input supply for DCDC_REG3
++- vcc4-supply:  The input supply for DCDC_REG4
++- vcc5-supply:  The input supply for LDO_REG1, LDO_REG2, LDO_REG3
++- vcc6-supply:  The input supply for LDO_REG4, LDO_REG5, LDO_REG6
++- vcc7-supply:  The input supply for LDO_REG7, LDO_REG8, LDO_REG9
++- vcc8-supply:  The input supply for SWITCH_REG1
++- vcc9-supply:  The input supply for DCDC_REG5, SWITCH_REG2
++
++Optional RK817 properties:
++- vcc1-supply:  The input supply for DCDC_REG1
++- vcc2-supply:  The input supply for DCDC_REG2
++- vcc3-supply:  The input supply for DCDC_REG3
++- vcc4-supply:  The input supply for DCDC_REG4
++- vcc5-supply:  The input supply for LDO_REG1, LDO_REG2, LDO_REG3
++- vcc6-supply:  The input supply for LDO_REG4, LDO_REG5, LDO_REG6
++- vcc7-supply:  The input supply for LDO_REG7, LDO_REG8, LDO_REG9
++- vcc8-supply:  The input supply for BOOST
++- vcc9-supply:  The input supply for OTG_SWITCH
++
+ Optional RK818 properties:
+ - vcc1-supply:  The input supply for DCDC_REG1
+ - vcc2-supply:  The input supply for DCDC_REG2
+@@ -87,6 +113,28 @@ number as described in RK808 datasheet.
+ 	- SWITCH_REGn
+ 		- valid values for n are 1 to 2
+ 
++Following regulators of the RK809 PMIC block are supported. Note that
++the 'n' in regulator name, as in DCDC_REGn or LDOn, represents the DCDC or LDO
++number as described in RK808 datasheet.
++
++	- DCDC_REGn
++		- valid values for n are 1 to 5.
++	- LDO_REGn
++		- valid values for n are 1 to 9.
++	- SWITCH_REGn
++		- valid values for n are 1 to 2.
++
++Following regulators of the RK817 PMIC block are supported. Note that
++the 'n' in regulator name, as in DCDC_REGn or LDOn, represents the DCDC or LDO
++number as described in RK818 datasheet.
++
++	- DCDC_REGn
++		- valid values for n are 1 to 4.
++	- LDO_REGn
++		- valid values for n are 1 to 9.
++	- BOOST
++	- OTG_SWITCH
++
+ Following regulators of the RK818 PMIC block are supported. Note that
+ the 'n' in regulator name, as in DCDC_REGn or LDOn, represents the DCDC or LDO
+ number as described in RK818 datasheet.
+@@ -99,6 +147,14 @@ number as described in RK818 datasheet.
+ 	- HDMI_SWITCH
+ 	- OTG_SWITCH
+ 
++There are three pins needed to config for each of RK809 and RK817,
++named "gpio_ts" "gpio_gt" "gpio_slp".
++	The gpio_gt and gpio_ts pins support the gpio function.
++	The gpio_slp pin is for controlling the pmic states, as below:
++		- reset
++		- power down
++		- sleep
++
+ Standard regulator bindings are used inside regulator subnodes. Check
+   Documentation/devicetree/bindings/regulator/regulator.txt
+ for more details
+-- 
+1.9.1
