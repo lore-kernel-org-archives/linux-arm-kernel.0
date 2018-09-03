@@ -1,83 +1,67 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Mon, 3 Sep 2018 09:43:15 +0200
-Subject: [PATCH v3 00/13] remove_conflicting_framebuffers() cleanup
-In-Reply-To: <cover.1535810304.git.mirq-linux@rere.qmqm.pl>
-References: <cover.1535656077.git.mirq-linux@rere.qmqm.pl>
- <cover.1535810304.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <20180903074315.GB21634@phenom.ffwll.local>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 3 Sep 2018 10:31:31 +0200
+Subject: [PATCH v4 00/13] ata: ahci_platform: support allwinner R40 AHCI
+In-Reply-To: <39f89b9d-f5bf-7c4a-8e68-252bfc0b91a4@kernel.dk>
+References: <20180830190120.722-1-clabbe.montjoie@gmail.com>
+ <f5838eae-fa6c-8699-14a4-95d0daa8a960@kernel.dk>
+ <CAGb2v67miUjqeKeDh_E_XPee_0Hq1C6YrfXxsOp_=NtQY+LLmQ@mail.gmail.com>
+ <8fa866c5-6800-505f-53bc-5c1b27582ca6@kernel.dk>
+ <20180831074024.w7yicj5y4imy57e2@flea>
+ <39f89b9d-f5bf-7c4a-8e68-252bfc0b91a4@kernel.dk>
+Message-ID: <20180903083131.asgh6wp54e2fs62l@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 01, 2018 at 04:08:41PM +0200, Micha? Miros?aw wrote:
-> This series cleans up duplicated code for replacing firmware FB
-> driver with proper DRI driver and adds handover support to
-> Tegra driver.
+On Fri, Aug 31, 2018 at 08:35:23AM -0600, Jens Axboe wrote:
+> On 8/31/18 1:40 AM, Maxime Ripard wrote:
+> > Hi Jens,
+11;rgb:0000/2b2b/3636> > 
+> > On Thu, Aug 30, 2018 at 08:52:52PM -0600, Jens Axboe wrote:
+> >> On 8/30/18 8:32 PM, Chen-Yu Tsai wrote:
+> >>> Hi,
+> >>>
+> >>> On Fri, Aug 31, 2018 at 4:31 AM Jens Axboe <axboe@kernel.dk> wrote:
+> >>>>
+> >>>> On 8/30/18 1:01 PM, Corentin Labbe wrote:
+> >>>>> Hello
+> >>>>>
+> >>>>> This patchset add support for allwinner R40 AHCI controller.
+> >>>>>
+> >>>>> The whole patchset is tested on sun8i-r40-bananapi-m2-ultra and
+> >>>>> on sun7i-a20-cubieboard2 which doesnt have any of the ressources added
+> >>>>> by this serie, so no regression should come with it.
+> >>>>>
+> >>>>> The last patch(ata: ahci_sunxi: remove PHY code) should not be merged,
+> >>>>> but will be resent for inclustion when all patchs will have hit linus
+> >>>>> tree.
+> >>>>
+> >>>> Applied 1-12 with Hans's blessing, thanks Corentin.
+> >>>
+> >>> Please don't merge device tree ("dts") patches, i.e. patches 9-12. We will
+> >>> merge them through the sunxi / armsoc tree. Having them in separate trees
+> >>> introduces conflicts when we have other stuff going through our tree.
+> >>
+> >> OK, fair enough, I can drop those.
+> > 
+> > And the DT bits actually have some issues that would need to change
+> > the code significantly.
+> > 
+> > Can you drop all of them please?
 > 
-> This is a sligtly updated version of a series sent on 24 Nov 2017.
-> 
-> ---
-> v2:
->  - rebased on current drm-next
->  - dropped staging/sm750fb changes
->  - added kernel docs for DRM helpers
-> v3:
->  - move kerneldoc to fbdev, where functions are implemented
->  - split kerneldoc for remove_conflicting_framebuffers()
+> OK, can do.
 
-Ah, that's not quite what I had in mind. I think having the docs (also) in
-the drm helpers would be good, since that's where drm people will look,
-and that's the function they'll call. I just wanted you to split the fbdev
-and drm parts into 2 patches (since those are two different maintainers).
+Thanks!
 
-Anyway, this is ok too, so imo ready for merging. If you can resurrect the
-drm docs (with a patch title of "drm/fb-helper: document fbdev remove
-functions" or similar) that would be great.
-
-Only thing we need for merging now is the ack from Bartlomiej.
--Daniel
-
->  - propagate return value in remove_conflicting_pci_framebuffers()
-> 
-> ---
-> Micha? Miros?aw (13):
->   fbdev: show fbdev number for debugging
->   fbdev: allow apertures == NULL in remove_conflicting_framebuffers()
->   fbdev: add kerneldoc do remove_conflicting_framebuffers()
->   fbdev: add remove_conflicting_pci_framebuffers()
->   drm/amdgpu: use simpler remove_conflicting_pci_framebuffers()
->   drm/bochs: use simpler remove_conflicting_pci_framebuffers()
->   drm/cirrus: use simpler remove_conflicting_pci_framebuffers()
->   drm/mgag200: use simpler remove_conflicting_pci_framebuffers()
->   drm/radeon: use simpler remove_conflicting_pci_framebuffers()
->   drm/virtio: use simpler remove_conflicting_pci_framebuffers()
->   drm/vc4: use simpler remove_conflicting_framebuffers(NULL)
->   drm/sun4i: use simpler remove_conflicting_framebuffers(NULL)
->   drm/tegra: kick out simplefb
-> 
->  drivers/gpu/drm/amd/amdgpu/amdgpu_drv.c  | 24 +--------
->  drivers/gpu/drm/bochs/bochs_drv.c        | 18 +------
->  drivers/gpu/drm/cirrus/cirrus_drv.c      | 23 +--------
->  drivers/gpu/drm/mgag200/mgag200_drv.c    | 21 +-------
->  drivers/gpu/drm/mgag200/mgag200_main.c   |  9 ----
->  drivers/gpu/drm/radeon/radeon_drv.c      | 23 +--------
->  drivers/gpu/drm/sun4i/sun4i_drv.c        | 18 +------
->  drivers/gpu/drm/tegra/drm.c              |  4 ++
->  drivers/gpu/drm/vc4/vc4_drv.c            | 20 +-------
->  drivers/gpu/drm/virtio/virtgpu_drm_bus.c | 24 ++-------
->  drivers/video/fbdev/core/fbmem.c         | 63 +++++++++++++++++++++++-
->  include/drm/drm_fb_helper.h              | 12 +++++
->  include/linux/fb.h                       |  2 +
->  13 files changed, 89 insertions(+), 172 deletions(-)
-> 
-> -- 
-> 2.18.0
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+Maxime
 
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180903/d7b82e28/attachment.sig>
