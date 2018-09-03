@@ -1,46 +1,95 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Mon, 3 Sep 2018 18:29:27 +0100
-Subject: [PATCH v3 18/30] iio: adc: sun4i-gpadc-iio: rework: support
- multiple sensors
-In-Reply-To: <3722842b-1aa3-ea46-c0ec-7a01bc8a723e@gmail.com>
-References: <20180830154518.29507-1-embed3d@gmail.com>
- <20180830154518.29507-19-embed3d@gmail.com>
- <20180902211125.0098c808@archlinux>
- <3722842b-1aa3-ea46-c0ec-7a01bc8a723e@gmail.com>
-Message-ID: <20180903182927.344858c4@archlinux>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Mon, 03 Sep 2018 18:29:30 +0100
+Subject: [PATCH] KVM: arm/arm64: Clean dcache to PoC when changing PTE due
+ to CoW
+In-Reply-To: <20180830122052.GD4029@e113682-lin.lund.arm.com> (Christoffer
+ Dall's message of "Thu, 30 Aug 2018 14:20:52 +0200")
+References: <20180823153342.158230-1-marc.zyngier@arm.com>
+ <20180830122052.GD4029@e113682-lin.lund.arm.com>
+Message-ID: <87a7oy7amd.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 3 Sep 2018 15:58:30 +0200
-Philipp Rossak <embed3d@gmail.com> wrote:
+Christoffer Dall <christoffer.dall@arm.com> writes:
 
-> On 02.09.2018 22:11, Jonathan Cameron wrote:
-> > This feels like a good place to factor out the code into a utility
-> > function that just does one of them.  That should hopefully
-> > reduce the indenting etc enough to make the code easier to read.
-> >   
-> >> +		info->tzds[i].info = info;
-> >> +		info->tzds[i].sensor_id = i;
-> >> +
-> >> +		info->tzds[i].tzd = thermal_zone_of_sensor_register(
-> >> +				info->sensor_device,
-> >> +				i, &info->tzds[i], &sun4i_ts_tz_ops);
-> >> +		/*
-> >> +		 * Do not fail driver probing when failing to register in
-> >> +		 * thermal because no thermal DT node is found.
-> >> +		 */
-> >> +		if (IS_ERR(info->tzds[i].tzd) && \
-> >> +				PTR_ERR(info->tzds[i].tzd) != -ENODEV) {
-> >> +			dev_err(&pdev->dev,
-> >> +				"could not register thermal sensor: %ld\n",
-> >> +				PTR_ERR(info->tzds[i].tzd));
-> >> +			return PTR_ERR(info->tzds[i].tzd);
-> >> +		}  
-> 
-> So this code above should be placed in a separate function and called by 
-> the for loop?
-> Did I understand that right?
-Yes - exactly.
+> [Adding Andrea and Steve in CC]
+>
+> On Thu, Aug 23, 2018 at 04:33:42PM +0100, Marc Zyngier wrote:
+>> When triggering a CoW, we unmap the RO page via an MMU notifier
+>> (invalidate_range_start), and then populate the new PTE using another
+>> one (change_pte). In the meantime, we'll have copied the old page
+>> into the new one.
+>> 
+>> The problem is that the data for the new page is sitting in the
+>> cache, and should the guest have an uncached mapping to that page
+>> (or its MMU off), following accesses will bypass the cache.
+>> 
+>> In a way, this is similar to what happens on a translation fault:
+>> We need to clean the page to the PoC before mapping it. So let's just
+>> do that.
+>> 
+>> This fixes a KVM unit test regression observed on a HiSilicon platform,
+>> and subsequently reproduced on Seattle.
+>> 
+>> Fixes: a9c0e12ebee5 ("KVM: arm/arm64: Only clean the dcache on translation fault")
+>> Reported-by: Mike Galbraith <efault@gmx.de>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  virt/kvm/arm/mmu.c | 9 ++++++++-
+>>  1 file changed, 8 insertions(+), 1 deletion(-)
+>> 
+>> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+>> index 1d90d79706bd..287c8e274655 100644
+>> --- a/virt/kvm/arm/mmu.c
+>> +++ b/virt/kvm/arm/mmu.c
+>> @@ -1811,13 +1811,20 @@ static int kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data
+>>  void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte)
+>>  {
+>>  	unsigned long end = hva + PAGE_SIZE;
+>> +	kvm_pfn_t pfn = pte_pfn(pte);
+>>  	pte_t stage2_pte;
+>>  
+>>  	if (!kvm->arch.pgd)
+>>  		return;
+>>  
+>>  	trace_kvm_set_spte_hva(hva);
+>> -	stage2_pte = pfn_pte(pte_pfn(pte), PAGE_S2);
+>> +
+>> +	/*
+>> +	 * We've moved a page around, probably through CoW, so let's treat
+>> +	 * just like a translation fault and clean the cache to the PoC.
+>> +	 */
+>> +	clean_dcache_guest_page(pfn, PAGE_SIZE);
+>> +	stage2_pte = pfn_pte(pfn, PAGE_S2);
+>>  	handle_hva_to_gpa(kvm, hva, end, &kvm_set_spte_handler, &stage2_pte);
+>>  }
+>
+> How does this work for pmd mappings?
 
-> 
-> Philipp
+kvm_set_spte_hva() isn't called for PMD mappings. But...
+
+>
+> Are we guaranteed that a pmd mapping (hugetlbfs or THP) is split before
+> a CoW happens?
+>
+> Steve tells me that we share THP mappings on fork and that we back THPs
+> by a zero page, so CoW with THP should be possible.
+>
+
+...the problem seems to affect handling write permission faults for CoW
+or zero pages.
+
+The memory gets unmapped at stage 2 due to the invalidate notifier (in
+hugetlb_cow() for hugetlbfs and do_huge_pmd_wp_page() for THP) while the
+cache maintenance for the newly allocated page will be skipped due to
+the !FSC_PERM. 
+
+Hmm... smells like there might be a problem here. I'll try and put
+together a fix.
+
+> Thanks,
+>     Christoffer
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
