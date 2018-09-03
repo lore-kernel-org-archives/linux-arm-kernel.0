@@ -1,57 +1,72 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon, 03 Sep 2018 19:01:47 +0800
-Subject: [linux-sunxi] Re: [PATCH v3 21/30] iio: adc: sun4i-gpadc-iio: add
- support for H3 thermal sensor
-In-Reply-To: <20180903102022.fkxfkxadkt4vpbmb@flea>
-References: <20180830154518.29507-1-embed3d@gmail.com>
- <20180830154518.29507-22-embed3d@gmail.com>
- <20180831091137.wkbbipssyd6mqfbt@flea>
- <f01ec2f202c7e2e5a7e0c822b2f9a8f0c55a9ea4.camel@aosc.io>
- <20180903102022.fkxfkxadkt4vpbmb@flea>
-Message-ID: <AFDFF5AB-8BF6-4461-A5C2-D628A2F22E2E@aosc.io>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Mon, 3 Sep 2018 13:13:41 +0200
+Subject: [PATCH v4 06/20] arm64: Add a helper for PARange to physical
+ shift conversion
+In-Reply-To: <30b9aa82-7600-8094-dca3-44a5e79caf5a@arm.com>
+References: <1531905547-25478-1-git-send-email-suzuki.poulose@arm.com>
+ <1531905547-25478-7-git-send-email-suzuki.poulose@arm.com>
+ <20180830094227.GB4029@e113682-lin.lund.arm.com>
+ <30b9aa82-7600-8094-dca3-44a5e79caf5a@arm.com>
+Message-ID: <20180903111341.GI4029@e113682-lin.lund.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Sep 03, 2018 at 11:06:44AM +0100, Suzuki K Poulose wrote:
+> On 30/08/18 10:42, Christoffer Dall wrote:
+> >On Wed, Jul 18, 2018 at 10:18:49AM +0100, Suzuki K Poulose wrote:
+> >>On arm64, ID_AA64MMFR0_EL1.PARange encodes the maximum Physical
+> >>Address range supported by the CPU. Add a helper to decode this
+> >>to actual physical shift. If we hit an unallocated value, return
+> >>the maximum range supported by the kernel.
+> >>This will be used by KVM to set the VTCR_EL2.T0SZ, as it
+> >>is about to move its place. Having this helper keeps the code
+> >>movement cleaner.
+> >>
+> >>Cc: Catalin Marinas <catalin.marinas@arm.com>
+> >>Cc: Marc Zyngier <marc.zyngier@arm.com>
+> >>Cc: James Morse <james.morse@arm.com>
+> >>Cc: Christoffer Dall <cdall@kernel.org>
+> >>Reviewed-by: Eric Auger <eric.auger@redhat.com>
+> >>Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> >>---
+> >>Changes since V2:
+> >>  - Split the patch
+> >>  - Limit the physical shift only for values unrecognized.
+> >>---
+> >>  arch/arm64/include/asm/cpufeature.h | 13 +++++++++++++
+> >>  1 file changed, 13 insertions(+)
+> >>
+> >>diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> >>index 1717ba1..855cf0e 100644
+> >>--- a/arch/arm64/include/asm/cpufeature.h
+> >>+++ b/arch/arm64/include/asm/cpufeature.h
+> >>@@ -530,6 +530,19 @@ void arm64_set_ssbd_mitigation(bool state);
+> >>  static inline void arm64_set_ssbd_mitigation(bool state) {}
+> >>  #endif
+> >>+static inline u32 id_aa64mmfr0_parange_to_phys_shift(int parange)
+> >>+{
+> >>+	switch (parange) {
+> >>+	case 0: return 32;
+> >>+	case 1: return 36;
+> >>+	case 2: return 40;
+> >>+	case 3: return 42;
+> >>+	case 4: return 44;
+> >>+	case 5: return 48;
+> >>+	case 6: return 52;
+> >>+	default: return CONFIG_ARM64_PA_BITS;
+> >
+> >I don't understand this case?  Shouldn't this include at least a WARN()
+> >?
+> 
+> If a new value gets assigned in the future, an older kernel might not
+> be aware of it. As per the Arm ARM ID feature value rules, we are
+> guaranteed that the next higher value must indicate higher value.
+> So, WARN() may not be the right choice. Hence, we restrict it to
+> the value supported by the kernel.
+> 
 
+ok, fair enough.
 
-? 2018?9?3? GMT+08:00 ??6:20:22, Maxime Ripard <maxime.ripard@bootlin.com> ??:
->On Fri, Aug 31, 2018 at 05:51:41PM +0800, Icenowy Zheng wrote:
->> Personally I suggest to leave out all SID or calibration related
->> patches here.
->> 
->> Currently we seems to be wrongly converting SID to big endian,
->however,
->> the orgnization of the THS calibration data on H6 shows that it's
->> surely little endian:
->> 
->> It consists a temperature value in 1/10 celsuis as unit, and some
->> thermal register readout values, which are the values read out at the
->> given temperature, and every value here (the temperature and the
->> readout) are all half word length.
->> 
->> Let the temperature value be AABB, the two readout values be XXYY and
->> ZZWW, the oragnization is:
->> BB AA YY XX WW ZZ ** ** .
->> 
->> When converting the SID to big endian, it becomes:
->> XX YY AA BB ** ** ZZ WW ,
->> which is non-sense, and not able to do sub-word cell addressing.
->> 
->> Maxime, should I drop the LE2BE conversion in SID driver? (I doubt
->> whether it will break compatibility.)
->
->This is exposed to the userspace, so no.
+Thanks,
 
-Please note the LE2BE totally breaks the SID addressing.
-
-Without it dropped all cells must be referenced with
-4 byte word as unit, and half word addressing of
-SID is thus not possible. The driver will also need then to split
-the half words if needed.
-
-I think this is kind of hardware misbehavior, and not a simple
-UAPI change, so the UAPI stability shouldn't affect this change.
-
->
->Maxime
->> 
+    Christoffer
