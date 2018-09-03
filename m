@@ -1,49 +1,36 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Mon,  3 Sep 2018 21:34:33 +0800
-Subject: [PATCH 2/3] drm/sun4i: change A64 HDMI PHY binding to R40
+Date: Mon,  3 Sep 2018 21:34:34 +0800
+Subject: [PATCH 3/3] ARM: sun8i: dts: r40: drop A64 fallback compatible string
+ of HDMI PHY
 In-Reply-To: <20180903133434.58188-1-icenowy@aosc.io>
 References: <20180903133434.58188-1-icenowy@aosc.io>
-Message-ID: <20180903133434.58188-3-icenowy@aosc.io>
+Message-ID: <20180903133434.58188-4-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner A64 SoC is proven to have no PLL-VIDEO mux in the HDMI PHY
-clock, although it has two PLL-VIDEOs. The R40 SoC has this mux.
+The A64 HDMI PHY is proven to have no PLL-VIDEO mux, thus it's not
+compatible with the R40 one.
 
-Change the binding compatible string from sun50i-a64 to sun8i-r40, and
-let A64 to use H3 compatible string.
-
-The compatible string is introduced in v4.19, and during the RC stage we
-can still change it.
+Drop the A64 fallback compatible string in R40 device tree.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/sun8i-r40.dtsi | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-index 82502b351aec..744a8a2a15c0 100644
---- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-@@ -396,7 +396,7 @@ static struct regmap_config sun8i_hdmi_phy_regmap_config = {
- 	.name		= "phy"
- };
+diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
+index ffd9f00f74a4..5f547c161baf 100644
+--- a/arch/arm/boot/dts/sun8i-r40.dtsi
++++ b/arch/arm/boot/dts/sun8i-r40.dtsi
+@@ -800,8 +800,7 @@
+ 		};
  
--static const struct sun8i_hdmi_phy_variant sun50i_a64_hdmi_phy = {
-+static const struct sun8i_hdmi_phy_variant sun8i_r40_hdmi_phy = {
- 	.has_phy_clk = true,
- 	.has_second_pll = true,
- 	.phy_init = &sun8i_hdmi_phy_init_h3,
-@@ -419,8 +419,8 @@ static const struct sun8i_hdmi_phy_variant sun8i_h3_hdmi_phy = {
- 
- static const struct of_device_id sun8i_hdmi_phy_of_table[] = {
- 	{
--		.compatible = "allwinner,sun50i-a64-hdmi-phy",
--		.data = &sun50i_a64_hdmi_phy,
-+		.compatible = "allwinner,sun8i-r40-hdmi-phy",
-+		.data = &sun8i_r40_hdmi_phy,
- 	},
- 	{
- 		.compatible = "allwinner,sun8i-a83t-hdmi-phy",
+ 		hdmi_phy: hdmi-phy at 1ef0000 {
+-			compatible = "allwinner,sun8i-r40-hdmi-phy",
+-				     "allwinner,sun50i-a64-hdmi-phy";
++			compatible = "allwinner,sun8i-r40-hdmi-phy";
+ 			reg = <0x01ef0000 0x10000>;
+ 			clocks = <&ccu CLK_BUS_HDMI1>, <&ccu CLK_HDMI_SLOW>,
+ 				 <&ccu 7>, <&ccu 16>;
 -- 
 2.18.0
