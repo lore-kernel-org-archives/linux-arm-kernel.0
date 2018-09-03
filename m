@@ -1,45 +1,100 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 3 Sep 2018 11:00:38 +0800
-Subject: [PATCH 0/3] arm64: dts: allwinner: a64: pinmux cleanups
-In-Reply-To: <20180828151140.7vc44czdlv4yhan2@flea>
-References: <20180828100132.12975-1-wens@csie.org>
- <20180828151140.7vc44czdlv4yhan2@flea>
-Message-ID: <CAGb2v651odpMn0LKYwP9WJjMZmzkBRyskaTWTaJ-YzJgB86EDQ@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 3 Sep 2018 11:01:12 +0800
+Subject: [PATCH 5/7] arm64: dts: lx2160a: add fspi node property
+In-Reply-To: <1535711404-29528-6-git-send-email-yogeshnarayan.gaur@nxp.com>
+References: <1535711404-29528-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <1535711404-29528-6-git-send-email-yogeshnarayan.gaur@nxp.com>
+Message-ID: <20180903030110.GI3850@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-n Tue, Aug 28, 2018 at 11:12 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->
-> On Tue, Aug 28, 2018 at 06:01:29PM +0800, Chen-Yu Tsai wrote:
-> > Hi,
-> >
-> > This series does some cleanup of the Allwinner A64 pinmux groups.
-> >
-> > The first addresses a limitation on the A64 where we have the eMMC's
-> > DS in always muxed in. The DS pin is shared with SPI0's MISO, thereby
-> > preventing SPI0 from being used. In this patch we split out the DS
-> > pin into a separate group for boards that actually utilize it to
-> > select on their own.
-> >
-> > The other two patches just rename pinmux group node names and labels
-> > from <func>_pins_<[a-z]> to <func>_<pingroup/pin names>_pins. The latter
-> > is the style we adopted later on, and is easier to know which pins they
-> > correspond to, i.e. easier to review.
-> >
-> > Please have a look.
->
-> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+On Fri, Aug 31, 2018 at 04:00:02PM +0530, Yogesh Gaur wrote:
+> Add fspi node property for LX2160A SoC for FlexSPI driver.
+> Property added for the FlexSPI controller and for the connected
+> slave device for the LX2160ARDB target.
+> This is having two SPI-NOR flash device, mt35xu512aba, connected
+> at CS0 and CS1.
+> 
+> Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
+> ---
+>  arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts | 21 +++++++++++++++++++++
+>  arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi    | 12 ++++++++++++
+>  2 files changed, 33 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+> index 70fad20..3646315 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+> +++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+> @@ -32,6 +32,27 @@
+>  	status = "okay";
+>  };
+>  
+> +&fspi {
+> +	status = "okay";
 
-Applied.
+Have a newline between property and child node.
 
-> > While I want to do some more cleanup, I realized that the label and/or
-> > node names might be used by distro (Armbian comes to mind) or personal
-> > device tree overlay files. Do we need to have these remain fixed? Do
-> > we or can we provide a fallback? (Is that even possible?)
->
-> I wouldn't worry too much about this. We broke it a number of times
-> already, and we probably will in the future for other stuff, I'm not
-> sure we have to provide any guarantee there, as long as the old,
-> compiled, dt still works.
+> +	flash0: mt35xu512aba at 0 {
 
-OK :)
+Generic name for node, and specific name for label.
+
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "m25p80";
+
+Please take a look at bindings doc jedec,spi-nor.txt on how compatible
+should be written.
+
+> +		m25p,fast-read;
+> +		spi-max-frequency = <20000000>;
+> +		reg = <0>;
+> +	};
+> +
+> +	flash1: mt35xu512aba at 1 {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "m25p80";
+> +		m25p,fast-read;
+> +		spi-max-frequency = <20000000>;
+> +		reg = <1>;
+> +	};
+> +};
+> +
+>  &i2c0 {
+>  	status = "okay";
+>  	pca9547 at 77 {
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+> index e35e494..031eb26 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+> @@ -568,5 +568,17 @@
+>  			timeout-sec = <30>;
+>  		};
+>  
+> +		fspi: flexspi at 20c0000 {
+> +			status = "disabled";
+
+We conventionally put 'status' line at the end of property list.
+
+Shawn
+
+> +			compatible = "nxp,lx2160a-fspi";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			reg = <0x0 0x20c0000 0x0 0x10000>,
+> +				<0x0 0x20000000 0x0 0x10000000>;
+> +			reg-names = "fspi_base", "fspi_mmap";
+> +			interrupts = <0 25 0x4>; /* Level high type */
+> +			clocks = <&clockgen 4 3>, <&clockgen 4 3>;
+> +			clock-names = "fspi_en", "fspi";
+> +		};
+>  	};
+>  };
+> -- 
+> 2.7.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
