@@ -1,174 +1,116 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Mon, 3 Sep 2018 14:01:42 +0800
-Subject: [PATCH 13/13] iommu/mediatek: Switch to SPDX license identifier
-In-Reply-To: <1535954502-30646-1-git-send-email-yong.wu@mediatek.com>
-References: <1535954502-30646-1-git-send-email-yong.wu@mediatek.com>
-Message-ID: <1535954502-30646-14-git-send-email-yong.wu@mediatek.com>
+From: haibo.xu@arm.com (Haibo.Xu)
+Date: Mon, 3 Sep 2018 14:23:17 +0800
+Subject: [PATCH] arm64/ptrace: add PTRACE_SYSEMU and PTRACE_SYSEMU_SINGLESTEP
+ support
+Message-ID: <20180903062310.GA4524@haibo-VirtualBox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch to SPDX license identifier for MediaTek iommu/smi and their
-header files.
+Add PTRACE_SYSEMU and PTRACE_SYSEMU_SINGLESTEP support on ARM64.
+This copies the x86 semantics for invoking ptrace hooks, and have
+been verified on ARM64 machine.
 
-Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+Signed-off-by: Haibo.Xu <haibo.xu@arm.com>
+Signed-off-by: Bin.Lu <bin.lu@arm.com>
 ---
- drivers/iommu/mtk_iommu.c                     | 10 +---------
- drivers/iommu/mtk_iommu.h                     | 10 +---------
- drivers/iommu/mtk_iommu_v1.c                  | 10 +---------
- drivers/memory/mtk-smi.c                      | 10 +---------
- include/dt-bindings/memory/mt2701-larb-port.h | 10 +---------
- include/dt-bindings/memory/mt8173-larb-port.h | 10 +---------
- include/soc/mediatek/smi.h                    | 10 +---------
- 7 files changed, 7 insertions(+), 63 deletions(-)
+ arch/arm64/include/asm/thread_info.h |  5 ++++-
+ arch/arm64/include/uapi/asm/ptrace.h |  2 ++
+ arch/arm64/kernel/ptrace.c           | 17 +++++++++++++++++
+ 3 files changed, 23 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
-index dd7521c..6e4209e 100644
---- a/drivers/iommu/mtk_iommu.c
-+++ b/drivers/iommu/mtk_iommu.c
-@@ -1,15 +1,7 @@
-+// SPDX-License-Identifier: GPL-2.0
+diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+index 46c3b93..5060d2d 100644
+--- a/arch/arm64/include/asm/thread_info.h
++++ b/arch/arm64/include/asm/thread_info.h
+@@ -75,6 +75,7 @@ struct thread_info {
+  *  TIF_SYSCALL_TRACE  - syscall trace active
+  *  TIF_SYSCALL_TRACEPOINT - syscall tracepoint for ftrace
+  *  TIF_SYSCALL_AUDIT  - syscall auditing
++ *  TIF_SYSCALL_EMU    - syscall emulation active
+  *  TIF_SECOMP         - syscall secure computing
+  *  TIF_SIGPENDING     - signal pending
+  *  TIF_NEED_RESCHED   - rescheduling necessary
+@@ -91,6 +92,7 @@ struct thread_info {
+ #define TIF_SYSCALL_AUDIT      9
+ #define TIF_SYSCALL_TRACEPOINT 10
+ #define TIF_SECCOMP            11
++#define TIF_SYSCALL_EMU                12
+ #define TIF_MEMDIE             18      /* is terminating due to OOM killer */
+ #define TIF_FREEZE             19
+ #define TIF_RESTORE_SIGMASK    20
+@@ -106,6 +108,7 @@ struct thread_info {
+ #define _TIF_SYSCALL_AUDIT     (1 << TIF_SYSCALL_AUDIT)
+ #define _TIF_SYSCALL_TRACEPOINT        (1 << TIF_SYSCALL_TRACEPOINT)
+ #define _TIF_SECCOMP           (1 << TIF_SECCOMP)
++#define _TIF_SYSCALL_EMU       (1 << TIF_SYSCALL_EMU)
+ #define _TIF_UPROBE            (1 << TIF_UPROBE)
+ #define _TIF_32BIT             (1 << TIF_32BIT)
+
+@@ -115,7 +118,7 @@ struct thread_info {
+
+ #define _TIF_SYSCALL_WORK      (_TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT | \
+                                 _TIF_SYSCALL_TRACEPOINT | _TIF_SECCOMP | \
+-                                _TIF_NOHZ)
++                                _TIF_NOHZ | _TIF_SYSCALL_EMU)
+
+ #endif /* __KERNEL__ */
+ #endif /* __ASM_THREAD_INFO_H */
+diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
+index b5c3933..04ab06f 100644
+--- a/arch/arm64/include/uapi/asm/ptrace.h
++++ b/arch/arm64/include/uapi/asm/ptrace.h
+@@ -23,6 +23,8 @@
+
+ #include <asm/hwcap.h>
+
++#define PTRACE_SYSEMU                  31
++#define PTRACE_SYSEMU_SINGLESTEP       32
+
  /*
-  * Copyright (c) 2015-2016 MediaTek Inc.
-  * Author: Yong Wu <yong.wu@mediatek.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- #include <linux/bootmem.h>
- #include <linux/bug.h>
-diff --git a/drivers/iommu/mtk_iommu.h b/drivers/iommu/mtk_iommu.h
-index 1b423fe..856c10d 100644
---- a/drivers/iommu/mtk_iommu.h
-+++ b/drivers/iommu/mtk_iommu.h
-@@ -1,15 +1,7 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
+  * PSR bits
+diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+index fc35e06..ff3e322 100644
+--- a/arch/arm64/kernel/ptrace.c
++++ b/arch/arm64/kernel/ptrace.c
+@@ -165,6 +165,9 @@ void ptrace_disable(struct task_struct *child)
+         * is likely to cause regressions on obscure architectures.
+         */
+        user_disable_single_step(child);
++#ifdef TIF_SYSCALL_EMU
++       clear_tsk_thread_flag(child, TIF_SYSCALL_EMU);
++#endif
+ }
+
+ #ifdef CONFIG_HAVE_HW_BREAKPOINT
+@@ -1351,6 +1354,11 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs)
+        if (test_thread_flag(TIF_SYSCALL_TRACE))
+                tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
+
++       if (test_thread_flag(TIF_SYSCALL_EMU)) {
++               tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
++               return -1;
++       }
++
+        /* Do the secure computing after ptrace; failures should be fast. */
+        if (secure_computing(NULL) == -1)
+                return -1;
+@@ -1373,6 +1381,15 @@ asmlinkage void syscall_trace_exit(struct pt_regs *regs)
+
+        if (test_thread_flag(TIF_SYSCALL_TRACE))
+                tracehook_report_syscall(regs, PTRACE_SYSCALL_EXIT);
++
++       /*
++        * We only get here because of TIF_SINGLESTEP,
++        * for PTRACE_SYSEMU_SINGLESTEP, we already reported
++        * the syscall instruction in syscall_trace_enter().
++        */
++       if (test_thread_flag(TIF_SINGLESTEP) &&
++                       !test_thread_flag(TIF_SYSCALL_EMU))
++               tracehook_report_syscall_exit(regs, 1);
+ }
+
  /*
-  * Copyright (c) 2015-2016 MediaTek Inc.
-  * Author: Honghui Zhang <honghui.zhang@mediatek.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #ifndef _MTK_IOMMU_H_
-diff --git a/drivers/iommu/mtk_iommu_v1.c b/drivers/iommu/mtk_iommu_v1.c
-index 676c029..f477300 100644
---- a/drivers/iommu/mtk_iommu_v1.c
-+++ b/drivers/iommu/mtk_iommu_v1.c
-@@ -1,17 +1,9 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright (c) 2015-2016 MediaTek Inc.
-  * Author: Honghui Zhang <honghui.zhang@mediatek.com>
-  *
-  * Based on driver/iommu/mtk_iommu.c
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- #include <linux/bootmem.h>
- #include <linux/bug.h>
-diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
-index 1a00f5b..a053295 100644
---- a/drivers/memory/mtk-smi.c
-+++ b/drivers/memory/mtk-smi.c
-@@ -1,15 +1,7 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright (c) 2015-2016 MediaTek Inc.
-  * Author: Yong Wu <yong.wu@mediatek.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- #include <linux/clk.h>
- #include <linux/component.h>
-diff --git a/include/dt-bindings/memory/mt2701-larb-port.h b/include/dt-bindings/memory/mt2701-larb-port.h
-index 6764d74..c511f0f 100644
---- a/include/dt-bindings/memory/mt2701-larb-port.h
-+++ b/include/dt-bindings/memory/mt2701-larb-port.h
-@@ -1,15 +1,7 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Copyright (c) 2015 MediaTek Inc.
-  * Author: Honghui Zhang <honghui.zhang@mediatek.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #ifndef _MT2701_LARB_PORT_H_
-diff --git a/include/dt-bindings/memory/mt8173-larb-port.h b/include/dt-bindings/memory/mt8173-larb-port.h
-index 111b4b0..a62bfeb 100644
---- a/include/dt-bindings/memory/mt8173-larb-port.h
-+++ b/include/dt-bindings/memory/mt8173-larb-port.h
-@@ -1,15 +1,7 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Copyright (c) 2015-2016 MediaTek Inc.
-  * Author: Yong Wu <yong.wu@mediatek.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- #ifndef __DTS_IOMMU_PORT_MT8173_H
- #define __DTS_IOMMU_PORT_MT8173_H
-diff --git a/include/soc/mediatek/smi.h b/include/soc/mediatek/smi.h
-index 5201e90..2b410d2 100644
---- a/include/soc/mediatek/smi.h
-+++ b/include/soc/mediatek/smi.h
-@@ -1,15 +1,7 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Copyright (c) 2015-2016 MediaTek Inc.
-  * Author: Yong Wu <yong.wu@mediatek.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- #ifndef MTK_IOMMU_SMI_H
- #define MTK_IOMMU_SMI_H
--- 
-1.9.1
+--
+2.7.4
+
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
