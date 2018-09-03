@@ -1,254 +1,146 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 03 Sep 2018 16:52:55 +0200
-Subject: [PATCH 3/3] media: imx-pxp: add i.MX Pixel Pipeline driver
-In-Reply-To: <966eb039-d850-75f0-5a65-56dae142aec5@xs4all.nl>
-References: <20180810151822.18650-1-p.zabel@pengutronix.de>
- <20180810151822.18650-4-p.zabel@pengutronix.de>
- <966eb039-d850-75f0-5a65-56dae142aec5@xs4all.nl>
-Message-ID: <1535986375.6568.5.camel@pengutronix.de>
+From: acme@kernel.org (Arnaldo Carvalho de Melo)
+Date: Mon,  3 Sep 2018 11:52:24 -0300
+Subject: [PATCH 13/13] perf annotate: Fix parsing aarch64 branch instructions
+ after objdump update
+In-Reply-To: <20180903145224.12318-1-acme@kernel.org>
+References: <20180903145224.12318-1-acme@kernel.org>
+Message-ID: <20180903145224.12318-14-acme@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+From: Kim Phillips <kim.phillips@arm.com>
 
-On Mon, 2018-09-03 at 14:55 +0200, Hans Verkuil wrote:
-> Hi Philipp,
-> 
-> Apologies for the delay, but the Request API took most of my time.
+Starting with binutils 2.28, aarch64 objdump adds comments to the
+disassembly output to show the alternative names of a condition code
+[1].
 
-Understandable. Also, I expect I'll profit from that work when adding
-CODA960 JPEG support. So I have no reason to complain.
+It is assumed that commas in objdump comments could occur in other
+arches now or in the future, so this fix is arch-independent.
 
-> But I finally got around to it:
->
-> On 08/10/2018 05:18 PM, Philipp Zabel wrote:
-> > Add a V4L2 mem-to-mem scaler/CSC driver for the Pixel Pipeline (PXP)
-> > version found on i.MX6ULL SoCs. A similar variant is used on i.MX7D.
-> > 
-> > Since this driver only uses the legacy pipeline, it should be reasonably
-> > easy to extend it to work with the older PXP versions found on i.MX6UL,
-> > i.MX6SX, i.MX6SL, i.MX28, and i.MX23.
-> > 
-> > The driver supports scaling and colorspace conversion. There is
-> > currently no support for rotation, alpha-blending, and the LUTs.
-> > 
-> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> > ---
-> >  drivers/media/platform/Kconfig   |    9 +
-> >  drivers/media/platform/Makefile  |    2 +
-> >  drivers/media/platform/imx-pxp.c | 1455 ++++++++++++++++++++++++++
-> >  drivers/media/platform/imx-pxp.h | 1685 ++++++++++++++++++++++++++++++
-> 
-> Missing MAINTAINERS entry.
+The fix could have been done with arm64 specific jump__parse and
+jump__scnprintf functions, but the jump__scnprintf instruction would
+have to have its comment character be a literal, since the scnprintf
+functions cannot receive a struct arch easily.
 
-I'll add one for v2.
+This inconvenience also applies to the generic jump__scnprintf, which is
+why we add a raw_comment pointer to struct ins_operands, so the __parse
+function assigns it to be re-used by its corresponding __scnprintf
+function.
 
-[...]
-> > +static void pxp_setup_csc(struct pxp_ctx *ctx)
-> > +{
-> > +	struct pxp_dev *dev = ctx->dev;
-> > +
-> > +	if (pxp_v4l2_pix_fmt_is_yuv(ctx->q_data[V4L2_M2M_SRC].fmt->fourcc) &&
-> > +	    !pxp_v4l2_pix_fmt_is_yuv(ctx->q_data[V4L2_M2M_DST].fmt->fourcc)) {
-[...]
-> > +		if (ctx->ycbcr_enc == V4L2_YCBCR_ENC_601 &&
-> > +		    ctx->quant == V4L2_QUANTIZATION_FULL_RANGE)
-> > +			csc1_coef = csc1_coef_bt601_full;
-> > +		else
-> > +			csc1_coef = csc1_coef_bt601_lim;
-> 
-> This is weird: setting ycbcr_enc to V4L2_YCBCR_ENC_709 would result in
-> limited range BT601.
-> 
-> > +
-> > +		writel(csc1_coef[0], dev->mmio + HW_PXP_CSC1_COEF0);
-> > +		writel(csc1_coef[1], dev->mmio + HW_PXP_CSC1_COEF1);
-> > +		writel(csc1_coef[2], dev->mmio + HW_PXP_CSC1_COEF2);
-> 
-> No support for Rec. 709?
+Example differences in 'perf annotate --stdio2' output on an aarch64
+perf.data file:
 
-Will add coefficients for Rec. 709.
+BEFORE: ? b.cs   ffff200008133d1c <unwind_frame+0x18c>  // b.hs, dffff7ecc47b
+AFTER : ? b.cs   18c
 
-> > +	} else {
-> > +		writel(BM_PXP_CSC1_COEF0_BYPASS, dev->mmio + HW_PXP_CSC1_COEF0);
-> > +	}
-> > +
-> > +	if (!pxp_v4l2_pix_fmt_is_yuv(ctx->q_data[V4L2_M2M_SRC].fmt->fourcc) &&
-> > +	    pxp_v4l2_pix_fmt_is_yuv(ctx->q_data[V4L2_M2M_DST].fmt->fourcc)) {
-[...]
-> > +		if (ctx->ycbcr_enc == V4L2_YCBCR_ENC_601 &&
-> > +		    ctx->quant == V4L2_QUANTIZATION_FULL_RANGE) {
-> 
-> This makes no sense. ctx->ycbcr_enc and ctx->quant refer to the output queue,
-> i.e. the RGB side. ycbcr_enc is ignored for RGB and quant is in practice always
-> full range. While you can have limited range RGB as well, that's not however
-> what you are trying to implement here.
->
-> The problem is that you cannot at the moment specify what ycbcr_enc etc.
-> format you want for the capture queue. See below for a link to an RFC to add
-> support for this.
+BEFORE: ? b.cc   ffff200008d8d9cc <get_alloc_profile+0x31c>  // b.lo, b.ul, dffff727295b
+AFTER : ? b.cc   31c
 
-Right. I'll split ycbcr_enc and quantization into per-queue settings for
-v2 and revive your RFC to allow configuring capture queue colorimetry.
+The branch target labels 18c and 31c also now appear in the output:
 
-[...]
-> > +/*
-> > + * video ioctls
-> > + */
-> > +static int vidioc_querycap(struct file *file, void *priv,
-> > +			   struct v4l2_capability *cap)
-> > +{
-> > +	strncpy(cap->driver, MEM2MEM_NAME, sizeof(cap->driver) - 1);
-> > +	strncpy(cap->card, MEM2MEM_NAME, sizeof(cap->card) - 1);
-> 
-> Use strlcpy.
+BEFORE:        add    x26, x29, #0x80
+AFTER : 18c:   add    x26, x29, #0x80
 
-Ok.
+BEFORE:        add    x21, x21, #0x8
+AFTER : 31c:   add    x21, x21, #0x8
 
-> > +	snprintf(cap->bus_info, sizeof(cap->bus_info),
-> > +			"platform:%s", MEM2MEM_NAME);
-> > +	cap->device_caps = V4L2_CAP_VIDEO_M2M | V4L2_CAP_STREAMING;
-> > +	cap->capabilities = cap->device_caps | V4L2_CAP_DEVICE_CAPS;
-> 
-> Please set the device_caps field of video_device, and then you can drop
-> these two lines since the core will fill this in for you.
+The Fixes: tag below is added so stable branches will get the update; it
+doesn't necessarily mean that commit was broken at the time, rather it
+didn't withstand the aarch64 objdump update.
 
-Ok.
+Tested no difference in output for sample x86_64, power arch perf.data files.
 
-[...]
-> > +static int vidioc_g_fmt(struct pxp_ctx *ctx, struct v4l2_format *f)
-> > +{
-> > +	struct vb2_queue *vq;
-> > +	struct pxp_q_data *q_data;
-> > +
-> > +	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
-> > +	if (!vq)
-> > +		return -EINVAL;
-> > +
-> > +	q_data = get_q_data(ctx, f->type);
-> > +
-> > +	f->fmt.pix.width	= q_data->width;
-> > +	f->fmt.pix.height	= q_data->height;
-> > +	f->fmt.pix.field	= V4L2_FIELD_NONE;
-> > +	f->fmt.pix.pixelformat	= q_data->fmt->fourcc;
-> > +	f->fmt.pix.bytesperline	= q_data->bytesperline;
-> > +	f->fmt.pix.sizeimage	= q_data->sizeimage;
-> > +	f->fmt.pix.colorspace	= ctx->colorspace;
-> > +	f->fmt.pix.xfer_func	= ctx->xfer_func;
-> > +	f->fmt.pix.ycbcr_enc	= ctx->ycbcr_enc;
-> > +	f->fmt.pix.quantization	= ctx->quant;
-> 
-> Since you do colorspace conversion, these can't be the same for
-> both output and capture.
-> 
-> colorspace and xfer_func will be the same (those are not converted),
-> but ycbcr_enc should be set to 0 for RGB and quantization range
-> will be different as well (either set to 0 for capture, or set
-> to FULL for RGB capture and LIMITED for YUV).
-> 
-> Please note that it is not possible at the moment to request
-> different values for these four field when capturing: they are currently
-> set by the driver, and userspace cann't request something else.
->
-> There is an old RFC to add support for this:
-> 
-> https://patchwork.linuxtv.org/patch/28847/
-> 
-> This driver might be a good opportunity to resurrect this RFC patch.
+[1] https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=commit;h=bb7eff5206e4795ac79c177a80fe9f4630aaf730
 
-Yes, I'll fix these to defaults for v2 and add a new patch to enable
-capture colorimetry configuration as per this RFC on top.
+Signed-off-by: Kim Phillips <kim.phillips@arm.com>
+Tested-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+Cc: Anton Blanchard <anton@samba.org>
+Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+Cc: Jiri Olsa <jolsa@redhat.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Namhyung Kim <namhyung@kernel.org>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Ravi Bangoria <ravi.bangoria@linux.vnet.ibm.com>
+Cc: Robin Murphy <robin.murphy@arm.com>
+Cc: Taeung Song <treeze.taeung@gmail.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Fixes: b13bbeee5ee6 ("perf annotate: Fix branch instruction with multiple operands")
+Link: http://lkml.kernel.org/r/20180827125340.a2f7e291901d17cea05daba4 at arm.com
+Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+---
+ tools/perf/util/annotate.c | 22 +++++++++++++++++++++-
+ tools/perf/util/annotate.h |  1 +
+ 2 files changed, 22 insertions(+), 1 deletion(-)
 
-[...]
-> > +static int vidioc_try_fmt_vid_out(struct file *file, void *priv,
-> > +				  struct v4l2_format *f)
-> > +{
-> > +	struct pxp_fmt *fmt;
-> > +	struct pxp_ctx *ctx = file2ctx(file);
-> > +
-> > +	fmt = find_format(f);
-> > +	if (!fmt) {
-> > +		f->fmt.pix.pixelformat = formats[0].fourcc;
-> > +		fmt = find_format(f);
-> > +	}
-> > +	if (!(fmt->types & MEM2MEM_OUTPUT)) {
-> > +		v4l2_err(&ctx->dev->v4l2_dev,
-> > +			 "Fourcc format (0x%08x) invalid.\n",
-> > +			 f->fmt.pix.pixelformat);
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	if (!f->fmt.pix.colorspace)
-> > +		f->fmt.pix.colorspace = V4L2_COLORSPACE_REC709;
-> 
-> REC709 implies that ycbcr_enc also uses REC709. But you only support
-> 601. To make this a practical driver you want to support both 601
-> and 709.
-
-Ack.
-
-> Does this hardware also support gamma tables? Without it you can't
-> convert between different transfer functions. Just curious if the hw
-> can do this at all.
-
-There is, but it is kind of useless for my purposes. It is located at
-the end of the pipeline and can do RGB/YUV565 -> RGB/YUV565 lookups at
-most (implemented as 16 KiB cache into a 128 KiB table in memory).
-So no scaling/blending in linear space, and no useful conversion between
-transfer functions.
-
-[...]
-> > +static int pxp_queue_setup(struct vb2_queue *vq,
-> > +			   unsigned int *nbuffers, unsigned int *nplanes,
-> > +			   unsigned int sizes[], struct device *alloc_devs[])
-> > +{
-> > +	struct pxp_ctx *ctx = vb2_get_drv_priv(vq);
-> > +	struct pxp_q_data *q_data;
-> > +	unsigned int size, count = *nbuffers;
-> > +
-> > +	q_data = get_q_data(ctx, vq->type);
-> > +
-> > +	size = q_data->sizeimage;
-> > +
-> > +	while (size * count > MEM2MEM_VID_MEM_LIMIT)
-> > +		(count)--;
-> 
-> Why do this? It never made sense to me. If you try to allocate more memory then
-> there is, you get -ENOMEM, which is just fine.
-> 
-> I'd drop this.
-
-This is copied from vim2m. I'll remove it.
-
-[...]
-> > +static int pxp_probe(struct platform_device *pdev)
-> > +{
-[...]
-> > +	/* Enable clocks and dump registers */
-> > +	clk_prepare_enable(dev->clk);
-> > +	pxp_soft_reset(dev);
-> > +
-> > +	spin_lock_init(&dev->irqlock);
-> > +
-> > +	ret = v4l2_device_register(&pdev->dev, &dev->v4l2_dev);
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	atomic_set(&dev->num_inst, 0);
-> > +	mutex_init(&dev->dev_mutex);
-> > +
-> > +	dev->vfd = pxp_videodev;
-> > +	vfd = &dev->vfd;
-> > +	vfd->lock = &dev->dev_mutex;
-> > +	vfd->v4l2_dev = &dev->v4l2_dev;
-> > +
-> > +	ret = video_register_device(vfd, VFL_TYPE_GRABBER, 0);
-> 
-> Please move this down until after v4l2_m2m_init: that should be done
-> before you register the video device.
-
-Yes, and I'll also fix the clock not being disabled on error. Thank you
-for the review!
-
-regards
-Philipp
+diff --git a/tools/perf/util/annotate.c b/tools/perf/util/annotate.c
+index e62b69ea87cd..28cd6a17491b 100644
+--- a/tools/perf/util/annotate.c
++++ b/tools/perf/util/annotate.c
+@@ -282,7 +282,19 @@ bool ins__is_call(const struct ins *ins)
+ 	return ins->ops == &call_ops || ins->ops == &s390_call_ops;
+ }
+ 
+-static int jump__parse(struct arch *arch __maybe_unused, struct ins_operands *ops, struct map_symbol *ms)
++/*
++ * Prevents from matching commas in the comment section, e.g.:
++ * ffff200008446e70:       b.cs    ffff2000084470f4 <generic_exec_single+0x314>  // b.hs, b.nlast
++ */
++static inline const char *validate_comma(const char *c, struct ins_operands *ops)
++{
++	if (ops->raw_comment && c > ops->raw_comment)
++		return NULL;
++
++	return c;
++}
++
++static int jump__parse(struct arch *arch, struct ins_operands *ops, struct map_symbol *ms)
+ {
+ 	struct map *map = ms->map;
+ 	struct symbol *sym = ms->sym;
+@@ -291,6 +303,10 @@ static int jump__parse(struct arch *arch __maybe_unused, struct ins_operands *op
+ 	};
+ 	const char *c = strchr(ops->raw, ',');
+ 	u64 start, end;
++
++	ops->raw_comment = strchr(ops->raw, arch->objdump.comment_char);
++	c = validate_comma(c, ops);
++
+ 	/*
+ 	 * Examples of lines to parse for the _cpp_lex_token@@Base
+ 	 * function:
+@@ -310,6 +326,7 @@ static int jump__parse(struct arch *arch __maybe_unused, struct ins_operands *op
+ 		ops->target.addr = strtoull(c, NULL, 16);
+ 		if (!ops->target.addr) {
+ 			c = strchr(c, ',');
++			c = validate_comma(c, ops);
+ 			if (c++ != NULL)
+ 				ops->target.addr = strtoull(c, NULL, 16);
+ 		}
+@@ -367,9 +384,12 @@ static int jump__scnprintf(struct ins *ins, char *bf, size_t size,
+ 		return scnprintf(bf, size, "%-6s %s", ins->name, ops->target.sym->name);
+ 
+ 	c = strchr(ops->raw, ',');
++	c = validate_comma(c, ops);
++
+ 	if (c != NULL) {
+ 		const char *c2 = strchr(c + 1, ',');
+ 
++		c2 = validate_comma(c2, ops);
+ 		/* check for 3-op insn */
+ 		if (c2 != NULL)
+ 			c = c2;
+diff --git a/tools/perf/util/annotate.h b/tools/perf/util/annotate.h
+index 005a5fe8a8c6..5399ba2321bb 100644
+--- a/tools/perf/util/annotate.h
++++ b/tools/perf/util/annotate.h
+@@ -22,6 +22,7 @@ struct ins {
+ 
+ struct ins_operands {
+ 	char	*raw;
++	char	*raw_comment;
+ 	struct {
+ 		char	*raw;
+ 		char	*name;
+-- 
+2.14.4
