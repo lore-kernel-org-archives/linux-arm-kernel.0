@@ -1,26 +1,33 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon, 3 Sep 2018 11:34:29 +0100
-Subject: [PATCH v2 13/40] vfio: Add support for Shared Virtual Addressing
-In-Reply-To: <5B89F818.7060300@huawei.com>
-References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
- <20180511190641.23008-14-jean-philippe.brucker@arm.com>
- <5B83B11E.7010807@huawei.com> <1d5b6529-4e5a-723c-3f1b-dd5a9adb490c@arm.com>
- <5B89F818.7060300@huawei.com>
-Message-ID: <3a961aff-e830-64bb-b6a9-14e08de1abf5@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 3 Sep 2018 11:50:38 +0100
+Subject: [PATCH] arm64: Kconfig: Remove ARCH_HAS_HOLES_MEMORYMODEL
+In-Reply-To: <20180831151943.9281-1-james.morse@arm.com>
+References: <20180831151943.9281-1-james.morse@arm.com>
+Message-ID: <20180903105037.GC11055@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09/18 03:23, Xu Zaibo wrote:
-> As one application takes a whole function while using VFIO-PCI, why do 
-> the application and the
-> function need to enable PASID capability? (Since just one I/O page table 
-> is enough for them.)
+On Fri, Aug 31, 2018 at 04:19:43PM +0100, James Morse wrote:
+> include/linux/mmzone.h describes ARCH_HAS_HOLES_MEMORYMODEL as
+> relevant when parts the memmap have been free()d. This would
+> happen on systems where memory is smaller than a sparsemem-section,
+> and the extra struct pages are expensive. pfn_valid() on these
+> systems returns true for the whole sparsemem-section, so an extra
+> memmap_valid_within() check is needed.
+> 
+> On arm64 we have nomap memory, so always provide pfn_valid() to test
+> for nomap pages. This means ARCH_HAS_HOLES_MEMORYMODEL's extra checks
+> are already rolled up into pfn_valid().
+> 
+> Remove it.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
+> ---
+>  arch/arm64/Kconfig            | 5 +----
+>  arch/arm64/include/asm/page.h | 2 --
+>  arch/arm64/mm/init.c          | 2 --
+>  3 files changed, 1 insertion(+), 8 deletions(-)
 
-At the moment the series doesn't provide support for SVA without PASID
-(on the I/O page fault path, 08/40). In addition the BIND ioctl could be
-used by the owner application to bind other processes (slaves) and
-perform sub-assignment. But that feature is incomplete because we don't
-send stop_pasid notification to the owner when a slave dies.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-Thanks,
-Jean
+Will
