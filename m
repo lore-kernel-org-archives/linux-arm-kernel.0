@@ -1,112 +1,48 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Mon,  3 Sep 2018 12:01:54 +0200
-Subject: [PATCH v5 2/9] ata: ahci_platform: add support for AHCI controller
- regulator
-In-Reply-To: <20180903100201.23131-1-clabbe.montjoie@gmail.com>
-References: <20180903100201.23131-1-clabbe.montjoie@gmail.com>
-Message-ID: <20180903100201.23131-3-clabbe.montjoie@gmail.com>
+Date: Mon,  3 Sep 2018 12:01:52 +0200
+Subject: [PATCH v5 0/9] ata: ahci_platform: support allwinner R40 AHCI
+Message-ID: <20180903100201.23131-1-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SoC R40 AHCI controller need a regulator to work.
-So this patch add a way to add an optional regulator on AHCI controller.
+This patchset add support for allwinner R40 AHCI controller.
 
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
----
- drivers/ata/ahci.h             |  1 +
- drivers/ata/libahci_platform.c | 26 ++++++++++++++++++++++++--
- 2 files changed, 25 insertions(+), 2 deletions(-)
+The whole patchset is tested on sun8i-r40-bananapi-m2-ultra and
+on sun7i-a20-cubieboard2 which doesnt have any of the ressources added
+by this serie, so no regression should come with it.
 
-diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
-index 6a1515f0da40..1415f1012de5 100644
---- a/drivers/ata/ahci.h
-+++ b/drivers/ata/ahci.h
-@@ -352,6 +352,7 @@ struct ahci_host_priv {
- 	struct clk		*clks[AHCI_MAX_CLKS]; /* Optional */
- 	struct reset_control	*rsts;		/* Optional */
- 	struct regulator	**target_pwrs;	/* Optional */
-+	struct regulator	*ahci_regulator;/* Optional */
- 	/*
- 	 * If platform uses PHYs. There is a 1:1 relation between the port number and
- 	 * the PHY position in this array.
-diff --git a/drivers/ata/libahci_platform.c b/drivers/ata/libahci_platform.c
-index c92c10d55374..a886b61476a3 100644
---- a/drivers/ata/libahci_platform.c
-+++ b/drivers/ata/libahci_platform.c
-@@ -139,7 +139,7 @@ EXPORT_SYMBOL_GPL(ahci_platform_disable_clks);
-  * ahci_platform_enable_regulators - Enable regulators
-  * @hpriv: host private area to store config values
-  *
-- * This function enables all the regulators found in
-+ * This function enables all the regulators found in controller and
-  * hpriv->target_pwrs, if any.  If a regulator fails to be enabled, it
-  * disables all the regulators already enabled in reverse order and
-  * returns an error.
-@@ -151,6 +151,12 @@ int ahci_platform_enable_regulators(struct ahci_host_priv *hpriv)
- {
- 	int rc, i;
- 
-+	if (hpriv->ahci_regulator) {
-+		rc = regulator_enable(hpriv->ahci_regulator);
-+		if (rc)
-+			return rc;
-+	}
-+
- 	for (i = 0; i < hpriv->nports; i++) {
- 		if (!hpriv->target_pwrs[i])
- 			continue;
-@@ -167,6 +173,8 @@ int ahci_platform_enable_regulators(struct ahci_host_priv *hpriv)
- 		if (hpriv->target_pwrs[i])
- 			regulator_disable(hpriv->target_pwrs[i]);
- 
-+	if (hpriv->ahci_regulator)
-+		regulator_disable(hpriv->ahci_regulator);
- 	return rc;
- }
- EXPORT_SYMBOL_GPL(ahci_platform_enable_regulators);
-@@ -175,7 +183,8 @@ EXPORT_SYMBOL_GPL(ahci_platform_enable_regulators);
-  * ahci_platform_disable_regulators - Disable regulators
-  * @hpriv: host private area to store config values
-  *
-- * This function disables all regulators found in hpriv->target_pwrs.
-+ * This function disables all regulators found in hpriv->target_pwrs and
-+ * AHCI controller.
-  */
- void ahci_platform_disable_regulators(struct ahci_host_priv *hpriv)
- {
-@@ -186,6 +195,9 @@ void ahci_platform_disable_regulators(struct ahci_host_priv *hpriv)
- 			continue;
- 		regulator_disable(hpriv->target_pwrs[i]);
- 	}
-+
-+	if (hpriv->ahci_regulator)
-+		regulator_disable(hpriv->ahci_regulator);
- }
- EXPORT_SYMBOL_GPL(ahci_platform_disable_regulators);
- /**
-@@ -351,6 +363,7 @@ static int ahci_platform_get_regulator(struct ahci_host_priv *hpriv, u32 port,
-  *
-  * 1) mmio registers (IORESOURCE_MEM 0, mandatory)
-  * 2) regulator for controlling the targets power (optional)
-+ *    regulator for controlling the AHCI controller (optional)
-  * 3) 0 - AHCI_MAX_CLKS clocks, as specified in the devs devicetree node,
-  *    or for non devicetree enabled platforms a single clock
-  * 4) resets, if flags has AHCI_PLATFORM_GET_RESETS (optional)
-@@ -408,6 +421,15 @@ struct ahci_host_priv *ahci_platform_get_resources(struct platform_device *pdev,
- 		hpriv->clks[i] = clk;
- 	}
- 
-+	hpriv->ahci_regulator = devm_regulator_get_optional(dev, "ahci");
-+	if (IS_ERR(hpriv->ahci_regulator)) {
-+		rc = PTR_ERR(hpriv->ahci_regulator);
-+		if (rc == -EPROBE_DEFER)
-+			goto err_out;
-+		rc = 0;
-+		hpriv->ahci_regulator = NULL;
-+	}
-+
- 	if (flags & AHCI_PLATFORM_GET_RESETS) {
- 		hpriv->rsts = devm_reset_control_array_get_optional_shared(dev);
- 		if (IS_ERR(hpriv->rsts)) {
+Patchs 1-7 should go via the ata tree
+Patchs 8,9 should go via the sunxi tree
+
+Changes since v4:
+- dropped PHY dedicated driver
+- added the optionnal phy-supply
+
+Changes since v3:
+- Moved PHY code to a new sun4i-a10-phy-sata driver
+- Removed reset code since ahci_platform support now reset controller.
+
+Changes since V2
+- Moved all ressources management to ahci_platform
+
+Corentin Labbe (9):
+  dt-bindings: ata: ahci-platform: fix indentation of target-supply
+  ata: ahci_platform: add support for AHCI controller regulator
+  dt-bindings: ata: ahci-platform: document ahci-supply
+  ata: ahci_platform: add support for PHY controller regulator
+  dt-bindings: ata: ahci-platform: document phy-supply
+  ata: ahci_sunxi: add support for r40
+  dt-bindings: ata: update ahci_sunxi bindings
+  ARM: dts: sun8i: r40: add sata node
+  ARM: dts: sun8i: sun8i-r40-bananapi-m2-ultra: enable AHCI
+
+ .../devicetree/bindings/ata/ahci-platform.txt      |  6 ++-
+ arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts  | 18 +++++++++
+ arch/arm/boot/dts/sun8i-r40.dtsi                   | 13 ++++++
+ drivers/ata/ahci.h                                 |  2 +
+ drivers/ata/ahci_sunxi.c                           |  3 +-
+ drivers/ata/libahci_platform.c                     | 46 +++++++++++++++++++++-
+ 6 files changed, 84 insertions(+), 4 deletions(-)
+
 -- 
 2.16.4
