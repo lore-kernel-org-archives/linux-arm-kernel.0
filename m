@@ -1,33 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 3 Sep 2018 11:50:38 +0100
-Subject: [PATCH] arm64: Kconfig: Remove ARCH_HAS_HOLES_MEMORYMODEL
-In-Reply-To: <20180831151943.9281-1-james.morse@arm.com>
-References: <20180831151943.9281-1-james.morse@arm.com>
-Message-ID: <20180903105037.GC11055@arm.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Mon, 03 Sep 2018 19:01:47 +0800
+Subject: [linux-sunxi] Re: [PATCH v3 21/30] iio: adc: sun4i-gpadc-iio: add
+ support for H3 thermal sensor
+In-Reply-To: <20180903102022.fkxfkxadkt4vpbmb@flea>
+References: <20180830154518.29507-1-embed3d@gmail.com>
+ <20180830154518.29507-22-embed3d@gmail.com>
+ <20180831091137.wkbbipssyd6mqfbt@flea>
+ <f01ec2f202c7e2e5a7e0c822b2f9a8f0c55a9ea4.camel@aosc.io>
+ <20180903102022.fkxfkxadkt4vpbmb@flea>
+Message-ID: <AFDFF5AB-8BF6-4461-A5C2-D628A2F22E2E@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2018 at 04:19:43PM +0100, James Morse wrote:
-> include/linux/mmzone.h describes ARCH_HAS_HOLES_MEMORYMODEL as
-> relevant when parts the memmap have been free()d. This would
-> happen on systems where memory is smaller than a sparsemem-section,
-> and the extra struct pages are expensive. pfn_valid() on these
-> systems returns true for the whole sparsemem-section, so an extra
-> memmap_valid_within() check is needed.
-> 
-> On arm64 we have nomap memory, so always provide pfn_valid() to test
-> for nomap pages. This means ARCH_HAS_HOLES_MEMORYMODEL's extra checks
-> are already rolled up into pfn_valid().
-> 
-> Remove it.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> ---
->  arch/arm64/Kconfig            | 5 +----
->  arch/arm64/include/asm/page.h | 2 --
->  arch/arm64/mm/init.c          | 2 --
->  3 files changed, 1 insertion(+), 8 deletions(-)
 
-Acked-by: Will Deacon <will.deacon@arm.com>
 
-Will
+? 2018?9?3? GMT+08:00 ??6:20:22, Maxime Ripard <maxime.ripard@bootlin.com> ??:
+>On Fri, Aug 31, 2018 at 05:51:41PM +0800, Icenowy Zheng wrote:
+>> Personally I suggest to leave out all SID or calibration related
+>> patches here.
+>> 
+>> Currently we seems to be wrongly converting SID to big endian,
+>however,
+>> the orgnization of the THS calibration data on H6 shows that it's
+>> surely little endian:
+>> 
+>> It consists a temperature value in 1/10 celsuis as unit, and some
+>> thermal register readout values, which are the values read out at the
+>> given temperature, and every value here (the temperature and the
+>> readout) are all half word length.
+>> 
+>> Let the temperature value be AABB, the two readout values be XXYY and
+>> ZZWW, the oragnization is:
+>> BB AA YY XX WW ZZ ** ** .
+>> 
+>> When converting the SID to big endian, it becomes:
+>> XX YY AA BB ** ** ZZ WW ,
+>> which is non-sense, and not able to do sub-word cell addressing.
+>> 
+>> Maxime, should I drop the LE2BE conversion in SID driver? (I doubt
+>> whether it will break compatibility.)
+>
+>This is exposed to the userspace, so no.
+
+Please note the LE2BE totally breaks the SID addressing.
+
+Without it dropped all cells must be referenced with
+4 byte word as unit, and half word addressing of
+SID is thus not possible. The driver will also need then to split
+the half words if needed.
+
+I think this is kind of hardware misbehavior, and not a simple
+UAPI change, so the UAPI stability shouldn't affect this change.
+
+>
+>Maxime
+>> 
