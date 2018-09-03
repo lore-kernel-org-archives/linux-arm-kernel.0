@@ -1,95 +1,135 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 3 Sep 2018 13:57:46 +0200
-Subject: [PATCH 0/4] media: platform: Add Aspeed Video Engine driver
-In-Reply-To: <1535576973-8067-1-git-send-email-eajames@linux.vnet.ibm.com>
-References: <1535576973-8067-1-git-send-email-eajames@linux.vnet.ibm.com>
-Message-ID: <364c2565-fdb0-dd31-5852-6358066810a5@xs4all.nl>
+From: anurag.kumar.vulisha@xilinx.com (Anurag Kumar Vulisha)
+Date: Mon, 3 Sep 2018 17:44:04 +0530
+Subject: [PATCH v2 2/2] phy: zynqmp: Add dt bindings for ZynqMP phy
+In-Reply-To: <1535976844-12494-1-git-send-email-anurag.kumar.vulisha@xilinx.com>
+References: <1535976844-12494-1-git-send-email-anurag.kumar.vulisha@xilinx.com>
+Message-ID: <1535976844-12494-3-git-send-email-anurag.kumar.vulisha@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eddie,
+This patch adds the document describing dt bindings for ZynqMP
+phy. ZynqMP SOC has a High Speed Processing System Gigabit
+Transceiver which provides PHY capabilties to USB, SATA,
+PCIE, Display Port and Ehernet SGMII controllers.
 
-Thank you for your work on this. Interesting to see support for this SoC :-)
+Signed-off-by: Anurag Kumar Vulisha <anurag.kumar.vulisha@xilinx.com>
+---
+ changes in v2:
+	1. None
+---
+ .../devicetree/bindings/phy/phy-zynqmp.txt         | 104 +++++++++++++++++++++
+ 1 file changed, 104 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-zynqmp.txt
 
-On 08/29/2018 11:09 PM, Eddie James wrote:
-> The Video Engine (VE) embedded in the Aspeed AST2400 and AST2500 SOCs
-> can capture and compress video data from digital or analog sources. With
-> the Aspeed chip acting as a service processor, the Video Engine can
-> capture the host processor graphics output.
-> 
-> This series adds a V4L2 driver for the VE, providing a read() interface
-> only. The driver triggers the hardware to capture the host graphics output
-> and compress it to JPEG format.
-> 
-> Testing on an AST2500 determined that the videobuf/streaming/mmap interface
-> was significantly slower than the simple read() interface, so I have not
-> included the streaming part.
-
-Do you know why? It should be equal or faster, not slower.
-
-I reviewed about half of the driver, but then I stopped since there were too
-many things missing.
-
-First of all, you need to test your driver with v4l2-compliance (available here:
-https://git.linuxtv.org/v4l-utils.git/). Always compile from the git repo since
-the versions from distros tend to be too old.
-
-Just run 'v4l2-compliance -d /dev/videoX' and fix all issues. Then run
-'v4l2-compliance -s -d /dev/videoX' to test streaming.
-
-This utility checks if the driver follows the V4L2 API correctly, implements
-all ioctls that it should and fills in all the fields that it should.
-
-Please add the output of 'v4l2-compliance -s' to future versions of this patch
-series: I don't accept V4L2 drivers without a clean report of this utility.
-
-If you have any questions, then mail me or (usually quicker) ask on the #v4l
-freenode irc channel (I'm in the CET timezone).
-
-One thing that needs more explanation: from what I could tell from the driver
-the VIDIOC_G_FMT ioctl returns the detected format instead of the current
-format. This is wrong. Instead you should implement the VIDIOC_*_DV_TIMINGS
-ioctls and the V4L2_EVENT_SOURCE_CHANGE event.
-
-The normal sequence is that userspace queries the current timings with
-VIDIOC_QUERY_DV_TIMINGS, if it finds valid timings, then it sets these
-timings with _S_DV_TIMINGS. Now it can call G/S_FMT. If the timings
-change, then the driver should detect that and send a V4L2_EVENT_SOURCE_CHANGE
-event.
-
-When the application receives this event it can take action, such as
-increasing the size of the buffer for the jpeg data that it reads into.
-
-The reason for this sequence of events is that you can't just change the
-format/resolution mid-stream without giving userspace the chance to
-reconfigure.
-
-Regards,
-
-	Hans
-
-> 
-> It's also possible to use an automatic mode for the VE such that
-> re-triggering the HW every frame isn't necessary. However this wasn't
-> reliable on the AST2400, and probably used more CPU anyway due to excessive
-> interrupts. It was approximately 15% faster.
-> 
-> The series also adds the necessary parent clock definitions to the Aspeed
-> clock driver, with both a mux and clock divider.
-> 
-> Eddie James (4):
->   clock: aspeed: Add VIDEO reset index definition
->   clock: aspeed: Setup video engine clocking
->   dt-bindings: media: Add Aspeed Video Engine binding documentation
->   media: platform: Add Aspeed Video Engine driver
-> 
->  .../devicetree/bindings/media/aspeed-video.txt     |   23 +
->  drivers/clk/clk-aspeed.c                           |   41 +-
->  drivers/media/platform/Kconfig                     |    8 +
->  drivers/media/platform/Makefile                    |    1 +
->  drivers/media/platform/aspeed-video.c              | 1307 ++++++++++++++++++++
->  include/dt-bindings/clock/aspeed-clock.h           |    1 +
->  6 files changed, 1379 insertions(+), 2 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/media/aspeed-video.txt
->  create mode 100644 drivers/media/platform/aspeed-video.c
-> 
+diff --git a/Documentation/devicetree/bindings/phy/phy-zynqmp.txt b/Documentation/devicetree/bindings/phy/phy-zynqmp.txt
+new file mode 100644
+index 0000000..2eed553
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/phy-zynqmp.txt
+@@ -0,0 +1,104 @@
++Xilinx ZynqMP PHY binding
++
++This binding describes a ZynqMP PHY device that is used to control ZynqMP
++High Speed Gigabit Transceiver(GT). ZynqMP PS GTR provides four lanes
++and are used by USB, SATA, PCIE, Display port and Ethernet SGMMI controllers.
++
++Phy provider node
++=================
++
++Required properties:
++- compatible	: Can be "xlnx,zynqmp-psgtr-v1.1" or "xlnx,zynqmp-psgtr"
++		  "xlnx,zynqmp-psgtr-v1.1" has "xlnx,tx_termination_fix" removed
++
++- reg           : Address and length of register sets for each device in
++                  "reg-names"
++
++- reg-names     : The names of the register addresses corresponding to the
++		  registers filled in "reg":
++			- serdes: SERDES block register set
++			- siou: SIOU block register set
++
++Optional properties:
++- xlnx,tx_termination_fix : Include this for fixing functional issue with the
++		  TX termination resistance in GT, which can be out of spec for
++		  the XCZU9EG silicon version.
++
++Required nodes	:  A sub-node is required for each lane the controller
++		   provides.
++
++Phy sub-nodes
++=============
++
++Required properties:
++lane0:
++- #phy-cells	: Should be 4
++
++lane1:
++- #phy-cells	: Should be 4
++
++lane2:
++- #phy-cells	: Should be 4
++
++lane3:
++- #phy-cells	: Should be 4
++
++Example:
++	serdes: zynqmp_phy at fd400000 {
++		compatible = "xlnx,zynqmp-psgtr-v1.1";
++		status = "okay";
++		reg = <0x0 0xfd400000 0x0 0x40000>, <0x0 0xfd3d0000 0x0 0x1000>;
++		reg-names = "serdes", "siou";
++
++		lane0: lane at 0 {
++			#phy-cells = <4>;
++		};
++		lane1: lane at 1 {
++			#phy-cells = <4>;
++		};
++		lane2: lane at 2 {
++			#phy-cells = <4>;
++		};
++		lane3: lane at 3 {
++			#phy-cells = <4>;
++		};
++	};
++
++Specifying phy control of devices
++=================================
++
++Device nodes should specify the configuration required in their "phys"
++property, containing a phandle to the phy port node and a device type.
++
++phys = <PHANDLE CONTROLLER_TYPE CONTROLLER_INSTANCE LANE_NUM LANE_FREQ>;
++
++PHANDLE                 = &lane0 or &lane1 or &lane2 or &lane3
++CONTROLLER_TYPE         = PHY_TYPE_PCIE or PHY_TYPE_SATA or PHY_TYPE_USB
++			  or PHY_TYPE_DP or PHY_TYPE_SGMII
++CONTROLLER_INSTANCE     = Depends on controller type used, can be any of
++				PHY_TYPE_PCIE : 0 or 1 or 2 or 3
++				PHY_TYPE_SATA : 0 or 1
++				PHY_TYPE_USB  : 0 or 1
++				PHY_TYPE_DP   : 0 or 1
++				PHY_TYPE_SGMII: 0 or 1 or 2 or 3
++LANE_NUM                = Depends on which lane clock is used as ref clk, can be
++			  0 or 1 or 2 or 3
++LANE_FREQ               = Frequency that controller can operate, can be any of
++			  19.2Mhz,20Mhz,24Mhz,26Mhz,27Mhz,28.4Mhz,40Mhz,52Mhz,
++			  100Mhz,108Mhz,125Mhz,135Mhz,150Mhz
++
++Example:
++
++#include <dt-bindings/phy/phy.h>
++
++	usb at fe200000 {
++		...
++		phys	  = <&lane2 PHY_TYPE_USB3 0 2 2600000>;
++		...
++	};
++
++	ahci at fd0c0000 {
++		...
++		phys	  = <&lane3 PHY_TYPE_SATA 1 1 125000000>;
++		...
++	};
+-- 
+2.1.1
