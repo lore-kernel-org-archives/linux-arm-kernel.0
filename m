@@ -1,40 +1,69 @@
-From: embed3d@gmail.com (Philipp Rossak)
-Date: Mon, 3 Sep 2018 15:58:30 +0200
-Subject: [PATCH v3 18/30] iio: adc: sun4i-gpadc-iio: rework: support
- multiple sensors
-In-Reply-To: <20180902211125.0098c808@archlinux>
-References: <20180830154518.29507-1-embed3d@gmail.com>
- <20180830154518.29507-19-embed3d@gmail.com>
- <20180902211125.0098c808@archlinux>
-Message-ID: <3722842b-1aa3-ea46-c0ec-7a01bc8a723e@gmail.com>
+From: viro@ZenIV.linux.org.uk (Al Viro)
+Date: Mon, 3 Sep 2018 14:56:36 +0100
+Subject: [PATCH v6 11/11] arm64: annotate user pointers casts detected by
+ sparse
+In-Reply-To: <CAAeHK+w86m6YztnTGhuZPKRczb-+znZ1hiJskPXeQok4SgcaOw@mail.gmail.com>
+References: <cover.1535629099.git.andreyknvl@google.com>
+ <5d54526e5ff2e5ad63d0dfdd9ab17cf359afa4f2.1535629099.git.andreyknvl@google.com>
+ <20180831081123.6mo62xnk54pvlxmc@ltop.local>
+ <20180831134244.GB19965@ZenIV.linux.org.uk>
+ <CAAeHK+w86m6YztnTGhuZPKRczb-+znZ1hiJskPXeQok4SgcaOw@mail.gmail.com>
+Message-ID: <20180903135636.GL19965@ZenIV.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02.09.2018 22:11, Jonathan Cameron wrote:
-> This feels like a good place to factor out the code into a utility
-> function that just does one of them.  That should hopefully
-> reduce the indenting etc enough to make the code easier to read.
+On Mon, Sep 03, 2018 at 02:34:27PM +0200, Andrey Konovalov wrote:
+
+> > Al, very annoyed by that kind of information-hiding crap...
 > 
->> +		info->tzds[i].info = info;
->> +		info->tzds[i].sensor_id = i;
->> +
->> +		info->tzds[i].tzd = thermal_zone_of_sensor_register(
->> +				info->sensor_device,
->> +				i, &info->tzds[i], &sun4i_ts_tz_ops);
->> +		/*
->> +		 * Do not fail driver probing when failing to register in
->> +		 * thermal because no thermal DT node is found.
->> +		 */
->> +		if (IS_ERR(info->tzds[i].tzd) && \
->> +				PTR_ERR(info->tzds[i].tzd) != -ENODEV) {
->> +			dev_err(&pdev->dev,
->> +				"could not register thermal sensor: %ld\n",
->> +				PTR_ERR(info->tzds[i].tzd));
->> +			return PTR_ERR(info->tzds[i].tzd);
->> +		}
+> This patch only adds __force to hide the reports I've looked at and
+> decided that the code does the right thing. The cases where this is
+> not the case are handled by the previous patches in the patchset. I'll
+> this to the patch description as well. Is that OK?
 
-So this code above should be placed in a separate function and called by 
-the for loop?
-Did I understand that right?
+I don't know about you, but personally I've run into "I've looked,
+I'm sure it's OK here" -> (a year or so later) "why is it OK, again?
+Oh, bugger..." quite a few times.  Some, but not all, hadn't been
+OK all along, some used to be but got quietly broken by subsequent
+changes by people who had no idea that some property of implementation
+was critical for correctness in the place in question, some (even
+more embarrassingly) were broken by a patch of my own.
 
-Philipp
+It happens.  "Looked in there, decided that the warning was bogus and
+quietly shut it up" has turned out to be a source of trouble down the
+road a lot of times.  If you are forcibly removing a warning (not by
+reorganizing the logics and annotations, that is - by force-cast, or
+something similar to it), leave behind something more useful than
+"On $DATE I've decided it was OK" (and even that - only accessible via
+git blame/git show).  As a hint for yourself, if nothing else - you
+might end up asking yourself the same question a year or two (or twenty,
+for that matter) later while looking for likely source of odd breakage
+and trying to narrow the search down.
+
+Force-cast conflates a *lot* of situations together - it's pretty much
+"fuck off, I know what's going on here, it's OK" and no more than that;
+hell, even the warning it removes would've carried more information...
+
+That kind of "these are false positives, let's turn them off to search for
+real problems" patches is fine when developing a branch like that; it's
+leaving them in for posterity that tends to cause PITA...
+
+I'm not attacking you, BTW - it's really a generic point re force-casts.
+There had been some really outrageous cases lately[1] and I think that
+this point does need to be made.  Unexplained force-cast is worse than
+leaving a warning in.
+
+[1] with, if my reading of the situation is correct,
+	newbie asking maintainers if dealing with endianness warnings in
+a certain driver would be useful
+	newbie getting told (perhaps by maintainers, perhaps by somebody else)
+that those were all noise, the driver's correct and the most useful thing to
+be done with them would be to make them STFU
+	force-cast-laden patch from said newbie doing just that picked by said
+maintainers, "cleaning up" the warnings.  And committed with authorship pinned
+to the newbie ;-/
+Not nice, seeing that the code in driver is *not* correct, despite the high-handed
+"shut that noise off, everything's fine there" commit - undoing that "cleanup" and
+trying to redo annotations properly starts to converge on absolutely real bugs on
+b-e hosts in about 10 minutes.  In PCIe driver, with devices existing as separate
+cards, not just something always embedded into x86 or arm motherboard...
