@@ -1,191 +1,134 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon,  3 Sep 2018 15:14:30 +0200
-Subject: [PATCH 2/2] serial: uartps: Change uart ID port allocation
-In-Reply-To: <0ee4683a7d3927c2ef20b1e106720e6154811cd7.1535980468.git.michal.simek@xilinx.com>
-References: <0ee4683a7d3927c2ef20b1e106720e6154811cd7.1535980468.git.michal.simek@xilinx.com>
-Message-ID: <8ade255a03610abfe28538d5fdff4cf37848c552.1535980468.git.michal.simek@xilinx.com>
+From: phil.edworthy@renesas.com (Phil Edworthy)
+Date: Mon, 3 Sep 2018 13:21:02 +0000
+Subject: [PATCH v5 1/2] clk: Add of_clk_get_by_name_optional() function
+In-Reply-To: <TY1PR01MB1769CBB6FC715E94B10815BFF50C0@TY1PR01MB1769.jpnprd01.prod.outlook.com>
+References: <1535724443-21150-1-git-send-email-phil.edworthy@renesas.com>
+ <1535724443-21150-2-git-send-email-phil.edworthy@renesas.com>
+ <153576994987.19113.11376893046599589648@swboyd.mtv.corp.google.com>
+ <TY1PR01MB1769CBB6FC715E94B10815BFF50C0@TY1PR01MB1769.jpnprd01.prod.outlook.com>
+Message-ID: <TY1PR01MB1769B2978D73DBC2EADC6B8DF50C0@TY1PR01MB1769.jpnprd01.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For IPs which have alias algorightm all the time using that alias and
-minor number. It means serial20 alias ends up as ttyPS20.
+Hi Stephen,
 
-If alias is not setup for probed IP instance the first unused position is
-used but that needs to be checked if it is really empty because another
-instance doesn't need to be probed at that time. of_alias_get_alias_list()
-fills alias bitmap which exactly shows which ID is free.
-If alias pointing to different not compatible IP, it is free to use.
+On 03 September 2018 10:33 Phil Edworthy wrote:
+> On 01 September 2018 03:46, Stephen Boyd wrote:
+> > Quoting Phil Edworthy (2018-08-31 07:07:22)
+> > > diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c index
+> > > 9ab3db8..4adb99e 100644
+> > > --- a/drivers/clk/clkdev.c
+> > > +++ b/drivers/clk/clkdev.c
+> > > @@ -54,30 +54,29 @@ EXPORT_SYMBOL(of_clk_get);
+> > >
+> > >  static struct clk *__of_clk_get_by_name(struct device_node *np,
+> > >                                         const char *dev_id,
+> > > -                                       const char *name)
+> > > +                                       const char *name,
+> > > +                                       bool optional)
+> > >  {
+> > >         struct clk *clk = ERR_PTR(-ENOENT);
+> > > +       struct device_node *child = np;
+> > > +       int index = 0;
+> > >
+> > >         /* Walk up the tree of devices looking for a clock that matches */
+> > >         while (np) {
+> > > -               int index = 0;
+> > >
+> > >                 /*
+> > >                  * For named clocks, first look up the name in the
+> > >                  * "clock-names" property.  If it cannot be found, then
+> > > -                * index will be an error code, and of_clk_get() will fail.
+> > > +                * index will be an error code.
+> > >                  */
+> > >                 if (name)
+> > >                         index = of_property_match_string(np, "clock-names",
+> name);
+> > > -               clk = __of_clk_get(np, index, dev_id, name);
+> > > -               if (!IS_ERR(clk)) {
+> > > -                       break;
+> > > -               } else if (name && index >= 0) {
+> > > -                       if (PTR_ERR(clk) != -EPROBE_DEFER)
+> > > -                               pr_err("ERROR: could not get clock %pOF:%s(%i)\n",
+> > > -                                       np, name ? name : "", index);
+> > > +               if (index >= 0)
+> > > +                       clk = __of_clk_get(np, index, dev_id, name);
+> > > +               if (!IS_ERR(clk))
+> >
+> > Was this change necessary? It looks like we can leave it all alone and keep
+> > passing a negative number to __of_clk_get() and have that return an error
+> > pointer which we then return immediately as an error. But, if the clock is
+> > optional and we've passed a name here, shouldn't we treat an error from
+> > of_property_match_string() as success too? This is all looking pretty fragile
+> so
+> > maybe it can be better commented and also more explicit instead of relying
+> > on the reader to jump through all the function calls to figure out what the
+> > return value is in some cases.
+> If we call __of_clk_get, with index < 0, we will not be able to differentiate
+> between clock provider not present and other errors with the passed data,
+> as it will just return -EINVAL.
+> 
+> of_property_match_string() will return -EINVAL if the "clock-names"
+> property
+> is missing, or -ENODATA if the specified clock name in the "clock-names"
+> property is missing. That is why I have changed the code to conditionally
+> call __of_clk_get, so the code will correctly treat optional clocks that are not
+> present.
+When getting named optional clocks, if the node has a "clock-names" property,
+but no clock matching the name we want, I think the function should stop there
+and *not* walk up the tree of devices looking for a matching clock. In this case,
+the code determines that the optional clock is not present.
 
-cdns_get_id() call is placed below structure allocation to simplify
-error path.
+If there isn?t a "clock-names" property in the current node, the function should
+walk up the tree of devices looking for a matching optional clock. If there are no
+parent nodes left and we haven't found a matching optional clock, we determine
+that the clock isn?t there.
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+Is that how this should work?
 
-Needs to be applied on the top of
-https://lkml.org/lkml/2018/9/3/404
-https://lkml.org/lkml/2018/9/3/400 (minor that's why just in case)
+Thanks
+Phil
 
----
- drivers/tty/serial/xilinx_uartps.c | 106 ++++++++++++++++++++++++++++++++-----
- 1 file changed, 93 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index 71c032744dae..61c4a644e143 100644
---- a/drivers/tty/serial/xilinx_uartps.c
-+++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -30,7 +30,6 @@
- #define CDNS_UART_TTY_NAME	"ttyPS"
- #define CDNS_UART_NAME		"xuartps"
- #define CDNS_UART_MAJOR		0	/* use dynamic node allocation */
--#define CDNS_UART_NR_PORTS	2
- #define CDNS_UART_FIFO_SIZE	64	/* FIFO size */
- #define CDNS_UART_REGISTER_SPACE	0x1000
- 
-@@ -1370,6 +1369,85 @@ static int __maybe_unused cdns_runtime_resume(struct device *dev)
- };
- MODULE_DEVICE_TABLE(of, cdns_uart_of_match);
- 
-+/*
-+ * Maximum number of instances without alias IDs but if there is alias
-+ * which target "< MAX_UART_INSTANCES" range this ID can't be used.
-+ */
-+#define MAX_UART_INSTANCES	32
-+
-+/* Stores static aliases list */
-+static DECLARE_BITMAP(alias_bitmap, MAX_UART_INSTANCES);
-+static int alias_bitmap_initialized;
-+
-+/* Stores actual bitmap of allocated IDs with alias IDs together */
-+static DECLARE_BITMAP(bitmap, MAX_UART_INSTANCES);
-+/* Protect bitmap operations to have unique IDs */
-+static DEFINE_MUTEX(bitmap_lock);
-+
-+static int cdns_get_id(struct platform_device *pdev)
-+{
-+	int id;
-+
-+	mutex_lock(&bitmap_lock);
-+
-+	/* Alias list is stable that's why get alias bitmap only once */
-+	if (!alias_bitmap_initialized) {
-+		of_alias_get_alias_list(cdns_uart_of_match, "serial",
-+					alias_bitmap, MAX_UART_INSTANCES);
-+		alias_bitmap_initialized++;
-+	}
-+
-+	/* Make sure that alias ID is not taken by instance without alias */
-+	bitmap_or(bitmap, bitmap, alias_bitmap, MAX_UART_INSTANCES);
-+
-+	dev_dbg(&pdev->dev, "Alias bitmap: %*pb\n",
-+		MAX_UART_INSTANCES, bitmap);
-+
-+	/* Look for a serialN alias */
-+	id = of_alias_get_id(pdev->dev.of_node, "serial");
-+	if (id < 0) {
-+		dev_warn(&pdev->dev,
-+			 "No serial alias passed. Using the first free id\n");
-+
-+		/*
-+		 * Start with id 0 and check if there is no serial0 alias
-+		 * which points to device which is compatible with this driver.
-+		 * If alias exists then try next free position.
-+		 */
-+		id = 0;
-+
-+		for (;;) {
-+			dev_info(&pdev->dev, "Checking id %d\n", id);
-+			id = find_next_zero_bit(bitmap, MAX_UART_INSTANCES, id);
-+
-+			/* No free empty instance */
-+			if (id == MAX_UART_INSTANCES) {
-+				dev_err(&pdev->dev, "No free ID\n");
-+				mutex_unlock(&bitmap_lock);
-+				return -EINVAL;
-+			}
-+
-+			dev_dbg(&pdev->dev, "The empty id is %d\n", id);
-+			/* Check if ID is empty */
-+			if (!test_and_set_bit(id, bitmap)) {
-+				/* Break the loop if bit is taken */
-+				dev_dbg(&pdev->dev,
-+					"Selected ID %d allocation passed\n",
-+					id);
-+				break;
-+			}
-+			dev_dbg(&pdev->dev,
-+				"Selected ID %d allocation failed\n", id);
-+			/* if taking bit fails then try next one */
-+			id++;
-+		}
-+	}
-+
-+	mutex_unlock(&bitmap_lock);
-+
-+	return id;
-+}
-+
- /**
-  * cdns_uart_probe - Platform driver probe
-  * @pdev: Pointer to the platform device structure
-@@ -1403,21 +1481,17 @@ static int cdns_uart_probe(struct platform_device *pdev)
- 	if (!cdns_uart_uart_driver)
- 		return -ENOMEM;
- 
--	/* Look for a serialN alias */
--	cdns_uart_data->id = of_alias_get_id(pdev->dev.of_node, "serial");
-+	cdns_uart_data->id = cdns_get_id(pdev);
- 	if (cdns_uart_data->id < 0)
--		cdns_uart_data->id = 0;
--
--	if (cdns_uart_data->id >= CDNS_UART_NR_PORTS) {
--		dev_err(&pdev->dev, "Cannot get uart_port structure\n");
--		return -ENODEV;
--	}
-+		return cdns_uart_data->id;
- 
- 	/* There is a need to use unique driver name */
- 	driver_name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "%s%d",
- 				     CDNS_UART_NAME, cdns_uart_data->id);
--	if (!driver_name)
--		return -ENOMEM;
-+	if (!driver_name) {
-+		rc = -ENOMEM;
-+		goto err_out_id;
-+	}
- 
- 	cdns_uart_uart_driver->owner = THIS_MODULE;
- 	cdns_uart_uart_driver->driver_name = driver_name;
-@@ -1446,7 +1520,7 @@ static int cdns_uart_probe(struct platform_device *pdev)
- 	rc = uart_register_driver(cdns_uart_uart_driver);
- 	if (rc < 0) {
- 		dev_err(&pdev->dev, "Failed to register driver\n");
--		return rc;
-+		goto err_out_id;
- 	}
- 
- 	cdns_uart_data->cdns_uart_driver = cdns_uart_uart_driver;
-@@ -1587,7 +1661,10 @@ static int cdns_uart_probe(struct platform_device *pdev)
- 	clk_disable_unprepare(cdns_uart_data->pclk);
- err_out_unregister_driver:
- 	uart_unregister_driver(cdns_uart_data->cdns_uart_driver);
--
-+err_out_id:
-+	mutex_lock(&bitmap_lock);
-+	clear_bit(cdns_uart_data->id, bitmap);
-+	mutex_unlock(&bitmap_lock);
- 	return rc;
- }
- 
-@@ -1610,6 +1687,9 @@ static int cdns_uart_remove(struct platform_device *pdev)
- #endif
- 	rc = uart_remove_one_port(cdns_uart_data->cdns_uart_driver, port);
- 	port->mapbase = 0;
-+	mutex_lock(&bitmap_lock);
-+	clear_bit(cdns_uart_data->id, bitmap);
-+	mutex_unlock(&bitmap_lock);
- 	clk_disable_unprepare(cdns_uart_data->uartclk);
- 	clk_disable_unprepare(cdns_uart_data->pclk);
- 	pm_runtime_disable(&pdev->dev);
--- 
-1.9.1
+> > >                         return clk;
+> > > -               }
+> > > +               if (name && index >= 0)
+> > > +                       break;
+> >
+> > And this causes us to duplicate logic down below because we have to check
+> it
+> > again if it's not optional or some other error condition?
+> Yes, the error handling is messy, though I have tried to make this simple.
+> I'll have a think about some other way to make this cleaner.
+> 
+> 
+> > >
+> > >                 /*
+> > >                  * No matching clock found on this node.  If the
+> > > parent node @@ -89,6 +88,16 @@ static struct clk
+> > *__of_clk_get_by_name(struct device_node *np,
+> > >                         break;
+> > >         }
+> > >
+> > > +       /* The clock is not valid, but it could be optional or deferred */
+> > > +       if (optional && PTR_ERR(clk) == -ENOENT) {
+> > > +               clk = NULL;
+> > > +               pr_info("no optional clock %pOF:%s\n", child,
+> > > +                       name ? name : "");
+> >
+> > Is this intentionally pr_info?
+> Yes, it's not an error if an optional clock isn?t there.
+> Would pr_debug be more appropriate?
+> 
+> 
+> > > +       } else if (name && index >= 0 && PTR_ERR(clk) != -EPROBE_DEFER) {
+> > > +               pr_err("ERROR: could not get clock %pOF:%s(%i)\n",
+> > > +                       child, name, index);
+> > > +       }
+> > > +
+> > >         return clk;
+> > >  }
+> > >
+> 
+> Thanks
+> Phil
