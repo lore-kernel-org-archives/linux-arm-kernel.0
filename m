@@ -1,88 +1,49 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 3 Sep 2018 14:15:39 +0200
-Subject: [PATCH 06/14] mmc: mmci: merge prepare data functions
-In-Reply-To: <1533116221-380-7-git-send-email-ludovic.Barre@st.com>
-References: <1533116221-380-1-git-send-email-ludovic.Barre@st.com>
- <1533116221-380-7-git-send-email-ludovic.Barre@st.com>
-Message-ID: <CAPDyKFqNOgK8sMa-o7jWecD2Y76+LdjmtYTq+1-ApapQv3fZxQ@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 3 Sep 2018 14:18:45 +0200
+Subject: [PATCH 10/27] drm/sun4i: Add compatible for H6 display engine
+In-Reply-To: <20180902072643.4917-11-jernej.skrabec@siol.net>
+References: <20180902072643.4917-1-jernej.skrabec@siol.net>
+ <20180902072643.4917-11-jernej.skrabec@siol.net>
+Message-ID: <20180903121845.znqhufx24ihcpmkn@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 August 2018 at 11:36, Ludovic Barre <ludovic.Barre@st.com> wrote:
-> From: Ludovic Barre <ludovic.barre@st.com>
->
-> This patch merges the prepare data functions.
-> This allows to define a single access to prepare data service.
-> This prepares integration for mmci host ops.
->
-> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+hi,
+
+On Sun, Sep 02, 2018 at 09:26:26AM +0200, Jernej Skrabec wrote:
+> H6 is first Allwinner SoC which supports 10 bit colors, HDR and AFBC.
+> 
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 > ---
->  drivers/mmc/host/mmci.c | 22 +++++++++-------------
->  1 file changed, 9 insertions(+), 13 deletions(-)
->
-> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-> index 5646c2e6..e4d80f1 100644
-> --- a/drivers/mmc/host/mmci.c
-> +++ b/drivers/mmc/host/mmci.c
-> @@ -651,11 +651,16 @@ static int __mmci_dma_prep_data(struct mmci_host *host, struct mmc_data *data,
->         return -ENOMEM;
->  }
->
-> -static inline int mmci_dma_prep_data(struct mmci_host *host,
-> -                                    struct mmc_data *data)
-> +static inline int mmci_dma_prepare_data(struct mmci_host *host,
+>  drivers/gpu/drm/sun4i/sun4i_drv.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+> index dd19d674055c..e5731d092e1a 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+> @@ -410,6 +410,7 @@ static int sun4i_drv_remove(struct platform_device *pdev)
+>  
+>  static const struct of_device_id sun4i_drv_of_table[] = {
+>  	{ .compatible = "allwinner,sun4i-a10-display-engine" },
+> +	{ .compatible = "allwinner,sun50i-h6-display-engine" },
+>  	{ .compatible = "allwinner,sun5i-a10s-display-engine" },
+>  	{ .compatible = "allwinner,sun5i-a13-display-engine" },
+>  	{ .compatible = "allwinner,sun6i-a31-display-engine" },
 
-Nitpick: I don't see the reason to why you need to rename this
-function here, please keep it as is.
+While it makes sens from an alphabetical point of view, we usually
+follow the number order here (so after sun9i).
 
-> +                                       struct mmc_data *data,
-> +                                       bool next)
->  {
->         struct dmaengine_priv *dmae = host->dma_priv;
-> +       struct dmaengine_next *nd = &dmae->next_data;
->
-> +       if (next)
-> +               return __mmci_dma_prep_data(host, data, &nd->dma_chan,
-> +                                           &nd->dma_desc);
->         /* Check if next job is already prepared. */
->         if (dmae->dma_current && dmae->dma_desc_current)
->                 return 0;
-> @@ -665,22 +670,13 @@ static inline int mmci_dma_prep_data(struct mmci_host *host,
->                                     &dmae->dma_desc_current);
->  }
->
-> -static inline int mmci_dma_prep_next(struct mmci_host *host,
-> -                                    struct mmc_data *data)
-> -{
-> -       struct dmaengine_priv *dmae = host->dma_priv;
-> -       struct dmaengine_next *nd = &dmae->next_data;
-> -
-> -       return __mmci_dma_prep_data(host, data, &nd->dma_chan, &nd->dma_desc);
-> -}
-> -
->  static int mmci_dma_start_data(struct mmci_host *host, unsigned int datactrl)
->  {
->         struct dmaengine_priv *dmae = host->dma_priv;
->         struct mmc_data *data = host->data;
->         int ret;
->
-> -       ret = mmci_dma_prep_data(host, host->data);
-> +       ret = mmci_dma_prepare_data(host, host->data, false);
->         if (ret)
->                 return ret;
->
-> @@ -737,7 +733,7 @@ static void mmci_pre_request(struct mmc_host *mmc, struct mmc_request *mrq)
->         if (mmci_validate_data(host, data))
->                 return;
->
-> -       if (!mmci_dma_prep_next(host, data))
-> +       if (!mmci_dma_prepare_data(host, data, true))
->                 data->host_cookie = ++host->next_cookie < 0 ?
->                         1 : host->next_cookie;
->  }
-> --
-> 2.7.4
->
+Maxime
 
-Kind regards
-Uffe
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180903/b60766eb/attachment-0001.sig>
