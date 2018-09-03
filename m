@@ -1,38 +1,56 @@
 From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Mon,  3 Sep 2018 15:45:16 +0200
-Subject: [PULL 4/4] arm64: KVM: Remove pgd_lock
-In-Reply-To: <20180903134516.17796-1-christoffer.dall@arm.com>
-References: <20180903134516.17796-1-christoffer.dall@arm.com>
-Message-ID: <20180903134516.17796-5-christoffer.dall@arm.com>
+Date: Mon,  3 Sep 2018 15:45:12 +0200
+Subject: [PULL 0/4] KVM/ARM Fixes for v4.19
+Message-ID: <20180903134516.17796-1-christoffer.dall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steven Price <steven.price@arm.com>
+Hi Radim and Paolo,
 
-The lock has never been used and the page tables are protected by
-mmu_lock in struct kvm.
+Here is the first small round of fixes for KVM/ARM for v4.19.  The
+changes include:
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Signed-off-by: Steven Price <steven.price@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+ - Fix a VFP corruption in 32-bit guest
+ - Add missing cache invalidation for CoW pages
+ - Two small cleanups
+
+Note that I have a question out on the CoW cache issue relating to
+zero-page backed PMD mappings, but if there is any additional fixes to
+be done, that doesn't invalidate the current patch and we can follow up
+later.
+
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+
+  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-fixes-for-v4.19
+
+for you to fetch changes up to f901c848464922bdf85a3b993539d56eedd20809:
+
+  arm64: KVM: Remove pgd_lock (2018-08-30 10:08:01 +0200)
+
 ---
- arch/arm64/include/asm/kvm_host.h | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 8e6d46df38aa..3d6d7336f871 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -61,8 +61,7 @@ struct kvm_arch {
- 	u64    vmid_gen;
- 	u32    vmid;
- 
--	/* 1-level 2nd stage table and lock */
--	spinlock_t pgd_lock;
-+	/* 1-level 2nd stage table, protected by kvm->mmu_lock */
- 	pgd_t *pgd;
- 
- 	/* VTTBR value associated with above pgd and vmid */
+Marc Zyngier (3):
+  KVM: arm/arm64: Clean dcache to PoC when changing PTE due to CoW
+  arm64: KVM: Only force FPEXC32_EL2.EN if trapping FPSIMD
+  KVM: Remove obsolete kvm_unmap_hva notifier backend
+
+Steven Price (1):
+  arm64: KVM: Remove pgd_lock
+
+ arch/arm/include/asm/kvm_host.h   |  1 -
+ arch/arm64/include/asm/kvm_host.h |  4 +---
+ arch/arm64/kvm/hyp/switch.c       |  9 ++++++---
+ arch/mips/include/asm/kvm_host.h  |  1 -
+ arch/mips/kvm/mmu.c               | 10 ----------
+ arch/x86/include/asm/kvm_host.h   |  1 -
+ arch/x86/kvm/mmu.c                |  5 -----
+ virt/kvm/arm/mmu.c                | 21 ++++++++-------------
+ virt/kvm/arm/trace.h              | 15 ---------------
+ 9 files changed, 15 insertions(+), 52 deletions(-)
+
 -- 
 2.18.0
