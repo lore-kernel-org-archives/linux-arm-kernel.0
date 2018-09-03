@@ -1,45 +1,30 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 03 Sep 2018 16:54:29 +0200
-Subject: [PATCH 2/3] ARM: dts: imx6ull: add pxp support
-In-Reply-To: <20180827065927.GE3850@dragon>
-References: <20180810151822.18650-1-p.zabel@pengutronix.de>
- <20180810151822.18650-3-p.zabel@pengutronix.de>
- <20180827065927.GE3850@dragon>
-Message-ID: <1535986469.6568.6.camel@pengutronix.de>
+From: wufan@codeaurora.org (wufan)
+Date: Mon, 3 Sep 2018 09:05:29 -0600
+Subject: [PATCH] EDAC, ghes: use CPER module handles to locate DIMMs
+In-Reply-To: <5B891308.40407@huawei.com>
+References: <1535567632-18089-1-git-send-email-wufan@codeaurora.org>
+ <5eab89c6-c063-cbc2-4d02-459faf87698a@arm.com>
+ <6cc3c5e2-3827-a89c-e37b-09728a34f21f@huawei.com> <5B891308.40407@huawei.com>
+Message-ID: <003201d44397$8eb02c20$ac108460$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-08-27 at 14:59 +0800, Shawn Guo wrote:
-> On Fri, Aug 10, 2018 at 05:18:21PM +0200, Philipp Zabel wrote:
-> > Add the device node for the i.MX6ULL Pixel Pipeline (PXP).
-> > 
-> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> > ---
-> >  arch/arm/boot/dts/imx6ul.dtsi  | 8 ++++++++
-> >  arch/arm/boot/dts/imx6ull.dtsi | 6 ++++++
-> >  2 files changed, 14 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-> > index 47a3453a4211..e80a660c14f2 100644
-> > --- a/arch/arm/boot/dts/imx6ul.dtsi
-> > +++ b/arch/arm/boot/dts/imx6ul.dtsi
-> > @@ -928,6 +928,14 @@
-> >  				};
-> >  			};
-> >  
-> > +			pxp: pxp at 21cc000 {
-> > +				compatible = "fsl,imx6ul-pxp";
-> > +				reg = <0x021cc000 0x4000>;
-> > +				interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-> > +				clock-names = "axi";
-> > +				clocks = <&clks IMX6UL_CLK_PXP>;
-> > +			};
-> > +
-> >  			lcdif: lcdif at 21c8000 {
+Thanks tanxiaofei!
+
+Boris/James, are you OK to sign off, or you want to see more tests on 
+this patch? 
+
+Thanks,
+Fan
+
+> -----Original Message-----
+> From: tanxiaofei <tanxiaofei@huawei.com>
+> Sent: Friday, August 31, 2018 4:06 AM
 > 
-> In order of unit-address, pxp at 21cc000 should go after lcdif at 21c8000.
-
-Thank you, I'll fix this in v2.
-
-regards
-Philipp
+> Hi James,
+> 
+> Our platform do not set CPER_MEM_VALID_MODULE_HANDLE in GHES
+> Memory errors.
+> 
+> Thanks,
+> tanxiaofei
