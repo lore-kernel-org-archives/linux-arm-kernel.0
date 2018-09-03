@@ -1,64 +1,84 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 3 Sep 2018 09:05:18 +0800
-Subject: [PATCH v2] arm64: dts: ls1043a: Add configure-gfladj property to
- USB3 node
-In-Reply-To: <20180829033055.22245-1-yinbo.zhu@nxp.com>
-References: <20180829033055.22245-1-yinbo.zhu@nxp.com>
-Message-ID: <20180903010517.GY3850@dragon>
+Date: Mon, 3 Sep 2018 09:16:26 +0800
+Subject: [PATCH 1/2] ARM: dts: imx7s: enable cpuidle driver
+In-Reply-To: <1535518847-24417-1-git-send-email-Anson.Huang@nxp.com>
+References: <1535518847-24417-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20180903011625.GZ3850@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 29, 2018 at 11:30:55AM +0800, Yinbo Zhu wrote:
-> From: Rajesh Bhagat <rajesh.bhagat@freescale.com>
+On Wed, Aug 29, 2018 at 01:00:46PM +0800, Anson Huang wrote:
+> Enable cpuidle for i.MX7S/D using generic ARM cpuidle
+> driver, below 2 idle states enabled:
 > 
-> Add "configure-gfladj" boolean property to USB3 node. This property
+> 1. ARM WFI;
+> 2. SoC WAIT mode.
+> 
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> ---
+>  arch/arm/boot/dts/imx7d.dtsi |  1 +
+>  arch/arm/boot/dts/imx7s.dtsi | 14 ++++++++++++++
+>  2 files changed, 15 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+> index 7cbc2ff..4d0d0f6 100644
+> --- a/arch/arm/boot/dts/imx7d.dtsi
+> +++ b/arch/arm/boot/dts/imx7d.dtsi
+> @@ -20,6 +20,7 @@
+>  			reg = <1>;
+>  			clock-frequency = <996000000>;
+>  			operating-points-v2 = <&cpu0_opp_table>;
+> +			cpu-idle-states = <&CPU_SLEEP>;
+>  		};
+>  	};
+>  
+> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+> index 93884ce..cf5570b 100644
+> --- a/arch/arm/boot/dts/imx7s.dtsi
+> +++ b/arch/arm/boot/dts/imx7s.dtsi
+> @@ -54,6 +54,19 @@
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+>  
+> +		idle-states {
+> +			entry-method = "psci";
+> +
+> +			CPU_SLEEP: WAIT {
 
-I do not see where this property is documented as bindings and how
-driver is using it.
+I understand uppercase is allowed, but we conventionally use lowercase
+for label and node name.  Can we do something like below?
+
+	cpu_sleep_wait: cpu-sleep-wait {
+		...
+	}
 
 Shawn
 
-> is used to determine whether frame length adjustment is required or
-> not
-> 
-> Signed-off-by: Rajesh Bhagat <rajesh.bhagat@nxp.com>
-> Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
-> Signed-off-by: Yinbo Zhu <yinbo.zhu@nxp.com>
-> ---
-> Change in v2:
-> 		Modified some word misspellings in commit information
-> 
->  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> index 7881e3d..ed3fa79 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> @@ -609,6 +609,7 @@
->  			dr_mode = "host";
->  			snps,quirk-frame-length-adjustment = <0x20>;
->  			snps,dis_rxdet_inp3_quirk;
-> +			configure-gfladj;
+> +				compatible = "arm,idle-state";
+> +				arm,psci-suspend-param = <0x0010000>;
+> +				local-timer-stop;
+> +				entry-latency-us = <100>;
+> +				exit-latency-us = <50>;
+> +				min-residency-us = <1000>;
+> +			};
+> +		};
+> +
+>  		cpu0: cpu at 0 {
+>  			compatible = "arm,cortex-a7";
+>  			device_type = "cpu";
+> @@ -61,6 +74,7 @@
+>  			clock-frequency = <792000000>;
+>  			clock-latency = <61036>; /* two CLK32 periods */
+>  			clocks = <&clks IMX7D_CLK_ARM>;
+> +			cpu-idle-states = <&CPU_SLEEP>;
 >  		};
+>  	};
 >  
->  		usb1: usb3 at 3000000 {
-> @@ -618,6 +619,7 @@
->  			dr_mode = "host";
->  			snps,quirk-frame-length-adjustment = <0x20>;
->  			snps,dis_rxdet_inp3_quirk;
-> +			configure-gfladj;
->  		};
->  
->  		usb2: usb3 at 3100000 {
-> @@ -627,6 +629,7 @@
->  			dr_mode = "host";
->  			snps,quirk-frame-length-adjustment = <0x20>;
->  			snps,dis_rxdet_inp3_quirk;
-> +			configure-gfladj;
->  		};
->  
->  		sata: sata at 3200000 {
 > -- 
-> 1.7.1
+> 2.7.4
 > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
