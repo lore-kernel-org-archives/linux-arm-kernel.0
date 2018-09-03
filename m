@@ -1,80 +1,95 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 3 Sep 2018 13:44:39 +0200
-Subject: [PATCH V5 0/5] soc: imx: add scu firmware api support
-In-Reply-To: <AM0PR04MB4211680A90724E089F5A1468800C0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <AM0PR04MB4211F68CCD399243613F8D7B80320@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <AM0PR04MB4211F748DBD1FE64A2B2136980360@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <20180827083310.omqa3kpmj542fu3b@pengutronix.de>
- <AM0PR04MB4211E5D66FD8502278765EC8800B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <AM0PR04MB42113BB0FA9E54629339F872800B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <20180828062113.khmkvsj3ofc7muu6@pengutronix.de>
- <AM0PR04MB4211A6BC038A141BA25B638A800A0@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <20180829065346.zi6v6me7ufft7ntt@pengutronix.de>
- <AM0PR04MB42110CB29DC190C9163B2FB580090@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <AM0PR04MB4211680A90724E089F5A1468800C0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <20180903114439.7y4zl63bpy26od23@pengutronix.de>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 3 Sep 2018 13:57:46 +0200
+Subject: [PATCH 0/4] media: platform: Add Aspeed Video Engine driver
+In-Reply-To: <1535576973-8067-1-git-send-email-eajames@linux.vnet.ibm.com>
+References: <1535576973-8067-1-git-send-email-eajames@linux.vnet.ibm.com>
+Message-ID: <364c2565-fdb0-dd31-5852-6358066810a5@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 03, 2018 at 08:57:36AM +0000, A.s. Dong wrote:
-> Hi Sascha,
+Hi Eddie,
+
+Thank you for your work on this. Interesting to see support for this SoC :-)
+
+On 08/29/2018 11:09 PM, Eddie James wrote:
+> The Video Engine (VE) embedded in the Aspeed AST2400 and AST2500 SOCs
+> can capture and compress video data from digital or analog sources. With
+> the Aspeed chip acting as a service processor, the Video Engine can
+> capture the host processor graphics output.
 > 
-> > -----Original Message-----
-> > From: A.s. Dong
-> > Sent: Wednesday, August 29, 2018 4:35 PM
-> > To: Sascha Hauer <s.hauer@pengutronix.de>
+> This series adds a V4L2 driver for the VE, providing a read() interface
+> only. The driver triggers the hardware to capture the host graphics output
+> and compress it to JPEG format.
 > 
-> [...]
+> Testing on an AST2500 determined that the videobuf/streaming/mmap interface
+> was significantly slower than the simple read() interface, so I have not
+> included the streaming part.
+
+Do you know why? It should be equal or faster, not slower.
+
+I reviewed about half of the driver, but then I stopped since there were too
+many things missing.
+
+First of all, you need to test your driver with v4l2-compliance (available here:
+https://git.linuxtv.org/v4l-utils.git/). Always compile from the git repo since
+the versions from distros tend to be too old.
+
+Just run 'v4l2-compliance -d /dev/videoX' and fix all issues. Then run
+'v4l2-compliance -s -d /dev/videoX' to test streaming.
+
+This utility checks if the driver follows the V4L2 API correctly, implements
+all ioctls that it should and fills in all the fields that it should.
+
+Please add the output of 'v4l2-compliance -s' to future versions of this patch
+series: I don't accept V4L2 drivers without a clean report of this utility.
+
+If you have any questions, then mail me or (usually quicker) ask on the #v4l
+freenode irc channel (I'm in the CET timezone).
+
+One thing that needs more explanation: from what I could tell from the driver
+the VIDIOC_G_FMT ioctl returns the detected format instead of the current
+format. This is wrong. Instead you should implement the VIDIOC_*_DV_TIMINGS
+ioctls and the V4L2_EVENT_SOURCE_CHANGE event.
+
+The normal sequence is that userspace queries the current timings with
+VIDIOC_QUERY_DV_TIMINGS, if it finds valid timings, then it sets these
+timings with _S_DV_TIMINGS. Now it can call G/S_FMT. If the timings
+change, then the driver should detect that and send a V4L2_EVENT_SOURCE_CHANGE
+event.
+
+When the application receives this event it can take action, such as
+increasing the size of the buffer for the jpeg data that it reads into.
+
+The reason for this sequence of events is that you can't just change the
+format/resolution mid-stream without giving userspace the chance to
+reconfigure.
+
+Regards,
+
+	Hans
+
 > 
-> > > > The original point is to separate the SCU service API implementation
-> > > > from the client drivers. Client drivers don't have to know the
-> > > > internal details of the API implementation, they just use the
-> > > > service API provided by SCU firmware. API implementation and client
-> > > > users will be
-> > > maintained independently.
-> > >
-> > > I would buy this argument if the 'API implementation' was more than a
-> > > shim layer that directly translates between function arguments and a
-> > message struct.
-> > > With this you effectively can't change the API implementation without
-> > > changing the API you provide to the client drivers.
-> > >
-> > 
-> > In reality, the API implementation could change without changing the API
-> > prototype.
-> > The API is defined in a more generic way and less possible to change.
-> > But the internal implementation is allowed to change if the firmware updates.
-> > e.g. protocol params layout and size and etc.
-> > 
-> > This way give us a clear separation between API internals and client users
-> > which are more like to be maintained independently.
-> > And it may also help if we want to support old firmware due to API internal
-> > implementation changes. (And note that SCU firmware supports many
-> > functions, distribute them into various drivers may cause a bit mess. Some of
-> > them may get troubles on finding a proper place to put.)
-
-Examples?
-
-> > 
-> > So aren't those more valuable comparing to move SCU APIs into client drivers?
-> > And current kernel users (arm scpi/scmi, ti sci) already do like this... why not
-> > i.MX?
-> > 
-> > Sorry if I still not get your point.
-> > Please help clarify a bit more if I missed something..
+> It's also possible to use an automatic mode for the VE such that
+> re-triggering the HW every frame isn't necessary. However this wasn't
+> reliable on the AST2400, and probably used more CPU anyway due to excessive
+> interrupts. It was approximately 15% faster.
 > 
-> Please let me know if you still believe moving SCU API implementation into
-> each client driver is a more reasonable way to go, then i will do it as I trust
-> your professionality.
-
-Yes, I still think that. I still think the 1:1 mapping between messages
-and function calls is an unnecessary overhead.
-
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> The series also adds the necessary parent clock definitions to the Aspeed
+> clock driver, with both a mux and clock divider.
+> 
+> Eddie James (4):
+>   clock: aspeed: Add VIDEO reset index definition
+>   clock: aspeed: Setup video engine clocking
+>   dt-bindings: media: Add Aspeed Video Engine binding documentation
+>   media: platform: Add Aspeed Video Engine driver
+> 
+>  .../devicetree/bindings/media/aspeed-video.txt     |   23 +
+>  drivers/clk/clk-aspeed.c                           |   41 +-
+>  drivers/media/platform/Kconfig                     |    8 +
+>  drivers/media/platform/Makefile                    |    1 +
+>  drivers/media/platform/aspeed-video.c              | 1307 ++++++++++++++++++++
+>  include/dt-bindings/clock/aspeed-clock.h           |    1 +
+>  6 files changed, 1379 insertions(+), 2 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/media/aspeed-video.txt
+>  create mode 100644 drivers/media/platform/aspeed-video.c
+> 
