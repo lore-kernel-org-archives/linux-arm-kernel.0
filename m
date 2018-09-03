@@ -1,26 +1,40 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Mon, 3 Sep 2018 22:50:20 +0900
-Subject: [PATCH v6 00/17] Rockchip ISP1 Driver
-In-Reply-To: <6761c936-82c7-e36a-de21-c0e827b68a3e@xs4all.nl>
-References: <20180308094807.9443-1-jacob-chen@iotwrt.com>
- <6761c936-82c7-e36a-de21-c0e827b68a3e@xs4all.nl>
-Message-ID: <CAAFQd5An=Dc5je_pedo+u8USMwtHMSfSBztaSA4G6Abn3xgbsQ@mail.gmail.com>
+From: embed3d@gmail.com (Philipp Rossak)
+Date: Mon, 3 Sep 2018 15:58:30 +0200
+Subject: [PATCH v3 18/30] iio: adc: sun4i-gpadc-iio: rework: support
+ multiple sensors
+In-Reply-To: <20180902211125.0098c808@archlinux>
+References: <20180830154518.29507-1-embed3d@gmail.com>
+ <20180830154518.29507-19-embed3d@gmail.com>
+ <20180902211125.0098c808@archlinux>
+Message-ID: <3722842b-1aa3-ea46-c0ec-7a01bc8a723e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+On 02.09.2018 22:11, Jonathan Cameron wrote:
+> This feels like a good place to factor out the code into a utility
+> function that just does one of them.  That should hopefully
+> reduce the indenting etc enough to make the code easier to read.
+> 
+>> +		info->tzds[i].info = info;
+>> +		info->tzds[i].sensor_id = i;
+>> +
+>> +		info->tzds[i].tzd = thermal_zone_of_sensor_register(
+>> +				info->sensor_device,
+>> +				i, &info->tzds[i], &sun4i_ts_tz_ops);
+>> +		/*
+>> +		 * Do not fail driver probing when failing to register in
+>> +		 * thermal because no thermal DT node is found.
+>> +		 */
+>> +		if (IS_ERR(info->tzds[i].tzd) && \
+>> +				PTR_ERR(info->tzds[i].tzd) != -ENODEV) {
+>> +			dev_err(&pdev->dev,
+>> +				"could not register thermal sensor: %ld\n",
+>> +				PTR_ERR(info->tzds[i].tzd));
+>> +			return PTR_ERR(info->tzds[i].tzd);
+>> +		}
 
-On Mon, Sep 3, 2018 at 10:07 PM Hans Verkuil <hverkuil@xs4all.nl> wrote:
->
-> Hi Jacob,
->
-> What is the status of this patch series? I haven't seen any updates for quite
-> some time now, and I thought that it was getting close.
->
-> It would be nice to see this go in.
+So this code above should be placed in a separate function and called by 
+the for loop?
+Did I understand that right?
 
-AFAIK, Jacob has left the project. +william.hu at rock-chips.com , who
-has been working on addressing the remaining comments for a while.
-
-Best regards,
-Tomasz
+Philipp
