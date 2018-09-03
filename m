@@ -1,19 +1,19 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 3 Sep 2018 07:58:14 +0800
-Subject: [PATCH 1/2][RESEND] ARM: dts: Add big-endian in nor node for
- ls1021a
-In-Reply-To: <20180828065936.8040-2-prabhakar.kushwaha@nxp.com>
-References: <20180828065936.8040-1-prabhakar.kushwaha@nxp.com>
- <20180828065936.8040-2-prabhakar.kushwaha@nxp.com>
-Message-ID: <20180902235812.GS3850@dragon>
+Date: Mon, 3 Sep 2018 08:00:50 +0800
+Subject: [PATCH V2 1/2] soc: imx: gpc: use A_CORE instread of A7 for more
+ i.MX platforms
+In-Reply-To: <1535445406-19633-1-git-send-email-Anson.Huang@nxp.com>
+References: <1535445406-19633-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20180903000048.GT3850@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2018 at 12:29:35PM +0530, Prabhakar Kushwaha wrote:
-> NOR and IFC controller connectivity is big-endian.
-> So add big-endian field in nor device tree node allowing
-> IFC controller to read/write data from/to the flash correctly.
+On Tue, Aug 28, 2018 at 04:36:45PM +0800, Anson Huang wrote:
+> gpcv2 driver is NOT just used on i.MX7D which has Cortex-A7
+> cores, but also on i.MX8MQ/i.MX8MM platforms which use Cortex-A53
+> cores, so let's use A_CORE instread of A7 to avoid confusion.
 > 
-> Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> Acked-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 
 Applied both, thanks.
