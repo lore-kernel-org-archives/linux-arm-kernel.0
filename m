@@ -1,87 +1,125 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Mon,  3 Sep 2018 12:01:56 +0200
-Subject: [PATCH v5 4/9] ata: ahci_platform: add support for PHY controller
- regulator
-In-Reply-To: <20180903100201.23131-1-clabbe.montjoie@gmail.com>
-References: <20180903100201.23131-1-clabbe.montjoie@gmail.com>
-Message-ID: <20180903100201.23131-5-clabbe.montjoie@gmail.com>
+From: tony.xie@rock-chips.com (Tony Xie)
+Date: Mon,  3 Sep 2018 18:04:00 +0800
+Subject: [PATCH v4 5/5] clk: RK808: add RK809 and RK817 support.
+In-Reply-To: <1535968829-19418-1-git-send-email-tony.xie@rock-chips.com>
+References: <1535968829-19418-1-git-send-email-tony.xie@rock-chips.com>
+Message-ID: <1535969040-19528-1-git-send-email-tony.xie@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SoC R40 AHCI controller need a PHY regulator to work.
-But since the PHY is embedded in the controller, we cannot do a DT node for it,
-since phy-supply works only in node with a PHY compatible.
-So this patch adds a way to add an optional phy-supply regulator on AHCI controller node.
+RK809 and RK817 are power management IC chips for multimedia products.
+most of their functions and registers are same, including the clkout
+funciton.
 
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+Signed-off-by: Tony Xie <tony.xie@rock-chips.com>
 ---
- drivers/ata/ahci.h             |  1 +
- drivers/ata/libahci_platform.c | 20 ++++++++++++++++++++
- 2 files changed, 21 insertions(+)
+ drivers/clk/Kconfig     |  9 ++++---
+ drivers/clk/clk-rk808.c | 64 ++++++++++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 67 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
-index 1415f1012de5..ef356e70e6de 100644
---- a/drivers/ata/ahci.h
-+++ b/drivers/ata/ahci.h
-@@ -353,6 +353,7 @@ struct ahci_host_priv {
- 	struct reset_control	*rsts;		/* Optional */
- 	struct regulator	**target_pwrs;	/* Optional */
- 	struct regulator	*ahci_regulator;/* Optional */
-+	struct regulator	*phy_regulator;/* Optional */
- 	/*
- 	 * If platform uses PHYs. There is a 1:1 relation between the port number and
- 	 * the PHY position in this array.
-diff --git a/drivers/ata/libahci_platform.c b/drivers/ata/libahci_platform.c
-index a886b61476a3..dc4d79b1c9ae 100644
---- a/drivers/ata/libahci_platform.c
-+++ b/drivers/ata/libahci_platform.c
-@@ -157,6 +157,12 @@ int ahci_platform_enable_regulators(struct ahci_host_priv *hpriv)
- 			return rc;
- 	}
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index 721572a..92cf5ad 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -46,13 +46,12 @@ config COMMON_CLK_MAX77686
+ 	  clock.
  
-+	if (hpriv->phy_regulator) {
-+		rc = regulator_enable(hpriv->phy_regulator);
-+		if (rc)
-+			goto disable_ahci_pwrs;
-+	}
-+
- 	for (i = 0; i < hpriv->nports; i++) {
- 		if (!hpriv->target_pwrs[i])
- 			continue;
-@@ -173,6 +179,9 @@ int ahci_platform_enable_regulators(struct ahci_host_priv *hpriv)
- 		if (hpriv->target_pwrs[i])
- 			regulator_disable(hpriv->target_pwrs[i]);
+ config COMMON_CLK_RK808
+-	tristate "Clock driver for RK805/RK808/RK818"
++	tristate "Clock driver for RK805/RK808/RK809/RK817/RK818"
+ 	depends on MFD_RK808
+ 	---help---
+-	  This driver supports RK805, RK808 and RK818 crystal oscillator clock. These
+-	  multi-function devices have two fixed-rate oscillators,
+-	  clocked at 32KHz each. Clkout1 is always on, Clkout2 can off
+-	  by control register.
++	  This driver supports RK805, RK809 and RK817, RK808 and RK818 crystal oscillator clock.
++	  These multi-function devices have two fixed-rate oscillators, clocked at 32KHz each.
++	  Clkout1 is always on, Clkout2 can off by control register.
  
-+	if (hpriv->phy_regulator)
-+		regulator_disable(hpriv->phy_regulator);
-+disable_ahci_pwrs:
- 	if (hpriv->ahci_regulator)
- 		regulator_disable(hpriv->ahci_regulator);
- 	return rc;
-@@ -198,6 +207,8 @@ void ahci_platform_disable_regulators(struct ahci_host_priv *hpriv)
- 
- 	if (hpriv->ahci_regulator)
- 		regulator_disable(hpriv->ahci_regulator);
-+	if (hpriv->phy_regulator)
-+		regulator_disable(hpriv->phy_regulator);
+ config COMMON_CLK_HI655X
+ 	tristate "Clock driver for Hi655x" if EXPERT
+diff --git a/drivers/clk/clk-rk808.c b/drivers/clk/clk-rk808.c
+index 6461f28..7f9a56b 100644
+--- a/drivers/clk/clk-rk808.c
++++ b/drivers/clk/clk-rk808.c
+@@ -96,6 +96,68 @@ static int rk808_clkout2_is_prepared(struct clk_hw *hw)
+ 	return idx ? &rk808_clkout->clkout2_hw : &rk808_clkout->clkout1_hw;
  }
- EXPORT_SYMBOL_GPL(ahci_platform_disable_regulators);
- /**
-@@ -430,6 +441,15 @@ struct ahci_host_priv *ahci_platform_get_resources(struct platform_device *pdev,
- 		hpriv->ahci_regulator = NULL;
- 	}
  
-+	hpriv->phy_regulator = devm_regulator_get_optional(dev, "phy");
-+	if (IS_ERR(hpriv->phy_regulator)) {
-+		rc = PTR_ERR(hpriv->phy_regulator);
-+		if (rc == -EPROBE_DEFER)
-+			goto err_out;
-+		rc = 0;
-+		hpriv->phy_regulator = NULL;
-+	}
++static int rk817_clkout2_enable(struct clk_hw *hw, bool enable)
++{
++	struct rk808_clkout *rk808_clkout = container_of(hw,
++							 struct rk808_clkout,
++							 clkout2_hw);
++	struct rk808 *rk808 = rk808_clkout->rk808;
 +
- 	if (flags & AHCI_PLATFORM_GET_RESETS) {
- 		hpriv->rsts = devm_reset_control_array_get_optional_shared(dev);
- 		if (IS_ERR(hpriv->rsts)) {
++	return regmap_update_bits(rk808->regmap, RK817_SYS_CFG(1),
++				  RK817_CLK32KOUT2_EN,
++				  enable ? RK817_CLK32KOUT2_EN : 0);
++}
++
++static int rk817_clkout2_prepare(struct clk_hw *hw)
++{
++	return rk817_clkout2_enable(hw, true);
++}
++
++static void rk817_clkout2_unprepare(struct clk_hw *hw)
++{
++	rk817_clkout2_enable(hw, false);
++}
++
++static int rk817_clkout2_is_prepared(struct clk_hw *hw)
++{
++	struct rk808_clkout *rk808_clkout = container_of(hw,
++							 struct rk808_clkout,
++							 clkout2_hw);
++	struct rk808 *rk808 = rk808_clkout->rk808;
++	unsigned int val;
++
++	int ret = regmap_read(rk808->regmap, RK817_SYS_CFG(1), &val);
++
++	if (ret < 0)
++		return 0;
++
++	return (val & RK817_CLK32KOUT2_EN) ? 1 : 0;
++}
++
++static const struct clk_ops rk817_clkout2_ops = {
++	.prepare = rk817_clkout2_prepare,
++	.unprepare = rk817_clkout2_unprepare,
++	.is_prepared = rk817_clkout2_is_prepared,
++	.recalc_rate = rk808_clkout_recalc_rate,
++};
++
++static const struct clk_ops *rkpmic_get_ops(long variant)
++{
++	switch (variant) {
++	case RK809_ID:
++	case RK817_ID:
++		return &rk817_clkout2_ops;
++	/*
++	 * For the default case, it match the following PMIC type.
++	 * RK805_ID
++	 * RK808_ID
++	 * RK818_ID
++	 */
++	default:
++		return &rk808_clkout2_ops;
++	}
++}
++
+ static int rk808_clkout_probe(struct platform_device *pdev)
+ {
+ 	struct rk808 *rk808 = dev_get_drvdata(pdev->dev.parent);
+@@ -127,7 +189,7 @@ static int rk808_clkout_probe(struct platform_device *pdev)
+ 		return ret;
+ 
+ 	init.name = "rk808-clkout2";
+-	init.ops = &rk808_clkout2_ops;
++	init.ops = rkpmic_get_ops(rk808->variant);
+ 	rk808_clkout->clkout2_hw.init = &init;
+ 
+ 	/* optional override of the clockname */
 -- 
-2.16.4
+1.9.1
