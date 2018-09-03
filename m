@@ -1,119 +1,92 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Mon, 3 Sep 2018 21:47:31 +0200
-Subject: [PATCH] arm64: mm: always enable CONFIG_HOLES_IN_ZONE
-In-Reply-To: <20180830150532.22745-1-james.morse@arm.com>
-References: <20180830150532.22745-1-james.morse@arm.com>
-Message-ID: <20180903194731.GE14951@dhcp22.suse.cz>
+From: oss@buserror.net (Scott Wood)
+Date: Mon, 03 Sep 2018 15:33:33 -0500
+Subject: [PATCH 3/5] drivers: clk-qoriq: Add clockgen support for lx2160a
+In-Reply-To: <DB5PR0401MB221332A5ED14C8E14C8D18A1F30C0@DB5PR0401MB2213.eurprd04.prod.outlook.com>
+References: <1534747636-20064-1-git-send-email-vabhav.sharma@nxp.com>
+ <1534747636-20064-4-git-send-email-vabhav.sharma@nxp.com>
+ <4a9ea6b451683ec98c92e86a5ae6b91213a6afcf.camel@buserror.net>
+ <VI1PR04MB4800E8B1E8541FCA9221A1CFF3080@VI1PR04MB4800.eurprd04.prod.outlook.com>
+ <d2cfd49eb33a3ce74f0e78f2b53d3954d2cb3e76.camel@buserror.net>
+ <b31ae8e788fb93971167faa9b55b497e838532c4.camel@buserror.net>
+ <DB5PR0401MB22130C025AA4CCAD0221781DF30F0@DB5PR0401MB2213.eurprd04.prod.outlook.com>
+ <f6707cb54c3e6da1b50f45f915c996dfccfeacda.camel@buserror.net>
+ <DB5PR0401MB221332A5ED14C8E14C8D18A1F30C0@DB5PR0401MB2213.eurprd04.prod.outlook.com>
+Message-ID: <3a4274af2200923875ff05f945888a34d6dccee3.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 30-08-18 16:05:32, James Morse wrote:
-> Commit 6d526ee26ccd ("arm64: mm: enable CONFIG_HOLES_IN_ZONE for NUMA")
-> only enabled HOLES_IN_ZONE for NUMA systems because the NUMA code was
-> choking on the missing zone for nomap pages. This problem doesn't just
-> apply to NUMA systems.
+On Mon, 2018-09-03 at 01:17 +0000, Andy Tang wrote:
+> Hi Scott,
 > 
-> If the architecture doesn't set HAVE_ARCH_PFN_VALID, pfn_valid() will
-> return true if the pfn is part of a valid sparsemem section.
+> Please see my replay in line.
 > 
-> When working with multiple pages, the mm code uses pfn_valid_within()
-> to test each page it uses within the sparsemem section is valid. On
-> most systems memory comes in MAX_ORDER_NR_PAGES chunks which all
-> have valid/initialised struct pages. In this case pfn_valid_within()
-> is optimised out.
+> > -----Original Message-----
+> > From: Linuxppc-dev
+> > <linuxppc-dev-bounces+b29983=freescale.com@lists.ozlabs.org> On
+> > Behalf Of Scott Wood
+> > Sent: 2018?9?1? 4:29
+> > To: Andy Tang <andy.tang@nxp.com>; Vabhav Sharma
+> > <vabhav.sharma@nxp.com>; linux-kernel at vger.kernel.org;
+> > devicetree at vger.kernel.org; robh+dt at kernel.org;
+> > mark.rutland at arm.com; linuxppc-dev at lists.ozlabs.org;
+> > linux-arm-kernel at lists.infradead.org; mturquette at baylibre.com;
+> > sboyd at kernel.org; rjw at rjwysocki.net; viresh.kumar at linaro.org;
+> > linux-clk at vger.kernel.org; linux-pm at vger.kernel.org;
+> > linux-kernel-owner at vger.kernel.org; catalin.marinas at arm.com;
+> > will.deacon at arm.com; gregkh at linuxfoundation.org; arnd at arndb.de;
+> > kstewart at linuxfoundation.org; yamada.masahiro at socionext.com
+> > Cc: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>;
+> > linux at armlinux.org.uk; Udit Kumar <udit.kumar@nxp.com>; Varun Sethi
+> > <V.Sethi@nxp.com>
+> > Subject: Re: [PATCH 3/5] drivers: clk-qoriq: Add clockgen support for
+> > lx2160a
+> > 
+> > On Fri, 2018-08-31 at 06:12 +0000, Andy Tang wrote:
+> > > We don't want to increase NUM_CMUX each time new soc with more
+> > 
+> > cmuxes added.
+> > 
+> > You don't want to have to make a trivial change each time you exceed a
+> > limit that has yet to be exceeded once since NUM_CMUX was added?
+> > This isn't ABI or in any other way hard to change.  It's right in the same
+> > file
+> > as the chip description you'd be adding.
+> > 
+> > And even if a chip did come along with 16 cmuxes, you'd then need to
+> > increase the array to 17 to hold the -1 if you don't want to leave a
+> > situation
+> > like the
+> > p4080 is in now, where a chip's cmux array could be broken by increasing
+> > NUM_CMUX further.
+> > 
 > 
-> Systems where this isn't true (e.g. due to nomap) should set
-> HOLES_IN_ZONE and provide HAVE_ARCH_PFN_VALID so that mm tests each
-> page as it works with it.
-> 
-> Currently non-NUMA arm64 systems can't enable HOLES_IN_ZONE, leading to
-> VM_BUG_ON():
-> | page:fffffdff802e1780 is uninitialized and poisoned
-> | raw: ffffffffffffffff ffffffffffffffff ffffffffffffffff ffffffffffffffff
-> | raw: ffffffffffffffff ffffffffffffffff ffffffffffffffff ffffffffffffffff
-> | page dumped because: VM_BUG_ON_PAGE(PagePoisoned(p))
-> | ------------[ cut here ]------------
-> | kernel BUG at include/linux/mm.h:978!
-> | Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
-> [...]
-> | CPU: 1 PID: 25236 Comm: dd Not tainted 4.18.0 #7
-> | Hardware name: QEMU KVM Virtual Machine, BIOS 0.0.0 02/06/2015
-> | pstate: 40000085 (nZcv daIf -PAN -UAO)
-> | pc : move_freepages_block+0x144/0x248
-> | lr : move_freepages_block+0x144/0x248
-> | sp : fffffe0071177680
-> [...]
-> | Process dd (pid: 25236, stack limit = 0x0000000094cc07fb)
-> | Call trace:
-> |  move_freepages_block+0x144/0x248
-> |  steal_suitable_fallback+0x100/0x16c
-> |  get_page_from_freelist+0x440/0xb20
-> |  __alloc_pages_nodemask+0xe8/0x838
-> |  new_slab+0xd4/0x418
-> |  ___slab_alloc.constprop.27+0x380/0x4a8
-> |  __slab_alloc.isra.21.constprop.26+0x24/0x34
-> |  kmem_cache_alloc+0xa8/0x180
-> |  alloc_buffer_head+0x1c/0x90
-> |  alloc_page_buffers+0x68/0xb0
-> |  create_empty_buffers+0x20/0x1ec
-> |  create_page_buffers+0xb0/0xf0
-> |  __block_write_begin_int+0xc4/0x564
-> |  __block_write_begin+0x10/0x18
-> |  block_write_begin+0x48/0xd0
-> |  blkdev_write_begin+0x28/0x30
-> |  generic_perform_write+0x98/0x16c
-> |  __generic_file_write_iter+0x138/0x168
-> |  blkdev_write_iter+0x80/0xf0
-> |  __vfs_write+0xe4/0x10c
-> |  vfs_write+0xb4/0x168
-> |  ksys_write+0x44/0x88
-> |  sys_write+0xc/0x14
-> |  el0_svc_naked+0x30/0x34
-> | Code: aa1303e0 90001a01 91296421 94008902 (d4210000)
-> | ---[ end trace 1601ba47f6e883fe ]---
-> 
-> Remove the NUMA dependency.
-> 
-> Reported-by: Mikulas Patocka <mpatocka@redhat.com>
-> Link: https://www.spinics.net/lists/arm-kernel/msg671851.html
-> Fixes: 6d526ee26ccd ("arm64: mm: enable CONFIG_HOLES_IN_ZONE for NUMA")
-> CC: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Signed-off-by: James Morse <james.morse@arm.com>
+> [Andy] Adding buffer to a limitation number is always a good habit when
+> coding. We often forget to increase this value when
+> a new chip with more cmuxes added. 
 
-OK. I guess you are also going to post a patch to drop
-ARCH_HAS_HOLES_MEMORYMODEL, right?
+"often"?  There has never been a new chip added with more cmuxes than p4080's
+8, and if one does come along and you forget, the compiler should complain
+about exceeding the array length with a static initializer.  This isn't like
+an array that is filled with a runtime-determined length.
 
-Anyway
-Acked-by: Michal Hocko <mhocko@suse.com>
+> Like this patch, we didn't increase this value at first. We spent a lot of
+> time finding out that NUM_CMUX needs to be increased too.
 
-I wish we could simplify the pfn validation code a bit. I find
-pfn_valid_within quite confusing and I would bet it is not used
-consistently. This will require a non trivial audit. I am wondering
-whether we really need to make the code more complicated rather than
-simply establish a contract that we always have a pageblock worth of
-struct pages always available. Even when there is no physical memory
-backing it. Such a page can be reserved and never used by the page
-allocator. pfn walkers should back off for reserved pages already.
+Are you talking about some other chip that you haven't sent a patch for yet? 
+Or is the cmux array for this chip wrong?  What specifically did you see
+happen "at first"?
 
-> ---
->  arch/arm64/Kconfig | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 29e75b47becd..1b1a0e95c751 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -763,7 +763,6 @@ config NEED_PER_CPU_EMBED_FIRST_CHUNK
->  
->  config HOLES_IN_ZONE
->  	def_bool y
-> -	depends on NUMA
->  
->  source kernel/Kconfig.hz
->  
-> -- 
-> 2.18.0
+> It is a personal preference how to set this value. I think it is better to
+> increase it to 16, not NUM_CMUX+1 as long as we fix the P4080 issue
+> even though it is a trivial change. And I agree the description needs to be
+> updated.
 
--- 
-Michal Hocko
-SUSE Labs
+I'm not the clock maintainer, so it's not up to me, but I don't see the point
+in setting it to an arbitrary number, and I do not agree that increasing
+NUM_CMUX is a suitable replacement for NUM_CMUX+1 in cmux_to_group[], as that
+array should be one larger than cmux[] in order to allow every chip to have a
+-1 terminator.  In any case, any change to NUM_CMUX should be a separate patch
+because it's not required for lx2160a support (assuming lx2160a was correctly
+described by this patch).
+
+-Scott
