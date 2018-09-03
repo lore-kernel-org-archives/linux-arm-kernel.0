@@ -1,162 +1,103 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 3 Sep 2018 19:37:15 +0200
-Subject: [RESEND PATCH v2 1/3] mtd: spi-nor: add support to non-uniform
- SFDP SPI NOR flash memories
-In-Reply-To: <20180827102644.7323-2-tudor.ambarus@microchip.com>
+Date: Mon, 3 Sep 2018 19:40:13 +0200
+Subject: [RESEND PATCH v2 2/3] mtd: spi-nor: parse SFDP Sector Map
+ Parameter Table
+In-Reply-To: <20180827102644.7323-3-tudor.ambarus@microchip.com>
 References: <20180827102644.7323-1-tudor.ambarus@microchip.com>
- <20180827102644.7323-2-tudor.ambarus@microchip.com>
-Message-ID: <8f25975d-e0d8-dd11-76ce-857e99df9c2c@gmail.com>
+ <20180827102644.7323-3-tudor.ambarus@microchip.com>
+Message-ID: <1bfbb5f7-39ee-08cb-8f7b-5c3f441f66a2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 08/27/2018 12:26 PM, Tudor Ambarus wrote:
 [...]
-
-> +/* JEDEC JESD216B Standard imposes erase sizes to be power of 2. */
-> +static inline u64
-> +spi_nor_div_by_erase_size(const struct spi_nor_erase_type *erase,
-> +			  u64 dividend, u32 *remainder)
+> +static const u32 *spi_nor_get_map_in_use(struct spi_nor *nor, const u32 *smpt)
 > +{
-> +	*remainder = (u32)dividend & erase->size_mask;
-
-Is the cast really needed ? btw I think there might be a macro doing
-just this, div_by_ or something in include/ .
-
-> +	return dividend >> erase->size_shift;
-> +}
+> +	const u32 *ret = NULL;
+> +	u32 i, addr;
+> +	int err;
+> +	u8 addr_width, read_opcode, read_dummy;
+> +	u8 read_data_mask, data_byte, map_id;
 > +
-> +static const struct spi_nor_erase_type *
-> +spi_nor_find_best_erase_type(const struct spi_nor_erase_map *map,
-> +			     const struct spi_nor_erase_region *region,
-> +			     u64 addr, u32 len)
-> +{
-> +	const struct spi_nor_erase_type *erase;
-> +	u32 rem;
-> +	int i;
-> +	u8 erase_mask = region->offset & SNOR_ERASE_TYPE_MASK;
+> +	addr_width = nor->addr_width;
+> +	read_dummy = nor->read_dummy;
+> +	read_opcode = nor->read_opcode;
 > +
-> +	/*
-> +	 * Erase types are ordered by size, with the biggest erase type at
-> +	 * index 0.
-> +	 */
-> +	for (i = SNOR_ERASE_TYPE_MAX - 1; i >= 0; i--) {
-> +		/* Does the erase region support the tested erase type? */
-> +		if (!(erase_mask & BIT(i)))
-> +			continue;
+> +	map_id = 0;
+> +	i = 0;
+> +	/* Determine if there are any optional Detection Command Descriptors */
+> +	while (!(smpt[i] & SMPT_DESC_TYPE_MAP)) {
+> +		read_data_mask = SMPT_CMD_READ_DATA(smpt[i]);
+> +		nor->addr_width = spi_nor_smpt_addr_width(nor, smpt[i]);
+> +		nor->read_dummy = spi_nor_smpt_read_dummy(nor, smpt[i]);
+> +		nor->read_opcode = SMPT_CMD_OPCODE(smpt[i]);
+> +		addr = smpt[i + 1];
 > +
-> +		erase = &map->erase_type[i];
-> +
-> +		/* Don't erase more than what the user has asked for. */
-> +		if (erase->size > len)
-> +			continue;
-> +
-> +		/* Alignment is not mandatory for overlaid regions */
-> +		if (region->offset & SNOR_OVERLAID_REGION)
-> +			return erase;
-> +
-> +		spi_nor_div_by_erase_size(erase, addr, &rem);
-> +		if (rem)
-> +			continue;
-> +		else
-> +			return erase;
-> +	}
-> +
-> +	return NULL;
-> +}
-> +
-> +static struct spi_nor_erase_region *
-> +spi_nor_region_next(struct spi_nor_erase_region *region)
-> +{
-> +	if (spi_nor_region_is_last(region))
-> +		return NULL;
-> +	return ++region;
-
-region++ ...
-
-[...]
-
-> +static int spi_nor_cmp_erase_type(const void *a, const void *b)
-> +{
-> +	const struct spi_nor_erase_type *erase1 = a;
-> +	const struct spi_nor_erase_type *erase2 = b;
-> +
-> +	return erase1->size - erase2->size;
-
-What does this function do again ?
-
-> +}
-> +
-> +static void spi_nor_regions_sort_erase_types(struct spi_nor_erase_map *map)
-> +{
-> +	struct spi_nor_erase_region *region = map->regions;
-> +	struct spi_nor_erase_type *erase_type = map->erase_type;
-> +	int i;
-> +	u8 region_erase_mask, ordered_erase_mask;
-> +
-> +	/*
-> +	 * Sort each region's Erase Types in ascending order with the smallest
-> +	 * Erase Type size starting at BIT(0).
-> +	 */
-> +	while (region) {
-> +		region_erase_mask = region->offset & SNOR_ERASE_TYPE_MASK;
+> +		err = spi_nor_read_raw(nor, addr, 1, &data_byte);
+> +		if (err)
+> +			goto out;
 > +
 > +		/*
-> +		 * The region's erase mask indicates which erase types are
-> +		 * supported from the erase types defined in the map.
+> +		 * Build an index value that is used to select the Sector Map
+> +		 * Configuration that is currently in use.
 > +		 */
-> +		ordered_erase_mask = 0;
-> +		for (i = 0; i < SNOR_ERASE_TYPE_MAX; i++)
-> +			if (erase_type[i].size &&
-> +			    region_erase_mask & BIT(erase_type[i].idx))
-> +				ordered_erase_mask |= BIT(i);
+> +		map_id = map_id << 1 | (!(data_byte & read_data_mask) ? 0 : 1);
+
+You can drop the ternary operator part completely ^
+
+> +		i = i + 2;
+> +	}
 > +
-> +		/* Overwrite erase mask. */
-> +		region->offset = (region->offset & ~SNOR_ERASE_TYPE_MASK) |
-> +				 ordered_erase_mask;
+> +	/* Find the matching configuration map */
+> +	while (SMPT_MAP_ID(smpt[i]) != map_id) {
+> +		if (smpt[i] & SMPT_DESC_END)
+> +			goto out;
+> +		/* increment the table index to the next map */
+> +		i += SMPT_MAP_REGION_COUNT(smpt[i]) + 1;
+> +	}
 > +
-> +		region = spi_nor_region_next(region);
+> +	ret = smpt + i;
+> +	/* fall through */
+> +out:
+> +	nor->addr_width = addr_width;
+> +	nor->read_dummy = read_dummy;
+> +	nor->read_opcode = read_opcode;
+> +	return ret;
+> +}
+> +
+> +static void
+> +spi_nor_region_check_overlay(struct spi_nor_erase_region *region,
+> +			     const struct spi_nor_erase_type *erase,
+> +			     const u8 erase_type)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < SNOR_ERASE_TYPE_MAX; i++) {
+> +		if (!(erase_type & BIT(i)))
+> +			continue;
+> +		if (region->size & erase[i].size_mask) {
+> +			spi_nor_region_mark_overlay(region);
+> +			return;
+> +		}
 > +	}
 > +}
 > +
-> +static inline void
-
-Drop the inline
-
-> +spi_nor_init_uniform_erase_map(struct spi_nor_erase_map *map,
-> +			       u8 erase_mask, u64 flash_size)
+> +static int spi_nor_init_non_uniform_erase_map(struct spi_nor *nor,
+> +					      const u32 *smpt)
 > +{
-> +	map->uniform_region.offset = SNOR_ERASE_FLAGS_OFFSET(erase_mask, 1, 0,
-> +							     0);
-> +	map->uniform_region.size = flash_size;
-> +	map->regions = &map->uniform_region;
-> +	map->uniform_erase_type = erase_mask;
-> +}
+> +	struct spi_nor_erase_map *map = &nor->erase_map;
+> +	const struct spi_nor_erase_type *erase = map->erase_type;
+> +	struct spi_nor_erase_region *region;
+> +	u64 offset;
+> +	u32 region_count;
+> +	int i, j;
+> +	u8 erase_type;
 > +
+> +	region_count = SMPT_MAP_REGION_COUNT(*smpt);
+> +	region = devm_kcalloc(nor->dev, region_count, sizeof(*region),
+> +			      GFP_KERNEL);
 
-[...]
-
-> +#define spi_nor_region_is_last(region)  (region->offset & SNOR_LAST_REGION)
-> +
-> +static inline u64 spi_nor_region_end(const struct spi_nor_erase_region *region)
-
-Get rid of the inlines, really.
-
-> +{
-> +	return (region->offset & ~SNOR_ERASE_FLAGS_MASK) + region->size;
-> +}
-> +
-> +static inline bool spi_nor_has_uniform_erase(const struct spi_nor *nor)
-> +{
-> +	return !!nor->erase_map.uniform_erase_type;
-> +}
-> +
->  static inline void spi_nor_set_flash_node(struct spi_nor *nor,
->  					  struct device_node *np)
->  {
-> 
-
-General question, what happens if the multi-block erase fails mid-way ,
-is that handled or reported somehow to the user ?
+Is this memory always correctly free'd ?
 
 -- 
 Best regards,
