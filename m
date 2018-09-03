@@ -1,75 +1,101 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 03 Sep 2018 11:57:25 +0200
-Subject: [PATCH 2/3] arm64: dts: meson-axg: s400: add dmic codec
-In-Reply-To: <CAOMZO5BOMOB6LaRs1fnmm-Ghu7pMkXW=sH_NOEWK3pqHAbUMCg@mail.gmail.com>
-References: <20180831150218.8307-1-jbrunet@baylibre.com>
- <20180831150218.8307-3-jbrunet@baylibre.com>
- <CAOMZO5BOMOB6LaRs1fnmm-Ghu7pMkXW=sH_NOEWK3pqHAbUMCg@mail.gmail.com>
-Message-ID: <b0efc5cf9cf4f7e05097fcd0ea6fd61ba8ff3476.camel@baylibre.com>
+From: patrice.chotard@st.com (Patrice CHOTARD)
+Date: Mon, 3 Sep 2018 09:57:11 +0000
+Subject: [PATCH] pinctrl: Convert to using %pOFn instead of
+ device_node.name
+In-Reply-To: <20180828015252.28511-40-robh@kernel.org>
+References: <20180828015252.28511-1-robh@kernel.org>
+ <20180828015252.28511-40-robh@kernel.org>
+Message-ID: <3335422d-0b46-fde6-d172-005ba9b60d76@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2018-09-01 at 18:24 -0300, Fabio Estevam wrote:
-> Hi Jerome,
+Hi Rob
+
+On 08/28/2018 03:52 AM, Rob Herring wrote:
+> In preparation to remove the node name pointer from struct device_node,
+> convert printf users to use the %pOFn format specifier.
 > 
-> On Fri, Aug 31, 2018 at 12:02 PM, Jerome Brunet <jbrunet@baylibre.com> wrote:
-> > There are 7 digital mics on the MIC daughter board attached
-> > to the s400 board, so add the digital microphone codec to
-> > its DTS
-> > 
-> > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> > ---
-> >  arch/arm64/boot/dts/amlogic/meson-axg-s400.dts | 9 +++++++++
-> >  1 file changed, 9 insertions(+)
-> > 
-> > diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-> > index ff64c429d432..f3e16cbbc61e 100644
-> > --- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-> > +++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-> > @@ -86,6 +86,15 @@
-> >                 sound-name-prefix = "DIT";
-> >         };
-> > 
-> > +       dmics: audio-codec at 3 {
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Dong Aisheng <aisheng.dong@nxp.com>
+> Cc: Fabio Estevam <festevam@gmail.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Stefan Agner <stefan@agner.ch>
+> Cc: Pengutronix Kernel Team <kernel@pengutronix.de>
+> Cc: Sean Wang <sean.wang@mediatek.com>
+> Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> Cc: Carlo Caione <carlo@caione.org>
+> Cc: Kevin Hilman <khilman@baylibre.com>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Gregory Clement <gregory.clement@bootlin.com>
+> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
+> Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Haojian Zhuang <haojian.zhuang@linaro.org>
+> Cc: Patrice Chotard <patrice.chotard@st.com>
+> Cc: Barry Song <baohua@kernel.org>
+> Cc: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> Cc: Alexandre Torgue <alexandre.torgue@st.com>
+> Cc: Maxime Ripard <maxime.ripard@bootlin.com>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: linux-gpio at vger.kernel.org
+> Cc: linux-mediatek at lists.infradead.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-amlogic at lists.infradead.org
+> Cc: linux-rockchip at lists.infradead.org
+> Cc: linux-omap at vger.kernel.org
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> ---
+>   drivers/pinctrl/berlin/berlin.c               |  6 ++--
+>   drivers/pinctrl/freescale/pinctrl-imx.c       |  7 ++--
+>   drivers/pinctrl/freescale/pinctrl-imx1-core.c | 12 +++----
+>   drivers/pinctrl/mediatek/pinctrl-mtk-common.c |  4 +--
+>   drivers/pinctrl/meson/pinctrl-meson.c         |  2 +-
+>   drivers/pinctrl/mvebu/pinctrl-mvebu.c         |  4 +--
+>   drivers/pinctrl/nomadik/pinctrl-nomadik.c     |  6 ++--
+>   drivers/pinctrl/pinctrl-at91.c                |  8 ++---
+>   drivers/pinctrl/pinctrl-lantiq.c              |  8 ++---
+>   drivers/pinctrl/pinctrl-rockchip.c            |  8 ++---
+>   drivers/pinctrl/pinctrl-rza1.c                |  8 ++---
+>   drivers/pinctrl/pinctrl-single.c              | 32 +++++++++----------
+>   drivers/pinctrl/pinctrl-st.c                  |  6 ++--
+>   drivers/pinctrl/sirf/pinctrl-atlas7.c         |  4 +--
+>   drivers/pinctrl/stm32/pinctrl-stm32.c         |  4 +--
+>   drivers/pinctrl/sunxi/pinctrl-sunxi.c         |  8 ++---
+>   drivers/pinctrl/ti/pinctrl-ti-iodelay.c       |  8 ++---
+>   17 files changed, 66 insertions(+), 69 deletions(-)
 > 
-> You pass @3 without a corresponding reg = <3>, which causes dtc
-> warnings with W=1.
+> diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
+> index 0966bb0bf71f..e66af93f2cbf 100644
+> --- a/drivers/pinctrl/pinctrl-st.c
+> +++ b/drivers/pinctrl/pinctrl-st.c
+> @@ -817,8 +817,8 @@ static int st_pctl_dt_node_to_map(struct pinctrl_dev *pctldev,
+>   
+>   	grp = st_pctl_find_group_by_name(info, np->name);
+>   	if (!grp) {
+> -		dev_err(info->dev, "unable to find group for node %s\n",
+> -			np->name);
+> +		dev_err(info->dev, "unable to find group for node %pOFn\n",
+> +			np);
+>   		return -EINVAL;
+>   	}
+>   
+> @@ -1184,7 +1184,7 @@ static int st_pctl_dt_parse_groups(struct device_node *np,
+>   		if (pp->length / sizeof(__be32) >= OF_GPIO_ARGS_MIN) {
+>   			npins++;
+>   		} else {
+> -			pr_warn("Invalid st,pins in %s node\n", np->name);
+> +			pr_warn("Invalid st,pins in %pOFn node\n", np);
+>   			return -EINVAL;
+>   		}
+>   	}
 
-Hi Fabio,
+For pinctrl-st:
 
-Thanks for pointing this out.
-Martin also raised concerns about this but, unfortunately, we did not get to the
-bottom of it:
+Acked-by: Patrice Chotard <patrice.chotard@st.com>
 
-https://lkml.kernel.org/r/
-90780f5a6b974ee9a4f9f9f2580fc83ef6bdd805.camel at baylibre.com
-
-In a nutshell, I numbered nodes (w/o a reg prop) to keep generic names as
-suggested in the DT spec.
-
-The idea came after working on sound cards, if you check
-Documentation/devicetree/bindings/sound/simple-card.txt, you'll see this kind of
-numbering is even in documentation examples.
-
-This is used by arch/arm/boot/dts/armada-370-db.dts. This is just an example I
-picked randomly, I'm not trying to single out the marvell folks here (or ASoC
-simple card). I'm actually doing exactly the same kind of multi link stuff on
-the amlogic cards.
-
-This looks to be a wide spread practice. Running `make dtbs W=1` on ARM and
-ARM64 arch, I've seen dozen of 'node has a unit name, but no reg property'
-examples, on things like clocks, buttons, leds, pinctrl, etc ...
-
-that being said, section 2.2.1 of the DT specs says:
-
-" If the node has no reg property, the @unit-address must be omitted and the
-node-name alone differentiates the node from other nodes at the same level in
-the tree "
-
-So apparently, this is used but not ok ?
-Maybe we should simply replace the '@' with a '-' everywhere this occurs ?
-
-If possible, I'd like to get the opinion of the DT gurus about this issue.
-Cheers
-
-Jerome
+Thanks
+Patrice
