@@ -1,235 +1,33 @@
 From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Mon,  3 Sep 2018 16:08:40 +0200
-Subject: [PATCH v2 5/5] arm64: dts: add Microsys MPX-LS1046A SoM and
- SBC-LS1046A SBC
+Date: Mon,  3 Sep 2018 16:08:37 +0200
+Subject: [PATCH v2 2/5] arm64: dts: fsl: ls1046a: disable the flash controller
+ by default
 In-Reply-To: <20180903140840.23648-1-alexandre.belloni@bootlin.com>
 References: <20180903140840.23648-1-alexandre.belloni@bootlin.com>
-Message-ID: <20180903140840.23648-5-alexandre.belloni@bootlin.com>
+Message-ID: <20180903140840.23648-2-alexandre.belloni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Microsys designs a SoM based on the LS1046A named miriac MPX-LS1046A
-https://microsys.de/products/system-on-modules/qoriqr-armr-architecture/miriactm-mpx-ls1046a/
-
-It also provides an SBC accepting this SoM, the miriac SBC-LS1046
-https://microsys.de/en/products/single-board-computer/miriactm-sbcs/miriactm-sbc-ls1046a/
-
-This adds a dtsi for the SoM and a dts for the SBC.
+Set the Integrated Flash Controller status to disabled so each board has
+the option to enable it. All the existing users have status = "okay" so
+there is no functional change.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
 ---
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-Changes in v2:
- - Addressed Shawn's comments
-
- arch/arm64/boot/dts/freescale/Makefile        |   1 +
- .../fsl-ls1046a-miriac-mpxls1046.dtsi         |  62 ++++++++++
- .../freescale/fsl-ls1046a-miriac-sbc1046.dts  | 116 ++++++++++++++++++
- 3 files changed, 179 insertions(+)
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1046a-miriac-mpxls1046.dtsi
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1046a-miriac-sbc1046.dts
-
-diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
-index 86e18adb695a..b0b81ca887e8 100644
---- a/arch/arm64/boot/dts/freescale/Makefile
-+++ b/arch/arm64/boot/dts/freescale/Makefile
-@@ -4,6 +4,7 @@ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-rdb.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-rdb.dtb
-+dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1046a-miriac-sbc1046.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1046a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1046a-rdb.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1088a-qds.dtb
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a-miriac-mpxls1046.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a-miriac-mpxls1046.dtsi
-new file mode 100644
-index 000000000000..b4f998fbe460
---- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a-miriac-mpxls1046.dtsi
-@@ -0,0 +1,62 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+
-+/ {
-+	compatible = "microsys,mpxls1046a", "fsl,ls1046a";
-+};
-+
-+&duart0 {
-+	status = "okay";
-+};
-+
-+&duart1 {
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+
-+	rtc at 32 {
-+		compatible = "epson,rx8803";
-+		reg = <0x32>;
-+	};
-+
-+	temp-sensor at 4c {
-+		compatible = "national,lm90";
-+		reg = <0x4c>;
-+	};
-+
-+	eeprom at 50 {
-+		compatible = "at24,24c128";
-+		reg = <0x50>;
-+	};
-+};
-+
-+&ifc {
-+	#address-cells = <2>;
-+	#size-cells = <1>;
-+
-+	ranges = <0x0 0x0 0x0 0x7e800000 0x00010000>;
-+	status = "okay";
-+
-+	nand at 0,0 {
-+		compatible = "fsl,ifc-nand";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0x0 0x0 0x10000>;
-+	};
-+};
-+
-+&qspi {
-+	num-cs = <1>;
-+	bus-num = <0>;
-+	status = "okay";
-+
-+	qflash0: flash at 0 {
-+		compatible = "spansion,m25p80";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		spi-max-frequency = <20000000>;
-+		m25p,fast-read;
-+		reg = <0>;
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a-miriac-sbc1046.dts b/arch/arm64/boot/dts/freescale/fsl-ls1046a-miriac-sbc1046.dts
-new file mode 100644
-index 000000000000..c0c8ebdd6bb4
---- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a-miriac-sbc1046.dts
-@@ -0,0 +1,116 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+
-+/dts-v1/;
-+
-+#include "fsl-ls1046a.dtsi"
-+#include "fsl-ls1046a-miriac-mpxls1046.dtsi"
-+
-+/ {
-+	model = "Microsys miriac SBC-LS1046A";
-+	compatible = "microsys,sbc1046a", "microsys,mpxls1046a", "fsl,ls1046a";
-+
-+	aliases {
-+		ethernet0 = &enet2;
-+		ethernet1 = &enet4;
-+		ethernet2 = &enet5;
-+		ethernet3 = &enet6;
-+		serial0 = &duart0;
-+		serial1 = &duart1;
-+		serial2 = &duart2;
-+		serial3 = &duart3;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+};
-+
-+&duart0 {
-+	status = "okay";
-+};
-+
-+&duart1 {
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+
-+	eeprom at 57 {
-+		compatible = "at24,24c128";
-+		reg = <0x57>;
-+	};
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+};
-+
-+&ifc {
-+	nand at 0,0 {
-+		partition at 0 {
-+			reg = <0x0 0x00100000>;
-+			label = "NAND U-Boot Image";
-+			read-only;
-+		};
-+
-+		partition at 100000 {
-+			reg = <0x00100000 0x00100000>;
-+			label = "NAND U-Boot Env";
-+		};
-+
-+		partition at 200000 {
-+			reg = <0x00200000 0x01E00000>;
-+			label = "NAND FIT Image";
-+		};
-+
-+		partition at 02000000 {
-+			reg = <0x02000000 0x1e000000>;
-+			label = "NAND (RW) UBIFS Root File System";
-+		};
-+	};
-+};
-+
-+#include "fsl-ls1046-post.dtsi"
-+
-+&fman0 {
-+	compatible = "fsl,fman", "simple-bus";
-+
-+	ethernet at e4000 {
-+		phy-handle = <&rgmii_phy1>;
-+		phy-connection-type = "rgmii";
-+	};
-+
-+	ethernet at e8000 {
-+		phy-handle = <&sgmii_phy1>;
-+		phy-connection-type = "sgmii";
-+	};
-+
-+	ethernet at ea000 {
-+		phy-handle = <&sgmii_phy2>;
-+		phy-connection-type = "sgmii";
-+	};
-+
-+	ethernet at f0000 {
-+		phy-handle = <&sgmii_phy3>;
-+		phy-connection-type = "sgmii";
-+	};
-+
-+	mdio at fc000 {
-+		sgmii_phy3: ethernet-phy at 0 {
-+			reg = <0>;
-+		};
-+
-+		sgmii_phy2: ethernet-phy at 1 {
-+			reg = <1>;
-+		};
-+
-+		sgmii_phy1: ethernet-phy at 2 {
-+			reg = <2>;
-+		};
-+
-+		rgmii_phy1: ethernet-phy at 3 {
-+			reg = <3>;
-+		};
-+	};
-+};
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+index ef83786b8b90..2d8122019cd8 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+@@ -200,6 +200,7 @@
+ 			reg = <0x0 0x1530000 0x0 0x10000>;
+ 			big-endian;
+ 			interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
+ 		};
+ 
+ 		qspi: quadspi at 1550000 {
 -- 
 2.19.0.rc1
