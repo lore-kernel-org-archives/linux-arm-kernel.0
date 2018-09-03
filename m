@@ -1,30 +1,32 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Mon,  3 Sep 2018 12:01:57 +0200
-Subject: [PATCH v5 5/9] dt-bindings: ata: ahci-platform: document phy-supply
+Date: Mon,  3 Sep 2018 12:01:53 +0200
+Subject: [PATCH v5 1/9] dt-bindings: ata: ahci-platform: fix indentation of
+ target-supply
 In-Reply-To: <20180903100201.23131-1-clabbe.montjoie@gmail.com>
 References: <20180903100201.23131-1-clabbe.montjoie@gmail.com>
-Message-ID: <20180903100201.23131-6-clabbe.montjoie@gmail.com>
+Message-ID: <20180903100201.23131-2-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch document the new optional phy-supply.
+This patch fix the indentation of target-supply's ':'.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- Documentation/devicetree/bindings/ata/ahci-platform.txt | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/ata/ahci-platform.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-index f495774c8af9..45b451961612 100644
+index 5d5bd456d9d9..b88820b4c01e 100644
 --- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
 +++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-@@ -31,6 +31,7 @@ Optional properties:
- - clocks            : a list of phandle + clock specifier pairs
- - resets            : a list of phandle + reset specifier pairs
- - target-supply     : regulator for SATA target power
-+- phy-supply        : regulator for PHY power
- - phys              : reference to the SATA PHY node
- - phy-names         : must be "sata-phy"
- - ahci-supply       : regulator for AHCI controller
+@@ -47,7 +47,7 @@ Sub-nodes required properties:
+ - reg		    : the port number
+ And at least one of the following properties:
+ - phys		    : reference to the SATA PHY node
+-- target-supply    : regulator for SATA target power
++- target-supply     : regulator for SATA target power
+ 
+ Examples:
+         sata at ffe08000 {
 -- 
 2.16.4
