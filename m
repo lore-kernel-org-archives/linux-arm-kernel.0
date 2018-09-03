@@ -1,64 +1,38 @@
 From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Mon,  3 Sep 2018 15:45:13 +0200
-Subject: [PULL 1/4] KVM: arm/arm64: Clean dcache to PoC when changing PTE due
- to CoW
+Date: Mon,  3 Sep 2018 15:45:16 +0200
+Subject: [PULL 4/4] arm64: KVM: Remove pgd_lock
 In-Reply-To: <20180903134516.17796-1-christoffer.dall@arm.com>
 References: <20180903134516.17796-1-christoffer.dall@arm.com>
-Message-ID: <20180903134516.17796-2-christoffer.dall@arm.com>
+Message-ID: <20180903134516.17796-5-christoffer.dall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+From: Steven Price <steven.price@arm.com>
 
-When triggering a CoW, we unmap the RO page via an MMU notifier
-(invalidate_range_start), and then populate the new PTE using another
-one (change_pte). In the meantime, we'll have copied the old page
-into the new one.
+The lock has never been used and the page tables are protected by
+mmu_lock in struct kvm.
 
-The problem is that the data for the new page is sitting in the
-cache, and should the guest have an uncached mapping to that page
-(or its MMU off), following accesses will bypass the cache.
-
-In a way, this is similar to what happens on a translation fault:
-We need to clean the page to the PoC before mapping it. So let's just
-do that.
-
-This fixes a KVM unit test regression observed on a HiSilicon platform,
-and subsequently reproduced on Seattle.
-
-Fixes: a9c0e12ebee5 ("KVM: arm/arm64: Only clean the dcache on translation fault")
-Reported-by: Mike Galbraith <efault@gmx.de>
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Steven Price <steven.price@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
 ---
- virt/kvm/arm/mmu.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/kvm_host.h | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 91aaf73b00df..111a660be3be 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -1860,13 +1860,20 @@ static int kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data
- void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte)
- {
- 	unsigned long end = hva + PAGE_SIZE;
-+	kvm_pfn_t pfn = pte_pfn(pte);
- 	pte_t stage2_pte;
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 8e6d46df38aa..3d6d7336f871 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -61,8 +61,7 @@ struct kvm_arch {
+ 	u64    vmid_gen;
+ 	u32    vmid;
  
- 	if (!kvm->arch.pgd)
- 		return;
+-	/* 1-level 2nd stage table and lock */
+-	spinlock_t pgd_lock;
++	/* 1-level 2nd stage table, protected by kvm->mmu_lock */
+ 	pgd_t *pgd;
  
- 	trace_kvm_set_spte_hva(hva);
--	stage2_pte = pfn_pte(pte_pfn(pte), PAGE_S2);
-+
-+	/*
-+	 * We've moved a page around, probably through CoW, so let's treat it
-+	 * just like a translation fault and clean the cache to the PoC.
-+	 */
-+	clean_dcache_guest_page(pfn, PAGE_SIZE);
-+	stage2_pte = pfn_pte(pfn, PAGE_S2);
- 	handle_hva_to_gpa(kvm, hva, end, &kvm_set_spte_handler, &stage2_pte);
- }
- 
+ 	/* VTTBR value associated with above pgd and vmid */
 -- 
 2.18.0
