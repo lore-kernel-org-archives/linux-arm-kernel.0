@@ -1,44 +1,90 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Mon, 3 Sep 2018 21:18:15 +0200
-Subject: [PATCH] EDAC, ghes: use CPER module handles to locate DIMMs
-In-Reply-To: <003201d44397$8eb02c20$ac108460$@codeaurora.org>
-References: <1535567632-18089-1-git-send-email-wufan@codeaurora.org>
- <5eab89c6-c063-cbc2-4d02-459faf87698a@arm.com>
- <6cc3c5e2-3827-a89c-e37b-09728a34f21f@huawei.com>
- <5B891308.40407@huawei.com>
- <003201d44397$8eb02c20$ac108460$@codeaurora.org>
-Message-ID: <20180903191814.GG10249@zn.tnic>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Mon, 3 Sep 2018 21:33:22 +0200
+Subject: A crash on ARM64 in move_freepages_block due to uninitialized
+ pages in reserved memory
+In-Reply-To: <541193a6-2bce-f042-5bb2-88913d5f1047@arm.com>
+References: <alpine.LRH.2.02.1808171527220.2385@file01.intranet.prod.int.rdu2.redhat.com>
+ <20180821104418.GA16611@dhcp22.suse.cz>
+ <e35b7c14-c7ea-412d-2763-c961b74576f3@arm.com>
+ <alpine.LRH.2.02.1808220808050.17906@file01.intranet.prod.int.rdu2.redhat.com>
+ <c823eace-8710-9bf5-6e76-d01b139c0859@arm.com>
+ <20180824114158.GJ29735@dhcp22.suse.cz>
+ <541193a6-2bce-f042-5bb2-88913d5f1047@arm.com>
+Message-ID: <20180903193322.GD14951@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 03, 2018 at 09:05:29AM -0600, wufan wrote:
-> Thanks tanxiaofei!
+On Wed 29-08-18 18:37:55, James Morse wrote:
+> Hi Michal,
 > 
-> Boris/James, are you OK to sign off, or you want to see more tests on 
-> this patch? 
+> (CC: +Ard)
+> 
+> On 24/08/18 12:41, Michal Hocko wrote:
+> > On Thu 23-08-18 15:06:08, James Morse wrote:
+> > [...]
+> >> My best-guess is that pfn_valid_within() shouldn't be optimised out if
+> > ARCH_HAS_HOLES_MEMORYMODEL, even if HOLES_IN_ZONE isn't set.
+> >>
+> >> Does something like this solve the problem?:
+> >> ============================%<============================
+> >> diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
+> >> index 32699b2dc52a..5e27095a15f4 100644
+> >> --- a/include/linux/mmzone.h
+> >> +++ b/include/linux/mmzone.h
+> >> @@ -1295,7 +1295,7 @@ void memory_present(int nid, unsigned long start, unsigned
+> >> long end);
+> >>   * pfn_valid_within() should be used in this case; we optimise this away
+> >>   * when we have no holes within a MAX_ORDER_NR_PAGES block.
+> >>   */
+> >> -#ifdef CONFIG_HOLES_IN_ZONE
+> >> +#if defined(CONFIG_HOLES_IN_ZONE) || defined(CONFIG_ARCH_HAS_HOLES_MEMORYMODEL)
+> >>  #define pfn_valid_within(pfn) pfn_valid(pfn)
+> >>  #else
+> >>  #define pfn_valid_within(pfn) (1)
+> >> ============================%<============================
+> 
+> After plenty of greping, git-archaeology and help from others, I think I've a
+> clearer picture of what these options do.
+> 
+> 
+> Please correct me if I've explained something wrong here:
+> 
+> > This is the first time I hear about CONFIG_ARCH_HAS_HOLES_MEMORYMODEL.
+> 
+> The comment in include/linux/mmzone.h describes this as relevant when parts the
+> memmap have been free()d. This would happen on systems where memory is smaller
+> than a sparsemem-section, and the extra struct pages are expensive.
+> pfn_valid() on these systems returns true for the whole sparsemem-section, so an
+> extra memmap_valid_within() check is needed.
 
-Please do not top-post.
+I have hard times to find an actual code that does this partial memmap
+initialization.
 
-Now, I don't have any problems with it - I'm still sceptical as the
-firmware is a stinking pile but if we cannot find a broken case, I guess
-we can take this one for a spin and revert it if there's trouble down
-the road.
+> This is independent of nomap, and isn't relevant on arm64 as our pfn_valid()
+> always tests the page in memblock due to nomap pages, which can occur anywhere.
+> (I will propose a patch removing ARCH_HAS_HOLES_MEMORYMODEL for arm64.)
 
-Unless James has objections.
+It seems ARCH_HAS_HOLES_MEMORYMODEL is only defined for arm and arm64.
+Is it really needed for arm?
 
-Then, you sent a v2 here:
+> HOLES_IN_ZONE is similar, if some memory is smaller than MAX_ORDER_NR_PAGES,
+> possibly due to nomap holes.
+> 
+> 6d526ee26ccd only enabled it for NUMA systems on arm64, because the NUMA code
+> was first to fall foul of this, but there is nothing NUMA specific about nomap
+> holes within a MAX_ORDER_NR_PAGES region.
+> 
+> I'm convinced arm64 should always enable HOLES_IN_ZONE because nomap pages can
+> occur anywhere. I'll post a fix.
+> 
+> 
+> Is it valid to have HOLES_IN_ZONE and !HAVE_ARCH_PFN_VALID?
+> This would mean pfn_valid_within() is necessary, but pfn_valid() is only looking
+> at sparse-sections. It looks like ia64 and mips:CAVIUM_OCTEON_SOC are both
+> configured like this...
 
-https://lkml.kernel.org/r/1535654266-40053-1-git-send-email-wufan at codeaurora.org
-
-and you've received a bunch of Reviewed-by's and Tested-by's and a
-couple of new comments.
-
-Incorporate *all* of those and send me a v3.
-
-Thx.
-
+this smells suspicious and I wouldn't be surprised if this was some
+leftover from the past.
 -- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+Michal Hocko
+SUSE Labs
