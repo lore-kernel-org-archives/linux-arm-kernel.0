@@ -1,110 +1,105 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon,  3 Sep 2018 15:10:51 +0200
-Subject: [PATCH v3 03/10] serial: uartps: Fix suspend functionality
+Date: Mon,  3 Sep 2018 15:10:58 +0200
+Subject: [PATCH v3 10/10] serial: uartps: Move Port ID to device data structure
 In-Reply-To: <cover.1535980253.git.michal.simek@xilinx.com>
 References: <cover.1535980253.git.michal.simek@xilinx.com>
-Message-ID: <26804ea4d2196674a30ddd7dccc068269816b882.1535980253.git.michal.simek@xilinx.com>
+Message-ID: <9cda66fc3c143cc2055241802300dc12f5571669.1535980253.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nava kishore Manne <nava.manne@xilinx.com>
+Record port ID in device data structure to be have it connected to
+certain instance.
 
-The driver's suspend/resume functions were buggy.
-If UART node contains any child node in the DT and
-the child is established a communication path with
-the parent UART. The relevant /dev/ttyPS* node will
-be not available for other operations.
-If the driver is trying to do any operations like
-suspend/resume without checking the tty->dev status
-it leads to the kernel crash/hang.
-
-This patch fix this issue by call the device_may_wake()
-with the generic parameter of type struct device.
-in the uart suspend and resume paths.
-
-It also fixes a race condition in the uart suspend
-path(i.e uart_suspend_port() should be called at the
-end of cdns_uart_suspend API this path updates the same)
-
-Signed-off-by: Nava kishore Manne <navam@xilinx.com>
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 
 Changes in v3:
-- New patch - can be sent separately but there is dependency that's why
-  sent in this series
+- New patch in series
 
 Changes in v2: None
 
- drivers/tty/serial/xilinx_uartps.c | 41 +++++++++++---------------------------
- 1 file changed, 12 insertions(+), 29 deletions(-)
+ drivers/tty/serial/xilinx_uartps.c | 20 +++++++++++---------
+ 1 file changed, 11 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index 9a08542cec47..fc0ecaf3615d 100644
+index d838612eda6f..71c032744dae 100644
 --- a/drivers/tty/serial/xilinx_uartps.c
 +++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -1272,24 +1272,11 @@ static int cdns_uart_console_setup(struct console *co, char *options)
- static int cdns_uart_suspend(struct device *device)
+@@ -181,6 +181,7 @@
+  * @pclk:		APB clock
+  * @cdns_uart_driver:	Pointer to UART driver
+  * @baud:		Current baud rate
++ * @id:			Port ID
+  * @clk_rate_change_nb:	Notifier block for clock changes
+  * @quirks:		Flags for RXBS support.
+  */
+@@ -190,6 +191,7 @@ struct cdns_uart {
+ 	struct clk		*pclk;
+ 	struct uart_driver	*cdns_uart_driver;
+ 	unsigned int		baud;
++	int			id;
+ 	struct notifier_block	clk_rate_change_nb;
+ 	u32			quirks;
+ };
+@@ -1376,7 +1378,7 @@ static int __maybe_unused cdns_runtime_resume(struct device *dev)
+  */
+ static int cdns_uart_probe(struct platform_device *pdev)
  {
- 	struct uart_port *port = dev_get_drvdata(device);
--	struct tty_struct *tty;
--	struct device *tty_dev;
--	int may_wake = 0;
--
--	/* Get the tty which could be NULL so don't assume it's valid */
--	tty = tty_port_tty_get(&port->state->port);
--	if (tty) {
--		tty_dev = tty->dev;
--		may_wake = device_may_wakeup(tty_dev);
--		tty_kref_put(tty);
--	}
-+	int may_wake;
+-	int rc, id, irq;
++	int rc, irq;
+ 	struct uart_port *port;
+ 	struct resource *res;
+ 	struct cdns_uart *cdns_uart_data;
+@@ -1402,18 +1404,18 @@ static int cdns_uart_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
  
--	/*
--	 * Call the API provided in serial_core.c file which handles
--	 * the suspend.
--	 */
--	uart_suspend_port(&cdns_uart_uart_driver, port);
--	if (!(console_suspend_enabled && !may_wake)) {
-+	may_wake = device_may_wakeup(device);
-+
-+	if (console_suspend_enabled && may_wake) {
- 		unsigned long flags = 0;
+ 	/* Look for a serialN alias */
+-	id = of_alias_get_id(pdev->dev.of_node, "serial");
+-	if (id < 0)
+-		id = 0;
++	cdns_uart_data->id = of_alias_get_id(pdev->dev.of_node, "serial");
++	if (cdns_uart_data->id < 0)
++		cdns_uart_data->id = 0;
  
- 		spin_lock_irqsave(&port->lock, flags);
-@@ -1304,7 +1291,11 @@ static int cdns_uart_suspend(struct device *device)
- 		spin_unlock_irqrestore(&port->lock, flags);
+-	if (id >= CDNS_UART_NR_PORTS) {
++	if (cdns_uart_data->id >= CDNS_UART_NR_PORTS) {
+ 		dev_err(&pdev->dev, "Cannot get uart_port structure\n");
+ 		return -ENODEV;
  	}
  
--	return 0;
-+	/*
-+	 * Call the API provided in serial_core.c file which handles
-+	 * the suspend.
-+	 */
-+	return uart_suspend_port(&cdns_uart_uart_driver, port);
- }
+ 	/* There is a need to use unique driver name */
+ 	driver_name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "%s%d",
+-				     CDNS_UART_NAME, id);
++				     CDNS_UART_NAME, cdns_uart_data->id);
+ 	if (!driver_name)
+ 		return -ENOMEM;
  
- /**
-@@ -1318,17 +1309,9 @@ static int cdns_uart_resume(struct device *device)
- 	struct uart_port *port = dev_get_drvdata(device);
- 	unsigned long flags = 0;
- 	u32 ctrl_reg;
--	struct tty_struct *tty;
--	struct device *tty_dev;
--	int may_wake = 0;
--
--	/* Get the tty which could be NULL so don't assume it's valid */
--	tty = tty_port_tty_get(&port->state->port);
--	if (tty) {
--		tty_dev = tty->dev;
--		may_wake = device_may_wakeup(tty_dev);
--		tty_kref_put(tty);
--	}
-+	int may_wake;
-+
-+	may_wake = device_may_wakeup(device);
+@@ -1421,7 +1423,7 @@ static int cdns_uart_probe(struct platform_device *pdev)
+ 	cdns_uart_uart_driver->driver_name = driver_name;
+ 	cdns_uart_uart_driver->dev_name	= CDNS_UART_TTY_NAME;
+ 	cdns_uart_uart_driver->major = CDNS_UART_MAJOR;
+-	cdns_uart_uart_driver->minor = id;
++	cdns_uart_uart_driver->minor = cdns_uart_data->id;
+ 	cdns_uart_uart_driver->nr = 1;
  
- 	if (console_suspend_enabled && !may_wake) {
- 		struct cdns_uart *cdns_uart = port->private_data;
+ #ifdef CONFIG_SERIAL_XILINX_PS_UART_CONSOLE
+@@ -1432,7 +1434,7 @@ static int cdns_uart_probe(struct platform_device *pdev)
+ 
+ 	strncpy(cdns_uart_console->name, CDNS_UART_TTY_NAME,
+ 		sizeof(cdns_uart_console->name));
+-	cdns_uart_console->index = id;
++	cdns_uart_console->index = cdns_uart_data->id;
+ 	cdns_uart_console->write = cdns_uart_console_write;
+ 	cdns_uart_console->device = uart_console_device;
+ 	cdns_uart_console->setup = cdns_uart_console_setup;
+@@ -1454,7 +1456,7 @@ static int cdns_uart_probe(struct platform_device *pdev)
+ 	 * registration because tty_driver structure is not filled.
+ 	 * name_base is 0 by default.
+ 	 */
+-	cdns_uart_uart_driver->tty_driver->name_base = id;
++	cdns_uart_uart_driver->tty_driver->name_base = cdns_uart_data->id;
+ 
+ 	match = of_match_node(cdns_uart_of_match, pdev->dev.of_node);
+ 	if (match && match->data) {
 -- 
 1.9.1
