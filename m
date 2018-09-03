@@ -1,45 +1,79 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 3 Sep 2018 11:54:15 +0530
-Subject: [PATCH v2] ARM: dts: spear: fix stmpe811 interrupt properties
-In-Reply-To: <20180814073949.27392-1-marcel@ziswiler.com>
-References: <20180814073949.27392-1-marcel@ziswiler.com>
-Message-ID: <20180903062415.xlzipo3mvpcorkk4@vireshk-i7>
+Date: Mon, 3 Sep 2018 12:01:31 +0530
+Subject: [PATCH v2] cpufreq: ti-cpufreq: Only register platform_device
+ when supported
+In-Reply-To: <20180823192035.22940-1-d-gerlach@ti.com>
+References: <20180823192035.22940-1-d-gerlach@ti.com>
+Message-ID: <20180903063131.6wmbl66544svagst@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14-08-18, 09:39, Marcel Ziswiler wrote:
-> From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+On 23-08-18, 14:20, Dave Gerlach wrote:
+> Currently the ti-cpufreq driver blindly registers a 'ti-cpufreq' to force
+> the driver to probe on any platforms where the driver is built in.
+> However, this should only happen on platforms that actually can make use
+> of the driver. There is already functionality in place to match the
+> SoC compatible so let's factor this out into a separate call and
+> make sure we find a match before creating the ti-cpufreq platform device.
 > 
-> The property "irq-over-gpio" simply does not exist (this is nowadays
-> actually auto detected) and the property "irq-gpios" is actually called
-> "irq-gpio".
-> 
-> Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> 
+> Reviewed-by: Johan Hovold <johan@kernel.org>
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 > ---
+> v1->v2:
+> * Return 'match' directly in ti_cpufreq_match_node.
+> * Add Johan's Reviewed-by.
 > 
-> Changes in v2:
-> - Fix commit message as pointed out by Viresh.
+>  drivers/cpufreq/ti-cpufreq.c | 22 +++++++++++++++++-----
+>  1 file changed, 17 insertions(+), 5 deletions(-)
 > 
->  arch/arm/boot/dts/spear320-hmi.dts | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/spear320-hmi.dts b/arch/arm/boot/dts/spear320-hmi.dts
-> index 0d0da1f65f0e..d2d1fe944407 100644
-> --- a/arch/arm/boot/dts/spear320-hmi.dts
-> +++ b/arch/arm/boot/dts/spear320-hmi.dts
-> @@ -241,8 +241,7 @@
->  					#address-cells = <1>;
->  					#size-cells = <0>;
->  					reg = <0x41>;
-> -					irq-over-gpio;
-> -					irq-gpios = <&gpiopinctrl 29 0x4>;
-> +					irq-gpio = <&gpiopinctrl 29 0x4>;
->  					id = <0>;
->  					blocks = <0x5>;
->  					irq-trigger = <0x1>;
+> diff --git a/drivers/cpufreq/ti-cpufreq.c b/drivers/cpufreq/ti-cpufreq.c
+> index 3f0e2a14895a..6b025953ddee 100644
+> --- a/drivers/cpufreq/ti-cpufreq.c
+> +++ b/drivers/cpufreq/ti-cpufreq.c
+> @@ -201,19 +201,28 @@ static const struct of_device_id ti_cpufreq_of_match[] = {
+>  	{},
+>  };
+>  
+> +static const struct of_device_id *ti_cpufreq_match_node(void)
+> +{
+> +	struct device_node *np;
+> +	const struct of_device_id *match;
+> +
+> +	np = of_find_node_by_path("/");
+> +	match = of_match_node(ti_cpufreq_of_match, np);
+> +	of_node_put(np);
+> +
+> +	return match;
+> +}
+> +
+>  static int ti_cpufreq_probe(struct platform_device *pdev)
+>  {
+>  	u32 version[VERSION_COUNT];
+> -	struct device_node *np;
+>  	const struct of_device_id *match;
+>  	struct opp_table *ti_opp_table;
+>  	struct ti_cpufreq_data *opp_data;
+>  	const char * const reg_names[] = {"vdd", "vbb"};
+>  	int ret;
+>  
+> -	np = of_find_node_by_path("/");
+> -	match = of_match_node(ti_cpufreq_of_match, np);
+> -	of_node_put(np);
+> +	match = ti_cpufreq_match_node();
+>  	if (!match)
+>  		return -ENODEV;
+>  
+> @@ -290,7 +299,10 @@ static int ti_cpufreq_probe(struct platform_device *pdev)
+>  
+>  static int ti_cpufreq_init(void)
+>  {
+> -	platform_device_register_simple("ti-cpufreq", -1, NULL, 0);
+> +	/* Check to ensure we are on a compatible platform */
+> +	if (ti_cpufreq_match_node())
+> +		platform_device_register_simple("ti-cpufreq", -1, NULL, 0);
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Maybe call platform_device_register_resndata() here instead and pass match->data
+to it and then you wouldn't be required to match again in probe ?
 
 -- 
 viresh
