@@ -1,98 +1,46 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Mon, 3 Sep 2018 18:28:40 +0100
-Subject: [PATCH v3 05/30] iio: adc: move SUN4I_GPADC_CHANNEL define to
- header file
-In-Reply-To: <882cb5f9-867b-d120-5ef5-80a8bee2d628@gmail.com>
+Date: Mon, 3 Sep 2018 18:29:27 +0100
+Subject: [PATCH v3 18/30] iio: adc: sun4i-gpadc-iio: rework: support
+ multiple sensors
+In-Reply-To: <3722842b-1aa3-ea46-c0ec-7a01bc8a723e@gmail.com>
 References: <20180830154518.29507-1-embed3d@gmail.com>
- <20180830154518.29507-6-embed3d@gmail.com>
- <20180902210109.7bd4a567@archlinux>
- <882cb5f9-867b-d120-5ef5-80a8bee2d628@gmail.com>
-Message-ID: <20180903182840.77231c8b@archlinux>
+ <20180830154518.29507-19-embed3d@gmail.com>
+ <20180902211125.0098c808@archlinux>
+ <3722842b-1aa3-ea46-c0ec-7a01bc8a723e@gmail.com>
+Message-ID: <20180903182927.344858c4@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 3 Sep 2018 16:24:32 +0200
+On Mon, 3 Sep 2018 15:58:30 +0200
 Philipp Rossak <embed3d@gmail.com> wrote:
 
-> On 02.09.2018 22:01, Jonathan Cameron wrote:
-> > On Thu, 30 Aug 2018 17:44:53 +0200
-> > Philipp Rossak <embed3d@gmail.com> wrote:
+> On 02.09.2018 22:11, Jonathan Cameron wrote:
+> > This feels like a good place to factor out the code into a utility
+> > function that just does one of them.  That should hopefully
+> > reduce the indenting etc enough to make the code easier to read.
 > >   
-> >> We are moving the SUN4I_GPADC_CHANNEL define to the header file.  
-> > Maxime has raised this point in other patches...
-> > 
-> > Why?  Obvious what but I have no idea why you are doing this.
-> > 
-> > Thanks,
-> > 
-> > Jonathan  
-> There are two reasons:
-> 1. Personal taste: I like to have the #define stuff in the header file.
-> 2. When I started the rework I had to get some better overview, so I 
-> moved it...
+> >> +		info->tzds[i].info = info;
+> >> +		info->tzds[i].sensor_id = i;
+> >> +
+> >> +		info->tzds[i].tzd = thermal_zone_of_sensor_register(
+> >> +				info->sensor_device,
+> >> +				i, &info->tzds[i], &sun4i_ts_tz_ops);
+> >> +		/*
+> >> +		 * Do not fail driver probing when failing to register in
+> >> +		 * thermal because no thermal DT node is found.
+> >> +		 */
+> >> +		if (IS_ERR(info->tzds[i].tzd) && \
+> >> +				PTR_ERR(info->tzds[i].tzd) != -ENODEV) {
+> >> +			dev_err(&pdev->dev,
+> >> +				"could not register thermal sensor: %ld\n",
+> >> +				PTR_ERR(info->tzds[i].tzd));
+> >> +			return PTR_ERR(info->tzds[i].tzd);
+> >> +		}  
 > 
-> Since those two reasons are no good reasons to submit a patch I will 
-> drop it and keep it in the *.c file.
-Don't move it.
+> So this code above should be placed in a separate function and called by 
+> the for loop?
+> Did I understand that right?
+Yes - exactly.
 
-For a 'utility' type define like this that is just about cutting
-down on code repetition it is nice to be able to see what it does near
-to where it is used.
-
-Also, as a general rule kernel style is to not put things in a header
-unless they are needed in multiple files.  There are exceptions, but
-it is generally felt keeping things local to where they are used
-leads to easier to review code.
-
-Jonathan
 > 
 > Philipp
-> 
-> >>
-> >> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
-> >> ---
-> >>   drivers/iio/adc/sun4i-gpadc-iio.c | 9 ---------
-> >>   include/linux/mfd/sun4i-gpadc.h   | 9 +++++++++
-> >>   2 files changed, 9 insertions(+), 9 deletions(-)
-> >>
-> >> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c b/drivers/iio/adc/sun4i-gpadc-iio.c
-> >> index d95dd0fde2a6..666329940e1e 100644
-> >> --- a/drivers/iio/adc/sun4i-gpadc-iio.c
-> >> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
-> >> @@ -109,15 +109,6 @@ struct sun4i_gpadc_iio {
-> >>   	struct device			*sensor_device;
-> >>   };
-> >>   
-> >> -#define SUN4I_GPADC_ADC_CHANNEL(_channel, _name) {		\
-> >> -	.type = IIO_VOLTAGE,					\
-> >> -	.indexed = 1,						\
-> >> -	.channel = _channel,					\
-> >> -	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),		\
-> >> -	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),	\
-> >> -	.datasheet_name = _name,				\
-> >> -}
-> >> -
-> >>   static struct iio_map sun4i_gpadc_hwmon_maps[] = {
-> >>   	{
-> >>   		.adc_channel_label = "temp_adc",
-> >> diff --git a/include/linux/mfd/sun4i-gpadc.h b/include/linux/mfd/sun4i-gpadc.h
-> >> index 139872c2e0fe..54c7c9375c1b 100644
-> >> --- a/include/linux/mfd/sun4i-gpadc.h
-> >> +++ b/include/linux/mfd/sun4i-gpadc.h
-> >> @@ -90,6 +90,15 @@
-> >>   /* 10s delay before suspending the IP */
-> >>   #define SUN4I_GPADC_AUTOSUSPEND_DELAY			10000
-> >>   
-> >> +#define SUN4I_GPADC_ADC_CHANNEL(_channel, _name) {		\
-> >> +	.type = IIO_VOLTAGE,					\
-> >> +	.indexed = 1,						\
-> >> +	.channel = _channel,					\
-> >> +	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),		\
-> >> +	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),	\
-> >> +	.datasheet_name = _name,				\
-> >> +}
-> >> +
-> >>   struct sun4i_gpadc_dev {
-> >>   	struct device			*dev;
-> >>   	struct regmap			*regmap;  
-> >   
