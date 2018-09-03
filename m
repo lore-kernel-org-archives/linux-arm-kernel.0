@@ -1,48 +1,36 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Mon, 3 Sep 2018 14:34:27 +0200
-Subject: [PATCH v6 11/11] arm64: annotate user pointers casts detected by
- sparse
-In-Reply-To: <20180831134244.GB19965@ZenIV.linux.org.uk>
-References: <cover.1535629099.git.andreyknvl@google.com>
- <5d54526e5ff2e5ad63d0dfdd9ab17cf359afa4f2.1535629099.git.andreyknvl@google.com>
- <20180831081123.6mo62xnk54pvlxmc@ltop.local>
- <20180831134244.GB19965@ZenIV.linux.org.uk>
-Message-ID: <CAAeHK+w86m6YztnTGhuZPKRczb-+znZ1hiJskPXeQok4SgcaOw@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 3 Sep 2018 14:42:29 +0200
+Subject: [PATCH v5 0/9] ata: ahci_platform: support allwinner R40 AHCI
+In-Reply-To: <20180903100201.23131-1-clabbe.montjoie@gmail.com>
+References: <20180903100201.23131-1-clabbe.montjoie@gmail.com>
+Message-ID: <20180903124229.rchurusvt4rv5ln7@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2018 at 3:42 PM, Al Viro <viro@zeniv.linux.org.uk> wrote:
-> On Fri, Aug 31, 2018 at 10:11:24AM +0200, Luc Van Oostenryck wrote:
->> On Thu, Aug 30, 2018 at 01:41:16PM +0200, Andrey Konovalov wrote:
->> > This patch adds __force annotations for __user pointers casts detected by
->> > sparse with the -Wcast-from-as flag enabled (added in [1]).
->> >
->> > [1] https://github.com/lucvoo/sparse-dev/commit/5f960cb10f56ec2017c128ef9d16060e0145f292
->>
->> Hi,
->>
->> It would be nice to have some explanation for why these added __force
->> are useful.
-
-I'll add this in the next version, thanks!
-
->         It would be even more useful if that series would either deal with
-> the noise for real ("that's what we intend here, that's what we intend there,
-> here's a primitive for such-and-such kind of cases, here we actually
-> ought to pass __user pointer instead of unsigned long", etc.) or left it
-> unmasked.
+On Mon, Sep 03, 2018 at 12:01:52PM +0200, Corentin Labbe wrote:
+> This patchset add support for allwinner R40 AHCI controller.
+> 
+> The whole patchset is tested on sun8i-r40-bananapi-m2-ultra and
+> on sun7i-a20-cubieboard2 which doesnt have any of the ressources added
+> by this serie, so no regression should come with it.
+> 
+> Patchs 1-7 should go via the ata tree
+> Patchs 8,9 should go via the sunxi tree
 >
->         As it is, __force says only one thing: "I know the code is doing
-> the right thing here".  That belongs in primitives, and I do *not* mean the
-> #define cast_to_ulong(x) ((__force unsigned long)(x))
-> kind.
->
->         Folks, if you don't want to deal with that - leave the warnings be.
-> They do carry more information than "someone has slapped __force in that place".
->
-> Al, very annoyed by that kind of information-hiding crap...
 
-This patch only adds __force to hide the reports I've looked at and
-decided that the code does the right thing. The cases where this is
-not the case are handled by the previous patches in the patchset. I'll
-this to the patch description as well. Is that OK?
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180903/e9c58cd6/attachment.sig>
