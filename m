@@ -1,149 +1,110 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon,  3 Sep 2018 15:10:54 +0200
-Subject: [PATCH v3 06/10] serial: uartps: Move register to probe based on run
- time detection
+Date: Mon,  3 Sep 2018 15:10:51 +0200
+Subject: [PATCH v3 03/10] serial: uartps: Fix suspend functionality
 In-Reply-To: <cover.1535980253.git.michal.simek@xilinx.com>
 References: <cover.1535980253.git.michal.simek@xilinx.com>
-Message-ID: <0ffd804b18c15b60a64aecadcf32b0036e6cbcdb.1535980253.git.michal.simek@xilinx.com>
+Message-ID: <26804ea4d2196674a30ddd7dccc068269816b882.1535980253.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register uart driver in probe to be able to register one device with
-unique major/minor separately. Also calculate number of instances of
-this driver to be able to call uart_unregister_driver() when there is no
-instance.
+From: Nava kishore Manne <nava.manne@xilinx.com>
 
+The driver's suspend/resume functions were buggy.
+If UART node contains any child node in the DT and
+the child is established a communication path with
+the parent UART. The relevant /dev/ttyPS* node will
+be not available for other operations.
+If the driver is trying to do any operations like
+suspend/resume without checking the tty->dev status
+it leads to the kernel crash/hang.
+
+This patch fix this issue by call the device_may_wake()
+with the generic parameter of type struct device.
+in the uart suspend and resume paths.
+
+It also fixes a race condition in the uart suspend
+path(i.e uart_suspend_port() should be called at the
+end of cdns_uart_suspend API this path updates the same)
+
+Signed-off-by: Nava kishore Manne <navam@xilinx.com>
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 
 Changes in v3:
-- Fix uart_unregister_driver() in error path or when driver is removed.
-- Change commit message
+- New patch - can be sent separately but there is dependency that's why
+  sent in this series
 
-Changes in v2:
-- Remove nr field logic
+Changes in v2: None
 
-Discussed here: https://patchwork.kernel.org/patch/9738445/
-
-The same solution is done in pl011 driver.
-
----
- drivers/tty/serial/xilinx_uartps.c | 42 +++++++++++++++++++++-----------------
- 1 file changed, 23 insertions(+), 19 deletions(-)
+ drivers/tty/serial/xilinx_uartps.c | 41 +++++++++++---------------------------
+ 1 file changed, 12 insertions(+), 29 deletions(-)
 
 diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index a3e97ccb376d..54735a7f9960 100644
+index 9a08542cec47..fc0ecaf3615d 100644
 --- a/drivers/tty/serial/xilinx_uartps.c
 +++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -1393,6 +1393,9 @@ static int __maybe_unused cdns_runtime_resume(struct device *dev)
- };
- MODULE_DEVICE_TABLE(of, cdns_uart_of_match);
+@@ -1272,24 +1272,11 @@ static int cdns_uart_console_setup(struct console *co, char *options)
+ static int cdns_uart_suspend(struct device *device)
+ {
+ 	struct uart_port *port = dev_get_drvdata(device);
+-	struct tty_struct *tty;
+-	struct device *tty_dev;
+-	int may_wake = 0;
+-
+-	/* Get the tty which could be NULL so don't assume it's valid */
+-	tty = tty_port_tty_get(&port->state->port);
+-	if (tty) {
+-		tty_dev = tty->dev;
+-		may_wake = device_may_wakeup(tty_dev);
+-		tty_kref_put(tty);
+-	}
++	int may_wake;
  
-+/* Temporary variable for storing number of instances */
-+static int instances;
+-	/*
+-	 * Call the API provided in serial_core.c file which handles
+-	 * the suspend.
+-	 */
+-	uart_suspend_port(&cdns_uart_uart_driver, port);
+-	if (!(console_suspend_enabled && !may_wake)) {
++	may_wake = device_may_wakeup(device);
 +
++	if (console_suspend_enabled && may_wake) {
+ 		unsigned long flags = 0;
+ 
+ 		spin_lock_irqsave(&port->lock, flags);
+@@ -1304,7 +1291,11 @@ static int cdns_uart_suspend(struct device *device)
+ 		spin_unlock_irqrestore(&port->lock, flags);
+ 	}
+ 
+-	return 0;
++	/*
++	 * Call the API provided in serial_core.c file which handles
++	 * the suspend.
++	 */
++	return uart_suspend_port(&cdns_uart_uart_driver, port);
+ }
+ 
  /**
-  * cdns_uart_probe - Platform driver probe
-  * @pdev: Pointer to the platform device structure
-@@ -1425,6 +1428,14 @@ static int cdns_uart_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 
-+	if (!cdns_uart_uart_driver.state) {
-+		rc = uart_register_driver(&cdns_uart_uart_driver);
-+		if (rc < 0) {
-+			dev_err(&pdev->dev, "Failed to register driver\n");
-+			return rc;
-+		}
-+	}
+@@ -1318,17 +1309,9 @@ static int cdns_uart_resume(struct device *device)
+ 	struct uart_port *port = dev_get_drvdata(device);
+ 	unsigned long flags = 0;
+ 	u32 ctrl_reg;
+-	struct tty_struct *tty;
+-	struct device *tty_dev;
+-	int may_wake = 0;
+-
+-	/* Get the tty which could be NULL so don't assume it's valid */
+-	tty = tty_port_tty_get(&port->state->port);
+-	if (tty) {
+-		tty_dev = tty->dev;
+-		may_wake = device_may_wakeup(tty_dev);
+-		tty_kref_put(tty);
+-	}
++	int may_wake;
 +
- 	cdns_uart_data->cdns_uart_driver = &cdns_uart_uart_driver;
++	may_wake = device_may_wakeup(device);
  
- 	match = of_match_node(cdns_uart_of_match, pdev->dev.of_node);
-@@ -1442,7 +1453,8 @@ static int cdns_uart_probe(struct platform_device *pdev)
- 	}
- 	if (IS_ERR(cdns_uart_data->pclk)) {
- 		dev_err(&pdev->dev, "pclk clock not found.\n");
--		return PTR_ERR(cdns_uart_data->pclk);
-+		rc = PTR_ERR(cdns_uart_data->pclk);
-+		goto err_out_unregister_driver;
- 	}
- 
- 	cdns_uart_data->uartclk = devm_clk_get(&pdev->dev, "uart_clk");
-@@ -1453,13 +1465,14 @@ static int cdns_uart_probe(struct platform_device *pdev)
- 	}
- 	if (IS_ERR(cdns_uart_data->uartclk)) {
- 		dev_err(&pdev->dev, "uart_clk clock not found.\n");
--		return PTR_ERR(cdns_uart_data->uartclk);
-+		rc = PTR_ERR(cdns_uart_data->uartclk);
-+		goto err_out_unregister_driver;
- 	}
- 
- 	rc = clk_prepare_enable(cdns_uart_data->pclk);
- 	if (rc) {
- 		dev_err(&pdev->dev, "Unable to enable pclk clock.\n");
--		return rc;
-+		goto err_out_unregister_driver;
- 	}
- 	rc = clk_prepare_enable(cdns_uart_data->uartclk);
- 	if (rc) {
-@@ -1538,6 +1551,7 @@ static int cdns_uart_probe(struct platform_device *pdev)
- 		console_port = NULL;
- #endif
- 
-+	instances++;
- 	return 0;
- 
- err_out_pm_disable:
-@@ -1552,7 +1566,9 @@ static int cdns_uart_probe(struct platform_device *pdev)
- 	clk_disable_unprepare(cdns_uart_data->uartclk);
- err_out_clk_dis_pclk:
- 	clk_disable_unprepare(cdns_uart_data->pclk);
--
-+err_out_unregister_driver:
-+	if (!instances)
-+		uart_unregister_driver(cdns_uart_data->cdns_uart_driver);
- 	return rc;
- }
- 
-@@ -1580,6 +1596,8 @@ static int cdns_uart_remove(struct platform_device *pdev)
- 	pm_runtime_disable(&pdev->dev);
- 	pm_runtime_set_suspended(&pdev->dev);
- 	pm_runtime_dont_use_autosuspend(&pdev->dev);
-+	if (!--instances)
-+		uart_unregister_driver(cdns_uart_data->cdns_uart_driver);
- 	return rc;
- }
- 
-@@ -1595,28 +1613,14 @@ static int cdns_uart_remove(struct platform_device *pdev)
- 
- static int __init cdns_uart_init(void)
- {
--	int retval = 0;
--
--	/* Register the cdns_uart driver with the serial core */
--	retval = uart_register_driver(&cdns_uart_uart_driver);
--	if (retval)
--		return retval;
--
- 	/* Register the platform driver */
--	retval = platform_driver_register(&cdns_uart_platform_driver);
--	if (retval)
--		uart_unregister_driver(&cdns_uart_uart_driver);
--
--	return retval;
-+	return platform_driver_register(&cdns_uart_platform_driver);
- }
- 
- static void __exit cdns_uart_exit(void)
- {
- 	/* Unregister the platform driver */
- 	platform_driver_unregister(&cdns_uart_platform_driver);
--
--	/* Unregister the cdns_uart driver */
--	uart_unregister_driver(&cdns_uart_uart_driver);
- }
- 
- arch_initcall(cdns_uart_init);
+ 	if (console_suspend_enabled && !may_wake) {
+ 		struct cdns_uart *cdns_uart = port->private_data;
 -- 
 1.9.1
