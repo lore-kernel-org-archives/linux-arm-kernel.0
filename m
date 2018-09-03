@@ -1,214 +1,761 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 3 Sep 2018 13:35:12 +0800
-Subject: [PATCH] arm64: allwinner: h6: Add OrangePi One Plus initial
- support
-In-Reply-To: <CAGb2v66Br9-KB-AD+N9mqRQ7rhrzYqUAQDkiepf2+3=FOgWKLg@mail.gmail.com>
-References: <20180728182615.20845-1-jagan@amarulasolutions.com>
- <20180730090048.gl7fkduztjkxacqq@flea>
- <CAGb2v67wKFp2Fntm2O0xGXZjbyTZ_3YjRrD6b612jer1DDXxZw@mail.gmail.com>
- <CAMty3ZBNM7mdtkBSq5BGuGoa5jKdSuuSVxkOoqPhDJZ-NM2THQ@mail.gmail.com>
- <CAGb2v66Br9-KB-AD+N9mqRQ7rhrzYqUAQDkiepf2+3=FOgWKLg@mail.gmail.com>
-Message-ID: <CAGb2v670WNu8tz+e0DqO5eiSvi8EEfhCrz3ksaAzvyxQvCGkgQ@mail.gmail.com>
+From: leilk.liu@mediatek.com (lei liu)
+Date: Mon, 3 Sep 2018 13:47:24 +0800
+Subject: [SPAM][PATCH 2/3] spis: mediatek: add spi slave for Mediatek
+ MT2712
+In-Reply-To: <1535683285.28775.46.camel@mtkswgap22>
+References: <1535437685-30230-1-git-send-email-leilk.liu@mediatek.com>
+ <1535437685-30230-3-git-send-email-leilk.liu@mediatek.com>
+ <1535683285.28775.46.camel@mtkswgap22>
+Message-ID: <1535953644.3043.31.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 31, 2018 at 9:42 PM Chen-Yu Tsai <wens@csie.org> wrote:
->
-> On Tue, Jul 31, 2018 at 9:41 PM, Jagan Teki <jagan@amarulasolutions.com> wrote:
-> > On Mon, Jul 30, 2018 at 2:47 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> >> On Mon, Jul 30, 2018 at 5:00 PM, Maxime Ripard
-> >> <maxime.ripard@bootlin.com> wrote:
-> >>> Hi,
-> >>>
-> >>> On Sat, Jul 28, 2018 at 11:56:15PM +0530, Jagan Teki wrote:
-> >>>> OrangePi One Plus is Allwinner H6 based open-source SBC,
-> >>>> which support:
-> >>>> - Allwinner H6 Quad-core 64-bit ARM Cortex-A53
-> >>>> - GPU Mali-T720
-> >>>> - 1GB LPDDR3 RAM
-> >>>> - AXP805 PMIC
-> >>>> - 1Gbps GMAC via RTL8211
-> >>>> - USB 2.0 Host, OTG
-> >>>> - HDMI port
-> >>>> - 5V/2A DC power supply
-> >>>>
-> >>>> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> >>>> ---
-> >>>>  arch/arm64/boot/dts/allwinner/Makefile        |   1 +
-> >>>>  .../allwinner/sun50i-h6-orangepi-one-plus.dts | 150 ++++++++++++++++++
-> >>>>  2 files changed, 151 insertions(+)
-> >>>>  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi-one-plus.dts
-> >>>>
-> >>>> diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-> >>>> index 9ffa7a038791..c38f326e7fec 100644
-> >>>> --- a/arch/arm64/boot/dts/allwinner/Makefile
-> >>>> +++ b/arch/arm64/boot/dts/allwinner/Makefile
-> >>>> @@ -15,4 +15,5 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
-> >>>>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-prime.dtb
-> >>>>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus.dtb
-> >>>>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus2.dtb
-> >>>> +dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h6-orangepi-one-plus.dtb
-> >>>>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h6-pine-h64.dtb
-> >>>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi-one-plus.dts b/arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi-one-plus.dts
-> >>>> new file mode 100644
-> >>>> index 000000000000..0612c19cd994
-> >>>> --- /dev/null
-> >>>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi-one-plus.dts
-> >>>> @@ -0,0 +1,150 @@
-> >>>> +// SPDX-License-Identifier: (GPL-2.0+ or MIT)
-> >>>> +/*
-> >>>> + * Copyright (C) 2018 Amarula Solutions
-> >>>> + * Author: Jagan Teki <jagan@amarulasolutions.com>
-> >>>> + */
-> >>>> +
-> >>>> +/dts-v1/;
-> >>>> +
-> >>>> +#include "sun50i-h6.dtsi"
-> >>>> +
-> >>>> +#include <dt-bindings/gpio/gpio.h>
-> >>>> +
-> >>>> +/ {
-> >>>> +     model = "OrangePi One Plus";
-> >>>> +     compatible = "xunlong,orangepi-one-plus", "allwinner,sun50i-h6";
-> >>>> +
-> >>>> +     aliases {
-> >>>> +             serial0 = &uart0;
-> >>>> +     };
-> >>>> +
-> >>>> +     chosen {
-> >>>> +             stdout-path = "serial0:115200n8";
-> >>>> +     };
-> >>>> +};
-> >>>> +
-> >>>> +&mmc0 {
-> >>>> +     pinctrl-names = "default";
-> >>>> +     pinctrl-0 = <&mmc0_pins>;
-> >>>> +     vmmc-supply = <&reg_cldo1>;
-> >>>> +     cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>;
-> >>>> +     bus-width = <4>;
-> >>>> +     status = "okay";
-> >>>> +};
-> >>>> +
-> >>>> +&r_i2c {
-> >>>> +     status = "okay";
-> >>>> +
-> >>>> +     axp805: pmic at 36 {
-> >>>> +             compatible = "x-powers,axp805", "x-powers,axp806";
-> >>>> +             reg = <0x36>;
-> >>>> +             interrupt-parent = <&r_intc>;
-> >>>> +             interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-> >>>> +             interrupt-controller;
-> >>>> +             #interrupt-cells = <1>;
-> >>>> +             x-powers,self-working-mode;
-> >>>> +
-> >>>> +             regulators {
-> >>>> +                     reg_aldo1: aldo1 {
-> >>>> +                             regulator-always-on;
-> >>>> +                             regulator-min-microvolt = <3300000>;
-> >>>> +                             regulator-max-microvolt = <3300000>;
-> >>>> +                             regulator-name = "vcc-pl";
-> >>>> +                     };
-> >>>> +
-> >>>> +                     reg_aldo2: aldo2 {
-> >>>> +                             regulator-min-microvolt = <3300000>;
-> >>>> +                             regulator-max-microvolt = <3300000>;
-> >>>> +                             regulator-name = "vcc-ac200";
-> >>>> +                     };
-> >>>> +
-> >>>> +                     reg_aldo3: aldo3 {
-> >>>> +                             regulator-always-on;
-> >>>> +                             regulator-min-microvolt = <3300000>;
-> >>>> +                             regulator-max-microvolt = <3300000>;
-> >>>> +                             regulator-name = "vcc25-dram";
-> >>>> +                     };
-> >>>> +
-> >>>> +                     reg_bldo1: bldo1 {
-> >>>> +                             regulator-always-on;
-> >>>> +                             regulator-min-microvolt = <1800000>;
-> >>>> +                             regulator-max-microvolt = <1800000>;
-> >>>> +                             regulator-name = "vcc-bias-pll";
-> >>>> +                     };
-> >>>> +
-> >>>> +                     reg_bldo2: bldo2 {
-> >>>> +                             regulator-always-on;
-> >>>> +                             regulator-min-microvolt = <1800000>;
-> >>>> +                             regulator-max-microvolt = <1800000>;
-> >>>> +                             regulator-name = "vcc-efuse-pcie-hdmi-io";
-> >>>> +                     };
-> >>>> +
-> >>>> +                     reg_bldo3: bldo3 {
-> >>>> +                             regulator-always-on;
-> >>>> +                             regulator-min-microvolt = <1800000>;
-> >>>> +                             regulator-max-microvolt = <1800000>;
-> >>>> +                             regulator-name = "vcc-dcxoio";
-> >>>> +                     };
-> >>>> +
-> >>>> +                     bldo4 {
-> >>>> +                             /* unused */
-> >>>> +                     };
-> >>>> +
-> >>>> +                     reg_cldo1: cldo1 {
-> >>>> +                             regulator-always-on;
-> >>>> +                             regulator-min-microvolt = <3300000>;
-> >>>> +                             regulator-max-microvolt = <3300000>;
-> >>>> +                             regulator-name = "vcc-3v3";
-> >>>> +                     };
-> >>>> +
-> >>>> +                     reg_cldo2: cldo2 {
-> >>>> +                             regulator-min-microvolt = <3300000>;
-> >>>> +                             regulator-max-microvolt = <3300000>;
-> >>>> +                             regulator-name = "vcc-wifi-1";
-> >>>> +                     };
-> >>>> +
-> >>>> +                     reg_cldo3: cldo3 {
-> >>>> +                             regulator-min-microvolt = <3300000>;
-> >>>> +                             regulator-max-microvolt = <3300000>;
-> >>>> +                             regulator-name = "vcc-wifi-2";
-> >>>> +                     };
-> >>>> +
-> >>>> +                     reg_dcdca: dcdca {
-> >>>> +                             regulator-always-on;
-> >>>> +                             regulator-min-microvolt = <810000>;
-> >>>> +                             regulator-max-microvolt = <1080000>;
-> >>>> +                             regulator-name = "vdd-cpu";
-> >>>> +                     };
-> >>>> +
-> >>>> +                     reg_dcdcc: dcdcc {
-> >>>> +                             regulator-min-microvolt = <810000>;
-> >>>> +                             regulator-max-microvolt = <1080000>;
-> >>>> +                             regulator-name = "vdd-gpu";
-> >>>> +                     };
-> >>>> +
-> >>>> +                     reg_dcdcd: dcdcd {
-> >>>> +                             regulator-always-on;
-> >>>> +                             regulator-min-microvolt = <960000>;
-> >>>> +                             regulator-max-microvolt = <960000>;
-> >>>> +                             regulator-name = "vdd-sys";
-> >>>> +                     };
-> >>>> +
-> >>>> +                     reg_dcdce: dcdce {
-> >>>> +                             regulator-always-on;
-> >>>> +                             regulator-min-microvolt = <1200000>;
-> >>>> +                             regulator-max-microvolt = <1200000>;
-> >>>> +                             regulator-name = "vcc-dram";
-> >>>> +                     };
-> >>>> +
-> >>>> +                     sw {
-> >>>> +                             /* unused */
-> >>>> +                     };
-> >>>
-> >>> Can't we have a DTSI for this PMIC too?
-> >>
-> >> Back when we started adding the regulators, Mark wasn't too happy with
-> >> all the placeholders we put in the dtsi. I think we got away with it
-> >> because we had other things in there as well. That's not true for this
-> >> particular PMIC.
-> >
-> > So we need separate dtsi for this PMIC as well?
->
-> I don't think we do. We don't gain much.
+On Fri, 2018-08-31 at 10:41 +0800, Sean Wang wrote:
+> Hi,
+> 
+> a few comments are added inline
+> 
+> On Tue, 2018-08-28 at 14:28 +0800, Leilk Liu wrote:
+> > This patchs add basic spi slave for MT2712.
+> > 
+> > Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+> > ---
+> >  drivers/spi/Kconfig            |    8 +
+> >  drivers/spi/Makefile           |    1 +
+> >  drivers/spi/spi-slave-mt27xx.c |  613 ++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 622 insertions(+)
+> >  create mode 100644 drivers/spi/spi-slave-mt27xx.c
+> > 
+> > diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+> > index 671d078..86ef6a5 100644
+> > --- a/drivers/spi/Kconfig
+> > +++ b/drivers/spi/Kconfig
+> > @@ -802,6 +802,14 @@ config SPI_SLAVE
+> >  	  slave protocol handlers.
+> >  
+> >  if SPI_SLAVE
+> > +config SPI_SLAVE_MT27XX
+> > +	tristate "MediaTek SPI slave device"
+> > +	depends on ARCH_MEDIATEK || COMPILE_TEST
+> > +	help
+> > +	  This selects the MediaTek(R) SPI slave device driver.
+> > +	  If you want to use MediaTek(R) SPI slave interface,
+> > +	  say Y or M here.If you are not sure, say N.
+> > +	  SPI slave drivers for Mediatek MT27XX series ARM SoCs.
+> >  
+> >  config SPI_SLAVE_TIME
+> >  	tristate "SPI slave handler reporting boot up time"
+> > diff --git a/drivers/spi/Makefile b/drivers/spi/Makefile
+> > index a90d559..a5e7b3c 100644
+> > --- a/drivers/spi/Makefile
+> > +++ b/drivers/spi/Makefile
+> > @@ -109,5 +109,6 @@ obj-$(CONFIG_SPI_XTENSA_XTFPGA)		+= spi-xtensa-xtfpga.o
+> >  obj-$(CONFIG_SPI_ZYNQMP_GQSPI)		+= spi-zynqmp-gqspi.o
+> >  
+> >  # SPI slave protocol handlers
+> > +obj-$(CONFIG_SPI_SLAVE_MT27XX)		+= spi-slave-mt27xx.o
+> >  obj-$(CONFIG_SPI_SLAVE_TIME)		+= spi-slave-time.o
+> >  obj-$(CONFIG_SPI_SLAVE_SYSTEM_CONTROL)	+= spi-slave-system-control.o
+> > diff --git a/drivers/spi/spi-slave-mt27xx.c b/drivers/spi/spi-slave-mt27xx.c
+> > new file mode 100644
+> > index 0000000..2aa12f3
+> > --- /dev/null
+> > +++ b/drivers/spi/spi-slave-mt27xx.c
+> > @@ -0,0 +1,613 @@
+> > +// SPDX-License-Identifier: GPL-2.0+
+> > +//
+> > +// Copyright (c) 2018 MediaTek Inc.
+> > +// Author: Leilk Liu <leilk.liu@mediatek.com>
+> > +//
+> > +// This program is free software; you can redistribute it and/or modify
+> > +// it under the terms of the GNU General Public License version 2 as
+> > +// published by the Free Software Foundation.
+> > +//
+> > +// This program is distributed in the hope that it will be useful,
+> > +// but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > +// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > +// GNU General Public License for more details.
+> > +
+> 
+> you can drop long disclaimer because you already had SPDX style license
+> 
+OK, I'll fix it, thanks
 
-Merged with Maxime's ack, and the subject prefix fixed.
-Also squashed in the Ethernet patch for this board.
+> > +#include <linux/clk.h>
+> > +#include <linux/device.h>
+> > +#include <linux/dma-mapping.h>
+> > +#include <linux/err.h>
+> > +#include <linux/interrupt.h>
+> > +#include <linux/module.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/pm_runtime.h>
+> > +#include <linux/spi/spi.h>
+> > +
+> > +#define SPIS_IRQ_EN_REG		0x0
+> > +#define SPIS_IRQ_CLR_REG	0x4
+> > +#define SPIS_IRQ_ST_REG		0x8
+> > +#define SPIS_IRQ_MASK_REG	0xc
+> > +#define SPIS_CFG_REG		0x10
+> > +#define SPIS_RX_DATA_REG	0x14
+> > +#define SPIS_TX_DATA_REG	0x18
+> > +#define SPIS_RX_DST_REG		0x1c
+> > +#define SPIS_TX_SRC_REG		0x20
+> > +#define SPIS_RX_CMD_REG		0x24
+> > +#define SPIS_FIFO_ST_REG	0x28
+> > +#define SPIS_MON_SEL_REG	0x2c
+> > +#define SPIS_DMA_CFG_REG	0x30
+> > +#define SPIS_FIFO_THR_REG	0x34
+> > +#define SPIS_DEBUG_ST_REG	0x38
+> > +#define SPIS_BYTE_CNT_REG	0x3c
+> > +#define SPIS_SOFT_RST_REG	0x40
+> > +
+> > +/* SPIS_IRQ_EN_REG */
+> > +#define DMA_DONE_EN		BIT(7)
+> > +#define TX_FIFO_EMPTY_EN	BIT(6)
+> > +#define TX_FIFO_FULL_EN		BIT(5)
+> > +#define RX_FIFO_EMPTY_EN	BIT(4)
+> > +#define RX_FIFO_FULL_EN		BIT(3)
+> > +#define DATA_DONE_EN		BIT(2)
+> > +#define RSTA_DONE_EN		BIT(1)
+> > +#define CMD_INVALID_EN		BIT(0)
+> > +
+> > +/* SPIS_IRQ_CLR_REG */
+> > +#define DMA_DONE_CLR		BIT(7)
+> > +#define TX_FIFO_EMPTY_CLR	BIT(6)
+> > +#define TX_FIFO_FULL_CLR	BIT(5)
+> > +#define RX_FIFO_EMPTY_CLR	BIT(4)
+> > +#define RX_FIFO_FULL_CLR	BIT(3)
+> > +#define DATA_DONE_CLR		BIT(2)
+> > +#define RSTA_DONE_CLR		BIT(1)
+> > +#define CMD_INVALID_CLR		BIT(0)
+> > +
+> > +/* SPIS_IRQ_ST_REG */
+> > +#define DMA_DONE_ST		BIT(7)
+> > +#define TX_FIFO_EMPTY_ST	BIT(6)
+> > +#define TX_FIFO_FULL_ST		BIT(5)
+> > +#define RX_FIFO_EMPTY_ST	BIT(4)
+> > +#define RX_FIFO_FULL_ST		BIT(3)
+> > +#define DATA_DONE_ST		BIT(2)
+> > +#define RSTA_DONE_ST		BIT(1)
+> > +#define CMD_INVALID_ST		BIT(0)
+> > +
+> > +/* SPIS_IRQ_MASK_REG */
+> > +#define DMA_DONE_MASK		BIT(7)
+> > +#define DATA_DONE_MASK		BIT(2)
+> > +#define RSTA_DONE_MASK		BIT(1)
+> > +#define CMD_INVALID_MASK	BIT(0)
+> > +
+> > +/* SPIS_CFG_REG */
+> > +#define SPIS_TX_ENDIAN		BIT(7)
+> > +#define SPIS_RX_ENDIAN		BIT(6)
+> > +#define SPIS_TXMSBF		BIT(5)
+> > +#define SPIS_RXMSBF		BIT(4)
+> > +#define SPIS_CPHA		BIT(3)
+> > +#define SPIS_CPOL		BIT(2)
+> > +#define SPIS_TX_EN		BIT(1)
+> > +#define SPIS_RX_EN		BIT(0)
+> > +
+> > +/* SPIS_DMA_CFG_REG */
+> > +#define TX_DMA_TRIG_EN		BIT(31)
+> > +#define TX_DMA_EN		BIT(30)
+> > +#define RX_DMA_EN		BIT(29)
+> > +#define TX_DMA_LEN		0xfffff
+> > +
+> > +/* SPIS_SOFT_RST_REG */
+> > +#define SPIS_DMA_ADDR_EN	BIT(1)
+> > +#define SPIS_SOFT_RST		BIT(0)
+> > +
+> > +#define MTK_SPI_SLAVE_MAX_FIFO_SIZE 512U
+> > +
+> > +struct mtk_spi_slave {
+> > +	struct device *dev;
+> > +	void __iomem *base;
+> > +	struct clk *parent_clk, *sel_clk, *spi_clk;
+> 
+> consider that parent clk should be configured in dts
+> by these property assigned-clocks, assigned-clock-parents. in that way, the driver
+> don't bother with what the parent and sel clock are and becomes more configurable.
+> 
+OK, I'll fix it, thanks
 
-ChenYu
+> > +	struct completion xfer_done;
+> > +	struct spi_transfer *cur_transfer;
+> > +	bool slave_aborted;
+> > +};
+> > +
+> > +static const struct of_device_id mtk_spi_slave_of_match[] = {
+> > +	{ .compatible = "mediatek,mt2712-spi-slave", },
+> > +	{}
+> > +};
+> > +MODULE_DEVICE_TABLE(of, mtk_spi_slave_of_match);
+> > +
+> > +static void mtk_spi_slave_disable_dma(struct mtk_spi_slave *mdata)
+> > +{
+> > +	u32 reg_val;
+> > +
+> > +	reg_val = readl(mdata->base + SPIS_DMA_CFG_REG);
+> > +	reg_val &= ~RX_DMA_EN;
+> > +	reg_val &= ~TX_DMA_EN;
+> > +	writel(reg_val, mdata->base + SPIS_DMA_CFG_REG);
+> > +}
+> > +
+> > +static void mtk_spi_slave_disable_xfer(struct mtk_spi_slave *mdata)
+> > +{
+> > +	u32 reg_val;
+> > +
+> > +	reg_val = readl(mdata->base + SPIS_CFG_REG);
+> > +	reg_val &= ~SPIS_TX_EN;
+> > +	reg_val &= ~SPIS_RX_EN;
+> > +	writel(reg_val, mdata->base + SPIS_CFG_REG);
+> > +}
+> > +
+> > +static int mtk_spi_slave_wait_for_completion(struct mtk_spi_slave *mdata)
+> > +{
+> > +	if (wait_for_completion_interruptible(&mdata->xfer_done) ||
+> > +	    mdata->slave_aborted) {
+> > +		pr_err("interrupted\n");
+> 
+> dev_err?
+> 
+OK, I'll fix it, thanks
+
+> 
+> > +		return -EINTR;
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int mtk_spi_slave_prepare_message(struct spi_controller *ctlr,
+> > +					 struct spi_message *msg)
+> > +{
+> > +	u16 cpha, cpol;
+> 
+> bool?
+> 
+OK, I'll fix it, thanks
+
+> > +	u32 reg_val;
+> > +	struct spi_device *spi = msg->spi;
+> > +	struct mtk_spi_slave *mdata = spi_controller_get_devdata(ctlr);
+> > +
+> 
+> how about using reverse xmas tree declarations for be readable? that means ordering declarations longest to shortest
+> 
+OK, I'll fix it, thanks
+
+> > +	cpha = spi->mode & SPI_CPHA ? 1 : 0;
+> > +	cpol = spi->mode & SPI_CPOL ? 1 : 0;
+> > +
+> > +	reg_val = readl(mdata->base + SPIS_CFG_REG);
+> > +	if (cpha)
+> > +		reg_val |= SPIS_CPHA;
+> > +	else
+> > +		reg_val &= ~SPIS_CPHA;
+> > +	if (cpol)
+> > +		reg_val |= SPIS_CPOL;
+> > +	else
+> > +		reg_val &= ~SPIS_CPOL;
+> > +
+> > +	if (spi->mode & SPI_LSB_FIRST)
+> > +		reg_val &= ~(SPIS_TXMSBF | SPIS_RXMSBF);
+> > +	else
+> > +		reg_val |= SPIS_TXMSBF | SPIS_RXMSBF;
+> > +
+> > +	/* set the tx/rx endian */
+> > +#ifdef __LITTLE_ENDIAN
+> > +	reg_val &= ~SPIS_TX_ENDIAN;
+> > +	reg_val &= ~SPIS_RX_ENDIAN;
+> > +#else
+> > +	reg_val |= SPIS_TX_ENDIAN;
+> > +	reg_val |= SPIS_RX_ENDIAN;
+> > +#endif
+> > +	writel(reg_val, mdata->base + SPIS_CFG_REG);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int mtk_spi_slave_fifo_transfer(struct spi_controller *ctlr,
+> > +				       struct spi_device *spi,
+> > +				       struct spi_transfer *xfer)
+> > +{
+> > +	int reg_val, cnt, remainder, ret;
+> > +	struct mtk_spi_slave *mdata = spi_controller_get_devdata(ctlr);
+> > +
+> 
+> reverse xmas tree declarations ?
+> 
+OK, I'll fix it, thanks
+
+> > +	writel(SPIS_SOFT_RST, mdata->base + SPIS_SOFT_RST_REG);
+> > +
+> > +	reg_val = readl(mdata->base + SPIS_CFG_REG);
+> > +	if (xfer->rx_buf)
+> > +		reg_val |= SPIS_RX_EN;
+> > +	if (xfer->tx_buf)
+> > +		reg_val |= SPIS_TX_EN;
+> > +	writel(reg_val, mdata->base + SPIS_CFG_REG);
+> > +
+> > +	cnt = xfer->len / 4;
+> > +	if (xfer->tx_buf)
+> > +		iowrite32_rep(mdata->base + SPIS_TX_DATA_REG,
+> > +			      xfer->tx_buf, cnt);
+> > +
+> > +	remainder = xfer->len % 4;
+> > +	if (xfer->tx_buf && remainder > 0) {
+> > +		reg_val = 0;
+> > +		memcpy(&reg_val, xfer->tx_buf + (cnt * 4), remainder);
+> > +		writel(reg_val, mdata->base + SPIS_TX_DATA_REG);
+> > +	}
+> > +
+> > +	ret = mtk_spi_slave_wait_for_completion(mdata);
+> > +	if (ret) {
+> > +		mtk_spi_slave_disable_xfer(mdata);
+> > +		writel(SPIS_SOFT_RST, mdata->base + SPIS_SOFT_RST_REG);
+> > +	}
+> > +
+> > +	return ret;
+> > +}
+> > +
+> > +static int mtk_spi_slave_dma_transfer(struct spi_controller *ctlr,
+> > +				      struct spi_device *spi,
+> > +				      struct spi_transfer *xfer)
+> > +{
+> > +	int reg_val, ret;
+> > +	struct mtk_spi_slave *mdata = spi_controller_get_devdata(ctlr);
+> > +	struct device *dev = mdata->dev;
+> > +
+> > +	writel(SPIS_SOFT_RST, mdata->base + SPIS_SOFT_RST_REG);
+> > +
+> > +	if (xfer->tx_buf) {
+> > +		xfer->tx_dma = dma_map_single(dev, (void *)xfer->tx_buf,
+> > +					      xfer->len, DMA_TO_DEVICE);
+> > +		if (dma_mapping_error(dev, xfer->tx_dma)) {
+> > +			ret = -ENOMEM;
+> > +			goto disable_transfer;
+> > +		}
+> > +	}
+> > +
+> > +	if (xfer->rx_buf) {
+> > +		xfer->rx_dma = dma_map_single(dev, (void *)xfer->rx_buf,
+> > +					      xfer->len, DMA_FROM_DEVICE);
+> > +		if (dma_mapping_error(dev, xfer->rx_dma)) {
+> > +			ret = -ENOMEM;
+> > +			goto unmap_txdma;
+> > +		}
+> > +	}
+> > +
+> > +	writel(xfer->tx_dma, mdata->base + SPIS_TX_SRC_REG);
+> > +	writel(xfer->rx_dma, mdata->base + SPIS_RX_DST_REG);
+> > +
+> > +	writel(SPIS_DMA_ADDR_EN, mdata->base + SPIS_SOFT_RST_REG);
+> > +
+> > +	/* enable config reg tx rx_enable */
+> > +	reg_val = readl(mdata->base + SPIS_CFG_REG);
+> > +	if (xfer->tx_buf)
+> > +		reg_val |= SPIS_TX_EN;
+> > +	if (xfer->rx_buf)
+> > +		reg_val |= SPIS_RX_EN;
+> > +	writel(reg_val, mdata->base + SPIS_CFG_REG);
+> > +
+> > +	/* config dma */
+> > +	reg_val = 0;
+> > +	reg_val &= ~TX_DMA_LEN;
+> 
+> it seems it no needs the extra clear bit
+> 
+OK, I'll fix it, thanks
+
+> > +	reg_val |= (xfer->len - 1) & TX_DMA_LEN;
+> > +	writel(reg_val, mdata->base + SPIS_DMA_CFG_REG);
+> > +
+> > +	reg_val = readl(mdata->base + SPIS_DMA_CFG_REG);
+> > +	if (xfer->tx_buf)
+> > +		reg_val |= TX_DMA_EN;
+> > +	if (xfer->rx_buf)
+> > +		reg_val |= RX_DMA_EN;
+> > +	reg_val |= TX_DMA_TRIG_EN;
+> > +	writel(reg_val, mdata->base + SPIS_DMA_CFG_REG);
+> > +
+> > +	ret = mtk_spi_slave_wait_for_completion(mdata);
+> > +	if (ret)
+> > +		goto unmap_rxdma;
+> > +
+> > +	return 0;
+> > +
+> > +unmap_rxdma:
+> > +	if (xfer->rx_buf)
+> > +		dma_unmap_single(dev, xfer->rx_dma,
+> > +				 xfer->len, DMA_FROM_DEVICE);
+> > +
+> > +unmap_txdma:
+> > +	if (xfer->tx_buf)
+> > +		dma_unmap_single(dev, xfer->tx_dma,
+> > +				 xfer->len, DMA_TO_DEVICE);
+> > +
+> > +disable_transfer:
+> > +	mtk_spi_slave_disable_dma(mdata);
+> > +	mtk_spi_slave_disable_xfer(mdata);
+> > +	writel(SPIS_SOFT_RST, mdata->base + SPIS_SOFT_RST_REG);
+> > +
+> > +	return ret;
+> > +}
+> > +
+> > +static int mtk_spi_slave_transfer_one(struct spi_controller *ctlr,
+> > +				      struct spi_device *spi,
+> > +				      struct spi_transfer *xfer)
+> > +{
+> > +	struct mtk_spi_slave *mdata = spi_controller_get_devdata(ctlr);
+> > +
+> > +	reinit_completion(&mdata->xfer_done);
+> > +	mdata->slave_aborted = false;
+> > +	mdata->cur_transfer = xfer;
+> > +
+> > +	if (xfer->len > MTK_SPI_SLAVE_MAX_FIFO_SIZE)
+> > +		return mtk_spi_slave_dma_transfer(ctlr, spi, xfer);
+> > +	else
+> > +		return mtk_spi_slave_fifo_transfer(ctlr, spi, xfer);
+> > +}
+> > +
+> > +static int mtk_spi_slave_setup(struct spi_device *spi)
+> > +{
+> > +	u32 reg_val;
+> > +	struct mtk_spi_slave *mdata = spi_controller_get_devdata(spi->master);
+> 
+> reverse xmas tree declarations ?
+> 
+OK, I'll fix it, thanks
+
+> > +	reg_val = DMA_DONE_EN | DATA_DONE_EN |
+> > +		  RSTA_DONE_EN | CMD_INVALID_EN;
+> > +	writel(reg_val, mdata->base + SPIS_IRQ_EN_REG);
+> > +
+> > +	reg_val = DMA_DONE_MASK | DATA_DONE_MASK |
+> > +		  RSTA_DONE_MASK | CMD_INVALID_MASK;
+> > +	writel(reg_val, mdata->base + SPIS_IRQ_MASK_REG);
+> > +
+> > +	mtk_spi_slave_disable_dma(mdata);
+> > +	mtk_spi_slave_disable_xfer(mdata);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int mtk_slave_abort(struct spi_controller *ctlr)
+> > +{
+> > +	struct mtk_spi_slave *mdata = spi_controller_get_devdata(ctlr);
+> > +
+> > +	mdata->slave_aborted = true;
+> > +	complete(&mdata->xfer_done);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static irqreturn_t mtk_spi_slave_interrupt(int irq, void *dev_id)
+> > +{
+> > +	u32 cmd, int_status, reg_val, cnt, remainder;
+> > +	struct spi_controller *ctlr = dev_id;
+> > +	struct mtk_spi_slave *mdata = spi_controller_get_devdata(ctlr);
+> > +	struct spi_transfer *trans = mdata->cur_transfer;
+> > +
+> > +	int_status = readl(mdata->base + SPIS_IRQ_ST_REG);
+> > +	writel(int_status, mdata->base + SPIS_IRQ_CLR_REG);
+> 
+> I supposed you already have disabled these bit the isr can't handle
+> 
+yes. It's disabled in mtk_spi_slave_setup() which would be called when
+probe.
+
+> > +	if (!trans)
+> > +		return IRQ_HANDLED;
+> > +
+> > +	if ((int_status & DMA_DONE_ST) &&
+> > +	    ((int_status & DATA_DONE_ST) ||
+> > +	    (int_status & RSTA_DONE_ST))) {
+> > +		writel(SPIS_SOFT_RST, mdata->base + SPIS_SOFT_RST_REG);
+> > +
+> > +		mtk_spi_slave_disable_dma(mdata);
+> > +		mtk_spi_slave_disable_xfer(mdata);
+> > +
+> > +		if (trans->tx_buf)
+> > +			dma_unmap_single(mdata->dev, trans->tx_dma,
+> > +					 trans->len, DMA_TO_DEVICE);
+> > +		if (trans->rx_buf)
+> > +			dma_unmap_single(mdata->dev, trans->rx_dma,
+> > +					 trans->len, DMA_FROM_DEVICE);
+> > +	}
+> > +
+> > +	if ((!(int_status & DMA_DONE_ST)) &&
+> > +	    ((int_status & DATA_DONE_ST) ||
+> > +	    (int_status & RSTA_DONE_ST))) {
+> 
+> is the condition both for dma and fifo mode ?
+> 
+> and it seems there is a missing disable_xfer for fifo mode
+> 
+this condition is for transfer data or read status by dma mode.
+if it's dma mode of transfer data, the HW assert the status:DMA_DONE_ST
+& DATA_DONE_ST.
+if it's dma mode of read status, the HW assert the status:DMA_DONE_ST &
+RSTA_DONE_ST.
+
+> > +		cnt = trans->len / 4;
+> > +		if (trans->rx_buf)
+> > +			ioread32_rep(mdata->base + SPIS_RX_DATA_REG,
+> > +				     trans->rx_buf, cnt);
+> > +		remainder = trans->len % 4;
+> > +		if (trans->rx_buf && remainder > 0) {
+> > +			reg_val = readl(mdata->base + SPIS_RX_DATA_REG);
+> > +			memcpy(trans->rx_buf + (cnt * 4),
+> 
+> parentheses around cnt * 4 is not needed, and no parentheses should be clearer enough
+> 
+OK, I'll fix it, thanks
+
+> > +			       &reg_val, remainder);
+> > +		}
+> > +
+> > +		mtk_spi_slave_disable_xfer(mdata);
+> 
+> a little confused you put disable xfer last at fifo mode, but put first at dma mode
+> 
+OK, I'll also put disable xfer last at dma mode. thanks.
+
+> > +	}
+> > +
+> > +	if (int_status & CMD_INVALID_ST)
+> > +		dev_err(&ctlr->dev, "cmd invalid\n");
+> > +
+> > +	mdata->cur_transfer = NULL;
+> > +	complete(&mdata->xfer_done);
+> > +
+> > +	return IRQ_HANDLED;
+> > +}
+> > +
+> > +static int mtk_spi_slave_probe(struct platform_device *pdev)
+> > +{
+> > +	struct spi_controller *ctlr;
+> > +	struct mtk_spi_slave *mdata;
+> > +	const struct of_device_id *of_id;
+> > +	struct resource *res;
+> > +	int i, irq, ret;
+> > +
+> 
+> reverse xmas tree declarations ?
+> 
+OK, I'll fix it, thanks
+
+> > +	ctlr = spi_alloc_slave(&pdev->dev, sizeof(*mdata));
+> > +	if (!ctlr) {
+> > +		dev_err(&pdev->dev, "failed to alloc spi slave\n");
+> > +		return -ENOMEM;
+> > +	}
+> > +
+> > +	ctlr->auto_runtime_pm = true;
+> > +	ctlr->dev.of_node = pdev->dev.of_node;
+> > +	ctlr->mode_bits = SPI_CPOL | SPI_CPHA;
+> > +	ctlr->mode_bits |= SPI_LSB_FIRST;
+> > +
+> > +	ctlr->prepare_message = mtk_spi_slave_prepare_message;
+> > +	ctlr->transfer_one = mtk_spi_slave_transfer_one;
+> > +	ctlr->setup = mtk_spi_slave_setup;
+> > +	ctlr->slave_abort = mtk_slave_abort;
+> > +
+> > +	mdata = spi_controller_get_devdata(ctlr);
+> > +
+> > +	platform_set_drvdata(pdev, ctlr);
+> > +
+> > +	init_completion(&mdata->xfer_done);
+> > +
+> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +	if (!res) {
+> > +		ret = -ENODEV;
+> > +		dev_err(&pdev->dev, "failed to determine base address\n");
+> > +		goto err_put_ctlr;
+> > +	}
+> > +
+> > +	mdata->dev = &pdev->dev;
+> > +
+> > +	mdata->base = devm_ioremap_resource(&pdev->dev, res);
+> > +	if (IS_ERR(mdata->base)) {
+> > +		ret = PTR_ERR(mdata->base);
+> > +		goto err_put_ctlr;
+> > +	}
+> > +
+> > +	irq = platform_get_irq(pdev, 0);
+> > +	if (irq < 0) {
+> > +		dev_err(&pdev->dev, "failed to get irq (%d)\n", irq);
+> > +		ret = irq;
+> > +		goto err_put_ctlr;
+> > +	}
+> > +
+> > +	ret = devm_request_irq(&pdev->dev, irq, mtk_spi_slave_interrupt,
+> > +			       IRQF_TRIGGER_NONE, dev_name(&pdev->dev), ctlr);
+> > +	if (ret) {
+> > +		dev_err(&pdev->dev, "failed to register irq (%d)\n", ret);
+> > +		goto err_put_ctlr;
+> > +	}
+> > +
+> > +	mdata->parent_clk = devm_clk_get(&pdev->dev, "parent-clk");
+> > +	if (IS_ERR(mdata->parent_clk)) {
+> > +		ret = PTR_ERR(mdata->parent_clk);
+> > +		dev_err(&pdev->dev, "failed to get parent-clk: %d\n", ret);
+> > +		goto err_put_ctlr;
+> > +	}
+> > +
+> > +	mdata->sel_clk = devm_clk_get(&pdev->dev, "sel-clk");
+> > +	if (IS_ERR(mdata->sel_clk)) {
+> > +		ret = PTR_ERR(mdata->sel_clk);
+> > +		dev_err(&pdev->dev, "failed to get sel-clk: %d\n", ret);
+> > +		goto err_put_ctlr;
+> > +	}
+> > +
+> > +	mdata->spi_clk = devm_clk_get(&pdev->dev, "spi-clk");
+> > +	if (IS_ERR(mdata->spi_clk)) {
+> > +		ret = PTR_ERR(mdata->spi_clk);
+> > +		dev_err(&pdev->dev, "failed to get spi-clk: %d\n", ret);
+> > +		goto err_put_ctlr;
+> > +	}
+> > +
+> > +	ret = clk_prepare_enable(mdata->spi_clk);
+> > +	if (ret < 0) {
+> > +		dev_err(&pdev->dev, "failed to enable spi_clk (%d)\n", ret);
+> > +		goto err_put_ctlr;
+> > +	}
+> > +
+> > +	ret = clk_set_parent(mdata->sel_clk, mdata->parent_clk);
+> > +	if (ret < 0) {
+> > +		dev_err(&pdev->dev, "failed to clk_set_parent (%d)\n", ret);
+> > +		goto err_disable_clk;
+> > +	}
+> > +
+> 
+> consider more about parent and sel clock assignment in the dts, that way would
+> help the driver to be portable on each soc
+> 
+OK, I'll fix it, thanks
+
+> > +	pm_runtime_enable(&pdev->dev);
+> 
+> disable interrupt bits the isr doesn't support to
+> 
+> > +	ret = devm_spi_register_controller(&pdev->dev, ctlr);
+> > +	if (ret) {
+> > +		dev_err(&pdev->dev,
+> > +			"failed to register slave controller(%d)\n", ret);
+> > +		goto err_disable_runtime_pm;
+> > +	}
+> > +
+> > +	clk_disable_unprepare(mdata->spi_clk);
+> > +
+> > +	return 0;
+> > +
+> > +err_disable_runtime_pm:
+> > +	pm_runtime_disable(&pdev->dev);
+> > +err_disable_clk:
+> > +	clk_disable_unprepare(mdata->spi_clk);
+> > +err_put_ctlr:
+> > +	spi_controller_put(ctlr);
+> > +
+> > +	return ret;
+> > +}
+> > +
+> > +static int mtk_spi_slave_remove(struct platform_device *pdev)
+> > +{
+> > +	struct spi_controller *ctlr = platform_get_drvdata(pdev);
+> > +
+> > +	pm_runtime_disable(&pdev->dev);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +#ifdef CONFIG_PM_SLEEP
+> > +static int mtk_spi_slave_suspend(struct device *dev)
+> > +{
+> > +	int ret;
+> > +	struct spi_controller *ctlr = dev_get_drvdata(dev);
+> > +	struct mtk_spi_slave *mdata = spi_controller_get_devdata(ctlr);
+> > +
+> > +	ret = spi_controller_suspend(ctlr);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	if (!pm_runtime_suspended(dev))
+> > +		clk_disable_unprepare(mdata->spi_clk);
+> > +
+> > +	return ret;
+> > +}
+> > +
+> > +static int mtk_spi_slave_resume(struct device *dev)
+> > +{
+> > +	int ret;
+> > +	struct spi_controller *ctlr = dev_get_drvdata(dev);
+> > +	struct mtk_spi_slave *mdata = spi_controller_get_devdata(ctlr);
+> > +
+> > +	if (!pm_runtime_suspended(dev)) {
+> > +		ret = clk_prepare_enable(mdata->spi_clk);
+> > +		if (ret < 0) {
+> > +			dev_err(dev, "failed to enable spi_clk (%d)\n", ret);
+> > +			return ret;
+> > +		}
+> > +	}
+> > +
+> > +	ret = spi_controller_resume(ctlr);
+> > +	if (ret < 0)
+> > +		clk_disable_unprepare(mdata->spi_clk);
+> > +
+> > +	return ret;
+> > +}
+> > +#endif /* CONFIG_PM_SLEEP */
+> > +
+> > +#ifdef CONFIG_PM
+> > +static int mtk_spi_slave_runtime_suspend(struct device *dev)
+> > +{
+> > +	struct spi_controller *ctlr = dev_get_drvdata(dev);
+> > +	struct mtk_spi_slave *mdata = spi_controller_get_devdata(ctlr);
+> > +
+> > +	clk_disable_unprepare(mdata->spi_clk);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int mtk_spi_slave_runtime_resume(struct device *dev)
+> > +{
+> > +	struct spi_controller *ctlr = dev_get_drvdata(dev);
+> > +	struct mtk_spi_slave *mdata = spi_controller_get_devdata(ctlr);
+> > +	int ret;
+> > +
+> > +	ret = clk_prepare_enable(mdata->spi_clk);
+> > +	if (ret < 0) {
+> > +		dev_err(dev, "failed to enable spi_clk (%d)\n", ret);
+> > +		return ret;
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +#endif /* CONFIG_PM */
+> > +
+> > +static const struct dev_pm_ops mtk_spi_slave_pm = {
+> > +	SET_SYSTEM_SLEEP_PM_OPS(mtk_spi_slave_suspend, mtk_spi_slave_resume)
+> > +	SET_RUNTIME_PM_OPS(mtk_spi_slave_runtime_suspend,
+> > +			   mtk_spi_slave_runtime_resume, NULL)
+> > +};
+> > +
+> > +static struct platform_driver mtk_spi_slave_driver = {
+> > +	.driver = {
+> > +		.name = "mtk-spi-slave",
+> > +		.pm	= &mtk_spi_slave_pm,
+> > +		.of_match_table = mtk_spi_slave_of_match,
+> > +	},
+> > +	.probe = mtk_spi_slave_probe,
+> > +	.remove = mtk_spi_slave_remove,
+> > +};
+> > +
+> > +module_platform_driver(mtk_spi_slave_driver);
+> > +
+> > +MODULE_DESCRIPTION("MTK SPI Slave Controller driver");
+> > +MODULE_AUTHOR("Leilk Liu <leilk.liu@mediatek.com>");
+> > +MODULE_LICENSE("GPL v2");
+> > +MODULE_ALIAS("platform:mtk-spi-slave");
+> 
+> 
+> 
