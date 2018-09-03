@@ -1,42 +1,85 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon,  3 Sep 2018 15:10:49 +0200
-Subject: [PATCH v3 01/10] serial: uartps: console_setup() can't be placed to
- init section
+Date: Mon,  3 Sep 2018 15:10:55 +0200
+Subject: [PATCH v3 07/10] serial: uartps: Fill struct uart_driver in probe()
 In-Reply-To: <cover.1535980253.git.michal.simek@xilinx.com>
 References: <cover.1535980253.git.michal.simek@xilinx.com>
-Message-ID: <08b079a26d5b5393ed58f68e55acbb1f9afe1821.1535980253.git.michal.simek@xilinx.com>
+Message-ID: <9a2f438e7d7e39b1ce965d09cebd9fb799422479.1535980253.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When console device is rebinded, console_setup() is called again.
-But marking it as __init means that function will be clear after boot is
-complete. If console device is binded again console_setup() is not found
-and error "Unable to handle kernel paging request at virtual address"
-is reported.
+This is preparation step for dynamic port allocation without
+CDNS_UART_NR_PORTS macro. Fill the structure only once at probe.
 
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 
 Changes in v3:
-- New patch found by testing
+- s/,/;/ in filling structure
+- get cdns_uart_uart_driver out of PS_UART_CONSOLE ifdefs
 
-Changes in v2: None
+Changes in v2:
+- new patch - it can be sent separately too
 
- drivers/tty/serial/xilinx_uartps.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/tty/serial/xilinx_uartps.c | 26 ++++++++++++--------------
+ 1 file changed, 12 insertions(+), 14 deletions(-)
 
 diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index e5d90611c03f..dd905c981f67 100644
+index 54735a7f9960..61087233f411 100644
 --- a/drivers/tty/serial/xilinx_uartps.c
 +++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -1216,7 +1216,7 @@ static void cdns_uart_console_write(struct console *co, const char *s,
-  *
-  * Return: 0 on success, negative errno otherwise.
-  */
--static int __init cdns_uart_console_setup(struct console *co, char *options)
-+static int cdns_uart_console_setup(struct console *co, char *options)
- {
- 	struct uart_port *port = console_port;
+@@ -1099,6 +1099,8 @@ static void cdns_uart_pm(struct uart_port *port, unsigned int state,
+ #endif
+ };
  
++static struct uart_driver cdns_uart_uart_driver;
++
+ #ifdef CONFIG_SERIAL_XILINX_PS_UART_CONSOLE
+ /**
+  * cdns_uart_console_putchar - write the character to the FIFO buffer
+@@ -1239,8 +1241,6 @@ static int cdns_uart_console_setup(struct console *co, char *options)
+ 	return uart_set_options(port, co, baud, parity, bits, flow);
+ }
+ 
+-static struct uart_driver cdns_uart_uart_driver;
+-
+ static struct console cdns_uart_console = {
+ 	.name	= CDNS_UART_TTY_NAME,
+ 	.write	= cdns_uart_console_write,
+@@ -1252,18 +1252,6 @@ static int cdns_uart_console_setup(struct console *co, char *options)
+ };
+ #endif /* CONFIG_SERIAL_XILINX_PS_UART_CONSOLE */
+ 
+-static struct uart_driver cdns_uart_uart_driver = {
+-	.owner		= THIS_MODULE,
+-	.driver_name	= CDNS_UART_NAME,
+-	.dev_name	= CDNS_UART_TTY_NAME,
+-	.major		= CDNS_UART_MAJOR,
+-	.minor		= CDNS_UART_MINOR,
+-	.nr		= CDNS_UART_NR_PORTS,
+-#ifdef CONFIG_SERIAL_XILINX_PS_UART_CONSOLE
+-	.cons		= &cdns_uart_console,
+-#endif
+-};
+-
+ #ifdef CONFIG_PM_SLEEP
+ /**
+  * cdns_uart_suspend - suspend event
+@@ -1429,6 +1417,16 @@ static int cdns_uart_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	if (!cdns_uart_uart_driver.state) {
++		cdns_uart_uart_driver.owner = THIS_MODULE;
++		cdns_uart_uart_driver.driver_name = CDNS_UART_NAME;
++		cdns_uart_uart_driver.dev_name = CDNS_UART_TTY_NAME;
++		cdns_uart_uart_driver.major = CDNS_UART_MAJOR;
++		cdns_uart_uart_driver.minor = CDNS_UART_MINOR;
++		cdns_uart_uart_driver.nr = CDNS_UART_NR_PORTS;
++#ifdef CONFIG_SERIAL_XILINX_PS_UART_CONSOLE
++		cdns_uart_uart_driver.cons = &cdns_uart_console;
++#endif
++
+ 		rc = uart_register_driver(&cdns_uart_uart_driver);
+ 		if (rc < 0) {
+ 			dev_err(&pdev->dev, "Failed to register driver\n");
 -- 
 1.9.1
