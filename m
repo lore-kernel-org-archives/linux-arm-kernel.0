@@ -1,56 +1,87 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Mon,  3 Sep 2018 12:02:01 +0200
-Subject: [PATCH v5 9/9] ARM: dts: sun8i: sun8i-r40-bananapi-m2-ultra: enable
- AHCI
+Date: Mon,  3 Sep 2018 12:01:56 +0200
+Subject: [PATCH v5 4/9] ata: ahci_platform: add support for PHY controller
+ regulator
 In-Reply-To: <20180903100201.23131-1-clabbe.montjoie@gmail.com>
 References: <20180903100201.23131-1-clabbe.montjoie@gmail.com>
-Message-ID: <20180903100201.23131-10-clabbe.montjoie@gmail.com>
+Message-ID: <20180903100201.23131-5-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enable the AHCI controller.
-Since this controller need two regulator, this patch add them.
+The SoC R40 AHCI controller need a PHY regulator to work.
+But since the PHY is embedded in the controller, we cannot do a DT node for it,
+since phy-supply works only in node with a PHY compatible.
+So this patch adds a way to add an optional phy-supply regulator on AHCI controller node.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ drivers/ata/ahci.h             |  1 +
+ drivers/ata/libahci_platform.c | 20 ++++++++++++++++++++
+ 2 files changed, 21 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-index a891a387e8f1..438b7b44dab3 100644
---- a/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-+++ b/arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
-@@ -105,6 +105,12 @@
- 	};
- };
+diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
+index 1415f1012de5..ef356e70e6de 100644
+--- a/drivers/ata/ahci.h
++++ b/drivers/ata/ahci.h
+@@ -353,6 +353,7 @@ struct ahci_host_priv {
+ 	struct reset_control	*rsts;		/* Optional */
+ 	struct regulator	**target_pwrs;	/* Optional */
+ 	struct regulator	*ahci_regulator;/* Optional */
++	struct regulator	*phy_regulator;/* Optional */
+ 	/*
+ 	 * If platform uses PHYs. There is a 1:1 relation between the port number and
+ 	 * the PHY position in this array.
+diff --git a/drivers/ata/libahci_platform.c b/drivers/ata/libahci_platform.c
+index a886b61476a3..dc4d79b1c9ae 100644
+--- a/drivers/ata/libahci_platform.c
++++ b/drivers/ata/libahci_platform.c
+@@ -157,6 +157,12 @@ int ahci_platform_enable_regulators(struct ahci_host_priv *hpriv)
+ 			return rc;
+ 	}
  
-+&ahci {
-+	ahci-supply = <&reg_dldo4>;
-+	phy-supply = <&reg_eldo3>;
-+	status = "okay";
-+};
++	if (hpriv->phy_regulator) {
++		rc = regulator_enable(hpriv->phy_regulator);
++		if (rc)
++			goto disable_ahci_pwrs;
++	}
 +
- &de {
- 	status = "okay";
- };
-@@ -250,6 +256,18 @@
- 	regulator-name = "vcc-wifi";
- };
+ 	for (i = 0; i < hpriv->nports; i++) {
+ 		if (!hpriv->target_pwrs[i])
+ 			continue;
+@@ -173,6 +179,9 @@ int ahci_platform_enable_regulators(struct ahci_host_priv *hpriv)
+ 		if (hpriv->target_pwrs[i])
+ 			regulator_disable(hpriv->target_pwrs[i]);
  
-+&reg_dldo4 {
-+	regulator-min-microvolt = <2500000>;
-+	regulator-max-microvolt = <2500000>;
-+	regulator-name = "vdd2v5-sata";
-+};
++	if (hpriv->phy_regulator)
++		regulator_disable(hpriv->phy_regulator);
++disable_ahci_pwrs:
+ 	if (hpriv->ahci_regulator)
+ 		regulator_disable(hpriv->ahci_regulator);
+ 	return rc;
+@@ -198,6 +207,8 @@ void ahci_platform_disable_regulators(struct ahci_host_priv *hpriv)
+ 
+ 	if (hpriv->ahci_regulator)
+ 		regulator_disable(hpriv->ahci_regulator);
++	if (hpriv->phy_regulator)
++		regulator_disable(hpriv->phy_regulator);
+ }
+ EXPORT_SYMBOL_GPL(ahci_platform_disable_regulators);
+ /**
+@@ -430,6 +441,15 @@ struct ahci_host_priv *ahci_platform_get_resources(struct platform_device *pdev,
+ 		hpriv->ahci_regulator = NULL;
+ 	}
+ 
++	hpriv->phy_regulator = devm_regulator_get_optional(dev, "phy");
++	if (IS_ERR(hpriv->phy_regulator)) {
++		rc = PTR_ERR(hpriv->phy_regulator);
++		if (rc == -EPROBE_DEFER)
++			goto err_out;
++		rc = 0;
++		hpriv->phy_regulator = NULL;
++	}
 +
-+&reg_eldo3 {
-+	regulator-min-microvolt = <1200000>;
-+	regulator-max-microvolt = <1200000>;
-+	regulator-name = "vdd1v2-sata";
-+};
-+
- &tcon_tv0 {
- 	status = "okay";
- };
+ 	if (flags & AHCI_PLATFORM_GET_RESETS) {
+ 		hpriv->rsts = devm_reset_control_array_get_optional_shared(dev);
+ 		if (IS_ERR(hpriv->rsts)) {
 -- 
 2.16.4
