@@ -1,56 +1,71 @@
 From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Mon,  3 Sep 2018 15:45:12 +0200
-Subject: [PULL 0/4] KVM/ARM Fixes for v4.19
-Message-ID: <20180903134516.17796-1-christoffer.dall@arm.com>
+Date: Mon,  3 Sep 2018 15:45:14 +0200
+Subject: [PULL 2/4] arm64: KVM: Only force FPEXC32_EL2.EN if trapping FPSIMD
+In-Reply-To: <20180903134516.17796-1-christoffer.dall@arm.com>
+References: <20180903134516.17796-1-christoffer.dall@arm.com>
+Message-ID: <20180903134516.17796-3-christoffer.dall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Radim and Paolo,
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-Here is the first small round of fixes for KVM/ARM for v4.19.  The
-changes include:
+If trapping FPSIMD in the context of an AArch32 guest, it is critical
+to set FPEXC32_EL2.EN to 1 so that the trapping is taken to EL2 and
+not EL1.
 
- - Fix a VFP corruption in 32-bit guest
- - Add missing cache invalidation for CoW pages
- - Two small cleanups
+Conversely, it is just as critical *not* to set FPEXC32_EL2.EN to 1
+if we're not going to trap FPSIMD, as we then corrupt the existing
+VFP state.
 
-Note that I have a question out on the CoW cache issue relating to
-zero-page backed PMD mappings, but if there is any additional fixes to
-be done, that doesn't invalidate the current patch and we can follow up
-later.
+Moving the call to __activate_traps_fpsimd32 to the point where we
+know for sure that we are going to trap ensures that we don't set that
+bit spuriously.
 
-The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
-
-  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
-
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-fixes-for-v4.19
-
-for you to fetch changes up to f901c848464922bdf85a3b993539d56eedd20809:
-
-  arm64: KVM: Remove pgd_lock (2018-08-30 10:08:01 +0200)
-
+Fixes: e6b673b741ea ("KVM: arm64: Optimise FPSIMD handling to reduce guest/host thrashing")
+Cc: Dave Martin <dave.martin@arm.com>
+Reported-by: Alexander Graf <agraf@suse.de>
+Tested-by: Alexander Graf <agraf@suse.de>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
 ---
+ arch/arm64/kvm/hyp/switch.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-Marc Zyngier (3):
-  KVM: arm/arm64: Clean dcache to PoC when changing PTE due to CoW
-  arm64: KVM: Only force FPEXC32_EL2.EN if trapping FPSIMD
-  KVM: Remove obsolete kvm_unmap_hva notifier backend
-
-Steven Price (1):
-  arm64: KVM: Remove pgd_lock
-
- arch/arm/include/asm/kvm_host.h   |  1 -
- arch/arm64/include/asm/kvm_host.h |  4 +---
- arch/arm64/kvm/hyp/switch.c       |  9 ++++++---
- arch/mips/include/asm/kvm_host.h  |  1 -
- arch/mips/kvm/mmu.c               | 10 ----------
- arch/x86/include/asm/kvm_host.h   |  1 -
- arch/x86/kvm/mmu.c                |  5 -----
- virt/kvm/arm/mmu.c                | 21 ++++++++-------------
- virt/kvm/arm/trace.h              | 15 ---------------
- 9 files changed, 15 insertions(+), 52 deletions(-)
-
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index d496ef579859..ca46153d7915 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -98,8 +98,10 @@ static void activate_traps_vhe(struct kvm_vcpu *vcpu)
+ 	val = read_sysreg(cpacr_el1);
+ 	val |= CPACR_EL1_TTA;
+ 	val &= ~CPACR_EL1_ZEN;
+-	if (!update_fp_enabled(vcpu))
++	if (!update_fp_enabled(vcpu)) {
+ 		val &= ~CPACR_EL1_FPEN;
++		__activate_traps_fpsimd32(vcpu);
++	}
+ 
+ 	write_sysreg(val, cpacr_el1);
+ 
+@@ -114,8 +116,10 @@ static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
+ 
+ 	val = CPTR_EL2_DEFAULT;
+ 	val |= CPTR_EL2_TTA | CPTR_EL2_TZ;
+-	if (!update_fp_enabled(vcpu))
++	if (!update_fp_enabled(vcpu)) {
+ 		val |= CPTR_EL2_TFP;
++		__activate_traps_fpsimd32(vcpu);
++	}
+ 
+ 	write_sysreg(val, cptr_el2);
+ }
+@@ -129,7 +133,6 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+ 	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN) && (hcr & HCR_VSE))
+ 		write_sysreg_s(vcpu->arch.vsesr_el2, SYS_VSESR_EL2);
+ 
+-	__activate_traps_fpsimd32(vcpu);
+ 	if (has_vhe())
+ 		activate_traps_vhe(vcpu);
+ 	else
 -- 
 2.18.0
