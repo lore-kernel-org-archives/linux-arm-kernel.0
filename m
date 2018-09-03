@@ -1,95 +1,83 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Mon, 3 Sep 2018 07:20:53 +0000
-Subject: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
-In-Reply-To: <153573827629.93865.6200966443862432044@swboyd.mtv.corp.google.com>
-References: <1533703167-26583-1-git-send-email-Anson.Huang@nxp.com>
- <1533703167-26583-2-git-send-email-Anson.Huang@nxp.com>
- <AM0PR04MB4481FC2BAD71B75D7BE84C0788260@AM0PR04MB4481.eurprd04.prod.outlook.com>
- <DB3PR0402MB3916F8BC381BBA01DB21D1C0F5260@DB3PR0402MB3916.eurprd04.prod.outlook.com>
- <AM0PR04MB44813C7A3E0AF4F3BCFFCF0088390@AM0PR04MB4481.eurprd04.prod.outlook.com>
- <153567894721.93865.4092113232222931488@swboyd.mtv.corp.google.com>
- <a6489bda-703f-207c-0b24-60f4044fe89f@linaro.org>
- <153573827629.93865.6200966443862432044@swboyd.mtv.corp.google.com>
-Message-ID: <AM6PR0402MB391120110A289BA5FB6B9F0DF50C0@AM6PR0402MB3911.eurprd04.prod.outlook.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Mon, 3 Sep 2018 09:43:15 +0200
+Subject: [PATCH v3 00/13] remove_conflicting_framebuffers() cleanup
+In-Reply-To: <cover.1535810304.git.mirq-linux@rere.qmqm.pl>
+References: <cover.1535656077.git.mirq-linux@rere.qmqm.pl>
+ <cover.1535810304.git.mirq-linux@rere.qmqm.pl>
+Message-ID: <20180903074315.GB21634@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-Anson Huang
-Best Regards!
-
-
-> -----Original Message-----
-> From: Stephen Boyd <sboyd@kernel.org>
-> Sent: Saturday, September 1, 2018 1:58 AM
-> To: kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org;
-> linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org;
-> mturquette at baylibre.com; s.hauer at pengutronix.de; shawnguo at kernel.org;
-> Anson Huang <anson.huang@nxp.com>; Fabio Estevam
-> <fabio.estevam@nxp.com>; Jerome Forissier <jerome.forissier@linaro.org>;
-> Peng Fan <peng.fan@nxp.com>; Rob Herring <robh@kernel.org>
-> Cc: dl-linux-imx <linux-imx@nxp.com>
-> Subject: Re: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
+On Sat, Sep 01, 2018 at 04:08:41PM +0200, Micha? Miros?aw wrote:
+> This series cleans up duplicated code for replacing firmware FB
+> driver with proper DRI driver and adds handover support to
+> Tegra driver.
 > 
-> Quoting Jerome Forissier (2018-08-31 01:01:44)
-> >
-> >
-> > On 08/31/2018 03:29 AM, Stephen Boyd wrote:
-> > > Quoting Peng Fan (2018-08-12 18:15:41)
-> > >> Hi Anson,
-> > >>
-> > >>>>> -----Original Message-----
-> > >>>>> From: Anson Huang
-> > >>>>> Sent: 2018?8?8? 12:39
-> > >>>>> To: shawnguo at kernel.org; s.hauer at pengutronix.de;
-> > >>>>> kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>;
-> > >>>>> mturquette at baylibre.com; sboyd at kernel.org;
-> > >>>>> linux-arm-kernel at lists.infradead.org;
-> > >>>>> linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org
-> > >>>>> Cc: dl-linux-imx <linux-imx@nxp.com>
-> > >>>>> Subject: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
-> > >>>>>
-> > >>>>> Clock framework will enable those clocks registered with
-> > >>>>> CLK_IS_CRITICAL flag, so no need to have clks_init_on array
-> > >>>>> during clock
-> > >>>> initialization now.
-> > >>>>
-> > >>>> Will it be more flexible to parse dts saying "critical-clocks = <xxx>"
-> > >>>> or "init-on-arrary=<xxx>"
-> > >>>> and enable those clocks?
-> > >>>
-> > >>> Parsing the clocks arrays from dtb is another way of enabling
-> > >>> critical clocks, but for current i.MX6/7 platforms, we implement
-> > >>> it in same way as most of other SoCs, currently I did NOT see any
-> > >>> necessity of putting them in dtb, just adding flag during clock
-> > >>> registering is more simple, if there is any special requirement
-> > >>> for different clocks set to be enabled, then we can add support to enable
-> the method of parsing critical-clocks from dtb. Just my two cents.
-> > >>
-> > >> Thinking about OP-TEE want to use one device, but it's clocks are
-> > >> registered by Linux, because there is no module in Linux side use
-> > >> it, it will shutdown the clock, which cause OP-TEE could not access the
-> device.
-> > >>
-> > >> Then people have to modify clk code to add CLK_IS_CRITICAL flag to
-> > >> make sure the clocks are not shutdown by Linux.
-> > >>
-> > >> However adding a new property in clk node and let driver code parse
-> > >> the dts, there is no need to modify clk driver code when OP-TEE needs
-> another device clock.
-> > >>
-> > >
-> > > If OP-TEE needs linux to keep things on then why can't the OP-TEE
-> > > driver in Linux probe, acquire clocks, and keep the clks enabled forever?
-> >
-> > Sounds reasonable, but how could this be done without introducing
-> > platform-specific stuff in the OP-TEE driver?
-> >
+> This is a sligtly updated version of a series sent on 24 Nov 2017.
 > 
-> Why is that a goal?
- 
-I do NOT think we should consider such case in this patch series, whatever OP-TEE needs for its own
-feature, it should do necessary operations either in its driver or somewhere else by adding new patch.
+> ---
+> v2:
+>  - rebased on current drm-next
+>  - dropped staging/sm750fb changes
+>  - added kernel docs for DRM helpers
+> v3:
+>  - move kerneldoc to fbdev, where functions are implemented
+>  - split kerneldoc for remove_conflicting_framebuffers()
 
-Anson.
+Ah, that's not quite what I had in mind. I think having the docs (also) in
+the drm helpers would be good, since that's where drm people will look,
+and that's the function they'll call. I just wanted you to split the fbdev
+and drm parts into 2 patches (since those are two different maintainers).
+
+Anyway, this is ok too, so imo ready for merging. If you can resurrect the
+drm docs (with a patch title of "drm/fb-helper: document fbdev remove
+functions" or similar) that would be great.
+
+Only thing we need for merging now is the ack from Bartlomiej.
+-Daniel
+
+>  - propagate return value in remove_conflicting_pci_framebuffers()
+> 
+> ---
+> Micha? Miros?aw (13):
+>   fbdev: show fbdev number for debugging
+>   fbdev: allow apertures == NULL in remove_conflicting_framebuffers()
+>   fbdev: add kerneldoc do remove_conflicting_framebuffers()
+>   fbdev: add remove_conflicting_pci_framebuffers()
+>   drm/amdgpu: use simpler remove_conflicting_pci_framebuffers()
+>   drm/bochs: use simpler remove_conflicting_pci_framebuffers()
+>   drm/cirrus: use simpler remove_conflicting_pci_framebuffers()
+>   drm/mgag200: use simpler remove_conflicting_pci_framebuffers()
+>   drm/radeon: use simpler remove_conflicting_pci_framebuffers()
+>   drm/virtio: use simpler remove_conflicting_pci_framebuffers()
+>   drm/vc4: use simpler remove_conflicting_framebuffers(NULL)
+>   drm/sun4i: use simpler remove_conflicting_framebuffers(NULL)
+>   drm/tegra: kick out simplefb
+> 
+>  drivers/gpu/drm/amd/amdgpu/amdgpu_drv.c  | 24 +--------
+>  drivers/gpu/drm/bochs/bochs_drv.c        | 18 +------
+>  drivers/gpu/drm/cirrus/cirrus_drv.c      | 23 +--------
+>  drivers/gpu/drm/mgag200/mgag200_drv.c    | 21 +-------
+>  drivers/gpu/drm/mgag200/mgag200_main.c   |  9 ----
+>  drivers/gpu/drm/radeon/radeon_drv.c      | 23 +--------
+>  drivers/gpu/drm/sun4i/sun4i_drv.c        | 18 +------
+>  drivers/gpu/drm/tegra/drm.c              |  4 ++
+>  drivers/gpu/drm/vc4/vc4_drv.c            | 20 +-------
+>  drivers/gpu/drm/virtio/virtgpu_drm_bus.c | 24 ++-------
+>  drivers/video/fbdev/core/fbmem.c         | 63 +++++++++++++++++++++++-
+>  include/drm/drm_fb_helper.h              | 12 +++++
+>  include/linux/fb.h                       |  2 +
+>  13 files changed, 89 insertions(+), 172 deletions(-)
+> 
+> -- 
+> 2.18.0
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
