@@ -1,99 +1,121 @@
 From: yong.wu@mediatek.com (Yong Wu)
-Date: Mon, 3 Sep 2018 14:01:29 +0800
-Subject: [PATCH 00/13] MT8183 IOMMU SUPPORT
-Message-ID: <1535954502-30646-1-git-send-email-yong.wu@mediatek.com>
+Date: Mon, 3 Sep 2018 14:01:31 +0800
+Subject: [PATCH 02/13] iommu/mediatek: Use a struct as the platform data
+In-Reply-To: <1535954502-30646-1-git-send-email-yong.wu@mediatek.com>
+References: <1535954502-30646-1-git-send-email-yong.wu@mediatek.com>
+Message-ID: <1535954502-30646-3-git-send-email-yong.wu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset mainly adds support for mt8183 IOMMU and SMI.
+Use a struct as the platform special data instead of the enumeration.
+This is a prepare patch for adding mt8183 iommu support.
 
-mt8183 has only one M4U like mt8173 and is also MTK IOMMU gen2 which
-uses ARM Short-Descriptor translation table format.
+Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+---
+ drivers/iommu/mtk_iommu.c | 24 ++++++++++++++++--------
+ drivers/iommu/mtk_iommu.h |  6 +++++-
+ 2 files changed, 21 insertions(+), 9 deletions(-)
 
-The mt8183 M4U-SMI HW diagram is as below:
-
-                          EMI
-                           |
-                          M4U
-                           |
-                       ----------
-                       |        |
-                   gals0-rx   gals1-rx
-                       |        |
-                       |        |
-                   gals0-tx   gals1-tx
-                       |        |
-                      ------------
-                       SMI Common
-                      ------------
-                           |
-  +-----+-----+--------+-----+-----+-------+-------+
-  |     |     |        |     |     |       |       |
-  |     |  gals-rx  gals-rx  |   gals-rx gals-rx gals-rx
-  |     |     |        |     |     |       |       |
-  |     |     |        |     |     |       |       |
-  |     |  gals-tx  gals-tx  |   gals-tx gals-tx gals-tx
-  |     |     |        |     |     |       |       |
-larb0 larb1  larb2   larb3  larb4 larb5  larb6    CCU
-disp  vdec   IPU0    IPU1   venc  IPU1    cam
-
-All the connections are HW fixed, SW can NOT adjust it.
-
-Compared with mt8173, we add a GALS(Global Async Local Sync) module
-between SMI-common and M4U, and additional between larb2/3/5/6 and
-SMI-common. GALS can help synchronize for the modules in different
-clock frequence, it can be seen as a "asynchronous fifo".
-
-GALS can only help transfer the command/data while it don't have the
-register, thus it has the special "smi" clock and it don't have the
-"apb" clock. From the diagram above, we add "gals0" and "gals1"
-clockes for smi-common and add a "gals" clock for smi-larb.
-
->From the diagram above, CCU(Camera Control Unit) is connected with
-smi-common directly, we can look it as "larb7" but its register space
-is different with the normal larb.
-
-This patchset is based on v4.19-rc1.
-the patch 1/2/3/4/5 add the iommu/smi support for mt8183;
-the patch 6/7/8/9 add mmu1 support;
-the last patches contain some minor changes:
-   -patch 10 fix a issue.
-   -patch 11 improve the code flow(add shutdown).
-   -patch 12 cleanup some smi codes(delete need_larbid).
-   -patch 13 switch to SPDX license.
-this patchset don't contain the dtsi part since it need depend on the
-ccf and power-domain nodes which has not been accepted.
-
-Yong Wu (13):
-  dt-bindings: mediatek: Add binding for mt8183 IOMMU and SMI
-  iommu/mediatek: Use a struct as the platform data
-  memory: mtk-smi: Use a general config_port interface
-  iommu/io-pgtable-arm-v7s: Extend MediaTek 4GB mode
-  iommu/mediatek: Add mt8183 IOMMU support
-  iommu/mediatek: Add mmu1 support
-  memory: mtk-smi: Invoke pm runtime_callback to enable clocks
-  memory: mtk-smi: Use a struct for the platform data for smi-common
-  memory: mtk-smi: Add bus_sel for mt8183
-  iommu/mediatek: Add VLD_PA_RANGE register backup when suspend
-  iommu/mediatek: Add shutdown callback
-  memory: mtk-smi: Get rid of need_larbid
-  iommu/mediatek: Switch to SPDX license identifier
-
- .../devicetree/bindings/iommu/mediatek,iommu.txt   |  15 +-
- .../memory-controllers/mediatek,smi-common.txt     |  11 +-
- .../memory-controllers/mediatek,smi-larb.txt       |   3 +
- drivers/iommu/io-pgtable-arm-v7s.c                 |  38 ++-
- drivers/iommu/io-pgtable.h                         |   8 +-
- drivers/iommu/mtk_iommu.c                          | 145 +++++++----
- drivers/iommu/mtk_iommu.h                          |  23 +-
- drivers/iommu/mtk_iommu_v1.c                       |  10 +-
- drivers/memory/mtk-smi.c                           | 267 ++++++++++++++-------
- include/dt-bindings/memory/mt2701-larb-port.h      |  10 +-
- include/dt-bindings/memory/mt8173-larb-port.h      |  10 +-
- include/dt-bindings/memory/mt8183-larb-port.h      | 130 ++++++++++
- include/soc/mediatek/smi.h                         |  10 +-
- 13 files changed, 476 insertions(+), 204 deletions(-)
- create mode 100644 include/dt-bindings/memory/mt8183-larb-port.h
-
+diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
+index f9f69f7..c0e2da5 100644
+--- a/drivers/iommu/mtk_iommu.c
++++ b/drivers/iommu/mtk_iommu.c
+@@ -54,7 +54,7 @@
+ #define REG_MMU_CTRL_REG			0x110
+ #define F_MMU_PREFETCH_RT_REPLACE_MOD		BIT(4)
+ #define F_MMU_TF_PROTECT_SEL_SHIFT(data) \
+-	((data)->m4u_plat == M4U_MT2712 ? 4 : 5)
++	((data)->plat_data->m4u_plat == M4U_MT2712 ? 4 : 5)
+ /* It's named by F_MMU_TF_PROT_SEL in mt2712. */
+ #define F_MMU_TF_PROTECT_SEL(prot, data) \
+ 	(((prot) & 0x3) << F_MMU_TF_PROTECT_SEL_SHIFT(data))
+@@ -517,7 +517,7 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
+ 	}
+ 
+ 	regval = F_MMU_TF_PROTECT_SEL(2, data);
+-	if (data->m4u_plat == M4U_MT8173)
++	if (data->plat_data->m4u_plat == M4U_MT8173)
+ 		regval |= F_MMU_PREFETCH_RT_REPLACE_MOD;
+ 	writel_relaxed(regval, data->base + REG_MMU_CTRL_REG);
+ 
+@@ -538,14 +538,14 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
+ 		F_INT_PRETETCH_TRANSATION_FIFO_FAULT;
+ 	writel_relaxed(regval, data->base + REG_MMU_INT_MAIN_CONTROL);
+ 
+-	if (data->m4u_plat == M4U_MT8173)
++	if (data->plat_data->m4u_plat == M4U_MT8173)
+ 		regval = (data->protect_base >> 1) | (data->enable_4GB << 31);
+ 	else
+ 		regval = lower_32_bits(data->protect_base) |
+ 			 upper_32_bits(data->protect_base);
+ 	writel_relaxed(regval, data->base + REG_MMU_IVRP_PADDR);
+ 
+-	if (data->enable_4GB && data->m4u_plat != M4U_MT8173) {
++	if (data->enable_4GB && data->plat_data->m4u_plat != M4U_MT8173) {
+ 		/*
+ 		 * If 4GB mode is enabled, the validate PA range is from
+ 		 * 0x1_0000_0000 to 0x1_ffff_ffff. here record bit[32:30].
+@@ -556,7 +556,7 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
+ 	writel_relaxed(0, data->base + REG_MMU_DCM_DIS);
+ 
+ 	/* It's MISC control register whose default value is ok except mt8173.*/
+-	if (data->m4u_plat == M4U_MT8173)
++	if (data->plat_data->m4u_plat == M4U_MT8173)
+ 		writel_relaxed(0, data->base + REG_MMU_STANDARD_AXI_MODE);
+ 
+ 	if (devm_request_irq(data->dev, data->irq, mtk_iommu_isr, 0,
+@@ -589,7 +589,7 @@ static int mtk_iommu_probe(struct platform_device *pdev)
+ 	if (!data)
+ 		return -ENOMEM;
+ 	data->dev = dev;
+-	data->m4u_plat = (enum mtk_iommu_plat)of_device_get_match_data(dev);
++	data->plat_data = of_device_get_match_data(dev);
+ 
+ 	/* Protect memory. HW will access here while translation fault.*/
+ 	protect = devm_kzalloc(dev, MTK_PROTECT_PA_ALIGN * 2, GFP_KERNEL);
+@@ -733,9 +733,17 @@ static int __maybe_unused mtk_iommu_resume(struct device *dev)
+ 	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(mtk_iommu_suspend, mtk_iommu_resume)
+ };
+ 
++static const struct mtk_iommu_plat_data mt2712_data = {
++	.m4u_plat = M4U_MT2712,
++};
++
++static const struct mtk_iommu_plat_data mt8173_data = {
++	.m4u_plat = M4U_MT8173,
++};
++
+ static const struct of_device_id mtk_iommu_of_ids[] = {
+-	{ .compatible = "mediatek,mt2712-m4u", .data = (void *)M4U_MT2712},
+-	{ .compatible = "mediatek,mt8173-m4u", .data = (void *)M4U_MT8173},
++	{ .compatible = "mediatek,mt2712-m4u", .data = &mt2712_data},
++	{ .compatible = "mediatek,mt8173-m4u", .data = &mt8173_data},
+ 	{}
+ };
+ 
+diff --git a/drivers/iommu/mtk_iommu.h b/drivers/iommu/mtk_iommu.h
+index 778498b..333a0ef 100644
+--- a/drivers/iommu/mtk_iommu.h
++++ b/drivers/iommu/mtk_iommu.h
+@@ -41,6 +41,10 @@ enum mtk_iommu_plat {
+ 	M4U_MT8173,
+ };
+ 
++struct mtk_iommu_plat_data {
++	enum mtk_iommu_plat m4u_plat;
++};
++
+ struct mtk_iommu_domain;
+ 
+ struct mtk_iommu_data {
+@@ -57,7 +61,7 @@ struct mtk_iommu_data {
+ 	bool				tlb_flush_active;
+ 
+ 	struct iommu_device		iommu;
+-	enum mtk_iommu_plat		m4u_plat;
++	const struct mtk_iommu_plat_data *plat_data;
+ 
+ 	struct list_head		list;
+ };
 -- 
-1.9.1 
+1.9.1
