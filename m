@@ -1,95 +1,128 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Mon, 3 Sep 2018 18:26:52 +0200
-Subject: [PATCH v3 00/13] remove_conflicting_framebuffers() cleanup
-In-Reply-To: <1705932.lAR3QV8q47@amdc3058>
-References: <cover.1535656077.git.mirq-linux@rere.qmqm.pl>
- <CGME20180903074322epcas4p1ce56cf44f5b169b5e1c1e3831bd5c038@epcas4p1.samsung.com>
- <20180903074315.GB21634@phenom.ffwll.local>
- <1705932.lAR3QV8q47@amdc3058>
-Message-ID: <20180903162652.GI21634@phenom.ffwll.local>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 3 Sep 2018 17:31:03 +0100
+Subject: [PATCH] arm64/ptrace: add PTRACE_SYSEMU and
+ PTRACE_SYSEMU_SINGLESTEP support
+In-Reply-To: <20180903062310.GA4524@haibo-VirtualBox>
+References: <20180903062310.GA4524@haibo-VirtualBox>
+Message-ID: <20180903163103.GC6954@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 03, 2018 at 01:31:34PM +0200, Bartlomiej Zolnierkiewicz wrote:
-> On Monday, September 03, 2018 09:43:15 AM Daniel Vetter wrote:
-> > On Sat, Sep 01, 2018 at 04:08:41PM +0200, Micha? Miros?aw wrote:
-> > > This series cleans up duplicated code for replacing firmware FB
-> > > driver with proper DRI driver and adds handover support to
-> > > Tegra driver.
-> > > 
-> > > This is a sligtly updated version of a series sent on 24 Nov 2017.
-> > > 
-> > > ---
-> > > v2:
-> > >  - rebased on current drm-next
-> > >  - dropped staging/sm750fb changes
-> > >  - added kernel docs for DRM helpers
-> > > v3:
-> > >  - move kerneldoc to fbdev, where functions are implemented
-> > >  - split kerneldoc for remove_conflicting_framebuffers()
-> > 
-> > Ah, that's not quite what I had in mind. I think having the docs (also) in
-> > the drm helpers would be good, since that's where drm people will look,
-> > and that's the function they'll call. I just wanted you to split the fbdev
-> > and drm parts into 2 patches (since those are two different maintainers).
-> > 
-> > Anyway, this is ok too, so imo ready for merging. If you can resurrect the
-> > drm docs (with a patch title of "drm/fb-helper: document fbdev remove
-> > functions" or similar) that would be great.
-> > 
-> > Only thing we need for merging now is the ack from Bartlomiej.
+On Mon, Sep 03, 2018 at 02:23:17PM +0800, Haibo.Xu wrote:
+> Add PTRACE_SYSEMU and PTRACE_SYSEMU_SINGLESTEP support on ARM64.
+> This copies the x86 semantics for invoking ptrace hooks, and have
+> been verified on ARM64 machine.
 > 
-> For the whole patchset:
-> 
-> Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Signed-off-by: Haibo.Xu <haibo.xu@arm.com>
+> Signed-off-by: Bin.Lu <bin.lu@arm.com>
+> ---
+>  arch/arm64/include/asm/thread_info.h |  5 ++++-
+>  arch/arm64/include/uapi/asm/ptrace.h |  2 ++
+>  arch/arm64/kernel/ptrace.c           | 17 +++++++++++++++++
+>  3 files changed, 23 insertions(+), 1 deletion(-)
 
-Thanks, entire patch set applied to drm-misc-next for 4.20.
--Daniel
+What is PTRACE_SYSEMU and what is its semantics? Why isn't it done in the
+core ptrace code?
 
-> 
-> > -Daniel
-> > 
-> > >  - propagate return value in remove_conflicting_pci_framebuffers()
-> > > 
-> > > ---
-> > > Micha? Miros?aw (13):
-> > >   fbdev: show fbdev number for debugging
-> > >   fbdev: allow apertures == NULL in remove_conflicting_framebuffers()
-> > >   fbdev: add kerneldoc do remove_conflicting_framebuffers()
-> > >   fbdev: add remove_conflicting_pci_framebuffers()
-> > >   drm/amdgpu: use simpler remove_conflicting_pci_framebuffers()
-> > >   drm/bochs: use simpler remove_conflicting_pci_framebuffers()
-> > >   drm/cirrus: use simpler remove_conflicting_pci_framebuffers()
-> > >   drm/mgag200: use simpler remove_conflicting_pci_framebuffers()
-> > >   drm/radeon: use simpler remove_conflicting_pci_framebuffers()
-> > >   drm/virtio: use simpler remove_conflicting_pci_framebuffers()
-> > >   drm/vc4: use simpler remove_conflicting_framebuffers(NULL)
-> > >   drm/sun4i: use simpler remove_conflicting_framebuffers(NULL)
-> > >   drm/tegra: kick out simplefb
-> > > 
-> > >  drivers/gpu/drm/amd/amdgpu/amdgpu_drv.c  | 24 +--------
-> > >  drivers/gpu/drm/bochs/bochs_drv.c        | 18 +------
-> > >  drivers/gpu/drm/cirrus/cirrus_drv.c      | 23 +--------
-> > >  drivers/gpu/drm/mgag200/mgag200_drv.c    | 21 +-------
-> > >  drivers/gpu/drm/mgag200/mgag200_main.c   |  9 ----
-> > >  drivers/gpu/drm/radeon/radeon_drv.c      | 23 +--------
-> > >  drivers/gpu/drm/sun4i/sun4i_drv.c        | 18 +------
-> > >  drivers/gpu/drm/tegra/drm.c              |  4 ++
-> > >  drivers/gpu/drm/vc4/vc4_drv.c            | 20 +-------
-> > >  drivers/gpu/drm/virtio/virtgpu_drm_bus.c | 24 ++-------
-> > >  drivers/video/fbdev/core/fbmem.c         | 63 +++++++++++++++++++++++-
-> > >  include/drm/drm_fb_helper.h              | 12 +++++
-> > >  include/linux/fb.h                       |  2 +
-> > >  13 files changed, 89 insertions(+), 172 deletions(-)
-> 
-> Best regards,
-> --
-> Bartlomiej Zolnierkiewicz
-> Samsung R&D Institute Poland
-> Samsung Electronics
-> 
+> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+> index 46c3b93..5060d2d 100644
+> --- a/arch/arm64/include/asm/thread_info.h
+> +++ b/arch/arm64/include/asm/thread_info.h
+> @@ -75,6 +75,7 @@ struct thread_info {
+>   *  TIF_SYSCALL_TRACE	- syscall trace active
+>   *  TIF_SYSCALL_TRACEPOINT - syscall tracepoint for ftrace
+>   *  TIF_SYSCALL_AUDIT	- syscall auditing
+> + *  TIF_SYSCALL_EMU	- syscall emulation active
+>   *  TIF_SECOMP		- syscall secure computing
+>   *  TIF_SIGPENDING	- signal pending
+>   *  TIF_NEED_RESCHED	- rescheduling necessary
+> @@ -91,6 +92,7 @@ struct thread_info {
+>  #define TIF_SYSCALL_AUDIT	9
+>  #define TIF_SYSCALL_TRACEPOINT	10
+>  #define TIF_SECCOMP		11
+> +#define TIF_SYSCALL_EMU		12
+>  #define TIF_MEMDIE		18	/* is terminating due to OOM killer */
+>  #define TIF_FREEZE		19
+>  #define TIF_RESTORE_SIGMASK	20
+> @@ -106,6 +108,7 @@ struct thread_info {
+>  #define _TIF_SYSCALL_AUDIT	(1 << TIF_SYSCALL_AUDIT)
+>  #define _TIF_SYSCALL_TRACEPOINT	(1 << TIF_SYSCALL_TRACEPOINT)
+>  #define _TIF_SECCOMP		(1 << TIF_SECCOMP)
+> +#define _TIF_SYSCALL_EMU	(1 << TIF_SYSCALL_EMU)
+>  #define _TIF_UPROBE		(1 << TIF_UPROBE)
+>  #define _TIF_32BIT		(1 << TIF_32BIT)
+>  
+> @@ -115,7 +118,7 @@ struct thread_info {
+>  
+>  #define _TIF_SYSCALL_WORK	(_TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT | \
+>  				 _TIF_SYSCALL_TRACEPOINT | _TIF_SECCOMP | \
+> -				 _TIF_NOHZ)
+> +				 _TIF_NOHZ | _TIF_SYSCALL_EMU)
+>  
+>  #endif /* __KERNEL__ */
+>  #endif /* __ASM_THREAD_INFO_H */
+> diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
+> index b5c3933..04ab06f 100644
+> --- a/arch/arm64/include/uapi/asm/ptrace.h
+> +++ b/arch/arm64/include/uapi/asm/ptrace.h
+> @@ -23,6 +23,8 @@
+>  
+>  #include <asm/hwcap.h>
+>  
+> +#define PTRACE_SYSEMU			31
+> +#define PTRACE_SYSEMU_SINGLESTEP	32
+>  
+>  /*
+>   * PSR bits
+> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+> index fc35e06..ff3e322 100644
+> --- a/arch/arm64/kernel/ptrace.c
+> +++ b/arch/arm64/kernel/ptrace.c
+> @@ -165,6 +165,9 @@ void ptrace_disable(struct task_struct *child)
+>  	 * is likely to cause regressions on obscure architectures.
+>  	 */
+>  	user_disable_single_step(child);
+> +#ifdef TIF_SYSCALL_EMU
+> +	clear_tsk_thread_flag(child, TIF_SYSCALL_EMU);
+> +#endif
+>  }
+>  
+>  #ifdef CONFIG_HAVE_HW_BREAKPOINT
+> @@ -1351,6 +1354,11 @@ asmlinkage int syscall_trace_enter(struct pt_regs *regs)
+>  	if (test_thread_flag(TIF_SYSCALL_TRACE))
+>  		tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
+>  
+> +	if (test_thread_flag(TIF_SYSCALL_EMU)) {
+> +		tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
+> +		return -1;
+> +	}
 
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+This looks weird -- are TIF_SYSCALL_EMU and TIF_SYSCALL_TRACE mutually
+exclusive, or is it harmless to report this twice? Why do we return early
+and skip the seccomp checks?
+
+Will
+
+> +
+>  	/* Do the secure computing after ptrace; failures should be fast. */
+>  	if (secure_computing(NULL) == -1)
+>  		return -1;
+> @@ -1373,6 +1381,15 @@ asmlinkage void syscall_trace_exit(struct pt_regs *regs)
+>  
+>  	if (test_thread_flag(TIF_SYSCALL_TRACE))
+>  		tracehook_report_syscall(regs, PTRACE_SYSCALL_EXIT);
+> +
+> +	/*
+> +	 * We only get here because of TIF_SINGLESTEP,
+> +	 * for PTRACE_SYSEMU_SINGLESTEP, we already reported
+> +	 * the syscall instruction in syscall_trace_enter().
+> +	 */
+> +	if (test_thread_flag(TIF_SINGLESTEP) &&
+> +			!test_thread_flag(TIF_SYSCALL_EMU))
+> +		tracehook_report_syscall_exit(regs, 1);
+>  }
+>  
+>  /*
+> -- 
+> 2.7.4
+> 
