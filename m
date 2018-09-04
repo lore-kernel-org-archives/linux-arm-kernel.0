@@ -1,313 +1,207 @@
 From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Tue,  4 Sep 2018 17:24:47 +0530
-Subject: [PATCH v2 12/15] soc: octeontx2: Set RVU PFs to CGX LMACs mapping
+Date: Tue,  4 Sep 2018 17:24:49 +0530
+Subject: [PATCH v2 14/15] soc: octeontx2: Register for CGX lmac events
 In-Reply-To: <1536062090-30446-1-git-send-email-sunil.kovvuri@gmail.com>
 References: <1536062090-30446-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1536062090-30446-13-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1536062090-30446-15-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linu Cherian <lcherian@marvell.com>
 
-Each of the enabled CGX LMAC is considered a physical
-interface and RVU PFs are mapped to these. VFs of these
-SRIOV PFs will be virtual interfaces and share CGX LMAC
-along with PF.
+Added support in RVU AF driver to register for
+CGX LMAC link status change events from firmware
+and managing them. Processing part will be added
+in followup patches.
 
-This mapping info will be used later on for Rx/Tx pkt steering.
+- Introduced eventqueue for posting events from cgx lmac.
+  Queueing mechanism will ensure that events can be posted
+  and firmware can be acked immediately and hence event
+  reception and processing are decoupled.
+- Events gets added to the queue by notification callback.
+  Notification callback is expected to be atomic, since it
+  is called from interrupt context.
+- Events are dequeued and processed in a worker thread.
 
 Signed-off-by: Linu Cherian <lcherian@marvell.com>
-Signed-off-by: Geetha sowjanya <gakula@marvell.com>
 ---
- drivers/soc/marvell/octeontx2/Makefile  |  2 +-
- drivers/soc/marvell/octeontx2/cgx.c     | 59 ++++++++++++++++++++
- drivers/soc/marvell/octeontx2/cgx.h     | 15 ++++-
- drivers/soc/marvell/octeontx2/rvu.c     |  4 ++
- drivers/soc/marvell/octeontx2/rvu.h     | 12 ++++
- drivers/soc/marvell/octeontx2/rvu_cgx.c | 97 +++++++++++++++++++++++++++++++++
- 6 files changed, 186 insertions(+), 3 deletions(-)
- create mode 100644 drivers/soc/marvell/octeontx2/rvu_cgx.c
+ drivers/soc/marvell/octeontx2/rvu.c     |   6 +-
+ drivers/soc/marvell/octeontx2/rvu.h     |   5 ++
+ drivers/soc/marvell/octeontx2/rvu_cgx.c | 101 +++++++++++++++++++++++++++++++-
+ 3 files changed, 108 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/soc/marvell/octeontx2/Makefile b/drivers/soc/marvell/octeontx2/Makefile
-index 8646421..eaac264 100644
---- a/drivers/soc/marvell/octeontx2/Makefile
-+++ b/drivers/soc/marvell/octeontx2/Makefile
-@@ -7,4 +7,4 @@ obj-$(CONFIG_OCTEONTX2_MBOX) += octeontx2_mbox.o
- obj-$(CONFIG_OCTEONTX2_AF) += octeontx2_af.o
- 
- octeontx2_mbox-y := mbox.o
--octeontx2_af-y := cgx.o rvu.o
-+octeontx2_af-y := cgx.o rvu.o rvu_cgx.o
-diff --git a/drivers/soc/marvell/octeontx2/cgx.c b/drivers/soc/marvell/octeontx2/cgx.c
-index 47aa4cb..c5e0ebb 100644
---- a/drivers/soc/marvell/octeontx2/cgx.c
-+++ b/drivers/soc/marvell/octeontx2/cgx.c
-@@ -29,8 +29,12 @@ struct cgx {
- 	void __iomem		*reg_base;
- 	struct pci_dev		*pdev;
- 	u8			cgx_id;
-+	u8			lmac_count;
-+	struct list_head	cgx_list;
- };
- 
-+static LIST_HEAD(cgx_list);
-+
- /* Supported devices */
- static const struct pci_device_id cgx_id_table[] = {
- 	{ PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, PCI_DEVID_OCTEONTX2_CGX) },
-@@ -43,6 +47,53 @@ MODULE_LICENSE("GPL v2");
- MODULE_VERSION(DRV_VERSION);
- MODULE_DEVICE_TABLE(pci, cgx_id_table);
- 
-+static u64 cgx_read(struct cgx *cgx, u64 lmac, u64 offset)
-+{
-+	return readq(cgx->reg_base + (lmac << 18) + offset);
-+}
-+
-+int cgx_get_cgx_cnt(void)
-+{
-+	struct cgx *cgx_dev;
-+	int count = 0;
-+
-+	list_for_each_entry(cgx_dev, &cgx_list, cgx_list)
-+		count++;
-+
-+	return count;
-+}
-+EXPORT_SYMBOL(cgx_get_cgx_cnt);
-+
-+int cgx_get_lmac_cnt(void *cgxd)
-+{
-+	struct cgx *cgx = cgxd;
-+
-+	if (!cgx)
-+		return -ENODEV;
-+
-+	return cgx->lmac_count;
-+}
-+EXPORT_SYMBOL(cgx_get_lmac_cnt);
-+
-+void *cgx_get_pdata(int cgx_id)
-+{
-+	struct cgx *cgx_dev;
-+
-+	list_for_each_entry(cgx_dev, &cgx_list, cgx_list) {
-+		if (cgx_dev->cgx_id == cgx_id)
-+			return cgx_dev;
-+	}
-+	return NULL;
-+}
-+EXPORT_SYMBOL(cgx_get_pdata);
-+
-+static void cgx_lmac_init(struct cgx *cgx)
-+{
-+	cgx->lmac_count = cgx_read(cgx, 0, CGXX_CMRX_RX_LMACS) & 0x7;
-+	if (cgx->lmac_count > MAX_LMAC_PER_CGX)
-+		cgx->lmac_count = MAX_LMAC_PER_CGX;
-+}
-+
- static int cgx_probe(struct pci_dev *pdev, const struct pci_device_id *id)
- {
- 	int err;
-@@ -77,9 +128,14 @@ static int cgx_probe(struct pci_dev *pdev, const struct pci_device_id *id)
- 		goto err_release_regions;
- 	}
- 
-+	list_add(&cgx->cgx_list, &cgx_list);
-+	cgx->cgx_id = cgx_get_cgx_cnt() - 1;
-+	cgx_lmac_init(cgx);
-+
- 	return 0;
- 
- err_release_regions:
-+	list_del(&cgx->cgx_list);
- 	pci_release_regions(pdev);
- err_disable_device:
- 	pci_disable_device(pdev);
-@@ -89,6 +145,9 @@ static int cgx_probe(struct pci_dev *pdev, const struct pci_device_id *id)
- 
- static void cgx_remove(struct pci_dev *pdev)
- {
-+	struct cgx *cgx = pci_get_drvdata(pdev);
-+
-+	list_del(&cgx->cgx_list);
- 	pci_release_regions(pdev);
- 	pci_disable_device(pdev);
- 	pci_set_drvdata(pdev, NULL);
-diff --git a/drivers/soc/marvell/octeontx2/cgx.h b/drivers/soc/marvell/octeontx2/cgx.h
-index a7d4b39..acdc16e 100644
---- a/drivers/soc/marvell/octeontx2/cgx.h
-+++ b/drivers/soc/marvell/octeontx2/cgx.h
-@@ -12,11 +12,22 @@
- #define CGX_H
- 
-  /* PCI device IDs */
--#define	PCI_DEVID_OCTEONTX2_CGX			0xA059
-+#define	PCI_DEVID_OCTEONTX2_CGX		0xA059
- 
- /* PCI BAR nos */
--#define PCI_CFG_REG_BAR_NUM			0
-+#define PCI_CFG_REG_BAR_NUM		0
-+
-+#define MAX_CGX				3
-+#define MAX_LMAC_PER_CGX		4
-+#define CGX_OFFSET(x)			((x) * MAX_LMAC_PER_CGX)
-+
-+/* Registers */
-+#define CGXX_CMRX_RX_ID_MAP		0x060
-+#define CGXX_CMRX_RX_LMACS		0x128
- 
- extern struct pci_driver cgx_driver;
- 
-+int cgx_get_cgx_cnt(void);
-+int cgx_get_lmac_cnt(void *cgxd);
-+void *cgx_get_pdata(int cgx_id);
- #endif /* CGX_H */
 diff --git a/drivers/soc/marvell/octeontx2/rvu.c b/drivers/soc/marvell/octeontx2/rvu.c
-index daa6fd3..faf7d0f 100644
+index faf7d0f..282982f 100644
 --- a/drivers/soc/marvell/octeontx2/rvu.c
 +++ b/drivers/soc/marvell/octeontx2/rvu.c
-@@ -1558,6 +1558,10 @@ static int rvu_probe(struct pci_dev *pdev, const struct pci_device_id *id)
- 	if (err)
- 		goto err_hwsetup;
+@@ -1564,10 +1564,11 @@ static int rvu_probe(struct pci_dev *pdev, const struct pci_device_id *id)
  
-+	err = rvu_cgx_probe(rvu);
-+	if (err)
-+		goto err_mbox;
-+
  	err = rvu_register_interrupts(rvu);
  	if (err)
- 		goto err_mbox;
+-		goto err_mbox;
++		goto err_cgx;
+ 
+ 	return 0;
+-
++err_cgx:
++	rvu_cgx_wq_destroy(rvu);
+ err_mbox:
+ 	rvu_mbox_destroy(rvu);
+ err_hwsetup:
+@@ -1589,6 +1590,7 @@ static void rvu_remove(struct pci_dev *pdev)
+ 	struct rvu *rvu = pci_get_drvdata(pdev);
+ 
+ 	rvu_unregister_interrupts(rvu);
++	rvu_cgx_wq_destroy(rvu);
+ 	rvu_mbox_destroy(rvu);
+ 	rvu_reset_all_blocks(rvu);
+ 	rvu_free_hw_resources(rvu);
 diff --git a/drivers/soc/marvell/octeontx2/rvu.h b/drivers/soc/marvell/octeontx2/rvu.h
-index 92c2022..385f597 100644
+index 385f597..d169fa9 100644
 --- a/drivers/soc/marvell/octeontx2/rvu.h
 +++ b/drivers/soc/marvell/octeontx2/rvu.h
-@@ -100,6 +100,16 @@ struct rvu {
- 	char			*irq_name;
- 	bool			*irq_allocated;
- 	dma_addr_t		msix_base_iova;
-+
-+	/* CGX */
-+#define PF_CGXMAP_BASE		1 /* PF 0 is reserved for RVU PF */
-+	u8			cgx_mapped_pfs;
-+	u8			cgx_cnt; /* available cgx ports */
-+	u8			*pf2cgxlmac_map; /* pf to cgx_lmac map */
-+	u16			*cgxlmac2pf_map; /* bitmap of mapped pfs for
-+						  * every cgx lmac port
-+						  */
-+	void			**cgx_idmap; /* cgx id to cgx data map table */
+@@ -110,6 +110,10 @@ struct rvu {
+ 						  * every cgx lmac port
+ 						  */
+ 	void			**cgx_idmap; /* cgx id to cgx data map table */
++	struct			work_struct cgx_evh_work;
++	struct			workqueue_struct *cgx_evh_wq;
++	spinlock_t		cgx_evq_lock; /* cgx event queue lock */
++	struct list_head	cgx_evq_head; /* cgx event queue head */
  };
  
  static inline void rvu_write64(struct rvu *rvu, u64 block, u64 offset, u64 val)
-@@ -138,4 +148,6 @@ int rvu_get_lf(struct rvu *rvu, struct rvu_block *block, u16 pcifunc, u16 slot);
- int rvu_get_blkaddr(struct rvu *rvu, int blktype, u16 pcifunc);
- int rvu_poll_reg(struct rvu *rvu, u64 block, u64 offset, u64 mask, bool zero);
+@@ -150,4 +154,5 @@ int rvu_poll_reg(struct rvu *rvu, u64 block, u64 offset, u64 mask, bool zero);
  
-+/* CGX APIs */
-+int rvu_cgx_probe(struct rvu *rvu);
+ /* CGX APIs */
+ int rvu_cgx_probe(struct rvu *rvu);
++void rvu_cgx_wq_destroy(struct rvu *rvu);
  #endif /* RVU_H */
 diff --git a/drivers/soc/marvell/octeontx2/rvu_cgx.c b/drivers/soc/marvell/octeontx2/rvu_cgx.c
-new file mode 100644
-index 0000000..bf81507
---- /dev/null
+index bf81507..2359806e 100644
+--- a/drivers/soc/marvell/octeontx2/rvu_cgx.c
 +++ b/drivers/soc/marvell/octeontx2/rvu_cgx.c
-@@ -0,0 +1,97 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/* Marvell OcteonTx2 RVU Admin Function driver
-+ *
-+ * Copyright (C) 2018 Marvell International Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
+@@ -15,6 +15,11 @@
+ #include "rvu.h"
+ #include "cgx.h"
+ 
++struct cgx_evq_entry {
++	struct list_head evq_node;
++	struct cgx_link_event link_event;
++};
 +
-+#include <linux/types.h>
-+#include <linux/module.h>
-+#include <linux/pci.h>
-+
-+#include "rvu.h"
-+#include "cgx.h"
-+
-+static inline u8 cgxlmac_id_to_bmap(u8 cgx_id, u8 lmac_id)
+ static inline u8 cgxlmac_id_to_bmap(u8 cgx_id, u8 lmac_id)
+ {
+ 	return ((cgx_id & 0xF) << 4) | (lmac_id & 0xF);
+@@ -72,9 +77,95 @@ static int rvu_map_cgx_lmac_pf(struct rvu *rvu)
+ 	return 0;
+ }
+ 
++/* This is called from interrupt context and is expected to be atomic */
++static int cgx_lmac_postevent(struct cgx_link_event *event, void *data)
 +{
-+	return ((cgx_id & 0xF) << 4) | (lmac_id & 0xF);
-+}
++	struct rvu *rvu = data;
++	struct cgx_evq_entry *qentry;
 +
-+static void *rvu_cgx_pdata(u8 cgx_id, struct rvu *rvu)
-+{
-+	if (cgx_id >= rvu->cgx_cnt)
-+		return NULL;
-+
-+	return rvu->cgx_idmap[cgx_id];
-+}
-+
-+static int rvu_map_cgx_lmac_pf(struct rvu *rvu)
-+{
-+	int cgx_cnt = rvu->cgx_cnt;
-+	int cgx, lmac_cnt, lmac;
-+	int pf = PF_CGXMAP_BASE;
-+	int size;
-+
-+	if (!cgx_cnt)
-+		return 0;
-+
-+	if (cgx_cnt > 0xF || MAX_LMAC_PER_CGX > 0xF)
-+		return -EINVAL;
-+
-+	/* Alloc map table
-+	 * An additional entry is required since PF id starts from 1 and
-+	 * hence entry at offset 0 is invalid.
-+	 */
-+	size = (cgx_cnt * MAX_LMAC_PER_CGX + 1) * sizeof(u8);
-+	rvu->pf2cgxlmac_map = devm_kzalloc(rvu->dev, size, GFP_KERNEL);
-+	if (!rvu->pf2cgxlmac_map)
++	/* post event to the event queue */
++	qentry = kmalloc(sizeof(*qentry), GFP_ATOMIC);
++	if (!qentry)
 +		return -ENOMEM;
++	qentry->link_event = *event;
++	spin_lock(&rvu->cgx_evq_lock);
++	list_add_tail(&qentry->evq_node, &rvu->cgx_evq_head);
++	spin_unlock(&rvu->cgx_evq_lock);
 +
-+	/* Initialize offset 0 with an invalid cgx and lmac id */
-+	rvu->pf2cgxlmac_map[0] = 0xFF;
++	/* start worker to process the events */
++	queue_work(rvu->cgx_evh_wq, &rvu->cgx_evh_work);
 +
-+	/* Reverse map table */
-+	rvu->cgxlmac2pf_map = devm_kzalloc(rvu->dev,
-+				  cgx_cnt * MAX_LMAC_PER_CGX * sizeof(u16),
-+				  GFP_KERNEL);
-+	if (!rvu->cgxlmac2pf_map)
-+		return -ENOMEM;
-+
-+	rvu->cgx_mapped_pfs = 0;
-+	for (cgx = 0; cgx < cgx_cnt; cgx++) {
-+		lmac_cnt = cgx_get_lmac_cnt(rvu_cgx_pdata(cgx, rvu));
-+		for (lmac = 0; lmac < lmac_cnt; lmac++, pf++) {
-+			rvu->pf2cgxlmac_map[pf] = cgxlmac_id_to_bmap(cgx, lmac);
-+			rvu->cgxlmac2pf_map[CGX_OFFSET(cgx) + lmac] = 1 << pf;
-+			rvu->cgx_mapped_pfs++;
-+		}
-+	}
 +	return 0;
 +}
 +
-+int rvu_cgx_probe(struct rvu *rvu)
++static void cgx_evhandler_task(struct work_struct *work)
 +{
-+	int i;
++	struct rvu *rvu = container_of(work, struct rvu, cgx_evh_work);
++	struct cgx_evq_entry *qentry;
++	struct cgx_link_event *event;
++	unsigned long flags;
 +
-+	/* find available cgx ports */
-+	rvu->cgx_cnt = cgx_get_cgx_cnt();
-+	if (!rvu->cgx_cnt) {
-+		dev_info(rvu->dev, "No CGX devices found!\n");
-+		return -ENODEV;
++	do {
++		/* Dequeue an event */
++		spin_lock_irqsave(&rvu->cgx_evq_lock, flags);
++		qentry = list_first_entry_or_null(&rvu->cgx_evq_head,
++						  struct cgx_evq_entry,
++						  evq_node);
++		if (qentry)
++			list_del(&qentry->evq_node);
++		spin_unlock_irqrestore(&rvu->cgx_evq_lock, flags);
++		if (!qentry)
++			break; /* nothing more to process */
++
++		event = &qentry->link_event;
++
++		/* Do nothing for now */
++		kfree(qentry);
++	} while (1);
++}
++
++static void cgx_lmac_event_handler_init(struct rvu *rvu)
++{
++	struct cgx_event_cb cb;
++	int cgx, lmac, err;
++	void *cgxd;
++
++	spin_lock_init(&rvu->cgx_evq_lock);
++	INIT_LIST_HEAD(&rvu->cgx_evq_head);
++	INIT_WORK(&rvu->cgx_evh_work, cgx_evhandler_task);
++	rvu->cgx_evh_wq = alloc_workqueue("rvu_evh_wq", 0, 0);
++	if (!rvu->cgx_evh_wq) {
++		dev_err(rvu->dev, "alloc workqueue failed");
++		return;
 +	}
 +
-+	rvu->cgx_idmap = devm_kzalloc(rvu->dev, rvu->cgx_cnt * sizeof(void *),
-+				      GFP_KERNEL);
-+	if (!rvu->cgx_idmap)
-+		return -ENOMEM;
++	cb.notify_link_chg = cgx_lmac_postevent; /* link change call back */
++	cb.data = rvu;
 +
-+	/* Initialize the cgxdata table */
-+	for (i = 0; i < rvu->cgx_cnt; i++)
-+		rvu->cgx_idmap[i] = cgx_get_pdata(i);
-+
-+	/* Map CGX LMAC interfaces to RVU PFs */
-+	return rvu_map_cgx_lmac_pf(rvu);
++	for (cgx = 0; cgx < rvu->cgx_cnt; cgx++) {
++		cgxd = rvu_cgx_pdata(cgx, rvu);
++		for (lmac = 0; lmac < cgx_get_lmac_cnt(cgxd); lmac++) {
++			err = cgx_lmac_evh_register(&cb, cgxd, lmac);
++			if (err)
++				dev_err(rvu->dev,
++					"%d:%d handler register failed\n",
++					cgx, lmac);
++		}
++	}
 +}
++
++void rvu_cgx_wq_destroy(struct rvu *rvu)
++{
++	if (rvu->cgx_evh_wq) {
++		flush_workqueue(rvu->cgx_evh_wq);
++		destroy_workqueue(rvu->cgx_evh_wq);
++		rvu->cgx_evh_wq = NULL;
++	}
++}
++
+ int rvu_cgx_probe(struct rvu *rvu)
+ {
+-	int i;
++	int i, err;
+ 
+ 	/* find available cgx ports */
+ 	rvu->cgx_cnt = cgx_get_cgx_cnt();
+@@ -93,5 +184,11 @@ int rvu_cgx_probe(struct rvu *rvu)
+ 		rvu->cgx_idmap[i] = cgx_get_pdata(i);
+ 
+ 	/* Map CGX LMAC interfaces to RVU PFs */
+-	return rvu_map_cgx_lmac_pf(rvu);
++	err = rvu_map_cgx_lmac_pf(rvu);
++	if (err)
++		return err;
++
++	/* Register for CGX events */
++	cgx_lmac_event_handler_init(rvu);
++	return 0;
+ }
 -- 
 2.7.4
