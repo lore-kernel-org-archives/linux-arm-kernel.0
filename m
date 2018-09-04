@@ -1,36 +1,23 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 4 Sep 2018 08:41:42 -0500
-Subject: [PATCH v2] arm64: dts: ti: k3-am65: Change #address-cells and
- #size-cells of interconnect to 2
-In-Reply-To: <20180903095235.13853-1-kishon@ti.com>
-References: <20180903095235.13853-1-kishon@ti.com>
-Message-ID: <20180904134142.npoxfimfsllmxdwb@akan>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 4 Sep 2018 09:16:18 -0500
+Subject: [PATCH v5 2/4] dt: bindings: Document ZynqMP DDRC in Synopsys
+ documentation
+In-Reply-To: <1535722070-10394-3-git-send-email-manish.narani@xilinx.com>
+References: <1535722070-10394-1-git-send-email-manish.narani@xilinx.com>
+ <1535722070-10394-3-git-send-email-manish.narani@xilinx.com>
+Message-ID: <20180904141618.GA5516@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15:22-20180903, Kishon Vijay Abraham I wrote:
-
-> AM65 has two PCIe controllers and each PCIe controller has '2' address
-> spaces one within the 4GB address space of the SoC and the other above
-> the 4GB address space of the SoC (cbass_main) in addition to the
-> register space. The size of the address space above the 4GB SoC address
-> space is 4GB. These address ranges will be used by CPU/DMA to access
-> the PCIe address space. In order to represent the address space above
-> the 4GB SoC address space and to represent the size of this address
-> space as 4GB, change address-cells and size-cells of interconnect to 2.
+On Fri, Aug 31, 2018 at 06:57:48PM +0530, Manish Narani wrote:
+> Add information of ZynqMP DDRC which reports the single bit errors that
+> are corrected and the double bit errors that are detected.
 > 
-> Since OSPI has similar need in MCU Domain Memory Map, change
-> address-cells and size-cells of cbass_mcu interconnect also to 2.
-> 
+> Signed-off-by: Manish Narani <manish.narani@xilinx.com>
+> ---
+>  .../bindings/memory-controllers/synopsys.txt       | 27 ++++++++++++++++++----
+>  1 file changed, 22 insertions(+), 5 deletions(-)
 
-Please add Fixes
+Please add acks/reviewed-bys when posting new versions.
 
-Vignesh, Sekhar, Tony,
-
-Do we agree this is the right way to go forward? if yes, please
-ack.
-
-
--- 
-Regards,
-Nishanth Menon
+Rob
