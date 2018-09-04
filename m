@@ -1,85 +1,28 @@
-From: dmurphy@ti.com (Dan Murphy)
-Date: Tue, 4 Sep 2018 09:34:49 -0500
-Subject: [rfc] leds: add TI LMU backlight driver
-In-Reply-To: <20180831213030.GA23447@amd>
-References: <20180829212032.GB15786@amd>
- <a0906253-44e3-5a01-73ca-67c7cb124eb0@ti.com> <20180830201825.GA1936@amd>
- <ec7c9624-c1c3-df35-3593-704ac1dc9a4d@ti.com> <20180831213030.GA23447@amd>
-Message-ID: <d96eab23-dbd9-71a6-551e-2bc99ce4a57c@ti.com>
+From: mathias.nyman@linux.intel.com (Mathias Nyman)
+Date: Tue, 4 Sep 2018 17:44:23 +0300
+Subject: [PATCH 1/6] usb: xhci-mtk: resume USB3 roothub first
+In-Reply-To: <1535591392.32173.30.camel@mhfsdcap03>
+References: <3bcc220aa54bfebc39cea54cd736388ad37ee0c5.1535510898.git.chunfeng.yun@mediatek.com>
+ <f144173b-6131-21cf-1ead-60d938ac289a@cogentembedded.com>
+ <1535591392.32173.30.camel@mhfsdcap03>
+Message-ID: <93e36b7b-f0d0-4f5e-69b7-4195c25628f4@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pavel
-
-On 08/31/2018 04:30 PM, Pavel Machek wrote:
-> Hi!
-> 
->>> Aha. I did not realize that was for same hardware... I should have
->>> cc-ed you, I guess.
+On 30.08.2018 04:09, Chunfeng Yun wrote:
+> Hi,
+> On Wed, 2018-08-29 at 12:13 +0300, Sergei Shtylyov wrote:
+>> On 8/29/2018 5:55 AM, Chunfeng Yun wrote:
 >>
->> No worries Jacek cc'd me.
-> 
-> Good.
-> 
->>>> I do not like this driver.
->>>> I don't like that it smashes numerous devices into some structure with varying register maps.
->>>>
->>>
->>> Can you elaborate? The chips are similar enough that single driver
->>> makes sense, and we certainly want to maintain one driver, not 6
->>> drivers differing only in .. what exactly?
+>>> Give USB3 devices a better chance to enumerate at USB3 speeds if
+>>> they are connected to a suspended host.
+>>> Porting from "671ffdf xhci: resume USB 3 roothub first"
 >>
->> Well I think it is justified to have independent drivers as each device has different features from
->> this basic LED driver.  If we are just looking for basic support then yes this driver is fine.
+>>      From commit 671ffdff5b13 ("xhci: resume USB 3 roothub first").
 > 
->> But here is where a single driver will start getting messy and support difficult
->>
->> LM3533 has ALS and an ADC for an ALS analog sensor
->> LM3631 has no ALS functionality
->> LM3632 has strobe functionality and no ramp support
->> LM3633 has indicator support coupled with the hvled support
->> LM3695 does not even appear to be available publicly
->> LM3697 is the only device that that this driver could be used for as is.
+> Ok, Thanks
 > 
-> Ok, so ... yes, I'm really interested in basic support. But drivers
-> seem to have a lot in common, voltage limits, for example. 
-> 
->> In addition if I wanted to only support a single device I have to pull in the full data
->> file that defines all the other devices.  That is pretty bad to increase the size of the kernel
->> image to have support for devices that are not even on the target product.  The ti-lmu data file
->> alone is ~15k, the ti-lmu code does not even build with this patch (So this is a nack on the patch as it is.)
->> but commenting out the offending code gives me at least ~23k more data on top
->> of the ti-lmu MFD framework which is ~33k.  That is ~71k of code just to support 1 LED device
->> that is 3x what we have now.  That is not good for IoT devices.
-> 
->> The LM3697 is 22k without ramp support.
-> 
-> Well, I don't think object file size is huge problem. First,
-> "distribution" kernel with support for 6 different chips will be ~71k,
-> while your proposal will result in ~136k. Second, yes, we could put
-> ifdefs into ti-lmu data file to make it smaller.
-> 
-> Anyway, clean source code and easy maintainance is more important.
 
-I am going to reply here and snip the rest of the chain.
+adding to queue (I'll fix that commit ID)
 
-My proposal is to create a ti-lmu-led-common file that contains all the common
-code.  We can have LED drivers use that common code to perform the common tasks.
-This can then be extended to other devices past, present or future that have the
-same feature set.
-
-Then the register maps and LED registration can be contained in each LED driver and any additional features
-can be supported in the LED driver.  The common code will retrieve any device settings from
-the firmware that it is interested in.
-
-I can throw some code together and RFC the code.  This way we get the common core for the
-chips and not the bloat or messy source with a single driver.
-
-And yes I can put this together and support it if it is needed.  I just need to go get the EVMs
-so I can test it.
-
-Thoughts?
-
-<snip>-- 
-------------------
-Dan Murphy
+-Mathias
