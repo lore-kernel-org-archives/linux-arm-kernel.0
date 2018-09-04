@@ -1,20 +1,21 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 04 Sep 2018 08:36:47 -0500
-Subject: [PATCH 2/6] clk: imx: vf610: Add CRC clock
-In-Reply-To: <20180830171539.20008-3-krzk@kernel.org>
-References: <20180830171539.20008-1-krzk@kernel.org>
- <20180830171539.20008-3-krzk@kernel.org>
-Message-ID: <5b8e8a6f.1c69fb81.8fb5e.93c2@mx.google.com>
+Date: Tue, 04 Sep 2018 08:36:51 -0500
+Subject: [PATCH 3/7] clk: imx6sx: add mmdc1 ipg clock
+In-Reply-To: <1535701998-20443-4-git-send-email-Anson.Huang@nxp.com>
+References: <1535701998-20443-1-git-send-email-Anson.Huang@nxp.com>
+ <1535701998-20443-4-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <5b8e8a74.1c69fb81.f383.6bc1@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 30 Aug 2018 19:15:35 +0200, Krzysztof Kozlowski wrote:
-> Add the clock for CRC block allowing it to be enabled by HW CRC driver.
+On Fri, 31 Aug 2018 15:53:14 +0800, Anson Huang wrote:
+> i.MX6SX has MMDC1 ipg clock in CCM CCGR, add it into
+> clock tree for clock management.
 > 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 > ---
->  drivers/clk/imx/clk-vf610.c             | 1 +
->  include/dt-bindings/clock/vf610-clock.h | 3 ++-
+>  drivers/clk/imx/clk-imx6sx.c             | 1 +
+>  include/dt-bindings/clock/imx6sx-clock.h | 3 ++-
 >  2 files changed, 3 insertions(+), 1 deletion(-)
 > 
 
