@@ -1,31 +1,28 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 4 Sep 2018 13:20:29 +0800
-Subject: [PATCH v2] crypto: arm64/aes-modes - get rid of literal load of
- addend vector
-In-Reply-To: <20180823164845.20055-1-ard.biesheuvel@linaro.org>
-References: <20180823164845.20055-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180904052029.fktlxcxtrowuvkh4@gondor.apana.org.au>
+Date: Tue, 4 Sep 2018 13:21:09 +0800
+Subject: [PATCH 4/4] crypto: arm64/crc32 - remove PMULL based CRC32 driver
+In-Reply-To: <20180827110245.14812-5-ard.biesheuvel@linaro.org>
+References: <20180827110245.14812-1-ard.biesheuvel@linaro.org>
+ <20180827110245.14812-5-ard.biesheuvel@linaro.org>
+Message-ID: <20180904052109.bprmzgstknh6yecz@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2018 at 05:48:45PM +0100, Ard Biesheuvel wrote:
-> Replace the literal load of the addend vector with a sequence that
-> performs each add individually. This sequence is only 2 instructions
-> longer than the original, and 2% faster on Cortex-A53.
+On Mon, Aug 27, 2018 at 01:02:45PM +0200, Ard Biesheuvel wrote:
+> Now that the scalar fallbacks have been moved out of this driver into
+> the core crc32()/crc32c() routines, we are left with a CRC32 crypto API
+> driver for arm64 that is based only on 64x64 polynomial multiplication,
+> which is an optional instruction in the ARMv8 architecture, and is less
+> and less likely to be available on cores that do not also implement the
+> CRC32 instructions, given that those are mandatory in the architecture
+> as of ARMv8.1.
 > 
-> This is an improvement by itself, but also works around a Clang issue,
-> whose integrated assembler does not implement the GNU ARM asm syntax
-> completely, and does not support the =literal notation for FP registers
-> (more info at https://bugs.llvm.org/show_bug.cgi?id=38642)
+> Since the scalar instructions do not require the special handling that
+> SIMD instructions do, and since they turn out to be considerably faster
+> on some cores (Cortex-A53) as well, there is really no point in keeping
+> this code around so let's just remove it.
 > 
-> Cc: Nick Desaulniers <ndesaulniers@google.com>
 > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> v2: replace convoluted code involving a SIMD add to increment four BE counters
->     at once with individual add/rev/mov instructions
-> 
->  arch/arm64/crypto/aes-modes.S | 16 +++++++++-------
->  1 file changed, 9 insertions(+), 7 deletions(-)
 
 Patch applied.  Thanks.
 -- 
