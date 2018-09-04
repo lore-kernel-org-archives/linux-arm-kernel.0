@@ -1,28 +1,27 @@
-From: sebastien.szymanski@armadeus.com (=?UTF-8?Q?S=c3=a9bastien_Szymanski?=)
-Date: Tue, 4 Sep 2018 10:01:18 +0200
-Subject: [PATCH] ARM: dts: imx6ull: update iomux header
-In-Reply-To: <20180903022642.GE3850@dragon>
-References: <1535606405-8099-1-git-send-email-Anson.Huang@nxp.com>
- <20180903022642.GE3850@dragon>
-Message-ID: <eaa5e1cf-04e6-f11f-e7f8-0ff95b97ab5c@armadeus.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 4 Sep 2018 11:05:40 +0300
+Subject: [RESEND PATCHv2 0/4] ARM build infra changes to support building
+ .dtbos
+In-Reply-To: <1535719666-13595-1-git-send-email-t-kristo@ti.com>
+References: <1535719666-13595-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1536048344-9995-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/03/2018 04:26 AM, Shawn Guo wrote:
-> Add S?bastien for a cross check.
-> 
-> Shawn
-> 
-> On Thu, Aug 30, 2018 at 01:20:05PM +0800, Anson Huang wrote:
->> Update i.MX6ULL iomux header according to latest reference
->> manual Rev.1, 11/2017.
->>
->> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+Hi,
 
-Reviewed-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
+This v2 is just a split of the v1 series, adding support for building
+DT overlays to ARM build infra. The series also adds support for
+individual Makefiles under boot/dts hierarchy, so that per-dir
+flags or rules can be introduced (patch #2, #4.)
 
--- 
-S?bastien Szymanski
-Software engineer, Armadeus Systems
-Tel: +33 (0)9 72 29 41 44
-Fax: +33 (0)9 72 28 79 26
+Resending due to missing Frank from delivery of initial v2.
+
+Depends on the kbuild change for adding support for building .dtbo files [1].
+
+[1] https://marc.info/?l=linux-arm-kernel&m=153604732319790&w=2
+
+-Tero
+
+--
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
