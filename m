@@ -1,76 +1,80 @@
 From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Tue, 4 Sep 2018 15:22:33 +0530
-Subject: [RFC PATCH v2 2/3] dt-bindings: fpga: Add bindings for ZynqMP nvmem
- driver
+Date: Tue, 4 Sep 2018 15:22:32 +0530
+Subject: [RFC PATCH v2 1/3] fairmware: xilinx: Add zynqmp_pm_get_chipid() API
 In-Reply-To: <1536054754-3119-1-git-send-email-nava.manne@xilinx.com>
 References: <1536054754-3119-1-git-send-email-nava.manne@xilinx.com>
-Message-ID: <1536054754-3119-3-git-send-email-nava.manne@xilinx.com>
+Message-ID: <1536054754-3119-2-git-send-email-nava.manne@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add documentation to describe Xilinx ZynqMP nvmem driver
-bindings.
+This patch adds a new API to provide access to the
+hardware related data like soc revision, IDCODE... etc.
 
 Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
 ---
 Changes for v2:
-		-Moved nvmem_firmware node as a child to
-		 firwmare node.
+		-New Patch.
 
- .../firmware/xilinx/xlnx,zynqmp-firmware.txt       | 35 ++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+ drivers/firmware/xilinx/zynqmp.c     | 24 ++++++++++++++++++++++++
+ include/linux/firmware/xlnx-zynqmp.h |  2 ++
+ 2 files changed, 26 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-index 1b431d9..4b95fcc 100644
---- a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-+++ b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-@@ -17,6 +17,19 @@ Required properties:
- 		  - "smc" : SMC #0, following the SMCCC
- 		  - "hvc" : HVC #0, following the SMCCC
+diff --git a/drivers/firmware/xilinx/zynqmp.c b/drivers/firmware/xilinx/zynqmp.c
+index 7ccedf0..7a33f93 100644
+--- a/drivers/firmware/xilinx/zynqmp.c
++++ b/drivers/firmware/xilinx/zynqmp.c
+@@ -447,8 +447,32 @@ static int zynqmp_pm_clock_getparent(u32 clock_id, u32 *parent_id)
+ 	return ret;
+ }
  
-+--------------------------------------------------------------------------
-+=  Zynq UltraScale+ MPSoC nvmem firmware driver binding =
-+--------------------------------------------------------------------------
-+The nvmem_firmware node provides access to the hardware related data
-+like soc revision, IDCODE... etc, By using the firmware interface.
++/**
++ * zynqmp_pm_get_chipid - Get silicon ID registers
++ * @idcode:     IDCODE register
++ * @version:    version register
++ *
++ * Return:      Returns the status of the operation and the idcode and version
++ *              registers in @idcode and @version.
++ */
++static int zynqmp_pm_get_chipid(u32 *idcode, u32 *version)
++{
++	u32 ret_payload[PAYLOAD_ARG_CNT];
++	int ret;
 +
-+Required properties:
-+- compatible: should be "xlnx,zynqmp-nvmem-fw"
++	if (!idcode || !version)
++		return -EINVAL;
 +
-+= Data cells =
-+Are child nodes of silicon id, bindings of which as described in
-+bindings/nvmem/nvmem.txt
++	ret = zynqmp_pm_invoke_fn(PM_GET_CHIPID, 0, 0, 0, 0, ret_payload);
++	*idcode = ret_payload[1];
++	*version = ret_payload[2];
 +
- -------
- Example
- -------
-@@ -25,5 +38,27 @@ firmware {
- 	zynqmp_firmware: zynqmp-firmware {
- 		compatible = "xlnx,zynqmp-firmware";
- 		method = "smc";
-+		nvmem_firmware {
-+			compatible = "xlnx,zynqmp-nvmem-fw";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
++	return ret;
++}
 +
-+			/* Data cells */
-+			soc_revision: soc_revision {
-+				reg = <0x0 0x4>;
-+			};
-+		};
- 	};
- };
-+
-+= Data consumers =
-+Are device nodes which consume nvmem data cells.
-+
-+For example:
-+
-+	pcap {
-+		...
-+		nvmem-cells = <&soc_revision>;
-+		nvmem-cell-names = "soc_revision";
-+	};
-+
+ static const struct zynqmp_eemi_ops eemi_ops = {
+ 	.get_api_version = zynqmp_pm_get_api_version,
++	.get_chipid = zynqmp_pm_get_chipid,
+ 	.ioctl = zynqmp_pm_ioctl,
+ 	.query_data = zynqmp_pm_query_data,
+ 	.clock_enable = zynqmp_pm_clock_enable,
+diff --git a/include/linux/firmware/xlnx-zynqmp.h b/include/linux/firmware/xlnx-zynqmp.h
+index 58a7478..5a49d6f 100644
+--- a/include/linux/firmware/xlnx-zynqmp.h
++++ b/include/linux/firmware/xlnx-zynqmp.h
+@@ -34,6 +34,7 @@
+ 
+ enum pm_api_id {
+ 	PM_GET_API_VERSION = 1,
++	PM_GET_CHIPID = 22,
+ 	PM_IOCTL = 34,
+ 	PM_QUERY_DATA,
+ 	PM_CLOCK_ENABLE,
+@@ -90,6 +91,7 @@ struct zynqmp_pm_query_data {
+ 
+ struct zynqmp_eemi_ops {
+ 	int (*get_api_version)(u32 *version);
++	int (*get_chipid)(u32 *idcode, u32 *version);
+ 	int (*ioctl)(u32 node_id, u32 ioctl_id, u32 arg1, u32 arg2, u32 *out);
+ 	int (*query_data)(struct zynqmp_pm_query_data qdata, u32 *out);
+ 	int (*clock_enable)(u32 clock_id);
 -- 
 2.7.4
