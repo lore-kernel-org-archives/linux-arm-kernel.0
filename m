@@ -1,31 +1,26 @@
-From: christianshewitt@gmail.com (Christian Hewitt)
-Date: Tue,  4 Sep 2018 22:30:43 +0400
-Subject: [PATCH] ARM64: dts: meson-gx: increase default shared CMA pool size
-Message-ID: <1536085844-29328-1-git-send-email-christianshewitt@gmail.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Tue, 4 Sep 2018 14:38:02 -0400
+Subject: [RFC PATCH 00/11] Avoid synchronous TLB invalidation for
+ intermediate page-table entries on arm64
+In-Reply-To: <1535125966-7666-1-git-send-email-will.deacon@arm.com>
+References: <1535125966-7666-1-git-send-email-will.deacon@arm.com>
+Message-ID: <3dd55e21-7424-071a-0f7e-d24fc2396f2a@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Devices using the new V4L2 mem2mem vdec require a larger CMA pool. As
-nearly all GX* devices are video/media focused and will use it, set a
-larger (256MB) default value.
+On 08/24/2018 11:52 AM, Will Deacon wrote:
 
-Signed-off-by: Christian Hewitt <christianshewitt@gmail.com>
----
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> I hacked up this RFC on the back of the recent changes to the mmu_gather
+> stuff in mainline. It's had a bit of testing and it looks pretty good so
+> far.
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-index b8dc4db..ef43922 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-@@ -44,7 +44,7 @@
- 		linux,cma {
- 			compatible = "shared-dma-pool";
- 			reusable;
--			size = <0x0 0xbc00000>;
-+			size = <0x0 0x10000000>;
- 			alignment = <0x0 0x400000>;
- 			linux,cma-default;
- 		};
+I will request the server folks go and test this. You'll probably
+remember a couple of parts we've seen where aggressive walker caches
+ended up (correctly) seeing stale page table entries and we had all
+manner of horrifically hard to debug problems. We have some fairly nice
+reproducers that were able to find this last time that we can test.
+
+Jon.
+
 -- 
-2.7.4
+Computer Architect | Sent from my Fedora powered laptop
