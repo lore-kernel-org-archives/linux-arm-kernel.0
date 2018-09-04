@@ -1,20 +1,21 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 04 Sep 2018 08:36:41 -0500
-Subject: [PATCH] ARM: dts: imx6ull: update iomux header
-In-Reply-To: <1535606405-8099-1-git-send-email-Anson.Huang@nxp.com>
-References: <1535606405-8099-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <5b8e8a69.1c69fb81.1c56d.87a4@mx.google.com>
+Date: Mon, 3 Sep 2018 20:20:10 -0500
+Subject: [PATCH 1/6] dt-bindings: crypto: Add Freescale Vybrid CRC
+In-Reply-To: <20180830171539.20008-2-krzk@kernel.org>
+References: <20180830171539.20008-1-krzk@kernel.org>
+ <20180830171539.20008-2-krzk@kernel.org>
+Message-ID: <20180904012005.GA2470@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 30 Aug 2018 13:20:05 +0800, Anson Huang wrote:
-> Update i.MX6ULL iomux header according to latest reference
-> manual Rev.1, 11/2017.
+On Thu, 30 Aug 2018 19:15:34 +0200, Krzysztof Kozlowski wrote:
+> Add bindings for Freescale/NXP Vybrid CRC HW accelerator.
 > 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 > ---
->  arch/arm/boot/dts/imx6ull-pinfunc.h | 21 +++++++++++++++++++--
->  1 file changed, 19 insertions(+), 2 deletions(-)
+>  .../devicetree/bindings/crypto/fsl-vf610-crc.txt         | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/crypto/fsl-vf610-crc.txt
 > 
 
 Reviewed-by: Rob Herring <robh@kernel.org>
