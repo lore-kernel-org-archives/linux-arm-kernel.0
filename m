@@ -1,59 +1,34 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Tue, 4 Sep 2018 17:29:33 +0200
-Subject: [PATCH] can: at91_can: fix fall-through annotations
-In-Reply-To: <20180903183618.GA6905@embeddedor.com>
-References: <20180903183618.GA6905@embeddedor.com>
-Message-ID: <20180904152933.GJ13888@piout.net>
+From: edgar.righi@lsitec.org.br (Edgar Bernardi Righi)
+Date: Tue, 4 Sep 2018 12:34:24 -0300
+Subject: [PATCH v2 00/03] Add clock driver for Actions Semi S500 SoC
+Message-ID: <CADHB5bAFM=Qs6f0zf6iQuYfmT-ErSwG3-2mTsLnL-MCCUw1FhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/2018 13:36:18-0500, Gustavo A. R. Silva wrote:
-> Properly place the "fall through" annotations at the bottom of the case,
-> which is what GCC is expecting to find.
-> 
-> This fix is part of the ongoing efforts to enabling -Wimplicit-fallthrough
-> 
-> Addresses-Coverity-ID: 1222851 ("Missing break in switch")
-> Addresses-Coverity-ID: 402011 ("Missing break in switch")
-> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
+This patchset adds clock support for Actions Semi Owl series S500 SoC
+with relevant clock bindings and device tree info.
+Updates from v1 to v2:
+SoC supports were organized in alphabetical manner.
+"_DELAY" suffixes were removed.
+Patch generation format changed.
+Commits were rebased on top of Saravanan's patches.
+Changed patches ordering.
 
-Seems good to me (but I preferred the previous annotation ;))
+Signed-off-by: Edgar Bernardi Righi <edgar.righi@lsitec.org.br>
 
-Reviewed-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
-
-> ---
->  drivers/net/can/at91_can.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/net/can/at91_can.c b/drivers/net/can/at91_can.c
-> index d98c690..1718c20 100644
-> --- a/drivers/net/can/at91_can.c
-> +++ b/drivers/net/can/at91_can.c
-> @@ -902,7 +902,8 @@ static void at91_irq_err_state(struct net_device *dev,
->  				CAN_ERR_CRTL_TX_WARNING :
->  				CAN_ERR_CRTL_RX_WARNING;
->  		}
-> -	case CAN_STATE_ERROR_WARNING:	/* fallthrough */
-> +		/* fall through */
-> +	case CAN_STATE_ERROR_WARNING:
->  		/*
->  		 * from: ERROR_ACTIVE, ERROR_WARNING
->  		 * to  : ERROR_PASSIVE, BUS_OFF
-> @@ -951,7 +952,8 @@ static void at91_irq_err_state(struct net_device *dev,
->  		netdev_dbg(dev, "Error Active\n");
->  		cf->can_id |= CAN_ERR_PROT;
->  		cf->data[2] = CAN_ERR_PROT_ACTIVE;
-> -	case CAN_STATE_ERROR_WARNING:	/* fallthrough */
-> +		/* fall through */
-> +	case CAN_STATE_ERROR_WARNING:
->  		reg_idr = AT91_IRQ_ERRA | AT91_IRQ_WARN | AT91_IRQ_BOFF;
->  		reg_ier = AT91_IRQ_ERRP;
->  		break;
-> -- 
-> 2.7.4
-> 
-
--- 
-Alexandre Belloni, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+---
+ arch/arm/boot/dts/owl-s500-cubieboard6.dts     |   8 +-
+ arch/arm/boot/dts/owl-s500-guitar-bb-rev-b.dts |   8 +-
+ arch/arm/boot/dts/owl-s500-sparky.dts          |   8 +-
+ arch/arm/boot/dts/owl-s500.dtsi                |  24 ++
+ drivers/clk/actions/Kconfig                    |   5 +
+ drivers/clk/actions/Makefile                   |   1 +
+ drivers/clk/actions/owl-pll.c                  |   2 +-
+ drivers/clk/actions/owl-pll.h                  |  15 +-
+ drivers/clk/actions/owl-s500.c                 | 524 +++++++++++++++++++++++++
+ drivers/clk/actions/owl-s700.c                 |  18 +-
+ drivers/clk/actions/owl-s900.c                 |  18 +-
+ include/dt-bindings/clock/actions,s500-cmu.h   |  78 ++++
+ 12 files changed, 664 insertions(+), 45 deletions(-)
+ create mode 100644 drivers/clk/actions/owl-s500.c
+ create mode 100644 include/dt-bindings/clock/actions,s500-cmu.
