@@ -1,52 +1,65 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Tue, 4 Sep 2018 12:19:34 +0530
-Subject: [PATCH v3 RESEND 0/4] clk: clk: Add functions to save/restore clock
- context en-masse
-Message-ID: <1536043778-2232-1-git-send-email-j-keerthy@ti.com>
+Date: Tue, 4 Sep 2018 12:19:36 +0530
+Subject: [PATCH v3 RESEND 2/4] clk: clk: Add clk_gate_restore_context function
+In-Reply-To: <1536043778-2232-1-git-send-email-j-keerthy@ti.com>
+References: <1536043778-2232-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <1536043778-2232-3-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Deep enough power saving mode can result into losing context of the clock
-registers also, and they need to be restored once coming back from the power
-saving mode. Hence add functions to save/restore clock context.
+The clock gate restore context function enables or disables
+the gate clocks based on the enable_count. This is done in cases
+where the clock context is lost and based on the enable_count
+the clock either needs to be enabled/disabled.
 
-Tested for DS0 on am437x-gp-evm
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+Acked-by: Tony Lindgren <tony@atomide.com>
+---
+ drivers/clk/clk.c            | 19 +++++++++++++++++++
+ include/linux/clk-provider.h |  2 ++
+ 2 files changed, 21 insertions(+)
 
-Based on top of linux-next
-
-Resend Series:
-
-  * Rebased on top of Linux 4.19-rc2
-  * Added Tony's Ack.
-
-Changes in v2:
-
-        * Renamed clk_dflt_restore to clk_gate_restore_context
-
-Changes in v3: Corrected the e-mail address of linux-omap list 
-
-Keerthy (2):
-  clk: clk: Add clk_gate_restore_context function
-  ti: pm33xx: Save/restore clk context based on enable_off_mode setting
-
-Russ Dill (2):
-  clk: clk: Add functions to save/restore clock context en-masse
-  clk: ti: Add functions to save/restore clk context
-
- arch/arm/mach-omap2/pm33xx-core.c    |  15 +++++
- drivers/clk/clk.c                    |  93 ++++++++++++++++++++++++++
- drivers/clk/ti/clock.h               |   2 +
- drivers/clk/ti/divider.c             |  36 ++++++++++
- drivers/clk/ti/dpll.c                |   6 ++
- drivers/clk/ti/dpll3xxx.c            | 124 +++++++++++++++++++++++++++++++++++
- drivers/clk/ti/gate.c                |   3 +
- drivers/clk/ti/mux.c                 |  29 ++++++++
- drivers/soc/ti/pm33xx.c              |  13 ++++
- include/linux/clk-provider.h         |   9 +++
- include/linux/clk.h                  |  25 +++++++
- include/linux/clk/ti.h               |   6 ++
- include/linux/platform_data/pm33xx.h |   1 +
- 13 files changed, 362 insertions(+)
-
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 8a0254a..dd77577 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -923,6 +923,25 @@ static int clk_core_enable_lock(struct clk_core *core)
+ 	return ret;
+ }
+ 
++/**
++ * clk_gate_restore_context - restore context for poweroff
++ * @hw: the clk_hw pointer of clock whose state is to be restored
++ *
++ * The clock gate restore context function enables or disables
++ * the gate clocks based on the enable_count. This is done in cases
++ * where the clock context is lost and based on the enable_count
++ * the clock either needs to be enabled/disabled. This
++ * helps restore the state of gate clocks.
++ */
++void clk_gate_restore_context(struct clk_hw *hw)
++{
++	if (hw->clk->core->enable_count)
++		hw->clk->core->ops->enable(hw);
++	else
++		hw->clk->core->ops->disable(hw);
++}
++EXPORT_SYMBOL_GPL(clk_gate_restore_context);
++
+ static int _clk_save_context(struct clk_core *clk)
+ {
+ 	struct clk_core *child;
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index df7379d..60c5187 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -1018,5 +1018,7 @@ static inline void clk_writel(u32 val, u32 __iomem *reg)
+ 
+ #endif	/* platform dependent I/O accessors */
+ 
++void clk_gate_restore_context(struct clk_hw *hw);
++
+ #endif /* CONFIG_COMMON_CLK */
+ #endif /* CLK_PROVIDER_H */
 -- 
 1.9.1
