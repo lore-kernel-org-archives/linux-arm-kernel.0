@@ -1,41 +1,98 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue,  4 Sep 2018 12:40:51 +0800
-Subject: [PATCH v4 09/11] dt-bindings: sun4i-drm: add HDMI VCC supply property
- for sun8i-dw-hdmi
+Date: Tue,  4 Sep 2018 12:40:52 +0800
+Subject: [PATCH v4 10/11] drm/sun4i: Add support for HDMI voltage regulator
 In-Reply-To: <20180904044053.15425-1-icenowy@aosc.io>
 References: <20180904044053.15425-1-icenowy@aosc.io>
-Message-ID: <20180904044053.15425-10-icenowy@aosc.io>
+Message-ID: <20180904044053.15425-11-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwiner SoCs with DesignWare HDMI controller all come with a "HVCC"
-pin, which is the VCC of HDMI part.
+From: Jernej Skrabec <jernej.skrabec@siol.net>
 
-Add a supply property to specify HVCC's regulator in the device tree.
+Some boards have HDMI VCC pin connected to voltage regulator which may
+not be turned on by default.
 
+Add support for such boards by adding voltage regulator handling code to
+HDMI driver.
+
+Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+[Icenowy: change supply name to "hvcc"]
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
 Changes in v4:
 - Rename the supply name to "hvcc".
 Changes in v3.1:
-- New patch.
+- New patch. (Replaced "drm: sun4i: add support for HVCC regulator
+  for DWC HDMI glue" by Icenowy.)
 
- Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c | 17 ++++++++++++++++-
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h |  2 ++
+ 2 files changed, 18 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index fdb8fb29033f..0bbb5d47f228 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -97,6 +97,9 @@ Required properties:
-     first port should be the input endpoint. The second should be the
-     output, usually to an HDMI connector.
+diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+index 31875b636434..ed2983770e9c 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
++++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+@@ -125,10 +125,22 @@ static int sun8i_dw_hdmi_bind(struct device *dev, struct device *master,
+ 		return PTR_ERR(hdmi->clk_tmds);
+ 	}
  
-+Optional properties:
-+  - hvcc-supply: the VCC power supply of the controller
++	hdmi->regulator = devm_regulator_get(dev, "hvcc");
++	if (IS_ERR(hdmi->regulator)) {
++		dev_err(dev, "Couldn't get regulator\n");
++		return PTR_ERR(hdmi->regulator);
++	}
 +
- DWC HDMI PHY
- ------------
++	ret = regulator_enable(hdmi->regulator);
++	if (ret) {
++		dev_err(dev, "Failed to enable regulator\n");
++		return ret;
++	}
++
+ 	ret = reset_control_deassert(hdmi->rst_ctrl);
+ 	if (ret) {
+ 		dev_err(dev, "Could not deassert ctrl reset control\n");
+-		return ret;
++		goto err_disable_regulator;
+ 	}
+ 
+ 	ret = clk_prepare_enable(hdmi->clk_tmds);
+@@ -183,6 +195,8 @@ static int sun8i_dw_hdmi_bind(struct device *dev, struct device *master,
+ 	clk_disable_unprepare(hdmi->clk_tmds);
+ err_assert_ctrl_reset:
+ 	reset_control_assert(hdmi->rst_ctrl);
++err_disable_regulator:
++	regulator_disable(hdmi->regulator);
+ 
+ 	return ret;
+ }
+@@ -196,6 +210,7 @@ static void sun8i_dw_hdmi_unbind(struct device *dev, struct device *master,
+ 	sun8i_hdmi_phy_remove(hdmi);
+ 	clk_disable_unprepare(hdmi->clk_tmds);
+ 	reset_control_assert(hdmi->rst_ctrl);
++	regulator_disable(hdmi->regulator);
+ }
+ 
+ static const struct component_ops sun8i_dw_hdmi_ops = {
+diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
+index aadbe0a10b0c..7fdc1ecd2892 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
++++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h
+@@ -10,6 +10,7 @@
+ #include <drm/drm_encoder.h>
+ #include <linux/clk.h>
+ #include <linux/regmap.h>
++#include <linux/regulator/consumer.h>
+ #include <linux/reset.h>
+ 
+ #define SUN8I_HDMI_PHY_DBG_CTRL_REG	0x0000
+@@ -176,6 +177,7 @@ struct sun8i_dw_hdmi {
+ 	struct drm_encoder		encoder;
+ 	struct sun8i_hdmi_phy		*phy;
+ 	struct dw_hdmi_plat_data	plat_data;
++	struct regulator		*regulator;
+ 	struct reset_control		*rst_ctrl;
+ };
  
 -- 
 2.18.0
