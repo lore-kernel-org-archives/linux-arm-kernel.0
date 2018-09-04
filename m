@@ -1,75 +1,59 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Tue, 4 Sep 2018 13:39:30 -0700
-Subject: [PATCH v3 1/3] ARM: dts: NSP: Enable SFP on bcm958625hr
-In-Reply-To: <20180831192039.11842-2-f.fainelli@gmail.com>
-References: <20180831192039.11842-1-f.fainelli@gmail.com>
- <20180831192039.11842-2-f.fainelli@gmail.com>
-Message-ID: <68b987de-9229-4606-a972-650b3f486e19@broadcom.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 4 Sep 2018 14:12:50 -0700
+Subject: [GIT PULL] Amlogic fixes for v4.19-rc
+In-Reply-To: <CAFBinCB3_P2mGR0HaxrARScVODoag78dkGBD_w46nNFJR=dnVQ@mail.gmail.com>
+References: <7hk1o9895g.fsf@baylibre.com>
+ <20180829185450.wmmyoona2hrapnj6@localhost>
+ <CAOi56cWrNfFKe7+FkhMiCsSaeW7Fy8=pMA7H+yx_qhFMkadh5Q@mail.gmail.com>
+ <CAOesGMgzWwVr6K9u-QJzOfF5PSgXmqKuAN8+cc42fSHskPV7=Q@mail.gmail.com>
+ <CAFBinCB3_P2mGR0HaxrARScVODoag78dkGBD_w46nNFJR=dnVQ@mail.gmail.com>
+Message-ID: <CAOi56cX-Jqg5Z71eNd42HoFwcvNAm+qFieYa=c-hsPw86dmBfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Sep 2, 2018 at 2:30 PM Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
+>
+> Hi Kevin,
+>
+> On Sun, Sep 2, 2018 at 3:22 AM Olof Johansson <olof@lixom.net> wrote:
+> >
+> > Hi,
+> >
+> > On Wed, Aug 29, 2018 at 1:42 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+> > > On Wed, Aug 29, 2018 at 1:31 PM Olof Johansson <olof@lixom.net> wrote:
+> > >>
+> > >> On Wed, Aug 29, 2018 at 08:50:03AM -0700, Kevin Hilman wrote:
+> > >> > Olof, Arnd,
+> > >> >
+> > >> > A round of DT fixes for Amlogic SoCs for v4.19-rc.
+> > >> >
+> > >> > The are all platform-specific DT, 2 are simple fixes, and the 3
+> > >> > meson-axg patches are to enable audio devices that were fully enabled by
+> > >> > reset changes in the late PR recently sent and merged.
+> > >> >
+> > >> > Kevin
+> > >> >
+> > >> > The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+> > >> >
+> > >> >   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+> > >> >
+> > >> > are available in the git repository at:
+> > >> >
+> > >> >   https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-fixes
+> > >> >
+> > >> > for you to fetch changes up to 1caa378e092f22d02e8a46216cbf1c8e8101163a:
+> > >> >
+> > >> >   ARM: dts: meson8b: fix the clock controller register size (2018-08-29 08:38:21 -0700)
+> > >> >
+> > >> > ----------------------------------------------------------------
+> > >> > Amlogic DT fixes for v4.19-rc
+> > >> > - meson8b: fix clock controller register sizes
+> I don't think it's worth re-building a "fixes" branch if it's just for
+> my two patches
+> the register sizes have been incorrect basically since forever
+> so I'm also happy if these go into 4.20/5.0 (however it's going to be called)
 
+OK, I'll just queue everything for $NEXT
 
-On 8/31/2018 12:20 PM, Florian Fainelli wrote:
-> Enable the SFP connected to port 5 of the switch and wire up all GPIOs
-> to the SFP cage. Because of a hardware limitation of the i2c controller
-> on the iProc SoCs which prevents large i2c (> 63 bytes) transactions to
-> work, we use the i2c-gpio interface instead, which does not have that
-> limitation. This allows us to read the SFP module EEPROM, which would
-> not be possible otherwise since it exceeds that size during a single
-> read transfer.
-> 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
->   arch/arm/boot/dts/bcm958625hr.dts | 26 ++++++++++++++++++++++++++
->   1 file changed, 26 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/bcm958625hr.dts b/arch/arm/boot/dts/bcm958625hr.dts
-> index ea3fc194f8f3..a53a2f629d74 100644
-> --- a/arch/arm/boot/dts/bcm958625hr.dts
-> +++ b/arch/arm/boot/dts/bcm958625hr.dts
-> @@ -58,6 +58,24 @@
->   		open-source;
->   		priority = <200>;
->   	};
-> +
-> +	/* Hardware I2C block cannot do more than 63 bytes per transfer,
-> +	 * which would prevent reading from a SFP's EEPROM (256 byte).
-> +	 */
-> +	i2c1: i2c {
-> +		compatible = "i2c-gpio";
-> +		sda-gpios = <&gpioa 5 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
-> +		scl-gpios = <&gpioa 4 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
-> +	};
-> +
-> +	sfp: sfp {
-> +		compatible = "sff,sfp";
-> +		i2c-bus = <&i2c1>;
-> +		mod-def0-gpios = <&gpioa 28 GPIO_ACTIVE_LOW>;
-> +		los-gpios = <&gpioa 24 GPIO_ACTIVE_HIGH>;
-> +		tx-fault-gpios = <&gpioa 30 GPIO_ACTIVE_HIGH>;
-> +		tx-disable-gpios = <&gpioa 26 GPIO_ACTIVE_HIGH>;
-> +	};
->   };
->   
->   &amac0 {
-> @@ -210,6 +228,14 @@
->   			reg = <4>;
->   		};
->   
-> +		port at 5 {
-> +			label = "sfp";
-> +			phy-mode = "sgmii";
-> +			reg = <5>;
-> +			sfp = <&sfp>;
-> +			managed = "in-band-status";
-> +		};
-> +
->   		port at 8 {
->   			ethernet = <&amac2>;
->   			label = "cpu";
-> 
-
-Looks good to me. Thanks!
-
-Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+Kevin
