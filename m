@@ -1,35 +1,44 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 4 Sep 2018 11:05:43 +0300
-Subject: [RESEND PATCHv2 3/4] arm64: dts: add support for building DT overlays
+Date: Tue, 4 Sep 2018 11:05:42 +0300
+Subject: [RESEND PATCHv2 2/4] ARM: dts: add support for individual build flags
+ for DT subdirs
 In-Reply-To: <1536048344-9995-1-git-send-email-t-kristo@ti.com>
 References: <1535719666-13595-1-git-send-email-t-kristo@ti.com>
  <1536048344-9995-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1536048344-9995-4-git-send-email-t-kristo@ti.com>
+Message-ID: <1536048344-9995-3-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add simple support for building DT overlays. This just compiles any
-given .dtso file under the base arch/arm64/boot/dts/*/ directory into
-a .dtbo.
+Currently the makefile is setup in such manner that even if
+we build a DT file in a subdirectory under arch/arm/boot/dts,
+it gets built based on the base boot/dts/Makefile rules.
+This patch modifies the base makefile in such manner, that
+it detects which makefile to use based on build target path.
+This allows setting for example per-directory DTC_FLAGS and
+using those for the subdir build. The dtbdir local variable
+is setup to target to the build path.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm64/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/Makefile | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 106039d..f04c814 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -127,7 +127,7 @@ Image.%: Image
- zinstall install:
- 	$(Q)$(MAKE) $(build)=$(boot) $@
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index ab555a0..b7c21e8 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -339,8 +339,10 @@ $(BOOT_TARGETS): vmlinux
+ $(INSTALL_TARGETS):
+ 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
  
--%.dtb: scripts
-+%.dtb %.dtbo: scripts
- 	$(Q)$(MAKE) $(build)=$(boot)/dts $(boot)/dts/$@
++%.dtb %.dtbo: dtbdir = $(patsubst %/,%,$(patsubst %./,%,$(boot)/dts/$(dir $@)))
++
+ %.dtb %.dtbo: | scripts
+-	$(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) $(boot)/dts/$@
++	$(Q)$(MAKE) $(build)=$(dtbdir) MACHINE=$(MACHINE) $(boot)/dts/$@
  
  PHONY += dtbs dtbs_install
+ 
 -- 
 1.9.1
 
