@@ -1,63 +1,47 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue,  4 Sep 2018 12:40:49 +0800
-Subject: [PATCH v4 07/11] dt-bindings: clock: sun50i-a64-ccu: Add PLL_VIDEO0
- macro
+Date: Tue,  4 Sep 2018 12:40:48 +0800
+Subject: [PATCH v4 06/11] dt-bindings: display: Add compatible for A64 HDMI
 In-Reply-To: <20180904044053.15425-1-icenowy@aosc.io>
 References: <20180904044053.15425-1-icenowy@aosc.io>
-Message-ID: <20180904044053.15425-8-icenowy@aosc.io>
+Message-ID: <20180904044053.15425-7-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jagan Teki <jagan@amarulasolutions.com>
 
-Allwinner A64 HDMI PHY clock has PLL_VIDEO0 as a parent.
+The HDMI controller on Allwinner A64 is similar on the one on
+H3/H5/A83T (although the PHY is different with A83T).
 
-Include the macro on dt-bindings so-that the same can be used
-while defining CCU clock phandles.
+Add A64 compatible and append A83T compatible as fallback.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 Reviewed-by: Rob Herring <robh@kernel.org>
+[Icenowy: refactor commit log]
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
 Changes for v4:
-- Dropped PLL_VIDEO1
-Changes for v3.1:
 - none
+Changes for v3.1:
+- Refactor commit log to make it more clear.
 Changes for v3:
 - collect Rob r-w-b tag
 Changes for v2:
-- new patch
+- Add fallback compatible
 
- drivers/clk/sunxi-ng/ccu-sun50i-a64.h      | 4 +++-
- include/dt-bindings/clock/sun50i-a64-ccu.h | 1 +
- 2 files changed, 4 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-a64.h b/drivers/clk/sunxi-ng/ccu-sun50i-a64.h
-index 061b6fbb4f95..a83951cf0224 100644
---- a/drivers/clk/sunxi-ng/ccu-sun50i-a64.h
-+++ b/drivers/clk/sunxi-ng/ccu-sun50i-a64.h
-@@ -27,7 +27,9 @@
- #define CLK_PLL_AUDIO_2X		4
- #define CLK_PLL_AUDIO_4X		5
- #define CLK_PLL_AUDIO_8X		6
--#define CLK_PLL_VIDEO0			7
-+
-+/* PLL_VIDEO0 exported for HDMI PHY */
-+
- #define CLK_PLL_VIDEO0_2X		8
- #define CLK_PLL_VE			9
- #define CLK_PLL_DDR0			10
-diff --git a/include/dt-bindings/clock/sun50i-a64-ccu.h b/include/dt-bindings/clock/sun50i-a64-ccu.h
-index d66432c6e675..a8ac4cfcdcbc 100644
---- a/include/dt-bindings/clock/sun50i-a64-ccu.h
-+++ b/include/dt-bindings/clock/sun50i-a64-ccu.h
-@@ -43,6 +43,7 @@
- #ifndef _DT_BINDINGS_CLK_SUN50I_A64_H_
- #define _DT_BINDINGS_CLK_SUN50I_A64_H_
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index 7b79c5e3dffc..fdb8fb29033f 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -78,6 +78,7 @@ Required properties:
  
-+#define CLK_PLL_VIDEO0		7
- #define CLK_PLL_PERIPH0		11
- 
- #define CLK_BUS_MIPI_DSI	28
+   - compatible: value must be one of:
+     * "allwinner,sun8i-a83t-dw-hdmi"
++    * "allwinner,sun50i-a64-dw-hdmi", "allwinner,sun8i-a83t-dw-hdmi"
+   - reg: base address and size of memory-mapped region
+   - reg-io-width: See dw_hdmi.txt. Shall be 1.
+   - interrupts: HDMI interrupt number
 -- 
 2.18.0
