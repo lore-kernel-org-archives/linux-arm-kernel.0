@@ -1,244 +1,143 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Tue, 4 Sep 2018 15:54:27 +0530
-Subject: [PATCH v9 0/8] Introduce on-chip interconnect API
-In-Reply-To: <20180831140151.13972-1-georgi.djakov@linaro.org>
-References: <20180831140151.13972-1-georgi.djakov@linaro.org>
-Message-ID: <CAHLCerNd0hrLKgbni95_RSYOtsNufMCVtHbAKa4W+eo8H2cL2A@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue,  4 Sep 2018 11:48:24 +0100
+Subject: [PATCHv3 0/6] atomics: generate atomic headers / instrument arm64
+Message-ID: <20180904104830.2975-1-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Georgi,
+Hi Ingo,
 
-I'm currently reviewing this patchset (long overdue), but considering
-that we haven't added any major new features to the framework for the
-last couple of revisions, can you get this patchset merged into
-linux-next to see how things shake out there? We've had this merged
-branch merged into a CI build on kernelci for a while now w/o any
-major incident so we should increase its exposure.
+As previously requested, this is a (trivial) rebase of the remaining generated
+atomic patches atop of v4.19-rc2, avoiding any potential conflict with Peter's
+ldsem atomic cleanup patch that got taken through the tty tree.
 
-You could ask Stephen Rothwell if he'll accept the a branch directly
-from you or he needs an upstream maintainer (GregKH?) to carry it.
+Are you still happy to pick this up? Full blurb below.
 
-Regard,
-Amit
+This series scripts the generation of the various atomic headers, to ensure
+that the various atomic APIs remain consistent, reducing the risk of human
+error, and simplifying future rework. This fleshes out the instrumented atomics
+such that arm64 can be migrated over to them.
 
-On Fri, Aug 31, 2018 at 7:31 PM, Georgi Djakov <georgi.djakov@linaro.org> wrote:
-> Modern SoCs have multiple processors and various dedicated cores (video, gpu,
-> graphics, modem). These cores are talking to each other and can generate a
-> lot of data flowing through the on-chip interconnects. These interconnect
-> buses could form different topologies such as crossbar, point to point buses,
-> hierarchical buses or use the network-on-chip concept.
->
-> These buses have been sized usually to handle use cases with high data
-> throughput but it is not necessary all the time and consume a lot of power.
-> Furthermore, the priority between masters can vary depending on the running
-> use case like video playback or CPU intensive tasks.
->
-> Having an API to control the requirement of the system in terms of bandwidth
-> and QoS, so we can adapt the interconnect configuration to match those by
-> scaling the frequencies, setting link priority and tuning QoS parameters.
-> This configuration can be a static, one-time operation done at boot for some
-> platforms or a dynamic set of operations that happen at run-time.
->
-> This patchset introduce a new API to get the requirement and configure the
-> interconnect buses across the entire chipset to fit with the current demand.
-> The API is NOT for changing the performance of the endpoint devices, but only
-> the interconnect path in between them.
->
-> The API is using a consumer/provider-based model, where the providers are
-> the interconnect buses and the consumers could be various drivers.
-> The consumers request interconnect resources (path) to an endpoint and set
-> the desired constraints on this data flow path. The provider(s) receive
-> requests from consumers and aggregate these requests for all master-slave
-> pairs on that path. Then the providers configure each participating in the
-> topology node according to the requested data flow path, physical links and
-> constraints. The topology could be complicated and multi-tiered and is SoC
-> specific.
->
-> Below is a simplified diagram of a real-world SoC topology. The interconnect
-> providers are the NoCs.
->
-> +----------------+    +----------------+
-> | HW Accelerator |--->|      M NoC     |<---------------+
-> +----------------+    +----------------+                |
->                         |      |                    +------------+
->  +-----+  +-------------+      V       +------+     |            |
->  | DDR |  |                +--------+  | PCIe |     |            |
->  +-----+  |                | Slaves |  +------+     |            |
->    ^ ^    |                +--------+     |         |   C NoC    |
->    | |    V                               V         |            |
-> +------------------+   +------------------------+   |            |   +-----+
-> |                  |-->|                        |-->|            |-->| CPU |
-> |                  |-->|                        |<--|            |   +-----+
-> |     Mem NoC      |   |         S NoC          |   +------------+
-> |                  |<--|                        |---------+    |
-> |                  |<--|                        |<------+ |    |   +--------+
-> +------------------+   +------------------------+       | |    +-->| Slaves |
->   ^  ^    ^    ^          ^                             | |        +--------+
->   |  |    |    |          |                             | V
-> +------+  |  +-----+   +-----+  +---------+   +----------------+   +--------+
-> | CPUs |  |  | GPU |   | DSP |  | Masters |-->|       P NoC    |-->| Slaves |
-> +------+  |  +-----+   +-----+  +---------+   +----------------+   +--------+
->           |
->       +-------+
->       | Modem |
->       +-------+
->
-> TODO:
-> * Create icc_set_extended() to handle parameters such as latency and other
->   QoS values.
-> * Convert from using global node identifiers to local per provider ids.
-> * Cache the path between the nodes instead of walking the graph on each get().
-> * Sync interconnect requests with the idle state of the device.
->
-> Changes since patchset v8 (https://lkml.org/lkml/2018/8/10/387)
-> * Fixed the names of the files when built as modules.
-> * Corrected some typos in comments.
->
-> Changes since patchset v7 (https://lkml.org/lkml/2018/7/31/647)
-> * Addressed comments on kernel-doc and grammar. (Randy)
-> * Picked Reviewed-by: Evan
-> * Squashed consumer and provider DT bindings into single patch. (Rob)
-> * Cleaned-up msm8916 DT bindings docs by removing unused port ids.
-> * Updated documentation for the cases when NULL is returned. (Saravana)
-> * New patch to add myself as maintainer.
->
-> Changes since patchset v6 (https://lkml.org/lkml/2018/7/9/698)
-> * [patches 1,6]: Move the aggregation within the provider from the framework to
->   the platform driver's set() callback, as the aggregation point could be SoC
->   specific.
-> * [patch 1]: Include missing header, reset state only of the traversed nodes,
->   move more code into path_init(), add more asserts, move misplaced mutex,
->   simplify icc_link_destroy() (Evan)
-> * [patch 1]: Fix the order of requests to go from source to destination. (Alex)
-> * [patch 7]: Use better wording in the documentation. (Evan)
-> * [patch 6]: Reorder struct members, sort nodes alphabetically, improve naming
->   of variables , add missing clk_disable_unprepare() in error paths. (Matthias)
-> * [patch 6]: Remove redundant NULL pointer check in msm8916 driver. (Alex)
-> * [patch 6]: Add missing depend on QCOM_SMD_RPM in Kconfig. (Evan)
-> * [patch 3]: Don't check for errors on debugfs calls, remove debugfs directory
->   when module is unloaded (Greg)
->
-> Changes since patchset v5 (https://lkml.org/lkml/2018/6/20/453)
-> * Fix the modular build, make rpm-smd driver a module.
-> * Optimize locking and move to higher level. (Evan)
-> * Code cleanups. Fix typos. (Evan, Matthias)
-> * Add the source node to the path. (Evan)
-> * Rename path_allocate() to path_init() with minor refactoring. (Evan)
-> * Rename *_remove() functions to *_destroy().
-> * Return fixed errors in icc_link_destroy(). (Evan)
-> * Fix krealloc() usage in icc_link_destroy(). (Evan)
-> * Add missing kfree() in icc_node_create(). (Matthias)
-> * Make icc_node_add() return void. (Matthias)
-> * Change mutex_init to mutex_lock in icc_provider_add(). (Matthias)
-> * Add new icc_node_del() function to delete nodes from provider.
-> * Fix the header guard to reflect the path in smd-rpm.h. (Evan)
-> * Check for errors returned by qcom_icc_rpm_smd_send(). (Evan)
-> * Propagate the error of icc_provider_del(). (Evan)
->
-> Changes since patchset v4 (https://lkml.org/lkml/2018/3/9/856)
-> * Simplified locking by using a single global mutex. (Evan)
-> * Changed the aggregation function interface.
-> * Implemented functions for node, link, provider removal. (Evan)
-> * Naming changes on variables and functions, removed redundant code. (Evan)
-> * Fixes and clarifications in the docs. (Matthias, Evan, Amit, Alexandre)
-> * Removed mandatory reg DT property, made interconnect-names optional. (Bjorn)
-> * Made interconnect-cells property required to align with other bindings. (Neil)
-> * Moved msm8916 specific bindings into a separate file and patch. (Bjorn)
-> * Use the names, instead of the hardcoded ids for topology. (Matthias)
-> * Init the node before creating the links. (Evan)
-> * Added icc_units_to_bps macro. (Amit)
->
-> Changes since patchset v3 (https://lkml.org/lkml/2017/9/8/544)
-> * Refactored the constraints aggregation.
-> * Use the IDR API.
-> * Split the provider and consumer bindings into separate patches and propose
->   new bindings for consumers, which allows to specify the local source port.
-> * Adopted the icc_ prefix for API functions.
-> * Introduced separate API functions for creating interconnect nodes and links.
-> * Added DT lookup support in addition to platform data.
-> * Dropped the event tracing patch for now.
-> * Added a patch to provide summary via debugfs.
-> * Use macro for the list of topology definitions in the platform driver.
-> * Various minor changes.
->
-> Changes since patchset v2 (https://lkml.org/lkml/2017/7/20/825)
-> * Split the aggregation into per node and per provider. Cache the
->   aggregated values.
-> * Various small refactorings and cleanups in the framework.
-> * Added a patch introducing basic tracepoint support for monitoring
->   the time required to update the interconnect nodes.
->
-> Changes since patchset v1 (https://lkml.org/lkml/2017/6/27/890)
-> * Updates in the documentation.
-> * Changes in request aggregation, locking.
-> * Dropped the aggregate() callback and use the default as it currently
->   sufficient for the single vendor driver. Will add it later when needed.
-> * Dropped the dt-bindings draft patch for now.
->
-> Changes since RFC v2 (https://lkml.org/lkml/2017/6/12/316)
-> * Converted documentation to rst format.
-> * Fixed an incorrect call to mutex_lock. Renamed max_bw to peak_bw.
->
-> Changes since RFC v1 (https://lkml.org/lkml/2017/5/15/605)
-> * Refactored code into shorter functions.
-> * Added a new aggregate() API function.
-> * Rearranged some structs to reduce padding bytes.
->
-> Changes since RFC v0 (https://lkml.org/lkml/2017/3/1/599)
-> * Removed DT support and added optional Patch 3 with new bindings proposal.
-> * Converted the topology into internal driver data.
-> * Made the framework modular.
-> * interconnect_get() now takes (src and dst ports as arguments).
-> * Removed public declarations of some structs.
-> * Now passing prev/next nodes to the vendor driver.
-> * Properly remove requests on _put().
-> * Added refcounting.
-> * Updated documentation.
-> * Changed struct interconnect_path to use array instead of linked list.
->
-> Georgi Djakov (8):
->   interconnect: Add generic on-chip interconnect API
->   dt-bindings: Introduce interconnect binding
->   interconnect: Allow endpoints translation via DT
->   interconnect: Add debugfs support
->   interconnect: qcom: Add RPM communication
->   dt-bindings: interconnect: Document qcom,msm8916 NoC bindings
->   interconnect: qcom: Add msm8916 interconnect provider driver
->   MAINTAINERS: add a maintainer for the interconnect API
->
->  .../bindings/interconnect/interconnect.txt    |  60 ++
->  .../bindings/interconnect/qcom-msm8916.txt    |  41 +
->  .../bindings/interconnect/qcom-smd.txt        |  32 +
->  Documentation/interconnect/interconnect.rst   |  94 +++
->  MAINTAINERS                                   |  10 +
->  drivers/Kconfig                               |   2 +
->  drivers/Makefile                              |   1 +
->  drivers/interconnect/Kconfig                  |  15 +
->  drivers/interconnect/Makefile                 |   6 +
->  drivers/interconnect/core.c                   | 729 ++++++++++++++++++
->  drivers/interconnect/qcom/Kconfig             |  22 +
->  drivers/interconnect/qcom/Makefile            |   7 +
->  drivers/interconnect/qcom/msm8916.c           | 510 ++++++++++++
->  drivers/interconnect/qcom/smd-rpm.c           |  91 +++
->  drivers/interconnect/qcom/smd-rpm.h           |  15 +
->  include/dt-bindings/interconnect/qcom.h       |  98 +++
->  include/linux/interconnect-provider.h         | 125 +++
->  include/linux/interconnect.h                  |  49 ++
->  18 files changed, 1907 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interconnect/interconnect.txt
->  create mode 100644 Documentation/devicetree/bindings/interconnect/qcom-msm8916.txt
->  create mode 100644 Documentation/devicetree/bindings/interconnect/qcom-smd.txt
->  create mode 100644 Documentation/interconnect/interconnect.rst
->  create mode 100644 drivers/interconnect/Kconfig
->  create mode 100644 drivers/interconnect/Makefile
->  create mode 100644 drivers/interconnect/core.c
->  create mode 100644 drivers/interconnect/qcom/Kconfig
->  create mode 100644 drivers/interconnect/qcom/Makefile
->  create mode 100644 drivers/interconnect/qcom/msm8916.c
->  create mode 100644 drivers/interconnect/qcom/smd-rpm.c
->  create mode 100644 drivers/interconnect/qcom/smd-rpm.h
->  create mode 100644 include/dt-bindings/interconnect/qcom.h
->  create mode 100644 include/linux/interconnect-provider.h
->  create mode 100644 include/linux/interconnect.h
->
+Since v1 [1]:
+* Use 'p' instead of 'I' for pointer to base int type
+* Use Peter's patch for ldsem
+* Rename atomic acquire/release barriers
+* Handle xchg/cmpxchg variants
+* Typo fixes
+* Migrate arm64 to instrumented atomics
+
+Since v2 [4]:
+* rebase to v4.19-rc2 to solve potential conflicts with ldsem patch
+
+The series is based on my atomic API cleanup patches [2], which have been
+queued in the tip locking/core branch.
+
+The first six patches clean up some issues with the existing atomic
+instrumentation, with patch six introducing the header generation
+infrastructure. The subsequent three patches migrate to each generated header
+in turn, with the final patch moving arm64 over to the instrumented atomics.
+
+The scripts themselves are mostly POSIX sh (modulo local), without bashisms,
+and work in dash and bash.
+
+Per Linus request that it is possible to use git grep to inspect the atomic
+headers [3], the headers are committed (and not generated by kbuild). Since we
+now expand the fallback definitions inline, each *should* be easier to find
+with grep. Each header also has a comment at the top with a path to the script
+used to generate it. 
+
+That scripting comes to ~900 lines, and replaces ~1700 lines of hand-written
+boilerplate with ~4700 lines of generated code. Some of that increase in line
+count is due to filling in missing portions of the API (e.g. adding all the
+ordering variants to the instrumented atomics), while some of that is due to
+expanding fallbacks in place, and consistently spreading these across multiple
+lines.
+
+I've build-tested this for x86_64 and arm64 (with and without LSE), and given
+this some basic boot testing.
+
+I've pushed the series out to my atomics/generated branch [3], based atop of
+v4.19-rc2.
+
+Thanks,
+Mark.
+
+[1] https://lkml.kernel.org/r/20180529180746.29684-1-mark.rutland at arm.com
+[2] https://lkml.kernel.org/r/20180621121321.4761-1-mark.rutland at arm.com
+[3] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git atomics/generated
+[4] https://lkml.kernel.org/r/20180625105952.3756-1-mark.rutland at arm.com
+
+Mark Rutland (6):
+  atomics: add common header generation files
+  atomics: switch to generated fallbacks
+  atomics: switch to generated atomic-long
+  atomics: switch to generated instrumentation
+  atomics: check generated headers are up-to-date
+  arm64: use instrumented atomics
+
+ Kbuild                                       |   18 +-
+ MAINTAINERS                                  |    1 +
+ arch/arm64/include/asm/atomic.h              |  237 +--
+ arch/arm64/include/asm/atomic_ll_sc.h        |   28 +-
+ arch/arm64/include/asm/atomic_lse.h          |   38 +-
+ arch/arm64/include/asm/cmpxchg.h             |   60 +-
+ arch/arm64/include/asm/sync_bitops.h         |   16 +-
+ include/asm-generic/atomic-instrumented.h    | 1688 ++++++++++++++++---
+ include/asm-generic/atomic-long.h            | 1173 ++++++++++---
+ include/linux/atomic-fallback.h              | 2294 ++++++++++++++++++++++++++
+ include/linux/atomic.h                       | 1241 +-------------
+ scripts/atomic/atomic-tbl.sh                 |  186 +++
+ scripts/atomic/atomics.tbl                   |   41 +
+ scripts/atomic/check-atomics.sh              |   19 +
+ scripts/atomic/fallbacks/acquire             |    9 +
+ scripts/atomic/fallbacks/add_negative        |   16 +
+ scripts/atomic/fallbacks/add_unless          |   16 +
+ scripts/atomic/fallbacks/andnot              |    7 +
+ scripts/atomic/fallbacks/dec                 |    7 +
+ scripts/atomic/fallbacks/dec_and_test        |   15 +
+ scripts/atomic/fallbacks/dec_if_positive     |   15 +
+ scripts/atomic/fallbacks/dec_unless_positive |   14 +
+ scripts/atomic/fallbacks/fence               |   11 +
+ scripts/atomic/fallbacks/fetch_add_unless    |   23 +
+ scripts/atomic/fallbacks/inc                 |    7 +
+ scripts/atomic/fallbacks/inc_and_test        |   15 +
+ scripts/atomic/fallbacks/inc_not_zero        |   14 +
+ scripts/atomic/fallbacks/inc_unless_negative |   14 +
+ scripts/atomic/fallbacks/read_acquire        |    7 +
+ scripts/atomic/fallbacks/release             |    8 +
+ scripts/atomic/fallbacks/set_release         |    7 +
+ scripts/atomic/fallbacks/sub_and_test        |   16 +
+ scripts/atomic/fallbacks/try_cmpxchg         |   11 +
+ scripts/atomic/gen-atomic-fallback.sh        |  181 ++
+ scripts/atomic/gen-atomic-instrumented.sh    |  182 ++
+ scripts/atomic/gen-atomic-long.sh            |  101 ++
+ 36 files changed, 5909 insertions(+), 1827 deletions(-)
+ create mode 100644 include/linux/atomic-fallback.h
+ create mode 100755 scripts/atomic/atomic-tbl.sh
+ create mode 100644 scripts/atomic/atomics.tbl
+ create mode 100755 scripts/atomic/check-atomics.sh
+ create mode 100644 scripts/atomic/fallbacks/acquire
+ create mode 100644 scripts/atomic/fallbacks/add_negative
+ create mode 100644 scripts/atomic/fallbacks/add_unless
+ create mode 100644 scripts/atomic/fallbacks/andnot
+ create mode 100644 scripts/atomic/fallbacks/dec
+ create mode 100644 scripts/atomic/fallbacks/dec_and_test
+ create mode 100644 scripts/atomic/fallbacks/dec_if_positive
+ create mode 100644 scripts/atomic/fallbacks/dec_unless_positive
+ create mode 100644 scripts/atomic/fallbacks/fence
+ create mode 100644 scripts/atomic/fallbacks/fetch_add_unless
+ create mode 100644 scripts/atomic/fallbacks/inc
+ create mode 100644 scripts/atomic/fallbacks/inc_and_test
+ create mode 100644 scripts/atomic/fallbacks/inc_not_zero
+ create mode 100644 scripts/atomic/fallbacks/inc_unless_negative
+ create mode 100644 scripts/atomic/fallbacks/read_acquire
+ create mode 100644 scripts/atomic/fallbacks/release
+ create mode 100644 scripts/atomic/fallbacks/set_release
+ create mode 100644 scripts/atomic/fallbacks/sub_and_test
+ create mode 100644 scripts/atomic/fallbacks/try_cmpxchg
+ create mode 100755 scripts/atomic/gen-atomic-fallback.sh
+ create mode 100755 scripts/atomic/gen-atomic-instrumented.sh
+ create mode 100755 scripts/atomic/gen-atomic-long.sh
+
+-- 
+2.11.0
