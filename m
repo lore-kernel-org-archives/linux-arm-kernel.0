@@ -1,105 +1,63 @@
-From: wufan@codeaurora.org (Fan Wu)
-Date: Tue,  4 Sep 2018 13:24:53 +0000
-Subject: [PATCH v4] EDAC, ghes: use CPER module handles to locate DIMMs
-Message-ID: <1536067493-31454-1-git-send-email-wufan@codeaurora.org>
+From: afd@ti.com (Andrew F. Davis)
+Date: Tue, 4 Sep 2018 08:35:09 -0500
+Subject: [PATCH 1/2] ARM: dts: imx6: RDU2: Fix the audio CODEC's reset pin
+In-Reply-To: <20180903045426.GM3850@dragon>
+References: <20180831191732.25504-1-afd@ti.com> <20180903045426.GM3850@dragon>
+Message-ID: <5796c470-a533-c010-ba53-7ee785a3b9e8@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For platforms whose firmwares provide valid module handles
-(SMBIOS type 17) in error records, this patch uses the module
-handles to locate corresponding DIMMs and enables per-DIMM
-error counter update.
-
-Signed-off-by: Fan Wu <wufan@codeaurora.org>
-Reviewed-by: Tyler Baicar <baicar.tyler@gmail.com>
-Tested-by: Toshi Kani <toshi.kani@hpe.com>
----
-
-Changes from v3:
-* Updated Reviewed-by list
-
-Changes from v2:
-* Fixed coding style glitch
-* Added Tested-by/Reviewed-by
-
-Changes from v1:
-*  Changed the new function name to get_dimm_smbios_index
-*  Removed unnecessary checks inside get_dimm_smbios_index
-*  Reverted the change of the DMI handle print
-*  Updated commit message
+On 09/02/2018 11:54 PM, Shawn Guo wrote:
+> On Fri, Aug 31, 2018 at 02:17:31PM -0500, Andrew F. Davis wrote:
+>> The correct DT property for specifying a GPIO used for reset
+>> is "reset-gpios", fix this here.
+>>
+>> Fixes: d763762e3b58 ("ARM: dts: imx6: add ZII RDU2 boards")
+> 
+> This Fixes tag and word 'Fix' in subject is inappropriate to me, as you
+> are not fixing something wrong from the beginning, but actually
+> replacing a deprecated property with new one.
+> 
 
 
----
- drivers/edac/ghes_edac.c | 23 +++++++++++++++++++++++
- include/linux/edac.h     |  2 ++
- 2 files changed, 25 insertions(+)
+reset-gpios was standard before this driver got it backwards, but it
+also wasn't required to be one way or the other as far as I can tell, so
+I can see your point that this isn't technically "broken". I have no
+preference, so I'll change the subject and drop the fixes for v2.
 
-diff --git a/drivers/edac/ghes_edac.c b/drivers/edac/ghes_edac.c
-index 473aeec..ba46160 100644
---- a/drivers/edac/ghes_edac.c
-+++ b/drivers/edac/ghes_edac.c
-@@ -81,6 +81,18 @@ static void ghes_edac_count_dimms(const struct dmi_header *dh, void *arg)
- 		(*num_dimm)++;
- }
- 
-+static int get_dimm_smbios_index(u16 handle)
-+{
-+	int i;
-+	struct mem_ctl_info *mci = ghes_pvt->mci;
-+
-+	for (i = 0; i < mci->tot_dimms; i++) {
-+		if (mci->dimms[i]->smbios_handle == handle)
-+			return i;
-+	}
-+	return -1;
-+}
-+
- static void ghes_edac_dmidecode(const struct dmi_header *dh, void *arg)
- {
- 	struct ghes_edac_dimm_fill *dimm_fill = arg;
-@@ -177,6 +189,8 @@ static void ghes_edac_dmidecode(const struct dmi_header *dh, void *arg)
- 				entry->total_width, entry->data_width);
- 		}
- 
-+		dimm->smbios_handle = entry->handle;
-+
- 		dimm_fill->count++;
- 	}
- }
-@@ -327,12 +341,21 @@ void ghes_edac_report_mem_error(int sev, struct cper_sec_mem_err *mem_err)
- 		p += sprintf(p, "bit_pos:%d ", mem_err->bit_pos);
- 	if (mem_err->validation_bits & CPER_MEM_VALID_MODULE_HANDLE) {
- 		const char *bank = NULL, *device = NULL;
-+		int index = -1;
-+
- 		dmi_memdev_name(mem_err->mem_dev_handle, &bank, &device);
- 		if (bank != NULL && device != NULL)
- 			p += sprintf(p, "DIMM location:%s %s ", bank, device);
- 		else
- 			p += sprintf(p, "DIMM DMI handle: 0x%.4x ",
- 				     mem_err->mem_dev_handle);
-+
-+		index = get_dimm_smbios_index(mem_err->mem_dev_handle);
-+		if (index >= 0) {
-+			e->top_layer = index;
-+			e->enable_per_layer_report = true;
-+		}
-+
- 	}
- 	if (p > e->location)
- 		*(p - 1) = '\0';
-diff --git a/include/linux/edac.h b/include/linux/edac.h
-index bffb978..a45ce1f 100644
---- a/include/linux/edac.h
-+++ b/include/linux/edac.h
-@@ -451,6 +451,8 @@ struct dimm_info {
- 	u32 nr_pages;			/* number of pages on this dimm */
- 
- 	unsigned csrow, cschannel;	/* Points to the old API data */
-+
-+	u16 smbios_handle;              /* Handle for SMBIOS type 17 */
- };
- 
- /**
--- 
-2.7.4
+Andrew
+
+
+> Shawn
+> 
+>>
+>> Signed-off-by: Andrew F. Davis <afd@ti.com>
+>> ---
+>>  arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+>> index 7fff3717cf7c..a0f5cfda0055 100644
+>> --- a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+>> +++ b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+>> @@ -384,7 +384,7 @@
+>>  		AVDD-supply = <&reg_3p3v>;
+>>  		IOVDD-supply = <&reg_3p3v>;
+>>  		DVDD-supply = <&vgen4_reg>;
+>> -		gpio-reset = <&gpio1 2 GPIO_ACTIVE_HIGH>;
+>> +		reset-gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
+>>  	};
+>>  
+>>  	accel at 1c {
+>> @@ -572,7 +572,7 @@
+>>  		AVDD-supply = <&reg_3p3v>;
+>>  		IOVDD-supply = <&reg_3p3v>;
+>>  		DVDD-supply = <&vgen4_reg>;
+>> -		gpio-reset = <&gpio1 0 GPIO_ACTIVE_HIGH>;
+>> +		reset-gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;
+>>  	};
+>>  
+>>  	touchscreen at 20 {
+>> -- 
+>> 2.18.0
+>>
