@@ -1,137 +1,57 @@
-From: andy.tang@nxp.com (Andy Tang)
-Date: Tue, 4 Sep 2018 03:08:57 +0000
-Subject: [PATCH 3/5] drivers: clk-qoriq: Add clockgen support for lx2160a
-In-Reply-To: <3a4274af2200923875ff05f945888a34d6dccee3.camel@buserror.net>
-References: <1534747636-20064-1-git-send-email-vabhav.sharma@nxp.com>
- <1534747636-20064-4-git-send-email-vabhav.sharma@nxp.com>
- <4a9ea6b451683ec98c92e86a5ae6b91213a6afcf.camel@buserror.net>
- <VI1PR04MB4800E8B1E8541FCA9221A1CFF3080@VI1PR04MB4800.eurprd04.prod.outlook.com>
- <d2cfd49eb33a3ce74f0e78f2b53d3954d2cb3e76.camel@buserror.net>
- <b31ae8e788fb93971167faa9b55b497e838532c4.camel@buserror.net>
- <DB5PR0401MB22130C025AA4CCAD0221781DF30F0@DB5PR0401MB2213.eurprd04.prod.outlook.com>
- <f6707cb54c3e6da1b50f45f915c996dfccfeacda.camel@buserror.net>
- <DB5PR0401MB221332A5ED14C8E14C8D18A1F30C0@DB5PR0401MB2213.eurprd04.prod.outlook.com>
- <3a4274af2200923875ff05f945888a34d6dccee3.camel@buserror.net>
-Message-ID: <DB5PR0401MB221372E7A7DA3ED53BA721B2F3030@DB5PR0401MB2213.eurprd04.prod.outlook.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Tue, 4 Sep 2018 11:18:55 +0800
+Subject: [PATCH 2/4] arm64: cpufeature: add feature for CRC32 instructions
+In-Reply-To: <CAKv+Gu-tM9aKZJ3ppt9yLVP_V5YA_yN8D1j_-NtM+qQCdnc6JA@mail.gmail.com>
+References: <20180827110245.14812-1-ard.biesheuvel@linaro.org>
+ <20180827110245.14812-3-ard.biesheuvel@linaro.org>
+ <20180828170135.GC19825@arm.com>
+ <CAKv+Gu-tM9aKZJ3ppt9yLVP_V5YA_yN8D1j_-NtM+qQCdnc6JA@mail.gmail.com>
+Message-ID: <20180904031855.mjpdndeh57lqziuk@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Scott,
+On Tue, Aug 28, 2018 at 08:43:35PM +0200, Ard Biesheuvel wrote:
+> On 28 August 2018 at 19:01, Will Deacon <will.deacon@arm.com> wrote:
+> > On Mon, Aug 27, 2018 at 01:02:43PM +0200, Ard Biesheuvel wrote:
+> >> Add a CRC32 feature bit and wire it up to the CPU id register so we
+> >> will be able to use alternatives patching for CRC32 operations.
+> >>
+> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> ---
+> >>  arch/arm64/include/asm/cpucaps.h | 3 ++-
+> >>  arch/arm64/kernel/cpufeature.c   | 9 +++++++++
+> >>  2 files changed, 11 insertions(+), 1 deletion(-)
+> >
+> > Acked-by: Will Deacon <will.deacon@arm.com>
+> >
+> > With the minor caveat below...
+> >
+> >> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+> >> index ae1f70450fb2..9932aca9704b 100644
+> >> --- a/arch/arm64/include/asm/cpucaps.h
+> >> +++ b/arch/arm64/include/asm/cpucaps.h
+> >> @@ -51,7 +51,8 @@
+> >>  #define ARM64_SSBD                           30
+> >>  #define ARM64_MISMATCHED_CACHE_TYPE          31
+> >>  #define ARM64_HAS_STAGE2_FWB                 32
+> >> +#define ARM64_HAS_CRC32                              33
+> >>
+> >> -#define ARM64_NCAPS                          33
+> >> +#define ARM64_NCAPS                          34
+> >
+> >
+> > ... if this goes via crypto, you'll almost certainly get a (trivial)
+> > conflict with arm64, since these numbers get bumped all the time.
+> >
+> 
+> I think the first three patches should go through the arm64 tree. The
+> last one just removes the now redundant crc32 SIMD driver, and Herbert
+> could pick that up separately, i.e., it should be totally independent.
 
-Please see my replay inline.
-
-> -----Original Message-----
-> From: linux-arm-kernel <linux-arm-kernel-bounces@lists.infradead.org>
-> On Behalf Of Scott Wood
-> Sent: 2018?9?4? 4:34
-> To: Andy Tang <andy.tang@nxp.com>; Vabhav Sharma
-> <vabhav.sharma@nxp.com>; linux-kernel at vger.kernel.org;
-> devicetree at vger.kernel.org; robh+dt at kernel.org;
-> mark.rutland at arm.com; linuxppc-dev at lists.ozlabs.org;
-> linux-arm-kernel at lists.infradead.org; mturquette at baylibre.com;
-> sboyd at kernel.org; rjw at rjwysocki.net; viresh.kumar at linaro.org;
-> linux-clk at vger.kernel.org; linux-pm at vger.kernel.org;
-> linux-kernel-owner at vger.kernel.org; catalin.marinas at arm.com;
-> will.deacon at arm.com; gregkh at linuxfoundation.org; arnd at arndb.de;
-> kstewart at linuxfoundation.org; yamada.masahiro at socionext.com
-> Cc: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>;
-> linux at armlinux.org.uk; Varun Sethi <V.Sethi@nxp.com>; Udit Kumar
-> <udit.kumar@nxp.com>
-> Subject: Re: [PATCH 3/5] drivers: clk-qoriq: Add clockgen support for
-> lx2160a
-> 
-> On Mon, 2018-09-03 at 01:17 +0000, Andy Tang wrote:
-> > Hi Scott,
-> >
-> > Please see my replay in line.
-> >
-> > > -----Original Message-----
-> > > From: Linuxppc-dev
-> > > <linuxppc-dev-bounces+b29983=freescale.com@lists.ozlabs.org> On
-> > > Behalf Of Scott Wood
-> > > Sent: 2018?9?1? 4:29
-> > > To: Andy Tang <andy.tang@nxp.com>; Vabhav Sharma
-> > > <vabhav.sharma@nxp.com>; linux-kernel at vger.kernel.org;
-> > > devicetree at vger.kernel.org; robh+dt at kernel.org;
-> > > mark.rutland at arm.com; linuxppc-dev at lists.ozlabs.org;
-> > > linux-arm-kernel at lists.infradead.org; mturquette at baylibre.com;
-> > > sboyd at kernel.org; rjw at rjwysocki.net; viresh.kumar at linaro.org;
-> > > linux-clk at vger.kernel.org; linux-pm at vger.kernel.org;
-> > > linux-kernel-owner at vger.kernel.org; catalin.marinas at arm.com;
-> > > will.deacon at arm.com; gregkh at linuxfoundation.org; arnd at arndb.de;
-> > > kstewart at linuxfoundation.org; yamada.masahiro at socionext.com
-> > > Cc: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>;
-> > > linux at armlinux.org.uk; Udit Kumar <udit.kumar@nxp.com>; Varun
-> Sethi
-> > > <V.Sethi@nxp.com>
-> > > Subject: Re: [PATCH 3/5] drivers: clk-qoriq: Add clockgen support
-> > > for lx2160a
-> > >
-> > > On Fri, 2018-08-31 at 06:12 +0000, Andy Tang wrote:
-> > > > We don't want to increase NUM_CMUX each time new soc with
-> more
-> > >
-> > > cmuxes added.
-> > >
-> > > You don't want to have to make a trivial change each time you exceed
-> > > a limit that has yet to be exceeded once since NUM_CMUX was added?
-> > > This isn't ABI or in any other way hard to change.  It's right in
-> > > the same file as the chip description you'd be adding.
-> > >
-> > > And even if a chip did come along with 16 cmuxes, you'd then need to
-> > > increase the array to 17 to hold the -1 if you don't want to leave a
-> > > situation like the
-> > > p4080 is in now, where a chip's cmux array could be broken by
-> > > increasing NUM_CMUX further.
-> > >
-> >
-> > [Andy] Adding buffer to a limitation number is always a good habit
-> > when coding. We often forget to increase this value when a new chip
-> > with more cmuxes added.
-> 
-> "often"?  There has never been a new chip added with more cmuxes
-> than p4080's 8, and if one does come along and you forget, the compiler
-> should complain about exceeding the array length with a static initializer.
-> This isn't like an array that is filled with a runtime-determined length.
-> 
-> > Like this patch, we didn't increase this value at first. We spent a
-> > lot of time finding out that NUM_CMUX needs to be increased too.
-> 
-> Are you talking about some other chip that you haven't sent a patch for
-> yet?
-> Or is the cmux array for this chip wrong?  What specifically did you see
-> happen "at first"?
-> 
-[Andy] Sorry, "Often" is not a right word. I meant we tend to add new soc without updating NUM_CMUX.
- 
-> > It is a personal preference how to set this value. I think it is
-> > better to increase it to 16, not NUM_CMUX+1 as long as we fix the
-> > P4080 issue even though it is a trivial change. And I agree the
-> > description needs to be updated.
-> 
-> I'm not the clock maintainer, so it's not up to me, but I don't see the point
-> in setting it to an arbitrary number, and I do not agree that increasing
-> NUM_CMUX is a suitable replacement for NUM_CMUX+1 in
-> cmux_to_group[], as that array should be one larger than cmux[] in order
-> to allow every chip to have a
-> -1 terminator.  In any case, any change to NUM_CMUX should be a
-> separate patch because it's not required for lx2160a support (assuming
-> lx2160a was correctly described by this patch).
-[Andy] I don't see any impropriate about your suggestion. so we are going to do in your way.
+Yes let's do that.
 
 Thanks,
-Andy
-> 
-> -Scott
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Flist
-> s.infradead.org%2Fmailman%2Flistinfo%2Flinux-arm-kernel&amp;data=02
-> %7C01%7Candy.tang%40nxp.com%7Cdbc824fc39674711316208d611dcf
-> 61b%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0%7C0%7C63671603
-> 8060797113&amp;sdata=iCLKGMEzRX2dpH5%2Bf4NWIiPDc5L5NpTcpZ7X
-> usehdIw%3D&amp;reserved=0
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
