@@ -1,530 +1,756 @@
 From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Tue,  4 Sep 2018 17:24:44 +0530
-Subject: [PATCH v2 09/15] soc: octeontx2: Configure block LF's MSIX vector
- offset
+Date: Tue,  4 Sep 2018 17:24:48 +0530
+Subject: [PATCH v2 13/15] soc: octeontx2: Add support for CGX link management
 In-Reply-To: <1536062090-30446-1-git-send-email-sunil.kovvuri@gmail.com>
 References: <1536062090-30446-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1536062090-30446-10-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1536062090-30446-14-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunil Goutham <sgoutham@marvell.com>
+From: Linu Cherian <lcherian@marvell.com>
 
-Firmware configures a certain number of MSIX vectors to each of
-enabled RVU PF/VF. When a block LF is attached to a PF/VF, number
-of MSIX vectors needed by that LF are set aside (out of PF/VF's
-total MSIX vectors) and LF's msix_offset is configured in HW.
+CGX LMAC initialization, link status polling etc is done
+by low level secure firmware. For link management this patch
+adds a interface or communication mechanism between firmware
+and this kernel CGX driver.
 
-Also added support for a RVU PF/VF to retrieve that block LF's
-MSIX vector offset information from AF via mbox.
+- Firmware interface specification is defined in cgx_fw_if.h.
+- Support to send/receive commands/events to/form firmware.
+- events/commands implemented
+  * link up
+  * link down
+  * reading firmware version
 
-Signed-off-by: Sunil Goutham <sgoutham@marvell.com>
+Signed-off-by: Linu Cherian <lcherian@marvell.com>
+Signed-off-by: Nithya Mani <nmani@marvell.com>
 ---
- drivers/soc/marvell/octeontx2/mbox.h       |  18 ++
- drivers/soc/marvell/octeontx2/rvu.c        | 333 ++++++++++++++++++++++++++++-
- drivers/soc/marvell/octeontx2/rvu.h        |   7 +
- drivers/soc/marvell/octeontx2/rvu_struct.h |   2 +
- 4 files changed, 357 insertions(+), 3 deletions(-)
+ drivers/soc/marvell/octeontx2/cgx.c       | 364 +++++++++++++++++++++++++++++-
+ drivers/soc/marvell/octeontx2/cgx.h       |  32 +++
+ drivers/soc/marvell/octeontx2/cgx_fw_if.h | 225 ++++++++++++++++++
+ 3 files changed, 617 insertions(+), 4 deletions(-)
+ create mode 100644 drivers/soc/marvell/octeontx2/cgx_fw_if.h
 
-diff --git a/drivers/soc/marvell/octeontx2/mbox.h b/drivers/soc/marvell/octeontx2/mbox.h
-index 7280d49..bedf0ee 100644
---- a/drivers/soc/marvell/octeontx2/mbox.h
-+++ b/drivers/soc/marvell/octeontx2/mbox.h
-@@ -122,6 +122,7 @@ static inline struct mbox_msghdr *otx2_mbox_alloc_msg(struct otx2_mbox *mbox,
- M(READY,		0x001, msg_req, ready_msg_rsp)			\
- M(ATTACH_RESOURCES,	0x002, rsrc_attach, msg_rsp)			\
- M(DETACH_RESOURCES,	0x003, rsrc_detach, msg_rsp)			\
-+M(MSIX_OFFSET,		0x004, msg_req, msix_offset_rsp)		\
- /* CGX mbox IDs (range 0x200 - 0x3FF) */				\
- /* NPA mbox IDs (range 0x400 - 0x5FF) */				\
- /* SSO/SSOW mbox IDs (range 0x600 - 0x7FF) */				\
-@@ -190,4 +191,21 @@ struct rsrc_detach {
- 	u8 cptlfs:1;
- };
+diff --git a/drivers/soc/marvell/octeontx2/cgx.c b/drivers/soc/marvell/octeontx2/cgx.c
+index c5e0ebb..26af8fa 100644
+--- a/drivers/soc/marvell/octeontx2/cgx.c
++++ b/drivers/soc/marvell/octeontx2/cgx.c
+@@ -25,16 +25,43 @@
+ #define DRV_STRING      "Marvell OcteonTX2 CGX/MAC Driver"
+ #define DRV_VERSION	"1.0"
  
-+#define MSIX_VECTOR_INVALID	0xFFFF
-+#define MAX_RVU_BLKLF_CNT	256
-+
-+struct msix_offset_rsp {
-+	struct mbox_msghdr hdr;
-+	u16  npa_msixoff;
-+	u16  nix_msixoff;
-+	u8   sso;
-+	u8   ssow;
-+	u8   timlfs;
-+	u8   cptlfs;
-+	u16  sso_msixoff[MAX_RVU_BLKLF_CNT];
-+	u16  ssow_msixoff[MAX_RVU_BLKLF_CNT];
-+	u16  timlf_msixoff[MAX_RVU_BLKLF_CNT];
-+	u16  cptlf_msixoff[MAX_RVU_BLKLF_CNT];
++/**
++ * struct lmac
++ * @wq_cmd_cmplt:	waitq to keep the process blocked until cmd completion
++ * @cmd_lock:		Lock to serialize the command interface
++ * @resp:		command response
++ * @event_cb:		callback for linkchange events
++ * @cmd_pend:		flag set before new command is started
++ *			flag cleared after command response is received
++ * @cgx:		parent cgx port
++ * @lmac_id:		lmac port id
++ * @name:		lmac port name
++ */
++struct lmac {
++	wait_queue_head_t wq_cmd_cmplt;
++	struct mutex cmd_lock;
++	struct cgx_evt_sts resp;
++	struct cgx_event_cb event_cb;
++	bool cmd_pend;
++	struct cgx *cgx;
++	u8 lmac_id;
++	char *name;
 +};
 +
- #endif /* MBOX_H */
-diff --git a/drivers/soc/marvell/octeontx2/rvu.c b/drivers/soc/marvell/octeontx2/rvu.c
-index 39dc45d..8ac3524 100644
---- a/drivers/soc/marvell/octeontx2/rvu.c
-+++ b/drivers/soc/marvell/octeontx2/rvu.c
-@@ -24,6 +24,11 @@
+ struct cgx {
+ 	void __iomem		*reg_base;
+ 	struct pci_dev		*pdev;
+ 	u8			cgx_id;
+ 	u8			lmac_count;
++	struct lmac		*lmac_idmap[MAX_LMAC_PER_CGX];
+ 	struct list_head	cgx_list;
+ };
  
- static int rvu_get_hwvf(struct rvu *rvu, int pcifunc);
+ static LIST_HEAD(cgx_list);
  
-+static void rvu_set_msix_offset(struct rvu *rvu, struct rvu_pfvf *pfvf,
-+				struct rvu_block *block, int lf);
-+static void rvu_clear_msix_offset(struct rvu *rvu, struct rvu_pfvf *pfvf,
-+				  struct rvu_block *block, int lf);
++/* CGX PHY management internal APIs */
++static int cgx_fwi_link_change(struct cgx *cgx, int lmac_id, bool en);
 +
  /* Supported devices */
- static const struct pci_device_id rvu_id_table[] = {
- 	{ PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, PCI_DEVID_OCTEONTX2_RVU_AF) },
-@@ -75,6 +80,45 @@ int rvu_alloc_rsrc(struct rsrc_bmap *rsrc)
- 	return id;
- }
+ static const struct pci_device_id cgx_id_table[] = {
+ 	{ PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, PCI_DEVID_OCTEONTX2_CGX) },
+@@ -47,11 +74,24 @@ MODULE_LICENSE("GPL v2");
+ MODULE_VERSION(DRV_VERSION);
+ MODULE_DEVICE_TABLE(pci, cgx_id_table);
  
-+static int rvu_alloc_rsrc_contig(struct rsrc_bmap *rsrc, int nrsrc)
++static void cgx_write(struct cgx *cgx, u64 lmac, u64 offset, u64 val)
 +{
-+	int start;
-+
-+	if (!rsrc->bmap)
-+		return -EINVAL;
-+
-+	start = bitmap_find_next_zero_area(rsrc->bmap, rsrc->max, 0, nrsrc, 0);
-+	if (start >= rsrc->max)
-+		return -ENOSPC;
-+
-+	bitmap_set(rsrc->bmap, start, nrsrc);
-+	return start;
++	writeq(val, cgx->reg_base + (lmac << 18) + offset);
 +}
 +
-+static void rvu_free_rsrc_contig(struct rsrc_bmap *rsrc, int nrsrc, int start)
-+{
-+	if (!rsrc->bmap)
-+		return;
-+	if (start >= rsrc->max)
-+		return;
-+
-+	bitmap_clear(rsrc->bmap, start, nrsrc);
-+}
-+
-+static bool rvu_rsrc_check_contig(struct rsrc_bmap *rsrc, int nrsrc)
-+{
-+	int start;
-+
-+	if (!rsrc->bmap)
-+		return false;
-+
-+	start = bitmap_find_next_zero_area(rsrc->bmap, rsrc->max, 0, nrsrc, 0);
-+	if (start >= rsrc->max)
-+		return false;
-+
-+	return true;
-+}
-+
- void rvu_free_rsrc(struct rsrc_bmap *rsrc, int id)
+ static u64 cgx_read(struct cgx *cgx, u64 lmac, u64 offset)
  {
- 	if (!rsrc->bmap)
-@@ -103,6 +147,26 @@ int rvu_alloc_bitmap(struct rsrc_bmap *rsrc)
- 	return 0;
+ 	return readq(cgx->reg_base + (lmac << 18) + offset);
  }
  
-+/* Get block LF's HW index from a PF_FUNC's block slot number */
-+int rvu_get_lf(struct rvu *rvu, struct rvu_block *block, u16 pcifunc, u16 slot)
++static inline struct lmac *lmac_pdata(u8 lmac_id, struct cgx *cgx)
 +{
-+	int lf;
-+	u16 match = 0;
++	if (!cgx || lmac_id >= MAX_LMAC_PER_CGX)
++		return NULL;
 +
-+	spin_lock(&rvu->rsrc_lock);
-+	for (lf = 0; lf < block->lf.max; lf++) {
-+		if (block->fn_map[lf] == pcifunc) {
-+			if (slot == match) {
-+				spin_unlock(&rvu->rsrc_lock);
-+				return lf;
-+			}
-+			match++;
-+		}
-+	}
-+	spin_unlock(&rvu->rsrc_lock);
-+	return -ENODEV;
++	return cgx->lmac_idmap[lmac_id];
 +}
 +
- /* Convert BLOCK_TYPE_E to a BLOCK_ADDR_E.
-  * Some silicon variants of OcteonTX2 supports
-  * multiple blocks of same type.
-@@ -237,6 +301,16 @@ inline int rvu_get_pf(u16 pcifunc)
- 	return (pcifunc >> RVU_PFVF_PF_SHIFT) & RVU_PFVF_PF_MASK;
- }
- 
-+void rvu_get_pf_numvfs(struct rvu *rvu, int pf, int *numvfs, int *hwvf)
-+{
-+	u64 cfg;
-+
-+	/* Get numVFs attached to this PF and first HWVF */
-+	cfg = rvu_read64(rvu, BLKADDR_RVUM, RVU_PRIV_PFX_CFG(pf));
-+	*numvfs = (cfg >> 12) & 0xFF;
-+	*hwvf = cfg & 0xFFF;
-+}
-+
- static int rvu_get_hwvf(struct rvu *rvu, int pcifunc)
+ int cgx_get_cgx_cnt(void)
  {
- 	int pf, func;
-@@ -331,20 +405,150 @@ static void rvu_scan_block(struct rvu *rvu, struct rvu_block *block)
- 		pfvf = rvu_get_pfvf(rvu, (cfg >> 8) & 0xFFFF);
- 		rvu_update_rsrc_map(rvu, pfvf, block,
- 				    (cfg >> 8) & 0xFFFF, lf, true);
-+
-+		/* Set start MSIX vector for this LF within this PF/VF */
-+		rvu_set_msix_offset(rvu, pfvf, block, lf);
- 	}
+ 	struct cgx *cgx_dev;
+@@ -87,18 +127,318 @@ void *cgx_get_pdata(int cgx_id)
  }
+ EXPORT_SYMBOL(cgx_get_pdata);
  
-+static void rvu_check_min_msix_vec(struct rvu *rvu, int nvecs, int pf, int vf)
+-static void cgx_lmac_init(struct cgx *cgx)
++/* CGX Firmware interface low level support */
++static int cgx_fwi_cmd_send(struct cgx_cmd *cmd, struct cgx_evt_sts *rsp,
++			    struct lmac *lmac)
 +{
-+	int min_vecs;
++	struct cgx *cgx = lmac->cgx;
++	union cgx_cmdreg creg;
++	union cgx_evtreg ereg;
++	struct device *dev;
++	int err = 0;
 +
-+	if (!vf)
-+		goto check_pf;
-+
-+	if (!nvecs) {
-+		dev_warn(rvu->dev,
-+			 "PF%d:VF%d is configured with zero msix vectors, %d\n",
-+			 pf, vf - 1, nvecs);
-+	}
-+	return;
-+
-+check_pf:
-+	if (pf == 0)
-+		min_vecs = RVU_AF_INT_VEC_CNT + RVU_PF_INT_VEC_CNT;
-+	else
-+		min_vecs = RVU_PF_INT_VEC_CNT;
-+
-+	if (!(nvecs < min_vecs))
-+		return;
-+	dev_warn(rvu->dev,
-+		 "PF%d is configured with too few vectors, %d, min is %d\n",
-+		 pf, nvecs, min_vecs);
-+}
-+
-+static int rvu_setup_msix_resources(struct rvu *rvu)
-+{
-+	struct rvu_hwinfo *hw = rvu->hw;
-+	int pf, vf, numvfs, hwvf, err;
-+	struct rvu_pfvf *pfvf;
-+	int nvecs, offset;
-+	u64 cfg;
-+
-+	for (pf = 0; pf < hw->total_pfs; pf++) {
-+		cfg = rvu_read64(rvu, BLKADDR_RVUM, RVU_PRIV_PFX_CFG(pf));
-+		/* If PF is not enabled, nothing to do */
-+		if (!((cfg >> 20) & 0x01))
-+			continue;
-+
-+		rvu_get_pf_numvfs(rvu, pf, &numvfs, &hwvf);
-+
-+		pfvf = &rvu->pf[pf];
-+		/* Get num of MSIX vectors attached to this PF */
-+		cfg = rvu_read64(rvu, BLKADDR_RVUM, RVU_PRIV_PFX_MSIX_CFG(pf));
-+		pfvf->msix.max = ((cfg >> 32) & 0xFFF) + 1;
-+		rvu_check_min_msix_vec(rvu, pfvf->msix.max, pf, 0);
-+
-+		/* Alloc msix bitmap for this PF */
-+		err = rvu_alloc_bitmap(&pfvf->msix);
-+		if (err)
-+			return err;
-+
-+		/* Allocate memory for MSIX vector to RVU block LF mapping */
-+		pfvf->msix_lfmap = devm_kcalloc(rvu->dev, pfvf->msix.max,
-+						sizeof(u16), GFP_KERNEL);
-+		if (!pfvf->msix_lfmap)
-+			return -ENOMEM;
-+
-+		/* For PF0 (AF) firmware will set msix vector offsets for
-+		 * AF, block AF and PF0_INT vectors, so jump to VFs.
-+		 */
-+		if (!pf)
-+			goto setup_vfmsix;
-+
-+		/* Set MSIX offset for PF's 'RVU_PF_INT_VEC' vectors.
-+		 * These are allocated on driver init and never freed,
-+		 * so no need to set 'msix_lfmap' for these.
-+		 */
-+		cfg = rvu_read64(rvu, BLKADDR_RVUM, RVU_PRIV_PFX_INT_CFG(pf));
-+		nvecs = (cfg >> 12) & 0xFF;
-+		cfg &= ~0x7FFULL;
-+		offset = rvu_alloc_rsrc_contig(&pfvf->msix, nvecs);
-+		rvu_write64(rvu, BLKADDR_RVUM,
-+			    RVU_PRIV_PFX_INT_CFG(pf), cfg | offset);
-+setup_vfmsix:
-+		/* Alloc msix bitmap for VFs */
-+		for (vf = 0; vf < numvfs; vf++) {
-+			pfvf =  &rvu->hwvf[hwvf + vf];
-+			/* Get num of MSIX vectors attached to this VF */
-+			cfg = rvu_read64(rvu, BLKADDR_RVUM,
-+					 RVU_PRIV_PFX_MSIX_CFG(pf));
-+			pfvf->msix.max = (cfg & 0xFFF) + 1;
-+			rvu_check_min_msix_vec(rvu, pfvf->msix.max, pf, vf + 1);
-+
-+			/* Alloc msix bitmap for this VF */
-+			err = rvu_alloc_bitmap(&pfvf->msix);
-+			if (err)
-+				return err;
-+
-+			pfvf->msix_lfmap =
-+				devm_kcalloc(rvu->dev, pfvf->msix.max,
-+					     sizeof(u16), GFP_KERNEL);
-+			if (!pfvf->msix_lfmap)
-+				return -ENOMEM;
-+
-+			/* Set MSIX offset for HWVF's 'RVU_VF_INT_VEC' vectors.
-+			 * These are allocated on driver init and never freed,
-+			 * so no need to set 'msix_lfmap' for these.
-+			 */
-+			cfg = rvu_read64(rvu, BLKADDR_RVUM,
-+					 RVU_PRIV_HWVFX_INT_CFG(hwvf + vf));
-+			nvecs = (cfg >> 12) & 0xFF;
-+			cfg &= ~0x7FFULL;
-+			offset = rvu_alloc_rsrc_contig(&pfvf->msix, nvecs);
-+			rvu_write64(rvu, BLKADDR_RVUM,
-+				    RVU_PRIV_HWVFX_INT_CFG(hwvf + vf),
-+				    cfg | offset);
-+		}
-+	}
-+
-+	return 0;
-+}
-+
- static void rvu_free_hw_resources(struct rvu *rvu)
- {
- 	struct rvu_hwinfo *hw = rvu->hw;
- 	struct rvu_block *block;
-+	struct rvu_pfvf  *pfvf;
- 	int id;
- 
--	/* Free all bitmaps */
-+	/* Free block LF bitmaps */
- 	for (id = 0; id < BLK_COUNT; id++) {
- 		block = &hw->block[id];
- 		kfree(block->lf.bmap);
- 	}
-+
-+	/* Free MSIX bitmaps */
-+	for (id = 0; id < hw->total_pfs; id++) {
-+		pfvf = &rvu->pf[id];
-+		kfree(pfvf->msix.bmap);
-+	}
-+
-+	for (id = 0; id < hw->total_vfs; id++) {
-+		pfvf = &rvu->hwvf[id];
-+		kfree(pfvf->msix.bmap);
-+	}
- }
- 
- static int rvu_setup_hw_resources(struct rvu *rvu)
-@@ -500,6 +704,12 @@ static int rvu_setup_hw_resources(struct rvu *rvu)
- 	if (!rvu->hwvf)
- 		return -ENOMEM;
- 
-+	spin_lock_init(&rvu->rsrc_lock);
-+
-+	err = rvu_setup_msix_resources(rvu);
++	/* Ensure no other command is in progress */
++	err = mutex_lock_interruptible(&lmac->cmd_lock);
 +	if (err)
 +		return err;
 +
- 	for (blkid = 0; blkid < BLK_COUNT; blkid++) {
- 		block = &hw->block[blkid];
- 		if (!block->lf.bmap)
-@@ -517,8 +727,6 @@ static int rvu_setup_hw_resources(struct rvu *rvu)
- 		rvu_scan_block(rvu, block);
- 	}
- 
--	spin_lock_init(&rvu->rsrc_lock);
--
- 	return 0;
- }
- 
-@@ -604,6 +812,9 @@ static void rvu_detach_block(struct rvu *rvu, int pcifunc, int blktype)
- 
- 		/* Free the resource */
- 		rvu_free_rsrc(&block->lf, lf);
-+
-+		/* Clear MSIX vector offset for this LF */
-+		rvu_clear_msix_offset(rvu, pfvf, block, lf);
- 	}
- }
- 
-@@ -697,6 +908,9 @@ static void rvu_attach_block(struct rvu *rvu, int pcifunc,
- 			    (lf << block->lfshift), cfg);
- 		rvu_update_rsrc_map(rvu, pfvf, block,
- 				    pcifunc, lf, true);
-+
-+		/* Set start MSIX vector for this LF within this PF/VF */
-+		rvu_set_msix_offset(rvu, pfvf, block, lf);
- 	}
- }
- 
-@@ -872,6 +1086,119 @@ static int rvu_mbox_handler_ATTACH_RESOURCES(struct rvu *rvu,
- 	return err;
- }
- 
-+static u16 rvu_get_msix_offset(struct rvu *rvu, struct rvu_pfvf *pfvf,
-+			       int blkaddr, int lf)
-+{
-+	u16 vec;
-+
-+	if (lf < 0)
-+		return MSIX_VECTOR_INVALID;
-+
-+	for (vec = 0; vec < pfvf->msix.max; vec++) {
-+		if (pfvf->msix_lfmap[vec] == MSIX_BLKLF(blkaddr, lf))
-+			return vec;
++	/* Ensure command register is free */
++	creg.val = cgx_read(cgx, lmac->lmac_id,  CGX_COMMAND_REG);
++	if (creg.cmd.own != CGX_CMD_OWN_NS) {
++		err = -EBUSY;
++		goto unlock;
 +	}
-+	return MSIX_VECTOR_INVALID;
++
++	/* Update ownership in command request */
++	cmd->own = CGX_CMD_OWN_FIRMWARE;
++
++	/* Mark this lmac as pending, before we start */
++	lmac->cmd_pend = true;
++
++	/* Start command in hardware */
++	creg.cmd = *cmd;
++	cgx_write(cgx, lmac->lmac_id, CGX_COMMAND_REG, creg.val);
++	creg.val = cgx_read(cgx, lmac->lmac_id,  CGX_COMMAND_REG);
++
++	/* Ensure command is completed without errors */
++	if (!wait_event_timeout(lmac->wq_cmd_cmplt, !lmac->cmd_pend,
++				msecs_to_jiffies(CGX_CMD_TIMEOUT))) {
++		dev = &cgx->pdev->dev;
++		ereg.val = cgx_read(cgx, lmac->lmac_id,  CGX_EVENT_REG);
++		if (ereg.val) {
++			dev_err(dev, "cgx port %d:%d: No event for response\n",
++				cgx->cgx_id, lmac->lmac_id);
++			/* copy event */
++			lmac->resp = ereg.evt_sts;
++		} else {
++			dev_err(dev, "cgx port %d:%d cmd timeout\n",
++				cgx->cgx_id, lmac->lmac_id);
++			err = -EIO;
++			goto unlock;
++		}
++	}
++
++	/* we have a valid command response */
++	smp_rmb(); /* Ensure the latest updates are visible */
++	*rsp = lmac->resp;
++
++unlock:
++	mutex_unlock(&lmac->cmd_lock);
++
++	return err;
 +}
 +
-+static void rvu_set_msix_offset(struct rvu *rvu, struct rvu_pfvf *pfvf,
-+				struct rvu_block *block, int lf)
++static inline int cgx_fwi_cmd_generic(struct cgx_cmd *req,
++				      struct cgx_evt_sts *rsp,
++				      struct cgx *cgx, int lmac_id)
 +{
-+	u16 nvecs, vec, offset;
-+	u64 cfg;
++	struct lmac *lmac;
++	int err;
 +
-+	cfg = rvu_read64(rvu, block->addr, block->msixcfg_reg |
-+			 (lf << block->lfshift));
-+	nvecs = (cfg >> 12) & 0xFF;
++	lmac = lmac_pdata(lmac_id, cgx);
++	if (!lmac)
++		return -ENODEV;
 +
-+	/* Check and alloc MSIX vectors, must be contiguous */
-+	if (!rvu_rsrc_check_contig(&pfvf->msix, nvecs))
++	err = cgx_fwi_cmd_send(req, rsp, lmac);
++
++	/* Check for valid response */
++	if (!err) {
++		if (rsp->stat == CGX_STAT_FAIL)
++			return -EIO;
++		else
++			return 0;
++	}
++
++	return err;
++}
++
++/* Hardware event handlers */
++static inline void cgx_link_change_handler(struct cgx_lnk_sts *lstat,
++					   struct lmac *lmac)
++{
++	struct cgx *cgx = lmac->cgx;
++	struct cgx_link_event event;
++	struct device *dev = &cgx->pdev->dev;
++
++	event.lstat = *lstat;
++	event.cgx_id = cgx->cgx_id;
++	event.lmac_id = lmac->lmac_id;
++
++	if (!lmac->event_cb.notify_link_chg) {
++		dev_dbg(dev, "cgx port %d:%d Link change handler null",
++			cgx->cgx_id, lmac->lmac_id);
++		if (lstat->err_type != CGX_ERR_NONE) {
++			dev_err(dev, "cgx port %d:%d Link error %d\n",
++				cgx->cgx_id, lmac->lmac_id, lstat->err_type);
++		}
++		dev_info(dev, "cgx port %d:%d Link status %s, speed %x\n",
++			 cgx->cgx_id, lmac->lmac_id,
++			lstat->link_up ? "UP" : "DOWN", lstat->speed);
 +		return;
++	}
 +
-+	offset = rvu_alloc_rsrc_contig(&pfvf->msix, nvecs);
-+
-+	/* Config MSIX offset in LF */
-+	rvu_write64(rvu, block->addr, block->msixcfg_reg |
-+		    (lf << block->lfshift), (cfg & ~0x7FFULL) | offset);
-+
-+	/* Update the bitmap as well */
-+	for (vec = 0; vec < nvecs; vec++)
-+		pfvf->msix_lfmap[offset + vec] = MSIX_BLKLF(block->addr, lf);
++	if (lmac->event_cb.notify_link_chg(&event, lmac->event_cb.data))
++		dev_err(dev, "event notification failure\n");
 +}
 +
-+static void rvu_clear_msix_offset(struct rvu *rvu, struct rvu_pfvf *pfvf,
-+				  struct rvu_block *block, int lf)
++static inline bool cgx_cmdresp_is_linkevent(struct cgx_evt_sts *rsp)
 +{
-+	u16 nvecs, vec, offset;
-+	u64 cfg;
-+
-+	cfg = rvu_read64(rvu, block->addr, block->msixcfg_reg |
-+			 (lf << block->lfshift));
-+	nvecs = (cfg >> 12) & 0xFF;
-+
-+	/* Clear MSIX offset in LF */
-+	rvu_write64(rvu, block->addr, block->msixcfg_reg |
-+		    (lf << block->lfshift), cfg & ~0x7FFULL);
-+
-+	offset = rvu_get_msix_offset(rvu, pfvf, block->addr, lf);
-+
-+	/* Update the mapping */
-+	for (vec = 0; vec < nvecs; vec++)
-+		pfvf->msix_lfmap[offset + vec] = 0;
-+
-+	/* Free the same in MSIX bitmap */
-+	rvu_free_rsrc_contig(&pfvf->msix, nvecs, offset);
++	if (rsp->id == CGX_CMD_LINK_BRING_UP ||
++	    rsp->id == CGX_CMD_LINK_BRING_DOWN)
++		return true;
++	else
++		return false;
 +}
 +
-+static int rvu_mbox_handler_MSIX_OFFSET(struct rvu *rvu, struct msg_req *req,
-+					struct msix_offset_rsp *rsp)
++static inline bool cgx_event_is_linkevent(struct cgx_evt_sts *evt)
 +{
-+	struct rvu_hwinfo *hw = rvu->hw;
-+	u16 pcifunc = req->hdr.pcifunc;
-+	struct rvu_pfvf *pfvf;
-+	int lf, slot;
++	if (evt->id == CGX_EVT_LINK_CHANGE)
++		return true;
++	else
++		return false;
++}
 +
-+	pfvf = rvu_get_pfvf(rvu, pcifunc);
-+	if (!pfvf->msix.bmap)
-+		return 0;
++static irqreturn_t cgx_fwi_event_handler(int irq, void *data)
++{
++	struct lmac *lmac = data;
++	struct cgx *cgx = lmac->cgx;
++	struct cgx_evt_sts event;
++	union cgx_evtreg ereg;
++	struct device *dev;
 +
-+	/* Set MSIX offsets for each block's LFs attached to this PF/VF */
-+	lf = rvu_get_lf(rvu, &hw->block[BLKADDR_NPA], pcifunc, 0);
-+	rsp->npa_msixoff = rvu_get_msix_offset(rvu, pfvf, BLKADDR_NPA, lf);
++	ereg.val = cgx_read(cgx, lmac->lmac_id, CGX_EVENT_REG);
++	if (!ereg.evt_sts.ack)
++		return IRQ_NONE;
 +
-+	lf = rvu_get_lf(rvu, &hw->block[BLKADDR_NIX0], pcifunc, 0);
-+	rsp->nix_msixoff = rvu_get_msix_offset(rvu, pfvf, BLKADDR_NIX0, lf);
++	dev = &cgx->pdev->dev;
 +
-+	rsp->sso = pfvf->sso;
-+	for (slot = 0; slot < rsp->sso; slot++) {
-+		lf = rvu_get_lf(rvu, &hw->block[BLKADDR_SSO], pcifunc, slot);
-+		rsp->sso_msixoff[slot] =
-+			rvu_get_msix_offset(rvu, pfvf, BLKADDR_SSO, lf);
++	event = ereg.evt_sts;
++
++	switch (event.evt_type) {
++	case CGX_EVT_CMD_RESP:
++		/* Copy the response. Since only one command is active at a
++		 * time, there is no way a response can get overwritten
++		 */
++		lmac->resp = event;
++		/* Ensure response is updated before thread context starts */
++		smp_wmb();
++
++		/* There wont be separate events for link change initiated from
++		 * software; Hence report the command responses as events
++		 */
++		if (cgx_cmdresp_is_linkevent(&event))
++			cgx_link_change_handler(&ereg.link_sts, lmac);
++
++		/* Release thread waiting for completion  */
++		lmac->cmd_pend = false;
++		wake_up_interruptible(&lmac->wq_cmd_cmplt);
++		break;
++	case CGX_EVT_ASYNC:
++		if (cgx_event_is_linkevent(&event))
++			cgx_link_change_handler(&ereg.link_sts, lmac);
++		break;
++	default:
++		dev_err(dev, "cgx port %d:%d Unknown event received\n",
++			cgx->cgx_id, lmac->lmac_id);
 +	}
 +
-+	rsp->ssow = pfvf->ssow;
-+	for (slot = 0; slot < rsp->ssow; slot++) {
-+		lf = rvu_get_lf(rvu, &hw->block[BLKADDR_SSOW], pcifunc, slot);
-+		rsp->ssow_msixoff[slot] =
-+			rvu_get_msix_offset(rvu, pfvf, BLKADDR_SSOW, lf);
-+	}
++	/* Any new event or command response will be posted by firmware
++	 * only after the current status is acked.
++	 * Ack the interrupt register as well.
++	 */
++	cgx_write(lmac->cgx, lmac->lmac_id, CGX_EVENT_REG, 0);
++	cgx_write(lmac->cgx, lmac->lmac_id, CGXX_CMRX_INT, FW_CGX_INT);
 +
-+	rsp->timlfs = pfvf->timlfs;
-+	for (slot = 0; slot < rsp->timlfs; slot++) {
-+		lf = rvu_get_lf(rvu, &hw->block[BLKADDR_TIM], pcifunc, slot);
-+		rsp->timlf_msixoff[slot] =
-+			rvu_get_msix_offset(rvu, pfvf, BLKADDR_TIM, lf);
-+	}
++	return IRQ_HANDLED;
++}
 +
-+	rsp->cptlfs = pfvf->cptlfs;
-+	for (slot = 0; slot < rsp->cptlfs; slot++) {
-+		lf = rvu_get_lf(rvu, &hw->block[BLKADDR_CPT0], pcifunc, slot);
-+		rsp->cptlf_msixoff[slot] =
-+			rvu_get_msix_offset(rvu, pfvf, BLKADDR_CPT0, lf);
-+	}
++/* APIs for PHY management using CGX firmware interface */
++
++/* callback registration for hardware events like link change */
++int cgx_lmac_evh_register(struct cgx_event_cb *cb, void *cgxd, int lmac_id)
+ {
++	struct lmac *lmac;
++	struct cgx *cgx = cgxd;
++
++	lmac = lmac_pdata(lmac_id, cgx);
++	if (!lmac)
++		return -ENODEV;
++
++	lmac->event_cb = *cb;
++
 +	return 0;
 +}
++EXPORT_SYMBOL(cgx_lmac_evh_register);
 +
- static int rvu_process_mbox_msg(struct rvu *rvu, int devid,
- 				struct mbox_msghdr *req)
++static int cgx_fwi_link_change(struct cgx *cgx, int lmac_id, bool enable)
++{
++	struct cgx_cmd req = { 0 };
++	struct cgx_evt_sts rsp;
++
++	if (enable)
++		req.id = CGX_CMD_LINK_BRING_UP;
++	else
++		req.id = CGX_CMD_LINK_BRING_DOWN;
++
++	return cgx_fwi_cmd_generic(&req, &rsp, cgx, lmac_id);
++}
++EXPORT_SYMBOL(cgx_fwi_link_change);
++
++static inline int cgx_fwi_read_version(struct cgx_ver_s *ver, struct cgx *cgx)
++{
++	struct cgx_cmd req = { 0 };
++	union cgx_evtreg event;
++	int err;
++
++	req.id = CGX_CMD_GET_FW_VER;
++
++	err = cgx_fwi_cmd_generic(&req, &event.evt_sts, cgx, 0);
++	if (!err)
++		*ver = event.ver;
++
++	return err;
++}
++
++static int cgx_lmac_verify_fwi_version(struct cgx *cgx)
++{
++	struct cgx_ver_s ver;
++	struct device *dev = &cgx->pdev->dev;
++	int err;
++
++	if (!cgx->lmac_count)
++		return 0;
++
++	err = cgx_fwi_read_version(&ver, cgx);
++	dev_dbg(dev, "Firmware command interface version = %d.%d\n",
++		ver.major_ver, ver.minor_ver);
++	if (err || ver.major_ver != CGX_FIRMWARE_MAJOR_VER ||
++	    ver.minor_ver != CGX_FIRMWARE_MINOR_VER)
++		return -EIO;
++	else
++		return 0;
++}
++
++static int cgx_lmac_init(struct cgx *cgx)
++{
++	struct lmac *lmac;
++	int i, err;
++
+ 	cgx->lmac_count = cgx_read(cgx, 0, CGXX_CMRX_RX_LMACS) & 0x7;
+ 	if (cgx->lmac_count > MAX_LMAC_PER_CGX)
+ 		cgx->lmac_count = MAX_LMAC_PER_CGX;
++
++	for (i = 0; i < cgx->lmac_count; i++) {
++		lmac = kcalloc(1, sizeof(struct lmac), GFP_KERNEL);
++		if (!lmac)
++			return -ENOMEM;
++		lmac->name = kcalloc(1, sizeof("cgx_fwi_xxx_yyy"), GFP_KERNEL);
++		if (!lmac->name)
++			return -ENOMEM;
++		sprintf(lmac->name, "cgx_fwi_%d_%d", cgx->cgx_id, i);
++		lmac->lmac_id = i;
++		lmac->cgx = cgx;
++		init_waitqueue_head(&lmac->wq_cmd_cmplt);
++		mutex_init(&lmac->cmd_lock);
++		err = request_irq(pci_irq_vector(cgx->pdev,
++						 CGX_LMAC_FWI + i * 9),
++				   cgx_fwi_event_handler, 0, lmac->name, lmac);
++		if (err)
++			return err;
++
++		/* Enable interrupt */
++		cgx_write(cgx, lmac->lmac_id, CGXX_CMRX_INT_ENA_W1S,
++			  FW_CGX_INT);
++
++		/* Add reference */
++		cgx->lmac_idmap[i] = lmac;
++	}
++
++	return cgx_lmac_verify_fwi_version(cgx);
++}
++
++static int cgx_lmac_exit(struct cgx *cgx)
++{
++	struct lmac *lmac;
++	int i;
++
++	/* Free all lmac related resources */
++	for (i = 0; i < cgx->lmac_count; i++) {
++		lmac = cgx->lmac_idmap[i];
++		if (!lmac)
++			continue;
++		free_irq(pci_irq_vector(cgx->pdev, CGX_LMAC_FWI + i * 9), lmac);
++		kfree(lmac->name);
++		kfree(lmac);
++	}
++
++	return 0;
+ }
+ 
+ static int cgx_probe(struct pci_dev *pdev, const struct pci_device_id *id)
  {
-diff --git a/drivers/soc/marvell/octeontx2/rvu.h b/drivers/soc/marvell/octeontx2/rvu.h
-index 0f76704..7435e83 100644
---- a/drivers/soc/marvell/octeontx2/rvu.h
-+++ b/drivers/soc/marvell/octeontx2/rvu.h
-@@ -65,6 +65,11 @@ struct rvu_pfvf {
- 	u16		ssow;
- 	u16		cptlfs;
- 	u16		timlfs;
+-	int err;
+ 	struct device *dev = &pdev->dev;
+ 	struct cgx *cgx;
++	int err, nvec;
+ 
+ 	cgx = devm_kzalloc(dev, sizeof(*cgx), GFP_KERNEL);
+ 	if (!cgx)
+@@ -128,14 +468,28 @@ static int cgx_probe(struct pci_dev *pdev, const struct pci_device_id *id)
+ 		goto err_release_regions;
+ 	}
+ 
++	nvec = CGX_NVEC;
++	err = pci_alloc_irq_vectors(pdev, nvec, nvec, PCI_IRQ_MSIX);
++	if (err < 0 || err != nvec) {
++		dev_err(dev, "Request for %d msix vectors failed, err %d\n",
++			nvec, err);
++		goto err_release_regions;
++	}
 +
-+	/* Block LF's MSIX vector info */
-+	struct rsrc_bmap msix;      /* Bitmap for MSIX vector alloc */
-+#define MSIX_BLKLF(blkaddr, lf) (((blkaddr) << 8) | ((lf) & 0xFF))
-+	u16		 *msix_lfmap; /* Vector to block LF mapping */
- };
+ 	list_add(&cgx->cgx_list, &cgx_list);
+ 	cgx->cgx_id = cgx_get_cgx_cnt() - 1;
+-	cgx_lmac_init(cgx);
++
++	err = cgx_lmac_init(cgx);
++	if (err)
++		goto err_release_lmac;
++
  
- struct rvu_hwinfo {
-@@ -126,7 +131,9 @@ void rvu_free_rsrc(struct rsrc_bmap *rsrc, int id);
- int rvu_rsrc_free_count(struct rsrc_bmap *rsrc);
- int rvu_get_pf(u16 pcifunc);
- struct rvu_pfvf *rvu_get_pfvf(struct rvu *rvu, int pcifunc);
-+void rvu_get_pf_numvfs(struct rvu *rvu, int pf, int *numvfs, int *hwvf);
- bool is_block_implemented(struct rvu_hwinfo *hw, int blkaddr);
-+int rvu_get_lf(struct rvu *rvu, struct rvu_block *block, u16 pcifunc, u16 slot);
- int rvu_get_blkaddr(struct rvu *rvu, int blktype, u16 pcifunc);
- int rvu_poll_reg(struct rvu *rvu, u64 block, u64 offset, u64 mask, bool zero);
+ 	return 0;
  
-diff --git a/drivers/soc/marvell/octeontx2/rvu_struct.h b/drivers/soc/marvell/octeontx2/rvu_struct.h
-index 77ac751..f61c862 100644
---- a/drivers/soc/marvell/octeontx2/rvu_struct.h
-+++ b/drivers/soc/marvell/octeontx2/rvu_struct.h
-@@ -58,6 +58,7 @@ enum rvu_af_int_vec_e {
- 	RVU_AF_INT_VEC_PFME   = 0x2,
- 	RVU_AF_INT_VEC_GEN    = 0x3,
- 	RVU_AF_INT_VEC_MBOX   = 0x4,
-+	RVU_AF_INT_VEC_CNT    = 0x5,
- };
+-err_release_regions:
++err_release_lmac:
++	cgx_lmac_exit(cgx);
+ 	list_del(&cgx->cgx_list);
++err_release_regions:
+ 	pci_release_regions(pdev);
+ err_disable_device:
+ 	pci_disable_device(pdev);
+@@ -147,7 +501,9 @@ static void cgx_remove(struct pci_dev *pdev)
+ {
+ 	struct cgx *cgx = pci_get_drvdata(pdev);
  
- /**
-@@ -71,6 +72,7 @@ enum rvu_pf_int_vec_e {
- 	RVU_PF_INT_VEC_VFPF_MBOX0 = 0x4,
- 	RVU_PF_INT_VEC_VFPF_MBOX1 = 0x5,
- 	RVU_PF_INT_VEC_AFPF_MBOX  = 0x6,
-+	RVU_PF_INT_VEC_CNT	  = 0x7,
- };
++	cgx_lmac_exit(cgx);
+ 	list_del(&cgx->cgx_list);
++	pci_free_irq_vectors(pdev);
+ 	pci_release_regions(pdev);
+ 	pci_disable_device(pdev);
+ 	pci_set_drvdata(pdev, NULL);
+diff --git a/drivers/soc/marvell/octeontx2/cgx.h b/drivers/soc/marvell/octeontx2/cgx.h
+index acdc16e..a2a7a6d 100644
+--- a/drivers/soc/marvell/octeontx2/cgx.h
++++ b/drivers/soc/marvell/octeontx2/cgx.h
+@@ -11,6 +11,8 @@
+ #ifndef CGX_H
+ #define CGX_H
  
- #endif /* RVU_STRUCT_H */
++#include "cgx_fw_if.h"
++
+  /* PCI device IDs */
+ #define	PCI_DEVID_OCTEONTX2_CGX		0xA059
+ 
+@@ -22,12 +24,42 @@
+ #define CGX_OFFSET(x)			((x) * MAX_LMAC_PER_CGX)
+ 
+ /* Registers */
++#define CGXX_CMRX_INT			0x040
++#define  FW_CGX_INT				BIT_ULL(1)
++#define CGXX_CMRX_INT_ENA_W1S		0x058
+ #define CGXX_CMRX_RX_ID_MAP		0x060
+ #define CGXX_CMRX_RX_LMACS		0x128
++#define CGXX_SCRATCH0_REG		0x1050
++#define CGXX_SCRATCH1_REG		0x1058
++#define CGX_CONST			0x2000
++
++#define CGX_COMMAND_REG			CGXX_SCRATCH1_REG
++#define CGX_EVENT_REG			CGXX_SCRATCH0_REG
++#define CGX_CMD_TIMEOUT			2200 /* msecs */
++
++#define CGX_NVEC			37
++#define CGX_LMAC_FWI			0
++
++struct cgx_link_event {
++	struct cgx_lnk_sts lstat;
++	u8 cgx_id;
++	u8 lmac_id;
++};
++
++/**
++ * struct cgx_event_cb
++ * @notify_link_chg:	callback for link change notification
++ * @data:	data passed to callback function
++ */
++struct cgx_event_cb {
++	int (*notify_link_chg)(struct cgx_link_event *event, void *data);
++	void *data;
++};
+ 
+ extern struct pci_driver cgx_driver;
+ 
+ int cgx_get_cgx_cnt(void);
+ int cgx_get_lmac_cnt(void *cgxd);
+ void *cgx_get_pdata(int cgx_id);
++int cgx_lmac_evh_register(struct cgx_event_cb *cb, void *cgxd, int lmac_id);
+ #endif /* CGX_H */
+diff --git a/drivers/soc/marvell/octeontx2/cgx_fw_if.h b/drivers/soc/marvell/octeontx2/cgx_fw_if.h
+new file mode 100644
+index 0000000..771dd50
+--- /dev/null
++++ b/drivers/soc/marvell/octeontx2/cgx_fw_if.h
+@@ -0,0 +1,225 @@
++/* SPDX-License-Identifier: GPL-2.0
++ * Marvell OcteonTx2 CGX driver
++ *
++ * Copyright (C) 2018 Marvell International Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __CGX_FW_INTF_H__
++#define __CGX_FW_INTF_H__
++
++#define CGX_FIRMWARE_MAJOR_VER		1
++#define CGX_FIRMWARE_MINOR_VER		0
++
++#define CGX_EVENT_ACK                   1UL
++
++/* CGX error types. set for cmd response status as CGX_STAT_FAIL */
++enum cgx_error_type {
++	CGX_ERR_NONE,
++	CGX_ERR_LMAC_NOT_ENABLED,
++	CGX_ERR_LMAC_MODE_INVALID,
++	CGX_ERR_REQUEST_ID_INVALID,
++	CGX_ERR_PREV_ACK_NOT_CLEAR,
++	CGX_ERR_PHY_LINK_DOWN,
++	CGX_ERR_PCS_RESET_FAIL,
++	CGX_ERR_AN_CPT_FAIL,
++	CGX_ERR_TX_NOT_IDLE,
++	CGX_ERR_RX_NOT_IDLE,
++	CGX_ERR_SPUX_BR_BLKLOCK_FAIL,
++	CGX_ERR_SPUX_RX_ALIGN_FAIL,
++	CGX_ERR_SPUX_TX_FAULT,
++	CGX_ERR_SPUX_RX_FAULT,
++	CGX_ERR_SPUX_RESET_FAIL,
++	CGX_ERR_SPUX_AN_RESET_FAIL,
++	CGX_ERR_SPUX_USX_AN_RESET_FAIL,
++	CGX_ERR_SMUX_RX_LINK_NOT_OK,
++	CGX_ERR_PCS_RECV_LINK_FAIL,
++	CGX_ERR_TRAINING_FAIL,
++	CGX_ERR_RX_EQU_FAIL,
++	CGX_ERR_SPUX_BER_FAIL,
++	CGX_ERR_SPUX_RSFEC_ALGN_FAIL,   /* = 22 */
++};
++
++/* LINK speed types */
++enum cgx_link_speed {
++	CGX_LINK_NONE,
++	CGX_LINK_10M,
++	CGX_LINK_100M,
++	CGX_LINK_1G,
++	CGX_LINK_2HG,
++	CGX_LINK_5G,
++	CGX_LINK_10G,
++	CGX_LINK_20G,
++	CGX_LINK_25G,
++	CGX_LINK_40G,
++	CGX_LINK_50G,
++	CGX_LINK_100G,
++	CGX_LINK_SPEED_MAX,
++};
++
++/* REQUEST ID types. Input to firmware */
++enum cgx_cmd_id {
++	CGX_CMD_NONE,
++	CGX_CMD_GET_FW_VER,
++	CGX_CMD_GET_MAC_ADDR,
++	CGX_CMD_SET_MTU,
++	CGX_CMD_GET_LINK_STS,		/* optional to user */
++	CGX_CMD_LINK_BRING_UP,
++	CGX_CMD_LINK_BRING_DOWN,
++	CGX_CMD_INTERNAL_LBK,
++	CGX_CMD_EXTERNAL_LBK,
++	CGX_CMD_HIGIG,
++	CGX_CMD_LINK_STATE_CHANGE,
++	CGX_CMD_MODE_CHANGE,		/* hot plug support */
++	CGX_CMD_INTF_SHUTDOWN,
++	CGX_CMD_IRQ_ENABLE,
++	CGX_CMD_IRQ_DISABLE,
++};
++
++/* async event ids */
++enum cgx_evt_id {
++	CGX_EVT_NONE,
++	CGX_EVT_LINK_CHANGE,
++};
++
++/* event types - cause of interrupt */
++enum cgx_evt_type {
++	CGX_EVT_ASYNC,
++	CGX_EVT_CMD_RESP
++};
++
++enum cgx_stat {
++	CGX_STAT_SUCCESS,
++	CGX_STAT_FAIL
++};
++
++enum cgx_cmd_own {
++	CGX_CMD_OWN_NS,
++	CGX_CMD_OWN_FIRMWARE,
++};
++
++/* scratchx(0) CSR used for ATF->non-secure SW communication.
++ * This acts as the status register
++ * Provides details on command ack/status, link status, error details
++ */
++struct cgx_evt_sts {
++	uint64_t ack:1;
++	uint64_t evt_type:1;		/* cgx_evt_type */
++	uint64_t stat:1;		/* cgx_stat */
++	uint64_t id:6;			/* cgx_evt_id/cgx_cmd_id */
++	uint64_t reserved:55;
++};
++
++/* Response to command IDs with command status as CGX_STAT_FAIL
++ *
++ * Not applicable for commands :
++ * CGX_CMD_LINK_BRING_UP/DOWN/CGX_EVT_LINK_CHANGE
++ * check struct cgx_lnk_sts comments
++ */
++struct cgx_err_sts_s {
++	uint64_t reserved1:9;
++	uint64_t type:10;		/* cgx_error_type */
++	uint64_t reserved2:35;
++};
++
++/* Response to cmd ID as CGX_CMD_GET_FW_VER with cmd status as
++ * CGX_STAT_SUCCESS
++ */
++struct cgx_ver_s {
++	uint64_t reserved1:9;
++	uint64_t major_ver:4;
++	uint64_t minor_ver:4;
++	uint64_t reserved2:47;
++};
++
++/* Response to cmd ID as CGX_CMD_GET_MAC_ADDR with cmd status as
++ * CGX_STAT_SUCCESS
++ */
++struct cgx_mac_addr_s {
++	uint64_t reserved1:9;
++	uint64_t local_mac_addr:48;
++	uint64_t reserved2:7;
++};
++
++/* Response to cmd ID - CGX_CMD_LINK_BRING_UP/DOWN, event ID CGX_EVT_LINK_CHANGE
++ * status can be either CGX_STAT_FAIL or CGX_STAT_SUCCESS
++ *
++ * In case of CGX_STAT_FAIL, it indicates CGX configuration failed
++ * when processing link up/down/change command.
++ * Both err_type and current link status will be updated
++ *
++ * In case of CGX_STAT_SUCCESS, err_type will be CGX_ERR_NONE and current
++ * link status will be updated
++ */
++struct cgx_lnk_sts {
++	uint64_t reserved1:9;
++	uint64_t link_up:1;
++	uint64_t full_duplex:1;
++	uint64_t speed:4;		/* cgx_link_speed */
++	uint64_t err_type:10;
++	uint64_t reserved2:39;
++};
++
++union cgx_evtreg {
++	u64 val;
++	struct cgx_evt_sts evt_sts; /* common for all commands/events */
++	struct cgx_lnk_sts link_sts; /* response to LINK_BRINGUP/DOWN/CHANGE */
++	struct cgx_ver_s ver;		/* response to CGX_CMD_GET_FW_VER */
++	struct cgx_mac_addr_s mac_addr;	/* response to CGX_CMD_GET_MAC_ADDR */
++	struct cgx_err_sts_s err;	/* response if evt_status = CMD_FAIL */
++};
++
++/* scratchx(1) CSR used for non-secure SW->ATF communication
++ * This CSR acts as a command register
++ */
++struct cgx_cmd {
++	uint64_t own:2;			/* cgx_csr_own */
++	uint64_t id:6;			/* cgx_request_id */
++	uint64_t reserved2:56;
++};
++
++/* Any command using enable/disable as an argument need
++ * to pass the option via this structure.
++ * Ex: Loopback, HiGig...
++ */
++struct cgx_ctl_args {
++	uint64_t reserved1:8;
++	uint64_t enable:1;
++	uint64_t reserved2:55;
++};
++
++/* command argument to be passed for cmd ID - CGX_CMD_SET_MTU */
++struct cgx_mtu_args {
++	uint64_t reserved1:8;
++	uint64_t size:16;
++	uint64_t reserved2:40;
++};
++
++/* command argument to be passed for cmd ID - CGX_CMD_LINK_CHANGE */
++struct cgx_link_change_args {
++	uint64_t reserved1:8;
++	uint64_t link_up:1;
++	uint64_t full_duplex:1;
++	uint64_t speed:4;		/* cgx_link_speed */
++	uint64_t reserved2:50;
++};
++
++struct cgx_irq_cfg {
++	uint64_t reserved1:8;
++	uint64_t irq_phys:32;
++	uint64_t reserved2:24;
++};
++
++union cgx_cmdreg {
++	u64 val;
++	struct cgx_cmd cmd;
++	struct cgx_ctl_args cmd_args;
++	struct cgx_mtu_args mtu_size;
++	struct cgx_irq_cfg irq_cfg; /* Input to CGX_CMD_IRQ_ENABLE */
++	struct cgx_link_change_args lnk_args;/* Input to CGX_CMD_LINK_CHANGE */
++};
++
++#endif /* __CGX_FW_INTF_H__ */
 -- 
 2.7.4
