@@ -1,99 +1,96 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue,  4 Sep 2018 10:10:09 +0100
-Subject: [stable PATCH 1/2] arm64: Fix mismatched cache line size detection
-Message-ID: <1536052210-11625-1-git-send-email-suzuki.poulose@arm.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 04 Sep 2018 11:12:25 +0200
+Subject: [PATCH 3/3] media: imx-pxp: add i.MX Pixel Pipeline driver
+In-Reply-To: <20180904080408.GJ20333@w540>
+References: <20180810151822.18650-1-p.zabel@pengutronix.de>
+ <20180810151822.18650-4-p.zabel@pengutronix.de>
+ <20180904080408.GJ20333@w540>
+Message-ID: <1536052345.3468.1.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 4c4a39dd5fe2d13e2d2fa5fceb8ef95d19fc389a upstream
+Hi Jacopo,
 
-If there is a mismatch in the I/D min line size, we must
-always use the system wide safe value both in applications
-and in the kernel, while performing cache operations. However,
-we have been checking more bits than just the min line sizes,
-which triggers false negatives. We may need to trap the user
-accesses in such cases, but not necessarily patch the kernel.
+thank you for the review!
 
-This patch fixes the check to do the right thing as advertised.
-A new capability will be added to check mismatches in other
-fields and ensure we trap the CTR accesses.
+On Tue, 2018-09-04 at 10:04 +0200, jacopo mondi wrote:
+> Hi Philipp,
+> 
+> On Fri, Aug 10, 2018 at 05:18:22PM +0200, Philipp Zabel wrote:
+[...]
+> > +static struct pxp_fmt formats[] = {
+> > +	{
+> > +		.fourcc	= V4L2_PIX_FMT_XBGR32,
+> > +		.depth	= 32,
+> > +		/* Both capture and output format */
+> > +		.types	= MEM2MEM_CAPTURE | MEM2MEM_OUTPUT,
+[...]
+> > +	}, {
+> > +		.fourcc = V4L2_PIX_FMT_YUV32,
+> > +		.depth	= 16,
+> 
+> According to:
+> https://www.linuxtv.org/downloads/v4l-dvb-apis-old/packed-yuv.html
+> shouldn't this be 32?
 
-Fixes: be68a8aaf925 ("arm64: cpufeature: Fix CTR_EL0 field definitions")
-Cc: <stable@vger.kernel.org> # v4.9
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Reported-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/cachetype.h | 5 +++++
- arch/arm64/kernel/cpu_errata.c     | 7 +++++--
- arch/arm64/kernel/cpufeature.c     | 4 ++--
- 3 files changed, 12 insertions(+), 4 deletions(-)
+Yes, I'll change depth to 32.
 
-diff --git a/arch/arm64/include/asm/cachetype.h b/arch/arm64/include/asm/cachetype.h
-index f558869..877d478 100644
---- a/arch/arm64/include/asm/cachetype.h
-+++ b/arch/arm64/include/asm/cachetype.h
-@@ -22,6 +22,11 @@
- #define CTR_L1IP_MASK		3
- #define CTR_CWG_SHIFT		24
- #define CTR_CWG_MASK		15
-+#define CTR_DMINLINE_SHIFT	16
-+#define CTR_IMINLINE_SHIFT	0
-+
-+#define CTR_CACHE_MINLINE_MASK	\
-+	((0xf << CTR_DMINLINE_SHIFT) | (0xf << CTR_IMINLINE_SHIFT))
- 
- #define ICACHE_POLICY_RESERVED	0
- #define ICACHE_POLICY_AIVIVT	1
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 1db97ad..fe604bb 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -17,6 +17,7 @@
-  */
- 
- #include <linux/types.h>
-+#include <asm/cachetype.h>
- #include <asm/cpu.h>
- #include <asm/cputype.h>
- #include <asm/cpufeature.h>
-@@ -34,9 +35,11 @@ static bool
- has_mismatched_cache_line_size(const struct arm64_cpu_capabilities *entry,
- 				int scope)
- {
-+	u64 mask = CTR_CACHE_MINLINE_MASK;
-+
- 	WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
--	return (read_cpuid_cachetype() & arm64_ftr_reg_ctrel0.strict_mask) !=
--		(arm64_ftr_reg_ctrel0.sys_val & arm64_ftr_reg_ctrel0.strict_mask);
-+	return (read_cpuid_cachetype() & mask) !=
-+	       (arm64_ftr_reg_ctrel0.sys_val & mask);
- }
- 
- static int cpu_enable_trap_ctr_access(void *__unused)
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index ab15747..a3ab7df 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -152,7 +152,7 @@ static const struct arm64_ftr_bits ftr_ctr[] = {
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 28, 3, 0),
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_HIGHER_SAFE, 24, 4, 0),	/* CWG */
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 20, 4, 0),	/* ERG */
--	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 16, 4, 1),	/* DminLine */
-+	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, CTR_DMINLINE_SHIFT, 4, 1),
- 	/*
- 	 * Linux can handle differing I-cache policies. Userspace JITs will
- 	 * make use of *minLine.
-@@ -160,7 +160,7 @@ static const struct arm64_ftr_bits ftr_ctr[] = {
- 	 */
- 	ARM64_FTR_BITS(FTR_NONSTRICT, FTR_EXACT, 14, 2, ICACHE_POLICY_AIVIVT),	/* L1Ip */
- 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, 4, 10, 0),	/* RAZ */
--	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, 0, 4, 0),	/* IminLine */
-+	ARM64_FTR_BITS(FTR_STRICT, FTR_LOWER_SAFE, CTR_IMINLINE_SHIFT, 4, 0),
- 	ARM64_FTR_END,
- };
- 
--- 
-2.7.4
+[...]
+> > +}
+> > +
+> 
+> Multiple blank lines (in a few other places too)
+> 
+> > +
+
+Found them, will fix them.
+
+[...]
+> > +	/* Enable clocks and dump registers */
+> > +	clk_prepare_enable(dev->clk);
+> > +	pxp_soft_reset(dev);
+> > +
+> > +	spin_lock_init(&dev->irqlock);
+> > +
+> > +	ret = v4l2_device_register(&pdev->dev, &dev->v4l2_dev);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	atomic_set(&dev->num_inst, 0);
+> > +	mutex_init(&dev->dev_mutex);
+> > +
+> > +	dev->vfd = pxp_videodev;
+> 
+> The name of the video device is the same for all instances of this
+> driver. Is this ok?
+
+I expect that there is only ever going to be one instance on the SoC.
+
+[...]
+> > +	v4l2_device_unregister(&dev->v4l2_dev);
+> 
+> Disable clock?
+
+Yes, I'll fix the clock handling.
+
+[...]
+> > +MODULE_DESCRIPTION("i.MX PXP mem2mem scaler/CSC/rotator");
+> > +MODULE_AUTHOR("Philipp Zabel <kernel@pengutronix.de>");
+> > +MODULE_LICENSE("GPL");
+> 
+> SPDX header says GPL2.0+
+
+See include/linux/module.h:
+
+/*
+?* The following license idents are currently accepted as indicating free
+?* software modules
+?*
+?*??????"GPL"???????????????????????????[GNU Public License v2 or later]
+ * [...]
+ */
+
+This already seems to be the right choice.
+
+regards
+Philipp
