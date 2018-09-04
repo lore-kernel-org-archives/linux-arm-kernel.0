@@ -1,109 +1,35 @@
-From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Wed, 5 Sep 2018 12:54:46 +0530
-Subject: [RFC PATCH v2 1/3] firmware: xilinx: Add fpga API's
-In-Reply-To: <20180905072448.12488-1-nava.manne@xilinx.com>
-References: <20180905072448.12488-1-nava.manne@xilinx.com>
-Message-ID: <20180905072448.12488-2-nava.manne@xilinx.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Tue, 4 Sep 2018 09:28:58 +0200
+Subject: [PATCH v3] EDAC, ghes: use CPER module handles to locate DIMMs
+In-Reply-To: <1536033055-25522-1-git-send-email-wufan@codeaurora.org>
+References: <1536033055-25522-1-git-send-email-wufan@codeaurora.org>
+Message-ID: <20180904072858.GA32615@zn.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This Patch Adds fpga API's to support the Bitstream loading
-by using firmware interface.
+On Tue, Sep 04, 2018 at 03:50:55AM +0000, Fan Wu wrote:
+> For platforms whose firmwares provide valid module handles
+> (SMBIOS type 17) in error records, this patch uses the module
+> handles to locate corresponding DIMMs and enables per-DIMM
+> error counter update.
+> 
+> Signed-off-by: Fan Wu <wufan@codeaurora.org>
+> Reviewed-by: Tyler Baicar <baicar.tyler@gmail.com>
+> Tested-by: Toshi Kani <toshi.kani@hpe.com>
 
-Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
----
-Changes for v2:
-                -New Patch.
+Those two tags I did see being given to you ...
 
- drivers/firmware/xilinx/zynqmp.c     | 46 ++++++++++++++++++++++++++++
- include/linux/firmware/xlnx-zynqmp.h |  4 +++
- 2 files changed, 50 insertions(+)
+> Reviewed-by: Borislav Petkov <bp@alien8.de>
+> Reviewed-by: James Morse <james.morse@arm.com>
+> Reviewed-by: tanxiaofei <tanxiaofei@huawei.com>
 
-diff --git a/drivers/firmware/xilinx/zynqmp.c b/drivers/firmware/xilinx/zynqmp.c
-index 7ccedf083926..9b3a59512dd7 100644
---- a/drivers/firmware/xilinx/zynqmp.c
-+++ b/drivers/firmware/xilinx/zynqmp.c
-@@ -447,6 +447,50 @@ static int zynqmp_pm_clock_getparent(u32 clock_id, u32 *parent_id)
- 	return ret;
- }
- 
-+/**
-+ * zynqmp_pm_fpga_load - Perform the fpga load
-+ * @address:	Address to write to
-+ * @size:	pl bitstream size
-+ * @flags:
-+ *	BIT(0) - Bit-stream type.
-+ *		 0 - Full Bit-stream.
-+ *		 1 - Partial Bit-stream.
-+ *
-+ * This function provides access to pmufw. To transfer
-+ * the required bitstream into PL.
-+ *
-+ * Return: Returns status, either success or error+reason
-+ */
-+static int zynqmp_pm_fpga_load(const u64 address, const u32 size,
-+			       const u32 flags)
-+{
-+	return zynqmp_pm_invoke_fn(PM_FPGA_LOAD, lower_32_bits(address),
-+				   upper_32_bits(address), size, flags, NULL);
-+}
-+
-+/**
-+ * zynqmp_pm_fpga_get_status - Read value from PCAP status register
-+ * @value: Value to read
-+ *
-+ * This function provides access to the xilfpga library to get
-+ * the PCAP status
-+ *
-+ * Return: Returns status, either success or error+reason
-+ */
-+static int zynqmp_pm_fpga_get_status(u32 *value)
-+{
-+	u32 ret_payload[PAYLOAD_ARG_CNT];
-+	int ret;
-+
-+	if (!value)
-+		return -EINVAL;
-+
-+	ret = zynqmp_pm_invoke_fn(PM_FPGA_GET_STATUS, 0, 0, 0, 0, ret_payload);
-+	*value = ret_payload[1];
-+
-+	return ret;
-+}
-+
- static const struct zynqmp_eemi_ops eemi_ops = {
- 	.get_api_version = zynqmp_pm_get_api_version,
- 	.ioctl = zynqmp_pm_ioctl,
-@@ -460,6 +504,8 @@ static const struct zynqmp_eemi_ops eemi_ops = {
- 	.clock_getrate = zynqmp_pm_clock_getrate,
- 	.clock_setparent = zynqmp_pm_clock_setparent,
- 	.clock_getparent = zynqmp_pm_clock_getparent,
-+	.fpga_load = zynqmp_pm_fpga_load,
-+	.fpga_get_status = zynqmp_pm_fpga_get_status,
- };
- 
- /**
-diff --git a/include/linux/firmware/xlnx-zynqmp.h b/include/linux/firmware/xlnx-zynqmp.h
-index 58a74781b51d..5a6bd5e58ea4 100644
---- a/include/linux/firmware/xlnx-zynqmp.h
-+++ b/include/linux/firmware/xlnx-zynqmp.h
-@@ -34,6 +34,8 @@
- 
- enum pm_api_id {
- 	PM_GET_API_VERSION = 1,
-+	PM_FPGA_LOAD = 22,
-+	PM_FPGA_GET_STATUS,
- 	PM_IOCTL = 34,
- 	PM_QUERY_DATA,
- 	PM_CLOCK_ENABLE,
-@@ -90,6 +92,8 @@ struct zynqmp_pm_query_data {
- 
- struct zynqmp_eemi_ops {
- 	int (*get_api_version)(u32 *version);
-+	int (*fpga_load)(const u64 address, const u32 size, const u32 flags);
-+	int (*fpga_get_status)(u32 *value);
- 	int (*ioctl)(u32 node_id, u32 ioctl_id, u32 arg1, u32 arg2, u32 *out);
- 	int (*query_data)(struct zynqmp_pm_query_data qdata, u32 *out);
- 	int (*clock_enable)(u32 clock_id);
+... but how in the world did you come up with those?
+
+Do you understand how Reviewed-by works or do you need to look at
+Documentation/process/submitting-patches.rst, section 13 ?
+
 -- 
-2.18.0
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
