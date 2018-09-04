@@ -1,80 +1,145 @@
 From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Tue, 4 Sep 2018 15:22:32 +0530
-Subject: [RFC PATCH v2 1/3] fairmware: xilinx: Add zynqmp_pm_get_chipid() API
+Date: Tue, 4 Sep 2018 15:22:34 +0530
+Subject: [RFC PATCH v2 3/3] nvmem: zynqmp: Added zynqmp nvmem firmware driver
 In-Reply-To: <1536054754-3119-1-git-send-email-nava.manne@xilinx.com>
 References: <1536054754-3119-1-git-send-email-nava.manne@xilinx.com>
-Message-ID: <1536054754-3119-2-git-send-email-nava.manne@xilinx.com>
+Message-ID: <1536054754-3119-4-git-send-email-nava.manne@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a new API to provide access to the
-hardware related data like soc revision, IDCODE... etc.
+This patch adds zynqmp nvmem firmware driver to access the
+SoC revision information from the hardware register.
 
 Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
 ---
 Changes for v2:
-		-New Patch.
+		-None.
 
- drivers/firmware/xilinx/zynqmp.c     | 24 ++++++++++++++++++++++++
- include/linux/firmware/xlnx-zynqmp.h |  2 ++
- 2 files changed, 26 insertions(+)
+ drivers/nvmem/Kconfig        | 10 ++++++
+ drivers/nvmem/Makefile       |  2 ++
+ drivers/nvmem/zynqmp_nvmem.c | 84 ++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 96 insertions(+)
+ create mode 100644 drivers/nvmem/zynqmp_nvmem.c
 
-diff --git a/drivers/firmware/xilinx/zynqmp.c b/drivers/firmware/xilinx/zynqmp.c
-index 7ccedf0..7a33f93 100644
---- a/drivers/firmware/xilinx/zynqmp.c
-+++ b/drivers/firmware/xilinx/zynqmp.c
-@@ -447,8 +447,32 @@ static int zynqmp_pm_clock_getparent(u32 clock_id, u32 *parent_id)
- 	return ret;
- }
+diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
+index 54a3c29..2edb142 100644
+--- a/drivers/nvmem/Kconfig
++++ b/drivers/nvmem/Kconfig
+@@ -181,4 +181,14 @@ config RAVE_SP_EEPROM
+ 	help
+ 	  Say y here to enable Rave SP EEPROM support.
  
-+/**
-+ * zynqmp_pm_get_chipid - Get silicon ID registers
-+ * @idcode:     IDCODE register
-+ * @version:    version register
-+ *
-+ * Return:      Returns the status of the operation and the idcode and version
-+ *              registers in @idcode and @version.
++config NVMEM_ZYNQMP
++	bool "Xilinx ZYNQMP SoC nvmem firmware support"
++	depends on ARCH_ZYNQMP
++	help
++	  This is a driver to access hardware related data like
++	  soc revision, IDCODE... etc by using the firmware
++	  interface.
++
++	  If sure, say yes. If unsure, say no.
++
+ endif
+diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
+index 27e96a8..0b3abd7 100644
+--- a/drivers/nvmem/Makefile
++++ b/drivers/nvmem/Makefile
+@@ -39,4 +39,6 @@ obj-$(CONFIG_NVMEM_SNVS_LPGPR)	+= nvmem_snvs_lpgpr.o
+ nvmem_snvs_lpgpr-y		:= snvs_lpgpr.o
+ obj-$(CONFIG_RAVE_SP_EEPROM)	+= nvmem-rave-sp-eeprom.o
+ nvmem-rave-sp-eeprom-y		:= rave-sp-eeprom.o
++obj-$(CONFIG_NVMEM_ZYNQMP)     += nvmem_zynqmp_nvmem.o
++nvmem_zynqmp_nvmem-y           := zynqmp_nvmem.o
+ 
+diff --git a/drivers/nvmem/zynqmp_nvmem.c b/drivers/nvmem/zynqmp_nvmem.c
+new file mode 100644
+index 0000000..e377900
+--- /dev/null
++++ b/drivers/nvmem/zynqmp_nvmem.c
+@@ -0,0 +1,84 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Copyright (C) 2018 Xilinx, Inc.
 + */
-+static int zynqmp_pm_get_chipid(u32 *idcode, u32 *version)
++
++#include <linux/module.h>
++#include <linux/nvmem-provider.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/firmware/xlnx-zynqmp.h>
++
++#define SILICON_REVISION_MASK 0xF
++
++static int zynqmp_nvmem_read(void *context, unsigned int offset,
++			     void *val, size_t bytes)
 +{
-+	u32 ret_payload[PAYLOAD_ARG_CNT];
 +	int ret;
++	int idcode, version;
++	const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
 +
-+	if (!idcode || !version)
-+		return -EINVAL;
++	if (!eemi_ops || !eemi_ops->get_chipid)
++		return -ENXIO;
 +
-+	ret = zynqmp_pm_invoke_fn(PM_GET_CHIPID, 0, 0, 0, 0, ret_payload);
-+	*idcode = ret_payload[1];
-+	*version = ret_payload[2];
++	ret = eemi_ops->get_chipid(&idcode, &version);
++	if (ret < 0)
++		return ret;
 +
-+	return ret;
++	pr_debug("Read chipid val %x %x\n", idcode, version);
++	*(int *)val = version & SILICON_REVISION_MASK;
++
++	return 0;
 +}
 +
- static const struct zynqmp_eemi_ops eemi_ops = {
- 	.get_api_version = zynqmp_pm_get_api_version,
-+	.get_chipid = zynqmp_pm_get_chipid,
- 	.ioctl = zynqmp_pm_ioctl,
- 	.query_data = zynqmp_pm_query_data,
- 	.clock_enable = zynqmp_pm_clock_enable,
-diff --git a/include/linux/firmware/xlnx-zynqmp.h b/include/linux/firmware/xlnx-zynqmp.h
-index 58a7478..5a49d6f 100644
---- a/include/linux/firmware/xlnx-zynqmp.h
-+++ b/include/linux/firmware/xlnx-zynqmp.h
-@@ -34,6 +34,7 @@
- 
- enum pm_api_id {
- 	PM_GET_API_VERSION = 1,
-+	PM_GET_CHIPID = 22,
- 	PM_IOCTL = 34,
- 	PM_QUERY_DATA,
- 	PM_CLOCK_ENABLE,
-@@ -90,6 +91,7 @@ struct zynqmp_pm_query_data {
- 
- struct zynqmp_eemi_ops {
- 	int (*get_api_version)(u32 *version);
-+	int (*get_chipid)(u32 *idcode, u32 *version);
- 	int (*ioctl)(u32 node_id, u32 ioctl_id, u32 arg1, u32 arg2, u32 *out);
- 	int (*query_data)(struct zynqmp_pm_query_data qdata, u32 *out);
- 	int (*clock_enable)(u32 clock_id);
++static struct nvmem_config econfig = {
++	.name = "zynqmp-nvmem",
++	.owner = THIS_MODULE,
++	.word_size = 1,
++	.size = 1,
++	.read_only = true,
++};
++
++static const struct of_device_id zynqmp_nvmem_match[] = {
++	{ .compatible = "xlnx,zynqmp-nvmem-fw", },
++	{ /* sentinel */ },
++};
++MODULE_DEVICE_TABLE(of, zynqmp_nvmem_match);
++
++static int zynqmp_nvmem_probe(struct platform_device *pdev)
++{
++	struct nvmem_device *nvmem;
++
++	econfig.dev = &pdev->dev;
++	econfig.reg_read = zynqmp_nvmem_read;
++
++	nvmem = nvmem_register(&econfig);
++	if (IS_ERR(nvmem))
++		return PTR_ERR(nvmem);
++
++	platform_set_drvdata(pdev, nvmem);
++
++	return 0;
++}
++
++static int zynqmp_nvmem_remove(struct platform_device *pdev)
++{
++	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
++
++	return nvmem_unregister(nvmem);
++}
++
++static struct platform_driver zynqmp_nvmem_driver = {
++	.probe = zynqmp_nvmem_probe,
++	.remove = zynqmp_nvmem_remove,
++	.driver = {
++		.name = "zynqmp-nvmem",
++		.of_match_table = zynqmp_nvmem_match,
++	},
++};
++
++module_platform_driver(zynqmp_nvmem_driver);
++
++MODULE_AUTHOR("Michal Simek <michal.simek@xilinx.com>, Nava kishore Manne <navam@xilinx.com>");
++MODULE_DESCRIPTION("ZynqMP NVMEM driver");
++MODULE_LICENSE("GPL");
 -- 
 2.7.4
