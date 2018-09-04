@@ -1,499 +1,250 @@
-From: radu_nicolae.pirea@upb.ro (Radu Pirea)
-Date: Tue,  4 Sep 2018 14:13:09 +0300
-Subject: [PATCH v12 5/6] spi: at91-usart: add driver for at91-usart as spi
-In-Reply-To: <20180904111310.4049-1-radu_nicolae.pirea@upb.ro>
-References: <20180904111310.4049-1-radu_nicolae.pirea@upb.ro>
-Message-ID: <20180904111310.4049-6-radu_nicolae.pirea@upb.ro>
+From: vincenzo.frascino@arm.com (Vincenzo Frascino)
+Date: Tue, 4 Sep 2018 12:27:23 +0100
+Subject: [PATCH v6 11/11] arm64: annotate user pointers casts detected by
+ sparse
+In-Reply-To: <20180903151026.n2jak3e4yqusnogt@ltop.local>
+References: <cover.1535629099.git.andreyknvl@google.com>
+ <5d54526e5ff2e5ad63d0dfdd9ab17cf359afa4f2.1535629099.git.andreyknvl@google.com>
+ <20180831081123.6mo62xnk54pvlxmc@ltop.local>
+ <20180831134244.GB19965@ZenIV.linux.org.uk>
+ <CAAeHK+w86m6YztnTGhuZPKRczb-+znZ1hiJskPXeQok4SgcaOw@mail.gmail.com>
+ <01cadefd-c929-cb45-500d-7043cf3943f6@arm.com>
+ <20180903151026.n2jak3e4yqusnogt@ltop.local>
+Message-ID: <a31d3400-4523-2bda-a429-f2a221e69ee8@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Radu Pirea <radu.pirea@microchip.com>
+On 03/09/18 16:10, Luc Van Oostenryck wrote:
+> On Mon, Sep 03, 2018 at 02:49:38PM +0100, Vincenzo Frascino wrote:
+>> On 03/09/18 13:34, Andrey Konovalov wrote:
+>>> On Fri, Aug 31, 2018 at 3:42 PM, Al Viro <viro@zeniv.linux.org.uk> wrote:
+>>>> On Fri, Aug 31, 2018 at 10:11:24AM +0200, Luc Van Oostenryck wrote:
+>>>>> On Thu, Aug 30, 2018 at 01:41:16PM +0200, Andrey Konovalov wrote:
+>>>>>> This patch adds __force annotations for __user pointers casts detected by
+>>>>>> sparse with the -Wcast-from-as flag enabled (added in [1]).
+>>>>>>
+>>>>>> [1] https://github.com/lucvoo/sparse-dev/commit/5f960cb10f56ec2017c128ef9d16060e0145f292
+>>>>>
+>>>>> Hi,
+>>>>>
+>>>>> It would be nice to have some explanation for why these added __force
+>>>>> are useful.
+>>>
+>>> I'll add this in the next version, thanks!
+>>>
+>>>>         It would be even more useful if that series would either deal with
+>>>> the noise for real ("that's what we intend here, that's what we intend there,
+>>>> here's a primitive for such-and-such kind of cases, here we actually
+>>>> ought to pass __user pointer instead of unsigned long", etc.) or left it
+>>>> unmasked.
+>>>>
+>>>>         As it is, __force says only one thing: "I know the code is doing
+>>>> the right thing here".  That belongs in primitives, and I do *not* mean the
+>>>> #define cast_to_ulong(x) ((__force unsigned long)(x))
+>>>> kind.
+>>>>
+>>>>         Folks, if you don't want to deal with that - leave the warnings be.
+>>>> They do carry more information than "someone has slapped __force in that place".
+>>>>
+>>>> Al, very annoyed by that kind of information-hiding crap...
+>>>
+>>> This patch only adds __force to hide the reports I've looked at and
+>>> decided that the code does the right thing. The cases where this is
+>>> not the case are handled by the previous patches in the patchset. I'll
+>>> this to the patch description as well. Is that OK?
+>>>
+>> I think as well that we should make explicit the information that
+>> __force is hiding.
+>> A possible solution could be defining some new address spaces and use
+>> them where it is relevant in the kernel. Something like:
+>>
+>> # define __compat_ptr __attribute__((noderef, address_space(5)))
+>> # define __tagged_ptr __attribute__((noderef, address_space(6)))
+>>
+>> In this way sparse can still identify the casting and trigger a warning.
+>>
+>> We could at that point modify sparse to ignore these conversions when a
+>> specific flag is passed (i.e. -Wignore-compat-ptr, -Wignore-tagged-ptr)
+>> to exclude from the generated warnings the ones we have already dealt
+>> with.
+>>
+>> What do you think about this approach?
+> 
+> I'll be happy to add such warnings to sparse if it is useful to detect
+> (and correct!) problems. I'm also thinking to other possiblities, like
+> having some weaker form of __force (maybe simply __force_as (which will
+> 'only' force the address space) or even __force_as(TO, FROM) (with TO
+> and FROM being a mask of the address space allowed).I believe we need something here to address this type of problems and I like
+your proposal of adding a weaker force in the form of __force_as(TO, FROM)
+because I think it provides the right level information. 
 
-This is the driver for at91-usart in spi mode. The USART IP can be configured
-to work in many modes and one of them is SPI.
+> However, for the specific situation here, I'm not sure that using
+> address spaces is the right choice because I suspect that the concept
+> of tagged pointer is orthogonal to the one of (the usual) address space
+> (it won't be possible for a pointer to be __tagged_ptr *and* __user).
+I was thinking to address spaces because the information seems easily accessible
+in sparse [1], but I am certainly open to any solution that can be semantically
+more correct.
 
-The driver was tested on sama5d3-xplained and sama5d4-xplained boards with
-enc28j60 ethernet controller as slave.
+> 
+> OTOH, when I see already the tons of warnings for concepts established
+> since many years (I'm thinking especially at __bitwise, see [1]) I'm a
+> bit affraid of adding new, more specialized ones that people will
+> understand even less how/when they need to use them.
+Thanks for providing this statistic, it is very interesting. I understand your
+concern, but I think that in this case we need a more specialized option not only
+to find potential problems but even to provide the right amount of information
+to who reads the code. 
 
-Signed-off-by: Radu Pirea <radu.pirea@microchip.com>
-Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
-Reviwed-by: Mark Brown <broonie@kernel.org>
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+A solution could be to let __force_as(TO, FROM) behave like __force and silence
+the warning by default, but have an option in sparse to re-enable it 
+(i.e. -Wshow-force-as). 
+
+[1]
 ---
- drivers/spi/Kconfig          |   8 +
- drivers/spi/Makefile         |   1 +
- drivers/spi/spi-at91-usart.c | 432 +++++++++++++++++++++++++++++++++++
- 3 files changed, 441 insertions(+)
- create mode 100644 drivers/spi/spi-at91-usart.c
+commit ee7985f0c2b29c96aefe78df4139209eb4e719d8
+Author: Vincenzo Frascino <vincenzo.frascino@arm.com>
+Date:   Wed Aug 15 10:55:44 2018 +0100
 
-diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-index ad5d68e1dab7..6d9e309fab67 100644
---- a/drivers/spi/Kconfig
-+++ b/drivers/spi/Kconfig
-@@ -83,6 +83,14 @@ config SPI_ATMEL
- 	  This selects a driver for the Atmel SPI Controller, present on
- 	  many AT91 ARM chips.
+    print address space number for explicit cast to ulong
+    
+    This patch build on top of commit b34880d ("stricter warning
+    for explicit cast to ulong") and prints the address space
+    number when a "warning: cast removes address space of expression"
+    is triggered.
+    
+    This makes easier to discriminate in between different address
+    spaces.
+    
+    A validation example is provided as well as part of this patch.
+    
+    Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
+
+diff --git a/evaluate.c b/evaluate.c
+index 6d5d479..2fc0ebc 100644
+--- a/evaluate.c
++++ b/evaluate.c
+@@ -3017,8 +3017,12 @@ static struct symbol *evaluate_cast(struct expression *expr)
+ 		sas = stype->ctype.as;
+ 	}
  
-+config SPI_AT91_USART
-+	tristate "Atmel USART Controller SPI driver"
-+	depends on (ARCH_AT91 || COMPILE_TEST)
-+	depends on MFD_AT91_USART
-+	help
-+	  This selects a driver for the AT91 USART Controller as SPI Master,
-+	  present on AT91 and SAMA5 SoC series.
+-	if (!tas && sas > 0)
+-		warning(expr->pos, "cast removes address space of expression");
++	if (!tas && sas > 0) {
++		if (Wcast_from_as)
++			warning(expr->pos, "cast removes address space of expression (<asn:%d>)", sas);
++		else
++			warning(expr->pos, "cast removes address space of expression");
++	}
+ 	if (tas > 0 && sas > 0 && tas != sas)
+ 		warning(expr->pos, "cast between address spaces (<asn:%d>-><asn:%d>)", sas, tas);
+ 	if (tas > 0 && !sas &&
+diff --git a/sparse.1 b/sparse.1
+index 3e13523..699d09f 100644
+--- a/sparse.1
++++ b/sparse.1
+@@ -84,6 +84,9 @@ This is similar to \fB\-Waddress\-space\fR but will also warn
+ on casts to \fBunsigned long\fR.
+ 
+ Sparse does not issues these warnings by default.
 +
- config SPI_AU1550
- 	tristate "Au1550/Au1200/Au1300 SPI Controller"
- 	depends on MIPS_ALCHEMY
-diff --git a/drivers/spi/Makefile b/drivers/spi/Makefile
-index cb1f4378b87c..901ff606e6e5 100644
---- a/drivers/spi/Makefile
-+++ b/drivers/spi/Makefile
-@@ -16,6 +16,7 @@ obj-$(CONFIG_SPI_LOOPBACK_TEST)		+= spi-loopback-test.o
- obj-$(CONFIG_SPI_ALTERA)		+= spi-altera.o
- obj-$(CONFIG_SPI_ARMADA_3700)		+= spi-armada-3700.o
- obj-$(CONFIG_SPI_ATMEL)			+= spi-atmel.o
-+obj-$(CONFIG_SPI_AT91_USART)		+= spi-at91-usart.o
- obj-$(CONFIG_SPI_ATH79)			+= spi-ath79.o
- obj-$(CONFIG_SPI_AU1550)		+= spi-au1550.o
- obj-$(CONFIG_SPI_AXI_SPI_ENGINE)	+= spi-axi-spi-engine.o
-diff --git a/drivers/spi/spi-at91-usart.c b/drivers/spi/spi-at91-usart.c
++When the option is activated the address space number is printed
++as part of the warning message.
+ .
+ .TP
+ .B \-Wcast\-to\-as
+diff --git a/validation/Waddress-space-all-attr.c b/validation/Waddress-space-all-attr.c
 new file mode 100644
-index 000000000000..a924657642fa
+index 0000000..455ba68
 --- /dev/null
-+++ b/drivers/spi/spi-at91-usart.c
-@@ -0,0 +1,432 @@
-+// SPDX-License-Identifier: GPL-2.0
-+//
-+// Driver for AT91 USART Controllers as SPI
-+//
-+// Copyright (C) 2018 Microchip Technology Inc.
-+//
-+// Author: Radu Pirea <radu.pirea@microchip.com>
++++ b/validation/Waddress-space-all-attr.c
+@@ -0,0 +1,84 @@
++/* Resembles include/linux/compiler_types.h */
++#define __kernel __attribute__((address_space(0)))
++#define __user __attribute__((address_space(1)))
++#define __iomem __attribute__((address_space(2)))
++#define __percpu __attribute__((address_space(3)))
++#define __rcu __attribute__((address_space(4)))
 +
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/interrupt.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of_gpio.h>
-+#include <linux/platform_device.h>
 +
-+#include <linux/spi/spi.h>
++typedef unsigned long ulong;
++typedef long long llong;
++typedef struct s obj_t;
 +
-+#define US_CR			0x00
-+#define US_MR			0x04
-+#define US_IER			0x08
-+#define US_IDR			0x0C
-+#define US_CSR			0x14
-+#define US_RHR			0x18
-+#define US_THR			0x1C
-+#define US_BRGR			0x20
-+#define US_VERSION		0xFC
-+
-+#define US_CR_RSTRX		BIT(2)
-+#define US_CR_RSTTX		BIT(3)
-+#define US_CR_RXEN		BIT(4)
-+#define US_CR_RXDIS		BIT(5)
-+#define US_CR_TXEN		BIT(6)
-+#define US_CR_TXDIS		BIT(7)
-+
-+#define US_MR_SPI_MASTER	0x0E
-+#define US_MR_CHRL		GENMASK(7, 6)
-+#define US_MR_CPHA		BIT(8)
-+#define US_MR_CPOL		BIT(16)
-+#define US_MR_CLKO		BIT(18)
-+#define US_MR_WRDBT		BIT(20)
-+#define US_MR_LOOP		BIT(15)
-+
-+#define US_IR_RXRDY		BIT(0)
-+#define US_IR_TXRDY		BIT(1)
-+#define US_IR_OVRE		BIT(5)
-+
-+#define US_BRGR_SIZE		BIT(16)
-+
-+#define US_MIN_CLK_DIV		0x06
-+#define US_MAX_CLK_DIV		BIT(16)
-+
-+#define US_RESET		(US_CR_RSTRX | US_CR_RSTTX)
-+#define US_DISABLE		(US_CR_RXDIS | US_CR_TXDIS)
-+#define US_ENABLE		(US_CR_RXEN | US_CR_TXEN)
-+#define US_OVRE_RXRDY_IRQS	(US_IR_OVRE | US_IR_RXRDY)
-+
-+#define US_INIT \
-+	(US_MR_SPI_MASTER | US_MR_CHRL | US_MR_CLKO | US_MR_WRDBT)
-+
-+/* Register access macros */
-+#define at91_usart_spi_readl(port, reg) \
-+	readl_relaxed((port)->regs + US_##reg)
-+#define at91_usart_spi_writel(port, reg, value) \
-+	writel_relaxed((value), (port)->regs + US_##reg)
-+
-+#define at91_usart_spi_readb(port, reg) \
-+	readb_relaxed((port)->regs + US_##reg)
-+#define at91_usart_spi_writeb(port, reg, value) \
-+	writeb_relaxed((value), (port)->regs + US_##reg)
-+
-+struct at91_usart_spi {
-+	struct spi_transfer	*current_transfer;
-+	void __iomem		*regs;
-+	struct device		*dev;
-+	struct clk		*clk;
-+
-+	/*used in interrupt to protect data reading*/
-+	spinlock_t		lock;
-+
-+	int			irq;
-+	unsigned int		current_tx_remaining_bytes;
-+	unsigned int		current_rx_remaining_bytes;
-+
-+	u32			spi_clk;
-+	u32			status;
-+
-+	bool			xfer_failed;
-+};
-+
-+static inline u32 at91_usart_spi_tx_ready(struct at91_usart_spi *aus)
++static void expl(obj_t __kernel *k, obj_t __iomem *o,
++		 obj_t __user *p, obj_t __percpu *pc,
++		 obj_t __rcu *r)
 +{
-+	return aus->status & US_IR_TXRDY;
++	(int)(k);
++	(ulong)(k);
++	(llong)(k);
++	(void *)(k);
++	(obj_t*)(k);
++	(obj_t __kernel*)(k);
++
++	(int)(o);
++	(ulong)(o);
++	(llong)(o);
++	(void *)(o);
++	(obj_t*)(o);
++	(obj_t __iomem*)(o);
++
++	(int)(p);
++	(ulong)(p);
++	(llong)(p);
++	(void *)(p);
++	(obj_t*)(p);
++	(obj_t __user*)(p);
++
++	(int)(pc);
++	(ulong)(pc);
++	(llong)(pc);
++	(void *)(pc);
++	(obj_t*)(pc);
++	(obj_t __percpu*)(pc);
++
++	(int)(r);
++	(ulong)(r);
++	(llong)(r);
++	(void *)(r);
++	(obj_t*)(r);
++	(obj_t __rcu*)(r);
 +}
 +
-+static inline u32 at91_usart_spi_rx_ready(struct at91_usart_spi *aus)
-+{
-+	return aus->status & US_IR_RXRDY;
-+}
-+
-+static inline u32 at91_usart_spi_check_overrun(struct at91_usart_spi *aus)
-+{
-+	return aus->status & US_IR_OVRE;
-+}
-+
-+static inline u32 at91_usart_spi_read_status(struct at91_usart_spi *aus)
-+{
-+	aus->status = at91_usart_spi_readl(aus, CSR);
-+	return aus->status;
-+}
-+
-+static inline void at91_usart_spi_tx(struct at91_usart_spi *aus)
-+{
-+	unsigned int len = aus->current_transfer->len;
-+	unsigned int remaining = aus->current_tx_remaining_bytes;
-+	const u8  *tx_buf = aus->current_transfer->tx_buf;
-+
-+	if (!remaining)
-+		return;
-+
-+	if (at91_usart_spi_tx_ready(aus)) {
-+		at91_usart_spi_writeb(aus, THR, tx_buf[len - remaining]);
-+		aus->current_tx_remaining_bytes--;
-+	}
-+}
-+
-+static inline void at91_usart_spi_rx(struct at91_usart_spi *aus)
-+{
-+	int len = aus->current_transfer->len;
-+	int remaining = aus->current_rx_remaining_bytes;
-+	u8  *rx_buf = aus->current_transfer->rx_buf;
-+
-+	if (!remaining)
-+		return;
-+
-+	rx_buf[len - remaining] = at91_usart_spi_readb(aus, RHR);
-+	aus->current_rx_remaining_bytes--;
-+}
-+
-+static inline void
-+at91_usart_spi_set_xfer_speed(struct at91_usart_spi *aus,
-+			      struct spi_transfer *xfer)
-+{
-+	at91_usart_spi_writel(aus, BRGR,
-+			      DIV_ROUND_UP(aus->spi_clk, xfer->speed_hz));
-+}
-+
-+static irqreturn_t at91_usart_spi_interrupt(int irq, void *dev_id)
-+{
-+	struct spi_controller *controller = dev_id;
-+	struct at91_usart_spi *aus = spi_master_get_devdata(controller);
-+
-+	spin_lock(&aus->lock);
-+	at91_usart_spi_read_status(aus);
-+
-+	if (at91_usart_spi_check_overrun(aus)) {
-+		aus->xfer_failed = true;
-+		at91_usart_spi_writel(aus, IDR, US_IR_OVRE | US_IR_RXRDY);
-+		spin_unlock(&aus->lock);
-+		return IRQ_HANDLED;
-+	}
-+
-+	if (at91_usart_spi_rx_ready(aus)) {
-+		at91_usart_spi_rx(aus);
-+		spin_unlock(&aus->lock);
-+		return IRQ_HANDLED;
-+	}
-+
-+	spin_unlock(&aus->lock);
-+
-+	return IRQ_NONE;
-+}
-+
-+static int at91_usart_spi_setup(struct spi_device *spi)
-+{
-+	struct at91_usart_spi *aus = spi_master_get_devdata(spi->controller);
-+	u32 *ausd = spi->controller_state;
-+	unsigned int mr = at91_usart_spi_readl(aus, MR);
-+	u8 bits = spi->bits_per_word;
-+
-+	if (bits != 8) {
-+		dev_dbg(&spi->dev, "Only 8 bits per word are supported\n");
-+		return -EINVAL;
-+	}
-+
-+	if (spi->mode & SPI_CPOL)
-+		mr |= US_MR_CPOL;
-+	else
-+		mr &= ~US_MR_CPOL;
-+
-+	if (spi->mode & SPI_CPHA)
-+		mr |= US_MR_CPHA;
-+	else
-+		mr &= ~US_MR_CPHA;
-+
-+	if (spi->mode & SPI_LOOP)
-+		mr |= US_MR_LOOP;
-+	else
-+		mr &= ~US_MR_LOOP;
-+
-+	if (!ausd) {
-+		ausd = kzalloc(sizeof(*ausd), GFP_KERNEL);
-+		if (!ausd)
-+			return -ENOMEM;
-+
-+		spi->controller_state = ausd;
-+	}
-+
-+	*ausd = mr;
-+
-+	dev_dbg(&spi->dev,
-+		"setup: bpw %u mode 0x%x -> mr %d %08x\n",
-+		bits, spi->mode, spi->chip_select, mr);
-+
-+	return 0;
-+}
-+
-+static int at91_usart_spi_transfer_one(struct spi_controller *ctlr,
-+				       struct spi_device *spi,
-+				       struct spi_transfer *xfer)
-+{
-+	struct at91_usart_spi *aus = spi_master_get_devdata(ctlr);
-+
-+	at91_usart_spi_set_xfer_speed(aus, xfer);
-+	aus->xfer_failed = false;
-+	aus->current_transfer = xfer;
-+	aus->current_tx_remaining_bytes = xfer->len;
-+	aus->current_rx_remaining_bytes = xfer->len;
-+
-+	while ((aus->current_tx_remaining_bytes ||
-+		aus->current_rx_remaining_bytes) && !aus->xfer_failed) {
-+		at91_usart_spi_read_status(aus);
-+		at91_usart_spi_tx(aus);
-+		cpu_relax();
-+	}
-+
-+	if (aus->xfer_failed) {
-+		dev_err(aus->dev, "Overrun!\n");
-+		return -EIO;
-+	}
-+
-+	return 0;
-+}
-+
-+static int at91_usart_spi_prepare_message(struct spi_controller *ctlr,
-+					  struct spi_message *message)
-+{
-+	struct at91_usart_spi *aus = spi_master_get_devdata(ctlr);
-+	struct spi_device *spi = message->spi;
-+	u32 *ausd = spi->controller_state;
-+
-+	at91_usart_spi_writel(aus, CR, US_ENABLE);
-+	at91_usart_spi_writel(aus, IER, US_OVRE_RXRDY_IRQS);
-+	at91_usart_spi_writel(aus, MR, *ausd);
-+
-+	return 0;
-+}
-+
-+static int at91_usart_spi_unprepare_message(struct spi_controller *ctlr,
-+					    struct spi_message *message)
-+{
-+	struct at91_usart_spi *aus = spi_master_get_devdata(ctlr);
-+
-+	at91_usart_spi_writel(aus, CR, US_RESET | US_DISABLE);
-+	at91_usart_spi_writel(aus, IDR, US_OVRE_RXRDY_IRQS);
-+
-+	return 0;
-+}
-+
-+static void at91_usart_spi_cleanup(struct spi_device *spi)
-+{
-+	struct at91_usart_spi_device *ausd = spi->controller_state;
-+
-+	spi->controller_state = NULL;
-+	kfree(ausd);
-+}
-+
-+static void at91_usart_spi_init(struct at91_usart_spi *aus)
-+{
-+	at91_usart_spi_writel(aus, MR, US_INIT);
-+	at91_usart_spi_writel(aus, CR, US_RESET | US_DISABLE);
-+}
-+
-+static int at91_usart_gpio_setup(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.parent->of_node;
-+	int i;
-+	int ret;
-+	int nb;
-+
-+	if (!np)
-+		return -EINVAL;
-+
-+	nb = of_gpio_named_count(np, "cs-gpios");
-+	for (i = 0; i < nb; i++) {
-+		int cs_gpio = of_get_named_gpio(np, "cs-gpios", i);
-+
-+		if (cs_gpio < 0)
-+			return cs_gpio;
-+
-+		if (gpio_is_valid(cs_gpio)) {
-+			ret = devm_gpio_request_one(&pdev->dev, cs_gpio,
-+						    GPIOF_DIR_OUT,
-+						    dev_name(&pdev->dev));
-+			if (ret)
-+				return ret;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static int at91_usart_spi_probe(struct platform_device *pdev)
-+{
-+	struct resource *regs;
-+	struct spi_controller *controller;
-+	struct at91_usart_spi *aus;
-+	struct clk *clk;
-+	int irq;
-+	int ret;
-+
-+	regs = platform_get_resource(to_platform_device(pdev->dev.parent),
-+				     IORESOURCE_MEM, 0);
-+	if (!regs)
-+		return -EINVAL;
-+
-+	irq = platform_get_irq(to_platform_device(pdev->dev.parent), 0);
-+	if (irq < 0)
-+		return irq;
-+
-+	clk = devm_clk_get(pdev->dev.parent, "usart");
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+
-+	ret = -ENOMEM;
-+	controller = spi_alloc_master(&pdev->dev, sizeof(*aus));
-+	if (!controller)
-+		goto at91_usart_spi_probe_fail;
-+
-+	ret = at91_usart_gpio_setup(pdev);
-+	if (ret)
-+		goto at91_usart_spi_probe_fail;
-+
-+	controller->mode_bits = SPI_CPOL | SPI_CPHA | SPI_LOOP | SPI_CS_HIGH;
-+	controller->dev.of_node = pdev->dev.parent->of_node;
-+	controller->bits_per_word_mask = SPI_BPW_MASK(8);
-+	controller->setup = at91_usart_spi_setup;
-+	controller->flags = SPI_MASTER_MUST_RX | SPI_MASTER_MUST_TX;
-+	controller->transfer_one = at91_usart_spi_transfer_one;
-+	controller->prepare_message = at91_usart_spi_prepare_message;
-+	controller->unprepare_message = at91_usart_spi_unprepare_message;
-+	controller->cleanup = at91_usart_spi_cleanup;
-+	controller->max_speed_hz = DIV_ROUND_UP(clk_get_rate(clk),
-+						US_MIN_CLK_DIV);
-+	controller->min_speed_hz = DIV_ROUND_UP(clk_get_rate(clk),
-+						US_MAX_CLK_DIV);
-+	platform_set_drvdata(pdev, controller);
-+
-+	aus = spi_master_get_devdata(controller);
-+
-+	aus->dev = &pdev->dev;
-+	aus->regs = devm_ioremap_resource(&pdev->dev, regs);
-+	if (IS_ERR(aus->regs)) {
-+		ret = PTR_ERR(aus->regs);
-+		goto at91_usart_spi_probe_fail;
-+	}
-+
-+	aus->irq = irq;
-+	aus->clk = clk;
-+
-+	ret = devm_request_irq(&pdev->dev, irq, at91_usart_spi_interrupt, 0,
-+			       dev_name(&pdev->dev), controller);
-+	if (ret)
-+		goto at91_usart_spi_probe_fail;
-+
-+	ret = clk_prepare_enable(clk);
-+	if (ret)
-+		goto at91_usart_spi_probe_fail;
-+
-+	aus->spi_clk = clk_get_rate(clk);
-+	at91_usart_spi_init(aus);
-+
-+	spin_lock_init(&aus->lock);
-+	ret = devm_spi_register_master(&pdev->dev, controller);
-+	if (ret)
-+		goto at91_usart_fail_register_master;
-+
-+	dev_info(&pdev->dev,
-+		 "AT91 USART SPI Controller version 0x%x at %pa (irq %d)\n",
-+		 at91_usart_spi_readl(aus, VERSION),
-+		 &regs->start, irq);
-+
-+	return 0;
-+
-+at91_usart_fail_register_master:
-+	clk_disable_unprepare(clk);
-+at91_usart_spi_probe_fail:
-+	spi_master_put(controller);
-+	return ret;
-+}
-+
-+static int at91_usart_spi_remove(struct platform_device *pdev)
-+{
-+	struct spi_controller *ctlr = platform_get_drvdata(pdev);
-+	struct at91_usart_spi *aus = spi_master_get_devdata(ctlr);
-+
-+	clk_disable_unprepare(aus->clk);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id at91_usart_spi_dt_ids[] = {
-+	{ .compatible = "microchip,at91sam9g45-usart-spi"},
-+	{ /* sentinel */}
-+};
-+
-+MODULE_DEVICE_TABLE(of, at91_usart_spi_dt_ids);
-+
-+static struct platform_driver at91_usart_spi_driver = {
-+	.driver = {
-+		.name = "at91_usart_spi",
-+	},
-+	.probe = at91_usart_spi_probe,
-+	.remove = at91_usart_spi_remove,
-+};
-+
-+module_platform_driver(at91_usart_spi_driver);
-+
-+MODULE_DESCRIPTION("Microchip AT91 USART SPI Controller driver");
-+MODULE_AUTHOR("Radu Pirea <radu.pirea@microchip.com>");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:at91_usart_spi");
++/*
++ * check-name: Waddress-space-all-attr
++ * check-command: sparse -Wcast-from-as -Wcast-to-as $file
++ *
++ * check-error-start
++Waddress-space-all-attr.c:24:10: warning: cast removes address space of expression (<asn:2>)
++Waddress-space-all-attr.c:25:10: warning: cast removes address space of expression (<asn:2>)
++Waddress-space-all-attr.c:26:10: warning: cast removes address space of expression (<asn:2>)
++Waddress-space-all-attr.c:27:10: warning: cast removes address space of expression (<asn:2>)
++Waddress-space-all-attr.c:28:10: warning: cast removes address space of expression (<asn:2>)
++Waddress-space-all-attr.c:31:10: warning: cast removes address space of expression (<asn:1>)
++Waddress-space-all-attr.c:32:10: warning: cast removes address space of expression (<asn:1>)
++Waddress-space-all-attr.c:33:10: warning: cast removes address space of expression (<asn:1>)
++Waddress-space-all-attr.c:34:10: warning: cast removes address space of expression (<asn:1>)
++Waddress-space-all-attr.c:35:10: warning: cast removes address space of expression (<asn:1>)
++Waddress-space-all-attr.c:38:10: warning: cast removes address space of expression (<asn:3>)
++Waddress-space-all-attr.c:39:10: warning: cast removes address space of expression (<asn:3>)
++Waddress-space-all-attr.c:40:10: warning: cast removes address space of expression (<asn:3>)
++Waddress-space-all-attr.c:41:10: warning: cast removes address space of expression (<asn:3>)
++Waddress-space-all-attr.c:42:10: warning: cast removes address space of expression (<asn:3>)
++Waddress-space-all-attr.c:45:10: warning: cast removes address space of expression (<asn:4>)
++Waddress-space-all-attr.c:46:10: warning: cast removes address space of expression (<asn:4>)
++Waddress-space-all-attr.c:47:10: warning: cast removes address space of expression (<asn:4>)
++Waddress-space-all-attr.c:48:10: warning: cast removes address space of expression (<asn:4>)
++Waddress-space-all-attr.c:49:10: warning: cast removes address space of expression (<asn:4>)
++Waddress-space-all-attr.c:17:10: warning: non size-preserving pointer to integer cast
++Waddress-space-all-attr.c:24:10: warning: non size-preserving pointer to integer cast
++Waddress-space-all-attr.c:31:10: warning: non size-preserving pointer to integer cast
++Waddress-space-all-attr.c:38:10: warning: non size-preserving pointer to integer cast
++Waddress-space-all-attr.c:45:10: warning: non size-preserving pointer to integer cast
++ * check-error-end
++ */
+
+
 -- 
-2.18.0
+Regards,
+Vincenzo
