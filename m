@@ -1,99 +1,30 @@
-From: argus.lin@mediatek.com (Argus Lin)
-Date: Tue, 4 Sep 2018 20:31:54 +0800
-Subject: [PATCH 3/3] soc: mediatek: pwrap: add mt6357 driver for mt6765 SoCs
-In-Reply-To: <1536064314-31967-1-git-send-email-argus.lin@mediatek.com>
-References: <1536064314-31967-1-git-send-email-argus.lin@mediatek.com>
-Message-ID: <1536064314-31967-4-git-send-email-argus.lin@mediatek.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 4 Sep 2018 14:40:41 +0200
+Subject: [PATCH] spi: Delete Atmel AT91 SPI driver
+In-Reply-To: <20180904121503.GF13888@piout.net>
+References: <20180904094922.8131-1-linus.walleij@linaro.org>
+ <20180904121503.GF13888@piout.net>
+Message-ID: <CACRpkdbd=SQPF0Vi2HP9uAwA27M8a5dZO-r31D5=3j5sjGh+qg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MT6357 is a new power management IC and it is used for mt6765 SoCs.
-To define mt6357_regs for pmic register mapping and pmic_mt6357
-for accessing register.
+On Tue, Sep 4, 2018 at 2:15 PM Alexandre Belloni
+<alexandre.belloni@bootlin.com> wrote:
+> On 04/09/2018 11:49:22+0200, Linus Walleij wrote:
+>
+> > This driver depends on the deleted AT91 architecture and cause
+> > me headaches from a GPIO point of view. It is unused so delete
+> > it.
+> >
+>
+> While AVR32 is gone, AT91 is alive and well.
 
-Signed-off-by: Argus Lin <argus.lin@mediatek.com>
----
- drivers/soc/mediatek/mtk-pmic-wrap.c | 35 ++++++++++++++++++++++++++++++++---
- 1 file changed, 32 insertions(+), 3 deletions(-)
+Gnah sorry guys that's the problem, I mixed up AVR32 and AT91.
 
-diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-index ddaeace..2b2cee1 100644
---- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-+++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-@@ -161,6 +161,21 @@ enum dew_regs {
- 	[PWRAP_DEW_RDDMY_NO] =		0x030C,
- };
- 
-+static const u32 mt6357_regs[] = {
-+	[PWRAP_DEW_DIO_EN] =		0x040A,
-+	[PWRAP_DEW_READ_TEST] =		0x040C,
-+	[PWRAP_DEW_WRITE_TEST] =	0x040E,
-+	[PWRAP_DEW_CRC_EN] =		0x0412,
-+	[PWRAP_DEW_CRC_VAL] =		0x0414,
-+	[PWRAP_DEW_CIPHER_KEY_SEL] =	0x0418,
-+	[PWRAP_DEW_CIPHER_IV_SEL] =	0x041A,
-+	[PWRAP_DEW_CIPHER_EN] =		0x041C,
-+	[PWRAP_DEW_CIPHER_RDY] =	0x041E,
-+	[PWRAP_DEW_CIPHER_MODE] =	0x0420,
-+	[PWRAP_DEW_CIPHER_SWRST] =	0x0422,
-+	[PWRAP_DEW_RDDMY_NO] =		0x0424,
-+};
-+
- enum pwrap_regs {
- 	PWRAP_MUX_SEL,
- 	PWRAP_WRAP_EN,
-@@ -716,6 +731,7 @@ enum pwrap_regs {
- enum pmic_type {
- 	PMIC_MT6323,
- 	PMIC_MT6351,
-+	PMIC_MT6357,
- 	PMIC_MT6380,
- 	PMIC_MT6397,
- };
-@@ -1175,6 +1191,7 @@ static int pwrap_init_cipher(struct pmic_wrapper *wrp)
- 		break;
- 	case PMIC_MT6323:
- 	case PMIC_MT6351:
-+	case PMIC_MT6357:
- 		pwrap_write(wrp, wrp->slave->dew_regs[PWRAP_DEW_CIPHER_EN],
- 			    0x1);
- 		break;
-@@ -1460,11 +1477,26 @@ static irqreturn_t pwrap_interrupt(int irqno, void *dev_id)
- 	.pwrap_write = pwrap_write16,
- };
- 
-+static const struct pwrap_slv_type pmic_mt6357 = {
-+	.dew_regs = mt6357_regs,
-+	.type = PMIC_MT6357,
-+	.regmap = &pwrap_regmap_config16,
-+	.caps = 0,
-+	.pwrap_read = pwrap_read16,
-+	.pwrap_write = pwrap_write16,
-+};
-+
- static const struct of_device_id of_slave_match_tbl[] = {
- 	{
- 		.compatible = "mediatek,mt6323",
- 		.data = &pmic_mt6323,
- 	}, {
-+		.compatible = "mediatek,mt6351",
-+		.data = &pmic_mt6351,
-+	}, {
-+		.compatible = "mediatek,mt6357",
-+		.data = &pmic_mt6357,
-+	}, {
- 		/* The MT6380 PMIC only implements a regulator, so we bind it
- 		 * directly instead of using a MFD.
- 		 */
-@@ -1474,9 +1506,6 @@ static irqreturn_t pwrap_interrupt(int irqno, void *dev_id)
- 		.compatible = "mediatek,mt6397",
- 		.data = &pmic_mt6397,
- 	}, {
--		.compatible = "mediatek,mt6351",
--		.data = &pmic_mt6351,
--	}, {
- 		/* sentinel */
- 	}
- };
--- 
-1.8.1.1.dirty
+Sorry for the screwup :(
+
+OK back to the drawing board, I will work slowly and careful
+and try not to do silly mistakes like this.
+
+Yours,
+Linus Walleij
