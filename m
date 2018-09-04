@@ -1,21 +1,38 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 04 Sep 2018 08:36:32 -0500
-Subject: [PATCH] dt-bindings: Add compatible string for LS1028A-QDS
-In-Reply-To: <1535555846-7817-1-git-send-email-sudhanshu.gupta@nxp.com>
-References: <1535555846-7817-1-git-send-email-sudhanshu.gupta@nxp.com>
-Message-ID: <5b8e8a61.1c69fb81.12eaa.f2a1@mx.google.com>
+Date: Mon, 3 Sep 2018 19:31:59 -0500
+Subject: [PATCH 2/7] dt-bindings: clock: rk3288-cru: Add property to
+ dedicate NPLL for VOPx
+In-Reply-To: <20180828185513.13216-3-urjaman@gmail.com>
+References: <20180828185513.13216-1-urjaman@gmail.com>
+ <20180828185513.13216-3-urjaman@gmail.com>
+Message-ID: <5b8e8a5a.1c69fb81.1c56d.877e@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 Aug 2018 20:47:26 +0530, Sudhanshu Gupta wrote:
-> From: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
-> 
-> Signed-off-by: Sudhanshu Gupta <sudhanshu.gupta@nxp.com>
-> Signed-off-by: Rai Harninder <harninder.rai@nxp.com>
-> Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
+On Tue, Aug 28, 2018 at 06:55:08PM +0000, Urja Rannikko wrote:
+> Signed-off-by: Urja Rannikko <urjaman@gmail.com>
 > ---
->  Documentation/devicetree/bindings/arm/fsl.txt | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
+>  .../devicetree/bindings/clock/rockchip,rk3288-cru.txt          | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
+> diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk3288-cru.txt b/Documentation/devicetree/bindings/clock/rockchip,rk3288-cru.txt
+> index 8cb47c39ba53..20724584e0a4 100644
+> --- a/Documentation/devicetree/bindings/clock/rockchip,rk3288-cru.txt
+> +++ b/Documentation/devicetree/bindings/clock/rockchip,rk3288-cru.txt
+> @@ -16,6 +16,9 @@ Optional Properties:
+>  
+>  - rockchip,grf: phandle to the syscon managing the "general register files"
+>    If missing pll rates are not changeable, due to the missing pll lock status.
+> +- rockchip,npll-for-vop: u32 0 or 1, dedicates NPLL to a VOP output unit for
+> +  more frequency flexibility for the selected VOP output at a cost of
+> +  flexibility for other devices. Disabled if not present or -1.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+It can't be a u32 and negative. Just drop the "or -1" part.
+
+
+>  
+>  Each clock is assigned an identifier and client nodes can use this identifier
+>  to specify the clock which they consume. All available clocks are defined as
+> -- 
+> 2.18.0
+> 
