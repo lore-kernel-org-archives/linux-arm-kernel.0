@@ -1,668 +1,230 @@
 From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Tue,  4 Sep 2018 17:24:43 +0530
-Subject: [PATCH v2 08/15] soc: octeontx2: Add RVU block LF provisioning support
+Date: Tue,  4 Sep 2018 17:24:46 +0530
+Subject: [PATCH v2 11/15] soc: octeontx2: Add Marvell OcteonTX2 CGX driver
 In-Reply-To: <1536062090-30446-1-git-send-email-sunil.kovvuri@gmail.com>
 References: <1536062090-30446-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1536062090-30446-9-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1536062090-30446-12-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sunil Goutham <sgoutham@marvell.com>
 
-Added support for a RVU PF/VF to request AF via mailbox
-to attach or detach NPA/NIX/SSO/SSOW/TIM/CPT block LFs.
-Also supports partial detachment and modifying current
-LF attached count of a certian block type.
+This patch adds basic template for Marvell OcteonTX2's
+CGX ethernet interface driver. Just the probe.
+RVU AF driver will use APIs exported by this driver
+for various things like PF to physical interface mapping,
+loopback mode, interface stats etc. Hence marged both
+drivers into a single module.
 
 Signed-off-by: Sunil Goutham <sgoutham@marvell.com>
 ---
- drivers/soc/marvell/octeontx2/mbox.h    |  45 ++-
- drivers/soc/marvell/octeontx2/rvu.c     | 472 +++++++++++++++++++++++++++++++-
- drivers/soc/marvell/octeontx2/rvu.h     |   8 +-
- drivers/soc/marvell/octeontx2/rvu_reg.h |   8 +-
- 4 files changed, 523 insertions(+), 10 deletions(-)
+ drivers/soc/marvell/Kconfig            |   3 +-
+ drivers/soc/marvell/octeontx2/Makefile |   2 +-
+ drivers/soc/marvell/octeontx2/cgx.c    | 102 +++++++++++++++++++++++++++++++++
+ drivers/soc/marvell/octeontx2/cgx.h    |  22 +++++++
+ drivers/soc/marvell/octeontx2/rvu.c    |  14 ++++-
+ 5 files changed, 140 insertions(+), 3 deletions(-)
+ create mode 100644 drivers/soc/marvell/octeontx2/cgx.c
+ create mode 100644 drivers/soc/marvell/octeontx2/cgx.h
 
-diff --git a/drivers/soc/marvell/octeontx2/mbox.h b/drivers/soc/marvell/octeontx2/mbox.h
-index fc593f0..7280d49 100644
---- a/drivers/soc/marvell/octeontx2/mbox.h
-+++ b/drivers/soc/marvell/octeontx2/mbox.h
-@@ -118,7 +118,17 @@ static inline struct mbox_msghdr *otx2_mbox_alloc_msg(struct otx2_mbox *mbox,
- #define MBOX_MSG_MAX				0xFFFF
+diff --git a/drivers/soc/marvell/Kconfig b/drivers/soc/marvell/Kconfig
+index 428d22e..8f36f3a 100644
+--- a/drivers/soc/marvell/Kconfig
++++ b/drivers/soc/marvell/Kconfig
+@@ -11,7 +11,8 @@ config OCTEONTX2_AF
+ 	tristate "OcteonTX2 RVU Admin Function driver"
+ 	select OCTEONTX2_MBOX
+ 	depends on ARM64 && PCI
+-	help
++	---help---
+ 	  This driver supports Marvell's OcteonTX2 Resource Virtualization
+ 	  Unit's admin function manager which manages all RVU HW resources.
++
+ endmenu
+diff --git a/drivers/soc/marvell/octeontx2/Makefile b/drivers/soc/marvell/octeontx2/Makefile
+index ac17cb9..8646421 100644
+--- a/drivers/soc/marvell/octeontx2/Makefile
++++ b/drivers/soc/marvell/octeontx2/Makefile
+@@ -7,4 +7,4 @@ obj-$(CONFIG_OCTEONTX2_MBOX) += octeontx2_mbox.o
+ obj-$(CONFIG_OCTEONTX2_AF) += octeontx2_af.o
  
- #define MBOX_MESSAGES							\
--M(READY,		0x001, msg_req, ready_msg_rsp)
-+/* Generic mbox IDs (range 0x000 - 0x1FF) */				\
-+M(READY,		0x001, msg_req, ready_msg_rsp)			\
-+M(ATTACH_RESOURCES,	0x002, rsrc_attach, msg_rsp)			\
-+M(DETACH_RESOURCES,	0x003, rsrc_detach, msg_rsp)			\
-+/* CGX mbox IDs (range 0x200 - 0x3FF) */				\
-+/* NPA mbox IDs (range 0x400 - 0x5FF) */				\
-+/* SSO/SSOW mbox IDs (range 0x600 - 0x7FF) */				\
-+/* TIM mbox IDs (range 0x800 - 0x9FF) */				\
-+/* CPT mbox IDs (range 0xA00 - 0xBFF) */				\
-+/* NPC mbox IDs (range 0x6000 - 0x7FFF) */				\
-+/* NIX mbox IDs (range 0x8000 - 0xFFFF) */				\
- 
- enum {
- #define M(_name, _id, _1, _2) MBOX_MSG_ ## _name = _id,
-@@ -147,4 +157,37 @@ struct ready_msg_rsp {
- 	u16    sclk_feq;	/* SCLK frequency */
- };
- 
-+/* Structure for requesting resource provisioning.
-+ * 'modify' flag to be used when either requesting more
-+ * or to detach partial of a cetain resource type.
-+ * Rest of the fields specify how many of what type to
-+ * be attached.
-+ */
-+struct rsrc_attach {
-+	struct mbox_msghdr hdr;
-+	u8   modify:1;
-+	u8   npalf:1;
-+	u8   nixlf:1;
-+	u16  sso;
-+	u16  ssow;
-+	u16  timlfs;
-+	u16  cptlfs;
-+};
-+
-+/* Structure for relinquishing resources.
-+ * 'partial' flag to be used when relinquishing all resources
-+ * but only of a certain type. If not set, all resources of all
-+ * types provisioned to the RVU function will be detached.
-+ */
-+struct rsrc_detach {
-+	struct mbox_msghdr hdr;
-+	u8 partial:1;
-+	u8 npalf:1;
-+	u8 nixlf:1;
-+	u8 sso:1;
-+	u8 ssow:1;
-+	u8 timlfs:1;
-+	u8 cptlfs:1;
-+};
-+
- #endif /* MBOX_H */
-diff --git a/drivers/soc/marvell/octeontx2/rvu.c b/drivers/soc/marvell/octeontx2/rvu.c
-index 9539ab9..39dc45d 100644
---- a/drivers/soc/marvell/octeontx2/rvu.c
-+++ b/drivers/soc/marvell/octeontx2/rvu.c
-@@ -59,6 +59,41 @@ int rvu_poll_reg(struct rvu *rvu, u64 block, u64 offset, u64 mask, bool zero)
- 	return -EBUSY;
- }
- 
-+int rvu_alloc_rsrc(struct rsrc_bmap *rsrc)
-+{
-+	int id;
-+
-+	if (!rsrc->bmap)
-+		return -EINVAL;
-+
-+	id = find_first_zero_bit(rsrc->bmap, rsrc->max);
-+	if (id >= rsrc->max)
-+		return -ENOSPC;
-+
-+	__set_bit(id, rsrc->bmap);
-+
-+	return id;
-+}
-+
-+void rvu_free_rsrc(struct rsrc_bmap *rsrc, int id)
-+{
-+	if (!rsrc->bmap)
-+		return;
-+
-+	__clear_bit(id, rsrc->bmap);
-+}
-+
-+int rvu_rsrc_free_count(struct rsrc_bmap *rsrc)
-+{
-+	int used;
-+
-+	if (!rsrc->bmap)
-+		return 0;
-+
-+	used = bitmap_weight(rsrc->bmap, rsrc->max);
-+	return (rsrc->max - used);
-+}
-+
- int rvu_alloc_bitmap(struct rsrc_bmap *rsrc)
- {
- 	rsrc->bmap = kcalloc(BITS_TO_LONGS(rsrc->max),
-@@ -68,6 +103,78 @@ int rvu_alloc_bitmap(struct rsrc_bmap *rsrc)
- 	return 0;
- }
- 
-+/* Convert BLOCK_TYPE_E to a BLOCK_ADDR_E.
-+ * Some silicon variants of OcteonTX2 supports
-+ * multiple blocks of same type.
+ octeontx2_mbox-y := mbox.o
+-octeontx2_af-y := rvu.o
++octeontx2_af-y := cgx.o rvu.o
+diff --git a/drivers/soc/marvell/octeontx2/cgx.c b/drivers/soc/marvell/octeontx2/cgx.c
+new file mode 100644
+index 0000000..47aa4cb
+--- /dev/null
++++ b/drivers/soc/marvell/octeontx2/cgx.c
+@@ -0,0 +1,102 @@
++// SPDX-License-Identifier: GPL-2.0
++/* Marvell OcteonTx2 CGX driver
 + *
-+ * @pcifunc has to be zero when no LF is yet attached.
++ * Copyright (C) 2018 Marvell International Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
-+int rvu_get_blkaddr(struct rvu *rvu, int blktype, u16 pcifunc)
++
++#include <linux/acpi.h>
++#include <linux/module.h>
++#include <linux/interrupt.h>
++#include <linux/pci.h>
++#include <linux/netdevice.h>
++#include <linux/etherdevice.h>
++#include <linux/phy.h>
++#include <linux/of.h>
++#include <linux/of_mdio.h>
++#include <linux/of_net.h>
++
++#include "cgx.h"
++
++#define DRV_NAME	"octeontx2-cgx"
++#define DRV_STRING      "Marvell OcteonTX2 CGX/MAC Driver"
++#define DRV_VERSION	"1.0"
++
++struct cgx {
++	void __iomem		*reg_base;
++	struct pci_dev		*pdev;
++	u8			cgx_id;
++};
++
++/* Supported devices */
++static const struct pci_device_id cgx_id_table[] = {
++	{ PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, PCI_DEVID_OCTEONTX2_CGX) },
++	{ 0, }  /* end of table */
++};
++
++MODULE_AUTHOR("Marvell International Ltd.");
++MODULE_DESCRIPTION(DRV_STRING);
++MODULE_LICENSE("GPL v2");
++MODULE_VERSION(DRV_VERSION);
++MODULE_DEVICE_TABLE(pci, cgx_id_table);
++
++static int cgx_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 +{
-+	int devnum, blkaddr = -ENODEV;
-+	u64 cfg, reg;
-+	bool is_pf;
++	int err;
++	struct device *dev = &pdev->dev;
++	struct cgx *cgx;
 +
-+	switch (blktype) {
-+	case BLKTYPE_NPA:
-+		blkaddr = BLKADDR_NPA;
-+		goto exit;
-+	case BLKTYPE_NIX:
-+		/* For now assume NIX0 */
-+		if (!pcifunc) {
-+			blkaddr = BLKADDR_NIX0;
-+			goto exit;
-+		}
-+		break;
-+	case BLKTYPE_SSO:
-+		blkaddr = BLKADDR_SSO;
-+		goto exit;
-+	case BLKTYPE_SSOW:
-+		blkaddr = BLKADDR_SSOW;
-+		goto exit;
-+	case BLKTYPE_TIM:
-+		blkaddr = BLKADDR_TIM;
-+		goto exit;
-+	case BLKTYPE_CPT:
-+		/* For now assume CPT0 */
-+		if (!pcifunc) {
-+			blkaddr = BLKADDR_CPT0;
-+			goto exit;
-+		}
-+		break;
++	cgx = devm_kzalloc(dev, sizeof(*cgx), GFP_KERNEL);
++	if (!cgx)
++		return -ENOMEM;
++	cgx->pdev = pdev;
++
++	pci_set_drvdata(pdev, cgx);
++
++	err = pci_enable_device(pdev);
++	if (err) {
++		dev_err(dev, "Failed to enable PCI device\n");
++		pci_set_drvdata(pdev, NULL);
++		return err;
 +	}
 +
-+	/* Check if this is a RVU PF or VF */
-+	if (pcifunc & RVU_PFVF_FUNC_MASK) {
-+		is_pf = false;
-+		devnum = rvu_get_hwvf(rvu, pcifunc);
-+	} else {
-+		is_pf = true;
-+		devnum = rvu_get_pf(pcifunc);
++	err = pci_request_regions(pdev, DRV_NAME);
++	if (err) {
++		dev_err(dev, "PCI request regions failed 0x%x\n", err);
++		goto err_disable_device;
 +	}
 +
-+	/* Check if the 'pcifunc' has a NIX LF from 'BLKADDR_NIX0' */
-+	if (blktype == BLKTYPE_NIX) {
-+		reg = is_pf ? RVU_PRIV_PFX_NIX0_CFG : RVU_PRIV_HWVFX_NIX0_CFG;
-+		cfg = rvu_read64(rvu, BLKADDR_RVUM, reg | (devnum << 16));
-+		if (cfg)
-+			blkaddr = BLKADDR_NIX0;
-+	}
-+
-+	/* Check if the 'pcifunc' has a CPT LF from 'BLKADDR_CPT0' */
-+	if (blktype == BLKTYPE_CPT) {
-+		reg = is_pf ? RVU_PRIV_PFX_CPT0_CFG : RVU_PRIV_HWVFX_CPT0_CFG;
-+		cfg = rvu_read64(rvu, BLKADDR_RVUM, reg | (devnum << 16));
-+		if (cfg)
-+			blkaddr = BLKADDR_CPT0;
-+	}
-+
-+exit:
-+	if (is_block_implemented(rvu->hw, blkaddr))
-+		return blkaddr;
-+	return -ENODEV;
-+}
-+
- static void rvu_update_rsrc_map(struct rvu *rvu, struct rvu_pfvf *pfvf,
- 				struct rvu_block *block, u16 pcifunc,
- 				u16 lf, bool attach)
-@@ -153,6 +260,17 @@ struct rvu_pfvf *rvu_get_pfvf(struct rvu *rvu, int pcifunc)
- 		return &rvu->pf[rvu_get_pf(pcifunc)];
- }
- 
-+bool is_block_implemented(struct rvu_hwinfo *hw, int blkaddr)
-+{
-+	struct rvu_block *block;
-+
-+	if ((blkaddr < BLKADDR_RVUM) || (blkaddr >= BLK_COUNT))
-+		return false;
-+
-+	block = &hw->block[blkaddr];
-+	return block->implemented;
-+}
-+
- static void rvu_check_block_implemented(struct rvu *rvu)
- {
- 	struct rvu_hwinfo *hw = rvu->hw;
-@@ -273,8 +391,8 @@ static int rvu_setup_hw_resources(struct rvu *rvu)
- 	block->type = BLKTYPE_NIX;
- 	block->lfshift = 8;
- 	block->lookup_reg = NIX_AF_RVU_LF_CFG_DEBUG;
--	block->pf_lfcnt_reg = RVU_PRIV_PFX_NIX_CFG;
--	block->vf_lfcnt_reg = RVU_PRIV_HWVFX_NIX_CFG;
-+	block->pf_lfcnt_reg = RVU_PRIV_PFX_NIX0_CFG;
-+	block->vf_lfcnt_reg = RVU_PRIV_HWVFX_NIX0_CFG;
- 	block->lfcfg_reg = NIX_PRIV_LFX_CFG;
- 	block->msixcfg_reg = NIX_PRIV_LFX_INT_CFG;
- 	block->lfreset_reg = NIX_AF_LF_RST;
-@@ -360,8 +478,8 @@ static int rvu_setup_hw_resources(struct rvu *rvu)
- 	block->multislot = true;
- 	block->lfshift = 3;
- 	block->lookup_reg = CPT_AF_RVU_LF_CFG_DEBUG;
--	block->pf_lfcnt_reg = RVU_PRIV_PFX_CPT_CFG;
--	block->vf_lfcnt_reg = RVU_PRIV_HWVFX_CPT_CFG;
-+	block->pf_lfcnt_reg = RVU_PRIV_PFX_CPT0_CFG;
-+	block->vf_lfcnt_reg = RVU_PRIV_HWVFX_CPT0_CFG;
- 	block->lfcfg_reg = CPT_PRIV_LFX_CFG;
- 	block->msixcfg_reg = CPT_PRIV_LFX_INT_CFG;
- 	block->lfreset_reg = CPT_AF_LF_RST;
-@@ -399,6 +517,8 @@ static int rvu_setup_hw_resources(struct rvu *rvu)
- 		rvu_scan_block(rvu, block);
- 	}
- 
-+	spin_lock_init(&rvu->rsrc_lock);
-+
- 	return 0;
- }
- 
-@@ -408,6 +528,350 @@ static int rvu_mbox_handler_READY(struct rvu *rvu, struct msg_req *req,
- 	return 0;
- }
- 
-+/* Get current count of a RVU block's LF/slots
-+ * provisioned to a given RVU func.
-+ */
-+static u16 rvu_get_rsrc_mapcount(struct rvu_pfvf *pfvf, int blktype)
-+{
-+	switch (blktype) {
-+	case BLKTYPE_NPA:
-+		return pfvf->npalf ? 1 : 0;
-+	case BLKTYPE_NIX:
-+		return pfvf->nixlf ? 1 : 0;
-+	case BLKTYPE_SSO:
-+		return pfvf->sso;
-+	case BLKTYPE_SSOW:
-+		return pfvf->ssow;
-+	case BLKTYPE_TIM:
-+		return pfvf->timlfs;
-+	case BLKTYPE_CPT:
-+		return pfvf->cptlfs;
-+	}
-+	return 0;
-+}
-+
-+static int rvu_lookup_rsrc(struct rvu *rvu, struct rvu_block *block,
-+			   int pcifunc, int slot)
-+{
-+	u64 val;
-+
-+	val = ((u64)pcifunc << 24) | (slot << 16) | (1ULL << 13);
-+	rvu_write64(rvu, block->addr, block->lookup_reg, val);
-+	/* Wait for the lookup to finish */
-+	/* TODO: put some timeout here */
-+	while (rvu_read64(rvu, block->addr, block->lookup_reg) & (1ULL << 13))
-+		;
-+
-+	val = rvu_read64(rvu, block->addr, block->lookup_reg);
-+
-+	/* Check LF valid bit */
-+	if (!(val & (1ULL << 12)))
-+		return -1;
-+
-+	return (val & 0xFFF);
-+}
-+
-+static void rvu_detach_block(struct rvu *rvu, int pcifunc, int blktype)
-+{
-+	struct rvu_pfvf *pfvf = rvu_get_pfvf(rvu, pcifunc);
-+	struct rvu_hwinfo *hw = rvu->hw;
-+	struct rvu_block *block;
-+	int slot, lf, num_lfs;
-+	int blkaddr;
-+
-+	blkaddr = rvu_get_blkaddr(rvu, blktype, pcifunc);
-+	if (blkaddr < 0)
-+		return;
-+
-+	block = &hw->block[blkaddr];
-+
-+	num_lfs = rvu_get_rsrc_mapcount(pfvf, block->type);
-+	if (!num_lfs)
-+		return;
-+
-+	for (slot = 0; slot < num_lfs; slot++) {
-+		lf = rvu_lookup_rsrc(rvu, block, pcifunc, slot);
-+		if (lf < 0) /* This should never happen */
-+			continue;
-+
-+		/* Disable the LF */
-+		rvu_write64(rvu, blkaddr, block->lfcfg_reg |
-+			    (lf << block->lfshift), 0x00ULL);
-+
-+		/* Update SW maintained mapping info as well */
-+		rvu_update_rsrc_map(rvu, pfvf, block,
-+				    pcifunc, lf, false);
-+
-+		/* Free the resource */
-+		rvu_free_rsrc(&block->lf, lf);
-+	}
-+}
-+
-+static int rvu_detach_rsrcs(struct rvu *rvu, struct rsrc_detach *detach,
-+			    u16 pcifunc)
-+{
-+	struct rvu_hwinfo *hw = rvu->hw;
-+	bool is_pf, detach_all = true;
-+	struct rvu_block *block;
-+	int devnum, blkid;
-+
-+	/* Check if this is for a RVU PF or VF */
-+	if (pcifunc & RVU_PFVF_FUNC_MASK) {
-+		is_pf = false;
-+		devnum = rvu_get_hwvf(rvu, pcifunc);
-+	} else {
-+		is_pf = true;
-+		devnum = rvu_get_pf(pcifunc);
-+	}
-+
-+	spin_lock(&rvu->rsrc_lock);
-+
-+	/* Check for partial resource detach */
-+	if (detach && detach->partial)
-+		detach_all = false;
-+
-+	/* Check for RVU block's LFs attached to this func,
-+	 * if so, detach them.
-+	 */
-+	for (blkid = 0; blkid < BLK_COUNT; blkid++) {
-+		block = &hw->block[blkid];
-+		if (!block->lf.bmap)
-+			continue;
-+		if (!detach_all && detach) {
-+			if ((blkid == BLKADDR_NPA) && !detach->npalf)
-+				continue;
-+			else if ((blkid == BLKADDR_NIX0) && !detach->nixlf)
-+				continue;
-+			else if ((blkid == BLKADDR_SSO) && !detach->sso)
-+				continue;
-+			else if ((blkid == BLKADDR_SSOW) && !detach->ssow)
-+				continue;
-+			else if ((blkid == BLKADDR_TIM) && !detach->timlfs)
-+				continue;
-+			else if ((blkid == BLKADDR_CPT0) && !detach->cptlfs)
-+				continue;
-+		}
-+		rvu_detach_block(rvu, pcifunc, block->type);
-+	}
-+
-+	spin_unlock(&rvu->rsrc_lock);
-+	return 0;
-+}
-+
-+static int rvu_mbox_handler_DETACH_RESOURCES(struct rvu *rvu,
-+					     struct rsrc_detach *detach,
-+					     struct msg_rsp *rsp)
-+{
-+	return rvu_detach_rsrcs(rvu, detach, detach->hdr.pcifunc);
-+}
-+
-+static void rvu_attach_block(struct rvu *rvu, int pcifunc,
-+			     int blktype, int num_lfs)
-+{
-+	struct rvu_pfvf *pfvf = rvu_get_pfvf(rvu, pcifunc);
-+	struct rvu_hwinfo *hw = rvu->hw;
-+	struct rvu_block *block;
-+	int slot, lf;
-+	int blkaddr;
-+	u64 cfg;
-+
-+	if (!num_lfs)
-+		return;
-+
-+	blkaddr = rvu_get_blkaddr(rvu, blktype, 0);
-+	if (blkaddr < 0)
-+		return;
-+
-+	block = &hw->block[blkaddr];
-+	if (!block->lf.bmap)
-+		return;
-+
-+	for (slot = 0; slot < num_lfs; slot++) {
-+		/* Allocate the resource */
-+		lf = rvu_alloc_rsrc(&block->lf);
-+		if (lf < 0)
-+			return;
-+
-+		cfg = (1ULL << 63) | (pcifunc << 8) | slot;
-+		rvu_write64(rvu, blkaddr, block->lfcfg_reg |
-+			    (lf << block->lfshift), cfg);
-+		rvu_update_rsrc_map(rvu, pfvf, block,
-+				    pcifunc, lf, true);
-+	}
-+}
-+
-+static int rvu_check_rsrc_availability(struct rvu *rvu,
-+				       struct rsrc_attach *req, u16 pcifunc)
-+{
-+	struct rvu_pfvf *pfvf = rvu_get_pfvf(rvu, pcifunc);
-+	struct rvu_hwinfo *hw = rvu->hw;
-+	struct rvu_block *block;
-+	int free_lfs, mappedlfs;
-+
-+	/* Only one NPA LF can be attached */
-+	if (req->npalf && !rvu_get_rsrc_mapcount(pfvf, BLKTYPE_NPA)) {
-+		block = &hw->block[BLKADDR_NPA];
-+		free_lfs = rvu_rsrc_free_count(&block->lf);
-+		if (!free_lfs)
-+			goto fail;
-+	} else if (req->npalf) {
-+		dev_err(&rvu->pdev->dev,
-+			"Func 0x%x: Invalid req, already has NPA\n",
-+			 pcifunc);
-+		return -EINVAL;
-+	}
-+
-+	/* Only one NIX LF can be attached */
-+	if (req->nixlf && !rvu_get_rsrc_mapcount(pfvf, BLKTYPE_NIX)) {
-+		block = &hw->block[BLKADDR_NIX0];
-+		free_lfs = rvu_rsrc_free_count(&block->lf);
-+		if (!free_lfs)
-+			goto fail;
-+	} else if (req->nixlf) {
-+		dev_err(&rvu->pdev->dev,
-+			"Func 0x%x: Invalid req, already has NIX\n",
-+			pcifunc);
-+		return -EINVAL;
-+	}
-+
-+	if (req->sso) {
-+		block = &hw->block[BLKADDR_SSO];
-+		/* Is request within limits ? */
-+		if (req->sso > block->lf.max) {
-+			dev_err(&rvu->pdev->dev,
-+				"Func 0x%x: Invalid SSO req, %d > max %d\n",
-+				 pcifunc, req->sso, block->lf.max);
-+			return -EINVAL;
-+		}
-+		mappedlfs = rvu_get_rsrc_mapcount(pfvf, block->type);
-+		free_lfs = rvu_rsrc_free_count(&block->lf);
-+		/* Check if additional resources are available */
-+		if ((req->sso > mappedlfs) &&
-+		    ((req->sso - mappedlfs) > free_lfs))
-+			goto fail;
-+	}
-+
-+	if (req->ssow) {
-+		block = &hw->block[BLKADDR_SSOW];
-+		if (req->ssow > block->lf.max) {
-+			dev_err(&rvu->pdev->dev,
-+				"Func 0x%x: Invalid SSOW req, %d > max %d\n",
-+				 pcifunc, req->sso, block->lf.max);
-+			return -EINVAL;
-+		}
-+		mappedlfs = rvu_get_rsrc_mapcount(pfvf, block->type);
-+		free_lfs = rvu_rsrc_free_count(&block->lf);
-+		if ((req->ssow > mappedlfs) &&
-+		    ((req->ssow - mappedlfs) > free_lfs))
-+			goto fail;
-+	}
-+
-+	if (req->timlfs) {
-+		block = &hw->block[BLKADDR_TIM];
-+		if (req->timlfs > block->lf.max) {
-+			dev_err(&rvu->pdev->dev,
-+				"Func 0x%x: Invalid TIMLF req, %d > max %d\n",
-+				 pcifunc, req->timlfs, block->lf.max);
-+			return -EINVAL;
-+		}
-+		mappedlfs = rvu_get_rsrc_mapcount(pfvf, block->type);
-+		free_lfs = rvu_rsrc_free_count(&block->lf);
-+		if ((req->timlfs > mappedlfs) &&
-+		    ((req->timlfs - mappedlfs) > free_lfs))
-+			goto fail;
-+	}
-+
-+	if (req->cptlfs) {
-+		block = &hw->block[BLKADDR_CPT0];
-+		if (req->cptlfs > block->lf.max) {
-+			dev_err(&rvu->pdev->dev,
-+				"Func 0x%x: Invalid CPTLF req, %d > max %d\n",
-+				 pcifunc, req->cptlfs, block->lf.max);
-+			return -EINVAL;
-+		}
-+		mappedlfs = rvu_get_rsrc_mapcount(pfvf, block->type);
-+		free_lfs = rvu_rsrc_free_count(&block->lf);
-+		if ((req->cptlfs > mappedlfs) &&
-+		    ((req->cptlfs - mappedlfs) > free_lfs))
-+			goto fail;
++	/* MAP configuration registers */
++	cgx->reg_base = pcim_iomap(pdev, PCI_CFG_REG_BAR_NUM, 0);
++	if (!cgx->reg_base) {
++		dev_err(dev, "CGX: Cannot map CSR memory space, aborting\n");
++		err = -ENOMEM;
++		goto err_release_regions;
 +	}
 +
 +	return 0;
 +
-+fail:
-+	dev_info(rvu->dev, "Request for %s failed\n", block->name);
-+	return -ENOSPC;
-+}
-+
-+static int rvu_mbox_handler_ATTACH_RESOURCES(struct rvu *rvu,
-+					     struct rsrc_attach *attach,
-+					     struct msg_rsp *rsp)
-+{
-+	u16 pcifunc = attach->hdr.pcifunc;
-+	int devnum, err;
-+	bool is_pf;
-+
-+	/* If first request, detach all existing attached resources */
-+	if (!attach->modify)
-+		rvu_detach_rsrcs(rvu, NULL, pcifunc);
-+
-+	/* Check if this is for a RVU PF or VF */
-+	if (pcifunc & RVU_PFVF_FUNC_MASK) {
-+		is_pf = false;
-+		devnum = rvu_get_hwvf(rvu, pcifunc);
-+	} else {
-+		is_pf = true;
-+		devnum = rvu_get_pf(pcifunc);
-+	}
-+
-+	spin_lock(&rvu->rsrc_lock);
-+
-+	/* Check if the request can be accommodated */
-+	err = rvu_check_rsrc_availability(rvu, attach, pcifunc);
-+	if (err)
-+		goto exit;
-+
-+	/* Now attach the requested resources */
-+	if (attach->npalf)
-+		rvu_attach_block(rvu, pcifunc, BLKTYPE_NPA, 1);
-+
-+	if (attach->nixlf)
-+		rvu_attach_block(rvu, pcifunc, BLKTYPE_NIX, 1);
-+
-+	if (attach->sso) {
-+		/* RVU func doesn't know which exact LF or slot is attached
-+		 * to it, it always sees as slot 0,1,2. So for a 'modify'
-+		 * request, simply detach all existing attached LFs/slots
-+		 * and attach a fresh.
-+		 */
-+		if (attach->modify)
-+			rvu_detach_block(rvu, pcifunc, BLKTYPE_SSO);
-+		rvu_attach_block(rvu, pcifunc, BLKTYPE_SSO, attach->sso);
-+	}
-+
-+	if (attach->ssow) {
-+		if (attach->modify)
-+			rvu_detach_block(rvu, pcifunc, BLKTYPE_SSOW);
-+		rvu_attach_block(rvu, pcifunc, BLKTYPE_SSOW, attach->ssow);
-+	}
-+
-+	if (attach->timlfs) {
-+		if (attach->modify)
-+			rvu_detach_block(rvu, pcifunc, BLKTYPE_TIM);
-+		rvu_attach_block(rvu, pcifunc, BLKTYPE_TIM, attach->timlfs);
-+	}
-+
-+	if (attach->cptlfs) {
-+		if (attach->modify)
-+			rvu_detach_block(rvu, pcifunc, BLKTYPE_CPT);
-+		rvu_attach_block(rvu, pcifunc, BLKTYPE_CPT, attach->cptlfs);
-+	}
-+
-+exit:
-+	spin_unlock(&rvu->rsrc_lock);
++err_release_regions:
++	pci_release_regions(pdev);
++err_disable_device:
++	pci_disable_device(pdev);
++	pci_set_drvdata(pdev, NULL);
 +	return err;
 +}
 +
- static int rvu_process_mbox_msg(struct rvu *rvu, int devid,
- 				struct mbox_msghdr *req)
++static void cgx_remove(struct pci_dev *pdev)
++{
++	pci_release_regions(pdev);
++	pci_disable_device(pdev);
++	pci_set_drvdata(pdev, NULL);
++}
++
++struct pci_driver cgx_driver = {
++	.name = DRV_NAME,
++	.id_table = cgx_id_table,
++	.probe = cgx_probe,
++	.remove = cgx_remove,
++};
+diff --git a/drivers/soc/marvell/octeontx2/cgx.h b/drivers/soc/marvell/octeontx2/cgx.h
+new file mode 100644
+index 0000000..a7d4b39
+--- /dev/null
++++ b/drivers/soc/marvell/octeontx2/cgx.h
+@@ -0,0 +1,22 @@
++/* SPDX-License-Identifier: GPL-2.0
++ * Marvell OcteonTx2 CGX driver
++ *
++ * Copyright (C) 2018 Marvell International Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef CGX_H
++#define CGX_H
++
++ /* PCI device IDs */
++#define	PCI_DEVID_OCTEONTX2_CGX			0xA059
++
++/* PCI BAR nos */
++#define PCI_CFG_REG_BAR_NUM			0
++
++extern struct pci_driver cgx_driver;
++
++#endif /* CGX_H */
+diff --git a/drivers/soc/marvell/octeontx2/rvu.c b/drivers/soc/marvell/octeontx2/rvu.c
+index 40684c9..daa6fd3 100644
+--- a/drivers/soc/marvell/octeontx2/rvu.c
++++ b/drivers/soc/marvell/octeontx2/rvu.c
+@@ -15,6 +15,7 @@
+ #include <linux/pci.h>
+ #include <linux/sysfs.h>
+ 
++#include "cgx.h"
+ #include "rvu.h"
+ #include "rvu_reg.h"
+ 
+@@ -1605,14 +1606,25 @@ static struct pci_driver rvu_driver = {
+ 
+ static int __init rvu_init_module(void)
  {
-diff --git a/drivers/soc/marvell/octeontx2/rvu.h b/drivers/soc/marvell/octeontx2/rvu.h
-index ce9897b..0f76704 100644
---- a/drivers/soc/marvell/octeontx2/rvu.h
-+++ b/drivers/soc/marvell/octeontx2/rvu.h
-@@ -83,6 +83,7 @@ struct rvu {
- 	struct rvu_hwinfo       *hw;
- 	struct rvu_pfvf		*pf;
- 	struct rvu_pfvf		*hwvf;
-+	spinlock_t		rsrc_lock; /* Serialize resource alloc/free */
++	int err;
++
+ 	pr_info("%s: %s\n", DRV_NAME, DRV_STRING);
  
- 	/* Mbox */
- 	struct otx2_mbox	mbox;
-@@ -120,8 +121,13 @@ static inline u64 rvupf_read64(struct rvu *rvu, u64 offset)
-  */
+-	return pci_register_driver(&rvu_driver);
++	err = pci_register_driver(&cgx_driver);
++	if (err < 0)
++		return err;
++
++	err =  pci_register_driver(&rvu_driver);
++	if (err < 0)
++		pci_unregister_driver(&cgx_driver);
++
++	return err;
+ }
  
- int rvu_alloc_bitmap(struct rsrc_bmap *rsrc);
--int rvu_poll_reg(struct rvu *rvu, u64 block, u64 offset, u64 mask, bool zero);
-+int rvu_alloc_rsrc(struct rsrc_bmap *rsrc);
-+void rvu_free_rsrc(struct rsrc_bmap *rsrc, int id);
-+int rvu_rsrc_free_count(struct rsrc_bmap *rsrc);
- int rvu_get_pf(u16 pcifunc);
- struct rvu_pfvf *rvu_get_pfvf(struct rvu *rvu, int pcifunc);
-+bool is_block_implemented(struct rvu_hwinfo *hw, int blkaddr);
-+int rvu_get_blkaddr(struct rvu *rvu, int blktype, u16 pcifunc);
-+int rvu_poll_reg(struct rvu *rvu, u64 block, u64 offset, u64 mask, bool zero);
+ static void __exit rvu_cleanup_module(void)
+ {
+ 	pci_unregister_driver(&rvu_driver);
++	pci_unregister_driver(&cgx_driver);
+ }
  
- #endif /* RVU_H */
-diff --git a/drivers/soc/marvell/octeontx2/rvu_reg.h b/drivers/soc/marvell/octeontx2/rvu_reg.h
-index 3bfb1e0..b28b310 100644
---- a/drivers/soc/marvell/octeontx2/rvu_reg.h
-+++ b/drivers/soc/marvell/octeontx2/rvu_reg.h
-@@ -54,20 +54,20 @@
- #define RVU_PRIV_PFX_MSIX_CFG(a)            (0x8000110 | (a) << 16)
- #define RVU_PRIV_PFX_ID_CFG(a)              (0x8000120 | (a) << 16)
- #define RVU_PRIV_PFX_INT_CFG(a)             (0x8000200 | (a) << 16)
--#define RVU_PRIV_PFX_NIX_CFG                (0x8000300)
-+#define RVU_PRIV_PFX_NIX0_CFG               (0x8000300)
- #define RVU_PRIV_PFX_NPA_CFG		    (0x8000310)
- #define RVU_PRIV_PFX_SSO_CFG                (0x8000320)
- #define RVU_PRIV_PFX_SSOW_CFG               (0x8000330)
- #define RVU_PRIV_PFX_TIM_CFG                (0x8000340)
--#define RVU_PRIV_PFX_CPT_CFG                (0x8000350)
-+#define RVU_PRIV_PFX_CPT0_CFG               (0x8000350)
- #define RVU_PRIV_BLOCK_TYPEX_REV(a)         (0x8000400 | (a) << 3)
- #define RVU_PRIV_HWVFX_INT_CFG(a)           (0x8001280 | (a) << 16)
--#define RVU_PRIV_HWVFX_NIX_CFG              (0x8001300)
-+#define RVU_PRIV_HWVFX_NIX0_CFG             (0x8001300)
- #define RVU_PRIV_HWVFX_NPA_CFG              (0x8001310)
- #define RVU_PRIV_HWVFX_SSO_CFG              (0x8001320)
- #define RVU_PRIV_HWVFX_SSOW_CFG             (0x8001330)
- #define RVU_PRIV_HWVFX_TIM_CFG              (0x8001340)
--#define RVU_PRIV_HWVFX_CPT_CFG              (0x8001350)
-+#define RVU_PRIV_HWVFX_CPT0_CFG             (0x8001350)
- 
- /* RVU PF registers */
- #define	RVU_PF_VFX_PFVF_MBOX0		    (0x00000)
+ module_init(rvu_init_module);
 -- 
 2.7.4
