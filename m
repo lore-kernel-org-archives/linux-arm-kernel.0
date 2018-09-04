@@ -1,28 +1,95 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 3 Sep 2018 20:25:18 -0500
-Subject: [PATCH 2/3] Documentation: dt: binding: fsl: update property
- description for RCPM
-In-Reply-To: <20180831035219.31619-2-ran.wang_1@nxp.com>
-References: <20180831035219.31619-1-ran.wang_1@nxp.com>
- <20180831035219.31619-2-ran.wang_1@nxp.com>
-Message-ID: <5b8e8a71.1c69fb81.d966f.1ca1@mx.google.com>
+Date: Mon, 3 Sep 2018 20:30:01 -0500
+Subject: [PATCH 1/4] dt-bindings: media: add Amlogic Video Decoder Bindings
+In-Reply-To: <20180831085205.14760-2-mjourdan@baylibre.com>
+References: <20180831085205.14760-1-mjourdan@baylibre.com>
+ <20180831085205.14760-2-mjourdan@baylibre.com>
+Message-ID: <20180904012958.GA14387@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2018 at 11:52:18AM +0800, Ran Wang wrote:
-> Add property 'big-endian' and supportted IP's configuration info.
-> Remove property 'fsl,#rcpm-wakeup-cell'.
-
-"dt-bindings: soc: ..." for the subject
-
-It is obvious reading the diff you are removing fsl,#rcpm-wakeup-cell. 
-What is not obvious is why? The commit msg should answer that.
-
-You also are mixing several things in this patch like adding ls1012 
-which you don't mention. Please split.
-
+On Fri, Aug 31, 2018 at 10:52:02AM +0200, Maxime Jourdan wrote:
+> Add documentation for the meson vdec dts node.
 > 
-> Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
+> Signed-off-by: Maxime Jourdan <mjourdan@baylibre.com>
 > ---
->  Documentation/devicetree/bindings/soc/fsl/rcpm.txt |   42 ++++++-------------
->  1 files changed, 13 insertions(+), 29 deletions(-)
+>  .../bindings/media/amlogic,vdec.txt           | 63 +++++++++++++++++++
+>  1 file changed, 63 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/amlogic,vdec.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/media/amlogic,vdec.txt b/Documentation/devicetree/bindings/media/amlogic,vdec.txt
+> new file mode 100644
+> index 000000000000..c6450f2e7f28
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/amlogic,vdec.txt
+> @@ -0,0 +1,63 @@
+> +Amlogic Video Decoder
+> +================================
+> +
+> +The VDEC IP is composed of the following blocks :
+> +
+> +- ESPARSER is a bitstream parser that outputs to a VIFIFO. Further VDEC blocks
+> +then feed from this VIFIFO.
+> +- VDEC_1 can decode MPEG-1, MPEG-2, MPEG-4 part 2, H.263, H.264.
+> +- VDEC_2 is used as a helper for corner cases like H.264 4K on older SoCs.
+> +It is not handled by this driver.
+
+Bindings should be complete, not a reflection of what a particular 
+driver supports.
+
+> +- VDEC_HCODEC is the H.264 encoding block. It is not handled by this driver.
+> +- VDEC_HEVC can decode HEVC and VP9.
+> +
+> +Device Tree Bindings:
+> +---------------------
+> +
+> +VDEC: Video Decoder
+> +--------------------------
+> +
+> +Required properties:
+> +- compatible: value should be different for each SoC family as :
+> +	- GXBB (S905) : "amlogic,gxbb-vdec"
+> +	- GXL (S905X, S905D) : "amlogic,gxl-vdec"
+> +	- GXM (S912) : "amlogic,gxm-vdec"
+> +- reg: base address and size of he following memory-mapped regions :
+> +	- dos
+> +	- esparser
+> +- reg-names: should contain the names of the previous memory regions
+> +- interrupts: should contain the vdec and esparser IRQs.
+> +- amlogic,ao-sysctrl: should point to the AOBUS sysctrl node
+> +- amlogic,canvas: should point to a canvas provider node
+> +- clocks: should contain the following clocks :
+> +	- dos_parser
+> +	- dos
+> +	- vdec_1
+> +	- vdec_hevc
+> +- clock-names: should contain the names of the previous clocks
+> +- resets: should contain the parser reset.
+> +- reset-names: should be "esparser".
+> +
+> +Example:
+> +
+> +vdec: video-decoder at c8820000 {
+> +	compatible = "amlogic,gxbb-vdec";
+> +	reg = <0x0 0xc8820000 0x0 0x10000>,
+> +	      <0x0 0xc110a580 0x0 0xe4>;
+> +	reg-names = "dos", "esparser";
+> +
+> +	interrupts = <GIC_SPI 44 IRQ_TYPE_EDGE_RISING>,
+> +		     <GIC_SPI 32 IRQ_TYPE_EDGE_RISING>;
+> +
+> +	amlogic,ao-sysctrl = <&sysctrl_AO>;
+> +	amlogic,canvas = <&canvas>;
+> +
+> +	clocks = <&clkc CLKID_DOS_PARSER>,
+> +		 <&clkc CLKID_DOS>,
+> +		 <&clkc CLKID_VDEC_1>,
+> +		 <&clkc CLKID_VDEC_HEVC>;
+> +	clock-names = "dos_parser", "dos", "vdec_1", "vdec_hevc";
+> +
+> +	resets = <&reset RESET_PARSER>;
+> +	reset-names = "esparser";
+> +};
+> -- 
+> 2.18.0
+> 
