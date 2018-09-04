@@ -1,30 +1,31 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 4 Sep 2018 13:20:17 +0800
-Subject: [PATCH v2] crypto: arm/ghash-ce - implement support for 4-way
- aggregation
-In-Reply-To: <20180823144851.14601-1-ard.biesheuvel@linaro.org>
-References: <20180823144851.14601-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180904052017.b33xkndrmr57urw7@gondor.apana.org.au>
+Date: Tue, 4 Sep 2018 13:20:29 +0800
+Subject: [PATCH v2] crypto: arm64/aes-modes - get rid of literal load of
+ addend vector
+In-Reply-To: <20180823164845.20055-1-ard.biesheuvel@linaro.org>
+References: <20180823164845.20055-1-ard.biesheuvel@linaro.org>
+Message-ID: <20180904052029.fktlxcxtrowuvkh4@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2018 at 03:48:51PM +0100, Ard Biesheuvel wrote:
-> Speed up the GHASH algorithm based on 64-bit polynomial multiplication
-> by adding support for 4-way aggregation. This improves throughput by
-> ~85% on Cortex-A53, from 1.7 cycles per byte to 0.9 cycles per byte.
+On Thu, Aug 23, 2018 at 05:48:45PM +0100, Ard Biesheuvel wrote:
+> Replace the literal load of the addend vector with a sequence that
+> performs each add individually. This sequence is only 2 instructions
+> longer than the original, and 2% faster on Cortex-A53.
 > 
-> When combined with AES into GCM, throughput improves by ~25%, from
-> 3.8 cycles per byte to 3.0 cycles per byte.
+> This is an improvement by itself, but also works around a Clang issue,
+> whose integrated assembler does not implement the GNU ARM asm syntax
+> completely, and does not support the =literal notation for FP registers
+> (more info at https://bugs.llvm.org/show_bug.cgi?id=38642)
 > 
+> Cc: Nick Desaulniers <ndesaulniers@google.com>
 > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > ---
-> v2: modulo schedule the loads of the input
->     add AES/GCM performance numbers to commit log
+> v2: replace convoluted code involving a SIMD add to increment four BE counters
+>     at once with individual add/rev/mov instructions
 > 
->  arch/arm/crypto/Kconfig         |   1 +
->  arch/arm/crypto/ghash-ce-core.S | 108 +++++++++++++++++++-
->  arch/arm/crypto/ghash-ce-glue.c |  38 +++++--
->  3 files changed, 131 insertions(+), 16 deletions(-)
+>  arch/arm64/crypto/aes-modes.S | 16 +++++++++-------
+>  1 file changed, 9 insertions(+), 7 deletions(-)
 
 Patch applied.  Thanks.
 -- 
