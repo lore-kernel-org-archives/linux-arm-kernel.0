@@ -1,43 +1,35 @@
-From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Tue,  4 Sep 2018 21:58:45 +0530
-Subject: [PATCH v3 15/15] MAINTAINERS: Add entry for Marvell OcteonTX2 Admin
- Function driver
-In-Reply-To: <1536078525-31534-1-git-send-email-sunil.kovvuri@gmail.com>
-References: <1536078525-31534-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1536078525-31534-16-git-send-email-sunil.kovvuri@gmail.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Tue,  4 Sep 2018 22:06:06 +0530
+Subject: [PATCH v4 1/4] clk: sunxi-ng: Enable DE2_CCU for SUN8I and SUN50I
+Message-ID: <20180904163609.10171-1-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunil Goutham <sgoutham@marvell.com>
+Allwinner SoC like SUN8I and SUN50I has DE2 CCU so enable them
+as default.
 
-Added maintainers entry for Marvell OcteonTX2 SOC's RVU
-admin function driver.
-
-Signed-off-by: Sunil Goutham <sgoutham@marvell.com>
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- MAINTAINERS | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Changes for v4, v3:
+- none
+Changes for v2:
+- Enable for MACH_SUN8I
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index e178f2b..38f874c 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -8748,6 +8748,16 @@ S:	Supported
- F:	drivers/mmc/host/sdhci-xenon*
- F:	Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
+ drivers/clk/sunxi-ng/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
+index 826674d090fd..e20182aa9748 100644
+--- a/drivers/clk/sunxi-ng/Kconfig
++++ b/drivers/clk/sunxi-ng/Kconfig
+@@ -63,6 +63,8 @@ config SUN8I_V3S_CCU
  
-+MARVELL OCTEONTX2 RVU ADMIN FUNCTION DRIVER
-+M:	Sunil Goutham <sgoutham@marvell.com>
-+M:	Linu Cherian <lcherian@marvell.com>
-+M:	Geetha sowjanya <gakula@marvell.com>
-+M:	Jerin Jacob <jerinj@marvell.com>
-+L:	linux-kernel at vger.kernel.org
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	drivers/soc/marvell/octeontx2
-+
- MATROX FRAMEBUFFER DRIVER
- L:	linux-fbdev at vger.kernel.org
- S:	Orphan
+ config SUN8I_DE2_CCU
+ 	bool "Support for the Allwinner SoCs DE2 CCU"
++	default MACH_SUN8I || (ARM64 && ARCH_SUNXI)
++	depends on DRM_SUN4I && (MACH_SUN8I || (ARM64 && ARCH_SUNXI))
+ 
+ config SUN8I_R40_CCU
+ 	bool "Support for the Allwinner R40 CCU"
 -- 
-2.7.4
+2.18.0.321.gffc6fa0e3
