@@ -1,27 +1,59 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 4 Sep 2018 17:18:47 +0800
-Subject: [PATCH 05/27] clk: sunxi-ng: Use u64 for calculation of NM rate
-In-Reply-To: <20180902072643.4917-6-jernej.skrabec@siol.net>
-References: <20180902072643.4917-1-jernej.skrabec@siol.net>
- <20180902072643.4917-6-jernej.skrabec@siol.net>
-Message-ID: <CAGb2v64Y0ui6ZvAJqc2dXMKtSSQJ-T4ubrV9188JTV7aFSrFCA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 4 Sep 2018 10:38:45 +0100
+Subject: [PATCH 2/4] arm64: cpufeature: add feature for CRC32 instructions
+In-Reply-To: <20180904031855.mjpdndeh57lqziuk@gondor.apana.org.au>
+References: <20180827110245.14812-1-ard.biesheuvel@linaro.org>
+ <20180827110245.14812-3-ard.biesheuvel@linaro.org>
+ <20180828170135.GC19825@arm.com>
+ <CAKv+Gu-tM9aKZJ3ppt9yLVP_V5YA_yN8D1j_-NtM+qQCdnc6JA@mail.gmail.com>
+ <20180904031855.mjpdndeh57lqziuk@gondor.apana.org.au>
+Message-ID: <20180904093844.GA12148@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 2, 2018 at 3:27 PM Jernej Skrabec <jernej.skrabec@siol.net> wrote:
->
-> Allwinner H6 SoC has multiplier N range between 1 and 254. Since parent
-> rate is 24MHz, intermediate result when calculating final rate easily
-> overflows 32 bit variable.
->
-> Because of that, introduce function for calculating clock rate which
-> uses 64 bit variable for intermediate result.
->
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+On Tue, Sep 04, 2018 at 11:18:55AM +0800, Herbert Xu wrote:
+> On Tue, Aug 28, 2018 at 08:43:35PM +0200, Ard Biesheuvel wrote:
+> > On 28 August 2018 at 19:01, Will Deacon <will.deacon@arm.com> wrote:
+> > > On Mon, Aug 27, 2018 at 01:02:43PM +0200, Ard Biesheuvel wrote:
+> > >> Add a CRC32 feature bit and wire it up to the CPU id register so we
+> > >> will be able to use alternatives patching for CRC32 operations.
+> > >>
+> > >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > >> ---
+> > >>  arch/arm64/include/asm/cpucaps.h | 3 ++-
+> > >>  arch/arm64/kernel/cpufeature.c   | 9 +++++++++
+> > >>  2 files changed, 11 insertions(+), 1 deletion(-)
+> > >
+> > > Acked-by: Will Deacon <will.deacon@arm.com>
+> > >
+> > > With the minor caveat below...
+> > >
+> > >> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+> > >> index ae1f70450fb2..9932aca9704b 100644
+> > >> --- a/arch/arm64/include/asm/cpucaps.h
+> > >> +++ b/arch/arm64/include/asm/cpucaps.h
+> > >> @@ -51,7 +51,8 @@
+> > >>  #define ARM64_SSBD                           30
+> > >>  #define ARM64_MISMATCHED_CACHE_TYPE          31
+> > >>  #define ARM64_HAS_STAGE2_FWB                 32
+> > >> +#define ARM64_HAS_CRC32                              33
+> > >>
+> > >> -#define ARM64_NCAPS                          33
+> > >> +#define ARM64_NCAPS                          34
+> > >
+> > >
+> > > ... if this goes via crypto, you'll almost certainly get a (trivial)
+> > > conflict with arm64, since these numbers get bumped all the time.
+> > >
+> > 
+> > I think the first three patches should go through the arm64 tree. The
+> > last one just removes the now redundant crc32 SIMD driver, and Herbert
+> > could pick that up separately, i.e., it should be totally independent.
+> 
+> Yes let's do that.
 
-The code looks good. The A80's Video PLLs are also affected by this.
-The range for N on the A80 is 12 ~ 255.
+Okey doke! In which case, please can we have your Ack on the first patch?
 
-Can you add fixes and stable tags?
+Cheers,
 
-ChenYu
+Will
