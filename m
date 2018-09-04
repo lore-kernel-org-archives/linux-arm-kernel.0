@@ -1,77 +1,205 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 4 Sep 2018 23:49:35 +0800
-Subject: [PATCH 06/27] clk: sunxi-ng: h6: Set video PLLs limits
-In-Reply-To: <20180902072643.4917-7-jernej.skrabec@siol.net>
-Message-ID: <20180904154935.GS17047@intel.com>
+From: edgar.righi@lsitec.org.br (Edgar Bernardi Righi)
+Date: Tue, 4 Sep 2018 12:38:24 -0300
+Subject: [PATCH v2 02/03] arm: dts: actions: Enable clock controller for
+ Actions Semi S500 SoC
+Message-ID: <CADHB5bAYs4QjhYVj--Vd5vVP0h5o8161St_=Yj2HfhFAR4U3eQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jernej,
+Enable clock controller for Actions Semi S500 SoC on owl-s500 device tree.
+Set UART clock reference from CMU for Actions Semi S500 SoC.
+Tested on a Lemaker Guitar board.
 
-Thank you for the patch! Perhaps something to improve:
+Signed-off-by: Edgar Bernardi Righi <edgar.righi@lsitec.org.br>
 
-[auto build test WARNING on sunxi/sunxi/for-next]
-[also build test WARNING on v4.19-rc2 next-20180831]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-url:    https://github.com/0day-ci/linux/commits/Jernej-Skrabec/Allwinner-H6-DE3-and-HDMI-support/20180903-082543
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git sunxi/for-next
-config: arm-allmodconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=arm 
-:::::: branch date: 2 hours ago
-:::::: commit date: 2 hours ago
+diff --git a/arch/arm/boot/dts/owl-s500-cubieboard6.dts
+b/arch/arm/boot/dts/owl-s500-cubieboard6.dts
+index 7c96c59b610d..4a91a29d2f29 100644
+--- a/arch/arm/boot/dts/owl-s500-cubieboard6.dts
++++ b/arch/arm/boot/dts/owl-s500-cubieboard6.dts
+@@ -3,6 +3,7 @@
+  * Cubietech CubieBoard6
+  *
+  * Copyright (c) 2017 Andreas F?rber
++ * Copyright (c) 2018 Edgar Bernardi Righi
+  */
 
-All warnings (new ones prefixed by >>):
+ /dts-v1/;
+@@ -25,12 +26,6 @@
+         device_type = "memory";
+         reg = <0x0 0x80000000>;
+     };
+-
+-    uart3_clk: uart3-clk {
+-        compatible = "fixed-clock";
+-        clock-frequency = <921600>;
+-        #clock-cells = <0>;
+-    };
+ };
 
->> drivers/clk/sunxi-ng/ccu-sun50i-h6.c:124:2: warning: this decimal constant is unsigned only in ISO C90
-     .max_rate = 2400000000,
-     ^
-   drivers/clk/sunxi-ng/ccu-sun50i-h6.c:142:2: warning: this decimal constant is unsigned only in ISO C90
-     .max_rate = 2400000000,
-     ^
+ &timer {
+@@ -39,5 +34,4 @@
 
-# https://github.com/0day-ci/linux/commit/752a88510f0bcada69753fccb31adb187f80f29a
-git remote add linux-review https://github.com/0day-ci/linux
-git remote update linux-review
-git checkout 752a88510f0bcada69753fccb31adb187f80f29a
-vim +124 drivers/clk/sunxi-ng/ccu-sun50i-h6.c
+ &uart3 {
+     status = "okay";
+-    clocks = <&uart3_clk>;
+ };
+diff --git a/arch/arm/boot/dts/owl-s500-guitar-bb-rev-b.dts
+b/arch/arm/boot/dts/owl-s500-guitar-bb-rev-b.dts
+index e610d49395d2..1a980ca6a426 100644
+--- a/arch/arm/boot/dts/owl-s500-guitar-bb-rev-b.dts
++++ b/arch/arm/boot/dts/owl-s500-guitar-bb-rev-b.dts
+@@ -1,6 +1,7 @@
+ // SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+ /*
+  * Copyright (c) 2016-2017 Andreas F?rber
++ * Copyright (c) 2018-2018 Edgar Bernardi Righi
+  */
 
-524353ea4 Icenowy Zheng  2018-03-16  111  
-524353ea4 Icenowy Zheng  2018-03-16  112  /*
-524353ea4 Icenowy Zheng  2018-03-16  113   * For Video PLLs, the output divider is described as "used for testing"
-524353ea4 Icenowy Zheng  2018-03-16  114   * in the user manual. So it's not modelled and forced to 0.
-524353ea4 Icenowy Zheng  2018-03-16  115   */
-524353ea4 Icenowy Zheng  2018-03-16  116  #define SUN50I_H6_PLL_VIDEO0_REG	0x040
-524353ea4 Icenowy Zheng  2018-03-16  117  static struct ccu_nm pll_video0_clk = {
-524353ea4 Icenowy Zheng  2018-03-16  118  	.enable		= BIT(31),
-524353ea4 Icenowy Zheng  2018-03-16  119  	.lock		= BIT(28),
-524353ea4 Icenowy Zheng  2018-03-16  120  	.n		= _SUNXI_CCU_MULT_MIN(8, 8, 12),
-524353ea4 Icenowy Zheng  2018-03-16  121  	.m		= _SUNXI_CCU_DIV(1, 1), /* input divider */
-524353ea4 Icenowy Zheng  2018-03-16  122  	.fixed_post_div	= 4,
-752a88510 Jernej Skrabec 2018-09-02  123  	.min_rate	= 288000000,
-752a88510 Jernej Skrabec 2018-09-02 @124  	.max_rate	= 2400000000,
-524353ea4 Icenowy Zheng  2018-03-16  125  	.common		= {
-524353ea4 Icenowy Zheng  2018-03-16  126  		.reg		= 0x040,
-524353ea4 Icenowy Zheng  2018-03-16  127  		.features	= CCU_FEATURE_FIXED_POSTDIV,
-524353ea4 Icenowy Zheng  2018-03-16  128  		.hw.init	= CLK_HW_INIT("pll-video0", "osc24M",
-524353ea4 Icenowy Zheng  2018-03-16  129  					      &ccu_nm_ops,
-524353ea4 Icenowy Zheng  2018-03-16  130  					      CLK_SET_RATE_UNGATE),
-524353ea4 Icenowy Zheng  2018-03-16  131  	},
-524353ea4 Icenowy Zheng  2018-03-16  132  };
-524353ea4 Icenowy Zheng  2018-03-16  133  
+ /dts-v1/;
+@@ -18,15 +19,8 @@
+     chosen {
+         stdout-path = "serial3:115200n8";
+     };
+-
+-    uart3_clk: uart3-clk {
+-        compatible = "fixed-clock";
+-        clock-frequency = <921600>;
+-        #clock-cells = <0>;
+-    };
+ };
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 67089 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180904/de2a8f11/attachment-0001.gz>
+ &uart3 {
+     status = "okay";
+-    clocks = <&uart3_clk>;
+ };
+diff --git a/arch/arm/boot/dts/owl-s500-sparky.dts
+b/arch/arm/boot/dts/owl-s500-sparky.dts
+index c665ce8b88b4..65555afee584 100644
+--- a/arch/arm/boot/dts/owl-s500-sparky.dts
++++ b/arch/arm/boot/dts/owl-s500-sparky.dts
+@@ -3,6 +3,7 @@
+  * Allo.com Sparky
+  *
+  * Copyright (c) 2017 Andreas F?rber
++ * Copyright (c) 2018-2018 Edgar Bernardi Righi
+  */
+
+ /dts-v1/;
+@@ -25,12 +26,6 @@
+         device_type = "memory";
+         reg = <0x0 0x40000000>; /* 1 or 2 GiB */
+     };
+-
+-    uart3_clk: uart3-clk {
+-        compatible = "fixed-clock";
+-        clock-frequency = <921600>;
+-        #clock-cells = <0>;
+-    };
+ };
+
+ &timer {
+@@ -39,5 +34,4 @@
+
+ &uart3 {
+     status = "okay";
+-    clocks = <&uart3_clk>;
+ };
+diff --git a/arch/arm/boot/dts/owl-s500.dtsi b/arch/arm/boot/dts/owl-s500.dtsi
+index 5ceb6cc4451d..bf506038e22b 100644
+--- a/arch/arm/boot/dts/owl-s500.dtsi
++++ b/arch/arm/boot/dts/owl-s500.dtsi
+@@ -3,10 +3,12 @@
+  * Actions Semi S500 SoC
+  *
+  * Copyright (c) 2016-2017 Andreas F?rber
++ * Copyright (c) 2018-2018 Edgar Bernardi Righi
+  */
+
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/power/owl-s500-powergate.h>
++#include <dt-bindings/clock/actions,s500-cmu.h>
+
+ / {
+     compatible = "actions,s500";
+@@ -69,6 +71,12 @@
+         clock-frequency = <24000000>;
+         #clock-cells = <0>;
+     };
++
++    losc: losc {
++        compatible = "fixed-clock";
++        clock-frequency = <32678>;
++        #clock-cells = <0>;
++    };
+
+     soc {
+         compatible = "simple-bus";
+@@ -124,6 +132,7 @@
+             compatible = "actions,s500-uart", "actions,owl-uart";
+             reg = <0xb0120000 0x2000>;
+             interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
++            clocks = <&cmu CLK_UART0>;
+             status = "disabled";
+         };
+
+@@ -131,6 +140,7 @@
+             compatible = "actions,s500-uart", "actions,owl-uart";
+             reg = <0xb0122000 0x2000>;
+             interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
++            clocks = <&cmu CLK_UART1>;
+             status = "disabled";
+         };
+
+@@ -138,6 +148,7 @@
+             compatible = "actions,s500-uart", "actions,owl-uart";
+             reg = <0xb0124000 0x2000>;
+             interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
++            clocks = <&cmu CLK_UART2>;
+             status = "disabled";
+         };
+
+@@ -145,6 +156,7 @@
+             compatible = "actions,s500-uart", "actions,owl-uart";
+             reg = <0xb0126000 0x2000>;
+             interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
++            clocks = <&cmu CLK_UART3>;
+             status = "disabled";
+         };
+
+@@ -152,6 +164,7 @@
+             compatible = "actions,s500-uart", "actions,owl-uart";
+             reg = <0xb0128000 0x2000>;
+             interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
++            clocks = <&cmu CLK_UART4>;
+             status = "disabled";
+         };
+
+@@ -159,6 +172,7 @@
+             compatible = "actions,s500-uart", "actions,owl-uart";
+             reg = <0xb012a000 0x2000>;
+             interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
++            clocks = <&cmu CLK_UART5>;
+             status = "disabled";
+         };
+
+@@ -166,8 +180,18 @@
+             compatible = "actions,s500-uart", "actions,owl-uart";
+             reg = <0xb012c000 0x2000>;
+             interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
++            clocks = <&cmu CLK_UART6>;
+             status = "disabled";
+         };
++
++        cmu: clock-controller at b0160000 {
++            compatible = "actions,s500-cmu";
++            reg = <0xb0160000 0x8000>;
++            clocks = <&hosc>, <&losc>;
++            clock-indices = <CLK_UART0>, <CLK_UART1>, <CLK_UART2>,
++                            <CLK_UART3>, <CLK_UART4>, <CLK_UART5>, <CLK_UART6>;
++            #clock-cells = <1>;
++        };
+
+         timer: timer at b0168000 {
+             compatible = "actions,s500-timer";
