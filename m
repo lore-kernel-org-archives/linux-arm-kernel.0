@@ -1,116 +1,99 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 4 Sep 2018 12:39:54 +0100
-Subject: [PULL 2/4] arm64: KVM: Only force FPEXC32_EL2.EN if trapping
- FPSIMD
-In-Reply-To: <20180903134516.17796-3-christoffer.dall@arm.com>
-References: <20180903134516.17796-1-christoffer.dall@arm.com>
- <20180903134516.17796-3-christoffer.dall@arm.com>
-Message-ID: <20180904113952.GB17801@e103592.cambridge.arm.com>
+From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
+Date: Tue,  4 Sep 2018 17:24:35 +0530
+Subject: [PATCH v2 00/15] soc: octeontx2: Add RVU admin function driver
+Message-ID: <1536062090-30446-1-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 03, 2018 at 03:45:14PM +0200, Christoffer Dall wrote:
-> From: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> If trapping FPSIMD in the context of an AArch32 guest, it is critical
-> to set FPEXC32_EL2.EN to 1 so that the trapping is taken to EL2 and
-> not EL1.
-> 
-> Conversely, it is just as critical *not* to set FPEXC32_EL2.EN to 1
-> if we're not going to trap FPSIMD, as we then corrupt the existing
-> VFP state.
-> 
-> Moving the call to __activate_traps_fpsimd32 to the point where we
-> know for sure that we are going to trap ensures that we don't set that
-> bit spuriously.
+From: Sunil Goutham <sgoutham@marvell.com>
 
+Resource virtualization unit (RVU) on Marvell's OcteonTX2 SOC supports
+multiple PCIe SRIOV physical functions (PFs) and virtual functions (VFs).
+PF0 is called administrative / admin function (AF) and has privilege access
+to registers to provision different RVU functional blocks to each of
+PF/VF.
 
-Hmmm, this looks like a viable fix but actually the way the code is
-structured is a bit confusing here.
+This admin function (AF) driver acts as a configuration / administrative
+software which provisions functional blocks to a PF/VF on demand for them
+to work as one of the following
+ - A basic network controller (i.e NIC).
+ - NIC with packet filtering, shaping and scheduling capabilities.
+ - A crypto device.
+ - A combination of above etc.
 
-It looks like some unnecessary functionality has been inherited from
-arch/arm here: for a 32-bit host, FPEXC controls FPSIMD trapping even
-at Hyp, so we need to handle it specially in order for the Hyp FPSIMD
-context switching code to run without generating additional traps.
+PF/VFs communicate with admin function via a shared memory region.
+This patch series adds logic for the following
+ - RVU AF driver with functional blocks provisioning support
+ - Mailbox infrastructure for communication between AF and PFs.
+ - CGX driver which provides information about physcial network
+   interfaces which AF processes and forwards required info to
+   PF/VF drivers.
 
-For a 64-bit host, this doesn't apply: FPEXC32_EL2 is just guest
-context and doesn't affect EL2 execution.
+This is the first set of patches out of 70 odd patches.
 
-The wrinkle this patch fixes is that implicit reads of FPEXC by
-the guest are in effect not trappable, so if this register is wrongly
-configured for the guest, spurious traps to EL1 may occur that are
-not architecturally expected by the guest, which is precisely the
-problem that Alexander hit.  I missed this issue in my previous
-refactoring...
+Note: This driver neither receives any data nor processes it i.e no I/O,
+      just does the hardware configuration.
 
+Changes from v1:
+ 1 Merged RVU admin function and CGX drivers into a single module
+   - Suggested by Arnd Bergmann
+ 2 Pulled mbox communication APIs into a separate module to remove
+   admin function driver dependency in a VM where AF is not attached.
+   - Suggested by Arnd Bergmann
 
-So, maybe FPEXC32_EL2 should just be treated as another guest system
-register that must be eagerly switched.
+Aleksey Makarov (2):
+  soc: octeontx2: Add mailbox support infra
+  soc: octeontx2: Convert mbox msg id check to a macro
 
-This would also avoid the double write of FPEXC32_EL2 that we currently
-do (once when enabling traps, then again when writing the correct guest
-value after a trap is taken), and the isb() can be removed too since
-host FPSIMD accesses won't trap on arm64 irrespective of FPEXC32_EL2.
+Geetha sowjanya (1):
+  soc: octeontx2: Reconfig MSIX base with IOVA
 
+Linu Cherian (3):
+  soc: octeontx2: Set RVU PFs to CGX LMACs mapping
+  soc: octeontx2: Add support for CGX link management
+  soc: octeontx2: Register for CGX lmac events
 
-I'll try to cook up a cleanup patch to apply on top, but it can be
-treated as non-urgent.
+Sunil Goutham (9):
+  soc: octeontx2: Add Marvell OcteonTX2 RVU AF driver
+  soc: octeontx2: Reset all RVU blocks
+  soc: octeontx2: Gather RVU blocks HW info
+  soc: octeontx2: Add mailbox IRQ and msg handlers
+  soc: octeontx2: Scan blocks for LFs provisioned to PF/VF
+  soc: octeontx2: Add RVU block LF provisioning support
+  soc: octeontx2: Configure block LF's MSIX vector offset
+  soc: octeontx2: Add Marvell OcteonTX2 CGX driver
+  MAINTAINERS: Add entry for Marvell OcteonTX2 Admin Function driver
 
-Cheers
----Dave
+ MAINTAINERS                                |   10 +
+ drivers/soc/Kconfig                        |    1 +
+ drivers/soc/Makefile                       |    1 +
+ drivers/soc/marvell/Kconfig                |   18 +
+ drivers/soc/marvell/Makefile               |    2 +
+ drivers/soc/marvell/octeontx2/Makefile     |   10 +
+ drivers/soc/marvell/octeontx2/cgx.c        |  517 +++++++++
+ drivers/soc/marvell/octeontx2/cgx.h        |   65 ++
+ drivers/soc/marvell/octeontx2/cgx_fw_if.h  |  225 ++++
+ drivers/soc/marvell/octeontx2/mbox.c       |  303 +++++
+ drivers/soc/marvell/octeontx2/mbox.h       |  211 ++++
+ drivers/soc/marvell/octeontx2/rvu.c        | 1637 ++++++++++++++++++++++++++++
+ drivers/soc/marvell/octeontx2/rvu.h        |  158 +++
+ drivers/soc/marvell/octeontx2/rvu_cgx.c    |  194 ++++
+ drivers/soc/marvell/octeontx2/rvu_reg.h    |  442 ++++++++
+ drivers/soc/marvell/octeontx2/rvu_struct.h |   78 ++
+ 16 files changed, 3872 insertions(+)
+ create mode 100644 drivers/soc/marvell/Kconfig
+ create mode 100644 drivers/soc/marvell/Makefile
+ create mode 100644 drivers/soc/marvell/octeontx2/Makefile
+ create mode 100644 drivers/soc/marvell/octeontx2/cgx.c
+ create mode 100644 drivers/soc/marvell/octeontx2/cgx.h
+ create mode 100644 drivers/soc/marvell/octeontx2/cgx_fw_if.h
+ create mode 100644 drivers/soc/marvell/octeontx2/mbox.c
+ create mode 100644 drivers/soc/marvell/octeontx2/mbox.h
+ create mode 100644 drivers/soc/marvell/octeontx2/rvu.c
+ create mode 100644 drivers/soc/marvell/octeontx2/rvu.h
+ create mode 100644 drivers/soc/marvell/octeontx2/rvu_cgx.c
+ create mode 100644 drivers/soc/marvell/octeontx2/rvu_reg.h
+ create mode 100644 drivers/soc/marvell/octeontx2/rvu_struct.h
 
-> 
-> Fixes: e6b673b741ea ("KVM: arm64: Optimise FPSIMD handling to reduce guest/host thrashing")
-> Cc: Dave Martin <dave.martin@arm.com>
-> Reported-by: Alexander Graf <agraf@suse.de>
-> Tested-by: Alexander Graf <agraf@suse.de>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
-> ---
->  arch/arm64/kvm/hyp/switch.c | 9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index d496ef579859..ca46153d7915 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -98,8 +98,10 @@ static void activate_traps_vhe(struct kvm_vcpu *vcpu)
->  	val = read_sysreg(cpacr_el1);
->  	val |= CPACR_EL1_TTA;
->  	val &= ~CPACR_EL1_ZEN;
-> -	if (!update_fp_enabled(vcpu))
-> +	if (!update_fp_enabled(vcpu)) {
->  		val &= ~CPACR_EL1_FPEN;
-> +		__activate_traps_fpsimd32(vcpu);
-> +	}
->  
->  	write_sysreg(val, cpacr_el1);
->  
-> @@ -114,8 +116,10 @@ static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
->  
->  	val = CPTR_EL2_DEFAULT;
->  	val |= CPTR_EL2_TTA | CPTR_EL2_TZ;
-> -	if (!update_fp_enabled(vcpu))
-> +	if (!update_fp_enabled(vcpu)) {
->  		val |= CPTR_EL2_TFP;
-> +		__activate_traps_fpsimd32(vcpu);
-> +	}
->  
->  	write_sysreg(val, cptr_el2);
->  }
-> @@ -129,7 +133,6 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
->  	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN) && (hcr & HCR_VSE))
->  		write_sysreg_s(vcpu->arch.vsesr_el2, SYS_VSESR_EL2);
->  
-> -	__activate_traps_fpsimd32(vcpu);
->  	if (has_vhe())
->  		activate_traps_vhe(vcpu);
->  	else
-> -- 
-> 2.18.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+2.7.4
