@@ -1,112 +1,173 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Tue, 4 Sep 2018 11:03:43 +0200
-Subject: [PATCH] KVM: arm/arm64: Clean dcache to PoC when changing PTE
- due to CoW
-In-Reply-To: <87a7oy7amd.fsf@e105922-lin.cambridge.arm.com>
-References: <20180823153342.158230-1-marc.zyngier@arm.com>
- <20180830122052.GD4029@e113682-lin.lund.arm.com>
- <87a7oy7amd.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <20180904090343.GN4029@e113682-lin.lund.arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 4 Sep 2018 17:04:21 +0800
+Subject: [PATCH 08/27] clk: sunxi-ng: Add support for H6 DE3 clocks
+In-Reply-To: <20180902072643.4917-9-jernej.skrabec@siol.net>
+References: <20180902072643.4917-1-jernej.skrabec@siol.net>
+ <20180902072643.4917-9-jernej.skrabec@siol.net>
+Message-ID: <CAGb2v66y1iVDknM0uQKbHQFoWn7RveTky8jZO=_2iDqL=bJd-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 03, 2018 at 06:29:30PM +0100, Punit Agrawal wrote:
-> Christoffer Dall <christoffer.dall@arm.com> writes:
-> 
-> > [Adding Andrea and Steve in CC]
-> >
-> > On Thu, Aug 23, 2018 at 04:33:42PM +0100, Marc Zyngier wrote:
-> >> When triggering a CoW, we unmap the RO page via an MMU notifier
-> >> (invalidate_range_start), and then populate the new PTE using another
-> >> one (change_pte). In the meantime, we'll have copied the old page
-> >> into the new one.
-> >> 
-> >> The problem is that the data for the new page is sitting in the
-> >> cache, and should the guest have an uncached mapping to that page
-> >> (or its MMU off), following accesses will bypass the cache.
-> >> 
-> >> In a way, this is similar to what happens on a translation fault:
-> >> We need to clean the page to the PoC before mapping it. So let's just
-> >> do that.
-> >> 
-> >> This fixes a KVM unit test regression observed on a HiSilicon platform,
-> >> and subsequently reproduced on Seattle.
-> >> 
-> >> Fixes: a9c0e12ebee5 ("KVM: arm/arm64: Only clean the dcache on translation fault")
-> >> Reported-by: Mike Galbraith <efault@gmx.de>
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >> ---
-> >>  virt/kvm/arm/mmu.c | 9 ++++++++-
-> >>  1 file changed, 8 insertions(+), 1 deletion(-)
-> >> 
-> >> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> >> index 1d90d79706bd..287c8e274655 100644
-> >> --- a/virt/kvm/arm/mmu.c
-> >> +++ b/virt/kvm/arm/mmu.c
-> >> @@ -1811,13 +1811,20 @@ static int kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data
-> >>  void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte)
-> >>  {
-> >>  	unsigned long end = hva + PAGE_SIZE;
-> >> +	kvm_pfn_t pfn = pte_pfn(pte);
-> >>  	pte_t stage2_pte;
-> >>  
-> >>  	if (!kvm->arch.pgd)
-> >>  		return;
-> >>  
-> >>  	trace_kvm_set_spte_hva(hva);
-> >> -	stage2_pte = pfn_pte(pte_pfn(pte), PAGE_S2);
-> >> +
-> >> +	/*
-> >> +	 * We've moved a page around, probably through CoW, so let's treat
-> >> +	 * just like a translation fault and clean the cache to the PoC.
-> >> +	 */
-> >> +	clean_dcache_guest_page(pfn, PAGE_SIZE);
-> >> +	stage2_pte = pfn_pte(pfn, PAGE_S2);
-> >>  	handle_hva_to_gpa(kvm, hva, end, &kvm_set_spte_handler, &stage2_pte);
-> >>  }
-> >
-> > How does this work for pmd mappings?
-> 
-> kvm_set_spte_hva() isn't called for PMD mappings. But...
-> 
-> >
-> > Are we guaranteed that a pmd mapping (hugetlbfs or THP) is split before
-> > a CoW happens?
-> >
-> > Steve tells me that we share THP mappings on fork and that we back THPs
-> > by a zero page, so CoW with THP should be possible.
-> >
-> 
-> ...the problem seems to affect handling write permission faults for CoW
-> or zero pages.
-> 
-> The memory gets unmapped at stage 2 due to the invalidate notifier (in
-> hugetlb_cow() for hugetlbfs and do_huge_pmd_wp_page() for THP) 
+On Sun, Sep 2, 2018 at 3:27 PM Jernej Skrabec <jernej.skrabec@siol.net> wrote:
+>
+> Support for mixer0, mixer1, writeback and rotation units is added.
+>
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  drivers/clk/sunxi-ng/ccu-sun8i-de2.c | 65 ++++++++++++++++++++++++++++
+>  drivers/clk/sunxi-ng/ccu-sun8i-de2.h |  1 +
+>  2 files changed, 66 insertions(+)
+>
+> diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-de2.c b/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
+> index bae5ee67a797..4535c1c27d27 100644
+> --- a/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
+> +++ b/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
+> @@ -31,6 +31,8 @@ static SUNXI_CCU_GATE(bus_mixer1_clk, "bus-mixer1",   "bus-de",
+>                       0x04, BIT(1), 0);
+>  static SUNXI_CCU_GATE(bus_wb_clk,      "bus-wb",       "bus-de",
+>                       0x04, BIT(2), 0);
+> +static SUNXI_CCU_GATE(bus_rot_clk,     "bus-rot",      "bus-de",
+> +                     0x04, BIT(3), 0);
+>
+>  static SUNXI_CCU_GATE(mixer0_clk,      "mixer0",       "mixer0-div",
+>                       0x00, BIT(0), CLK_SET_RATE_PARENT);
+> @@ -38,6 +40,8 @@ static SUNXI_CCU_GATE(mixer1_clk,     "mixer1",       "mixer1-div",
+>                       0x00, BIT(1), CLK_SET_RATE_PARENT);
+>  static SUNXI_CCU_GATE(wb_clk,          "wb",           "wb-div",
+>                       0x00, BIT(2), CLK_SET_RATE_PARENT);
+> +static SUNXI_CCU_GATE(rot_clk,         "rot",          "rot-div",
+> +                     0x00, BIT(3), CLK_SET_RATE_PARENT);
+>
+>  static SUNXI_CCU_M(mixer0_div_clk, "mixer0-div", "de", 0x0c, 0, 4,
+>                    CLK_SET_RATE_PARENT);
+> @@ -45,6 +49,8 @@ static SUNXI_CCU_M(mixer1_div_clk, "mixer1-div", "de", 0x0c, 4, 4,
+>                    CLK_SET_RATE_PARENT);
+>  static SUNXI_CCU_M(wb_div_clk, "wb-div", "de", 0x0c, 8, 4,
+>                    CLK_SET_RATE_PARENT);
+> +static SUNXI_CCU_M(rot_div_clk, "rot-div", "de", 0x0c, 0x0c, 4,
+> +                  CLK_SET_RATE_PARENT);
+>
+>  static SUNXI_CCU_M(mixer0_div_a83_clk, "mixer0-div", "pll-de", 0x0c, 0, 4,
+>                    CLK_SET_RATE_PARENT);
+> @@ -53,6 +59,24 @@ static SUNXI_CCU_M(mixer1_div_a83_clk, "mixer1-div", "pll-de", 0x0c, 4, 4,
+>  static SUNXI_CCU_M(wb_div_a83_clk, "wb-div", "pll-de", 0x0c, 8, 4,
+>                    CLK_SET_RATE_PARENT);
+>
+> +static struct ccu_common *sun50i_h6_de3_clks[] = {
+> +       &mixer0_clk.common,
+> +       &mixer1_clk.common,
+> +       &wb_clk.common,
+> +
+> +       &bus_mixer0_clk.common,
+> +       &bus_mixer1_clk.common,
+> +       &bus_wb_clk.common,
+> +
+> +       &mixer0_div_clk.common,
+> +       &mixer1_div_clk.common,
+> +       &wb_div_clk.common,
+> +
+> +       &bus_rot_clk.common,
+> +       &rot_clk.common,
+> +       &rot_div_clk.common,
+> +};
+> +
+>  static struct ccu_common *sun8i_a83t_de2_clks[] = {
+>         &mixer0_clk.common,
+>         &mixer1_clk.common,
+> @@ -92,6 +116,26 @@ static struct ccu_common *sun8i_v3s_de2_clks[] = {
+>         &wb_div_clk.common,
+>  };
+>
+> +static struct clk_hw_onecell_data sun50i_h6_de3_hw_clks = {
+> +       .hws    = {
+> +               [CLK_MIXER0]            = &mixer0_clk.common.hw,
+> +               [CLK_MIXER1]            = &mixer1_clk.common.hw,
+> +               [CLK_WB]                = &wb_clk.common.hw,
+> +               [CLK_ROT]               = &rot_clk.common.hw,
+> +
+> +               [CLK_BUS_MIXER0]        = &bus_mixer0_clk.common.hw,
+> +               [CLK_BUS_MIXER1]        = &bus_mixer1_clk.common.hw,
+> +               [CLK_BUS_WB]            = &bus_wb_clk.common.hw,
+> +               [CLK_BUS_ROT]           = &bus_rot_clk.common.hw,
+> +
+> +               [CLK_MIXER0_DIV]        = &mixer0_div_clk.common.hw,
+> +               [CLK_MIXER1_DIV]        = &mixer1_div_clk.common.hw,
+> +               [CLK_WB_DIV]            = &wb_div_clk.common.hw,
+> +               [CLK_ROT_DIV]           = &rot_div_clk.common.hw,
+> +       },
+> +       .num    = 12,
 
-So just to make sure I get this right.  For a pte CoW, Linux calls the
-set_spte function to simply change the pte mapping, without doing any
-unmapping at stage 2, but with pmd, we unmap and wait to take another
-fault as an alternative method?
+It's best not to openly code these. It is error prone, like having
+an index beyond .num, which then never gets registered.
 
-Why the two different approaches depending on the mapping size?
+Instead, please update CLK_NUMBERS and use that instead. sunxi_ccu_probe()
+can handle holes in .hws.
 
-> while the
-> cache maintenance for the newly allocated page will be skipped due to
-> the !FSC_PERM. 
+On the other hand, it can't handle holes in the ccu_reset_map. Hope we
+never have to deal with such an instance.
 
-If the above holds, then the subsequent fault would be similar to any
-other fault which should work via the normal mechanism (dcache clean +
-XN on fault, icache invalidation on permission fault).
+ChenYu
 
-> 
-> Hmm... smells like there might be a problem here. I'll try and put
-> together a fix.
-> 
-
-It's not clear to me if we have a problem, or just different ways of
-handling the PMD vs. PTE CoW case?
-
-
-Thanks,
-
-    Christoffer
+> +};
+> +
+>  static struct clk_hw_onecell_data sun8i_a83t_de2_hw_clks = {
+>         .hws    = {
+>                 [CLK_MIXER0]            = &mixer0_clk.common.hw,
+> @@ -156,6 +200,13 @@ static struct ccu_reset_map sun50i_a64_de2_resets[] = {
+>         [RST_WB]        = { 0x08, BIT(2) },
+>  };
+>
+> +static struct ccu_reset_map sun50i_h6_de3_resets[] = {
+> +       [RST_MIXER0]    = { 0x08, BIT(0) },
+> +       [RST_MIXER1]    = { 0x08, BIT(1) },
+> +       [RST_WB]        = { 0x08, BIT(2) },
+> +       [RST_ROT]       = { 0x08, BIT(3) },
+> +};
+> +
+>  static const struct sunxi_ccu_desc sun8i_a83t_de2_clk_desc = {
+>         .ccu_clks       = sun8i_a83t_de2_clks,
+>         .num_ccu_clks   = ARRAY_SIZE(sun8i_a83t_de2_clks),
+> @@ -186,6 +237,16 @@ static const struct sunxi_ccu_desc sun50i_a64_de2_clk_desc = {
+>         .num_resets     = ARRAY_SIZE(sun50i_a64_de2_resets),
+>  };
+>
+> +static const struct sunxi_ccu_desc sun50i_h6_de3_clk_desc = {
+> +       .ccu_clks       = sun50i_h6_de3_clks,
+> +       .num_ccu_clks   = ARRAY_SIZE(sun50i_h6_de3_clks),
+> +
+> +       .hw_clks        = &sun50i_h6_de3_hw_clks,
+> +
+> +       .resets         = sun50i_h6_de3_resets,
+> +       .num_resets     = ARRAY_SIZE(sun50i_h6_de3_resets),
+> +};
+> +
+>  static const struct sunxi_ccu_desc sun8i_v3s_de2_clk_desc = {
+>         .ccu_clks       = sun8i_v3s_de2_clks,
+>         .num_ccu_clks   = ARRAY_SIZE(sun8i_v3s_de2_clks),
+> @@ -296,6 +357,10 @@ static const struct of_device_id sunxi_de2_clk_ids[] = {
+>                 .compatible = "allwinner,sun50i-h5-de2-clk",
+>                 .data = &sun50i_a64_de2_clk_desc,
+>         },
+> +       {
+> +               .compatible = "allwinner,sun50i-h6-de3-clk",
+> +               .data = &sun50i_h6_de3_clk_desc,
+> +       },
+>         { }
+>  };
+>
+> diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-de2.h b/drivers/clk/sunxi-ng/ccu-sun8i-de2.h
+> index 530c006e0ae9..27bd88539f42 100644
+> --- a/drivers/clk/sunxi-ng/ccu-sun8i-de2.h
+> +++ b/drivers/clk/sunxi-ng/ccu-sun8i-de2.h
+> @@ -22,6 +22,7 @@
+>  #define CLK_MIXER0_DIV 3
+>  #define CLK_MIXER1_DIV 4
+>  #define CLK_WB_DIV     5
+> +#define CLK_ROT_DIV    11
+>
+>  #define CLK_NUMBER     (CLK_WB + 1)
+>
+> --
+> 2.18.0
+>
