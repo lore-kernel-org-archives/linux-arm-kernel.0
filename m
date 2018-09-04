@@ -1,106 +1,96 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Tue, 4 Sep 2018 12:19:38 +0530
-Subject: [PATCH v3 RESEND 4/4] ti: pm33xx: Save/restore clk context based on
- enable_off_mode setting
-In-Reply-To: <1536043778-2232-1-git-send-email-j-keerthy@ti.com>
-References: <1536043778-2232-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1536043778-2232-5-git-send-email-j-keerthy@ti.com>
+From: kyeongdon.kim@lge.com (Kyeongdon Kim)
+Date: Tue, 4 Sep 2018 15:59:17 +0900
+Subject: [PATCH v2] arm64: kasan: add interceptors for strcmp/strncmp
+ functions
+In-Reply-To: <dff9a2f3-7db5-9e60-072a-312b6cfbe0f0@virtuozzo.com>
+References: <1535014606-176525-1-git-send-email-kyeongdon.kim@lge.com>
+ <dff9a2f3-7db5-9e60-072a-312b6cfbe0f0@virtuozzo.com>
+Message-ID: <ad334e64-28d1-4b91-aeba-8352934a9c46@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Save/restore clk context based on enable_off_mode setting.
-The context needs to be saved at the very end of suspend path
-and restored at the beginning of resume path.
+Hello Andrey,
 
-Signed-off-by: Keerthy <j-keerthy@ti.com>
----
- arch/arm/mach-omap2/pm33xx-core.c    | 15 +++++++++++++++
- drivers/soc/ti/pm33xx.c              | 13 +++++++++++++
- include/linux/platform_data/pm33xx.h |  1 +
- 3 files changed, 29 insertions(+)
+Thanks for your review.
 
-diff --git a/arch/arm/mach-omap2/pm33xx-core.c b/arch/arm/mach-omap2/pm33xx-core.c
-index f4971e4..ccba2cd 100644
---- a/arch/arm/mach-omap2/pm33xx-core.c
-+++ b/arch/arm/mach-omap2/pm33xx-core.c
-@@ -38,6 +38,20 @@ static int __init am43xx_map_scu(void)
- 	return 0;
- }
- 
-+static int am43xx_check_off_mode_enable(void)
-+{
-+	/*
-+	 * Check for am437x-sk-evm which due to HW design cannot support
-+	 * this mode reliably.
-+	 */
-+	if (of_machine_is_compatible("ti,am437x-sk-evm") && enable_off_mode) {
-+		pr_warn("WARNING: This platform does not support off-mode, entering DeepSleep suspend.\n");
-+		return 0;
-+	}
-+
-+	return enable_off_mode;
-+}
-+
- static int amx3_common_init(void)
- {
- 	gfx_pwrdm = pwrdm_lookup("gfx_pwrdm");
-@@ -166,6 +180,7 @@ void __iomem *am43xx_get_rtc_base_addr(void)
- 	.soc_suspend = am33xx_suspend,
- 	.get_sram_addrs = amx3_get_sram_addrs,
- 	.get_rtc_base_addr = am43xx_get_rtc_base_addr,
-+	.check_off_mode_enable = am43xx_check_off_mode_enable,
- };
- 
- static struct am33xx_pm_platform_data am43xx_ops = {
-diff --git a/drivers/soc/ti/pm33xx.c b/drivers/soc/ti/pm33xx.c
-index d0dab32..1a8df56 100644
---- a/drivers/soc/ti/pm33xx.c
-+++ b/drivers/soc/ti/pm33xx.c
-@@ -6,6 +6,7 @@
-  *	Vaibhav Bedia, Dave Gerlach
-  */
- 
-+#include <linux/clk.h>
- #include <linux/cpu.h>
- #include <linux/err.h>
- #include <linux/genalloc.h>
-@@ -54,6 +55,14 @@ static int am33xx_pm_suspend(suspend_state_t suspend_state)
- {
- 	int i, ret = 0;
- 
-+	/*
-+	 * For RTC only mode with DDR in selfresh we need to save
-+	 * clocks context at the very end
-+	 */
-+	if (suspend_state == PM_SUSPEND_MEM &&
-+	    pm_ops->check_off_mode_enable())
-+		clk_save_context();
-+
- 	ret = pm_ops->soc_suspend((unsigned long)suspend_state,
- 				  am33xx_do_wfi_sram, suspend_wfi_flags);
- 
-@@ -79,6 +88,10 @@ static int am33xx_pm_suspend(suspend_state_t suspend_state)
- 		}
- 	}
- 
-+	if (suspend_state == PM_SUSPEND_MEM &&
-+	    pm_ops->check_off_mode_enable())
-+		clk_restore_context();
-+
- 	return ret;
- }
- 
-diff --git a/include/linux/platform_data/pm33xx.h b/include/linux/platform_data/pm33xx.h
-index fbf5ed7..dcea606 100644
---- a/include/linux/platform_data/pm33xx.h
-+++ b/include/linux/platform_data/pm33xx.h
-@@ -51,6 +51,7 @@ struct am33xx_pm_platform_data {
- 			       unsigned long args);
- 	struct  am33xx_pm_sram_addr *(*get_sram_addrs)(void);
- 	void __iomem *(*get_rtc_base_addr)(void);
-+	int (*check_off_mode_enable)(void);
- };
- 
- struct am33xx_pm_sram_data {
--- 
-1.9.1
+On 2018-09-03 ?? 6:40, Andrey Ryabinin wrote:
+>
+>
+> On 08/23/2018 11:56 AM, Kyeongdon Kim wrote:
+>
+> > diff --git a/mm/kasan/kasan.c b/mm/kasan/kasan.c
+> > index c3bd520..61ad7f1 100644
+> > --- a/mm/kasan/kasan.c
+> > +++ b/mm/kasan/kasan.c
+> > @@ -304,6 +304,29 @@ void *memcpy(void *dest, const void *src, 
+> size_t len)
+> >
+> > return __memcpy(dest, src, len);
+> > }
+> > +#ifdef CONFIG_ARM64
+> > +/*
+> > + * Arch arm64 use assembly variant for strcmp/strncmp,
+> > + * xtensa use inline asm operations and x86_64 use c one,
+> > + * so now this interceptors only for arm64 kasan.
+> > + */
+> > +#undef strcmp
+> > +int strcmp(const char *cs, const char *ct)
+> > +{
+> > + check_memory_region((unsigned long)cs, 1, false, _RET_IP_);
+> > + check_memory_region((unsigned long)ct, 1, false, _RET_IP_);
+> > +
+>
+> Well this is definitely wrong. strcmp() often accesses far more than 
+> one byte.
+>
+> > + return __strcmp(cs, ct);
+> > +}
+> > +#undef strncmp
+> > +int strncmp(const char *cs, const char *ct, size_t len)
+> > +{
+> > + check_memory_region((unsigned long)cs, len, false, _RET_IP_);
+> > + check_memory_region((unsigned long)ct, len, false, _RET_IP_);
+>
+> This will cause false positives. Both 'cs', and 'ct' could be less 
+> than len bytes.
+>
+> There is no need in these interceptors, just use the C implementations 
+> from lib/string.c
+> like you did in your first patch.
+> The only thing that was wrong in the first patch is that assembly 
+> implementations
+> were compiled out instead of being declared week.
+>
+Well, at first I thought so..
+I would remove diff code in /mm/kasan/kasan.c then use C implementations 
+in lib/string.c
+w/ assem implementations as weak :
+
+diff --git a/lib/string.c b/lib/string.c
+index 2c0900a..a18b18f 100644
+--- a/lib/string.c
++++ b/lib/string.c
+@@ -312,7 +312,7 @@ size_t strlcat(char *dest, const char *src, size_t 
+count)
+ ?EXPORT_SYMBOL(strlcat);
+ ?#endif
+
+-#ifndef __HAVE_ARCH_STRCMP
++#if (defined(CONFIG_ARM64) && defined(CONFIG_KASAN)) || 
+!defined(__HAVE_ARCH_STRCMP)
+ ?/**
+ ? * strcmp - Compare two strings
+ ? * @cs: One string
+@@ -336,7 +336,7 @@ int strcmp(const char *cs, const char *ct)
+ ?EXPORT_SYMBOL(strcmp);
+ ?#endif
+
+-#ifndef __HAVE_ARCH_STRNCMP
++#if (defined(CONFIG_ARM64) && defined(CONFIG_KASAN)) || 
+!defined(__HAVE_ARCH_STRNCMP)
+ ?/**
+ ? * strncmp - Compare two length-limited strings
+
+Can I get your opinion wrt this ?
+
+Thanks,
