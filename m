@@ -1,67 +1,76 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue,  4 Sep 2018 12:40:45 +0800
-Subject: [PATCH v4 03/11] dt-bindings: display: Add compatible for A64 DE2
- display pipeline
+Date: Tue,  4 Sep 2018 12:40:46 +0800
+Subject: [PATCH v4 04/11] drm/sun4i: Add support for A64 mixers
 In-Reply-To: <20180904044053.15425-1-icenowy@aosc.io>
 References: <20180904044053.15425-1-icenowy@aosc.io>
-Message-ID: <20180904044053.15425-4-icenowy@aosc.io>
+Message-ID: <20180904044053.15425-5-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jagan Teki <jagan@amarulasolutions.com>
 
-Allwinner A64 has a DE2 display pipeline. The TCONs are similar to the
-ones in A83T, but the mixers are new (similar to the later R40 SoC).
+Mixers in Allwinner have similar capabilities as others SoCs with DE2.
 
-This patch adds dt-binding documentation for A64 DE2 display pipeline.
+Add support for them.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
-[Icenowy: Refactor and also cover TCON1]
+[Icenowy: Add mixer1]
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Reviewed-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
 Changes for v4:
 - none
 Changes for v3.1:
-- added mixer0 and TCON0
+- Add mixer0
 Changes for v3:
-- collect Rob r-w-b tag
+- none 
 Changes for v2:
-- Add fallback compatible for tcon1
-- Add separate compatible for mixer1 
+- New patch
 
- .../devicetree/bindings/display/sunxi/sun4i-drm.txt          | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/gpu/drm/sun4i/sun8i_mixer.c | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index f8773ecb7525..7b79c5e3dffc 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -151,6 +151,8 @@ Required properties:
-    * allwinner,sun8i-v3s-tcon
-    * allwinner,sun9i-a80-tcon-lcd
-    * allwinner,sun9i-a80-tcon-tv
-+   * "allwinner,sun50i-a64-tcon-lcd", "allwinner,sun8i-a83t-tcon-lcd"
-+   * "allwinner,sun50i-a64-tcon-tv", "allwinner,sun8i-a83t-tcon-tv"
-  - reg: base address and size of memory-mapped region
-  - interrupts: interrupt associated to this IP
-  - clocks: phandles to the clocks feeding the TCON.
-@@ -370,6 +372,8 @@ Required properties:
-     * allwinner,sun8i-a83t-de2-mixer-1
-     * allwinner,sun8i-h3-de2-mixer-0
-     * allwinner,sun8i-v3s-de2-mixer
-+    * allwinner,sun50i-a64-de2-mixer-0
-+    * allwinner,sun50i-a64-de2-mixer-1
-   - reg: base address and size of the memory-mapped region.
-   - clocks: phandles to the clocks feeding the mixer
-     * bus: the mixer interface clock
-@@ -403,6 +407,7 @@ Required properties:
-     * allwinner,sun8i-r40-display-engine
-     * allwinner,sun8i-v3s-display-engine
-     * allwinner,sun9i-a80-display-engine
-+    * allwinner,sun50i-a64-display-engine
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+index cb65b0ed53fd..091f6cf40353 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+@@ -553,6 +553,22 @@ static const struct sun8i_mixer_cfg sun8i_v3s_mixer_cfg = {
+ 	.mod_rate = 150000000,
+ };
  
-   - allwinner,pipelines: list of phandle to the display engine
-     frontends (DE 1.0) or mixers (DE 2.0) available.
++static const struct sun8i_mixer_cfg sun50i_a64_mixer0_cfg = {
++	.ccsc		= 0,
++	.mod_rate	= 297000000,
++	.scaler_mask	= 0xf,
++	.ui_num		= 3,
++	.vi_num		= 1,
++};
++
++static const struct sun8i_mixer_cfg sun50i_a64_mixer1_cfg = {
++	.ccsc		= 1,
++	.mod_rate	= 297000000,
++	.scaler_mask	= 0x3,
++	.ui_num		= 1,
++	.vi_num		= 1,
++};
++
+ static const struct of_device_id sun8i_mixer_of_table[] = {
+ 	{
+ 		.compatible = "allwinner,sun8i-a83t-de2-mixer-0",
+@@ -570,6 +586,14 @@ static const struct of_device_id sun8i_mixer_of_table[] = {
+ 		.compatible = "allwinner,sun8i-v3s-de2-mixer",
+ 		.data = &sun8i_v3s_mixer_cfg,
+ 	},
++	{
++		.compatible = "allwinner,sun50i-a64-de2-mixer-0",
++		.data = &sun50i_a64_mixer0_cfg,
++	},
++	{
++		.compatible = "allwinner,sun50i-a64-de2-mixer-1",
++		.data = &sun50i_a64_mixer1_cfg,
++	},
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(of, sun8i_mixer_of_table);
 -- 
 2.18.0
