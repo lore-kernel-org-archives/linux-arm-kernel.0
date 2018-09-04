@@ -1,80 +1,45 @@
-From: christianshewitt@gmail.com (Christian Hewitt)
-Date: Tue, 4 Sep 2018 23:42:32 +0400
-Subject: [PATCH] ARM64: dts: meson-gxbb-wetek: add ttyAML1 uart for
- Bluetooth
-In-Reply-To: <CAFBinCAQFcYKRCr72vOtuB9x=Zdt4Ox=pY0E9oxZFCO2XKF7oQ@mail.gmail.com>
-References: <1536072290-28015-1-git-send-email-christianshewitt@gmail.com>
- <CAFBinCAQFcYKRCr72vOtuB9x=Zdt4Ox=pY0E9oxZFCO2XKF7oQ@mail.gmail.com>
-Message-ID: <84ED3B83-82E2-4ABE-AA03-9F4950EAF4A4@gmail.com>
+From: richard@nod.at (Richard Weinberger)
+Date: Tue, 04 Sep 2018 21:45:06 +0200
+Subject: =?UTF-8?B?562U5aSNOg==?= [PATCH] arm64/ptrace: add PTRACE_SYSEMU
+ and PTRACE_SYSEMU_SINGLESTEP support
+In-Reply-To: <AM4PR08MB29297B27FCC0E8696473523185030@AM4PR08MB2929.eurprd08.prod.outlook.com>
+References: <20180903062310.GA4524@haibo-VirtualBox>
+ <20180903165726.GJ6954@arm.com>
+ <AM4PR08MB29297B27FCC0E8696473523185030@AM4PR08MB2929.eurprd08.prod.outlook.com>
+Message-ID: <3641125.aEYyuDiOni@blindfold>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Am Dienstag, 4. September 2018, 04:11:07 CEST schrieb Haibo Xu (Arm Technology China):
+> Hi Richard,
+> 
+> What do you mean by done it in the core? moving macro definition to include/uapi/linux/ptrace.h?
+> The patch is strictly follow x86's sematic on PTRACE_SYSEMU/SINGLESTEP support.
 
-> On 4 Sep 2018, at 11:05 pm, Martin Blumenstingl <martin.blumenstingl@googlemail.com> wrote:
-> 
-> Hi Christian,
-> 
-> On Tue, Sep 4, 2018 at 4:47 PM chewitt <christianshewitt@gmail.com> wrote:
->> 
->> This change adds the ttyAML1 uart used by the brmcfmac sdio module in
->> the WeTek Hub and WeTek Play 2 devices.
-> do you know which Broadcom chip this is exactly?
+Well, the feature itself is not really architecture specific.
+Just because x86 does it in arch/x86, it does not mean that this is the best way.
+I guess this is also what Will tried to say.
+If we can, we should implement PTRACE_SYSEMU in the core ptrace code and not
+per architecture.
 
-It?s an AMPAK 6335 module. WiFi shows as BCM4339, BT shows as BCM4335(rev C0). I?ve submitted a patch to add the BT id earlier, see:
-(https://marc.info/?l=linux-bluetooth&m=153608351032693&w=2)
+> > > I wonder what Haibo Xu want to do with PTRACE_SYSEMU on arm64.
+> > > Are you porting UML or gvisor to arm64?
+> >
+> > That's a good question. Haibo?
+> 
+> The story is we are working on a container runtime(Google Gvisor) support on ARM64 platform,
+> and the Gvisor depend on Linux kernel PTRACE_SYSEMU/SINGLESTEP support.
 
-> I assume you want to use the "patchram" userspace program (or
-> something similar) to initialize the HCI controller?
-> it's been a while since a similar patch was rejected, but things have
-> gotten better since then. more details below
-> 
->> Signed-off-by: chewitt <christianshewitt@gmail.com>
->> ---
->> arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi | 8 ++++++++
->> 1 file changed, 8 insertions(+)
->> 
->> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi
->> index 70325b2..9476868 100644
->> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi
->> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi
->> @@ -10,6 +10,7 @@
->> / {
->>        aliases {
->>                serial0 = &uart_AO;
->> +               serial1 = &uart_A;
-> this can be dropped if you read on
-> 
->>                ethernet0 = &ethmac;
->>        };
->> 
->> @@ -239,6 +240,13 @@
->>        vqmmc-supply = <&vddio_boot>;
->> };
->> 
->> +/* This is connected to the Bluetooth module: */
->> +&uart_A {
->> +       status = "okay";
->> +       pinctrl-0 = <&uart_a_pins>, <&uart_a_cts_rts_pins>;
->> +       pinctrl-names = "default";
-> insert bluetooth child-node from [0] here (with the correct max-speed,
-> *-gpios and clock* properties for this board)
-> 
-> some background: with Rob's serdev framework some Bluetooth controller
-> drivers recently gained the ability to get the controller into a
-> working state without any userspace utility. if you add the bluetooth
-> child-node here the kernel will:
-> - not create a /dev/ttyAMLn
-> - load the matching Bluetooth controller driver (the Broadcom one in your case)
-> - do the "initialize this Bluetooth controller with all the vendor
-> specific magic" dance (toggling GPIOs, loading firmware from userspace
-> via standard request_firmware, etc.)
-> - provide you with a ready-to-use hci0 interface
+Gvisor also supports a kvm backend which should be *much* faster than PTRACE_SYSEMU.
+Otherwise gvisor suffers from the same performance drawbacks as UML does.
+Pagefaults via SIGSEGV/mmap, syscall gate via ptrace().
 
-No problem, i?ve done that for another device. I?ll investigate.
+Did you check, is PTRACE_SYSEMU really the way to go for gvisor?
+Last time I checked the KVM backend looked promising but still WIP, though.
 
-> 
-> Regards
-> Martin
-> 
-> 
-> [0] https://elixir.bootlin.com/linux/v4.18/source/Documentation/devicetree/bindings/net/broadcom-bluetooth.txt
+I also wonder whether PTRACE_SYSEMU is really the only missing bit to support
+gvisor on arm64. Did you check how to work around VIPT/VIVT caching issues?
+UML (and gvisor in this context) have lots of implicit x86 dependencies.
+
+Thanks,
+//richard
