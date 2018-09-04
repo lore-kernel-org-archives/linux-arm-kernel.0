@@ -1,199 +1,137 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 4 Sep 2018 07:54:41 +0530
-Subject: [PATCH] phy: Convert to using %pOFn instead of device_node.name
-In-Reply-To: <20180828015252.28511-39-robh@kernel.org>
-References: <20180828015252.28511-1-robh@kernel.org>
- <20180828015252.28511-39-robh@kernel.org>
-Message-ID: <9dcceda0-1d92-0a7a-feb1-887414021ac9@ti.com>
+From: andy.tang@nxp.com (Andy Tang)
+Date: Tue, 4 Sep 2018 03:08:57 +0000
+Subject: [PATCH 3/5] drivers: clk-qoriq: Add clockgen support for lx2160a
+In-Reply-To: <3a4274af2200923875ff05f945888a34d6dccee3.camel@buserror.net>
+References: <1534747636-20064-1-git-send-email-vabhav.sharma@nxp.com>
+ <1534747636-20064-4-git-send-email-vabhav.sharma@nxp.com>
+ <4a9ea6b451683ec98c92e86a5ae6b91213a6afcf.camel@buserror.net>
+ <VI1PR04MB4800E8B1E8541FCA9221A1CFF3080@VI1PR04MB4800.eurprd04.prod.outlook.com>
+ <d2cfd49eb33a3ce74f0e78f2b53d3954d2cb3e76.camel@buserror.net>
+ <b31ae8e788fb93971167faa9b55b497e838532c4.camel@buserror.net>
+ <DB5PR0401MB22130C025AA4CCAD0221781DF30F0@DB5PR0401MB2213.eurprd04.prod.outlook.com>
+ <f6707cb54c3e6da1b50f45f915c996dfccfeacda.camel@buserror.net>
+ <DB5PR0401MB221332A5ED14C8E14C8D18A1F30C0@DB5PR0401MB2213.eurprd04.prod.outlook.com>
+ <3a4274af2200923875ff05f945888a34d6dccee3.camel@buserror.net>
+Message-ID: <DB5PR0401MB221372E7A7DA3ED53BA721B2F3030@DB5PR0401MB2213.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Scott,
 
-On Tuesday 28 August 2018 07:22 AM, Rob Herring wrote:
-> In preparation to remove the node name pointer from struct device_node,
-> convert printf users to use the %pOFn format specifier.
+Please see my replay inline.
 
-I assume it should be okay to get this merged in the next merge window?
+> -----Original Message-----
+> From: linux-arm-kernel <linux-arm-kernel-bounces@lists.infradead.org>
+> On Behalf Of Scott Wood
+> Sent: 2018?9?4? 4:34
+> To: Andy Tang <andy.tang@nxp.com>; Vabhav Sharma
+> <vabhav.sharma@nxp.com>; linux-kernel at vger.kernel.org;
+> devicetree at vger.kernel.org; robh+dt at kernel.org;
+> mark.rutland at arm.com; linuxppc-dev at lists.ozlabs.org;
+> linux-arm-kernel at lists.infradead.org; mturquette at baylibre.com;
+> sboyd at kernel.org; rjw at rjwysocki.net; viresh.kumar at linaro.org;
+> linux-clk at vger.kernel.org; linux-pm at vger.kernel.org;
+> linux-kernel-owner at vger.kernel.org; catalin.marinas at arm.com;
+> will.deacon at arm.com; gregkh at linuxfoundation.org; arnd at arndb.de;
+> kstewart at linuxfoundation.org; yamada.masahiro at socionext.com
+> Cc: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>;
+> linux at armlinux.org.uk; Varun Sethi <V.Sethi@nxp.com>; Udit Kumar
+> <udit.kumar@nxp.com>
+> Subject: Re: [PATCH 3/5] drivers: clk-qoriq: Add clockgen support for
+> lx2160a
+> 
+> On Mon, 2018-09-03 at 01:17 +0000, Andy Tang wrote:
+> > Hi Scott,
+> >
+> > Please see my replay in line.
+> >
+> > > -----Original Message-----
+> > > From: Linuxppc-dev
+> > > <linuxppc-dev-bounces+b29983=freescale.com@lists.ozlabs.org> On
+> > > Behalf Of Scott Wood
+> > > Sent: 2018?9?1? 4:29
+> > > To: Andy Tang <andy.tang@nxp.com>; Vabhav Sharma
+> > > <vabhav.sharma@nxp.com>; linux-kernel at vger.kernel.org;
+> > > devicetree at vger.kernel.org; robh+dt at kernel.org;
+> > > mark.rutland at arm.com; linuxppc-dev at lists.ozlabs.org;
+> > > linux-arm-kernel at lists.infradead.org; mturquette at baylibre.com;
+> > > sboyd at kernel.org; rjw at rjwysocki.net; viresh.kumar at linaro.org;
+> > > linux-clk at vger.kernel.org; linux-pm at vger.kernel.org;
+> > > linux-kernel-owner at vger.kernel.org; catalin.marinas at arm.com;
+> > > will.deacon at arm.com; gregkh at linuxfoundation.org; arnd at arndb.de;
+> > > kstewart at linuxfoundation.org; yamada.masahiro at socionext.com
+> > > Cc: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>;
+> > > linux at armlinux.org.uk; Udit Kumar <udit.kumar@nxp.com>; Varun
+> Sethi
+> > > <V.Sethi@nxp.com>
+> > > Subject: Re: [PATCH 3/5] drivers: clk-qoriq: Add clockgen support
+> > > for lx2160a
+> > >
+> > > On Fri, 2018-08-31 at 06:12 +0000, Andy Tang wrote:
+> > > > We don't want to increase NUM_CMUX each time new soc with
+> more
+> > >
+> > > cmuxes added.
+> > >
+> > > You don't want to have to make a trivial change each time you exceed
+> > > a limit that has yet to be exceeded once since NUM_CMUX was added?
+> > > This isn't ABI or in any other way hard to change.  It's right in
+> > > the same file as the chip description you'd be adding.
+> > >
+> > > And even if a chip did come along with 16 cmuxes, you'd then need to
+> > > increase the array to 17 to hold the -1 if you don't want to leave a
+> > > situation like the
+> > > p4080 is in now, where a chip's cmux array could be broken by
+> > > increasing NUM_CMUX further.
+> > >
+> >
+> > [Andy] Adding buffer to a limitation number is always a good habit
+> > when coding. We often forget to increase this value when a new chip
+> > with more cmuxes added.
+> 
+> "often"?  There has never been a new chip added with more cmuxes
+> than p4080's 8, and if one does come along and you forget, the compiler
+> should complain about exceeding the array length with a static initializer.
+> This isn't like an array that is filled with a runtime-determined length.
+> 
+> > Like this patch, we didn't increase this value at first. We spent a
+> > lot of time finding out that NUM_CMUX needs to be increased too.
+> 
+> Are you talking about some other chip that you haven't sent a patch for
+> yet?
+> Or is the cmux array for this chip wrong?  What specifically did you see
+> happen "at first"?
+> 
+[Andy] Sorry, "Often" is not a right word. I meant we tend to add new soc without updating NUM_CMUX.
+ 
+> > It is a personal preference how to set this value. I think it is
+> > better to increase it to 16, not NUM_CMUX+1 as long as we fix the
+> > P4080 issue even though it is a trivial change. And I agree the
+> > description needs to be updated.
+> 
+> I'm not the clock maintainer, so it's not up to me, but I don't see the point
+> in setting it to an arbitrary number, and I do not agree that increasing
+> NUM_CMUX is a suitable replacement for NUM_CMUX+1 in
+> cmux_to_group[], as that array should be one larger than cmux[] in order
+> to allow every chip to have a
+> -1 terminator.  In any case, any change to NUM_CMUX should be a
+> separate patch because it's not required for lx2160a support (assuming
+> lx2160a was correctly described by this patch).
+[Andy] I don't see any impropriate about your suggestion. so we are going to do in your way.
 
-Thanks
-Kishon
+Thanks,
+Andy
 > 
-> Cc: Kishon Vijay Abraham I <kishon@ti.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
->   drivers/phy/broadcom/phy-bcm-cygnus-pcie.c    | 4 ++--
->   drivers/phy/broadcom/phy-brcm-sata.c          | 4 ++--
->   drivers/phy/marvell/phy-berlin-sata.c         | 6 +++---
->   drivers/phy/qualcomm/phy-qcom-qmp.c           | 2 +-
->   drivers/phy/rockchip/phy-rockchip-emmc.c      | 4 ++--
->   drivers/phy/rockchip/phy-rockchip-inno-usb2.c | 8 ++++----
->   drivers/phy/rockchip/phy-rockchip-typec.c     | 8 ++++----
->   drivers/phy/rockchip/phy-rockchip-usb.c       | 4 ++--
->   drivers/phy/tegra/xusb.c                      | 4 ++--
->   9 files changed, 22 insertions(+), 22 deletions(-)
+> -Scott
 > 
-> diff --git a/drivers/phy/broadcom/phy-bcm-cygnus-pcie.c b/drivers/phy/broadcom/phy-bcm-cygnus-pcie.c
-> index 0f4ac5d63cff..b074682d9dd8 100644
-> --- a/drivers/phy/broadcom/phy-bcm-cygnus-pcie.c
-> +++ b/drivers/phy/broadcom/phy-bcm-cygnus-pcie.c
-> @@ -153,8 +153,8 @@ static int cygnus_pcie_phy_probe(struct platform_device *pdev)
->   		struct cygnus_pcie_phy *p;
->   
->   		if (of_property_read_u32(child, "reg", &id)) {
-> -			dev_err(dev, "missing reg property for %s\n",
-> -				child->name);
-> +			dev_err(dev, "missing reg property for %pOFn\n",
-> +				child);
->   			ret = -EINVAL;
->   			goto put_child;
->   		}
-> diff --git a/drivers/phy/broadcom/phy-brcm-sata.c b/drivers/phy/broadcom/phy-brcm-sata.c
-> index 8708ea3b4d6d..ac57f5a41708 100644
-> --- a/drivers/phy/broadcom/phy-brcm-sata.c
-> +++ b/drivers/phy/broadcom/phy-brcm-sata.c
-> @@ -600,8 +600,8 @@ static int brcm_sata_phy_probe(struct platform_device *pdev)
->   		struct brcm_sata_port *port;
->   
->   		if (of_property_read_u32(child, "reg", &id)) {
-> -			dev_err(dev, "missing reg property in node %s\n",
-> -					child->name);
-> +			dev_err(dev, "missing reg property in node %pOFn\n",
-> +					child);
->   			ret = -EINVAL;
->   			goto put_child;
->   		}
-> diff --git a/drivers/phy/marvell/phy-berlin-sata.c b/drivers/phy/marvell/phy-berlin-sata.c
-> index c1bb6725e48f..a91fc67fc4e0 100644
-> --- a/drivers/phy/marvell/phy-berlin-sata.c
-> +++ b/drivers/phy/marvell/phy-berlin-sata.c
-> @@ -231,14 +231,14 @@ static int phy_berlin_sata_probe(struct platform_device *pdev)
->   		struct phy_berlin_desc *phy_desc;
->   
->   		if (of_property_read_u32(child, "reg", &phy_id)) {
-> -			dev_err(dev, "missing reg property in node %s\n",
-> -				child->name);
-> +			dev_err(dev, "missing reg property in node %pOFn\n",
-> +				child);
->   			ret = -EINVAL;
->   			goto put_child;
->   		}
->   
->   		if (phy_id >= ARRAY_SIZE(phy_berlin_power_down_bits)) {
-> -			dev_err(dev, "invalid reg in node %s\n", child->name);
-> +			dev_err(dev, "invalid reg in node %pOFn\n", child);
->   			ret = -EINVAL;
->   			goto put_child;
->   		}
-> diff --git a/drivers/phy/qualcomm/phy-qcom-qmp.c b/drivers/phy/qualcomm/phy-qcom-qmp.c
-> index 4c470104a0d6..baa59484a90c 100644
-> --- a/drivers/phy/qualcomm/phy-qcom-qmp.c
-> +++ b/drivers/phy/qualcomm/phy-qcom-qmp.c
-> @@ -1400,7 +1400,7 @@ static int phy_pipe_clk_register(struct qcom_qmp *qmp, struct device_node *np)
->   
->   	ret = of_property_read_string(np, "clock-output-names", &init.name);
->   	if (ret) {
-> -		dev_err(qmp->dev, "%s: No clock-output-names\n", np->name);
-> +		dev_err(qmp->dev, "%pOFn: No clock-output-names\n", np);
->   		return ret;
->   	}
->   
-> diff --git a/drivers/phy/rockchip/phy-rockchip-emmc.c b/drivers/phy/rockchip/phy-rockchip-emmc.c
-> index b237360f95f6..19bf84f0bc67 100644
-> --- a/drivers/phy/rockchip/phy-rockchip-emmc.c
-> +++ b/drivers/phy/rockchip/phy-rockchip-emmc.c
-> @@ -337,8 +337,8 @@ static int rockchip_emmc_phy_probe(struct platform_device *pdev)
->   		return -ENOMEM;
->   
->   	if (of_property_read_u32(dev->of_node, "reg", &reg_offset)) {
-> -		dev_err(dev, "missing reg property in node %s\n",
-> -			dev->of_node->name);
-> +		dev_err(dev, "missing reg property in node %pOFn\n",
-> +			dev->of_node);
->   		return -EINVAL;
->   	}
->   
-> diff --git a/drivers/phy/rockchip/phy-rockchip-inno-usb2.c b/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
-> index 5049dac79bd0..24bd2717abdb 100644
-> --- a/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
-> +++ b/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
-> @@ -1116,8 +1116,8 @@ static int rockchip_usb2phy_probe(struct platform_device *pdev)
->   	}
->   
->   	if (of_property_read_u32(np, "reg", &reg)) {
-> -		dev_err(dev, "the reg property is not assigned in %s node\n",
-> -			np->name);
-> +		dev_err(dev, "the reg property is not assigned in %pOFn node\n",
-> +			np);
->   		return -EINVAL;
->   	}
->   
-> @@ -1143,8 +1143,8 @@ static int rockchip_usb2phy_probe(struct platform_device *pdev)
->   	}
->   
->   	if (!rphy->phy_cfg) {
-> -		dev_err(dev, "no phy-config can be matched with %s node\n",
-> -			np->name);
-> +		dev_err(dev, "no phy-config can be matched with %pOFn node\n",
-> +			np);
->   		return -EINVAL;
->   	}
->   
-> diff --git a/drivers/phy/rockchip/phy-rockchip-typec.c b/drivers/phy/rockchip/phy-rockchip-typec.c
-> index 76a4b58ec771..c57e496f0b0c 100644
-> --- a/drivers/phy/rockchip/phy-rockchip-typec.c
-> +++ b/drivers/phy/rockchip/phy-rockchip-typec.c
-> @@ -1145,8 +1145,8 @@ static int rockchip_typec_phy_probe(struct platform_device *pdev)
->   	}
->   
->   	if (!tcphy->port_cfgs) {
-> -		dev_err(dev, "no phy-config can be matched with %s node\n",
-> -			np->name);
-> +		dev_err(dev, "no phy-config can be matched with %pOFn node\n",
-> +			np);
->   		return -EINVAL;
->   	}
->   
-> @@ -1186,8 +1186,8 @@ static int rockchip_typec_phy_probe(struct platform_device *pdev)
->   			continue;
->   
->   		if (IS_ERR(phy)) {
-> -			dev_err(dev, "failed to create phy: %s\n",
-> -				child_np->name);
-> +			dev_err(dev, "failed to create phy: %pOFn\n",
-> +				child_np);
->   			pm_runtime_disable(dev);
->   			return PTR_ERR(phy);
->   		}
-> diff --git a/drivers/phy/rockchip/phy-rockchip-usb.c b/drivers/phy/rockchip/phy-rockchip-usb.c
-> index 3378eeb7a562..269c86329cb8 100644
-> --- a/drivers/phy/rockchip/phy-rockchip-usb.c
-> +++ b/drivers/phy/rockchip/phy-rockchip-usb.c
-> @@ -208,8 +208,8 @@ static int rockchip_usb_phy_init(struct rockchip_usb_phy_base *base,
->   	rk_phy->np = child;
->   
->   	if (of_property_read_u32(child, "reg", &reg_offset)) {
-> -		dev_err(base->dev, "missing reg property in node %s\n",
-> -			child->name);
-> +		dev_err(base->dev, "missing reg property in node %pOFn\n",
-> +			child);
->   		return -EINVAL;
->   	}
->   
-> diff --git a/drivers/phy/tegra/xusb.c b/drivers/phy/tegra/xusb.c
-> index de1b4ebe4de2..5b3b8863363e 100644
-> --- a/drivers/phy/tegra/xusb.c
-> +++ b/drivers/phy/tegra/xusb.c
-> @@ -115,8 +115,8 @@ int tegra_xusb_lane_parse_dt(struct tegra_xusb_lane *lane,
->   
->   	err = match_string(lane->soc->funcs, lane->soc->num_funcs, function);
->   	if (err < 0) {
-> -		dev_err(dev, "invalid function \"%s\" for lane \"%s\"\n",
-> -			function, np->name);
-> +		dev_err(dev, "invalid function \"%s\" for lane \"%pOFn\"\n",
-> +			function, np);
->   		return err;
->   	}
->   
 > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Flist
+> s.infradead.org%2Fmailman%2Flistinfo%2Flinux-arm-kernel&amp;data=02
+> %7C01%7Candy.tang%40nxp.com%7Cdbc824fc39674711316208d611dcf
+> 61b%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0%7C0%7C63671603
+> 8060797113&amp;sdata=iCLKGMEzRX2dpH5%2Bf4NWIiPDc5L5NpTcpZ7X
+> usehdIw%3D&amp;reserved=0
