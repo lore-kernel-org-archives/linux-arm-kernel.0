@@ -1,54 +1,40 @@
-From: wufan@codeaurora.org (wufan)
-Date: Tue, 4 Sep 2018 07:22:25 -0600
-Subject: [PATCH v3] EDAC, ghes: use CPER module handles to locate DIMMs
-In-Reply-To: <20180904072858.GA32615@zn.tnic>
-References: <1536033055-25522-1-git-send-email-wufan@codeaurora.org>
- <20180904072858.GA32615@zn.tnic>
-Message-ID: <003601d44452$531d4060$f957c120$@codeaurora.org>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 4 Sep 2018 08:24:42 -0500
+Subject: [PATCH 0/2] Drop node-local allocation during host controller
+ initialisation
+In-Reply-To: <20180828150513.32458-1-punit.agrawal@arm.com>
+References: <20180828150513.32458-1-punit.agrawal@arm.com>
+Message-ID: <20180904132442.GB107892@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Aug 28, 2018 at 04:05:11PM +0100, Punit Agrawal wrote:
+> Hi Bjorn,
+> 
+> As discussed before[0], here are a couple of patches to drop
+> node-local allocations during host contoller initialisation. This set
+> covers both arm64 and x86.
+> 
+> I'm posting early to give the patches time on the list as well in next
+> in case there are issues we've missed.
+> 
+> The patches are based on v4.19-rc1 and has been boot tested on arm64
+> and compile tested on x86.
+> 
+> Thanks,
+> Punit
+> 
+> [0] https://www.spinics.net/lists/arm-kernel/msg669746.html
+> 
+> Punit Agrawal (2):
+>   arm64: PCI: Remove node-local allocations when initialising host
+>     controller
+>   x86/PCI: Remove node-local allocation when initialising host
+>     controller
+> 
+>  arch/arm64/kernel/pci.c | 5 ++---
+>  arch/x86/pci/acpi.c     | 2 +-
+>  2 files changed, 3 insertions(+), 4 deletions(-)
 
-
-> -----Original Message-----
-> From: Borislav Petkov <bp@alien8.de>
-> Sent: Tuesday, September 4, 2018 1:29 AM
-> To: Fan Wu <wufan@codeaurora.org>
-> Cc: mchehab at kernel.org; james.morse at arm.com; baicar.tyler at gmail.com;
-> linux-edac at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; john.garry at huawei.com; toshi.kani at hpe.com;
-> tanxiaofei at huawei.com; wanghuiqiang at huawei.com;
-> shiju.jose at huawei.com
-> Subject: Re: [PATCH v3] EDAC, ghes: use CPER module handles to locate
-> DIMMs
-> 
-> On Tue, Sep 04, 2018 at 03:50:55AM +0000, Fan Wu wrote:
-> > For platforms whose firmwares provide valid module handles (SMBIOS
-> > type 17) in error records, this patch uses the module handles to
-> > locate corresponding DIMMs and enables per-DIMM error counter update.
-> >
-> > Signed-off-by: Fan Wu <wufan@codeaurora.org>
-> > Reviewed-by: Tyler Baicar <baicar.tyler@gmail.com>
-> > Tested-by: Toshi Kani <toshi.kani@hpe.com>
-> 
-> Those two tags I did see being given to you ...
-> 
-> > Reviewed-by: Borislav Petkov <bp@alien8.de>
-> > Reviewed-by: James Morse <james.morse@arm.com>
-> > Reviewed-by: tanxiaofei <tanxiaofei@huawei.com>
->
-> ... but how in the world did you come up with those?
-
-Sorry. Will remove these in v4. 
-Thanks,
-Fan
-
- 
-> Do you understand how Reviewed-by works or do you need to look at
-> Documentation/process/submitting-patches.rst, section 13 ?
-> 
-> --
-> Regards/Gruss,
->     Boris.
-> 
-> Good mailing practices for 400: avoid top-posting and trim the reply.
+Applied with Will's ack on the arm64 patch to pci/enumeration for v4.20,
+thanks!
