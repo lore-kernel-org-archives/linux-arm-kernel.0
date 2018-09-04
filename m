@@ -1,63 +1,21 @@
-From: afd@ti.com (Andrew F. Davis)
-Date: Tue, 4 Sep 2018 08:35:09 -0500
-Subject: [PATCH 1/2] ARM: dts: imx6: RDU2: Fix the audio CODEC's reset pin
-In-Reply-To: <20180903045426.GM3850@dragon>
-References: <20180831191732.25504-1-afd@ti.com> <20180903045426.GM3850@dragon>
-Message-ID: <5796c470-a533-c010-ba53-7ee785a3b9e8@ti.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 04 Sep 2018 08:36:33 -0500
+Subject: [PATCH 1/4] clock: aspeed: Add VIDEO reset index definition
+In-Reply-To: <1535576973-8067-2-git-send-email-eajames@linux.vnet.ibm.com>
+References: <1535576973-8067-1-git-send-email-eajames@linux.vnet.ibm.com>
+ <1535576973-8067-2-git-send-email-eajames@linux.vnet.ibm.com>
+Message-ID: <5b8e8a62.1c69fb81.6801.2c0d@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/2018 11:54 PM, Shawn Guo wrote:
-> On Fri, Aug 31, 2018 at 02:17:31PM -0500, Andrew F. Davis wrote:
->> The correct DT property for specifying a GPIO used for reset
->> is "reset-gpios", fix this here.
->>
->> Fixes: d763762e3b58 ("ARM: dts: imx6: add ZII RDU2 boards")
+On Wed, 29 Aug 2018 16:09:30 -0500, Eddie James wrote:
+> Add an index into the array of resets kept in the Aspeed clock driver.
+> This isn't a HW bit definition.
 > 
-> This Fixes tag and word 'Fix' in subject is inappropriate to me, as you
-> are not fixing something wrong from the beginning, but actually
-> replacing a deprecated property with new one.
+> Signed-off-by: Eddie James <eajames@linux.vnet.ibm.com>
+> ---
+>  include/dt-bindings/clock/aspeed-clock.h | 1 +
+>  1 file changed, 1 insertion(+)
 > 
 
-
-reset-gpios was standard before this driver got it backwards, but it
-also wasn't required to be one way or the other as far as I can tell, so
-I can see your point that this isn't technically "broken". I have no
-preference, so I'll change the subject and drop the fixes for v2.
-
-Andrew
-
-
-> Shawn
-> 
->>
->> Signed-off-by: Andrew F. Davis <afd@ti.com>
->> ---
->>  arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
->> index 7fff3717cf7c..a0f5cfda0055 100644
->> --- a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
->> +++ b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
->> @@ -384,7 +384,7 @@
->>  		AVDD-supply = <&reg_3p3v>;
->>  		IOVDD-supply = <&reg_3p3v>;
->>  		DVDD-supply = <&vgen4_reg>;
->> -		gpio-reset = <&gpio1 2 GPIO_ACTIVE_HIGH>;
->> +		reset-gpios = <&gpio1 2 GPIO_ACTIVE_LOW>;
->>  	};
->>  
->>  	accel at 1c {
->> @@ -572,7 +572,7 @@
->>  		AVDD-supply = <&reg_3p3v>;
->>  		IOVDD-supply = <&reg_3p3v>;
->>  		DVDD-supply = <&vgen4_reg>;
->> -		gpio-reset = <&gpio1 0 GPIO_ACTIVE_HIGH>;
->> +		reset-gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;
->>  	};
->>  
->>  	touchscreen at 20 {
->> -- 
->> 2.18.0
->>
+Reviewed-by: Rob Herring <robh@kernel.org>
