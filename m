@@ -1,24 +1,104 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 4 Sep 2018 09:21:05 -0500
-Subject: [PATCH] phy: Convert to using %pOFn instead of device_node.name
-In-Reply-To: <9dcceda0-1d92-0a7a-feb1-887414021ac9@ti.com>
-References: <20180828015252.28511-1-robh@kernel.org>
- <20180828015252.28511-39-robh@kernel.org>
- <9dcceda0-1d92-0a7a-feb1-887414021ac9@ti.com>
-Message-ID: <CAL_JsqLrMwd-=Y6rm5RRJ25HNLTxOkFbLMcB4w0UgHteVdidGA@mail.gmail.com>
+From: tnowicki@caviumnetworks.com (Tomasz Nowicki)
+Date: Tue,  4 Sep 2018 16:20:34 +0200
+Subject: [PATCH 1/1] coresight: etm4x: Configure EL2 exception level when
+ kernel is running in HYP
+Message-ID: <20180904142034.19116-1-tnowicki@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 3, 2018 at 9:24 PM Kishon Vijay Abraham I <kishon@ti.com> wrote:
->
-> Hi Rob,
->
-> On Tuesday 28 August 2018 07:22 AM, Rob Herring wrote:
-> > In preparation to remove the node name pointer from struct device_node,
-> > convert printf users to use the %pOFn format specifier.
->
-> I assume it should be okay to get this merged in the next merge window?
+For non-VHE systems host kernel runs at EL1 and jumps to EL2 whenever
+hypervisor code should be executed. In this case ETM4x driver must
+restrict configuration to EL1 when it setups kernel tracing.
+However, there is no separate hypervisor privilege level when VHE
+is enabled, the host kernel runs at EL2.
 
-Yes, of course.
+This patch fixes configuration of TRCACATRn register for VHE systems
+so that ETM_EXLEVEL_NS_HYP bit is used instead of ETM_EXLEVEL_NS_OS
+to on/off kernel tracing. At the same time, it moves common code
+to new helper.
 
-Rob
+Signed-off-by: Tomasz Nowicki <tnowicki@caviumnetworks.com>
+---
+ drivers/hwtracing/coresight/coresight-etm4x.c | 39 ++++++++++---------
+ 1 file changed, 20 insertions(+), 19 deletions(-)
+
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index f79b0ea85d76..5f495c942f99 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -28,6 +28,7 @@
+ #include <linux/pm_runtime.h>
+ #include <asm/sections.h>
+ #include <asm/local.h>
++#include <asm/virt.h>
+ 
+ #include "coresight-etm4x.h"
+ #include "coresight-etm-perf.h"
+@@ -606,7 +607,7 @@ static void etm4_set_default_config(struct etmv4_config *config)
+ 	config->vinst_ctrl |= BIT(0);
+ }
+ 
+-static u64 etm4_get_access_type(struct etmv4_config *config)
++static u64 etm4_get_ns_access_type(struct etmv4_config *config)
+ {
+ 	u64 access_type = 0;
+ 
+@@ -617,17 +618,27 @@ static u64 etm4_get_access_type(struct etmv4_config *config)
+ 	 *   Bit[13] Exception level 1 - OS
+ 	 *   Bit[14] Exception level 2 - Hypervisor
+ 	 *   Bit[15] Never implemented
+-	 *
+-	 * Always stay away from hypervisor mode.
+ 	 */
+-	access_type = ETM_EXLEVEL_NS_HYP;
+ 
+-	if (config->mode & ETM_MODE_EXCL_KERN)
+-		access_type |= ETM_EXLEVEL_NS_OS;
++	if (!is_kernel_in_hyp_mode()) {
++		/* Stay away from hypervisor mode for non-VHE */
++		access_type =  ETM_EXLEVEL_NS_HYP;
++		if (config->mode & ETM_MODE_EXCL_KERN)
++			access_type |= ETM_EXLEVEL_NS_OS;
++	} else if (config->mode & ETM_MODE_EXCL_KERN) {
++		access_type = ETM_EXLEVEL_NS_HYP;
++	}
+ 
+ 	if (config->mode & ETM_MODE_EXCL_USER)
+ 		access_type |= ETM_EXLEVEL_NS_APP;
+ 
++	return access_type;
++}
++
++static u64 etm4_get_access_type(struct etmv4_config *config)
++{
++	u64 access_type = etm4_get_ns_access_type(config);
++
+ 	/*
+ 	 * EXLEVEL_S, bits[11:8], don't trace anything happening
+ 	 * in secure state.
+@@ -881,20 +892,10 @@ void etm4_config_trace_mode(struct etmv4_config *config)
+ 
+ 	addr_acc = config->addr_acc[ETM_DEFAULT_ADDR_COMP];
+ 	/* clear default config */
+-	addr_acc &= ~(ETM_EXLEVEL_NS_APP | ETM_EXLEVEL_NS_OS);
++	addr_acc &= ~(ETM_EXLEVEL_NS_APP | ETM_EXLEVEL_NS_OS |
++			ETM_EXLEVEL_NS_HYP);
+ 
+-	/*
+-	 * EXLEVEL_NS, bits[15:12]
+-	 * The Exception levels are:
+-	 *   Bit[12] Exception level 0 - Application
+-	 *   Bit[13] Exception level 1 - OS
+-	 *   Bit[14] Exception level 2 - Hypervisor
+-	 *   Bit[15] Never implemented
+-	 */
+-	if (mode & ETM_MODE_EXCL_KERN)
+-		addr_acc |= ETM_EXLEVEL_NS_OS;
+-	else
+-		addr_acc |= ETM_EXLEVEL_NS_APP;
++	addr_acc |= etm4_get_ns_access_type(config);
+ 
+ 	config->addr_acc[ETM_DEFAULT_ADDR_COMP] = addr_acc;
+ 	config->addr_acc[ETM_DEFAULT_ADDR_COMP + 1] = addr_acc;
+-- 
+2.17.1
