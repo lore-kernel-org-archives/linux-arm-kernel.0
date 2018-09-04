@@ -1,85 +1,64 @@
 From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Tue, 4 Sep 2018 14:43:29 +0200
-Subject: [PATCH 0/7] spi: spi-mem: Add a driver for NXP FlexSPI controller
-In-Reply-To: <1535711404-29528-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+Date: Tue, 4 Sep 2018 14:46:27 +0200
+Subject: [PATCH 4/7] dt-bindings: spi: add binding file for NXP FlexSPI
+ driver
+In-Reply-To: <VI1PR0402MB385465BEDBFC9CB6A89BEFF4970C0@VI1PR0402MB3854.eurprd04.prod.outlook.com>
 References: <1535711404-29528-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-Message-ID: <20180904144329.35cf27de@bbrezillon>
+ <1535711404-29528-5-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <VI1PR0402MB385465BEDBFC9CB6A89BEFF4970C0@VI1PR0402MB3854.eurprd04.prod.outlook.com>
+Message-ID: <20180904144627.1de264b6@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yogesh,
+On Mon, 3 Sep 2018 09:54:08 +0000
+Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com> wrote:
 
-On Fri, 31 Aug 2018 15:59:57 +0530
-Yogesh Gaur <yogeshnarayan.gaur@nxp.com> wrote:
+> Dear Yogesh,
+> 
+> > -----Original Message-----
+> > From: linux-kernel-owner at vger.kernel.org <linux-kernel-  
+> > owner at vger.kernel.org> On Behalf Of Yogesh Gaur  
+> > Sent: Friday, August 31, 2018 4:00 PM
+> > To: linux-mtd at lists.infradead.org; boris.brezillon at bootlin.com;
+> > marek.vasut at gmail.com; linux-spi at vger.kernel.org;
+> > devicetree at vger.kernel.org
+> > Cc: robh at kernel.org; mark.rutland at arm.com; shawnguo at kernel.org; linux-
+> > arm-kernel at lists.infradead.org; computersforpeace at gmail.com;
+> > frieder.schrempf at exceet.de; linux-kernel at vger.kernel.org; Yogesh
+> > Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+> > Subject: [PATCH 4/7] dt-bindings: spi: add binding file for NXP FlexSPI driver
+> > 
+> > Add binding file for NXP FlexSPI driver.
+> > 
+> > Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
+> > ---
+> >  .../devicetree/bindings/spi/spi-nxp-fspi.txt       | 42
+> > ++++++++++++++++++++++
+> >  1 file changed, 42 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/spi/spi-nxp-
+> > fspi.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
+> > b/Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
+> > new file mode 100644
+> > index 0000000..9f07116
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
+> > @@ -0,0 +1,42 @@
+> > +* NXP Flex Serial Peripheral Interface (FSPI)
+> > +
+> > +Required properties:
+> > +  - compatible : Should be "nxp,lx2160a-fspi"
+> > +  - reg :        First contains the register location and length,
+> > +                 Second contains the memory mapping address and length  
+> 
+> Why are we overriding reg property.  Is there any special requirement. 
+> 
+> Can we use "reg" and "ranges" property in device tree.
+> Here "reg" represents controller registers and "ranges" represent the memory address of flash.
 
-> - Add a driver for NXP FlexSPI host controller
-> 
->  FlexSPI is a flexsible SPI host controller [1], Chapter 30 page 1475,
->  which supports two SPI channels and up to 4 external devices.
->  Each channel supports Single/Dual/Quad/Octal mode data transfer (1/2/4/8 bidirectional data lines)
->  i.e. FlexSPI acts as an interface to external devices, maximum 4, each with up to 8
->  bidirectional data lines.
-> 
->  FlexSPI controller is similar to the existing Freescale/NXP QuadSPI
->  controller with advanced features.
-> 
-> - Tested this driver with mtd_debug(Erase/Write/Read) utility and JFFS2
->  filesystem mounting and booting on NXP LX2160ARDB[2] and LX2160AQDS targets.
->  LX2160ARDB is having two NOR slave device connected on single bus A
->  i.e. A0 and A1 (CS0 and CS1).
->  LX2160AQDS is having two NOR slave device connected on separate buses
->  one flash on A0 and second on B1 i.e. (CS0 and CS3).
->  Verified this driver on following SPI NOR flashes:
->     Micron, mt35xu512aba[3], [Read - 1 bit mode]
->     Cypress, s25fl512s, [Read - 1/2/4 bit mode]
-> 
-> Patch 1 adds variable size in spi_device struct, to save the
-> size of connected slave device.
-> Patch 2 adds flags for octal I/O data transfer.
-> Support for octal flash commands and other framework changes would going to be done in different
-> patch set.
-> Patch 3 adds a driver for the NXP FlexSPI controller, driver is based on
-> new spi-mem framework.
+No, ranges is not used for that. It's used when you need to convert
+from one address space to another, which is not what you're describing
+here. Check section 2.38 of this document [1] for more details.
 
-Can we please omit octa mode support for now and focus on
-single/dual/quad SPI support? That is, drop patch 2, and do not set the
-OCTAL flags in patch 3.
-
-Regards,
-
-Boris
-
-> Patch 4 add binding file for this driver.
-> Patch 5 add device node property for FlexSPI driver for lx2160 SoC.
-> Patch 6 enables the config option.
-> Patch 7 add MAINTAINERS file.
-> 
-> [1] https://www.nxp.com/docs/en/reference-manual/IMXRT1050RM.pdf
-> [2] https://patchwork.kernel.org/project/linux-arm-kernel/list/?series=9721
-> [3] https://patchwork.ozlabs.org/project/linux-mtd/list/?series=63445
-> 
-> This series adds below patches:
-> Yogesh Gaur (7):
->   spi: add slave device size in spi_device struct
->   spi: add flags for octal I/O data transfer
->   spi: spi-mem: Add a driver for NXP FlexSPI controller
->   dt-bindings: spi: add binding file for NXP FlexSPI driver
->   arm64: dts: lx2160a: add fspi node property
->   arm64: defconfig: enable NXP FlexSPI driver
->   MAINTAINERS: add maintainers for the NXP FlexSPI driver
-> 
->  .../devicetree/bindings/spi/spi-nxp-fspi.txt       |   42 +
->  MAINTAINERS                                        |    6 +
->  arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts  |   21 +
->  arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi     |   12 +
->  arch/arm64/configs/defconfig                       |    1 +
->  drivers/mtd/devices/m25p80.c                       |    6 +
->  drivers/mtd/spi-nor/spi-nor.c                      |    2 +
->  drivers/spi/Kconfig                                |   10 +
->  drivers/spi/Makefile                               |    1 +
->  drivers/spi/spi-nxp-fspi.c                         | 1242 ++++++++++++++++++++
->  include/linux/spi/spi.h                            |    4 +
->  11 files changed, 1347 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
->  create mode 100644 drivers/spi/spi-nxp-fspi.c
-> 
+[1]https://elinux.org/images/c/cf/Power_ePAPR_APPROVED_v1.1.pdf
