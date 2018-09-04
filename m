@@ -1,40 +1,105 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 4 Sep 2018 08:24:42 -0500
-Subject: [PATCH 0/2] Drop node-local allocation during host controller
- initialisation
-In-Reply-To: <20180828150513.32458-1-punit.agrawal@arm.com>
-References: <20180828150513.32458-1-punit.agrawal@arm.com>
-Message-ID: <20180904132442.GB107892@bhelgaas-glaptop.roam.corp.google.com>
+From: wufan@codeaurora.org (Fan Wu)
+Date: Tue,  4 Sep 2018 13:24:53 +0000
+Subject: [PATCH v4] EDAC, ghes: use CPER module handles to locate DIMMs
+Message-ID: <1536067493-31454-1-git-send-email-wufan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 28, 2018 at 04:05:11PM +0100, Punit Agrawal wrote:
-> Hi Bjorn,
-> 
-> As discussed before[0], here are a couple of patches to drop
-> node-local allocations during host contoller initialisation. This set
-> covers both arm64 and x86.
-> 
-> I'm posting early to give the patches time on the list as well in next
-> in case there are issues we've missed.
-> 
-> The patches are based on v4.19-rc1 and has been boot tested on arm64
-> and compile tested on x86.
-> 
-> Thanks,
-> Punit
-> 
-> [0] https://www.spinics.net/lists/arm-kernel/msg669746.html
-> 
-> Punit Agrawal (2):
->   arm64: PCI: Remove node-local allocations when initialising host
->     controller
->   x86/PCI: Remove node-local allocation when initialising host
->     controller
-> 
->  arch/arm64/kernel/pci.c | 5 ++---
->  arch/x86/pci/acpi.c     | 2 +-
->  2 files changed, 3 insertions(+), 4 deletions(-)
+For platforms whose firmwares provide valid module handles
+(SMBIOS type 17) in error records, this patch uses the module
+handles to locate corresponding DIMMs and enables per-DIMM
+error counter update.
 
-Applied with Will's ack on the arm64 patch to pci/enumeration for v4.20,
-thanks!
+Signed-off-by: Fan Wu <wufan@codeaurora.org>
+Reviewed-by: Tyler Baicar <baicar.tyler@gmail.com>
+Tested-by: Toshi Kani <toshi.kani@hpe.com>
+---
+
+Changes from v3:
+* Updated Reviewed-by list
+
+Changes from v2:
+* Fixed coding style glitch
+* Added Tested-by/Reviewed-by
+
+Changes from v1:
+*  Changed the new function name to get_dimm_smbios_index
+*  Removed unnecessary checks inside get_dimm_smbios_index
+*  Reverted the change of the DMI handle print
+*  Updated commit message
+
+
+---
+ drivers/edac/ghes_edac.c | 23 +++++++++++++++++++++++
+ include/linux/edac.h     |  2 ++
+ 2 files changed, 25 insertions(+)
+
+diff --git a/drivers/edac/ghes_edac.c b/drivers/edac/ghes_edac.c
+index 473aeec..ba46160 100644
+--- a/drivers/edac/ghes_edac.c
++++ b/drivers/edac/ghes_edac.c
+@@ -81,6 +81,18 @@ static void ghes_edac_count_dimms(const struct dmi_header *dh, void *arg)
+ 		(*num_dimm)++;
+ }
+ 
++static int get_dimm_smbios_index(u16 handle)
++{
++	int i;
++	struct mem_ctl_info *mci = ghes_pvt->mci;
++
++	for (i = 0; i < mci->tot_dimms; i++) {
++		if (mci->dimms[i]->smbios_handle == handle)
++			return i;
++	}
++	return -1;
++}
++
+ static void ghes_edac_dmidecode(const struct dmi_header *dh, void *arg)
+ {
+ 	struct ghes_edac_dimm_fill *dimm_fill = arg;
+@@ -177,6 +189,8 @@ static void ghes_edac_dmidecode(const struct dmi_header *dh, void *arg)
+ 				entry->total_width, entry->data_width);
+ 		}
+ 
++		dimm->smbios_handle = entry->handle;
++
+ 		dimm_fill->count++;
+ 	}
+ }
+@@ -327,12 +341,21 @@ void ghes_edac_report_mem_error(int sev, struct cper_sec_mem_err *mem_err)
+ 		p += sprintf(p, "bit_pos:%d ", mem_err->bit_pos);
+ 	if (mem_err->validation_bits & CPER_MEM_VALID_MODULE_HANDLE) {
+ 		const char *bank = NULL, *device = NULL;
++		int index = -1;
++
+ 		dmi_memdev_name(mem_err->mem_dev_handle, &bank, &device);
+ 		if (bank != NULL && device != NULL)
+ 			p += sprintf(p, "DIMM location:%s %s ", bank, device);
+ 		else
+ 			p += sprintf(p, "DIMM DMI handle: 0x%.4x ",
+ 				     mem_err->mem_dev_handle);
++
++		index = get_dimm_smbios_index(mem_err->mem_dev_handle);
++		if (index >= 0) {
++			e->top_layer = index;
++			e->enable_per_layer_report = true;
++		}
++
+ 	}
+ 	if (p > e->location)
+ 		*(p - 1) = '\0';
+diff --git a/include/linux/edac.h b/include/linux/edac.h
+index bffb978..a45ce1f 100644
+--- a/include/linux/edac.h
++++ b/include/linux/edac.h
+@@ -451,6 +451,8 @@ struct dimm_info {
+ 	u32 nr_pages;			/* number of pages on this dimm */
+ 
+ 	unsigned csrow, cschannel;	/* Points to the old API data */
++
++	u16 smbios_handle;              /* Handle for SMBIOS type 17 */
+ };
+ 
+ /**
+-- 
+2.7.4
