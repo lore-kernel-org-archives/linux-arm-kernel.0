@@ -1,226 +1,178 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Tue, 4 Sep 2018 18:58:28 +0200
-Subject: [PATCH v5 1/4] edac: synps: Add platform specific structures for
- ddrc controller
-In-Reply-To: <1535722070-10394-2-git-send-email-manish.narani@xilinx.com>
-References: <1535722070-10394-1-git-send-email-manish.narani@xilinx.com>
- <1535722070-10394-2-git-send-email-manish.narani@xilinx.com>
-Message-ID: <20180904165828.GM32615@zn.tnic>
+From: scott.branden@broadcom.com (Scott Branden)
+Date: Tue, 4 Sep 2018 10:19:58 -0700
+Subject: [PATCH] arm64: defconfig: enable EFI_ARMSTUB_DTB_LOADER
+In-Reply-To: <CACxGe6uK+N5XUqZhH7gAQXoq+QXMvFPHF_i4WqivrufTU=0cog@mail.gmail.com>
+References: <1535563287-24803-1-git-send-email-scott.branden@broadcom.com>
+ <CAOesGMhjcJ1p3QcEYb9fsx3fMXAOsgR2njOq=VKgEbWGwJi36g@mail.gmail.com>
+ <fb07b89d-d427-5e59-9f17-b12df26284ec@broadcom.com>
+ <CAKv+Gu-R7eX=aj=O2-gpzmp0K4t0T4s536UiqJZs0WuxRjkYwQ@mail.gmail.com>
+ <CAOesGMho8CfT7iDXadmkB5=7DoOi6n8qXcS9X643vf+Y0BbD6w@mail.gmail.com>
+ <CAKv+Gu_mKU+RdPgg2Dfezy4-L+KDEEBx02R49ObomRhEkJJ6Mw@mail.gmail.com>
+ <CAOesGMgLHx3+j1bWEsMWsN-yjGNZyLOpAjLg0Jut8gG=ADE25g@mail.gmail.com>
+ <CAKv+Gu_x=bS4xJcD_LuEnnN=Lx4Jc87uK8J_ACdA9EeUqtM3Yg@mail.gmail.com>
+ <CACxGe6uK+N5XUqZhH7gAQXoq+QXMvFPHF_i4WqivrufTU=0cog@mail.gmail.com>
+Message-ID: <bf917897-1697-a6c4-7f77-8dfa74dddc8a@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2018 at 06:57:47PM +0530, Manish Narani wrote:
-> Add platform specific structures, so that we can add different IP
-> support later using quirks.
-> 
-> Signed-off-by: Manish Narani <manish.narani@xilinx.com>
-> ---
->  drivers/edac/synopsys_edac.c | 78 +++++++++++++++++++++++++++++++++-----------
->  1 file changed, 59 insertions(+), 19 deletions(-)
-> 
-> diff --git a/drivers/edac/synopsys_edac.c b/drivers/edac/synopsys_edac.c
-> index 0c9c59e..2470d35 100644
-> --- a/drivers/edac/synopsys_edac.c
-> +++ b/drivers/edac/synopsys_edac.c
-> @@ -22,6 +22,8 @@
->  #include <linux/edac.h>
->  #include <linux/module.h>
->  #include <linux/platform_device.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
->  
->  #include "edac_module.h"
->  
-> @@ -130,6 +132,7 @@ struct synps_ecc_status {
->   * @baseaddr:	Base address of the DDR controller
->   * @message:	Buffer for framing the event specific info
->   * @stat:	ECC status information
-> + * @p_data:	Pointer to platform data
->   * @ce_cnt:	Correctable Error count
->   * @ue_cnt:	Uncorrectable Error count
->   */
-> @@ -137,24 +140,47 @@ struct synps_edac_priv {
->  	void __iomem *baseaddr;
->  	char message[SYNPS_EDAC_MSG_SIZE];
->  	struct synps_ecc_status stat;
-> +	const struct synps_platform_data *p_data;
->  	u32 ce_cnt;
->  	u32 ue_cnt;
->  };
->  
->  /**
-> + * struct synps_platform_data -  synps platform data structure
-> + * @edac_geterror_info:	function pointer to synps edac error info
-> + * @edac_get_mtype:	function pointer to synps edac mtype
-> + * @edac_get_dtype:	function pointer to synps edac dtype
-> + * @edac_get_eccstate:	function pointer to synps edac eccstate
-> + * @quirks:		to differentiate IPs
 
-Kill all that "function pointer" fluff. Here's how I've changed it:
 
-/**
- * struct synps_platform_data -  synps platform data structure
- * @edac_geterror_info: edac error info
- * @edac_get_mtype:     get mtype
- * @edac_get_dtype:     get dtype
- * @edac_get_eccstate:  get ECC state
- * @quirks:             to differentiate IPs
- */
+On 18-09-04 03:13 AM, Grant Likely wrote:
+> Hey folks. More comments below, but the short answer is I really don't
+> see what the problem is. Distros cannot easily support platforms that
+> require a dtb= parameter, and so they probably won't. They may or may
+> not disable 'dtb=', depending on whether they see it as valuable for
+> debug.
+>
+> Vertically integrated platforms are a different beast. We may strongly
+> recommend firmware provides the dtb for all the mentioned good
+> reasons, but they still get to decide their deployment methodology,
+> and it is not burdensome for the kernel to keep the dtb= feature that
+> they are using.
+>
+> On Tue, Sep 4, 2018 at 7:24 AM Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> On 2 September 2018 at 04:54, Olof Johansson <olof@lixom.net> wrote:
+>>> On Thu, Aug 30, 2018 at 9:23 AM, Ard Biesheuvel
+>>> <ard.biesheuvel@linaro.org> wrote:
+>>>> On 30 August 2018 at 17:06, Olof Johansson <olof@lixom.net> wrote:
+>>>>> On Wed, Aug 29, 2018 at 10:54 PM, Ard Biesheuvel
+>>>>> <ard.biesheuvel@linaro.org> wrote:
+>>>>>> On 29 August 2018 at 20:59, Scott Branden <scott.branden@broadcom.com> wrote:
+>>>>>>> Hi Olof,
+>>>>>>>
+>>>>>>>
+>>>>>>> On 18-08-29 11:44 AM, Olof Johansson wrote:
+>>>>>>>> Hi,
+>>>>>>>>
+>>>>>>>> On Wed, Aug 29, 2018 at 10:21 AM, Scott Branden
+>>>>>>>> <scott.branden@broadcom.com> wrote:
+>>>>>>>>> Enable EFI_ARMSTUB_DTB_LOADER to add support for the dtb= command line
+>>>>>>>>> parameter to function with efi loader.
+>>>>>>>>>
+>>>>>>>>> Required to boot on existing bootloaders that do not support devicetree
+>>>>>>>>> provided by the platform or by the bootloader.
+>>>>>>>>>
+>>>>>>>>> Fixes: 3d7ee348aa41 ("efi/libstub/arm: Add opt-in Kconfig option for the
+>>>>>>>>> DTB loader")
+>>>>>>>>> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
+>>>>>>>> Why did Ard create an option for this if it's just going be turned on
+>>>>>>>> in default configs? Doesn't make sense to me.
+>>>>>>>>
+>>>>>>>> It would help to know what firmware still is crippled and how common
+>>>>>>>> it is, since it's been a few years that this has been a requirement by
+>>>>>>>> now.
+>>>>>>> Broadcom NS2 and Stingray in current development and production need this
+>>>>>>> option in the kernel enabled in order to boot.
+>>>>>> And these production systems run mainline kernels in a defconfig configuration?
+>>>>>>
+>>>>>> The simply reality is that the DTB loader has been deprecated for a
+>>>>>> good reason: it was only ever intended as a development hack anyway,
+>>>>>> and if we need to treat the EFI stub provided DTB as a first class
+>>>>>> citizen, there are things we need to fix to make things works as
+>>>>>> expected. For instance, GRUB will put a property in the /chosen node
+>>>>>> for the initramfs which will get dropped if you boot with dtb=.
+>>>>>>
+>>>>>> Don't be surprised if some future enhancements of the EFI stub code
+>>>>>> depend on !EFI_ARMSTUB_DTB_LOADER.
+> That's an odd statement to make. The DTB loader code is well contained
+> and with defined semantics... True, the semantics are "I DON'T BELIEVE
+> FIRMWARE", but it is still well defined. What scenario are you
+> envisioning where EFI_ARMSTUB_DTB_LOADER would be explicitly excluded?
+>
+> Conversely, the dtb= argument is an invaluable debug tool during
+> development. As Olof has already said, there are a lot of embedded
+> deployments where there is no desire for grub or any other
+> intermediary loader.
+>
+>>>>>> On UEFI systems, DTBs [or ACPI
+>>>>>> tables] are used by the firmware to describe itself and the underlying
+>>>>>> platform to the OS, and the practice of booting with DTB file images
+>>>>>> (taken from the kernel build as well) conflicts with that view. Note
+>>>>>> that GRUB still permits you to load DTBs from files (and supports more
+>>>>>> sources than just the file system the kernel Image was loaded from).
+>>>>> Ard,
+>>>>>
+>>>>> Maybe a WARN() splat would be more useful as a phasing-out method than
+>>>>> removing functionality for them that needs to be reinstated through
+>>>>> changing the config?
+>>>>>
+>>>> We don't have any of that in the stub, and inventing new ways to pass
+>>>> such information between the stub and the kernel proper seems like a
+>>>> cart-before-horse kind of thing to me. The EFI stub diagnostic
+>>>> messages you get on the serial console are not recorded in the kernel
+>>>> log buffer, so they only appear if you actually look at the serial
+>>>> output.
+> As an aside, they probably should be recorded. That is probably a
+> question for the UEFI USWG. Grub and the ARMSTUB could probably bodge
+> something together, but that would be non-standard.
+>
+>>> Ah yeah. I suppose you could do it in the kernel later if you detect
+>>> you've booted through EFI with dtb= on the command line though.
+>>>
+>>>>> Once the stub and the boot method is there, it's hard to undo as we
+>>>>> can see here. Being loud and warn might be more useful, and set a
+>>>>> timeline for hard removal (12 months?).
+>>>>>
+>>>> The dtb= handling is still there, it is just not enabled by default.
+>>>> We can keep it around if people are still using it. But as I pointed
+>>>> out, we may decide to make new functionality available only if it is
+>>>> disabled, and at that point, we'll have to choose between one or the
+>>>> other in defconfig, which is annoying.
+>>>>
+>>>>> Scott; an alternative for you is to do a boot wrapper that bundles a
+>>>>> DT and kernel, and boot that instead of the kernel image (outside of
+>>>>> the kernel tree). Some 32-bit platforms from Marvell use that. That
+>>>>> way the kernel will just see it as a normally passed in DT.
+>>>>>
+>>>> Or use GRUB. It comes wired up in all the distros, and let's you load
+>>>> a DT binary from anywhere you can imagine, as opposed to the EFI stub
+>>>> which can only load it if it happens to reside in the same file system
+>>>> (or even directory - I can't remember) as the kernel image. Note that
+>>>> the same reservations apply to doing that - the firmware is no longer
+>>>> able to describe itself to the OS via the DT, which is really the only
+>>>> conduit it has available on an arm64 system..
+>>> So, I've looked at the history here a bit, and dtb= support was
+>>> introduced in 2014. Nowhere does it say that it isn't a recommended
+>>> way of booting.
+>>>
+>>> There are some firmware stacks today that modify and provide a
+>>> runtime-updated devicetree to the kernel, but there are also a bunch
+>>> who don't. Most "real" products will want a firmware that knows how to
+>>> pass in things such as firmware environment variables, or MAC
+>>> addresses, etc, to the kernel, but not all of them need it.
+>>>
+>>> In particular, in a world where you want EFI to be used on embedded
+>>> platforms, requiring another bootloader step such as GRUB to be able
+>>> to reasonably boot said platforms seems like a significant and
+>>> unfortunate new limitation. Documentation/efi-stub.txt has absolutely
+>>> no indication that it is a second-class option that isn't expected to
+>>> be available everywhere. It doesn't really matter what _your_
+>>> intention was around it, if those who use it never found out and now
+>>> rely on it.
+>>>
+>>> Unfortunately the way forward here is to revert 3d7ee348aa4127a.
+>>>
+>> I agree with your analysis but not with your conclusion.
+>>
+>> Whether or not the option is def_bool y and/or enabled in defconfig is
+>> a matter of policy. ACPI-only distros such as RHEL are definitely
+>> going to disable this option. But in general, supporting DTBs loaded
+>> from files is a huge pain for the distros, so I expect most of them to
+>> disable it as well.
+> I support leaving 3d7ee348 in, and making it def_bool y
+Rather than introduce EFI_ARMSTUB_DTB_LOADER, why not have
+the efistub use CONFIG_OF to determine whether it supports dtb= or not?
 
-Shorter, quicker to read/scan/etc...
+That way ACPI-only distros disable devicetree support entirely.
 
-> + */
-> +struct synps_platform_data {
-> +	int (*edac_geterror_info)(struct synps_edac_priv *priv);
-> +	enum mem_type (*edac_get_mtype)(const void __iomem *base);
-> +	enum dev_type (*edac_get_dtype)(const void __iomem *base);
-> +	bool (*edac_get_eccstate)(void __iomem *base);
-> +	int quirks;
-> +};
-> +
-> +/**
->   * synps_edac_geterror_info - Get the current ecc error info
-> - * @base:	Pointer to the base address of the ddr memory controller
-> - * @p:		Pointer to the synopsys ecc status structure
-> + * @priv:	Pointer to DDR memory controller private instance data
->   *
->   * Determines there is any ecc error or not
-
-All sentences end with a fullstop. Check all your patches.
-
-Also, it is not "ecc" it is "ECC". Also go over all your patches.
-
->   *
->   * Return: one if there is no error otherwise returns zero
->   */
-> -static int synps_edac_geterror_info(void __iomem *base,
-> -				    struct synps_ecc_status *p)
-> +static int synps_edac_geterror_info(struct synps_edac_priv *priv)
->  {
-> +	void __iomem *base;
-> +	struct synps_ecc_status *p;
->  	u32 regval, clearval = 0;
-
-Please sort function local variables declaration in a reverse christmas
-tree order:
-
-	<type> longest_variable_name;
-	<type> shorter_var_name;
-	<type> even_shorter;
-	<type> i;
-
->  
-> +	if (!priv)
-> +		return 1;
-
-Why are you even checking this here?
-
-synps_edac_check() is merrily dereferencing it - if anything we will
-explode there already.
-
-> +
-> +	base = priv->baseaddr;
-> +	p = &priv->stat;
-> +
->  	regval = readl(base + STAT_OFST);
->  	if (!regval)
->  		return 1;
-> @@ -240,9 +266,10 @@ static void synps_edac_handle_error(struct mem_ctl_info *mci,
->  static void synps_edac_check(struct mem_ctl_info *mci)
->  {
->  	struct synps_edac_priv *priv = mci->pvt_info;
-> +	const struct synps_platform_data *p_data = priv->p_data;
->  	int status;
->  
-> -	status = synps_edac_geterror_info(priv->baseaddr, &priv->stat);
-> +	status = p_data->edac_geterror_info(priv);
->  	if (status)
->  		return;
->  
-> @@ -362,6 +389,7 @@ static int synps_edac_init_csrows(struct mem_ctl_info *mci)
->  	struct csrow_info *csi;
->  	struct dimm_info *dimm;
->  	struct synps_edac_priv *priv = mci->pvt_info;
-> +	const struct synps_platform_data *p_data = priv->p_data;
->  	u32 size;
->  	int row, j;
->  
-> @@ -370,12 +398,12 @@ static int synps_edac_init_csrows(struct mem_ctl_info *mci)
-
-That function returns 0 unconditionally. Make it a void in a prepatch.
-
->  		size = synps_edac_get_memsize();
->  
->  		for (j = 0; j < csi->nr_channels; j++) {
-> -			dimm            = csi->channels[j]->dimm;
-> -			dimm->edac_mode = EDAC_FLAG_SECDED;
-> -			dimm->mtype     = synps_edac_get_mtype(priv->baseaddr);
-> -			dimm->nr_pages  = (size >> PAGE_SHIFT) / csi->nr_channels;
-> -			dimm->grain     = SYNPS_EDAC_ERR_GRAIN;
-> -			dimm->dtype     = synps_edac_get_dtype(priv->baseaddr);
-> +			dimm		= csi->channels[j]->dimm;
-> +			dimm->edac_mode	= EDAC_FLAG_SECDED;
-> +			dimm->mtype	= p_data->edac_get_mtype(priv->baseaddr);
-> +			dimm->nr_pages	= (size >> PAGE_SHIFT) / csi->nr_channels;
-> +			dimm->grain	= SYNPS_EDAC_ERR_GRAIN;
-> +			dimm->dtype	= p_data->edac_get_dtype(priv->baseaddr);
->  		}
->  	}
->  
-> @@ -423,6 +451,21 @@ static int synps_edac_mc_init(struct mem_ctl_info *mci,
->  	return status;
->  }
->  
-> +static const struct synps_platform_data zynq_edac_def = {
-> +	.edac_geterror_info	= synps_edac_geterror_info,
-> +	.edac_get_mtype		= synps_edac_get_mtype,
-> +	.edac_get_dtype		= synps_edac_get_dtype,
-> +	.edac_get_eccstate	= synps_edac_get_eccstate,
-> +	.quirks			= 0,
-> +};
-> +
-> +static const struct of_device_id synps_edac_match[] = {
-> +	{ .compatible = "xlnx,zynq-ddrc-a05", .data = (void *)&zynq_edac_def },
-> +	{ /* end of table */ }
-> +};
-> +
-> +MODULE_DEVICE_TABLE(of, synps_edac_match);
-> +
->  /**
->   * synps_edac_mc_probe - Check controller and bind driver
->   * @pdev:	Pointer to the platform_device struct
-> @@ -440,13 +483,15 @@ static int synps_edac_mc_probe(struct platform_device *pdev)
->  	int rc;
->  	struct resource *res;
->  	void __iomem *baseaddr;
-> +	const struct synps_platform_data *p_data;
-
-Please sort function local variables declaration in a reverse christmas
-tree order:
-
-	<type> longest_variable_name;
-	<type> shorter_var_name;
-	<type> even_shorter;
-	<type> i;
-
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	baseaddr = devm_ioremap_resource(&pdev->dev, res);
->  	if (IS_ERR(baseaddr))
->  		return PTR_ERR(baseaddr);
->  
-> -	if (!synps_edac_get_eccstate(baseaddr)) {
-> +	p_data = of_device_get_match_data(&pdev->dev);
-> +	if (!(p_data->edac_get_eccstate(baseaddr))) {
-
-Too many parentheses:
-
-	if (!p_data->...
-
-is enough.
-
--- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+>
+> g.
+>> As for EFI on embedded systems: this will be mostly on U-boot's
+>> bootefi implementation, which definitely does the right thing when it
+>> comes to passing the DTB via a UEFI configuration table (regardless of
+>> whether it makes any modifications to it)
+>>
+>> In any case, I won't object to a patch that reenables the EFI stub DTB
+>> loader in defconfig. Whether or not it should be def_bool y is
+>> something we can discuss as well. I have added Leif and Alex to cc,
+>> perhaps they have anything to add.
