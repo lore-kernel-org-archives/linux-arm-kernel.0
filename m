@@ -1,34 +1,27 @@
 From: hch@lst.de (Christoph Hellwig)
-Date: Tue,  4 Sep 2018 12:14:19 -0700
-Subject: [PATCH 01/13] arm: remove the unused BIOVEC_MERGEABLE define
+Date: Tue,  4 Sep 2018 12:14:20 -0700
+Subject: [PATCH 02/13] xen: remove the xen_biovec_phys_mergeable export
 In-Reply-To: <20180904191431.20102-1-hch@lst.de>
 References: <20180904191431.20102-1-hch@lst.de>
-Message-ID: <20180904191431.20102-2-hch@lst.de>
+Message-ID: <20180904191431.20102-3-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+BIOVEC_PHYS_MERGEABLE is only called from core block code.
+
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- arch/arm/include/asm/io.h | 7 -------
- 1 file changed, 7 deletions(-)
+ drivers/xen/biomerge.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index 2cfbc531f63b..6774553dc214 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -459,13 +459,6 @@ extern void pci_iounmap(struct pci_dev *dev, void __iomem *addr);
- 
- #include <asm-generic/io.h>
- 
--/*
-- * can the hardware map this into one segment or not, given no other
-- * constraints.
-- */
--#define BIOVEC_MERGEABLE(vec1, vec2)	\
--	((bvec_to_phys((vec1)) + (vec1)->bv_len) == bvec_to_phys((vec2)))
--
- struct bio_vec;
- extern bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
- 				      const struct bio_vec *vec2);
+diff --git a/drivers/xen/biomerge.c b/drivers/xen/biomerge.c
+index 55ed80c3a17c..399c4e30f723 100644
+--- a/drivers/xen/biomerge.c
++++ b/drivers/xen/biomerge.c
+@@ -20,4 +20,3 @@ bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
+ 	return false;
+ #endif
+ }
+-EXPORT_SYMBOL(xen_biovec_phys_mergeable);
 -- 
 2.18.0
