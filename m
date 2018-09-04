@@ -1,23 +1,24 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 4 Sep 2018 09:16:18 -0500
-Subject: [PATCH v5 2/4] dt: bindings: Document ZynqMP DDRC in Synopsys
- documentation
-In-Reply-To: <1535722070-10394-3-git-send-email-manish.narani@xilinx.com>
-References: <1535722070-10394-1-git-send-email-manish.narani@xilinx.com>
- <1535722070-10394-3-git-send-email-manish.narani@xilinx.com>
-Message-ID: <20180904141618.GA5516@bogus>
+Date: Tue, 4 Sep 2018 09:21:05 -0500
+Subject: [PATCH] phy: Convert to using %pOFn instead of device_node.name
+In-Reply-To: <9dcceda0-1d92-0a7a-feb1-887414021ac9@ti.com>
+References: <20180828015252.28511-1-robh@kernel.org>
+ <20180828015252.28511-39-robh@kernel.org>
+ <9dcceda0-1d92-0a7a-feb1-887414021ac9@ti.com>
+Message-ID: <CAL_JsqLrMwd-=Y6rm5RRJ25HNLTxOkFbLMcB4w0UgHteVdidGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2018 at 06:57:48PM +0530, Manish Narani wrote:
-> Add information of ZynqMP DDRC which reports the single bit errors that
-> are corrected and the double bit errors that are detected.
-> 
-> Signed-off-by: Manish Narani <manish.narani@xilinx.com>
-> ---
->  .../bindings/memory-controllers/synopsys.txt       | 27 ++++++++++++++++++----
->  1 file changed, 22 insertions(+), 5 deletions(-)
+On Mon, Sep 3, 2018 at 9:24 PM Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>
+> Hi Rob,
+>
+> On Tuesday 28 August 2018 07:22 AM, Rob Herring wrote:
+> > In preparation to remove the node name pointer from struct device_node,
+> > convert printf users to use the %pOFn format specifier.
+>
+> I assume it should be okay to get this merged in the next merge window?
 
-Please add acks/reviewed-bys when posting new versions.
+Yes, of course.
 
 Rob
