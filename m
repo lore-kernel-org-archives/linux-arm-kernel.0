@@ -1,237 +1,218 @@
 From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Tue,  4 Sep 2018 21:58:31 +0530
-Subject: [PATCH v3 01/15] soc: octeontx2: Add Marvell OcteonTX2 RVU AF driver
+Date: Tue,  4 Sep 2018 21:58:32 +0530
+Subject: [PATCH v3 02/15] soc: octeontx2: Reset all RVU blocks
 In-Reply-To: <1536078525-31534-1-git-send-email-sunil.kovvuri@gmail.com>
 References: <1536078525-31534-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1536078525-31534-2-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1536078525-31534-3-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sunil Goutham <sgoutham@marvell.com>
 
-This patch adds basic template for Marvell OcteonTX2's
-resource virtualization unit (RVU) admin function (AF)
-driver. Just the driver registration and probe.
+Go through all BLKADDRs and check which ones are implemented
+on this silicon and do a HW reset of each implemented block.
+Also added all RVU AF and PF register offsets.
 
 Signed-off-by: Sunil Goutham <sgoutham@marvell.com>
 ---
- drivers/soc/Kconfig                    |   1 +
- drivers/soc/Makefile                   |   1 +
- drivers/soc/marvell/Kconfig            |  13 ++++
- drivers/soc/marvell/Makefile           |   2 +
- drivers/soc/marvell/octeontx2/Makefile |   8 +++
- drivers/soc/marvell/octeontx2/rvu.c    | 126 +++++++++++++++++++++++++++++++++
- drivers/soc/marvell/octeontx2/rvu.h    |  31 ++++++++
- 7 files changed, 182 insertions(+)
- create mode 100644 drivers/soc/marvell/Kconfig
- create mode 100644 drivers/soc/marvell/Makefile
- create mode 100644 drivers/soc/marvell/octeontx2/Makefile
- create mode 100644 drivers/soc/marvell/octeontx2/rvu.c
- create mode 100644 drivers/soc/marvell/octeontx2/rvu.h
+ drivers/soc/marvell/octeontx2/rvu.c        |  78 ++++++++++++++++++++
+ drivers/soc/marvell/octeontx2/rvu.h        |  37 ++++++++++
+ drivers/soc/marvell/octeontx2/rvu_reg.h    | 113 +++++++++++++++++++++++++++++
+ drivers/soc/marvell/octeontx2/rvu_struct.h |  36 +++++++++
+ 4 files changed, 264 insertions(+)
+ create mode 100644 drivers/soc/marvell/octeontx2/rvu_reg.h
+ create mode 100644 drivers/soc/marvell/octeontx2/rvu_struct.h
 
-diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
-index c07b4a8..42f2d0b 100644
---- a/drivers/soc/Kconfig
-+++ b/drivers/soc/Kconfig
-@@ -6,6 +6,7 @@ source "drivers/soc/atmel/Kconfig"
- source "drivers/soc/bcm/Kconfig"
- source "drivers/soc/fsl/Kconfig"
- source "drivers/soc/imx/Kconfig"
-+source "drivers/soc/marvell/Kconfig"
- source "drivers/soc/mediatek/Kconfig"
- source "drivers/soc/qcom/Kconfig"
- source "drivers/soc/renesas/Kconfig"
-diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
-index 113e884..5e18cbb 100644
---- a/drivers/soc/Makefile
-+++ b/drivers/soc/Makefile
-@@ -12,6 +12,7 @@ obj-y				+= fsl/
- obj-$(CONFIG_ARCH_GEMINI)	+= gemini/
- obj-$(CONFIG_ARCH_MXC)		+= imx/
- obj-$(CONFIG_SOC_XWAY)		+= lantiq/
-+obj-y				+= marvell/
- obj-y				+= mediatek/
- obj-$(CONFIG_ARCH_MESON)	+= amlogic/
- obj-y				+= qcom/
-diff --git a/drivers/soc/marvell/Kconfig b/drivers/soc/marvell/Kconfig
-new file mode 100644
-index 0000000..4499caf
---- /dev/null
-+++ b/drivers/soc/marvell/Kconfig
-@@ -0,0 +1,13 @@
-+#
-+# MARVELL SoC drivers
-+#
-+
-+menu "Marvell SoC drivers"
-+
-+config OCTEONTX2_AF
-+	tristate "OcteonTX2 RVU Admin Function driver"
-+	depends on ARM64 && PCI
-+	help
-+	  This driver supports Marvell's OcteonTX2 Resource Virtualization
-+	  Unit's admin function manager which manages all RVU HW resources.
-+endmenu
-diff --git a/drivers/soc/marvell/Makefile b/drivers/soc/marvell/Makefile
-new file mode 100644
-index 0000000..16e0ca0
---- /dev/null
-+++ b/drivers/soc/marvell/Makefile
-@@ -0,0 +1,2 @@
-+# SPDX-License-Identifier: GPL-2.0
-+obj-y		+= octeontx2/
-diff --git a/drivers/soc/marvell/octeontx2/Makefile b/drivers/soc/marvell/octeontx2/Makefile
-new file mode 100644
-index 0000000..dacbd16
---- /dev/null
-+++ b/drivers/soc/marvell/octeontx2/Makefile
-@@ -0,0 +1,8 @@
-+# SPDX-License-Identifier: GPL-2.0
-+#
-+# Makefile for Marvell's OcteonTX2 RVU Admin Function driver
-+#
-+
-+obj-$(CONFIG_OCTEONTX2_AF) += octeontx2_af.o
-+
-+octeontx2_af-y := rvu.o
 diff --git a/drivers/soc/marvell/octeontx2/rvu.c b/drivers/soc/marvell/octeontx2/rvu.c
-new file mode 100644
-index 0000000..5af4da6
---- /dev/null
+index 5af4da6..d40fabf 100644
+--- a/drivers/soc/marvell/octeontx2/rvu.c
 +++ b/drivers/soc/marvell/octeontx2/rvu.c
-@@ -0,0 +1,126 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/* Marvell OcteonTx2 RVU Admin Function driver
-+ *
-+ * Copyright (C) 2018 Marvell International Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
+@@ -16,6 +16,7 @@
+ #include <linux/sysfs.h>
+ 
+ #include "rvu.h"
++#include "rvu_reg.h"
+ 
+ #define DRV_NAME	"octeontx2-af"
+ #define DRV_STRING      "Marvell OcteonTX2 RVU Admin Function Driver"
+@@ -33,6 +34,70 @@ MODULE_LICENSE("GPL v2");
+ MODULE_VERSION(DRV_VERSION);
+ MODULE_DEVICE_TABLE(pci, rvu_id_table);
+ 
++/* Poll a RVU block's register 'offset', for a 'zero'
++ * or 'nonzero' at bits specified by 'mask'
++ */
++int rvu_poll_reg(struct rvu *rvu, u64 block, u64 offset, u64 mask, bool zero)
++{
++	void __iomem *reg;
++	int timeout = 100;
++	u64 reg_val;
++
++	reg = rvu->afreg_base + ((block << 28) | offset);
++	while (timeout) {
++		reg_val = readq(reg);
++		if (zero && !(reg_val & mask))
++			return 0;
++		if (!zero && (reg_val & mask))
++			return 0;
++		udelay(1);
++		cpu_relax();
++		timeout--;
++	}
++	return -EBUSY;
++}
++
++static void rvu_check_block_implemented(struct rvu *rvu)
++{
++	struct rvu_hwinfo *hw = rvu->hw;
++	struct rvu_block *block;
++	int blkid;
++	u64 cfg;
++
++	/* For each block check if 'implemented' bit is set */
++	for (blkid = 0; blkid < BLK_COUNT; blkid++) {
++		block = &hw->block[blkid];
++		cfg = rvupf_read64(rvu, RVU_PF_BLOCK_ADDRX_DISC(blkid));
++		if (cfg & BIT_ULL(11))
++			block->implemented = true;
++	}
++}
++
++static void rvu_block_reset(struct rvu *rvu, int blkaddr, u64 rst_reg)
++{
++	struct rvu_block *block = &rvu->hw->block[blkaddr];
++
++	if (!block->implemented)
++		return;
++
++	rvu_write64(rvu, blkaddr, rst_reg, BIT_ULL(0));
++	rvu_poll_reg(rvu, blkaddr, rst_reg, BIT_ULL(63), true);
++}
++
++static void rvu_reset_all_blocks(struct rvu *rvu)
++{
++	/* Do a HW reset of all RVU blocks */
++	rvu_block_reset(rvu, BLKADDR_NPA, NPA_AF_BLK_RST);
++	rvu_block_reset(rvu, BLKADDR_NIX0, NIX_AF_BLK_RST);
++	rvu_block_reset(rvu, BLKADDR_NPC, NPC_AF_BLK_RST);
++	rvu_block_reset(rvu, BLKADDR_SSO, SSO_AF_BLK_RST);
++	rvu_block_reset(rvu, BLKADDR_TIM, TIM_AF_BLK_RST);
++	rvu_block_reset(rvu, BLKADDR_CPT0, CPT_AF_BLK_RST);
++	rvu_block_reset(rvu, BLKADDR_NDC0, NDC_AF_BLK_RST);
++	rvu_block_reset(rvu, BLKADDR_NDC1, NDC_AF_BLK_RST);
++	rvu_block_reset(rvu, BLKADDR_NDC2, NDC_AF_BLK_RST);
++}
++
+ static int rvu_probe(struct pci_dev *pdev, const struct pci_device_id *id)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -43,6 +108,12 @@ static int rvu_probe(struct pci_dev *pdev, const struct pci_device_id *id)
+ 	if (!rvu)
+ 		return -ENOMEM;
+ 
++	rvu->hw = devm_kzalloc(dev, sizeof(struct rvu_hwinfo), GFP_KERNEL);
++	if (!rvu->hw) {
++		devm_kfree(dev, rvu);
++		return -ENOMEM;
++	}
++
+ 	pci_set_drvdata(pdev, rvu);
+ 	rvu->pdev = pdev;
+ 	rvu->dev = &pdev->dev;
+@@ -80,6 +151,11 @@ static int rvu_probe(struct pci_dev *pdev, const struct pci_device_id *id)
+ 		goto err_release_regions;
+ 	}
+ 
++	/* Check which blocks the HW supports */
++	rvu_check_block_implemented(rvu);
++
++	rvu_reset_all_blocks(rvu);
++
+ 	return 0;
+ 
+ err_release_regions:
+@@ -88,6 +164,7 @@ static int rvu_probe(struct pci_dev *pdev, const struct pci_device_id *id)
+ 	pci_disable_device(pdev);
+ err_freemem:
+ 	pci_set_drvdata(pdev, NULL);
++	devm_kfree(&pdev->dev, rvu->hw);
+ 	devm_kfree(dev, rvu);
+ 	return err;
+ }
+@@ -100,6 +177,7 @@ static void rvu_remove(struct pci_dev *pdev)
+ 	pci_disable_device(pdev);
+ 	pci_set_drvdata(pdev, NULL);
+ 
++	devm_kfree(&pdev->dev, rvu->hw);
+ 	devm_kfree(&pdev->dev, rvu);
+ }
+ 
+diff --git a/drivers/soc/marvell/octeontx2/rvu.h b/drivers/soc/marvell/octeontx2/rvu.h
+index 4a4b0ad..e2c54d0 100644
+--- a/drivers/soc/marvell/octeontx2/rvu.h
++++ b/drivers/soc/marvell/octeontx2/rvu.h
+@@ -11,6 +11,8 @@
+ #ifndef RVU_H
+ #define RVU_H
+ 
++#include "rvu_struct.h"
++
+ /* PCI device IDs */
+ #define	PCI_DEVID_OCTEONTX2_RVU_AF		0xA065
+ 
+@@ -21,11 +23,46 @@
+ 
+ #define NAME_SIZE				32
+ 
++struct rvu_block {
++	bool implemented;
++};
++
++struct rvu_hwinfo {
++	struct rvu_block block[BLK_COUNT]; /* Block info */
++};
++
+ struct rvu {
+ 	void __iomem		*afreg_base;
+ 	void __iomem		*pfreg_base;
+ 	struct pci_dev		*pdev;
+ 	struct device		*dev;
++	struct rvu_hwinfo       *hw;
+ };
+ 
++static inline void rvu_write64(struct rvu *rvu, u64 block, u64 offset, u64 val)
++{
++	writeq(val, rvu->afreg_base + ((block << 28) | offset));
++}
++
++static inline u64 rvu_read64(struct rvu *rvu, u64 block, u64 offset)
++{
++	return readq(rvu->afreg_base + ((block << 28) | offset));
++}
++
++static inline void rvupf_write64(struct rvu *rvu, u64 offset, u64 val)
++{
++	writeq(val, rvu->pfreg_base + offset);
++}
++
++static inline u64 rvupf_read64(struct rvu *rvu, u64 offset)
++{
++	return readq(rvu->pfreg_base + offset);
++}
++
++/* Function Prototypes
++ * RVU
 + */
 +
-+#include <linux/module.h>
-+#include <linux/interrupt.h>
-+#include <linux/delay.h>
-+#include <linux/irq.h>
-+#include <linux/pci.h>
-+#include <linux/sysfs.h>
++int rvu_poll_reg(struct rvu *rvu, u64 block, u64 offset, u64 mask, bool zero);
 +
-+#include "rvu.h"
-+
-+#define DRV_NAME	"octeontx2-af"
-+#define DRV_STRING      "Marvell OcteonTX2 RVU Admin Function Driver"
-+#define DRV_VERSION	"1.0"
-+
-+/* Supported devices */
-+static const struct pci_device_id rvu_id_table[] = {
-+	{ PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, PCI_DEVID_OCTEONTX2_RVU_AF) },
-+	{ 0, }  /* end of table */
-+};
-+
-+MODULE_AUTHOR("Marvell International Ltd.");
-+MODULE_DESCRIPTION(DRV_STRING);
-+MODULE_LICENSE("GPL v2");
-+MODULE_VERSION(DRV_VERSION);
-+MODULE_DEVICE_TABLE(pci, rvu_id_table);
-+
-+static int rvu_probe(struct pci_dev *pdev, const struct pci_device_id *id)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct rvu *rvu;
-+	int    err;
-+
-+	rvu = devm_kzalloc(dev, sizeof(*rvu), GFP_KERNEL);
-+	if (!rvu)
-+		return -ENOMEM;
-+
-+	pci_set_drvdata(pdev, rvu);
-+	rvu->pdev = pdev;
-+	rvu->dev = &pdev->dev;
-+
-+	err = pci_enable_device(pdev);
-+	if (err) {
-+		dev_err(dev, "Failed to enable PCI device\n");
-+		goto err_freemem;
-+	}
-+
-+	err = pci_request_regions(pdev, DRV_NAME);
-+	if (err) {
-+		dev_err(dev, "PCI request regions failed 0x%x\n", err);
-+		goto err_disable_device;
-+	}
-+
-+	err = pci_set_dma_mask(pdev, DMA_BIT_MASK(48));
-+	if (err) {
-+		dev_err(dev, "Unable to set DMA mask\n");
-+		goto err_release_regions;
-+	}
-+
-+	err = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(48));
-+	if (err) {
-+		dev_err(dev, "Unable to set consistent DMA mask\n");
-+		goto err_release_regions;
-+	}
-+
-+	/* Map Admin function CSRs */
-+	rvu->afreg_base = pcim_iomap(pdev, PCI_AF_REG_BAR_NUM, 0);
-+	rvu->pfreg_base = pcim_iomap(pdev, PCI_PF_REG_BAR_NUM, 0);
-+	if (!rvu->afreg_base || !rvu->pfreg_base) {
-+		dev_err(dev, "Unable to map admin function CSRs, aborting\n");
-+		err = -ENOMEM;
-+		goto err_release_regions;
-+	}
-+
-+	return 0;
-+
-+err_release_regions:
-+	pci_release_regions(pdev);
-+err_disable_device:
-+	pci_disable_device(pdev);
-+err_freemem:
-+	pci_set_drvdata(pdev, NULL);
-+	devm_kfree(dev, rvu);
-+	return err;
-+}
-+
-+static void rvu_remove(struct pci_dev *pdev)
-+{
-+	struct rvu *rvu = pci_get_drvdata(pdev);
-+
-+	pci_release_regions(pdev);
-+	pci_disable_device(pdev);
-+	pci_set_drvdata(pdev, NULL);
-+
-+	devm_kfree(&pdev->dev, rvu);
-+}
-+
-+static struct pci_driver rvu_driver = {
-+	.name = DRV_NAME,
-+	.id_table = rvu_id_table,
-+	.probe = rvu_probe,
-+	.remove = rvu_remove,
-+};
-+
-+static int __init rvu_init_module(void)
-+{
-+	pr_info("%s: %s\n", DRV_NAME, DRV_STRING);
-+
-+	return pci_register_driver(&rvu_driver);
-+}
-+
-+static void __exit rvu_cleanup_module(void)
-+{
-+	pci_unregister_driver(&rvu_driver);
-+}
-+
-+module_init(rvu_init_module);
-+module_exit(rvu_cleanup_module);
-diff --git a/drivers/soc/marvell/octeontx2/rvu.h b/drivers/soc/marvell/octeontx2/rvu.h
+ #endif /* RVU_H */
+diff --git a/drivers/soc/marvell/octeontx2/rvu_reg.h b/drivers/soc/marvell/octeontx2/rvu_reg.h
 new file mode 100644
-index 0000000..4a4b0ad
+index 0000000..e7abd7e
 --- /dev/null
-+++ b/drivers/soc/marvell/octeontx2/rvu.h
-@@ -0,0 +1,31 @@
++++ b/drivers/soc/marvell/octeontx2/rvu_reg.h
+@@ -0,0 +1,113 @@
 +/* SPDX-License-Identifier: GPL-2.0
 + * Marvell OcteonTx2 RVU Admin Function driver
 + *
@@ -242,26 +223,150 @@ index 0000000..4a4b0ad
 + * published by the Free Software Foundation.
 + */
 +
-+#ifndef RVU_H
-+#define RVU_H
++#ifndef RVU_REG_H
++#define RVU_REG_H
 +
-+/* PCI device IDs */
-+#define	PCI_DEVID_OCTEONTX2_RVU_AF		0xA065
++/* Admin function registers */
++#define RVU_AF_MSIXTR_BASE                  (0x10)
++#define RVU_AF_ECO                          (0x20)
++#define RVU_AF_BLK_RST                      (0x30)
++#define RVU_AF_PF_BAR4_ADDR                 (0x40)
++#define RVU_AF_RAS                          (0x100)
++#define RVU_AF_RAS_W1S                      (0x108)
++#define RVU_AF_RAS_ENA_W1S                  (0x110)
++#define RVU_AF_RAS_ENA_W1C                  (0x118)
++#define RVU_AF_GEN_INT                      (0x120)
++#define RVU_AF_GEN_INT_W1S                  (0x128)
++#define RVU_AF_GEN_INT_ENA_W1S              (0x130)
++#define RVU_AF_GEN_INT_ENA_W1C              (0x138)
++#define	RVU_AF_AFPF_MBOX0		    (0x02000)
++#define	RVU_AF_AFPF_MBOX1		    (0x02008)
++#define RVU_AF_AFPFX_MBOXX(a, b)            (0x2000 | (a) << 4 | (b) << 3)
++#define RVU_AF_PFME_STATUS                  (0x2800)
++#define RVU_AF_PFTRPEND                     (0x2810)
++#define RVU_AF_PFTRPEND_W1S                 (0x2820)
++#define RVU_AF_PF_RST                       (0x2840)
++#define RVU_AF_HWVF_RST                     (0x2850)
++#define RVU_AF_PFAF_MBOX_INT                (0x2880)
++#define RVU_AF_PFAF_MBOX_INT_W1S            (0x2888)
++#define RVU_AF_PFAF_MBOX_INT_ENA_W1S        (0x2890)
++#define RVU_AF_PFAF_MBOX_INT_ENA_W1C        (0x2898)
++#define RVU_AF_PFFLR_INT                    (0x28a0)
++#define RVU_AF_PFFLR_INT_W1S                (0x28a8)
++#define RVU_AF_PFFLR_INT_ENA_W1S            (0x28b0)
++#define RVU_AF_PFFLR_INT_ENA_W1C            (0x28b8)
++#define RVU_AF_PFME_INT                     (0x28c0)
++#define RVU_AF_PFME_INT_W1S                 (0x28c8)
++#define RVU_AF_PFME_INT_ENA_W1S             (0x28d0)
++#define RVU_AF_PFME_INT_ENA_W1C             (0x28d8)
 +
-+/* PCI BAR nos */
-+#define	PCI_AF_REG_BAR_NUM			0
-+#define	PCI_PF_REG_BAR_NUM			2
-+#define	PCI_MBOX_BAR_NUM			4
++/* Admin function's privileged PF/VF registers */
++#define RVU_PRIV_CONST                      (0x8000000)
++#define RVU_PRIV_GEN_CFG                    (0x8000010)
++#define RVU_PRIV_CLK_CFG                    (0x8000020)
++#define RVU_PRIV_ACTIVE_PC                  (0x8000030)
++#define RVU_PRIV_PFX_CFG(a)                 (0x8000100 | (a) << 16)
++#define RVU_PRIV_PFX_MSIX_CFG(a)            (0x8000110 | (a) << 16)
++#define RVU_PRIV_PFX_ID_CFG(a)              (0x8000120 | (a) << 16)
++#define RVU_PRIV_PFX_INT_CFG(a)             (0x8000200 | (a) << 16)
++#define RVU_PRIV_PFX_NIX_CFG                (0x8000300)
++#define RVU_PRIV_PFX_NPA_CFG		    (0x8000310)
++#define RVU_PRIV_PFX_SSO_CFG                (0x8000320)
++#define RVU_PRIV_PFX_SSOW_CFG               (0x8000330)
++#define RVU_PRIV_PFX_TIM_CFG                (0x8000340)
++#define RVU_PRIV_PFX_CPT_CFG                (0x8000350)
++#define RVU_PRIV_BLOCK_TYPEX_REV(a)         (0x8000400 | (a) << 3)
++#define RVU_PRIV_HWVFX_INT_CFG(a)           (0x8001280 | (a) << 16)
++#define RVU_PRIV_HWVFX_NIX_CFG              (0x8001300)
++#define RVU_PRIV_HWVFX_NPA_CFG              (0x8001310)
++#define RVU_PRIV_HWVFX_SSO_CFG              (0x8001320)
++#define RVU_PRIV_HWVFX_SSOW_CFG             (0x8001330)
++#define RVU_PRIV_HWVFX_TIM_CFG              (0x8001340)
++#define RVU_PRIV_HWVFX_CPT_CFG              (0x8001350)
 +
-+#define NAME_SIZE				32
++/* RVU PF registers */
++#define	RVU_PF_VFX_PFVF_MBOX0		    (0x00000)
++#define	RVU_PF_VFX_PFVF_MBOX1		    (0x00008)
++#define RVU_PF_VFX_PFVF_MBOXX(a, b)         (0x0 | (a) << 12 | (b) << 3)
++#define RVU_PF_VF_BAR4_ADDR                 (0x10)
++#define RVU_PF_BLOCK_ADDRX_DISC(a)          (0x200 | (a) << 3)
++#define RVU_PF_VFME_STATUSX(a)              (0x800 | (a) << 3)
++#define RVU_PF_VFTRPENDX(a)                 (0x820 | (a) << 3)
++#define RVU_PF_VFTRPEND_W1SX(a)             (0x840 | (a) << 3)
++#define RVU_PF_VFPF_MBOX_INTX(a)            (0x880 | (a) << 3)
++#define RVU_PF_VFPF_MBOX_INT_W1SX(a)        (0x8A0 | (a) << 3)
++#define RVU_PF_VFPF_MBOX_INT_ENA_W1SX(a)    (0x8C0 | (a) << 3)
++#define RVU_PF_VFPF_MBOX_INT_ENA_W1CX(a)    (0x8E0 | (a) << 3)
++#define RVU_PF_VFFLR_INTX(a)                (0x900 | (a) << 3)
++#define RVU_PF_VFFLR_INT_W1SX(a)            (0x920 | (a) << 3)
++#define RVU_PF_VFFLR_INT_ENA_W1SX(a)        (0x940 | (a) << 3)
++#define RVU_PF_VFFLR_INT_ENA_W1CX(a)        (0x960 | (a) << 3)
++#define RVU_PF_VFME_INTX(a)                 (0x980 | (a) << 3)
++#define RVU_PF_VFME_INT_W1SX(a)             (0x9A0 | (a) << 3)
++#define RVU_PF_VFME_INT_ENA_W1SX(a)         (0x9C0 | (a) << 3)
++#define RVU_PF_VFME_INT_ENA_W1CX(a)         (0x9E0 | (a) << 3)
++#define RVU_PF_PFAF_MBOX0                   (0xC00)
++#define RVU_PF_PFAF_MBOX1                   (0xC08)
++#define RVU_PF_PFAF_MBOXX(a)                (0xC00 | (a) << 3)
++#define RVU_PF_INT                          (0xc20)
++#define RVU_PF_INT_W1S                      (0xc28)
++#define RVU_PF_INT_ENA_W1S                  (0xc30)
++#define RVU_PF_INT_ENA_W1C                  (0xc38)
++#define RVU_PF_MSIX_VECX_ADDR(a)            (0x000 | (a) << 4)
++#define RVU_PF_MSIX_VECX_CTL(a)             (0x008 | (a) << 4)
++#define RVU_PF_MSIX_PBAX(a)                 (0xF0000 | (a) << 3)
 +
-+struct rvu {
-+	void __iomem		*afreg_base;
-+	void __iomem		*pfreg_base;
-+	struct pci_dev		*pdev;
-+	struct device		*dev;
++
++#define NPA_AF_BLK_RST                  (0x0000)
++#define NIX_AF_BLK_RST                  (0x00B0)
++#define SSO_AF_BLK_RST                  (0x10f8)
++#define TIM_AF_BLK_RST                  (0x10)
++#define CPT_AF_BLK_RST                  (0x46000)
++#define NDC_AF_BLK_RST                  (0x002F0)
++#define NPC_AF_BLK_RST                  (0x00040)
++
++#endif /* RVU_REG_H */
+diff --git a/drivers/soc/marvell/octeontx2/rvu_struct.h b/drivers/soc/marvell/octeontx2/rvu_struct.h
+new file mode 100644
+index 0000000..4122559
+--- /dev/null
++++ b/drivers/soc/marvell/octeontx2/rvu_struct.h
+@@ -0,0 +1,36 @@
++/* SPDX-License-Identifier: GPL-2.0
++ * Marvell OcteonTx2 RVU Admin Function driver
++ *
++ * Copyright (C) 2018 Marvell International Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef RVU_STRUCT_H
++#define RVU_STRUCT_H
++
++/*
++ * RVU Block Address Enumeration
++ */
++enum rvu_block_addr_e {
++	BLKADDR_RVUM    = 0x0ULL,
++	BLKADDR_LMT     = 0x1ULL,
++	BLKADDR_MSIX    = 0x2ULL,
++	BLKADDR_NPA     = 0x3ULL,
++	BLKADDR_NIX0    = 0x4ULL,
++	BLKADDR_NIX1    = 0x5ULL,
++	BLKADDR_NPC     = 0x6ULL,
++	BLKADDR_SSO     = 0x7ULL,
++	BLKADDR_SSOW    = 0x8ULL,
++	BLKADDR_TIM     = 0x9ULL,
++	BLKADDR_CPT0    = 0xaULL,
++	BLKADDR_CPT1    = 0xbULL,
++	BLKADDR_NDC0    = 0xcULL,
++	BLKADDR_NDC1    = 0xdULL,
++	BLKADDR_NDC2    = 0xeULL,
++	BLK_COUNT	= 0xfULL,
 +};
 +
-+#endif /* RVU_H */
++#endif /* RVU_STRUCT_H */
 -- 
 2.7.4
