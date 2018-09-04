@@ -1,85 +1,338 @@
 From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Tue,  4 Sep 2018 17:24:41 +0530
-Subject: [PATCH v2 06/15] soc: octeontx2: Convert mbox msg id check to a macro
+Date: Tue,  4 Sep 2018 17:24:42 +0530
+Subject: [PATCH v2 07/15] soc: octeontx2: Scan blocks for LFs provisioned to
+ PF/VF
 In-Reply-To: <1536062090-30446-1-git-send-email-sunil.kovvuri@gmail.com>
 References: <1536062090-30446-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1536062090-30446-7-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1536062090-30446-8-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Aleksey Makarov <amakarov@marvell.com>
+From: Sunil Goutham <sgoutham@marvell.com>
 
-With 10's of mailbox messages expected to be handled in future,
-checking for message id could become a lengthy switch case. Hence
-added a macro to auto generate the switch case for each msg id.
+Scan all RVU blocks to find any 'LF to RVU PF/VF' mapping done by
+low level firmware. If found any, mark them as used in respective
+block's LF bitmap and also save mapped PF/VF's PF_FUNC info.
 
-Signed-off-by: Aleksey Makarov <amakarov@marvell.com>
+This is done to avoid reattaching a block LF to a different RVU PF/VF.
+
+Signed-off-by: Sunil Goutham <sgoutham@marvell.com>
 ---
- drivers/soc/marvell/octeontx2/rvu.c | 44 ++++++++++++++++++++++++++++++++-----
- 1 file changed, 38 insertions(+), 6 deletions(-)
+ drivers/soc/marvell/octeontx2/rvu.c        | 148 ++++++++++++++++++++++++++++-
+ drivers/soc/marvell/octeontx2/rvu.h        |  16 ++++
+ drivers/soc/marvell/octeontx2/rvu_struct.h |  18 ++++
+ 3 files changed, 180 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/soc/marvell/octeontx2/rvu.c b/drivers/soc/marvell/octeontx2/rvu.c
-index e795c2f..25f79bf 100644
+index 25f79bf..9539ab9 100644
 --- a/drivers/soc/marvell/octeontx2/rvu.c
 +++ b/drivers/soc/marvell/octeontx2/rvu.c
-@@ -258,6 +258,12 @@ static int rvu_setup_hw_resources(struct rvu *rvu)
+@@ -22,6 +22,8 @@
+ #define DRV_STRING      "Marvell OcteonTX2 RVU Admin Function Driver"
+ #define DRV_VERSION	"1.0"
+ 
++static int rvu_get_hwvf(struct rvu *rvu, int pcifunc);
++
+ /* Supported devices */
+ static const struct pci_device_id rvu_id_table[] = {
+ 	{ PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, PCI_DEVID_OCTEONTX2_RVU_AF) },
+@@ -66,6 +68,91 @@ int rvu_alloc_bitmap(struct rsrc_bmap *rsrc)
  	return 0;
  }
  
-+static int rvu_mbox_handler_READY(struct rvu *rvu, struct msg_req *req,
-+				  struct ready_msg_rsp *rsp)
++static void rvu_update_rsrc_map(struct rvu *rvu, struct rvu_pfvf *pfvf,
++				struct rvu_block *block, u16 pcifunc,
++				u16 lf, bool attach)
 +{
-+	return 0;
++	int devnum, num_lfs = 0;
++	bool is_pf;
++	u64 reg;
++
++	if (lf >= block->lf.max) {
++		dev_err(&rvu->pdev->dev,
++			"%s: FATAL: LF %d is >= %s's max lfs i.e %d\n",
++			__func__, lf, block->name, block->lf.max);
++		return;
++	}
++
++	/* Check if this is for a RVU PF or VF */
++	if (pcifunc & RVU_PFVF_FUNC_MASK) {
++		is_pf = false;
++		devnum = rvu_get_hwvf(rvu, pcifunc);
++	} else {
++		is_pf = true;
++		devnum = rvu_get_pf(pcifunc);
++	}
++
++	block->fn_map[lf] = attach ? pcifunc : 0;
++
++	switch (block->type) {
++	case BLKTYPE_NPA:
++		pfvf->npalf = attach ? true : false;
++		num_lfs = pfvf->npalf;
++		break;
++	case BLKTYPE_NIX:
++		pfvf->nixlf = attach ? true : false;
++		num_lfs = pfvf->nixlf;
++		break;
++	case BLKTYPE_SSO:
++		attach ? pfvf->sso++ : pfvf->sso--;
++		num_lfs = pfvf->sso;
++		break;
++	case BLKTYPE_SSOW:
++		attach ? pfvf->ssow++ : pfvf->ssow--;
++		num_lfs = pfvf->ssow;
++		break;
++	case BLKTYPE_TIM:
++		attach ? pfvf->timlfs++ : pfvf->timlfs--;
++		num_lfs = pfvf->timlfs;
++		break;
++	case BLKTYPE_CPT:
++		attach ? pfvf->cptlfs++ : pfvf->cptlfs--;
++		num_lfs = pfvf->cptlfs;
++		break;
++	}
++
++	reg = is_pf ? block->pf_lfcnt_reg : block->vf_lfcnt_reg;
++	rvu_write64(rvu, BLKADDR_RVUM, reg | (devnum << 16), num_lfs);
 +}
 +
- static int rvu_process_mbox_msg(struct rvu *rvu, int devid,
- 				struct mbox_msghdr *req)
++inline int rvu_get_pf(u16 pcifunc)
++{
++	return (pcifunc >> RVU_PFVF_PF_SHIFT) & RVU_PFVF_PF_MASK;
++}
++
++static int rvu_get_hwvf(struct rvu *rvu, int pcifunc)
++{
++	int pf, func;
++	u64 cfg;
++
++	pf = rvu_get_pf(pcifunc);
++	func = pcifunc & RVU_PFVF_FUNC_MASK;
++
++	/* Get first HWVF attached to this PF */
++	cfg = rvu_read64(rvu, BLKADDR_RVUM, RVU_PRIV_PFX_CFG(pf));
++
++	return ((cfg & 0xFFF) + func - 1);
++}
++
++struct rvu_pfvf *rvu_get_pfvf(struct rvu *rvu, int pcifunc)
++{
++	/* Check if it is a PF or VF */
++	if (pcifunc & RVU_PFVF_FUNC_MASK)
++		return &rvu->hwvf[rvu_get_hwvf(rvu, pcifunc)];
++	else
++		return &rvu->pf[rvu_get_pf(pcifunc)];
++}
++
+ static void rvu_check_block_implemented(struct rvu *rvu)
  {
-@@ -265,13 +271,39 @@ static int rvu_process_mbox_msg(struct rvu *rvu, int devid,
- 	if (req->sig != OTX2_MBOX_REQ_SIG)
- 		goto bad_message;
- 
--	if (req->id == MBOX_MSG_READY)
--		return 0;
--
-+	switch (req->id) {
-+#define M(_name, _id, _req_type, _rsp_type)				\
-+	case _id: {							\
-+		struct _rsp_type *rsp;					\
-+		int err;						\
-+									\
-+		rsp = (struct _rsp_type *)otx2_mbox_alloc_msg(		\
-+			&rvu->mbox, devid,				\
-+			sizeof(struct _rsp_type));			\
-+		if (rsp) {						\
-+			rsp->hdr.id = _id;				\
-+			rsp->hdr.sig = OTX2_MBOX_RSP_SIG;		\
-+			rsp->hdr.pcifunc = req->pcifunc;		\
-+			rsp->hdr.rc = 0;				\
-+		}							\
-+									\
-+		err = rvu_mbox_handler_ ## _name(rvu,			\
-+						 (struct _req_type *)req, \
-+						 rsp);			\
-+		if (rsp && err)						\
-+			rsp->hdr.rc = err;				\
-+									\
-+		return rsp ? err : -ENOMEM;				\
-+	}
-+MBOX_MESSAGES
-+#undef M
-+		break;
- bad_message:
--	otx2_reply_invalid_msg(&rvu->mbox, devid, req->pcifunc,
--			       req->id);
--	return -ENODEV;
-+	default:
-+		otx2_reply_invalid_msg(&rvu->mbox, devid, req->pcifunc,
-+				       req->id);
-+		return -ENODEV;
-+	}
+ 	struct rvu_hwinfo *hw = rvu->hw;
+@@ -107,6 +194,28 @@ static void rvu_reset_all_blocks(struct rvu *rvu)
+ 	rvu_block_reset(rvu, BLKADDR_NDC2, NDC_AF_BLK_RST);
  }
  
- static void rvu_mbox_handler(struct work_struct *work)
++static void rvu_scan_block(struct rvu *rvu, struct rvu_block *block)
++{
++	struct rvu_pfvf *pfvf;
++	u64 cfg;
++	int lf;
++
++	for (lf = 0; lf < block->lf.max; lf++) {
++		cfg = rvu_read64(rvu, block->addr,
++				 block->lfcfg_reg | (lf << block->lfshift));
++		if (!(cfg & BIT_ULL(63)))
++			continue;
++
++		/* Set this resource as being used */
++		__set_bit(lf, block->lf.bmap);
++
++		/* Get, to whom this LF is attached */
++		pfvf = rvu_get_pfvf(rvu, (cfg >> 8) & 0xFFFF);
++		rvu_update_rsrc_map(rvu, pfvf, block,
++				    (cfg >> 8) & 0xFFFF, lf, true);
++	}
++}
++
+ static void rvu_free_hw_resources(struct rvu *rvu)
+ {
+ 	struct rvu_hwinfo *hw = rvu->hw;
+@@ -124,7 +233,7 @@ static int rvu_setup_hw_resources(struct rvu *rvu)
+ {
+ 	struct rvu_hwinfo *hw = rvu->hw;
+ 	struct rvu_block *block;
+-	int err;
++	int blkid, err;
+ 	u64 cfg;
+ 
+ 	/* Get HW supported max RVU PF & VF count */
+@@ -140,6 +249,7 @@ static int rvu_setup_hw_resources(struct rvu *rvu)
+ 	cfg = rvu_read64(rvu, BLKADDR_NPA, NPA_AF_CONST);
+ 	block->lf.max = (cfg >> 16) & 0xFFF;
+ 	block->addr = BLKADDR_NPA;
++	block->type = BLKTYPE_NPA;
+ 	block->lfshift = 8;
+ 	block->lookup_reg = NPA_AF_RVU_LF_CFG_DEBUG;
+ 	block->pf_lfcnt_reg = RVU_PRIV_PFX_NPA_CFG;
+@@ -160,6 +270,7 @@ static int rvu_setup_hw_resources(struct rvu *rvu)
+ 	cfg = rvu_read64(rvu, BLKADDR_NIX0, NIX_AF_CONST2);
+ 	block->lf.max = cfg & 0xFFF;
+ 	block->addr = BLKADDR_NIX0;
++	block->type = BLKTYPE_NIX;
+ 	block->lfshift = 8;
+ 	block->lookup_reg = NIX_AF_RVU_LF_CFG_DEBUG;
+ 	block->pf_lfcnt_reg = RVU_PRIV_PFX_NIX_CFG;
+@@ -180,6 +291,7 @@ static int rvu_setup_hw_resources(struct rvu *rvu)
+ 	cfg = rvu_read64(rvu, BLKADDR_SSO, SSO_AF_CONST);
+ 	block->lf.max = cfg & 0xFFFF;
+ 	block->addr = BLKADDR_SSO;
++	block->type = BLKTYPE_SSO;
+ 	block->multislot = true;
+ 	block->lfshift = 3;
+ 	block->lookup_reg = SSO_AF_RVU_LF_CFG_DEBUG;
+@@ -200,6 +312,7 @@ static int rvu_setup_hw_resources(struct rvu *rvu)
+ 		goto tim;
+ 	block->lf.max = (cfg >> 56) & 0xFF;
+ 	block->addr = BLKADDR_SSOW;
++	block->type = BLKTYPE_SSOW;
+ 	block->multislot = true;
+ 	block->lfshift = 3;
+ 	block->lookup_reg = SSOW_AF_RVU_LF_HWS_CFG_DEBUG;
+@@ -221,6 +334,7 @@ static int rvu_setup_hw_resources(struct rvu *rvu)
+ 	cfg = rvu_read64(rvu, BLKADDR_TIM, TIM_AF_CONST);
+ 	block->lf.max = cfg & 0xFFFF;
+ 	block->addr = BLKADDR_TIM;
++	block->type = BLKTYPE_TIM;
+ 	block->multislot = true;
+ 	block->lfshift = 3;
+ 	block->lookup_reg = TIM_AF_RVU_LF_CFG_DEBUG;
+@@ -238,10 +352,11 @@ static int rvu_setup_hw_resources(struct rvu *rvu)
+ 	/* Init CPT LF's bitmap */
+ 	block = &hw->block[BLKADDR_CPT0];
+ 	if (!block->implemented)
+-		return 0;
++		goto init;
+ 	cfg = rvu_read64(rvu, BLKADDR_CPT0, CPT_AF_CONSTANTS0);
+ 	block->lf.max = cfg & 0xFF;
+ 	block->addr = BLKADDR_CPT0;
++	block->type = BLKTYPE_CPT;
+ 	block->multislot = true;
+ 	block->lfshift = 3;
+ 	block->lookup_reg = CPT_AF_RVU_LF_CFG_DEBUG;
+@@ -255,6 +370,35 @@ static int rvu_setup_hw_resources(struct rvu *rvu)
+ 	if (err)
+ 		return err;
+ 
++init:
++	/* Allocate memory for PFVF data */
++	rvu->pf = devm_kcalloc(rvu->dev, hw->total_pfs,
++			       sizeof(struct rvu_pfvf), GFP_KERNEL);
++	if (!rvu->pf)
++		return -ENOMEM;
++
++	rvu->hwvf = devm_kcalloc(rvu->dev, hw->total_vfs,
++				 sizeof(struct rvu_pfvf), GFP_KERNEL);
++	if (!rvu->hwvf)
++		return -ENOMEM;
++
++	for (blkid = 0; blkid < BLK_COUNT; blkid++) {
++		block = &hw->block[blkid];
++		if (!block->lf.bmap)
++			continue;
++
++		/* Allocate memory for block LF/slot to pcifunc mapping info */
++		block->fn_map = devm_kcalloc(rvu->dev, block->lf.max,
++					     sizeof(u16), GFP_KERNEL);
++		if (!block->fn_map)
++			return -ENOMEM;
++
++		/* Scan all blocks to check if low level firmware has
++		 * already provisioned any of the resources to a PF/VF.
++		 */
++		rvu_scan_block(rvu, block);
++	}
++
+ 	return 0;
+ }
+ 
+diff --git a/drivers/soc/marvell/octeontx2/rvu.h b/drivers/soc/marvell/octeontx2/rvu.h
+index 2fb9407..ce9897b 100644
+--- a/drivers/soc/marvell/octeontx2/rvu.h
++++ b/drivers/soc/marvell/octeontx2/rvu.h
+@@ -42,9 +42,11 @@ struct rsrc_bmap {
+ 
+ struct rvu_block {
+ 	struct rsrc_bmap lf;
++	u16  *fn_map; /* LF to pcifunc mapping */
+ 	bool multislot;
+ 	bool implemented;
+ 	u8   addr;  /* RVU_BLOCK_ADDR_E */
++	u8   type;  /* RVU_BLOCK_TYPE_E */
+ 	u8   lfshift;
+ 	u64  lookup_reg;
+ 	u64  pf_lfcnt_reg;
+@@ -55,6 +57,16 @@ struct rvu_block {
+ 	unsigned char name[NAME_SIZE];
+ };
+ 
++/* Structure for per RVU func info ie PF/VF */
++struct rvu_pfvf {
++	bool		npalf; /* Only one NPALF per RVU_FUNC */
++	bool		nixlf; /* Only one NIXLF per RVU_FUNC */
++	u16		sso;
++	u16		ssow;
++	u16		cptlfs;
++	u16		timlfs;
++};
++
+ struct rvu_hwinfo {
+ 	u8	total_pfs;   /* MAX RVU PFs HW supports */
+ 	u16	total_vfs;   /* Max RVU VFs HW supports */
+@@ -69,6 +81,8 @@ struct rvu {
+ 	struct pci_dev		*pdev;
+ 	struct device		*dev;
+ 	struct rvu_hwinfo       *hw;
++	struct rvu_pfvf		*pf;
++	struct rvu_pfvf		*hwvf;
+ 
+ 	/* Mbox */
+ 	struct otx2_mbox	mbox;
+@@ -107,5 +121,7 @@ static inline u64 rvupf_read64(struct rvu *rvu, u64 offset)
+ 
+ int rvu_alloc_bitmap(struct rsrc_bmap *rsrc);
+ int rvu_poll_reg(struct rvu *rvu, u64 block, u64 offset, u64 mask, bool zero);
++int rvu_get_pf(u16 pcifunc);
++struct rvu_pfvf *rvu_get_pfvf(struct rvu *rvu, int pcifunc);
+ 
+ #endif /* RVU_H */
+diff --git a/drivers/soc/marvell/octeontx2/rvu_struct.h b/drivers/soc/marvell/octeontx2/rvu_struct.h
+index 1dc1518..77ac751 100644
+--- a/drivers/soc/marvell/octeontx2/rvu_struct.h
++++ b/drivers/soc/marvell/octeontx2/rvu_struct.h
+@@ -33,6 +33,24 @@ enum rvu_block_addr_e {
+ 	BLK_COUNT	= 0xfULL,
+ };
+ 
++/*
++ * RVU Block Type Enumeration
++ */
++enum rvu_block_type_e {
++	BLKTYPE_RVUM = 0x0,
++	BLKTYPE_MSIX = 0x1,
++	BLKTYPE_LMT  = 0x2,
++	BLKTYPE_NIX  = 0x3,
++	BLKTYPE_NPA  = 0x4,
++	BLKTYPE_NPC  = 0x5,
++	BLKTYPE_SSO  = 0x6,
++	BLKTYPE_SSOW = 0x7,
++	BLKTYPE_TIM  = 0x8,
++	BLKTYPE_CPT  = 0x9,
++	BLKTYPE_NDC  = 0xa,
++	BLKTYPE_MAX  = 0xa,
++};
++
+ /* RVU Admin function Interrupt Vector Enumeration */
+ enum rvu_af_int_vec_e {
+ 	RVU_AF_INT_VEC_POISON = 0x0,
 -- 
 2.7.4
