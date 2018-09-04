@@ -1,37 +1,56 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue,  4 Sep 2018 22:06:08 +0530
-Subject: [PATCH v4 3/4] drm/sun4i: Enable DE2 Mixer for SUN8I and SUN50I
-In-Reply-To: <20180904163609.10171-1-jagan@amarulasolutions.com>
-References: <20180904163609.10171-1-jagan@amarulasolutions.com>
-Message-ID: <20180904163609.10171-3-jagan@amarulasolutions.com>
+From: koomi@moshbit.net (Lukas Braun)
+Date: Tue,  4 Sep 2018 18:39:36 +0200
+Subject: [PATCH] KVM: arm/arm64: Check memslot bounds before mapping hugepages
+Message-ID: <20180904163937.12759-1-koomi@moshbit.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner SoC like SUN8I and SUN50I are now using DE2 Mixer
-so enable them as default.
+Userspace can create a memslot with memory backed by (transparent)
+hugepages, but with bounds that do not align with hugepages.
+In that case, we cannot map the entire region in the guest as hugepages
+without exposing additional host memory to the guest and potentially
+interfering with other memslots.
+Consequently, this patch adds a bounds check when populating guest page
+tables and forces the creation of regular PTEs if mapping an entire
+hugepage would violate the memslots bounds.
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+Signed-off-by: Lukas Braun <koomi@moshbit.net>
 ---
-Changes for v4, v3:
-- none
-Changes for v2:
-- Enable for SUN8I
+ virt/kvm/arm/mmu.c | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
 
- drivers/gpu/drm/sun4i/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/gpu/drm/sun4i/Kconfig b/drivers/gpu/drm/sun4i/Kconfig
-index c2c042287c19..cfa8b96273fb 100644
---- a/drivers/gpu/drm/sun4i/Kconfig
-+++ b/drivers/gpu/drm/sun4i/Kconfig
-@@ -61,7 +61,7 @@ config DRM_SUN8I_DW_HDMI
- 
- config DRM_SUN8I_MIXER
- 	tristate "Support for Allwinner Display Engine 2.0 Mixer"
--	default MACH_SUN8I
-+	default MACH_SUN8I || (ARM64 && ARCH_SUNXI)
- 	help
- 	  Choose this option if you have an Allwinner SoC with the
- 	  Allwinner Display Engine 2.0, which has a mixer to do some
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index ed162a6c57c5..bdbec1d136a1 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1504,6 +1504,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		hugetlb = true;
+ 		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
+ 	} else {
++		unsigned long pmd_fn_mask = PTRS_PER_PMD - 1;
++
+ 		/*
+ 		 * Pages belonging to memslots that don't have the same
+ 		 * alignment for userspace and IPA cannot be mapped using
+@@ -1513,8 +1515,17 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		 * unmapping, updates, and splits of the THP or other pages
+ 		 * in the stage-2 block range.
+ 		 */
+-		if ((memslot->userspace_addr & ~PMD_MASK) !=
+-		    ((memslot->base_gfn << PAGE_SHIFT) & ~PMD_MASK))
++		int aligned = ((memslot->userspace_addr & ~PMD_MASK) ==
++			((memslot->base_gfn << PAGE_SHIFT) & ~PMD_MASK));
++
++		/*
++		 * We also can't map a huge page if it would violate the bounds
++		 * of the containing memslot.
++		 */
++		int in_bounds = ((memslot->base_gfn <= (gfn & ~pmd_fn_mask)) &&
++			((memslot->base_gfn + memslot->npages) > (gfn | pmd_fn_mask)));
++
++		if (!aligned || !in_bounds)
+ 			force_pte = true;
+ 	}
+ 	up_read(&current->mm->mmap_sem);
 -- 
-2.18.0.321.gffc6fa0e3
+2.11.0
