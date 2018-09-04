@@ -1,372 +1,538 @@
 From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Tue,  4 Sep 2018 17:24:37 +0530
-Subject: [PATCH v2 02/15] soc: octeontx2: Reset all RVU blocks
+Date: Tue,  4 Sep 2018 17:24:39 +0530
+Subject: [PATCH v2 04/15] soc: octeontx2: Add mailbox support infra
 In-Reply-To: <1536062090-30446-1-git-send-email-sunil.kovvuri@gmail.com>
 References: <1536062090-30446-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1536062090-30446-3-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1536062090-30446-5-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunil Goutham <sgoutham@marvell.com>
+From: Aleksey Makarov <amakarov@marvell.com>
 
-Go through all BLKADDRs and check which ones are implemented
-on this silicon and do a HW reset of each implemented block.
-Also added all RVU AF and PF register offsets.
+This patch adds mailbox support infrastructure APIs.
+Each RVU device has a dedicated 64KB mailbox region
+shared with it's peer for communication. RVU AF has
+a separate mailbox region shared with each of RVU PFs
+and a RVU PF has a separate region shared with each of
+it's VF.
 
+These set of APIs are used by this driver (RVU AF) and
+other RVU PF/VF drivers eg netdev, crypto e.t.c.
+
+Signed-off-by: Aleksey Makarov <amakarov@marvell.com>
 Signed-off-by: Sunil Goutham <sgoutham@marvell.com>
+Signed-off-by: Lukasz Bartosik <lbartosik@marvell.com>
 ---
- drivers/soc/marvell/octeontx2/rvu.c        |  78 ++++++++++++++++++++
- drivers/soc/marvell/octeontx2/rvu.h        |  37 ++++++++++
- drivers/soc/marvell/octeontx2/rvu_reg.h    | 113 +++++++++++++++++++++++++++++
- drivers/soc/marvell/octeontx2/rvu_struct.h |  36 +++++++++
- 4 files changed, 264 insertions(+)
- create mode 100644 drivers/soc/marvell/octeontx2/rvu_reg.h
- create mode 100644 drivers/soc/marvell/octeontx2/rvu_struct.h
+ drivers/soc/marvell/Kconfig             |   4 +
+ drivers/soc/marvell/octeontx2/Makefile  |   2 +
+ drivers/soc/marvell/octeontx2/mbox.c    | 303 ++++++++++++++++++++++++++++++++
+ drivers/soc/marvell/octeontx2/mbox.h    | 142 +++++++++++++++
+ drivers/soc/marvell/octeontx2/rvu_reg.h |   4 +
+ 5 files changed, 455 insertions(+)
+ create mode 100644 drivers/soc/marvell/octeontx2/mbox.c
+ create mode 100644 drivers/soc/marvell/octeontx2/mbox.h
 
-diff --git a/drivers/soc/marvell/octeontx2/rvu.c b/drivers/soc/marvell/octeontx2/rvu.c
-index 5af4da6..d40fabf 100644
---- a/drivers/soc/marvell/octeontx2/rvu.c
-+++ b/drivers/soc/marvell/octeontx2/rvu.c
-@@ -16,6 +16,7 @@
- #include <linux/sysfs.h>
+diff --git a/drivers/soc/marvell/Kconfig b/drivers/soc/marvell/Kconfig
+index 4499caf..428d22e 100644
+--- a/drivers/soc/marvell/Kconfig
++++ b/drivers/soc/marvell/Kconfig
+@@ -4,8 +4,12 @@
  
- #include "rvu.h"
-+#include "rvu_reg.h"
+ menu "Marvell SoC drivers"
  
- #define DRV_NAME	"octeontx2-af"
- #define DRV_STRING      "Marvell OcteonTX2 RVU Admin Function Driver"
-@@ -33,6 +34,70 @@ MODULE_LICENSE("GPL v2");
- MODULE_VERSION(DRV_VERSION);
- MODULE_DEVICE_TABLE(pci, rvu_id_table);
++config OCTEONTX2_MBOX
++	tristate
++
+ config OCTEONTX2_AF
+ 	tristate "OcteonTX2 RVU Admin Function driver"
++	select OCTEONTX2_MBOX
+ 	depends on ARM64 && PCI
+ 	help
+ 	  This driver supports Marvell's OcteonTX2 Resource Virtualization
+diff --git a/drivers/soc/marvell/octeontx2/Makefile b/drivers/soc/marvell/octeontx2/Makefile
+index dacbd16..ac17cb9 100644
+--- a/drivers/soc/marvell/octeontx2/Makefile
++++ b/drivers/soc/marvell/octeontx2/Makefile
+@@ -3,6 +3,8 @@
+ # Makefile for Marvell's OcteonTX2 RVU Admin Function driver
+ #
  
-+/* Poll a RVU block's register 'offset', for a 'zero'
-+ * or 'nonzero' at bits specified by 'mask'
++obj-$(CONFIG_OCTEONTX2_MBOX) += octeontx2_mbox.o
+ obj-$(CONFIG_OCTEONTX2_AF) += octeontx2_af.o
+ 
++octeontx2_mbox-y := mbox.o
+ octeontx2_af-y := rvu.o
+diff --git a/drivers/soc/marvell/octeontx2/mbox.c b/drivers/soc/marvell/octeontx2/mbox.c
+new file mode 100644
+index 0000000..0722fa4
+--- /dev/null
++++ b/drivers/soc/marvell/octeontx2/mbox.c
+@@ -0,0 +1,303 @@
++// SPDX-License-Identifier: GPL-2.0
++/* Marvell OcteonTx2 RVU Admin Function driver
++ *
++ * Copyright (C) 2018 Marvell International Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
-+int rvu_poll_reg(struct rvu *rvu, u64 block, u64 offset, u64 mask, bool zero)
-+{
-+	void __iomem *reg;
-+	int timeout = 100;
-+	u64 reg_val;
 +
-+	reg = rvu->afreg_base + ((block << 28) | offset);
-+	while (timeout) {
-+		reg_val = readq(reg);
-+		if (zero && !(reg_val & mask))
-+			return 0;
-+		if (!zero && (reg_val & mask))
-+			return 0;
-+		udelay(1);
-+		cpu_relax();
-+		timeout--;
++#include <linux/module.h>
++#include <linux/interrupt.h>
++#include <linux/pci.h>
++
++#include "rvu_reg.h"
++#include "mbox.h"
++
++static const u16 msgs_offset = ALIGN(sizeof(struct mbox_hdr), MBOX_MSG_ALIGN);
++
++void otx2_mbox_reset(struct otx2_mbox *mbox, int devid)
++{
++	struct otx2_mbox_dev *mdev = &mbox->dev[devid];
++	struct mbox_hdr *tx_hdr =
++		(struct mbox_hdr *)(mdev->mbase  + mbox->tx_start);
++	struct mbox_hdr *rx_hdr =
++		(struct mbox_hdr *)(mdev->mbase  + mbox->rx_start);
++
++	spin_lock(&mdev->mbox_lock);
++	mdev->msg_size = 0;
++	mdev->rsp_size = 0;
++	tx_hdr->num_msgs = 0;
++	rx_hdr->num_msgs = 0;
++	spin_unlock(&mdev->mbox_lock);
++}
++EXPORT_SYMBOL(otx2_mbox_reset);
++
++void otx2_mbox_destroy(struct otx2_mbox *mbox)
++{
++	mbox->reg_base = NULL;
++	mbox->hwbase = NULL;
++
++	kfree(mbox->dev);
++	mbox->dev = NULL;
++}
++EXPORT_SYMBOL(otx2_mbox_destroy);
++
++int otx2_mbox_init(struct otx2_mbox *mbox, void *hwbase, struct pci_dev *pdev,
++		   void *reg_base, int direction, int ndevs)
++{
++	int devid;
++	struct otx2_mbox_dev *mdev;
++
++	switch (direction) {
++	case MBOX_DIR_AFPF:
++	case MBOX_DIR_PFVF:
++		mbox->tx_start = MBOX_DOWN_TX_START;
++		mbox->rx_start = MBOX_DOWN_RX_START;
++		mbox->tx_size  = MBOX_DOWN_TX_SIZE;
++		mbox->rx_size  = MBOX_DOWN_RX_SIZE;
++		break;
++	case MBOX_DIR_PFAF:
++	case MBOX_DIR_VFPF:
++		mbox->tx_start = MBOX_DOWN_RX_START;
++		mbox->rx_start = MBOX_DOWN_TX_START;
++		mbox->tx_size  = MBOX_DOWN_RX_SIZE;
++		mbox->rx_size  = MBOX_DOWN_TX_SIZE;
++		break;
++	case MBOX_DIR_AFPF_UP:
++	case MBOX_DIR_PFVF_UP:
++		mbox->tx_start = MBOX_UP_TX_START;
++		mbox->rx_start = MBOX_UP_RX_START;
++		mbox->tx_size  = MBOX_UP_TX_SIZE;
++		mbox->rx_size  = MBOX_UP_RX_SIZE;
++		break;
++	case MBOX_DIR_PFAF_UP:
++	case MBOX_DIR_VFPF_UP:
++		mbox->tx_start = MBOX_UP_RX_START;
++		mbox->rx_start = MBOX_UP_TX_START;
++		mbox->tx_size  = MBOX_UP_RX_SIZE;
++		mbox->rx_size  = MBOX_UP_TX_SIZE;
++		break;
++	default:
++		return -ENODEV;
 +	}
-+	return -EBUSY;
-+}
 +
-+static void rvu_check_block_implemented(struct rvu *rvu)
-+{
-+	struct rvu_hwinfo *hw = rvu->hw;
-+	struct rvu_block *block;
-+	int blkid;
-+	u64 cfg;
-+
-+	/* For each block check if 'implemented' bit is set */
-+	for (blkid = 0; blkid < BLK_COUNT; blkid++) {
-+		block = &hw->block[blkid];
-+		cfg = rvupf_read64(rvu, RVU_PF_BLOCK_ADDRX_DISC(blkid));
-+		if (cfg & BIT_ULL(11))
-+			block->implemented = true;
++	switch (direction) {
++	case MBOX_DIR_AFPF:
++	case MBOX_DIR_AFPF_UP:
++		mbox->trigger = RVU_AF_AFPF_MBOX0;
++		mbox->tr_shift = 4;
++		break;
++	case MBOX_DIR_PFAF:
++	case MBOX_DIR_PFAF_UP:
++		mbox->trigger = RVU_PF_PFAF_MBOX1;
++		mbox->tr_shift = 0;
++		break;
++	case MBOX_DIR_PFVF:
++	case MBOX_DIR_PFVF_UP:
++		mbox->trigger = RVU_PF_VFX_PFVF_MBOX0;
++		mbox->tr_shift = 12;
++		break;
++	case MBOX_DIR_VFPF:
++	case MBOX_DIR_VFPF_UP:
++		mbox->trigger = RVU_VF_VFPF_MBOX1;
++		mbox->tr_shift = 0;
++		break;
++	default:
++		return -ENODEV;
 +	}
-+}
 +
-+static void rvu_block_reset(struct rvu *rvu, int blkaddr, u64 rst_reg)
-+{
-+	struct rvu_block *block = &rvu->hw->block[blkaddr];
++	mbox->reg_base = reg_base;
++	mbox->hwbase = hwbase;
++	mbox->pdev = pdev;
 +
-+	if (!block->implemented)
-+		return;
-+
-+	rvu_write64(rvu, blkaddr, rst_reg, BIT_ULL(0));
-+	rvu_poll_reg(rvu, blkaddr, rst_reg, BIT_ULL(63), true);
-+}
-+
-+static void rvu_reset_all_blocks(struct rvu *rvu)
-+{
-+	/* Do a HW reset of all RVU blocks */
-+	rvu_block_reset(rvu, BLKADDR_NPA, NPA_AF_BLK_RST);
-+	rvu_block_reset(rvu, BLKADDR_NIX0, NIX_AF_BLK_RST);
-+	rvu_block_reset(rvu, BLKADDR_NPC, NPC_AF_BLK_RST);
-+	rvu_block_reset(rvu, BLKADDR_SSO, SSO_AF_BLK_RST);
-+	rvu_block_reset(rvu, BLKADDR_TIM, TIM_AF_BLK_RST);
-+	rvu_block_reset(rvu, BLKADDR_CPT0, CPT_AF_BLK_RST);
-+	rvu_block_reset(rvu, BLKADDR_NDC0, NDC_AF_BLK_RST);
-+	rvu_block_reset(rvu, BLKADDR_NDC1, NDC_AF_BLK_RST);
-+	rvu_block_reset(rvu, BLKADDR_NDC2, NDC_AF_BLK_RST);
-+}
-+
- static int rvu_probe(struct pci_dev *pdev, const struct pci_device_id *id)
- {
- 	struct device *dev = &pdev->dev;
-@@ -43,6 +108,12 @@ static int rvu_probe(struct pci_dev *pdev, const struct pci_device_id *id)
- 	if (!rvu)
- 		return -ENOMEM;
- 
-+	rvu->hw = devm_kzalloc(dev, sizeof(struct rvu_hwinfo), GFP_KERNEL);
-+	if (!rvu->hw) {
-+		devm_kfree(dev, rvu);
++	mbox->dev = kcalloc(ndevs, sizeof(struct otx2_mbox_dev), GFP_KERNEL);
++	if (!mbox->dev) {
++		otx2_mbox_destroy(mbox);
 +		return -ENOMEM;
 +	}
 +
- 	pci_set_drvdata(pdev, rvu);
- 	rvu->pdev = pdev;
- 	rvu->dev = &pdev->dev;
-@@ -80,6 +151,11 @@ static int rvu_probe(struct pci_dev *pdev, const struct pci_device_id *id)
- 		goto err_release_regions;
- 	}
- 
-+	/* Check which blocks the HW supports */
-+	rvu_check_block_implemented(rvu);
++	mbox->ndevs = ndevs;
++	for (devid = 0; devid < ndevs; devid++) {
++		mdev = &mbox->dev[devid];
++		mdev->mbase = mbox->hwbase + (devid * MBOX_SIZE);
++		spin_lock_init(&mdev->mbox_lock);
++		/* Init header to reset value */
++		otx2_mbox_reset(mbox, devid);
++	}
 +
-+	rvu_reset_all_blocks(rvu);
++	return 0;
++}
++EXPORT_SYMBOL(otx2_mbox_init);
 +
- 	return 0;
- 
- err_release_regions:
-@@ -88,6 +164,7 @@ static int rvu_probe(struct pci_dev *pdev, const struct pci_device_id *id)
- 	pci_disable_device(pdev);
- err_freemem:
- 	pci_set_drvdata(pdev, NULL);
-+	devm_kfree(&pdev->dev, rvu->hw);
- 	devm_kfree(dev, rvu);
- 	return err;
- }
-@@ -100,6 +177,7 @@ static void rvu_remove(struct pci_dev *pdev)
- 	pci_disable_device(pdev);
- 	pci_set_drvdata(pdev, NULL);
- 
-+	devm_kfree(&pdev->dev, rvu->hw);
- 	devm_kfree(&pdev->dev, rvu);
- }
- 
-diff --git a/drivers/soc/marvell/octeontx2/rvu.h b/drivers/soc/marvell/octeontx2/rvu.h
-index 4a4b0ad..e2c54d0 100644
---- a/drivers/soc/marvell/octeontx2/rvu.h
-+++ b/drivers/soc/marvell/octeontx2/rvu.h
-@@ -11,6 +11,8 @@
- #ifndef RVU_H
- #define RVU_H
- 
++int otx2_mbox_wait_for_rsp(struct otx2_mbox *mbox, int devid)
++{
++	struct otx2_mbox_dev *mdev = &mbox->dev[devid];
++	int timeout = 0, sleep = 1;
++
++	while (mdev->num_msgs != mdev->msgs_acked) {
++		msleep(sleep);
++		timeout += sleep;
++		if (timeout >= MBOX_RSP_TIMEOUT)
++			return -EIO;
++	}
++	return 0;
++}
++EXPORT_SYMBOL(otx2_mbox_wait_for_rsp);
++
++int otx2_mbox_busy_poll_for_rsp(struct otx2_mbox *mbox, int devid)
++{
++	struct otx2_mbox_dev *mdev = &mbox->dev[devid];
++	unsigned long timeout = jiffies + 1 * HZ;
++
++	while (!time_after(jiffies, timeout)) {
++		if (mdev->num_msgs == mdev->msgs_acked)
++			return 0;
++		cpu_relax();
++	}
++	return -EIO;
++}
++EXPORT_SYMBOL(otx2_mbox_busy_poll_for_rsp);
++
++void otx2_mbox_msg_send(struct otx2_mbox *mbox, int devid)
++{
++	struct otx2_mbox_dev *mdev = &mbox->dev[devid];
++	struct mbox_hdr *tx_hdr =
++		(struct mbox_hdr *)(mdev->mbase  + mbox->tx_start);
++	struct mbox_hdr *rx_hdr =
++		(struct mbox_hdr *)(mdev->mbase  + mbox->rx_start);
++
++	spin_lock(&mdev->mbox_lock);
++	/* Reset header for next messages */
++	mdev->msg_size = 0;
++	mdev->rsp_size = 0;
++	mdev->msgs_acked = 0;
++
++	/* Sync mbox data into memory */
++	smp_wmb();
++
++	/* num_msgs != 0 signals to the peer that the buffer has a number of
++	 * messages.  So this should be written after writing all the messages
++	 * to the shared memory.
++	 */
++	tx_hdr->num_msgs = mdev->num_msgs;
++	rx_hdr->num_msgs = 0;
++	spin_unlock(&mdev->mbox_lock);
++
++	/* The interrupt should be fired after num_msgs is written
++	 * to the shared memory
++	 */
++	writeq(1, (void __iomem *)mbox->reg_base +
++	       (mbox->trigger | (devid << mbox->tr_shift)));
++}
++EXPORT_SYMBOL(otx2_mbox_msg_send);
++
++struct mbox_msghdr *otx2_mbox_alloc_msg_rsp(struct otx2_mbox *mbox, int devid,
++					    int size, int size_rsp)
++{
++	struct otx2_mbox_dev *mdev = &mbox->dev[devid];
++	struct mbox_msghdr *msghdr = NULL;
++
++	spin_lock(&mdev->mbox_lock);
++	size = ALIGN(size, MBOX_MSG_ALIGN);
++	size_rsp = ALIGN(size_rsp, MBOX_MSG_ALIGN);
++	/* Check if there is space in mailbox */
++	if ((mdev->msg_size + size) > mbox->tx_size - msgs_offset)
++		goto exit;
++	if ((mdev->rsp_size + size_rsp) > mbox->rx_size - msgs_offset)
++		goto exit;
++
++	if (mdev->msg_size == 0)
++		mdev->num_msgs = 0;
++	mdev->num_msgs++;
++
++	msghdr = (struct mbox_msghdr *)(mdev->mbase + mbox->tx_start +
++					msgs_offset + mdev->msg_size);
++	/* Clear the whole msg region */
++	memset(msghdr, 0, sizeof(*msghdr) + size);
++	/* Init message header with reset values */
++	msghdr->ver = OTX2_MBOX_VERSION;
++	mdev->msg_size += size;
++	mdev->rsp_size += size_rsp;
++	msghdr->next_msgoff = mdev->msg_size + msgs_offset;
++exit:
++	spin_unlock(&mdev->mbox_lock);
++
++	return msghdr;
++}
++EXPORT_SYMBOL(otx2_mbox_alloc_msg_rsp);
++
++struct mbox_msghdr *otx2_mbox_get_rsp(struct otx2_mbox *mbox, int devid,
++				      struct mbox_msghdr *msg)
++{
++	struct otx2_mbox_dev *mdev = &mbox->dev[devid];
++	unsigned long imsg = mbox->tx_start + msgs_offset;
++	unsigned long irsp = mbox->rx_start + msgs_offset;
++	u16 msgs;
++
++	if (mdev->num_msgs != mdev->msgs_acked)
++		return ERR_PTR(-ENODEV);
++
++	for (msgs = 0; msgs < mdev->msgs_acked; msgs++) {
++		struct mbox_msghdr *pmsg = mdev->mbase + imsg;
++		struct mbox_msghdr *prsp = mdev->mbase + irsp;
++
++		if (msg == pmsg) {
++			if (pmsg->id != prsp->id)
++				return ERR_PTR(-ENODEV);
++			return prsp;
++		}
++
++		imsg = pmsg->next_msgoff;
++		irsp = prsp->next_msgoff;
++	}
++
++	return ERR_PTR(-ENODEV);
++}
++EXPORT_SYMBOL(otx2_mbox_get_rsp);
++
++int
++otx2_reply_invalid_msg(struct otx2_mbox *mbox, int devid, u16 pcifunc, u16 id)
++{
++	struct msg_rsp *rsp;
++
++	rsp = (struct msg_rsp *)
++	       otx2_mbox_alloc_msg(mbox, devid, sizeof(*rsp));
++	if (!rsp)
++		return -ENOMEM;
++	rsp->hdr.id = id;
++	rsp->hdr.sig = OTX2_MBOX_RSP_SIG;
++	rsp->hdr.rc = MBOX_MSG_INVALID;
++	rsp->hdr.pcifunc = pcifunc;
++	return 0;
++}
++EXPORT_SYMBOL(otx2_reply_invalid_msg);
++
++bool otx2_mbox_nonempty(struct otx2_mbox *mbox, int devid)
++{
++	struct otx2_mbox_dev *mdev = &mbox->dev[devid];
++	bool ret;
++
++	spin_lock(&mdev->mbox_lock);
++	ret = mdev->num_msgs != 0;
++	spin_unlock(&mdev->mbox_lock);
++
++	return ret;
++}
++EXPORT_SYMBOL(otx2_mbox_nonempty);
++
++const char *otx2_mbox_id2name(u16 id)
++{
++	switch (id) {
++#define M(_name, _id, _1, _2) case _id: return # _name;
++	MBOX_MESSAGES
++#undef M
++	default:
++		return "INVALID ID";
++	}
++}
++EXPORT_SYMBOL(otx2_mbox_id2name);
++
++MODULE_AUTHOR("Marvell International Ltd.");
++MODULE_LICENSE("GPL v2");
+diff --git a/drivers/soc/marvell/octeontx2/mbox.h b/drivers/soc/marvell/octeontx2/mbox.h
+new file mode 100644
+index 0000000..8e205fd
+--- /dev/null
++++ b/drivers/soc/marvell/octeontx2/mbox.h
+@@ -0,0 +1,142 @@
++/* SPDX-License-Identifier: GPL-2.0
++ * Marvell OcteonTx2 RVU Admin Function driver
++ *
++ * Copyright (C) 2018 Marvell International Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef MBOX_H
++#define MBOX_H
++
++#include <linux/etherdevice.h>
++#include <linux/sizes.h>
++
 +#include "rvu_struct.h"
 +
- /* PCI device IDs */
- #define	PCI_DEVID_OCTEONTX2_RVU_AF		0xA065
- 
-@@ -21,11 +23,46 @@
- 
- #define NAME_SIZE				32
- 
-+struct rvu_block {
-+	bool implemented;
++#define MBOX_SIZE		SZ_64K
++
++/* AF/PF: PF initiated, PF/VF VF initiated */
++#define MBOX_DOWN_RX_START	0
++#define MBOX_DOWN_RX_SIZE	(46 * SZ_1K)
++#define MBOX_DOWN_TX_START	(MBOX_DOWN_RX_START + MBOX_DOWN_RX_SIZE)
++#define MBOX_DOWN_TX_SIZE	(16 * SZ_1K)
++/* AF/PF: AF initiated, PF/VF PF initiated */
++#define MBOX_UP_RX_START	(MBOX_DOWN_TX_START + MBOX_DOWN_TX_SIZE)
++#define MBOX_UP_RX_SIZE		SZ_1K
++#define MBOX_UP_TX_START	(MBOX_UP_RX_START + MBOX_UP_RX_SIZE)
++#define MBOX_UP_TX_SIZE		SZ_1K
++
++#if MBOX_UP_TX_SIZE + MBOX_UP_TX_START != MBOX_SIZE
++# error "incorrect mailbox area sizes"
++#endif
++
++#define MBOX_RSP_TIMEOUT	1000 /* in ms, Time to wait for mbox response */
++
++#define MBOX_MSG_ALIGN		16  /* Align mbox msg start to 16bytes */
++
++/* Mailbox directions */
++#define MBOX_DIR_AFPF		0  /* AF replies to PF */
++#define MBOX_DIR_PFAF		1  /* PF sends messages to AF */
++#define MBOX_DIR_PFVF		2  /* PF replies to VF */
++#define MBOX_DIR_VFPF		3  /* VF sends messages to PF */
++#define MBOX_DIR_AFPF_UP	4  /* AF sends messages to PF */
++#define MBOX_DIR_PFAF_UP	5  /* PF replies to AF */
++#define MBOX_DIR_PFVF_UP	6  /* PF sends messages to VF */
++#define MBOX_DIR_VFPF_UP	7  /* VF replies to PF */
++
++struct otx2_mbox_dev {
++	void	    *mbase;   /* This dev's mbox region */
++	spinlock_t  mbox_lock;
++	u16         msg_size; /* Total msg size to be sent */
++	u16         rsp_size; /* Total rsp size to be sure the reply is ok */
++	u16         num_msgs; /* No of msgs sent or waiting for response */
++	u16         msgs_acked; /* No of msgs for which response is received */
 +};
 +
-+struct rvu_hwinfo {
-+	struct rvu_block block[BLK_COUNT]; /* Block info */
++struct otx2_mbox {
++	struct pci_dev *pdev;
++	void   *hwbase;  /* Mbox region advertised by HW */
++	void   *reg_base;/* CSR base for this dev */
++	u64    trigger;  /* Trigger mbox notification */
++	u16    tr_shift; /* Mbox trigger shift */
++	u64    rx_start; /* Offset of Rx region in mbox memory */
++	u64    tx_start; /* Offset of Tx region in mbox memory */
++	u16    rx_size;  /* Size of Rx region */
++	u16    tx_size;  /* Size of Tx region */
++	u16    ndevs;    /* The number of peers */
++	struct otx2_mbox_dev *dev;
 +};
 +
- struct rvu {
- 	void __iomem		*afreg_base;
- 	void __iomem		*pfreg_base;
- 	struct pci_dev		*pdev;
- 	struct device		*dev;
-+	struct rvu_hwinfo       *hw;
- };
- 
-+static inline void rvu_write64(struct rvu *rvu, u64 block, u64 offset, u64 val)
++/* Header which preceeds all mbox messages */
++struct mbox_hdr {
++	u16  num_msgs;   /* No of msgs embedded */
++};
++
++/* Header which preceeds every msg and is also part of it */
++struct mbox_msghdr {
++	u16 pcifunc;     /* Who's sending this msg */
++	u16 id;          /* Mbox message ID */
++#define OTX2_MBOX_REQ_SIG (0xdead)
++#define OTX2_MBOX_RSP_SIG (0xbeef)
++	u16 sig;         /* Signature, for validating corrupted msgs */
++#define OTX2_MBOX_VERSION (0x0001)
++	u16 ver;         /* Version of msg's structure for this ID */
++	u16 next_msgoff; /* Offset of next msg within mailbox region */
++	int rc;          /* Msg process'ed response code */
++};
++
++void otx2_mbox_reset(struct otx2_mbox *mbox, int devid);
++void otx2_mbox_destroy(struct otx2_mbox *mbox);
++int otx2_mbox_init(struct otx2_mbox *mbox, void *hwbase, struct pci_dev *pdev,
++		   void *reg_base, int direction, int ndevs);
++void otx2_mbox_msg_send(struct otx2_mbox *mbox, int devid);
++int otx2_mbox_wait_for_rsp(struct otx2_mbox *mbox, int devid);
++int otx2_mbox_busy_poll_for_rsp(struct otx2_mbox *mbox, int devid);
++struct mbox_msghdr *otx2_mbox_alloc_msg_rsp(struct otx2_mbox *mbox, int devid,
++					    int size, int size_rsp);
++struct mbox_msghdr *otx2_mbox_get_rsp(struct otx2_mbox *mbox, int devid,
++				      struct mbox_msghdr *msg);
++int otx2_reply_invalid_msg(struct otx2_mbox *mbox, int devid,
++			   u16 pcifunc, u16 id);
++bool otx2_mbox_nonempty(struct otx2_mbox *mbox, int devid);
++const char *otx2_mbox_id2name(u16 id);
++static inline struct mbox_msghdr *otx2_mbox_alloc_msg(struct otx2_mbox *mbox,
++						      int devid, int size)
 +{
-+	writeq(val, rvu->afreg_base + ((block << 28) | offset));
++	return otx2_mbox_alloc_msg_rsp(mbox, devid, size, 0);
 +}
 +
-+static inline u64 rvu_read64(struct rvu *rvu, u64 block, u64 offset)
-+{
-+	return readq(rvu->afreg_base + ((block << 28) | offset));
-+}
++/* Mailbox message types */
++#define MBOX_MSG_MASK				0xFFFF
++#define MBOX_MSG_INVALID			0xFFFE
++#define MBOX_MSG_MAX				0xFFFF
 +
-+static inline void rvupf_write64(struct rvu *rvu, u64 offset, u64 val)
-+{
-+	writeq(val, rvu->pfreg_base + offset);
-+}
++#define MBOX_MESSAGES							\
++M(READY,		0x001, msg_req, msg_rsp)
 +
-+static inline u64 rvupf_read64(struct rvu *rvu, u64 offset)
-+{
-+	return readq(rvu->pfreg_base + offset);
-+}
++enum {
++#define M(_name, _id, _1, _2) MBOX_MSG_ ## _name = _id,
++MBOX_MESSAGES
++#undef M
++};
 +
-+/* Function Prototypes
-+ * RVU
++/* Mailbox message formats */
++
++/* Generic request msg used for those mbox messages which
++ * don't send any data in the request.
 + */
++struct msg_req {
++	struct mbox_msghdr hdr;
++};
 +
-+int rvu_poll_reg(struct rvu *rvu, u64 block, u64 offset, u64 mask, bool zero);
++/* Generic rsponse msg used a ack or response for those mbox
++ * messages which doesn't have a specific rsp msg format.
++ */
++struct msg_rsp {
++	struct mbox_msghdr hdr;
++};
 +
- #endif /* RVU_H */
++#endif /* MBOX_H */
 diff --git a/drivers/soc/marvell/octeontx2/rvu_reg.h b/drivers/soc/marvell/octeontx2/rvu_reg.h
-new file mode 100644
-index 0000000..e7abd7e
---- /dev/null
+index a7995d1..3bfb1e0 100644
+--- a/drivers/soc/marvell/octeontx2/rvu_reg.h
 +++ b/drivers/soc/marvell/octeontx2/rvu_reg.h
-@@ -0,0 +1,113 @@
-+/* SPDX-License-Identifier: GPL-2.0
-+ * Marvell OcteonTx2 RVU Admin Function driver
-+ *
-+ * Copyright (C) 2018 Marvell International Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
+@@ -101,6 +101,10 @@
+ #define RVU_PF_MSIX_VECX_CTL(a)             (0x008 | (a) << 4)
+ #define RVU_PF_MSIX_PBAX(a)                 (0xF0000 | (a) << 3)
+ 
++/* RVU VF registers */
++#define	RVU_VF_VFPF_MBOX0		    (0x00000)
++#define	RVU_VF_VFPF_MBOX1		    (0x00008)
 +
-+#ifndef RVU_REG_H
-+#define RVU_REG_H
-+
-+/* Admin function registers */
-+#define RVU_AF_MSIXTR_BASE                  (0x10)
-+#define RVU_AF_ECO                          (0x20)
-+#define RVU_AF_BLK_RST                      (0x30)
-+#define RVU_AF_PF_BAR4_ADDR                 (0x40)
-+#define RVU_AF_RAS                          (0x100)
-+#define RVU_AF_RAS_W1S                      (0x108)
-+#define RVU_AF_RAS_ENA_W1S                  (0x110)
-+#define RVU_AF_RAS_ENA_W1C                  (0x118)
-+#define RVU_AF_GEN_INT                      (0x120)
-+#define RVU_AF_GEN_INT_W1S                  (0x128)
-+#define RVU_AF_GEN_INT_ENA_W1S              (0x130)
-+#define RVU_AF_GEN_INT_ENA_W1C              (0x138)
-+#define	RVU_AF_AFPF_MBOX0		    (0x02000)
-+#define	RVU_AF_AFPF_MBOX1		    (0x02008)
-+#define RVU_AF_AFPFX_MBOXX(a, b)            (0x2000 | (a) << 4 | (b) << 3)
-+#define RVU_AF_PFME_STATUS                  (0x2800)
-+#define RVU_AF_PFTRPEND                     (0x2810)
-+#define RVU_AF_PFTRPEND_W1S                 (0x2820)
-+#define RVU_AF_PF_RST                       (0x2840)
-+#define RVU_AF_HWVF_RST                     (0x2850)
-+#define RVU_AF_PFAF_MBOX_INT                (0x2880)
-+#define RVU_AF_PFAF_MBOX_INT_W1S            (0x2888)
-+#define RVU_AF_PFAF_MBOX_INT_ENA_W1S        (0x2890)
-+#define RVU_AF_PFAF_MBOX_INT_ENA_W1C        (0x2898)
-+#define RVU_AF_PFFLR_INT                    (0x28a0)
-+#define RVU_AF_PFFLR_INT_W1S                (0x28a8)
-+#define RVU_AF_PFFLR_INT_ENA_W1S            (0x28b0)
-+#define RVU_AF_PFFLR_INT_ENA_W1C            (0x28b8)
-+#define RVU_AF_PFME_INT                     (0x28c0)
-+#define RVU_AF_PFME_INT_W1S                 (0x28c8)
-+#define RVU_AF_PFME_INT_ENA_W1S             (0x28d0)
-+#define RVU_AF_PFME_INT_ENA_W1C             (0x28d8)
-+
-+/* Admin function's privileged PF/VF registers */
-+#define RVU_PRIV_CONST                      (0x8000000)
-+#define RVU_PRIV_GEN_CFG                    (0x8000010)
-+#define RVU_PRIV_CLK_CFG                    (0x8000020)
-+#define RVU_PRIV_ACTIVE_PC                  (0x8000030)
-+#define RVU_PRIV_PFX_CFG(a)                 (0x8000100 | (a) << 16)
-+#define RVU_PRIV_PFX_MSIX_CFG(a)            (0x8000110 | (a) << 16)
-+#define RVU_PRIV_PFX_ID_CFG(a)              (0x8000120 | (a) << 16)
-+#define RVU_PRIV_PFX_INT_CFG(a)             (0x8000200 | (a) << 16)
-+#define RVU_PRIV_PFX_NIX_CFG                (0x8000300)
-+#define RVU_PRIV_PFX_NPA_CFG		    (0x8000310)
-+#define RVU_PRIV_PFX_SSO_CFG                (0x8000320)
-+#define RVU_PRIV_PFX_SSOW_CFG               (0x8000330)
-+#define RVU_PRIV_PFX_TIM_CFG                (0x8000340)
-+#define RVU_PRIV_PFX_CPT_CFG                (0x8000350)
-+#define RVU_PRIV_BLOCK_TYPEX_REV(a)         (0x8000400 | (a) << 3)
-+#define RVU_PRIV_HWVFX_INT_CFG(a)           (0x8001280 | (a) << 16)
-+#define RVU_PRIV_HWVFX_NIX_CFG              (0x8001300)
-+#define RVU_PRIV_HWVFX_NPA_CFG              (0x8001310)
-+#define RVU_PRIV_HWVFX_SSO_CFG              (0x8001320)
-+#define RVU_PRIV_HWVFX_SSOW_CFG             (0x8001330)
-+#define RVU_PRIV_HWVFX_TIM_CFG              (0x8001340)
-+#define RVU_PRIV_HWVFX_CPT_CFG              (0x8001350)
-+
-+/* RVU PF registers */
-+#define	RVU_PF_VFX_PFVF_MBOX0		    (0x00000)
-+#define	RVU_PF_VFX_PFVF_MBOX1		    (0x00008)
-+#define RVU_PF_VFX_PFVF_MBOXX(a, b)         (0x0 | (a) << 12 | (b) << 3)
-+#define RVU_PF_VF_BAR4_ADDR                 (0x10)
-+#define RVU_PF_BLOCK_ADDRX_DISC(a)          (0x200 | (a) << 3)
-+#define RVU_PF_VFME_STATUSX(a)              (0x800 | (a) << 3)
-+#define RVU_PF_VFTRPENDX(a)                 (0x820 | (a) << 3)
-+#define RVU_PF_VFTRPEND_W1SX(a)             (0x840 | (a) << 3)
-+#define RVU_PF_VFPF_MBOX_INTX(a)            (0x880 | (a) << 3)
-+#define RVU_PF_VFPF_MBOX_INT_W1SX(a)        (0x8A0 | (a) << 3)
-+#define RVU_PF_VFPF_MBOX_INT_ENA_W1SX(a)    (0x8C0 | (a) << 3)
-+#define RVU_PF_VFPF_MBOX_INT_ENA_W1CX(a)    (0x8E0 | (a) << 3)
-+#define RVU_PF_VFFLR_INTX(a)                (0x900 | (a) << 3)
-+#define RVU_PF_VFFLR_INT_W1SX(a)            (0x920 | (a) << 3)
-+#define RVU_PF_VFFLR_INT_ENA_W1SX(a)        (0x940 | (a) << 3)
-+#define RVU_PF_VFFLR_INT_ENA_W1CX(a)        (0x960 | (a) << 3)
-+#define RVU_PF_VFME_INTX(a)                 (0x980 | (a) << 3)
-+#define RVU_PF_VFME_INT_W1SX(a)             (0x9A0 | (a) << 3)
-+#define RVU_PF_VFME_INT_ENA_W1SX(a)         (0x9C0 | (a) << 3)
-+#define RVU_PF_VFME_INT_ENA_W1CX(a)         (0x9E0 | (a) << 3)
-+#define RVU_PF_PFAF_MBOX0                   (0xC00)
-+#define RVU_PF_PFAF_MBOX1                   (0xC08)
-+#define RVU_PF_PFAF_MBOXX(a)                (0xC00 | (a) << 3)
-+#define RVU_PF_INT                          (0xc20)
-+#define RVU_PF_INT_W1S                      (0xc28)
-+#define RVU_PF_INT_ENA_W1S                  (0xc30)
-+#define RVU_PF_INT_ENA_W1C                  (0xc38)
-+#define RVU_PF_MSIX_VECX_ADDR(a)            (0x000 | (a) << 4)
-+#define RVU_PF_MSIX_VECX_CTL(a)             (0x008 | (a) << 4)
-+#define RVU_PF_MSIX_PBAX(a)                 (0xF0000 | (a) << 3)
-+
-+
-+#define NPA_AF_BLK_RST                  (0x0000)
-+#define NIX_AF_BLK_RST                  (0x00B0)
-+#define SSO_AF_BLK_RST                  (0x10f8)
-+#define TIM_AF_BLK_RST                  (0x10)
-+#define CPT_AF_BLK_RST                  (0x46000)
-+#define NDC_AF_BLK_RST                  (0x002F0)
-+#define NPC_AF_BLK_RST                  (0x00040)
-+
-+#endif /* RVU_REG_H */
-diff --git a/drivers/soc/marvell/octeontx2/rvu_struct.h b/drivers/soc/marvell/octeontx2/rvu_struct.h
-new file mode 100644
-index 0000000..4122559
---- /dev/null
-+++ b/drivers/soc/marvell/octeontx2/rvu_struct.h
-@@ -0,0 +1,36 @@
-+/* SPDX-License-Identifier: GPL-2.0
-+ * Marvell OcteonTx2 RVU Admin Function driver
-+ *
-+ * Copyright (C) 2018 Marvell International Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef RVU_STRUCT_H
-+#define RVU_STRUCT_H
-+
-+/*
-+ * RVU Block Address Enumeration
-+ */
-+enum rvu_block_addr_e {
-+	BLKADDR_RVUM    = 0x0ULL,
-+	BLKADDR_LMT     = 0x1ULL,
-+	BLKADDR_MSIX    = 0x2ULL,
-+	BLKADDR_NPA     = 0x3ULL,
-+	BLKADDR_NIX0    = 0x4ULL,
-+	BLKADDR_NIX1    = 0x5ULL,
-+	BLKADDR_NPC     = 0x6ULL,
-+	BLKADDR_SSO     = 0x7ULL,
-+	BLKADDR_SSOW    = 0x8ULL,
-+	BLKADDR_TIM     = 0x9ULL,
-+	BLKADDR_CPT0    = 0xaULL,
-+	BLKADDR_CPT1    = 0xbULL,
-+	BLKADDR_NDC0    = 0xcULL,
-+	BLKADDR_NDC1    = 0xdULL,
-+	BLKADDR_NDC2    = 0xeULL,
-+	BLK_COUNT	= 0xfULL,
-+};
-+
-+#endif /* RVU_STRUCT_H */
+ /* NPA block's admin function registers */
+ #define NPA_AF_BLK_RST                  (0x0000)
+ #define NPA_AF_CONST                    (0x0010)
 -- 
 2.7.4
