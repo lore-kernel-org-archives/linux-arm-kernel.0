@@ -1,30 +1,85 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 4 Sep 2018 14:40:41 +0200
-Subject: [PATCH] spi: Delete Atmel AT91 SPI driver
-In-Reply-To: <20180904121503.GF13888@piout.net>
-References: <20180904094922.8131-1-linus.walleij@linaro.org>
- <20180904121503.GF13888@piout.net>
-Message-ID: <CACRpkdbd=SQPF0Vi2HP9uAwA27M8a5dZO-r31D5=3j5sjGh+qg@mail.gmail.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Tue, 4 Sep 2018 14:43:29 +0200
+Subject: [PATCH 0/7] spi: spi-mem: Add a driver for NXP FlexSPI controller
+In-Reply-To: <1535711404-29528-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+References: <1535711404-29528-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+Message-ID: <20180904144329.35cf27de@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 4, 2018 at 2:15 PM Alexandre Belloni
-<alexandre.belloni@bootlin.com> wrote:
-> On 04/09/2018 11:49:22+0200, Linus Walleij wrote:
->
-> > This driver depends on the deleted AT91 architecture and cause
-> > me headaches from a GPIO point of view. It is unused so delete
-> > it.
-> >
->
-> While AVR32 is gone, AT91 is alive and well.
+Hi Yogesh,
 
-Gnah sorry guys that's the problem, I mixed up AVR32 and AT91.
+On Fri, 31 Aug 2018 15:59:57 +0530
+Yogesh Gaur <yogeshnarayan.gaur@nxp.com> wrote:
 
-Sorry for the screwup :(
+> - Add a driver for NXP FlexSPI host controller
+> 
+>  FlexSPI is a flexsible SPI host controller [1], Chapter 30 page 1475,
+>  which supports two SPI channels and up to 4 external devices.
+>  Each channel supports Single/Dual/Quad/Octal mode data transfer (1/2/4/8 bidirectional data lines)
+>  i.e. FlexSPI acts as an interface to external devices, maximum 4, each with up to 8
+>  bidirectional data lines.
+> 
+>  FlexSPI controller is similar to the existing Freescale/NXP QuadSPI
+>  controller with advanced features.
+> 
+> - Tested this driver with mtd_debug(Erase/Write/Read) utility and JFFS2
+>  filesystem mounting and booting on NXP LX2160ARDB[2] and LX2160AQDS targets.
+>  LX2160ARDB is having two NOR slave device connected on single bus A
+>  i.e. A0 and A1 (CS0 and CS1).
+>  LX2160AQDS is having two NOR slave device connected on separate buses
+>  one flash on A0 and second on B1 i.e. (CS0 and CS3).
+>  Verified this driver on following SPI NOR flashes:
+>     Micron, mt35xu512aba[3], [Read - 1 bit mode]
+>     Cypress, s25fl512s, [Read - 1/2/4 bit mode]
+> 
+> Patch 1 adds variable size in spi_device struct, to save the
+> size of connected slave device.
+> Patch 2 adds flags for octal I/O data transfer.
+> Support for octal flash commands and other framework changes would going to be done in different
+> patch set.
+> Patch 3 adds a driver for the NXP FlexSPI controller, driver is based on
+> new spi-mem framework.
 
-OK back to the drawing board, I will work slowly and careful
-and try not to do silly mistakes like this.
+Can we please omit octa mode support for now and focus on
+single/dual/quad SPI support? That is, drop patch 2, and do not set the
+OCTAL flags in patch 3.
 
-Yours,
-Linus Walleij
+Regards,
+
+Boris
+
+> Patch 4 add binding file for this driver.
+> Patch 5 add device node property for FlexSPI driver for lx2160 SoC.
+> Patch 6 enables the config option.
+> Patch 7 add MAINTAINERS file.
+> 
+> [1] https://www.nxp.com/docs/en/reference-manual/IMXRT1050RM.pdf
+> [2] https://patchwork.kernel.org/project/linux-arm-kernel/list/?series=9721
+> [3] https://patchwork.ozlabs.org/project/linux-mtd/list/?series=63445
+> 
+> This series adds below patches:
+> Yogesh Gaur (7):
+>   spi: add slave device size in spi_device struct
+>   spi: add flags for octal I/O data transfer
+>   spi: spi-mem: Add a driver for NXP FlexSPI controller
+>   dt-bindings: spi: add binding file for NXP FlexSPI driver
+>   arm64: dts: lx2160a: add fspi node property
+>   arm64: defconfig: enable NXP FlexSPI driver
+>   MAINTAINERS: add maintainers for the NXP FlexSPI driver
+> 
+>  .../devicetree/bindings/spi/spi-nxp-fspi.txt       |   42 +
+>  MAINTAINERS                                        |    6 +
+>  arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts  |   21 +
+>  arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi     |   12 +
+>  arch/arm64/configs/defconfig                       |    1 +
+>  drivers/mtd/devices/m25p80.c                       |    6 +
+>  drivers/mtd/spi-nor/spi-nor.c                      |    2 +
+>  drivers/spi/Kconfig                                |   10 +
+>  drivers/spi/Makefile                               |    1 +
+>  drivers/spi/spi-nxp-fspi.c                         | 1242 ++++++++++++++++++++
+>  include/linux/spi/spi.h                            |    4 +
+>  11 files changed, 1347 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
+>  create mode 100644 drivers/spi/spi-nxp-fspi.c
+> 
