@@ -1,145 +1,67 @@
-From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Tue, 4 Sep 2018 15:22:34 +0530
-Subject: [RFC PATCH v2 3/3] nvmem: zynqmp: Added zynqmp nvmem firmware driver
-In-Reply-To: <1536054754-3119-1-git-send-email-nava.manne@xilinx.com>
-References: <1536054754-3119-1-git-send-email-nava.manne@xilinx.com>
-Message-ID: <1536054754-3119-4-git-send-email-nava.manne@xilinx.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 4 Sep 2018 12:00:35 +0200
+Subject: [PATCH 00/14] mmc: mmci: prepare dma callbacks with mmci_host_ops
+In-Reply-To: <1533116221-380-1-git-send-email-ludovic.Barre@st.com>
+References: <1533116221-380-1-git-send-email-ludovic.Barre@st.com>
+Message-ID: <CAPDyKFqArwShaUZAit4fHa7F6UNC_z7Yc1GMpBuQcrkkwrB84g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds zynqmp nvmem firmware driver to access the
-SoC revision information from the hardware register.
+On 1 August 2018 at 11:36, Ludovic Barre <ludovic.Barre@st.com> wrote:
+> From: Ludovic Barre <ludovic.barre@st.com>
+>
+> This patch series prepares and adds callbacks for dma transfert at
+> mmci_host_ops. This series is composed of 3 parts:
+> -Internalize specific needs of legacy dmaengine.
+> -Create and setup dma_priv pointer
+> -Create generic callbacks  which share some features
+> (like cookie...) and call specific needs
 
-Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
----
-Changes for v2:
-		-None.
+I have now reviewed part of this series and provided you with some
+comments, but will stop at this point.
 
- drivers/nvmem/Kconfig        | 10 ++++++
- drivers/nvmem/Makefile       |  2 ++
- drivers/nvmem/zynqmp_nvmem.c | 84 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 96 insertions(+)
- create mode 100644 drivers/nvmem/zynqmp_nvmem.c
+Overall, the comments are about renaming and picking better function
+names. Those comments should be easy to address in a new version.
 
-diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
-index 54a3c29..2edb142 100644
---- a/drivers/nvmem/Kconfig
-+++ b/drivers/nvmem/Kconfig
-@@ -181,4 +181,14 @@ config RAVE_SP_EEPROM
- 	help
- 	  Say y here to enable Rave SP EEPROM support.
- 
-+config NVMEM_ZYNQMP
-+	bool "Xilinx ZYNQMP SoC nvmem firmware support"
-+	depends on ARCH_ZYNQMP
-+	help
-+	  This is a driver to access hardware related data like
-+	  soc revision, IDCODE... etc by using the firmware
-+	  interface.
-+
-+	  If sure, say yes. If unsure, say no.
-+
- endif
-diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
-index 27e96a8..0b3abd7 100644
---- a/drivers/nvmem/Makefile
-+++ b/drivers/nvmem/Makefile
-@@ -39,4 +39,6 @@ obj-$(CONFIG_NVMEM_SNVS_LPGPR)	+= nvmem_snvs_lpgpr.o
- nvmem_snvs_lpgpr-y		:= snvs_lpgpr.o
- obj-$(CONFIG_RAVE_SP_EEPROM)	+= nvmem-rave-sp-eeprom.o
- nvmem-rave-sp-eeprom-y		:= rave-sp-eeprom.o
-+obj-$(CONFIG_NVMEM_ZYNQMP)     += nvmem_zynqmp_nvmem.o
-+nvmem_zynqmp_nvmem-y           := zynqmp_nvmem.o
- 
-diff --git a/drivers/nvmem/zynqmp_nvmem.c b/drivers/nvmem/zynqmp_nvmem.c
-new file mode 100644
-index 0000000..e377900
---- /dev/null
-+++ b/drivers/nvmem/zynqmp_nvmem.c
-@@ -0,0 +1,84 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * Copyright (C) 2018 Xilinx, Inc.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/nvmem-provider.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/firmware/xlnx-zynqmp.h>
-+
-+#define SILICON_REVISION_MASK 0xF
-+
-+static int zynqmp_nvmem_read(void *context, unsigned int offset,
-+			     void *val, size_t bytes)
-+{
-+	int ret;
-+	int idcode, version;
-+	const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
-+
-+	if (!eemi_ops || !eemi_ops->get_chipid)
-+		return -ENXIO;
-+
-+	ret = eemi_ops->get_chipid(&idcode, &version);
-+	if (ret < 0)
-+		return ret;
-+
-+	pr_debug("Read chipid val %x %x\n", idcode, version);
-+	*(int *)val = version & SILICON_REVISION_MASK;
-+
-+	return 0;
-+}
-+
-+static struct nvmem_config econfig = {
-+	.name = "zynqmp-nvmem",
-+	.owner = THIS_MODULE,
-+	.word_size = 1,
-+	.size = 1,
-+	.read_only = true,
-+};
-+
-+static const struct of_device_id zynqmp_nvmem_match[] = {
-+	{ .compatible = "xlnx,zynqmp-nvmem-fw", },
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, zynqmp_nvmem_match);
-+
-+static int zynqmp_nvmem_probe(struct platform_device *pdev)
-+{
-+	struct nvmem_device *nvmem;
-+
-+	econfig.dev = &pdev->dev;
-+	econfig.reg_read = zynqmp_nvmem_read;
-+
-+	nvmem = nvmem_register(&econfig);
-+	if (IS_ERR(nvmem))
-+		return PTR_ERR(nvmem);
-+
-+	platform_set_drvdata(pdev, nvmem);
-+
-+	return 0;
-+}
-+
-+static int zynqmp_nvmem_remove(struct platform_device *pdev)
-+{
-+	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
-+
-+	return nvmem_unregister(nvmem);
-+}
-+
-+static struct platform_driver zynqmp_nvmem_driver = {
-+	.probe = zynqmp_nvmem_probe,
-+	.remove = zynqmp_nvmem_remove,
-+	.driver = {
-+		.name = "zynqmp-nvmem",
-+		.of_match_table = zynqmp_nvmem_match,
-+	},
-+};
-+
-+module_platform_driver(zynqmp_nvmem_driver);
-+
-+MODULE_AUTHOR("Michal Simek <michal.simek@xilinx.com>, Nava kishore Manne <navam@xilinx.com>");
-+MODULE_DESCRIPTION("ZynqMP NVMEM driver");
-+MODULE_LICENSE("GPL");
--- 
-2.7.4
+However, the other more important point is the number of variant
+callbacks you are adding. It's of course a balance to pick the right
+level, to get both flexibility but also to avoid open coding. In the
+end we don't want to get too many callbacks, but then it's better to
+share common mmci code for variants, through mmci.h.
+
+Finally, I would like to see a patch on top adding the support for the
+new ST variant, so I can see how the callbacks and changes really are
+being used. Can you please add that?
+
+>
+> This patch series must be applied on top of
+> "mmc: mmci: Add and implement a ->dma_setup() callback for qcom dml"
+>
+> Ludovic Barre (14):
+>   mmc: mmci: fix qcom dma issue during mmci init with new dma_setup
+>     callback
+>   mmc: mmci: internalize dma map/unmap into mmci dma functions
+>   mmc: mmci: internalize dma_inprogress into mmci dma functions
+>   mmc: mmci: introduce dma_priv pointer to mmci_host
+>   mmc: mmci: move mmci next cookie to mci host
+>   mmc: mmci: merge prepare data functions
+>   mmc: mmci: add prepare/unprepare_data callbacks
+>   mmc: mmci: add get_next_data callback
+>   mmc: mmci: modify dma_setup callback
+>   mmc: mmci: add dma_release callback
+>   mmc: mmci: add dma_start callback
+>   mmc: mmci: add dma_finalize callback
+>   mmc: mmci: add dma_error callback
+>   mmc: mmci: add validate_data callback
+>
+>  drivers/mmc/host/mmci.c          | 458 ++++++++++++++++++++++++---------------
+>  drivers/mmc/host/mmci.h          |  45 ++--
+>  drivers/mmc/host/mmci_qcom_dml.c |  15 +-
+>  3 files changed, 322 insertions(+), 196 deletions(-)
+>
+> --
+> 2.7.4
+>
+
+Kind regards
+Uffe
