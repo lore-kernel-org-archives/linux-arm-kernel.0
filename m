@@ -1,54 +1,27 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 4 Sep 2018 11:27:30 +0300
-Subject: [RESEND PATCHv2 1/2] ARM: dts: ti: add support for building Texas
- Instruments specific overlays
-In-Reply-To: <1536049651-10206-1-git-send-email-t-kristo@ti.com>
-References: <1535722107-13767-1-git-send-email-t-kristo@ti.com>
- <1536049651-10206-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1536049651-10206-2-git-send-email-t-kristo@ti.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 4 Sep 2018 16:39:05 +0800
+Subject: [PATCH 01/27] dt-bindings: sunxi-sram: add binding for Allwinner
+ H6 SRAM C
+In-Reply-To: <20180902072643.4917-2-jernej.skrabec@siol.net>
+References: <20180902072643.4917-1-jernej.skrabec@siol.net>
+ <20180902072643.4917-2-jernej.skrabec@siol.net>
+Message-ID: <CAGb2v66V=7ArH0hssVZbBhD1v9P86oOXSh+1pY3e9xrzCHXBeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for TI specific DT subdir, along with support for building
-DT overlays. Right now, no DT files are specified in this directory,
-those are to be added later.
+On Sun, Sep 2, 2018 at 3:27 PM Jernej Skrabec <jernej.skrabec@siol.net> wrote:
+>
+> From: Icenowy Zheng <icenowy@aosc.io>
+>
+> The Allwinner H6 SoC's DE3 needs the SRAM C section being claimed in the
+> system controller to work, like A64 DE2.
+>
+> As H6 and A64 system controller are quite similar, code is reused now,
+> and the A64 fallback compatible string is added after the H6 compatible
+> string.
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> [fixed typo in compatible string]
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- arch/arm/boot/dts/Makefile    | 1 +
- arch/arm/boot/dts/ti/Makefile | 9 +++++++++
- 2 files changed, 10 insertions(+)
- create mode 100644 arch/arm/boot/dts/ti/Makefile
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b5bd3de..59a4b63 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -755,6 +755,7 @@ dtb-$(CONFIG_SOC_DRA7XX) += \
- 	dra72-evm-revc.dtb \
- 	dra71-evm.dtb \
- 	dra76-evm.dtb
-+subdir-$(CONFIG_SOC_DRA7XX) += ti
- dtb-$(CONFIG_ARCH_ORION5X) += \
- 	orion5x-kuroboxpro.dtb \
- 	orion5x-lacie-d2-network.dtb \
-diff --git a/arch/arm/boot/dts/ti/Makefile b/arch/arm/boot/dts/ti/Makefile
-new file mode 100644
-index 0000000..e0203ba
---- /dev/null
-+++ b/arch/arm/boot/dts/ti/Makefile
-@@ -0,0 +1,9 @@
-+# SPDX-License-Identifier: GPL-2.0
-+#
-+# Make file to build device tree binaries for boards based on
-+# Texas Instruments Inc processors
-+#
-+# Copyright (C) 2016-2018 Texas Instruments Incorporated - http://www.ti.com/
-+#
-+
-+DTC_FLAGS += -@
--- 
-1.9.1
-
---
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
