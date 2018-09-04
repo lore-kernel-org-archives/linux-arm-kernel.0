@@ -1,21 +1,66 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 04 Sep 2018 08:36:33 -0500
-Subject: [PATCH 1/4] clock: aspeed: Add VIDEO reset index definition
-In-Reply-To: <1535576973-8067-2-git-send-email-eajames@linux.vnet.ibm.com>
+Date: Mon, 3 Sep 2018 19:50:18 -0500
+Subject: [PATCH 3/4] dt-bindings: media: Add Aspeed Video Engine binding
+ documentation
+In-Reply-To: <1535576973-8067-4-git-send-email-eajames@linux.vnet.ibm.com>
 References: <1535576973-8067-1-git-send-email-eajames@linux.vnet.ibm.com>
- <1535576973-8067-2-git-send-email-eajames@linux.vnet.ibm.com>
-Message-ID: <5b8e8a62.1c69fb81.6801.2c0d@mx.google.com>
+ <1535576973-8067-4-git-send-email-eajames@linux.vnet.ibm.com>
+Message-ID: <20180904005015.GA5214@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 Aug 2018 16:09:30 -0500, Eddie James wrote:
-> Add an index into the array of resets kept in the Aspeed clock driver.
-> This isn't a HW bit definition.
+On Wed, Aug 29, 2018 at 04:09:32PM -0500, Eddie James wrote:
+> Document the bindings.
 > 
 > Signed-off-by: Eddie James <eajames@linux.vnet.ibm.com>
 > ---
->  include/dt-bindings/clock/aspeed-clock.h | 1 +
->  1 file changed, 1 insertion(+)
+>  .../devicetree/bindings/media/aspeed-video.txt     | 23 ++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/aspeed-video.txt
 > 
+> diff --git a/Documentation/devicetree/bindings/media/aspeed-video.txt b/Documentation/devicetree/bindings/media/aspeed-video.txt
+> new file mode 100644
+> index 0000000..58c056a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/aspeed-video.txt
+> @@ -0,0 +1,23 @@
+> +* Device tree bindings for Aspeed Video Engine
+> +
+> +The Video Engine (VE) embedded in the Aspeed AST2400 and AST2500 SOCs can
+> +capture and compress video data from digital or analog sources.
+> +
+> +Required properties:
+> + - compatible:		"aspeed,ast2400-video" or "aspeed,ast2500-video"
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Maybe "video-engine" or "ve" would be more specific than just "video". 
+Use what is closest to the name of the block.
+
+> + - reg:			contains the offset and length of the VE memory region
+> + - clocks:		pointers to the the "vclk" and "eclk" of the syscon
+
+No pointers in DT. "Clock specifier"
+
+> + - clock-names:		"vclk-gate", "eclk-gate"
+
+Is that the name at or in the module? The fact that it is gated is 
+really outside the block and a property of the clock controller.
+
+> + - resets:		pointer to the VE reset of the syscon
+> + - interrupts:		the interrupt associated with the VE on this platform
+> +
+> +Example:
+> +
+> +video: video at 1e700000 {
+
+video-codec at ...
+
+> +    compatible = "aspeed,ast2500-video";
+> +    reg = <0x1e700000 0x20000>;
+> +    clocks = <&syscon ASPEED_CLK_GATE_VCLK>, <&syscon ASPEED_CLK_GATE_ECLK>;
+> +    clock-names = "vclk-gate", "eclk-gate";
+> +    resets = <&syscon ASPEED_RESET_VIDEO>;
+> +    interrupts = <7>;
+> +};
+> -- 
+> 1.8.3.1
+> 
