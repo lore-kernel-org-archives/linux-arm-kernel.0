@@ -1,64 +1,30 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 4 Sep 2018 12:55:59 +0800
-Subject: [PATCH v2] crypto: remove Speck
-In-Reply-To: <20180807062225.6331-1-Jason@zx2c4.com>
-References: <20180807011937.GA133621@gmail.com>
- <20180807062225.6331-1-Jason@zx2c4.com>
-Message-ID: <20180904045559.jfzqhwcfyq42x2cs@gondor.apana.org.au>
+Date: Tue, 4 Sep 2018 13:20:17 +0800
+Subject: [PATCH v2] crypto: arm/ghash-ce - implement support for 4-way
+ aggregation
+In-Reply-To: <20180823144851.14601-1-ard.biesheuvel@linaro.org>
+References: <20180823144851.14601-1-ard.biesheuvel@linaro.org>
+Message-ID: <20180904052017.b33xkndrmr57urw7@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 07, 2018 at 08:22:25AM +0200, Jason A. Donenfeld wrote:
-> These are unused, undesired, and have never actually been used by
-> anybody. The original authors of this code have changed their mind about
-> its inclusion. While originally proposed for disk encryption on low-end
-> devices, the idea was discarded [1] in favor of something else before
-> that could really get going. Therefore, this patch removes Speck.
+On Thu, Aug 23, 2018 at 03:48:51PM +0100, Ard Biesheuvel wrote:
+> Speed up the GHASH algorithm based on 64-bit polynomial multiplication
+> by adding support for 4-way aggregation. This improves throughput by
+> ~85% on Cortex-A53, from 1.7 cycles per byte to 0.9 cycles per byte.
 > 
-> [1] https://marc.info/?l=linux-crypto-vger&m=153359499015659
+> When combined with AES into GCM, throughput improves by ~25%, from
+> 3.8 cycles per byte to 3.0 cycles per byte.
 > 
-> Signed-off-by: Jason A. Donenfeld <Jason@zx2c4.com>
-> Acked-by: Eric Biggers <ebiggers@google.com>
-> Cc: stable at vger.kernel.org
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > ---
->  Documentation/filesystems/fscrypt.rst |  10 -
->  arch/arm/crypto/Kconfig               |   6 -
->  arch/arm/crypto/Makefile              |   2 -
->  arch/arm/crypto/speck-neon-core.S     | 434 ---------------
->  arch/arm/crypto/speck-neon-glue.c     | 288 ----------
->  arch/arm64/crypto/Kconfig             |   6 -
->  arch/arm64/crypto/Makefile            |   3 -
->  arch/arm64/crypto/speck-neon-core.S   | 352 ------------
->  arch/arm64/crypto/speck-neon-glue.c   | 282 ----------
->  arch/m68k/configs/amiga_defconfig     |   1 -
->  arch/m68k/configs/apollo_defconfig    |   1 -
->  arch/m68k/configs/atari_defconfig     |   1 -
->  arch/m68k/configs/bvme6000_defconfig  |   1 -
->  arch/m68k/configs/hp300_defconfig     |   1 -
->  arch/m68k/configs/mac_defconfig       |   1 -
->  arch/m68k/configs/multi_defconfig     |   1 -
->  arch/m68k/configs/mvme147_defconfig   |   1 -
->  arch/m68k/configs/mvme16x_defconfig   |   1 -
->  arch/m68k/configs/q40_defconfig       |   1 -
->  arch/m68k/configs/sun3_defconfig      |   1 -
->  arch/m68k/configs/sun3x_defconfig     |   1 -
->  arch/s390/defconfig                   |   1 -
->  crypto/Kconfig                        |  14 -
->  crypto/Makefile                       |   1 -
->  crypto/speck.c                        | 307 -----------
->  crypto/testmgr.c                      |  24 -
->  crypto/testmgr.h                      | 738 --------------------------
->  fs/crypto/fscrypt_private.h           |   4 -
->  fs/crypto/keyinfo.c                   |  10 -
->  include/crypto/speck.h                |  62 ---
->  include/uapi/linux/fs.h               |   4 +-
->  31 files changed, 2 insertions(+), 2558 deletions(-)
->  delete mode 100644 arch/arm/crypto/speck-neon-core.S
->  delete mode 100644 arch/arm/crypto/speck-neon-glue.c
->  delete mode 100644 arch/arm64/crypto/speck-neon-core.S
->  delete mode 100644 arch/arm64/crypto/speck-neon-glue.c
->  delete mode 100644 crypto/speck.c
->  delete mode 100644 include/crypto/speck.h
+> v2: modulo schedule the loads of the input
+>     add AES/GCM performance numbers to commit log
+> 
+>  arch/arm/crypto/Kconfig         |   1 +
+>  arch/arm/crypto/ghash-ce-core.S | 108 +++++++++++++++++++-
+>  arch/arm/crypto/ghash-ce-glue.c |  38 +++++--
+>  3 files changed, 131 insertions(+), 16 deletions(-)
 
 Patch applied.  Thanks.
 -- 
