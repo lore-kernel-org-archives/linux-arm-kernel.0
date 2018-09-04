@@ -1,79 +1,112 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 4 Sep 2018 16:59:02 +0800
-Subject: [PATCH 07/27] dt-bindings: clock: sun8i-de2: Add H6 DE3 clock
- description
-In-Reply-To: <20180902072643.4917-8-jernej.skrabec@siol.net>
-References: <20180902072643.4917-1-jernej.skrabec@siol.net>
- <20180902072643.4917-8-jernej.skrabec@siol.net>
-Message-ID: <CAGb2v65AsKzEH3AgmQi+RRvVa6AO-cpAckGnNkvWwONsCCsoxw@mail.gmail.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Tue, 4 Sep 2018 11:03:43 +0200
+Subject: [PATCH] KVM: arm/arm64: Clean dcache to PoC when changing PTE
+ due to CoW
+In-Reply-To: <87a7oy7amd.fsf@e105922-lin.cambridge.arm.com>
+References: <20180823153342.158230-1-marc.zyngier@arm.com>
+ <20180830122052.GD4029@e113682-lin.lund.arm.com>
+ <87a7oy7amd.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <20180904090343.GN4029@e113682-lin.lund.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Sep 03, 2018 at 06:29:30PM +0100, Punit Agrawal wrote:
+> Christoffer Dall <christoffer.dall@arm.com> writes:
+> 
+> > [Adding Andrea and Steve in CC]
+> >
+> > On Thu, Aug 23, 2018 at 04:33:42PM +0100, Marc Zyngier wrote:
+> >> When triggering a CoW, we unmap the RO page via an MMU notifier
+> >> (invalidate_range_start), and then populate the new PTE using another
+> >> one (change_pte). In the meantime, we'll have copied the old page
+> >> into the new one.
+> >> 
+> >> The problem is that the data for the new page is sitting in the
+> >> cache, and should the guest have an uncached mapping to that page
+> >> (or its MMU off), following accesses will bypass the cache.
+> >> 
+> >> In a way, this is similar to what happens on a translation fault:
+> >> We need to clean the page to the PoC before mapping it. So let's just
+> >> do that.
+> >> 
+> >> This fixes a KVM unit test regression observed on a HiSilicon platform,
+> >> and subsequently reproduced on Seattle.
+> >> 
+> >> Fixes: a9c0e12ebee5 ("KVM: arm/arm64: Only clean the dcache on translation fault")
+> >> Reported-by: Mike Galbraith <efault@gmx.de>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >>  virt/kvm/arm/mmu.c | 9 ++++++++-
+> >>  1 file changed, 8 insertions(+), 1 deletion(-)
+> >> 
+> >> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+> >> index 1d90d79706bd..287c8e274655 100644
+> >> --- a/virt/kvm/arm/mmu.c
+> >> +++ b/virt/kvm/arm/mmu.c
+> >> @@ -1811,13 +1811,20 @@ static int kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *data
+> >>  void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte)
+> >>  {
+> >>  	unsigned long end = hva + PAGE_SIZE;
+> >> +	kvm_pfn_t pfn = pte_pfn(pte);
+> >>  	pte_t stage2_pte;
+> >>  
+> >>  	if (!kvm->arch.pgd)
+> >>  		return;
+> >>  
+> >>  	trace_kvm_set_spte_hva(hva);
+> >> -	stage2_pte = pfn_pte(pte_pfn(pte), PAGE_S2);
+> >> +
+> >> +	/*
+> >> +	 * We've moved a page around, probably through CoW, so let's treat
+> >> +	 * just like a translation fault and clean the cache to the PoC.
+> >> +	 */
+> >> +	clean_dcache_guest_page(pfn, PAGE_SIZE);
+> >> +	stage2_pte = pfn_pte(pfn, PAGE_S2);
+> >>  	handle_hva_to_gpa(kvm, hva, end, &kvm_set_spte_handler, &stage2_pte);
+> >>  }
+> >
+> > How does this work for pmd mappings?
+> 
+> kvm_set_spte_hva() isn't called for PMD mappings. But...
+> 
+> >
+> > Are we guaranteed that a pmd mapping (hugetlbfs or THP) is split before
+> > a CoW happens?
+> >
+> > Steve tells me that we share THP mappings on fork and that we back THPs
+> > by a zero page, so CoW with THP should be possible.
+> >
+> 
+> ...the problem seems to affect handling write permission faults for CoW
+> or zero pages.
+> 
+> The memory gets unmapped at stage 2 due to the invalidate notifier (in
+> hugetlb_cow() for hugetlbfs and do_huge_pmd_wp_page() for THP) 
 
-On Sun, Sep 2, 2018 at 3:27 PM Jernej Skrabec <jernej.skrabec@siol.net> wrote:
->
-> This commit adds necessary description and dt includes for H6 DE3 clock.
-> It is very similar to others, but memory region has some additional
-> registers not found in DE2.
->
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> ---
->  Documentation/devicetree/bindings/clock/sun8i-de2.txt | 5 +++--
->  include/dt-bindings/clock/sun8i-de2.h                 | 3 +++
->  include/dt-bindings/reset/sun8i-de2.h                 | 1 +
->  3 files changed, 7 insertions(+), 2 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/clock/sun8i-de2.txt b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
-> index e94582e8b8a9..41a52c2acffd 100644
-> --- a/Documentation/devicetree/bindings/clock/sun8i-de2.txt
-> +++ b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
-> @@ -1,5 +1,5 @@
-> -Allwinner Display Engine 2.0 Clock Control Binding
-> ---------------------------------------------------
-> +Allwinner Display Engine 2.0/3.0 Clock Control Binding
-> +------------------------------------------------------
->
->  Required properties :
->  - compatible: must contain one of the following compatibles:
-> @@ -8,6 +8,7 @@ Required properties :
->                 - "allwinner,sun8i-v3s-de2-clk"
->                 - "allwinner,sun50i-a64-de2-clk"
->                 - "allwinner,sun50i-h5-de2-clk"
-> +               - "allwinner,sun50i-h6-de3-clk"
->
->  - reg: Must contain the registers base address and length
->  - clocks: phandle to the clocks feeding the display engine subsystem.
-> diff --git a/include/dt-bindings/clock/sun8i-de2.h b/include/dt-bindings/clock/sun8i-de2.h
-> index 3bed63b524aa..7768f73b051e 100644
-> --- a/include/dt-bindings/clock/sun8i-de2.h
-> +++ b/include/dt-bindings/clock/sun8i-de2.h
-> @@ -15,4 +15,7 @@
->  #define CLK_MIXER1             7
->  #define CLK_WB                 8
->
-> +#define CLK_BUS_ROT            9
-> +#define CLK_ROT                        10
-> +
->  #endif /* _DT_BINDINGS_CLOCK_SUN8I_DE2_H_ */
-> diff --git a/include/dt-bindings/reset/sun8i-de2.h b/include/dt-bindings/reset/sun8i-de2.h
-> index 9526017432f0..1c36a6ac86d6 100644
-> --- a/include/dt-bindings/reset/sun8i-de2.h
-> +++ b/include/dt-bindings/reset/sun8i-de2.h
-> @@ -10,5 +10,6 @@
->  #define RST_MIXER0     0
->  #define RST_MIXER1     1
->  #define RST_WB         2
-> +#define RST_ROT                3
+So just to make sure I get this right.  For a pte CoW, Linux calls the
+set_spte function to simply change the pte mapping, without doing any
+unmapping at stage 2, but with pmd, we unmap and wait to take another
+fault as an alternative method?
 
-Looking at the DE 2.0 register guide, the "Rotate" related fields are also
-found on the A83T. So this is not DE 3.0 specific. And you could also have
-the H6 DE3 compatible fall back to the A83T for the common parts.
+Why the two different approaches depending on the mapping size?
 
-ChenYu
+> while the
+> cache maintenance for the newly allocated page will be skipped due to
+> the !FSC_PERM. 
 
->
->  #endif /* _DT_BINDINGS_RESET_SUN8I_DE2_H_ */
-> --
-> 2.18.0
->
+If the above holds, then the subsequent fault would be similar to any
+other fault which should work via the normal mechanism (dcache clean +
+XN on fault, icache invalidation on permission fault).
+
+> 
+> Hmm... smells like there might be a problem here. I'll try and put
+> together a fix.
+> 
+
+It's not clear to me if we have a problem, or just different ways of
+handling the PMD vs. PTE CoW case?
+
+
+Thanks,
+
+    Christoffer
