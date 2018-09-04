@@ -1,173 +1,85 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 4 Sep 2018 17:04:21 +0800
-Subject: [PATCH 08/27] clk: sunxi-ng: Add support for H6 DE3 clocks
-In-Reply-To: <20180902072643.4917-9-jernej.skrabec@siol.net>
+Date: Tue, 4 Sep 2018 17:05:16 +0800
+Subject: [PATCH 07/27] dt-bindings: clock: sun8i-de2: Add H6 DE3 clock
+ description
+In-Reply-To: <CAGb2v65AsKzEH3AgmQi+RRvVa6AO-cpAckGnNkvWwONsCCsoxw@mail.gmail.com>
 References: <20180902072643.4917-1-jernej.skrabec@siol.net>
- <20180902072643.4917-9-jernej.skrabec@siol.net>
-Message-ID: <CAGb2v66y1iVDknM0uQKbHQFoWn7RveTky8jZO=_2iDqL=bJd-w@mail.gmail.com>
+ <20180902072643.4917-8-jernej.skrabec@siol.net>
+ <CAGb2v65AsKzEH3AgmQi+RRvVa6AO-cpAckGnNkvWwONsCCsoxw@mail.gmail.com>
+Message-ID: <CAGb2v67udJ1_668Q4MFb3MbEQXzukNBKtEu3FYHsw+QyVA9J2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 2, 2018 at 3:27 PM Jernej Skrabec <jernej.skrabec@siol.net> wrote:
+On Tue, Sep 4, 2018 at 4:59 PM Chen-Yu Tsai <wens@csie.org> wrote:
 >
-> Support for mixer0, mixer1, writeback and rotation units is added.
+> Hi,
 >
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  drivers/clk/sunxi-ng/ccu-sun8i-de2.c | 65 ++++++++++++++++++++++++++++
->  drivers/clk/sunxi-ng/ccu-sun8i-de2.h |  1 +
->  2 files changed, 66 insertions(+)
+> On Sun, Sep 2, 2018 at 3:27 PM Jernej Skrabec <jernej.skrabec@siol.net> wrote:
+> >
+> > This commit adds necessary description and dt includes for H6 DE3 clock.
+> > It is very similar to others, but memory region has some additional
+> > registers not found in DE2.
+> >
+> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> > ---
+> >  Documentation/devicetree/bindings/clock/sun8i-de2.txt | 5 +++--
+> >  include/dt-bindings/clock/sun8i-de2.h                 | 3 +++
+> >  include/dt-bindings/reset/sun8i-de2.h                 | 1 +
+> >  3 files changed, 7 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/clock/sun8i-de2.txt b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
+> > index e94582e8b8a9..41a52c2acffd 100644
+> > --- a/Documentation/devicetree/bindings/clock/sun8i-de2.txt
+> > +++ b/Documentation/devicetree/bindings/clock/sun8i-de2.txt
+> > @@ -1,5 +1,5 @@
+> > -Allwinner Display Engine 2.0 Clock Control Binding
+> > ---------------------------------------------------
+> > +Allwinner Display Engine 2.0/3.0 Clock Control Binding
+> > +------------------------------------------------------
+> >
+> >  Required properties :
+> >  - compatible: must contain one of the following compatibles:
+> > @@ -8,6 +8,7 @@ Required properties :
+> >                 - "allwinner,sun8i-v3s-de2-clk"
+> >                 - "allwinner,sun50i-a64-de2-clk"
+> >                 - "allwinner,sun50i-h5-de2-clk"
+> > +               - "allwinner,sun50i-h6-de3-clk"
+> >
+> >  - reg: Must contain the registers base address and length
+> >  - clocks: phandle to the clocks feeding the display engine subsystem.
+> > diff --git a/include/dt-bindings/clock/sun8i-de2.h b/include/dt-bindings/clock/sun8i-de2.h
+> > index 3bed63b524aa..7768f73b051e 100644
+> > --- a/include/dt-bindings/clock/sun8i-de2.h
+> > +++ b/include/dt-bindings/clock/sun8i-de2.h
+> > @@ -15,4 +15,7 @@
+> >  #define CLK_MIXER1             7
+> >  #define CLK_WB                 8
+> >
+> > +#define CLK_BUS_ROT            9
+> > +#define CLK_ROT                        10
+> > +
+> >  #endif /* _DT_BINDINGS_CLOCK_SUN8I_DE2_H_ */
+> > diff --git a/include/dt-bindings/reset/sun8i-de2.h b/include/dt-bindings/reset/sun8i-de2.h
+> > index 9526017432f0..1c36a6ac86d6 100644
+> > --- a/include/dt-bindings/reset/sun8i-de2.h
+> > +++ b/include/dt-bindings/reset/sun8i-de2.h
+> > @@ -10,5 +10,6 @@
+> >  #define RST_MIXER0     0
+> >  #define RST_MIXER1     1
+> >  #define RST_WB         2
+> > +#define RST_ROT                3
 >
-> diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-de2.c b/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
-> index bae5ee67a797..4535c1c27d27 100644
-> --- a/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
-> +++ b/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
-> @@ -31,6 +31,8 @@ static SUNXI_CCU_GATE(bus_mixer1_clk, "bus-mixer1",   "bus-de",
->                       0x04, BIT(1), 0);
->  static SUNXI_CCU_GATE(bus_wb_clk,      "bus-wb",       "bus-de",
->                       0x04, BIT(2), 0);
-> +static SUNXI_CCU_GATE(bus_rot_clk,     "bus-rot",      "bus-de",
-> +                     0x04, BIT(3), 0);
->
->  static SUNXI_CCU_GATE(mixer0_clk,      "mixer0",       "mixer0-div",
->                       0x00, BIT(0), CLK_SET_RATE_PARENT);
-> @@ -38,6 +40,8 @@ static SUNXI_CCU_GATE(mixer1_clk,     "mixer1",       "mixer1-div",
->                       0x00, BIT(1), CLK_SET_RATE_PARENT);
->  static SUNXI_CCU_GATE(wb_clk,          "wb",           "wb-div",
->                       0x00, BIT(2), CLK_SET_RATE_PARENT);
-> +static SUNXI_CCU_GATE(rot_clk,         "rot",          "rot-div",
-> +                     0x00, BIT(3), CLK_SET_RATE_PARENT);
->
->  static SUNXI_CCU_M(mixer0_div_clk, "mixer0-div", "de", 0x0c, 0, 4,
->                    CLK_SET_RATE_PARENT);
-> @@ -45,6 +49,8 @@ static SUNXI_CCU_M(mixer1_div_clk, "mixer1-div", "de", 0x0c, 4, 4,
->                    CLK_SET_RATE_PARENT);
->  static SUNXI_CCU_M(wb_div_clk, "wb-div", "de", 0x0c, 8, 4,
->                    CLK_SET_RATE_PARENT);
-> +static SUNXI_CCU_M(rot_div_clk, "rot-div", "de", 0x0c, 0x0c, 4,
-> +                  CLK_SET_RATE_PARENT);
->
->  static SUNXI_CCU_M(mixer0_div_a83_clk, "mixer0-div", "pll-de", 0x0c, 0, 4,
->                    CLK_SET_RATE_PARENT);
-> @@ -53,6 +59,24 @@ static SUNXI_CCU_M(mixer1_div_a83_clk, "mixer1-div", "pll-de", 0x0c, 4, 4,
->  static SUNXI_CCU_M(wb_div_a83_clk, "wb-div", "pll-de", 0x0c, 8, 4,
->                    CLK_SET_RATE_PARENT);
->
-> +static struct ccu_common *sun50i_h6_de3_clks[] = {
-> +       &mixer0_clk.common,
-> +       &mixer1_clk.common,
-> +       &wb_clk.common,
-> +
-> +       &bus_mixer0_clk.common,
-> +       &bus_mixer1_clk.common,
-> +       &bus_wb_clk.common,
-> +
-> +       &mixer0_div_clk.common,
-> +       &mixer1_div_clk.common,
-> +       &wb_div_clk.common,
-> +
-> +       &bus_rot_clk.common,
-> +       &rot_clk.common,
-> +       &rot_div_clk.common,
-> +};
-> +
->  static struct ccu_common *sun8i_a83t_de2_clks[] = {
->         &mixer0_clk.common,
->         &mixer1_clk.common,
-> @@ -92,6 +116,26 @@ static struct ccu_common *sun8i_v3s_de2_clks[] = {
->         &wb_div_clk.common,
->  };
->
-> +static struct clk_hw_onecell_data sun50i_h6_de3_hw_clks = {
-> +       .hws    = {
-> +               [CLK_MIXER0]            = &mixer0_clk.common.hw,
-> +               [CLK_MIXER1]            = &mixer1_clk.common.hw,
-> +               [CLK_WB]                = &wb_clk.common.hw,
-> +               [CLK_ROT]               = &rot_clk.common.hw,
-> +
-> +               [CLK_BUS_MIXER0]        = &bus_mixer0_clk.common.hw,
-> +               [CLK_BUS_MIXER1]        = &bus_mixer1_clk.common.hw,
-> +               [CLK_BUS_WB]            = &bus_wb_clk.common.hw,
-> +               [CLK_BUS_ROT]           = &bus_rot_clk.common.hw,
-> +
-> +               [CLK_MIXER0_DIV]        = &mixer0_div_clk.common.hw,
-> +               [CLK_MIXER1_DIV]        = &mixer1_div_clk.common.hw,
-> +               [CLK_WB_DIV]            = &wb_div_clk.common.hw,
-> +               [CLK_ROT_DIV]           = &rot_div_clk.common.hw,
-> +       },
-> +       .num    = 12,
+> Looking at the DE 2.0 register guide, the "Rotate" related fields are also
+> found on the A83T. So this is not DE 3.0 specific. And you could also have
+> the H6 DE3 compatible fall back to the A83T for the common parts.
 
-It's best not to openly code these. It is error prone, like having
-an index beyond .num, which then never gets registered.
+I take that back. The A83T has a different clock tree structure because it
+lacks the DE mod clock, so it's not compatible.
 
-Instead, please update CLK_NUMBERS and use that instead. sunxi_ccu_probe()
-can handle holes in .hws.
-
-On the other hand, it can't handle holes in the ccu_reset_map. Hope we
-never have to deal with such an instance.
-
-ChenYu
-
-> +};
-> +
->  static struct clk_hw_onecell_data sun8i_a83t_de2_hw_clks = {
->         .hws    = {
->                 [CLK_MIXER0]            = &mixer0_clk.common.hw,
-> @@ -156,6 +200,13 @@ static struct ccu_reset_map sun50i_a64_de2_resets[] = {
->         [RST_WB]        = { 0x08, BIT(2) },
->  };
+> ChenYu
 >
-> +static struct ccu_reset_map sun50i_h6_de3_resets[] = {
-> +       [RST_MIXER0]    = { 0x08, BIT(0) },
-> +       [RST_MIXER1]    = { 0x08, BIT(1) },
-> +       [RST_WB]        = { 0x08, BIT(2) },
-> +       [RST_ROT]       = { 0x08, BIT(3) },
-> +};
-> +
->  static const struct sunxi_ccu_desc sun8i_a83t_de2_clk_desc = {
->         .ccu_clks       = sun8i_a83t_de2_clks,
->         .num_ccu_clks   = ARRAY_SIZE(sun8i_a83t_de2_clks),
-> @@ -186,6 +237,16 @@ static const struct sunxi_ccu_desc sun50i_a64_de2_clk_desc = {
->         .num_resets     = ARRAY_SIZE(sun50i_a64_de2_resets),
->  };
->
-> +static const struct sunxi_ccu_desc sun50i_h6_de3_clk_desc = {
-> +       .ccu_clks       = sun50i_h6_de3_clks,
-> +       .num_ccu_clks   = ARRAY_SIZE(sun50i_h6_de3_clks),
-> +
-> +       .hw_clks        = &sun50i_h6_de3_hw_clks,
-> +
-> +       .resets         = sun50i_h6_de3_resets,
-> +       .num_resets     = ARRAY_SIZE(sun50i_h6_de3_resets),
-> +};
-> +
->  static const struct sunxi_ccu_desc sun8i_v3s_de2_clk_desc = {
->         .ccu_clks       = sun8i_v3s_de2_clks,
->         .num_ccu_clks   = ARRAY_SIZE(sun8i_v3s_de2_clks),
-> @@ -296,6 +357,10 @@ static const struct of_device_id sunxi_de2_clk_ids[] = {
->                 .compatible = "allwinner,sun50i-h5-de2-clk",
->                 .data = &sun50i_a64_de2_clk_desc,
->         },
-> +       {
-> +               .compatible = "allwinner,sun50i-h6-de3-clk",
-> +               .data = &sun50i_h6_de3_clk_desc,
-> +       },
->         { }
->  };
->
-> diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-de2.h b/drivers/clk/sunxi-ng/ccu-sun8i-de2.h
-> index 530c006e0ae9..27bd88539f42 100644
-> --- a/drivers/clk/sunxi-ng/ccu-sun8i-de2.h
-> +++ b/drivers/clk/sunxi-ng/ccu-sun8i-de2.h
-> @@ -22,6 +22,7 @@
->  #define CLK_MIXER0_DIV 3
->  #define CLK_MIXER1_DIV 4
->  #define CLK_WB_DIV     5
-> +#define CLK_ROT_DIV    11
->
->  #define CLK_NUMBER     (CLK_WB + 1)
->
-> --
-> 2.18.0
->
+> >
+> >  #endif /* _DT_BINDINGS_RESET_SUN8I_DE2_H_ */
+> > --
+> > 2.18.0
+> >
