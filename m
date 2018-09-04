@@ -1,230 +1,530 @@
 From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Tue,  4 Sep 2018 17:24:46 +0530
-Subject: [PATCH v2 11/15] soc: octeontx2: Add Marvell OcteonTX2 CGX driver
+Date: Tue,  4 Sep 2018 17:24:44 +0530
+Subject: [PATCH v2 09/15] soc: octeontx2: Configure block LF's MSIX vector
+ offset
 In-Reply-To: <1536062090-30446-1-git-send-email-sunil.kovvuri@gmail.com>
 References: <1536062090-30446-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1536062090-30446-12-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <1536062090-30446-10-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sunil Goutham <sgoutham@marvell.com>
 
-This patch adds basic template for Marvell OcteonTX2's
-CGX ethernet interface driver. Just the probe.
-RVU AF driver will use APIs exported by this driver
-for various things like PF to physical interface mapping,
-loopback mode, interface stats etc. Hence marged both
-drivers into a single module.
+Firmware configures a certain number of MSIX vectors to each of
+enabled RVU PF/VF. When a block LF is attached to a PF/VF, number
+of MSIX vectors needed by that LF are set aside (out of PF/VF's
+total MSIX vectors) and LF's msix_offset is configured in HW.
+
+Also added support for a RVU PF/VF to retrieve that block LF's
+MSIX vector offset information from AF via mbox.
 
 Signed-off-by: Sunil Goutham <sgoutham@marvell.com>
 ---
- drivers/soc/marvell/Kconfig            |   3 +-
- drivers/soc/marvell/octeontx2/Makefile |   2 +-
- drivers/soc/marvell/octeontx2/cgx.c    | 102 +++++++++++++++++++++++++++++++++
- drivers/soc/marvell/octeontx2/cgx.h    |  22 +++++++
- drivers/soc/marvell/octeontx2/rvu.c    |  14 ++++-
- 5 files changed, 140 insertions(+), 3 deletions(-)
- create mode 100644 drivers/soc/marvell/octeontx2/cgx.c
- create mode 100644 drivers/soc/marvell/octeontx2/cgx.h
+ drivers/soc/marvell/octeontx2/mbox.h       |  18 ++
+ drivers/soc/marvell/octeontx2/rvu.c        | 333 ++++++++++++++++++++++++++++-
+ drivers/soc/marvell/octeontx2/rvu.h        |   7 +
+ drivers/soc/marvell/octeontx2/rvu_struct.h |   2 +
+ 4 files changed, 357 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/soc/marvell/Kconfig b/drivers/soc/marvell/Kconfig
-index 428d22e..8f36f3a 100644
---- a/drivers/soc/marvell/Kconfig
-+++ b/drivers/soc/marvell/Kconfig
-@@ -11,7 +11,8 @@ config OCTEONTX2_AF
- 	tristate "OcteonTX2 RVU Admin Function driver"
- 	select OCTEONTX2_MBOX
- 	depends on ARM64 && PCI
--	help
-+	---help---
- 	  This driver supports Marvell's OcteonTX2 Resource Virtualization
- 	  Unit's admin function manager which manages all RVU HW resources.
-+
- endmenu
-diff --git a/drivers/soc/marvell/octeontx2/Makefile b/drivers/soc/marvell/octeontx2/Makefile
-index ac17cb9..8646421 100644
---- a/drivers/soc/marvell/octeontx2/Makefile
-+++ b/drivers/soc/marvell/octeontx2/Makefile
-@@ -7,4 +7,4 @@ obj-$(CONFIG_OCTEONTX2_MBOX) += octeontx2_mbox.o
- obj-$(CONFIG_OCTEONTX2_AF) += octeontx2_af.o
+diff --git a/drivers/soc/marvell/octeontx2/mbox.h b/drivers/soc/marvell/octeontx2/mbox.h
+index 7280d49..bedf0ee 100644
+--- a/drivers/soc/marvell/octeontx2/mbox.h
++++ b/drivers/soc/marvell/octeontx2/mbox.h
+@@ -122,6 +122,7 @@ static inline struct mbox_msghdr *otx2_mbox_alloc_msg(struct otx2_mbox *mbox,
+ M(READY,		0x001, msg_req, ready_msg_rsp)			\
+ M(ATTACH_RESOURCES,	0x002, rsrc_attach, msg_rsp)			\
+ M(DETACH_RESOURCES,	0x003, rsrc_detach, msg_rsp)			\
++M(MSIX_OFFSET,		0x004, msg_req, msix_offset_rsp)		\
+ /* CGX mbox IDs (range 0x200 - 0x3FF) */				\
+ /* NPA mbox IDs (range 0x400 - 0x5FF) */				\
+ /* SSO/SSOW mbox IDs (range 0x600 - 0x7FF) */				\
+@@ -190,4 +191,21 @@ struct rsrc_detach {
+ 	u8 cptlfs:1;
+ };
  
- octeontx2_mbox-y := mbox.o
--octeontx2_af-y := rvu.o
-+octeontx2_af-y := cgx.o rvu.o
-diff --git a/drivers/soc/marvell/octeontx2/cgx.c b/drivers/soc/marvell/octeontx2/cgx.c
-new file mode 100644
-index 0000000..47aa4cb
---- /dev/null
-+++ b/drivers/soc/marvell/octeontx2/cgx.c
-@@ -0,0 +1,102 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/* Marvell OcteonTx2 CGX driver
-+ *
-+ * Copyright (C) 2018 Marvell International Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
++#define MSIX_VECTOR_INVALID	0xFFFF
++#define MAX_RVU_BLKLF_CNT	256
 +
-+#include <linux/acpi.h>
-+#include <linux/module.h>
-+#include <linux/interrupt.h>
-+#include <linux/pci.h>
-+#include <linux/netdevice.h>
-+#include <linux/etherdevice.h>
-+#include <linux/phy.h>
-+#include <linux/of.h>
-+#include <linux/of_mdio.h>
-+#include <linux/of_net.h>
-+
-+#include "cgx.h"
-+
-+#define DRV_NAME	"octeontx2-cgx"
-+#define DRV_STRING      "Marvell OcteonTX2 CGX/MAC Driver"
-+#define DRV_VERSION	"1.0"
-+
-+struct cgx {
-+	void __iomem		*reg_base;
-+	struct pci_dev		*pdev;
-+	u8			cgx_id;
++struct msix_offset_rsp {
++	struct mbox_msghdr hdr;
++	u16  npa_msixoff;
++	u16  nix_msixoff;
++	u8   sso;
++	u8   ssow;
++	u8   timlfs;
++	u8   cptlfs;
++	u16  sso_msixoff[MAX_RVU_BLKLF_CNT];
++	u16  ssow_msixoff[MAX_RVU_BLKLF_CNT];
++	u16  timlf_msixoff[MAX_RVU_BLKLF_CNT];
++	u16  cptlf_msixoff[MAX_RVU_BLKLF_CNT];
 +};
 +
-+/* Supported devices */
-+static const struct pci_device_id cgx_id_table[] = {
-+	{ PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, PCI_DEVID_OCTEONTX2_CGX) },
-+	{ 0, }  /* end of table */
-+};
+ #endif /* MBOX_H */
+diff --git a/drivers/soc/marvell/octeontx2/rvu.c b/drivers/soc/marvell/octeontx2/rvu.c
+index 39dc45d..8ac3524 100644
+--- a/drivers/soc/marvell/octeontx2/rvu.c
++++ b/drivers/soc/marvell/octeontx2/rvu.c
+@@ -24,6 +24,11 @@
+ 
+ static int rvu_get_hwvf(struct rvu *rvu, int pcifunc);
+ 
++static void rvu_set_msix_offset(struct rvu *rvu, struct rvu_pfvf *pfvf,
++				struct rvu_block *block, int lf);
++static void rvu_clear_msix_offset(struct rvu *rvu, struct rvu_pfvf *pfvf,
++				  struct rvu_block *block, int lf);
 +
-+MODULE_AUTHOR("Marvell International Ltd.");
-+MODULE_DESCRIPTION(DRV_STRING);
-+MODULE_LICENSE("GPL v2");
-+MODULE_VERSION(DRV_VERSION);
-+MODULE_DEVICE_TABLE(pci, cgx_id_table);
-+
-+static int cgx_probe(struct pci_dev *pdev, const struct pci_device_id *id)
+ /* Supported devices */
+ static const struct pci_device_id rvu_id_table[] = {
+ 	{ PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, PCI_DEVID_OCTEONTX2_RVU_AF) },
+@@ -75,6 +80,45 @@ int rvu_alloc_rsrc(struct rsrc_bmap *rsrc)
+ 	return id;
+ }
+ 
++static int rvu_alloc_rsrc_contig(struct rsrc_bmap *rsrc, int nrsrc)
 +{
-+	int err;
-+	struct device *dev = &pdev->dev;
-+	struct cgx *cgx;
++	int start;
 +
-+	cgx = devm_kzalloc(dev, sizeof(*cgx), GFP_KERNEL);
-+	if (!cgx)
-+		return -ENOMEM;
-+	cgx->pdev = pdev;
++	if (!rsrc->bmap)
++		return -EINVAL;
 +
-+	pci_set_drvdata(pdev, cgx);
++	start = bitmap_find_next_zero_area(rsrc->bmap, rsrc->max, 0, nrsrc, 0);
++	if (start >= rsrc->max)
++		return -ENOSPC;
 +
-+	err = pci_enable_device(pdev);
-+	if (err) {
-+		dev_err(dev, "Failed to enable PCI device\n");
-+		pci_set_drvdata(pdev, NULL);
-+		return err;
++	bitmap_set(rsrc->bmap, start, nrsrc);
++	return start;
++}
++
++static void rvu_free_rsrc_contig(struct rsrc_bmap *rsrc, int nrsrc, int start)
++{
++	if (!rsrc->bmap)
++		return;
++	if (start >= rsrc->max)
++		return;
++
++	bitmap_clear(rsrc->bmap, start, nrsrc);
++}
++
++static bool rvu_rsrc_check_contig(struct rsrc_bmap *rsrc, int nrsrc)
++{
++	int start;
++
++	if (!rsrc->bmap)
++		return false;
++
++	start = bitmap_find_next_zero_area(rsrc->bmap, rsrc->max, 0, nrsrc, 0);
++	if (start >= rsrc->max)
++		return false;
++
++	return true;
++}
++
+ void rvu_free_rsrc(struct rsrc_bmap *rsrc, int id)
+ {
+ 	if (!rsrc->bmap)
+@@ -103,6 +147,26 @@ int rvu_alloc_bitmap(struct rsrc_bmap *rsrc)
+ 	return 0;
+ }
+ 
++/* Get block LF's HW index from a PF_FUNC's block slot number */
++int rvu_get_lf(struct rvu *rvu, struct rvu_block *block, u16 pcifunc, u16 slot)
++{
++	int lf;
++	u16 match = 0;
++
++	spin_lock(&rvu->rsrc_lock);
++	for (lf = 0; lf < block->lf.max; lf++) {
++		if (block->fn_map[lf] == pcifunc) {
++			if (slot == match) {
++				spin_unlock(&rvu->rsrc_lock);
++				return lf;
++			}
++			match++;
++		}
 +	}
++	spin_unlock(&rvu->rsrc_lock);
++	return -ENODEV;
++}
 +
-+	err = pci_request_regions(pdev, DRV_NAME);
-+	if (err) {
-+		dev_err(dev, "PCI request regions failed 0x%x\n", err);
-+		goto err_disable_device;
+ /* Convert BLOCK_TYPE_E to a BLOCK_ADDR_E.
+  * Some silicon variants of OcteonTX2 supports
+  * multiple blocks of same type.
+@@ -237,6 +301,16 @@ inline int rvu_get_pf(u16 pcifunc)
+ 	return (pcifunc >> RVU_PFVF_PF_SHIFT) & RVU_PFVF_PF_MASK;
+ }
+ 
++void rvu_get_pf_numvfs(struct rvu *rvu, int pf, int *numvfs, int *hwvf)
++{
++	u64 cfg;
++
++	/* Get numVFs attached to this PF and first HWVF */
++	cfg = rvu_read64(rvu, BLKADDR_RVUM, RVU_PRIV_PFX_CFG(pf));
++	*numvfs = (cfg >> 12) & 0xFF;
++	*hwvf = cfg & 0xFFF;
++}
++
+ static int rvu_get_hwvf(struct rvu *rvu, int pcifunc)
+ {
+ 	int pf, func;
+@@ -331,20 +405,150 @@ static void rvu_scan_block(struct rvu *rvu, struct rvu_block *block)
+ 		pfvf = rvu_get_pfvf(rvu, (cfg >> 8) & 0xFFFF);
+ 		rvu_update_rsrc_map(rvu, pfvf, block,
+ 				    (cfg >> 8) & 0xFFFF, lf, true);
++
++		/* Set start MSIX vector for this LF within this PF/VF */
++		rvu_set_msix_offset(rvu, pfvf, block, lf);
+ 	}
+ }
+ 
++static void rvu_check_min_msix_vec(struct rvu *rvu, int nvecs, int pf, int vf)
++{
++	int min_vecs;
++
++	if (!vf)
++		goto check_pf;
++
++	if (!nvecs) {
++		dev_warn(rvu->dev,
++			 "PF%d:VF%d is configured with zero msix vectors, %d\n",
++			 pf, vf - 1, nvecs);
 +	}
++	return;
 +
-+	/* MAP configuration registers */
-+	cgx->reg_base = pcim_iomap(pdev, PCI_CFG_REG_BAR_NUM, 0);
-+	if (!cgx->reg_base) {
-+		dev_err(dev, "CGX: Cannot map CSR memory space, aborting\n");
-+		err = -ENOMEM;
-+		goto err_release_regions;
++check_pf:
++	if (pf == 0)
++		min_vecs = RVU_AF_INT_VEC_CNT + RVU_PF_INT_VEC_CNT;
++	else
++		min_vecs = RVU_PF_INT_VEC_CNT;
++
++	if (!(nvecs < min_vecs))
++		return;
++	dev_warn(rvu->dev,
++		 "PF%d is configured with too few vectors, %d, min is %d\n",
++		 pf, nvecs, min_vecs);
++}
++
++static int rvu_setup_msix_resources(struct rvu *rvu)
++{
++	struct rvu_hwinfo *hw = rvu->hw;
++	int pf, vf, numvfs, hwvf, err;
++	struct rvu_pfvf *pfvf;
++	int nvecs, offset;
++	u64 cfg;
++
++	for (pf = 0; pf < hw->total_pfs; pf++) {
++		cfg = rvu_read64(rvu, BLKADDR_RVUM, RVU_PRIV_PFX_CFG(pf));
++		/* If PF is not enabled, nothing to do */
++		if (!((cfg >> 20) & 0x01))
++			continue;
++
++		rvu_get_pf_numvfs(rvu, pf, &numvfs, &hwvf);
++
++		pfvf = &rvu->pf[pf];
++		/* Get num of MSIX vectors attached to this PF */
++		cfg = rvu_read64(rvu, BLKADDR_RVUM, RVU_PRIV_PFX_MSIX_CFG(pf));
++		pfvf->msix.max = ((cfg >> 32) & 0xFFF) + 1;
++		rvu_check_min_msix_vec(rvu, pfvf->msix.max, pf, 0);
++
++		/* Alloc msix bitmap for this PF */
++		err = rvu_alloc_bitmap(&pfvf->msix);
++		if (err)
++			return err;
++
++		/* Allocate memory for MSIX vector to RVU block LF mapping */
++		pfvf->msix_lfmap = devm_kcalloc(rvu->dev, pfvf->msix.max,
++						sizeof(u16), GFP_KERNEL);
++		if (!pfvf->msix_lfmap)
++			return -ENOMEM;
++
++		/* For PF0 (AF) firmware will set msix vector offsets for
++		 * AF, block AF and PF0_INT vectors, so jump to VFs.
++		 */
++		if (!pf)
++			goto setup_vfmsix;
++
++		/* Set MSIX offset for PF's 'RVU_PF_INT_VEC' vectors.
++		 * These are allocated on driver init and never freed,
++		 * so no need to set 'msix_lfmap' for these.
++		 */
++		cfg = rvu_read64(rvu, BLKADDR_RVUM, RVU_PRIV_PFX_INT_CFG(pf));
++		nvecs = (cfg >> 12) & 0xFF;
++		cfg &= ~0x7FFULL;
++		offset = rvu_alloc_rsrc_contig(&pfvf->msix, nvecs);
++		rvu_write64(rvu, BLKADDR_RVUM,
++			    RVU_PRIV_PFX_INT_CFG(pf), cfg | offset);
++setup_vfmsix:
++		/* Alloc msix bitmap for VFs */
++		for (vf = 0; vf < numvfs; vf++) {
++			pfvf =  &rvu->hwvf[hwvf + vf];
++			/* Get num of MSIX vectors attached to this VF */
++			cfg = rvu_read64(rvu, BLKADDR_RVUM,
++					 RVU_PRIV_PFX_MSIX_CFG(pf));
++			pfvf->msix.max = (cfg & 0xFFF) + 1;
++			rvu_check_min_msix_vec(rvu, pfvf->msix.max, pf, vf + 1);
++
++			/* Alloc msix bitmap for this VF */
++			err = rvu_alloc_bitmap(&pfvf->msix);
++			if (err)
++				return err;
++
++			pfvf->msix_lfmap =
++				devm_kcalloc(rvu->dev, pfvf->msix.max,
++					     sizeof(u16), GFP_KERNEL);
++			if (!pfvf->msix_lfmap)
++				return -ENOMEM;
++
++			/* Set MSIX offset for HWVF's 'RVU_VF_INT_VEC' vectors.
++			 * These are allocated on driver init and never freed,
++			 * so no need to set 'msix_lfmap' for these.
++			 */
++			cfg = rvu_read64(rvu, BLKADDR_RVUM,
++					 RVU_PRIV_HWVFX_INT_CFG(hwvf + vf));
++			nvecs = (cfg >> 12) & 0xFF;
++			cfg &= ~0x7FFULL;
++			offset = rvu_alloc_rsrc_contig(&pfvf->msix, nvecs);
++			rvu_write64(rvu, BLKADDR_RVUM,
++				    RVU_PRIV_HWVFX_INT_CFG(hwvf + vf),
++				    cfg | offset);
++		}
 +	}
 +
 +	return 0;
-+
-+err_release_regions:
-+	pci_release_regions(pdev);
-+err_disable_device:
-+	pci_disable_device(pdev);
-+	pci_set_drvdata(pdev, NULL);
-+	return err;
 +}
 +
-+static void cgx_remove(struct pci_dev *pdev)
-+{
-+	pci_release_regions(pdev);
-+	pci_disable_device(pdev);
-+	pci_set_drvdata(pdev, NULL);
-+}
-+
-+struct pci_driver cgx_driver = {
-+	.name = DRV_NAME,
-+	.id_table = cgx_id_table,
-+	.probe = cgx_probe,
-+	.remove = cgx_remove,
-+};
-diff --git a/drivers/soc/marvell/octeontx2/cgx.h b/drivers/soc/marvell/octeontx2/cgx.h
-new file mode 100644
-index 0000000..a7d4b39
---- /dev/null
-+++ b/drivers/soc/marvell/octeontx2/cgx.h
-@@ -0,0 +1,22 @@
-+/* SPDX-License-Identifier: GPL-2.0
-+ * Marvell OcteonTx2 CGX driver
-+ *
-+ * Copyright (C) 2018 Marvell International Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef CGX_H
-+#define CGX_H
-+
-+ /* PCI device IDs */
-+#define	PCI_DEVID_OCTEONTX2_CGX			0xA059
-+
-+/* PCI BAR nos */
-+#define PCI_CFG_REG_BAR_NUM			0
-+
-+extern struct pci_driver cgx_driver;
-+
-+#endif /* CGX_H */
-diff --git a/drivers/soc/marvell/octeontx2/rvu.c b/drivers/soc/marvell/octeontx2/rvu.c
-index 40684c9..daa6fd3 100644
---- a/drivers/soc/marvell/octeontx2/rvu.c
-+++ b/drivers/soc/marvell/octeontx2/rvu.c
-@@ -15,6 +15,7 @@
- #include <linux/pci.h>
- #include <linux/sysfs.h>
- 
-+#include "cgx.h"
- #include "rvu.h"
- #include "rvu_reg.h"
- 
-@@ -1605,14 +1606,25 @@ static struct pci_driver rvu_driver = {
- 
- static int __init rvu_init_module(void)
+ static void rvu_free_hw_resources(struct rvu *rvu)
  {
-+	int err;
-+
- 	pr_info("%s: %s\n", DRV_NAME, DRV_STRING);
+ 	struct rvu_hwinfo *hw = rvu->hw;
+ 	struct rvu_block *block;
++	struct rvu_pfvf  *pfvf;
+ 	int id;
  
--	return pci_register_driver(&rvu_driver);
-+	err = pci_register_driver(&cgx_driver);
-+	if (err < 0)
+-	/* Free all bitmaps */
++	/* Free block LF bitmaps */
+ 	for (id = 0; id < BLK_COUNT; id++) {
+ 		block = &hw->block[id];
+ 		kfree(block->lf.bmap);
+ 	}
++
++	/* Free MSIX bitmaps */
++	for (id = 0; id < hw->total_pfs; id++) {
++		pfvf = &rvu->pf[id];
++		kfree(pfvf->msix.bmap);
++	}
++
++	for (id = 0; id < hw->total_vfs; id++) {
++		pfvf = &rvu->hwvf[id];
++		kfree(pfvf->msix.bmap);
++	}
+ }
+ 
+ static int rvu_setup_hw_resources(struct rvu *rvu)
+@@ -500,6 +704,12 @@ static int rvu_setup_hw_resources(struct rvu *rvu)
+ 	if (!rvu->hwvf)
+ 		return -ENOMEM;
+ 
++	spin_lock_init(&rvu->rsrc_lock);
++
++	err = rvu_setup_msix_resources(rvu);
++	if (err)
 +		return err;
 +
-+	err =  pci_register_driver(&rvu_driver);
-+	if (err < 0)
-+		pci_unregister_driver(&cgx_driver);
+ 	for (blkid = 0; blkid < BLK_COUNT; blkid++) {
+ 		block = &hw->block[blkid];
+ 		if (!block->lf.bmap)
+@@ -517,8 +727,6 @@ static int rvu_setup_hw_resources(struct rvu *rvu)
+ 		rvu_scan_block(rvu, block);
+ 	}
+ 
+-	spin_lock_init(&rvu->rsrc_lock);
+-
+ 	return 0;
+ }
+ 
+@@ -604,6 +812,9 @@ static void rvu_detach_block(struct rvu *rvu, int pcifunc, int blktype)
+ 
+ 		/* Free the resource */
+ 		rvu_free_rsrc(&block->lf, lf);
 +
-+	return err;
++		/* Clear MSIX vector offset for this LF */
++		rvu_clear_msix_offset(rvu, pfvf, block, lf);
+ 	}
  }
  
- static void __exit rvu_cleanup_module(void)
+@@ -697,6 +908,9 @@ static void rvu_attach_block(struct rvu *rvu, int pcifunc,
+ 			    (lf << block->lfshift), cfg);
+ 		rvu_update_rsrc_map(rvu, pfvf, block,
+ 				    pcifunc, lf, true);
++
++		/* Set start MSIX vector for this LF within this PF/VF */
++		rvu_set_msix_offset(rvu, pfvf, block, lf);
+ 	}
+ }
+ 
+@@ -872,6 +1086,119 @@ static int rvu_mbox_handler_ATTACH_RESOURCES(struct rvu *rvu,
+ 	return err;
+ }
+ 
++static u16 rvu_get_msix_offset(struct rvu *rvu, struct rvu_pfvf *pfvf,
++			       int blkaddr, int lf)
++{
++	u16 vec;
++
++	if (lf < 0)
++		return MSIX_VECTOR_INVALID;
++
++	for (vec = 0; vec < pfvf->msix.max; vec++) {
++		if (pfvf->msix_lfmap[vec] == MSIX_BLKLF(blkaddr, lf))
++			return vec;
++	}
++	return MSIX_VECTOR_INVALID;
++}
++
++static void rvu_set_msix_offset(struct rvu *rvu, struct rvu_pfvf *pfvf,
++				struct rvu_block *block, int lf)
++{
++	u16 nvecs, vec, offset;
++	u64 cfg;
++
++	cfg = rvu_read64(rvu, block->addr, block->msixcfg_reg |
++			 (lf << block->lfshift));
++	nvecs = (cfg >> 12) & 0xFF;
++
++	/* Check and alloc MSIX vectors, must be contiguous */
++	if (!rvu_rsrc_check_contig(&pfvf->msix, nvecs))
++		return;
++
++	offset = rvu_alloc_rsrc_contig(&pfvf->msix, nvecs);
++
++	/* Config MSIX offset in LF */
++	rvu_write64(rvu, block->addr, block->msixcfg_reg |
++		    (lf << block->lfshift), (cfg & ~0x7FFULL) | offset);
++
++	/* Update the bitmap as well */
++	for (vec = 0; vec < nvecs; vec++)
++		pfvf->msix_lfmap[offset + vec] = MSIX_BLKLF(block->addr, lf);
++}
++
++static void rvu_clear_msix_offset(struct rvu *rvu, struct rvu_pfvf *pfvf,
++				  struct rvu_block *block, int lf)
++{
++	u16 nvecs, vec, offset;
++	u64 cfg;
++
++	cfg = rvu_read64(rvu, block->addr, block->msixcfg_reg |
++			 (lf << block->lfshift));
++	nvecs = (cfg >> 12) & 0xFF;
++
++	/* Clear MSIX offset in LF */
++	rvu_write64(rvu, block->addr, block->msixcfg_reg |
++		    (lf << block->lfshift), cfg & ~0x7FFULL);
++
++	offset = rvu_get_msix_offset(rvu, pfvf, block->addr, lf);
++
++	/* Update the mapping */
++	for (vec = 0; vec < nvecs; vec++)
++		pfvf->msix_lfmap[offset + vec] = 0;
++
++	/* Free the same in MSIX bitmap */
++	rvu_free_rsrc_contig(&pfvf->msix, nvecs, offset);
++}
++
++static int rvu_mbox_handler_MSIX_OFFSET(struct rvu *rvu, struct msg_req *req,
++					struct msix_offset_rsp *rsp)
++{
++	struct rvu_hwinfo *hw = rvu->hw;
++	u16 pcifunc = req->hdr.pcifunc;
++	struct rvu_pfvf *pfvf;
++	int lf, slot;
++
++	pfvf = rvu_get_pfvf(rvu, pcifunc);
++	if (!pfvf->msix.bmap)
++		return 0;
++
++	/* Set MSIX offsets for each block's LFs attached to this PF/VF */
++	lf = rvu_get_lf(rvu, &hw->block[BLKADDR_NPA], pcifunc, 0);
++	rsp->npa_msixoff = rvu_get_msix_offset(rvu, pfvf, BLKADDR_NPA, lf);
++
++	lf = rvu_get_lf(rvu, &hw->block[BLKADDR_NIX0], pcifunc, 0);
++	rsp->nix_msixoff = rvu_get_msix_offset(rvu, pfvf, BLKADDR_NIX0, lf);
++
++	rsp->sso = pfvf->sso;
++	for (slot = 0; slot < rsp->sso; slot++) {
++		lf = rvu_get_lf(rvu, &hw->block[BLKADDR_SSO], pcifunc, slot);
++		rsp->sso_msixoff[slot] =
++			rvu_get_msix_offset(rvu, pfvf, BLKADDR_SSO, lf);
++	}
++
++	rsp->ssow = pfvf->ssow;
++	for (slot = 0; slot < rsp->ssow; slot++) {
++		lf = rvu_get_lf(rvu, &hw->block[BLKADDR_SSOW], pcifunc, slot);
++		rsp->ssow_msixoff[slot] =
++			rvu_get_msix_offset(rvu, pfvf, BLKADDR_SSOW, lf);
++	}
++
++	rsp->timlfs = pfvf->timlfs;
++	for (slot = 0; slot < rsp->timlfs; slot++) {
++		lf = rvu_get_lf(rvu, &hw->block[BLKADDR_TIM], pcifunc, slot);
++		rsp->timlf_msixoff[slot] =
++			rvu_get_msix_offset(rvu, pfvf, BLKADDR_TIM, lf);
++	}
++
++	rsp->cptlfs = pfvf->cptlfs;
++	for (slot = 0; slot < rsp->cptlfs; slot++) {
++		lf = rvu_get_lf(rvu, &hw->block[BLKADDR_CPT0], pcifunc, slot);
++		rsp->cptlf_msixoff[slot] =
++			rvu_get_msix_offset(rvu, pfvf, BLKADDR_CPT0, lf);
++	}
++	return 0;
++}
++
+ static int rvu_process_mbox_msg(struct rvu *rvu, int devid,
+ 				struct mbox_msghdr *req)
  {
- 	pci_unregister_driver(&rvu_driver);
-+	pci_unregister_driver(&cgx_driver);
- }
+diff --git a/drivers/soc/marvell/octeontx2/rvu.h b/drivers/soc/marvell/octeontx2/rvu.h
+index 0f76704..7435e83 100644
+--- a/drivers/soc/marvell/octeontx2/rvu.h
++++ b/drivers/soc/marvell/octeontx2/rvu.h
+@@ -65,6 +65,11 @@ struct rvu_pfvf {
+ 	u16		ssow;
+ 	u16		cptlfs;
+ 	u16		timlfs;
++
++	/* Block LF's MSIX vector info */
++	struct rsrc_bmap msix;      /* Bitmap for MSIX vector alloc */
++#define MSIX_BLKLF(blkaddr, lf) (((blkaddr) << 8) | ((lf) & 0xFF))
++	u16		 *msix_lfmap; /* Vector to block LF mapping */
+ };
  
- module_init(rvu_init_module);
+ struct rvu_hwinfo {
+@@ -126,7 +131,9 @@ void rvu_free_rsrc(struct rsrc_bmap *rsrc, int id);
+ int rvu_rsrc_free_count(struct rsrc_bmap *rsrc);
+ int rvu_get_pf(u16 pcifunc);
+ struct rvu_pfvf *rvu_get_pfvf(struct rvu *rvu, int pcifunc);
++void rvu_get_pf_numvfs(struct rvu *rvu, int pf, int *numvfs, int *hwvf);
+ bool is_block_implemented(struct rvu_hwinfo *hw, int blkaddr);
++int rvu_get_lf(struct rvu *rvu, struct rvu_block *block, u16 pcifunc, u16 slot);
+ int rvu_get_blkaddr(struct rvu *rvu, int blktype, u16 pcifunc);
+ int rvu_poll_reg(struct rvu *rvu, u64 block, u64 offset, u64 mask, bool zero);
+ 
+diff --git a/drivers/soc/marvell/octeontx2/rvu_struct.h b/drivers/soc/marvell/octeontx2/rvu_struct.h
+index 77ac751..f61c862 100644
+--- a/drivers/soc/marvell/octeontx2/rvu_struct.h
++++ b/drivers/soc/marvell/octeontx2/rvu_struct.h
+@@ -58,6 +58,7 @@ enum rvu_af_int_vec_e {
+ 	RVU_AF_INT_VEC_PFME   = 0x2,
+ 	RVU_AF_INT_VEC_GEN    = 0x3,
+ 	RVU_AF_INT_VEC_MBOX   = 0x4,
++	RVU_AF_INT_VEC_CNT    = 0x5,
+ };
+ 
+ /**
+@@ -71,6 +72,7 @@ enum rvu_pf_int_vec_e {
+ 	RVU_PF_INT_VEC_VFPF_MBOX0 = 0x4,
+ 	RVU_PF_INT_VEC_VFPF_MBOX1 = 0x5,
+ 	RVU_PF_INT_VEC_AFPF_MBOX  = 0x6,
++	RVU_PF_INT_VEC_CNT	  = 0x7,
+ };
+ 
+ #endif /* RVU_STRUCT_H */
 -- 
 2.7.4
