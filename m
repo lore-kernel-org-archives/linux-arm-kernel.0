@@ -1,44 +1,33 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 4 Sep 2018 11:05:42 +0300
-Subject: [RESEND PATCHv2 2/4] ARM: dts: add support for individual build flags
- for DT subdirs
-In-Reply-To: <1536048344-9995-1-git-send-email-t-kristo@ti.com>
-References: <1535719666-13595-1-git-send-email-t-kristo@ti.com>
- <1536048344-9995-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1536048344-9995-3-git-send-email-t-kristo@ti.com>
+Date: Tue, 4 Sep 2018 11:27:31 +0300
+Subject: [RESEND PATCHv2 2/2] arm64: ti: add support for building Texas
+ instruments overlays
+In-Reply-To: <1536049651-10206-1-git-send-email-t-kristo@ti.com>
+References: <1535722107-13767-1-git-send-email-t-kristo@ti.com>
+ <1536049651-10206-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1536049651-10206-3-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the makefile is setup in such manner that even if
-we build a DT file in a subdirectory under arch/arm/boot/dts,
-it gets built based on the base boot/dts/Makefile rules.
-This patch modifies the base makefile in such manner, that
-it detects which makefile to use based on build target path.
-This allows setting for example per-directory DTC_FLAGS and
-using those for the subdir build. The dtbdir local variable
-is setup to target to the build path.
+Add the symbols to TI build DT files, for supporting overlays. Right now,
+there are no overlay files introduced, those shall be added later on.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/Makefile | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/ti/Makefile | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index ab555a0..b7c21e8 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -339,8 +339,10 @@ $(BOOT_TARGETS): vmlinux
- $(INSTALL_TARGETS):
- 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
+diff --git a/arch/arm64/boot/dts/ti/Makefile b/arch/arm64/boot/dts/ti/Makefile
+index 63e619d..753de8c 100644
+--- a/arch/arm64/boot/dts/ti/Makefile
++++ b/arch/arm64/boot/dts/ti/Makefile
+@@ -6,4 +6,6 @@
+ # Copyright (C) 2016-2018 Texas Instruments Incorporated - http://www.ti.com/
+ #
  
-+%.dtb %.dtbo: dtbdir = $(patsubst %/,%,$(patsubst %./,%,$(boot)/dts/$(dir $@)))
++DTC_FLAGS += -@
 +
- %.dtb %.dtbo: | scripts
--	$(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) $(boot)/dts/$@
-+	$(Q)$(MAKE) $(build)=$(dtbdir) MACHINE=$(MACHINE) $(boot)/dts/$@
- 
- PHONY += dtbs dtbs_install
- 
+ dtb-$(CONFIG_ARCH_K3_AM6_SOC) += k3-am654-base-board.dtb
 -- 
 1.9.1
 
