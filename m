@@ -1,56 +1,42 @@
-From: koomi@moshbit.net (Lukas Braun)
-Date: Tue,  4 Sep 2018 18:39:36 +0200
-Subject: [PATCH] KVM: arm/arm64: Check memslot bounds before mapping hugepages
-Message-ID: <20180904163937.12759-1-koomi@moshbit.net>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Tue,  4 Sep 2018 22:06:09 +0530
+Subject: [PATCH v4 4/4] drm/sun4i: Enable DesignWare HDMI for SUN50I
+In-Reply-To: <20180904163609.10171-1-jagan@amarulasolutions.com>
+References: <20180904163609.10171-1-jagan@amarulasolutions.com>
+Message-ID: <20180904163609.10171-4-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Userspace can create a memslot with memory backed by (transparent)
-hugepages, but with bounds that do not align with hugepages.
-In that case, we cannot map the entire region in the guest as hugepages
-without exposing additional host memory to the guest and potentially
-interfering with other memslots.
-Consequently, this patch adds a bounds check when populating guest page
-tables and forces the creation of regular PTEs if mapping an entire
-hugepage would violate the memslots bounds.
+Allwinner SUN50I are now using DesignWare HDMI so enable
+them as default. This can build DRM_SUN8I_DW_HDMI as module
+since DRM in arm64 has module.
 
-Signed-off-by: Lukas Braun <koomi@moshbit.net>
+Making this as defult to SUN8I, may cause an issue while
+loading since arm32 DRM built as static.
+
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- virt/kvm/arm/mmu.c | 15 +++++++++++++--
- 1 file changed, 13 insertions(+), 2 deletions(-)
+Changes for v4:
+- none
+Changes for v3:
+- skip SUN8I enablement, since it built statically for arm32
+Changes for v2:
+- Enable for SUN8I
 
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index ed162a6c57c5..bdbec1d136a1 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -1504,6 +1504,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		hugetlb = true;
- 		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
- 	} else {
-+		unsigned long pmd_fn_mask = PTRS_PER_PMD - 1;
-+
- 		/*
- 		 * Pages belonging to memslots that don't have the same
- 		 * alignment for userspace and IPA cannot be mapped using
-@@ -1513,8 +1515,17 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		 * unmapping, updates, and splits of the THP or other pages
- 		 * in the stage-2 block range.
- 		 */
--		if ((memslot->userspace_addr & ~PMD_MASK) !=
--		    ((memslot->base_gfn << PAGE_SHIFT) & ~PMD_MASK))
-+		int aligned = ((memslot->userspace_addr & ~PMD_MASK) ==
-+			((memslot->base_gfn << PAGE_SHIFT) & ~PMD_MASK));
-+
-+		/*
-+		 * We also can't map a huge page if it would violate the bounds
-+		 * of the containing memslot.
-+		 */
-+		int in_bounds = ((memslot->base_gfn <= (gfn & ~pmd_fn_mask)) &&
-+			((memslot->base_gfn + memslot->npages) > (gfn | pmd_fn_mask)));
-+
-+		if (!aligned || !in_bounds)
- 			force_pte = true;
- 	}
- 	up_read(&current->mm->mmap_sem);
+ drivers/gpu/drm/sun4i/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/gpu/drm/sun4i/Kconfig b/drivers/gpu/drm/sun4i/Kconfig
+index cfa8b96273fb..5d0c450db148 100644
+--- a/drivers/gpu/drm/sun4i/Kconfig
++++ b/drivers/gpu/drm/sun4i/Kconfig
+@@ -52,6 +52,7 @@ config DRM_SUN6I_DSI
+ 
+ config DRM_SUN8I_DW_HDMI
+ 	tristate "Support for Allwinner version of DesignWare HDMI"
++	default ARM64 && ARCH_SUNXI
+ 	depends on DRM_SUN4I
+ 	select DRM_DW_HDMI
+ 	help
 -- 
-2.11.0
+2.18.0.321.gffc6fa0e3
