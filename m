@@ -1,216 +1,85 @@
-From: jagan@openedev.com (Jagan Teki)
-Date: Tue, 4 Sep 2018 20:00:37 +0530
-Subject: [linux-sunxi] Re: [PATCH] arm64: allwinner: h6: Add OrangePi One
- Plus initial support
-In-Reply-To: <CAGb2v670WNu8tz+e0DqO5eiSvi8EEfhCrz3ksaAzvyxQvCGkgQ@mail.gmail.com>
-References: <20180728182615.20845-1-jagan@amarulasolutions.com>
- <20180730090048.gl7fkduztjkxacqq@flea>
- <CAGb2v67wKFp2Fntm2O0xGXZjbyTZ_3YjRrD6b612jer1DDXxZw@mail.gmail.com>
- <CAMty3ZBNM7mdtkBSq5BGuGoa5jKdSuuSVxkOoqPhDJZ-NM2THQ@mail.gmail.com>
- <CAGb2v66Br9-KB-AD+N9mqRQ7rhrzYqUAQDkiepf2+3=FOgWKLg@mail.gmail.com>
- <CAGb2v670WNu8tz+e0DqO5eiSvi8EEfhCrz3ksaAzvyxQvCGkgQ@mail.gmail.com>
-Message-ID: <3f31bff7-689a-3cf6-8e55-cfd98a19ad50@openedev.com>
+From: dmurphy@ti.com (Dan Murphy)
+Date: Tue, 4 Sep 2018 09:34:49 -0500
+Subject: [rfc] leds: add TI LMU backlight driver
+In-Reply-To: <20180831213030.GA23447@amd>
+References: <20180829212032.GB15786@amd>
+ <a0906253-44e3-5a01-73ca-67c7cb124eb0@ti.com> <20180830201825.GA1936@amd>
+ <ec7c9624-c1c3-df35-3593-704ac1dc9a4d@ti.com> <20180831213030.GA23447@amd>
+Message-ID: <d96eab23-dbd9-71a6-551e-2bc99ce4a57c@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 03 September 2018 11:05 AM, Chen-Yu Tsai wrote:
-> On Tue, Jul 31, 2018 at 9:42 PM Chen-Yu Tsai <wens@csie.org> wrote:
->>
->> On Tue, Jul 31, 2018 at 9:41 PM, Jagan Teki <jagan@amarulasolutions.com> wrote:
->>> On Mon, Jul 30, 2018 at 2:47 PM, Chen-Yu Tsai <wens@csie.org> wrote:
->>>> On Mon, Jul 30, 2018 at 5:00 PM, Maxime Ripard
->>>> <maxime.ripard@bootlin.com> wrote:
->>>>> Hi,
->>>>>
->>>>> On Sat, Jul 28, 2018 at 11:56:15PM +0530, Jagan Teki wrote:
->>>>>> OrangePi One Plus is Allwinner H6 based open-source SBC,
->>>>>> which support:
->>>>>> - Allwinner H6 Quad-core 64-bit ARM Cortex-A53
->>>>>> - GPU Mali-T720
->>>>>> - 1GB LPDDR3 RAM
->>>>>> - AXP805 PMIC
->>>>>> - 1Gbps GMAC via RTL8211
->>>>>> - USB 2.0 Host, OTG
->>>>>> - HDMI port
->>>>>> - 5V/2A DC power supply
->>>>>>
->>>>>> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
->>>>>> ---
->>>>>>   arch/arm64/boot/dts/allwinner/Makefile        |   1 +
->>>>>>   .../allwinner/sun50i-h6-orangepi-one-plus.dts | 150 ++++++++++++++++++
->>>>>>   2 files changed, 151 insertions(+)
->>>>>>   create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi-one-plus.dts
->>>>>>
->>>>>> diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
->>>>>> index 9ffa7a038791..c38f326e7fec 100644
->>>>>> --- a/arch/arm64/boot/dts/allwinner/Makefile
->>>>>> +++ b/arch/arm64/boot/dts/allwinner/Makefile
->>>>>> @@ -15,4 +15,5 @@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
->>>>>>   dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-prime.dtb
->>>>>>   dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus.dtb
->>>>>>   dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus2.dtb
->>>>>> +dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h6-orangepi-one-plus.dtb
->>>>>>   dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h6-pine-h64.dtb
->>>>>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi-one-plus.dts b/arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi-one-plus.dts
->>>>>> new file mode 100644
->>>>>> index 000000000000..0612c19cd994
->>>>>> --- /dev/null
->>>>>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi-one-plus.dts
->>>>>> @@ -0,0 +1,150 @@
->>>>>> +// SPDX-License-Identifier: (GPL-2.0+ or MIT)
->>>>>> +/*
->>>>>> + * Copyright (C) 2018 Amarula Solutions
->>>>>> + * Author: Jagan Teki <jagan@amarulasolutions.com>
->>>>>> + */
->>>>>> +
->>>>>> +/dts-v1/;
->>>>>> +
->>>>>> +#include "sun50i-h6.dtsi"
->>>>>> +
->>>>>> +#include <dt-bindings/gpio/gpio.h>
->>>>>> +
->>>>>> +/ {
->>>>>> +     model = "OrangePi One Plus";
->>>>>> +     compatible = "xunlong,orangepi-one-plus", "allwinner,sun50i-h6";
->>>>>> +
->>>>>> +     aliases {
->>>>>> +             serial0 = &uart0;
->>>>>> +     };
->>>>>> +
->>>>>> +     chosen {
->>>>>> +             stdout-path = "serial0:115200n8";
->>>>>> +     };
->>>>>> +};
->>>>>> +
->>>>>> +&mmc0 {
->>>>>> +     pinctrl-names = "default";
->>>>>> +     pinctrl-0 = <&mmc0_pins>;
->>>>>> +     vmmc-supply = <&reg_cldo1>;
->>>>>> +     cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>;
->>>>>> +     bus-width = <4>;
->>>>>> +     status = "okay";
->>>>>> +};
->>>>>> +
->>>>>> +&r_i2c {
->>>>>> +     status = "okay";
->>>>>> +
->>>>>> +     axp805: pmic at 36 {
->>>>>> +             compatible = "x-powers,axp805", "x-powers,axp806";
->>>>>> +             reg = <0x36>;
->>>>>> +             interrupt-parent = <&r_intc>;
->>>>>> +             interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
->>>>>> +             interrupt-controller;
->>>>>> +             #interrupt-cells = <1>;
->>>>>> +             x-powers,self-working-mode;
->>>>>> +
->>>>>> +             regulators {
->>>>>> +                     reg_aldo1: aldo1 {
->>>>>> +                             regulator-always-on;
->>>>>> +                             regulator-min-microvolt = <3300000>;
->>>>>> +                             regulator-max-microvolt = <3300000>;
->>>>>> +                             regulator-name = "vcc-pl";
->>>>>> +                     };
->>>>>> +
->>>>>> +                     reg_aldo2: aldo2 {
->>>>>> +                             regulator-min-microvolt = <3300000>;
->>>>>> +                             regulator-max-microvolt = <3300000>;
->>>>>> +                             regulator-name = "vcc-ac200";
->>>>>> +                     };
->>>>>> +
->>>>>> +                     reg_aldo3: aldo3 {
->>>>>> +                             regulator-always-on;
->>>>>> +                             regulator-min-microvolt = <3300000>;
->>>>>> +                             regulator-max-microvolt = <3300000>;
->>>>>> +                             regulator-name = "vcc25-dram";
->>>>>> +                     };
->>>>>> +
->>>>>> +                     reg_bldo1: bldo1 {
->>>>>> +                             regulator-always-on;
->>>>>> +                             regulator-min-microvolt = <1800000>;
->>>>>> +                             regulator-max-microvolt = <1800000>;
->>>>>> +                             regulator-name = "vcc-bias-pll";
->>>>>> +                     };
->>>>>> +
->>>>>> +                     reg_bldo2: bldo2 {
->>>>>> +                             regulator-always-on;
->>>>>> +                             regulator-min-microvolt = <1800000>;
->>>>>> +                             regulator-max-microvolt = <1800000>;
->>>>>> +                             regulator-name = "vcc-efuse-pcie-hdmi-io";
->>>>>> +                     };
->>>>>> +
->>>>>> +                     reg_bldo3: bldo3 {
->>>>>> +                             regulator-always-on;
->>>>>> +                             regulator-min-microvolt = <1800000>;
->>>>>> +                             regulator-max-microvolt = <1800000>;
->>>>>> +                             regulator-name = "vcc-dcxoio";
->>>>>> +                     };
->>>>>> +
->>>>>> +                     bldo4 {
->>>>>> +                             /* unused */
->>>>>> +                     };
->>>>>> +
->>>>>> +                     reg_cldo1: cldo1 {
->>>>>> +                             regulator-always-on;
->>>>>> +                             regulator-min-microvolt = <3300000>;
->>>>>> +                             regulator-max-microvolt = <3300000>;
->>>>>> +                             regulator-name = "vcc-3v3";
->>>>>> +                     };
->>>>>> +
->>>>>> +                     reg_cldo2: cldo2 {
->>>>>> +                             regulator-min-microvolt = <3300000>;
->>>>>> +                             regulator-max-microvolt = <3300000>;
->>>>>> +                             regulator-name = "vcc-wifi-1";
->>>>>> +                     };
->>>>>> +
->>>>>> +                     reg_cldo3: cldo3 {
->>>>>> +                             regulator-min-microvolt = <3300000>;
->>>>>> +                             regulator-max-microvolt = <3300000>;
->>>>>> +                             regulator-name = "vcc-wifi-2";
->>>>>> +                     };
->>>>>> +
->>>>>> +                     reg_dcdca: dcdca {
->>>>>> +                             regulator-always-on;
->>>>>> +                             regulator-min-microvolt = <810000>;
->>>>>> +                             regulator-max-microvolt = <1080000>;
->>>>>> +                             regulator-name = "vdd-cpu";
->>>>>> +                     };
->>>>>> +
->>>>>> +                     reg_dcdcc: dcdcc {
->>>>>> +                             regulator-min-microvolt = <810000>;
->>>>>> +                             regulator-max-microvolt = <1080000>;
->>>>>> +                             regulator-name = "vdd-gpu";
->>>>>> +                     };
->>>>>> +
->>>>>> +                     reg_dcdcd: dcdcd {
->>>>>> +                             regulator-always-on;
->>>>>> +                             regulator-min-microvolt = <960000>;
->>>>>> +                             regulator-max-microvolt = <960000>;
->>>>>> +                             regulator-name = "vdd-sys";
->>>>>> +                     };
->>>>>> +
->>>>>> +                     reg_dcdce: dcdce {
->>>>>> +                             regulator-always-on;
->>>>>> +                             regulator-min-microvolt = <1200000>;
->>>>>> +                             regulator-max-microvolt = <1200000>;
->>>>>> +                             regulator-name = "vcc-dram";
->>>>>> +                     };
->>>>>> +
->>>>>> +                     sw {
->>>>>> +                             /* unused */
->>>>>> +                     };
->>>>>
->>>>> Can't we have a DTSI for this PMIC too?
->>>>
->>>> Back when we started adding the regulators, Mark wasn't too happy with
->>>> all the placeholders we put in the dtsi. I think we got away with it
->>>> because we had other things in there as well. That's not true for this
->>>> particular PMIC.
->>>
->>> So we need separate dtsi for this PMIC as well?
->>
->> I don't think we do. We don't gain much.
-> 
-> Merged with Maxime's ack, and the subject prefix fixed.
-> Also squashed in the Ethernet patch for this board.
+Pavel
 
-H6 EMAC node changes still in ML.
+On 08/31/2018 04:30 PM, Pavel Machek wrote:
+> Hi!
+> 
+>>> Aha. I did not realize that was for same hardware... I should have
+>>> cc-ed you, I guess.
+>>
+>> No worries Jacek cc'd me.
+> 
+> Good.
+> 
+>>>> I do not like this driver.
+>>>> I don't like that it smashes numerous devices into some structure with varying register maps.
+>>>>
+>>>
+>>> Can you elaborate? The chips are similar enough that single driver
+>>> makes sense, and we certainly want to maintain one driver, not 6
+>>> drivers differing only in .. what exactly?
+>>
+>> Well I think it is justified to have independent drivers as each device has different features from
+>> this basic LED driver.  If we are just looking for basic support then yes this driver is fine.
+> 
+>> But here is where a single driver will start getting messy and support difficult
+>>
+>> LM3533 has ALS and an ADC for an ALS analog sensor
+>> LM3631 has no ALS functionality
+>> LM3632 has strobe functionality and no ramp support
+>> LM3633 has indicator support coupled with the hvled support
+>> LM3695 does not even appear to be available publicly
+>> LM3697 is the only device that that this driver could be used for as is.
+> 
+> Ok, so ... yes, I'm really interested in basic support. But drivers
+> seem to have a lot in common, voltage limits, for example. 
+> 
+>> In addition if I wanted to only support a single device I have to pull in the full data
+>> file that defines all the other devices.  That is pretty bad to increase the size of the kernel
+>> image to have support for devices that are not even on the target product.  The ti-lmu data file
+>> alone is ~15k, the ti-lmu code does not even build with this patch (So this is a nack on the patch as it is.)
+>> but commenting out the offending code gives me at least ~23k more data on top
+>> of the ti-lmu MFD framework which is ~33k.  That is ~71k of code just to support 1 LED device
+>> that is 3x what we have now.  That is not good for IoT devices.
+> 
+>> The LM3697 is 22k without ramp support.
+> 
+> Well, I don't think object file size is huge problem. First,
+> "distribution" kernel with support for 6 different chips will be ~71k,
+> while your proposal will result in ~136k. Second, yes, we could put
+> ifdefs into ti-lmu data file to make it smaller.
+> 
+> Anyway, clean source code and easy maintainance is more important.
+
+I am going to reply here and snip the rest of the chain.
+
+My proposal is to create a ti-lmu-led-common file that contains all the common
+code.  We can have LED drivers use that common code to perform the common tasks.
+This can then be extended to other devices past, present or future that have the
+same feature set.
+
+Then the register maps and LED registration can be contained in each LED driver and any additional features
+can be supported in the LED driver.  The common code will retrieve any device settings from
+the firmware that it is interested in.
+
+I can throw some code together and RFC the code.  This way we get the common core for the
+chips and not the bloat or messy source with a single driver.
+
+And yes I can put this together and support it if it is needed.  I just need to go get the EVMs
+so I can test it.
+
+Thoughts?
+
+<snip>-- 
+------------------
+Dan Murphy
