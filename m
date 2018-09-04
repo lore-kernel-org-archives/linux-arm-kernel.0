@@ -1,104 +1,54 @@
-From: wufan@codeaurora.org (Fan Wu)
-Date: Tue,  4 Sep 2018 03:50:55 +0000
-Subject: [PATCH v3] EDAC, ghes: use CPER module handles to locate DIMMs
-Message-ID: <1536033055-25522-1-git-send-email-wufan@codeaurora.org>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Tue,  4 Sep 2018 12:40:42 +0800
+Subject: [PATCH v4 00/11] arm64: allwinner: Add A64 DE2 HDMI support
+Message-ID: <20180904044053.15425-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For platforms whose firmwares provide valid module handles
-(SMBIOS type 17) in error records, this patch uses the module
-handles to locate corresponding DIMMs and enables per-DIMM
-error counter update.
+Allwinner A64 has display engine pipeline like other Allwinner SOC's A83T/H3/H5.
 
-Signed-off-by: Fan Wu <wufan@codeaurora.org>
-Reviewed-by: Tyler Baicar <baicar.tyler@gmail.com>
-Tested-by: Toshi Kani <toshi.kani@hpe.com>
-Reviewed-by: Borislav Petkov <bp@alien8.de>
-Reviewed-by: James Morse <james.morse@arm.com>
-Reviewed-by: tanxiaofei <tanxiaofei@huawei.com>
----
+A64 behaviour similar to Allwinner A83T where
+Mixer0 => TCON0 => LVDS/RGB/MIPI-DSI
+Mixer1 => TCON1 => HDMI
+as per Display System Block Diagram from the A64 user manual.
 
-Changes from v2:
-* Fixed coding style glitch
-* Added Tested-by/Reviewed-by
+This patchset adds support for the two display pipelines, and enables
+the HDMI output on several boards. The first pipeline is not enabled in
+this patchset yet, although it's added.
 
-Changes from v1:
-*  Changed the new function name to get_dimm_smbios_index
-*  Removed unnecessary checks inside get_dimm_smbios_index
-*  Reverted the change of the DMI handle print
-*  Updated commit message
+Icenowy Zheng (2):
+  clk: sunxi-ng: a64: Add max. rate constraint to video PLLs
+  dt-bindings: sun4i-drm: add HDMI VCC supply property for sun8i-dw-hdmi
 
----
- drivers/edac/ghes_edac.c | 23 +++++++++++++++++++++++
- include/linux/edac.h     |  2 ++
- 2 files changed, 25 insertions(+)
+Jagan Teki (8):
+  clk: sunxi-ng: a64: Add minimal rate for video PLLs
+  dt-bindings: display: Add compatible for A64 DE2 display pipeline
+  drm/sun4i: Add support for A64 mixers
+  drm/sun4i: Add support for A64 display engine
+  dt-bindings: display: Add compatible for A64 HDMI
+  dt-bindings: clock: sun50i-a64-ccu: Add PLL_VIDEO0 macro
+  arm64: dts: allwinner: a64: Add display pipeline
+  arm64: dts: allwinner: a64: Enable HDMI output on A64 boards w/ HDMI
 
-diff --git a/drivers/edac/ghes_edac.c b/drivers/edac/ghes_edac.c
-index 473aeec..ba46160 100644
---- a/drivers/edac/ghes_edac.c
-+++ b/drivers/edac/ghes_edac.c
-@@ -81,6 +81,18 @@ static void ghes_edac_count_dimms(const struct dmi_header *dh, void *arg)
- 		(*num_dimm)++;
- }
- 
-+static int get_dimm_smbios_index(u16 handle)
-+{
-+	int i;
-+	struct mem_ctl_info *mci = ghes_pvt->mci;
-+
-+	for (i = 0; i < mci->tot_dimms; i++) {
-+		if (mci->dimms[i]->smbios_handle == handle)
-+			return i;
-+	}
-+	return -1;
-+}
-+
- static void ghes_edac_dmidecode(const struct dmi_header *dh, void *arg)
- {
- 	struct ghes_edac_dimm_fill *dimm_fill = arg;
-@@ -177,6 +189,8 @@ static void ghes_edac_dmidecode(const struct dmi_header *dh, void *arg)
- 				entry->total_width, entry->data_width);
- 		}
- 
-+		dimm->smbios_handle = entry->handle;
-+
- 		dimm_fill->count++;
- 	}
- }
-@@ -327,12 +341,21 @@ void ghes_edac_report_mem_error(int sev, struct cper_sec_mem_err *mem_err)
- 		p += sprintf(p, "bit_pos:%d ", mem_err->bit_pos);
- 	if (mem_err->validation_bits & CPER_MEM_VALID_MODULE_HANDLE) {
- 		const char *bank = NULL, *device = NULL;
-+		int index = -1;
-+
- 		dmi_memdev_name(mem_err->mem_dev_handle, &bank, &device);
- 		if (bank != NULL && device != NULL)
- 			p += sprintf(p, "DIMM location:%s %s ", bank, device);
- 		else
- 			p += sprintf(p, "DIMM DMI handle: 0x%.4x ",
- 				     mem_err->mem_dev_handle);
-+
-+		index = get_dimm_smbios_index(mem_err->mem_dev_handle);
-+		if (index >= 0) {
-+			e->top_layer = index;
-+			e->enable_per_layer_report = true;
-+		}
-+
- 	}
- 	if (p > e->location)
- 		*(p - 1) = '\0';
-diff --git a/include/linux/edac.h b/include/linux/edac.h
-index bffb978..a45ce1f 100644
---- a/include/linux/edac.h
-+++ b/include/linux/edac.h
-@@ -451,6 +451,8 @@ struct dimm_info {
- 	u32 nr_pages;			/* number of pages on this dimm */
- 
- 	unsigned csrow, cschannel;	/* Points to the old API data */
-+
-+	u16 smbios_handle;              /* Handle for SMBIOS type 17 */
- };
- 
- /**
+Jernej Skrabec (1):
+  drm/sun4i: Add support for HDMI voltage regulator
+
+ .../bindings/display/sunxi/sun4i-drm.txt      |   9 +
+ .../dts/allwinner/sun50i-a64-bananapi-m64.dts |  34 ++++
+ .../dts/allwinner/sun50i-a64-nanopi-a64.dts   |  34 ++++
+ .../dts/allwinner/sun50i-a64-olinuxino.dts    |  34 ++++
+ .../dts/allwinner/sun50i-a64-orangepi-win.dts |  34 ++++
+ .../boot/dts/allwinner/sun50i-a64-pine64.dts  |  34 ++++
+ .../allwinner/sun50i-a64-sopine-baseboard.dts |  34 ++++
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 170 ++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu-sun50i-a64.c         |  48 ++---
+ drivers/clk/sunxi-ng/ccu-sun50i-a64.h         |   4 +-
+ drivers/gpu/drm/sun4i/sun4i_drv.c             |   1 +
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c         |  17 +-
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.h         |   2 +
+ drivers/gpu/drm/sun4i/sun8i_mixer.c           |  24 +++
+ include/dt-bindings/clock/sun50i-a64-ccu.h    |   1 +
+ 15 files changed, 456 insertions(+), 24 deletions(-)
+
 -- 
-2.7.4
+2.18.0
