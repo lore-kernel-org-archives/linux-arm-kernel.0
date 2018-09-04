@@ -1,33 +1,73 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue,  4 Sep 2018 22:06:07 +0530
-Subject: [PATCH v4 2/4] arm64: defconfig: Enable CONFIG_DRM_SUN4I
-In-Reply-To: <20180904163609.10171-1-jagan@amarulasolutions.com>
-References: <20180904163609.10171-1-jagan@amarulasolutions.com>
-Message-ID: <20180904163609.10171-2-jagan@amarulasolutions.com>
+From: manu@bidouilliste.com (Emmanuel Vadot)
+Date: Tue, 4 Sep 2018 18:46:23 +0200
+Subject: [PATCH v3 27/30] ARM: dts: sun8i: h3: use calibration for ths
+In-Reply-To: <20180830154518.29507-28-embed3d@gmail.com>
+References: <20180830154518.29507-1-embed3d@gmail.com>
+ <20180830154518.29507-28-embed3d@gmail.com>
+Message-ID: <20180904184623.e4386b8e6b657b1b25e90c09@bidouilliste.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable DRM Support for Allwinner Display Engine, built as a module.
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
-Changes for v4, v3, v2:
-- none
+ Hi Philipp,
 
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+On Thu, 30 Aug 2018 17:45:15 +0200
+Philipp Rossak <embed3d@gmail.com> wrote:
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index f67e8d5e93ad..4919e4577548 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -433,6 +433,7 @@ CONFIG_DRM_EXYNOS_DSI=y
- CONFIG_DRM_EXYNOS_HDMI=y
- CONFIG_DRM_EXYNOS_MIC=y
- CONFIG_DRM_ROCKCHIP=m
-+CONFIG_DRM_SUN4I=m
- CONFIG_ROCKCHIP_ANALOGIX_DP=y
- CONFIG_ROCKCHIP_CDN_DP=y
- CONFIG_ROCKCHIP_DW_HDMI=y
+> The H3 SID is supported by the kernel so we can add a NVMEM Data cell,
+> that contains the calibration data.
+> 
+> On the H3 the eFuses are located at the offset 0x200. The thermal data
+> itself has an offset of 0x34 from the eFuse base. So we end on an offset
+> of 0x234.
+> 
+> Signed-off-by: Philipp Rossak <embed3d@gmail.com>
+> ---
+>  arch/arm/boot/dts/sun8i-h3.dtsi | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+> index 1866aec69ec1..0fc447f0c02a 100644
+> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+> @@ -106,8 +106,15 @@
+>  
+>  	soc {
+>  		sid: eeprom at 1c14000 {
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+>  			compatible = "allwinner,sun8i-h3-sid";
+>  			reg = <0x01c14000 0x400>;
+> +
+> +			/* Data cells */
+> +			thermal_calibration: calib at 234 {
+> +				reg = <0x234 0x8>;
+> +			};
+
+ You are declaring 8 bytes of calibration data but to my knowledge it's
+only 2 bytes per sensor, so 2 bytes for H3.
+ Am I missing something ?
+
+ Thanks,
+>  		};
+>  	};
+>  
+> @@ -227,4 +234,6 @@
+>  &ths {
+>  	compatible = "allwinner,sun8i-h3-ths";
+>  	#thermal-sensor-cells = <0>;
+> +	nvmem-cells = <&thermal_calibration>;
+> +	nvmem-cell-names = "calibration";
+>  };
+> -- 
+> 2.11.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
 -- 
-2.18.0.321.gffc6fa0e3
+Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
