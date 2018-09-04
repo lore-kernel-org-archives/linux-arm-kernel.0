@@ -1,69 +1,244 @@
-From: pramod.kumar_1@nxp.com (Pramod Kumar)
-Date: Tue,  4 Sep 2018 15:53:45 +0530
-Subject: [PATCH v1] arm64: dts: ls1012a: Add FRWY-LS1012A board support
-Message-ID: <20180904102345.1264-1-pramod.kumar_1@nxp.com>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Tue, 4 Sep 2018 15:54:27 +0530
+Subject: [PATCH v9 0/8] Introduce on-chip interconnect API
+In-Reply-To: <20180831140151.13972-1-georgi.djakov@linaro.org>
+References: <20180831140151.13972-1-georgi.djakov@linaro.org>
+Message-ID: <CAHLCerNd0hrLKgbni95_RSYOtsNufMCVtHbAKa4W+eo8H2cL2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
+Hi Georgi,
 
-FRWY-LS1012A is a different design from LS1012A-FRDM,
-but has some common SoC features. Key feature on this
-board is Micro SD, USB 3.0, DDR, UART.
+I'm currently reviewing this patchset (long overdue), but considering
+that we haven't added any major new features to the framework for the
+last couple of revisions, can you get this patchset merged into
+linux-next to see how things shake out there? We've had this merged
+branch merged into a CI build on kernelci for a while now w/o any
+major incident so we should increase its exposure.
 
-Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
-Signed-off-by: Pramod Kumar <pramod.kumar_1@nxp.com>
----
- changes in v1:
- 1. fix license identifier
- 2. remove pcie node
+You could ask Stephen Rothwell if he'll accept the a branch directly
+from you or he needs an upstream maintainer (GregKH?) to carry it.
 
- arch/arm64/boot/dts/freescale/Makefile        |  1 +
- .../boot/dts/freescale/fsl-ls1012a-frwy.dts   | 26 +++++++++++++++++++
- 2 files changed, 27 insertions(+)
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1012a-frwy.dts
+Regard,
+Amit
 
-diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
-index 86e18adb695a..d1161442ff2f 100644
---- a/arch/arm64/boot/dts/freescale/Makefile
-+++ b/arch/arm64/boot/dts/freescale/Makefile
-@@ -1,4 +1,5 @@
- # SPDX-License-Identifier: GPL-2.0
-+dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-frwy.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-frdm.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-rdb.dtb
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-frwy.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-frwy.dts
-new file mode 100644
-index 000000000000..e75a8dc0dda5
---- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-frwy.dts
-@@ -0,0 +1,26 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Device Tree file for Freescale LS1012A FRWY Board.
-+ *
-+ * Copyright 2018 NXP
-+ *
-+ * Pramod Kumar <pramod.kumar_1@nxp.com>
-+ *
-+ */
-+/dts-v1/;
-+
-+#include "fsl-ls1012a.dtsi"
-+
-+/ {
-+	model = "LS1012A FRWY Board";
-+	compatible = "fsl,frwy-ls1012a", "fsl,ls1012a";
-+
-+};
-+
-+&duart0 {
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+};
--- 
-2.17.1
+On Fri, Aug 31, 2018 at 7:31 PM, Georgi Djakov <georgi.djakov@linaro.org> wrote:
+> Modern SoCs have multiple processors and various dedicated cores (video, gpu,
+> graphics, modem). These cores are talking to each other and can generate a
+> lot of data flowing through the on-chip interconnects. These interconnect
+> buses could form different topologies such as crossbar, point to point buses,
+> hierarchical buses or use the network-on-chip concept.
+>
+> These buses have been sized usually to handle use cases with high data
+> throughput but it is not necessary all the time and consume a lot of power.
+> Furthermore, the priority between masters can vary depending on the running
+> use case like video playback or CPU intensive tasks.
+>
+> Having an API to control the requirement of the system in terms of bandwidth
+> and QoS, so we can adapt the interconnect configuration to match those by
+> scaling the frequencies, setting link priority and tuning QoS parameters.
+> This configuration can be a static, one-time operation done at boot for some
+> platforms or a dynamic set of operations that happen at run-time.
+>
+> This patchset introduce a new API to get the requirement and configure the
+> interconnect buses across the entire chipset to fit with the current demand.
+> The API is NOT for changing the performance of the endpoint devices, but only
+> the interconnect path in between them.
+>
+> The API is using a consumer/provider-based model, where the providers are
+> the interconnect buses and the consumers could be various drivers.
+> The consumers request interconnect resources (path) to an endpoint and set
+> the desired constraints on this data flow path. The provider(s) receive
+> requests from consumers and aggregate these requests for all master-slave
+> pairs on that path. Then the providers configure each participating in the
+> topology node according to the requested data flow path, physical links and
+> constraints. The topology could be complicated and multi-tiered and is SoC
+> specific.
+>
+> Below is a simplified diagram of a real-world SoC topology. The interconnect
+> providers are the NoCs.
+>
+> +----------------+    +----------------+
+> | HW Accelerator |--->|      M NoC     |<---------------+
+> +----------------+    +----------------+                |
+>                         |      |                    +------------+
+>  +-----+  +-------------+      V       +------+     |            |
+>  | DDR |  |                +--------+  | PCIe |     |            |
+>  +-----+  |                | Slaves |  +------+     |            |
+>    ^ ^    |                +--------+     |         |   C NoC    |
+>    | |    V                               V         |            |
+> +------------------+   +------------------------+   |            |   +-----+
+> |                  |-->|                        |-->|            |-->| CPU |
+> |                  |-->|                        |<--|            |   +-----+
+> |     Mem NoC      |   |         S NoC          |   +------------+
+> |                  |<--|                        |---------+    |
+> |                  |<--|                        |<------+ |    |   +--------+
+> +------------------+   +------------------------+       | |    +-->| Slaves |
+>   ^  ^    ^    ^          ^                             | |        +--------+
+>   |  |    |    |          |                             | V
+> +------+  |  +-----+   +-----+  +---------+   +----------------+   +--------+
+> | CPUs |  |  | GPU |   | DSP |  | Masters |-->|       P NoC    |-->| Slaves |
+> +------+  |  +-----+   +-----+  +---------+   +----------------+   +--------+
+>           |
+>       +-------+
+>       | Modem |
+>       +-------+
+>
+> TODO:
+> * Create icc_set_extended() to handle parameters such as latency and other
+>   QoS values.
+> * Convert from using global node identifiers to local per provider ids.
+> * Cache the path between the nodes instead of walking the graph on each get().
+> * Sync interconnect requests with the idle state of the device.
+>
+> Changes since patchset v8 (https://lkml.org/lkml/2018/8/10/387)
+> * Fixed the names of the files when built as modules.
+> * Corrected some typos in comments.
+>
+> Changes since patchset v7 (https://lkml.org/lkml/2018/7/31/647)
+> * Addressed comments on kernel-doc and grammar. (Randy)
+> * Picked Reviewed-by: Evan
+> * Squashed consumer and provider DT bindings into single patch. (Rob)
+> * Cleaned-up msm8916 DT bindings docs by removing unused port ids.
+> * Updated documentation for the cases when NULL is returned. (Saravana)
+> * New patch to add myself as maintainer.
+>
+> Changes since patchset v6 (https://lkml.org/lkml/2018/7/9/698)
+> * [patches 1,6]: Move the aggregation within the provider from the framework to
+>   the platform driver's set() callback, as the aggregation point could be SoC
+>   specific.
+> * [patch 1]: Include missing header, reset state only of the traversed nodes,
+>   move more code into path_init(), add more asserts, move misplaced mutex,
+>   simplify icc_link_destroy() (Evan)
+> * [patch 1]: Fix the order of requests to go from source to destination. (Alex)
+> * [patch 7]: Use better wording in the documentation. (Evan)
+> * [patch 6]: Reorder struct members, sort nodes alphabetically, improve naming
+>   of variables , add missing clk_disable_unprepare() in error paths. (Matthias)
+> * [patch 6]: Remove redundant NULL pointer check in msm8916 driver. (Alex)
+> * [patch 6]: Add missing depend on QCOM_SMD_RPM in Kconfig. (Evan)
+> * [patch 3]: Don't check for errors on debugfs calls, remove debugfs directory
+>   when module is unloaded (Greg)
+>
+> Changes since patchset v5 (https://lkml.org/lkml/2018/6/20/453)
+> * Fix the modular build, make rpm-smd driver a module.
+> * Optimize locking and move to higher level. (Evan)
+> * Code cleanups. Fix typos. (Evan, Matthias)
+> * Add the source node to the path. (Evan)
+> * Rename path_allocate() to path_init() with minor refactoring. (Evan)
+> * Rename *_remove() functions to *_destroy().
+> * Return fixed errors in icc_link_destroy(). (Evan)
+> * Fix krealloc() usage in icc_link_destroy(). (Evan)
+> * Add missing kfree() in icc_node_create(). (Matthias)
+> * Make icc_node_add() return void. (Matthias)
+> * Change mutex_init to mutex_lock in icc_provider_add(). (Matthias)
+> * Add new icc_node_del() function to delete nodes from provider.
+> * Fix the header guard to reflect the path in smd-rpm.h. (Evan)
+> * Check for errors returned by qcom_icc_rpm_smd_send(). (Evan)
+> * Propagate the error of icc_provider_del(). (Evan)
+>
+> Changes since patchset v4 (https://lkml.org/lkml/2018/3/9/856)
+> * Simplified locking by using a single global mutex. (Evan)
+> * Changed the aggregation function interface.
+> * Implemented functions for node, link, provider removal. (Evan)
+> * Naming changes on variables and functions, removed redundant code. (Evan)
+> * Fixes and clarifications in the docs. (Matthias, Evan, Amit, Alexandre)
+> * Removed mandatory reg DT property, made interconnect-names optional. (Bjorn)
+> * Made interconnect-cells property required to align with other bindings. (Neil)
+> * Moved msm8916 specific bindings into a separate file and patch. (Bjorn)
+> * Use the names, instead of the hardcoded ids for topology. (Matthias)
+> * Init the node before creating the links. (Evan)
+> * Added icc_units_to_bps macro. (Amit)
+>
+> Changes since patchset v3 (https://lkml.org/lkml/2017/9/8/544)
+> * Refactored the constraints aggregation.
+> * Use the IDR API.
+> * Split the provider and consumer bindings into separate patches and propose
+>   new bindings for consumers, which allows to specify the local source port.
+> * Adopted the icc_ prefix for API functions.
+> * Introduced separate API functions for creating interconnect nodes and links.
+> * Added DT lookup support in addition to platform data.
+> * Dropped the event tracing patch for now.
+> * Added a patch to provide summary via debugfs.
+> * Use macro for the list of topology definitions in the platform driver.
+> * Various minor changes.
+>
+> Changes since patchset v2 (https://lkml.org/lkml/2017/7/20/825)
+> * Split the aggregation into per node and per provider. Cache the
+>   aggregated values.
+> * Various small refactorings and cleanups in the framework.
+> * Added a patch introducing basic tracepoint support for monitoring
+>   the time required to update the interconnect nodes.
+>
+> Changes since patchset v1 (https://lkml.org/lkml/2017/6/27/890)
+> * Updates in the documentation.
+> * Changes in request aggregation, locking.
+> * Dropped the aggregate() callback and use the default as it currently
+>   sufficient for the single vendor driver. Will add it later when needed.
+> * Dropped the dt-bindings draft patch for now.
+>
+> Changes since RFC v2 (https://lkml.org/lkml/2017/6/12/316)
+> * Converted documentation to rst format.
+> * Fixed an incorrect call to mutex_lock. Renamed max_bw to peak_bw.
+>
+> Changes since RFC v1 (https://lkml.org/lkml/2017/5/15/605)
+> * Refactored code into shorter functions.
+> * Added a new aggregate() API function.
+> * Rearranged some structs to reduce padding bytes.
+>
+> Changes since RFC v0 (https://lkml.org/lkml/2017/3/1/599)
+> * Removed DT support and added optional Patch 3 with new bindings proposal.
+> * Converted the topology into internal driver data.
+> * Made the framework modular.
+> * interconnect_get() now takes (src and dst ports as arguments).
+> * Removed public declarations of some structs.
+> * Now passing prev/next nodes to the vendor driver.
+> * Properly remove requests on _put().
+> * Added refcounting.
+> * Updated documentation.
+> * Changed struct interconnect_path to use array instead of linked list.
+>
+> Georgi Djakov (8):
+>   interconnect: Add generic on-chip interconnect API
+>   dt-bindings: Introduce interconnect binding
+>   interconnect: Allow endpoints translation via DT
+>   interconnect: Add debugfs support
+>   interconnect: qcom: Add RPM communication
+>   dt-bindings: interconnect: Document qcom,msm8916 NoC bindings
+>   interconnect: qcom: Add msm8916 interconnect provider driver
+>   MAINTAINERS: add a maintainer for the interconnect API
+>
+>  .../bindings/interconnect/interconnect.txt    |  60 ++
+>  .../bindings/interconnect/qcom-msm8916.txt    |  41 +
+>  .../bindings/interconnect/qcom-smd.txt        |  32 +
+>  Documentation/interconnect/interconnect.rst   |  94 +++
+>  MAINTAINERS                                   |  10 +
+>  drivers/Kconfig                               |   2 +
+>  drivers/Makefile                              |   1 +
+>  drivers/interconnect/Kconfig                  |  15 +
+>  drivers/interconnect/Makefile                 |   6 +
+>  drivers/interconnect/core.c                   | 729 ++++++++++++++++++
+>  drivers/interconnect/qcom/Kconfig             |  22 +
+>  drivers/interconnect/qcom/Makefile            |   7 +
+>  drivers/interconnect/qcom/msm8916.c           | 510 ++++++++++++
+>  drivers/interconnect/qcom/smd-rpm.c           |  91 +++
+>  drivers/interconnect/qcom/smd-rpm.h           |  15 +
+>  include/dt-bindings/interconnect/qcom.h       |  98 +++
+>  include/linux/interconnect-provider.h         | 125 +++
+>  include/linux/interconnect.h                  |  49 ++
+>  18 files changed, 1907 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/interconnect/interconnect.txt
+>  create mode 100644 Documentation/devicetree/bindings/interconnect/qcom-msm8916.txt
+>  create mode 100644 Documentation/devicetree/bindings/interconnect/qcom-smd.txt
+>  create mode 100644 Documentation/interconnect/interconnect.rst
+>  create mode 100644 drivers/interconnect/Kconfig
+>  create mode 100644 drivers/interconnect/Makefile
+>  create mode 100644 drivers/interconnect/core.c
+>  create mode 100644 drivers/interconnect/qcom/Kconfig
+>  create mode 100644 drivers/interconnect/qcom/Makefile
+>  create mode 100644 drivers/interconnect/qcom/msm8916.c
+>  create mode 100644 drivers/interconnect/qcom/smd-rpm.c
+>  create mode 100644 drivers/interconnect/qcom/smd-rpm.h
+>  create mode 100644 include/dt-bindings/interconnect/qcom.h
+>  create mode 100644 include/linux/interconnect-provider.h
+>  create mode 100644 include/linux/interconnect.h
+>
