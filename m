@@ -1,101 +1,77 @@
-From: edgar.righi@lsitec.org.br (Edgar Bernardi Righi)
-Date: Tue, 4 Sep 2018 12:36:36 -0300
-Subject: [PATCH v2 01/03] dt-bindings: clock: Add Clock Management Unit for
- Actions Semi S500 SoC
-Message-ID: <CADHB5bBkyE90LVrWjt0ziU+oe=4sc8G_513VGECc++6xQ2ACdA@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 4 Sep 2018 23:49:35 +0800
+Subject: [PATCH 06/27] clk: sunxi-ng: h6: Set video PLLs limits
+In-Reply-To: <20180902072643.4917-7-jernej.skrabec@siol.net>
+Message-ID: <20180904154935.GS17047@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Clock Management Unit for Actions Semi S500 SoC. Dt-Bindings
-constants added.
-Tested on a Lemaker Guitar board.
+Hi Jernej,
 
-Signed-off-by: Edgar Bernardi Righi <edgar.righi@lsitec.org.br>
+Thank you for the patch! Perhaps something to improve:
 
-diff --git a/include/dt-bindings/clock/actions,s500-cmu.h
-b/include/dt-bindings/clock/actions,s500-cmu.h
-new file mode 100644
-index 000000000000..34e5849ffcf1
---- /dev/null
-+++ b/include/dt-bindings/clock/actions,s500-cmu.h
-@@ -0,0 +1,78 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+//
-+// Device Tree binding constants for Actions Semi S500 Clock Management Unit
-+//
-+// Copyright (c) 2014 Actions Semi Inc.
-+// Copyright (c) 2018 Linaro Ltd.
-+// Copyright (c) 2018 LSI-TEC - Caninos Loucos
-+
-+#ifndef __DT_BINDINGS_CLOCK_S500_CMU_H
-+#define __DT_BINDINGS_CLOCK_S500_CMU_H
-+
-+#define CLK_NONE            0
-+
-+/* fixed rate clocks */
-+#define CLK_LOSC            1
-+#define CLK_HOSC            2
-+
-+/* pll clocks */
-+#define CLK_CORE_PLL        3
-+#define CLK_DEV_PLL            4
-+#define CLK_DDR_PLL            5
-+#define CLK_NAND_PLL        6
-+#define CLK_DISPLAY_PLL        7
-+#define CLK_ETHERNET_PLL    8
-+#define CLK_AUDIO_PLL        9
-+
-+/* system clock */
-+#define CLK_DEV                10
-+#define CLK_H                11
-+#define CLK_AHBPREDIV        12
-+#define CLK_AHB                13
-+#define CLK_DE                14
-+#define CLK_BISP            15
-+#define CLK_VCE                16
-+#define CLK_VDE                17
-+
-+/* peripheral device clock */
-+#define CLK_TIMER            18
-+#define CLK_I2C0            19
-+#define CLK_I2C1            20
-+#define CLK_I2C2            21
-+#define CLK_I2C3            22
-+#define CLK_PWM0            23
-+#define CLK_PWM1            24
-+#define CLK_PWM2            25
-+#define CLK_PWM3            26
-+#define CLK_PWM4            27
-+#define CLK_PWM5            28
-+#define CLK_SD0                29
-+#define CLK_SD1                30
-+#define CLK_SD2                31
-+#define CLK_SENSOR0            32
-+#define CLK_SENSOR1            33
-+#define CLK_SPI0            34
-+#define CLK_SPI1            35
-+#define CLK_SPI2            36
-+#define CLK_SPI3            37
-+#define CLK_UART0            38
-+#define CLK_UART1            39
-+#define CLK_UART2            40
-+#define CLK_UART3            41
-+#define CLK_UART4            42
-+#define CLK_UART5            43
-+#define CLK_UART6            44
-+#define CLK_DE1                45
-+#define CLK_DE2                46
-+#define CLK_I2SRX            47
-+#define CLK_I2STX            48
-+#define CLK_HDMI_AUDIO        49
-+#define CLK_HDMI            50
-+#define CLK_SPDIF            51
-+#define CLK_NAND            52
-+#define CLK_ECC                53
-+#define CLK_RMII_REF        54
-+
-+#define CLK_NR_CLKS            (CLK_RMII_REF + 1)
-+
-+#endif /* __DT_BINDINGS_CLOCK_S500_CMU_H */
--- 
-2.11.0
+[auto build test WARNING on sunxi/sunxi/for-next]
+[also build test WARNING on v4.19-rc2 next-20180831]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Jernej-Skrabec/Allwinner-H6-DE3-and-HDMI-support/20180903-082543
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git sunxi/for-next
+config: arm-allmodconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=arm 
+:::::: branch date: 2 hours ago
+:::::: commit date: 2 hours ago
+
+All warnings (new ones prefixed by >>):
+
+>> drivers/clk/sunxi-ng/ccu-sun50i-h6.c:124:2: warning: this decimal constant is unsigned only in ISO C90
+     .max_rate = 2400000000,
+     ^
+   drivers/clk/sunxi-ng/ccu-sun50i-h6.c:142:2: warning: this decimal constant is unsigned only in ISO C90
+     .max_rate = 2400000000,
+     ^
+
+# https://github.com/0day-ci/linux/commit/752a88510f0bcada69753fccb31adb187f80f29a
+git remote add linux-review https://github.com/0day-ci/linux
+git remote update linux-review
+git checkout 752a88510f0bcada69753fccb31adb187f80f29a
+vim +124 drivers/clk/sunxi-ng/ccu-sun50i-h6.c
+
+524353ea4 Icenowy Zheng  2018-03-16  111  
+524353ea4 Icenowy Zheng  2018-03-16  112  /*
+524353ea4 Icenowy Zheng  2018-03-16  113   * For Video PLLs, the output divider is described as "used for testing"
+524353ea4 Icenowy Zheng  2018-03-16  114   * in the user manual. So it's not modelled and forced to 0.
+524353ea4 Icenowy Zheng  2018-03-16  115   */
+524353ea4 Icenowy Zheng  2018-03-16  116  #define SUN50I_H6_PLL_VIDEO0_REG	0x040
+524353ea4 Icenowy Zheng  2018-03-16  117  static struct ccu_nm pll_video0_clk = {
+524353ea4 Icenowy Zheng  2018-03-16  118  	.enable		= BIT(31),
+524353ea4 Icenowy Zheng  2018-03-16  119  	.lock		= BIT(28),
+524353ea4 Icenowy Zheng  2018-03-16  120  	.n		= _SUNXI_CCU_MULT_MIN(8, 8, 12),
+524353ea4 Icenowy Zheng  2018-03-16  121  	.m		= _SUNXI_CCU_DIV(1, 1), /* input divider */
+524353ea4 Icenowy Zheng  2018-03-16  122  	.fixed_post_div	= 4,
+752a88510 Jernej Skrabec 2018-09-02  123  	.min_rate	= 288000000,
+752a88510 Jernej Skrabec 2018-09-02 @124  	.max_rate	= 2400000000,
+524353ea4 Icenowy Zheng  2018-03-16  125  	.common		= {
+524353ea4 Icenowy Zheng  2018-03-16  126  		.reg		= 0x040,
+524353ea4 Icenowy Zheng  2018-03-16  127  		.features	= CCU_FEATURE_FIXED_POSTDIV,
+524353ea4 Icenowy Zheng  2018-03-16  128  		.hw.init	= CLK_HW_INIT("pll-video0", "osc24M",
+524353ea4 Icenowy Zheng  2018-03-16  129  					      &ccu_nm_ops,
+524353ea4 Icenowy Zheng  2018-03-16  130  					      CLK_SET_RATE_UNGATE),
+524353ea4 Icenowy Zheng  2018-03-16  131  	},
+524353ea4 Icenowy Zheng  2018-03-16  132  };
+524353ea4 Icenowy Zheng  2018-03-16  133  
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 67089 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180904/de2a8f11/attachment-0001.gz>
