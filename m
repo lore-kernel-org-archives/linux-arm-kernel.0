@@ -1,24 +1,143 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 4 Sep 2018 14:46:20 +0200
-Subject: [PATCH v2 00/15] soc: octeontx2: Add RVU admin function driver
-In-Reply-To: <1536062090-30446-1-git-send-email-sunil.kovvuri@gmail.com>
-References: <1536062090-30446-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <20180904124620.GC29121@lunn.ch>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Tue, 4 Sep 2018 14:51:21 +0200
+Subject: [PULL 2/4] arm64: KVM: Only force FPEXC32_EL2.EN if trapping
+ FPSIMD
+In-Reply-To: <20180904113952.GB17801@e103592.cambridge.arm.com>
+References: <20180903134516.17796-1-christoffer.dall@arm.com>
+ <20180903134516.17796-3-christoffer.dall@arm.com>
+ <20180904113952.GB17801@e103592.cambridge.arm.com>
+Message-ID: <20180904125121.GO4029@e113682-lin.lund.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 04, 2018 at 05:24:35PM +0530, sunil.kovvuri at gmail.com wrote:
-> From: Sunil Goutham <sgoutham@marvell.com>
+On Tue, Sep 04, 2018 at 12:39:54PM +0100, Dave Martin wrote:
+> On Mon, Sep 03, 2018 at 03:45:14PM +0200, Christoffer Dall wrote:
+> > From: Marc Zyngier <marc.zyngier@arm.com>
+> > 
+> > If trapping FPSIMD in the context of an AArch32 guest, it is critical
+> > to set FPEXC32_EL2.EN to 1 so that the trapping is taken to EL2 and
+> > not EL1.
+> > 
+> > Conversely, it is just as critical *not* to set FPEXC32_EL2.EN to 1
+> > if we're not going to trap FPSIMD, as we then corrupt the existing
+> > VFP state.
+> > 
+> > Moving the call to __activate_traps_fpsimd32 to the point where we
+> > know for sure that we are going to trap ensures that we don't set that
+> > bit spuriously.
 > 
-> Resource virtualization unit (RVU) on Marvell's OcteonTX2 SOC supports
-> multiple PCIe SRIOV physical functions (PFs) and virtual functions (VFs).
-> PF0 is called administrative / admin function (AF) and has privilege access
-> to registers to provision different RVU functional blocks to each of
-> PF/VF.
+> 
+> Hmmm, this looks like a viable fix but actually the way the code is
+> structured is a bit confusing here.
+> 
+> It looks like some unnecessary functionality has been inherited from
+> arch/arm here: for a 32-bit host, FPEXC controls FPSIMD trapping even
+> at Hyp, so we need to handle it specially in order for the Hyp FPSIMD
+> context switching code to run without generating additional traps.
+> 
+> For a 64-bit host, this doesn't apply: FPEXC32_EL2 is just guest
+> context and doesn't affect EL2 execution.
 
-Hi Sunil
+Hmm, is that really true?  Earlier versions of the Armv8 Arm ARM, for
+the description of CPTR_EL2.TFP:
 
-Please keep netdev in the loop. The people with most experience with
-PF/VF tend to hang out there, not arm-soc.
+  This causes instructions that access the registers associated with
+  Floating Point and Advanced SIMD execution to trap to EL2 when
+  executed from EL0, EL1, or EL2, unless trapped to EL1.
 
-      Andrew
+In the current version I think you can arrive at the same conclusion by
+looking at the FPEXC_EL2.EN description which tells you that if EN==0,
+then the instruction is UNDEFINED, and the Synchronous exception
+prioritization rules specify that undefined instructions are taken
+before trapped intructions because of CPTR_EL2.
+
+But there does seem to be some inconsistency with the description of
+generally trapping floating point access to EL2.
+
+> 
+> The wrinkle this patch fixes is that implicit reads of FPEXC by
+
+what do you mean by implicit reads here?
+
+> the guest are in effect not trappable, so if this register is wrongly
+> configured for the guest, spurious traps to EL1 may occur that are
+> not architecturally expected by the guest, which is precisely the
+> problem that Alexander hit.  I missed this issue in my previous
+> refactoring...
+> 
+
+Thanks,
+
+    Christoffer
+
+> 
+> So, maybe FPEXC32_EL2 should just be treated as another guest system
+> register that must be eagerly switched.
+> 
+> This would also avoid the double write of FPEXC32_EL2 that we currently
+> do (once when enabling traps, then again when writing the correct guest
+> value after a trap is taken), and the isb() can be removed too since
+> host FPSIMD accesses won't trap on arm64 irrespective of FPEXC32_EL2.
+> 
+> 
+> I'll try to cook up a cleanup patch to apply on top, but it can be
+> treated as non-urgent.
+> 
+> Cheers
+> ---Dave
+> 
+> > 
+> > Fixes: e6b673b741ea ("KVM: arm64: Optimise FPSIMD handling to reduce guest/host thrashing")
+> > Cc: Dave Martin <dave.martin@arm.com>
+> > Reported-by: Alexander Graf <agraf@suse.de>
+> > Tested-by: Alexander Graf <agraf@suse.de>
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+> > ---
+> >  arch/arm64/kvm/hyp/switch.c | 9 ++++++---
+> >  1 file changed, 6 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> > index d496ef579859..ca46153d7915 100644
+> > --- a/arch/arm64/kvm/hyp/switch.c
+> > +++ b/arch/arm64/kvm/hyp/switch.c
+> > @@ -98,8 +98,10 @@ static void activate_traps_vhe(struct kvm_vcpu *vcpu)
+> >  	val = read_sysreg(cpacr_el1);
+> >  	val |= CPACR_EL1_TTA;
+> >  	val &= ~CPACR_EL1_ZEN;
+> > -	if (!update_fp_enabled(vcpu))
+> > +	if (!update_fp_enabled(vcpu)) {
+> >  		val &= ~CPACR_EL1_FPEN;
+> > +		__activate_traps_fpsimd32(vcpu);
+> > +	}
+> >  
+> >  	write_sysreg(val, cpacr_el1);
+> >  
+> > @@ -114,8 +116,10 @@ static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
+> >  
+> >  	val = CPTR_EL2_DEFAULT;
+> >  	val |= CPTR_EL2_TTA | CPTR_EL2_TZ;
+> > -	if (!update_fp_enabled(vcpu))
+> > +	if (!update_fp_enabled(vcpu)) {
+> >  		val |= CPTR_EL2_TFP;
+> > +		__activate_traps_fpsimd32(vcpu);
+> > +	}
+> >  
+> >  	write_sysreg(val, cptr_el2);
+> >  }
+> > @@ -129,7 +133,6 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+> >  	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN) && (hcr & HCR_VSE))
+> >  		write_sysreg_s(vcpu->arch.vsesr_el2, SYS_VSESR_EL2);
+> >  
+> > -	__activate_traps_fpsimd32(vcpu);
+> >  	if (has_vhe())
+> >  		activate_traps_vhe(vcpu);
+> >  	else
+> > -- 
+> > 2.18.0
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
