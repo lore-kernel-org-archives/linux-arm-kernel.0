@@ -1,48 +1,83 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 5 Sep 2018 13:29:05 +0100
-Subject: [PATCH] arm64: don't account for cpu offline time with irqsoff
- tracer
-In-Reply-To: <1536135583-6607-1-git-send-email-zhizhouzhang@asrmicro.com>
-References: <1536135583-6607-1-git-send-email-zhizhouzhang@asrmicro.com>
-Message-ID: <20180905122905.GI20186@arm.com>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Wed, 5 Sep 2018 14:43:41 +0200
+Subject: [PATCH v3 2/2] tty/serial: atmel: add ISO7816 support
+In-Reply-To: <20180809113035.kftvdalca7zsf4ly@M43218.corp.atmel.com>
+References: <20180807130049.5957-1-ludovic.desroches@microchip.com>
+ <20180807130049.5957-3-ludovic.desroches@microchip.com>
+ <d66c4318-1d31-5c4e-3952-6b69a010b028@sorico.fr>
+ <20180809113035.kftvdalca7zsf4ly@M43218.corp.atmel.com>
+Message-ID: <20180905124341.5n4gadgd5luza7fd@M43218.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2018 at 04:19:43PM +0800, Zhizhou Zhang wrote:
-> This is no need to account for cpu offline time with irqsoff tracer.
-> We can trigger a large irqsoff latency with below commands:
-> 
-> $ echo irqsoff > /sys/kernel/debug/tracing/current_tracer
-> $ echo 0 > /sys/kernel/debug/tracing/options/function-trace
-> $ echo 1 > /sys/kernel/debug/tracing/tracing_on
-> $ echo 0 > /sys/devices/system/cpu/cpu1/online
-> $ # wait a while ...
-> $ echo 1 > /sys/devices/system/cpu/cpu1/online
-> $ cat /sys/kernel/debug/tracing/trace
-> 
-> Signed-off-by: Zhizhou Zhang <zhizhouzhang@asrmicro.com>
-> ---
->  arch/arm64/kernel/smp.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index 25fcd22..faed8f6 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -346,6 +346,7 @@ void cpu_die(void)
->  	idle_task_exit();
->  
->  	local_daif_mask();
-> +	stop_critical_timings();
->  
->  	/* Tell __cpu_die() that this CPU is now safe to dispose of */
->  	(void)cpu_report_death();
-> -- 
-> 1.9.1
+Hi Richard,
 
-Hmm, so there are only a handful of other callers of stop_critical_timings()
-which suggests that we probably shouldn't be calling this from deep in the
-arch code. Do other architectures have the same problem? If not, how do they
-avoid it?
+On Thu, Aug 09, 2018 at 01:30:35PM +0200, Ludovic Desroches wrote:
+> Hi Richard,
+> 
+> On Thu, Aug 09, 2018 at 10:47:17AM +0200, Richard Genoud wrote:
+> > Hi !
+> > 
+> > On 07/08/2018 15:00, Ludovic Desroches wrote:
+> > > From: Nicolas Ferre <nicolas.ferre@microchip.com>
+> > > 
+> > > When mode is set in atmel_config_iso7816() we backup last RS232 mode
+> > > for coming back to this mode if requested.
+> > > Also allow setup of T=0 and T=1 parameter and basic support in set_termios
+> > > function as well.
+> > > 
+> > > Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> > > [ludovic.desroches at microchip.com: rebase, add check on fidi ratio, checkpatch fixes]
+> > > Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+> > > ---
+> > >  drivers/tty/serial/atmel_serial.c | 211 +++++++++++++++++++++++++++++++++++---
+> > >  drivers/tty/serial/atmel_serial.h |   6 +-
+> > >  2 files changed, 201 insertions(+), 16 deletions(-)
+> > > 
+> > > diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> > > index 8e4428725848..4a7ec44b0ace 100644
+> > > --- a/drivers/tty/serial/atmel_serial.c
+> > > +++ b/drivers/tty/serial/atmel_serial.c
+> 
+> [...]
+> 
+> > >  #if defined(CONFIG_OF)
+> > > +static struct atmel_uart_pdata at91rm9200_pdata = {
+> > > +	.fidi_min = 1,
+> > > +	.fidi_max = 2047,
+> > > +};
+> > > +
+> > > +static struct atmel_uart_pdata at91sam9260_pdata = {
+> > > +	.fidi_min = 1,
+> > > +	.fidi_max = 2047,
+> > > +};
+> > > +
+> > > +static struct atmel_uart_pdata sama5d3_pdata = {
+> > > +	.fidi_min = 3,
+> > > +	.fidi_max = 65535,
+> > Are you sure this is for sama5d3 ?
+> > From the datasheets I have, 65535 is for sama5d4/sama5d2
+> 
+> I checked it and I missed it. What a pity... In fact, it's a bit more
+> tricky since the min value for d3 is 3 and no longer 1.
+> 
+> > And also, you'll have to s/atmel,at91sam9260-usart/atmel,sama5d2-usart/g
+> > in sama5d{2,4}.dtsi
+> >
+> 
+> Yes, I planed to send it later but I can add those patches within this
+> set of patches. 
+> 
+> > But I wonder if it could be detected via ATMEL_US_VERSION instead ?
+> > 
+> 
+> I have not checked, I tend to prefer the compatible string for this kind
+> of thing. But as we already use the version number, I can investigate
+> this solution if it's the one you prefer.
+> 
 
-Will
+ping about this question still in suspend in order to prepare a new version.
+
+Regards
+
+Ludovic
