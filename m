@@ -1,43 +1,37 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Wed, 5 Sep 2018 13:51:25 +0530
-Subject: [PATCH v4 3/4] drm/sun4i: Enable DE2 Mixer for SUN8I and SUN50I
-In-Reply-To: <20180905070748.g43lfdqdhmoci6pk@flea>
-References: <20180904163609.10171-1-jagan@amarulasolutions.com>
- <20180904163609.10171-3-jagan@amarulasolutions.com>
- <20180905070748.g43lfdqdhmoci6pk@flea>
-Message-ID: <CAMty3ZBYjq8VBnwSqKhJgag1ARRvnPTVSpYT7SWu=A6pMwKEiA@mail.gmail.com>
+From: zhizhouzhang@asrmicro.com (Zhizhou Zhang)
+Date: Wed, 5 Sep 2018 16:19:43 +0800
+Subject: [PATCH] arm64: don't account for cpu offline time with irqsoff tracer
+Message-ID: <1536135583-6607-1-git-send-email-zhizhouzhang@asrmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 5, 2018 at 12:37 PM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> On Tue, Sep 04, 2018 at 10:06:08PM +0530, Jagan Teki wrote:
->> Allwinner SoC like SUN8I and SUN50I are now using DE2 Mixer
->> so enable them as default.
->>
->> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
->> ---
->> Changes for v4, v3:
->> - none
->> Changes for v2:
->> - Enable for SUN8I
->>
->>  drivers/gpu/drm/sun4i/Kconfig | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/gpu/drm/sun4i/Kconfig b/drivers/gpu/drm/sun4i/Kconfig
->> index c2c042287c19..cfa8b96273fb 100644
->> --- a/drivers/gpu/drm/sun4i/Kconfig
->> +++ b/drivers/gpu/drm/sun4i/Kconfig
->> @@ -61,7 +61,7 @@ config DRM_SUN8I_DW_HDMI
->>
->>  config DRM_SUN8I_MIXER
->>       tristate "Support for Allwinner Display Engine 2.0 Mixer"
->> -     default MACH_SUN8I
->> +     default MACH_SUN8I || (ARM64 && ARCH_SUNXI)
->
-> I'm not really sure we should put it as a default. We should just
-> enable it in the defconfig.
+This is no need to account for cpu offline time with irqsoff tracer.
+We can trigger a large irqsoff latency with below commands:
 
-What would be the difference in both cases it would be build as module
-since DRM_SUN4I=m for ARM64
+$ echo irqsoff > /sys/kernel/debug/tracing/current_tracer
+$ echo 0 > /sys/kernel/debug/tracing/options/function-trace
+$ echo 1 > /sys/kernel/debug/tracing/tracing_on
+$ echo 0 > /sys/devices/system/cpu/cpu1/online
+$ # wait a while ...
+$ echo 1 > /sys/devices/system/cpu/cpu1/online
+$ cat /sys/kernel/debug/tracing/trace
+
+Signed-off-by: Zhizhou Zhang <zhizhouzhang@asrmicro.com>
+---
+ arch/arm64/kernel/smp.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 25fcd22..faed8f6 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -346,6 +346,7 @@ void cpu_die(void)
+ 	idle_task_exit();
+ 
+ 	local_daif_mask();
++	stop_critical_timings();
+ 
+ 	/* Tell __cpu_die() that this CPU is now safe to dispose of */
+ 	(void)cpu_report_death();
+-- 
+1.9.1
