@@ -1,40 +1,88 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 5 Sep 2018 09:36:20 +1000
-Subject: [PATCH v9 0/8] Introduce on-chip interconnect API
-In-Reply-To: <CAHLCerNd0hrLKgbni95_RSYOtsNufMCVtHbAKa4W+eo8H2cL2A@mail.gmail.com>
-References: <20180831140151.13972-1-georgi.djakov@linaro.org>
- <CAHLCerNd0hrLKgbni95_RSYOtsNufMCVtHbAKa4W+eo8H2cL2A@mail.gmail.com>
-Message-ID: <20180905093620.6d9162ca@canb.auug.org.au>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Wed, 5 Sep 2018 09:15:20 +0800
+Subject: [PATCH v4 2/2] iommu/arm-smmu-v3: avoid redundant CMD_SYNCs if
+ possible
+In-Reply-To: <992a5e9a-ba0c-e25f-b881-89aa914d3a36@huawei.com>
+References: <1534665071-7976-1-git-send-email-thunder.leizhen@huawei.com>
+ <1534665071-7976-3-git-send-email-thunder.leizhen@huawei.com>
+ <992a5e9a-ba0c-e25f-b881-89aa914d3a36@huawei.com>
+Message-ID: <5B8F2E28.6060201@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
 
-On Tue, 4 Sep 2018 15:54:27 +0530 Amit Kucheria <amit.kucheria@linaro.org> wrote:
->
-> I'm currently reviewing this patchset (long overdue), but considering
-> that we haven't added any major new features to the framework for the
-> last couple of revisions, can you get this patchset merged into
-> linux-next to see how things shake out there? We've had this merged
-> branch merged into a CI build on kernelci for a while now w/o any
-> major incident so we should increase its exposure.
+
+On 2018/8/30 19:18, John Garry wrote:
+> On 19/08/2018 08:51, Zhen Lei wrote:
+>>      spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
 > 
-> You could ask Stephen Rothwell if he'll accept the a branch directly
-> from you or he needs an upstream maintainer (GregKH?) to carry it.
+> I find something like this adds support for combining CMD_SYNC commands for regular polling mode:
+> 
+> @@ -569,6 +569,7 @@ struct arm_smmu_device {
+>         int                             combined_irq;
+>         u32                             sync_nr;
+>         u8                              prev_cmd_opcode;
+> +       int                             prev_cmd_sync_res;
+> 
+>         unsigned long                   ias; /* IPA */
+>         unsigned long                   oas; /* PA */
+> @@ -985,17 +986,33 @@ static int __arm_smmu_cmdq_issue_sync_msi(struct arm_smmu_device *smmu)
+> 
+>  static int __arm_smmu_cmdq_issue_sync(struct arm_smmu_device *smmu)
+>  {
+> -       u64 cmd[CMDQ_ENT_DWORDS];
+> +       static u64 cmd[CMDQ_ENT_DWORDS] = {
+> +               _FIELD_PREP(CMDQ_0_OP, CMDQ_OP_CMD_SYNC) |
+> +               _FIELD_PREP(CMDQ_SYNC_0_CS, CMDQ_SYNC_0_CS_SEV) |
+> +               _FIELD_PREP(CMDQ_SYNC_0_MSH, ARM_SMMU_SH_ISH) |
+> +               _FIELD_PREP(CMDQ_SYNC_0_MSIATTR, ARM_SMMU_MEMATTR_OIWB)
+> +       };
+>         unsigned long flags;
+>         bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
+> -       struct arm_smmu_cmdq_ent ent = { .opcode = CMDQ_OP_CMD_SYNC };
+> -       int ret;
+> +       int ret = 0;
+> 
+> -       arm_smmu_cmdq_build_cmd(cmd, &ent);
+> 
+>         spin_lock_irqsave(&smmu->cmdq.lock, flags);
+> -       arm_smmu_cmdq_insert_cmd(smmu, cmd);
+> -       ret = queue_poll_cons(&smmu->cmdq.q, true, wfe);
+> +       if (smmu->prev_cmd_opcode != CMDQ_OP_CMD_SYNC ||
+> +               smmu->prev_cmd_sync_res != 0) {
+> +               arm_smmu_cmdq_insert_cmd(smmu, cmd);
+> +               smmu->prev_cmd_sync_res = ret =
+> +                       queue_poll_cons(&smmu->cmdq.q, true, wfe);
+> +       }
+> 
+> I tested iperf on a 1G network link and was seeing 6-10% CMD_SYNC commands combined. I would really need to test this on a faster connection to see any throughout difference.
+> 
+> From the above figures, I think leizhen was seeing 25% combine rate, right?
 
-Since it appears to have been well reviewed and tested, I can take it
-if you send me a git URL and the names of contacts in case of issues
-with the branch.  Once Greg has merged it, I will try to drop it again
-(unless you think there will be an ongoing reason to keep it in
-linux-next separately), but a prompting email would also be nice in
-case I forget.
+Yes. In my test case, the size of unmap are almost one page, that means 1 TLBI follows 1 SYNC,
+so the probability that two CMD_SYNCs next to each other will be greater.
+
+> 
+> As for this code, it could be neatened...
+> 
+> Cheers,
+> John
+> 
+>>
+>>      return __arm_smmu_sync_poll_msi(smmu, ent.sync.msidata);
+>> -- 
+>> 1.8.3
+>>
+>>
+>>
+>> .
+>>
+> 
+> 
+> 
+> .
+> 
+
 -- 
-Cheers,
-Stephen Rothwell
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180905/b3a68f32/attachment.sig>
+Thanks!
+BestRegards
