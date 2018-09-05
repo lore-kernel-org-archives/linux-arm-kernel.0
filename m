@@ -1,77 +1,63 @@
 From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Wed, 5 Sep 2018 16:31:37 +0800
-Subject: [PATCH v2 04/13] drm/mediatek: add clock factor for different IC
+Date: Wed, 5 Sep 2018 16:31:38 +0800
+Subject: [PATCH v2 05/13] drm/mediatek: dpi use new API for finding bridge
 In-Reply-To: <20180905083146.14727-1-bibby.hsieh@mediatek.com>
 References: <20180905083146.14727-1-bibby.hsieh@mediatek.com>
-Message-ID: <20180905083146.14727-5-bibby.hsieh@mediatek.com>
+Message-ID: <20180905083146.14727-6-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: chunhui dai <chunhui.dai@mediatek.com>
 
-different IC has different clock designed in HDMI, the factor for
-calculate clock should be different. Usinng the data in of_node
-to find this factor.
+Using new API for finding bridge.
 
 Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_dpi.c | 28 +++++++++++++++++++---------
- 1 file changed, 19 insertions(+), 9 deletions(-)
+ drivers/gpu/drm/mediatek/mtk_dpi.c | 17 +++++++----------
+ 1 file changed, 7 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
-index df27107b1f0b..3758cfeb586b 100644
+index 3758cfeb586b..ed2c153c70a2 100644
 --- a/drivers/gpu/drm/mediatek/mtk_dpi.c
 +++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
-@@ -119,6 +119,7 @@ struct mtk_dpi_yc_limit {
- };
+@@ -14,6 +14,7 @@
+ #include <drm/drmP.h>
+ #include <drm/drm_crtc.h>
+ #include <drm/drm_crtc_helper.h>
++#include <drm/drm_of.h>
+ #include <linux/kernel.h>
+ #include <linux/component.h>
+ #include <linux/platform_device.h>
+@@ -708,7 +709,6 @@ static int mtk_dpi_probe(struct platform_device *pdev)
+ 	struct device *dev = &pdev->dev;
+ 	struct mtk_dpi *dpi;
+ 	struct resource *mem;
+-	struct device_node *bridge_node;
+ 	int comp_id;
+ 	const struct of_device_id *match;
+ 	int ret;
+@@ -758,16 +758,13 @@ static int mtk_dpi_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
  
- struct mtk_dpi_conf {
-+	unsigned int (*cal_factor)(int clock);
- 	const u32 reg_h_fre_con;
- 	bool edge_sel_en;
- };
-@@ -458,16 +459,12 @@ static int mtk_dpi_set_display_mode(struct mtk_dpi *dpi,
- 	unsigned long pll_rate;
- 	unsigned int factor;
- 
-+	if (!dpi) {
-+		dev_err(dpi->dev, "invalid argument\n");
-+		return -EINVAL;
-+	}
- 	/* let pll_rate can fix the valid range of tvdpll (1G~2GHz) */
+-	bridge_node = of_graph_get_remote_node(dev->of_node, 0, 0);
+-	if (!bridge_node)
+-		return -ENODEV;
 -
--	if (mode->clock <= 27000)
--		factor = 3 << 4;
--	else if (mode->clock <= 84000)
--		factor = 3 << 3;
--	else if (mode->clock <= 167000)
--		factor = 3 << 2;
--	else
--		factor = 3 << 1;
-+	factor = dpi->conf->cal_factor(mode->clock);
- 	drm_display_mode_to_videomode(mode, &vm);
- 	pll_rate = vm.pixelclock * factor;
+-	dev_info(dev, "Found bridge node: %pOF\n", bridge_node);
+-
+-	dpi->bridge = of_drm_find_bridge(bridge_node);
+-	of_node_put(bridge_node);
+-	if (!dpi->bridge)
++	ret = drm_of_find_panel_or_bridge(dev->of_node, 0, 0,
++					  NULL, &dpi->bridge);
++	if (ret) {
++		dev_err(dev, "Failed to find panel or bridge: %d\n", ret);
+ 		return -EPROBE_DEFER;
++	}
++	dev_info(dev, "Found bridge node: %pOF\n", dpi->bridge);
  
-@@ -681,7 +678,20 @@ static const struct component_ops mtk_dpi_component_ops = {
- 	.unbind = mtk_dpi_unbind,
- };
- 
-+static unsigned int mt8173_calculate_factor(int clock)
-+{
-+	if (clock <= 27000)
-+		return 3 << 4;
-+	else if (clock <= 84000)
-+		return 3 << 3;
-+	else if (clock <= 167000)
-+		return 3 << 2;
-+	else
-+		return 3 << 1;
-+}
-+
- static const struct mtk_dpi_conf mt8173_conf = {
-+	.cal_factor = mt8173_calculate_factor,
- 	.reg_h_fre_con = 0xe0,
- };
- 
+ 	comp_id = mtk_ddp_comp_get_id(dev->of_node, MTK_DPI);
+ 	if (comp_id < 0) {
 -- 
 2.12.5.2.gbdf23ab
