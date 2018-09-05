@@ -1,40 +1,66 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Wed, 5 Sep 2018 10:27:55 -0700
-Subject: [PATCH] arm64: defconfig: enable EFI_ARMSTUB_DTB_LOADER
-In-Reply-To: <CAKv+Gu8FK9K0G-GJygdpkwqKYzjvpDDj8TyGTC2u0SRxK3ez_w@mail.gmail.com>
-References: <1535563287-24803-1-git-send-email-scott.branden@broadcom.com>
- <CAOesGMhjcJ1p3QcEYb9fsx3fMXAOsgR2njOq=VKgEbWGwJi36g@mail.gmail.com>
- <fb07b89d-d427-5e59-9f17-b12df26284ec@broadcom.com>
- <CAKv+Gu-R7eX=aj=O2-gpzmp0K4t0T4s536UiqJZs0WuxRjkYwQ@mail.gmail.com>
- <CAOesGMho8CfT7iDXadmkB5=7DoOi6n8qXcS9X643vf+Y0BbD6w@mail.gmail.com>
- <CAKv+Gu_mKU+RdPgg2Dfezy4-L+KDEEBx02R49ObomRhEkJJ6Mw@mail.gmail.com>
- <CAOesGMgLHx3+j1bWEsMWsN-yjGNZyLOpAjLg0Jut8gG=ADE25g@mail.gmail.com>
- <CAKv+Gu_x=bS4xJcD_LuEnnN=Lx4Jc87uK8J_ACdA9EeUqtM3Yg@mail.gmail.com>
- <CACxGe6uK+N5XUqZhH7gAQXoq+QXMvFPHF_i4WqivrufTU=0cog@mail.gmail.com>
- <bf917897-1697-a6c4-7f77-8dfa74dddc8a@broadcom.com>
- <CAKv+Gu8FK9K0G-GJygdpkwqKYzjvpDDj8TyGTC2u0SRxK3ez_w@mail.gmail.com>
-Message-ID: <1f8095f1-1f0c-0791-31c4-c7b986c4ce1f@broadcom.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed,  5 Sep 2018 19:40:24 +0200
+Subject: [RFT] ARM: dts: exynos: Remove double SD card detect pin inversion
+Message-ID: <20180905174024.28366-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The SDHCI standard, MMC host controller bindings and MMC core defines
+card detect pin as active low.  Therefore there is no point to invert it
+twice.
 
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-On 18-09-05 02:40 AM, Ard Biesheuvel wrote:
-> On 4 September 2018 at 19:19, Scott Branden <scott.branden@broadcom.com> wrote:
->> Rather than introduce EFI_ARMSTUB_DTB_LOADER, why not have
->> the efistub use CONFIG_OF to determine whether it supports dtb= or not?
->>
->> That way ACPI-only distros disable devicetree support entirely.
->>
-> Unfortunately, CONFIG_OF cannot be disabled on arm64 even on ACPI-only builds.
-OF shouldn't be automatically selected in the arm64/Kconfig.? It should 
-have a config
-parmaeter like other archs as mips and arm.? I can submit a patch so it 
-functions the
-same way as other archs so it is not always selected.? It will be good 
-to add a USE_OF
-config options like the other archs (or simply remove the select from 
-the Kconfig and choose OF directly in the defconfig.
-This will have the added benefit of doing away with OF support when its 
-not needed on an ARM64 platform.? ACPI is already not automatically 
-selected for all ARM64 platforms, nor should devicetree.
+---
+
+Tested only on Odroid U3. Tests on other platforms would be appreciated.
+---
+ arch/arm/boot/dts/exynos4210-universal_c210.dts | 3 +--
+ arch/arm/boot/dts/exynos4412-midas.dtsi         | 3 +--
+ arch/arm/boot/dts/exynos4412-odroid-common.dtsi | 3 +--
+ 3 files changed, 3 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/boot/dts/exynos4210-universal_c210.dts b/arch/arm/boot/dts/exynos4210-universal_c210.dts
+index 4e6ff97e1ec4..249bfbff1e20 100644
+--- a/arch/arm/boot/dts/exynos4210-universal_c210.dts
++++ b/arch/arm/boot/dts/exynos4210-universal_c210.dts
+@@ -537,8 +537,7 @@
+ 	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_bus4>;
+ 	pinctrl-names = "default";
+ 	vmmc-supply = <&ldo5_reg>;
+-	cd-gpios = <&gpx3 4 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpx3 4 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/exynos4412-midas.dtsi b/arch/arm/boot/dts/exynos4412-midas.dtsi
+index c0476c290977..aed2f2e2b0d1 100644
+--- a/arch/arm/boot/dts/exynos4412-midas.dtsi
++++ b/arch/arm/boot/dts/exynos4412-midas.dtsi
+@@ -1269,8 +1269,7 @@
+ 
+ &sdhci_2 {
+ 	bus-width = <4>;
+-	cd-gpios = <&gpx3 4 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpx3 4 GPIO_ACTIVE_LOW>;
+ 	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_bus4 &sdhci2_cd>;
+ 	pinctrl-names = "default";
+ 	vmmc-supply = <&ldo21_reg>;
+diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+index a09e46c9dbc0..2caa3132f34e 100644
+--- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
++++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+@@ -539,8 +539,7 @@
+ 	pinctrl-names = "default";
+ 	vmmc-supply = <&ldo21_reg>;
+ 	vqmmc-supply = <&ldo4_reg>;
+-	cd-gpios = <&gpk2 2 GPIO_ACTIVE_HIGH>;
+-	cd-inverted;
++	cd-gpios = <&gpk2 2 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
+ 
+-- 
+2.14.1
