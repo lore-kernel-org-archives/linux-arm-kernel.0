@@ -1,58 +1,50 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 5 Sep 2018 17:45:28 +0200
-Subject: [PATCH/RFT] arm64: dts: renesas: r8a77995-draak: Add MSIOF ch2
- pins support
-In-Reply-To: <1536092527-5950-1-git-send-email-ykaneko0929@gmail.com>
-References: <1536092527-5950-1-git-send-email-ykaneko0929@gmail.com>
-Message-ID: <CAMuHMdVSMzf6nJW4xxWQvcwcDe0qtdR8N7Y4Oe3bYngCPEXZPw@mail.gmail.com>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Wed, 05 Sep 2018 17:49:31 +0200
+Subject: [PATCH v8 4/8] media: platform: Add Cedrus VPU decoder driver
+In-Reply-To: <f15e355ece0b250a252347ec22f1433dd786bb5b.camel@collabora.com>
+References: <20180828073424.30247-1-paul.kocialkowski@bootlin.com>
+ <20180828073424.30247-5-paul.kocialkowski@bootlin.com>
+ <f15e355ece0b250a252347ec22f1433dd786bb5b.camel@collabora.com>
+Message-ID: <383bf546272ac7edca5a5f502fce4cafa88a3321.camel@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kaneko-san,
+Hi,
 
-On Tue, Sep 4, 2018 at 10:22 PM Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
-> From: Hiromitsu Yamasaki <hiromitsu.yamasaki.ym@renesas.com>
->
-> This patch adds support for MSIOF ch2 pinctrl to use the LVDS Control
-> Connector (CN41) for the Draak board on the R8A77995 SoC.
->
-> Signed-off-by: Hiromitsu Yamasaki <hiromitsu.yamasaki.ym@renesas.com>
-> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> [ykaneko0929 at gmail.com: deleted the unused reference to 'msiof_ref_clk']
-> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+Le mardi 28 ao?t 2018 ? 22:08 -0300, Ezequiel Garcia a ?crit :
+> On Tue, 2018-08-28 at 09:34 +0200, Paul Kocialkowski wrote:
+> > +static const struct v4l2_m2m_ops cedrus_m2m_ops = {
+> > +	.device_run	= cedrus_device_run,
+> > +	.job_abort	= cedrus_job_abort,
+> > +};
+> > +
+> 
+> I think you can get rid of this .job_abort. It should
+> simplify your .device_run quite a bit.
+> 
+> .job_abort is optional now since
+> 5525b8314389a0c558d15464e86f438974b94e32.
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Alright, I will probably do that for the next revision, since it seems
+that there is no particular downside to removing it.
 
-Minor nit below.
+Thanks,
 
-> --- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-> +++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+Paul
 
-> @@ -371,3 +377,10 @@
->                 };
->         };
->  };
-> +
-> +&msiof2 {
-
-Please insert following alphabetical order.
-
-> +       pinctrl-0 = <&msiof2_pins>;
-> +       pinctrl-names = "default";
-> +       /* In case of using this node, please enable this property */
-
-I think this deserves some explanation about CN41.
-
-> +       /* status = "okay"; */
-> +};
-
-Gr{oetje,eeting}s,
-
-                        Geert
+> Regards,
+> Ezequiel
 
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Developer of free digital technology and hardware support.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Website: https://www.paulk.fr/
+Coding blog: https://code.paulk.fr/
+Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180905/ede4ff8e/attachment.sig>
