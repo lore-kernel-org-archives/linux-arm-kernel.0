@@ -1,244 +1,160 @@
 From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Wed, 5 Sep 2018 12:39:00 +0530
-Subject: [RFC PATCH v3 1/3] firmware: xilinx: Add reset API's
+Date: Wed, 5 Sep 2018 12:39:02 +0530
+Subject: [RFC PATCH v3 3/3] reset: reset-zynqmp: Adding support for Xilinx
+ zynqmp reset controller.
 In-Reply-To: <1536131342-28041-1-git-send-email-nava.manne@xilinx.com>
 References: <1536131342-28041-1-git-send-email-nava.manne@xilinx.com>
-Message-ID: <1536131342-28041-2-git-send-email-nava.manne@xilinx.com>
+Message-ID: <1536131342-28041-4-git-send-email-nava.manne@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This Patch Adds reset API's to support release, assert
-and status functionalities by using firmware interface.
+Add a reset controller driver for Xilinx Zynq UltraScale+ MPSoC.
+The zynqmp reset-controller has the ability to reset lines
+connected to different blocks and peripheral in the Soc.
 
 Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
 ---
 Changes for v3:
 		-None.
 Changes for v2:
-		-New Patch.
+		-Moved eemi_ops into a priv struct as suggested
+		 by philipp.
 
- drivers/firmware/xilinx/zynqmp.c     |  40 +++++++++++
- include/linux/firmware/xlnx-zynqmp.h | 136 +++++++++++++++++++++++++++++++++++
- 2 files changed, 176 insertions(+)
+ drivers/reset/Makefile       |   1 +
+ drivers/reset/reset-zynqmp.c | 115 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 116 insertions(+)
+ create mode 100644 drivers/reset/reset-zynqmp.c
 
-diff --git a/drivers/firmware/xilinx/zynqmp.c b/drivers/firmware/xilinx/zynqmp.c
-index 7ccedf0..639c72f 100644
---- a/drivers/firmware/xilinx/zynqmp.c
-+++ b/drivers/firmware/xilinx/zynqmp.c
-@@ -447,6 +447,44 @@ static int zynqmp_pm_clock_getparent(u32 clock_id, u32 *parent_id)
- 	return ret;
- }
+diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+index c1261dc..27e4a33 100644
+--- a/drivers/reset/Makefile
++++ b/drivers/reset/Makefile
+@@ -21,4 +21,5 @@ obj-$(CONFIG_RESET_TI_SCI) += reset-ti-sci.o
+ obj-$(CONFIG_RESET_TI_SYSCON) += reset-ti-syscon.o
+ obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
+ obj-$(CONFIG_RESET_ZYNQ) += reset-zynq.o
++obj-$(CONFIG_ARCH_ZYNQMP) += reset-zynqmp.o
  
-+/**
-+ * zynqmp_pm_reset_assert - Request setting of reset (1 - assert, 0 - release)
-+ * @reset:		Reset to be configured
-+ * @assert_flag:	Flag stating should reset be asserted (1) or
-+ *			released (0)
+diff --git a/drivers/reset/reset-zynqmp.c b/drivers/reset/reset-zynqmp.c
+new file mode 100644
+index 0000000..f908492
+--- /dev/null
++++ b/drivers/reset/reset-zynqmp.c
+@@ -0,0 +1,115 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Copyright (C) 2018 Xilinx, Inc.
 + *
-+ * Return: Returns status, either success or error+reason
 + */
-+static int zynqmp_pm_reset_assert(const enum zynqmp_pm_reset reset,
-+				  const enum zynqmp_pm_reset_action assert_flag)
++
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/reset-controller.h>
++#include <linux/firmware/xlnx-zynqmp.h>
++
++#define ZYNQMP_NR_RESETS (ZYNQMP_PM_RESET_END - ZYNQMP_PM_RESET_START - 2)
++#define ZYNQMP_RESET_ID (ZYNQMP_PM_RESET_START + 1)
++
++struct zynqmp_reset_data {
++	struct reset_controller_dev rcdev;
++	const struct zynqmp_eemi_ops *eemi_ops;
++};
++
++static inline struct zynqmp_reset_data *
++to_zynqmp_reset_data(struct reset_controller_dev *rcdev)
 +{
-+	return zynqmp_pm_invoke_fn(PM_RESET_ASSERT, reset, assert_flag,
-+				   0, 0, NULL);
++	return container_of(rcdev, struct zynqmp_reset_data, rcdev);
 +}
 +
-+/**
-+ * zynqmp_pm_reset_get_status - Get status of the reset
-+ * @reset:      Reset whose status should be returned
-+ * @status:     Returned status
-+ *
-+ * Return: Returns status, either success or error+reason
-+ */
-+static int zynqmp_pm_reset_get_status(const enum zynqmp_pm_reset reset,
-+				      u32 *status)
++static int zynqmp_reset_assert(struct reset_controller_dev *rcdev,
++			       unsigned long id)
 +{
-+	u32 ret_payload[PAYLOAD_ARG_CNT];
-+	int ret;
++	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
 +
-+	if (!status)
++	return priv->eemi_ops->reset_assert(ZYNQMP_RESET_ID + id,
++					    PM_RESET_ACTION_ASSERT);
++}
++
++static int zynqmp_reset_deassert(struct reset_controller_dev *rcdev,
++				 unsigned long id)
++{
++	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
++
++	return priv->eemi_ops->reset_assert(ZYNQMP_RESET_ID + id,
++					    PM_RESET_ACTION_RELEASE);
++}
++
++static int zynqmp_reset_status(struct reset_controller_dev *rcdev,
++			       unsigned long id)
++{
++	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
++	int val, err;
++
++	err = priv->eemi_ops->reset_get_status(ZYNQMP_RESET_ID + id, &val);
++	if (!err)
 +		return -EINVAL;
 +
-+	ret = zynqmp_pm_invoke_fn(PM_RESET_GET_STATUS, reset, 0,
-+				  0, 0, ret_payload);
-+	*status = ret_payload[1];
-+
-+	return ret;
++	return val;
 +}
 +
- static const struct zynqmp_eemi_ops eemi_ops = {
- 	.get_api_version = zynqmp_pm_get_api_version,
- 	.ioctl = zynqmp_pm_ioctl,
-@@ -460,6 +498,8 @@ static const struct zynqmp_eemi_ops eemi_ops = {
- 	.clock_getrate = zynqmp_pm_clock_getrate,
- 	.clock_setparent = zynqmp_pm_clock_setparent,
- 	.clock_getparent = zynqmp_pm_clock_getparent,
-+	.reset_assert = zynqmp_pm_reset_assert,
-+	.reset_get_status = zynqmp_pm_reset_get_status,
- };
- 
- /**
-diff --git a/include/linux/firmware/xlnx-zynqmp.h b/include/linux/firmware/xlnx-zynqmp.h
-index 58a7478..93decf5 100644
---- a/include/linux/firmware/xlnx-zynqmp.h
-+++ b/include/linux/firmware/xlnx-zynqmp.h
-@@ -34,6 +34,8 @@
- 
- enum pm_api_id {
- 	PM_GET_API_VERSION = 1,
-+	PM_RESET_ASSERT = 17,
-+	PM_RESET_GET_STATUS,
- 	PM_IOCTL = 34,
- 	PM_QUERY_DATA,
- 	PM_CLOCK_ENABLE,
-@@ -74,6 +76,137 @@ enum pm_query_id {
- 	PM_QID_CLOCK_GET_ATTRIBUTES,
- };
- 
-+enum zynqmp_pm_reset_action {
-+	PM_RESET_ACTION_RELEASE,
-+	PM_RESET_ACTION_ASSERT,
-+	PM_RESET_ACTION_PULSE,
++static int zynqmp_reset_reset(struct reset_controller_dev *rcdev,
++			      unsigned long id)
++{
++	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
++
++	return priv->eemi_ops->reset_assert(ZYNQMP_RESET_ID + id,
++					    PM_RESET_ACTION_PULSE);
++}
++
++static struct reset_control_ops zynqmp_reset_ops = {
++	.reset = zynqmp_reset_reset,
++	.assert = zynqmp_reset_assert,
++	.deassert = zynqmp_reset_deassert,
++	.status = zynqmp_reset_status,
 +};
 +
-+enum zynqmp_pm_reset {
-+	ZYNQMP_PM_RESET_START = 999,
-+	ZYNQMP_PM_RESET_PCIE_CFG,
-+	ZYNQMP_PM_RESET_PCIE_BRIDGE,
-+	ZYNQMP_PM_RESET_PCIE_CTRL,
-+	ZYNQMP_PM_RESET_DP,
-+	ZYNQMP_PM_RESET_SWDT_CRF,
-+	ZYNQMP_PM_RESET_AFI_FM5,
-+	ZYNQMP_PM_RESET_AFI_FM4,
-+	ZYNQMP_PM_RESET_AFI_FM3,
-+	ZYNQMP_PM_RESET_AFI_FM2,
-+	ZYNQMP_PM_RESET_AFI_FM1,
-+	ZYNQMP_PM_RESET_AFI_FM0,
-+	ZYNQMP_PM_RESET_GDMA,
-+	ZYNQMP_PM_RESET_GPU_PP1,
-+	ZYNQMP_PM_RESET_GPU_PP0,
-+	ZYNQMP_PM_RESET_GPU,
-+	ZYNQMP_PM_RESET_GT,
-+	ZYNQMP_PM_RESET_SATA,
-+	ZYNQMP_PM_RESET_ACPU3_PWRON,
-+	ZYNQMP_PM_RESET_ACPU2_PWRON,
-+	ZYNQMP_PM_RESET_ACPU1_PWRON,
-+	ZYNQMP_PM_RESET_ACPU0_PWRON,
-+	ZYNQMP_PM_RESET_APU_L2,
-+	ZYNQMP_PM_RESET_ACPU3,
-+	ZYNQMP_PM_RESET_ACPU2,
-+	ZYNQMP_PM_RESET_ACPU1,
-+	ZYNQMP_PM_RESET_ACPU0,
-+	ZYNQMP_PM_RESET_DDR,
-+	ZYNQMP_PM_RESET_APM_FPD,
-+	ZYNQMP_PM_RESET_SOFT,
-+	ZYNQMP_PM_RESET_GEM0,
-+	ZYNQMP_PM_RESET_GEM1,
-+	ZYNQMP_PM_RESET_GEM2,
-+	ZYNQMP_PM_RESET_GEM3,
-+	ZYNQMP_PM_RESET_QSPI,
-+	ZYNQMP_PM_RESET_UART0,
-+	ZYNQMP_PM_RESET_UART1,
-+	ZYNQMP_PM_RESET_SPI0,
-+	ZYNQMP_PM_RESET_SPI1,
-+	ZYNQMP_PM_RESET_SDIO0,
-+	ZYNQMP_PM_RESET_SDIO1,
-+	ZYNQMP_PM_RESET_CAN0,
-+	ZYNQMP_PM_RESET_CAN1,
-+	ZYNQMP_PM_RESET_I2C0,
-+	ZYNQMP_PM_RESET_I2C1,
-+	ZYNQMP_PM_RESET_TTC0,
-+	ZYNQMP_PM_RESET_TTC1,
-+	ZYNQMP_PM_RESET_TTC2,
-+	ZYNQMP_PM_RESET_TTC3,
-+	ZYNQMP_PM_RESET_SWDT_CRL,
-+	ZYNQMP_PM_RESET_NAND,
-+	ZYNQMP_PM_RESET_ADMA,
-+	ZYNQMP_PM_RESET_GPIO,
-+	ZYNQMP_PM_RESET_IOU_CC,
-+	ZYNQMP_PM_RESET_TIMESTAMP,
-+	ZYNQMP_PM_RESET_RPU_R50,
-+	ZYNQMP_PM_RESET_RPU_R51,
-+	ZYNQMP_PM_RESET_RPU_AMBA,
-+	ZYNQMP_PM_RESET_OCM,
-+	ZYNQMP_PM_RESET_RPU_PGE,
-+	ZYNQMP_PM_RESET_USB0_CORERESET,
-+	ZYNQMP_PM_RESET_USB1_CORERESET,
-+	ZYNQMP_PM_RESET_USB0_HIBERRESET,
-+	ZYNQMP_PM_RESET_USB1_HIBERRESET,
-+	ZYNQMP_PM_RESET_USB0_APB,
-+	ZYNQMP_PM_RESET_USB1_APB,
-+	ZYNQMP_PM_RESET_IPI,
-+	ZYNQMP_PM_RESET_APM_LPD,
-+	ZYNQMP_PM_RESET_RTC,
-+	ZYNQMP_PM_RESET_SYSMON,
-+	ZYNQMP_PM_RESET_AFI_FM6,
-+	ZYNQMP_PM_RESET_LPD_SWDT,
-+	ZYNQMP_PM_RESET_FPD,
-+	ZYNQMP_PM_RESET_RPU_DBG1,
-+	ZYNQMP_PM_RESET_RPU_DBG0,
-+	ZYNQMP_PM_RESET_DBG_LPD,
-+	ZYNQMP_PM_RESET_DBG_FPD,
-+	ZYNQMP_PM_RESET_APLL,
-+	ZYNQMP_PM_RESET_DPLL,
-+	ZYNQMP_PM_RESET_VPLL,
-+	ZYNQMP_PM_RESET_IOPLL,
-+	ZYNQMP_PM_RESET_RPLL,
-+	ZYNQMP_PM_RESET_GPO3_PL_0,
-+	ZYNQMP_PM_RESET_GPO3_PL_1,
-+	ZYNQMP_PM_RESET_GPO3_PL_2,
-+	ZYNQMP_PM_RESET_GPO3_PL_3,
-+	ZYNQMP_PM_RESET_GPO3_PL_4,
-+	ZYNQMP_PM_RESET_GPO3_PL_5,
-+	ZYNQMP_PM_RESET_GPO3_PL_6,
-+	ZYNQMP_PM_RESET_GPO3_PL_7,
-+	ZYNQMP_PM_RESET_GPO3_PL_8,
-+	ZYNQMP_PM_RESET_GPO3_PL_9,
-+	ZYNQMP_PM_RESET_GPO3_PL_10,
-+	ZYNQMP_PM_RESET_GPO3_PL_11,
-+	ZYNQMP_PM_RESET_GPO3_PL_12,
-+	ZYNQMP_PM_RESET_GPO3_PL_13,
-+	ZYNQMP_PM_RESET_GPO3_PL_14,
-+	ZYNQMP_PM_RESET_GPO3_PL_15,
-+	ZYNQMP_PM_RESET_GPO3_PL_16,
-+	ZYNQMP_PM_RESET_GPO3_PL_17,
-+	ZYNQMP_PM_RESET_GPO3_PL_18,
-+	ZYNQMP_PM_RESET_GPO3_PL_19,
-+	ZNQMP_PM_RESET_GPO3_PL_20,
-+	ZYNQMP_PM_RESET_GPO3_PL_21,
-+	ZYNQMP_PM_RESET_GPO3_PL_22,
-+	ZYNQMP_PM_RESET_GPO3_PL_23,
-+	ZYNQMP_PM_RESET_GPO3_PL_24,
-+	ZYNQMP_PM_RESET_GPO3_PL_25,
-+	ZYNQMP_PM_RESET_GPO3_PL_26,
-+	ZYNQMP_PM_RESET_GPO3_PL_27,
-+	ZYNQMP_PM_RESET_GPO3_PL_28,
-+	ZYNQMP_PM_RESET_GPO3_PL_29,
-+	ZYNQMP_PM_RESET_GPO3_PL_30,
-+	ZYNQMP_PM_RESET_GPO3_PL_31,
-+	ZYNQMP_PM_RESET_RPU_LS,
-+	ZYNQMP_PM_RESET_PS_ONLY,
-+	ZYNQMP_PM_RESET_PL,
-+	ZYNQMP_PM_RESET_PS_PL0,
-+	ZYNQMP_PM_RESET_PS_PL1,
-+	ZYNQMP_PM_RESET_PS_PL2,
-+	ZYNQMP_PM_RESET_PS_PL3,
-+	ZYNQMP_PM_RESET_END
++static int zynqmp_reset_probe(struct platform_device *pdev)
++{
++	struct zynqmp_reset_data *priv;
++
++	priv = devm_kzalloc(&pdev->dev,
++			    sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	platform_set_drvdata(pdev, priv);
++
++	priv->eemi_ops = zynqmp_pm_get_eemi_ops();
++	if (!priv->eemi_ops)
++		return -ENXIO;
++
++	priv->rcdev.ops = &zynqmp_reset_ops;
++	priv->rcdev.owner = THIS_MODULE;
++	priv->rcdev.of_node = pdev->dev.of_node;
++	priv->rcdev.nr_resets = ZYNQMP_NR_RESETS;
++
++	return devm_reset_controller_register(&pdev->dev, &priv->rcdev);
++}
++
++static const struct of_device_id zynqmp_reset_dt_ids[] = {
++	{ .compatible = "xlnx,zynqmp-reset", },
++	{ },
 +};
 +
- /**
-  * struct zynqmp_pm_query_data - PM query data
-  * @qid:	query ID
-@@ -101,6 +234,9 @@ struct zynqmp_eemi_ops {
- 	int (*clock_getrate)(u32 clock_id, u64 *rate);
- 	int (*clock_setparent)(u32 clock_id, u32 parent_id);
- 	int (*clock_getparent)(u32 clock_id, u32 *parent_id);
-+	int (*reset_assert)(const enum zynqmp_pm_reset reset,
-+			    const enum zynqmp_pm_reset_action assert_flag);
-+	int (*reset_get_status)(const enum zynqmp_pm_reset reset, u32 *status);
- };
- 
- #if IS_REACHABLE(CONFIG_ARCH_ZYNQMP)
++static struct platform_driver zynqmp_reset_driver = {
++	.probe	= zynqmp_reset_probe,
++	.driver = {
++		.name		= KBUILD_MODNAME,
++		.of_match_table	= zynqmp_reset_dt_ids,
++	},
++};
++
++static int __init zynqmp_reset_init(void)
++{
++	return platform_driver_register(&zynqmp_reset_driver);
++}
++
++arch_initcall(zynqmp_reset_init);
 -- 
 2.7.4
