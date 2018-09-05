@@ -1,42 +1,75 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed,  5 Sep 2018 11:57:32 +0200
-Subject: [PATCH 07/13] nvmem: remove the name field from struct nvmem_device
+Date: Wed,  5 Sep 2018 11:57:31 +0200
+Subject: [PATCH 06/13] nvmem: provide nvmem_dev_name()
 In-Reply-To: <20180905095738.26406-1-brgl@bgdev.pl>
 References: <20180905095738.26406-1-brgl@bgdev.pl>
-Message-ID: <20180905095738.26406-8-brgl@bgdev.pl>
+Message-ID: <20180905095738.26406-7-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-This field is never set and is only used in a single error message.
-Remove the field and use nvmem_dev_name() instead.
+Kernel users don't have any means of checking the names of nvmem
+devices. Add a routine that returns the name of the nvmem provider.
+
+This will be useful for nvmem notifier subscribers - otherwise they
+can't check what device is being added/removed.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/nvmem/core.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/nvmem/core.c           | 13 +++++++++++++
+ include/linux/nvmem-consumer.h |  8 ++++++++
+ 2 files changed, 21 insertions(+)
 
 diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index 364ee16e7d6a..e456aaa6184a 100644
+index 89b91f73d08a..364ee16e7d6a 100644
 --- a/drivers/nvmem/core.c
 +++ b/drivers/nvmem/core.c
-@@ -26,7 +26,6 @@
- #include <linux/slab.h>
+@@ -1144,6 +1144,19 @@ int nvmem_device_write(struct nvmem_device *nvmem,
+ }
+ EXPORT_SYMBOL_GPL(nvmem_device_write);
  
- struct nvmem_device {
--	const char		*name;
- 	struct module		*owner;
- 	struct device		dev;
- 	int			stride;
-@@ -537,7 +536,7 @@ static struct nvmem_device *__nvmem_device_get(struct device_node *np)
- 	if (!try_module_get(nvmem->owner)) {
- 		dev_err(&nvmem->dev,
- 			"could not increase module refcount for cell %s\n",
--			nvmem->name);
-+			nvmem_dev_name(nvmem));
- 		return ERR_PTR(-EINVAL);
- 	}
++/**
++ * nvmem_dev_name() - Get the name of a given nvmem device.
++ *
++ * @nvmem: nvmem device.
++ *
++ * Return: name of the nvmem device.
++ */
++const char *nvmem_dev_name(struct nvmem_device *nvmem)
++{
++	return dev_name(&nvmem->dev);
++}
++EXPORT_SYMBOL_GPL(nvmem_dev_name);
++
+ static int __init nvmem_init(void)
+ {
+ 	return bus_register(&nvmem_bus_type);
+diff --git a/include/linux/nvmem-consumer.h b/include/linux/nvmem-consumer.h
+index 7e9fb5a19d91..1313da6731ff 100644
+--- a/include/linux/nvmem-consumer.h
++++ b/include/linux/nvmem-consumer.h
+@@ -43,6 +43,8 @@ int nvmem_device_read(struct nvmem_device *nvmem, unsigned int offset,
+ int nvmem_device_write(struct nvmem_device *nvmem, unsigned int offset,
+ 		       size_t bytes, void *buf);
  
++const char *nvmem_dev_name(struct nvmem_device *nvmem);
++
+ #else
+ 
+ static inline struct nvmem_cell *nvmem_cell_get(struct device *dev,
+@@ -117,6 +119,12 @@ static inline int nvmem_device_write(struct nvmem_device *nvmem,
+ {
+ 	return -ENOSYS;
+ }
++
++static inline const char *nvmem_dev_name(struct nvmem_device *nvmem)
++{
++	return NULL;
++}
++
+ #endif /* CONFIG_NVMEM */
+ 
+ #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
 -- 
 2.18.0
