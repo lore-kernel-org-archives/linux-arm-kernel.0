@@ -1,86 +1,279 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 5 Sep 2018 12:28:46 +0100
-Subject: [PULL 2/4] arm64: KVM: Only force FPEXC32_EL2.EN if trapping
- FPSIMD
-In-Reply-To: <20180904125121.GO4029@e113682-lin.lund.arm.com>
-References: <20180903134516.17796-1-christoffer.dall@arm.com>
- <20180903134516.17796-3-christoffer.dall@arm.com>
- <20180904113952.GB17801@e103592.cambridge.arm.com>
- <20180904125121.GO4029@e113682-lin.lund.arm.com>
-Message-ID: <20180905112846.GC17801@e103592.cambridge.arm.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Wed, 5 Sep 2018 13:29:10 +0200
+Subject: [PATCH v2 01/40] iommu: Introduce Shared Virtual Addressing API
+In-Reply-To: <20180511190641.23008-2-jean-philippe.brucker@arm.com>
+References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
+ <20180511190641.23008-2-jean-philippe.brucker@arm.com>
+Message-ID: <bf42affd-e9d0-e4fc-6d28-f3c3f7795348@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 04, 2018 at 02:51:21PM +0200, Christoffer Dall wrote:
-> On Tue, Sep 04, 2018 at 12:39:54PM +0100, Dave Martin wrote:
-> > On Mon, Sep 03, 2018 at 03:45:14PM +0200, Christoffer Dall wrote:
-> > > From: Marc Zyngier <marc.zyngier@arm.com>
-> > > 
-> > > If trapping FPSIMD in the context of an AArch32 guest, it is critical
-> > > to set FPEXC32_EL2.EN to 1 so that the trapping is taken to EL2 and
-> > > not EL1.
-> > > 
-> > > Conversely, it is just as critical *not* to set FPEXC32_EL2.EN to 1
-> > > if we're not going to trap FPSIMD, as we then corrupt the existing
-> > > VFP state.
-> > > 
-> > > Moving the call to __activate_traps_fpsimd32 to the point where we
-> > > know for sure that we are going to trap ensures that we don't set that
-> > > bit spuriously.
-> > 
-> > 
-> > Hmmm, this looks like a viable fix but actually the way the code is
-> > structured is a bit confusing here.
-> > 
-> > It looks like some unnecessary functionality has been inherited from
-> > arch/arm here: for a 32-bit host, FPEXC controls FPSIMD trapping even
-> > at Hyp, so we need to handle it specially in order for the Hyp FPSIMD
-> > context switching code to run without generating additional traps.
-> > 
-> > For a 64-bit host, this doesn't apply: FPEXC32_EL2 is just guest
-> > context and doesn't affect EL2 execution.
+Hi Jean-Philippe,
+On 05/11/2018 09:06 PM, Jean-Philippe Brucker wrote:
+> Shared Virtual Addressing (SVA) provides a way for device drivers to bind
+> process address spaces to devices. This requires the IOMMU to support page
+> table format and features compatible with the CPUs, and usually requires
+> the system to support I/O Page Faults (IOPF) and Process Address Space ID
+> (PASID). When all of these are available, DMA can access virtual addresses
+> of a process. A PASID is allocated for each process, and the device driver
+> programs it into the device in an implementation-specific way.
 > 
-> Hmm, is that really true?  Earlier versions of the Armv8 Arm ARM, for
-> the description of CPTR_EL2.TFP:
+> Add a new API for sharing process page tables with devices. Introduce two
+> IOMMU operations, sva_device_init() and sva_device_shutdown(), that
+> prepare the IOMMU driver for SVA. For example allocate PASID tables and
+> fault queues. Subsequent patches will implement the bind() and unbind()
+> operations.
 > 
->   This causes instructions that access the registers associated with
->   Floating Point and Advanced SIMD execution to trap to EL2 when
->   executed from EL0, EL1, or EL2, unless trapped to EL1.
+> Support for I/O Page Faults will be added in a later patch using a new
+> feature bit (IOMMU_SVA_FEAT_IOPF). With the current API users must pin
+> down all shared mappings. Other feature bits that may be added in the
+> future are IOMMU_SVA_FEAT_PRIVATE, to support private PASID address
+> spaces, and IOMMU_SVA_FEAT_NO_PASID, to bind the whole device address
+> space to a process.
 > 
-> In the current version I think you can arrive at the same conclusion by
-> looking at the FPEXC_EL2.EN description which tells you that if EN==0,
-> then the instruction is UNDEFINED, and the Synchronous exception
-> prioritization rules specify that undefined instructions are taken
-> before trapped intructions because of CPTR_EL2.
+> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 > 
-> But there does seem to be some inconsistency with the description of
-> generally trapping floating point access to EL2.
-
-You can try taking a look at the archietctural pseudocode -- see the
-CheckFPAdvSIMDEnabled64() (for AArch64) and CheckFPAdvSIMDEnabled() (for
-AArch32) function hierarchies on developer.arm.com.
-
-ARM DDI 0487B.b says for FPEXC32_EL2:
-
-"Purpose:  Allows access to the AArch32 register FPEXC from AArch64
-state only. Its value has no effect on execution in AArch64 state."
-
-This could arguably be worded better, but the second sentence is
-pretty unequivocal.
-
+> ---
+> v1->v2:
+> * Add sva_param structure to iommu_param
+> * CONFIG option is only selectable by IOMMU drivers
+> ---
+>  drivers/iommu/Kconfig     |   4 ++
+>  drivers/iommu/Makefile    |   1 +
+>  drivers/iommu/iommu-sva.c | 110 ++++++++++++++++++++++++++++++++++++++
+>  include/linux/iommu.h     |  32 +++++++++++
+>  4 files changed, 147 insertions(+)
+>  create mode 100644 drivers/iommu/iommu-sva.c
 > 
-> > 
-> > The wrinkle this patch fixes is that implicit reads of FPEXC by
+> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+> index 7564237f788d..cca8e06903c7 100644
+> --- a/drivers/iommu/Kconfig
+> +++ b/drivers/iommu/Kconfig
+> @@ -74,6 +74,10 @@ config IOMMU_DMA
+>  	select IOMMU_IOVA
+>  	select NEED_SG_DMA_LENGTH
+>  
+> +config IOMMU_SVA
+> +	bool
+> +	select IOMMU_API
+> +
+>  config FSL_PAMU
+>  	bool "Freescale IOMMU support"
+>  	depends on PCI
+> diff --git a/drivers/iommu/Makefile b/drivers/iommu/Makefile
+> index 1fb695854809..1dbcc89ebe4c 100644
+> --- a/drivers/iommu/Makefile
+> +++ b/drivers/iommu/Makefile
+> @@ -3,6 +3,7 @@ obj-$(CONFIG_IOMMU_API) += iommu.o
+>  obj-$(CONFIG_IOMMU_API) += iommu-traces.o
+>  obj-$(CONFIG_IOMMU_API) += iommu-sysfs.o
+>  obj-$(CONFIG_IOMMU_DMA) += dma-iommu.o
+> +obj-$(CONFIG_IOMMU_SVA) += iommu-sva.o
+>  obj-$(CONFIG_IOMMU_IO_PGTABLE) += io-pgtable.o
+>  obj-$(CONFIG_IOMMU_IO_PGTABLE_ARMV7S) += io-pgtable-arm-v7s.o
+>  obj-$(CONFIG_IOMMU_IO_PGTABLE_LPAE) += io-pgtable-arm.o
+> diff --git a/drivers/iommu/iommu-sva.c b/drivers/iommu/iommu-sva.c
+> new file mode 100644
+> index 000000000000..8b4afb7c63ae
+> --- /dev/null
+> +++ b/drivers/iommu/iommu-sva.c
+> @@ -0,0 +1,110 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Manage PASIDs and bind process address spaces to devices.
+> + *
+> + * Copyright (C) 2018 ARM Ltd.
+> + */
+> +
+> +#include <linux/iommu.h>
+> +#include <linux/slab.h>
+> +
+> +/**
+> + * iommu_sva_device_init() - Initialize Shared Virtual Addressing for a device
+> + * @dev: the device
+> + * @features: bitmask of features that need to be initialized
+> + * @max_pasid: max PASID value supported by the device
+> + *
+> + * Users of the bind()/unbind() API must call this function to initialize all
+> + * features required for SVA.
+> + *
+> + * The device must support multiple address spaces (e.g. PCI PASID). By default
+> + * the PASID allocated during bind() is limited by the IOMMU capacity, and by
+> + * the device PASID width defined in the PCI capability or in the firmware
+> + * description. Setting @max_pasid to a non-zero value smaller than this limit
+> + * overrides it.
+> + *
+> + * The device should not be performing any DMA while this function is running,
+> + * otherwise the behavior is undefined.
+> + *
+> + * Return 0 if initialization succeeded, or an error.
+> + */
+> +int iommu_sva_device_init(struct device *dev, unsigned long features,
+> +			  unsigned int max_pasid)
+what about min_pasid?
+> +{
+> +	int ret;
+> +	struct iommu_sva_param *param;
+> +	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+> +
+> +	if (!domain || !domain->ops->sva_device_init)
+> +		return -ENODEV;
+> +
+> +	if (features)
+> +		return -EINVAL;
+> +
+> +	param = kzalloc(sizeof(*param), GFP_KERNEL);
+> +	if (!param)
+> +		return -ENOMEM;
+> +
+> +	param->features		= features;
+> +	param->max_pasid	= max_pasid;
+> +
+> +	/*
+> +	 * IOMMU driver updates the limits depending on the IOMMU and device
+> +	 * capabilities.
+> +	 */
+> +	ret = domain->ops->sva_device_init(dev, param);
+> +	if (ret)
+> +		goto err_free_param;
+So you are likely to call sva_device_init even if it was already called
+(ie. dev->iommu_param->sva_param is already set). Can't you test whether
+dev->iommu_param->sva_param is already set first?
+> +
+> +	mutex_lock(&dev->iommu_param->lock);
+> +	if (dev->iommu_param->sva_param)
+> +		ret = -EEXIST;
+> +	else
+> +		dev->iommu_param->sva_param = param;
+> +	mutex_unlock(&dev->iommu_param->lock);
+> +	if (ret)
+> +		goto err_device_shutdown;
+> +
+> +	return 0;
+> +
+> +err_device_shutdown:
+> +	if (domain->ops->sva_device_shutdown)
+> +		domain->ops->sva_device_shutdown(dev, param);
+> +
+> +err_free_param:
+> +	kfree(param);
+> +
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(iommu_sva_device_init);
+> +
+> +/**
+> + * iommu_sva_device_shutdown() - Shutdown Shared Virtual Addressing for a device
+> + * @dev: the device
+> + *
+> + * Disable SVA. Device driver should ensure that the device isn't performing any
+> + * DMA while this function is running.
+> + */
+> +int iommu_sva_device_shutdown(struct device *dev)
+Not sure the returned value is required for a shutdown operation.
+> +{
+> +	struct iommu_sva_param *param;
+> +	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+> +
+> +	if (!domain)
+> +		return -ENODEV;
+> +
+> +	mutex_lock(&dev->iommu_param->lock);
+> +	param = dev->iommu_param->sva_param;
+> +	dev->iommu_param->sva_param = NULL;
+> +	mutex_unlock(&dev->iommu_param->lock);
+> +	if (!param)
+> +		return -ENODEV;
+> +
+> +	if (domain->ops->sva_device_shutdown)
+> +		domain->ops->sva_device_shutdown(dev, param);
+> +
+> +	kfree(param);
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(iommu_sva_device_shutdown);
+> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+> index 0933f726d2e6..2efe7738bedb 100644
+> --- a/include/linux/iommu.h
+> +++ b/include/linux/iommu.h
+> @@ -212,6 +212,12 @@ struct page_response_msg {
+>  	u64 private_data;
+>  };
+>  
+> +struct iommu_sva_param {
+What are the feature values?
+> +	unsigned long features;
+> +	unsigned int min_pasid;
+> +	unsigned int max_pasid;
+> +};
+> +
+>  /**
+>   * struct iommu_ops - iommu ops and capabilities
+>   * @capable: check capability
+> @@ -219,6 +225,8 @@ struct page_response_msg {
+>   * @domain_free: free iommu domain
+>   * @attach_dev: attach device to an iommu domain
+>   * @detach_dev: detach device from an iommu domain
+> + * @sva_device_init: initialize Shared Virtual Adressing for a device
+Addressing
+> + * @sva_device_shutdown: shutdown Shared Virtual Adressing for a device
+Addressing
+>   * @map: map a physically contiguous memory region to an iommu domain
+>   * @unmap: unmap a physically contiguous memory region from an iommu domain
+>   * @map_sg: map a scatter-gather list of physically contiguous memory chunks
+> @@ -256,6 +264,10 @@ struct iommu_ops {
+>  
+>  	int (*attach_dev)(struct iommu_domain *domain, struct device *dev);
+>  	void (*detach_dev)(struct iommu_domain *domain, struct device *dev);
+> +	int (*sva_device_init)(struct device *dev,
+> +			       struct iommu_sva_param *param);
+> +	void (*sva_device_shutdown)(struct device *dev,
+> +				    struct iommu_sva_param *param);
+>  	int (*map)(struct iommu_domain *domain, unsigned long iova,
+>  		   phys_addr_t paddr, size_t size, int prot);
+>  	size_t (*unmap)(struct iommu_domain *domain, unsigned long iova,
+> @@ -413,6 +425,7 @@ struct iommu_fault_param {
+>   * struct iommu_param - collection of per-device IOMMU data
+>   *
+>   * @fault_param: IOMMU detected device fault reporting data
+> + * @sva_param: SVA parameters
+>   *
+>   * TODO: migrate other per device data pointers under iommu_dev_data, e.g.
+>   *	struct iommu_group	*iommu_group;
+> @@ -421,6 +434,7 @@ struct iommu_fault_param {
+>  struct iommu_param {
+>  	struct mutex lock;
+>  	struct iommu_fault_param *fault_param;
+> +	struct iommu_sva_param *sva_param;
+>  };
+>  
+>  int  iommu_device_register(struct iommu_device *iommu);
+> @@ -920,4 +934,22 @@ static inline int iommu_sva_invalidate(struct iommu_domain *domain,
+>  
+>  #endif /* CONFIG_IOMMU_API */
+>  
+> +#ifdef CONFIG_IOMMU_SVA
+> +extern int iommu_sva_device_init(struct device *dev, unsigned long features,
+> +				 unsigned int max_pasid);
+> +extern int iommu_sva_device_shutdown(struct device *dev);
+> +#else /* CONFIG_IOMMU_SVA */
+> +static inline int iommu_sva_device_init(struct device *dev,
+> +					unsigned long features,
+> +					unsigned int max_pasid)
+> +{
+> +	return -ENODEV;
+> +}
+> +
+> +static inline int iommu_sva_device_shutdown(struct device *dev)
+> +{
+> +	return -ENODEV;
+> +}
+> +#endif /* CONFIG_IOMMU_SVA */
+> +
+>  #endif /* __LINUX_IOMMU_H */
 > 
-> what do you mean by implicit reads here?
 
-In effect any trappable instruction can be thought of as reading a bunch
-of system registers in order to decide whether to take a trap or execute
-the instruction normally.  The pseudocode adopts this model.  These
-reads are not done by actual MRS instructions in the instruction stream,
-so they are deemed implicit.
+Thanks
 
-[...]
-
-Cheers
----Dave
+Eric
