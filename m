@@ -1,7 +1,7 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 5 Sep 2018 19:00:33 +0100
+From: scott.branden@broadcom.com (Scott Branden)
+Date: Wed, 5 Sep 2018 11:04:36 -0700
 Subject: [PATCH] arm64: defconfig: enable EFI_ARMSTUB_DTB_LOADER
-In-Reply-To: <1f8095f1-1f0c-0791-31c4-c7b986c4ce1f@broadcom.com>
+In-Reply-To: <CACxGe6tbuDzEaBqOD7Z3nWMW0Nkcf22MFbD3BL+KBqnKEo2tQw@mail.gmail.com>
 References: <1535563287-24803-1-git-send-email-scott.branden@broadcom.com>
  <CAOesGMhjcJ1p3QcEYb9fsx3fMXAOsgR2njOq=VKgEbWGwJi36g@mail.gmail.com>
  <fb07b89d-d427-5e59-9f17-b12df26284ec@broadcom.com>
@@ -14,39 +14,46 @@ References: <1535563287-24803-1-git-send-email-scott.branden@broadcom.com>
  <bf917897-1697-a6c4-7f77-8dfa74dddc8a@broadcom.com>
  <CAKv+Gu8FK9K0G-GJygdpkwqKYzjvpDDj8TyGTC2u0SRxK3ez_w@mail.gmail.com>
  <1f8095f1-1f0c-0791-31c4-c7b986c4ce1f@broadcom.com>
-Message-ID: <CACxGe6tbuDzEaBqOD7Z3nWMW0Nkcf22MFbD3BL+KBqnKEo2tQw@mail.gmail.com>
+ <CACxGe6tbuDzEaBqOD7Z3nWMW0Nkcf22MFbD3BL+KBqnKEo2tQw@mail.gmail.com>
+Message-ID: <dc26dc1b-c022-341b-18ba-c009275e5ee9@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 5, 2018 at 6:27 PM Scott Branden <scott.branden@broadcom.com> wrote:
->
->
->
-> On 18-09-05 02:40 AM, Ard Biesheuvel wrote:
-> > On 4 September 2018 at 19:19, Scott Branden <scott.branden@broadcom.com> wrote:
-> >> Rather than introduce EFI_ARMSTUB_DTB_LOADER, why not have
-> >> the efistub use CONFIG_OF to determine whether it supports dtb= or not?
-> >>
-> >> That way ACPI-only distros disable devicetree support entirely.
-> >>
-> > Unfortunately, CONFIG_OF cannot be disabled on arm64 even on ACPI-only builds.
-> OF shouldn't be automatically selected in the arm64/Kconfig.  It should
-> have a config
-> parmaeter like other archs as mips and arm.  I can submit a patch so it
-> functions the
-> same way as other archs so it is not always selected.  It will be good
-> to add a USE_OF
-> config options like the other archs (or simply remove the select from
-> the Kconfig and choose OF directly in the defconfig.
-> This will have the added benefit of doing away with OF support when its
-> not needed on an ARM64 platform.  ACPI is already not automatically
-> selected for all ARM64 platforms, nor should devicetree.
 
-We don't do that on Arm because a devicetree is always required at
-boot time. Even on ACPI systems a tiny DTB is used containing just a
-/chosen node for passing the kernel command line and the initrd
-location.
 
-g.
-
-g.
+On 18-09-05 11:00 AM, Grant Likely wrote:
+> On Wed, Sep 5, 2018 at 6:27 PM Scott Branden <scott.branden@broadcom.com> wrote:
+>>
+>>
+>> On 18-09-05 02:40 AM, Ard Biesheuvel wrote:
+>>> On 4 September 2018 at 19:19, Scott Branden <scott.branden@broadcom.com> wrote:
+>>>> Rather than introduce EFI_ARMSTUB_DTB_LOADER, why not have
+>>>> the efistub use CONFIG_OF to determine whether it supports dtb= or not?
+>>>>
+>>>> That way ACPI-only distros disable devicetree support entirely.
+>>>>
+>>> Unfortunately, CONFIG_OF cannot be disabled on arm64 even on ACPI-only builds.
+>> OF shouldn't be automatically selected in the arm64/Kconfig.  It should
+>> have a config
+>> parmaeter like other archs as mips and arm.  I can submit a patch so it
+>> functions the
+>> same way as other archs so it is not always selected.  It will be good
+>> to add a USE_OF
+>> config options like the other archs (or simply remove the select from
+>> the Kconfig and choose OF directly in the defconfig.
+>> This will have the added benefit of doing away with OF support when its
+>> not needed on an ARM64 platform.  ACPI is already not automatically
+>> selected for all ARM64 platforms, nor should devicetree.
+> We don't do that on Arm because a devicetree is always required at
+> boot time. Even on ACPI systems a tiny DTB is used containing just a
+> /chosen node for passing the kernel command line and the initrd
+> location.
+Seems bizarre DTB is not needed for x86 to boot from UEFI with ACPI 
+support?? I'll look into it further at some point in order to remove 
+such anomaly.? There should be no need for such devicetree reliance.
+>
+> g.
+>
+> g.
+Thanks,
+ ?Scott
