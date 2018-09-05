@@ -1,146 +1,84 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Wed, 5 Sep 2018 11:28:31 +0200
-Subject: [PATCH] spi: Do not print a message if
- spi_controller_{suspend,resume}() fails
-In-Reply-To: <20180905085157.7807-1-geert+renesas@glider.be>
-References: <20180905085157.7807-1-geert+renesas@glider.be>
-Message-ID: <20180905092831.GN13888@piout.net>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Wed, 5 Sep 2018 17:30:35 +0800
+Subject: [PATCH v2 01/13] drm/mediatek: add refcount for DPI power on/off
+In-Reply-To: <20180905083146.14727-2-bibby.hsieh@mediatek.com>
+References: <20180905083146.14727-1-bibby.hsieh@mediatek.com>
+ <20180905083146.14727-2-bibby.hsieh@mediatek.com>
+Message-ID: <1536139835.11913.3.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/2018 10:51:57+0200, Geert Uytterhoeven wrote:
-> spi_controller_{suspend,resume}() already prints an error message on
-> failure, so there is no need to repeat this in individual drivers.
-> 
-> Note: spi_master_{suspend,resume}() is an alias for
->       spi_controller_{suspend,resume}().
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+Hi, Bibby:
 
+This looks reasonable, but why MT8173 doesn't need this patch? So
+describe more about why MT7623 need this patch. If this is caused by
+latest DRM core flow change, I think we should treat this patch
+independent with MT7623.
+
+Regards,
+CK
+
+On Wed, 2018-09-05 at 16:31 +0800, Bibby Hsieh wrote:
+> From: chunhui dai <chunhui.dai@mediatek.com>
+> 
+> add refcount for DPI power on/off to protect the flow
+> 
+> Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
 > ---
->  drivers/spi/spi-atmel.c    | 10 ++--------
->  drivers/spi/spi-dw.c       |  7 +------
->  drivers/spi/spi-fsl-espi.c |  4 +---
->  drivers/spi/spi-pl022.c    |  8 ++------
->  drivers/spi/spi-pxa2xx.c   |  8 +-------
->  5 files changed, 7 insertions(+), 30 deletions(-)
+>  drivers/gpu/drm/mediatek/mtk_dpi.c | 16 ++++++++++++++--
+>  1 file changed, 14 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-> index 3f890d16293411ba..74fddcd3282b4bea 100644
-> --- a/drivers/spi/spi-atmel.c
-> +++ b/drivers/spi/spi-atmel.c
-> @@ -1767,10 +1767,8 @@ static int atmel_spi_suspend(struct device *dev)
+> diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
+> index 6c0ea39d5739..d9373e67d328 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_dpi.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
+> @@ -77,6 +77,7 @@ struct mtk_dpi {
+>  	enum mtk_dpi_out_bit_num bit_num;
+>  	enum mtk_dpi_out_channel_swap channel_swap;
+>  	bool power_sta;
+> +	int refcount;
+>  	u8 power_ctl;
+>  };
 >  
->  	/* Stop the queue running */
->  	ret = spi_master_suspend(master);
-> -	if (ret) {
-> -		dev_warn(dev, "cannot suspend master\n");
-> +	if (ret)
->  		return ret;
-> -	}
+> @@ -369,6 +370,12 @@ static void mtk_dpi_config_color_format(struct mtk_dpi *dpi,
 >  
->  	if (!pm_runtime_suspended(dev))
->  		atmel_spi_runtime_suspend(dev);
-> @@ -1799,11 +1797,7 @@ static int atmel_spi_resume(struct device *dev)
->  	}
->  
->  	/* Start the queue running */
-> -	ret = spi_master_resume(master);
-> -	if (ret)
-> -		dev_err(dev, "problem starting queue (%d)\n", ret);
-> -
-> -	return ret;
-> +	return spi_master_resume(master);
->  }
->  #endif
->  
-> diff --git a/drivers/spi/spi-dw.c b/drivers/spi/spi-dw.c
-> index ac2eb89ef7a5a061..1736612ee86be7dd 100644
-> --- a/drivers/spi/spi-dw.c
-> +++ b/drivers/spi/spi-dw.c
-> @@ -572,13 +572,8 @@ EXPORT_SYMBOL_GPL(dw_spi_suspend_host);
->  
->  int dw_spi_resume_host(struct dw_spi *dws)
+>  static void mtk_dpi_power_off(struct mtk_dpi *dpi, enum mtk_dpi_power_ctl pctl)
 >  {
-> -	int ret;
-> -
->  	spi_hw_init(&dws->master->dev, dws);
-> -	ret = spi_controller_resume(dws->master);
-> -	if (ret)
-> -		dev_err(&dws->master->dev, "fail to start queue (%d)\n", ret);
-> -	return ret;
-> +	return spi_controller_resume(dws->master);
->  }
->  EXPORT_SYMBOL_GPL(dw_spi_resume_host);
+> +	if (WARN_ON(dpi->refcount == 0))
+> +		return;
+> +
+> +	if (--dpi->refcount != 0)
+> +		return;
+> +
+>  	dpi->power_ctl &= ~pctl;
 >  
-> diff --git a/drivers/spi/spi-fsl-espi.c b/drivers/spi/spi-fsl-espi.c
-> index 1e8ff6256079f134..cf2118dc91f44548 100644
-> --- a/drivers/spi/spi-fsl-espi.c
-> +++ b/drivers/spi/spi-fsl-espi.c
-> @@ -798,10 +798,8 @@ static int of_fsl_espi_suspend(struct device *dev)
+>  	if ((dpi->power_ctl & DPI_POWER_START) ||
+> @@ -388,14 +395,17 @@ static int mtk_dpi_power_on(struct mtk_dpi *dpi, enum mtk_dpi_power_ctl pctl)
+>  {
 >  	int ret;
 >  
->  	ret = spi_master_suspend(master);
-> -	if (ret) {
-> -		dev_warn(dev, "cannot suspend master\n");
-> +	if (ret)
->  		return ret;
-> -	}
+> +	if (++dpi->refcount != 1)
+> +		return 0;
+> +
+>  	dpi->power_ctl |= pctl;
 >  
->  	return pm_runtime_force_suspend(dev);
->  }
-> diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-> index 1af8c96b940e203d..5f5f197b153c3ec4 100644
-> --- a/drivers/spi/spi-pl022.c
-> +++ b/drivers/spi/spi-pl022.c
-> @@ -2325,10 +2325,8 @@ static int pl022_suspend(struct device *dev)
->  	int ret;
+>  	if (!(dpi->power_ctl & DPI_POWER_START) &&
+>  	    !(dpi->power_ctl & DPI_POWER_ENABLE))
+> -		return 0;
+> +		goto err_refcount;
 >  
->  	ret = spi_master_suspend(pl022->master);
-> -	if (ret) {
-> -		dev_warn(dev, "cannot suspend master\n");
-> +	if (ret)
->  		return ret;
-> -	}
+>  	if (dpi->power_sta)
+> -		return 0;
+> +		goto err_refcount;
 >  
->  	ret = pm_runtime_force_suspend(dev);
+>  	ret = clk_prepare_enable(dpi->engine_clk);
 >  	if (ret) {
-> @@ -2353,9 +2351,7 @@ static int pl022_resume(struct device *dev)
->  
->  	/* Start the queue running */
->  	ret = spi_master_resume(pl022->master);
-> -	if (ret)
-> -		dev_err(dev, "problem starting queue (%d)\n", ret);
-> -	else
-> +	if (!ret)
->  		dev_dbg(dev, "resumed\n");
->  
+> @@ -417,6 +427,8 @@ static int mtk_dpi_power_on(struct mtk_dpi *dpi, enum mtk_dpi_power_ctl pctl)
+>  	clk_disable_unprepare(dpi->engine_clk);
+>  err_eng:
+>  	dpi->power_ctl &= ~pctl;
+> +err_refcount:
+> +	dpi->refcount--;
 >  	return ret;
-> diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
-> index 14f4ea59caff7a23..e3cbc66a7061b42f 100644
-> --- a/drivers/spi/spi-pxa2xx.c
-> +++ b/drivers/spi/spi-pxa2xx.c
-> @@ -1808,13 +1808,7 @@ static int pxa2xx_spi_resume(struct device *dev)
->  		lpss_ssp_setup(drv_data);
->  
->  	/* Start the queue running */
-> -	status = spi_controller_resume(drv_data->master);
-> -	if (status != 0) {
-> -		dev_err(dev, "problem starting queue (%d)\n", status);
-> -		return status;
-> -	}
-> -
-> -	return 0;
-> +	return spi_controller_resume(drv_data->master);
 >  }
->  #endif
 >  
-> -- 
-> 2.17.1
-> 
-
--- 
-Alexandre Belloni, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
