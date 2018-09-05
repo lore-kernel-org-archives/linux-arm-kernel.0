@@ -1,25 +1,33 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Wed, 5 Sep 2018 13:54:42 +0530
-Subject: [PATCH v4 4/4] drm/sun4i: Enable DesignWare HDMI for SUN50I
-In-Reply-To: <20180905070819.gisznpkvvuqire7c@flea>
-References: <20180904163609.10171-1-jagan@amarulasolutions.com>
- <20180904163609.10171-4-jagan@amarulasolutions.com>
- <20180905070819.gisznpkvvuqire7c@flea>
-Message-ID: <CAMty3ZAzjSwq86BwB8O_7DrT0jrhn3ByzN34dY37pF3ZsAZ6uA@mail.gmail.com>
+From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
+Date: Wed,  5 Sep 2018 17:31:37 +0900
+Subject: [PATCH] ASoC: uniphier: change status to orphan
+Message-ID: <20180905083137.23153-1-suzuki.katsuhiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 5, 2018 at 12:38 PM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> On Tue, Sep 04, 2018 at 10:06:09PM +0530, Jagan Teki wrote:
->> Allwinner SUN50I are now using DesignWare HDMI so enable
->> them as default. This can build DRM_SUN8I_DW_HDMI as module
->> since DRM in arm64 has module.
->>
->> Making this as defult to SUN8I, may cause an issue while
->> loading since arm32 DRM built as static.
->
-> Uh? Why? We should fix this instead of working around it.
+Since I'm leaving from Socionext, I'll unable to access specification
+documents of this hardware (these are not public). So change the
+state to orphan until someone will maintain this driver.
 
-I didn't dig further on this. Since ARM64 has is fine with it both
-(module and static) may be we can take this.
+Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+---
+ MAINTAINERS | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index a8683e549777..4788a5335d35 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -13450,9 +13450,8 @@ F:	drivers/i2c/busses/i2c-synquacer.c
+ F:	Documentation/devicetree/bindings/i2c/i2c-synquacer.txt
+ 
+ SOCIONEXT UNIPHIER SOUND DRIVER
+-M:	Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+ L:	alsa-devel at alsa-project.org (moderated for non-subscribers)
+-S:	Maintained
++S:	Orphan
+ F:	sound/soc/uniphier/
+ 
+ SOEKRIS NET48XX LED SUPPORT
+-- 
+2.18.0
