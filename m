@@ -1,18 +1,56 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 05 Sep 2018 21:17:04 +0200
-Subject: [PATCH v2] ARM: dts: rockchip: add rk3188 lcd controller nodes
-In-Reply-To: <20180831072537.15785-1-heiko@sntech.de>
-References: <20180831072537.15785-1-heiko@sntech.de>
-Message-ID: <3757715.Y541dOOzu4@diego>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Wed, 5 Sep 2018 20:30:28 +0100
+Subject: [PATCH] efi_stub: update documentation on dtb= parameter
+In-Reply-To: <20180905190750.4566-1-grant.likely@arm.com>
+References: <20180905190750.4566-1-grant.likely@arm.com>
+Message-ID: <20180905193028.4vhqtlwwgvqq6v26@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 31. August 2018, 09:25:37 CEST schrieb Heiko Stuebner:
-> Add the core display subsystem and vop nodes to rk3188.
-> Vop0 has a fully dedicated set of pins and only vop1 needs to
-> do pinctrl to have display output, so also add the necessary
-> pinctrl entries for it.
+On Wed, Sep 05, 2018 at 08:07:50PM +0100, Grant Likely wrote:
+> The dtb= parameter is no longer the primary mechanism for providing a
+> devicetree to the kernel. Now either firmware or the boot selector (ex.
+> Grub) should provide the devicetree and dtb= should only be used for
+> debug or when using firmware that doesn't understand DT.
+> Update the EFI stub documentation to reflect the current usage.
 > 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Signed-off-by: Grant Likely <grant.likely@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Jonathan Corbet <corbet@lwn.net>
 
-applied for 4.20
+Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
+
+> ---
+>  Documentation/efi-stub.txt | 17 ++++++++++++++---
+>  1 file changed, 14 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/efi-stub.txt b/Documentation/efi-stub.txt
+> index 41df801f9a50..833edb0d0bc4 100644
+> --- a/Documentation/efi-stub.txt
+> +++ b/Documentation/efi-stub.txt
+> @@ -83,7 +83,18 @@ is passed to bzImage.efi.
+>  The "dtb=" option
+>  -----------------
+> 
+> -For the ARM and arm64 architectures, we also need to be able to provide a
+> -device tree to the kernel. This is done with the "dtb=" command line option,
+> -and is processed in the same manner as the "initrd=" option that is
+> +For the ARM and arm64 architectures, a device tree must be provided to
+> +the kernel. Normally firmware shall supply the device tree via the
+> +EFI CONFIGURATION TABLE. However, the "dtb=" command line option can
+> +be used to override the firmware supplied device tree, or to supply
+> +one when firmware is unable to.
+> +
+> +Please note: Firmware adds runtime configuration information to the
+> +device tree before booting the kernel. If dtb= is used to override
+> +the device tree, then any runtime data provided by firmware will be
+> +lost. The dtb= option should only be used either as a debug tool, or
+> +as a last resort when a device tree is not provided in the EFI
+> +CONFIGURATION TABLE.
+> +
+> +"dtb=" is processed in the same manner as the "initrd=" option that is
+>  described above.
+> --
+> 2.11.0
+> 
+> IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
