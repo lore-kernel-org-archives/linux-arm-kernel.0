@@ -1,57 +1,62 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 05 Sep 2018 12:09:48 +0200
-Subject: [RFC PATCH v3 2/3] dt-bindings: reset: Add bindings for ZynqMP
- reset driver
-In-Reply-To: <1536131342-28041-3-git-send-email-nava.manne@xilinx.com>
-References: <1536131342-28041-1-git-send-email-nava.manne@xilinx.com>
- <1536131342-28041-3-git-send-email-nava.manne@xilinx.com>
-Message-ID: <1536142188.4084.1.camel@pengutronix.de>
+From: pmenzel+amd-gfx@molgen.mpg.de (Paul Menzel)
+Date: Wed, 5 Sep 2018 13:02:32 +0200
+Subject: [PATCH v3 03/13] fbdev: add kerneldoc do
+ remove_conflicting_framebuffers()
+In-Reply-To: <283fef19815b991700b56119d8d5874a2a8da44e.1535810304.git.mirq-linux@rere.qmqm.pl>
+References: <cover.1535810304.git.mirq-linux@rere.qmqm.pl>
+ <283fef19815b991700b56119d8d5874a2a8da44e.1535810304.git.mirq-linux@rere.qmqm.pl>
+Message-ID: <740483cb-2fbd-29ba-7f61-ed975ea5152f@molgen.mpg.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear Micha?,
 
-On Wed, 2018-09-05 at 12:39 +0530, Nava kishore Manne wrote:
-> Add documentation to describe Xilinx ZynqMP reset driver
-> bindings.
+
+Thank you for documenting the function. Do you mean *to* instead of *do*
+in the commit message summary?
+
+
+On 09/01/18 16:08, Micha? Miros?aw wrote:
+> Document remove_conflicting_framebuffers() behaviour.
 > 
-> Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
+> Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
 > ---
-> Changes for v3:
-> 		-Corrected Commit Msg. 
-> Changes for v2:
-> 		-Moved reset node as a child to firwmare
-> 		 node.
+>  drivers/video/fbdev/core/fbmem.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
 > 
->  .../firmware/xilinx/xlnx,zynqmp-firmware.txt       | 142 +++++++++++++++++++++
->  1 file changed, 142 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-> index 1b431d9..351b1bb 100644
-> --- a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-> +++ b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-[...]
->  -------
->  Example
->  -------
-> @@ -25,5 +163,9 @@ firmware {
->  	zynqmp_firmware: zynqmp-firmware {
->  		compatible = "xlnx,zynqmp-firmware";
->  		method = "smc";
-> +		reset-controller:reset-controller at 0 {
+> diff --git a/drivers/video/fbdev/core/fbmem.c b/drivers/video/fbdev/core/fbmem.c
+> index 0df148eb4699..2de93b5014e3 100644
+> --- a/drivers/video/fbdev/core/fbmem.c
+> +++ b/drivers/video/fbdev/core/fbmem.c
+> @@ -1775,6 +1775,16 @@ int unlink_framebuffer(struct fb_info *fb_info)
+>  }
+>  EXPORT_SYMBOL(unlink_framebuffer);
+>  
+> +/**
+> + * remove_conflicting_framebuffers - remove firmware-configured framebuffers
+> + * @a: memory range, users of which are to be removed
+> + * @name: requesting driver name
+> + * @primary: also kick vga16fb if present
+> + *
+> + * This function removes framebuffer devices (initialized by firmware/bootloader)
+> + * which use memory range described by @a. If @a is NULL all such devices are
+> + * removed.
+> + */
+>  int remove_conflicting_framebuffers(struct apertures_struct *a,
+>  				    const char *name, bool primary)
+>  {
 
-I think the label should use underscore instead of hyphen, and the unit
-address part should be removed from the node name. There is no unit
-address, as there is no reg property inside the node and the parent node
-doesn't have #address-cells:
+Acked-by: Paul Menzel <pmenzel@molgen.mpg.de>
 
-		reset_controller: reset-controller {
 
-> +			compatible = "xlnx,zynqmp-reset";
-> +			#reset-cells = <1>;
-> +		};
->  	};
->  };
+Kind regards,
 
-regards
-Philipp
+Paul
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/pkcs7-signature
+Size: 5174 bytes
+Desc: S/MIME Cryptographic Signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180905/21f15c2d/attachment-0001.p7s>
