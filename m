@@ -1,160 +1,42 @@
-From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Wed, 5 Sep 2018 12:39:02 +0530
-Subject: [RFC PATCH v3 3/3] reset: reset-zynqmp: Adding support for Xilinx
- zynqmp reset controller.
-In-Reply-To: <1536131342-28041-1-git-send-email-nava.manne@xilinx.com>
-References: <1536131342-28041-1-git-send-email-nava.manne@xilinx.com>
-Message-ID: <1536131342-28041-4-git-send-email-nava.manne@xilinx.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 5 Sep 2018 09:14:35 +0200
+Subject: [PATCH 1/3] dt-bindings: change the A64 HDMI PHY binding to R40
+In-Reply-To: <20180903133434.58188-2-icenowy@aosc.io>
+References: <20180903133434.58188-1-icenowy@aosc.io>
+ <20180903133434.58188-2-icenowy@aosc.io>
+Message-ID: <20180905071435.lgsogpzmh5nw6bcy@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a reset controller driver for Xilinx Zynq UltraScale+ MPSoC.
-The zynqmp reset-controller has the ability to reset lines
-connected to different blocks and peripheral in the Soc.
+On Mon, Sep 03, 2018 at 09:34:32PM +0800, Icenowy Zheng wrote:
+> By experiment, the A64 HDMi PHY doesn't support the PLL-VIDEO mux
+> introduced in R40, although it has two PLL-VIDEOs.
+> 
+> Change the A64 HDMI PHY binding to R40 one.
+> 
+> This binding is introduced in v4.19, which is still in RC stage, so we
+> have change to fix it.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 
-Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
----
-Changes for v3:
-		-None.
-Changes for v2:
-		-Moved eemi_ops into a priv struct as suggested
-		 by philipp.
+That doesn't make much sense. The A64 doesn't have any particular
+reason to behave like the R40, and the R40 can definitely use a
+different compatible if it has a different behaviour. But I don't see
+*why* the A64 not behaving like the R40 is a justification to remove
+the A64 compatible. Especially when the R40 was released later.
 
- drivers/reset/Makefile       |   1 +
- drivers/reset/reset-zynqmp.c | 115 +++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 116 insertions(+)
- create mode 100644 drivers/reset/reset-zynqmp.c
+Add a new compatible, and leave the A64 compatible alone.
 
-diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-index c1261dc..27e4a33 100644
---- a/drivers/reset/Makefile
-+++ b/drivers/reset/Makefile
-@@ -21,4 +21,5 @@ obj-$(CONFIG_RESET_TI_SCI) += reset-ti-sci.o
- obj-$(CONFIG_RESET_TI_SYSCON) += reset-ti-syscon.o
- obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
- obj-$(CONFIG_RESET_ZYNQ) += reset-zynq.o
-+obj-$(CONFIG_ARCH_ZYNQMP) += reset-zynqmp.o
- 
-diff --git a/drivers/reset/reset-zynqmp.c b/drivers/reset/reset-zynqmp.c
-new file mode 100644
-index 0000000..f908492
---- /dev/null
-+++ b/drivers/reset/reset-zynqmp.c
-@@ -0,0 +1,115 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * Copyright (C) 2018 Xilinx, Inc.
-+ *
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/reset-controller.h>
-+#include <linux/firmware/xlnx-zynqmp.h>
-+
-+#define ZYNQMP_NR_RESETS (ZYNQMP_PM_RESET_END - ZYNQMP_PM_RESET_START - 2)
-+#define ZYNQMP_RESET_ID (ZYNQMP_PM_RESET_START + 1)
-+
-+struct zynqmp_reset_data {
-+	struct reset_controller_dev rcdev;
-+	const struct zynqmp_eemi_ops *eemi_ops;
-+};
-+
-+static inline struct zynqmp_reset_data *
-+to_zynqmp_reset_data(struct reset_controller_dev *rcdev)
-+{
-+	return container_of(rcdev, struct zynqmp_reset_data, rcdev);
-+}
-+
-+static int zynqmp_reset_assert(struct reset_controller_dev *rcdev,
-+			       unsigned long id)
-+{
-+	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
-+
-+	return priv->eemi_ops->reset_assert(ZYNQMP_RESET_ID + id,
-+					    PM_RESET_ACTION_ASSERT);
-+}
-+
-+static int zynqmp_reset_deassert(struct reset_controller_dev *rcdev,
-+				 unsigned long id)
-+{
-+	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
-+
-+	return priv->eemi_ops->reset_assert(ZYNQMP_RESET_ID + id,
-+					    PM_RESET_ACTION_RELEASE);
-+}
-+
-+static int zynqmp_reset_status(struct reset_controller_dev *rcdev,
-+			       unsigned long id)
-+{
-+	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
-+	int val, err;
-+
-+	err = priv->eemi_ops->reset_get_status(ZYNQMP_RESET_ID + id, &val);
-+	if (!err)
-+		return -EINVAL;
-+
-+	return val;
-+}
-+
-+static int zynqmp_reset_reset(struct reset_controller_dev *rcdev,
-+			      unsigned long id)
-+{
-+	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
-+
-+	return priv->eemi_ops->reset_assert(ZYNQMP_RESET_ID + id,
-+					    PM_RESET_ACTION_PULSE);
-+}
-+
-+static struct reset_control_ops zynqmp_reset_ops = {
-+	.reset = zynqmp_reset_reset,
-+	.assert = zynqmp_reset_assert,
-+	.deassert = zynqmp_reset_deassert,
-+	.status = zynqmp_reset_status,
-+};
-+
-+static int zynqmp_reset_probe(struct platform_device *pdev)
-+{
-+	struct zynqmp_reset_data *priv;
-+
-+	priv = devm_kzalloc(&pdev->dev,
-+			    sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, priv);
-+
-+	priv->eemi_ops = zynqmp_pm_get_eemi_ops();
-+	if (!priv->eemi_ops)
-+		return -ENXIO;
-+
-+	priv->rcdev.ops = &zynqmp_reset_ops;
-+	priv->rcdev.owner = THIS_MODULE;
-+	priv->rcdev.of_node = pdev->dev.of_node;
-+	priv->rcdev.nr_resets = ZYNQMP_NR_RESETS;
-+
-+	return devm_reset_controller_register(&pdev->dev, &priv->rcdev);
-+}
-+
-+static const struct of_device_id zynqmp_reset_dt_ids[] = {
-+	{ .compatible = "xlnx,zynqmp-reset", },
-+	{ },
-+};
-+
-+static struct platform_driver zynqmp_reset_driver = {
-+	.probe	= zynqmp_reset_probe,
-+	.driver = {
-+		.name		= KBUILD_MODNAME,
-+		.of_match_table	= zynqmp_reset_dt_ids,
-+	},
-+};
-+
-+static int __init zynqmp_reset_init(void)
-+{
-+	return platform_driver_register(&zynqmp_reset_driver);
-+}
-+
-+arch_initcall(zynqmp_reset_init);
+Maxime
+
 -- 
-2.7.4
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180905/6d3bed30/attachment.sig>
