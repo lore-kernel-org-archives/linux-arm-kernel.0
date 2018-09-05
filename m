@@ -1,62 +1,32 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 05 Sep 2018 23:50:25 +0300
-Subject: [PATCH 3/6] dt-bindings: display: add data-enable polarity
- property
-In-Reply-To: <e708c5bac502e60a2eeb685fddf67042@agner.ch>
-References: <20180905052113.21262-1-stefan@agner.ch>
- <139651706.L0sBFfZMDQ@avalon> <e708c5bac502e60a2eeb685fddf67042@agner.ch>
-Message-ID: <6830776.vZAoroGVFQ@avalon>
+From: pku.leo@gmail.com (Yang Li)
+Date: Wed, 5 Sep 2018 15:52:33 -0500
+Subject: [PATCH v6 3/4] arm64: dts: dwc3: description of incr burst type
+In-Reply-To: <20180724232018.GA16709@rob-hp-laptop>
+References: <1532341959-3478-1-git-send-email-pengbo.mu@nxp.com>
+ <1532341959-3478-3-git-send-email-pengbo.mu@nxp.com>
+ <20180724232018.GA16709@rob-hp-laptop>
+Message-ID: <CADRPPNQQE1ESJ5WkMxySstxpaQir-w5XOdiwDe3qTTQ_cim5Xw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+On Tue, Jul 24, 2018 at 6:23 PM Rob Herring <robh@kernel.org> wrote:
+>
+> On Mon, Jul 23, 2018 at 06:32:38PM +0800, Pengbo Mu wrote:
+> > Add description of 'snps,incr-burst-type-adjustment' to binding
+> > so that configuring devicetree.
+> >
+> > Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
+> > Signed-off-by: Pengbo Mu <pengbo.mu@nxp.com>
+> > ---
+> >  Documentation/devicetree/bindings/usb/dwc3.txt | 6 ++++++
+> >  1 file changed, 6 insertions(+)
+>
+> Reviewed-by: Rob Herring <robh@kernel.org>
 
-On Wednesday, 5 September 2018 21:10:08 EEST Stefan Agner wrote:
-> On 05.09.2018 00:07, Laurent Pinchart wrote:
-> > On Wednesday, 5 September 2018 08:21:10 EEST Stefan Agner wrote:
-> >> Allow to specify the data-enable polarity required by a dumb VGA
-> >> DAC converting parallel RGB to VGA.
-> >> 
-> >> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> >> ---
-> >> 
-> >>  .../devicetree/bindings/display/bridge/dumb-vga-dac.txt          | 1 +
-> >>  1 file changed, 1 insertion(+)
-> >> 
-> >> diff --git
-> >> a/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
-> >> b/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt index
-> >> 164cbb15f04c..adbd2ca0af2f 100644
-> >> --- a/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
-> >> +++ b/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
-> >> @@ -18,6 +18,7 @@ graph bindings specified in
-> >> Documentation/devicetree/bindings/graph.txt.
-> >> 
-> >>  Optional properties:
-> >>  - vdd-supply: Power supply for DAC
-> >> 
-> >> +- de-active: data-enable pulse is active low/high/ignored
-> > 
-> > Which value corresponds to low, high and ignored ?
-> 
-> The wording is taken from
-> Documentation/devicetree/bindings/display/panel/display-timing.txt. But
-> I agree, not very useful.
-> 
-> 0 is low active, 1 is high active, and none is using driver defaults.
-> 
-> How about:
-> - de-active: data-enable pulse is 0=active low/1=active high
+Hi Felipe,
 
-The data enable signal isn't really a pulse. I would word this as
+What do you think about this patch?  The patch title prefix should be
+updated from "arm64: dts: dwc3" to "dt-bindings: usb: dwc3" though.
 
-- de-active: Polarity of the data enable signal. 0 for active low, 1 for 
-active high, unset for system-specific defaults.
-
-> >>  Example
-> >>  -------
-
--- 
 Regards,
-
-Laurent Pinchart
+Leo
