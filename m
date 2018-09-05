@@ -1,27 +1,38 @@
-From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Wed, 5 Sep 2018 12:38:59 +0530
-Subject: [RFC PATCH v3 0/3] Add reset driver support for ZynqMP
-Message-ID: <1536131342-28041-1-git-send-email-nava.manne@xilinx.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 5 Sep 2018 09:20:51 +0200
+Subject: [PATCH v4 03/11] dt-bindings: display: Add compatible for A64
+ DE2 display pipeline
+In-Reply-To: <20180904044053.15425-4-icenowy@aosc.io>
+References: <20180904044053.15425-1-icenowy@aosc.io>
+ <20180904044053.15425-4-icenowy@aosc.io>
+Message-ID: <20180905072051.ac7nfa4f65gcqaf7@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series of patches are created On top of the
-below series of patches.
-https://lkml.org/lkml/2018/8/3/687 
+On Tue, Sep 04, 2018 at 12:40:45PM +0800, Icenowy Zheng wrote:
+> From: Jagan Teki <jagan@amarulasolutions.com>
+> 
+> Allwinner A64 has a DE2 display pipeline. The TCONs are similar to the
+> ones in A83T, but the mixers are new (similar to the later R40 SoC).
+> 
+> This patch adds dt-binding documentation for A64 DE2 display pipeline.
+> 
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> [Icenowy: Refactor and also cover TCON1]
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 
-Nava kishore Manne (3):
-  firmware: xilinx: Add reset API's
-  dt-bindings: reset: Add bindings for ZynqMP reset driver
-  reset: reset-zynqmp: Adding support for Xilinx zynqmp reset
-    controller.
-
- .../firmware/xilinx/xlnx,zynqmp-firmware.txt       | 142 +++++++++++++++++++++
- drivers/firmware/xilinx/zynqmp.c                   |  40 ++++++
- drivers/reset/Makefile                             |   1 +
- drivers/reset/reset-zynqmp.c                       | 115 +++++++++++++++++
- include/linux/firmware/xlnx-zynqmp.h               | 136 ++++++++++++++++++++
- 5 files changed, 434 insertions(+)
- create mode 100644 drivers/reset/reset-zynqmp.c
+Applied, thanks!
+Maxime
 
 -- 
-2.7.4
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180905/c188707d/attachment.sig>
