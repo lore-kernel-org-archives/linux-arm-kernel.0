@@ -1,75 +1,86 @@
-From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Wed, 5 Sep 2018 16:55:22 +0530
-Subject: [PATCH 0/5] Qcom smmu-500 TLB invalidation errata for sdm845
-In-Reply-To: <CAF6AEGsuAXXtUbeteQk5ssZEqk8XLViDZH5PfxQjn6sg8+B08A@mail.gmail.com>
-References: <20180814105528.20592-1-vivek.gautam@codeaurora.org>
- <20180814114009.GF28664@arm.com>
- <ad4e9f85-ff57-ad26-fb25-7b4c08683a52@codeaurora.org>
- <3f74124c-b09f-a92d-117d-a747d33a4561@codeaurora.org>
- <CAF6AEGsuAXXtUbeteQk5ssZEqk8XLViDZH5PfxQjn6sg8+B08A@mail.gmail.com>
-Message-ID: <3ac669af-a68e-874f-4c3e-91a2e9f676af@codeaurora.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 5 Sep 2018 12:28:46 +0100
+Subject: [PULL 2/4] arm64: KVM: Only force FPEXC32_EL2.EN if trapping
+ FPSIMD
+In-Reply-To: <20180904125121.GO4029@e113682-lin.lund.arm.com>
+References: <20180903134516.17796-1-christoffer.dall@arm.com>
+ <20180903134516.17796-3-christoffer.dall@arm.com>
+ <20180904113952.GB17801@e103592.cambridge.arm.com>
+ <20180904125121.GO4029@e113682-lin.lund.arm.com>
+Message-ID: <20180905112846.GC17801@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Sep 04, 2018 at 02:51:21PM +0200, Christoffer Dall wrote:
+> On Tue, Sep 04, 2018 at 12:39:54PM +0100, Dave Martin wrote:
+> > On Mon, Sep 03, 2018 at 03:45:14PM +0200, Christoffer Dall wrote:
+> > > From: Marc Zyngier <marc.zyngier@arm.com>
+> > > 
+> > > If trapping FPSIMD in the context of an AArch32 guest, it is critical
+> > > to set FPEXC32_EL2.EN to 1 so that the trapping is taken to EL2 and
+> > > not EL1.
+> > > 
+> > > Conversely, it is just as critical *not* to set FPEXC32_EL2.EN to 1
+> > > if we're not going to trap FPSIMD, as we then corrupt the existing
+> > > VFP state.
+> > > 
+> > > Moving the call to __activate_traps_fpsimd32 to the point where we
+> > > know for sure that we are going to trap ensures that we don't set that
+> > > bit spuriously.
+> > 
+> > 
+> > Hmmm, this looks like a viable fix but actually the way the code is
+> > structured is a bit confusing here.
+> > 
+> > It looks like some unnecessary functionality has been inherited from
+> > arch/arm here: for a 32-bit host, FPEXC controls FPSIMD trapping even
+> > at Hyp, so we need to handle it specially in order for the Hyp FPSIMD
+> > context switching code to run without generating additional traps.
+> > 
+> > For a 64-bit host, this doesn't apply: FPEXC32_EL2 is just guest
+> > context and doesn't affect EL2 execution.
+> 
+> Hmm, is that really true?  Earlier versions of the Armv8 Arm ARM, for
+> the description of CPTR_EL2.TFP:
+> 
+>   This causes instructions that access the registers associated with
+>   Floating Point and Advanced SIMD execution to trap to EL2 when
+>   executed from EL0, EL1, or EL2, unless trapped to EL1.
+> 
+> In the current version I think you can arrive at the same conclusion by
+> looking at the FPEXC_EL2.EN description which tells you that if EN==0,
+> then the instruction is UNDEFINED, and the Synchronous exception
+> prioritization rules specify that undefined instructions are taken
+> before trapped intructions because of CPTR_EL2.
+> 
+> But there does seem to be some inconsistency with the description of
+> generally trapping floating point access to EL2.
 
+You can try taking a look at the archietctural pseudocode -- see the
+CheckFPAdvSIMDEnabled64() (for AArch64) and CheckFPAdvSIMDEnabled() (for
+AArch32) function hierarchies on developer.arm.com.
 
-On 9/5/2018 3:34 PM, Rob Clark wrote:
-> On Wed, Sep 5, 2018 at 5:22 AM Vivek Gautam <vivek.gautam@codeaurora.org> wrote:
->>
->> On 8/14/2018 5:54 PM, Vivek Gautam wrote:
->>> Hi Will,
->>>
->>>
->>> On 8/14/2018 5:10 PM, Will Deacon wrote:
->>>> Hi Vivek,
->>>>
->>>> On Tue, Aug 14, 2018 at 04:25:23PM +0530, Vivek Gautam wrote:
->>>>> Qcom's implementation of arm,mmu-500 on sdm845 has a
->>>>> functional/performance
->>>>> errata [1] because of which the TCU cache look ups are stalled during
->>>>> invalidation cycle. This is mitigated by serializing all the
->>>>> invalidation
->>>>> requests coming to the smmu.
->>>> How does this implementation differ from the one supported by
->>>> qcom_iommu.c?
->>>> I notice you're adding firmware hooks here, which we avoided by
->>>> having the
->>>> extra driver. Please help me understand which devices exist, how they
->>>> differ, and which drivers are intended to support them!
->>> IIRC, the qcom_iommu driver was intended to support the static context
->>> bank - SID
->>> mapping, and is very specific to the smmu-v2 version present on
->>> msm8916 soc.
->>> However, this is the qcom's mmu-500 implementation specific errata.
->>> qcom_iommu
->>> will not be able to support mmu-500 configurations.
->>> Rob Clark can add more.
->>> Let you know what you suggest.
->> Rob, can you please comment about how qcom-smmu driver has different
->> implementation
->> from arm-smmu driver?
-> sorry, I missed this thread earlier.  But yeah, as you mentioned, the
-> purpose for qcom_iommu.c was to deal with the static context/SID
-> mapping.
->
-> (I guess it is all just software, and we could make qcom_iommu.c
-> support dynamic mapping as well, but I think then it starts to
-> duplicate most of arm_smmu.c, so that doesn't seem like the right
-> direction)
+ARM DDI 0487B.b says for FPEXC32_EL2:
 
-Thanks Rob for the response. I will wait for Will's response on how would he
-like this support be implemented.
+"Purpose:  Allows access to the AArch32 register FPEXC from AArch64
+state only. Its value has no effect on execution in AArch64 state."
 
-Best regards
-Vivek
->
-> BR,
-> -R
->
->> Will, in case we would want to use arm-smmu driver, what would you
->> suggest for
->> having the firmware hooks?
->> Thanks.
->>
->> Best regards
->> Vivek
+This could arguably be worded better, but the second sentence is
+pretty unequivocal.
+
+> 
+> > 
+> > The wrinkle this patch fixes is that implicit reads of FPEXC by
+> 
+> what do you mean by implicit reads here?
+
+In effect any trappable instruction can be thought of as reading a bunch
+of system registers in order to decide whether to take a trap or execute
+the instruction normally.  The pseudocode adopts this model.  These
+reads are not done by actual MRS instructions in the instruction stream,
+so they are deemed implicit.
+
+[...]
+
+Cheers
+---Dave
