@@ -1,24 +1,40 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 5 Sep 2018 14:57:46 -0700
-Subject: [PATCH] efi_stub: update documentation on dtb= parameter
-In-Reply-To: <20180905190750.4566-1-grant.likely@arm.com>
-References: <20180905190750.4566-1-grant.likely@arm.com>
-Message-ID: <CAOesGMjzEKsa1rx-kHemcSyT2PudLeCd7OrogrVdn99efTXg8g@mail.gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 5 Sep 2018 14:57:55 -0700
+Subject: [PATCH v11 0/3] remain and optimize memblock_next_valid_pfn on
+ arm and arm64
+In-Reply-To: <1534907237-2982-1-git-send-email-jia.he@hxt-semitech.com>
+References: <1534907237-2982-1-git-send-email-jia.he@hxt-semitech.com>
+Message-ID: <20180905145755.cc89819d446f311e4b8e8f95@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 5, 2018 at 12:07 PM, Grant Likely <grant.likely@arm.com> wrote:
-> The dtb= parameter is no longer the primary mechanism for providing a
-> devicetree to the kernel. Now either firmware or the boot selector (ex.
-> Grub) should provide the devicetree and dtb= should only be used for
-> debug or when using firmware that doesn't understand DT.
-> Update the EFI stub documentation to reflect the current usage.
->
-> Signed-off-by: Grant Likely <grant.likely@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Jonathan Corbet <corbet@lwn.net>
+On Wed, 22 Aug 2018 11:07:14 +0800 Jia He <hejianet@gmail.com> wrote:
 
-Acked-by: Olof Johansson <olof@lixom.net>
+> Commit b92df1de5d28 ("mm: page_alloc: skip over regions of invalid pfns
+> where possible") optimized the loop in memmap_init_zone(). But it causes
+> possible panic bug. So Daniel Vacek reverted it later.
+> 
+> But as suggested by Daniel Vacek, it is fine to using memblock to skip
+> gaps and finding next valid frame with CONFIG_HAVE_ARCH_PFN_VALID.
+> 
+> More from what Daniel said:
+> "On arm and arm64, memblock is used by default. But generic version of
+> pfn_valid() is based on mem sections and memblock_next_valid_pfn() does
+> not always return the next valid one but skips more resulting in some
+> valid frames to be skipped (as if they were invalid). And that's why
+> kernel was eventually crashing on some !arm machines."
+> 
+> About the performance consideration:
+> As said by James in b92df1de5,
+> "I have tested this patch on a virtual model of a Samurai CPU with a
+> sparse memory map.  The kernel boot time drops from 109 to 62 seconds."
+> Thus it would be better if we remain memblock_next_valid_pfn on arm/arm64.
+> 
+> Besides we can remain memblock_next_valid_pfn, there is still some room
+> for improvement. After this set, I can see the time overhead of memmap_init
+> is reduced from 27956us to 13537us in my armv8a server(QDF2400 with 96G
+> memory, pagesize 64k). I believe arm server will benefit more if memory is
+> larger than TBs
 
-
--Olof
+Thanks.  I switched to v11.  It would be nice to see some confirmation
+from ARM people please?
