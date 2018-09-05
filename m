@@ -1,80 +1,64 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue,  4 Sep 2018 22:21:13 -0700
-Subject: [PATCH 6/6] ARM: dts: imx6qdl-apalis: add GPIO I2C node for DDC
-In-Reply-To: <20180905052113.21262-1-stefan@agner.ch>
-References: <20180905052113.21262-1-stefan@agner.ch>
-Message-ID: <20180905052113.21262-6-stefan@agner.ch>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Wed, 05 Sep 2018 08:05:29 +0200
+Subject: [PATCH 2/2] crypto: skcipher: Remove VLA usage for
+ SKCIPHER_REQUEST_ON_STACK
+In-Reply-To: <20180904181629.20712-3-keescook@chromium.org>
+References: <20180904181629.20712-1-keescook@chromium.org>
+ <20180904181629.20712-3-keescook@chromium.org>
+Message-ID: <2109885.PdqaXYh4EC@ws-140106>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the DDC signals are controlled by the DWC HDMI I2C
-master to be used for HDMI (DVI on the Apalis Evaluation Board).
-However, the Apalis Evaluation board also allows to route the Apalis
-DDC I2C to the LVDS or the VGA connector. By default, the signal
-is routed to DVI (HDMI), and therefor the current default settings
-are sensible.
+On Tuesday, September 4, 2018, 8:16:29 PM CEST Kees Cook wrote:
+> In the quest to remove all stack VLA usage from the kernel[1], this
+> caps the skcipher request size similar to other limits and adds a sanity
+> check at registration. Looking at instrumented tcrypt output, the largest
+> is for lrw:
+> 
+> 	crypt: testing lrw(aes)
+> 	crypto_skcipher_set_reqsize: 8
+> 	crypto_skcipher_set_reqsize: 88
+> 	crypto_skcipher_set_reqsize: 472
+> 
+> [1] https://lkml.kernel.org/r/CA+55aFzCG-zNmZwX4A2FQpadafLfEzK6CC=qPXydAacU1RqZWA at mail.gmail.com
+> 
+> Signed-off-by: Kees Cook <keescook@chromium.org>
+> ---
+>  include/crypto/internal/skcipher.h | 3 +++
+>  include/crypto/skcipher.h          | 4 +++-
+>  2 files changed, 6 insertions(+), 1 deletion(-)
+> 
+> diff --git a/include/crypto/internal/skcipher.h b/include/crypto/internal/skcipher.h
+> index d2926ecae2ac..6da811c0747e 100644
+> --- a/include/crypto/internal/skcipher.h
+> +++ b/include/crypto/internal/skcipher.h
+> @@ -130,6 +130,9 @@ static inline struct crypto_skcipher *crypto_spawn_skcipher(
+>  static inline int crypto_skcipher_set_reqsize(
+>  	struct crypto_skcipher *skcipher, unsigned int reqsize)
+>  {
+> +	if (WARN_ON(reqsize > SKCIPHER_MAX_REQSIZE))
+> +		return -EINVAL;
+> +
+>  	skcipher->reqsize = reqsize;
+>  
+>  	return 0;
+> diff --git a/include/crypto/skcipher.h b/include/crypto/skcipher.h
+> index 2f327f090c3e..c48e194438cf 100644
+> --- a/include/crypto/skcipher.h
+> +++ b/include/crypto/skcipher.h
+> @@ -139,9 +139,11 @@ struct skcipher_alg {
+>  	struct crypto_alg base;
+>  };
+>  
+> +#define SKCIPHER_MAX_REQSIZE	472
+> +
+>  #define SKCIPHER_REQUEST_ON_STACK(name, tfm) \
+>  	char __##name##_desc[sizeof(struct skcipher_request) + \
+> -		crypto_skcipher_reqsize(tfm)] CRYPTO_MINALIGN_ATTR; \
+> +		SKCIPHER_MAX_REQSIZE] CRYPTO_MINALIGN_ATTR; \
+>  	struct skcipher_request *name = (void *)__##name##_desc
 
-To ease customization and to prepare for carrier boards with other
-needs, add a GPIO I2C DDC node.
+Now tfm could be removed from the macro arguments, no?
 
-E.g. to reroute the Apalis DDC to the VGA connector on the Apalis
-Evaluation Board, the following changes can be used:
-
-vga {
-	...
-	ddc-i2c-bus = <&i2cddc>;
-};
-
-&hdmi {
-	/delete-property/ pinctrl-0;
-};
-
-&i2cddc {
-	status = "okay";
-};
-
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- arch/arm/boot/dts/imx6qdl-apalis.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6qdl-apalis.dtsi b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-index e8d0407e3e18..8340391796df 100644
---- a/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-@@ -61,6 +61,18 @@
- 		status = "disabled";
- 	};
- 
-+	/* DDC_I2C: I2C2_SDA/SCL on MXM3 205/207 */
-+	i2cddc: i2c at 0 {
-+		compatible = "i2c-gpio";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_i2c_ddc>;
-+		gpios = <&gpio3 16 GPIO_ACTIVE_HIGH /* sda */
-+			 &gpio2 30 GPIO_ACTIVE_HIGH /* scl */
-+			>;
-+		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
-+		status = "disabled";
-+	};
-+
- 	reg_module_3v3: regulator-module-3v3 {
- 		compatible = "regulator-fixed";
- 		regulator-name = "+V3.3";
-@@ -688,6 +700,14 @@
- 		>;
- 	};
- 
-+	pinctrl_i2c_ddc: gpioi2cddcgrp {
-+		fsl,pins = <
-+			/* DDC bitbang */
-+			MX6QDL_PAD_EIM_EB2__GPIO2_IO30 0x1b0b0
-+			MX6QDL_PAD_EIM_D16__GPIO3_IO16 0x1b0b0
-+		>;
-+	};
-+
- 	pinctrl_i2c1: i2c1grp {
- 		fsl,pins = <
- 			MX6QDL_PAD_CSI0_DAT8__I2C1_SDA 0x4001b8b1
--- 
-2.18.0
+Best regards,
+Alexander
