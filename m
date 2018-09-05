@@ -1,158 +1,41 @@
-From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Wed, 5 Sep 2018 12:10:42 +0530
-Subject: [RFC PATCH v2 3/3] reset: reset-zynqmp: Adding support for Xilinx
- zynqmp reset controller.
-In-Reply-To: <1536129642-7049-1-git-send-email-nava.manne@xilinx.com>
-References: <1536129642-7049-1-git-send-email-nava.manne@xilinx.com>
-Message-ID: <1536129642-7049-4-git-send-email-nava.manne@xilinx.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Wed, 5 Sep 2018 08:42:52 +0200
+Subject: [PATCH] arm64: add NUMA emulation support
+In-Reply-To: <f041ba95-03e6-4a7d-c324-870b45a2f648@kernel.org>
+References: <20180824230559.32336-1-shuah@kernel.org>
+ <20180828174011.GE20375@arm.com>
+ <a58ad11f-3c22-ed7f-a0cd-938aabc4adaf@kernel.org>
+ <20180829110802.GD10349@dhcp22.suse.cz>
+ <f041ba95-03e6-4a7d-c324-870b45a2f648@kernel.org>
+Message-ID: <20180905064252.GW14951@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a reset controller driver for Xilinx Zynq UltraScale+ MPSoC.
-The zynqmp reset-controller has the ability to reset lines
-connected to different blocks and peripheral in the Soc.
+On Tue 04-09-18 15:59:34, Shuah Khan wrote:
+[...]
+> This will support the following workload requirements:
+> 
+> - reserving one or more NUMA memory nodes for class of critical tasks that require
+>   guaranteed memory availability.
+> - isolate memory blocks with a guaranteed exclusive access.
 
-Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
----
-Changes for v2:
-		-Moved eemi_ops into a priv struct as suggested
-		 by philipp.
+How do you enforce kernel doesn't allocate from those reserved nodes?
+They will be in a fallback zonelists so once the memory gets used on all
+other ones then the kernel happily spills over to your reserved node.
 
- drivers/reset/Makefile       |   1 +
- drivers/reset/reset-zynqmp.c | 115 +++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 116 insertions(+)
- create mode 100644 drivers/reset/reset-zynqmp.c
+> NUMA emulation to split the flat machine into "x" number of nodes, combined with
+> cpuset cgroup with the following example configuration will make it possible to
+> support the above workloads on non-NUMA platforms.
+> 
+> numa=fake=4
+> 
+> cpuset.mems=2
+> cpuset.cpus=2
+> cpuset.mem_exclusive=1 (enabling exclusive use of the memory nodes by a CPU set)
+> cpuset.mem_hardwall=1  (separate the memory nodes that are allocated to different cgroups)
 
-diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-index c1261dc..27e4a33 100644
---- a/drivers/reset/Makefile
-+++ b/drivers/reset/Makefile
-@@ -21,4 +21,5 @@ obj-$(CONFIG_RESET_TI_SCI) += reset-ti-sci.o
- obj-$(CONFIG_RESET_TI_SYSCON) += reset-ti-syscon.o
- obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
- obj-$(CONFIG_RESET_ZYNQ) += reset-zynq.o
-+obj-$(CONFIG_ARCH_ZYNQMP) += reset-zynqmp.o
- 
-diff --git a/drivers/reset/reset-zynqmp.c b/drivers/reset/reset-zynqmp.c
-new file mode 100644
-index 0000000..f908492
---- /dev/null
-+++ b/drivers/reset/reset-zynqmp.c
-@@ -0,0 +1,115 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * Copyright (C) 2018 Xilinx, Inc.
-+ *
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/reset-controller.h>
-+#include <linux/firmware/xlnx-zynqmp.h>
-+
-+#define ZYNQMP_NR_RESETS (ZYNQMP_PM_RESET_END - ZYNQMP_PM_RESET_START - 2)
-+#define ZYNQMP_RESET_ID (ZYNQMP_PM_RESET_START + 1)
-+
-+struct zynqmp_reset_data {
-+	struct reset_controller_dev rcdev;
-+	const struct zynqmp_eemi_ops *eemi_ops;
-+};
-+
-+static inline struct zynqmp_reset_data *
-+to_zynqmp_reset_data(struct reset_controller_dev *rcdev)
-+{
-+	return container_of(rcdev, struct zynqmp_reset_data, rcdev);
-+}
-+
-+static int zynqmp_reset_assert(struct reset_controller_dev *rcdev,
-+			       unsigned long id)
-+{
-+	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
-+
-+	return priv->eemi_ops->reset_assert(ZYNQMP_RESET_ID + id,
-+					    PM_RESET_ACTION_ASSERT);
-+}
-+
-+static int zynqmp_reset_deassert(struct reset_controller_dev *rcdev,
-+				 unsigned long id)
-+{
-+	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
-+
-+	return priv->eemi_ops->reset_assert(ZYNQMP_RESET_ID + id,
-+					    PM_RESET_ACTION_RELEASE);
-+}
-+
-+static int zynqmp_reset_status(struct reset_controller_dev *rcdev,
-+			       unsigned long id)
-+{
-+	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
-+	int val, err;
-+
-+	err = priv->eemi_ops->reset_get_status(ZYNQMP_RESET_ID + id, &val);
-+	if (!err)
-+		return -EINVAL;
-+
-+	return val;
-+}
-+
-+static int zynqmp_reset_reset(struct reset_controller_dev *rcdev,
-+			      unsigned long id)
-+{
-+	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
-+
-+	return priv->eemi_ops->reset_assert(ZYNQMP_RESET_ID + id,
-+					    PM_RESET_ACTION_PULSE);
-+}
-+
-+static struct reset_control_ops zynqmp_reset_ops = {
-+	.reset = zynqmp_reset_reset,
-+	.assert = zynqmp_reset_assert,
-+	.deassert = zynqmp_reset_deassert,
-+	.status = zynqmp_reset_status,
-+};
-+
-+static int zynqmp_reset_probe(struct platform_device *pdev)
-+{
-+	struct zynqmp_reset_data *priv;
-+
-+	priv = devm_kzalloc(&pdev->dev,
-+			    sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, priv);
-+
-+	priv->eemi_ops = zynqmp_pm_get_eemi_ops();
-+	if (!priv->eemi_ops)
-+		return -ENXIO;
-+
-+	priv->rcdev.ops = &zynqmp_reset_ops;
-+	priv->rcdev.owner = THIS_MODULE;
-+	priv->rcdev.of_node = pdev->dev.of_node;
-+	priv->rcdev.nr_resets = ZYNQMP_NR_RESETS;
-+
-+	return devm_reset_controller_register(&pdev->dev, &priv->rcdev);
-+}
-+
-+static const struct of_device_id zynqmp_reset_dt_ids[] = {
-+	{ .compatible = "xlnx,zynqmp-reset", },
-+	{ },
-+};
-+
-+static struct platform_driver zynqmp_reset_driver = {
-+	.probe	= zynqmp_reset_probe,
-+	.driver = {
-+		.name		= KBUILD_MODNAME,
-+		.of_match_table	= zynqmp_reset_dt_ids,
-+	},
-+};
-+
-+static int __init zynqmp_reset_init(void)
-+{
-+	return platform_driver_register(&zynqmp_reset_driver);
-+}
-+
-+arch_initcall(zynqmp_reset_init);
+This will only enforce userspace to follow and I strongly suspect that
+tasks in the root cgroup will be allowed to allocate as well.
 -- 
-2.7.4
+Michal Hocko
+SUSE Labs
