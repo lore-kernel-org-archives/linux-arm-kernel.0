@@ -1,173 +1,127 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed,  5 Sep 2018 12:46:16 +0100 (BST)
-Subject: Applied "spi: Do not print a message if spi_controller_{suspend,
- resume}() fails" to the spi tree
-In-Reply-To: <20180905085157.7807-1-geert+renesas@glider.be>
-Message-ID: <20180905114616.63A8111229D0@debutante.sirena.org.uk>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 5 Sep 2018 13:55:23 +0200
+Subject: [PATCH V5] ARM: shmobile: Rework the PMIC IRQ line quirk
+In-Reply-To: <20180611121513.9673-1-marek.vasut+renesas@gmail.com>
+References: <20180611121513.9673-1-marek.vasut+renesas@gmail.com>
+Message-ID: <CAMuHMdUuUwP2NAkHFsnuLigRRfEJVa8xBQ5Ee-jxU9MK8_8PZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+Hi Marek,
 
-   spi: Do not print a message if spi_controller_{suspend,resume}() fails
+On Mon, Jun 11, 2018 at 2:15 PM Marek Vasut <marek.vasut@gmail.com> wrote:
+> Rather than hard-coding the quirk topology, which stopped scaling,
+> parse the information from DT. The code looks for all compatible
+> PMICs -- da9063 and da9210 -- and checks if their IRQ line is tied
+> to the same pin. If so, the code sends a matching sequence to the
+> PMIC to deassert the IRQ.
+>
+> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> Cc: Simon Horman <horms+renesas@verge.net.au>
+> Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> Cc: linux-renesas-soc at vger.kernel.org
+> Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> Tested-by: Geert Uytterhoeven <geert+renesas@glider.be> (on Koelsch)
+> ---
+> V2: - Replace the DT shared IRQ check loop with memcmp()
+>     - Send the I2C message to deassert the IRQ line to all PMICs
+>       in the list with shared IRQ line instead of just one
+>     - Add comment that this works only in case all the PMICs are
+>       on the same I2C bus
+> V3: - Drop the addr = 0x00 init
+>     - Drop reinit of argsa in rcar_gen2_regulator_quirk
+> V4: - Squash regulator_quirk on single line
+>     - Drop !np check in for_each_matching_node_and_match()
+>     - Use argsa in of_irq_parse_one
+> V5: - Check kzalloc failure
+>     - Rename da...._msgs to da...._msg
+>     - Don't reinit quirk->shared
 
-has been applied to the spi tree at
+Thanks for the update!
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+> --- a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
+> +++ b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+> @@ -122,7 +142,12 @@ static struct notifier_block regulator_quirk_nb = {
+>
+>  static int __init rcar_gen2_regulator_quirk(void)
+>  {
+> -       u32 mon;
+> +       struct regulator_quirk *quirk, *pos, *tmp;
+> +       struct of_phandle_args *argsa, *argsb;
+> +       const struct of_device_id *id;
+> +       struct device_node *np;
+> +       u32 mon, addr;
+> +       int ret;
+>
+>         if (!of_machine_is_compatible("renesas,koelsch") &&
+>             !of_machine_is_compatible("renesas,lager") &&
+> @@ -130,22 +155,76 @@ static int __init rcar_gen2_regulator_quirk(void)
+>             !of_machine_is_compatible("renesas,gose"))
+>                 return -ENODEV;
+>
+> +       for_each_matching_node_and_match(np, rcar_gen2_quirk_match, &id) {
+> +               if (!of_device_is_available(np))
+> +                       break;
+> +
+> +               quirk = kzalloc(sizeof(*quirk), GFP_KERNEL);
+> +               if (!quirk) {
+> +                       ret = -ENOMEM;
+> +                       goto err_mem;
+> +               }
+> +
+> +               argsa = &quirk->irq_args;
+> +               memcpy(&quirk->i2c_msg, id->data, sizeof(quirk->i2c_msg));
+> +
+> +               ret = of_property_read_u32(np, "reg", &addr);
+> +               if (ret)
+> +                       return ret;
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+I think it's safer to skip this entry and continue, after calling
+kfree(quirk), of course.
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+> +
+> +               quirk->id = id;
+> +               quirk->i2c_msg.addr = addr;
+> +
+> +               ret = of_irq_parse_one(np, 0, argsa);
+> +               if (ret)
+> +                       return ret;
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+kfree(quirk) and continue...
 
-Thanks,
-Mark
+> +
+> +               list_for_each_entry(pos, &quirk_list, list) {
+> +                       argsb = &pos->irq_args;
+> +
+> +                       if (argsa->args_count != argsb->args_count)
+> +                               continue;
+> +
+> +                       ret = memcmp(argsa->args, argsb->args,
+> +                                    argsa->args_count *
+> +                                    sizeof(argsa->args[0]));
+> +                       if (!ret) {
+> +                               pos->shared = true;
+> +                               quirk->shared = true;
+> +                       }
+> +               }
+> +
+> +               list_add_tail(&quirk->list, &quirk_list);
+> +       }
+> +
 
->From 7c5d8a249acadc3e9d5af643c0fe24b608a98269 Mon Sep 17 00:00:00 2001
-From: Geert Uytterhoeven <geert+renesas@glider.be>
-Date: Wed, 5 Sep 2018 10:51:57 +0200
-Subject: [PATCH] spi: Do not print a message if
- spi_controller_{suspend,resume}() fails
+With the above fixed:
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-spi_controller_{suspend,resume}() already prints an error message on
-failure, so there is no need to repeat this in individual drivers.
+Gr{oetje,eeting}s,
 
-Note: spi_master_{suspend,resume}() is an alias for
-      spi_controller_{suspend,resume}().
+                        Geert
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
-Reviewed-by: Daniel Mack <daniel@zonque.org>
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- drivers/spi/spi-atmel.c    | 10 ++--------
- drivers/spi/spi-dw.c       |  7 +------
- drivers/spi/spi-fsl-espi.c |  4 +---
- drivers/spi/spi-pl022.c    |  8 ++------
- drivers/spi/spi-pxa2xx.c   |  8 +-------
- 5 files changed, 7 insertions(+), 30 deletions(-)
-
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index 3f890d162934..74fddcd3282b 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -1767,10 +1767,8 @@ static int atmel_spi_suspend(struct device *dev)
- 
- 	/* Stop the queue running */
- 	ret = spi_master_suspend(master);
--	if (ret) {
--		dev_warn(dev, "cannot suspend master\n");
-+	if (ret)
- 		return ret;
--	}
- 
- 	if (!pm_runtime_suspended(dev))
- 		atmel_spi_runtime_suspend(dev);
-@@ -1799,11 +1797,7 @@ static int atmel_spi_resume(struct device *dev)
- 	}
- 
- 	/* Start the queue running */
--	ret = spi_master_resume(master);
--	if (ret)
--		dev_err(dev, "problem starting queue (%d)\n", ret);
--
--	return ret;
-+	return spi_master_resume(master);
- }
- #endif
- 
-diff --git a/drivers/spi/spi-dw.c b/drivers/spi/spi-dw.c
-index ac2eb89ef7a5..1736612ee86b 100644
---- a/drivers/spi/spi-dw.c
-+++ b/drivers/spi/spi-dw.c
-@@ -572,13 +572,8 @@ EXPORT_SYMBOL_GPL(dw_spi_suspend_host);
- 
- int dw_spi_resume_host(struct dw_spi *dws)
- {
--	int ret;
--
- 	spi_hw_init(&dws->master->dev, dws);
--	ret = spi_controller_resume(dws->master);
--	if (ret)
--		dev_err(&dws->master->dev, "fail to start queue (%d)\n", ret);
--	return ret;
-+	return spi_controller_resume(dws->master);
- }
- EXPORT_SYMBOL_GPL(dw_spi_resume_host);
- 
-diff --git a/drivers/spi/spi-fsl-espi.c b/drivers/spi/spi-fsl-espi.c
-index 1e8ff6256079..cf2118dc91f4 100644
---- a/drivers/spi/spi-fsl-espi.c
-+++ b/drivers/spi/spi-fsl-espi.c
-@@ -798,10 +798,8 @@ static int of_fsl_espi_suspend(struct device *dev)
- 	int ret;
- 
- 	ret = spi_master_suspend(master);
--	if (ret) {
--		dev_warn(dev, "cannot suspend master\n");
-+	if (ret)
- 		return ret;
--	}
- 
- 	return pm_runtime_force_suspend(dev);
- }
-diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-index 1af8c96b940e..5f5f197b153c 100644
---- a/drivers/spi/spi-pl022.c
-+++ b/drivers/spi/spi-pl022.c
-@@ -2325,10 +2325,8 @@ static int pl022_suspend(struct device *dev)
- 	int ret;
- 
- 	ret = spi_master_suspend(pl022->master);
--	if (ret) {
--		dev_warn(dev, "cannot suspend master\n");
-+	if (ret)
- 		return ret;
--	}
- 
- 	ret = pm_runtime_force_suspend(dev);
- 	if (ret) {
-@@ -2353,9 +2351,7 @@ static int pl022_resume(struct device *dev)
- 
- 	/* Start the queue running */
- 	ret = spi_master_resume(pl022->master);
--	if (ret)
--		dev_err(dev, "problem starting queue (%d)\n", ret);
--	else
-+	if (!ret)
- 		dev_dbg(dev, "resumed\n");
- 
- 	return ret;
-diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
-index 14f4ea59caff..e3cbc66a7061 100644
---- a/drivers/spi/spi-pxa2xx.c
-+++ b/drivers/spi/spi-pxa2xx.c
-@@ -1808,13 +1808,7 @@ static int pxa2xx_spi_resume(struct device *dev)
- 		lpss_ssp_setup(drv_data);
- 
- 	/* Start the queue running */
--	status = spi_controller_resume(drv_data->master);
--	if (status != 0) {
--		dev_err(dev, "problem starting queue (%d)\n", status);
--		return status;
--	}
--
--	return 0;
-+	return spi_controller_resume(drv_data->master);
- }
- #endif
- 
 -- 
-2.19.0.rc1
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
