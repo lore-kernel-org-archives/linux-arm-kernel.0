@@ -1,47 +1,55 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 5 Sep 2018 19:10:36 +0200 (CEST)
-Subject: [PATCH v2 1/4] dt-bindings: media: Add i.MX Pixel Pipeline binding
-In-Reply-To: <20180905100018.27556-2-p.zabel@pengutronix.de>
-References: <20180905100018.27556-1-p.zabel@pengutronix.de>
- <20180905100018.27556-2-p.zabel@pengutronix.de>
-Message-ID: <1527575951.28748.1536167436305@email.1und1.de>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 5 Sep 2018 12:21:18 -0500
+Subject: [PATCH 1/2] dt-bindings: pci: add UniPhier PCIe host controller
+ description
+In-Reply-To: <1536114731-28630-2-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1536114731-28630-1-git-send-email-hayashi.kunihiko@socionext.com>
+ <1536114731-28630-2-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <20180905172118.GN107892@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
 
-> Philipp Zabel <p.zabel@pengutronix.de> hat am 5. September 2018 um 12:00 geschrieben:
+Please follow the capitalization convention, i.e.,
+
+  $ git log --oneline --no-merges Documentaon/devicetree/bindings/pci/ | grep -i pci
+  82dfbd27c837 dt-bindings: PCI: cadence: Add DT bindings for optional PHYs
+  92f9ccca4c08 PCI: mobiveil: Add Mobiveil PCIe Host Bridge IP driver DT bindings
+  71918e24cb49 dt-bindings: PCI: designware: Add support for EP in DesignWare driver
+  467c7a737642 dt-bindings: PCI: designware: Example update
+  1dca7a636933 dt-bindings: PCI: rockchip: Add DT bindings for Rockchip PCIe EP driver
+  2ca25bd7472f dt-bindings: PCI: rockchip: Rename rockchip-pcie.txt to rockchip-pcie-host.txt
+
+On Wed, Sep 05, 2018 at 11:32:10AM +0900, Kunihiko Hayashi wrote:
+> Add DT bindings for PCIe controller implemented in UniPhier SoCs when
+> configured in Root Complex (host) mode. This controller is based on
+> the Designware PCIe Core.
+
+s/Designware/DesignWare/
+s/Core/core/
+
 > 
-> 
-> Add DT binding documentation for the Pixel Pipeline (PXP) found on
-> various NXP i.MX SoCs.
-> 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Reviewed-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
 > ---
->  .../devicetree/bindings/media/fsl-pxp.txt     | 26 +++++++++++++++++++
->  1 file changed, 26 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/fsl-pxp.txt
+>  .../devicetree/bindings/pci/uniphier-pcie.txt      | 78 ++++++++++++++++++++++
+>  1 file changed, 78 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/uniphier-pcie.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/media/fsl-pxp.txt b/Documentation/devicetree/bindings/media/fsl-pxp.txt
+> diff --git a/Documentation/devicetree/bindings/pci/uniphier-pcie.txt b/Documentation/devicetree/bindings/pci/uniphier-pcie.txt
 > new file mode 100644
-> index 000000000000..2477e7f87381
+> index 0000000..ea63f78
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/fsl-pxp.txt
-> @@ -0,0 +1,26 @@
-> +Freescale Pixel Pipeline
-> +========================
-> +
-> +The Pixel Pipeline (PXP) is a memory-to-memory graphics processing engine
-> +that supports scaling, colorspace conversion, alpha blending, rotation, and
-> +pixel conversion via lookup table. Different versions are present on various
-> +i.MX SoCs from i.MX23 to i.MX7.
-> +
-> +Required properties:
-> +- compatible: should be "fsl,<soc>-pxp", where SoC can be one of imx23, imx28,
-> +  imx6dl, imx6sl, imx6ul, imx6sx, imx6ull, or imx7d.
+> +++ b/Documentation/devicetree/bindings/pci/uniphier-pcie.txt
+> @@ -0,0 +1,78 @@
+> +Socionext UniPhier PCI-express host controller bindings
 
-please correct me if i'm wrong, but the driver in patch #3 only support imx6ull so this binding is misleading. As a user i would expect that binding and driver are in sync.
+s/PCI-express/PCIe/ (also in other occurrences below)
 
-Regards
-Stefan
+> +
+> +This describes the devicetree bindings for PCI-express host controller
+> +implemented on Socionext UniPhier SoCs.
+> +
+> +UniPhier PCI-express host controller is based on the Synopsys DesignWare
+> +PCI core. It shares common functions with the PCIe DesignWare core driver
+> +and inherits common properties defined in
+> +Documentation/devicetree/bindings/pci/designware-pcie.txt.
