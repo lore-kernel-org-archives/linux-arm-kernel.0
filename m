@@ -1,36 +1,30 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed,  5 Sep 2018 15:18:48 -0300
-Subject: [PATCH] ARM: dts: imx6ul: Enable the PMU node
-Message-ID: <1536171528-23005-1-git-send-email-festevam@gmail.com>
+From: jacob.jun.pan@linux.intel.com (Jacob Pan)
+Date: Wed, 5 Sep 2018 11:18:35 -0700
+Subject: [PATCH v2 03/40] iommu/sva: Manage process address spaces
+In-Reply-To: <d785ec89-6743-d0f1-1a7f-85599a033e5b@redhat.com>
+References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
+ <20180511190641.23008-4-jean-philippe.brucker@arm.com>
+ <d785ec89-6743-d0f1-1a7f-85599a033e5b@redhat.com>
+Message-ID: <20180905111835.7f3ae40e@jacob-builder>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+On Wed, 5 Sep 2018 14:14:12 +0200
+Auger Eric <eric.auger@redhat.com> wrote:
 
-There is no need to keep the PMU disabled.
-
-Enable it like it is done in the other i.MX dtsi files.
-
-With this change applied we see:
-
-[    1.338866] hw perfevents: enabled with armv7_cortex_a7 PMU driver, 5 counters available
-
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx6ul.dtsi | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index 448d765..2a770d0 100644
---- a/arch/arm/boot/dts/imx6ul.dtsi
-+++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -156,7 +156,6 @@
- 		compatible = "arm,cortex-a7-pmu";
- 		interrupt-parent = <&gpc>;
- 		interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
--		status = "disabled";
- 	};
- 
- 	soc {
--- 
-2.7.4
+> > + *
+> > + * On Arm and AMD IOMMUs, entry 0 of the PASID table can be used
+> > to hold
+> > + * non-PASID translations. In this case PASID 0 is reserved and
+> > entry 0 points
+> > + * to the io_pgtable base. On Intel IOMMU, the io_pgtable base
+> > would be held in
+> > + * the device table and PASID 0 would be available to the
+> > allocator.
+> > + */  
+> very nice explanation
+With the new Vt-d 3.0 spec., 2nd level IO page table base is no longer
+held in the device context table. Instead it is held in the PASID table
+entry pointed by the RID_PASID field in the device context entry. If
+RID_PASID = 0, then it is the same as ARM and AMD IOMMUs.
+You can refer to ch3.4.3 of the VT-d spec.
