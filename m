@@ -1,54 +1,69 @@
-From: anuragku@xilinx.com (Anurag Kumar Vulisha)
-Date: Wed, 5 Sep 2018 09:32:23 +0000
-Subject: [PATCH v2 2/2] phy: zynqmp: Add dt bindings for ZynqMP phy
-In-Reply-To: <2831a270-a4d1-ba51-e13f-85c029bbe8c0@codeaurora.org>
-References: <1535976844-12494-1-git-send-email-anurag.kumar.vulisha@xilinx.com>
- <1535976844-12494-3-git-send-email-anurag.kumar.vulisha@xilinx.com>
- <2831a270-a4d1-ba51-e13f-85c029bbe8c0@codeaurora.org>
-Message-ID: <BN3PR0201MB0993F5B9CAAFB3DF83A200B6A7020@BN3PR0201MB0993.namprd02.prod.outlook.com>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Wed, 5 Sep 2018 14:52:21 +0530
+Subject: [PATCH 0/5] Qcom smmu-500 TLB invalidation errata for sdm845
+In-Reply-To: <ad4e9f85-ff57-ad26-fb25-7b4c08683a52@codeaurora.org>
+References: <20180814105528.20592-1-vivek.gautam@codeaurora.org>
+ <20180814114009.GF28664@arm.com>
+ <ad4e9f85-ff57-ad26-fb25-7b4c08683a52@codeaurora.org>
+Message-ID: <3f74124c-b09f-a92d-117d-a747d33a4561@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vivek,
 
->> +Phy provider node
->> +=================
->> +
->> +Required properties:
->> +- compatible	: Can be "xlnx,zynqmp-psgtr-v1.1" or "xlnx,zynqmp-psgtr"
->> +		  "xlnx,zynqmp-psgtr-v1.1" has "xlnx,tx_termination_fix" removed
->This is not very clear. You can rather mention this statement for the property.
->e.g. In "xlnx,tx_termination_fix" you can write - this is not required for "xlnx,zynqmp-
->psgtr-v1.1.
+On 8/14/2018 5:54 PM, Vivek Gautam wrote:
+> Hi Will,
 >
+>
+> On 8/14/2018 5:10 PM, Will Deacon wrote:
+>> Hi Vivek,
+>>
+>> On Tue, Aug 14, 2018 at 04:25:23PM +0530, Vivek Gautam wrote:
+>>> Qcom's implementation of arm,mmu-500 on sdm845 has a 
+>>> functional/performance
+>>> errata [1] because of which the TCU cache look ups are stalled during
+>>> invalidation cycle. This is mitigated by serializing all the 
+>>> invalidation
+>>> requests coming to the smmu.
+>> How does this implementation differ from the one supported by 
+>> qcom_iommu.c?
+>> I notice you're adding firmware hooks here, which we avoided by 
+>> having the
+>> extra driver. Please help me understand which devices exist, how they
+>> differ, and which drivers are intended to support them!
+>
+> IIRC, the qcom_iommu driver was intended to support the static context 
+> bank - SID
+> mapping, and is very specific to the smmu-v2 version present on 
+> msm8916 soc.
+> However, this is the qcom's mmu-500 implementation specific errata. 
+> qcom_iommu
+> will not be able to support mmu-500 configurations.
+> Rob Clark can add more.
+> Let you know what you suggest.
 
-Thanks for spending your time in reviewing this patch,  will correct this in the
-next series of patch.
- 
->> +
->> +- reg           : Address and length of register sets for each device in
->> +                  "reg-names"
->> +
->> +- reg-names     : The names of the register addresses corresponding to the
->> +
->> +lane1:
->> +- #phy-cells	: Should be 4
->> +
->> +lane2:
->> +- #phy-cells	: Should be 4
->> +
->> +lane3:
->> +- #phy-cells	: Should be 4
->> +
->> +Example:
->> +	serdes: zynqmp_phy at fd400000 {
->
->phy is not just the serdes. Also s/zynqmp_phy/phy
->
->This could be:
-> ??????????????????? zynqmp_phy: phy at fd400000
->
-Thanks for correcting, will fix this in next series of this patch
+Rob, can you please comment about how qcom-smmu driver has different 
+implementation
+from arm-smmu driver?
+Will, in case we would want to use arm-smmu driver, what would you 
+suggest for
+having the firmware hooks?
+Thanks.
 
-Best Regards,
-Anurag Kumar Vulisha
+Best regards
+Vivek
+>
+>>
+>> Also -- you didn't CC all the maintainers for the firmware bits, so 
+>> adding
+>> Andy here for that, and Rob for the previous question.
+>
+> I added Andy to the series, would you want me to add Rob H also?
+>
+> Best regards
+> Vivek
+>
+>>
+>> Thanks,
+>>
+>> Will
+>
