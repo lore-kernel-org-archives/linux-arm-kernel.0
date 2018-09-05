@@ -1,142 +1,27 @@
-From: daniel@zonque.org (Daniel Mack)
-Date: Wed, 5 Sep 2018 11:37:41 +0200
-Subject: [PATCH] spi: Do not print a message if
- spi_controller_{suspend,resume}() fails
-In-Reply-To: <20180905085157.7807-1-geert+renesas@glider.be>
-References: <20180905085157.7807-1-geert+renesas@glider.be>
-Message-ID: <e07ddaed-1e8a-af59-c28d-46fa9dd08b0a@zonque.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 5 Sep 2018 11:40:49 +0200
+Subject: [PATCH] arm64: defconfig: enable EFI_ARMSTUB_DTB_LOADER
+In-Reply-To: <bf917897-1697-a6c4-7f77-8dfa74dddc8a@broadcom.com>
+References: <1535563287-24803-1-git-send-email-scott.branden@broadcom.com>
+ <CAOesGMhjcJ1p3QcEYb9fsx3fMXAOsgR2njOq=VKgEbWGwJi36g@mail.gmail.com>
+ <fb07b89d-d427-5e59-9f17-b12df26284ec@broadcom.com>
+ <CAKv+Gu-R7eX=aj=O2-gpzmp0K4t0T4s536UiqJZs0WuxRjkYwQ@mail.gmail.com>
+ <CAOesGMho8CfT7iDXadmkB5=7DoOi6n8qXcS9X643vf+Y0BbD6w@mail.gmail.com>
+ <CAKv+Gu_mKU+RdPgg2Dfezy4-L+KDEEBx02R49ObomRhEkJJ6Mw@mail.gmail.com>
+ <CAOesGMgLHx3+j1bWEsMWsN-yjGNZyLOpAjLg0Jut8gG=ADE25g@mail.gmail.com>
+ <CAKv+Gu_x=bS4xJcD_LuEnnN=Lx4Jc87uK8J_ACdA9EeUqtM3Yg@mail.gmail.com>
+ <CACxGe6uK+N5XUqZhH7gAQXoq+QXMvFPHF_i4WqivrufTU=0cog@mail.gmail.com>
+ <bf917897-1697-a6c4-7f77-8dfa74dddc8a@broadcom.com>
+Message-ID: <CAKv+Gu8FK9K0G-GJygdpkwqKYzjvpDDj8TyGTC2u0SRxK3ez_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, September 05, 2018 10:51 AM, Geert Uytterhoeven wrote:
-> spi_controller_{suspend,resume}() already prints an error message on
-> failure, so there is no need to repeat this in individual drivers.
-> 
-> Note: spi_master_{suspend,resume}() is an alias for
->        spi_controller_{suspend,resume}().
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+On 4 September 2018 at 19:19, Scott Branden <scott.branden@broadcom.com> wrote:
+>
+> Rather than introduce EFI_ARMSTUB_DTB_LOADER, why not have
+> the efistub use CONFIG_OF to determine whether it supports dtb= or not?
+>
+> That way ACPI-only distros disable devicetree support entirely.
+>
 
-For PXA:
-
-Reviewed-by: Daniel Mack <daniel@zonque.org>
-
-> ---
->   drivers/spi/spi-atmel.c    | 10 ++--------
->   drivers/spi/spi-dw.c       |  7 +------
->   drivers/spi/spi-fsl-espi.c |  4 +---
->   drivers/spi/spi-pl022.c    |  8 ++------
->   drivers/spi/spi-pxa2xx.c   |  8 +-------
->   5 files changed, 7 insertions(+), 30 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-> index 3f890d16293411ba..74fddcd3282b4bea 100644
-> --- a/drivers/spi/spi-atmel.c
-> +++ b/drivers/spi/spi-atmel.c
-> @@ -1767,10 +1767,8 @@ static int atmel_spi_suspend(struct device *dev)
->   
->   	/* Stop the queue running */
->   	ret = spi_master_suspend(master);
-> -	if (ret) {
-> -		dev_warn(dev, "cannot suspend master\n");
-> +	if (ret)
->   		return ret;
-> -	}
->   
->   	if (!pm_runtime_suspended(dev))
->   		atmel_spi_runtime_suspend(dev);
-> @@ -1799,11 +1797,7 @@ static int atmel_spi_resume(struct device *dev)
->   	}
->   
->   	/* Start the queue running */
-> -	ret = spi_master_resume(master);
-> -	if (ret)
-> -		dev_err(dev, "problem starting queue (%d)\n", ret);
-> -
-> -	return ret;
-> +	return spi_master_resume(master);
->   }
->   #endif
->   
-> diff --git a/drivers/spi/spi-dw.c b/drivers/spi/spi-dw.c
-> index ac2eb89ef7a5a061..1736612ee86be7dd 100644
-> --- a/drivers/spi/spi-dw.c
-> +++ b/drivers/spi/spi-dw.c
-> @@ -572,13 +572,8 @@ EXPORT_SYMBOL_GPL(dw_spi_suspend_host);
->   
->   int dw_spi_resume_host(struct dw_spi *dws)
->   {
-> -	int ret;
-> -
->   	spi_hw_init(&dws->master->dev, dws);
-> -	ret = spi_controller_resume(dws->master);
-> -	if (ret)
-> -		dev_err(&dws->master->dev, "fail to start queue (%d)\n", ret);
-> -	return ret;
-> +	return spi_controller_resume(dws->master);
->   }
->   EXPORT_SYMBOL_GPL(dw_spi_resume_host);
->   
-> diff --git a/drivers/spi/spi-fsl-espi.c b/drivers/spi/spi-fsl-espi.c
-> index 1e8ff6256079f134..cf2118dc91f44548 100644
-> --- a/drivers/spi/spi-fsl-espi.c
-> +++ b/drivers/spi/spi-fsl-espi.c
-> @@ -798,10 +798,8 @@ static int of_fsl_espi_suspend(struct device *dev)
->   	int ret;
->   
->   	ret = spi_master_suspend(master);
-> -	if (ret) {
-> -		dev_warn(dev, "cannot suspend master\n");
-> +	if (ret)
->   		return ret;
-> -	}
->   
->   	return pm_runtime_force_suspend(dev);
->   }
-> diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-> index 1af8c96b940e203d..5f5f197b153c3ec4 100644
-> --- a/drivers/spi/spi-pl022.c
-> +++ b/drivers/spi/spi-pl022.c
-> @@ -2325,10 +2325,8 @@ static int pl022_suspend(struct device *dev)
->   	int ret;
->   
->   	ret = spi_master_suspend(pl022->master);
-> -	if (ret) {
-> -		dev_warn(dev, "cannot suspend master\n");
-> +	if (ret)
->   		return ret;
-> -	}
->   
->   	ret = pm_runtime_force_suspend(dev);
->   	if (ret) {
-> @@ -2353,9 +2351,7 @@ static int pl022_resume(struct device *dev)
->   
->   	/* Start the queue running */
->   	ret = spi_master_resume(pl022->master);
-> -	if (ret)
-> -		dev_err(dev, "problem starting queue (%d)\n", ret);
-> -	else
-> +	if (!ret)
->   		dev_dbg(dev, "resumed\n");
->   
->   	return ret;
-> diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
-> index 14f4ea59caff7a23..e3cbc66a7061b42f 100644
-> --- a/drivers/spi/spi-pxa2xx.c
-> +++ b/drivers/spi/spi-pxa2xx.c
-> @@ -1808,13 +1808,7 @@ static int pxa2xx_spi_resume(struct device *dev)
->   		lpss_ssp_setup(drv_data);
->   
->   	/* Start the queue running */
-> -	status = spi_controller_resume(drv_data->master);
-> -	if (status != 0) {
-> -		dev_err(dev, "problem starting queue (%d)\n", status);
-> -		return status;
-> -	}
-> -
-> -	return 0;
-> +	return spi_controller_resume(drv_data->master);
->   }
->   #endif
->   
-> 
+Unfortunately, CONFIG_OF cannot be disabled on arm64 even on ACPI-only builds.
