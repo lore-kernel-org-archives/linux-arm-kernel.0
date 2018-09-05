@@ -1,42 +1,40 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  5 Sep 2018 15:34:41 +0100
-Subject: [RESEND PATCH 0/2] Don't use SIGMINSTKSZ when enforcing alternative
- signal stack size for compat tasks
-Message-ID: <1536158083-30166-1-git-send-email-will.deacon@arm.com>
+Date: Wed,  5 Sep 2018 15:34:43 +0100
+Subject: [RESEND PATCH 2/2] arm64: compat: Provide definition for
+ COMPAT_SIGMINSTKSZ
+In-Reply-To: <1536158083-30166-1-git-send-email-will.deacon@arm.com>
+References: <1536158083-30166-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1536158083-30166-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+arch/arm/ defines a SIGMINSTKSZ of 2k, so we should use the same value
+for compat tasks.
 
-This is a resend of:
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Dominik Brodowski <linux@dominikbrodowski.net>
+Cc: "Eric W. Biederman" <ebiederm@xmission.com>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Al Viro <viro@zeniv.linux.org.uk>
+Cc: Oleg Nesterov <oleg@redhat.com>
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+Reported-by: Steve McIntyre <steve.mcintyre@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/compat.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2018-July/593559.html
-
-now based on 4.19-rc2.
-
-The Debian folks have observed a failure in the 32-bit arm glibc testsuite
-when running under a 64-bit kernel. They tracked this down to sigaltstack(2)
-enforcing the alternative signal stack to be at least SIGMINSTKSZ bytes,
-which is higher for native arm64 tasks than compat 32-bit tasks.
-
-These patches resolve the issue by allowing an architecture to define
-COMPAT_SIGMINSTKSZ for compat tasks, which is then used by the sigaltstack
-checking code.
-
-Feedback welcome,
-
-Will
-
---->8
-
-Will Deacon (2):
-  signal: Introduce COMPAT_SIGMINSTKSZ for use in compat_sys_sigaltstack
-  arm64: compat: Provide definition for COMPAT_SIGMINSTKSZ
-
- arch/arm64/include/asm/compat.h |  1 +
- include/linux/compat.h          |  3 +++
- kernel/signal.c                 | 14 +++++++++-----
- 3 files changed, 13 insertions(+), 5 deletions(-)
-
+diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
+index 1a037b94eba1..cee28a05ee98 100644
+--- a/arch/arm64/include/asm/compat.h
++++ b/arch/arm64/include/asm/compat.h
+@@ -159,6 +159,7 @@ static inline compat_uptr_t ptr_to_compat(void __user *uptr)
+ }
+ 
+ #define compat_user_stack_pointer() (user_stack_pointer(task_pt_regs(current)))
++#define COMPAT_MINSIGSTKSZ	2048
+ 
+ static inline void __user *arch_compat_alloc_user_space(long len)
+ {
 -- 
 2.1.4
