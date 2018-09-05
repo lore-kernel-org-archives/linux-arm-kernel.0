@@ -1,150 +1,135 @@
-From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Wed, 5 Sep 2018 14:29:09 +0530
-Subject: [PATCH v2 2/2] phy: zynqmp: Add dt bindings for ZynqMP phy
-In-Reply-To: <1535976844-12494-3-git-send-email-anurag.kumar.vulisha@xilinx.com>
-References: <1535976844-12494-1-git-send-email-anurag.kumar.vulisha@xilinx.com>
- <1535976844-12494-3-git-send-email-anurag.kumar.vulisha@xilinx.com>
-Message-ID: <2831a270-a4d1-ba51-e13f-85c029bbe8c0@codeaurora.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 5 Sep 2018 11:05:34 +0200
+Subject: [PATCH 3/4] bus: Add DT bindings for 96Boards low speed connector
+In-Reply-To: <CAL_JsqK2tdGHkeJ0OceLbBiki7VUqKrstDSiB7KRpZ-FExHtQw@mail.gmail.com>
+References: <20180823103332.32047-1-linus.walleij@linaro.org>
+ <20180823103332.32047-4-linus.walleij@linaro.org>
+ <CAL_JsqK2tdGHkeJ0OceLbBiki7VUqKrstDSiB7KRpZ-FExHtQw@mail.gmail.com>
+Message-ID: <CACRpkdZ5jYTvNeHNDf3oJaGxgP8kie-uQu1=8FYyEDLeMquEnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 9/3/2018 5:44 PM, Anurag Kumar Vulisha wrote:
-> This patch adds the document describing dt bindings for ZynqMP
-> phy. ZynqMP SOC has a High Speed Processing System Gigabit
-> Transceiver which provides PHY capabilties to USB, SATA,
-> PCIE, Display Port and Ehernet SGMII controllers.
+On Thu, Aug 23, 2018 at 3:46 PM Rob Herring <robh+dt@kernel.org> wrote:
+> On Thu, Aug 23, 2018 at 5:33 AM Linus Walleij <linus.walleij@linaro.org> wrote:
+> >
+> > We need to be able to grab resources on a 96Boards low
+> > speed connector to populate and use a daughterboard, so
+> > define some very rudimentary properties simply passing
+> > phandles for the resources used on the low speed
+> > connector.
 >
-> Signed-off-by: Anurag Kumar Vulisha <anurag.kumar.vulisha@xilinx.com>
-> ---
->   changes in v2:
-> 	1. None
-> ---
->   .../devicetree/bindings/phy/phy-zynqmp.txt         | 104 +++++++++++++++++++++
->   1 file changed, 104 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/phy/phy-zynqmp.txt
+> This only works for describing what's on the connector, but does
+> nothing for describing downstream devices on the connector. We already
+> have a way to do the former with label properties at least for uart,
+> i2c and spi. And gpio has it's own method of labeling lines.
+
+This is on purpose as the downstream daughterboards are
+described by C code rather than DT. The idea is to use the same
+for ACPI rather than DSDT.
+
+> > +lscon: connector {
+> > +       compatible = "96boards,low-speed-connector";
+> > +       i2c0 = <&i2csw_0>;
+> > +       i2c1 = <&i2csw_1>;
+> > +       spi = <&spi0>;
 >
-> diff --git a/Documentation/devicetree/bindings/phy/phy-zynqmp.txt b/Documentation/devicetree/bindings/phy/phy-zynqmp.txt
-> new file mode 100644
-> index 0000000..2eed553
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/phy/phy-zynqmp.txt
-> @@ -0,0 +1,104 @@
-> +Xilinx ZynqMP PHY binding
-> +
-> +This binding describes a ZynqMP PHY device that is used to control ZynqMP
-> +High Speed Gigabit Transceiver(GT). ZynqMP PS GTR provides four lanes
-> +and are used by USB, SATA, PCIE, Display port and Ethernet SGMMI controllers.
-> +
-> +Phy provider node
-> +=================
-> +
-> +Required properties:
-> +- compatible	: Can be "xlnx,zynqmp-psgtr-v1.1" or "xlnx,zynqmp-psgtr"
-> +		  "xlnx,zynqmp-psgtr-v1.1" has "xlnx,tx_termination_fix" removed
-This is not very clear. You can rather mention this statement for the 
-property.
-e.g. In "xlnx,tx_termination_fix" you can write - this is not required 
-for "xlnx,zynqmp-psgtr-v1.1.
+> David G has suggested using aliases (in this node, not top-level) for
+> this purpose of mapping things like spi and i2c, and I think that's a
+> good use of aliases (versus spi and i2c aliases at the top level which
+> I don't). The hard part is still how to structure the child devices.
 
-> +
-> +- reg           : Address and length of register sets for each device in
-> +                  "reg-names"
-> +
-> +- reg-names     : The names of the register addresses corresponding to the
-> +		  registers filled in "reg":
-> +			- serdes: SERDES block register set
-> +			- siou: SIOU block register set
-> +
-> +Optional properties:
-> +- xlnx,tx_termination_fix : Include this for fixing functional issue with the
-> +		  TX termination resistance in GT, which can be out of spec for
-> +		  the XCZU9EG silicon version.
-> +
-> +Required nodes	:  A sub-node is required for each lane the controller
-> +		   provides.
-> +
-> +Phy sub-nodes
-> +=============
-> +
-> +Required properties:
-> +lane0:
-> +- #phy-cells	: Should be 4
-> +
-> +lane1:
-> +- #phy-cells	: Should be 4
-> +
-> +lane2:
-> +- #phy-cells	: Should be 4
-> +
-> +lane3:
-> +- #phy-cells	: Should be 4
-> +
-> +Example:
-> +	serdes: zynqmp_phy at fd400000 {
+Sorry, I am just too ignorant about the semantic difference between
+a phandle and an alias. As long as I can follow it to get a handle on
+the device node I'm happy, aliases are fine I guess.
 
-phy is not just the serdes. Also s/zynqmp_phy/phy
+The specification says:
 
-This could be:
- ??????????????????? zynqmp_phy: phy at fd400000
+"The phandle property specifies a numerical identifier for a node that
+is unique within the devicetree. The phandle property value is used by
+other nodes that need to refer to the node associated with the
+property."
 
-regards
-Vivek
-> +		compatible = "xlnx,zynqmp-psgtr-v1.1";
-> +		status = "okay";
-> +		reg = <0x0 0xfd400000 0x0 0x40000>, <0x0 0xfd3d0000 0x0 0x1000>;
-> +		reg-names = "serdes", "siou";
-> +
-> +		lane0: lane at 0 {
-> +			#phy-cells = <4>;
-> +		};
-> +		lane1: lane at 1 {
-> +			#phy-cells = <4>;
-> +		};
-> +		lane2: lane at 2 {
-> +			#phy-cells = <4>;
-> +		};
-> +		lane3: lane at 3 {
-> +			#phy-cells = <4>;
-> +		};
-> +	};
-> +
-> +Specifying phy control of devices
-> +=================================
-> +
-> +Device nodes should specify the configuration required in their "phys"
-> +property, containing a phandle to the phy port node and a device type.
-> +
-> +phys = <PHANDLE CONTROLLER_TYPE CONTROLLER_INSTANCE LANE_NUM LANE_FREQ>;
-> +
-> +PHANDLE                 = &lane0 or &lane1 or &lane2 or &lane3
-> +CONTROLLER_TYPE         = PHY_TYPE_PCIE or PHY_TYPE_SATA or PHY_TYPE_USB
-> +			  or PHY_TYPE_DP or PHY_TYPE_SGMII
-> +CONTROLLER_INSTANCE     = Depends on controller type used, can be any of
-> +				PHY_TYPE_PCIE : 0 or 1 or 2 or 3
-> +				PHY_TYPE_SATA : 0 or 1
-> +				PHY_TYPE_USB  : 0 or 1
-> +				PHY_TYPE_DP   : 0 or 1
-> +				PHY_TYPE_SGMII: 0 or 1 or 2 or 3
-> +LANE_NUM                = Depends on which lane clock is used as ref clk, can be
-> +			  0 or 1 or 2 or 3
-> +LANE_FREQ               = Frequency that controller can operate, can be any of
-> +			  19.2Mhz,20Mhz,24Mhz,26Mhz,27Mhz,28.4Mhz,40Mhz,52Mhz,
-> +			  100Mhz,108Mhz,125Mhz,135Mhz,150Mhz
-> +
-> +Example:
-> +
-> +#include <dt-bindings/phy/phy.h>
-> +
-> +	usb at fe200000 {
-> +		...
-> +		phys	  = <&lane2 PHY_TYPE_USB3 0 2 2600000>;
-> +		...
-> +	};
-> +
-> +	ahci at fd0c0000 {
-> +		...
-> +		phys	  = <&lane3 PHY_TYPE_SATA 1 1 125000000>;
-> +		...
-> +	};
+Numerical? Hm.
+
+The aliases are very vague and seem to not be really specified.
+Not in the DT spec at least. And that is not in line with how the
+Linux kernel DTs uses aliases anyway, it seems.
+
+Syntactically they look like so:
+
+aliases {
+        serial0 = &uart1;
+};
+
+phandles {
+        serial0 = <&uart1>;
+};
+
+Not a big difference.
+
+In your opinion, what constitues the semantic meaning of an alias
+vs a phandle?
+
+> > +       gpios = <&gpio 36 0>, /* GPIO-A */
+>
+> We defined 'gpio-map' specifically for handling GPIOs thru connectors.
+> It's in the DT spec (though not a released version yet). Use it here.
+
+We have code for it (by Stephen Boyd) which works and I tested
+it even, it works fine!
+
+But it is not intended for what I do here. It shares the ambition to
+define all devices in the daughterboard using DT, so there must
+be a consuming node, on the daughterboard, using
+my-gpios = <&connector 0>; and we are back
+at overlays. There is no way for a connector driver to
+grab a GPIO from the GPIO map, the map is just a
+cross-reference, not resource provider.
+
+Maybe I could let the connector say that it's using
+GPIOs from itself? I can take a stab at that. It will look weird
+but it's allright I guess.
+
+> Sorry, but the only halfway solution
+> I'm going to accept is one which
+> can evolve into a full solution. Define the basic structure and add
+> each interface one by one.
+>
+> Maybe that starts with just:
+>
+> lscon: connector {
+>        compatible = "96boards,low-speed-connector";
+> };
+
+I suspect "full solution" in the above paragraph means full
+DT overlays, and ACPI systems are none of your concern
+in this context?
+
+A halfway solution is what I am trying to do, because the
+walking all the way down the road means we run into the
+imperialistic ambitions of both DT and ACPI DSDT to describe
+the whole system using just DT or just ACPI DSDT.
+
+As mentioned, we have today the developer box that is
+using ACPI, and the other 96Boards using mostly DT.
+
+Which currently means similar support code twice
+for these (simple) mezzanines, then author and support
+overlays in both HW description languages.
+
+Like with the fwnode rework that is going on in parallel, in
+my view it is really necessary for both DT and ACPI to take
+a step back and stop being so imperialistic. It seems they
+are both living under the assumption that they do not really
+need to care about the other HW description language, and
+it is stifling development. Maybe this view is too harsh, I am
+sometimes also just thinking inside my little box :(
+
+My current plan is to develop the code in the patch set using
+fwnode where possible so that I have a proof of concept of
+the same mezzanine population code being used for DT and
+ACPI alike. It works for GPIOs, but phandles or aliases are
+going to be a challenge.
+
+Yours,
+Linus Walleij
