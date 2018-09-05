@@ -1,86 +1,79 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Wed, 5 Sep 2018 17:03:21 +0200
-Subject: [PULL 2/4] arm64: KVM: Only force FPEXC32_EL2.EN if trapping
- FPSIMD
-In-Reply-To: <20180905112846.GC17801@e103592.cambridge.arm.com>
-References: <20180903134516.17796-1-christoffer.dall@arm.com>
- <20180903134516.17796-3-christoffer.dall@arm.com>
- <20180904113952.GB17801@e103592.cambridge.arm.com>
- <20180904125121.GO4029@e113682-lin.lund.arm.com>
- <20180905112846.GC17801@e103592.cambridge.arm.com>
-Message-ID: <20180905150321.GT4029@e113682-lin.lund.arm.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 6 Sep 2018 01:05:34 +1000
+Subject: [PATCH v9 0/8] Introduce on-chip interconnect API
+In-Reply-To: <fe9f3e91-93f9-d7d5-1643-dc09543e2850@linaro.org>
+References: <20180831140151.13972-1-georgi.djakov@linaro.org>
+ <CAHLCerNd0hrLKgbni95_RSYOtsNufMCVtHbAKa4W+eo8H2cL2A@mail.gmail.com>
+ <20180905093620.6d9162ca@canb.auug.org.au>
+ <fe9f3e91-93f9-d7d5-1643-dc09543e2850@linaro.org>
+Message-ID: <20180906010534.329d0fca@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2018 at 12:28:46PM +0100, Dave Martin wrote:
-> On Tue, Sep 04, 2018 at 02:51:21PM +0200, Christoffer Dall wrote:
-> > On Tue, Sep 04, 2018 at 12:39:54PM +0100, Dave Martin wrote:
-> > > On Mon, Sep 03, 2018 at 03:45:14PM +0200, Christoffer Dall wrote:
-> > > > From: Marc Zyngier <marc.zyngier@arm.com>
-> > > > 
-> > > > If trapping FPSIMD in the context of an AArch32 guest, it is critical
-> > > > to set FPEXC32_EL2.EN to 1 so that the trapping is taken to EL2 and
-> > > > not EL1.
-> > > > 
-> > > > Conversely, it is just as critical *not* to set FPEXC32_EL2.EN to 1
-> > > > if we're not going to trap FPSIMD, as we then corrupt the existing
-> > > > VFP state.
-> > > > 
-> > > > Moving the call to __activate_traps_fpsimd32 to the point where we
-> > > > know for sure that we are going to trap ensures that we don't set that
-> > > > bit spuriously.
-> > > 
-> > > 
-> > > Hmmm, this looks like a viable fix but actually the way the code is
-> > > structured is a bit confusing here.
-> > > 
-> > > It looks like some unnecessary functionality has been inherited from
-> > > arch/arm here: for a 32-bit host, FPEXC controls FPSIMD trapping even
-> > > at Hyp, so we need to handle it specially in order for the Hyp FPSIMD
-> > > context switching code to run without generating additional traps.
-> > > 
-> > > For a 64-bit host, this doesn't apply: FPEXC32_EL2 is just guest
-> > > context and doesn't affect EL2 execution.
-> > 
-> > Hmm, is that really true?  Earlier versions of the Armv8 Arm ARM, for
-> > the description of CPTR_EL2.TFP:
-> > 
-> >   This causes instructions that access the registers associated with
-> >   Floating Point and Advanced SIMD execution to trap to EL2 when
-> >   executed from EL0, EL1, or EL2, unless trapped to EL1.
-> > 
-> > In the current version I think you can arrive at the same conclusion by
-> > looking at the FPEXC_EL2.EN description which tells you that if EN==0,
-> > then the instruction is UNDEFINED, and the Synchronous exception
-> > prioritization rules specify that undefined instructions are taken
-> > before trapped intructions because of CPTR_EL2.
-> > 
-> > But there does seem to be some inconsistency with the description of
-> > generally trapping floating point access to EL2.
-> 
-> You can try taking a look at the archietctural pseudocode -- see the
-> CheckFPAdvSIMDEnabled64() (for AArch64) and CheckFPAdvSIMDEnabled() (for
-> AArch32) function hierarchies on developer.arm.com.
-> 
-> ARM DDI 0487B.b says for FPEXC32_EL2:
-> 
-> "Purpose:  Allows access to the AArch32 register FPEXC from AArch64
-> state only. Its value has no effect on execution in AArch64 state."
-> 
-> This could arguably be worded better, but the second sentence is
-> pretty unequivocal.
-> 
+Hi Georgi,
 
-I think I was confused about your point.  I thought you were arguing
-that CPTR_EL2.TFP==1 + FPEXC_EL2.EN==0, and running in AArch32 EL1+EL0,
-and accessing VFP at EL0 would trap to EL2, when in fact it traps to
-EL1.  But now I think you're arguing that EL2 is unaffected by
-FPEXC32_EL2, and I agree with that.
+On Wed, 5 Sep 2018 17:50:28 +0300 Georgi Djakov <georgi.djakov@linaro.org> wrote:
+>
+> On 09/05/2018 02:36 AM, Stephen Rothwell wrote:
+> > 
+> > On Tue, 4 Sep 2018 15:54:27 +0530 Amit Kucheria <amit.kucheria@linaro.org> wrote:  
+> >>
+> >> I'm currently reviewing this patchset (long overdue), but considering
+> >> that we haven't added any major new features to the framework for the
+> >> last couple of revisions, can you get this patchset merged into
+> >> linux-next to see how things shake out there? We've had this merged
+> >> branch merged into a CI build on kernelci for a while now w/o any
+> >> major incident so we should increase its exposure.
+> >>
+> >> You could ask Stephen Rothwell if he'll accept the a branch directly
+> >> from you or he needs an upstream maintainer (GregKH?) to carry it.  
+> > 
+> > Since it appears to have been well reviewed and tested, I can take it
+> > if you send me a git URL and the names of contacts in case of issues
+> > with the branch.  Once Greg has merged it, I will try to drop it again
+> > (unless you think there will be an ongoing reason to keep it in
+> > linux-next separately), but a prompting email would also be nice in
+> > case I forget.  
+> 
+> Thank you! Below is the git URL to pull from and you can use my e-mail
+> as contact for any issues.
+> 
+> git://git.linaro.org/people/georgi.djakov/linux.git#icc-next
+> 
+> I expect this to be a continuing effort with some upcoming users of this
+> API, so i plan to maintain this branch and occasionally put some
+> reviewed/tested patches to get wider integration testing. But let's see
+> what happens now.
+> 
+> In any case, if this increases your burden, feel free to drop it.
 
-However, given the above, I don't understand how we can let the guest be
-in control of FPEXC, if we want to make sure we trap VFP accesses?
+Added from (later) today.
 
-I'll comment on the other patch.
+Thanks for adding your subsystem tree as a participant of linux-next.  As
+you may know, this is not a judgement of your code.  The purpose of
+linux-next is for integration testing and to lower the impact of
+conflicts between subsystems in the next merge window. 
 
-Thanks,
-     Christoffer
+You will need to ensure that the patches/commits in your tree/series have
+been:
+     * submitted under GPL v2 (or later) and include the Contributor's
+        Signed-off-by,
+     * posted to the relevant mailing list,
+     * reviewed by you (or another maintainer of your subsystem tree),
+     * successfully unit tested, and 
+     * destined for the current or next Linux merge window.
+
+Basically, this should be just what you would send to Linus (or ask him
+to fetch).  It is allowed to be rebased if you deem it necessary.
+
+-- 
+Cheers,
+Stephen Rothwell 
+sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180906/ff91ad44/attachment.sig>
