@@ -1,56 +1,45 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Wed, 5 Sep 2018 20:30:28 +0100
-Subject: [PATCH] efi_stub: update documentation on dtb= parameter
-In-Reply-To: <20180905190750.4566-1-grant.likely@arm.com>
-References: <20180905190750.4566-1-grant.likely@arm.com>
-Message-ID: <20180905193028.4vhqtlwwgvqq6v26@bivouac.eciton.net>
+From: robh@kernel.org (Rob Herring)
+Date: Wed,  5 Sep 2018 14:37:20 -0500
+Subject: [PATCH 03/21] ARM: use for_each_of_cpu_node iterator
+In-Reply-To: <20180905193738.19325-1-robh@kernel.org>
+References: <20180905193738.19325-1-robh@kernel.org>
+Message-ID: <20180905193738.19325-4-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2018 at 08:07:50PM +0100, Grant Likely wrote:
-> The dtb= parameter is no longer the primary mechanism for providing a
-> devicetree to the kernel. Now either firmware or the boot selector (ex.
-> Grub) should provide the devicetree and dtb= should only be used for
-> debug or when using firmware that doesn't understand DT.
-> Update the EFI stub documentation to reflect the current usage.
-> 
-> Signed-off-by: Grant Likely <grant.likely@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Jonathan Corbet <corbet@lwn.net>
+Use the for_each_of_cpu_node iterator to iterate over cpu nodes. This
+has the side effect of defaulting to iterating using "cpu" node names in
+preference to the deprecated (for FDT) device_type == "cpu".
 
-Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Rob Herring <robh@kernel.org>
+---
+Please ack and I will take via the DT tree. This is dependent on the
+first 2 patches.
 
-> ---
->  Documentation/efi-stub.txt | 17 ++++++++++++++---
->  1 file changed, 14 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/efi-stub.txt b/Documentation/efi-stub.txt
-> index 41df801f9a50..833edb0d0bc4 100644
-> --- a/Documentation/efi-stub.txt
-> +++ b/Documentation/efi-stub.txt
-> @@ -83,7 +83,18 @@ is passed to bzImage.efi.
->  The "dtb=" option
->  -----------------
-> 
-> -For the ARM and arm64 architectures, we also need to be able to provide a
-> -device tree to the kernel. This is done with the "dtb=" command line option,
-> -and is processed in the same manner as the "initrd=" option that is
-> +For the ARM and arm64 architectures, a device tree must be provided to
-> +the kernel. Normally firmware shall supply the device tree via the
-> +EFI CONFIGURATION TABLE. However, the "dtb=" command line option can
-> +be used to override the firmware supplied device tree, or to supply
-> +one when firmware is unable to.
-> +
-> +Please note: Firmware adds runtime configuration information to the
-> +device tree before booting the kernel. If dtb= is used to override
-> +the device tree, then any runtime data provided by firmware will be
-> +lost. The dtb= option should only be used either as a debug tool, or
-> +as a last resort when a device tree is not provided in the EFI
-> +CONFIGURATION TABLE.
-> +
-> +"dtb=" is processed in the same manner as the "initrd=" option that is
->  described above.
-> --
-> 2.11.0
-> 
-> IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+ arch/arm/kernel/devtree.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index ecaa68dd1af5..13bcd3b867cb 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -87,14 +87,11 @@ void __init arm_dt_init_cpu_maps(void)
+ 	if (!cpus)
+ 		return;
+
+-	for_each_child_of_node(cpus, cpu) {
++	for_each_of_cpu_node(cpu) {
+ 		const __be32 *cell;
+ 		int prop_bytes;
+ 		u32 hwid;
+
+-		if (of_node_cmp(cpu->type, "cpu"))
+-			continue;
+-
+ 		pr_debug(" * %pOF...\n", cpu);
+ 		/*
+ 		 * A device tree containing CPU nodes with missing "reg"
+--
+2.17.1
