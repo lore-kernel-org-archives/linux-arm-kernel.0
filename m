@@ -1,106 +1,72 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  5 Sep 2018 15:34:42 +0100
-Subject: [RESEND PATCH 1/2] signal: Introduce COMPAT_SIGMINSTKSZ for use in
- compat_sys_sigaltstack
-In-Reply-To: <1536158083-30166-1-git-send-email-will.deacon@arm.com>
-References: <1536158083-30166-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1536158083-30166-2-git-send-email-will.deacon@arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 5 Sep 2018 16:39:32 +0200
+Subject: [PATCH 1/3] dt-bindings: change the A64 HDMI PHY binding to R40
+In-Reply-To: <1CE38B34-005F-4E49-B9B5-48EDFA56EFE5@aosc.io>
+References: <20180903133434.58188-1-icenowy@aosc.io>
+ <20180903133434.58188-2-icenowy@aosc.io>
+ <20180905071435.lgsogpzmh5nw6bcy@flea>
+ <3D28A45F-D67D-4388-9FB7-2A2763955398@aosc.io>
+ <20180905075601.32kzkd3is2gpa3ft@flea>
+ <1CE38B34-005F-4E49-B9B5-48EDFA56EFE5@aosc.io>
+Message-ID: <20180905143932.lbytjftmobjtzdsu@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sigaltstack(2) system call fails with -ENOMEM if the new alternative
-signal stack is found to be smaller than SIGMINSTKSZ. On architectures
-such as arm64, where the native value for SIGMINSTKSZ is larger than
-the compat value, this can result in an unexpected error being reported
-to a compat task. See, for example:
+On Wed, Sep 05, 2018 at 04:05:18PM +0800, Icenowy Zheng wrote:
+> 
+> 
+> ? 2018?9?5? GMT+08:00 ??3:56:01, Maxime Ripard <maxime.ripard@bootlin.com> ??:
+> >On Wed, Sep 05, 2018 at 03:46:41PM +0800, Icenowy Zheng wrote:
+> >> 
+> >> 
+> >> ? 2018?9?5? GMT+08:00 ??3:14:35, Maxime Ripard
+> ><maxime.ripard@bootlin.com> ??:
+> >> >On Mon, Sep 03, 2018 at 09:34:32PM +0800, Icenowy Zheng wrote:
+> >> >> By experiment, the A64 HDMi PHY doesn't support the PLL-VIDEO mux
+> >> >> introduced in R40, although it has two PLL-VIDEOs.
+> >> >> 
+> >> >> Change the A64 HDMI PHY binding to R40 one.
+> >> >> 
+> >> >> This binding is introduced in v4.19, which is still in RC stage,
+> >so
+> >> >we
+> >> >> have change to fix it.
+> >> >> 
+> >> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> >> >
+> >> >That doesn't make much sense. The A64 doesn't have any particular
+> >> >reason to behave like the R40, and the R40 can definitely use a
+> >> >different compatible if it has a different behaviour. But I don't
+> >see
+> >> >*why* the A64 not behaving like the R40 is a justification to remove
+> >> >the A64 compatible. Especially when the R40 was released later.
+> >> >
+> >> >Add a new compatible, and leave the A64 compatible alone.
+> >> 
+> >> But the behavior of A64 compatible will change from double
+> >> PLL to single PLL, because the A64 HDMI PHY is proven
+> >> to have no double PLL.
+> >> 
+> >> Should I then change the A64 compatible behavior and import R40
+> >> compatible at the same time?
+> >
+> >I don't see why you should do both at the same time. Fix the A64, and
+> >add the support for the R40, those are two orthogonal changes.
+> 
+> Then how to deal with double PLL support? Make them temporarily
+> dead during 4.19?
 
-  https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=904385
+Well, if the PHY doesn't use two PLL, don't use it, ever. Why does it
+have to be temporary?
 
-This patch fixes the problem by extending do_sigaltstack to take the
-minimum signal stack size as an additional parameter, allowing the
-native and compat system call entry code to pass in their respective
-values. COMPAT_SIGMINSTKSZ is just defined as SIGMINSTKSZ if it has not
-been defined by the architecture.
-
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Dominik Brodowski <linux@dominikbrodowski.net>
-Cc: "Eric W. Biederman" <ebiederm@xmission.com>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Al Viro <viro@zeniv.linux.org.uk>
-Cc: Oleg Nesterov <oleg@redhat.com>
-Reported-by: Steve McIntyre <steve.mcintyre@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- include/linux/compat.h |  3 +++
- kernel/signal.c        | 14 +++++++++-----
- 2 files changed, 12 insertions(+), 5 deletions(-)
-
-diff --git a/include/linux/compat.h b/include/linux/compat.h
-index 1a3c4f37e908..de0c13bdcd2c 100644
---- a/include/linux/compat.h
-+++ b/include/linux/compat.h
-@@ -103,6 +103,9 @@ typedef struct compat_sigaltstack {
- 	compat_size_t			ss_size;
- } compat_stack_t;
- #endif
-+#ifndef COMPAT_MINSIGSTKSZ
-+#define COMPAT_MINSIGSTKSZ	MINSIGSTKSZ
-+#endif
- 
- #define compat_jiffies_to_clock_t(x)	\
- 		(((unsigned long)(x) * COMPAT_USER_HZ) / HZ)
-diff --git a/kernel/signal.c b/kernel/signal.c
-index 5843c541fda9..e4aad0e90882 100644
---- a/kernel/signal.c
-+++ b/kernel/signal.c
-@@ -3460,7 +3460,8 @@ int do_sigaction(int sig, struct k_sigaction *act, struct k_sigaction *oact)
- }
- 
- static int
--do_sigaltstack (const stack_t *ss, stack_t *oss, unsigned long sp)
-+do_sigaltstack (const stack_t *ss, stack_t *oss, unsigned long sp,
-+		size_t min_ss_size)
- {
- 	struct task_struct *t = current;
- 
-@@ -3490,7 +3491,7 @@ do_sigaltstack (const stack_t *ss, stack_t *oss, unsigned long sp)
- 			ss_size = 0;
- 			ss_sp = NULL;
- 		} else {
--			if (unlikely(ss_size < MINSIGSTKSZ))
-+			if (unlikely(ss_size < min_ss_size))
- 				return -ENOMEM;
- 		}
- 
-@@ -3508,7 +3509,8 @@ SYSCALL_DEFINE2(sigaltstack,const stack_t __user *,uss, stack_t __user *,uoss)
- 	if (uss && copy_from_user(&new, uss, sizeof(stack_t)))
- 		return -EFAULT;
- 	err = do_sigaltstack(uss ? &new : NULL, uoss ? &old : NULL,
--			      current_user_stack_pointer());
-+			      current_user_stack_pointer(),
-+			      MINSIGSTKSZ);
- 	if (!err && uoss && copy_to_user(uoss, &old, sizeof(stack_t)))
- 		err = -EFAULT;
- 	return err;
-@@ -3519,7 +3521,8 @@ int restore_altstack(const stack_t __user *uss)
- 	stack_t new;
- 	if (copy_from_user(&new, uss, sizeof(stack_t)))
- 		return -EFAULT;
--	(void)do_sigaltstack(&new, NULL, current_user_stack_pointer());
-+	(void)do_sigaltstack(&new, NULL, current_user_stack_pointer(),
-+			     MINSIGSTKSZ);
- 	/* squash all but EFAULT for now */
- 	return 0;
- }
-@@ -3553,7 +3556,8 @@ static int do_compat_sigaltstack(const compat_stack_t __user *uss_ptr,
- 		uss.ss_size = uss32.ss_size;
- 	}
- 	ret = do_sigaltstack(uss_ptr ? &uss : NULL, &uoss,
--			     compat_user_stack_pointer());
-+			     compat_user_stack_pointer(),
-+			     COMPAT_MINSIGSTKSZ);
- 	if (ret >= 0 && uoss_ptr)  {
- 		compat_stack_t old;
- 		memset(&old, 0, sizeof(old));
 -- 
-2.1.4
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180905/d636662a/attachment.sig>
