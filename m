@@ -1,111 +1,96 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Wed, 5 Sep 2018 16:14:54 +0200
-Subject: [PATCH v3 2/2] tty/serial: atmel: add ISO7816 support
-In-Reply-To: <211528d5-81b6-46f2-4191-66023d928ae3@sorico.fr>
-References: <20180807130049.5957-1-ludovic.desroches@microchip.com>
- <20180807130049.5957-3-ludovic.desroches@microchip.com>
- <d66c4318-1d31-5c4e-3952-6b69a010b028@sorico.fr>
- <20180809113035.kftvdalca7zsf4ly@M43218.corp.atmel.com>
- <20180905124341.5n4gadgd5luza7fd@M43218.corp.atmel.com>
- <211528d5-81b6-46f2-4191-66023d928ae3@sorico.fr>
-Message-ID: <20180905141454.xh2ovvpoth6s76ne@M43218.corp.atmel.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Wed, 5 Sep 2018 16:21:35 +0200
+Subject: [PATCH 11/13] nvmem: add support for cell lookups from machine
+ code
+In-Reply-To: <CAMRc=Mco7Tbk5P_mgv49f+3j9DKYk5AL6EjPhwF7M=Hb7o5-Mw@mail.gmail.com>
+References: <20180905095738.26406-1-brgl@bgdev.pl>
+ <20180905095738.26406-12-brgl@bgdev.pl>
+ <20180905155741.22b7d0ef@bbrezillon>
+ <CAMRc=Mco7Tbk5P_mgv49f+3j9DKYk5AL6EjPhwF7M=Hb7o5-Mw@mail.gmail.com>
+Message-ID: <20180905162135.700d2145@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2018 at 03:53:02PM +0200, Richard Genoud wrote:
-> [added Nicolas back in the thread, he was removed somehow]
+On Wed, 5 Sep 2018 16:00:36 +0200
+Bartosz Golaszewski <brgl@bgdev.pl> wrote:
+
+> 2018-09-05 15:57 GMT+02:00 Boris Brezillon <boris.brezillon@bootlin.com>:
+> > On Wed,  5 Sep 2018 11:57:36 +0200
+> > Bartosz Golaszewski <brgl@bgdev.pl> wrote:
+> >  
+> >>
+> >> +struct nvmem_cell_lookup {
+> >> +     const char              *nvmem_name;
+> >> +     const char              *dev_id;  
+> >
+> > Shouldn't we have a con_id here?
+> >  
+> >> +     const char              *cell_id;
+> >> +     struct list_head        node;
+> >> +};  
 > 
-> Hi Ludovic !
-> 
-> On 05/09/2018 14:43, Ludovic Desroches wrote:
-> > Hi Richard,
-> > 
-> > On Thu, Aug 09, 2018 at 01:30:35PM +0200, Ludovic Desroches wrote:
-> >> Hi Richard,
-> >>
-> >> On Thu, Aug 09, 2018 at 10:47:17AM +0200, Richard Genoud wrote:
-> >>> Hi !
-> >>>
-> >>> On 07/08/2018 15:00, Ludovic Desroches wrote:
-> >>>> From: Nicolas Ferre <nicolas.ferre@microchip.com>
-> >>>>
-> >>>> When mode is set in atmel_config_iso7816() we backup last RS232 mode
-> >>>> for coming back to this mode if requested.
-> >>>> Also allow setup of T=0 and T=1 parameter and basic support in set_termios
-> >>>> function as well.
-> >>>>
-> >>>> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-> >>>> [ludovic.desroches at microchip.com: rebase, add check on fidi ratio, checkpatch fixes]
-> >>>> Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
-> >>>> ---
-> >>>>  drivers/tty/serial/atmel_serial.c | 211 +++++++++++++++++++++++++++++++++++---
-> >>>>  drivers/tty/serial/atmel_serial.h |   6 +-
-> >>>>  2 files changed, 201 insertions(+), 16 deletions(-)
-> >>>>
-> >>>> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> >>>> index 8e4428725848..4a7ec44b0ace 100644
-> >>>> --- a/drivers/tty/serial/atmel_serial.c
-> >>>> +++ b/drivers/tty/serial/atmel_serial.c
-> >>
-> >> [...]
-> >>
-> >>>>  #if defined(CONFIG_OF)
-> >>>> +static struct atmel_uart_pdata at91rm9200_pdata = {
-> >>>> +	.fidi_min = 1,
-> >>>> +	.fidi_max = 2047,
-> >>>> +};
-> >>>> +
-> >>>> +static struct atmel_uart_pdata at91sam9260_pdata = {
-> >>>> +	.fidi_min = 1,
-> >>>> +	.fidi_max = 2047,
-> >>>> +};
-> >>>> +
-> >>>> +static struct atmel_uart_pdata sama5d3_pdata = {
-> >>>> +	.fidi_min = 3,
-> >>>> +	.fidi_max = 65535,
-> >>> Are you sure this is for sama5d3 ?
-> >>> From the datasheets I have, 65535 is for sama5d4/sama5d2
-> >>
-> >> I checked it and I missed it. What a pity... In fact, it's a bit more
-> >> tricky since the min value for d3 is 3 and no longer 1.
-> >>
-> >>> And also, you'll have to s/atmel,at91sam9260-usart/atmel,sama5d2-usart/g
-> >>> in sama5d{2,4}.dtsi
-> >>>
-> >>
-> >> Yes, I planed to send it later but I can add those patches within this
-> >> set of patches. 
-> >>
-> >>> But I wonder if it could be detected via ATMEL_US_VERSION instead ?
-> >>>
-> >>
-> >> I have not checked, I tend to prefer the compatible string for this kind
-> >> of thing. But as we already use the version number, I can investigate
-> >> this solution if it's the one you prefer.
-> >>
-> > 
-> > ping about this question still in suspend in order to prepare a new version.
-> Well, if we use the compatible string for this, we will have to add :
-> - atmel,sama5d2-usart
-> - atmel,sama5d3-usart
-> - (maybe others ?)
-> to the already existing :
-> - atmel,at91sam9260-usart
-> - atmel,at91rm9200-usart
-> just for setting different limits on the fidi register.
-> IMHO, it seems a bit overkill. Moreover, the ATMEL_US_VERSION has
-> already been read, so...
-> But if you think adding compatible strings is a better/cleaner solution, just convince me ! :)
+> I wanted to stay in line with the current API - nvmem_cell_get() takes
+> as argument a string called cell_id. I wanted to reflect that here.
 
-I won't try to convince you since we already use the ATMEL_US_VERSION.
-IMHO we should use the compatible string from the beginning but we
-didn't have the necessary DT experience at this time to figure out it
-was probably better than relying on the version number which can be not
-incrimented by error.
+Actually, you need both. con_id is the name you would have in your DT
+in the nvmem-cell-names property, cell_id is the name of the cell
+you'd find under the nvmem device node.
 
-I'll check the values of the ATMEL_US_VERSION and use it if everything
-is okay.
+Let's take an example:
 
-Regards
+	mydev {
+		#nvmem-cell-names = "mac-address", "revision";
+		#nvmem-cells = <&cell1>, <&cell2>;
+	};
 
-Ludovic
+	mynvmemdev {
+		#size-cells = <1>;
+		#address-cells = <1>;
+
+		cell1: foo at 0 {
+			reg = <0x0 0x6>;
+		};
+
+		cell2: bar at 6 {
+			reg = <0x6 0x10>;
+		};
+	};
+
+this can be described the same way using a consumer lookup table:
+
+struct nvmem_cell_lookup_entry {
+	const char *con_id;
+	const char *nvmem_name;
+	const char *cell_name;
+};
+
+struct nvmem_cell_lookup_table {
+	struct list_head node;
+	const char *dev_id;
+	unsigned int nentries;
+	const struct nvmem_cell_lookup_entry *entries;
+}
+
+static const struct nvmem_cell_lookup_entry mydev_nvmem_cells[] = {
+	{
+		.con_id = "mac-address",
+		.nvmem_name = "mynvmemdev",
+		.cell_name = "foo",
+	},
+	{
+		.con_id = "revision",
+		.nvmem_name = "mynvmemdev",
+		.cell_name = "bar",
+	},
+}
+
+static const struct nvmem_cell_lookup_table mydev_nvmem_lookup = {
+	.dev_id = "mydev.0",
+	.nentries = ARRAY_SIZE(mydev_nvmem_cells),
+	.entries = mydev_nvmem_cells,
+};
+
+
+...
+
+	nvmem_add_cell_lookups(&mydev_nvmem_lookup);
