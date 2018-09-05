@@ -1,46 +1,96 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 05 Sep 2018 16:48:27 +0300
-Subject: [PATCH 09/10] phy: Add Cadence D-PHY support
-In-Reply-To: <d50a5f0750647dcc09ef52411641b628161b362e.1536138624.git-series.maxime.ripard@bootlin.com>
-References: <cover.ee6158898d563fcc01d45c9652501180bccff0f0.1536138624.git-series.maxime.ripard@bootlin.com>
- <d50a5f0750647dcc09ef52411641b628161b362e.1536138624.git-series.maxime.ripard@bootlin.com>
-Message-ID: <1838745.9zNmGlpGXc@avalon>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Wed, 5 Sep 2018 15:53:02 +0200
+Subject: [PATCH v3 2/2] tty/serial: atmel: add ISO7816 support
+In-Reply-To: <20180905124341.5n4gadgd5luza7fd@M43218.corp.atmel.com>
+References: <20180807130049.5957-1-ludovic.desroches@microchip.com>
+ <20180807130049.5957-3-ludovic.desroches@microchip.com>
+ <d66c4318-1d31-5c4e-3952-6b69a010b028@sorico.fr>
+ <20180809113035.kftvdalca7zsf4ly@M43218.corp.atmel.com>
+ <20180905124341.5n4gadgd5luza7fd@M43218.corp.atmel.com>
+Message-ID: <211528d5-81b6-46f2-4191-66023d928ae3@sorico.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+[added Nicolas back in the thread, he was removed somehow]
 
-Thank you for the patch.
+Hi Ludovic !
 
-On Wednesday, 5 September 2018 12:16:40 EEST Maxime Ripard wrote:
-> Cadence has designed a D-PHY that can be used by the, currently in tree,
-> DSI bridge (DRM), CSI Transceiver and CSI Receiver (v4l2) drivers.
+On 05/09/2018 14:43, Ludovic Desroches wrote:
+> Hi Richard,
 > 
-> Only the DSI driver has an ad-hoc driver for that phy at the moment, while
-> the v4l2 drivers are completely missing any phy support. In order to make
-> that phy support available to all these drivers, without having to
-> duplicate that code three times, let's create a generic phy framework
-> driver.
+> On Thu, Aug 09, 2018 at 01:30:35PM +0200, Ludovic Desroches wrote:
+>> Hi Richard,
+>>
+>> On Thu, Aug 09, 2018 at 10:47:17AM +0200, Richard Genoud wrote:
+>>> Hi !
+>>>
+>>> On 07/08/2018 15:00, Ludovic Desroches wrote:
+>>>> From: Nicolas Ferre <nicolas.ferre@microchip.com>
+>>>>
+>>>> When mode is set in atmel_config_iso7816() we backup last RS232 mode
+>>>> for coming back to this mode if requested.
+>>>> Also allow setup of T=0 and T=1 parameter and basic support in set_termios
+>>>> function as well.
+>>>>
+>>>> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+>>>> [ludovic.desroches at microchip.com: rebase, add check on fidi ratio, checkpatch fixes]
+>>>> Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+>>>> ---
+>>>>  drivers/tty/serial/atmel_serial.c | 211 +++++++++++++++++++++++++++++++++++---
+>>>>  drivers/tty/serial/atmel_serial.h |   6 +-
+>>>>  2 files changed, 201 insertions(+), 16 deletions(-)
+>>>>
+>>>> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+>>>> index 8e4428725848..4a7ec44b0ace 100644
+>>>> --- a/drivers/tty/serial/atmel_serial.c
+>>>> +++ b/drivers/tty/serial/atmel_serial.c
+>>
+>> [...]
+>>
+>>>>  #if defined(CONFIG_OF)
+>>>> +static struct atmel_uart_pdata at91rm9200_pdata = {
+>>>> +	.fidi_min = 1,
+>>>> +	.fidi_max = 2047,
+>>>> +};
+>>>> +
+>>>> +static struct atmel_uart_pdata at91sam9260_pdata = {
+>>>> +	.fidi_min = 1,
+>>>> +	.fidi_max = 2047,
+>>>> +};
+>>>> +
+>>>> +static struct atmel_uart_pdata sama5d3_pdata = {
+>>>> +	.fidi_min = 3,
+>>>> +	.fidi_max = 65535,
+>>> Are you sure this is for sama5d3 ?
+>>> From the datasheets I have, 65535 is for sama5d4/sama5d2
+>>
+>> I checked it and I missed it. What a pity... In fact, it's a bit more
+>> tricky since the min value for d3 is 3 and no longer 1.
+>>
+>>> And also, you'll have to s/atmel,at91sam9260-usart/atmel,sama5d2-usart/g
+>>> in sama5d{2,4}.dtsi
+>>>
+>>
+>> Yes, I planed to send it later but I can add those patches within this
+>> set of patches. 
+>>
+>>> But I wonder if it could be detected via ATMEL_US_VERSION instead ?
+>>>
+>>
+>> I have not checked, I tend to prefer the compatible string for this kind
+>> of thing. But as we already use the version number, I can investigate
+>> this solution if it's the one you prefer.
+>>
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> ---
->  drivers/phy/Kconfig             |   1 +-
->  drivers/phy/Makefile            |   1 +-
->  drivers/phy/cadence/Kconfig     |  13 +-
->  drivers/phy/cadence/Makefile    |   1 +-
->  drivers/phy/cadence/cdns-dphy.c | 499 +++++++++++++++++++++++++++++++++-
-
-Should the DT bindings be split from Documentation/devicetree/bindings/
-display/bridge/cdns,dsi.txt ?
-
->  5 files changed, 515 insertions(+)
->  create mode 100644 drivers/phy/cadence/Kconfig
->  create mode 100644 drivers/phy/cadence/Makefile
->  create mode 100644 drivers/phy/cadence/cdns-dphy.c
-
-[snip]
-
--- 
-Regards,
-
-Laurent Pinchart
+> ping about this question still in suspend in order to prepare a new version.
+Well, if we use the compatible string for this, we will have to add :
+- atmel,sama5d2-usart
+- atmel,sama5d3-usart
+- (maybe others ?)
+to the already existing :
+- atmel,at91sam9260-usart
+- atmel,at91rm9200-usart
+just for setting different limits on the fidi register.
+IMHO, it seems a bit overkill. Moreover, the ATMEL_US_VERSION has
+already been read, so...
+But if you think adding compatible strings is a better/cleaner solution, just convince me ! :)
