@@ -1,27 +1,57 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 5 Sep 2018 11:40:49 +0200
-Subject: [PATCH] arm64: defconfig: enable EFI_ARMSTUB_DTB_LOADER
-In-Reply-To: <bf917897-1697-a6c4-7f77-8dfa74dddc8a@broadcom.com>
-References: <1535563287-24803-1-git-send-email-scott.branden@broadcom.com>
- <CAOesGMhjcJ1p3QcEYb9fsx3fMXAOsgR2njOq=VKgEbWGwJi36g@mail.gmail.com>
- <fb07b89d-d427-5e59-9f17-b12df26284ec@broadcom.com>
- <CAKv+Gu-R7eX=aj=O2-gpzmp0K4t0T4s536UiqJZs0WuxRjkYwQ@mail.gmail.com>
- <CAOesGMho8CfT7iDXadmkB5=7DoOi6n8qXcS9X643vf+Y0BbD6w@mail.gmail.com>
- <CAKv+Gu_mKU+RdPgg2Dfezy4-L+KDEEBx02R49ObomRhEkJJ6Mw@mail.gmail.com>
- <CAOesGMgLHx3+j1bWEsMWsN-yjGNZyLOpAjLg0Jut8gG=ADE25g@mail.gmail.com>
- <CAKv+Gu_x=bS4xJcD_LuEnnN=Lx4Jc87uK8J_ACdA9EeUqtM3Yg@mail.gmail.com>
- <CACxGe6uK+N5XUqZhH7gAQXoq+QXMvFPHF_i4WqivrufTU=0cog@mail.gmail.com>
- <bf917897-1697-a6c4-7f77-8dfa74dddc8a@broadcom.com>
-Message-ID: <CAKv+Gu8FK9K0G-GJygdpkwqKYzjvpDDj8TyGTC2u0SRxK3ez_w@mail.gmail.com>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Wed,  5 Sep 2018 18:49:44 +0900
+Subject: [PATCH 1/2] dt-bindings: phy: add UniPhier PCIe PHY description
+In-Reply-To: <1536140985-6058-1-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1536140985-6058-1-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <1536140985-6058-2-git-send-email-hayashi.kunihiko@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 September 2018 at 19:19, Scott Branden <scott.branden@broadcom.com> wrote:
->
-> Rather than introduce EFI_ARMSTUB_DTB_LOADER, why not have
-> the efistub use CONFIG_OF to determine whether it supports dtb= or not?
->
-> That way ACPI-only distros disable devicetree support entirely.
->
+Add DT bindings for PHY interface built into PCIe controller implemented
+in UniPhier SoCs.
 
-Unfortunately, CONFIG_OF cannot be disabled on arm64 even on ACPI-only builds.
+Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+---
+ .../devicetree/bindings/phy/uniphier-pcie-phy.txt  | 31 ++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/uniphier-pcie-phy.txt
+
+diff --git a/Documentation/devicetree/bindings/phy/uniphier-pcie-phy.txt b/Documentation/devicetree/bindings/phy/uniphier-pcie-phy.txt
+new file mode 100644
+index 0000000..1889d3b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/uniphier-pcie-phy.txt
+@@ -0,0 +1,31 @@
++Socionext UniPhier PCIe PHY bindings
++
++This describes the devicetree bindings for PHY interface built into
++PCIe controller implemented on Socionext UniPhier SoCs.
++
++Required properties:
++- compatible: Should contain one of the following:
++    "socionext,uniphier-ld20-pcie-phy" - for LD20 PHY
++    "socionext,uniphier-pxs3-pcie-phy" - for PXs3 PHY
++- reg: Specifies offset and length of the register set for the device.
++- #phy-cells: Must be zero.
++- clocks: A phandle to the clock gate for PCIe glue layer including
++	this phy.
++- resets: A phandle to the reset line for PCIe glue layer including
++	this phy.
++
++Optional properties:
++- socionext,syscon: A phandle to system control to set configurations
++	for phy.
++
++Refer to phy/phy-bindings.txt for the generic PHY binding properties.
++
++Example:
++	pcie_phy: phy at 66038000 {
++		compatible = "socionext,uniphier-ld20-pcie-phy";
++		reg = <0x66038000 0x4000>;
++		#phy-cells = <0>;
++		clocks = <&sys_clk 24>;
++		resets = <&sys_rst 24>;
++		socionext,syscon = <&soc_glue>;
++	};
+-- 
+2.7.4
