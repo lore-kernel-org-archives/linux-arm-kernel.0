@@ -1,41 +1,75 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Wed, 5 Sep 2018 08:42:52 +0200
-Subject: [PATCH] arm64: add NUMA emulation support
-In-Reply-To: <f041ba95-03e6-4a7d-c324-870b45a2f648@kernel.org>
-References: <20180824230559.32336-1-shuah@kernel.org>
- <20180828174011.GE20375@arm.com>
- <a58ad11f-3c22-ed7f-a0cd-938aabc4adaf@kernel.org>
- <20180829110802.GD10349@dhcp22.suse.cz>
- <f041ba95-03e6-4a7d-c324-870b45a2f648@kernel.org>
-Message-ID: <20180905064252.GW14951@dhcp22.suse.cz>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 5 Sep 2018 08:52:56 +0200
+Subject: [PATCH/RFT] arm64: dts: renesas: r8a77990: Add all MSIOF device
+ nodes
+In-Reply-To: <1536092561-6048-1-git-send-email-ykaneko0929@gmail.com>
+References: <1536092561-6048-1-git-send-email-ykaneko0929@gmail.com>
+Message-ID: <CAMuHMdWjLYhMDz6YuU_Y0vHtWBgSgt5BgTz0dDq86bqR8sX-1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 04-09-18 15:59:34, Shuah Khan wrote:
-[...]
-> This will support the following workload requirements:
-> 
-> - reserving one or more NUMA memory nodes for class of critical tasks that require
->   guaranteed memory availability.
-> - isolate memory blocks with a guaranteed exclusive access.
+Hi Kaneko-san,
 
-How do you enforce kernel doesn't allocate from those reserved nodes?
-They will be in a fallback zonelists so once the memory gets used on all
-other ones then the kernel happily spills over to your reserved node.
+On Tue, Sep 4, 2018 at 10:23 PM Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
+> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+>
+> This patch adds the device nodes for all MSIOF SPI controllers to
+> the R8A77990 SoC.
+>
+> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
 
-> NUMA emulation to split the flat machine into "x" number of nodes, combined with
-> cpuset cgroup with the following example configuration will make it possible to
-> support the above workloads on non-NUMA platforms.
-> 
-> numa=fake=4
-> 
-> cpuset.mems=2
-> cpuset.cpus=2
-> cpuset.mem_exclusive=1 (enabling exclusive use of the memory nodes by a CPU set)
-> cpuset.mem_hardwall=1  (separate the memory nodes that are allocated to different cgroups)
+Thanks for your patch!
 
-This will only enforce userspace to follow and I strongly suspect that
-tasks in the root cgroup will be allowed to allocate as well.
+Unfortunately this is a duplicate of
+https://www.spinics.net/lists/devicetree/msg246988.html.
+
+Sorry for stepping on your toes, I added MSIOF support for Ebisu to investigate
+MSIOF driver bugs.
+
+> --- a/arch/arm64/boot/dts/renesas/r8a77990.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
+> @@ -14,6 +14,13 @@
+>         #address-cells = <2>;
+>         #size-cells = <2>;
+>
+> +       aliases {
+> +               spi0 = &msiof0;
+> +               spi1 = &msiof1;
+> +               spi2 = &msiof2;
+> +               spi3 = &msiof3;
+> +       };
+
+The SPI subsystem no longer needs aliases.
+Furthermore, aliases complicate DT overlay handling.
+
+> +
+>         cpus {
+>                 #address-cells = <1>;
+>                 #size-cells = <0>;
+> @@ -70,6 +77,13 @@
+>                 clock-frequency = <0>;
+>         };
+>
+> +       /* MSIOF reference clock - to be overridden by boards that provide it */
+> +       msiof_ref_clk: msiof-ref-clock {
+> +               compatible = "fixed-clock";
+> +               #clock-cells = <0>;
+> +               clock-frequency = <0>;
+> +       };
+
+This clock does not exist.
+
+Board DTS should use "assigned-clocks" and "assigned-clock-rates" on the
+MSO clock instead.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
 -- 
-Michal Hocko
-SUSE Labs
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
