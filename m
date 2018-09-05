@@ -1,31 +1,70 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Tue,  4 Sep 2018 22:21:10 -0700
-Subject: [PATCH 3/6] dt-bindings: display: add data-enable polarity property
+Date: Tue,  4 Sep 2018 22:21:09 -0700
+Subject: [PATCH 2/6] drm/bridge: allow to specify data-enable polarity
 In-Reply-To: <20180905052113.21262-1-stefan@agner.ch>
 References: <20180905052113.21262-1-stefan@agner.ch>
-Message-ID: <20180905052113.21262-3-stefan@agner.ch>
+Message-ID: <20180905052113.21262-2-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow to specify the data-enable polarity required by a dumb VGA
-DAC converting parallel RGB to VGA.
+Support boards with a passive RGB to VGA bridge which require a low
+active data-enable polarity.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- .../devicetree/bindings/display/bridge/dumb-vga-dac.txt          | 1 +
- 1 file changed, 1 insertion(+)
+Alternatively a new dt binding could be introduced for dumb VGA bridges
+requiring low active data enable... However, also other polarities might
+need a specific polarity, hence this generic approach might be better.
 
-diff --git a/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt b/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
-index 164cbb15f04c..adbd2ca0af2f 100644
---- a/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
-+++ b/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
-@@ -18,6 +18,7 @@ graph bindings specified in Documentation/devicetree/bindings/graph.txt.
+ drivers/gpu/drm/bridge/dumb-vga-dac.c | 22 ++++++++++++++++++----
+ 1 file changed, 18 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/gpu/drm/bridge/dumb-vga-dac.c b/drivers/gpu/drm/bridge/dumb-vga-dac.c
+index 7a5c24967115..2b8c3d629f2f 100644
+--- a/drivers/gpu/drm/bridge/dumb-vga-dac.c
++++ b/drivers/gpu/drm/bridge/dumb-vga-dac.c
+@@ -179,6 +179,7 @@ static struct i2c_adapter *dumb_vga_retrieve_ddc(struct device *dev)
+ static int dumb_vga_probe(struct platform_device *pdev)
+ {
+ 	struct dumb_vga *vga;
++	u32 de;
  
- Optional properties:
- - vdd-supply: Power supply for DAC
-+- de-active: data-enable pulse is active low/high/ignored
+ 	vga = devm_kzalloc(&pdev->dev, sizeof(*vga), GFP_KERNEL);
+ 	if (!vga)
+@@ -194,6 +195,23 @@ static int dumb_vga_probe(struct platform_device *pdev)
+ 		dev_dbg(&pdev->dev, "No vdd regulator found: %d\n", ret);
+ 	}
  
- Example
- -------
++	vga->bridge.funcs = &dumb_vga_bridge_funcs;
++	vga->bridge.of_node = pdev->dev.of_node;
++	vga->bridge.timings = of_device_get_match_data(&pdev->dev);
++
++	if (!vga->bridge.timings &&
++	    !of_property_read_u32(pdev->dev.of_node, "de-active", &de)) {
++		struct drm_bridge_timings *timings;
++
++		timings = devm_kzalloc(&pdev->dev, sizeof(*timings), GFP_KERNEL);
++		if (!timings)
++			return -ENOMEM;
++
++		timings->bus_flags = de ? DRM_BUS_FLAG_DE_HIGH :
++					DRM_BUS_FLAG_DE_LOW;
++		vga->bridge.timings = timings;
++	}
++
+ 	vga->ddc = dumb_vga_retrieve_ddc(&pdev->dev);
+ 	if (IS_ERR(vga->ddc)) {
+ 		if (PTR_ERR(vga->ddc) == -ENODEV) {
+@@ -205,10 +223,6 @@ static int dumb_vga_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
+-	vga->bridge.funcs = &dumb_vga_bridge_funcs;
+-	vga->bridge.of_node = pdev->dev.of_node;
+-	vga->bridge.timings = of_device_get_match_data(&pdev->dev);
+-
+ 	drm_bridge_add(&vga->bridge);
+ 
+ 	return 0;
 -- 
 2.18.0
