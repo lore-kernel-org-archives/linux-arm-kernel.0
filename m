@@ -1,147 +1,62 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed,  5 Sep 2018 11:57:33 +0200
-Subject: [PATCH 08/13] nvmem: add a notifier chain
+Date: Wed,  5 Sep 2018 11:57:37 +0200
+Subject: [PATCH 12/13] Documentation: nvmem: document cell tables and lookup
+ entries
 In-Reply-To: <20180905095738.26406-1-brgl@bgdev.pl>
 References: <20180905095738.26406-1-brgl@bgdev.pl>
-Message-ID: <20180905095738.26406-9-brgl@bgdev.pl>
+Message-ID: <20180905095738.26406-13-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Add a blocking notifier chain with two events (add and remove) so that
-users can get notified about the addition of nvmem devices they're
-waiting for.
-
-We'll use this instead of the at24 setup callback in the mityomapl138
-board file.
+Document the new nvmem kernel APIs.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/nvmem/core.c           | 36 ++++++++++++++++++++++++++++++++++
- include/linux/nvmem-consumer.h | 19 ++++++++++++++++++
- 2 files changed, 55 insertions(+)
+ Documentation/nvmem/nvmem.txt | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index e456aaa6184a..17307015905a 100644
---- a/drivers/nvmem/core.c
-+++ b/drivers/nvmem/core.c
-@@ -58,6 +58,8 @@ struct nvmem_cell {
- static DEFINE_MUTEX(nvmem_mutex);
- static DEFINE_IDA(nvmem_ida);
+diff --git a/Documentation/nvmem/nvmem.txt b/Documentation/nvmem/nvmem.txt
+index 8d8d8f58f96f..2cb01cdf87c8 100644
+--- a/Documentation/nvmem/nvmem.txt
++++ b/Documentation/nvmem/nvmem.txt
+@@ -58,6 +58,36 @@ static int qfprom_probe(struct platform_device *pdev)
+ It is mandatory that the NVMEM provider has a regmap associated with its
+ struct device. Failure to do would return error code from nvmem_register().
  
-+static BLOCKING_NOTIFIER_HEAD(nvmem_notifier);
++Users of board files can define and register nvmem cells using the
++nvmem_cell_table struct:
 +
- #ifdef CONFIG_DEBUG_LOCK_ALLOC
- static struct lock_class_key eeprom_lock_key;
- #endif
-@@ -339,6 +341,32 @@ static int nvmem_setup_compat(struct nvmem_device *nvmem,
- 	return 0;
- }
- 
-+/**
-+ * nvmem_register_notifier() - Register a notifier block for nvmem events.
-+ *
-+ * @nb: notifier block to be called on nvmem events.
-+ *
-+ * Return: 0 on success, negative error number on failure.
-+ */
-+int nvmem_register_notifier(struct notifier_block *nb)
-+{
-+	return blocking_notifier_chain_register(&nvmem_notifier, nb);
-+}
-+EXPORT_SYMBOL_GPL(nvmem_register_notifier);
-+
-+/**
-+ * nvmem_unregister_notifier() - Unregister a notifier block for nvmem events.
-+ *
-+ * @nb: notifier block to be unregistered.
-+ *
-+ * Return: 0 on success, negative error number on failure.
-+ */
-+int nvmem_unregister_notifier(struct notifier_block *nb)
-+{
-+	return blocking_notifier_chain_unregister(&nvmem_notifier, nb);
-+}
-+EXPORT_SYMBOL_GPL(nvmem_unregister_notifier);
-+
- /**
-  * nvmem_register() - Register a nvmem device for given nvmem_config.
-  * Also creates an binary entry in /sys/bus/nvmem/devices/dev-name/nvmem
-@@ -420,8 +448,15 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
- 
- 	INIT_LIST_HEAD(&nvmem->cells);
- 
-+	rval = blocking_notifier_call_chain(&nvmem_notifier, NVMEM_ADD, nvmem);
-+	if (rval)
-+		goto err_teardown_compat;
-+
- 	return nvmem;
- 
-+err_teardown_compat:
-+	if (config->compat)
-+		device_remove_bin_file(nvmem->base_dev, &nvmem->eeprom);
- err_device_del:
- 	device_del(&nvmem->dev);
- err_put_device:
-@@ -436,6 +471,7 @@ static void nvmem_device_release(struct kref *kref)
- 	struct nvmem_device *nvmem;
- 
- 	nvmem = container_of(kref, struct nvmem_device, refcnt);
-+	blocking_notifier_call_chain(&nvmem_notifier, NVMEM_REMOVE, nvmem);
- 
- 	if (nvmem->flags & FLAG_COMPAT)
- 		device_remove_bin_file(nvmem->base_dev, &nvmem->eeprom);
-diff --git a/include/linux/nvmem-consumer.h b/include/linux/nvmem-consumer.h
-index 1313da6731ff..8a6405febc32 100644
---- a/include/linux/nvmem-consumer.h
-+++ b/include/linux/nvmem-consumer.h
-@@ -14,6 +14,7 @@
- 
- #include <linux/err.h>
- #include <linux/errno.h>
-+#include <linux/notifier.h>
- 
- struct device;
- struct device_node;
-@@ -21,6 +22,11 @@ struct device_node;
- struct nvmem_cell;
- struct nvmem_device;
- 
-+enum {
-+	NVMEM_ADD = 1,
-+	NVMEM_REMOVE,
++static struct nvmem_cell_info foo_nvmem_cells[] = {
++	{
++		.name		= "mac-address",
++		.offset		= 0x7f00,
++		.bytes		= ETH_ALEN,
++	}
 +};
 +
- #if IS_ENABLED(CONFIG_NVMEM)
- 
- /* Cell based interface */
-@@ -45,6 +51,9 @@ int nvmem_device_write(struct nvmem_device *nvmem, unsigned int offset,
- 
- const char *nvmem_dev_name(struct nvmem_device *nvmem);
- 
-+int nvmem_register_notifier(struct notifier_block *nb);
-+int nvmem_unregister_notifier(struct notifier_block *nb);
++static struct nvmem_cell_table foo_nvmem_cell_table = {
++	.nvmem_name		= "i2c-eeprom",
++	.cells			= foo_nvmem_cells,
++	.ncells			= ARRAY_SIZE(foo_nvmem_cells),
++};
 +
- #else
- 
- static inline struct nvmem_cell *nvmem_cell_get(struct device *dev,
-@@ -125,6 +134,16 @@ static inline const char *nvmem_dev_name(struct nvmem_device *nvmem)
- 	return NULL;
- }
- 
-+static inline int nvmem_register_notifier(struct notifier_block *nb)
-+{
-+	return -ENOSYS;
-+}
++nvmem_add_cell_table(&foo_nvmem_cell_table);
 +
-+static inline int int nvmem_unregister_notifier(struct notifier_block *nb)
-+{
-+	return -ENOSYS;
-+}
++Additionally it is possible to create nvmem cell lookup entries and register
++them with the nvmem framework from machine code as shown in the example below:
 +
- #endif /* CONFIG_NVMEM */
++static struct nvmem_cell_lookup foo_nvmem_lookup = {
++	.nvmem_name		= "i2c-eeprom",
++	.dev_id			= "foo_mac.0",
++	.cell_id		= "mac-address",
++};
++
++nvmem_add_cell_lookups(&foo_nvmem_lookup, 1);
++
+ NVMEM Consumers
+ +++++++++++++++
  
- #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
 -- 
 2.18.0
