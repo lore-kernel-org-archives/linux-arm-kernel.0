@@ -1,41 +1,48 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Wed, 5 Sep 2018 13:25:30 +0530
-Subject: [PATCH v4 1/4] clk: sunxi-ng: Enable DE2_CCU for SUN8I and SUN50I
-In-Reply-To: <20180905070335.dclhpxjld4vdkdu4@flea>
-References: <20180904163609.10171-1-jagan@amarulasolutions.com>
- <20180905070335.dclhpxjld4vdkdu4@flea>
-Message-ID: <CAMty3ZDVnsjJ0eRx1LxFjX+ti85=jRy=1x_sZ5d3yCHsVCD3HA@mail.gmail.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Wed,  5 Sep 2018 15:55:43 +0800
+Subject: [PATCH 1/2] coresight: tmc: Fix byte-address alignment for RRP
+Message-ID: <1536134144-2764-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 5, 2018 at 12:33 PM, Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
-> On Tue, Sep 04, 2018 at 10:06:06PM +0530, Jagan Teki wrote:
->> Allwinner SoC like SUN8I and SUN50I has DE2 CCU so enable them
->> as default.
->>
->> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
->> ---
->> Changes for v4, v3:
->> - none
->> Changes for v2:
->> - Enable for MACH_SUN8I
->>
->>  drivers/clk/sunxi-ng/Kconfig | 2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
->> index 826674d090fd..e20182aa9748 100644
->> --- a/drivers/clk/sunxi-ng/Kconfig
->> +++ b/drivers/clk/sunxi-ng/Kconfig
->> @@ -63,6 +63,8 @@ config SUN8I_V3S_CCU
->>
->>  config SUN8I_DE2_CCU
->>       bool "Support for the Allwinner SoCs DE2 CCU"
->> +     default MACH_SUN8I || (ARM64 && ARCH_SUNXI)
->> +     depends on DRM_SUN4I && (MACH_SUN8I || (ARM64 && ARCH_SUNXI))
->
-> I don't see why there's a dependency on the DRM driver. I'm pretty
-> sure this would even break simplefb.
+>From the comment in the code, it claims the requirement for byte-address
+alignment for RRP register: 'for 32-bit, 64-bit and 128-bit wide trace
+memory, the four LSBs must be 0s. For 256-bit wide trace memory, the
+five LSBs must be 0s'.  This isn't consistent with the program, the
+program sets five LSBs as zeros for 32/64/128-bit wide trace memory and
+set six LSBs zeros for 256-bit wide trace memory.
 
-Ok, got it. I will drop the depends on just add default.
+After checking with the CoreSight Trace Memory Controller technical
+reference manual (ARM DDI 0461B, section 3.3.4 RAM Read Pointer
+Register), it proves the comment is right and the program does wrong
+setting.
+
+This patch fixes byte-address alignment for RRP by following correct
+definition in the technical reference manual.
+
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: Mike Leach <mike.leach@linaro.org>
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ drivers/hwtracing/coresight/coresight-tmc-etf.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+index 0549249..e310613 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+@@ -438,10 +438,10 @@ static void tmc_update_etf_buffer(struct coresight_device *csdev,
+ 		case TMC_MEM_INTF_WIDTH_32BITS:
+ 		case TMC_MEM_INTF_WIDTH_64BITS:
+ 		case TMC_MEM_INTF_WIDTH_128BITS:
+-			mask = GENMASK(31, 5);
++			mask = GENMASK(31, 4);
+ 			break;
+ 		case TMC_MEM_INTF_WIDTH_256BITS:
+-			mask = GENMASK(31, 6);
++			mask = GENMASK(31, 5);
+ 			break;
+ 		}
+ 
+-- 
+2.7.4
