@@ -1,79 +1,179 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 6 Sep 2018 01:05:34 +1000
-Subject: [PATCH v9 0/8] Introduce on-chip interconnect API
-In-Reply-To: <fe9f3e91-93f9-d7d5-1643-dc09543e2850@linaro.org>
-References: <20180831140151.13972-1-georgi.djakov@linaro.org>
- <CAHLCerNd0hrLKgbni95_RSYOtsNufMCVtHbAKa4W+eo8H2cL2A@mail.gmail.com>
- <20180905093620.6d9162ca@canb.auug.org.au>
- <fe9f3e91-93f9-d7d5-1643-dc09543e2850@linaro.org>
-Message-ID: <20180906010534.329d0fca@canb.auug.org.au>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Wed, 5 Sep 2018 17:08:38 +0200
+Subject: [RFC PATCH] KVM: arm64: Treat FPEXC32_EL2 as a regular guest
+ system register
+In-Reply-To: <1536153553-28767-1-git-send-email-Dave.Martin@arm.com>
+References: <1536153553-28767-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20180905150838.GU4029@e113682-lin.lund.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Georgi,
-
-On Wed, 5 Sep 2018 17:50:28 +0300 Georgi Djakov <georgi.djakov@linaro.org> wrote:
->
-> On 09/05/2018 02:36 AM, Stephen Rothwell wrote:
-> > 
-> > On Tue, 4 Sep 2018 15:54:27 +0530 Amit Kucheria <amit.kucheria@linaro.org> wrote:  
-> >>
-> >> I'm currently reviewing this patchset (long overdue), but considering
-> >> that we haven't added any major new features to the framework for the
-> >> last couple of revisions, can you get this patchset merged into
-> >> linux-next to see how things shake out there? We've had this merged
-> >> branch merged into a CI build on kernelci for a while now w/o any
-> >> major incident so we should increase its exposure.
-> >>
-> >> You could ask Stephen Rothwell if he'll accept the a branch directly
-> >> from you or he needs an upstream maintainer (GregKH?) to carry it.  
-> > 
-> > Since it appears to have been well reviewed and tested, I can take it
-> > if you send me a git URL and the names of contacts in case of issues
-> > with the branch.  Once Greg has merged it, I will try to drop it again
-> > (unless you think there will be an ongoing reason to keep it in
-> > linux-next separately), but a prompting email would also be nice in
-> > case I forget.  
+On Wed, Sep 05, 2018 at 02:19:13PM +0100, Dave Martin wrote:
+> Currently FPEXC32_EL2 is handled specially when context-switching.
+> This made sense for arm, where FPEXC affects host execution
+> (including VFP/SIMD register save/restore at Hyp).
 > 
-> Thank you! Below is the git URL to pull from and you can use my e-mail
-> as contact for any issues.
+> However, FPEXC has no architectural effect when running in AArch64.
+> The only case where an arm64 host may execute in AArch32 is when
+> running compat user code at EL0: the architecture explicitly
+> documents FPEXC as having no effect in this case either when the
+> kernel (EL2 in the VHE case; otherwise EL1) is AArch64.
 > 
-> git://git.linaro.org/people/georgi.djakov/linux.git#icc-next
+> So, we can just handle FPEXC32_EL2 (which is the AArch64 alias for
+> this register) as a regular AArch32-only system register and switch
+> it without any special handling or synchronisation.
 > 
-> I expect this to be a continuing effort with some upcoming users of this
-> API, so i plan to maintain this branch and occasionally put some
-> reviewed/tested patches to get wider integration testing. But let's see
-> what happens now.
+> This allows some gnarly special-case code to be eliminated from
+> hyp.  The extra isb() in __activate_traps_fpsimd32() is dropped
+> too: for the reasons explained above arm64 never required this
+> anyway.
+
+This looks like a reasonable cleanup, but I don't understand how this
+works.  The reason we had the special casing of FPXEC_EL2 was to ensure
+that we trap to EL2 when VFP should be trapped for a 32-bit guest
+instead of going to EL1.  How does that work with this patch if we set
+CPTR_EL2.TFP and the guest has set FPXEX32_EL2.EN ?
+
+Thanks,
+
+    Christoffer
+
 > 
-> In any case, if this increases your burden, feel free to drop it.
-
-Added from (later) today.
-
-Thanks for adding your subsystem tree as a participant of linux-next.  As
-you may know, this is not a judgement of your code.  The purpose of
-linux-next is for integration testing and to lower the impact of
-conflicts between subsystems in the next merge window. 
-
-You will need to ensure that the patches/commits in your tree/series have
-been:
-     * submitted under GPL v2 (or later) and include the Contributor's
-        Signed-off-by,
-     * posted to the relevant mailing list,
-     * reviewed by you (or another maintainer of your subsystem tree),
-     * successfully unit tested, and 
-     * destined for the current or next Linux merge window.
-
-Basically, this should be just what you would send to Linus (or ask him
-to fetch).  It is allowed to be rebased if you deem it necessary.
-
--- 
-Cheers,
-Stephen Rothwell 
-sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180906/ff91ad44/attachment.sig>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@arm.com>
+> Cc: Alexander Graf <agraf@suse.de>
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> ---
+> 
+> I could do with some confirmation from someone that my interpretation of
+> the architecture is in fact correct here.  The CheckFPAdvSIMDEnabled64()
+> and CheckAdvSIMDEnabled() pseudocode functions may be a reasonable
+> starting point (this was my reference where the wordy text is unclear).
+> 
+> If Alexander could try this out, that would be good.
+> 
+> This cleanup applies on top of the following previously pubished fix:
+> [PULL 2/4] arm64: KVM: Only force FPEXC32_EL2.EN if trapping FPSIMD
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2018-September/599537.html
+> 
+> 
+>  arch/arm64/kvm/hyp/switch.c    | 45 ++----------------------------------------
+>  arch/arm64/kvm/hyp/sysreg-sr.c |  2 ++
+>  2 files changed, 4 insertions(+), 43 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index ca46153..0450b85 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -43,32 +43,6 @@ static bool __hyp_text update_fp_enabled(struct kvm_vcpu *vcpu)
+>  	return !!(vcpu->arch.flags & KVM_ARM64_FP_ENABLED);
+>  }
+>  
+> -/* Save the 32-bit only FPSIMD system register state */
+> -static void __hyp_text __fpsimd_save_fpexc32(struct kvm_vcpu *vcpu)
+> -{
+> -	if (!vcpu_el1_is_32bit(vcpu))
+> -		return;
+> -
+> -	vcpu->arch.ctxt.sys_regs[FPEXC32_EL2] = read_sysreg(fpexc32_el2);
+> -}
+> -
+> -static void __hyp_text __activate_traps_fpsimd32(struct kvm_vcpu *vcpu)
+> -{
+> -	/*
+> -	 * We are about to set CPTR_EL2.TFP to trap all floating point
+> -	 * register accesses to EL2, however, the ARM ARM clearly states that
+> -	 * traps are only taken to EL2 if the operation would not otherwise
+> -	 * trap to EL1.  Therefore, always make sure that for 32-bit guests,
+> -	 * we set FPEXC.EN to prevent traps to EL1, when setting the TFP bit.
+> -	 * If FP/ASIMD is not implemented, FPEXC is UNDEFINED and any access to
+> -	 * it will cause an exception.
+> -	 */
+> -	if (vcpu_el1_is_32bit(vcpu) && system_supports_fpsimd()) {
+> -		write_sysreg(1 << 30, fpexc32_el2);
+> -		isb();
+> -	}
+> -}
+> -
+>  static void __hyp_text __activate_traps_common(struct kvm_vcpu *vcpu)
+>  {
+>  	/* Trap on AArch32 cp15 c15 (impdef sysregs) accesses (EL1 or EL0) */
+> @@ -98,10 +72,8 @@ static void activate_traps_vhe(struct kvm_vcpu *vcpu)
+>  	val = read_sysreg(cpacr_el1);
+>  	val |= CPACR_EL1_TTA;
+>  	val &= ~CPACR_EL1_ZEN;
+> -	if (!update_fp_enabled(vcpu)) {
+> +	if (!update_fp_enabled(vcpu))
+>  		val &= ~CPACR_EL1_FPEN;
+> -		__activate_traps_fpsimd32(vcpu);
+> -	}
+>  
+>  	write_sysreg(val, cpacr_el1);
+>  
+> @@ -116,10 +88,8 @@ static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
+>  
+>  	val = CPTR_EL2_DEFAULT;
+>  	val |= CPTR_EL2_TTA | CPTR_EL2_TZ;
+> -	if (!update_fp_enabled(vcpu)) {
+> +	if (!update_fp_enabled(vcpu))
+>  		val |= CPTR_EL2_TFP;
+> -		__activate_traps_fpsimd32(vcpu);
+> -	}
+>  
+>  	write_sysreg(val, cptr_el2);
+>  }
+> @@ -366,11 +336,6 @@ static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
+>  
+>  	__fpsimd_restore_state(&vcpu->arch.ctxt.gp_regs.fp_regs);
+>  
+> -	/* Skip restoring fpexc32 for AArch64 guests */
+> -	if (!(read_sysreg(hcr_el2) & HCR_RW))
+> -		write_sysreg(vcpu->arch.ctxt.sys_regs[FPEXC32_EL2],
+> -			     fpexc32_el2);
+> -
+>  	vcpu->arch.flags |= KVM_ARM64_FP_ENABLED;
+>  
+>  	return true;
+> @@ -522,9 +487,6 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+>  
+>  	sysreg_restore_host_state_vhe(host_ctxt);
+>  
+> -	if (vcpu->arch.flags & KVM_ARM64_FP_ENABLED)
+> -		__fpsimd_save_fpexc32(vcpu);
+> -
+>  	__debug_switch_to_host(vcpu);
+>  
+>  	return exit_code;
+> @@ -580,9 +542,6 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+>  
+>  	__sysreg_restore_state_nvhe(host_ctxt);
+>  
+> -	if (vcpu->arch.flags & KVM_ARM64_FP_ENABLED)
+> -		__fpsimd_save_fpexc32(vcpu);
+> -
+>  	/*
+>  	 * This must come after restoring the host sysregs, since a non-VHE
+>  	 * system may enable SPE here and make use of the TTBRs.
+> diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+> index 9ce2239..12994a9 100644
+> --- a/arch/arm64/kvm/hyp/sysreg-sr.c
+> +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+> @@ -195,6 +195,7 @@ void __hyp_text __sysreg32_save_state(struct kvm_vcpu *vcpu)
+>  
+>  	sysreg[DACR32_EL2] = read_sysreg(dacr32_el2);
+>  	sysreg[IFSR32_EL2] = read_sysreg(ifsr32_el2);
+> +	sysreg[FPEXC32_EL2] = read_sysreg(fpexc32_el2);
+>  
+>  	if (has_vhe() || vcpu->arch.flags & KVM_ARM64_DEBUG_DIRTY)
+>  		sysreg[DBGVCR32_EL2] = read_sysreg(dbgvcr32_el2);
+> @@ -217,6 +218,7 @@ void __hyp_text __sysreg32_restore_state(struct kvm_vcpu *vcpu)
+>  
+>  	write_sysreg(sysreg[DACR32_EL2], dacr32_el2);
+>  	write_sysreg(sysreg[IFSR32_EL2], ifsr32_el2);
+> +	write_sysreg(sysreg[FPEXC32_EL2], fpexc32_el2);
+>  
+>  	if (has_vhe() || vcpu->arch.flags & KVM_ARM64_DEBUG_DIRTY)
+>  		write_sysreg(sysreg[DBGVCR32_EL2], dbgvcr32_el2);
+> -- 
+> 2.1.4
+> 
