@@ -1,125 +1,58 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 5 Sep 2018 14:34:36 -0600
-Subject: [PATCH 1/1] coresight: etm4x: Configure EL2 exception level when
- kernel is running in HYP
-In-Reply-To: <20180904142034.19116-1-tnowicki@caviumnetworks.com>
-References: <20180904142034.19116-1-tnowicki@caviumnetworks.com>
-Message-ID: <20180905203436.GA16793@xps15>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Wed, 5 Sep 2018 13:36:20 -0700
+Subject: [RESEND PATCHv2 1/4] ARM: dts: add support for building DT
+ overlays
+In-Reply-To: <1536048344-9995-2-git-send-email-t-kristo@ti.com>
+References: <1535719666-13595-1-git-send-email-t-kristo@ti.com>
+ <1536048344-9995-1-git-send-email-t-kristo@ti.com>
+ <1536048344-9995-2-git-send-email-t-kristo@ti.com>
+Message-ID: <71d48595-f40f-acce-2660-ce1630ffc398@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
++cc: devicetree-compiler at vger.kernel.org
 
-On Tue, Sep 04, 2018 at 04:20:34PM +0200, Tomasz Nowicki wrote:
-> For non-VHE systems host kernel runs at EL1 and jumps to EL2 whenever
-> hypervisor code should be executed. In this case ETM4x driver must
-> restrict configuration to EL1 when it setups kernel tracing.
-> However, there is no separate hypervisor privilege level when VHE
-> is enabled, the host kernel runs at EL2.
+     For context on the device-tree compiler list, this patch is for
+     the Linux kernel.
+
+On 09/04/18 01:05, Tero Kristo wrote:
+> Add simple support for building DT overlays. This just compiles any
+> given .dtso file under the base arch/arm/boot/dts directory into
+> a .dtbo.
 > 
-> This patch fixes configuration of TRCACATRn register for VHE systems
-> so that ETM_EXLEVEL_NS_HYP bit is used instead of ETM_EXLEVEL_NS_OS
-> to on/off kernel tracing. At the same time, it moves common code
-> to new helper.
-> 
-> Signed-off-by: Tomasz Nowicki <tnowicki@caviumnetworks.com>
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
 > ---
->  drivers/hwtracing/coresight/coresight-etm4x.c | 39 ++++++++++---------
->  1 file changed, 20 insertions(+), 19 deletions(-)
+>  arch/arm/Makefile | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-> index f79b0ea85d76..5f495c942f99 100644
-> --- a/drivers/hwtracing/coresight/coresight-etm4x.c
-> +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-> @@ -28,6 +28,7 @@
->  #include <linux/pm_runtime.h>
->  #include <asm/sections.h>
->  #include <asm/local.h>
-> +#include <asm/virt.h>
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index d1516f8..ab555a0 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -339,7 +339,7 @@ $(BOOT_TARGETS): vmlinux
+>  $(INSTALL_TARGETS):
+>  	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
 >  
->  #include "coresight-etm4x.h"
->  #include "coresight-etm-perf.h"
-> @@ -606,7 +607,7 @@ static void etm4_set_default_config(struct etmv4_config *config)
->  	config->vinst_ctrl |= BIT(0);
->  }
+> -%.dtb: | scripts
+> +%.dtb %.dtbo: | scripts
+>  	$(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) $(boot)/dts/$@
 >  
-> -static u64 etm4_get_access_type(struct etmv4_config *config)
-> +static u64 etm4_get_ns_access_type(struct etmv4_config *config)
->  {
->  	u64 access_type = 0;
->  
-> @@ -617,17 +618,27 @@ static u64 etm4_get_access_type(struct etmv4_config *config)
->  	 *   Bit[13] Exception level 1 - OS
->  	 *   Bit[14] Exception level 2 - Hypervisor
->  	 *   Bit[15] Never implemented
-> -	 *
-> -	 * Always stay away from hypervisor mode.
->  	 */
-> -	access_type = ETM_EXLEVEL_NS_HYP;
->  
-
-Extra space 
-
-> -	if (config->mode & ETM_MODE_EXCL_KERN)
-> -		access_type |= ETM_EXLEVEL_NS_OS;
-> +	if (!is_kernel_in_hyp_mode()) {
-> +		/* Stay away from hypervisor mode for non-VHE */
-> +		access_type =  ETM_EXLEVEL_NS_HYP;
-> +		if (config->mode & ETM_MODE_EXCL_KERN)
-> +			access_type |= ETM_EXLEVEL_NS_OS;
-> +	} else if (config->mode & ETM_MODE_EXCL_KERN) {
-> +		access_type = ETM_EXLEVEL_NS_HYP;
-> +	}
->  
->  	if (config->mode & ETM_MODE_EXCL_USER)
->  		access_type |= ETM_EXLEVEL_NS_APP;
->  
-> +	return access_type;
-> +}
-> +
-> +static u64 etm4_get_access_type(struct etmv4_config *config)
-> +{
-> +	u64 access_type = etm4_get_ns_access_type(config);
-> +
->  	/*
->  	 * EXLEVEL_S, bits[11:8], don't trace anything happening
->  	 * in secure state.
-> @@ -881,20 +892,10 @@ void etm4_config_trace_mode(struct etmv4_config *config)
->  
->  	addr_acc = config->addr_acc[ETM_DEFAULT_ADDR_COMP];
->  	/* clear default config */
-> -	addr_acc &= ~(ETM_EXLEVEL_NS_APP | ETM_EXLEVEL_NS_OS);
-> +	addr_acc &= ~(ETM_EXLEVEL_NS_APP | ETM_EXLEVEL_NS_OS |
-> +			ETM_EXLEVEL_NS_HYP);
-
-Indentation problems
-
->  
-> -	/*
-> -	 * EXLEVEL_NS, bits[15:12]
-> -	 * The Exception levels are:
-> -	 *   Bit[12] Exception level 0 - Application
-> -	 *   Bit[13] Exception level 1 - OS
-> -	 *   Bit[14] Exception level 2 - Hypervisor
-> -	 *   Bit[15] Never implemented
-> -	 */
-> -	if (mode & ETM_MODE_EXCL_KERN)
-> -		addr_acc |= ETM_EXLEVEL_NS_OS;
-> -	else
-> -		addr_acc |= ETM_EXLEVEL_NS_APP;
-> +	addr_acc |= etm4_get_ns_access_type(config);
->  
->  	config->addr_acc[ETM_DEFAULT_ADDR_COMP] = addr_acc;
->  	config->addr_acc[ETM_DEFAULT_ADDR_COMP + 1] = addr_acc;
-
-I tested your patch on my side and it didn't break kernel space decoding.
-
-Since it would have taken longer to ask you to respin than to make the changes
-myself, I applied your patch with the above modifications.
-
-Thanks,
-Mathieu
-
-> -- 
-> 2.17.1
+>  PHONY += dtbs dtbs_install
 > 
+
+The idea of adding knowledge of .dtso and .dtbo files to the dtc
+compiler, but that idea and the related patches have fallen by
+the wayside.
+
+Current overlay sources and blobs are properly handled by dtc when
+they are .dts and .dtb files.
+
+If the dtc compiler is updated with knowledge of .dtso and .dtbo
+then these changes would be needed.  At the moment the distinction
+of a .dtso and .dtbo is a naming convention that provides a clue
+about the intended use of the file.  But dtc does not know these
+file name extensions, requiring a specific flag to tell dtc to
+treat them as .dts or .dtb files.  I think the negative outweighs
+the positive for this patch.
+
+-Frank
