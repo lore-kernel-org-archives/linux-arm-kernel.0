@@ -1,82 +1,53 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed,  5 Sep 2018 11:57:38 +0200
-Subject: [PATCH 13/13] nvmem: use SPDX license identifiers
-In-Reply-To: <20180905095738.26406-1-brgl@bgdev.pl>
-References: <20180905095738.26406-1-brgl@bgdev.pl>
-Message-ID: <20180905095738.26406-14-brgl@bgdev.pl>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed,  5 Sep 2018 12:00:15 +0200
+Subject: [PATCH v2 1/4] dt-bindings: media: Add i.MX Pixel Pipeline binding
+In-Reply-To: <20180905100018.27556-1-p.zabel@pengutronix.de>
+References: <20180905100018.27556-1-p.zabel@pengutronix.de>
+Message-ID: <20180905100018.27556-2-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Add DT binding documentation for the Pixel Pipeline (PXP) found on
+various NXP i.MX SoCs.
 
-Use SPDX license identiefiers to core nvmem files and remove GPL 2.0
-license boilerplate.
-
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- drivers/nvmem/core.c           | 10 +---------
- include/linux/nvmem-consumer.h |  5 +----
- include/linux/nvmem-provider.h |  5 +----
- 3 files changed, 3 insertions(+), 17 deletions(-)
+ .../devicetree/bindings/media/fsl-pxp.txt     | 26 +++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/fsl-pxp.txt
 
-diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index d7c609109cfd..9a4eaedaa5ea 100644
---- a/drivers/nvmem/core.c
-+++ b/drivers/nvmem/core.c
-@@ -1,17 +1,9 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * nvmem framework core.
-  *
-  * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-  * Copyright (C) 2013 Maxime Ripard <maxime.ripard@free-electrons.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 and
-- * only version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #include <linux/device.h>
-diff --git a/include/linux/nvmem-consumer.h b/include/linux/nvmem-consumer.h
-index 8a6405febc32..e417e28d6aa2 100644
---- a/include/linux/nvmem-consumer.h
-+++ b/include/linux/nvmem-consumer.h
-@@ -1,12 +1,9 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * nvmem framework consumer.
-  *
-  * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-  * Copyright (C) 2013 Maxime Ripard <maxime.ripard@free-electrons.com>
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-  */
- 
- #ifndef _LINUX_NVMEM_CONSUMER_H
-diff --git a/include/linux/nvmem-provider.h b/include/linux/nvmem-provider.h
-index 07ab1ea73520..02ac0dcb2001 100644
---- a/include/linux/nvmem-provider.h
-+++ b/include/linux/nvmem-provider.h
-@@ -1,12 +1,9 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * nvmem framework provider.
-  *
-  * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-  * Copyright (C) 2013 Maxime Ripard <maxime.ripard@free-electrons.com>
-- *
-- * This file is licensed under the terms of the GNU General Public
-- * License version 2.  This program is licensed "as is" without any
-- * warranty of any kind, whether express or implied.
-  */
- 
- #ifndef _LINUX_NVMEM_PROVIDER_H
+diff --git a/Documentation/devicetree/bindings/media/fsl-pxp.txt b/Documentation/devicetree/bindings/media/fsl-pxp.txt
+new file mode 100644
+index 000000000000..2477e7f87381
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/fsl-pxp.txt
+@@ -0,0 +1,26 @@
++Freescale Pixel Pipeline
++========================
++
++The Pixel Pipeline (PXP) is a memory-to-memory graphics processing engine
++that supports scaling, colorspace conversion, alpha blending, rotation, and
++pixel conversion via lookup table. Different versions are present on various
++i.MX SoCs from i.MX23 to i.MX7.
++
++Required properties:
++- compatible: should be "fsl,<soc>-pxp", where SoC can be one of imx23, imx28,
++  imx6dl, imx6sl, imx6ul, imx6sx, imx6ull, or imx7d.
++- reg: the register base and size for the device registers
++- interrupts: the PXP interrupt, two interrupts for imx6ull and imx7d.
++- clock-names: should be "axi"
++- clocks: the PXP AXI clock
++
++Example:
++
++pxp at 21cc000 {
++	compatible = "fsl,imx6ull-pxp";
++	reg = <0x021cc000 0x4000>;
++	interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
++		     <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
++	clock-names = "axi";
++	clocks = <&clks IMX6UL_CLK_PXP>;
++};
 -- 
 2.18.0
