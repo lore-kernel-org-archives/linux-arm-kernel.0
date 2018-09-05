@@ -1,58 +1,56 @@
 From: frowand.list@gmail.com (Frank Rowand)
-Date: Wed, 5 Sep 2018 13:36:20 -0700
-Subject: [RESEND PATCHv2 1/4] ARM: dts: add support for building DT
- overlays
-In-Reply-To: <1536048344-9995-2-git-send-email-t-kristo@ti.com>
+Date: Wed, 5 Sep 2018 13:36:31 -0700
+Subject: [RESEND PATCHv2 2/4] ARM: dts: add support for individual build
+ flags for DT subdirs
+In-Reply-To: <1536048344-9995-3-git-send-email-t-kristo@ti.com>
 References: <1535719666-13595-1-git-send-email-t-kristo@ti.com>
  <1536048344-9995-1-git-send-email-t-kristo@ti.com>
- <1536048344-9995-2-git-send-email-t-kristo@ti.com>
-Message-ID: <71d48595-f40f-acce-2660-ce1630ffc398@gmail.com>
+ <1536048344-9995-3-git-send-email-t-kristo@ti.com>
+Message-ID: <45fada0c-af5c-ee94-9878-8ea78a34da26@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+cc: devicetree-compiler at vger.kernel.org
-
-     For context on the device-tree compiler list, this patch is for
-     the Linux kernel.
-
 On 09/04/18 01:05, Tero Kristo wrote:
-> Add simple support for building DT overlays. This just compiles any
-> given .dtso file under the base arch/arm/boot/dts directory into
-> a .dtbo.
+> Currently the makefile is setup in such manner that even if
+> we build a DT file in a subdirectory under arch/arm/boot/dts,
+> it gets built based on the base boot/dts/Makefile rules.
+> This patch modifies the base makefile in such manner, that
+> it detects which makefile to use based on build target path.
+> This allows setting for example per-directory DTC_FLAGS and
+> using those for the subdir build. The dtbdir local variable
+> is setup to target to the build path.
 > 
 > Signed-off-by: Tero Kristo <t-kristo@ti.com>
 > ---
->  arch/arm/Makefile | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm/Makefile | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
 > 
 > diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index d1516f8..ab555a0 100644
+> index ab555a0..b7c21e8 100644
 > --- a/arch/arm/Makefile
 > +++ b/arch/arm/Makefile
-> @@ -339,7 +339,7 @@ $(BOOT_TARGETS): vmlinux
+> @@ -339,8 +339,10 @@ $(BOOT_TARGETS): vmlinux
 >  $(INSTALL_TARGETS):
 >  	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
 >  
-> -%.dtb: | scripts
-> +%.dtb %.dtbo: | scripts
->  	$(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) $(boot)/dts/$@
+> +%.dtb %.dtbo: dtbdir = $(patsubst %/,%,$(patsubst %./,%,$(boot)/dts/$(dir $@)))
+> +
+>  %.dtb %.dtbo: | scripts
+> -	$(Q)$(MAKE) $(build)=$(boot)/dts MACHINE=$(MACHINE) $(boot)/dts/$@
+> +	$(Q)$(MAKE) $(build)=$(dtbdir) MACHINE=$(MACHINE) $(boot)/dts/$@
 >  
 >  PHONY += dtbs dtbs_install
+>  
 > 
 
-The idea of adding knowledge of .dtso and .dtbo files to the dtc
-compiler, but that idea and the related patches have fallen by
-the wayside.
+The makefile magic to handle subdirectories below $(boot)/dts/ already
+works properly to have Makefiles in $(boot)/dts/, using the following
+rule in arch/arm64/Makefile:
 
-Current overlay sources and blobs are properly handled by dtc when
-they are .dts and .dtb files.
+%.dtb: scripts
+        $(Q)$(MAKE) $(build)=$(boot)/dts $(boot)/dts/$@
 
-If the dtc compiler is updated with knowledge of .dtso and .dtbo
-then these changes would be needed.  At the moment the distinction
-of a .dtso and .dtbo is a naming convention that provides a clue
-about the intended use of the file.  But dtc does not know these
-file name extensions, requiring a specific flag to tell dtc to
-treat them as .dts or .dtb files.  I think the negative outweighs
-the positive for this patch.
-
--Frank
+I don't understand why that works for arm64, but it should work the
+same way for arm.  Or if arch/arm is missing another piece from
+arch/arm64 we should be consistent with however the make system
+specifies it in arch/arm64
