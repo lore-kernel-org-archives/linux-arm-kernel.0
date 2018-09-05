@@ -1,223 +1,142 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 5 Sep 2018 11:37:15 +0200
-Subject: [PATCH] arm64: defconfig: enable EFI_ARMSTUB_DTB_LOADER
-In-Reply-To: <CACxGe6uK+N5XUqZhH7gAQXoq+QXMvFPHF_i4WqivrufTU=0cog@mail.gmail.com>
-References: <1535563287-24803-1-git-send-email-scott.branden@broadcom.com>
- <CAOesGMhjcJ1p3QcEYb9fsx3fMXAOsgR2njOq=VKgEbWGwJi36g@mail.gmail.com>
- <fb07b89d-d427-5e59-9f17-b12df26284ec@broadcom.com>
- <CAKv+Gu-R7eX=aj=O2-gpzmp0K4t0T4s536UiqJZs0WuxRjkYwQ@mail.gmail.com>
- <CAOesGMho8CfT7iDXadmkB5=7DoOi6n8qXcS9X643vf+Y0BbD6w@mail.gmail.com>
- <CAKv+Gu_mKU+RdPgg2Dfezy4-L+KDEEBx02R49ObomRhEkJJ6Mw@mail.gmail.com>
- <CAOesGMgLHx3+j1bWEsMWsN-yjGNZyLOpAjLg0Jut8gG=ADE25g@mail.gmail.com>
- <CAKv+Gu_x=bS4xJcD_LuEnnN=Lx4Jc87uK8J_ACdA9EeUqtM3Yg@mail.gmail.com>
- <CACxGe6uK+N5XUqZhH7gAQXoq+QXMvFPHF_i4WqivrufTU=0cog@mail.gmail.com>
-Message-ID: <CAKv+Gu_zDJ11+CjgpBPRm2C66sUq6bzGGA2EBCZoDXa-3NdYNA@mail.gmail.com>
+From: daniel@zonque.org (Daniel Mack)
+Date: Wed, 5 Sep 2018 11:37:41 +0200
+Subject: [PATCH] spi: Do not print a message if
+ spi_controller_{suspend,resume}() fails
+In-Reply-To: <20180905085157.7807-1-geert+renesas@glider.be>
+References: <20180905085157.7807-1-geert+renesas@glider.be>
+Message-ID: <e07ddaed-1e8a-af59-c28d-46fa9dd08b0a@zonque.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant,
+On Wednesday, September 05, 2018 10:51 AM, Geert Uytterhoeven wrote:
+> spi_controller_{suspend,resume}() already prints an error message on
+> failure, so there is no need to repeat this in individual drivers.
+> 
+> Note: spi_master_{suspend,resume}() is an alias for
+>        spi_controller_{suspend,resume}().
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Thanks for chiming in.
+For PXA:
 
-On 4 September 2018 at 12:13, Grant Likely <grant.likely@secretlab.ca> wrote:
-> Hey folks. More comments below, but the short answer is I really don't
-> see what the problem is. Distros cannot easily support platforms that
-> require a dtb= parameter, and so they probably won't. They may or may
-> not disable 'dtb=', depending on whether they see it as valuable for
-> debug.
->
-> Vertically integrated platforms are a different beast. We may strongly
-> recommend firmware provides the dtb for all the mentioned good
-> reasons, but they still get to decide their deployment methodology,
-> and it is not burdensome for the kernel to keep the dtb= feature that
-> they are using.
->
-> On Tue, Sep 4, 2018 at 7:24 AM Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>
->> On 2 September 2018 at 04:54, Olof Johansson <olof@lixom.net> wrote:
->> > On Thu, Aug 30, 2018 at 9:23 AM, Ard Biesheuvel
->> > <ard.biesheuvel@linaro.org> wrote:
->> >> On 30 August 2018 at 17:06, Olof Johansson <olof@lixom.net> wrote:
->> >>> On Wed, Aug 29, 2018 at 10:54 PM, Ard Biesheuvel
->> >>> <ard.biesheuvel@linaro.org> wrote:
->> >>>> On 29 August 2018 at 20:59, Scott Branden <scott.branden@broadcom.com> wrote:
->> >>>>> Hi Olof,
->> >>>>>
->> >>>>>
->> >>>>> On 18-08-29 11:44 AM, Olof Johansson wrote:
->> >>>>>>
->> >>>>>> Hi,
->> >>>>>>
->> >>>>>> On Wed, Aug 29, 2018 at 10:21 AM, Scott Branden
->> >>>>>> <scott.branden@broadcom.com> wrote:
->> >>>>>>>
->> >>>>>>> Enable EFI_ARMSTUB_DTB_LOADER to add support for the dtb= command line
->> >>>>>>> parameter to function with efi loader.
->> >>>>>>>
->> >>>>>>> Required to boot on existing bootloaders that do not support devicetree
->> >>>>>>> provided by the platform or by the bootloader.
->> >>>>>>>
->> >>>>>>> Fixes: 3d7ee348aa41 ("efi/libstub/arm: Add opt-in Kconfig option for the
->> >>>>>>> DTB loader")
->> >>>>>>> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
->> >>>>>>
->> >>>>>> Why did Ard create an option for this if it's just going be turned on
->> >>>>>> in default configs? Doesn't make sense to me.
->> >>>>>>
->> >>>>>> It would help to know what firmware still is crippled and how common
->> >>>>>> it is, since it's been a few years that this has been a requirement by
->> >>>>>> now.
->> >>>>>
->> >>>>> Broadcom NS2 and Stingray in current development and production need this
->> >>>>> option in the kernel enabled in order to boot.
->> >>>>
->> >>>> And these production systems run mainline kernels in a defconfig configuration?
->> >>>>
->> >>>> The simply reality is that the DTB loader has been deprecated for a
->> >>>> good reason: it was only ever intended as a development hack anyway,
->> >>>> and if we need to treat the EFI stub provided DTB as a first class
->> >>>> citizen, there are things we need to fix to make things works as
->> >>>> expected. For instance, GRUB will put a property in the /chosen node
->> >>>> for the initramfs which will get dropped if you boot with dtb=.
->> >>>>
->> >>>> Don't be surprised if some future enhancements of the EFI stub code
->> >>>> depend on !EFI_ARMSTUB_DTB_LOADER.
->
-> That's an odd statement to make. The DTB loader code is well contained
-> and with defined semantics... True, the semantics are "I DON'T BELIEVE
-> FIRMWARE", but it is still well defined. What scenario are you
-> envisioning where EFI_ARMSTUB_DTB_LOADER would be explicitly excluded?
->
+Reviewed-by: Daniel Mack <daniel@zonque.org>
 
-Well, to be honest, I don't have a real-world example at hand, but my
-concern is about cases where the firmware provided DTB and the
-override DTB diverge in a way that leaves it up to the EFI stub to
-reconcile them and/or to reason about which one it should prefer.
-
-One example could be OP-TEE support: currently, we put a
-/firmware/optee node in the DT to inform the OS that OP-TEE is running
-in the secure world. If we allow a DT to be provided via dtb= that
-provides such a node, we are blocking all future opportunities in
-future kernels to do any kind of preparatory OP-TEE related
-initialization in the EFI stub [while boot services are still
-available] unless we decide to make it the EFI stub's problem to
-reason about which version of the DT is the correct one to use. What
-if the firmware's DT has /firmware/optee/status = disabled and the
-dtb= one does not?
-
-Another trivial example is GRUB: passing dtb= via the command line
-will break initrds loaded via GRUB, since they are passed via the
-/chosen node.
-
-> Conversely, the dtb= argument is an invaluable debug tool during
-> development. As Olof has already said, there are a lot of embedded
-> deployments where there is no desire for grub or any other
-> intermediary loader.
->
-
-Agreed.
-
-So perhaps the conclusion here is that dtb= should be supported fully
-if no DTB is provided by the firmware in the first place, and only
-marginally (perhaps with a taint) when the firmware provides one as
-well.
-
-
->> >>>> On UEFI systems, DTBs [or ACPI
->> >>>> tables] are used by the firmware to describe itself and the underlying
->> >>>> platform to the OS, and the practice of booting with DTB file images
->> >>>> (taken from the kernel build as well) conflicts with that view. Note
->> >>>> that GRUB still permits you to load DTBs from files (and supports more
->> >>>> sources than just the file system the kernel Image was loaded from).
->> >>>
->> >>> Ard,
->> >>>
->> >>> Maybe a WARN() splat would be more useful as a phasing-out method than
->> >>> removing functionality for them that needs to be reinstated through
->> >>> changing the config?
->> >>>
->> >>
->> >> We don't have any of that in the stub, and inventing new ways to pass
->> >> such information between the stub and the kernel proper seems like a
->> >> cart-before-horse kind of thing to me. The EFI stub diagnostic
->> >> messages you get on the serial console are not recorded in the kernel
->> >> log buffer, so they only appear if you actually look at the serial
->> >> output.
->
-> As an aside, they probably should be recorded. That is probably a
-> question for the UEFI USWG. Grub and the ARMSTUB could probably bodge
-> something together, but that would be non-standard.
->
->> >
->> > Ah yeah. I suppose you could do it in the kernel later if you detect
->> > you've booted through EFI with dtb= on the command line though.
->> >
->> >>
->> >>> Once the stub and the boot method is there, it's hard to undo as we
->> >>> can see here. Being loud and warn might be more useful, and set a
->> >>> timeline for hard removal (12 months?).
->> >>>
->> >>
->> >> The dtb= handling is still there, it is just not enabled by default.
->> >> We can keep it around if people are still using it. But as I pointed
->> >> out, we may decide to make new functionality available only if it is
->> >> disabled, and at that point, we'll have to choose between one or the
->> >> other in defconfig, which is annoying.
->> >>
->> >>> Scott; an alternative for you is to do a boot wrapper that bundles a
->> >>> DT and kernel, and boot that instead of the kernel image (outside of
->> >>> the kernel tree). Some 32-bit platforms from Marvell use that. That
->> >>> way the kernel will just see it as a normally passed in DT.
->> >>>
->> >>
->> >> Or use GRUB. It comes wired up in all the distros, and let's you load
->> >> a DT binary from anywhere you can imagine, as opposed to the EFI stub
->> >> which can only load it if it happens to reside in the same file system
->> >> (or even directory - I can't remember) as the kernel image. Note that
->> >> the same reservations apply to doing that - the firmware is no longer
->> >> able to describe itself to the OS via the DT, which is really the only
->> >> conduit it has available on an arm64 system..
->> >
->> > So, I've looked at the history here a bit, and dtb= support was
->> > introduced in 2014. Nowhere does it say that it isn't a recommended
->> > way of booting.
->> >
->> > There are some firmware stacks today that modify and provide a
->> > runtime-updated devicetree to the kernel, but there are also a bunch
->> > who don't. Most "real" products will want a firmware that knows how to
->> > pass in things such as firmware environment variables, or MAC
->> > addresses, etc, to the kernel, but not all of them need it.
->> >
->> > In particular, in a world where you want EFI to be used on embedded
->> > platforms, requiring another bootloader step such as GRUB to be able
->> > to reasonably boot said platforms seems like a significant and
->> > unfortunate new limitation. Documentation/efi-stub.txt has absolutely
->> > no indication that it is a second-class option that isn't expected to
->> > be available everywhere. It doesn't really matter what _your_
->> > intention was around it, if those who use it never found out and now
->> > rely on it.
->> >
->> > Unfortunately the way forward here is to revert 3d7ee348aa4127a.
->> >
->>
->> I agree with your analysis but not with your conclusion.
->>
->> Whether or not the option is def_bool y and/or enabled in defconfig is
->> a matter of policy. ACPI-only distros such as RHEL are definitely
->> going to disable this option. But in general, supporting DTBs loaded
->> from files is a huge pain for the distros, so I expect most of them to
->> disable it as well.
->
-> I support leaving 3d7ee348 in, and making it def_bool y
->
-> g.
->>
->> As for EFI on embedded systems: this will be mostly on U-boot's
->> bootefi implementation, which definitely does the right thing when it
->> comes to passing the DTB via a UEFI configuration table (regardless of
->> whether it makes any modifications to it)
->>
->> In any case, I won't object to a patch that reenables the EFI stub DTB
->> loader in defconfig. Whether or not it should be def_bool y is
->> something we can discuss as well. I have added Leif and Alex to cc,
->> perhaps they have anything to add.
+> ---
+>   drivers/spi/spi-atmel.c    | 10 ++--------
+>   drivers/spi/spi-dw.c       |  7 +------
+>   drivers/spi/spi-fsl-espi.c |  4 +---
+>   drivers/spi/spi-pl022.c    |  8 ++------
+>   drivers/spi/spi-pxa2xx.c   |  8 +-------
+>   5 files changed, 7 insertions(+), 30 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+> index 3f890d16293411ba..74fddcd3282b4bea 100644
+> --- a/drivers/spi/spi-atmel.c
+> +++ b/drivers/spi/spi-atmel.c
+> @@ -1767,10 +1767,8 @@ static int atmel_spi_suspend(struct device *dev)
+>   
+>   	/* Stop the queue running */
+>   	ret = spi_master_suspend(master);
+> -	if (ret) {
+> -		dev_warn(dev, "cannot suspend master\n");
+> +	if (ret)
+>   		return ret;
+> -	}
+>   
+>   	if (!pm_runtime_suspended(dev))
+>   		atmel_spi_runtime_suspend(dev);
+> @@ -1799,11 +1797,7 @@ static int atmel_spi_resume(struct device *dev)
+>   	}
+>   
+>   	/* Start the queue running */
+> -	ret = spi_master_resume(master);
+> -	if (ret)
+> -		dev_err(dev, "problem starting queue (%d)\n", ret);
+> -
+> -	return ret;
+> +	return spi_master_resume(master);
+>   }
+>   #endif
+>   
+> diff --git a/drivers/spi/spi-dw.c b/drivers/spi/spi-dw.c
+> index ac2eb89ef7a5a061..1736612ee86be7dd 100644
+> --- a/drivers/spi/spi-dw.c
+> +++ b/drivers/spi/spi-dw.c
+> @@ -572,13 +572,8 @@ EXPORT_SYMBOL_GPL(dw_spi_suspend_host);
+>   
+>   int dw_spi_resume_host(struct dw_spi *dws)
+>   {
+> -	int ret;
+> -
+>   	spi_hw_init(&dws->master->dev, dws);
+> -	ret = spi_controller_resume(dws->master);
+> -	if (ret)
+> -		dev_err(&dws->master->dev, "fail to start queue (%d)\n", ret);
+> -	return ret;
+> +	return spi_controller_resume(dws->master);
+>   }
+>   EXPORT_SYMBOL_GPL(dw_spi_resume_host);
+>   
+> diff --git a/drivers/spi/spi-fsl-espi.c b/drivers/spi/spi-fsl-espi.c
+> index 1e8ff6256079f134..cf2118dc91f44548 100644
+> --- a/drivers/spi/spi-fsl-espi.c
+> +++ b/drivers/spi/spi-fsl-espi.c
+> @@ -798,10 +798,8 @@ static int of_fsl_espi_suspend(struct device *dev)
+>   	int ret;
+>   
+>   	ret = spi_master_suspend(master);
+> -	if (ret) {
+> -		dev_warn(dev, "cannot suspend master\n");
+> +	if (ret)
+>   		return ret;
+> -	}
+>   
+>   	return pm_runtime_force_suspend(dev);
+>   }
+> diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
+> index 1af8c96b940e203d..5f5f197b153c3ec4 100644
+> --- a/drivers/spi/spi-pl022.c
+> +++ b/drivers/spi/spi-pl022.c
+> @@ -2325,10 +2325,8 @@ static int pl022_suspend(struct device *dev)
+>   	int ret;
+>   
+>   	ret = spi_master_suspend(pl022->master);
+> -	if (ret) {
+> -		dev_warn(dev, "cannot suspend master\n");
+> +	if (ret)
+>   		return ret;
+> -	}
+>   
+>   	ret = pm_runtime_force_suspend(dev);
+>   	if (ret) {
+> @@ -2353,9 +2351,7 @@ static int pl022_resume(struct device *dev)
+>   
+>   	/* Start the queue running */
+>   	ret = spi_master_resume(pl022->master);
+> -	if (ret)
+> -		dev_err(dev, "problem starting queue (%d)\n", ret);
+> -	else
+> +	if (!ret)
+>   		dev_dbg(dev, "resumed\n");
+>   
+>   	return ret;
+> diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
+> index 14f4ea59caff7a23..e3cbc66a7061b42f 100644
+> --- a/drivers/spi/spi-pxa2xx.c
+> +++ b/drivers/spi/spi-pxa2xx.c
+> @@ -1808,13 +1808,7 @@ static int pxa2xx_spi_resume(struct device *dev)
+>   		lpss_ssp_setup(drv_data);
+>   
+>   	/* Start the queue running */
+> -	status = spi_controller_resume(drv_data->master);
+> -	if (status != 0) {
+> -		dev_err(dev, "problem starting queue (%d)\n", status);
+> -		return status;
+> -	}
+> -
+> -	return 0;
+> +	return spi_controller_resume(drv_data->master);
+>   }
+>   #endif
+>   
+> 
