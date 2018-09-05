@@ -1,376 +1,150 @@
-From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Wed, 5 Sep 2018 16:31:43 +0800
-Subject: [PATCH v2 10/13] drm/mediatek: add hdmi driver for MT2701 and MT7623
-In-Reply-To: <20180905083146.14727-1-bibby.hsieh@mediatek.com>
-References: <20180905083146.14727-1-bibby.hsieh@mediatek.com>
-Message-ID: <20180905083146.14727-11-bibby.hsieh@mediatek.com>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Wed, 5 Sep 2018 14:29:09 +0530
+Subject: [PATCH v2 2/2] phy: zynqmp: Add dt bindings for ZynqMP phy
+In-Reply-To: <1535976844-12494-3-git-send-email-anurag.kumar.vulisha@xilinx.com>
+References: <1535976844-12494-1-git-send-email-anurag.kumar.vulisha@xilinx.com>
+ <1535976844-12494-3-git-send-email-anurag.kumar.vulisha@xilinx.com>
+Message-ID: <2831a270-a4d1-ba51-e13f-85c029bbe8c0@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: chunhui dai <chunhui.dai@mediatek.com>
 
-This patch adds hdmi dirver suppot for both MT2701 and MT7623.
-And also support other (existing or future) chips that use
-the same binding and driver.
 
-Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
----
- drivers/gpu/drm/mediatek/Makefile              |   1 +
- drivers/gpu/drm/mediatek/mtk_hdmi.h            |   1 +
- drivers/gpu/drm/mediatek/mtk_hdmi_phy.c        |   3 +
- drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c | 307 +++++++++++++++++++++++++
- 4 files changed, 312 insertions(+)
- create mode 100644 drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c
+On 9/3/2018 5:44 PM, Anurag Kumar Vulisha wrote:
+> This patch adds the document describing dt bindings for ZynqMP
+> phy. ZynqMP SOC has a High Speed Processing System Gigabit
+> Transceiver which provides PHY capabilties to USB, SATA,
+> PCIE, Display Port and Ehernet SGMII controllers.
+>
+> Signed-off-by: Anurag Kumar Vulisha <anurag.kumar.vulisha@xilinx.com>
+> ---
+>   changes in v2:
+> 	1. None
+> ---
+>   .../devicetree/bindings/phy/phy-zynqmp.txt         | 104 +++++++++++++++++++++
+>   1 file changed, 104 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/phy/phy-zynqmp.txt
+>
+> diff --git a/Documentation/devicetree/bindings/phy/phy-zynqmp.txt b/Documentation/devicetree/bindings/phy/phy-zynqmp.txt
+> new file mode 100644
+> index 0000000..2eed553
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/phy/phy-zynqmp.txt
+> @@ -0,0 +1,104 @@
+> +Xilinx ZynqMP PHY binding
+> +
+> +This binding describes a ZynqMP PHY device that is used to control ZynqMP
+> +High Speed Gigabit Transceiver(GT). ZynqMP PS GTR provides four lanes
+> +and are used by USB, SATA, PCIE, Display port and Ethernet SGMMI controllers.
+> +
+> +Phy provider node
+> +=================
+> +
+> +Required properties:
+> +- compatible	: Can be "xlnx,zynqmp-psgtr-v1.1" or "xlnx,zynqmp-psgtr"
+> +		  "xlnx,zynqmp-psgtr-v1.1" has "xlnx,tx_termination_fix" removed
+This is not very clear. You can rather mention this statement for the 
+property.
+e.g. In "xlnx,tx_termination_fix" you can write - this is not required 
+for "xlnx,zynqmp-psgtr-v1.1.
 
-diff --git a/drivers/gpu/drm/mediatek/Makefile b/drivers/gpu/drm/mediatek/Makefile
-index 7f947979d68f..bf0067b5ee6f 100644
---- a/drivers/gpu/drm/mediatek/Makefile
-+++ b/drivers/gpu/drm/mediatek/Makefile
-@@ -2,6 +2,7 @@
- mediatek-drm-hdmi-objs := mtk_cec.o \
- 			  mtk_hdmi.o \
- 			  mtk_hdmi_ddc.o \
-+                          mtk_mt2701_hdmi_phy.o \
- 			  mtk_mt8173_hdmi_phy.o \
- 			  mtk_hdmi_phy.o
- 
-diff --git a/drivers/gpu/drm/mediatek/mtk_hdmi.h b/drivers/gpu/drm/mediatek/mtk_hdmi.h
-index a350a6c9271f..fa12eb6288f3 100644
---- a/drivers/gpu/drm/mediatek/mtk_hdmi.h
-+++ b/drivers/gpu/drm/mediatek/mtk_hdmi.h
-@@ -45,5 +45,6 @@ extern struct platform_driver mtk_cec_driver;
- extern struct platform_driver mtk_hdmi_ddc_driver;
- extern struct platform_driver mtk_hdmi_phy_driver;
- extern struct mtk_hdmi_phy_conf mtk_hdmi_phy_8173_conf;
-+extern struct mtk_hdmi_phy_conf mtk_hdmi_phy_2701_conf;
- 
- #endif /* _MTK_HDMI_CTRL_H */
-diff --git a/drivers/gpu/drm/mediatek/mtk_hdmi_phy.c b/drivers/gpu/drm/mediatek/mtk_hdmi_phy.c
-index 82ed73575e04..606fc7a0c13b 100644
---- a/drivers/gpu/drm/mediatek/mtk_hdmi_phy.c
-+++ b/drivers/gpu/drm/mediatek/mtk_hdmi_phy.c
-@@ -135,6 +135,9 @@ static int mtk_hdmi_phy_remove(struct platform_device *pdev)
- }
- 
- static const struct of_device_id mtk_hdmi_phy_match[] = {
-+	{ .compatible = "mediatek,mt2701-hdmi-phy",
-+	  .data = &mtk_hdmi_phy_2701_conf,
-+	},
- 	{ .compatible = "mediatek,mt8173-hdmi-phy",
- 	  .data = &mtk_hdmi_phy_8173_conf,
- 	},
-diff --git a/drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c b/drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c
-new file mode 100644
-index 000000000000..428ef1557a14
---- /dev/null
-+++ b/drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c
-@@ -0,0 +1,307 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright (c) 2018 MediaTek Inc.
-+ * Author: Chunhui Dai <chunhui.dai@mediatek.com>
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+#include <linux/debugfs.h>
-+#include <linux/delay.h>
-+#include <linux/kernel.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/of_platform.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/phy/phy.h>
-+#include <linux/slab.h>
-+#include "mtk_hdmi.h"
-+
-+#define HDMI_CON0	0x00
-+#define RG_HDMITX_DRV_IBIAS		(0)
-+#define RG_HDMITX_DRV_IBIAS_MASK	(0x3F << 0)
-+#define RG_HDMITX_EN_SER		(12)
-+#define RG_HDMITX_EN_SER_MASK		(0x0F << 12)
-+#define RG_HDMITX_EN_SLDO		(16)
-+#define RG_HDMITX_EN_SLDO_MASK		(0x0F << 16)
-+#define RG_HDMITX_EN_PRED		(20)
-+#define RG_HDMITX_EN_PRED_MASK		(0x0F << 20)
-+#define RG_HDMITX_EN_IMP		(24)
-+#define RG_HDMITX_EN_IMP_MASK		(0x0F << 24)
-+#define RG_HDMITX_EN_DRV		(28)
-+#define RG_HDMITX_EN_DRV_MASK		(0x0F << 28)
-+
-+#define HDMI_CON1	0x04
-+#define RG_HDMITX_PRED_IBIAS		(18)
-+#define RG_HDMITX_PRED_IBIAS_MASK	(0x0F << 18)
-+#define RG_HDMITX_PRED_IMP		(0x01 << 22)
-+#define RG_HDMITX_DRV_IMP		(26)
-+#define RG_HDMITX_DRV_IMP_MASK		(0x3F << 26)
-+
-+#define HDMI_CON2	0x08
-+#define RG_HDMITX_EN_TX_CKLDO		(0x01 << 0)
-+#define RG_HDMITX_EN_TX_POSDIV		(0x01 << 1)
-+#define RG_HDMITX_TX_POSDIV		(3)
-+#define RG_HDMITX_TX_POSDIV_MASK	(0x03 << 3)
-+#define RG_HDMITX_EN_MBIAS		(0x01 << 6)
-+#define RG_HDMITX_MBIAS_LPF_EN		(0x01 << 7)
-+
-+#define HDMI_CON4	0x10
-+#define RG_HDMITX_RESERVE_MASK		(0xFFFFFFFF << 0)
-+
-+#define HDMI_CON6	0x18
-+#define RG_HTPLL_BR			(0)
-+#define RG_HTPLL_BR_MASK		(0x03 << 0)
-+#define RG_HTPLL_BC			(2)
-+#define RG_HTPLL_BC_MASK		(0x03 << 2)
-+#define RG_HTPLL_BP			(4)
-+#define RG_HTPLL_BP_MASK		(0x0F << 4)
-+#define RG_HTPLL_IR			(8)
-+#define RG_HTPLL_IR_MASK		(0x0F << 8)
-+#define RG_HTPLL_IC			(12)
-+#define RG_HTPLL_IC_MASK		(0x0F << 12)
-+#define RG_HTPLL_POSDIV			(16)
-+#define RG_HTPLL_POSDIV_MASK		(0x03 << 16)
-+#define RG_HTPLL_PREDIV			(18)
-+#define RG_HTPLL_PREDIV_MASK		(0x03 << 18)
-+#define RG_HTPLL_FBKSEL			(20)
-+#define RG_HTPLL_FBKSEL_MASK		(0x03 << 20)
-+#define RG_HTPLL_RLH_EN			(0x01 << 22)
-+#define RG_HTPLL_FBKDIV			(24)
-+#define RG_HTPLL_FBKDIV_MASK		(0x7F << 24)
-+#define RG_HTPLL_EN			(0x01 << 31)
-+
-+#define HDMI_CON7	0x1c
-+#define RG_HTPLL_AUTOK_EN		(0x01 << 23)
-+#define RG_HTPLL_DIVEN			(28)
-+#define RG_HTPLL_DIVEN_MASK		(0x07 << 28)
-+
-+static inline struct mtk_hdmi_phy *to_mtk_hdmi_pll(struct clk_hw *hw)
-+{
-+	return container_of(hw, struct mtk_hdmi_phy, pll_hw);
-+}
-+
-+static inline void mtk_hdmi_pll_mask(struct mtk_hdmi_phy *hdmi_phy, u32 offset,
-+				     u32 val, u32 mask)
-+{
-+	u32 tmp = readl(hdmi_phy->regs  + offset) & ~mask;
-+
-+	tmp |= (val & mask);
-+	writel(tmp, hdmi_phy->regs + offset);
-+}
-+
-+static int mtk_hdmi_pll_enable(struct clk_hw *hw)
-+{
-+	struct mtk_hdmi_phy *hdmi_phy = to_mtk_hdmi_pll(hw);
-+
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON7, RG_HTPLL_AUTOK_EN,
-+			  RG_HTPLL_AUTOK_EN);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, 0, RG_HTPLL_RLH_EN);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, (0x3 << RG_HTPLL_POSDIV),
-+			  RG_HTPLL_POSDIV_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_MBIAS,
-+			  RG_HDMITX_EN_MBIAS);
-+	usleep_range(80, 100);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, RG_HTPLL_EN, RG_HTPLL_EN);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_TX_CKLDO,
-+			  RG_HDMITX_EN_TX_CKLDO);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, (0xf << RG_HDMITX_EN_SLDO),
-+			  RG_HDMITX_EN_SLDO_MASK);
-+	usleep_range(80, 100);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, RG_HDMITX_MBIAS_LPF_EN,
-+			  RG_HDMITX_MBIAS_LPF_EN);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_TX_POSDIV,
-+			  RG_HDMITX_EN_TX_POSDIV);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, (0xf << RG_HDMITX_EN_SER),
-+			  RG_HDMITX_EN_SER_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, (0xf << RG_HDMITX_EN_PRED),
-+			  RG_HDMITX_EN_PRED_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, (0xf << RG_HDMITX_EN_DRV),
-+			  RG_HDMITX_EN_DRV_MASK);
-+	usleep_range(80, 100);
-+	return 0;
-+}
-+
-+static void mtk_hdmi_pll_disable(struct clk_hw *hw)
-+{
-+	struct mtk_hdmi_phy *hdmi_phy = to_mtk_hdmi_pll(hw);
-+
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, 0, RG_HDMITX_EN_DRV_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, 0, RG_HDMITX_EN_PRED_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, 0, RG_HDMITX_EN_SER_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, 0, RG_HDMITX_EN_TX_POSDIV);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, 0, RG_HDMITX_MBIAS_LPF_EN);
-+	usleep_range(80, 100);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, 0, RG_HDMITX_EN_SLDO_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, 0, RG_HDMITX_EN_TX_CKLDO);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, 0, RG_HTPLL_EN);
-+	usleep_range(80, 100);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, 0, RG_HDMITX_EN_MBIAS);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, 0, RG_HTPLL_POSDIV_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, 0, RG_HTPLL_RLH_EN);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON7, 0, RG_HTPLL_AUTOK_EN);
-+	usleep_range(80, 100);
-+}
-+
-+static int mtk_hdmi_pll_set_rate(struct clk_hw *hw, unsigned long rate,
-+				 unsigned long parent_rate)
-+{
-+	struct mtk_hdmi_phy *hdmi_phy = to_mtk_hdmi_pll(hw);
-+	u32 pos_div;
-+
-+	if (rate <= 64000000)
-+		pos_div = 3;
-+	else if (rate <= 12800000)
-+		pos_div = 1;
-+	else
-+		pos_div = 1;
-+
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, (0x3 << RG_HTPLL_PREDIV),
-+			  RG_HTPLL_PREDIV_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, (0x3 << RG_HTPLL_POSDIV),
-+			  RG_HTPLL_POSDIV_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, (0x1 << RG_HTPLL_IC),
-+			  RG_HTPLL_IC_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, (0x1 << RG_HTPLL_IR),
-+			  RG_HTPLL_IR_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, (pos_div << RG_HDMITX_TX_POSDIV),
-+			  RG_HDMITX_TX_POSDIV_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, (1 << RG_HTPLL_FBKSEL),
-+			  RG_HTPLL_FBKSEL_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, (19 << RG_HTPLL_FBKDIV),
-+			  RG_HTPLL_FBKDIV_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON7, (0x2 << RG_HTPLL_DIVEN),
-+			  RG_HTPLL_DIVEN_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, (0xc << RG_HTPLL_BP),
-+			  RG_HTPLL_BP_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, (0x2 << RG_HTPLL_BC),
-+			  RG_HTPLL_BC_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, (0x1 << RG_HTPLL_BR),
-+			  RG_HTPLL_BR_MASK);
-+
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON1, 0, RG_HDMITX_PRED_IMP);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON1, (0x3 << RG_HDMITX_PRED_IBIAS),
-+			  RG_HDMITX_PRED_IBIAS_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, (0x0 << RG_HDMITX_EN_IMP),
-+			  RG_HDMITX_EN_IMP_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON1, (0x28 << RG_HDMITX_DRV_IMP),
-+			  RG_HDMITX_DRV_IMP_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON4, 0x28, RG_HDMITX_RESERVE_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, (0xa << RG_HDMITX_DRV_IBIAS),
-+			  RG_HDMITX_DRV_IBIAS_MASK);
-+	return 0;
-+}
-+
-+static long mtk_hdmi_pll_round_rate(struct clk_hw *hw, unsigned long rate,
-+				    unsigned long *parent_rate)
-+{
-+	struct mtk_hdmi_phy *hdmi_phy = to_mtk_hdmi_pll(hw);
-+
-+	hdmi_phy->pll_rate = rate;
-+	return rate;
-+}
-+
-+static unsigned long mtk_hdmi_pll_recalc_rate(struct clk_hw *hw,
-+					      unsigned long parent_rate)
-+{
-+	struct mtk_hdmi_phy *hdmi_phy = to_mtk_hdmi_pll(hw);
-+
-+	return hdmi_phy->pll_rate;
-+}
-+
-+static const struct clk_ops mtk_hdmi_phy_pll_ops = {
-+	.enable = mtk_hdmi_pll_enable,
-+	.disable = mtk_hdmi_pll_disable,
-+	.set_rate = mtk_hdmi_pll_set_rate,
-+	.round_rate = mtk_hdmi_pll_round_rate,
-+	.recalc_rate = mtk_hdmi_pll_recalc_rate,
-+};
-+
-+static void mtk_hdmi_phy_enable_tmds(struct mtk_hdmi_phy *hdmi_phy)
-+{
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON7, RG_HTPLL_AUTOK_EN,
-+			  RG_HTPLL_AUTOK_EN);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, 0, RG_HTPLL_RLH_EN);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, (0x3 << RG_HTPLL_POSDIV),
-+			  RG_HTPLL_POSDIV_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_MBIAS,
-+			  RG_HDMITX_EN_MBIAS);
-+	usleep_range(80, 100);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, RG_HTPLL_EN, RG_HTPLL_EN);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_TX_CKLDO,
-+			  RG_HDMITX_EN_TX_CKLDO);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, (0xf << RG_HDMITX_EN_SLDO),
-+			  RG_HDMITX_EN_SLDO_MASK);
-+	usleep_range(80, 100);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, RG_HDMITX_MBIAS_LPF_EN,
-+			  RG_HDMITX_MBIAS_LPF_EN);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_TX_POSDIV,
-+			  RG_HDMITX_EN_TX_POSDIV);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, (0xf << RG_HDMITX_EN_SER),
-+			  RG_HDMITX_EN_SER_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, (0xf << RG_HDMITX_EN_PRED),
-+			  RG_HDMITX_EN_PRED_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, (0xf << RG_HDMITX_EN_DRV),
-+			  RG_HDMITX_EN_DRV_MASK);
-+	usleep_range(80, 100);
-+}
-+
-+static void mtk_hdmi_phy_disable_tmds(struct mtk_hdmi_phy *hdmi_phy)
-+{
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, 0, RG_HDMITX_EN_DRV_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, 0, RG_HDMITX_EN_PRED_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, 0, RG_HDMITX_EN_SER_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, 0, RG_HDMITX_EN_TX_POSDIV);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, 0, RG_HDMITX_MBIAS_LPF_EN);
-+	usleep_range(80, 100);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, 0, RG_HDMITX_EN_SLDO_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, 0, RG_HDMITX_EN_TX_CKLDO);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, 0, RG_HTPLL_EN);
-+	usleep_range(80, 100);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, 0, RG_HDMITX_EN_MBIAS);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, 0, RG_HTPLL_POSDIV_MASK);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, 0, RG_HTPLL_RLH_EN);
-+	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON7, 0, RG_HTPLL_AUTOK_EN);
-+	usleep_range(80, 100);
-+}
-+
-+static int mtk_hdmi_phy_power_on(struct phy *phy)
-+{
-+	struct mtk_hdmi_phy *hdmi_phy = phy_get_drvdata(phy);
-+	int ret;
-+
-+	ret = clk_prepare_enable(hdmi_phy->pll);
-+	if (ret < 0)
-+		return ret;
-+
-+	mtk_hdmi_phy_enable_tmds(hdmi_phy);
-+
-+	return 0;
-+}
-+
-+static int mtk_hdmi_phy_power_off(struct phy *phy)
-+{
-+	struct mtk_hdmi_phy *hdmi_phy = phy_get_drvdata(phy);
-+
-+	mtk_hdmi_phy_disable_tmds(hdmi_phy);
-+	clk_disable_unprepare(hdmi_phy->pll);
-+
-+	return 0;
-+}
-+
-+static const struct phy_ops mtk_hdmi_phy_dev_ops = {
-+	.power_on = mtk_hdmi_phy_power_on,
-+	.power_off = mtk_hdmi_phy_power_off,
-+	.owner = THIS_MODULE,
-+};
-+
-+struct mtk_hdmi_phy_conf mtk_hdmi_phy_2701_conf = {
-+	.tz_enabled = false,
-+	.hdmi_phy_clk_ops = &mtk_hdmi_phy_pll_ops,
-+	.hdmi_phy_dev_ops = &mtk_hdmi_phy_dev_ops,
-+};
-+
-+MODULE_AUTHOR("Chunhui Dai <chunhui.dai@mediatek.com>");
-+MODULE_DESCRIPTION("MediaTek HDMI PHY Driver");
-+MODULE_LICENSE("GPL v2");
--- 
-2.12.5.2.gbdf23ab
+> +
+> +- reg           : Address and length of register sets for each device in
+> +                  "reg-names"
+> +
+> +- reg-names     : The names of the register addresses corresponding to the
+> +		  registers filled in "reg":
+> +			- serdes: SERDES block register set
+> +			- siou: SIOU block register set
+> +
+> +Optional properties:
+> +- xlnx,tx_termination_fix : Include this for fixing functional issue with the
+> +		  TX termination resistance in GT, which can be out of spec for
+> +		  the XCZU9EG silicon version.
+> +
+> +Required nodes	:  A sub-node is required for each lane the controller
+> +		   provides.
+> +
+> +Phy sub-nodes
+> +=============
+> +
+> +Required properties:
+> +lane0:
+> +- #phy-cells	: Should be 4
+> +
+> +lane1:
+> +- #phy-cells	: Should be 4
+> +
+> +lane2:
+> +- #phy-cells	: Should be 4
+> +
+> +lane3:
+> +- #phy-cells	: Should be 4
+> +
+> +Example:
+> +	serdes: zynqmp_phy at fd400000 {
+
+phy is not just the serdes. Also s/zynqmp_phy/phy
+
+This could be:
+ ??????????????????? zynqmp_phy: phy at fd400000
+
+regards
+Vivek
+> +		compatible = "xlnx,zynqmp-psgtr-v1.1";
+> +		status = "okay";
+> +		reg = <0x0 0xfd400000 0x0 0x40000>, <0x0 0xfd3d0000 0x0 0x1000>;
+> +		reg-names = "serdes", "siou";
+> +
+> +		lane0: lane at 0 {
+> +			#phy-cells = <4>;
+> +		};
+> +		lane1: lane at 1 {
+> +			#phy-cells = <4>;
+> +		};
+> +		lane2: lane at 2 {
+> +			#phy-cells = <4>;
+> +		};
+> +		lane3: lane at 3 {
+> +			#phy-cells = <4>;
+> +		};
+> +	};
+> +
+> +Specifying phy control of devices
+> +=================================
+> +
+> +Device nodes should specify the configuration required in their "phys"
+> +property, containing a phandle to the phy port node and a device type.
+> +
+> +phys = <PHANDLE CONTROLLER_TYPE CONTROLLER_INSTANCE LANE_NUM LANE_FREQ>;
+> +
+> +PHANDLE                 = &lane0 or &lane1 or &lane2 or &lane3
+> +CONTROLLER_TYPE         = PHY_TYPE_PCIE or PHY_TYPE_SATA or PHY_TYPE_USB
+> +			  or PHY_TYPE_DP or PHY_TYPE_SGMII
+> +CONTROLLER_INSTANCE     = Depends on controller type used, can be any of
+> +				PHY_TYPE_PCIE : 0 or 1 or 2 or 3
+> +				PHY_TYPE_SATA : 0 or 1
+> +				PHY_TYPE_USB  : 0 or 1
+> +				PHY_TYPE_DP   : 0 or 1
+> +				PHY_TYPE_SGMII: 0 or 1 or 2 or 3
+> +LANE_NUM                = Depends on which lane clock is used as ref clk, can be
+> +			  0 or 1 or 2 or 3
+> +LANE_FREQ               = Frequency that controller can operate, can be any of
+> +			  19.2Mhz,20Mhz,24Mhz,26Mhz,27Mhz,28.4Mhz,40Mhz,52Mhz,
+> +			  100Mhz,108Mhz,125Mhz,135Mhz,150Mhz
+> +
+> +Example:
+> +
+> +#include <dt-bindings/phy/phy.h>
+> +
+> +	usb at fe200000 {
+> +		...
+> +		phys	  = <&lane2 PHY_TYPE_USB3 0 2 2600000>;
+> +		...
+> +	};
+> +
+> +	ahci at fd0c0000 {
+> +		...
+> +		phys	  = <&lane3 PHY_TYPE_SATA 1 1 125000000>;
+> +		...
+> +	};
