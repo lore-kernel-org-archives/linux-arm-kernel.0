@@ -1,54 +1,109 @@
 From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Wed, 5 Sep 2018 12:54:47 +0530
-Subject: [RFC PATCH v2 2/3] dt-bindings: fpga: Add bindings for ZynqMP fpga
- driver
+Date: Wed, 5 Sep 2018 12:54:46 +0530
+Subject: [RFC PATCH v2 1/3] firmware: xilinx: Add fpga API's
 In-Reply-To: <20180905072448.12488-1-nava.manne@xilinx.com>
 References: <20180905072448.12488-1-nava.manne@xilinx.com>
-Message-ID: <20180905072448.12488-3-nava.manne@xilinx.com>
+Message-ID: <20180905072448.12488-2-nava.manne@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add documentation to describe Xilinx ZynqMP fpga driver
-bindings.
+This Patch Adds fpga API's to support the Bitstream loading
+by using firmware interface.
 
 Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
 ---
 Changes for v2:
-                -Moved pcap node as a child to firwmare
-                 node as suggested by Rob.
+                -New Patch.
 
- .../firmware/xilinx/xlnx,zynqmp-firmware.txt        | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ drivers/firmware/xilinx/zynqmp.c     | 46 ++++++++++++++++++++++++++++
+ include/linux/firmware/xlnx-zynqmp.h |  4 +++
+ 2 files changed, 50 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-index 1b431d9bbe44..ef0c3978e6e7 100644
---- a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-+++ b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-@@ -16,6 +16,16 @@ Required properties:
- 		Permitted values are:
- 		  - "smc" : SMC #0, following the SMCCC
- 		  - "hvc" : HVC #0, following the SMCCC
-+--------------------------------------------------------------------------
-+Device Tree zynqmp-fpga bindings for the Zynq Ultrascale+ MPSoC controlled
-+using ZynqMP SoC firmware interface
-+--------------------------------------------------------------------------
-+For Bitstream configuration on ZynqMp Soc uses processor configuration
-+port(PCAP) to configure the programmable logic(PL) through PS by using
-+FW interface.
-+
-+Required properties:
-+- compatible: should contain "xlnx,zynqmp-pcap-fpga"
+diff --git a/drivers/firmware/xilinx/zynqmp.c b/drivers/firmware/xilinx/zynqmp.c
+index 7ccedf083926..9b3a59512dd7 100644
+--- a/drivers/firmware/xilinx/zynqmp.c
++++ b/drivers/firmware/xilinx/zynqmp.c
+@@ -447,6 +447,50 @@ static int zynqmp_pm_clock_getparent(u32 clock_id, u32 *parent_id)
+ 	return ret;
+ }
  
- -------
- Example
-@@ -25,5 +35,8 @@ firmware {
- 	zynqmp_firmware: zynqmp-firmware {
- 		compatible = "xlnx,zynqmp-firmware";
- 		method = "smc";
-+		zynqmp_pcap: pcap {
-+			compatible = "xlnx,zynqmp-pcap-fpga";
-+		};
- 	};
++/**
++ * zynqmp_pm_fpga_load - Perform the fpga load
++ * @address:	Address to write to
++ * @size:	pl bitstream size
++ * @flags:
++ *	BIT(0) - Bit-stream type.
++ *		 0 - Full Bit-stream.
++ *		 1 - Partial Bit-stream.
++ *
++ * This function provides access to pmufw. To transfer
++ * the required bitstream into PL.
++ *
++ * Return: Returns status, either success or error+reason
++ */
++static int zynqmp_pm_fpga_load(const u64 address, const u32 size,
++			       const u32 flags)
++{
++	return zynqmp_pm_invoke_fn(PM_FPGA_LOAD, lower_32_bits(address),
++				   upper_32_bits(address), size, flags, NULL);
++}
++
++/**
++ * zynqmp_pm_fpga_get_status - Read value from PCAP status register
++ * @value: Value to read
++ *
++ * This function provides access to the xilfpga library to get
++ * the PCAP status
++ *
++ * Return: Returns status, either success or error+reason
++ */
++static int zynqmp_pm_fpga_get_status(u32 *value)
++{
++	u32 ret_payload[PAYLOAD_ARG_CNT];
++	int ret;
++
++	if (!value)
++		return -EINVAL;
++
++	ret = zynqmp_pm_invoke_fn(PM_FPGA_GET_STATUS, 0, 0, 0, 0, ret_payload);
++	*value = ret_payload[1];
++
++	return ret;
++}
++
+ static const struct zynqmp_eemi_ops eemi_ops = {
+ 	.get_api_version = zynqmp_pm_get_api_version,
+ 	.ioctl = zynqmp_pm_ioctl,
+@@ -460,6 +504,8 @@ static const struct zynqmp_eemi_ops eemi_ops = {
+ 	.clock_getrate = zynqmp_pm_clock_getrate,
+ 	.clock_setparent = zynqmp_pm_clock_setparent,
+ 	.clock_getparent = zynqmp_pm_clock_getparent,
++	.fpga_load = zynqmp_pm_fpga_load,
++	.fpga_get_status = zynqmp_pm_fpga_get_status,
  };
+ 
+ /**
+diff --git a/include/linux/firmware/xlnx-zynqmp.h b/include/linux/firmware/xlnx-zynqmp.h
+index 58a74781b51d..5a6bd5e58ea4 100644
+--- a/include/linux/firmware/xlnx-zynqmp.h
++++ b/include/linux/firmware/xlnx-zynqmp.h
+@@ -34,6 +34,8 @@
+ 
+ enum pm_api_id {
+ 	PM_GET_API_VERSION = 1,
++	PM_FPGA_LOAD = 22,
++	PM_FPGA_GET_STATUS,
+ 	PM_IOCTL = 34,
+ 	PM_QUERY_DATA,
+ 	PM_CLOCK_ENABLE,
+@@ -90,6 +92,8 @@ struct zynqmp_pm_query_data {
+ 
+ struct zynqmp_eemi_ops {
+ 	int (*get_api_version)(u32 *version);
++	int (*fpga_load)(const u64 address, const u32 size, const u32 flags);
++	int (*fpga_get_status)(u32 *value);
+ 	int (*ioctl)(u32 node_id, u32 ioctl_id, u32 arg1, u32 arg2, u32 *out);
+ 	int (*query_data)(struct zynqmp_pm_query_data qdata, u32 *out);
+ 	int (*clock_enable)(u32 clock_id);
 -- 
 2.18.0
