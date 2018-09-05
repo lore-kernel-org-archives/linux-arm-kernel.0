@@ -1,27 +1,27 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 5 Sep 2018 09:22:24 +0200
-Subject: [PATCH v4 10/11] drm/sun4i: Add support for HDMI voltage regulator
-In-Reply-To: <20180904044053.15425-11-icenowy@aosc.io>
-References: <20180904044053.15425-1-icenowy@aosc.io>
- <20180904044053.15425-11-icenowy@aosc.io>
-Message-ID: <20180905072224.w5u3djfxxxc2h2pc@flea>
+Date: Wed, 5 Sep 2018 09:25:19 +0200
+Subject: [PATCH v5 0/9] ata: ahci_platform: support allwinner R40 AHCI
+In-Reply-To: <f70d43de-1305-997e-687a-d6e9978e37f5@kernel.dk>
+References: <20180903100201.23131-1-clabbe.montjoie@gmail.com>
+ <f70d43de-1305-997e-687a-d6e9978e37f5@kernel.dk>
+Message-ID: <20180905072519.wx4wgdklinyysad6@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 04, 2018 at 12:40:52PM +0800, Icenowy Zheng wrote:
-> From: Jernej Skrabec <jernej.skrabec@siol.net>
+On Mon, Sep 03, 2018 at 08:26:22AM -0600, Jens Axboe wrote:
+> On 9/3/18 4:01 AM, Corentin Labbe wrote:
+> > This patchset add support for allwinner R40 AHCI controller.
+> > 
+> > The whole patchset is tested on sun8i-r40-bananapi-m2-ultra and
+> > on sun7i-a20-cubieboard2 which doesnt have any of the ressources added
+> > by this serie, so no regression should come with it.
+> > 
+> > Patchs 1-7 should go via the ata tree
+> > Patchs 8,9 should go via the sunxi tree
 > 
-> Some boards have HDMI VCC pin connected to voltage regulator which may
-> not be turned on by default.
-> 
-> Add support for such boards by adding voltage regulator handling code to
-> HDMI driver.
-> 
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> [Icenowy: change supply name to "hvcc"]
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> Applied 1-7 for 4.20, thanks everyone.
 
-Applied, thanks!
+Applied 8 and 9, thanks!
 Maxime
 
 -- 
@@ -34,4 +34,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180905/89e3ed55/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180905/38e83f0c/attachment.sig>
