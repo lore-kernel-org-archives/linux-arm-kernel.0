@@ -1,117 +1,64 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 6 Sep 2018 00:49:52 +0200
-Subject: [PATCH 2/2] crypto: skcipher: Remove VLA usage for
- SKCIPHER_REQUEST_ON_STACK
-In-Reply-To: <CAGXu5jKmcuhULMR=O9B_hJAxEK8uV36uoMxm4F3F8yYSuMzYNA@mail.gmail.com>
-References: <20180904181629.20712-1-keescook@chromium.org>
- <20180904181629.20712-3-keescook@chromium.org>
- <CAKv+Gu9uJ+ZjBSCM=aU0GDvYR72cy2k8reXdLV5on3dOVw8KdQ@mail.gmail.com>
- <CAGXu5jKmcuhULMR=O9B_hJAxEK8uV36uoMxm4F3F8yYSuMzYNA@mail.gmail.com>
-Message-ID: <CAKv+Gu_0vWUqkUex45iW=pAfUbKVsqzP9MDf6OOwTg-nUVPZNg@mail.gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Wed, 5 Sep 2018 15:53:23 -0700
+Subject: [linux-sunxi] [PATCH v4 11/11] arm64: dts: allwinner: a64: Enable
+ HDMI output on A64 boards w/ HDMI
+In-Reply-To: <CAMty3ZAVr_d+Rwry_DMWY221OC+YSWmReNm-TXzYWgpd1s68+w@mail.gmail.com>
+References: <20180904044053.15425-1-icenowy@aosc.io>
+ <20180904044053.15425-12-icenowy@aosc.io>
+ <CAMty3ZCvpUf0nJ3WuPccP8BizBP=Uc8ChzB8SeN8fkX2iS1E_Q@mail.gmail.com>
+ <20180905075136.chumwosx76o2n66l@flea>
+ <CAMty3ZAVr_d+Rwry_DMWY221OC+YSWmReNm-TXzYWgpd1s68+w@mail.gmail.com>
+Message-ID: <CA+E=qVdWXWztLj3989X+U+=4P5FpM4hs+6ByVmq8bf7mPeiWsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 September 2018 at 23:05, Kees Cook <keescook@chromium.org> wrote:
-> On Wed, Sep 5, 2018 at 2:18 AM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
->> On 4 September 2018 at 20:16, Kees Cook <keescook@chromium.org> wrote:
->>> In the quest to remove all stack VLA usage from the kernel[1], this
->>> caps the skcipher request size similar to other limits and adds a sanity
->>> check at registration. Looking at instrumented tcrypt output, the largest
->>> is for lrw:
+I can test it tonight.
+
+On Wed, Sep 5, 2018 at 12:57 AM, Jagan Teki <jagan@amarulasolutions.com> wrote:
+> On Wed, Sep 5, 2018 at 1:21 PM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+>> On Wed, Sep 05, 2018 at 12:56:03PM +0530, Jagan Teki wrote:
+>>> On Tue, Sep 4, 2018 at 10:10 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
+>>> > From: Jagan Teki <jagan@amarulasolutions.com>
+>>> >
+>>> > Enable all necessary device tree nodes and add connector node to device
+>>> > trees for all supported A64 boards with HDMI.
+>>> >
+>>> > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+>>> > [Icenowy: squash all board patches altogether and change supply name]
+>>> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>>> > ---
+>>> > Changes in v4:
+>>> > - Rebase some device trees.
+>>> > Changes in v3,1:
+>>> > - Squash all enablement patches altogether.
+>>> > - Change supply name to match DT binding & driver change.
+>>> > Changes for v3:
+>>> > - Enable all pipeline components
+>>> > Changes for v2:
+>>> > - none
+>>> >
+>>> >  .../dts/allwinner/sun50i-a64-bananapi-m64.dts | 34 +++++++++++++++++++
+>>> >  .../dts/allwinner/sun50i-a64-nanopi-a64.dts   | 34 +++++++++++++++++++
+>>> >  .../dts/allwinner/sun50i-a64-olinuxino.dts    | 34 +++++++++++++++++++
+>>> >  .../dts/allwinner/sun50i-a64-orangepi-win.dts | 34 +++++++++++++++++++
+>>> >  .../boot/dts/allwinner/sun50i-a64-pine64.dts  | 34 +++++++++++++++++++
+>>> >  .../allwinner/sun50i-a64-sopine-baseboard.dts | 34 +++++++++++++++++++
+>>> >  6 files changed, 204 insertions(+)
 >>>
->>>         crypt: testing lrw(aes)
->>>         crypto_skcipher_set_reqsize: 8
->>>         crypto_skcipher_set_reqsize: 88
->>>         crypto_skcipher_set_reqsize: 472
+>>> Tested-by: Jagan Teki <jagan@amarulasolutions.com> # BPI-M64, OPI-Win,
+>>> A64-Olinuxino, NPI-A64
 >>>
+>>> Pine64 boards look unable by saying
+>>> [drm] Cannot find any crtc or sizes
+>>>
+>>> May be someone can confirm, it.
 >>
->> Are you sure this is a representative sampling? I haven't double
->> checked myself, but we have plenty of drivers for peripherals in
->> drivers/crypto that implement block ciphers, and they would not turn
->> up in tcrypt unless you are running on a platform that provides the
->> hardware in question.
+>> Then we should drop the pine64 additions until someone figures it out,
+>> as it has been already discussed.
 >
-> Hrm, excellent point. Looking at this again:
+> That is fine, but If anyone have pine64 can confirm this.
 >
-> The core part of the VLA is using this in the ON_STACK macro:
->
-> static inline unsigned int crypto_skcipher_reqsize(struct crypto_skcipher *tfm)
-> {
->         return tfm->reqsize;
-> }
->
-> I don't find any struct crypto_skcipher .reqsize static initializers,
-> and the initial reqsize is here:
->
-> static int crypto_init_skcipher_ops_ablkcipher(struct crypto_tfm *tfm)
-> {
-> ...
->         skcipher->reqsize = crypto_ablkcipher_reqsize(ablkcipher) +
->                             sizeof(struct ablkcipher_request);
->
-> with updates via crypto_skcipher_set_reqsize().
->
-> So I have to examine ablkcipher reqsize too:
->
-> static inline unsigned int crypto_ablkcipher_reqsize(
->         struct crypto_ablkcipher *tfm)
-> {
->         return crypto_ablkcipher_crt(tfm)->reqsize;
-> }
->
-> And of the crt_ablkcipher.reqsize assignments/initializers, I found:
->
-> ablkcipher reqsize:
-> 1       struct dcp_aes_req_ctx
-> 8       struct atmel_tdes_reqctx
-> 8       struct cryptd_blkcipher_request_ctx
-> 8       struct mtk_aes_reqctx
-> 8       struct omap_des_reqctx
-> 8       struct s5p_aes_reqctx
-> 8       struct sahara_aes_reqctx
-> 8       struct stm32_cryp_reqctx
-> 8       struct stm32_cryp_reqctx
-> 16      struct ablk_ctx
-> 24      struct atmel_aes_reqctx
-> 48      struct omap_aes_reqctx
-> 48      struct omap_aes_reqctx
-> 48      struct qat_crypto_request
-> 56      struct artpec6_crypto_request_context
-> 64      struct chcr_blkcipher_req_ctx
-> 80      struct spacc_req
-> 80      struct virtio_crypto_sym_request
-> 136     struct qce_cipher_reqctx
-> 168     struct n2_request_context
-> 328     struct ccp_des3_req_ctx
-> 400     struct ccp_aes_req_ctx
-> 536     struct hifn_request_context
-> 992     struct cvm_req_ctx
-> 2456    struct iproc_reqctx_s
->
-> The base ablkcipher wrapper is:
-> 80      struct ablkcipher_request
->
-> And in my earlier skcipher wrapper analysis, lrw was the largest
-> skcipher wrapper:
-> 384     struct rctx
->
-> iproc_reqctx_s is an extreme outlier, with cvm_req_ctx at a bit less than half.
->
-> Making this a 2920 byte fixed array doesn't seem sensible at all
-> (though that's what's already possible to use with existing
-> SKCIPHER_REQUEST_ON_STACK users).
->
-> What's the right path forward here?
->
-
-The skcipher implementations based on crypto IP blocks are typically
-asynchronous, and I wouldn't be surprised if a fair number of
-SKCIPHER_REQUEST_ON_STACK() users are limited to synchronous
-skciphers.
-
-So we could formalize this and limit SKCIPHER_REQUEST_ON_STACK() to
-synchronous skciphers, which implies that the reqsize limit only has
-to apply synchronous skciphers as well. But before we can do this, we
-have to identify the remaining occurrences that allow asynchronous
-skciphers to be used, and replace them with heap allocations.
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
