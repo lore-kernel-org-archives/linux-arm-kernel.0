@@ -1,133 +1,161 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 05 Sep 2018 10:44:53 +0300
-Subject: [PATCH 1/6] drm/bridge: use bus flags in bridge timings
-In-Reply-To: <4035252.QuWadVx7pr@avalon>
-References: <20180905052113.21262-1-stefan@agner.ch>
- <4035252.QuWadVx7pr@avalon>
-Message-ID: <1569297.pdEFdpi3HS@avalon>
+From: kyeongdon.kim@lge.com (Kyeongdon Kim)
+Date: Wed, 5 Sep 2018 16:44:54 +0900
+Subject: [PATCH v2] arm64: kasan: add interceptors for strcmp/strncmp
+ functions
+In-Reply-To: <12d4e435-e229-b4af-4286-a53fa77cb09d@virtuozzo.com>
+References: <1535014606-176525-1-git-send-email-kyeongdon.kim@lge.com>
+ <12d4e435-e229-b4af-4286-a53fa77cb09d@virtuozzo.com>
+Message-ID: <0bde837e-2804-c6d6-4bda-8b166bdcfc6b@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
 
-On Wednesday, 5 September 2018 10:06:28 EEST Laurent Pinchart wrote:
-> On Wednesday, 5 September 2018 08:21:08 EEST Stefan Agner wrote:
-> > The DRM bus flags convey additional information on pixel data on
-> > the bus. All current available bus flags might be of interest for
-> > a bridge. Remove the sampling_edge field and use bus_flags.
-> > 
-> > In the case at hand a dumb VGA bridge needs a specific data enable
-> > polarity (DRM_BUS_FLAG_DE_LOW).
-> > 
-> > Signed-off-by: Stefan Agner <stefan@agner.ch>
-> > ---
-> > 
-> >  drivers/gpu/drm/bridge/dumb-vga-dac.c |  6 +++---
-> >  include/drm/drm_bridge.h              | 11 +++++------
-> >  2 files changed, 8 insertions(+), 9 deletions(-)
-> > 
-> > diff --git a/drivers/gpu/drm/bridge/dumb-vga-dac.c
-> > b/drivers/gpu/drm/bridge/dumb-vga-dac.c index 9b706789a341..7a5c24967115
-> > 100644
-> > --- a/drivers/gpu/drm/bridge/dumb-vga-dac.c
-> > +++ b/drivers/gpu/drm/bridge/dumb-vga-dac.c
-> > @@ -234,7 +234,7 @@ static int dumb_vga_remove(struct platform_device
-> > *pdev) */
-> > 
-> >  static const struct drm_bridge_timings default_dac_timings = {
-> >  
-> >  	/* Timing specifications, datasheet page 7 */
-> > 
-> > -	.sampling_edge = DRM_BUS_FLAG_PIXDATA_POSEDGE,
-> > +	.bus_flags = DRM_BUS_FLAG_PIXDATA_POSEDGE,
-> > 
-> >  	.setup_time_ps = 500,
-> >  	.hold_time_ps = 1500,
-> >  
-> >  };
-> > 
-> > @@ -245,7 +245,7 @@ static const struct drm_bridge_timings
-> > default_dac_timings = { */
-> > 
-> >  static const struct drm_bridge_timings ti_ths8134_dac_timings = {
-> >  
-> >  	/* From timing diagram, datasheet page 9 */
-> > 
-> > -	.sampling_edge = DRM_BUS_FLAG_PIXDATA_POSEDGE,
-> > +	.bus_flags = DRM_BUS_FLAG_PIXDATA_POSEDGE,
-> > 
-> >  	/* From datasheet, page 12 */
-> >  	.setup_time_ps = 3000,
-> >  	/* I guess this means latched input */
-> > 
-> > @@ -258,7 +258,7 @@ static const struct drm_bridge_timings
-> > ti_ths8134_dac_timings = { */
-> > 
-> >  static const struct drm_bridge_timings ti_ths8135_dac_timings = {
-> >  
-> >  	/* From timing diagram, datasheet page 14 */
-> > 
-> > -	.sampling_edge = DRM_BUS_FLAG_PIXDATA_POSEDGE,
-> > +	.bus_flags = DRM_BUS_FLAG_PIXDATA_POSEDGE,
-> > 
-> >  	/* From datasheet, page 16 */
-> >  	.setup_time_ps = 2000,
-> >  	.hold_time_ps = 500,
-> > 
-> > diff --git a/include/drm/drm_bridge.h b/include/drm/drm_bridge.h
-> > index bd850747ce54..85d4b51eae19 100644
-> > --- a/include/drm/drm_bridge.h
-> > +++ b/include/drm/drm_bridge.h
-> > @@ -244,14 +244,13 @@ struct drm_bridge_funcs {
-> > 
-> >   */
-> >  
-> >  struct drm_bridge_timings {
-> >  
-> >  	/**
-> > 
-> > -	 * @sampling_edge:
-> > 
-> > +	 * @bus_flags:
-> >  	 *
-> > 
-> > -	 * Tells whether the bridge samples the digital input signal
-> > -	 * from the display engine on the positive or negative edge of the
-> > -	 * clock, this should reuse the DRM_BUS_FLAG_PIXDATA_[POS|NEG]EDGE
-> > -	 * bitwise flags from the DRM connector (bit 2 and 3 valid).
-> > +	 * Tells what additional settings for the pixel data on the bus
-> > +	 * this bridge requires (like pixel signal polarity). See also
-> > +	 * &drm_display_info->bus_flags.
-> > 
-> >  	 */
-> > 
-> > -	u32 sampling_edge;
-> > +	u32 bus_flags;
-> 
-> While I'm not opposed to extending the bridge structure to allow specifying
-> other flags, I think we're losing information here. The sampling_edge field
-> makes it clear that the DRM_BUS_FLAG_PIXDATA_(NEG|POS)EDGE flags specified
-> on which clock edge signals are sampled. bus_flags could be interpreted
-> differently, for instance as specifying on which clock edge signals are
-> output on the other side of the bridge.
-> 
-> We could easily fix this by specifying that the bus_flags field refers to
-> the input side of the bridge. We could also rename the field to
-> input_bus_flags. The rename could be delayed until needed, but that would
-> result in yet another change to all bridge drivers, so we may want to do it
-> now as your patch touches all the drivers already. Other options might also
-> be possible.
 
-And I should of course make sure to wake up before reviewing patches. 
-Obviously only one driver is currently affected by the rename. More will use 
-the flags later though, so the argument could still hold.
+On 2018-09-05 ?? 1:24, Andrey Ryabinin wrote:
+>
+>
+> On 09/04/2018 01:10 PM, Andrey Ryabinin wrote:
+> >
+> >
+> > On 09/04/2018 09:59 AM, Kyeongdon Kim wrote:
+> >
+> >>>> +#undef strncmp
+> >>>> +int strncmp(const char *cs, const char *ct, size_t len)
+> >>>> +{
+> >>>> + check_memory_region((unsigned long)cs, len, false, _RET_IP_);
+> >>>> + check_memory_region((unsigned long)ct, len, false, _RET_IP_);
+> >>>
+> >>> This will cause false positives. Both 'cs', and 'ct' could be less 
+> than len bytes.
+> >>>
+> >>> There is no need in these interceptors, just use the C 
+> implementations from lib/string.c
+> >>> like you did in your first patch.
+> >>> The only thing that was wrong in the first patch is that assembly 
+> implementations
+> >>> were compiled out instead of being declared week.
+> >>>
+> >> Well, at first I thought so..
+> >> I would remove diff code in /mm/kasan/kasan.c then use C 
+> implementations in lib/string.c
+> >> w/ assem implementations as weak :
+> >>
+> >> diff --git a/lib/string.c b/lib/string.c
+> >> index 2c0900a..a18b18f 100644
+> >> --- a/lib/string.c
+> >> +++ b/lib/string.c
+> >> @@ -312,7 +312,7 @@ size_t strlcat(char *dest, const char *src, 
+> size_t count)
+> >> ?EXPORT_SYMBOL(strlcat);
+> >> ?#endif
+> >>
+> >> -#ifndef __HAVE_ARCH_STRCMP
+> >> +#if (defined(CONFIG_ARM64) && defined(CONFIG_KASAN)) || 
+> !defined(__HAVE_ARCH_STRCMP)
+> >
+> > No. What part of "like you did in your first patch" is unclear to you?
+>
+> Just to be absolutely clear, I meant #ifdef out __HAVE_ARCH_* defines 
+> like it has been done in this patch
+> http://lkml.kernel.org/r/<1534233322-106271-1-git-send-email-kyeongdon.kim@lge.com> 
+>
+I understood what you're saying, but I might think the wrong patch.
 
-> >  	/**
-> >  	
-> >  	 * @setup_time_ps:
-> >  	 *
+So, thinking about the other way as below:
+can pick up assem variant or c one, declare them as weak.
+---
+diff --git a/arch/arm64/include/asm/string.h 
+b/arch/arm64/include/asm/string.h
+index dd95d33..53a2ae0 100644
+--- a/arch/arm64/include/asm/string.h
++++ b/arch/arm64/include/asm/string.h
+@@ -22,11 +22,22 @@ extern char *strrchr(const char *, int c);
+ ?#define __HAVE_ARCH_STRCHR
+ ?extern char *strchr(const char *, int c);
 
++#ifdef CONFIG_KASAN
++extern int __strcmp(const char *, const char *);
++extern int __strncmp(const char *, const char *, __kernel_size_t);
++
++#ifndef __SANITIZE_ADDRESS__
++#define strcmp(cs, ct) __strcmp(cs, ct)
++#define strncmp(cs, ct, n) __strncmp(cs, ct, n)
++#endif
++
++#else
+ ?#define __HAVE_ARCH_STRCMP
+ ?extern int strcmp(const char *, const char *);
+
+ ?#define __HAVE_ARCH_STRNCMP
+ ?extern int strncmp(const char *, const char *, __kernel_size_t);
++#endif
+
+ ?#define __HAVE_ARCH_STRLEN
+ ?extern __kernel_size_t strlen(const char *);
+diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
+index d894a20..9aeffd5 100644
+--- a/arch/arm64/kernel/arm64ksyms.c
++++ b/arch/arm64/kernel/arm64ksyms.c
+@@ -50,6 +50,10 @@ EXPORT_SYMBOL(strcmp);
+ ?EXPORT_SYMBOL(strncmp);
+ ?EXPORT_SYMBOL(strlen);
+ ?EXPORT_SYMBOL(strnlen);
++#ifdef CONFIG_KASAN
++EXPORT_SYMBOL(__strcmp);
++EXPORT_SYMBOL(__strncmp);
++#endif
+ ?EXPORT_SYMBOL(memset);
+ ?EXPORT_SYMBOL(memcpy);
+ ?EXPORT_SYMBOL(memmove);
+diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
+index a820ed0..5ef7a57 100644
+--- a/arch/arm64/kernel/image.h
++++ b/arch/arm64/kernel/image.h
+@@ -110,6 +110,8 @@ __efistub___flush_dcache_area??? = 
+KALLSYMS_HIDE(__pi___flush_dcache_area);
+ ?__efistub___memcpy??? ??? = KALLSYMS_HIDE(__pi_memcpy);
+ ?__efistub___memmove??? ??? = KALLSYMS_HIDE(__pi_memmove);
+ ?__efistub___memset??? ??? = KALLSYMS_HIDE(__pi_memset);
++__efistub___strcmp??? ??? = KALLSYMS_HIDE(__pi_strcmp);
++__efistub___strncmp??? ??? = KALLSYMS_HIDE(__pi_strncmp);
+ ?#endif
+
+ ?__efistub__text??? ??? ??? = KALLSYMS_HIDE(_text);
+diff --git a/arch/arm64/lib/strcmp.S b/arch/arm64/lib/strcmp.S
+index 471fe61..0dffef7 100644
+--- a/arch/arm64/lib/strcmp.S
++++ b/arch/arm64/lib/strcmp.S
+@@ -60,6 +60,8 @@ tmp3??? ??? .req??? x9
+ ?zeroones??? .req??? x10
+ ?pos??? ??? .req??? x11
+
++.weak strcmp
++ENTRY(__strcmp)
+ ?ENTRY(strcmp)
+ ???? eor??? tmp1, src1, src2
+ ???? mov??? zeroones, #REP8_01
+@@ -232,3 +234,4 @@ CPU_BE(??? orr??? syndrome, diff, has_nul )
+ ???? sub??? result, data1, data2, lsr #56
+ ???? ret
+ ?ENDPIPROC(strcmp)
++ENDPROC(__strcmp)
+diff --git a/arch/arm64/lib/strncmp.S b/arch/arm64/lib/strncmp.S
+index e267044..b2648c7 100644
+--- a/arch/arm64/lib/strncmp.S
++++ b/arch/arm64/lib/strncmp.S
+@@ -64,6 +64,8 @@ limit_wd??? .req??? x13
+ ?mask??? ??? .req??? x14
+ ?endloop??? ??? .req??? x15
+
++.weak strncmp
++ENTRY(__strncmp)
+ ?ENTRY(strncmp)
+ ???? cbz??? limit, .Lret0
+ ???? eor??? tmp1, src1, src2
+@@ -308,3 +310,4 @@ CPU_BE( orr??? syndrome, diff, has_nul )
+ ???? mov??? result, #0
+ ???? ret
+ ?ENDPIPROC(strncmp)
++ENDPROC(__strncmp)
 -- 
-Regards,
-
-Laurent Pinchart
+Could you review this diff?
