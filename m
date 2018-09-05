@@ -1,42 +1,52 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 5 Sep 2018 19:45:13 +0200
-Subject: [PATCH] mini2440 MMC correct write protect detection
-In-Reply-To: <85dac0df-2b75-9cc4-fde1-f62136974a1e@free.fr>
-References: <85dac0df-2b75-9cc4-fde1-f62136974a1e@free.fr>
-Message-ID: <20180905174513.6w7z5jsc2e6ndntv@kozik-lap>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 5 Sep 2018 19:00:33 +0100
+Subject: [PATCH] arm64: defconfig: enable EFI_ARMSTUB_DTB_LOADER
+In-Reply-To: <1f8095f1-1f0c-0791-31c4-c7b986c4ce1f@broadcom.com>
+References: <1535563287-24803-1-git-send-email-scott.branden@broadcom.com>
+ <CAOesGMhjcJ1p3QcEYb9fsx3fMXAOsgR2njOq=VKgEbWGwJi36g@mail.gmail.com>
+ <fb07b89d-d427-5e59-9f17-b12df26284ec@broadcom.com>
+ <CAKv+Gu-R7eX=aj=O2-gpzmp0K4t0T4s536UiqJZs0WuxRjkYwQ@mail.gmail.com>
+ <CAOesGMho8CfT7iDXadmkB5=7DoOi6n8qXcS9X643vf+Y0BbD6w@mail.gmail.com>
+ <CAKv+Gu_mKU+RdPgg2Dfezy4-L+KDEEBx02R49ObomRhEkJJ6Mw@mail.gmail.com>
+ <CAOesGMgLHx3+j1bWEsMWsN-yjGNZyLOpAjLg0Jut8gG=ADE25g@mail.gmail.com>
+ <CAKv+Gu_x=bS4xJcD_LuEnnN=Lx4Jc87uK8J_ACdA9EeUqtM3Yg@mail.gmail.com>
+ <CACxGe6uK+N5XUqZhH7gAQXoq+QXMvFPHF_i4WqivrufTU=0cog@mail.gmail.com>
+ <bf917897-1697-a6c4-7f77-8dfa74dddc8a@broadcom.com>
+ <CAKv+Gu8FK9K0G-GJygdpkwqKYzjvpDDj8TyGTC2u0SRxK3ez_w@mail.gmail.com>
+ <1f8095f1-1f0c-0791-31c4-c7b986c4ce1f@broadcom.com>
+Message-ID: <CACxGe6tbuDzEaBqOD7Z3nWMW0Nkcf22MFbD3BL+KBqnKEo2tQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 04, 2018 at 10:36:35PM +0200, Cedric Roux wrote:
-> mini2440 MMC correct write protect detection
-> 
-> The mini2440 computer uses "active high" to signal that the "write protect"
-> of the inserted MMC is set. The current code uses the opposite, leading to
-> a wrong detection of write protection. The solution is simply to use
-> ".wprotect_invert = 1" in the description of the MMC.
+On Wed, Sep 5, 2018 at 6:27 PM Scott Branden <scott.branden@broadcom.com> wrote:
+>
+>
+>
+> On 18-09-05 02:40 AM, Ard Biesheuvel wrote:
+> > On 4 September 2018 at 19:19, Scott Branden <scott.branden@broadcom.com> wrote:
+> >> Rather than introduce EFI_ARMSTUB_DTB_LOADER, why not have
+> >> the efistub use CONFIG_OF to determine whether it supports dtb= or not?
+> >>
+> >> That way ACPI-only distros disable devicetree support entirely.
+> >>
+> > Unfortunately, CONFIG_OF cannot be disabled on arm64 even on ACPI-only builds.
+> OF shouldn't be automatically selected in the arm64/Kconfig.  It should
+> have a config
+> parmaeter like other archs as mips and arm.  I can submit a patch so it
+> functions the
+> same way as other archs so it is not always selected.  It will be good
+> to add a USE_OF
+> config options like the other archs (or simply remove the select from
+> the Kconfig and choose OF directly in the defconfig.
+> This will have the added benefit of doing away with OF support when its
+> not needed on an ARM64 platform.  ACPI is already not automatically
+> selected for all ARM64 platforms, nor should devicetree.
 
-I looked at Mini2440 schematics found on the net and it looks like the
-pin (just like CD) is active low. However I might be looking at wrong
-schematics or missing some things.
+We don't do that on Arm because a devicetree is always required at
+boot time. Even on ACPI systems a tiny DTB is used containing just a
+/chosen node for passing the kernel command line and the initrd
+location.
 
-This is really an old code so I am just quite surprised that it was not
-reported before. Not able to write to SD card (for example if it is
-rootfs) should be spotted quite early.
+g.
 
-Best regards,
-Krzysztof
-
-
-> 
-> Signed-off-by: Cedric Roux <sed@free.fr>
-> 
-> --- arch/arm/mach-s3c24xx/mach-mini2440.c.orig	2018-09-04 22:15:20.696087528 +0200
-> +++ arch/arm/mach-s3c24xx/mach-mini2440.c	2018-09-04 22:15:32.708088023 +0200
-> @@ -232,6 +232,7 @@ static struct s3c2410fb_mach_info mini24
->  /* MMC/SD  */
->  
->  static struct s3c24xx_mci_pdata mini2440_mmc_cfg __initdata = {
-> +   .wprotect_invert = 1,
->     .gpio_detect   = S3C2410_GPG(8),
->     .gpio_wprotect = S3C2410_GPH(8),
->     .set_power     = NULL,
+g.
