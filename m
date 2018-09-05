@@ -1,79 +1,507 @@
 From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Wed, 5 Sep 2018 18:22:18 +0800
-Subject: [PATCH 2/5] arm: dts: mt7623: update subsystem clock controller
- device nodes
+Date: Wed, 5 Sep 2018 18:22:21 +0800
+Subject: [PATCH 5/5] arm: dts: mt7623: add display subsystem related device
+ nodes
 In-Reply-To: <84011aa94dd7be9239b7a2f944dd30fc70568fbb.1536141302.git.ryder.lee@mediatek.com>
 References: <84011aa94dd7be9239b7a2f944dd30fc70568fbb.1536141302.git.ryder.lee@mediatek.com>
-Message-ID: <6cc820db27996d8fd3094df10abbba1a2008907a.1536141302.git.ryder.lee@mediatek.com>
+Message-ID: <0452ad90c2d18442d8b4ad32cdcdb56db74d40f0.1536141302.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update MT7623 subsystem clock controllers, inlcuding mmsys, imgsys,
-vdecsys, g3dsys and bdpsys.
+Add display subsystem related device nodes for MT7623.
 
+Cc: CK Hu <ck.hu@mediatek.com>
+Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
+Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
 Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 ---
- arch/arm/boot/dts/mt7623.dtsi | 41 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
+This patch depends on the series: https://lkml.org/lkml/2018/9/5/223
+
+Hi Matthias,
+
+I know you're working on broken MMSYS - just want to ask whether it's possible
+to let the patch to go to your tree (if others are okay with it), and we could 
+send another fixup one for MT7623 MMSYS later?
+---
+ arch/arm/boot/dts/mt7623.dtsi                 | 177 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts |  83 ++++++++++++
+ arch/arm/boot/dts/mt7623n-rfb-emmc.dts        |  83 ++++++++++++
+ 3 files changed, 343 insertions(+)
 
 diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
-index 8c43bd0..b7ccf8b 100644
+index d01bdee..c6e1e5b 100644
 --- a/arch/arm/boot/dts/mt7623.dtsi
 +++ b/arch/arm/boot/dts/mt7623.dtsi
-@@ -692,6 +692,39 @@
+@@ -23,6 +23,11 @@
+ 	#address-cells = <2>;
+ 	#size-cells = <2>;
+ 
++	aliases {
++		rdma0 = &rdma0;
++		rdma1 = &rdma1;
++	};
++
+ 	cpu_opp_table: opp-table {
+ 		compatible = "operating-points-v2";
+ 		opp-shared;
+@@ -311,6 +316,25 @@
+ 		clock-names = "spi", "wrap";
+ 	};
+ 
++	mipi_tx0: mipi-dphy at 10010000 {
++		compatible = "mediatek,mt7623-mipi-tx",
++			     "mediatek,mt2701-mipi-tx";
++		reg = <0 0x10010000 0 0x90>;
++		clocks = <&clk26m>;
++		clock-output-names = "mipi_tx0_pll";
++		#clock-cells = <0>;
++		#phy-cells = <0>;
++	};
++
++	cec: cec at 10012000 {
++		compatible = "mediatek,mt7623-cec",
++			     "mediatek,mt8173-cec";
++		reg = <0 0x10012000 0 0xbc>;
++		interrupts = <GIC_SPI 182 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&infracfg CLK_INFRA_CEC>;
++		status = "disabled";
++	};
++
+ 	cir: cir at 10013000 {
+ 		compatible = "mediatek,mt7623-cir";
+ 		reg = <0 0x10013000 0 0x1000>;
+@@ -359,6 +383,18 @@
+ 		#clock-cells = <1>;
+ 	};
+ 
++	hdmi_phy: phy at 10209100 {
++		compatible = "mediatek,mt7623-hdmi-phy",
++			     "mediatek,mt2701-hdmi-phy";
++		reg = <0 0x10209100 0 0x24>;
++		clocks = <&apmixedsys CLK_APMIXED_HDMI_REF>;
++		clock-names = "pll_ref";
++		clock-output-names = "hdmitx_dig_cts";
++		#clock-cells = <0>;
++		#phy-cells = <0>;
++		status = "disabled";
++	};
++
+ 	rng: rng at 1020f000 {
+ 		compatible = "mediatek,mt7623-rng";
+ 		reg = <0 0x1020f000 0 0x1000>;
+@@ -505,6 +541,16 @@
  		status = "disabled";
  	};
  
-+	g3dsys: syscon at 13000000 {
-+		compatible = "mediatek,mt7623-g3dsys",
-+			     "mediatek,mt2701-g3dsys",
-+			     "syscon";
-+		reg = <0 0x13000000 0 0x200>;
-+		#clock-cells = <1>;
-+		#reset-cells = <1>;
++	hdmiddc0: i2c at 11013000 {
++		compatible = "mediatek,mt7623-hdmi-ddc",
++			     "mediatek,mt8173-hdmi-ddc";
++		interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_LOW>;
++		reg = <0 0x11013000 0 0x1C>;
++		clocks = <&pericfg CLK_PERI_I2C3>;
++		clock-names = "ddc-i2c";
++		status = "disabled";
 +	};
 +
-+	mmsys: syscon at 14000000 {
+ 	thermal: thermal at 1100b000 {
+ 		#thermal-sensor-cells = <1>;
+ 		compatible = "mediatek,mt7623-thermal",
+@@ -732,6 +778,84 @@
+ 		#clock-cells = <1>;
+ 	};
+ 
++	display_components: dispsys at 14000000 {
 +		compatible = "mediatek,mt7623-mmsys",
-+			     "mediatek,mt2701-mmsys",
-+			     "syscon";
++			     "mediatek,mt2701-mmsys";
 +		reg = <0 0x14000000 0 0x1000>;
-+		#clock-cells = <1>;
++		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
 +	};
 +
-+	imgsys: syscon at 15000000 {
-+		compatible = "mediatek,mt7623-imgsys",
-+			     "mediatek,mt2701-imgsys",
-+			     "syscon";
-+		reg = <0 0x15000000 0 0x1000>;
-+		#clock-cells = <1>;
++	ovl at 14007000 {
++		compatible = "mediatek,mt7623-disp-ovl",
++			     "mediatek,mt2701-disp-ovl";
++		reg = <0 0x14007000 0 0x1000>;
++		interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&mmsys CLK_MM_DISP_OVL>;
++		iommus = <&iommu MT2701_M4U_PORT_DISP_OVL_0>;
++		mediatek,larb = <&larb0>;
 +	};
 +
-+	vdecsys: syscon at 16000000 {
-+		compatible = "mediatek,mt7623-vdecsys",
-+			     "mediatek,mt2701-vdecsys",
-+			     "syscon";
-+		reg = <0 0x16000000 0 0x1000>;
-+		#clock-cells = <1>;
++	rdma0: rdma at 14008000 {
++		compatible = "mediatek,mt7623-disp-rdma",
++			     "mediatek,mt2701-disp-rdma";
++		reg = <0 0x14008000 0 0x1000>;
++		interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&mmsys CLK_MM_DISP_RDMA>;
++		iommus = <&iommu MT2701_M4U_PORT_DISP_RDMA>;
++		mediatek,larb = <&larb0>;
++	};
++
++	wdma at 14009000 {
++		compatible = "mediatek,mt7623-disp-wdma",
++			     "mediatek,mt2701-disp-wdma";
++		reg = <0 0x14009000 0 0x1000>;
++		interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&mmsys CLK_MM_DISP_WDMA>;
++		iommus = <&iommu MT2701_M4U_PORT_DISP_WDMA>;
++		mediatek,larb = <&larb0>;
++	};
++
++	bls: bls at 1400a000 {
++		compatible = "mediatek,mt7623-disp-pwm",
++			     "mediatek,mt2701-disp-pwm";
++		reg = <0 0x1400a000 0 0x1000>;
++		#pwm-cells = <2>;
++		clocks = <&mmsys CLK_MM_MDP_BLS_26M>,
++			 <&mmsys CLK_MM_DISP_BLS>;
++		clock-names = "main", "mm";
++		status = "disabled";
++	};
++
++	color at 1400b000 {
++		compatible = "mediatek,mt7623-disp-color",
++			     "mediatek,mt2701-disp-color";
++		reg = <0 0x1400b000 0 0x1000>;
++		interrupts = <GIC_SPI 156 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&mmsys CLK_MM_DISP_COLOR>;
++	};
++
++	dsi: dsi at 1400c000 {
++		compatible = "mediatek,mt7623-dsi",
++			     "mediatek,mt2701-dsi";
++		reg = <0 0x1400c000 0 0x1000>;
++		interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&mmsys CLK_MM_DSI_ENGINE>,
++			 <&mmsys CLK_MM_DSI_DIG>,
++			 <&mipi_tx0>;
++		clock-names = "engine", "digital", "hs";
++		phys = <&mipi_tx0>;
++		phy-names = "dphy";
++		status = "disabled";
++	};
++
++	mutex: mutex at 1400e000 {
++		compatible = "mediatek,mt7623-disp-mutex",
++			     "mediatek,mt2701-disp-mutex";
++		reg = <0 0x1400e000 0 0x1000>;
++		interrupts = <GIC_SPI 161 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&mmsys CLK_MM_MUTEX_32K>;
++	};
++
+ 	larb0: larb at 14010000 {
+ 		compatible = "mediatek,mt7623-smi-larb",
+ 			     "mediatek,mt2701-smi-larb";
+@@ -744,6 +868,16 @@
+ 		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
+ 	};
+ 
++	rdma1: rdma at 14012000 {
++		compatible = "mediatek,mt7623-disp-rdma",
++			     "mediatek,mt2701-disp-rdma";
++		reg = <0 0x14012000 0 0x1000>;
++		interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&mmsys CLK_MM_DISP_RDMA1>;
++		iommus = <&iommu MT2701_M4U_PORT_DISP_RDMA1>;
++		mediatek,larb = <&larb0>;
++	};
++
+ 	imgsys: syscon at 15000000 {
+ 		compatible = "mediatek,mt7623-imgsys",
+ 			     "mediatek,mt2701-imgsys",
+@@ -799,6 +933,34 @@
+ 		power-domains = <&scpsys MT2701_POWER_DOMAIN_VDEC>;
+ 	};
+ 
++	dpi0: dpi at 14014000 {
++		compatible = "mediatek,mt7623-dpi",
++			     "mediatek,mt2701-dpi";
++		reg = <0 0x14014000 0 0x1000>;
++		interrupts = <GIC_SPI 194 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&mmsys CLK_MM_DPI1_DIGL>,
++			 <&mmsys CLK_MM_DPI1_ENGINE>,
++			 <&topckgen CLK_TOP_TVDPLL>;
++		clock-names = "pixel", "engine", "pll";
++		status = "disabled";
++	};
++
++	hdmi0: hdmi at 14015000 {
++		compatible = "mediatek,mt7623-hdmi",
++			     "mediatek,mt8173-hdmi";
++		reg = <0 0x14015000 0 0x400>;
++		clocks = <&mmsys CLK_MM_HDMI_PIXEL>,
++			 <&mmsys CLK_MM_HDMI_PLL>,
++			 <&mmsys CLK_MM_HDMI_AUDIO>,
++			 <&mmsys CLK_MM_HDMI_SPDIF>;
++		clock-names = "pixel", "pll", "bclk", "spdif";
++		phys = <&hdmi_phy>;
++		phy-names = "hdmi";
++		mediatek,syscon-hdmi = <&mmsys 0x900>;
++		cec = <&cec>;
++		status = "disabled";
 +	};
 +
  	hifsys: syscon at 1a000000 {
  		compatible = "mediatek,mt7623-hifsys",
  			     "mediatek,mt2701-hifsys",
-@@ -946,6 +979,14 @@
- 		power-domains = <&scpsys MT2701_POWER_DOMAIN_ETH>;
- 		status = "disabled";
+@@ -1071,6 +1233,21 @@
+ 		};
  	};
-+
-+	bdpsys: syscon at 1c000000 {
-+		compatible = "mediatek,mt7623-bdpsys",
-+			     "mediatek,mt2701-bdpsys",
-+			     "syscon";
-+		reg = <0 0x1c000000 0 0x1000>;
-+		#clock-cells = <1>;
+ 
++	hdmi_pins_a: hdmi-default {
++		pins-hdmi {
++			pinmux = <MT7623_PIN_123_HTPLG_FUNC_HTPLG>;
++			input-enable;
++			bias-pull-down;
++		};
 +	};
++
++	hdmi_ddc_pins_a: hdmi_ddc-default {
++		pins-hdmi-ddc {
++			pinmux = <MT7623_PIN_124_GPIO124_FUNC_HDMISCK>,
++				 <MT7623_PIN_125_GPIO125_FUNC_HDMISD>;
++		};
++	};
++
+ 	i2c0_pins_a: i2c0-default {
+ 		pins-i2c0 {
+ 			pinmux = <MT7623_PIN_75_SDA0_FUNC_SDA0>,
+diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+index 2b760f9..dbce86b 100644
+--- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
++++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+@@ -21,6 +21,19 @@
+ 		stdout-path = "serial2:115200n8";
+ 	};
+ 
++	connector {
++		compatible = "hdmi-connector";
++		label = "hdmi";
++		type = "d";
++		ddc-i2c-bus = <&hdmiddc0>;
++
++		port {
++			hdmi_connector_in: endpoint {
++				remote-endpoint = <&hdmi0_out>;
++			};
++		};
++	};
++
+ 	cpus {
+ 		cpu at 0 {
+ 			proc-supply = <&mt6323_vproc_reg>;
+@@ -114,10 +127,24 @@
+ 	};
  };
  
- &pio {
++&bls {
++	status = "okay";
++
++	port {
++		bls_out: endpoint {
++			remote-endpoint = <&dpi0_in>;
++		};
++	};
++};
++
+ &btif {
+ 	status = "okay";
+ };
+ 
++&cec {
++	status = "okay";
++};
++
+ &cir {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&cir_pins_a>;
+@@ -128,6 +155,26 @@
+ 	status = "okay";
+ };
+ 
++&dpi0 {
++	status = "okay";
++
++	ports {
++		port at 0 {
++			reg = <0>;
++			dpi0_out: endpoint {
++				remote-endpoint = <&hdmi0_in>;
++			};
++		};
++
++		port at 1 {
++			reg = <1>;
++			dpi0_in: endpoint {
++				remote-endpoint = <&bls_out>;
++			};
++		};
++	};
++};
++
+ &eth {
+ 	status = "okay";
+ 
+@@ -199,6 +246,42 @@
+ 	};
+ };
+ 
++&hdmi0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&hdmi_pins_a>;
++	status = "okay";
++
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		port at 0 {
++			reg = <0>;
++			hdmi0_in: endpoint {
++				remote-endpoint = <&dpi0_out>;
++			};
++		};
++
++		port at 1 {
++			reg = <1>;
++			hdmi0_out: endpoint {
++				remote-endpoint = <&hdmi_connector_in>;
++			};
++		};
++	};
++};
++
++&hdmiddc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&hdmi_ddc_pins_a>;
++	status = "okay";
++};
++
++&hdmi_phy {
++	mediatek,ibias = <0xa>;
++	mediatek,ibias_up = <0x1c>;
++	status = "okay";
++};
++
+ &i2c0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c0_pins_a>;
+diff --git a/arch/arm/boot/dts/mt7623n-rfb-emmc.dts b/arch/arm/boot/dts/mt7623n-rfb-emmc.dts
+index b760613..bdf9010 100644
+--- a/arch/arm/boot/dts/mt7623n-rfb-emmc.dts
++++ b/arch/arm/boot/dts/mt7623n-rfb-emmc.dts
+@@ -24,6 +24,19 @@
+ 		stdout-path = "serial2:115200n8";
+ 	};
+ 
++	connector {
++		compatible = "hdmi-connector";
++		label = "hdmi";
++		type = "d";
++		ddc-i2c-bus = <&hdmiddc0>;
++
++		port {
++			hdmi_connector_in: endpoint {
++				remote-endpoint = <&hdmi0_out>;
++			};
++		};
++	};
++
+ 	cpus {
+ 		cpu at 0 {
+ 			proc-supply = <&mt6323_vproc_reg>;
+@@ -106,10 +119,24 @@
+ 	};
+ };
+ 
++&bls {
++	status = "okay";
++
++	port {
++		bls_out: endpoint {
++			remote-endpoint = <&dpi0_in>;
++		};
++	};
++};
++
+ &btif {
+ 	status = "okay";
+ };
+ 
++&cec {
++	status = "okay";
++};
++
+ &cir {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&cir_pins_a>;
+@@ -120,6 +147,26 @@
+ 	status = "okay";
+ };
+ 
++&dpi0 {
++	status = "okay";
++
++	ports {
++		port at 0 {
++			reg = <0>;
++			dpi0_out: endpoint {
++				remote-endpoint = <&hdmi0_in>;
++			};
++		};
++
++		port at 1 {
++			reg = <1>;
++			dpi0_in: endpoint {
++				remote-endpoint = <&bls_out>;
++			};
++		};
++	};
++};
++
+ &eth {
+ 	status = "okay";
+ 
+@@ -202,6 +249,42 @@
+ 	};
+ };
+ 
++&hdmi0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&hdmi_pins_a>;
++	status = "okay";
++
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		port at 0 {
++			reg = <0>;
++			hdmi0_in: endpoint {
++				remote-endpoint = <&dpi0_out>;
++			};
++		};
++
++		port at 1 {
++			reg = <1>;
++			hdmi0_out: endpoint {
++				remote-endpoint = <&hdmi_connector_in>;
++			};
++		};
++	};
++};
++
++&hdmiddc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&hdmi_ddc_pins_a>;
++	status = "okay";
++};
++
++&hdmi_phy {
++	mediatek,ibias = <0xa>;
++	mediatek,ibias_up = <0x1c>;
++	status = "okay";
++};
++
+ &i2c0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c0_pins_a>;
 -- 
 1.9.1
