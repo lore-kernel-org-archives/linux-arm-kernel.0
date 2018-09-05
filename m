@@ -1,64 +1,78 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Wed, 5 Sep 2018 15:53:23 -0700
-Subject: [linux-sunxi] [PATCH v4 11/11] arm64: dts: allwinner: a64: Enable
- HDMI output on A64 boards w/ HDMI
-In-Reply-To: <CAMty3ZAVr_d+Rwry_DMWY221OC+YSWmReNm-TXzYWgpd1s68+w@mail.gmail.com>
-References: <20180904044053.15425-1-icenowy@aosc.io>
- <20180904044053.15425-12-icenowy@aosc.io>
- <CAMty3ZCvpUf0nJ3WuPccP8BizBP=Uc8ChzB8SeN8fkX2iS1E_Q@mail.gmail.com>
- <20180905075136.chumwosx76o2n66l@flea>
- <CAMty3ZAVr_d+Rwry_DMWY221OC+YSWmReNm-TXzYWgpd1s68+w@mail.gmail.com>
-Message-ID: <CA+E=qVdWXWztLj3989X+U+=4P5FpM4hs+6ByVmq8bf7mPeiWsA@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed,  5 Sep 2018 18:53:18 -0500
+Subject: [PATCH v2 0/9] Devicetree build consolidation
+Message-ID: <20180905235327.5996-1-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I can test it tonight.
+This series addresses a couple of issues I have with building dts files.
 
-On Wed, Sep 5, 2018 at 12:57 AM, Jagan Teki <jagan@amarulasolutions.com> wrote:
-> On Wed, Sep 5, 2018 at 1:21 PM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->> On Wed, Sep 05, 2018 at 12:56:03PM +0530, Jagan Teki wrote:
->>> On Tue, Sep 4, 2018 at 10:10 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
->>> > From: Jagan Teki <jagan@amarulasolutions.com>
->>> >
->>> > Enable all necessary device tree nodes and add connector node to device
->>> > trees for all supported A64 boards with HDMI.
->>> >
->>> > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
->>> > [Icenowy: squash all board patches altogether and change supply name]
->>> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->>> > ---
->>> > Changes in v4:
->>> > - Rebase some device trees.
->>> > Changes in v3,1:
->>> > - Squash all enablement patches altogether.
->>> > - Change supply name to match DT binding & driver change.
->>> > Changes for v3:
->>> > - Enable all pipeline components
->>> > Changes for v2:
->>> > - none
->>> >
->>> >  .../dts/allwinner/sun50i-a64-bananapi-m64.dts | 34 +++++++++++++++++++
->>> >  .../dts/allwinner/sun50i-a64-nanopi-a64.dts   | 34 +++++++++++++++++++
->>> >  .../dts/allwinner/sun50i-a64-olinuxino.dts    | 34 +++++++++++++++++++
->>> >  .../dts/allwinner/sun50i-a64-orangepi-win.dts | 34 +++++++++++++++++++
->>> >  .../boot/dts/allwinner/sun50i-a64-pine64.dts  | 34 +++++++++++++++++++
->>> >  .../allwinner/sun50i-a64-sopine-baseboard.dts | 34 +++++++++++++++++++
->>> >  6 files changed, 204 insertions(+)
->>>
->>> Tested-by: Jagan Teki <jagan@amarulasolutions.com> # BPI-M64, OPI-Win,
->>> A64-Olinuxino, NPI-A64
->>>
->>> Pine64 boards look unable by saying
->>> [drm] Cannot find any crtc or sizes
->>>
->>> May be someone can confirm, it.
->>
->> Then we should drop the pine64 additions until someone figures it out,
->> as it has been already discussed.
->
-> That is fine, but If anyone have pine64 can confirm this.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+First, the ability to build all the dts files in the tree. This has been
+supported on most arches for some time with powerpc being the main
+exception. The reason powerpc wasn't supported was it needed a change
+in the location built dtb files are put.
+
+Secondly, it's a pain to acquire all the cross-compilers needed to build
+dtbs for each arch. There's no reason to build with the cross compiler and
+the host compiler is perfectly fine as we only need the pre-processor.
+
+I started addressing just those 2 problems, but kept finding small
+differences such as target dependencies and dtbs_install support across
+architectures. Instead of trying to align all these, I've consolidated the
+build targets moving them out of the arch makefiles.
+
+I'd like to take the series via the DT tree.
+
+Rob
+
+v2:
+ - Fix $arch/boot/dts path check for out of tree builds
+ - Fix dtc dependency for building built-in dtbs
+ - Fix microblaze built-in dtb building
+ - Add dtbs target for microblaze
+
+Rob Herring (9):
+  powerpc: build .dtb files in dts directory
+  nios2: build .dtb files in dts directory
+  nios2: use common rules to build built-in dtb
+  nios2: fix building all dtbs
+  c6x: use common built-in dtb support
+  kbuild: consolidate Devicetree dtb build rules
+  powerpc: enable building all dtbs
+  c6x: enable building all dtbs
+  microblaze: enable building all dtbs
+
+ Makefile                           | 32 +++++++++++++++++++
+ arch/arc/Makefile                  |  6 ----
+ arch/arm/Makefile                  | 20 +-----------
+ arch/arm64/Makefile                | 17 +----------
+ arch/c6x/Makefile                  |  2 --
+ arch/c6x/boot/dts/Makefile         | 17 +++++------
+ arch/c6x/boot/dts/linked_dtb.S     |  2 --
+ arch/c6x/include/asm/sections.h    |  1 -
+ arch/c6x/kernel/setup.c            |  4 +--
+ arch/c6x/kernel/vmlinux.lds.S      | 10 ------
+ arch/h8300/Makefile                | 11 +------
+ arch/microblaze/Makefile           |  4 +--
+ arch/microblaze/boot/dts/Makefile  |  4 +++
+ arch/mips/Makefile                 | 15 +--------
+ arch/nds32/Makefile                |  2 +-
+ arch/nios2/Makefile                | 11 +------
+ arch/nios2/boot/Makefile           | 22 --------------
+ arch/nios2/boot/dts/Makefile       |  6 ++++
+ arch/nios2/boot/linked_dtb.S       | 19 ------------
+ arch/powerpc/Makefile              |  3 --
+ arch/powerpc/boot/Makefile         | 49 ++++++++++++++----------------
+ arch/powerpc/boot/dts/Makefile     |  6 ++++
+ arch/powerpc/boot/dts/fsl/Makefile |  4 +++
+ arch/xtensa/Makefile               | 12 +-------
+ scripts/Makefile.lib               |  2 +-
+ 25 files changed, 93 insertions(+), 188 deletions(-)
+ delete mode 100644 arch/c6x/boot/dts/linked_dtb.S
+ create mode 100644 arch/nios2/boot/dts/Makefile
+ delete mode 100644 arch/nios2/boot/linked_dtb.S
+ create mode 100644 arch/powerpc/boot/dts/Makefile
+ create mode 100644 arch/powerpc/boot/dts/fsl/Makefile
+
+--
+2.17.1
