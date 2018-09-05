@@ -1,64 +1,55 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 5 Sep 2018 09:56:01 +0200
-Subject: [PATCH 1/3] dt-bindings: change the A64 HDMI PHY binding to R40
-In-Reply-To: <3D28A45F-D67D-4388-9FB7-2A2763955398@aosc.io>
-References: <20180903133434.58188-1-icenowy@aosc.io>
- <20180903133434.58188-2-icenowy@aosc.io>
- <20180905071435.lgsogpzmh5nw6bcy@flea>
- <3D28A45F-D67D-4388-9FB7-2A2763955398@aosc.io>
-Message-ID: <20180905075601.32kzkd3is2gpa3ft@flea>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Wed, 5 Sep 2018 13:27:54 +0530
+Subject: [linux-sunxi] [PATCH v4 11/11] arm64: dts: allwinner: a64: Enable
+ HDMI output on A64 boards w/ HDMI
+In-Reply-To: <20180905075136.chumwosx76o2n66l@flea>
+References: <20180904044053.15425-1-icenowy@aosc.io>
+ <20180904044053.15425-12-icenowy@aosc.io>
+ <CAMty3ZCvpUf0nJ3WuPccP8BizBP=Uc8ChzB8SeN8fkX2iS1E_Q@mail.gmail.com>
+ <20180905075136.chumwosx76o2n66l@flea>
+Message-ID: <CAMty3ZAVr_d+Rwry_DMWY221OC+YSWmReNm-TXzYWgpd1s68+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2018 at 03:46:41PM +0800, Icenowy Zheng wrote:
-> 
-> 
-> ? 2018?9?5? GMT+08:00 ??3:14:35, Maxime Ripard <maxime.ripard@bootlin.com> ??:
-> >On Mon, Sep 03, 2018 at 09:34:32PM +0800, Icenowy Zheng wrote:
-> >> By experiment, the A64 HDMi PHY doesn't support the PLL-VIDEO mux
-> >> introduced in R40, although it has two PLL-VIDEOs.
-> >> 
-> >> Change the A64 HDMI PHY binding to R40 one.
-> >> 
-> >> This binding is introduced in v4.19, which is still in RC stage, so
-> >we
-> >> have change to fix it.
-> >> 
-> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> >
-> >That doesn't make much sense. The A64 doesn't have any particular
-> >reason to behave like the R40, and the R40 can definitely use a
-> >different compatible if it has a different behaviour. But I don't see
-> >*why* the A64 not behaving like the R40 is a justification to remove
-> >the A64 compatible. Especially when the R40 was released later.
-> >
-> >Add a new compatible, and leave the A64 compatible alone.
-> 
-> But the behavior of A64 compatible will change from double
-> PLL to single PLL, because the A64 HDMI PHY is proven
-> to have no double PLL.
-> 
-> Should I then change the A64 compatible behavior and import R40
-> compatible at the same time?
+On Wed, Sep 5, 2018 at 1:21 PM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> On Wed, Sep 05, 2018 at 12:56:03PM +0530, Jagan Teki wrote:
+>> On Tue, Sep 4, 2018 at 10:10 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
+>> > From: Jagan Teki <jagan@amarulasolutions.com>
+>> >
+>> > Enable all necessary device tree nodes and add connector node to device
+>> > trees for all supported A64 boards with HDMI.
+>> >
+>> > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+>> > [Icenowy: squash all board patches altogether and change supply name]
+>> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> > ---
+>> > Changes in v4:
+>> > - Rebase some device trees.
+>> > Changes in v3,1:
+>> > - Squash all enablement patches altogether.
+>> > - Change supply name to match DT binding & driver change.
+>> > Changes for v3:
+>> > - Enable all pipeline components
+>> > Changes for v2:
+>> > - none
+>> >
+>> >  .../dts/allwinner/sun50i-a64-bananapi-m64.dts | 34 +++++++++++++++++++
+>> >  .../dts/allwinner/sun50i-a64-nanopi-a64.dts   | 34 +++++++++++++++++++
+>> >  .../dts/allwinner/sun50i-a64-olinuxino.dts    | 34 +++++++++++++++++++
+>> >  .../dts/allwinner/sun50i-a64-orangepi-win.dts | 34 +++++++++++++++++++
+>> >  .../boot/dts/allwinner/sun50i-a64-pine64.dts  | 34 +++++++++++++++++++
+>> >  .../allwinner/sun50i-a64-sopine-baseboard.dts | 34 +++++++++++++++++++
+>> >  6 files changed, 204 insertions(+)
+>>
+>> Tested-by: Jagan Teki <jagan@amarulasolutions.com> # BPI-M64, OPI-Win,
+>> A64-Olinuxino, NPI-A64
+>>
+>> Pine64 boards look unable by saying
+>> [drm] Cannot find any crtc or sizes
+>>
+>> May be someone can confirm, it.
+>
+> Then we should drop the pine64 additions until someone figures it out,
+> as it has been already discussed.
 
-I don't see why you should do both at the same time. Fix the A64, and
-add the support for the R40, those are two orthogonal changes.
-
-> In addition maybe I can just drop A64 compatible, and let A64
-> use H3 one.
-
-No, that break the backward compatibility.
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180905/96a447bd/attachment.sig>
+That is fine, but If anyone have pine64 can confirm this.
