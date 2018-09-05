@@ -1,37 +1,25 @@
-From: zhizhouzhang@asrmicro.com (Zhizhou Zhang)
-Date: Wed, 5 Sep 2018 16:19:43 +0800
-Subject: [PATCH] arm64: don't account for cpu offline time with irqsoff tracer
-Message-ID: <1536135583-6607-1-git-send-email-zhizhouzhang@asrmicro.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Wed, 5 Sep 2018 13:54:42 +0530
+Subject: [PATCH v4 4/4] drm/sun4i: Enable DesignWare HDMI for SUN50I
+In-Reply-To: <20180905070819.gisznpkvvuqire7c@flea>
+References: <20180904163609.10171-1-jagan@amarulasolutions.com>
+ <20180904163609.10171-4-jagan@amarulasolutions.com>
+ <20180905070819.gisznpkvvuqire7c@flea>
+Message-ID: <CAMty3ZAzjSwq86BwB8O_7DrT0jrhn3ByzN34dY37pF3ZsAZ6uA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is no need to account for cpu offline time with irqsoff tracer.
-We can trigger a large irqsoff latency with below commands:
+On Wed, Sep 5, 2018 at 12:38 PM, Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+> On Tue, Sep 04, 2018 at 10:06:09PM +0530, Jagan Teki wrote:
+>> Allwinner SUN50I are now using DesignWare HDMI so enable
+>> them as default. This can build DRM_SUN8I_DW_HDMI as module
+>> since DRM in arm64 has module.
+>>
+>> Making this as defult to SUN8I, may cause an issue while
+>> loading since arm32 DRM built as static.
+>
+> Uh? Why? We should fix this instead of working around it.
 
-$ echo irqsoff > /sys/kernel/debug/tracing/current_tracer
-$ echo 0 > /sys/kernel/debug/tracing/options/function-trace
-$ echo 1 > /sys/kernel/debug/tracing/tracing_on
-$ echo 0 > /sys/devices/system/cpu/cpu1/online
-$ # wait a while ...
-$ echo 1 > /sys/devices/system/cpu/cpu1/online
-$ cat /sys/kernel/debug/tracing/trace
-
-Signed-off-by: Zhizhou Zhang <zhizhouzhang@asrmicro.com>
----
- arch/arm64/kernel/smp.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 25fcd22..faed8f6 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -346,6 +346,7 @@ void cpu_die(void)
- 	idle_task_exit();
- 
- 	local_daif_mask();
-+	stop_critical_timings();
- 
- 	/* Tell __cpu_die() that this CPU is now safe to dispose of */
- 	(void)cpu_report_death();
--- 
-1.9.1
+I didn't dig further on this. Since ARM64 has is fine with it both
+(module and static) may be we can take this.
