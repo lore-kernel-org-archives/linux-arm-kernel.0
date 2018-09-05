@@ -1,163 +1,47 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Wed, 5 Sep 2018 09:46:29 +0800
-Subject: [PATCH v3 1/2] iommu/arm-smmu-v3: fix unexpected CMD_SYNC timeout
-In-Reply-To: <5B791622.4040509@huawei.com>
-References: <1534328582-17664-1-git-send-email-thunder.leizhen@huawei.com>
- <1534328582-17664-2-git-send-email-thunder.leizhen@huawei.com>
- <6027cd67-7c76-673c-082f-8dd0b7a575b0@arm.com> <5B7533FD.20903@huawei.com>
- <20180816091805.GB31093@arm.com>
- <ad5bd6c0-20bd-9581-a12a-4464e5ec69f6@arm.com> <5B791622.4040509@huawei.com>
-Message-ID: <5B8F3575.8000408@huawei.com>
+From: ran.wang_1@nxp.com (Ran Wang)
+Date: Wed, 5 Sep 2018 02:22:55 +0000
+Subject: [PATCH 2/3] Documentation: dt: binding: fsl: update property
+ description for RCPM
+In-Reply-To: <5b8e8a71.1c69fb81.d966f.1ca1@mx.google.com>
+References: <20180831035219.31619-1-ran.wang_1@nxp.com>
+ <20180831035219.31619-2-ran.wang_1@nxp.com>
+ <5b8e8a71.1c69fb81.d966f.1ca1@mx.google.com>
+Message-ID: <AM5PR0402MB28659BF8C2B5B3B18DB6BAC9F1020@AM5PR0402MB2865.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Rob
 
+> -----Original Message-----
+> From: Rob Herring <robh@kernel.org>
+> Sent: Tuesday, September 04, 2018 09:25
+> To: Ran Wang <ran.wang_1@nxp.com>
+> Cc: Leo Li <leoyang.li@nxp.com>; Mark Rutland <mark.rutland@arm.com>;
+> linuxppc-dev at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH 2/3] Documentation: dt: binding: fsl: update property
+> description for RCPM
+> 
+> On Fri, Aug 31, 2018 at 11:52:18AM +0800, Ran Wang wrote:
+> > Add property 'big-endian' and supportted IP's configuration info.
+> > Remove property 'fsl,#rcpm-wakeup-cell'.
+> 
+> "dt-bindings: soc: ..." for the subject
+> 
+> It is obvious reading the diff you are removing fsl,#rcpm-wakeup-cell.
+> What is not obvious is why? The commit msg should answer that.
 
-On 2018/8/19 15:02, Leizhen (ThunderTown) wrote:
-> 
-> 
-> On 2018/8/16 17:27, Robin Murphy wrote:
->> On 2018-08-16 10:18 AM, Will Deacon wrote:
->>> On Thu, Aug 16, 2018 at 04:21:17PM +0800, Leizhen (ThunderTown) wrote:
->>>> On 2018/8/15 20:26, Robin Murphy wrote:
->>>>> On 15/08/18 11:23, Zhen Lei wrote:
->>>>>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->>>>>> index 1d64710..3f5c236 100644
->>>>>> --- a/drivers/iommu/arm-smmu-v3.c
->>>>>> +++ b/drivers/iommu/arm-smmu-v3.c
->>>>>> @@ -566,7 +566,7 @@ struct arm_smmu_device {
->>>>>>
->>>>>>        int                gerr_irq;
->>>>>>        int                combined_irq;
->>>>>> -    atomic_t            sync_nr;
->>>>>> +    u32                sync_nr;
->>>>>>
->>>>>>        unsigned long            ias; /* IPA */
->>>>>>        unsigned long            oas; /* PA */
->>>>>> @@ -775,6 +775,11 @@ static int queue_remove_raw(struct arm_smmu_queue *q, u64 *ent)
->>>>>>        return 0;
->>>>>>    }
->>>>>>
->>>>>> +static inline void arm_smmu_cmdq_sync_set_msidata(u64 *cmd, u32 msidata)
->>>>>
->>>>> If we *are* going to go down this route then I think it would make sense
->>>>> to move the msiaddr and CMDQ_SYNC_0_CS_MSI logic here as well; i.e.
->>>>> arm_smmu_cmdq_build_cmd() always generates a "normal" SEV-based sync
->>>>> command, then calling this guy would convert it to an MSI-based one.
->>>>> As-is, having bits of mutually-dependent data handled across two
->>>>> separate places just seems too messy and error-prone.
->>>>
->>>> Yes, How about create a new function "arm_smmu_cmdq_build_sync_msi_cmd"?
->>>>
->>>> static inline
->>>> void arm_smmu_cmdq_build_sync_msi_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
->>>> {
->>>>     cmd[0]  = FIELD_PREP(CMDQ_0_OP, ent->opcode);
->>>>     cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_CS, CMDQ_SYNC_0_CS_IRQ);
->>>>     cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSH, ARM_SMMU_SH_ISH);
->>>>     cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSIATTR, ARM_SMMU_MEMATTR_OIWB);
-> 
-> miss:   cmd[0] |= FIELD_PREP(CMDQ_SYNC_0_MSIDATA, ent->sync.msidata);
-> 
->>>>     cmd[1]  = ent->sync.msiaddr & CMDQ_SYNC_1_MSIADDR_MASK;
->>>> }
->>>
->>> None of this seems justified given the numbers from John, so please just do
->>> the simple thing and build the command with the lock held.
-> 
-> In order to observe the optimization effect, I conducted 5 tests for each
-> case. Although the test result is volatility, but we can still get which case
-> is good or bad. It accords with our theoretical analysis.
-> 
-> Test command: fio -numjobs=8 -rw=randread -runtime=30 ... -bs=4k
-> Test Result: IOPS, for example: read : io=86790MB, bw=2892.1MB/s, iops=740586, runt= 30001msec
-> 
-> Case 1: (without these patches)
-> 675480
-> 672055
-> 665275
-> 648610
-> 661146
-> 
-> Case 2: (move arm_smmu_cmdq_build_cmd into lock)
+Sure, I will add this in next version patch.
 
-https://lore.kernel.org/patchwork/patch/973121/
-[v2,1/2] iommu/arm-smmu-v3: fix unexpected CMD_SYNC timeout
+> You also are mixing several things in this patch like adding ls1012 which you
+> don't mention. Please split.
 
-> 688714
-> 697355
-> 632951
-> 700540
-> 678459
-> 
-> Case 3: (base on case 2, replace arm_smmu_cmdq_build_cmd with arm_smmu_cmdq_build_sync_msi_cmd)
-
-https://patchwork.kernel.org/patch/10569675/
-[v4,1/2] iommu/arm-smmu-v3: fix unexpected CMD_SYNC timeout
-
-> 721582
-> 729226
-> 689574
-> 679710
-> 727770
-> 
-> Case 4: (base on case 3, plus patch 2)
-> 734077
-> 742868
-> 738194
-> 682544
-> 740586
-> 
-> Case 2 is better than case 1, I think the main reason is the atomic_inc_return_relaxed(&smmu->sync_nr)
-> has been removed. Case 3 is better than case 2, because the assembly code is reduced, see below.
-
-Hi, Will
-  Have you received this email? Which case do you prefer? Suppose we don't consider patch 2, according
-to the test result, maybe we should choose case3.
-  Because John Garry wants patch 2 to cover the non-MSI branch also, this may take some time. So can
-you decide and apply patch 1 first?
-
-
-> 
-> 
->>
->> Agreed - sorry if my wording was unclear, but that suggestion was only for the possibility of it proving genuinely worthwhile to build the command outside the lock. Since that isn't the case, I definitely prefer the simpler approach too.
-> 
-> Yes, I mean replace arm_smmu_cmdq_build_cmd with arm_smmu_cmdq_build_sync_msi_cmd to build the command inside the lock.
->          spin_lock_irqsave(&smmu->cmdq.lock, flags);
-> +        ent.sync.msidata = ++smmu->sync_nr;
-> +        arm_smmu_cmdq_build_sync_msi_cmd(cmd, &ent);
->          arm_smmu_cmdq_insert_cmd(smmu, cmd);
->          spin_unlock_irqrestore(&smmu->cmdq.lock, flags);
-> 
-> The assembly code showed me that it's very nice.
-> ffff0000085e6928:       94123207        bl      ffff000008a73144 <_raw_spin_lock_irqsave>
-> ffff0000085e692c:       b9410ad5        ldr     w21, [x22,#264]
-> ffff0000085e6930:       d28208c2        mov     x2, #0x1046                     // #4166
-> ffff0000085e6934:       aa0003fa        mov     x26, x0
-> ffff0000085e6938:       110006b5        add     w21, w21, #0x1
-> ffff0000085e693c:       f2a1f802        movk    x2, #0xfc0, lsl #16
-> ffff0000085e6940:       aa1603e0        mov     x0, x22
-> ffff0000085e6944:       910163a1        add     x1, x29, #0x58
-> ffff0000085e6948:       aa158042        orr     x2, x2, x21, lsl #32
-> ffff0000085e694c:       b9010ad5        str     w21, [x22,#264]
-> ffff0000085e6950:       f9002fa2        str     x2, [x29,#88]
-> ffff0000085e6954:       d2994016        mov     x22, #0xca00                    // #51712
-> ffff0000085e6958:       f90033b3        str     x19, [x29,#96]
-> ffff0000085e695c:       97fffd5b        bl      ffff0000085e5ec8 <arm_smmu_cmdq_insert_cmd>
-> ffff0000085e6960:       aa1903e0        mov     x0, x25
-> ffff0000085e6964:       aa1a03e1        mov     x1, x26
-> ffff0000085e6968:       f2a77356        movk    x22, #0x3b9a, lsl #16
-> ffff0000085e696c:       94123145        bl      ffff000008a72e80 <_raw_spin_unlock_irqrestore>
-> 
-> 
->>
->> Robin.
->>
->> .
->>
-> 
-
--- 
-Thanks!
-BestRegards
+Got it, will split them and add more information in next version.
+ 
+Ran
+> >
+> > Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
+> > ---
+> >  Documentation/devicetree/bindings/soc/fsl/rcpm.txt |   42 ++++++-----------
+> --
+> >  1 files changed, 13 insertions(+), 29 deletions(-)
