@@ -1,57 +1,129 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed,  5 Sep 2018 11:57:25 +0200
-Subject: [PATCH 00/13] nvmem: rework of the subsystem for non-DT users
-Message-ID: <20180905095738.26406-1-brgl@bgdev.pl>
+Date: Wed,  5 Sep 2018 11:57:28 +0200
+Subject: [PATCH 03/13] nvmem: use kref
+In-Reply-To: <20180905095738.26406-1-brgl@bgdev.pl>
+References: <20180905095738.26406-1-brgl@bgdev.pl>
+Message-ID: <20180905095738.26406-4-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-This series contains nvmem framework changes prerequisite for further
-development of my previous series[1] that aims at removal of the
-platform data struct from at24 EEPROM driver.
+Use kref for reference counting. Use an approach similar to the one
+seen in the common clock subsystem: don't actually destroy the nvmem
+device until the last user puts it. This way we can get rid of the
+users check from nvmem_unregister().
 
-First we remove unused APIs and the global cell list. We then switch
-to using kref instead of manual user counting. Next we simplify the
-provider unregistration by removing the return value from
-nvmem_unregister().
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+ drivers/nvmem/core.c | 45 +++++++++++++++++++++-----------------------
+ 1 file changed, 21 insertions(+), 24 deletions(-)
 
-Next three patches improve the framework by adding a notifier chain
-for future use and fixing the issue with nvmem device names.
-
-Finally we add support for cell definitions, cell lookups and make
-DT systems resolve the nvmem cells during provider's registration.
-
-Last patch just uses the SPDX license identifiers.
-
-Tested both DT and non-DT use cases.
-
-[1] https://lkml.org/lkml/2018/8/10/149
-
-Bartosz Golaszewski (13):
-  nvmem: remove unused APIs
-  nvmem: remove the global cell list
-  nvmem: use kref
-  nvmem: lpc18xx_eeprom: use devm_nvmem_register()
-  nvmem: change the signature of nvmem_unregister()
-  nvmem: provide nvmem_dev_name()
-  nvmem: remove the name field from struct nvmem_device
-  nvmem: add a notifier chain
-  nvmem: add support for cell info
-  nvmem: resolve cells from DT at registration time
-  nvmem: add support for cell lookups from machine code
-  Documentation: nvmem: document cell tables and lookup entries
-  nvmem: use SPDX license identifiers
-
- Documentation/nvmem/nvmem.txt  |  30 ++
- MAINTAINERS                    |   1 +
- drivers/nvmem/core.c           | 650 ++++++++++++++++++---------------
- drivers/nvmem/lpc18xx_eeprom.c |   6 +-
- include/linux/nvmem-consumer.h |  50 ++-
- include/linux/nvmem-machine.h  |  56 +++
- include/linux/nvmem-provider.h |  22 +-
- 7 files changed, 465 insertions(+), 350 deletions(-)
- create mode 100644 include/linux/nvmem-machine.h
-
+diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+index 86af62e2df47..2335b72d4b3e 100644
+--- a/drivers/nvmem/core.c
++++ b/drivers/nvmem/core.c
+@@ -32,7 +32,7 @@ struct nvmem_device {
+ 	int			stride;
+ 	int			word_size;
+ 	int			id;
+-	int			users;
++	struct kref		refcnt;
+ 	size_t			size;
+ 	bool			read_only;
+ 	int			flags;
+@@ -368,6 +368,8 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
+ 		return ERR_PTR(rval);
+ 	}
+ 
++	kref_init(&nvmem->refcnt);
++
+ 	nvmem->id = rval;
+ 	nvmem->owner = config->owner;
+ 	if (!nvmem->owner && config->dev->driver)
+@@ -430,6 +432,20 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
+ }
+ EXPORT_SYMBOL_GPL(nvmem_register);
+ 
++static void nvmem_device_release(struct kref *kref)
++{
++	struct nvmem_device *nvmem;
++
++	nvmem = container_of(kref, struct nvmem_device, refcnt);
++
++	if (nvmem->flags & FLAG_COMPAT)
++		device_remove_bin_file(nvmem->base_dev, &nvmem->eeprom);
++
++	nvmem_device_remove_all_cells(nvmem);
++	device_del(&nvmem->dev);
++	put_device(&nvmem->dev);
++}
++
+ /**
+  * nvmem_unregister() - Unregister previously registered nvmem device
+  *
+@@ -439,19 +455,7 @@ EXPORT_SYMBOL_GPL(nvmem_register);
+  */
+ int nvmem_unregister(struct nvmem_device *nvmem)
+ {
+-	mutex_lock(&nvmem_mutex);
+-	if (nvmem->users) {
+-		mutex_unlock(&nvmem_mutex);
+-		return -EBUSY;
+-	}
+-	mutex_unlock(&nvmem_mutex);
+-
+-	if (nvmem->flags & FLAG_COMPAT)
+-		device_remove_bin_file(nvmem->base_dev, &nvmem->eeprom);
+-
+-	nvmem_device_remove_all_cells(nvmem);
+-	device_del(&nvmem->dev);
+-	put_device(&nvmem->dev);
++	kref_put(&nvmem->refcnt, nvmem_device_release);
+ 
+ 	return 0;
+ }
+@@ -517,7 +521,6 @@ int devm_nvmem_unregister(struct device *dev, struct nvmem_device *nvmem)
+ }
+ EXPORT_SYMBOL(devm_nvmem_unregister);
+ 
+-
+ static struct nvmem_device *__nvmem_device_get(struct device_node *np)
+ {
+ 	struct nvmem_device *nvmem = NULL;
+@@ -533,30 +536,24 @@ static struct nvmem_device *__nvmem_device_get(struct device_node *np)
+ 		return ERR_PTR(-EPROBE_DEFER);
+ 	}
+ 
+-	nvmem->users++;
+ 	mutex_unlock(&nvmem_mutex);
+ 
+ 	if (!try_module_get(nvmem->owner)) {
+ 		dev_err(&nvmem->dev,
+ 			"could not increase module refcount for cell %s\n",
+ 			nvmem->name);
+-
+-		mutex_lock(&nvmem_mutex);
+-		nvmem->users--;
+-		mutex_unlock(&nvmem_mutex);
+-
+ 		return ERR_PTR(-EINVAL);
+ 	}
+ 
++	kref_get(&nvmem->refcnt);
++
+ 	return nvmem;
+ }
+ 
+ static void __nvmem_device_put(struct nvmem_device *nvmem)
+ {
+ 	module_put(nvmem->owner);
+-	mutex_lock(&nvmem_mutex);
+-	nvmem->users--;
+-	mutex_unlock(&nvmem_mutex);
++	kref_put(&nvmem->refcnt, nvmem_device_release);
+ }
+ 
+ static struct nvmem_device *nvmem_find(const char *name)
 -- 
 2.18.0
