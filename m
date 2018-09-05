@@ -1,69 +1,157 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Wed, 5 Sep 2018 06:04:44 -0400
-Subject: [PATCH 0/5] Qcom smmu-500 TLB invalidation errata for sdm845
-In-Reply-To: <3f74124c-b09f-a92d-117d-a747d33a4561@codeaurora.org>
-References: <20180814105528.20592-1-vivek.gautam@codeaurora.org>
- <20180814114009.GF28664@arm.com>
- <ad4e9f85-ff57-ad26-fb25-7b4c08683a52@codeaurora.org>
- <3f74124c-b09f-a92d-117d-a747d33a4561@codeaurora.org>
-Message-ID: <CAF6AEGsuAXXtUbeteQk5ssZEqk8XLViDZH5PfxQjn6sg8+B08A@mail.gmail.com>
+From: yogeshnarayan.gaur@nxp.com (Yogesh Narayan Gaur)
+Date: Wed, 5 Sep 2018 10:07:10 +0000
+Subject: [PATCH 3/7] spi: spi-mem: Add a driver for NXP FlexSPI controller
+In-Reply-To: <20180904165842.774ed960@bbrezillon>
+References: <1535711404-29528-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <1535711404-29528-4-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <20180904165842.774ed960@bbrezillon>
+Message-ID: <VI1PR04MB1038CE65EF4E98ACBEA9990B99020@VI1PR04MB1038.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 5, 2018 at 5:22 AM Vivek Gautam <vivek.gautam@codeaurora.org> wrote:
->
->
-> On 8/14/2018 5:54 PM, Vivek Gautam wrote:
-> > Hi Will,
+Hi Boris,
+
+> -----Original Message-----
+> From: Boris Brezillon [mailto:boris.brezillon at bootlin.com]
+> Sent: Tuesday, September 4, 2018 8:29 PM
+> To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
+> Cc: linux-mtd at lists.infradead.org; marek.vasut at gmail.com; linux-
+> spi at vger.kernel.org; devicetree at vger.kernel.org; robh at kernel.org;
+> mark.rutland at arm.com; shawnguo at kernel.org; linux-arm-
+> kernel at lists.infradead.org; computersforpeace at gmail.com;
+> frieder.schrempf at exceet.de; linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH 3/7] spi: spi-mem: Add a driver for NXP FlexSPI controller
+> 
+> Hi Yogesh,
+> 
+> On Fri, 31 Aug 2018 16:00:00 +0530
+> Yogesh Gaur <yogeshnarayan.gaur@nxp.com> wrote:
+> 
+> > - Add a driver for NXP FlexSPI host controller
 > >
+> > (0) What is the FlexSPI controller?
+> >  FlexSPI is a flexsible SPI host controller which supports two SPI
+> > channels and up to 4 external devices.
+> >  Each channel supports Single/Dual/Quad/Octal mode data  transfer
+> > (1/2/4/8 bidirectional data lines)  i.e. FlexSPI acts as an interface
+> > to external devices,  maximum 4, each with up to 8 bidirectional data
+> > lines.
 > >
-> > On 8/14/2018 5:10 PM, Will Deacon wrote:
-> >> Hi Vivek,
-> >>
-> >> On Tue, Aug 14, 2018 at 04:25:23PM +0530, Vivek Gautam wrote:
-> >>> Qcom's implementation of arm,mmu-500 on sdm845 has a
-> >>> functional/performance
-> >>> errata [1] because of which the TCU cache look ups are stalled during
-> >>> invalidation cycle. This is mitigated by serializing all the
-> >>> invalidation
-> >>> requests coming to the smmu.
-> >> How does this implementation differ from the one supported by
-> >> qcom_iommu.c?
-> >> I notice you're adding firmware hooks here, which we avoided by
-> >> having the
-> >> extra driver. Please help me understand which devices exist, how they
-> >> differ, and which drivers are intended to support them!
+> >  It uses new SPI memory interface of the SPI framework to issue flash
+> > memory operations to up to four connected flash chips (2 buses with
+> >  2 CS each).
+> >  Chipselect for each flash can be selected as per address assigned in
+> > controller specific registers.
 > >
-> > IIRC, the qcom_iommu driver was intended to support the static context
-> > bank - SID
-> > mapping, and is very specific to the smmu-v2 version present on
-> > msm8916 soc.
-> > However, this is the qcom's mmu-500 implementation specific errata.
-> > qcom_iommu
-> > will not be able to support mmu-500 configurations.
-> > Rob Clark can add more.
-> > Let you know what you suggest.
->
-> Rob, can you please comment about how qcom-smmu driver has different
-> implementation
-> from arm-smmu driver?
+> >  FlexSPI controller is similar to the existing Freescale/NXP QuadSPI
+> > controller with advanced features.
+> 
+> Yep, I had a quick look at the code and they really look similar. Why not
+> extending the existing driver instead of creating a new one from scratch?
+> 
 
-sorry, I missed this thread earlier.  But yeah, as you mentioned, the
-purpose for qcom_iommu.c was to deal with the static context/SID
-mapping.
+FlexSPI is different controller not related to the QuadSPI controller in its working behavior
+Both these controller are having
+* Different registers name, registers address, registers functionality etc, section 30.5.2[1]
+* Different programming sequence for initialization of the controller, section 30.8.1[1]
+* Different programming sequence for performing Read and Write operation using IP, section 30.7.9[1] and AHB mode
+* Different programming sequence for checking controller current state like busy or not 
+* New mechanism to program for the connected slave device i.e. flash access mode and flash memory map 30.7.4[1] and 30.7.5[1]
+* New entries added for FlexSPI controller for LUT_XX mode for various commands, section 30.7.8[1]
 
-(I guess it is all just software, and we could make qcom_iommu.c
-support dynamic mapping as well, but I think then it starts to
-duplicate most of arm_smmu.c, so that doesn't seem like the right
-direction)
+There are few similarities between these two like LUT programming logic is same
+i.e. LUT needs to be programmed in same sequence of 'INSTR  PAD  OPCODE', but again LUT register address and LUT command mode values are different.
 
-BR,
--R
+Creating common driver for both FlexSPI and QuadSPI controller, would involve creation of one more layer between driver/spi/spi-xxx and the actual controller driver, this layer would going to have less functionality like doing LUT creation programming and then would re-direct calls to the respective controller driver functionality to perform desired programming sequence.
 
-> Will, in case we would want to use arm-smmu driver, what would you
-> suggest for
-> having the firmware hooks?
-> Thanks.
->
-> Best regards
-> Vivek
+> >
+> > (1) The FlexSPI controller is driven by the LUT(Look-up Table)
+> > registers.
+> >  The LUT registers are a look-up-table for sequences of instructions.
+> >  A valid sequence consists of four LUT registers.
+> >  Maximum 32 LUT sequences can be programmed simultaneously.
+> >
+> > (2) The definition of the LUT register shows below:
+> >  ---------------------------------------------------
+> >  | INSTR1 | PAD1 | OPRND1 | INSTR0 | PAD0 | OPRND0 |
+> >  ---------------------------------------------------
+> >
+> >  There are several types of INSTRx, such as:
+> >  CMD     : the SPI NOR command.
+> >  ADDR    : the address for the SPI NOR command.
+> >  DUMMY   : the dummy cycles needed by the SPI NOR command.
+> >  ....
+> >
+> >  There are several types of PADx, such as:
+> >  PAD1    : use a singe I/O line.
+> >  PAD2    : use two I/O lines.
+> >  PAD4    : use quad I/O lines.
+> >  PAD8    : use octal I/O lines.
+> >  ....
+> >
+> > (3) LUTs are being created at run-time based on the commands passed
+> > from the spi-mem framework. Thus, using single LUT index.
+> >
+> > (4) Software triggered Flash read/write access by IP Bus.
+> >
+> > (5) Memory mapped read access by AHB Bus.
+> 
+> Do we really want to have this level of details in the commit message?
+> I mean, this is something you can document in the driver, but not here.
+> 
+> BTW, you might want to have a look at [1]. I think we can get rid of the ->size
+> field you're adding if this driver implements the dirmap hooks.
+> 
+
+I need size information for the connected device to program the controller register FLSHXXCRO as Flash Chip select is determined by flash access address and Flash size setting in register FLSHXXCR0[FLSHz], section 30.7.9[1].
+
+Link for reference of the driver implementing dirmap hooks was missing in mail, please share.
+
+> >
+> > (6) Tested this driver with the mtd_debug and JFFS2 filesystem utility
+> > on NXP LX2160ARDB and LX2160AQDS targets.
+> >  LX2160ARDB is having two NOR slave device connected on single bus A
+> > i.e. A0 and A1 (CS0 and CS1).
+> >  LX2160AQDS is having two NOR slave device connected on separate buses
+> > one flash on A0 and second on B1 i.e. (CS0 and CS3).
+> >  Verified this driver on following SPI NOR flashes:
+> >     Micron, mt35xu512ab, [Read - 1 bit mode]
+> >     Cypress, s25fl512s, [Read - 1/2/4 bit mode]
+> 
+> Ok, that's good to have in the commit message.
+> 
+> >
+> > - Add config option entry in 'spi-nor/Kconfig' for FlexSPI driver.
+> 
+> But this one is useless. If you add a new driver, you have no other choice but to
+> add a new entry in the Kconfig file.
+> 
+> >
+> > - Add entry in the 'spi-nor/Makefile'.
+> >
+> 
+> Ditto.
+> 
+> Before you re-send a new version, I'd like to understand why you think you need
+> to create a new driver, and I want you to try to implement the dirmap hook and
+> check if you can get rid of the ->size field when doing that.
+> 
+> I also seem one extra benefit to having a single driver for both FlexSPI and
+> QuadSPI IPs: you'll help Frieder debug the last remaining problems you reported
+> on the new QuadSPI driver :-P.
+
+Regarding testing of the QuadSPI driver on spi-mem framework, I have already given suggestions to the Frieder and my local changes using which flash connected at CS0 and CS1 starts working for read/write/erase commands on ls1088ardb target.
+
+Current v2 which has been shared, data operation for the slave flash device connected at CS1 is not working.
+I have to make changes for the calculation of flash base address for the requested chip select and changes in address remapping the buffer in AHB read case for CS1 access to work.
+
+[1] https://www.nxp.com/docs/en/reference-manual/IMXRT1050RM.pdf
+
+--
+Regards
+Yogesh Gaur
+
+> 
+> Thanks,
+> 
+> Boris
