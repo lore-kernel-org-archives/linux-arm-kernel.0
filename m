@@ -1,70 +1,77 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Tue,  4 Sep 2018 22:21:09 -0700
-Subject: [PATCH 2/6] drm/bridge: allow to specify data-enable polarity
-In-Reply-To: <20180905052113.21262-1-stefan@agner.ch>
-References: <20180905052113.21262-1-stefan@agner.ch>
-Message-ID: <20180905052113.21262-2-stefan@agner.ch>
+Date: Tue,  4 Sep 2018 22:21:08 -0700
+Subject: [PATCH 1/6] drm/bridge: use bus flags in bridge timings
+Message-ID: <20180905052113.21262-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support boards with a passive RGB to VGA bridge which require a low
-active data-enable polarity.
+The DRM bus flags convey additional information on pixel data on
+the bus. All current available bus flags might be of interest for
+a bridge. Remove the sampling_edge field and use bus_flags.
+
+In the case at hand a dumb VGA bridge needs a specific data enable
+polarity (DRM_BUS_FLAG_DE_LOW).
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
-Alternatively a new dt binding could be introduced for dumb VGA bridges
-requiring low active data enable... However, also other polarities might
-need a specific polarity, hence this generic approach might be better.
-
- drivers/gpu/drm/bridge/dumb-vga-dac.c | 22 ++++++++++++++++++----
- 1 file changed, 18 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/bridge/dumb-vga-dac.c |  6 +++---
+ include/drm/drm_bridge.h              | 11 +++++------
+ 2 files changed, 8 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/gpu/drm/bridge/dumb-vga-dac.c b/drivers/gpu/drm/bridge/dumb-vga-dac.c
-index 7a5c24967115..2b8c3d629f2f 100644
+index 9b706789a341..7a5c24967115 100644
 --- a/drivers/gpu/drm/bridge/dumb-vga-dac.c
 +++ b/drivers/gpu/drm/bridge/dumb-vga-dac.c
-@@ -179,6 +179,7 @@ static struct i2c_adapter *dumb_vga_retrieve_ddc(struct device *dev)
- static int dumb_vga_probe(struct platform_device *pdev)
- {
- 	struct dumb_vga *vga;
-+	u32 de;
- 
- 	vga = devm_kzalloc(&pdev->dev, sizeof(*vga), GFP_KERNEL);
- 	if (!vga)
-@@ -194,6 +195,23 @@ static int dumb_vga_probe(struct platform_device *pdev)
- 		dev_dbg(&pdev->dev, "No vdd regulator found: %d\n", ret);
- 	}
- 
-+	vga->bridge.funcs = &dumb_vga_bridge_funcs;
-+	vga->bridge.of_node = pdev->dev.of_node;
-+	vga->bridge.timings = of_device_get_match_data(&pdev->dev);
-+
-+	if (!vga->bridge.timings &&
-+	    !of_property_read_u32(pdev->dev.of_node, "de-active", &de)) {
-+		struct drm_bridge_timings *timings;
-+
-+		timings = devm_kzalloc(&pdev->dev, sizeof(*timings), GFP_KERNEL);
-+		if (!timings)
-+			return -ENOMEM;
-+
-+		timings->bus_flags = de ? DRM_BUS_FLAG_DE_HIGH :
-+					DRM_BUS_FLAG_DE_LOW;
-+		vga->bridge.timings = timings;
-+	}
-+
- 	vga->ddc = dumb_vga_retrieve_ddc(&pdev->dev);
- 	if (IS_ERR(vga->ddc)) {
- 		if (PTR_ERR(vga->ddc) == -ENODEV) {
-@@ -205,10 +223,6 @@ static int dumb_vga_probe(struct platform_device *pdev)
- 		}
- 	}
- 
--	vga->bridge.funcs = &dumb_vga_bridge_funcs;
--	vga->bridge.of_node = pdev->dev.of_node;
--	vga->bridge.timings = of_device_get_match_data(&pdev->dev);
--
- 	drm_bridge_add(&vga->bridge);
- 
- 	return 0;
+@@ -234,7 +234,7 @@ static int dumb_vga_remove(struct platform_device *pdev)
+  */
+ static const struct drm_bridge_timings default_dac_timings = {
+ 	/* Timing specifications, datasheet page 7 */
+-	.sampling_edge = DRM_BUS_FLAG_PIXDATA_POSEDGE,
++	.bus_flags = DRM_BUS_FLAG_PIXDATA_POSEDGE,
+ 	.setup_time_ps = 500,
+ 	.hold_time_ps = 1500,
+ };
+@@ -245,7 +245,7 @@ static const struct drm_bridge_timings default_dac_timings = {
+  */
+ static const struct drm_bridge_timings ti_ths8134_dac_timings = {
+ 	/* From timing diagram, datasheet page 9 */
+-	.sampling_edge = DRM_BUS_FLAG_PIXDATA_POSEDGE,
++	.bus_flags = DRM_BUS_FLAG_PIXDATA_POSEDGE,
+ 	/* From datasheet, page 12 */
+ 	.setup_time_ps = 3000,
+ 	/* I guess this means latched input */
+@@ -258,7 +258,7 @@ static const struct drm_bridge_timings ti_ths8134_dac_timings = {
+  */
+ static const struct drm_bridge_timings ti_ths8135_dac_timings = {
+ 	/* From timing diagram, datasheet page 14 */
+-	.sampling_edge = DRM_BUS_FLAG_PIXDATA_POSEDGE,
++	.bus_flags = DRM_BUS_FLAG_PIXDATA_POSEDGE,
+ 	/* From datasheet, page 16 */
+ 	.setup_time_ps = 2000,
+ 	.hold_time_ps = 500,
+diff --git a/include/drm/drm_bridge.h b/include/drm/drm_bridge.h
+index bd850747ce54..85d4b51eae19 100644
+--- a/include/drm/drm_bridge.h
++++ b/include/drm/drm_bridge.h
+@@ -244,14 +244,13 @@ struct drm_bridge_funcs {
+  */
+ struct drm_bridge_timings {
+ 	/**
+-	 * @sampling_edge:
++	 * @bus_flags:
+ 	 *
+-	 * Tells whether the bridge samples the digital input signal
+-	 * from the display engine on the positive or negative edge of the
+-	 * clock, this should reuse the DRM_BUS_FLAG_PIXDATA_[POS|NEG]EDGE
+-	 * bitwise flags from the DRM connector (bit 2 and 3 valid).
++	 * Tells what additional settings for the pixel data on the bus
++	 * this bridge requires (like pixel signal polarity). See also
++	 * &drm_display_info->bus_flags.
+ 	 */
+-	u32 sampling_edge;
++	u32 bus_flags;
+ 	/**
+ 	 * @setup_time_ps:
+ 	 *
 -- 
 2.18.0
