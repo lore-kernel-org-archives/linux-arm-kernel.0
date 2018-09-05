@@ -1,49 +1,72 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Wed, 5 Sep 2018 17:50:28 +0300
-Subject: [PATCH v9 0/8] Introduce on-chip interconnect API
-In-Reply-To: <20180905093620.6d9162ca@canb.auug.org.au>
-References: <20180831140151.13972-1-georgi.djakov@linaro.org>
- <CAHLCerNd0hrLKgbni95_RSYOtsNufMCVtHbAKa4W+eo8H2cL2A@mail.gmail.com>
- <20180905093620.6d9162ca@canb.auug.org.au>
-Message-ID: <fe9f3e91-93f9-d7d5-1643-dc09543e2850@linaro.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 5 Sep 2018 16:58:58 +0200
+Subject: [linux-sunxi] Re: [PATCH v3 21/30] iio: adc: sun4i-gpadc-iio:
+ add support for H3 thermal sensor
+In-Reply-To: <AFDFF5AB-8BF6-4461-A5C2-D628A2F22E2E@aosc.io>
+References: <20180830154518.29507-1-embed3d@gmail.com>
+ <20180830154518.29507-22-embed3d@gmail.com>
+ <20180831091137.wkbbipssyd6mqfbt@flea>
+ <f01ec2f202c7e2e5a7e0c822b2f9a8f0c55a9ea4.camel@aosc.io>
+ <20180903102022.fkxfkxadkt4vpbmb@flea>
+ <AFDFF5AB-8BF6-4461-A5C2-D628A2F22E2E@aosc.io>
+Message-ID: <20180905145858.4ny5c7xojn7aiwlv@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-On 09/05/2018 02:36 AM, Stephen Rothwell wrote:
-> Hi all,
+On Mon, Sep 03, 2018 at 07:01:47PM +0800, Icenowy Zheng wrote:
+> ? 2018?9?3? GMT+08:00 ??6:20:22, Maxime Ripard <maxime.ripard@bootlin.com> ??:
+> >On Fri, Aug 31, 2018 at 05:51:41PM +0800, Icenowy Zheng wrote:
+> >> Personally I suggest to leave out all SID or calibration related
+> >> patches here.
+> >> 
+> >> Currently we seems to be wrongly converting SID to big endian,
+> >however,
+> >> the orgnization of the THS calibration data on H6 shows that it's
+> >> surely little endian:
+> >> 
+> >> It consists a temperature value in 1/10 celsuis as unit, and some
+> >> thermal register readout values, which are the values read out at the
+> >> given temperature, and every value here (the temperature and the
+> >> readout) are all half word length.
+> >> 
+> >> Let the temperature value be AABB, the two readout values be XXYY and
+> >> ZZWW, the oragnization is:
+> >> BB AA YY XX WW ZZ ** ** .
+> >> 
+> >> When converting the SID to big endian, it becomes:
+> >> XX YY AA BB ** ** ZZ WW ,
+> >> which is non-sense, and not able to do sub-word cell addressing.
+> >> 
+> >> Maxime, should I drop the LE2BE conversion in SID driver? (I doubt
+> >> whether it will break compatibility.)
+> >
+> >This is exposed to the userspace, so no.
 > 
-> On Tue, 4 Sep 2018 15:54:27 +0530 Amit Kucheria <amit.kucheria@linaro.org> wrote:
->>
->> I'm currently reviewing this patchset (long overdue), but considering
->> that we haven't added any major new features to the framework for the
->> last couple of revisions, can you get this patchset merged into
->> linux-next to see how things shake out there? We've had this merged
->> branch merged into a CI build on kernelci for a while now w/o any
->> major incident so we should increase its exposure.
->>
->> You could ask Stephen Rothwell if he'll accept the a branch directly
->> from you or he needs an upstream maintainer (GregKH?) to carry it.
+> Please note the LE2BE totally breaks the SID addressing.
+
+On which SoCs?
+
+> Without it dropped all cells must be referenced with 4 byte word as
+> unit, and half word addressing of SID is thus not possible. The
+> driver will also need then to split the half words if needed.
 > 
-> Since it appears to have been well reviewed and tested, I can take it
-> if you send me a git URL and the names of contacts in case of issues
-> with the branch.  Once Greg has merged it, I will try to drop it again
-> (unless you think there will be an ongoing reason to keep it in
-> linux-next separately), but a prompting email would also be nice in
-> case I forget.
+> I think this is kind of hardware misbehavior, and not a simple
+> UAPI change, so the UAPI stability shouldn't affect this change.
 
-Thank you! Below is the git URL to pull from and you can use my e-mail
-as contact for any issues.
+How would you feel having your files on your filesystem suddenly not
+in the same endianness and having all the bytes reordered? This is
+definitely about the userspace ABI.
 
-git://git.linaro.org/people/georgi.djakov/linux.git#icc-next
+Maxime
 
-I expect this to be a continuing effort with some upcoming users of this
-API, so i plan to maintain this branch and occasionally put some
-reviewed/tested patches to get wider integration testing. But let's see
-what happens now.
-
-In any case, if this increases your burden, feel free to drop it.
-
-Thanks,
-Georgi
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180905/fb9aade5/attachment.sig>
