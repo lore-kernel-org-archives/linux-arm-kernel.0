@@ -1,58 +1,29 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Wed,  5 Sep 2018 18:09:07 +0800
-Subject: [PATCH] coresight: tmc: Refactor loops in etb dump
-Message-ID: <1536142147-21323-1-git-send-email-leo.yan@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 5 Sep 2018 12:13:42 +0200
+Subject: [PATCH -next] pinctrl: sirf: atlas7: remove set but not used
+ variables 'conf, bank'
+In-Reply-To: <1535681346-152447-1-git-send-email-yuehaibing@huawei.com>
+References: <1535681346-152447-1-git-send-email-yuehaibing@huawei.com>
+Message-ID: <CACRpkdY5qurpthqB8=ek5RhD3egXbceWi0RYK1P8pboH-KcA7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In ETB dump function tmc_etb_dump_hw() it has nested loops.  The second
-level loop is to iterate index in the range [0 .. drvdata->memwidth);
-but the index isn't really used in the code, thus the second level
-loop is useless.
+On Fri, Aug 31, 2018 at 3:58 AM YueHaibing <yuehaibing@huawei.com> wrote:
 
-This patch is to remove the second level loop; the refactor also reduces
-indentation and we can use 'break' to replace 'goto' tag.
+> Fixes gcc '-Wunused-but-set-variable' warning:
+>
+> drivers/pinctrl/sirf/pinctrl-atlas7.c: In function 'atlas7_pinmux_resume_noirq':
+> drivers/pinctrl/sirf/pinctrl-atlas7.c:5545:6: warning:
+>  variable 'bank' set but not used [-Wunused-but-set-variable]
+>   u32 bank;
+>
+> drivers/pinctrl/sirf/pinctrl-atlas7.c:5543:28: warning:
+>  variable 'conf' set but not used [-Wunused-but-set-variable]
+>   struct atlas7_pad_config *conf;
+>
+> Signed-off-by: YueHaibing <yuehaibing@huawei.com>
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- drivers/hwtracing/coresight/coresight-tmc-etf.c | 17 +++++++----------
- 1 file changed, 7 insertions(+), 10 deletions(-)
+Patch applied.
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-index 9c599c9..8b34161 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-@@ -34,23 +34,20 @@ static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
- {
- 	char *bufp;
- 	u32 read_data, lost;
--	int i;
- 
- 	/* Check if the buffer wrapped around. */
- 	lost = readl_relaxed(drvdata->base + TMC_STS) & TMC_STS_FULL;
- 	bufp = drvdata->buf;
- 	drvdata->len = 0;
- 	while (1) {
--		for (i = 0; i < drvdata->memwidth; i++) {
--			read_data = readl_relaxed(drvdata->base + TMC_RRD);
--			if (read_data == 0xFFFFFFFF)
--				goto done;
--			memcpy(bufp, &read_data, 4);
--			bufp += 4;
--			drvdata->len += 4;
--		}
-+		read_data = readl_relaxed(drvdata->base + TMC_RRD);
-+		if (read_data == 0xFFFFFFFF)
-+			break;
-+		memcpy(bufp, &read_data, 4);
-+		bufp += 4;
-+		drvdata->len += 4;
- 	}
--done:
-+
- 	if (lost)
- 		coresight_insert_barrier_packet(drvdata->buf);
- 	return;
--- 
-2.7.4
+Yours,
+Linus Walleij
