@@ -1,71 +1,151 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Wed, 5 Sep 2018 18:47:14 +0800
-Subject: [PATCH v2 03/13] drm/mediatek: adjust EDGE to match clock and data
-In-Reply-To: <20180905083146.14727-4-bibby.hsieh@mediatek.com>
-References: <20180905083146.14727-1-bibby.hsieh@mediatek.com>
- <20180905083146.14727-4-bibby.hsieh@mediatek.com>
-Message-ID: <1536144434.4618.1.camel@mtksdaap41>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Wed, 5 Sep 2018 12:10:47 +0200
+Subject: [PATCH] spi: Do not print a message if
+ spi_controller_{suspend,resume}() fails
+In-Reply-To: <20180905092831.GN13888@piout.net>
+References: <20180905085157.7807-1-geert+renesas@glider.be>
+ <20180905092831.GN13888@piout.net>
+Message-ID: <463b7aff-bf38-0caf-cc3f-7d1a621fb36f@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Bibby:
+On 05/09/2018 at 11:28, Alexandre Belloni wrote:
+> On 05/09/2018 10:51:57+0200, Geert Uytterhoeven wrote:
+>> spi_controller_{suspend,resume}() already prints an error message on
+>> failure, so there is no need to repeat this in individual drivers.
+>>
+>> Note: spi_master_{suspend,resume}() is an alias for
+>>        spi_controller_{suspend,resume}().
+>>
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Reviewed-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
 
-On Wed, 2018-09-05 at 16:31 +0800, Bibby Hsieh wrote:
-> From: chunhui dai <chunhui.dai@mediatek.com>
-> 
-> The default timing of DPI data and clock is not match.
-> We could adjust this bit to make them match.
-> 
-> Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 
-Reviewed-by: CK Hu <ck.hu@mediatek.com>
-
-> ---
->  drivers/gpu/drm/mediatek/mtk_dpi.c      | 8 ++++++++
->  drivers/gpu/drm/mediatek/mtk_dpi_regs.h | 1 +
->  2 files changed, 9 insertions(+)
 > 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
-> index 3db959fed493..df27107b1f0b 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_dpi.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
-> @@ -120,6 +120,7 @@ struct mtk_dpi_yc_limit {
->  
->  struct mtk_dpi_conf {
->  	const u32 reg_h_fre_con;
-> +	bool edge_sel_en;
->  };
->  
->  static void mtk_dpi_mask(struct mtk_dpi *dpi, u32 offset, u32 val, u32 mask)
-> @@ -350,6 +351,12 @@ static void mtk_dpi_config_2n_h_fre(struct mtk_dpi *dpi)
->  	mtk_dpi_mask(dpi, dpi->conf->reg_h_fre_con, H_FRE_2N, H_FRE_2N);
->  }
->  
-> +static void mtk_dpi_config_disable_edge(struct mtk_dpi *dpi)
-> +{
-> +	if (dpi->conf->edge_sel_en)
-> +		mtk_dpi_mask(dpi, dpi->conf->reg_h_fre_con, 0, EDGE_SEL_EN);
-> +}
-> +
->  static void mtk_dpi_config_color_format(struct mtk_dpi *dpi,
->  					enum mtk_dpi_out_color_format format)
->  {
-> @@ -535,6 +542,7 @@ static int mtk_dpi_set_display_mode(struct mtk_dpi *dpi,
->  	mtk_dpi_config_yc_map(dpi, dpi->yc_map);
->  	mtk_dpi_config_color_format(dpi, dpi->color_format);
->  	mtk_dpi_config_2n_h_fre(dpi);
-> +	mtk_dpi_config_disable_edge(dpi);
->  	mtk_dpi_sw_reset(dpi, false);
->  
->  	return 0;
-> diff --git a/drivers/gpu/drm/mediatek/mtk_dpi_regs.h b/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
-> index 040444d7718d..d9db8c4cacd7 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
-> +++ b/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
-> @@ -223,5 +223,6 @@
->  #define ESAV_CODE2			(0xFFF << 0)
->  #define ESAV_CODE3_MSB			BIT(16)
->  
-> +#define EDGE_SEL_EN			BIT(5)
->  #define H_FRE_2N			BIT(25)
->  #endif /* __MTK_DPI_REGS_H */
+>> ---
+>>   drivers/spi/spi-atmel.c    | 10 ++--------
+>>   drivers/spi/spi-dw.c       |  7 +------
+>>   drivers/spi/spi-fsl-espi.c |  4 +---
+>>   drivers/spi/spi-pl022.c    |  8 ++------
+>>   drivers/spi/spi-pxa2xx.c   |  8 +-------
+>>   5 files changed, 7 insertions(+), 30 deletions(-)
+>>
+>> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+>> index 3f890d16293411ba..74fddcd3282b4bea 100644
+>> --- a/drivers/spi/spi-atmel.c
+>> +++ b/drivers/spi/spi-atmel.c
+>> @@ -1767,10 +1767,8 @@ static int atmel_spi_suspend(struct device *dev)
+>>   
+>>   	/* Stop the queue running */
+>>   	ret = spi_master_suspend(master);
+>> -	if (ret) {
+>> -		dev_warn(dev, "cannot suspend master\n");
+>> +	if (ret)
+>>   		return ret;
+>> -	}
+>>   
+>>   	if (!pm_runtime_suspended(dev))
+>>   		atmel_spi_runtime_suspend(dev);
+>> @@ -1799,11 +1797,7 @@ static int atmel_spi_resume(struct device *dev)
+>>   	}
+>>   
+>>   	/* Start the queue running */
+>> -	ret = spi_master_resume(master);
+>> -	if (ret)
+>> -		dev_err(dev, "problem starting queue (%d)\n", ret);
+>> -
+>> -	return ret;
+>> +	return spi_master_resume(master);
+>>   }
+>>   #endif
+>>   
+>> diff --git a/drivers/spi/spi-dw.c b/drivers/spi/spi-dw.c
+>> index ac2eb89ef7a5a061..1736612ee86be7dd 100644
+>> --- a/drivers/spi/spi-dw.c
+>> +++ b/drivers/spi/spi-dw.c
+>> @@ -572,13 +572,8 @@ EXPORT_SYMBOL_GPL(dw_spi_suspend_host);
+>>   
+>>   int dw_spi_resume_host(struct dw_spi *dws)
+>>   {
+>> -	int ret;
+>> -
+>>   	spi_hw_init(&dws->master->dev, dws);
+>> -	ret = spi_controller_resume(dws->master);
+>> -	if (ret)
+>> -		dev_err(&dws->master->dev, "fail to start queue (%d)\n", ret);
+>> -	return ret;
+>> +	return spi_controller_resume(dws->master);
+>>   }
+>>   EXPORT_SYMBOL_GPL(dw_spi_resume_host);
+>>   
+>> diff --git a/drivers/spi/spi-fsl-espi.c b/drivers/spi/spi-fsl-espi.c
+>> index 1e8ff6256079f134..cf2118dc91f44548 100644
+>> --- a/drivers/spi/spi-fsl-espi.c
+>> +++ b/drivers/spi/spi-fsl-espi.c
+>> @@ -798,10 +798,8 @@ static int of_fsl_espi_suspend(struct device *dev)
+>>   	int ret;
+>>   
+>>   	ret = spi_master_suspend(master);
+>> -	if (ret) {
+>> -		dev_warn(dev, "cannot suspend master\n");
+>> +	if (ret)
+>>   		return ret;
+>> -	}
+>>   
+>>   	return pm_runtime_force_suspend(dev);
+>>   }
+>> diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
+>> index 1af8c96b940e203d..5f5f197b153c3ec4 100644
+>> --- a/drivers/spi/spi-pl022.c
+>> +++ b/drivers/spi/spi-pl022.c
+>> @@ -2325,10 +2325,8 @@ static int pl022_suspend(struct device *dev)
+>>   	int ret;
+>>   
+>>   	ret = spi_master_suspend(pl022->master);
+>> -	if (ret) {
+>> -		dev_warn(dev, "cannot suspend master\n");
+>> +	if (ret)
+>>   		return ret;
+>> -	}
+>>   
+>>   	ret = pm_runtime_force_suspend(dev);
+>>   	if (ret) {
+>> @@ -2353,9 +2351,7 @@ static int pl022_resume(struct device *dev)
+>>   
+>>   	/* Start the queue running */
+>>   	ret = spi_master_resume(pl022->master);
+>> -	if (ret)
+>> -		dev_err(dev, "problem starting queue (%d)\n", ret);
+>> -	else
+>> +	if (!ret)
+>>   		dev_dbg(dev, "resumed\n");
+>>   
+>>   	return ret;
+>> diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
+>> index 14f4ea59caff7a23..e3cbc66a7061b42f 100644
+>> --- a/drivers/spi/spi-pxa2xx.c
+>> +++ b/drivers/spi/spi-pxa2xx.c
+>> @@ -1808,13 +1808,7 @@ static int pxa2xx_spi_resume(struct device *dev)
+>>   		lpss_ssp_setup(drv_data);
+>>   
+>>   	/* Start the queue running */
+>> -	status = spi_controller_resume(drv_data->master);
+>> -	if (status != 0) {
+>> -		dev_err(dev, "problem starting queue (%d)\n", status);
+>> -		return status;
+>> -	}
+>> -
+>> -	return 0;
+>> +	return spi_controller_resume(drv_data->master);
+>>   }
+>>   #endif
+>>   
+>> -- 
+>> 2.17.1
+>>
+> 
+
+
+-- 
+Nicolas Ferre
