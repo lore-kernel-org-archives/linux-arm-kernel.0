@@ -1,76 +1,125 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 05 Sep 2018 12:29:49 +0200
-Subject: [RFC PATCH v3 1/3] firmware: xilinx: Add reset API's
-In-Reply-To: <1536131342-28041-2-git-send-email-nava.manne@xilinx.com>
-References: <1536131342-28041-1-git-send-email-nava.manne@xilinx.com>
- <1536131342-28041-2-git-send-email-nava.manne@xilinx.com>
-Message-ID: <1536143389.4084.4.camel@pengutronix.de>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Wed, 5 Sep 2018 18:32:31 +0800
+Subject: [PATCH v2 02/13] drm/mediatek: move hardware register to node data
+In-Reply-To: <20180905083146.14727-3-bibby.hsieh@mediatek.com>
+References: <20180905083146.14727-1-bibby.hsieh@mediatek.com>
+ <20180905083146.14727-3-bibby.hsieh@mediatek.com>
+Message-ID: <1536143551.4618.0.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi, Bibby:
 
-On Wed, 2018-09-05 at 12:39 +0530, Nava kishore Manne wrote:
-> This Patch Adds reset API's to support release, assert
-> and status functionalities by using firmware interface.
+One more inline comment.
+
+On Wed, 2018-09-05 at 16:31 +0800, Bibby Hsieh wrote:
+> From: chunhui dai <chunhui.dai@mediatek.com>
 > 
-> Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
+> The address of register DPI_H_FRE_CON is different in different IC.
+> Using of_node data to find this address.
+> 
+> Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
 > ---
-> Changes for v3:
-> 		-None.
-> Changes for v2:
-> 		-New Patch.
+>  drivers/gpu/drm/mediatek/mtk_dpi.c      | 29 +++++++++++++++++++++++------
+>  drivers/gpu/drm/mediatek/mtk_dpi_regs.h |  1 -
+>  2 files changed, 23 insertions(+), 7 deletions(-)
 > 
->  drivers/firmware/xilinx/zynqmp.c     |  40 +++++++++++
->  include/linux/firmware/xlnx-zynqmp.h | 136 +++++++++++++++++++++++++++++++++++
->  2 files changed, 176 insertions(+)
-> 
-> diff --git a/drivers/firmware/xilinx/zynqmp.c b/drivers/firmware/xilinx/zynqmp.c
-> index 7ccedf0..639c72f 100644
-> --- a/drivers/firmware/xilinx/zynqmp.c
-> +++ b/drivers/firmware/xilinx/zynqmp.c
-> @@ -447,6 +447,44 @@ static int zynqmp_pm_clock_getparent(u32 clock_id, u32 *parent_id)
->  	return ret;
+> diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
+> index d9373e67d328..3db959fed493 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_dpi.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
+> @@ -72,6 +72,7 @@ struct mtk_dpi {
+>  	struct clk *tvd_clk;
+>  	int irq;
+>  	struct drm_display_mode mode;
+> +	const struct mtk_dpi_conf *conf;
+>  	enum mtk_dpi_out_color_format color_format;
+>  	enum mtk_dpi_out_yc_map yc_map;
+>  	enum mtk_dpi_out_bit_num bit_num;
+> @@ -117,6 +118,10 @@ struct mtk_dpi_yc_limit {
+>  	u16 c_bottom;
+>  };
+>  
+> +struct mtk_dpi_conf {
+> +	const u32 reg_h_fre_con;
+
+Remove 'const'.
+
+Regards,
+CK
+
+> +};
+> +
+>  static void mtk_dpi_mask(struct mtk_dpi *dpi, u32 offset, u32 val, u32 mask)
+>  {
+>  	u32 tmp = readl(dpi->regs + offset) & ~mask;
+> @@ -342,7 +347,7 @@ static void mtk_dpi_config_swap_input(struct mtk_dpi *dpi, bool enable)
+>  
+>  static void mtk_dpi_config_2n_h_fre(struct mtk_dpi *dpi)
+>  {
+> -	mtk_dpi_mask(dpi, DPI_H_FRE_CON, H_FRE_2N, H_FRE_2N);
+> +	mtk_dpi_mask(dpi, dpi->conf->reg_h_fre_con, H_FRE_2N, H_FRE_2N);
 >  }
 >  
-> +/**
-> + * zynqmp_pm_reset_assert - Request setting of reset (1 - assert, 0 - release)
-> + * @reset:		Reset to be configured
-> + * @assert_flag:	Flag stating should reset be asserted (1) or
-> + *			released (0)
-> + *
-> + * Return: Returns status, either success or error+reason
-> + */
-> +static int zynqmp_pm_reset_assert(const enum zynqmp_pm_reset reset,
-> +				  const enum zynqmp_pm_reset_action assert_flag)
-> +{
-> +	return zynqmp_pm_invoke_fn(PM_RESET_ASSERT, reset, assert_flag,
-> +				   0, 0, NULL);
-> +}
+>  static void mtk_dpi_config_color_format(struct mtk_dpi *dpi,
+> @@ -668,6 +673,18 @@ static const struct component_ops mtk_dpi_component_ops = {
+>  	.unbind = mtk_dpi_unbind,
+>  };
+>  
+> +static const struct mtk_dpi_conf mt8173_conf = {
+> +	.reg_h_fre_con = 0xe0,
+> +};
 > +
-> +/**
-> + * zynqmp_pm_reset_get_status - Get status of the reset
-> + * @reset:      Reset whose status should be returned
-> + * @status:     Returned status
-> + *
-> + * Return: Returns status, either success or error+reason
-> + */
-> +static int zynqmp_pm_reset_get_status(const enum zynqmp_pm_reset reset,
-> +				      u32 *status)
-> +{
-> +	u32 ret_payload[PAYLOAD_ARG_CNT];
-> +	int ret;
+> +static const struct of_device_id mtk_dpi_of_ids[] = {
+> +	{ .compatible = "mediatek,mt8173-dpi",
+> +	  .data = &mt8173_conf,
+> +	},
+> +	{ },
+> +};
+> +MODULE_DEVICE_TABLE(of, mtk_dpi_of_ids);
 > +
-> +	if (!status)
-> +		return -EINVAL;
-> +
-> +	ret = zynqmp_pm_invoke_fn(PM_RESET_GET_STATUS, reset, 0,
-> +				  0, 0, ret_payload);
-> +	*status = ret_payload[1];
-
-It doesn't really matter here, but in general I'd skip writing output
-arguments in case of error.
-For all I know, the result returned in ret_payload could be undefined.
-
-regards
-Philipp
+>  static int mtk_dpi_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+> @@ -675,13 +692,18 @@ static int mtk_dpi_probe(struct platform_device *pdev)
+>  	struct resource *mem;
+>  	struct device_node *bridge_node;
+>  	int comp_id;
+> +	const struct of_device_id *match;
+>  	int ret;
+>  
+> +	match = of_match_node(mtk_dpi_of_ids, dev->of_node);
+> +	if (!match)
+> +		return -ENODEV;
+>  	dpi = devm_kzalloc(dev, sizeof(*dpi), GFP_KERNEL);
+>  	if (!dpi)
+>  		return -ENOMEM;
+>  
+>  	dpi->dev = dev;
+> +	dpi->conf = (struct mtk_dpi_conf *)match->data;
+>  
+>  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	dpi->regs = devm_ioremap_resource(dev, mem);
+> @@ -760,11 +782,6 @@ static int mtk_dpi_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> -static const struct of_device_id mtk_dpi_of_ids[] = {
+> -	{ .compatible = "mediatek,mt8173-dpi", },
+> -	{}
+> -};
+> -
+>  struct platform_driver mtk_dpi_driver = {
+>  	.probe = mtk_dpi_probe,
+>  	.remove = mtk_dpi_remove,
+> diff --git a/drivers/gpu/drm/mediatek/mtk_dpi_regs.h b/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
+> index 4b6ad4751a31..040444d7718d 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
+> +++ b/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
+> @@ -223,6 +223,5 @@
+>  #define ESAV_CODE2			(0xFFF << 0)
+>  #define ESAV_CODE3_MSB			BIT(16)
+>  
+> -#define DPI_H_FRE_CON		0xE0
+>  #define H_FRE_2N			BIT(25)
+>  #endif /* __MTK_DPI_REGS_H */
