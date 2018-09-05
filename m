@@ -1,96 +1,42 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Wed, 5 Sep 2018 16:21:35 +0200
-Subject: [PATCH 11/13] nvmem: add support for cell lookups from machine
- code
-In-Reply-To: <CAMRc=Mco7Tbk5P_mgv49f+3j9DKYk5AL6EjPhwF7M=Hb7o5-Mw@mail.gmail.com>
-References: <20180905095738.26406-1-brgl@bgdev.pl>
- <20180905095738.26406-12-brgl@bgdev.pl>
- <20180905155741.22b7d0ef@bbrezillon>
- <CAMRc=Mco7Tbk5P_mgv49f+3j9DKYk5AL6EjPhwF7M=Hb7o5-Mw@mail.gmail.com>
-Message-ID: <20180905162135.700d2145@bbrezillon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed,  5 Sep 2018 15:34:41 +0100
+Subject: [RESEND PATCH 0/2] Don't use SIGMINSTKSZ when enforcing alternative
+ signal stack size for compat tasks
+Message-ID: <1536158083-30166-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 5 Sep 2018 16:00:36 +0200
-Bartosz Golaszewski <brgl@bgdev.pl> wrote:
+Hi all,
 
-> 2018-09-05 15:57 GMT+02:00 Boris Brezillon <boris.brezillon@bootlin.com>:
-> > On Wed,  5 Sep 2018 11:57:36 +0200
-> > Bartosz Golaszewski <brgl@bgdev.pl> wrote:
-> >  
-> >>
-> >> +struct nvmem_cell_lookup {
-> >> +     const char              *nvmem_name;
-> >> +     const char              *dev_id;  
-> >
-> > Shouldn't we have a con_id here?
-> >  
-> >> +     const char              *cell_id;
-> >> +     struct list_head        node;
-> >> +};  
-> 
-> I wanted to stay in line with the current API - nvmem_cell_get() takes
-> as argument a string called cell_id. I wanted to reflect that here.
+This is a resend of:
 
-Actually, you need both. con_id is the name you would have in your DT
-in the nvmem-cell-names property, cell_id is the name of the cell
-you'd find under the nvmem device node.
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2018-July/593559.html
 
-Let's take an example:
+now based on 4.19-rc2.
 
-	mydev {
-		#nvmem-cell-names = "mac-address", "revision";
-		#nvmem-cells = <&cell1>, <&cell2>;
-	};
+The Debian folks have observed a failure in the 32-bit arm glibc testsuite
+when running under a 64-bit kernel. They tracked this down to sigaltstack(2)
+enforcing the alternative signal stack to be at least SIGMINSTKSZ bytes,
+which is higher for native arm64 tasks than compat 32-bit tasks.
 
-	mynvmemdev {
-		#size-cells = <1>;
-		#address-cells = <1>;
+These patches resolve the issue by allowing an architecture to define
+COMPAT_SIGMINSTKSZ for compat tasks, which is then used by the sigaltstack
+checking code.
 
-		cell1: foo at 0 {
-			reg = <0x0 0x6>;
-		};
+Feedback welcome,
 
-		cell2: bar at 6 {
-			reg = <0x6 0x10>;
-		};
-	};
+Will
 
-this can be described the same way using a consumer lookup table:
+--->8
 
-struct nvmem_cell_lookup_entry {
-	const char *con_id;
-	const char *nvmem_name;
-	const char *cell_name;
-};
+Will Deacon (2):
+  signal: Introduce COMPAT_SIGMINSTKSZ for use in compat_sys_sigaltstack
+  arm64: compat: Provide definition for COMPAT_SIGMINSTKSZ
 
-struct nvmem_cell_lookup_table {
-	struct list_head node;
-	const char *dev_id;
-	unsigned int nentries;
-	const struct nvmem_cell_lookup_entry *entries;
-}
+ arch/arm64/include/asm/compat.h |  1 +
+ include/linux/compat.h          |  3 +++
+ kernel/signal.c                 | 14 +++++++++-----
+ 3 files changed, 13 insertions(+), 5 deletions(-)
 
-static const struct nvmem_cell_lookup_entry mydev_nvmem_cells[] = {
-	{
-		.con_id = "mac-address",
-		.nvmem_name = "mynvmemdev",
-		.cell_name = "foo",
-	},
-	{
-		.con_id = "revision",
-		.nvmem_name = "mynvmemdev",
-		.cell_name = "bar",
-	},
-}
-
-static const struct nvmem_cell_lookup_table mydev_nvmem_lookup = {
-	.dev_id = "mydev.0",
-	.nentries = ARRAY_SIZE(mydev_nvmem_cells),
-	.entries = mydev_nvmem_cells,
-};
-
-
-...
-
-	nvmem_add_cell_lookups(&mydev_nvmem_lookup);
+-- 
+2.1.4
