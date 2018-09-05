@@ -1,59 +1,55 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Wed, 5 Sep 2018 11:04:36 -0700
-Subject: [PATCH] arm64: defconfig: enable EFI_ARMSTUB_DTB_LOADER
-In-Reply-To: <CACxGe6tbuDzEaBqOD7Z3nWMW0Nkcf22MFbD3BL+KBqnKEo2tQw@mail.gmail.com>
-References: <1535563287-24803-1-git-send-email-scott.branden@broadcom.com>
- <CAOesGMhjcJ1p3QcEYb9fsx3fMXAOsgR2njOq=VKgEbWGwJi36g@mail.gmail.com>
- <fb07b89d-d427-5e59-9f17-b12df26284ec@broadcom.com>
- <CAKv+Gu-R7eX=aj=O2-gpzmp0K4t0T4s536UiqJZs0WuxRjkYwQ@mail.gmail.com>
- <CAOesGMho8CfT7iDXadmkB5=7DoOi6n8qXcS9X643vf+Y0BbD6w@mail.gmail.com>
- <CAKv+Gu_mKU+RdPgg2Dfezy4-L+KDEEBx02R49ObomRhEkJJ6Mw@mail.gmail.com>
- <CAOesGMgLHx3+j1bWEsMWsN-yjGNZyLOpAjLg0Jut8gG=ADE25g@mail.gmail.com>
- <CAKv+Gu_x=bS4xJcD_LuEnnN=Lx4Jc87uK8J_ACdA9EeUqtM3Yg@mail.gmail.com>
- <CACxGe6uK+N5XUqZhH7gAQXoq+QXMvFPHF_i4WqivrufTU=0cog@mail.gmail.com>
- <bf917897-1697-a6c4-7f77-8dfa74dddc8a@broadcom.com>
- <CAKv+Gu8FK9K0G-GJygdpkwqKYzjvpDDj8TyGTC2u0SRxK3ez_w@mail.gmail.com>
- <1f8095f1-1f0c-0791-31c4-c7b986c4ce1f@broadcom.com>
- <CACxGe6tbuDzEaBqOD7Z3nWMW0Nkcf22MFbD3BL+KBqnKEo2tQw@mail.gmail.com>
-Message-ID: <dc26dc1b-c022-341b-18ba-c009275e5ee9@broadcom.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 05 Sep 2018 11:10:08 -0700
+Subject: [PATCH 3/6] dt-bindings: display: add data-enable polarity
+ property
+In-Reply-To: <139651706.L0sBFfZMDQ@avalon>
+References: <20180905052113.21262-1-stefan@agner.ch>
+ <20180905052113.21262-3-stefan@agner.ch> <139651706.L0sBFfZMDQ@avalon>
+Message-ID: <e708c5bac502e60a2eeb685fddf67042@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 18-09-05 11:00 AM, Grant Likely wrote:
-> On Wed, Sep 5, 2018 at 6:27 PM Scott Branden <scott.branden@broadcom.com> wrote:
+On 05.09.2018 00:07, Laurent Pinchart wrote:
+> Hi Stefan,
+> 
+> Thank you for the patch.
+> 
+> On Wednesday, 5 September 2018 08:21:10 EEST Stefan Agner wrote:
+>> Allow to specify the data-enable polarity required by a dumb VGA
+>> DAC converting parallel RGB to VGA.
 >>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> ---
+>>  .../devicetree/bindings/display/bridge/dumb-vga-dac.txt          | 1 +
+>>  1 file changed, 1 insertion(+)
 >>
->> On 18-09-05 02:40 AM, Ard Biesheuvel wrote:
->>> On 4 September 2018 at 19:19, Scott Branden <scott.branden@broadcom.com> wrote:
->>>> Rather than introduce EFI_ARMSTUB_DTB_LOADER, why not have
->>>> the efistub use CONFIG_OF to determine whether it supports dtb= or not?
->>>>
->>>> That way ACPI-only distros disable devicetree support entirely.
->>>>
->>> Unfortunately, CONFIG_OF cannot be disabled on arm64 even on ACPI-only builds.
->> OF shouldn't be automatically selected in the arm64/Kconfig.  It should
->> have a config
->> parmaeter like other archs as mips and arm.  I can submit a patch so it
->> functions the
->> same way as other archs so it is not always selected.  It will be good
->> to add a USE_OF
->> config options like the other archs (or simply remove the select from
->> the Kconfig and choose OF directly in the defconfig.
->> This will have the added benefit of doing away with OF support when its
->> not needed on an ARM64 platform.  ACPI is already not automatically
->> selected for all ARM64 platforms, nor should devicetree.
-> We don't do that on Arm because a devicetree is always required at
-> boot time. Even on ACPI systems a tiny DTB is used containing just a
-> /chosen node for passing the kernel command line and the initrd
-> location.
-Seems bizarre DTB is not needed for x86 to boot from UEFI with ACPI 
-support?? I'll look into it further at some point in order to remove 
-such anomaly.? There should be no need for such devicetree reliance.
->
-> g.
->
-> g.
-Thanks,
- ?Scott
+>> diff --git
+>> a/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
+>> b/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt index
+>> 164cbb15f04c..adbd2ca0af2f 100644
+>> --- a/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
+>> +++ b/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
+>> @@ -18,6 +18,7 @@ graph bindings specified in
+>> Documentation/devicetree/bindings/graph.txt.
+>>
+>>  Optional properties:
+>>  - vdd-supply: Power supply for DAC
+>> +- de-active: data-enable pulse is active low/high/ignored
+> 
+> Which value corresponds to low, high and ignored ?
+> 
+
+The wording is taken from
+Documentation/devicetree/bindings/display/panel/display-timing.txt. But
+I agree, not very useful.
+
+0 is low active, 1 is high active, and none is using driver defaults.
+
+How about:
+- de-active: data-enable pulse is 0=active low/1=active high
+
+--
+Stefan
+
+>>  Example
+>>  -------
