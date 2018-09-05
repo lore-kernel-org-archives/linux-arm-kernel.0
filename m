@@ -1,55 +1,35 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed,  5 Sep 2018 12:00:16 +0200
-Subject: [PATCH v2 2/4] ARM: dts: imx6ull: add pxp support
+Date: Wed,  5 Sep 2018 12:00:18 +0200
+Subject: [PATCH v2 4/4] MAINTAINERS: add entry for i.MX PXP media mem2mem
+ driver
 In-Reply-To: <20180905100018.27556-1-p.zabel@pengutronix.de>
 References: <20180905100018.27556-1-p.zabel@pengutronix.de>
-Message-ID: <20180905100018.27556-3-p.zabel@pengutronix.de>
+Message-ID: <20180905100018.27556-5-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the device node for the i.MX6ULL Pixel Pipeline (PXP).
-
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
-Changes since v1:
-- Fix node address order
----
- arch/arm/boot/dts/imx6ul.dtsi  | 8 ++++++++
- arch/arm/boot/dts/imx6ull.dtsi | 6 ++++++
- 2 files changed, 14 insertions(+)
+ MAINTAINERS | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index 6dc0b569acdf..051d42676160 100644
---- a/arch/arm/boot/dts/imx6ul.dtsi
-+++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -945,6 +945,14 @@
- 				status = "disabled";
- 			};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index a5b256b25905..2e23c644f5d3 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -8994,6 +8994,13 @@ F:	drivers/staging/media/imx/
+ F:	include/linux/imx-media.h
+ F:	include/media/imx.h
  
-+			pxp: pxp at 21cc000 {
-+				compatible = "fsl,imx6ul-pxp";
-+				reg = <0x021cc000 0x4000>;
-+				interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-+				clock-names = "axi";
-+				clocks = <&clks IMX6UL_CLK_PXP>;
-+			};
++MEDIA DRIVER FOR FREESCALE IMX PXP
++M:	Philipp Zabel <p.zabel@pengutronix.de>
++L:	linux-media at vger.kernel.org
++T:	git git://linuxtv.org/media_tree.git
++S:	Maintained
++F:	drivers/media/platform/imx-pxp.[ch]
 +
- 			qspi: qspi at 21e0000 {
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/imx6ull.dtsi b/arch/arm/boot/dts/imx6ull.dtsi
-index cd1776a7015a..c0518490b58c 100644
---- a/arch/arm/boot/dts/imx6ull.dtsi
-+++ b/arch/arm/boot/dts/imx6ull.dtsi
-@@ -57,3 +57,9 @@
- 		};
- 	};
- };
-+
-+&pxp {
-+	compatible = "fsl,imx6ull-pxp";
-+	interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
-+};
+ MEDIA DRIVERS FOR HELENE
+ M:	Abylay Ospan <aospan@netup.ru>
+ L:	linux-media at vger.kernel.org
 -- 
 2.18.0
