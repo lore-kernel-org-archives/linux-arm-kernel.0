@@ -1,125 +1,57 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Wed, 5 Sep 2018 17:50:03 +0800
-Subject: [PATCH v2 02/13] drm/mediatek: move hardware register to node data
-In-Reply-To: <20180905083146.14727-3-bibby.hsieh@mediatek.com>
-References: <20180905083146.14727-1-bibby.hsieh@mediatek.com>
- <20180905083146.14727-3-bibby.hsieh@mediatek.com>
-Message-ID: <1536141003.11913.6.camel@mtksdaap41>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Wed,  5 Sep 2018 11:57:25 +0200
+Subject: [PATCH 00/13] nvmem: rework of the subsystem for non-DT users
+Message-ID: <20180905095738.26406-1-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Bibby:
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-One inline comment.
+This series contains nvmem framework changes prerequisite for further
+development of my previous series[1] that aims at removal of the
+platform data struct from at24 EEPROM driver.
 
-On Wed, 2018-09-05 at 16:31 +0800, Bibby Hsieh wrote:
-> From: chunhui dai <chunhui.dai@mediatek.com>
-> 
-> The address of register DPI_H_FRE_CON is different in different IC.
-> Using of_node data to find this address.
-> 
-> Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
-> ---
->  drivers/gpu/drm/mediatek/mtk_dpi.c      | 29 +++++++++++++++++++++++------
->  drivers/gpu/drm/mediatek/mtk_dpi_regs.h |  1 -
->  2 files changed, 23 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
-> index d9373e67d328..3db959fed493 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_dpi.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
-> @@ -72,6 +72,7 @@ struct mtk_dpi {
->  	struct clk *tvd_clk;
->  	int irq;
->  	struct drm_display_mode mode;
-> +	const struct mtk_dpi_conf *conf;
->  	enum mtk_dpi_out_color_format color_format;
->  	enum mtk_dpi_out_yc_map yc_map;
->  	enum mtk_dpi_out_bit_num bit_num;
-> @@ -117,6 +118,10 @@ struct mtk_dpi_yc_limit {
->  	u16 c_bottom;
->  };
->  
-> +struct mtk_dpi_conf {
-> +	const u32 reg_h_fre_con;
-> +};
-> +
->  static void mtk_dpi_mask(struct mtk_dpi *dpi, u32 offset, u32 val, u32 mask)
->  {
->  	u32 tmp = readl(dpi->regs + offset) & ~mask;
-> @@ -342,7 +347,7 @@ static void mtk_dpi_config_swap_input(struct mtk_dpi *dpi, bool enable)
->  
->  static void mtk_dpi_config_2n_h_fre(struct mtk_dpi *dpi)
->  {
-> -	mtk_dpi_mask(dpi, DPI_H_FRE_CON, H_FRE_2N, H_FRE_2N);
-> +	mtk_dpi_mask(dpi, dpi->conf->reg_h_fre_con, H_FRE_2N, H_FRE_2N);
->  }
->  
->  static void mtk_dpi_config_color_format(struct mtk_dpi *dpi,
-> @@ -668,6 +673,18 @@ static const struct component_ops mtk_dpi_component_ops = {
->  	.unbind = mtk_dpi_unbind,
->  };
->  
-> +static const struct mtk_dpi_conf mt8173_conf = {
-> +	.reg_h_fre_con = 0xe0,
-> +};
-> +
-> +static const struct of_device_id mtk_dpi_of_ids[] = {
-> +	{ .compatible = "mediatek,mt8173-dpi",
-> +	  .data = &mt8173_conf,
-> +	},
-> +	{ },
-> +};
-> +MODULE_DEVICE_TABLE(of, mtk_dpi_of_ids);
-> +
->  static int mtk_dpi_probe(struct platform_device *pdev)
->  {
->  	struct device *dev = &pdev->dev;
-> @@ -675,13 +692,18 @@ static int mtk_dpi_probe(struct platform_device *pdev)
->  	struct resource *mem;
->  	struct device_node *bridge_node;
->  	int comp_id;
-> +	const struct of_device_id *match;
->  	int ret;
->  
-> +	match = of_match_node(mtk_dpi_of_ids, dev->of_node);
-> +	if (!match)
-> +		return -ENODEV;
+First we remove unused APIs and the global cell list. We then switch
+to using kref instead of manual user counting. Next we simplify the
+provider unregistration by removing the return value from
+nvmem_unregister().
 
-One more blank line.
+Next three patches improve the framework by adding a notifier chain
+for future use and fixing the issue with nvmem device names.
 
-Regards,
-CK
+Finally we add support for cell definitions, cell lookups and make
+DT systems resolve the nvmem cells during provider's registration.
 
->  	dpi = devm_kzalloc(dev, sizeof(*dpi), GFP_KERNEL);
->  	if (!dpi)
->  		return -ENOMEM;
->  
->  	dpi->dev = dev;
-> +	dpi->conf = (struct mtk_dpi_conf *)match->data;
->  
->  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	dpi->regs = devm_ioremap_resource(dev, mem);
-> @@ -760,11 +782,6 @@ static int mtk_dpi_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> -static const struct of_device_id mtk_dpi_of_ids[] = {
-> -	{ .compatible = "mediatek,mt8173-dpi", },
-> -	{}
-> -};
-> -
->  struct platform_driver mtk_dpi_driver = {
->  	.probe = mtk_dpi_probe,
->  	.remove = mtk_dpi_remove,
-> diff --git a/drivers/gpu/drm/mediatek/mtk_dpi_regs.h b/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
-> index 4b6ad4751a31..040444d7718d 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
-> +++ b/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
-> @@ -223,6 +223,5 @@
->  #define ESAV_CODE2			(0xFFF << 0)
->  #define ESAV_CODE3_MSB			BIT(16)
->  
-> -#define DPI_H_FRE_CON		0xE0
->  #define H_FRE_2N			BIT(25)
->  #endif /* __MTK_DPI_REGS_H */
+Last patch just uses the SPDX license identifiers.
+
+Tested both DT and non-DT use cases.
+
+[1] https://lkml.org/lkml/2018/8/10/149
+
+Bartosz Golaszewski (13):
+  nvmem: remove unused APIs
+  nvmem: remove the global cell list
+  nvmem: use kref
+  nvmem: lpc18xx_eeprom: use devm_nvmem_register()
+  nvmem: change the signature of nvmem_unregister()
+  nvmem: provide nvmem_dev_name()
+  nvmem: remove the name field from struct nvmem_device
+  nvmem: add a notifier chain
+  nvmem: add support for cell info
+  nvmem: resolve cells from DT at registration time
+  nvmem: add support for cell lookups from machine code
+  Documentation: nvmem: document cell tables and lookup entries
+  nvmem: use SPDX license identifiers
+
+ Documentation/nvmem/nvmem.txt  |  30 ++
+ MAINTAINERS                    |   1 +
+ drivers/nvmem/core.c           | 650 ++++++++++++++++++---------------
+ drivers/nvmem/lpc18xx_eeprom.c |   6 +-
+ include/linux/nvmem-consumer.h |  50 ++-
+ include/linux/nvmem-machine.h  |  56 +++
+ include/linux/nvmem-provider.h |  22 +-
+ 7 files changed, 465 insertions(+), 350 deletions(-)
+ create mode 100644 include/linux/nvmem-machine.h
+
+-- 
+2.18.0
