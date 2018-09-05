@@ -1,63 +1,85 @@
 From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Wed, 5 Sep 2018 16:31:38 +0800
-Subject: [PATCH v2 05/13] drm/mediatek: dpi use new API for finding bridge
+Date: Wed, 5 Sep 2018 16:31:39 +0800
+Subject: [PATCH v2 06/13] drm/mediatek: add dpi driver for mt2701 and mt7623
 In-Reply-To: <20180905083146.14727-1-bibby.hsieh@mediatek.com>
 References: <20180905083146.14727-1-bibby.hsieh@mediatek.com>
-Message-ID: <20180905083146.14727-6-bibby.hsieh@mediatek.com>
+Message-ID: <20180905083146.14727-7-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: chunhui dai <chunhui.dai@mediatek.com>
 
-Using new API for finding bridge.
+This patch adds dpi dirver suppot for both mt2701 and mt7623.
+And also support other (existing or future) chips that use
+the same binding and driver.
 
 Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_dpi.c | 17 +++++++----------
- 1 file changed, 7 insertions(+), 10 deletions(-)
+ drivers/gpu/drm/mediatek/mtk_dpi.c     | 25 ++++++++++++++++++++++---
+ drivers/gpu/drm/mediatek/mtk_drm_drv.c |  2 ++
+ 2 files changed, 24 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
-index 3758cfeb586b..ed2c153c70a2 100644
+index ed2c153c70a2..1af25765ab5f 100644
 --- a/drivers/gpu/drm/mediatek/mtk_dpi.c
 +++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
-@@ -14,6 +14,7 @@
- #include <drm/drmP.h>
- #include <drm/drm_crtc.h>
- #include <drm/drm_crtc_helper.h>
-+#include <drm/drm_of.h>
- #include <linux/kernel.h>
- #include <linux/component.h>
- #include <linux/platform_device.h>
-@@ -708,7 +709,6 @@ static int mtk_dpi_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct mtk_dpi *dpi;
- 	struct resource *mem;
--	struct device_node *bridge_node;
- 	int comp_id;
- 	const struct of_device_id *match;
- 	int ret;
-@@ -758,16 +758,13 @@ static int mtk_dpi_probe(struct platform_device *pdev)
- 		return -EINVAL;
+@@ -641,9 +641,7 @@ static int mtk_dpi_bind(struct device *dev, struct device *master, void *data)
  	}
+ 	drm_encoder_helper_add(&dpi->encoder, &mtk_dpi_encoder_helper_funcs);
  
--	bridge_node = of_graph_get_remote_node(dev->of_node, 0, 0);
--	if (!bridge_node)
--		return -ENODEV;
+-	/* Currently DPI0 is fixed to be driven by OVL1 */
+-	dpi->encoder.possible_crtcs = BIT(1);
 -
--	dev_info(dev, "Found bridge node: %pOF\n", bridge_node);
--
--	dpi->bridge = of_drm_find_bridge(bridge_node);
--	of_node_put(bridge_node);
--	if (!dpi->bridge)
-+	ret = drm_of_find_panel_or_bridge(dev->of_node, 0, 0,
-+					  NULL, &dpi->bridge);
-+	if (ret) {
-+		dev_err(dev, "Failed to find panel or bridge: %d\n", ret);
- 		return -EPROBE_DEFER;
-+	}
-+	dev_info(dev, "Found bridge node: %pOF\n", dpi->bridge);
++	dpi->encoder.possible_crtcs = BIT(0) | BIT(1);
+ 	ret = drm_bridge_attach(&dpi->encoder, dpi->bridge, NULL);
+ 	if (ret) {
+ 		dev_err(dev, "Failed to attach bridge: %d\n", ret);
+@@ -691,12 +689,33 @@ static unsigned int mt8173_calculate_factor(int clock)
+ 		return 3 << 1;
+ }
  
- 	comp_id = mtk_ddp_comp_get_id(dev->of_node, MTK_DPI);
- 	if (comp_id < 0) {
++static unsigned int mt2701_calculate_factor(int clock)
++{
++	if (clock <= 64000)
++		return 16;
++	else if (clock <= 128000)
++		return 8;
++	else if (clock <= 256000)
++		return 4;
++	else
++		return 2;
++}
++
+ static const struct mtk_dpi_conf mt8173_conf = {
+ 	.cal_factor = mt8173_calculate_factor,
+ 	.reg_h_fre_con = 0xe0,
+ };
+ 
++static const struct mtk_dpi_conf mt2701_conf = {
++	.cal_factor = mt2701_calculate_factor,
++	.reg_h_fre_con = 0xb0,
++	.edge_sel_en = true,
++};
++
+ static const struct of_device_id mtk_dpi_of_ids[] = {
++	{ .compatible = "mediatek,mt2701-dpi",
++	  .data = &mt2701_conf,
++	},
+ 	{ .compatible = "mediatek,mt8173-dpi",
+ 	  .data = &mt8173_conf,
+ 	},
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+index 39721119713b..d961112fa2f5 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+@@ -424,6 +424,8 @@ static const struct of_device_id mtk_ddp_comp_dt_ids[] = {
+ 	  .data = (void *)MTK_DSI },
+ 	{ .compatible = "mediatek,mt8173-dsi",
+ 	  .data = (void *)MTK_DSI },
++	{ .compatible = "mediatek,mt2701-dpi",
++	  .data = (void *)MTK_DPI },
+ 	{ .compatible = "mediatek,mt8173-dpi",
+ 	  .data = (void *)MTK_DPI },
+ 	{ .compatible = "mediatek,mt2701-disp-mutex",
 -- 
 2.12.5.2.gbdf23ab
