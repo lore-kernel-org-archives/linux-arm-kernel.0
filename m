@@ -1,81 +1,64 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 6 Sep 2018 11:21:51 +0200
-Subject: [RFT] ARM: dts: exynos: Remove double SD card detect pin inversion
-In-Reply-To: <20180905174024.28366-1-krzk@kernel.org>
-References: <CGME20180905174039epcas3p2091bb7ef6c51b2850ea774e6d76b7f5d@epcas3p2.samsung.com>
- <20180905174024.28366-1-krzk@kernel.org>
-Message-ID: <20180906092151eucas1p1c7e7e187120468f0e99afce3dd2859b6~RxSVGQkCD1671916719eucas1p1C@eucas1p1.samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 6 Sep 2018 11:18:28 +0200
+Subject: [PATCH/RFT] arm64: dts: renesas: r8a77995-draak: Add MSIOF ch2
+ pins support
+In-Reply-To: <1536092527-5950-1-git-send-email-ykaneko0929@gmail.com>
+References: <1536092527-5950-1-git-send-email-ykaneko0929@gmail.com>
+Message-ID: <20180906091827.jauhvbq6cudanlzl@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+On Wed, Sep 05, 2018 at 05:22:07AM +0900, Yoshihiro Kaneko wrote:
+> From: Hiromitsu Yamasaki <hiromitsu.yamasaki.ym@renesas.com>
+> 
+> This patch adds support for MSIOF ch2 pinctrl to use the LVDS Control
+> Connector (CN41) for the Draak board on the R8A77995 SoC.
+> 
+> Signed-off-by: Hiromitsu Yamasaki <hiromitsu.yamasaki.ym@renesas.com>
+> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> [ykaneko0929 at gmail.com: deleted the unused reference to 'msiof_ref_clk']
+> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
 
-On 2018-09-05 19:40, Krzysztof Kozlowski wrote:
-> The SDHCI standard, MMC host controller bindings and MMC core defines
-> card detect pin as active low.  Therefore there is no point to invert it
-> twice.
->
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
->
-> ---
->
-> Tested only on Odroid U3. Tests on other platforms would be appreciated.
+Hi Kaneko-san,
 
-SD card detection still works fine on UniversalC210, Trats2 and OdroidU3 
-with this patch.
-
-Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+sorry about this but I think we should drop this patch as
+it is my understanding that msiof2 is not used on the Draak board.
 
 > ---
->   arch/arm/boot/dts/exynos4210-universal_c210.dts | 3 +--
->   arch/arm/boot/dts/exynos4412-midas.dtsi         | 3 +--
->   arch/arm/boot/dts/exynos4412-odroid-common.dtsi | 3 +--
->   3 files changed, 3 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/exynos4210-universal_c210.dts b/arch/arm/boot/dts/exynos4210-universal_c210.dts
-> index 4e6ff97e1ec4..249bfbff1e20 100644
-> --- a/arch/arm/boot/dts/exynos4210-universal_c210.dts
-> +++ b/arch/arm/boot/dts/exynos4210-universal_c210.dts
-> @@ -537,8 +537,7 @@
->   	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_bus4>;
->   	pinctrl-names = "default";
->   	vmmc-supply = <&ldo5_reg>;
-> -	cd-gpios = <&gpx3 4 GPIO_ACTIVE_HIGH>;
-> -	cd-inverted;
-> +	cd-gpios = <&gpx3 4 GPIO_ACTIVE_LOW>;
->   	status = "okay";
->   };
->   
-> diff --git a/arch/arm/boot/dts/exynos4412-midas.dtsi b/arch/arm/boot/dts/exynos4412-midas.dtsi
-> index c0476c290977..aed2f2e2b0d1 100644
-> --- a/arch/arm/boot/dts/exynos4412-midas.dtsi
-> +++ b/arch/arm/boot/dts/exynos4412-midas.dtsi
-> @@ -1269,8 +1269,7 @@
->   
->   &sdhci_2 {
->   	bus-width = <4>;
-> -	cd-gpios = <&gpx3 4 GPIO_ACTIVE_HIGH>;
-> -	cd-inverted;
-> +	cd-gpios = <&gpx3 4 GPIO_ACTIVE_LOW>;
->   	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_bus4 &sdhci2_cd>;
->   	pinctrl-names = "default";
->   	vmmc-supply = <&ldo21_reg>;
-> diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-> index a09e46c9dbc0..2caa3132f34e 100644
-> --- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-> +++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-> @@ -539,8 +539,7 @@
->   	pinctrl-names = "default";
->   	vmmc-supply = <&ldo21_reg>;
->   	vqmmc-supply = <&ldo4_reg>;
-> -	cd-gpios = <&gpk2 2 GPIO_ACTIVE_HIGH>;
-> -	cd-inverted;
-> +	cd-gpios = <&gpk2 2 GPIO_ACTIVE_LOW>;
->   	status = "okay";
->   };
->   
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+> 
+> This patch is based on the devel branch of Simon Horman's renesas tree.
+> 
+>  arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+> index a8e8f26..e60b1e4 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+> +++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+> @@ -135,6 +135,12 @@
+>  		function = "i2c1";
+>  	};
+>  
+> +	msiof2_pins: spi2 {
+> +		groups = "msiof2_clk", "msiof2_sync_b",
+> +			 "msiof2_rxd",  "msiof2_txd";
+> +		function = "msiof2";
+> +	};
+> +
+>  	pwm0_pins: pwm0 {
+>  		groups = "pwm0_c";
+>  		function = "pwm0";
+> @@ -371,3 +377,10 @@
+>  		};
+>  	};
+>  };
+> +
+> +&msiof2 {
+> +	pinctrl-0 = <&msiof2_pins>;
+> +	pinctrl-names = "default";
+> +	/* In case of using this node, please enable this property */
+> +	/* status = "okay"; */
+> +};
+> -- 
+> 1.9.1
+> 
