@@ -1,110 +1,90 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu,  6 Sep 2018 10:08:35 +0100
-Subject: [PATCH v2 14/14] coreisght: tmc: Claim device before use
+Date: Thu,  6 Sep 2018 10:08:32 +0100
+Subject: [PATCH v2 11/14] coresight: funnel: Claim devices before use
 In-Reply-To: <1536224915-31766-1-git-send-email-suzuki.poulose@arm.com>
 References: <1536224915-31766-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1536224915-31766-15-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1536224915-31766-12-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use CLAIM tags to make sure the device is available for use.
+Use the CLAIM protocol to grab the ownership of the component.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-tmc-etf.c | 22 +++++++++++++++++++---
- drivers/hwtracing/coresight/coresight-tmc-etr.c |  4 ++++
- 2 files changed, 23 insertions(+), 3 deletions(-)
+ drivers/hwtracing/coresight/coresight-funnel.c | 26 +++++++++++++++++++++-----
+ 1 file changed, 21 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-index 24908e0..082f0b1 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-@@ -36,6 +36,11 @@ static void __tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
+diff --git a/drivers/hwtracing/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
+index ee7a30b..9279251 100644
+--- a/drivers/hwtracing/coresight/coresight-funnel.c
++++ b/drivers/hwtracing/coresight/coresight-funnel.c
+@@ -25,6 +25,7 @@
+ #define FUNNEL_HOLDTIME_MASK	0xf00
+ #define FUNNEL_HOLDTIME_SHFT	0x8
+ #define FUNNEL_HOLDTIME		(0x7 << FUNNEL_HOLDTIME_SHFT)
++#define FUNNEL_ENSx_MASK	0xff
  
- static int tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
- {
-+	int rc = coresight_claim_device(drvdata->base);
-+
-+	if (rc)
-+		return rc;
-+
- 	__tmc_etb_enable_hw(drvdata);
- 	return 0;
- }
-@@ -66,7 +71,7 @@ static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
- 	return;
- }
+ /**
+  * struct funnel_drvdata - specifics associated to a funnel component
+@@ -42,31 +43,42 @@ struct funnel_drvdata {
+ 	unsigned long		priority;
+ };
  
--static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
-+static void __tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
+-static void funnel_enable_hw(struct funnel_drvdata *drvdata, int port)
++static int funnel_enable_hw(struct funnel_drvdata *drvdata, int port)
  {
+ 	u32 functl;
++	int rc = 0;
+ 
  	CS_UNLOCK(drvdata->base);
  
-@@ -82,6 +87,12 @@ static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
- 	CS_LOCK(drvdata->base);
- }
- 
-+static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
-+{
-+	coresight_disclaim_device(drvdata);
-+	__tmc_etb_disable_hw(drvdata);
-+}
+ 	functl = readl_relaxed(drvdata->base + FUNNEL_FUNCTL);
++	/* Claim the device only when we enable the first slave */
++	if (!(functl & FUNNEL_ENSx_MASK)) {
++		rc = coresight_claim_device_unlocked(drvdata->base);
++		if (rc)
++			goto done;
++	}
 +
- static void __tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
- {
- 	CS_UNLOCK(drvdata->base);
-@@ -100,6 +111,11 @@ static void __tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
- 
- static int tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
- {
-+	int rc = coresight_claim_device(drvdata->base);
-+
-+	if (rc)
-+		return rc;
-+
- 	__tmc_etf_enable_hw(drvdata);
- 	return 0;
- }
-@@ -110,7 +126,7 @@ static void tmc_etf_disable_hw(struct tmc_drvdata *drvdata)
- 
- 	tmc_flush_and_stop(drvdata);
- 	tmc_disable_hw(drvdata);
+ 	functl &= ~FUNNEL_HOLDTIME_MASK;
+ 	functl |= FUNNEL_HOLDTIME;
+ 	functl |= (1 << port);
+ 	writel_relaxed(functl, drvdata->base + FUNNEL_FUNCTL);
+ 	writel_relaxed(drvdata->priority, drvdata->base + FUNNEL_PRICTL);
 -
-+	coresight_disclaim_device_unlocked(drvdata->base);
++done:
+ 	CS_LOCK(drvdata->base);
++	return rc;
+ }
+ 
+ static int funnel_enable(struct coresight_device *csdev, int inport,
+ 			 int outport)
+ {
++	int rc;
+ 	struct funnel_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+ 
+-	funnel_enable_hw(drvdata, inport);
++	rc = funnel_enable_hw(drvdata, inport);
+ 
+-	dev_dbg(drvdata->dev, "FUNNEL inport %d enabled\n", inport);
+-	return 0;
++	if (!rc)
++		dev_dbg(drvdata->dev, "FUNNEL inport %d enabled\n", inport);
++	return rc;
+ }
+ 
+ static void funnel_disable_hw(struct funnel_drvdata *drvdata, int inport)
+@@ -79,6 +91,10 @@ static void funnel_disable_hw(struct funnel_drvdata *drvdata, int inport)
+ 	functl &= ~(1 << inport);
+ 	writel_relaxed(functl, drvdata->base + FUNNEL_FUNCTL);
+ 
++	/* Disclaim the device if none of the slaves are now active */
++	if (!(functl & FUNNEL_ENSx_MASK))
++		coresight_disclaim_device_unlocked(drvdata->base);
++
  	CS_LOCK(drvdata->base);
  }
  
-@@ -556,7 +572,7 @@ int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
- 
- 	/* Disable the TMC if need be */
- 	if (drvdata->mode == CS_MODE_SYSFS)
--		tmc_etb_disable_hw(drvdata);
-+		__tmc_etb_disable_hw(drvdata);
- 
- 	drvdata->reading = true;
- out:
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index daad521..f684283 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -991,6 +991,9 @@ static int tmc_etr_enable_hw(struct tmc_drvdata *drvdata,
- 	 * this on.
- 	 */
- 	rc = tmc_etr_enable_catu(drvdata, etr_buf);
-+	if (rc)
-+		return rc;
-+	rc = coresight_claim_device(drvdata->base);
- 	if (!rc) {
- 		drvdata->etr_buf = etr_buf;
- 		__tmc_etr_enable_hw(drvdata);
-@@ -1077,6 +1080,7 @@ static void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
- 	__tmc_etr_disable_hw(drvdata);
- 	/* Disable CATU device if this ETR is connected to one */
- 	tmc_etr_disable_catu(drvdata);
-+	coresight_disclaim_device(drvdata->base);
- 	/* Reset the ETR buf used by hardware */
- 	drvdata->etr_buf = NULL;
- }
 -- 
 2.7.4
