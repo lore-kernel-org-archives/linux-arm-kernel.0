@@ -1,144 +1,92 @@
-From: MNARANI@xilinx.com (Manish Narani)
-Date: Thu, 6 Sep 2018 15:53:54 +0000
-Subject: [PATCH v5 1/4] edac: synps: Add platform specific structures for
- ddrc controller
-In-Reply-To: <20180904165828.GM32615@zn.tnic>
-References: <1535722070-10394-1-git-send-email-manish.narani@xilinx.com>
- <1535722070-10394-2-git-send-email-manish.narani@xilinx.com>
- <20180904165828.GM32615@zn.tnic>
-Message-ID: <DM6PR02MB522730A32310C1CBB2971B61C1010@DM6PR02MB5227.namprd02.prod.outlook.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 6 Sep 2018 18:01:24 +0200
+Subject: [PATCH] mini2440 MMC correct write protect detection
+In-Reply-To: <204cf57b-a4f2-76b9-766c-20905596ca4e@free.fr>
+References: <85dac0df-2b75-9cc4-fde1-f62136974a1e@free.fr>
+ <20180905174513.6w7z5jsc2e6ndntv@kozik-lap>
+ <204cf57b-a4f2-76b9-766c-20905596ca4e@free.fr>
+Message-ID: <20180906160124.626l5fgn2cn4veyq@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+On Wed, Sep 05, 2018 at 09:45:15PM +0200, Cedric Roux wrote:
+> On 09/05/2018 07:45 PM, Krzysztof Kozlowski wrote:
+> > I looked at Mini2440 schematics found on the net and it looks like the
+> > pin (just like CD) is active low. However I might be looking at wrong
+> > schematics or missing some things.
+> 
+> I have the same schematics I think.
+> But I have a real mini2440 and I am positively sure that WP
+> is active high. CD is active low, yes.
+> 
+> Do you know someone that you trust that could confirm this?
+> 
+> > 
+> > This is really an old code so I am just quite surprised that it was not
+> > reported before. Not able to write to SD card (for example if it is
+> > rootfs) should be spotted quite early.
+> 
+> I don't think anyone tried a recent kernel, that's why.
+> And the mini2440 has been kind of replaced by the mini6410,
+> I'm not sure it's still in production. Apart from me, I
+> don't think anyone still uses it. If someone does, I
+> heavily doubt that person will try to boot a 4.something
+> kernel on it.
+> 
+> In the 2.6.32.63 kernel it's all different.
+> 
+> We have s3cmci_get_ro in drivers/mmc/host/s3cmci.c
+> that calls s3c2410_gpio_getpin in arch/arm/plat-s3c24xx/gpio.c
+> that returns the WP bit as is read from the GPIO.
+> s3cmci_get_ro will return > 0 if the bit is set and
+> wprotect_invert is not set. For mini2440, wprotect_invert
+> is not set (actually it does not seem to be set anywhere
+> in the kernel tree, is it used at all in 2.6.32.63?). So
+> it's returned as is. Getting 1 from GPIO means Read Only.
+> 
+> Then we have s3cmci_card_present, also in drivers/mmc/host/s3cmci.c,
+> that reads the CD bit from the GPIO, but take the opposite value
+> and then returns the opposite of the result if detect_invert
+> is 1. For mini2440 it's not 1, but 0. So we return the opposite
+> of the CD bit read from the GPIO, which means active low.
+> 
+> I'm not an electronic professional so I don't know how to interpret
+> the schematics. My experiment with my mini2440 says that:
+> - no card:         WP bit = 1, CD bit = 1
+> - card read/write: WP bit = 0, CD bit = 0
+> - card read only:  WP bit = 1, CD bit = 0
+> By "WP bit" I mean the value read from GPH8.
+> By "CD bit" I mean the value read from GPG8.
+> 
+> So I don't know what to do. If you don't trust me and you know
+> no one that you trust that would confirm my findings, then it's
+> game over.
+> 
+> I can do things that you ask me to do to prove my claims.
+> 
+> I can provide a simple userland program to be run on a mini2440
+> that demonstrates this as well (open /dev/mem, mmap 0x56000000,
+> reads GPG and GPH and prints the values).
 
-Thanks a lot for the review. Please see my comments inline.
+The patch was not patchwork compatible:
+    Applying patch #10587863 using 'git am -s'
+    Description: mini2440 MMC correct write protect detection
+    Applying: mini2440 MMC correct write protect detection
+    error: arm/mach-s3c24xx/mach-mini2440.c: does not exist in index
 
-> -----Original Message-----
-> From: Borislav Petkov [mailto:bp at alien8.de]
-> Sent: Tuesday, September 4, 2018 10:28 PM
-> To: Manish Narani <MNARANI@xilinx.com>
-> Cc: robh+dt at kernel.org; mark.rutland at arm.com; Michal Simek
-> <michals@xilinx.com>; mchehab at kernel.org; leoyang.li at nxp.com;
-> amit.kucheria at linaro.org; olof at lixom.net; Srinivas Goud <sgoud@xilinx.com>;
-> Anirudha Sarangi <anirudh@xilinx.com>; linux-kernel at vger.kernel.org;
-> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> edac at vger.kernel.org
-> Subject: Re: [PATCH v5 1/4] edac: synps: Add platform specific structures for
-> ddrc controller
-> 
-> On Fri, Aug 31, 2018 at 06:57:47PM +0530, Manish Narani wrote:
-> > Add platform specific structures, so that we can add different IP
-> > support later using quirks.
-> >
-> > Signed-off-by: Manish Narani <manish.narani@xilinx.com>
-> > ---
-> >  drivers/edac/synopsys_edac.c | 78
-> > +++++++++++++++++++++++++++++++++-----------
-> >  1 file changed, 59 insertions(+), 19 deletions(-)
-> >
-> > diff --git a/drivers/edac/synopsys_edac.c
-> > b/drivers/edac/synopsys_edac.c index 0c9c59e..2470d35 100644
-> > --- a/drivers/edac/synopsys_edac.c
-> > +++ b/drivers/edac/synopsys_edac.c
-> >
-> >  /**
-> > + * struct synps_platform_data -  synps platform data structure
-> > + * @edac_geterror_info:	function pointer to synps edac error info
-> > + * @edac_get_mtype:	function pointer to synps edac mtype
-> > + * @edac_get_dtype:	function pointer to synps edac dtype
-> > + * @edac_get_eccstate:	function pointer to synps edac eccstate
-> > + * @quirks:		to differentiate IPs
-> 
-> Kill all that "function pointer" fluff. Here's how I've changed it:
-> 
-> /**
->  * struct synps_platform_data -  synps platform data structure
->  * @edac_geterror_info: edac error info
->  * @edac_get_mtype:     get mtype
->  * @edac_get_dtype:     get dtype
->  * @edac_get_eccstate:  get ECC state
->  * @quirks:             to differentiate IPs
->  */
-> 
-> Shorter, quicker to read/scan/etc...
+git-am by default expects -p1.
 
-Okay. I will update this way throughout all the patches.
+The preferred and easiest way to generate patches is to use git for your
+work and then just:
+    $ git format-patch -1
+    $ scripts/get_maintainer 000*
+    $ git send-email --to ........  000*
 
-> 
-> > +/**
-> >   * synps_edac_geterror_info - Get the current ecc error info
-> > - * @base:	Pointer to the base address of the ddr memory controller
-> > - * @p:		Pointer to the synopsys ecc status structure
-> > + * @priv:	Pointer to DDR memory controller private instance data
-> >   *
-> >   * Determines there is any ecc error or not
-> 
-> All sentences end with a fullstop. Check all your patches.
+(the last commands can be even squashed into one but that is just
+optimization).
 
-Okay.
+If you do not use git, please pay attention to generate proper
+applicable patches.
 
-> 
-> Also, it is not "ecc" it is "ECC". Also go over all your patches.
-
-Okay. I updated this in (3/4), but I will update this as a separate patch in v6.
-
-> 
-> >   *
-> >   * Return: one if there is no error otherwise returns zero
-> >   */
-> > -static int synps_edac_geterror_info(void __iomem *base,
-> > -				    struct synps_ecc_status *p)
-> > +static int synps_edac_geterror_info(struct synps_edac_priv *priv)
-> >  {
-> > +	void __iomem *base;
-> > +	struct synps_ecc_status *p;
-> >  	u32 regval, clearval = 0;
-> 
-> Please sort function local variables declaration in a reverse christmas tree
-> order:
-> 
-> 	<type> longest_variable_name;
-> 	<type> shorter_var_name;
-> 	<type> even_shorter;
-> 	<type> i;
-> 
-
-Okay.
-
-> >
-> > +	if (!priv)
-> > +		return 1;
-> 
-> Why are you even checking this here?
-> 
-> synps_edac_check() is merrily dereferencing it - if anything we will explode
-> there already.
-
-Okay. I will remove this in v6.
-
-> 
-> >
-> > @@ -370,12 +398,12 @@ static int synps_edac_init_csrows(struct
-> > mem_ctl_info *mci)
-> 
-> That function returns 0 unconditionally. Make it a void in a prepatch.
-
-Sure.
-
-> 
-> > -	if (!synps_edac_get_eccstate(baseaddr)) {
-> > +	p_data = of_device_get_match_data(&pdev->dev);
-> > +	if (!(p_data->edac_get_eccstate(baseaddr))) {
-> 
-> Too many parentheses:
-> 
-> 	if (!p_data->...
-> 
-> is enough.
-
-Okay.
-
-
-Thanks,
-Manish Narani
+Best regards,
+Krzysztof
