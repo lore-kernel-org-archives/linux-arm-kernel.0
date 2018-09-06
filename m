@@ -1,84 +1,175 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 6 Sep 2018 13:42:41 +0200
-Subject: [PATCH v3 30/30] ARM: sun8i: a83t: full range OPP tables and
- CPUfreq
-In-Reply-To: <c76e71bc-6bc5-f73c-2c7a-c9315cf2da31@gmail.com>
-References: <20180830154518.29507-1-embed3d@gmail.com>
- <20180830154518.29507-31-embed3d@gmail.com>
- <20180906072429.7qjwbbqsjlbskk6v@qschulz>
- <c76e71bc-6bc5-f73c-2c7a-c9315cf2da31@gmail.com>
-Message-ID: <20180906114241.zuesfnxuoovxiig6@flea>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Thu, 6 Sep 2018 13:43:56 +0200
+Subject: [PATCH 3/7] spi: spi-mem: Add a driver for NXP FlexSPI controller
+In-Reply-To: <VI1PR04MB1038AB7497A2FD3E73FBA6D699010@VI1PR04MB1038.eurprd04.prod.outlook.com>
+References: <1535711404-29528-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <1535711404-29528-4-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <20180904165842.774ed960@bbrezillon>
+ <VI1PR04MB1038CE65EF4E98ACBEA9990B99020@VI1PR04MB1038.eurprd04.prod.outlook.com>
+ <add79e8b-1ab7-e465-5f65-eed6b78161e1@exceet.de>
+ <VI1PR04MB1038AB7497A2FD3E73FBA6D699010@VI1PR04MB1038.eurprd04.prod.outlook.com>
+Message-ID: <20180906134356.10e740fa@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2018 at 01:39:43PM +0200, Philipp Rossak wrote:
-> On 06.09.2018 09:24, Quentin Schulz wrote:
-> > Hi Philipp,
-> > 
-> > On Thu, Aug 30, 2018 at 05:45:18PM +0200, Philipp Rossak wrote:
-> > > Since we have now thermal trotteling enabeled we can now add the full
-> > > range of the OPP table.
-> > > 
-> > That's not the reason why they were not added.
-> > 
-> > Please see commit 2db639d8c1663d7543c9ab5323383d94c8a76c63[1].
-> > 
-> > Basically, you only want the OPPs which can work below or at the default
-> > voltage of the CPU supply, because the CPU supply is specific to each
-> > board.
-> > 
-> > If you set your CPU to work at a given frequency and the voltage isn't
-> > updated (saying opp-microvolt = <x>; in DT isn't enough, you need
-> > cpu-supply to be provided and functional), the CPU might just crash.
-> > 
-> > Without cpu-supply property, underclocking isn't effective in term of
-> > thermal cooling or power saving. Overclocking is very, very, very likely
-> > to make the CPU crash.
-> > 
-> > It's not a very difficult thing to do to test if a given frequency work
-> > well but it needs a specific test environment and it's a lengthy test,
-> > you can have a look at those tools here[3] if you like. It's not because
-> > it works in a given test case that'll work on the long term under heavy
-> > load and constant frequency changes.
-> > 
-> > For A83T, I already did it and the outcome is the patch in [1]. Same for
-> > A33.
-> > 
-> > So, if you want to use these three higher OPPs, you need to define them
-> > in your board DTS and add the cpu-supply property. See what's done for
-> > the A33 and more specifically the Sinlinx SinA33[2] as an example.
-> > 
-> > [1]https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=2db639d8c1663d7543c9ab5323383d94c8a76c63
-> > [2]https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-> > [3]http://linux-sunxi.org/Hardware_Reliability_Tests#CPU
-> > 
-> > Quentin
-> > 
-> 
-> Hey Quentin,
-> 
-> thanks for your feedback!
-> 
-> Sounds like we will never be able to run the A83T on its maximum frequency
-> in mainline.
-> 
-> I will do some testing, during the next weeks/months when I have time.
-> With the old Allwinner kernel I was able to run the A83T with its maximum
-> frequency without any problems since my board is very good cooled.
+On Thu, 6 Sep 2018 11:35:13 +0000
+Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
 
-You definitely can, but I think Quentin's point was to do it on a
-per-board basis, not for all of the A83t boards at once.
+> Hi Frieder,
+> 
+> > -----Original Message-----
+> > From: Frieder Schrempf [mailto:frieder.schrempf at exceet.de]
+> > Sent: Thursday, September 6, 2018 1:56 PM
+> > To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>; Boris
+> > Brezillon <boris.brezillon@bootlin.com>
+> > Cc: linux-mtd at lists.infradead.org; marek.vasut at gmail.com; linux-
+> > spi at vger.kernel.org; devicetree at vger.kernel.org; robh at kernel.org;
+> > mark.rutland at arm.com; shawnguo at kernel.org; linux-arm-
+> > kernel at lists.infradead.org; computersforpeace at gmail.com; linux-
+> > kernel at vger.kernel.org
+> > Subject: Re: [PATCH 3/7] spi: spi-mem: Add a driver for NXP FlexSPI
+> > controller 
+> > >> Hi Yogesh,
+> > >>
+> > >> On Fri, 31 Aug 2018 16:00:00 +0530
+> > >> Yogesh Gaur <yogeshnarayan.gaur@nxp.com> wrote:
+> > >>  
+> > >>> - Add a driver for NXP FlexSPI host controller
+> > >>>  
+> > >>
+> > >> Yep, I had a quick look at the code and they really look
+> > >> similar. Why not extending the existing driver instead of
+> > >> creating a new one from scratch? 
+> > >
+> > > FlexSPI is different controller not related to the QuadSPI
+> > > controller in its working behavior Both these controller are
+> > > having
+> > > * Different registers name, registers address, registers
+> > > functionality etc, section 30.5.2[1]
+> > > * Different programming sequence for initialization of the
+> > > controller, section 30.8.1[1]
+> > > * Different programming sequence for performing Read and Write
+> > > operation using IP, section 30.7.9[1] and AHB mode
+> > > * Different programming sequence for checking controller current
+> > > state like busy or not
+> > > * New mechanism to program for the connected slave device i.e.
+> > > flash access mode and flash memory map 30.7.4[1] and 30.7.5[1]
+> > > * New entries added for FlexSPI controller for LUT_XX mode for
+> > > various commands, section 30.7.8[1]
+> > >
+> > > There are few similarities between these two like LUT programming
+> > > logic is same i.e. LUT needs to be programmed in same sequence of
+> > > 'INSTR  
+> > PAD  OPCODE', but again LUT register address and LUT command mode
+> > values are different.  
+> > >
+> > > Creating common driver for both FlexSPI and QuadSPI controller,
+> > > would  
+> > involve creation of one more layer between driver/spi/spi-xxx and
+> > the actual controller driver, this layer would going to have less
+> > functionality like doing LUT creation programming and then would
+> > re-direct calls to the respective controller driver functionality
+> > to perform desired programming sequence.  
+> > >  
+> > >>>
+> > >>> (1) The FlexSPI controller is driven by the LUT(Look-up Table)
+> > >>> registers.
+> > >>>   The LUT registers are a look-up-table for sequences of
+> > >>> instructions. A valid sequence consists of four LUT registers.
+> > >>>   Maximum 32 LUT sequences can be programmed simultaneously.
+> > >>>  
+> > >>
+> > >> Do we really want to have this level of details in the commit
+> > >> message? I mean, this is something you can document in the
+> > >> driver, but not here.
+> > >>
+> > >> BTW, you might want to have a look at [1]. I think we can get
+> > >> rid of the ->size field you're adding if this driver implements
+> > >> the dirmap hooks. 
+> > >
+> > > I need size information for the connected device to program the
+> > > controller  
+> > register FLSHXXCRO as Flash Chip select is determined by flash
+> > access address and Flash size setting in register FLSHXXCR0[FLSHz],
+> > section 30.7.9[1].
+> > 
+> > It's the same situation we had with the QSPI driver before. We
+> > decided to **not** pass information about flash size directly to
+> > the controller for now. That's why we currently don't support
+> > mapping the flash device in the implementation of the QSPI driver.
+> > 
+> > I think we should not start this discussion all over again for the
+> > FlexSPI driver, but stick to what we decided for QSPI.
+> >   
+> 
+> There is difference between FlexSPI and QuadSPI controller
+> functionality in detecting the current CS.
+> 
+> As per table-10.32[1] for QuadSPI controller, access to flash is
+> being assigned as per the address values provided i.e. it would be
+> CS0 if address is between TOP_ADDR_MEMXX and QSPI_AMBA_BASE and CS1
+> if access is in between TOP_ADDR_MEMA2 and TOP_ADDR_MEMA1.
+> 
+> But for case of FlexSPI controller, section 30.7.5[2],  CS is being
+> defined as per the address value lies in below range
+> - Flash A1 address range: 0x00000000 ~ FA1_SIZE
+> - Flash A2 address range: FA1_SIZE ~ (FA1_SIZE + FA2_SIZE)
+> - Flash B1 address range: (FA1_SIZE + FA2_SIZE) ~ (FA1_SIZE +
+> FA2_SIZE + FB1_SIZE)
+> - Flash B2 address range: FA1_SIZE + FA2_SIZE + FB1_SIZE) ~ (FA1_SIZE
+> + FA2_SIZE + FB1_SIZE + FB2_SIZE) and FAx_SIZE is determined from
+> register FLSHxxCR0[FLASHSZ]
+> 
+> Thus, for QuadSPI controller we can actually go away with the flash
+> size requirement and with the code logic which you have introduced,
+> of using 2 * ahb_buf_size data size for TOP_ADDR_MEMXX bits in SFxxD
+> register, things are working fine.
+> 
+> But for FlexSPI controller its required to have the connected slave
+> device size to detect the current CS.
 
-Maxime
+I don't see why. You should be able to take an arbitrary (big enough)
+size at first, and only extend it on-the-fly when a dirmap request is
+done.
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180906/d404cf66/attachment.sig>
+> I have tried the quadspi driver
+> logic in flexspi driver code, but it gives me failure.
+
+Can you detail a bit what's failing?
+
+> Due, to this
+> reason and requirement I have come-up with this solution of getting
+> the connected device size and programming correct value in
+> FLSHxxCR0[FLASHSZ] register
+
+Alternatively, what we could do is split the memory map in 4 regions
+of the same size and stick to it. That works if you can define an
+offset to apply to the address when an access is done through the
+direct mapping area.
+
+> 
+> > >
+> > > Link for reference of the driver implementing dirmap hooks was
+> > > missing in mail,  
+> > please share.
+> > 
+> > I guess Boris meant to link to his PoC implementation of the direct
+> > mapping API [1]. When this is available we can easily add support
+> > for direct memory mappings to the QuadSPI and FlexSPI drivers.
+> >   
+> 
+> I have checked the link, found that size value is being derived from
+> spi_nor.mtd.size variable. Same being performed in this patch series
+> to detect the size of the slave device.
+
+Well, yes, the result is the same, except it does not require adding a
+new field to spi_mem and ->attach/detach() hooks to the spi_mem_ops
+interface (which your implementation is lacking BTW).
+
+> As per my understanding
+> developed with Boris's code implementation, when direct mapping API
+> interface are available then both QuadSPI and FlexSPI driver needs to
+> be changed as per new introduced ops structure.
+
+It's not a hard requirement, but they would definitely benefit from
+this extension (mainly a perf improvement).
