@@ -1,77 +1,102 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 6 Sep 2018 11:05:28 +0100
-Subject: [PATCH] iommu/io-pgtable-arm: Fix race handling in
- split_blk_unmap()
-In-Reply-To: <f6700817286f60597f2a93835bf658f3ef3585ef.1535026499.git.robin.murphy@arm.com>
-References: <f6700817286f60597f2a93835bf658f3ef3585ef.1535026499.git.robin.murphy@arm.com>
-Message-ID: <20180906100527.GF3592@arm.com>
+Date: Thu, 6 Sep 2018 11:05:24 +0100
+Subject: [RFC PATCH v2 3/3] dynamic_debug: Add support for dynamic
+ register trace
+In-Reply-To: <9015a7a4aafa9935be769c07918743df63d6f648.1535119711.git.saiprakash.ranjan@codeaurora.org>
+References: <cover.1535119710.git.saiprakash.ranjan@codeaurora.org>
+ <9015a7a4aafa9935be769c07918743df63d6f648.1535119711.git.saiprakash.ranjan@codeaurora.org>
+Message-ID: <20180906100523.GE3592@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
-
-On Thu, Aug 23, 2018 at 01:14:59PM +0100, Robin Murphy wrote:
-> In removing the pagetable-wide lock, we gained the possibility of the
-> vanishingly unlikely case where we have a race between two concurrent
-> unmappers splitting the same block entry. The logic to handle this is
-> fairly straightforward - whoever loses the race frees their partial
-> next-level table and instead dereferences the winner's newly-installed
-> entry in order to fall back to a regular unmap, which intentionally
-> echoes the pre-existing case of recursively splitting a 1GB block down
-> to 4KB pages by installing a full table of 2MB blocks first.
+On Fri, Aug 24, 2018 at 08:15:27PM +0530, Sai Prakash Ranjan wrote:
+> Introduce dynamic debug filtering mechanism to register
+> tracing as dynamic_rtb() which will reduce a lot of
+> overhead otherwise of tracing all the register reads/writes
+> in all files.
 > 
-> Unfortunately, the chump who implemented that logic failed to update the
-> condition check for that fallback, meaning that if said race occurs at
-> the last level (where the loser's unmap_idx is valid) then the unmap
-> won't actually happen. Fix that to properly account for both the race
-> and recursive cases.
+> Now we can just specify the file name or any wildcard pattern
+> as any other dynamic debug facility in bootargs and dynamic rtb
+> will just trace them and the output can be seen in pstore.
 > 
-> Fixes: 2c3d273eabe8 ("iommu/io-pgtable-arm: Support lockless operation")
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> TODO: Now we use same 'p' flag but will add a separate flag for register trace
+> later.
+> 
+> Also add asm-generic/io-instrumented.h file for instrumentation of IO
+> operations such as read/write{b,w,l,q} as per Will's suggestion to not touch
+> arch code and let core generate instrumentation.
+> This can be extended to arm as well later for tracing.
+> 
+> Example for tracing all register reads/writes in drivers/soc/qcom/* below:
+> 
+>   # dyndbg="file drivers/soc/qcom/* +p" in bootargs
+>   # reboot -f
+>   # mount -t pstore pstore /sys/fs/pstore
+>   # cat /sys/fs/pstore/rtb-ramoops-0
+>     [LOGK_WRITE] ts:1373030419  data:ffff00000d5065a4  <ffff00000867cb44>  qcom_smsm_probe+0x51c/0x668
+>     [LOGK_WRITE] ts:1373360576  data:ffff00000d506608  <ffff00000867cb44>  qcom_smsm_probe+0x51c/0x668
+> 
+> Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
 > ---
->  drivers/iommu/io-pgtable-arm.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm64/include/asm/io.h           | 26 +++++++++-------------
+>  include/asm-generic/io-instrumented.h | 32 +++++++++++++++++++++++++++
+>  include/linux/dynamic_debug.h         | 13 +++++++++++
+>  kernel/trace/Kconfig                  |  1 +
+>  4 files changed, 56 insertions(+), 16 deletions(-)
+>  create mode 100644 include/asm-generic/io-instrumented.h
+> 
+> diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+> index 35b2e50f17fb..aafd4b0be9f0 100644
+> --- a/arch/arm64/include/asm/io.h
+> +++ b/arch/arm64/include/asm/io.h
 
-Well spotted! Did you just find this by inspection?
+The arm64 bits look fine to me, but please can you split them into a
+separate patch?
 
-> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-> index 010a254305dd..93b4833cef73 100644
-> --- a/drivers/iommu/io-pgtable-arm.c
-> +++ b/drivers/iommu/io-pgtable-arm.c
-> @@ -575,7 +575,7 @@ static size_t arm_lpae_split_blk_unmap(struct arm_lpae_io_pgtable *data,
->  		tablep = iopte_deref(pte, data);
->  	}
->  
-> -	if (unmap_idx < 0)
-> +	if (unmap_idx < 0 || pte != blk_pte)
->  		return __arm_lpae_unmap(data, iova, size, lvl, tablep);
+> diff --git a/include/asm-generic/io-instrumented.h b/include/asm-generic/io-instrumented.h
+> new file mode 100644
+> index 000000000000..ce273742b98c
+> --- /dev/null
+> +++ b/include/asm-generic/io-instrumented.h
+> @@ -0,0 +1,32 @@
+> +/* SPDX-License-Identifier: GPL-2.0 */
+> +
+> +#ifndef _ASM_GENERIC_IO_INSTRUMENTED_H
+> +#define _ASM_GENERIC_IO_INSTRUMENTED_H
+> +
+> +#include <linux/dynamic_debug.h>
+> +
+> +#define __raw_write(v, a, _t) ({			\
+> +	volatile void __iomem *_a = (a);		\
 
-Can we tidy up the control flow a bit here to avoid re-checking the status
-of the cmpxchg? See below.
+Does this actually need to be volatile?
+
+> +	dynamic_rtb("LOGK_WRITE", (void __force *)(_a));\
+> +	arch_raw_write##_t((v), _a);			\
+> +	})
+> +
+> +#define __raw_writeb(v, a)	__raw_write((v), a, b)
+> +#define __raw_writew(v, a)	__raw_write((v), a, w)
+> +#define __raw_writel(v, a)	__raw_write((v), a, l)
+> +#define __raw_writeq(v, a)	__raw_write((v), a, q)
+> +
+> +#define __raw_read(a, _l, _t)    ({					\
+> +	_t __a;								\
+> +	const volatile void __iomem *_a = (const volatile void __iomem *)(a);\
+
+Again, can't this just be void __iomem * ?
+
+> +	dynamic_rtb("LOGK_READ", (void __force *)(_a));			\
+> +	__a = arch_raw_read##_l(_a);					\
+> +	__a;								\
+> +	})
+> +
+> +#define __raw_readb(a)	__raw_read((a), b, u8)
+> +#define __raw_readw(a)	__raw_read((a), w, u16)
+> +#define __raw_readl(a)	__raw_read((a), l, u32)
+> +#define __raw_readq(a)	__raw_read((a), q, u64)
+
+I find the way you've defined the __raw_{read,write} macros quite confusing.
+They both have an _t parameter, but it's totally unrelated between the two!
 
 Will
-
---->8
-
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index 88641b4560bc..2f79efd16a05 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -574,13 +574,12 @@ static size_t arm_lpae_split_blk_unmap(struct arm_lpae_io_pgtable *data,
- 			return 0;
- 
- 		tablep = iopte_deref(pte, data);
-+	} else if (unmap_idx >= 0) {
-+		io_pgtable_tlb_add_flush(&data->iop, iova, size, size, true);
-+		return size;
- 	}
- 
--	if (unmap_idx < 0)
--		return __arm_lpae_unmap(data, iova, size, lvl, tablep);
--
--	io_pgtable_tlb_add_flush(&data->iop, iova, size, size, true);
--	return size;
-+	return __arm_lpae_unmap(data, iova, size, lvl, tablep);
- }
- 
- static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
