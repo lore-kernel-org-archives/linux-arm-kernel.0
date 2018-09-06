@@ -1,80 +1,65 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 6 Sep 2018 17:57:51 +0100
-Subject: [PATCH v2 3/9] ARM: vfp: use __copy_to_user() when saving VFP
- state
-In-Reply-To: <1536251888-8302-4-git-send-email-julien.thierry@arm.com>
+Date: Thu, 6 Sep 2018 18:04:18 +0100
+Subject: [PATCH v2 4/9] ARM: oabi-compat: copy oabi events using
+ __copy_to_user()
+In-Reply-To: <1536251888-8302-5-git-send-email-julien.thierry@arm.com>
 References: <1536251888-8302-1-git-send-email-julien.thierry@arm.com>
- <1536251888-8302-4-git-send-email-julien.thierry@arm.com>
-Message-ID: <20180906165751.GS30658@n2100.armlinux.org.uk>
+ <1536251888-8302-5-git-send-email-julien.thierry@arm.com>
+Message-ID: <20180906170417.GT30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2018 at 05:38:02PM +0100, Julien Thierry wrote:
-> Use __copy_to_user() rather than __put_user_error() for individual
-> members when saving VFP state.
-> This has the benefit of disabling/enabling PAN once per copied struct
-> intead of once per write.
-> 
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> ---
->  arch/arm/include/asm/thread_info.h |  4 ++--
->  arch/arm/kernel/signal.c           | 12 ++++++------
->  arch/arm/vfp/vfpmodule.c           | 20 ++++++++------------
->  3 files changed, 16 insertions(+), 20 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-> index 9b37b6a..8f55dc5 100644
-> --- a/arch/arm/include/asm/thread_info.h
-> +++ b/arch/arm/include/asm/thread_info.h
-> @@ -121,8 +121,8 @@ static inline struct thread_info *current_thread_info(void)
->  struct user_vfp;
->  struct user_vfp_exc;
->  
-> -extern int vfp_preserve_user_clear_hwstate(struct user_vfp __user *,
-> -					   struct user_vfp_exc __user *);
-> +extern int vfp_preserve_user_clear_hwstate(struct user_vfp *,
-> +					   struct user_vfp_exc *);
->  extern int vfp_restore_user_hwstate(struct user_vfp *,
->  				    struct user_vfp_exc *);
->  #endif
-> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-> index 464393d..baa055d 100644
-> --- a/arch/arm/kernel/signal.c
-> +++ b/arch/arm/kernel/signal.c
-> @@ -137,17 +137,17 @@ static int restore_iwmmxt_context(char __user **auxp)
->  
->  static int preserve_vfp_context(struct vfp_sigframe __user *frame)
->  {
-> -	const unsigned long magic = VFP_MAGIC;
-> -	const unsigned long size = VFP_STORAGE_SIZE;
-> +	struct vfp_sigframe kframe;
->  	int err = 0;
->  
-> -	__put_user_error(magic, &frame->magic, err);
-> -	__put_user_error(size, &frame->size, err);
-> +	kframe.magic = VFP_MAGIC;
-> +	kframe.size = VFP_STORAGE_SIZE;
->  
-> +	err = vfp_preserve_user_clear_hwstate(&kframe.ufp, &kframe.ufp_exc);
->  	if (err)
-> -		return -EFAULT;
-> +		return err;
->  
-> -	return vfp_preserve_user_clear_hwstate(&frame->ufp, &frame->ufp_exc);
-> +	return __copy_to_user(frame, &kframe, sizeof(kframe));
+On Thu, Sep 06, 2018 at 05:38:03PM +0100, Julien Thierry wrote:
+> @@ -294,11 +294,9 @@ asmlinkage long sys_oabi_epoll_wait(int epfd,
+>  	ret = sys_epoll_wait(epfd, kbuf, maxevents, timeout);
+>  	set_fs(fs);
+>  	err = 0;
+> -	for (i = 0; i < ret; i++) {
+> -		__put_user_error(kbuf[i].events, &events->events, err);
+> -		__put_user_error(kbuf[i].data,   &events->data,   err);
+> -		events++;
+> -	}
+> +	if (ret > 0)
+> +		err = __copy_to_user(events, kbuf, ret * sizeof(*kbuf));
+> +
 
-This one needs a memset() to ensure that padding is cleared:
+It's not that simple!
 
-/*
- *  8 byte for magic and size, 264 byte for ufp, 12 bytes for ufp_exc,
- *  4 bytes padding.
- */
-#define VFP_STORAGE_SIZE        sizeof(struct vfp_sigframe)
+kbuf is of type "struct epoll_event" whereas events is of type
+"struct oabi_epoll_event".  They have different layouts - if they
+were the same, we wouldn't need the OABI shim.
 
-so as this patch stands, it results in a leak one word of kernel data
-to userspace.
+struct oabi_epoll_event {
+        __u32 events;
+        __u64 data;
+} __attribute__ ((packed,aligned(4)));
+
+vs
+
+struct epoll_event {
+        __poll_t events;
+        __u64 data;
+};
+
+which results in EABI sizeof(struct epoll_event) being 16 and 12 on
+OABI.  What's more is that 'data' is at offset 4 in OABI, or 8 in
+EABI.
+
+So, what I think needs to happen is that we need to do something
+like:
+
+	struct oabi_epoll_event e;
+
+	for (i = 0; i < ret; i++) {
+		e.events = kbuf[i].events;
+		e.data = kbuf[i].data;
+		err = __copy_to_user(events, e, sizeof(e))
+		if (err)
+			break;
+		events++;
+	}
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+FTTC broadband for 0.8mile line in suburbia: sync@13.8Mbps down 630kbps up
 According to speedtest.net: 13Mbps down 490kbps up
