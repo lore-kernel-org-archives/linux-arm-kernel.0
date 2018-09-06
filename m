@@ -1,52 +1,83 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Thu,  6 Sep 2018 17:38:01 +0100
-Subject: [PATCH v2 2/9] ARM: signal: always use __copy_to_user to save iwmmxt
- context
+Date: Thu,  6 Sep 2018 17:38:00 +0100
+Subject: [PATCH v2 1/9] ARM: signal: copy registers using __copy_to_user()
 In-Reply-To: <1536251888-8302-1-git-send-email-julien.thierry@arm.com>
 References: <1536251888-8302-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1536251888-8302-3-git-send-email-julien.thierry@arm.com>
+Message-ID: <1536251888-8302-2-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When setting a dummy iwmmxt context, create a local instance and
-use __copy_to_user both cases whether iwmmxt is being used or not.
+When saving the ARM integer registers, use __copy_to_user() to
+copy them into user signal frame, rather than __put_user_error().
 This has the benefit of disabling/enabling PAN once for the whole copy
 intead of once per write.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
 ---
- arch/arm/kernel/signal.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ arch/arm/kernel/signal.c | 49 ++++++++++++++++++++++++++----------------------
+ 1 file changed, 27 insertions(+), 22 deletions(-)
 
 diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-index 76fe75d..464393d 100644
+index b8f766c..76fe75d 100644
 --- a/arch/arm/kernel/signal.c
 +++ b/arch/arm/kernel/signal.c
-@@ -77,8 +77,6 @@ static int preserve_iwmmxt_context(struct iwmmxt_sigframe __user *frame)
- 		kframe->magic = IWMMXT_MAGIC;
- 		kframe->size = IWMMXT_STORAGE_SIZE;
- 		iwmmxt_task_copy(current_thread_info(), &kframe->storage);
--
--		err = __copy_to_user(frame, kframe, sizeof(*frame));
- 	} else {
- 		/*
- 		 * For bug-compatibility with older kernels, some space
-@@ -86,10 +84,14 @@ static int preserve_iwmmxt_context(struct iwmmxt_sigframe __user *frame)
- 		 * Set the magic and size appropriately so that properly
- 		 * written userspace can skip it reliably:
- 		 */
--		__put_user_error(DUMMY_MAGIC, &frame->magic, err);
--		__put_user_error(IWMMXT_STORAGE_SIZE, &frame->size, err);
-+		*kframe = (struct iwmmxt_sigframe) {
-+			.magic = DUMMY_MAGIC,
-+			.size  = IWMMXT_STORAGE_SIZE,
-+		};
- 	}
+@@ -288,30 +288,35 @@ asmlinkage int sys_rt_sigreturn(struct pt_regs *regs)
+ setup_sigframe(struct sigframe __user *sf, struct pt_regs *regs, sigset_t *set)
+ {
+ 	struct aux_sigframe __user *aux;
++	struct sigcontext context;
+ 	int err = 0;
  
-+	err = __copy_to_user(frame, kframe, sizeof(*kframe));
+-	__put_user_error(regs->ARM_r0, &sf->uc.uc_mcontext.arm_r0, err);
+-	__put_user_error(regs->ARM_r1, &sf->uc.uc_mcontext.arm_r1, err);
+-	__put_user_error(regs->ARM_r2, &sf->uc.uc_mcontext.arm_r2, err);
+-	__put_user_error(regs->ARM_r3, &sf->uc.uc_mcontext.arm_r3, err);
+-	__put_user_error(regs->ARM_r4, &sf->uc.uc_mcontext.arm_r4, err);
+-	__put_user_error(regs->ARM_r5, &sf->uc.uc_mcontext.arm_r5, err);
+-	__put_user_error(regs->ARM_r6, &sf->uc.uc_mcontext.arm_r6, err);
+-	__put_user_error(regs->ARM_r7, &sf->uc.uc_mcontext.arm_r7, err);
+-	__put_user_error(regs->ARM_r8, &sf->uc.uc_mcontext.arm_r8, err);
+-	__put_user_error(regs->ARM_r9, &sf->uc.uc_mcontext.arm_r9, err);
+-	__put_user_error(regs->ARM_r10, &sf->uc.uc_mcontext.arm_r10, err);
+-	__put_user_error(regs->ARM_fp, &sf->uc.uc_mcontext.arm_fp, err);
+-	__put_user_error(regs->ARM_ip, &sf->uc.uc_mcontext.arm_ip, err);
+-	__put_user_error(regs->ARM_sp, &sf->uc.uc_mcontext.arm_sp, err);
+-	__put_user_error(regs->ARM_lr, &sf->uc.uc_mcontext.arm_lr, err);
+-	__put_user_error(regs->ARM_pc, &sf->uc.uc_mcontext.arm_pc, err);
+-	__put_user_error(regs->ARM_cpsr, &sf->uc.uc_mcontext.arm_cpsr, err);
+-
+-	__put_user_error(current->thread.trap_no, &sf->uc.uc_mcontext.trap_no, err);
+-	__put_user_error(current->thread.error_code, &sf->uc.uc_mcontext.error_code, err);
+-	__put_user_error(current->thread.address, &sf->uc.uc_mcontext.fault_address, err);
+-	__put_user_error(set->sig[0], &sf->uc.uc_mcontext.oldmask, err);
++	context = (struct sigcontext) {
++		.arm_r0        = regs->ARM_r0,
++		.arm_r1        = regs->ARM_r1,
++		.arm_r2        = regs->ARM_r2,
++		.arm_r3        = regs->ARM_r3,
++		.arm_r4        = regs->ARM_r4,
++		.arm_r5        = regs->ARM_r5,
++		.arm_r6        = regs->ARM_r6,
++		.arm_r7        = regs->ARM_r7,
++		.arm_r8        = regs->ARM_r8,
++		.arm_r9        = regs->ARM_r9,
++		.arm_r10       = regs->ARM_r10,
++		.arm_fp        = regs->ARM_fp,
++		.arm_ip        = regs->ARM_ip,
++		.arm_sp        = regs->ARM_sp,
++		.arm_lr        = regs->ARM_lr,
++		.arm_pc        = regs->ARM_pc,
++		.arm_cpsr      = regs->ARM_cpsr,
 +
- 	return err;
- }
++		.trap_no       = current->thread.trap_no,
++		.error_code    = current->thread.error_code,
++		.fault_address = current->thread.address,
++		.oldmask       = set->sig[0],
++	};
++
++	err |= __copy_to_user(&sf->uc.uc_mcontext, &context, sizeof(context));
+ 
+ 	err |= __copy_to_user(&sf->uc.uc_sigmask, set, sizeof(*set));
  
 -- 
 1.9.1
