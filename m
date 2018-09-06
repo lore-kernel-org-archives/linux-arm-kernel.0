@@ -1,142 +1,35 @@
-From: jun.gao@mediatek.com (Jun Gao)
-Date: Thu, 6 Sep 2018 21:15:29 +0800
-Subject: [PATCH v3 2/2] i2c: mediatek: Use DMA safe buffers for i2c
- transactions
-In-Reply-To: <1536239729-10008-1-git-send-email-jun.gao@mediatek.com>
-References: <1536239729-10008-1-git-send-email-jun.gao@mediatek.com>
-Message-ID: <1536239729-10008-3-git-send-email-jun.gao@mediatek.com>
+From: quentin.perret@arm.com (Quentin Perret)
+Date: Thu, 6 Sep 2018 14:17:54 +0100
+Subject: [PATCH] firmware: arm_scmi: fix divide by zero when
+ sustained_perf_level is zero
+In-Reply-To: <1536165491-27813-1-git-send-email-sudeep.holla@arm.com>
+References: <1536165491-27813-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20180906131752.ysubfiufocddpoey@queper01-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jun Gao <jun.gao@mediatek.com>
+Hi Sudeep,
 
-DMA mode will always be used in i2c transactions, try to allocate
-a DMA safe buffer if the buf of struct i2c_msg used is not DMA safe.
+On Wednesday 05 Sep 2018 at 17:38:11 (+0100), Sudeep Holla wrote:
+> @@ -166,7 +166,12 @@ scmi_perf_domain_attributes_get(const struct scmi_handle *handle, u32 domain,
+>  					le32_to_cpu(attr->sustained_freq_khz);
+>  		dom_info->sustained_perf_level =
+>  					le32_to_cpu(attr->sustained_perf_level);
+> -		dom_info->mult_factor =	(dom_info->sustained_freq_khz * 1000) /
+> +		if (!dom_info->sustained_freq_khz ||
+> +		    !dom_info->sustained_perf_level)
+> +			dom_info->mult_factor =	1;
 
-Signed-off-by: Jun Gao <jun.gao@mediatek.com>
----
- drivers/i2c/busses/i2c-mt65xx.c | 62 ++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 55 insertions(+), 7 deletions(-)
+I'm sorry I missed that the first time I reviewed this patch, but after
+discussing with Ionela, we found out that there is actually a case where
+this could be a problem. If you have perf levels that are 1,2,3,4 (for
+example), then with mult_factor=1 you'll register OPPs at 1Hz, 2Hz, 3Hz,
+4Hz into PM_OPP. And that will be turned into 0 KHz for all of them at
+the CPUFreq level when divided by 1000 in dev_pm_opp_init_cpufreq_table().
 
-diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
-index 806e8b90..695a2ae 100644
---- a/drivers/i2c/busses/i2c-mt65xx.c
-+++ b/drivers/i2c/busses/i2c-mt65xx.c
-@@ -441,6 +441,8 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
- 	u16 control_reg;
- 	u16 restart_flag = 0;
- 	u32 reg_4g_mode;
-+	u8 *dma_rd_buf = NULL;
-+	u8 *dma_wr_buf = NULL;
- 	dma_addr_t rpaddr = 0;
- 	dma_addr_t wpaddr = 0;
- 	int ret;
-@@ -500,10 +502,18 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
- 	if (i2c->op == I2C_MASTER_RD) {
- 		writel(I2C_DMA_INT_FLAG_NONE, i2c->pdmabase + OFFSET_INT_FLAG);
- 		writel(I2C_DMA_CON_RX, i2c->pdmabase + OFFSET_CON);
--		rpaddr = dma_map_single(i2c->dev, msgs->buf,
-+
-+		dma_rd_buf = i2c_get_dma_safe_msg_buf(msgs, 0);
-+		if (!dma_rd_buf)
-+			return -ENOMEM;
-+
-+		rpaddr = dma_map_single(i2c->dev, dma_rd_buf,
- 					msgs->len, DMA_FROM_DEVICE);
--		if (dma_mapping_error(i2c->dev, rpaddr))
-+		if (dma_mapping_error(i2c->dev, rpaddr)) {
-+			i2c_put_dma_safe_msg_buf(dma_rd_buf, msgs, false);
-+
- 			return -ENOMEM;
-+		}
- 
- 		if (i2c->dev_comp->support_33bits) {
- 			reg_4g_mode = mtk_i2c_set_4g_mode(rpaddr);
-@@ -515,10 +525,18 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
- 	} else if (i2c->op == I2C_MASTER_WR) {
- 		writel(I2C_DMA_INT_FLAG_NONE, i2c->pdmabase + OFFSET_INT_FLAG);
- 		writel(I2C_DMA_CON_TX, i2c->pdmabase + OFFSET_CON);
--		wpaddr = dma_map_single(i2c->dev, msgs->buf,
-+
-+		dma_wr_buf = i2c_get_dma_safe_msg_buf(msgs, 0);
-+		if (!dma_wr_buf)
-+			return -ENOMEM;
-+
-+		wpaddr = dma_map_single(i2c->dev, dma_wr_buf,
- 					msgs->len, DMA_TO_DEVICE);
--		if (dma_mapping_error(i2c->dev, wpaddr))
-+		if (dma_mapping_error(i2c->dev, wpaddr)) {
-+			i2c_put_dma_safe_msg_buf(dma_wr_buf, msgs, false);
-+
- 			return -ENOMEM;
-+		}
- 
- 		if (i2c->dev_comp->support_33bits) {
- 			reg_4g_mode = mtk_i2c_set_4g_mode(wpaddr);
-@@ -530,16 +548,39 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
- 	} else {
- 		writel(I2C_DMA_CLR_FLAG, i2c->pdmabase + OFFSET_INT_FLAG);
- 		writel(I2C_DMA_CLR_FLAG, i2c->pdmabase + OFFSET_CON);
--		wpaddr = dma_map_single(i2c->dev, msgs->buf,
-+
-+		dma_wr_buf = i2c_get_dma_safe_msg_buf(msgs, 0);
-+		if (!dma_wr_buf)
-+			return -ENOMEM;
-+
-+		wpaddr = dma_map_single(i2c->dev, dma_wr_buf,
- 					msgs->len, DMA_TO_DEVICE);
--		if (dma_mapping_error(i2c->dev, wpaddr))
-+		if (dma_mapping_error(i2c->dev, wpaddr)) {
-+			i2c_put_dma_safe_msg_buf(dma_wr_buf, msgs, false);
-+
- 			return -ENOMEM;
--		rpaddr = dma_map_single(i2c->dev, (msgs + 1)->buf,
-+		}
-+
-+		dma_rd_buf = i2c_get_dma_safe_msg_buf((msgs + 1), 0);
-+		if (!dma_rd_buf) {
-+			dma_unmap_single(i2c->dev, wpaddr,
-+					 msgs->len, DMA_TO_DEVICE);
-+
-+			i2c_put_dma_safe_msg_buf(dma_wr_buf, msgs, false);
-+
-+			return -ENOMEM;
-+		}
-+
-+		rpaddr = dma_map_single(i2c->dev, dma_rd_buf,
- 					(msgs + 1)->len,
- 					DMA_FROM_DEVICE);
- 		if (dma_mapping_error(i2c->dev, rpaddr)) {
- 			dma_unmap_single(i2c->dev, wpaddr,
- 					 msgs->len, DMA_TO_DEVICE);
-+
-+			i2c_put_dma_safe_msg_buf(dma_wr_buf, msgs, false);
-+			i2c_put_dma_safe_msg_buf(dma_rd_buf, (msgs + 1), false);
-+
- 			return -ENOMEM;
- 		}
- 
-@@ -578,14 +619,21 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
- 	if (i2c->op == I2C_MASTER_WR) {
- 		dma_unmap_single(i2c->dev, wpaddr,
- 				 msgs->len, DMA_TO_DEVICE);
-+
-+		i2c_put_dma_safe_msg_buf(dma_wr_buf, msgs, true);
- 	} else if (i2c->op == I2C_MASTER_RD) {
- 		dma_unmap_single(i2c->dev, rpaddr,
- 				 msgs->len, DMA_FROM_DEVICE);
-+
-+		i2c_put_dma_safe_msg_buf(dma_rd_buf, msgs, true);
- 	} else {
- 		dma_unmap_single(i2c->dev, wpaddr, msgs->len,
- 				 DMA_TO_DEVICE);
- 		dma_unmap_single(i2c->dev, rpaddr, (msgs + 1)->len,
- 				 DMA_FROM_DEVICE);
-+
-+		i2c_put_dma_safe_msg_buf(dma_wr_buf, msgs, true);
-+		i2c_put_dma_safe_msg_buf(dma_rd_buf, (msgs + 1), true);
- 	}
- 
- 	if (ret == 0) {
--- 
-1.8.1.1
+I guess a quick fix would be to have a default mult_factor of 1000 ...
+
+What do you think ?
+
+Thanks,
+Quentin
