@@ -1,48 +1,77 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Thu, 06 Sep 2018 10:38:20 +0900
-Subject: [PATCH 2/2] pci: dwc: add UniPhier PCIe host controller support
-In-Reply-To: <20180905172529.GO107892@bhelgaas-glaptop.roam.corp.google.com>
-References: <1536114731-28630-3-git-send-email-hayashi.kunihiko@socionext.com>
- <20180905172529.GO107892@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20180906103819.252A.4A936039@socionext.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Thu, 6 Sep 2018 09:49:53 +0800
+Subject: [PATCH v2 05/13] drm/mediatek: dpi use new API for finding bridge
+In-Reply-To: <20180905083146.14727-6-bibby.hsieh@mediatek.com>
+References: <20180905083146.14727-1-bibby.hsieh@mediatek.com>
+ <20180905083146.14727-6-bibby.hsieh@mediatek.com>
+Message-ID: <1536198593.4618.9.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Hi, Bibby:
 
-On Wed, 5 Sep 2018 12:25:29 -0500 <helgaas@kernel.org> wrote:
-
-> Follow capitalization conventions for subject.
+On Wed, 2018-09-05 at 16:31 +0800, Bibby Hsieh wrote:
+> From: chunhui dai <chunhui.dai@mediatek.com>
 > 
-> On Wed, Sep 05, 2018 at 11:32:11AM +0900, Kunihiko Hayashi wrote:
-> > This introduces specific glue layer for UniPhier platform to support
-> > PCIe host controller that is based on the Designware PCIe Core, and
-> > this driver supports Root Complex (host) mode.
+> Using new API for finding bridge.
 > 
-> s/Designware/DesignWare/
-> s/Core/core/
 
-I'll fix them like [1/2].
+This patch looks good, but your description is so simple that we don't
+know why you want to do this. In [1], Rob wants to clean up OF graph
+API, so in [2], mtk_dsi.c use drm_of_find_panel_or_bridge() to do this
+clean-up. If your reason is clean-up, describe it in commit message.
 
+[1] https://lkml.org/lkml/2017/2/3/716
+[2] https://lkml.org/lkml/2017/2/3/719
+
+Regards,
+CK
+
+> Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
+> ---
+>  drivers/gpu/drm/mediatek/mtk_dpi.c | 17 +++++++----------
+>  1 file changed, 7 insertions(+), 10 deletions(-)
 > 
-> > diff --git a/drivers/pci/controller/dwc/pcie-uniphier.c b/drivers/pci/controller/dwc/pcie-uniphier.c
-> > new file mode 100644
-> > index 0000000..13ce02e
-> > --- /dev/null
-> > +++ b/drivers/pci/controller/dwc/pcie-uniphier.c
-> > @@ -0,0 +1,464 @@
-> > +// SPDX-License-Identifier: GPL-2.0
-> > +//
-> > +// PCI-express host controller driver for UniPhier SoCs
-> > +// Copyright 2018 Socionext Inc.
-> > +// Author: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> 
-> Use /* ... */ comments except for the SPDX line.
-
-Okay, although I wondered which way to put, I'll replace the header next.
-
-Thank you,
-
----
-Best Regards,
-Kunihiko Hayashi
+> diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
+> index 3758cfeb586b..ed2c153c70a2 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_dpi.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
+> @@ -14,6 +14,7 @@
+>  #include <drm/drmP.h>
+>  #include <drm/drm_crtc.h>
+>  #include <drm/drm_crtc_helper.h>
+> +#include <drm/drm_of.h>
+>  #include <linux/kernel.h>
+>  #include <linux/component.h>
+>  #include <linux/platform_device.h>
+> @@ -708,7 +709,6 @@ static int mtk_dpi_probe(struct platform_device *pdev)
+>  	struct device *dev = &pdev->dev;
+>  	struct mtk_dpi *dpi;
+>  	struct resource *mem;
+> -	struct device_node *bridge_node;
+>  	int comp_id;
+>  	const struct of_device_id *match;
+>  	int ret;
+> @@ -758,16 +758,13 @@ static int mtk_dpi_probe(struct platform_device *pdev)
+>  		return -EINVAL;
+>  	}
+>  
+> -	bridge_node = of_graph_get_remote_node(dev->of_node, 0, 0);
+> -	if (!bridge_node)
+> -		return -ENODEV;
+> -
+> -	dev_info(dev, "Found bridge node: %pOF\n", bridge_node);
+> -
+> -	dpi->bridge = of_drm_find_bridge(bridge_node);
+> -	of_node_put(bridge_node);
+> -	if (!dpi->bridge)
+> +	ret = drm_of_find_panel_or_bridge(dev->of_node, 0, 0,
+> +					  NULL, &dpi->bridge);
+> +	if (ret) {
+> +		dev_err(dev, "Failed to find panel or bridge: %d\n", ret);
+>  		return -EPROBE_DEFER;
+> +	}
+> +	dev_info(dev, "Found bridge node: %pOF\n", dpi->bridge);
+>  
+>  	comp_id = mtk_ddp_comp_get_id(dev->of_node, MTK_DPI);
+>  	if (comp_id < 0) {
