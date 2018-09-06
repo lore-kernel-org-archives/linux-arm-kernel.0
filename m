@@ -1,63 +1,41 @@
-From: aryabinin@virtuozzo.com (Andrey Ryabinin)
-Date: Thu, 6 Sep 2018 20:06:48 +0300
-Subject: [PATCH v2] arm64: kasan: add interceptors for strcmp/strncmp
- functions
-In-Reply-To: <0bde837e-2804-c6d6-4bda-8b166bdcfc6b@lge.com>
-References: <1535014606-176525-1-git-send-email-kyeongdon.kim@lge.com>
- <12d4e435-e229-b4af-4286-a53fa77cb09d@virtuozzo.com>
- <0bde837e-2804-c6d6-4bda-8b166bdcfc6b@lge.com>
-Message-ID: <4301317d-74a1-963c-e423-781808de215a@virtuozzo.com>
+From: paul.burton@mips.com (Paul Burton)
+Date: Thu, 6 Sep 2018 10:11:33 -0700
+Subject: [PATCH v2 6/9] kbuild: consolidate Devicetree dtb build rules
+In-Reply-To: <20180905235327.5996-7-robh@kernel.org>
+References: <20180905235327.5996-1-robh@kernel.org>
+ <20180905235327.5996-7-robh@kernel.org>
+Message-ID: <20180906171133.awny5cx533kkolrg@pburton-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/2018 10:44 AM, Kyeongdon Kim wrote:
-> 
-> 
-> On 2018-09-05 ?? 1:24, Andrey Ryabinin wrote:
->>
->>
->> On 09/04/2018 01:10 PM, Andrey Ryabinin wrote:
->> >
->> >
->> > On 09/04/2018 09:59 AM, Kyeongdon Kim wrote:
->> >
->> >>>> +#undef strncmp
->> >>>> +int strncmp(const char *cs, const char *ct, size_t len)
->> >>>> +{
->> >>>> + check_memory_region((unsigned long)cs, len, false, _RET_IP_);
->> >>>> + check_memory_region((unsigned long)ct, len, false, _RET_IP_);
->> >>>
->> >>> This will cause false positives. Both 'cs', and 'ct' could be less than len bytes.
->> >>>
->> >>> There is no need in these interceptors, just use the C implementations from lib/string.c
->> >>> like you did in your first patch.
->> >>> The only thing that was wrong in the first patch is that assembly implementations
->> >>> were compiled out instead of being declared week.
->> >>>
->> >> Well, at first I thought so..
->> >> I would remove diff code in /mm/kasan/kasan.c then use C implementations in lib/string.c
->> >> w/ assem implementations as weak :
->> >>
->> >> diff --git a/lib/string.c b/lib/string.c
->> >> index 2c0900a..a18b18f 100644
->> >> --- a/lib/string.c
->> >> +++ b/lib/string.c
->> >> @@ -312,7 +312,7 @@ size_t strlcat(char *dest, const char *src, size_t count)
->> >> ?EXPORT_SYMBOL(strlcat);
->> >> ?#endif
->> >>
->> >> -#ifndef __HAVE_ARCH_STRCMP
->> >> +#if (defined(CONFIG_ARM64) && defined(CONFIG_KASAN)) || !defined(__HAVE_ARCH_STRCMP)
->> >
->> > No. What part of "like you did in your first patch" is unclear to you?
->>
->> Just to be absolutely clear, I meant #ifdef out __HAVE_ARCH_* defines like it has been done in this patch
->> http://lkml.kernel.org/r/<1534233322-106271-1-git-send-email-kyeongdon.kim@lge.com>
-> I understood what you're saying, but I might think the wrong patch.
-> 
-> So, thinking about the other way as below:
-> can pick up assem variant or c one, declare them as weak.
+Hi Rob,
 
+On Wed, Sep 05, 2018 at 06:53:24PM -0500, Rob Herring wrote:
+> There is nothing arch specific about building dtb files other than their
+> location under /arch/*/boot/dts/. Keeping each arch aligned is a pain.
+> The dependencies and supported targets are all slightly different.
+> Also, a cross-compiler for each arch is needed, but really the host
+> compiler preprocessor is perfectly fine for building dtbs. Move the
+> build rules to a common location and remove the arch specific ones. This
+> is done in a single step to avoid warnings about overriding rules.
+> 
+> The build dependencies had been a mixture of 'scripts' and/or 'prepare'.
+> These pull in several dependencies some of which need a target compiler
+> (specifically devicetable-offsets.h) and aren't needed to build dtbs.
+> All that is really needed is dtc, so adjust the dependencies to only be
+> dtc.
+> 
+> This change enables support 'dtbs_install' on some arches which were
+> missing the target.
+> 
+>%
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> ---
+> Please ack so I can take the whole series via the DT tree.
 
-It's was much easier for me to explain with patch how this should be done in my opinion.
-So I just sent the patches, take a look.
+For MIPS:
+
+    Acked-by: Paul Burton <paul.burton@mips.com>
+
+Thanks,
+    Paul
