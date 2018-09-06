@@ -1,146 +1,98 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 6 Sep 2018 09:31:33 +0200
-Subject: [PATCH v3] ata: Disable AHCI ALPM feature for Ampere Computing
- eMAG SATA
-In-Reply-To: <1536208421-24867-1-git-send-email-stripathi@amperecomputing.com>
-References: <1536208421-24867-1-git-send-email-stripathi@amperecomputing.com>
-Message-ID: <a1c6012f-3b50-0e5e-677c-41903b4ccf64@redhat.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Thu, 6 Sep 2018 09:39:30 +0200
+Subject: [PATCH v8 4/8] media: platform: Add Cedrus VPU decoder driver
+In-Reply-To: <CAAFQd5Cmc7uFhprsoTU6Gq19n3z2eiUfZZ2ZjDW4QWVWMDN6tg@mail.gmail.com>
+References: <20180828073424.30247-1-paul.kocialkowski@bootlin.com>
+ <20180828073424.30247-5-paul.kocialkowski@bootlin.com>
+ <5faf5eed-eb2c-f804-93e3-5a42f6204d99@xs4all.nl>
+ <b7b3cb2320978d45acb34475d15abd7bf03da367.camel@paulk.fr>
+ <461c6a0d-a346-b9da-b75e-4aab907054df@xs4all.nl>
+ <CAAFQd5Cmc7uFhprsoTU6Gq19n3z2eiUfZZ2ZjDW4QWVWMDN6tg@mail.gmail.com>
+Message-ID: <7a2167a3-5b61-0937-7f06-8b36fa12e7a0@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 06-09-18 06:33, Suman Tripathi wrote:
-> Due to hardware errata, Ampere Computing eMAG SATA can't support
-> AHCI ALPM feature. This patch disables the AHCI ALPM feature for
-> eMAG SATA.
+On 09/06/2018 09:25 AM, Tomasz Figa wrote:
+> On Thu, Sep 6, 2018 at 4:01 PM Hans Verkuil <hverkuil@xs4all.nl> wrote:
+>>
+>> On 09/05/2018 06:29 PM, Paul Kocialkowski wrote:
+>>> Hi and thanks for the review!
+>>>
+>>> Le lundi 03 septembre 2018 ? 11:11 +0200, Hans Verkuil a ?crit :
+>>>> On 08/28/2018 09:34 AM, Paul Kocialkowski wrote:
+>>>>> +static int cedrus_request_validate(struct media_request *req)
+>>>>> +{
+>>>>> +   struct media_request_object *obj, *obj_safe;
+>>>>> +   struct v4l2_ctrl_handler *parent_hdl, *hdl;
+>>>>> +   struct cedrus_ctx *ctx = NULL;
+>>>>> +   struct v4l2_ctrl *ctrl_test;
+>>>>> +   unsigned int i;
+>>>>> +
+>>>>> +   list_for_each_entry_safe(obj, obj_safe, &req->objects, list) {
+>>>>
+>>>> You don't need to use the _safe variant during validation.
+>>>
+>>> Okay, I'll use the regular one then.
+>>>
+>>>>> +           struct vb2_buffer *vb;
+>>>>> +
+>>>>> +           if (vb2_request_object_is_buffer(obj)) {
+>>>>> +                   vb = container_of(obj, struct vb2_buffer, req_obj);
+>>>>> +                   ctx = vb2_get_drv_priv(vb->vb2_queue);
+>>>>> +
+>>>>> +                   break;
+>>>>> +           }
+>>>>> +   }
+>>>>
+>>>> Interesting question: what happens if more than one buffer is queued in the
+>>>> request? This is allowed by the request API and in that case the associated
+>>>> controls in the request apply to all queued buffers.
+>>>>
+>>>> Would this make sense at all for this driver? If not, then you need to
+>>>> check here if there is more than one buffer in the request and document in
+>>>> the spec that this is not allowed.
+>>>
+>>> Well, our driver was written with the (unformal) assumption that we
+>>> only deal with a pair of one output and one capture buffer. So I will
+>>> add a check for this at request validation time and document it in the
+>>> spec. Should that be part of the MPEG-2 PIXFMT documentation (and
+>>> duplicated for future formats we add support for)?
+>>
+>> Can you make a patch for vb2_request_has_buffers() in videobuf2-core.c
+>> renaming it to vb2_request_buffer_cnt() and returning the number of buffers
+>> in the request?
+>>
+>> Then you can call it here to check that you have only one buffer.
+>>
+>> And this has to be documented with the PIXFMT.
+>>
+>> Multiple buffers are certainly possible in non-codec scenarios (vim2m and
+>> vivid happily accept that), so this is an exception that should be
+>> documented and checked in the codec driver.
 > 
-> Changes for v2:
+> Hmm, isn't it still 1 buffer per 1 queue and just multiple queues
+> included in the request?
+
+No. The request API allows multiple buffers for the same vb2_queue to be
+queued for the same request (obviously when the request is committed, the
+buffers are queued to the driver in the same order).
+
 > 
-> * Introduce the new ata_port_info object which includes ATA_FLAG_NO_LPM.
-> * Include this object for eMAG SATA inside the acpi match table.
-> * Retrieve the ata_port_info from the acpi match table.
-> 
-> Changes for v3:
-> 
-> * Fix the indentation and whitespace warnings.
-> 
-> Signed-off-by: Suman Trpathi <stripathi@amperecomputing.com>
-> Signed-off-by: Rameshwar Prasad Sahu <rameshwar.sahu@amperecomputing.com>
+> If we indeed allow multiple buffers for the same queue in a request,
+> we shouldn't restrict this on a per-driver basis. It's definitely not
+> a hardware limitation, since the driver could just do the same as if 2
+> requests with the same controls were given.
 
-Small remark, normally the changelog is put after the Signed-off-by messages like
-this:
+That's how it operates: for all buffers in the request the same controls
+apply. But does this make sense for codecs? If the control(s) with the
+codec metadata always change for every buffer, then having more than one
+buffer in the request is senseless and the driver should check for this
+in the validation step.
 
-"""
-Signed-off-by: Suman Trpathi <stripathi@amperecomputing.com>
-Signed-off-by: Rameshwar Prasad Sahu <rameshwar.sahu@amperecomputing.com>
----
-Changes for v3:
-* Fix the indentation and whitespace warnings.
-
-Changes for v2:
-
-* Introduce the new ata_port_info object which includes ATA_FLAG_NO_LPM.
-* Include this object for eMAG SATA inside the acpi match table.
-* Retrieve the ata_port_info from the acpi match table.
-"""
-
-This will cause git am to remove it, so that the git history just
-has your original commit message.
-
-By itself this would not be a reason to request a new version, but it
-seems you've copy and pasted the patch from "git format-patch" output
-into you mail client. I tried to run checkpatch myself to make
-sure you caught all whitespace issues and I got this:
-
-[hans at shalem linux]$ scripts/checkpatch.pl ~/\[PATCH\ v3\]\ ata\:\ Disable\ AHCI\ ALPM\ feature\ for\ Ampere\ Computing\ eMAG\ SATA.eml
-ERROR: patch seems to be corrupt (line wrapped?)
-#177: FILE: drivers/ata/ahci_platform.c:34:
-
-
-ERROR: DOS line endings
-#178: FILE: drivers/ata/ahci_platform.c:35:
-+static const struct ata_port_info ahci_port_info_nolpm = {^M$
-
-ERROR: DOS line endings
-#179: FILE: drivers/ata/ahci_platform.c:36:
-+^I.flags^I^I= AHCI_FLAG_COMMON | ATA_FLAG_NO_LPM,^M$
-
-ERROR: DOS line endings
-#180: FILE: drivers/ata/ahci_platform.c:37:
-+^I.pio_mask^I= ATA_PIO4,^M$
-
-ERROR: DOS line endings
-#181: FILE: drivers/ata/ahci_platform.c:38:
-+^I.udma_mask^I= ATA_UDMA6,^M$
-
-Followed by lots more errors, line 177 of the email is empty,
-while it should contain a single space. This stripping
-of whitespace typically is the result of copy pasting
-or some other processing of the patch.
-
-Please try to re-send v3 using the "git send-email" command,
-so that we get a patch which we can actually apply.
+If it *does* make sense in some circumstances to have the same metadata
+for multiple buffers, then it should be checked if the cedrus driver
+handles this correctly.
 
 Regards,
 
-Hans
-
-
-
-
-
-> ---
->   drivers/ata/ahci_platform.c | 15 ++++++++++++++-
->   1 file changed, 14 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-> index 99f9a89..9ba283f 100644
-> --- a/drivers/ata/ahci_platform.c
-> +++ b/drivers/ata/ahci_platform.c
-> @@ -33,6 +33,13 @@ static const struct ata_port_info ahci_port_info = {
->   	.port_ops	= &ahci_platform_ops,
->   };
-> 
-> +static const struct ata_port_info ahci_port_info_nolpm = {
-> +	.flags		= AHCI_FLAG_COMMON | ATA_FLAG_NO_LPM,
-> +	.pio_mask	= ATA_PIO4,
-> +	.udma_mask	= ATA_UDMA6,
-> +	.port_ops	= &ahci_platform_ops,
-> +};
-> +
->   static struct scsi_host_template ahci_platform_sht = {
->   	AHCI_SHT(DRV_NAME),
->   };
-> @@ -41,6 +48,7 @@ static int ahci_probe(struct platform_device *pdev)
->   {
->   	struct device *dev = &pdev->dev;
->   	struct ahci_host_priv *hpriv;
-> +	const struct ata_port_info *port;
->   	int rc;
-> 
->   	hpriv = ahci_platform_get_resources(pdev);
-> @@ -57,7 +65,11 @@ static int ahci_probe(struct platform_device *pdev)
->   	if (of_device_is_compatible(dev->of_node, "hisilicon,hisi-ahci"))
->   		hpriv->flags |= AHCI_HFLAG_NO_FBS | AHCI_HFLAG_NO_NCQ;
-> 
-> -	rc = ahci_platform_init_host(pdev, hpriv, &ahci_port_info,
-> +	port = acpi_device_get_match_data(dev);
-> +	if (!port)
-> +		port = &ahci_port_info;
-> +
-> +	rc = ahci_platform_init_host(pdev, hpriv, port,
->   				     &ahci_platform_sht);
->   	if (rc)
->   		goto disable_resources;
-> @@ -85,6 +97,7 @@ static const struct of_device_id ahci_of_match[] = {
->   MODULE_DEVICE_TABLE(of, ahci_of_match);
-> 
->   static const struct acpi_device_id ahci_acpi_match[] = {
-> +	{ "APMC0D33", (unsigned long)&ahci_port_info_nolpm },
->   	{ ACPI_DEVICE_CLASS(PCI_CLASS_STORAGE_SATA_AHCI, 0xffffff) },
->   	{},
->   };
-> --
-> 2.7.4
-> 
+	Hans
