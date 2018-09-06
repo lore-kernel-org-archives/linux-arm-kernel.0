@@ -1,113 +1,63 @@
 From: aryabinin@virtuozzo.com (Andrey Ryabinin)
-Date: Thu,  6 Sep 2018 20:05:34 +0300
-Subject: [PATCH] lib/test_kasan: Add tests for several string/memory API
+Date: Thu, 6 Sep 2018 20:06:48 +0300
+Subject: [PATCH v2] arm64: kasan: add interceptors for strcmp/strncmp
  functions
-In-Reply-To: <20180906170534.20726-1-aryabinin@virtuozzo.com>
-References: <20180906170534.20726-1-aryabinin@virtuozzo.com>
-Message-ID: <20180906170534.20726-2-aryabinin@virtuozzo.com>
+In-Reply-To: <0bde837e-2804-c6d6-4bda-8b166bdcfc6b@lge.com>
+References: <1535014606-176525-1-git-send-email-kyeongdon.kim@lge.com>
+ <12d4e435-e229-b4af-4286-a53fa77cb09d@virtuozzo.com>
+ <0bde837e-2804-c6d6-4bda-8b166bdcfc6b@lge.com>
+Message-ID: <4301317d-74a1-963c-e423-781808de215a@virtuozzo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arch code may have asm implementation of string/memory API functions
-instead of using generic one from lib/string.c. KASAN don't see
-memory accesses in asm code, thus can miss many bugs.
+On 09/05/2018 10:44 AM, Kyeongdon Kim wrote:
+> 
+> 
+> On 2018-09-05 ?? 1:24, Andrey Ryabinin wrote:
+>>
+>>
+>> On 09/04/2018 01:10 PM, Andrey Ryabinin wrote:
+>> >
+>> >
+>> > On 09/04/2018 09:59 AM, Kyeongdon Kim wrote:
+>> >
+>> >>>> +#undef strncmp
+>> >>>> +int strncmp(const char *cs, const char *ct, size_t len)
+>> >>>> +{
+>> >>>> + check_memory_region((unsigned long)cs, len, false, _RET_IP_);
+>> >>>> + check_memory_region((unsigned long)ct, len, false, _RET_IP_);
+>> >>>
+>> >>> This will cause false positives. Both 'cs', and 'ct' could be less than len bytes.
+>> >>>
+>> >>> There is no need in these interceptors, just use the C implementations from lib/string.c
+>> >>> like you did in your first patch.
+>> >>> The only thing that was wrong in the first patch is that assembly implementations
+>> >>> were compiled out instead of being declared week.
+>> >>>
+>> >> Well, at first I thought so..
+>> >> I would remove diff code in /mm/kasan/kasan.c then use C implementations in lib/string.c
+>> >> w/ assem implementations as weak :
+>> >>
+>> >> diff --git a/lib/string.c b/lib/string.c
+>> >> index 2c0900a..a18b18f 100644
+>> >> --- a/lib/string.c
+>> >> +++ b/lib/string.c
+>> >> @@ -312,7 +312,7 @@ size_t strlcat(char *dest, const char *src, size_t count)
+>> >> ?EXPORT_SYMBOL(strlcat);
+>> >> ?#endif
+>> >>
+>> >> -#ifndef __HAVE_ARCH_STRCMP
+>> >> +#if (defined(CONFIG_ARM64) && defined(CONFIG_KASAN)) || !defined(__HAVE_ARCH_STRCMP)
+>> >
+>> > No. What part of "like you did in your first patch" is unclear to you?
+>>
+>> Just to be absolutely clear, I meant #ifdef out __HAVE_ARCH_* defines like it has been done in this patch
+>> http://lkml.kernel.org/r/<1534233322-106271-1-git-send-email-kyeongdon.kim@lge.com>
+> I understood what you're saying, but I might think the wrong patch.
+> 
+> So, thinking about the other way as below:
+> can pick up assem variant or c one, declare them as weak.
 
-E.g. on ARM64 KASAN don't see bugs in memchr(), memcmp(), str[r]chr(),
-str[n]cmp(), str[n]len(). Add tests for these functions to be sure
-that we notice the problem on other architectures.
 
-Signed-off-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
----
- lib/test_kasan.c | 70 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 70 insertions(+)
-
-diff --git a/lib/test_kasan.c b/lib/test_kasan.c
-index ec657105edbf..51b78405bf24 100644
---- a/lib/test_kasan.c
-+++ b/lib/test_kasan.c
-@@ -579,6 +579,73 @@ static noinline void __init kmem_cache_invalid_free(void)
- 	kmem_cache_destroy(cache);
- }
- 
-+static noinline void __init kasan_memchr(void)
-+{
-+	char *ptr;
-+	size_t size = 24;
-+
-+	pr_info("out-of-bounds in memchr\n");
-+	ptr = kmalloc(size, GFP_KERNEL | __GFP_ZERO);
-+	if (!ptr)
-+		return;
-+
-+	memchr(ptr, '1', size + 1);
-+	kfree(ptr);
-+}
-+
-+static noinline void __init kasan_memcmp(void)
-+{
-+	char *ptr;
-+	size_t size = 24;
-+	int arr[9];
-+
-+	pr_info("out-of-bounds in memcmp\n");
-+	ptr = kmalloc(size, GFP_KERNEL | __GFP_ZERO);
-+	if (!ptr)
-+		return;
-+
-+	memset(arr, 0, sizeof(arr));
-+	memcmp(ptr, arr, size+1);
-+	kfree(ptr);
-+}
-+
-+static noinline void __init kasan_strings(void)
-+{
-+	char *ptr;
-+	size_t size = 24;
-+
-+	pr_info("use-after-free in strchr\n");
-+	ptr = kmalloc(size, GFP_KERNEL | __GFP_ZERO);
-+	if (!ptr)
-+		return;
-+
-+	kfree(ptr);
-+
-+	/*
-+	 * Try to cause only 1 invalid access (less spam in dmesg).
-+	 * For that we need ptr to point to zeroed byte.
-+	 * Skip metadata that could be stored in freed object so ptr
-+	 * will likely point to zeroed byte.
-+	 */
-+	ptr += 16;
-+	strchr(ptr, '1');
-+
-+	pr_info("use-after-free in strrchr\n");
-+	strrchr(ptr, '1');
-+
-+	pr_info("use-after-free in strcmp\n");
-+	strcmp(ptr, "2");
-+
-+	pr_info("use-after-free in strncmp\n");
-+	strncmp(ptr, "2", 1);
-+
-+	pr_info("use-after-free in strlen\n");
-+	strlen(ptr);
-+
-+	pr_info("use-after-free in strnlen\n");
-+	strnlen(ptr, 1);
-+}
-+
- static int __init kmalloc_tests_init(void)
- {
- 	/*
-@@ -618,6 +685,9 @@ static int __init kmalloc_tests_init(void)
- 	use_after_scope_test();
- 	kmem_cache_double_free();
- 	kmem_cache_invalid_free();
-+	kasan_memchr();
-+	kasan_memcmp();
-+	kasan_strings();
- 
- 	kasan_restore_multi_shot(multishot);
- 
--- 
-2.16.4
+It's was much easier for me to explain with patch how this should be done in my opinion.
+So I just sent the patches, take a look.
