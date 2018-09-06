@@ -1,64 +1,83 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Thu,  6 Sep 2018 15:58:50 -0700
-Subject: [PATCH v2 0/4] crypto: skcipher - Remove VLA usage
-Message-ID: <20180906225854.40989-1-keescook@chromium.org>
+Date: Thu,  6 Sep 2018 15:58:51 -0700
+Subject: [PATCH v2 1/4] crypto: skcipher - Consolidate encrypt/decrypt sanity
+ check
+In-Reply-To: <20180906225854.40989-1-keescook@chromium.org>
+References: <20180906225854.40989-1-keescook@chromium.org>
+Message-ID: <20180906225854.40989-2-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This removes VLAs[1] from SKCIPHER_REQUEST_ON_STACK by making sure that
-on-stack requests are being used only on non-ASYNC algorithms and that
-enough space has been reserved.
+In preparation to adding additional sanity checks before running an
+skcipher request, this consolidates the open-coded checks into a single
+function. Instead of passing both req and tfm into the new check this
+just returns the tfm on success and an ERR_PTR on failure, keeping things
+as clean as possible.
 
-v2:
-- Instead of globally failing large reqsizes, limit to only non-ASYNC users
-  of the on-stack request.
-- Remove unused tfm argument after VLA removal.
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+ include/crypto/skcipher.h | 33 +++++++++++++++++++++++++++------
+ 1 file changed, 27 insertions(+), 6 deletions(-)
 
--Kees
-
-[1] https://lkml.kernel.org/r/CA+55aFzCG-zNmZwX4A2FQpadafLfEzK6CC=qPXydAacU1RqZWA at mail.gmail.com
-
-Kees Cook (4):
-  crypto: skcipher - Consolidate encrypt/decrypt sanity check
-  crypto: skcipher - Enforce non-ASYNC for on-stack requests
-  crypto: skcipher - Remove VLA usage for SKCIPHER_REQUEST_ON_STACK
-  crypto: skcipher - Remove unused argument to SKCIPHER_REQUEST_ON_STACK()
-
- arch/s390/crypto/aes_s390.c                   |  8 +-
- arch/x86/crypto/fpu.c                         |  4 +-
- crypto/algif_aead.c                           |  2 +-
- crypto/authenc.c                              |  2 +-
- crypto/authencesn.c                           |  2 +-
- crypto/cryptd.c                               |  4 +-
- crypto/echainiv.c                             |  2 +-
- crypto/gcm.c                                  |  2 +-
- crypto/seqiv.c                                |  2 +-
- drivers/block/cryptoloop.c                    |  2 +-
- drivers/crypto/axis/artpec6_crypto.c          |  2 +-
- drivers/crypto/ccp/ccp-crypto-aes-xts.c       |  2 +-
- drivers/crypto/chelsio/chcr_algo.c            |  2 +-
- drivers/crypto/mxs-dcp.c                      |  2 +-
- drivers/crypto/omap-aes.c                     |  2 +-
- drivers/crypto/picoxcell_crypto.c             |  2 +-
- drivers/crypto/qce/ablkcipher.c               |  2 +-
- drivers/crypto/sahara.c                       |  8 +-
- drivers/crypto/vmx/aes_cbc.c                  |  4 +-
- drivers/crypto/vmx/aes_ctr.c                  |  2 +-
- drivers/crypto/vmx/aes_xts.c                  |  2 +-
- drivers/net/ppp/ppp_mppe.c                    |  6 +-
- drivers/staging/rtl8192e/rtllib_crypt_tkip.c  |  4 +-
- drivers/staging/rtl8192e/rtllib_crypt_wep.c   |  4 +-
- .../rtl8192u/ieee80211/ieee80211_crypt_tkip.c |  4 +-
- .../rtl8192u/ieee80211/ieee80211_crypt_wep.c  |  4 +-
- drivers/usb/wusbcore/crypto.c                 |  2 +-
- include/crypto/skcipher.h                     | 74 ++++++++++++++-----
- net/ceph/crypto.c                             |  2 +-
- net/mac802154/llsec.c                         |  4 +-
- net/rxrpc/rxkad.c                             | 10 +--
- net/sunrpc/auth_gss/gss_krb5_crypto.c         | 14 ++--
- net/wireless/lib80211_crypt_tkip.c            |  4 +-
- net/wireless/lib80211_crypt_wep.c             |  4 +-
- 34 files changed, 116 insertions(+), 80 deletions(-)
-
+diff --git a/include/crypto/skcipher.h b/include/crypto/skcipher.h
+index 2f327f090c3e..6e954d398e0f 100644
+--- a/include/crypto/skcipher.h
++++ b/include/crypto/skcipher.h
+@@ -422,6 +422,27 @@ static inline struct crypto_skcipher *crypto_skcipher_reqtfm(
+ 	return __crypto_skcipher_cast(req->base.tfm);
+ }
+ 
++/**
++ * crypto_skcipher_reqtfm_check() - obtain and check cipher handle from request
++ * @req: skcipher_request out of which the cipher handle is to be obtained
++ *
++ * Return the crypto_skcipher handle when furnishing an skcipher_request
++ * data structure. Check for error conditions that would make it unusable
++ * for an encrypt/decrypt call.
++ *
++ * Return: crypto_skcipher handle, or ERR_PTR on error.
++ */
++static inline struct crypto_skcipher *crypto_skcipher_reqtfm_check(
++	struct skcipher_request *req)
++{
++	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
++
++	if (crypto_skcipher_get_flags(tfm) & CRYPTO_TFM_NEED_KEY)
++		return ERR_PTR(-ENOKEY);
++
++	return tfm;
++}
++
+ /**
+  * crypto_skcipher_encrypt() - encrypt plaintext
+  * @req: reference to the skcipher_request handle that holds all information
+@@ -435,10 +456,10 @@ static inline struct crypto_skcipher *crypto_skcipher_reqtfm(
+  */
+ static inline int crypto_skcipher_encrypt(struct skcipher_request *req)
+ {
+-	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
++	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm_check(req);
+ 
+-	if (crypto_skcipher_get_flags(tfm) & CRYPTO_TFM_NEED_KEY)
+-		return -ENOKEY;
++	if (IS_ERR(tfm))
++		return PTR_ERR(tfm);
+ 
+ 	return tfm->encrypt(req);
+ }
+@@ -456,10 +477,10 @@ static inline int crypto_skcipher_encrypt(struct skcipher_request *req)
+  */
+ static inline int crypto_skcipher_decrypt(struct skcipher_request *req)
+ {
+-	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
++	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm_check(req);
+ 
+-	if (crypto_skcipher_get_flags(tfm) & CRYPTO_TFM_NEED_KEY)
+-		return -ENOKEY;
++	if (IS_ERR(tfm))
++		return PTR_ERR(tfm);
+ 
+ 	return tfm->decrypt(req);
+ }
 -- 
 2.17.1
