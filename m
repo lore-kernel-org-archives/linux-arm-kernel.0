@@ -1,54 +1,46 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 6 Sep 2018 11:47:00 +0200
-Subject: [PATCH] arm64: enable CMT/TMU support for Renesas SoC
-In-Reply-To: <ebd7d1f7-d99b-f0a1-f05e-d822254b2e86@cogentembedded.com>
-References: <ebd7d1f7-d99b-f0a1-f05e-d822254b2e86@cogentembedded.com>
-Message-ID: <CAMuHMdWr3c9m6XHboJj92MOXCrc6m6CiU96FYKA98pCm-D0QnQ@mail.gmail.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Thu, 6 Sep 2018 11:54:29 +0200
+Subject: [PATCH 0/6] shutdown procedure verification for SAMA5D2
+In-Reply-To: <1535629811-13403-1-git-send-email-claudiu.beznea@microchip.com>
+References: <1535629811-13403-1-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <7098e5f1-aa97-1b82-abbc-2c069d6be9cb@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+On 30/08/2018 at 13:50, Claudiu Beznea wrote:
+> Hi,
+> 
+> Patch 1 from this series implement a fix for shutdown procedure
+> for SAMA5D2.
+> 
+> The rest of the patch are improvements as follows:
+> patch 2 - use only one function for poweroff
+> patches 3-6 - cosmetic improvements
 
-On Fri, Aug 31, 2018 at 9:54 PM Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Renesas R-Car gen3 SoCs have both CMT and TMU timers, so we have to enable
-> building them in Kconfig.platforms (as they don't normally have the prompts
-> in Kconfig).
->
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->
-> ---
-> The patch is against the ARM64 repo's 'for-next/core' branch.
->
->  arch/arm64/Kconfig.platforms |    2 ++
->  1 file changed, 2 insertions(+)
->
-> Index: linux/arch/arm64/Kconfig.platforms
-> ===================================================================
-> --- linux.orig/arch/arm64/Kconfig.platforms
-> +++ linux/arch/arm64/Kconfig.platforms
-> @@ -175,6 +175,8 @@ config ARCH_RENESAS
->         select PM_GENERIC_DOMAINS
->         select RENESAS_IRQC
->         select SOC_BUS
-> +       select SYS_SUPPORTS_SH_CMT
-> +       select SYS_SUPPORTS_SH_TMU
+For the whole series:
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 
-Perhaps the CONFIG_SH_TIMER_CMT and _TMU logic should be reworked instead,
-to allow the user to choose if he wants to enable the driver or not on platforms
-that do not select these two symbls?
+> The patches are based on latest sys-reset/for-next [1].
+> 
+> Thank you,
+> Claudiu Beznea
+> 
+> [1] https://git.kernel.org/pub/scm/linux/kernel/git/sre/linux-power-supply.git
+> 
+> Claudiu Beznea (6):
+>    power: reset: at91-poweroff: switch to slow clock before shutdown
+>    power: reset: at91-poweroff: use only one poweroff function
+>    power: reset: at91-poweroff: make mpddrc_base part of struct shdwc
+>    power: reset: at91-poweroff: make sclk part of struct shdwc
+>    power: reset: at91-poweroff: rename at91_shdwc_base member of struct
+>      shdwc
+>    power: reset: at91-poweroff: do not procede if at91_shdwc is allocated
+> 
+>   arch/arm/mach-at91/pm_suspend.S          |   8 +++
+>   drivers/power/reset/at91-sama5d2_shdwc.c | 119 +++++++++++++++++++++----------
+>   2 files changed, 88 insertions(+), 39 deletions(-)
+> 
 
-Hardcoding this to y depending on SYS_SUPPORTS_SH_* may be needed on
-SuperH and older Renesas ARM SoCs, but R-Car Gen2+ and RZ/G now use the
-ARM architectured timer by default.
-
-Gr{oetje,eeting}s,
-
-                        Geert
 
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Nicolas Ferre
