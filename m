@@ -1,86 +1,71 @@
 From: ck.hu@mediatek.com (CK Hu)
-Date: Thu, 6 Sep 2018 13:36:22 +0800
-Subject: [PATCH v2 08/13] drm/mediatek: register hdmi codec more earlier
-In-Reply-To: <20180905083146.14727-9-bibby.hsieh@mediatek.com>
+Date: Thu, 6 Sep 2018 13:42:54 +0800
+Subject: [PATCH v2 11/13] drm/mediatek: implement connection from BLS to
+ DPI0
+In-Reply-To: <20180905083146.14727-12-bibby.hsieh@mediatek.com>
 References: <20180905083146.14727-1-bibby.hsieh@mediatek.com>
- <20180905083146.14727-9-bibby.hsieh@mediatek.com>
-Message-ID: <1536212182.4618.36.camel@mtksdaap41>
+ <20180905083146.14727-12-bibby.hsieh@mediatek.com>
+Message-ID: <1536212574.4618.37.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi, Bibby:
 
 On Wed, 2018-09-05 at 16:31 +0800, Bibby Hsieh wrote:
-> From: chunhui dai <chunhui.dai@mediatek.com>
+> Modify display driver to support connection from BLS to DPI.
 > 
-> sometimes hdmi reprobe due to encoder probe late,
-> but audio dai probe earlier than hdmi. it would make
-> audio dai cannot find the hdmi codec. we need to
-> register hdmi codec earlier, and the base name which
-> used in the register should be PLATFORM_DEVID_NONE,
-> otherwise some audio dai dirver could not match it.
-> 
-> Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
+> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+
+Reviewed-by: CK Hu <ck.hu@mediatek.com>
+
 > ---
->  drivers/gpu/drm/mediatek/mtk_hdmi.c | 16 +++++++---------
->  1 file changed, 7 insertions(+), 9 deletions(-)
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 19 ++++++++++++++++++-
+>  1 file changed, 18 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_hdmi.c b/drivers/gpu/drm/mediatek/mtk_hdmi.c
-> index 7c022f3f53ec..2cb33098ec1a 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_hdmi.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_hdmi.c
-> @@ -1669,15 +1669,14 @@ static void mtk_hdmi_register_audio_driver(struct device *dev)
->  		.max_i2s_channels = 2,
->  		.i2s = 1,
->  	};
-> -	struct platform_device *pdev;
-> +	static struct platform_device *pdev;
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> index 87e4191c250e..cc8d49e60c7e 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> @@ -39,6 +39,7 @@
+>  #define DISP_REG_CONFIG_DISP_OVL_MOUT_EN	0x030
+>  #define DISP_REG_CONFIG_OUT_SEL			0x04c
+>  #define DISP_REG_CONFIG_DSI_SEL			0x050
+> +#define DISP_REG_CONFIG_DPI_SEL			0x064
 >  
-> -	pdev = platform_device_register_data(dev, HDMI_CODEC_DRV_NAME,
-> -					     PLATFORM_DEVID_AUTO, &codec_data,
-> -					     sizeof(codec_data));
-> -	if (IS_ERR(pdev))
-> +	if (!pdev) {
-> +		pdev = platform_device_register_data(dev, HDMI_CODEC_DRV_NAME,
-> +						     PLATFORM_DEVID_NONE,
-> +						     &codec_data,
-> +						     sizeof(codec_data));
-> +		DRM_INFO("%s driver bound to HDMI\n", HDMI_CODEC_DRV_NAME);
+>  #define DISP_REG_MUTEX_EN(n)	(0x20 + 0x20 * (n))
+>  #define DISP_REG_MUTEX(n)	(0x24 + 0x20 * (n))
+> @@ -132,7 +133,11 @@
+>  
+>  #define OVL_MOUT_EN_RDMA		0x1
+>  #define BLS_TO_DSI_RDMA1_TO_DPI1	0x8
+> +#define BLS_TO_DPI_RDMA1_TO_DSI		0x2
+>  #define DSI_SEL_IN_BLS			0x0
+> +#define DPI_SEL_IN_BLS			0x0
+> +#define DSI_SEL_IN_RDMA			0x1
+> +#define DPI_SEL_IN_RDMA			0x1
+>  
+>  struct mtk_disp_mutex {
+>  	int id;
+> @@ -323,9 +328,21 @@ static void mtk_ddp_sout_sel(void __iomem *config_regs,
+>  			     enum mtk_ddp_comp_id cur,
+>  			     enum mtk_ddp_comp_id next)
+>  {
+> -	if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0)
+> +	if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0) {
+>  		writel_relaxed(BLS_TO_DSI_RDMA1_TO_DPI1,
+>  			       config_regs + DISP_REG_CONFIG_OUT_SEL);
+> +		writel_relaxed(DSI_SEL_IN_BLS,
+> +			       config_regs + DISP_REG_CONFIG_DSI_SEL);
+> +		writel_relaxed(DPI_SEL_IN_RDMA,
+> +			       config_regs + DISP_REG_CONFIG_DPI_SEL);
+> +	} else if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DPI0) {
+> +		writel_relaxed(BLS_TO_DPI_RDMA1_TO_DSI,
+> +			       config_regs + DISP_REG_CONFIG_OUT_SEL);
+> +		writel_relaxed(DSI_SEL_IN_RDMA,
+> +			       config_regs + DISP_REG_CONFIG_DSI_SEL);
+> +		writel_relaxed(DPI_SEL_IN_BLS,
+> +			       config_regs + DISP_REG_CONFIG_DPI_SEL);
 > +	}
-
-In the original code, it only register device but not unregister device.
-This looks like a bug in hdmi driver. So we need to register and
-unregister. You define a 'static' variable here would make
-register/unregister asymmetric. And how do you make sure that hdmi
-driver is probed before audio dai driver? By the device tree order?
-Device tree older may vary for each SoC. I would like more general
-solution to make sure that hdmi driver is probed before audio dai
-driver. There are some method to make drivers probe in order, so try to
-use the better method.
-
-Regards,
-CK
-
->  		return;
-> -
-> -	DRM_INFO("%s driver bound to HDMI\n", HDMI_CODEC_DRV_NAME);
 >  }
 >  
->  static int mtk_drm_hdmi_probe(struct platform_device *pdev)
-> @@ -1691,6 +1690,7 @@ static int mtk_drm_hdmi_probe(struct platform_device *pdev)
->  		return -ENOMEM;
->  
->  	hdmi->dev = dev;
-> +	mtk_hdmi_register_audio_driver(dev);
->  
->  	ret = mtk_hdmi_dt_parse_pdata(hdmi, pdev);
->  	if (ret)
-> @@ -1704,8 +1704,6 @@ static int mtk_drm_hdmi_probe(struct platform_device *pdev)
->  		return ret;
->  	}
->  
-> -	mtk_hdmi_register_audio_driver(dev);
-> -
->  	hdmi->bridge.funcs = &mtk_hdmi_bridge_funcs;
->  	hdmi->bridge.of_node = pdev->dev.of_node;
->  	drm_bridge_add(&hdmi->bridge);
+>  void mtk_ddp_add_comp_to_path(void __iomem *config_regs,
