@@ -1,39 +1,24 @@
 From: MNARANI@xilinx.com (Manish Narani)
-Date: Thu, 6 Sep 2018 13:27:34 +0000
+Date: Thu, 6 Sep 2018 13:42:30 +0000
 Subject: [PATCH 1/3] dt-bindings: iio: adc: Add Xilinx AMS binding
  documentation
-In-Reply-To: <20180902191459.5f597c94@archlinux>
+In-Reply-To: <5b8e8a6c.1c69fb81.21d7a.5b20@mx.google.com>
 References: <1535624539-7839-1-git-send-email-manish.narani@xilinx.com>
  <1535624539-7839-2-git-send-email-manish.narani@xilinx.com>
- <20180902191459.5f597c94@archlinux>
-Message-ID: <DM6PR02MB522706FDCF22A0F62E1A70BEC1010@DM6PR02MB5227.namprd02.prod.outlook.com>
+ <5b8e8a6c.1c69fb81.21d7a.5b20@mx.google.com>
+Message-ID: <DM6PR02MB52274964865A3F7CE1A8889AC1010@DM6PR02MB5227.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jonathan,
+Hi Rob,
 
-Thanks for the review!
+Thanks for the review. Please see my comments inline.
 
-> -----Original Message-----
-> From: Jonathan Cameron [mailto:jic23 at kernel.org]
-> Sent: Sunday, September 2, 2018 11:45 PM
+> From: Rob Herring [mailto:robh at kernel.org]
+> Sent: Tuesday, September 4, 2018 6:48 AM
 > To: Manish Narani <MNARANI@xilinx.com>
-> Cc: knaack.h at gmx.de; lars at metafoo.de; pmeerw at pmeerw.net;
-> robh+dt at kernel.org; mark.rutland at arm.com; Michal Simek
-> <michals@xilinx.com>; leoyang.li at nxp.com; sudeep.holla at arm.com;
-> amit.kucheria at linaro.org; broonie at kernel.org; arnaud.pouliquen at st.com;
-> geert at linux-m68k.org; eugen.hristev at microchip.com; rdunlap at infradead.org;
-> lukas at wunner.de; freeman.liu at spreadtrum.com; vilhelm.gray at gmail.com;
-> tglx at linutronix.de; baolin.wang at linaro.org; gregkh at linuxfoundation.org;
-> Srinivas Goud <sgoud@xilinx.com>; Anirudha Sarangi <anirudh@xilinx.com>;
-> linux-iio at vger.kernel.org; devicetree at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH 1/3] dt-bindings: iio: adc: Add Xilinx AMS binding
-> documentation
 > 
-> On Thu, 30 Aug 2018 15:52:17 +0530
-> Manish Narani <manish.narani@xilinx.com> wrote:
-> 
+> On Thu, Aug 30, 2018 at 03:52:17PM +0530, Manish Narani wrote:
 > > Xilinx AMS have several ADC channels that can be used for measurement
 > > of different voltages and temperatures. Document the same in the bindings.
 > >
@@ -51,70 +36,33 @@ Thanks for the review!
 > > index 0000000..8cc96f0
 > > --- /dev/null
 > > +++ b/Documentation/devicetree/bindings/iio/adc/xilinx-ams.txt
-> > @@ -0,0 +1,159 @@
-> > +Xilinx AMS controller
-> > +
-> > +The AMS includes an ADC as well as on-chip sensors that can be used
-> > +to sample external voltages and monitor on-die operating conditions,
-> > +such as temperature and supply voltage levels. The AMS has two SYSMON
-> blocks.
-> > +PL-SYSMON block is capable of monitoring off chip voltage and
-> temperature.
-> > +PL-SYSMON block has DRP, JTAG and I2C interface to enable monitoring
-> > +from external master. Out of this interface currently only DRP is supported.
-> > +Other block PS-SYSMON is memory mapped to PS. Both of block has
-> > +built-in alarm generation logic that is used to interrupt the
-> > +processor based on condition set.
-> 
-> I guess anyone reading this because they have the hardware would know what
-> PS and PL are, but it would still be nice to define those acronyms!
-
-Okay, I will rectify this in v2.
-
-> 
-> Google suggest, Programmable Logic (FPGA bit I guess) and Process Space
-> (Arm core bit?)  As I read this, from a driver point of view it doesn't really
-> matter - these are just blocks of channels that are there?
-
-Yes, these are just blocks of channels, which are enabled/disabled via devicetree child nodes "xlnx,zynqmp-ams-ps" and "xlnx,zynqmp-ams-pl".
-
-> 
-> This binding is complex enough I definitely want some DT binding review.
-
-Sure!
-
-> 
-> 
-> 
-> > +
-> > +All designs should have AMS registers, but PS and PL are optional.
-> > +The AMS controller can work with only PS, only PL and both PS and PL
-> > +configurations. Please specify registers according to your design.
-> > +Devicetree should always have AMS module property. Providing PS & PL
-> module is optional.
-> > +
-> > +Required properties:
-> > +	- compatible: Should be "xlnx,zynqmp-ams"
-> > +	- reg:  Should specify AMS register space
-> > +	- interrupts: Interrupt number for the AMS control interface
-> > +	- interrupt-names: Interrupt name, must be "ams-irq"
-> > +	- clocks: Should contain a clock specifier for the device
-> > +	- ranges: keep the property empty to map child address space
-> > +	          (for PS and/or PL) nodes 1:1 onto the parent address
-> > +	          space
-> > +
 > > +AMS device tree subnode:
 > > +	- compatible: Should be "xlnx,zynqmp-ams-ps" or "xlnx,zynqmp-ams-pl"
 > > +	- reg:  Register space for PS or PL
+> 
+> Please split each child node into its own section.
+
+Okay. I will update this in v2.
+
+> 
 > > +
 > > +Optional properties:
 > > +
 > > +Following optional property only valid for PL.
+> 
+> property or...
+
+It should be node.  I will update this in v2.
+
+> 
 > > +	- xlnx,ext-channels: List of external channels that are connected to the
 > > +	                     AMS PL module.
 > > +
 > > +	  The child nodes of this node represent the external channels which
-> are
+> > +are
+> 
+> node?
+> 
 > > +	  connected to the AMS Module. If the property is not present
 > > +	  no external channels will be assumed to be connected.
 > > +
@@ -123,15 +71,6 @@ Sure!
 > > +		Required properties:
 > > +			* reg: Pair of pins the channel is connected to.
 > > +				0: VP/VN
-> Hmm. So we have this table here of the ones that may or may not be connected
-> with different numbering from the overall table.  Given these indexes are
-> arbitrary can we unify them?
-> 
-> I.e. use the index from below but state here which values can be used?
-
-Okay. I guess you are suggesting to use the channel index from the channel details table given in the end of this file and state here which number (for 'reg' value) should be used for given channel. Is this correct?
-
-> 
 > > +				1: VUSER0
 > > +				2: VUSER1
 > > +				3: VUSER3
@@ -160,6 +99,11 @@ Okay. I guess you are suggesting to use the channel index from the channel detai
 > > +		#address-cells = <2>;
 > > +		#size-cells = <2>;
 > > +		ranges;
+> 
+> There's no need for 64-bits of addresses and sizes here. Use ranges.
+
+Okay.
+
 > > +
 > > +		ams_ps: ams_ps at ffa50800 {
 > > +			compatible = "xlnx,zynqmp-ams-ps";
@@ -303,10 +247,9 @@ Okay. I guess you are suggesting to use the channel index from the channel detai
 > 			|Voltage
 > > +---------------------------------------------------------------------
 > > +------------------------------------
-> 
-> Thanks,
-> 
-> Jonathan
+> > --
+> > 2.1.1
+> >
 
 Thanks,
 Manish Narani
