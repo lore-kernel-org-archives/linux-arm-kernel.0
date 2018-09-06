@@ -1,168 +1,51 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu,  6 Sep 2018 10:08:25 +0100
-Subject: [PATCH v2 04/14] coresight: tmc-etb/etf: Prepare to handle errors
- enabling
+Date: Thu,  6 Sep 2018 10:08:33 +0100
+Subject: [PATCH v2 12/14] coresight: catu: Claim device before use
 In-Reply-To: <1536224915-31766-1-git-send-email-suzuki.poulose@arm.com>
 References: <1536224915-31766-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1536224915-31766-5-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1536224915-31766-13-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prepare to handle errors in enabling the hardware and
-report it back to the core driver.
+Use the CLAIM protocol to grab the ownership of the component when
+in use.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
-Changes since v1:
- - Fix return code for tmc_enable_etf_link (Mathieu Poirier)
----
- drivers/hwtracing/coresight/coresight-tmc-etf.c | 73 +++++++++++++++----------
- 1 file changed, 45 insertions(+), 28 deletions(-)
+ drivers/hwtracing/coresight/coresight-catu.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-index 4156c95..24908e0 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-@@ -15,7 +15,7 @@
- static int tmc_set_etf_buffer(struct coresight_device *csdev,
- 			      struct perf_output_handle *handle);
+diff --git a/drivers/hwtracing/coresight/coresight-catu.c b/drivers/hwtracing/coresight/coresight-catu.c
+index ff94e58..170fbb6 100644
+--- a/drivers/hwtracing/coresight/coresight-catu.c
++++ b/drivers/hwtracing/coresight/coresight-catu.c
+@@ -406,6 +406,7 @@ static inline int catu_wait_for_ready(struct catu_drvdata *drvdata)
  
--static void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
-+static void __tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
+ static int catu_enable_hw(struct catu_drvdata *drvdata, void *data)
  {
- 	CS_UNLOCK(drvdata->base);
++	int rc;
+ 	u32 control, mode;
+ 	struct etr_buf *etr_buf = data;
  
-@@ -34,6 +34,12 @@ static void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
- 	CS_LOCK(drvdata->base);
- }
- 
-+static int tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
-+{
-+	__tmc_etb_enable_hw(drvdata);
-+	return 0;
-+}
-+
- static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
- {
- 	char *bufp;
-@@ -76,7 +82,7 @@ static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
- 	CS_LOCK(drvdata->base);
- }
- 
--static void tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
-+static void __tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
- {
- 	CS_UNLOCK(drvdata->base);
- 
-@@ -92,6 +98,12 @@ static void tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
- 	CS_LOCK(drvdata->base);
- }
- 
-+static int tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
-+{
-+	__tmc_etf_enable_hw(drvdata);
-+	return 0;
-+}
-+
- static void tmc_etf_disable_hw(struct tmc_drvdata *drvdata)
- {
- 	CS_UNLOCK(drvdata->base);
-@@ -174,8 +186,12 @@ static int tmc_enable_etf_sink_sysfs(struct coresight_device *csdev)
- 		drvdata->buf = buf;
- 	}
- 
--	drvdata->mode = CS_MODE_SYSFS;
--	tmc_etb_enable_hw(drvdata);
-+	ret = tmc_etb_enable_hw(drvdata);
-+	if (!ret)
-+		drvdata->mode = CS_MODE_SYSFS;
-+	else
-+		/* Free up the buffer if we failed to enable */
-+		used = false;
- out:
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
-@@ -194,27 +210,25 @@ static int tmc_enable_etf_sink_perf(struct coresight_device *csdev, void *data)
- 	struct perf_output_handle *handle = data;
- 
- 	spin_lock_irqsave(&drvdata->spinlock, flags);
--	if (drvdata->reading) {
-+	do {
- 		ret = -EINVAL;
--		goto out;
--	}
-+		if (drvdata->reading)
-+			break;
-+		/*
-+		 * In Perf mode there can be only one writer per sink.  There
-+		 * is also no need to continue if the ETB/ETF is already
-+		 * operated from sysFS.
-+		 */
-+		if (drvdata->mode != CS_MODE_DISABLED)
-+			break;
- 
--	/*
--	 * In Perf mode there can be only one writer per sink.  There
--	 * is also no need to continue if the ETB/ETR is already operated
--	 * from sysFS.
--	 */
--	if (drvdata->mode != CS_MODE_DISABLED) {
--		ret = -EINVAL;
--		goto out;
--	}
--
--	ret = tmc_set_etf_buffer(csdev, handle);
--	if (!ret) {
--		drvdata->mode = CS_MODE_PERF;
--		tmc_etb_enable_hw(drvdata);
--	}
--out:
-+		ret = tmc_set_etf_buffer(csdev, handle);
-+		if (ret)
-+			break;
-+		ret  = tmc_etb_enable_hw(drvdata);
-+		if (!ret)
-+			drvdata->mode = CS_MODE_PERF;
-+	} while (0);
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
- 	return ret;
-@@ -271,6 +285,7 @@ static void tmc_disable_etf_sink(struct coresight_device *csdev)
- static int tmc_enable_etf_link(struct coresight_device *csdev,
- 			       int inport, int outport)
- {
-+	int ret;
- 	unsigned long flags;
- 	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
-@@ -280,12 +295,14 @@ static int tmc_enable_etf_link(struct coresight_device *csdev,
+@@ -418,6 +419,10 @@ static int catu_enable_hw(struct catu_drvdata *drvdata, void *data)
  		return -EBUSY;
  	}
  
--	tmc_etf_enable_hw(drvdata);
--	drvdata->mode = CS_MODE_SYSFS;
-+	ret = tmc_etf_enable_hw(drvdata);
-+	if (!ret)
-+		drvdata->mode = CS_MODE_SYSFS;
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
++	rc = coresight_claim_device_unlocked(drvdata->base);
++	if (rc)
++		return rc;
++
+ 	control |= BIT(CATU_CONTROL_ENABLE);
  
--	dev_dbg(drvdata->dev, "TMC-ETF enabled\n");
--	return 0;
-+	if (!ret)
-+		dev_dbg(drvdata->dev, "TMC-ETF enabled\n");
-+	return ret;
- }
+ 	if (etr_buf && etr_buf->mode == ETR_MODE_CATU) {
+@@ -459,6 +464,7 @@ static int catu_disable_hw(struct catu_drvdata *drvdata)
+ 	int rc = 0;
  
- static void tmc_disable_etf_link(struct coresight_device *csdev,
-@@ -579,7 +596,7 @@ int tmc_read_unprepare_etb(struct tmc_drvdata *drvdata)
- 		 * can't be NULL.
- 		 */
- 		memset(drvdata->buf, 0, drvdata->size);
--		tmc_etb_enable_hw(drvdata);
-+		__tmc_etb_enable_hw(drvdata);
- 	} else {
- 		/*
- 		 * The ETB/ETF is not tracing and the buffer was just read.
+ 	catu_write_control(drvdata, 0);
++	coresight_disclaim_device_unlocked(drvdata->base);
+ 	if (catu_wait_for_ready(drvdata)) {
+ 		dev_info(drvdata->dev, "Timeout while waiting for READY\n");
+ 		rc = -EAGAIN;
 -- 
 2.7.4
