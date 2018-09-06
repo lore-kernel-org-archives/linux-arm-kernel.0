@@ -1,53 +1,77 @@
-From: ndesaulniers@google.com (Nick Desaulniers)
-Date: Thu, 6 Sep 2018 09:39:51 -0700
-Subject: [PATCH v6 00/18] khwasan: kernel hardware assisted address
- sanitizer
-In-Reply-To: <CAAeHK+wStsNwh2oKv-KCG4kx5538FuDMQ6Yw2X=sK5LPrw2DZg@mail.gmail.com>
-References: <cover.1535462971.git.andreyknvl@google.com>
- <20180905141032.b1ddaab53d1b2b3bada95415@linux-foundation.org>
- <20180906100543.GI3592@arm.com>
- <CAAeHK+wStsNwh2oKv-KCG4kx5538FuDMQ6Yw2X=sK5LPrw2DZg@mail.gmail.com>
-Message-ID: <CAKwvOdk=F=kja-ZznrifTO8EASmPF0CoTPWbFxpMqLk-_KGEEQ@mail.gmail.com>
+From: katsuhiro@katsuster.net (Katsuhiro Suzuki)
+Date: Fri,  7 Sep 2018 01:39:56 +0900
+Subject: [PATCH] arm64: dts: rockchip: add i2s and spdif endpoint of rk3328
+Message-ID: <20180906163956.20667-1-katsuhiro@katsuster.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 6, 2018 at 4:06 AM Andrey Konovalov <andreyknvl@google.com> wrote:
->
-> On Thu, Sep 6, 2018 at 12:05 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Wed, Sep 05, 2018 at 02:10:32PM -0700, Andrew Morton wrote:
-> >> On Wed, 29 Aug 2018 13:35:04 +0200 Andrey Konovalov <andreyknvl@google.com> wrote:
-> >>
-> >> > This patchset adds a new mode to KASAN [1], which is called KHWASAN
-> >> > (Kernel HardWare assisted Address SANitizer).
-> >>
-> >> We're at v6 and there are no reviewed-by's or acked-by's to be seen.
-> >> Is that a fair commentary on what has been happening, or have people
-> >> been remiss in sending and gathering such things?
-> >
-> > I still have concerns about the consequences of merging this as anything
-> > other than a debug option [1]. Unfortunately, merging it as a debug option
-> > defeats the whole point, so I think we need to spend more effort on developing
-> > tools that can help us to find and fix the subtle bugs which will arise from
-> > enabling tagged pointers in the kernel.
->
-> I totally don't mind calling it a debug option. Do I need to somehow
-> specify it somewhere?
->
-> Why does it defeat the point? The point is to ease KASAN-like testing
-> on devices with limited memory.
+This patch adds port and endpoint of i2s and spdif nodes for rk3328.
+Because to use modern sound card interface such as audio-graph-card.
 
-I don't disagree with using it strictly for debug.  When I say I want
-the series for Pixel phones, I should have been clearer that my intent
-is for a limited pool of internal testers to walk around with KHWASAN
-enabled devices; not general end users.  It's hard enough today to get
-anyone to test KASAN/ASAN on their "daily driver" due to the memory
-usage and resulting performance.
+Signed-off-by: Katsuhiro Suzuki <katsuhiro@katsuster.net>
+---
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-We don't ship KASAN or KUBSAN on by default to end users (nor plan
-to); it's used strictly for fuzzing through syzkaller (or by brave
-"dogfooders" on the internal kernel teams).  KHWASAN would let these
-dogfooders go from being brave to fearless.
-
+diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+index d3ef6566325e..41f0a20b73ed 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+@@ -179,7 +179,13 @@
+ 		clock-names = "i2s_clk", "i2s_hclk";
+ 		dmas = <&dmac 11>, <&dmac 12>;
+ 		dma-names = "tx", "rx";
++		#sound-dai-cells = <0>;
+ 		status = "disabled";
++
++		i2s0_p0: port at 0 {
++			i2s0_p0_0: endpoint {
++			};
++		};
+ 	};
+ 
+ 	i2s1: i2s at ff010000 {
+@@ -190,7 +196,13 @@
+ 		clock-names = "i2s_clk", "i2s_hclk";
+ 		dmas = <&dmac 14>, <&dmac 15>;
+ 		dma-names = "tx", "rx";
++		#sound-dai-cells = <0>;
+ 		status = "disabled";
++
++		i2s1_p0: port at 0 {
++			i2s1_p0_0: endpoint {
++			};
++		};
+ 	};
+ 
+ 	i2s2: i2s at ff020000 {
+@@ -201,7 +213,13 @@
+ 		clock-names = "i2s_clk", "i2s_hclk";
+ 		dmas = <&dmac 0>, <&dmac 1>;
+ 		dma-names = "tx", "rx";
++		#sound-dai-cells = <0>;
+ 		status = "disabled";
++
++		i2s2_p0: port at 0 {
++			i2s2_p0_0: endpoint {
++			};
++		};
+ 	};
+ 
+ 	spdif: spdif at ff030000 {
+@@ -214,7 +232,13 @@
+ 		dma-names = "tx";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&spdifm2_tx>;
++		#sound-dai-cells = <0>;
+ 		status = "disabled";
++
++		spdif_p0: port at 0 {
++			spdif_p0_0: endpoint {
++			};
++		};
+ 	};
+ 
+ 	pdm: pdm at ff040000 {
 -- 
-Thanks,
-~Nick Desaulniers
+2.18.0
