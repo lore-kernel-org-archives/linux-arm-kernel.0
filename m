@@ -1,79 +1,140 @@
-From: stripathi@amperecomputing.com (Suman Tripathi)
-Date: Wed,  5 Sep 2018 21:33:41 -0700
-Subject: [PATCH v3] ata: Disable AHCI ALPM feature for Ampere Computing eMAG
- SATA
-Message-ID: <1536208421-24867-1-git-send-email-stripathi@amperecomputing.com>
+From: gilad@benyossef.com (Gilad Ben-Yossef)
+Date: Thu, 6 Sep 2018 07:53:58 +0300
+Subject: [PATCH 2/2] crypto: skcipher: Remove VLA usage for
+ SKCIPHER_REQUEST_ON_STACK
+In-Reply-To: <CAKv+Gu_0vWUqkUex45iW=pAfUbKVsqzP9MDf6OOwTg-nUVPZNg@mail.gmail.com>
+References: <20180904181629.20712-1-keescook@chromium.org>
+ <20180904181629.20712-3-keescook@chromium.org>
+ <CAKv+Gu9uJ+ZjBSCM=aU0GDvYR72cy2k8reXdLV5on3dOVw8KdQ@mail.gmail.com>
+ <CAGXu5jKmcuhULMR=O9B_hJAxEK8uV36uoMxm4F3F8yYSuMzYNA@mail.gmail.com>
+ <CAKv+Gu_0vWUqkUex45iW=pAfUbKVsqzP9MDf6OOwTg-nUVPZNg@mail.gmail.com>
+Message-ID: <CAOtvUMfu4-DWD4n4c5itjArAYWhGaBnPBEnkh6cbCubG-k9cCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to hardware errata, Ampere Computing eMAG SATA can't support
-AHCI ALPM feature. This patch disables the AHCI ALPM feature for
-eMAG SATA.
+On Thu, Sep 6, 2018 at 1:49 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 5 September 2018 at 23:05, Kees Cook <keescook@chromium.org> wrote:
+>> On Wed, Sep 5, 2018 at 2:18 AM, Ard Biesheuvel
+>> <ard.biesheuvel@linaro.org> wrote:
+>>> On 4 September 2018 at 20:16, Kees Cook <keescook@chromium.org> wrote:
+>>>> In the quest to remove all stack VLA usage from the kernel[1], this
+>>>> caps the skcipher request size similar to other limits and adds a sanity
+>>>> check at registration. Looking at instrumented tcrypt output, the largest
+>>>> is for lrw:
+>>>>
+>>>>         crypt: testing lrw(aes)
+>>>>         crypto_skcipher_set_reqsize: 8
+>>>>         crypto_skcipher_set_reqsize: 88
+>>>>         crypto_skcipher_set_reqsize: 472
+>>>>
+>>>
+>>> Are you sure this is a representative sampling? I haven't double
+>>> checked myself, but we have plenty of drivers for peripherals in
+>>> drivers/crypto that implement block ciphers, and they would not turn
+>>> up in tcrypt unless you are running on a platform that provides the
+>>> hardware in question.
+>>
+>> Hrm, excellent point. Looking at this again:
+>>
+>> The core part of the VLA is using this in the ON_STACK macro:
+>>
+>> static inline unsigned int crypto_skcipher_reqsize(struct crypto_skcipher *tfm)
+>> {
+>>         return tfm->reqsize;
+>> }
+>>
+>> I don't find any struct crypto_skcipher .reqsize static initializers,
+>> and the initial reqsize is here:
+>>
+>> static int crypto_init_skcipher_ops_ablkcipher(struct crypto_tfm *tfm)
+>> {
+>> ...
+>>         skcipher->reqsize = crypto_ablkcipher_reqsize(ablkcipher) +
+>>                             sizeof(struct ablkcipher_request);
+>>
+>> with updates via crypto_skcipher_set_reqsize().
+>>
+>> So I have to examine ablkcipher reqsize too:
+>>
+>> static inline unsigned int crypto_ablkcipher_reqsize(
+>>         struct crypto_ablkcipher *tfm)
+>> {
+>>         return crypto_ablkcipher_crt(tfm)->reqsize;
+>> }
+>>
+>> And of the crt_ablkcipher.reqsize assignments/initializers, I found:
+>>
+>> ablkcipher reqsize:
+>> 1       struct dcp_aes_req_ctx
+>> 8       struct atmel_tdes_reqctx
+>> 8       struct cryptd_blkcipher_request_ctx
+>> 8       struct mtk_aes_reqctx
+>> 8       struct omap_des_reqctx
+>> 8       struct s5p_aes_reqctx
+>> 8       struct sahara_aes_reqctx
+>> 8       struct stm32_cryp_reqctx
+>> 8       struct stm32_cryp_reqctx
+>> 16      struct ablk_ctx
+>> 24      struct atmel_aes_reqctx
+>> 48      struct omap_aes_reqctx
+>> 48      struct omap_aes_reqctx
+>> 48      struct qat_crypto_request
+>> 56      struct artpec6_crypto_request_context
+>> 64      struct chcr_blkcipher_req_ctx
+>> 80      struct spacc_req
+>> 80      struct virtio_crypto_sym_request
+>> 136     struct qce_cipher_reqctx
+>> 168     struct n2_request_context
+>> 328     struct ccp_des3_req_ctx
+>> 400     struct ccp_aes_req_ctx
+>> 536     struct hifn_request_context
+>> 992     struct cvm_req_ctx
+>> 2456    struct iproc_reqctx_s
+>>
+>> The base ablkcipher wrapper is:
+>> 80      struct ablkcipher_request
+>>
+>> And in my earlier skcipher wrapper analysis, lrw was the largest
+>> skcipher wrapper:
+>> 384     struct rctx
+>>
+>> iproc_reqctx_s is an extreme outlier, with cvm_req_ctx at a bit less than half.
+>>
+>> Making this a 2920 byte fixed array doesn't seem sensible at all
+>> (though that's what's already possible to use with existing
+>> SKCIPHER_REQUEST_ON_STACK users).
+>>
+>> What's the right path forward here?
+>>
+>
+> The skcipher implementations based on crypto IP blocks are typically
+> asynchronous, and I wouldn't be surprised if a fair number of
+> SKCIPHER_REQUEST_ON_STACK() users are limited to synchronous
+> skciphers.
 
-Changes for v2:
+According to Herbert, SKCIPHER_REQUEST_ON_STACK() may only be used
+for invoking synchronous ciphers.
 
-* Introduce the new ata_port_info object which includes ATA_FLAG_NO_LPM.
-* Include this object for eMAG SATA inside the acpi match table.
-* Retrieve the ata_port_info from the acpi match table.
+In fact, due to the way the crypto API is built, if you try using it
+with any transformation that uses DMA
+you would most probably end up trying to DMA to/from the stack which
+as we all know is not a great idea.
 
-Changes for v3:
+>
+> So we could formalize this and limit SKCIPHER_REQUEST_ON_STACK() to
+> synchronous skciphers, which implies that the reqsize limit only has
+> to apply synchronous skciphers as well. But before we can do this, we
+> have to identify the remaining occurrences that allow asynchronous
+> skciphers to be used, and replace them with heap allocations.
 
-* Fix the indentation and whitespace warnings.
+Any such occurrences are almost for sure broken already due to the DMA
+issue I've mentioned.
 
-Signed-off-by: Suman Trpathi <stripathi@amperecomputing.com>
-Signed-off-by: Rameshwar Prasad Sahu <rameshwar.sahu@amperecomputing.com>
----
- drivers/ata/ahci_platform.c | 15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
+Gilad
 
-diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-index 99f9a89..9ba283f 100644
---- a/drivers/ata/ahci_platform.c
-+++ b/drivers/ata/ahci_platform.c
-@@ -33,6 +33,13 @@ static const struct ata_port_info ahci_port_info = {
-        .port_ops       = &ahci_platform_ops,
- };
+-- 
+Gilad Ben-Yossef
+Chief Coffee Drinker
 
-+static const struct ata_port_info ahci_port_info_nolpm = {
-+       .flags          = AHCI_FLAG_COMMON | ATA_FLAG_NO_LPM,
-+       .pio_mask       = ATA_PIO4,
-+       .udma_mask      = ATA_UDMA6,
-+       .port_ops       = &ahci_platform_ops,
-+};
-+
- static struct scsi_host_template ahci_platform_sht = {
-        AHCI_SHT(DRV_NAME),
- };
-@@ -41,6 +48,7 @@ static int ahci_probe(struct platform_device *pdev)
- {
-        struct device *dev = &pdev->dev;
-        struct ahci_host_priv *hpriv;
-+       const struct ata_port_info *port;
-        int rc;
-
-        hpriv = ahci_platform_get_resources(pdev);
-@@ -57,7 +65,11 @@ static int ahci_probe(struct platform_device *pdev)
-        if (of_device_is_compatible(dev->of_node, "hisilicon,hisi-ahci"))
-                hpriv->flags |= AHCI_HFLAG_NO_FBS | AHCI_HFLAG_NO_NCQ;
-
--       rc = ahci_platform_init_host(pdev, hpriv, &ahci_port_info,
-+       port = acpi_device_get_match_data(dev);
-+       if (!port)
-+               port = &ahci_port_info;
-+
-+       rc = ahci_platform_init_host(pdev, hpriv, port,
-                                     &ahci_platform_sht);
-        if (rc)
-                goto disable_resources;
-@@ -85,6 +97,7 @@ static const struct of_device_id ahci_of_match[] = {
- MODULE_DEVICE_TABLE(of, ahci_of_match);
-
- static const struct acpi_device_id ahci_acpi_match[] = {
-+       { "APMC0D33", (unsigned long)&ahci_port_info_nolpm },
-        { ACPI_DEVICE_CLASS(PCI_CLASS_STORAGE_SATA_AHCI, 0xffffff) },
-        {},
- };
---
-2.7.4
-
-CONFIDENTIALITY NOTICE: This e-mail message, including any attachments, is for the sole use of the intended recipient(s) and contains information that is confidential and proprietary to Ampere Computing or its subsidiaries. It is to be used solely for the purpose of furthering the parties' business relationship. Any review, copying, or distribution of this email (or any attachments thereto) is strictly prohibited. If you are not the intended recipient, please contact the sender immediately and permanently delete the original and any copies of this email and any attachments thereto.
+values of ? will give rise to dom!
