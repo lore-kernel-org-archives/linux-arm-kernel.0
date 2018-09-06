@@ -1,36 +1,98 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 6 Sep 2018 20:40:49 +0200
-Subject: [PATCH i2c-next v6] i2c: aspeed: Handle master/slave combined
- irq events properly
-In-Reply-To: <20180823225731.19063-1-jae.hyun.yoo@linux.intel.com>
-References: <20180823225731.19063-1-jae.hyun.yoo@linux.intel.com>
-Message-ID: <20180906184049.GF8607@kunai>
+From: richard.gong@linux.intel.com (richard.gong at linux.intel.com)
+Date: Thu,  6 Sep 2018 14:25:03 -0500
+Subject: [PATCHv9 1/8] dt-bindings,
+ firmware: add Intel Stratix10 service layer binding
+In-Reply-To: <1536261910-16426-1-git-send-email-richard.gong@linux.intel.com>
+References: <1536261910-16426-1-git-send-email-richard.gong@linux.intel.com>
+Message-ID: <1536261910-16426-2-git-send-email-richard.gong@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 23, 2018 at 03:57:31PM -0700, Jae Hyun Yoo wrote:
-> In most of cases, interrupt bits are set one by one but there are
-> also a lot of other cases that Aspeed I2C IP sends multiple
-> interrupt bits with combining master and slave events using a
-> single interrupt call. It happens much more in multi-master
-> environment than single-master. For an example, when master is
-> waiting for a NORMAL_STOP interrupt in its MASTER_STOP state,
-> SLAVE_MATCH and RX_DONE interrupts could come along with the
-> NORMAL_STOP in case of an another master immediately sends data
-> just after acquiring the bus. In this case, the NORMAL_STOP
-> interrupt should be handled by master_irq and the SLAVE_MATCH and
-> RX_DONE interrupts should be handled by slave_irq. This commit
-> modifies irq hadling logic to handle the master/slave combined
-> events properly.
-> 
-> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+From: Richard Gong <richard.gong@intel.com>
 
-Applied to for-next, thanks!
+Add a device tree binding for the Intel Stratix10 service layer driver
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180906/e639f9f3/attachment.sig>
+Signed-off-by: Richard Gong <richard.gong@intel.com>
+Signed-off-by: Alan Tull <atull@kernel.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
+Acked-by: Moritz Fischer <mdf@kernel.org>
+---
+v2: change to put service layer driver node under the firmware node
+    change compatible to "intel, stratix10-svc"
+v3: no change
+v4: add Rob's Reviewed-by
+v5: no change
+v6: add Moritz's Acked-by
+v7: no change
+v8: no change
+v9: no chnage
+---
+ .../bindings/firmware/intel,stratix10-svc.txt      | 57 ++++++++++++++++++++++
+ 1 file changed, 57 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
+
+diff --git a/Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt b/Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
+new file mode 100644
+index 0000000..1fa6606
+--- /dev/null
++++ b/Documentation/devicetree/bindings/firmware/intel,stratix10-svc.txt
+@@ -0,0 +1,57 @@
++Intel Service Layer Driver for Stratix10 SoC
++============================================
++Intel Stratix10 SoC is composed of a 64 bit quad-core ARM Cortex A53 hard
++processor system (HPS) and Secure Device Manager (SDM). When the FPGA is
++configured from HPS, there needs to be a way for HPS to notify SDM the
++location and size of the configuration data. Then SDM will get the
++configuration data from that location and perform the FPGA configuration.
++
++To meet the whole system security needs and support virtual machine requesting
++communication with SDM, only the secure world of software (EL3, Exception
++Layer 3) can interface with SDM. All software entities running on other
++exception layers must channel through the EL3 software whenever it needs
++service from SDM.
++
++Intel Stratix10 service layer driver, running at privileged exception level
++(EL1, Exception Layer 1), interfaces with the service providers and provides
++the services for FPGA configuration, QSPI, Crypto and warm reset. Service layer
++driver also manages secure monitor call (SMC) to communicate with secure monitor
++code running in EL3.
++
++Required properties:
++-------------------
++The svc node has the following mandatory properties, must be located under
++the firmware node.
++
++- compatible: "intel,stratix10-svc"
++- method: smc or hvc
++        smc - Secure Monitor Call
++        hvc - Hypervisor Call
++- memory-region:
++	phandle to the reserved memory node. See
++	Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
++	for details
++
++Example:
++-------
++
++	reserved-memory {
++                #address-cells = <2>;
++                #size-cells = <2>;
++                ranges;
++
++                service_reserved: svcbuffer at 0 {
++                        compatible = "shared-dma-pool";
++                        reg = <0x0 0x0 0x0 0x1000000>;
++                        alignment = <0x1000>;
++                        no-map;
++                };
++        };
++
++	firmware {
++		svc {
++			compatible = "intel,stratix10-svc";
++			method = "smc";
++			memory-region = <&service_reserved>;
++		};
++	};
+-- 
+2.7.4
