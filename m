@@ -1,54 +1,27 @@
-From: grant.likely@arm.com (Grant Likely)
-Date: Thu,  6 Sep 2018 19:29:27 +0100
-Subject: [PATCH RESEND] efi_stub: update documentation on dtb= parameter
-Message-ID: <20180906182927.22318-1-grant.likely@arm.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 6 Sep 2018 20:31:44 +0200
+Subject: [PATCH v3 1/2] i2c: mediatek: Register i2c adapter driver earlier
+In-Reply-To: <1536239729-10008-2-git-send-email-jun.gao@mediatek.com>
+References: <1536239729-10008-1-git-send-email-jun.gao@mediatek.com>
+ <1536239729-10008-2-git-send-email-jun.gao@mediatek.com>
+Message-ID: <20180906183144.GD8607@kunai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dtb= parameter is no longer the primary mechanism for providing a
-devicetree to the kernel. Now either firmware or the boot selector (ex.
-Grub) should provide the devicetree and dtb= should only be used for
-debug or when using firmware that doesn't understand DT.
-Update the EFI stub documentation to reflect the current usage.
+On Thu, Sep 06, 2018 at 09:15:28PM +0800, Jun Gao wrote:
+> From: Jun Gao <jun.gao@mediatek.com>
+> 
+> In order not to block the initializations of some i2c devices.
+> Register i2c adapter driver at appropriate time.
+> 
+> Signed-off-by: Jun Gao <jun.gao@mediatek.com>
 
-Signed-off-by: Grant Likely <grant.likely@arm.com>
-Reviewed-by: Alexander Graf <agraf@suse.de>
-Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
-Acked-by: Olof Johansson <olof@lixom.net>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Jonathan Corbet <corbet@lwn.net>
----
+The reasons this patch was rejected in v2 still hold.
 
-Resending because original post included Arm corporate disclaimer.
-
- Documentation/efi-stub.txt | 17 ++++++++++++++---
- 1 file changed, 14 insertions(+), 3 deletions(-)
-
-diff --git a/Documentation/efi-stub.txt b/Documentation/efi-stub.txt
-index 41df801f9a50..833edb0d0bc4 100644
---- a/Documentation/efi-stub.txt
-+++ b/Documentation/efi-stub.txt
-@@ -83,7 +83,18 @@ is passed to bzImage.efi.
- The "dtb=" option
- -----------------
- 
--For the ARM and arm64 architectures, we also need to be able to provide a
--device tree to the kernel. This is done with the "dtb=" command line option,
--and is processed in the same manner as the "initrd=" option that is
-+For the ARM and arm64 architectures, a device tree must be provided to
-+the kernel. Normally firmware shall supply the device tree via the
-+EFI CONFIGURATION TABLE. However, the "dtb=" command line option can
-+be used to override the firmware supplied device tree, or to supply
-+one when firmware is unable to.
-+
-+Please note: Firmware adds runtime configuration information to the
-+device tree before booting the kernel. If dtb= is used to override
-+the device tree, then any runtime data provided by firmware will be
-+lost. The dtb= option should only be used either as a debug tool, or
-+as a last resort when a device tree is not provided in the EFI
-+CONFIGURATION TABLE.
-+
-+"dtb=" is processed in the same manner as the "initrd=" option that is
- described above.
--- 
-2.11.0
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180906/8e20f8ac/attachment.sig>
