@@ -1,149 +1,72 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 5 Sep 2018 17:43:50 -0700
-Subject: [PATCH 2/2] crypto: skcipher: Remove VLA usage for
- SKCIPHER_REQUEST_ON_STACK
-In-Reply-To: <CAKv+Gu_0vWUqkUex45iW=pAfUbKVsqzP9MDf6OOwTg-nUVPZNg@mail.gmail.com>
-References: <20180904181629.20712-1-keescook@chromium.org>
- <20180904181629.20712-3-keescook@chromium.org>
- <CAKv+Gu9uJ+ZjBSCM=aU0GDvYR72cy2k8reXdLV5on3dOVw8KdQ@mail.gmail.com>
- <CAGXu5jKmcuhULMR=O9B_hJAxEK8uV36uoMxm4F3F8yYSuMzYNA@mail.gmail.com>
- <CAKv+Gu_0vWUqkUex45iW=pAfUbKVsqzP9MDf6OOwTg-nUVPZNg@mail.gmail.com>
-Message-ID: <CAGXu5j+z8eQKu_3sm93pdo+bBZDFqkHNM3Y0tKTDbnHfUNzywg@mail.gmail.com>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Thu, 06 Sep 2018 10:38:08 +0900
+Subject: [PATCH 1/2] dt-bindings: pci: add UniPhier PCIe host controller
+ description
+In-Reply-To: <20180905172118.GN107892@bhelgaas-glaptop.roam.corp.google.com>
+References: <1536114731-28630-2-git-send-email-hayashi.kunihiko@socionext.com>
+ <20180905172118.GN107892@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20180906103808.2529.4A936039@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 5, 2018 at 3:49 PM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> On 5 September 2018 at 23:05, Kees Cook <keescook@chromium.org> wrote:
->> On Wed, Sep 5, 2018 at 2:18 AM, Ard Biesheuvel
->> <ard.biesheuvel@linaro.org> wrote:
->>> On 4 September 2018 at 20:16, Kees Cook <keescook@chromium.org> wrote:
->>>> In the quest to remove all stack VLA usage from the kernel[1], this
->>>> caps the skcipher request size similar to other limits and adds a sanity
->>>> check at registration. Looking at instrumented tcrypt output, the largest
->>>> is for lrw:
->>>>
->>>>         crypt: testing lrw(aes)
->>>>         crypto_skcipher_set_reqsize: 8
->>>>         crypto_skcipher_set_reqsize: 88
->>>>         crypto_skcipher_set_reqsize: 472
->>>>
->>>
->>> Are you sure this is a representative sampling? I haven't double
->>> checked myself, but we have plenty of drivers for peripherals in
->>> drivers/crypto that implement block ciphers, and they would not turn
->>> up in tcrypt unless you are running on a platform that provides the
->>> hardware in question.
->>
->> Hrm, excellent point. Looking at this again:
->>
->> The core part of the VLA is using this in the ON_STACK macro:
->>
->> static inline unsigned int crypto_skcipher_reqsize(struct crypto_skcipher *tfm)
->> {
->>         return tfm->reqsize;
->> }
->>
->> I don't find any struct crypto_skcipher .reqsize static initializers,
->> and the initial reqsize is here:
->>
->> static int crypto_init_skcipher_ops_ablkcipher(struct crypto_tfm *tfm)
->> {
->> ...
->>         skcipher->reqsize = crypto_ablkcipher_reqsize(ablkcipher) +
->>                             sizeof(struct ablkcipher_request);
->>
->> with updates via crypto_skcipher_set_reqsize().
->>
->> So I have to examine ablkcipher reqsize too:
->>
->> static inline unsigned int crypto_ablkcipher_reqsize(
->>         struct crypto_ablkcipher *tfm)
->> {
->>         return crypto_ablkcipher_crt(tfm)->reqsize;
->> }
->>
->> And of the crt_ablkcipher.reqsize assignments/initializers, I found:
->>
->> ablkcipher reqsize:
->> 1       struct dcp_aes_req_ctx
->> 8       struct atmel_tdes_reqctx
->> 8       struct cryptd_blkcipher_request_ctx
->> 8       struct mtk_aes_reqctx
->> 8       struct omap_des_reqctx
->> 8       struct s5p_aes_reqctx
->> 8       struct sahara_aes_reqctx
->> 8       struct stm32_cryp_reqctx
->> 8       struct stm32_cryp_reqctx
->> 16      struct ablk_ctx
->> 24      struct atmel_aes_reqctx
->> 48      struct omap_aes_reqctx
->> 48      struct omap_aes_reqctx
->> 48      struct qat_crypto_request
->> 56      struct artpec6_crypto_request_context
->> 64      struct chcr_blkcipher_req_ctx
->> 80      struct spacc_req
->> 80      struct virtio_crypto_sym_request
->> 136     struct qce_cipher_reqctx
->> 168     struct n2_request_context
->> 328     struct ccp_des3_req_ctx
->> 400     struct ccp_aes_req_ctx
->> 536     struct hifn_request_context
->> 992     struct cvm_req_ctx
->> 2456    struct iproc_reqctx_s
->>
->> The base ablkcipher wrapper is:
->> 80      struct ablkcipher_request
->>
->> And in my earlier skcipher wrapper analysis, lrw was the largest
->> skcipher wrapper:
->> 384     struct rctx
->>
->> iproc_reqctx_s is an extreme outlier, with cvm_req_ctx at a bit less than half.
->>
->> Making this a 2920 byte fixed array doesn't seem sensible at all
->> (though that's what's already possible to use with existing
->> SKCIPHER_REQUEST_ON_STACK users).
->>
->> What's the right path forward here?
->>
+Hi Bjorn,
+
+Thank you for reviewing.
+
+On Wed, 5 Sep 2018 12:21:18 -0500 <helgaas@kernel.org> wrote:
+
+> 
+> Please follow the capitalization convention, i.e.,
+> 
+>   $ git log --oneline --no-merges Documentaon/devicetree/bindings/pci/ | grep -i pci
+>   82dfbd27c837 dt-bindings: PCI: cadence: Add DT bindings for optional PHYs
+>   92f9ccca4c08 PCI: mobiveil: Add Mobiveil PCIe Host Bridge IP driver DT bindings
+>   71918e24cb49 dt-bindings: PCI: designware: Add support for EP in DesignWare driver
+>   467c7a737642 dt-bindings: PCI: designware: Example update
+>   1dca7a636933 dt-bindings: PCI: rockchip: Add DT bindings for Rockchip PCIe EP driver
+>   2ca25bd7472f dt-bindings: PCI: rockchip: Rename rockchip-pcie.txt to rockchip-pcie-host.txt
+> 
+> On Wed, Sep 05, 2018 at 11:32:10AM +0900, Kunihiko Hayashi wrote:
+> > Add DT bindings for PCIe controller implemented in UniPhier SoCs when
+> > configured in Root Complex (host) mode. This controller is based on
+> > the Designware PCIe Core.
+> 
+> s/Designware/DesignWare/
+> s/Core/core/
+
+Okay, I'll fix capitalization conventions in all the descriptions
+according to the previous commits.
+
+> > 
+> > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> > ---
+> >  .../devicetree/bindings/pci/uniphier-pcie.txt      | 78 ++++++++++++++++++++++
+> >  1 file changed, 78 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/pci/uniphier-pcie.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/pci/uniphier-pcie.txt b/Documentation/devicetree/bindings/pci/uniphier-pcie.txt
+> > new file mode 100644
+> > index 0000000..ea63f78
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/pci/uniphier-pcie.txt
+> > @@ -0,0 +1,78 @@
+> > +Socionext UniPhier PCI-express host controller bindings
+> 
+> s/PCI-express/PCIe/ (also in other occurrences below)
 >
-> The skcipher implementations based on crypto IP blocks are typically
-> asynchronous, and I wouldn't be surprised if a fair number of
-> SKCIPHER_REQUEST_ON_STACK() users are limited to synchronous
-> skciphers.
+> > +
+> > +This describes the devicetree bindings for PCI-express host controller
+> > +implemented on Socionext UniPhier SoCs.
+> > +
+> > +UniPhier PCI-express host controller is based on the Synopsys DesignWare
+> > +PCI core. It shares common functions with the PCIe DesignWare core driver
+> > +and inherits common properties defined in
+> > +Documentation/devicetree/bindings/pci/designware-pcie.txt.
 
-Looks similar to ahash vs shash. :) Yes, so nearly all
-crypto_alloc_skcipher() users explicitly mask away ASYNC. What's left
-appears to be:
+Indeed, there are descriptions of inconsistency. I'll fix them.
 
-crypto/drbg.c:  sk_tfm = crypto_alloc_skcipher(ctr_name, 0, 0);
-crypto/tcrypt.c:        tfm = crypto_alloc_skcipher(algo, 0, async ? 0
-: CRYPTO_ALG_ASYNC);
-drivers/crypto/omap-aes.c:      ctx->ctr =
-crypto_alloc_skcipher("ecb(aes)", 0, 0);
-drivers/md/dm-crypt.c:          cc->cipher_tfm.tfms[i] =
-crypto_alloc_skcipher(ciphermode, 0, 0);
-drivers/md/dm-integrity.c:              ic->journal_crypt =
-crypto_alloc_skcipher(ic->journal_crypt_alg.alg_string, 0, 0);
-fs/crypto/keyinfo.c:    struct crypto_skcipher *tfm =
-crypto_alloc_skcipher("ecb(aes)", 0, 0);
-fs/crypto/keyinfo.c:    ctfm = crypto_alloc_skcipher(mode->cipher_str, 0, 0);
-fs/ecryptfs/crypto.c:   crypt_stat->tfm =
-crypto_alloc_skcipher(full_alg_name, 0, 0);
+Thank you,
 
-I'll cross-reference this with SKCIPHER_REQUEST_ON_STACK...
-
-> So we could formalize this and limit SKCIPHER_REQUEST_ON_STACK() to
-> synchronous skciphers, which implies that the reqsize limit only has
-> to apply synchronous skciphers as well. But before we can do this, we
-> have to identify the remaining occurrences that allow asynchronous
-> skciphers to be used, and replace them with heap allocations.
-
-Sounds good; thanks!
-
--Kees
-
--- 
-Kees Cook
-Pixel Security
+---
+Best Regards,
+Kunihiko Hayashi
