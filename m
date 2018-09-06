@@ -1,74 +1,121 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu,  6 Sep 2018 10:08:24 +0100
-Subject: [PATCH v2 03/14] coresight: tmc-etr: Handle errors enabling CATU
+Date: Thu,  6 Sep 2018 10:08:22 +0100
+Subject: [PATCH v2 01/14] coresight: Handle failures in enabling a trace path
 In-Reply-To: <1536224915-31766-1-git-send-email-suzuki.poulose@arm.com>
 References: <1536224915-31766-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1536224915-31766-4-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1536224915-31766-2-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sure we honor the errors in CATU device and abort the operation.
-While at it, delay setting the etr_buf for the session until we are
-sure that we are indeed enabling the ETR.
+coresight_enable_path() enables the components in a trace
+path from a given source to a sink, excluding the source.
+The operation is performed in the reverse order; the sink
+first and then backwards in the list. However, if we encounter
+an error in enabling any of the component, we simply disable
+all the components in the given path irrespective of whether
+we enabled some of the components in the enable iteration.
+This could interfere with another trace session if one of the
+link devices is turned off (e.g, TMC-ETF). So, we need to
+make sure that we only disable those components which were
+actually enabled from the iteration.
+
+This patch achieves the same by refactoring the coresight_disable_path
+to accept a "node" to start from in the forward order, which can
+then be used from the error path of coresight_enable_path().
+With this change, we don't issue a disable call back for a component
+which didn't get enabled. This change of behavior triggers
+a bug in coresight_enable_link(), where we leave the refcount
+on the device and will prevent the device from being enabled
+forever. So, we also drop the refcount in the coresight_enable_link()
+if the operation failed.
+
+Also, with the refactoring, we always start after the first node (which
+is the "SOURCE" device) for disabling the entire path. This implies,
+we must not find a "SOURCE" in the middle of the path. Hence, added
+a WARN_ON() to make sure the paths we get are sane, rather than
+simply ignoring them.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-tmc-etr.c | 19 ++++++++++++-------
- 1 file changed, 12 insertions(+), 7 deletions(-)
+ drivers/hwtracing/coresight/coresight.c | 32 ++++++++++++++++++++++++++------
+ 1 file changed, 26 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index c426935..daad521 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -751,12 +751,14 @@ tmc_etr_get_catu_device(struct tmc_drvdata *drvdata)
- 	return NULL;
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index e73ca6a..f4f5075 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -187,8 +187,10 @@ static int coresight_enable_link(struct coresight_device *csdev,
+ 	if (atomic_inc_return(&csdev->refcnt[refport]) == 1) {
+ 		if (link_ops(csdev)->enable) {
+ 			ret = link_ops(csdev)->enable(csdev, inport, outport);
+-			if (ret)
++			if (ret) {
++				atomic_dec(&csdev->refcnt[refport]);
+ 				return ret;
++			}
+ 		}
+ 	}
+ 
+@@ -277,13 +279,21 @@ static bool coresight_disable_source(struct coresight_device *csdev)
+ 	return !csdev->enable;
  }
  
--static inline void tmc_etr_enable_catu(struct tmc_drvdata *drvdata)
-+static inline int tmc_etr_enable_catu(struct tmc_drvdata *drvdata,
-+				      struct etr_buf *etr_buf)
+-void coresight_disable_path(struct list_head *path)
++/*
++ * coresight_disable_path_from : Disable components in the given path beyond
++ * @nd in the list. If @nd is NULL, all the components, except the SOURCE are
++ * disabled.
++ */
++static void coresight_disable_path_from(struct list_head *path,
++					struct coresight_node *nd)
  {
- 	struct coresight_device *catu = tmc_etr_get_catu_device(drvdata);
+ 	u32 type;
+-	struct coresight_node *nd;
+ 	struct coresight_device *csdev, *parent, *child;
  
- 	if (catu && helper_ops(catu)->enable)
--		helper_ops(catu)->enable(catu, drvdata->etr_buf);
-+		return helper_ops(catu)->enable(catu, etr_buf);
-+	return 0;
- }
- 
- static inline void tmc_etr_disable_catu(struct tmc_drvdata *drvdata)
-@@ -971,6 +973,8 @@ static void __tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
- static int tmc_etr_enable_hw(struct tmc_drvdata *drvdata,
- 			     struct etr_buf *etr_buf)
- {
-+	int rc;
+-	list_for_each_entry(nd, path, link) {
++	if (!nd)
++		nd = list_first_entry(path, struct coresight_node, link);
 +
- 	/* Callers should provide an appropriate buffer for use */
- 	if (WARN_ON(!etr_buf))
- 		return -EINVAL;
-@@ -982,16 +986,17 @@ static int tmc_etr_enable_hw(struct tmc_drvdata *drvdata,
- 	if (WARN_ON(drvdata->etr_buf))
- 		return -EBUSY;
++	list_for_each_entry_continue(nd, path, link) {
+ 		csdev = nd->csdev;
+ 		type = csdev->type;
  
--	/* Set the buffer for the session */
--	drvdata->etr_buf = etr_buf;
- 	/*
- 	 * If this ETR is connected to a CATU, enable it before we turn
- 	 * this on.
- 	 */
--	tmc_etr_enable_catu(drvdata);
-+	rc = tmc_etr_enable_catu(drvdata, etr_buf);
-+	if (!rc) {
-+		drvdata->etr_buf = etr_buf;
-+		__tmc_etr_enable_hw(drvdata);
-+	}
- 
--	__tmc_etr_enable_hw(drvdata);
--	return 0;
-+	return rc;
+@@ -303,7 +313,12 @@ void coresight_disable_path(struct list_head *path)
+ 			coresight_disable_sink(csdev);
+ 			break;
+ 		case CORESIGHT_DEV_TYPE_SOURCE:
+-			/* sources are disabled from either sysFS or Perf */
++			/*
++			 * We skip the first node in the path assuming that it
++			 * is the source. So we don't expect a source device in
++			 * the middle of a path.
++			 */
++			WARN_ON(1);
+ 			break;
+ 		case CORESIGHT_DEV_TYPE_LINK:
+ 			parent = list_prev_entry(nd, link)->csdev;
+@@ -316,6 +331,11 @@ void coresight_disable_path(struct list_head *path)
+ 	}
  }
  
- /*
++void coresight_disable_path(struct list_head *path)
++{
++	coresight_disable_path_from(path, NULL);
++}
++
+ int coresight_enable_path(struct list_head *path, u32 mode, void *sink_data)
+ {
+ 
+@@ -369,7 +389,7 @@ int coresight_enable_path(struct list_head *path, u32 mode, void *sink_data)
+ out:
+ 	return ret;
+ err:
+-	coresight_disable_path(path);
++	coresight_disable_path_from(path, nd);
+ 	goto out;
+ }
+ 
 -- 
 2.7.4
