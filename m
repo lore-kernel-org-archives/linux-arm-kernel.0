@@ -1,106 +1,162 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 6 Sep 2018 13:49:26 +0100
-Subject: [RESEND PATCH 5/8] ARM: signal: copy registers using
- __copy_to_user()
-In-Reply-To: <1535447316-32187-6-git-send-email-julien.thierry@arm.com>
-References: <1535447316-32187-1-git-send-email-julien.thierry@arm.com>
- <1535447316-32187-6-git-send-email-julien.thierry@arm.com>
-Message-ID: <20180906124926.GP30658@n2100.armlinux.org.uk>
+From: stripathi@amperecomputing.com (Suman Tripathi)
+Date: Thu, 6 Sep 2018 12:51:34 +0000
+Subject: [PATCH v3] ata: Disable AHCI ALPM feature for Ampere Computing
+ eMAG SATA
+In-Reply-To: <a1c6012f-3b50-0e5e-677c-41903b4ccf64@redhat.com>
+References: <1536208421-24867-1-git-send-email-stripathi@amperecomputing.com>
+ <a1c6012f-3b50-0e5e-677c-41903b4ccf64@redhat.com>
+Message-ID: <MWHPR01MB233693C3A340055CC5CF3D40B3010@MWHPR01MB2336.prod.exchangelabs.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julien,
+Hi Hans,
 
-I would much prefer these to be ordered before the patches changing
-__put_user() etc.  That would then allow patch 2 (which would become
-the last patch) to get rid of __put_user_error() - __put_user_error()
-is utterly pointless with the need to work around Spectre, and that
-would reflect what was done in my series for Spectre variant 1.
+I ran checkpatch and see no error. I will check my git-send-email
 
-In any case, removing it from signal handling, vfp and oabi compat
-should mean that after your existing series, there are no users of
-__put_user_error(), but it still remains.
+scripts/checkpatch.pl  0001-ata-Disable-AHCI-ALPM-feature-for-Ampere-Computing-e.patch total: 0 errors, 0 warnings, 39 lines checked
 
-Thanks.
+0001-ata-Disable-AHCI-ALPM-feature-for-Ampere-Computing-e.patch has no obvious style problems and is ready for submission.
 
-On Tue, Aug 28, 2018 at 10:08:33AM +0100, Julien Thierry wrote:
-> When saving the ARM integer registers, use __copy_to_user() to
-> copy them into user signal frame, rather than __put_user_error().
-> This has the benefit of disabling/enabling PAN once for the whole copy
-> intead of once per write.
-> 
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+
+With regards,
+Suman
+
+
+
+-----Original Message-----
+From: Hans de Goede <hdegoede@redhat.com> 
+Sent: Thursday, September 6, 2018 12:32 AM
+To: Suman Tripathi <stripathi@amperecomputing.com>; axboe at kernel.dk; tj at kernel.org; linux-ide at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; joe at perches.com; arnd at arndb.de; gregkh at linuxfoundation.org
+Cc: Open Source Submission <patches@amperecomputing.com>; Rameshwar Sahu <Rameshwar.Sahu@amperecomputing.com>
+Subject: Re: [PATCH v3] ata: Disable AHCI ALPM feature for Ampere Computing eMAG SATA
+
+[NOTICE: This email originated from an external sender. Please be mindful of safe email handling and proprietary information protection practices.] ________________________________________________________________________________________________________________________
+
+Hi,
+
+On 06-09-18 06:33, Suman Tripathi wrote:
+> Due to hardware errata, Ampere Computing eMAG SATA can't support AHCI 
+> ALPM feature. This patch disables the AHCI ALPM feature for eMAG SATA.
+>
+> Changes for v2:
+>
+> * Introduce the new ata_port_info object which includes ATA_FLAG_NO_LPM.
+> * Include this object for eMAG SATA inside the acpi match table.
+> * Retrieve the ata_port_info from the acpi match table.
+>
+> Changes for v3:
+>
+> * Fix the indentation and whitespace warnings.
+>
+> Signed-off-by: Suman Trpathi <stripathi@amperecomputing.com>
+> Signed-off-by: Rameshwar Prasad Sahu 
+> <rameshwar.sahu@amperecomputing.com>
+
+Small remark, normally the changelog is put after the Signed-off-by messages like
+this:
+
+"""
+Signed-off-by: Suman Trpathi <stripathi@amperecomputing.com>
+Signed-off-by: Rameshwar Prasad Sahu <rameshwar.sahu@amperecomputing.com>
+---
+Changes for v3:
+* Fix the indentation and whitespace warnings.
+
+Changes for v2:
+
+* Introduce the new ata_port_info object which includes ATA_FLAG_NO_LPM.
+* Include this object for eMAG SATA inside the acpi match table.
+* Retrieve the ata_port_info from the acpi match table.
+"""
+
+This will cause git am to remove it, so that the git history just has your original commit message.
+
+By itself this would not be a reason to request a new version, but it seems you've copy and pasted the patch from "git format-patch" output into you mail client. I tried to run checkpatch myself to make sure you caught all whitespace issues and I got this:
+
+[hans at shalem linux]$ scripts/checkpatch.pl ~/\[PATCH\ v3\]\ ata\:\ Disable\ AHCI\ ALPM\ feature\ for\ Ampere\ Computing\ eMAG\ SATA.eml
+ERROR: patch seems to be corrupt (line wrapped?)
+#177: FILE: drivers/ata/ahci_platform.c:34:
+
+
+ERROR: DOS line endings
+#178: FILE: drivers/ata/ahci_platform.c:35:
++static const struct ata_port_info ahci_port_info_nolpm = {^M$
+
+ERROR: DOS line endings
+#179: FILE: drivers/ata/ahci_platform.c:36:
++^I.flags^I^I= AHCI_FLAG_COMMON | ATA_FLAG_NO_LPM,^M$
+
+ERROR: DOS line endings
+#180: FILE: drivers/ata/ahci_platform.c:37:
++^I.pio_mask^I= ATA_PIO4,^M$
+
+ERROR: DOS line endings
+#181: FILE: drivers/ata/ahci_platform.c:38:
++^I.udma_mask^I= ATA_UDMA6,^M$
+
+Followed by lots more errors, line 177 of the email is empty, while it should contain a single space. This stripping of whitespace typically is the result of copy pasting or some other processing of the patch.
+
+Please try to re-send v3 using the "git send-email" command, so that we get a patch which we can actually apply.
+
+Regards,
+
+Hans
+
+
+
+
+
 > ---
->  arch/arm/kernel/signal.c | 49 ++++++++++++++++++++++++++----------------------
->  1 file changed, 27 insertions(+), 22 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-> index b8f766c..76fe75d 100644
-> --- a/arch/arm/kernel/signal.c
-> +++ b/arch/arm/kernel/signal.c
-> @@ -288,30 +288,35 @@ asmlinkage int sys_rt_sigreturn(struct pt_regs *regs)
->  setup_sigframe(struct sigframe __user *sf, struct pt_regs *regs, sigset_t *set)
->  {
->  	struct aux_sigframe __user *aux;
-> +	struct sigcontext context;
->  	int err = 0;
->  
-> -	__put_user_error(regs->ARM_r0, &sf->uc.uc_mcontext.arm_r0, err);
-> -	__put_user_error(regs->ARM_r1, &sf->uc.uc_mcontext.arm_r1, err);
-> -	__put_user_error(regs->ARM_r2, &sf->uc.uc_mcontext.arm_r2, err);
-> -	__put_user_error(regs->ARM_r3, &sf->uc.uc_mcontext.arm_r3, err);
-> -	__put_user_error(regs->ARM_r4, &sf->uc.uc_mcontext.arm_r4, err);
-> -	__put_user_error(regs->ARM_r5, &sf->uc.uc_mcontext.arm_r5, err);
-> -	__put_user_error(regs->ARM_r6, &sf->uc.uc_mcontext.arm_r6, err);
-> -	__put_user_error(regs->ARM_r7, &sf->uc.uc_mcontext.arm_r7, err);
-> -	__put_user_error(regs->ARM_r8, &sf->uc.uc_mcontext.arm_r8, err);
-> -	__put_user_error(regs->ARM_r9, &sf->uc.uc_mcontext.arm_r9, err);
-> -	__put_user_error(regs->ARM_r10, &sf->uc.uc_mcontext.arm_r10, err);
-> -	__put_user_error(regs->ARM_fp, &sf->uc.uc_mcontext.arm_fp, err);
-> -	__put_user_error(regs->ARM_ip, &sf->uc.uc_mcontext.arm_ip, err);
-> -	__put_user_error(regs->ARM_sp, &sf->uc.uc_mcontext.arm_sp, err);
-> -	__put_user_error(regs->ARM_lr, &sf->uc.uc_mcontext.arm_lr, err);
-> -	__put_user_error(regs->ARM_pc, &sf->uc.uc_mcontext.arm_pc, err);
-> -	__put_user_error(regs->ARM_cpsr, &sf->uc.uc_mcontext.arm_cpsr, err);
-> -
-> -	__put_user_error(current->thread.trap_no, &sf->uc.uc_mcontext.trap_no, err);
-> -	__put_user_error(current->thread.error_code, &sf->uc.uc_mcontext.error_code, err);
-> -	__put_user_error(current->thread.address, &sf->uc.uc_mcontext.fault_address, err);
-> -	__put_user_error(set->sig[0], &sf->uc.uc_mcontext.oldmask, err);
-> +	context = (struct sigcontext) {
-> +		.arm_r0        = regs->ARM_r0,
-> +		.arm_r1        = regs->ARM_r1,
-> +		.arm_r2        = regs->ARM_r2,
-> +		.arm_r3        = regs->ARM_r3,
-> +		.arm_r4        = regs->ARM_r4,
-> +		.arm_r5        = regs->ARM_r5,
-> +		.arm_r6        = regs->ARM_r6,
-> +		.arm_r7        = regs->ARM_r7,
-> +		.arm_r8        = regs->ARM_r8,
-> +		.arm_r9        = regs->ARM_r9,
-> +		.arm_r10       = regs->ARM_r10,
-> +		.arm_fp        = regs->ARM_fp,
-> +		.arm_ip        = regs->ARM_ip,
-> +		.arm_sp        = regs->ARM_sp,
-> +		.arm_lr        = regs->ARM_lr,
-> +		.arm_pc        = regs->ARM_pc,
-> +		.arm_cpsr      = regs->ARM_cpsr,
+>   drivers/ata/ahci_platform.c | 15 ++++++++++++++-
+>   1 file changed, 14 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c 
+> index 99f9a89..9ba283f 100644
+> --- a/drivers/ata/ahci_platform.c
+> +++ b/drivers/ata/ahci_platform.c
+> @@ -33,6 +33,13 @@ static const struct ata_port_info ahci_port_info = {
+>       .port_ops       = &ahci_platform_ops,
+>   };
+>
+> +static const struct ata_port_info ahci_port_info_nolpm = {
+> +     .flags          = AHCI_FLAG_COMMON | ATA_FLAG_NO_LPM,
+> +     .pio_mask       = ATA_PIO4,
+> +     .udma_mask      = ATA_UDMA6,
+> +     .port_ops       = &ahci_platform_ops,
+> +};
 > +
-> +		.trap_no       = current->thread.trap_no,
-> +		.error_code    = current->thread.error_code,
-> +		.fault_address = current->thread.address,
-> +		.oldmask       = set->sig[0],
-> +	};
+>   static struct scsi_host_template ahci_platform_sht = {
+>       AHCI_SHT(DRV_NAME),
+>   };
+> @@ -41,6 +48,7 @@ static int ahci_probe(struct platform_device *pdev)
+>   {
+>       struct device *dev = &pdev->dev;
+>       struct ahci_host_priv *hpriv;
+> +     const struct ata_port_info *port;
+>       int rc;
+>
+>       hpriv = ahci_platform_get_resources(pdev);
+> @@ -57,7 +65,11 @@ static int ahci_probe(struct platform_device *pdev)
+>       if (of_device_is_compatible(dev->of_node, "hisilicon,hisi-ahci"))
+>               hpriv->flags |= AHCI_HFLAG_NO_FBS | AHCI_HFLAG_NO_NCQ;
+>
+> -     rc = ahci_platform_init_host(pdev, hpriv, &ahci_port_info,
+> +     port = acpi_device_get_match_data(dev);
+> +     if (!port)
+> +             port = &ahci_port_info;
 > +
-> +	err |= __copy_to_user(&sf->uc.uc_mcontext, &context, sizeof(context));
->  
->  	err |= __copy_to_user(&sf->uc.uc_sigmask, set, sizeof(*set));
->  
-> -- 
-> 1.9.1
-> 
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-According to speedtest.net: 13Mbps down 490kbps up
+> +     rc = ahci_platform_init_host(pdev, hpriv, port,
+>                                    &ahci_platform_sht);
+>       if (rc)
+>               goto disable_resources;
+> @@ -85,6 +97,7 @@ static const struct of_device_id ahci_of_match[] = {
+>   MODULE_DEVICE_TABLE(of, ahci_of_match);
+>
+>   static const struct acpi_device_id ahci_acpi_match[] = {
+> +     { "APMC0D33", (unsigned long)&ahci_port_info_nolpm },
+>       { ACPI_DEVICE_CLASS(PCI_CLASS_STORAGE_SATA_AHCI, 0xffffff) },
+>       {},
+>   };
+> --
+> 2.7.4
+>
