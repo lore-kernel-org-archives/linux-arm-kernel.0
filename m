@@ -1,92 +1,177 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 6 Sep 2018 18:01:24 +0200
-Subject: [PATCH] mini2440 MMC correct write protect detection
-In-Reply-To: <204cf57b-a4f2-76b9-766c-20905596ca4e@free.fr>
-References: <85dac0df-2b75-9cc4-fde1-f62136974a1e@free.fr>
- <20180905174513.6w7z5jsc2e6ndntv@kozik-lap>
- <204cf57b-a4f2-76b9-766c-20905596ca4e@free.fr>
-Message-ID: <20180906160124.626l5fgn2cn4veyq@kozik-lap>
+From: MNARANI@xilinx.com (Manish Narani)
+Date: Thu, 6 Sep 2018 16:14:52 +0000
+Subject: [PATCH v5 3/4] edac: synopsys: Add EDAC ECC support for ZynqMP
+ DDRC
+In-Reply-To: <20180905101935.GD2237@zn.tnic>
+References: <1535722070-10394-1-git-send-email-manish.narani@xilinx.com>
+ <1535722070-10394-4-git-send-email-manish.narani@xilinx.com>
+ <20180905101935.GD2237@zn.tnic>
+Message-ID: <DM6PR02MB52273E288A625F7BD59BB2FFC1010@DM6PR02MB5227.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2018 at 09:45:15PM +0200, Cedric Roux wrote:
-> On 09/05/2018 07:45 PM, Krzysztof Kozlowski wrote:
-> > I looked at Mini2440 schematics found on the net and it looks like the
-> > pin (just like CD) is active low. However I might be looking at wrong
-> > schematics or missing some things.
-> 
-> I have the same schematics I think.
-> But I have a real mini2440 and I am positively sure that WP
-> is active high. CD is active low, yes.
-> 
-> Do you know someone that you trust that could confirm this?
-> 
-> > 
-> > This is really an old code so I am just quite surprised that it was not
-> > reported before. Not able to write to SD card (for example if it is
-> > rootfs) should be spotted quite early.
-> 
-> I don't think anyone tried a recent kernel, that's why.
-> And the mini2440 has been kind of replaced by the mini6410,
-> I'm not sure it's still in production. Apart from me, I
-> don't think anyone still uses it. If someone does, I
-> heavily doubt that person will try to boot a 4.something
-> kernel on it.
-> 
-> In the 2.6.32.63 kernel it's all different.
-> 
-> We have s3cmci_get_ro in drivers/mmc/host/s3cmci.c
-> that calls s3c2410_gpio_getpin in arch/arm/plat-s3c24xx/gpio.c
-> that returns the WP bit as is read from the GPIO.
-> s3cmci_get_ro will return > 0 if the bit is set and
-> wprotect_invert is not set. For mini2440, wprotect_invert
-> is not set (actually it does not seem to be set anywhere
-> in the kernel tree, is it used at all in 2.6.32.63?). So
-> it's returned as is. Getting 1 from GPIO means Read Only.
-> 
-> Then we have s3cmci_card_present, also in drivers/mmc/host/s3cmci.c,
-> that reads the CD bit from the GPIO, but take the opposite value
-> and then returns the opposite of the result if detect_invert
-> is 1. For mini2440 it's not 1, but 0. So we return the opposite
-> of the CD bit read from the GPIO, which means active low.
-> 
-> I'm not an electronic professional so I don't know how to interpret
-> the schematics. My experiment with my mini2440 says that:
-> - no card:         WP bit = 1, CD bit = 1
-> - card read/write: WP bit = 0, CD bit = 0
-> - card read only:  WP bit = 1, CD bit = 0
-> By "WP bit" I mean the value read from GPH8.
-> By "CD bit" I mean the value read from GPG8.
-> 
-> So I don't know what to do. If you don't trust me and you know
-> no one that you trust that would confirm my findings, then it's
-> game over.
-> 
-> I can do things that you ask me to do to prove my claims.
-> 
-> I can provide a simple userland program to be run on a mini2440
-> that demonstrates this as well (open /dev/mem, mmap 0x56000000,
-> reads GPG and GPH and prints the values).
+Hi Boris,
 
-The patch was not patchwork compatible:
-    Applying patch #10587863 using 'git am -s'
-    Description: mini2440 MMC correct write protect detection
-    Applying: mini2440 MMC correct write protect detection
-    error: arm/mach-s3c24xx/mach-mini2440.c: does not exist in index
+Thanks for the review.
 
-git-am by default expects -p1.
+> -----Original Message-----
+> From: Borislav Petkov [mailto:bp at alien8.de]
+> Sent: Wednesday, September 5, 2018 3:50 PM
+> To: Manish Narani <MNARANI@xilinx.com>
+> Cc: robh+dt at kernel.org; mark.rutland at arm.com; Michal Simek
+> <michals@xilinx.com>; mchehab at kernel.org; leoyang.li at nxp.com;
+> amit.kucheria at linaro.org; olof at lixom.net; Srinivas Goud <sgoud@xilinx.com>;
+> Anirudha Sarangi <anirudh@xilinx.com>; linux-kernel at vger.kernel.org;
+> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> edac at vger.kernel.org
+> Subject: Re: [PATCH v5 3/4] edac: synopsys: Add EDAC ECC support for ZynqMP
+> DDRC
+> 
+> On Fri, Aug 31, 2018 at 06:57:49PM +0530, Manish Narani wrote:
+> > Add EDAC ECC support for ZynqMP DDRC IP. Also add support for ECC
+> > Error Injection in ZynqMP. The corrected and uncorrected error
+> > interrupts support is added. The Row, Column, Bank, Bank Group and
+> > Rank bits positions are determined via Address Map registers of Synopsys
+> DDRC.
+> > Minor indentation changes are also done for better readability.
+> >
+> > Signed-off-by: Manish Narani <manish.narani@xilinx.com>
+> > ---
+> >  drivers/edac/Kconfig         |    2 +-
+> >  drivers/edac/synopsys_edac.c | 1054
+> > +++++++++++++++++++++++++++++++++++++-----
+> >  2 files changed, 937 insertions(+), 119 deletions(-)
+> 
+> ...
+> 
+> > @@ -222,11 +408,77 @@ static int synps_edac_geterror_info(struct
+> > synps_edac_priv *priv)  }
+> >
+> >  /**
+> > + * zynqmp_geterror_info - Get the current ECC error info
+> > + * @priv:	DDR memory controller private instance data
+> > + *
+> > + * Get the ECC error information from the ECC registers and clear the
+> > +error
+> > + * status bits in the ECC registers.
+> > + *
+> > + * Return: 0 if there is no error, otherwise return 1  */ static int
+> > +zynqmp_geterror_info(struct synps_edac_priv *priv) {
+> > +	void __iomem *base;
+> > +	struct synps_ecc_status *p;
+> > +	u32 regval, clearval = 0;
+> > +
+> > +	if (!priv)
+> > +		return 1;
+> 
+> Same as for the previous patch: why are you testing this since you're
+> dereferencing it before calling this function?
 
-The preferred and easiest way to generate patches is to use git for your
-work and then just:
-    $ git format-patch -1
-    $ scripts/get_maintainer 000*
-    $ git send-email --to ........  000*
+Okay.
 
-(the last commands can be even squashed into one but that is just
-optimization).
+> 
+> ...
+> 
+> > @@ -258,10 +536,46 @@ static void synps_edac_handle_error(struct
+> > mem_ctl_info *mci,  }
+> >
+> >  /**
+> > + * synps_edac_intr_handler - Interrupt Handler for ECC interrupts
+> > + * @irq:        irq number
+> > + * @dev_id:     device id pointer
+> > + *
+> > + * This is the ISR called by EDAC core interrupt thread.
+> 
+> There's an "EDAC core interrupt thread"?!? This is the first time I hear of it.
+> 
+> Try again.
 
-If you do not use git, please pay attention to generate proper
-applicable patches.
+Okay. I will update this in v6.
 
-Best regards,
-Krzysztof
+> 
+> > + * This is used to check and post ECC errors.
+> > + *
+> > + * Return: IRQ_NONE, if interrupt not set or IRQ_HANDLED otherwise.
+> > + */
+> > +static irqreturn_t synps_edac_intr_handler(int irq, void *dev_id) {
+> > +	struct mem_ctl_info *mci = dev_id;
+> > +	struct synps_edac_priv *priv = mci->pvt_info;
+> > +	const struct synps_platform_data *p_data = priv->p_data;
+> > +	int status, regval;
+> > +
+> > +	regval = readl(priv->baseaddr + DDR_QOS_IRQ_STAT_OFST);
+> > +	regval &= (DDR_QOSCE_MASK | DDR_QOSUE_MASK);
+> > +	if (!(regval & ECC_CE_UE_INTR_MASK))
+> > +		return IRQ_NONE;
+> > +
+> > +	status = p_data->geterror_info(priv);
+> > +	if (status)
+> > +		return IRQ_NONE;
+> > +
+> > +	priv->ce_cnt += priv->stat.ce_cnt;
+> > +	priv->ue_cnt += priv->stat.ue_cnt;
+> > +	synps_edac_handle_error(mci, &priv->stat);
+> > +
+> > +	edac_dbg(3, "Total error count ce %d ue %d\n",
+> 
+> "ce" and "ue" are also abbreviations and should be in caps.
+
+Okay. Will be taken care in v6.
+
+> 
+> ...
+> 
+> > +static DEVICE_ATTR_RW(inject_data_error);
+> > +static DEVICE_ATTR_RW(inject_data_poison);
+> > +
+> > +static int synps_edac_create_sysfs_attributes(struct mem_ctl_info
+> > +*mci) {
+> > +	int rc;
+> > +
+> > +	rc = device_create_file(&mci->dev, &dev_attr_inject_data_error);
+> > +	if (rc < 0)
+> > +		return rc;
+> > +	rc = device_create_file(&mci->dev, &dev_attr_inject_data_poison);
+> > +	if (rc < 0)
+> > +		return rc;
+> > +	return 0;
+> > +}
+> 
+> I think I'm having a deja-vu:
+> 
+> Last time I said:
+> 
+> "More importantly, you need to put all that injection functionality behind
+> CONFIG_EDAC_DEBUG - you don't want to expose the injection capabilities on
+> a production machine."
+> 
+> and you said:
+> 
+> "I agree. I will update the same by keeping the above mentioned macro."
+> 
+> But maybe you've misunderstood me.
+
+I missed it in v5. Sorry for the inconvenience. Will update that in v6.
+
+> 
+> Grep the other EDAC drivers to find out how to hide the injection functionality
+> behind CONFIG_EDAC_DEBUG.
+> 
+> And maybe this patch is becoming huuge and too unwieldy to review properly
+> and for you to incorporate all the feedback.
+> 
+> Therefore, please split it in single patches, each of which is doing different
+> things:
+> 
+> 1. fixup/change comments
+> 2. add defines
+> 3. add functionality X
+> 4. add functionality Y
+> ...
+> 5. add injection
+> 6. tie it all together
+
+Will do the same in v6.
+
+Thanks,
+Manish Narani
