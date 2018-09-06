@@ -1,66 +1,85 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 6 Sep 2018 09:43:58 -0700
-Subject: Regression in next with filesystem context concept
-Message-ID: <20180906164358.GI5659@atomide.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 06 Sep 2018 09:48:51 -0700
+Subject: [PATCH 1/6] drm/bridge: use bus flags in bridge timings
+In-Reply-To: <10044412.4MiZRujKJI@avalon>
+References: <20180905052113.21262-1-stefan@agner.ch>
+ <a00c1650b69ba85bed7ae39b81a0c40f@agner.ch>
+ <CACRpkdbw0VjkHYcUpox+DorRG0oRdPARL4ShgPfV2eFaUF_w0g@mail.gmail.com>
+ <10044412.4MiZRujKJI@avalon>
+Message-ID: <d07214d3005fb7229f17dd62d1b5b8ee@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 06.09.2018 05:25, Laurent Pinchart wrote:
+> Hi Linus,
+> 
+> On Thursday, 6 September 2018 14:07:41 EEST Linus Walleij wrote:
+>> On Wed, Sep 5, 2018 at 8:32 PM Stefan Agner <stefan@agner.ch> wrote:
+>> > On 05.09.2018 00:44, Laurent Pinchart wrote:
+>> >
+>> > Good point! I actually really don't like that we use the same flags here
+>> > but from a different perspective. Especially since the flags defines
+>> > document things differently:
+>> >
+>> > /* drive data on pos. edge */
+>> > #define DRM_BUS_FLAG_PIXDATA_POSEDGE    (1<<2)
+>> > /* drive data on neg. edge */
+>> > #define DRM_BUS_FLAG_PIXDATA_NEGEDGE    (1<<3)
+>>
+>> Maybe a stupid comment from my side, but can't we just change the
+>> documentation to match the usecases?
+>>
+>> /* Trigger pixel data latch on positive edge */
+>> #define DRM_BUS_FLAG_PIXDATA_POSEDGE    (1<<2)
+> 
+> The flags are used for the drm_connector bus_flags field, and really mean 
+> driving on the positive/negative edges. We this can't change their meaning 
+> like this.
+> 
+>> > Using the opposite perspective would also need translation in crtc
+>> > drivers... So far no driver uses sampling_edge.
+>> >
+>> > I would prefer if we always use the meaning as documented by the flags.
+>> >
+>> > I guess we would need to convert DRM_BUS_FLAG_PIXDATA_POSEDGE ->
+>> > DRM_BUS_FLAG_PIXDATA_NEGEDGE.
+>> >
+>> > Linus Walleij, you added sampling edge, any thoughts?
+>>
+>> I just thought it was generally useful to have triggering edge encoded
+>> into the bridge as it makes it clear that this edge is something
+>> that is a delayed version of the driving edge which is subject to
+>> clock skew caused by the speed of electrons in silicon and
+>> copper and slew rate caused by parasitic capacitance.
+> 
+> I agree that we need both the driving and sampling edge. In many case they 
+> will be opposite, and providing some kind of appropriate defaults in APIs is 
+> fine by me, but we need a way to specify both when needed.
 
-Looks like next-20180906 now has a regression where mounting
-root won't work with commit fd0002870b45 ("vfs: Implement a
-filesystem superblock creation/configuration context").
+We do have pixel clock flags for displays, but also they are actually
+controller oriented:
 
-Here's what happens for me on MMC for example:
+https://elixir.bootlin.com/linux/latest/source/include/video/display_timing.h#L15
 
-Waiting for root device /dev/mmcblk0p2...
-mmc0: host does not support reading read-only switch, assuming write-enable
-mmc1: new SDIO card at address 0001
-mmc0: new high speed SDXC card at address e624
-mmcblk0: mmc0:e624 SU64G 59.5 GiB
- mmcblk0: p1 p2 p3
-VFS: Cannot open root device "mmcblk0p2" or unknown-block(179,2): error -2
-Please append a correct "root=" boot option; here are the available partitions:
-...
-  b302        60298240 mmcblk0p2 000b9930-02
-...
-Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(179,2)
+I guess having different flags to denote driving and sampling edge
+independently would be ideal. But then, is there really a use case where
+it wouldn't be the exact opposite?
 
-And NFSroot fails with:
+The other bus flags are actually fine as is. I suggest to just stick
+with the bus flags as we have them now, at least for now.
 
-Unable to handle kernel NULL pointer dereference at virtual address 00000000
-pgd = (ptrval)
-[00000000] *pgd=00000000
-Internal error: Oops: 5 [#1] SMP ARM
-Modules linked in:
-CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.19.0-rc1-00104-gfd0002870b45 #867
-Hardware name: Generic OMAP4 (Flattened Device Tree)
-PC is at nfs_fs_mount+0x4d4/0x9dc
-LR is at nfs_fs_mount+0x450/0x9dc
-pc : [<c04100c0>]    lr : [<c041003c>]    psr: 60000153
-sp : ee8bde10  ip : 00000000  fp : 00000400
-r10: 00001000  r9 : 00008001  r8 : 00000000
-r7 : eefc7110  r6 : c0d08948  r5 : eefdc000  r4 : eefc7000
-r3 : 00000000  r2 : 00000002  r1 : eefc71a0  r0 : eefc710c
-Flags: nZCv  IRQs on  FIQs off  Mode SVC_32  ISA ARM  Segment none
-Control: 10c5387d  Table: 8000404a  DAC: 00000051
-Process swapper/0 (pid: 1, stack limit = 0x(ptrval))
-...
-[<c04100c0>] (nfs_fs_mount) from [<c031c4f0>] (legacy_get_tree+0x2c/0xe4)
-[<c031c4f0>] (legacy_get_tree) from [<c02e014c>] (vfs_get_tree+0x70/0x1a0)
-[<c02e014c>] (vfs_get_tree) from [<c0305a98>] (do_mount+0x788/0xb18)
-[<c0305a98>] (do_mount) from [<c03061e4>] (ksys_mount+0x8c/0xb4)
-[<c03061e4>] (ksys_mount) from [<c0c01988>] (mount_root+0x70/0x158)
-[<c0c01988>] (mount_root) from [<c0c01bd0>] (prepare_namespace+0x160/0x1c4)
-[<c0c01bd0>] (prepare_namespace) from [<c0c012a4>] (kernel_init_freeable+0x444/0x4b4)
-[<c0c012a4>] (kernel_init_freeable) from [<c08f0558>] (kernel_init+0x8/0x114)
-[<c08f0558>] (kernel_init) from [<c01010b4>] (ret_from_fork+0x14/0x20)
-Exception stack(0xee8bdfb0 to 0xee8bdff8)
-dfa0:                                     00000000 00000000 00000000 00000000
-dfc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-dfe0: 00000000 00000000 00000000 00000000 00000013 00000000
-Code: e352000a 1a000001 e6bf3fb3 e1c730b2 (e5d83000)
+Alternatively, we could provide "consumer/bridge" oriented flags which
+use the same bit and just are the opposite of the controller oriented
+flags, e.g.:
 
-Regards,
+/* drive data on pos. edge */
+#define DRM_BUS_FLAG_PIXDATA_POSEDGE	(1<<2)
+/* drive data on neg. edge */
+#define DRM_BUS_FLAG_PIXDATA_NEGEDGE	(1<<3)
+/* sample data on neg. edge */
+#define DRM_BUS_FLAG_PIXDATA_SAMPLE_NEGEDGE	(1<<2)
+/* sample data on pos. edge */
+#define DRM_BUS_FLAG_PIXDATA_SAMPLE_POSEDGE	(1<<3)
 
-Tony
+--
+Stefan
