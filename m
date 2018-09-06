@@ -1,167 +1,35 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 06 Sep 2018 19:51:05 +0300
-Subject: [PATCH 02/10] phy: Add configuration interface
-In-Reply-To: <20180906144807.pn753tgfyovvheil@flea>
-References: <cover.ee6158898d563fcc01d45c9652501180bccff0f0.1536138624.git-series.maxime.ripard@bootlin.com>
- <8397722.XVQDA25ZU6@avalon> <20180906144807.pn753tgfyovvheil@flea>
-Message-ID: <2403687.Gdit31W5bd@avalon>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 6 Sep 2018 17:53:14 +0100
+Subject: [PATCH v2 2/9] ARM: signal: always use __copy_to_user to save
+ iwmmxt context
+In-Reply-To: <1536251888-8302-3-git-send-email-julien.thierry@arm.com>
+References: <1536251888-8302-1-git-send-email-julien.thierry@arm.com>
+ <1536251888-8302-3-git-send-email-julien.thierry@arm.com>
+Message-ID: <20180906165314.GR30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On Thu, Sep 06, 2018 at 05:38:01PM +0100, Julien Thierry wrote:
+> @@ -86,10 +84,14 @@ static int preserve_iwmmxt_context(struct iwmmxt_sigframe __user *frame)
+>  		 * Set the magic and size appropriately so that properly
+>  		 * written userspace can skip it reliably:
+>  		 */
+> -		__put_user_error(DUMMY_MAGIC, &frame->magic, err);
+> -		__put_user_error(IWMMXT_STORAGE_SIZE, &frame->size, err);
+> +		*kframe = (struct iwmmxt_sigframe) {
+> +			.magic = DUMMY_MAGIC,
+> +			.size  = IWMMXT_STORAGE_SIZE,
+> +		};
+>  	}
+>  
+> +	err = __copy_to_user(frame, kframe, sizeof(*kframe));
 
-On Thursday, 6 September 2018 17:48:07 EEST Maxime Ripard wrote:
-> On Wed, Sep 05, 2018 at 04:39:46PM +0300, Laurent Pinchart wrote:
-> > On Wednesday, 5 September 2018 12:16:33 EEST Maxime Ripard wrote:
-> >> The phy framework is only allowing to configure the power state of the
-> >> PHY using the init and power_on hooks, and their power_off and exit
-> >> counterparts.
-> >> 
-> >> While it works for most, simple, PHYs supported so far, some more
-> >> advanced PHYs need some configuration depending on runtime parameters.
-> >> These PHYs have been supported by a number of means already, often by
-> >> using ad-hoc drivers in their consumer drivers.
-> >> 
-> >> That doesn't work too well however, when a consumer device needs to deal
-> > 
-> > s/deal/deal with/
-> > 
-> >> multiple PHYs, or when multiple consumers need to deal with the same PHY
-> >> (a DSI driver and a CSI driver for example).
-> >> 
-> >> So we'll add a new interface, through two funtions, phy_validate and
-> >> phy_configure. The first one will allow to check that a current
-> >> configuration, for a given mode, is applicable. It will also allow the
-> >> PHY driver to tune the settings given as parameters as it sees fit.
-> >> 
-> >> phy_configure will actually apply that configuration in the phy itself.
-> >> 
-> >> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> >> ---
-> >> 
-> >>  drivers/phy/phy-core.c  | 62 +++++++++++++++++++++++++++++++++++++++++-
-> >>  include/linux/phy/phy.h | 42 ++++++++++++++++++++++++++++-
-> >>  2 files changed, 104 insertions(+)
-> >> 
-> >> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
-> >> index 35fd38c5a4a1..6eaf655e370f 100644
-> >> --- a/drivers/phy/phy-core.c
-> >> +++ b/drivers/phy/phy-core.c
-> >> @@ -408,6 +408,68 @@ int phy_calibrate(struct phy *phy)
-> >>  EXPORT_SYMBOL_GPL(phy_calibrate);
-> >>  
-> >>  /**
-> >> + * phy_configure() - Changes the phy parameters
-> >> + * @phy: the phy returned by phy_get()
-> >> + * @mode: phy_mode the configuration is applicable to.
-> >> + * @opts: New configuration to apply
-> >> + *
-> >> + * Used to change the PHY parameters. phy_init() must have
-> >> + * been called on the phy.
-> >> + *
-> >> + * Returns: 0 if successful, an negative error code otherwise
-> >> + */
-> >> +int phy_configure(struct phy *phy, enum phy_mode mode,
-> >> +		  union phy_configure_opts *opts)
-> >> +{
-> >> +	int ret;
-> >> +
-> >> +	if (!phy)
-> >> +		return -EINVAL;
-> >> +
-> >> +	if (!phy->ops->configure)
-> >> +		return 0;
-> > 
-> > Shouldn't you report an error to the caller ? If a caller expects the PHY
-> > to be configurable, I would assume that silently ignoring the requested
-> > configuration won't work great.
-> 
-> I'm not sure. I also expect a device having to interact with multiple
-> PHYs, some of them needing some configuration while some other do
-> not. In that scenario, returning 0 seems to be the right thing to do.
-
-It could be up to the caller to decide whether to ignore the error or not when 
-the operation isn't implemented. I expect that a call requiring specific 
-configuration parameters for a given PHY might want to bail out if the 
-configuration can't be applied. On the other hand that should never happen 
-when the system is designed correctly, as vendors are not supposed to ship 
-kernels that would be broken by design (as in requiring a configure operation 
-but not providing it).
-
-> >> +	mutex_lock(&phy->mutex);
-> >> +	ret = phy->ops->configure(phy, mode, opts);
-> >> +	mutex_unlock(&phy->mutex);
-> >> +
-> >> +	return ret;
-> >> +}
-
-[snip]
-
-> >> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
-> >> index 9cba7fe16c23..3cc315dcfcd0 100644
-> >> --- a/include/linux/phy/phy.h
-> >> +++ b/include/linux/phy/phy.h
-
-[snip]
-
-> >> @@ -60,6 +66,38 @@ struct phy_ops {
-> >>  	int	(*power_on)(struct phy *phy);
-> >>  	int	(*power_off)(struct phy *phy);
-> >>  	int	(*set_mode)(struct phy *phy, enum phy_mode mode);
-> >> +
-> >> +	/**
-> >> +	 * @configure:
-> >> +	 *
-> >> +	 * Optional.
-> >> +	 *
-> >> +	 * Used to change the PHY parameters. phy_init() must have
-> >> +	 * been called on the phy.
-> >> +	 *
-> >> +	 * Returns: 0 if successful, an negative error code otherwise
-> >> +	 */
-> >> +	int	(*configure)(struct phy *phy, enum phy_mode mode,
-> >> +			     union phy_configure_opts *opts);
-> > 
-> > Is this function allowed to modify opts ? If so, to what extent ? If not,
-> > the pointer should be made const.
-> 
-> That's a pretty good question. I guess it could modify it to the same
-> extent than validate could. Would that make sense?
-
-It would, or we could say that PHY users are required to call the validate 
-function first, and the the configure function will return an error if the 
-passed configuration isn't valid. That would avoid double-validation when the 
-PHY user uses .validate().
-
-> >> +	/**
-> >> +	 * @validate:
-> >> +	 *
-> >> +	 * Optional.
-> >> +	 *
-> >> +	 * Used to check that the current set of parameters can be
-> >> +	 * handled by the phy. Implementations are free to tune the
-> >> +	 * parameters passed as arguments if needed by some
-> >> +	 * implementation detail or constraints. It must not change
-> >> +	 * any actual configuration of the PHY, so calling it as many
-> >> +	 * times as deemed fit by the consumer must have no side
-> >> +	 * effect.
-> >> +	 *
-> >> +	 * Returns: 0 if the configuration can be applied, an negative
-> >> +	 * error code otherwise
-> > 
-> > When should this operation modify the passed parameters, and when should
-> > it return an error ? I understand that your goal is to implement a
-> > negotiation mechanism for the PHY parameters, and to be really useful I
-> > think we need to document it more precisely.
-> 
-> My initial idea was to reject a configuration that wouldn't be
-> achievable by the PHY, ie you're asking something that is outside of
-> the operating boundaries, while you would be able to change settings
-> that would be operational, but sub-optimal.
-
-I'm fine with that, let's document it explicitly.
+Looks safe to me - iwmmxt_sigframe is ultimately made up of
+unsigned long's and unsigned int's and the embedded struct
+iwmmxt_struct is aligned to an 8 byte boundary anyway, so there
+should be no padding here either.
 
 -- 
-Regards,
-
-Laurent Pinchart
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
