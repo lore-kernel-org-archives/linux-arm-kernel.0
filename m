@@ -1,51 +1,46 @@
-From: phdm@macq.eu (Philippe De Muyter)
-Date: Thu, 6 Sep 2018 12:36:42 +0200
-Subject: [PATCH v3 1/4] dt-bindings: media: Add i.MX Pixel Pipeline binding
-In-Reply-To: <20180906090215.15719-2-p.zabel@pengutronix.de>
-References: <20180906090215.15719-1-p.zabel@pengutronix.de>
- <20180906090215.15719-2-p.zabel@pengutronix.de>
-Message-ID: <20180906103642.GA26723@frolo.macqel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 6 Sep 2018 11:47:07 +0100
+Subject: [PATCH v11 0/3] remain and optimize memblock_next_valid_pfn on
+ arm and arm64
+In-Reply-To: <20180905145755.cc89819d446f311e4b8e8f95@linux-foundation.org>
+References: <1534907237-2982-1-git-send-email-jia.he@hxt-semitech.com>
+ <20180905145755.cc89819d446f311e4b8e8f95@linux-foundation.org>
+Message-ID: <20180906104707.GL3592@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
-
-On Thu, Sep 06, 2018 at 11:02:12AM +0200, Philipp Zabel wrote:
-> Add DT binding documentation for the Pixel Pipeline (PXP) found on
-> various NXP i.MX SoCs.
+On Wed, Sep 05, 2018 at 02:57:55PM -0700, Andrew Morton wrote:
+> On Wed, 22 Aug 2018 11:07:14 +0800 Jia He <hejianet@gmail.com> wrote:
 > 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> ---
-> No changes since v2.
-> ---
->  .../devicetree/bindings/media/fsl-pxp.txt     | 26 +++++++++++++++++++
->  1 file changed, 26 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/fsl-pxp.txt
+> > Commit b92df1de5d28 ("mm: page_alloc: skip over regions of invalid pfns
+> > where possible") optimized the loop in memmap_init_zone(). But it causes
+> > possible panic bug. So Daniel Vacek reverted it later.
+> > 
+> > But as suggested by Daniel Vacek, it is fine to using memblock to skip
+> > gaps and finding next valid frame with CONFIG_HAVE_ARCH_PFN_VALID.
+> > 
+> > More from what Daniel said:
+> > "On arm and arm64, memblock is used by default. But generic version of
+> > pfn_valid() is based on mem sections and memblock_next_valid_pfn() does
+> > not always return the next valid one but skips more resulting in some
+> > valid frames to be skipped (as if they were invalid). And that's why
+> > kernel was eventually crashing on some !arm machines."
+> > 
+> > About the performance consideration:
+> > As said by James in b92df1de5,
+> > "I have tested this patch on a virtual model of a Samurai CPU with a
+> > sparse memory map.  The kernel boot time drops from 109 to 62 seconds."
+> > Thus it would be better if we remain memblock_next_valid_pfn on arm/arm64.
+> > 
+> > Besides we can remain memblock_next_valid_pfn, there is still some room
+> > for improvement. After this set, I can see the time overhead of memmap_init
+> > is reduced from 27956us to 13537us in my armv8a server(QDF2400 with 96G
+> > memory, pagesize 64k). I believe arm server will benefit more if memory is
+> > larger than TBs
 > 
-> diff --git a/Documentation/devicetree/bindings/media/fsl-pxp.txt b/Documentation/devicetree/bindings/media/fsl-pxp.txt
-> new file mode 100644
-> index 000000000000..2477e7f87381
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/fsl-pxp.txt
-> @@ -0,0 +1,26 @@
-> +Freescale Pixel Pipeline
-> +========================
-> +
-> +The Pixel Pipeline (PXP) is a memory-to-memory graphics processing engine
-> +that supports scaling, colorspace conversion, alpha blending, rotation, and
-> +pixel conversion via lookup table. Different versions are present on various
-> +i.MX SoCs from i.MX23 to i.MX7.
-> +
-> +Required properties:
-> +- compatible: should be "fsl,<soc>-pxp", where SoC can be one of imx23, imx28,
-> +  imx6dl, imx6sl, imx6ul, imx6sx, imx6ull, or imx7d.
+> Thanks.  I switched to v11.  It would be nice to see some confirmation
+> from ARM people please?
 
-Is imx6q also compatible ?
+I'll take a look...
 
-Best regards
-
-Philippe
-
--- 
-Philippe De Muyter +32 2 6101532 Macq SA rue de l'Aeronef 2 B-1140 Bruxelles
+Will
