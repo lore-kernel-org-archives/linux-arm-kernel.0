@@ -1,494 +1,96 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu,  6 Sep 2018 14:19:47 +0300
-Subject: [PATCH v2] arm64: dts: add support for SolidRun Clearfog GT 8K
-Message-ID: <a8f5114101ac62622a8b8152ba5415f39e52f05b.1536232787.git.baruch@tkos.co.il>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 6 Sep 2018 13:24:22 +0200
+Subject: [PATCH v11 0/3] remain and optimize memblock_next_valid_pfn on
+ arm and arm64
+In-Reply-To: <1534907237-2982-1-git-send-email-jia.he@hxt-semitech.com>
+References: <1534907237-2982-1-git-send-email-jia.he@hxt-semitech.com>
+Message-ID: <CAKv+Gu9u8RcrzSHdgXiqHS9HK1aSrjbPxVUSCP0DT4erAhx0pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SolidRun Clearfog GT-8K is based on Marvell Armada 8040 SoC.
+On 22 August 2018 at 05:07, Jia He <hejianet@gmail.com> wrote:
+> Commit b92df1de5d28 ("mm: page_alloc: skip over regions of invalid pfns
+> where possible") optimized the loop in memmap_init_zone(). But it causes
+> possible panic bug. So Daniel Vacek reverted it later.
+>
+> But as suggested by Daniel Vacek, it is fine to using memblock to skip
+> gaps and finding next valid frame with CONFIG_HAVE_ARCH_PFN_VALID.
+>
+> More from what Daniel said:
+> "On arm and arm64, memblock is used by default. But generic version of
+> pfn_valid() is based on mem sections and memblock_next_valid_pfn() does
+> not always return the next valid one but skips more resulting in some
+> valid frames to be skipped (as if they were invalid). And that's why
+> kernel was eventually crashing on some !arm machines."
+>
+> About the performance consideration:
+> As said by James in b92df1de5,
+> "I have tested this patch on a virtual model of a Samurai CPU with a
+> sparse memory map.  The kernel boot time drops from 109 to 62 seconds."
+> Thus it would be better if we remain memblock_next_valid_pfn on arm/arm64.
+>
+> Besides we can remain memblock_next_valid_pfn, there is still some room
+> for improvement. After this set, I can see the time overhead of memmap_init
+> is reduced from 27956us to 13537us in my armv8a server(QDF2400 with 96G
+> memory, pagesize 64k). I believe arm server will benefit more if memory is
+> larger than TBs
+>
 
-  https://wiki.solid-run.com/doku.php?id=products:a8040:clearfoggt8k
+OK so we can summarize the benefits of this series as follows:
+- boot time on a virtual model of a Samurai CPU drops from 109 to 62 seconds
+- boot time on a QDF2400 arm64 server with 96 GB of RAM drops by ~15
+*milliseconds*
 
-The following devices were tested with this DT on top of kernel
-v4.19-rc1:
+Google was not very helpful in figuring out what a Samurai CPU is and
+why we should care about the boot time of Linux running on a virtual
+model of it, and the 15 ms speedup is not that compelling either.
 
-  * 1GB Ethernet WAN
+Apologies to Jia that it took 11 revisions to reach this conclusion,
+but in /my/ opinion, tweaking the fragile memblock/pfn handling code
+for this reason is totally unjustified, and we're better off
+disregarding these patches.
 
-  * 4 ports 1GB Ethernet switch (2.5GB uplink)
 
-  * SATA on CON3 PCIe slot
 
-  * USB3 type A port
 
-  * SD card and eMMC
 
-  * 2 LEDs
-
-  * 2 push buttons
-
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
-v2:
-  * Add SATA node
-
-  * Set front button code to KEY_WPS_BUTTON
-
-  * Use LEDs labels more aligned to conversion
-
-  * Document the marvell,reg-init meaning
----
- arch/arm64/boot/dts/marvell/Makefile          |   1 +
- .../marvell/armada-8040-clearfog-gt-8k.dts    | 430 ++++++++++++++++++
- 2 files changed, 431 insertions(+)
- create mode 100644 arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts
-
-diff --git a/arch/arm64/boot/dts/marvell/Makefile b/arch/arm64/boot/dts/marvell/Makefile
-index ea9d49f2a911..eca8bac6303a 100644
---- a/arch/arm64/boot/dts/marvell/Makefile
-+++ b/arch/arm64/boot/dts/marvell/Makefile
-@@ -3,6 +3,7 @@
- dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-db.dtb
- dtb-$(CONFIG_ARCH_MVEBU) += armada-3720-espressobin.dtb
- dtb-$(CONFIG_ARCH_MVEBU) += armada-7040-db.dtb
-+dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-clearfog-gt-8k.dtb
- dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-db.dtb
- dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-mcbin.dtb
- dtb-$(CONFIG_ARCH_MVEBU) += armada-8080-db.dtb
-diff --git a/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts b/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts
-new file mode 100644
-index 000000000000..b9bbd1afecbb
---- /dev/null
-+++ b/arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts
-@@ -0,0 +1,430 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Copyright (C) 2018 SolidRun ltd.
-+ * Based on Marvell MACCHIATOBin board
-+ *
-+ * Device Tree file for SolidRun's ClearFog GT 8K
-+ */
-+
-+#include "armada-8040.dtsi"
-+
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/gpio/gpio.h>
-+
-+/ {
-+	model = "SolidRun ClearFog GT 8K";
-+	compatible = "solidrun,clearfog-gt-8k", "marvell,armada8040",
-+			"marvell,armada-ap806-quad", "marvell,armada-ap806";
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory at 00000000 {
-+		device_type = "memory";
-+		reg = <0x0 0x0 0x0 0x80000000>;
-+	};
-+
-+	aliases {
-+		ethernet0 = &cp1_eth1;
-+		ethernet1 = &cp0_eth0;
-+		ethernet2 = &cp1_eth2;
-+	};
-+
-+	v_3_3: regulator-3-3v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "v_3_3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+		status = "okay";
-+	};
-+
-+	v_5v0_usb3_hst_vbus: regulator-usb3-vbus0 {
-+		compatible = "regulator-fixed";
-+		gpio = <&cp0_gpio2 15 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&cp0_xhci_vbus_pins>;
-+		regulator-name = "v_5v0_usb3_hst_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		status = "okay";
-+	};
-+
-+	usb3h0_phy: usb3_phy0 {
-+		compatible = "usb-nop-xceiv";
-+		vcc-supply = <&v_5v0_usb3_hst_vbus>;
-+	};
-+
-+	sfp_cp0_eth0: sfp-cp0-eth0 {
-+		compatible = "sff,sfp";
-+		i2c-bus = <&cp0_i2c1>;
-+		mod-def0-gpio = <&cp0_gpio2 17 GPIO_ACTIVE_LOW>;
-+		tx-disable-gpio = <&cp1_gpio1 29 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&cp0_sfp_present_pins &cp1_sfp_tx_disable_pins>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-0 = <&cp0_led0_pins
-+			     &cp0_led1_pins>;
-+		pinctrl-names = "default";
-+		/* No designated function for these LEDs at the moment */
-+		led0 {
-+			label = "green:led0";
-+			gpios = <&cp0_gpio2 8 GPIO_ACTIVE_LOW>;
-+			default-state = "on";
-+		};
-+		led1 {
-+			label = "green:led1";
-+			gpios = <&cp0_gpio2 9 GPIO_ACTIVE_LOW>;
-+			default-state = "on";
-+		};
-+	};
-+
-+	keys {
-+		compatible = "gpio-keys";
-+		pinctrl-0 = <&cp0_gpio_reset_pins &cp1_wps_button_pins>;
-+		pinctrl-names = "default";
-+
-+		button_0 {
-+			/* The rear button */
-+			label = "Rear Button";
-+			gpios = <&cp0_gpio2 7 GPIO_ACTIVE_LOW>;
-+			linux,can-disable;
-+			linux,code = <BTN_0>;
-+		};
-+
-+		button_1 {
-+			/* The wps button */
-+			label = "WPS Button";
-+			gpios = <&cp1_gpio1 30 GPIO_ACTIVE_LOW>;
-+			linux,can-disable;
-+			linux,code = <KEY_WPS_BUTTON>;
-+		};
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+	pinctrl-0 = <&uart0_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+&ap_sdhci0 {
-+	bus-width = <8>;
-+	no-1-8-v;
-+	no-sd;
-+	no-sdio;
-+	non-removable;
-+	status = "okay";
-+	vqmmc-supply = <&v_3_3>;
-+};
-+
-+&cp0_i2c0 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&cp0_i2c0_pins>;
-+	status = "okay";
-+};
-+
-+&cp0_i2c1 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&cp0_i2c1_pins>;
-+	status = "okay";
-+};
-+
-+&cp0_pinctrl {
-+	/*
-+	* MPP Bus:
-+	* [0-31] = 0xff: Keep default CP0_shared_pins:
-+	* [11] CLKOUT_MPP_11 (out)
-+	* [23] LINK_RD_IN_CP2CP (in)
-+	* [25] CLKOUT_MPP_25 (out)
-+	* [29] AVS_FB_IN_CP2CP (in)
-+	* [32, 33, 34] pci0/1/2 reset
-+	* [35-38] CP0 I2C1 and I2C0
-+	* [39] GPIO reset button
-+	* [40,41] LED0 and LED1
-+	* [43] 1512 phy reset
-+	* [47] USB VBUS EN (active low)
-+	* [48] FAN PWM
-+	* [49] SFP+ present signal
-+	* [50] TPM interrupt
-+	* [51] WLAN0 disable
-+	* [52] WLAN1 disable
-+	* [53] LTE disable
-+	* [54] NFC reset
-+	* [55] Micro SD card detect
-+	* [56-61] Micro SD
-+	*/
-+
-+	cp0_pci0_reset_pins: pci0-reset-pins {
-+		marvell,pins = "mpp32";
-+		marvell,function = "gpio";
-+	};
-+
-+	cp0_pci1_reset_pins: pci1-reset-pins {
-+		marvell,pins = "mpp33";
-+		marvell,function = "gpio";
-+	};
-+
-+	cp0_pci2_reset_pins: pci2-reset-pins {
-+		marvell,pins = "mpp34";
-+		marvell,function = "gpio";
-+	};
-+
-+	cp0_i2c1_pins: i2c1-pins {
-+		marvell,pins = "mpp35", "mpp36";
-+		marvell,function = "i2c1";
-+	};
-+
-+	cp0_i2c0_pins: i2c0-pins {
-+		marvell,pins = "mpp37", "mpp38";
-+		marvell,function = "i2c0";
-+	};
-+
-+	cp0_gpio_reset_pins: gpio-reset-pins {
-+		marvell,pins = "mpp39";
-+		marvell,function = "gpio";
-+	};
-+
-+	cp0_led0_pins: led0-pins {
-+		marvell,pins = "mpp40";
-+		marvell,function = "gpio";
-+	};
-+
-+	cp0_led1_pins: led1-pins {
-+		marvell,pins = "mpp41";
-+		marvell,function = "gpio";
-+	};
-+
-+	cp0_copper_eth_phy_reset: copper-eth-phy-reset {
-+		marvell,pins = "mpp43";
-+		marvell,function = "gpio";
-+	};
-+
-+	cp0_xhci_vbus_pins: xhci0-vbus-pins {
-+		marvell,pins = "mpp47";
-+		marvell,function = "gpio";
-+	};
-+
-+	cp0_fan_pwm_pins: fan-pwm-pins {
-+		marvell,pins = "mpp48";
-+		marvell,function = "gpio";
-+	};
-+
-+	cp0_sfp_present_pins: sfp-present-pins {
-+		marvell,pins = "mpp49";
-+		marvell,function = "gpio";
-+	};
-+
-+	cp0_tpm_irq_pins: tpm-irq-pins {
-+		marvell,pins = "mpp50";
-+		marvell,function = "gpio";
-+	};
-+
-+	cp0_sdhci_pins: sdhci-pins {
-+		marvell,pins = "mpp55", "mpp56", "mpp57", "mpp58", "mpp59",
-+			       "mpp60", "mpp61";
-+		marvell,function = "sdio";
-+	};
-+};
-+
-+&cp0_gpio2 {
-+	sata_reset {
-+		gpio-hog;
-+		gpios = <1 GPIO_ACTIVE_HIGH>;
-+		output-high;
-+	};
-+};
-+
-+&cp0_ethernet {
-+	status = "okay";
-+};
-+
-+/* SFP */
-+&cp0_eth0 {
-+	status = "okay";
-+	phy-mode = "10gbase-kr";
-+	managed = "in-band-status";
-+	phys = <&cp0_comphy2 0>;
-+	sfp = <&sfp_cp0_eth0>;
-+};
-+
-+&cp0_sdhci0 {
-+	broken-cd;
-+	bus-width = <4>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&cp0_sdhci_pins>;
-+	status = "okay";
-+	vqmmc-supply = <&v_3_3>;
-+};
-+
-+&cp1_pinctrl {
-+	/*
-+	 * MPP Bus:
-+	 * [0-5] TDM
-+	 * [6]   VHV Enable
-+	 * [7]   CP1 SPI0 CSn1 (FXS)
-+	 * [8]   CP1 SPI0 CSn0 (TPM)
-+	 * [9.11]CP1 SPI0 MOSI/MISO/CLK
-+	 * [13]  CP1 SPI1 MISO (TDM and SPI ROM shared)
-+	 * [14]  CP1 SPI1 CS0n (64Mb SPI ROM)
-+	 * [15]  CP1 SPI1 MOSI (TDM and SPI ROM shared)
-+	 * [16]  CP1 SPI1 CLK (TDM and SPI ROM shared)
-+	 * [24]  Topaz switch reset
-+	 * [26]  Buzzer
-+	 * [27]  CP1 SMI MDIO
-+	 * [28]  CP1 SMI MDC
-+	 * [29]  CP0 10G SFP TX Disable
-+	 * [30]  WPS button
-+	 * [31]  Front panel button
-+	 */
-+
-+	cp1_spi1_pins: spi1-pins {
-+		marvell,pins = "mpp13", "mpp14", "mpp15", "mpp16";
-+		marvell,function = "spi1";
-+	};
-+
-+	cp1_switch_reset_pins: switch-reset-pins {
-+		marvell,pins = "mpp24";
-+		marvell,function = "gpio";
-+	};
-+
-+	cp1_ge_mdio_pins: ge-mdio-pins {
-+		marvell,pins = "mpp27", "mpp28";
-+		marvell,function = "ge";
-+	};
-+
-+	cp1_sfp_tx_disable_pins: sfp-tx-disable-pins {
-+		marvell,pins = "mpp29";
-+		marvell,function = "gpio";
-+	};
-+
-+	cp1_wps_button_pins: wps-button-pins {
-+		marvell,pins = "mpp30";
-+		marvell,function = "gpio";
-+	};
-+};
-+
-+&cp1_sata0 {
-+	pinctrl-0 = <&cp0_pci1_reset_pins>;
-+	status = "okay";
-+};
-+
-+&cp1_mdio {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&cp1_ge_mdio_pins>;
-+	status = "okay";
-+
-+	ge_phy: ethernet-phy at 0 {
-+		/* LED0 - GB link
-+		 * LED1 - on: link, blink: activity
-+		 */
-+		marvell,reg-init = <3 16 0 0x1017>;
-+		reg = <0>;
-+	};
-+
-+	switch0: switch0 at 4 {
-+		compatible = "marvell,mv88e6085";
-+		reg = <4>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&cp1_switch_reset_pins>;
-+		reset-gpios = <&cp1_gpio1 24 GPIO_ACTIVE_LOW>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 1 {
-+				reg = <1>;
-+				label = "lan2";
-+				phy-handle = <&switch0phy0>;
-+			};
-+
-+			port at 2 {
-+				reg = <2>;
-+				label = "lan1";
-+				phy-handle = <&switch0phy1>;
-+			};
-+
-+			port at 3 {
-+				reg = <3>;
-+				label = "lan4";
-+				phy-handle = <&switch0phy2>;
-+			};
-+
-+			port at 4 {
-+				reg = <4>;
-+				label = "lan3";
-+				phy-handle = <&switch0phy3>;
-+			};
-+
-+			port at 5 {
-+				reg = <5>;
-+				label = "cpu";
-+				ethernet = <&cp1_eth2>;
-+			};
-+		};
-+
-+		mdio {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			switch0phy0: switch0phy0 at 11 {
-+				reg = <0x11>;
-+			};
-+			switch0phy1: switch0phy1 at 12 {
-+				reg = <0x12>;
-+			};
-+			switch0phy2: switch0phy2 at 13 {
-+				reg = <0x13>;
-+			};
-+			switch0phy3: switch0phy3 at 14 {
-+				reg = <0x14>;
-+			};
-+		};
-+	};
-+};
-+
-+&cp1_ethernet {
-+	status = "okay";
-+};
-+
-+/* 1G copper */
-+&cp1_eth1 {
-+	status = "okay";
-+	phy-mode = "sgmii";
-+	phy = <&ge_phy>;
-+	phys = <&cp1_comphy3 1>;
-+};
-+
-+/* Switch uplink */
-+&cp1_eth2 {
-+	status = "okay";
-+	phy-mode = "2500base-x";
-+	phys = <&cp1_comphy5 2>;
-+	fixed-link {
-+		speed = <2500>;
-+		full-duplex;
-+	};
-+};
-+
-+&cp1_spi1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&cp1_spi1_pins>;
-+	status = "okay";
-+
-+	spi-flash at 0 {
-+		compatible = "st,w25q32";
-+		spi-max-frequency = <50000000>;
-+		reg = <0>;
-+	};
-+};
-+
-+&cp1_usb3_0 {
-+	usb-phy = <&usb3h0_phy>;
-+	status = "okay";
-+};
--- 
-2.18.0
+> Patch 1 introduces new config to make codes more generic
+> Patch 2 remains the memblock_next_valid_pfn on arm and arm64,this patch is
+>         originated from b92df1de5
+> Patch 3 optimizes the memblock_next_valid_pfn()
+>
+> Changelog:
+> V11:- drop patch#4-6, refine the codes
+> V10:- move codes to memblock.c, refine the performance consideration
+> V9: - rebase to mmotm master, refine the log description. No major changes
+> V8: - introduce new config and move generic code to early_pfn.h
+>     - optimize memblock_next_valid_pfn as suggested by Matthew Wilcox
+> V7: - fix i386 compilation error. refine the commit description
+> V6: - simplify the codes, move arm/arm64 common codes to one file.
+>     - refine patches as suggested by Danial Vacek and Ard Biesheuvel
+> V5: - further refining as suggested by Danial Vacek. Make codes
+>       arm/arm64 more arch specific
+> V4: - refine patches as suggested by Danial Vacek and Wei Yang
+>     - optimized on arm besides arm64
+> V3: - fix 2 issues reported by kbuild test robot
+> V2: - rebase to mmotm latest
+>     - remain memblock_next_valid_pfn on arm64
+>     - refine memblock_search_pfn_regions and pfn_valid_region
+>
+> Jia He (3):
+>   arm: arm64: introduce CONFIG_HAVE_MEMBLOCK_PFN_VALID
+>   mm: page_alloc: remain memblock_next_valid_pfn() on arm/arm64
+>   mm: page_alloc: reduce unnecessary binary search in
+>     memblock_next_valid_pfn
+>
+>  arch/arm/Kconfig       |  1 +
+>  arch/arm64/Kconfig     |  1 +
+>  include/linux/mmzone.h |  9 +++++++++
+>  mm/Kconfig             |  3 +++
+>  mm/memblock.c          | 51 ++++++++++++++++++++++++++++++++++++++++++++++++++
+>  mm/page_alloc.c        |  5 ++++-
+>  6 files changed, 69 insertions(+), 1 deletion(-)
+>
+> --
+> 1.8.3.1
+>
