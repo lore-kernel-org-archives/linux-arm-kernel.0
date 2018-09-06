@@ -1,35 +1,30 @@
 From: contact@paulk.fr (Paul Kocialkowski)
-Date: Fri,  7 Sep 2018 00:24:41 +0200
-Subject: [PATCH v9 8/9] ARM: dts: sun8i-a33: Add Video Engine and reserved
+Date: Fri,  7 Sep 2018 00:24:42 +0200
+Subject: [PATCH v9 9/9] ARM: dts: sun8i-h3: Add Video Engine and reserved
  memory nodes
 In-Reply-To: <20180906222442.14825-1-contact@paulk.fr>
 References: <20180906222442.14825-1-contact@paulk.fr>
-Message-ID: <20180906222442.14825-9-contact@paulk.fr>
+Message-ID: <20180906222442.14825-10-contact@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 
 This adds nodes for the Video Engine and the associated reserved memory
-for the A33. Up to 96 MiB of memory are dedicated to the CMA pool.
-
-The VPU can only map the first 256 MiB of DRAM, so the reserved memory
-pool has to be located in that area. Following Allwinner's decision in
-downstream software, the last 96 MiB of the first 256 MiB of RAM are
-reserved for this purpose.
+for the H3. Up to 96 MiB of memory are dedicated to the CMA pool.
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- arch/arm/boot/dts/sun8i-a33.dtsi | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ arch/arm/boot/dts/sun8i-h3.dtsi | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
-index 4e92741b24a7..c1cc8f09dd9a 100644
---- a/arch/arm/boot/dts/sun8i-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a33.dtsi
-@@ -190,6 +190,21 @@
- 		reg = <0x40000000 0x80000000>;
+diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+index f0096074a467..3ecfabb10151 100644
+--- a/arch/arm/boot/dts/sun8i-h3.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+@@ -119,6 +119,20 @@
+ 			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
  	};
  
 +	reserved-memory {
@@ -37,7 +32,6 @@ index 4e92741b24a7..c1cc8f09dd9a 100644
 +		#size-cells = <1>;
 +		ranges;
 +
-+		/* Address must be kept in the lower 256 MiBs of DRAM for VE. */
 +		cma_pool: cma at 4a000000 {
 +			compatible = "shared-dma-pool";
 +			size = <0x6000000>;
@@ -47,15 +41,15 @@ index 4e92741b24a7..c1cc8f09dd9a 100644
 +		};
 +	};
 +
- 	sound: sound {
- 		compatible = "simple-audio-card";
- 		simple-audio-card,name = "sun8i-a33-audio";
-@@ -254,6 +269,17 @@
+ 	soc {
+ 		system-control at 1c00000 {
+ 			compatible = "allwinner,sun8i-h3-system-control";
+@@ -142,6 +156,17 @@
  			};
  		};
  
 +		video-codec at 01c0e000 {
-+			compatible = "allwinner,sun8i-a33-video-engine";
++			compatible = "allwinner,sun8i-h3-video-engine";
 +			reg = <0x01c0e000 0x1000>;
 +			clocks = <&ccu CLK_BUS_VE>, <&ccu CLK_VE>,
 +				 <&ccu CLK_DRAM_VE>;
@@ -65,8 +59,8 @@ index 4e92741b24a7..c1cc8f09dd9a 100644
 +			allwinner,sram = <&ve_sram 1>;
 +		};
 +
- 		crypto: crypto-engine at 1c15000 {
- 			compatible = "allwinner,sun4i-a10-crypto";
- 			reg = <0x01c15000 0x1000>;
+ 		mali: gpu at 1c40000 {
+ 			compatible = "allwinner,sun8i-h3-mali", "arm,mali-400";
+ 			reg = <0x01c40000 0x10000>;
 -- 
 2.18.0
