@@ -1,34 +1,62 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 6 Sep 2018 22:39:25 +0100
-Subject: Timer on i.MX28 moving backwards
-In-Reply-To: <20180906200202.et4whmzq22n4uajt@pengutronix.de>
-References: <20180906200202.et4whmzq22n4uajt@pengutronix.de>
-Message-ID: <20180906213925.GU30658@n2100.armlinux.org.uk>
+From: shuah@kernel.org (Shuah Khan)
+Date: Thu, 6 Sep 2018 15:53:34 -0600
+Subject: [PATCH] arm64: add NUMA emulation support
+In-Reply-To: <20180905064252.GW14951@dhcp22.suse.cz>
+References: <20180824230559.32336-1-shuah@kernel.org>
+ <20180828174011.GE20375@arm.com>
+ <a58ad11f-3c22-ed7f-a0cd-938aabc4adaf@kernel.org>
+ <20180829110802.GD10349@dhcp22.suse.cz>
+ <f041ba95-03e6-4a7d-c324-870b45a2f648@kernel.org>
+ <20180905064252.GW14951@dhcp22.suse.cz>
+Message-ID: <c1b58f13-6190-20e9-7e4f-b8bc2b9d5f80@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2018 at 10:02:02PM +0200, Uwe Kleine-K?nig wrote:
-> +cycle_t mxs_clocksource_mmio_readl_down(struct clocksource *c)
-> +{
-> +	cycle_t ret = ~(cycle_t)readl_relaxed(to_mmio_clksrc(c)->reg) & c->mask;
-> +	trace_printk("time = %llx\n", ret);
+On 09/05/2018 12:42 AM, Michal Hocko wrote:
+> On Tue 04-09-18 15:59:34, Shuah Khan wrote:
+> [...]
+>> This will support the following workload requirements:
+>>
+>> - reserving one or more NUMA memory nodes for class of critical tasks that require
+>>   guaranteed memory availability.
+>> - isolate memory blocks with a guaranteed exclusive access.
+> 
+> How do you enforce kernel doesn't allocate from those reserved nodes?
+> They will be in a fallback zonelists so once the memory gets used on all
+> other ones then the kernel happily spills over to your reserved node.
 
-I think it may be worth re-running your test with:
+I should have clarified the "isolate memory blocks with a guaranteed exclusive
+access." scope.
 
-	u32 one, two;
+Kernel does satisfy GFP_ATOMIC at the expense of cpuset exclusive/hardwall policies
+to not stress the kernel.
 
-	one = readl_relaxed(to_mmio_clksrc(c)->reg);
-	two = readl_relaxed(to_mmio_clksrc(c)->reg);
-	trace_printk("time=0x%08x:0x%08x\n", one, two);
+It is not the intent to make sure kernel doesn't allocate from these reserved
+nodes. The intent is to work within the constraints of cpuset mem.exclusive and
+cpuset mem.hardwall policies.
 
-	return ~(cycle_t)two & c->mask;
+> 
+>> NUMA emulation to split the flat machine into "x" number of nodes, combined with
+>> cpuset cgroup with the following example configuration will make it possible to
+>> support the above workloads on non-NUMA platforms.
+>>
+>> numa=fake=4
+>>
+>> cpuset.mems=2
+>> cpuset.cpus=2
+>> cpuset.mem_exclusive=1 (enabling exclusive use of the memory nodes by a CPU set)
+>> cpuset.mem_hardwall=1  (separate the memory nodes that are allocated to different cgroups)
+> 
+> This will only enforce userspace to follow and I strongly suspect that
+> tasks in the root cgroup will be allowed to allocate as well.
+> 
 
-and compare the values not only between each call but also between
-each read of the register.  It could be a synchronisation issue when
-reading the timer register, in which case you may find just one read
-is incorrect.
+A few critical allocations could be satisfied and root cgroup prevails. It is not the
+intent to have exclusivity at the expense of the kernel.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-According to speedtest.net: 13Mbps down 490kbps up
+This feature will allow a way to configure cpusets on non-NUMA for workloads that can
+benefit from the reservation and isolation that is available within the constraints of
+exclusive cpuset policies.
+
+thanks,
+-- Shuah
