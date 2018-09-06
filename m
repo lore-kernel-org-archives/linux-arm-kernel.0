@@ -1,60 +1,52 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Thu,  6 Sep 2018 17:38:06 +0100
-Subject: [PATCH v2 7/9] ARM: spectre-v1.1: use put_user() for __put_user()
+Date: Thu,  6 Sep 2018 17:38:04 +0100
+Subject: [PATCH v2 5/9] ARM: signal: replace __put_user_error with __put_user
 In-Reply-To: <1536251888-8302-1-git-send-email-julien.thierry@arm.com>
 References: <1536251888-8302-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1536251888-8302-8-git-send-email-julien.thierry@arm.com>
+Message-ID: <1536251888-8302-6-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When Spectre mitigation is required, __put_user() needs to include
-check_uaccess. This is already the case for put_user(), so just make
-__put_user() an alias of put_user().
+With Spectre-v1.1 mitigations, __put_user_error is pointless. In an attempt
+to remove it, replace its references in frame setups with __put_user.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
 ---
- arch/arm/include/asm/uaccess.h | 15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
+ arch/arm/kernel/signal.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
-index d65ef85..1191e7d 100644
---- a/arch/arm/include/asm/uaccess.h
-+++ b/arch/arm/include/asm/uaccess.h
-@@ -370,6 +370,14 @@ static inline void set_fs(mm_segment_t fs)
- 	__pu_err;							\
- })
+diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+index baa055d..61ae58a 100644
+--- a/arch/arm/kernel/signal.c
++++ b/arch/arm/kernel/signal.c
+@@ -335,7 +335,7 @@ asmlinkage int sys_rt_sigreturn(struct pt_regs *regs)
+ 	if (err == 0)
+ 		err |= preserve_vfp_context(&aux->vfp);
+ #endif
+-	__put_user_error(0, &aux->end_magic, err);
++	err |= __put_user(0, &aux->end_magic);
  
-+#ifdef CONFIG_CPU_SPECTRE
-+/*
-+ * When mitigating Spectre variant 1.1, all accessors need to include
-+ * verification of the address space.
-+ */
-+#define __put_user(x, ptr) put_user(x, ptr)
-+
-+#else
- #define __put_user(x, ptr)						\
- ({									\
- 	long __pu_err = 0;						\
-@@ -377,12 +385,6 @@ static inline void set_fs(mm_segment_t fs)
- 	__pu_err;							\
- })
+ 	return err;
+ }
+@@ -498,7 +498,7 @@ asmlinkage int sys_rt_sigreturn(struct pt_regs *regs)
+ 	/*
+ 	 * Set uc.uc_flags to a value which sc.trap_no would never have.
+ 	 */
+-	__put_user_error(0x5ac3c35a, &frame->uc.uc_flags, err);
++	err = __put_user(0x5ac3c35a, &frame->uc.uc_flags);
  
--#define __put_user_error(x, ptr, err)					\
--({									\
--	__put_user_switch((x), (ptr), (err), __put_user_nocheck);	\
--	(void) 0;							\
--})
--
- #define __put_user_nocheck(x, __pu_ptr, __err, __size)			\
- 	do {								\
- 		unsigned long __pu_addr = (unsigned long)__pu_ptr;	\
-@@ -462,6 +464,7 @@ static inline void set_fs(mm_segment_t fs)
- 	: "r" (x), "i" (-EFAULT)				\
- 	: "cc")
+ 	err |= setup_sigframe(frame, regs, set);
+ 	if (err == 0)
+@@ -518,8 +518,8 @@ asmlinkage int sys_rt_sigreturn(struct pt_regs *regs)
  
-+#endif /* !CONFIG_CPU_SPECTRE */
+ 	err |= copy_siginfo_to_user(&frame->info, &ksig->info);
  
- #ifdef CONFIG_MMU
- extern unsigned long __must_check
+-	__put_user_error(0, &frame->sig.uc.uc_flags, err);
+-	__put_user_error(NULL, &frame->sig.uc.uc_link, err);
++	err |= __put_user(0, &frame->sig.uc.uc_flags);
++	err |= __put_user(NULL, &frame->sig.uc.uc_link);
+ 
+ 	err |= __save_altstack(&frame->sig.uc.uc_stack, regs->ARM_sp);
+ 	err |= setup_sigframe(&frame->sig, regs, set);
 -- 
 1.9.1
