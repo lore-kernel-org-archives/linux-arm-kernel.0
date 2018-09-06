@@ -1,116 +1,74 @@
-From: nv@vosn.de (Nikolaus Voss)
-Date: Thu, 6 Sep 2018 11:06:06 +0200 (CEST)
-Subject: [PATCH v3 4/4] regmap-i2c: Add smbus i2c block support
-In-Reply-To: <1440657872-24554-5-git-send-email-mpa@pengutronix.de>
-References: <1440657872-24554-1-git-send-email-mpa@pengutronix.de>
- <1440657872-24554-5-git-send-email-mpa@pengutronix.de>
-Message-ID: <alpine.DEB.2.20.1809061101560.24070@fox.voss.local>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Thu,  6 Sep 2018 10:08:21 +0100
+Subject: [PATCH v2 00/14] coresight: Implement device claim protocol
+Message-ID: <1536224915-31766-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Markus,
+Coresight architecture defines CLAIM tags for a device to negotiate
+control of the components (external agent vs self-hosted). Each device
+has a pair of registers (CLAIMSET & CLAIMCLR) for managing the CLAIM
+tags. However, the protocol for the CLAIM tags is IMPLEMENTATION DEFINED.
+PSCI has recommendations for the use of the CLAIM tags to negotiate
+controls for external agent vs self-hosted use, as defined in
+ARM DEN 0022D, Section "6.8.1 Debug and Trace save and restore".
 
-On Thu, 27 Aug 2015, Markus Pargmann wrote:
-> This allows to read/write up to 32 bytes of data and is to be prefered
-> if supported before the register read/write smbus support.
->
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
-> drivers/base/regmap/regmap-i2c.c | 49 ++++++++++++++++++++++++++++++++++++++++
-> 1 file changed, 49 insertions(+)
->
-> diff --git a/drivers/base/regmap/regmap-i2c.c b/drivers/base/regmap/regmap-i2c.c
-> index 4b76e33110a2..ddb9b0efb724 100644
-> --- a/drivers/base/regmap/regmap-i2c.c
-> +++ b/drivers/base/regmap/regmap-i2c.c
-> @@ -209,11 +209,60 @@ static struct regmap_bus regmap_i2c = {
-> 	.val_format_endian_default = REGMAP_ENDIAN_BIG,
-> };
->
-> +static int regmap_i2c_smbus_i2c_write(void *context, const void *data,
-> +				      size_t count)
-> +{
-> +	struct device *dev = context;
-> +	struct i2c_client *i2c = to_i2c_client(dev);
-> +
-> +	if (count < 1)
-> +		return -EINVAL;
-> +	if (count >= I2C_SMBUS_BLOCK_MAX)
-> +		return -E2BIG;
-> +
-> +	--count;
-> +	return i2c_smbus_write_i2c_block_data(i2c, ((u8 *)data)[0], count,
-> +					      ((u8 *)data + 1));
-> +}
-> +
-> +static int regmap_i2c_smbus_i2c_read(void *context, const void *reg,
-> +				     size_t reg_size, void *val,
-> +				     size_t val_size)
-> +{
-> +	struct device *dev = context;
-> +	struct i2c_client *i2c = to_i2c_client(dev);
-> +	int ret;
-> +
-> +	if (reg_size != 1 || val_size < 1)
-> +		return -EINVAL;
-> +	if (val_size >= I2C_SMBUS_BLOCK_MAX)
-> +		return -E2BIG;
-> +
-> +	ret = i2c_smbus_read_i2c_block_data(i2c, ((u8 *)reg)[0], val_size, val);
-> +	if (ret == val_size)
-> +		return 0;
-> +	else if (ret < 0)
-> +		return ret;
-> +	else
-> +		return -EIO;
-> +}
-> +
-> +static struct regmap_bus regmap_i2c_smbus_i2c_block = {
-> +	.write = regmap_i2c_smbus_i2c_write,
-> +	.read = regmap_i2c_smbus_i2c_read,
-> +	.max_raw_read = I2C_SMBUS_BLOCK_MAX,
-> +	.max_raw_write = I2C_SMBUS_BLOCK_MAX,
-> +};
-> +
-> static const struct regmap_bus *regmap_get_i2c_bus(struct i2c_client *i2c,
-> 					const struct regmap_config *config)
-> {
-> 	if (i2c_check_functionality(i2c->adapter, I2C_FUNC_I2C))
-> 		return &regmap_i2c;
-> +	else if (config->reg_bits == 8 &&
-> +		 i2c_check_functionality(i2c->adapter,
-> +					 I2C_FUNC_SMBUS_I2C_BLOCK))
-> +		return &regmap_i2c_smbus_i2c_block;
-> 	else if (config->val_bits == 16 && config->reg_bits == 8 &&
-> 		 i2c_check_functionality(i2c->adapter,
-> 					 I2C_FUNC_SMBUS_WORD_DATA))
->
+This series implements the recommended protocol by PSCI.
 
-using i2c_smbus_read/write_i2c_block_data() instead of
-read/write_word_data() or i2c_transfer() actually changes what is
-transferred on the bus. SMBus block transfers have a different
-register model, they additionally read or write the byte count after
-transmitting the register/command code, see SMBus spec:
+There were two options for the implementation.
+ 1) Have the claim/disclaim operations performed from the coresight
+    generic driver - This doesn't work unfortunately for ETM devices
+    as the need cross-CPU calls to access the CLAIM registers. Also,
+    makes it complex for error recovery and reference counting.
 
-+---+-------------+---+--+-------------+--+---------------+--+------------+----+
-| S | Slave Addr  | Wr| A| Command Code| A| Byte Count = N| A| Data Byte 1| A  |
-+---+-------------+---+--+-------------+--+---------------+--+------------+----+
+ 2) Have the claim/disclaim operations performed from the device
+    specific drivers. The disadvantage is that the calls are sprinkled
+    in each driver, but this makes the operation much simpler.
 
-So a driver using regmap must implement different transfers depending on
-the i2c adapter capabilities, is this intentionally done so?
+This series implements the method (2). The first part of the series
+prepares different drivers to handle errors from the lower layer
+and clean up the state. The second part of the series updates the
+existing drivers to claim/disclaim the devices as necessary.
 
-Specifically, there is no way of getting rid of the additional byte count
-field if the adapter doesn't support I2C_FUNC_I2C although it would be
-technically possible.
+Tested with a hacked coresight driver which modifies the external
+claim tag via sysfs handle.
 
-I would prefer regmap to always use the same register model (i.e. without
-the byte count field), can you explain the rationale for this?
+Applies on coresight/next in Mathieu's tree.
 
-Niko
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/pkcs7-signature
-Size: 3493 bytes
-Desc: S/MIME Cryptographic Signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180906/7b7f3661/attachment-0001.p7s>
+Changes since V1:
+ - Handle errors is enabling path and disable only the components
+   that were enabled in the iteration.
+ - Fix build break on arm32 (etm3x)
+ - Update commit description for "coresight: Add support for CLAIM tag protocol"
+
+Suzuki K Poulose (14):
+  coresight: Handle failures in enabling a trace path
+  coresight: tmc-etr: Refactor for handling errors
+  coresight: tmc-etr: Handle errors enabling CATU
+  coresight: tmc-etb/etf: Prepare to handle errors enabling
+  coresight: etm4x: Add support for handling errors
+  coresight: etm3: Add support for handling errors
+  coresight: etb10: Handle errors enabling the device
+  coresight: dynamic-replicator: Handle multiple connections
+  coresight: Add support for CLAIM tag protocol
+  coresight: etmx: Claim devices before use
+  coresight: funnel: Claim devices before use
+  coresight: catu: Claim device before use
+  coresight: dynamic-replicator: Claim device for use
+  coreisght: tmc: Claim device before use
+
+ drivers/hwtracing/coresight/coresight-catu.c       |   6 ++
+ .../coresight/coresight-dynamic-replicator.c       |  79 ++++++++++----
+ drivers/hwtracing/coresight/coresight-etb10.c      |  18 +++-
+ drivers/hwtracing/coresight/coresight-etm3x.c      |  56 +++++++---
+ drivers/hwtracing/coresight/coresight-etm4x.c      |  51 ++++++---
+ drivers/hwtracing/coresight/coresight-funnel.c     |  26 ++++-
+ drivers/hwtracing/coresight/coresight-priv.h       |   7 ++
+ drivers/hwtracing/coresight/coresight-tmc-etf.c    |  95 +++++++++++------
+ drivers/hwtracing/coresight/coresight-tmc-etr.c    |  80 +++++++++-----
+ drivers/hwtracing/coresight/coresight.c            | 118 +++++++++++++++++++--
+ include/linux/coresight.h                          |  20 ++++
+ 11 files changed, 434 insertions(+), 122 deletions(-)
+
+-- 
+2.7.4
