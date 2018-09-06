@@ -1,58 +1,81 @@
-From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
-Date: Fri, 7 Sep 2018 01:08:59 +0200
-Subject: [PATCH v6 11/11] arm64: annotate user pointers casts detected by
- sparse
-In-Reply-To: <CA+55aFy2t_MHgr_CgwbhtFkL+djaCq2qMM1G+f2DwJ0qEr1URQ@mail.gmail.com>
-References: <cover.1535629099.git.andreyknvl@google.com>
- <5d54526e5ff2e5ad63d0dfdd9ab17cf359afa4f2.1535629099.git.andreyknvl@google.com>
- <CA+55aFyW9N2tSb2bQvkthbVVyY6nt5yFeWQRLHp1zruBmb5ocw@mail.gmail.com>
- <CA+55aFy2t_MHgr_CgwbhtFkL+djaCq2qMM1G+f2DwJ0qEr1URQ@mail.gmail.com>
-Message-ID: <20180906230858.psedqdai3dw2cvvl@ltop.local>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu,  6 Sep 2018 16:46:58 -0700
+Subject: [PATCH] ARM: dts: imx6q-apalis: mux RESET_MOCI# signal
+Message-ID: <20180906234658.12205-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2018 at 02:16:19PM -0700, Linus Torvalds wrote:
-> On Thu, Sep 6, 2018 at 2:13 PM Linus Torvalds
-> <torvalds@linux-foundation.org> wrote:
-> >
-> > So for example:
-> >
-> > >  static inline compat_uptr_t ptr_to_compat(void __user *uptr)
-> > >  {
-> > > -       return (u32)(unsigned long)uptr;
-> > > +       return (u32)(__force unsigned long)uptr;
-> > >  }
-> >
-> > this actually looks correct.
-> 
-> Side note: I do think that while the above is correct, the rest of the
-> patch shows that we might be better off simply not havign the warning
-> for address space changes at all for the "cast a pointer to an integer
-> type" case.
-> 
-> When you cast to a non-pointer type, the address space issue simply
-> doesn't exist at all, so the warning makes less sense.
-> 
-> It's really just he "pointer to one address space" being cast to
-> "pointer to another address space" that should really warn, and that
-> might need that "__force" thing.
-> 
-> Hmm? So maybe a sparse change is better for most of that patch.
+The pinctrl properties on the IOMUXC node get overwritten by the
+carrier board level device tree, hence the pinctrl_reset_moci
+pinctrl does not get applied.
 
-Unless I'm misunderstanding something, I don't think there is
-anything to change for this specific point. Sparse don't warn
-(by default) on "cast from pointer with address space to integer",
-as it always been the case, I think. I think it's the good choice.
+Associate the pinctrl_reset_moci pinctrl with the PCIe node where
+we also make use of the pin as a reset GPIO.
 
-It's just that recently, I've added a new flag -Wcast-from-as [1],
-defaulting to 'no', specifically to *detect* these cast because of
-these tagged pointers.
+Since the pin is muxed as a GPIO by default not muxing it explicitly
+worked fine in practise.
 
-Note: I tend to think more and more that __force is simply too
-      strong and weaker form, like __force_as and __force_bitwise
-      would be more appropriate.
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ arch/arm/boot/dts/imx6q-apalis-eval.dts       | 2 ++
+ arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts | 2 ++
+ arch/arm/boot/dts/imx6q-apalis-ixora.dts      | 2 ++
+ arch/arm/boot/dts/imx6qdl-apalis.dtsi         | 4 ----
+ 4 files changed, 6 insertions(+), 4 deletions(-)
 
-
--- Luc Van Oostenryck
-
-[1] d96da358c ("stricter warning for explicit cast to ulong")
+diff --git a/arch/arm/boot/dts/imx6q-apalis-eval.dts b/arch/arm/boot/dts/imx6q-apalis-eval.dts
+index 707ac9a46115..0edd3043d9c1 100644
+--- a/arch/arm/boot/dts/imx6q-apalis-eval.dts
++++ b/arch/arm/boot/dts/imx6q-apalis-eval.dts
+@@ -196,6 +196,8 @@
+ };
+ 
+ &pcie {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_reset_moci>;
+ 	/* active-high meaning opposite of regular PERST# active-low polarity */
+ 	reset-gpio = <&gpio1 28 GPIO_ACTIVE_HIGH>;
+ 	reset-gpio-active-high;
+diff --git a/arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts b/arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts
+index 4e1c8feaef82..b94bb687be6b 100644
+--- a/arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts
++++ b/arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts
+@@ -196,6 +196,8 @@
+ };
+ 
+ &pcie {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_reset_moci>;
+ 	/* active-high meaning opposite of regular PERST# active-low polarity */
+ 	reset-gpio = <&gpio1 28 GPIO_ACTIVE_HIGH>;
+ 	reset-gpio-active-high;
+diff --git a/arch/arm/boot/dts/imx6q-apalis-ixora.dts b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
+index 469e3d0e2827..302fd6adc8a7 100644
+--- a/arch/arm/boot/dts/imx6q-apalis-ixora.dts
++++ b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
+@@ -200,6 +200,8 @@
+ };
+ 
+ &pcie {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_reset_moci>;
+ 	/* active-high meaning opposite of regular PERST# active-low polarity */
+ 	reset-gpio = <&gpio1 28 GPIO_ACTIVE_HIGH>;
+ 	reset-gpio-active-high;
+diff --git a/arch/arm/boot/dts/imx6qdl-apalis.dtsi b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
+index 05f07ea3e8c8..3dc99dd8dde1 100644
+--- a/arch/arm/boot/dts/imx6qdl-apalis.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
+@@ -482,10 +482,6 @@
+ };
+ 
+ &iomuxc {
+-	/* pins used on module */
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_reset_moci>;
+-
+ 	pinctrl_apalis_gpio1: gpio2io04grp {
+ 		fsl,pins = <
+ 			MX6QDL_PAD_NANDF_D4__GPIO2_IO04 0x130b0
+-- 
+2.18.0
