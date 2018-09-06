@@ -1,40 +1,81 @@
-From: sed@free.fr (Cedric Roux)
-Date: Thu, 6 Sep 2018 22:35:01 +0200
-Subject: [PATCH v2] ARM: s3c24xx: Correct SD card write protect detection on
- Mini2440
-Message-ID: <96fe9889-2649-7a1e-23bf-b4d16713d212@free.fr>
+From: mka@chromium.org (Matthias Kaehlcke)
+Date: Thu, 6 Sep 2018 13:36:15 -0700
+Subject: [PATCH 2/3] arm64: dts: qcom: pm8998: Add adc node
+In-Reply-To: <CAD=FV=Vvhjcs9UwLkyHJ+nxwRCk70SBC3eVxBXwK7DFcPeu8wQ@mail.gmail.com>
+References: <20180808191339.16875-1-mka@chromium.org>
+ <20180808191339.16875-3-mka@chromium.org>
+ <CAD=FV=Ug3oiHOLxYRXtr0LbBUyXjBB=92fAYfpfhEQ8Xih6PNA@mail.gmail.com>
+ <20180827171003.GU160295@google.com>
+ <CAD=FV=Vvhjcs9UwLkyHJ+nxwRCk70SBC3eVxBXwK7DFcPeu8wQ@mail.gmail.com>
+Message-ID: <20180906203615.GD22824@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mini2440 computer uses "active high" to signal that the "write protect"
-of the inserted MMC is set. The current code uses the opposite, leading to
-a wrong detection of write protection. The solution is simply to use
-".wprotect_invert = 1" in the description of the MMC.
+On Thu, Sep 06, 2018 at 11:34:32AM -0700, Doug Anderson wrote:
+> Hi,
+> 
+> On Mon, Aug 27, 2018 at 10:10 AM, Matthias Kaehlcke <mka@chromium.org> wrote:
+> > On Fri, Aug 10, 2018 at 05:09:17PM -0700, Doug Anderson wrote:
+> >> Hi,
+> >>
+> >> On Wed, Aug 8, 2018 at 12:13 PM, Matthias Kaehlcke <mka@chromium.org> wrote:
+> >> > This adds the adc node to pm8998 based on the examples in the
+> >> > bindings. It also fixes the order of the included headers.
+> >> >
+> >> > Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+> >> > ---
+> >> >  arch/arm64/boot/dts/qcom/pm8998.dtsi | 13 ++++++++++++-
+> >> >  1 file changed, 12 insertions(+), 1 deletion(-)
+> >> >
+> >> > diff --git a/arch/arm64/boot/dts/qcom/pm8998.dtsi b/arch/arm64/boot/dts/qcom/pm8998.dtsi
+> >> > index 92bed1e7d4bb..f70f6101bceb 100644
+> >> > --- a/arch/arm64/boot/dts/qcom/pm8998.dtsi
+> >> > +++ b/arch/arm64/boot/dts/qcom/pm8998.dtsi
+> >> > @@ -1,8 +1,9 @@
+> >> >  // SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+> >> >  /* Copyright 2018 Google LLC. */
+> >> >
+> >> > -#include <dt-bindings/spmi/spmi.h>
+> >> > +#include <dt-bindings/iio/qcom,spmi-vadc.h>
+> >> >  #include <dt-bindings/interrupt-controller/irq.h>
+> >> > +#include <dt-bindings/spmi/spmi.h>
+> >> >
+> >> >  &spmi_bus {
+> >> >         pm8998_lsid0: pmic at 0 {
+> >> > @@ -11,6 +12,16 @@
+> >> >                 #address-cells = <1>;
+> >> >                 #size-cells = <0>;
+> >> >
+> >> > +               pm8998_adc: adc at 3100 {
+> >> > +                       compatible = "qcom,spmi-adc-rev2";
+> >> > +                       reg = <0x3100>;
+> >> > +                       interrupts = <0x0 0x31 0x0 IRQ_TYPE_EDGE_RISING>;
+> >> > +                       #address-cells = <1>;
+> >> > +                       #size-cells = <0>;
+> >> > +                       #io-channel-cells = <1>;
+> >> > +                       io-channel-ranges;
+> >> > +               };
+> >>
+> >> I'm a little confused about what the "io-channel-ranges" does here.
+> >> The documentation isn't clear at all to me for it.  If I'm reading it
+> >> right it's also supposed to be for iio-consumers, but you're using it
+> >> in a provider.  I see you copied this from the example.  Maybe the
+> >> example is wrong?  ...or I'm just confused...
+> >
+> > Yes, I copied it from the example, its use here is also not clear to
+> > me, other ADC providers like adc at 126c0000 in exynos3250.dtsi or
+> > adc at 180a6000 in bcm-cygnus.dtsi also specify it ...
+> >
+> > Siddartha/Jonathan, could you help to clarify if "io-channel-ranges"
+> > should really be specified here as the DT example suggests?
+> 
+> Does everything work if you just remove the "io-channel-ranges"?
 
-Signed-off-by: Cedric Roux <sed@free.fr>
----
- arch/arm/mach-s3c24xx/mach-mini2440.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+Yes, the ADC channels are still available within the kernel and
+through sysfs and provide reasonable values.
 
-diff --git a/arch/arm/mach-s3c24xx/mach-mini2440.c b/arch/arm/mach-s3c24xx/mach-mini2440.c
-index 95753e0..4cd8d45 100644
---- a/arch/arm/mach-s3c24xx/mach-mini2440.c
-+++ b/arch/arm/mach-s3c24xx/mach-mini2440.c
-@@ -232,10 +232,11 @@ static struct s3c2410fb_mach_info mini2440_fb_info __initdata = {
- /* MMC/SD  */
- 
- static struct s3c24xx_mci_pdata mini2440_mmc_cfg __initdata = {
--   .gpio_detect   = S3C2410_GPG(8),
--   .gpio_wprotect = S3C2410_GPH(8),
--   .set_power     = NULL,
--   .ocr_avail     = MMC_VDD_32_33|MMC_VDD_33_34,
-+	.wprotect_invert = 1,
-+	.gpio_detect   = S3C2410_GPG(8),
-+	.gpio_wprotect = S3C2410_GPH(8),
-+	.set_power     = NULL,
-+	.ocr_avail     = MMC_VDD_32_33|MMC_VDD_33_34,
- };
- 
- /* NAND Flash on MINI2440 board */
--- 
-2.18.0
+> We could remove it and always add it back in later if someone could
+> explain what it's for or if we find a reason why it was needed?  ...or
+> we have any other ideas for how to get this resolved?  :(
+
+Sounds good, I'll respin with 'io-channel-ranges' removed.
