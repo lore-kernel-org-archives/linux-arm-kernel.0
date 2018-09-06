@@ -1,65 +1,61 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 6 Sep 2018 18:04:18 +0100
-Subject: [PATCH v2 4/9] ARM: oabi-compat: copy oabi events using
- __copy_to_user()
-In-Reply-To: <1536251888-8302-5-git-send-email-julien.thierry@arm.com>
-References: <1536251888-8302-1-git-send-email-julien.thierry@arm.com>
- <1536251888-8302-5-git-send-email-julien.thierry@arm.com>
-Message-ID: <20180906170417.GT30658@n2100.armlinux.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 6 Sep 2018 09:59:32 -0700
+Subject: [PATCH v2] firmware: arm_scmi: fix divide by zero when
+ sustained_perf_level is zero
+In-Reply-To: <1536246639-7420-1-git-send-email-sudeep.holla@arm.com>
+References: <1536165491-27813-1-git-send-email-sudeep.holla@arm.com>
+ <1536246639-7420-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20180906165932.csa5b4vlmaekv5y2@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2018 at 05:38:03PM +0100, Julien Thierry wrote:
-> @@ -294,11 +294,9 @@ asmlinkage long sys_oabi_epoll_wait(int epfd,
->  	ret = sys_epoll_wait(epfd, kbuf, maxevents, timeout);
->  	set_fs(fs);
->  	err = 0;
-> -	for (i = 0; i < ret; i++) {
-> -		__put_user_error(kbuf[i].events, &events->events, err);
-> -		__put_user_error(kbuf[i].data,   &events->data,   err);
-> -		events++;
-> -	}
-> +	if (ret > 0)
-> +		err = __copy_to_user(events, kbuf, ret * sizeof(*kbuf));
-> +
+Hi,
 
-It's not that simple!
+On Thu, Sep 06, 2018 at 04:10:39PM +0100, Sudeep Holla wrote:
+> Firmware can provide zero as values for sustained performance level and
+> corresponding sustained frequency in kHz in order to hide the actual
+> frequencies and provide only abstract values. It may endup with divide
+> by zero scenario resulting in kernel panic.
+> 
+> Let's set the multiplication factor to one if either one or both of them
+> (sustained_perf_level and sustained_freq) are set to zero.
+> 
+> Fixes: a9e3fbfaa0ff ("firmware: arm_scmi: add initial support for performance protocol")
+> Reported-by: Ionela Voinescu <ionela.voinescu@arm.com>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  drivers/firmware/arm_scmi/perf.c | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
+> 
+> Hi ARM SoC team,
+> 
+> Can you pick this patch directly ?
 
-kbuf is of type "struct epoll_event" whereas events is of type
-"struct oabi_epoll_event".  They have different layouts - if they
-were the same, we wouldn't need the OABI shim.
+Applied, however:
 
-struct oabi_epoll_event {
-        __u32 events;
-        __u64 data;
-} __attribute__ ((packed,aligned(4)));
+> diff --git a/drivers/firmware/arm_scmi/perf.c b/drivers/firmware/arm_scmi/perf.c
+> index 721e6c57beae..64342944d917 100644
+> --- a/drivers/firmware/arm_scmi/perf.c
+> +++ b/drivers/firmware/arm_scmi/perf.c
+> @@ -166,7 +166,13 @@ scmi_perf_domain_attributes_get(const struct scmi_handle *handle, u32 domain,
+>  					le32_to_cpu(attr->sustained_freq_khz);
+>  		dom_info->sustained_perf_level =
+>  					le32_to_cpu(attr->sustained_perf_level);
+> -		dom_info->mult_factor =	(dom_info->sustained_freq_khz * 1000) /
+> +		if (!dom_info->sustained_freq_khz ||
+> +		    !dom_info->sustained_perf_level)
+> +			/* CPUFreq converts to kHz, hence default 1000 */
+> +			dom_info->mult_factor =	1000;
+> +		else
+> +			dom_info->mult_factor =
+> +					(dom_info->sustained_freq_khz * 1000) /
+>  					dom_info->sustained_perf_level;
+>  		memcpy(dom_info->name, attr->name, SCMI_MAX_STR_SIZE);
 
-vs
+I noticed you do memcpy of these name strings in a few places, and use
+it as a string. Any firmware that would return a non-terminated string
+would cause problems later on. strlcpy() might be a better approach.
 
-struct epoll_event {
-        __poll_t events;
-        __u64 data;
-};
 
-which results in EABI sizeof(struct epoll_event) being 16 and 12 on
-OABI.  What's more is that 'data' is at offset 4 in OABI, or 8 in
-EABI.
 
-So, what I think needs to happen is that we need to do something
-like:
-
-	struct oabi_epoll_event e;
-
-	for (i = 0; i < ret; i++) {
-		e.events = kbuf[i].events;
-		e.data = kbuf[i].data;
-		err = __copy_to_user(events, e, sizeof(e))
-		if (err)
-			break;
-		events++;
-	}
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync@13.8Mbps down 630kbps up
-According to speedtest.net: 13Mbps down 490kbps up
+-Olof
