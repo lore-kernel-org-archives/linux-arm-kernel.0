@@ -1,90 +1,78 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu,  6 Sep 2018 10:08:32 +0100
-Subject: [PATCH v2 11/14] coresight: funnel: Claim devices before use
+Date: Thu,  6 Sep 2018 10:08:34 +0100
+Subject: [PATCH v2 13/14] coresight: dynamic-replicator: Claim device for use
 In-Reply-To: <1536224915-31766-1-git-send-email-suzuki.poulose@arm.com>
 References: <1536224915-31766-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1536224915-31766-12-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1536224915-31766-14-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the CLAIM protocol to grab the ownership of the component.
+Use CLAIM protocol to make sure the device is available for use.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-funnel.c | 26 +++++++++++++++++++++-----
- 1 file changed, 21 insertions(+), 5 deletions(-)
+ .../coresight/coresight-dynamic-replicator.c       | 23 +++++++++++++++++-----
+ 1 file changed, 18 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
-index ee7a30b..9279251 100644
---- a/drivers/hwtracing/coresight/coresight-funnel.c
-+++ b/drivers/hwtracing/coresight/coresight-funnel.c
-@@ -25,6 +25,7 @@
- #define FUNNEL_HOLDTIME_MASK	0xf00
- #define FUNNEL_HOLDTIME_SHFT	0x8
- #define FUNNEL_HOLDTIME		(0x7 << FUNNEL_HOLDTIME_SHFT)
-+#define FUNNEL_ENSx_MASK	0xff
- 
- /**
-  * struct funnel_drvdata - specifics associated to a funnel component
-@@ -42,31 +43,42 @@ struct funnel_drvdata {
- 	unsigned long		priority;
- };
- 
--static void funnel_enable_hw(struct funnel_drvdata *drvdata, int port)
-+static int funnel_enable_hw(struct funnel_drvdata *drvdata, int port)
+diff --git a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
+index 97f4673..299667b 100644
+--- a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
++++ b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
+@@ -41,8 +41,11 @@ static void replicator_reset(struct replicator_state *drvdata)
  {
- 	u32 functl;
+ 	CS_UNLOCK(drvdata->base);
+ 
+-	writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER0);
+-	writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER1);
++	if (!coresight_claim_device_unlocked(drvdata->base)) {
++		writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER0);
++		writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER1);
++		coresight_disclaim_device_unlocked(drvdata->base);
++	}
+ 
+ 	CS_LOCK(drvdata->base);
+ }
+@@ -50,6 +53,7 @@ static void replicator_reset(struct replicator_state *drvdata)
+ static int replicator_enable(struct coresight_device *csdev, int inport,
+ 			      int outport)
+ {
 +	int rc = 0;
+ 	u32 reg;
+ 	struct replicator_state *drvdata = dev_get_drvdata(csdev->dev.parent);
+ 
+@@ -67,13 +71,19 @@ static int replicator_enable(struct coresight_device *csdev, int inport,
  
  	CS_UNLOCK(drvdata->base);
  
- 	functl = readl_relaxed(drvdata->base + FUNNEL_FUNCTL);
-+	/* Claim the device only when we enable the first slave */
-+	if (!(functl & FUNNEL_ENSx_MASK)) {
++	if ((readl_relaxed(drvdata->base + REPLICATOR_IDFILTER0) == 0xff) &&
++	    (readl_relaxed(drvdata->base + REPLICATOR_IDFILTER1) == 0xff))
 +		rc = coresight_claim_device_unlocked(drvdata->base);
-+		if (rc)
-+			goto done;
+ 
+ 	/* Ensure that the outport is enabled. */
+-	writel_relaxed(0x00, drvdata->base + reg);
++	if (!rc) {
++		writel_relaxed(0x00, drvdata->base + reg);
++		dev_dbg(drvdata->dev, "REPLICATOR enabled\n");
 +	}
 +
- 	functl &= ~FUNNEL_HOLDTIME_MASK;
- 	functl |= FUNNEL_HOLDTIME;
- 	functl |= (1 << port);
- 	writel_relaxed(functl, drvdata->base + FUNNEL_FUNCTL);
- 	writel_relaxed(drvdata->priority, drvdata->base + FUNNEL_PRICTL);
--
-+done:
  	CS_LOCK(drvdata->base);
-+	return rc;
- }
  
- static int funnel_enable(struct coresight_device *csdev, int inport,
- 			 int outport)
- {
-+	int rc;
- 	struct funnel_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
--	funnel_enable_hw(drvdata, inport);
-+	rc = funnel_enable_hw(drvdata, inport);
- 
--	dev_dbg(drvdata->dev, "FUNNEL inport %d enabled\n", inport);
+-	dev_dbg(drvdata->dev, "REPLICATOR enabled\n");
 -	return 0;
-+	if (!rc)
-+		dev_dbg(drvdata->dev, "FUNNEL inport %d enabled\n", inport);
 +	return rc;
  }
  
- static void funnel_disable_hw(struct funnel_drvdata *drvdata, int inport)
-@@ -79,6 +91,10 @@ static void funnel_disable_hw(struct funnel_drvdata *drvdata, int inport)
- 	functl &= ~(1 << inport);
- 	writel_relaxed(functl, drvdata->base + FUNNEL_FUNCTL);
+ static void replicator_disable(struct coresight_device *csdev, int inport,
+@@ -99,6 +109,9 @@ static void replicator_disable(struct coresight_device *csdev, int inport,
+ 	/* disable the flow of ATB data through port */
+ 	writel_relaxed(0xff, drvdata->base + reg);
  
-+	/* Disclaim the device if none of the slaves are now active */
-+	if (!(functl & FUNNEL_ENSx_MASK))
++	if ((readl_relaxed(drvdata->base + REPLICATOR_IDFILTER0) == 0xff) &&
++	    (readl_relaxed(drvdata->base + REPLICATOR_IDFILTER1) == 0xff))
 +		coresight_disclaim_device_unlocked(drvdata->base);
-+
  	CS_LOCK(drvdata->base);
- }
  
+ 	dev_dbg(drvdata->dev, "REPLICATOR disabled\n");
 -- 
 2.7.4
