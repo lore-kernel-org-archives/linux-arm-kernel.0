@@ -1,121 +1,160 @@
-From: jagdish.gediya@nxp.com (Jagdish Gediya)
-Date: Thu, 6 Sep 2018 07:08:16 +0000
-Subject: [PATCH 4/7] dt-bindings: spi: add binding file for NXP FlexSPI
- driver
-In-Reply-To: <20180904144627.1de264b6@bbrezillon>
-References: <1535711404-29528-1-git-send-email-yogeshnarayan.gaur@nxp.com>
- <1535711404-29528-5-git-send-email-yogeshnarayan.gaur@nxp.com>
- <VI1PR0402MB385465BEDBFC9CB6A89BEFF4970C0@VI1PR0402MB3854.eurprd04.prod.outlook.com>
- <20180904144627.1de264b6@bbrezillon>
-Message-ID: <AM0PR04MB4052840603E71673747DFA7B90010@AM0PR04MB4052.eurprd04.prod.outlook.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 6 Sep 2018 09:21:40 +0200
+Subject: [PATCH 2/2] crypto: skcipher: Remove VLA usage for
+ SKCIPHER_REQUEST_ON_STACK
+In-Reply-To: <CAOtvUMfu4-DWD4n4c5itjArAYWhGaBnPBEnkh6cbCubG-k9cCA@mail.gmail.com>
+References: <20180904181629.20712-1-keescook@chromium.org>
+ <20180904181629.20712-3-keescook@chromium.org>
+ <CAKv+Gu9uJ+ZjBSCM=aU0GDvYR72cy2k8reXdLV5on3dOVw8KdQ@mail.gmail.com>
+ <CAGXu5jKmcuhULMR=O9B_hJAxEK8uV36uoMxm4F3F8yYSuMzYNA@mail.gmail.com>
+ <CAKv+Gu_0vWUqkUex45iW=pAfUbKVsqzP9MDf6OOwTg-nUVPZNg@mail.gmail.com>
+ <CAOtvUMfu4-DWD4n4c5itjArAYWhGaBnPBEnkh6cbCubG-k9cCA@mail.gmail.com>
+Message-ID: <CAKv+Gu8bKcPksgoryaVjoD9G5KeCYrqWOCgVhqrBqGw5dCzXag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+On 6 September 2018 at 06:53, Gilad Ben-Yossef <gilad@benyossef.com> wrote:
+> On Thu, Sep 6, 2018 at 1:49 AM, Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+>> On 5 September 2018 at 23:05, Kees Cook <keescook@chromium.org> wrote:
+>>> On Wed, Sep 5, 2018 at 2:18 AM, Ard Biesheuvel
+>>> <ard.biesheuvel@linaro.org> wrote:
+>>>> On 4 September 2018 at 20:16, Kees Cook <keescook@chromium.org> wrote:
+>>>>> In the quest to remove all stack VLA usage from the kernel[1], this
+>>>>> caps the skcipher request size similar to other limits and adds a sanity
+>>>>> check at registration. Looking at instrumented tcrypt output, the largest
+>>>>> is for lrw:
+>>>>>
+>>>>>         crypt: testing lrw(aes)
+>>>>>         crypto_skcipher_set_reqsize: 8
+>>>>>         crypto_skcipher_set_reqsize: 88
+>>>>>         crypto_skcipher_set_reqsize: 472
+>>>>>
+>>>>
+>>>> Are you sure this is a representative sampling? I haven't double
+>>>> checked myself, but we have plenty of drivers for peripherals in
+>>>> drivers/crypto that implement block ciphers, and they would not turn
+>>>> up in tcrypt unless you are running on a platform that provides the
+>>>> hardware in question.
+>>>
+>>> Hrm, excellent point. Looking at this again:
+>>>
+>>> The core part of the VLA is using this in the ON_STACK macro:
+>>>
+>>> static inline unsigned int crypto_skcipher_reqsize(struct crypto_skcipher *tfm)
+>>> {
+>>>         return tfm->reqsize;
+>>> }
+>>>
+>>> I don't find any struct crypto_skcipher .reqsize static initializers,
+>>> and the initial reqsize is here:
+>>>
+>>> static int crypto_init_skcipher_ops_ablkcipher(struct crypto_tfm *tfm)
+>>> {
+>>> ...
+>>>         skcipher->reqsize = crypto_ablkcipher_reqsize(ablkcipher) +
+>>>                             sizeof(struct ablkcipher_request);
+>>>
+>>> with updates via crypto_skcipher_set_reqsize().
+>>>
+>>> So I have to examine ablkcipher reqsize too:
+>>>
+>>> static inline unsigned int crypto_ablkcipher_reqsize(
+>>>         struct crypto_ablkcipher *tfm)
+>>> {
+>>>         return crypto_ablkcipher_crt(tfm)->reqsize;
+>>> }
+>>>
+>>> And of the crt_ablkcipher.reqsize assignments/initializers, I found:
+>>>
+>>> ablkcipher reqsize:
+>>> 1       struct dcp_aes_req_ctx
+>>> 8       struct atmel_tdes_reqctx
+>>> 8       struct cryptd_blkcipher_request_ctx
+>>> 8       struct mtk_aes_reqctx
+>>> 8       struct omap_des_reqctx
+>>> 8       struct s5p_aes_reqctx
+>>> 8       struct sahara_aes_reqctx
+>>> 8       struct stm32_cryp_reqctx
+>>> 8       struct stm32_cryp_reqctx
+>>> 16      struct ablk_ctx
+>>> 24      struct atmel_aes_reqctx
+>>> 48      struct omap_aes_reqctx
+>>> 48      struct omap_aes_reqctx
+>>> 48      struct qat_crypto_request
+>>> 56      struct artpec6_crypto_request_context
+>>> 64      struct chcr_blkcipher_req_ctx
+>>> 80      struct spacc_req
+>>> 80      struct virtio_crypto_sym_request
+>>> 136     struct qce_cipher_reqctx
+>>> 168     struct n2_request_context
+>>> 328     struct ccp_des3_req_ctx
+>>> 400     struct ccp_aes_req_ctx
+>>> 536     struct hifn_request_context
+>>> 992     struct cvm_req_ctx
+>>> 2456    struct iproc_reqctx_s
+>>>
+>>> The base ablkcipher wrapper is:
+>>> 80      struct ablkcipher_request
+>>>
+>>> And in my earlier skcipher wrapper analysis, lrw was the largest
+>>> skcipher wrapper:
+>>> 384     struct rctx
+>>>
+>>> iproc_reqctx_s is an extreme outlier, with cvm_req_ctx at a bit less than half.
+>>>
+>>> Making this a 2920 byte fixed array doesn't seem sensible at all
+>>> (though that's what's already possible to use with existing
+>>> SKCIPHER_REQUEST_ON_STACK users).
+>>>
+>>> What's the right path forward here?
+>>>
+>>
+>> The skcipher implementations based on crypto IP blocks are typically
+>> asynchronous, and I wouldn't be surprised if a fair number of
+>> SKCIPHER_REQUEST_ON_STACK() users are limited to synchronous
+>> skciphers.
+>
+> According to Herbert, SKCIPHER_REQUEST_ON_STACK() may only be used
+> for invoking synchronous ciphers.
+>
+> In fact, due to the way the crypto API is built, if you try using it
+> with any transformation that uses DMA
+> you would most probably end up trying to DMA to/from the stack which
+> as we all know is not a great idea.
+>
 
-Currently FlexSPI controller is present in ARM SoC but NXP is coming with PowerPC SoC with same FlexSPI controller.
+Ah yes, I found [0] which contains that quote.
 
-We are trying to use same binding as defined in this patch-set(tested on ARM64 processors) for PowerPC.
-Unfortunately, It is showing issue when driver tries to parse 'fspi_mmap'.
+So that means that Kees can disregard the occurrences that are async
+only, but it still implies that we cannot limit the reqsize like he
+proposes unless we take the sync/async nature into account.
+It also means we should probably BUG() or WARN() in
+SKCIPHER_REQUEST_ON_STACK() when used with an async algo.
 
-We did some investigation and figured out that for ARM device trees Peripherals nodes inside 'soc' node have absolute addresses. For in general NXP's PowerPC device trees, Peripheral nodes have the relative addresses to the unit-address of the parent 'soc' node.  
+>>
+>> So we could formalize this and limit SKCIPHER_REQUEST_ON_STACK() to
+>> synchronous skciphers, which implies that the reqsize limit only has
+>> to apply synchronous skciphers as well. But before we can do this, we
+>> have to identify the remaining occurrences that allow asynchronous
+>> skciphers to be used, and replace them with heap allocations.
+>
+> Any such occurrences are almost for sure broken already due to the DMA
+> issue I've mentioned.
+>
 
-This creates issue for PowerPC if we follow implementation in this patch-set. 
+I am not convinced of this. The skcipher request struct does not
+contain any payload buffers, and whether the algo specific ctx struct
+is used for DMA is completely up to the driver. So I am quite sure
+there are plenty of async algos that work fine with
+SKCIPHER_REQUEST_ON_STACK() and vmapped stacks.
 
-Example of device tree used for upcoming PowerPC SoC with FlexSPI controller.
+> Gilad
+>
+> --
+> Gilad Ben-Yossef
+> Chief Coffee Drinker
+>
+> values of ? will give rise to dom!
 
-soc at f8000000 {
-	ranges = <0x0 0x0 0xf8000000 0x4000000>;
-	.
-	fspi0: flexspi at 20c0000 {
-		compatible = "nxp,XXX-fspi";
-		reg = <0x20c0000 0x10000>, <0xC0000000 0x10000000>;
-		reg-names = "fspi_base", "fspi_mmap";
-		.
-		.
-	}
- } 
-
-As we can see, Final address of 'fspi_base' (0xf8000000 + 0x20c0000) falls into the parent 'soc' range(CCSR) but 
-for 'fspi_mmap', It is outside of 'soc' range(CCSR). It creates issue when driver tries to parse 'fspi_mmap'.
-
-As per definition of ranges, this field can't be used to solve this problem. 
-Please suggest how to implement the "fspi_mmap"(memory mapping address and length) in case of PowerPC.
-
-Thanks,
-Jagdish
-
-> -----Original Message-----
-> From: linux-kernel-owner at vger.kernel.org <linux-kernel-
-> owner at vger.kernel.org> On Behalf Of Boris Brezillon
-> Sent: Tuesday, September 4, 2018 6:16 PM
-> To: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
-> Cc: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>; linux-
-> mtd at lists.infradead.org; marek.vasut at gmail.com; linux-
-> spi at vger.kernel.org; devicetree at vger.kernel.org; robh at kernel.org;
-> mark.rutland at arm.com; shawnguo at kernel.org; linux-arm-
-> kernel at lists.infradead.org; computersforpeace at gmail.com;
-> frieder.schrempf at exceet.de; linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH 4/7] dt-bindings: spi: add binding file for NXP FlexSPI
-> driver
-> 
-> On Mon, 3 Sep 2018 09:54:08 +0000
-> Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com> wrote:
-> 
-> > Dear Yogesh,
-> >
-> > > -----Original Message-----
-> > > From: linux-kernel-owner at vger.kernel.org <linux-kernel-
-> > > owner at vger.kernel.org> On Behalf Of Yogesh Gaur
-> > > Sent: Friday, August 31, 2018 4:00 PM
-> > > To: linux-mtd at lists.infradead.org; boris.brezillon at bootlin.com;
-> > > marek.vasut at gmail.com; linux-spi at vger.kernel.org;
-> > > devicetree at vger.kernel.org
-> > > Cc: robh at kernel.org; mark.rutland at arm.com; shawnguo at kernel.org;
-> > > linux- arm-kernel at lists.infradead.org; computersforpeace at gmail.com;
-> > > frieder.schrempf at exceet.de; linux-kernel at vger.kernel.org; Yogesh
-> > > Narayan Gaur <yogeshnarayan.gaur@nxp.com>
-> > > Subject: [PATCH 4/7] dt-bindings: spi: add binding file for NXP
-> > > FlexSPI driver
-> > >
-> > > Add binding file for NXP FlexSPI driver.
-> > >
-> > > Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
-> > > ---
-> > >  .../devicetree/bindings/spi/spi-nxp-fspi.txt       | 42
-> > > ++++++++++++++++++++++
-> > >  1 file changed, 42 insertions(+)
-> > >  create mode 100644 Documentation/devicetree/bindings/spi/spi-nxp-
-> > > fspi.txt
-> > >
-> > > diff --git a/Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
-> > > b/Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
-> > > new file mode 100644
-> > > index 0000000..9f07116
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
-> > > @@ -0,0 +1,42 @@
-> > > +* NXP Flex Serial Peripheral Interface (FSPI)
-> > > +
-> > > +Required properties:
-> > > +  - compatible : Should be "nxp,lx2160a-fspi"
-> > > +  - reg :        First contains the register location and length,
-> > > +                 Second contains the memory mapping address and
-> > > +length
-> >
-> > Why are we overriding reg property.  Is there any special requirement.
-> >
-> > Can we use "reg" and "ranges" property in device tree.
-> > Here "reg" represents controller registers and "ranges" represent the
-> memory address of flash.
-> 
-> No, ranges is not used for that. It's used when you need to convert from one
-> address space to another, which is not what you're describing here. Check
-> section 2.38 of this document [1] for more details.
-> 
-> [1]https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fe
-> linux.org%2Fimages%2Fc%2Fcf%2FPower_ePAPR_APPROVED_v1.1.pdf&amp;
-> data=02%7C01%7Cjagdish.gediya%40nxp.com%7C5bdb57713bd4403a39e90
-> 8d6126472a0%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0%7C0%7C63671
-> 6619958727753&amp;sdata=TB4mbWEm0opk58oPAVEOQFM0xeAFxCsqdzw
-> 37BPuE3A%3D&amp;reserved=0
+[0] https://www.redhat.com/archives/dm-devel/2018-January/msg00087.html
