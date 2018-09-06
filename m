@@ -1,117 +1,184 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu,  6 Sep 2018 10:08:31 +0100
-Subject: [PATCH v2 10/14] coresight: etmx: Claim devices before use
+Date: Thu,  6 Sep 2018 10:08:30 +0100
+Subject: [PATCH v2 09/14] coresight: Add support for CLAIM tag protocol
 In-Reply-To: <1536224915-31766-1-git-send-email-suzuki.poulose@arm.com>
 References: <1536224915-31766-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1536224915-31766-11-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1536224915-31766-10-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the CLAIM tags to grab the device for self-hosted usage.
+Coresight architecture defines CLAIM tags for a device to negotiate
+control of the components (external agent vs self-hosted). Each device
+has a pair of registers (CLAIMSET & CLAIMCLR) for managing the CLAIM
+tags. However, the protocol for the CLAIM tags is IMPLEMENTATION DEFINED.
+PSCI has recommendations for the use of the CLAIM tags to negotiate
+controls for external agent vs self-hosted use. This patch implements
+the recommended protocol by PSCI.
+
+The claim/disclaim operations are performed from the device specific
+drivers. The disadvantage is that the calls are sprinkled in each driver,
+but this makes the operation much simpler.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-etm3x.c | 16 +++++++++++++---
- drivers/hwtracing/coresight/coresight-etm4x.c | 14 +++++++++++---
- 2 files changed, 24 insertions(+), 6 deletions(-)
+ drivers/hwtracing/coresight/coresight-priv.h |  7 +++
+ drivers/hwtracing/coresight/coresight.c      | 86 ++++++++++++++++++++++++++++
+ include/linux/coresight.h                    | 20 +++++++
+ 3 files changed, 113 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index 206c238..fd5c4cc 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -357,7 +357,7 @@ static int etm_parse_event_config(struct etm_drvdata *drvdata,
+diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
+index c11da55..579f349 100644
+--- a/drivers/hwtracing/coresight/coresight-priv.h
++++ b/drivers/hwtracing/coresight/coresight-priv.h
+@@ -25,6 +25,13 @@
+ #define CORESIGHT_DEVID		0xfc8
+ #define CORESIGHT_DEVTYPE	0xfcc
  
- static int etm_enable_hw(struct etm_drvdata *drvdata)
- {
--	int i;
-+	int i, rc;
- 	u32 etmcr;
- 	struct etm_config *config = &drvdata->config;
- 
-@@ -369,6 +369,9 @@ static int etm_enable_hw(struct etm_drvdata *drvdata)
- 	etm_set_pwrup(drvdata);
- 	/* Make sure all registers are accessible */
- 	etm_os_unlock(drvdata);
-+	rc = coresight_claim_device_unlocked(drvdata->base);
-+	if (rc)
-+		goto done;
- 
- 	etm_set_prog(drvdata);
- 
-@@ -417,10 +420,15 @@ static int etm_enable_hw(struct etm_drvdata *drvdata)
- 	etm_writel(drvdata, 0x0, ETMVMIDCVR);
- 
- 	etm_clr_prog(drvdata);
 +
-+done:
-+	if (rc)
-+		etm_set_pwrdwn(drvdata);
- 	CS_LOCK(drvdata->base);
++/*
++ * Coresight device CLAIM protocol.
++ * See PSCI - ARM DEN 0022D, Section: 6.8.1 Debug and Trace save and restore.
++ */
++#define CORESIGHT_CLAIM_SELF_HOSTED	BIT(1)
++
+ #define TIMEOUT_US		100
+ #define BMVAL(val, lsb, msb)	((val & GENMASK(msb, lsb)) >> lsb)
  
--	dev_dbg(drvdata->dev, "cpu: %d enable smp call done\n", drvdata->cpu);
--	return 0;
-+	dev_dbg(drvdata->dev, "cpu: %d enable smp call done: %d\n",
-+		drvdata->cpu, rc);
-+	return rc;
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index f4f5075..2b0df1a 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -128,6 +128,92 @@ static int coresight_find_link_outport(struct coresight_device *csdev,
+ 	return -ENODEV;
  }
  
- struct etm_enable_arg {
-@@ -569,6 +577,8 @@ static void etm_disable_hw(void *info)
- 	for (i = 0; i < drvdata->nr_cntr; i++)
- 		config->cntr_val[i] = etm_readl(drvdata, ETMCNTVRn(i));
- 
-+	coresight_disclaim_device_unlocked(drvdata->base);
++static inline u32 coresight_read_claim_tags(void __iomem *base)
++{
++	return readl_relaxed(base + CORESIGHT_CLAIMCLR);
++}
 +
- 	etm_set_pwrdwn(drvdata);
- 	CS_LOCK(drvdata->base);
- 
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index 4f9e6bb..ac311e5 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -84,13 +84,17 @@ struct etm4_enable_arg {
- 
- static int etm4_enable_hw(struct etmv4_drvdata *drvdata)
- {
--	int i;
-+	int i, rc;
- 	struct etmv4_config *config = &drvdata->config;
- 
- 	CS_UNLOCK(drvdata->base);
- 
- 	etm4_os_unlock(drvdata);
- 
-+	rc = coresight_claim_device_unlocked(drvdata->base);
-+	if (rc)
-+		goto done;
++static inline bool coresight_is_claimed_self_hosted(void __iomem *base)
++{
++	return coresight_read_claim_tags(base) == CORESIGHT_CLAIM_SELF_HOSTED;
++}
 +
- 	/* Disable the trace unit before programming trace registers */
- 	writel_relaxed(0, drvdata->base + TRCPRGCTLR);
- 
-@@ -178,10 +182,12 @@ static int etm4_enable_hw(struct etmv4_drvdata *drvdata)
- 		dev_err(drvdata->dev,
- 			"timeout while waiting for Idle Trace Status\n");
- 
-+done:
- 	CS_LOCK(drvdata->base);
- 
--	dev_dbg(drvdata->dev, "cpu: %d enable smp call done\n", drvdata->cpu);
--	return 0;
-+	dev_dbg(drvdata->dev, "cpu: %d enable smp call done: %d\n",
-+		drvdata->cpu, rc);
++static inline bool coresight_is_claimed_any(void __iomem *base)
++{
++	return coresight_read_claim_tags(base) != 0;
++}
++
++static inline void coresight_set_claim_tags(void __iomem *base)
++{
++	writel_relaxed(CORESIGHT_CLAIM_SELF_HOSTED, base + CORESIGHT_CLAIMSET);
++	isb();
++}
++
++static inline void coresight_clear_claim_tags(void __iomem *base)
++{
++	writel_relaxed(CORESIGHT_CLAIM_SELF_HOSTED, base + CORESIGHT_CLAIMCLR);
++	isb();
++}
++
++/*
++ * coresight_claim_device_unlocked : Claim the device for self-hosted usage
++ * to prevent an external tool from touching this device. As per PSCI
++ * standards, section "Preserving the execution context" => "Debug and Trace
++ * save and Restore", DBGCLAIM[1] is reserved for Self-hosted debug/trace and
++ * DBGCLAIM[0] is reserved for external tools.
++ *
++ * Called with CS_UNLOCKed for the component.
++ * Returns : 0 on success
++ */
++int coresight_claim_device_unlocked(void __iomem *base)
++{
++	if (coresight_is_claimed_any(base))
++		return -EBUSY;
++
++	coresight_set_claim_tags(base);
++	if (coresight_is_claimed_self_hosted(base))
++		return 0;
++	/* There was a race setting the tags, clean up and fail */
++	coresight_clear_claim_tags(base);
++	return -EBUSY;
++}
++
++int coresight_claim_device(void __iomem *base)
++{
++	int rc;
++
++	CS_UNLOCK(base);
++	rc = coresight_claim_device_unlocked(base);
++	CS_LOCK(base);
++
 +	return rc;
- }
- 
- static void etm4_enable_hw_smp_call(void *info)
-@@ -341,6 +347,8 @@ static void etm4_disable_hw(void *info)
- 	isb();
- 	writel_relaxed(control, drvdata->base + TRCPRGCTLR);
- 
-+	coresight_disclaim_device_unlocked(drvdata->base);
++}
 +
- 	CS_LOCK(drvdata->base);
++/*
++ * coresight_disclaim_device_unlocked : Clear the claim tags for the device.
++ * Called with CS_UNLOCKed for the component.
++ */
++void coresight_disclaim_device_unlocked(void __iomem *base)
++{
++
++	if (coresight_is_claimed_self_hosted(base))
++		coresight_clear_claim_tags(base);
++	else
++		/*
++		 * The external agent may have not honoured our claim
++		 * and has manipulated it. Or something else has seriously
++		 * gone wrong in our driver.
++		 */
++		WARN_ON_ONCE(1);
++}
++
++void coresight_disclaim_device(void __iomem *base)
++{
++	CS_UNLOCK(base);
++	coresight_disclaim_device_unlocked(base);
++	CS_LOCK(base);
++}
++
+ static int coresight_enable_sink(struct coresight_device *csdev,
+ 				 u32 mode, void *data)
+ {
+diff --git a/include/linux/coresight.h b/include/linux/coresight.h
+index 5353582..46c67a7 100644
+--- a/include/linux/coresight.h
++++ b/include/linux/coresight.h
+@@ -257,6 +257,13 @@ extern int coresight_enable(struct coresight_device *csdev);
+ extern void coresight_disable(struct coresight_device *csdev);
+ extern int coresight_timeout(void __iomem *addr, u32 offset,
+ 			     int position, int value);
++
++extern int coresight_claim_device(void __iomem *base);
++extern int coresight_claim_device_unlocked(void __iomem *base);
++
++extern void coresight_disclaim_device(void __iomem *base);
++extern void coresight_disclaim_device_unlocked(void __iomem *base);
++
+ #else
+ static inline struct coresight_device *
+ coresight_register(struct coresight_desc *desc) { return NULL; }
+@@ -266,6 +273,19 @@ coresight_enable(struct coresight_device *csdev) { return -ENOSYS; }
+ static inline void coresight_disable(struct coresight_device *csdev) {}
+ static inline int coresight_timeout(void __iomem *addr, u32 offset,
+ 				     int position, int value) { return 1; }
++static inline int coresight_claim_device_unlocked(void __iomem *base)
++{
++	return -EINVAL;
++}
++
++static inline int coresight_claim_device(void __iomem *base)
++{
++	return -EINVAL;
++}
++
++static inline void coresight_disclaim_device(void __iomem *base) {}
++static inline void coresight_disclaim_device_unlocked(void __iomem *base) {}
++
+ #endif
  
- 	dev_dbg(drvdata->dev, "cpu: %d disable smp call done\n", drvdata->cpu);
+ #ifdef CONFIG_OF
 -- 
 2.7.4
