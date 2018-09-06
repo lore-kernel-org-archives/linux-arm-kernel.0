@@ -1,34 +1,47 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Thu, 6 Sep 2018 13:06:23 +0200
-Subject: [PATCH v6 00/18] khwasan: kernel hardware assisted address
- sanitizer
-In-Reply-To: <20180906100543.GI3592@arm.com>
-References: <cover.1535462971.git.andreyknvl@google.com>
- <20180905141032.b1ddaab53d1b2b3bada95415@linux-foundation.org>
- <20180906100543.GI3592@arm.com>
-Message-ID: <CAAeHK+wStsNwh2oKv-KCG4kx5538FuDMQ6Yw2X=sK5LPrw2DZg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 6 Sep 2018 13:07:41 +0200
+Subject: [PATCH 1/6] drm/bridge: use bus flags in bridge timings
+In-Reply-To: <a00c1650b69ba85bed7ae39b81a0c40f@agner.ch>
+References: <20180905052113.21262-1-stefan@agner.ch>
+ <4035252.QuWadVx7pr@avalon>
+ <1569297.pdEFdpi3HS@avalon> <a00c1650b69ba85bed7ae39b81a0c40f@agner.ch>
+Message-ID: <CACRpkdbw0VjkHYcUpox+DorRG0oRdPARL4ShgPfV2eFaUF_w0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 6, 2018 at 12:05 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Sep 05, 2018 at 02:10:32PM -0700, Andrew Morton wrote:
->> On Wed, 29 Aug 2018 13:35:04 +0200 Andrey Konovalov <andreyknvl@google.com> wrote:
->>
->> > This patchset adds a new mode to KASAN [1], which is called KHWASAN
->> > (Kernel HardWare assisted Address SANitizer).
->>
->> We're at v6 and there are no reviewed-by's or acked-by's to be seen.
->> Is that a fair commentary on what has been happening, or have people
->> been remiss in sending and gathering such things?
+On Wed, Sep 5, 2018 at 8:32 PM Stefan Agner <stefan@agner.ch> wrote:
+> On 05.09.2018 00:44, Laurent Pinchart wrote:
+
+> Good point! I actually really don't like that we use the same flags here
+> but from a different perspective. Especially since the flags defines
+> document things differently:
 >
-> I still have concerns about the consequences of merging this as anything
-> other than a debug option [1]. Unfortunately, merging it as a debug option
-> defeats the whole point, so I think we need to spend more effort on developing
-> tools that can help us to find and fix the subtle bugs which will arise from
-> enabling tagged pointers in the kernel.
+> /* drive data on pos. edge */
+> #define DRM_BUS_FLAG_PIXDATA_POSEDGE    (1<<2)
+> /* drive data on neg. edge */
+> #define DRM_BUS_FLAG_PIXDATA_NEGEDGE    (1<<3)
 
-I totally don't mind calling it a debug option. Do I need to somehow
-specify it somewhere?
+Maybe a stupid comment from my side, but can't we just change the
+documentation to match the usecases?
 
-Why does it defeat the point? The point is to ease KASAN-like testing
-on devices with limited memory.
+/* Trigger pixel data latch on positive edge */
+#define DRM_BUS_FLAG_PIXDATA_POSEDGE    (1<<2)
+
+> Using the opposite perspective would also need translation in crtc
+> drivers... So far no driver uses sampling_edge.
+>
+> I would prefer if we always use the meaning as documented by the flags.
+>
+> I guess we would need to convert DRM_BUS_FLAG_PIXDATA_POSEDGE ->
+> DRM_BUS_FLAG_PIXDATA_NEGEDGE.
+>
+> Linus Walleij, you added sampling edge, any thoughts?
+
+I just thought it was generally useful to have triggering edge encoded
+into the bridge as it makes it clear that this edge is something
+that is a delayed version of the driving edge which is subject to
+clock skew caused by the speed of electrons in silicon and
+copper and slew rate caused by parasitic capacitance.
+
+Yours,
+Linus Walleij
