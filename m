@@ -1,46 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 6 Sep 2018 11:47:07 +0100
-Subject: [PATCH v11 0/3] remain and optimize memblock_next_valid_pfn on
- arm and arm64
-In-Reply-To: <20180905145755.cc89819d446f311e4b8e8f95@linux-foundation.org>
-References: <1534907237-2982-1-git-send-email-jia.he@hxt-semitech.com>
- <20180905145755.cc89819d446f311e4b8e8f95@linux-foundation.org>
-Message-ID: <20180906104707.GL3592@arm.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Thu, 6 Sep 2018 13:06:23 +0200
+Subject: [PATCH v6 00/18] khwasan: kernel hardware assisted address
+ sanitizer
+In-Reply-To: <20180906100543.GI3592@arm.com>
+References: <cover.1535462971.git.andreyknvl@google.com>
+ <20180905141032.b1ddaab53d1b2b3bada95415@linux-foundation.org>
+ <20180906100543.GI3592@arm.com>
+Message-ID: <CAAeHK+wStsNwh2oKv-KCG4kx5538FuDMQ6Yw2X=sK5LPrw2DZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2018 at 02:57:55PM -0700, Andrew Morton wrote:
-> On Wed, 22 Aug 2018 11:07:14 +0800 Jia He <hejianet@gmail.com> wrote:
-> 
-> > Commit b92df1de5d28 ("mm: page_alloc: skip over regions of invalid pfns
-> > where possible") optimized the loop in memmap_init_zone(). But it causes
-> > possible panic bug. So Daniel Vacek reverted it later.
-> > 
-> > But as suggested by Daniel Vacek, it is fine to using memblock to skip
-> > gaps and finding next valid frame with CONFIG_HAVE_ARCH_PFN_VALID.
-> > 
-> > More from what Daniel said:
-> > "On arm and arm64, memblock is used by default. But generic version of
-> > pfn_valid() is based on mem sections and memblock_next_valid_pfn() does
-> > not always return the next valid one but skips more resulting in some
-> > valid frames to be skipped (as if they were invalid). And that's why
-> > kernel was eventually crashing on some !arm machines."
-> > 
-> > About the performance consideration:
-> > As said by James in b92df1de5,
-> > "I have tested this patch on a virtual model of a Samurai CPU with a
-> > sparse memory map.  The kernel boot time drops from 109 to 62 seconds."
-> > Thus it would be better if we remain memblock_next_valid_pfn on arm/arm64.
-> > 
-> > Besides we can remain memblock_next_valid_pfn, there is still some room
-> > for improvement. After this set, I can see the time overhead of memmap_init
-> > is reduced from 27956us to 13537us in my armv8a server(QDF2400 with 96G
-> > memory, pagesize 64k). I believe arm server will benefit more if memory is
-> > larger than TBs
-> 
-> Thanks.  I switched to v11.  It would be nice to see some confirmation
-> from ARM people please?
+On Thu, Sep 6, 2018 at 12:05 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Sep 05, 2018 at 02:10:32PM -0700, Andrew Morton wrote:
+>> On Wed, 29 Aug 2018 13:35:04 +0200 Andrey Konovalov <andreyknvl@google.com> wrote:
+>>
+>> > This patchset adds a new mode to KASAN [1], which is called KHWASAN
+>> > (Kernel HardWare assisted Address SANitizer).
+>>
+>> We're at v6 and there are no reviewed-by's or acked-by's to be seen.
+>> Is that a fair commentary on what has been happening, or have people
+>> been remiss in sending and gathering such things?
+>
+> I still have concerns about the consequences of merging this as anything
+> other than a debug option [1]. Unfortunately, merging it as a debug option
+> defeats the whole point, so I think we need to spend more effort on developing
+> tools that can help us to find and fix the subtle bugs which will arise from
+> enabling tagged pointers in the kernel.
 
-I'll take a look...
+I totally don't mind calling it a debug option. Do I need to somehow
+specify it somewhere?
 
-Will
+Why does it defeat the point? The point is to ease KASAN-like testing
+on devices with limited memory.
