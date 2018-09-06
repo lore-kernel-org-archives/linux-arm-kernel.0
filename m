@@ -1,40 +1,34 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Thu, 6 Sep 2018 14:16:19 -0700
-Subject: [PATCH v6 11/11] arm64: annotate user pointers casts detected by
- sparse
-In-Reply-To: <CA+55aFyW9N2tSb2bQvkthbVVyY6nt5yFeWQRLHp1zruBmb5ocw@mail.gmail.com>
-References: <cover.1535629099.git.andreyknvl@google.com>
- <5d54526e5ff2e5ad63d0dfdd9ab17cf359afa4f2.1535629099.git.andreyknvl@google.com>
- <CA+55aFyW9N2tSb2bQvkthbVVyY6nt5yFeWQRLHp1zruBmb5ocw@mail.gmail.com>
-Message-ID: <CA+55aFy2t_MHgr_CgwbhtFkL+djaCq2qMM1G+f2DwJ0qEr1URQ@mail.gmail.com>
+From: mka@chromium.org (Matthias Kaehlcke)
+Date: Thu, 6 Sep 2018 14:22:06 -0700
+Subject: [PATCH v2 3/3] arm64: dts: qcom: pm8998: Add die temperature
+ channel node to the ADC
+In-Reply-To: <CAD=FV=WLcgKQWAp8HnBFZhZ4+32keMANcYJ+nGquePqsOnjJ7A@mail.gmail.com>
+References: <20180906210454.247219-1-mka@chromium.org>
+ <20180906210454.247219-4-mka@chromium.org>
+ <CAD=FV=WLcgKQWAp8HnBFZhZ4+32keMANcYJ+nGquePqsOnjJ7A@mail.gmail.com>
+Message-ID: <20180906212206.GE22824@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 6, 2018 at 2:13 PM Linus Torvalds
-<torvalds@linux-foundation.org> wrote:
->
-> So for example:
->
-> >  static inline compat_uptr_t ptr_to_compat(void __user *uptr)
-> >  {
-> > -       return (u32)(unsigned long)uptr;
-> > +       return (u32)(__force unsigned long)uptr;
-> >  }
->
-> this actually looks correct.
+On Thu, Sep 06, 2018 at 02:10:43PM -0700, Doug Anderson wrote:
+> Hi,
+> 
+> On Thu, Sep 6, 2018 at 2:04 PM, Matthias Kaehlcke <mka@chromium.org> wrote:
+> > Add a channel node for the die temperature to the ADC.
+> >
+> > Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+> > Reviewed-by: Douglas Anderson <dianders@chromium.org>
+> > Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+> 
+> Double-SoB?
 
-Side note: I do think that while the above is correct, the rest of the
-patch shows that we might be better off simply not havign the warning
-for address space changes at all for the "cast a pointer to an integer
-type" case.
+I must have run 'amend' with '-s' out of habit, which wasn't the right
+thing to do in this case :/
 
-When you cast to a non-pointer type, the address space issue simply
-doesn't exist at all, so the warning makes less sense.
+> ...presumably Andy can remove that when he lands and doesn't need a re-post...
 
-It's really just he "pointer to one address space" being cast to
-"pointer to another address space" that should really warn, and that
-might need that "__force" thing.
+Andy, in case you need me to repost let me know.
 
-Hmm? So maybe a sparse change is better for most of that patch.
+Thanks
 
-             Linus
+Matthias
