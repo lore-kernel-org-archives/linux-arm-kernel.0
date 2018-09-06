@@ -1,27 +1,19 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 6 Sep 2018 20:31:44 +0200
-Subject: [PATCH v3 1/2] i2c: mediatek: Register i2c adapter driver earlier
-In-Reply-To: <1536239729-10008-2-git-send-email-jun.gao@mediatek.com>
-References: <1536239729-10008-1-git-send-email-jun.gao@mediatek.com>
- <1536239729-10008-2-git-send-email-jun.gao@mediatek.com>
-Message-ID: <20180906183144.GD8607@kunai>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Thu, 6 Sep 2018 11:33:47 -0700
+Subject: [PATCH i2c-next v6] i2c: aspeed: Handle master/slave combined irq
+ events properly
+In-Reply-To: <20180906180837.GA8607@kunai>
+References: <20180823225731.19063-1-jae.hyun.yoo@linux.intel.com>
+ <CAFd5g46fRrYW8E8FsPB=5fWSGxemgc4ENc4D2fT7yBfH6p4ERg@mail.gmail.com>
+ <eab56d58-0703-d201-dc9a-f9fd257e96cf@linux.intel.com>
+ <20180906180837.GA8607@kunai>
+Message-ID: <0e844fc2-777b-7aee-2402-9fe579cbcf51@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2018 at 09:15:28PM +0800, Jun Gao wrote:
-> From: Jun Gao <jun.gao@mediatek.com>
 > 
-> In order not to block the initializations of some i2c devices.
-> Register i2c adapter driver at appropriate time.
+> Please don't quote the whole message. Everyone else has to scroll down
+> a lot to find the relevant information. Thanks!
 > 
-> Signed-off-by: Jun Gao <jun.gao@mediatek.com>
 
-The reasons this patch was rejected in v2 still hold.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180906/8e20f8ac/attachment.sig>
+Will keep that in mind. Thanks Wolfram!
