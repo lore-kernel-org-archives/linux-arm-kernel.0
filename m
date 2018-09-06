@@ -1,41 +1,77 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  6 Sep 2018 23:33:04 +0800
-Subject: [PATCH resend] mmc: sunxi: Use new timing mode for A64 eMMC controller
-Message-ID: <20180906153304.22239-1-wens@csie.org>
+From: phil.edworthy@renesas.com (Phil Edworthy)
+Date: Thu, 6 Sep 2018 15:34:07 +0000
+Subject: [PATCH] ARM: dts: r9a06g032: Correct UART and add all other UARTs
+In-Reply-To: <CAMuHMdVSLaaJmLEnke-iPSrgkRa4SUQyAnm_Tw9TPs3KcekFFA@mail.gmail.com>
+References: <1535622742-6237-1-git-send-email-phil.edworthy@renesas.com>
+ <CAMuHMdVSLaaJmLEnke-iPSrgkRa4SUQyAnm_Tw9TPs3KcekFFA@mail.gmail.com>
+Message-ID: <TY1PR01MB1769A5DF4ECDAA51090BA207F5010@TY1PR01MB1769.jpnprd01.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The eMMC controller is also a new timing mode controller, but it doesn't
-have the timing mode switch. It does however have signal delay and
-calibration controls, typical of Allwinner MMC controllers that support
-the new timing mode.
+Hi Geert,
 
-Enable the new timing mode setting for the A64 eMMC controller. This
-also enables MMC HS-DDR modes, which gives higher throughput for eMMC
-chips that support it, and can deliver such throughput.
-
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
-
-This is just a resend. A separate patch clarifying the usage of the new
-timing mode should meet Maxime's request for comments clarifying the
-new timing mode usage from the initial submission of this patch.
-
----
- drivers/mmc/host/sunxi-mmc.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index 5f8d3ea0a0f8..279e326e397e 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -1177,6 +1177,7 @@ static const struct sunxi_mmc_cfg sun50i_a64_emmc_cfg = {
- 	.idma_des_size_bits = 13,
- 	.clk_delays = NULL,
- 	.can_calibrate = true,
-+	.needs_new_timings = true,
- };
+On 06 September 2018 15:38 Geert Uytterhoeven wrote:
+> On Thu, Aug 30, 2018 at 11:52 AM Phil Edworthy wrote:
+> > - UART0 was missing the bus clock ("apb_pclk").
+> > - Now that the relevant rzn1 bindings have been added, replace the
+> Synopsys
+> >   compat string with the rzn1 strings.
+> > - Add all the other UARTs.
+> >
+> > Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+> 
+> Thanks for your patch!
+And thanks for your review!
  
- static const struct of_device_id sunxi_mmc_of_match[] = {
--- 
-2.19.0.rc1
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> 
+> But a few notes/questions below.
+> 
+> > --- a/arch/arm/boot/dts/r9a06g032.dtsi
+> > +++ b/arch/arm/boot/dts/r9a06g032.dtsi
+> > @@ -78,13 +78,90 @@
+> >                 };
+> >
+> >                 uart0: serial at 40060000 {
+> > -                       compatible = "snps,dw-apb-uart";
+> > +                       compatible = "renesas,r9a06g032-uart", "renesas,rzn1-uart";
+> 
+> Apparently not all 8 UARTs are identical: the first 3 don't have DMA, the
+> last 5 do, and they have more registers.
+> 
+> Are you sure no different compatible values are needed to distinguish
+> between them?
+> Can you handle them purely based on the presence or absence of
+> "dmas" properties (which are not yet present)?
+Yes, I am pretty sure... the extra registers for the last 5 uarts are only dma
+related and we have been using the standard Synopsys driver on the other
+3 uarts without issue for some time.
+
+> According to commit 72b0505f0830df95 ("dt: serial: Add Renesas RZ/N1
+> binding documentation"), the Synopsis compatible string would work if you
+> are not using DMA, so perhaps it should be added for the ports that cannot
+> do DMA?
+Makes sense, I will make them:
+compatible = "renesas,r9a06g032-uart", "renesas,rzn1-uart", "snps,dw-apb-uart";
+
+> >                         reg = <0x40060000 0x400>;
+> >                         interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
+> >                         reg-shift = <2>;
+> >                         reg-io-width = <4>;
+> > -                       clocks = <&sysctrl R9A06G032_CLK_UART0>;
+> > -                       clock-names = "baudclk";
+> > +                       clocks = <&sysctrl R9A06G032_CLK_UART0>, <&sysctrl
+> R9A06G032_HCLK_UART0>;
+> 
+> It's a pity the clock names don't match the datasheet, but the output from
+> the internal Renesas tools. So I have to trust you to not list them
+> in the wrong order.
+True... Note that all bus clocks required to access the peripheral's registers
+are 'HCLK', other clocks such as baud clks are 'CLK'.
+
+> > +                       clock-names = "baudclk", "apb_pclk";
+> > +                       status = "disabled";
+> > +               };
+
+Thanks
+Phil
