@@ -1,87 +1,57 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Thu, 6 Sep 2018 12:09:30 +0100
-Subject: [PATCH v2 01/40] iommu: Introduce Shared Virtual Addressing API
-In-Reply-To: <bf42affd-e9d0-e4fc-6d28-f3c3f7795348@redhat.com>
+Date: Thu, 6 Sep 2018 12:09:42 +0100
+Subject: [PATCH v2 02/40] iommu/sva: Bind process address spaces to devices
+In-Reply-To: <471873d4-a1a6-1a3a-cf17-1e686b4ade96@redhat.com>
 References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
- <20180511190641.23008-2-jean-philippe.brucker@arm.com>
- <bf42affd-e9d0-e4fc-6d28-f3c3f7795348@redhat.com>
-Message-ID: <03d31ba5-1eda-ea86-8c0c-91d14c86fe83@arm.com>
+ <20180511190641.23008-3-jean-philippe.brucker@arm.com>
+ <471873d4-a1a6-1a3a-cf17-1e686b4ade96@redhat.com>
+Message-ID: <fbe7615d-2236-8080-c54f-f53da8118f93@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
-
-Thanks for reviewing
-
 On 05/09/2018 12:29, Auger Eric wrote:
->> +int iommu_sva_device_init(struct device *dev, unsigned long features,
->> +			  unsigned int max_pasid)
-> what about min_pasid?
+>> +/**
+>> + * iommu_sva_bind_device() - Bind a process address space to a device
+>> + * @dev: the device
+>> + * @mm: the mm to bind, caller must hold a reference to it
+>> + * @pasid: valid address where the PASID will be stored
+>> + * @flags: bond properties
+>> + * @drvdata: private data passed to the mm exit handler
+>> + *
+>> + * Create a bond between device and task, allowing the device to access the mm
+>> + * using the returned PASID. If unbind() isn't called first, a subsequent bind()
+>> + * for the same device and mm fails with -EEXIST.
+>> + *
+>> + * iommu_sva_device_init() must be called first, to initialize the required SVA
+>> + * features. @flags is a subset of these features.
+> @flags must be a subset of these features?
 
-No one asked for it... The max_pasid parameter is here for drivers that
-have vendor-specific PASID size limits, such as AMD KFD (see
-kfd_iommu_device_init and
-https://patchwork.kernel.org/patch/9989307/#21389571). But in most cases
-the PASID size will only depend on the PCI PASID capability and the
-IOMMU limits, both known by the IOMMU driver, so device drivers won't
-have to set max_pasid.
+Ok
 
-IOMMU drivers need to set min_pasid in the sva_device_init callback
-because it may be either 1 (e.g. Arm where PASID #0 is reserved) or 0
-(Intel Vt-d rev2), but at the moment I can't see a reason for device
-drivers to override min_pasid
+> don't you want to check flags is a subset of
+> dev->iommu_param->sva_param->features?
 
->> +	/*
->> +	 * IOMMU driver updates the limits depending on the IOMMU and device
->> +	 * capabilities.
->> +	 */
->> +	ret = domain->ops->sva_device_init(dev, param);
->> +	if (ret)
->> +		goto err_free_param;
-> So you are likely to call sva_device_init even if it was already called
-> (ie. dev->iommu_param->sva_param is already set). Can't you test whether
-> dev->iommu_param->sva_param is already set first?
-
-Right, that's probably better
+Yes, that will be in next version
 
 >> +/**
->> + * iommu_sva_device_shutdown() - Shutdown Shared Virtual Addressing for a device
+>> + * iommu_sva_unbind_device() - Remove a bond created with iommu_sva_bind_device
 >> + * @dev: the device
+>> + * @pasid: the pasid returned by bind()
 >> + *
->> + * Disable SVA. Device driver should ensure that the device isn't performing any
->> + * DMA while this function is running.
+>> + * Remove bond between device and address space identified by @pasid. Users
+>> + * should not call unbind() if the corresponding mm exited (as the PASID might
+>> + * have been reallocated for another process).
+>> + *
+>> + * The device must not be issuing any more transaction for this PASID. All
+>> + * outstanding page requests for this PASID must have been flushed to the IOMMU.
+>> + *
+>> + * Returns 0 on success, or an error value
 >> + */
->> +int iommu_sva_device_shutdown(struct device *dev)
-> Not sure the returned value is required for a shutdown operation.
+>> +int iommu_sva_unbind_device(struct device *dev, int pasid)
+> returned value needed?
 
-I don't know either. I like them because they help me debug, but are
-otherwise rather useless if we don't describe precise semantics. The
-caller cannot do anything with it. Given that the corresponding IOMMU op
-is already void, I can change this function to void as well
-
->> +struct iommu_sva_param {
-> What are the feature values?
-
-At the moment only IOMMU_SVA_FEAT_IOPF, introduced by patch 09
-
->> +	unsigned long features;
->> +	unsigned int min_pasid;
->> +	unsigned int max_pasid;
->> +};
->> +
->>  /**
->>   * struct iommu_ops - iommu ops and capabilities
->>   * @capable: check capability
->> @@ -219,6 +225,8 @@ struct page_response_msg {
->>   * @domain_free: free iommu domain
->>   * @attach_dev: attach device to an iommu domain
->>   * @detach_dev: detach device from an iommu domain
->> + * @sva_device_init: initialize Shared Virtual Adressing for a device
-> Addressing
->> + * @sva_device_shutdown: shutdown Shared Virtual Adressing for a device
-> Addressing
-
-Nice catch
+I'd rather keep this one, since it already pointed out some of my bugs
+during regression testing.
 
 Thanks,
 Jean
