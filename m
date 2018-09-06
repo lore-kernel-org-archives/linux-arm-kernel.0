@@ -1,50 +1,43 @@
-From: embed3d@gmail.com (Philipp Rossak)
-Date: Thu, 6 Sep 2018 14:18:45 +0200
-Subject: [linux-sunxi] Re: [PATCH v3 27/30] ARM: dts: sun8i: h3: use
- calibration for ths
-In-Reply-To: <BEA89263-1186-432A-B274-228FAC21A798@aosc.io>
-References: <20180830154518.29507-1-embed3d@gmail.com>
- <20180830154518.29507-28-embed3d@gmail.com>
- <20180904184623.e4386b8e6b657b1b25e90c09@bidouilliste.com>
- <55579dd6-625d-e71b-1482-4592dccac665@gmail.com>
- <20180906115114.inc6dhqhy47obo25@flea>
- <BEA89263-1186-432A-B274-228FAC21A798@aosc.io>
-Message-ID: <d8825c55-60e0-16da-e122-22855c294bc4@gmail.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Thu, 6 Sep 2018 13:45:36 +0100
+Subject: [PATCH v2 01/40] iommu: Introduce Shared Virtual Addressing API
+In-Reply-To: <ed39159c-087e-7e56-7d29-d1de9fa1677f@amd.com>
+References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
+ <20180511190641.23008-2-jean-philippe.brucker@arm.com>
+ <bf42affd-e9d0-e4fc-6d28-f3c3f7795348@redhat.com>
+ <03d31ba5-1eda-ea86-8c0c-91d14c86fe83@arm.com>
+ <ed39159c-087e-7e56-7d29-d1de9fa1677f@amd.com>
+Message-ID: <f0b317d5-e2e9-5478-952c-05e8b97bd68b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 06.09.2018 14:04, Icenowy Zheng wrote:
-> 
-> 
-> ? 2018?9?6? GMT+08:00 ??7:51:15, Maxime Ripard <maxime.ripard@bootlin.com> ??:
->> On Thu, Sep 06, 2018 at 01:47:47PM +0200, Philipp Rossak wrote:
->>> On 04.09.2018 18:46, Emmanuel Vadot wrote:
->>>>> +			/* Data cells */
->>>>> +			thermal_calibration: calib at 234 {
->>>>> +				reg = <0x234 0x8>;
->>>>> +			};
->>>>    You are declaring 8 bytes of calibration data but to my knowledge
->> it's
->>>> only 2 bytes per sensor, so 2 bytes for H3.
->>>>    Am I missing something ?
->>>>
->>>>    Thanks,
->>>
->>> Emmanuel you are right, it is 2 bytes per Sensor and should be 2
->> bytes for
->>> H3, but the thermal calibration data field is on all chips 64 bit
->> wide - so
->>> 8 bytes. So I'm reading here the complete calibration data field.
+On 06/09/2018 12:12, Christian K?nig wrote:
+> Am 06.09.2018 um 13:09 schrieb Jean-Philippe Brucker:
+>> Hi Eric,
 >>
->> Having one cell per channel would make more sense I guess.
-Ok I will change this.
+>> Thanks for reviewing
+>>
+>> On 05/09/2018 12:29, Auger Eric wrote:
+>>>> +int iommu_sva_device_init(struct device *dev, unsigned long features,
+>>>> +????????????? unsigned int max_pasid)
+>>> what about min_pasid?
+>> No one asked for it... The max_pasid parameter is here for drivers that
+>> have vendor-specific PASID size limits, such as AMD KFD (see
+>> kfd_iommu_device_init and
+>> https://patchwork.kernel.org/patch/9989307/#21389571). But in most cases
+>> the PASID size will only depend on the PCI PASID capability and the
+>> IOMMU limits, both known by the IOMMU driver, so device drivers won't
+>> have to set max_pasid.
+>>
+>> IOMMU drivers need to set min_pasid in the sva_device_init callback
+>> because it may be either 1 (e.g. Arm where PASID #0 is reserved) or 0
+>> (Intel Vt-d rev2), but at the moment I can't see a reason for device
+>> drivers to override min_pasid
 > 
-> I have mentioned that this is impossible because of wrong
-> addressing caused by LE2BE in SID driver.
->
-I know! But I would like to prepare patches for it, that they can be 
-merged when this is fixed.
+> Sorry to ruin your day, but if I'm not completely mistaken PASID zero is
+> reserved in the AMD KFD as well.
 
-Philipp
+Heh, fair enough. I'll add the min_pasid parameter
+
+Thanks,
+Jean
