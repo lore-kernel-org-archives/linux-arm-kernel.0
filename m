@@ -1,26 +1,29 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 06 Sep 2018 15:52:12 +0200
-Subject: [PATCH v3 RESEND 2/2] phy: add Rockchip Innosilicon hdmi phy
-In-Reply-To: <b85eeaeb-b7e2-285b-0df0-1df641c7b983@ti.com>
-References: <20180710134949.25203-1-heiko@sntech.de>
- <21954745.lUUHsRAzaY@diego> <b85eeaeb-b7e2-285b-0df0-1df641c7b983@ti.com>
-Message-ID: <3357705.vCjhXlgJ7n@phil>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 6 Sep 2018 15:01:48 +0100
+Subject: [PATCH] arm64: uaccess: implement unsafe accessors
+In-Reply-To: <1536232196-55027-1-git-send-email-julien.thierry@arm.com>
+References: <1536232196-55027-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <20180906140147.GD5212@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 6. September 2018, 11:38:35 CEST schrieb Kishon Vijay Abraham I:
-> On Friday 31 August 2018 02:56 PM, Heiko St?bner wrote:
-> > Am Dienstag, 14. August 2018, 14:52:00 CEST schrieb Heiko Stuebner:
-> >> Hi Kishon,
-> >>
-> >> thanks for your review.
-> >>
+On Thu, Sep 06, 2018 at 12:09:56PM +0100, Julien Thierry wrote:
+> Current implementation of get/put_user_unsafe default to get/put_user
+> which toggle PAN before each access, despite having been told by the caller
+> that multiple accesses to user memory were about to happen.
+> 
+> Provide implementations for user_access_begin/end to turn PAN off/on and
+> implement unsafe accessors that assume PAN was already turned off.
+> 
+> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/uaccess.h | 61 ++++++++++++++++++++++++++++++----------
+>  1 file changed, 46 insertions(+), 15 deletions(-)
 
-> All right! I'll merge once you send a patch fixing this.
+Tested-by: Will Deacon <will.deacon@arm.com>
 
-Thanks and v4 with the rest of the issues fixed should be in your
-inbox now :-)
+Cheers,
 
-
-Thanks
-Heiko
+Will
