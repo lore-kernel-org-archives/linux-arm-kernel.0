@@ -1,167 +1,107 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Thu,  6 Sep 2018 12:09:56 +0100
-Subject: [PATCH] arm64: uaccess: implement unsafe accessors
-Message-ID: <1536232196-55027-1-git-send-email-julien.thierry@arm.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Thu, 6 Sep 2018 12:10:14 +0100
+Subject: [PATCH v2 03/40] iommu/sva: Manage process address spaces
+In-Reply-To: <d785ec89-6743-d0f1-1a7f-85599a033e5b@redhat.com>
+References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
+ <20180511190641.23008-4-jean-philippe.brucker@arm.com>
+ <d785ec89-6743-d0f1-1a7f-85599a033e5b@redhat.com>
+Message-ID: <ec209a7f-dfc4-c762-3ad8-491eeb8e8744@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current implementation of get/put_user_unsafe default to get/put_user
-which toggle PAN before each access, despite having been told by the caller
-that multiple accesses to user memory were about to happen.
+On 05/09/2018 13:14, Auger Eric wrote:
+>> +static struct io_mm *
+>> +io_mm_alloc(struct iommu_domain *domain, struct device *dev,
+>> +	    struct mm_struct *mm, unsigned long flags)
+>> +{
+>> +	int ret;
+>> +	int pasid;
+>> +	struct io_mm *io_mm;
+>> +	struct iommu_sva_param *param = dev->iommu_param->sva_param;
+>> +
+> don't you need to check param != NULL and flags are compatible with
+> those set at init?
 
-Provide implementations for user_access_begin/end to turn PAN off/on and
-implement unsafe accessors that assume PAN was already turned off.
+It would be redundant, parameters are already checked by bind().
+Following your comment below I think this function should also be called
+under iommu_param->lock
 
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/uaccess.h | 61 ++++++++++++++++++++++++++++++----------
- 1 file changed, 46 insertions(+), 15 deletions(-)
+>> +	idr_preload(GFP_KERNEL);
+>> +	spin_lock(&iommu_sva_lock);
+>> +	pasid = idr_alloc(&iommu_pasid_idr, io_mm, param->min_pasid,
+>> +			  param->max_pasid + 1, GFP_ATOMIC);
+> isn't it param->max_pasid - 1?
 
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index e66b0fc..c4528dd 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -277,11 +277,9 @@ static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
- 	: "+r" (err), "=&r" (x)						\
- 	: "r" (addr), "i" (-EFAULT))
+max_pasid is the last allocatable PASID, and the 'end' parameter of
+idr_alloc is exclusive, so this needs to be max_pasid + 1.
 
--#define __get_user_err(x, ptr, err)					\
-+#define __get_user_err_unsafe(x, ptr, err)				\
- do {									\
- 	unsigned long __gu_val;						\
--	__chk_user_ptr(ptr);						\
--	uaccess_enable_not_uao();					\
- 	switch (sizeof(*(ptr))) {					\
- 	case 1:								\
- 		__get_user_asm("ldrb", "ldtrb", "%w", __gu_val, (ptr),  \
-@@ -302,17 +300,24 @@ static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
- 	default:							\
- 		BUILD_BUG();						\
- 	}								\
--	uaccess_disable_not_uao();					\
- 	(x) = (__force __typeof__(*(ptr)))__gu_val;			\
- } while (0)
+>> +static int io_mm_attach(struct iommu_domain *domain, struct device *dev,
+>> +			struct io_mm *io_mm, void *drvdata)
+>> +{
+>> +	int ret;
+>> +	bool attach_domain = true;
+>> +	int pasid = io_mm->pasid;
+>> +	struct iommu_bond *bond, *tmp;
+>> +	struct iommu_sva_param *param = dev->iommu_param->sva_param;
+>> +
+>> +	if (!domain->ops->mm_attach || !domain->ops->mm_detach)
+>> +		return -ENODEV;
+> don't you need to check param is not NULL?
 
--#define __get_user_check(x, ptr, err)					\
-+#define __get_user_err_check(x, ptr, err)				\
-+do {									\
-+	__chk_user_ptr(ptr);						\
-+	uaccess_enable_not_uao();					\
-+	__get_user_err_unsafe((x), (ptr), (err));			\
-+	uaccess_disable_not_uao();					\
-+} while (0)
-+
-+#define __get_user_err(x, ptr, err, accessor)				\
- ({									\
- 	__typeof__(*(ptr)) __user *__p = (ptr);				\
- 	might_fault();							\
- 	if (access_ok(VERIFY_READ, __p, sizeof(*__p))) {		\
- 		__p = uaccess_mask_ptr(__p);				\
--		__get_user_err((x), __p, (err));			\
-+		accessor((x), __p, (err));				\
- 	} else {							\
- 		(x) = 0; (err) = -EFAULT;				\
- 	}								\
-@@ -320,14 +325,14 @@ static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
+As mm_alloc, this is called by bind() which already performs argument checks
 
- #define __get_user_error(x, ptr, err)					\
- ({									\
--	__get_user_check((x), (ptr), (err));				\
-+	__get_user_err((x), (ptr), (err), __get_user_err_check);	\
- 	(void)0;							\
- })
+>> +
+>> +	if (pasid > param->max_pasid || pasid < param->min_pasid)
+> pasid >= param->max_pasid ?
 
- #define __get_user(x, ptr)						\
- ({									\
- 	int __gu_err = 0;						\
--	__get_user_check((x), (ptr), __gu_err);				\
-+	__get_user_err((x), (ptr), __gu_err, __get_user_err_check);	\
- 	__gu_err;							\
- })
+max_pasid is inclusive
 
-@@ -347,11 +352,9 @@ static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
- 	: "+r" (err)							\
- 	: "r" (x), "r" (addr), "i" (-EFAULT))
+>> +	ret = domain->ops->mm_attach(domain, dev, io_mm, attach_domain);
+> the fact the mm_attach/detach() must not sleep may be documented in the
+> API doc.
 
--#define __put_user_err(x, ptr, err)					\
-+#define __put_user_err_unsafe(x, ptr, err)				\
- do {									\
- 	__typeof__(*(ptr)) __pu_val = (x);				\
--	__chk_user_ptr(ptr);						\
--	uaccess_enable_not_uao();					\
- 	switch (sizeof(*(ptr))) {					\
- 	case 1:								\
- 		__put_user_asm("strb", "sttrb", "%w", __pu_val, (ptr),	\
-@@ -372,16 +375,24 @@ static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
- 	default:							\
- 		BUILD_BUG();						\
- 	}								\
-+} while (0)
-+
-+
-+#define __put_user_err_check(x, ptr, err)				\
-+do {									\
-+	__chk_user_ptr(ptr);						\
-+	uaccess_enable_not_uao();					\
-+	__put_user_err_unsafe((x), (ptr), (err));			\
- 	uaccess_disable_not_uao();					\
- } while (0)
+Ok
 
--#define __put_user_check(x, ptr, err)					\
-+#define __put_user_err(x, ptr, err, accessor)				\
- ({									\
- 	__typeof__(*(ptr)) __user *__p = (ptr);				\
- 	might_fault();							\
- 	if (access_ok(VERIFY_WRITE, __p, sizeof(*__p))) {		\
- 		__p = uaccess_mask_ptr(__p);				\
--		__put_user_err((x), __p, (err));			\
-+		accessor((x), __p, (err));				\
- 	} else	{							\
- 		(err) = -EFAULT;					\
- 	}								\
-@@ -389,19 +400,39 @@ static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
+>>  int __iommu_sva_bind_device(struct device *dev, struct mm_struct *mm,
+>>  			    int *pasid, unsigned long flags, void *drvdata)
+>>  {
+>> -	return -ENOSYS; /* TODO */
+>> +	int i, ret = 0;
+>> +	struct io_mm *io_mm = NULL;
+>> +	struct iommu_domain *domain;
+>> +	struct iommu_bond *bond = NULL, *tmp;
+>> +	struct iommu_sva_param *param = dev->iommu_param->sva_param;
+>> +
+>> +	domain = iommu_get_domain_for_dev(dev);
+>> +	if (!domain)
+>> +		return -EINVAL;
+>> +
+>> +	/*
+>> +	 * The device driver does not call sva_device_init/shutdown and
+>> +	 * bind/unbind concurrently, so no need to take the param lock.
+>> +	 */
+> what does guarantee that?
 
- #define __put_user_error(x, ptr, err)					\
- ({									\
--	__put_user_check((x), (ptr), (err));				\
-+	__put_user_err((x), (ptr), (err), __put_user_err_check);	\
- 	(void)0;							\
- })
+The doc for iommu_sva_bind_device mandates that iommu_sva_device_init()
+is called before bind(), but nothing is said about unbind and shutdown.
+I think that was just based on the assumption that the device driver
+doesn't have any reason to call unbind and shutdown concurrently, but
+taking the lock here and in unbind is probably safer.
 
- #define __put_user(x, ptr)						\
- ({									\
- 	int __pu_err = 0;						\
--	__put_user_check((x), (ptr), __pu_err);				\
-+	__put_user_err((x), (ptr), __pu_err, __put_user_err_check);	\
- 	__pu_err;							\
- })
+>> +	ret = io_mm_attach(domain, dev, io_mm, drvdata);
+>> +	if (ret)
+>> +		io_mm_put(io_mm);
+> dont't you want to free the io_mm if just allocated?
 
- #define put_user	__put_user
+We do: if the io_mm has just been allocated, it has a single reference
+so io_mm_put frees it.
 
-+
-+#define user_access_begin()	uaccess_enable_not_uao()
-+#define user_access_end()	uaccess_disable_not_uao()
-+
-+#define unsafe_get_user(x, ptr, err)					\
-+do {									\
-+	int __gu_err = 0;						\
-+	__get_user_err((x), (ptr), __gu_err, __get_user_err_unsafe);	\
-+	if (__gu_err != 0)						\
-+		goto err;						\
-+} while (0)
-+
-+#define unsafe_put_user(x, ptr, err)					\
-+do {									\
-+	int __pu_err = 0;						\
-+	__put_user_err((x), (ptr), __pu_err, __put_user_err_unsafe);	\
-+	if (__pu_err != 0)						\
-+		goto err;						\
-+} while (0)
-+
- extern unsigned long __must_check __arch_copy_from_user(void *to, const void __user *from, unsigned long n);
- #define raw_copy_from_user(to, from, n)					\
- ({									\
---
-1.9.1
+>> + * @mm_attach: attach io_mm to a device. Install PASID entry if necessary
+>> + * @mm_detach: detach io_mm from a device. Remove PASID entry and
+>> + *             flush associated TLB entries.
+> if necessary too?
+
+Right
+
+Thanks,
+Jean
