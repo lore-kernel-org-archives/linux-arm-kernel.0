@@ -1,195 +1,25 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 6 Sep 2018 14:57:58 +0530
-Subject: [PATCH 02/10] phy: Add configuration interface
-In-Reply-To: <a739a2d623c3e60373a73e1ec206c2aa35c4a742.1536138624.git-series.maxime.ripard@bootlin.com>
-References: <cover.ee6158898d563fcc01d45c9652501180bccff0f0.1536138624.git-series.maxime.ripard@bootlin.com>
- <a739a2d623c3e60373a73e1ec206c2aa35c4a742.1536138624.git-series.maxime.ripard@bootlin.com>
-Message-ID: <1ed01c1f-76d5-fa96-572b-9bfd269ad11b@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 6 Sep 2018 11:28:37 +0200
+Subject: [PATCH] arm64: enable CMT/TMU support for Renesas SoC
+In-Reply-To: <20180903071715.gim5ukqkmvxjp3vm@verge.net.au>
+References: <ebd7d1f7-d99b-f0a1-f05e-d822254b2e86@cogentembedded.com>
+ <20180903071715.gim5ukqkmvxjp3vm@verge.net.au>
+Message-ID: <20180906092836.zcbizy2yzj5x33r6@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wednesday 05 September 2018 02:46 PM, Maxime Ripard wrote:
-> The phy framework is only allowing to configure the power state of the PHY
-> using the init and power_on hooks, and their power_off and exit
-> counterparts.
+On Mon, Sep 03, 2018 at 09:17:15AM +0200, Simon Horman wrote:
+> On Fri, Aug 31, 2018 at 10:54:42PM +0300, Sergei Shtylyov wrote:
+> > Renesas R-Car gen3 SoCs have both CMT and TMU timers, so we have to enable
+> > building them in Kconfig.platforms (as they don't normally have the prompts
+> > in Kconfig).
+> > 
+> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 > 
-> While it works for most, simple, PHYs supported so far, some more advanced
-> PHYs need some configuration depending on runtime parameters. These PHYs
-> have been supported by a number of means already, often by using ad-hoc
-> drivers in their consumer drivers.
+> Thank Sergei,
 > 
-> That doesn't work too well however, when a consumer device needs to deal
-> multiple PHYs, or when multiple consumers need to deal with the same PHY (a
-> DSI driver and a CSI driver for example).
-> 
-> So we'll add a new interface, through two funtions, phy_validate and
-> phy_configure. The first one will allow to check that a current
-> configuration, for a given mode, is applicable. It will also allow the PHY
-> driver to tune the settings given as parameters as it sees fit.
-> 
-> phy_configure will actually apply that configuration in the phy itself.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> ---
->  drivers/phy/phy-core.c  | 62 ++++++++++++++++++++++++++++++++++++++++++-
->  include/linux/phy/phy.h | 42 ++++++++++++++++++++++++++++-
->  2 files changed, 104 insertions(+)
-> 
-> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
-> index 35fd38c5a4a1..6eaf655e370f 100644
-> --- a/drivers/phy/phy-core.c
-> +++ b/drivers/phy/phy-core.c
-> @@ -408,6 +408,68 @@ int phy_calibrate(struct phy *phy)
->  EXPORT_SYMBOL_GPL(phy_calibrate);
->  
->  /**
-> + * phy_configure() - Changes the phy parameters
-> + * @phy: the phy returned by phy_get()
-> + * @mode: phy_mode the configuration is applicable to.
+> this looks fine to me and I'd be happy to take it through the renesas tree,
+> after others have been given time for review, if that is the appropriate
+> path for this patch.
 
-mode should be used if the same PHY can be configured in multiple modes. But
-with phy_set_mode() and phy_calibrate() we could achieve the same.
-> + * @opts: New configuration to apply
-
-Should these configuration come from the consumer driver? Can't the helper
-functions be directly invoked by the PHY driver for the configuration.
-> + *
-> + * Used to change the PHY parameters. phy_init() must have
-> + * been called on the phy.
-> + *
-> + * Returns: 0 if successful, an negative error code otherwise
-> + */
-> +int phy_configure(struct phy *phy, enum phy_mode mode,
-> +		  union phy_configure_opts *opts)
-> +{> +	int ret;
-> +
-> +	if (!phy)
-> +		return -EINVAL;
-> +
-> +	if (!phy->ops->configure)
-> +		return 0;
-> +
-> +	mutex_lock(&phy->mutex);
-> +	ret = phy->ops->configure(phy, mode, opts);
-> +	mutex_unlock(&phy->mutex);
-> +
-> +	return ret;
-> +}
-> +
-> +/**
-> + * phy_validate() - Checks the phy parameters
-> + * @phy: the phy returned by phy_get()
-> + * @mode: phy_mode the configuration is applicable to.
-> + * @opts: Configuration to check
-> + *
-> + * Used to check that the current set of parameters can be handled by
-> + * the phy. Implementations are free to tune the parameters passed as
-> + * arguments if needed by some implementation detail or
-> + * constraints. It will not change any actual configuration of the
-> + * PHY, so calling it as many times as deemed fit will have no side
-> + * effect.
-> + *
-> + * Returns: 0 if successful, an negative error code otherwise
-> + */
-> +int phy_validate(struct phy *phy, enum phy_mode mode,
-> +		  union phy_configure_opts *opts)
-
-IIUC the consumer driver will pass configuration options (or PHY parameters)
-which will be validated by the PHY driver and in some cases the PHY driver can
-modify the configuration options? And these modified configuration options will
-again be given to phy_configure?
-
-Looks like it's a round about way of doing the same thing.
-
-
-> +{
-> +	int ret;
-> +
-> +	if (!phy)
-> +		return -EINVAL;
-> +
-> +	if (!phy->ops->validate)
-> +		return 0;
-> +
-> +	mutex_lock(&phy->mutex);
-> +	ret = phy->ops->validate(phy, mode, opts);
-> +	mutex_unlock(&phy->mutex);
-> +
-> +	return ret;
-> +}
-> +
-> +/**
->   * _of_phy_get() - lookup and obtain a reference to a phy by phandle
->   * @np: device_node for which to get the phy
->   * @index: the index of the phy
-> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
-> index 9cba7fe16c23..3cc315dcfcd0 100644
-> --- a/include/linux/phy/phy.h
-> +++ b/include/linux/phy/phy.h
-> @@ -44,6 +44,12 @@ enum phy_mode {
->  };
->  
->  /**
-> + * union phy_configure_opts - Opaque generic phy configuration
-> + */
-> +union phy_configure_opts {
-> +};
-> +
-> +/**
->   * struct phy_ops - set of function pointers for performing phy operations
->   * @init: operation to be performed for initializing phy
->   * @exit: operation to be performed while exiting
-> @@ -60,6 +66,38 @@ struct phy_ops {
->  	int	(*power_on)(struct phy *phy);
->  	int	(*power_off)(struct phy *phy);
->  	int	(*set_mode)(struct phy *phy, enum phy_mode mode);
-> +
-> +	/**
-> +	 * @configure:
-> +	 *
-> +	 * Optional.
-> +	 *
-> +	 * Used to change the PHY parameters. phy_init() must have
-> +	 * been called on the phy.
-> +	 *
-> +	 * Returns: 0 if successful, an negative error code otherwise
-> +	 */
-> +	int	(*configure)(struct phy *phy, enum phy_mode mode,
-> +			     union phy_configure_opts *opts);
-> +
-> +	/**
-> +	 * @validate:
-> +	 *
-> +	 * Optional.
-> +	 *
-> +	 * Used to check that the current set of parameters can be
-> +	 * handled by the phy. Implementations are free to tune the
-> +	 * parameters passed as arguments if needed by some
-> +	 * implementation detail or constraints. It must not change
-> +	 * any actual configuration of the PHY, so calling it as many
-> +	 * times as deemed fit by the consumer must have no side
-> +	 * effect.
-> +	 *
-> +	 * Returns: 0 if the configuration can be applied, an negative
-> +	 * error code otherwise
-> +	 */
-> +	int	(*validate)(struct phy *phy, enum phy_mode mode,
-> +			    union phy_configure_opts *opts);
->  	int	(*reset)(struct phy *phy);
->  	int	(*calibrate)(struct phy *phy);
->  	struct module *owner;
-> @@ -164,6 +202,10 @@ int phy_exit(struct phy *phy);
->  int phy_power_on(struct phy *phy);
->  int phy_power_off(struct phy *phy);
->  int phy_set_mode(struct phy *phy, enum phy_mode mode);
-> +int phy_configure(struct phy *phy, enum phy_mode mode,
-> +		  union phy_configure_opts *opts);
-> +int phy_validate(struct phy *phy, enum phy_mode mode,
-> +		 union phy_configure_opts *opts);
-
-Stub function when CONFIG_GENERIC_PHY is not set is also required.
-
-Thanks
-Kishon
+Thanks again, I have applied this to the renesas tree for v4.20.
