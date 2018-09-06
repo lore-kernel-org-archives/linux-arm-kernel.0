@@ -1,45 +1,32 @@
-From: katsuhiro@katsuster.net (Katsuhiro Suzuki)
-Date: Fri,  7 Sep 2018 00:39:47 +0900
-Subject: [PATCH] arm64: dts: rockchip: fix vcc_host1_5v pin assign
-Message-ID: <20180906153947.19495-1-katsuhiro@katsuster.net>
+From: corbet@lwn.net (Jonathan Corbet)
+Date: Thu, 6 Sep 2018 09:51:11 -0600
+Subject: [PATCH] efi_stub: update documentation on dtb= parameter
+In-Reply-To: <20180905190750.4566-1-grant.likely@arm.com>
+References: <20180905190750.4566-1-grant.likely@arm.com>
+Message-ID: <20180906095111.1a74dfcd@lwn.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes pin assign of vcc_host1_5v. This regulator is
-controlled by USB20_HOST_DRV signal.
+On Wed,  5 Sep 2018 20:07:50 +0100
+Grant Likely <grant.likely@arm.com> wrote:
 
-ROCK64 schematic says that GPIO0_A2 pin is used as USB20_HOST_DRV.
-GPIO0_D3 pin is for SPDIF_TX_M0.
+> The dtb= parameter is no longer the primary mechanism for providing a
+> devicetree to the kernel. Now either firmware or the boot selector (ex.
+> Grub) should provide the devicetree and dtb= should only be used for
+> debug or when using firmware that doesn't understand DT.
+> Update the EFI stub documentation to reflect the current usage.
 
-ROCK64 schematic:
-http://files.pine64.org/doc/rock64/ROCK64_Schematic_v2.0_20171019.pdf
+So I hate to be obnoxious, but...
 
-Signed-off-by: Katsuhiro Suzuki <katsuhiro@katsuster.net>
----
- arch/arm64/boot/dts/rockchip/rk3328-rock64.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> IMPORTANT NOTICE: The contents of this email and any attachments are
+> confidential and may also be privileged. If you are not the intended
+> recipient, please notify the sender immediately and do not disclose the
+> contents to any other person, use it for any purpose, or store or copy
+> the information in any medium. Thank you.
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts b/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
-index 5272e887a434..5852061e497b 100644
---- a/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
-@@ -46,7 +46,7 @@
- 	vcc_host1_5v: vcc_otg_5v: vcc-host1-5v-regulator {
- 		compatible = "regulator-fixed";
- 		enable-active-high;
--		gpio = <&gpio0 RK_PD3 GPIO_ACTIVE_HIGH>;
-+		gpio = <&gpio0 RK_PA2 GPIO_ACTIVE_HIGH>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&usb20_host_drv>;
- 		regulator-name = "vcc_host1_5v";
-@@ -238,7 +238,7 @@
- 
- 	usb2 {
- 		usb20_host_drv: usb20-host-drv {
--			rockchip,pins = <0 RK_PD3 RK_FUNC_GPIO &pcfg_pull_none>;
-+			rockchip,pins = <0 RK_PA2 RK_FUNC_GPIO &pcfg_pull_none>;
- 		};
- 	};
- 
--- 
-2.18.0
+Can I get a version of the patch without this language?  Then I'll be glad
+to apply it.
+
+Thanks,
+
+jon
