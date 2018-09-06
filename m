@@ -1,97 +1,79 @@
 From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Thu, 6 Sep 2018 09:39:30 +0200
-Subject: [PATCH v8 4/8] media: platform: Add Cedrus VPU decoder driver
-In-Reply-To: <CAAFQd5Cmc7uFhprsoTU6Gq19n3z2eiUfZZ2ZjDW4QWVWMDN6tg@mail.gmail.com>
-References: <20180828073424.30247-1-paul.kocialkowski@bootlin.com>
- <20180828073424.30247-5-paul.kocialkowski@bootlin.com>
- <5faf5eed-eb2c-f804-93e3-5a42f6204d99@xs4all.nl>
- <b7b3cb2320978d45acb34475d15abd7bf03da367.camel@paulk.fr>
- <461c6a0d-a346-b9da-b75e-4aab907054df@xs4all.nl>
- <CAAFQd5Cmc7uFhprsoTU6Gq19n3z2eiUfZZ2ZjDW4QWVWMDN6tg@mail.gmail.com>
-Message-ID: <7a2167a3-5b61-0937-7f06-8b36fa12e7a0@xs4all.nl>
+Date: Thu, 6 Sep 2018 09:57:49 +0200
+Subject: [PATCH v2 3/4] media: imx-pxp: add i.MX Pixel Pipeline driver
+In-Reply-To: <1536153658.4084.7.camel@pengutronix.de>
+References: <20180905100018.27556-1-p.zabel@pengutronix.de>
+ <20180905100018.27556-4-p.zabel@pengutronix.de>
+ <b2968b6b-b6ab-dfbe-b51c-5c4e73786039@xs4all.nl>
+ <1536153658.4084.7.camel@pengutronix.de>
+Message-ID: <dbc31612-1686-c115-8618-309355363f27@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/06/2018 09:25 AM, Tomasz Figa wrote:
-> On Thu, Sep 6, 2018 at 4:01 PM Hans Verkuil <hverkuil@xs4all.nl> wrote:
+On 09/05/2018 03:20 PM, Philipp Zabel wrote:
+> On Wed, 2018-09-05 at 14:50 +0200, Hans Verkuil wrote: 
+>>> +static enum v4l2_ycbcr_encoding pxp_default_ycbcr_enc(struct pxp_ctx *ctx)
+>>> +{
+>>> +	if (ctx->xfer_func)
+>>> +		return V4L2_MAP_YCBCR_ENC_DEFAULT(ctx->colorspace);
+>>> +	else
+>>> +		return V4L2_YCBCR_ENC_DEFAULT;
+>>> +}
+>>> +
+>>> +static enum v4l2_quantization
+>>> +pxp_default_quant(struct pxp_ctx *ctx, u32 pixelformat,
+>>> +		  enum v4l2_ycbcr_encoding ycbcr_enc)
+>>> +{
+>>> +	bool is_rgb = !pxp_v4l2_pix_fmt_is_yuv(pixelformat);
+>>> +
+>>> +	if (ctx->xfer_func)
 >>
->> On 09/05/2018 06:29 PM, Paul Kocialkowski wrote:
->>> Hi and thanks for the review!
->>>
->>> Le lundi 03 septembre 2018 ? 11:11 +0200, Hans Verkuil a ?crit :
->>>> On 08/28/2018 09:34 AM, Paul Kocialkowski wrote:
->>>>> +static int cedrus_request_validate(struct media_request *req)
->>>>> +{
->>>>> +   struct media_request_object *obj, *obj_safe;
->>>>> +   struct v4l2_ctrl_handler *parent_hdl, *hdl;
->>>>> +   struct cedrus_ctx *ctx = NULL;
->>>>> +   struct v4l2_ctrl *ctrl_test;
->>>>> +   unsigned int i;
->>>>> +
->>>>> +   list_for_each_entry_safe(obj, obj_safe, &req->objects, list) {
->>>>
->>>> You don't need to use the _safe variant during validation.
->>>
->>> Okay, I'll use the regular one then.
->>>
->>>>> +           struct vb2_buffer *vb;
->>>>> +
->>>>> +           if (vb2_request_object_is_buffer(obj)) {
->>>>> +                   vb = container_of(obj, struct vb2_buffer, req_obj);
->>>>> +                   ctx = vb2_get_drv_priv(vb->vb2_queue);
->>>>> +
->>>>> +                   break;
->>>>> +           }
->>>>> +   }
->>>>
->>>> Interesting question: what happens if more than one buffer is queued in the
->>>> request? This is allowed by the request API and in that case the associated
->>>> controls in the request apply to all queued buffers.
->>>>
->>>> Would this make sense at all for this driver? If not, then you need to
->>>> check here if there is more than one buffer in the request and document in
->>>> the spec that this is not allowed.
->>>
->>> Well, our driver was written with the (unformal) assumption that we
->>> only deal with a pair of one output and one capture buffer. So I will
->>> add a check for this at request validation time and document it in the
->>> spec. Should that be part of the MPEG-2 PIXFMT documentation (and
->>> duplicated for future formats we add support for)?
->>
->> Can you make a patch for vb2_request_has_buffers() in videobuf2-core.c
->> renaming it to vb2_request_buffer_cnt() and returning the number of buffers
->> in the request?
->>
->> Then you can call it here to check that you have only one buffer.
->>
->> And this has to be documented with the PIXFMT.
->>
->> Multiple buffers are certainly possible in non-codec scenarios (vim2m and
->> vivid happily accept that), so this is an exception that should be
->> documented and checked in the codec driver.
+>> Why check for xfer_func? (same question for the previous function)
 > 
-> Hmm, isn't it still 1 buffer per 1 queue and just multiple queues
-> included in the request?
-
-No. The request API allows multiple buffers for the same vb2_queue to be
-queued for the same request (obviously when the request is committed, the
-buffers are queued to the driver in the same order).
-
+> That way if userspace sets
+> 	V4L2_XFER_FUNC_DEFAULT
+> 	V4L2_YCBCR_ENC_DEFAULT
+> 	V4L2_QUANTIZATION_DEFAULT
+> on the output queue, it will get
+> 	V4L2_XFER_FUNC_DEFAULT
+> 	V4L2_YCBCR_ENC_DEFAULT
+> 	V4L2_QUANTIZATION_DEFAULT
+> on the capture queue.
 > 
-> If we indeed allow multiple buffers for the same queue in a request,
-> we shouldn't restrict this on a per-driver basis. It's definitely not
-> a hardware limitation, since the driver could just do the same as if 2
-> requests with the same controls were given.
+> If userspace sets xfer_func explicitly, it will get the explicit default
+> ycbcr_enc and quantization values.
+> 
+> I think I did this to make v4l2-compliance at some point, but it could
+> be that the explicit output->capture colorimetry copy for RGB->RGB and
+> YUV->YUV conversions has me covered now.
 
-That's how it operates: for all buffers in the request the same controls
-apply. But does this make sense for codecs? If the control(s) with the
-codec metadata always change for every buffer, then having more than one
-buffer in the request is senseless and the driver should check for this
-in the validation step.
+This xfer_func test makes no sense. xfer_func is completely ignored by the
+driver (other than copying it from output to capture queue) since it can't
+make any changes to it anyway.
 
-If it *does* make sense in some circumstances to have the same metadata
-for multiple buffers, then it should be checked if the cedrus driver
-handles this correctly.
+What you are trying to do in pxp_fixup_colorimetry() is to figure out the
+ycbcr_enc and quantization values for the capture queue.
+
+BTW, can you rename pxp_fixup_colorimetry to pxp_fixup_colorimetry_cap or
+something? Since it is specifically for the capture queue.
+
+These values depend entirely on the capture queue pixelformat and on the
+colorspace and not on the xfer_func value.
+
+So just do:
+
+bool is_rgb = !pxp_v4l2_pix_fmt_is_yuv(dst_fourcc);
+*ycbcr_enc = V4L2_MAP_YCBCR_ENC_DEFAULT(ctx->colorspace);
+*quantization = V4L2_MAP_QUANTIZATION_DEFAULT(is_rgb, ctx->colorspace,
+					      *ycbcr_enc);
+
+BTW, I just noticed that the V4L2_MAP_QUANTIZATION_DEFAULT macro no longer
+uses ycbcr_enc. The comment in videodev2.h should be updated. I can't
+change the define as it is used in applications (and we might need to
+depend on it again in the future anyway).
+
+If this code will give you v4l2-compliance issues, please let me know.
+It shouldn't AFAICT.
 
 Regards,
 
