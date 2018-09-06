@@ -1,51 +1,110 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu,  6 Sep 2018 10:08:33 +0100
-Subject: [PATCH v2 12/14] coresight: catu: Claim device before use
+Date: Thu,  6 Sep 2018 10:08:35 +0100
+Subject: [PATCH v2 14/14] coreisght: tmc: Claim device before use
 In-Reply-To: <1536224915-31766-1-git-send-email-suzuki.poulose@arm.com>
 References: <1536224915-31766-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1536224915-31766-13-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1536224915-31766-15-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the CLAIM protocol to grab the ownership of the component when
-in use.
+Use CLAIM tags to make sure the device is available for use.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-catu.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/hwtracing/coresight/coresight-tmc-etf.c | 22 +++++++++++++++++++---
+ drivers/hwtracing/coresight/coresight-tmc-etr.c |  4 ++++
+ 2 files changed, 23 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-catu.c b/drivers/hwtracing/coresight/coresight-catu.c
-index ff94e58..170fbb6 100644
---- a/drivers/hwtracing/coresight/coresight-catu.c
-+++ b/drivers/hwtracing/coresight/coresight-catu.c
-@@ -406,6 +406,7 @@ static inline int catu_wait_for_ready(struct catu_drvdata *drvdata)
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+index 24908e0..082f0b1 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+@@ -36,6 +36,11 @@ static void __tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
  
- static int catu_enable_hw(struct catu_drvdata *drvdata, void *data)
+ static int tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
  {
-+	int rc;
- 	u32 control, mode;
- 	struct etr_buf *etr_buf = data;
- 
-@@ -418,6 +419,10 @@ static int catu_enable_hw(struct catu_drvdata *drvdata, void *data)
- 		return -EBUSY;
- 	}
- 
-+	rc = coresight_claim_device_unlocked(drvdata->base);
++	int rc = coresight_claim_device(drvdata->base);
++
 +	if (rc)
 +		return rc;
 +
- 	control |= BIT(CATU_CONTROL_ENABLE);
+ 	__tmc_etb_enable_hw(drvdata);
+ 	return 0;
+ }
+@@ -66,7 +71,7 @@ static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
+ 	return;
+ }
  
- 	if (etr_buf && etr_buf->mode == ETR_MODE_CATU) {
-@@ -459,6 +464,7 @@ static int catu_disable_hw(struct catu_drvdata *drvdata)
- 	int rc = 0;
+-static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
++static void __tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
+ {
+ 	CS_UNLOCK(drvdata->base);
  
- 	catu_write_control(drvdata, 0);
+@@ -82,6 +87,12 @@ static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
+ 	CS_LOCK(drvdata->base);
+ }
+ 
++static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
++{
++	coresight_disclaim_device(drvdata);
++	__tmc_etb_disable_hw(drvdata);
++}
++
+ static void __tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
+ {
+ 	CS_UNLOCK(drvdata->base);
+@@ -100,6 +111,11 @@ static void __tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
+ 
+ static int tmc_etf_enable_hw(struct tmc_drvdata *drvdata)
+ {
++	int rc = coresight_claim_device(drvdata->base);
++
++	if (rc)
++		return rc;
++
+ 	__tmc_etf_enable_hw(drvdata);
+ 	return 0;
+ }
+@@ -110,7 +126,7 @@ static void tmc_etf_disable_hw(struct tmc_drvdata *drvdata)
+ 
+ 	tmc_flush_and_stop(drvdata);
+ 	tmc_disable_hw(drvdata);
+-
 +	coresight_disclaim_device_unlocked(drvdata->base);
- 	if (catu_wait_for_ready(drvdata)) {
- 		dev_info(drvdata->dev, "Timeout while waiting for READY\n");
- 		rc = -EAGAIN;
+ 	CS_LOCK(drvdata->base);
+ }
+ 
+@@ -556,7 +572,7 @@ int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
+ 
+ 	/* Disable the TMC if need be */
+ 	if (drvdata->mode == CS_MODE_SYSFS)
+-		tmc_etb_disable_hw(drvdata);
++		__tmc_etb_disable_hw(drvdata);
+ 
+ 	drvdata->reading = true;
+ out:
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+index daad521..f684283 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+@@ -991,6 +991,9 @@ static int tmc_etr_enable_hw(struct tmc_drvdata *drvdata,
+ 	 * this on.
+ 	 */
+ 	rc = tmc_etr_enable_catu(drvdata, etr_buf);
++	if (rc)
++		return rc;
++	rc = coresight_claim_device(drvdata->base);
+ 	if (!rc) {
+ 		drvdata->etr_buf = etr_buf;
+ 		__tmc_etr_enable_hw(drvdata);
+@@ -1077,6 +1080,7 @@ static void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
+ 	__tmc_etr_disable_hw(drvdata);
+ 	/* Disable CATU device if this ETR is connected to one */
+ 	tmc_etr_disable_catu(drvdata);
++	coresight_disclaim_device(drvdata->base);
+ 	/* Reset the ETR buf used by hardware */
+ 	drvdata->etr_buf = NULL;
+ }
 -- 
 2.7.4
