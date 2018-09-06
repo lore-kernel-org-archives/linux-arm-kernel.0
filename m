@@ -1,146 +1,29 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 6 Sep 2018 15:08:35 +0530
-Subject: [PATCH v3 RESEND 2/2] phy: add Rockchip Innosilicon hdmi phy
-In-Reply-To: <21954745.lUUHsRAzaY@diego>
-References: <20180710134949.25203-1-heiko@sntech.de>
- <a0a84907-c51f-b484-33fa-592a23c756f9@ti.com> <4194245.uYZyAYm7Hd@phil>
- <21954745.lUUHsRAzaY@diego>
-Message-ID: <b85eeaeb-b7e2-285b-0df0-1df641c7b983@ti.com>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Thu,  6 Sep 2018 18:40:30 +0900
+Subject: [PATCH v2 0/2] add new UniPhier PCIe host driver
+Message-ID: <1536226832-5089-1-git-send-email-hayashi.kunihiko@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This series adds PCIe host controller driver for Socionext UniPhier SoCs.
+This controller is based on the DesignWare PCIe core. This driver
+supports LD20 and PXs3 SoCs.
 
+Changes since v1:
+- follow capitalization conventions in the descriptions
+- use C style comments except for the SPDX line
 
-On Friday 31 August 2018 02:56 PM, Heiko St?bner wrote:
-> Am Dienstag, 14. August 2018, 14:52:00 CEST schrieb Heiko Stuebner:
->> Hi Kishon,
->>
->> thanks for your review.
->>
->> Am Freitag, 3. August 2018, 11:24:06 CEST schrieb Kishon Vijay Abraham I:
->>> On Tuesday 10 July 2018 07:19 PM, Heiko Stuebner wrote:
->>>> +config PHY_ROCKCHIP_INNO_HDMI
->>>> +	tristate "Rockchip INNO HDMI PHY Driver"
->>>> +	depends on (ARCH_ROCKCHIP || COMPILE_TEST) && OF
->>>
->>> depends on COMMON_CLK since the phy registers a clock provider?
->>
->> ok
->>
->>>> +static const struct phy_config rk3228_phy_cfg[] = {
->>>> +	{	165000000, {
->>>> +			0xaa, 0x00, 0x44, 0x44, 0x00, 0x00, 0x00, 0x00, 0x00,
->>>> +			0x00, 0x00, 0x00, 0x00, 0x00,
->>>
->>> If these register configurations are not a tuning value or dividers (which
->>> can have absolute values), then we should have macros for each of these
->>> configurations.
->> That might get difficult.
->>
->> That phy register set is completely undocumented even in the vendor TRMs
->> of the 2 socs. I pieced together most existing macros from code comments
->> and such from the vendor kernel. And Innosilicon is not known to willingly
->> share much of their register documentation it seems.
->>
->>>> +static unsigned long inno_hdmi_phy_get_tmdsclk(struct inno_hdmi_phy
->>>> *inno,
->>>> +					       unsigned long rate)
->>>> +{
->>>> +	int bus_width = phy_get_bus_width(inno->phy);
->>>
->>> hmm, the bus_width could be a member of struct inno_hdmi_phy. PHY API's
->>> don't have to be used for getting data within the PHY driver itself.
->>> Looking at the phy_get_bus_width() implementation, we should have
->>> protected
->>> bus-width set and get with mutex. With that there might be a deadlock
->>> here.
->>
->> ok, so just read phy->attrs.bus_width directly here?
->>
->> I don't see how this can be part of struct inno_hdmi_phy, as the bus-width
->> depends on the color-depth used on the hdmi-controller side, so
->> depending on that it will want to adapt the phy's bus_width.
->>
->> Right now our dw_hdmi in mainline only supports one output format
->> requiring a bus_width of 8, but the vendor kernel shows [0] how this
->> wants to be used with multiple output formats.
+Kunihiko Hayashi (2):
+  dt-bindings: PCI: add UniPhier PCIe host controller description
+  PCI: controller: dwc: add UniPhier PCIe host controller support
 
-Ignore my comment. You can use phy_get_bus_width. I'll see if there's a better
-way to handle this.
->>
->> [0]
->> https://github.com/rockchip-linux/kernel/blob/release-4.4/drivers/gpu/drm/r
->> ockchip/dw_hdmi-rockchip.c#L817
->>>> +static irqreturn_t inno_hdmi_phy_rk3328_irq(int irq, void *dev_id)
->>>> +{
->>>> +	struct inno_hdmi_phy *inno = dev_id;
->>>> +
->>>> +	inno_update_bits(inno, 0x02, RK3328_PDATA_EN, 0);
->>>> +	usleep_range(9, 10);
->>>
->>> This range looks very narrow. 10 to 20 should be okay?
->>
->> ok
->>
->>>> +static void inno_hdmi_phy_action(void *data)
->>>> +{
->>>> +	struct inno_hdmi_phy *inno = data;
->>>> +
->>>> +	clk_disable_unprepare(inno->refpclk);
->>>> +	clk_disable_unprepare(inno->sysclk);
->>>> +}
->>>> +
->>>> +static int inno_hdmi_phy_probe(struct platform_device *pdev)
->>>> +{
->>>> +	struct inno_hdmi_phy *inno;
->>>> +	const struct of_device_id *match;
->>>> +	struct phy_provider *phy_provider;
->>>> +	struct resource *res;
->>>> +	void __iomem *regs;
->>>> +	int ret;
->>>> +
->>
->> [...]
->>
->>>> +	/*
->>>> +	 * Refpclk needs to be on, on at least the rk3328 for still
->>>> +	 * unknown reasons.
->>>> +	 */
->>>> +	ret = clk_prepare_enable(inno->refpclk);
->>>> +	if (ret) {
->>>> +		dev_err(inno->dev, "failed to enable refpclk\n");
->>>> +		clk_disable_unprepare(inno->sysclk);
->>>> +		return ret;
->>>> +	}
->>>> +
->>>> +	ret = devm_add_action_or_reset(inno->dev, inno_hdmi_phy_action,
->>>> +				       inno);
->>>> +	if (ret) {
->>>> +		clk_disable_unprepare(inno->refpclk);
->>>> +		clk_disable_unprepare(inno->sysclk);
->>>> +		return ret;
->>>> +	}
->>>> +
->>>> +	inno->regmap = devm_regmap_init_mmio(inno->dev, regs,
->>>> +					     &inno_hdmi_phy_regmap_config);
->>>> +	if (IS_ERR(inno->regmap))
->>>
->>> here too clk_disable_unprepare and all error handling below?
->>> It's better if we just handle error handling at the bottom of the
->>> function.
->>
->> Nope ;-) ... I.e. the goal of registering the devm_action above is to have
->> the clocks get disabled in the correct order when devm undoes the other
->> things in sequence.
->>
->> Manual error handling for the clocks would also break devm, as then
->> the clocks would get disabled before the devm cleanup kicks in.
-> 
-> but I just realized, that I don't need the initial disable_unprepare calls
-> anymore as well, as devm_add_action_or_reset will call that itself
-> in the error case.
+ .../devicetree/bindings/pci/uniphier-pcie.txt      |  78 ++++
+ drivers/pci/controller/dwc/Kconfig                 |   9 +
+ drivers/pci/controller/dwc/Makefile                |   1 +
+ drivers/pci/controller/dwc/pcie-uniphier.c         | 465 +++++++++++++++++++++
+ 4 files changed, 553 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/uniphier-pcie.txt
+ create mode 100644 drivers/pci/controller/dwc/pcie-uniphier.c
 
-All right! I'll merge once you send a patch fixing this.
-
-Thanks
-Kishon
+-- 
+2.7.4
