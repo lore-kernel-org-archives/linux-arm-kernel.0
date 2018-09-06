@@ -1,105 +1,117 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu,  6 Sep 2018 10:08:26 +0100
-Subject: [PATCH v2 05/14] coresight: etm4x: Add support for handling errors
+Date: Thu,  6 Sep 2018 10:08:31 +0100
+Subject: [PATCH v2 10/14] coresight: etmx: Claim devices before use
 In-Reply-To: <1536224915-31766-1-git-send-email-suzuki.poulose@arm.com>
 References: <1536224915-31766-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1536224915-31766-6-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1536224915-31766-11-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for handling errors in enabling the component.
-The ETM is enabled via cross call to owner CPU. Make
-necessary changes to report the error back from the cross
-call.
+Use the CLAIM tags to grab the device for self-hosted usage.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-etm4x.c | 39 ++++++++++++++++++---------
- 1 file changed, 26 insertions(+), 13 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm3x.c | 16 +++++++++++++---
+ drivers/hwtracing/coresight/coresight-etm4x.c | 14 +++++++++++---
+ 2 files changed, 24 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index c1dcc7c..4f9e6bb 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -77,10 +77,14 @@ static int etm4_trace_id(struct coresight_device *csdev)
- 	return drvdata->trcid;
+diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+index 206c238..fd5c4cc 100644
+--- a/drivers/hwtracing/coresight/coresight-etm3x.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+@@ -357,7 +357,7 @@ static int etm_parse_event_config(struct etm_drvdata *drvdata,
+ 
+ static int etm_enable_hw(struct etm_drvdata *drvdata)
+ {
+-	int i;
++	int i, rc;
+ 	u32 etmcr;
+ 	struct etm_config *config = &drvdata->config;
+ 
+@@ -369,6 +369,9 @@ static int etm_enable_hw(struct etm_drvdata *drvdata)
+ 	etm_set_pwrup(drvdata);
+ 	/* Make sure all registers are accessible */
+ 	etm_os_unlock(drvdata);
++	rc = coresight_claim_device_unlocked(drvdata->base);
++	if (rc)
++		goto done;
+ 
+ 	etm_set_prog(drvdata);
+ 
+@@ -417,10 +420,15 @@ static int etm_enable_hw(struct etm_drvdata *drvdata)
+ 	etm_writel(drvdata, 0x0, ETMVMIDCVR);
+ 
+ 	etm_clr_prog(drvdata);
++
++done:
++	if (rc)
++		etm_set_pwrdwn(drvdata);
+ 	CS_LOCK(drvdata->base);
+ 
+-	dev_dbg(drvdata->dev, "cpu: %d enable smp call done\n", drvdata->cpu);
+-	return 0;
++	dev_dbg(drvdata->dev, "cpu: %d enable smp call done: %d\n",
++		drvdata->cpu, rc);
++	return rc;
  }
  
--static void etm4_enable_hw(void *info)
-+struct etm4_enable_arg {
-+	struct etmv4_drvdata *drvdata;
-+	int rc;
-+};
+ struct etm_enable_arg {
+@@ -569,6 +577,8 @@ static void etm_disable_hw(void *info)
+ 	for (i = 0; i < drvdata->nr_cntr; i++)
+ 		config->cntr_val[i] = etm_readl(drvdata, ETMCNTVRn(i));
+ 
++	coresight_disclaim_device_unlocked(drvdata->base);
 +
-+static int etm4_enable_hw(struct etmv4_drvdata *drvdata)
+ 	etm_set_pwrdwn(drvdata);
+ 	CS_LOCK(drvdata->base);
+ 
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index 4f9e6bb..ac311e5 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -84,13 +84,17 @@ struct etm4_enable_arg {
+ 
+ static int etm4_enable_hw(struct etmv4_drvdata *drvdata)
  {
- 	int i;
--	struct etmv4_drvdata *drvdata = info;
+-	int i;
++	int i, rc;
  	struct etmv4_config *config = &drvdata->config;
  
  	CS_UNLOCK(drvdata->base);
-@@ -177,6 +181,16 @@ static void etm4_enable_hw(void *info)
+ 
+ 	etm4_os_unlock(drvdata);
+ 
++	rc = coresight_claim_device_unlocked(drvdata->base);
++	if (rc)
++		goto done;
++
+ 	/* Disable the trace unit before programming trace registers */
+ 	writel_relaxed(0, drvdata->base + TRCPRGCTLR);
+ 
+@@ -178,10 +182,12 @@ static int etm4_enable_hw(struct etmv4_drvdata *drvdata)
+ 		dev_err(drvdata->dev,
+ 			"timeout while waiting for Idle Trace Status\n");
+ 
++done:
  	CS_LOCK(drvdata->base);
  
- 	dev_dbg(drvdata->dev, "cpu: %d enable smp call done\n", drvdata->cpu);
-+	return 0;
-+}
-+
-+static void etm4_enable_hw_smp_call(void *info)
-+{
-+	struct etm4_enable_arg *arg = info;
-+
-+	if (WARN_ON(!arg))
-+		return;
-+	arg->rc = etm4_enable_hw(arg->drvdata);
- }
- 
- static int etm4_parse_event_config(struct etmv4_drvdata *drvdata,
-@@ -242,7 +256,7 @@ static int etm4_enable_perf(struct coresight_device *csdev,
- 	if (ret)
- 		goto out;
- 	/* And enable it */
--	etm4_enable_hw(drvdata);
-+	ret = etm4_enable_hw(drvdata);
- 
- out:
- 	return ret;
-@@ -251,6 +265,7 @@ static int etm4_enable_perf(struct coresight_device *csdev,
- static int etm4_enable_sysfs(struct coresight_device *csdev)
- {
- 	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-+	struct etm4_enable_arg arg = { 0 };
- 	int ret;
- 
- 	spin_lock(&drvdata->spinlock);
-@@ -259,19 +274,17 @@ static int etm4_enable_sysfs(struct coresight_device *csdev)
- 	 * Executing etm4_enable_hw on the cpu whose ETM is being enabled
- 	 * ensures that register writes occur when cpu is powered.
- 	 */
-+	arg.drvdata = drvdata;
- 	ret = smp_call_function_single(drvdata->cpu,
--				       etm4_enable_hw, drvdata, 1);
--	if (ret)
--		goto err;
--
--	drvdata->sticky_enable = true;
-+				       etm4_enable_hw_smp_call, &arg, 1);
-+	if (!ret)
-+		ret = arg.rc;
-+	if (!ret)
-+		drvdata->sticky_enable = true;
- 	spin_unlock(&drvdata->spinlock);
- 
--	dev_dbg(drvdata->dev, "ETM tracing enabled\n");
+-	dev_dbg(drvdata->dev, "cpu: %d enable smp call done\n", drvdata->cpu);
 -	return 0;
--
--err:
--	spin_unlock(&drvdata->spinlock);
-+	if (!ret)
-+		dev_dbg(drvdata->dev, "ETM tracing enabled\n");
- 	return ret;
++	dev_dbg(drvdata->dev, "cpu: %d enable smp call done: %d\n",
++		drvdata->cpu, rc);
++	return rc;
  }
  
+ static void etm4_enable_hw_smp_call(void *info)
+@@ -341,6 +347,8 @@ static void etm4_disable_hw(void *info)
+ 	isb();
+ 	writel_relaxed(control, drvdata->base + TRCPRGCTLR);
+ 
++	coresight_disclaim_device_unlocked(drvdata->base);
++
+ 	CS_LOCK(drvdata->base);
+ 
+ 	dev_dbg(drvdata->dev, "cpu: %d disable smp call done\n", drvdata->cpu);
 -- 
 2.7.4
