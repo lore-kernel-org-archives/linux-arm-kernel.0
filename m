@@ -1,140 +1,31 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Thu, 6 Sep 2018 14:03:22 +0800
-Subject: [PATCH v2 13/13] drm/mediatek: config component output by
- device node port
-In-Reply-To: <20180905083146.14727-14-bibby.hsieh@mediatek.com>
-References: <20180905083146.14727-1-bibby.hsieh@mediatek.com>
- <20180905083146.14727-14-bibby.hsieh@mediatek.com>
-Message-ID: <1536213802.4618.41.camel@mtksdaap41>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Thu, 6 Sep 2018 11:48:13 +0530
+Subject: [linux-sunxi] [PATCH v4 08/11] arm64: dts: allwinner: a64: Add
+ display pipeline
+In-Reply-To: <20180904044053.15425-9-icenowy@aosc.io>
+References: <20180904044053.15425-1-icenowy@aosc.io>
+ <20180904044053.15425-9-icenowy@aosc.io>
+Message-ID: <CAMty3ZDn=uj3buvJx93R1J7Swr3CyfjJJ=MgQTGvRZ01izbAAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Bibby:
-
-On Wed, 2018-09-05 at 16:31 +0800, Bibby Hsieh wrote:
-> We can select output component by decive node port.
-> Main path default output component is DSI.
-> External path default output component is DPI.
-> 
-> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+On Tue, Sep 4, 2018 at 10:10 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
+> From: Jagan Teki <jagan@amarulasolutions.com>
+>
+> Allwinner A64 have a display pipeline with 2 mixers/TCONs, the first
+> TCON is connected to LCD and the second is to HDMI.
+>
+> The HDMI controller/PHY pair is similar to the one on H3/H5.
+>
+> Add all required device tree nodes of the display pipeline, including
+> the TCON0 LCD one and the TCON1 HDMI one.
+>
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> [Icenowy: refactor commit message and add 1st pipeline]
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 > ---
->  drivers/gpu/drm/mediatek/mtk_drm_drv.c | 37 ++++++++++++++++++++++++++++++----
->  drivers/gpu/drm/mediatek/mtk_drm_drv.h |  4 ++--
->  2 files changed, 35 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> index d961112fa2f5..a477fb878c06 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> @@ -21,7 +21,9 @@
->  #include <drm/drm_of.h>
->  #include <linux/component.h>
->  #include <linux/iommu.h>
-> +#include <linux/of.h>
->  #include <linux/of_address.h>
-> +#include <linux/of_graph.h>
->  #include <linux/of_platform.h>
->  #include <linux/pm_runtime.h>
->  
-> @@ -133,7 +135,7 @@ static const struct drm_mode_config_funcs mtk_drm_mode_config_funcs = {
->  	.atomic_commit = mtk_atomic_commit,
->  };
->  
-> -static const enum mtk_ddp_comp_id mt2701_mtk_ddp_main[] = {
-> +static enum mtk_ddp_comp_id mt2701_mtk_ddp_main[] = {
->  	DDP_COMPONENT_OVL0,
->  	DDP_COMPONENT_RDMA0,
->  	DDP_COMPONENT_COLOR0,
-> @@ -141,7 +143,7 @@ static const enum mtk_ddp_comp_id mt2701_mtk_ddp_main[] = {
->  	DDP_COMPONENT_DSI0,
->  };
->  
-> -static const enum mtk_ddp_comp_id mt2701_mtk_ddp_ext[] = {
-> +static enum mtk_ddp_comp_id mt2701_mtk_ddp_ext[] = {
->  	DDP_COMPONENT_RDMA1,
->  	DDP_COMPONENT_DPI0,
->  };
-> @@ -172,7 +174,7 @@ static const enum mtk_ddp_comp_id mt2712_mtk_ddp_third[] = {
->  	DDP_COMPONENT_PWM2,
->  };
->  
-> -static const enum mtk_ddp_comp_id mt8173_mtk_ddp_main[] = {
-> +static enum mtk_ddp_comp_id mt8173_mtk_ddp_main[] = {
->  	DDP_COMPONENT_OVL0,
->  	DDP_COMPONENT_COLOR0,
->  	DDP_COMPONENT_AAL0,
-> @@ -183,7 +185,7 @@ static const enum mtk_ddp_comp_id mt8173_mtk_ddp_main[] = {
->  	DDP_COMPONENT_PWM0,
->  };
->  
-> -static const enum mtk_ddp_comp_id mt8173_mtk_ddp_ext[] = {
-> +static enum mtk_ddp_comp_id mt8173_mtk_ddp_ext[] = {
->  	DDP_COMPONENT_OVL1,
->  	DDP_COMPONENT_COLOR1,
->  	DDP_COMPONENT_GAMMA,
-> @@ -472,6 +474,7 @@ static int mtk_drm_probe(struct platform_device *pdev)
->  
->  	/* Iterate over sibling DISP function blocks */
->  	for_each_child_of_node(dev->of_node->parent, node) {
-> +		struct device_node *port, *ep, *remote;
->  		const struct of_device_id *of_id;
->  		enum mtk_ddp_comp_type comp_type;
->  		int comp_id;
-> @@ -531,6 +534,32 @@ static int mtk_drm_probe(struct platform_device *pdev)
->  
->  			private->ddp_comp[comp_id] = comp;
->  		}
-> +
-> +		if (comp_type != MTK_DSI && comp_type != MTK_DPI) {
-> +			port = of_graph_get_port_by_id(node, 0);
-> +			if (!port)
-> +				continue;
-> +			ep = of_get_child_by_name(port, "endpoint");
-> +			of_node_put(port);
-> +			if (!ep)
-> +				continue;
-> +			remote = of_graph_get_remote_port_parent(ep);
-> +			of_node_put(ep);
-> +			if (!remote)
-> +				continue;
-> +			of_id = of_match_node(mtk_ddp_comp_dt_ids, remote);
-> +			if (!of_id)
-> +				continue;
-> +			comp_type = (enum mtk_ddp_comp_type)of_id->data;
-> +			for (i = 0; i < private->data->main_len - 1; i++)
-> +				if (private->data->main_path[i] == comp_id)
-> +					private->data->main_path[i + 1] =
-> +					mtk_ddp_comp_get_id(node, comp_type);
-> +			for (i = 0; i < private->data->ext_len - 1; i++)
-> +				if (private->data->ext_path[i] == comp_id)
-> +					private->data->ext_path[i + 1] =
-> +					mtk_ddp_comp_get_id(node, comp_type);
-> +		}
+> Changes for v4:
+> - Misc fixes
+> - Dropped second PLL from HDMI PHY clock
 
-I think you should add description in binding document
-(Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt)
-for this. After the binding document is fully reviewed, we could start
-to review this patch.
-
-Regards,
-CK
-
->  	}
->  
->  	if (!private->mutex_node) {
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> index ecc00ca3221d..256a3ff2e66e 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> @@ -29,9 +29,9 @@ struct drm_property;
->  struct regmap;
->  
->  struct mtk_mmsys_driver_data {
-> -	const enum mtk_ddp_comp_id *main_path;
-> +	enum mtk_ddp_comp_id *main_path;
->  	unsigned int main_len;
-> -	const enum mtk_ddp_comp_id *ext_path;
-> +	enum mtk_ddp_comp_id *ext_path;
->  	unsigned int ext_len;
->  	const enum mtk_ddp_comp_id *third_path;
->  	unsigned int third_len;
+Why? it was there in previous versions.
