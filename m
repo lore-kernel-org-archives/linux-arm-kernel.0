@@ -1,106 +1,79 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Wed, 5 Sep 2018 21:12:51 -0700
-Subject: [linux-sunxi] [PATCH v4 11/11] arm64: dts: allwinner: a64: Enable
- HDMI output on A64 boards w/ HDMI
-In-Reply-To: <CA+E=qVdWXWztLj3989X+U+=4P5FpM4hs+6ByVmq8bf7mPeiWsA@mail.gmail.com>
-References: <20180904044053.15425-1-icenowy@aosc.io>
- <20180904044053.15425-12-icenowy@aosc.io>
- <CAMty3ZCvpUf0nJ3WuPccP8BizBP=Uc8ChzB8SeN8fkX2iS1E_Q@mail.gmail.com>
- <20180905075136.chumwosx76o2n66l@flea>
- <CAMty3ZAVr_d+Rwry_DMWY221OC+YSWmReNm-TXzYWgpd1s68+w@mail.gmail.com>
- <CA+E=qVdWXWztLj3989X+U+=4P5FpM4hs+6ByVmq8bf7mPeiWsA@mail.gmail.com>
-Message-ID: <CA+E=qVd4siJReWxbEeQ1DjFrTnewSGW=UJitduLT=52YfB-rag@mail.gmail.com>
+From: stripathi@amperecomputing.com (Suman Tripathi)
+Date: Wed,  5 Sep 2018 21:33:41 -0700
+Subject: [PATCH v3] ata: Disable AHCI ALPM feature for Ampere Computing eMAG
+ SATA
+Message-ID: <1536208421-24867-1-git-send-email-stripathi@amperecomputing.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 5, 2018 at 3:53 PM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
-> I can test it tonight.
+Due to hardware errata, Ampere Computing eMAG SATA can't support
+AHCI ALPM feature. This patch disables the AHCI ALPM feature for
+eMAG SATA.
 
-It works fine for me on pine64-lts with HDMI monitor:
+Changes for v2:
 
-[    1.969772] sun4i-drm display-engine: bound 1100000.mixer (ops
-sun8i_mixer_ops)
-[    1.979302] sun4i-drm display-engine: bound 1200000.mixer (ops
-sun8i_mixer_ops)
-[    1.979738] sun4i-drm display-engine: No panel or bridge found...
-RGB output disabled
-[    1.979755] sun4i-drm display-engine: bound 1c0c000.lcd-controller
-(ops sun4i_tcon_ops)
-[    1.979935] sun4i-drm display-engine: bound 1c0d000.lcd-controller
-(ops sun4i_tcon_ops)
-[    1.980017] sun4i-drm display-engine: failed to bind 1ee0000.hdmi
-(ops sun8i_dw_hdmi_ops): -517
-[    1.980306] sun4i-drm display-engine: Couldn't bind all pipelines components
-[    1.980446] sun4i-drm display-engine: master bind failed: -517
-[    4.230997] sun4i-drm display-engine: bound 1100000.mixer (ops
-sun8i_mixer_ops)
-[    4.247886] sun4i-drm display-engine: bound 1200000.mixer (ops
-sun8i_mixer_ops)
-[    4.255639] sun4i-drm display-engine: No panel or bridge found...
-RGB output disabled
-[    4.263482] sun4i-drm display-engine: bound 1c0c000.lcd-controller
-(ops sun4i_tcon_ops)
-[    4.283255] sun4i-drm display-engine: bound 1c0d000.lcd-controller
-(ops sun4i_tcon_ops)
-[    4.322055] sun4i-drm display-engine: bound 1ee0000.hdmi (ops
-sun8i_dw_hdmi_ops)
-[    4.342115] fb: switching to sun4i-drm-fb from simple
-[    5.001434] sun4i-drm display-engine: fb0: DRM emulated frame buffer device
-[    5.008933] [drm] Initialized sun4i-drm 1.0.0 20150629 for
-display-engine on minor 0
+* Introduce the new ata_port_info object which includes ATA_FLAG_NO_LPM.
+* Include this object for eMAG SATA inside the acpi match table.
+* Retrieve the ata_port_info from the acpi match table.
 
-I tested non-applied patches from this series on top of
-git://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git
-sunxi/for-next
+Changes for v3:
 
-Tested-by: Vasily Khoruzhick <anarsoul@gmail.com>
+* Fix the indentation and whitespace warnings.
 
->
-> On Wed, Sep 5, 2018 at 12:57 AM, Jagan Teki <jagan@amarulasolutions.com> wrote:
->> On Wed, Sep 5, 2018 at 1:21 PM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->>> On Wed, Sep 05, 2018 at 12:56:03PM +0530, Jagan Teki wrote:
->>>> On Tue, Sep 4, 2018 at 10:10 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
->>>> > From: Jagan Teki <jagan@amarulasolutions.com>
->>>> >
->>>> > Enable all necessary device tree nodes and add connector node to device
->>>> > trees for all supported A64 boards with HDMI.
->>>> >
->>>> > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
->>>> > [Icenowy: squash all board patches altogether and change supply name]
->>>> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->>>> > ---
->>>> > Changes in v4:
->>>> > - Rebase some device trees.
->>>> > Changes in v3,1:
->>>> > - Squash all enablement patches altogether.
->>>> > - Change supply name to match DT binding & driver change.
->>>> > Changes for v3:
->>>> > - Enable all pipeline components
->>>> > Changes for v2:
->>>> > - none
->>>> >
->>>> >  .../dts/allwinner/sun50i-a64-bananapi-m64.dts | 34 +++++++++++++++++++
->>>> >  .../dts/allwinner/sun50i-a64-nanopi-a64.dts   | 34 +++++++++++++++++++
->>>> >  .../dts/allwinner/sun50i-a64-olinuxino.dts    | 34 +++++++++++++++++++
->>>> >  .../dts/allwinner/sun50i-a64-orangepi-win.dts | 34 +++++++++++++++++++
->>>> >  .../boot/dts/allwinner/sun50i-a64-pine64.dts  | 34 +++++++++++++++++++
->>>> >  .../allwinner/sun50i-a64-sopine-baseboard.dts | 34 +++++++++++++++++++
->>>> >  6 files changed, 204 insertions(+)
->>>>
->>>> Tested-by: Jagan Teki <jagan@amarulasolutions.com> # BPI-M64, OPI-Win,
->>>> A64-Olinuxino, NPI-A64
->>>>
->>>> Pine64 boards look unable by saying
->>>> [drm] Cannot find any crtc or sizes
->>>>
->>>> May be someone can confirm, it.
->>>
->>> Then we should drop the pine64 additions until someone figures it out,
->>> as it has been already discussed.
->>
->> That is fine, but If anyone have pine64 can confirm this.
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Signed-off-by: Suman Trpathi <stripathi@amperecomputing.com>
+Signed-off-by: Rameshwar Prasad Sahu <rameshwar.sahu@amperecomputing.com>
+---
+ drivers/ata/ahci_platform.c | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+index 99f9a89..9ba283f 100644
+--- a/drivers/ata/ahci_platform.c
++++ b/drivers/ata/ahci_platform.c
+@@ -33,6 +33,13 @@ static const struct ata_port_info ahci_port_info = {
+        .port_ops       = &ahci_platform_ops,
+ };
+
++static const struct ata_port_info ahci_port_info_nolpm = {
++       .flags          = AHCI_FLAG_COMMON | ATA_FLAG_NO_LPM,
++       .pio_mask       = ATA_PIO4,
++       .udma_mask      = ATA_UDMA6,
++       .port_ops       = &ahci_platform_ops,
++};
++
+ static struct scsi_host_template ahci_platform_sht = {
+        AHCI_SHT(DRV_NAME),
+ };
+@@ -41,6 +48,7 @@ static int ahci_probe(struct platform_device *pdev)
+ {
+        struct device *dev = &pdev->dev;
+        struct ahci_host_priv *hpriv;
++       const struct ata_port_info *port;
+        int rc;
+
+        hpriv = ahci_platform_get_resources(pdev);
+@@ -57,7 +65,11 @@ static int ahci_probe(struct platform_device *pdev)
+        if (of_device_is_compatible(dev->of_node, "hisilicon,hisi-ahci"))
+                hpriv->flags |= AHCI_HFLAG_NO_FBS | AHCI_HFLAG_NO_NCQ;
+
+-       rc = ahci_platform_init_host(pdev, hpriv, &ahci_port_info,
++       port = acpi_device_get_match_data(dev);
++       if (!port)
++               port = &ahci_port_info;
++
++       rc = ahci_platform_init_host(pdev, hpriv, port,
+                                     &ahci_platform_sht);
+        if (rc)
+                goto disable_resources;
+@@ -85,6 +97,7 @@ static const struct of_device_id ahci_of_match[] = {
+ MODULE_DEVICE_TABLE(of, ahci_of_match);
+
+ static const struct acpi_device_id ahci_acpi_match[] = {
++       { "APMC0D33", (unsigned long)&ahci_port_info_nolpm },
+        { ACPI_DEVICE_CLASS(PCI_CLASS_STORAGE_SATA_AHCI, 0xffffff) },
+        {},
+ };
+--
+2.7.4
+
+CONFIDENTIALITY NOTICE: This e-mail message, including any attachments, is for the sole use of the intended recipient(s) and contains information that is confidential and proprietary to Ampere Computing or its subsidiaries. It is to be used solely for the purpose of furthering the parties' business relationship. Any review, copying, or distribution of this email (or any attachments thereto) is strictly prohibited. If you are not the intended recipient, please contact the sender immediately and permanently delete the original and any copies of this email and any attachments thereto.
