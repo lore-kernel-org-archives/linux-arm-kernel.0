@@ -1,50 +1,195 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 6 Sep 2018 11:27:48 +0200
-Subject: [PATCH/RFT] arm64: dts: renesas: r8a77990: Add all MSIOF device
- nodes
-In-Reply-To: <20180906092507.lz2n3xw7ksbgpges@verge.net.au>
-References: <1536092561-6048-1-git-send-email-ykaneko0929@gmail.com>
- <CAMuHMdWjLYhMDz6YuU_Y0vHtWBgSgt5BgTz0dDq86bqR8sX-1A@mail.gmail.com>
- <20180906092507.lz2n3xw7ksbgpges@verge.net.au>
-Message-ID: <CAMuHMdXgAe=AO_B2DfP1jLi1omETocJQt=C6G+WBJKNqTEDvFQ@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 6 Sep 2018 14:57:58 +0530
+Subject: [PATCH 02/10] phy: Add configuration interface
+In-Reply-To: <a739a2d623c3e60373a73e1ec206c2aa35c4a742.1536138624.git-series.maxime.ripard@bootlin.com>
+References: <cover.ee6158898d563fcc01d45c9652501180bccff0f0.1536138624.git-series.maxime.ripard@bootlin.com>
+ <a739a2d623c3e60373a73e1ec206c2aa35c4a742.1536138624.git-series.maxime.ripard@bootlin.com>
+Message-ID: <1ed01c1f-76d5-fa96-572b-9bfd269ad11b@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi,
 
-On Thu, Sep 6, 2018 at 11:25 AM Simon Horman <horms@verge.net.au> wrote:
-> On Wed, Sep 05, 2018 at 08:52:56AM +0200, Geert Uytterhoeven wrote:
-> > On Tue, Sep 4, 2018 at 10:23 PM Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
-> > > From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> > > This patch adds the device nodes for all MSIOF SPI controllers to
-> > > the R8A77990 SoC.
-> > >
-> > > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> > > Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
-> >
-> > Thanks for your patch!
-> >
-> > Unfortunately this is a duplicate of
-> > https://www.spinics.net/lists/devicetree/msg246988.html.
-> >
-> > Sorry for stepping on your toes, I added MSIOF support for Ebisu to investigate
-> > MSIOF driver bugs.
->
-> The DMA portions seem new.
+On Wednesday 05 September 2018 02:46 PM, Maxime Ripard wrote:
+> The phy framework is only allowing to configure the power state of the PHY
+> using the init and power_on hooks, and their power_off and exit
+> counterparts.
+> 
+> While it works for most, simple, PHYs supported so far, some more advanced
+> PHYs need some configuration depending on runtime parameters. These PHYs
+> have been supported by a number of means already, often by using ad-hoc
+> drivers in their consumer drivers.
+> 
+> That doesn't work too well however, when a consumer device needs to deal
+> multiple PHYs, or when multiple consumers need to deal with the same PHY (a
+> DSI driver and a CSI driver for example).
+> 
+> So we'll add a new interface, through two funtions, phy_validate and
+> phy_configure. The first one will allow to check that a current
+> configuration, for a given mode, is applicable. It will also allow the PHY
+> driver to tune the settings given as parameters as it sees fit.
+> 
+> phy_configure will actually apply that configuration in the phy itself.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> ---
+>  drivers/phy/phy-core.c  | 62 ++++++++++++++++++++++++++++++++++++++++++-
+>  include/linux/phy/phy.h | 42 ++++++++++++++++++++++++++++-
+>  2 files changed, 104 insertions(+)
+> 
+> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+> index 35fd38c5a4a1..6eaf655e370f 100644
+> --- a/drivers/phy/phy-core.c
+> +++ b/drivers/phy/phy-core.c
+> @@ -408,6 +408,68 @@ int phy_calibrate(struct phy *phy)
+>  EXPORT_SYMBOL_GPL(phy_calibrate);
+>  
+>  /**
+> + * phy_configure() - Changes the phy parameters
+> + * @phy: the phy returned by phy_get()
+> + * @mode: phy_mode the configuration is applicable to.
 
-Yes it is.
+mode should be used if the same PHY can be configured in multiple modes. But
+with phy_set_mode() and phy_calibrate() we could achieve the same.
+> + * @opts: New configuration to apply
 
-> Perhaps a new patch should be constructed that only adds those properties?
+Should these configuration come from the consumer driver? Can't the helper
+functions be directly invoked by the PHY driver for the configuration.
+> + *
+> + * Used to change the PHY parameters. phy_init() must have
+> + * been called on the phy.
+> + *
+> + * Returns: 0 if successful, an negative error code otherwise
+> + */
+> +int phy_configure(struct phy *phy, enum phy_mode mode,
+> +		  union phy_configure_opts *opts)
+> +{> +	int ret;
+> +
+> +	if (!phy)
+> +		return -EINVAL;
+> +
+> +	if (!phy->ops->configure)
+> +		return 0;
+> +
+> +	mutex_lock(&phy->mutex);
+> +	ret = phy->ops->configure(phy, mode, opts);
+> +	mutex_unlock(&phy->mutex);
+> +
+> +	return ret;
+> +}
+> +
+> +/**
+> + * phy_validate() - Checks the phy parameters
+> + * @phy: the phy returned by phy_get()
+> + * @mode: phy_mode the configuration is applicable to.
+> + * @opts: Configuration to check
+> + *
+> + * Used to check that the current set of parameters can be handled by
+> + * the phy. Implementations are free to tune the parameters passed as
+> + * arguments if needed by some implementation detail or
+> + * constraints. It will not change any actual configuration of the
+> + * PHY, so calling it as many times as deemed fit will have no side
+> + * effect.
+> + *
+> + * Returns: 0 if successful, an negative error code otherwise
+> + */
+> +int phy_validate(struct phy *phy, enum phy_mode mode,
+> +		  union phy_configure_opts *opts)
 
-To be added after testing MSIOF DMA ;-)
+IIUC the consumer driver will pass configuration options (or PHY parameters)
+which will be validated by the PHY driver and in some cases the PHY driver can
+modify the configuration options? And these modified configuration options will
+again be given to phy_configure?
 
-Gr{oetje,eeting}s,
+Looks like it's a round about way of doing the same thing.
 
-                        Geert
 
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> +{
+> +	int ret;
+> +
+> +	if (!phy)
+> +		return -EINVAL;
+> +
+> +	if (!phy->ops->validate)
+> +		return 0;
+> +
+> +	mutex_lock(&phy->mutex);
+> +	ret = phy->ops->validate(phy, mode, opts);
+> +	mutex_unlock(&phy->mutex);
+> +
+> +	return ret;
+> +}
+> +
+> +/**
+>   * _of_phy_get() - lookup and obtain a reference to a phy by phandle
+>   * @np: device_node for which to get the phy
+>   * @index: the index of the phy
+> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
+> index 9cba7fe16c23..3cc315dcfcd0 100644
+> --- a/include/linux/phy/phy.h
+> +++ b/include/linux/phy/phy.h
+> @@ -44,6 +44,12 @@ enum phy_mode {
+>  };
+>  
+>  /**
+> + * union phy_configure_opts - Opaque generic phy configuration
+> + */
+> +union phy_configure_opts {
+> +};
+> +
+> +/**
+>   * struct phy_ops - set of function pointers for performing phy operations
+>   * @init: operation to be performed for initializing phy
+>   * @exit: operation to be performed while exiting
+> @@ -60,6 +66,38 @@ struct phy_ops {
+>  	int	(*power_on)(struct phy *phy);
+>  	int	(*power_off)(struct phy *phy);
+>  	int	(*set_mode)(struct phy *phy, enum phy_mode mode);
+> +
+> +	/**
+> +	 * @configure:
+> +	 *
+> +	 * Optional.
+> +	 *
+> +	 * Used to change the PHY parameters. phy_init() must have
+> +	 * been called on the phy.
+> +	 *
+> +	 * Returns: 0 if successful, an negative error code otherwise
+> +	 */
+> +	int	(*configure)(struct phy *phy, enum phy_mode mode,
+> +			     union phy_configure_opts *opts);
+> +
+> +	/**
+> +	 * @validate:
+> +	 *
+> +	 * Optional.
+> +	 *
+> +	 * Used to check that the current set of parameters can be
+> +	 * handled by the phy. Implementations are free to tune the
+> +	 * parameters passed as arguments if needed by some
+> +	 * implementation detail or constraints. It must not change
+> +	 * any actual configuration of the PHY, so calling it as many
+> +	 * times as deemed fit by the consumer must have no side
+> +	 * effect.
+> +	 *
+> +	 * Returns: 0 if the configuration can be applied, an negative
+> +	 * error code otherwise
+> +	 */
+> +	int	(*validate)(struct phy *phy, enum phy_mode mode,
+> +			    union phy_configure_opts *opts);
+>  	int	(*reset)(struct phy *phy);
+>  	int	(*calibrate)(struct phy *phy);
+>  	struct module *owner;
+> @@ -164,6 +202,10 @@ int phy_exit(struct phy *phy);
+>  int phy_power_on(struct phy *phy);
+>  int phy_power_off(struct phy *phy);
+>  int phy_set_mode(struct phy *phy, enum phy_mode mode);
+> +int phy_configure(struct phy *phy, enum phy_mode mode,
+> +		  union phy_configure_opts *opts);
+> +int phy_validate(struct phy *phy, enum phy_mode mode,
+> +		 union phy_configure_opts *opts);
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Stub function when CONFIG_GENERIC_PHY is not set is also required.
+
+Thanks
+Kishon
