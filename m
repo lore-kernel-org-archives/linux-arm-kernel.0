@@ -1,35 +1,48 @@
-From: quentin.perret@arm.com (Quentin Perret)
-Date: Thu, 6 Sep 2018 14:17:54 +0100
-Subject: [PATCH] firmware: arm_scmi: fix divide by zero when
- sustained_perf_level is zero
-In-Reply-To: <1536165491-27813-1-git-send-email-sudeep.holla@arm.com>
-References: <1536165491-27813-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20180906131752.ysubfiufocddpoey@queper01-lin>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu,  6 Sep 2018 21:25:37 +0800
+Subject: [PATCH] clk: sunxi-ng: sun4i: Set VCO and PLL bias current to lowest
+ setting
+Message-ID: <20180906132537.20772-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
+The default mid-level PLL bias current setting interferes with sigma
+delta modulation. This manifests as decreased audio quality at lower
+sampling rates, which sounds like radio broadcast quality, and
+distortion noises at sampling rates at 48 kHz or above.
 
-On Wednesday 05 Sep 2018 at 17:38:11 (+0100), Sudeep Holla wrote:
-> @@ -166,7 +166,12 @@ scmi_perf_domain_attributes_get(const struct scmi_handle *handle, u32 domain,
->  					le32_to_cpu(attr->sustained_freq_khz);
->  		dom_info->sustained_perf_level =
->  					le32_to_cpu(attr->sustained_perf_level);
-> -		dom_info->mult_factor =	(dom_info->sustained_freq_khz * 1000) /
-> +		if (!dom_info->sustained_freq_khz ||
-> +		    !dom_info->sustained_perf_level)
-> +			dom_info->mult_factor =	1;
+Changing the bias current settings to the lowest gets rid of the
+noise.
 
-I'm sorry I missed that the first time I reviewed this patch, but after
-discussing with Ionela, we found out that there is actually a case where
-this could be a problem. If you have perf levels that are 1,2,3,4 (for
-example), then with mult_factor=1 you'll register OPPs at 1Hz, 2Hz, 3Hz,
-4Hz into PM_OPP. And that will be turned into 0 KHz for all of them at
-the CPUFreq level when divided by 1000 in dev_pm_opp_init_cpufreq_table().
+Fixes: de3448519194 ("clk: sunxi-ng: sun4i: Use sigma-delta modulation
+		      for audio PLL")
+Cc: <stable@vger.kernel.org> # 4.15.x
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/clk/sunxi-ng/ccu-sun4i-a10.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-I guess a quick fix would be to have a default mult_factor of 1000 ...
-
-What do you think ?
-
-Thanks,
-Quentin
+diff --git a/drivers/clk/sunxi-ng/ccu-sun4i-a10.c b/drivers/clk/sunxi-ng/ccu-sun4i-a10.c
+index ffa5dac221e4..129ebd2588fd 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun4i-a10.c
++++ b/drivers/clk/sunxi-ng/ccu-sun4i-a10.c
+@@ -1434,8 +1434,16 @@ static void __init sun4i_ccu_init(struct device_node *node,
+ 		return;
+ 	}
+ 
+-	/* Force the PLL-Audio-1x divider to 1 */
+ 	val = readl(reg + SUN4I_PLL_AUDIO_REG);
++
++	/*
++	 * Force VCO and PLL bias current to lowest setting. Higher
++	 * settings interfere with sigma-delta modulation and result
++	 * in audible noise and distortions when using SPDIF or I2S.
++	 */
++	val &= ~GENMASK(25, 16);
++
++	/* Force the PLL-Audio-1x divider to 1 */
+ 	val &= ~GENMASK(29, 26);
+ 	writel(val | (1 << 26), reg + SUN4I_PLL_AUDIO_REG);
+ 
+-- 
+2.19.0.rc1
