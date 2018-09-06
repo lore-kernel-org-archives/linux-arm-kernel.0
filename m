@@ -1,78 +1,110 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu,  6 Sep 2018 10:08:34 +0100
-Subject: [PATCH v2 13/14] coresight: dynamic-replicator: Claim device for use
+Date: Thu,  6 Sep 2018 10:08:27 +0100
+Subject: [PATCH v2 06/14] coresight: etm3: Add support for handling errors
 In-Reply-To: <1536224915-31766-1-git-send-email-suzuki.poulose@arm.com>
 References: <1536224915-31766-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1536224915-31766-14-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1536224915-31766-7-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use CLAIM protocol to make sure the device is available for use.
+Add support for reporting errors back from the SMP cross
+function call for enabling ETM.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- .../coresight/coresight-dynamic-replicator.c       | 23 +++++++++++++++++-----
- 1 file changed, 18 insertions(+), 5 deletions(-)
+Changes since v1:
+ - Fix build break, missing ;. (Mathieu Poirier)
+---
+ drivers/hwtracing/coresight/coresight-etm3x.c | 42 ++++++++++++++++++---------
+ 1 file changed, 28 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-index 97f4673..299667b 100644
---- a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-+++ b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-@@ -41,8 +41,11 @@ static void replicator_reset(struct replicator_state *drvdata)
- {
- 	CS_UNLOCK(drvdata->base);
- 
--	writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER0);
--	writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER1);
-+	if (!coresight_claim_device_unlocked(drvdata->base)) {
-+		writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER0);
-+		writel_relaxed(0xff, drvdata->base + REPLICATOR_IDFILTER1);
-+		coresight_disclaim_device_unlocked(drvdata->base);
-+	}
- 
- 	CS_LOCK(drvdata->base);
+diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+index 9ce8fba..206c238 100644
+--- a/drivers/hwtracing/coresight/coresight-etm3x.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+@@ -355,11 +355,10 @@ static int etm_parse_event_config(struct etm_drvdata *drvdata,
+ 	return 0;
  }
-@@ -50,6 +53,7 @@ static void replicator_reset(struct replicator_state *drvdata)
- static int replicator_enable(struct coresight_device *csdev, int inport,
- 			      int outport)
- {
-+	int rc = 0;
- 	u32 reg;
- 	struct replicator_state *drvdata = dev_get_drvdata(csdev->dev.parent);
  
-@@ -67,13 +71,19 @@ static int replicator_enable(struct coresight_device *csdev, int inport,
+-static void etm_enable_hw(void *info)
++static int etm_enable_hw(struct etm_drvdata *drvdata)
+ {
+ 	int i;
+ 	u32 etmcr;
+-	struct etm_drvdata *drvdata = info;
+ 	struct etm_config *config = &drvdata->config;
  
  	CS_UNLOCK(drvdata->base);
+@@ -421,6 +420,21 @@ static void etm_enable_hw(void *info)
+ 	CS_LOCK(drvdata->base);
  
-+	if ((readl_relaxed(drvdata->base + REPLICATOR_IDFILTER0) == 0xff) &&
-+	    (readl_relaxed(drvdata->base + REPLICATOR_IDFILTER1) == 0xff))
-+		rc = coresight_claim_device_unlocked(drvdata->base);
- 
- 	/* Ensure that the outport is enabled. */
--	writel_relaxed(0x00, drvdata->base + reg);
-+	if (!rc) {
-+		writel_relaxed(0x00, drvdata->base + reg);
-+		dev_dbg(drvdata->dev, "REPLICATOR enabled\n");
-+	}
+ 	dev_dbg(drvdata->dev, "cpu: %d enable smp call done\n", drvdata->cpu);
++	return 0;
++}
 +
- 	CS_LOCK(drvdata->base);
- 
--	dev_dbg(drvdata->dev, "REPLICATOR enabled\n");
--	return 0;
-+	return rc;
++struct etm_enable_arg {
++	struct etm_drvdata *drvdata;
++	int rc;
++};
++
++static void etm_enable_hw_smp_call(void *info)
++{
++	struct etm_enable_arg *arg = info;
++
++	if (WARN_ON(!arg))
++		return;
++	arg->rc = etm_enable_hw(arg->drvdata);
  }
  
- static void replicator_disable(struct coresight_device *csdev, int inport,
-@@ -99,6 +109,9 @@ static void replicator_disable(struct coresight_device *csdev, int inport,
- 	/* disable the flow of ATB data through port */
- 	writel_relaxed(0xff, drvdata->base + reg);
+ static int etm_cpu_id(struct coresight_device *csdev)
+@@ -475,14 +489,13 @@ static int etm_enable_perf(struct coresight_device *csdev,
+ 	/* Configure the tracer based on the session's specifics */
+ 	etm_parse_event_config(drvdata, event);
+ 	/* And enable it */
+-	etm_enable_hw(drvdata);
+-
+-	return 0;
++	return etm_enable_hw(drvdata);
+ }
  
-+	if ((readl_relaxed(drvdata->base + REPLICATOR_IDFILTER0) == 0xff) &&
-+	    (readl_relaxed(drvdata->base + REPLICATOR_IDFILTER1) == 0xff))
-+		coresight_disclaim_device_unlocked(drvdata->base);
- 	CS_LOCK(drvdata->base);
+ static int etm_enable_sysfs(struct coresight_device *csdev)
+ {
+ 	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++	struct etm_enable_arg arg = { 0 };
+ 	int ret;
  
- 	dev_dbg(drvdata->dev, "REPLICATOR disabled\n");
+ 	spin_lock(&drvdata->spinlock);
+@@ -492,20 +505,21 @@ static int etm_enable_sysfs(struct coresight_device *csdev)
+ 	 * hw configuration will take place on the local CPU during bring up.
+ 	 */
+ 	if (cpu_online(drvdata->cpu)) {
++		arg.drvdata = drvdata;
+ 		ret = smp_call_function_single(drvdata->cpu,
+-					       etm_enable_hw, drvdata, 1);
+-		if (ret)
+-			goto err;
++					       etm_enable_hw_smp_call, &arg, 1);
++		if (!ret)
++			ret = arg.rc;
++		if (!ret)
++			drvdata->sticky_enable = true;
++	} else {
++		ret = -ENODEV;
+ 	}
+ 
+-	drvdata->sticky_enable = true;
+ 	spin_unlock(&drvdata->spinlock);
+ 
+-	dev_dbg(drvdata->dev, "ETM tracing enabled\n");
+-	return 0;
+-
+-err:
+-	spin_unlock(&drvdata->spinlock);
++	if (!ret)
++		dev_dbg(drvdata->dev, "ETM tracing enabled\n");
+ 	return ret;
+ }
+ 
 -- 
 2.7.4
