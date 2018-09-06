@@ -1,200 +1,60 @@
-From: yogeshnarayan.gaur@nxp.com (Yogesh Narayan Gaur)
-Date: Thu, 6 Sep 2018 12:23:17 +0000
-Subject: [PATCH 3/7] spi: spi-mem: Add a driver for NXP FlexSPI controller
-In-Reply-To: <20180906134356.10e740fa@bbrezillon>
-References: <1535711404-29528-1-git-send-email-yogeshnarayan.gaur@nxp.com>
- <1535711404-29528-4-git-send-email-yogeshnarayan.gaur@nxp.com>
- <20180904165842.774ed960@bbrezillon>
- <VI1PR04MB1038CE65EF4E98ACBEA9990B99020@VI1PR04MB1038.eurprd04.prod.outlook.com>
- <add79e8b-1ab7-e465-5f65-eed6b78161e1@exceet.de>
- <VI1PR04MB1038AB7497A2FD3E73FBA6D699010@VI1PR04MB1038.eurprd04.prod.outlook.com>
- <20180906134356.10e740fa@bbrezillon>
-Message-ID: <VI1PR04MB103829FBFC128073B370B56399010@VI1PR04MB1038.eurprd04.prod.outlook.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 06 Sep 2018 15:25:56 +0300
+Subject: [PATCH 1/6] drm/bridge: use bus flags in bridge timings
+In-Reply-To: <CACRpkdbw0VjkHYcUpox+DorRG0oRdPARL4ShgPfV2eFaUF_w0g@mail.gmail.com>
+References: <20180905052113.21262-1-stefan@agner.ch>
+ <a00c1650b69ba85bed7ae39b81a0c40f@agner.ch>
+ <CACRpkdbw0VjkHYcUpox+DorRG0oRdPARL4ShgPfV2eFaUF_w0g@mail.gmail.com>
+Message-ID: <10044412.4MiZRujKJI@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+Hi Linus,
 
-> -----Original Message-----
-> From: Boris Brezillon [mailto:boris.brezillon at bootlin.com]
-> Sent: Thursday, September 6, 2018 5:14 PM
-> To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
-> Cc: Frieder Schrempf <frieder.schrempf@exceet.de>; linux-
-> mtd at lists.infradead.org; marek.vasut at gmail.com; linux-spi at vger.kernel.org;
-> devicetree at vger.kernel.org; robh at kernel.org; mark.rutland at arm.com;
-> shawnguo at kernel.org; linux-arm-kernel at lists.infradead.org;
-> computersforpeace at gmail.com; linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH 3/7] spi: spi-mem: Add a driver for NXP FlexSPI controller
+On Thursday, 6 September 2018 14:07:41 EEST Linus Walleij wrote:
+> On Wed, Sep 5, 2018 at 8:32 PM Stefan Agner <stefan@agner.ch> wrote:
+> > On 05.09.2018 00:44, Laurent Pinchart wrote:
+> > 
+> > Good point! I actually really don't like that we use the same flags here
+> > but from a different perspective. Especially since the flags defines
+> > document things differently:
+> > 
+> > /* drive data on pos. edge */
+> > #define DRM_BUS_FLAG_PIXDATA_POSEDGE    (1<<2)
+> > /* drive data on neg. edge */
+> > #define DRM_BUS_FLAG_PIXDATA_NEGEDGE    (1<<3)
 > 
-> On Thu, 6 Sep 2018 11:35:13 +0000
-> Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com> wrote:
+> Maybe a stupid comment from my side, but can't we just change the
+> documentation to match the usecases?
 > 
-> > Hi Frieder,
-> >
-> > > -----Original Message-----
-> > > From: Frieder Schrempf [mailto:frieder.schrempf at exceet.de]
-> > > Sent: Thursday, September 6, 2018 1:56 PM
-> > > To: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>; Boris
-> > > Brezillon <boris.brezillon@bootlin.com>
-> > > Cc: linux-mtd at lists.infradead.org; marek.vasut at gmail.com; linux-
-> > > spi at vger.kernel.org; devicetree at vger.kernel.org; robh at kernel.org;
-> > > mark.rutland at arm.com; shawnguo at kernel.org; linux-arm-
-> > > kernel at lists.infradead.org; computersforpeace at gmail.com; linux-
-> > > kernel at vger.kernel.org
-> > > Subject: Re: [PATCH 3/7] spi: spi-mem: Add a driver for NXP FlexSPI
-> > > controller
-> > > >> Hi Yogesh,
-> > > >>
-> > > >> On Fri, 31 Aug 2018 16:00:00 +0530 Yogesh Gaur
-> > > >> <yogeshnarayan.gaur@nxp.com> wrote:
-> > > >>
-> > > >>> - Add a driver for NXP FlexSPI host controller
-> > > >>>
-> > > >>
-> > > >> Yep, I had a quick look at the code and they really look similar.
-> > > >> Why not extending the existing driver instead of creating a new
-> > > >> one from scratch?
-> > > >
-> > > > FlexSPI is different controller not related to the QuadSPI
-> > > > controller in its working behavior Both these controller are
-> > > > having
-> > > > * Different registers name, registers address, registers
-> > > > functionality etc, section 30.5.2[1]
-> > > > * Different programming sequence for initialization of the
-> > > > controller, section 30.8.1[1]
-> > > > * Different programming sequence for performing Read and Write
-> > > > operation using IP, section 30.7.9[1] and AHB mode
-> > > > * Different programming sequence for checking controller current
-> > > > state like busy or not
-> > > > * New mechanism to program for the connected slave device i.e.
-> > > > flash access mode and flash memory map 30.7.4[1] and 30.7.5[1]
-> > > > * New entries added for FlexSPI controller for LUT_XX mode for
-> > > > various commands, section 30.7.8[1]
-> > > >
-> > > > There are few similarities between these two like LUT programming
-> > > > logic is same i.e. LUT needs to be programmed in same sequence of
-> > > > 'INSTR
-> > > PAD  OPCODE', but again LUT register address and LUT command mode
-> > > values are different.
-> > > >
-> > > > Creating common driver for both FlexSPI and QuadSPI controller,
-> > > > would
-> > > involve creation of one more layer between driver/spi/spi-xxx and
-> > > the actual controller driver, this layer would going to have less
-> > > functionality like doing LUT creation programming and then would
-> > > re-direct calls to the respective controller driver functionality to
-> > > perform desired programming sequence.
-> > > >
-> > > >>>
-> > > >>> (1) The FlexSPI controller is driven by the LUT(Look-up Table)
-> > > >>> registers.
-> > > >>>   The LUT registers are a look-up-table for sequences of
-> > > >>> instructions. A valid sequence consists of four LUT registers.
-> > > >>>   Maximum 32 LUT sequences can be programmed simultaneously.
-> > > >>>
-> > > >>
-> > > >> Do we really want to have this level of details in the commit
-> > > >> message? I mean, this is something you can document in the
-> > > >> driver, but not here.
-> > > >>
-> > > >> BTW, you might want to have a look at [1]. I think we can get rid
-> > > >> of the ->size field you're adding if this driver implements the
-> > > >> dirmap hooks.
-> > > >
-> > > > I need size information for the connected device to program the
-> > > > controller
-> > > register FLSHXXCRO as Flash Chip select is determined by flash
-> > > access address and Flash size setting in register FLSHXXCR0[FLSHz],
-> > > section 30.7.9[1].
-> > >
-> > > It's the same situation we had with the QSPI driver before. We
-> > > decided to **not** pass information about flash size directly to the
-> > > controller for now. That's why we currently don't support mapping
-> > > the flash device in the implementation of the QSPI driver.
-> > >
-> > > I think we should not start this discussion all over again for the
-> > > FlexSPI driver, but stick to what we decided for QSPI.
-> > >
-> >
-> > There is difference between FlexSPI and QuadSPI controller
-> > functionality in detecting the current CS.
-> >
-> > As per table-10.32[1] for QuadSPI controller, access to flash is being
-> > assigned as per the address values provided i.e. it would be
-> > CS0 if address is between TOP_ADDR_MEMXX and QSPI_AMBA_BASE and CS1
-> if
-> > access is in between TOP_ADDR_MEMA2 and TOP_ADDR_MEMA1.
-> >
-> > But for case of FlexSPI controller, section 30.7.5[2],  CS is being
-> > defined as per the address value lies in below range
-> > - Flash A1 address range: 0x00000000 ~ FA1_SIZE
-> > - Flash A2 address range: FA1_SIZE ~ (FA1_SIZE + FA2_SIZE)
-> > - Flash B1 address range: (FA1_SIZE + FA2_SIZE) ~ (FA1_SIZE + FA2_SIZE
-> > + FB1_SIZE)
-> > - Flash B2 address range: FA1_SIZE + FA2_SIZE + FB1_SIZE) ~ (FA1_SIZE
-> > + FA2_SIZE + FB1_SIZE + FB2_SIZE) and FAx_SIZE is determined from
-> > register FLSHxxCR0[FLASHSZ]
-> >
-> > Thus, for QuadSPI controller we can actually go away with the flash
-> > size requirement and with the code logic which you have introduced, of
-> > using 2 * ahb_buf_size data size for TOP_ADDR_MEMXX bits in SFxxD
-> > register, things are working fine.
-> >
-> > But for FlexSPI controller its required to have the connected slave
-> > device size to detect the current CS.
-> 
-> I don't see why. You should be able to take an arbitrary (big enough) size at first,
-> and only extend it on-the-fly when a dirmap request is done.
-> 
-> > I have tried the quadspi driver
-> > logic in flexspi driver code, but it gives me failure.
-> 
-> Can you detail a bit what's failing?
-> 
-> > Due, to this
-> > reason and requirement I have come-up with this solution of getting
-> > the connected device size and programming correct value in
-> > FLSHxxCR0[FLASHSZ] register
-> 
-> Alternatively, what we could do is split the memory map in 4 regions of the same
-> size and stick to it. That works if you can define an offset to apply to the address
-> when an access is done through the direct mapping area.
+> /* Trigger pixel data latch on positive edge */
+> #define DRM_BUS_FLAG_PIXDATA_POSEDGE    (1<<2)
 
-Ok. I would try this and share the result and the failure point, if any.
+The flags are used for the drm_connector bus_flags field, and really mean 
+driving on the positive/negative edges. We this can't change their meaning 
+like this.
 
-Meanwhile, can you please review the rest of the driver except _select_mem() functionality and provide your feedback.
+> > Using the opposite perspective would also need translation in crtc
+> > drivers... So far no driver uses sampling_edge.
+> > 
+> > I would prefer if we always use the meaning as documented by the flags.
+> > 
+> > I guess we would need to convert DRM_BUS_FLAG_PIXDATA_POSEDGE ->
+> > DRM_BUS_FLAG_PIXDATA_NEGEDGE.
+> > 
+> > Linus Walleij, you added sampling edge, any thoughts?
+> 
+> I just thought it was generally useful to have triggering edge encoded
+> into the bridge as it makes it clear that this edge is something
+> that is a delayed version of the driving edge which is subject to
+> clock skew caused by the speed of electrons in silicon and
+> copper and slew rate caused by parasitic capacitance.
 
-Also, as question asked for AHB RX buffer flush when using both IP and AHB mode in quadspi driver.
-Same logic has been used in the FlexSPI driver as it's required to flush the AHB RX buffer after using IP mode write operation.
-But, in FlexSPI, SWRESET register bit is w1c i.e. it automatically get reset to zero, after setting to 1, after 64 clock cycle. Thus, no explicitly udelay() needs to be added when doing AHB RX buffer invalidation.
+I agree that we need both the driving and sampling edge. In many case they 
+will be opposite, and providing some kind of appropriate defaults in APIs is 
+fine by me, but we need a way to specify both when needed.
 
-Thanks
-Yogesh Gaur.
+-- 
+Regards,
 
-> 
-> >
-> > > >
-> > > > Link for reference of the driver implementing dirmap hooks was
-> > > > missing in mail,
-> > > please share.
-> > >
-> > > I guess Boris meant to link to his PoC implementation of the direct
-> > > mapping API [1]. When this is available we can easily add support
-> > > for direct memory mappings to the QuadSPI and FlexSPI drivers.
-> > >
-> >
-> > I have checked the link, found that size value is being derived from
-> > spi_nor.mtd.size variable. Same being performed in this patch series
-> > to detect the size of the slave device.
-> 
-> Well, yes, the result is the same, except it does not require adding a new field to
-> spi_mem and ->attach/detach() hooks to the spi_mem_ops interface (which
-> your implementation is lacking BTW).
-> 
-> > As per my understanding
-> > developed with Boris's code implementation, when direct mapping API
-> > interface are available then both QuadSPI and FlexSPI driver needs to
-> > be changed as per new introduced ops structure.
-> 
-> It's not a hard requirement, but they would definitely benefit from this extension
-> (mainly a perf improvement).
+Laurent Pinchart
