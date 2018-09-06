@@ -1,100 +1,53 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Thu,  6 Sep 2018 17:38:07 +0100
-Subject: [PATCH v2 8/9] ARM: spectre-v1,
- v1.1: provide helpers for address sanitization
-In-Reply-To: <1536251888-8302-1-git-send-email-julien.thierry@arm.com>
-References: <1536251888-8302-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1536251888-8302-9-git-send-email-julien.thierry@arm.com>
+From: ndesaulniers@google.com (Nick Desaulniers)
+Date: Thu, 6 Sep 2018 09:39:51 -0700
+Subject: [PATCH v6 00/18] khwasan: kernel hardware assisted address
+ sanitizer
+In-Reply-To: <CAAeHK+wStsNwh2oKv-KCG4kx5538FuDMQ6Yw2X=sK5LPrw2DZg@mail.gmail.com>
+References: <cover.1535462971.git.andreyknvl@google.com>
+ <20180905141032.b1ddaab53d1b2b3bada95415@linux-foundation.org>
+ <20180906100543.GI3592@arm.com>
+ <CAAeHK+wStsNwh2oKv-KCG4kx5538FuDMQ6Yw2X=sK5LPrw2DZg@mail.gmail.com>
+Message-ID: <CAKwvOdk=F=kja-ZznrifTO8EASmPF0CoTPWbFxpMqLk-_KGEEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce C and asm helpers to sanitize user address, taking the
-address range they target into account.
+On Thu, Sep 6, 2018 at 4:06 AM Andrey Konovalov <andreyknvl@google.com> wrote:
+>
+> On Thu, Sep 6, 2018 at 12:05 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Wed, Sep 05, 2018 at 02:10:32PM -0700, Andrew Morton wrote:
+> >> On Wed, 29 Aug 2018 13:35:04 +0200 Andrey Konovalov <andreyknvl@google.com> wrote:
+> >>
+> >> > This patchset adds a new mode to KASAN [1], which is called KHWASAN
+> >> > (Kernel HardWare assisted Address SANitizer).
+> >>
+> >> We're at v6 and there are no reviewed-by's or acked-by's to be seen.
+> >> Is that a fair commentary on what has been happening, or have people
+> >> been remiss in sending and gathering such things?
+> >
+> > I still have concerns about the consequences of merging this as anything
+> > other than a debug option [1]. Unfortunately, merging it as a debug option
+> > defeats the whole point, so I think we need to spend more effort on developing
+> > tools that can help us to find and fix the subtle bugs which will arise from
+> > enabling tagged pointers in the kernel.
+>
+> I totally don't mind calling it a debug option. Do I need to somehow
+> specify it somewhere?
+>
+> Why does it defeat the point? The point is to ease KASAN-like testing
+> on devices with limited memory.
 
-Use asm helper for existing sanitization in __copy_from_user().
+I don't disagree with using it strictly for debug.  When I say I want
+the series for Pixel phones, I should have been clearer that my intent
+is for a limited pool of internal testers to walk around with KHWASAN
+enabled devices; not general end users.  It's hard enough today to get
+anyone to test KASAN/ASAN on their "daily driver" due to the memory
+usage and resulting performance.
 
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
----
- arch/arm/include/asm/assembler.h | 11 +++++++++++
- arch/arm/include/asm/uaccess.h   | 26 ++++++++++++++++++++++++++
- arch/arm/lib/copy_from_user.S    |  6 +-----
- 3 files changed, 38 insertions(+), 5 deletions(-)
+We don't ship KASAN or KUBSAN on by default to end users (nor plan
+to); it's used strictly for fuzzing through syzkaller (or by brave
+"dogfooders" on the internal kernel teams).  KHWASAN would let these
+dogfooders go from being brave to fearless.
 
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index b17ee03..88286dd 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -467,6 +467,17 @@
- #endif
- 	.endm
- 
-+	.macro uaccess_mask_range_ptr, addr:req, size:req, limit:req, tmp:req
-+#ifdef CONFIG_CPU_SPECTRE
-+	sub	\tmp, \limit, #1
-+	subs	\tmp, \tmp, \addr	@ tmp = limit - 1 - addr
-+	addhs	\tmp, \tmp, #1		@ if (tmp >= 0) {
-+	subhss	\tmp, \tmp, \size	@ tmp = limit - (addr + size) }
-+	movlo	\addr, #0		@ if (tmp < 0) addr = NULL
-+	csdb
-+#endif
-+	.endm
-+
- 	.macro	uaccess_disable, tmp, isb=1
- #ifdef CONFIG_CPU_SW_DOMAIN_PAN
- 	/*
-diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
-index 1191e7d..c136eef 100644
---- a/arch/arm/include/asm/uaccess.h
-+++ b/arch/arm/include/asm/uaccess.h
-@@ -100,6 +100,32 @@ static inline void set_fs(mm_segment_t fs)
- 	__typeof__(__builtin_choose_expr(sizeof(x) > sizeof(0UL), 0ULL, 0UL))
- 
- /*
-+ * Sanitise a uaccess pointer such that it becomes NULL if addr+size
-+ * is above the current addr_limit.
-+ */
-+#define uaccess_mask_range_ptr(ptr, size)			\
-+	((__typeof__(ptr))__uaccess_mask_range_ptr(ptr, size))
-+static inline void __user *__uaccess_mask_range_ptr(const void __user *ptr,
-+						    size_t size)
-+{
-+	void __user *safe_ptr = (void __user *)ptr;
-+	unsigned long tmp;
-+
-+	asm volatile(
-+	"	sub	%1, %3, #1\n"
-+	"	subs	%1, %1, %0\n"
-+	"	addhs	%1, %1, #1\n"
-+	"	subhss	%1, %1, %2\n"
-+	"	movlo	%0, #0\n"
-+	: "+r" (safe_ptr), "=&r" (tmp)
-+	: "r" (size), "r" (current_thread_info()->addr_limit)
-+	: "cc");
-+
-+	csdb();
-+	return safe_ptr;
-+}
-+
-+/*
-  * Single-value transfer routines.  They automatically use the right
-  * size if we just have the right pointer type.  Note that the functions
-  * which read from user space (*get_*) need to take care not to leak
-diff --git a/arch/arm/lib/copy_from_user.S b/arch/arm/lib/copy_from_user.S
-index a826df3..6709a8d 100644
---- a/arch/arm/lib/copy_from_user.S
-+++ b/arch/arm/lib/copy_from_user.S
-@@ -93,11 +93,7 @@ ENTRY(arm_copy_from_user)
- #ifdef CONFIG_CPU_SPECTRE
- 	get_thread_info r3
- 	ldr	r3, [r3, #TI_ADDR_LIMIT]
--	adds	ip, r1, r2	@ ip=addr+size
--	sub	r3, r3, #1	@ addr_limit - 1
--	cmpcc	ip, r3		@ if (addr+size > addr_limit - 1)
--	movcs	r1, #0		@ addr = NULL
--	csdb
-+	uaccess_mask_range_ptr r1, r2, r3, ip
- #endif
- 
- #include "copy_template.S"
 -- 
-1.9.1
+Thanks,
+~Nick Desaulniers
