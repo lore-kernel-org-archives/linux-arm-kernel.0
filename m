@@ -1,48 +1,74 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 6 Sep 2018 15:38:13 +0100
-Subject: [PATCH] firmware: arm_scmi: fix divide by zero when
- sustained_perf_level is zero
-In-Reply-To: <20180906131752.ysubfiufocddpoey@queper01-lin>
-References: <1536165491-27813-1-git-send-email-sudeep.holla@arm.com>
- <20180906131752.ysubfiufocddpoey@queper01-lin>
-Message-ID: <538c5bdc-bd3b-922a-c51c-f47e5cf2257d@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 6 Sep 2018 16:38:07 +0200
+Subject: [PATCH] ARM: dts: r9a06g032: Correct UART and add all other UARTs
+In-Reply-To: <1535622742-6237-1-git-send-email-phil.edworthy@renesas.com>
+References: <1535622742-6237-1-git-send-email-phil.edworthy@renesas.com>
+Message-ID: <CAMuHMdVSLaaJmLEnke-iPSrgkRa4SUQyAnm_Tw9TPs3KcekFFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Phil,
 
-
-On 06/09/18 14:17, Quentin Perret wrote:
-> Hi Sudeep,
-> 
-> On Wednesday 05 Sep 2018 at 17:38:11 (+0100), Sudeep Holla wrote:
->> @@ -166,7 +166,12 @@ scmi_perf_domain_attributes_get(const struct scmi_handle *handle, u32 domain,
->>  					le32_to_cpu(attr->sustained_freq_khz);
->>  		dom_info->sustained_perf_level =
->>  					le32_to_cpu(attr->sustained_perf_level);
->> -		dom_info->mult_factor =	(dom_info->sustained_freq_khz * 1000) /
->> +		if (!dom_info->sustained_freq_khz ||
->> +		    !dom_info->sustained_perf_level)
->> +			dom_info->mult_factor =	1;
-> 
-> I'm sorry I missed that the first time I reviewed this patch, but after
-> discussing with Ionela, we found out that there is actually a case where
-> this could be a problem. If you have perf levels that are 1,2,3,4 (for
-> example), then with mult_factor=1 you'll register OPPs at 1Hz, 2Hz, 3Hz,
-> 4Hz into PM_OPP. And that will be turned into 0 KHz for all of them at
-> the CPUFreq level when divided by 1000 in dev_pm_opp_init_cpufreq_table().
+On Thu, Aug 30, 2018 at 11:52 AM Phil Edworthy
+<phil.edworthy@renesas.com> wrote:
+> - UART0 was missing the bus clock ("apb_pclk").
+> - Now that the relevant rzn1 bindings have been added, replace the Synopsys
+>   compat string with the rzn1 strings.
+> - Add all the other UARTs.
 >
+> Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
 
-Good find.
+Thanks for your patch!
 
-> I guess a quick fix would be to have a default mult_factor of 1000 ...
-> 
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-I agree.
+But a few notes/questions below.
 
-> What do you think ?
+> --- a/arch/arm/boot/dts/r9a06g032.dtsi
+> +++ b/arch/arm/boot/dts/r9a06g032.dtsi
+> @@ -78,13 +78,90 @@
+>                 };
+>
+>                 uart0: serial at 40060000 {
+> -                       compatible = "snps,dw-apb-uart";
+> +                       compatible = "renesas,r9a06g032-uart", "renesas,rzn1-uart";
 
-I will respin and send.
+Apparently not all 8 UARTs are identical: the first 3 don't have DMA, the
+last 5 do, and they have more registers.
+
+Are you sure no different compatible values are needed to distinguish
+between them?
+Can you handle them purely based on the presence or absence of
+"dmas" properties (which are not yet present)?
+
+According to commit 72b0505f0830df95 ("dt: serial: Add Renesas RZ/N1
+binding documentation"), the Synopsis compatible string would work if you
+are not using DMA, so perhaps it should be added for the ports that cannot
+do DMA?
+
+>                         reg = <0x40060000 0x400>;
+>                         interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
+>                         reg-shift = <2>;
+>                         reg-io-width = <4>;
+> -                       clocks = <&sysctrl R9A06G032_CLK_UART0>;
+> -                       clock-names = "baudclk";
+> +                       clocks = <&sysctrl R9A06G032_CLK_UART0>, <&sysctrl R9A06G032_HCLK_UART0>;
+
+It's a pity the clock names don't match the datasheet, but the output from
+the internal Renesas tools. So I have to trust you to not list them
+in the wrong order.
+
+> +                       clock-names = "baudclk", "apb_pclk";
+> +                       status = "disabled";
+> +               };
+
+Gr{oetje,eeting}s,
+
+                        Geert
 
 -- 
-Regards,
-Sudeep
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
