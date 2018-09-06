@@ -1,60 +1,40 @@
 From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Thu, 6 Sep 2018 14:13:41 -0700
+Date: Thu, 6 Sep 2018 14:16:19 -0700
 Subject: [PATCH v6 11/11] arm64: annotate user pointers casts detected by
  sparse
-In-Reply-To: <5d54526e5ff2e5ad63d0dfdd9ab17cf359afa4f2.1535629099.git.andreyknvl@google.com>
+In-Reply-To: <CA+55aFyW9N2tSb2bQvkthbVVyY6nt5yFeWQRLHp1zruBmb5ocw@mail.gmail.com>
 References: <cover.1535629099.git.andreyknvl@google.com>
  <5d54526e5ff2e5ad63d0dfdd9ab17cf359afa4f2.1535629099.git.andreyknvl@google.com>
-Message-ID: <CA+55aFyW9N2tSb2bQvkthbVVyY6nt5yFeWQRLHp1zruBmb5ocw@mail.gmail.com>
+ <CA+55aFyW9N2tSb2bQvkthbVVyY6nt5yFeWQRLHp1zruBmb5ocw@mail.gmail.com>
+Message-ID: <CA+55aFy2t_MHgr_CgwbhtFkL+djaCq2qMM1G+f2DwJ0qEr1URQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 30, 2018 at 4:41 AM Andrey Konovalov <andreyknvl@google.com> wrote:
+On Thu, Sep 6, 2018 at 2:13 PM Linus Torvalds
+<torvalds@linux-foundation.org> wrote:
 >
-> This patch adds __force annotations for __user pointers casts detected by
-> sparse with the -Wcast-from-as flag enabled (added in [1]).
-
-No, several of these are wrong, and just silence a warning that shows a problem.
-
-So for example:
-
->  static inline compat_uptr_t ptr_to_compat(void __user *uptr)
->  {
-> -       return (u32)(unsigned long)uptr;
-> +       return (u32)(__force unsigned long)uptr;
->  }
-
-this actually looks correct.
-
-But:
-
-> --- a/arch/arm64/include/asm/uaccess.h
-> +++ b/arch/arm64/include/asm/uaccess.h
-> @@ -76,7 +76,7 @@ static inline unsigned long __range_ok(const void __user *addr, unsigned long si
->  {
->         unsigned long ret, limit = current_thread_info()->addr_limit;
+> So for example:
 >
-> -       __chk_user_ptr(addr);
-> +       __chk_user_ptr((void __force *)addr);
+> >  static inline compat_uptr_t ptr_to_compat(void __user *uptr)
+> >  {
+> > -       return (u32)(unsigned long)uptr;
+> > +       return (u32)(__force unsigned long)uptr;
+> >  }
+>
+> this actually looks correct.
 
-This looks actively wrong. The whole - and only - point of
-"__chk_user_ptr()" is that it warns about a lack of a "__user *" type.
+Side note: I do think that while the above is correct, the rest of the
+patch shows that we might be better off simply not havign the warning
+for address space changes at all for the "cast a pointer to an integer
+type" case.
 
-So the above makes no sense at all.
+When you cast to a non-pointer type, the address space issue simply
+doesn't exist at all, so the warning makes less sense.
 
-There are other similar "that makes no sense what-so-ever", like this one:
+It's really just he "pointer to one address space" being cast to
+"pointer to another address space" that should really warn, and that
+might need that "__force" thing.
 
-> -               struct compat_group_req __user *gr32 = (void *)optval;
-> +               struct compat_group_req __user *gr32 = (__force void *)optval;
+Hmm? So maybe a sparse change is better for most of that patch.
 
-no, the additionl of __force is not the right thing, the problem, is
-that a __user pointer is cast to a non-user 'void *' only to be
-assigned to another user type.
-
-The fix should have been to use (void __user *) as the cast instead,
-no __force needed.
-
-In general, I think the patch shows all the signs of "mindlessly just
-add casts", which is exactly the wrong thing to do to sparse warnings.
-
-                   Linus
+             Linus
