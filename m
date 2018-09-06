@@ -1,23 +1,63 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 6 Sep 2018 10:56:37 +0200
-Subject: [PATCH 05/21] ARM: shmobile: use for_each_of_cpu_node iterator
-In-Reply-To: <20180905193738.19325-6-robh@kernel.org>
-References: <20180905193738.19325-1-robh@kernel.org>
- <20180905193738.19325-6-robh@kernel.org>
-Message-ID: <20180906085637.h7ae46qqdjti5g7q@verge.net.au>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 06 Sep 2018 11:00:10 +0200
+Subject: [PATCH v2 3/4] media: imx-pxp: add i.MX Pixel Pipeline driver
+In-Reply-To: <dbc31612-1686-c115-8618-309355363f27@xs4all.nl>
+References: <20180905100018.27556-1-p.zabel@pengutronix.de>
+ <20180905100018.27556-4-p.zabel@pengutronix.de>
+ <b2968b6b-b6ab-dfbe-b51c-5c4e73786039@xs4all.nl>
+ <1536153658.4084.7.camel@pengutronix.de>
+ <dbc31612-1686-c115-8618-309355363f27@xs4all.nl>
+Message-ID: <1536224410.5357.2.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2018 at 02:37:22PM -0500, Rob Herring wrote:
-> Use the for_each_of_cpu_node iterator to iterate over cpu nodes. This
-> has the side effect of defaulting to iterating using "cpu" node names in
-> preference to the deprecated (for FDT) device_type == "cpu".
+On Thu, 2018-09-06 at 09:57 +0200, Hans Verkuil wrote:
+[...]
+> > If userspace sets xfer_func explicitly, it will get the explicit default
+> > ycbcr_enc and quantization values.
+> > 
+> > I think I did this to make v4l2-compliance at some point, but it could
+> > be that the explicit output->capture colorimetry copy for RGB->RGB and
+> > YUV->YUV conversions has me covered now.
 > 
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-renesas-soc at vger.kernel.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
+> This xfer_func test makes no sense. xfer_func is completely ignored by the
+> driver (other than copying it from output to capture queue) since it can't
+> make any changes to it anyway.
+> 
+> What you are trying to do in pxp_fixup_colorimetry() is to figure out the
+> ycbcr_enc and quantization values for the capture queue.
 
-Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+Yes. I checked again without that. Since there is the forced out->cap
+copy for RGB->RGB and YUV->YUV conversions in pxp_fixup_colorimetry,
+v4l2-compliance is happy anyway. The pxp_default_quant/ycbcr_enc
+functions are removed now.
+
+> BTW, can you rename pxp_fixup_colorimetry to pxp_fixup_colorimetry_cap or
+> something? Since it is specifically for the capture queue.
+
+Ok.
+
+> These values depend entirely on the capture queue pixelformat and on the
+> colorspace and not on the xfer_func value.
+> 
+> So just do:
+> 
+> bool is_rgb = !pxp_v4l2_pix_fmt_is_yuv(dst_fourcc);
+> *ycbcr_enc = V4L2_MAP_YCBCR_ENC_DEFAULT(ctx->colorspace);
+> *quantization = V4L2_MAP_QUANTIZATION_DEFAULT(is_rgb, ctx->colorspace,
+> 					      *ycbcr_enc);
+
+That's almost exactly what I ended up with, thank you.
+
+> BTW, I just noticed that the V4L2_MAP_QUANTIZATION_DEFAULT macro no longer
+> uses ycbcr_enc. The comment in videodev2.h should be updated. I can't
+> change the define as it is used in applications (and we might need to
+> depend on it again in the future anyway).
+> 
+> If this code will give you v4l2-compliance issues, please let me know.
+> It shouldn't AFAICT.
+
+There are no complaints anymore.
+
+regards
+Philipp
