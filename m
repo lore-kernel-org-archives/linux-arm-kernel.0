@@ -1,52 +1,26 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 6 Sep 2018 14:52:25 +0100
-Subject: [PATCH] arm64: fix erroneous warnings in page freeing functions
-In-Reply-To: <20180905163857.7933-1-mark.rutland@arm.com>
-References: <20180905163857.7933-1-mark.rutland@arm.com>
-Message-ID: <20180906135225.GB5212@arm.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 06 Sep 2018 15:52:12 +0200
+Subject: [PATCH v3 RESEND 2/2] phy: add Rockchip Innosilicon hdmi phy
+In-Reply-To: <b85eeaeb-b7e2-285b-0df0-1df641c7b983@ti.com>
+References: <20180710134949.25203-1-heiko@sntech.de>
+ <21954745.lUUHsRAzaY@diego> <b85eeaeb-b7e2-285b-0df0-1df641c7b983@ti.com>
+Message-ID: <3357705.vCjhXlgJ7n@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2018 at 05:38:57PM +0100, Mark Rutland wrote:
-> In pmd_free_pte_page() and pud_free_pmd_page() we try to warn if they
-> hit a present non-table entry. In both cases we'll warn for non-present
-> entries, as the VM_WARN_ON() only checks the entry is not a table entry.
-> 
-> This has been observed to result in warnings when booting a v4.19-rc2
-> kernel under qemu.
-> 
-> Fix this by bailing out earlier for non-present entries.
-> 
-> Fixes: ec28bb9c9b0826d7 ("arm64: Implement page table free interfaces")
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> ---
->  arch/arm64/mm/mmu.c | 10 ++++++----
->  1 file changed, 6 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 65f86271f02b..8080c9f489c3 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -985,8 +985,9 @@ int pmd_free_pte_page(pmd_t *pmdp, unsigned long addr)
->  
->  	pmd = READ_ONCE(*pmdp);
->  
-> -	/* No-op for empty entry and WARN_ON for valid entry */
-> -	if (!pmd_present(pmd) || !pmd_table(pmd)) {
-> +	if (!pmd_present(pmd))
-> +		return 1;
-> +	if (!pmd_table(pmd)) {
+Am Donnerstag, 6. September 2018, 11:38:35 CEST schrieb Kishon Vijay Abraham I:
+> On Friday 31 August 2018 02:56 PM, Heiko St?bner wrote:
+> > Am Dienstag, 14. August 2018, 14:52:00 CEST schrieb Heiko Stuebner:
+> >> Hi Kishon,
+> >>
+> >> thanks for your review.
+> >>
 
-It's a pity this can't be written as:
+> All right! I'll merge once you send a patch fixing this.
 
-	if (!pmd_present(pmd) || VM_WARN_ON(!pmd_table(pmd)))
-		return 1;
+Thanks and v4 with the rest of the issues fixed should be in your
+inbox now :-)
 
-and I suspect the fact that you can't do that with VM_WARN_ON actually
-contributed to the bug in the first place.
 
-Anywho, thanks for fixing it. I'll queue this up as a fix.
-
-Will
+Thanks
+Heiko
