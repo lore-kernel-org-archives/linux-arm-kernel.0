@@ -1,66 +1,64 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Fri,  7 Sep 2018 00:24:42 +0200
-Subject: [PATCH v9 9/9] ARM: dts: sun8i-h3: Add Video Engine and reserved
- memory nodes
-In-Reply-To: <20180906222442.14825-1-contact@paulk.fr>
-References: <20180906222442.14825-1-contact@paulk.fr>
-Message-ID: <20180906222442.14825-10-contact@paulk.fr>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu,  6 Sep 2018 15:58:50 -0700
+Subject: [PATCH v2 0/4] crypto: skcipher - Remove VLA usage
+Message-ID: <20180906225854.40989-1-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+This removes VLAs[1] from SKCIPHER_REQUEST_ON_STACK by making sure that
+on-stack requests are being used only on non-ASYNC algorithms and that
+enough space has been reserved.
 
-This adds nodes for the Video Engine and the associated reserved memory
-for the H3. Up to 96 MiB of memory are dedicated to the CMA pool.
+v2:
+- Instead of globally failing large reqsizes, limit to only non-ASYNC users
+  of the on-stack request.
+- Remove unused tfm argument after VLA removal.
 
-Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
----
- arch/arm/boot/dts/sun8i-h3.dtsi | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+-Kees
 
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index f0096074a467..3ecfabb10151 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -119,6 +119,20 @@
- 			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
- 	};
- 
-+	reserved-memory {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		cma_pool: cma at 4a000000 {
-+			compatible = "shared-dma-pool";
-+			size = <0x6000000>;
-+			alloc-ranges = <0x4a000000 0x6000000>;
-+			reusable;
-+			linux,cma-default;
-+		};
-+	};
-+
- 	soc {
- 		system-control at 1c00000 {
- 			compatible = "allwinner,sun8i-h3-system-control";
-@@ -142,6 +156,17 @@
- 			};
- 		};
- 
-+		video-codec at 01c0e000 {
-+			compatible = "allwinner,sun8i-h3-video-engine";
-+			reg = <0x01c0e000 0x1000>;
-+			clocks = <&ccu CLK_BUS_VE>, <&ccu CLK_VE>,
-+				 <&ccu CLK_DRAM_VE>;
-+			clock-names = "ahb", "mod", "ram";
-+			resets = <&ccu RST_BUS_VE>;
-+			interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
-+			allwinner,sram = <&ve_sram 1>;
-+		};
-+
- 		mali: gpu at 1c40000 {
- 			compatible = "allwinner,sun8i-h3-mali", "arm,mali-400";
- 			reg = <0x01c40000 0x10000>;
+[1] https://lkml.kernel.org/r/CA+55aFzCG-zNmZwX4A2FQpadafLfEzK6CC=qPXydAacU1RqZWA at mail.gmail.com
+
+Kees Cook (4):
+  crypto: skcipher - Consolidate encrypt/decrypt sanity check
+  crypto: skcipher - Enforce non-ASYNC for on-stack requests
+  crypto: skcipher - Remove VLA usage for SKCIPHER_REQUEST_ON_STACK
+  crypto: skcipher - Remove unused argument to SKCIPHER_REQUEST_ON_STACK()
+
+ arch/s390/crypto/aes_s390.c                   |  8 +-
+ arch/x86/crypto/fpu.c                         |  4 +-
+ crypto/algif_aead.c                           |  2 +-
+ crypto/authenc.c                              |  2 +-
+ crypto/authencesn.c                           |  2 +-
+ crypto/cryptd.c                               |  4 +-
+ crypto/echainiv.c                             |  2 +-
+ crypto/gcm.c                                  |  2 +-
+ crypto/seqiv.c                                |  2 +-
+ drivers/block/cryptoloop.c                    |  2 +-
+ drivers/crypto/axis/artpec6_crypto.c          |  2 +-
+ drivers/crypto/ccp/ccp-crypto-aes-xts.c       |  2 +-
+ drivers/crypto/chelsio/chcr_algo.c            |  2 +-
+ drivers/crypto/mxs-dcp.c                      |  2 +-
+ drivers/crypto/omap-aes.c                     |  2 +-
+ drivers/crypto/picoxcell_crypto.c             |  2 +-
+ drivers/crypto/qce/ablkcipher.c               |  2 +-
+ drivers/crypto/sahara.c                       |  8 +-
+ drivers/crypto/vmx/aes_cbc.c                  |  4 +-
+ drivers/crypto/vmx/aes_ctr.c                  |  2 +-
+ drivers/crypto/vmx/aes_xts.c                  |  2 +-
+ drivers/net/ppp/ppp_mppe.c                    |  6 +-
+ drivers/staging/rtl8192e/rtllib_crypt_tkip.c  |  4 +-
+ drivers/staging/rtl8192e/rtllib_crypt_wep.c   |  4 +-
+ .../rtl8192u/ieee80211/ieee80211_crypt_tkip.c |  4 +-
+ .../rtl8192u/ieee80211/ieee80211_crypt_wep.c  |  4 +-
+ drivers/usb/wusbcore/crypto.c                 |  2 +-
+ include/crypto/skcipher.h                     | 74 ++++++++++++++-----
+ net/ceph/crypto.c                             |  2 +-
+ net/mac802154/llsec.c                         |  4 +-
+ net/rxrpc/rxkad.c                             | 10 +--
+ net/sunrpc/auth_gss/gss_krb5_crypto.c         | 14 ++--
+ net/wireless/lib80211_crypt_tkip.c            |  4 +-
+ net/wireless/lib80211_crypt_wep.c             |  4 +-
+ 34 files changed, 116 insertions(+), 80 deletions(-)
+
 -- 
-2.18.0
+2.17.1
