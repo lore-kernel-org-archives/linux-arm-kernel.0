@@ -1,85 +1,64 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 06 Sep 2018 09:48:51 -0700
-Subject: [PATCH 1/6] drm/bridge: use bus flags in bridge timings
-In-Reply-To: <10044412.4MiZRujKJI@avalon>
-References: <20180905052113.21262-1-stefan@agner.ch>
- <a00c1650b69ba85bed7ae39b81a0c40f@agner.ch>
- <CACRpkdbw0VjkHYcUpox+DorRG0oRdPARL4ShgPfV2eFaUF_w0g@mail.gmail.com>
- <10044412.4MiZRujKJI@avalon>
-Message-ID: <d07214d3005fb7229f17dd62d1b5b8ee@agner.ch>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 6 Sep 2018 17:50:15 +0100
+Subject: [PATCH v2 1/9] ARM: signal: copy registers using __copy_to_user()
+In-Reply-To: <1536251888-8302-2-git-send-email-julien.thierry@arm.com>
+References: <1536251888-8302-1-git-send-email-julien.thierry@arm.com>
+ <1536251888-8302-2-git-send-email-julien.thierry@arm.com>
+Message-ID: <20180906165015.GQ30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06.09.2018 05:25, Laurent Pinchart wrote:
-> Hi Linus,
-> 
-> On Thursday, 6 September 2018 14:07:41 EEST Linus Walleij wrote:
->> On Wed, Sep 5, 2018 at 8:32 PM Stefan Agner <stefan@agner.ch> wrote:
->> > On 05.09.2018 00:44, Laurent Pinchart wrote:
->> >
->> > Good point! I actually really don't like that we use the same flags here
->> > but from a different perspective. Especially since the flags defines
->> > document things differently:
->> >
->> > /* drive data on pos. edge */
->> > #define DRM_BUS_FLAG_PIXDATA_POSEDGE    (1<<2)
->> > /* drive data on neg. edge */
->> > #define DRM_BUS_FLAG_PIXDATA_NEGEDGE    (1<<3)
->>
->> Maybe a stupid comment from my side, but can't we just change the
->> documentation to match the usecases?
->>
->> /* Trigger pixel data latch on positive edge */
->> #define DRM_BUS_FLAG_PIXDATA_POSEDGE    (1<<2)
-> 
-> The flags are used for the drm_connector bus_flags field, and really mean 
-> driving on the positive/negative edges. We this can't change their meaning 
-> like this.
-> 
->> > Using the opposite perspective would also need translation in crtc
->> > drivers... So far no driver uses sampling_edge.
->> >
->> > I would prefer if we always use the meaning as documented by the flags.
->> >
->> > I guess we would need to convert DRM_BUS_FLAG_PIXDATA_POSEDGE ->
->> > DRM_BUS_FLAG_PIXDATA_NEGEDGE.
->> >
->> > Linus Walleij, you added sampling edge, any thoughts?
->>
->> I just thought it was generally useful to have triggering edge encoded
->> into the bridge as it makes it clear that this edge is something
->> that is a delayed version of the driving edge which is subject to
->> clock skew caused by the speed of electrons in silicon and
->> copper and slew rate caused by parasitic capacitance.
-> 
-> I agree that we need both the driving and sampling edge. In many case they 
-> will be opposite, and providing some kind of appropriate defaults in APIs is 
-> fine by me, but we need a way to specify both when needed.
+On Thu, Sep 06, 2018 at 05:38:00PM +0100, Julien Thierry wrote:
+> When saving the ARM integer registers, use __copy_to_user() to
+> copy them into user signal frame, rather than __put_user_error().
+> This has the benefit of disabling/enabling PAN once for the whole copy
+> intead of once per write.
 
-We do have pixel clock flags for displays, but also they are actually
-controller oriented:
+Looks fine, but please note:
 
-https://elixir.bootlin.com/linux/latest/source/include/video/display_timing.h#L15
+> +	struct sigcontext context;
+>  	int err = 0;
+>  
+> +	context = (struct sigcontext) {
+> +		.arm_r0        = regs->ARM_r0,
+> +		.arm_r1        = regs->ARM_r1,
+> +		.arm_r2        = regs->ARM_r2,
+> +		.arm_r3        = regs->ARM_r3,
+> +		.arm_r4        = regs->ARM_r4,
+> +		.arm_r5        = regs->ARM_r5,
+> +		.arm_r6        = regs->ARM_r6,
+> +		.arm_r7        = regs->ARM_r7,
+> +		.arm_r8        = regs->ARM_r8,
+> +		.arm_r9        = regs->ARM_r9,
+> +		.arm_r10       = regs->ARM_r10,
+> +		.arm_fp        = regs->ARM_fp,
+> +		.arm_ip        = regs->ARM_ip,
+> +		.arm_sp        = regs->ARM_sp,
+> +		.arm_lr        = regs->ARM_lr,
+> +		.arm_pc        = regs->ARM_pc,
+> +		.arm_cpsr      = regs->ARM_cpsr,
+> +
+> +		.trap_no       = current->thread.trap_no,
+> +		.error_code    = current->thread.error_code,
+> +		.fault_address = current->thread.address,
+> +		.oldmask       = set->sig[0],
+> +	};
+> +
+> +	err |= __copy_to_user(&sf->uc.uc_mcontext, &context, sizeof(context));
 
-I guess having different flags to denote driving and sampling edge
-independently would be ideal. But then, is there really a use case where
-it wouldn't be the exact opposite?
+This construct is safe here, because struct sigcontext will have
+no padding.
 
-The other bus flags are actually fine as is. I suggest to just stick
-with the bus flags as we have them now, at least for now.
+However, in the case of a struct that does contain padding, doing
+the above will leave the padding uninitialised, and therefore the
+__copy_to_user() will end up leaking information from the kernel
+stack into userspace - which is bad news.
 
-Alternatively, we could provide "consumer/bridge" oriented flags which
-use the same bit and just are the opposite of the controller oriented
-flags, e.g.:
+So, such constructs are best avoided in generic code (where it's
+less known whether padding is present), and only in arch code after
+careful review.
 
-/* drive data on pos. edge */
-#define DRM_BUS_FLAG_PIXDATA_POSEDGE	(1<<2)
-/* drive data on neg. edge */
-#define DRM_BUS_FLAG_PIXDATA_NEGEDGE	(1<<3)
-/* sample data on neg. edge */
-#define DRM_BUS_FLAG_PIXDATA_SAMPLE_NEGEDGE	(1<<2)
-/* sample data on pos. edge */
-#define DRM_BUS_FLAG_PIXDATA_SAMPLE_POSEDGE	(1<<3)
-
---
-Stefan
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
