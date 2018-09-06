@@ -1,74 +1,162 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu,  6 Sep 2018 10:08:21 +0100
-Subject: [PATCH v2 00/14] coresight: Implement device claim protocol
-Message-ID: <1536224915-31766-1-git-send-email-suzuki.poulose@arm.com>
+Date: Thu,  6 Sep 2018 10:08:23 +0100
+Subject: [PATCH v2 02/14] coresight: tmc-etr: Refactor for handling errors
+In-Reply-To: <1536224915-31766-1-git-send-email-suzuki.poulose@arm.com>
+References: <1536224915-31766-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1536224915-31766-3-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Coresight architecture defines CLAIM tags for a device to negotiate
-control of the components (external agent vs self-hosted). Each device
-has a pair of registers (CLAIMSET & CLAIMCLR) for managing the CLAIM
-tags. However, the protocol for the CLAIM tags is IMPLEMENTATION DEFINED.
-PSCI has recommendations for the use of the CLAIM tags to negotiate
-controls for external agent vs self-hosted use, as defined in
-ARM DEN 0022D, Section "6.8.1 Debug and Trace save and restore".
+Refactor the tmc-etr enable operation to make it easier to
+handle errors in enabling the hardware. We need to make
+sure that the buffer is compatible with the ETR. This
+patch re-arranges to make the error handling easier, by
+deferring the hardware enablement until all the errors
+are checked. This also avoids turning the CATU on/off
+during a sysfs read session.
 
-This series implements the recommended protocol by PSCI.
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 67 ++++++++++++++++---------
+ 1 file changed, 43 insertions(+), 24 deletions(-)
 
-There were two options for the implementation.
- 1) Have the claim/disclaim operations performed from the coresight
-    generic driver - This doesn't work unfortunately for ETM devices
-    as the need cross-CPU calls to access the CLAIM registers. Also,
-    makes it complex for error recovery and reference counting.
-
- 2) Have the claim/disclaim operations performed from the device
-    specific drivers. The disadvantage is that the calls are sprinkled
-    in each driver, but this makes the operation much simpler.
-
-This series implements the method (2). The first part of the series
-prepares different drivers to handle errors from the lower layer
-and clean up the state. The second part of the series updates the
-existing drivers to claim/disclaim the devices as necessary.
-
-Tested with a hacked coresight driver which modifies the external
-claim tag via sysfs handle.
-
-Applies on coresight/next in Mathieu's tree.
-
-Changes since V1:
- - Handle errors is enabling path and disable only the components
-   that were enabled in the iteration.
- - Fix build break on arm32 (etm3x)
- - Update commit description for "coresight: Add support for CLAIM tag protocol"
-
-Suzuki K Poulose (14):
-  coresight: Handle failures in enabling a trace path
-  coresight: tmc-etr: Refactor for handling errors
-  coresight: tmc-etr: Handle errors enabling CATU
-  coresight: tmc-etb/etf: Prepare to handle errors enabling
-  coresight: etm4x: Add support for handling errors
-  coresight: etm3: Add support for handling errors
-  coresight: etb10: Handle errors enabling the device
-  coresight: dynamic-replicator: Handle multiple connections
-  coresight: Add support for CLAIM tag protocol
-  coresight: etmx: Claim devices before use
-  coresight: funnel: Claim devices before use
-  coresight: catu: Claim device before use
-  coresight: dynamic-replicator: Claim device for use
-  coreisght: tmc: Claim device before use
-
- drivers/hwtracing/coresight/coresight-catu.c       |   6 ++
- .../coresight/coresight-dynamic-replicator.c       |  79 ++++++++++----
- drivers/hwtracing/coresight/coresight-etb10.c      |  18 +++-
- drivers/hwtracing/coresight/coresight-etm3x.c      |  56 +++++++---
- drivers/hwtracing/coresight/coresight-etm4x.c      |  51 ++++++---
- drivers/hwtracing/coresight/coresight-funnel.c     |  26 ++++-
- drivers/hwtracing/coresight/coresight-priv.h       |   7 ++
- drivers/hwtracing/coresight/coresight-tmc-etf.c    |  95 +++++++++++------
- drivers/hwtracing/coresight/coresight-tmc-etr.c    |  80 +++++++++-----
- drivers/hwtracing/coresight/coresight.c            | 118 +++++++++++++++++++--
- include/linux/coresight.h                          |  20 ++++
- 11 files changed, 434 insertions(+), 122 deletions(-)
-
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+index 56fea4f..c426935 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+@@ -918,21 +918,10 @@ static void tmc_sync_etr_buf(struct tmc_drvdata *drvdata)
+ 		tmc_etr_buf_insert_barrier_packet(etr_buf, etr_buf->offset);
+ }
+ 
+-static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata,
+-			      struct etr_buf *etr_buf)
++static void __tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
+ {
+ 	u32 axictl, sts;
+-
+-	/* Callers should provide an appropriate buffer for use */
+-	if (WARN_ON(!etr_buf || drvdata->etr_buf))
+-		return;
+-	drvdata->etr_buf = etr_buf;
+-
+-	/*
+-	 * If this ETR is connected to a CATU, enable it before we turn
+-	 * this on
+-	 */
+-	tmc_etr_enable_catu(drvdata);
++	struct etr_buf *etr_buf = drvdata->etr_buf;
+ 
+ 	CS_UNLOCK(drvdata->base);
+ 
+@@ -952,11 +941,8 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata,
+ 		axictl |= TMC_AXICTL_ARCACHE_OS;
+ 	}
+ 
+-	if (etr_buf->mode == ETR_MODE_ETR_SG) {
+-		if (WARN_ON(!tmc_etr_has_cap(drvdata, TMC_ETR_SG)))
+-			return;
++	if (etr_buf->mode == ETR_MODE_ETR_SG)
+ 		axictl |= TMC_AXICTL_SCT_GAT_MODE;
+-	}
+ 
+ 	writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
+ 	tmc_write_dba(drvdata, etr_buf->hwaddr);
+@@ -982,6 +968,32 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata,
+ 	CS_LOCK(drvdata->base);
+ }
+ 
++static int tmc_etr_enable_hw(struct tmc_drvdata *drvdata,
++			     struct etr_buf *etr_buf)
++{
++	/* Callers should provide an appropriate buffer for use */
++	if (WARN_ON(!etr_buf))
++		return -EINVAL;
++
++	if ((etr_buf->mode == ETR_MODE_ETR_SG) &&
++	    WARN_ON(!tmc_etr_has_cap(drvdata, TMC_ETR_SG)))
++		return -EINVAL;
++
++	if (WARN_ON(drvdata->etr_buf))
++		return -EBUSY;
++
++	/* Set the buffer for the session */
++	drvdata->etr_buf = etr_buf;
++	/*
++	 * If this ETR is connected to a CATU, enable it before we turn
++	 * this on.
++	 */
++	tmc_etr_enable_catu(drvdata);
++
++	__tmc_etr_enable_hw(drvdata);
++	return 0;
++}
++
+ /*
+  * Return the available trace data in the buffer (starts at etr_buf->offset,
+  * limited by etr_buf->len) from @pos, with a maximum limit of @len,
+@@ -1037,7 +1049,7 @@ static void tmc_etr_sync_sysfs_buf(struct tmc_drvdata *drvdata)
+ 	}
+ }
+ 
+-static void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
++static void __tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
+ {
+ 	CS_UNLOCK(drvdata->base);
+ 
+@@ -1053,6 +1065,11 @@ static void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
+ 
+ 	CS_LOCK(drvdata->base);
+ 
++}
++
++static void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
++{
++	__tmc_etr_disable_hw(drvdata);
+ 	/* Disable CATU device if this ETR is connected to one */
+ 	tmc_etr_disable_catu(drvdata);
+ 	/* Reset the ETR buf used by hardware */
+@@ -1111,8 +1128,9 @@ static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev)
+ 		drvdata->sysfs_buf = new_buf;
+ 	}
+ 
+-	drvdata->mode = CS_MODE_SYSFS;
+-	tmc_etr_enable_hw(drvdata, drvdata->sysfs_buf);
++	ret = tmc_etr_enable_hw(drvdata, drvdata->sysfs_buf);
++	if (!ret)
++		drvdata->mode = CS_MODE_SYSFS;
+ out:
+ 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+ 
+@@ -1342,8 +1360,9 @@ static int tmc_enable_etr_sink_perf(struct coresight_device *csdev, void *data)
+ 
+ 	etr_perf->head = PERF_IDX2OFF(handle->head, etr_perf);
+ 	drvdata->perf_data = etr_perf;
+-	drvdata->mode = CS_MODE_PERF;
+-	tmc_etr_enable_hw(drvdata, etr_perf->etr_buf);
++	rc = tmc_etr_enable_hw(drvdata, etr_perf->etr_buf);
++	if (!rc)
++		drvdata->mode = CS_MODE_PERF;
+ 
+ unlock_out:
+ 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+@@ -1425,7 +1444,7 @@ int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
+ 
+ 	/* Disable the TMC if we are trying to read from a running session. */
+ 	if (drvdata->mode == CS_MODE_SYSFS)
+-		tmc_etr_disable_hw(drvdata);
++		__tmc_etr_disable_hw(drvdata);
+ 
+ 	drvdata->reading = true;
+ out:
+@@ -1452,7 +1471,7 @@ int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata)
+ 		 * buffer. Since the tracer is still enabled drvdata::buf can't
+ 		 * be NULL.
+ 		 */
+-		tmc_etr_enable_hw(drvdata, drvdata->sysfs_buf);
++		__tmc_etr_enable_hw(drvdata);
+ 	} else {
+ 		/*
+ 		 * The ETR is not tracing and the buffer was just read.
 -- 
 2.7.4
