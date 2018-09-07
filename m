@@ -1,80 +1,49 @@
 From: oss@buserror.net (Scott Wood)
-Date: Fri, 07 Sep 2018 15:00:40 -0500
-Subject: [PATCH 2/5] include: add
- setbits32/clrbits32/clrsetbits32/setbits64/clrbits64/clrsetbits64 in
- linux/setbits.h
-In-Reply-To: <1536349307-20714-3-git-send-email-clabbe@baylibre.com>
-References: <1536349307-20714-1-git-send-email-clabbe@baylibre.com>
- <1536349307-20714-3-git-send-email-clabbe@baylibre.com>
-Message-ID: <8bfa1740800ca494028350addd7c874a8b4804bb.camel@buserror.net>
+Date: Fri, 07 Sep 2018 15:25:04 -0500
+Subject: [PATCH 3/3] soc: fsl: add RCPM driver
+In-Reply-To: <20180831035219.31619-3-ran.wang_1@nxp.com>
+References: <20180831035219.31619-1-ran.wang_1@nxp.com>
+ <20180831035219.31619-3-ran.wang_1@nxp.com>
+Message-ID: <86101ce0f4201d05510e57d74cafe8c665b8e5d4.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-09-07 at 19:41 +0000, Corentin Labbe wrote:
-> This patch adds setbits32/clrbits32/clrsetbits32 and
-> setbits64/clrbits64/clrsetbits64 in linux/setbits.h header.
+On Fri, 2018-08-31 at 11:52 +0800, Ran Wang wrote:
+> The NXP's QorIQ Processors based on ARM Core have RCPM module (Run
+> Control and Power Management), which performs all device-level
+> tasks associated with power management such as wakeup source control.
 > 
-> Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
+> This driver depends on FSL platform PM driver framework which help to
+> isolate user and PM service provider (such as RCPM driver).
+> 
+> Signed-off-by: Chenhui Zhao <chenhui.zhao@nxp.com>
+> Signed-off-by: Ying Zhang <ying.zhang22455@nxp.com>
+> Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
 > ---
->  include/linux/setbits.h | 55
-> +++++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 55 insertions(+)
->  create mode 100644 include/linux/setbits.h
-> 
-> diff --git a/include/linux/setbits.h b/include/linux/setbits.h
-> new file mode 100644
-> index 000000000000..3e1e273551bb
-> --- /dev/null
-> +++ b/include/linux/setbits.h
-> @@ -0,0 +1,55 @@
-> +/* SPDX-License-Identifier: GPL-2.0 */
-> +#ifndef __LINUX_SETBITS_H
-> +#define __LINUX_SETBITS_H
-> +
-> +#include <linux/io.h>
-> +
-> +#define __setbits(readfunction, writefunction, addr, set) \
-> +	writefunction((readfunction(addr) | (set)), addr)
-> +#define __clrbits(readfunction, writefunction, addr, mask) \
-> +	writefunction((readfunction(addr) & ~(mask)), addr)
-> +#define __clrsetbits(readfunction, writefunction, addr, mask, set) \
-> +	writefunction(((readfunction(addr) & ~(mask)) | (set)), addr)
-> +#define __setclrbits(readfunction, writefunction, addr, mask, set) \
-> +	writefunction(((readfunction(addr) | (seti)) & ~(mask)), addr)
-> +
-> +#define setbits32(addr, set) __setbits(readl, writel, addr, set)
-> +#define setbits32_relaxed(addr, set) __setbits(readl_relaxed,
-> writel_relaxed, \
-> +					       addr, set)
-> +
-> +#define clrbits32(addr, mask) __clrbits(readl, writel, addr, mask)
-> +#define clrbits32_relaxed(addr, mask) __clrbits(readl_relaxed,
-> writel_relaxed, \
-> +						addr, mask)
+>  drivers/soc/fsl/Kconfig   |    6 ++
+>  drivers/soc/fsl/Makefile  |    1 +
+>  drivers/soc/fsl/ls-rcpm.c |  153
+> +++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 160 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/soc/fsl/ls-rcpm.c
 
-So now setbits32/clrbits32 is implicitly little-endian?  Introducing new
-implicit-endian accessors is probably a bad thing in general, but doing it
-with a name that until this patchset was implicitly big-endian (at least on
-powerpc) seems worse.  Why not setbits32_le()?
+Is there a reason why this is LS-specific, or could it be used with PPC RCPM
+blocks?
 
-
+> diff --git a/drivers/soc/fsl/Kconfig b/drivers/soc/fsl/Kconfig
+> index 6517412..882330d 100644
+> --- a/drivers/soc/fsl/Kconfig
+> +++ b/drivers/soc/fsl/Kconfig
+> @@ -30,3 +30,9 @@ config FSL_PLAT_PM
+>  	  have to know the implement details of wakeup function it require.
+>  	  Besides, it is also easy for service side to upgrade its logic
+> when
+>  	  design changed and remain user side unchanged.
 > +
-> +#define clrsetbits32(addr, mask, set) __clrsetbits(readl, writel, addr,
-> mask, set)
-> +#define clrsetbits32_relaxed(addr, mask, set) __clrsetbits(readl_relaxed, \
-> +							   writel_relaxed,
-> \
-> +							   addr, mask, set)
-> +
-> +#define setclrbits32(addr, mask, set) __setclrbits(readl, writel, addr,
-> mask, set)
-> +#define setclrbits32_relaxed(addr, mask, set) __setclrbits(readl_relaxed, \
-> +							   writel_relaxed,
-> \
-> +							   addr, mask, set)
+> +config LS_RCPM
+> +	bool "Freescale RCPM support"
+> +	depends on (FSL_PLAT_PM)
 
-What's the use case for setclrbits?  I don't see it used anywhere in this
-patchset (not even in the coccinelle patterns), it doesn't seem like it would
-be a common pattern, and it could easily get confused with clrsetbits.
+Why is this parenthesized?
 
 -Scott
