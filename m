@@ -1,27 +1,38 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 7 Sep 2018 13:48:54 +0530
-Subject: [PATCH v4 2/2] phy: add Rockchip Innosilicon hdmi phy
-In-Reply-To: <20180906135047.30788-2-heiko@sntech.de>
-References: <20180906135047.30788-1-heiko@sntech.de>
- <20180906135047.30788-2-heiko@sntech.de>
-Message-ID: <86a8225e-ed07-d4f1-10c6-a5f3158e44f1@ti.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 7 Sep 2018 10:21:03 +0200
+Subject: [PATCH] clk: sunxi-ng: sun4i: Set VCO and PLL bias current to
+ lowest setting
+In-Reply-To: <20180906132537.20772-1-wens@csie.org>
+References: <20180906132537.20772-1-wens@csie.org>
+Message-ID: <20180907082103.lyuubyqpojehtkz4@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
-
-On Thursday 06 September 2018 07:20 PM, Heiko Stuebner wrote:
-> From: Zheng Yang <zhengyang@rock-chips.com>
+On Thu, Sep 06, 2018 at 09:25:37PM +0800, Chen-Yu Tsai wrote:
+> The default mid-level PLL bias current setting interferes with sigma
+> delta modulation. This manifests as decreased audio quality at lower
+> sampling rates, which sounds like radio broadcast quality, and
+> distortion noises at sampling rates at 48 kHz or above.
 > 
-> Add a driver for the Innosilicon hdmi phy used on rk3228/rk3229
-> and rk3328 socs from Rockchip.
+> Changing the bias current settings to the lowest gets rid of the
+> noise.
 > 
-> Signed-off-by: Zheng Yang <zhengyang@rock-chips.com>
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> Tested-by: Robin Murphy <robin.murphy@arm.com>
+> Fixes: de3448519194 ("clk: sunxi-ng: sun4i: Use sigma-delta modulation
+> 		      for audio PLL")
+> Cc: <stable@vger.kernel.org> # 4.15.x
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-I got a bunch of checkpatch "check" warnings
-"Alignment should match open parenthesis". Can you fix resend after fixing those?
+Applied, thanks!
+Maxime
 
-Thanks
-Kishon
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180907/3af44284/attachment.sig>
