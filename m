@@ -1,9 +1,9 @@
 From: lkp@intel.com (kbuild test robot)
-Date: Fri, 7 Sep 2018 12:48:13 +0800
+Date: Fri, 7 Sep 2018 12:57:49 +0800
 Subject: [PATCH 05/13] nvmem: change the signature of nvmem_unregister()
 In-Reply-To: <20180905095738.26406-6-brgl@bgdev.pl>
 References: <20180905095738.26406-6-brgl@bgdev.pl>
-Message-ID: <201809071258.0YDrDxfq%fengguang.wu@intel.com>
+Message-ID: <201809071229.wdsqKzQM%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,53 +16,41 @@ I love your patch! Yet something to improve:
 [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
 url:    https://github.com/0day-ci/linux/commits/Bartosz-Golaszewski/nvmem-rework-of-the-subsystem-for-non-DT-users/20180907-112400
-config: i386-randconfig-s3-09061342 (attached as .config)
-compiler: gcc-6 (Debian 6.4.0-9) 6.4.0 20171026
+config: xtensa-allmodconfig (attached as .config)
+compiler: xtensa-linux-gcc (GCC) 8.1.0
 reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
         # save the attached .config to linux build tree
-        make ARCH=i386 
+        GCC_VERSION=8.1.0 make.cross ARCH=xtensa 
 
 All error/warnings (new ones prefixed by >>):
 
-   In file included from include/linux/rtc.h:18:0,
-                    from include/linux/efi.h:20,
-                    from drivers//char/tpm/eventlog/tpm1.c:24:
-   include/linux/nvmem-provider.h: In function 'nvmem_unregister':
->> include/linux/nvmem-provider.h:86:9: warning: 'return' with a value, in function returning void
-     return -ENOSYS;
-            ^
-   include/linux/nvmem-provider.h:84:20: note: declared here
-    static inline void nvmem_unregister(struct nvmem_device *nvmem)
-                       ^~~~~~~~~~~~~~~~
-   include/linux/nvmem-provider.h: In function 'devm_nvmem_unregister':
->> include/linux/nvmem-provider.h:98:9: error: void value not ignored as it ought to be
-     return nvmem_unregister(nvmem);
-            ^~~~~~~~~~~~~~~~~~~~~~~
+   drivers//nvmem/mxs-ocotp.c: In function 'mxs_ocotp_remove':
+>> drivers//nvmem/mxs-ocotp.c:202:9: error: void value not ignored as it ought to be
+     return nvmem_unregister(otp->nvmem);
+            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+>> drivers//nvmem/mxs-ocotp.c:203:1: warning: control reaches end of non-void function [-Wreturn-type]
+    }
+    ^
 
-vim +98 include/linux/nvmem-provider.h
+vim +202 drivers//nvmem/mxs-ocotp.c
 
-eace75cf Srinivas Kandagatla 2015-07-27  83  
-fd7df99e Bartosz Golaszewski 2018-09-05  84  static inline void nvmem_unregister(struct nvmem_device *nvmem)
-eace75cf Srinivas Kandagatla 2015-07-27  85  {
-eace75cf Srinivas Kandagatla 2015-07-27 @86  	return -ENOSYS;
-eace75cf Srinivas Kandagatla 2015-07-27  87  }
-eace75cf Srinivas Kandagatla 2015-07-27  88  
-f1f50eca Andrey Smirnov      2018-03-09  89  static inline struct nvmem_device *
-f1f50eca Andrey Smirnov      2018-03-09  90  devm_nvmem_register(struct device *dev, const struct nvmem_config *c)
-f1f50eca Andrey Smirnov      2018-03-09  91  {
-f1f50eca Andrey Smirnov      2018-03-09  92  	return nvmem_register(c);
-f1f50eca Andrey Smirnov      2018-03-09  93  }
-f1f50eca Andrey Smirnov      2018-03-09  94  
-f1f50eca Andrey Smirnov      2018-03-09  95  static inline int
-f1f50eca Andrey Smirnov      2018-03-09  96  devm_nvmem_unregister(struct device *dev, struct nvmem_device *nvmem)
-f1f50eca Andrey Smirnov      2018-03-09  97  {
-f1f50eca Andrey Smirnov      2018-03-09 @98  	return nvmem_unregister(nvmem);
-b3db17e4 Andrew Lunn         2018-05-11  99  
+c01e9a11 Stefan Wahren 2015-09-30  195  
+c01e9a11 Stefan Wahren 2015-09-30  196  static int mxs_ocotp_remove(struct platform_device *pdev)
+c01e9a11 Stefan Wahren 2015-09-30  197  {
+c01e9a11 Stefan Wahren 2015-09-30  198  	struct mxs_ocotp *otp = platform_get_drvdata(pdev);
+c01e9a11 Stefan Wahren 2015-09-30  199  
+c01e9a11 Stefan Wahren 2015-09-30  200  	clk_unprepare(otp->clk);
+c01e9a11 Stefan Wahren 2015-09-30  201  
+c01e9a11 Stefan Wahren 2015-09-30 @202  	return nvmem_unregister(otp->nvmem);
+c01e9a11 Stefan Wahren 2015-09-30 @203  }
+c01e9a11 Stefan Wahren 2015-09-30  204  
 
-:::::: The code at line 98 was first introduced by commit
-:::::: f1f50eca5f90527d2cca3479cda08883958777f6 nvmem: Introduce devm_nvmem_(un)register()
+:::::: The code at line 202 was first introduced by commit
+:::::: c01e9a11ab6f3096a54574c3224d8732a374f135 nvmem: add driver for ocotp in i.MX23 and i.MX28
 
-:::::: TO: Andrey Smirnov <andrew.smirnov@gmail.com>
+:::::: TO: Stefan Wahren <stefan.wahren@i2se.com>
 :::::: CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 ---
@@ -72,6 +60,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/gzip
-Size: 27032 bytes
+Size: 54957 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180907/f9aef0bc/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180907/68865a99/attachment-0001.gz>
