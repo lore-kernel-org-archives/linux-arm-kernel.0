@@ -1,46 +1,51 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 7 Sep 2018 09:58:04 +0100
-Subject: [PATCH v4 2/2] phy: add Rockchip Innosilicon hdmi phy
-In-Reply-To: <20180906135047.30788-2-heiko@sntech.de>
-References: <20180906135047.30788-1-heiko@sntech.de>
- <20180906135047.30788-2-heiko@sntech.de>
-Message-ID: <81c527fc-5837-658f-5c57-60acd909ed2e@arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 7 Sep 2018 11:01:29 +0200
+Subject: [PATCH 02/10] phy: Add configuration interface
+In-Reply-To: <20180906162450.GA26997@lunn.ch>
+References: <cover.ee6158898d563fcc01d45c9652501180bccff0f0.1536138624.git-series.maxime.ripard@bootlin.com>
+ <a739a2d623c3e60373a73e1ec206c2aa35c4a742.1536138624.git-series.maxime.ripard@bootlin.com>
+ <8397722.XVQDA25ZU6@avalon> <20180906144807.pn753tgfyovvheil@flea>
+ <20180906162450.GA26997@lunn.ch>
+Message-ID: <20180907090129.yg5m5h7ocoow5xbv@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-09-06 2:50 PM, Heiko Stuebner wrote:
-> From: Zheng Yang <zhengyang@rock-chips.com>
+On Thu, Sep 06, 2018 at 06:24:50PM +0200, Andrew Lunn wrote:
+> > > > +int phy_configure(struct phy *phy, enum phy_mode mode,
+> > > > +		  union phy_configure_opts *opts)
+> > > > +{
+> > > > +	int ret;
+> > > > +
+> > > > +	if (!phy)
+> > > > +		return -EINVAL;
+> > > > +
+> > > > +	if (!phy->ops->configure)
+> > > > +		return 0;
+> > > 
+> > > Shouldn't you report an error to the caller ? If a caller expects the PHY to 
+> > > be configurable, I would assume that silently ignoring the requested 
+> > > configuration won't work great.
+> > 
+> > I'm not sure. I also expect a device having to interact with multiple
+> > PHYs, some of them needing some configuration while some other do
+> > not. In that scenario, returning 0 seems to be the right thing to do.
 > 
-> Add a driver for the Innosilicon hdmi phy used on rk3228/rk3229
-> and rk3328 socs from Rockchip.
-> 
-> Signed-off-by: Zheng Yang <zhengyang@rock-chips.com>
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> Tested-by: Robin Murphy <robin.murphy@arm.com>
+> You could return -EOPNOTSUPP. That is common in the network stack. The
+> caller then has the information to decide if it should keep going, or
+> return an error.
 
-That reminds me, I really must dig out that box again and finish 
-figuring out the GPIOs and regulators... :)
+Ok, that works for me then.
 
-[...]
-> +static int inno_hdmi_phy_probe(struct platform_device *pdev)
-> +{
-> +	struct inno_hdmi_phy *inno;
-> +	const struct of_device_id *match;
-> +	struct phy_provider *phy_provider;
-> +	struct resource *res;
-> +	void __iomem *regs;
-> +	int ret;
-> +
-> +	inno = devm_kzalloc(&pdev->dev, sizeof(*inno), GFP_KERNEL);
-> +	if (!inno)
-> +		return -ENOMEM;
-> +
-> +	inno->dev = &pdev->dev;
-> +
-> +	match = of_match_device(inno->dev->driver->of_match_table, inno->dev);
-> +	inno->plat_data = (struct inno_hdmi_phy_drv_data *)match->data;
+Maxime
 
-Nit: if there's cause to do another respin anyway, you could simplify 
-this part with of_device_get_match_data().
-
-Robin.
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180907/ca2d98f2/attachment.sig>
