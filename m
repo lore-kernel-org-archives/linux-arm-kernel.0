@@ -1,48 +1,62 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 07 Sep 2018 12:38:21 +0200
-Subject: [PATCH v4 2/2] phy: add Rockchip Innosilicon hdmi phy
-In-Reply-To: <81c527fc-5837-658f-5c57-60acd909ed2e@arm.com>
-References: <20180906135047.30788-1-heiko@sntech.de>
- <20180906135047.30788-2-heiko@sntech.de>
- <81c527fc-5837-658f-5c57-60acd909ed2e@arm.com>
-Message-ID: <7862264.msy1cYF2Tk@phil>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 7 Sep 2018 12:43:25 +0200
+Subject: [PATCH RESEND] efi_stub: update documentation on dtb= parameter
+In-Reply-To: <20180906182927.22318-1-grant.likely@arm.com>
+References: <20180906182927.22318-1-grant.likely@arm.com>
+Message-ID: <CAKv+Gu_k5Yr-aRhE6atrtGQOVpw60XfevVdUb8BvH1G3mfoU+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 7. September 2018, 10:58:04 CEST schrieb Robin Murphy:
-> On 2018-09-06 2:50 PM, Heiko Stuebner wrote:
-> > From: Zheng Yang <zhengyang@rock-chips.com>
-> > 
-> > Add a driver for the Innosilicon hdmi phy used on rk3228/rk3229
-> > and rk3328 socs from Rockchip.
-> > 
-> > Signed-off-by: Zheng Yang <zhengyang@rock-chips.com>
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > Tested-by: Robin Murphy <robin.murphy@arm.com>
-> 
-> That reminds me, I really must dig out that box again and finish 
-> figuring out the GPIOs and regulators... :)
+On 6 September 2018 at 20:29, Grant Likely <grant.likely@arm.com> wrote:
+> The dtb= parameter is no longer the primary mechanism for providing a
+> devicetree to the kernel. Now either firmware or the boot selector (ex.
+> Grub) should provide the devicetree and dtb= should only be used for
+> debug or when using firmware that doesn't understand DT.
+> Update the EFI stub documentation to reflect the current usage.
 >
-> [...]
-> > +static int inno_hdmi_phy_probe(struct platform_device *pdev)
-> > +{
-> > +	struct inno_hdmi_phy *inno;
-> > +	const struct of_device_id *match;
-> > +	struct phy_provider *phy_provider;
-> > +	struct resource *res;
-> > +	void __iomem *regs;
-> > +	int ret;
-> > +
-> > +	inno = devm_kzalloc(&pdev->dev, sizeof(*inno), GFP_KERNEL);
-> > +	if (!inno)
-> > +		return -ENOMEM;
-> > +
-> > +	inno->dev = &pdev->dev;
-> > +
-> > +	match = of_match_device(inno->dev->driver->of_match_table, inno->dev);
-> > +	inno->plat_data = (struct inno_hdmi_phy_drv_data *)match->data;
-> 
-> Nit: if there's cause to do another respin anyway, you could simplify 
-> this part with of_device_get_match_data().
+> Signed-off-by: Grant Likely <grant.likely@arm.com>
+> Reviewed-by: Alexander Graf <agraf@suse.de>
+> Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
+> Acked-by: Olof Johansson <olof@lixom.net>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Jonathan Corbet <corbet@lwn.net>
 
-done in v6  ... I found your mail directly after sending v5 ;-) .
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+
+> ---
+>
+> Resending because original post included Arm corporate disclaimer.
+>
+>  Documentation/efi-stub.txt | 17 ++++++++++++++---
+>  1 file changed, 14 insertions(+), 3 deletions(-)
+>
+> diff --git a/Documentation/efi-stub.txt b/Documentation/efi-stub.txt
+> index 41df801f9a50..833edb0d0bc4 100644
+> --- a/Documentation/efi-stub.txt
+> +++ b/Documentation/efi-stub.txt
+> @@ -83,7 +83,18 @@ is passed to bzImage.efi.
+>  The "dtb=" option
+>  -----------------
+>
+> -For the ARM and arm64 architectures, we also need to be able to provide a
+> -device tree to the kernel. This is done with the "dtb=" command line option,
+> -and is processed in the same manner as the "initrd=" option that is
+> +For the ARM and arm64 architectures, a device tree must be provided to
+> +the kernel. Normally firmware shall supply the device tree via the
+> +EFI CONFIGURATION TABLE. However, the "dtb=" command line option can
+> +be used to override the firmware supplied device tree, or to supply
+> +one when firmware is unable to.
+> +
+> +Please note: Firmware adds runtime configuration information to the
+> +device tree before booting the kernel. If dtb= is used to override
+> +the device tree, then any runtime data provided by firmware will be
+> +lost. The dtb= option should only be used either as a debug tool, or
+> +as a last resort when a device tree is not provided in the EFI
+> +CONFIGURATION TABLE.
+> +
+> +"dtb=" is processed in the same manner as the "initrd=" option that is
+>  described above.
+> --
+> 2.11.0
+>
