@@ -1,70 +1,426 @@
-From: ley.foon.tan@intel.com (Ley Foon Tan)
-Date: Fri, 07 Sep 2018 10:08:19 +0800
-Subject: [PATCH v2 6/9] kbuild: consolidate Devicetree dtb build rules
-In-Reply-To: <20180905235327.5996-7-robh@kernel.org>
-References: <20180905235327.5996-1-robh@kernel.org>
- <20180905235327.5996-7-robh@kernel.org>
-Message-ID: <1536286099.6128.1.camel@intel.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Fri, 7 Sep 2018 10:28:41 +0800
+Subject: [PATCH v2 10/13] drm/mediatek: add hdmi driver for MT2701 and
+ MT7623
+In-Reply-To: <20180905083146.14727-11-bibby.hsieh@mediatek.com>
+References: <20180905083146.14727-1-bibby.hsieh@mediatek.com>
+ <20180905083146.14727-11-bibby.hsieh@mediatek.com>
+Message-ID: <1536287321.25853.19.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-09-05 at 18:53 -0500, Rob Herring wrote:
-> There is nothing arch specific about building dtb files other than
-> their
-> location under /arch/*/boot/dts/. Keeping each arch aligned is a
-> pain.
-> The dependencies and supported targets are all slightly different.
-> Also, a cross-compiler for each arch is needed, but really the host
-> compiler preprocessor is perfectly fine for building dtbs. Move the
-> build rules to a common location and remove the arch specific ones.
-> This
-> is done in a single step to avoid warnings about overriding rules.
+Hi, Bibby:
+
+On Wed, 2018-09-05 at 16:31 +0800, Bibby Hsieh wrote:
+> From: chunhui dai <chunhui.dai@mediatek.com>
 > 
-> The build dependencies had been a mixture of 'scripts' and/or
-> 'prepare'.
-> These pull in several dependencies some of which need a target
-> compiler
-> (specifically devicetable-offsets.h) and aren't needed to build dtbs.
-> All that is really needed is dtc, so adjust the dependencies to only
-> be
-> dtc.
+> This patch adds hdmi dirver suppot for both MT2701 and MT7623.
+> And also support other (existing or future) chips that use
+> the same binding and driver.
 > 
-> This change enables support 'dtbs_install' on some arches which were
-> missing the target.
-> 
-> Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
-> Cc: Michal Marek <michal.lkml@markovi.net>
-> Cc: Vineet Gupta <vgupta@synopsys.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
-> Cc: Michal Simek <monstr@monstr.eu>
-> Cc: Ralf Baechle <ralf@linux-mips.org>
-> Cc: Paul Burton <paul.burton@mips.com>
-> Cc: James Hogan <jhogan@kernel.org>
-> Cc: Ley Foon Tan <lftan@altera.com>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Paul Mackerras <paulus@samba.org>
-> Cc: Michael Ellerman <mpe@ellerman.id.au>
-> Cc: Chris Zankel <chris@zankel.net>
-> Cc: Max Filippov <jcmvbkbc@gmail.com>
-> Cc: linux-kbuild at vger.kernel.org
-> Cc: linux-snps-arc at lists.infradead.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: uclinux-h8-devel at lists.sourceforge.jp
-> Cc: linux-mips at linux-mips.org
-> Cc: nios2-dev at lists.rocketboards.org
-> Cc: linuxppc-dev at lists.ozlabs.org
-> Cc: linux-xtensa at linux-xtensa.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
 > ---
-> Please ack so I can take the whole series via the DT tree.
+>  drivers/gpu/drm/mediatek/Makefile              |   1 +
+>  drivers/gpu/drm/mediatek/mtk_hdmi.h            |   1 +
+>  drivers/gpu/drm/mediatek/mtk_hdmi_phy.c        |   3 +
+>  drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c | 307 +++++++++++++++++++++++++
+>  4 files changed, 312 insertions(+)
+>  create mode 100644 drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c
 > 
-For nios2:
+> diff --git a/drivers/gpu/drm/mediatek/Makefile b/drivers/gpu/drm/mediatek/Makefile
+> index 7f947979d68f..bf0067b5ee6f 100644
+> --- a/drivers/gpu/drm/mediatek/Makefile
+> +++ b/drivers/gpu/drm/mediatek/Makefile
+> @@ -2,6 +2,7 @@
+>  mediatek-drm-hdmi-objs := mtk_cec.o \
+>  			  mtk_hdmi.o \
+>  			  mtk_hdmi_ddc.o \
+> +                          mtk_mt2701_hdmi_phy.o \
+>  			  mtk_mt8173_hdmi_phy.o \
+>  			  mtk_hdmi_phy.o
+>  
+> diff --git a/drivers/gpu/drm/mediatek/mtk_hdmi.h b/drivers/gpu/drm/mediatek/mtk_hdmi.h
+> index a350a6c9271f..fa12eb6288f3 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_hdmi.h
+> +++ b/drivers/gpu/drm/mediatek/mtk_hdmi.h
+> @@ -45,5 +45,6 @@ extern struct platform_driver mtk_cec_driver;
+>  extern struct platform_driver mtk_hdmi_ddc_driver;
+>  extern struct platform_driver mtk_hdmi_phy_driver;
+>  extern struct mtk_hdmi_phy_conf mtk_hdmi_phy_8173_conf;
+> +extern struct mtk_hdmi_phy_conf mtk_hdmi_phy_2701_conf;
+>  
+>  #endif /* _MTK_HDMI_CTRL_H */
+> diff --git a/drivers/gpu/drm/mediatek/mtk_hdmi_phy.c b/drivers/gpu/drm/mediatek/mtk_hdmi_phy.c
+> index 82ed73575e04..606fc7a0c13b 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_hdmi_phy.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_hdmi_phy.c
+> @@ -135,6 +135,9 @@ static int mtk_hdmi_phy_remove(struct platform_device *pdev)
+>  }
+>  
+>  static const struct of_device_id mtk_hdmi_phy_match[] = {
+> +	{ .compatible = "mediatek,mt2701-hdmi-phy",
+> +	  .data = &mtk_hdmi_phy_2701_conf,
+> +	},
+>  	{ .compatible = "mediatek,mt8173-hdmi-phy",
+>  	  .data = &mtk_hdmi_phy_8173_conf,
+>  	},
+> diff --git a/drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c b/drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c
+> new file mode 100644
+> index 000000000000..428ef1557a14
+> --- /dev/null
+> +++ b/drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c
+> @@ -0,0 +1,307 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Copyright (c) 2018 MediaTek Inc.
+> + * Author: Chunhui Dai <chunhui.dai@mediatek.com>
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/debugfs.h>
 
-Acked-by: Ley Foon Tan <ley.foon.tan@intel.com>
+Why need debugfs.h?
+
+> +#include <linux/delay.h>
+> +#include <linux/kernel.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/module.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/phy/phy.h>
+> +#include <linux/slab.h>
+> +#include "mtk_hdmi.h"
+
+I don't know why the included file is different in mtk_mt8173_hdmi_phy.c
+with this file. The difference of these two files are hardware control,
+so I think these two files would include the same header files. If these
+two file include the same files, maybe we should move the common include
+statement in some header file to prevent duplicate in these two files.
+
+> +
+> +#define HDMI_CON0	0x00
+> +#define RG_HDMITX_DRV_IBIAS		(0)
+
+You need not to embrace a single number.
+
+> +#define RG_HDMITX_DRV_IBIAS_MASK	(0x3F << 0)
+
+Use lower case for hex number.
+
+> +#define RG_HDMITX_EN_SER		(12)
+> +#define RG_HDMITX_EN_SER_MASK		(0x0F << 12)
+> +#define RG_HDMITX_EN_SLDO		(16)
+> +#define RG_HDMITX_EN_SLDO_MASK		(0x0F << 16)
+> +#define RG_HDMITX_EN_PRED		(20)
+> +#define RG_HDMITX_EN_PRED_MASK		(0x0F << 20)
+> +#define RG_HDMITX_EN_IMP		(24)
+> +#define RG_HDMITX_EN_IMP_MASK		(0x0F << 24)
+> +#define RG_HDMITX_EN_DRV		(28)
+> +#define RG_HDMITX_EN_DRV_MASK		(0x0F << 28)
+> +
+> +#define HDMI_CON1	0x04
+> +#define RG_HDMITX_PRED_IBIAS		(18)
+> +#define RG_HDMITX_PRED_IBIAS_MASK	(0x0F << 18)
+> +#define RG_HDMITX_PRED_IMP		(0x01 << 22)
+> +#define RG_HDMITX_DRV_IMP		(26)
+> +#define RG_HDMITX_DRV_IMP_MASK		(0x3F << 26)
+> +
+> +#define HDMI_CON2	0x08
+> +#define RG_HDMITX_EN_TX_CKLDO		(0x01 << 0)
+> +#define RG_HDMITX_EN_TX_POSDIV		(0x01 << 1)
+> +#define RG_HDMITX_TX_POSDIV		(3)
+> +#define RG_HDMITX_TX_POSDIV_MASK	(0x03 << 3)
+> +#define RG_HDMITX_EN_MBIAS		(0x01 << 6)
+> +#define RG_HDMITX_MBIAS_LPF_EN		(0x01 << 7)
+> +
+> +#define HDMI_CON4	0x10
+> +#define RG_HDMITX_RESERVE_MASK		(0xFFFFFFFF << 0)
+> +
+> +#define HDMI_CON6	0x18
+> +#define RG_HTPLL_BR			(0)
+> +#define RG_HTPLL_BR_MASK		(0x03 << 0)
+> +#define RG_HTPLL_BC			(2)
+> +#define RG_HTPLL_BC_MASK		(0x03 << 2)
+> +#define RG_HTPLL_BP			(4)
+> +#define RG_HTPLL_BP_MASK		(0x0F << 4)
+> +#define RG_HTPLL_IR			(8)
+> +#define RG_HTPLL_IR_MASK		(0x0F << 8)
+> +#define RG_HTPLL_IC			(12)
+> +#define RG_HTPLL_IC_MASK		(0x0F << 12)
+> +#define RG_HTPLL_POSDIV			(16)
+> +#define RG_HTPLL_POSDIV_MASK		(0x03 << 16)
+> +#define RG_HTPLL_PREDIV			(18)
+> +#define RG_HTPLL_PREDIV_MASK		(0x03 << 18)
+> +#define RG_HTPLL_FBKSEL			(20)
+> +#define RG_HTPLL_FBKSEL_MASK		(0x03 << 20)
+> +#define RG_HTPLL_RLH_EN			(0x01 << 22)
+> +#define RG_HTPLL_FBKDIV			(24)
+> +#define RG_HTPLL_FBKDIV_MASK		(0x7F << 24)
+> +#define RG_HTPLL_EN			(0x01 << 31)
+> +
+> +#define HDMI_CON7	0x1c
+> +#define RG_HTPLL_AUTOK_EN		(0x01 << 23)
+> +#define RG_HTPLL_DIVEN			(28)
+> +#define RG_HTPLL_DIVEN_MASK		(0x07 << 28)
+> +
+> +static inline struct mtk_hdmi_phy *to_mtk_hdmi_pll(struct clk_hw *hw)
+> +{
+> +	return container_of(hw, struct mtk_hdmi_phy, pll_hw);
+> +}
+
+to_mtk_hdmi_pll() is the same as to_mtk_hdmi_phy() in
+mtk_mt8173_hdmi_phy.c, I would like the merge these two functions. Maybe
+you could these common function to a .h or .c file.
+
+> +
+> +static inline void mtk_hdmi_pll_mask(struct mtk_hdmi_phy *hdmi_phy, u32 offset,
+> +				     u32 val, u32 mask)
+> +{
+> +	u32 tmp = readl(hdmi_phy->regs  + offset) & ~mask;
+> +
+> +	tmp |= (val & mask);
+> +	writel(tmp, hdmi_phy->regs + offset);
+> +}
+
+Ditto.
+
+> +
+> +static int mtk_hdmi_pll_enable(struct clk_hw *hw)
+> +{
+> +	struct mtk_hdmi_phy *hdmi_phy = to_mtk_hdmi_pll(hw);
+> +
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON7, RG_HTPLL_AUTOK_EN,
+> +			  RG_HTPLL_AUTOK_EN);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, 0, RG_HTPLL_RLH_EN);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, (0x3 << RG_HTPLL_POSDIV),
+> +			  RG_HTPLL_POSDIV_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_MBIAS,
+> +			  RG_HDMITX_EN_MBIAS);
+> +	usleep_range(80, 100);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, RG_HTPLL_EN, RG_HTPLL_EN);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_TX_CKLDO,
+> +			  RG_HDMITX_EN_TX_CKLDO);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, (0xf << RG_HDMITX_EN_SLDO),
+> +			  RG_HDMITX_EN_SLDO_MASK);
+> +	usleep_range(80, 100);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, RG_HDMITX_MBIAS_LPF_EN,
+> +			  RG_HDMITX_MBIAS_LPF_EN);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_TX_POSDIV,
+> +			  RG_HDMITX_EN_TX_POSDIV);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, (0xf << RG_HDMITX_EN_SER),
+> +			  RG_HDMITX_EN_SER_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, (0xf << RG_HDMITX_EN_PRED),
+> +			  RG_HDMITX_EN_PRED_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, (0xf << RG_HDMITX_EN_DRV),
+> +			  RG_HDMITX_EN_DRV_MASK);
+> +	usleep_range(80, 100);
+> +	return 0;
+> +}
+> +
+> +static void mtk_hdmi_pll_disable(struct clk_hw *hw)
+> +{
+> +	struct mtk_hdmi_phy *hdmi_phy = to_mtk_hdmi_pll(hw);
+> +
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, 0, RG_HDMITX_EN_DRV_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, 0, RG_HDMITX_EN_PRED_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, 0, RG_HDMITX_EN_SER_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, 0, RG_HDMITX_EN_TX_POSDIV);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, 0, RG_HDMITX_MBIAS_LPF_EN);
+> +	usleep_range(80, 100);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, 0, RG_HDMITX_EN_SLDO_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, 0, RG_HDMITX_EN_TX_CKLDO);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, 0, RG_HTPLL_EN);
+> +	usleep_range(80, 100);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, 0, RG_HDMITX_EN_MBIAS);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, 0, RG_HTPLL_POSDIV_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, 0, RG_HTPLL_RLH_EN);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON7, 0, RG_HTPLL_AUTOK_EN);
+> +	usleep_range(80, 100);
+> +}
+> +
+> +static int mtk_hdmi_pll_set_rate(struct clk_hw *hw, unsigned long rate,
+> +				 unsigned long parent_rate)
+> +{
+> +	struct mtk_hdmi_phy *hdmi_phy = to_mtk_hdmi_pll(hw);
+> +	u32 pos_div;
+> +
+> +	if (rate <= 64000000)
+> +		pos_div = 3;
+> +	else if (rate <= 12800000)
+> +		pos_div = 1;
+> +	else
+> +		pos_div = 1;
+> +
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, (0x3 << RG_HTPLL_PREDIV),
+> +			  RG_HTPLL_PREDIV_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, (0x3 << RG_HTPLL_POSDIV),
+> +			  RG_HTPLL_POSDIV_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, (0x1 << RG_HTPLL_IC),
+> +			  RG_HTPLL_IC_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, (0x1 << RG_HTPLL_IR),
+> +			  RG_HTPLL_IR_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, (pos_div << RG_HDMITX_TX_POSDIV),
+> +			  RG_HDMITX_TX_POSDIV_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, (1 << RG_HTPLL_FBKSEL),
+> +			  RG_HTPLL_FBKSEL_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, (19 << RG_HTPLL_FBKDIV),
+> +			  RG_HTPLL_FBKDIV_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON7, (0x2 << RG_HTPLL_DIVEN),
+> +			  RG_HTPLL_DIVEN_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, (0xc << RG_HTPLL_BP),
+> +			  RG_HTPLL_BP_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, (0x2 << RG_HTPLL_BC),
+> +			  RG_HTPLL_BC_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, (0x1 << RG_HTPLL_BR),
+> +			  RG_HTPLL_BR_MASK);
+> +
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON1, 0, RG_HDMITX_PRED_IMP);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON1, (0x3 << RG_HDMITX_PRED_IBIAS),
+> +			  RG_HDMITX_PRED_IBIAS_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, (0x0 << RG_HDMITX_EN_IMP),
+> +			  RG_HDMITX_EN_IMP_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON1, (0x28 << RG_HDMITX_DRV_IMP),
+> +			  RG_HDMITX_DRV_IMP_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON4, 0x28, RG_HDMITX_RESERVE_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, (0xa << RG_HDMITX_DRV_IBIAS),
+> +			  RG_HDMITX_DRV_IBIAS_MASK);
+> +	return 0;
+> +}
+> +
+> +static long mtk_hdmi_pll_round_rate(struct clk_hw *hw, unsigned long rate,
+> +				    unsigned long *parent_rate)
+> +{
+> +	struct mtk_hdmi_phy *hdmi_phy = to_mtk_hdmi_pll(hw);
+> +
+> +	hdmi_phy->pll_rate = rate;
+
+In mtk_mt8173_hdmi_phy.c, mtk_hdmi_pll_round_rate adjust the
+parent_rate, so mt2701 need not to adjust?
+
+> +	return rate;
+> +}
+> +
+> +static unsigned long mtk_hdmi_pll_recalc_rate(struct clk_hw *hw,
+> +					      unsigned long parent_rate)
+> +{
+> +	struct mtk_hdmi_phy *hdmi_phy = to_mtk_hdmi_pll(hw);
+> +
+> +	return hdmi_phy->pll_rate;
+> +}
+> +
+> +static const struct clk_ops mtk_hdmi_phy_pll_ops = {
+> +	.enable = mtk_hdmi_pll_enable,
+> +	.disable = mtk_hdmi_pll_disable,
+
+Why mt2701 implement enable/disable, but mt8173 implement
+prepare/unprepare? I would like these two use the same method. If these
+two would be different, describe 'why' in commit message.
+
+> +	.set_rate = mtk_hdmi_pll_set_rate,
+> +	.round_rate = mtk_hdmi_pll_round_rate,
+> +	.recalc_rate = mtk_hdmi_pll_recalc_rate,
+> +};
+> +
+> +static void mtk_hdmi_phy_enable_tmds(struct mtk_hdmi_phy *hdmi_phy)
+> +{
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON7, RG_HTPLL_AUTOK_EN,
+> +			  RG_HTPLL_AUTOK_EN);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, 0, RG_HTPLL_RLH_EN);
+
+In mtk_mt8173_hdmi_phy.c, it define mtk_hdmi_phy_set_bits() and
+mtk_hdmi_phy_clear_bits(). I think we could reuse it to reduce the code
+size.
+
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, (0x3 << RG_HTPLL_POSDIV),
+> +			  RG_HTPLL_POSDIV_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_MBIAS,
+> +			  RG_HDMITX_EN_MBIAS);
+> +	usleep_range(80, 100);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, RG_HTPLL_EN, RG_HTPLL_EN);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_TX_CKLDO,
+> +			  RG_HDMITX_EN_TX_CKLDO);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, (0xf << RG_HDMITX_EN_SLDO),
+> +			  RG_HDMITX_EN_SLDO_MASK);
+> +	usleep_range(80, 100);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, RG_HDMITX_MBIAS_LPF_EN,
+> +			  RG_HDMITX_MBIAS_LPF_EN);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_TX_POSDIV,
+> +			  RG_HDMITX_EN_TX_POSDIV);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, (0xf << RG_HDMITX_EN_SER),
+> +			  RG_HDMITX_EN_SER_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, (0xf << RG_HDMITX_EN_PRED),
+> +			  RG_HDMITX_EN_PRED_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, (0xf << RG_HDMITX_EN_DRV),
+> +			  RG_HDMITX_EN_DRV_MASK);
+> +	usleep_range(80, 100);
+> +}
+> +
+> +static void mtk_hdmi_phy_disable_tmds(struct mtk_hdmi_phy *hdmi_phy)
+> +{
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, 0, RG_HDMITX_EN_DRV_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, 0, RG_HDMITX_EN_PRED_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, 0, RG_HDMITX_EN_SER_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, 0, RG_HDMITX_EN_TX_POSDIV);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, 0, RG_HDMITX_MBIAS_LPF_EN);
+> +	usleep_range(80, 100);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON0, 0, RG_HDMITX_EN_SLDO_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, 0, RG_HDMITX_EN_TX_CKLDO);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, 0, RG_HTPLL_EN);
+> +	usleep_range(80, 100);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON2, 0, RG_HDMITX_EN_MBIAS);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, 0, RG_HTPLL_POSDIV_MASK);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON6, 0, RG_HTPLL_RLH_EN);
+> +	mtk_hdmi_pll_mask(hdmi_phy, HDMI_CON7, 0, RG_HTPLL_AUTOK_EN);
+> +	usleep_range(80, 100);
+> +}
+> +
+> +static int mtk_hdmi_phy_power_on(struct phy *phy)
+> +{
+> +	struct mtk_hdmi_phy *hdmi_phy = phy_get_drvdata(phy);
+> +	int ret;
+> +
+> +	ret = clk_prepare_enable(hdmi_phy->pll);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	mtk_hdmi_phy_enable_tmds(hdmi_phy);
+> +
+> +	return 0;
+> +}
+> +
+> +static int mtk_hdmi_phy_power_off(struct phy *phy)
+> +{
+> +	struct mtk_hdmi_phy *hdmi_phy = phy_get_drvdata(phy);
+> +
+> +	mtk_hdmi_phy_disable_tmds(hdmi_phy);
+> +	clk_disable_unprepare(hdmi_phy->pll);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct phy_ops mtk_hdmi_phy_dev_ops = {
+> +	.power_on = mtk_hdmi_phy_power_on,
+> +	.power_off = mtk_hdmi_phy_power_off,
+> +	.owner = THIS_MODULE,
+> +};
 
 
-Regards
-Ley Foon
+mtk_hdmi_phy_power_on(), mtk_hdmi_phy_power_off(), mtk_hdmi_phy_dev_ops
+is the same as those in mtk_mt8173_hdmi_phy.c, so I think you should
+merge them to prevent duplicate code.
+
+Regards,
+CK
+
+> +
+> +struct mtk_hdmi_phy_conf mtk_hdmi_phy_2701_conf = {
+> +	.tz_enabled = false,
+> +	.hdmi_phy_clk_ops = &mtk_hdmi_phy_pll_ops,
+> +	.hdmi_phy_dev_ops = &mtk_hdmi_phy_dev_ops,
+> +};
+> +
+> +MODULE_AUTHOR("Chunhui Dai <chunhui.dai@mediatek.com>");
+> +MODULE_DESCRIPTION("MediaTek HDMI PHY Driver");
+> +MODULE_LICENSE("GPL v2");
