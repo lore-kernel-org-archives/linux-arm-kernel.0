@@ -1,53 +1,115 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 7 Sep 2018 15:31:26 +0200
-Subject: [linux-sunxi] Re: [PATCH v4 1/4] clk: sunxi-ng: Enable DE2_CCU
- for SUN8I and SUN50I
-In-Reply-To: <2955967.qdhifWMYUT@jernej-laptop>
-References: <20180904163609.10171-1-jagan@amarulasolutions.com>
- <20180905070335.dclhpxjld4vdkdu4@flea>
- <2955967.qdhifWMYUT@jernej-laptop>
-Message-ID: <20180907133125.ghks5cgk5u6vrhd6@flea>
+Date: Fri, 7 Sep 2018 15:37:39 +0200
+Subject: [PATCH 04/10] phy: dphy: Add configuration helpers
+In-Reply-To: <3617916.Vq2Smf1hnZ@avalon>
+References: <cover.ee6158898d563fcc01d45c9652501180bccff0f0.1536138624.git-series.maxime.ripard@bootlin.com>
+ <aa491b814100a670ad16b646765005efbdae05d9.1536138624.git-series.maxime.ripard@bootlin.com>
+ <3617916.Vq2Smf1hnZ@avalon>
+Message-ID: <20180907133739.6lvlw7wsdk4ffeua@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2018 at 07:10:06AM +0200, Jernej ?krabec wrote:
-> Dne sreda, 05. september 2018 ob 09:03:35 CEST je Maxime Ripard napisal(a):
-> > On Tue, Sep 04, 2018 at 10:06:06PM +0530, Jagan Teki wrote:
-> > > Allwinner SoC like SUN8I and SUN50I has DE2 CCU so enable them
-> > > as default.
-> > > 
-> > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > > ---
-> > > Changes for v4, v3:
-> > > - none
-> > > Changes for v2:
-> > > - Enable for MACH_SUN8I
-> > > 
-> > >  drivers/clk/sunxi-ng/Kconfig | 2 ++
-> > >  1 file changed, 2 insertions(+)
-> > > 
-> > > diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
-> > > index 826674d090fd..e20182aa9748 100644
-> > > --- a/drivers/clk/sunxi-ng/Kconfig
-> > > +++ b/drivers/clk/sunxi-ng/Kconfig
-> > > @@ -63,6 +63,8 @@ config SUN8I_V3S_CCU
-> > > 
-> > >  config SUN8I_DE2_CCU
-> > >  
-> > >  	bool "Support for the Allwinner SoCs DE2 CCU"
-> > > 
-> > > +	default MACH_SUN8I || (ARM64 && ARCH_SUNXI)
-> > > +	depends on DRM_SUN4I && (MACH_SUN8I || (ARM64 && ARCH_SUNXI))
-> > 
-> > I don't see why there's a dependency on the DRM driver. I'm pretty
-> > sure this would even break simplefb.
+On Wed, Sep 05, 2018 at 04:46:05PM +0300, Laurent Pinchart wrote:
+> Hi Maxime,
 > 
-> I think best approach would be that SUN8I_MIXER selects (or depends on?) this 
-> symbol, since it can't work if there is no DE2 CCU clock present.
+> Thank you for the patch.
+> 
+> On Wednesday, 5 September 2018 12:16:35 EEST Maxime Ripard wrote:
+> > The MIPI D-PHY spec defines default values and boundaries for most of the
+> > parameters it defines. Introduce helpers to help drivers get meaningful
+> > values based on their current parameters, and validate the boundaries of
+> > these parameters if needed.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> > ---
+> >  drivers/phy/Kconfig               |   8 ++-
+> >  drivers/phy/Makefile              |   1 +-
+> >  drivers/phy/phy-core-mipi-dphy.c  | 160 +++++++++++++++++++++++++++++++-
+> >  include/linux/phy/phy-mipi-dphy.h |   6 +-
+> >  4 files changed, 175 insertions(+)
+> >  create mode 100644 drivers/phy/phy-core-mipi-dphy.c
+> > 
+> > diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> > index 5c8d452e35e2..06bd22bd1f4a 100644
+> > --- a/drivers/phy/Kconfig
+> > +++ b/drivers/phy/Kconfig
+> > @@ -15,6 +15,14 @@ config GENERIC_PHY
+> >  	  phy users can obtain reference to the PHY. All the users of this
+> >  	  framework should select this config.
+> > 
+> > +config GENERIC_PHY_MIPI_DPHY
+> > +	bool "MIPI D-PHY support"
+> > +	help
+> > +	  Generic MIPI D-PHY support.
+> > +
+> > +	  Provides a number of helpers a core functions for MIPI D-PHY
+> > +	  drivers to us.
+> 
+> Do we really need to make this user-selectable ?
 
-This is a runtime dependency, not a build time one. We're not doing it
-for any other similar driver, so there's no reason to do it in this
-particular case.
+Probably not :)
+
+> >  config PHY_LPC18XX_USB_OTG
+> >  	tristate "NXP LPC18xx/43xx SoC USB OTG PHY driver"
+> >  	depends on OF && (ARCH_LPC18XX || COMPILE_TEST)
+> > diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+> > index 84e3bd9c5665..71c29d2b9af7 100644
+> > --- a/drivers/phy/Makefile
+> > +++ b/drivers/phy/Makefile
+> > @@ -4,6 +4,7 @@
+> >  #
+> > 
+> >  obj-$(CONFIG_GENERIC_PHY)		+= phy-core.o
+> > +obj-$(CONFIG_GENERIC_PHY_MIPI_DPHY)	+= phy-core-mipi-dphy.o
+> >  obj-$(CONFIG_PHY_LPC18XX_USB_OTG)	+= phy-lpc18xx-usb-otg.o
+> >  obj-$(CONFIG_PHY_XGENE)			+= phy-xgene.o
+> >  obj-$(CONFIG_PHY_PISTACHIO_USB)		+= phy-pistachio-usb.o
+> > diff --git a/drivers/phy/phy-core-mipi-dphy.c
+> > b/drivers/phy/phy-core-mipi-dphy.c new file mode 100644
+> > index 000000000000..6c1ddc7734a2
+> > --- /dev/null
+> > +++ b/drivers/phy/phy-core-mipi-dphy.c
+> > @@ -0,0 +1,160 @@
+> > +/* SPDX-License-Identifier: GPL-2.0 */
+> > +/*
+> > + * Copyright (C) 2013 NVIDIA Corporation
+> > + * Copyright (C) 2018 Cadence Design Systems Inc.
+> > + */
+> > +
+> > +#include <linux/errno.h>
+> > +#include <linux/export.h>
+> > +#include <linux/kernel.h>
+> > +#include <linux/time64.h>
+> > +
+> > +#include <linux/phy/phy.h>
+> > +#include <linux/phy/phy-mipi-dphy.h>
+> > +
+> > +/*
+> > + * Default D-PHY timings based on MIPI D-PHY specification. Derived from
+> > the
+> > + * valid ranges specified in Section 6.9, Table 14, Page 40 of the D-PHY
+> > + * specification (v1.2) with minor adjustments.
+> 
+> Could you list those adjustments ?
+
+I will. This was taken from the Tegra DSI driver, so I'm not sure what
+these are exactly, but that should be addressed.
+
+> > + */
+> > +int phy_mipi_dphy_get_default_config(unsigned long pixel_clock,
+> > +				     unsigned int bpp,
+> > +				     unsigned int lanes,
+> > +				     struct phy_configure_opts_mipi_dphy *cfg)
+> > +{
+> > +	unsigned long hs_clk_rate;
+> > +	unsigned long ui;
+> > +
+> > +	if (!cfg)
+> > +		return -EINVAL;
+> 
+> Should we really expect cfg to be NULL ?
+
+It avoids a kernel panic and it's not in a hot patch, so I'd say yes?
 
 Maxime
 
@@ -61,4 +123,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180907/abb38502/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180907/85bfed67/attachment.sig>
