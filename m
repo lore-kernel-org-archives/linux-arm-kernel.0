@@ -1,43 +1,30 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 7 Sep 2018 09:02:45 -0700
-Subject: [PATCH v2 2/4] crypto: skcipher - Enforce non-ASYNC for on-stack
- requests
-In-Reply-To: <20180907034242.zhm4dglzkldhvh3x@gondor.apana.org.au>
-References: <20180906225854.40989-1-keescook@chromium.org>
- <20180906225854.40989-3-keescook@chromium.org>
- <20180907034242.zhm4dglzkldhvh3x@gondor.apana.org.au>
-Message-ID: <CAGXu5jLx8bdr+Ld7QE1LxttPB-LOs-H96kyx0O0MXq9MzX2vNw@mail.gmail.com>
+From: aryabinin@virtuozzo.com (Andrey Ryabinin)
+Date: Fri, 7 Sep 2018 19:06:42 +0300
+Subject: [PATCH v6 16/18] khwasan, mm, arm64: tag non slab memory
+ allocated via pagealloc
+In-Reply-To: <db103bdc2109396af0c6007f1669ebbbb63b872b.1535462971.git.andreyknvl@google.com>
+References: <cover.1535462971.git.andreyknvl@google.com>
+ <db103bdc2109396af0c6007f1669ebbbb63b872b.1535462971.git.andreyknvl@google.com>
+Message-ID: <3f2dee71-1615-4a34-d611-3ccaf407551e@virtuozzo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 6, 2018 at 8:42 PM, Herbert Xu <herbert@gondor.apana.org.au> wrote:
-> On Thu, Sep 06, 2018 at 03:58:52PM -0700, Kees Cook wrote:
->>
->> @@ -437,6 +442,12 @@ static inline struct crypto_skcipher *crypto_skcipher_reqtfm_check(
->>  {
->>       struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
->>
->> +     if (req->__onstack) {
->> +             if (WARN_ON(crypto_skcipher_alg(tfm)->base.cra_flags &
->> +                             CRYPTO_ALG_ASYNC))
->> +                     return ERR_PTR(-EINVAL);
->> +     }
->
-> Sorry but I don't like imposing a run-time check on everybody when
-> stack-based requests are the odd ones out.  If we're going to make
-> this a run-time check (I'd much prefer a compile-time check, but I
-> understand that this may involve too much churn), then please do it
-> for stack-based request users only.
 
-I'll continue to investigate alternatives, but I wanted to point out
-that the struct change actually fills an existing padding byte (so no
-change in memory usage) and marking this as an unlikely() test means
-it wouldn't even be measurable due to the branch predictor (so no
-change in speed). encrypt/decrypt entry is a tiny tiny fraction of the
-actual work done during encryption/decryption, etc.
 
--Kees
+On 08/29/2018 02:35 PM, Andrey Konovalov wrote:
 
--- 
-Kees Cook
-Pixel Security
+>  void kasan_poison_slab(struct page *page)
+>  {
+> +	unsigned long i;
+> +
+> +	if (IS_ENABLED(CONFIG_SLAB))
+> +		page->s_mem = reset_tag(page->s_mem);
+
+Why reinitialize here, instead of single initialization in alloc_slabmgmt()?
+
+
+> +	for (i = 0; i < (1 << compound_order(page)); i++)
+> +		page_kasan_tag_reset(page + i);
+>  	kasan_poison_shadow(page_address(page),
+>  			PAGE_SIZE << compound_order(page),
+>  			KASAN_KMALLOC_REDZONE);
