@@ -1,52 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 7 Sep 2018 09:10:27 +0200
-Subject: [PATCH 1/6] drm/bridge: use bus flags in bridge timings
-In-Reply-To: <b1cb586397a4cd444c33dd83d72fa544@agner.ch>
-References: <20180905052113.21262-1-stefan@agner.ch>
- <4035252.QuWadVx7pr@avalon>
- <1569297.pdEFdpi3HS@avalon> <a00c1650b69ba85bed7ae39b81a0c40f@agner.ch>
- <CACRpkdbw0VjkHYcUpox+DorRG0oRdPARL4ShgPfV2eFaUF_w0g@mail.gmail.com>
- <b1cb586397a4cd444c33dd83d72fa544@agner.ch>
-Message-ID: <CACRpkdaUuWUHZgT0b64hMNZm3oy=7rece3H0p5VVe4d8jpFRaw@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 7 Sep 2018 09:21:05 +0200
+Subject: Timer on i.MX28 moving backwards
+In-Reply-To: <20180906213925.GU30658@n2100.armlinux.org.uk>
+References: <20180906200202.et4whmzq22n4uajt@pengutronix.de>
+ <20180906213925.GU30658@n2100.armlinux.org.uk>
+Message-ID: <20180907072105.m47r3rjf2dd3jlv6@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 6, 2018 at 10:25 PM Stefan Agner <stefan@agner.ch> wrote:
+On Thu, Sep 06, 2018 at 10:39:25PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Sep 06, 2018 at 10:02:02PM +0200, Uwe Kleine-K?nig wrote:
+> > +cycle_t mxs_clocksource_mmio_readl_down(struct clocksource *c)
+> > +{
+> > +	cycle_t ret = ~(cycle_t)readl_relaxed(to_mmio_clksrc(c)->reg) & c->mask;
+> > +	trace_printk("time = %llx\n", ret);
+> 
+> I think it may be worth re-running your test with:
+> 
+> 	u32 one, two;
+> 
+> 	one = readl_relaxed(to_mmio_clksrc(c)->reg);
+> 	two = readl_relaxed(to_mmio_clksrc(c)->reg);
+> 	trace_printk("time=0x%08x:0x%08x\n", one, two);
+> 
+> 	return ~(cycle_t)two & c->mask;
+> 
+> and compare the values not only between each call but also between
+> each read of the register.  It could be a synchronisation issue when
+> reading the timer register, in which case you may find just one read
+> is incorrect.
 
-> Ok, I read a bit up on the history of bridge timing, especially:
-> https://www.spinics.net/lists/dri-devel/msg155618.html
->
-> IMHO, this got overengineered. For displays we do not need all that
-> setup/sample delay timing information, and much longer cables are in
-> use. So why is all that needed for bridges?
+Good idea, this is a part of a trace I captured with this implemented:
 
-I also avoided the overhead of creating this abstraction initially.
+       mrp62439d-224   [000] d..h2..   790.936689: mxs_clocksource_mmio_readl_down: time = 0x948e3d1a:0x948e3d14
+       mrp62439d-224   [000] .......   790.936689: mxs_clocksource_mmio_readl_down: time = 0x948e4d26:0x948e4d20
+       mrp62439d-224   [000] .......   790.936904: mxs_clocksource_mmio_readl_down: time = 0x948e3690:0x948e368a
 
-But after doing it I have this Stockholm syndrome that I start
-liking what Laurent told me to do.
+hmm, I'm unsure what to think now.
 
-> For Linus case, the THS8134(A/B) data sheet I found (revised March 2010)
-> clearly states:
-> Clock input. A rising edge on CLK latches RPr0-7, GY0-7, BPb0-7.
->
-> So we need to drive on negative edge, hence DRM_BUS_FLAG_PIXDATA_NEGEDGE
-> should be used, which makes the pl111 driver setting TIM2_IPC:
-> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0121d/index.html
+Uwe
 
-That is easy to say, but if I just set that up in code, even with a good
-comment it is hard for the next reader to understand what is going
-on. The central question will be, why does PL111 need to do this
-but not R-Car though they are using the same bridge?
-
-So this elaborate model gives a better transfer of abstract concepts
-to whoever needs to touch that code next. The code is not just
-logic, but also our map of the world and the documentation of our
-problem space.
-
-Donald Knuth has this idea about literate programming which even
-turns the documentation/implementation process around. We are
-not there, not even remotely, but IMO the more complex the problem.
-the more we need to convey our thinking, not just our solution.
-
-Yours,
-Linus Walleij
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
