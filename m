@@ -1,22 +1,43 @@
 From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Fri,  7 Sep 2018 12:59:24 +1200
-Subject: [PATCH 0/2] ARM: dts: mvebu: marvell,prestera
-Message-ID: <20180907005926.27134-1-chris.packham@alliedtelesis.co.nz>
+Date: Fri,  7 Sep 2018 12:59:25 +1200
+Subject: [PATCH 1/2] dt-bindings: marvell,
+ prestera: Add common compatible string
+In-Reply-To: <20180907005926.27134-1-chris.packham@alliedtelesis.co.nz>
+References: <20180907005926.27134-1-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20180907005926.27134-2-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define a generic compatible string so that drivers don't need to deal with the
-specific variants.
+Add "marvell,prestera" as a compatible string so that drivers can be
+written to account for any prestera variant without needing to
+specialise to the more specific values.
 
-Chris Packham (2):
-  dt-bindings: marvell,prestera: Add common compatible string
-  ARM: dts: mvebu: add "marvell,prestera" to PP nodes
-
+Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+---
  Documentation/devicetree/bindings/net/marvell,prestera.txt | 4 ++--
- arch/arm/boot/dts/armada-xp-98dx3236.dtsi                  | 2 +-
- arch/arm/boot/dts/armada-xp-98dx3336.dtsi                  | 2 +-
- arch/arm/boot/dts/armada-xp-98dx4251.dtsi                  | 2 +-
- 4 files changed, 5 insertions(+), 5 deletions(-)
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/net/marvell,prestera.txt b/Documentation/devicetree/bindings/net/marvell,prestera.txt
+index c329608fa887..83370ebf5b89 100644
+--- a/Documentation/devicetree/bindings/net/marvell,prestera.txt
++++ b/Documentation/devicetree/bindings/net/marvell,prestera.txt
+@@ -2,7 +2,7 @@ Marvell Prestera Switch Chip bindings
+ -------------------------------------
+ 
+ Required properties:
+-- compatible: one of the following
++- compatible: must be "marvell,prestera" and one of the following
+ 	"marvell,prestera-98dx3236",
+ 	"marvell,prestera-98dx3336",
+ 	"marvell,prestera-98dx4251",
+@@ -21,7 +21,7 @@ switch {
+ 	ranges = <0 MBUS_ID(0x03, 0x00) 0 0x100000>;
+ 
+ 	packet-processor at 0 {
+-		compatible = "marvell,prestera-98dx3236";
++		compatible = "marvell,prestera-98dx3236", "marvell,prestera";
+ 		reg = <0 0x4000000>;
+ 		interrupts = <33>, <34>, <35>;
+ 		dfx = <&dfx>;
 -- 
 2.18.0
