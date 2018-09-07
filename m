@@ -1,28 +1,35 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 7 Sep 2018 10:21:03 +0200
-Subject: [PATCH] clk: sunxi-ng: sun4i: Set VCO and PLL bias current to
- lowest setting
-In-Reply-To: <20180906132537.20772-1-wens@csie.org>
-References: <20180906132537.20772-1-wens@csie.org>
-Message-ID: <20180907082103.lyuubyqpojehtkz4@flea>
+Date: Fri, 7 Sep 2018 10:21:22 +0200
+Subject: [PATCH v4 08/11] arm64: dts: allwinner: a64: Add display pipeline
+In-Reply-To: <CAMty3ZBo+X5o22i1=HR9d1VjkEWQ7=DHHPL9RLtbzbyzCZLyFw@mail.gmail.com>
+References: <20180904044053.15425-1-icenowy@aosc.io>
+ <20180904044053.15425-9-icenowy@aosc.io>
+ <20180905075056.tob7itg3judccooe@flea>
+ <CAMty3ZBo+X5o22i1=HR9d1VjkEWQ7=DHHPL9RLtbzbyzCZLyFw@mail.gmail.com>
+Message-ID: <20180907082122.bcylf2jpf6eq6dgq@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2018 at 09:25:37PM +0800, Chen-Yu Tsai wrote:
-> The default mid-level PLL bias current setting interferes with sigma
-> delta modulation. This manifests as decreased audio quality at lower
-> sampling rates, which sounds like radio broadcast quality, and
-> distortion noises at sampling rates at 48 kHz or above.
+On Fri, Sep 07, 2018 at 09:43:29AM +0530, Jagan Teki wrote:
+> On Wed, Sep 5, 2018 at 1:20 PM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> > On Tue, Sep 04, 2018 at 12:40:50PM +0800, Icenowy Zheng wrote:
+> >> +             hdmi_phy: hdmi-phy at 1ef0000 {
+> >> +                     compatible = "allwinner,sun8i-h3-hdmi-phy";
+> >> +                     reg = <0x01ef0000 0x10000>;
+> >> +                     clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI_DDC>,
+> >> +                              <&ccu 7>;
+> >> +                     clock-names = "bus", "mod", "pll-0";
+> >> +                     resets = <&ccu RST_BUS_HDMI0>;
+> >> +                     reset-names = "phy";
+> >> +                     #phy-cells = <0>;
+> >> +             };
+> >
+> > This needs to use the bindings we have for that phy.
 > 
-> Changing the bias current settings to the lowest gets rid of the
-> noise.
-> 
-> Fixes: de3448519194 ("clk: sunxi-ng: sun4i: Use sigma-delta modulation
-> 		      for audio PLL")
-> Cc: <stable@vger.kernel.org> # 4.15.x
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> You mean allwinner,sun50i-a64-hdmi-phy ?
 
-Applied, thanks!
+Yes
+
 Maxime
 
 -- 
@@ -35,4 +42,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180907/3af44284/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180907/c8e4f324/attachment.sig>
