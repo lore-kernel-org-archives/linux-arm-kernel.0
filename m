@@ -1,37 +1,55 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Fri, 7 Sep 2018 10:34:52 +0200
-Subject: [PATCH] arm64: add NUMA emulation support
-In-Reply-To: <c1b58f13-6190-20e9-7e4f-b8bc2b9d5f80@kernel.org>
-References: <20180824230559.32336-1-shuah@kernel.org>
- <20180828174011.GE20375@arm.com>
- <a58ad11f-3c22-ed7f-a0cd-938aabc4adaf@kernel.org>
- <20180829110802.GD10349@dhcp22.suse.cz>
- <f041ba95-03e6-4a7d-c324-870b45a2f648@kernel.org>
- <20180905064252.GW14951@dhcp22.suse.cz>
- <c1b58f13-6190-20e9-7e4f-b8bc2b9d5f80@kernel.org>
-Message-ID: <20180907083452.GC19621@dhcp22.suse.cz>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 7 Sep 2018 10:38:04 +0200
+Subject: Timer on i.MX28 moving backwards
+In-Reply-To: <20180907072105.m47r3rjf2dd3jlv6@pengutronix.de>
+References: <20180906200202.et4whmzq22n4uajt@pengutronix.de>
+ <20180906213925.GU30658@n2100.armlinux.org.uk>
+ <20180907072105.m47r3rjf2dd3jlv6@pengutronix.de>
+Message-ID: <20180907083804.yo65kinfwvm4esdz@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 06-09-18 15:53:34, Shuah Khan wrote:
-[...]
-> A few critical allocations could be satisfied and root cgroup prevails. It is not the
-> intent to have exclusivity at the expense of the kernel.
-
-Well, it is not "few critical allocations". It can be a lot of
-memory. Basically any GFP_KERNEL allocation. So how exactly you expect
-this to work when you cannot estimate how much
-memory will kernel eat?
-
+On Fri, Sep 07, 2018 at 09:21:05AM +0200, Uwe Kleine-K?nig wrote:
+> On Thu, Sep 06, 2018 at 10:39:25PM +0100, Russell King - ARM Linux wrote:
+> > On Thu, Sep 06, 2018 at 10:02:02PM +0200, Uwe Kleine-K?nig wrote:
+> > > +cycle_t mxs_clocksource_mmio_readl_down(struct clocksource *c)
+> > > +{
+> > > +	cycle_t ret = ~(cycle_t)readl_relaxed(to_mmio_clksrc(c)->reg) & c->mask;
+> > > +	trace_printk("time = %llx\n", ret);
+> > 
+> > I think it may be worth re-running your test with:
+> > 
+> > 	u32 one, two;
+> > 
+> > 	one = readl_relaxed(to_mmio_clksrc(c)->reg);
+> > 	two = readl_relaxed(to_mmio_clksrc(c)->reg);
+> > 	trace_printk("time=0x%08x:0x%08x\n", one, two);
+> > 
+> > 	return ~(cycle_t)two & c->mask;
+> > 
+> > and compare the values not only between each call but also between
+> > each read of the register.  It could be a synchronisation issue when
+> > reading the timer register, in which case you may find just one read
+> > is incorrect.
 > 
-> This feature will allow a way to configure cpusets on non-NUMA for workloads that can
-> benefit from the reservation and isolation that is available within the constraints of
-> exclusive cpuset policies.
+> Good idea, this is a part of a trace I captured with this implemented:
+> 
+>        mrp62439d-224   [000] d..h2..   790.936689: mxs_clocksource_mmio_readl_down: time = 0x948e3d1a:0x948e3d14
+>        mrp62439d-224   [000] .......   790.936689: mxs_clocksource_mmio_readl_down: time = 0x948e4d26:0x948e4d20
+>        mrp62439d-224   [000] .......   790.936904: mxs_clocksource_mmio_readl_down: time = 0x948e3690:0x948e368a
+> 
+> hmm, I'm unsure what to think now.
 
-AFAIR this was the first approach Google took for the memory isolation
-and they moved over to memory cgroups. I would recommend to talk to
-those guys bebfore you introduce potentially a lot of code that will not
-really work for the workload you indend it for.
+To clearify my (obviously too short) mail:
+
+Judging form a trace over 43s the two consecutive reads always correctly
+yield a decrementing counter as expected. But there is not always the
+expected monotonicity between consecutive calls to
+clocksource_mmio_readl_down.
+
+Best regards
+Uwe
+
 -- 
-Michal Hocko
-SUSE Labs
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
