@@ -1,43 +1,27 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Fri, 07 Sep 2018 13:11:27 +0900
-Subject: [PATCH 2/2] pci: dwc: add UniPhier PCIe host controller support
-In-Reply-To: <20180906140926.GB214747@bhelgaas-glaptop.roam.corp.google.com>
-References: <20180906103819.252A.4A936039@socionext.com>
- <20180906140926.GB214747@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20180907131126.FACD.4A936039@socionext.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Fri, 7 Sep 2018 09:43:29 +0530
+Subject: [PATCH v4 08/11] arm64: dts: allwinner: a64: Add display pipeline
+In-Reply-To: <20180905075056.tob7itg3judccooe@flea>
+References: <20180904044053.15425-1-icenowy@aosc.io>
+ <20180904044053.15425-9-icenowy@aosc.io>
+ <20180905075056.tob7itg3judccooe@flea>
+Message-ID: <CAMty3ZBo+X5o22i1=HR9d1VjkEWQ7=DHHPL9RLtbzbyzCZLyFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+On Wed, Sep 5, 2018 at 1:20 PM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> On Tue, Sep 04, 2018 at 12:40:50PM +0800, Icenowy Zheng wrote:
+>> +             hdmi_phy: hdmi-phy at 1ef0000 {
+>> +                     compatible = "allwinner,sun8i-h3-hdmi-phy";
+>> +                     reg = <0x01ef0000 0x10000>;
+>> +                     clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI_DDC>,
+>> +                              <&ccu 7>;
+>> +                     clock-names = "bus", "mod", "pll-0";
+>> +                     resets = <&ccu RST_BUS_HDMI0>;
+>> +                     reset-names = "phy";
+>> +                     #phy-cells = <0>;
+>> +             };
+>
+> This needs to use the bindings we have for that phy.
 
-On Thu, 6 Sep 2018 09:09:27 -0500 <helgaas@kernel.org> wrote:
-
-> On Thu, Sep 06, 2018 at 10:38:20AM +0900, Kunihiko Hayashi wrote:
-> > > > +++ b/drivers/pci/controller/dwc/pcie-uniphier.c
-> > > > @@ -0,0 +1,464 @@
-> > > > +// SPDX-License-Identifier: GPL-2.0
-> > > > +//
-> > > > +// PCI-express host controller driver for UniPhier SoCs
-> > > > +// Copyright 2018 Socionext Inc.
-> > > > +// Author: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> > > 
-> > > Use /* ... */ comments except for the SPDX line.
-> > 
-> > Okay, although I wondered which way to put, I'll replace the header next.
-> 
-> The easiest thing is to look at similar files already in the tree and
-> follow their style.  The details are here:
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/process/coding-style.rst#n540
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/process/license-rules.rst#n74
-
-Thanks for your advice.
-Although I've found both styles in some sub-systems, these are helpful for me.
-
-I replaced it in posted v2.
-
-Thank you,
-
----
-Best Regards,
-Kunihiko Hayashi
+You mean allwinner,sun50i-a64-hdmi-phy ?
