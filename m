@@ -1,45 +1,124 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri,  7 Sep 2018 12:19:47 +0800
-Subject: [PATCH v2 5/6] ARM: dts: sun7i: add pinmux setting for RGB888 output
- for LCD0
+Date: Fri,  7 Sep 2018 12:19:48 +0800
+Subject: [PATCH v2 6/6] [DO NOT MERGE] ARM: dts: sun7i: bananapi-m1-plus:
+ Enable Bananapi 7" 800x480 RGB LCD panel
 In-Reply-To: <20180907041948.19913-1-wens@csie.org>
 References: <20180907041948.19913-1-wens@csie.org>
-Message-ID: <20180907041948.19913-6-wens@csie.org>
+Message-ID: <20180907041948.19913-7-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the A20, as well as many other Allwinner SoCs, the PD pingroup has
-the LCD0 RGB output functions.
+The BPI-M1+ has an FPC connector for connecting an RGB (parallel) or
+LVDS LCD panel. One of the compatible panels is a 7" 800x480 RGB panel
+from Bananapi. The backlight can be controlled by driving a PWM signal
+from the SoC at different duty cycles. The LCD enable pin does not seem
+to do anything, but it is nevertheless included for completeness. There
+is also a FT5306 capacitive touchscreen controller.
 
-Add a pinmux setting for RGB888 output from LCD0, so boards and tablets
-with parallel RGB LCD panels may reference it.
+This should not be confused with the other 7" LCD that is LVDS based
+and has a resolution of 1024x600.
+
+This patch enables all of the above for the BPI-M1+.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun7i-a20.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ .../boot/dts/sun7i-a20-bananapi-m1-plus.dts   | 56 +++++++++++++++++++
+ 1 file changed, 56 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 9c52712af241..b2c56833b0e6 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -950,6 +950,17 @@
- 				pins = "PI20", "PI21";
- 				function = "uart7";
- 			};
-+
-+			lcd0_rgb888_pins: lcd0-rgb888-pins {
-+				pins = "PD0", "PD1", "PD2", "PD3", "PD4",
-+				       "PD5", "PD6", "PD7", "PD8", "PD9",
-+				       "PD10", "PD11", "PD12", "PD13",
-+				       "PD14", "PD15", "PD16", "PD17",
-+				       "PD18", "PD19", "PD20", "PD21",
-+				       "PD22", "PD23", "PD24", "PD25",
-+				       "PD26", "PD27";
-+				function = "lcd0";
-+			};
- 		};
+diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts b/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
+index 763cb03033c4..9fa58adade56 100644
+--- a/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
++++ b/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
+@@ -47,6 +47,7 @@
+ #include "sunxi-common-regulators.dtsi"
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/pwm/pwm.h>
  
- 		timer at 1c20c00 {
+ / {
+ 	model = "Banana Pi BPI-M1-Plus";
+@@ -71,6 +72,29 @@
+ 		};
+ 	};
+ 
++	lcd_backlight: lcd-backlight {
++		compatible = "pwm-backlight";
++		pwms = <&pwm 0 20000 PWM_POLARITY_INVERTED>; /* 50 kHz */
++		enable-gpios = <&pio 7 9 GPIO_ACTIVE_HIGH>; /* PH9 */
++		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
++		default-brightness-level = <8>;
++	};
++
++	lcd_panel: lcd-panel {
++		compatible = "bananapi,s070wv20-ct16", "simple-panel";
++		power-supply = <&reg_vcc5v0>; /* Actually driven from IPSOUT */
++		/* This doesn't do anything for this particular connector */
++		enable-gpios = <&pio 7 12 GPIO_ACTIVE_HIGH>; /* PH12 */
++
++		port {
++			backlight = <&lcd_backlight>;
++
++			lcd_panel_input: endpoint {
++				remote-endpoint = <&tcon0_out_lcd>;
++			};
++		};
++	};
++
+ 	leds {
+ 		compatible = "gpio-leds";
+ 		pinctrl-names = "default";
+@@ -173,6 +197,20 @@
+ 	status = "okay";
+ };
+ 
++&i2c3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c3_pins_a>;
++	status = "okay";
++
++	touchscreen at 38 {
++		compatible = "edt,edt-ft5306", "edt,edt-ft5x06";
++		reg = <0x38>;
++		interrupt-parent = <&pio>;
++		interrupts = <7 7 IRQ_TYPE_EDGE_FALLING>; /* PH7 */
++		reset-gpios = <&pio 7 8 GPIO_ACTIVE_LOW>; /* PH8 */
++	};
++};
++
+ &ir0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&ir0_rx_pins_a>;
+@@ -249,6 +287,12 @@
+ 	};
+ };
+ 
++&pwm {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pwm0_pins_a>;
++	status = "okay";
++};
++
+ &reg_dcdc2 {
+ 	regulator-always-on;
+ 	regulator-min-microvolt = <1000000>;
+@@ -278,6 +322,18 @@
+ 	status = "okay";
+ };
+ 
++&tcon0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&lcd0_rgb888_pins>;
++};
++
++&tcon0_out {
++	tcon0_out_lcd: endpoint at 0 {
++		reg = <0>;
++		remote-endpoint = <&lcd_panel_input>;
++	};
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
 -- 
 2.19.0.rc1
