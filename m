@@ -1,79 +1,140 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 7 Sep 2018 19:32:06 +0900
-Subject: [PATCH v2 6/9] kbuild: consolidate Devicetree dtb build rules
-In-Reply-To: <20180905235327.5996-7-robh@kernel.org>
-References: <20180905235327.5996-1-robh@kernel.org>
- <20180905235327.5996-7-robh@kernel.org>
-Message-ID: <CAK7LNARD+_kV=XtJ66mZBU-CPMQgWF+oQtv4bGKaGGARNwzXiQ@mail.gmail.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Fri,  7 Sep 2018 12:07:50 +0200
+Subject: [PATCH v2 16/16] nvmem: make the naming of arguments in
+ nvmem_cell_get() consistent
+In-Reply-To: <20180907100750.14564-1-brgl@bgdev.pl>
+References: <20180907100750.14564-1-brgl@bgdev.pl>
+Message-ID: <20180907100750.14564-17-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-09-06 8:53 GMT+09:00 Rob Herring <robh@kernel.org>:
-> There is nothing arch specific about building dtb files other than their
-> location under /arch/*/boot/dts/. Keeping each arch aligned is a pain.
-> The dependencies and supported targets are all slightly different.
-> Also, a cross-compiler for each arch is needed, but really the host
-> compiler preprocessor is perfectly fine for building dtbs. Move the
-> build rules to a common location and remove the arch specific ones. This
-> is done in a single step to avoid warnings about overriding rules.
->
-> The build dependencies had been a mixture of 'scripts' and/or 'prepare'.
-> These pull in several dependencies some of which need a target compiler
-> (specifically devicetable-offsets.h) and aren't needed to build dtbs.
-> All that is really needed is dtc, so adjust the dependencies to only be
-> dtc.
->
-> This change enables support 'dtbs_install' on some arches which were
-> missing the target.
->
-> Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
-> Cc: Michal Marek <michal.lkml@markovi.net>
-> Cc: Vineet Gupta <vgupta@synopsys.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
-> Cc: Michal Simek <monstr@monstr.eu>
-> Cc: Ralf Baechle <ralf@linux-mips.org>
-> Cc: Paul Burton <paul.burton@mips.com>
-> Cc: James Hogan <jhogan@kernel.org>
-> Cc: Ley Foon Tan <lftan@altera.com>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Paul Mackerras <paulus@samba.org>
-> Cc: Michael Ellerman <mpe@ellerman.id.au>
-> Cc: Chris Zankel <chris@zankel.net>
-> Cc: Max Filippov <jcmvbkbc@gmail.com>
-> Cc: linux-kbuild at vger.kernel.org
-> Cc: linux-snps-arc at lists.infradead.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: uclinux-h8-devel at lists.sourceforge.jp
-> Cc: linux-mips at linux-mips.org
-> Cc: nios2-dev at lists.rocketboards.org
-> Cc: linuxppc-dev at lists.ozlabs.org
-> Cc: linux-xtensa at linux-xtensa.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
-> Please ack so I can take the whole series via the DT tree.
->
-> v2:
->  - Fix $arch/boot/dts path check for out of tree builds
->  - Fix dtc dependency for building built-in dtbs
->  - Fix microblaze built-in dtb building
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
+The argument representing the cell name in the nvmem_cell_get() family
+of functions is not consistend between function prototypes and
+definitions. Name it 'id' in all those routines. This is in line with
+other frameworks and can represent both the DT cell name from the
+nvmem-cell-names property as well as the con_id field from cell
+lookup entries.
 
-This breaks parallel building
-because two threads could descend into scripts/dtc
-at the same time.
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+ drivers/nvmem/core.c           | 27 ++++++++++++++-------------
+ include/linux/nvmem-consumer.h | 12 ++++++------
+ 2 files changed, 20 insertions(+), 19 deletions(-)
 
-'all' depends on both 'scripts' and 'dtc'.
-
-* 'scripts' target -- descends into scripts/, then scripts/dtc
-* 'dtc' target     -- descents into scripts/dtc directly
-
-
-
-
-
+diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+index 320b3cc975a0..efcc41ba487d 100644
+--- a/drivers/nvmem/core.c
++++ b/drivers/nvmem/core.c
+@@ -873,16 +873,15 @@ EXPORT_SYMBOL_GPL(devm_nvmem_device_get);
+  * of_nvmem_cell_get() - Get a nvmem cell from given device node and cell id
+  *
+  * @np: Device tree node that uses the nvmem cell.
+- * @name: nvmem cell name from nvmem-cell-names property, or NULL
+- *	  for the cell at index 0 (the lone cell with no accompanying
+- *	  nvmem-cell-names property).
++ * @id: nvmem cell name from nvmem-cell-names property, or NULL
++ *      for the cell at index 0 (the lone cell with no accompanying
++ *      nvmem-cell-names property).
+  *
+  * Return: Will be an ERR_PTR() on error or a valid pointer
+  * to a struct nvmem_cell.  The nvmem_cell will be freed by the
+  * nvmem_cell_put().
+  */
+-struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+-					    const char *name)
++struct nvmem_cell *of_nvmem_cell_get(struct device_node *np, const char *id)
+ {
+ 	struct device_node *cell_np, *nvmem_np;
+ 	struct nvmem_device *nvmem;
+@@ -890,8 +889,8 @@ struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+ 	int index = 0;
+ 
+ 	/* if cell name exists, find index to the name */
+-	if (name)
+-		index = of_property_match_string(np, "nvmem-cell-names", name);
++	if (id)
++		index = of_property_match_string(np, "nvmem-cell-names", id);
+ 
+ 	cell_np = of_parse_phandle(np, "nvmem-cells", index);
+ 	if (!cell_np)
+@@ -959,22 +958,24 @@ nvmem_cell_get_from_lookup(struct device *dev, const char *con_id)
+  * nvmem_cell_get() - Get nvmem cell of device form a given cell name
+  *
+  * @dev: Device that requests the nvmem cell.
+- * @cell_id: nvmem cell name to get.
++ * @id: nvmem cell name to get (this corresponds with the name from the
++ *      nvmem-cell-names property for DT systems and with the con_id from
++ *      the lookup entry for non-DT systems).
+  *
+  * Return: Will be an ERR_PTR() on error or a valid pointer
+  * to a struct nvmem_cell.  The nvmem_cell will be freed by the
+  * nvmem_cell_put().
+  */
+-struct nvmem_cell *nvmem_cell_get(struct device *dev, const char *cell_id)
++struct nvmem_cell *nvmem_cell_get(struct device *dev, const char *id)
+ {
+ 	if (dev->of_node)
+-		return of_nvmem_cell_get(dev->of_node, cell_id);
++		return of_nvmem_cell_get(dev->of_node, id);
+ 
+-	/* Only allow empty cell_id for DT systems. */
+-	if (!cell_id)
++	/* Only allow empty cell id for DT systems. */
++	if (!id)
+ 		return ERR_PTR(-EINVAL);
+ 
+-	return nvmem_cell_get_from_lookup(dev, cell_id);
++	return nvmem_cell_get_from_lookup(dev, id);
+ }
+ EXPORT_SYMBOL_GPL(nvmem_cell_get);
+ 
+diff --git a/include/linux/nvmem-consumer.h b/include/linux/nvmem-consumer.h
+index 4c146379b9ba..31ff907c7fe7 100644
+--- a/include/linux/nvmem-consumer.h
++++ b/include/linux/nvmem-consumer.h
+@@ -27,8 +27,8 @@ enum {
+ #if IS_ENABLED(CONFIG_NVMEM)
+ 
+ /* Cell based interface */
+-struct nvmem_cell *nvmem_cell_get(struct device *dev, const char *name);
+-struct nvmem_cell *devm_nvmem_cell_get(struct device *dev, const char *name);
++struct nvmem_cell *nvmem_cell_get(struct device *dev, const char *id);
++struct nvmem_cell *devm_nvmem_cell_get(struct device *dev, const char *id);
+ void nvmem_cell_put(struct nvmem_cell *cell);
+ void devm_nvmem_cell_put(struct device *dev, struct nvmem_cell *cell);
+ void *nvmem_cell_read(struct nvmem_cell *cell, size_t *len);
+@@ -54,13 +54,13 @@ int nvmem_unregister_notifier(struct notifier_block *nb);
+ #else
+ 
+ static inline struct nvmem_cell *nvmem_cell_get(struct device *dev,
+-						const char *name)
++						const char *id)
+ {
+ 	return ERR_PTR(-ENOSYS);
+ }
+ 
+ static inline struct nvmem_cell *devm_nvmem_cell_get(struct device *dev,
+-				       const char *name)
++						     const char *id)
+ {
+ 	return ERR_PTR(-ENOSYS);
+ }
+@@ -145,12 +145,12 @@ static inline int nvmem_unregister_notifier(struct notifier_block *nb)
+ 
+ #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
+ struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+-				     const char *name);
++				     const char *id);
+ struct nvmem_device *of_nvmem_device_get(struct device_node *np,
+ 					 const char *name);
+ #else
+ static inline struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+-				     const char *name)
++						   const char *id)
+ {
+ 	return ERR_PTR(-ENOSYS);
+ }
 -- 
-Best Regards
-Masahiro Yamada
+2.18.0
