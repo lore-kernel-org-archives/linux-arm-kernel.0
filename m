@@ -1,38 +1,49 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 7 Sep 2018 13:23:31 +0200
-Subject: [PATCH v2 0/6] drm/sun4i: Support color dithering for LCD panels
-In-Reply-To: <20180907041948.19913-1-wens@csie.org>
-References: <20180907041948.19913-1-wens@csie.org>
-Message-ID: <20180907112331.wjml25rfkyabvwwt@flea>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 7 Sep 2018 13:26:30 +0200
+Subject: [PATCH] [v3] drm/sun4i: fix build failure with
+ CONFIG_DRM_SUN8I_MIXER=m
+In-Reply-To: <105cb1cf-577a-043a-9b50-248a37090bdd@nvidia.com>
+References: <20180711144403.1022829-1-arnd@arndb.de>
+ <105cb1cf-577a-043a-9b50-248a37090bdd@nvidia.com>
+Message-ID: <CAK8P3a1w0SrxFNRwjt1nWhQPdqgt=bZ8oqGaPE=z9iHp84R5mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2018 at 12:19:42PM +0800, Chen-Yu Tsai wrote:
-> 
-> Hi,
-> 
-> This is v2 of my sun4i-drm LCD color dithering series. v1 was from back
-> in April [1]. Most of the driver code is unchanged.
-> 
-> Changes since v1:
-> 
->   - Explicitly list properties from the simple-panel binding that apply
->     to the Bananapi 7" panel
-> 
->   - Moved an incorrectly squashed change from patch 3 to patch 1, where
->     it belongs
+On Fri, Sep 7, 2018 at 11:41 AM Jon Hunter <jonathanh@nvidia.com> wrote:
+>
+>
+> On 11/07/18 15:43, Arnd Bergmann wrote:
+> > Having DRM_SUN4I built-in but DRM_SUN8I_MIXER as a loadable module results in
+> > a link error, as we try to access a symbol from the sun8i_tcon_top.ko module:
+> >
+> > ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun8i-drm-hdmi.ko] undefined!
+> > ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun4i-drm.ko] undefined!
+> >
+> > This solves the problem by adding a silent symbol for the tcon_top module,
+> > building it as a separate module in exactly the cases that we need it,
+> > but in a way that it is reachable by the other modules.
+> >
+> > Fixes: 57e23de02f48 ("drm/sun4i: DW HDMI: Expand algorithm for possible crtcs")
+> > Fixes: ef0cf6441fbb ("drm/sun4i: Add support for traversing graph with TCON TOP")
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> I am seeing the following on today's -next (20180907) as well the last
+> few -next versions for that matter ...
+>
+> ERROR: "sun8i_tcon_top_de_config" [drivers/gpu/drm/sun4i/sun4i-tcon.ko] undefined!
+> ERROR: "sun8i_tcon_top_set_hdmi_src" [drivers/gpu/drm/sun4i/sun4i-tcon.ko] undefined!
+> ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun4i-tcon.ko] undefined!
+>
+> Seems like this issue has cropped up again as Arnd's fix is present. I
+> am seeing this on ARM64 builds.
 
-Applied the first three patches, thanks!
-Maxime
+I have not started build testing on linux-next since the merge window, but
+looking at the changes that got queued up, I find commits cf77d79b4e29
+("drm/sun4i: tcon: Add another way for matching mixers with tcon") and
+0305189afb32 ("drm/sun4i: tcon: Add support for R40 TCON") that both
+introduced a reference to the tcon_top file from sun4i_tcon.c.
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180907/fe10f9e0/attachment.sig>
+More IS_ENABLED(CONFIG_DRM_SUN8I_TCON_TOP) checks in
+the caller like I did in my patch would help, or alternatively one could
+decide to give up and just always include the TCON_TOP.
+
+      Arnd
