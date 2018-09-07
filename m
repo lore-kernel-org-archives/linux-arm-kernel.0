@@ -1,36 +1,141 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Fri, 7 Sep 2018 10:51:19 -0700
-Subject: [GIT PULL] arm64: fix for -rc3
-In-Reply-To: <20180907154516.GG12788@arm.com>
-References: <20180907154516.GG12788@arm.com>
-Message-ID: <CA+55aFw97E=pUTRejXDAVYbK90cgF=1R3MPxE3t9fDoKctOGNA@mail.gmail.com>
+From: christian.koenig@amd.com (=?UTF-8?Q?Christian_K=c3=b6nig?=)
+Date: Fri, 7 Sep 2018 20:02:54 +0200
+Subject: [PATCH v2 01/40] iommu: Introduce Shared Virtual Addressing API
+In-Reply-To: <65e7accd-4446-19f5-c667-c6407e89cfa6@arm.com>
+References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
+ <20180511190641.23008-2-jean-philippe.brucker@arm.com>
+ <bf42affd-e9d0-e4fc-6d28-f3c3f7795348@redhat.com>
+ <03d31ba5-1eda-ea86-8c0c-91d14c86fe83@arm.com>
+ <ed39159c-087e-7e56-7d29-d1de9fa1677f@amd.com>
+ <f0b317d5-e2e9-5478-952c-05e8b97bd68b@arm.com>
+ <2fd4a0a1-1a35-bf82-df84-b995cce011d9@amd.com>
+ <65e7accd-4446-19f5-c667-c6407e89cfa6@arm.com>
+Message-ID: <5bbc0332-b94b-75cc-ca42-a9b196811daf@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 7, 2018 at 8:45 AM Will Deacon <will.deacon@arm.com> wrote:
+Am 07.09.2018 um 17:45 schrieb Jean-Philippe Brucker:
+> On 07/09/2018 09:55, Christian K?nig wrote:
+>> I will take this as an opportunity to summarize some of the requirements
+>> we have for PASID management from the amdgpu driver point of view:
+> That's incredibly useful, thanks :)
 >
-> Just one small fix here, preventing a VM_WARN_ON when a !present PMD/PUD
-> is "freed" as part of a huge ioremap() operation. The correct behaviour
-> is to skip the free silently in this case, which is a little weird (the
-> function is a bit of a misnomer), but it follows the x86 implementation.
+>> 1. We need to be able to allocate PASID between 1 and some maximum. Zero
+>> is reserved as far as I know, but we don't necessary need a minimum.
+> Should be fine. The PASID range is restricted by the PCI PASID
+> capability, firmware description (for non-PCI devices), the IOMMU
+> capacity, and what the device driver passes to iommu_sva_device_init.
+> Not all IOMMUs reserve PASID 0 (AMD IOMMU without GIoSup doesn't, if I'm
+> not mistaken), so the KFD driver will need to pass min_pasid=1 to make
+> sure that 0 isn't allocated.
+>
+>> 2. We need to be able to allocate PASIDs without a process address space
+>> backing it. E.g. our hardware uses PASIDs even without Shared Virtual
+>> Addressing enabled to distinct clients from each other.
+>>   ??? ??? Would be a pity if we need to still have a separate PASID
+>> handling because the system wide is only available when IOMMU is turned on.
+> I'm still not sure about this one. From my point of view we shouldn't
+> add to the IOMMU subsystem helpers for devices without an IOMMU.
 
-Hmm. I've obviously pulled it, but it does strike me that maybe the
-confusing semantics could be fixed?
+I agree on that.
 
-There's only one call site, and only two implementations (x86 and arm64).
+> iommu-sva expects everywhere that the device has an iommu_domain, it's
+> the first thing we check on entry. Bypassing all of this would call
+> idr_alloc() directly, and wouldn't have any code in common with the
+> current iommu-sva. So it seems like you need a layer on top of iommu-sva
+> calling idr_alloc() when an IOMMU isn't present, but I don't think it
+> should be in drivers/iommu/
 
-Maybe the whole "read pmd, check for present" could just be in the
-caller, avoiding that oddity wrt name-vs-behavior.
+In this case I question if the PASID handling should be under 
+drivers/iommu at all.
 
-I'm not entirely sure why that code has that special case to begin
-with. I guess this is the only case of a kernel mapping of a hugepage,
-and people wanted to avoid polluting the generic code with stuff that
-was only relevant for architectures that implemented it? But we
-already have that ioremap_pmd_enabled() guard, so architectures that
-don't do this wouldn't actually have any extra code.
+See I can have a mix of VM context which are bound to processes (some 
+few) and VM contexts which are standalone and doesn't care for a process 
+address space. But for each VM context I need a distinct PASID for the 
+hardware to work.
 
-Anyway, I'll let it be, but I think it could be a good idea to simply
-change the semantics, and in the process also make it a lot clearer
-what that thing actually is expected to do.
+I can live if we say if IOMMU is completely disabled we use a simple ida 
+to allocate them, but when IOMMU is enabled I certainly need a way to 
+reserve a PASID without an associated process.
 
-                 Linus
+>> 3. Even after destruction of a process address space we need some grace
+>> period before a PASID is reused because it can be that the specific
+>> PASID is still in some hardware queues etc...
+>>   ??? ??? At bare minimum all device drivers using process binding need
+>> to explicitly note to the core when they are done with a PASID.
+> Right, much of the horribleness in iommu-sva deals with this:
+>
+> The process dies, iommu-sva is notified and calls the mm_exit() function
+> passed by the device driver to iommu_sva_device_init(). In mm_exit() the
+> device driver needs to clear any reference to the PASID in hardware and
+> in its own structures. When the device driver returns from mm_exit(), it
+> effectively tells the core that it has finished using the PASID, and
+> iommu-sva can reuse the PASID for another process. mm_exit() is allowed
+> to block, so the device driver has time to clean up and flush the queues.
+>
+> If the device driver finishes using the PASID before the process exits,
+> it just calls unbind().
+
+Exactly that's what Michal Hocko is probably going to not like at all.
+
+Can we have a different approach where each driver is informed by the 
+mm_exit(), but needs to explicitly call unbind() before a PASID is reused?
+
+During that teardown transition it would be ideal if that PASID only 
+points to a dummy root page directory with only invalid entries.
+
+>
+>> 4. It would be nice to have to be able to set a "void *" for each
+>> PASID/device combination while binding to a process which then can be
+>> queried later on based on the PASID.
+>>   ??? ??? E.g. when you have a per PASID/device structure around anyway,
+>> just add an extra field.
+> iommu_sva_bind_device() takes a "drvdata" pointer that is stored
+> internally for the PASID/device combination (iommu_bond). It is passed
+> to mm_exit(), but I haven't added anything for the device driver to
+> query it back.
+
+Nice! Looks like all we need additionally is a function to retrieve that 
+based on the PASID.
+
+>> 5. It would be nice to have to allocate multiple PASIDs for the same
+>> process address space.
+>>   ??? ??? E.g. some teams at AMD want to use a separate GPU address space
+>> for their userspace client library. I'm still trying to avoid that, but
+>> it is perfectly possible that we are going to need that.
+> Two PASIDs pointing to the same process pgd? At first glance it seems
+> feasible, maybe with a flag passed to bind() and a few changes to
+> internal structures. It will duplicate ATC invalidation commands for
+> each process address space change (munmap etc) so you might take a
+> performance hit.
+>
+> Intel's SVM code has the SVM_FLAG_PRIVATE_PASID which seems similar to
+> what you describe, but I don't plan to support it in this series (the
+> io_mm model is already pretty complicated). I think it can be added
+> without too much effort in a future series, though with a different flag
+> name since we'd like to use "private PASID" for something else
+> (https://www.spinics.net/lists/dri-devel/msg177007.html).
+
+To be honest I hoped that you would say: No never! So that I have a good 
+argument to pushback on such requirements :)
+
+But if it's doable it would be at least nice to have for debugging.
+
+Thanks a lot for working on that,
+Christian.
+
+>
+> Thanks,
+> Jean
+>
+>>   ??? ??? Additional to that it is sometimes quite useful for debugging
+>> to isolate where exactly an incorrect access (segfault) is coming from.
+>>
+>> Let me know if there are some problems with that, especially I want to
+>> know if there is pushback on #5 so that I can forward that :)
+>>
+>> Thanks,
+>> Christian.
+>>
+>>> Thanks,
+>>> Jean
