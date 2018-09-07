@@ -1,46 +1,88 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 7 Sep 2018 18:41:40 +0100
-Subject: [REGRESSION] Commit 5745392e0c2b ("PCI: Apply the new generic I/O
- management on PCI IO hosts") breaks PCI for legacy virtio devices with
- kvmtool on arm64
-Message-ID: <20180907174140.GI12788@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 7 Sep 2018 18:47:24 +0100
+Subject: [PATCH] arm64: mm: always enable CONFIG_HOLES_IN_ZONE
+In-Reply-To: <20180903194731.GE14951@dhcp22.suse.cz>
+References: <20180830150532.22745-1-james.morse@arm.com>
+ <20180903194731.GE14951@dhcp22.suse.cz>
+Message-ID: <1310a17b-214a-b840-d87b-42b799b623d2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi Michal,
 
-I'm seeing a regression in Linux guests since 4.17 under kvmtool, where
-legacy virtio devices using the PCI transport fail to probe. Legacy virtio
-PCI devices must be accessed via "I/O space" (e.g. BAR0, which is
-IORESOURCE_IO) and kvmtool assigns this to the guest physical range
-0x0 - 0x10000.
+On 03/09/18 20:47, Michal Hocko wrote:
+> On Thu 30-08-18 16:05:32, James Morse wrote:
+>> Commit 6d526ee26ccd ("arm64: mm: enable CONFIG_HOLES_IN_ZONE for NUMA")
+>> only enabled HOLES_IN_ZONE for NUMA systems because the NUMA code was
+>> choking on the missing zone for nomap pages. This problem doesn't just
+>> apply to NUMA systems.
+>>
+>> If the architecture doesn't set HAVE_ARCH_PFN_VALID, pfn_valid() will
+>> return true if the pfn is part of a valid sparsemem section.
+>>
+>> When working with multiple pages, the mm code uses pfn_valid_within()
+>> to test each page it uses within the sparsemem section is valid. On
+>> most systems memory comes in MAX_ORDER_NR_PAGES chunks which all
+>> have valid/initialised struct pages. In this case pfn_valid_within()
+>> is optimised out.
+>>
+>> Systems where this isn't true (e.g. due to nomap) should set
+>> HOLES_IN_ZONE and provide HAVE_ARCH_PFN_VALID so that mm tests each
+>> page as it works with it.
+>>
+>> Currently non-NUMA arm64 systems can't enable HOLES_IN_ZONE, leading to
+>> VM_BUG_ON()
 
-On arm64, when the virtio legacy PCI driver calls pci_iomap() for this BAR,
-it expands to ioport_map():
+[...]
 
-  static inline void __iomem *ioport_map(unsigned long port, unsigned int nr)
-  {
-  	return PCI_IOBASE + (port & MMIO_UPPER_LIMIT);
-  }
+>> Remove the NUMA dependency.
+>>
+>> Reported-by: Mikulas Patocka <mpatocka@redhat.com>
+>> Link: https://www.spinics.net/lists/arm-kernel/msg671851.html
+>> Fixes: 6d526ee26ccd ("arm64: mm: enable CONFIG_HOLES_IN_ZONE for NUMA")
+>> CC: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> Signed-off-by: James Morse <james.morse@arm.com>
+> 
+> OK. I guess you are also going to post a patch to drop
+> ARCH_HAS_HOLES_MEMORYMODEL, right?
 
-Since the indirect PIO changes, MMIO_UPPER_LIMIT is defined as:
+Yes:
+https://marc.info/?l=linux-arm-kernel&m=153572884121769&w=2
 
-  /*
-   * We reserve 0x4000 bytes for Indirect IO as so far this library is only
-   * used by the HiSilicon LPC Host. If needed, we can reserve a wider IO
-   * area by redefining the macro below.
-   */
-  #define PIO_INDIRECT_SIZE 0x4000
-  #define MMIO_UPPER_LIMIT (IO_SPACE_LIMIT - PIO_INDIRECT_SIZE)
+After all this I'm suspicious about arm64's support for FLATMEM given we always
+set HAVE_ARCH_PFN_VALID.
 
-which corrupts the BAR address. For example, kvmtool has the BAR pointing
-at 0x6200 on my system, but pci_iomap() actually maps offset 0x2200.
-Changing PIO_INDIRECT_SIZE to 0 gets things working again.
 
-Since this stuff doesn't revert nicely, I'm not sure how to proceed. Any
-thoughts? Generally, having a per-platform magic constant hardcoded in
-the PCI mapping code makes me feel slightly ill...
+> Anyway
+> Acked-by: Michal Hocko <mhocko@suse.com>
 
-Cheers,
+Thanks!
 
-Will
+
+> I wish we could simplify the pfn validation code a bit. I find
+> pfn_valid_within quite confusing and I would bet it is not used
+> consistently.
+
+> This will require a non trivial audit. I am wondering
+> whether we really need to make the code more complicated rather than
+> simply establish a contract that we always have a pageblock worth of
+> struct pages always available. Even when there is no physical memory
+> backing it. Such a page can be reserved and never used by the page
+> allocator. pfn walkers should back off for reserved pages already.
+
+Is PG_Reserved really where this stops?
+Going through the mail archive it looks like whenever this crops up on arm64 the
+issues are with nomap pages needing a 'correct' node or zone,  where-as we would
+prefer it if linux knew nothing about them.
+
+
+Thanks,
+
+James
+
+
+pages needing a node came up here:
+https://www.spinics.net/lists/arm-kernel/msg535191.html
+
+and flags such as PG_Reserved on nomap pages made Ard slightly uneasy here:
+https://lkml.org/lkml/2016/12/5/388
