@@ -1,46 +1,37 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Fri, 7 Sep 2018 10:18:51 +0200
-Subject: [PATCH] ARM: dts: at91: sama5d2_ptc_ek: fix nand pinctrl
-Message-ID: <20180907081851.15911-1-ludovic.desroches@microchip.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Fri, 7 Sep 2018 10:34:52 +0200
+Subject: [PATCH] arm64: add NUMA emulation support
+In-Reply-To: <c1b58f13-6190-20e9-7e4f-b8bc2b9d5f80@kernel.org>
+References: <20180824230559.32336-1-shuah@kernel.org>
+ <20180828174011.GE20375@arm.com>
+ <a58ad11f-3c22-ed7f-a0cd-938aabc4adaf@kernel.org>
+ <20180829110802.GD10349@dhcp22.suse.cz>
+ <f041ba95-03e6-4a7d-c324-870b45a2f648@kernel.org>
+ <20180905064252.GW14951@dhcp22.suse.cz>
+ <c1b58f13-6190-20e9-7e4f-b8bc2b9d5f80@kernel.org>
+Message-ID: <20180907083452.GC19621@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The drive strength has to be set to medium otherwise some data
-corruption may happen.
+On Thu 06-09-18 15:53:34, Shuah Khan wrote:
+[...]
+> A few critical allocations could be satisfied and root cgroup prevails. It is not the
+> intent to have exclusivity at the expense of the kernel.
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
----
+Well, it is not "few critical allocations". It can be a lot of
+memory. Basically any GFP_KERNEL allocation. So how exactly you expect
+this to work when you cannot estimate how much
+memory will kernel eat?
 
-Hi,
+> 
+> This feature will allow a way to configure cpusets on non-NUMA for workloads that can
+> benefit from the reservation and isolation that is available within the constraints of
+> exclusive cpuset policies.
 
-This fix depends on the support of the drive-strength for the atmel pio4
-pinctroller. It has been added in v4.19 but I omitted to send it at the
-same time.
-
-Ludovic
-
- arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts b/arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts
-index b10dccd0958f..3b1baa8605a7 100644
---- a/arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts
-+++ b/arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts
-@@ -11,6 +11,7 @@
- #include "sama5d2-pinfunc.h"
- #include <dt-bindings/mfd/atmel-flexcom.h>
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/at91.h>
- 
- / {
- 	model = "Atmel SAMA5D2 PTC EK";
-@@ -299,6 +300,7 @@
- 							 <PIN_PA30__NWE_NANDWE>,
- 							 <PIN_PB2__NRD_NANDOE>;
- 						bias-pull-up;
-+						atmel,drive-strength = <ATMEL_PIO_DRVSTR_ME>;
- 					};
- 
- 					ale_cle_rdy_cs {
+AFAIR this was the first approach Google took for the memory isolation
+and they moved over to memory cgroups. I would recommend to talk to
+those guys bebfore you introduce potentially a lot of code that will not
+really work for the workload you indend it for.
 -- 
-2.12.2
+Michal Hocko
+SUSE Labs
