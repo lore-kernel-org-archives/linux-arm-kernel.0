@@ -1,48 +1,57 @@
 From: oss@buserror.net (Scott Wood)
-Date: Fri, 07 Sep 2018 15:22:48 -0500
-Subject: [PATCH 2/3] Documentation: dt: binding: fsl: update property
- description for RCPM
-In-Reply-To: <20180831035219.31619-2-ran.wang_1@nxp.com>
+Date: Fri, 07 Sep 2018 15:35:08 -0500
+Subject: [PATCH 1/3] soc: fsl: add Platform PM driver QorIQ platforms
+In-Reply-To: <20180831035219.31619-1-ran.wang_1@nxp.com>
 References: <20180831035219.31619-1-ran.wang_1@nxp.com>
- <20180831035219.31619-2-ran.wang_1@nxp.com>
-Message-ID: <c19f11e200258297dbe5a61392a4bbc1e937d7c3.camel@buserror.net>
+Message-ID: <cad8c585fb415959e7ade8b500278c2c5e070873.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, 2018-08-31 at 11:52 +0800, Ran Wang wrote:
-> +Optional properties:
-> + - big-endian : Indicate RCPM registers is big-endian. A RCPM node
-> +   that doesn't have this property will be regarded as little-endian.
+> This driver is to provide a independent framework for PM service
+> provider and consumer to configure system level wake up feature. For
+> example, RCPM driver could register a callback function on this
+> platform first, and Flex timer driver who want to enable timer wake
+> up feature, will call generic API provided by this platform driver,
+> and then it will trigger RCPM driver to do it. The benefit is to
+> isolate the user and service, such as flex timer driver will not have
+> to know the implement details of wakeup function it require. Besides,
+> it is also easy for service side to upgrade its logic when design is
+> changed and remain user side unchanged.
+> 
+> Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
+> ---
+>  drivers/soc/fsl/Kconfig   |   14 +++++
+>  drivers/soc/fsl/Makefile  |    1 +
+>  drivers/soc/fsl/plat_pm.c |  144
+> +++++++++++++++++++++++++++++++++++++++++++++
+>  include/soc/fsl/plat_pm.h |   22 +++++++
+>  4 files changed, 181 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/soc/fsl/plat_pm.c
+>  create mode 100644 include/soc/fsl/plat_pm.h
+> 
+> diff --git a/drivers/soc/fsl/Kconfig b/drivers/soc/fsl/Kconfig
+> index 7a9fb9b..6517412 100644
+> --- a/drivers/soc/fsl/Kconfig
+> +++ b/drivers/soc/fsl/Kconfig
+> @@ -16,3 +16,17 @@ config FSL_GUTS
+>  	  Initially only reading SVR and registering soc device are
+> supported.
+>  	  Other guts accesses, such as reading RCW, should eventually be
+> moved
+>  	  into this driver as well.
++
+> +config FSL_PLAT_PM
+> +	bool "Freescale platform PM framework"
 
-You've just broken all the existing powerpc device trees that are big-endian
-and have no big-endian property.
+This name seems to be simultaneously too generic (for something that is likely
+intended only for use with certain Freescale/NXP chip families) and too
+specific (for something that seems to be general infrastructure with no real
+hardware dependencies).
 
-> + - <property 'compatible' string of consumer device> : This string
-> +   is referred by RCPM driver to judge if the consumer (such as flex timer)
-> +   is able to be regards as wakeup source or not, such as 'fsl,ls1012a-
-> ftm'.
-> +   Further, this property will carry the bit mask info to control
-> +   coresponding wake up source.
+What specific problems with Linux's generic wakeup infrastructure is this
+trying to solve, and why would those problems not be better solved there?
 
-What will you do if there are multiple instances of a device with the same
-compatible, and different wakeup bits?  Plus, it's an awkward design in
-general, and you don't describe what the value actually means (bits in which
-register?).  What was wrong with the existing binding?  Alternatively, use the
-clock bindings.
-
-> -
-> -Example:
-> -	lpuart0: serial at 2950000 {
-> -		compatible = "fsl,ls1021a-lpuart";
-> -		reg = <0x0 0x2950000 0x0 0x1000>;
-> -		interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
-> -		clocks = <&sysclk>;
-> -		clock-names = "ipg";
-> -		fsl,rcpm-wakeup = <&rcpm 0x0 0x40000000>;
-> +		big-endian;
-> +		fsl,ls1012a-ftm = <0x20000>;
-> +		fsl,pfe = <0xf0000020>;
-
-fsl,pfe is not documented.
+Also, you should CC linux-pm on these patches.
 
 -Scott
