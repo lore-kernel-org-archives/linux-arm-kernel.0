@@ -1,63 +1,79 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri,  7 Sep 2018 12:07:48 +0200
-Subject: [PATCH v2 14/16] Documentation: nvmem: document cell tables and
- lookup entries
-In-Reply-To: <20180907100750.14564-1-brgl@bgdev.pl>
-References: <20180907100750.14564-1-brgl@bgdev.pl>
-Message-ID: <20180907100750.14564-15-brgl@bgdev.pl>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 7 Sep 2018 19:32:06 +0900
+Subject: [PATCH v2 6/9] kbuild: consolidate Devicetree dtb build rules
+In-Reply-To: <20180905235327.5996-7-robh@kernel.org>
+References: <20180905235327.5996-1-robh@kernel.org>
+ <20180905235327.5996-7-robh@kernel.org>
+Message-ID: <CAK7LNARD+_kV=XtJ66mZBU-CPMQgWF+oQtv4bGKaGGARNwzXiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+2018-09-06 8:53 GMT+09:00 Rob Herring <robh@kernel.org>:
+> There is nothing arch specific about building dtb files other than their
+> location under /arch/*/boot/dts/. Keeping each arch aligned is a pain.
+> The dependencies and supported targets are all slightly different.
+> Also, a cross-compiler for each arch is needed, but really the host
+> compiler preprocessor is perfectly fine for building dtbs. Move the
+> build rules to a common location and remove the arch specific ones. This
+> is done in a single step to avoid warnings about overriding rules.
+>
+> The build dependencies had been a mixture of 'scripts' and/or 'prepare'.
+> These pull in several dependencies some of which need a target compiler
+> (specifically devicetable-offsets.h) and aren't needed to build dtbs.
+> All that is really needed is dtc, so adjust the dependencies to only be
+> dtc.
+>
+> This change enables support 'dtbs_install' on some arches which were
+> missing the target.
+>
+> Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Cc: Michal Marek <michal.lkml@markovi.net>
+> Cc: Vineet Gupta <vgupta@synopsys.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
+> Cc: Michal Simek <monstr@monstr.eu>
+> Cc: Ralf Baechle <ralf@linux-mips.org>
+> Cc: Paul Burton <paul.burton@mips.com>
+> Cc: James Hogan <jhogan@kernel.org>
+> Cc: Ley Foon Tan <lftan@altera.com>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Paul Mackerras <paulus@samba.org>
+> Cc: Michael Ellerman <mpe@ellerman.id.au>
+> Cc: Chris Zankel <chris@zankel.net>
+> Cc: Max Filippov <jcmvbkbc@gmail.com>
+> Cc: linux-kbuild at vger.kernel.org
+> Cc: linux-snps-arc at lists.infradead.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: uclinux-h8-devel at lists.sourceforge.jp
+> Cc: linux-mips at linux-mips.org
+> Cc: nios2-dev at lists.rocketboards.org
+> Cc: linuxppc-dev at lists.ozlabs.org
+> Cc: linux-xtensa at linux-xtensa.org
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> ---
+> Please ack so I can take the whole series via the DT tree.
+>
+> v2:
+>  - Fix $arch/boot/dts path check for out of tree builds
+>  - Fix dtc dependency for building built-in dtbs
+>  - Fix microblaze built-in dtb building
 
-Document the new nvmem kernel APIs.
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- Documentation/nvmem/nvmem.txt | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+This breaks parallel building
+because two threads could descend into scripts/dtc
+at the same time.
 
-diff --git a/Documentation/nvmem/nvmem.txt b/Documentation/nvmem/nvmem.txt
-index 8d8d8f58f96f..fc2fe4b18655 100644
---- a/Documentation/nvmem/nvmem.txt
-+++ b/Documentation/nvmem/nvmem.txt
-@@ -58,6 +58,37 @@ static int qfprom_probe(struct platform_device *pdev)
- It is mandatory that the NVMEM provider has a regmap associated with its
- struct device. Failure to do would return error code from nvmem_register().
- 
-+Users of board files can define and register nvmem cells using the
-+nvmem_cell_table struct:
-+
-+static struct nvmem_cell_info foo_nvmem_cells[] = {
-+	{
-+		.name		= "macaddr",
-+		.offset		= 0x7f00,
-+		.bytes		= ETH_ALEN,
-+	}
-+};
-+
-+static struct nvmem_cell_table foo_nvmem_cell_table = {
-+	.nvmem_name		= "i2c-eeprom",
-+	.cells			= foo_nvmem_cells,
-+	.ncells			= ARRAY_SIZE(foo_nvmem_cells),
-+};
-+
-+nvmem_add_cell_table(&foo_nvmem_cell_table);
-+
-+Additionally it is possible to create nvmem cell lookup entries and register
-+them with the nvmem framework from machine code as shown in the example below:
-+
-+static struct nvmem_cell_lookup foo_nvmem_lookup = {
-+	.nvmem_name		= "i2c-eeprom",
-+	.cell_name		= "macaddr",
-+	.dev_id			= "foo_mac.0",
-+	.con_id			= "mac-address",
-+};
-+
-+nvmem_add_cell_lookups(&foo_nvmem_lookup, 1);
-+
- NVMEM Consumers
- +++++++++++++++
- 
+'all' depends on both 'scripts' and 'dtc'.
+
+* 'scripts' target -- descends into scripts/, then scripts/dtc
+* 'dtc' target     -- descents into scripts/dtc directly
+
+
+
+
+
 -- 
-2.18.0
+Best Regards
+Masahiro Yamada
