@@ -1,116 +1,104 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri,  7 Sep 2018 17:00:40 +0900
-Subject: [PATCH v14 16/16] arm64: kexec_file: add kaslr support
-In-Reply-To: <20180907080040.4967-1-takahiro.akashi@linaro.org>
-References: <20180907080040.4967-1-takahiro.akashi@linaro.org>
-Message-ID: <20180907080040.4967-11-takahiro.akashi@linaro.org>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Fri, 7 Sep 2018 17:05:01 +0900
+Subject: [PATCH v8 4/8] media: platform: Add Cedrus VPU decoder driver
+In-Reply-To: <7a2167a3-5b61-0937-7f06-8b36fa12e7a0@xs4all.nl>
+References: <20180828073424.30247-1-paul.kocialkowski@bootlin.com>
+ <20180828073424.30247-5-paul.kocialkowski@bootlin.com>
+ <5faf5eed-eb2c-f804-93e3-5a42f6204d99@xs4all.nl>
+ <b7b3cb2320978d45acb34475d15abd7bf03da367.camel@paulk.fr>
+ <461c6a0d-a346-b9da-b75e-4aab907054df@xs4all.nl>
+ <CAAFQd5Cmc7uFhprsoTU6Gq19n3z2eiUfZZ2ZjDW4QWVWMDN6tg@mail.gmail.com>
+ <7a2167a3-5b61-0937-7f06-8b36fa12e7a0@xs4all.nl>
+Message-ID: <CAAFQd5A1NFBE8x8h-CYrusmqR5sJzhQdgyrhU5oVbPR22vu6wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding "kaslr-seed" to dtb enables triggering kaslr, or kernel virtual
-address randomization, at secondary kernel boot. We always do this as
-it will have no harm on kaslr-incapable kernel.
+On Thu, Sep 6, 2018 at 4:39 PM Hans Verkuil <hverkuil@xs4all.nl> wrote:
+>
+> On 09/06/2018 09:25 AM, Tomasz Figa wrote:
+> > On Thu, Sep 6, 2018 at 4:01 PM Hans Verkuil <hverkuil@xs4all.nl> wrote:
+> >>
+> >> On 09/05/2018 06:29 PM, Paul Kocialkowski wrote:
+> >>> Hi and thanks for the review!
+> >>>
+> >>> Le lundi 03 septembre 2018 ? 11:11 +0200, Hans Verkuil a ?crit :
+> >>>> On 08/28/2018 09:34 AM, Paul Kocialkowski wrote:
+> >>>>> +static int cedrus_request_validate(struct media_request *req)
+> >>>>> +{
+> >>>>> +   struct media_request_object *obj, *obj_safe;
+> >>>>> +   struct v4l2_ctrl_handler *parent_hdl, *hdl;
+> >>>>> +   struct cedrus_ctx *ctx = NULL;
+> >>>>> +   struct v4l2_ctrl *ctrl_test;
+> >>>>> +   unsigned int i;
+> >>>>> +
+> >>>>> +   list_for_each_entry_safe(obj, obj_safe, &req->objects, list) {
+> >>>>
+> >>>> You don't need to use the _safe variant during validation.
+> >>>
+> >>> Okay, I'll use the regular one then.
+> >>>
+> >>>>> +           struct vb2_buffer *vb;
+> >>>>> +
+> >>>>> +           if (vb2_request_object_is_buffer(obj)) {
+> >>>>> +                   vb = container_of(obj, struct vb2_buffer, req_obj);
+> >>>>> +                   ctx = vb2_get_drv_priv(vb->vb2_queue);
+> >>>>> +
+> >>>>> +                   break;
+> >>>>> +           }
+> >>>>> +   }
+> >>>>
+> >>>> Interesting question: what happens if more than one buffer is queued in the
+> >>>> request? This is allowed by the request API and in that case the associated
+> >>>> controls in the request apply to all queued buffers.
+> >>>>
+> >>>> Would this make sense at all for this driver? If not, then you need to
+> >>>> check here if there is more than one buffer in the request and document in
+> >>>> the spec that this is not allowed.
+> >>>
+> >>> Well, our driver was written with the (unformal) assumption that we
+> >>> only deal with a pair of one output and one capture buffer. So I will
+> >>> add a check for this at request validation time and document it in the
+> >>> spec. Should that be part of the MPEG-2 PIXFMT documentation (and
+> >>> duplicated for future formats we add support for)?
+> >>
+> >> Can you make a patch for vb2_request_has_buffers() in videobuf2-core.c
+> >> renaming it to vb2_request_buffer_cnt() and returning the number of buffers
+> >> in the request?
+> >>
+> >> Then you can call it here to check that you have only one buffer.
+> >>
+> >> And this has to be documented with the PIXFMT.
+> >>
+> >> Multiple buffers are certainly possible in non-codec scenarios (vim2m and
+> >> vivid happily accept that), so this is an exception that should be
+> >> documented and checked in the codec driver.
+> >
+> > Hmm, isn't it still 1 buffer per 1 queue and just multiple queues
+> > included in the request?
+>
+> No. The request API allows multiple buffers for the same vb2_queue to be
+> queued for the same request (obviously when the request is committed, the
+> buffers are queued to the driver in the same order).
+>
+> >
+> > If we indeed allow multiple buffers for the same queue in a request,
+> > we shouldn't restrict this on a per-driver basis. It's definitely not
+> > a hardware limitation, since the driver could just do the same as if 2
+> > requests with the same controls were given.
+>
+> That's how it operates: for all buffers in the request the same controls
+> apply. But does this make sense for codecs? If the control(s) with the
+> codec metadata always change for every buffer, then having more than one
+> buffer in the request is senseless and the driver should check for this
+> in the validation step.
+>
+> If it *does* make sense in some circumstances to have the same metadata
+> for multiple buffers, then it should be checked if the cedrus driver
+> handles this correctly.
 
-We don't have any "switch" to turn off this feature directly, but still
-can suppress it by passing "nokaslr" as a kernel boot argument.
+Just FYI, we may want to move this discussion to Alex's RFC with
+documentation of stateless interface:
+https://patchwork.kernel.org/patch/10583233/
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/machine_kexec_file.c | 45 ++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
-
-diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
-index ecaecb122cad..967db9824e3f 100644
---- a/arch/arm64/kernel/machine_kexec_file.c
-+++ b/arch/arm64/kernel/machine_kexec_file.c
-@@ -16,6 +16,7 @@
- #include <linux/libfdt.h>
- #include <linux/memblock.h>
- #include <linux/of_fdt.h>
-+#include <linux/random.h>
- #include <linux/slab.h>
- #include <linux/types.h>
- #include <linux/vmalloc.h>
-@@ -27,6 +28,7 @@
- #define FDT_PSTR_INITRD_STA	"linux,initrd-start"
- #define FDT_PSTR_INITRD_END	"linux,initrd-end"
- #define FDT_PSTR_BOOTARGS	"bootargs"
-+#define FDT_PSTR_KASLR_SEED	"kaslr-seed"
- 
- const struct kexec_file_ops * const kexec_file_loaders[] = {
- 	&kexec_image_ops,
-@@ -45,6 +47,32 @@ int arch_kimage_file_post_load_cleanup(struct kimage *image)
- 	return kexec_image_post_load_cleanup_default(image);
- }
- 
-+/* crng needs to have been initialized for providing kaslr-seed */
-+static int random_ready;
-+
-+static void random_ready_notified(struct random_ready_callback *unused)
-+{
-+	random_ready = 1;
-+}
-+
-+static struct random_ready_callback random_ready_cb = {
-+	.func = random_ready_notified,
-+};
-+
-+static __init int init_random_ready_cb(void)
-+{
-+	int ret;
-+
-+	ret = add_random_ready_callback(&random_ready_cb);
-+	if (ret == -EALREADY)
-+		random_ready = 1;
-+	else if (ret)
-+		pr_warn("failed to add a callback for random_ready\n");
-+
-+	return 0;
-+}
-+late_initcall(init_random_ready_cb)
-+
- static int setup_dtb(struct kimage *image,
- 		unsigned long initrd_load_addr, unsigned long initrd_len,
- 		char *cmdline, unsigned long cmdline_len,
-@@ -53,6 +81,7 @@ static int setup_dtb(struct kimage *image,
- 	void *buf = NULL;
- 	size_t buf_size, range_size;
- 	int nodeoffset;
-+	u64 value;
- 	int ret;
- 
- 	/* check ranges against root's #address-cells and #size-cells */
-@@ -85,6 +114,8 @@ static int setup_dtb(struct kimage *image,
- 		/* can be redundant, but trimmed at the end */
- 		buf_size += fdt_prop_len(FDT_PSTR_BOOTARGS, cmdline_len);
- 
-+	buf_size += fdt_prop_len(FDT_PSTR_KASLR_SEED, sizeof(u64));
-+
- 	buf = vmalloc(buf_size);
- 	if (!buf) {
- 		ret = -ENOMEM;
-@@ -164,6 +195,20 @@ static int setup_dtb(struct kimage *image,
- 		}
- 	}
- 
-+	/* add kaslr-seed */
-+	fdt_delprop(buf, nodeoffset, FDT_PSTR_KASLR_SEED);
-+	if (random_ready) {
-+		get_random_bytes(&value, sizeof(value));
-+		ret = fdt_setprop_u64(buf, nodeoffset, FDT_PSTR_KASLR_SEED,
-+							value);
-+		if (ret) {
-+			ret = -EINVAL;
-+			goto out_err;
-+		}
-+	} else {
-+		pr_notice("kaslr-seed won't be fed\n");
-+	}
-+
- 	/* trim a buffer */
- 	fdt_pack(buf);
- 	*dtb_buf = buf;
--- 
-2.18.0
+Best regards,
+Tomasz
