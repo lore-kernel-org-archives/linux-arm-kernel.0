@@ -1,50 +1,39 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 7 Sep 2018 13:11:37 +0800
-Subject: [PATCH 08/13] nvmem: add a notifier chain
-In-Reply-To: <20180905095738.26406-9-brgl@bgdev.pl>
-References: <20180905095738.26406-9-brgl@bgdev.pl>
-Message-ID: <201809071334.mbXFY6MH%fengguang.wu@intel.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Fri, 7 Sep 2018 13:51:48 +0800
+Subject: [PATCH] usb: xhci: fix interrupt transfer error happened on MTK
+ platforms
+Message-ID: <afafa68eb3a74a414848c116382e95811f924905.1536298766.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartosz,
+The MTK xHCI controller use some reserved bytes in endpoint context for
+bandwidth scheduling, so need keep them in xhci_endpoint_copy();
 
-I love your patch! Yet something to improve:
+The issue is introduced by:
+commit f5249461b504 ("xhci: Clear the host side toggle manually when
+endpoint is soft reset")
+It resets endpoints and will drop bandwidth scheduling parameters used
+by interrupt or isochronous endpoints on MTK xHCI controller.
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.19-rc2 next-20180906]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Bartosz-Golaszewski/nvmem-rework-of-the-subsystem-for-non-DT-users/20180907-112400
-config: i386-randconfig-s3-09061342 (attached as .config)
-compiler: gcc-6 (Debian 6.4.0-9) 6.4.0 20171026
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
-
-All errors (new ones prefixed by >>):
-
-   In file included from drivers//of/of_net.c:10:0:
->> include/linux/nvmem-consumer.h:142:19: error: two or more data types in declaration specifiers
-    static inline int int nvmem_unregister_notifier(struct notifier_block *nb)
-                      ^~~
-
-vim +142 include/linux/nvmem-consumer.h
-
-   141	
- > 142	static inline int int nvmem_unregister_notifier(struct notifier_block *nb)
-   143	{
-   144		return -ENOSYS;
-   145	}
-   146	
-
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 27032 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180907/566153cb/attachment-0001.gz>
+ drivers/usb/host/xhci-mem.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/usb/host/xhci-mem.c b/drivers/usb/host/xhci-mem.c
+index ef350c3..b1f27aa 100644
+--- a/drivers/usb/host/xhci-mem.c
++++ b/drivers/usb/host/xhci-mem.c
+@@ -1613,6 +1613,10 @@ void xhci_endpoint_copy(struct xhci_hcd *xhci,
+ 	in_ep_ctx->ep_info2 = out_ep_ctx->ep_info2;
+ 	in_ep_ctx->deq = out_ep_ctx->deq;
+ 	in_ep_ctx->tx_info = out_ep_ctx->tx_info;
++	if (xhci->quirks & XHCI_MTK_HOST) {
++		in_ep_ctx->reserved[0] = out_ep_ctx->reserved[0];
++		in_ep_ctx->reserved[1] = out_ep_ctx->reserved[1];
++	}
+ }
+ 
+ /* Copy output xhci_slot_ctx to the input xhci_slot_ctx.
+-- 
+1.9.1
