@@ -1,34 +1,43 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Fri, 7 Sep 2018 11:42:42 +0800
-Subject: [PATCH v2 2/4] crypto: skcipher - Enforce non-ASYNC for on-stack
- requests
-In-Reply-To: <20180906225854.40989-3-keescook@chromium.org>
-References: <20180906225854.40989-1-keescook@chromium.org>
- <20180906225854.40989-3-keescook@chromium.org>
-Message-ID: <20180907034242.zhm4dglzkldhvh3x@gondor.apana.org.au>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Fri, 07 Sep 2018 13:11:27 +0900
+Subject: [PATCH 2/2] pci: dwc: add UniPhier PCIe host controller support
+In-Reply-To: <20180906140926.GB214747@bhelgaas-glaptop.roam.corp.google.com>
+References: <20180906103819.252A.4A936039@socionext.com>
+ <20180906140926.GB214747@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20180907131126.FACD.4A936039@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2018 at 03:58:52PM -0700, Kees Cook wrote:
->
-> @@ -437,6 +442,12 @@ static inline struct crypto_skcipher *crypto_skcipher_reqtfm_check(
->  {
->  	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
->  
-> +	if (req->__onstack) {
-> +		if (WARN_ON(crypto_skcipher_alg(tfm)->base.cra_flags &
-> +				CRYPTO_ALG_ASYNC))
-> +			return ERR_PTR(-EINVAL);
-> +	}
+Hi Bjorn,
 
-Sorry but I don't like imposing a run-time check on everybody when
-stack-based requests are the odd ones out.  If we're going to make
-this a run-time check (I'd much prefer a compile-time check, but I
-understand that this may involve too much churn), then please do it
-for stack-based request users only.
+On Thu, 6 Sep 2018 09:09:27 -0500 <helgaas@kernel.org> wrote:
 
-Thanks,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+> On Thu, Sep 06, 2018 at 10:38:20AM +0900, Kunihiko Hayashi wrote:
+> > > > +++ b/drivers/pci/controller/dwc/pcie-uniphier.c
+> > > > @@ -0,0 +1,464 @@
+> > > > +// SPDX-License-Identifier: GPL-2.0
+> > > > +//
+> > > > +// PCI-express host controller driver for UniPhier SoCs
+> > > > +// Copyright 2018 Socionext Inc.
+> > > > +// Author: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> > > 
+> > > Use /* ... */ comments except for the SPDX line.
+> > 
+> > Okay, although I wondered which way to put, I'll replace the header next.
+> 
+> The easiest thing is to look at similar files already in the tree and
+> follow their style.  The details are here:
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/process/coding-style.rst#n540
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/process/license-rules.rst#n74
+
+Thanks for your advice.
+Although I've found both styles in some sub-systems, these are helpful for me.
+
+I replaced it in posted v2.
+
+Thank you,
+
+---
+Best Regards,
+Kunihiko Hayashi
