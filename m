@@ -1,38 +1,43 @@
-From: aryabinin@virtuozzo.com (Andrey Ryabinin)
-Date: Fri, 7 Sep 2018 18:48:10 +0300
-Subject: [PATCH] arm64: lib: use C string functions with KASAN enabled.
-In-Reply-To: <20180907145605.GE12788@arm.com>
-References: <20180906170534.20726-1-aryabinin@virtuozzo.com>
- <20180907145605.GE12788@arm.com>
-Message-ID: <9634affa-b210-d931-e40b-6e8a20f105fc@virtuozzo.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 7 Sep 2018 09:02:45 -0700
+Subject: [PATCH v2 2/4] crypto: skcipher - Enforce non-ASYNC for on-stack
+ requests
+In-Reply-To: <20180907034242.zhm4dglzkldhvh3x@gondor.apana.org.au>
+References: <20180906225854.40989-1-keescook@chromium.org>
+ <20180906225854.40989-3-keescook@chromium.org>
+ <20180907034242.zhm4dglzkldhvh3x@gondor.apana.org.au>
+Message-ID: <CAGXu5jLx8bdr+Ld7QE1LxttPB-LOs-H96kyx0O0MXq9MzX2vNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 09/07/2018 05:56 PM, Will Deacon wrote:
-> On Thu, Sep 06, 2018 at 08:05:33PM +0300, Andrey Ryabinin wrote:
->> ARM64 has asm implementations of memchr(), memcmp(), str[r]chr(),
->> str[n]cmp(), str[n]len(). KASAN don't see memory accesses in asm
->> code, thus it can potentially miss many bugs.
+On Thu, Sep 6, 2018 at 8:42 PM, Herbert Xu <herbert@gondor.apana.org.au> wrote:
+> On Thu, Sep 06, 2018 at 03:58:52PM -0700, Kees Cook wrote:
 >>
->> Ifdef out __HAVE_ARCH_* defines of these functions when KASAN is
->> enabled, so the generic implementations from lib/string.c will be used.
+>> @@ -437,6 +442,12 @@ static inline struct crypto_skcipher *crypto_skcipher_reqtfm_check(
+>>  {
+>>       struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
 >>
->> Declare asm functions as weak instead of removing them because they
->> still can be used by efistub.
-> 
-> I don't understand this bit: efistub uses the __pi_ prefixed versions of the
-> routines, so why do we need to declare them as weak?
+>> +     if (req->__onstack) {
+>> +             if (WARN_ON(crypto_skcipher_alg(tfm)->base.cra_flags &
+>> +                             CRYPTO_ALG_ASYNC))
+>> +                     return ERR_PTR(-EINVAL);
+>> +     }
+>
+> Sorry but I don't like imposing a run-time check on everybody when
+> stack-based requests are the odd ones out.  If we're going to make
+> this a run-time check (I'd much prefer a compile-time check, but I
+> understand that this may involve too much churn), then please do it
+> for stack-based request users only.
 
-Weak needed because we can't have two non-weak functions with the same name.
+I'll continue to investigate alternatives, but I wanted to point out
+that the struct change actually fills an existing padding byte (so no
+change in memory usage) and marking this as an unlikely() test means
+it wouldn't even be measurable due to the branch predictor (so no
+change in speed). encrypt/decrypt entry is a tiny tiny fraction of the
+actual work done during encryption/decryption, etc.
 
-Alternative approach would be to never use e.g. "strlen" name for asm implementation of strlen() under CONFIG_KASAN=y.
-But that would require adding some special ENDPIPROC_KASAN() macro since we want __pi_strlen() to point
-to the asm_strlen().
+-Kees
 
-Using weak seems like a way better solution to me.
-
-> 
-> Will
-> 
+-- 
+Kees Cook
+Pixel Security
