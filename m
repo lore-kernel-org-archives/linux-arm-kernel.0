@@ -1,36 +1,45 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri,  7 Sep 2018 15:22:34 +0800
-Subject: [PATCH 5/5] ARM: sun8i: dts: drop A64 HDMI PHY fallback compatible
- from R40 DT
-In-Reply-To: <20180907072234.48282-1-icenowy@aosc.io>
-References: <20180907072234.48282-1-icenowy@aosc.io>
-Message-ID: <20180907072234.48282-6-icenowy@aosc.io>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Fri, 7 Sep 2018 15:29:12 +0800
+Subject: [PATCH v2] usb: xhci: fix interrupt transfer error happened on MTK
+ platforms
+Message-ID: <e8698cc5710a9d1f25e33e2201e2177bfbfec75c.1536305256.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The R40 HDMI PHY seems to be different to the A64 one, the A64 one
-has no input mux, but the R40 one has.
+The MTK xHCI controller use some reserved bytes in endpoint context for
+bandwidth scheduling, so need keep them in xhci_endpoint_copy();
 
-Drop the A64 fallback compatible from the HDMI PHY node in R40 DT.
+The issue is introduced by:
+commit f5249461b504 ("xhci: Clear the host side toggle manually when
+endpoint is soft reset")
+It resets endpoints and will drop bandwidth scheduling parameters used
+by interrupt or isochronous endpoints on MTK xHCI controller.
+Fixes: f5249461b504 ("xhci: Clear the host side toggle manually when
+endpoint is soft reset")
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Cc: stable at vger.kernel.org
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+Tested-by: Sean Wang <sean.wang@mediatek.com>
 ---
- arch/arm/boot/dts/sun8i-r40.dtsi | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+v2: add fix tag, Cc and Tested-by
+---
+ drivers/usb/host/xhci-mem.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi b/arch/arm/boot/dts/sun8i-r40.dtsi
-index ffd9f00f74a4..5f547c161baf 100644
---- a/arch/arm/boot/dts/sun8i-r40.dtsi
-+++ b/arch/arm/boot/dts/sun8i-r40.dtsi
-@@ -800,8 +800,7 @@
- 		};
+diff --git a/drivers/usb/host/xhci-mem.c b/drivers/usb/host/xhci-mem.c
+index ef350c3..b1f27aa 100644
+--- a/drivers/usb/host/xhci-mem.c
++++ b/drivers/usb/host/xhci-mem.c
+@@ -1613,6 +1613,10 @@ void xhci_endpoint_copy(struct xhci_hcd *xhci,
+ 	in_ep_ctx->ep_info2 = out_ep_ctx->ep_info2;
+ 	in_ep_ctx->deq = out_ep_ctx->deq;
+ 	in_ep_ctx->tx_info = out_ep_ctx->tx_info;
++	if (xhci->quirks & XHCI_MTK_HOST) {
++		in_ep_ctx->reserved[0] = out_ep_ctx->reserved[0];
++		in_ep_ctx->reserved[1] = out_ep_ctx->reserved[1];
++	}
+ }
  
- 		hdmi_phy: hdmi-phy at 1ef0000 {
--			compatible = "allwinner,sun8i-r40-hdmi-phy",
--				     "allwinner,sun50i-a64-hdmi-phy";
-+			compatible = "allwinner,sun8i-r40-hdmi-phy";
- 			reg = <0x01ef0000 0x10000>;
- 			clocks = <&ccu CLK_BUS_HDMI1>, <&ccu CLK_HDMI_SLOW>,
- 				 <&ccu 7>, <&ccu 16>;
+ /* Copy output xhci_slot_ctx to the input xhci_slot_ctx.
 -- 
-2.18.0
+1.9.1
