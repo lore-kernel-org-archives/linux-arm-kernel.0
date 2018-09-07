@@ -1,52 +1,46 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 7 Sep 2018 10:51:36 +0200
-Subject: [PATCH resend] mmc: sunxi: Use new timing mode for A64 eMMC
- controller
-In-Reply-To: <20180906153304.22239-1-wens@csie.org>
-References: <20180906153304.22239-1-wens@csie.org>
-Message-ID: <CAPDyKFonwT+Xid9mrfPAA_91uNajNdibeg_JPftzO37pK1Nt5w@mail.gmail.com>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Fri, 7 Sep 2018 17:54:22 +0900
+Subject: [RFC 3/3] stk1160: Use non-coherent buffers for USB transfers
+In-Reply-To: <20180830175937.GB11521@infradead.org>
+References: <20180830172030.23344-1-ezequiel@collabora.com>
+ <20180830172030.23344-4-ezequiel@collabora.com>
+ <20180830175937.GB11521@infradead.org>
+Message-ID: <CAAFQd5D=tETh0638gR0TP=_FZXzMcy=6EjOLW8n1SRPqR=sCrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 September 2018 at 17:33, Chen-Yu Tsai <wens@csie.org> wrote:
-> The eMMC controller is also a new timing mode controller, but it doesn't
-> have the timing mode switch. It does however have signal delay and
-> calibration controls, typical of Allwinner MMC controllers that support
-> the new timing mode.
+On Fri, Aug 31, 2018 at 2:59 AM Christoph Hellwig <hch@infradead.org> wrote:
 >
-> Enable the new timing mode setting for the A64 eMMC controller. This
-> also enables MMC HS-DDR modes, which gives higher throughput for eMMC
-> chips that support it, and can deliver such throughput.
+> > +     dma_sync_single_for_cpu(&urb->dev->dev, urb->transfer_dma,
+> > +             urb->transfer_buffer_length, DMA_FROM_DEVICE);
 >
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> You can't ue dma_sync_single_for_cpu on non-coherent dma buffers,
+> which is one of the major issues with them.
 
-Applied for next, thanks!
+It's not an issue of DMA API, but just an API mismatch. By design,
+memory allocated for device (e.g. by DMA API) doesn't have to be
+physically contiguous, while dma_*_single() API expects a _single_,
+physically contiguous region of memory.
 
-Kind regards
-Uffe
+We need a way to allocate non-coherent memory using DMA API to handle
+(on USB example, but applies to virtually any class of devices doing
+DMA):
+ - DMA address range limitations (e.g. dma_mask) - while a USB HCD
+driver is normally aware of those, USB device driver should have no
+idea,
+ - memory mapping capability === whether contiguous memory or a set of
+random pages can be allocated - this is a platform integration detail,
+which even a USB HCD driver may not be aware of, if a SoC IOMMU is
+just stuffed between the bus and HCD,
+ - platform coherency specifics - there are practical scenarios when
+on a coherent-by-default system it's more efficient to allocate
+non-coherent memory and manage caches explicitly to avoid the costs of
+cache snooping.
 
-> ---
->
-> This is just a resend. A separate patch clarifying the usage of the new
-> timing mode should meet Maxime's request for comments clarifying the
-> new timing mode usage from the initial submission of this patch.
->
-> ---
->  drivers/mmc/host/sunxi-mmc.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index 5f8d3ea0a0f8..279e326e397e 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -1177,6 +1177,7 @@ static const struct sunxi_mmc_cfg sun50i_a64_emmc_cfg = {
->         .idma_des_size_bits = 13,
->         .clk_delays = NULL,
->         .can_calibrate = true,
-> +       .needs_new_timings = true,
->  };
->
->  static const struct of_device_id sunxi_mmc_of_match[] = {
-> --
-> 2.19.0.rc1
->
+If DMA_ATTR_NON_CONSISTENT is not the right way to do it, there should
+be definitely a new API introduced, coupled closely to DMA API
+implementation on given platform, since it's the only place which can
+solve all the constraints above.
+
+Best regards,
+Tomasz
