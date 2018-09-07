@@ -1,144 +1,57 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Fri, 7 Sep 2018 14:19:44 +0200
-Subject: [RFC PATCH v3 1/2] dt-bindings: nand: meson: add Amlogic NAND
- controller driver
-In-Reply-To: <1536317831-58056-2-git-send-email-jianxin.pan@amlogic.com>
-References: <1536317831-58056-1-git-send-email-jianxin.pan@amlogic.com>
- <1536317831-58056-2-git-send-email-jianxin.pan@amlogic.com>
-Message-ID: <20180907141944.4dd4406b@bbrezillon>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 7 Sep 2018 14:37:54 +0200
+Subject: [PATCH v2] ARM: s3c24xx: Correct SD card write protect detection
+ on Mini2440
+In-Reply-To: <96fe9889-2649-7a1e-23bf-b4d16713d212@free.fr>
+References: <96fe9889-2649-7a1e-23bf-b4d16713d212@free.fr>
+Message-ID: <CAJKOXPc5UTG2viu8KcbthJmdZW06_yAt+JttNBnbMuW4YU8hSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 7 Sep 2018 18:57:10 +0800
-Jianxin Pan <jianxin.pan@amlogic.com> wrote:
-
-> From: Liang Yang <liang.yang@amlogic.com>
-> 
-> Add Amlogic NAND controller dt-bindings for Meson SoC,
-> Current this driver support GXBB/GXL/AXG platform.
-> 
-> Signed-off-by: Liang Yang <liang.yang@amlogic.com>
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+On Thu, 6 Sep 2018 at 23:27, Cedric Roux <sed@free.fr> wrote:
+>
+> The mini2440 computer uses "active high" to signal that the "write protect"
+> of the inserted MMC is set. The current code uses the opposite, leading to
+> a wrong detection of write protection. The solution is simply to use
+> ".wprotect_invert = 1" in the description of the MMC.
+>
+> Signed-off-by: Cedric Roux <sed@free.fr>
 > ---
->  .../devicetree/bindings/mtd/amlogic,meson-nand.txt | 91 ++++++++++++++++++++++
->  1 file changed, 91 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt b/Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt
-> new file mode 100644
-> index 0000000..655a778
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt
-> @@ -0,0 +1,91 @@
-> +Amlogic NAND Flash Controller (NFC) for GXBB/GXL/AXG family SoCs
-> +
-> +This file documents the properties in addition to those available in
-> +the MTD NAND bindings.
-> +
-> +Required properties:
-> +- compatible : contains one of:
-> +  - "amlogic,meson-gxl-nfc"
-> +  - "amlogic,meson-axg-nfc"
-> +- clocks     :
-> +	A list of phandle + clock-specifier pairs for the clocks listed
-> +	in clock-names.
-> +
-> +- clock-names: Should contain the following:
-> +	"core" - NFC module gate clock
-> +	"device" - device clock from eMMC sub clock controller
-> +
-> +- pins     : Select pins which NFC need.
-> +- nand_pins: Detail NAND pins information.
+>  arch/arm/mach-s3c24xx/mach-mini2440.c | 9 +++++----
+>  1 file changed, 5 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/mach-s3c24xx/mach-mini2440.c b/arch/arm/mach-s3c24xx/mach-mini2440.c
+> index 95753e0..4cd8d45 100644
+> --- a/arch/arm/mach-s3c24xx/mach-mini2440.c
+> +++ b/arch/arm/mach-s3c24xx/mach-mini2440.c
+> @@ -232,10 +232,11 @@ static struct s3c2410fb_mach_info mini2440_fb_info __initdata = {
+>  /* MMC/SD  */
+>
+>  static struct s3c24xx_mci_pdata mini2440_mmc_cfg __initdata = {
+> -   .gpio_detect   = S3C2410_GPG(8),
+> -   .gpio_wprotect = S3C2410_GPH(8),
+> -   .set_power     = NULL,
+> -   .ocr_avail     = MMC_VDD_32_33|MMC_VDD_33_34,
+> +       .wprotect_invert = 1,
+> +       .gpio_detect   = S3C2410_GPG(8),
+> +       .gpio_wprotect = S3C2410_GPH(8),
+> +       .set_power     = NULL,
+> +       .ocr_avail     = MMC_VDD_32_33|MMC_VDD_33_34,
 
-You mean pinctrl-names and pinctrl-0, right? Not sure it's necessary to
-document that, but if you do, please use the correct DT prop names.
+I see that entire struct has wrong indentation. In such case can you
+send a separate patch cleaning it up, prior to introducing new
+feature? First patch would be cleanup and second new feature.
 
-> +- amlogic,mmc-syscon	: Required for NAND clocks, it's shared with SD/eMMC
-> +				controller port C
-> +
-> +Optional children nodes:
-> +Children nodes represent the available nand chips.
-> +
-> +
-> +
+While at cleanup you can also get rid of other checkpatch errors, like:
+ERROR: Macros with complex values should be enclosed in parentheses
+ERROR: space required after that ',' (ctx:VxV)
+WARNING: please, no space before tabs
+ERROR: trailing whitespace
+WARNING: Avoid unnecessary line continuations
+ERROR: "foo * bar" should be "foo *bar"
+ERROR: space prohibited before that close parenthesis ')'
+WARNING: quoted string split across lines
+WARNING: printk() should include KERN_<LEVEL> facility level
 
-One too many blank lines here.
-
-> +Other properties:
-> +see Documentation/devicetree/bindings/mtd/nand.txt for generic bindings.
-> +
-> +Example demonstrate on AXG SoC:
-> +
-> +	sd_emmc_c_clkc: mmc at 7000 {
-> +		compatible = "amlogic,meson-axg-mmc-clkc", "syscon";
-> +		reg = <0x0 0x7000 0x0 0x800>;
-> +		status = "okay";
-> +	};
-> +
-> +	nand: nfc at 7800 {
-> +		compatible = "amlogic,meson-axg-nfc";
-> +		reg = <0x0 0x7800 0x0 0x100>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		interrupts = <GIC_SPI 34 IRQ_TYPE_EDGE_RISING>;
-> +		status = "disabled";
-> +
-> +		clocks = <&clkc CLKID_SD_EMMC_C>,
-> +			<&sd_emmc_c_clkc CLKID_MMC_DIV>;
-> +		clock-names = "core", "device";
-> +		amlogic,mmc-syscon = <&sd_emmc_c_clkc>;
-> +
-> +		status = "okay";
-> +
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&nand_pins>;
-> +
-> +		nand at 0 {
-> +			reg = <0>;
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +
-> +			nand-on-flash-bbt;
-> +			nand-ecc-mode = "hw";
-> +			nand-ecc-strength = <8>;
-> +			nand-ecc-step-size = <1024>;
-
-Drop nand-ecc- props. I guess you have a sensible default value and I
-prefer when ECC requirements are directly extracted during chip
-detection. Defining that in the DT is a bad habit. The only one that
-could make sense (assuming you support it) is nand-ecc-maximize.
-
-> +
-> +			amlogic,nand-enable-scrambler;
-
-Please drop this property (it's not longer documented).
-
-> +
-> +			partition at 0 {
-> +				label = "boot";
-> +				reg = <0x00000000 0x00200000>;
-> +				read-only;
-> +			};
-> +			partition at 200000 {
-> +				label = "env";
-> +				reg = <0x00200000 0x00400000>;
-> +			};
-> +			partition at 600000 {
-> +				label = "system";
-> +				reg = <0x00600000 0x00a00000>;
-> +			};
-> +			partition at 1000000 {
-> +				label = "rootfs";
-> +				reg = <0x01000000 0x03000000>;
-> +			};
-> +			partition at 4000000 {
-> +				label = "media";
-> +				reg = <0x04000000 0x8000000>;
-> +			};
-
-No need to define the partitions in your example, especially since they
-should be placed in a partitions subnode with a "fixed-partitions"
-compat.
-
-> +		};
-> +	};
+Best regards,
+Krzysztof
