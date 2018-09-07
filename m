@@ -1,45 +1,41 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Fri, 7 Sep 2018 15:29:12 +0800
-Subject: [PATCH v2] usb: xhci: fix interrupt transfer error happened on MTK
- platforms
-Message-ID: <e8698cc5710a9d1f25e33e2201e2177bfbfec75c.1536305256.git.chunfeng.yun@mediatek.com>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Fri, 7 Sep 2018 09:35:59 +0200
+Subject: [PATCH v9 3/6] kernel/reboot.c: export pm_power_off_prepare
+In-Reply-To: <20180906101516.GA5360@sirena.org.uk>
+References: <20180802103425.3053-1-o.rempel@pengutronix.de>
+ <20180802103425.3053-4-o.rempel@pengutronix.de>
+ <20180802104443.GH9117@sirena.org.uk>
+ <94d48ecb-7302-c7ed-e815-730be0426a04@pengutronix.de>
+ <20180802113552.GJ9117@sirena.org.uk>
+ <20180827014815.GD29208@dragon>
+ <20180906101516.GA5360@sirena.org.uk>
+Message-ID: <20180907073559.ejffdfjy7zpqetzq@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MTK xHCI controller use some reserved bytes in endpoint context for
-bandwidth scheduling, so need keep them in xhci_endpoint_copy();
+Hi Mark,
 
-The issue is introduced by:
-commit f5249461b504 ("xhci: Clear the host side toggle manually when
-endpoint is soft reset")
-It resets endpoints and will drop bandwidth scheduling parameters used
-by interrupt or isochronous endpoints on MTK xHCI controller.
-Fixes: f5249461b504 ("xhci: Clear the host side toggle manually when
-endpoint is soft reset")
+On Thu, Sep 06, 2018 at 11:15:17AM +0100, Mark Brown wrote:
+> On Mon, Aug 27, 2018 at 09:48:16AM +0800, Shawn Guo wrote:
+> 
+> > Can you ACK on those two regulator patches, so that I can queue this
+> > series up on IMX tree?
+> 
+> I was expecting to get a pull request with the precursor patches in it -
+> the regulator driver seems to get a moderate amount of development so
+> there's a reasonable risk of conflicts.
 
-Cc: stable at vger.kernel.org
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-Tested-by: Sean Wang <sean.wang@mediatek.com>
----
-v2: add fix tag, Cc and Tested-by
----
- drivers/usb/host/xhci-mem.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Are there any thing I can or should do?
 
-diff --git a/drivers/usb/host/xhci-mem.c b/drivers/usb/host/xhci-mem.c
-index ef350c3..b1f27aa 100644
---- a/drivers/usb/host/xhci-mem.c
-+++ b/drivers/usb/host/xhci-mem.c
-@@ -1613,6 +1613,10 @@ void xhci_endpoint_copy(struct xhci_hcd *xhci,
- 	in_ep_ctx->ep_info2 = out_ep_ctx->ep_info2;
- 	in_ep_ctx->deq = out_ep_ctx->deq;
- 	in_ep_ctx->tx_info = out_ep_ctx->tx_info;
-+	if (xhci->quirks & XHCI_MTK_HOST) {
-+		in_ep_ctx->reserved[0] = out_ep_ctx->reserved[0];
-+		in_ep_ctx->reserved[1] = out_ep_ctx->reserved[1];
-+	}
- }
- 
- /* Copy output xhci_slot_ctx to the input xhci_slot_ctx.
 -- 
-1.9.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180907/fbc8584a/attachment.sig>
