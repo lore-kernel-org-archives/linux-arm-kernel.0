@@ -1,45 +1,27 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 7 Sep 2018 10:14:49 +0200
-Subject: [PATCH] mmc: sunxi: Clarify new timing mode usage and
- implementation
-In-Reply-To: <20180906153107.20225-1-wens@csie.org>
-References: <20180906153107.20225-1-wens@csie.org>
-Message-ID: <20180907081449.roowspmgmtd5zcs6@flea>
+Date: Fri, 7 Sep 2018 10:15:06 +0200
+Subject: [PATCH resend] mmc: sunxi: Use new timing mode for A64 eMMC
+ controller
+In-Reply-To: <20180906153304.22239-1-wens@csie.org>
+References: <20180906153304.22239-1-wens@csie.org>
+Message-ID: <20180907081506.lj26hmbaisacefih@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2018 at 11:31:07PM +0800, Chen-Yu Tsai wrote:
-> Newer sunxi mmc controller variants support what they call the "new
-> timing mode". Support for this was implemented in two ways, according
-> to the hardware that was seen at the time.
+On Thu, Sep 06, 2018 at 11:33:04PM +0800, Chen-Yu Tsai wrote:
+> The eMMC controller is also a new timing mode controller, but it doesn't
+> have the timing mode switch. It does however have signal delay and
+> calibration controls, typical of Allwinner MMC controllers that support
+> the new timing mode.
 > 
-> The first type retained the old timing mode, and both the clock and mmc
-> controllers had switches to select which mode was used. Both switches
-> had to be set to the same setting. This variant was denoted with the
-> .has_timings_switch field in the sunxi_mmc_cfg structure. This hardware
-> is only seen on the A83T.
-> 
-> The second type did away with the old timing mode. The clock controller
-> no longer had the mode selection or clock delay setting bits. In some
-> cases the mmc controller retained its mode selection bit, but this
-> always needed to be set to the new mode, or instabilities would occur.
-> In a few cases, such as the A64 and H6 eMMC controller, the mode
-> selection bit is gone, but the controller still behaves like the new
-> timing mode, requiring the module clock to be double the card clock
-> in DDR transfer modes. This variant is denoted with the
-> .needs_new_timings field.
-> 
-> This patch adds more comments explaining the two fields, as well as
-> the possibly nonexistent mode switch in the mmc controller.
-> 
-> The .has_timings_switch is renamed to .ccu_has_timings_switch to clarify
-> its meaning.
+> Enable the new timing mode setting for the A64 eMMC controller. This
+> also enables MMC HS-DDR modes, which gives higher throughput for eMMC
+> chips that support it, and can deliver such throughput.
 > 
 > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
 Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
-Thanks!
 Maxime
 
 -- 
@@ -52,4 +34,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180907/24241561/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180907/5e520c74/attachment.sig>
