@@ -1,62 +1,65 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 7 Sep 2018 12:43:25 +0200
-Subject: [PATCH RESEND] efi_stub: update documentation on dtb= parameter
-In-Reply-To: <20180906182927.22318-1-grant.likely@arm.com>
-References: <20180906182927.22318-1-grant.likely@arm.com>
-Message-ID: <CAKv+Gu_k5Yr-aRhE6atrtGQOVpw60XfevVdUb8BvH1G3mfoU+Q@mail.gmail.com>
+From: jianxin.pan@amlogic.com (Jianxin Pan)
+Date: Fri, 7 Sep 2018 18:57:09 +0800
+Subject: [RFC PATCH v3 0/2] mtd: rawnand: meson: add Amlogic NAND driver
+ support
+Message-ID: <1536317831-58056-1-git-send-email-jianxin.pan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 September 2018 at 20:29, Grant Likely <grant.likely@arm.com> wrote:
-> The dtb= parameter is no longer the primary mechanism for providing a
-> devicetree to the kernel. Now either firmware or the boot selector (ex.
-> Grub) should provide the devicetree and dtb= should only be used for
-> debug or when using firmware that doesn't understand DT.
-> Update the EFI stub documentation to reflect the current usage.
->
-> Signed-off-by: Grant Likely <grant.likely@arm.com>
-> Reviewed-by: Alexander Graf <agraf@suse.de>
-> Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
-> Acked-by: Olof Johansson <olof@lixom.net>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Jonathan Corbet <corbet@lwn.net>
+  These two patches try to add initial NAND driver support for Amlogic Meson
+SoCs, current it has been tested on GXL(p212) and AXG(s400) platform.
 
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Changes since v2 at [3]:
+ - remove some hardcode time value, like twb
+ - use dev wait R/B instead of nand_soft_waitrdy
+ - implement nfc ecc init by ecc helper
+ - rework nfc buffer init to register the maximun buffer when several chips
+ - free nfc buffer when error and cleanup
+ - add variable to teack all the already assigned CS lines
+ - fix mtd->name use the first cs line only
+ - remove dt "nand-enable-scrambler" and use NAND_NEED_SCRAMBLING instead.
+ - move setuping ECC fileds after the identification phase
+ - use nand_scan() and attach_chip()
+ - check one event to return IRQ_NONE
+ - delete cast when of_device_get_match_data
+ - use nand_controller_init() helper
+ - remove nfc driver complains when calling devm_ioremap_resource
+ - clear irqs before setting up irq handler
 
+Changes since v1 at [1]:
+  - adopt property amlogic,nand-enable-scrambler - thanks Martin
+  - drop nand pins in DT
+  - convert clk access to emmc clkc model 
+  - fix regiser field definition alignment
+  - drop nand-user-mode 
+  - parse cs id from DT
+  - rework n2m, m2n function
+  - explain why insert two "IDLE" command
+  - implement exec_op()
+  - drop meson_nfc_get_nand_chip_dts()
+  - release resource once error occur in meson_nfc_nand_chips_init(), 
+  - call nand_cleanup(nand) once mtd_device_register fail
 
-> ---
->
-> Resending because original post included Arm corporate disclaimer.
->
->  Documentation/efi-stub.txt | 17 ++++++++++++++---
->  1 file changed, 14 insertions(+), 3 deletions(-)
->
-> diff --git a/Documentation/efi-stub.txt b/Documentation/efi-stub.txt
-> index 41df801f9a50..833edb0d0bc4 100644
-> --- a/Documentation/efi-stub.txt
-> +++ b/Documentation/efi-stub.txt
-> @@ -83,7 +83,18 @@ is passed to bzImage.efi.
->  The "dtb=" option
->  -----------------
->
-> -For the ARM and arm64 architectures, we also need to be able to provide a
-> -device tree to the kernel. This is done with the "dtb=" command line option,
-> -and is processed in the same manner as the "initrd=" option that is
-> +For the ARM and arm64 architectures, a device tree must be provided to
-> +the kernel. Normally firmware shall supply the device tree via the
-> +EFI CONFIGURATION TABLE. However, the "dtb=" command line option can
-> +be used to override the firmware supplied device tree, or to supply
-> +one when firmware is unable to.
-> +
-> +Please note: Firmware adds runtime configuration information to the
-> +device tree before booting the kernel. If dtb= is used to override
-> +the device tree, then any runtime data provided by firmware will be
-> +lost. The dtb= option should only be used either as a debug tool, or
-> +as a last resort when a device tree is not provided in the EFI
-> +CONFIGURATION TABLE.
-> +
-> +"dtb=" is processed in the same manner as the "initrd=" option that is
->  described above.
-> --
-> 2.11.0
->
+Items not addressed ( or confirmed ) in this version:
+  - convert to ECC conf helper() 
+  - convert to dma coherent API
+  - how to construct mtd->name
+
+[1] https://lkml.kernel.org/r/20180613161314.14894-1-yixun.lan at amlogic.com
+[2] https://lkml.kernel.org/r/20180712211244.11428-1-yixun.lan at amlogic.com
+[3] https://lkml.kernel.org/r//20180719094612.5833-1-yixun.lan at amlogic.com
+
+Liang Yang (2):
+  dt-bindings: nand: meson: add Amlogic NAND controller driver
+  mtd: rawnand: meson: add support for Amlogic NAND flash controller
+
+ .../devicetree/bindings/mtd/amlogic,meson-nand.txt |   91 ++
+ drivers/mtd/nand/raw/Kconfig                       |   10 +
+ drivers/mtd/nand/raw/Makefile                      |    1 +
+ drivers/mtd/nand/raw/meson_nand.c                  | 1372 ++++++++++++++++++++
+ 4 files changed, 1474 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt
+ create mode 100644 drivers/mtd/nand/raw/meson_nand.c
+
+-- 
+1.9.1
