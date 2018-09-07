@@ -1,102 +1,74 @@
-From: honghui.zhang@mediatek.com (Honghui Zhang)
-Date: Fri, 7 Sep 2018 17:43:30 +0800
-Subject: [PATCH v3 3/4] PCI: mediatek: Add system pm support for MT2712
- and MT7622
-In-Reply-To: <20180718094924.GA21463@red-moon>
-References: <1530518264-6125-1-git-send-email-honghui.zhang@mediatek.com>
- <1530518264-6125-4-git-send-email-honghui.zhang@mediatek.com>
- <20180717171543.GA20991@red-moon> <1531893761.31406.15.camel@mhfsdcap03>
- <20180718094924.GA21463@red-moon>
-Message-ID: <1536313410.31406.30.camel@mhfsdcap03>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri,  7 Sep 2018 11:46:04 +0200
+Subject: [PATCH v5 1/2] dt-bindings: add binding for Rockchip hdmi phy using
+ an Innosilicon IP
+Message-ID: <20180907094605.25206-1-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-07-18 at 10:49 +0100, Lorenzo Pieralisi wrote:
-> On Wed, Jul 18, 2018 at 02:02:41PM +0800, Honghui Zhang wrote:
-> 
-> <snip>
-> 
-> > > > +static int __maybe_unused mtk_pcie_resume_noirq(struct device *dev)
-> > > > +{
-> > > > +	struct mtk_pcie *pcie = dev_get_drvdata(dev);
-> > > > +	const struct mtk_pcie_soc *soc = pcie->soc;
-> > > > +	struct mtk_pcie_port *port, *tmp;
-> > > > +
-> > > > +	if (!soc->pm_support)
-> > > > +		return 0;
-> > > > +
-> > > > +	if (list_empty(&pcie->ports))
-> > > > +		return 0;
-> > > > +
-> > > > +	if (dev->pm_domain) {
-> > > > +		pm_runtime_enable(dev);
-> > > > +		pm_runtime_get_sync(dev);
-> > > > +	}
-> > > 
-> > > Are these runtime PM calls needed/abused here ?
-> > > 
-> > > Mind explaining the logic ?
-> > > 
-> > > There is certainly an asymmetry with the suspend callback which made me
-> > > suspicious, I am pretty certain Rafael/Kevin/Ulf can help me clarify so
-> > > that we can make progress with this patch.
-> > > 
-> > > Lorenzo
-> > > 
-> > Hi Lorenzo, thanks for your comments.
-> > Sorry I don't get you.
-> > I believe that in suspend callbacks the pm_runtime_put_sync and
-> > pm_runtime_disable should be called to gated the CMOS for this module,
-> > while the pm_rumtime_enable and pm_rumtime_get_sync should be called
-> > in resume callback.
+From: Zheng Yang <zhengyang@rock-chips.com>
 
-> That's why I CC'ed Rafael, Kevin and Ulf, to answer this question
-> thoroughly, I am not sure it is needed and that's the right way
-> of doing it in system suspend callbacks.
-> 
+The phy is used so far in two Rockchip socs the rk3228 and the rk3328.
 
-hi, Rafael, Kevin and Ulf,
+Signed-off-by: Zheng Yang <zhengyang@rock-chips.com>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+changes in v3:
+- describe both refclks supplied to the phy block
 
-after reading of the power related documents in Documents/power/, I'm
-still confused whether the runtime_pm callbacks should be called in
-system suspend callbacks.
+ .../bindings/phy/phy-rockchip-inno-hdmi.txt   | 43 +++++++++++++++++++
+ 1 file changed, 43 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-rockchip-inno-hdmi.txt
 
-I believe that system suspend does not care about the device's CMOS
-status. And the device's CMOS status is controlled by runtime pm.
-That why I gated the CMOS through runtime pm in the system suspend
-callbacks.
-
-But I checked all existing system suspend callbacks and found there's no
-runtime pm was executed in system suspend callbacks. Does that means
-when system suspend, the system suspend framework does not care about
-the power consume? Or does it gated each device's CMOS in somewhere
-else?
-
-Or should I just remove the runtime pm callbacks in the system suspend
-flow?
-
-Could someone kindly give me some comments?
-
-Thanks in advance.
-
-> > That's exactly this patch doing.
-> > But the pm_rumtime_put_sync and pm_runtime_disable functions was wrapped
-> > in the mtk_pcie_subsys_powerdown.
-> 
-> Ah, sorry, I missed that.
-> 
-> > I did not call mtk_pcie_subsys_powerup since it does not just wrapped
-> > pm_rumtime related functions but also do the platform_resource_get,
-> > devm_ioremap, and free_ck clock get which I do not needed in resume
-> > callback.
-> > 
-> > Do you think it will be much clear if I abstract the
-> > platform_resource_get, devm_ioremap functions from
-> > mtk_pcie_subsys_powerup and put it to a new functions like
-> > mtk_pcie_subsys_resource_get, and then we may call the
-> > mtk_pcie_subsys_powerup in the resume function?
-> 
-> I think so but let's wait first for feedback on whether those
-> runtime PM calls are needed in the first place.
-> 
-> Lorenzo
+diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-hdmi.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-hdmi.txt
+new file mode 100644
+index 000000000000..710cccd5ee56
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-hdmi.txt
+@@ -0,0 +1,43 @@
++ROCKCHIP HDMI PHY WITH INNO IP BLOCK
++
++Required properties:
++ - compatible : should be one of the listed compatibles:
++	* "rockchip,rk3228-hdmi-phy",
++	* "rockchip,rk3328-hdmi-phy";
++ - reg : Address and length of the hdmi phy control register set
++ - clocks : phandle + clock specifier for the phy clocks
++ - clock-names : string, clock name, must contain "sysclk" for system
++	  control and register configuration, "refoclk" for crystal-
++	  oscillator reference PLL clock input and "refpclk" for pclk-
++	  based refeference PLL clock input.
++ - #clock-cells: should be 0.
++ - clock-output-names : shall be the name for the output clock.
++ - interrupts : phandle + interrupt specified for the hdmiphy interrupt
++ - #phy-cells : must be 0. See ./phy-bindings.txt for details.
++
++Optional properties for rk3328-hdmi-phy:
++ - nvmem-cells = phandle + nvmem specifier for the cpu-version efuse
++ - nvmem-cell-names : "cpu-version" to read the chip version, required
++	  for adjustment to some frequency settings
++
++Example:
++	hdmi_phy: hdmi-phy at 12030000 {
++		compatible = "rockchip,rk3228-hdmi-phy";
++		reg = <0x12030000 0x10000>;
++		#phy-cells = <0>;
++		clocks = <&cru PCLK_HDMI_PHY>, <&xin24m>, <&cru DCLK_HDMIPHY>;
++		clock-names = "sysclk", "refoclk", "refpclk";
++		#clock-cells = <0>;
++		clock-output-names = "hdmi_phy";
++		status = "disabled";
++	};
++
++Then the PHY can be used in other nodes such as:
++
++	hdmi: hdmi at 200a0000 {
++		compatible = "rockchip,rk3228-dw-hdmi";
++		...
++		phys = <&hdmi_phy>;
++		phy-names = "hdmi";
++		...
++	};
+-- 
+2.17.0
