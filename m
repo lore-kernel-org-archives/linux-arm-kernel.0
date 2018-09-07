@@ -1,34 +1,33 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri,  7 Sep 2018 15:22:30 +0800
-Subject: [PATCH 1/5] dt-bindings: sun4i-drm: drop second PLL from A64 HDMI PHY
- binding
+Date: Fri,  7 Sep 2018 15:22:31 +0800
+Subject: [PATCH 2/5] drm: sun4i: drop second PLL from A64 HDMI PHY
 In-Reply-To: <20180907072234.48282-1-icenowy@aosc.io>
 References: <20180907072234.48282-1-icenowy@aosc.io>
-Message-ID: <20180907072234.48282-2-icenowy@aosc.io>
+Message-ID: <20180907072234.48282-3-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By experiments it seems that the A64 HDMI PHY is not able to use the
-second video PLL as the clock parent.
+The A64 HDMI PHY seems to be not able to use the second video PLL as
+clock parent in experiments.
 
-Drop pll-1 from the device tree binding of A64 HDMI PHY.
+Drop the support for the second PLL from A64 HDMI PHY driver.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 1 -
+ drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c | 1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index f8773ecb7525..62034039cee1 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -114,7 +114,6 @@ Required properties:
+diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+index 82502b351aec..a564b5dfe082 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
++++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
+@@ -398,7 +398,6 @@ static struct regmap_config sun8i_hdmi_phy_regmap_config = {
  
- H3 and A64 HDMI PHY require additional clocks:
-   - pll-0: parent of phy clock
--  - pll-1: second possible phy clock parent (A64 only)
- 
- TV Encoder
- ----------
+ static const struct sun8i_hdmi_phy_variant sun50i_a64_hdmi_phy = {
+ 	.has_phy_clk = true,
+-	.has_second_pll = true,
+ 	.phy_init = &sun8i_hdmi_phy_init_h3,
+ 	.phy_disable = &sun8i_hdmi_phy_disable_h3,
+ 	.phy_config = &sun8i_hdmi_phy_config_h3,
 -- 
 2.18.0
