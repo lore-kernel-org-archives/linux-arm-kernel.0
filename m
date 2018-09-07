@@ -1,42 +1,16 @@
-From: sed@free.fr (Cedric Roux)
-Date: Fri,  7 Sep 2018 23:54:46 +0200
-Subject: [PATCH v3 2/2] ARM: s3c24xx: Correct SD card write protect detection
- on Mini2440
-In-Reply-To: <20180907215446.15160-1-sed@free.fr>
-References: <20180907215446.15160-1-sed@free.fr>
-Message-ID: <20180907215446.15160-2-sed@free.fr>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 07 Sep 2018 14:57:17 -0700 (PDT)
+Subject: [PATCH 0/5] introduce
+ setbits32/clrbits32/clrsetbits32/setbits64/clrbits64/clrsetbits64 functions
+In-Reply-To: <1536349307-20714-1-git-send-email-clabbe@baylibre.com>
+References: <1536349307-20714-1-git-send-email-clabbe@baylibre.com>
+Message-ID: <20180907.145717.248815695221355297.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mini2440 computer uses "active high" to signal that the "write protect"
-of the inserted MMC is set. The current code uses the opposite, leading to
-a wrong detection of write protection. The solution is simply to use
-".wprotect_invert = 1" in the description of the MMC.
 
-Signed-off-by: Cedric Roux <sed@free.fr>
----
- arch/arm/mach-s3c24xx/mach-mini2440.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+If you are going to do this, please add for_each_set_bit64() and similar.
 
-diff --git a/arch/arm/mach-s3c24xx/mach-mini2440.c b/arch/arm/mach-s3c24xx/mach-mini2440.c
-index 4a0bf6abba8c..bfce7971d741 100644
---- a/arch/arm/mach-s3c24xx/mach-mini2440.c
-+++ b/arch/arm/mach-s3c24xx/mach-mini2440.c
-@@ -234,10 +234,11 @@ static struct s3c2410fb_mach_info mini2440_fb_info __initdata = {
- /* MMC/SD  */
- 
- static struct s3c24xx_mci_pdata mini2440_mmc_cfg __initdata = {
--	.gpio_detect   = S3C2410_GPG(8),
--	.gpio_wprotect = S3C2410_GPH(8),
--	.set_power     = NULL,
--	.ocr_avail     = MMC_VDD_32_33|MMC_VDD_33_34,
-+	.gpio_detect     = S3C2410_GPG(8),
-+	.gpio_wprotect   = S3C2410_GPH(8),
-+	.wprotect_invert = 1,
-+	.set_power       = NULL,
-+	.ocr_avail       = MMC_VDD_32_33|MMC_VDD_33_34,
- };
- 
- /* NAND Flash on MINI2440 board */
--- 
-2.18.0
+For example, see:
+
+https://marc.info/?l=linux-netdev&m=153633391214025&w=2
