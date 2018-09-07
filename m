@@ -1,49 +1,51 @@
-From: radheys@xilinx.com (Radhey Shyam Pandey)
-Date: Fri, 7 Sep 2018 12:08:01 +0000
-Subject: [PATCH 3/3] dmaengine: xilinx_dma: Fix 64-bit simple CDMA transfer
-In-Reply-To: <MWHPR0201MB36282BE6CB5BD242480757F8C7090@MWHPR0201MB3628.namprd02.prod.outlook.com>
-References: <1532688639-32230-1-git-send-email-radhey.shyam.pandey@xilinx.com>
- <1532688639-32230-4-git-send-email-radhey.shyam.pandey@xilinx.com>
- <20180821155553.GI2388@vkoul-mobl>
- <MWHPR0201MB362803E975383398B361330FC70A0@MWHPR0201MB3628.namprd02.prod.outlook.com>
- <20180829040111.GD2388@vkoul-mobl>
- <MWHPR0201MB36282BE6CB5BD242480757F8C7090@MWHPR0201MB3628.namprd02.prod.outlook.com>
-Message-ID: <MWHPR0201MB362841247B08AFFA21CB0A18C7000@MWHPR0201MB3628.namprd02.prod.outlook.com>
+From: jianxin.pan@amlogic.com (Jianxin Pan)
+Date: Fri, 7 Sep 2018 20:09:04 +0800
+Subject: [PATCH v3 0/2] arm64: dts: meson-g12a: Introduce new DT files for
+ Meson-G12A SoC
+In-Reply-To: <170648ffb748c7b3890f5d7293920873efd16e30.camel@baylibre.com>
+References: <1534243121-33589-1-git-send-email-jianxin.pan@amlogic.com>
+ <170648ffb748c7b3890f5d7293920873efd16e30.camel@baylibre.com>
+Message-ID: <aebe4a85-94b0-90f9-d3c2-ed0764398a55@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-<snip>
-> > > > > -		xilinx_write(chan, XILINX_CDMA_REG_SRCADDR, hw-
-> > > > >src_addr);
-> > > > > -		xilinx_write(chan, XILINX_CDMA_REG_DSTADDR, hw-
-> > > > >dest_addr);
-> > > > > +		xilinx_write(chan, XILINX_CDMA_REG_SRCADDR,
-> > > > (dma_addr_t)
-> > > > > +			     ((u64)hw->src_addr_msb << 32 | hw-
-> >src_addr));
-> > > >
-> > > > so this is:
-> > > >         (dma_addr_t)((u64)hw->src_addr_msb << 32 | hw->src_addr)
-> > > >
-> > > > what is src_addr data type? I think its u32. It would be better to
-> > > > update xilinx_write() to take u64 and not dma_addr_t.
-> > >
-> > > Yes, src_addr_msb and src_addr BD fields are u32. To explain: There is no
-> > > prob in xilinx_write it takes dma_addr_t as an arg which is 32/64 bit
-> > > depending on _DMA_ADDR_T_64BIT. In 64bit CDMA transfer, there was a
-> > bug
-> > > i.e in the call to xilinx_write src_addr_msb 32 bits were not passed. To fix
-> > > that combine MSB and LSB 32 bits before passing it to xilinx_write.
-> >
-> > Yeah that part was clear but the implementation can be better..
-I thought over it and it seems having a new interface dma_ctrl_write_64
-taking lsb and msb bits input looks better and scalable. It will be similar
-to existing vdma_desc_write_64 impl. I will send v2 if it looks ok.
-
-Thanks,
-Radhey
-<snip>
+On 8/14/2018 7:58 PM, Jerome Brunet wrote:
+> On Tue, 2018-08-14 at 18:38 +0800, Jianxin Pan wrote:
+>> This attempt will try to add new DT files to support Meson-G12A SoC.
+>>
+>> 1) first, Please notice that, in this patch series, the DT node about 16M reserved
+>> memory for hwrom is removed, since it's not needed by G12A SoC.
+>> 2) second, the pclk for uart_AO need to be fixed once G12A clock_ao driver is
+>> merged. In this version, it rely on bootloader to enable the pclk gate which 
+>> belong to AO clock domain. Please add clk_ignore_unused to bootargs.
+>>
+>> Changes since v2 [1]:
+>>  - reorder subnodes
+>>  - collect Rob's Reviewed-by
+>>
+>> Changes since v1 [0]:
+>>  - fix signoff typo
+>>  - order subnodes by addresses when there is one and alphabetically when there is none
+>>
+>> [0] https://lore.kernel.org/lkml/1533802951-49919-2-git-send-email-jianxin.pan at amlogic.com/
+>>
+>> Jianxin Pan (2):
+>>   dt-bindings: arm: amlogic: Add Meson G12A binding
+>>   arm64: dts: meson-g12a: add initial g12a s905d2 SoC DT support
+>>
+>>  Documentation/devicetree/bindings/arm/amlogic.txt |   6 +
+>>  arch/arm64/boot/dts/amlogic/Makefile              |   1 +
+>>  arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts   |  22 +++
+>>  arch/arm64/boot/dts/amlogic/meson-g12a.dtsi       | 172 ++++++++++++++++++++++
+>>  4 files changed, 201 insertions(+)
+>>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts
+>>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-g12a.dtsi
+>>
 > 
-> >
-> > --
-> > ~Vinod
+> Series looks good as far as I can tell
+> 
+> Reviewed-by: Jerome Brunet <jbrunet@baylibre.com>
+> 
+> .
+> 
+Hi Kevin, this series are tested on latest v4.20/integ.
