@@ -1,87 +1,92 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 7 Sep 2018 16:25:28 +0200
-Subject: [PATCH v9 5/9] media: platform: Add Cedrus VPU decoder driver
-In-Reply-To: <2c9689b2-c5a6-58b7-b467-fc53208ecd2d@xs4all.nl>
-References: <20180906222442.14825-1-contact@paulk.fr>
- <20180906222442.14825-6-contact@paulk.fr>
- <4b30c0bf-e525-1868-f625-569d4a104aa0@xs4all.nl>
- <20180907132620.lmsvlwpa3rzioj2h@flea>
- <2c9689b2-c5a6-58b7-b467-fc53208ecd2d@xs4all.nl>
-Message-ID: <20180907142528.4daxlsd6jwnkw74h@flea>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 07 Sep 2018 17:26:29 +0300
+Subject: [PATCH 04/10] phy: dphy: Add configuration helpers
+In-Reply-To: <20180907133739.6lvlw7wsdk4ffeua@flea>
+References: <cover.ee6158898d563fcc01d45c9652501180bccff0f0.1536138624.git-series.maxime.ripard@bootlin.com>
+ <3617916.Vq2Smf1hnZ@avalon> <20180907133739.6lvlw7wsdk4ffeua@flea>
+Message-ID: <1923627.Ifno3EcWVN@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2018 at 03:52:00PM +0200, Hans Verkuil wrote:
-> On 09/07/2018 03:26 PM, Maxime Ripard wrote:
-> > Hi Hans,
+Hi Maxime,
+
+On Friday, 7 September 2018 16:37:39 EEST Maxime Ripard wrote:
+> On Wed, Sep 05, 2018 at 04:46:05PM +0300, Laurent Pinchart wrote:
+> > On Wednesday, 5 September 2018 12:16:35 EEST Maxime Ripard wrote:
+> >> The MIPI D-PHY spec defines default values and boundaries for most of
+> >> the parameters it defines. Introduce helpers to help drivers get
+> >> meaningful values based on their current parameters, and validate the
+> >> boundaries of these parameters if needed.
+> >> 
+> >> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> >> ---
+> >> 
+> >>  drivers/phy/Kconfig               |   8 ++-
+> >>  drivers/phy/Makefile              |   1 +-
+> >>  drivers/phy/phy-core-mipi-dphy.c  | 160 ++++++++++++++++++++++++++++++-
+> >>  include/linux/phy/phy-mipi-dphy.h |   6 +-
+> >>  4 files changed, 175 insertions(+)
+> >>  create mode 100644 drivers/phy/phy-core-mipi-dphy.c
+
+[snip]
+
+> >> diff --git a/drivers/phy/phy-core-mipi-dphy.c
+> >> b/drivers/phy/phy-core-mipi-dphy.c new file mode 100644
+> >> index 000000000000..6c1ddc7734a2
+> >> --- /dev/null
+> >> +++ b/drivers/phy/phy-core-mipi-dphy.c
+> >> @@ -0,0 +1,160 @@
+> >> +/* SPDX-License-Identifier: GPL-2.0 */
+> >> +/*
+> >> + * Copyright (C) 2013 NVIDIA Corporation
+> >> + * Copyright (C) 2018 Cadence Design Systems Inc.
+> >> + */
+> >> +
+> >> +#include <linux/errno.h>
+> >> +#include <linux/export.h>
+> >> +#include <linux/kernel.h>
+> >> +#include <linux/time64.h>
+> >> +
+> >> +#include <linux/phy/phy.h>
+> >> +#include <linux/phy/phy-mipi-dphy.h>
+> >> +
+> >> +/*
+> >> + * Default D-PHY timings based on MIPI D-PHY specification. Derived
+> >> from the
+> >> + * valid ranges specified in Section 6.9, Table 14, Page 40 of the
+> >> D-PHY
+> >> + * specification (v1.2) with minor adjustments.
 > > 
-> > On Fri, Sep 07, 2018 at 03:13:19PM +0200, Hans Verkuil wrote:
-> >> On 09/07/2018 12:24 AM, Paul Kocialkowski wrote:
-> >>> From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> >>>
-> >>> This introduces the Cedrus VPU driver that supports the VPU found in
-> >>> Allwinner SoCs, also known as Video Engine. It is implemented through
-> >>> a V4L2 M2M decoder device and a media device (used for media requests).
-> >>> So far, it only supports MPEG-2 decoding.
-> >>>
-> >>> Since this VPU is stateless, synchronization with media requests is
-> >>> required in order to ensure consistency between frame headers that
-> >>> contain metadata about the frame to process and the raw slice data that
-> >>> is used to generate the frame.
-> >>>
-> >>> This driver was made possible thanks to the long-standing effort
-> >>> carried out by the linux-sunxi community in the interest of reverse
-> >>> engineering, documenting and implementing support for the Allwinner VPU.
-> >>>
-> >>> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> >>> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> >>
-> >> One high-level comment:
-> >>
-> >> Can you add a TODO file for this staging driver? This can be done in
-> >> a follow-up patch.
-> >>
-> >> It should contain what needs to be done to get this out of staging:
-> >>
-> >> - Request API needs to stabilize
-> >> - Userspace support for stateless codecs must be created
-> > 
-> > On that particular note, as part of the effort to develop the driver,
-> > we've also developped two userspace components:
-> > 
-> >   - v4l2-request-test, that has a bunch of sample frames for various
-> >     codecs and will rely solely on the kernel request api (and DRM for
-> >     the display part) to test and bringup a particular driver
-> >     https://github.com/bootlin/v4l2-request-test
-> > 
-> >   - libva-v4l2-request, that is a libva implementation using the
-> >     request API
-> >     https://github.com/bootlin/libva-v4l2-request
-> > 
-> > Did you have something else in mind?
+> > Could you list those adjustments ?
 > 
-> Reviewing this will be the next step. I haven't looked at the userspace components
-> at all yet, so I don't know yet whether it is what we expect/want/need.
+> I will. This was taken from the Tegra DSI driver, so I'm not sure what
+> these are exactly, but that should be addressed.
+> 
+> >> + */
+> >> +int phy_mipi_dphy_get_default_config(unsigned long pixel_clock,
+> >> +				     unsigned int bpp,
+> >> +				     unsigned int lanes,
+> >> +				     struct phy_configure_opts_mipi_dphy *cfg)
+> >> +{
+> >> +	unsigned long hs_clk_rate;
+> >> +	unsigned long ui;
+> >> +
+> >> +	if (!cfg)
+> >> +		return -EINVAL;
+> > 
+> > Should we really expect cfg to be NULL ?
+> 
+> It avoids a kernel panic and it's not in a hot patch, so I'd say yes?
 
-We meant this as a debug tool and a stop-gap measure, respectively, so
-it might not be what you're expecting, and I'm kind of expecting to
-have the libva fade away with media frameworks getting native support.
+A few line below you divide by the lanes parameter without checking whether it 
+is equal to 0 first, which would also cause issues.
 
-> I think this might be a very good topic for the media summit in October if we
-> can get all the stakeholders together.
-
-I'll be there, so we can definitely discuss this.
-
-Maxime
+I believe that invalid values in input parameters should only be handled 
+explicitly when considered acceptable for the caller to pass such values. In 
+this case a NULL cfg pointer is a bug in the caller, which would get noticed 
+during development if the kernel panics.
 
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180907/2f28f91e/attachment.sig>
+Regards,
+
+Laurent Pinchart
