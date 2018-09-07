@@ -1,111 +1,38 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Fri, 7 Sep 2018 16:45:02 +0100
-Subject: [PATCH v2 01/40] iommu: Introduce Shared Virtual Addressing API
-In-Reply-To: <2fd4a0a1-1a35-bf82-df84-b995cce011d9@amd.com>
-References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
- <20180511190641.23008-2-jean-philippe.brucker@arm.com>
- <bf42affd-e9d0-e4fc-6d28-f3c3f7795348@redhat.com>
- <03d31ba5-1eda-ea86-8c0c-91d14c86fe83@arm.com>
- <ed39159c-087e-7e56-7d29-d1de9fa1677f@amd.com>
- <f0b317d5-e2e9-5478-952c-05e8b97bd68b@arm.com>
- <2fd4a0a1-1a35-bf82-df84-b995cce011d9@amd.com>
-Message-ID: <65e7accd-4446-19f5-c667-c6407e89cfa6@arm.com>
+From: aryabinin@virtuozzo.com (Andrey Ryabinin)
+Date: Fri, 7 Sep 2018 18:48:10 +0300
+Subject: [PATCH] arm64: lib: use C string functions with KASAN enabled.
+In-Reply-To: <20180907145605.GE12788@arm.com>
+References: <20180906170534.20726-1-aryabinin@virtuozzo.com>
+ <20180907145605.GE12788@arm.com>
+Message-ID: <9634affa-b210-d931-e40b-6e8a20f105fc@virtuozzo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/2018 09:55, Christian K?nig wrote:
-> I will take this as an opportunity to summarize some of the requirements 
-> we have for PASID management from the amdgpu driver point of view:
 
-That's incredibly useful, thanks :)
 
-> 1. We need to be able to allocate PASID between 1 and some maximum. Zero 
-> is reserved as far as I know, but we don't necessary need a minimum.
-
-Should be fine. The PASID range is restricted by the PCI PASID
-capability, firmware description (for non-PCI devices), the IOMMU
-capacity, and what the device driver passes to iommu_sva_device_init.
-Not all IOMMUs reserve PASID 0 (AMD IOMMU without GIoSup doesn't, if I'm
-not mistaken), so the KFD driver will need to pass min_pasid=1 to make
-sure that 0 isn't allocated.
-
-> 2. We need to be able to allocate PASIDs without a process address space 
-> backing it. E.g. our hardware uses PASIDs even without Shared Virtual 
-> Addressing enabled to distinct clients from each other.
->  ??? ??? Would be a pity if we need to still have a separate PASID 
-> handling because the system wide is only available when IOMMU is turned on.
-
-I'm still not sure about this one. From my point of view we shouldn't
-add to the IOMMU subsystem helpers for devices without an IOMMU.
-iommu-sva expects everywhere that the device has an iommu_domain, it's
-the first thing we check on entry. Bypassing all of this would call
-idr_alloc() directly, and wouldn't have any code in common with the
-current iommu-sva. So it seems like you need a layer on top of iommu-sva
-calling idr_alloc() when an IOMMU isn't present, but I don't think it
-should be in drivers/iommu/
-
-> 3. Even after destruction of a process address space we need some grace 
-> period before a PASID is reused because it can be that the specific 
-> PASID is still in some hardware queues etc...
->  ??? ??? At bare minimum all device drivers using process binding need 
-> to explicitly note to the core when they are done with a PASID.
-
-Right, much of the horribleness in iommu-sva deals with this:
-
-The process dies, iommu-sva is notified and calls the mm_exit() function
-passed by the device driver to iommu_sva_device_init(). In mm_exit() the
-device driver needs to clear any reference to the PASID in hardware and
-in its own structures. When the device driver returns from mm_exit(), it
-effectively tells the core that it has finished using the PASID, and
-iommu-sva can reuse the PASID for another process. mm_exit() is allowed
-to block, so the device driver has time to clean up and flush the queues.
-
-If the device driver finishes using the PASID before the process exits,
-it just calls unbind().
-
-> 4. It would be nice to have to be able to set a "void *" for each 
-> PASID/device combination while binding to a process which then can be 
-> queried later on based on the PASID.
->  ??? ??? E.g. when you have a per PASID/device structure around anyway, 
-> just add an extra field.
-
-iommu_sva_bind_device() takes a "drvdata" pointer that is stored
-internally for the PASID/device combination (iommu_bond). It is passed
-to mm_exit(), but I haven't added anything for the device driver to
-query it back.
-
-> 5. It would be nice to have to allocate multiple PASIDs for the same 
-> process address space.
->  ??? ??? E.g. some teams at AMD want to use a separate GPU address space 
-> for their userspace client library. I'm still trying to avoid that, but 
-> it is perfectly possible that we are going to need that.
-
-Two PASIDs pointing to the same process pgd? At first glance it seems
-feasible, maybe with a flag passed to bind() and a few changes to
-internal structures. It will duplicate ATC invalidation commands for
-each process address space change (munmap etc) so you might take a
-performance hit.
-
-Intel's SVM code has the SVM_FLAG_PRIVATE_PASID which seems similar to
-what you describe, but I don't plan to support it in this series (the
-io_mm model is already pretty complicated). I think it can be added
-without too much effort in a future series, though with a different flag
-name since we'd like to use "private PASID" for something else
-(https://www.spinics.net/lists/dri-devel/msg177007.html).
-
-Thanks,
-Jean
-
->  ??? ??? Additional to that it is sometimes quite useful for debugging 
-> to isolate where exactly an incorrect access (segfault) is coming from.
-> 
-> Let me know if there are some problems with that, especially I want to 
-> know if there is pushback on #5 so that I can forward that :)
-> 
-> Thanks,
-> Christian.
-> 
+On 09/07/2018 05:56 PM, Will Deacon wrote:
+> On Thu, Sep 06, 2018 at 08:05:33PM +0300, Andrey Ryabinin wrote:
+>> ARM64 has asm implementations of memchr(), memcmp(), str[r]chr(),
+>> str[n]cmp(), str[n]len(). KASAN don't see memory accesses in asm
+>> code, thus it can potentially miss many bugs.
 >>
->> Thanks,
->> Jean
+>> Ifdef out __HAVE_ARCH_* defines of these functions when KASAN is
+>> enabled, so the generic implementations from lib/string.c will be used.
+>>
+>> Declare asm functions as weak instead of removing them because they
+>> still can be used by efistub.
+> 
+> I don't understand this bit: efistub uses the __pi_ prefixed versions of the
+> routines, so why do we need to declare them as weak?
+
+Weak needed because we can't have two non-weak functions with the same name.
+
+Alternative approach would be to never use e.g. "strlen" name for asm implementation of strlen() under CONFIG_KASAN=y.
+But that would require adding some special ENDPIPROC_KASAN() macro since we want __pi_strlen() to point
+to the asm_strlen().
+
+Using weak seems like a way better solution to me.
+
+> 
+> Will
 > 
