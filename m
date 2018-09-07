@@ -1,84 +1,48 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Fri, 7 Sep 2018 14:00:39 +0800
-Subject: [RESEND PATCH] usb: mtu3: disable vbus rise/fall interrupts of ltssm
-Message-ID: <6e7bed46598dfb65f43c2490802a51a8b50cd257.1536299914.git.chunfeng.yun@mediatek.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Fri, 7 Sep 2018 02:15:32 -0400
+Subject: [PATCH 3/5] arm64: mm: Copy over arch_get_unmapped_area
+In-Reply-To: <20180829124543.25314-4-steve.capper@arm.com>
+References: <20180829124543.25314-1-steve.capper@arm.com>
+ <20180829124543.25314-4-steve.capper@arm.com>
+Message-ID: <0b6b0dba-b8ae-3e8d-68d1-6b93dfb777c0@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The vbus rise & fall interrupts are used to enable and disable
-U3 function of device automatically, this cause some issues when
-class driver is initialized as deactivated, and will skip over
-software-controlled connect by pullup(), but UDC wants to keep
-disconnect until usb_gadget_activate() is called which calls
-pullup() if needed. So we disable vbus rise & fall interrupts
-and just use pullup() to enable & disable U3 function, and reset
-mtu3 state when disconnect instead when vbus fall.
+On 08/29/2018 08:45 AM, Steve Capper wrote:
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- drivers/usb/mtu3/mtu3_core.c   |  4 ++--
- drivers/usb/mtu3/mtu3_gadget.c | 22 ++++++++++++++--------
- 2 files changed, 16 insertions(+), 10 deletions(-)
+> In order to support 52-bit VAs for userspace we need to alter the mmap
+> area choosing logic to give 52-bit VAs where "high" addresses are
+> requested.
 
-diff --git a/drivers/usb/mtu3/mtu3_core.c b/drivers/usb/mtu3/mtu3_core.c
-index d045d84..ae70b9b 100644
---- a/drivers/usb/mtu3/mtu3_core.c
-+++ b/drivers/usb/mtu3/mtu3_core.c
-@@ -185,8 +185,8 @@ static void mtu3_intr_enable(struct mtu3 *mtu)
- 
- 	if (mtu->is_u3_ip) {
- 		/* Enable U3 LTSSM interrupts */
--		value = HOT_RST_INTR | WARM_RST_INTR | VBUS_RISE_INTR |
--		    VBUS_FALL_INTR | ENTER_U3_INTR | EXIT_U3_INTR;
-+		value = HOT_RST_INTR | WARM_RST_INTR |
-+			ENTER_U3_INTR | EXIT_U3_INTR;
- 		mtu3_writel(mbase, U3D_LTSSM_INTR_ENABLE, value);
- 	}
- 
-diff --git a/drivers/usb/mtu3/mtu3_gadget.c b/drivers/usb/mtu3/mtu3_gadget.c
-index 5c60a8c..bbcd333 100644
---- a/drivers/usb/mtu3/mtu3_gadget.c
-+++ b/drivers/usb/mtu3/mtu3_gadget.c
-@@ -585,6 +585,17 @@ static int mtu3_gadget_stop(struct usb_gadget *g)
- 	.udc_stop = mtu3_gadget_stop,
- };
- 
-+static void mtu3_state_reset(struct mtu3 *mtu)
-+{
-+	mtu->address = 0;
-+	mtu->ep0_state = MU3D_EP0_STATE_SETUP;
-+	mtu->may_wakeup = 0;
-+	mtu->u1_enable = 0;
-+	mtu->u2_enable = 0;
-+	mtu->delayed_status = false;
-+	mtu->test_mode = false;
-+}
-+
- static void init_hw_ep(struct mtu3 *mtu, struct mtu3_ep *mep,
- 		u32 epnum, u32 is_in)
- {
-@@ -702,6 +713,7 @@ void mtu3_gadget_disconnect(struct mtu3 *mtu)
- 		spin_lock(&mtu->lock);
- 	}
- 
-+	mtu3_state_reset(mtu);
- 	usb_gadget_set_state(&mtu->g, USB_STATE_NOTATTACHED);
- }
- 
-@@ -712,12 +724,6 @@ void mtu3_gadget_reset(struct mtu3 *mtu)
- 	/* report disconnect, if we didn't flush EP state */
- 	if (mtu->g.speed != USB_SPEED_UNKNOWN)
- 		mtu3_gadget_disconnect(mtu);
--
--	mtu->address = 0;
--	mtu->ep0_state = MU3D_EP0_STATE_SETUP;
--	mtu->may_wakeup = 0;
--	mtu->u1_enable = 0;
--	mtu->u2_enable = 0;
--	mtu->delayed_status = false;
--	mtu->test_mode = false;
-+	else
-+		mtu3_state_reset(mtu);
- }
+<snip>
+
+> +unsigned long
+> +arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
+> +			  const unsigned long len, const unsigned long pgoff,
+> +			  const unsigned long flags)
+
+<snip>
+
+> +	/* requested length too big for entire address space */
+> +	if (len > TASK_SIZE - mmap_min_addr)
+> +		return -ENOMEM;
+> +
+> +	if (flags & MAP_FIXED)
+> +		return addr;
+
+arch/x86/mm/mmap.c:
+
+ *  With 5-level paging this request would be granted and result in a
+ *  mapping which crosses the border of the 47-bit virtual address
+ *  space. If the application cannot handle addresses above 47-bit this
+ *  will lead to misbehaviour and hard to diagnose failures.
+ *
+ * Therefore ignore address hints which would result in a mapping
+ * crossing the 47-bit virtual address boundary.
+
+You'll probably want something similar above.
+
+Jon.
+
 -- 
-1.9.1
+Computer Architect | Sent from my Fedora powered laptop
