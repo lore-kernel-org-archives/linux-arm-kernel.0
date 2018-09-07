@@ -1,34 +1,50 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Fri,  7 Sep 2018 18:33:47 +0200
-Subject: [PATCH 2/2] media: cedrus: Add TODO file with tasks to complete
- before unstaging
-In-Reply-To: <20180907163347.32312-1-contact@paulk.fr>
-References: <20180907163347.32312-1-contact@paulk.fr>
-Message-ID: <20180907163347.32312-3-contact@paulk.fr>
+From: stripathi@amperecomputing.com (Suman Tripathi)
+Date: Fri, 7 Sep 2018 16:35:02 +0000
+Subject: [PATCH v3] ata: Disable AHCI ALPM feature for Ampere Computing
+ eMAG SATA
+In-Reply-To: <cd3e5c60-1619-9842-6198-e36fdbaa4b4b@kernel.dk>
+References: <1536257111-27948-1-git-send-email-stripathi@amperecomputing.com>
+ <d3682fff-473f-021a-c805-466030b7644e@redhat.com>
+ <MWHPR01MB2336EE4B6E4923C9ED851F20B3010@MWHPR01MB2336.prod.exchangelabs.com>
+ <cd3e5c60-1619-9842-6198-e36fdbaa4b4b@kernel.dk>
+Message-ID: <MWHPR01MB2336534C2B5343D4235063E3B3000@MWHPR01MB2336.prod.exchangelabs.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the elements listed are complete, the Cedrus driver will be ready
-to move out of the staging area of the kernel.
+Hi Jens
 
-Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
----
- drivers/staging/media/sunxi/cedrus/TODO | 7 +++++++
- 1 file changed, 7 insertions(+)
- create mode 100644 drivers/staging/media/sunxi/cedrus/TODO
+With regards,
+Suman
 
-diff --git a/drivers/staging/media/sunxi/cedrus/TODO b/drivers/staging/media/sunxi/cedrus/TODO
-new file mode 100644
-index 000000000000..ec277ece47af
---- /dev/null
-+++ b/drivers/staging/media/sunxi/cedrus/TODO
-@@ -0,0 +1,7 @@
-+Before this stateless decoder driver can leave the staging area:
-+* The Request API needs to be stabilized;
-+* The codec-specific controls need to be thoroughly reviewed to ensure they
-+  cover all intended uses cases;
-+* Userspace support for the Request API needs to be reviewed;
-+* Another stateless decoder driver should be submitted;
-+* At least one stateless encoder driver should be submitted.
--- 
-2.18.0
+
+
+>-----Original Message-----
+>From: Jens Axboe <axboe@kernel.dk>
+>Sent: Friday, September 7, 2018 7:26 AM
+>To: Suman Tripathi <stripathi@amperecomputing.com>; Hans de Goede
+><hdegoede@redhat.com>; tj at kernel.org; linux-ide at vger.kernel.org; linux-
+>arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+>joe at perches.com; arnd at arndb.de; gregkh at linuxfoundation.org
+>Cc: Open Source Submission <patches@amperecomputing.com>; Rameshwar
+>Sahu <Rameshwar.Sahu@amperecomputing.com>
+>Subject: Re: [PATCH v3] ata: Disable AHCI ALPM feature for Ampere Computing
+>eMAG SATA
+>
+>[NOTICE: This email originated from an external sender. Please be mindful of
+>safe email handling and proprietary information protection practices.]
+>_____________________________________________________________
+>___________________________________________________________
+>
+>On 9/6/18 2:08 PM, Suman Tripathi wrote:
+>>> Sorry, but the patch is still coming through mangled. Did you use git
+>>> send-email ?
+>>
+>> [Suman Tripathi] yes. I rechecked before sending twice. Sorry for the
+>> inconvenience. Will figure the issue out
+>
+>I can apply it manually while you work out the kinks in your email setup. It might
+>even be your company MTA mangling it, I've seen all sorts of crazy like that.
+Thanks for the support. We are working with IT to fix this issue.
+>
+>--
+>Jens Axboe
