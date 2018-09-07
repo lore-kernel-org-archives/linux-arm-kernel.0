@@ -1,109 +1,99 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 8 Sep 2018 01:47:24 +0900
-Subject: [PATCH v2 6/9] kbuild: consolidate Devicetree dtb build rules
-In-Reply-To: <CAL_JsqJeTqxFPxZfuusPxuOTsVbVk_Uhue6NXwpotkwZWHrCDw@mail.gmail.com>
-References: <20180905235327.5996-1-robh@kernel.org>
- <20180905235327.5996-7-robh@kernel.org>
- <CAK7LNARD+_kV=XtJ66mZBU-CPMQgWF+oQtv4bGKaGGARNwzXiQ@mail.gmail.com>
- <CAL_JsqJeTqxFPxZfuusPxuOTsVbVk_Uhue6NXwpotkwZWHrCDw@mail.gmail.com>
-Message-ID: <CAK7LNATqTh4oxG5uz2Z4gk0J=kXP62UX2r3cP9Kd2aCSTXzTuA@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri,  7 Sep 2018 17:52:15 +0100
+Subject: [PATCH] firmware: arm_scmi: use strlcpy to ensure NULL-terminated
+ strings
+Message-ID: <1536339135-5431-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Replace all the memcpy() for copying name strings from the firmware with
+strlcpy() to make sure we are bounded by the source buffer size and we
+also always have NULL-terminated strings.
 
-2018-09-07 21:17 GMT+09:00 Rob Herring <robh@kernel.org>:
-> On Fri, Sep 7, 2018 at 5:33 AM Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
->>
->> 2018-09-06 8:53 GMT+09:00 Rob Herring <robh@kernel.org>:
->> > There is nothing arch specific about building dtb files other than their
->> > location under /arch/*/boot/dts/. Keeping each arch aligned is a pain.
->> > The dependencies and supported targets are all slightly different.
->> > Also, a cross-compiler for each arch is needed, but really the host
->> > compiler preprocessor is perfectly fine for building dtbs. Move the
->> > build rules to a common location and remove the arch specific ones. This
->> > is done in a single step to avoid warnings about overriding rules.
->> >
->> > The build dependencies had been a mixture of 'scripts' and/or 'prepare'.
->> > These pull in several dependencies some of which need a target compiler
->> > (specifically devicetable-offsets.h) and aren't needed to build dtbs.
->> > All that is really needed is dtc, so adjust the dependencies to only be
->> > dtc.
->> >
->> > This change enables support 'dtbs_install' on some arches which were
->> > missing the target.
->> >
->> > Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
->> > Cc: Michal Marek <michal.lkml@markovi.net>
->> > Cc: Vineet Gupta <vgupta@synopsys.com>
->> > Cc: Russell King <linux@armlinux.org.uk>
->> > Cc: Catalin Marinas <catalin.marinas@arm.com>
->> > Cc: Will Deacon <will.deacon@arm.com>
->> > Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
->> > Cc: Michal Simek <monstr@monstr.eu>
->> > Cc: Ralf Baechle <ralf@linux-mips.org>
->> > Cc: Paul Burton <paul.burton@mips.com>
->> > Cc: James Hogan <jhogan@kernel.org>
->> > Cc: Ley Foon Tan <lftan@altera.com>
->> > Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
->> > Cc: Paul Mackerras <paulus@samba.org>
->> > Cc: Michael Ellerman <mpe@ellerman.id.au>
->> > Cc: Chris Zankel <chris@zankel.net>
->> > Cc: Max Filippov <jcmvbkbc@gmail.com>
->> > Cc: linux-kbuild at vger.kernel.org
->> > Cc: linux-snps-arc at lists.infradead.org
->> > Cc: linux-arm-kernel at lists.infradead.org
->> > Cc: uclinux-h8-devel at lists.sourceforge.jp
->> > Cc: linux-mips at linux-mips.org
->> > Cc: nios2-dev at lists.rocketboards.org
->> > Cc: linuxppc-dev at lists.ozlabs.org
->> > Cc: linux-xtensa at linux-xtensa.org
->> > Signed-off-by: Rob Herring <robh@kernel.org>
->> > ---
->> > Please ack so I can take the whole series via the DT tree.
->> >
->> > v2:
->> >  - Fix $arch/boot/dts path check for out of tree builds
->> >  - Fix dtc dependency for building built-in dtbs
->> >  - Fix microblaze built-in dtb building
->>
->>
->> This breaks parallel building
->> because two threads could descend into scripts/dtc
->> at the same time.
->>
->> 'all' depends on both 'scripts' and 'dtc'.
->>
->> * 'scripts' target -- descends into scripts/, then scripts/dtc
->> * 'dtc' target     -- descents into scripts/dtc directly
->
-> Any suggestions for how to fix given the problem with depending on
-> scripts? I suppose I could make scripts depend on dtc instead, but I'd
-> be back to needing to fix cleaning.
+This is needed to avoid out of bounds accesses if the firmware returns
+a non-terminated string.
 
-How about making 'prepare' depend on 'dtc'?
+Reported-by: Olof Johansson <olof@lixom.net>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ drivers/firmware/arm_scmi/base.c    | 2 +-
+ drivers/firmware/arm_scmi/clock.c   | 2 +-
+ drivers/firmware/arm_scmi/perf.c    | 2 +-
+ drivers/firmware/arm_scmi/power.c   | 2 +-
+ drivers/firmware/arm_scmi/sensors.c | 2 +-
+ 5 files changed, 5 insertions(+), 5 deletions(-)
 
-Then, remove
-subdir-$(CONFIG_DTC)         += dtc
-from scripts/Makefile
+Hi Olof,
 
-but, add dtc to subdir-
+Let me know if this is rc/fix material or need to wait for v4.20 ?
 
+Regards,
+Sudeep
 
-> Or I could just skip removing the
-> cross compiler dependency for now.
+diff --git a/drivers/firmware/arm_scmi/base.c b/drivers/firmware/arm_scmi/base.c
+index 9dff33ea6416..204390297f4b 100644
+--- a/drivers/firmware/arm_scmi/base.c
++++ b/drivers/firmware/arm_scmi/base.c
+@@ -208,7 +208,7 @@ static int scmi_base_discover_agent_get(const struct scmi_handle *handle,
 
-I want to build scripts/
-without target compiler.
+ 	ret = scmi_do_xfer(handle, t);
+ 	if (!ret)
+-		memcpy(name, t->rx.buf, SCMI_MAX_STR_SIZE);
++		strlcpy(name, t->rx.buf, SCMI_MAX_STR_SIZE);
 
-modpost is a special host-program
-that depends on $(CC).
+ 	scmi_xfer_put(handle, t);
 
-I will take a look at it
-when I find some time.
+diff --git a/drivers/firmware/arm_scmi/clock.c b/drivers/firmware/arm_scmi/clock.c
+index e4119eb34986..30fc04e28431 100644
+--- a/drivers/firmware/arm_scmi/clock.c
++++ b/drivers/firmware/arm_scmi/clock.c
+@@ -111,7 +111,7 @@ static int scmi_clock_attributes_get(const struct scmi_handle *handle,
 
+ 	ret = scmi_do_xfer(handle, t);
+ 	if (!ret)
+-		memcpy(clk->name, attr->name, SCMI_MAX_STR_SIZE);
++		strlcpy(clk->name, attr->name, SCMI_MAX_STR_SIZE);
+ 	else
+ 		clk->name[0] = '\0';
 
--- 
-Best Regards
-Masahiro Yamada
+diff --git a/drivers/firmware/arm_scmi/perf.c b/drivers/firmware/arm_scmi/perf.c
+index 721e6c57beae..c3b0041defee 100644
+--- a/drivers/firmware/arm_scmi/perf.c
++++ b/drivers/firmware/arm_scmi/perf.c
+@@ -168,7 +168,7 @@ scmi_perf_domain_attributes_get(const struct scmi_handle *handle, u32 domain,
+ 					le32_to_cpu(attr->sustained_perf_level);
+ 		dom_info->mult_factor =	(dom_info->sustained_freq_khz * 1000) /
+ 					dom_info->sustained_perf_level;
+-		memcpy(dom_info->name, attr->name, SCMI_MAX_STR_SIZE);
++		strlcpy(dom_info->name, attr->name, SCMI_MAX_STR_SIZE);
+ 	}
+
+ 	scmi_xfer_put(handle, t);
+diff --git a/drivers/firmware/arm_scmi/power.c b/drivers/firmware/arm_scmi/power.c
+index cfa033b05aed..62f3401a1f01 100644
+--- a/drivers/firmware/arm_scmi/power.c
++++ b/drivers/firmware/arm_scmi/power.c
+@@ -106,7 +106,7 @@ scmi_power_domain_attributes_get(const struct scmi_handle *handle, u32 domain,
+ 		dom_info->state_set_notify = SUPPORTS_STATE_SET_NOTIFY(flags);
+ 		dom_info->state_set_async = SUPPORTS_STATE_SET_ASYNC(flags);
+ 		dom_info->state_set_sync = SUPPORTS_STATE_SET_SYNC(flags);
+-		memcpy(dom_info->name, attr->name, SCMI_MAX_STR_SIZE);
++		strlcpy(dom_info->name, attr->name, SCMI_MAX_STR_SIZE);
+ 	}
+
+ 	scmi_xfer_put(handle, t);
+diff --git a/drivers/firmware/arm_scmi/sensors.c b/drivers/firmware/arm_scmi/sensors.c
+index 27f2092b9882..b53d5cc9c9f6 100644
+--- a/drivers/firmware/arm_scmi/sensors.c
++++ b/drivers/firmware/arm_scmi/sensors.c
+@@ -140,7 +140,7 @@ static int scmi_sensor_description_get(const struct scmi_handle *handle,
+ 			s = &si->sensors[desc_index + cnt];
+ 			s->id = le32_to_cpu(buf->desc[cnt].id);
+ 			s->type = SENSOR_TYPE(attrh);
+-			memcpy(s->name, buf->desc[cnt].name, SCMI_MAX_STR_SIZE);
++			strlcpy(s->name, buf->desc[cnt].name, SCMI_MAX_STR_SIZE);
+ 		}
+
+ 		desc_index += num_returned;
+--
+2.7.4
