@@ -1,67 +1,42 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Fri, 7 Sep 2018 14:31:36 +0800
-Subject: [SPAM][PATCH] usb: xhci: fix interrupt transfer error happened
- on MTK platforms
-In-Reply-To: <afafa68eb3a74a414848c116382e95811f924905.1536298766.git.chunfeng.yun@mediatek.com>
-References: <afafa68eb3a74a414848c116382e95811f924905.1536298766.git.chunfeng.yun@mediatek.com>
-Message-ID: <1536301896.6414.48.camel@mtkswgap22>
+From: jcm@redhat.com (Jon Masters)
+Date: Fri, 7 Sep 2018 02:36:08 -0400
+Subject: [RFC PATCH 00/11] Avoid synchronous TLB invalidation for
+ intermediate page-table entries on arm64
+In-Reply-To: <20180905122828.GF20186@arm.com>
+References: <1535125966-7666-1-git-send-email-will.deacon@arm.com>
+ <3dd55e21-7424-071a-0f7e-d24fc2396f2a@redhat.com>
+ <20180905122828.GF20186@arm.com>
+Message-ID: <f8ba271b-87c0-29ef-1216-77d5d391d5c8@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Should add Fixes: tag and Cc: <stable@vger.kernel.org> also to apply the patch to the stable tree. Otherwise, the problem still is kept in the stable kernel.
-
-The patch really can solve the problem by testing with the ASIX AX88179 u3 Ethernet can't work since v4.17.x.
-
-So, Tested-by: Sean Wang <sean.wang@mediatek.com>
- 
-and attach the log testing with AX88179
-
-[  126.369574] usb 2-1: new SuperSpeed Gen 1 USB device number 2 using xhci-mtk
-[  126.730806] ax88179_178a 2-1:1.0 eth2: register 'ax88179_178a' at usb-1a0c0000.usb-1, ASIX AX88179 USB 3.0 Gigabit Ethernet, 00:11:6b:68:4c:9e
-[  126.759932] ax88179_178a 2-1:1.0 enx00116b684c9e: renamed from eth2
-
-~# ifconfig enx00116b684c9e 10.10.10.1
-~# ping 10[  147.613266] ax88179_178a 2-1:1.0 enx00116b684c9e: ax88179 - Link status is: 1
-.10.10.3
-PING 10.10.10.3 (10.10.10.3) 56(84) bytes of data.
-64 bytes from 10.10.10.3: icmp_seq=1 ttl=64 time=0.414 ms
-64 bytes from 10.10.10.3: icmp_seq=2 ttl=64 time=0.422 ms
-64 bytes from 10.10.10.3: icmp_seq=3 ttl=64 time=0.376 ms
-64 bytes from 10.10.10.3: icmp_seq=4 ttl=64 time=0.309 ms
-64 bytes from 10.10.10.3: icmp_seq=5 ttl=64 time=0.392 ms
-64 bytes from 10.10.10.3: icmp_seq=6 ttl=64 time=0.355 ms
-64 bytes from 10.10.10.3: icmp_seq=7 ttl=64 time=0.407 ms
-64 bytes from 10.10.10.3: icmp_seq=8 ttl=64 time=0.325 ms
-
-On Fri, 2018-09-07 at 13:51 +0800, Chunfeng Yun wrote:
-> The MTK xHCI controller use some reserved bytes in endpoint context for
-> bandwidth scheduling, so need keep them in xhci_endpoint_copy();
+On 09/05/2018 08:28 AM, Will Deacon wrote:
+> On Tue, Sep 04, 2018 at 02:38:02PM -0400, Jon Masters wrote:
+>> On 08/24/2018 11:52 AM, Will Deacon wrote:
+>>
+>>> I hacked up this RFC on the back of the recent changes to the mmu_gather
+>>> stuff in mainline. It's had a bit of testing and it looks pretty good so
+>>> far.
+>>
+>> I will request the server folks go and test this. You'll probably
+>> remember a couple of parts we've seen where aggressive walker caches
+>> ended up (correctly) seeing stale page table entries and we had all
+>> manner of horrifically hard to debug problems. We have some fairly nice
+>> reproducers that were able to find this last time that we can test.
 > 
-> The issue is introduced by:
-> commit f5249461b504 ("xhci: Clear the host side toggle manually when
-> endpoint is soft reset")
-> It resets endpoints and will drop bandwidth scheduling parameters used
-> by interrupt or isochronous endpoints on MTK xHCI controller.
+> Cheers, Jon, that would be very helpful. You're probably best off using
+> my (rebasing) tlb branch rather than picking the RFC:
 > 
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> ---
->  drivers/usb/host/xhci-mem.c | 4 ++++
->  1 file changed, 4 insertions(+)
+>   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git tlb
 > 
-> diff --git a/drivers/usb/host/xhci-mem.c b/drivers/usb/host/xhci-mem.c
-> index ef350c3..b1f27aa 100644
-> --- a/drivers/usb/host/xhci-mem.c
-> +++ b/drivers/usb/host/xhci-mem.c
-> @@ -1613,6 +1613,10 @@ void xhci_endpoint_copy(struct xhci_hcd *xhci,
->  	in_ep_ctx->ep_info2 = out_ep_ctx->ep_info2;
->  	in_ep_ctx->deq = out_ep_ctx->deq;
->  	in_ep_ctx->tx_info = out_ep_ctx->tx_info;
-> +	if (xhci->quirks & XHCI_MTK_HOST) {
-> +		in_ep_ctx->reserved[0] = out_ep_ctx->reserved[0];
-> +		in_ep_ctx->reserved[1] = out_ep_ctx->reserved[1];
-> +	}
->  }
->  
->  /* Copy output xhci_slot_ctx to the input xhci_slot_ctx.
+> Let me know if you'd prefer something stable (I can tag it with a date).
+
+That would be useful. I've prodded each of the Arm server SoC vendors I
+work with via our weekly call to have them each specifically check this.
+A tag would be helpful to that effort I expect. They all claim to be
+watching this thread now, so we'll see if they see cabbages here.
+
+Jon.
+
+-- 
+Computer Architect | Sent from my Fedora powered laptop
