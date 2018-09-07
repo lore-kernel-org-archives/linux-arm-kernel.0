@@ -1,50 +1,154 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Fri,  7 Sep 2018 15:12:52 +0200
-Subject: [PULL RESEND v2 0/4] KVM/ARM Fixes for v4.19
-Message-ID: <20180907131256.2412-1-christoffer.dall@arm.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Fri, 7 Sep 2018 15:13:19 +0200
+Subject: [PATCH v9 5/9] media: platform: Add Cedrus VPU decoder driver
+In-Reply-To: <20180906222442.14825-6-contact@paulk.fr>
+References: <20180906222442.14825-1-contact@paulk.fr>
+ <20180906222442.14825-6-contact@paulk.fr>
+Message-ID: <4b30c0bf-e525-1868-f625-569d4a104aa0@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Radim and Paolo,
+On 09/07/2018 12:24 AM, Paul Kocialkowski wrote:
+> From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> 
+> This introduces the Cedrus VPU driver that supports the VPU found in
+> Allwinner SoCs, also known as Video Engine. It is implemented through
+> a V4L2 M2M decoder device and a media device (used for media requests).
+> So far, it only supports MPEG-2 decoding.
+> 
+> Since this VPU is stateless, synchronization with media requests is
+> required in order to ensure consistency between frame headers that
+> contain metadata about the frame to process and the raw slice data that
+> is used to generate the frame.
+> 
+> This driver was made possible thanks to the long-standing effort
+> carried out by the linux-sunxi community in the interest of reverse
+> engineering, documenting and implementing support for the Allwinner VPU.
+> 
+> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
-Here is the first small round of fixes for KVM/ARM for v4.19.  The
-changes include:
+One high-level comment:
 
- - Fix a VFP corruption in 32-bit guest
- - Add missing cache invalidation for CoW pages
- - Two small cleanups
+Can you add a TODO file for this staging driver? This can be done in
+a follow-up patch.
 
-This is a v2 because I forgot to add the appropriate cc stable on the first two
-patches, otherwise there is no difference.
+It should contain what needs to be done to get this out of staging:
 
-The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+- Request API needs to stabilize
+- Userspace support for stateless codecs must be created
+- Ideally one other stateless decoder driver and at least one
+  stateless encoder driver should be implemented to ensure that nothing
+  was forgotten in the Request API.
+- Anything else?
 
-  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+And a few last code comments:
 
-are available in the Git repository at:
+> ---
+>  MAINTAINERS                                   |   7 +
+>  drivers/staging/media/Kconfig                 |   2 +
+>  drivers/staging/media/Makefile                |   1 +
+>  drivers/staging/media/sunxi/Kconfig           |  15 +
+>  drivers/staging/media/sunxi/Makefile          |   1 +
+>  drivers/staging/media/sunxi/cedrus/Kconfig    |  14 +
+>  drivers/staging/media/sunxi/cedrus/Makefile   |   3 +
+>  drivers/staging/media/sunxi/cedrus/cedrus.c   | 422 ++++++++++++++
+>  drivers/staging/media/sunxi/cedrus/cedrus.h   | 165 ++++++
+>  .../staging/media/sunxi/cedrus/cedrus_dec.c   |  70 +++
+>  .../staging/media/sunxi/cedrus/cedrus_dec.h   |  27 +
+>  .../staging/media/sunxi/cedrus/cedrus_hw.c    | 322 +++++++++++
+>  .../staging/media/sunxi/cedrus/cedrus_hw.h    |  30 +
+>  .../staging/media/sunxi/cedrus/cedrus_mpeg2.c | 237 ++++++++
+>  .../staging/media/sunxi/cedrus/cedrus_regs.h  | 233 ++++++++
+>  .../staging/media/sunxi/cedrus/cedrus_video.c | 544 ++++++++++++++++++
+>  .../staging/media/sunxi/cedrus/cedrus_video.h |  30 +
+>  17 files changed, 2123 insertions(+)
+>  create mode 100644 drivers/staging/media/sunxi/Kconfig
+>  create mode 100644 drivers/staging/media/sunxi/Makefile
+>  create mode 100644 drivers/staging/media/sunxi/cedrus/Kconfig
+>  create mode 100644 drivers/staging/media/sunxi/cedrus/Makefile
+>  create mode 100644 drivers/staging/media/sunxi/cedrus/cedrus.c
+>  create mode 100644 drivers/staging/media/sunxi/cedrus/cedrus.h
+>  create mode 100644 drivers/staging/media/sunxi/cedrus/cedrus_dec.c
+>  create mode 100644 drivers/staging/media/sunxi/cedrus/cedrus_dec.h
+>  create mode 100644 drivers/staging/media/sunxi/cedrus/cedrus_hw.c
+>  create mode 100644 drivers/staging/media/sunxi/cedrus/cedrus_hw.h
+>  create mode 100644 drivers/staging/media/sunxi/cedrus/cedrus_mpeg2.c
+>  create mode 100644 drivers/staging/media/sunxi/cedrus/cedrus_regs.h
+>  create mode 100644 drivers/staging/media/sunxi/cedrus/cedrus_video.c
+>  create mode 100644 drivers/staging/media/sunxi/cedrus/cedrus_video.h
+> 
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-fixes-for-v4.19-v2
+<snip>
 
-for you to fetch changes up to df3190e22016abf74ef67c9691e9fa1012a66bd5:
+> +static int cedrus_request_validate(struct media_request *req)
+> +{
+> +	struct media_request_object *obj;
+> +	struct v4l2_ctrl_handler *parent_hdl, *hdl;
+> +	struct cedrus_ctx *ctx = NULL;
+> +	struct v4l2_ctrl *ctrl_test;
+> +	unsigned int i;
+> +
+> +	if (vb2_request_buffer_cnt(req) != 1)
+> +		return -ENOENT;
 
-  arm64: KVM: Remove pgd_lock (2018-09-07 15:06:03 +0200)
+I would return ENOENT if there are no buffers, and EINVAL if there are too
+many. Returning ENOENT in the latter case would be very confusing.
 
----
-Marc Zyngier (3):
-      KVM: arm/arm64: Clean dcache to PoC when changing PTE due to CoW
-      arm64: KVM: Only force FPEXC32_EL2.EN if trapping FPSIMD
-      KVM: Remove obsolete kvm_unmap_hva notifier backend
+I also highly recommend that you add v4l2_info lines for these errors.
 
-Steven Price (1):
-      arm64: KVM: Remove pgd_lock
+> +
+> +	list_for_each_entry(obj, &req->objects, list) {
+> +		struct vb2_buffer *vb;
+> +
+> +		if (vb2_request_object_is_buffer(obj)) {
+> +			vb = container_of(obj, struct vb2_buffer, req_obj);
+> +			ctx = vb2_get_drv_priv(vb->vb2_queue);
+> +
+> +			break;
+> +		}
+> +	}
+> +
+> +	if (!ctx)
+> +		return -ENOENT;
+> +
+> +	parent_hdl = &ctx->hdl;
+> +
+> +	hdl = v4l2_ctrl_request_hdl_find(req, parent_hdl);
+> +	if (!hdl) {
+> +		v4l2_err(&ctx->dev->v4l2_dev, "Missing codec control(s)\n");
 
- arch/arm/include/asm/kvm_host.h   |  1 -
- arch/arm64/include/asm/kvm_host.h |  4 +---
- arch/arm64/kvm/hyp/switch.c       |  9 ++++++---
- arch/mips/include/asm/kvm_host.h  |  1 -
- arch/mips/kvm/mmu.c               | 10 ----------
- arch/x86/include/asm/kvm_host.h   |  1 -
- arch/x86/kvm/mmu.c                |  5 -----
- virt/kvm/arm/mmu.c                | 21 ++++++++-------------
- virt/kvm/arm/trace.h              | 15 ---------------
- 9 files changed, 15 insertions(+), 52 deletions(-)
+Should be v4l2_info: it is not a driver error, it is just an info message.
+
+> +		return -ENOENT;
+> +	}
+> +
+> +	for (i = 0; i < CEDRUS_CONTROLS_COUNT; i++) {
+> +		if (cedrus_controls[i].codec != ctx->current_codec ||
+> +		    !cedrus_controls[i].required)
+> +			continue;
+> +
+> +		ctrl_test = v4l2_ctrl_request_hdl_ctrl_find(hdl,
+> +			cedrus_controls[i].id);
+> +		if (!ctrl_test) {
+> +			v4l2_err(&ctx->dev->v4l2_dev,
+> +				 "Missing required codec control\n");
+
+Ditto.
+
+> +			return -ENOENT;
+> +		}
+> +	}
+> +
+> +	v4l2_ctrl_request_hdl_put(hdl);
+> +
+> +	return vb2_request_validate(req);
+> +}
+
+Not worth making a v10, but you can do this in a follow-up patch.
+
+Once I have the two follow-up patches I'll make a pull request.
+
+Regards,
+
+	Hans
