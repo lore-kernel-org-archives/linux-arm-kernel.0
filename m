@@ -1,34 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 7 Sep 2018 10:20:49 -0700
-Subject: [PATCH] ARM: omap2+: hwmod_core: improve the support for clkctrl
- clocks
-In-Reply-To: <20180907171549.GM5662@atomide.com>
-References: <1535727683-23930-1-git-send-email-t-kristo@ti.com>
- <20180907171549.GM5662@atomide.com>
-Message-ID: <20180907172049.GN5662@atomide.com>
+From: naresh.kamboju@linaro.org (Naresh Kamboju)
+Date: Fri, 7 Sep 2018 22:53:04 +0530
+Subject: [PATCH] [v3] drm/sun4i: fix build failure with
+ CONFIG_DRM_SUN8I_MIXER=m
+In-Reply-To: <105cb1cf-577a-043a-9b50-248a37090bdd@nvidia.com>
+References: <20180711144403.1022829-1-arnd@arndb.de>
+ <105cb1cf-577a-043a-9b50-248a37090bdd@nvidia.com>
+Message-ID: <CA+G9fYuw66eL+d7pxhSbH3J-D4wdOU7BEPL3rCWu-ntfB4OWog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [180907 17:20]:
-> Hi,
-> 
-> * Tero Kristo <t-kristo@ti.com> [180831 08:05]:
-> > This patch adds support for split memory ranges for clkctrl providers.
-> > This is necessary to support the coming clockdomain based split of
-> > clkctrl provider ranges, instead of the current CM instance based one.
-> > 
-> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> > ---
-> > Note: This patch can be applied independently, the only hard dependency
-> > with the clkctrl data split is with the DT changes, those must follow
-> > everything else.
-> 
-> Tero, looks like this won't apply against v4.19-rc1, can you
-> please repost?
+On 7 September 2018 at 15:11, Jon Hunter <jonathanh@nvidia.com> wrote:
+>
+> On 11/07/18 15:43, Arnd Bergmann wrote:
+>> Having DRM_SUN4I built-in but DRM_SUN8I_MIXER as a loadable module results in
+>> a link error, as we try to access a symbol from the sun8i_tcon_top.ko module:
+>>
+>> ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun8i-drm-hdmi.ko] undefined!
+>> ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun4i-drm.ko] undefined!
+>>
+>> This solves the problem by adding a silent symbol for the tcon_top module,
+>> building it as a separate module in exactly the cases that we need it,
+>> but in a way that it is reachable by the other modules.
+>>
+>> Fixes: 57e23de02f48 ("drm/sun4i: DW HDMI: Expand algorithm for possible crtcs")
+>> Fixes: ef0cf6441fbb ("drm/sun4i: Add support for traversing graph with TCON TOP")
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> I am seeing the following on today's -next (20180907) as well the last
+> few -next versions for that matter ...
+>
+> ERROR: "sun8i_tcon_top_de_config" [drivers/gpu/drm/sun4i/sun4i-tcon.ko] undefined!
+> ERROR: "sun8i_tcon_top_set_hdmi_src" [drivers/gpu/drm/sun4i/sun4i-tcon.ko] undefined!
+> ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun4i-tcon.ko] undefined!
+>
+> Seems like this issue has cropped up again as Arnd's fix is present. I
+> am seeing this on ARM64 builds.
 
-Oh never mind, it's because of the %pOF changes I applied,
-I'll resolve here.
+I do notice these failures on ARM64 builds on linux next 20180906 and 20180907.
 
-Regards,
+11:40:55 | ERROR: "sun8i_tcon_top_de_config"
+[drivers/gpu/drm/sun4i/sun4i-tcon.ko] undefined!
+11:40:55 | ERROR: "sun8i_tcon_top_set_hdmi_src"
+[drivers/gpu/drm/sun4i/sun4i-tcon.ko] undefined!
+11:40:55 | ERROR: "sun8i_tcon_top_of_table"
+[drivers/gpu/drm/sun4i/sun4i-tcon.ko] undefined!
 
-Tony
+Build full log can be found on this link.
+https://ci.linaro.org/view/lkft/job/openembedded-lkft-linux-next/DISTRO=rpb,MACHINE=dragonboard-410c,label=docker-stretch-amd64/346/console
+
+- Naresh
+
+>
+> Cheers
+> Jon
+>
+> --
+> nvpublic
