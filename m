@@ -1,55 +1,61 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 7 Sep 2018 15:23:11 +0200
-Subject: [PATCH v10 0/2] Initial Allwinner V3s CSI Support
-In-Reply-To: <CAGb2v67RP8bjObBJu_1JsREUo64hnEzptG_n-aYMn4Dcd_Zo-g@mail.gmail.com>
-References: <20180517090224.u3ygdzjr77im2mmp@flea>
- <20180529095757.qkz7jyuxza7movbc@flea.home>
- <20180530091934.tbd6xbyr5s3ipn3v@paasikivi.fi.intel.com>
- <CAGb2v67RP8bjObBJu_1JsREUo64hnEzptG_n-aYMn4Dcd_Zo-g@mail.gmail.com>
-Message-ID: <20180907132311.g7q3zzziiagqecae@flea>
+Date: Fri, 7 Sep 2018 15:26:20 +0200
+Subject: [PATCH v9 5/9] media: platform: Add Cedrus VPU decoder driver
+In-Reply-To: <4b30c0bf-e525-1868-f625-569d4a104aa0@xs4all.nl>
+References: <20180906222442.14825-1-contact@paulk.fr>
+ <20180906222442.14825-6-contact@paulk.fr>
+ <4b30c0bf-e525-1868-f625-569d4a104aa0@xs4all.nl>
+Message-ID: <20180907132620.lmsvlwpa3rzioj2h@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yong,
+Hi Hans,
 
-On Wed, Jun 20, 2018 at 12:45:03PM +0800, Chen-Yu Tsai wrote:
-> On Wed, May 30, 2018 at 5:19 PM, Sakari Ailus
-> <sakari.ailus@linux.intel.com> wrote:
-> > On Tue, May 29, 2018 at 11:57:57AM +0200, Maxime Ripard wrote:
-> >> On Thu, May 17, 2018 at 11:02:24AM +0200, Maxime Ripard wrote:
-> >> > On Fri, May 04, 2018 at 02:44:08PM +0800, Yong Deng wrote:
-> >> > > This patchset add initial support for Allwinner V3s CSI.
-> >> > >
-> >> > > Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
-> >> > > interface and CSI1 is used for parallel interface. This is not
-> >> > > documented in datasheet but by test and guess.
-> >> > >
-> >> > > This patchset implement a v4l2 framework driver and add a binding
-> >> > > documentation for it.
-> >> > >
-> >> > > Currently, the driver only support the parallel interface. And has been
-> >> > > tested with a BT1120 signal which generating from FPGA. The following
-> >> > > fetures are not support with this patchset:
-> >> > >   - ISP
-> >> > >   - MIPI-CSI2
-> >> > >   - Master clock for camera sensor
-> >> > >   - Power regulator for the front end IC
-> >> >
-> >> > I tested it on my H3 with a parallel camera, and it still works. Thanks!
-> >> >
-> >> > Hans, Sakari, any chance this might land in 4.18?
-> >>
-> >> Ping?
-> >
-> > I'll try to look into this soonish but it seems to be too late for 4.18.
-> > Sorry about that.
+On Fri, Sep 07, 2018 at 03:13:19PM +0200, Hans Verkuil wrote:
+> On 09/07/2018 12:24 AM, Paul Kocialkowski wrote:
+> > From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> > 
+> > This introduces the Cedrus VPU driver that supports the VPU found in
+> > Allwinner SoCs, also known as Video Engine. It is implemented through
+> > a V4L2 M2M decoder device and a media device (used for media requests).
+> > So far, it only supports MPEG-2 decoding.
+> > 
+> > Since this VPU is stateless, synchronization with media requests is
+> > required in order to ensure consistency between frame headers that
+> > contain metadata about the frame to process and the raw slice data that
+> > is used to generate the frame.
+> > 
+> > This driver was made possible thanks to the long-standing effort
+> > carried out by the linux-sunxi community in the interest of reverse
+> > engineering, documenting and implementing support for the Allwinner VPU.
+> > 
+> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> > Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 > 
-> Can we get this into 4.19?
+> One high-level comment:
+> 
+> Can you add a TODO file for this staging driver? This can be done in
+> a follow-up patch.
+> 
+> It should contain what needs to be done to get this out of staging:
+> 
+> - Request API needs to stabilize
+> - Userspace support for stateless codecs must be created
 
-Did you have some time to make the changes Sakari asked for? That
-would be great to have it in 4.20.
+On that particular note, as part of the effort to develop the driver,
+we've also developped two userspace components:
 
-Thanks!
+  - v4l2-request-test, that has a bunch of sample frames for various
+    codecs and will rely solely on the kernel request api (and DRM for
+    the display part) to test and bringup a particular driver
+    https://github.com/bootlin/v4l2-request-test
+
+  - libva-v4l2-request, that is a libva implementation using the
+    request API
+    https://github.com/bootlin/libva-v4l2-request
+
+Did you have something else in mind?
+
 Maxime
 
 -- 
@@ -62,4 +68,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180907/9d2a6c9a/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180907/74dbcadb/attachment.sig>
