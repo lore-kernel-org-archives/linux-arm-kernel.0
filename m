@@ -1,45 +1,46 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 7 Sep 2018 10:21:22 +0200
-Subject: [PATCH v4 08/11] arm64: dts: allwinner: a64: Add display pipeline
-In-Reply-To: <CAMty3ZBo+X5o22i1=HR9d1VjkEWQ7=DHHPL9RLtbzbyzCZLyFw@mail.gmail.com>
-References: <20180904044053.15425-1-icenowy@aosc.io>
- <20180904044053.15425-9-icenowy@aosc.io>
- <20180905075056.tob7itg3judccooe@flea>
- <CAMty3ZBo+X5o22i1=HR9d1VjkEWQ7=DHHPL9RLtbzbyzCZLyFw@mail.gmail.com>
-Message-ID: <20180907082122.bcylf2jpf6eq6dgq@flea>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Fri, 7 Sep 2018 10:18:51 +0200
+Subject: [PATCH] ARM: dts: at91: sama5d2_ptc_ek: fix nand pinctrl
+Message-ID: <20180907081851.15911-1-ludovic.desroches@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2018 at 09:43:29AM +0530, Jagan Teki wrote:
-> On Wed, Sep 5, 2018 at 1:20 PM, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > On Tue, Sep 04, 2018 at 12:40:50PM +0800, Icenowy Zheng wrote:
-> >> +             hdmi_phy: hdmi-phy at 1ef0000 {
-> >> +                     compatible = "allwinner,sun8i-h3-hdmi-phy";
-> >> +                     reg = <0x01ef0000 0x10000>;
-> >> +                     clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI_DDC>,
-> >> +                              <&ccu 7>;
-> >> +                     clock-names = "bus", "mod", "pll-0";
-> >> +                     resets = <&ccu RST_BUS_HDMI0>;
-> >> +                     reset-names = "phy";
-> >> +                     #phy-cells = <0>;
-> >> +             };
-> >
-> > This needs to use the bindings we have for that phy.
-> 
-> You mean allwinner,sun50i-a64-hdmi-phy ?
+The drive strength has to be set to medium otherwise some data
+corruption may happen.
 
-Yes
+Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+---
 
-Maxime
+Hi,
 
+This fix depends on the support of the drive-strength for the atmel pio4
+pinctroller. It has been added in v4.19 but I omitted to send it at the
+same time.
+
+Ludovic
+
+ arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts b/arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts
+index b10dccd0958f..3b1baa8605a7 100644
+--- a/arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts
++++ b/arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts
+@@ -11,6 +11,7 @@
+ #include "sama5d2-pinfunc.h"
+ #include <dt-bindings/mfd/atmel-flexcom.h>
+ #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/pinctrl/at91.h>
+ 
+ / {
+ 	model = "Atmel SAMA5D2 PTC EK";
+@@ -299,6 +300,7 @@
+ 							 <PIN_PA30__NWE_NANDWE>,
+ 							 <PIN_PB2__NRD_NANDOE>;
+ 						bias-pull-up;
++						atmel,drive-strength = <ATMEL_PIO_DRVSTR_ME>;
+ 					};
+ 
+ 					ale_cle_rdy_cs {
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180907/c8e4f324/attachment.sig>
+2.12.2
