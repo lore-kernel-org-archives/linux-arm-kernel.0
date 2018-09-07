@@ -1,31 +1,46 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 7 Sep 2018 10:56:45 +0200
-Subject: [PATCH v2] usb: xhci: fix interrupt transfer error happened on
- MTK platforms
-In-Reply-To: <1536309826.32173.45.camel@mhfsdcap03>
-References: <e8698cc5710a9d1f25e33e2201e2177bfbfec75c.1536305256.git.chunfeng.yun@mediatek.com>
- <20180907074251.GA2079@kroah.com>
- <1536309826.32173.45.camel@mhfsdcap03>
-Message-ID: <20180907085645.GA17270@kroah.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 7 Sep 2018 09:58:04 +0100
+Subject: [PATCH v4 2/2] phy: add Rockchip Innosilicon hdmi phy
+In-Reply-To: <20180906135047.30788-2-heiko@sntech.de>
+References: <20180906135047.30788-1-heiko@sntech.de>
+ <20180906135047.30788-2-heiko@sntech.de>
+Message-ID: <81c527fc-5837-658f-5c57-60acd909ed2e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2018 at 04:43:46PM +0800, Chunfeng Yun wrote:
-> Hi,
+On 2018-09-06 2:50 PM, Heiko Stuebner wrote:
+> From: Zheng Yang <zhengyang@rock-chips.com>
 > 
-> On Fri, 2018-09-07 at 09:42 +0200, Greg Kroah-Hartman wrote:
-> > On Fri, Sep 07, 2018 at 03:29:12PM +0800, Chunfeng Yun wrote:
-> > > The MTK xHCI controller use some reserved bytes in endpoint context for
-> > > bandwidth scheduling, so need keep them in xhci_endpoint_copy();
-> > 
-> > If they are "reserved" shouldn't they be properly named?  And by using
-> > reserved bytes, isn't that a spec violation?
-> It indeed violates the spec, "they shall be treated by system software
-> as Reserved and Opaque", and it's a quirk of the MTK xHCI controller.
+> Add a driver for the Innosilicon hdmi phy used on rk3228/rk3229
+> and rk3328 socs from Rockchip.
+> 
+> Signed-off-by: Zheng Yang <zhengyang@rock-chips.com>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Tested-by: Robin Murphy <robin.murphy@arm.com>
 
-So as the "system software" here, we should just ignore them otherwise
-we violate the spec?  :)
+That reminds me, I really must dig out that box again and finish 
+figuring out the GPIOs and regulators... :)
 
-Anyway, that's fine, no objection from me for the patch, thanks.
+[...]
+> +static int inno_hdmi_phy_probe(struct platform_device *pdev)
+> +{
+> +	struct inno_hdmi_phy *inno;
+> +	const struct of_device_id *match;
+> +	struct phy_provider *phy_provider;
+> +	struct resource *res;
+> +	void __iomem *regs;
+> +	int ret;
+> +
+> +	inno = devm_kzalloc(&pdev->dev, sizeof(*inno), GFP_KERNEL);
+> +	if (!inno)
+> +		return -ENOMEM;
+> +
+> +	inno->dev = &pdev->dev;
+> +
+> +	match = of_match_device(inno->dev->driver->of_match_table, inno->dev);
+> +	inno->plat_data = (struct inno_hdmi_phy_drv_data *)match->data;
 
-greg k-h
+Nit: if there's cause to do another respin anyway, you could simplify 
+this part with of_device_get_match_data().
+
+Robin.
