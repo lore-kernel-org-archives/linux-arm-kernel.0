@@ -1,159 +1,101 @@
-From: leoyang.li@nxp.com (Li Yang)
-Date: Fri, 7 Sep 2018 13:56:33 -0500
-Subject: [PATCH 3/3] soc: fsl: add RCPM driver
-In-Reply-To: <AM5PR0402MB2865E57EDC0DE8B0047282A2F1000@AM5PR0402MB2865.eurprd04.prod.outlook.com>
-References: <20180831035219.31619-1-ran.wang_1@nxp.com>
- <20180831035219.31619-3-ran.wang_1@nxp.com>
- <be39f5ea8c9046b0bf1f6bbfe935fae4@HXTBJIDCEMVIW02.hxtcorp.net>
- <CADRPPNQN=27+pOSckxvwSuBJoFaz7pT+Z6h07Wu3Liz5ao5kkA@mail.gmail.com>
- <AM5PR0402MB2865E57EDC0DE8B0047282A2F1000@AM5PR0402MB2865.eurprd04.prod.outlook.com>
-Message-ID: <CADRPPNTGrKBxzpbP05R0T3ovngYgQ4P_kgwgYwB6Aqrs8maXqw@mail.gmail.com>
+From: clabbe@baylibre.com (Corentin Labbe)
+Date: Fri,  7 Sep 2018 19:41:42 +0000
+Subject: [PATCH 0/5] introduce
+ setbits32/clrbits32/clrsetbits32/setbits64/clrbits64/clrsetbits64 functions
+Message-ID: <1536349307-20714-1-git-send-email-clabbe@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 7, 2018 at 4:51 AM Ran Wang <ran.wang_1@nxp.com> wrote:
->
-> Hi Leo,
->
-> On September 05, 2018 at 11:22 Yang Li wrote:
-> > -----Original Message-----
-> > From: Li Yang <leoyang.li@nxp.com>
-> > Sent: Wednesday, September 05, 2018 11:22
-> > To: dongsheng.wang at hxt-semitech.com
-> > Cc: Ran Wang <ran.wang_1@nxp.com>; Rob Herring <robh+dt@kernel.org>;
-> > Mark Rutland <mark.rutland@arm.com>; open list:OPEN FIRMWARE AND
-> > FLATTENED DEVICE TREE BINDINGS <devicetree@vger.kernel.org>; linuxppc-
-> > dev <linuxppc-dev@lists.ozlabs.org>; lkml <linux-kernel@vger.kernel.org>;
-> > moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE <linux-arm-
-> > kernel at lists.infradead.org>
-> > Subject: Re: [PATCH 3/3] soc: fsl: add RCPM driver
-> >
-> > On Tue, Sep 4, 2018 at 9:58 PM Wang, Dongsheng <dongsheng.wang@hxt-
-> > semitech.com> wrote:
-> > >
-> > > Please change your comments style.
-> >
-> > Although this doesn't get into the Linux kernel coding style documentation
-> > yet, Linus seems changed his mind to prefer // than /*
-> > */ comment style now.
-> > https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Flkml
-> > .org%2Flkml%2F2017%2F11%2F25%2F133&amp;data=02%7C01%7Cran.wang_
-> > 1%40nxp.com%7Cc0d88e6690384e02b95108d612dec235%7C686ea1d3bc2b4c
-> > 6fa92cd99c5c301635%7C0%7C0%7C636717145285126200&amp;sdata=JIoCZp
-> > WhRyW76EqgSflfTDA1f0gMQGKa%2FcbvSc5CO%2Fw%3D&amp;reserved=0
-> > So the
-> > // style should be acceptable for now.
-> >
-> > >
-> > > On 2018/8/31 11:56, Ran Wang wrote:
-> > > > The NXP's QorIQ Processors based on ARM Core have RCPM module (Run
-> > > > Control and Power Management), which performs all device-level tasks
-> > > > associated with power management such as wakeup source control.
-> > > >
-> > > > This driver depends on FSL platform PM driver framework which help
-> > > > to isolate user and PM service provider (such as RCPM driver).
-> > > >
-> > > > Signed-off-by: Chenhui Zhao <chenhui.zhao@nxp.com>
-> > > > Signed-off-by: Ying Zhang <ying.zhang22455@nxp.com>
-> > > > Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
-> > > > ---
-> > > >  drivers/soc/fsl/Kconfig   |    6 ++
-> > > >  drivers/soc/fsl/Makefile  |    1 +
-> > > >  drivers/soc/fsl/ls-rcpm.c |  153
-> > > > +++++++++++++++++++++++++++++++++++++++++++++
-> > > >  3 files changed, 160 insertions(+), 0 deletions(-)  create mode
-> > > > 100644 drivers/soc/fsl/ls-rcpm.c
-> > > >
-> > > > diff --git a/drivers/soc/fsl/Kconfig b/drivers/soc/fsl/Kconfig index
-> > > > 6517412..882330d 100644
-> > > > --- a/drivers/soc/fsl/Kconfig
-> > > > +++ b/drivers/soc/fsl/Kconfig
-> > > > @@ -30,3 +30,9 @@ config FSL_PLAT_PM
-> > > >         have to know the implement details of wakeup function it require.
-> > > >         Besides, it is also easy for service side to upgrade its logic when
-> > > >         design changed and remain user side unchanged.
-> > > > +
-> > > > +config LS_RCPM
-> > > > +     bool "Freescale RCPM support"
-> > > > +     depends on (FSL_PLAT_PM)
-> > > > +     help
-> > > > +       This feature is to enable specified wakeup source for system sleep.
-> > > > diff --git a/drivers/soc/fsl/Makefile b/drivers/soc/fsl/Makefile
-> > > > index 8f9db23..43ff71a 100644
-> > > > --- a/drivers/soc/fsl/Makefile
-> > > > +++ b/drivers/soc/fsl/Makefile
-> > > > @@ -7,3 +7,4 @@ obj-$(CONFIG_QUICC_ENGINE)            += qe/
-> > > >  obj-$(CONFIG_CPM)                    += qe/
-> > > >  obj-$(CONFIG_FSL_GUTS)                       += guts.o
-> > > >  obj-$(CONFIG_FSL_PLAT_PM)    += plat_pm.o
-> > > > +obj-$(CONFIG_LS_RCPM)                += ls-rcpm.o
-> >
-> > Probably use "_" instead of "-" for alignment.
->
-> OK, will update in next version
->
-> > > > diff --git a/drivers/soc/fsl/ls-rcpm.c b/drivers/soc/fsl/ls-rcpm.c
-> > > > new file mode 100644 index 0000000..b0feb88
-> > > > --- /dev/null
-> > > > +++ b/drivers/soc/fsl/ls-rcpm.c
-> > > > @@ -0,0 +1,153 @@
-> > > > +// SPDX-License-Identifier: GPL-2.0 // // plat_pm.c - Freescale
-> > > > +Layerscape RCPM driver
-> >
-> > The file name here is not the same as the real file name.
->
-> Got it, will correct it.
->
-> > > > +//
-> > > > +// Copyright 2018 NXP
-> > > > +//
-> > > > +// Author: Ran Wang <ran.wang_1@nxp.com>,
-> >
-> > Where do you need the comma in the end?
->
-> My bad, will remove comma in next version.
->
-> > > > +
-> > > > +#include <linux/init.h>
-> > > > +#include <linux/module.h>
-> > > > +#include <linux/platform_device.h>
-> > > > +#include <linux/of_address.h>
-> > > > +#include <linux/slab.h>
-> > > > +#include <soc/fsl/plat_pm.h>
-> > > > +
-> > > > +#define MAX_COMPATIBLE_NUM   10
-> > > > +
-> > > > +struct rcpm_t {
-> > > > +     struct device *dev;
-> > > > +     void __iomem *ippdexpcr_addr;
-> > > > +     bool big_endian;        /* Big/Little endian of RCPM module */
-> > > > +};
-> > > > +
-> > > > +// rcpm_handle - Configure RCPM reg according to wake up source
-> > > > +request // @user_dev: pointer to user's device struct // @flag: to
-> > > > +enable(true) or disable(false) wakeup source // @handle_priv:
-> > > > +pointer to struct rcpm_t instance // // Return 0 on success other
-> > > > +negative errno
-> >
-> > Although Linus preferred this // comment style.  I'm not sure if this will be
-> > handled correctly by the kernel-doc compiler.
-> > https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fww
-> > w.kernel.org%2Fdoc%2Fhtml%2Fv4.18%2Fdoc-guide%2Fkernel-
-> > doc.html&amp;data=02%7C01%7Cran.wang_1%40nxp.com%7Cc0d88e669038
-> > 4e02b95108d612dec235%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0%7C0
-> > %7C636717145285126200&amp;sdata=H7GkUNOLVG%2FCcZESzhtHBeHCbO9
-> > %2FK4k9EdH30Cxq2%2BM%3D&amp;reserved=0
->
-> So, do you think I need to change all comment style back to '/* ... */' ?
-> Actually I feel a little bit confused here.
+Hello
 
-I think Linus's comment about // comment style applies to normal code
-comment.  But kernel-doc comment is a special kind of code comment
-that needs to meet certain requirements.  People can use the
-scripts/kernel-doc tool to generate readable API documents from the
-source code.  It looks like you wanted to make the function
-description aligned with the kernel-doc format, but kernel-doc
-specifically requires to use the /* */ style(at least for now).
+This patchset adds a new set of functions which are open-coded in lot of
+place.
+Basicly the pattern is always the same, "read, modify a bit, write"
+some driver already have thoses pattern them as functions. (like ahci_sunxi.c or dwmac-meson8b)
 
-Regards,
-Leo
+The first patch rename some powerpc funtions which already use the same name (xxxbits32)
+but with only bigendian values.
+
+The second patch adds the header.
+The third patch is an ugly try to implement a coccinelle semantic patch to
+find all place where xxxbits function could be used.
+Probably this spatch could be better written and I didnt found an easy way to add the "linux/setbits" header.
+
+The two last patch are example of convertion of two drivers.
+Thoses patchs give an example of the reduction of code won by using xxxbits32.
+
+This patchset is tested with the ahci_sunxi and dwmac-sun8i drivers.
+
+Regards
+
+Corentin Labbe (5):
+  powerpc: rename setbits32/clrbits32 to setbits32_be/clrbits32_be
+  include: add
+    setbits32/clrbits32/clrsetbits32/setbits64/clrbits64/clrsetbits64 in
+    linux/setbits.h
+  coccinelle: add xxxsetbitsXX converting spatch
+  net: ethernet: stmmac: use xxxsetbits32
+  ata: ahci_sunxi: use xxxsetbits32 functions
+
+ arch/powerpc/include/asm/fsl_lbc.h                 |   2 +-
+ arch/powerpc/include/asm/io.h                      |   5 +-
+ arch/powerpc/platforms/44x/canyonlands.c           |   4 +-
+ arch/powerpc/platforms/4xx/gpio.c                  |  28 +-
+ arch/powerpc/platforms/512x/pdm360ng.c             |   6 +-
+ arch/powerpc/platforms/52xx/mpc52xx_common.c       |   6 +-
+ arch/powerpc/platforms/52xx/mpc52xx_gpt.c          |  10 +-
+ arch/powerpc/platforms/82xx/ep8248e.c              |   2 +-
+ arch/powerpc/platforms/82xx/km82xx.c               |   6 +-
+ arch/powerpc/platforms/82xx/mpc8272_ads.c          |  10 +-
+ arch/powerpc/platforms/82xx/pq2.c                  |   2 +-
+ arch/powerpc/platforms/82xx/pq2ads-pci-pic.c       |   4 +-
+ arch/powerpc/platforms/82xx/pq2fads.c              |  10 +-
+ arch/powerpc/platforms/83xx/km83xx.c               |   6 +-
+ arch/powerpc/platforms/83xx/mpc836x_mds.c          |   2 +-
+ arch/powerpc/platforms/85xx/mpc85xx_mds.c          |   2 +-
+ arch/powerpc/platforms/85xx/mpc85xx_pm_ops.c       |   4 +-
+ arch/powerpc/platforms/85xx/mpc85xx_rdb.c          |   2 +-
+ arch/powerpc/platforms/85xx/p1022_ds.c             |   4 +-
+ arch/powerpc/platforms/85xx/p1022_rdk.c            |   4 +-
+ arch/powerpc/platforms/85xx/t1042rdb_diu.c         |   4 +-
+ arch/powerpc/platforms/85xx/twr_p102x.c            |   2 +-
+ arch/powerpc/platforms/86xx/mpc8610_hpcd.c         |   4 +-
+ arch/powerpc/platforms/8xx/adder875.c              |   2 +-
+ arch/powerpc/platforms/8xx/m8xx_setup.c            |   4 +-
+ arch/powerpc/platforms/8xx/mpc86xads_setup.c       |   4 +-
+ arch/powerpc/platforms/8xx/mpc885ads_setup.c       |  28 +-
+ arch/powerpc/platforms/embedded6xx/flipper-pic.c   |   6 +-
+ arch/powerpc/platforms/embedded6xx/hlwd-pic.c      |   8 +-
+ arch/powerpc/platforms/embedded6xx/wii.c           |  10 +-
+ arch/powerpc/sysdev/cpm1.c                         |  26 +-
+ arch/powerpc/sysdev/cpm2.c                         |  16 +-
+ arch/powerpc/sysdev/cpm_common.c                   |   4 +-
+ arch/powerpc/sysdev/fsl_85xx_l2ctlr.c              |   8 +-
+ arch/powerpc/sysdev/fsl_lbc.c                      |   2 +-
+ arch/powerpc/sysdev/fsl_pci.c                      |   8 +-
+ arch/powerpc/sysdev/fsl_pmc.c                      |   2 +-
+ arch/powerpc/sysdev/fsl_rcpm.c                     |  74 ++--
+ arch/powerpc/sysdev/fsl_rio.c                      |   4 +-
+ arch/powerpc/sysdev/fsl_rmu.c                      |   8 +-
+ arch/powerpc/sysdev/mpic_timer.c                   |  12 +-
+ drivers/ata/ahci_sunxi.c                           |  51 +--
+ .../net/ethernet/stmicro/stmmac/dwmac-meson8b.c    |  54 +--
+ drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c  |  55 +--
+ .../net/ethernet/stmicro/stmmac/dwmac1000_core.c   |  21 +-
+ drivers/net/ethernet/stmicro/stmmac/dwmac4_core.c  |  51 +--
+ drivers/net/ethernet/stmicro/stmmac/dwmac4_dma.c   |  13 +-
+ drivers/net/ethernet/stmicro/stmmac/dwmac4_lib.c   |  42 +-
+ drivers/net/ethernet/stmicro/stmmac/dwmac5.c       |  11 +-
+ drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c    |  17 +-
+ .../net/ethernet/stmicro/stmmac/dwxgmac2_core.c    |  30 +-
+ drivers/net/ethernet/stmicro/stmmac/dwxgmac2_dma.c |  69 +---
+ .../net/ethernet/stmicro/stmmac/stmmac_hwtstamp.c  |  11 +-
+ drivers/net/ethernet/stmicro/stmmac/stmmac_mdio.c  |   7 +-
+ include/linux/setbits.h                            |  55 +++
+ scripts/coccinelle/misc/setbits.cocci              | 423 +++++++++++++++++++++
+ 56 files changed, 776 insertions(+), 489 deletions(-)
+ create mode 100644 include/linux/setbits.h
+ create mode 100644 scripts/coccinelle/misc/setbits.cocci
+
+-- 
+2.16.4
