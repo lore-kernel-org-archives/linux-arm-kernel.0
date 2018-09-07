@@ -1,28 +1,17 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri,  7 Sep 2018 12:19:42 +0800
-Subject: [PATCH v2 0/6] drm/sun4i: Support color dithering for LCD panels
-Message-ID: <20180907041948.19913-1-wens@csie.org>
+Date: Fri,  7 Sep 2018 12:19:45 +0800
+Subject: [PATCH v2 3/6] drm/sun4i: tcon: Add dithering support for
+ RGB565/RGB666 LCD panels
+In-Reply-To: <20180907041948.19913-1-wens@csie.org>
+References: <20180907041948.19913-1-wens@csie.org>
+Message-ID: <20180907041948.19913-4-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Jonathan Liu <net147@gmail.com>
 
-Hi,
-
-This is v2 of my sun4i-drm LCD color dithering series. v1 was from back
-in April [1]. Most of the driver code is unchanged.
-
-Changes since v1:
-
-  - Explicitly list properties from the simple-panel binding that apply
-    to the Bananapi 7" panel
-
-  - Moved an incorrectly squashed change from patch 3 to patch 1, where
-    it belongs
-
-
-[1] https://patchwork.ozlabs.org/cover/900725/
-
-Original cover letter follows:
+The hardware supports dithering on TCON channel 0 which is used for LCD
+panels.
 
 Dithering is a method of approximating a color from a mixture of other
 colors when the required color isn't available. It reduces color
@@ -31,60 +20,112 @@ banding artifacts that can be observed when displaying gradients
 to be displayed is 24-bit but the LCD panel is a lower bit depth and
 does not perform dithering on its own.
 
-The TCON (LCD controller) found in Allwinner SoCs has hardware support
-for dithering on channel 0, the channel used to feed LCD panels. This
-series adds support for it.
+Signed-off-by: Jonathan Liu <net147@gmail.com>
+[wens at csie.org: check display_info.bpc first; handle LVDS and MIPI DSI]
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 61 ++++++++++++++++++++++++++++++
+ 1 file changed, 61 insertions(+)
 
-Patch 1 reworks the mode set function for the CPU interface to pass
-the encoder object, so it can be passed to other helper functions.
-
-Patch 2 renames the dithering related register macros to reflect the
-fact that dithering is only supported on channel 0.
-
-Patch 3 adds support for dithering on all LCD panel output types.
-
-Patch 4 adds support for Banana Pi's 7" DPI LCD panel.
-
-Patch 5 adds a pinmux setting for RGB888 for the Allwinner A20 SoC.
-This change has been sent by others before.
-
-Patch 6 provides an example for enabling the Banana Pi 7" DPI LCD panel
-on the Banana Pi M1+. This should not be merged. I will likely rework
-this into an overlay in the future.
-
-Note that I was only able to test dithering with DPI, as I do not have
-other panel types. However the underlying concept and core code is the
-same, as are the drm objects accessed. Nevertheless I'm hoping Jonathan
-can test LVDS and Maxime can test MIPI DSI.
-
-Also it seems pwm-backlight hardware is unusable at the moment. I'm not
-sure whether the pwm-backlight or sun4i-pwm driver is to blame. I had to
-manually poke the pwm registers so the LCD backlight wouldn't be
-completely black.
-
-
-Regards
-ChenYu
-
-Chen-Yu Tsai (5):
-  drm/sun4i: tcon: Pass drm_encoder * into sun4i_tcon0_mode_set_cpu
-  drm/sun4i: tcon: Rename Dithering related register macros
-  drm/panel: simple: Add support for Banana Pi 7" S070WV20-CT16 panel
-  ARM: dts: sun7i: add pinmux setting for RGB888 output for LCD0
-  [DO NOT MERGE] ARM: dts: sun7i: bananapi-m1-plus: Enable Bananapi 7"
-    800x480 RGB LCD panel
-
-Jonathan Liu (1):
-  drm/sun4i: tcon: Add dithering support for RGB565/RGB666 LCD panels
-
- .../display/panel/bananapi,s070wv20-ct16.txt  | 12 +++
- .../boot/dts/sun7i-a20-bananapi-m1-plus.dts   | 56 ++++++++++++++
- arch/arm/boot/dts/sun7i-a20.dtsi              | 11 +++
- drivers/gpu/drm/panel/panel-simple.c          | 25 ++++++
- drivers/gpu/drm/sun4i/sun4i_tcon.c            | 76 ++++++++++++++++---
- drivers/gpu/drm/sun4i/sun4i_tcon.h            | 27 ++++---
- 6 files changed, 186 insertions(+), 21 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
-
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index d6f9d5f3b15b..4834c90b4912 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -12,6 +12,7 @@
+ 
+ #include <drm/drmP.h>
+ #include <drm/drm_atomic_helper.h>
++#include <drm/drm_connector.h>
+ #include <drm/drm_crtc.h>
+ #include <drm/drm_crtc_helper.h>
+ #include <drm/drm_encoder.h>
+@@ -277,6 +278,57 @@ static void sun4i_tcon0_mode_set_common(struct sun4i_tcon *tcon,
+ 		     SUN4I_TCON0_BASIC0_Y(mode->crtc_vdisplay));
+ }
+ 
++static void sun4i_tcon0_mode_set_dithering(struct sun4i_tcon *tcon,
++					   const struct drm_connector *connector)
++{
++	u32 bus_format = 0;
++	u32 val = 0;
++
++	/* XXX Would this ever happen? */
++	if (!connector)
++		return;
++
++	/*
++	 * FIXME: Undocumented bits
++	 *
++	 * The whole dithering process and these parameters are not
++	 * explained in the vendor documents or BSP kernel code.
++	 */
++	regmap_write(tcon->regs, SUN4I_TCON0_FRM_SEED_PR_REG, 0x11111111);
++	regmap_write(tcon->regs, SUN4I_TCON0_FRM_SEED_PG_REG, 0x11111111);
++	regmap_write(tcon->regs, SUN4I_TCON0_FRM_SEED_PB_REG, 0x11111111);
++	regmap_write(tcon->regs, SUN4I_TCON0_FRM_SEED_LR_REG, 0x11111111);
++	regmap_write(tcon->regs, SUN4I_TCON0_FRM_SEED_LG_REG, 0x11111111);
++	regmap_write(tcon->regs, SUN4I_TCON0_FRM_SEED_LB_REG, 0x11111111);
++	regmap_write(tcon->regs, SUN4I_TCON0_FRM_TBL0_REG, 0x01010000);
++	regmap_write(tcon->regs, SUN4I_TCON0_FRM_TBL1_REG, 0x15151111);
++	regmap_write(tcon->regs, SUN4I_TCON0_FRM_TBL2_REG, 0x57575555);
++	regmap_write(tcon->regs, SUN4I_TCON0_FRM_TBL3_REG, 0x7f7f7777);
++
++	/* Do dithering if panel only supports 6 bits per color */
++	if (connector->display_info.bpc == 6)
++		val |= SUN4I_TCON0_FRM_CTL_EN;
++
++	if (connector->display_info.num_bus_formats == 1)
++		bus_format = connector->display_info.bus_formats[0];
++
++	/* Check the connection format */
++	switch (bus_format) {
++	case MEDIA_BUS_FMT_RGB565_1X16:
++		/* R and B components are only 5 bits deep */
++		val |= SUN4I_TCON0_FRM_CTL_MODE_R;
++		val |= SUN4I_TCON0_FRM_CTL_MODE_B;
++	case MEDIA_BUS_FMT_RGB666_1X18:
++	case MEDIA_BUS_FMT_RGB666_1X7X3_SPWG:
++		/* Fall through: enable dithering */
++		val |= SUN4I_TCON0_FRM_CTL_EN;
++		break;
++	}
++
++	/* Write dithering settings */
++	regmap_write(tcon->regs, SUN4I_TCON_FRM_CTL_REG, val);
++}
++
+ static void sun4i_tcon0_mode_set_cpu(struct sun4i_tcon *tcon,
+ 				     const struct drm_encoder *encoder,
+ 				     const struct drm_display_mode *mode)
+@@ -294,6 +346,9 @@ static void sun4i_tcon0_mode_set_cpu(struct sun4i_tcon *tcon,
+ 
+ 	sun4i_tcon0_mode_set_common(tcon, mode);
+ 
++	/* Set dithering if needed */
++	sun4i_tcon0_mode_set_dithering(tcon, sun4i_tcon_get_connector(encoder));
++
+ 	regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
+ 			   SUN4I_TCON0_CTL_IF_MASK,
+ 			   SUN4I_TCON0_CTL_IF_8080);
+@@ -359,6 +414,9 @@ static void sun4i_tcon0_mode_set_lvds(struct sun4i_tcon *tcon,
+ 	tcon->dclk_max_div = 7;
+ 	sun4i_tcon0_mode_set_common(tcon, mode);
+ 
++	/* Set dithering if needed */
++	sun4i_tcon0_mode_set_dithering(tcon, sun4i_tcon_get_connector(encoder));
++
+ 	/* Adjust clock delay */
+ 	clk_delay = sun4i_tcon_get_clk_delay(mode, 0);
+ 	regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
+@@ -432,6 +490,9 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
+ 	tcon->dclk_max_div = 127;
+ 	sun4i_tcon0_mode_set_common(tcon, mode);
+ 
++	/* Set dithering if needed */
++	sun4i_tcon0_mode_set_dithering(tcon, tcon->panel->connector);
++
+ 	/* Adjust clock delay */
+ 	clk_delay = sun4i_tcon_get_clk_delay(mode, 0);
+ 	regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
 -- 
 2.19.0.rc1
