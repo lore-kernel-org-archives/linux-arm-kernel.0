@@ -1,141 +1,96 @@
-From: christian.koenig@amd.com (=?UTF-8?Q?Christian_K=c3=b6nig?=)
-Date: Fri, 7 Sep 2018 20:02:54 +0200
-Subject: [PATCH v2 01/40] iommu: Introduce Shared Virtual Addressing API
-In-Reply-To: <65e7accd-4446-19f5-c667-c6407e89cfa6@arm.com>
-References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
- <20180511190641.23008-2-jean-philippe.brucker@arm.com>
- <bf42affd-e9d0-e4fc-6d28-f3c3f7795348@redhat.com>
- <03d31ba5-1eda-ea86-8c0c-91d14c86fe83@arm.com>
- <ed39159c-087e-7e56-7d29-d1de9fa1677f@amd.com>
- <f0b317d5-e2e9-5478-952c-05e8b97bd68b@arm.com>
- <2fd4a0a1-1a35-bf82-df84-b995cce011d9@amd.com>
- <65e7accd-4446-19f5-c667-c6407e89cfa6@arm.com>
-Message-ID: <5bbc0332-b94b-75cc-ca42-a9b196811daf@amd.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 07 Sep 2018 11:25:40 -0700
+Subject: [PATCH 1/6] drm/bridge: use bus flags in bridge timings
+In-Reply-To: <CACRpkdaUuWUHZgT0b64hMNZm3oy=7rece3H0p5VVe4d8jpFRaw@mail.gmail.com>
+References: <20180905052113.21262-1-stefan@agner.ch>
+ <4035252.QuWadVx7pr@avalon> <1569297.pdEFdpi3HS@avalon>
+ <a00c1650b69ba85bed7ae39b81a0c40f@agner.ch>
+ <CACRpkdbw0VjkHYcUpox+DorRG0oRdPARL4ShgPfV2eFaUF_w0g@mail.gmail.com>
+ <b1cb586397a4cd444c33dd83d72fa544@agner.ch>
+ <CACRpkdaUuWUHZgT0b64hMNZm3oy=7rece3H0p5VVe4d8jpFRaw@mail.gmail.com>
+Message-ID: <3c048938d12a070c03f0cbdbc89c86e8@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 07.09.2018 um 17:45 schrieb Jean-Philippe Brucker:
-> On 07/09/2018 09:55, Christian K?nig wrote:
->> I will take this as an opportunity to summarize some of the requirements
->> we have for PASID management from the amdgpu driver point of view:
-> That's incredibly useful, thanks :)
->
->> 1. We need to be able to allocate PASID between 1 and some maximum. Zero
->> is reserved as far as I know, but we don't necessary need a minimum.
-> Should be fine. The PASID range is restricted by the PCI PASID
-> capability, firmware description (for non-PCI devices), the IOMMU
-> capacity, and what the device driver passes to iommu_sva_device_init.
-> Not all IOMMUs reserve PASID 0 (AMD IOMMU without GIoSup doesn't, if I'm
-> not mistaken), so the KFD driver will need to pass min_pasid=1 to make
-> sure that 0 isn't allocated.
->
->> 2. We need to be able to allocate PASIDs without a process address space
->> backing it. E.g. our hardware uses PASIDs even without Shared Virtual
->> Addressing enabled to distinct clients from each other.
->>   ??? ??? Would be a pity if we need to still have a separate PASID
->> handling because the system wide is only available when IOMMU is turned on.
-> I'm still not sure about this one. From my point of view we shouldn't
-> add to the IOMMU subsystem helpers for devices without an IOMMU.
-
-I agree on that.
-
-> iommu-sva expects everywhere that the device has an iommu_domain, it's
-> the first thing we check on entry. Bypassing all of this would call
-> idr_alloc() directly, and wouldn't have any code in common with the
-> current iommu-sva. So it seems like you need a layer on top of iommu-sva
-> calling idr_alloc() when an IOMMU isn't present, but I don't think it
-> should be in drivers/iommu/
-
-In this case I question if the PASID handling should be under 
-drivers/iommu at all.
-
-See I can have a mix of VM context which are bound to processes (some 
-few) and VM contexts which are standalone and doesn't care for a process 
-address space. But for each VM context I need a distinct PASID for the 
-hardware to work.
-
-I can live if we say if IOMMU is completely disabled we use a simple ida 
-to allocate them, but when IOMMU is enabled I certainly need a way to 
-reserve a PASID without an associated process.
-
->> 3. Even after destruction of a process address space we need some grace
->> period before a PASID is reused because it can be that the specific
->> PASID is still in some hardware queues etc...
->>   ??? ??? At bare minimum all device drivers using process binding need
->> to explicitly note to the core when they are done with a PASID.
-> Right, much of the horribleness in iommu-sva deals with this:
->
-> The process dies, iommu-sva is notified and calls the mm_exit() function
-> passed by the device driver to iommu_sva_device_init(). In mm_exit() the
-> device driver needs to clear any reference to the PASID in hardware and
-> in its own structures. When the device driver returns from mm_exit(), it
-> effectively tells the core that it has finished using the PASID, and
-> iommu-sva can reuse the PASID for another process. mm_exit() is allowed
-> to block, so the device driver has time to clean up and flush the queues.
->
-> If the device driver finishes using the PASID before the process exits,
-> it just calls unbind().
-
-Exactly that's what Michal Hocko is probably going to not like at all.
-
-Can we have a different approach where each driver is informed by the 
-mm_exit(), but needs to explicitly call unbind() before a PASID is reused?
-
-During that teardown transition it would be ideal if that PASID only 
-points to a dummy root page directory with only invalid entries.
-
->
->> 4. It would be nice to have to be able to set a "void *" for each
->> PASID/device combination while binding to a process which then can be
->> queried later on based on the PASID.
->>   ??? ??? E.g. when you have a per PASID/device structure around anyway,
->> just add an extra field.
-> iommu_sva_bind_device() takes a "drvdata" pointer that is stored
-> internally for the PASID/device combination (iommu_bond). It is passed
-> to mm_exit(), but I haven't added anything for the device driver to
-> query it back.
-
-Nice! Looks like all we need additionally is a function to retrieve that 
-based on the PASID.
-
->> 5. It would be nice to have to allocate multiple PASIDs for the same
->> process address space.
->>   ??? ??? E.g. some teams at AMD want to use a separate GPU address space
->> for their userspace client library. I'm still trying to avoid that, but
->> it is perfectly possible that we are going to need that.
-> Two PASIDs pointing to the same process pgd? At first glance it seems
-> feasible, maybe with a flag passed to bind() and a few changes to
-> internal structures. It will duplicate ATC invalidation commands for
-> each process address space change (munmap etc) so you might take a
-> performance hit.
->
-> Intel's SVM code has the SVM_FLAG_PRIVATE_PASID which seems similar to
-> what you describe, but I don't plan to support it in this series (the
-> io_mm model is already pretty complicated). I think it can be added
-> without too much effort in a future series, though with a different flag
-> name since we'd like to use "private PASID" for something else
-> (https://www.spinics.net/lists/dri-devel/msg177007.html).
-
-To be honest I hoped that you would say: No never! So that I have a good 
-argument to pushback on such requirements :)
-
-But if it's doable it would be at least nice to have for debugging.
-
-Thanks a lot for working on that,
-Christian.
-
->
-> Thanks,
-> Jean
->
->>   ??? ??? Additional to that it is sometimes quite useful for debugging
->> to isolate where exactly an incorrect access (segfault) is coming from.
+On 07.09.2018 00:10, Linus Walleij wrote:
+> On Thu, Sep 6, 2018 at 10:25 PM Stefan Agner <stefan@agner.ch> wrote:
+> 
+>> Ok, I read a bit up on the history of bridge timing, especially:
+>> https://www.spinics.net/lists/dri-devel/msg155618.html
 >>
->> Let me know if there are some problems with that, especially I want to
->> know if there is pushback on #5 so that I can forward that :)
+>> IMHO, this got overengineered. For displays we do not need all that
+>> setup/sample delay timing information, and much longer cables are in
+>> use. So why is all that needed for bridges?
+> 
+> I also avoided the overhead of creating this abstraction initially.
+> 
+> But after doing it I have this Stockholm syndrome that I start
+> liking what Laurent told me to do.
+> 
+>> For Linus case, the THS8134(A/B) data sheet I found (revised March 2010)
+>> clearly states:
+>> Clock input. A rising edge on CLK latches RPr0-7, GY0-7, BPb0-7.
 >>
->> Thanks,
->> Christian.
->>
->>> Thanks,
->>> Jean
+>> So we need to drive on negative edge, hence DRM_BUS_FLAG_PIXDATA_NEGEDGE
+>> should be used, which makes the pl111 driver setting TIM2_IPC:
+>> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0121d/index.html
+> 
+> That is easy to say, but if I just set that up in code, even with a good
+> comment it is hard for the next reader to understand what is going
+> on. The central question will be, why does PL111 need to do this
+> but not R-Car though they are using the same bridge?
+
+That is something I have experienced before. Depending on drive
+strength, and I guess sampling delay etc, it might sample just late
+enough that signals are stable and no issues are really visible on the
+screen. In those cases different cabling, changes in drive strength, or
+even production variations might suddenly show artefacts though... My
+point being, just because it supposedly works, does not mean that it is
+right.
+
+I did introduce the bus flags a while ago:
+https://patchwork.kernel.org/patch/8254801/
+https://patchwork.kernel.org/patch/8254821/
+
+And then had to debug quite some controller and display issues around
+pixel clock polarity:
+https://patchwork.kernel.org/patch/8117181/
+https://patchwork.kernel.org/patch/9465485/
+
+E.g. in that last case, the pixel clock polarity flags were interpreted
+wrong on both controller and display side. Hence this worked fine for
+the case already upstream, but it did not work in my case...
+
+In the end, best thing is to look on the bus. Parallel display signals
+are still rather slow, and usually rather easy to scope.
+
+PL111 needs to do this because its standard setting is driving on rising
+edge. However, most displays as well as that bridge sample data on
+rising edge.
+
+I guess R-Car DU drives on negative edge by default, but can't say for
+sure without hardware/data sheet.
+
+As far as I can tell the R-Car DU driver also does not use the
+DRM_BUS_FLAG_PIXDATA_*EDGE flags currently.
+
+
+
+> 
+> So this elaborate model gives a better transfer of abstract concepts
+> to whoever needs to touch that code next. The code is not just
+> logic, but also our map of the world and the documentation of our
+> problem space.
+> 
+> Donald Knuth has this idea about literate programming which even
+> turns the documentation/implementation process around. We are
+> not there, not even remotely, but IMO the more complex the problem.
+> the more we need to convey our thinking, not just our solution.
+
+Fully agree.
+
+My argument here is, that the map of the world (code) and the problem
+are not aligned.
+
+--
+Stefan
