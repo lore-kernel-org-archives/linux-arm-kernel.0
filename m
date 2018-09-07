@@ -1,112 +1,69 @@
-From: tudor.ambarus@microchip.com (Tudor Ambarus)
-Date: Fri, 7 Sep 2018 12:10:30 +0300
-Subject: [RESEND PATCH v2 2/3] mtd: spi-nor: parse SFDP Sector Map
- Parameter Table
-In-Reply-To: <1bfbb5f7-39ee-08cb-8f7b-5c3f441f66a2@gmail.com>
-References: <20180827102644.7323-1-tudor.ambarus@microchip.com>
- <20180827102644.7323-3-tudor.ambarus@microchip.com>
- <1bfbb5f7-39ee-08cb-8f7b-5c3f441f66a2@gmail.com>
-Message-ID: <78a6ebd0-f0e4-cee4-ab66-b393366b2fe5@microchip.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 7 Sep 2018 10:08:36 +0100
+Subject: Timer on i.MX28 moving backwards
+In-Reply-To: <20180907083804.yo65kinfwvm4esdz@pengutronix.de>
+References: <20180906200202.et4whmzq22n4uajt@pengutronix.de>
+ <20180906213925.GU30658@n2100.armlinux.org.uk>
+ <20180907072105.m47r3rjf2dd3jlv6@pengutronix.de>
+ <20180907083804.yo65kinfwvm4esdz@pengutronix.de>
+Message-ID: <20180907090836.GV30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 09/03/2018 08:40 PM, Marek Vasut wrote:
-> On 08/27/2018 12:26 PM, Tudor Ambarus wrote:
-> [...]
->> +static const u32 *spi_nor_get_map_in_use(struct spi_nor *nor, const u32 *smpt)
->> +{
->> +	const u32 *ret = NULL;
->> +	u32 i, addr;
->> +	int err;
->> +	u8 addr_width, read_opcode, read_dummy;
->> +	u8 read_data_mask, data_byte, map_id;
->> +
->> +	addr_width = nor->addr_width;
->> +	read_dummy = nor->read_dummy;
->> +	read_opcode = nor->read_opcode;
->> +
->> +	map_id = 0;
->> +	i = 0;
->> +	/* Determine if there are any optional Detection Command Descriptors */
->> +	while (!(smpt[i] & SMPT_DESC_TYPE_MAP)) {
->> +		read_data_mask = SMPT_CMD_READ_DATA(smpt[i]);
->> +		nor->addr_width = spi_nor_smpt_addr_width(nor, smpt[i]);
->> +		nor->read_dummy = spi_nor_smpt_read_dummy(nor, smpt[i]);
->> +		nor->read_opcode = SMPT_CMD_OPCODE(smpt[i]);
->> +		addr = smpt[i + 1];
->> +
->> +		err = spi_nor_read_raw(nor, addr, 1, &data_byte);
->> +		if (err)
->> +			goto out;
->> +
->> +		/*
->> +		 * Build an index value that is used to select the Sector Map
->> +		 * Configuration that is currently in use.
->> +		 */
->> +		map_id = map_id << 1 | (!(data_byte & read_data_mask) ? 0 : 1);
+On Fri, Sep 07, 2018 at 10:38:04AM +0200, Uwe Kleine-K?nig wrote:
+> On Fri, Sep 07, 2018 at 09:21:05AM +0200, Uwe Kleine-K?nig wrote:
+> > On Thu, Sep 06, 2018 at 10:39:25PM +0100, Russell King - ARM Linux wrote:
+> > > On Thu, Sep 06, 2018 at 10:02:02PM +0200, Uwe Kleine-K?nig wrote:
+> > > > +cycle_t mxs_clocksource_mmio_readl_down(struct clocksource *c)
+> > > > +{
+> > > > +	cycle_t ret = ~(cycle_t)readl_relaxed(to_mmio_clksrc(c)->reg) & c->mask;
+> > > > +	trace_printk("time = %llx\n", ret);
+> > > 
+> > > I think it may be worth re-running your test with:
+> > > 
+> > > 	u32 one, two;
+> > > 
+> > > 	one = readl_relaxed(to_mmio_clksrc(c)->reg);
+> > > 	two = readl_relaxed(to_mmio_clksrc(c)->reg);
+> > > 	trace_printk("time=0x%08x:0x%08x\n", one, two);
+> > > 
+> > > 	return ~(cycle_t)two & c->mask;
+> > > 
+> > > and compare the values not only between each call but also between
+> > > each read of the register.  It could be a synchronisation issue when
+> > > reading the timer register, in which case you may find just one read
+> > > is incorrect.
+> > 
+> > Good idea, this is a part of a trace I captured with this implemented:
+> > 
+> >        mrp62439d-224   [000] d..h2..   790.936689: mxs_clocksource_mmio_readl_down: time = 0x948e3d1a:0x948e3d14
+> >        mrp62439d-224   [000] .......   790.936689: mxs_clocksource_mmio_readl_down: time = 0x948e4d26:0x948e4d20
+> >        mrp62439d-224   [000] .......   790.936904: mxs_clocksource_mmio_readl_down: time = 0x948e3690:0x948e368a
+> > 
+> > hmm, I'm unsure what to think now.
 > 
-> You can drop the ternary operator part completely ^
-
-I'll use !! instead.
-
+> To clearify my (obviously too short) mail:
 > 
->> +		i = i + 2;
->> +	}
->> +
->> +	/* Find the matching configuration map */
->> +	while (SMPT_MAP_ID(smpt[i]) != map_id) {
->> +		if (smpt[i] & SMPT_DESC_END)
->> +			goto out;
->> +		/* increment the table index to the next map */
->> +		i += SMPT_MAP_REGION_COUNT(smpt[i]) + 1;
->> +	}
->> +
->> +	ret = smpt + i;
->> +	/* fall through */
->> +out:
->> +	nor->addr_width = addr_width;
->> +	nor->read_dummy = read_dummy;
->> +	nor->read_opcode = read_opcode;
->> +	return ret;
->> +}
->> +
->> +static void
->> +spi_nor_region_check_overlay(struct spi_nor_erase_region *region,
->> +			     const struct spi_nor_erase_type *erase,
->> +			     const u8 erase_type)
->> +{
->> +	int i;
->> +
->> +	for (i = 0; i < SNOR_ERASE_TYPE_MAX; i++) {
->> +		if (!(erase_type & BIT(i)))
->> +			continue;
->> +		if (region->size & erase[i].size_mask) {
->> +			spi_nor_region_mark_overlay(region);
->> +			return;
->> +		}
->> +	}
->> +}
->> +
->> +static int spi_nor_init_non_uniform_erase_map(struct spi_nor *nor,
->> +					      const u32 *smpt)
->> +{
->> +	struct spi_nor_erase_map *map = &nor->erase_map;
->> +	const struct spi_nor_erase_type *erase = map->erase_type;
->> +	struct spi_nor_erase_region *region;
->> +	u64 offset;
->> +	u32 region_count;
->> +	int i, j;
->> +	u8 erase_type;
->> +
->> +	region_count = SMPT_MAP_REGION_COUNT(*smpt);
->> +	region = devm_kcalloc(nor->dev, region_count, sizeof(*region),
->> +			      GFP_KERNEL);
-> 
-> Is this memory always correctly free'd ?
+> Judging form a trace over 43s the two consecutive reads always correctly
+> yield a decrementing counter as expected. But there is not always the
+> expected monotonicity between consecutive calls to
+> clocksource_mmio_readl_down.
 
-Yes. It will be free'd when the driver detaches from the device.
+Hmm, there is another explanation - maybe the order of the trace
+entries are not strictly ordered.  What happens with this:
 
-Thanks,
-ta
+	static atomic_t order;
+	u32 one, two;
+	int o;
+
+	one = readl_relaxed(to_mmio_clksrc(c)->reg);
+	o = atomic_add_return(1, &order);
+	two = readl_relaxed(to_mmio_clksrc(c)->reg);
+	trace_printk("time=0x%08x:0x%08x:%u\n", one, two, o);
+
+	return ~(cycle_t)two & c->mask;
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
