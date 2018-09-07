@@ -1,83 +1,42 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri,  7 Sep 2018 12:07:41 +0200
-Subject: [PATCH v2 07/16] nvmem: change the signature of nvmem_unregister()
+Date: Fri,  7 Sep 2018 12:07:43 +0200
+Subject: [PATCH v2 09/16] nvmem: remove the name field from struct nvmem_device
 In-Reply-To: <20180907100750.14564-1-brgl@bgdev.pl>
 References: <20180907100750.14564-1-brgl@bgdev.pl>
-Message-ID: <20180907100750.14564-8-brgl@bgdev.pl>
+Message-ID: <20180907100750.14564-10-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-This function can no longer fail and there are no more users that check
-it return value. Change it to return void.
+This field is never set and is only used in a single error message.
+Remove the field and use nvmem_dev_name() instead.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/nvmem/core.c           | 8 ++------
- include/linux/nvmem-provider.h | 9 +++------
- 2 files changed, 5 insertions(+), 12 deletions(-)
+ drivers/nvmem/core.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
 diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index 2335b72d4b3e..89b91f73d08a 100644
+index 364ee16e7d6a..e456aaa6184a 100644
 --- a/drivers/nvmem/core.c
 +++ b/drivers/nvmem/core.c
-@@ -450,20 +450,16 @@ static void nvmem_device_release(struct kref *kref)
-  * nvmem_unregister() - Unregister previously registered nvmem device
-  *
-  * @nvmem: Pointer to previously registered nvmem device.
-- *
-- * Return: Will be an negative on error or a zero on success.
-  */
--int nvmem_unregister(struct nvmem_device *nvmem)
-+void nvmem_unregister(struct nvmem_device *nvmem)
- {
- 	kref_put(&nvmem->refcnt, nvmem_device_release);
--
--	return 0;
- }
- EXPORT_SYMBOL_GPL(nvmem_unregister);
+@@ -26,7 +26,6 @@
+ #include <linux/slab.h>
  
- static void devm_nvmem_release(struct device *dev, void *res)
- {
--	WARN_ON(nvmem_unregister(*(struct nvmem_device **)res));
-+	nvmem_unregister(*(struct nvmem_device **)res);
- }
- 
- /**
-diff --git a/include/linux/nvmem-provider.h b/include/linux/nvmem-provider.h
-index cc8556e3c825..d14a577a002d 100644
---- a/include/linux/nvmem-provider.h
-+++ b/include/linux/nvmem-provider.h
-@@ -67,7 +67,7 @@ struct nvmem_config {
- #if IS_ENABLED(CONFIG_NVMEM)
- 
- struct nvmem_device *nvmem_register(const struct nvmem_config *cfg);
--int nvmem_unregister(struct nvmem_device *nvmem);
-+void nvmem_unregister(struct nvmem_device *nvmem);
- 
- struct nvmem_device *devm_nvmem_register(struct device *dev,
- 					 const struct nvmem_config *cfg);
-@@ -81,10 +81,7 @@ static inline struct nvmem_device *nvmem_register(const struct nvmem_config *c)
- 	return ERR_PTR(-ENOSYS);
- }
- 
--static inline int nvmem_unregister(struct nvmem_device *nvmem)
--{
--	return -ENOSYS;
--}
-+static inline void nvmem_unregister(struct nvmem_device *nvmem) {}
- 
- static inline struct nvmem_device *
- devm_nvmem_register(struct device *dev, const struct nvmem_config *c)
-@@ -95,7 +92,7 @@ devm_nvmem_register(struct device *dev, const struct nvmem_config *c)
- static inline int
- devm_nvmem_unregister(struct device *dev, struct nvmem_device *nvmem)
- {
--	return nvmem_unregister(nvmem);
-+	return ERR_PTR(-ENOSYS);
- 
- }
+ struct nvmem_device {
+-	const char		*name;
+ 	struct module		*owner;
+ 	struct device		dev;
+ 	int			stride;
+@@ -537,7 +536,7 @@ static struct nvmem_device *__nvmem_device_get(struct device_node *np)
+ 	if (!try_module_get(nvmem->owner)) {
+ 		dev_err(&nvmem->dev,
+ 			"could not increase module refcount for cell %s\n",
+-			nvmem->name);
++			nvmem_dev_name(nvmem));
+ 		return ERR_PTR(-EINVAL);
+ 	}
  
 -- 
 2.18.0
