@@ -1,55 +1,38 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 7 Sep 2018 12:19:27 +0100
-Subject: [PULL 2/4] arm64: KVM: Only force FPEXC32_EL2.EN if trapping
- FPSIMD
-In-Reply-To: <20180905150321.GT4029@e113682-lin.lund.arm.com>
-References: <20180903134516.17796-1-christoffer.dall@arm.com>
- <20180903134516.17796-3-christoffer.dall@arm.com>
- <20180904113952.GB17801@e103592.cambridge.arm.com>
- <20180904125121.GO4029@e113682-lin.lund.arm.com>
- <20180905112846.GC17801@e103592.cambridge.arm.com>
- <20180905150321.GT4029@e113682-lin.lund.arm.com>
-Message-ID: <20180907111924.GE17801@e103592.cambridge.arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 7 Sep 2018 13:23:31 +0200
+Subject: [PATCH v2 0/6] drm/sun4i: Support color dithering for LCD panels
+In-Reply-To: <20180907041948.19913-1-wens@csie.org>
+References: <20180907041948.19913-1-wens@csie.org>
+Message-ID: <20180907112331.wjml25rfkyabvwwt@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2018 at 05:03:21PM +0200, Christoffer Dall wrote:
-> On Wed, Sep 05, 2018 at 12:28:46PM +0100, Dave Martin wrote:
-
-[...]
-
-> > You can try taking a look at the archietctural pseudocode -- see the
-> > CheckFPAdvSIMDEnabled64() (for AArch64) and CheckFPAdvSIMDEnabled() (for
-> > AArch32) function hierarchies on developer.arm.com.
-> > 
-> > ARM DDI 0487B.b says for FPEXC32_EL2:
-> > 
-> > "Purpose:  Allows access to the AArch32 register FPEXC from AArch64
-> > state only. Its value has no effect on execution in AArch64 state."
-> > 
-> > This could arguably be worded better, but the second sentence is
-> > pretty unequivocal.
-> > 
+On Fri, Sep 07, 2018 at 12:19:42PM +0800, Chen-Yu Tsai wrote:
 > 
-> I think I was confused about your point.  I thought you were arguing
-> that CPTR_EL2.TFP==1 + FPEXC_EL2.EN==0, and running in AArch32 EL1+EL0,
-> and accessing VFP at EL0 would trap to EL2, when in fact it traps to
-> EL1.  But now I think you're arguing that EL2 is unaffected by
-> FPEXC32_EL2, and I agree with that.
+> Hi,
 > 
-> However, given the above, I don't understand how we can let the guest be
-> in control of FPEXC, if we want to make sure we trap VFP accesses?
+> This is v2 of my sun4i-drm LCD color dithering series. v1 was from back
+> in April [1]. Most of the driver code is unchanged.
+> 
+> Changes since v1:
+> 
+>   - Explicitly list properties from the simple-panel binding that apply
+>     to the Bananapi 7" panel
+> 
+>   - Moved an incorrectly squashed change from patch 3 to patch 1, where
+>     it belongs
 
-If the guest set FPEXC.EN to 0, then it is expecting its own VFP
-accesses to trap to EL1.  If a VFP access attempt traps to EL1 and the
-guest is expecting it, why does hyp need to get involved?
+Applied the first three patches, thanks!
+Maxime
 
-Hyp only needs to interfere when an otherwise untrapped access to the
-VFP state would occur.
-
-If we don't have the guest context loaded, we would still trap any
-attempt by the guest to modify FPEXC to EL2 as a result of CPTR_EL2.TFP
-still being set (or equivalent).
-
-Cheers
----Dave
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180907/fe10f9e0/attachment.sig>
