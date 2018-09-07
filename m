@@ -1,104 +1,55 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Fri, 7 Sep 2018 17:05:01 +0900
-Subject: [PATCH v8 4/8] media: platform: Add Cedrus VPU decoder driver
-In-Reply-To: <7a2167a3-5b61-0937-7f06-8b36fa12e7a0@xs4all.nl>
-References: <20180828073424.30247-1-paul.kocialkowski@bootlin.com>
- <20180828073424.30247-5-paul.kocialkowski@bootlin.com>
- <5faf5eed-eb2c-f804-93e3-5a42f6204d99@xs4all.nl>
- <b7b3cb2320978d45acb34475d15abd7bf03da367.camel@paulk.fr>
- <461c6a0d-a346-b9da-b75e-4aab907054df@xs4all.nl>
- <CAAFQd5Cmc7uFhprsoTU6Gq19n3z2eiUfZZ2ZjDW4QWVWMDN6tg@mail.gmail.com>
- <7a2167a3-5b61-0937-7f06-8b36fa12e7a0@xs4all.nl>
-Message-ID: <CAAFQd5A1NFBE8x8h-CYrusmqR5sJzhQdgyrhU5oVbPR22vu6wg@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 7 Sep 2018 10:14:49 +0200
+Subject: [PATCH] mmc: sunxi: Clarify new timing mode usage and
+ implementation
+In-Reply-To: <20180906153107.20225-1-wens@csie.org>
+References: <20180906153107.20225-1-wens@csie.org>
+Message-ID: <20180907081449.roowspmgmtd5zcs6@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 6, 2018 at 4:39 PM Hans Verkuil <hverkuil@xs4all.nl> wrote:
->
-> On 09/06/2018 09:25 AM, Tomasz Figa wrote:
-> > On Thu, Sep 6, 2018 at 4:01 PM Hans Verkuil <hverkuil@xs4all.nl> wrote:
-> >>
-> >> On 09/05/2018 06:29 PM, Paul Kocialkowski wrote:
-> >>> Hi and thanks for the review!
-> >>>
-> >>> Le lundi 03 septembre 2018 ? 11:11 +0200, Hans Verkuil a ?crit :
-> >>>> On 08/28/2018 09:34 AM, Paul Kocialkowski wrote:
-> >>>>> +static int cedrus_request_validate(struct media_request *req)
-> >>>>> +{
-> >>>>> +   struct media_request_object *obj, *obj_safe;
-> >>>>> +   struct v4l2_ctrl_handler *parent_hdl, *hdl;
-> >>>>> +   struct cedrus_ctx *ctx = NULL;
-> >>>>> +   struct v4l2_ctrl *ctrl_test;
-> >>>>> +   unsigned int i;
-> >>>>> +
-> >>>>> +   list_for_each_entry_safe(obj, obj_safe, &req->objects, list) {
-> >>>>
-> >>>> You don't need to use the _safe variant during validation.
-> >>>
-> >>> Okay, I'll use the regular one then.
-> >>>
-> >>>>> +           struct vb2_buffer *vb;
-> >>>>> +
-> >>>>> +           if (vb2_request_object_is_buffer(obj)) {
-> >>>>> +                   vb = container_of(obj, struct vb2_buffer, req_obj);
-> >>>>> +                   ctx = vb2_get_drv_priv(vb->vb2_queue);
-> >>>>> +
-> >>>>> +                   break;
-> >>>>> +           }
-> >>>>> +   }
-> >>>>
-> >>>> Interesting question: what happens if more than one buffer is queued in the
-> >>>> request? This is allowed by the request API and in that case the associated
-> >>>> controls in the request apply to all queued buffers.
-> >>>>
-> >>>> Would this make sense at all for this driver? If not, then you need to
-> >>>> check here if there is more than one buffer in the request and document in
-> >>>> the spec that this is not allowed.
-> >>>
-> >>> Well, our driver was written with the (unformal) assumption that we
-> >>> only deal with a pair of one output and one capture buffer. So I will
-> >>> add a check for this at request validation time and document it in the
-> >>> spec. Should that be part of the MPEG-2 PIXFMT documentation (and
-> >>> duplicated for future formats we add support for)?
-> >>
-> >> Can you make a patch for vb2_request_has_buffers() in videobuf2-core.c
-> >> renaming it to vb2_request_buffer_cnt() and returning the number of buffers
-> >> in the request?
-> >>
-> >> Then you can call it here to check that you have only one buffer.
-> >>
-> >> And this has to be documented with the PIXFMT.
-> >>
-> >> Multiple buffers are certainly possible in non-codec scenarios (vim2m and
-> >> vivid happily accept that), so this is an exception that should be
-> >> documented and checked in the codec driver.
-> >
-> > Hmm, isn't it still 1 buffer per 1 queue and just multiple queues
-> > included in the request?
->
-> No. The request API allows multiple buffers for the same vb2_queue to be
-> queued for the same request (obviously when the request is committed, the
-> buffers are queued to the driver in the same order).
->
-> >
-> > If we indeed allow multiple buffers for the same queue in a request,
-> > we shouldn't restrict this on a per-driver basis. It's definitely not
-> > a hardware limitation, since the driver could just do the same as if 2
-> > requests with the same controls were given.
->
-> That's how it operates: for all buffers in the request the same controls
-> apply. But does this make sense for codecs? If the control(s) with the
-> codec metadata always change for every buffer, then having more than one
-> buffer in the request is senseless and the driver should check for this
-> in the validation step.
->
-> If it *does* make sense in some circumstances to have the same metadata
-> for multiple buffers, then it should be checked if the cedrus driver
-> handles this correctly.
+On Thu, Sep 06, 2018 at 11:31:07PM +0800, Chen-Yu Tsai wrote:
+> Newer sunxi mmc controller variants support what they call the "new
+> timing mode". Support for this was implemented in two ways, according
+> to the hardware that was seen at the time.
+> 
+> The first type retained the old timing mode, and both the clock and mmc
+> controllers had switches to select which mode was used. Both switches
+> had to be set to the same setting. This variant was denoted with the
+> .has_timings_switch field in the sunxi_mmc_cfg structure. This hardware
+> is only seen on the A83T.
+> 
+> The second type did away with the old timing mode. The clock controller
+> no longer had the mode selection or clock delay setting bits. In some
+> cases the mmc controller retained its mode selection bit, but this
+> always needed to be set to the new mode, or instabilities would occur.
+> In a few cases, such as the A64 and H6 eMMC controller, the mode
+> selection bit is gone, but the controller still behaves like the new
+> timing mode, requiring the module clock to be double the card clock
+> in DDR transfer modes. This variant is denoted with the
+> .needs_new_timings field.
+> 
+> This patch adds more comments explaining the two fields, as well as
+> the possibly nonexistent mode switch in the mmc controller.
+> 
+> The .has_timings_switch is renamed to .ccu_has_timings_switch to clarify
+> its meaning.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Just FYI, we may want to move this discussion to Alex's RFC with
-documentation of stateless interface:
-https://patchwork.kernel.org/patch/10583233/
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
-Best regards,
-Tomasz
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180907/24241561/attachment.sig>
