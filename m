@@ -1,51 +1,82 @@
-From: jianxin.pan@amlogic.com (Jianxin Pan)
-Date: Fri, 7 Sep 2018 20:09:04 +0800
-Subject: [PATCH v3 0/2] arm64: dts: meson-g12a: Introduce new DT files for
- Meson-G12A SoC
-In-Reply-To: <170648ffb748c7b3890f5d7293920873efd16e30.camel@baylibre.com>
-References: <1534243121-33589-1-git-send-email-jianxin.pan@amlogic.com>
- <170648ffb748c7b3890f5d7293920873efd16e30.camel@baylibre.com>
-Message-ID: <aebe4a85-94b0-90f9-d3c2-ed0764398a55@amlogic.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 7 Sep 2018 07:17:14 -0500
+Subject: [PATCH v2 6/9] kbuild: consolidate Devicetree dtb build rules
+In-Reply-To: <CAK7LNARD+_kV=XtJ66mZBU-CPMQgWF+oQtv4bGKaGGARNwzXiQ@mail.gmail.com>
+References: <20180905235327.5996-1-robh@kernel.org>
+ <20180905235327.5996-7-robh@kernel.org>
+ <CAK7LNARD+_kV=XtJ66mZBU-CPMQgWF+oQtv4bGKaGGARNwzXiQ@mail.gmail.com>
+Message-ID: <CAL_JsqJeTqxFPxZfuusPxuOTsVbVk_Uhue6NXwpotkwZWHrCDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/14/2018 7:58 PM, Jerome Brunet wrote:
-> On Tue, 2018-08-14 at 18:38 +0800, Jianxin Pan wrote:
->> This attempt will try to add new DT files to support Meson-G12A SoC.
->>
->> 1) first, Please notice that, in this patch series, the DT node about 16M reserved
->> memory for hwrom is removed, since it's not needed by G12A SoC.
->> 2) second, the pclk for uart_AO need to be fixed once G12A clock_ao driver is
->> merged. In this version, it rely on bootloader to enable the pclk gate which 
->> belong to AO clock domain. Please add clk_ignore_unused to bootargs.
->>
->> Changes since v2 [1]:
->>  - reorder subnodes
->>  - collect Rob's Reviewed-by
->>
->> Changes since v1 [0]:
->>  - fix signoff typo
->>  - order subnodes by addresses when there is one and alphabetically when there is none
->>
->> [0] https://lore.kernel.org/lkml/1533802951-49919-2-git-send-email-jianxin.pan at amlogic.com/
->>
->> Jianxin Pan (2):
->>   dt-bindings: arm: amlogic: Add Meson G12A binding
->>   arm64: dts: meson-g12a: add initial g12a s905d2 SoC DT support
->>
->>  Documentation/devicetree/bindings/arm/amlogic.txt |   6 +
->>  arch/arm64/boot/dts/amlogic/Makefile              |   1 +
->>  arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts   |  22 +++
->>  arch/arm64/boot/dts/amlogic/meson-g12a.dtsi       | 172 ++++++++++++++++++++++
->>  4 files changed, 201 insertions(+)
->>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts
->>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-g12a.dtsi
->>
-> 
-> Series looks good as far as I can tell
-> 
-> Reviewed-by: Jerome Brunet <jbrunet@baylibre.com>
-> 
-> .
-> 
-Hi Kevin, this series are tested on latest v4.20/integ.
+On Fri, Sep 7, 2018 at 5:33 AM Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+>
+> 2018-09-06 8:53 GMT+09:00 Rob Herring <robh@kernel.org>:
+> > There is nothing arch specific about building dtb files other than their
+> > location under /arch/*/boot/dts/. Keeping each arch aligned is a pain.
+> > The dependencies and supported targets are all slightly different.
+> > Also, a cross-compiler for each arch is needed, but really the host
+> > compiler preprocessor is perfectly fine for building dtbs. Move the
+> > build rules to a common location and remove the arch specific ones. This
+> > is done in a single step to avoid warnings about overriding rules.
+> >
+> > The build dependencies had been a mixture of 'scripts' and/or 'prepare'.
+> > These pull in several dependencies some of which need a target compiler
+> > (specifically devicetable-offsets.h) and aren't needed to build dtbs.
+> > All that is really needed is dtc, so adjust the dependencies to only be
+> > dtc.
+> >
+> > This change enables support 'dtbs_install' on some arches which were
+> > missing the target.
+> >
+> > Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+> > Cc: Michal Marek <michal.lkml@markovi.net>
+> > Cc: Vineet Gupta <vgupta@synopsys.com>
+> > Cc: Russell King <linux@armlinux.org.uk>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
+> > Cc: Michal Simek <monstr@monstr.eu>
+> > Cc: Ralf Baechle <ralf@linux-mips.org>
+> > Cc: Paul Burton <paul.burton@mips.com>
+> > Cc: James Hogan <jhogan@kernel.org>
+> > Cc: Ley Foon Tan <lftan@altera.com>
+> > Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> > Cc: Paul Mackerras <paulus@samba.org>
+> > Cc: Michael Ellerman <mpe@ellerman.id.au>
+> > Cc: Chris Zankel <chris@zankel.net>
+> > Cc: Max Filippov <jcmvbkbc@gmail.com>
+> > Cc: linux-kbuild at vger.kernel.org
+> > Cc: linux-snps-arc at lists.infradead.org
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: uclinux-h8-devel at lists.sourceforge.jp
+> > Cc: linux-mips at linux-mips.org
+> > Cc: nios2-dev at lists.rocketboards.org
+> > Cc: linuxppc-dev at lists.ozlabs.org
+> > Cc: linux-xtensa at linux-xtensa.org
+> > Signed-off-by: Rob Herring <robh@kernel.org>
+> > ---
+> > Please ack so I can take the whole series via the DT tree.
+> >
+> > v2:
+> >  - Fix $arch/boot/dts path check for out of tree builds
+> >  - Fix dtc dependency for building built-in dtbs
+> >  - Fix microblaze built-in dtb building
+>
+>
+> This breaks parallel building
+> because two threads could descend into scripts/dtc
+> at the same time.
+>
+> 'all' depends on both 'scripts' and 'dtc'.
+>
+> * 'scripts' target -- descends into scripts/, then scripts/dtc
+> * 'dtc' target     -- descents into scripts/dtc directly
+
+Any suggestions for how to fix given the problem with depending on
+scripts? I suppose I could make scripts depend on dtc instead, but I'd
+be back to needing to fix cleaning. Or I could just skip removing the
+cross compiler dependency for now.
+
+Rob
