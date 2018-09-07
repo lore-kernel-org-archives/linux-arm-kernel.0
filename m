@@ -1,75 +1,37 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Fri, 7 Sep 2018 15:21:36 +0800
-Subject: [SPAM][PATCH] usb: xhci: fix interrupt transfer error happened
- on MTK platforms
-In-Reply-To: <1536301896.6414.48.camel@mtkswgap22>
-References: <afafa68eb3a74a414848c116382e95811f924905.1536298766.git.chunfeng.yun@mediatek.com>
- <1536301896.6414.48.camel@mtkswgap22>
-Message-ID: <1536304896.32173.37.camel@mhfsdcap03>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Fri,  7 Sep 2018 15:22:29 +0800
+Subject: [PATCH 0/5] Fix A64 HDMI PHY device tree binding
+Message-ID: <20180907072234.48282-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
+When adding support for A64 HDMI PHY in 4.19, we assumed that the two
+PLL-VIDEOs can both feed the HDMI PHY clock. However experiments show
+that the mux bit discovered in R40 blob is not applicable on A64. This
+is not discovered, as normally with a single display pipeline only
+PLL-VIDEO0 will be used.
 
-I'll send a new version, thanks
+In this patchset the second PLL is dropped, and a binding specially for
+R40 HDMI PHY is added (which seems to have the mux).
 
-On Fri, 2018-09-07 at 14:31 +0800, Sean Wang wrote:
-> Hi,
-> 
-> Should add Fixes: tag and Cc: <stable@vger.kernel.org> also to apply the patch to the stable tree. Otherwise, the problem still is kept in the stable kernel.
-> 
-> The patch really can solve the problem by testing with the ASIX AX88179 u3 Ethernet can't work since v4.17.x.
-> 
-> So, Tested-by: Sean Wang <sean.wang@mediatek.com>
->  
-> and attach the log testing with AX88179
-> 
-> [  126.369574] usb 2-1: new SuperSpeed Gen 1 USB device number 2 using xhci-mtk
-> [  126.730806] ax88179_178a 2-1:1.0 eth2: register 'ax88179_178a' at usb-1a0c0000.usb-1, ASIX AX88179 USB 3.0 Gigabit Ethernet, 00:11:6b:68:4c:9e
-> [  126.759932] ax88179_178a 2-1:1.0 enx00116b684c9e: renamed from eth2
-> 
-> ~# ifconfig enx00116b684c9e 10.10.10.1
-> ~# ping 10[  147.613266] ax88179_178a 2-1:1.0 enx00116b684c9e: ax88179 - Link status is: 1
-> .10.10.3
-> PING 10.10.10.3 (10.10.10.3) 56(84) bytes of data.
-> 64 bytes from 10.10.10.3: icmp_seq=1 ttl=64 time=0.414 ms
-> 64 bytes from 10.10.10.3: icmp_seq=2 ttl=64 time=0.422 ms
-> 64 bytes from 10.10.10.3: icmp_seq=3 ttl=64 time=0.376 ms
-> 64 bytes from 10.10.10.3: icmp_seq=4 ttl=64 time=0.309 ms
-> 64 bytes from 10.10.10.3: icmp_seq=5 ttl=64 time=0.392 ms
-> 64 bytes from 10.10.10.3: icmp_seq=6 ttl=64 time=0.355 ms
-> 64 bytes from 10.10.10.3: icmp_seq=7 ttl=64 time=0.407 ms
-> 64 bytes from 10.10.10.3: icmp_seq=8 ttl=64 time=0.325 ms
-> 
-> On Fri, 2018-09-07 at 13:51 +0800, Chunfeng Yun wrote:
-> > The MTK xHCI controller use some reserved bytes in endpoint context for
-> > bandwidth scheduling, so need keep them in xhci_endpoint_copy();
-> > 
-> > The issue is introduced by:
-> > commit f5249461b504 ("xhci: Clear the host side toggle manually when
-> > endpoint is soft reset")
-> > It resets endpoints and will drop bandwidth scheduling parameters used
-> > by interrupt or isochronous endpoints on MTK xHCI controller.
-> > 
-> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> > ---
-> >  drivers/usb/host/xhci-mem.c | 4 ++++
-> >  1 file changed, 4 insertions(+)
-> > 
-> > diff --git a/drivers/usb/host/xhci-mem.c b/drivers/usb/host/xhci-mem.c
-> > index ef350c3..b1f27aa 100644
-> > --- a/drivers/usb/host/xhci-mem.c
-> > +++ b/drivers/usb/host/xhci-mem.c
-> > @@ -1613,6 +1613,10 @@ void xhci_endpoint_copy(struct xhci_hcd *xhci,
-> >  	in_ep_ctx->ep_info2 = out_ep_ctx->ep_info2;
-> >  	in_ep_ctx->deq = out_ep_ctx->deq;
-> >  	in_ep_ctx->tx_info = out_ep_ctx->tx_info;
-> > +	if (xhci->quirks & XHCI_MTK_HOST) {
-> > +		in_ep_ctx->reserved[0] = out_ep_ctx->reserved[0];
-> > +		in_ep_ctx->reserved[1] = out_ep_ctx->reserved[1];
-> > +	}
-> >  }
-> >  
-> >  /* Copy output xhci_slot_ctx to the input xhci_slot_ctx.
-> 
-> 
+PATCH 1 and 2 are dropping second PLL for A64 HDMI PHY, and PATCH 3 to 5
+are adding R40 HDMI PHY binding.
+
+This patchset targets v4.19 fixes tree, because the binding is
+introduced in v4.19, and if we don't fix it there a wrong binding will
+be left in a stable version released.
+
+Icenowy Zheng (5):
+  dt-bindings: sun4i-drm: drop second PLL from A64 HDMI PHY binding
+  drm: sun4i: drop second PLL from A64 HDMI PHY
+  dt-bindings: sun4i-drm: add compatible for R40 HDMI PHY
+  drm/sun4i: add support for R40 HDMI PHY
+  ARM: sun8i: dts: drop A64 HDMI PHY fallback compatible from R40 DT
+
+ .../devicetree/bindings/display/sunxi/sun4i-drm.txt |  5 +++--
+ arch/arm/boot/dts/sun8i-r40.dtsi                    |  3 +--
+ drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c              | 13 ++++++++++++-
+ 3 files changed, 16 insertions(+), 5 deletions(-)
+
+-- 
+2.18.0
