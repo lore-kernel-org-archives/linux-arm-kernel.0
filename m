@@ -1,96 +1,159 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 07 Sep 2018 11:25:40 -0700
-Subject: [PATCH 1/6] drm/bridge: use bus flags in bridge timings
-In-Reply-To: <CACRpkdaUuWUHZgT0b64hMNZm3oy=7rece3H0p5VVe4d8jpFRaw@mail.gmail.com>
-References: <20180905052113.21262-1-stefan@agner.ch>
- <4035252.QuWadVx7pr@avalon> <1569297.pdEFdpi3HS@avalon>
- <a00c1650b69ba85bed7ae39b81a0c40f@agner.ch>
- <CACRpkdbw0VjkHYcUpox+DorRG0oRdPARL4ShgPfV2eFaUF_w0g@mail.gmail.com>
- <b1cb586397a4cd444c33dd83d72fa544@agner.ch>
- <CACRpkdaUuWUHZgT0b64hMNZm3oy=7rece3H0p5VVe4d8jpFRaw@mail.gmail.com>
-Message-ID: <3c048938d12a070c03f0cbdbc89c86e8@agner.ch>
+From: leoyang.li@nxp.com (Li Yang)
+Date: Fri, 7 Sep 2018 13:56:33 -0500
+Subject: [PATCH 3/3] soc: fsl: add RCPM driver
+In-Reply-To: <AM5PR0402MB2865E57EDC0DE8B0047282A2F1000@AM5PR0402MB2865.eurprd04.prod.outlook.com>
+References: <20180831035219.31619-1-ran.wang_1@nxp.com>
+ <20180831035219.31619-3-ran.wang_1@nxp.com>
+ <be39f5ea8c9046b0bf1f6bbfe935fae4@HXTBJIDCEMVIW02.hxtcorp.net>
+ <CADRPPNQN=27+pOSckxvwSuBJoFaz7pT+Z6h07Wu3Liz5ao5kkA@mail.gmail.com>
+ <AM5PR0402MB2865E57EDC0DE8B0047282A2F1000@AM5PR0402MB2865.eurprd04.prod.outlook.com>
+Message-ID: <CADRPPNTGrKBxzpbP05R0T3ovngYgQ4P_kgwgYwB6Aqrs8maXqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07.09.2018 00:10, Linus Walleij wrote:
-> On Thu, Sep 6, 2018 at 10:25 PM Stefan Agner <stefan@agner.ch> wrote:
-> 
->> Ok, I read a bit up on the history of bridge timing, especially:
->> https://www.spinics.net/lists/dri-devel/msg155618.html
->>
->> IMHO, this got overengineered. For displays we do not need all that
->> setup/sample delay timing information, and much longer cables are in
->> use. So why is all that needed for bridges?
-> 
-> I also avoided the overhead of creating this abstraction initially.
-> 
-> But after doing it I have this Stockholm syndrome that I start
-> liking what Laurent told me to do.
-> 
->> For Linus case, the THS8134(A/B) data sheet I found (revised March 2010)
->> clearly states:
->> Clock input. A rising edge on CLK latches RPr0-7, GY0-7, BPb0-7.
->>
->> So we need to drive on negative edge, hence DRM_BUS_FLAG_PIXDATA_NEGEDGE
->> should be used, which makes the pl111 driver setting TIM2_IPC:
->> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0121d/index.html
-> 
-> That is easy to say, but if I just set that up in code, even with a good
-> comment it is hard for the next reader to understand what is going
-> on. The central question will be, why does PL111 need to do this
-> but not R-Car though they are using the same bridge?
+On Fri, Sep 7, 2018 at 4:51 AM Ran Wang <ran.wang_1@nxp.com> wrote:
+>
+> Hi Leo,
+>
+> On September 05, 2018 at 11:22 Yang Li wrote:
+> > -----Original Message-----
+> > From: Li Yang <leoyang.li@nxp.com>
+> > Sent: Wednesday, September 05, 2018 11:22
+> > To: dongsheng.wang at hxt-semitech.com
+> > Cc: Ran Wang <ran.wang_1@nxp.com>; Rob Herring <robh+dt@kernel.org>;
+> > Mark Rutland <mark.rutland@arm.com>; open list:OPEN FIRMWARE AND
+> > FLATTENED DEVICE TREE BINDINGS <devicetree@vger.kernel.org>; linuxppc-
+> > dev <linuxppc-dev@lists.ozlabs.org>; lkml <linux-kernel@vger.kernel.org>;
+> > moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE <linux-arm-
+> > kernel at lists.infradead.org>
+> > Subject: Re: [PATCH 3/3] soc: fsl: add RCPM driver
+> >
+> > On Tue, Sep 4, 2018 at 9:58 PM Wang, Dongsheng <dongsheng.wang@hxt-
+> > semitech.com> wrote:
+> > >
+> > > Please change your comments style.
+> >
+> > Although this doesn't get into the Linux kernel coding style documentation
+> > yet, Linus seems changed his mind to prefer // than /*
+> > */ comment style now.
+> > https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Flkml
+> > .org%2Flkml%2F2017%2F11%2F25%2F133&amp;data=02%7C01%7Cran.wang_
+> > 1%40nxp.com%7Cc0d88e6690384e02b95108d612dec235%7C686ea1d3bc2b4c
+> > 6fa92cd99c5c301635%7C0%7C0%7C636717145285126200&amp;sdata=JIoCZp
+> > WhRyW76EqgSflfTDA1f0gMQGKa%2FcbvSc5CO%2Fw%3D&amp;reserved=0
+> > So the
+> > // style should be acceptable for now.
+> >
+> > >
+> > > On 2018/8/31 11:56, Ran Wang wrote:
+> > > > The NXP's QorIQ Processors based on ARM Core have RCPM module (Run
+> > > > Control and Power Management), which performs all device-level tasks
+> > > > associated with power management such as wakeup source control.
+> > > >
+> > > > This driver depends on FSL platform PM driver framework which help
+> > > > to isolate user and PM service provider (such as RCPM driver).
+> > > >
+> > > > Signed-off-by: Chenhui Zhao <chenhui.zhao@nxp.com>
+> > > > Signed-off-by: Ying Zhang <ying.zhang22455@nxp.com>
+> > > > Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
+> > > > ---
+> > > >  drivers/soc/fsl/Kconfig   |    6 ++
+> > > >  drivers/soc/fsl/Makefile  |    1 +
+> > > >  drivers/soc/fsl/ls-rcpm.c |  153
+> > > > +++++++++++++++++++++++++++++++++++++++++++++
+> > > >  3 files changed, 160 insertions(+), 0 deletions(-)  create mode
+> > > > 100644 drivers/soc/fsl/ls-rcpm.c
+> > > >
+> > > > diff --git a/drivers/soc/fsl/Kconfig b/drivers/soc/fsl/Kconfig index
+> > > > 6517412..882330d 100644
+> > > > --- a/drivers/soc/fsl/Kconfig
+> > > > +++ b/drivers/soc/fsl/Kconfig
+> > > > @@ -30,3 +30,9 @@ config FSL_PLAT_PM
+> > > >         have to know the implement details of wakeup function it require.
+> > > >         Besides, it is also easy for service side to upgrade its logic when
+> > > >         design changed and remain user side unchanged.
+> > > > +
+> > > > +config LS_RCPM
+> > > > +     bool "Freescale RCPM support"
+> > > > +     depends on (FSL_PLAT_PM)
+> > > > +     help
+> > > > +       This feature is to enable specified wakeup source for system sleep.
+> > > > diff --git a/drivers/soc/fsl/Makefile b/drivers/soc/fsl/Makefile
+> > > > index 8f9db23..43ff71a 100644
+> > > > --- a/drivers/soc/fsl/Makefile
+> > > > +++ b/drivers/soc/fsl/Makefile
+> > > > @@ -7,3 +7,4 @@ obj-$(CONFIG_QUICC_ENGINE)            += qe/
+> > > >  obj-$(CONFIG_CPM)                    += qe/
+> > > >  obj-$(CONFIG_FSL_GUTS)                       += guts.o
+> > > >  obj-$(CONFIG_FSL_PLAT_PM)    += plat_pm.o
+> > > > +obj-$(CONFIG_LS_RCPM)                += ls-rcpm.o
+> >
+> > Probably use "_" instead of "-" for alignment.
+>
+> OK, will update in next version
+>
+> > > > diff --git a/drivers/soc/fsl/ls-rcpm.c b/drivers/soc/fsl/ls-rcpm.c
+> > > > new file mode 100644 index 0000000..b0feb88
+> > > > --- /dev/null
+> > > > +++ b/drivers/soc/fsl/ls-rcpm.c
+> > > > @@ -0,0 +1,153 @@
+> > > > +// SPDX-License-Identifier: GPL-2.0 // // plat_pm.c - Freescale
+> > > > +Layerscape RCPM driver
+> >
+> > The file name here is not the same as the real file name.
+>
+> Got it, will correct it.
+>
+> > > > +//
+> > > > +// Copyright 2018 NXP
+> > > > +//
+> > > > +// Author: Ran Wang <ran.wang_1@nxp.com>,
+> >
+> > Where do you need the comma in the end?
+>
+> My bad, will remove comma in next version.
+>
+> > > > +
+> > > > +#include <linux/init.h>
+> > > > +#include <linux/module.h>
+> > > > +#include <linux/platform_device.h>
+> > > > +#include <linux/of_address.h>
+> > > > +#include <linux/slab.h>
+> > > > +#include <soc/fsl/plat_pm.h>
+> > > > +
+> > > > +#define MAX_COMPATIBLE_NUM   10
+> > > > +
+> > > > +struct rcpm_t {
+> > > > +     struct device *dev;
+> > > > +     void __iomem *ippdexpcr_addr;
+> > > > +     bool big_endian;        /* Big/Little endian of RCPM module */
+> > > > +};
+> > > > +
+> > > > +// rcpm_handle - Configure RCPM reg according to wake up source
+> > > > +request // @user_dev: pointer to user's device struct // @flag: to
+> > > > +enable(true) or disable(false) wakeup source // @handle_priv:
+> > > > +pointer to struct rcpm_t instance // // Return 0 on success other
+> > > > +negative errno
+> >
+> > Although Linus preferred this // comment style.  I'm not sure if this will be
+> > handled correctly by the kernel-doc compiler.
+> > https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fww
+> > w.kernel.org%2Fdoc%2Fhtml%2Fv4.18%2Fdoc-guide%2Fkernel-
+> > doc.html&amp;data=02%7C01%7Cran.wang_1%40nxp.com%7Cc0d88e669038
+> > 4e02b95108d612dec235%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0%7C0
+> > %7C636717145285126200&amp;sdata=H7GkUNOLVG%2FCcZESzhtHBeHCbO9
+> > %2FK4k9EdH30Cxq2%2BM%3D&amp;reserved=0
+>
+> So, do you think I need to change all comment style back to '/* ... */' ?
+> Actually I feel a little bit confused here.
 
-That is something I have experienced before. Depending on drive
-strength, and I guess sampling delay etc, it might sample just late
-enough that signals are stable and no issues are really visible on the
-screen. In those cases different cabling, changes in drive strength, or
-even production variations might suddenly show artefacts though... My
-point being, just because it supposedly works, does not mean that it is
-right.
+I think Linus's comment about // comment style applies to normal code
+comment.  But kernel-doc comment is a special kind of code comment
+that needs to meet certain requirements.  People can use the
+scripts/kernel-doc tool to generate readable API documents from the
+source code.  It looks like you wanted to make the function
+description aligned with the kernel-doc format, but kernel-doc
+specifically requires to use the /* */ style(at least for now).
 
-I did introduce the bus flags a while ago:
-https://patchwork.kernel.org/patch/8254801/
-https://patchwork.kernel.org/patch/8254821/
-
-And then had to debug quite some controller and display issues around
-pixel clock polarity:
-https://patchwork.kernel.org/patch/8117181/
-https://patchwork.kernel.org/patch/9465485/
-
-E.g. in that last case, the pixel clock polarity flags were interpreted
-wrong on both controller and display side. Hence this worked fine for
-the case already upstream, but it did not work in my case...
-
-In the end, best thing is to look on the bus. Parallel display signals
-are still rather slow, and usually rather easy to scope.
-
-PL111 needs to do this because its standard setting is driving on rising
-edge. However, most displays as well as that bridge sample data on
-rising edge.
-
-I guess R-Car DU drives on negative edge by default, but can't say for
-sure without hardware/data sheet.
-
-As far as I can tell the R-Car DU driver also does not use the
-DRM_BUS_FLAG_PIXDATA_*EDGE flags currently.
-
-
-
-> 
-> So this elaborate model gives a better transfer of abstract concepts
-> to whoever needs to touch that code next. The code is not just
-> logic, but also our map of the world and the documentation of our
-> problem space.
-> 
-> Donald Knuth has this idea about literate programming which even
-> turns the documentation/implementation process around. We are
-> not there, not even remotely, but IMO the more complex the problem.
-> the more we need to convey our thinking, not just our solution.
-
-Fully agree.
-
-My argument here is, that the map of the world (code) and the problem
-are not aligned.
-
---
-Stefan
+Regards,
+Leo
