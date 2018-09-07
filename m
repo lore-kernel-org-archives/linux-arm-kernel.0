@@ -1,46 +1,82 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Fri, 7 Sep 2018 17:54:22 +0900
-Subject: [RFC 3/3] stk1160: Use non-coherent buffers for USB transfers
-In-Reply-To: <20180830175937.GB11521@infradead.org>
-References: <20180830172030.23344-1-ezequiel@collabora.com>
- <20180830172030.23344-4-ezequiel@collabora.com>
- <20180830175937.GB11521@infradead.org>
-Message-ID: <CAAFQd5D=tETh0638gR0TP=_FZXzMcy=6EjOLW8n1SRPqR=sCrQ@mail.gmail.com>
+From: christian.koenig@amd.com (=?UTF-8?Q?Christian_K=c3=b6nig?=)
+Date: Fri, 7 Sep 2018 10:55:31 +0200
+Subject: [PATCH v2 01/40] iommu: Introduce Shared Virtual Addressing API
+In-Reply-To: <f0b317d5-e2e9-5478-952c-05e8b97bd68b@arm.com>
+References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
+ <20180511190641.23008-2-jean-philippe.brucker@arm.com>
+ <bf42affd-e9d0-e4fc-6d28-f3c3f7795348@redhat.com>
+ <03d31ba5-1eda-ea86-8c0c-91d14c86fe83@arm.com>
+ <ed39159c-087e-7e56-7d29-d1de9fa1677f@amd.com>
+ <f0b317d5-e2e9-5478-952c-05e8b97bd68b@arm.com>
+Message-ID: <2fd4a0a1-1a35-bf82-df84-b995cce011d9@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2018 at 2:59 AM Christoph Hellwig <hch@infradead.org> wrote:
+Am 06.09.2018 um 14:45 schrieb Jean-Philippe Brucker:
+> On 06/09/2018 12:12, Christian K?nig wrote:
+>> Am 06.09.2018 um 13:09 schrieb Jean-Philippe Brucker:
+>>> Hi Eric,
+>>>
+>>> Thanks for reviewing
+>>>
+>>> On 05/09/2018 12:29, Auger Eric wrote:
+>>>>> +int iommu_sva_device_init(struct device *dev, unsigned long features,
+>>>>> +????????????? unsigned int max_pasid)
+>>>> what about min_pasid?
+>>> No one asked for it... The max_pasid parameter is here for drivers that
+>>> have vendor-specific PASID size limits, such as AMD KFD (see
+>>> kfd_iommu_device_init and
+>>> https://patchwork.kernel.org/patch/9989307/#21389571). But in most cases
+>>> the PASID size will only depend on the PCI PASID capability and the
+>>> IOMMU limits, both known by the IOMMU driver, so device drivers won't
+>>> have to set max_pasid.
+>>>
+>>> IOMMU drivers need to set min_pasid in the sva_device_init callback
+>>> because it may be either 1 (e.g. Arm where PASID #0 is reserved) or 0
+>>> (Intel Vt-d rev2), but at the moment I can't see a reason for device
+>>> drivers to override min_pasid
+>> Sorry to ruin your day, but if I'm not completely mistaken PASID zero is
+>> reserved in the AMD KFD as well.
+> Heh, fair enough. I'll add the min_pasid parameter
+
+I will take this as an opportunity to summarize some of the requirements 
+we have for PASID management from the amdgpu driver point of view:
+
+1. We need to be able to allocate PASID between 1 and some maximum. Zero 
+is reserved as far as I know, but we don't necessary need a minimum.
+
+2. We need to be able to allocate PASIDs without a process address space 
+backing it. E.g. our hardware uses PASIDs even without Shared Virtual 
+Addressing enabled to distinct clients from each other.
+ ??? ??? Would be a pity if we need to still have a separate PASID 
+handling because the system wide is only available when IOMMU is turned on.
+
+3. Even after destruction of a process address space we need some grace 
+period before a PASID is reused because it can be that the specific 
+PASID is still in some hardware queues etc...
+ ??? ??? At bare minimum all device drivers using process binding need 
+to explicitly note to the core when they are done with a PASID.
+
+4. It would be nice to have to be able to set a "void *" for each 
+PASID/device combination while binding to a process which then can be 
+queried later on based on the PASID.
+ ??? ??? E.g. when you have a per PASID/device structure around anyway, 
+just add an extra field.
+
+5. It would be nice to have to allocate multiple PASIDs for the same 
+process address space.
+ ??? ??? E.g. some teams at AMD want to use a separate GPU address space 
+for their userspace client library. I'm still trying to avoid that, but 
+it is perfectly possible that we are going to need that.
+ ??? ??? Additional to that it is sometimes quite useful for debugging 
+to isolate where exactly an incorrect access (segfault) is coming from.
+
+Let me know if there are some problems with that, especially I want to 
+know if there is pushback on #5 so that I can forward that :)
+
+Thanks,
+Christian.
+
 >
-> > +     dma_sync_single_for_cpu(&urb->dev->dev, urb->transfer_dma,
-> > +             urb->transfer_buffer_length, DMA_FROM_DEVICE);
->
-> You can't ue dma_sync_single_for_cpu on non-coherent dma buffers,
-> which is one of the major issues with them.
-
-It's not an issue of DMA API, but just an API mismatch. By design,
-memory allocated for device (e.g. by DMA API) doesn't have to be
-physically contiguous, while dma_*_single() API expects a _single_,
-physically contiguous region of memory.
-
-We need a way to allocate non-coherent memory using DMA API to handle
-(on USB example, but applies to virtually any class of devices doing
-DMA):
- - DMA address range limitations (e.g. dma_mask) - while a USB HCD
-driver is normally aware of those, USB device driver should have no
-idea,
- - memory mapping capability === whether contiguous memory or a set of
-random pages can be allocated - this is a platform integration detail,
-which even a USB HCD driver may not be aware of, if a SoC IOMMU is
-just stuffed between the bus and HCD,
- - platform coherency specifics - there are practical scenarios when
-on a coherent-by-default system it's more efficient to allocate
-non-coherent memory and manage caches explicitly to avoid the costs of
-cache snooping.
-
-If DMA_ATTR_NON_CONSISTENT is not the right way to do it, there should
-be definitely a new API introduced, coupled closely to DMA API
-implementation on given platform, since it's the only place which can
-solve all the constraints above.
-
-Best regards,
-Tomasz
+> Thanks,
+> Jean
