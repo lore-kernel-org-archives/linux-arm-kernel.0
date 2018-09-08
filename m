@@ -1,56 +1,96 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 8 Sep 2018 18:22:58 +0800
-Subject: [PATCH 0/2] Follow-up patches for Cedrus v9
-In-Reply-To: <11104c03-97ac-8b36-7d75-dfecb8fcce10@xs4all.nl>
-References: <20180907163347.32312-1-contact@paulk.fr>
- <11104c03-97ac-8b36-7d75-dfecb8fcce10@xs4all.nl>
-Message-ID: <CAGb2v67F2a-kYFRb_f+CyhzkHf5+Y+h01=SE-rxJ=-Oj-ma1BA@mail.gmail.com>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Sat, 8 Sep 2018 19:07:26 +0800
+Subject: [PATCH v2 10/22] pinctrl: mediatek: add ies register support to
+ pinctrl-mtk-common-v2.c
+In-Reply-To: <cover.1536404280.git.sean.wang@mediatek.com>
+References: <cover.1536404280.git.sean.wang@mediatek.com>
+Message-ID: <af007cdcec1d4e8512faf47182aa4b17b17c1093.1536404280.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 8, 2018 at 6:06 PM Hans Verkuil <hverkuil@xs4all.nl> wrote:
->
-> On 09/07/2018 06:33 PM, Paul Kocialkowski wrote:
-> > This brings the requested modifications on top of version 9 of the
-> > Cedrus VPU driver, that implements stateless video decoding using the
-> > Request API.
-> >
-> > Paul Kocialkowski (2):
-> >   media: cedrus: Fix error reporting in request validation
-> >   media: cedrus: Add TODO file with tasks to complete before unstaging
-> >
-> >  drivers/staging/media/sunxi/cedrus/TODO     |  7 +++++++
-> >  drivers/staging/media/sunxi/cedrus/cedrus.c | 15 ++++++++++++---
-> >  2 files changed, 19 insertions(+), 3 deletions(-)
-> >  create mode 100644 drivers/staging/media/sunxi/cedrus/TODO
-> >
->
-> So close...
->
-> When compiling under e.g. intel I get errors since it doesn't know about
-> the sunxi_sram_claim/release function and the PHYS_PFN_OFFSET define.
->
-> Is it possible to add stub functions to linux/soc/sunxi/sunxi_sram.h
-> if CONFIG_SUNXI_SRAM is not defined? That would be the best fix for that.
->
-> The use of PHYS_PFN_OFFSET is weird: are you sure this is the right
-> way? I see that drivers/of/device.c also sets dev->dma_pfn_offset, which
-> makes me wonder if this information shouldn't come from the device tree.
->
-> You are the only driver that uses this define directly, which makes me
-> suspicious.
+From: Sean Wang <sean.wang@mediatek.com>
 
-On Allwinner platforms, some devices do DMA directly on the memory BUS
-with the DRAM controller. In such cases, the DRAM has no offset. In all
-other cases where the DMA goes through the common system bus and the DRAM
-offset is either 0x40000000 or 0x20000000, depending on the SoC. Since the
-former case is not described in the device tree (this is being worked on
-by Maxime BTW), the dma_pfn_offset is not the value it should be. AFAIK
-only the display and media subsystems (VPU, camera, TS) are wired this
-way.
+Certain SoCs have to program an extra IES register to configure input
+enabled mode so that we add it in the existing path as an option.
 
-In drivers/gpu/drm/sun4i/sun4i_backend.c (the display driver) we use
-PHYS_OFFSET, which is pretty much the same thing.
+Signed-off-by: Ryder.Lee <ryder.lee@mediatek.com>
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+---
+ drivers/pinctrl/mediatek/pinctrl-moore.c         | 26 +++++++++++++++++-------
+ drivers/pinctrl/mediatek/pinctrl-mt7622.c        |  1 +
+ drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h |  2 ++
+ 3 files changed, 22 insertions(+), 7 deletions(-)
 
-Regards
-ChenYu
+diff --git a/drivers/pinctrl/mediatek/pinctrl-moore.c b/drivers/pinctrl/mediatek/pinctrl-moore.c
+index 4009329..219cfce 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-moore.c
++++ b/drivers/pinctrl/mediatek/pinctrl-moore.c
+@@ -244,15 +244,27 @@ static int mtk_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin,
+ 					       MTK_DISABLE);
+ 			if (err)
+ 				goto err;
+-			/* else: fall through */
++
++			err = mtk_hw_set_value(hw, pin, PINCTRL_PIN_REG_DIR,
++					       MTK_OUTPUT);
++			if (err)
++				goto err;
++			break;
+ 		case PIN_CONFIG_INPUT_ENABLE:
+-		case PIN_CONFIG_SLEW_RATE:
+-			reg = (param == PIN_CONFIG_SLEW_RATE) ?
+-			       PINCTRL_PIN_REG_SR : PINCTRL_PIN_REG_DIR;
+ 
+-			arg = (param == PIN_CONFIG_INPUT_ENABLE) ? 0 :
+-			      (param == PIN_CONFIG_OUTPUT_ENABLE) ? 1 : arg;
+-			err = mtk_hw_set_value(hw, pin, reg, arg);
++			if (hw->soc->ies_present) {
++				mtk_hw_set_value(hw, pin, PINCTRL_PIN_REG_IES,
++						 MTK_ENABLE);
++			}
++
++			err = mtk_hw_set_value(hw, pin, PINCTRL_PIN_REG_DIR,
++					       MTK_INPUT);
++			if (err)
++				goto err;
++			break;
++		case PIN_CONFIG_SLEW_RATE:
++			err = mtk_hw_set_value(hw, pin, PINCTRL_PIN_REG_SR,
++					       arg);
+ 			if (err)
+ 				goto err;
+ 
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mt7622.c b/drivers/pinctrl/mediatek/pinctrl-mt7622.c
+index 9a5b13a..9ac36ab 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mt7622.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mt7622.c
+@@ -767,6 +767,7 @@ static const struct mtk_pin_soc mt7622_data = {
+ 	.eint_hw = &mt7622_eint_hw,
+ 	.gpio_m	= 1,
+ 	.eint_m = 1,
++	.ies_present = false,
+ 	.bias_disable_set = mtk_pinconf_bias_disable_set,
+ 	.bias_disable_get = mtk_pinconf_bias_disable_get,
+ 	.bias_set = mtk_pinconf_bias_set,
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h
+index ce364a1..b01dbd8 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h
++++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h
+@@ -54,6 +54,7 @@ enum {
+ 	PINCTRL_PIN_REG_PUPD,
+ 	PINCTRL_PIN_REG_R0,
+ 	PINCTRL_PIN_REG_R1,
++	PINCTRL_PIN_REG_IES,
+ 	PINCTRL_PIN_REG_MAX,
+ };
+ 
+@@ -151,6 +152,7 @@ struct mtk_pin_soc {
+ 	/* Specific parameters per SoC */
+ 	u8				gpio_m;
+ 	u8				eint_m;
++	bool				ies_present;
+ 
+ 	/* Specific pinconfig operations */
+ 	int (*bias_disable_set)(struct mtk_pinctrl *hw,
+-- 
+2.7.4
