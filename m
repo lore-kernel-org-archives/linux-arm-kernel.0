@@ -1,79 +1,72 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Sat, 8 Sep 2018 19:07:35 +0800
-Subject: [PATCH v2 19/22] pinctrl: mediatek: extend advanced pull support in
- pinctrl-mtk-common-v2.c
+Date: Sat, 8 Sep 2018 19:07:36 +0800
+Subject: [PATCH v2 20/22] pintcrl: mediatek: add pull tweaks for I2C related
+ pins on MT8183
 In-Reply-To: <cover.1536404280.git.sean.wang@mediatek.com>
 References: <cover.1536404280.git.sean.wang@mediatek.com>
-Message-ID: <818dc8145d9b1e193c0c203767d33b11fa69ead4.1536404280.git.sean.wang@mediatek.com>
+Message-ID: <3d957d32b5b0f67548f63ae4ba7176dba9e61faa.1536404280.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+From: Zhiyong Tao <zhiyong.tao@mediatek.com>
 
-Extend the advanced pull based on the legacy bias plus additional r0 and r1
-to tweak the resistor level.
+This patch provides the advanced pull for I2C used pins on MT8183.
 
 Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 ---
- drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c | 37 ++++++++++++++++++++----
- 1 file changed, 32 insertions(+), 5 deletions(-)
+ drivers/pinctrl/mediatek/pinctrl-mt8183.c | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c
-index 7cdd46f..7d5f570 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c
-+++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c
-@@ -476,6 +476,19 @@ int mtk_pinconf_adv_pull_set(struct mtk_pinctrl *hw,
- 
- 	err = mtk_hw_set_value(hw, desc, PINCTRL_PIN_REG_PUPD, arg);
- 
-+	/* If PUPD register is not supported for that pin, let's fallback to
-+	 * general bias control.
-+	 */
-+	if (err == -ENOTSUPP) {
-+		if (hw->soc->bias_set) {
-+			err = hw->soc->bias_set(hw, desc, pullup);
-+			if (err)
-+				return err;
-+		} else {
-+			return -ENOTSUPP;
-+		}
-+	}
-+
- 	return err;
- }
- 
-@@ -487,12 +500,26 @@ int mtk_pinconf_adv_pull_get(struct mtk_pinctrl *hw,
- 	int err;
- 
- 	err = mtk_hw_get_value(hw, desc, PINCTRL_PIN_REG_PUPD, &t);
--	if (err)
--		return err;
- 
--	/* t == 0 supposes PULLUP for the customized PULL setup */
--	if (pullup ^ !t)
--		return -EINVAL;
-+	/* If PUPD register is not supported for that pin, let's fallback to
-+	 * general bias control.
-+	 */
-+	if (err == -ENOTSUPP) {
-+		if (hw->soc->bias_get) {
-+			err = hw->soc->bias_get(hw, desc, pullup, val);
-+			if (err)
-+				return err;
-+		} else {
-+			return -ENOTSUPP;
-+		}
-+	} else {
-+		/* t == 0 supposes PULLUP for the customized PULL setup */
-+		if (err)
-+			return err;
-+
-+		if (pullup ^ !t)
-+			return -EINVAL;
-+	}
- 
- 	err = mtk_hw_get_value(hw, desc, PINCTRL_PIN_REG_R0, &t);
- 	if (err)
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mt8183.c b/drivers/pinctrl/mediatek/pinctrl-mt8183.c
+index bd3f00b..9d5aa27 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mt8183.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mt8183.c
+@@ -397,10 +397,22 @@ static const struct mtk_pin_field_calc mt8183_pin_r0_range[] = {
+ 	PIN_FIELD_BASE(40, 40, 3, 0x0C0, 0x10, 20, 1),
+ 	PIN_FIELD_BASE(41, 41, 3, 0x0C0, 0x10, 24, 1),
+ 	PIN_FIELD_BASE(42, 42, 3, 0x0C0, 0x10, 28, 1),
++	PIN_FIELD_BASE(48, 48, 3, 0x0F0, 0x10, 18, 1),
++	PIN_FIELD_BASE(49, 49, 3, 0x0F0, 0x10, 13, 1),
++	PIN_FIELD_BASE(50, 50, 4, 0x0F0, 0x10, 10, 1),
++	PIN_FIELD_BASE(51, 51, 4, 0x0F0, 0x10, 5, 1),
++	PIN_FIELD_BASE(81, 81, 5, 0x0F0, 0x10, 7, 1),
++	PIN_FIELD_BASE(82, 82, 5, 0x0F0, 0x10, 5, 1),
++	PIN_FIELD_BASE(83, 83, 5, 0x0F0, 0x10, 15, 1),
++	PIN_FIELD_BASE(84, 84, 5, 0x0F0, 0x10, 17, 1),
+ 	PIN_FIELD_BASE(91, 91, 6, 0x0C0, 0x10, 0, 1),
+ 	PIN_FIELD_BASE(92, 92, 6, 0x0C0, 0x10, 4, 1),
+ 	PIN_FIELD_BASE(93, 93, 6, 0x0C0, 0x10, 8, 1),
+ 	PIN_FIELD_BASE(94, 94, 6, 0x0C0, 0x10, 12, 1),
++	PIN_FIELD_BASE(103, 103, 6, 0x0F0, 0x10, 20, 1),
++	PIN_FIELD_BASE(104, 104, 6, 0x0F0, 0x10, 10, 1),
++	PIN_FIELD_BASE(105, 105, 6, 0x0F0, 0x10, 22, 1),
++	PIN_FIELD_BASE(106, 106, 6, 0x0F0, 0x10, 12, 1),
+ 	PIN_FIELD_BASE(122, 122, 8, 0x0C0, 0x10, 0, 1),
+ 	PIN_FIELD_BASE(123, 123, 8, 0x0C0, 0x10, 4, 1),
+ 	PIN_FIELD_BASE(124, 124, 8, 0x0C0, 0x10, 8, 1),
+@@ -430,10 +442,22 @@ static const struct mtk_pin_field_calc mt8183_pin_r1_range[] = {
+ 	PIN_FIELD_BASE(40, 40, 3, 0x0C0, 0x10, 21, 1),
+ 	PIN_FIELD_BASE(41, 41, 3, 0x0C0, 0x10, 25, 1),
+ 	PIN_FIELD_BASE(42, 42, 3, 0x0C0, 0x10, 29, 1),
++	PIN_FIELD_BASE(48, 48, 3, 0x0F0, 0x10, 19, 1),
++	PIN_FIELD_BASE(49, 49, 3, 0x0F0, 0x10, 14, 1),
++	PIN_FIELD_BASE(50, 50, 4, 0x0F0, 0x10, 11, 1),
++	PIN_FIELD_BASE(51, 51, 4, 0x0F0, 0x10, 6, 1),
++	PIN_FIELD_BASE(81, 81, 5, 0x0F0, 0x10, 8, 1),
++	PIN_FIELD_BASE(82, 82, 5, 0x0F0, 0x10, 6, 1),
++	PIN_FIELD_BASE(83, 83, 5, 0x0F0, 0x10, 16, 1),
++	PIN_FIELD_BASE(84, 84, 5, 0x0F0, 0x10, 18, 1),
+ 	PIN_FIELD_BASE(91, 91, 6, 0x0C0, 0x10, 1, 1),
+ 	PIN_FIELD_BASE(92, 92, 6, 0x0C0, 0x10, 5, 1),
+ 	PIN_FIELD_BASE(93, 93, 6, 0x0C0, 0x10, 9, 1),
+ 	PIN_FIELD_BASE(94, 94, 6, 0x0C0, 0x10, 13, 1),
++	PIN_FIELD_BASE(103, 103, 6, 0x0F0, 0x10, 21, 1),
++	PIN_FIELD_BASE(104, 104, 6, 0x0F0, 0x10, 11, 1),
++	PIN_FIELD_BASE(105, 105, 6, 0x0F0, 0x10, 23, 1),
++	PIN_FIELD_BASE(106, 106, 6, 0x0F0, 0x10, 13, 1),
+ 	PIN_FIELD_BASE(122, 122, 8, 0x0C0, 0x10, 1, 1),
+ 	PIN_FIELD_BASE(123, 123, 8, 0x0C0, 0x10, 5, 1),
+ 	PIN_FIELD_BASE(124, 124, 8, 0x0C0, 0x10, 9, 1),
 -- 
 2.7.4
