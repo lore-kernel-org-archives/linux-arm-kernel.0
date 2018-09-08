@@ -1,144 +1,127 @@
 From: saiprakash.ranjan@codeaurora.org (Sai Prakash Ranjan)
-Date: Sun,  9 Sep 2018 01:57:05 +0530
-Subject: [PATCH 4/6] arm64/io: Add tracepoint for register accesses
+Date: Sun,  9 Sep 2018 01:57:07 +0530
+Subject: [PATCH 6/6] dynamic_debug: Add flag for dynamic event tracing
 In-Reply-To: <cover.1536430404.git.saiprakash.ranjan@codeaurora.org>
 References: <cover.1536430404.git.saiprakash.ranjan@codeaurora.org>
-Message-ID: <84677d700f0e894142bf3460292c695bb1a946e4.1536430404.git.saiprakash.ranjan@codeaurora.org>
+Message-ID: <3f0166ff19ae44dbf92cbb239ebf25fa8a4f243c.1536430404.git.saiprakash.ranjan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Generic IO read/write i.e., __raw_{read,write}{b,l,w,q} are
-typically used to read/write from/to memory mapped registers,
-which can cause hangs or some undefined behaviour if access
-unclocked. Tracing these register accesses can be very helpful
-to debug such issues during initial development stages.
-This can be used later for tracing arm IO register accesses.
+Debugging a specific driver or subsystem can be a lot easier
+if we can trace events specific to that driver or subsystem.
+This type of filtering can be achieved using existing
+dynamic debug library which provides a way to filter based
+on files, functions and modules.
 
-Sample output format of register access trace is below:
+Using this, provide an additional flag 'e' to filter event
+tracing to specified input.
 
-  io_write: type=writel cpu=3 ts:1424714326 data=0xffff00000d1065a4 caller=qcom_smsm_probe+0x52c/0x678
-  io_write: type=writel cpu=3 ts:1424962659 data=0xffff00000d106608 caller=qcom_smsm_probe+0x52c/0x678
+For example, tracing all IO read/write can be overwhelming
+and of no use when debugging a specific driver or a subsystem.
+So switch to dynamic event tracing for register accesses.
+
+Example for tracing register accesses in drivers/soc/qcom/*
+and the pstore output is given below:
+
+  # dyndbg="file drivers/soc/qcom/* +e" trace_event=io tp_pstore
+  # reboot -f
+  # mount -t pstore pstore /sys/fs/pstore
+  # cat /sys/fs/pstore/event-ramoops-0
+    io_write: type=writel cpu=1 ts:1423596253 data=0xffff00000d2065a4 caller=qcom_smsm_probe+0x524/0x670
+    io_write: type=writel cpu=1 ts:1423945889 data=0xffff00000d206608 caller=qcom_smsm_probe+0x524/0x670
+
+Note: Tracing is activated only when flag is enabled either
+through command line or through dynamic debug control file.
 
 Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
 ---
- arch/arm64/kernel/io.c         | 22 +++++++++++
- include/asm-generic/io-trace.h | 70 ++++++++++++++++++++++++++++++++++
- 2 files changed, 92 insertions(+)
- create mode 100644 include/asm-generic/io-trace.h
+ include/asm-generic/io-instrumented.h | 28 +++++++++++++++++++++++++--
+ include/linux/dynamic_debug.h         |  1 +
+ lib/dynamic_debug.c                   |  1 +
+ 3 files changed, 28 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/io.c b/arch/arm64/kernel/io.c
-index 79b17384effa..a9db07f66477 100644
---- a/arch/arm64/kernel/io.c
-+++ b/arch/arm64/kernel/io.c
-@@ -19,6 +19,10 @@
- #include <linux/export.h>
- #include <linux/types.h>
- #include <linux/io.h>
-+#include <linux/sched/clock.h>
-+
-+#define CREATE_TRACE_POINTS
-+#include <asm-generic/io-trace.h>
+diff --git a/include/asm-generic/io-instrumented.h b/include/asm-generic/io-instrumented.h
+index 7b050e2487ed..023f28571ea3 100644
+--- a/include/asm-generic/io-instrumented.h
++++ b/include/asm-generic/io-instrumented.h
+@@ -2,6 +2,8 @@
+ #ifndef _ASM_GENERIC_IO_INSTRUMENTED_H
+ #define _ASM_GENERIC_IO_INSTRUMENTED_H
  
- /*
-  * Copy data from IO memory space to "real" memory space.
-@@ -106,3 +110,21 @@ void __memset_io(volatile void __iomem *dst, int c, size_t count)
- 	}
- }
- EXPORT_SYMBOL(__memset_io);
++#include <linux/dynamic_debug.h>
 +
-+#if defined(CONFIG_TRACING_EVENTS_IO)
-+void do_trace_io_write(const char *type, void *addr)
-+{
-+	trace_io_write(type, raw_smp_processor_id(), sched_clock(), addr,
-+		       _RET_IP_);
-+}
-+EXPORT_SYMBOL(do_trace_io_write);
-+EXPORT_TRACEPOINT_SYMBOL(io_write);
+ #if defined(CONFIG_TRACING_EVENTS_IO)
+ #include <linux/tracepoint-defs.h>
+ 
+@@ -19,7 +21,7 @@ static inline void do_trace_io_read(const char *type, void *addr) {}
+ #define __raw_write(v, a, _l)	({						\
+ 	volatile void __iomem *_a = (a);					\
+ 	if (io_tracepoint_active(__tracepoint_io_write))			\
+-		do_trace_io_write(__stringify(write##_l), (void __force *)(_a));\
++		dynamic_io_write(__stringify(write##_l), (void __force *)(_a));	\
+ 	arch_raw_write##_l((v), _a);						\
+ 	})
+ 
+@@ -32,7 +34,7 @@ static inline void do_trace_io_read(const char *type, void *addr) {}
+ 	_t __a;									\
+ 	const volatile void __iomem *_a = (a);					\
+ 	if (io_tracepoint_active(__tracepoint_io_read))				\
+-		do_trace_io_read(__stringify(read##_l), (void __force *)(_a));	\
++		dynamic_io_read(__stringify(read##_l), (void __force *)(_a));	\
+ 	__a = arch_raw_read##_l(_a);						\
+ 	__a;									\
+ 	})
+@@ -42,4 +44,26 @@ static inline void do_trace_io_read(const char *type, void *addr) {}
+ #define __raw_readl(a)	__raw_read((a), l, u32)
+ #define __raw_readq(a)	__raw_read((a), q, u64)
+ 
++#if defined(CONFIG_DYNAMIC_DEBUG) && defined(CONFIG_TRACING_EVENTS_IO)
++#define dynamic_io_write(type, addr)					\
++do {									\
++	DEFINE_DYNAMIC_DEBUG_METADATA(descriptor, type);		\
++	if (unlikely(descriptor.flags & _DPRINTK_FLAGS_EVENT))		\
++		do_trace_io_write(type, addr);				\
++} while (0)
 +
-+void do_trace_io_read(const char *type, void *addr)
-+{
-+	trace_io_read(type, raw_smp_processor_id(), sched_clock(), addr,
-+		      _RET_IP_);
-+}
-+EXPORT_SYMBOL(do_trace_io_read);
-+EXPORT_TRACEPOINT_SYMBOL(io_read);
-+#endif
-diff --git a/include/asm-generic/io-trace.h b/include/asm-generic/io-trace.h
-new file mode 100644
-index 000000000000..e57b52d8976a
---- /dev/null
-+++ b/include/asm-generic/io-trace.h
-@@ -0,0 +1,70 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+#undef TRACE_SYSTEM
-+#define TRACE_SYSTEM io
++#define dynamic_io_read(type, addr)					\
++do {									\
++	DEFINE_DYNAMIC_DEBUG_METADATA(descriptor, type);		\
++	if (unlikely(descriptor.flags & _DPRINTK_FLAGS_EVENT))		\
++		do_trace_io_read(type, addr);				\
++} while (0)
++#elif defined(CONFIG_TRACING_EVENTS_IO)
++#define dynamic_io_write(type, addr)	do_trace_io_write(type, addr)
++#define dynamic_io_read(type, addr)	do_trace_io_read(type, addr)
++#else
++#define dynamic_io_write(type, addr)
++#define dynamic_io_read(type, addr)
++#endif /* CONFIG_DYNAMIC_DEBUG && CONFIG_TRACING_EVENTS_IO */
 +
-+#if !defined(CONFIG_TRACING_EVENTS_IO)
-+#define NOTRACE
-+#endif
-+
-+#undef TRACE_INCLUDE_FILE
-+#define TRACE_INCLUDE_FILE io-trace
-+
-+#undef TRACE_INCLUDE_PATH
-+#define TRACE_INCLUDE_PATH asm-generic
-+
-+#if !defined(_TRACE_IO_H) || defined(TRACE_HEADER_MULTI_READ)
-+#define _TRACE_IO_H
-+
-+#include <linux/tracepoint.h>
-+
-+/*
-+ * Tracepoint for generic IO read/write, i.e., __raw_{read,write}{b,l,w,q}()
-+ */
-+DECLARE_EVENT_CLASS(io_trace_class,
-+
-+	TP_PROTO(const char *type, int cpu, u64 ts, void *addr,
-+		 unsigned long ret_ip),
-+
-+	TP_ARGS(type, cpu, ts, addr, ret_ip),
-+
-+	TP_STRUCT__entry(
-+		__string(	type,		type	)
-+		__field(	int,		cpu	)
-+		__field(	u64,		ts	)
-+		__field(	void *,		addr	)
-+		__field(	unsigned long,	ret_ip	)
-+	),
-+
-+	TP_fast_assign(
-+		__assign_str(type, type);
-+		__entry->cpu	= cpu;
-+		__entry->ts	= ts;
-+		__entry->addr	= addr;
-+		__entry->ret_ip	= ret_ip;
-+	),
-+
-+	TP_printk("type=%s cpu=%d ts:%llu data=0x%lx caller=%pS",
-+		  __get_str(type), __entry->cpu, __entry->ts,
-+		  (unsigned long)__entry->addr, (void *)__entry->ret_ip)
-+);
-+
-+DEFINE_EVENT(io_trace_class, io_read,
-+
-+	TP_PROTO(const char *type, int cpu, u64 ts, void *addr,
-+		 unsigned long ret_ip),
-+
-+	TP_ARGS(type, cpu, ts, addr, ret_ip)
-+);
-+
-+DEFINE_EVENT(io_trace_class, io_write,
-+
-+	TP_PROTO(const char *type, int cpu, u64 ts, void *addr,
-+		 unsigned long ret_ip),
-+
-+	TP_ARGS(type, cpu, ts, addr, ret_ip)
-+);
-+
-+#endif /* _TRACE_IO_H */
-+
-+/* This part must be outside protection */
-+#include <trace/define_trace.h>
+ #endif /* _ASM_GENERIC_IO_INSTRUMENTED_H */
+diff --git a/include/linux/dynamic_debug.h b/include/linux/dynamic_debug.h
+index 2fd8006153c3..14e595c51002 100644
+--- a/include/linux/dynamic_debug.h
++++ b/include/linux/dynamic_debug.h
+@@ -32,6 +32,7 @@ struct _ddebug {
+ #define _DPRINTK_FLAGS_INCL_FUNCNAME	(1<<2)
+ #define _DPRINTK_FLAGS_INCL_LINENO	(1<<3)
+ #define _DPRINTK_FLAGS_INCL_TID		(1<<4)
++#define _DPRINTK_FLAGS_EVENT		(1<<5)
+ #if defined DEBUG
+ #define _DPRINTK_FLAGS_DEFAULT _DPRINTK_FLAGS_PRINT
+ #else
+diff --git a/lib/dynamic_debug.c b/lib/dynamic_debug.c
+index c7c96bc7654a..694957a8ae54 100644
+--- a/lib/dynamic_debug.c
++++ b/lib/dynamic_debug.c
+@@ -78,6 +78,7 @@ static inline const char *trim_prefix(const char *path)
+ 
+ static struct { unsigned flag:8; char opt_char; } opt_array[] = {
+ 	{ _DPRINTK_FLAGS_PRINT, 'p' },
++	{ _DPRINTK_FLAGS_EVENT, 'e' },
+ 	{ _DPRINTK_FLAGS_INCL_MODNAME, 'm' },
+ 	{ _DPRINTK_FLAGS_INCL_FUNCNAME, 'f' },
+ 	{ _DPRINTK_FLAGS_INCL_LINENO, 'l' },
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
