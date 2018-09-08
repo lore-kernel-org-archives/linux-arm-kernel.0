@@ -1,114 +1,92 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 8 Sep 2018 10:15:34 -0700
-Subject: [GIT PULL] ARM: SoC fixes
-Message-ID: <20180908171534.umap5fj6bkyvhki2@localhost>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Sat, 08 Sep 2018 21:42:34 +0200
+Subject: [PATCH 0/2] Follow-up patches for Cedrus v9
+In-Reply-To: <3c4e5a98-4dbd-9a8c-8dab-612a923f0eb9@xs4all.nl>
+References: <20180907163347.32312-1-contact@paulk.fr>
+ <11104c03-97ac-8b36-7d75-dfecb8fcce10@xs4all.nl>
+ <CAGb2v67F2a-kYFRb_f+CyhzkHf5+Y+h01=SE-rxJ=-Oj-ma1BA@mail.gmail.com>
+ <3c4e5a98-4dbd-9a8c-8dab-612a923f0eb9@xs4all.nl>
+Message-ID: <e17313d436b8b8b778218f0ab309274e2ae2f1c4.camel@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi,
 
-The following changes since commit a72b44a871c218e2a0580e68affa1d3528c0587a:
+Le samedi 08 septembre 2018 ? 13:24 +0200, Hans Verkuil a ?crit :
+> On 09/08/2018 12:22 PM, Chen-Yu Tsai wrote:
+> > On Sat, Sep 8, 2018 at 6:06 PM Hans Verkuil <hverkuil@xs4all.nl> wrote:
+> > > 
+> > > On 09/07/2018 06:33 PM, Paul Kocialkowski wrote:
+> > > > This brings the requested modifications on top of version 9 of the
+> > > > Cedrus VPU driver, that implements stateless video decoding using the
+> > > > Request API.
+> > > > 
+> > > > Paul Kocialkowski (2):
+> > > >   media: cedrus: Fix error reporting in request validation
+> > > >   media: cedrus: Add TODO file with tasks to complete before unstaging
+> > > > 
+> > > >  drivers/staging/media/sunxi/cedrus/TODO     |  7 +++++++
+> > > >  drivers/staging/media/sunxi/cedrus/cedrus.c | 15 ++++++++++++---
+> > > >  2 files changed, 19 insertions(+), 3 deletions(-)
+> > > >  create mode 100644 drivers/staging/media/sunxi/cedrus/TODO
+> > > > 
+> > > 
+> > > So close...
+> > > 
+> > > When compiling under e.g. intel I get errors since it doesn't know about
+> > > the sunxi_sram_claim/release function and the PHYS_PFN_OFFSET define.
+> > > 
+> > > Is it possible to add stub functions to linux/soc/sunxi/sunxi_sram.h
+> > > if CONFIG_SUNXI_SRAM is not defined? That would be the best fix for that.
+> > > 
+> > > The use of PHYS_PFN_OFFSET is weird: are you sure this is the right
+> > > way? I see that drivers/of/device.c also sets dev->dma_pfn_offset, which
+> > > makes me wonder if this information shouldn't come from the device tree.
+> > > 
+> > > You are the only driver that uses this define directly, which makes me
+> > > suspicious.
+> > 
+> > On Allwinner platforms, some devices do DMA directly on the memory BUS
+> > with the DRAM controller. In such cases, the DRAM has no offset. In all
+> > other cases where the DMA goes through the common system bus and the DRAM
+> > offset is either 0x40000000 or 0x20000000, depending on the SoC. Since the
+> > former case is not described in the device tree (this is being worked on
+> > by Maxime BTW), the dma_pfn_offset is not the value it should be. AFAIK
+> > only the display and media subsystems (VPU, camera, TS) are wired this
+> > way.
+> > 
+> > In drivers/gpu/drm/sun4i/sun4i_backend.c (the display driver) we use
+> > PHYS_OFFSET, which is pretty much the same thing.
+> > 
+> 
+> OK, in that case just put #ifdef PHYS_PFN_OFFSET around that line together
+> with a comment that this will eventually come from the device tree.
 
-  Merge tag 'omap-for-v4.19/fixes-v2-signed' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into fixes (2018-09-01 18:22:19 -0700)
+That seems fine, although I'm less certain about what to do for the
+SRAM situation. Other drivers that use SUNXI_SRAM have a Kconfig select
+on it (that Cedrus lacks). Provided that the SRAM driver builds fine
+for non-sunxi configs, bringing-in that select would remove the need
+for dummy functions and also ensure that the actual implementation is
+always used on sunxi. Otherwise, there'd be a risk of having the dummy
+functions used (if the SRAM driver is not explicitly selected in the
+config), causing a hang when accessing the VPU.
 
-are available in the git repository at:
+What do you think?
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-fixes
+Cheers,
 
-for you to fetch changes up to a132bb90414bfad4f8ee23cb45fe6946a89b167d:
+Paul
 
-  Merge tag 'sunxi-fixes-for-4.19' of https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux into fixes (2018-09-08 10:04:37 -0700)
+-- 
+Developer of free digital technology and hardware support.
 
-----------------------------------------------------------------
-ARM: SoC fixes
-
-A few more fixes who have trickled in:
- - MMC bus width fixup for some Allwinner platforms
- - Fix for NULL deref in ti-aemif when no platform data is passed in
- - Fix div by 0 in SCMI code
- - Add a missing module alias in a new RPi driver
-
-----------------------------------------------------------------
-Bartosz Golaszewski (1):
-      memory: ti-aemif: fix a potential NULL-pointer dereference
-
-Icenowy Zheng (1):
-      arm64: allwinner: dts: h6: fix Pine H64 MMC bus width
-
-Olof Johansson (2):
-      Merge tag 'arm-soc/for-4.19/drivers-fixes' of https://github.com/Broadcom/stblinux into fixes
-      Merge tag 'sunxi-fixes-for-4.19' of https://git.kernel.org/.../sunxi/linux into fixes
-
-Peter Robinson (1):
-      hwmon: rpi: add module alias to raspberrypi-hwmon
-
-Sudeep Holla (1):
-      firmware: arm_scmi: fix divide by zero when sustained_perf_level is zero
-
- arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts | 2 ++
- drivers/firmware/arm_scmi/perf.c                     | 8 +++++++-
- drivers/hwmon/raspberrypi-hwmon.c                    | 1 +
- drivers/memory/ti-aemif.c                            | 2 +-
- 4 files changed, 11 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-index ceffc40810ee..48daec7f78ba 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dts
-@@ -46,6 +46,7 @@
- 	pinctrl-0 = <&mmc0_pins>;
- 	vmmc-supply = <&reg_cldo1>;
- 	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>;
-+	bus-width = <4>;
- 	status = "okay";
- };
- 
-@@ -56,6 +57,7 @@
- 	vqmmc-supply = <&reg_bldo2>;
- 	non-removable;
- 	cap-mmc-hw-reset;
-+	bus-width = <8>;
- 	status = "okay";
- };
- 
-diff --git a/drivers/firmware/arm_scmi/perf.c b/drivers/firmware/arm_scmi/perf.c
-index 721e6c57beae..64342944d917 100644
---- a/drivers/firmware/arm_scmi/perf.c
-+++ b/drivers/firmware/arm_scmi/perf.c
-@@ -166,7 +166,13 @@ scmi_perf_domain_attributes_get(const struct scmi_handle *handle, u32 domain,
- 					le32_to_cpu(attr->sustained_freq_khz);
- 		dom_info->sustained_perf_level =
- 					le32_to_cpu(attr->sustained_perf_level);
--		dom_info->mult_factor =	(dom_info->sustained_freq_khz * 1000) /
-+		if (!dom_info->sustained_freq_khz ||
-+		    !dom_info->sustained_perf_level)
-+			/* CPUFreq converts to kHz, hence default 1000 */
-+			dom_info->mult_factor =	1000;
-+		else
-+			dom_info->mult_factor =
-+					(dom_info->sustained_freq_khz * 1000) /
- 					dom_info->sustained_perf_level;
- 		memcpy(dom_info->name, attr->name, SCMI_MAX_STR_SIZE);
- 	}
-diff --git a/drivers/hwmon/raspberrypi-hwmon.c b/drivers/hwmon/raspberrypi-hwmon.c
-index fb4e4a6bb1f6..be5ba4690895 100644
---- a/drivers/hwmon/raspberrypi-hwmon.c
-+++ b/drivers/hwmon/raspberrypi-hwmon.c
-@@ -164,3 +164,4 @@ module_platform_driver(rpi_hwmon_driver);
- MODULE_AUTHOR("Stefan Wahren <stefan.wahren@i2se.com>");
- MODULE_DESCRIPTION("Raspberry Pi voltage sensor driver");
- MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:raspberrypi-hwmon");
-diff --git a/drivers/memory/ti-aemif.c b/drivers/memory/ti-aemif.c
-index 31112f622b88..475e5b3790ed 100644
---- a/drivers/memory/ti-aemif.c
-+++ b/drivers/memory/ti-aemif.c
-@@ -411,7 +411,7 @@ static int aemif_probe(struct platform_device *pdev)
- 			if (ret < 0)
- 				goto error;
- 		}
--	} else {
-+	} else if (pdata) {
- 		for (i = 0; i < pdata->num_sub_devices; i++) {
- 			pdata->sub_devices[i].dev.parent = dev;
- 			ret = platform_device_register(&pdata->sub_devices[i]);
+Website: https://www.paulk.fr/
+Coding blog: https://code.paulk.fr/
+Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180908/1e5e2ff5/attachment.sig>
