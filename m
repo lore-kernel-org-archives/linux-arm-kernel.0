@@ -1,58 +1,53 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 8 Sep 2018 15:11:42 +0100
-Subject: [PATCH v2 1/3] dt-bindings: iio: vadc: Fix documentation of 'reg'
-In-Reply-To: <20180906210454.247219-2-mka@chromium.org>
+Date: Sat, 8 Sep 2018 15:15:18 +0100
+Subject: [PATCH v2 3/3] arm64: dts: qcom: pm8998: Add die temperature
+ channel node to the ADC
+In-Reply-To: <20180906212206.GE22824@google.com>
 References: <20180906210454.247219-1-mka@chromium.org>
- <20180906210454.247219-2-mka@chromium.org>
-Message-ID: <20180908151142.465a1b7b@archlinux>
+ <20180906210454.247219-4-mka@chromium.org>
+ <CAD=FV=WLcgKQWAp8HnBFZhZ4+32keMANcYJ+nGquePqsOnjJ7A@mail.gmail.com>
+ <20180906212206.GE22824@google.com>
+Message-ID: <20180908151518.1a235bff@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu,  6 Sep 2018 14:04:52 -0700
+On Thu, 6 Sep 2018 14:22:06 -0700
 Matthias Kaehlcke <mka@chromium.org> wrote:
 
-> The documentation of Qualcomm's SPMI PMIC voltage ADC claims that the
-> 'reg' property consists of two values, the SPMI address and the length
-> of the controller's registers. However the SPMI bus to which it is added
-> specifies "#size-cells = <0>;". Remove the controller register length
-> from the documentation of the field and the example.
+> On Thu, Sep 06, 2018 at 02:10:43PM -0700, Doug Anderson wrote:
+> > Hi,
+> > 
+> > On Thu, Sep 6, 2018 at 2:04 PM, Matthias Kaehlcke <mka@chromium.org> wrote:  
+> > > Add a channel node for the die temperature to the ADC.
+> > >
+> > > Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+> > > Reviewed-by: Douglas Anderson <dianders@chromium.org>
+> > > Signed-off-by: Matthias Kaehlcke <mka@chromium.org>  
+> > 
+> > Double-SoB?  
 > 
-> Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
-> Reviewed-by: Douglas Anderson <dianders@chromium.org>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
-Applied to the togreg branch of iio.git.
+> I must have run 'amend' with '-s' out of habit, which wasn't the right
+> thing to do in this case :/
+> 
+> > ...presumably Andy can remove that when he lands and doesn't need a re-post...  
+> 
+> Andy, in case you need me to repost let me know.
+Slightly worse than that (as was patch 1).  You accidentally used
+-- rather than --- to separate the change log.  So I ended up with
 
-Thanks,
+Signed-off-by: M..
+Reviewed-by: ..
+Signed-off-by: M..
+--
+Changelog
+
+Signed-off-by: J....
+
+Good think the double signed off was raised as chances are I wouldn't
+have notice it.
 
 Jonathan
-
-> --
-> Changes in v2:
-> - none
-> ---
->  Documentation/devicetree/bindings/iio/adc/qcom,spmi-vadc.txt | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/iio/adc/qcom,spmi-vadc.txt b/Documentation/devicetree/bindings/iio/adc/qcom,spmi-vadc.txt
-> index 0fb46137f936..d0c188e5c922 100644
-> --- a/Documentation/devicetree/bindings/iio/adc/qcom,spmi-vadc.txt
-> +++ b/Documentation/devicetree/bindings/iio/adc/qcom,spmi-vadc.txt
-> @@ -13,7 +13,7 @@ VADC node:
->  - reg:
->      Usage: required
->      Value type: <prop-encoded-array>
-> -    Definition: VADC base address and length in the SPMI PMIC register map.
-> +    Definition: VADC base address in the SPMI PMIC register map.
->  
->  - #address-cells:
->      Usage: required
-> @@ -104,7 +104,7 @@ Example:
->  	/* VADC node */
->  	pmic_vadc: vadc at 3100 {
->  		compatible = "qcom,spmi-vadc";
-> -		reg = <0x3100 0x100>;
-> +		reg = <0x3100>;
->  		interrupts = <0x0 0x31 0x0 IRQ_TYPE_EDGE_RISING>;
->  		#address-cells = <1>;
->  		#size-cells = <0>;
+> Thanks
+> 
+> Matthias
