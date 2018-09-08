@@ -1,53 +1,27 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 8 Sep 2018 15:15:18 +0100
-Subject: [PATCH v2 3/3] arm64: dts: qcom: pm8998: Add die temperature
- channel node to the ADC
-In-Reply-To: <20180906212206.GE22824@google.com>
-References: <20180906210454.247219-1-mka@chromium.org>
- <20180906210454.247219-4-mka@chromium.org>
- <CAD=FV=WLcgKQWAp8HnBFZhZ4+32keMANcYJ+nGquePqsOnjJ7A@mail.gmail.com>
- <20180906212206.GE22824@google.com>
-Message-ID: <20180908151518.1a235bff@archlinux>
+From: dhowells@redhat.com (David Howells)
+Date: Sat, 08 Sep 2018 16:24:26 +0100
+Subject: Regression in next with filesystem context concept
+In-Reply-To: <20180907161023.GF5662@atomide.com>
+References: <20180907161023.GF5662@atomide.com>
+ <20180906164358.GI5659@atomide.com> <9053.1536310046@warthog.procyon.org.uk>
+Message-ID: <11959.1536420266@warthog.procyon.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 6 Sep 2018 14:22:06 -0700
-Matthias Kaehlcke <mka@chromium.org> wrote:
+Tony Lindgren <tony@atomide.com> wrote:
 
-> On Thu, Sep 06, 2018 at 02:10:43PM -0700, Doug Anderson wrote:
-> > Hi,
+> > > Looks like next-20180906 now has a regression where mounting
+> > > root won't work with commit fd0002870b45 ("vfs: Implement a
+> > > filesystem superblock creation/configuration context").
 > > 
-> > On Thu, Sep 6, 2018 at 2:04 PM, Matthias Kaehlcke <mka@chromium.org> wrote:  
-> > > Add a channel node for the die temperature to the ADC.
-> > >
-> > > Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
-> > > Reviewed-by: Douglas Anderson <dianders@chromium.org>
-> > > Signed-off-by: Matthias Kaehlcke <mka@chromium.org>  
-> > 
-> > Double-SoB?  
+> > Am I right in thinking you're not using any of the LSMs?
 > 
-> I must have run 'amend' with '-s' out of habit, which wasn't the right
-> thing to do in this case :/
-> 
-> > ...presumably Andy can remove that when he lands and doesn't need a re-post...  
-> 
-> Andy, in case you need me to repost let me know.
-Slightly worse than that (as was patch 1).  You accidentally used
--- rather than --- to separate the change log.  So I ended up with
+> Assuming LSM as in Documentation/lsm.txt, right not using any.
 
-Signed-off-by: M..
-Reviewed-by: ..
-Signed-off-by: M..
---
-Changelog
+The default return value for security_fs_context_parse_param() should be
+-ENOPARAM, both in security.h and security.c.
 
-Signed-off-by: J....
+I've fixed my tree and Al has pulled it, but we're now waiting on Stephen
+Rothwell to refresh linux/next.
 
-Good think the double signed off was raised as chances are I wouldn't
-have notice it.
-
-Jonathan
-> 
-> Thanks
-> 
-> Matthias
+David
