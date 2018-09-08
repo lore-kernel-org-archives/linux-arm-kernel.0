@@ -1,255 +1,366 @@
 From: saiprakash.ranjan@codeaurora.org (Sai Prakash Ranjan)
-Date: Sun,  9 Sep 2018 01:57:04 +0530
-Subject: [PATCH 3/6] tracing: Add tp_pstore cmdline to have tracepoints go to
- pstore
+Date: Sun,  9 Sep 2018 01:57:03 +0530
+Subject: [PATCH 2/6] pstore: Add event tracing support
 In-Reply-To: <cover.1536430404.git.saiprakash.ranjan@codeaurora.org>
 References: <cover.1536430404.git.saiprakash.ranjan@codeaurora.org>
-Message-ID: <f65e9fa6e047b9b14d4f64362f9fe1f89b306050.1536430404.git.saiprakash.ranjan@codeaurora.org>
+Message-ID: <b9b60ff2864a17fb05481aa33f90114ab051d6ce.1536430404.git.saiprakash.ranjan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the kernel command line tp_pstore option that will have
-tracepoints go to persistent ram buffer as well as to the
-trace buffer for further debugging. This is similar to tp_printk
-cmdline option of ftrace.
+Currently pstore has function trace support which can be
+used to get the function call chain with limited data.
+Event tracing has extra data which is useful to debug wide
+variety of issues and is heavily used across the kernel.
 
-Pstore support for event tracing is already added and we enable
-logging to pstore only if cmdline is specified.
+Adding this support to pstore can be very helpful to debug
+different subsystems since almost all of them have trace
+events already available. And also it is useful to debug
+unknown resets or crashes since we can get lot more info
+from event tracing by viewing the last occurred events.
 
-Passing "tp_pstore" will activate logging to pstore. To turn it
-off, the sysctl /proc/sys/kernel/tracepoint_pstore can have '0'
-echoed into it. Note, this only works if the cmdline option is
-used. Echoing 1 into the sysctl file without the cmdline option
-will have no affect.
+High frequency tracepoints such as sched and irq has also
+been tested. This implementation is similar to "tp_printk"
+command line feature of ftrace by Steven.
+
+For example, sample pstore output of tracing sched events
+after reboot:
+
+  # mount -t pstore pstore /sys/fs/pstore/
+  # tail /sys/fs/pstore/event-ramoops-0
+  sched_switch: prev_comm=swapper/1 prev_pid=0 prev_prio=120 prev_state=S ==> next_comm=rcu_preempt next_pid=10 next_prio=120
+  sched_switch: prev_comm=rcu_preempt prev_pid=10 prev_prio=120 prev_state=R+ ==> next_comm=swapper/1 next_pid=0 next_prio=120
+  sched_waking: comm=rcu_sched pid=11 prio=120 target_cpu=002
+  sched_wakeup: comm=rcu_sched pid=11 prio=120 target_cpu=002
+  sched_switch: prev_comm=swapper/2 prev_pid=0 prev_prio=120 prev_state=S ==> next_comm=rcu_sched next_pid=11 next_prio=120
+  sched_switch: prev_comm=rcu_sched prev_pid=11 prev_prio=120 prev_state=R+ ==> next_comm=swapper/2 next_pid=0 next_prio=120
+  sched_waking: comm=reboot pid=1867 prio=120 target_cpu=000
+  sched_wakeup: comm=reboot pid=1867 prio=120 target_cpu=000
+  sched_switch: prev_comm=swapper/0 prev_pid=0 prev_prio=120 prev_state=S ==> next_comm=reboot next_pid=1867 next_prio=120
 
 Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
 ---
- .../admin-guide/kernel-parameters.txt         | 21 ++++++++
- include/linux/ftrace.h                        |  6 ++-
- kernel/sysctl.c                               |  7 +++
- kernel/trace/Kconfig                          | 22 +++++++-
- kernel/trace/trace.c                          | 51 +++++++++++++++++++
- kernel/trace/trace.h                          |  7 +++
- 6 files changed, 112 insertions(+), 2 deletions(-)
+ fs/pstore/Kconfig          |  2 +-
+ fs/pstore/ftrace.c         | 55 ++++++++++++++++++++++++++++++++++++++
+ fs/pstore/inode.c          |  4 +++
+ fs/pstore/ram.c            | 44 +++++++++++++++++++++++++++---
+ include/linux/pstore.h     |  2 ++
+ include/linux/pstore_ram.h |  1 +
+ 6 files changed, 104 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-index 9871e649ffef..622cf64d4e5b 100644
---- a/Documentation/admin-guide/kernel-parameters.txt
-+++ b/Documentation/admin-guide/kernel-parameters.txt
-@@ -4519,6 +4519,27 @@
- 			frequency tracepoints such as irq or sched, can cause
- 			the system to live lock.
+diff --git a/fs/pstore/Kconfig b/fs/pstore/Kconfig
+index 503086f7f7c1..6fe087b13a51 100644
+--- a/fs/pstore/Kconfig
++++ b/fs/pstore/Kconfig
+@@ -126,7 +126,7 @@ config PSTORE_PMSG
  
-+	tp_pstore[FTRACE]
-+			Have the tracepoints sent to persistent ram buffer for
-+			debugging. This is useful for debugging early boot up
-+			and other kernel issues where the system hangs or
-+			reboots due to some unclocked access or some buggy
-+			driver. Instead of spamming the console with unwanted
-+			logs, we can send the logs to pstore buffer for further
-+			debugging.
-+
-+			Last occurred events in the pstore log will be helpful
-+			in identifying the reset cause.
-+
-+			For example, to trace sched event, add to the command
-+			line:
-+				trace_event=sched tp_pstore
-+
-+			To turn off having tracepoints sent to pstore,
-+				echo 0 > /proc/sys/kernel/tracepoint_pstore
-+			Note, echoing 1 into this file without the
-+			tracepoint_pstore kernel cmdline option has no effect.
-+
- 	traceoff_on_warning
- 			[FTRACE] enable this option to disable tracing when a
- 			warning is hit. This turns off "tracing_on". Tracing can
-diff --git a/include/linux/ftrace.h b/include/linux/ftrace.h
-index a397907e8d72..7c3074e7ec6b 100644
---- a/include/linux/ftrace.h
-+++ b/include/linux/ftrace.h
-@@ -900,6 +900,7 @@ enum ftrace_dump_mode;
- 
- extern enum ftrace_dump_mode ftrace_dump_on_oops;
- extern int tracepoint_printk;
-+extern int tracepoint_pstore;
- 
- extern void disable_trace_on_warning(void);
- extern int __disable_trace_on_warning;
-@@ -907,9 +908,12 @@ extern int __disable_trace_on_warning;
- int tracepoint_printk_sysctl(struct ctl_table *table, int write,
- 			     void __user *buffer, size_t *lenp,
- 			     loff_t *ppos);
-+int tracepoint_pstore_sysctl(struct ctl_table *table, int write,
-+			     void __user *buffer, size_t *lenp,
-+			     loff_t *ppos);
- 
- #else /* CONFIG_TRACING */
--static inline void  disable_trace_on_warning(void) { }
-+static inline void disable_trace_on_warning(void) { }
- #endif /* CONFIG_TRACING */
- 
- #ifdef CONFIG_FTRACE_SYSCALLS
-diff --git a/kernel/sysctl.c b/kernel/sysctl.c
-index cc02050fd0c4..3cc1223b8955 100644
---- a/kernel/sysctl.c
-+++ b/kernel/sysctl.c
-@@ -653,6 +653,13 @@ static struct ctl_table kern_table[] = {
- 		.mode		= 0644,
- 		.proc_handler	= tracepoint_printk_sysctl,
- 	},
-+	{
-+		.procname	= "tracepoint_pstore",
-+		.data		= &tracepoint_pstore,
-+		.maxlen		= sizeof(tracepoint_pstore),
-+		.mode		= 0644,
-+		.proc_handler	= tracepoint_pstore_sysctl,
-+	},
- #endif
- #ifdef CONFIG_KEXEC_CORE
- 	{
-diff --git a/kernel/trace/Kconfig b/kernel/trace/Kconfig
-index 5e3de28c7677..d0eed268ee85 100644
---- a/kernel/trace/Kconfig
-+++ b/kernel/trace/Kconfig
-@@ -774,6 +774,27 @@ config TRACING_EVENTS_GPIO
+ config PSTORE_FTRACE
+ 	bool "Persistent function tracer"
+-	depends on PSTORE
++	depends on PSTORE && PSTORE!=m
+ 	depends on FUNCTION_TRACER
+ 	depends on DEBUG_FS
  	help
- 	  Enable tracing events for gpio subsystem
+diff --git a/fs/pstore/ftrace.c b/fs/pstore/ftrace.c
+index 06aab07b6bb7..d47dc93ac098 100644
+--- a/fs/pstore/ftrace.c
++++ b/fs/pstore/ftrace.c
+@@ -24,6 +24,8 @@
+ #include <linux/debugfs.h>
+ #include <linux/err.h>
+ #include <linux/cache.h>
++#include <linux/slab.h>
++#include <linux/trace_events.h>
+ #include <asm/barrier.h>
+ #include "internal.h"
  
-+config TRACING_EVENTS_IO
-+	bool "Trace IO read/write events"
-+	help
-+	  Enable tracing events for IO read/write operations.
-+	  This is useful for debugging random hangs or resets
-+	  caused due to unclocked access or some buggy driver.
-+
-+	  Output of this trace event can be overwhelming and hence
-+	  dynamic filtering option based on dynamic debug library
-+	  is provided to narrow down the issues.
-+
-+	  Eg: Trace all register read/write of mmc subsystem with
-+	  below command line:
-+
-+	    dyndbg="file drivers/mmc/* +p" trace_event=io
-+
-+	  See Documentation/admin-guide/dynamic-debug-howto.rst for
-+	  more info on using dynamic debug.
-+
-+	  If unsure, say N.
-+
- config GCOV_PROFILE_FTRACE
- 	bool "Enable GCOV profiling on ftrace subsystem"
- 	depends on GCOV_KERNEL
-@@ -789,4 +810,3 @@ config GCOV_PROFILE_FTRACE
- endif # FTRACE
+@@ -62,6 +64,59 @@ static struct ftrace_ops pstore_ftrace_ops __read_mostly = {
+ 	.func	= pstore_ftrace_call,
+ };
  
- endif # TRACING_SUPPORT
--
-diff --git a/kernel/trace/trace.c b/kernel/trace/trace.c
-index bf6f1d70484d..018cbbefb769 100644
---- a/kernel/trace/trace.c
-+++ b/kernel/trace/trace.c
-@@ -73,6 +73,11 @@ struct trace_iterator *tracepoint_print_iter;
- int tracepoint_printk;
- static DEFINE_STATIC_KEY_FALSE(tracepoint_printk_key);
- 
-+/* Pipe tracepoints to pstore */
-+struct trace_iterator *tracepoint_pstore_iter;
-+int tracepoint_pstore;
-+static DEFINE_STATIC_KEY_FALSE(tracepoint_pstore_key);
-+
- /* For tracers that don't implement custom flags */
- static struct tracer_opt dummy_tracer_opt[] = {
- 	{ }
-@@ -238,6 +243,14 @@ static int __init set_tracepoint_printk(char *str)
- }
- __setup("tp_printk", set_tracepoint_printk);
- 
-+static int __init set_tracepoint_pstore(char *str)
++void notrace pstore_event_call(struct trace_event_buffer *fbuffer)
 +{
-+	if ((strcmp(str, "=0") != 0 && strcmp(str, "=off") != 0))
-+		tracepoint_pstore = 1;
-+	return 1;
-+}
-+__setup("tp_pstore", set_tracepoint_pstore);
++	struct trace_iterator *iter;
++	struct trace_seq *s;
++	struct trace_event_call *event_call;
++	struct pstore_record record;
++	struct trace_event *event;
++	struct seq_buf *seq;
++	unsigned long flags;
 +
- unsigned long long ns2usecs(u64 nsec)
- {
- 	nsec += 500;
-@@ -2376,11 +2389,45 @@ int tracepoint_printk_sysctl(struct ctl_table *table, int write,
- 	return ret;
- }
- 
-+static DEFINE_MUTEX(tracepoint_pstore_mutex);
++	if (!psinfo)
++		return;
 +
-+int tracepoint_pstore_sysctl(struct ctl_table *table, int write,
-+			     void __user *buffer, size_t *lenp,
-+			     loff_t *ppos)
-+{
-+	int save_tracepoint_pstore;
-+	int ret;
++	if (unlikely(oops_in_progress))
++		return;
 +
-+	mutex_lock(&tracepoint_pstore_mutex);
-+	save_tracepoint_pstore = tracepoint_pstore;
++	pstore_record_init(&record, psinfo);
++	record.type = PSTORE_TYPE_EVENT;
 +
-+	ret = proc_dointvec(table, write, buffer, lenp, ppos);
++	iter = kmalloc(sizeof(*iter), GFP_KERNEL);
++	if (!iter)
++		return;
 +
-+	if (!tracepoint_pstore_iter)
-+		tracepoint_pstore = 0;
++	event_call = fbuffer->trace_file->event_call;
++	if (!event_call || !event_call->event.funcs ||
++	    !event_call->event.funcs->trace)
++		goto fail_event;
 +
-+	if (save_tracepoint_pstore == tracepoint_pstore)
-+		goto out;
++	event = &fbuffer->trace_file->event_call->event;
 +
-+	if (tracepoint_pstore)
-+		static_key_enable(&tracepoint_pstore_key.key);
-+	else
-+		static_key_disable(&tracepoint_pstore_key.key);
++	spin_lock_irqsave(&psinfo->buf_lock, flags);
 +
-+ out:
-+	mutex_unlock(&tracepoint_pstore_mutex);
++	trace_seq_init(&iter->seq);
++	iter->ent = fbuffer->entry;
++	event_call->event.funcs->trace(iter, 0, event);
++	trace_seq_putc(&iter->seq, 0);
 +
-+	return ret;
++	if (seq->size > psinfo->bufsize)
++		seq->size = psinfo->bufsize;
++
++	s = &iter->seq;
++	seq = &s->seq;
++
++	record.buf = (char *)(seq->buffer);
++	record.size = seq->len;
++	psinfo->write(&record);
++
++	spin_unlock_irqrestore(&psinfo->buf_lock, flags);
++
++fail_event:
++	kfree(iter);
 +}
 +
- void trace_event_buffer_commit(struct trace_event_buffer *fbuffer)
- {
- 	if (static_key_false(&tracepoint_printk_key.key))
- 		output_printk(fbuffer);
+ static DEFINE_MUTEX(pstore_ftrace_lock);
+ static bool pstore_ftrace_enabled;
  
-+	if (static_key_false(&tracepoint_pstore_key.key))
-+		pstore_event_call(fbuffer);
+diff --git a/fs/pstore/inode.c b/fs/pstore/inode.c
+index 5fcb845b9fec..f099152abbbd 100644
+--- a/fs/pstore/inode.c
++++ b/fs/pstore/inode.c
+@@ -345,6 +345,10 @@ int pstore_mkfile(struct dentry *root, struct pstore_record *record)
+ 		scnprintf(name, sizeof(name), "console-%s-%llu",
+ 			  record->psi->name, record->id);
+ 		break;
++	case PSTORE_TYPE_EVENT:
++		scnprintf(name, sizeof(name), "event-%s-%llu",
++			  record->psi->name, record->id);
++		break;
+ 	case PSTORE_TYPE_FTRACE:
+ 		scnprintf(name, sizeof(name), "ftrace-%s-%llu",
+ 			  record->psi->name, record->id);
+diff --git a/fs/pstore/ram.c b/fs/pstore/ram.c
+index bbd1e357c23d..f60d41c0309e 100644
+--- a/fs/pstore/ram.c
++++ b/fs/pstore/ram.c
+@@ -48,6 +48,10 @@ static ulong ramoops_console_size = MIN_MEM_SIZE;
+ module_param_named(console_size, ramoops_console_size, ulong, 0400);
+ MODULE_PARM_DESC(console_size, "size of kernel console log");
+ 
++static ulong ramoops_event_size = MIN_MEM_SIZE;
++module_param_named(event_size, ramoops_event_size, ulong, 0400);
++MODULE_PARM_DESC(event_size, "size of event log");
 +
- 	event_trigger_unlock_commit(fbuffer->trace_file, fbuffer->buffer,
- 				    fbuffer->event, fbuffer->entry,
- 				    fbuffer->flags, fbuffer->pc);
-@@ -8596,6 +8643,10 @@ void __init early_trace_init(void)
- 		else
- 			static_key_enable(&tracepoint_printk_key.key);
+ static ulong ramoops_ftrace_size = MIN_MEM_SIZE;
+ module_param_named(ftrace_size, ramoops_ftrace_size, ulong, 0400);
+ MODULE_PARM_DESC(ftrace_size, "size of ftrace log");
+@@ -86,6 +90,7 @@ MODULE_PARM_DESC(ramoops_ecc,
+ struct ramoops_context {
+ 	struct persistent_ram_zone **dprzs;	/* Oops dump zones */
+ 	struct persistent_ram_zone *cprz;	/* Console zone */
++	struct persistent_ram_zone *eprz;       /* Event zone */
+ 	struct persistent_ram_zone **fprzs;	/* Ftrace zones */
+ 	struct persistent_ram_zone *mprz;	/* PMSG zone */
+ 	phys_addr_t phys_addr;
+@@ -93,6 +98,7 @@ struct ramoops_context {
+ 	unsigned int memtype;
+ 	size_t record_size;
+ 	size_t console_size;
++	size_t event_size;
+ 	size_t ftrace_size;
+ 	size_t pmsg_size;
+ 	int dump_oops;
+@@ -103,6 +109,7 @@ struct ramoops_context {
+ 	/* _read_cnt need clear on ramoops_pstore_open */
+ 	unsigned int dump_read_cnt;
+ 	unsigned int console_read_cnt;
++	unsigned int event_read_cnt;
+ 	unsigned int max_ftrace_cnt;
+ 	unsigned int ftrace_read_cnt;
+ 	unsigned int pmsg_read_cnt;
+@@ -118,6 +125,7 @@ static int ramoops_pstore_open(struct pstore_info *psi)
+ 
+ 	cxt->dump_read_cnt = 0;
+ 	cxt->console_read_cnt = 0;
++	cxt->event_read_cnt = 0;
+ 	cxt->ftrace_read_cnt = 0;
+ 	cxt->pmsg_read_cnt = 0;
+ 	return 0;
+@@ -277,6 +285,11 @@ static ssize_t ramoops_pstore_read(struct pstore_record *record)
+ 					   1, &record->id, &record->type,
+ 					   PSTORE_TYPE_CONSOLE, 0);
+ 
++	if (!prz_ok(prz))
++		prz = ramoops_get_next_prz(&cxt->eprz, &cxt->event_read_cnt,
++					   1, &record->id, &record->type,
++					   PSTORE_TYPE_EVENT, 0);
++
+ 	if (!prz_ok(prz))
+ 		prz = ramoops_get_next_prz(&cxt->mprz, &cxt->pmsg_read_cnt,
+ 					   1, &record->id, &record->type,
+@@ -385,6 +398,11 @@ static int notrace ramoops_pstore_write(struct pstore_record *record)
+ 			return -ENOMEM;
+ 		persistent_ram_write(cxt->cprz, record->buf, record->size);
+ 		return 0;
++	} else if (record->type == PSTORE_TYPE_EVENT) {
++		if (!cxt->eprz)
++			return -ENOMEM;
++		persistent_ram_write(cxt->eprz, record->buf, record->size);
++		return 0;
+ 	} else if (record->type == PSTORE_TYPE_FTRACE) {
+ 		int zonenum;
+ 
+@@ -475,6 +493,9 @@ static int ramoops_pstore_erase(struct pstore_record *record)
+ 	case PSTORE_TYPE_CONSOLE:
+ 		prz = cxt->cprz;
+ 		break;
++	case PSTORE_TYPE_EVENT:
++		prz = cxt->eprz;
++		break;
+ 	case PSTORE_TYPE_FTRACE:
+ 		if (record->id >= cxt->max_ftrace_cnt)
+ 			return -EINVAL;
+@@ -699,6 +720,7 @@ static int ramoops_parse_dt(struct platform_device *pdev,
+ 
+ 	parse_size("record-size", pdata->record_size);
+ 	parse_size("console-size", pdata->console_size);
++	parse_size("event-size", pdata->event_size);
+ 	parse_size("ftrace-size", pdata->ftrace_size);
+ 	parse_size("pmsg-size", pdata->pmsg_size);
+ 	parse_size("ecc-size", pdata->ecc_info.ecc_size);
+@@ -747,7 +769,8 @@ static int ramoops_probe(struct platform_device *pdev)
  	}
-+
-+	if (tracepoint_pstore)
-+		static_key_enable(&tracepoint_pstore_key.key);
-+
- 	tracer_alloc_buffers();
- }
  
-diff --git a/kernel/trace/trace.h b/kernel/trace/trace.h
-index 3b8c0e24ab30..edc28d0c27eb 100644
---- a/kernel/trace/trace.h
-+++ b/kernel/trace/trace.h
-@@ -1843,5 +1843,12 @@ static inline void tracer_hardirqs_off(unsigned long a0, unsigned long a1) { }
- #endif
+ 	if (!pdata->mem_size || (!pdata->record_size && !pdata->console_size &&
+-			!pdata->ftrace_size && !pdata->pmsg_size)) {
++			!pdata->event_size && !pdata->ftrace_size &&
++			!pdata->pmsg_size)) {
+ 		pr_err("The memory size and the record/console size must be "
+ 			"non-zero\n");
+ 		goto fail_out;
+@@ -757,6 +780,8 @@ static int ramoops_probe(struct platform_device *pdev)
+ 		pdata->record_size = rounddown_pow_of_two(pdata->record_size);
+ 	if (pdata->console_size && !is_power_of_2(pdata->console_size))
+ 		pdata->console_size = rounddown_pow_of_two(pdata->console_size);
++	if (pdata->event_size && !is_power_of_2(pdata->event_size))
++		pdata->event_size = rounddown_pow_of_two(pdata->event_size);
+ 	if (pdata->ftrace_size && !is_power_of_2(pdata->ftrace_size))
+ 		pdata->ftrace_size = rounddown_pow_of_two(pdata->ftrace_size);
+ 	if (pdata->pmsg_size && !is_power_of_2(pdata->pmsg_size))
+@@ -767,6 +792,7 @@ static int ramoops_probe(struct platform_device *pdev)
+ 	cxt->memtype = pdata->mem_type;
+ 	cxt->record_size = pdata->record_size;
+ 	cxt->console_size = pdata->console_size;
++	cxt->event_size = pdata->event_size;
+ 	cxt->ftrace_size = pdata->ftrace_size;
+ 	cxt->pmsg_size = pdata->pmsg_size;
+ 	cxt->dump_oops = pdata->dump_oops;
+@@ -775,8 +801,8 @@ static int ramoops_probe(struct platform_device *pdev)
  
- extern struct trace_iterator *tracepoint_print_iter;
-+extern struct trace_iterator *tracepoint_pstore_iter;
+ 	paddr = cxt->phys_addr;
+ 
+-	dump_mem_sz = cxt->size - cxt->console_size - cxt->ftrace_size
+-			- cxt->pmsg_size;
++	dump_mem_sz = cxt->size - cxt->console_size - cxt->event_size
++			- cxt->ftrace_size - cxt->pmsg_size;
+ 	err = ramoops_init_przs("dump", dev, cxt, &cxt->dprzs, &paddr,
+ 				dump_mem_sz, cxt->record_size,
+ 				&cxt->max_dump_cnt, 0, 0);
+@@ -788,6 +814,11 @@ static int ramoops_probe(struct platform_device *pdev)
+ 	if (err)
+ 		goto fail_init_cprz;
+ 
++	err = ramoops_init_prz("event", dev, cxt, &cxt->eprz, &paddr,
++			       cxt->event_size, 0);
++	if (err)
++		goto fail_init_eprz;
 +
-+#ifdef CONFIG_PSTORE_FTRACE
-+extern void pstore_event_call(struct trace_event_buffer *fbuffer);
-+#else
-+static inline void pstore_event_call(struct trace_event_buffer *fbuffer) { }
-+#endif
+ 	cxt->max_ftrace_cnt = (cxt->flags & RAMOOPS_FLAG_FTRACE_PER_CPU)
+ 				? nr_cpu_ids
+ 				: 1;
+@@ -825,6 +856,8 @@ static int ramoops_probe(struct platform_device *pdev)
+ 	cxt->pstore.flags = PSTORE_FLAGS_DMESG;
+ 	if (cxt->console_size)
+ 		cxt->pstore.flags |= PSTORE_FLAGS_CONSOLE;
++	if (cxt->event_size)
++		cxt->pstore.flags |= PSTORE_FLAGS_EVENT;
+ 	if (cxt->ftrace_size)
+ 		cxt->pstore.flags |= PSTORE_FLAGS_FTRACE;
+ 	if (cxt->pmsg_size)
+@@ -845,6 +878,7 @@ static int ramoops_probe(struct platform_device *pdev)
+ 	record_size = pdata->record_size;
+ 	dump_oops = pdata->dump_oops;
+ 	ramoops_console_size = pdata->console_size;
++	ramoops_event_size = pdata->event_size;
+ 	ramoops_pmsg_size = pdata->pmsg_size;
+ 	ramoops_ftrace_size = pdata->ftrace_size;
  
- #endif /* _LINUX_KERNEL_TRACE_H */
+@@ -858,6 +892,8 @@ static int ramoops_probe(struct platform_device *pdev)
+ 	kfree(cxt->pstore.buf);
+ fail_clear:
+ 	cxt->pstore.bufsize = 0;
++	persistent_ram_free(cxt->eprz);
++fail_init_eprz:
+ 	persistent_ram_free(cxt->mprz);
+ fail_init_mprz:
+ fail_init_fprz:
+@@ -877,6 +913,7 @@ static int ramoops_remove(struct platform_device *pdev)
+ 	kfree(cxt->pstore.buf);
+ 	cxt->pstore.bufsize = 0;
+ 
++	persistent_ram_free(cxt->eprz);
+ 	persistent_ram_free(cxt->mprz);
+ 	persistent_ram_free(cxt->cprz);
+ 	ramoops_free_przs(cxt);
+@@ -916,6 +953,7 @@ static void ramoops_register_dummy(void)
+ 	dummy_data->mem_type = mem_type;
+ 	dummy_data->record_size = record_size;
+ 	dummy_data->console_size = ramoops_console_size;
++	dummy_data->event_size = ramoops_event_size;
+ 	dummy_data->ftrace_size = ramoops_ftrace_size;
+ 	dummy_data->pmsg_size = ramoops_pmsg_size;
+ 	dummy_data->dump_oops = dump_oops;
+diff --git a/include/linux/pstore.h b/include/linux/pstore.h
+index a15bc4d48752..c31bb9567b4a 100644
+--- a/include/linux/pstore.h
++++ b/include/linux/pstore.h
+@@ -44,6 +44,7 @@ enum pstore_type_id {
+ 	PSTORE_TYPE_PPC_COMMON	= 6,
+ 	PSTORE_TYPE_PMSG	= 7,
+ 	PSTORE_TYPE_PPC_OPAL	= 8,
++	PSTORE_TYPE_EVENT	= 9,
+ 	PSTORE_TYPE_UNKNOWN	= 255
+ };
+ 
+@@ -193,6 +194,7 @@ struct pstore_info {
+ #define PSTORE_FLAGS_CONSOLE	(1 << 1)
+ #define PSTORE_FLAGS_FTRACE	(1 << 2)
+ #define PSTORE_FLAGS_PMSG	(1 << 3)
++#define PSTORE_FLAGS_EVENT	(1 << 4)
+ 
+ extern int pstore_register(struct pstore_info *);
+ extern void pstore_unregister(struct pstore_info *);
+diff --git a/include/linux/pstore_ram.h b/include/linux/pstore_ram.h
+index e6d226464838..f01055c6cc40 100644
+--- a/include/linux/pstore_ram.h
++++ b/include/linux/pstore_ram.h
+@@ -95,6 +95,7 @@ struct ramoops_platform_data {
+ 	unsigned int	mem_type;
+ 	unsigned long	record_size;
+ 	unsigned long	console_size;
++	unsigned long	event_size;
+ 	unsigned long	ftrace_size;
+ 	unsigned long	pmsg_size;
+ 	int		dump_oops;
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
