@@ -1,67 +1,62 @@
 From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Sun,  9 Sep 2018 22:38:48 +0200
-Subject: [PATCH 3/3] rtc: pl031: switch to
- devm_rtc_allocate_device/rtc_register_device
-In-Reply-To: <20180909203848.3470-1-alexandre.belloni@bootlin.com>
-References: <20180909203848.3470-1-alexandre.belloni@bootlin.com>
-Message-ID: <20180909203848.3470-3-alexandre.belloni@bootlin.com>
+Date: Sun,  9 Sep 2018 22:38:46 +0200
+Subject: [PATCH 1/3] rtc: mt6397: fix possible race condition
+Message-ID: <20180909203848.3470-1-alexandre.belloni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch to devm_rtc_allocate_device to simplify the erro and driver removal
-paths.
+The IRQ is requested before the struct rtc is allocated and registered, but
+this struct is used in the IRQ handler. This may lead to a NULL pointer
+dereference.
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
+Switch to devm_rtc_allocate_device/rtc_register_device to allocate the rtc
+before requesting the IRQ.
+
+Cc: Eddie Huang <eddie.huang@mediatek.com>
+Cc: Sean Wang <sean.wang@mediatek.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
 ---
- drivers/rtc/rtc-pl031.c | 18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+ drivers/rtc/rtc-mt6397.c | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/rtc/rtc-pl031.c b/drivers/rtc/rtc-pl031.c
-index 82eb7da2c478..30943d200c5e 100644
---- a/drivers/rtc/rtc-pl031.c
-+++ b/drivers/rtc/rtc-pl031.c
-@@ -310,7 +310,6 @@ static int pl031_remove(struct amba_device *adev)
- 	device_init_wakeup(&adev->dev, false);
- 	if (adev->irq[0])
- 		free_irq(adev->irq[0], ldata);
--	rtc_device_unregister(ldata->rtc);
- 	amba_release_regions(adev);
+diff --git a/drivers/rtc/rtc-mt6397.c b/drivers/rtc/rtc-mt6397.c
+index 385f8303bb41..e9a25ec4d434 100644
+--- a/drivers/rtc/rtc-mt6397.c
++++ b/drivers/rtc/rtc-mt6397.c
+@@ -332,6 +332,10 @@ static int mtk_rtc_probe(struct platform_device *pdev)
  
- 	return 0;
-@@ -383,24 +382,25 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
+ 	platform_set_drvdata(pdev, rtc);
+ 
++	rtc->rtc_dev = devm_rtc_allocate_device(rtc->dev);
++	if (IS_ERR(rtc->rtc_dev))
++		return PTR_ERR(rtc->rtc_dev);
++
+ 	ret = request_threaded_irq(rtc->irq, NULL,
+ 				   mtk_rtc_irq_handler_thread,
+ 				   IRQF_ONESHOT | IRQF_TRIGGER_HIGH,
+@@ -344,11 +348,11 @@ static int mtk_rtc_probe(struct platform_device *pdev)
+ 
+ 	device_init_wakeup(&pdev->dev, 1);
+ 
+-	rtc->rtc_dev = rtc_device_register("mt6397-rtc", &pdev->dev,
+-					   &mtk_rtc_ops, THIS_MODULE);
+-	if (IS_ERR(rtc->rtc_dev)) {
++	rtc->rtc_dev->ops = &mtk_rtc_ops;
++
++	ret = rtc_register_device(rtc->rtc_dev);
++	if (ret) {
+ 		dev_err(&pdev->dev, "register rtc device failed\n");
+-		ret = PTR_ERR(rtc->rtc_dev);
+ 		goto out_free_irq;
  	}
  
- 	device_init_wakeup(&adev->dev, true);
--	ldata->rtc = rtc_device_register("pl031", &adev->dev, ops,
--					THIS_MODULE);
--	if (IS_ERR(ldata->rtc)) {
--		ret = PTR_ERR(ldata->rtc);
-+	ldata->rtc = devm_rtc_allocate_device(&adev->dev);
-+	if (IS_ERR(ldata->rtc))
-+		return PTR_ERR(ldata->rtc);
-+
-+	ldata->rtc->ops = ops;
-+
-+	ret = rtc_register_device(ldata->rtc);
-+	if (ret)
- 		goto out;
--	}
+@@ -365,7 +369,6 @@ static int mtk_rtc_remove(struct platform_device *pdev)
+ {
+ 	struct mt6397_rtc *rtc = platform_get_drvdata(pdev);
  
- 	if (adev->irq[0]) {
- 		ret = request_irq(adev->irq[0], pl031_interrupt,
- 				  vendor->irqflags, "rtc-pl031", ldata);
- 		if (ret)
--			goto out_no_irq;
-+			goto out;
- 		dev_pm_set_wake_irq(&adev->dev, adev->irq[0]);
- 	}
- 	return 0;
+-	rtc_device_unregister(rtc->rtc_dev);
+ 	free_irq(rtc->irq, rtc->rtc_dev);
+ 	irq_dispose_mapping(rtc->irq);
  
--out_no_irq:
--	rtc_device_unregister(ldata->rtc);
- out:
- 	amba_release_regions(adev);
- err_req:
 -- 
 2.19.0.rc2
