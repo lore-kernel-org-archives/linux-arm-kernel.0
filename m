@@ -1,55 +1,29 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 8 Sep 2018 18:21:30 -0700
-Subject: [GIT PULL] arm64: zynqmp: Xilinx SoC changes for v4.20
-In-Reply-To: <5e9c248d-c19c-1881-f406-d7bfd38ec479@xilinx.com>
-References: <5e9c248d-c19c-1881-f406-d7bfd38ec479@xilinx.com>
-Message-ID: <CAOesGMjh-Chhncw3cYaCvFpfhtOSz8hprC0xARmVXe8i4mvxHw@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sun, 9 Sep 2018 10:00:23 +0800
+Subject: [PATCH v9 3/6] kernel/reboot.c: export pm_power_off_prepare
+In-Reply-To: <20180906101516.GA5360@sirena.org.uk>
+References: <20180802103425.3053-1-o.rempel@pengutronix.de>
+ <20180802103425.3053-4-o.rempel@pengutronix.de>
+ <20180802104443.GH9117@sirena.org.uk>
+ <94d48ecb-7302-c7ed-e815-730be0426a04@pengutronix.de>
+ <20180802113552.GJ9117@sirena.org.uk>
+ <20180827014815.GD29208@dragon>
+ <20180906101516.GA5360@sirena.org.uk>
+Message-ID: <20180909020021.GA18838@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+On Thu, Sep 06, 2018 at 11:15:17AM +0100, Mark Brown wrote:
+> On Mon, Aug 27, 2018 at 09:48:16AM +0800, Shawn Guo wrote:
+> 
+> > Can you ACK on those two regulator patches, so that I can queue this
+> > series up on IMX tree?
+> 
+> I was expecting to get a pull request with the precursor patches in it -
+> the regulator driver seems to get a moderate amount of development so
+> there's a reasonable risk of conflicts.
 
-On Fri, Sep 7, 2018 at 12:57 AM, Michal Simek <michal.simek@xilinx.com> wrote:
-> Hi,
->
-> please pull the following firmware interface to your tree.
->
-> Thanks,
-> Michal
->
->
-> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
->
->   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
->
-> are available in the git repository at:
->
->   https://github.com/Xilinx/linux-xlnx.git tags/zynqmp-soc-for-v4.20
->
-> for you to fetch changes up to bca7067d2d4e91f58162b07d73cd94e20437b4f6:
->
->   firmware: xilinx: Add debugfs for query data API (2018-09-07 09:44:44
-> +0200)
->
-> ----------------------------------------------------------------
-> arm64: zynqmp: SoC changes for v4.20
->
-> - Adding firmware API for SoC with debugfs interface
+What about you create a stable topic branch for regulator patches and I
+pull it into IMX tree?
 
-This is a bit terse. Jolly has been good at writing cover letters, you
-could have stolen the writeup from there. :)
-
-I posted two comments on the patches -- one is a nit that can be
-followed up on with an incremental patch.
-
-I'm more worried about the ioctl interface though, and what it opens
-up. Maybe it's been discussed in the time the set has been reviewed, I
-didn't search extensively for the history. If it had been, bringing
-explanations into the patch description would have been nice for new
-readers such as myself. And if it hasn't, well, let's talk about it.
-
-Not merging based on the above. Hopefully it's something we can
-straighten out pretty quickly.
-
-
--Olof
+Shawn
