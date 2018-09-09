@@ -1,120 +1,64 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Sun, 9 Sep 2018 21:39:38 +0200
-Subject: [GIT PULL 00/13] perf/urgent fixes
-In-Reply-To: <20180903145224.12318-1-acme@kernel.org>
-References: <20180903145224.12318-1-acme@kernel.org>
-Message-ID: <20180909193938.GA14324@gmail.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Sun,  9 Sep 2018 22:38:47 +0200
+Subject: [PATCH 2/3] rtc: pl030: fix possible race condition
+In-Reply-To: <20180909203848.3470-1-alexandre.belloni@bootlin.com>
+References: <20180909203848.3470-1-alexandre.belloni@bootlin.com>
+Message-ID: <20180909203848.3470-2-alexandre.belloni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The IRQ is requested before the struct rtc is allocated and registered, but
+this struct is used in the IRQ handler. This may lead to a NULL pointer
+dereference.
 
-* Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
+Switch to devm_rtc_allocate_device/rtc_register_device to allocate the rtc
+before requesting the IRQ.
 
-> Hi Ingo,
-> 
-> 	Please consider pulling,
-> 
-> - Arnaldo
-> 
-> Test results at the end of this message, as usual.
-> 
-> The following changes since commit 66e5db4a1ccc64f278653bc69dc406d184dc750a:
-> 
->   Merge tag 'perf-core-for-mingo-4.19-20180820' of git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux into perf/urgent (2018-08-23 10:29:19 +0200)
-> 
-> are available in the Git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git tags/perf-urgent-for-mingo-4.19-20180903
-> 
-> for you to fetch changes up to 4e67b2a5df5d3f341776d12ee575e00ca3ef92de:
-> 
->   perf annotate: Fix parsing aarch64 branch instructions after objdump update (2018-08-30 15:51:54 -0300)
-> 
-> ----------------------------------------------------------------
-> perf/urgent fixes:
-> 
-> Kernel:
-> 
-> - Modify breakpoint fixes (Jiri Olsa)
-> 
-> perf annotate:
-> 
-> - Fix parsing aarch64 branch instructions after objdump update (Kim Phillips)
-> 
-> - Fix parsing indirect calls in 'perf annotate' (Martin Li?ka)
-> 
-> perf probe:
-> 
-> - Ignore SyS symbols irrespective of endianness on PowerPC (Sandipan Das)
-> 
-> perf trace:
-> 
-> - Fix include path for asm-generic/unistd.h on arm64 (Kim Phillips)
-> 
-> Core libraries:
-> 
-> - Fix potential null pointer dereference in perf_evsel__new_idx() (Hisao Tanabe)
-> 
-> - Use fixed size string for comms instead of scanf("%m"), that is
->   not present in the bionic libc and leads to a crash (Chris Phlipot)
-> 
-> - Fix bad memory access in trace info on 32-bit systems, we were reading
->   8 bytes from a 4-byte long variable when saving the command line in the
->   perf.data file.  (Chris Phlipot)
-> 
-> Build system:
-> 
-> - Streamline bpf examples and headers installation, clarifying
->   some install messages. (Arnaldo Carvalho de Melo)
-> 
-> Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
-> 
-> ----------------------------------------------------------------
-> Arnaldo Carvalho de Melo (1):
->       perf tools: Streamline bpf examples and headers installation
-> 
-> Chris Phlipot (2):
->       perf util: Fix bad memory access in trace info.
->       perf event-parse: Use fixed size string for comms
-> 
-> Hisao Tanabe (1):
->       perf evsel: Fix potential null pointer dereference in perf_evsel__new_idx()
-> 
-> Jiri Olsa (5):
->       perf tests: Add breakpoint modify tests
->       perf/hw_breakpoint: Modify breakpoint even if the new attr has disabled set
->       perf/hw_breakpoint: Remove superfluous bp->attr.disabled = 0
->       perf/hw_breakpoint: Enable breakpoint in modify_user_hw_breakpoint
->       perf/hw_breakpoint: Simplify breakpoint enable in perf_event_modify_breakpoint
-> 
-> Kim Phillips (2):
->       perf arm64: Fix include path for asm-generic/unistd.h
->       perf annotate: Fix parsing aarch64 branch instructions after objdump update
-> 
-> Martin Li?ka (1):
->       perf annotate: Properly interpret indirect call
-> 
-> Sandipan Das (1):
->       perf probe powerpc: Ignore SyS symbols irrespective of endianness
-> 
->  kernel/events/core.c                              |  11 +-
->  kernel/events/hw_breakpoint.c                     |  13 +-
->  tools/perf/Makefile.perf                          |  14 +-
->  tools/perf/arch/arm64/Makefile                    |   5 +-
->  tools/perf/arch/arm64/entry/syscalls/mksyscalltbl |   6 +-
->  tools/perf/arch/powerpc/util/sym-handling.c       |   4 +-
->  tools/perf/arch/x86/include/arch-tests.h          |   1 +
->  tools/perf/arch/x86/tests/Build                   |   1 +
->  tools/perf/arch/x86/tests/arch-tests.c            |   6 +
->  tools/perf/arch/x86/tests/bp-modify.c             | 213 ++++++++++++++++++++++
->  tools/perf/util/annotate.c                        |  32 +++-
->  tools/perf/util/annotate.h                        |   1 +
->  tools/perf/util/evsel.c                           |   5 +-
->  tools/perf/util/trace-event-info.c                |   2 +-
->  tools/perf/util/trace-event-parse.c               |   7 +-
->  15 files changed, 282 insertions(+), 39 deletions(-)
->  create mode 100644 tools/perf/arch/x86/tests/bp-modify.c
+Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+---
+ drivers/rtc/rtc-pl030.c | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
 
-Pulled into tip:perf/urgent, thanks a lot Arnaldo!
-
-	Ingo
+diff --git a/drivers/rtc/rtc-pl030.c b/drivers/rtc/rtc-pl030.c
+index f85a1a93e669..343bb6ed1783 100644
+--- a/drivers/rtc/rtc-pl030.c
++++ b/drivers/rtc/rtc-pl030.c
+@@ -112,6 +112,13 @@ static int pl030_probe(struct amba_device *dev, const struct amba_id *id)
+ 		goto err_rtc;
+ 	}
+ 
++	rtc->rtc = devm_rtc_allocate_device(&dev->dev);
++	if (IS_ERR(rtc->rtc)) {
++		ret = PTR_ERR(rtc->rtc);
++		goto err_rtc;
++	}
++
++	rtc->rtc->ops = &pl030_ops;
+ 	rtc->base = ioremap(dev->res.start, resource_size(&dev->res));
+ 	if (!rtc->base) {
+ 		ret = -ENOMEM;
+@@ -128,12 +135,9 @@ static int pl030_probe(struct amba_device *dev, const struct amba_id *id)
+ 	if (ret)
+ 		goto err_irq;
+ 
+-	rtc->rtc = rtc_device_register("pl030", &dev->dev, &pl030_ops,
+-				       THIS_MODULE);
+-	if (IS_ERR(rtc->rtc)) {
+-		ret = PTR_ERR(rtc->rtc);
++	ret = rtc_register_device(rtc->rtc);
++	if (ret)
+ 		goto err_reg;
+-	}
+ 
+ 	return 0;
+ 
+@@ -154,7 +158,6 @@ static int pl030_remove(struct amba_device *dev)
+ 	writel(0, rtc->base + RTC_CR);
+ 
+ 	free_irq(dev->irq[0], rtc);
+-	rtc_device_unregister(rtc->rtc);
+ 	iounmap(rtc->base);
+ 	amba_release_regions(dev);
+ 
+-- 
+2.19.0.rc2
