@@ -1,82 +1,44 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Sun, 9 Sep 2018 13:13:25 +0200
-Subject: [PATCH RFC 3/5] coccinelle: add xxxsetbitsXX converting spatch
-In-Reply-To: <1536349307-20714-4-git-send-email-clabbe@baylibre.com>
-References: <1536349307-20714-4-git-send-email-clabbe@baylibre.com>
-Message-ID: <463dbbdc-7afc-bee8-8da1-bbe70b4aec26@users.sourceforge.net>
+From: miguel.ojeda.sandonis@gmail.com (Miguel Ojeda)
+Date: Sun, 9 Sep 2018 17:47:31 +0200
+Subject: [PATCH] arch/arm64/include/asm/jump_label.h: use asm_volatile_goto
+Message-ID: <20180909154731.GA20381@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-How do you think about to add any more meta-data for this semantic patch script?
+All other uses of "asm goto" go through asm_volatile_goto
+(including the arm version of the same file). For consistency,
+use it here as well.
 
-* SPDX identifier
-* Copyright information
-* Confidence level
+Cc: Nick Desaulniers <ndesaulniers@google.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Miguel Ojeda <miguel.ojeda.sandonis@gmail.com>
+---
+ arch/arm64/include/asm/jump_label.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-https://bottest.wiki.kernel.org/coccicheck
-
-
-> +virtual context
-
-Further variables will be needed if you would like to use corresponding
-operation modes (besides ?patch?).
-
-
-> +expression reg;
-> +expression set;
-> +expression clear;
-
-I propose once more to avoid the repetition of (unnecessary) SmPL code.
-This part could be written like the following instead.
-
-+expression clear, set, reg;
-
-
-If you would increase the usage of SmPL disjunctions, the specification
-of duplicate SmPL code could be reduced considerably.
-
-* Would you like to merge SmPL rules based on the distinction between
-  the data types ?u32? and ?u64??
-
-* Did you identify any optional code in this transformation approach?
-
-
-> +@@
-> +expression base;
-> +expression offset;
-> +expression value;
-> +@@
-> +
-> +- mtu3_setbits(base, offset, value);
-> ++ setbits32(base + offset, value);
-> +
-> +@@
-> +expression base;
-> +expression offset;
-> +expression mask;
-> +@@
-> +
-> +- mtu3_clrbits(base, offset, mask);
-> ++ clrbits32(base + offset, mask);
-
-Another update suggestion:
-
-+ at replacement@
-+expression base, offset;
-+@@
-+(
-+-mtu3_clrbits
-++clrbits32
-+|
-+-mtu3_setbits
-++setbits32
-+)(base
-+-     ,
-++ +
-+  offset, ...);
-
-
-Would you like to try further software fine-tuning out?
-
-Regards,
-Markus
+diff --git a/arch/arm64/include/asm/jump_label.h b/arch/arm64/include/asm/jump_label.h
+index 1b5e0e843c3a..7e2b3e360086 100644
+--- a/arch/arm64/include/asm/jump_label.h
++++ b/arch/arm64/include/asm/jump_label.h
+@@ -28,7 +28,7 @@
+ 
+ static __always_inline bool arch_static_branch(struct static_key *key, bool branch)
+ {
+-	asm goto("1: nop\n\t"
++	asm_volatile_goto("1: nop\n\t"
+ 		 ".pushsection __jump_table,  \"aw\"\n\t"
+ 		 ".align 3\n\t"
+ 		 ".quad 1b, %l[l_yes], %c0\n\t"
+@@ -42,7 +42,7 @@ static __always_inline bool arch_static_branch(struct static_key *key, bool bran
+ 
+ static __always_inline bool arch_static_branch_jump(struct static_key *key, bool branch)
+ {
+-	asm goto("1: b %l[l_yes]\n\t"
++	asm_volatile_goto("1: b %l[l_yes]\n\t"
+ 		 ".pushsection __jump_table,  \"aw\"\n\t"
+ 		 ".align 3\n\t"
+ 		 ".quad 1b, %l[l_yes], %c0\n\t"
+-- 
+2.17.1
