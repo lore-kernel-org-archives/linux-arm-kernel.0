@@ -1,35 +1,34 @@
 From: contact@paulk.fr (Paul Kocialkowski)
-Date: Sun,  9 Sep 2018 21:04:39 +0200
-Subject: [PATCH RESEND] drivers: soc: Allow building the sunxi driver without
- ARCH_SUNXI
-Message-ID: <20180909190439.20425-1-contact@paulk.fr>
+Date: Sun,  9 Sep 2018 21:10:11 +0200
+Subject: [PATCH v2 0/4] Follow-up patches for Cedrus v9
+Message-ID: <20180909191015.20902-1-contact@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This makes it possible to build the sunxi SRAM driver without building
-for the sunxi architecture. This allows selecting the driver when
-building the kernel in testing environments.
+This brings the requested modifications on top of version 9 of the
+Cedrus VPU driver, that implements stateless video decoding using the
+Request API.
 
-In particular, this is necessary for testing of the Cedrus driver, that
-selects the sunxi SRAM driver.
+Changes since v1:
+* Added two more commits to fix build issues with non-sunxi configs.
 
-Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
----
- drivers/soc/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+In order to build correctly on non-sunxi platforms, the following commit
+is also required to select the sunxi SRAM driver:
+* drivers: soc: Allow building the sunxi driver without ARCH_SUNXI
 
-diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
-index 113e884697fd..446166ba0bec 100644
---- a/drivers/soc/Makefile
-+++ b/drivers/soc/Makefile
-@@ -18,7 +18,7 @@ obj-y				+= qcom/
- obj-y				+= renesas/
- obj-$(CONFIG_ARCH_ROCKCHIP)	+= rockchip/
- obj-$(CONFIG_SOC_SAMSUNG)	+= samsung/
--obj-$(CONFIG_ARCH_SUNXI)	+= sunxi/
-+obj-y				+= sunxi/
- obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
- obj-$(CONFIG_SOC_TI)		+= ti/
- obj-$(CONFIG_ARCH_U8500)	+= ux500/
+Paul Kocialkowski (4):
+  media: cedrus: Fix error reporting in request validation
+  media: cedrus: Add TODO file with tasks to complete before unstaging
+  media: cedrus: Wrap PHYS_PFN_OFFSET with ifdef and add dedicated
+    comment
+  media: cedrus: Select the sunxi SRAM driver in Kconfig
+
+ drivers/staging/media/sunxi/cedrus/Kconfig     |  1 +
+ drivers/staging/media/sunxi/cedrus/TODO        |  7 +++++++
+ drivers/staging/media/sunxi/cedrus/cedrus.c    | 15 ++++++++++++---
+ drivers/staging/media/sunxi/cedrus/cedrus_hw.c |  5 +++++
+ 4 files changed, 25 insertions(+), 3 deletions(-)
+ create mode 100644 drivers/staging/media/sunxi/cedrus/TODO
+
 -- 
 2.18.0
