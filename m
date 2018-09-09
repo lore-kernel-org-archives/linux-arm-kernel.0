@@ -1,36 +1,55 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 8 Sep 2018 18:18:53 -0700
-Subject: [PATCH v11 03/11] firmware: xilinx: Add zynqmp IOCTL API for
- device control
-In-Reply-To: <1533318808-10781-4-git-send-email-jollys@xilinx.com>
-References: <1533318808-10781-1-git-send-email-jollys@xilinx.com>
- <1533318808-10781-4-git-send-email-jollys@xilinx.com>
-Message-ID: <CAOesGMi7Q9L4oZkUubKtV-m8XD67MQ05ZFhPA_0Hwky_qVUxfg@mail.gmail.com>
+Date: Sat, 8 Sep 2018 18:21:30 -0700
+Subject: [GIT PULL] arm64: zynqmp: Xilinx SoC changes for v4.20
+In-Reply-To: <5e9c248d-c19c-1881-f406-d7bfd38ec479@xilinx.com>
+References: <5e9c248d-c19c-1881-f406-d7bfd38ec479@xilinx.com>
+Message-ID: <CAOesGMjh-Chhncw3cYaCvFpfhtOSz8hprC0xARmVXe8i4mvxHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Michal,
 
-On Fri, Aug 3, 2018 at 10:53 AM, Jolly Shah <jolly.shah@xilinx.com> wrote:
-> From: Rajan Vaja <rajanv@xilinx.com>
+On Fri, Sep 7, 2018 at 12:57 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+> Hi,
 >
-> Add ZynqMP firmware IOCTL API to control and configure
-> devices like PLLs, SD, Gem, etc.
+> please pull the following firmware interface to your tree.
 >
-> Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
-> Signed-off-by: Jolly Shah <jollys@xilinx.com>
+> Thanks,
+> Michal
+>
+>
+> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+>
+>   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+>
+> are available in the git repository at:
+>
+>   https://github.com/Xilinx/linux-xlnx.git tags/zynqmp-soc-for-v4.20
+>
+> for you to fetch changes up to bca7067d2d4e91f58162b07d73cd94e20437b4f6:
+>
+>   firmware: xilinx: Add debugfs for query data API (2018-09-07 09:44:44
+> +0200)
+>
+> ----------------------------------------------------------------
+> arm64: zynqmp: SoC changes for v4.20
+>
+> - Adding firmware API for SoC with debugfs interface
 
-This patch worries me somewhat. It's a transparent pass-through ioctl
-driver. Is there a spec available for what the implemented IOCTLs are?
+This is a bit terse. Jolly has been good at writing cover letters, you
+could have stolen the writeup from there. :)
 
-Should some of them be proper drivers instead of an opaque
-pass-through like this? Could some of them have stability impact on
-the platform such that there are security concerns and the list of
-arguments should somehow be sanitized?
+I posted two comments on the patches -- one is a nit that can be
+followed up on with an incremental patch.
 
-What's the intended usecase anyway? Just a debug tool during
-development, or something that you expect heavy use of by some
-userspace middleware?
+I'm more worried about the ioctl interface though, and what it opens
+up. Maybe it's been discussed in the time the set has been reviewed, I
+didn't search extensively for the history. If it had been, bringing
+explanations into the patch description would have been nice for new
+readers such as myself. And if it hasn't, well, let's talk about it.
+
+Not merging based on the above. Hopefully it's something we can
+straighten out pretty quickly.
 
 
 -Olof
