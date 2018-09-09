@@ -1,8 +1,8 @@
 From: contact@paulk.fr (Paul Kocialkowski)
-Date: Sun,  9 Sep 2018 20:58:57 +0200
-Subject: [PATCH] drivers: soc: Allow building the sunxi driver without
+Date: Sun,  9 Sep 2018 21:04:39 +0200
+Subject: [PATCH RESEND] drivers: soc: Allow building the sunxi driver without
  ARCH_SUNXI
-Message-ID: <20180909185857.19983-1-contact@paulk.fr>
+Message-ID: <20180909190439.20425-1-contact@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
