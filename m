@@ -1,48 +1,71 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 10 Sep 2018 10:55:23 +0100
-Subject: [PATCH v2 01/16] nvmem: remove unused APIs
-In-Reply-To: <CAMRc=Mduu4CmLX5DFtJd8NSbzs5g65U9AmM=rbscit0JyQKVAQ@mail.gmail.com>
-References: <20180907100750.14564-1-brgl@bgdev.pl>
- <20180907100750.14564-2-brgl@bgdev.pl>
- <c0b0c411-65f6-62f9-6d6d-2884e5a17250@linaro.org>
- <CAMRc=MfO01EQAfY4Uu3UwzzvhVOMF7_BpCOPVz2yVXqDgpb0AA@mail.gmail.com>
- <7e138142-8161-3646-4daf-619995baf395@linaro.org>
- <CAMRc=Mduu4CmLX5DFtJd8NSbzs5g65U9AmM=rbscit0JyQKVAQ@mail.gmail.com>
-Message-ID: <3dbd65e5-c948-a784-0362-930fc41b840e@linaro.org>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Mon, 10 Sep 2018 09:56:18 +0000
+Subject: [PATCH] arm64: dts: renesas: r8a774a1: Add CAN nodes
+In-Reply-To: <CAMuHMdUL0Ck=6er8rvx_kCSi7KR9kjBqjNRiLOL41nxeJXQG-w@mail.gmail.com>
+References: <1535034166-24798-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <CAMuHMdUL0Ck=6er8rvx_kCSi7KR9kjBqjNRiLOL41nxeJXQG-w@mail.gmail.com>
+Message-ID: <TY1PR01MB17706300DDF78B3067DC779DC0050@TY1PR01MB1770.jpnprd01.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Geert,
+
+Thank you for your feedback.
+
+> Subject: Re: [PATCH] arm64: dts: renesas: r8a774a1: Add CAN nodes
+>
+> Hi Fabrizio,
+>
+> On Thu, Aug 23, 2018 at 4:22 PM Fabrizio Castro
+> <fabrizio.castro@bp.renesas.com> wrote:
+> > From: Chris Paterson <chris.paterson2@renesas.com>
+> >
+> > Add the device nodes for both RZ/G2M CAN channels.
+> >
+> > Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+> > Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+> > ---
+> >
+> > This patch depends on:
+> > https://lkml.org/lkml/2018/8/23/1049
+> > https://www.mail-archive.com/linux-renesas-soc at vger.kernel.org/msg30550.html
+> >
+> >
+> >  arch/arm64/boot/dts/renesas/r8a774a1.dtsi | 24 ++++++++++++++++++++++++
+> >  1 file changed, 24 insertions(+)
+> >
+> > diff --git a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+> > index 5d0109a..cd204f5 100644
+> > --- a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+> > +++ b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+> > @@ -816,6 +816,30 @@
+> >                         status = "disabled";
+> >                 };
+> >
+> > +               can0: can at e6c30000 {
+> > +                       compatible = "renesas,can-r8a774a1",
+> > +                                    "renesas,rzg-gen2-can";
+>
+> Please don't introduce "renesas,rzg-gen2-can", cfr. my comments in
+> https://lore.kernel.org/lkml/CAMuHMdWPuqfXOgh_-qp8q6wATU3Lj_WpX0bAOxPBX76SKvyXCQ at mail.gmail.com/
+
+Agreed, will send a v2.
+
+Thanks,
+Fab
+
+>
+> Gr{oetje,eeting}s,
+>
+>                         Geert
+>
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
 
 
-On 10/09/18 09:43, Bartosz Golaszewski wrote:
->>> this series. Later patches are MUCH cleaner thanks to this removal and
->>> I believe it makes them easier for review.
->> Am not sure about that, it definitely did not help me!
->>
-> Why exactly? Aren't clean patches resulting from this removal easier
-> to read then if they'd also have to take into account the burden of
-> existing code that will be changes anyway later? I really don't see
-> why you insist on removing this.
 
-Here are few reasons:
-
-1> TBH, This cleanup patch removes more than one feature from nvmem 
-subsystem.
-Ex: it remove ability to add static cell from nvmem config, secondly it 
-removed ability to read/write cells directly using nvmem_cell_info.
-
-2> If you do changes as part of each patch, it will be much traceable on 
-what is changed exactly and will allow much better review, and 
-understand the reasoning.
-
-Having a clean start and writing code on top of it is alway nice, but we 
-will definitely miss things in review in this particular instance.
-
-
-thanks,
-srini
-
-> 
-> Best regards,
-> Bart
-> 
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
