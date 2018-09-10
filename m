@@ -1,76 +1,71 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Sun, 09 Sep 2018 23:21:23 -0700
-Subject: [PATCH 1/5] crypto: arm/aes-ce - enable module autoloading based
- on CPU feature bits
-In-Reply-To: <1495362220-30044-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1495362220-30044-1-git-send-email-ard.biesheuvel@linaro.org>
- <1495362220-30044-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <f68937805ccdbdd296118ee6871fa25e@agner.ch>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Mon, 10 Sep 2018 11:55:47 +0530
+Subject: [PATCH v2 0/4] Qcom smmu-500 TLB invalidation errata for sdm845
+Message-ID: <20180910062551.28175-1-vivek.gautam@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+Qcom's implementation of arm,mmu-500 on sdm845 has a functional/performance
+errata [1] because of which the TCU cache look ups are stalled during
+invalidation cycle. This is mitigated by serializing all the invalidation
+requests coming to the smmu.
 
-On 21.05.2017 03:23, Ard Biesheuvel wrote:
-> Make the module autoloadable by tying it to the CPU feature bit that
-> describes whether the optional instructions it relies on are implemented
-> by the current CPU.
-> 
+This patch series addresses this errata by adding new tlb_ops for
+qcom,sdm845-smmu-500 [2]. These ops take context bank locks for all the
+tlb_ops that queue and sync the TLB invalidation requests.
 
-This leads to a compiler warning when compiling multi_v7_defconfig/ARM32
-using Clang 6.0.1:
+Besides adding locks, there's a way to expadite these TLB invalidations
+for display and camera devices by turning off the 'wait-for-safe' logic
+in hardware that holds the tlb invalidations until a safe level.
+This 'wait-for-safe' logic is controlled by toggling a chicken bit
+through a secure register. This secure register is accessed by making an
+explicit SCM call into the EL3 firmware.
+There are two ways of handling this logic -
+ * Firmware, such as tz present on sdm845-mtp devices has a handler to do
+   all the register access and bit set/clear. So is the handling in
+   downstream arm-smmu driver [3].
+ * Other firmwares can have handlers to just read/write this secure
+   register. In such cases the kernel make io_read/writel scm calls to
+   modify the register.
+This patch series adds APIs in qcom-scm driver to handle both of these
+cases.
 
-arch/arm/crypto/aes-ce-glue.c:450:1: warning: variable
-'cpu_feature_match_AES' is not needed and will not
-      be emitted [-Wunneeded-internal-declaration]
-module_cpu_feature_match(AES, aes_init);
+Lastly, since these TLB invalidations can happen in atomic contexts
+there's a need to add atomic versions of qcom_scm_io_readl/writel() and
+qcom_scm_call() APIs. The traditional scm calls take mutex and we therefore
+can't use these calls in atomic contexts.
 
-./include/linux/cpufeature.h:48:33: note: expanded from macro
-'module_cpu_feature_match'
-static struct cpu_feature const cpu_feature_match_ ## x[] =     \
+This patch series is adapted version of how the errata is handled in
+downstream [1].
 
-<scratch space>:83:1: note: expanded from here
-cpu_feature_match_AES
-^
-1 warning generated.
+Changes since v1:
+ * Addressed Will and Robin's comments:
+    - Dropped the patch[4] that forked out __arm_smmu_tlb_inv_range_nosync(),
+      and __arm_smmu_tlb_sync().
+    - Cleaned up the errata patch further to use downstream polling mechanism
+      for tlb sync.
+ * No change in SCM call patches - patches 1 to 3.
 
-Do you happen to have an idea how to alleviate?
+[1] https://source.codeaurora.org/quic/la/kernel/msm-4.9/tree/drivers/iommu/arm-smmu.c?h=msm-4.9#n4842
+[2] https://lore.kernel.org/patchwork/patch/974114/
+[3] https://source.codeaurora.org/quic/la/kernel/msm-4.9/tree/drivers/iommu/arm-smmu.c?h=msm-4.9#n4864
+[4] https://patchwork.kernel.org/patch/10565349/
 
---
-Stefan
+Vivek Gautam (4):
+  firmware: qcom_scm-64: Add atomic version of qcom_scm_call
+  firmware/qcom_scm: Add atomic version of io read/write APIs
+  firmware/qcom_scm: Add scm call to handle smmu errata
+  iommu/arm-smmu: Add support to handle Qcom's TLBI serialization errata
 
+ drivers/firmware/qcom_scm-32.c |  17 ++++
+ drivers/firmware/qcom_scm-64.c | 181 +++++++++++++++++++++++++++++++----------
+ drivers/firmware/qcom_scm.c    |  18 ++++
+ drivers/firmware/qcom_scm.h    |   9 ++
+ drivers/iommu/arm-smmu-regs.h  |   2 +
+ drivers/iommu/arm-smmu.c       | 133 +++++++++++++++++++++++++++++-
+ include/linux/qcom_scm.h       |   6 ++
+ 7 files changed, 320 insertions(+), 46 deletions(-)
 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm/crypto/aes-ce-glue.c | 6 ++----
->  1 file changed, 2 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/crypto/aes-ce-glue.c b/arch/arm/crypto/aes-ce-glue.c
-> index 883b84d828c5..0f966a8ca1ce 100644
-> --- a/arch/arm/crypto/aes-ce-glue.c
-> +++ b/arch/arm/crypto/aes-ce-glue.c
-> @@ -14,6 +14,7 @@
->  #include <crypto/aes.h>
->  #include <crypto/internal/simd.h>
->  #include <crypto/internal/skcipher.h>
-> +#include <linux/cpufeature.h>
->  #include <linux/module.h>
->  #include <crypto/xts.h>
->  
-> @@ -425,9 +426,6 @@ static int __init aes_init(void)
->  	int err;
->  	int i;
->  
-> -	if (!(elf_hwcap2 & HWCAP2_AES))
-> -		return -ENODEV;
-> -
->  	err = crypto_register_skciphers(aes_algs, ARRAY_SIZE(aes_algs));
->  	if (err)
->  		return err;
-> @@ -451,5 +449,5 @@ static int __init aes_init(void)
->  	return err;
->  }
->  
-> -module_init(aes_init);
-> +module_cpu_feature_match(AES, aes_init);
->  module_exit(aes_exit);
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
