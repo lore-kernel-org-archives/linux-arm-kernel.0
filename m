@@ -1,71 +1,121 @@
-From: ran.wang_1@nxp.com (Ran Wang)
-Date: Mon, 10 Sep 2018 09:09:59 +0000
-Subject: [PATCH 3/3] soc: fsl: add RCPM driver
-In-Reply-To: <86101ce0f4201d05510e57d74cafe8c665b8e5d4.camel@buserror.net>
-References: <20180831035219.31619-1-ran.wang_1@nxp.com>
- <20180831035219.31619-3-ran.wang_1@nxp.com>
- <86101ce0f4201d05510e57d74cafe8c665b8e5d4.camel@buserror.net>
-Message-ID: <AM5PR0402MB28652A2D74A891BC35B1B680F1050@AM5PR0402MB2865.eurprd04.prod.outlook.com>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Mon, 10 Sep 2018 09:18:35 +0000
+Subject: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
+In-Reply-To: <AM6PR0402MB391120110A289BA5FB6B9F0DF50C0@AM6PR0402MB3911.eurprd04.prod.outlook.com>
+References: <1533703167-26583-1-git-send-email-Anson.Huang@nxp.com>
+ <1533703167-26583-2-git-send-email-Anson.Huang@nxp.com>
+ <AM0PR04MB4481FC2BAD71B75D7BE84C0788260@AM0PR04MB4481.eurprd04.prod.outlook.com>
+ <DB3PR0402MB3916F8BC381BBA01DB21D1C0F5260@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+ <AM0PR04MB44813C7A3E0AF4F3BCFFCF0088390@AM0PR04MB4481.eurprd04.prod.outlook.com>
+ <153567894721.93865.4092113232222931488@swboyd.mtv.corp.google.com>
+ <a6489bda-703f-207c-0b24-60f4044fe89f@linaro.org>
+ <153573827629.93865.6200966443862432044@swboyd.mtv.corp.google.com>
+ <AM6PR0402MB391120110A289BA5FB6B9F0DF50C0@AM6PR0402MB3911.eurprd04.prod.outlook.com>
+Message-ID: <DB3PR0402MB391656D3F0C5E7AC1975064CF5050@DB3PR0402MB3916.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Scott,
+Gentle Ping...
 
-On 2018/9/8 18:16, Scott Wood wrote:
+Anson Huang
+Best Regards!
+
+
+> -----Original Message-----
+> From: Anson Huang
+> Sent: Monday, September 3, 2018 3:21 PM
+> To: Stephen Boyd <sboyd@kernel.org>; kernel at pengutronix.de;
+> linux-arm-kernel at lists.infradead.org; linux-clk at vger.kernel.org;
+> linux-kernel at vger.kernel.org; mturquette at baylibre.com;
+> s.hauer at pengutronix.de; shawnguo at kernel.org; Fabio Estevam
+> <fabio.estevam@nxp.com>; Jerome Forissier <jerome.forissier@linaro.org>;
+> Peng Fan <peng.fan@nxp.com>; Rob Herring <robh@kernel.org>
+> Cc: dl-linux-imx <linux-imx@nxp.com>
+> Subject: RE: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
 > 
-> On Fri, 2018-08-31 at 11:52 +0800, Ran Wang wrote:
-> > The NXP's QorIQ Processors based on ARM Core have RCPM module (Run
-> > Control and Power Management), which performs all device-level tasks
-> > associated with power management such as wakeup source control.
+> 
+> 
+> Anson Huang
+> Best Regards!
+> 
+> 
+> > -----Original Message-----
+> > From: Stephen Boyd <sboyd@kernel.org>
+> > Sent: Saturday, September 1, 2018 1:58 AM
+> > To: kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org;
+> > linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org;
+> > mturquette at baylibre.com; s.hauer at pengutronix.de;
+> shawnguo at kernel.org;
+> > Anson Huang <anson.huang@nxp.com>; Fabio Estevam
+> > <fabio.estevam@nxp.com>; Jerome Forissier
+> > <jerome.forissier@linaro.org>; Peng Fan <peng.fan@nxp.com>; Rob
+> > Herring <robh@kernel.org>
+> > Cc: dl-linux-imx <linux-imx@nxp.com>
+> > Subject: Re: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
 > >
-> > This driver depends on FSL platform PM driver framework which help to
-> > isolate user and PM service provider (such as RCPM driver).
+> > Quoting Jerome Forissier (2018-08-31 01:01:44)
+> > >
+> > >
+> > > On 08/31/2018 03:29 AM, Stephen Boyd wrote:
+> > > > Quoting Peng Fan (2018-08-12 18:15:41)
+> > > >> Hi Anson,
+> > > >>
+> > > >>>>> -----Original Message-----
+> > > >>>>> From: Anson Huang
+> > > >>>>> Sent: 2018?8?8? 12:39
+> > > >>>>> To: shawnguo at kernel.org; s.hauer at pengutronix.de;
+> > > >>>>> kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>;
+> > > >>>>> mturquette at baylibre.com; sboyd at kernel.org;
+> > > >>>>> linux-arm-kernel at lists.infradead.org;
+> > > >>>>> linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org
+> > > >>>>> Cc: dl-linux-imx <linux-imx@nxp.com>
+> > > >>>>> Subject: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on
+> > > >>>>> array
+> > > >>>>>
+> > > >>>>> Clock framework will enable those clocks registered with
+> > > >>>>> CLK_IS_CRITICAL flag, so no need to have clks_init_on array
+> > > >>>>> during clock
+> > > >>>> initialization now.
+> > > >>>>
+> > > >>>> Will it be more flexible to parse dts saying "critical-clocks = <xxx>"
+> > > >>>> or "init-on-arrary=<xxx>"
+> > > >>>> and enable those clocks?
+> > > >>>
+> > > >>> Parsing the clocks arrays from dtb is another way of enabling
+> > > >>> critical clocks, but for current i.MX6/7 platforms, we implement
+> > > >>> it in same way as most of other SoCs, currently I did NOT see
+> > > >>> any necessity of putting them in dtb, just adding flag during
+> > > >>> clock registering is more simple, if there is any special
+> > > >>> requirement for different clocks set to be enabled, then we can
+> > > >>> add support to enable
+> > the method of parsing critical-clocks from dtb. Just my two cents.
+> > > >>
+> > > >> Thinking about OP-TEE want to use one device, but it's clocks are
+> > > >> registered by Linux, because there is no module in Linux side use
+> > > >> it, it will shutdown the clock, which cause OP-TEE could not
+> > > >> access the
+> > device.
+> > > >>
+> > > >> Then people have to modify clk code to add CLK_IS_CRITICAL flag
+> > > >> to make sure the clocks are not shutdown by Linux.
+> > > >>
+> > > >> However adding a new property in clk node and let driver code
+> > > >> parse the dts, there is no need to modify clk driver code when
+> > > >> OP-TEE needs
+> > another device clock.
+> > > >>
+> > > >
+> > > > If OP-TEE needs linux to keep things on then why can't the OP-TEE
+> > > > driver in Linux probe, acquire clocks, and keep the clks enabled forever?
+> > >
+> > > Sounds reasonable, but how could this be done without introducing
+> > > platform-specific stuff in the OP-TEE driver?
+> > >
 > >
-> > Signed-off-by: Chenhui Zhao <chenhui.zhao@nxp.com>
-> > Signed-off-by: Ying Zhang <ying.zhang22455@nxp.com>
-> > Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
-> > ---
-> >  drivers/soc/fsl/Kconfig   |    6 ++
-> >  drivers/soc/fsl/Makefile  |    1 +
-> >  drivers/soc/fsl/ls-rcpm.c |  153
-> > +++++++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 160 insertions(+), 0 deletions(-)  create mode
-> > 100644 drivers/soc/fsl/ls-rcpm.c
+> > Why is that a goal?
 > 
-> Is there a reason why this is LS-specific, or could it be used with PPC RCPM
-> blocks?
-
-They have different SW arch design on low power operation: PPC RCPM
-driver has taken care of most things of suspend enter & exit. And LS RCPM driver
-will only handle wakeup source configure and left rest work to system firmware
-to do. So you might be aware that LS RCPM will only get call whenever plat_pm
-driver API is called rather than system suspend begin where.
-
+> I do NOT think we should consider such case in this patch series, whatever
+> OP-TEE needs for its own feature, it should do necessary operations either in its
+> driver or somewhere else by adding new patch.
 > 
-> > diff --git a/drivers/soc/fsl/Kconfig b/drivers/soc/fsl/Kconfig index
-> > 6517412..882330d 100644
-> > --- a/drivers/soc/fsl/Kconfig
-> > +++ b/drivers/soc/fsl/Kconfig
-> > @@ -30,3 +30,9 @@ config FSL_PLAT_PM
-> >  	  have to know the implement details of wakeup function it require.
-> >  	  Besides, it is also easy for service side to upgrade its logic
-> > when
-> >  	  design changed and remain user side unchanged.
-> > +
-> > +config LS_RCPM
-> > +	bool "Freescale RCPM support"
-> > +	depends on (FSL_PLAT_PM)
-> 
-> Why is this parenthesized?
-
-Because we'd like to decouple RCPM driver and its user.
-Benefit is that will allow user doesn't have to know who will serve it for some PM
-features (such as wake up source control), and provide some kind of flexibility when
-either RCMP or user driver evolve in the future. So I add a plat_pm driver to prevent
-wake up IP knowing any information of RCPM.
-
-Regards,
-Ran
-
-> 
-> -Scott
+> Anson.
