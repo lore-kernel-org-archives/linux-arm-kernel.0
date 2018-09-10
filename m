@@ -1,59 +1,69 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Mon, 10 Sep 2018 15:48:45 +0200
-Subject: [PATCH] arm64: add NUMA emulation support
-In-Reply-To: <e46e715c-f115-f054-eeb2-3cecbcd1192d@kernel.org>
-References: <20180824230559.32336-1-shuah@kernel.org>
- <20180828174011.GE20375@arm.com>
- <a58ad11f-3c22-ed7f-a0cd-938aabc4adaf@kernel.org>
- <20180829110802.GD10349@dhcp22.suse.cz>
- <f041ba95-03e6-4a7d-c324-870b45a2f648@kernel.org>
- <20180905064252.GW14951@dhcp22.suse.cz>
- <c1b58f13-6190-20e9-7e4f-b8bc2b9d5f80@kernel.org>
- <20180907083452.GC19621@dhcp22.suse.cz>
- <e46e715c-f115-f054-eeb2-3cecbcd1192d@kernel.org>
-Message-ID: <20180910134845.GH10951@dhcp22.suse.cz>
+From: nipun.gupta@nxp.com (Nipun Gupta)
+Date: Mon, 10 Sep 2018 19:19:14 +0530
+Subject: [PATCH 0/7 v7] Support for fsl-mc bus and its devices in SMMU
+Message-ID: <1536587361-11047-1-git-send-email-nipun.gupta@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 07-09-18 16:30:59, Shuah Khan wrote:
-> On 09/07/2018 02:34 AM, Michal Hocko wrote:
-> > On Thu 06-09-18 15:53:34, Shuah Khan wrote:
-> > [...]
-> >> A few critical allocations could be satisfied and root cgroup prevails. It is not the
-> >> intent to have exclusivity at the expense of the kernel.
-> > 
-> > Well, it is not "few critical allocations". It can be a lot of
-> > memory. Basically any GFP_KERNEL allocation. So how exactly you expect
-> > this to work when you cannot estimate how much
-> > memory will kernel eat?
-> > 
-> >>
-> >> This feature will allow a way to configure cpusets on non-NUMA for workloads that can
-> >> benefit from the reservation and isolation that is available within the constraints of
-> >> exclusive cpuset policies.
-> > 
-> > AFAIR this was the first approach Google took for the memory isolation
-> > and they moved over to memory cgroups. 
-> 
-> In addition to isolation, being able to reserve a block instead is one of the
-> issues I am looking to address. Unfortunately memory cgroups won't address that
-> issue.
+This patchset defines IOMMU DT binding for fsl-mc bus and adds
+support in SMMU for fsl-mc bus.
 
-Could you be more specific why you need reservations other than
-isolation.
+These patches
+  - Define property 'iommu-map' for fsl-mc bus (patch 1)
+  - Integrates the fsl-mc bus with the SMMU using this
+    IOMMU binding (patch 2,3,4)
+  - Adds the dma configuration support for fsl-mc bus (patch 5, 6)
+  - Updates the fsl-mc device node with iommu/dma related changes (patch 7)
 
-> I would recommend to talk to
-> > those guys bebfore you introduce potentially a lot of code that will not
-> > really work for the workload you indend it for.
-> > 
-> 
-> Will you be able to point me to a good contact at Goggle and/or some pointers
-> on finding discussion on the memory isolation. My searches on lkml came up
-> short,
+Changes in v2:
+  - use iommu-map property for fsl-mc bus
+  - rebase over patchset https://patchwork.kernel.org/patch/10317337/
+    and make corresponding changes for dma configuration of devices on
+    fsl-mc bus
 
-Well, Ying Han who used to work on memcg early days is working on a
-different project. So I am not really sure.
-https://lwn.net/Articles/459585/ might tell you more.
+Changes in v3:
+  - move of_map_rid in drivers/of/address.c
+
+Changes in v4:
+  - move of_map_rid in drivers/of/base.c
+
+Changes in v5:
+  - break patch 5 in two separate patches (now patch 5/7 and patch 6/7)
+  - add changelog text in patch 3/7 and patch 5/7
+  - typo fix
+
+Changes in v6:
+  - Updated fsl_mc_device_group() API to be more rational
+  - Added dma-coherent property in the LS2 smmu device node
+  - Minor fixes in the device-tree documentation
+
+Changes in v7:
+  - Rebased over linux 4.19
+
+Nipun Gupta (7):
+  Documentation: fsl-mc: add iommu-map device-tree binding for fsl-mc
+    bus
+  iommu/of: make of_pci_map_rid() available for other devices too
+  iommu/of: support iommu configuration for fsl-mc devices
+  iommu/arm-smmu: Add support for the fsl-mc bus
+  bus: fsl-mc: support dma configure for devices on fsl-mc bus
+  bus: fsl-mc: set coherent dma mask for devices on fsl-mc bus
+  arm64: dts: ls208xa: comply with the iommu map binding for fsl_mc
+
+ .../devicetree/bindings/misc/fsl,qoriq-mc.txt      |  39 ++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi     |   7 +-
+ drivers/bus/fsl-mc/fsl-mc-bus.c                    |  16 +++-
+ drivers/iommu/arm-smmu.c                           |   7 ++
+ drivers/iommu/iommu.c                              |  13 +++
+ drivers/iommu/of_iommu.c                           |  25 ++++-
+ drivers/of/base.c                                  | 102 +++++++++++++++++++++
+ drivers/of/irq.c                                   |   5 +-
+ drivers/pci/of.c                                   | 101 --------------------
+ include/linux/fsl/mc.h                             |   8 ++
+ include/linux/iommu.h                              |   2 +
+ include/linux/of.h                                 |  11 +++
+ include/linux/of_pci.h                             |  10 --
+ 13 files changed, 224 insertions(+), 122 deletions(-)
+
 -- 
-Michal Hocko
-SUSE Labs
+1.9.1
