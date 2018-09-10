@@ -1,103 +1,48 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 10 Sep 2018 11:28:41 +0200
-Subject: [PATCH v3 2/4] arm64: dts: rockchip: add rk3328 display nodes
-In-Reply-To: <20180910092843.1700-1-heiko@sntech.de>
-References: <20180910092843.1700-1-heiko@sntech.de>
-Message-ID: <20180910092843.1700-3-heiko@sntech.de>
+From: victor.chong@linaro.org (Victor Chong)
+Date: Mon, 10 Sep 2018 18:33:02 +0900
+Subject: Fwd: [PATCH] tee: optee: log message if dynamic shm is enabled
+In-Reply-To: <20180910092009.y2p5n5owozaz6etw@holly.lan>
+References: <CAHqM-Qgy7zPjrnNm0Xdyz_F_BYbSPgDfQrkv0tGv_rB1G7tSXg@mail.gmail.com>
+ <CAHqM-QgH3d3Fz=P-_Gj_ZJODK1YOxT49G=qhzAnM=g2HAYqoow@mail.gmail.com>
+ <20180910092009.y2p5n5owozaz6etw@holly.lan>
+Message-ID: <CAHqM-QgaweVSYPqqKwdwZQdqN6YT6gWpM5XdTZ7_KiSjPgrD+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the chain of display nodes from the core display-subsystem
-through the one vop to the dw-hdmi output.
+On Mon, Sep 10, 2018 at 6:20 PM, Daniel Thompson
+<daniel.thompson@linaro.org> wrote:
+> On Mon, Sep 10, 2018 at 05:57:28PM +0900, Victor Chong wrote:
+>
+> This (empty) patch description seems unusually terse! Surely there
+> should be some clues in the description about why this messages
+> deserves user/dev/admin attention...
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Tested-by: Robin Murphy <robin.murphy@arm.com>
+Ok. Will add description and send out v2.
 
-changes in v3:
-- drop reg from hdmi-in-port
-changes in v2:
-- remove trailing 0 from vop irq
----
- arch/arm64/boot/dts/rockchip/rk3328.dtsi | 53 ++++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
+Thanks
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-index beebab74ce17..6b480d723fca 100644
---- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-@@ -151,6 +151,11 @@
- 		interrupt-affinity = <&cpu0>, <&cpu1>, <&cpu2>, <&cpu3>;
- 	};
- 
-+	display_subsystem: display-subsystem {
-+		compatible = "rockchip,display-subsystem";
-+		ports = <&vop_out>;
-+	};
-+
- 	psci {
- 		compatible = "arm,psci-1.0", "arm,psci-0.2";
- 		method = "smc";
-@@ -605,6 +610,28 @@
- 		status = "disabled";
- 	};
- 
-+	vop: vop at ff370000 {
-+		compatible = "rockchip,rk3328-vop";
-+		reg = <0x0 0xff370000 0x0 0x3efc>;
-+		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru ACLK_VOP>, <&cru DCLK_LCDC>, <&cru HCLK_VOP>;
-+		clock-names = "aclk_vop", "dclk_vop", "hclk_vop";
-+		resets = <&cru SRST_VOP_A>, <&cru SRST_VOP_H>, <&cru SRST_VOP_D>;
-+		reset-names = "axi", "ahb", "dclk";
-+		iommus = <&vop_mmu>;
-+		status = "disabled";
-+
-+		vop_out: port {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			vop_out_hdmi: endpoint at 0 {
-+				reg = <0>;
-+				remote-endpoint = <&hdmi_in_vop>;
-+			};
-+		};
-+	};
-+
- 	vop_mmu: iommu at ff373f00 {
- 		compatible = "rockchip,iommu";
- 		reg = <0x0 0xff373f00 0x0 0x100>;
-@@ -616,6 +643,32 @@
- 		status = "disabled";
- 	};
- 
-+	hdmi: hdmi at ff3c0000 {
-+		compatible = "rockchip,rk3328-dw-hdmi";
-+		reg = <0x0 0xff3c0000 0x0 0x20000>;
-+		reg-io-width = <4>;
-+		interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru PCLK_HDMI>,
-+			 <&cru SCLK_HDMI_SFC>;
-+		clock-names = "iahb",
-+			      "isfr";
-+		phys = <&hdmiphy>;
-+		phy-names = "hdmi";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&hdmi_cec &hdmii2c_xfer &hdmi_hpd>;
-+		rockchip,grf = <&grf>;
-+		status = "disabled";
-+
-+		ports {
-+			hdmi_in: port {
-+				hdmi_in_vop: endpoint {
-+					remote-endpoint = <&vop_out_hdmi>;
-+				};
-+			};
-+		};
-+	};
-+
- 	hdmiphy: phy at ff430000 {
- 		compatible = "rockchip,rk3328-hdmi-phy";
- 		reg = <0x0 0xff430000 0x0 0x10000>;
--- 
-2.17.0
+>
+>
+>> Suggested-by: Jerome Forissier <jerome.forissier@linaro.org>
+>> Signed-off-by: Victor Chong <victor.chong@linaro.org>
+>> Reviewed-by: Jerome Forissier <jerome.forissier@linaro.org>
+>> ---
+>>  drivers/tee/optee/core.c | 3 +++
+>>  1 file changed, 3 insertions(+)
+>>
+>> diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
+>> index e1aafe842d66..cca5c091e55a 100644
+>> --- a/drivers/tee/optee/core.c
+>> +++ b/drivers/tee/optee/core.c
+>> @@ -631,6 +631,9 @@ static struct optee *optee_probe(struct device_node *np)
+>>
+>>         optee_enable_shm_cache(optee);
+>>
+>> +       if (optee->sec_caps & OPTEE_SMC_SEC_CAP_DYNAMIC_SHM)
+>> +               pr_info("dynamic shared memory is enabled\n");
+>> +
+>>         pr_info("initialized driver\n");
+>>         return optee;
+>>  err:
+>> --
+>> 2.17.1
