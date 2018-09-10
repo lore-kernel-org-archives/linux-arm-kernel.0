@@ -1,66 +1,50 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 10 Sep 2018 15:24:37 +0300
-Subject: omap4: support for manually updated display
-In-Reply-To: <797c13fa-7a5b-a809-7dd0-14b01a3046be@ti.com>
-References: <20180830090456.GA17277@amd>
- <797c13fa-7a5b-a809-7dd0-14b01a3046be@ti.com>
-Message-ID: <3205865.8O8aibZXye@avalon>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 10 Sep 2018 14:34:35 +0200
+Subject: [PATCH v11 03/11] firmware: xilinx: Add zynqmp IOCTL API for
+ device control
+In-Reply-To: <CAOesGMi7Q9L4oZkUubKtV-m8XD67MQ05ZFhPA_0Hwky_qVUxfg@mail.gmail.com>
+References: <1533318808-10781-1-git-send-email-jollys@xilinx.com>
+ <1533318808-10781-4-git-send-email-jollys@xilinx.com>
+ <CAOesGMi7Q9L4oZkUubKtV-m8XD67MQ05ZFhPA_0Hwky_qVUxfg@mail.gmail.com>
+Message-ID: <89a81241-e2c3-9fdf-7436-3d50025cec4d@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 9.9.2018 03:18, Olof Johansson wrote:
+> Hi,
+> 
+> On Fri, Aug 3, 2018 at 10:53 AM, Jolly Shah <jolly.shah@xilinx.com> wrote:
+>> From: Rajan Vaja <rajanv@xilinx.com>
+>>
+>> Add ZynqMP firmware IOCTL API to control and configure
+>> devices like PLLs, SD, Gem, etc.
+>>
+>> Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
+>> Signed-off-by: Jolly Shah <jollys@xilinx.com>
+> 
+> This patch worries me somewhat. It's a transparent pass-through ioctl
+> driver. Is there a spec available for what the implemented IOCTLs are?
 
-On Monday, 10 September 2018 14:59:23 EEST Tomi Valkeinen wrote:
-> Hi Pavel,
-> 
-> (dropping Dave, no need to spam him)
-> 
-> On 30/08/18 12:04, Pavel Machek wrote:
-> > Hi!
-> > 
-> > There's neat series of patches on
-> > 
-> > https://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git/log/
-> > ?h=droid4-pending-v4.19
-> > 
-> > They enable display support for my hardware. As you can imagine,
-> > display is rather important for a cellphone.
-> > 
-> > Tomi, can you take the patches? I can resubmit them in email, or
-> > shuffle them to another branch without mfd changes, or clean them up
-> > etc...
-> 
-> A large omapdrm change set from Laurent was merged into drm-next, and
-> I'm certain they conflict with this series. Laurent also has continued
-> that work, and while those new patches haven't been sent for review yet,
-> I fear they'll also conflict with these.
-> 
-> So in the minimum, a rebase on top of drm-next is needed.
-> 
-> I also continue to be very worried that adding DSI support to omapdrm at
-> this stage will be a huge extra burden for Laurent's work.
-> 
-> We should transform the panel-dsi-cm.c towards the common DRM model.
-> With a quick look, there seems to be a driver for Samsung's S6E63J0X03
-> panel. So possibly all the DSI features are there in the DRM framework,
-> but someone needs to check that and start working on panel-dsi-cm.c so
-> that it's ready when we finally switch to the DRM model.
-> 
-> In my opinion, which I've also expressed before, the above work is much
-> easier to do by first changing the omapdrm to DRM model, without any DSI
-> displays, and then add the DSI command mode support. But if people
-> insist on adding the DSI support already now, I would appreciate the
-> same people working on the DSI support so that Laurent doesn't have to
-> do it all.
+https://www.xilinx.com/support/documentation/user_guides/ug1200-eemi-api.pdf
 
-I want to make it clear that I don't want to claim any privilege in getting 
-patches merged first. I am however worried that, without an easy way to test 
-DSI support, and without enough time to focus on it, I would break whatever 
-would be merged now in future reworks. I would thus like to find out how to 
-collaborate on this task, hopefully to move towards usage of drm_bridge and 
-drm_panel for DSI-based pipelines.
+> 
+> Should some of them be proper drivers instead of an opaque
+> pass-through like this? Could some of them have stability impact on
+> the platform such that there are security concerns and the list of
+> arguments should somehow be sanitized?
 
--- 
-Regards,
+You can look at for example reset driver which is using this eemi interface.
+https://lkml.org/lkml/2018/9/5/144
 
-Laurent Pinchart
+> What's the intended usecase anyway? Just a debug tool during
+> development, or something that you expect heavy use of by some
+> userspace middleware?
+
+I am not an author of this interface but there is no intention to enable
+this interface for userspace as far as I see. All functions should be
+used by kernel drivers only.
+
+Jolly: Please answer all others concern in connection to this patchset.
+
+Thanks,
+Michal
