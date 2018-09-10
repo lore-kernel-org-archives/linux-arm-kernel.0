@@ -1,36 +1,50 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Mon, 10 Sep 2018 13:59:32 +0200
-Subject: [PATCH 2/5] PCI: provide pci_match_id() with CONFIG_PCI=n
+Date: Mon, 10 Sep 2018 13:59:31 +0200
+Subject: [PATCH 1/5] dt-bindings: spi/spi-pxa2xx: add PXA2xx SSP SPI Controller
 In-Reply-To: <20180910115935.163121-1-lkundrak@v3.sk>
 References: <20180910115935.163121-1-lkundrak@v3.sk>
-Message-ID: <20180910115935.163121-3-lkundrak@v3.sk>
+Message-ID: <20180910115935.163121-2-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This spares drivers from #ifdef-ing on CONFIG_PCI if the driver can be
-optionally built on machines without PCI bus.
-
-Consistent with acpi_driver_match_device() and similar.
+This is the SPI controller found on Marvel MMP2 and perhaps more
+platforms.
 
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
 ---
- include/linux/pci.h | 4 ++++
- 1 file changed, 4 insertions(+)
+ .../devicetree/bindings/spi/spi-pxa2xx.txt    | 24 +++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/spi/spi-pxa2xx.txt
 
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index e72ca8dd6241..d2f14eb23ea4 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1702,6 +1702,10 @@ static inline int pci_irqd_intx_xlate(struct irq_domain *d,
- 				      unsigned long *out_hwirq,
- 				      unsigned int *out_type)
- { return -EINVAL; }
+diff --git a/Documentation/devicetree/bindings/spi/spi-pxa2xx.txt b/Documentation/devicetree/bindings/spi/spi-pxa2xx.txt
+new file mode 100644
+index 000000000000..75be87cf9909
+--- /dev/null
++++ b/Documentation/devicetree/bindings/spi/spi-pxa2xx.txt
+@@ -0,0 +1,24 @@
++PXA2xx SSP SPI Controller
 +
-+static inline const struct pci_device_id *pci_match_id(const struct pci_device_id *ids,
-+							 struct pci_dev *dev)
-+{ return NULL; }
- #endif /* CONFIG_PCI */
- 
- /* Include architecture-dependent settings and functions */
++Required properties:
++- compatible: Must be "marvell,mmp2-ssp".
++- reg: Offset and length of the device's register set.
++- interrupts: Should be the interrupt number.
++- clocks: Should contain a single entry describing the clock input.
++- #address-cells:  Number of cells required to define a chip select address.
++- #size-cells: Should be zero.
++
++Optional properties:
++- cs-gpios: list of GPIO chip selects. See the SPI bus bindings,
++  Documentation/devicetree/bindings/spi/spi-bus.txt
++
++Child nodes represent devices on the SPI bus
++  See ../spi/spi-bus.txt
++
++Example:
++	ssp1: ssp at d4035000 {
++		compatible = "marvell,mmp2-ssp";
++		reg = <0xd4035000 0x1000>;
++		clocks = <&soc_clocks MMP2_CLK_SSP0>;
++		interrupts = <0>;
++	};
 -- 
 2.17.1
