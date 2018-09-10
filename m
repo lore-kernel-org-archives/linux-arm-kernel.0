@@ -1,83 +1,115 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Mon, 10 Sep 2018 11:42:40 +0100
-Subject: [PATCH v3 1/9] ARM: signal: copy registers using __copy_to_user()
+Date: Mon, 10 Sep 2018 11:42:42 +0100
+Subject: [PATCH v3 3/9] ARM: vfp: use __copy_to_user() when saving VFP state
 In-Reply-To: <1536576168-40096-1-git-send-email-julien.thierry@arm.com>
 References: <1536576168-40096-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1536576168-40096-2-git-send-email-julien.thierry@arm.com>
+Message-ID: <1536576168-40096-4-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When saving the ARM integer registers, use __copy_to_user() to
-copy them into user signal frame, rather than __put_user_error().
-This has the benefit of disabling/enabling PAN once for the whole copy
+Use __copy_to_user() rather than __put_user_error() for individual
+members when saving VFP state.
+This has the benefit of disabling/enabling PAN once per copied struct
 intead of once per write.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
 ---
- arch/arm/kernel/signal.c | 49 ++++++++++++++++++++++++++----------------------
- 1 file changed, 27 insertions(+), 22 deletions(-)
+ arch/arm/include/asm/thread_info.h |  4 ++--
+ arch/arm/kernel/signal.c           | 13 +++++++------
+ arch/arm/vfp/vfpmodule.c           | 20 ++++++++------------
+ 3 files changed, 17 insertions(+), 20 deletions(-)
 
+diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
+index 9b37b6a..8f55dc5 100644
+--- a/arch/arm/include/asm/thread_info.h
++++ b/arch/arm/include/asm/thread_info.h
+@@ -121,8 +121,8 @@ static inline struct thread_info *current_thread_info(void)
+ struct user_vfp;
+ struct user_vfp_exc;
+ 
+-extern int vfp_preserve_user_clear_hwstate(struct user_vfp __user *,
+-					   struct user_vfp_exc __user *);
++extern int vfp_preserve_user_clear_hwstate(struct user_vfp *,
++					   struct user_vfp_exc *);
+ extern int vfp_restore_user_hwstate(struct user_vfp *,
+ 				    struct user_vfp_exc *);
+ #endif
 diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-index b8f766c..76fe75d 100644
+index 464393d..1e2ecfe 100644
 --- a/arch/arm/kernel/signal.c
 +++ b/arch/arm/kernel/signal.c
-@@ -288,30 +288,35 @@ asmlinkage int sys_rt_sigreturn(struct pt_regs *regs)
- setup_sigframe(struct sigframe __user *sf, struct pt_regs *regs, sigset_t *set)
+@@ -137,17 +137,18 @@ static int restore_iwmmxt_context(char __user **auxp)
+ 
+ static int preserve_vfp_context(struct vfp_sigframe __user *frame)
  {
- 	struct aux_sigframe __user *aux;
-+	struct sigcontext context;
+-	const unsigned long magic = VFP_MAGIC;
+-	const unsigned long size = VFP_STORAGE_SIZE;
++	struct vfp_sigframe kframe;
  	int err = 0;
  
--	__put_user_error(regs->ARM_r0, &sf->uc.uc_mcontext.arm_r0, err);
--	__put_user_error(regs->ARM_r1, &sf->uc.uc_mcontext.arm_r1, err);
--	__put_user_error(regs->ARM_r2, &sf->uc.uc_mcontext.arm_r2, err);
--	__put_user_error(regs->ARM_r3, &sf->uc.uc_mcontext.arm_r3, err);
--	__put_user_error(regs->ARM_r4, &sf->uc.uc_mcontext.arm_r4, err);
--	__put_user_error(regs->ARM_r5, &sf->uc.uc_mcontext.arm_r5, err);
--	__put_user_error(regs->ARM_r6, &sf->uc.uc_mcontext.arm_r6, err);
--	__put_user_error(regs->ARM_r7, &sf->uc.uc_mcontext.arm_r7, err);
--	__put_user_error(regs->ARM_r8, &sf->uc.uc_mcontext.arm_r8, err);
--	__put_user_error(regs->ARM_r9, &sf->uc.uc_mcontext.arm_r9, err);
--	__put_user_error(regs->ARM_r10, &sf->uc.uc_mcontext.arm_r10, err);
--	__put_user_error(regs->ARM_fp, &sf->uc.uc_mcontext.arm_fp, err);
--	__put_user_error(regs->ARM_ip, &sf->uc.uc_mcontext.arm_ip, err);
--	__put_user_error(regs->ARM_sp, &sf->uc.uc_mcontext.arm_sp, err);
--	__put_user_error(regs->ARM_lr, &sf->uc.uc_mcontext.arm_lr, err);
--	__put_user_error(regs->ARM_pc, &sf->uc.uc_mcontext.arm_pc, err);
--	__put_user_error(regs->ARM_cpsr, &sf->uc.uc_mcontext.arm_cpsr, err);
+-	__put_user_error(magic, &frame->magic, err);
+-	__put_user_error(size, &frame->size, err);
++	memset(&kframe, 0, sizeof(kframe));
++	kframe.magic = VFP_MAGIC;
++	kframe.size = VFP_STORAGE_SIZE;
+ 
++	err = vfp_preserve_user_clear_hwstate(&kframe.ufp, &kframe.ufp_exc);
+ 	if (err)
+-		return -EFAULT;
++		return err;
+ 
+-	return vfp_preserve_user_clear_hwstate(&frame->ufp, &frame->ufp_exc);
++	return __copy_to_user(frame, &kframe, sizeof(kframe));
+ }
+ 
+ static int restore_vfp_context(char __user **auxp)
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index dc7e6b5..2b287d0 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -553,12 +553,11 @@ void vfp_flush_hwstate(struct thread_info *thread)
+  * Save the current VFP state into the provided structures and prepare
+  * for entry into a new function (signal handler).
+  */
+-int vfp_preserve_user_clear_hwstate(struct user_vfp __user *ufp,
+-				    struct user_vfp_exc __user *ufp_exc)
++int vfp_preserve_user_clear_hwstate(struct user_vfp *ufp,
++				    struct user_vfp_exc *ufp_exc)
+ {
+ 	struct thread_info *thread = current_thread_info();
+ 	struct vfp_hard_struct *hwstate = &thread->vfpstate.hard;
+-	int err = 0;
+ 
+ 	/* Ensure that the saved hwstate is up-to-date. */
+ 	vfp_sync_hwstate(thread);
+@@ -567,22 +566,19 @@ int vfp_preserve_user_clear_hwstate(struct user_vfp __user *ufp,
+ 	 * Copy the floating point registers. There can be unused
+ 	 * registers see asm/hwcap.h for details.
+ 	 */
+-	err |= __copy_to_user(&ufp->fpregs, &hwstate->fpregs,
+-			      sizeof(hwstate->fpregs));
++	memcpy(&ufp->fpregs, &hwstate->fpregs, sizeof(hwstate->fpregs));
++
+ 	/*
+ 	 * Copy the status and control register.
+ 	 */
+-	__put_user_error(hwstate->fpscr, &ufp->fpscr, err);
++	ufp->fpscr = hwstate->fpscr;
+ 
+ 	/*
+ 	 * Copy the exception registers.
+ 	 */
+-	__put_user_error(hwstate->fpexc, &ufp_exc->fpexc, err);
+-	__put_user_error(hwstate->fpinst, &ufp_exc->fpinst, err);
+-	__put_user_error(hwstate->fpinst2, &ufp_exc->fpinst2, err);
 -
--	__put_user_error(current->thread.trap_no, &sf->uc.uc_mcontext.trap_no, err);
--	__put_user_error(current->thread.error_code, &sf->uc.uc_mcontext.error_code, err);
--	__put_user_error(current->thread.address, &sf->uc.uc_mcontext.fault_address, err);
--	__put_user_error(set->sig[0], &sf->uc.uc_mcontext.oldmask, err);
-+	context = (struct sigcontext) {
-+		.arm_r0        = regs->ARM_r0,
-+		.arm_r1        = regs->ARM_r1,
-+		.arm_r2        = regs->ARM_r2,
-+		.arm_r3        = regs->ARM_r3,
-+		.arm_r4        = regs->ARM_r4,
-+		.arm_r5        = regs->ARM_r5,
-+		.arm_r6        = regs->ARM_r6,
-+		.arm_r7        = regs->ARM_r7,
-+		.arm_r8        = regs->ARM_r8,
-+		.arm_r9        = regs->ARM_r9,
-+		.arm_r10       = regs->ARM_r10,
-+		.arm_fp        = regs->ARM_fp,
-+		.arm_ip        = regs->ARM_ip,
-+		.arm_sp        = regs->ARM_sp,
-+		.arm_lr        = regs->ARM_lr,
-+		.arm_pc        = regs->ARM_pc,
-+		.arm_cpsr      = regs->ARM_cpsr,
-+
-+		.trap_no       = current->thread.trap_no,
-+		.error_code    = current->thread.error_code,
-+		.fault_address = current->thread.address,
-+		.oldmask       = set->sig[0],
-+	};
-+
-+	err |= __copy_to_user(&sf->uc.uc_mcontext, &context, sizeof(context));
+-	if (err)
+-		return -EFAULT;
++	ufp_exc->fpexc = hwstate->fpexc;
++	ufp_exc->fpinst = hwstate->fpinst;
++	ufp_exc->fpinst2 = ufp_exc->fpinst2;
  
- 	err |= __copy_to_user(&sf->uc.uc_sigmask, set, sizeof(*set));
- 
+ 	/* Ensure that VFP is disabled. */
+ 	vfp_flush_hwstate(thread);
 -- 
 1.9.1
