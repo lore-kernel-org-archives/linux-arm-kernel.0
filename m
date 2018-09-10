@@ -1,121 +1,40 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Mon, 10 Sep 2018 09:18:35 +0000
-Subject: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
-In-Reply-To: <AM6PR0402MB391120110A289BA5FB6B9F0DF50C0@AM6PR0402MB3911.eurprd04.prod.outlook.com>
-References: <1533703167-26583-1-git-send-email-Anson.Huang@nxp.com>
- <1533703167-26583-2-git-send-email-Anson.Huang@nxp.com>
- <AM0PR04MB4481FC2BAD71B75D7BE84C0788260@AM0PR04MB4481.eurprd04.prod.outlook.com>
- <DB3PR0402MB3916F8BC381BBA01DB21D1C0F5260@DB3PR0402MB3916.eurprd04.prod.outlook.com>
- <AM0PR04MB44813C7A3E0AF4F3BCFFCF0088390@AM0PR04MB4481.eurprd04.prod.outlook.com>
- <153567894721.93865.4092113232222931488@swboyd.mtv.corp.google.com>
- <a6489bda-703f-207c-0b24-60f4044fe89f@linaro.org>
- <153573827629.93865.6200966443862432044@swboyd.mtv.corp.google.com>
- <AM6PR0402MB391120110A289BA5FB6B9F0DF50C0@AM6PR0402MB3911.eurprd04.prod.outlook.com>
-Message-ID: <DB3PR0402MB391656D3F0C5E7AC1975064CF5050@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Mon, 10 Sep 2018 10:20:09 +0100
+Subject: Fwd: [PATCH] tee: optee: log message if dynamic shm is enabled
+In-Reply-To: <CAHqM-QgH3d3Fz=P-_Gj_ZJODK1YOxT49G=qhzAnM=g2HAYqoow@mail.gmail.com>
+References: <CAHqM-Qgy7zPjrnNm0Xdyz_F_BYbSPgDfQrkv0tGv_rB1G7tSXg@mail.gmail.com>
+ <CAHqM-QgH3d3Fz=P-_Gj_ZJODK1YOxT49G=qhzAnM=g2HAYqoow@mail.gmail.com>
+Message-ID: <20180910092009.y2p5n5owozaz6etw@holly.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gentle Ping...
+On Mon, Sep 10, 2018 at 05:57:28PM +0900, Victor Chong wrote:
 
-Anson Huang
-Best Regards!
+This (empty) patch description seems unusually terse! Surely there
+should be some clues in the description about why this messages
+deserves user/dev/admin attention...
 
 
-> -----Original Message-----
-> From: Anson Huang
-> Sent: Monday, September 3, 2018 3:21 PM
-> To: Stephen Boyd <sboyd@kernel.org>; kernel at pengutronix.de;
-> linux-arm-kernel at lists.infradead.org; linux-clk at vger.kernel.org;
-> linux-kernel at vger.kernel.org; mturquette at baylibre.com;
-> s.hauer at pengutronix.de; shawnguo at kernel.org; Fabio Estevam
-> <fabio.estevam@nxp.com>; Jerome Forissier <jerome.forissier@linaro.org>;
-> Peng Fan <peng.fan@nxp.com>; Rob Herring <robh@kernel.org>
-> Cc: dl-linux-imx <linux-imx@nxp.com>
-> Subject: RE: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
+> Suggested-by: Jerome Forissier <jerome.forissier@linaro.org>
+> Signed-off-by: Victor Chong <victor.chong@linaro.org>
+> Reviewed-by: Jerome Forissier <jerome.forissier@linaro.org>
+> ---
+>  drivers/tee/optee/core.c | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
+> diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
+> index e1aafe842d66..cca5c091e55a 100644
+> --- a/drivers/tee/optee/core.c
+> +++ b/drivers/tee/optee/core.c
+> @@ -631,6 +631,9 @@ static struct optee *optee_probe(struct device_node *np)
 > 
+>         optee_enable_shm_cache(optee);
 > 
-> Anson Huang
-> Best Regards!
-> 
-> 
-> > -----Original Message-----
-> > From: Stephen Boyd <sboyd@kernel.org>
-> > Sent: Saturday, September 1, 2018 1:58 AM
-> > To: kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org;
-> > linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org;
-> > mturquette at baylibre.com; s.hauer at pengutronix.de;
-> shawnguo at kernel.org;
-> > Anson Huang <anson.huang@nxp.com>; Fabio Estevam
-> > <fabio.estevam@nxp.com>; Jerome Forissier
-> > <jerome.forissier@linaro.org>; Peng Fan <peng.fan@nxp.com>; Rob
-> > Herring <robh@kernel.org>
-> > Cc: dl-linux-imx <linux-imx@nxp.com>
-> > Subject: Re: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on array
-> >
-> > Quoting Jerome Forissier (2018-08-31 01:01:44)
-> > >
-> > >
-> > > On 08/31/2018 03:29 AM, Stephen Boyd wrote:
-> > > > Quoting Peng Fan (2018-08-12 18:15:41)
-> > > >> Hi Anson,
-> > > >>
-> > > >>>>> -----Original Message-----
-> > > >>>>> From: Anson Huang
-> > > >>>>> Sent: 2018?8?8? 12:39
-> > > >>>>> To: shawnguo at kernel.org; s.hauer at pengutronix.de;
-> > > >>>>> kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>;
-> > > >>>>> mturquette at baylibre.com; sboyd at kernel.org;
-> > > >>>>> linux-arm-kernel at lists.infradead.org;
-> > > >>>>> linux-clk at vger.kernel.org; linux-kernel at vger.kernel.org
-> > > >>>>> Cc: dl-linux-imx <linux-imx@nxp.com>
-> > > >>>>> Subject: [PATCH 2/2] clk: imx: imx7d: remove clks_init_on
-> > > >>>>> array
-> > > >>>>>
-> > > >>>>> Clock framework will enable those clocks registered with
-> > > >>>>> CLK_IS_CRITICAL flag, so no need to have clks_init_on array
-> > > >>>>> during clock
-> > > >>>> initialization now.
-> > > >>>>
-> > > >>>> Will it be more flexible to parse dts saying "critical-clocks = <xxx>"
-> > > >>>> or "init-on-arrary=<xxx>"
-> > > >>>> and enable those clocks?
-> > > >>>
-> > > >>> Parsing the clocks arrays from dtb is another way of enabling
-> > > >>> critical clocks, but for current i.MX6/7 platforms, we implement
-> > > >>> it in same way as most of other SoCs, currently I did NOT see
-> > > >>> any necessity of putting them in dtb, just adding flag during
-> > > >>> clock registering is more simple, if there is any special
-> > > >>> requirement for different clocks set to be enabled, then we can
-> > > >>> add support to enable
-> > the method of parsing critical-clocks from dtb. Just my two cents.
-> > > >>
-> > > >> Thinking about OP-TEE want to use one device, but it's clocks are
-> > > >> registered by Linux, because there is no module in Linux side use
-> > > >> it, it will shutdown the clock, which cause OP-TEE could not
-> > > >> access the
-> > device.
-> > > >>
-> > > >> Then people have to modify clk code to add CLK_IS_CRITICAL flag
-> > > >> to make sure the clocks are not shutdown by Linux.
-> > > >>
-> > > >> However adding a new property in clk node and let driver code
-> > > >> parse the dts, there is no need to modify clk driver code when
-> > > >> OP-TEE needs
-> > another device clock.
-> > > >>
-> > > >
-> > > > If OP-TEE needs linux to keep things on then why can't the OP-TEE
-> > > > driver in Linux probe, acquire clocks, and keep the clks enabled forever?
-> > >
-> > > Sounds reasonable, but how could this be done without introducing
-> > > platform-specific stuff in the OP-TEE driver?
-> > >
-> >
-> > Why is that a goal?
-> 
-> I do NOT think we should consider such case in this patch series, whatever
-> OP-TEE needs for its own feature, it should do necessary operations either in its
-> driver or somewhere else by adding new patch.
-> 
-> Anson.
+> +       if (optee->sec_caps & OPTEE_SMC_SEC_CAP_DYNAMIC_SHM)
+> +               pr_info("dynamic shared memory is enabled\n");
+> +
+>         pr_info("initialized driver\n");
+>         return optee;
+>  err:
+> --
+> 2.17.1
