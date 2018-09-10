@@ -1,31 +1,39 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 10 Sep 2018 08:55:12 -0500
-Subject: [PATCH] irqchip: Convert to using %pOFn instead of
- device_node.name
-In-Reply-To: <alpine.DEB.2.21.1809081414150.1402@nanos.tec.linutronix.de>
-References: <20180828015252.28511-1-robh@kernel.org>
- <20180828015252.28511-24-robh@kernel.org>
- <alpine.DEB.2.21.1809081414150.1402@nanos.tec.linutronix.de>
-Message-ID: <CAL_JsqJVbc4ecRfSp4=crH0Ci9duP-2_mZmKW-5NW-zZv4QwQw@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 10 Sep 2018 15:57:31 +0200
+Subject: [PATCH] arm64: dts: rockchip: add i2s and spdif endpoint of rk3328
+In-Reply-To: <20180906163956.20667-1-katsuhiro@katsuster.net>
+References: <20180906163956.20667-1-katsuhiro@katsuster.net>
+Message-ID: <2729174.Cl53sqNc79@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 8, 2018 at 7:15 AM Thomas Gleixner <tglx@linutronix.de> wrote:
->
-> On Mon, 27 Aug 2018, Rob Herring wrote:
->
-> > In preparation to remove the node name pointer from struct device_node,
-> > convert printf users to use the %pOFn format specifier.
-> >
-> > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > Cc: Jason Cooper <jason@lakedaemon.net>
-> > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Signed-off-by: Rob Herring <robh@kernel.org>
->
-> Should I take it or do you want to take it with others? If the latter,
-> acked-by-me.
+Hi,
 
-Please take it. There's no dependency.
+Am Donnerstag, 6. September 2018, 18:39:56 CEST schrieb Katsuhiro Suzuki:
+> This patch adds port and endpoint of i2s and spdif nodes for rk3328.
+> Because to use modern sound card interface such as audio-graph-card.
+> 
+> Signed-off-by: Katsuhiro Suzuki <katsuhiro@katsuster.net>
+> ---
+>  arch/arm64/boot/dts/rockchip/rk3328.dtsi | 24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+> index d3ef6566325e..41f0a20b73ed 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+> @@ -179,7 +179,13 @@
+>  		clock-names = "i2s_clk", "i2s_hclk";
+>  		dmas = <&dmac 11>, <&dmac 12>;
+>  		dma-names = "tx", "rx";
+> +		#sound-dai-cells = <0>;
+>  		status = "disabled";
+> +
+> +		i2s0_p0: port at 0 {
 
-Rob
+there is only one port per device, so this should probably be
+	i2s0_p0: port {
+without the address. Same for all others.
+The of-graph framework should work just fine then as well.
+
+Heiko
