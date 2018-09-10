@@ -1,75 +1,55 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Mon, 10 Sep 2018 09:04:47 +0100
-Subject: [PATCH v2 4/9] ARM: oabi-compat: copy oabi events using
- __copy_to_user()
-In-Reply-To: <20180906170417.GT30658@n2100.armlinux.org.uk>
-References: <1536251888-8302-1-git-send-email-julien.thierry@arm.com>
- <1536251888-8302-5-git-send-email-julien.thierry@arm.com>
- <20180906170417.GT30658@n2100.armlinux.org.uk>
-Message-ID: <e69c823e-282e-d44d-df03-a0a0377df138@arm.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Mon, 10 Sep 2018 09:09:20 +0100
+Subject: [PATCH v2 01/16] nvmem: remove unused APIs
+In-Reply-To: <CAMRc=MfO01EQAfY4Uu3UwzzvhVOMF7_BpCOPVz2yVXqDgpb0AA@mail.gmail.com>
+References: <20180907100750.14564-1-brgl@bgdev.pl>
+ <20180907100750.14564-2-brgl@bgdev.pl>
+ <c0b0c411-65f6-62f9-6d6d-2884e5a17250@linaro.org>
+ <CAMRc=MfO01EQAfY4Uu3UwzzvhVOMF7_BpCOPVz2yVXqDgpb0AA@mail.gmail.com>
+Message-ID: <7e138142-8161-3646-4daf-619995baf395@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
 
-On 06/09/18 18:04, Russell King - ARM Linux wrote:
-> On Thu, Sep 06, 2018 at 05:38:03PM +0100, Julien Thierry wrote:
->> @@ -294,11 +294,9 @@ asmlinkage long sys_oabi_epoll_wait(int epfd,
->>   	ret = sys_epoll_wait(epfd, kbuf, maxevents, timeout);
->>   	set_fs(fs);
->>   	err = 0;
->> -	for (i = 0; i < ret; i++) {
->> -		__put_user_error(kbuf[i].events, &events->events, err);
->> -		__put_user_error(kbuf[i].data,   &events->data,   err);
->> -		events++;
->> -	}
->> +	if (ret > 0)
->> +		err = __copy_to_user(events, kbuf, ret * sizeof(*kbuf));
->> +
-> 
-> It's not that simple!
-> 
-> kbuf is of type "struct epoll_event" whereas events is of type
-> "struct oabi_epoll_event".  They have different layouts - if they
-> were the same, we wouldn't need the OABI shim.
-> 
 
-Right, I completely missed the type mismatch... sorry.
+On 10/09/18 08:58, Bartosz Golaszewski wrote:
+> 2018-09-10 9:32 GMT+02:00 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>:
+>>
+>>
+>> On 07/09/18 11:07, Bartosz Golaszewski wrote:
+>>>
+>>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>>
+>>> Remove all APIs dealing with nvmem_cell_info. There are no users and
+>>> this part of the subsystem will be reworked.
+>>>
+>>> This patch temprarily disables support for non-DT users.
+>>>
+>>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>> ---
+>>>    drivers/nvmem/core.c           | 212 ++-------------------------------
+>>>    include/linux/nvmem-consumer.h |  26 ----
+>>>    include/linux/nvmem-provider.h |  13 --
+>>>    3 files changed, 12 insertions(+), 239 deletions(-)
+>>
+>>
+>> This looks totally un-necessary, Other patches in this series adds them
+>> back.. Consider updating these in those respective patches.!
+>>
+> 
+> While this may not be entirely necessary, it's very useful. There's
+Yes, thats exactly what am saying if it not necessary please do not do it.
 
-I'll fix this.
+> almost nothing common between this API and the new one added later in
+There is more than 60%-70% of the code reused in new patches, which is 
+unnecessary churn to me!
 
-Thanks,
+> this series. Later patches are MUCH cleaner thanks to this removal and
+> I believe it makes them easier for review.
+Am not sure about that, it definitely did not help me!
 
-> struct oabi_epoll_event {
->          __u32 events;
->          __u64 data;
-> } __attribute__ ((packed,aligned(4)));
+--srini
 > 
-> vs
+> Best regards,
+> Bart
 > 
-> struct epoll_event {
->          __poll_t events;
->          __u64 data;
-> };
-> 
-> which results in EABI sizeof(struct epoll_event) being 16 and 12 on
-> OABI.  What's more is that 'data' is at offset 4 in OABI, or 8 in
-> EABI.
-> 
-> So, what I think needs to happen is that we need to do something
-> like:
-> 
-> 	struct oabi_epoll_event e;
-> 
-> 	for (i = 0; i < ret; i++) {
-> 		e.events = kbuf[i].events;
-> 		e.data = kbuf[i].data;
-> 		err = __copy_to_user(events, e, sizeof(e))
-> 		if (err)
-> 			break;
-> 		events++;
-> 	}
-> 
-
--- 
-Julien Thierry
