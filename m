@@ -1,62 +1,101 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Mon, 10 Sep 2018 14:18:20 +0200
-Subject: [PATCH v2 01/16] nvmem: remove unused APIs
-In-Reply-To: <ec2ba4af-46cf-2025-1670-cbed366d0f15@linaro.org>
-References: <20180907100750.14564-1-brgl@bgdev.pl>
- <20180907100750.14564-2-brgl@bgdev.pl>
- <c0b0c411-65f6-62f9-6d6d-2884e5a17250@linaro.org>
- <CAMRc=MfO01EQAfY4Uu3UwzzvhVOMF7_BpCOPVz2yVXqDgpb0AA@mail.gmail.com>
- <7e138142-8161-3646-4daf-619995baf395@linaro.org>
- <CAMRc=Mduu4CmLX5DFtJd8NSbzs5g65U9AmM=rbscit0JyQKVAQ@mail.gmail.com>
- <3dbd65e5-c948-a784-0362-930fc41b840e@linaro.org>
- <CAMRc=Mck=rAJ6jbm57ZecJWNvOYR5pjLy0JnyxFzA8kFvoK7Ew@mail.gmail.com>
- <ec2ba4af-46cf-2025-1670-cbed366d0f15@linaro.org>
-Message-ID: <20180910141820.6c715895@bbrezillon>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 10 Sep 2018 14:20:12 +0200
+Subject: [GIT PULL] arm64: zynqmp: Xilinx SoC changes for v4.20
+In-Reply-To: <CAOesGMjh-Chhncw3cYaCvFpfhtOSz8hprC0xARmVXe8i4mvxHw@mail.gmail.com>
+References: <5e9c248d-c19c-1881-f406-d7bfd38ec479@xilinx.com>
+ <CAOesGMjh-Chhncw3cYaCvFpfhtOSz8hprC0xARmVXe8i4mvxHw@mail.gmail.com>
+Message-ID: <b0df50fb-3889-a3dd-c92f-7877e287f5be@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinivas,
-
-On Mon, 10 Sep 2018 12:47:19 +0100
-Srinivas Kandagatla <srinivas.kandagatla@linaro.org> wrote:
-
-> On 10/09/18 12:31, Bartosz Golaszewski wrote:
-> > About that: there are no users of nvmem_device_cell_read/write()
-> > currently and with the new API I'm not sure this is still needed. Are
-> > you alright with removing those two?  
+On 9.9.2018 03:21, Olof Johansson wrote:
+> Hi Michal,
 > 
-> Why do you want to remove them? Other than reason of no users.
+> On Fri, Sep 7, 2018 at 12:57 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+>> Hi,
+>>
+>> please pull the following firmware interface to your tree.
+>>
+>> Thanks,
+>> Michal
+>>
+>>
+>> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+>>
+>>   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   https://github.com/Xilinx/linux-xlnx.git tags/zynqmp-soc-for-v4.20
+>>
+>> for you to fetch changes up to bca7067d2d4e91f58162b07d73cd94e20437b4f6:
+>>
+>>   firmware: xilinx: Add debugfs for query data API (2018-09-07 09:44:44
+>> +0200)
+>>
+>> ----------------------------------------------------------------
+>> arm64: zynqmp: SoC changes for v4.20
+>>
+>> - Adding firmware API for SoC with debugfs interface
+> 
+> This is a bit terse. Jolly has been good at writing cover letters, you
+> could have stolen the writeup from there. :)
 
-I'm just sharing my (and probably other maintainers/developers) PoV
-here, so please don't take this as an attempt to force you to change
-your mind, but rather an attempt at explaining why APIs usually stay
-private when they have no users.
-
-Kernel maintainers tend to reject APIs that have no users because
-adding something that nobody needs yet is hard to get right. I mean,
-you can design an API on what you think will be needed/appropriate, and
-then, when people actually start needing this feature, they realize it
-does not quite match what they need, and they have to adjust/rework
-this API.
+Isn't it one line which is ending up in summary log?
 
 > 
-> All it boils down to if we support device based apis using cell info or 
-> not?
+> I posted two comments on the patches -- one is a nit that can be
+> followed up on with an incremental patch.
+>
+> I'm more worried about the ioctl interface though, and what it opens
+> up. Maybe it's been discussed in the time the set has been reviewed, I
+> didn't search extensively for the history. If it had been, bringing
+> explanations into the patch description would have been nice for new
+> readers such as myself. And if it hasn't, well, let's talk about it.
 
-But it looks like nobody is actually using it, and the first potential
-user (Bart) proposed a different approach with the nvmem cell table
-declaration.
+Anyway here is the full spec.
+https://www.xilinx.com/support/documentation/user_guides/ug1200-eemi-api.pdf
 
-> IMO, I see no harm in leaving these apis as it is, unless there is a 
-> strong reason to do so.
+I don't know all the details that's why please (Jolly) correct me if I
+am wrong.
+PMUFW which is microblaze running firmware was providing read/write
+interface which was checking ranges for accesses. One of that
+functionality was for example clock/pin muxing and others. This was done
+before any SCMI spec was created because Xilinx needs to deal with
+problems how to handle these interfaces.
+At that time non secure OS(linux) was owner of all these subsystems.
+Over the time it was clear that non secure SW shouldn't have such a big
+control over SoC because on this heterogeneous chip it is not covering
+all possible use cases.
+Based on this new EEMI spec was created to move a lot of functionality
+from non secure sw with also improve security of the system. IIRC at
+that time SCMI wasn't released that's why we were lacking any standard
+interface which we could use directly.
 
-It's harmless, but it's also unused. If people start using it and you
-realize the API is not working for some use cases, then you'll have to
-patch all existing users.
+We are also communicating with Arm about SCMI extension but still there
+are missing gaps which are not addressed and it will take a lot of time
+to have everything there.
 
-All this being said, it's your call to make, and if you think it makes
-sense to keep these functions around for any reason, then be it.
+I can copy here Jolly's description but these patches are adding
+communication layer/interface which provide API for clock, reset, pin
+control, secure, serdes, fpga and chip detection to communicate with
+PMUFW via ATF by using SMC instructions and then communication interface
+setup between A53 and Microblaze.
 
-Regards,
+Arm trusted firmware already contains this interface
+https://github.com/ARM-software/arm-trusted-firmware/tree/master/plat/xilinx/zynqmp/pm_service
 
-Boris
+The v11 contained 11 patches and I have taken first 8 because clock part
+is not reviewed by Stephen yet.
+Other drivers (fpga, phy/serdes, reset) are sent as RFCs but needs this
+firmware interface to have basic stuff up and running before extension.
+
+> 
+> Not merging based on the above. Hopefully it's something we can
+> straighten out pretty quickly.
+
+Please ask more question if something is unclear and I believe that
+Jolly is happy to answer them as quickly as possible.
+
+Thanks,
+Michal
