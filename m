@@ -1,192 +1,122 @@
-From: jonas@kwiboo.se (Jonas Karlman)
-Date: Mon, 10 Sep 2018 15:15:46 +0000
-Subject: [PATCH v4 6/6] drm/rockchip: dw_hdmi: add dw-hdmi support for the
- rk3328
-In-Reply-To: <20180910092223.1106-7-heiko@sntech.de>
-References: <20180910092223.1106-1-heiko@sntech.de>
- <20180910092223.1106-7-heiko@sntech.de>
-Message-ID: <AM0PR03MB46769977FF55C3AC6F65E001AC050@AM0PR03MB4676.eurprd03.prod.outlook.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Mon, 10 Sep 2018 17:16:25 +0200
+Subject: [PATCH v2 17/40] iommu/arm-smmu-v3: Link domains and devices
+In-Reply-To: <20180511190641.23008-18-jean-philippe.brucker@arm.com>
+References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
+ <20180511190641.23008-18-jean-philippe.brucker@arm.com>
+Message-ID: <b4154adb-313c-133b-6c5d-6e789bd754c7@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+Hi Jean-Philippe,
 
-CEC is not working when CEC 5V is enabled
-
-On 2018-09-10 11:22, Heiko Stuebner wrote:
-
-> The rk3328 uses a dw-hdmi controller with an external hdmi phy from
-> Innosilicon which uses the generic phy framework for access.
-> Add the necessary data and the compatible for the rk3328 to the
-> rockchip dw-hdmi driver.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> Tested-by: Robin Murphy <robin.murphy@arm.com>
-> Acked-by: Rob Herring <robh@kernel.org>
->
-> changes in v3:
-> - reword as suggested by Rob to show that it's a dw-hdmi + Inno phy
+On 05/11/2018 09:06 PM, Jean-Philippe Brucker wrote:
+> When removing a mapping from a domain, we need to send an invalidation to
+> all devices that might have stored it in their Address Translation Cache
+> (ATC). In addition when updating the context descriptor of a live domain,
+> we'll need to send invalidations for all devices attached to it.
+> 
+> Maintain a list of devices in each domain, protected by a spinlock. It is
+> updated every time we attach or detach devices to and from domains.
+> 
+> It needs to be a spinlock because we'll invalidate ATC entries from
+> within hardirq-safe contexts, but it may be possible to relax the read
+> side with RCU later.
+> 
+> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 > ---
->  .../display/rockchip/dw_hdmi-rockchip.txt     |   1 +
->  drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c   | 106 ++++++++++++++++++
->  2 files changed, 107 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-> index 937bfb472e1d..39143424a474 100644
-> --- a/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-> +++ b/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-> @@ -13,6 +13,7 @@ Required properties:
->  
->  - compatible: should be one of the following:
->  		"rockchip,rk3288-dw-hdmi"
-> +		"rockchip,rk3328-dw-hdmi"
->  		"rockchip,rk3399-dw-hdmi"
->  - reg: See dw_hdmi.txt.
->  - reg-io-width: See dw_hdmi.txt. Shall be 4.
-> diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-> index 19f002fa0a09..237f31fd8403 100644
-> --- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-> +++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-> @@ -25,6 +25,24 @@
->  
->  #define RK3288_GRF_SOC_CON6		0x025C
->  #define RK3288_HDMI_LCDC_SEL		BIT(4)
-> +#define RK3328_GRF_SOC_CON2		0x0408
+>  drivers/iommu/arm-smmu-v3.c | 28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+> 
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 1d647104bccc..c892f012fb43 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -595,6 +595,11 @@ struct arm_smmu_device {
+>  struct arm_smmu_master_data {
+>  	struct arm_smmu_device		*smmu;
+>  	struct arm_smmu_strtab_ent	ste;
 > +
-> +#define RK3328_HDMI_SDAIN_MSK		BIT(11)
-> +#define RK3328_HDMI_SCLIN_MSK		BIT(10)
-> +#define RK3328_HDMI_HPD_IOE		BIT(2)
-> +#define RK3328_GRF_SOC_CON3		0x040c
-> +/* need to be unset if hdmi or i2c should control voltage */
-> +#define RK3328_HDMI_SDA5V_GRF		BIT(15)
-> +#define RK3328_HDMI_SCL5V_GRF		BIT(14)
-> +#define RK3328_HDMI_HPD5V_GRF		BIT(13)
-> +#define RK3328_HDMI_CEC5V_GRF		BIT(12)
-> +#define RK3328_GRF_SOC_CON4		0x0410
-> +#define RK3328_HDMI_HPD_SARADC		BIT(13)
-> +#define RK3328_HDMI_CEC_5V		BIT(11)
-> +#define RK3328_HDMI_SDA_5V		BIT(10)
-> +#define RK3328_HDMI_SCL_5V		BIT(9)
-> +#define RK3328_HDMI_HPD_5V		BIT(8)
+> +	struct arm_smmu_domain		*domain;
+> +	struct list_head		list; /* domain->devices */
 > +
->  #define RK3399_GRF_SOC_CON20		0x6250
->  #define RK3399_HDMI_LCDC_SEL		BIT(6)
->  
-> @@ -292,6 +310,68 @@ static const struct drm_encoder_helper_funcs dw_hdmi_rockchip_encoder_helper_fun
->  	.atomic_check = dw_hdmi_rockchip_encoder_atomic_check,
+> +	struct device			*dev;
+This field addition and associated assignment in arm_smmu_attach_dev()
+is not really documented in the commit message.
+
 >  };
 >  
-> +static int dw_hdmi_rockchip_genphy_init(struct dw_hdmi *dw_hdmi, void *data,
-> +			     struct drm_display_mode *mode)
-> +{
-> +	struct rockchip_hdmi *hdmi = (struct rockchip_hdmi *)data;
+>  /* SMMU private data for an IOMMU domain */
+> @@ -618,6 +623,9 @@ struct arm_smmu_domain {
+>  	};
+>  
+>  	struct iommu_domain		domain;
 > +
-> +	return phy_power_on(hdmi->phy);
-> +}
-> +
-> +static void dw_hdmi_rockchip_genphy_disable(struct dw_hdmi *dw_hdmi, void *data)
-> +{
-> +	struct rockchip_hdmi *hdmi = (struct rockchip_hdmi *)data;
-> +
-> +	phy_power_off(hdmi->phy);
-> +}
-> +
-> +static enum drm_connector_status
-> +dw_hdmi_rk3328_read_hpd(struct dw_hdmi *dw_hdmi, void *data)
-> +{
-> +	struct rockchip_hdmi *hdmi = (struct rockchip_hdmi *)data;
-> +	enum drm_connector_status status;
-> +
-> +	status = dw_hdmi_phy_read_hpd(dw_hdmi, data);
-> +
-> +	if (status == connector_status_connected)
-> +		regmap_write(hdmi->regmap,
-> +			RK3328_GRF_SOC_CON4,
-> +			HIWORD_UPDATE(RK3328_HDMI_CEC_5V | RK3328_HDMI_SDA_5V |
-> +				      RK3328_HDMI_SCL_5V,
-> +				      RK3328_HDMI_CEC_5V | RK3328_HDMI_SDA_5V |
-> +				      RK3328_HDMI_SCL_5V));
-
-This differs from BSP kernel and enable of CEC 5V stops CEC from working.
-BSP kernel do not set write enable bit for CEC 5V:
-
-RK3328_IO_5V_DOMAIN ((7 << 9) | (3 << (9 + 16)))
-
-https://github.com/Kwiboo/linux-rockchip/commit/e74ac6a3a581bcb7b2ac9f4d70cf7298df01e417 makes CEC work on v3 of this patch.
-
-> +	else
-> +		regmap_write(hdmi->regmap,
-> +			RK3328_GRF_SOC_CON4,
-> +			HIWORD_UPDATE(0,
-> +				      RK3328_HDMI_CEC_5V | RK3328_HDMI_SDA_5V |
-> +				      RK3328_HDMI_SCL_5V));
-> +	return status;
-> +}
-> +
-> +static void dw_hdmi_rk3328_setup_hpd(struct dw_hdmi *dw_hdmi, void *data)
-> +{
-> +	struct rockchip_hdmi *hdmi = (struct rockchip_hdmi *)data;
-> +
-> +	dw_hdmi_phy_setup_hpd(dw_hdmi, data);
-> +
-> +	/* Enable and map pins to 3V grf-controlled io-voltage */
-> +	regmap_write(hdmi->regmap,
-> +		RK3328_GRF_SOC_CON4,
-> +		HIWORD_UPDATE(0, RK3328_HDMI_HPD_SARADC | RK3328_HDMI_CEC_5V |
-> +				 RK3328_HDMI_SDA_5V | RK3328_HDMI_SCL_5V |
-> +				 RK3328_HDMI_HPD_5V));
-> +	regmap_write(hdmi->regmap,
-> +		RK3328_GRF_SOC_CON3,
-> +		HIWORD_UPDATE(0, RK3328_HDMI_SDA5V_GRF | RK3328_HDMI_SCL5V_GRF |
-> +				 RK3328_HDMI_HPD5V_GRF | RK3328_HDMI_CEC5V_GRF));
-> +	regmap_write(hdmi->regmap,
-> +		RK3328_GRF_SOC_CON2,
-> +		HIWORD_UPDATE(RK3328_HDMI_SDAIN_MSK | RK3328_HDMI_SCLIN_MSK,
-> +			      RK3328_HDMI_SDAIN_MSK | RK3328_HDMI_SCLIN_MSK |
-> +			      RK3328_HDMI_HPD_IOE));
-> +}
-> +
->  static struct rockchip_hdmi_chip_data rk3288_chip_data = {
->  	.lcdsel_grf_reg = RK3288_GRF_SOC_CON6,
->  	.lcdsel_big = HIWORD_UPDATE(0, RK3288_HDMI_LCDC_SEL),
-> @@ -306,6 +386,29 @@ static const struct dw_hdmi_plat_data rk3288_hdmi_drv_data = {
->  	.phy_data = &rk3288_chip_data,
+> +	struct list_head		devices;
+> +	spinlock_t			devices_lock;
 >  };
 >  
-> +static const struct dw_hdmi_phy_ops rk3328_hdmi_phy_ops = {
-> +	.init		= dw_hdmi_rockchip_genphy_init,
-> +	.disable	= dw_hdmi_rockchip_genphy_disable,
-> +	.read_hpd	= dw_hdmi_rk3328_read_hpd,
-> +	.update_hpd	= dw_hdmi_phy_update_hpd,
-> +	.setup_hpd	= dw_hdmi_rk3328_setup_hpd,
-> +};
+>  struct arm_smmu_option_prop {
+> @@ -1470,6 +1478,9 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
+>  	}
+>  
+>  	mutex_init(&smmu_domain->init_mutex);
+> +	INIT_LIST_HEAD(&smmu_domain->devices);
+> +	spin_lock_init(&smmu_domain->devices_lock);
 > +
-> +static struct rockchip_hdmi_chip_data rk3328_chip_data = {
-> +	.lcdsel_grf_reg = -1,
-> +};
+>  	return &smmu_domain->domain;
+>  }
+>  
+> @@ -1685,7 +1696,17 @@ static void arm_smmu_install_ste_for_dev(struct iommu_fwspec *fwspec)
+>  
+>  static void arm_smmu_detach_dev(struct device *dev)
+>  {
+> +	unsigned long flags;
+>  	struct arm_smmu_master_data *master = dev->iommu_fwspec->iommu_priv;
+> +	struct arm_smmu_domain *smmu_domain = master->domain;
 > +
-> +static const struct dw_hdmi_plat_data rk3328_hdmi_drv_data = {
-> +	.mode_valid = dw_hdmi_rockchip_mode_valid,
-> +	.mpll_cfg = rockchip_mpll_cfg,
-> +	.cur_ctr = rockchip_cur_ctr,
-> +	.phy_config = rockchip_phy_config,
-> +	.phy_data = &rk3328_chip_data,
-> +	.phy_ops = &rk3328_hdmi_phy_ops,
-> +	.phy_name = "inno_dw_hdmi_phy2",
-> +	.phy_force_vendor = true,
-> +};
+> +	if (smmu_domain) {
+> +		spin_lock_irqsave(&smmu_domain->devices_lock, flags);
+> +		list_del(&master->list);
+> +		spin_unlock_irqrestore(&smmu_domain->devices_lock, flags);
 > +
->  static struct rockchip_hdmi_chip_data rk3399_chip_data = {
->  	.lcdsel_grf_reg = RK3399_GRF_SOC_CON20,
->  	.lcdsel_big = HIWORD_UPDATE(0, RK3399_HDMI_LCDC_SEL),
-> @@ -324,6 +427,9 @@ static const struct of_device_id dw_hdmi_rockchip_dt_ids[] = {
->  	{ .compatible = "rockchip,rk3288-dw-hdmi",
->  	  .data = &rk3288_hdmi_drv_data
->  	},
-> +	{ .compatible = "rockchip,rk3328-dw-hdmi",
-> +	  .data = &rk3328_hdmi_drv_data
-> +	},
->  	{ .compatible = "rockchip,rk3399-dw-hdmi",
->  	  .data = &rk3399_hdmi_drv_data
->  	},
->
+> +		master->domain = NULL;
+> +	}
+>  
+>  	master->ste.assigned = false;
+>  	arm_smmu_install_ste_for_dev(dev->iommu_fwspec);
+> @@ -1694,6 +1715,7 @@ static void arm_smmu_detach_dev(struct device *dev)
+>  static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+>  {
+>  	int ret = 0;
+> +	unsigned long flags;
+>  	struct arm_smmu_device *smmu;
+>  	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+>  	struct arm_smmu_master_data *master;
+> @@ -1729,6 +1751,11 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+>  	}
+>  
+>  	ste->assigned = true;
+> +	master->domain = smmu_domain;
+> +
+> +	spin_lock_irqsave(&smmu_domain->devices_lock, flags);
+> +	list_add(&master->list, &smmu_domain->devices);
+it is not totally obvious to me why master->domain = smmu_domain isn't
+within the lock either for consistency. Same when deleting the node.
+
+Thanks
+
+Eric
+> +	spin_unlock_irqrestore(&smmu_domain->devices_lock, flags);
+>  
+>  	if (smmu_domain->stage == ARM_SMMU_DOMAIN_BYPASS) {
+>  		ste->s1_cfg = NULL;
+> @@ -1847,6 +1874,7 @@ static int arm_smmu_add_device(struct device *dev)
+>  			return -ENOMEM;
+>  
+>  		master->smmu = smmu;
+> +		master->dev = dev;
+>  		fwspec->iommu_priv = master;
+>  	}
+>  
+> 
