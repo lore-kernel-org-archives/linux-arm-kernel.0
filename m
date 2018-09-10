@@ -1,44 +1,46 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 10 Sep 2018 10:25:08 +0200
-Subject: [PATCH v2 4/4] media: cedrus: Select the sunxi SRAM driver in
- Kconfig
-In-Reply-To: <20180909191015.20902-5-contact@paulk.fr>
-References: <20180909191015.20902-1-contact@paulk.fr>
- <20180909191015.20902-5-contact@paulk.fr>
-Message-ID: <16fd7291-f51b-b0bc-4299-97adbe197e54@xs4all.nl>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 10 Sep 2018 16:30:54 +0800
+Subject: [PATCH RESEND] drivers: soc: Allow building the sunxi driver
+ without ARCH_SUNXI
+In-Reply-To: <20180909190439.20425-1-contact@paulk.fr>
+References: <20180909190439.20425-1-contact@paulk.fr>
+Message-ID: <CAGb2v66=O6E43xKRkSDHm_Un_CEd2NQnNtyAH+C98i7Zyj7zdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/09/2018 09:10 PM, Paul Kocialkowski wrote:
-> Since the sunxi SRAM driver is required to build the Cedrus driver,
-> select it in Kconfig.
-> 
+Hi Hans,
+
+On Mon, Sep 10, 2018 at 3:04 AM Paul Kocialkowski <contact@paulk.fr> wrote:
+>
+> This makes it possible to build the sunxi SRAM driver without building
+> for the sunxi architecture. This allows selecting the driver when
+> building the kernel in testing environments.
+>
+> In particular, this is necessary for testing of the Cedrus driver, that
+> selects the sunxi SRAM driver.
+>
 > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
 > ---
->  drivers/staging/media/sunxi/cedrus/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/staging/media/sunxi/cedrus/Kconfig b/drivers/staging/media/sunxi/cedrus/Kconfig
-> index afd7d7ee0388..3b06283e4bf3 100644
-> --- a/drivers/staging/media/sunxi/cedrus/Kconfig
-> +++ b/drivers/staging/media/sunxi/cedrus/Kconfig
-> @@ -3,6 +3,7 @@ config VIDEO_SUNXI_CEDRUS
->  	depends on VIDEO_DEV && VIDEO_V4L2 && MEDIA_CONTROLLER
->  	depends on HAS_DMA
->  	depends on OF
-> +	select SUNXI_SRAM
->  	select VIDEOBUF2_DMA_CONTIG
->  	select MEDIA_REQUEST_API
+>  drivers/soc/Makefile | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
+> index 113e884697fd..446166ba0bec 100644
+> --- a/drivers/soc/Makefile
+> +++ b/drivers/soc/Makefile
+> @@ -18,7 +18,7 @@ obj-y                         += qcom/
+>  obj-y                          += renesas/
+>  obj-$(CONFIG_ARCH_ROCKCHIP)    += rockchip/
+>  obj-$(CONFIG_SOC_SAMSUNG)      += samsung/
+> -obj-$(CONFIG_ARCH_SUNXI)       += sunxi/
+> +obj-y                          += sunxi/
+>  obj-$(CONFIG_ARCH_TEGRA)       += tegra/
+>  obj-$(CONFIG_SOC_TI)           += ti/
+>  obj-$(CONFIG_ARCH_U8500)       += ux500/
+> --
+> 2.18.0
+>
 
-I noticed this select, but CONFIG_MEDIA_REQUEST_API doesn't exist. It's
-probably from an old version and I have dropped it from the patch that
-added this.
+Do you want us to merge this on an immutable tag for you to pull?
 
-No need for you to do anything.
-
->  	select V4L2_MEM2MEM_DEV
-> 
-
-Regards,
-
-	Hans
+ChenYu
