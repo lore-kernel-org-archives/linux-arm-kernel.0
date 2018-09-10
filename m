@@ -1,74 +1,90 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 10 Sep 2018 16:18:23 +0200
-Subject: [PATCH 03/10] phy: Add MIPI D-PHY configuration options
-In-Reply-To: <4247225.jW0mJSbZmP@avalon>
-References: <cover.ee6158898d563fcc01d45c9652501180bccff0f0.1536138624.git-series.maxime.ripard@bootlin.com>
- <11216244.YyI1EIWKhC@avalon> <20180907085623.ltzybsftrw3zmmev@flea>
- <4247225.jW0mJSbZmP@avalon>
-Message-ID: <20180910141823.q43yylpkcq5cls4r@flea>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 10 Sep 2018 15:20:54 +0100
+Subject: [PATCH] arm64: kernel: arch_crash_save_vmcoreinfo() should depend on
+ CONFIG_CRASH_CORE
+Message-ID: <20180910142054.22013-1-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2018 at 05:50:52PM +0300, Laurent Pinchart wrote:
-> On Friday, 7 September 2018 11:56:23 EEST Maxime Ripard wrote:
-> > On Wed, Sep 05, 2018 at 04:43:57PM +0300, Laurent Pinchart wrote:
-> > >> The current set of parameters should cover all the potential users.
-> > >> 
-> > >> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> > >> ---
-> > >> 
-> > >>  include/linux/phy/phy-mipi-dphy.h | 241 ++++++++++++++++++++++++++++++-
-> > >>  include/linux/phy/phy.h           |   6 +-
-> > >>  2 files changed, 247 insertions(+)
-> > >>  create mode 100644 include/linux/phy/phy-mipi-dphy.h
-> > >> 
-> > >> diff --git a/include/linux/phy/phy-mipi-dphy.h
-> > >> b/include/linux/phy/phy-mipi-dphy.h new file mode 100644
-> > >> index 000000000000..792724145290
-> > >> --- /dev/null
-> > >> +++ b/include/linux/phy/phy-mipi-dphy.h
-> > >> @@ -0,0 +1,241 @@
-> > >> +/* SPDX-License-Identifier: GPL-2.0 */
-> > >> +/*
-> > >> + * Copyright (C) 2018 Cadence Design Systems Inc.
-> > >> + */
-> > >> +
-> > >> +#ifndef __PHY_MIPI_DPHY_H_
-> > >> +#define __PHY_MIPI_DPHY_H_
-> > >> +
-> > >> +#include <video/videomode.h>
-> > >> +
-> > >> +/**
-> > >> + * struct phy_configure_opts_mipi_dphy - MIPI D-PHY configuration set
-> > >> + *
-> > >> + * This structure is used to represent the configuration state of a
-> > >> + * MIPI D-PHY phy.
-> > > 
-> > > Shouldn't we split the RX and TX parameters in two structures ?
-> > 
-> > Are they different? As far as I understood it, both were having the
-> > same parameters.
-> 
-> clk_miss, for instance, is a receiver parameter, while clk_post is a 
-> transmitter parameter. There are relationships between the transmitter and 
-> receiver parameters in the sense that they have to be compatible, and we may 
-> want to compute one set of parameters based on the other one, but I think they 
-> target RX and TX separately.
+Since commit 23c85094fe18 ("proc/kcore: add vmcoreinfo note to /proc/kcore")
+the kernel has exported the vmcoreinfo PT_NOTE on /proc/kcore as well
+as /proc/vmcore.
 
-That would require however to have to fill a structure in the consumer
-whose sole purpose would be to validate things in the phy
-framework. That looks quite weird from an API point-of-view.
+arm64 only exposes it's additional arch information via
+arch_crash_save_vmcoreinfo() if built with CONFIG_KEXEC, as kdump was
+previously the only user of vmcoreinfo.
 
-Maxime
+Move this weak function to a separate file that is built at the same
+time as its caller in kernel/crash_core.c. This ensures values like
+'kimage_voffset' are always present in the vmcoreinfo PT_NOTE.
 
+CC: AKASHI Takahiro <takahiro.akashi@linaro.org>
+CC: Bhupesh Sharma <bhsharma@redhat.com>
+Signed-off-by: James Morse <james.morse@arm.com>
+---
+Intended as a fix for v4.19.
+
+ arch/arm64/kernel/Makefile        |  1 +
+ arch/arm64/kernel/crash_core.c    | 19 +++++++++++++++++++
+ arch/arm64/kernel/machine_kexec.c | 11 -----------
+ 3 files changed, 20 insertions(+), 11 deletions(-)
+ create mode 100644 arch/arm64/kernel/crash_core.c
+
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 95ac7374d723..4c8b13bede80 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -54,6 +54,7 @@ arm64-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o	\
+ arm64-obj-$(CONFIG_ARM64_RELOC_TEST)	+= arm64-reloc-test.o
+ arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
+ arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
++arm64-obj-$(CONFIG_CRASH_CORE)		+= crash_core.o
+ arm64-obj-$(CONFIG_ARM_SDE_INTERFACE)	+= sdei.o
+ arm64-obj-$(CONFIG_ARM64_SSBD)		+= ssbd.o
+ 
+diff --git a/arch/arm64/kernel/crash_core.c b/arch/arm64/kernel/crash_core.c
+new file mode 100644
+index 000000000000..ca4c3e12d8c5
+--- /dev/null
++++ b/arch/arm64/kernel/crash_core.c
+@@ -0,0 +1,19 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (C) Linaro.
++ * Copyright (C) Huawei Futurewei Technologies.
++ */
++
++#include <linux/crash_core.h>
++#include <asm/memory.h>
++
++void arch_crash_save_vmcoreinfo(void)
++{
++	VMCOREINFO_NUMBER(VA_BITS);
++	/* Please note VMCOREINFO_NUMBER() uses "%d", not "%x" */
++	vmcoreinfo_append_str("NUMBER(kimage_voffset)=0x%llx\n",
++						kimage_voffset);
++	vmcoreinfo_append_str("NUMBER(PHYS_OFFSET)=0x%llx\n",
++						PHYS_OFFSET);
++	vmcoreinfo_append_str("KERNELOFFSET=%lx\n", kaslr_offset());
++}
+diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+index f6a5c6bc1434..922add8adb74 100644
+--- a/arch/arm64/kernel/machine_kexec.c
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -358,14 +358,3 @@ void crash_free_reserved_phys_range(unsigned long begin, unsigned long end)
+ 	}
+ }
+ #endif /* CONFIG_HIBERNATION */
+-
+-void arch_crash_save_vmcoreinfo(void)
+-{
+-	VMCOREINFO_NUMBER(VA_BITS);
+-	/* Please note VMCOREINFO_NUMBER() uses "%d", not "%x" */
+-	vmcoreinfo_append_str("NUMBER(kimage_voffset)=0x%llx\n",
+-						kimage_voffset);
+-	vmcoreinfo_append_str("NUMBER(PHYS_OFFSET)=0x%llx\n",
+-						PHYS_OFFSET);
+-	vmcoreinfo_append_str("KERNELOFFSET=%lx\n", kaslr_offset());
+-}
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180910/1d2f06eb/attachment.sig>
+2.18.0
