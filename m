@@ -1,58 +1,36 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Mon, 10 Sep 2018 13:59:35 +0200
-Subject: [PATCH 5/5] DT: marvell,mmp2: add SSP1 and SSP3
+Date: Mon, 10 Sep 2018 13:59:32 +0200
+Subject: [PATCH 2/5] PCI: provide pci_match_id() with CONFIG_PCI=n
 In-Reply-To: <20180910115935.163121-1-lkundrak@v3.sk>
 References: <20180910115935.163121-1-lkundrak@v3.sk>
-Message-ID: <20180910115935.163121-6-lkundrak@v3.sk>
+Message-ID: <20180910115935.163121-3-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There seem to be SSP2, SSP4 and perhaps SSP5 too, but Marvel keeps their
-base addresses secret.
+This spares drivers from #ifdef-ing on CONFIG_PCI if the driver can be
+optionally built on machines without PCI bus.
 
-The SSP1 and SSP3 addresses were taken from OLPC 1.75, OpenFirmware and
-kernel respectively.
+Consistent with acpi_driver_match_device() and similar.
 
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
 ---
- arch/arm/boot/dts/mmp2.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ include/linux/pci.h | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/mmp2.dtsi b/arch/arm/boot/dts/mmp2.dtsi
-index 766bbb8495b6..ba55d6483ed0 100644
---- a/arch/arm/boot/dts/mmp2.dtsi
-+++ b/arch/arm/boot/dts/mmp2.dtsi
-@@ -18,6 +18,8 @@
- 		serial3 = &uart4;
- 		i2c0 = &twsi1;
- 		i2c1 = &twsi2;
-+		spi0 = &ssp1;
-+		spi3 = &ssp3;
- 	};
- 
- 	soc {
-@@ -239,6 +241,22 @@
- 				resets = <&soc_clocks MMP2_CLK_RTC>;
- 				status = "disabled";
- 			};
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index e72ca8dd6241..d2f14eb23ea4 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -1702,6 +1702,10 @@ static inline int pci_irqd_intx_xlate(struct irq_domain *d,
+ 				      unsigned long *out_hwirq,
+ 				      unsigned int *out_type)
+ { return -EINVAL; }
 +
-+			ssp1: ssp at d4035000 {
-+				compatible = "marvell,mmp2-ssp";
-+				reg = <0xd4035000 0x1000>;
-+				clocks = <&soc_clocks MMP2_CLK_SSP0>;
-+				interrupts = <0>;
-+				status = "disabled";
-+			};
-+
-+			ssp3: ssp at d4037000 {
-+				compatible = "marvell,mmp2-ssp";
-+				reg = <0xd4037000 0x1000>;
-+				clocks = <&soc_clocks MMP2_CLK_SSP2>;
-+				interrupts = <20>;
-+				status = "disabled";
-+			};
- 		};
++static inline const struct pci_device_id *pci_match_id(const struct pci_device_id *ids,
++							 struct pci_dev *dev)
++{ return NULL; }
+ #endif /* CONFIG_PCI */
  
- 		soc_clocks: clocks{
+ /* Include architecture-dependent settings and functions */
 -- 
 2.17.1
