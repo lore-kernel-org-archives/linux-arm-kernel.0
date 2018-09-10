@@ -1,83 +1,42 @@
-From: leoyang.li@nxp.com (Li Yang)
-Date: Mon, 10 Sep 2018 00:56:40 -0500
-Subject: [PATCH v2 1/5] arm64: dts: fsl: use a generic node name for
- m25p80 flashes
-In-Reply-To: <20180910003946.GE21218@dragon>
-References: <20180903140840.23648-1-alexandre.belloni@bootlin.com>
- <20180910003946.GE21218@dragon>
-Message-ID: <CADRPPNS1N7J_F4ApqSKPrOJ4JuPwgV8srsGsS9DSSURvyhhM9A@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sun,  9 Sep 2018 23:04:55 -0700
+Subject: [PATCH] include/linux/compiler-clang.h: define __naked
+Message-ID: <20180910060455.20409-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 9, 2018 at 10:11 PM Shawn Guo <shawnguo@kernel.org> wrote:
->
-> The series looks good to me.  @Leo, what about you?
+ARM32 arch code uses the __naked attribute. This has previously been
+defined in include/linux/compiler-gcc.h, which is no longer included
+for Clang. Define __naked for Clang. Conservatively add all attributes
+previously used (and supported by Clang).
 
-Looks fine to me too.
+This fixes compile errors when building ARM32 using Clang:
+  arch/arm/mach-exynos/mcpm-exynos.c:193:13: error: variable has incomplete type 'void'
+  static void __naked exynos_pm_power_up_setup(unsigned int affinity_level)
+              ^
 
-Acked-by: Li Yang <leoyang.li@nxp.com>
+Fixes: 815f0ddb346c ("include/linux/compiler*.h: make compiler-*.h mutually exclusive")
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ include/linux/compiler-clang.h | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
->
-> Shawn
->
-> On Mon, Sep 03, 2018 at 04:08:36PM +0200, Alexandre Belloni wrote:
-> > Use a generic node name for the m25p80 flashes on ls1043 and ls1046 boards.
-> >
-> > Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
-> > ---
-> >  arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts | 2 +-
-> >  arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts | 2 +-
-> >  arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts | 4 ++--
-> >  3 files changed, 4 insertions(+), 4 deletions(-)
-> >
-> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
-> > index c7b8d2c009cd..af972e91d6bc 100644
-> > --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
-> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
-> > @@ -136,7 +136,7 @@
-> >       bus-num = <0>;
-> >       status = "okay";
-> >
-> > -     qflash0: s25fl128s at 0 {
-> > +     qflash0: flash at 0 {
-> >               compatible = "spansion,m25p80";
-> >               #address-cells = <1>;
-> >               #size-cells = <1>;
-> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
-> > index e69306e6b0b1..219068220b84 100644
-> > --- a/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
-> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
-> > @@ -165,7 +165,7 @@
-> >       bus-num = <0>;
-> >       status = "okay";
-> >
-> > -     qflash0: s25fl128s at 0 {
-> > +     qflash0: flash at 0 {
-> >               compatible = "spansion,m25p80";
-> >               #address-cells = <1>;
-> >               #size-cells = <1>;
-> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
-> > index 440e111651d5..df676b30357b 100644
-> > --- a/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
-> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
-> > @@ -103,7 +103,7 @@
-> >       bus-num = <0>;
-> >       status = "okay";
-> >
-> > -     qflash0: s25fs512s at 0 {
-> > +     qflash0: flash at 0 {
-> >               compatible = "spansion,m25p80";
-> >               #address-cells = <1>;
-> >               #size-cells = <1>;
-> > @@ -111,7 +111,7 @@
-> >               reg = <0>;
-> >       };
-> >
-> > -     qflash1: s25fs512s at 1 {
-> > +     qflash1: flash at 1 {
-> >               compatible = "spansion,m25p80";
-> >               #address-cells = <1>;
-> >               #size-cells = <1>;
-> > --
-> > 2.19.0.rc1
-> >
+diff --git a/include/linux/compiler-clang.h b/include/linux/compiler-clang.h
+index b1ce500fe8b3..a593e3ac0720 100644
+--- a/include/linux/compiler-clang.h
++++ b/include/linux/compiler-clang.h
+@@ -23,6 +23,12 @@
+ 
+ #define __no_sanitize_address __attribute__((no_sanitize("address")))
+ 
++/*
++ * ARM32 is currently the only user of __naked supported by Clang. Follow
++ * gcc: Do not trace naked functions and make sure they don't get inlined.
++ */
++#define __naked __attribute__((naked)) noinline notrace
++
+ /*
+  * Not all versions of clang implement the the type-generic versions
+  * of the builtin overflow checkers. Fortunately, clang implements
+-- 
+2.18.0
