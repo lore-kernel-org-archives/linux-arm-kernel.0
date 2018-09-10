@@ -1,54 +1,42 @@
-From: ndesaulniers@google.com (Nick Desaulniers)
-Date: Mon, 10 Sep 2018 09:51:24 -0700
-Subject: [PATCH] include/linux/compiler-clang.h: define __naked
-In-Reply-To: <CAK8P3a2cc741UqFSk+hXpC2s4S+A+0FuiM1yP=Z4rC18sJHq9g@mail.gmail.com>
-References: <20180910060455.20409-1-stefan@agner.ch>
- <CAK8P3a2cc741UqFSk+hXpC2s4S+A+0FuiM1yP=Z4rC18sJHq9g@mail.gmail.com>
-Message-ID: <CAKwvOd=E6+QSoRqcMJ0o1_q8VSMO8Zoi75e+zhj2SRSTdfacJw@mail.gmail.com>
+From: sed@free.fr (Cedric Roux)
+Date: Mon, 10 Sep 2018 18:55:09 +0200
+Subject: [PATCH v3 2/2] ARM: s3c24xx: Correct SD card write protect
+ detection on Mini2440
+In-Reply-To: <CAJKOXPeYO3VR5LABP3zKYnKckqUBahKPt7MCjzuo3j6oe+d87w@mail.gmail.com>
+References: <20180907215446.15160-1-sed@free.fr>
+ <20180907215446.15160-2-sed@free.fr>
+ <CAJKOXPeYO3VR5LABP3zKYnKckqUBahKPt7MCjzuo3j6oe+d87w@mail.gmail.com>
+Message-ID: <ba9d81bf-f000-f6ae-30b1-3e922985f655@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2018 at 5:14 AM Arnd Bergmann <arnd@arndb.de> wrote:
->
-> On Mon, Sep 10, 2018 at 8:05 AM Stefan Agner <stefan@agner.ch> wrote:
-> >
-> > ARM32 arch code uses the __naked attribute. This has previously been
-> > defined in include/linux/compiler-gcc.h, which is no longer included
-> > for Clang. Define __naked for Clang. Conservatively add all attributes
-> > previously used (and supported by Clang).
-> >
-> > This fixes compile errors when building ARM32 using Clang:
-> >   arch/arm/mach-exynos/mcpm-exynos.c:193:13: error: variable has incomplete type 'void'
-> >   static void __naked exynos_pm_power_up_setup(unsigned int affinity_level)
-> >               ^
-> >
-> > Fixes: 815f0ddb346c ("include/linux/compiler*.h: make compiler-*.h mutually exclusive")
-> > Signed-off-by: Stefan Agner <stefan@agner.ch>
+On 09/10/2018 12:23 PM, Krzysztof Kozlowski wrote:
+>>  static struct s3c24xx_mci_pdata mini2440_mmc_cfg __initdata = {
+>> -       .gpio_detect   = S3C2410_GPG(8),
+>> -       .gpio_wprotect = S3C2410_GPH(8),
+>> -       .set_power     = NULL,
+>> -       .ocr_avail     = MMC_VDD_32_33|MMC_VDD_33_34,
+>> +       .gpio_detect     = S3C2410_GPG(8),
+>> +       .gpio_wprotect   = S3C2410_GPH(8),
+>> +       .wprotect_invert = 1,
+>> +       .set_power       = NULL,
+>> +       .ocr_avail       = MMC_VDD_32_33|MMC_VDD_33_34,
+> 
+> This looks unexpected... after patch 1 there should be only one change
+> - one new line added. What happened here?
 
-Cool, thanks for this patch! I'll admit I need to start testing more
-architectures with Clang.
+This is to align all the '='.
 
->
-> > +/*
-> > + * ARM32 is currently the only user of __naked supported by Clang. Follow
-> > + * gcc: Do not trace naked functions and make sure they don't get inlined.
-> > + */
-> > +#define __naked __attribute__((naked)) noinline notrace
-> > +
->
-> Please see patches 5 and 6 of the series that Miguel posted:
->
-> https://lore.kernel.org/lkml/20180908212459.19736-6-miguel.ojeda.sandonis at gmail.com/
+These were spaces before the '=' so I also used spaces.
+Should I put TABs instead? I looked in the coding style
+and didn't find anything about this specific thing
+(maybe I read too fast though).
 
-Yes, I'd prefer those 2 patches.
+And if this ends up unaligned because 'wprotect_invert'
+requires a second TAB for the others, should I do a separate
+commit?
 
->
-> I suppose we want the patch to fix clang build as soon as possible though,
-> and follow up with the cleanup for the next merge window, right?
+Thanks.
 
-Can we take Miguel's two patches from above in the ARM tree, since
-this attribute is only used on ARM, IIUC?
-
--- 
-Thanks,
-~Nick Desaulniers
+Regards,
+C?dric.
