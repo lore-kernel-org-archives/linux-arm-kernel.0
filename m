@@ -1,40 +1,44 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Mon, 10 Sep 2018 10:24:04 +0200
-Subject: [PATCH v2 00/16] nvmem: rework of the subsystem for non-DT users
-In-Reply-To: <da9556fd-0022-8e6a-12b4-cc3babbae5b0@linaro.org>
-References: <20180907100750.14564-1-brgl@bgdev.pl>
- <da9556fd-0022-8e6a-12b4-cc3babbae5b0@linaro.org>
-Message-ID: <CAMRc=MeT7UP57x+Q-a1ODRCvcGKKj_NSfkBLVQ9O5dhTC1DAYg@mail.gmail.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 10 Sep 2018 10:25:08 +0200
+Subject: [PATCH v2 4/4] media: cedrus: Select the sunxi SRAM driver in
+ Kconfig
+In-Reply-To: <20180909191015.20902-5-contact@paulk.fr>
+References: <20180909191015.20902-1-contact@paulk.fr>
+ <20180909191015.20902-5-contact@paulk.fr>
+Message-ID: <16fd7291-f51b-b0bc-4299-97adbe197e54@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-09-10 9:54 GMT+02:00 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>:
->
->
-> On 07/09/18 11:07, Bartosz Golaszewski wrote:
->>
->> Next three patches improve the framework by adding a notifier chain
->> for future use and fixing the issue with nvmem device names.
->>
->> Finally we add support for cell definitions, cell lookups and make
->> DT systems resolve the nvmem cells during provider's registration.
->>
->> Last patches just use the SPDX license identifiers and make the
->> naming convention for some arguments more consistent.
->
-> Please send separate series for fixes and things that do not depend on this
-> new apis or Order/place them at the end of the series.
->
+On 09/09/2018 09:10 PM, Paul Kocialkowski wrote:
+> Since the sunxi SRAM driver is required to build the Cedrus driver,
+> select it in Kconfig.
+> 
+> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+> ---
+>  drivers/staging/media/sunxi/cedrus/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/staging/media/sunxi/cedrus/Kconfig b/drivers/staging/media/sunxi/cedrus/Kconfig
+> index afd7d7ee0388..3b06283e4bf3 100644
+> --- a/drivers/staging/media/sunxi/cedrus/Kconfig
+> +++ b/drivers/staging/media/sunxi/cedrus/Kconfig
+> @@ -3,6 +3,7 @@ config VIDEO_SUNXI_CEDRUS
+>  	depends on VIDEO_DEV && VIDEO_V4L2 && MEDIA_CONTROLLER
+>  	depends on HAS_DMA
+>  	depends on OF
+> +	select SUNXI_SRAM
+>  	select VIDEOBUF2_DMA_CONTIG
+>  	select MEDIA_REQUEST_API
 
-The API changes change so many things, that these series would be
-incompatible. I can send the series separately but they would be
-co-dependent anyway. Does it sound good?
+I noticed this select, but CONFIG_MEDIA_REQUEST_API doesn't exist. It's
+probably from an old version and I have dropped it from the patch that
+added this.
 
-Bart
+No need for you to do anything.
 
-> This can help reviewer when there is large number of patches in series with
-> unrelated subject.
->
-> -s-rini
->
->
+>  	select V4L2_MEM2MEM_DEV
+> 
+
+Regards,
+
+	Hans
