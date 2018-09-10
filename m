@@ -1,34 +1,41 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 10 Sep 2018 14:42:36 +0200
-Subject: Rockchip RV1108 mainline kernel support
-In-Reply-To: <CAAPZna3aGkUmDeAwM4J6LpeC9m1VA=CUQN_ChiwvTLkaE2zdrw@mail.gmail.com>
-References: <CAAPZna3aGkUmDeAwM4J6LpeC9m1VA=CUQN_ChiwvTLkaE2zdrw@mail.gmail.com>
-Message-ID: <8240937.RLPrvYGblP@phil>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 10 Sep 2018 14:50:56 +0200
+Subject: [PATCH] ARM: dts: imx53-qsb: disable 1.2GHz OPP
+Message-ID: <20180910125056.30813-1-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+The maximum CPU frequency for the i.MX53 QSB is 1GHz, so disable the
+1.2GHz OPP. This makes the board work with cpufreq again.
 
-Am Donnerstag, 19. Juli 2018, 15:53:02 CEST schrieb Fabio Berton:
-> We're adding support to a custom Rockchip RV1108 in mainline kernel.
-> 
-> Currently this custom board runs fine on the Rockchip 3.10 vendor kernel.
-> 
-> The main problems is that kernel 4.17 can't detect eMMC.
-> 
-> I would appreciate any help on how to make the mainline kernel to
-> detect eMMC on this board
+Fixes: 791f416608 ("ARM: dts: imx53: add cpufreq-dt support")
 
-Maybe you already solved your issue already, I just found your mail in
-my inbox again.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/boot/dts/imx53-qsb-common.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-So far I haven't gotten any rv1108-based board to do tests on, so it's a
-bit hard trying to find problem sources.
-
-On most recent Rockchip boards the (dw-)mmc runs just fine, but in your
-log + kernel commandline I noticed that you could try to add the
-"rootwait"  commandline option, as at the time of the failing rootfs the
-emmc may simply not have finished probing the card yet.
-
-
-Heiko
+diff --git a/arch/arm/boot/dts/imx53-qsb-common.dtsi b/arch/arm/boot/dts/imx53-qsb-common.dtsi
+index 7423d462d1e4..50dde84b72ed 100644
+--- a/arch/arm/boot/dts/imx53-qsb-common.dtsi
++++ b/arch/arm/boot/dts/imx53-qsb-common.dtsi
+@@ -123,6 +123,17 @@
+ 	};
+ };
+ 
++&cpu0 {
++	/* CPU rated to 1GHz, not 1.2GHz as per the default settings */
++	operating-points = <
++		/* kHz   uV */
++		166666  850000
++		400000  900000
++		800000  1050000
++		1000000 1200000
++	>;
++};
++
+ &esdhc1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_esdhc1>;
+-- 
+2.18.0
