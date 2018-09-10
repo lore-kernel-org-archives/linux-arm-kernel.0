@@ -1,10 +1,10 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 10 Sep 2018 08:32:09 +0100
-Subject: [PATCH v2 01/16] nvmem: remove unused APIs
-In-Reply-To: <20180907100750.14564-2-brgl@bgdev.pl>
+Date: Mon, 10 Sep 2018 08:32:21 +0100
+Subject: [PATCH v2 11/16] nvmem: add support for cell info
+In-Reply-To: <20180907100750.14564-12-brgl@bgdev.pl>
 References: <20180907100750.14564-1-brgl@bgdev.pl>
- <20180907100750.14564-2-brgl@bgdev.pl>
-Message-ID: <c0b0c411-65f6-62f9-6d6d-2884e5a17250@linaro.org>
+ <20180907100750.14564-12-brgl@bgdev.pl>
+Message-ID: <21ec4e6f-aa39-66cf-af32-d9e8e85f4961@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,21 +13,57 @@ List-Id: linux-arm-kernel.lists.infradead.org
 On 07/09/18 11:07, Bartosz Golaszewski wrote:
 > From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > 
-> Remove all APIs dealing with nvmem_cell_info. There are no users and
-> this part of the subsystem will be reworked.
+> Add new structs and routines allowing users to define nvmem cells from
+> machine code. This global list of entries is parsed when a provider
+> is registered and cells are associated with the relevant nvmem_device
+> struct.
 > 
-> This patch temprarily disables support for non-DT users.
+> A possible improvement for the future is to allow users to register
+> cell tables after the nvmem provider has been registered by updating
+> the cell list at each call to nvmem_(add|del)_cell_table().
 > 
 > Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > ---
->   drivers/nvmem/core.c           | 212 ++-------------------------------
->   include/linux/nvmem-consumer.h |  26 ----
->   include/linux/nvmem-provider.h |  13 --
->   3 files changed, 12 insertions(+), 239 deletions(-)
+>   MAINTAINERS                   |  1 +
+>   drivers/nvmem/core.c          | 97 ++++++++++++++++++++++++++++++++++-
 
-This looks totally un-necessary, Other patches in this series adds them 
-back.. Consider updating these in those respective patches.!
+I see some of this code is removed in first patch and added back here, I 
+dont really see a value in doing this in a single series of patchset.
+
+I would recommend "[PATCH v2 01/16] nvmem: remove unused APIs" and this 
+patch to be merged.
+
+>   include/linux/nvmem-machine.h | 41 +++++++++++++++
+>   3 files changed, 138 insertions(+), 1 deletion(-)
+>   create mode 100644 include/linux/nvmem-machine.h
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 9ad052aeac39..a520924bf0a9 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -10391,6 +10391,7 @@ F:	drivers/nvmem/
+>   F:	Documentation/devicetree/bindings/nvmem/
+>   F:	Documentation/ABI/stable/sysfs-bus-nvmem
+>   F:	include/linux/nvmem-consumer.h
+> +F:	include/linux/nvmem-machine.h
+>   F:	include/linux/nvmem-provider.h
+>   
+>   NXP SGTL5000 DRIVER
+> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+> index 17307015905a..854baa0559a1 100644
+> --- a/drivers/nvmem/core.c
+> +++ b/drivers/nvmem/core.c
+...
+>    *
+> diff --git a/include/linux/nvmem-machine.h b/include/linux/nvmem-machine.h
+> new file mode 100644
+> index 000000000000..1e199dfaacab
+> --- /dev/null
+> +++ b/include/linux/nvmem-machine.h
+
+This should go in nvmem-consumer.h, I don't think we should add header 
+files for each usecase. These are nvmem consumers so lets put them in 
+correct header file.
 
 
-
--srini
+--srini
