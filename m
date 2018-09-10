@@ -1,125 +1,53 @@
-From: navam@xilinx.com (Nava kishore Manne)
-Date: Mon, 10 Sep 2018 04:49:50 +0000
-Subject: [RFC PATCH v3 3/3] reset: reset-zynqmp: Adding support for Xilinx
- zynqmp reset controller.
-In-Reply-To: <1536143395.4084.5.camel@pengutronix.de>
-References: <1536131342-28041-1-git-send-email-nava.manne@xilinx.com>
- <1536131342-28041-4-git-send-email-nava.manne@xilinx.com>
- <1536143395.4084.5.camel@pengutronix.de>
-Message-ID: <BYAPR02MB47101009A8B5F7E1BB20C7A2C2050@BYAPR02MB4710.namprd02.prod.outlook.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 10 Sep 2018 13:03:32 +0800
+Subject: [linux-sunxi] [PATCH 0/5] Fix A64 HDMI PHY device tree binding
+In-Reply-To: <20180907072234.48282-1-icenowy@aosc.io>
+References: <20180907072234.48282-1-icenowy@aosc.io>
+Message-ID: <CAGb2v65G-rVK67C2EfKB+xcKY2OP_K-eXXpyC_BtskXyANe2UA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp
+On Fri, Sep 7, 2018 at 3:22 PM Icenowy Zheng <icenowy@aosc.io> wrote:
+>
+> When adding support for A64 HDMI PHY in 4.19, we assumed that the two
+> PLL-VIDEOs can both feed the HDMI PHY clock. However experiments show
+> that the mux bit discovered in R40 blob is not applicable on A64. This
+> is not discovered, as normally with a single display pipeline only
+> PLL-VIDEO0 will be used.
+>
+> In this patchset the second PLL is dropped, and a binding specially for
+> R40 HDMI PHY is added (which seems to have the mux).
+>
+> PATCH 1 and 2 are dropping second PLL for A64 HDMI PHY, and PATCH 3 to 5
+> are adding R40 HDMI PHY binding.
+>
+> This patchset targets v4.19 fixes tree, because the binding is
+> introduced in v4.19, and if we don't fix it there a wrong binding will
+> be left in a stable version released.
 
-Thanks for the quick response...
-Please find my response inline.
+Please add fixes tags.
 
-> -----Original Message-----
-> From: Philipp Zabel [mailto:p.zabel at pengutronix.de]
-> Sent: Wednesday, September 5, 2018 4:00 PM
-> To: Nava kishore Manne <navam@xilinx.com>; robh+dt at kernel.org;
-> mark.rutland at arm.com; Michal Simek <michals@xilinx.com>; Rajan Vaja
-> <RAJANV@xilinx.com>; Jolly Shah <JOLLYS@xilinx.com>;
-> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org
-> Subject: Re: [RFC PATCH v3 3/3] reset: reset-zynqmp: Adding support for Xilinx
-> zynqmp reset controller.
-> 
-> Hi,
-> 
-> thank you for the patch. I have a few comments below:
-> 
-> On Wed, 2018-09-05 at 12:39 +0530, Nava kishore Manne wrote:
-> > Add a reset controller driver for Xilinx Zynq UltraScale+ MPSoC.
-> > The zynqmp reset-controller has the ability to reset lines connected
-> > to different blocks and peripheral in the Soc.
-> >
-> > Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
-> > ---
-> > Changes for v3:
-> > 		-None.
-> > Changes for v2:
-> > 		-Moved eemi_ops into a priv struct as suggested
-> > 		 by philipp.
-> >
-> >  drivers/reset/Makefile       |   1 +
-> >  drivers/reset/reset-zynqmp.c | 115
-> > +++++++++++++++++++++++++++++++++++++++++++
-> >  2 files changed, 116 insertions(+)
-> >  create mode 100644 drivers/reset/reset-zynqmp.c
-> >
-> > diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile index
-> > c1261dc..27e4a33 100644
-> > --- a/drivers/reset/Makefile
-> > +++ b/drivers/reset/Makefile
-> > @@ -21,4 +21,5 @@ obj-$(CONFIG_RESET_TI_SCI) += reset-ti-sci.o
-> >  obj-$(CONFIG_RESET_TI_SYSCON) += reset-ti-syscon.o
-> >  obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
-> >  obj-$(CONFIG_RESET_ZYNQ) += reset-zynq.o
-> > +obj-$(CONFIG_ARCH_ZYNQMP) += reset-zynqmp.o
-> >
-> > diff --git a/drivers/reset/reset-zynqmp.c
-> > b/drivers/reset/reset-zynqmp.c new file mode 100644 index
-> > 0000000..f908492
-> > --- /dev/null
-> > +++ b/drivers/reset/reset-zynqmp.c
-> > @@ -0,0 +1,115 @@
-> > +// SPDX-License-Identifier: GPL-2.0+
-> > +/*
-> > + * Copyright (C) 2018 Xilinx, Inc.
-> > + *
-> > + */
-> > +
-> > +#include <linux/io.h>
-> 
-> I think including io.h is not necessary.
-> 
-> [...]
+The patches look good, though I'm not sure about patches 3 and 4 going in fixes.
 
-Will fix in the next version.
+ChenYu
 
-> > +static int zynqmp_reset_status(struct reset_controller_dev *rcdev,
-> > +			       unsigned long id)
-> > +{
-> > +	struct zynqmp_reset_data *priv = to_zynqmp_reset_data(rcdev);
-> > +	int val, err;
-> > +
-> > +	err = priv->eemi_ops->reset_get_status(ZYNQMP_RESET_ID + id, &val);
-> > +	if (!err)
-> > +		return -EINVAL;
-> 
-> This looks like it should be
-> 
-> 	if (err)
-> 		return err;
-> 
-> instead.
-> 
-> [...]
-Will fix in the next version.
 
-> > +static struct reset_control_ops zynqmp_reset_ops = {
-> 
-> static const struct reset_control_ops zynqmp_reset_ops = {
-> 
-Will fix in the next version.
-
-> > +	.reset = zynqmp_reset_reset,
-> > +	.assert = zynqmp_reset_assert,
-> > +	.deassert = zynqmp_reset_deassert,
-> > +	.status = zynqmp_reset_status,
-> > +};
-> > +
-> > +static int zynqmp_reset_probe(struct platform_device *pdev) {
-> > +	struct zynqmp_reset_data *priv;
-> > +
-> > +	priv = devm_kzalloc(&pdev->dev,
-> > +			    sizeof(*priv), GFP_KERNEL);
-> 
-> This should fit on one line.
-> 
-Will fix in the next version.
-
-Regards,
-Navakishore.
+> Icenowy Zheng (5):
+>   dt-bindings: sun4i-drm: drop second PLL from A64 HDMI PHY binding
+>   drm: sun4i: drop second PLL from A64 HDMI PHY
+>   dt-bindings: sun4i-drm: add compatible for R40 HDMI PHY
+>   drm/sun4i: add support for R40 HDMI PHY
+>   ARM: sun8i: dts: drop A64 HDMI PHY fallback compatible from R40 DT
+>
+>  .../devicetree/bindings/display/sunxi/sun4i-drm.txt |  5 +++--
+>  arch/arm/boot/dts/sun8i-r40.dtsi                    |  3 +--
+>  drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c              | 13 ++++++++++++-
+>  3 files changed, 16 insertions(+), 5 deletions(-)
+>
+> --
+> 2.18.0
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
