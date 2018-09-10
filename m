@@ -1,97 +1,74 @@
-From: quentin.perret@arm.com (Quentin Perret)
-Date: Mon, 10 Sep 2018 17:28:10 +0100
-Subject: [PATCH v3] firmware: arm_scmi: add a getter for power of performance
- states
-In-Reply-To: <20180910161530.izm4l22clxqktetn@queper01-lin>
-References: <20180910161530.izm4l22clxqktetn@queper01-lin>
-Message-ID: <20180910162810.7307-1-quentin.perret@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 10 Sep 2018 17:35:18 +0100
+Subject: [PATCH v3 0/9] ARM: spectre-v1.1 mitigations
+In-Reply-To: <1536576168-40096-1-git-send-email-julien.thierry@arm.com>
+References: <1536576168-40096-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <20180910163518.GW30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SCMI protocol can be used to get power estimates from firmware
-corresponding to each performance state of a device. Although these power
-costs are already managed by the SCMI firmware driver, they are not
-exposed to any external subsystem yet.
+Hi Julien,
 
-Fix this by adding a new get_power() interface to the exisiting perf_ops
-defined for the SCMI protocol.
+I think this now looks fine, please drop it into the patch system.
+Thanks.
 
-Signed-off-by: Quentin Perret <quentin.perret@arm.com>
----
-v3: Changed the accessor name to "scmi_dvfs_est_power_get"
-v2: rebased on 4.19-rc2
----
- drivers/firmware/arm_scmi/perf.c | 28 ++++++++++++++++++++++++++++
- include/linux/scmi_protocol.h    |  4 ++++
- 2 files changed, 32 insertions(+)
+On Mon, Sep 10, 2018 at 11:42:39AM +0100, Julien Thierry wrote:
+> Hi,
+> 
+> The series provides mitigations for spectre-v1.1. It is mostly mirroring
+> what Russell did [1], but this time for writes to user provided addresses.
+> 
+> * Patches 1-5 replace some __put_user_error calls with __copy_to_user, this
+>   both reduces the number of time address sanitizing is performed and also
+>   the number of time PAN needs to be toggled.
+> 
+> * Patches 6-9 ensure user addresses used by __put_user* and
+>   __copy_to_user functions are sanitized before being used.
+> 
+> Changes since v2[2]:
+> - Ensure padding in vfp_sigframe is properly initialized
+> - Fix incorrect copy of oabi events
+> 
+> Changes since v1[3]:
+> - Fixed off-by-one error in uaccess_mask_range_ptr, spotted by Russell
+> - Remove remaining calls to __put_user_error() and get rid of the macro
+> - Reorder the patches to better reflect the spectre-v1 series
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-July/589869.html
+> [2] https://www.spinics.net/lists/arm-kernel/msg674995.html
+> [3] https://www.spinics.net/lists/arm-kernel/msg671026.html
+> 
+> Cheers,
+> 
+> Julien
+> 
+> 
+> Julien Thierry (9):
+>   ARM: signal: copy registers using __copy_to_user()
+>   ARM: signal: always use __copy_to_user to save iwmmxt context
+>   ARM: vfp: use __copy_to_user() when saving VFP state
+>   ARM: oabi-compat: copy oabi events using __copy_to_user()
+>   ARM: signal: replace __put_user_error with __put_user
+>   ARM: uaccess: Prevent speculative use of the current addr_limit
+>   ARM: spectre-v1.1: use put_user() for __put_user()
+>   ARM: spectre-v1,v1.1: provide helpers for address sanitization
+>   ARM: spectre-v1.1: harden __copy_to_user
+> 
+>  arch/arm/include/asm/assembler.h   | 11 ++++++
+>  arch/arm/include/asm/thread_info.h |  4 +-
+>  arch/arm/include/asm/uaccess.h     | 49 ++++++++++++++++++++---
+>  arch/arm/kernel/signal.c           | 80 +++++++++++++++++++++-----------------
+>  arch/arm/kernel/sys_oabi-compat.c  |  8 +++-
+>  arch/arm/lib/copy_from_user.S      |  6 +--
+>  arch/arm/lib/copy_to_user.S        |  6 ++-
+>  arch/arm/lib/uaccess_with_memcpy.c |  3 +-
+>  arch/arm/vfp/vfpmodule.c           | 20 ++++------
+>  9 files changed, 122 insertions(+), 65 deletions(-)
+> 
+> --
+> 1.9.1
 
-diff --git a/drivers/firmware/arm_scmi/perf.c b/drivers/firmware/arm_scmi/perf.c
-index 721e6c57beae..3e6453b4ea1d 100644
---- a/drivers/firmware/arm_scmi/perf.c
-+++ b/drivers/firmware/arm_scmi/perf.c
-@@ -421,6 +421,33 @@ static int scmi_dvfs_freq_get(const struct scmi_handle *handle, u32 domain,
- 	return ret;
- }
- 
-+static int scmi_dvfs_est_power_get(const struct scmi_handle *handle, u32 domain,
-+			       unsigned long *freq, unsigned long *power)
-+{
-+	struct scmi_perf_info *pi = handle->perf_priv;
-+	struct perf_dom_info *dom;
-+	unsigned long opp_freq;
-+	int idx, ret = -EINVAL;
-+	struct scmi_opp *opp;
-+
-+	dom = pi->dom_info + domain;
-+	if (!dom)
-+		return -EIO;
-+
-+	for (opp = dom->opp, idx = 0; idx < dom->opp_count; idx++, opp++) {
-+		opp_freq = opp->perf * dom->mult_factor;
-+		if (opp_freq < *freq)
-+			continue;
-+
-+		*freq = opp_freq;
-+		*power = opp->power;
-+		ret = 0;
-+		break;
-+	}
-+
-+	return ret;
-+}
-+
- static struct scmi_perf_ops perf_ops = {
- 	.limits_set = scmi_perf_limits_set,
- 	.limits_get = scmi_perf_limits_get,
-@@ -431,6 +458,7 @@ static struct scmi_perf_ops perf_ops = {
- 	.device_opps_add = scmi_dvfs_device_opps_add,
- 	.freq_set = scmi_dvfs_freq_set,
- 	.freq_get = scmi_dvfs_freq_get,
-+	.est_power_get = scmi_dvfs_est_power_get,
- };
- 
- static int scmi_perf_protocol_init(struct scmi_handle *handle)
-diff --git a/include/linux/scmi_protocol.h b/include/linux/scmi_protocol.h
-index f4c9fc0fc755..e4db899c1cfb 100644
---- a/include/linux/scmi_protocol.h
-+++ b/include/linux/scmi_protocol.h
-@@ -91,6 +91,8 @@ struct scmi_clk_ops {
-  *	to sustained performance level mapping
-  * @freq_get: gets the frequency for a given device using sustained frequency
-  *	to sustained performance level mapping
-+ * @est_power_get: gets the estimated power cost for a given performance domain
-+ *	at a given frequency
-  */
- struct scmi_perf_ops {
- 	int (*limits_set)(const struct scmi_handle *handle, u32 domain,
-@@ -110,6 +112,8 @@ struct scmi_perf_ops {
- 			unsigned long rate, bool poll);
- 	int (*freq_get)(const struct scmi_handle *handle, u32 domain,
- 			unsigned long *rate, bool poll);
-+	int (*est_power_get)(const struct scmi_handle *handle, u32 domain,
-+			 unsigned long *rate, unsigned long *power);
- };
- 
- /**
 -- 
-2.17.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
