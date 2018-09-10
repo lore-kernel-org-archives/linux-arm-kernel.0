@@ -1,158 +1,80 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 10 Sep 2018 15:30:59 -0500
-Subject: [PATCH v3 2/2] phy: zynqmp: Add dt bindings for ZynqMP phy
-In-Reply-To: <1536165747-6405-3-git-send-email-anurag.kumar.vulisha@xilinx.com>
-References: <1536165747-6405-1-git-send-email-anurag.kumar.vulisha@xilinx.com>
- <1536165747-6405-3-git-send-email-anurag.kumar.vulisha@xilinx.com>
-Message-ID: <20180910203059.GA7055@bogus>
+From: JOLLYS@xilinx.com (Jolly Shah)
+Date: Mon, 10 Sep 2018 20:39:33 +0000
+Subject: [GIT PULL] arm64: zynqmp: Xilinx SoC changes for v4.20
+In-Reply-To: <CAOesGMjh-Chhncw3cYaCvFpfhtOSz8hprC0xARmVXe8i4mvxHw@mail.gmail.com>
+References: <5e9c248d-c19c-1881-f406-d7bfd38ec479@xilinx.com>
+ <CAOesGMjh-Chhncw3cYaCvFpfhtOSz8hprC0xARmVXe8i4mvxHw@mail.gmail.com>
+Message-ID: <CY1PR02MB2138F7D3AACB11CAA959B496B8050@CY1PR02MB2138.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2018 at 10:12:27PM +0530, Anurag Kumar Vulisha wrote:
-> This patch adds the document describing dt bindings for ZynqMP
-> phy. ZynqMP SOC has a High Speed Processing System Gigabit
-> Transceiver which provides PHY capabilties to USB, SATA,
-> PCIE, Display Port and Ehernet SGMII controllers.
+Hi Olof,
+
+> -----Original Message-----
+> From: Olof Johansson [mailto:olof at lixom.net]
+> Sent: Saturday, September 08, 2018 6:22 PM
+> To: Michal Simek <michals@xilinx.com>
+> Cc: arm-soc <arm@kernel.org>; Jolly Shah <JOLLYS@xilinx.com>; linux-arm
+> <linux-arm-kernel@lists.infradead.org>
+> Subject: Re: [GIT PULL] arm64: zynqmp: Xilinx SoC changes for v4.20
 > 
-> Signed-off-by: Anurag Kumar Vulisha <anurag.kumar.vulisha@xilinx.com>
-> ---
->  Changes in v3:
-> 	1. Corrected the Documentation as suggested by Vivek Gautam
+> Hi Michal,
 > 
->  Changes in v2:
-> 	1. None
->  .../devicetree/bindings/phy/phy-zynqmp.txt         | 104 +++++++++++++++++++++
->  1 file changed, 104 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/phy-zynqmp.txt
+> On Fri, Sep 7, 2018 at 12:57 AM, Michal Simek <michal.simek@xilinx.com>
+> wrote:
+> > Hi,
+> >
+> > please pull the following firmware interface to your tree.
+> >
+> > Thanks,
+> > Michal
+> >
+> >
+> > The following changes since commit
+> 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+> >
+> >   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+> >
+> > are available in the git repository at:
+> >
+> >   https://github.com/Xilinx/linux-xlnx.git tags/zynqmp-soc-for-v4.20
+> >
+> > for you to fetch changes up to
+> bca7067d2d4e91f58162b07d73cd94e20437b4f6:
+> >
+> >   firmware: xilinx: Add debugfs for query data API (2018-09-07
+> > 09:44:44
+> > +0200)
+> >
+> > ----------------------------------------------------------------
+> > arm64: zynqmp: SoC changes for v4.20
+> >
+> > - Adding firmware API for SoC with debugfs interface
 > 
-> diff --git a/Documentation/devicetree/bindings/phy/phy-zynqmp.txt b/Documentation/devicetree/bindings/phy/phy-zynqmp.txt
-> new file mode 100644
-> index 0000000..65007c4
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/phy/phy-zynqmp.txt
-> @@ -0,0 +1,104 @@
-> +Xilinx ZynqMP PHY binding
-> +
-> +This binding describes a ZynqMP PHY device that is used to control ZynqMP
-> +High Speed Gigabit Transceiver(GT). ZynqMP PS GTR provides four lanes
-> +and are used by USB, SATA, PCIE, Display port and Ethernet SGMMI controllers.
-> +
-> +Phy provider node
-> +=================
-> +
-> +Required properties:
-> +- compatible	: Can be "xlnx,zynqmp-psgtr-v1.1" or "xlnx,zynqmp-psgtr"
-> +
-> +- reg           : Address and length of register sets for each device in
-> +                  "reg-names"
-> +
-> +- reg-names     : The names of the register addresses corresponding to the
-> +		  registers filled in "reg":
-> +			- serdes: SERDES block register set
-> +			- siou: SIOU block register set
-> +
-> +Optional properties:
-> +- xlnx,tx_termination_fix : Include this for fixing functional issue with the
-
-s/_/-/
-
-> +		  TX termination resistance in GT, which can be out of spec for
-> +		  the XCZU9EG silicon version. This property is not required for
-> +		  "xlnx,zynqmp-psgtr-v1.1"
-> +
-> +Required nodes	:  A sub-node is required for each lane the controller
-> +		   provides.
-> +
-> +Phy sub-nodes
-> +=============
-> +
-> +Required properties:
-> +lane0:
-
-lane0 or lane at 0? If you need or care about numbering then add a reg 
-property.
-
-> +- #phy-cells	: Should be 4
-> +
-> +lane1:
-> +- #phy-cells	: Should be 4
-> +
-> +lane2:
-> +- #phy-cells	: Should be 4
-> +
-> +lane3:
-> +- #phy-cells	: Should be 4
-> +
-> +Example:
-> +	zynqmp_phy: phy at fd400000 {
-> +		compatible = "xlnx,zynqmp-psgtr-v1.1";
-> +		status = "okay";
-> +		reg = <0x0 0xfd400000 0x0 0x40000>, <0x0 0xfd3d0000 0x0 0x1000>;
-> +		reg-names = "serdes", "siou";
-> +
-> +		lane0: lane at 0 {
-> +			#phy-cells = <4>;
-> +		};
-> +		lane1: lane at 1 {
-> +			#phy-cells = <4>;
-> +		};
-> +		lane2: lane at 2 {
-> +			#phy-cells = <4>;
-> +		};
-> +		lane3: lane at 3 {
-> +			#phy-cells = <4>;
-> +		};
-> +	};
-> +
-> +Specifying phy control of devices
-> +=================================
-> +
-> +Device nodes should specify the configuration required in their "phys"
-> +property, containing a phandle to the phy port node and a device type.
-> +
-> +phys = <PHANDLE CONTROLLER_TYPE CONTROLLER_INSTANCE LANE_NUM LANE_FREQ>;
-> +
-> +PHANDLE                 = &lane0 or &lane1 or &lane2 or &lane3
-> +CONTROLLER_TYPE         = PHY_TYPE_PCIE or PHY_TYPE_SATA or PHY_TYPE_USB
-> +			  or PHY_TYPE_DP or PHY_TYPE_SGMII
-> +CONTROLLER_INSTANCE     = Depends on controller type used, can be any of
-> +				PHY_TYPE_PCIE : 0 or 1 or 2 or 3
-> +				PHY_TYPE_SATA : 0 or 1
-> +				PHY_TYPE_USB  : 0 or 1
-> +				PHY_TYPE_DP   : 0 or 1
-> +				PHY_TYPE_SGMII: 0 or 1 or 2 or 3
-> +LANE_NUM                = Depends on which lane clock is used as ref clk, can be
-> +			  0 or 1 or 2 or 3
-
-I'm not really clear about what this is.
-
-> +LANE_FREQ               = Frequency that controller can operate, can be any of
-> +			  19.2Mhz,20Mhz,24Mhz,26Mhz,27Mhz,28.4Mhz,40Mhz,52Mhz,
-> +			  100Mhz,108Mhz,125Mhz,135Mhz,150Mhz
-
-This can't be implied by the mode/type? I wouldn't expect any frequency 
-can be used for each mode.
-
-> +
-> +Example:
-> +
-> +#include <dt-bindings/phy/phy.h>
-> +
-> +	usb at fe200000 {
-> +		...
-> +		phys	  = <&lane2 PHY_TYPE_USB3 0 2 2600000>;
-> +		...
-> +	};
-> +
-> +	ahci at fd0c0000 {
-> +		...
-> +		phys	  = <&lane3 PHY_TYPE_SATA 1 1 125000000>;
-> +		...
-> +	};
-
-What if you are doing multiple lanes for 1 device? That would be more 
-useful 2nd example if that's supported.
-
-> -- 
-> 2.1.1
+> This is a bit terse. Jolly has been good at writing cover letters, you could have
+> stolen the writeup from there. :)
 > 
+> I posted two comments on the patches -- one is a nit that can be followed up on
+> with an incremental patch.
+> 
+
+Posted incremental patch set to address your review comments. Also included a commit from v11 which was missed in above pull request.
+
+
+> I'm more worried about the ioctl interface though, and what it opens up. Maybe
+> it's been discussed in the time the set has been reviewed, I didn't search
+> extensively for the history. If it had been, bringing explanations into the patch
+> description would have been nice for new readers such as myself. And if it
+> hasn't, well, let's talk about it.
+> 
+
+Responded to your queries in another thread. Will be happy to answer any further questions you have.
+
+Thanks,
+Jolly Shah
+
+> Not merging based on the above. Hopefully it's something we can straighten out
+> pretty quickly.
+> 
+> 
+> -Olof
