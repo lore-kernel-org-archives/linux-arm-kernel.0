@@ -1,78 +1,83 @@
-From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Mon, 10 Sep 2018 16:08:36 +0530
-Subject: [PATCH v2 0/4] Qcom smmu-500 TLB invalidation errata for sdm845
-In-Reply-To: <20180910062551.28175-1-vivek.gautam@codeaurora.org>
-References: <20180910062551.28175-1-vivek.gautam@codeaurora.org>
-Message-ID: <4f6e48c4-6fec-b764-6083-fea4133e1fa8@codeaurora.org>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Mon, 10 Sep 2018 11:42:40 +0100
+Subject: [PATCH v3 1/9] ARM: signal: copy registers using __copy_to_user()
+In-Reply-To: <1536576168-40096-1-git-send-email-julien.thierry@arm.com>
+References: <1536576168-40096-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <1536576168-40096-2-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+linux-arm-msm
+When saving the ARM integer registers, use __copy_to_user() to
+copy them into user signal frame, rather than __put_user_error().
+This has the benefit of disabling/enabling PAN once for the whole copy
+intead of once per write.
 
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+---
+ arch/arm/kernel/signal.c | 49 ++++++++++++++++++++++++++----------------------
+ 1 file changed, 27 insertions(+), 22 deletions(-)
 
-On 09/10/2018 11:55 AM, Vivek Gautam wrote:
-> Qcom's implementation of arm,mmu-500 on sdm845 has a functional/performance
-> errata [1] because of which the TCU cache look ups are stalled during
-> invalidation cycle. This is mitigated by serializing all the invalidation
-> requests coming to the smmu.
->
-> This patch series addresses this errata by adding new tlb_ops for
-> qcom,sdm845-smmu-500 [2]. These ops take context bank locks for all the
-> tlb_ops that queue and sync the TLB invalidation requests.
->
-> Besides adding locks, there's a way to expadite these TLB invalidations
-> for display and camera devices by turning off the 'wait-for-safe' logic
-> in hardware that holds the tlb invalidations until a safe level.
-> This 'wait-for-safe' logic is controlled by toggling a chicken bit
-> through a secure register. This secure register is accessed by making an
-> explicit SCM call into the EL3 firmware.
-> There are two ways of handling this logic -
->   * Firmware, such as tz present on sdm845-mtp devices has a handler to do
->     all the register access and bit set/clear. So is the handling in
->     downstream arm-smmu driver [3].
->   * Other firmwares can have handlers to just read/write this secure
->     register. In such cases the kernel make io_read/writel scm calls to
->     modify the register.
-> This patch series adds APIs in qcom-scm driver to handle both of these
-> cases.
->
-> Lastly, since these TLB invalidations can happen in atomic contexts
-> there's a need to add atomic versions of qcom_scm_io_readl/writel() and
-> qcom_scm_call() APIs. The traditional scm calls take mutex and we therefore
-> can't use these calls in atomic contexts.
->
-> This patch series is adapted version of how the errata is handled in
-> downstream [1].
->
-> Changes since v1:
->   * Addressed Will and Robin's comments:
->      - Dropped the patch[4] that forked out __arm_smmu_tlb_inv_range_nosync(),
->        and __arm_smmu_tlb_sync().
->      - Cleaned up the errata patch further to use downstream polling mechanism
->        for tlb sync.
->   * No change in SCM call patches - patches 1 to 3.
->
-> [1] https://source.codeaurora.org/quic/la/kernel/msm-4.9/tree/drivers/iommu/arm-smmu.c?h=msm-4.9#n4842
-> [2] https://lore.kernel.org/patchwork/patch/974114/
-> [3] https://source.codeaurora.org/quic/la/kernel/msm-4.9/tree/drivers/iommu/arm-smmu.c?h=msm-4.9#n4864
-> [4] https://patchwork.kernel.org/patch/10565349/
->
-> Vivek Gautam (4):
->    firmware: qcom_scm-64: Add atomic version of qcom_scm_call
->    firmware/qcom_scm: Add atomic version of io read/write APIs
->    firmware/qcom_scm: Add scm call to handle smmu errata
->    iommu/arm-smmu: Add support to handle Qcom's TLBI serialization errata
->
->   drivers/firmware/qcom_scm-32.c |  17 ++++
->   drivers/firmware/qcom_scm-64.c | 181 +++++++++++++++++++++++++++++++----------
->   drivers/firmware/qcom_scm.c    |  18 ++++
->   drivers/firmware/qcom_scm.h    |   9 ++
->   drivers/iommu/arm-smmu-regs.h  |   2 +
->   drivers/iommu/arm-smmu.c       | 133 +++++++++++++++++++++++++++++-
->   include/linux/qcom_scm.h       |   6 ++
->   7 files changed, 320 insertions(+), 46 deletions(-)
->
-
+diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+index b8f766c..76fe75d 100644
+--- a/arch/arm/kernel/signal.c
++++ b/arch/arm/kernel/signal.c
+@@ -288,30 +288,35 @@ asmlinkage int sys_rt_sigreturn(struct pt_regs *regs)
+ setup_sigframe(struct sigframe __user *sf, struct pt_regs *regs, sigset_t *set)
+ {
+ 	struct aux_sigframe __user *aux;
++	struct sigcontext context;
+ 	int err = 0;
+ 
+-	__put_user_error(regs->ARM_r0, &sf->uc.uc_mcontext.arm_r0, err);
+-	__put_user_error(regs->ARM_r1, &sf->uc.uc_mcontext.arm_r1, err);
+-	__put_user_error(regs->ARM_r2, &sf->uc.uc_mcontext.arm_r2, err);
+-	__put_user_error(regs->ARM_r3, &sf->uc.uc_mcontext.arm_r3, err);
+-	__put_user_error(regs->ARM_r4, &sf->uc.uc_mcontext.arm_r4, err);
+-	__put_user_error(regs->ARM_r5, &sf->uc.uc_mcontext.arm_r5, err);
+-	__put_user_error(regs->ARM_r6, &sf->uc.uc_mcontext.arm_r6, err);
+-	__put_user_error(regs->ARM_r7, &sf->uc.uc_mcontext.arm_r7, err);
+-	__put_user_error(regs->ARM_r8, &sf->uc.uc_mcontext.arm_r8, err);
+-	__put_user_error(regs->ARM_r9, &sf->uc.uc_mcontext.arm_r9, err);
+-	__put_user_error(regs->ARM_r10, &sf->uc.uc_mcontext.arm_r10, err);
+-	__put_user_error(regs->ARM_fp, &sf->uc.uc_mcontext.arm_fp, err);
+-	__put_user_error(regs->ARM_ip, &sf->uc.uc_mcontext.arm_ip, err);
+-	__put_user_error(regs->ARM_sp, &sf->uc.uc_mcontext.arm_sp, err);
+-	__put_user_error(regs->ARM_lr, &sf->uc.uc_mcontext.arm_lr, err);
+-	__put_user_error(regs->ARM_pc, &sf->uc.uc_mcontext.arm_pc, err);
+-	__put_user_error(regs->ARM_cpsr, &sf->uc.uc_mcontext.arm_cpsr, err);
+-
+-	__put_user_error(current->thread.trap_no, &sf->uc.uc_mcontext.trap_no, err);
+-	__put_user_error(current->thread.error_code, &sf->uc.uc_mcontext.error_code, err);
+-	__put_user_error(current->thread.address, &sf->uc.uc_mcontext.fault_address, err);
+-	__put_user_error(set->sig[0], &sf->uc.uc_mcontext.oldmask, err);
++	context = (struct sigcontext) {
++		.arm_r0        = regs->ARM_r0,
++		.arm_r1        = regs->ARM_r1,
++		.arm_r2        = regs->ARM_r2,
++		.arm_r3        = regs->ARM_r3,
++		.arm_r4        = regs->ARM_r4,
++		.arm_r5        = regs->ARM_r5,
++		.arm_r6        = regs->ARM_r6,
++		.arm_r7        = regs->ARM_r7,
++		.arm_r8        = regs->ARM_r8,
++		.arm_r9        = regs->ARM_r9,
++		.arm_r10       = regs->ARM_r10,
++		.arm_fp        = regs->ARM_fp,
++		.arm_ip        = regs->ARM_ip,
++		.arm_sp        = regs->ARM_sp,
++		.arm_lr        = regs->ARM_lr,
++		.arm_pc        = regs->ARM_pc,
++		.arm_cpsr      = regs->ARM_cpsr,
++
++		.trap_no       = current->thread.trap_no,
++		.error_code    = current->thread.error_code,
++		.fault_address = current->thread.address,
++		.oldmask       = set->sig[0],
++	};
++
++	err |= __copy_to_user(&sf->uc.uc_mcontext, &context, sizeof(context));
+ 
+ 	err |= __copy_to_user(&sf->uc.uc_sigmask, set, sizeof(*set));
+ 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.9.1
