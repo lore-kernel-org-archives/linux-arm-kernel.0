@@ -1,185 +1,117 @@
-From: ran.wang_1@nxp.com (Ran Wang)
-Date: Mon, 10 Sep 2018 03:31:56 +0000
-Subject: [PATCH 3/3] soc: fsl: add RCPM driver
-In-Reply-To: <CADRPPNTGrKBxzpbP05R0T3ovngYgQ4P_kgwgYwB6Aqrs8maXqw@mail.gmail.com>
-References: <20180831035219.31619-1-ran.wang_1@nxp.com>
- <20180831035219.31619-3-ran.wang_1@nxp.com>
- <be39f5ea8c9046b0bf1f6bbfe935fae4@HXTBJIDCEMVIW02.hxtcorp.net>
- <CADRPPNQN=27+pOSckxvwSuBJoFaz7pT+Z6h07Wu3Liz5ao5kkA@mail.gmail.com>
- <AM5PR0402MB2865E57EDC0DE8B0047282A2F1000@AM5PR0402MB2865.eurprd04.prod.outlook.com>
- <CADRPPNTGrKBxzpbP05R0T3ovngYgQ4P_kgwgYwB6Aqrs8maXqw@mail.gmail.com>
-Message-ID: <AM5PR0402MB2865939D4412A4129AC0FC67F1050@AM5PR0402MB2865.eurprd04.prod.outlook.com>
+From: pihsun@chromium.org (Peter Shih)
+Date: Mon, 10 Sep 2018 11:50:47 +0800
+Subject: [PATCH] spi: mediatek: Don't modify spi_transfer when transfer.
+Message-ID: <20180910035047.98496-1-pihsun@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leo,
+Mediatek SPI driver modifies some fields (tx_buf, rx_buf, len, tx_dma,
+rx_dma) of the spi_transfer* passed in when doing transfer_one and in
+interrupt handler. This is somewhat unexpected, and there are some
+caller (e.g. Cr50 spi driver) that reuse the spi_transfer for multiple
+messages. Add a field to record how many bytes have been transferred,
+and calculate the right len / buffer based on it instead.
 
-On 2018/9/7 4:51, Yang Li wrote:
-> 
-> On Fri, Sep 7, 2018 at 4:51 AM Ran Wang <ran.wang_1@nxp.com> wrote:
-> >
-> > Hi Leo,
-> >
-> > On September 05, 2018 at 11:22 Yang Li wrote:
-> > > -----Original Message-----
-> > > From: Li Yang <leoyang.li@nxp.com>
-> > > Sent: Wednesday, September 05, 2018 11:22
-> > > To: dongsheng.wang at hxt-semitech.com
-> > > Cc: Ran Wang <ran.wang_1@nxp.com>; Rob Herring
-> <robh+dt@kernel.org>;
-> > > Mark Rutland <mark.rutland@arm.com>; open list:OPEN FIRMWARE AND
-> > > FLATTENED DEVICE TREE BINDINGS <devicetree@vger.kernel.org>;
-> > > linuxppc- dev <linuxppc-dev@lists.ozlabs.org>; lkml
-> > > <linux-kernel@vger.kernel.org>; moderated list:ARM/FREESCALE IMX /
-> > > MXC ARM ARCHITECTURE <linux-arm- kernel@lists.infradead.org>
-> > > Subject: Re: [PATCH 3/3] soc: fsl: add RCPM driver
-> > >
-> > > On Tue, Sep 4, 2018 at 9:58 PM Wang, Dongsheng
-> <dongsheng.wang@hxt-
-> > > semitech.com> wrote:
-> > > >
-> > > > Please change your comments style.
-> > >
-> > > Although this doesn't get into the Linux kernel coding style
-> > > documentation yet, Linus seems changed his mind to prefer // than /*
-> > > */ comment style now.
-> > > https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fl
-> > >
-> kml .org%2Flkml%2F2017%2F11%2F25%2F133&amp;data=02%7C01%7Cran.w
-> ang_
-> > >
-> 1%40nxp.com%7Cc0d88e6690384e02b95108d612dec235%7C686ea1d3bc2b4c
-> > >
-> 6fa92cd99c5c301635%7C0%7C0%7C636717145285126200&amp;sdata=JIoCZp
-> > >
-> WhRyW76EqgSflfTDA1f0gMQGKa%2FcbvSc5CO%2Fw%3D&amp;reserved=0
-> > > So the
-> > > // style should be acceptable for now.
-> > >
-> > > >
-> > > > On 2018/8/31 11:56, Ran Wang wrote:
-> > > > > The NXP's QorIQ Processors based on ARM Core have RCPM module
-> > > > > (Run Control and Power Management), which performs all
-> > > > > device-level tasks associated with power management such as
-> wakeup source control.
-> > > > >
-> > > > > This driver depends on FSL platform PM driver framework which
-> > > > > help to isolate user and PM service provider (such as RCPM driver).
-> > > > >
-> > > > > Signed-off-by: Chenhui Zhao <chenhui.zhao@nxp.com>
-> > > > > Signed-off-by: Ying Zhang <ying.zhang22455@nxp.com>
-> > > > > Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
-> > > > > ---
-> > > > >  drivers/soc/fsl/Kconfig   |    6 ++
-> > > > >  drivers/soc/fsl/Makefile  |    1 +
-> > > > >  drivers/soc/fsl/ls-rcpm.c |  153
-> > > > > +++++++++++++++++++++++++++++++++++++++++++++
-> > > > >  3 files changed, 160 insertions(+), 0 deletions(-)  create mode
-> > > > > 100644 drivers/soc/fsl/ls-rcpm.c
-> > > > >
-> > > > > diff --git a/drivers/soc/fsl/Kconfig b/drivers/soc/fsl/Kconfig
-> > > > > index 6517412..882330d 100644
-> > > > > --- a/drivers/soc/fsl/Kconfig
-> > > > > +++ b/drivers/soc/fsl/Kconfig
-> > > > > @@ -30,3 +30,9 @@ config FSL_PLAT_PM
-> > > > >         have to know the implement details of wakeup function it
-> require.
-> > > > >         Besides, it is also easy for service side to upgrade its logic when
-> > > > >         design changed and remain user side unchanged.
-> > > > > +
-> > > > > +config LS_RCPM
-> > > > > +     bool "Freescale RCPM support"
-> > > > > +     depends on (FSL_PLAT_PM)
-> > > > > +     help
-> > > > > +       This feature is to enable specified wakeup source for system
-> sleep.
-> > > > > diff --git a/drivers/soc/fsl/Makefile b/drivers/soc/fsl/Makefile
-> > > > > index 8f9db23..43ff71a 100644
-> > > > > --- a/drivers/soc/fsl/Makefile
-> > > > > +++ b/drivers/soc/fsl/Makefile
-> > > > > @@ -7,3 +7,4 @@ obj-$(CONFIG_QUICC_ENGINE)            += qe/
-> > > > >  obj-$(CONFIG_CPM)                    += qe/
-> > > > >  obj-$(CONFIG_FSL_GUTS)                       += guts.o
-> > > > >  obj-$(CONFIG_FSL_PLAT_PM)    += plat_pm.o
-> > > > > +obj-$(CONFIG_LS_RCPM)                += ls-rcpm.o
-> > >
-> > > Probably use "_" instead of "-" for alignment.
-> >
-> > OK, will update in next version
-> >
-> > > > > diff --git a/drivers/soc/fsl/ls-rcpm.c
-> > > > > b/drivers/soc/fsl/ls-rcpm.c new file mode 100644 index
-> > > > > 0000000..b0feb88
-> > > > > --- /dev/null
-> > > > > +++ b/drivers/soc/fsl/ls-rcpm.c
-> > > > > @@ -0,0 +1,153 @@
-> > > > > +// SPDX-License-Identifier: GPL-2.0 // // plat_pm.c - Freescale
-> > > > > +Layerscape RCPM driver
-> > >
-> > > The file name here is not the same as the real file name.
-> >
-> > Got it, will correct it.
-> >
-> > > > > +//
-> > > > > +// Copyright 2018 NXP
-> > > > > +//
-> > > > > +// Author: Ran Wang <ran.wang_1@nxp.com>,
-> > >
-> > > Where do you need the comma in the end?
-> >
-> > My bad, will remove comma in next version.
-> >
-> > > > > +
-> > > > > +#include <linux/init.h>
-> > > > > +#include <linux/module.h>
-> > > > > +#include <linux/platform_device.h> #include
-> > > > > +<linux/of_address.h> #include <linux/slab.h> #include
-> > > > > +<soc/fsl/plat_pm.h>
-> > > > > +
-> > > > > +#define MAX_COMPATIBLE_NUM   10
-> > > > > +
-> > > > > +struct rcpm_t {
-> > > > > +     struct device *dev;
-> > > > > +     void __iomem *ippdexpcr_addr;
-> > > > > +     bool big_endian;        /* Big/Little endian of RCPM module */
-> > > > > +};
-> > > > > +
-> > > > > +// rcpm_handle - Configure RCPM reg according to wake up source
-> > > > > +request // @user_dev: pointer to user's device struct // @flag:
-> > > > > +to
-> > > > > +enable(true) or disable(false) wakeup source // @handle_priv:
-> > > > > +pointer to struct rcpm_t instance // // Return 0 on success
-> > > > > +other negative errno
-> > >
-> > > Although Linus preferred this // comment style.  I'm not sure if
-> > > this will be handled correctly by the kernel-doc compiler.
-> > >
-> https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fw
-> > > w
-> > > w.kernel.org%2Fdoc%2Fhtml%2Fv4.18%2Fdoc-guide%2Fkernel-
-> > >
-> doc.html&amp;data=02%7C01%7Cran.wang_1%40nxp.com%7Cc0d88e669038
-> > >
-> 4e02b95108d612dec235%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0%7C0
-> > > %7C636717145285126200&amp;sdata=H7GkUNOLVG%2FCcZESzhtHBeHC
-> bO9
-> > > %2FK4k9EdH30Cxq2%2BM%3D&amp;reserved=0
-> >
-> > So, do you think I need to change all comment style back to '/* ... */' ?
-> > Actually I feel a little bit confused here.
-> 
-> I think Linus's comment about // comment style applies to normal code
-> comment.  But kernel-doc comment is a special kind of code comment that
-> needs to meet certain requirements.  People can use the scripts/kernel-doc
-> tool to generate readable API documents from the source code.  It looks like
-> you wanted to make the function description aligned with the kernel-doc
-> format, but kernel-doc specifically requires to use the /* */ style(at least for
-> now).
+BUG=b:113973051
+TEST=None
 
-OK, will change style back to /* */.
+Signed-off-by: Pi-Hsun Shih <pihsun@chromium.org>
 
-Regards,
-Ran
+Change-Id: I23e218cd964f16c0b2b26127d4a5ca6529867673
+---
+ drivers/spi/spi-mt65xx.c | 37 +++++++++++++++++++++----------------
+ 1 file changed, 21 insertions(+), 16 deletions(-)
 
-> Regards,
-> Leo
+diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
+index 86bf45667a040..3dc31627c6558 100644
+--- a/drivers/spi/spi-mt65xx.c
++++ b/drivers/spi/spi-mt65xx.c
+@@ -98,6 +98,7 @@ struct mtk_spi {
+ 	struct clk *parent_clk, *sel_clk, *spi_clk;
+ 	struct spi_transfer *cur_transfer;
+ 	u32 xfer_len;
++	u32 num_xfered;
+ 	struct scatterlist *tx_sgl, *rx_sgl;
+ 	u32 tx_sgl_len, rx_sgl_len;
+ 	const struct mtk_spi_compatible *dev_comp;
+@@ -385,6 +386,7 @@ static int mtk_spi_fifo_transfer(struct spi_master *master,
+ 
+ 	mdata->cur_transfer = xfer;
+ 	mdata->xfer_len = min(MTK_SPI_MAX_FIFO_SIZE, xfer->len);
++	mdata->num_xfered = 0;
+ 	mtk_spi_prepare_transfer(master, xfer);
+ 	mtk_spi_setup_packet(master);
+ 
+@@ -415,6 +417,7 @@ static int mtk_spi_dma_transfer(struct spi_master *master,
+ 	mdata->tx_sgl_len = 0;
+ 	mdata->rx_sgl_len = 0;
+ 	mdata->cur_transfer = xfer;
++	mdata->num_xfered = 0;
+ 
+ 	mtk_spi_prepare_transfer(master, xfer);
+ 
+@@ -482,7 +485,7 @@ static int mtk_spi_setup(struct spi_device *spi)
+ 
+ static irqreturn_t mtk_spi_interrupt(int irq, void *dev_id)
+ {
+-	u32 cmd, reg_val, cnt, remainder;
++	u32 cmd, reg_val, cnt, remainder, len;
+ 	struct spi_master *master = dev_id;
+ 	struct mtk_spi *mdata = spi_master_get_devdata(master);
+ 	struct spi_transfer *trans = mdata->cur_transfer;
+@@ -497,36 +500,38 @@ static irqreturn_t mtk_spi_interrupt(int irq, void *dev_id)
+ 		if (trans->rx_buf) {
+ 			cnt = mdata->xfer_len / 4;
+ 			ioread32_rep(mdata->base + SPI_RX_DATA_REG,
+-				     trans->rx_buf, cnt);
++				     trans->rx_buf + mdata->num_xfered, cnt);
+ 			remainder = mdata->xfer_len % 4;
+ 			if (remainder > 0) {
+ 				reg_val = readl(mdata->base + SPI_RX_DATA_REG);
+-				memcpy(trans->rx_buf + (cnt * 4),
+-					&reg_val, remainder);
++				memcpy(trans->rx_buf +
++					mdata->num_xfered +
++					(cnt * 4),
++					&reg_val,
++					remainder);
+ 			}
+ 		}
+ 
+-		trans->len -= mdata->xfer_len;
+-		if (!trans->len) {
++		mdata->num_xfered += mdata->xfer_len;
++		if (mdata->num_xfered == trans->len) {
+ 			spi_finalize_current_transfer(master);
+ 			return IRQ_HANDLED;
+ 		}
+ 
+-		if (trans->tx_buf)
+-			trans->tx_buf += mdata->xfer_len;
+-		if (trans->rx_buf)
+-			trans->rx_buf += mdata->xfer_len;
+-
+-		mdata->xfer_len = min(MTK_SPI_MAX_FIFO_SIZE, trans->len);
++		len = trans->len - mdata->num_xfered;
++		mdata->xfer_len = min(MTK_SPI_MAX_FIFO_SIZE, len);
+ 		mtk_spi_setup_packet(master);
+ 
+-		cnt = trans->len / 4;
+-		iowrite32_rep(mdata->base + SPI_TX_DATA_REG, trans->tx_buf, cnt);
++		cnt = len / 4;
++		iowrite32_rep(mdata->base + SPI_TX_DATA_REG,
++				trans->tx_buf + mdata->num_xfered, cnt);
+ 
+-		remainder = trans->len % 4;
++		remainder = len % 4;
+ 		if (remainder > 0) {
+ 			reg_val = 0;
+-			memcpy(&reg_val, trans->tx_buf + (cnt * 4), remainder);
++			memcpy(&reg_val,
++				trans->tx_buf + (cnt * 4) + mdata->num_xfered,
++				remainder);
+ 			writel(reg_val, mdata->base + SPI_TX_DATA_REG);
+ 		}
+ 
+-- 
+2.19.0.rc2.392.g5ba43deb5a-goog
