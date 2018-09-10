@@ -1,65 +1,86 @@
-From: ndesaulniers@google.com (Nick Desaulniers)
-Date: Mon, 10 Sep 2018 10:02:09 -0700
-Subject: [PATCH] arch/arm64/include/asm/jump_label.h: use asm_volatile_goto
-In-Reply-To: <20180910095008.GB31531@arm.com>
-References: <20180909154731.GA20381@gmail.com> <20180910095008.GB31531@arm.com>
-Message-ID: <CAKwvOdn3SgUhPSUBwBm26X-Y3te1iYqwS9v=nyGCzC6KVNtJ6Q@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 10 Sep 2018 19:05:01 +0200
+Subject: [PATCH] ARM: s3c24xx: Consistently use tab for indenting member
+ assignments
+Message-ID: <20180910170501.14190-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2018 at 2:49 AM Will Deacon <will.deacon@arm.com> wrote:
->
-> On Sun, Sep 09, 2018 at 05:47:31PM +0200, Miguel Ojeda wrote:
-> > All other uses of "asm goto" go through asm_volatile_goto
-> > (including the arm version of the same file). For consistency,
-> > use it here as well.
-> >
-> > Cc: Nick Desaulniers <ndesaulniers@google.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Signed-off-by: Miguel Ojeda <miguel.ojeda.sandonis@gmail.com>
-> > ---
-> >  arch/arm64/include/asm/jump_label.h | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> Thanks, I'll pick this up as a fix.
->
-> Will
->
-> > diff --git a/arch/arm64/include/asm/jump_label.h b/arch/arm64/include/asm/jump_label.h
-> > index 1b5e0e843c3a..7e2b3e360086 100644
-> > --- a/arch/arm64/include/asm/jump_label.h
-> > +++ b/arch/arm64/include/asm/jump_label.h
-> > @@ -28,7 +28,7 @@
-> >
-> >  static __always_inline bool arch_static_branch(struct static_key *key, bool branch)
-> >  {
-> > -     asm goto("1: nop\n\t"
-> > +     asm_volatile_goto("1: nop\n\t"
-> >                ".pushsection __jump_table,  \"aw\"\n\t"
-> >                ".align 3\n\t"
-> >                ".quad 1b, %l[l_yes], %c0\n\t"
-> > @@ -42,7 +42,7 @@ static __always_inline bool arch_static_branch(struct static_key *key, bool bran
-> >
-> >  static __always_inline bool arch_static_branch_jump(struct static_key *key, bool branch)
-> >  {
-> > -     asm goto("1: b %l[l_yes]\n\t"
-> > +     asm_volatile_goto("1: b %l[l_yes]\n\t"
-> >                ".pushsection __jump_table,  \"aw\"\n\t"
-> >                ".align 3\n\t"
-> >                ".quad 1b, %l[l_yes], %c0\n\t"
-> > --
-> > 2.17.1
-> >
+Code was mixing spaces and tabs for indenting members in structures.
 
-Yes, this should help avoid a known miscompile in gcc < 4.8.2 (at
-least for x86_64; not sure how backend specific the asm goto
-implementation is in gcc, but this shouldn't hurt).
-https://lkml.org/lkml/2018/9/7/1628
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+---
+ arch/arm/mach-s3c24xx/mach-mini2440.c | 40 +++++++++++++++++------------------
+ 1 file changed, 20 insertions(+), 20 deletions(-)
 
-Reviewed-by: Nick Desaulniers <ndesaulniers@google.com>
-
+diff --git a/arch/arm/mach-s3c24xx/mach-mini2440.c b/arch/arm/mach-s3c24xx/mach-mini2440.c
+index 4a0bf6abba8c..925ff1b3198e 100644
+--- a/arch/arm/mach-s3c24xx/mach-mini2440.c
++++ b/arch/arm/mach-s3c24xx/mach-mini2440.c
+@@ -70,25 +70,25 @@ static struct map_desc mini2440_iodesc[] __initdata = {
+ 
+ static struct s3c2410_uartcfg mini2440_uartcfgs[] __initdata = {
+ 	[0] = {
+-		.hwport	     = 0,
+-		.flags	     = 0,
+-		.ucon	     = UCON,
+-		.ulcon	     = ULCON,
+-		.ufcon	     = UFCON,
++		.hwport		= 0,
++		.flags		= 0,
++		.ucon		= UCON,
++		.ulcon		= ULCON,
++		.ufcon		= UFCON,
+ 	},
+ 	[1] = {
+-		.hwport	     = 1,
+-		.flags	     = 0,
+-		.ucon	     = UCON,
+-		.ulcon	     = ULCON,
+-		.ufcon	     = UFCON,
++		.hwport		= 1,
++		.flag		= 0,
++		.ucon		= UCON,
++		.ulcon		= ULCON,
++		.ufcon		= UFCON,
+ 	},
+ 	[2] = {
+-		.hwport	     = 2,
+-		.flags	     = 0,
+-		.ucon	     = UCON,
+-		.ulcon	     = ULCON,
+-		.ufcon	     = UFCON,
++		.hwport		= 2,
++		.flags		= 0,
++		.ucon		= UCON,
++		.ulcon		= ULCON,
++		.ufcon		= UFCON,
+ 	},
+ };
+ 
+@@ -234,10 +234,10 @@ static struct s3c2410fb_mach_info mini2440_fb_info __initdata = {
+ /* MMC/SD  */
+ 
+ static struct s3c24xx_mci_pdata mini2440_mmc_cfg __initdata = {
+-	.gpio_detect   = S3C2410_GPG(8),
+-	.gpio_wprotect = S3C2410_GPH(8),
+-	.set_power     = NULL,
+-	.ocr_avail     = MMC_VDD_32_33|MMC_VDD_33_34,
++	.gpio_detect	= S3C2410_GPG(8),
++	.gpio_wprotect	= S3C2410_GPH(8),
++	.set_power	= NULL,
++	.ocr_avail	= MMC_VDD_32_33|MMC_VDD_33_34,
+ };
+ 
+ /* NAND Flash on MINI2440 board */
+@@ -285,7 +285,7 @@ static struct s3c2410_platform_nand mini2440_nand_info __initdata = {
+ 	.nr_sets	= ARRAY_SIZE(mini2440_nand_sets),
+ 	.sets		= mini2440_nand_sets,
+ 	.ignore_unset_ecc = 1,
+-	.ecc_mode       = NAND_ECC_HW,
++	.ecc_mode	= NAND_ECC_HW,
+ };
+ 
+ /* DM9000AEP 10/100 ethernet controller */
 -- 
-Thanks,
-~Nick Desaulniers
+2.14.1
