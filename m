@@ -1,32 +1,31 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Mon, 10 Sep 2018 13:30:30 +0200
-Subject: [PATCH 3/4] ARM: mmp2: initialize clocks before the timer
+Date: Mon, 10 Sep 2018 13:30:29 +0200
+Subject: [PATCH 2/4] DT: marvell,mmp2: add clock to the timer
 In-Reply-To: <20180910113031.42634-1-lkundrak@v3.sk>
 References: <20180910113031.42634-1-lkundrak@v3.sk>
-Message-ID: <20180910113031.42634-4-lkundrak@v3.sk>
+Message-ID: <20180910113031.42634-3-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The timer shall enable its clock.
+The timer needs the timer clock to be enabled, otherwise it stops
+ticking.
 
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
 ---
- arch/arm/mach-mmp/mmp2-dt.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/mmp2.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-mmp/mmp2-dt.c b/arch/arm/mach-mmp/mmp2-dt.c
-index 0341359b24a4..50c5e8b5be3d 100644
---- a/arch/arm/mach-mmp/mmp2-dt.c
-+++ b/arch/arm/mach-mmp/mmp2-dt.c
-@@ -26,8 +26,8 @@ static void __init mmp_init_time(void)
- #ifdef CONFIG_CACHE_TAUROS2
- 	tauros2_init(0);
- #endif
--	mmp_dt_init_timer();
- 	of_clk_init(NULL);
-+	mmp_dt_init_timer();
- }
+diff --git a/arch/arm/boot/dts/mmp2.dtsi b/arch/arm/boot/dts/mmp2.dtsi
+index 766bbb8495b6..58e0098a007d 100644
+--- a/arch/arm/boot/dts/mmp2.dtsi
++++ b/arch/arm/boot/dts/mmp2.dtsi
+@@ -130,6 +130,7 @@
+ 				compatible = "mrvl,mmp-timer";
+ 				reg = <0xd4014000 0x100>;
+ 				interrupts = <13>;
++				clocks = <&soc_clocks MMP2_CLK_TIMER>;
+ 			};
  
- static const char *const mmp2_dt_board_compat[] __initconst = {
+ 			uart1: uart at d4030000 {
 -- 
 2.17.1
