@@ -1,76 +1,66 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Mon, 10 Sep 2018 14:22:24 +0200
-Subject: [PATCH v2 01/16] nvmem: remove unused APIs
-In-Reply-To: <20180910141820.6c715895@bbrezillon>
-References: <20180907100750.14564-1-brgl@bgdev.pl>
- <20180907100750.14564-2-brgl@bgdev.pl>
- <c0b0c411-65f6-62f9-6d6d-2884e5a17250@linaro.org>
- <CAMRc=MfO01EQAfY4Uu3UwzzvhVOMF7_BpCOPVz2yVXqDgpb0AA@mail.gmail.com>
- <7e138142-8161-3646-4daf-619995baf395@linaro.org>
- <CAMRc=Mduu4CmLX5DFtJd8NSbzs5g65U9AmM=rbscit0JyQKVAQ@mail.gmail.com>
- <3dbd65e5-c948-a784-0362-930fc41b840e@linaro.org>
- <CAMRc=Mck=rAJ6jbm57ZecJWNvOYR5pjLy0JnyxFzA8kFvoK7Ew@mail.gmail.com>
- <ec2ba4af-46cf-2025-1670-cbed366d0f15@linaro.org>
- <20180910141820.6c715895@bbrezillon>
-Message-ID: <CAMRc=Mdew1s35=M+vh=Fxc--0+rYxRXT96KVOJRhAX9f8QwtkA@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 10 Sep 2018 15:24:37 +0300
+Subject: omap4: support for manually updated display
+In-Reply-To: <797c13fa-7a5b-a809-7dd0-14b01a3046be@ti.com>
+References: <20180830090456.GA17277@amd>
+ <797c13fa-7a5b-a809-7dd0-14b01a3046be@ti.com>
+Message-ID: <3205865.8O8aibZXye@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-09-10 14:18 GMT+02:00 Boris Brezillon <boris.brezillon@bootlin.com>:
-> Hi Srinivas,
->
-> On Mon, 10 Sep 2018 12:47:19 +0100
-> Srinivas Kandagatla <srinivas.kandagatla@linaro.org> wrote:
->
->> On 10/09/18 12:31, Bartosz Golaszewski wrote:
->> > About that: there are no users of nvmem_device_cell_read/write()
->> > currently and with the new API I'm not sure this is still needed. Are
->> > you alright with removing those two?
->>
->> Why do you want to remove them? Other than reason of no users.
->
-> I'm just sharing my (and probably other maintainers/developers) PoV
-> here, so please don't take this as an attempt to force you to change
-> your mind, but rather an attempt at explaining why APIs usually stay
-> private when they have no users.
->
-> Kernel maintainers tend to reject APIs that have no users because
-> adding something that nobody needs yet is hard to get right. I mean,
-> you can design an API on what you think will be needed/appropriate, and
-> then, when people actually start needing this feature, they realize it
-> does not quite match what they need, and they have to adjust/rework
-> this API.
->
->>
->> All it boils down to if we support device based apis using cell info or
->> not?
->
-> But it looks like nobody is actually using it, and the first potential
-> user (Bart) proposed a different approach with the nvmem cell table
-> declaration.
->
->> IMO, I see no harm in leaving these apis as it is, unless there is a
->> strong reason to do so.
->
-> It's harmless, but it's also unused. If people start using it and you
-> realize the API is not working for some use cases, then you'll have to
-> patch all existing users.
->
-> All this being said, it's your call to make, and if you think it makes
-> sense to keep these functions around for any reason, then be it.
->
+Hello,
 
-Also: the general notion in most subsystems is that drivers should be
-generalized enough to not have to care about the provider's internals,
-which is the case if we allow users to specify cell info. They should
-just query the subsystem for a given resource, use it, then put it.
-Fortunately this is what all current users do in this case - we don't
-even have any users of nvmem_device_get() which is good since it
-should be reserved for very special cases.
+On Monday, 10 September 2018 14:59:23 EEST Tomi Valkeinen wrote:
+> Hi Pavel,
+> 
+> (dropping Dave, no need to spam him)
+> 
+> On 30/08/18 12:04, Pavel Machek wrote:
+> > Hi!
+> > 
+> > There's neat series of patches on
+> > 
+> > https://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git/log/
+> > ?h=droid4-pending-v4.19
+> > 
+> > They enable display support for my hardware. As you can imagine,
+> > display is rather important for a cellphone.
+> > 
+> > Tomi, can you take the patches? I can resubmit them in email, or
+> > shuffle them to another branch without mfd changes, or clean them up
+> > etc...
+> 
+> A large omapdrm change set from Laurent was merged into drm-next, and
+> I'm certain they conflict with this series. Laurent also has continued
+> that work, and while those new patches haven't been sent for review yet,
+> I fear they'll also conflict with these.
+> 
+> So in the minimum, a rebase on top of drm-next is needed.
+> 
+> I also continue to be very worried that adding DSI support to omapdrm at
+> this stage will be a huge extra burden for Laurent's work.
+> 
+> We should transform the panel-dsi-cm.c towards the common DRM model.
+> With a quick look, there seems to be a driver for Samsung's S6E63J0X03
+> panel. So possibly all the DSI features are there in the DRM framework,
+> but someone needs to check that and start working on panel-dsi-cm.c so
+> that it's ready when we finally switch to the DRM model.
+> 
+> In my opinion, which I've also expressed before, the above work is much
+> easier to do by first changing the omapdrm to DRM model, without any DSI
+> displays, and then add the DSI command mode support. But if people
+> insist on adding the DSI support already now, I would appreciate the
+> same people working on the DSI support so that Laurent doesn't have to
+> do it all.
 
-While one can argue that nvmem_device_cell_read/write() may be needed
-in some strange corner case now, once we add the cell lookup API, we
-can safely remove it and force users to do the right thing.
+I want to make it clear that I don't want to claim any privilege in getting 
+patches merged first. I am however worried that, without an easy way to test 
+DSI support, and without enough time to focus on it, I would break whatever 
+would be merged now in future reworks. I would thus like to find out how to 
+collaborate on this task, hopefully to move towards usage of drm_bridge and 
+drm_panel for DSI-based pipelines.
 
-Best regards,
-Bartosz Golaszewski
+-- 
+Regards,
+
+Laurent Pinchart
