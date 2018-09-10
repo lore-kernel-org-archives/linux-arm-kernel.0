@@ -1,30 +1,58 @@
-From: katsuhiro@katsuster.net (Katsuhiro Suzuki)
-Date: Tue, 11 Sep 2018 01:39:32 +0900
-Subject: [PATCH] ASoC: rockchip: add missing INTERLEAVED PCM attribute
-Message-ID: <20180910163932.13722-1-katsuhiro@katsuster.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 10 Sep 2018 17:50:11 +0100
+Subject: [RFC 1/3] arm: mm: reordering memory type table
+In-Reply-To: <20180906102212.218294-2-minchan@kernel.org>
+References: <20180906102212.218294-1-minchan@kernel.org>
+ <20180906102212.218294-2-minchan@kernel.org>
+Message-ID: <20180910165011.zcighyuabshsmxjb@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds SNDRV_PCM_INFO_INTERLEAVED into PCM hardware info.
+On Thu, Sep 06, 2018 at 07:22:10PM +0900, Minchan Kim wrote:
+> diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
+> index 92fd2c8a9af0..91b99fadcba1 100644
+> --- a/arch/arm/include/asm/pgtable-2level.h
+> +++ b/arch/arm/include/asm/pgtable-2level.h
+> @@ -164,14 +164,23 @@
+>  #define L_PTE_MT_BUFFERABLE	(_AT(pteval_t, 0x01) << 2)	/* 0001 */
+>  #define L_PTE_MT_WRITETHROUGH	(_AT(pteval_t, 0x02) << 2)	/* 0010 */
+>  #define L_PTE_MT_WRITEBACK	(_AT(pteval_t, 0x03) << 2)	/* 0011 */
+> +#define L_PTE_MT_DEV_SHARED	(_AT(pteval_t, 0x04) << 2)	/* 0100 */
+>  #define L_PTE_MT_MINICACHE	(_AT(pteval_t, 0x06) << 2)	/* 0110 (sa1100, xscale) */
+>  #define L_PTE_MT_WRITEALLOC	(_AT(pteval_t, 0x07) << 2)	/* 0111 */
+> -#define L_PTE_MT_DEV_SHARED	(_AT(pteval_t, 0x04) << 2)	/* 0100 */
+> -#define L_PTE_MT_DEV_NONSHARED	(_AT(pteval_t, 0x0c) << 2)	/* 1100 */
+> +#if defined(CONFIG_CPU_V7) || defined(CONFIG_CPU_V7M) || \
+> +	defined (CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K)
+> +#define L_PTE_MT_DEV_WC		L_PTE_MT_BUFFERABLE
+> +#define L_PTE_MT_DEV_CACHED	L_PTE_MT_WRITEBACK
+> +#define L_PTE_MT_DEV_NONSHARED	L_PTE_MT_MINICACHE
 
-Signed-off-by: Katsuhiro Suzuki <katsuhiro@katsuster.net>
----
- sound/soc/rockchip/rockchip_pcm.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+I think you can just ignore v7M here, it doesn't have an MMU.
 
-diff --git a/sound/soc/rockchip/rockchip_pcm.c b/sound/soc/rockchip/rockchip_pcm.c
-index f77538319221..9e7b5fa4cf59 100644
---- a/sound/soc/rockchip/rockchip_pcm.c
-+++ b/sound/soc/rockchip/rockchip_pcm.c
-@@ -21,7 +21,8 @@ static const struct snd_pcm_hardware snd_rockchip_hardware = {
- 	.info			= SNDRV_PCM_INFO_MMAP |
- 				  SNDRV_PCM_INFO_MMAP_VALID |
- 				  SNDRV_PCM_INFO_PAUSE |
--				  SNDRV_PCM_INFO_RESUME,
-+				  SNDRV_PCM_INFO_RESUME |
-+				  SNDRV_PCM_INFO_INTERLEAVED,
- 	.period_bytes_min	= 32,
- 	.period_bytes_max	= 8192,
- 	.periods_min		= 1,
+You are defining L_PTE_MT_DEV_NONSHARED to L_PTE_MT_MINICACHE but what I
+think you just meant is index 6 in the cpu_v6_mt_table which I would use
+explicitly to avoid confusion.
+
+Anyway, on ARMv7 or ARMv6+LPAE, the non-shared device gets mapped to
+shared device in hardware. Looking through the arm32 code, it seems that
+MT_DEVICE_NONSHARED is used by arch/arm/mach-shmobile/setup-r8a7779.c
+and IIUC that's a v7 platform (R-Car H1, Cortex-A9). I think the above
+should be defined to L_PTE_MT_DEV_SHARED, unless I miss any place where
+DEV_NONSHARED is relevant on ARMv6 (adding Simon to confirm on
+shmobile).
+
+> diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+> index 81d0efb055c6..f896a30653fa 100644
+> --- a/arch/arm/mm/proc-macros.S
+> +++ b/arch/arm/mm/proc-macros.S
+> @@ -134,21 +134,21 @@
+>  	.macro	armv6_mt_table pfx
+>  \pfx\()_mt_table:
+
+Since you changed the MT index, you'd have to fix proc-v7-*levels.S  as
+well. If you define DEV_NONSHARED to SHARED, I think you only need to
+update the index for L_PTE_MT_VECTORS.
+
 -- 
-2.18.0
+Catalin
