@@ -1,53 +1,56 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 10 Sep 2018 17:28:11 +0300
-Subject: [PATCH 04/10] phy: dphy: Add configuration helpers
-In-Reply-To: <20180910141603.gnwpkmemevaxbi7b@flea>
-References: <cover.ee6158898d563fcc01d45c9652501180bccff0f0.1536138624.git-series.maxime.ripard@bootlin.com>
- <1923627.Ifno3EcWVN@avalon> <20180910141603.gnwpkmemevaxbi7b@flea>
-Message-ID: <3954754.hq6Pmoh9iE@avalon>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Mon, 10 Sep 2018 16:32:30 +0200
+Subject: [PATCH 5/5] ARM: sun8i: dts: drop A64 HDMI PHY fallback
+ compatible from R40 DT
+In-Reply-To: <20180910142354.5ldexkvnan6ohz4x@flea>
+References: <20180907072234.48282-1-icenowy@aosc.io>
+ <20180907072234.48282-6-icenowy@aosc.io>
+ <20180910142354.5ldexkvnan6ohz4x@flea>
+Message-ID: <1926288.mXGsSvSKgU@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-On Monday, 10 September 2018 17:16:03 EEST Maxime Ripard wrote:
-> On Fri, Sep 07, 2018 at 05:26:29PM +0300, Laurent Pinchart wrote:
-> >>>> + */
-> >>>> +int phy_mipi_dphy_get_default_config(unsigned long pixel_clock,
-> >>>> +				     unsigned int bpp,
-> >>>> +				     unsigned int lanes,
-> >>>> +				     struct phy_configure_opts_mipi_dphy *cfg)
-> >>>> +{
-> >>>> +	unsigned long hs_clk_rate;
-> >>>> +	unsigned long ui;
-> >>>> +
-> >>>> +	if (!cfg)
-> >>>> +		return -EINVAL;
-> >>> 
-> >>> Should we really expect cfg to be NULL ?
-> >> 
-> >> It avoids a kernel panic and it's not in a hot patch, so I'd say yes?
+Dne ponedeljek, 10. september 2018 ob 16:23:54 CEST je Maxime Ripard 
+napisal(a):
+> On Fri, Sep 07, 2018 at 03:22:34PM +0800, Icenowy Zheng wrote:
+> > The R40 HDMI PHY seems to be different to the A64 one, the A64 one
+> > has no input mux, but the R40 one has.
 > > 
-> > A few line below you divide by the lanes parameter without checking
-> > whether it is equal to 0 first, which would also cause issues.
+> > Drop the A64 fallback compatible from the HDMI PHY node in R40 DT.
+> > 
+> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> > ---
+> > 
+> >  arch/arm/boot/dts/sun8i-r40.dtsi | 3 +--
+> >  1 file changed, 1 insertion(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi
+> > b/arch/arm/boot/dts/sun8i-r40.dtsi index ffd9f00f74a4..5f547c161baf
+> > 100644
+> > --- a/arch/arm/boot/dts/sun8i-r40.dtsi
+> > +++ b/arch/arm/boot/dts/sun8i-r40.dtsi
+> > @@ -800,8 +800,7 @@
+> > 
+> >  		};
+> >  		
+> >  		hdmi_phy: hdmi-phy at 1ef0000 {
+> > 
+> > -			compatible = "allwinner,sun8i-r40-hdmi-phy",
+> > -				     "allwinner,sun50i-a64-hdmi-phy";
+> > +			compatible = "allwinner,sun8i-r40-hdmi-phy";
 > 
-> You say that like it would be a bad thing to test for this.
-> 
-> > I believe that invalid values in input parameters should only be handled
-> > explicitly when considered acceptable for the caller to pass such values.
-> > In this case a NULL cfg pointer is a bug in the caller, which would get
-> > noticed during development if the kernel panics.
-> 
-> In the common case, yes. In the case where that pointer is actually
-> being lost by the caller somewhere down the line and you have to wait
-> for a while before it happens, then having the driver inoperant
-> instead of just having a panic seems like the right thing to do.
+> If you could use the A64 phy before, you can still use it now.
 
-But why would it happen in the first place ? Why would the pointer be more 
-likely here to be NULL than to contain, for instance, an uninitialized value, 
-which we don't guard against ?
+Not exactly. Given that we don't know how to switch between HDMI PHY clock 
+parents on A64 (if it is actually connected at all, there is no information 
+about that in manual and AW didn't answered our questions, despite asking them 
+through different channels), A64 compatible will be associated with quirk, 
+which will tell that only one clock parent is usable.
 
--- 
-Regards,
+However, R40 HDMI PHY has definetly two clock parents, as it was tested by me 
+and Icenowy and we know how to switch between them without issues. 
+Technically, we could have A64 compatible there, but that would mean only 
+single PHY parent is considered instead of two.
 
-Laurent Pinchart
+Best regards,
+Jernej
