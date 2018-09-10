@@ -1,41 +1,55 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Mon, 10 Sep 2018 14:45:18 -0700
-Subject: [RFC PATCH i2c-next 1/2] dt-bindings: i2c: aspeed: Add
- 'idle-wait-timeout-ms' setting
-In-Reply-To: <20180910214519.14126-1-jae.hyun.yoo@linux.intel.com>
-References: <20180910214519.14126-1-jae.hyun.yoo@linux.intel.com>
-Message-ID: <20180910214519.14126-2-jae.hyun.yoo@linux.intel.com>
+From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
+Date: Mon, 10 Sep 2018 23:49:56 +0200
+Subject: [PATCH v2 0/3] ARM: OMAP1: ams-delta: Clean up GPIO setup for
+ MODEM
+In-Reply-To: <20180909234419.31261-1-jmkrzyszt@gmail.com>
+References: <20180820181333.2527-1-jmkrzyszt@gmail.com>
+ <20180909234419.31261-1-jmkrzyszt@gmail.com>
+Message-ID: <2690911.AdkODg5D9b@z50>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds 'idle-wait-timeout-ms' setting which can be used
-for bus idle waiting logic in multi-master environment.
+On Monday, September 10, 2018 1:44:16 AM CEST Janusz Krzysztofik wrote:
+> 
+> Convert modem related GPIO setup from integer space to GPIO descriptors.
+> Also, restore original initialization order of the MODEM device and its
+> related GPIO pins.
+> 
+> Cleanup of MODEM relaated regulator setup is postponed while waiting for
+> upcoming conversion of fixed regulator API to GPIO descriptors.
+> 
+> 
+> Janusz Krzysztofik (3):
+>       ARM: OMAP1: ams-delta: assign MODEM IRQ from GPIO descriptor
+>       ARM: OMAP1: ams-delta: initialize latch2 pins to safe values
+>       ARM: OMAP1: ams-delta: register MODEM device earlier
+> 
+> 
+> Changelog:
+> v2:
+> - rebased on v4.19-rc1
 
-Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
----
- Documentation/devicetree/bindings/i2c/i2c-aspeed.txt | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+Hi Tony,
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-aspeed.txt b/Documentation/devicetree/bindings/i2c/i2c-aspeed.txt
-index 8fbd8633a387..42ecaaf67172 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-aspeed.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-aspeed.txt
-@@ -13,9 +13,13 @@ Required Properties:
- - interrupts		: interrupt number
- 
- Optional Properties:
--- bus-frequency	: frequency of the bus clock in Hz defaults to 100 kHz when not
--		  specified
--- multi-master	: states that there is another master active on this bus.
-+- bus-frequency		: frequency of the bus clock in Hz defaults to 100 kHz
-+			  when not specified
-+- multi-master		: states that there is another master active on this
-+			  bus.
-+- idle-wait-timeout-ms	: bus idle waiting timeout in milliseconds when
-+			  multi-master is set, defaults to 100 ms when not
-+			  specified.
- 
- Example:
- 
--- 
-2.18.0
+I forgot to mention: please apply on top of "[PATCH v3 0/3] ARM: OMAP1: ams-
+delta: Complete driver gpiod migration" series. Sorry.
+
+Thanks,
+Janusz
+
+> - added Reviewed-by: obtained from Linus Walleij
+> 
+> Please ignore the patch "ARM: OMAP1: ams-delta: assign MODEM IRQ from GPIO"
+> sent alone on 2018-07-17.
+> 
+> Thanks,
+> Janusz
+> 
+> 
+> diffstat:
+>  board-ams-delta.c |  121 ++++++++++++++++++++++++++++++++++++++
++---------------
+>  board-ams-delta.h |    7 ---
+>  2 files changed, 88 insertions(+), 40 deletions(-)
+> 
+> 
