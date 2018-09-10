@@ -1,129 +1,404 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 10 Sep 2018 09:35:29 -0500
-Subject: [PATCH v2 6/9] kbuild: consolidate Devicetree dtb build rules
-In-Reply-To: <CAK7LNAS5uEUMDpL8oCJmFWKu1YF8tof5d=2h8jzt-MLHGAEAhg@mail.gmail.com>
-References: <20180905235327.5996-1-robh@kernel.org>
- <20180905235327.5996-7-robh@kernel.org>
- <CAK7LNAS5uEUMDpL8oCJmFWKu1YF8tof5d=2h8jzt-MLHGAEAhg@mail.gmail.com>
-Message-ID: <CAL_JsqKS+h0B5AuUh=vk0m1_7KSj4h2zZUo22rdt1w7oee=QwA@mail.gmail.com>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Mon, 10 Sep 2018 15:31:18 +0100
+Subject: [PATCH 5/5] arm64: dts: renesas: r8a774a1: Add VIN and CSI-2 nodes
+In-Reply-To: <1536589878-26218-1-git-send-email-biju.das@bp.renesas.com>
+References: <1536589878-26218-1-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <1536589878-26218-6-git-send-email-biju.das@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 9, 2018 at 6:28 PM Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
->
-> 2018-09-06 8:53 GMT+09:00 Rob Herring <robh@kernel.org>:
-> > There is nothing arch specific about building dtb files other than their
-> > location under /arch/*/boot/dts/. Keeping each arch aligned is a pain.
-> > The dependencies and supported targets are all slightly different.
-> > Also, a cross-compiler for each arch is needed, but really the host
-> > compiler preprocessor is perfectly fine for building dtbs. Move the
-> > build rules to a common location and remove the arch specific ones. This
-> > is done in a single step to avoid warnings about overriding rules.
-> >
-> > The build dependencies had been a mixture of 'scripts' and/or 'prepare'.
-> > These pull in several dependencies some of which need a target compiler
-> > (specifically devicetable-offsets.h) and aren't needed to build dtbs.
-> > All that is really needed is dtc, so adjust the dependencies to only be
-> > dtc.
-> >
-> > This change enables support 'dtbs_install' on some arches which were
-> > missing the target.
-> >
-> > Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
-> > Cc: Michal Marek <michal.lkml@markovi.net>
-> > Cc: Vineet Gupta <vgupta@synopsys.com>
-> > Cc: Russell King <linux@armlinux.org.uk>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
-> > Cc: Michal Simek <monstr@monstr.eu>
-> > Cc: Ralf Baechle <ralf@linux-mips.org>
-> > Cc: Paul Burton <paul.burton@mips.com>
-> > Cc: James Hogan <jhogan@kernel.org>
-> > Cc: Ley Foon Tan <lftan@altera.com>
-> > Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> > Cc: Paul Mackerras <paulus@samba.org>
-> > Cc: Michael Ellerman <mpe@ellerman.id.au>
-> > Cc: Chris Zankel <chris@zankel.net>
-> > Cc: Max Filippov <jcmvbkbc@gmail.com>
-> > Cc: linux-kbuild at vger.kernel.org
-> > Cc: linux-snps-arc at lists.infradead.org
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: uclinux-h8-devel at lists.sourceforge.jp
-> > Cc: linux-mips at linux-mips.org
-> > Cc: nios2-dev at lists.rocketboards.org
-> > Cc: linuxppc-dev at lists.ozlabs.org
-> > Cc: linux-xtensa at linux-xtensa.org
-> > Signed-off-by: Rob Herring <robh@kernel.org>
-> > ---
-> > Please ack so I can take the whole series via the DT tree.
-> >
-> > v2:
-> >  - Fix $arch/boot/dts path check for out of tree builds
-> >  - Fix dtc dependency for building built-in dtbs
-> >  - Fix microblaze built-in dtb building
-> >
-> >  Makefile                          | 32 +++++++++++++++++++++++++++++++
-> >  arch/arc/Makefile                 |  6 ------
-> >  arch/arm/Makefile                 | 20 +------------------
-> >  arch/arm64/Makefile               | 17 +---------------
-> >  arch/c6x/Makefile                 |  2 --
-> >  arch/h8300/Makefile               | 11 +----------
-> >  arch/microblaze/Makefile          |  4 +---
-> >  arch/microblaze/boot/dts/Makefile |  2 ++
-> >  arch/mips/Makefile                | 15 +--------------
-> >  arch/nds32/Makefile               |  2 +-
-> >  arch/nios2/Makefile               |  7 -------
-> >  arch/nios2/boot/Makefile          |  4 ----
-> >  arch/powerpc/Makefile             |  3 ---
-> >  arch/xtensa/Makefile              | 12 +-----------
-> >  scripts/Makefile.lib              |  2 +-
-> >  15 files changed, 42 insertions(+), 97 deletions(-)
-> >
-> > diff --git a/Makefile b/Makefile
-> > index 2b458801ba74..bc18dbbc16c5 100644
-> > --- a/Makefile
-> > +++ b/Makefile
-> > @@ -1212,6 +1212,32 @@ kselftest-merge:
-> >                 $(srctree)/tools/testing/selftests/*/config
-> >         +$(Q)$(MAKE) -f $(srctree)/Makefile olddefconfig
-> >
-> > +# ---------------------------------------------------------------------------
-> > +# Devicetree files
-> > +
-> > +ifneq ($(wildcard $(srctree)/arch/$(SRCARCH)/boot/dts/),)
-> > +dtstree := arch/$(SRCARCH)/boot/dts
-> > +endif
-> > +
-> > +ifdef CONFIG_OF_EARLY_FLATTREE
-> > +
-> > +%.dtb %.dtb.S %.dtb.o: | dtc
-> > +       $(Q)$(MAKE) $(build)=$(dtstree) $(dtstree)/$@
->
->
-> Hmm, I was worried about '%.dtb.o: | dtc'
-> but seems working.
->
-> Compiling %.S -> %.o requires objtool for x86,
-> but x86 does not support DT.
+Add VIN and CSI-2 nodes to RZ/G2M SoC dtsi.
 
-Well, x86 does support DT to some extent. There's 2 platforms and the
-DT unittests build and run on x86.
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+---
+ arch/arm64/boot/dts/renesas/r8a774a1.dtsi | 367 ++++++++++++++++++++++++++++++
+ 1 file changed, 367 insertions(+)
 
-Actually, we can remove "%.dtb.S %.dtb.o" because we don't need those
-as top-level build targets. Must have been a copy-n-paste relic from
-before having common rules.
-
->
-> If CONFIG_MODVERSIONS=y, scripts/genksyms/genksyms is required,
-> %.dtb.S does not contain EXPORT_SYMBOL.
-
-Okay, but that shouldn't affect any of this. We only build *.dtb.S
-when doing built-in dtbs.
-
-> BTW, 'dtc' should be a PHONY target.
-
-Right, I found that too.
-
-Rob
+diff --git a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+index d9005cb..43db993 100644
+--- a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+@@ -1127,6 +1127,262 @@
+ 			status = "disabled";
+ 		};
+ 
++		vin0: video at e6ef0000 {
++			compatible = "renesas,vin-r8a774a1";
++			reg = <0 0xe6ef0000 0 0x1000>;
++			interrupts = <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 811>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 811>;
++			renesas,id = <0>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					vin0csi20: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&csi20vin0>;
++					};
++					vin0csi40: endpoint at 2 {
++						reg = <2>;
++						remote-endpoint = <&csi40vin0>;
++					};
++				};
++			};
++		};
++
++		vin1: video at e6ef1000 {
++			compatible = "renesas,vin-r8a774a1";
++			reg = <0 0xe6ef1000 0 0x1000>;
++			interrupts = <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 810>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 810>;
++			renesas,id = <1>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					vin1csi20: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&csi20vin1>;
++					};
++					vin1csi40: endpoint at 2 {
++						reg = <2>;
++						remote-endpoint = <&csi40vin1>;
++					};
++				};
++			};
++		};
++
++		vin2: video at e6ef2000 {
++			compatible = "renesas,vin-r8a774a1";
++			reg = <0 0xe6ef2000 0 0x1000>;
++			interrupts = <GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 809>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 809>;
++			renesas,id = <2>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					vin2csi20: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&csi20vin2>;
++					};
++					vin2csi40: endpoint at 2 {
++						reg = <2>;
++						remote-endpoint = <&csi40vin2>;
++					};
++				};
++			};
++		};
++
++		vin3: video at e6ef3000 {
++			compatible = "renesas,vin-r8a774a1";
++			reg = <0 0xe6ef3000 0 0x1000>;
++			interrupts = <GIC_SPI 191 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 808>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 808>;
++			renesas,id = <3>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					vin3csi20: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&csi20vin3>;
++					};
++					vin3csi40: endpoint at 2 {
++						reg = <2>;
++						remote-endpoint = <&csi40vin3>;
++					};
++				};
++			};
++		};
++
++		vin4: video at e6ef4000 {
++			compatible = "renesas,vin-r8a774a1";
++			reg = <0 0xe6ef4000 0 0x1000>;
++			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 807>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 807>;
++			renesas,id = <4>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					vin4csi20: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&csi20vin4>;
++					};
++					vin4csi40: endpoint at 2 {
++						reg = <2>;
++						remote-endpoint = <&csi40vin4>;
++					};
++				};
++			};
++		};
++
++		vin5: video at e6ef5000 {
++			compatible = "renesas,vin-r8a774a1";
++			reg = <0 0xe6ef5000 0 0x1000>;
++			interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 806>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 806>;
++			renesas,id = <5>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					vin5csi20: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&csi20vin5>;
++					};
++					vin5csi40: endpoint at 2 {
++						reg = <2>;
++						remote-endpoint = <&csi40vin5>;
++					};
++				};
++			};
++		};
++
++		vin6: video at e6ef6000 {
++			compatible = "renesas,vin-r8a774a1";
++			reg = <0 0xe6ef6000 0 0x1000>;
++			interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 805>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 805>;
++			renesas,id = <6>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					vin6csi20: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&csi20vin6>;
++					};
++					vin6csi40: endpoint at 2 {
++						reg = <2>;
++						remote-endpoint = <&csi40vin6>;
++					};
++				};
++			};
++		};
++
++		vin7: video at e6ef7000 {
++			compatible = "renesas,vin-r8a774a1";
++			reg = <0 0xe6ef7000 0 0x1000>;
++			interrupts = <GIC_SPI 171 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 804>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 804>;
++			renesas,id = <7>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					vin7csi20: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&csi20vin7>;
++					};
++					vin7csi40: endpoint at 2 {
++						reg = <2>;
++						remote-endpoint = <&csi40vin7>;
++					};
++				};
++			};
++		};
++
+ 		rcar_sound: sound at ec500000 {
+ 			/*
+ 			 * #sound-dai-cells is required
+@@ -1614,6 +1870,117 @@
+ 			iommus = <&ipmmu_vc0 19>;
+ 		};
+ 
++		csi20: csi2 at fea80000 {
++			compatible = "renesas,r8a774a1-csi2";
++			reg = <0 0xfea80000 0 0x10000>;
++			interrupts = <GIC_SPI 184 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 714>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 714>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					csi20vin0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&vin0csi20>;
++					};
++					csi20vin1: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&vin1csi20>;
++					};
++					csi20vin2: endpoint at 2 {
++						reg = <2>;
++						remote-endpoint = <&vin2csi20>;
++					};
++					csi20vin3: endpoint at 3 {
++						reg = <3>;
++						remote-endpoint = <&vin3csi20>;
++					};
++					csi20vin4: endpoint at 4 {
++						reg = <4>;
++						remote-endpoint = <&vin4csi20>;
++					};
++					csi20vin5: endpoint at 5 {
++						reg = <5>;
++						remote-endpoint = <&vin5csi20>;
++					};
++					csi20vin6: endpoint at 6 {
++						reg = <6>;
++						remote-endpoint = <&vin6csi20>;
++					};
++					csi20vin7: endpoint at 7 {
++						reg = <7>;
++						remote-endpoint = <&vin7csi20>;
++					};
++				};
++			};
++		};
++
++		csi40: csi2 at feaa0000 {
++			compatible = "renesas,r8a774a1-csi2";
++			reg = <0 0xfeaa0000 0 0x10000>;
++			interrupts = <GIC_SPI 246 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 716>;
++			power-domains = <&sysc 32>;
++			resets = <&cpg 716>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					reg = <1>;
++
++					csi40vin0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&vin0csi40>;
++					};
++					csi40vin1: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&vin1csi40>;
++					};
++					csi40vin2: endpoint at 2 {
++						reg = <2>;
++						remote-endpoint = <&vin2csi40>;
++					};
++					csi40vin3: endpoint at 3 {
++						reg = <3>;
++						remote-endpoint = <&vin3csi40>;
++					};
++					csi40vin4: endpoint at 4 {
++						reg = <4>;
++						remote-endpoint = <&vin4csi40>;
++					};
++					csi40vin5: endpoint at 5 {
++						reg = <5>;
++						remote-endpoint = <&vin5csi40>;
++					};
++					csi40vin6: endpoint at 6 {
++						reg = <6>;
++						remote-endpoint = <&vin6csi40>;
++					};
++					csi40vin7: endpoint at 7 {
++						reg = <7>;
++						remote-endpoint = <&vin7csi40>;
++					};
++				};
++
++			};
++		};
++
+ 		prr: chipid at fff00044 {
+ 			compatible = "renesas,prr";
+ 			reg = <0 0xfff00044 0 4>;
+-- 
+2.7.4
