@@ -1,39 +1,18 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 10 Sep 2018 15:57:31 +0200
-Subject: [PATCH] arm64: dts: rockchip: add i2s and spdif endpoint of rk3328
-In-Reply-To: <20180906163956.20667-1-katsuhiro@katsuster.net>
-References: <20180906163956.20667-1-katsuhiro@katsuster.net>
-Message-ID: <2729174.Cl53sqNc79@phil>
+Date: Mon, 10 Sep 2018 16:14:47 +0200
+Subject: [PATCH] iommu: rockchip: Drop verbose prints in the interrupt
+ handler
+In-Reply-To: <20180830222832.16766-1-ezequiel@collabora.com>
+References: <20180830222832.16766-1-ezequiel@collabora.com>
+Message-ID: <3492511.ggRQRNLldU@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Am Donnerstag, 6. September 2018, 18:39:56 CEST schrieb Katsuhiro Suzuki:
-> This patch adds port and endpoint of i2s and spdif nodes for rk3328.
-> Because to use modern sound card interface such as audio-graph-card.
+Am Freitag, 31. August 2018, 00:28:32 CEST schrieb Ezequiel Garcia:
+> Printing verbosely via WARN macros and friends in interrupt handlers
+> is strongly discouraged. Drop them and use proper ratelimited
+> prints.
 > 
-> Signed-off-by: Katsuhiro Suzuki <katsuhiro@katsuster.net>
-> ---
->  arch/arm64/boot/dts/rockchip/rk3328.dtsi | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-> index d3ef6566325e..41f0a20b73ed 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-> +++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-> @@ -179,7 +179,13 @@
->  		clock-names = "i2s_clk", "i2s_hclk";
->  		dmas = <&dmac 11>, <&dmac 12>;
->  		dma-names = "tx", "rx";
-> +		#sound-dai-cells = <0>;
->  		status = "disabled";
-> +
-> +		i2s0_p0: port at 0 {
+> Signed-off-by: Ezequiel Garcia <ezequiel@collabora.com>
 
-there is only one port per device, so this should probably be
-	i2s0_p0: port {
-without the address. Same for all others.
-The of-graph framework should work just fine then as well.
-
-Heiko
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
