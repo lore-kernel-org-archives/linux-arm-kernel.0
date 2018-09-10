@@ -1,71 +1,99 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Mon, 10 Sep 2018 09:56:18 +0000
-Subject: [PATCH] arm64: dts: renesas: r8a774a1: Add CAN nodes
-In-Reply-To: <CAMuHMdUL0Ck=6er8rvx_kCSi7KR9kjBqjNRiLOL41nxeJXQG-w@mail.gmail.com>
-References: <1535034166-24798-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <CAMuHMdUL0Ck=6er8rvx_kCSi7KR9kjBqjNRiLOL41nxeJXQG-w@mail.gmail.com>
-Message-ID: <TY1PR01MB17706300DDF78B3067DC779DC0050@TY1PR01MB1770.jpnprd01.prod.outlook.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 10 Sep 2018 10:56:36 +0100
+Subject: [PATCH] KVM: arm/arm64: Check memslot bounds before mapping
+ hugepages
+In-Reply-To: <20180904163937.12759-1-koomi@moshbit.net>
+References: <20180904163937.12759-1-koomi@moshbit.net>
+Message-ID: <1e88db29-9bfd-7a47-ba36-c025c121c223@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Geert,
+Hi Lukas,
 
-Thank you for your feedback.
+On 04/09/18 17:39, Lukas Braun wrote:
+> Userspace can create a memslot with memory backed by (transparent)
+> hugepages, but with bounds that do not align with hugepages.
+> In that case, we cannot map the entire region in the guest as hugepages
+> without exposing additional host memory to the guest and potentially
+> interfering with other memslots.
+> Consequently, this patch adds a bounds check when populating guest page
+> tables and forces the creation of regular PTEs if mapping an entire
+> hugepage would violate the memslots bounds.
+> 
+> Signed-off-by: Lukas Braun <koomi@moshbit.net>
+> ---
+>  virt/kvm/arm/mmu.c | 15 +++++++++++++--
+>  1 file changed, 13 insertions(+), 2 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+> index ed162a6c57c5..bdbec1d136a1 100644
+> --- a/virt/kvm/arm/mmu.c
+> +++ b/virt/kvm/arm/mmu.c
+> @@ -1504,6 +1504,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  		hugetlb = true;
+>  		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
+>  	} else {
+> +		unsigned long pmd_fn_mask = PTRS_PER_PMD - 1;
+> +
+>  		/*
+>  		 * Pages belonging to memslots that don't have the same
+>  		 * alignment for userspace and IPA cannot be mapped using
+> @@ -1513,8 +1515,17 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  		 * unmapping, updates, and splits of the THP or other pages
+>  		 * in the stage-2 block range.
+>  		 */
+> -		if ((memslot->userspace_addr & ~PMD_MASK) !=
+> -		    ((memslot->base_gfn << PAGE_SHIFT) & ~PMD_MASK))
+> +		int aligned = ((memslot->userspace_addr & ~PMD_MASK) ==
+> +			((memslot->base_gfn << PAGE_SHIFT) & ~PMD_MASK));
 
-> Subject: Re: [PATCH] arm64: dts: renesas: r8a774a1: Add CAN nodes
->
-> Hi Fabrizio,
->
-> On Thu, Aug 23, 2018 at 4:22 PM Fabrizio Castro
-> <fabrizio.castro@bp.renesas.com> wrote:
-> > From: Chris Paterson <chris.paterson2@renesas.com>
-> >
-> > Add the device nodes for both RZ/G2M CAN channels.
-> >
-> > Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
-> > Reviewed-by: Biju Das <biju.das@bp.renesas.com>
-> > ---
-> >
-> > This patch depends on:
-> > https://lkml.org/lkml/2018/8/23/1049
-> > https://www.mail-archive.com/linux-renesas-soc at vger.kernel.org/msg30550.html
-> >
-> >
-> >  arch/arm64/boot/dts/renesas/r8a774a1.dtsi | 24 ++++++++++++++++++++++++
-> >  1 file changed, 24 insertions(+)
-> >
-> > diff --git a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-> > index 5d0109a..cd204f5 100644
-> > --- a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-> > +++ b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-> > @@ -816,6 +816,30 @@
-> >                         status = "disabled";
-> >                 };
-> >
-> > +               can0: can at e6c30000 {
-> > +                       compatible = "renesas,can-r8a774a1",
-> > +                                    "renesas,rzg-gen2-can";
->
-> Please don't introduce "renesas,rzg-gen2-can", cfr. my comments in
-> https://lore.kernel.org/lkml/CAMuHMdWPuqfXOgh_-qp8q6wATU3Lj_WpX0bAOxPBX76SKvyXCQ at mail.gmail.com/
+This should most probably be a bool, together with the in_bounds variable.
 
-Agreed, will send a v2.
+> +
+> +		/*
+> +		 * We also can't map a huge page if it would violate the bounds
+> +		 * of the containing memslot.
+> +		 */
+> +		int in_bounds = ((memslot->base_gfn <= (gfn & ~pmd_fn_mask)) &&
+> +			((memslot->base_gfn + memslot->npages) > (gfn | pmd_fn_mask)));
+
+It's the morning, and I haven't had much coffee, but this looks 
+confusing as hell. Most of the reasoning here is done in terms of 
+addresses, and you're now mixing it with a different unit, making the 
+result more unreadable.
+
+I find it easier to read it as:
+
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index b3c9cc73b0f1..3729ca414fc3 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1516,6 +1516,14 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		if ((memslot->userspace_addr & ~PMD_MASK) !=
+ 		    ((memslot->base_gfn << PAGE_SHIFT) & ~PMD_MASK))
+ 			force_pte = true;
++
++		/*
++		 * Force PTE mapping if a THP would lead to map
++		 * something outside of the memslot.
++		 */
++		if ((fault_ipa & S2_PMD_MASK) < (memslot->base_gfn << PAGE_SHIFT) ||
++		    ALIGN(fault_ipa, S2_PMD_SIZE) >= ((memslot->base_gfn + memslot->npages) << PAGE_SHIFT))
++			force_pte = true;
+ 	}
+ 	up_read(&current->mm->mmap_sem);
+ 
+which is of course completely untested.
+
+> +
+> +		if (!aligned || !in_bounds)
+>  			force_pte = true;
+>  	}
+>  	up_read(&current->mm->mmap_sem);
+> 
 
 Thanks,
-Fab
 
->
-> Gr{oetje,eeting}s,
->
->                         Geert
->
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
->
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
-
-
-
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
