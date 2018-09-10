@@ -1,58 +1,135 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 10 Sep 2018 16:16:03 +0200
-Subject: [PATCH 04/10] phy: dphy: Add configuration helpers
-In-Reply-To: <1923627.Ifno3EcWVN@avalon>
-References: <cover.ee6158898d563fcc01d45c9652501180bccff0f0.1536138624.git-series.maxime.ripard@bootlin.com>
- <3617916.Vq2Smf1hnZ@avalon> <20180907133739.6lvlw7wsdk4ffeua@flea>
- <1923627.Ifno3EcWVN@avalon>
-Message-ID: <20180910141603.gnwpkmemevaxbi7b@flea>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 10 Sep 2018 15:16:36 +0100
+Subject: [RFC/PATCH] arm64: Fix /proc/iomem for reserved but not memory regions
+Message-ID: <20180910141636.21813-1-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+commit 50d7ba36b916 ("arm64: export memblock_reserve()d regions via
+/proc/iomem") wrongly assumed that memblock_reserve() would not be used to
+reserve regions that aren't memory. It turns out, this is exactly what
+early_init_dt_reserve_memory_arch() will do if it finds a reservation
+that was also carved out of the memory node.
 
-On Fri, Sep 07, 2018 at 05:26:29PM +0300, Laurent Pinchart wrote:
-> > >> + */
-> > >> +int phy_mipi_dphy_get_default_config(unsigned long pixel_clock,
-> > >> +				     unsigned int bpp,
-> > >> +				     unsigned int lanes,
-> > >> +				     struct phy_configure_opts_mipi_dphy *cfg)
-> > >> +{
-> > >> +	unsigned long hs_clk_rate;
-> > >> +	unsigned long ui;
-> > >> +
-> > >> +	if (!cfg)
-> > >> +		return -EINVAL;
-> > > 
-> > > Should we really expect cfg to be NULL ?
-> > 
-> > It avoids a kernel panic and it's not in a hot patch, so I'd say yes?
-> 
-> A few line below you divide by the lanes parameter without checking whether it 
-> is equal to 0 first, which would also cause issues.
+reserve_memblock_reserved_regions() now needs to cope with reserved regions
+that aren't memory, which means we must walk two lists at once.
 
-You say that like it would be a bad thing to test for this.
+We can't use walk_system_ram_res() and reserve_region_with_split()
+together, as the former hands its callback a copied resource on
+the stack, where as the latter expects the in-tree resource to be
+provided.
 
-> I believe that invalid values in input parameters should only be handled 
-> explicitly when considered acceptable for the caller to pass such values. In 
-> this case a NULL cfg pointer is a bug in the caller, which would get noticed 
-> during development if the kernel panics.
+Allocate an array of struct resources during request_standard_resources()
+so that we have all the 'System RAM' regions on hand.
 
-In the common case, yes. In the case where that pointer is actually
-being lost by the caller somewhere down the line and you have to wait
-for a while before it happens, then having the driver inoperant
-instead of just having a panic seems like the right thing to do.
+Increasing the mem_idx cursor is optional as multiple memblock_reserved()
+regions may exist in one System RAM region.
+Because adjacent memblock_reserved() regions will be merged, we also need
+to consider multiple System RAM regions for one span of memblock_reserved()
+address space.
 
-Maxime
+Fixes: 50d7ba36b916 ("arm64: export memblock_reserve()d regions via /proc/iomem")
+Reported-by: John Stultz <john.stultz@linaro.org>
+CC: Akashi Takahiro <takahiro.akashi@linaro.org>
+CC: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: James Morse <james.morse@arm.com>
+---
+John, any chance you could give this a test on the platform that the warning
+fires on? Thanks!
 
+ arch/arm64/kernel/setup.c | 50 ++++++++++++++++++++++++---------------
+ 1 file changed, 31 insertions(+), 19 deletions(-)
+
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 5b4fac434c84..952c2b126882 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -64,6 +64,9 @@
+ #include <asm/xen/hypervisor.h>
+ #include <asm/mmu_context.h>
+ 
++static int num_standard_resources;
++static struct resource *standard_resources;
++
+ phys_addr_t __fdt_pointer __initdata;
+ 
+ /*
+@@ -206,14 +209,19 @@ static void __init request_standard_resources(void)
+ {
+ 	struct memblock_region *region;
+ 	struct resource *res;
++	unsigned long i = 0;
+ 
+ 	kernel_code.start   = __pa_symbol(_text);
+ 	kernel_code.end     = __pa_symbol(__init_begin - 1);
+ 	kernel_data.start   = __pa_symbol(_sdata);
+ 	kernel_data.end     = __pa_symbol(_end - 1);
+ 
++	num_standard_resources = memblock.memory.cnt;
++	standard_resources = alloc_bootmem_low(num_standard_resources *
++					       sizeof(*standard_resources));
++
+ 	for_each_memblock(memory, region) {
+-		res = alloc_bootmem_low(sizeof(*res));
++		res = &standard_resources[i++];
+ 		if (memblock_is_nomap(region)) {
+ 			res->name  = "reserved";
+ 			res->flags = IORESOURCE_MEM;
+@@ -244,8 +252,11 @@ static void __init request_standard_resources(void)
+ static int __init reserve_memblock_reserved_regions(void)
+ {
+ 	phys_addr_t start, end, roundup_end = 0;
+-	struct resource *mem, *res;
+-	u64 i;
++	struct resource *mem;
++	u64 i, mem_idx = 0;
++
++	if (!standard_resources)
++		return 0;
+ 
+ 	for_each_reserved_mem_region(i, &start, &end) {
+ 		if (end <= roundup_end)
+@@ -255,24 +266,25 @@ static int __init reserve_memblock_reserved_regions(void)
+ 		end = __pfn_to_phys(PFN_UP(end)) - 1;
+ 		roundup_end = end;
+ 
+-		res = kzalloc(sizeof(*res), GFP_ATOMIC);
+-		if (WARN_ON(!res))
+-			return -ENOMEM;
+-		res->start = start;
+-		res->end = end;
+-		res->name  = "reserved";
+-		res->flags = IORESOURCE_MEM;
++		while (start > standard_resources[mem_idx].end) {
++			mem_idx++;
++			if (mem_idx >= num_standard_resources)
++				return 0; /* no more 'System RAM' */
++		}
++		do {
++			mem = &standard_resources[mem_idx];
+ 
+-		mem = request_resource_conflict(&iomem_resource, res);
+-		/*
+-		 * We expected memblock_reserve() regions to conflict with
+-		 * memory created by request_standard_resources().
+-		 */
+-		if (WARN_ON_ONCE(!mem))
+-			continue;
+-		kfree(res);
++			if (mem->start > end)
++				continue; /* doesn't overlap with memory */
++
++			start = max(start, mem->start);
++			reserve_region_with_split(mem, start,
++						  min(end, mem->end),
++						  "reserved");
+ 
+-		reserve_region_with_split(mem, start, end, "reserved");
++			if (mem->end < end)
++				mem_idx++;
++		} while (mem->end < end && mem_idx < num_standard_resources);
+ 	}
+ 
+ 	return 0;
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180910/f063ef39/attachment.sig>
+2.18.0
