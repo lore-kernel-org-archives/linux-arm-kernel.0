@@ -1,36 +1,49 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 10 Sep 2018 16:19:26 +0100
-Subject: [PATCH v9 3/6] kernel/reboot.c: export pm_power_off_prepare
-In-Reply-To: <20180909020021.GA18838@dragon>
-References: <20180802103425.3053-1-o.rempel@pengutronix.de>
- <20180802103425.3053-4-o.rempel@pengutronix.de>
- <20180802104443.GH9117@sirena.org.uk>
- <94d48ecb-7302-c7ed-e815-730be0426a04@pengutronix.de>
- <20180802113552.GJ9117@sirena.org.uk>
- <20180827014815.GD29208@dragon>
- <20180906101516.GA5360@sirena.org.uk>
- <20180909020021.GA18838@dragon>
-Message-ID: <20180910151926.GA10889@sirena.org.uk>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Mon, 10 Sep 2018 10:21:50 -0500
+Subject: [PATCH 1/4] dt-bindings: mrvl,mmp-timer: add clock
+In-Reply-To: <20180910113031.42634-2-lkundrak@v3.sk>
+References: <20180910113031.42634-1-lkundrak@v3.sk>
+ <20180910113031.42634-2-lkundrak@v3.sk>
+Message-ID: <CAL_JsqKgJFZnpuv7rW6ovxMKi4Q2AngWxKa=CMR_Y+xD5Oh3GA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 09, 2018 at 10:00:23AM +0800, Shawn Guo wrote:
-> On Thu, Sep 06, 2018 at 11:15:17AM +0100, Mark Brown wrote:
+On Mon, Sep 10, 2018 at 6:30 AM Lubomir Rintel <lkundrak@v3.sk> wrote:
+>
+> The timer needs the timer clock to be enabled, otherwise it stops
+> ticking.
+>
+> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+> ---
+>  Documentation/devicetree/bindings/timer/mrvl,mmp-timer.txt | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/timer/mrvl,mmp-timer.txt b/Documentation/devicetree/bindings/timer/mrvl,mmp-timer.txt
+> index 9a6e251462e7..a2ede0bd12ca 100644
+> --- a/Documentation/devicetree/bindings/timer/mrvl,mmp-timer.txt
+> +++ b/Documentation/devicetree/bindings/timer/mrvl,mmp-timer.txt
+> @@ -4,10 +4,12 @@ Required properties:
+>  - compatible : Should be "mrvl,mmp-timer".
+>  - reg : Address and length of the register set of timer controller.
+>  - interrupts : Should be the interrupt number.
+> +- clocks : Should contain a single entry describing the clock input.
 
-> > I was expecting to get a pull request with the precursor patches in it -
-> > the regulator driver seems to get a moderate amount of development so
-> > there's a reasonable risk of conflicts.
+So now pxa910 and pxa168 dts files have errors because they are
+missing a required clock. Plus somehow other MMP2 platforms either
+worked without a clock or have been broken.
 
-> What about you create a stable topic branch for regulator patches and I
-> pull it into IMX tree?
+You can't add new required properties to a binding. That breaks
+backward compatibility.
 
-Sure, I can send a pull request back but the first two patches in the
-series are ARM ones - are you OK with me just applying them and sending
-them in the pull request or do you want to apply them first?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180910/a549cbdc/attachment.sig>
+Rob
+>
+>  Example:
+>         timer0: timer at d4014000 {
+>                 compatible = "mrvl,mmp-timer";
+>                 reg = <0xd4014000 0x100>;
+>                 interrupts = <13>;
+> +               clocks = <&coreclk 2>;
+>         };
+> --
+> 2.17.1
+>
