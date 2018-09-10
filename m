@@ -1,38 +1,88 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Mon, 10 Sep 2018 16:58:13 +0200
-Subject: [PATCH v2 00/16] nvmem: rework of the subsystem for non-DT users
-In-Reply-To: <dec727cf-486f-8126-34f8-1b1099cec3a1@linaro.org>
-References: <20180907100750.14564-1-brgl@bgdev.pl>
- <da9556fd-0022-8e6a-12b4-cc3babbae5b0@linaro.org>
- <CAMRc=MeT7UP57x+Q-a1ODRCvcGKKj_NSfkBLVQ9O5dhTC1DAYg@mail.gmail.com>
- <dec727cf-486f-8126-34f8-1b1099cec3a1@linaro.org>
-Message-ID: <CAMRc=Mdmi91=2zn-T0B8C2rxVhsXL9cHh7mx8RamYfBpfDjC=Q@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 10 Sep 2018 10:03:54 -0500
+Subject: [PATCH v3 0/9] Devicetree build consolidation
+Message-ID: <20180910150403.19476-1-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-09-10 12:02 GMT+02:00 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>:
->
->
-> On 10/09/18 09:24, Bartosz Golaszewski wrote:
->>
->> The API changes change so many things, that these series would be
->> incompatible. I can send the series separately but they would be
->> co-dependent anyway. Does it sound good?
->
->
-> What am asking is to reorder the patches in a such a way that its easy to
-> review.
-> ex: Order can be :
-> 1> kref and update nvmem_unregister followed by the provider changes.
-> 2> Add support to cell tables, cell lookup, notifier
-> 3> general cleanup patches  followed by fixes
->
-> Current set seems to jump from one thing to other which makes it hard to
-> follow and time consuming while review!
->
+This series addresses a couple of issues I have with building dts files.
 
-I would just change that ordering a bit: I think we should fix stuff
-that's broken first, so fix the name field of struct nvmem_device,
-then the rest as you listed it.
+First, the ability to build all the dts files in the tree. This has been
+supported on most arches for some time with powerpc being the main
+exception. The reason powerpc wasn't supported was it needed a change
+in the location built dtb files are put.
 
-Bart
+Secondly, it's a pain to acquire all the cross-compilers needed to build
+dtbs for each arch. There's no reason to build with the cross compiler and
+the host compiler is perfectly fine as we only need the pre-processor.
+
+I started addressing just those 2 problems, but kept finding small
+differences such as target dependencies and dtbs_install support across
+architectures. Instead of trying to align all these, I've consolidated the
+build targets moving them out of the arch makefiles.
+
+I'd like to take the series via the DT tree.
+
+Rob
+
+v3:
+ - Rework dtc dependency to avoid 2 entry paths to scripts/dtc/. Essentially,
+   I copied 'scripts_basic'.
+ - Add missing scripts_basic dependency for dtc and missing PHONY tag.
+ - Drop the '|' order only from dependencies
+ - Drop %.dtb.S and %.dtb.o as top-level targets
+ - PPC: remove duplicate mpc5200 dtbs from image-y targets
+
+v2:
+ - Fix $arch/boot/dts path check for out of tree builds
+ - Fix dtc dependency for building built-in dtbs
+ - Fix microblaze built-in dtb building
+ - Add dtbs target for microblaze
+
+Rob Herring (9):
+  powerpc: build .dtb files in dts directory
+  nios2: build .dtb files in dts directory
+  nios2: use common rules to build built-in dtb
+  nios2: fix building all dtbs
+  c6x: use common built-in dtb support
+  kbuild: consolidate Devicetree dtb build rules
+  powerpc: enable building all dtbs
+  c6x: enable building all dtbs
+  microblaze: enable building all dtbs
+
+ Makefile                           | 35 ++++++++++++++++++-
+ arch/arc/Makefile                  |  6 ----
+ arch/arm/Makefile                  | 20 +----------
+ arch/arm64/Makefile                | 17 +--------
+ arch/c6x/Makefile                  |  2 --
+ arch/c6x/boot/dts/Makefile         | 17 ++++-----
+ arch/c6x/boot/dts/linked_dtb.S     |  2 --
+ arch/c6x/include/asm/sections.h    |  1 -
+ arch/c6x/kernel/setup.c            |  4 +--
+ arch/c6x/kernel/vmlinux.lds.S      | 10 ------
+ arch/h8300/Makefile                | 11 +-----
+ arch/microblaze/Makefile           |  4 +--
+ arch/microblaze/boot/dts/Makefile  |  4 +++
+ arch/mips/Makefile                 | 15 +-------
+ arch/nds32/Makefile                |  2 +-
+ arch/nios2/Makefile                | 11 +-----
+ arch/nios2/boot/Makefile           | 22 ------------
+ arch/nios2/boot/dts/Makefile       |  6 ++++
+ arch/nios2/boot/linked_dtb.S       | 19 -----------
+ arch/powerpc/Makefile              |  3 --
+ arch/powerpc/boot/Makefile         | 55 ++++++++++++++----------------
+ arch/powerpc/boot/dts/Makefile     |  6 ++++
+ arch/powerpc/boot/dts/fsl/Makefile |  4 +++
+ arch/xtensa/Makefile               | 12 +------
+ scripts/Makefile                   |  3 +-
+ scripts/Makefile.lib               |  2 +-
+ scripts/dtc/Makefile               |  2 +-
+ 27 files changed, 100 insertions(+), 195 deletions(-)
+ delete mode 100644 arch/c6x/boot/dts/linked_dtb.S
+ create mode 100644 arch/nios2/boot/dts/Makefile
+ delete mode 100644 arch/nios2/boot/linked_dtb.S
+ create mode 100644 arch/powerpc/boot/dts/Makefile
+ create mode 100644 arch/powerpc/boot/dts/fsl/Makefile
+
+--
+2.17.1
