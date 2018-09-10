@@ -1,60 +1,31 @@
-From: nipun.gupta@nxp.com (Nipun Gupta)
-Date: Mon, 10 Sep 2018 19:19:21 +0530
-Subject: [PATCH 7/7 v7] arm64: dts: ls208xa: comply with the iommu map binding
- for fsl_mc
-In-Reply-To: <1536587361-11047-1-git-send-email-nipun.gupta@nxp.com>
-References: <1536587361-11047-1-git-send-email-nipun.gupta@nxp.com>
-Message-ID: <1536587361-11047-8-git-send-email-nipun.gupta@nxp.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 10 Sep 2018 08:55:12 -0500
+Subject: [PATCH] irqchip: Convert to using %pOFn instead of
+ device_node.name
+In-Reply-To: <alpine.DEB.2.21.1809081414150.1402@nanos.tec.linutronix.de>
+References: <20180828015252.28511-1-robh@kernel.org>
+ <20180828015252.28511-24-robh@kernel.org>
+ <alpine.DEB.2.21.1809081414150.1402@nanos.tec.linutronix.de>
+Message-ID: <CAL_JsqJVbc4ecRfSp4=crH0Ci9duP-2_mZmKW-5NW-zZv4QwQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fsl-mc bus support the new iommu-map property. Comply to this binding
-for fsl_mc bus.
+On Sat, Sep 8, 2018 at 7:15 AM Thomas Gleixner <tglx@linutronix.de> wrote:
+>
+> On Mon, 27 Aug 2018, Rob Herring wrote:
+>
+> > In preparation to remove the node name pointer from struct device_node,
+> > convert printf users to use the %pOFn format specifier.
+> >
+> > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > Cc: Jason Cooper <jason@lakedaemon.net>
+> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Signed-off-by: Rob Herring <robh@kernel.org>
+>
+> Should I take it or do you want to take it with others? If the latter,
+> acked-by-me.
 
-Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
-Reviewed-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+Please take it. There's no dependency.
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-index 137ef4d..3d5e049 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-@@ -184,6 +184,7 @@
- 		#address-cells = <2>;
- 		#size-cells = <2>;
- 		ranges;
-+		dma-ranges = <0x0 0x0 0x0 0x0 0x10000 0x00000000>;
- 
- 		clockgen: clocking at 1300000 {
- 			compatible = "fsl,ls2080a-clockgen";
-@@ -357,6 +358,8 @@
- 			reg = <0x00000008 0x0c000000 0 0x40>,	 /* MC portal base */
- 			      <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
- 			msi-parent = <&its>;
-+			iommu-map = <0 &smmu 0 0>;	/* This is fixed-up by u-boot */
-+			dma-coherent;
- 			#address-cells = <3>;
- 			#size-cells = <1>;
- 
-@@ -460,6 +463,9 @@
- 			compatible = "arm,mmu-500";
- 			reg = <0 0x5000000 0 0x800000>;
- 			#global-interrupts = <12>;
-+			#iommu-cells = <1>;
-+			stream-match-mask = <0x7C00>;
-+			dma-coherent;
- 			interrupts = <0 13 4>, /* global secure fault */
- 				     <0 14 4>, /* combined secure interrupt */
- 				     <0 15 4>, /* global non-secure fault */
-@@ -502,7 +508,6 @@
- 				     <0 204 4>, <0 205 4>,
- 				     <0 206 4>, <0 207 4>,
- 				     <0 208 4>, <0 209 4>;
--			mmu-masters = <&fsl_mc 0x300 0>;
- 		};
- 
- 		dspi: dspi at 2100000 {
--- 
-1.9.1
+Rob
