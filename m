@@ -1,40 +1,23 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 10 Sep 2018 13:19:13 -0500
-Subject: [PATCH v5 3/7] dt-bindings: dmaengine: xilinx_dma: add optional
- xlnx,sg-length-width property
-In-Reply-To: <20180907062502.8241-3-andrea.merello@gmail.com>
-References: <20180907062502.8241-1-andrea.merello@gmail.com>
- <20180907062502.8241-3-andrea.merello@gmail.com>
-Message-ID: <20180910181913.GA13764@bogus>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 10 Sep 2018 11:21:43 -0700
+Subject: Regression in next with apps hanging with vm_fault_t
+Message-ID: <20180910182143.GW5662@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  7 Sep 2018 08:24:58 +0200, Andrea Merello wrote:
-> The width of the "length register" cannot be autodetected, and it is now
-> specified with a DT property. Add documentation for it.
-> 
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: devicetree at vger.kernel.org
-> Cc: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
-> Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
-> Reviewed-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
-> ---
-> Changes in v2:
-> 	- change property name
-> 	- property is now optional
-> 	- cc DT maintainer
-> Changes in v3:
-> 	- reword
-> 	- cc DT maintainerS and ML
-> Changes in v4:
-> 	- specify the unit, the valid range and the default value
-> Changes in v5:
-> 	- commit message trivial fix
-> 	- fix spaces before tab
-> ---
->  Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
+Hi,
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+I'm seeing a regression with Linux next with commit 7b6ec2ae877a
+("fs: convert return type int to vm_fault_t") where apps can just
+hang.
+
+The reproducable test case I have is to remove a distro package
+and then add it back where adding the package back just hangs and
+the package file seems corrupted.
+
+This is with ext4 rootfs on MMC, NFSroot does not have this
+issue. Any ideas?
+
+Regards,
+
+Tony
