@@ -1,61 +1,55 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Mon, 10 Sep 2018 13:31:37 +0200
-Subject: [PATCH v2 01/16] nvmem: remove unused APIs
-In-Reply-To: <3dbd65e5-c948-a784-0362-930fc41b840e@linaro.org>
-References: <20180907100750.14564-1-brgl@bgdev.pl>
- <20180907100750.14564-2-brgl@bgdev.pl>
- <c0b0c411-65f6-62f9-6d6d-2884e5a17250@linaro.org>
- <CAMRc=MfO01EQAfY4Uu3UwzzvhVOMF7_BpCOPVz2yVXqDgpb0AA@mail.gmail.com>
- <7e138142-8161-3646-4daf-619995baf395@linaro.org>
- <CAMRc=Mduu4CmLX5DFtJd8NSbzs5g65U9AmM=rbscit0JyQKVAQ@mail.gmail.com>
- <3dbd65e5-c948-a784-0362-930fc41b840e@linaro.org>
-Message-ID: <CAMRc=Mck=rAJ6jbm57ZecJWNvOYR5pjLy0JnyxFzA8kFvoK7Ew@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 10 Sep 2018 12:33:22 +0100
+Subject: [PATCH] arm64: lib: use C string functions with KASAN enabled.
+In-Reply-To: <9634affa-b210-d931-e40b-6e8a20f105fc@virtuozzo.com>
+References: <20180906170534.20726-1-aryabinin@virtuozzo.com>
+ <20180907145605.GE12788@arm.com>
+ <9634affa-b210-d931-e40b-6e8a20f105fc@virtuozzo.com>
+Message-ID: <20180910113257.7rjj5qseu3m2tj6y@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-09-10 11:55 GMT+02:00 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>:
->
->
-> On 10/09/18 09:43, Bartosz Golaszewski wrote:
->>>>
->>>> this series. Later patches are MUCH cleaner thanks to this removal and
->>>> I believe it makes them easier for review.
->>>
->>> Am not sure about that, it definitely did not help me!
->>>
->> Why exactly? Aren't clean patches resulting from this removal easier
->> to read then if they'd also have to take into account the burden of
->> existing code that will be changes anyway later? I really don't see
->> why you insist on removing this.
->
->
-> Here are few reasons:
->
-> 1> TBH, This cleanup patch removes more than one feature from nvmem
-> subsystem.
-> Ex: it remove ability to add static cell from nvmem config, secondly it
-> removed ability to read/write cells directly using nvmem_cell_info.
->
+On Fri, Sep 07, 2018 at 06:48:10PM +0300, Andrey Ryabinin wrote:
+> On 09/07/2018 05:56 PM, Will Deacon wrote:
+> > On Thu, Sep 06, 2018 at 08:05:33PM +0300, Andrey Ryabinin wrote:
+> >> ARM64 has asm implementations of memchr(), memcmp(), str[r]chr(),
+> >> str[n]cmp(), str[n]len(). KASAN don't see memory accesses in asm
+> >> code, thus it can potentially miss many bugs.
+> >>
+> >> Ifdef out __HAVE_ARCH_* defines of these functions when KASAN is
+> >> enabled, so the generic implementations from lib/string.c will be
+> >> used.
+> >>
+> >> Declare asm functions as weak instead of removing them because they
+> >> still can be used by efistub.
+> > 
+> > I don't understand this bit: efistub uses the __pi_ prefixed
+> > versions of the routines, so why do we need to declare them as weak?
+> 
+> Weak needed because we can't have two non-weak functions with the same
+> name.
+> 
+> Alternative approach would be to never use e.g. "strlen" name for asm
+> implementation of strlen() under CONFIG_KASAN=y.  But that would
+> require adding some special ENDPIPROC_KASAN() macro since we want
+> __pi_strlen() to point to the asm_strlen().
 
-About that: there are no users of nvmem_device_cell_read/write()
-currently and with the new API I'm not sure this is still needed. Are
-you alright with removing those two?
+Somehow, what we have today works with CONFIG_FORTIFY_SOURCE, which
+AFAICT would suffer from texactly the same problem with things like
+memcpy.
 
-Bart
+So either we're getting away with that by chance already (and should fix
+that regardless of this patch), or this is not actually a problem.
 
-> 2> If you do changes as part of each patch, it will be much traceable on
-> what is changed exactly and will allow much better review, and understand
-> the reasoning.
->
-> Having a clean start and writing code on top of it is alway nice, but we
-> will definitely miss things in review in this particular instance.
->
->
-> thanks,
-> srini
->
->>
->> Best regards,
->> Bart
->>
->
+Conditionally aliasing <foo> to pi_<foo> in a linker script (or header,
+for functions which aren't special per the c spec) seems sane to me.
+
+> Using weak seems like a way better solution to me.
+
+I would strongly prefer fixing this without weak, even if we need a
+ENDPRPROC_KASAN, and/or wrappers in some header file somewhere, since if
+something goes wrong that will fail deterministically at build time
+rather than silently falling back to the wrong piece of code.
+
+Thanks,
+Mark.
