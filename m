@@ -1,43 +1,30 @@
 From: mka@chromium.org (Matthias Kaehlcke)
-Date: Mon, 10 Sep 2018 09:03:01 -0700
-Subject: [PATCH v3 3/3] arm64: dts: qcom: pm8998: Add die temperature channel
- node to the ADC
-In-Reply-To: <20180910160301.237538-1-mka@chromium.org>
-References: <20180910160301.237538-1-mka@chromium.org>
-Message-ID: <20180910160301.237538-4-mka@chromium.org>
+Date: Mon, 10 Sep 2018 09:02:58 -0700
+Subject: [PATCH v3 0/3] arm64: dts: qcom: pm8998: Add ADC node and die
+ temperature channel
+Message-ID: <20180910160301.237538-1-mka@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a channel node for the die temperature to the ADC.
+This series adds the DT node for the QCOM SPMI PMIC5 ADC and a channel
+for the die temperature.
 
-Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
----
-Changes in v3:
-- fixed separator in commit message
-- remove duplicate 'Signed-off-by' tag
+The die temperature is going to be used by the temperature alarm driver
+(https://lore.kernel.org/patchwork/project/lkml/list/?series=361416).
 
-Changes in v2:
-- none
----
- arch/arm64/boot/dts/qcom/pm8998.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+The driver for the QCOM SPMI PMIC5 ADC landed in the 'testing' branch of the
+'iio' tree:
 
-diff --git a/arch/arm64/boot/dts/qcom/pm8998.dtsi b/arch/arm64/boot/dts/qcom/pm8998.dtsi
-index 41593ebbea2c..d18d4f260fbe 100644
---- a/arch/arm64/boot/dts/qcom/pm8998.dtsi
-+++ b/arch/arm64/boot/dts/qcom/pm8998.dtsi
-@@ -19,6 +19,11 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			#io-channel-cells = <1>;
-+
-+			die-temp {
-+				reg = <ADC5_DIE_TEMP>;
-+				label = "die_temp";
-+			};
- 		};
- 
- 		pm8998_gpio: gpios at c000 {
+https://git.kernel.org/pub/scm/linux/kernel/git/jic23/iio.git/commit/?h=testing&id=e13d757279bbc59776c8435fb94e54b5a58bdd0b
+
+Matthias Kaehlcke (3):
+  dt-bindings: iio: vadc: Fix documentation of 'reg'
+  arm64: dts: qcom: pm8998: Add adc node
+  arm64: dts: qcom: pm8998: Add die temperature channel node to the ADC
+
+ .../bindings/iio/adc/qcom,spmi-vadc.txt         |  4 ++--
+ arch/arm64/boot/dts/qcom/pm8998.dtsi            | 17 ++++++++++++++++-
+ 2 files changed, 18 insertions(+), 3 deletions(-)
+
 -- 
 2.19.0.rc2.392.g5ba43deb5a-goog
