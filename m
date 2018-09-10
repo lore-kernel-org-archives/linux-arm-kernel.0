@@ -1,48 +1,52 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Mon, 10 Sep 2018 11:42:43 +0100
-Subject: [PATCH v3 4/9] ARM: oabi-compat: copy oabi events using
- __copy_to_user()
+Date: Mon, 10 Sep 2018 11:42:41 +0100
+Subject: [PATCH v3 2/9] ARM: signal: always use __copy_to_user to save iwmmxt
+ context
 In-Reply-To: <1536576168-40096-1-git-send-email-julien.thierry@arm.com>
 References: <1536576168-40096-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1536576168-40096-5-git-send-email-julien.thierry@arm.com>
+Message-ID: <1536576168-40096-3-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Copy events to user using __copy_to_user() rather than copy members of
-individually with __put_user_error().
-This has the benefit of disabling/enabling PAN once per event intead of
-once per event member.
+When setting a dummy iwmmxt context, create a local instance and
+use __copy_to_user both cases whether iwmmxt is being used or not.
+This has the benefit of disabling/enabling PAN once for the whole copy
+intead of once per write.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
 ---
- arch/arm/kernel/sys_oabi-compat.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ arch/arm/kernel/signal.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/kernel/sys_oabi-compat.c b/arch/arm/kernel/sys_oabi-compat.c
-index f0dd4b6..40da087 100644
---- a/arch/arm/kernel/sys_oabi-compat.c
-+++ b/arch/arm/kernel/sys_oabi-compat.c
-@@ -277,6 +277,7 @@ asmlinkage long sys_oabi_epoll_wait(int epfd,
- 				    int maxevents, int timeout)
- {
- 	struct epoll_event *kbuf;
-+	struct oabi_epoll_event e;
- 	mm_segment_t fs;
- 	long ret, err, i;
- 
-@@ -295,8 +296,11 @@ asmlinkage long sys_oabi_epoll_wait(int epfd,
- 	set_fs(fs);
- 	err = 0;
- 	for (i = 0; i < ret; i++) {
--		__put_user_error(kbuf[i].events, &events->events, err);
--		__put_user_error(kbuf[i].data,   &events->data,   err);
-+		e.events = kbuf[i].events;
-+		e.data = kbuf[i].data;
-+		err = __copy_to_user(events, &e, sizeof(e));
-+		if (err)
-+			break;
- 		events++;
+diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+index 76fe75d..464393d 100644
+--- a/arch/arm/kernel/signal.c
++++ b/arch/arm/kernel/signal.c
+@@ -77,8 +77,6 @@ static int preserve_iwmmxt_context(struct iwmmxt_sigframe __user *frame)
+ 		kframe->magic = IWMMXT_MAGIC;
+ 		kframe->size = IWMMXT_STORAGE_SIZE;
+ 		iwmmxt_task_copy(current_thread_info(), &kframe->storage);
+-
+-		err = __copy_to_user(frame, kframe, sizeof(*frame));
+ 	} else {
+ 		/*
+ 		 * For bug-compatibility with older kernels, some space
+@@ -86,10 +84,14 @@ static int preserve_iwmmxt_context(struct iwmmxt_sigframe __user *frame)
+ 		 * Set the magic and size appropriately so that properly
+ 		 * written userspace can skip it reliably:
+ 		 */
+-		__put_user_error(DUMMY_MAGIC, &frame->magic, err);
+-		__put_user_error(IWMMXT_STORAGE_SIZE, &frame->size, err);
++		*kframe = (struct iwmmxt_sigframe) {
++			.magic = DUMMY_MAGIC,
++			.size  = IWMMXT_STORAGE_SIZE,
++		};
  	}
- 	kfree(kbuf);
+ 
++	err = __copy_to_user(frame, kframe, sizeof(*kframe));
++
+ 	return err;
+ }
+ 
 -- 
 1.9.1
