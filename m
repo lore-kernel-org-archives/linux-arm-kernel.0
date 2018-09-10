@@ -1,404 +1,172 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Mon, 10 Sep 2018 15:31:18 +0100
-Subject: [PATCH 5/5] arm64: dts: renesas: r8a774a1: Add VIN and CSI-2 nodes
-In-Reply-To: <1536589878-26218-1-git-send-email-biju.das@bp.renesas.com>
-References: <1536589878-26218-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <1536589878-26218-6-git-send-email-biju.das@bp.renesas.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 10 Sep 2018 16:41:12 +0200
+Subject: [PATCH 1/4] crypto: arm64/aes-blk - remove pointless (u8 *) casts
+In-Reply-To: <20180910144115.25727-1-ard.biesheuvel@linaro.org>
+References: <20180910144115.25727-1-ard.biesheuvel@linaro.org>
+Message-ID: <20180910144115.25727-2-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add VIN and CSI-2 nodes to RZ/G2M SoC dtsi.
+For some reason, the asmlinkage prototypes of the NEON routines take
+u8[] arguments for the round key arrays, while the actual round keys
+are arrays of u32, and so passing them into those routines requires
+u8* casts at each occurrence. Fix that.
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/boot/dts/renesas/r8a774a1.dtsi | 367 ++++++++++++++++++++++++++++++
- 1 file changed, 367 insertions(+)
+ arch/arm64/crypto/aes-glue.c | 47 ++++++++++----------
+ 1 file changed, 23 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-index d9005cb..43db993 100644
---- a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-@@ -1127,6 +1127,262 @@
- 			status = "disabled";
- 		};
+diff --git a/arch/arm64/crypto/aes-glue.c b/arch/arm64/crypto/aes-glue.c
+index adcb83eb683c..1c6934544c1f 100644
+--- a/arch/arm64/crypto/aes-glue.c
++++ b/arch/arm64/crypto/aes-glue.c
+@@ -63,24 +63,24 @@ MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
+ MODULE_LICENSE("GPL v2");
  
-+		vin0: video at e6ef0000 {
-+			compatible = "renesas,vin-r8a774a1";
-+			reg = <0 0xe6ef0000 0 0x1000>;
-+			interrupts = <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 811>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 811>;
-+			renesas,id = <0>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+
-+					reg = <1>;
-+
-+					vin0csi20: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&csi20vin0>;
-+					};
-+					vin0csi40: endpoint at 2 {
-+						reg = <2>;
-+						remote-endpoint = <&csi40vin0>;
-+					};
-+				};
-+			};
-+		};
-+
-+		vin1: video at e6ef1000 {
-+			compatible = "renesas,vin-r8a774a1";
-+			reg = <0 0xe6ef1000 0 0x1000>;
-+			interrupts = <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 810>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 810>;
-+			renesas,id = <1>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+
-+					reg = <1>;
-+
-+					vin1csi20: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&csi20vin1>;
-+					};
-+					vin1csi40: endpoint at 2 {
-+						reg = <2>;
-+						remote-endpoint = <&csi40vin1>;
-+					};
-+				};
-+			};
-+		};
-+
-+		vin2: video at e6ef2000 {
-+			compatible = "renesas,vin-r8a774a1";
-+			reg = <0 0xe6ef2000 0 0x1000>;
-+			interrupts = <GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 809>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 809>;
-+			renesas,id = <2>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+
-+					reg = <1>;
-+
-+					vin2csi20: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&csi20vin2>;
-+					};
-+					vin2csi40: endpoint at 2 {
-+						reg = <2>;
-+						remote-endpoint = <&csi40vin2>;
-+					};
-+				};
-+			};
-+		};
-+
-+		vin3: video at e6ef3000 {
-+			compatible = "renesas,vin-r8a774a1";
-+			reg = <0 0xe6ef3000 0 0x1000>;
-+			interrupts = <GIC_SPI 191 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 808>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 808>;
-+			renesas,id = <3>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+
-+					reg = <1>;
-+
-+					vin3csi20: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&csi20vin3>;
-+					};
-+					vin3csi40: endpoint at 2 {
-+						reg = <2>;
-+						remote-endpoint = <&csi40vin3>;
-+					};
-+				};
-+			};
-+		};
-+
-+		vin4: video at e6ef4000 {
-+			compatible = "renesas,vin-r8a774a1";
-+			reg = <0 0xe6ef4000 0 0x1000>;
-+			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 807>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 807>;
-+			renesas,id = <4>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+
-+					reg = <1>;
-+
-+					vin4csi20: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&csi20vin4>;
-+					};
-+					vin4csi40: endpoint at 2 {
-+						reg = <2>;
-+						remote-endpoint = <&csi40vin4>;
-+					};
-+				};
-+			};
-+		};
-+
-+		vin5: video at e6ef5000 {
-+			compatible = "renesas,vin-r8a774a1";
-+			reg = <0 0xe6ef5000 0 0x1000>;
-+			interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 806>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 806>;
-+			renesas,id = <5>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+
-+					reg = <1>;
-+
-+					vin5csi20: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&csi20vin5>;
-+					};
-+					vin5csi40: endpoint at 2 {
-+						reg = <2>;
-+						remote-endpoint = <&csi40vin5>;
-+					};
-+				};
-+			};
-+		};
-+
-+		vin6: video at e6ef6000 {
-+			compatible = "renesas,vin-r8a774a1";
-+			reg = <0 0xe6ef6000 0 0x1000>;
-+			interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 805>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 805>;
-+			renesas,id = <6>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+
-+					reg = <1>;
-+
-+					vin6csi20: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&csi20vin6>;
-+					};
-+					vin6csi40: endpoint at 2 {
-+						reg = <2>;
-+						remote-endpoint = <&csi40vin6>;
-+					};
-+				};
-+			};
-+		};
-+
-+		vin7: video at e6ef7000 {
-+			compatible = "renesas,vin-r8a774a1";
-+			reg = <0 0xe6ef7000 0 0x1000>;
-+			interrupts = <GIC_SPI 171 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 804>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 804>;
-+			renesas,id = <7>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+
-+					reg = <1>;
-+
-+					vin7csi20: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&csi20vin7>;
-+					};
-+					vin7csi40: endpoint at 2 {
-+						reg = <2>;
-+						remote-endpoint = <&csi40vin7>;
-+					};
-+				};
-+			};
-+		};
-+
- 		rcar_sound: sound at ec500000 {
- 			/*
- 			 * #sound-dai-cells is required
-@@ -1614,6 +1870,117 @@
- 			iommus = <&ipmmu_vc0 19>;
- 		};
+ /* defined in aes-modes.S */
+-asmlinkage void aes_ecb_encrypt(u8 out[], u8 const in[], u8 const rk[],
++asmlinkage void aes_ecb_encrypt(u8 out[], u8 const in[], u32 const rk[],
+ 				int rounds, int blocks);
+-asmlinkage void aes_ecb_decrypt(u8 out[], u8 const in[], u8 const rk[],
++asmlinkage void aes_ecb_decrypt(u8 out[], u8 const in[], u32 const rk[],
+ 				int rounds, int blocks);
  
-+		csi20: csi2 at fea80000 {
-+			compatible = "renesas,r8a774a1-csi2";
-+			reg = <0 0xfea80000 0 0x10000>;
-+			interrupts = <GIC_SPI 184 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 714>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 714>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+
-+					reg = <1>;
-+
-+					csi20vin0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&vin0csi20>;
-+					};
-+					csi20vin1: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&vin1csi20>;
-+					};
-+					csi20vin2: endpoint at 2 {
-+						reg = <2>;
-+						remote-endpoint = <&vin2csi20>;
-+					};
-+					csi20vin3: endpoint at 3 {
-+						reg = <3>;
-+						remote-endpoint = <&vin3csi20>;
-+					};
-+					csi20vin4: endpoint at 4 {
-+						reg = <4>;
-+						remote-endpoint = <&vin4csi20>;
-+					};
-+					csi20vin5: endpoint at 5 {
-+						reg = <5>;
-+						remote-endpoint = <&vin5csi20>;
-+					};
-+					csi20vin6: endpoint at 6 {
-+						reg = <6>;
-+						remote-endpoint = <&vin6csi20>;
-+					};
-+					csi20vin7: endpoint at 7 {
-+						reg = <7>;
-+						remote-endpoint = <&vin7csi20>;
-+					};
-+				};
-+			};
-+		};
-+
-+		csi40: csi2 at feaa0000 {
-+			compatible = "renesas,r8a774a1-csi2";
-+			reg = <0 0xfeaa0000 0 0x10000>;
-+			interrupts = <GIC_SPI 246 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 716>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 716>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+
-+					reg = <1>;
-+
-+					csi40vin0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&vin0csi40>;
-+					};
-+					csi40vin1: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&vin1csi40>;
-+					};
-+					csi40vin2: endpoint at 2 {
-+						reg = <2>;
-+						remote-endpoint = <&vin2csi40>;
-+					};
-+					csi40vin3: endpoint at 3 {
-+						reg = <3>;
-+						remote-endpoint = <&vin3csi40>;
-+					};
-+					csi40vin4: endpoint at 4 {
-+						reg = <4>;
-+						remote-endpoint = <&vin4csi40>;
-+					};
-+					csi40vin5: endpoint at 5 {
-+						reg = <5>;
-+						remote-endpoint = <&vin5csi40>;
-+					};
-+					csi40vin6: endpoint at 6 {
-+						reg = <6>;
-+						remote-endpoint = <&vin6csi40>;
-+					};
-+					csi40vin7: endpoint at 7 {
-+						reg = <7>;
-+						remote-endpoint = <&vin7csi40>;
-+					};
-+				};
-+
-+			};
-+		};
-+
- 		prr: chipid at fff00044 {
- 			compatible = "renesas,prr";
- 			reg = <0 0xfff00044 0 4>;
+-asmlinkage void aes_cbc_encrypt(u8 out[], u8 const in[], u8 const rk[],
++asmlinkage void aes_cbc_encrypt(u8 out[], u8 const in[], u32 const rk[],
+ 				int rounds, int blocks, u8 iv[]);
+-asmlinkage void aes_cbc_decrypt(u8 out[], u8 const in[], u8 const rk[],
++asmlinkage void aes_cbc_decrypt(u8 out[], u8 const in[], u32 const rk[],
+ 				int rounds, int blocks, u8 iv[]);
+ 
+-asmlinkage void aes_ctr_encrypt(u8 out[], u8 const in[], u8 const rk[],
++asmlinkage void aes_ctr_encrypt(u8 out[], u8 const in[], u32 const rk[],
+ 				int rounds, int blocks, u8 ctr[]);
+ 
+-asmlinkage void aes_xts_encrypt(u8 out[], u8 const in[], u8 const rk1[],
+-				int rounds, int blocks, u8 const rk2[], u8 iv[],
++asmlinkage void aes_xts_encrypt(u8 out[], u8 const in[], u32 const rk1[],
++				int rounds, int blocks, u32 const rk2[], u8 iv[],
+ 				int first);
+-asmlinkage void aes_xts_decrypt(u8 out[], u8 const in[], u8 const rk1[],
+-				int rounds, int blocks, u8 const rk2[], u8 iv[],
++asmlinkage void aes_xts_decrypt(u8 out[], u8 const in[], u32 const rk1[],
++				int rounds, int blocks, u32 const rk2[], u8 iv[],
+ 				int first);
+ 
+ asmlinkage void aes_mac_update(u8 const in[], u32 const rk[], int rounds,
+@@ -142,7 +142,7 @@ static int ecb_encrypt(struct skcipher_request *req)
+ 	while ((blocks = (walk.nbytes / AES_BLOCK_SIZE))) {
+ 		kernel_neon_begin();
+ 		aes_ecb_encrypt(walk.dst.virt.addr, walk.src.virt.addr,
+-				(u8 *)ctx->key_enc, rounds, blocks);
++				ctx->key_enc, rounds, blocks);
+ 		kernel_neon_end();
+ 		err = skcipher_walk_done(&walk, walk.nbytes % AES_BLOCK_SIZE);
+ 	}
+@@ -162,7 +162,7 @@ static int ecb_decrypt(struct skcipher_request *req)
+ 	while ((blocks = (walk.nbytes / AES_BLOCK_SIZE))) {
+ 		kernel_neon_begin();
+ 		aes_ecb_decrypt(walk.dst.virt.addr, walk.src.virt.addr,
+-				(u8 *)ctx->key_dec, rounds, blocks);
++				ctx->key_dec, rounds, blocks);
+ 		kernel_neon_end();
+ 		err = skcipher_walk_done(&walk, walk.nbytes % AES_BLOCK_SIZE);
+ 	}
+@@ -182,7 +182,7 @@ static int cbc_encrypt(struct skcipher_request *req)
+ 	while ((blocks = (walk.nbytes / AES_BLOCK_SIZE))) {
+ 		kernel_neon_begin();
+ 		aes_cbc_encrypt(walk.dst.virt.addr, walk.src.virt.addr,
+-				(u8 *)ctx->key_enc, rounds, blocks, walk.iv);
++				ctx->key_enc, rounds, blocks, walk.iv);
+ 		kernel_neon_end();
+ 		err = skcipher_walk_done(&walk, walk.nbytes % AES_BLOCK_SIZE);
+ 	}
+@@ -202,7 +202,7 @@ static int cbc_decrypt(struct skcipher_request *req)
+ 	while ((blocks = (walk.nbytes / AES_BLOCK_SIZE))) {
+ 		kernel_neon_begin();
+ 		aes_cbc_decrypt(walk.dst.virt.addr, walk.src.virt.addr,
+-				(u8 *)ctx->key_dec, rounds, blocks, walk.iv);
++				ctx->key_dec, rounds, blocks, walk.iv);
+ 		kernel_neon_end();
+ 		err = skcipher_walk_done(&walk, walk.nbytes % AES_BLOCK_SIZE);
+ 	}
+@@ -222,7 +222,7 @@ static int ctr_encrypt(struct skcipher_request *req)
+ 	while ((blocks = (walk.nbytes / AES_BLOCK_SIZE))) {
+ 		kernel_neon_begin();
+ 		aes_ctr_encrypt(walk.dst.virt.addr, walk.src.virt.addr,
+-				(u8 *)ctx->key_enc, rounds, blocks, walk.iv);
++				ctx->key_enc, rounds, blocks, walk.iv);
+ 		kernel_neon_end();
+ 		err = skcipher_walk_done(&walk, walk.nbytes % AES_BLOCK_SIZE);
+ 	}
+@@ -238,7 +238,7 @@ static int ctr_encrypt(struct skcipher_request *req)
+ 		blocks = -1;
+ 
+ 		kernel_neon_begin();
+-		aes_ctr_encrypt(tail, NULL, (u8 *)ctx->key_enc, rounds,
++		aes_ctr_encrypt(tail, NULL, ctx->key_enc, rounds,
+ 				blocks, walk.iv);
+ 		kernel_neon_end();
+ 		crypto_xor_cpy(tdst, tsrc, tail, nbytes);
+@@ -272,8 +272,8 @@ static int xts_encrypt(struct skcipher_request *req)
+ 	for (first = 1; (blocks = (walk.nbytes / AES_BLOCK_SIZE)); first = 0) {
+ 		kernel_neon_begin();
+ 		aes_xts_encrypt(walk.dst.virt.addr, walk.src.virt.addr,
+-				(u8 *)ctx->key1.key_enc, rounds, blocks,
+-				(u8 *)ctx->key2.key_enc, walk.iv, first);
++				ctx->key1.key_enc, rounds, blocks,
++				ctx->key2.key_enc, walk.iv, first);
+ 		kernel_neon_end();
+ 		err = skcipher_walk_done(&walk, walk.nbytes % AES_BLOCK_SIZE);
+ 	}
+@@ -294,8 +294,8 @@ static int xts_decrypt(struct skcipher_request *req)
+ 	for (first = 1; (blocks = (walk.nbytes / AES_BLOCK_SIZE)); first = 0) {
+ 		kernel_neon_begin();
+ 		aes_xts_decrypt(walk.dst.virt.addr, walk.src.virt.addr,
+-				(u8 *)ctx->key1.key_dec, rounds, blocks,
+-				(u8 *)ctx->key2.key_enc, walk.iv, first);
++				ctx->key1.key_dec, rounds, blocks,
++				ctx->key2.key_enc, walk.iv, first);
+ 		kernel_neon_end();
+ 		err = skcipher_walk_done(&walk, walk.nbytes % AES_BLOCK_SIZE);
+ 	}
+@@ -412,7 +412,6 @@ static int cmac_setkey(struct crypto_shash *tfm, const u8 *in_key,
+ {
+ 	struct mac_tfm_ctx *ctx = crypto_shash_ctx(tfm);
+ 	be128 *consts = (be128 *)ctx->consts;
+-	u8 *rk = (u8 *)ctx->key.key_enc;
+ 	int rounds = 6 + key_len / 4;
+ 	int err;
+ 
+@@ -422,7 +421,8 @@ static int cmac_setkey(struct crypto_shash *tfm, const u8 *in_key,
+ 
+ 	/* encrypt the zero vector */
+ 	kernel_neon_begin();
+-	aes_ecb_encrypt(ctx->consts, (u8[AES_BLOCK_SIZE]){}, rk, rounds, 1);
++	aes_ecb_encrypt(ctx->consts, (u8[AES_BLOCK_SIZE]){}, ctx->key.key_enc,
++			rounds, 1);
+ 	kernel_neon_end();
+ 
+ 	cmac_gf128_mul_by_x(consts, consts);
+@@ -441,7 +441,6 @@ static int xcbc_setkey(struct crypto_shash *tfm, const u8 *in_key,
+ 	};
+ 
+ 	struct mac_tfm_ctx *ctx = crypto_shash_ctx(tfm);
+-	u8 *rk = (u8 *)ctx->key.key_enc;
+ 	int rounds = 6 + key_len / 4;
+ 	u8 key[AES_BLOCK_SIZE];
+ 	int err;
+@@ -451,8 +450,8 @@ static int xcbc_setkey(struct crypto_shash *tfm, const u8 *in_key,
+ 		return err;
+ 
+ 	kernel_neon_begin();
+-	aes_ecb_encrypt(key, ks[0], rk, rounds, 1);
+-	aes_ecb_encrypt(ctx->consts, ks[1], rk, rounds, 2);
++	aes_ecb_encrypt(key, ks[0], ctx->key.key_enc, rounds, 1);
++	aes_ecb_encrypt(ctx->consts, ks[1], ctx->key.key_enc, rounds, 2);
+ 	kernel_neon_end();
+ 
+ 	return cbcmac_setkey(tfm, key, sizeof(key));
 -- 
-2.7.4
+2.18.0
