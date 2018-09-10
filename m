@@ -1,36 +1,25 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 10 Sep 2018 19:22:26 +0200
-Subject: [PATCH 2/4] dt-bindings: arm: rockchip: Add binding for Rock960
- board
-In-Reply-To: <20180910151356.25946-3-manivannan.sadhasivam@linaro.org>
-References: <20180910151356.25946-1-manivannan.sadhasivam@linaro.org>
- <20180910151356.25946-3-manivannan.sadhasivam@linaro.org>
-Message-ID: <1606406.b630GQBvc1@phil>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 10 Sep 2018 19:22:55 +0200
+Subject: [PATCH v3 2/2] ARM: s3c24xx: Correct SD card write protect
+ detection on Mini2440
+In-Reply-To: <20180907215446.15160-2-sed@free.fr>
+References: <20180907215446.15160-1-sed@free.fr>
+ <20180907215446.15160-2-sed@free.fr>
+Message-ID: <20180910172255.yeqe4d263vj7n6ge@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 10. September 2018, 17:13:54 CEST schrieb Manivannan Sadhasivam:
-> Add devicetree binding for Rock960 board from Vamrs Limited.
+On Fri, Sep 07, 2018 at 11:54:46PM +0200, Cedric Roux wrote:
+> The mini2440 computer uses "active high" to signal that the "write protect"
+> of the inserted MMC is set. The current code uses the opposite, leading to
+> a wrong detection of write protection. The solution is simply to use
+> ".wprotect_invert = 1" in the description of the MMC.
 > 
-> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> Signed-off-by: Cedric Roux <sed@free.fr>
 > ---
->  Documentation/devicetree/bindings/arm/rockchip.txt | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
-> index acfd3c773dd0..aaad9e2ff9a3 100644
-> --- a/Documentation/devicetree/bindings/arm/rockchip.txt
-> +++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-> @@ -5,6 +5,10 @@ Rockchip platforms device tree bindings
->      Required root node properties:
->        - compatible = "vamrs,ficus", "rockchip,rk3399";
->  
-> +- 96boards RK3399 Rock960 (ROCK960 Consumer Edition)
-> +    Required root node properties:
-> +      - compatible = "vamrs,rk3399-rock960", "rockchip,rk3399";
+>  arch/arm/mach-s3c24xx/mach-mini2440.c | 9 +++++----
 
-hmm, are there more boards labeled rock960 from Vamrs?
-Because I'm trying to determine what makes "vamrs,rock960" unsuitable.
+Thanks, applied.
 
-
-Heiko
+Best regards,
+Krzysztof
