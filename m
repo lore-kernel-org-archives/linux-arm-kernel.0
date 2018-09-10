@@ -1,28 +1,28 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Sep 2018 16:38:56 +0100
-Subject: [PATCH] mfd: motorola-cpcap: Add audio-codec support
-In-Reply-To: <20180829093104.GA22065@amd>
-References: <20180829093104.GA22065@amd>
-Message-ID: <20180910153856.GC28860@dell>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 10 Sep 2018 16:44:22 +0100
+Subject: [PATCH] arm64: uaccess: implement unsafe accessors
+In-Reply-To: <1536232196-55027-1-git-send-email-julien.thierry@arm.com>
+References: <1536232196-55027-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <20180910154421.zevsqqdxoaislly7@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 Aug 2018, Pavel Machek wrote:
+On Thu, Sep 06, 2018 at 12:09:56PM +0100, Julien Thierry wrote:
+> Current implementation of get/put_user_unsafe default to get/put_user
+> which toggle PAN before each access, despite having been told by the caller
+> that multiple accesses to user memory were about to happen.
+> 
+> Provide implementations for user_access_begin/end to turn PAN off/on and
+> implement unsafe accessors that assume PAN was already turned off.
+> 
+> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/uaccess.h | 61 ++++++++++++++++++++++++++++++----------
+>  1 file changed, 46 insertions(+), 15 deletions(-)
 
-> From: Sebastian Reichel <sre@kernel.org>
->     
-> Add support for the audio-codec node by converting from
-> devm_of_platform_populate() to devm_mfd_add_devices().
->    
-> Tested-by: Pavel Machek <pavel@ucw.cz>
-> Acked-by: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
-> Signed-off-by: Pavel Machek <pavel@ucw.cz>
-
-Applied, thanks.
+Queued for 4.19. Thanks.
 
 -- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Catalin
