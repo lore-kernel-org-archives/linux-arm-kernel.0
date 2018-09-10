@@ -1,23 +1,53 @@
 From: jolly.shah@xilinx.com (Jolly Shah)
-Date: Mon, 10 Sep 2018 13:01:31 -0700
-Subject: [PATCH 0/3]  drivers: firmware: xilinx: Minor fixes
-Message-ID: <1536609694-7920-1-git-send-email-jollys@xilinx.com>
+Date: Mon, 10 Sep 2018 13:01:33 -0700
+Subject: [PATCH 2/3] firmware: xilinx: Move declaration of qdata to top of the
+ function
+In-Reply-To: <1536609694-7920-1-git-send-email-jollys@xilinx.com>
+References: <1536609694-7920-1-git-send-email-jollys@xilinx.com>
+Message-ID: <1536609694-7920-3-git-send-email-jollys@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset is created on top of commit bca7067d2d4e91f58162b07d73cd94e20437b4f6 from below git repository:
-https://github.com/Xilinx/linux-xlnx.git tags/zynqmp-soc-for-v4.20
+From: Rajan Vaja <rajan.vaja@xilinx.com>
 
-It contains 1 pending patch from v11 patchset and 2 patches to fix minor review comments received from Olof Johansson.
+Move structure declaration from switch case to the top of function
+and drop the braces.
 
-Rajan Vaja (3):
-  firmware: xilinx: Replace init call with probe method
-  firmware: xilinx: Move declaration of qdata to top of the function
-  firmware: xilinx: Replace if/else with switch case
+Signed-off-by: Rajan Vaja <rajan.vaja@xilinx.com>
+Signed-off-by: Jolly Shah <jollys@xilinx.com>
+---
+ drivers/firmware/xilinx/zynqmp-debug.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
- drivers/firmware/xilinx/zynqmp-debug.c | 15 ++++----
- drivers/firmware/xilinx/zynqmp.c       | 63 ++++++++++------------------------
- 2 files changed, 26 insertions(+), 52 deletions(-)
-
+diff --git a/drivers/firmware/xilinx/zynqmp-debug.c b/drivers/firmware/xilinx/zynqmp-debug.c
+index 4532bd0..ecbd599 100644
+--- a/drivers/firmware/xilinx/zynqmp-debug.c
++++ b/drivers/firmware/xilinx/zynqmp-debug.c
+@@ -87,6 +87,7 @@ static int process_api_request(u32 pm_id, u64 *pm_api_arg, u32 *pm_api_ret)
+ 	const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
+ 	u32 pm_api_version;
+ 	int ret;
++	struct zynqmp_pm_query_data qdata = {0};
+ 
+ 	if (!eemi_ops)
+ 		return -ENXIO;
+@@ -107,9 +108,6 @@ static int process_api_request(u32 pm_id, u64 *pm_api_arg, u32 *pm_api_ret)
+ 				pm_api_ret[1]);
+ 		break;
+ 	case PM_QUERY_DATA:
+-	{
+-		struct zynqmp_pm_query_data qdata = {0};
+-
+ 		qdata.qid = pm_api_arg[0];
+ 		qdata.arg1 = pm_api_arg[1];
+ 		qdata.arg2 = pm_api_arg[2];
+@@ -131,7 +129,6 @@ static int process_api_request(u32 pm_id, u64 *pm_api_arg, u32 *pm_api_ret)
+ 				pm_api_ret[0], pm_api_ret[1],
+ 				pm_api_ret[2], pm_api_ret[3]);
+ 		break;
+-	}
+ 	default:
+ 		sprintf(debugfs_buf, "Unsupported PM-API request\n");
+ 		ret = -EINVAL;
 -- 
 2.7.4
