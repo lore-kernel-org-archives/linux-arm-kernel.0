@@ -1,136 +1,39 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 10 Sep 2018 14:11:52 +0200
-Subject: [PATCH V5 2/5] soc: imx: add SC firmware IPC and APIs
-In-Reply-To: <AM0PR04MB42114BE452BB4305A3EBE9DF80050@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1534781305-4770-1-git-send-email-aisheng.dong@nxp.com>
- <1534781305-4770-3-git-send-email-aisheng.dong@nxp.com>
- <20180910084042.3zihiimzrvappdjj@pengutronix.de>
- <AM0PR04MB42114BE452BB4305A3EBE9DF80050@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <20180910121152.qyuuwxqesznzac7t@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 10 Sep 2018 14:14:13 +0200
+Subject: [PATCH] include/linux/compiler-clang.h: define __naked
+In-Reply-To: <20180910060455.20409-1-stefan@agner.ch>
+References: <20180910060455.20409-1-stefan@agner.ch>
+Message-ID: <CAK8P3a2cc741UqFSk+hXpC2s4S+A+0FuiM1yP=Z4rC18sJHq9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2018 at 09:44:08AM +0000, A.s. Dong wrote:
-> > -----Original Message-----
-> > From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
-> > Sent: Monday, September 10, 2018 4:41 PM
-> > To: A.s. Dong <aisheng.dong@nxp.com>
-> > Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com; Jassi Brar
-> > <jassisinghbrar@gmail.com>; dl-linux-imx <linux-imx@nxp.com>;
-> > kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>;
-> > shawnguo at kernel.org
-> > Subject: Re: [PATCH V5 2/5] soc: imx: add SC firmware IPC and APIs
-> > 
-> > On Tue, Aug 21, 2018 at 12:08:22AM +0800, Dong Aisheng wrote:
-> > > The System Controller Firmware (SCFW) is a low-level system function
-> > > which runs on a dedicated Cortex-M core to provide power, clock, and
-> > > resource management. It exists on some i.MX8 processors. e.g. i.MX8QM
-> > > (QM, QP), and i.MX8QX (QXP, DX).
-> > >
-> > > This patch adds the SC firmware service APIs used by the system.
-> > > It mainly consists of two parts:
-> > > 1) Implementation of the IPC functions using MUs (client side).
-> > > 2) SCU firmware services APIs implemented based on RPC calls
-> > >
-> > > Cc: Shawn Guo <shawnguo@kernel.org>
-> > > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > > Cc: Jassi Brar <jassisinghbrar@gmail.com>
-> > > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > > ---
-> > > +int sc_ipc_open(sc_ipc_t *ipc, struct device *dev) {
-> > > +	struct sc_ipc *sc_ipc;
-> > > +	struct sc_chan *sc_chan;
-> > > +	struct mbox_client *cl;
-> > > +	char *chan_name;
-> > > +	int ret;
-> > > +	int i;
-> > > +
-> > > +	sc_ipc = devm_kzalloc(dev, sizeof(*sc_ipc), GFP_KERNEL);
-> > > +	if (!sc_ipc)
-> > > +		return -ENOMEM;
-> > > +
-> > > +	for (i = 0; i < SCU_MU_CHAN_NUM; i++) {
-> > > +		if (i < 4)
-> > > +			chan_name = kasprintf(GFP_KERNEL, "tx%d", i);
-> > > +		else
-> > > +			chan_name = kasprintf(GFP_KERNEL, "rx%d", i - 4);
-> > > +
-> > > +		if (!chan_name)
-> > > +			return -ENOMEM;
-> > > +
-> > > +		sc_chan = &sc_ipc->chans[i];
-> > > +		cl = &sc_chan->cl;
-> > > +		cl->dev = dev;
-> > > +		cl->tx_block = false;
-> > > +		cl->knows_txdone = true;
-> > > +		cl->rx_callback = sc_rx_callback;
-> > > +
-> > > +		sc_chan->sc_ipc = sc_ipc;
-> > > +		sc_chan->idx = i % 4;
-> > > +		sc_chan->ch = mbox_request_channel_byname(cl, chan_name);
-> > > +		if (IS_ERR(sc_chan->ch)) {
-> > > +			ret = PTR_ERR(sc_chan->ch);
-> > > +			if (ret != -EPROBE_DEFER)
-> > > +				dev_err(dev, "Failed to get mbox %d\n", ret);
-> > > +
-> > > +			return ret;
-> > > +		}
-> > > +
-> > > +		dev_dbg(dev, "mbox request chan %s\n", chan_name);
-> > > +		/* chan_name is not used anymore by framework */
-> > > +		kfree(chan_name);
-> > > +	}
-> > > +
-> > > +	sc_ipc->dev = dev;
-> > > +	mutex_init(&sc_ipc->lock);
-> > > +	init_completion(&sc_ipc->done);
-> > > +
-> > > +	*ipc = (sc_ipc_t)sc_ipc;
-> > > +
-> > > +	return 0;
-> > > +}
-> > > +EXPORT_SYMBOL(sc_ipc_open);
-> > 
-> > You export a sc_ipc_open() but it's only ever used once, in your internal code.
-> > Every other user uses sc_ipc_get_handle() which returns the same global
-> > handle for every user. In fact, I think sc_ipc_open()
-> > *can* only be used once, because every other user would get -EBUSY when
-> > requesting the same mailboxes again.
-> > 
-> > Please drop all this pseudo resource management nonsense. You simply do no
-> > resource management. Face it, there is only one global handle that is used,
-> > don't try to hide it.
-> > 
-> 
-> The original purpose of this code is that there're 5 MUs can be used by the system,
-> that means other users can choose to not use the default SCU MU. So sc_ipc_open()
-> may not be used only once.
-> e.g.
-> SCU MU1 sc_ipc_open()
-> CLK MU1 sc_ipc_get_handle()
-> Power Domain MU2 sc_ipc_open()
-> Pinctrl MU3 sc_ipc_open()
-> and etc...
+On Mon, Sep 10, 2018 at 8:05 AM Stefan Agner <stefan@agner.ch> wrote:
+>
+> ARM32 arch code uses the __naked attribute. This has previously been
+> defined in include/linux/compiler-gcc.h, which is no longer included
+> for Clang. Define __naked for Clang. Conservatively add all attributes
+> previously used (and supported by Clang).
+>
+> This fixes compile errors when building ARM32 using Clang:
+>   arch/arm/mach-exynos/mcpm-exynos.c:193:13: error: variable has incomplete type 'void'
+>   static void __naked exynos_pm_power_up_setup(unsigned int affinity_level)
+>               ^
+>
+> Fixes: 815f0ddb346c ("include/linux/compiler*.h: make compiler-*.h mutually exclusive")
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 
-Your code started by busy polling the MU units until it would send an
-answer. The communication is completely synchronous and on the SCU side
-we have a single core cortex M4 processor. Why should we use another SCU
-channel? I bet the SCU side services the MUs round robin, so changing
-the MU won't change much.
+> +/*
+> + * ARM32 is currently the only user of __naked supported by Clang. Follow
+> + * gcc: Do not trace naked functions and make sure they don't get inlined.
+> + */
+> +#define __naked __attribute__((naked)) noinline notrace
+> +
 
-> Our SCU firmware is OS independent. From SC point of view definition,
-> sc_ipc_t implementation is OS dependant. OS can interpret them into
-> the structure they needed. That's the orginal purpose and where the APIs
-> are prototyped.
+Please see patches 5 and 6 of the series that Miguel posted:
 
-Nobody is interested in the SCU side here. I'd really like to have a
-peek, but it's totally irrelevant for the Kernel code.
+https://lore.kernel.org/lkml/20180908212459.19736-6-miguel.ojeda.sandonis at gmail.com/
 
-Sascha
+I suppose we want the patch to fix clang build as soon as possible though,
+and follow up with the cleanup for the next merge window, right?
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+       Arnd
