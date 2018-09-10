@@ -1,41 +1,52 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Mon, 10 Sep 2018 11:49:27 +0200
-Subject: [PATCH v2 13/16] nvmem: add support for cell lookups from
- machine code
-In-Reply-To: <CAMRc=Me0bYjdmaqqxKqFkRRSNdoOgDf1A==dASz0dJAtx9BDqg@mail.gmail.com>
-References: <20180907100750.14564-1-brgl@bgdev.pl>
- <20180907100750.14564-14-brgl@bgdev.pl>
- <484b6ec5-cd8e-e5c5-0c5c-2f11c504ea1c@linaro.org>
- <CAMRc=MdnSHY1ah4X3Bu55HvZcOQHxPHaFudidDA4mEOW9ZzeEg@mail.gmail.com>
- <20180910102324.52ecd8f7@bbrezillon>
- <c72866dd-1fb0-c765-5815-ba63d051a09b@linaro.org>
- <CAMRc=Me0bYjdmaqqxKqFkRRSNdoOgDf1A==dASz0dJAtx9BDqg@mail.gmail.com>
-Message-ID: <20180910114927.083e2de8@bbrezillon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 10 Sep 2018 10:50:09 +0100
+Subject: [PATCH] arch/arm64/include/asm/jump_label.h: use asm_volatile_goto
+In-Reply-To: <20180909154731.GA20381@gmail.com>
+References: <20180909154731.GA20381@gmail.com>
+Message-ID: <20180910095008.GB31531@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Sep 2018 11:45:48 +0200
-Bartosz Golaszewski <brgl@bgdev.pl> wrote:
-
-> 2018-09-10 10:55 GMT+02:00 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>:
-> >
-> >
-> > On 10/09/18 09:23, Boris Brezillon wrote:  
-> >>
-> >> Well, if we get rid of nvmem-machine.h, the cell-lookup stuff
-> >> should go in nvmem-consumer.h not nvmem-provider.h. On the other hand,
-> >> everything that is related to cell creation should be placed in
-> >> nvmem-provider.h.  
-> >
-> > Yes, this is how it should be!
-> >  
+On Sun, Sep 09, 2018 at 05:47:31PM +0200, Miguel Ojeda wrote:
+> All other uses of "asm goto" go through asm_volatile_goto
+> (including the arm version of the same file). For consistency,
+> use it here as well.
 > 
-> Any actual reason for not putting these definitions into a separate
-> 'machine' header? This approach is currently used by gpio, pinctrl,
-> iio and regulator framework because most systems use either DT or ACPI
-> and don't need to pull in any stuff aimed at board files.
+> Cc: Nick Desaulniers <ndesaulniers@google.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Miguel Ojeda <miguel.ojeda.sandonis@gmail.com>
+> ---
+>  arch/arm64/include/asm/jump_label.h | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 
-I'm perfectly fine with the separate header file, all I'm saying is, if
-Srinivas does not want nvmem-machine.h, definitions should be placed in
-nvmem-provider.h or nvmem-consumer.h depending on who they're meant to
-be used by (providers or consumers).
+Thanks, I'll pick this up as a fix.
+
+Will
+
+> diff --git a/arch/arm64/include/asm/jump_label.h b/arch/arm64/include/asm/jump_label.h
+> index 1b5e0e843c3a..7e2b3e360086 100644
+> --- a/arch/arm64/include/asm/jump_label.h
+> +++ b/arch/arm64/include/asm/jump_label.h
+> @@ -28,7 +28,7 @@
+>  
+>  static __always_inline bool arch_static_branch(struct static_key *key, bool branch)
+>  {
+> -	asm goto("1: nop\n\t"
+> +	asm_volatile_goto("1: nop\n\t"
+>  		 ".pushsection __jump_table,  \"aw\"\n\t"
+>  		 ".align 3\n\t"
+>  		 ".quad 1b, %l[l_yes], %c0\n\t"
+> @@ -42,7 +42,7 @@ static __always_inline bool arch_static_branch(struct static_key *key, bool bran
+>  
+>  static __always_inline bool arch_static_branch_jump(struct static_key *key, bool branch)
+>  {
+> -	asm goto("1: b %l[l_yes]\n\t"
+> +	asm_volatile_goto("1: b %l[l_yes]\n\t"
+>  		 ".pushsection __jump_table,  \"aw\"\n\t"
+>  		 ".align 3\n\t"
+>  		 ".quad 1b, %l[l_yes], %c0\n\t"
+> -- 
+> 2.17.1
+> 
