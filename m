@@ -1,30 +1,43 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 10 Sep 2018 10:50:58 +0100
-Subject: [PATCH v2 13/16] nvmem: add support for cell lookups from machine
- code
-In-Reply-To: <CAMRc=Me0bYjdmaqqxKqFkRRSNdoOgDf1A==dASz0dJAtx9BDqg@mail.gmail.com>
-References: <20180907100750.14564-1-brgl@bgdev.pl>
- <20180907100750.14564-14-brgl@bgdev.pl>
- <484b6ec5-cd8e-e5c5-0c5c-2f11c504ea1c@linaro.org>
- <CAMRc=MdnSHY1ah4X3Bu55HvZcOQHxPHaFudidDA4mEOW9ZzeEg@mail.gmail.com>
- <20180910102324.52ecd8f7@bbrezillon>
- <c72866dd-1fb0-c765-5815-ba63d051a09b@linaro.org>
- <CAMRc=Me0bYjdmaqqxKqFkRRSNdoOgDf1A==dASz0dJAtx9BDqg@mail.gmail.com>
-Message-ID: <f161f5fd-a651-eee1-78ee-63607021db7f@linaro.org>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Mon, 10 Sep 2018 11:51:42 +0200
+Subject: [PATCH v12 0/6] Driver for at91 usart in spi mode
+In-Reply-To: <20180910094817.GJ28860@dell>
+References: <20180904111310.4049-1-radu_nicolae.pirea@upb.ro>
+ <20180910094817.GJ28860@dell>
+Message-ID: <2a8ccc95-bbf0-2211-0f88-c5a594600d34@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Lee,
+
+On 10/09/2018 at 11:48, Lee Jones wrote:
+> On Tue, 04 Sep 2018, Radu Pirea wrote:
+>> Well, this is the 12th version of this patch series.
+>> In this version I fixed a warning from kbuild-robot and I have no idea
+>> how I forgot to add static in declaration of that functions. Also I
+>> fixed the example for the SPI driver in bindings.
+> 
+> Okay great.  So which patches still require Acks?
+
+None I would say: everything's ready to be integrated into your MFD tree 
+as you proposed some time ago.
+
+We are looking forward seeing this series integrated in linux-next as 
+soon as possible.
+
+Best regards,
+   Nicolas
 
 
-On 10/09/18 10:45, Bartosz Golaszewski wrote:
->> Yes, this is how it should be!
->>
-> Any actual reason for not putting these definitions into a separate
-> 'machine' header? This approach is currently used by gpio, pinctrl,
-> iio and regulator framework because most systems use either DT or ACPI
-> and don't need to pull in any stuff aimed at board files.
+>> Radu Pirea (6):
+>>    MAINTAINERS: add at91 usart mfd driver
+>>    dt-bindings: add binding for atmel-usart in SPI mode
+>>    mfd: at91-usart: added mfd driver for usart
+>>    MAINTAINERS: add at91 usart spi driver
+>>    spi: at91-usart: add driver for at91-usart as spi
+>>    tty/serial: atmel: change the driver to work under at91-usart mfd
+> 
 
-I don't want to create header files specific to usecase!
-Lets keep it simple!
 
---srini
+-- 
+Nicolas Ferre
