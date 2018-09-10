@@ -1,55 +1,80 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 10 Sep 2018 12:33:22 +0100
-Subject: [PATCH] arm64: lib: use C string functions with KASAN enabled.
-In-Reply-To: <9634affa-b210-d931-e40b-6e8a20f105fc@virtuozzo.com>
-References: <20180906170534.20726-1-aryabinin@virtuozzo.com>
- <20180907145605.GE12788@arm.com>
- <9634affa-b210-d931-e40b-6e8a20f105fc@virtuozzo.com>
-Message-ID: <20180910113257.7rjj5qseu3m2tj6y@lakrids.cambridge.arm.com>
+From: yaojun8558363@gmail.com (Jun Yao)
+Date: Mon, 10 Sep 2018 19:41:53 +0800
+Subject: [RESEND PATCH v4 5/6] arm64/mm: Populate the swapper_pg_dir by
+ fixmap.
+In-Reply-To: <2bf9b9d1-271c-f85e-5a98-0eb74f2fedd9@arm.com>
+References: <20180822095432.12125-1-yaojun8558363@gmail.com>
+ <20180822095432.12125-6-yaojun8558363@gmail.com>
+ <2bf9b9d1-271c-f85e-5a98-0eb74f2fedd9@arm.com>
+Message-ID: <20180910114153.GA10734@toy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2018 at 06:48:10PM +0300, Andrey Ryabinin wrote:
-> On 09/07/2018 05:56 PM, Will Deacon wrote:
-> > On Thu, Sep 06, 2018 at 08:05:33PM +0300, Andrey Ryabinin wrote:
-> >> ARM64 has asm implementations of memchr(), memcmp(), str[r]chr(),
-> >> str[n]cmp(), str[n]len(). KASAN don't see memory accesses in asm
-> >> code, thus it can potentially miss many bugs.
-> >>
-> >> Ifdef out __HAVE_ARCH_* defines of these functions when KASAN is
-> >> enabled, so the generic implementations from lib/string.c will be
-> >> used.
-> >>
-> >> Declare asm functions as weak instead of removing them because they
-> >> still can be used by efistub.
-> > 
-> > I don't understand this bit: efistub uses the __pi_ prefixed
-> > versions of the routines, so why do we need to declare them as weak?
+Hi James,
+
+On Fri, Sep 07, 2018 at 10:58:22AM +0100, James Morse wrote:
+> On 22/08/18 10:54, Jun Yao wrote:
+> >  	WRITE_ONCE(*pmdp, pmd);
+> >  	dsb(ishst);
+> >  }
+> > @@ -480,6 +511,19 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
+> >  
+> >  static inline void set_pud(pud_t *pudp, pud_t pud)
+> >  {
+> > +#ifdef __PAGETABLE_PUD_FOLDED
+> > +	if (in_swapper_pgdir(pudp)) {
+> > +		pud_t *fixmap_pudp;
+> > +
+> > +		spin_lock(&swapper_pgdir_lock);
+> > +		fixmap_pudp = (pud_t *)pgd_set_fixmap(__pa(pudp));
 > 
-> Weak needed because we can't have two non-weak functions with the same
-> name.
+> This is a bit subtle: are you using the pgd fixmap entry because the path from
+> map_mem() uses the other three?
 > 
-> Alternative approach would be to never use e.g. "strlen" name for asm
-> implementation of strlen() under CONFIG_KASAN=y.  But that would
-> require adding some special ENDPIPROC_KASAN() macro since we want
-> __pi_strlen() to point to the asm_strlen().
+> Using the pgd fix slot for a pud looks a bit strange to me, but its arguably a
+> side-effect of the folding.
 
-Somehow, what we have today works with CONFIG_FORTIFY_SOURCE, which
-AFAICT would suffer from texactly the same problem with things like
-memcpy.
+Yes, it's a side-effect of the folding.
 
-So either we're getting away with that by chance already (and should fix
-that regardless of this patch), or this is not actually a problem.
+When the CONFIG_PGTABLE_LEVELS == 3, the pud is folded into the pgd. It
+means that the pgd is never none and it is also a pud. That's why I use
+the pgd fixmap entry.
 
-Conditionally aliasing <foo> to pi_<foo> in a linker script (or header,
-for functions which aren't special per the c spec) seems sane to me.
+Maybe write this more clearly:
 
-> Using weak seems like a way better solution to me.
+static inline void set_pud(pud_t *pudp, pud_t pud)
+{
+#ifdef __PAGETABLE_PUD_FOLDED
+	pgd_t *pgdp = (pgd_t *)pudp;
 
-I would strongly prefer fixing this without weak, even if we need a
-ENDPRPROC_KASAN, and/or wrappers in some header file somewhere, since if
-something goes wrong that will fail deterministically at build time
-rather than silently falling back to the wrong piece of code.
+	if (...) {
+		pgd_t *fixmap_pgdp;
+		pud_t *fixmap_pudp;
+
+		spin_lock(...);
+		fixmap_pgdp = pgd_set_fixmap(__pa(pgdp));
+		fixmap_pudp = pud_set_fixmap_offset(fixmap_pgdp, 0UL);
+		...
+	}
+
+Do you have any way to make it look more reasonable?
+
+> I see this called 68 times during boot on a 64K/42bit-VA, 65 of which appear to
+> be during paging_init(). What do you think to keeping paging_init()s use of the
+> pgd fixmap for swapper_pg_dir, deliberately to skip the in_swapper_pgdir() test
+> during paging_init()?
+
+I think the set_pud() should not be called on a 64K/42bit-VA. As only
+the level 2 and level 3 page tables are in use. It means that the pmd is
+folded into the pud and the pud is never none. So the set_pud() should
+not be called.
+
+I think a variable can be introduced to indicate whether paging_init()
+has been completed. And decide whether or not to skip the
+in_swapper_pgdir() base on the value of it.
+
+I don't know if this is reasonable. What do you think?
 
 Thanks,
-Mark.
+
+Jun
