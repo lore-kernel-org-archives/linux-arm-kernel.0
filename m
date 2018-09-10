@@ -1,58 +1,59 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 10 Sep 2018 16:45:33 +0100
-Subject: [PATCH 2/4] arm64: cpufeature: add feature for CRC32 instructions
-In-Reply-To: <20180904031855.mjpdndeh57lqziuk@gondor.apana.org.au>
-References: <20180827110245.14812-1-ard.biesheuvel@linaro.org>
- <20180827110245.14812-3-ard.biesheuvel@linaro.org>
- <20180828170135.GC19825@arm.com>
- <CAKv+Gu-tM9aKZJ3ppt9yLVP_V5YA_yN8D1j_-NtM+qQCdnc6JA@mail.gmail.com>
- <20180904031855.mjpdndeh57lqziuk@gondor.apana.org.au>
-Message-ID: <20180910154533.3yxh7iooqbbsp7nc@armageddon.cambridge.arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 10 Sep 2018 09:49:07 -0600
+Subject: [PATCH v3 0/9] coresight: Update device tree bindings
+In-Reply-To: <9e935bd9-1cd1-0fda-3d73-fe2487759a1c@arm.com>
+References: <1532686537-12380-1-git-send-email-suzuki.poulose@arm.com>
+ <20180730200232.GA31755@xps15>
+ <CANLsYkzBfCydwDO-KyDub4X=GTy_dtv-478RyMReBEH6VybSAg@mail.gmail.com>
+ <9e935bd9-1cd1-0fda-3d73-fe2487759a1c@arm.com>
+Message-ID: <CANLsYkwpFZcxaNdvcnag_-ywhWyE1yV6BT1sUx8-4i2dMdD8MA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 04, 2018 at 11:18:55AM +0800, Herbert Xu wrote:
-> On Tue, Aug 28, 2018 at 08:43:35PM +0200, Ard Biesheuvel wrote:
-> > On 28 August 2018 at 19:01, Will Deacon <will.deacon@arm.com> wrote:
-> > > On Mon, Aug 27, 2018 at 01:02:43PM +0200, Ard Biesheuvel wrote:
-> > >> Add a CRC32 feature bit and wire it up to the CPU id register so we
-> > >> will be able to use alternatives patching for CRC32 operations.
-> > >>
-> > >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > >> ---
-> > >>  arch/arm64/include/asm/cpucaps.h | 3 ++-
-> > >>  arch/arm64/kernel/cpufeature.c   | 9 +++++++++
-> > >>  2 files changed, 11 insertions(+), 1 deletion(-)
-> > >
-> > > Acked-by: Will Deacon <will.deacon@arm.com>
-> > >
-> > > With the minor caveat below...
-> > >
-> > >> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-> > >> index ae1f70450fb2..9932aca9704b 100644
-> > >> --- a/arch/arm64/include/asm/cpucaps.h
-> > >> +++ b/arch/arm64/include/asm/cpucaps.h
-> > >> @@ -51,7 +51,8 @@
-> > >>  #define ARM64_SSBD                           30
-> > >>  #define ARM64_MISMATCHED_CACHE_TYPE          31
-> > >>  #define ARM64_HAS_STAGE2_FWB                 32
-> > >> +#define ARM64_HAS_CRC32                              33
-> > >>
-> > >> -#define ARM64_NCAPS                          33
-> > >> +#define ARM64_NCAPS                          34
-> > >
-> > >
-> > > ... if this goes via crypto, you'll almost certainly get a (trivial)
-> > > conflict with arm64, since these numbers get bumped all the time.
-> > >
-> > 
-> > I think the first three patches should go through the arm64 tree. The
-> > last one just removes the now redundant crc32 SIMD driver, and Herbert
-> > could pick that up separately, i.e., it should be totally independent.
-> 
-> Yes let's do that.
+On Mon, 10 Sep 2018 at 09:35, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>
+> Hi Mathieu,
+>
+> On 31/07/18 16:06, Mathieu Poirier wrote:
+> > [...]
+> >
+> >>>
+> >>> Suzuki K Poulose (9):
+> >>>   coresight: Document error handling in coresight_register
+> >>>   coresight: platform: Refactor graph endpoint parsing
+> >>>   coresight: platform: Fix refcounting for graph nodes
+> >>>   coresight: platform: Fix leaking device reference
+> >>>   coresight: Fix remote endpoint parsing
+> >>>   coresight: Add helper to check if the endpoint is input
+> >>>   coresight: platform: Cleanup coresight connection handling
+> >>>   coresight: Cleanup coresight DT bindings
+> >>>   dts: juno: Update coresight bindings
+> >>>
+> >>>  .../devicetree/bindings/arm/coresight.txt          |  95 +++++---
+> >>>  arch/arm64/boot/dts/arm/juno-base.dtsi             | 161 ++++++------
+> >>>  arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi          |  52 ++--
+> >>>  arch/arm64/boot/dts/arm/juno.dts                   |  13 +-
+> >>>  drivers/hwtracing/coresight/coresight.c            |  35 +--
+> >>>  drivers/hwtracing/coresight/of_coresight.c         | 269 ++++++++++++++-------
+> >>>  include/linux/coresight.h                          |   9 +-
+> >>>  7 files changed, 359 insertions(+), 275 deletions(-)
+> >>>
+> >>
+> >> Good day,
+> >>
+> >> I have applied patches 1 to 7.  I will wait for Rob's ACK before doing the same
+> >> with 8 and 9.
+> >
+> > I just applied patch 8 and 9.
+> >
+> Sorry for the delay, but ARM SoC expects all the DTS changes to go via
+> their tree. Please drop patch 9, I will route via ARM-SoC.
 
-I queued the first 3 patches for 4.19. Thanks.
+Done - it's all yours now.
 
--- 
-Catalin
+Mathieu
+
+>
+> --
+> Regards,
+> Sudeep
