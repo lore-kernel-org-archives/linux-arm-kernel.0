@@ -1,115 +1,83 @@
-From: christophe.leroy@c-s.fr (Christophe LEROY)
-Date: Mon, 10 Sep 2018 07:24:16 +0200
-Subject: [PATCH 0/5] introduce
- setbits32/clrbits32/clrsetbits32/setbits64/clrbits64/clrsetbits64 functions
-In-Reply-To: <1536349307-20714-1-git-send-email-clabbe@baylibre.com>
-References: <1536349307-20714-1-git-send-email-clabbe@baylibre.com>
-Message-ID: <93f879d1-ddae-9a7c-e629-ee34f97686c6@c-s.fr>
+From: leoyang.li@nxp.com (Li Yang)
+Date: Mon, 10 Sep 2018 00:56:40 -0500
+Subject: [PATCH v2 1/5] arm64: dts: fsl: use a generic node name for
+ m25p80 flashes
+In-Reply-To: <20180910003946.GE21218@dragon>
+References: <20180903140840.23648-1-alexandre.belloni@bootlin.com>
+ <20180910003946.GE21218@dragon>
+Message-ID: <CADRPPNS1N7J_F4ApqSKPrOJ4JuPwgV8srsGsS9DSSURvyhhM9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Sep 9, 2018 at 10:11 PM Shawn Guo <shawnguo@kernel.org> wrote:
+>
+> The series looks good to me.  @Leo, what about you?
 
+Looks fine to me too.
 
-Le 07/09/2018 ? 21:41, Corentin Labbe a ?crit?:
-> Hello
-> 
-> This patchset adds a new set of functions which are open-coded in lot of
-> place.
-> Basicly the pattern is always the same, "read, modify a bit, write"
-> some driver already have thoses pattern them as functions. (like ahci_sunxi.c or dwmac-meson8b)
-> 
-> The first patch rename some powerpc funtions which already use the same name (xxxbits32)
-> but with only bigendian values.
+Acked-by: Li Yang <leoyang.li@nxp.com>
 
-The same name as what ?
-
-> 
-> The second patch adds the header.
-
-But the second patch adds functions with the same name as the powerpc 
-ones but doing something different. Why consider that setbits32() should 
-be LE and not BE ?
-
-Christophe
-
-
-> The third patch is an ugly try to implement a coccinelle semantic patch to
-> find all place where xxxbits function could be used.
-> Probably this spatch could be better written and I didnt found an easy way to add the "linux/setbits" header.
-> 
-> The two last patch are example of convertion of two drivers.
-> Thoses patchs give an example of the reduction of code won by using xxxbits32.
-> 
-> This patchset is tested with the ahci_sunxi and dwmac-sun8i drivers.
-> 
-> Regards
-> 
-> Corentin Labbe (5):
->    powerpc: rename setbits32/clrbits32 to setbits32_be/clrbits32_be
->    include: add
->      setbits32/clrbits32/clrsetbits32/setbits64/clrbits64/clrsetbits64 in
->      linux/setbits.h
->    coccinelle: add xxxsetbitsXX converting spatch
->    net: ethernet: stmmac: use xxxsetbits32
->    ata: ahci_sunxi: use xxxsetbits32 functions
-> 
->   arch/powerpc/include/asm/fsl_lbc.h                 |   2 +-
->   arch/powerpc/include/asm/io.h                      |   5 +-
->   arch/powerpc/platforms/44x/canyonlands.c           |   4 +-
->   arch/powerpc/platforms/4xx/gpio.c                  |  28 +-
->   arch/powerpc/platforms/512x/pdm360ng.c             |   6 +-
->   arch/powerpc/platforms/52xx/mpc52xx_common.c       |   6 +-
->   arch/powerpc/platforms/52xx/mpc52xx_gpt.c          |  10 +-
->   arch/powerpc/platforms/82xx/ep8248e.c              |   2 +-
->   arch/powerpc/platforms/82xx/km82xx.c               |   6 +-
->   arch/powerpc/platforms/82xx/mpc8272_ads.c          |  10 +-
->   arch/powerpc/platforms/82xx/pq2.c                  |   2 +-
->   arch/powerpc/platforms/82xx/pq2ads-pci-pic.c       |   4 +-
->   arch/powerpc/platforms/82xx/pq2fads.c              |  10 +-
->   arch/powerpc/platforms/83xx/km83xx.c               |   6 +-
->   arch/powerpc/platforms/83xx/mpc836x_mds.c          |   2 +-
->   arch/powerpc/platforms/85xx/mpc85xx_mds.c          |   2 +-
->   arch/powerpc/platforms/85xx/mpc85xx_pm_ops.c       |   4 +-
->   arch/powerpc/platforms/85xx/mpc85xx_rdb.c          |   2 +-
->   arch/powerpc/platforms/85xx/p1022_ds.c             |   4 +-
->   arch/powerpc/platforms/85xx/p1022_rdk.c            |   4 +-
->   arch/powerpc/platforms/85xx/t1042rdb_diu.c         |   4 +-
->   arch/powerpc/platforms/85xx/twr_p102x.c            |   2 +-
->   arch/powerpc/platforms/86xx/mpc8610_hpcd.c         |   4 +-
->   arch/powerpc/platforms/8xx/adder875.c              |   2 +-
->   arch/powerpc/platforms/8xx/m8xx_setup.c            |   4 +-
->   arch/powerpc/platforms/8xx/mpc86xads_setup.c       |   4 +-
->   arch/powerpc/platforms/8xx/mpc885ads_setup.c       |  28 +-
->   arch/powerpc/platforms/embedded6xx/flipper-pic.c   |   6 +-
->   arch/powerpc/platforms/embedded6xx/hlwd-pic.c      |   8 +-
->   arch/powerpc/platforms/embedded6xx/wii.c           |  10 +-
->   arch/powerpc/sysdev/cpm1.c                         |  26 +-
->   arch/powerpc/sysdev/cpm2.c                         |  16 +-
->   arch/powerpc/sysdev/cpm_common.c                   |   4 +-
->   arch/powerpc/sysdev/fsl_85xx_l2ctlr.c              |   8 +-
->   arch/powerpc/sysdev/fsl_lbc.c                      |   2 +-
->   arch/powerpc/sysdev/fsl_pci.c                      |   8 +-
->   arch/powerpc/sysdev/fsl_pmc.c                      |   2 +-
->   arch/powerpc/sysdev/fsl_rcpm.c                     |  74 ++--
->   arch/powerpc/sysdev/fsl_rio.c                      |   4 +-
->   arch/powerpc/sysdev/fsl_rmu.c                      |   8 +-
->   arch/powerpc/sysdev/mpic_timer.c                   |  12 +-
->   drivers/ata/ahci_sunxi.c                           |  51 +--
->   .../net/ethernet/stmicro/stmmac/dwmac-meson8b.c    |  54 +--
->   drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c  |  55 +--
->   .../net/ethernet/stmicro/stmmac/dwmac1000_core.c   |  21 +-
->   drivers/net/ethernet/stmicro/stmmac/dwmac4_core.c  |  51 +--
->   drivers/net/ethernet/stmicro/stmmac/dwmac4_dma.c   |  13 +-
->   drivers/net/ethernet/stmicro/stmmac/dwmac4_lib.c   |  42 +-
->   drivers/net/ethernet/stmicro/stmmac/dwmac5.c       |  11 +-
->   drivers/net/ethernet/stmicro/stmmac/dwmac_lib.c    |  17 +-
->   .../net/ethernet/stmicro/stmmac/dwxgmac2_core.c    |  30 +-
->   drivers/net/ethernet/stmicro/stmmac/dwxgmac2_dma.c |  69 +---
->   .../net/ethernet/stmicro/stmmac/stmmac_hwtstamp.c  |  11 +-
->   drivers/net/ethernet/stmicro/stmmac/stmmac_mdio.c  |   7 +-
->   include/linux/setbits.h                            |  55 +++
->   scripts/coccinelle/misc/setbits.cocci              | 423 +++++++++++++++++++++
->   56 files changed, 776 insertions(+), 489 deletions(-)
->   create mode 100644 include/linux/setbits.h
->   create mode 100644 scripts/coccinelle/misc/setbits.cocci
-> 
+>
+> Shawn
+>
+> On Mon, Sep 03, 2018 at 04:08:36PM +0200, Alexandre Belloni wrote:
+> > Use a generic node name for the m25p80 flashes on ls1043 and ls1046 boards.
+> >
+> > Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+> > ---
+> >  arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts | 2 +-
+> >  arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts | 2 +-
+> >  arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts | 4 ++--
+> >  3 files changed, 4 insertions(+), 4 deletions(-)
+> >
+> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+> > index c7b8d2c009cd..af972e91d6bc 100644
+> > --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+> > @@ -136,7 +136,7 @@
+> >       bus-num = <0>;
+> >       status = "okay";
+> >
+> > -     qflash0: s25fl128s at 0 {
+> > +     qflash0: flash at 0 {
+> >               compatible = "spansion,m25p80";
+> >               #address-cells = <1>;
+> >               #size-cells = <1>;
+> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
+> > index e69306e6b0b1..219068220b84 100644
+> > --- a/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
+> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts
+> > @@ -165,7 +165,7 @@
+> >       bus-num = <0>;
+> >       status = "okay";
+> >
+> > -     qflash0: s25fl128s at 0 {
+> > +     qflash0: flash at 0 {
+> >               compatible = "spansion,m25p80";
+> >               #address-cells = <1>;
+> >               #size-cells = <1>;
+> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
+> > index 440e111651d5..df676b30357b 100644
+> > --- a/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
+> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
+> > @@ -103,7 +103,7 @@
+> >       bus-num = <0>;
+> >       status = "okay";
+> >
+> > -     qflash0: s25fs512s at 0 {
+> > +     qflash0: flash at 0 {
+> >               compatible = "spansion,m25p80";
+> >               #address-cells = <1>;
+> >               #size-cells = <1>;
+> > @@ -111,7 +111,7 @@
+> >               reg = <0>;
+> >       };
+> >
+> > -     qflash1: s25fs512s at 1 {
+> > +     qflash1: flash at 1 {
+> >               compatible = "spansion,m25p80";
+> >               #address-cells = <1>;
+> >               #size-cells = <1>;
+> > --
+> > 2.19.0.rc1
+> >
