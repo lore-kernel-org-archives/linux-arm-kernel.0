@@ -1,52 +1,47 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Mon, 10 Sep 2018 11:42:44 +0100
-Subject: [PATCH v3 5/9] ARM: signal: replace __put_user_error with __put_user
+Date: Mon, 10 Sep 2018 11:42:45 +0100
+Subject: [PATCH v3 6/9] ARM: uaccess: Prevent speculative use of the current
+ addr_limit
 In-Reply-To: <1536576168-40096-1-git-send-email-julien.thierry@arm.com>
 References: <1536576168-40096-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1536576168-40096-6-git-send-email-julien.thierry@arm.com>
+Message-ID: <1536576168-40096-7-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With Spectre-v1.1 mitigations, __put_user_error is pointless. In an attempt
-to remove it, replace its references in frame setups with __put_user.
+A mispredicted conditional call to set_fs could result in the wrong
+addr_limit being forwarded under speculation to a subsequent access_ok
+check, potentially forming part of a spectre-v1 attack using uaccess
+routines.
+
+This patch prevents this forwarding from taking place, but putting heavy
+barriers in set_fs after writing the addr_limit.
+
+Porting commit c2f0ad4fc089cff8 ("arm64: uaccess: Prevent speculative use
+of the current addr_limit").
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
 ---
- arch/arm/kernel/signal.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/include/asm/uaccess.h | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-index 1e2ecfe..b908382 100644
---- a/arch/arm/kernel/signal.c
-+++ b/arch/arm/kernel/signal.c
-@@ -336,7 +336,7 @@ asmlinkage int sys_rt_sigreturn(struct pt_regs *regs)
- 	if (err == 0)
- 		err |= preserve_vfp_context(&aux->vfp);
- #endif
--	__put_user_error(0, &aux->end_magic, err);
-+	err |= __put_user(0, &aux->end_magic);
- 
- 	return err;
+diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
+index 5451e1f..d65ef85 100644
+--- a/arch/arm/include/asm/uaccess.h
++++ b/arch/arm/include/asm/uaccess.h
+@@ -69,6 +69,14 @@ static inline void uaccess_restore(unsigned int flags)
+ static inline void set_fs(mm_segment_t fs)
+ {
+ 	current_thread_info()->addr_limit = fs;
++
++	/*
++	 * Prevent a mispredicted conditional call to set_fs from forwarding
++	 * the wrong address limit to access_ok under speculation.
++	 */
++	dsb(nsh);
++	isb();
++
+ 	modify_domain(DOMAIN_KERNEL, fs ? DOMAIN_CLIENT : DOMAIN_MANAGER);
  }
-@@ -499,7 +499,7 @@ asmlinkage int sys_rt_sigreturn(struct pt_regs *regs)
- 	/*
- 	 * Set uc.uc_flags to a value which sc.trap_no would never have.
- 	 */
--	__put_user_error(0x5ac3c35a, &frame->uc.uc_flags, err);
-+	err = __put_user(0x5ac3c35a, &frame->uc.uc_flags);
  
- 	err |= setup_sigframe(frame, regs, set);
- 	if (err == 0)
-@@ -519,8 +519,8 @@ asmlinkage int sys_rt_sigreturn(struct pt_regs *regs)
- 
- 	err |= copy_siginfo_to_user(&frame->info, &ksig->info);
- 
--	__put_user_error(0, &frame->sig.uc.uc_flags, err);
--	__put_user_error(NULL, &frame->sig.uc.uc_link, err);
-+	err |= __put_user(0, &frame->sig.uc.uc_flags);
-+	err |= __put_user(NULL, &frame->sig.uc.uc_link);
- 
- 	err |= __save_altstack(&frame->sig.uc.uc_stack, regs->ARM_sp);
- 	err |= setup_sigframe(&frame->sig, regs, set);
 -- 
 1.9.1
