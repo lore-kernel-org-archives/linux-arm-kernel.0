@@ -1,91 +1,106 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Mon, 10 Sep 2018 11:30:10 +0100
-Subject: [PATCH v2 1/9] ARM: signal: copy registers using __copy_to_user()
-In-Reply-To: <fa57d18f-2dd8-2aad-f921-8131886da843@arm.com>
-References: <1536251888-8302-1-git-send-email-julien.thierry@arm.com>
- <1536251888-8302-2-git-send-email-julien.thierry@arm.com>
- <20180906165015.GQ30658@n2100.armlinux.org.uk>
- <fa57d18f-2dd8-2aad-f921-8131886da843@arm.com>
-Message-ID: <8539775f-e97a-9af7-2952-91cca4e9424f@arm.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 10 Sep 2018 12:33:52 +0200
+Subject: [PATCH v9 2/9] media: v4l: Add definitions for MPEG-2 slice
+ format and metadata
+In-Reply-To: <2409ba6607e85acf3dbbaed394487fa8e92d93df.camel@paulk.fr>
+References: <20180906222442.14825-1-contact@paulk.fr>
+ <20180906222442.14825-3-contact@paulk.fr>
+ <9a7fd34d-50e3-4db6-4752-9e62bb160655@xs4all.nl>
+ <2409ba6607e85acf3dbbaed394487fa8e92d93df.camel@paulk.fr>
+Message-ID: <bd6dd135-1719-2e25-051b-d15b1fe52d61@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 10/09/18 09:00, Julien Thierry wrote:
-> Hi Russell,
+On 09/10/2018 11:47 AM, Paul Kocialkowski wrote:
+> Hi,
 > 
-> On 06/09/18 17:50, Russell King - ARM Linux wrote:
->> On Thu, Sep 06, 2018 at 05:38:00PM +0100, Julien Thierry wrote:
->>> When saving the ARM integer registers, use __copy_to_user() to
->>> copy them into user signal frame, rather than __put_user_error().
->>> This has the benefit of disabling/enabling PAN once for the whole copy
->>> intead of once per write.
->>
->> Looks fine, but please note:
->>
->>> +??? struct sigcontext context;
->>> ????? int err = 0;
->>> +??? context = (struct sigcontext) {
->>> +??????? .arm_r0??????? = regs->ARM_r0,
->>> +??????? .arm_r1??????? = regs->ARM_r1,
->>> +??????? .arm_r2??????? = regs->ARM_r2,
->>> +??????? .arm_r3??????? = regs->ARM_r3,
->>> +??????? .arm_r4??????? = regs->ARM_r4,
->>> +??????? .arm_r5??????? = regs->ARM_r5,
->>> +??????? .arm_r6??????? = regs->ARM_r6,
->>> +??????? .arm_r7??????? = regs->ARM_r7,
->>> +??????? .arm_r8??????? = regs->ARM_r8,
->>> +??????? .arm_r9??????? = regs->ARM_r9,
->>> +??????? .arm_r10?????? = regs->ARM_r10,
->>> +??????? .arm_fp??????? = regs->ARM_fp,
->>> +??????? .arm_ip??????? = regs->ARM_ip,
->>> +??????? .arm_sp??????? = regs->ARM_sp,
->>> +??????? .arm_lr??????? = regs->ARM_lr,
->>> +??????? .arm_pc??????? = regs->ARM_pc,
->>> +??????? .arm_cpsr????? = regs->ARM_cpsr,
+> Le lundi 10 septembre 2018 ? 11:41 +0200, Hans Verkuil a ?crit :
+>> On 09/07/2018 12:24 AM, Paul Kocialkowski wrote:
+>>> From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+>>>
+>>> Stateless video decoding engines require both the MPEG-2 slices and
+>>> associated metadata from the video stream in order to decode frames.
+>>>
+>>> This introduces definitions for a new pixel format, describing buffers
+>>> with MPEG-2 slice data, as well as control structure sfor passing the
+>>> frame metadata to drivers.
+>>>
+>>> This is based on work from both Florent Revest and Hugues Fruchet.
+>>>
+>>> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+>>> ---
+>>>  .../media/uapi/v4l/extended-controls.rst      | 176 ++++++++++++++++++
+>>>  .../media/uapi/v4l/pixfmt-compressed.rst      |  16 ++
+>>>  .../media/uapi/v4l/vidioc-queryctrl.rst       |  14 +-
+>>>  .../media/videodev2.h.rst.exceptions          |   2 +
+>>>  drivers/media/v4l2-core/v4l2-ctrls.c          |  63 +++++++
+>>>  drivers/media/v4l2-core/v4l2-ioctl.c          |   1 +
+>>>  include/media/v4l2-ctrls.h                    |  18 +-
+>>>  include/uapi/linux/v4l2-controls.h            |  65 +++++++
+>>>  include/uapi/linux/videodev2.h                |   5 +
+>>>  9 files changed, 351 insertions(+), 9 deletions(-)
+>>>
+>>> diff --git a/Documentation/media/uapi/v4l/extended-controls.rst b/Documentation/media/uapi/v4l/extended-controls.rst
+>>> index 9f7312bf3365..f1951236266a 100644
+>>> --- a/Documentation/media/uapi/v4l/extended-controls.rst
+>>> +++ b/Documentation/media/uapi/v4l/extended-controls.rst
+>>> @@ -1497,6 +1497,182 @@ enum v4l2_mpeg_video_h264_hierarchical_coding_type -
+>>>  
+>>>  
+>>>  
+>>> +.. _v4l2-mpeg-mpeg2:
 >>> +
->>> +??????? .trap_no?????? = current->thread.trap_no,
->>> +??????? .error_code??? = current->thread.error_code,
->>> +??????? .fault_address = current->thread.address,
->>> +??????? .oldmask?????? = set->sig[0],
->>> +??? };
+>>> +``V4L2_CID_MPEG_VIDEO_MPEG2_SLICE_PARAMS (struct)``
+>>> +    Specifies the slice parameters (as extracted from the bitstream) for the
+>>> +    associated MPEG-2 slice data. This includes the necessary parameters for
+>>> +    configuring a stateless hardware decoding pipeline for MPEG-2.
+>>> +    The bitstream parameters are defined according to :ref:`mpeg2part2`.
 >>> +
->>> +??? err |= __copy_to_user(&sf->uc.uc_mcontext, &context, 
->>> sizeof(context));
+>>> +.. c:type:: v4l2_ctrl_mpeg2_slice_params
+>>> +
+>>> +.. cssclass:: longtable
+>>> +
+>>> +.. flat-table:: struct v4l2_ctrl_mpeg2_slice_params
+>>> +    :header-rows:  0
+>>> +    :stub-columns: 0
+>>> +    :widths:       1 1 2
+>>> +
+>>> +    * - __u32
+>>> +      - ``bit_size``
+>>> +      - Size (in bits) of the current slice data.
+>>> +    * - __u32
+>>> +      - ``data_bit_offset``
+>>> +      - Offset (in bits) to the video data in the current slice data.
+>>> +    * - struct :c:type:`v4l2_mpeg2_sequence`
+>>> +      - ``sequence``
+>>> +      - Structure with MPEG-2 sequence metadata, merging relevant fields from
+>>> +	the sequence header and sequence extension parts of the bitstream.
+>>> +    * - struct :c:type:`v4l2_mpeg2_picture`
+>>> +      - ``picture``
+>>> +      - Structure with MPEG-2 picture metadata, merging relevant fields from
+>>> +	the picture header and picture coding extension parts of the bitstream.
+>>> +    * - __u8
+>>> +      - ``quantiser_scale_code``
+>>> +      - Code used to determine the quantization scale to use for the IDCT.
+>>> +    * - __u8
+>>> +      - ``backward_ref_index``
+>>> +      - Index for the V4L2 buffer to use as backward reference, used with
+>>> +	B-coded and P-coded frames.
+>>> +    * - __u8
+>>> +      - ``forward_ref_index``
+>>> +      - Index for the V4L2 buffer to use as forward reference, used with
+>>> +	P-coded frames.
 >>
->> This construct is safe here, because struct sigcontext will have
->> no padding.
->>
->> However, in the case of a struct that does contain padding, doing
->> the above will leave the padding uninitialised, and therefore the
->> __copy_to_user() will end up leaking information from the kernel
->> stack into userspace - which is bad news.
->>
+>> Should this be "B-coded frames"?
 > 
-> Thanks for pointing this out. I wrongly assumed this would be 
-> initialized the same way unspecified fields get initialized to 0. But 
-> you're right, there is no guaranty about the padding getting initialized.
+> Oops, that's right, B-coded frames.
 > 
-> I'll fix the patches affected.
-> 
-> About the ones where there is currently no padding, are 
-> preserve_iwmmxt_context and setup_sigframe called in performance 
-> critical paths? (I don't think that is the case but I prefer to be sure)
-> If not I would prefer adding the memset to those as well just in case 
-> the corresponding structs get a new field introducing padding. Unless 
-> you really feel this would be unnecessary.
-> 
+> Should I make a follow-up patch for that (maybe gathered with other
+> changes if required)?
 
-Thinking about this, I might be a bit overzealous. for sigcontext the 
-issue would come up only if someone decides to add a member smaller than 
-an int (or add some alignment requirement). And for iwmmxt_sigframe 
-everything is properly aligned as you stated.
+Follow-up patches, please. All on top of my last pull request that adds the
+cedrus driver.
 
-I'll just leave it like this since you said it was fine and fix patch 3 
-which definitely needs it.
+Regards,
 
-Thanks,
-
--- 
-Julien Thierry
+	Hans
