@@ -1,113 +1,29 @@
-From: JOLLYS@xilinx.com (Jolly Shah)
-Date: Mon, 10 Sep 2018 19:19:00 +0000
-Subject: [PATCH v11 08/11] firmware: xilinx: Add debugfs for query data API
-In-Reply-To: <CAOesGMjMcznFAQj0L-=J5+gJ5ENsdejqP2SdYomu=C9bJqG+YQ@mail.gmail.com>
-References: <1533318808-10781-1-git-send-email-jollys@xilinx.com>
- <1533318808-10781-9-git-send-email-jollys@xilinx.com>
- <CAOesGMjMcznFAQj0L-=J5+gJ5ENsdejqP2SdYomu=C9bJqG+YQ@mail.gmail.com>
-Message-ID: <CY1PR02MB21386F9699EC6FA4CD344497B8050@CY1PR02MB2138.namprd02.prod.outlook.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 10 Sep 2018 12:26:58 -0700
+Subject: Regression in next with filesystem context concept
+In-Reply-To: <20180910183146.GA17726@roeck-us.net>
+References: <20180907161023.GF5662@atomide.com>
+ <20180906164358.GI5659@atomide.com>
+ <9053.1536310046@warthog.procyon.org.uk>
+ <11959.1536420266@warthog.procyon.org.uk>
+ <20180910160836.GT5662@atomide.com>
+ <20180910183146.GA17726@roeck-us.net>
+Message-ID: <20180910192658.GX5662@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+* Guenter Roeck <linux@roeck-us.net> [180910 18:35]:
+> On Mon, Sep 10, 2018 at 09:08:36AM -0700, Tony Lindgren wrote:
+> > OK thanks for tracking that down, next-20180910 boots again
+> > for me.
+> > 
+> 
+> Did you try to shutdown and/or reboot ?
+> 
+> You might see something like the attached if you try.
 
-> -----Original Message-----
-> From: Olof Johansson [mailto:olof at lixom.net]
-> Sent: Saturday, September 08, 2018 6:15 PM
-> To: Jolly Shah <JOLLYS@xilinx.com>
-> Cc: ard.biesheuvel at linaro.org; Ingo Molnar <mingo@kernel.org>; Greg Kroah-
-> Hartman <gregkh@linuxfoundation.org>; matt at codeblueprint.co.uk; Sudeep
-> Holla <sudeep.holla@arm.com>; hkallweit1 at gmail.com; Kees Cook
-> <keescook@chromium.org>; Dmitry Torokhov <dmitry.torokhov@gmail.com>;
-> Michael Turquette <mturquette@baylibre.com>; Stephen Boyd
-> <sboyd@codeaurora.org>; Michal Simek <michals@xilinx.com>; Rob Herring
-> <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>; linux-clk
-> <linux-clk@vger.kernel.org>; Rajan Vaja <RAJANV@xilinx.com>; Linux ARM
-> Mailing List <linux-arm-kernel@lists.infradead.org>; Linux Kernel Mailing List
-> <linux-kernel@vger.kernel.org>; DTML <devicetree@vger.kernel.org>; Jolly
-> Shah <JOLLYS@xilinx.com>
-> Subject: Re: [PATCH v11 08/11] firmware: xilinx: Add debugfs for query data API
-> 
-> Hi,
-> 
-> I noticed the below when I was reviewing the code for merge into arm-soc.
-> Would you mind following up with an incremental patch? I don't think we need
-> to ask Michal to respin for this:
-> 
+Hmm not seeing that here with next-20180910 on ARM at least.
 
-Sure. I will submit incremental patches for suggested changes.
+Regards,
 
-Thanks,
-Jolly Shah
-
-
-> On Fri, Aug 3, 2018 at 10:53 AM, Jolly Shah <jolly.shah@xilinx.com> wrote:
-> > From: Rajan Vaja <rajanv@xilinx.com>
-> >
-> > Add debugfs file to query platform specific data from firmware using
-> > debugfs interface.
-> >
-> > Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
-> > Signed-off-by: Jolly Shah <jollys@xilinx.com>
-> > ---
-> >  drivers/firmware/xilinx/zynqmp-debug.c | 27
-> > +++++++++++++++++++++++++++
-> >  1 file changed, 27 insertions(+)
-> >
-> > diff --git a/drivers/firmware/xilinx/zynqmp-debug.c
-> > b/drivers/firmware/xilinx/zynqmp-debug.c
-> > index fc11db9..4532bd0 100644
-> > --- a/drivers/firmware/xilinx/zynqmp-debug.c
-> > +++ b/drivers/firmware/xilinx/zynqmp-debug.c
-> > @@ -33,6 +33,7 @@ static char debugfs_buf[PAGE_SIZE];  static struct
-> > pm_api_info pm_api_list[] = {
-> >         PM_API(PM_GET_API_VERSION),
-> >         PM_API(PM_IOCTL),
-> > +       PM_API(PM_QUERY_DATA),
-> >  };
-> >
-> >  /**
-> > @@ -105,6 +106,32 @@ static int process_api_request(u32 pm_id, u64
-> *pm_api_arg, u32 *pm_api_ret)
-> >                         sprintf(debugfs_buf, "IOCTL return value: %u\n",
-> >                                 pm_api_ret[1]);
-> >                 break;
-> > +       case PM_QUERY_DATA:
-> > +       {
-> > +               struct zynqmp_pm_query_data qdata = {0};
-> > +
-> > +               qdata.qid = pm_api_arg[0];
-> > +               qdata.arg1 = pm_api_arg[1];
-> > +               qdata.arg2 = pm_api_arg[2];
-> > +               qdata.arg3 = pm_api_arg[3];
-> 
-> This is usually a pattern we try to avoid (having full code blocks in a switch
-> statement, and local variables).
-> 
-> Please move the declaration of qdata to the top of the function so you can drop
-> the braces.
-> 
-> > +
-> > +               ret = eemi_ops->query_data(qdata, pm_api_ret);
-> > +               if (ret)
-> > +                       break;
-> > +
-> > +               if (qdata.qid == PM_QID_CLOCK_GET_NAME)
-> > +                       sprintf(debugfs_buf, "Clock name = %s\n",
-> > +                               (char *)pm_api_ret);
-> > +               else if (qdata.qid == PM_QID_CLOCK_GET_FIXEDFACTOR_PARAMS)
-> > +                       sprintf(debugfs_buf, "Multiplier = %d, Divider = %d\n",
-> > +                               pm_api_ret[1], pm_api_ret[2]);
-> > +               else
-> > +                       sprintf(debugfs_buf,
-> > +                               "data[0] = 0x%08x\ndata[1] = 0x%08x\n data[2] =
-> 0x%08x\ndata[3] = 0x%08x\n",
-> > +                               pm_api_ret[0], pm_api_ret[1],
-> > +                               pm_api_ret[2], pm_api_ret[3]);
-> 
-> If you anticipate more qids here later, a switch could be nicer than a sequence of
-> if/else.
-> 
-> 
-> 
-> -Olof
+Tony
