@@ -1,122 +1,58 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Mon, 10 Sep 2018 17:16:25 +0200
-Subject: [PATCH v2 17/40] iommu/arm-smmu-v3: Link domains and devices
-In-Reply-To: <20180511190641.23008-18-jean-philippe.brucker@arm.com>
-References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
- <20180511190641.23008-18-jean-philippe.brucker@arm.com>
-Message-ID: <b4154adb-313c-133b-6c5d-6e789bd754c7@redhat.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 10 Sep 2018 16:18:03 +0100
+Subject: [GIT PULL] Immutable branch between MFD, SPI and TTY due for the
+ v4.20 merge window
+In-Reply-To: <20180713164736.26028-1-radu.pirea@microchip.com>
+References: <20180713164736.26028-1-radu.pirea@microchip.com>
+Message-ID: <20180910151803.GX28860@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Philippe,
+Enjoy!
 
-On 05/11/2018 09:06 PM, Jean-Philippe Brucker wrote:
-> When removing a mapping from a domain, we need to send an invalidation to
-> all devices that might have stored it in their Address Translation Cache
-> (ATC). In addition when updating the context descriptor of a live domain,
-> we'll need to send invalidations for all devices attached to it.
-> 
-> Maintain a list of devices in each domain, protected by a spinlock. It is
-> updated every time we attach or detach devices to and from domains.
-> 
-> It needs to be a spinlock because we'll invalidate ATC entries from
-> within hardirq-safe contexts, but it may be possible to relax the read
-> side with RCU later.
-> 
-> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-> ---
->  drivers/iommu/arm-smmu-v3.c | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
-> 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 1d647104bccc..c892f012fb43 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -595,6 +595,11 @@ struct arm_smmu_device {
->  struct arm_smmu_master_data {
->  	struct arm_smmu_device		*smmu;
->  	struct arm_smmu_strtab_ent	ste;
-> +
-> +	struct arm_smmu_domain		*domain;
-> +	struct list_head		list; /* domain->devices */
-> +
-> +	struct device			*dev;
-This field addition and associated assignment in arm_smmu_attach_dev()
-is not really documented in the commit message.
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 
->  };
->  
->  /* SMMU private data for an IOMMU domain */
-> @@ -618,6 +623,9 @@ struct arm_smmu_domain {
->  	};
->  
->  	struct iommu_domain		domain;
-> +
-> +	struct list_head		devices;
-> +	spinlock_t			devices_lock;
->  };
->  
->  struct arm_smmu_option_prop {
-> @@ -1470,6 +1478,9 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
->  	}
->  
->  	mutex_init(&smmu_domain->init_mutex);
-> +	INIT_LIST_HEAD(&smmu_domain->devices);
-> +	spin_lock_init(&smmu_domain->devices_lock);
-> +
->  	return &smmu_domain->domain;
->  }
->  
-> @@ -1685,7 +1696,17 @@ static void arm_smmu_install_ste_for_dev(struct iommu_fwspec *fwspec)
->  
->  static void arm_smmu_detach_dev(struct device *dev)
->  {
-> +	unsigned long flags;
->  	struct arm_smmu_master_data *master = dev->iommu_fwspec->iommu_priv;
-> +	struct arm_smmu_domain *smmu_domain = master->domain;
-> +
-> +	if (smmu_domain) {
-> +		spin_lock_irqsave(&smmu_domain->devices_lock, flags);
-> +		list_del(&master->list);
-> +		spin_unlock_irqrestore(&smmu_domain->devices_lock, flags);
-> +
-> +		master->domain = NULL;
-> +	}
->  
->  	master->ste.assigned = false;
->  	arm_smmu_install_ste_for_dev(dev->iommu_fwspec);
-> @@ -1694,6 +1715,7 @@ static void arm_smmu_detach_dev(struct device *dev)
->  static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
->  {
->  	int ret = 0;
-> +	unsigned long flags;
->  	struct arm_smmu_device *smmu;
->  	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
->  	struct arm_smmu_master_data *master;
-> @@ -1729,6 +1751,11 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
->  	}
->  
->  	ste->assigned = true;
-> +	master->domain = smmu_domain;
-> +
-> +	spin_lock_irqsave(&smmu_domain->devices_lock, flags);
-> +	list_add(&master->list, &smmu_domain->devices);
-it is not totally obvious to me why master->domain = smmu_domain isn't
-within the lock either for consistency. Same when deleting the node.
+  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
 
-Thanks
+are available in the Git repository at:
 
-Eric
-> +	spin_unlock_irqrestore(&smmu_domain->devices_lock, flags);
->  
->  	if (smmu_domain->stage == ARM_SMMU_DOMAIN_BYPASS) {
->  		ste->s1_cfg = NULL;
-> @@ -1847,6 +1874,7 @@ static int arm_smmu_add_device(struct device *dev)
->  			return -ENOMEM;
->  
->  		master->smmu = smmu;
-> +		master->dev = dev;
->  		fwspec->iommu_priv = master;
->  	}
->  
-> 
+  git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/ib-mfd-spi-tty-v4.20
+
+for you to fetch changes up to c24d25317a7c6bb3053d4c193b3cf57d1e9a3e4b:
+
+  tty/serial: atmel: Change the driver to work under at91-usart MFD (2018-09-10 16:12:43 +0100)
+
+----------------------------------------------------------------
+Immutable branch between MFD, SPI and TTY due for the v4.20 merge window
+
+----------------------------------------------------------------
+Radu Pirea (6):
+      MAINTAINERS: Add AT91 USART MFD entry
+      dt-bindings: Add binding for atmel-usart in SPI mode
+      mfd: at91-usart: Add MFD driver for USART
+      MAINTAINERS: Add AT91 USART SPI entry
+      spi: at91-usart: Add driver for at91-usart as SPI
+      tty/serial: atmel: Change the driver to work under at91-usart MFD
+
+ .../bindings/{serial => mfd}/atmel-usart.txt       |  25 +-
+ MAINTAINERS                                        |  16 +
+ drivers/mfd/Kconfig                                |   9 +
+ drivers/mfd/Makefile                               |   1 +
+ drivers/mfd/at91-usart.c                           |  71 ++++
+ drivers/spi/Kconfig                                |   8 +
+ drivers/spi/Makefile                               |   1 +
+ drivers/spi/spi-at91-usart.c                       | 432 +++++++++++++++++++++
+ drivers/tty/serial/Kconfig                         |   1 +
+ drivers/tty/serial/atmel_serial.c                  |  42 +-
+ include/dt-bindings/mfd/at91-usart.h               |  17 +
+ 11 files changed, 606 insertions(+), 17 deletions(-)
+ rename Documentation/devicetree/bindings/{serial => mfd}/atmel-usart.txt (76%)
+ create mode 100644 drivers/mfd/at91-usart.c
+ create mode 100644 drivers/spi/spi-at91-usart.c
+ create mode 100644 include/dt-bindings/mfd/at91-usart.h
+
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
