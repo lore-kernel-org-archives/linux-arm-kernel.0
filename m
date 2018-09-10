@@ -1,45 +1,65 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 10 Sep 2018 18:57:26 +0200
-Subject: [PATCH v3 2/2] ARM: s3c24xx: Correct SD card write protect
- detection on Mini2440
-In-Reply-To: <ba9d81bf-f000-f6ae-30b1-3e922985f655@free.fr>
-References: <20180907215446.15160-1-sed@free.fr>
- <20180907215446.15160-2-sed@free.fr>
- <CAJKOXPeYO3VR5LABP3zKYnKckqUBahKPt7MCjzuo3j6oe+d87w@mail.gmail.com>
- <ba9d81bf-f000-f6ae-30b1-3e922985f655@free.fr>
-Message-ID: <20180910165726.5vl24ng2dywexzsf@kozik-lap>
+From: ndesaulniers@google.com (Nick Desaulniers)
+Date: Mon, 10 Sep 2018 10:02:09 -0700
+Subject: [PATCH] arch/arm64/include/asm/jump_label.h: use asm_volatile_goto
+In-Reply-To: <20180910095008.GB31531@arm.com>
+References: <20180909154731.GA20381@gmail.com> <20180910095008.GB31531@arm.com>
+Message-ID: <CAKwvOdn3SgUhPSUBwBm26X-Y3te1iYqwS9v=nyGCzC6KVNtJ6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2018 at 06:55:09PM +0200, Cedric Roux wrote:
-> On 09/10/2018 12:23 PM, Krzysztof Kozlowski wrote:
-> >>  static struct s3c24xx_mci_pdata mini2440_mmc_cfg __initdata = {
-> >> -       .gpio_detect   = S3C2410_GPG(8),
-> >> -       .gpio_wprotect = S3C2410_GPH(8),
-> >> -       .set_power     = NULL,
-> >> -       .ocr_avail     = MMC_VDD_32_33|MMC_VDD_33_34,
-> >> +       .gpio_detect     = S3C2410_GPG(8),
-> >> +       .gpio_wprotect   = S3C2410_GPH(8),
-> >> +       .wprotect_invert = 1,
-> >> +       .set_power       = NULL,
-> >> +       .ocr_avail       = MMC_VDD_32_33|MMC_VDD_33_34,
-> > 
-> > This looks unexpected... after patch 1 there should be only one change
-> > - one new line added. What happened here?
-> 
-> This is to align all the '='.
-> 
-> These were spaces before the '=' so I also used spaces.
-> Should I put TABs instead? I looked in the coding style
-> and didn't find anything about this specific thing
-> (maybe I read too fast though).
-> 
-> And if this ends up unaligned because 'wprotect_invert'
-> requires a second TAB for the others, should I do a separate
-> commit?
+On Mon, Sep 10, 2018 at 2:49 AM Will Deacon <will.deacon@arm.com> wrote:
+>
+> On Sun, Sep 09, 2018 at 05:47:31PM +0200, Miguel Ojeda wrote:
+> > All other uses of "asm goto" go through asm_volatile_goto
+> > (including the arm version of the same file). For consistency,
+> > use it here as well.
+> >
+> > Cc: Nick Desaulniers <ndesaulniers@google.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Signed-off-by: Miguel Ojeda <miguel.ojeda.sandonis@gmail.com>
+> > ---
+> >  arch/arm64/include/asm/jump_label.h | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> Thanks, I'll pick this up as a fix.
+>
+> Will
+>
+> > diff --git a/arch/arm64/include/asm/jump_label.h b/arch/arm64/include/asm/jump_label.h
+> > index 1b5e0e843c3a..7e2b3e360086 100644
+> > --- a/arch/arm64/include/asm/jump_label.h
+> > +++ b/arch/arm64/include/asm/jump_label.h
+> > @@ -28,7 +28,7 @@
+> >
+> >  static __always_inline bool arch_static_branch(struct static_key *key, bool branch)
+> >  {
+> > -     asm goto("1: nop\n\t"
+> > +     asm_volatile_goto("1: nop\n\t"
+> >                ".pushsection __jump_table,  \"aw\"\n\t"
+> >                ".align 3\n\t"
+> >                ".quad 1b, %l[l_yes], %c0\n\t"
+> > @@ -42,7 +42,7 @@ static __always_inline bool arch_static_branch(struct static_key *key, bool bran
+> >
+> >  static __always_inline bool arch_static_branch_jump(struct static_key *key, bool branch)
+> >  {
+> > -     asm goto("1: b %l[l_yes]\n\t"
+> > +     asm_volatile_goto("1: b %l[l_yes]\n\t"
+> >                ".pushsection __jump_table,  \"aw\"\n\t"
+> >                ".align 3\n\t"
+> >                ".quad 1b, %l[l_yes], %c0\n\t"
+> > --
+> > 2.17.1
+> >
 
-Ah, I understand. It's okay, thanks!
+Yes, this should help avoid a known miscompile in gcc < 4.8.2 (at
+least for x86_64; not sure how backend specific the asm goto
+implementation is in gcc, but this shouldn't hurt).
+https://lkml.org/lkml/2018/9/7/1628
 
+Reviewed-by: Nick Desaulniers <ndesaulniers@google.com>
 
-Best regards,
-Krzysztof
+-- 
+Thanks,
+~Nick Desaulniers
