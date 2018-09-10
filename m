@@ -1,55 +1,43 @@
-From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
-Date: Mon, 10 Sep 2018 23:49:56 +0200
-Subject: [PATCH v2 0/3] ARM: OMAP1: ams-delta: Clean up GPIO setup for
- MODEM
-In-Reply-To: <20180909234419.31261-1-jmkrzyszt@gmail.com>
-References: <20180820181333.2527-1-jmkrzyszt@gmail.com>
- <20180909234419.31261-1-jmkrzyszt@gmail.com>
-Message-ID: <2690911.AdkODg5D9b@z50>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 11 Sep 2018 08:05:03 +1000
+Subject: Regression in next with apps hanging with vm_fault_t
+In-Reply-To: <CAFqt6zaRFW+bwVmWbMQ9ni9VJzsa1QMPRLFDCE6X0yQbvbPukw@mail.gmail.com>
+References: <20180910182143.GW5662@atomide.com>
+ <CAFqt6zaRFW+bwVmWbMQ9ni9VJzsa1QMPRLFDCE6X0yQbvbPukw@mail.gmail.com>
+Message-ID: <20180911080503.62cb4699@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, September 10, 2018 1:44:16 AM CEST Janusz Krzysztofik wrote:
-> 
-> Convert modem related GPIO setup from integer space to GPIO descriptors.
-> Also, restore original initialization order of the MODEM device and its
-> related GPIO pins.
-> 
-> Cleanup of MODEM relaated regulator setup is postponed while waiting for
-> upcoming conversion of fixed regulator API to GPIO descriptors.
-> 
-> 
-> Janusz Krzysztofik (3):
->       ARM: OMAP1: ams-delta: assign MODEM IRQ from GPIO descriptor
->       ARM: OMAP1: ams-delta: initialize latch2 pins to safe values
->       ARM: OMAP1: ams-delta: register MODEM device earlier
-> 
-> 
-> Changelog:
-> v2:
-> - rebased on v4.19-rc1
+Hi all,
 
-Hi Tony,
+On Tue, 11 Sep 2018 00:17:45 +0530 Souptick Joarder <jrdr.linux@gmail.com> wrote:
+>
+> On Mon, Sep 10, 2018 at 11:51 PM Tony Lindgren <tony@atomide.com> wrote:
+> >
+> > I'm seeing a regression with Linux next with commit 7b6ec2ae877a
+> > ("fs: convert return type int to vm_fault_t") where apps can just
+> > hang.
+> >
+> > The reproducable test case I have is to remove a distro package
+> > and then add it back where adding the package back just hangs and
+> > the package file seems corrupted.
+> >
+> > This is with ext4 rootfs on MMC, NFSroot does not have this
+> > issue. Any ideas?  
+> 
+> This is a bad commit and there is a plan to remove it from all the tree.
+> Not sure why it is still showing in linux-next tree.
 
-I forgot to mention: please apply on top of "[PATCH v3 0/3] ARM: OMAP1: ams-
-delta: Complete driver gpiod migration" series. Sorry.
+OK, I have removed that commit (and the following fix patch) from
+linux-next today (in case Andrew doesn't get around to it).
 
-Thanks,
-Janusz
-
-> - added Reviewed-by: obtained from Linus Walleij
-> 
-> Please ignore the patch "ARM: OMAP1: ams-delta: assign MODEM IRQ from GPIO"
-> sent alone on 2018-07-17.
-> 
-> Thanks,
-> Janusz
-> 
-> 
-> diffstat:
->  board-ams-delta.c |  121 ++++++++++++++++++++++++++++++++++++++
-+---------------
->  board-ams-delta.h |    7 ---
->  2 files changed, 88 insertions(+), 40 deletions(-)
-> 
-> 
+-- 
+Cheers,
+Stephen Rothwell
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180911/45f583ff/attachment.sig>
