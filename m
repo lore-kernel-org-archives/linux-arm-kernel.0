@@ -1,58 +1,36 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Sep 2018 16:18:03 +0100
-Subject: [GIT PULL] Immutable branch between MFD, SPI and TTY due for the
- v4.20 merge window
-In-Reply-To: <20180713164736.26028-1-radu.pirea@microchip.com>
-References: <20180713164736.26028-1-radu.pirea@microchip.com>
-Message-ID: <20180910151803.GX28860@dell>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 10 Sep 2018 16:19:26 +0100
+Subject: [PATCH v9 3/6] kernel/reboot.c: export pm_power_off_prepare
+In-Reply-To: <20180909020021.GA18838@dragon>
+References: <20180802103425.3053-1-o.rempel@pengutronix.de>
+ <20180802103425.3053-4-o.rempel@pengutronix.de>
+ <20180802104443.GH9117@sirena.org.uk>
+ <94d48ecb-7302-c7ed-e815-730be0426a04@pengutronix.de>
+ <20180802113552.GJ9117@sirena.org.uk>
+ <20180827014815.GD29208@dragon>
+ <20180906101516.GA5360@sirena.org.uk>
+ <20180909020021.GA18838@dragon>
+Message-ID: <20180910151926.GA10889@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enjoy!
+On Sun, Sep 09, 2018 at 10:00:23AM +0800, Shawn Guo wrote:
+> On Thu, Sep 06, 2018 at 11:15:17AM +0100, Mark Brown wrote:
 
-The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+> > I was expecting to get a pull request with the precursor patches in it -
+> > the regulator driver seems to get a moderate amount of development so
+> > there's a reasonable risk of conflicts.
 
-  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+> What about you create a stable topic branch for regulator patches and I
+> pull it into IMX tree?
 
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/ib-mfd-spi-tty-v4.20
-
-for you to fetch changes up to c24d25317a7c6bb3053d4c193b3cf57d1e9a3e4b:
-
-  tty/serial: atmel: Change the driver to work under at91-usart MFD (2018-09-10 16:12:43 +0100)
-
-----------------------------------------------------------------
-Immutable branch between MFD, SPI and TTY due for the v4.20 merge window
-
-----------------------------------------------------------------
-Radu Pirea (6):
-      MAINTAINERS: Add AT91 USART MFD entry
-      dt-bindings: Add binding for atmel-usart in SPI mode
-      mfd: at91-usart: Add MFD driver for USART
-      MAINTAINERS: Add AT91 USART SPI entry
-      spi: at91-usart: Add driver for at91-usart as SPI
-      tty/serial: atmel: Change the driver to work under at91-usart MFD
-
- .../bindings/{serial => mfd}/atmel-usart.txt       |  25 +-
- MAINTAINERS                                        |  16 +
- drivers/mfd/Kconfig                                |   9 +
- drivers/mfd/Makefile                               |   1 +
- drivers/mfd/at91-usart.c                           |  71 ++++
- drivers/spi/Kconfig                                |   8 +
- drivers/spi/Makefile                               |   1 +
- drivers/spi/spi-at91-usart.c                       | 432 +++++++++++++++++++++
- drivers/tty/serial/Kconfig                         |   1 +
- drivers/tty/serial/atmel_serial.c                  |  42 +-
- include/dt-bindings/mfd/at91-usart.h               |  17 +
- 11 files changed, 606 insertions(+), 17 deletions(-)
- rename Documentation/devicetree/bindings/{serial => mfd}/atmel-usart.txt (76%)
- create mode 100644 drivers/mfd/at91-usart.c
- create mode 100644 drivers/spi/spi-at91-usart.c
- create mode 100644 include/dt-bindings/mfd/at91-usart.h
-
--- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Sure, I can send a pull request back but the first two patches in the
+series are ARM ones - are you OK with me just applying them and sending
+them in the pull request or do you want to apply them first?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180910/a549cbdc/attachment.sig>
