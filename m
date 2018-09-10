@@ -1,20 +1,40 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 10 Sep 2018 13:18:27 -0500
-Subject: [PATCH v5 7/9] dt-bindings: ata: update ahci_sunxi bindings
-In-Reply-To: <20180903100201.23131-8-clabbe.montjoie@gmail.com>
-References: <20180903100201.23131-1-clabbe.montjoie@gmail.com>
- <20180903100201.23131-8-clabbe.montjoie@gmail.com>
-Message-ID: <20180910181827.GA12679@bogus>
+Date: Mon, 10 Sep 2018 13:19:13 -0500
+Subject: [PATCH v5 3/7] dt-bindings: dmaengine: xilinx_dma: add optional
+ xlnx,sg-length-width property
+In-Reply-To: <20180907062502.8241-3-andrea.merello@gmail.com>
+References: <20180907062502.8241-1-andrea.merello@gmail.com>
+ <20180907062502.8241-3-andrea.merello@gmail.com>
+Message-ID: <20180910181913.GA13764@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon,  3 Sep 2018 12:01:59 +0200, Corentin Labbe wrote:
-> This patch update binding with the new R40 compatible.
+On Fri,  7 Sep 2018 08:24:58 +0200, Andrea Merello wrote:
+> The width of the "length register" cannot be autodetected, and it is now
+> specified with a DT property. Add documentation for it.
 > 
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: devicetree at vger.kernel.org
+> Cc: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
+> Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
+> Reviewed-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
 > ---
->  Documentation/devicetree/bindings/ata/ahci-platform.txt | 2 ++
->  1 file changed, 2 insertions(+)
+> Changes in v2:
+> 	- change property name
+> 	- property is now optional
+> 	- cc DT maintainer
+> Changes in v3:
+> 	- reword
+> 	- cc DT maintainerS and ML
+> Changes in v4:
+> 	- specify the unit, the valid range and the default value
+> Changes in v5:
+> 	- commit message trivial fix
+> 	- fix spaces before tab
+> ---
+>  Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
 
 Reviewed-by: Rob Herring <robh@kernel.org>
