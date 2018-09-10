@@ -1,41 +1,59 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Sep 2018 14:43:39 +0100
-Subject: [PATCH v12 0/6] Driver for at91 usart in spi mode
-In-Reply-To: <2a8ccc95-bbf0-2211-0f88-c5a594600d34@microchip.com>
-References: <20180904111310.4049-1-radu_nicolae.pirea@upb.ro>
- <20180910094817.GJ28860@dell>
- <2a8ccc95-bbf0-2211-0f88-c5a594600d34@microchip.com>
-Message-ID: <20180910134339.GM28860@dell>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Mon, 10 Sep 2018 15:48:45 +0200
+Subject: [PATCH] arm64: add NUMA emulation support
+In-Reply-To: <e46e715c-f115-f054-eeb2-3cecbcd1192d@kernel.org>
+References: <20180824230559.32336-1-shuah@kernel.org>
+ <20180828174011.GE20375@arm.com>
+ <a58ad11f-3c22-ed7f-a0cd-938aabc4adaf@kernel.org>
+ <20180829110802.GD10349@dhcp22.suse.cz>
+ <f041ba95-03e6-4a7d-c324-870b45a2f648@kernel.org>
+ <20180905064252.GW14951@dhcp22.suse.cz>
+ <c1b58f13-6190-20e9-7e4f-b8bc2b9d5f80@kernel.org>
+ <20180907083452.GC19621@dhcp22.suse.cz>
+ <e46e715c-f115-f054-eeb2-3cecbcd1192d@kernel.org>
+Message-ID: <20180910134845.GH10951@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Sep 2018, Nicolas Ferre wrote:
-
-> Hi Lee,
-> 
-> On 10/09/2018 at 11:48, Lee Jones wrote:
-> > On Tue, 04 Sep 2018, Radu Pirea wrote:
-> > > Well, this is the 12th version of this patch series.
-> > > In this version I fixed a warning from kbuild-robot and I have no idea
-> > > how I forgot to add static in declaration of that functions. Also I
-> > > fixed the example for the SPI driver in bindings.
+On Fri 07-09-18 16:30:59, Shuah Khan wrote:
+> On 09/07/2018 02:34 AM, Michal Hocko wrote:
+> > On Thu 06-09-18 15:53:34, Shuah Khan wrote:
+> > [...]
+> >> A few critical allocations could be satisfied and root cgroup prevails. It is not the
+> >> intent to have exclusivity at the expense of the kernel.
 > > 
-> > Okay great.  So which patches still require Acks?
+> > Well, it is not "few critical allocations". It can be a lot of
+> > memory. Basically any GFP_KERNEL allocation. So how exactly you expect
+> > this to work when you cannot estimate how much
+> > memory will kernel eat?
+> > 
+> >>
+> >> This feature will allow a way to configure cpusets on non-NUMA for workloads that can
+> >> benefit from the reservation and isolation that is available within the constraints of
+> >> exclusive cpuset policies.
+> > 
+> > AFAIR this was the first approach Google took for the memory isolation
+> > and they moved over to memory cgroups. 
 > 
-> None I would say: everything's ready to be integrated into your MFD tree as
-> you proposed some time ago.
+> In addition to isolation, being able to reserve a block instead is one of the
+> issues I am looking to address. Unfortunately memory cgroups won't address that
+> issue.
+
+Could you be more specific why you need reservations other than
+isolation.
+
+> I would recommend to talk to
+> > those guys bebfore you introduce potentially a lot of code that will not
+> > really work for the workload you indend it for.
+> > 
 > 
-> We are looking forward seeing this series integrated in linux-next as soon
-> as possible.
+> Will you be able to point me to a good contact at Goggle and/or some pointers
+> on finding discussion on the memory isolation. My searches on lkml came up
+> short,
 
-Very well.
-
-I'm just catching up after an extended vacation - only 300 mails to go!
-
-Please bear with me.
-
+Well, Ying Han who used to work on memcg early days is working on a
+different project. So I am not really sure.
+https://lwn.net/Articles/459585/ might tell you more.
 -- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Michal Hocko
+SUSE Labs
