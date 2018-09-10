@@ -1,7 +1,9 @@
 From: pihsun@chromium.org (Peter Shih)
-Date: Mon, 10 Sep 2018 11:50:47 +0800
-Subject: [PATCH] spi: mediatek: Don't modify spi_transfer when transfer.
-Message-ID: <20180910035047.98496-1-pihsun@chromium.org>
+Date: Mon, 10 Sep 2018 11:54:21 +0800
+Subject: [PATCH v2] spi: mediatek: Don't modify spi_transfer when transfer.
+In-Reply-To: <20180910035047.98496-1-pihsun@chromium.org>
+References: <20180910035047.98496-1-pihsun@chromium.org>
+Message-ID: <20180910035421.101505-1-pihsun@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,9 +13,6 @@ interrupt handler. This is somewhat unexpected, and there are some
 caller (e.g. Cr50 spi driver) that reuse the spi_transfer for multiple
 messages. Add a field to record how many bytes have been transferred,
 and calculate the right len / buffer based on it instead.
-
-BUG=b:113973051
-TEST=None
 
 Signed-off-by: Pi-Hsun Shih <pihsun@chromium.org>
 
