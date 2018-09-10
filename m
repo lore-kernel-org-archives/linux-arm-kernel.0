@@ -1,100 +1,63 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Mon, 10 Sep 2018 11:42:47 +0100
-Subject: [PATCH v3 8/9] ARM: spectre-v1,
- v1.1: provide helpers for address sanitization
-In-Reply-To: <1536576168-40096-1-git-send-email-julien.thierry@arm.com>
-References: <1536576168-40096-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1536576168-40096-9-git-send-email-julien.thierry@arm.com>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Mon, 10 Sep 2018 11:43:15 +0100
+Subject: [PATCH v2 3/3] arm64: dts: renesas: r8a774a1: Add CAN nodes
+In-Reply-To: <1536576195-11520-1-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1536576195-11520-1-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <1536576195-11520-4-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce C and asm helpers to sanitize user address, taking the
-address range they target into account.
+From: Chris Paterson <chris.paterson2@renesas.com>
 
-Use asm helper for existing sanitization in __copy_from_user().
+Add the device nodes for both RZ/G2M CAN channels.
 
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+Reviewed-by: Biju Das <biju.das@bp.renesas.com>
 ---
- arch/arm/include/asm/assembler.h | 11 +++++++++++
- arch/arm/include/asm/uaccess.h   | 26 ++++++++++++++++++++++++++
- arch/arm/lib/copy_from_user.S    |  6 +-----
- 3 files changed, 38 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index b17ee03..88286dd 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -467,6 +467,17 @@
- #endif
- 	.endm
+v1->v2:
+* replaced "renesas,rzg-gen2-can" with "renesas,rcar-gen3-can" as per
+  Geert's comment.
+
+This patch applies on top of renesas-devel-20180906-v4.19-rc2.
+
+ arch/arm64/boot/dts/renesas/r8a774a1.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+index 046fc93..867e875 100644
+--- a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+@@ -874,6 +874,30 @@
+ 			status = "disabled";
+ 		};
  
-+	.macro uaccess_mask_range_ptr, addr:req, size:req, limit:req, tmp:req
-+#ifdef CONFIG_CPU_SPECTRE
-+	sub	\tmp, \limit, #1
-+	subs	\tmp, \tmp, \addr	@ tmp = limit - 1 - addr
-+	addhs	\tmp, \tmp, #1		@ if (tmp >= 0) {
-+	subhss	\tmp, \tmp, \size	@ tmp = limit - (addr + size) }
-+	movlo	\addr, #0		@ if (tmp < 0) addr = NULL
-+	csdb
-+#endif
-+	.endm
++		can0: can at e6c30000 {
++			compatible = "renesas,can-r8a774a1",
++				     "renesas,rcar-gen3-can";
++			reg = <0 0xe6c30000 0 0x1000>;
++			interrupts = <GIC_SPI 186 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 916>, <&can_clk>;
++			clock-names = "clkp1", "can_clk";
++			power-domains = <&sysc 32>;
++			resets = <&cpg 916>;
++			status = "disabled";
++		};
 +
- 	.macro	uaccess_disable, tmp, isb=1
- #ifdef CONFIG_CPU_SW_DOMAIN_PAN
- 	/*
-diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
-index 1191e7d..c136eef 100644
---- a/arch/arm/include/asm/uaccess.h
-+++ b/arch/arm/include/asm/uaccess.h
-@@ -100,6 +100,32 @@ static inline void set_fs(mm_segment_t fs)
- 	__typeof__(__builtin_choose_expr(sizeof(x) > sizeof(0UL), 0ULL, 0UL))
- 
- /*
-+ * Sanitise a uaccess pointer such that it becomes NULL if addr+size
-+ * is above the current addr_limit.
-+ */
-+#define uaccess_mask_range_ptr(ptr, size)			\
-+	((__typeof__(ptr))__uaccess_mask_range_ptr(ptr, size))
-+static inline void __user *__uaccess_mask_range_ptr(const void __user *ptr,
-+						    size_t size)
-+{
-+	void __user *safe_ptr = (void __user *)ptr;
-+	unsigned long tmp;
++		can1: can at e6c38000 {
++			compatible = "renesas,can-r8a774a1",
++				     "renesas,rcar-gen3-can";
++			reg = <0 0xe6c38000 0 0x1000>;
++			interrupts = <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 915>, <&can_clk>;
++			clock-names = "clkp1", "can_clk";
++			power-domains = <&sysc 32>;
++			resets = <&cpg 915>;
++			status = "disabled";
++		};
 +
-+	asm volatile(
-+	"	sub	%1, %3, #1\n"
-+	"	subs	%1, %1, %0\n"
-+	"	addhs	%1, %1, #1\n"
-+	"	subhss	%1, %1, %2\n"
-+	"	movlo	%0, #0\n"
-+	: "+r" (safe_ptr), "=&r" (tmp)
-+	: "r" (size), "r" (current_thread_info()->addr_limit)
-+	: "cc");
-+
-+	csdb();
-+	return safe_ptr;
-+}
-+
-+/*
-  * Single-value transfer routines.  They automatically use the right
-  * size if we just have the right pointer type.  Note that the functions
-  * which read from user space (*get_*) need to take care not to leak
-diff --git a/arch/arm/lib/copy_from_user.S b/arch/arm/lib/copy_from_user.S
-index a826df3..6709a8d 100644
---- a/arch/arm/lib/copy_from_user.S
-+++ b/arch/arm/lib/copy_from_user.S
-@@ -93,11 +93,7 @@ ENTRY(arm_copy_from_user)
- #ifdef CONFIG_CPU_SPECTRE
- 	get_thread_info r3
- 	ldr	r3, [r3, #TI_ADDR_LIMIT]
--	adds	ip, r1, r2	@ ip=addr+size
--	sub	r3, r3, #1	@ addr_limit - 1
--	cmpcc	ip, r3		@ if (addr+size > addr_limit - 1)
--	movcs	r1, #0		@ addr = NULL
--	csdb
-+	uaccess_mask_range_ptr r1, r2, r3, ip
- #endif
- 
- #include "copy_template.S"
+ 		pwm0: pwm at e6e30000 {
+ 			compatible = "renesas,pwm-r8a774a1", "renesas,pwm-rcar";
+ 			reg = <0 0xe6e30000 0 0x8>;
 -- 
-1.9.1
+2.7.4
