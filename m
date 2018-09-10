@@ -1,50 +1,42 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Mon, 10 Sep 2018 09:54:56 +0200
-Subject: [PATCH v2 4/5] dt-bindings: Add vendor prefix for Microsys
-In-Reply-To: <20180910003852.GD21218@dragon>
-References: <20180903140840.23648-1-alexandre.belloni@bootlin.com>
- <20180903140840.23648-4-alexandre.belloni@bootlin.com>
- <20180910003852.GD21218@dragon>
-Message-ID: <20180910075456.GA2494@piout.net>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Mon, 10 Sep 2018 09:58:49 +0200
+Subject: [PATCH v2 01/16] nvmem: remove unused APIs
+In-Reply-To: <c0b0c411-65f6-62f9-6d6d-2884e5a17250@linaro.org>
+References: <20180907100750.14564-1-brgl@bgdev.pl>
+ <20180907100750.14564-2-brgl@bgdev.pl>
+ <c0b0c411-65f6-62f9-6d6d-2884e5a17250@linaro.org>
+Message-ID: <CAMRc=MfO01EQAfY4Uu3UwzzvhVOMF7_BpCOPVz2yVXqDgpb0AA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/09/2018 08:38:53+0800, Shawn Guo wrote:
-> +Rob
-> 
-> @Rob, Are you okay with this?  The patch should really be sent to you
-> from the beginning.
-> 
+2018-09-10 9:32 GMT+02:00 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>:
+>
+>
+> On 07/09/18 11:07, Bartosz Golaszewski wrote:
+>>
+>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>
+>> Remove all APIs dealing with nvmem_cell_info. There are no users and
+>> this part of the subsystem will be reworked.
+>>
+>> This patch temprarily disables support for non-DT users.
+>>
+>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>> ---
+>>   drivers/nvmem/core.c           | 212 ++-------------------------------
+>>   include/linux/nvmem-consumer.h |  26 ----
+>>   include/linux/nvmem-provider.h |  13 --
+>>   3 files changed, 12 insertions(+), 239 deletions(-)
+>
+>
+> This looks totally un-necessary, Other patches in this series adds them
+> back.. Consider updating these in those respective patches.!
+>
 
-Ah right, Rob was cced on v1 and I forgot to do that in v2.
+While this may not be entirely necessary, it's very useful. There's
+almost nothing common between this API and the new one added later in
+this series. Later patches are MUCH cleaner thanks to this removal and
+I believe it makes them easier for review.
 
-> Shawn
-> 
-> On Mon, Sep 03, 2018 at 04:08:39PM +0200, Alexandre Belloni wrote:
-> > Add vendor prefix for MicroSys Electronics GmbH
-> > 
-> > Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
-> > ---
-> >  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> > index 2c3fc512e746..10155a44b783 100644
-> > --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> > +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> > @@ -235,6 +235,7 @@ micrel	Micrel Inc.
-> >  microchip	Microchip Technology Inc.
-> >  microcrystal	Micro Crystal AG
-> >  micron	Micron Technology Inc.
-> > +microsys	MicroSys Electronics GmbH
-> >  minix	MINIX Technology Ltd.
-> >  miramems	MiraMEMS Sensing Technology Co., Ltd.
-> >  mitsubishi	Mitsubishi Electric Corporation
-> > -- 
-> > 2.19.0.rc1
-> > 
-
--- 
-Alexandre Belloni, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Best regards,
+Bart
