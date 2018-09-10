@@ -1,23 +1,23 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 10 Sep 2018 09:04:49 +0800
-Subject: [PATCH] ARM: dts: imx6ul: Enable the PMU node
-In-Reply-To: <1536171528-23005-1-git-send-email-festevam@gmail.com>
-References: <1536171528-23005-1-git-send-email-festevam@gmail.com>
-Message-ID: <20180910010448.GC21992@dragon>
+Date: Mon, 10 Sep 2018 09:09:14 +0800
+Subject: [PATCH] ARM: dts: imx6q-apalis: mux RESET_MOCI# signal
+In-Reply-To: <20180906234658.12205-1-stefan@agner.ch>
+References: <20180906234658.12205-1-stefan@agner.ch>
+Message-ID: <20180910010913.GD21992@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2018 at 03:18:48PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
+On Thu, Sep 06, 2018 at 04:46:58PM -0700, Stefan Agner wrote:
+> The pinctrl properties on the IOMUXC node get overwritten by the
+> carrier board level device tree, hence the pinctrl_reset_moci
+> pinctrl does not get applied.
 > 
-> There is no need to keep the PMU disabled.
+> Associate the pinctrl_reset_moci pinctrl with the PCIe node where
+> we also make use of the pin as a reset GPIO.
 > 
-> Enable it like it is done in the other i.MX dtsi files.
+> Since the pin is muxed as a GPIO by default not muxing it explicitly
+> worked fine in practise.
 > 
-> With this change applied we see:
-> 
-> [    1.338866] hw perfevents: enabled with armv7_cortex_a7 PMU driver, 5 counters available
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 
 Applied, thanks.
