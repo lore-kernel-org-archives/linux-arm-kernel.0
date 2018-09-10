@@ -1,166 +1,163 @@
-From: sunnyliangjy@gmail.com (Wendy Liang)
-Date: Mon, 10 Sep 2018 10:13:33 -0700
-Subject: [PATCH v3 2/2] dt-bindings: mailbox: Add Xilinx IPI Mailbox
-In-Reply-To: <CAA07jV-K5x0TFvVDE4SyFqCztJsjiMbns=h=dQ4_EPRa+p7jfg@mail.gmail.com>
-References: <1515109891-17133-1-git-send-email-jliang@xilinx.com>
- <1515109891-17133-3-git-send-email-jliang@xilinx.com>
- <CABb+yY00n6fLiQXftj-TMhT6q=KopZMkLYr6DpYE8CvxH-gz8Q@mail.gmail.com>
- <BY1PR0201MB0885F2BCD9FE353171B54888B0110@BY1PR0201MB0885.namprd02.prod.outlook.com>
- <CABb+yY1VxNCskPK4LJ=JnxyKPBid2SEEgRLK3M1Csbu2xMRn8g@mail.gmail.com>
- <CAA07jV-K5x0TFvVDE4SyFqCztJsjiMbns=h=dQ4_EPRa+p7jfg@mail.gmail.com>
-Message-ID: <CAA07jV_RmL+DfMbWW93Xa8ZjS2g50vY93zcwqO2=Y9GZJgab1g@mail.gmail.com>
+From: horia.geanta@nxp.com (=?UTF-8?q?Horia=20Geant=C4=83?=)
+Date: Mon, 10 Sep 2018 20:15:45 +0300
+Subject: [PATCH 06/11] crypto: caam - add Queue Interface v2 error codes
+In-Reply-To: <20180910171550.5659-1-horia.geanta@nxp.com>
+References: <20180910171550.5659-1-horia.geanta@nxp.com>
+Message-ID: <20180910171550.5659-7-horia.geanta@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2018 at 2:31 PM Wendy Liang <sunnyliangjy@gmail.com> wrote:
->
-> On Tue, Jan 9, 2018 at 8:42 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
-> > On Wed, Jan 10, 2018 at 6:52 AM, Jiaying Liang <jliang@xilinx.com> wrote:
-> >>> From: Jassi Brar [mailto:jassisinghbrar at gmail.com]
-> >
-> >>> > +
-> >>> > +Controller Device Node:
-> >>> > +===========================
-> >>> > +Required properties:
-> >>> > +--------------------
-> >>> > +- compatible:          Shall be: "xlnx,zynqmp-ipi-mailbox"
-> >>> > +- reg:                 IPI buffers address ranges
-> >>> > +- reg-names:           Names of the reg resources. It should have:
-> >>> > +                       * local_request_region
-> >>> > +                         - IPI request msg buffer written by local and read
-> >>> > +                           by remote
-> >>> > +                       * local_response_region
-> >>> > +                         - IPI response msg buffer written by local and read
-> >>> > +                           by remote
-> >>> > +                       * remote_request_region
-> >>> > +                         - IPI request msg buffer written by remote and read
-> >>> > +                           by local
-> >>> > +                       * remote_response_region
-> >>> > +                         - IPI response msg buffer written by remote and read
-> >>> > +                           by local
-> >>> >
-> >>> shmem is option and external to the controller. It should be passed via
-> >>> client's binding.
-> >>> Please have a look at Sudeep's proposed patch
-> >>> https://www.spinics.net/lists/arm-kernel/msg626120.html
-> >> [Wendy] thanks for the link, but those 'buffers" are registers in the hardware
-> >> but not memory.
-> >>
-> > No, that is for memory, not registers.
-> > Please have a more careful look at the patch.
->
-> Sorry for very late response.
->
-> Those are not the normal memory but device memories,
-> they are 32bytes fixed request buffers and response buffers per
-> channel. They come
-> from the IPI hardware block.
->
-> The mailbox framework API "mbox_send_message()" allows users to send message
-> to the mailbox. in this case, just not clear on why we cannot have the
-> buffer in the
-> controller? These memories are not for sharing data, but just for
-> short notification
-> messages.
->
-> >
-> >>>
-> >>> > +- #mbox-cells:         Shall be 1. It contains:
-> >>> > +                       * tx(0) or rx(1) channel
-> >>> > +- xlnx,ipi-ids:                Xilinx IPI agent IDs of the two peers of the
-> >>> > +                       Xilinx IPI communication channel.
-> >>> > +- interrupt-parent:    Phandle for the interrupt controller
-> >>> > +- interrupts:          Interrupt information corresponding to the
-> >>> > +                       interrupt-names property.
-> >>> > +
-> >>> > +Optional properties:
-> >>> > +--------------------
-> >>> > +- method:              The method of accessing the IPI agent registers.
-> >>> > +                       Permitted values are: "smc" and "hvc". Default is
-> >>> > +                       "smc".
-> >>> > +
-> >>> Andre almost implemented the generic driver. Can you please have a look at
-> >>> https://www.spinics.net/lists/arm-kernel/msg595416.html
-> >>> and see if you can just finish it off?
-> >> [Wendy] This mailbox controller is about to use Xilinx IPI hardware as mailbox.
-> >>
-> > I couldn't find anything specific to Xilinx h/w
-> > zynqmp_ipi_fw_call() is same as arm_smc_send_data() in Andre's driver
-> > (though it needs to pass on [R2,R7] as I suggested in reply to him).
-> >
-> >> We use it to send notification/short request to firmware (usually running on
-> >> another core on SoC),
-> >>
-> > So does Andre's driver. Which is precise and generic, so I much prefer that.
-> >
-> >> and also to receive notification/short request from firmware.
-> >> Interrupt is used in the receiving direction. It looks different to the usage of
-> >> mailbox driver from the link.
-> >>
-> > Yes, there is some difference. But nothing related to your h/w.
-> > Andre's driver assume synchronous transmits where the response is
-> > filled in the regs upon return.
-> > What kind of calls do you make to your remote firmware? I would expect
-> > them to be 'fast'.
->
-> The reason to have this mailbox driver is because, we have an hardware block
-> for IPI, this hardware block has registers and buffers and we want to
-> to use Linux
-> kernel mailbox framework APIs such as mbox_send_message() and rx_callback in
-> client drivers to send notification or short request to other
-> processors and receive
-> response and request.
->
-> The reason to use SMC calls to access the registers is because we have the case
-> that both the ATF and Linux kernel drive will need to access the same registers.
->
-> I have looked at the arm_smc patch, it looks like it is for
-> synchronous request, and only
-> allow 32bit message. In our case, we need to:
-> * besides synchronous request, we also need to handle asynchronous request.
->   The driver will monitor the interrupt to see if there is a message
-> from the other core.
->    If yes, it will notify the client from rx_callback.
-> * put 32bytes short message to the mailbox.
->
-> Thanks,
-> Wendy
-Hi Jassi,
+Add support to translate error codes returned by QI v2, i.e.
+Queue Interface present on DataPath Acceleration Architecture
+v2 (DPAA2).
 
-Ping.
-I posted some questions on another email to the ARM SMC mailbox
-driver. But no response yet.
-There are some issues with the latest ARM SMC mailbox driver I have seen so far.
+Signed-off-by: Horia Geant? <horia.geanta@nxp.com>
+---
+ drivers/crypto/caam/error.c | 75 +++++++++++++++++++++++++++++++++++++++++++--
+ drivers/crypto/caam/error.h |  6 +++-
+ drivers/crypto/caam/regs.h  |  2 ++
+ 3 files changed, 79 insertions(+), 4 deletions(-)
 
-* The message length is very limited. In our case, in order to send or
-receive message from our mailbox hardware,
-  we will need to extend the message length, in our case it is 32bytes.
-  Here is what I am thinking about:
-     * Opt 1: pass pointer from kernel to ATF to allow ATF to
-read/write to the pointer.
-     * Opt 2: define ARM-SMC message as
-        struct arm_smc_msg {
-                u32 len;
-                void *msg;
-                void *resp;
-         };
-         When sends to the message, use multiple SMC calls to copy the
-message content to the SMCC parameters.
-         Also use multiple SMC calls to get the response from SMCC parameters.
-     * Opt3: even if our driver is using SMCC to send and receive
-messages, but those SMCC calls will be specific to our hardware.
-Instead of using a generic ARM-SMC mailbox driver, we have our vendor
-specific mailbox driver in Linux kernel.
-
-How do you think about the above options?
-
-Thanks,
-Wendy
->
-> >
-> >> Is there a plan to extend the ARM SMC mailbox driver
-> >> to both trigger firmware actions and receive request from firmware?
-> >>
-> > Sure if we have a genuine requirement we can support RX path as well.
-> >
-> > Thanks.
+diff --git a/drivers/crypto/caam/error.c b/drivers/crypto/caam/error.c
+index 8da88beb1abb..db0f0d96842e 100644
+--- a/drivers/crypto/caam/error.c
++++ b/drivers/crypto/caam/error.c
+@@ -108,6 +108,54 @@ static const struct {
+ 	{ 0xF1, "3GPP HFN matches or exceeds the Threshold" },
+ };
+ 
++static const struct {
++	u8 value;
++	const char *error_text;
++} qi_error_list[] = {
++	{ 0x1F, "Job terminated by FQ or ICID flush" },
++	{ 0x20, "FD format error"},
++	{ 0x21, "FD command format error"},
++	{ 0x23, "FL format error"},
++	{ 0x25, "CRJD specified in FD, but not enabled in FLC"},
++	{ 0x30, "Max. buffer size too small"},
++	{ 0x31, "DHR exceeds max. buffer size (allocate mode, S/G format)"},
++	{ 0x32, "SGT exceeds max. buffer size (allocate mode, S/G format"},
++	{ 0x33, "Size over/underflow (allocate mode)"},
++	{ 0x34, "Size over/underflow (reuse mode)"},
++	{ 0x35, "Length exceeds max. short length (allocate mode, S/G/ format)"},
++	{ 0x36, "Memory footprint exceeds max. value (allocate mode, S/G/ format)"},
++	{ 0x41, "SBC frame format not supported (allocate mode)"},
++	{ 0x42, "Pool 0 invalid / pool 1 size < pool 0 size (allocate mode)"},
++	{ 0x43, "Annotation output enabled but ASAR = 0 (allocate mode)"},
++	{ 0x44, "Unsupported or reserved frame format or SGHR = 1 (reuse mode)"},
++	{ 0x45, "DHR correction underflow (reuse mode, single buffer format)"},
++	{ 0x46, "Annotation length exceeds offset (reuse mode)"},
++	{ 0x48, "Annotation output enabled but ASA limited by ASAR (reuse mode)"},
++	{ 0x49, "Data offset correction exceeds input frame data length (reuse mode)"},
++	{ 0x4B, "Annotation output enabled but ASA cannote be expanded (frame list)"},
++	{ 0x51, "Unsupported IF reuse mode"},
++	{ 0x52, "Unsupported FL use mode"},
++	{ 0x53, "Unsupported RJD use mode"},
++	{ 0x54, "Unsupported inline descriptor use mode"},
++	{ 0xC0, "Table buffer pool 0 depletion"},
++	{ 0xC1, "Table buffer pool 1 depletion"},
++	{ 0xC2, "Data buffer pool 0 depletion, no OF allocated"},
++	{ 0xC3, "Data buffer pool 1 depletion, no OF allocated"},
++	{ 0xC4, "Data buffer pool 0 depletion, partial OF allocated"},
++	{ 0xC5, "Data buffer pool 1 depletion, partial OF allocated"},
++	{ 0xD0, "FLC read error"},
++	{ 0xD1, "FL read error"},
++	{ 0xD2, "FL write error"},
++	{ 0xD3, "OF SGT write error"},
++	{ 0xD4, "PTA read error"},
++	{ 0xD5, "PTA write error"},
++	{ 0xD6, "OF SGT F-bit write error"},
++	{ 0xD7, "ASA write error"},
++	{ 0xE1, "FLC[ICR]=0 ICID error"},
++	{ 0xE2, "FLC[ICR]=1 ICID error"},
++	{ 0xE4, "source of ICID flush not trusted (BDI = 0)"},
++};
++
+ static const char * const cha_id_list[] = {
+ 	"",
+ 	"AES",
+@@ -236,6 +284,27 @@ static void report_deco_status(struct device *jrdev, const u32 status,
+ 		status, error, idx_str, idx, err_str, err_err_code);
+ }
+ 
++static void report_qi_status(struct device *qidev, const u32 status,
++			     const char *error)
++{
++	u8 err_id = status & JRSTA_QIERR_ERROR_MASK;
++	const char *err_str = "unidentified error value 0x";
++	char err_err_code[3] = { 0 };
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(qi_error_list); i++)
++		if (qi_error_list[i].value == err_id)
++			break;
++
++	if (i != ARRAY_SIZE(qi_error_list) && qi_error_list[i].error_text)
++		err_str = qi_error_list[i].error_text;
++	else
++		snprintf(err_err_code, sizeof(err_err_code), "%02x", err_id);
++
++	dev_err(qidev, "%08x: %s: %s%s\n",
++		status, error, err_str, err_err_code);
++}
++
+ static void report_jr_status(struct device *jrdev, const u32 status,
+ 			     const char *error)
+ {
+@@ -250,7 +319,7 @@ static void report_cond_code_status(struct device *jrdev, const u32 status,
+ 		status, error, __func__);
+ }
+ 
+-void caam_jr_strstatus(struct device *jrdev, u32 status)
++void caam_strstatus(struct device *jrdev, u32 status, bool qi_v2)
+ {
+ 	static const struct stat_src {
+ 		void (*report_ssed)(struct device *jrdev, const u32 status,
+@@ -262,7 +331,7 @@ void caam_jr_strstatus(struct device *jrdev, u32 status)
+ 		{ report_ccb_status, "CCB" },
+ 		{ report_jump_status, "Jump" },
+ 		{ report_deco_status, "DECO" },
+-		{ NULL, "Queue Manager Interface" },
++		{ report_qi_status, "Queue Manager Interface" },
+ 		{ report_jr_status, "Job Ring" },
+ 		{ report_cond_code_status, "Condition Code" },
+ 		{ NULL, NULL },
+@@ -288,4 +357,4 @@ void caam_jr_strstatus(struct device *jrdev, u32 status)
+ 	else
+ 		dev_err(jrdev, "%d: unknown error source\n", ssrc);
+ }
+-EXPORT_SYMBOL(caam_jr_strstatus);
++EXPORT_SYMBOL(caam_strstatus);
+diff --git a/drivers/crypto/caam/error.h b/drivers/crypto/caam/error.h
+index 5aa332bac4b0..67ea94079837 100644
+--- a/drivers/crypto/caam/error.h
++++ b/drivers/crypto/caam/error.h
+@@ -8,7 +8,11 @@
+ #ifndef CAAM_ERROR_H
+ #define CAAM_ERROR_H
+ #define CAAM_ERROR_STR_MAX 302
+-void caam_jr_strstatus(struct device *jrdev, u32 status);
++
++void caam_strstatus(struct device *dev, u32 status, bool qi_v2);
++
++#define caam_jr_strstatus(jrdev, status) caam_strstatus(jrdev, status, false)
++#define caam_qi2_strstatus(qidev, status) caam_strstatus(qidev, status, true)
+ 
+ void caam_dump_sg(const char *level, const char *prefix_str, int prefix_type,
+ 		  int rowsize, int groupsize, struct scatterlist *sg,
+diff --git a/drivers/crypto/caam/regs.h b/drivers/crypto/caam/regs.h
+index 4fb91ba39c36..cb930c868029 100644
+--- a/drivers/crypto/caam/regs.h
++++ b/drivers/crypto/caam/regs.h
+@@ -633,6 +633,8 @@ struct caam_job_ring {
+ #define JRSTA_DECOERR_INVSIGN       0x86
+ #define JRSTA_DECOERR_DSASIGN       0x87
+ 
++#define JRSTA_QIERR_ERROR_MASK      0x00ff
++
+ #define JRSTA_CCBERR_JUMP           0x08000000
+ #define JRSTA_CCBERR_INDEX_MASK     0xff00
+ #define JRSTA_CCBERR_INDEX_SHIFT    8
+-- 
+2.16.2
