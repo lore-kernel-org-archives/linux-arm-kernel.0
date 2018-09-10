@@ -1,115 +1,48 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Mon, 10 Sep 2018 11:42:42 +0100
-Subject: [PATCH v3 3/9] ARM: vfp: use __copy_to_user() when saving VFP state
+Date: Mon, 10 Sep 2018 11:42:43 +0100
+Subject: [PATCH v3 4/9] ARM: oabi-compat: copy oabi events using
+ __copy_to_user()
 In-Reply-To: <1536576168-40096-1-git-send-email-julien.thierry@arm.com>
 References: <1536576168-40096-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1536576168-40096-4-git-send-email-julien.thierry@arm.com>
+Message-ID: <1536576168-40096-5-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use __copy_to_user() rather than __put_user_error() for individual
-members when saving VFP state.
-This has the benefit of disabling/enabling PAN once per copied struct
-intead of once per write.
+Copy events to user using __copy_to_user() rather than copy members of
+individually with __put_user_error().
+This has the benefit of disabling/enabling PAN once per event intead of
+once per event member.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
 ---
- arch/arm/include/asm/thread_info.h |  4 ++--
- arch/arm/kernel/signal.c           | 13 +++++++------
- arch/arm/vfp/vfpmodule.c           | 20 ++++++++------------
- 3 files changed, 17 insertions(+), 20 deletions(-)
+ arch/arm/kernel/sys_oabi-compat.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-index 9b37b6a..8f55dc5 100644
---- a/arch/arm/include/asm/thread_info.h
-+++ b/arch/arm/include/asm/thread_info.h
-@@ -121,8 +121,8 @@ static inline struct thread_info *current_thread_info(void)
- struct user_vfp;
- struct user_vfp_exc;
- 
--extern int vfp_preserve_user_clear_hwstate(struct user_vfp __user *,
--					   struct user_vfp_exc __user *);
-+extern int vfp_preserve_user_clear_hwstate(struct user_vfp *,
-+					   struct user_vfp_exc *);
- extern int vfp_restore_user_hwstate(struct user_vfp *,
- 				    struct user_vfp_exc *);
- #endif
-diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-index 464393d..1e2ecfe 100644
---- a/arch/arm/kernel/signal.c
-+++ b/arch/arm/kernel/signal.c
-@@ -137,17 +137,18 @@ static int restore_iwmmxt_context(char __user **auxp)
- 
- static int preserve_vfp_context(struct vfp_sigframe __user *frame)
+diff --git a/arch/arm/kernel/sys_oabi-compat.c b/arch/arm/kernel/sys_oabi-compat.c
+index f0dd4b6..40da087 100644
+--- a/arch/arm/kernel/sys_oabi-compat.c
++++ b/arch/arm/kernel/sys_oabi-compat.c
+@@ -277,6 +277,7 @@ asmlinkage long sys_oabi_epoll_wait(int epfd,
+ 				    int maxevents, int timeout)
  {
--	const unsigned long magic = VFP_MAGIC;
--	const unsigned long size = VFP_STORAGE_SIZE;
-+	struct vfp_sigframe kframe;
- 	int err = 0;
+ 	struct epoll_event *kbuf;
++	struct oabi_epoll_event e;
+ 	mm_segment_t fs;
+ 	long ret, err, i;
  
--	__put_user_error(magic, &frame->magic, err);
--	__put_user_error(size, &frame->size, err);
-+	memset(&kframe, 0, sizeof(kframe));
-+	kframe.magic = VFP_MAGIC;
-+	kframe.size = VFP_STORAGE_SIZE;
- 
-+	err = vfp_preserve_user_clear_hwstate(&kframe.ufp, &kframe.ufp_exc);
- 	if (err)
--		return -EFAULT;
-+		return err;
- 
--	return vfp_preserve_user_clear_hwstate(&frame->ufp, &frame->ufp_exc);
-+	return __copy_to_user(frame, &kframe, sizeof(kframe));
- }
- 
- static int restore_vfp_context(char __user **auxp)
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index dc7e6b5..2b287d0 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -553,12 +553,11 @@ void vfp_flush_hwstate(struct thread_info *thread)
-  * Save the current VFP state into the provided structures and prepare
-  * for entry into a new function (signal handler).
-  */
--int vfp_preserve_user_clear_hwstate(struct user_vfp __user *ufp,
--				    struct user_vfp_exc __user *ufp_exc)
-+int vfp_preserve_user_clear_hwstate(struct user_vfp *ufp,
-+				    struct user_vfp_exc *ufp_exc)
- {
- 	struct thread_info *thread = current_thread_info();
- 	struct vfp_hard_struct *hwstate = &thread->vfpstate.hard;
--	int err = 0;
- 
- 	/* Ensure that the saved hwstate is up-to-date. */
- 	vfp_sync_hwstate(thread);
-@@ -567,22 +566,19 @@ int vfp_preserve_user_clear_hwstate(struct user_vfp __user *ufp,
- 	 * Copy the floating point registers. There can be unused
- 	 * registers see asm/hwcap.h for details.
- 	 */
--	err |= __copy_to_user(&ufp->fpregs, &hwstate->fpregs,
--			      sizeof(hwstate->fpregs));
-+	memcpy(&ufp->fpregs, &hwstate->fpregs, sizeof(hwstate->fpregs));
-+
- 	/*
- 	 * Copy the status and control register.
- 	 */
--	__put_user_error(hwstate->fpscr, &ufp->fpscr, err);
-+	ufp->fpscr = hwstate->fpscr;
- 
- 	/*
- 	 * Copy the exception registers.
- 	 */
--	__put_user_error(hwstate->fpexc, &ufp_exc->fpexc, err);
--	__put_user_error(hwstate->fpinst, &ufp_exc->fpinst, err);
--	__put_user_error(hwstate->fpinst2, &ufp_exc->fpinst2, err);
--
--	if (err)
--		return -EFAULT;
-+	ufp_exc->fpexc = hwstate->fpexc;
-+	ufp_exc->fpinst = hwstate->fpinst;
-+	ufp_exc->fpinst2 = ufp_exc->fpinst2;
- 
- 	/* Ensure that VFP is disabled. */
- 	vfp_flush_hwstate(thread);
+@@ -295,8 +296,11 @@ asmlinkage long sys_oabi_epoll_wait(int epfd,
+ 	set_fs(fs);
+ 	err = 0;
+ 	for (i = 0; i < ret; i++) {
+-		__put_user_error(kbuf[i].events, &events->events, err);
+-		__put_user_error(kbuf[i].data,   &events->data,   err);
++		e.events = kbuf[i].events;
++		e.data = kbuf[i].data;
++		err = __copy_to_user(events, &e, sizeof(e));
++		if (err)
++			break;
+ 		events++;
+ 	}
+ 	kfree(kbuf);
 -- 
 1.9.1
