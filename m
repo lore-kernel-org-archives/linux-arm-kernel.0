@@ -1,101 +1,62 @@
-From: bhsharma@redhat.com (Bhupesh Sharma)
-Date: Mon, 10 Sep 2018 23:58:34 +0530
-Subject: [PATCH] arm64: kernel: arch_crash_save_vmcoreinfo() should depend
- on CONFIG_CRASH_CORE
-In-Reply-To: <20180910142054.22013-1-james.morse@arm.com>
-References: <20180910142054.22013-1-james.morse@arm.com>
-Message-ID: <CACi5LpPYMtkWN3DZ5zPX6_sjfVo3grMKvVcyZVFh6zLfOXhqJQ@mail.gmail.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Mon, 10 Sep 2018 20:30:20 +0200
+Subject: [PATCH v2] ARM64: dts: meson-gxbb-wetek: add ttyAML1 uart for
+ Bluetooth
+In-Reply-To: <1536322536-53109-1-git-send-email-christianshewitt@gmail.com>
+References: <1536072290-28015-1-git-send-email-christianshewitt@gmail.com>
+ <1536322536-53109-1-git-send-email-christianshewitt@gmail.com>
+Message-ID: <CAFBinCA=sDT4mVD=ZA90SF+d84bg5HCWuv6O5uz4+dKVSxNgiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks James,
+Hi Rob,
 
-
-On Mon, Sep 10, 2018 at 7:50 PM, James Morse <james.morse@arm.com> wrote:
-> Since commit 23c85094fe18 ("proc/kcore: add vmcoreinfo note to /proc/kcore")
-> the kernel has exported the vmcoreinfo PT_NOTE on /proc/kcore as well
-> as /proc/vmcore.
+On Fri, Sep 7, 2018 at 2:16 PM Christian Hewitt
+<christianshewitt@gmail.com> wrote:
 >
-> arm64 only exposes it's additional arch information via
-> arch_crash_save_vmcoreinfo() if built with CONFIG_KEXEC, as kdump was
-> previously the only user of vmcoreinfo.
+> This change adds the uart_A used by the brmcfmac sdio module in the
+> WeTek Hub and WeTek Play 2 devices. meson_uart_probe seems to mandate
+> an alias (without it, BT is not working) so this is also included.
 >
-> Move this weak function to a separate file that is built at the same
-> time as its caller in kernel/crash_core.c. This ensures values like
-> 'kimage_voffset' are always present in the vmcoreinfo PT_NOTE.
->
-> CC: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> CC: Bhupesh Sharma <bhsharma@redhat.com>
-> Signed-off-by: James Morse <james.morse@arm.com>
+> Signed-off-by: Christian Hewitt <christianshewitt@gmail.com>
 > ---
-> Intended as a fix for v4.19.
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
 >
->  arch/arm64/kernel/Makefile        |  1 +
->  arch/arm64/kernel/crash_core.c    | 19 +++++++++++++++++++
->  arch/arm64/kernel/machine_kexec.c | 11 -----------
->  3 files changed, 20 insertions(+), 11 deletions(-)
->  create mode 100644 arch/arm64/kernel/crash_core.c
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi
+> index 70325b2..e75ace7 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi
+> @@ -10,6 +10,7 @@
+>  / {
+>         aliases {
+>                 serial0 = &uart_AO;
+> +               serial1 = &uart_A;
+>                 ethernet0 = &ethmac;
+>         };
 >
-> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> index 95ac7374d723..4c8b13bede80 100644
-> --- a/arch/arm64/kernel/Makefile
-> +++ b/arch/arm64/kernel/Makefile
-> @@ -54,6 +54,7 @@ arm64-obj-$(CONFIG_KEXEC)             += machine_kexec.o relocate_kernel.o    \
->  arm64-obj-$(CONFIG_ARM64_RELOC_TEST)   += arm64-reloc-test.o
->  arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
->  arm64-obj-$(CONFIG_CRASH_DUMP)         += crash_dump.o
-> +arm64-obj-$(CONFIG_CRASH_CORE)         += crash_core.o
->  arm64-obj-$(CONFIG_ARM_SDE_INTERFACE)  += sdei.o
->  arm64-obj-$(CONFIG_ARM64_SSBD)         += ssbd.o
+> @@ -239,6 +240,18 @@
+>         vqmmc-supply = <&vddio_boot>;
+>  };
 >
-> diff --git a/arch/arm64/kernel/crash_core.c b/arch/arm64/kernel/crash_core.c
-> new file mode 100644
-> index 000000000000..ca4c3e12d8c5
-> --- /dev/null
-> +++ b/arch/arm64/kernel/crash_core.c
-> @@ -0,0 +1,19 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Copyright (C) Linaro.
-> + * Copyright (C) Huawei Futurewei Technologies.
-> + */
+> +/* This is connected to the Bluetooth module: */
+> +&uart_A {
+> +       status = "okay";
+> +       pinctrl-0 = <&uart_a_pins>, <&uart_a_cts_rts_pins>;
+> +       pinctrl-names = "default";
 > +
-> +#include <linux/crash_core.h>
-> +#include <asm/memory.h>
-> +
-> +void arch_crash_save_vmcoreinfo(void)
-> +{
-> +       VMCOREINFO_NUMBER(VA_BITS);
-> +       /* Please note VMCOREINFO_NUMBER() uses "%d", not "%x" */
-> +       vmcoreinfo_append_str("NUMBER(kimage_voffset)=0x%llx\n",
-> +                                               kimage_voffset);
-> +       vmcoreinfo_append_str("NUMBER(PHYS_OFFSET)=0x%llx\n",
-> +                                               PHYS_OFFSET);
-> +       vmcoreinfo_append_str("KERNELOFFSET=%lx\n", kaslr_offset());
-> +}
-> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-> index f6a5c6bc1434..922add8adb74 100644
-> --- a/arch/arm64/kernel/machine_kexec.c
-> +++ b/arch/arm64/kernel/machine_kexec.c
-> @@ -358,14 +358,3 @@ void crash_free_reserved_phys_range(unsigned long begin, unsigned long end)
->         }
->  }
->  #endif /* CONFIG_HIBERNATION */
-> -
-> -void arch_crash_save_vmcoreinfo(void)
-> -{
-> -       VMCOREINFO_NUMBER(VA_BITS);
-> -       /* Please note VMCOREINFO_NUMBER() uses "%d", not "%x" */
-> -       vmcoreinfo_append_str("NUMBER(kimage_voffset)=0x%llx\n",
-> -                                               kimage_voffset);
-> -       vmcoreinfo_append_str("NUMBER(PHYS_OFFSET)=0x%llx\n",
-> -                                               PHYS_OFFSET);
-> -       vmcoreinfo_append_str("KERNELOFFSET=%lx\n", kaslr_offset());
-> -}
-> --
-> 2.18.0
->
+> +       bluetooth {
+> +               compatible = "brcm,bcm43438-bt";
+I have a question regarding the Broadcom Bluetooth compatible strings:
+Christian mentioned earlier that the Bluetooth controller identifies
+itself as BCM4335C0 (BCM4335 rev. C0)
 
-Looks fine to me, so:
+do we need to add a new compatible string (to
+Documentation/devicetree/bindings/net/broadcom-bluetooth.txt)?
+if yes: should we also add a new of_device_id to hci_bcm.c or should
+board.dts simply use compatible = "brcm,bcm4335c0-bt",
+"brcm,bcm43438-bt"?
 
-Reviewed-by: Bhupesh Sharma <bhsharma@redhat.com>
+
+Regards
+Martin
