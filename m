@@ -1,95 +1,77 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Mon, 10 Sep 2018 11:25:11 +0200
-Subject: [PATCH] arm64: mm: always enable CONFIG_HOLES_IN_ZONE
-In-Reply-To: <1310a17b-214a-b840-d87b-42b799b623d2@arm.com>
-References: <20180830150532.22745-1-james.morse@arm.com>
- <20180903194731.GE14951@dhcp22.suse.cz>
- <1310a17b-214a-b840-d87b-42b799b623d2@arm.com>
-Message-ID: <20180910092511.GC10951@dhcp22.suse.cz>
+From: ran.wang_1@nxp.com (Ran Wang)
+Date: Mon, 10 Sep 2018 09:26:58 +0000
+Subject: [PATCH 1/3] soc: fsl: add Platform PM driver QorIQ platforms
+In-Reply-To: <cad8c585fb415959e7ade8b500278c2c5e070873.camel@buserror.net>
+References: <20180831035219.31619-1-ran.wang_1@nxp.com>
+ <cad8c585fb415959e7ade8b500278c2c5e070873.camel@buserror.net>
+Message-ID: <AM5PR0402MB2865520968A3656EC904ECB8F1050@AM5PR0402MB2865.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 07-09-18 18:47:24, James Morse wrote:
-> Hi Michal,
-> 
-> On 03/09/18 20:47, Michal Hocko wrote:
-> > On Thu 30-08-18 16:05:32, James Morse wrote:
-> >> Commit 6d526ee26ccd ("arm64: mm: enable CONFIG_HOLES_IN_ZONE for NUMA")
-> >> only enabled HOLES_IN_ZONE for NUMA systems because the NUMA code was
-> >> choking on the missing zone for nomap pages. This problem doesn't just
-> >> apply to NUMA systems.
-> >>
-> >> If the architecture doesn't set HAVE_ARCH_PFN_VALID, pfn_valid() will
-> >> return true if the pfn is part of a valid sparsemem section.
-> >>
-> >> When working with multiple pages, the mm code uses pfn_valid_within()
-> >> to test each page it uses within the sparsemem section is valid. On
-> >> most systems memory comes in MAX_ORDER_NR_PAGES chunks which all
-> >> have valid/initialised struct pages. In this case pfn_valid_within()
-> >> is optimised out.
-> >>
-> >> Systems where this isn't true (e.g. due to nomap) should set
-> >> HOLES_IN_ZONE and provide HAVE_ARCH_PFN_VALID so that mm tests each
-> >> page as it works with it.
-> >>
-> >> Currently non-NUMA arm64 systems can't enable HOLES_IN_ZONE, leading to
-> >> VM_BUG_ON()
-> 
-> [...]
-> 
-> >> Remove the NUMA dependency.
-> >>
-> >> Reported-by: Mikulas Patocka <mpatocka@redhat.com>
-> >> Link: https://www.spinics.net/lists/arm-kernel/msg671851.html
-> >> Fixes: 6d526ee26ccd ("arm64: mm: enable CONFIG_HOLES_IN_ZONE for NUMA")
-> >> CC: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> Signed-off-by: James Morse <james.morse@arm.com>
-> > 
-> > OK. I guess you are also going to post a patch to drop
-> > ARCH_HAS_HOLES_MEMORYMODEL, right?
-> 
-> Yes:
-> https://marc.info/?l=linux-arm-kernel&m=153572884121769&w=2
-> 
-> After all this I'm suspicious about arm64's support for FLATMEM given we always
-> set HAVE_ARCH_PFN_VALID.
-> 
-> 
-> > Anyway
-> > Acked-by: Michal Hocko <mhocko@suse.com>
-> 
-> Thanks!
-> 
-> 
-> > I wish we could simplify the pfn validation code a bit. I find
-> > pfn_valid_within quite confusing and I would bet it is not used
-> > consistently.
-> 
-> > This will require a non trivial audit. I am wondering
-> > whether we really need to make the code more complicated rather than
-> > simply establish a contract that we always have a pageblock worth of
-> > struct pages always available. Even when there is no physical memory
-> > backing it. Such a page can be reserved and never used by the page
-> > allocator. pfn walkers should back off for reserved pages already.
-> 
-> Is PG_Reserved really where this stops?
-> Going through the mail archive it looks like whenever this crops up on arm64 the
-> issues are with nomap pages needing a 'correct' node or zone,  where-as we would
-> prefer it if linux knew nothing about them.
+Hi Scott,
 
-Well, I will not pretend I have a clear view on early mem init code. I
-have seen so many surprises lately that I just gave up. I can clearly
-see why you want nomap pages to have no backing struct pages. It just
-makes sense but I strongly suspect that pfn_valid_within is not the
-right approach. If for no other reason it is basically unmaintainable
-interface. All/Most pfn walkers should use it but I do not see this
-being the case. I strongly suspect that initializing sub section memmaps
-is quite wastefull on its own (especially with VMEMAP) because you are
-losing the large kernel pagetables for those memmaps. So having a full
-section worth of initialized memory and then reserving holes should
-result in a better maintainable code because pfn_valid_within shouldn't
-be really needed. But I might easily miss something subtle here.
-Especially arm specific.
--- 
-Michal Hocko
-SUSE Labs
+On 2018/9/8 4:35, Scott Wood wrote:
+> 
+> On Fri, 2018-08-31 at 11:52 +0800, Ran Wang wrote:
+> > This driver is to provide a independent framework for PM service
+> > provider and consumer to configure system level wake up feature. For
+> > example, RCPM driver could register a callback function on this
+> > platform first, and Flex timer driver who want to enable timer wake up
+> > feature, will call generic API provided by this platform driver, and
+> > then it will trigger RCPM driver to do it. The benefit is to isolate
+> > the user and service, such as flex timer driver will not have to know
+> > the implement details of wakeup function it require. Besides, it is
+> > also easy for service side to upgrade its logic when design is changed
+> > and remain user side unchanged.
+> >
+> > Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
+> > ---
+> >  drivers/soc/fsl/Kconfig   |   14 +++++
+> >  drivers/soc/fsl/Makefile  |    1 +
+> >  drivers/soc/fsl/plat_pm.c |  144
+> > +++++++++++++++++++++++++++++++++++++++++++++
+> >  include/soc/fsl/plat_pm.h |   22 +++++++
+> >  4 files changed, 181 insertions(+), 0 deletions(-)  create mode
+> > 100644 drivers/soc/fsl/plat_pm.c  create mode 100644
+> > include/soc/fsl/plat_pm.h
+> >
+> > diff --git a/drivers/soc/fsl/Kconfig b/drivers/soc/fsl/Kconfig index
+> > 7a9fb9b..6517412 100644
+> > --- a/drivers/soc/fsl/Kconfig
+> > +++ b/drivers/soc/fsl/Kconfig
+> > @@ -16,3 +16,17 @@ config FSL_GUTS
+> >  	  Initially only reading SVR and registering soc device are
+> > supported.
+> >  	  Other guts accesses, such as reading RCW, should eventually be
+> > moved
+> >  	  into this driver as well.
+> +
+> > +config FSL_PLAT_PM
+> > +	bool "Freescale platform PM framework"
+> 
+> This name seems to be simultaneously too generic (for something that is
+> likely intended only for use with certain Freescale/NXP chip families) and too
+> specific (for something that seems to be general infrastructure with no real
+> hardware dependencies).
+
+Yes, this driver has no real HW dependencies at all. But we'd like to introduce it
+to help providing more flexibility & generic on FSL PM feature configure (so far 
+we have RCPM on system wakeup source control). I think it's good
+for driver/IP porting among different SoC in the future. As to the name, do you
+have better suggestion?
+
+> What specific problems with Linux's generic wakeup infrastructure is this
+> trying to solve, and why would those problems not be better solved there?
+
+Actually, I am not sure if generic wakeup infrastructure have this kind of PM feature
+(keep specific IP alive during system suspend, could you please show me?).
+And I think it is not common requirement, so I decide to put it in FSL folder. 
+
+> Also, you should CC linux-pm on these patches.
+
+Yes, thanks for suggestion
+
+Regards,
+Ran
+
+> -Scott
