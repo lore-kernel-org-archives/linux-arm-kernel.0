@@ -1,27 +1,29 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 10 Sep 2018 15:07:43 +0200
-Subject: [PATCH] arm64: dts: rockchip: fix vcc_host1_5v pin assign
-In-Reply-To: <20180906153947.19495-1-katsuhiro@katsuster.net>
-References: <20180906153947.19495-1-katsuhiro@katsuster.net>
-Message-ID: <2254080.m30pKOgRkt@phil>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Mon, 10 Sep 2018 15:19:58 +0200
+Subject: [PATCH v4 2/2] tty/serial: atmel: add ISO7816 support
+In-Reply-To: <20180906134214.29031-3-ludovic.desroches@microchip.com>
+References: <20180906134214.29031-1-ludovic.desroches@microchip.com>
+ <20180906134214.29031-3-ludovic.desroches@microchip.com>
+Message-ID: <ea441610-1337-d14c-7171-f0fac158bd9a@sorico.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 6. September 2018, 17:39:47 CEST schrieb Katsuhiro Suzuki:
-> This patch fixes pin assign of vcc_host1_5v. This regulator is
-> controlled by USB20_HOST_DRV signal.
-> 
-> ROCK64 schematic says that GPIO0_A2 pin is used as USB20_HOST_DRV.
-> GPIO0_D3 pin is for SPDIF_TX_M0.
-> 
-> ROCK64 schematic:
-> http://files.pine64.org/doc/rock64/ROCK64_Schematic_v2.0_20171019.pdf
-> 
-> Signed-off-by: Katsuhiro Suzuki <katsuhiro@katsuster.net>
+Hi, Ludovic,
 
-applied for 4.20 after adapting the subject to also list the actual board
-this affects :-) .
+On 06/09/2018 15:42, Ludovic Desroches wrote:
+> From: Nicolas Ferre <nicolas.ferre@microchip.com>
+> 
+> When mode is set in atmel_config_iso7816() we backup last RS232 mode
+> for coming back to this mode if requested.
+> Also allow setup of T=0 and T=1 parameter and basic support in set_termios
+> function as well.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> [ludovic.desroches at microchip.com: rebase, add check on fidi ratio, checkpatch fixes]
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
 
+This seems ok for me.
 
-Thanks
-Heiko
+Acked-by: Richard Genoud <richard.genoud@gmail.com>
+
+Thanks !
