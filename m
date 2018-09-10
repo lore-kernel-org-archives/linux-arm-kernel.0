@@ -1,54 +1,35 @@
-From: katsuhiro@katsuster.net (Katsuhiro Suzuki)
-Date: Tue, 11 Sep 2018 01:07:18 +0900
-Subject: [PATCH] arm64: dts: rockchip: add i2s and spdif endpoint of rk3328
-In-Reply-To: <2729174.Cl53sqNc79@phil>
-References: <20180906163956.20667-1-katsuhiro@katsuster.net>
- <2729174.Cl53sqNc79@phil>
-Message-ID: <ba47e7c5-184c-caf7-2892-3610639d36eb@katsuster.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 10 Sep 2018 09:08:36 -0700
+Subject: Regression in next with filesystem context concept
+In-Reply-To: <11959.1536420266@warthog.procyon.org.uk>
+References: <20180907161023.GF5662@atomide.com>
+ <20180906164358.GI5659@atomide.com>
+ <9053.1536310046@warthog.procyon.org.uk>
+ <11959.1536420266@warthog.procyon.org.uk>
+Message-ID: <20180910160836.GT5662@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+* David Howells <dhowells@redhat.com> [180908 15:28]:
+> Tony Lindgren <tony@atomide.com> wrote:
+> 
+> > > > Looks like next-20180906 now has a regression where mounting
+> > > > root won't work with commit fd0002870b45 ("vfs: Implement a
+> > > > filesystem superblock creation/configuration context").
+> > > 
+> > > Am I right in thinking you're not using any of the LSMs?
+> > 
+> > Assuming LSM as in Documentation/lsm.txt, right not using any.
+> 
+> The default return value for security_fs_context_parse_param() should be
+> -ENOPARAM, both in security.h and security.c.
+> 
+> I've fixed my tree and Al has pulled it, but we're now waiting on Stephen
+> Rothwell to refresh linux/next.
 
-On 2018?09?10? 22:57, Heiko Stuebner wrote:
-> Hi,
-> 
-> Am Donnerstag, 6. September 2018, 18:39:56 CEST schrieb Katsuhiro Suzuki:
->> This patch adds port and endpoint of i2s and spdif nodes for rk3328.
->> Because to use modern sound card interface such as audio-graph-card.
->>
->> Signed-off-by: Katsuhiro Suzuki <katsuhiro@katsuster.net>
->> ---
->>   arch/arm64/boot/dts/rockchip/rk3328.dtsi | 24 ++++++++++++++++++++++++
->>   1 file changed, 24 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
->> index d3ef6566325e..41f0a20b73ed 100644
->> --- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
->> +++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
->> @@ -179,7 +179,13 @@
->>   		clock-names = "i2s_clk", "i2s_hclk";
->>   		dmas = <&dmac 11>, <&dmac 12>;
->>   		dma-names = "tx", "rx";
->> +		#sound-dai-cells = <0>;
->>   		status = "disabled";
->> +
->> +		i2s0_p0: port at 0 {
-> 
-> there is only one port per device, so this should probably be
-> 	i2s0_p0: port {
-> without the address. Same for all others.
-> The of-graph framework should work just fine then as well.
-
-Thanks, indeed. I'll fix and send v2.
-
-
-> 
-> Heiko
-> 
-> 
-> 
+OK thanks for tracking that down, next-20180910 boots again
+for me.
 
 Regards,
---
-Katsuhiro Suzuki
+
+Tony
