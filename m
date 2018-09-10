@@ -1,48 +1,101 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 10 Sep 2018 14:35:04 +0200
-Subject: [PATCH v11 03/11] firmware: xilinx: Add zynqmp IOCTL API for
- device control
-In-Reply-To: <CAAtXAHfwpKagBUQSFLJ1bBsxvbvyg=+nCuQv11eD+nhuxD=1_A@mail.gmail.com>
-References: <1533318808-10781-1-git-send-email-jollys@xilinx.com>
- <1533318808-10781-4-git-send-email-jollys@xilinx.com>
- <CAOesGMi7Q9L4oZkUubKtV-m8XD67MQ05ZFhPA_0Hwky_qVUxfg@mail.gmail.com>
- <CAAtXAHfwpKagBUQSFLJ1bBsxvbvyg=+nCuQv11eD+nhuxD=1_A@mail.gmail.com>
-Message-ID: <0bc8f69a-2d44-7ee2-133b-29f6dd4c0929@xilinx.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 10 Sep 2018 13:35:33 +0100
+Subject: [PATCH] [v3] drm/sun4i: fix build failure with
+ CONFIG_DRM_SUN8I_MIXER=m
+In-Reply-To: <20180907114255.7j7r6wzolnz5qkk7@flea>
+References: <20180711144403.1022829-1-arnd@arndb.de>
+ <105cb1cf-577a-043a-9b50-248a37090bdd@nvidia.com>
+ <CAK8P3a1w0SrxFNRwjt1nWhQPdqgt=bZ8oqGaPE=z9iHp84R5mw@mail.gmail.com>
+ <20180907114255.7j7r6wzolnz5qkk7@flea>
+Message-ID: <27a7c704-26c9-5b51-68d4-e6b57b30cadf@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9.9.2018 21:20, Moritz Fischer wrote:
-> Hi Olof,
-> 
-> On Sat, Sep 8, 2018 at 6:18 PM, Olof Johansson <olof@lixom.net> wrote:
->> Hi,
->>
->> On Fri, Aug 3, 2018 at 10:53 AM, Jolly Shah <jolly.shah@xilinx.com> wrote:
->>> From: Rajan Vaja <rajanv@xilinx.com>
->>>
->>> Add ZynqMP firmware IOCTL API to control and configure
->>> devices like PLLs, SD, Gem, etc.
->>>
->>> Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
->>> Signed-off-by: Jolly Shah <jollys@xilinx.com>
->>
->> This patch worries me somewhat. It's a transparent pass-through ioctl
->> driver. Is there a spec available for what the implemented IOCTLs are?
->>
->> Should some of them be proper drivers instead of an opaque
->> pass-through like this? Could some of them have stability impact on
->> the platform such that there are security concerns and the list of
->> arguments should somehow be sanitized?
-> 
-> I tend to agree with this, good catch.
-> 
->> What's the intended usecase anyway? Just a debug tool during
->> development, or something that you expect heavy use of by some
->> userspace middleware?
-> 
-> I suspect it is another attempt to make userspace clocks/plls work? Scary.
 
-none is trying to do that as far as I know.
+On 07/09/18 12:42, Maxime Ripard wrote:
+> On Fri, Sep 07, 2018 at 01:26:30PM +0200, Arnd Bergmann wrote:
+>> On Fri, Sep 7, 2018 at 11:41 AM Jon Hunter <jonathanh@nvidia.com> wrote:
+>>>
+>>>
+>>> On 11/07/18 15:43, Arnd Bergmann wrote:
+>>>> Having DRM_SUN4I built-in but DRM_SUN8I_MIXER as a loadable module results in
+>>>> a link error, as we try to access a symbol from the sun8i_tcon_top.ko module:
+>>>>
+>>>> ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun8i-drm-hdmi.ko] undefined!
+>>>> ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun4i-drm.ko] undefined!
+>>>>
+>>>> This solves the problem by adding a silent symbol for the tcon_top module,
+>>>> building it as a separate module in exactly the cases that we need it,
+>>>> but in a way that it is reachable by the other modules.
+>>>>
+>>>> Fixes: 57e23de02f48 ("drm/sun4i: DW HDMI: Expand algorithm for possible crtcs")
+>>>> Fixes: ef0cf6441fbb ("drm/sun4i: Add support for traversing graph with TCON TOP")
+>>>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>>> I am seeing the following on today's -next (20180907) as well the last
+>>> few -next versions for that matter ...
+>>>
+>>> ERROR: "sun8i_tcon_top_de_config" [drivers/gpu/drm/sun4i/sun4i-tcon.ko] undefined!
+>>> ERROR: "sun8i_tcon_top_set_hdmi_src" [drivers/gpu/drm/sun4i/sun4i-tcon.ko] undefined!
+>>> ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun4i-tcon.ko] undefined!
+>>>
+>>> Seems like this issue has cropped up again as Arnd's fix is present. I
+>>> am seeing this on ARM64 builds.
+>>
+>> I have not started build testing on linux-next since the merge window, but
+>> looking at the changes that got queued up, I find commits cf77d79b4e29
+>> ("drm/sun4i: tcon: Add another way for matching mixers with tcon") and
+>> 0305189afb32 ("drm/sun4i: tcon: Add support for R40 TCON") that both
+>> introduced a reference to the tcon_top file from sun4i_tcon.c.
+>>
+>> More IS_ENABLED(CONFIG_DRM_SUN8I_TCON_TOP) checks in
+>> the caller like I did in my patch would help, or alternatively one could
+>> decide to give up and just always include the TCON_TOP.
+> 
+> Sorry for the breakage.
+> 
+> Can you test:
+> 
+> ----8<----
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> index 4834c90b4912..c78cd35a1294 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> @@ -974,7 +974,8 @@ static bool sun4i_tcon_connected_to_tcon_top(struct device_node *node)
+>  
+>  	remote = of_graph_get_remote_node(node, 0, -1);
+>  	if (remote) {
+> -		ret = !!of_match_node(sun8i_tcon_top_of_table, remote);
+> +		ret = !!(IS_ENABLED(CONFIG_DRM_SUN8I_TCON_TOP) &&
+> +			 of_match_node(sun8i_tcon_top_of_table, remote));
+>  		of_node_put(remote);
+>  	}
+>  
+> @@ -1402,13 +1403,20 @@ static int sun8i_r40_tcon_tv_set_mux(struct sun4i_tcon *tcon,
+>  	if (!pdev)
+>  		return -EINVAL;
+>  
+> -	if (encoder->encoder_type == DRM_MODE_ENCODER_TMDS) {
+> +	if (IS_ENABLED(CONFIG_DRM_SUN8I_TCON_TOP) &&
+> +	    encoder->encoder_type == DRM_MODE_ENCODER_TMDS) {
+>  		ret = sun8i_tcon_top_set_hdmi_src(&pdev->dev, id);
+>  		if (ret)
+>  			return ret;
+>  	}
+>  
+> -	return sun8i_tcon_top_de_config(&pdev->dev, tcon->id, id);
+> +	if (IS_ENABLED(CONFIG_DRM_SUN8I_TCON_TOP)) {
+> +		ret = sun8i_tcon_top_de_config(&pdev->dev, tcon->id, id);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+> +	return 0;
+>  }
+>  
+>  static const struct sun4i_tcon_quirks sun4i_a10_quirks = {
+> ----8<----
 
-Thanks,
-Michal
+Yes works for me! Thanks, Jon
+
+-- 
+nvpublic
