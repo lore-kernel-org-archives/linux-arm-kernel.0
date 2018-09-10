@@ -1,9 +1,9 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Mon, 10 Sep 2018 13:30:29 +0200
-Subject: [PATCH 2/4] DT: marvell,mmp2: add clock to the timer
+Date: Mon, 10 Sep 2018 13:30:28 +0200
+Subject: [PATCH 1/4] dt-bindings: mrvl,mmp-timer: add clock
 In-Reply-To: <20180910113031.42634-1-lkundrak@v3.sk>
 References: <20180910113031.42634-1-lkundrak@v3.sk>
-Message-ID: <20180910113031.42634-3-lkundrak@v3.sk>
+Message-ID: <20180910113031.42634-2-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,20 +12,25 @@ ticking.
 
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
 ---
- arch/arm/boot/dts/mmp2.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/timer/mrvl,mmp-timer.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/mmp2.dtsi b/arch/arm/boot/dts/mmp2.dtsi
-index 766bbb8495b6..58e0098a007d 100644
---- a/arch/arm/boot/dts/mmp2.dtsi
-+++ b/arch/arm/boot/dts/mmp2.dtsi
-@@ -130,6 +130,7 @@
- 				compatible = "mrvl,mmp-timer";
- 				reg = <0xd4014000 0x100>;
- 				interrupts = <13>;
-+				clocks = <&soc_clocks MMP2_CLK_TIMER>;
- 			};
+diff --git a/Documentation/devicetree/bindings/timer/mrvl,mmp-timer.txt b/Documentation/devicetree/bindings/timer/mrvl,mmp-timer.txt
+index 9a6e251462e7..a2ede0bd12ca 100644
+--- a/Documentation/devicetree/bindings/timer/mrvl,mmp-timer.txt
++++ b/Documentation/devicetree/bindings/timer/mrvl,mmp-timer.txt
+@@ -4,10 +4,12 @@ Required properties:
+ - compatible : Should be "mrvl,mmp-timer".
+ - reg : Address and length of the register set of timer controller.
+ - interrupts : Should be the interrupt number.
++- clocks : Should contain a single entry describing the clock input.
  
- 			uart1: uart at d4030000 {
+ Example:
+ 	timer0: timer at d4014000 {
+ 		compatible = "mrvl,mmp-timer";
+ 		reg = <0xd4014000 0x100>;
+ 		interrupts = <13>;
++		clocks = <&coreclk 2>;
+ 	};
 -- 
 2.17.1
