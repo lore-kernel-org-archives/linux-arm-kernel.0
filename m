@@ -1,36 +1,51 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 11 Sep 2018 22:21:38 +0100
-Subject: [PATCH 00/11] dts: Update coresight device tree bindings
-In-Reply-To: <1536661032-30481-1-git-send-email-suzuki.poulose@arm.com>
-References: <1536661032-30481-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <8bfdaa9a-eaa5-5223-80fa-c0a315e904bb@arm.com>
+From: jolly.shah@xilinx.com (Jolly Shah)
+Date: Tue, 11 Sep 2018 14:34:55 -0700
+Subject: [PATCH v3 1/3] dt-bindings: soc: Add ZynqMP PM bindings
+In-Reply-To: <1536701697-23949-1-git-send-email-jollys@xilinx.com>
+References: <1536701697-23949-1-git-send-email-jollys@xilinx.com>
+Message-ID: <1536701697-23949-2-git-send-email-jollys@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/11/2018 11:17 AM, Suzuki K Poulose wrote:
-> Coresight DT bindings have been updated to obey the DTS rules
-> for label/address matching for graph nodes. The changes are in
-> coresight/next tree scheduled for v4.20. This series updates the
-> in kernel dts to match the new bindings along with updating a couple
-> of new examples (e.,g CATU) in the Documentation (which were missed
-> as they were still in flight when we created the series).
-> 
-> Please note that this should not be pulled for v4.19, which I assume
-> is a safe assumption. But please do pull it for v4.20.
-> The dt updates for the Juno boards were sent earlier with the original
-> DT update series and has been queued for v4.20.
-> 
-> Applies on coresight/next (which is based on v4.19) and should apply
-> cleanly on v4.19-rc3.
-> 
+From: Rajan Vaja <rajan.vaja@xilinx.com>
 
-All,
+Add documentation to describe Xilinx ZynqMP power management
+bindings.
 
-There are some additional warnings triggered by this series, as reported
-by Sudeep [0]. I intend to fix the warnings and send and updated version
-soon. So kindly ignore this thread. Apologies.
+Signed-off-by: Rajan Vaja <rajan.vaja@xilinx.com>
+Signed-off-by: Jolly Shah <jollys@xilinx.com>
+---
+ .../bindings/power/reset/xlnx,zynqmp-power.txt     | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/power/reset/xlnx,zynqmp-power.txt
 
-[0] 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2018-September/601121.html
-
-Suzuki
+diff --git a/Documentation/devicetree/bindings/power/reset/xlnx,zynqmp-power.txt b/Documentation/devicetree/bindings/power/reset/xlnx,zynqmp-power.txt
+new file mode 100644
+index 0000000..925d17d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/power/reset/xlnx,zynqmp-power.txt
+@@ -0,0 +1,22 @@
++--------------------------------------------------------------------
++Device Tree Bindings for the Xilinx Zynq MPSoC Power Management
++--------------------------------------------------------------------
++The zynqmp-power node describes the power management configurations.
++It will control remote suspend/shutdown interfaces.
++
++Required properties:
++ - compatible:		Must contain:	"xlnx,zynqmp-power"
++ - interrupts:		Interrupt specifier
++
++-------
++Example
++-------
++
++firmware {
++	zynqmp_firmware: zynqmp-firmware {
++		zynqmp_power: zynqmp-power {
++			compatible = "xlnx,zynqmp-power";
++			interrupts = <0 35 4>;
++		};
++	};
++};
+-- 
+2.7.4
