@@ -1,71 +1,54 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Sep 2018 11:56:28 +0100
-Subject: [GIT PULL v2] Immutable branch between MFD, SPI and TTY due for the
- v4.20 merge window
-In-Reply-To: <20180910151803.GX28860@dell>
-References: <20180713164736.26028-1-radu.pirea@microchip.com>
- <20180910151803.GX28860@dell>
-Message-ID: <20180911105628.GI4185@dell>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 11 Sep 2018 11:57:36 +0100
+Subject: [PATCH] iommu/rockchip: Free irqs in shutdown handler
+In-Reply-To: <20180827105624.5593-1-heiko@sntech.de>
+References: <20180827105624.5593-1-heiko@sntech.de>
+Message-ID: <cd621b70-ddb1-1e04-0432-db69a50df081@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This new pull-request contains the following changes since v1:
+Hi Heiko,
 
- - Uplift the submission version from v11 to v12
- - Include fix for build breakage due to missing Device Tree include file
+On 27/08/18 11:56, Heiko Stuebner wrote:
+> In the iommu's shutdown handler we disable runtime-pm which could
+> result in the irq-handler running unclocked and since commit
+>     3fc7c5c0cff3 ("iommu/rockchip: Handle errors returned from PM framework")
+> we warn about that fact.
+> 
+> This can cause warnings on shutdown on some Rockchip machines, so
+> free the irqs in the shutdown handler before we disable runtime-pm.
+> 
+> Reported-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> Fixes: 3fc7c5c0cff3 ("iommu/rockchip: Handle errors returned from PM framework")
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  drivers/iommu/rockchip-iommu.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+> index 258115b10fa9..ad3e2b97469e 100644
+> --- a/drivers/iommu/rockchip-iommu.c
+> +++ b/drivers/iommu/rockchip-iommu.c
+> @@ -1241,6 +1241,12 @@ static int rk_iommu_probe(struct platform_device *pdev)
+>  
+>  static void rk_iommu_shutdown(struct platform_device *pdev)
+>  {
+> +	struct rk_iommu *iommu = platform_get_drvdata(pdev);
+> +	int i = 0, irq;
+> +
+> +	while ((irq = platform_get_irq(pdev, i++)) != -ENXIO)
+> +		devm_free_irq(iommu->dev, irq, iommu);
+> +
+>  	pm_runtime_force_suspend(&pdev->dev);
+>  }
+>  
+> 
 
-Since it is based on the original pull-request, it can be pulled
-in either directly on top of it or as a pull in its own right.
+Looks OK to me. I don't think there is a point in using devm_irq* 
+anymore in this driver, but that's a separate issue.
 
-The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
-
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/ib-mfd-spi-tty-v4.20-1
-
-for you to fetch changes up to 65b80dfffeabd4eb253b93d07eadde4d89c18511:
-
-  mfd: at91-usart: Include Device Tree header (2018-09-11 11:44:56 +0100)
-
-----------------------------------------------------------------
-Immutable branch between MFD, SPI and TTY due for the v4.20 merge window (v2)
-
-----------------------------------------------------------------
-Lee Jones (4):
-      dt-bindings: mfd: atmel-usart: Correct interrupts property to include IRQ number
-      MAINTAINERS: Change Radu's email address
-      spi: at91-usart: Make local functions static
-      mfd: at91-usart: Include Device Tree header
-
-Radu Pirea (6):
-      MAINTAINERS: Add AT91 USART MFD entry
-      dt-bindings: Add binding for atmel-usart in SPI mode
-      mfd: at91-usart: Add MFD driver for USART
-      MAINTAINERS: Add AT91 USART SPI entry
-      spi: at91-usart: Add driver for at91-usart as SPI
-      tty/serial: atmel: Change the driver to work under at91-usart MFD
-
- .../bindings/{serial => mfd}/atmel-usart.txt       |  25 +-
- MAINTAINERS                                        |  16 +
- drivers/mfd/Kconfig                                |   9 +
- drivers/mfd/Makefile                               |   1 +
- drivers/mfd/at91-usart.c                           |  72 ++++
- drivers/spi/Kconfig                                |   8 +
- drivers/spi/Makefile                               |   1 +
- drivers/spi/spi-at91-usart.c                       | 432 +++++++++++++++++++++
- drivers/tty/serial/Kconfig                         |   1 +
- drivers/tty/serial/atmel_serial.c                  |  42 +-
- include/dt-bindings/mfd/at91-usart.h               |  17 +
- 11 files changed, 607 insertions(+), 17 deletions(-)
- rename Documentation/devicetree/bindings/{serial => mfd}/atmel-usart.txt (76%)
- create mode 100644 drivers/mfd/at91-usart.c
- create mode 100644 drivers/spi/spi-at91-usart.c
- create mode 100644 include/dt-bindings/mfd/at91-usart.h
-
+	M.
 -- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Jazz is not dead. It just smells funny...
