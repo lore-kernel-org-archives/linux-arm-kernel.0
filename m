@@ -1,42 +1,32 @@
-From: hangdianqj@163.com (jun qian)
-Date: Tue, 11 Sep 2018 07:31:58 -0700
-Subject: [PATCH] dmaengine: zx-dma: replace spin_lock_irqsave with spin_lock
- in ISR
-Message-ID: <20180911143158.52917-1-hangdianqj@163.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 11 Sep 2018 08:47:27 -0600
+Subject: [PATCH] dts: juno: Enable coresight tmc scatter gather in ETR
+In-Reply-To: <20180911103509.GA770@e107155-lin>
+References: <1536655641-26192-1-git-send-email-suzuki.poulose@arm.com>
+ <20180911103509.GA770@e107155-lin>
+Message-ID: <CANLsYkzaHsi=V+GZaJ+hdzDODT-BRHU42fPJ1Vu-aX726E=grA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As you are already in ISR, it is unnecessary to call spin_lock_irqsave.
+On Tue, 11 Sep 2018 at 04:35, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>
+> On 11/09/18 09:47, Suzuki K Poulose wrote:
+> > We do not enable scatter-gather mode in the TMC-ETR by default
+> > to prevent malfunctioning of systems where the ETR may not be
+> > properly connected to the memory subsystem to allow for simultaneous
+> > READ/WRITE transactions when used in SG mode. Instead we whitelist
+> > the platforms where we know that it is safe to use the mode.
+> >
+> > All revisions of Juno have a proper ETR connection and hence
+> > white list them.
+> >
+>
+> Applied conditionally, this conflicts with the patch Mathieu has in his
+> branch. He needs to drop that so that I can take both of them via ARM SoC.
 
-Signed-off-by: jun qian <hangdianqj@163.com>
-Cc: Barry song <21cnbao@gmail.com>
----
- drivers/dma/zx_dma.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+As I communicated yesterday, I've already dropped that patch from my tree.
 
-diff --git a/drivers/dma/zx_dma.c b/drivers/dma/zx_dma.c
-index 2571bc7693df..111ab2db83b1 100644
---- a/drivers/dma/zx_dma.c
-+++ b/drivers/dma/zx_dma.c
-@@ -288,9 +288,8 @@ static irqreturn_t zx_dma_int_handler(int irq, void *dev_id)
- 		p = &d->phy[i];
- 		c = p->vchan;
- 		if (c) {
--			unsigned long flags;
- 
--			spin_lock_irqsave(&c->vc.lock, flags);
-+			spin_lock(&c->vc.lock);
- 			if (c->cyclic) {
- 				vchan_cyclic_callback(&p->ds_run->vd);
- 			} else {
-@@ -298,7 +297,7 @@ static irqreturn_t zx_dma_int_handler(int irq, void *dev_id)
- 				p->ds_done = p->ds_run;
- 				task = 1;
- 			}
--			spin_unlock_irqrestore(&c->vc.lock, flags);
-+			spin_unlock(&c->vc.lock);
- 			irq_chan |= BIT(i);
- 		}
- 	}
--- 
-2.17.1
+>
+> --
+> Regards,
+> Sudeep
