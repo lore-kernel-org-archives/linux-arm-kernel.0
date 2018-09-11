@@ -1,14 +1,22 @@
 From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Tue, 11 Sep 2018 09:26:59 +0200
-Subject: [PATCH v1 6/7] dmaengine: stm32-dma: enable descriptor_reuse
+Date: Tue, 11 Sep 2018 09:26:54 +0200
+Subject: [PATCH v1 1/7] dt-bindings: stm32-dma: Add DMA/MDMA chaining support
+ bindings
 In-Reply-To: <1536650820-16076-1-git-send-email-pierre-yves.mordret@st.com>
 References: <1536650820-16076-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <1536650820-16076-7-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <1536650820-16076-2-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable client to resubmit already processed descriptors
-in order to save descriptor creation time.
+This patch adds dma bindings to support DMA/MDMA chaining transfer.
+1 bit is to manage both DMA FIFO Threshold
+1 bit is to manage DMA/MDMA Chaining features.
+2 bits are used to specify SDRAM size to use for DMA/MDMA chaining.
+The size in bytes of a certain order is given by the formula:
+    (2 ^ order) * PAGE_SIZE.
+The order is given by those 2 bits.
+For cyclic, whether chaining is chosen, any value above 1 can be set :
+SRAM buffer size will rely on period size and not on this DT value.
 
 Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 ---
@@ -17,169 +25,76 @@ Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
        * Initial
 ---
 ---
- drivers/dma/stm32-dma.c | 84 +++++++++++++++++++++++++++++++------------------
- 1 file changed, 54 insertions(+), 30 deletions(-)
+ .../devicetree/bindings/dma/stm32-dma.txt          | 32 +++++++++++++++++++---
+ 1 file changed, 28 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/dma/stm32-dma.c b/drivers/dma/stm32-dma.c
-index 1571f2f..fac44ed 100644
---- a/drivers/dma/stm32-dma.c
-+++ b/drivers/dma/stm32-dma.c
-@@ -836,34 +836,8 @@ static int stm32_dma_mdma_start(struct stm32_dma_chan *chan,
- {
- 	struct stm32_dma_mdma *mchan = &chan->mchan;
- 	struct stm32_dma_mdma_desc *m_desc = &sg_req->m_desc;
--	struct dma_slave_config config;
- 	int ret;
+diff --git a/Documentation/devicetree/bindings/dma/stm32-dma.txt b/Documentation/devicetree/bindings/dma/stm32-dma.txt
+index c5f5190..163be09 100644
+--- a/Documentation/devicetree/bindings/dma/stm32-dma.txt
++++ b/Documentation/devicetree/bindings/dma/stm32-dma.txt
+@@ -17,6 +17,12 @@ Optional properties:
+ - resets: Reference to a reset controller asserting the DMA controller
+ - st,mem2mem: boolean; if defined, it indicates that the controller supports
+   memory-to-memory transfer
++- dmas: A list of eight dma specifiers, one for each entry in dma-names.
++  Refer to stm32-mdma.txt for more details.
++- dma-names: should contain "ch0", "ch1", "ch2", "ch3", "ch4", "ch5", "ch6" and
++  "ch7" and represents each STM32 DMA channel connected to a STM32 MDMA one.
++- memory-region : phandle to a node describing memory to be used for
++  M2M intermediate transfer between DMA and MDMA.
  
--	/* Configure MDMA channel */
--	memset(&config, 0, sizeof(config));
--	if (mchan->dir == DMA_MEM_TO_DEV)
--		config.dst_addr = mchan->sram_buf;
--	else
--		config.src_addr = mchan->sram_buf;
+ Example:
+ 
+@@ -36,6 +42,16 @@ Example:
+ 		st,mem2mem;
+ 		resets = <&rcc 150>;
+ 		dma-requests = <8>;
++		dmas = <&mdma1 8 0x10 0x1200000a 0x40026408 0x00000020 1>,
++		       <&mdma1 9 0x10 0x1200000a 0x40026408 0x00000800 1>,
++		       <&mdma1 10 0x10 0x1200000a 0x40026408 0x00200000 1>,
++		       <&mdma1 11 0x10 0x1200000a 0x40026408 0x08000000 1>,
++		       <&mdma1 12 0x10 0x1200000a 0x4002640C 0x00000020 1>,
++		       <&mdma1 13 0x10 0x1200000a 0x4002640C 0x00000800 1>,
++		       <&mdma1 14 0x10 0x1200000a 0x4002640C 0x00200000 1>,
++		       <&mdma1 15 0x10 0x1200000a 0x4002640C 0x08000000 1>;
++		dma-names = "ch0", "ch1", "ch2", "ch3", "ch4", "ch5", "ch6", "ch7";
++		memory-region = <&sram_dmapool>;
+ 	};
+ 
+ * DMA client
+@@ -62,13 +78,21 @@ channel: a phandle to the DMA controller plus the following four integer cells:
+ 	0x1: medium
+ 	0x2: high
+ 	0x3: very high
+-4. A 32bit bitfield value specifying DMA features which are device dependent:
++4. A bitfield value specifying DMA features which are device dependent:
+  -bit 0-1: DMA FIFO threshold selection
+ 	0x0: 1/4 full FIFO
+ 	0x1: 1/2 full FIFO
+ 	0x2: 3/4 full FIFO
+ 	0x3: full FIFO
 -
--	ret = dmaengine_slave_config(mchan->chan, &config);
--	if (ret < 0)
--		goto error;
--
--	 /* Prepare MDMA descriptor */
--	m_desc->desc = dmaengine_prep_slave_sg(mchan->chan, m_desc->sgt.sgl,
--					       m_desc->sgt.nents, mchan->dir,
--					       DMA_PREP_INTERRUPT);
--	if (!m_desc->desc) {
--		ret = -EINVAL;
--		goto error;
--	}
--
--	if (mchan->dir != DMA_MEM_TO_DEV) {
--		m_desc->desc->callback_result = stm32_mdma_chan_complete;
--		m_desc->desc->callback_param = chan;
--	}
--
- 	ret = dma_submit_error(dmaengine_submit(m_desc->desc));
- 	if (ret < 0) {
- 		dev_err(chan2dev(chan), "MDMA submit failed\n");
-@@ -1001,6 +975,7 @@ static void stm32_dma_start_transfer(struct stm32_dma_chan *chan)
++ -bit 2: Intermediate M2M transfer from/to DDR to/from SRAM throughout MDMA
++	0: MDMA not used to generate an intermediate M2M transfer
++	1: MDMA used to generate an intermediate M2M transfer.
++ -bit 3-4: indicated SRAM Buffer size in (2^order)*PAGE_SIZE.
++	Order is given by those 2 bits starting at 0.
++	Valid only whether Intermediate M2M transfer is set.
++	For cyclic, whether Intermediate M2M transfer is chosen, any value can
++	be set: SRAM buffer size will rely on period size and not on this DT
++	value.
  
- 	chan->next_sg++;
+ Example:
  
-+	reg->dma_scr &= ~STM32_DMA_SCR_EN;
- 	stm32_dma_write(dmadev, STM32_DMA_SCR(chan->id), reg->dma_scr);
- 	stm32_dma_write(dmadev, STM32_DMA_SPAR(chan->id), reg->dma_spar);
- 	stm32_dma_write(dmadev, STM32_DMA_SM0AR(chan->id), reg->dma_sm0ar);
-@@ -1238,9 +1213,11 @@ static void stm32_dma_clear_reg(struct stm32_dma_chan_reg *regs)
- 
- static int stm32_dma_mdma_prep_slave_sg(struct stm32_dma_chan *chan,
- 					struct scatterlist *sgl, u32 sg_len,
--					struct stm32_dma_desc *desc)
-+					struct stm32_dma_desc *desc,
-+					unsigned long flags)
- {
- 	struct stm32_dma_device *dmadev = stm32_dma_get_dev(chan);
-+	struct stm32_dma_mdma *mchan = &chan->mchan;
- 	struct scatterlist *sg, *m_sg;
- 	dma_addr_t dma_buf;
- 	u32 len, num_sgs, sram_period;
-@@ -1256,12 +1233,13 @@ static int stm32_dma_mdma_prep_slave_sg(struct stm32_dma_chan *chan,
- 
- 	for_each_sg(sgl, sg, sg_len, i) {
- 		struct stm32_dma_mdma_desc *m_desc = &desc->sg_req[i].m_desc;
-+		struct dma_slave_config config;
- 
- 		len = sg_dma_len(sg);
- 		desc->sg_req[i].stm32_sgl_req = *sg;
- 		num_sgs = 1;
- 
--		if (chan->mchan.dir == DMA_MEM_TO_DEV) {
-+		if (mchan->dir == DMA_MEM_TO_DEV) {
- 			if (len > chan->sram_size) {
- 				dev_err(chan2dev(chan),
- 					"max buf size = %d bytes\n",
-@@ -1293,6 +1271,38 @@ static int stm32_dma_mdma_prep_slave_sg(struct stm32_dma_chan *chan,
- 			dma_buf += bytes;
- 			len -= bytes;
- 		}
-+
-+		/* Configure MDMA channel */
-+		memset(&config, 0, sizeof(config));
-+		if (mchan->dir == DMA_MEM_TO_DEV)
-+			config.dst_addr = desc->dma_buf;
-+		else
-+			config.src_addr = desc->dma_buf;
-+
-+		ret = dmaengine_slave_config(mchan->chan, &config);
-+		if (ret < 0)
-+			goto err;
-+
-+		/* Prepare MDMA descriptor */
-+		m_desc->desc = dmaengine_prep_slave_sg(mchan->chan,
-+						       m_desc->sgt.sgl,
-+						       m_desc->sgt.nents,
-+						       mchan->dir,
-+						       DMA_PREP_INTERRUPT);
-+
-+		if (!m_desc->desc) {
-+			ret = -EINVAL;
-+			goto err;
-+		}
-+
-+		if (flags & DMA_CTRL_REUSE)
-+			dmaengine_desc_set_reuse(m_desc->desc);
-+
-+		if (mchan->dir != DMA_MEM_TO_DEV) {
-+			m_desc->desc->callback_result =
-+				stm32_mdma_chan_complete;
-+			m_desc->desc->callback_param = chan;
-+		}
- 	}
- 
- 	chan->mchan.sram_buf = desc->dma_buf;
-@@ -1302,8 +1312,12 @@ static int stm32_dma_mdma_prep_slave_sg(struct stm32_dma_chan *chan,
- 	return 0;
- 
- err:
--	for (j = 0; j < i; j++)
-+	for (j = 0; j < i; j++) {
-+		struct stm32_dma_mdma_desc *m_desc = &desc->sg_req[j].m_desc;
-+
-+		m_desc->desc = NULL;
- 		sg_free_table(&desc->sg_req[j].m_desc.sgt);
-+	}
- free_alloc:
- 	gen_pool_free(dmadev->sram_pool, (unsigned long)desc->dma_buf_cpu,
- 		      chan->sram_size);
-@@ -1385,7 +1399,8 @@ static struct dma_async_tx_descriptor *stm32_dma_prep_slave_sg(
- 		struct scatterlist *s, *_sgl;
- 
- 		chan->mchan.dir = direction;
--		ret = stm32_dma_mdma_prep_slave_sg(chan, sgl, sg_len, desc);
-+		ret = stm32_dma_mdma_prep_slave_sg(chan, sgl, sg_len, desc,
-+						   flags);
- 		if (ret < 0)
- 			return NULL;
- 
-@@ -1791,6 +1806,14 @@ static void stm32_dma_desc_free(struct virt_dma_desc *vdesc)
- 	int i;
- 
- 	if (chan->use_mdma) {
-+		struct stm32_dma_mdma_desc *m_desc;
-+
-+		for (i = 0; i < desc->num_sgs; i++) {
-+			m_desc = &desc->sg_req[i].m_desc;
-+			dmaengine_desc_free(m_desc->desc);
-+			m_desc->desc = NULL;
-+		}
-+
- 		for (i = 0; i < desc->num_sgs; i++)
- 			sg_free_table(&desc->sg_req[i].m_desc.sgt);
- 
-@@ -1934,6 +1957,7 @@ static int stm32_dma_probe(struct platform_device *pdev)
- 	dd->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
- 	dd->residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
- 	dd->max_burst = STM32_DMA_MAX_BURST;
-+	dd->descriptor_reuse = true;
- 	dd->dev = &pdev->dev;
- 	INIT_LIST_HEAD(&dd->channels);
- 
+@@ -77,7 +101,7 @@ Example:
+ 		reg = <0x40011000 0x400>;
+ 		interrupts = <37>;
+ 		clocks = <&clk_pclk2>;
+-		dmas = <&dma2 2 4 0x10400 0x3>,
+-		       <&dma2 7 5 0x10200 0x3>;
++		dmas = <&dma2 2 4 0x10400 0x1>,
++		       <&dma2 7 5 0x10200 0x1>;
+ 		dma-names = "rx", "tx";
+ 	};
 -- 
 2.7.4
