@@ -1,18 +1,38 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 11 Sep 2018 15:53:42 +0200
-Subject: [PATCH 5/5] arm64: dts: renesas: r8a774a1: Add VIN and CSI-2 nodes
-In-Reply-To: <1536589878-26218-6-git-send-email-biju.das@bp.renesas.com>
-References: <1536589878-26218-1-git-send-email-biju.das@bp.renesas.com>
- <1536589878-26218-6-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <20180911135341.j5nj4crbg5bjeibw@verge.net.au>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 11 Sep 2018 16:04:00 +0200
+Subject: [GIT PULL v2] Immutable branch between MFD, SPI and TTY due for
+ the v4.20 merge window
+In-Reply-To: <20180911111850.GJ4185@dell>
+References: <20180904111310.4049-1-radu_nicolae.pirea@upb.ro>
+ <20180911111850.GJ4185@dell>
+Message-ID: <20180911140400.GB18410@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2018 at 03:31:18PM +0100, Biju Das wrote:
-> Add VIN and CSI-2 nodes to RZ/G2M SoC dtsi.
+On Tue, Sep 11, 2018 at 12:18:50PM +0100, Lee Jones wrote:
+> [In case you missed it]
 > 
-> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> This new pull-request contains the following changes since v1:
+> 
+>  - Uplift the submission version from v11 to v12
+>  - Include fix for build breakage due to missing Device Tree include file
+> 
+> Since it is based on the original pull-request, it can be pulled
+> in either directly on top of it or as a pull in its own right.
+> 
+> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+> 
+>   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+> 
+> are available in the Git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/ib-mfd-spi-tty-v4.20-1
 
-Thanks, I would value a review of this entire series before I apply this
-patch.
+Ok, let's try this again, I've dropped that other patch and taken this
+branch into my tree.
+
+Hopefully this all works well :)
+
+thanks,
+
+greg k-h
