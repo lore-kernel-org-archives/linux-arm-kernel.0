@@ -1,174 +1,60 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 11 Sep 2018 16:17:50 +0100
-Subject: [PATCH] perf: xgene: Add CPU hotplug support
-In-Reply-To: <1534357895-19031-1-git-send-email-hoan.tran@amperecomputing.com>
-References: <1534357895-19031-1-git-send-email-hoan.tran@amperecomputing.com>
-Message-ID: <20180911151749.3vvvgovguuyyugma@lakrids.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 11 Sep 2018 16:19:27 +0100
+Subject: [PATCH v9 3/6] kernel/reboot.c: export pm_power_off_prepare
+In-Reply-To: <20180911015320.GA25790@dragon>
+References: <20180802103425.3053-1-o.rempel@pengutronix.de>
+ <20180802103425.3053-4-o.rempel@pengutronix.de>
+ <20180802104443.GH9117@sirena.org.uk>
+ <94d48ecb-7302-c7ed-e815-730be0426a04@pengutronix.de>
+ <20180802113552.GJ9117@sirena.org.uk>
+ <20180827014815.GD29208@dragon>
+ <20180906101516.GA5360@sirena.org.uk>
+ <20180909020021.GA18838@dragon>
+ <20180910151926.GA10889@sirena.org.uk>
+ <20180911015320.GA25790@dragon>
+Message-ID: <20180911151927.GB10123@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 15, 2018 at 11:31:35AM -0700, Hoan Tran wrote:
-> This patch adds CPU hotplug support where the PMU migrates the context to
-> another online CPU when its CPU is offline.
-> 
-> It fixes the below issue where the user does offline the CPU which is assigned
-> to this PMU.
-> 
-> Assuming, CPU0 is assigned for this PMU. When the user does offline CPU0
->         [root@(none) ~]# echo 0 > /sys/devices/system/cpu/cpu0/online
-> This PMU does not work anymore and shows the below error.
->         [root@(none) ~]# perf stat -a -e l3c0/cycle-count/,l3c0/write/ sleep 1
->         Error:
->         The sys_perf_event_open() syscall returned with 19 (No such device) for event (l3c0/cycle-count/).
->         /bin/dmesg may provide additional information.
->         No CONFIG_PERF_EVENTS=y kernel support configured?
-> 
-> With this patch, when CPU0 is offline, PMU migrates to another online CPU and
-> works on that CPU.
-> 
-> Signed-off-by: Hoan Tran <hoan.tran@amperecomputing.com>
-> ---
->  drivers/perf/xgene_pmu.c   | 71 ++++++++++++++++++++++++++++++++++++++++++----
->  include/linux/cpuhotplug.h |  1 +
->  2 files changed, 66 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/perf/xgene_pmu.c b/drivers/perf/xgene_pmu.c
-> index 0e31f13..248a3f7 100644
-> --- a/drivers/perf/xgene_pmu.c
-> +++ b/drivers/perf/xgene_pmu.c
-> @@ -21,6 +21,7 @@
-> 
->  #include <linux/acpi.h>
->  #include <linux/clk.h>
-> +#include <linux/cpuhotplug.h>
->  #include <linux/cpumask.h>
->  #include <linux/interrupt.h>
->  #include <linux/io.h>
-> @@ -130,12 +131,14 @@ struct xgene_pmu_ops {
-> 
->  struct xgene_pmu {
->         struct device *dev;
-> +       struct hlist_node node;
->         int version;
->         void __iomem *pcppmu_csr;
->         u32 mcb_active_mask;
->         u32 mc_active_mask;
->         u32 l3c_active_mask;
->         cpumask_t cpu;
-> +       int irq;
->         raw_spinlock_t lock;
->         const struct xgene_pmu_ops *ops;
->         struct list_head l3cpmus;
-> @@ -1806,6 +1809,53 @@ static const struct acpi_device_id xgene_pmu_acpi_match[] = {
->  MODULE_DEVICE_TABLE(acpi, xgene_pmu_acpi_match);
->  #endif
-> 
-> +static int xgene_pmu_online_cpu(unsigned int cpu, struct hlist_node *node)
-> +{
-> +       struct xgene_pmu *xgene_pmu = hlist_entry_safe(node, struct xgene_pmu,
-> +                                                      node);
-> +
-> +       if (cpumask_empty(&xgene_pmu->cpu))
-> +               cpumask_set_cpu(cpu, &xgene_pmu->cpu);
-> +
-> +       /* Overflow interrupt also should use the same CPU */
-> +       WARN_ON(irq_set_affinity(xgene_pmu->irq, &xgene_pmu->cpu));
-> +
-> +       return 0;
-> +}
-> +
-> +static int xgene_pmu_offline_cpu(unsigned int cpu, struct hlist_node *node)
-> +{
-> +       struct xgene_pmu *xgene_pmu = hlist_entry_safe(node, struct xgene_pmu,
-> +                                                      node);
-> +       struct xgene_pmu_dev_ctx *ctx;
-> +       unsigned int target;
-> +
-> +       if (!cpumask_test_and_clear_cpu(cpu, &xgene_pmu->cpu))
-> +               return 0;
-> +       target = cpumask_any_but(cpu_online_mask, cpu);
-> +       if (target >= nr_cpu_ids)
-> +               return 0;
-> +
-> +       list_for_each_entry(ctx, &xgene_pmu->mcpmus, next) {
-> +               perf_pmu_migrate_context(&ctx->pmu_dev->pmu, cpu, target);
-> +       }
-> +       list_for_each_entry(ctx, &xgene_pmu->mcbpmus, next) {
-> +               perf_pmu_migrate_context(&ctx->pmu_dev->pmu, cpu, target);
-> +       }
-> +       list_for_each_entry(ctx, &xgene_pmu->l3cpmus, next) {
-> +               perf_pmu_migrate_context(&ctx->pmu_dev->pmu, cpu, target);
-> +       }
-> +       list_for_each_entry(ctx, &xgene_pmu->iobpmus, next) {
-> +               perf_pmu_migrate_context(&ctx->pmu_dev->pmu, cpu, target);
-> +       }
-> +
-> +       cpumask_set_cpu(target, &xgene_pmu->cpu);
-> +       /* Overflow interrupt also should use the same CPU */
-> +       WARN_ON(irq_set_affinity(xgene_pmu->irq, &xgene_pmu->cpu));
-> +
-> +       return 0;
-> +}
-> +
->  static int xgene_pmu_probe(struct platform_device *pdev)
->  {
->         const struct xgene_pmu_data *dev_data;
-> @@ -1815,6 +1865,14 @@ static int xgene_pmu_probe(struct platform_device *pdev)
->         int irq, rc;
->         int version;
-> 
-> +       /* Install a hook to update the reader CPU in case it goes offline */
-> +       rc = cpuhp_setup_state_multi(CPUHP_AP_PERF_XGENE_ONLINE,
-> +                                     "CPUHP_AP_PERF_XGENE_ONLINE",
-> +                                     xgene_pmu_online_cpu,
-> +                                     xgene_pmu_offline_cpu);
-> +       if (rc)
-> +               return rc;
-> +
->         xgene_pmu = devm_kzalloc(&pdev->dev, sizeof(*xgene_pmu), GFP_KERNEL);
->         if (!xgene_pmu)
->                 return -ENOMEM;
-> @@ -1865,6 +1923,7 @@ static int xgene_pmu_probe(struct platform_device *pdev)
->                 dev_err(&pdev->dev, "No IRQ resource\n");
->                 return -EINVAL;
->         }
-> +
->         rc = devm_request_irq(&pdev->dev, irq, xgene_pmu_isr,
->                                 IRQF_NOBALANCING | IRQF_NO_THREAD,
->                                 dev_name(&pdev->dev), xgene_pmu);
-> @@ -1873,6 +1932,8 @@ static int xgene_pmu_probe(struct platform_device *pdev)
->                 return rc;
->         }
-> 
-> +       xgene_pmu->irq = irq;
-> +
->         raw_spin_lock_init(&xgene_pmu->lock);
-> 
->         /* Check for active MCBs and MCUs */
-> @@ -1883,13 +1944,11 @@ static int xgene_pmu_probe(struct platform_device *pdev)
->                 xgene_pmu->mc_active_mask = 0x1;
->         }
-> 
-> -       /* Pick one core to use for cpumask attributes */
-> -       cpumask_set_cpu(smp_processor_id(), &xgene_pmu->cpu);
-> -
-> -       /* Make sure that the overflow interrupt is handled by this CPU */
-> -       rc = irq_set_affinity(irq, &xgene_pmu->cpu);
-> +       /* Add this instance to the list used by the hotplug callback */
-> +       rc = cpuhp_state_add_instance(CPUHP_AP_PERF_XGENE_ONLINE,
-> +                                     &xgene_pmu->node);
->         if (rc) {
-> -               dev_err(&pdev->dev, "Failed to set interrupt affinity!\n");
-> +               dev_err(&pdev->dev, "Error %d registering hotplug", rc);
->                 return rc;
->         }
+On Tue, Sep 11, 2018 at 09:53:21AM +0800, Shawn Guo wrote:
 
-You also need to remove the cpuhp instances when unregistering the PMUs
-in xgene_pmu_dev_cleanup().
+> There shouldn't be any build or run time regression on either tree, and
+> the feature that the series adds will be available when both trees get
+> merged together on -next or Linus tree.
 
-Otherwise this looks fine to me, on the assumption the system PMU is
-accessible from all CPUs in the system (e.g. it's not lcoal to a socket
-or anything like that).
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 
-Thanks,
-Mark.
+  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+
+are available in the Git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git tags/pfuze100-poweroff
+
+for you to fetch changes up to c29daffa322ad36978cbce487f8ebcd9c3c3f7c0:
+
+  regulator: pfuze100-regulator: provide pm_power_off_prepare handler (2018-09-11 16:15:57 +0100)
+
+----------------------------------------------------------------
+regulator: pfuze100: Power off support
+
+The pfuze100 has some innovative and creative power off support which
+requires some cross tree work to handle; this tag is the regualtor bits
+of that work.
+
+----------------------------------------------------------------
+Oleksij Rempel (3):
+      kernel/reboot.c: export pm_power_off_prepare
+      regulator: pfuze100: add fsl,pmic-stby-poweroff property
+      regulator: pfuze100-regulator: provide pm_power_off_prepare handler
+
+ .../devicetree/bindings/regulator/pfuze100.txt     |  5 ++
+ drivers/regulator/pfuze100-regulator.c             | 91 ++++++++++++++++++++++
+ kernel/reboot.c                                    |  1 +
+ 3 files changed, 97 insertions(+)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180911/9541d5f3/attachment-0001.sig>
