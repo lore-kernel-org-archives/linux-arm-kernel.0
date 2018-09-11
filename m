@@ -1,286 +1,337 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 11 Sep 2018 15:49:55 -0600
-Subject: [PATCH 5/5] coresight: Allow drivers to be verbose only in sysFS mode
-In-Reply-To: <1536702595-9999-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1536702595-9999-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1536702595-9999-6-git-send-email-mathieu.poirier@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 11 Sep 2018 16:54:40 -0500
+Subject: i.MX DT memory nodes
+Message-ID: <CAL_JsqKtwt39k95d32ni=mKrZ=UVmTBH_onxC3ncjWs9eLbdJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Debug messages emitted during perf sessions are useless and have
-an habit of triggering the lockdep mechanic.  As such this patch
-confines driver output to the sysFS mode where the establishement
-of paths between source and sink happens outside of an atomic
-context.
+It appears that many i.MX platforms have duplicate, incomplete memory
+nodes with both "memory" and "memory@<addr>" nodes. Are you all aware
+of this? Plan to fix it? I guess u-boot fixes things enough to work.
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- drivers/hwtracing/coresight/coresight-dynamic-replicator.c | 4 ++--
- drivers/hwtracing/coresight/coresight-etb10.c              | 6 +++---
- drivers/hwtracing/coresight/coresight-etm3x.c              | 7 +++++--
- drivers/hwtracing/coresight/coresight-etm4x.c              | 8 ++++++--
- drivers/hwtracing/coresight/coresight-funnel.c             | 6 ++++--
- drivers/hwtracing/coresight/coresight-replicator.c         | 4 ++--
- drivers/hwtracing/coresight/coresight-stm.c                | 2 +-
- drivers/hwtracing/coresight/coresight-tmc-etf.c            | 8 ++++----
- drivers/hwtracing/coresight/coresight-tmc-etr.c            | 2 +-
- drivers/hwtracing/coresight/coresight-tpiu.c               | 4 ++--
- 10 files changed, 30 insertions(+), 21 deletions(-)
+>From the DT schema checking:
 
-diff --git a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-index de2c197886c6..ea7b19aac94c 100644
---- a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-+++ b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-@@ -56,7 +56,7 @@ static int replicator_enable(struct coresight_device *csdev, int inport,
- 
- 	CS_LOCK(drvdata->base);
- 
--	dev_dbg(drvdata->dev, "REPLICATOR enabled\n");
-+	coresight_dev_dbg(drvdata->dev, mode, "REPLICATOR enabled\n");
- 	return 0;
- }
- 
-@@ -75,7 +75,7 @@ static void replicator_disable(struct coresight_device *csdev, int inport,
- 
- 	CS_LOCK(drvdata->base);
- 
--	dev_dbg(drvdata->dev, "REPLICATOR disabled\n");
-+	coresight_dev_dbg(drvdata->dev, mode, "REPLICATOR disabled\n");
- }
- 
- static const struct coresight_ops_link replicator_link_ops = {
-diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-index 79793cb51d82..78b4669e7dc7 100644
---- a/drivers/hwtracing/coresight/coresight-etb10.c
-+++ b/drivers/hwtracing/coresight/coresight-etb10.c
-@@ -211,7 +211,7 @@ static int etb_enable(struct coresight_device *csdev, u32 mode, void *data)
- 	if (ret)
- 		return ret;
- 
--	dev_dbg(drvdata->dev, "ETB enabled\n");
-+	coresight_dev_dbg(drvdata->dev, mode, "ETB enabled\n");
- 	return 0;
- }
- 
-@@ -320,7 +320,7 @@ static void etb_disable(struct coresight_device *csdev, u32 mode)
- 	}
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
--	dev_dbg(drvdata->dev, "ETB disabled\n");
-+	coresight_dev_dbg(drvdata->dev, mode, "ETB disabled\n");
- }
- 
- static void *etb_alloc_buffer(struct coresight_device *csdev, int cpu,
-@@ -532,7 +532,7 @@ static void etb_dump(struct etb_drvdata *drvdata)
- 	}
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
--	dev_dbg(drvdata->dev, "ETB dumped\n");
-+	coresight_dev_dbg(drvdata->dev, drvdata->mode, "ETB dumped\n");
- }
- 
- static int etb_open(struct inode *inode, struct file *file)
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index 9ce8fba20b0f..f9e40078422e 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -358,10 +358,12 @@ static int etm_parse_event_config(struct etm_drvdata *drvdata,
- static void etm_enable_hw(void *info)
- {
- 	int i;
--	u32 etmcr;
-+	u32 etmcr, mode;
- 	struct etm_drvdata *drvdata = info;
- 	struct etm_config *config = &drvdata->config;
- 
-+	mode = local_read(&drvdata->mode);
-+
- 	CS_UNLOCK(drvdata->base);
- 
- 	/* Turn engine on */
-@@ -420,7 +422,8 @@ static void etm_enable_hw(void *info)
- 	etm_clr_prog(drvdata);
- 	CS_LOCK(drvdata->base);
- 
--	dev_dbg(drvdata->dev, "cpu: %d enable smp call done\n", drvdata->cpu);
-+	coresight_dev_dbg(drvdata->dev,  mode,
-+			  "cpu: %d enable smp call done\n", drvdata->cpu);
- }
- 
- static int etm_cpu_id(struct coresight_device *csdev)
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index b7379e9cfb30..70519fea3c41 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -83,6 +83,7 @@ static void etm4_enable_hw(void *info)
- 	int i;
- 	struct etmv4_drvdata *drvdata = info;
- 	struct etmv4_config *config = &drvdata->config;
-+	u32 mode = local_read(&drvdata->mode);
- 
- 	CS_UNLOCK(drvdata->base);
- 
-@@ -177,7 +178,8 @@ static void etm4_enable_hw(void *info)
- 
- 	CS_LOCK(drvdata->base);
- 
--	dev_dbg(drvdata->dev, "cpu: %d enable smp call done\n", drvdata->cpu);
-+	coresight_dev_dbg(drvdata->dev, mode,
-+			  "cpu: %d enable smp call done\n", drvdata->cpu);
- }
- 
- static int etm4_parse_event_config(struct etmv4_drvdata *drvdata,
-@@ -311,6 +313,7 @@ static void etm4_disable_hw(void *info)
- {
- 	u32 control;
- 	struct etmv4_drvdata *drvdata = info;
-+	u32 mode = local_read(&drvdata->mode);
- 
- 	CS_UNLOCK(drvdata->base);
- 
-@@ -331,7 +334,8 @@ static void etm4_disable_hw(void *info)
- 
- 	CS_LOCK(drvdata->base);
- 
--	dev_dbg(drvdata->dev, "cpu: %d disable smp call done\n", drvdata->cpu);
-+	coresight_dev_dbg(drvdata->dev, mode,
-+			  "cpu: %d disable smp call done\n", drvdata->cpu);
- }
- 
- static int etm4_disable_perf(struct coresight_device *csdev,
-diff --git a/drivers/hwtracing/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
-index c1c9f5fccc4b..cc7a424cf676 100644
---- a/drivers/hwtracing/coresight/coresight-funnel.c
-+++ b/drivers/hwtracing/coresight/coresight-funnel.c
-@@ -65,7 +65,8 @@ static int funnel_enable(struct coresight_device *csdev, int inport,
- 
- 	funnel_enable_hw(drvdata, inport);
- 
--	dev_dbg(drvdata->dev, "FUNNEL inport %d enabled\n", inport);
-+	coresight_dev_dbg(drvdata->dev, mode,
-+			  "FUNNEL inport %d enabled\n", inport);
- 	return 0;
- }
- 
-@@ -89,7 +90,8 @@ static void funnel_disable(struct coresight_device *csdev, int inport,
- 
- 	funnel_disable_hw(drvdata, inport);
- 
--	dev_dbg(drvdata->dev, "FUNNEL inport %d disabled\n", inport);
-+	coresight_dev_dbg(drvdata->dev, mode,
-+			  "FUNNEL inport %d disabled\n", inport);
- }
- 
- static const struct coresight_ops_link funnel_link_ops = {
-diff --git a/drivers/hwtracing/coresight/coresight-replicator.c b/drivers/hwtracing/coresight/coresight-replicator.c
-index 0b749302c066..c81bbd5adf13 100644
---- a/drivers/hwtracing/coresight/coresight-replicator.c
-+++ b/drivers/hwtracing/coresight/coresight-replicator.c
-@@ -35,7 +35,7 @@ static int replicator_enable(struct coresight_device *csdev, int inport,
- {
- 	struct replicator_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
--	dev_dbg(drvdata->dev, "REPLICATOR enabled\n");
-+	coresight_dev_dbg(drvdata->dev, mode, "REPLICATOR enabled\n");
- 	return 0;
- }
- 
-@@ -44,7 +44,7 @@ static void replicator_disable(struct coresight_device *csdev, int inport,
- {
- 	struct replicator_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
--	dev_dbg(drvdata->dev, "REPLICATOR disabled\n");
-+	coresight_dev_dbg(drvdata->dev, mode, "REPLICATOR disabled\n");
- }
- 
- static const struct coresight_ops_link replicator_link_ops = {
-diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
-index 35d6f9709274..40bdcada696b 100644
---- a/drivers/hwtracing/coresight/coresight-stm.c
-+++ b/drivers/hwtracing/coresight/coresight-stm.c
-@@ -211,7 +211,7 @@ static int stm_enable(struct coresight_device *csdev,
- 	stm_enable_hw(drvdata);
- 	spin_unlock(&drvdata->spinlock);
- 
--	dev_dbg(drvdata->dev, "STM tracing enabled\n");
-+	coresight_dev_dbg(drvdata->dev, mode, "STM tracing enabled\n");
- 	return 0;
- }
- 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-index ce33c0f05148..ea8334f70ca7 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-@@ -242,7 +242,7 @@ static int tmc_enable_etf_sink(struct coresight_device *csdev,
- 	if (ret)
- 		return ret;
- 
--	dev_dbg(drvdata->dev, "TMC-ETB/ETF enabled\n");
-+	coresight_dev_dbg(drvdata->dev, mode, "TMC-ETB/ETF enabled\n");
- 	return 0;
- }
- 
-@@ -265,7 +265,7 @@ static void tmc_disable_etf_sink(struct coresight_device *csdev, u32 mode)
- 
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
--	dev_dbg(drvdata->dev, "TMC-ETB/ETF disabled\n");
-+	coresight_dev_dbg(drvdata->dev, mode, "TMC-ETB/ETF disabled\n");
- }
- 
- static int tmc_enable_etf_link(struct coresight_device *csdev,
-@@ -284,7 +284,7 @@ static int tmc_enable_etf_link(struct coresight_device *csdev,
- 	drvdata->mode = CS_MODE_SYSFS;
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
--	dev_dbg(drvdata->dev, "TMC-ETF enabled\n");
-+	coresight_dev_dbg(drvdata->dev, mode, "TMC-ETF enabled\n");
- 	return 0;
- }
- 
-@@ -304,7 +304,7 @@ static void tmc_disable_etf_link(struct coresight_device *csdev,
- 	drvdata->mode = CS_MODE_DISABLED;
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
--	dev_dbg(drvdata->dev, "TMC-ETF disabled\n");
-+	coresight_dev_dbg(drvdata->dev, mode, "TMC-ETF disabled\n");
- }
- 
- static void *tmc_alloc_etf_buffer(struct coresight_device *csdev, int cpu,
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index ec5100e7b7b9..51af305244d2 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -1383,7 +1383,7 @@ static void tmc_disable_etr_sink(struct coresight_device *csdev, u32 mode)
- 
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
--	dev_dbg(drvdata->dev, "TMC-ETR disabled\n");
-+	coresight_dev_dbg(drvdata->dev, mode, "TMC-ETR disabled\n");
- }
- 
- static const struct coresight_ops_sink tmc_etr_sink_ops = {
-diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
-index 5f9fe97690fe..dc78c3ae2218 100644
---- a/drivers/hwtracing/coresight/coresight-tpiu.c
-+++ b/drivers/hwtracing/coresight/coresight-tpiu.c
-@@ -74,7 +74,7 @@ static int tpiu_enable(struct coresight_device *csdev, u32 mode, void *__unused)
- 
- 	tpiu_enable_hw(drvdata);
- 
--	dev_dbg(drvdata->dev, "TPIU enabled\n");
-+	coresight_dev_dbg(drvdata->dev, mode, "TPIU enabled\n");
- 	return 0;
- }
- 
-@@ -100,7 +100,7 @@ static void tpiu_disable(struct coresight_device *csdev, u32 mode)
- 
- 	tpiu_disable_hw(drvdata);
- 
--	dev_dbg(drvdata->dev, "TPIU disabled\n");
-+	coresight_dev_dbg(drvdata->dev, mode, "TPIU disabled\n");
- }
- 
- static const struct coresight_ops_sink tpiu_sink_ops = {
--- 
-2.7.4
+arch/arm/boot/dts/imx31-bug.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx31-lite.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx35-eukrea-mbimxsd35-baseboard.dt.yaml:8:5: 'reg'
+is a required property
+arch/arm/boot/dts/imx35-pdk.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx50-evk.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx51-apf51.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx51-apf51dev.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx51-digi-connectcore-jsk.dt.yaml:9:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx51-babbage.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx51-eukrea-mbimxsd51-baseboard.dt.yaml:8:5: 'reg'
+is a required property
+arch/arm/boot/dts/imx51-ts4800.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx51-zii-scu2-mezz.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx51-zii-rdu1.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx51-zii-scu3-esb.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx53-ard.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx53-cx9020.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx53-kp-ddc.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx53-kp-hsc.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx53-m53evk.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx53-mba53.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx53-qsb.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx53-qsrb.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx53-ppd.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx53-smd.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx53-usbarmory.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx53-tx53-x13x.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx53-voipac-bsb.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx53-tx53-x03x.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-apf6dev.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-aristainetos_4.dt.yaml:8:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6dl-aristainetos_7.dt.yaml:8:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6dl-aristainetos2_4.dt.yaml:8:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6dl-aristainetos2_7.dt.yaml:8:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6dl-cubox-i.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-cubox-i-emmc-som-v15.dt.yaml:8:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6dl-colibri-eval-v3.dt.yaml:9:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6dl-cubox-i-som-v15.dt.yaml:8:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6dl-dfi-fs700-m60.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-gw51xx.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-gw52xx.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-gw53xx.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-gw551x.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-gw54xx.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-gw552x.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-gw553x.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-gw560x.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-gw5903.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-gw5904.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-hummingboard.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-hummingboard-emmc-som-v15.dt.yaml:9:5: 'reg'
+is a required property
+arch/arm/boot/dts/imx6dl-hummingboard-som-v15.dt.yaml:9:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6dl-hummingboard2.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-hummingboard2-emmc-som-v15.dt.yaml:9:5: 'reg'
+is a required property
+arch/arm/boot/dts/imx6dl-icore.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-hummingboard2-som-v15.dt.yaml:9:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6dl-icore-mipi.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-icore-rqs.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-mamoj.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-nit6xlite.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-nitrogen6x.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-phytec-mira-rdk-nand.dt.yaml:10:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6dl-rex-basic.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-phytec-pbab01.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-riotboard.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-sabreauto.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-sabrelite.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-savageboard.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-sabresd.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-ts4900.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-ts7970.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-tx6dl-comtft.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-tx6s-8034.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-tx6s-8034-mb7.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-tx6s-8035.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-tx6s-8035-mb7.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-tx6u-801x.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-tx6u-80xx-mb7.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-tx6u-8033.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-tx6u-8033-mb7.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-tx6u-811x.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-udoo.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-tx6u-81xx-mb7.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-wandboard.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6dl-wandboard-revb1.dt.yaml:8:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6dl-wandboard-revd1.dt.yaml:8:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6q-apalis-eval.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-apf6dev.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-apalis-ixora.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-arm2.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dt.yaml:10:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6q-b450v3.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-b650v3.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-b850v3.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-cm-fx6.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-cubox-i-emmc-som-v15.dt.yaml:8:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6q-cubox-i-som-v15.dt.yaml:8:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6q-cubox-i.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-dfi-fs700-m60.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-dhcom-pdk2.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-display5-tianma-tm070-1280x768.dt.yaml:8:5:
+'reg' is a required property
+arch/arm/boot/dts/imx6q-dmo-edmqmx6.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-dms-ba16.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-gk802.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-gw51xx.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-evi.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-gw52xx.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-gw53xx.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-gw5400-a.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-gw551x.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-gw54xx.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-gw552x.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-gw553x.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-gw5903.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-gw560x.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-gw5904.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-h100.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-hummingboard.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-hummingboard-emmc-som-v15.dt.yaml:9:5: 'reg'
+is a required property
+arch/arm/boot/dts/imx6q-hummingboard-som-v15.dt.yaml:9:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6q-hummingboard2.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-hummingboard2-emmc-som-v15.dt.yaml:9:5: 'reg'
+is a required property
+arch/arm/boot/dts/imx6q-hummingboard2-som-v15.dt.yaml:9:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6q-icore.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-icore-mipi.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-icore-ofcap10.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-icore-ofcap12.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-icore-rqs.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-kp-tpc.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-marsboard.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-mccmon6.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-nitrogen6x.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-nitrogen6_max.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-nitrogen6_som2.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-novena.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-phytec-mira-rdk-emmc.dt.yaml:10:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6q-phytec-mira-rdk-nand.dt.yaml:10:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6q-phytec-pbab01.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-pistachio.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-rex-pro.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-sabreauto.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-savageboard.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-sabrelite.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-sbc6x.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-sabresd.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-tbs2910.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-ts4900.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-ts7970.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-tx6q-1010.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-tx6q-1010-comtft.dt.yaml:8:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6q-tx6q-1020.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-tx6q-1020-comtft.dt.yaml:8:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6q-tx6q-1036.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-tx6q-1036-mb7.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-tx6q-10x0-mb7.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-tx6q-1110.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-udoo.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-tx6q-11x0-mb7.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-var-dt6customboard.dt.yaml:8:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6q-wandboard.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-utilite-pro.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6q-wandboard-revb1.dt.yaml:8:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6q-wandboard-revd1.dt.yaml:8:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6q-zii-rdu2.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6qp-nitrogen6_max.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6qp-nitrogen6_som2.dt.yaml:9:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6qp-sabresd.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6qp-sabreauto.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6qp-phytec-mira-rdk-nand.dt.yaml:10:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6qp-tx6qp-8037.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6qp-tx6qp-8037-mb7.dt.yaml:8:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6sl-warp.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6sl-evk.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6qp-tx6qp-8137.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6qp-wandboard-revd1.dt.yaml:8:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6qp-tx6qp-8137-mb7.dt.yaml:8:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6qp-zii-rdu2.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6sx-nitrogen6sx.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6sx-sabreauto.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx6sx-sdb-reva.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6sx-sdb-sai.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6sx-softing-vining-2000.dt.yaml:9:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6sx-sdb.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6sx-udoo-neo-basic.dt.yaml:9:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6sx-udoo-neo-extended.dt.yaml:9:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6sx-udoo-neo-full.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6ul-14x14-evk.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6ul-ccimx6ulsbcexpress.dt.yaml:8:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6ul-isiot-emmc.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6ul-geam.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6ul-isiot-nand.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6ul-liteboard.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6ul-opos6uldev.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6ul-pico-hobbit.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6ul-tx6ul-0010.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6ull-14x14-evk.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6ull-colibri-eval-v3.dt.yaml:9:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6ul-tx6ul-0011.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx6ull-colibri-wifi-eval-v3.dt.yaml:9:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx6ul-tx6ul-mainboard.dt.yaml:9:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx7d-cl-som-imx7.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx7d-colibri-emmc-eval-v3.dt.yaml:10:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx7d-sbc-imx7.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx7d-pico-pi.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx7d-nitrogen7.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx7d-colibri-eval-v3.dt.yaml:9:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx7d-sdb.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx7d-sdb-sht11.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx7s-colibri-eval-v3.dt.yaml:9:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx7s-warp.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/vf610m4-colibri.dt.yaml:587:5: 'reg' is a required property
+arch/arm/boot/dts/vf500-colibri-eval-v3.dt.yaml:746:5: 'reg' is a
+required property
+arch/arm/boot/dts/vf610-colibri-eval-v3.dt.yaml:742:5: 'reg' is a
+required property
+arch/arm/boot/dts/vf610-cosmic.dt.yaml:614:5: 'reg' is a required property
+arch/arm/boot/dts/vf610m4-cosmic.dt.yaml:584:5: 'reg' is a required property
+arch/arm/boot/dts/vf610-twr.dt.yaml:723:5: 'reg' is a required property
+arch/arm/boot/dts/vf610-zii-cfu1.dt.yaml:713:5: 'reg' is a required property
+arch/arm/boot/dts/vf610-zii-ssmb-spu3.dt.yaml:741:5: 'reg' is a
+required property
+arch/arm/boot/dts/vf610-zii-dev-rev-b.dt.yaml:790:5: 'reg' is a
+required property
+arch/arm/boot/dts/vf610-zii-dev-rev-c.dt.yaml:845:5: 'reg' is a
+required property
+arch/arm/boot/dts/qcom-mdm9615-wp8548-mangoh-green.dt.yaml:22:7:
+cpu at 0: 'reg' is a required property
+arch/arm/boot/dts/imx1-apf9328.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx1-ads.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard.dt.yaml:8:5: 'reg'
+is a required property
+arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-svga.dt.yaml:9:5:
+'reg' is a required property
+arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dt.yaml:9:5:
+'reg' is a required property
+arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dt.yaml:9:5:
+'reg' is a required property
+arch/arm/boot/dts/imx25-karo-tx25.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx25-pdk.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx27-apf27.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx27-apf27dev.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx27-pdk.dt.yaml:8:5: 'reg' is a required property
+arch/arm/boot/dts/imx23-evk.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx27-eukrea-mbimxsd27-baseboard.dt.yaml:8:5: 'reg'
+is a required property
+arch/arm/boot/dts/imx27-phytec-phycard-s-rdk.dt.yaml:9:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx23-sansa.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx23-olinuxino.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx27-phytec-phycore-rdk.dt.yaml:9:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx23-stmp378x_devb.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx23-xfi3.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx28-apf28.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx28-apf28dev.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx28-apx4devkit.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx28-cfa10036.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx28-cfa10037.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx28-cfa10055.dt.yaml:10:5: 'reg' is a required property
+arch/arm/boot/dts/imx28-cfa10049.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx28-cfa10056.dt.yaml:10:5: 'reg' is a required property
+arch/arm/boot/dts/imx28-cfa10057.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx28-duckbill-2.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx28-cfa10058.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx28-duckbill-2-485.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx28-duckbill-2-enocean.dt.yaml:9:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx28-duckbill-2-spi.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx28-duckbill.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx28-eukrea-mbmx283lc.dt.yaml:9:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx28-eukrea-mbmx287lc.dt.yaml:9:5: 'reg' is a
+required property
+arch/arm/boot/dts/imx28-m28cu3.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx28-evk.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx28-m28evk.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx28-sps1.dt.yaml:9:5: 'reg' is a required property
+arch/arm/boot/dts/imx28-ts4600.dt.yaml:9:5: 'reg' is a required property
