@@ -1,94 +1,84 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Tue, 11 Sep 2018 17:36:21 +0200
-Subject: [PATCH v12 0/6] Driver for at91 usart in spi mode
-In-Reply-To: <CAMuHMdXH8gNjKGOHGFc+K03U2zsVCSN7G_Q4wtepQr859nRQKg@mail.gmail.com>
-References: <20180904111310.4049-1-radu_nicolae.pirea@upb.ro>
- <20180911093356.GE4185@dell> <20180911093917.GL2494@piout.net>
- <CAMuHMdXH8gNjKGOHGFc+K03U2zsVCSN7G_Q4wtepQr859nRQKg@mail.gmail.com>
-Message-ID: <20180911153621.GP2494@piout.net>
+From: tudor.ambarus@microchip.com (Tudor Ambarus)
+Date: Tue, 11 Sep 2018 18:40:05 +0300
+Subject: [PATCH v3 0/2] add support to non-uniform SFDP SPI NOR flash memories
+Message-ID: <20180911154007.17195-1-tudor.ambarus@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/2018 16:59:09+0200, Geert Uytterhoeven wrote:
-> Hi Alexandre,
-> 
-> On Tue, Sep 11, 2018 at 11:40 AM Alexandre Belloni
-> <alexandre.belloni@bootlin.com> wrote:
-> > On 11/09/2018 10:33:56+0100, Lee Jones wrote:
-> > > On Tue, 04 Sep 2018, Radu Pirea wrote:
-> > > > Radu Pirea (6):
-> > > >   MAINTAINERS: add at91 usart mfd driver
-> > > >   dt-bindings: add binding for atmel-usart in SPI mode
-> > > >   mfd: at91-usart: added mfd driver for usart
-> > > >   MAINTAINERS: add at91 usart spi driver
-> > > >   spi: at91-usart: add driver for at91-usart as spi
-> > > >   tty/serial: atmel: change the driver to work under at91-usart mfd
-> > > >
-> > > >  .../bindings/{serial => mfd}/atmel-usart.txt  |  25 +-
-> > > >  MAINTAINERS                                   |  16 +
-> > > >  drivers/mfd/Kconfig                           |   9 +
-> > > >  drivers/mfd/Makefile                          |   1 +
-> > > >  drivers/mfd/at91-usart.c                      |  71 +++
-> > > >  drivers/spi/Kconfig                           |   8 +
-> > > >  drivers/spi/Makefile                          |   1 +
-> > > >  drivers/spi/spi-at91-usart.c                  | 432 ++++++++++++++++++
-> > > >  drivers/tty/serial/Kconfig                    |   1 +
-> > > >  drivers/tty/serial/atmel_serial.c             |  42 +-
-> > > >  include/dt-bindings/mfd/at91-usart.h          |  17 +
-> > > >  11 files changed, 606 insertions(+), 17 deletions(-)
-> > > >  rename Documentation/devicetree/bindings/{serial => mfd}/atmel-usart.txt (76%)
-> > > >  create mode 100644 drivers/mfd/at91-usart.c
-> > > >  create mode 100644 drivers/spi/spi-at91-usart.c
-> > > >  create mode 100644 include/dt-bindings/mfd/at91-usart.h
-> > >
-> > > Seeing as this patch-set has caused some issues this morning, I took
-> > > the liberty to peruse back into its history to figure out where things
-> > > started to go wrong.  I also re-reviewed the MFD driver - and I'm glad
-> > > I did!
-> > >
-> > > My Acked-by has been attached to the MFD portion since v5, which is
-> > > why the code hasn't caught my eye before today.  I reviewed the
-> > > relocation of the *binding document* (serial => mfd with no changes)
-> > > in v4 and nothing else.  It appears as though you mistakenly added it
-> > > to the *MFD driver* instead.  This explains my confusion in v10 when I
-> > > told you I'd already reviewed the binding document.
-> > >
-> > > As I said, I have re-reviewed the MFD driver and I'm afraid to say
-> > > that I do not like what I see.  Besides the missing header file and
-> > > the whitespace tabbing errors, I do not agree with the implementation.
-> > > Using MFD as a shim to hack around driver selection is not a valid
-> > > use-case.
-> > >
-> > > What's stopping you from just using the compatible string directly to
-> > > select which driver you need to probe?
-> > >
-> >
-> > Then you'd have multiple compatible strings for the same IP which is a
-> > big no-no.
-> 
-> It's still the same hardware device, isn't?
-> What if the SPI or UART slave is not on-board, but on an expansion board?
-> Then the SoC-specific .dtsi has no idea what mode should be used.
-> 
-> Hence shouldn't the software derive the hardware mode from the full
-> hardware description in DT? If that's impossible (I didn't look into detail
-> whether an SPI bus can easily be distinguished from a UART bus), perhaps
-> a mode property should be added?
-> 
+Backward compatibility test done on mx25l3273fm2i-08g with
+CONFIG_MTD_SPI_NOR_USE_4K_SECTORS set and unset.
+Non-uniform erase test done on sst26vf064b-104i/sn with
+CONFIG_MTD_SPI_NOR_USE_4K_SECTORS set and unset.
 
-Yes, this is exactly what is done:
+Note that in order to do the non-uniform test you'll have to force the
+spi_nor_has_uniform_erase() to return false, because the erase map is
+tuned to come back to the uniform case. Also, for the SST flashes, you'll
+have to unlock the global protection (see
+https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1763887.html).
 
-https://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git/tree/drivers/mfd/at91-usart.c?h=ib-mfd-spi-tty-4.20-1#n33
+Changes in v3:
+- drop "mtd: spi-nor: parse SFDP 4-byte Address Instruction Table":
+  let's add just a feature per patch set to make it easily digestible.
+  No worries, will resubmit it once the non-uniform erase supports gets
+  approved.
+- SNOR_ERASE_FLAGS_OFFSET was buggy and since it's used only once
+  in the uniform erase case, remove it entirely and do the init by
+  hand
+- describe all introduced functions together with arguments and
+  return value
+- various minor updates: drop a cast, rename a function - cosmetics ...
 
-Only one compatbile for the IP and a property to know what is the mode.
-That property should indeed be set in the board dts and not the SoC
-dtsi.
+Changes in v2:
+- add JESD216B SFDP optional parsers: Sector Map Parameter Table parser and
+  4-byte Address Instruction Table parser (patch 2/3 and patch 3/3).
 
-the other, less robust alternative was to look for child nodes and
-decide that if some where present it would indicate an SPI bus. But I
-think at some point we may have child nodes under a UART node.
+- save the Erase Types from bfpt to determine the Erase Type sizes. Sort all
+  the map's Erase Types in ascending order with the smallest erase size being
+  the first member in the erase_type array. Sort in the same way the Erase Type
+  mask in regions in order to have a 1-to-1 correspondence with the Erase
+  Types defined in the map. We sort the Erase Type by size, at init, in order to
+  speed up the process of finding the best erase command at run-time.
+
+- remove setting of mtd->erasesize and nor->erase_opcode when parsing the Basic
+  Flash Parameter Table. mtd->erasesize was set to the maximum supported Erase
+  Type size, without verifying if that Erase Type can erase the entire flash.
+  mtd->erasesize is now set just in spi_nor_select_erase(), after we find which
+  Erase Types are supported in the uniform case.
+
+- spi_nor_select_erase(): pass directly info->sector_size instead of the whole
+  flash_info structure in order to simplify the code.
+
+- fix condition on finding erase regions:
+  while (addr < region_start || addr >= region_end) {
+- fix the list command adding: list_add_tail() instead of list_add()
+- write_enable(nor); before erasing the sectors
+- As Boris suggested, remove likely() because it doesn't make any difference
+  given the time it takes to actually erase the block.
+- bool return value for spi_nor_has_uniform_erase().
+
+Changes in v1 or what I've done on top of Cyrille's work (https://lkml.org/lkml//
+2017/4/15/70):
+- minimize the amount of erase() calls by using the best sequence of erase
+  type commands depending on alignment.
+- build the list of best fitted erase commands to be executed once we
+  validate that the erase can be performed.
+- add improvements on how the erase map is handled. The regions are
+  consecutive in the address space, walk through the regions incrementally.
+- speed up finding the best erase type command. Order erase types by
+  size, iterate them from the biggest to the smallest and stop when best
+  fitted command is found.
+- determine at init if there are erase types that can erase the entire
+  memory
+- fix support for overlaid regions.
+
+
+Tudor Ambarus (2):
+  mtd: spi-nor: add support to non-uniform SFDP SPI NOR flash memories
+  mtd: spi-nor: parse SFDP Sector Map Parameter Table
+
+ drivers/mtd/spi-nor/spi-nor.c | 910 +++++++++++++++++++++++++++++++++++++++---
+ include/linux/mtd/spi-nor.h   | 119 ++++++
+ 2 files changed, 971 insertions(+), 58 deletions(-)
 
 -- 
-Alexandre Belloni, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+2.9.4
