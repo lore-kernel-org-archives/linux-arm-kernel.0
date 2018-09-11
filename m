@@ -1,41 +1,58 @@
-From: victor.chong@linaro.org (Victor Chong)
-Date: Tue, 11 Sep 2018 18:09:02 +0900
-Subject: [PATCH v2] tee: optee: log message if dynamic shm is enabled
-Message-ID: <CAHqM-Qjr+5T1pMatJ=5MSsJvzaRqPybt_2TtyzHPwLnt=WjCEA@mail.gmail.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Tue, 11 Sep 2018 11:11:24 +0200
+Subject: [PATCH] arm64: add NUMA emulation support
+In-Reply-To: <4d7beb50-f778-507a-4c3c-f6de92f8cfb9@kernel.org>
+References: <20180828174011.GE20375@arm.com>
+ <a58ad11f-3c22-ed7f-a0cd-938aabc4adaf@kernel.org>
+ <20180829110802.GD10349@dhcp22.suse.cz>
+ <f041ba95-03e6-4a7d-c324-870b45a2f648@kernel.org>
+ <20180905064252.GW14951@dhcp22.suse.cz>
+ <c1b58f13-6190-20e9-7e4f-b8bc2b9d5f80@kernel.org>
+ <20180907083452.GC19621@dhcp22.suse.cz>
+ <e46e715c-f115-f054-eeb2-3cecbcd1192d@kernel.org>
+ <20180910134845.GH10951@dhcp22.suse.cz>
+ <4d7beb50-f778-507a-4c3c-f6de92f8cfb9@kernel.org>
+Message-ID: <20180911091124.GP10951@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When dynamic shared memory support is enabled in the OP-TEE Trusted
-OS, it doesn't mean that the driver supports it, which can confuse
-users during debugging. Log a message when dynamic shared memory is
-enabled in the driver, to let users know for sure.
+On Mon 10-09-18 20:02:05, Shuah Khan wrote:
+> Hi Michal,
+> 
+> On 09/10/2018 07:48 AM, Michal Hocko wrote:
+> > On Fri 07-09-18 16:30:59, Shuah Khan wrote:
+> >> On 09/07/2018 02:34 AM, Michal Hocko wrote:
+> >>> On Thu 06-09-18 15:53:34, Shuah Khan wrote:
+> [....]
+> >>
+> >> In addition to isolation, being able to reserve a block instead is one of the
+> >> issues I am looking to address. Unfortunately memory cgroups won't address that
+> >> issue.
+> > 
+> > Could you be more specific why you need reservations other than
+> > isolation.
+> > 
+> 
+> Taking automotive as a specific example, there are two classes of applications:
+> 1. critical applications that must run
+> 2. Infotainment and misc. user-space.
+> 
+> In this case, being able to reserve a block of memory for critical applications
+> will ensure the memory is available for them. If a critical application has to
+> restart and/or when an on-demand critical application starts, it might not be able
+> to allocate memory if it is not reserved.
+> 
+> When a flat system has multiple memory blocks, with NUMA emulation in conjunction with
+> cpusets, one or more block can be reserved for critical applications configuring a set
+> of cpus and one of more memory nodes for them.
+> 
+> Memory cgroups will not support such reservation. Hope this helps explain the use-case
+> I am trying to address with this patch.
 
-Suggested-by: Jerome Forissier <jerome.forissier@linaro.org>
-Signed-off-by: Victor Chong <victor.chong@linaro.org>
-Reviewed-by: Jerome Forissier <jerome.forissier@linaro.org>
----
-
-v2:
-* Added patch description
-
-[v1] lore.kernel.org/patchwork/patch/983949/
-
- drivers/tee/optee/core.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
-index e1aafe842d66..cca5c091e55a 100644
---- a/drivers/tee/optee/core.c
-+++ b/drivers/tee/optee/core.c
-@@ -631,6 +631,9 @@ static struct optee *optee_probe(struct device_node *np)
-
-        optee_enable_shm_cache(optee);
-
-+       if (optee->sec_caps & OPTEE_SMC_SEC_CAP_DYNAMIC_SHM)
-+               pr_info("dynamic shared memory is enabled\n");
-+
-        pr_info("initialized driver\n");
-        return optee;
- err:
---
-2.17.1
+OK, that is more clear. I still believe that you either have to have a
+very good control over memory allocations or a good luck to not see
+unexpected kernel allocations in your reserved memory which might easily
+break guarantees you would like to accomplish.
+-- 
+Michal Hocko
+SUSE Labs
