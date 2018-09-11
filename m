@@ -1,115 +1,196 @@
-From: shuah@kernel.org (Shuah Khan)
-Date: Tue, 11 Sep 2018 13:53:08 -0600
-Subject: [PATCH] arm64: add NUMA emulation support
-In-Reply-To: <20180911165029.GA15022@arm.com>
-References: <20180829110802.GD10349@dhcp22.suse.cz>
- <f041ba95-03e6-4a7d-c324-870b45a2f648@kernel.org>
- <20180905064252.GW14951@dhcp22.suse.cz>
- <c1b58f13-6190-20e9-7e4f-b8bc2b9d5f80@kernel.org>
- <20180907083452.GC19621@dhcp22.suse.cz>
- <e46e715c-f115-f054-eeb2-3cecbcd1192d@kernel.org>
- <20180910134845.GH10951@dhcp22.suse.cz>
- <4d7beb50-f778-507a-4c3c-f6de92f8cfb9@kernel.org>
- <20180911091124.GP10951@dhcp22.suse.cz>
- <86aad702-9f42-c572-a8f1-74983cd1bf33@kernel.org>
- <20180911165029.GA15022@arm.com>
-Message-ID: <4c6ae739-28f9-3859-123a-8fde9294d918@kernel.org>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 11 Sep 2018 13:54:09 -0600
+Subject: [PATCH v2 2/2] coresight: tmc: Fix writing barrier packets for
+ ring buffer
+In-Reply-To: <1536652366-17119-3-git-send-email-leo.yan@linaro.org>
+References: <1536652366-17119-1-git-send-email-leo.yan@linaro.org>
+ <1536652366-17119-3-git-send-email-leo.yan@linaro.org>
+Message-ID: <20180911195409.GA17613@xps15>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/11/2018 10:50 AM, Will Deacon wrote:
-> On Tue, Sep 11, 2018 at 09:27:49AM -0600, Shuah Khan wrote:
->> On 09/11/2018 03:11 AM, Michal Hocko wrote:
->>> On Mon 10-09-18 20:02:05, Shuah Khan wrote:
->>>> Hi Michal,
->>>>
->>>> On 09/10/2018 07:48 AM, Michal Hocko wrote:
->>>>> On Fri 07-09-18 16:30:59, Shuah Khan wrote:
->>>>>> On 09/07/2018 02:34 AM, Michal Hocko wrote:
->>>>>>> On Thu 06-09-18 15:53:34, Shuah Khan wrote:
->>>> [....]
->>>>>>
->>>>>> In addition to isolation, being able to reserve a block instead is one of the
->>>>>> issues I am looking to address. Unfortunately memory cgroups won't address that
->>>>>> issue.
->>>>>
->>>>> Could you be more specific why you need reservations other than
->>>>> isolation.
->>>>>
->>>>
->>>> Taking automotive as a specific example, there are two classes of applications:
->>>> 1. critical applications that must run
->>>> 2. Infotainment and misc. user-space.
->>>>
->>>> In this case, being able to reserve a block of memory for critical applications
->>>> will ensure the memory is available for them. If a critical application has to
->>>> restart and/or when an on-demand critical application starts, it might not be able
->>>> to allocate memory if it is not reserved.
->>>>
->>>> When a flat system has multiple memory blocks, with NUMA emulation in conjunction with
->>>> cpusets, one or more block can be reserved for critical applications configuring a set
->>>> of cpus and one of more memory nodes for them.
->>>>
->>>> Memory cgroups will not support such reservation. Hope this helps explain the use-case
->>>> I am trying to address with this patch.
->>>
->>> OK, that is more clear. I still believe that you either have to have a
->>> very good control over memory allocations or a good luck to not see
->>> unexpected kernel allocations in your reserved memory which might easily
->>> break guarantees you would like to accomplish.
->>>
->>
->> Thanks. Right. I am with you on the possibility that root cgroup can eat into
->> the reserved memory. However, with this solution I proposed, there is a guarantee
->> that the cpuset cgroup that is configured for non-critical Infotainment and misc.
->> user-space application will not be able to allocate from the reserved memory node.
->>
->> I am hoping the proposed patch will allow critical apps. reserving memory with the
->> exception that root cgroup and kernel can still allocate from it when needed. Perhaps
->> cpuset exclusive logic could be extended to look for non-exclusive memory nodes first
->> if it doesn't already do that. This is inline with the current cpuset approach is that
->> the critical kernel allocations aren't starved to ensure memory reservations.
->>
->> If you don't think this solution isn't ideal/good, do you have other suggestions
->> for solving the problem? If not would it be okay to start with what I proposed and
->> build on top of as needed?
+Hi Leo,
+
+On Tue, Sep 11, 2018 at 03:52:46PM +0800, Leo Yan wrote:
+> When tmc driver updates ring buffer and detects the ETB RAM has a wrap
+> around, in the head of ring buffer the first four words is filled trace
+> data by reading out RRD register, but the driver simply discards the
+> first four words and leave the memory to store the barrier packets with
+> value 0x7fff,ffff.  As result we get below data content in the buffer:
 > 
-> I still don't understand why this can't be achieved by faking up some NUMA
-> entries in the firmware table and just using the existing NUMA code that we
-> have.
+>   +--------+--------+--------+--------+--------+--------+--------+
+>   | trace0 | trace1 | trace2 | trace3 | trace4 | trace5 |  ...   |
+>   |   v    |   v    |   v    |   v    |        |        |        |
+>   | barrier| barrier| barrier| barrier|        |        |        |
+>   +--------+--------+--------+--------+--------+--------+--------+
+
+
+Right, that is how things are.
+
 > 
+> On the other hand, the ring buffer actually has enough space for saving
 
-That is what is this patch is doing in some ways. Instead of hacking the firmware
-tables, it provides a command line option to split the flat machine into specified
-number of NUMA memory nodes.
+s/ring buffer/perf ring buffer/
 
-In addition to the new config option and new command line handling, I added one
-init routine that handles the NUMA emulation and after that normal NUMA code is
-leveraged.
+I understood what you meant because of history and context but otherwise someone
+can easily get lost.
 
-The only change is the following added to arm64_numa_init()
+> both barrier packets and trace data from ETB RAM.  Ideally we should
+> save both barrier packets and complete trace data in the ETB RAM for the
+> wrap around case.  So below is the ideal data content we can get: the
+> first four words are for barrier packets and then save trace data from
+> reading the first word from RRD register.
+> 
+>   +--------+--------+--------+--------+--------+--------+--------+
+>   | barrier| barrier| barrier| barrier| trace0 | trace1 |  ...   |
+>   +--------+--------+--------+--------+--------+--------+--------+
 
-if (!numa_init(arm64_numa_emu_init))
-+                       return;
+I thought about doing just that when I first looked at this driver but decided
+the gains were small compared to the efforts (and messy code that comes with
+it).  I mean, the internal component buffer has already wrapped around,
+potentially several times, I am not convinced that saving 4 byte will change a
+whole lot.
 
+> 
+> To achieve this purpose, this patch introduces a variable 'barrier_sz'
+> to present the barrier packets length is to be written into the ring
+> buffer.  There have two cases that we will lose trace data so need to
+> insert the barrier packets between two discontinuous trace data block;
+> the first one case is the ETB RAM is in full state, another case is the
+> ring buffer has no enough space for trace data at this time.
+> 
+> We firstly need to reserve memory space in the ring buffer for barrier
+> packets and the left memory space can be used to save trace data. This
+> patch caps the value 'barrier_sz' so ensure barrier length is not longer
+> than ring buffer and calculate the rest memory space for 'to_read' for
+> trace data recording.
 
-arm64_numa_emu_init() does nothing unless the kernel is booted with the new
-"numa=fake=N"
+As usual a changelog should emphasise on "why" rather than "what".
 
-Please note that I am not adding any new NUMA code other than just this init
-routine. When the command line is specified, instead of going down the
-dummy_numa_init() path it will create NUMA emulation nodes.
+> 
+> At the data saving stage, the patch firstly saves barrier packets
+> without reading RRD register so that will not lose trace data; after
+> that it will save trace data by accessing RRD register.  At the end, the
+> read data length is the sum value of barrier length 'barrier_sz' plus
+> trace data length 'to_read'.
+> 
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Cc: Mike Leach <mike.leach@linaro.org>
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> ---
+>  drivers/hwtracing/coresight/coresight-tmc-etf.c | 37 ++++++++++++++++++-------
+>  1 file changed, 27 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> index b54a3db..6265370 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> @@ -367,7 +367,7 @@ static unsigned long tmc_update_etf_buffer(struct coresight_device *csdev,
+>  	u32 *buf_ptr;
+>  	u64 read_ptr, write_ptr;
+>  	u32 status;
+> -	unsigned long offset, to_read;
+> +	unsigned long offset, to_read, barrier_sz = 0;
+>  	struct cs_buffers *buf = sink_config;
+>  	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+>  
+> @@ -398,11 +398,19 @@ static unsigned long tmc_update_etf_buffer(struct coresight_device *csdev,
+>  	}
+>  
+>  	/*
+> -	 * The TMC RAM buffer may be bigger than the space available in the
+> -	 * perf ring buffer (handle->size).  If so advance the RRP so that we
+> -	 * get the latest trace data.
+> +	 * Drop some trace data when the TMC RAM buffer is full or bigger than
+> +	 * perf ring buffer.  Since the trace data is discontinuous so need to
+> +	 * insert barrier packets.
+>  	 */
+> -	if (to_read > handle->size) {
+> +	if (lost || to_read > handle->size)
+> +		barrier_sz = CORESIGHT_BARRIER_PKT_SIZE;
+> +
+> +	/*
+> +	 * The sum of trace data and inserted barriers may be bigger than the
+> +	 * space available in the perf ring buffer (handle->size).  If so
+> +	 * advance the RRP so that we get the latest trace data.
+> +	 */
+> +	if (to_read + barrier_sz > handle->size) {
+>  		u32 mask = 0;
 
-I was very careful in identifying the minimal amount of code needed to add
-this support. The change is limited to two existing routines:
-numa_parse_early_param() and arm64_numa_init().
+If the internal buffer is bigger than the perf ring buffer there isn't much we
+can do - we will end up clobbering traces regardless as the current
+implementation does.  As such I don't see the need to account for the size of
+the barrier packet.
 
-numa_init() which is common for all the variants including the fallback
-dummy_numa_init()
+>  
+>  		/*
+> @@ -424,11 +432,15 @@ static unsigned long tmc_update_etf_buffer(struct coresight_device *csdev,
+>  			break;
+>  		}
+>  
+> +		/* Make sure barrier isn't out of bound */
+> +		barrier_sz = min_t(u32, barrier_sz, handle->size);
+> +
+>  		/*
+> -		 * Make sure the new size is aligned in accordance with the
+> +		 * Firstly reserve the memory for inserted barrier packets;
+> +		 * make sure the new size is aligned in accordance with the
+>  		 * requirement explained above.
+>  		 */
+> -		to_read = handle->size & mask;
+> +		to_read = (handle->size - barrier_sz) & mask;
+>  		/* Move the RAM read pointer up */
+>  		read_ptr = (write_ptr + drvdata->size) - to_read;
+>  		/* Make sure we are still within our limits */
+> @@ -447,13 +459,14 @@ static unsigned long tmc_update_etf_buffer(struct coresight_device *csdev,
+>  	barrier = barrier_pkt;
+>  
+>  	/* for every byte to read */
+> -	for (i = 0; i < to_read; i += 4) {
+> +	for (i = 0; i < to_read + barrier_sz; i += 4) {
+>  		buf_ptr = buf->data_pages[cur] + offset;
+> -		*buf_ptr = readl_relaxed(drvdata->base + TMC_RRD);
+>  
+> -		if (lost && *barrier) {
+> +		if (i < barrier_sz) {
+>  			*buf_ptr = *barrier;
+>  			barrier++;
 
-This allows a cleaner way to split the memory and leverage all of the NUMA
-code. This makes it easier to debug problems as opposed to hacked firmware
-tables.
+I think we have a problem here - see how Suzuki has implemented function
+tmc_etb_dump_hw() in this file.  I'm pretty sure his intention was to address
+this loop as well (since the processing is the same) but it slipped through the
+cracks somewhere.  
 
-thanks,
--- Shuah
+Anyways, if you want to move forward with this feature please add a patch that
+ends up using coresight_insert_barrier_packet() before doing anything else.
+
+I also think that if we do it for one component, the same scheme has to be
+enacted for all the sinks.  So ETB, TMC-ETB, TMC-ETF, ETR-CM and ETR-SG.  As I
+said, not sure it is worth the trouble just to save 4 byte.
+
+> +		} else {
+> +			*buf_ptr = readl_relaxed(drvdata->base + TMC_RRD);
+>  		}
+>  
+>  		offset += 4;
+> @@ -469,7 +482,11 @@ static unsigned long tmc_update_etf_buffer(struct coresight_device *csdev,
+>  	if (buf->snapshot) {
+>  		handle->head = (cur * PAGE_SIZE) + offset;
+>  		to_read = buf->nr_pages << PAGE_SHIFT;
+> +	} else {
+> +		/* Sum of trace data size and barrier size */
+> +		to_read = to_read + barrier_sz;
+>  	}
+> +
+
+Extra cosmetic modification.
+
+Regards,
+Mathieu
+
+>  	CS_LOCK(drvdata->base);
+>  
+>  	return to_read;
+> -- 
+> 2.7.4
+> 
