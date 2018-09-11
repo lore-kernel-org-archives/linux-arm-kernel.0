@@ -1,71 +1,105 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 11 Sep 2018 11:37:34 -0700
-Subject: [PATCH i2c-next v6] i2c: aspeed: Handle master/slave combined
- irq events properly
-In-Reply-To: <20180823225731.19063-1-jae.hyun.yoo@linux.intel.com>
-References: <20180823225731.19063-1-jae.hyun.yoo@linux.intel.com>
-Message-ID: <20180911183734.GA21976@roeck-us.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 11 Sep 2018 19:39:30 +0100
+Subject: [PATCH v12 0/6] Driver for at91 usart in spi mode
+In-Reply-To: <CAMuHMdV+=EgAYogwNHbY=RExkGox_+YSeHV6pJtQb6g6PzD-CQ@mail.gmail.com>
+References: <20180904111310.4049-1-radu_nicolae.pirea@upb.ro>
+ <20180911093356.GE4185@dell> <20180911093917.GL2494@piout.net>
+ <CAMuHMdXH8gNjKGOHGFc+K03U2zsVCSN7G_Q4wtepQr859nRQKg@mail.gmail.com>
+ <20180911153621.GP2494@piout.net>
+ <CAMuHMdV+=EgAYogwNHbY=RExkGox_+YSeHV6pJtQb6g6PzD-CQ@mail.gmail.com>
+Message-ID: <20180911181838.GI4185@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, 11 Sep 2018, Geert Uytterhoeven wrote:
 
-On Thu, Aug 23, 2018 at 03:57:31PM -0700, Jae Hyun Yoo wrote:
-> In most of cases, interrupt bits are set one by one but there are
-> also a lot of other cases that Aspeed I2C IP sends multiple
-> interrupt bits with combining master and slave events using a
-> single interrupt call. It happens much more in multi-master
-> environment than single-master. For an example, when master is
-> waiting for a NORMAL_STOP interrupt in its MASTER_STOP state,
-> SLAVE_MATCH and RX_DONE interrupts could come along with the
-> NORMAL_STOP in case of an another master immediately sends data
-> just after acquiring the bus. In this case, the NORMAL_STOP
-> interrupt should be handled by master_irq and the SLAVE_MATCH and
-> RX_DONE interrupts should be handled by slave_irq. This commit
-> modifies irq hadling logic to handle the master/slave combined
-> events properly.
+> On Tue, Sep 11, 2018 at 5:36 PM Alexandre Belloni
+> <alexandre.belloni@bootlin.com> wrote:
+> > On 11/09/2018 16:59:09+0200, Geert Uytterhoeven wrote:
+> > > On Tue, Sep 11, 2018 at 11:40 AM Alexandre Belloni
+> > > <alexandre.belloni@bootlin.com> wrote:
+> > > > On 11/09/2018 10:33:56+0100, Lee Jones wrote:
+> > > > > On Tue, 04 Sep 2018, Radu Pirea wrote:
+> > > > > > Radu Pirea (6):
+> > > > > >   MAINTAINERS: add at91 usart mfd driver
+> > > > > >   dt-bindings: add binding for atmel-usart in SPI mode
+> > > > > >   mfd: at91-usart: added mfd driver for usart
+> > > > > >   MAINTAINERS: add at91 usart spi driver
+> > > > > >   spi: at91-usart: add driver for at91-usart as spi
+> > > > > >   tty/serial: atmel: change the driver to work under at91-usart mfd
+> > > > > >
+> > > > > >  .../bindings/{serial => mfd}/atmel-usart.txt  |  25 +-
+> > > > > >  MAINTAINERS                                   |  16 +
+> > > > > >  drivers/mfd/Kconfig                           |   9 +
+> > > > > >  drivers/mfd/Makefile                          |   1 +
+> > > > > >  drivers/mfd/at91-usart.c                      |  71 +++
+> > > > > >  drivers/spi/Kconfig                           |   8 +
+> > > > > >  drivers/spi/Makefile                          |   1 +
+> > > > > >  drivers/spi/spi-at91-usart.c                  | 432 ++++++++++++++++++
+> > > > > >  drivers/tty/serial/Kconfig                    |   1 +
+> > > > > >  drivers/tty/serial/atmel_serial.c             |  42 +-
+> > > > > >  include/dt-bindings/mfd/at91-usart.h          |  17 +
+> > > > > >  11 files changed, 606 insertions(+), 17 deletions(-)
+> > > > > >  rename Documentation/devicetree/bindings/{serial => mfd}/atmel-usart.txt (76%)
+> > > > > >  create mode 100644 drivers/mfd/at91-usart.c
+> > > > > >  create mode 100644 drivers/spi/spi-at91-usart.c
+> > > > > >  create mode 100644 include/dt-bindings/mfd/at91-usart.h
+> > > > >
+> > > > > Seeing as this patch-set has caused some issues this morning, I took
+> > > > > the liberty to peruse back into its history to figure out where things
+> > > > > started to go wrong.  I also re-reviewed the MFD driver - and I'm glad
+> > > > > I did!
+> > > > >
+> > > > > My Acked-by has been attached to the MFD portion since v5, which is
+> > > > > why the code hasn't caught my eye before today.  I reviewed the
+> > > > > relocation of the *binding document* (serial => mfd with no changes)
+> > > > > in v4 and nothing else.  It appears as though you mistakenly added it
+> > > > > to the *MFD driver* instead.  This explains my confusion in v10 when I
+> > > > > told you I'd already reviewed the binding document.
+> > > > >
+> > > > > As I said, I have re-reviewed the MFD driver and I'm afraid to say
+> > > > > that I do not like what I see.  Besides the missing header file and
+> > > > > the whitespace tabbing errors, I do not agree with the implementation.
+> > > > > Using MFD as a shim to hack around driver selection is not a valid
+> > > > > use-case.
+> > > > >
+> > > > > What's stopping you from just using the compatible string directly to
+> > > > > select which driver you need to probe?
+> > > > >
+> > > >
+> > > > Then you'd have multiple compatible strings for the same IP which is a
+> > > > big no-no.
+> > >
+> > > It's still the same hardware device, isn't?
+> > > What if the SPI or UART slave is not on-board, but on an expansion board?
+> > > Then the SoC-specific .dtsi has no idea what mode should be used.
+> > >
+> > > Hence shouldn't the software derive the hardware mode from the full
+> > > hardware description in DT? If that's impossible (I didn't look into detail
+> > > whether an SPI bus can easily be distinguished from a UART bus), perhaps
+> > > a mode property should be added?
+> >
+> > Yes, this is exactly what is done:
+> >
+> > https://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git/tree/drivers/mfd/at91-usart.c?h=ib-mfd-spi-tty-4.20-1#n33
 > 
-> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
-> Reviewed-by: Brendan Higgins <brendanhiggins@google.com>
+> OK.
+> 
+> I guess the main "hackish" part is that the mfd_cell uses of_compatible,
+> which thus requires having additional compatible values?
+> 
+> I think those can just be removed. AFAICS, the SPI and serial drivers already
+> match against the "at91_usart_spi" resp. "atmel_usart_serial" platform device
+> names?
 
-This patch causes a boot stall when booting witherspoon-bmc with
-qemu v3.0, and all i2c device probes fail with error -110 (timeout).
-Bisect log is attached for reference.
+The hackish part of this driver is that it's using MFD for something
+which is clearly not an MFD.  It's a USART device.  Nothing more,
+nothing less.
 
-With the same kernel configuration (aspeed_g5_defconfig),
-ast2500-evb and romulus-bmc are still able to boot.
-palmetto-bmc with aspeed_g4_defconfig also appears to work.
+Does anyone have the datasheet to hand?
 
-Is this a problem with qemu ? Should I drop the qemu test
-for witherspoon-bmc starting with the next kernel release ?
-
-Thanks,
-Guenter
-
----
-# bad: [09c0888767529cdb382f34452819e42d1a66a114] Add linux-next specific files for 20180911
-# good: [11da3a7f84f19c26da6f86af878298694ede0804] Linux 4.19-rc3
-git bisect start 'HEAD' 'v4.19-rc3'
-# bad: [a2ebc71cf97bed9b453318418e4a281434565e8b] Merge remote-tracking branch 'nfc-next/master'
-git bisect bad a2ebc71cf97bed9b453318418e4a281434565e8b
-# good: [6fde463b32bf4105c28c0a297a5b66aca5d6ecd4] Merge remote-tracking branch 's390/features'
-git bisect good 6fde463b32bf4105c28c0a297a5b66aca5d6ecd4
-# bad: [136fd6d530a3ae0dd003984f683345cfe88c01f3] Merge remote-tracking branch 'v4l-dvb/master'
-git bisect bad 136fd6d530a3ae0dd003984f683345cfe88c01f3
-# good: [c7ae95368af43c08f5f615b00f2f7bf2e9c45788] Merge remote-tracking branch 'v9fs/9p-next'
-git bisect good c7ae95368af43c08f5f615b00f2f7bf2e9c45788
-# good: [4c640c41381e47b328c6507bcf534812761256cd] Merge branch 'for-4.19/fixes' into for-next
-git bisect good 4c640c41381e47b328c6507bcf534812761256cd
-# good: [5bc91f70c5ecc2bc5967b98ce7fa4e55ad230d99] Merge remote-tracking branch 'hid/for-next'
-git bisect good 5bc91f70c5ecc2bc5967b98ce7fa4e55ad230d99
-# bad: [657b9d37406ed1625d469db0fd356e364dc75dd8] Merge remote-tracking branch 'hwmon-staging/hwmon-next'
-git bisect bad 657b9d37406ed1625d469db0fd356e364dc75dd8
-# bad: [fc9f90ddace238716cfcbd00d51428ee8baa12c7] Merge branch 'i2c/for-current' into i2c/for-next
-git bisect bad fc9f90ddace238716cfcbd00d51428ee8baa12c7
-# good: [34b7be301d4c5d85d1d093d2faf856f3d727416f] Merge branch 'i2c/for-current' into i2c/for-next
-git bisect good 34b7be301d4c5d85d1d093d2faf856f3d727416f
-# bad: [3e9efc3299dd78a0fa96515f0a453fab1ed4a1bd] i2c: aspeed: Handle master/slave combined irq events properly
-git bisect bad 3e9efc3299dd78a0fa96515f0a453fab1ed4a1bd
-# good: [fc66b39fe36acfd06f716e338de7cd8f9550fad2] i2c: mediatek: Use DMA safe buffers for i2c transactions
-git bisect good fc66b39fe36acfd06f716e338de7cd8f9550fad2
-# first bad commit: [3e9efc3299dd78a0fa96515f0a453fab1ed4a1bd] i2c: aspeed: Handle master/slave combined irq events properly
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
