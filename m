@@ -1,72 +1,67 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Sep 2018 12:18:50 +0100
-Subject: [GIT PULL v2] Immutable branch between MFD, SPI and TTY due for the
- v4.20 merge window
-In-Reply-To: <20180904111310.4049-1-radu_nicolae.pirea@upb.ro>
-References: <20180904111310.4049-1-radu_nicolae.pirea@upb.ro>
-Message-ID: <20180911111850.GJ4185@dell>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Tue, 11 Sep 2018 19:32:26 +0800
+Subject: [PATCH 1/3] rtc: mt6397: fix possible race condition
+In-Reply-To: <20180909203848.3470-1-alexandre.belloni@bootlin.com>
+References: <20180909203848.3470-1-alexandre.belloni@bootlin.com>
+Message-ID: <1536665546.25102.1.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[In case you missed it]
+On Sun, 2018-09-09 at 22:38 +0200, Alexandre Belloni wrote:
+> The IRQ is requested before the struct rtc is allocated and registered, but
+> this struct is used in the IRQ handler. This may lead to a NULL pointer
+> dereference.
+> 
+> Switch to devm_rtc_allocate_device/rtc_register_device to allocate the rtc
+> before requesting the IRQ.
+> 
+> Cc: Eddie Huang <eddie.huang@mediatek.com>
+> Cc: Sean Wang <sean.wang@mediatek.com>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+> ---
+>  drivers/rtc/rtc-mt6397.c | 13 ++++++++-----
+>  1 file changed, 8 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/rtc/rtc-mt6397.c b/drivers/rtc/rtc-mt6397.c
+> index 385f8303bb41..e9a25ec4d434 100644
+> --- a/drivers/rtc/rtc-mt6397.c
+> +++ b/drivers/rtc/rtc-mt6397.c
+> @@ -332,6 +332,10 @@ static int mtk_rtc_probe(struct platform_device *pdev)
+>  
+>  	platform_set_drvdata(pdev, rtc);
+>  
+> +	rtc->rtc_dev = devm_rtc_allocate_device(rtc->dev);
+> +	if (IS_ERR(rtc->rtc_dev))
+> +		return PTR_ERR(rtc->rtc_dev);
+> +
+>  	ret = request_threaded_irq(rtc->irq, NULL,
+>  				   mtk_rtc_irq_handler_thread,
+>  				   IRQF_ONESHOT | IRQF_TRIGGER_HIGH,
+> @@ -344,11 +348,11 @@ static int mtk_rtc_probe(struct platform_device *pdev)
+>  
+>  	device_init_wakeup(&pdev->dev, 1);
+>  
+> -	rtc->rtc_dev = rtc_device_register("mt6397-rtc", &pdev->dev,
+> -					   &mtk_rtc_ops, THIS_MODULE);
+> -	if (IS_ERR(rtc->rtc_dev)) {
+> +	rtc->rtc_dev->ops = &mtk_rtc_ops;
+> +
+> +	ret = rtc_register_device(rtc->rtc_dev);
+> +	if (ret) {
+>  		dev_err(&pdev->dev, "register rtc device failed\n");
+> -		ret = PTR_ERR(rtc->rtc_dev);
+>  		goto out_free_irq;
+>  	}
+>  
+> @@ -365,7 +369,6 @@ static int mtk_rtc_remove(struct platform_device *pdev)
+>  {
+>  	struct mt6397_rtc *rtc = platform_get_drvdata(pdev);
+>  
+> -	rtc_device_unregister(rtc->rtc_dev);
+>  	free_irq(rtc->irq, rtc->rtc_dev);
+>  	irq_dispose_mapping(rtc->irq);
+>  
 
-This new pull-request contains the following changes since v1:
+Thanks
 
- - Uplift the submission version from v11 to v12
- - Include fix for build breakage due to missing Device Tree include file
-
-Since it is based on the original pull-request, it can be pulled
-in either directly on top of it or as a pull in its own right.
-
-The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
-
-  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
-
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/ib-mfd-spi-tty-v4.20-1
-
-for you to fetch changes up to 65b80dfffeabd4eb253b93d07eadde4d89c18511:
-
-  mfd: at91-usart: Include Device Tree header (2018-09-11 11:44:56 +0100)
-
-----------------------------------------------------------------
-Immutable branch between MFD, SPI and TTY due for the v4.20 merge window (v2)
-
-----------------------------------------------------------------
-Lee Jones (4):
-      dt-bindings: mfd: atmel-usart: Correct interrupts property to include IRQ number
-      MAINTAINERS: Change Radu's email address
-      spi: at91-usart: Make local functions static
-      mfd: at91-usart: Include Device Tree header
-
-Radu Pirea (6):
-      MAINTAINERS: Add AT91 USART MFD entry
-      dt-bindings: Add binding for atmel-usart in SPI mode
-      mfd: at91-usart: Add MFD driver for USART
-      MAINTAINERS: Add AT91 USART SPI entry
-      spi: at91-usart: Add driver for at91-usart as SPI
-      tty/serial: atmel: Change the driver to work under at91-usart MFD
-
- .../bindings/{serial => mfd}/atmel-usart.txt       |  25 +-
- MAINTAINERS                                        |  16 +
- drivers/mfd/Kconfig                                |   9 +
- drivers/mfd/Makefile                               |   1 +
- drivers/mfd/at91-usart.c                           |  72 ++++
- drivers/spi/Kconfig                                |   8 +
- drivers/spi/Makefile                               |   1 +
- drivers/spi/spi-at91-usart.c                       | 432 +++++++++++++++++++++
- drivers/tty/serial/Kconfig                         |   1 +
- drivers/tty/serial/atmel_serial.c                  |  42 +-
- include/dt-bindings/mfd/at91-usart.h               |  17 +
- 11 files changed, 607 insertions(+), 17 deletions(-)
- rename Documentation/devicetree/bindings/{serial => mfd}/atmel-usart.txt (76%)
- create mode 100644 drivers/mfd/at91-usart.c
- create mode 100644 drivers/spi/spi-at91-usart.c
- create mode 100644 include/dt-bindings/mfd/at91-usart.h
-
--- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Acked-by: Eddie Huang <eddie.huang@mediatek.com>
