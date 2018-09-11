@@ -1,157 +1,44 @@
-From: mchehab+samsung@kernel.org (Mauro Carvalho Chehab)
-Date: Tue, 11 Sep 2018 12:46:25 -0300
-Subject: [PATCH v9 5/9] media: platform: Add Cedrus VPU decoder driver
-In-Reply-To: <20180906222442.14825-6-contact@paulk.fr>
-References: <20180906222442.14825-1-contact@paulk.fr>
- <20180906222442.14825-6-contact@paulk.fr>
-Message-ID: <20180911124625.6759e429@coco.lan>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 11 Sep 2018 16:57:35 +0100
+Subject: [PATCH] mfd: ti-lmu: constify mfd_cell tables
+In-Reply-To: <e10bdc74-8138-055e-c829-7befbc7161b4@ti.com>
+References: <20180829093108.GB22065@amd> <20180907093954.GA26364@amd>
+ <e10bdc74-8138-055e-c829-7befbc7161b4@ti.com>
+Message-ID: <20180911155355.GD4185@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Fri,  7 Sep 2018 00:24:38 +0200
-Paul Kocialkowski <contact@paulk.fr> escreveu:
+On Fri, 07 Sep 2018, Dan Murphy wrote:
 
-> From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> Pavel
 > 
-> This introduces the Cedrus VPU driver that supports the VPU found in
-> Allwinner SoCs, also known as Video Engine. It is implemented through
-> a V4L2 M2M decoder device and a media device (used for media requests).
-> So far, it only supports MPEG-2 decoding.
+> On 09/07/2018 04:39 AM, Pavel Machek wrote:
+> > On Wed 2018-08-29 11:31:08, Pavel Machek wrote:
+> >> From: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
+> >>
+> >> mfd: ti-lmu: constify mfd_cell tables
+> >>     
+> >> Add const attribute to all mfd_cell structures.
+> >>     
+> >> Signed-off-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
+> >> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> > 
+> > Lee, I guess this is for you to apply. Any news there?
+> > 
+> > There are more patches ready,
 > 
-> Since this VPU is stateless, synchronization with media requests is
-> required in order to ensure consistency between frame headers that
-> contain metadata about the frame to process and the raw slice data that
-> is used to generate the frame.
+> As I stated in another email thread.  I don't see the need for this level of LMU framework.
 > 
-> This driver was made possible thanks to the long-standing effort
-> carried out by the linux-sunxi community in the interest of reverse
-> engineering, documenting and implementing support for the Allwinner VPU.
+> Here is the reference thread
 > 
-> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> https://lore.kernel.org/patchwork/patch/982550/
 
-There are several checkpatch issues here. Ok, some can be
-ignored, but there are at least some of them that sounda relevant.
+This driver has been present for 1.5 years.
 
-Please address them.
+Is that a NACK for *this* patch or are you hijacking? :)
 
-
-CHECK: Comparison to NULL could be written "ctx->ctrls[i]"
-#214: FILE: drivers/staging/media/sunxi/cedrus/cedrus.c:51:
-+	for (i = 0; ctx->ctrls[i] != NULL; i++)
-
-CHECK: Alignment should match open parenthesis
-#304: FILE: drivers/staging/media/sunxi/cedrus/cedrus.c:141:
-+		ctrl_test = v4l2_ctrl_request_hdl_ctrl_find(hdl,
-+			cedrus_controls[i].id);
-
-CHECK: Alignment should match open parenthesis
-#468: FILE: drivers/staging/media/sunxi/cedrus/cedrus.c:305:
-+	ret = v4l2_m2m_register_media_controller(dev->m2m_dev,
-+			vfd, MEDIA_ENT_F_PROC_VIDEO_DECODER);
-
-CHECK: Avoid using bool structure members because of possible alignment issues - see: https://lkml.org/lkml/2017/11/21/384
-#638: FILE: drivers/staging/media/sunxi/cedrus/cedrus.h:47:
-+	bool			required;
-
-WARNING: line over 80 characters
-#744: FILE: drivers/staging/media/sunxi/cedrus/cedrus.h:153:
-+static inline struct cedrus_buffer *vb2_v4l2_to_cedrus_buffer(const struct vb2_v4l2_buffer *p)
-
-WARNING: line over 80 characters
-#749: FILE: drivers/staging/media/sunxi/cedrus/cedrus.h:158:
-+static inline struct cedrus_buffer *vb2_to_cedrus_buffer(const struct vb2_buffer *p)
-
-CHECK: Alignment should match open parenthesis
-#809: FILE: drivers/staging/media/sunxi/cedrus/cedrus_dec.c:47:
-+		run.mpeg2.slice_params = cedrus_find_control_data(ctx,
-+			V4L2_CID_MPEG_VIDEO_MPEG2_SLICE_PARAMS);
-
-CHECK: Alignment should match open parenthesis
-#811: FILE: drivers/staging/media/sunxi/cedrus/cedrus_dec.c:49:
-+		run.mpeg2.quantization = cedrus_find_control_data(ctx,
-+			V4L2_CID_MPEG_VIDEO_MPEG2_QUANTIZATION);
-
-WARNING: line over 80 characters
-#1368: FILE: drivers/staging/media/sunxi/cedrus/cedrus_mpeg2.c:133:
-+	reg |= VE_DEC_MPEG_MP12HDR_INTRA_DC_PRECISION(picture->intra_dc_precision);
-
-WARNING: line over 80 characters
-#1369: FILE: drivers/staging/media/sunxi/cedrus/cedrus_mpeg2.c:134:
-+	reg |= VE_DEC_MPEG_MP12HDR_INTRA_PICTURE_STRUCTURE(picture->picture_structure);
-
-WARNING: line over 80 characters
-#1371: FILE: drivers/staging/media/sunxi/cedrus/cedrus_mpeg2.c:136:
-+	reg |= VE_DEC_MPEG_MP12HDR_FRAME_PRED_FRAME_DCT(picture->frame_pred_frame_dct);
-
-WARNING: line over 80 characters
-#1372: FILE: drivers/staging/media/sunxi/cedrus/cedrus_mpeg2.c:137:
-+	reg |= VE_DEC_MPEG_MP12HDR_CONCEALMENT_MOTION_VECTORS(picture->concealment_motion_vectors);
-
-WARNING: line over 80 characters
-#1395: FILE: drivers/staging/media/sunxi/cedrus/cedrus_mpeg2.c:160:
-+	fwd_luma_addr = cedrus_dst_buf_addr(ctx, slice_params->forward_ref_index, 0);
-
-WARNING: line over 80 characters
-#1396: FILE: drivers/staging/media/sunxi/cedrus/cedrus_mpeg2.c:161:
-+	fwd_chroma_addr = cedrus_dst_buf_addr(ctx, slice_params->forward_ref_index, 1);
-
-WARNING: line over 80 characters
-#1401: FILE: drivers/staging/media/sunxi/cedrus/cedrus_mpeg2.c:166:
-+	bwd_luma_addr = cedrus_dst_buf_addr(ctx, slice_params->backward_ref_index, 0);
-
-WARNING: line over 80 characters
-#1402: FILE: drivers/staging/media/sunxi/cedrus/cedrus_mpeg2.c:167:
-+	bwd_chroma_addr = cedrus_dst_buf_addr(ctx, slice_params->backward_ref_index, 1);
-
-WARNING: line over 80 characters
-#1417: FILE: drivers/staging/media/sunxi/cedrus/cedrus_mpeg2.c:182:
-+	cedrus_write(dev, VE_DEC_MPEG_VLD_OFFSET, slice_params->data_bit_offset);
-
-CHECK: Macro argument reuse 'x' - possible side-effects?
-#1552: FILE: drivers/staging/media/sunxi/cedrus/cedrus_regs.h:74:
-+#define VE_DEC_MPEG_MP12HDR_F_CODE_MASK(x, y) \
-+	GENMASK(VE_DEC_MPEG_MP12HDR_F_CODE_SHIFT(x, y) + 3, \
-+		VE_DEC_MPEG_MP12HDR_F_CODE_SHIFT(x, y))
-
-CHECK: Macro argument reuse 'y' - possible side-effects?
-#1552: FILE: drivers/staging/media/sunxi/cedrus/cedrus_regs.h:74:
-+#define VE_DEC_MPEG_MP12HDR_F_CODE_MASK(x, y) \
-+	GENMASK(VE_DEC_MPEG_MP12HDR_F_CODE_SHIFT(x, y) + 3, \
-+		VE_DEC_MPEG_MP12HDR_F_CODE_SHIFT(x, y))
-
-CHECK: Macro argument reuse 'x' - possible side-effects?
-#1555: FILE: drivers/staging/media/sunxi/cedrus/cedrus_regs.h:77:
-+#define VE_DEC_MPEG_MP12HDR_F_CODE(x, y, v) \
-+	(((v) << VE_DEC_MPEG_MP12HDR_F_CODE_SHIFT(x, y)) & \
-+	 VE_DEC_MPEG_MP12HDR_F_CODE_MASK(x, y))
-
-CHECK: Macro argument reuse 'y' - possible side-effects?
-#1555: FILE: drivers/staging/media/sunxi/cedrus/cedrus_regs.h:77:
-+#define VE_DEC_MPEG_MP12HDR_F_CODE(x, y, v) \
-+	(((v) << VE_DEC_MPEG_MP12HDR_F_CODE_SHIFT(x, y)) & \
-+	 VE_DEC_MPEG_MP12HDR_F_CODE_MASK(x, y))
-
-CHECK: Macro argument reuse 'a' - possible side-effects?
-#1685: FILE: drivers/staging/media/sunxi/cedrus/cedrus_regs.h:207:
-+#define VE_DEC_MPEG_VLD_ADDR_BASE(a) \
-+	(((a) & GENMASK(27, 4)) | (((a) >> 28) & GENMASK(3, 0)))
-
-CHECK: Comparison to NULL could be written "fmt"
-#1805: FILE: drivers/staging/media/sunxi/cedrus/cedrus_video.c:88:
-+	return fmt != NULL;
-
-CHECK: Please use a blank line after function/struct/union/enum declarations
-#2214: FILE: drivers/staging/media/sunxi/cedrus/cedrus_video.c:497:
-+}
-+static struct vb2_ops cedrus_qops = {
-
-total: 0 errors, 11 warnings, 13 checks, 2139 lines checked
-
-
-
-
-
-
-Thanks,
-Mauro
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
