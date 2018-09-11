@@ -1,30 +1,39 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 11 Sep 2018 17:10:42 -0300
-Subject: [PATCH 1/6] ARM: dts: imx51: Add label for VPU node
-Message-ID: <1536696647-8228-1-git-send-email-festevam@gmail.com>
+Date: Tue, 11 Sep 2018 17:10:46 -0300
+Subject: [PATCH 5/6] ARM: dts: vf610-zii-cfu1: Pass the 'no-sdio' property
+In-Reply-To: <1536696647-8228-1-git-send-email-festevam@gmail.com>
+References: <1536696647-8228-1-git-send-email-festevam@gmail.com>
+Message-ID: <1536696647-8228-5-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add label for VPU node so that board dts files can disable VPU
-if needed.
+No SDIO devices are connected to these ports, so pass the 'no-sdio'
+property.
 
 Signed-off-by: Fabio Estevam <festevam@gmail.com>
 ---
- arch/arm/boot/dts/imx51.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/vf610-zii-cfu1.dts | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index 5c4ba91..268daea 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -608,7 +608,7 @@
- 				status = "disabled";
- 			};
+diff --git a/arch/arm/boot/dts/vf610-zii-cfu1.dts b/arch/arm/boot/dts/vf610-zii-cfu1.dts
+index de3ed03..aba4cec 100644
+--- a/arch/arm/boot/dts/vf610-zii-cfu1.dts
++++ b/arch/arm/boot/dts/vf610-zii-cfu1.dts
+@@ -122,6 +122,7 @@
+ 	non-removable;
+ 	no-1-8-v;
+ 	keep-power-in-suspend;
++	no-sdio;
+ 	status = "okay";
+ };
  
--			vpu at 83ff4000 {
-+			vpu: vpu at 83ff4000 {
- 				compatible = "fsl,imx51-vpu", "cnm,codahx4";
- 				reg = <0x83ff4000 0x1000>;
- 				interrupts = <9>;
+@@ -129,6 +130,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_esdhc1>;
+ 	bus-width = <4>;
++	no-sdio;
+ 	status = "okay";
+ };
+ 
 -- 
 2.7.4
