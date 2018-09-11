@@ -1,27 +1,31 @@
-From: vkoul@kernel.org (Vinod)
-Date: Tue, 11 Sep 2018 13:11:22 +0530
-Subject: [PATCH 3/3] dmaengine: xilinx_dma: Fix 64-bit simple CDMA transfer
-In-Reply-To: <MWHPR0201MB362841247B08AFFA21CB0A18C7000@MWHPR0201MB3628.namprd02.prod.outlook.com>
-References: <1532688639-32230-1-git-send-email-radhey.shyam.pandey@xilinx.com>
- <1532688639-32230-4-git-send-email-radhey.shyam.pandey@xilinx.com>
- <20180821155553.GI2388@vkoul-mobl>
- <MWHPR0201MB362803E975383398B361330FC70A0@MWHPR0201MB3628.namprd02.prod.outlook.com>
- <20180829040111.GD2388@vkoul-mobl>
- <MWHPR0201MB36282BE6CB5BD242480757F8C7090@MWHPR0201MB3628.namprd02.prod.outlook.com>
- <MWHPR0201MB362841247B08AFFA21CB0A18C7000@MWHPR0201MB3628.namprd02.prod.outlook.com>
-Message-ID: <20180911074122.GM2634@vkoul-mobl>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Tue, 11 Sep 2018 15:52:44 +0800
+Subject: [PATCH v2 0/2] CoreSight: tmc-etf: Fixes for updating buffer
+Message-ID: <1536652366-17119-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07-09-18, 12:08, Radhey Shyam Pandey wrote:
+This patch series is to two fixing of updating ring buffer in tmc-etf
+driver.  The first patch is to fix alignment setting for RRP; the second
+patch tries to fix discarding trace data issue caused by filling
+barrier packets in the same place, the patch keeps complete trace data
+with inserting extra barrier packets.
 
-> > > Yeah that part was clear but the implementation can be better..
-> I thought over it and it seems having a new interface dma_ctrl_write_64
-> taking lsb and msb bits input looks better and scalable. It will be similar
-> to existing vdma_desc_write_64 impl. I will send v2 if it looks ok.
+This patch series has been rebased on CoreSight next branch:
+https://git.linaro.org/kernel/coresight.git/log/?h=next with latest
+commit 3733ca5a6578 ("coresight: tmc: Refactor loops in etb dump").
 
-Yes that is much better, btw why not reuse same routine as common xilinx
-lib functions :)
+Changes from v1:
+* Rebased on CoreSight next branch (Sept 11th, 2018);
+* Added checking 'lost || to_read > handle->size' to set 'barrier_sz'.
+
+
+Leo Yan (2):
+  coresight: tmc: Fix byte-address alignment for RRP
+  coresight: tmc: Fix writing barrier packets for ring buffer
+
+ drivers/hwtracing/coresight/coresight-tmc-etf.c | 41 +++++++++++++++++--------
+ 1 file changed, 29 insertions(+), 12 deletions(-)
 
 -- 
-~Vinod
+2.7.4
