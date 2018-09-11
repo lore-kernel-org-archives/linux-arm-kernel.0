@@ -1,46 +1,46 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 11 Sep 2018 15:49:50 -0600
-Subject: [PATCH 0/5] coresight: Output debug messages only in sysFS mode
-Message-ID: <1536702595-9999-1-git-send-email-mathieu.poirier@linaro.org>
+Date: Tue, 11 Sep 2018 15:49:54 -0600
+Subject: [PATCH 4/5] coresight: Define macro to replace dev_dbg() boiler plate
+ code
+In-Reply-To: <1536702595-9999-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1536702595-9999-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1536702595-9999-5-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Status messages related to the establishment of paths between source and
-sinks are not useful outside of a debugging environment and clogs the log
-files needlessly.  They also trigger the lockdep mechanic when operating
-from perf since they call output functions during process context switch.
+Using a macro is much better than repeating the same code everywhere
+in the drivers.  That way it is easy to keep debug output messages
+confined to the sysFS mode of operation.
 
-This patch is fixing the problem by allowing debugging information to be
-emitted only when operating from sysFS.  This doesn't change the 
-debugging capability of the system since 1) everything that is done from
-perf is built on top of the sysFS mode and 2) debugging output is
-completely useless under perf.
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ drivers/hwtracing/coresight/coresight-priv.h | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Regards,
-Mathieu 
-
-Mathieu Poirier (5):
-  coresight: Make path enable/disable aware of operation mode
-  coresight: Make link components aware of operation mode
-  coresight: Make sink disable functions aware of operation mode
-  coresight: Define macro to replace dev_dbg() boiler plate code
-  coresight: Allow drivers to be verbose only in sysFS mode
-
- .../coresight/coresight-dynamic-replicator.c       |  8 +++----
- drivers/hwtracing/coresight/coresight-etb10.c      |  8 +++----
- drivers/hwtracing/coresight/coresight-etm-perf.c   |  4 ++--
- drivers/hwtracing/coresight/coresight-etm3x.c      |  7 ++++--
- drivers/hwtracing/coresight/coresight-etm4x.c      |  8 +++++--
- drivers/hwtracing/coresight/coresight-funnel.c     | 10 ++++----
- drivers/hwtracing/coresight/coresight-priv.h       |  9 +++++++-
- drivers/hwtracing/coresight/coresight-replicator.c |  8 +++----
- drivers/hwtracing/coresight/coresight-stm.c        |  2 +-
- drivers/hwtracing/coresight/coresight-tmc-etf.c    | 14 +++++------
- drivers/hwtracing/coresight/coresight-tmc-etr.c    |  4 ++--
- drivers/hwtracing/coresight/coresight-tpiu.c       |  6 ++---
- drivers/hwtracing/coresight/coresight.c            | 27 +++++++++++-----------
- include/linux/coresight.h                          |  8 ++++---
- 14 files changed, 71 insertions(+), 52 deletions(-)
-
+diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
+index acfe67646a05..8a7a197cba69 100644
+--- a/drivers/hwtracing/coresight/coresight-priv.h
++++ b/drivers/hwtracing/coresight/coresight-priv.h
+@@ -7,6 +7,7 @@
+ #define _CORESIGHT_PRIV_H
+ 
+ #include <linux/bitops.h>
++#include <linux/device.h>
+ #include <linux/io.h>
+ #include <linux/coresight.h>
+ #include <linux/pm_runtime.h>
+@@ -74,6 +75,12 @@ enum cs_mode {
+ 	CS_MODE_PERF,
+ };
+ 
++#define coresight_dev_dbg(dev, mode, format, ...)	\
++do {							\
++	if (mode == CS_MODE_SYSFS)			\
++		dev_dbg(dev, format, ##__VA_ARGS__);	\
++} while (0)
++
+ /**
+  * struct cs_buffer - keep track of a recording session' specifics
+  * @cur:	index of the current buffer
 -- 
 2.7.4
