@@ -1,153 +1,154 @@
-From: vkoul@kernel.org (Vinod)
-Date: Tue, 11 Sep 2018 12:30:03 +0530
-Subject: [PATCH v2 2/2] dmaengine: uniphier-mdmac: add UniPhier MIO DMAC
- driver
-In-Reply-To: <1535074873-15617-3-git-send-email-yamada.masahiro@socionext.com>
-References: <1535074873-15617-1-git-send-email-yamada.masahiro@socionext.com>
- <1535074873-15617-3-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20180911070003.GI2634@vkoul-mobl>
+From: l.subrahmanya@mobiveil.co.in (Subrahmanya Lingappa)
+Date: Tue, 11 Sep 2018 12:56:24 +0530
+Subject: [PATCH] PCI: remove unnecessary check of device_type == pci
+In-Reply-To: <20180829183440.13601-1-robh@kernel.org>
+References: <20180829183440.13601-1-robh@kernel.org>
+Message-ID: <CAFZiPx18GLf5QypztjtMgb0uDF86PG9ky5mj6eOdyHNsqUpirA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24-08-18, 10:41, Masahiro Yamada wrote:
+Hi,
 
-> +/* mc->vc.lock must be held by caller */
-> +static u32 __uniphier_mdmac_get_residue(struct uniphier_mdmac_desc *md)
-> +{
-> +	u32 residue = 0;
-> +	int i;
-> +
-> +	for (i = md->sg_cur; i < md->sg_len; i++)
-> +		residue += sg_dma_len(&md->sgl[i]);
+with regards to : drivers/pci/controller/pcie-mobiveil.c
+Acked-by: Subrahmaya Lingappa <l.subrahmanya@mobiveil.co.in>
 
-so if the descriptor is submitted to hardware, we return the descriptor
-length, which is not correct.
+Thanks.
 
-Two cases are required to be handled:
-1. Descriptor is in queue (IMO above logic is fine for that, but it can
-be calculated at descriptor submit and looked up here)
-
-2. Descriptor is running (interesting case), you need to read current
-register and offset that from descriptor length and return
-
-> +static struct dma_async_tx_descriptor *uniphier_mdmac_prep_slave_sg(
-> +					struct dma_chan *chan,
-> +					struct scatterlist *sgl,
-> +					unsigned int sg_len,
-> +					enum dma_transfer_direction direction,
-> +					unsigned long flags, void *context)
-> +{
-> +	struct virt_dma_chan *vc = to_virt_chan(chan);
-> +	struct uniphier_mdmac_desc *md;
-> +
-> +	if (!is_slave_direction(direction))
-> +		return NULL;
-> +
-> +	md = kzalloc(sizeof(*md), GFP_KERNEL);
-
-_prep calls can be invoked from atomic context, so this should be
-GFP_NOWAIT, see Documentation/driver-api/dmaengine/provider.rst
-
-> +	if (!md)
-> +		return NULL;
-> +
-> +	md->sgl = sgl;
-> +	md->sg_len = sg_len;
-> +	md->dir = direction;
-> +
-> +	return vchan_tx_prep(vc, &md->vd, flags);
-
-this seems missing stuff. Where do you do register calculation for the
-descriptor and where is slave_config here, how do you know where to
-send/receive data form/to (peripheral)
-
-> +static enum dma_status uniphier_mdmac_tx_status(struct dma_chan *chan,
-> +						dma_cookie_t cookie,
-> +						struct dma_tx_state *txstate)
-> +{
-> +	struct virt_dma_chan *vc;
-> +	struct virt_dma_desc *vd;
-> +	struct uniphier_mdmac_chan *mc;
-> +	struct uniphier_mdmac_desc *md = NULL;
-> +	enum dma_status stat;
-> +	unsigned long flags;
-> +
-> +	stat = dma_cookie_status(chan, cookie, txstate);
-> +	if (stat == DMA_COMPLETE)
-> +		return stat;
-> +
-> +	vc = to_virt_chan(chan);
-> +
-> +	spin_lock_irqsave(&vc->lock, flags);
-> +
-> +	mc = to_uniphier_mdmac_chan(vc);
-> +
-> +	if (mc->md && mc->md->vd.tx.cookie == cookie)
-> +		md = mc->md;
-> +
-> +	if (!md) {
-> +		vd = vchan_find_desc(vc, cookie);
-> +		if (vd)
-> +			md = to_uniphier_mdmac_desc(vd);
-> +	}
-> +
-> +	if (md)
-> +		txstate->residue = __uniphier_mdmac_get_residue(md);
-
-txstate can be NULL and should be checked...
-
-> +static int uniphier_mdmac_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct uniphier_mdmac_device *mdev;
-> +	struct dma_device *ddev;
-> +	struct resource *res;
-> +	int nr_chans, ret, i;
-> +
-> +	nr_chans = platform_irq_count(pdev);
-> +	if (nr_chans < 0)
-> +		return nr_chans;
-> +
-> +	ret = dma_set_mask(dev, DMA_BIT_MASK(32));
-> +	if (ret)
-> +		return ret;
-> +
-> +	mdev = devm_kzalloc(dev, struct_size(mdev, channels, nr_chans),
-> +			    GFP_KERNEL);
-
-kcalloc variant?
-
-> +	if (!mdev)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	mdev->reg_base = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(mdev->reg_base))
-> +		return PTR_ERR(mdev->reg_base);
-> +
-> +	mdev->clk = devm_clk_get(dev, NULL);
-> +	if (IS_ERR(mdev->clk)) {
-> +		dev_err(dev, "failed to get clock\n");
-> +		return PTR_ERR(mdev->clk);
-> +	}
-> +
-> +	ret = clk_prepare_enable(mdev->clk);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ddev = &mdev->ddev;
-> +	ddev->dev = dev;
-> +	dma_cap_set(DMA_PRIVATE, ddev->cap_mask);
-> +	ddev->src_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_UNDEFINED);
-> +	ddev->dst_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_UNDEFINED);
-> +	ddev->directions = BIT(DMA_MEM_TO_DEV) | BIT(DMA_DEV_TO_MEM);
-> +	ddev->residue_granularity = DMA_RESIDUE_GRANULARITY_SEGMENT;
-> +	ddev->device_prep_slave_sg = uniphier_mdmac_prep_slave_sg;
-> +	ddev->device_terminate_all = uniphier_mdmac_terminate_all;
-> +	ddev->device_synchronize = uniphier_mdmac_synchronize;
-> +	ddev->device_tx_status = uniphier_mdmac_tx_status;
-> +	ddev->device_issue_pending = uniphier_mdmac_issue_pending;
-
-No device_config?
--- 
-~Vinod
+On Thu, Aug 30, 2018 at 12:04 AM Rob Herring <robh@kernel.org> wrote:
+>
+> PCI host drivers have already matched on compatible strings, so checking
+> device_type is redundant. Also, device_type is considered deprecated for
+> FDT though we've still been requiring it for PCI hosts as it is useful
+> for finding PCI buses.
+>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Alan Douglas <adouglas@cadence.com>
+> Cc: Subrahmanya Lingappa <l.subrahmanya@mobiveil.co.in>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: linux-pci at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> ---
+>  drivers/pci/controller/pci-host-common.c   | 8 --------
+>  drivers/pci/controller/pcie-cadence-host.c | 7 -------
+>  drivers/pci/controller/pcie-mobiveil.c     | 7 -------
+>  drivers/pci/controller/pcie-xilinx-nwl.c   | 9 ---------
+>  drivers/pci/controller/pcie-xilinx.c       | 7 -------
+>  5 files changed, 38 deletions(-)
+>
+> diff --git a/drivers/pci/controller/pci-host-common.c b/drivers/pci/controller/pci-host-common.c
+> index d8f10451f273..c742881b5061 100644
+> --- a/drivers/pci/controller/pci-host-common.c
+> +++ b/drivers/pci/controller/pci-host-common.c
+> @@ -58,9 +58,7 @@ static struct pci_config_window *gen_pci_init(struct device *dev,
+>  int pci_host_common_probe(struct platform_device *pdev,
+>                           struct pci_ecam_ops *ops)
+>  {
+> -       const char *type;
+>         struct device *dev = &pdev->dev;
+> -       struct device_node *np = dev->of_node;
+>         struct pci_host_bridge *bridge;
+>         struct pci_config_window *cfg;
+>         struct list_head resources;
+> @@ -70,12 +68,6 @@ int pci_host_common_probe(struct platform_device *pdev,
+>         if (!bridge)
+>                 return -ENOMEM;
+>
+> -       type = of_get_property(np, "device_type", NULL);
+> -       if (!type || strcmp(type, "pci")) {
+> -               dev_err(dev, "invalid \"device_type\" %s\n", type);
+> -               return -EINVAL;
+> -       }
+> -
+>         of_pci_check_probe_only();
+>
+>         /* Parse and map our Configuration Space windows */
+> diff --git a/drivers/pci/controller/pcie-cadence-host.c b/drivers/pci/controller/pcie-cadence-host.c
+> index ec394f6a19c8..97e251090b4f 100644
+> --- a/drivers/pci/controller/pcie-cadence-host.c
+> +++ b/drivers/pci/controller/pcie-cadence-host.c
+> @@ -235,7 +235,6 @@ static int cdns_pcie_host_init(struct device *dev,
+>
+>  static int cdns_pcie_host_probe(struct platform_device *pdev)
+>  {
+> -       const char *type;
+>         struct device *dev = &pdev->dev;
+>         struct device_node *np = dev->of_node;
+>         struct pci_host_bridge *bridge;
+> @@ -268,12 +267,6 @@ static int cdns_pcie_host_probe(struct platform_device *pdev)
+>         rc->device_id = 0xffff;
+>         of_property_read_u16(np, "device-id", &rc->device_id);
+>
+> -       type = of_get_property(np, "device_type", NULL);
+> -       if (!type || strcmp(type, "pci")) {
+> -               dev_err(dev, "invalid \"device_type\" %s\n", type);
+> -               return -EINVAL;
+> -       }
+> -
+>         res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "reg");
+>         pcie->reg_base = devm_ioremap_resource(dev, res);
+>         if (IS_ERR(pcie->reg_base)) {
+> diff --git a/drivers/pci/controller/pcie-mobiveil.c b/drivers/pci/controller/pcie-mobiveil.c
+> index a939e8d31735..77052a0712d0 100644
+> --- a/drivers/pci/controller/pcie-mobiveil.c
+> +++ b/drivers/pci/controller/pcie-mobiveil.c
+> @@ -301,13 +301,6 @@ static int mobiveil_pcie_parse_dt(struct mobiveil_pcie *pcie)
+>         struct platform_device *pdev = pcie->pdev;
+>         struct device_node *node = dev->of_node;
+>         struct resource *res;
+> -       const char *type;
+> -
+> -       type = of_get_property(node, "device_type", NULL);
+> -       if (!type || strcmp(type, "pci")) {
+> -               dev_err(dev, "invalid \"device_type\" %s\n", type);
+> -               return -EINVAL;
+> -       }
+>
+>         /* map config resource */
+>         res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+> diff --git a/drivers/pci/controller/pcie-xilinx-nwl.c b/drivers/pci/controller/pcie-xilinx-nwl.c
+> index fb32840ce8e6..81538d77f790 100644
+> --- a/drivers/pci/controller/pcie-xilinx-nwl.c
+> +++ b/drivers/pci/controller/pcie-xilinx-nwl.c
+> @@ -777,16 +777,7 @@ static int nwl_pcie_parse_dt(struct nwl_pcie *pcie,
+>                              struct platform_device *pdev)
+>  {
+>         struct device *dev = pcie->dev;
+> -       struct device_node *node = dev->of_node;
+>         struct resource *res;
+> -       const char *type;
+> -
+> -       /* Check for device type */
+> -       type = of_get_property(node, "device_type", NULL);
+> -       if (!type || strcmp(type, "pci")) {
+> -               dev_err(dev, "invalid \"device_type\" %s\n", type);
+> -               return -EINVAL;
+> -       }
+>
+>         res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "breg");
+>         pcie->breg_base = devm_ioremap_resource(dev, res);
+> diff --git a/drivers/pci/controller/pcie-xilinx.c b/drivers/pci/controller/pcie-xilinx.c
+> index 7b1389d8e2a5..9bd1a35cd5d8 100644
+> --- a/drivers/pci/controller/pcie-xilinx.c
+> +++ b/drivers/pci/controller/pcie-xilinx.c
+> @@ -574,15 +574,8 @@ static int xilinx_pcie_parse_dt(struct xilinx_pcie_port *port)
+>         struct device *dev = port->dev;
+>         struct device_node *node = dev->of_node;
+>         struct resource regs;
+> -       const char *type;
+>         int err;
+>
+> -       type = of_get_property(node, "device_type", NULL);
+> -       if (!type || strcmp(type, "pci")) {
+> -               dev_err(dev, "invalid \"device_type\" %s\n", type);
+> -               return -EINVAL;
+> -       }
+> -
+>         err = of_address_to_resource(node, 0, &regs);
+>         if (err) {
+>                 dev_err(dev, "missing \"reg\" property\n");
+> --
+> 2.17.1
+>
