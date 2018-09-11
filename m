@@ -1,5 +1,5 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Tue, 11 Sep 2018 20:58:39 +0200
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 11 Sep 2018 20:59:12 +0200
 Subject: [PATCH v12 0/6] Driver for at91 usart in spi mode
 In-Reply-To: <20180911181838.GI4185@dell>
 References: <20180904111310.4049-1-radu_nicolae.pirea@upb.ro>
@@ -8,13 +8,14 @@ References: <20180904111310.4049-1-radu_nicolae.pirea@upb.ro>
  <20180911153621.GP2494@piout.net>
  <CAMuHMdV+=EgAYogwNHbY=RExkGox_+YSeHV6pJtQb6g6PzD-CQ@mail.gmail.com>
  <20180911181838.GI4185@dell>
-Message-ID: <20180911185839.GA25212@piout.net>
+Message-ID: <CAMuHMdUMt=HJGCDZvJF99=45mecn5AjnTr-tA_LioxWrNKM2ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/2018 19:39:30+0100, Lee Jones wrote:
+Hi Lee,
+
+On Tue, Sep 11, 2018 at 8:40 PM Lee Jones <lee.jones@linaro.org> wrote:
 > On Tue, 11 Sep 2018, Geert Uytterhoeven wrote:
-> 
 > > On Tue, Sep 11, 2018 at 5:36 PM Alexandre Belloni
 > > <alexandre.belloni@bootlin.com> wrote:
 > > > On 11/09/2018 16:59:09+0200, Geert Uytterhoeven wrote:
@@ -84,34 +85,50 @@ On 11/09/2018 19:39:30+0100, Lee Jones wrote:
 > > > Yes, this is exactly what is done:
 > > >
 > > > https://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git/tree/drivers/mfd/at91-usart.c?h=ib-mfd-spi-tty-4.20-1#n33
-> > 
+> >
 > > OK.
-> > 
+> >
 > > I guess the main "hackish" part is that the mfd_cell uses of_compatible,
 > > which thus requires having additional compatible values?
-> > 
+> >
 > > I think those can just be removed. AFAICS, the SPI and serial drivers already
 > > match against the "at91_usart_spi" resp. "atmel_usart_serial" platform device
 > > names?
-> 
+>
 > The hackish part of this driver is that it's using MFD for something
 > which is clearly not an MFD.  It's a USART device.  Nothing more,
 > nothing less.
-> 
+>
 > Does anyone have the datasheet to hand?
-> 
 
-It is not a simple usart, it is either a usart or a full blown SPI
-controller with registers changing layout depending on the selected
-mode. Otherwise, I'm not sure how you would get a USART to do SPI.
+I haven't read it, but I believe it's not unlike Renesas SCIF, which is
+served by both drivers/tty/serial/sh-sci.c and drivers/spi/spi-sh-sci.c.
+But the latter is not used from DT, so we haven't experienced (and solved)
+the similar issue yet.
 
-Datasheet here:
+Would it work if the UART driver and SPI driver would match against the
+same compatible value, but the UART driver would do in its probe()
+function:
 
-http://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-6438-32-bit-ARM926-Embedded-Microprocessor-SAM9G45_Datasheet.pdf
+    device_property_read_u32(&pdev->dev, "atmel,usart-mode", &opmode);
+    if (opmode != AT91_USART_MODE_SERIAL)
+        return ENODEV;
 
-USART doc starting p572, registers p621.
+while the SPI driver would do:
+
+    device_property_read_u32(&pdev->dev, "atmel,usart-mode", &opmode);
+    if (opmode != AT91_USART_MODE_SPI)
+        return ENODEV;
+
+? No MFD driver involved.
+
+Gr{oetje,eeting}s,
+
+                        Geert
 
 -- 
-Alexandre Belloni, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
