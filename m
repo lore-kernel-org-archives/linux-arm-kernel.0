@@ -1,55 +1,31 @@
-From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Tue, 11 Sep 2018 06:36:35 +0200
-Subject: [PATCH v9 3/6] kernel/reboot.c: export pm_power_off_prepare
-In-Reply-To: <20180911015320.GA25790@dragon>
-References: <20180802103425.3053-1-o.rempel@pengutronix.de>
- <20180802103425.3053-4-o.rempel@pengutronix.de>
- <20180802104443.GH9117@sirena.org.uk>
- <94d48ecb-7302-c7ed-e815-730be0426a04@pengutronix.de>
- <20180802113552.GJ9117@sirena.org.uk> <20180827014815.GD29208@dragon>
- <20180906101516.GA5360@sirena.org.uk> <20180909020021.GA18838@dragon>
- <20180910151926.GA10889@sirena.org.uk> <20180911015320.GA25790@dragon>
-Message-ID: <134a7f76-6e0b-1a9f-26da-f01adaac44e6@pengutronix.de>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Tue, 11 Sep 2018 13:20:07 +0800
+Subject: [RFC PATCH] crypto: dpaa2_caam_iova_to_virt() can be static
+In-Reply-To: <20180910171550.5659-8-horia.geanta@nxp.com>
+References: <20180910171550.5659-8-horia.geanta@nxp.com>
+Message-ID: <20180911052007.GA10279@ivb42>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
 
-On 11.09.2018 03:53, Shawn Guo wrote:
-> On Mon, Sep 10, 2018 at 04:19:26PM +0100, Mark Brown wrote:
->> On Sun, Sep 09, 2018 at 10:00:23AM +0800, Shawn Guo wrote:
->>> On Thu, Sep 06, 2018 at 11:15:17AM +0100, Mark Brown wrote:
->>
->>>> I was expecting to get a pull request with the precursor patches in it -
->>>> the regulator driver seems to get a moderate amount of development so
->>>> there's a reasonable risk of conflicts.
->>
->>> What about you create a stable topic branch for regulator patches and I
->>> pull it into IMX tree?
->>
->> Sure, I can send a pull request back but the first two patches in the
->> series are ARM ones - are you OK with me just applying them and sending
->> them in the pull request or do you want to apply them first?
-> 
-> I just took another look at the series.  It seems that there is no
-> build-time dependency between regulator and platform patches.  So I
-> think we can handle the series like:
-> 
->  - You apply patch #3, #4 and #5 on regulator tree;
->  - I apply the reset on IMX tree.
-> 
-> There shouldn't be any build or run time regression on either tree, and
-> the feature that the series adds will be available when both trees get
-> merged together on -next or Linus tree.
-> 
-> @Oleksij Is my understanding above correct?
+Fixes: 10c08052347f ("crypto: caam/qi2 - add DPAA2-CAAM driver")
+Signed-off-by: kbuild test robot <fengguang.wu@intel.com>
+---
+ caamalg_qi2.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Yes.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180911/72ac4272/attachment.sig>
+diff --git a/drivers/crypto/caam/caamalg_qi2.c b/drivers/crypto/caam/caamalg_qi2.c
+index e883386..af8d890 100644
+--- a/drivers/crypto/caam/caamalg_qi2.c
++++ b/drivers/crypto/caam/caamalg_qi2.c
+@@ -80,8 +80,8 @@ struct caam_ctx {
+ 	unsigned int authsize;
+ };
+ 
+-void *dpaa2_caam_iova_to_virt(struct dpaa2_caam_priv *priv,
+-			      dma_addr_t iova_addr)
++static void *dpaa2_caam_iova_to_virt(struct dpaa2_caam_priv *priv,
++				     dma_addr_t iova_addr)
+ {
+ 	phys_addr_t phys_addr;
+ 
