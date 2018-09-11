@@ -1,15 +1,41 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Tue, 11 Sep 2018 17:00:30 +0800
-Subject: [4.14.y] request commit 94a5d8790e79 ("arm64: cpu_errata: include
- required headers")
-Message-ID: <20180911170030.650928d8@xhacker.debian>
+From: victor.chong@linaro.org (Victor Chong)
+Date: Tue, 11 Sep 2018 18:09:02 +0900
+Subject: [PATCH v2] tee: optee: log message if dynamic shm is enabled
+Message-ID: <CAHqM-Qjr+5T1pMatJ=5MSsJvzaRqPybt_2TtyzHPwLnt=WjCEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+When dynamic shared memory support is enabled in the OP-TEE Trusted
+OS, it doesn't mean that the driver supports it, which can confuse
+users during debugging. Log a message when dynamic shared memory is
+enabled in the driver, to let users know for sure.
 
-I think we missed the commit 94a5d8790e79 ("arm64: cpu_errata: include
-required headers"), could you please include it in next stable release?
+Suggested-by: Jerome Forissier <jerome.forissier@linaro.org>
+Signed-off-by: Victor Chong <victor.chong@linaro.org>
+Reviewed-by: Jerome Forissier <jerome.forissier@linaro.org>
+---
 
-Thanks,
-Jisheng
+v2:
+* Added patch description
+
+[v1] lore.kernel.org/patchwork/patch/983949/
+
+ drivers/tee/optee/core.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
+index e1aafe842d66..cca5c091e55a 100644
+--- a/drivers/tee/optee/core.c
++++ b/drivers/tee/optee/core.c
+@@ -631,6 +631,9 @@ static struct optee *optee_probe(struct device_node *np)
+
+        optee_enable_shm_cache(optee);
+
++       if (optee->sec_caps & OPTEE_SMC_SEC_CAP_DYNAMIC_SHM)
++               pr_info("dynamic shared memory is enabled\n");
++
+        pr_info("initialized driver\n");
+        return optee;
+ err:
+--
+2.17.1
