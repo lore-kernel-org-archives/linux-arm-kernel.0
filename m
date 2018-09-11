@@ -1,14 +1,15 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 11 Sep 2018 17:10:44 -0300
-Subject: [PATCH 3/6] ARM: dts: imx51-zii-scu2-mezz: Disable VPU
+Date: Tue, 11 Sep 2018 17:10:45 -0300
+Subject: [PATCH 4/6] ARM: dts: imx51-zii-scu2-mezz: Disable the internal
+ watchdog
 In-Reply-To: <1536696647-8228-1-git-send-email-festevam@gmail.com>
 References: <1536696647-8228-1-git-send-email-festevam@gmail.com>
-Message-ID: <1536696647-8228-3-git-send-email-festevam@gmail.com>
+Message-ID: <1536696647-8228-4-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-imx51-zii-scu2-mezz does not have any video encoding/decoding needs,
-so disable the VPU.
+imx51-zii-scu2-mezz has an external watchdog in the environment
+microcontroller, so disable the internal one.
 
 Signed-off-by: Fabio Estevam <festevam@gmail.com>
 ---
@@ -16,14 +17,14 @@ Signed-off-by: Fabio Estevam <festevam@gmail.com>
  1 file changed, 4 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx51-zii-scu2-mezz.dts b/arch/arm/boot/dts/imx51-zii-scu2-mezz.dts
-index 26cf085..fc4a32c 100644
+index fc4a32c..243d1c8 100644
 --- a/arch/arm/boot/dts/imx51-zii-scu2-mezz.dts
 +++ b/arch/arm/boot/dts/imx51-zii-scu2-mezz.dts
-@@ -342,6 +342,10 @@
- 	vcc-supply = <&vusb2_reg>;
+@@ -346,6 +346,10 @@
+ 	status = "disabled";
  };
  
-+&vpu {
++&wdog1 {
 +	status = "disabled";
 +};
 +
