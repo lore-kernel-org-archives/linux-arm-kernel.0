@@ -1,28 +1,40 @@
 From: tudor.ambarus@microchip.com (Tudor Ambarus)
-Date: Tue, 11 Sep 2018 11:22:29 +0300
-Subject: [PATCH v2 0/3] mtd: spi-nor: add Global Block Unlock support
-Message-ID: <20180911082232.28678-1-tudor.ambarus@microchip.com>
+Date: Tue, 11 Sep 2018 11:22:31 +0300
+Subject: [PATCH v2 2/3] mtd: spi-nor: unlock global block protection on
+ sst26vf064b
+In-Reply-To: <20180911082232.28678-1-tudor.ambarus@microchip.com>
+References: <20180911082232.28678-1-tudor.ambarus@microchip.com>
+Message-ID: <20180911082232.28678-3-tudor.ambarus@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To avoid inadvertent writes during power-up, SST26 flash memories are
-write-protected by default after a power-on reset cycle. Unlock the serial
-flash memory by using the Global Block Protection Unlock command - it offers
-a single command cycle that unlocks the entire memory array.
+To avoid inadvertent writes during power-up, sst26vf064b is
+write-protected by default after a power-on reset cycle.
+Unlock the serial flash memory by using the Global Block Protection
+Unlock command - it offers a single command cycle that unlocks
+the entire memory array.
 
-v2:
-- add Cyrille's reviewed-by tag
-- add cover letter
-- fix link to initial work done by Anurag Kumar Vulisha
+Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
+---
+ drivers/mtd/spi-nor/spi-nor.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-Tudor Ambarus (3):
-  mtd: spi-nor: add Global Block Unlock support
-  mtd: spi-nor: unlock global block protection on sst26vf064b
-  mtd: spi-nor: add support for Microchip SST26 QSPI flash memories
-
- drivers/mtd/spi-nor/spi-nor.c | 47 ++++++++++++++++++++++++++++++++++++++++++-
- include/linux/mtd/spi-nor.h   |  1 +
- 2 files changed, 47 insertions(+), 1 deletion(-)
-
+diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+index d3134fd..ba0fd8b 100644
+--- a/drivers/mtd/spi-nor/spi-nor.c
++++ b/drivers/mtd/spi-nor/spi-nor.c
+@@ -1163,7 +1163,11 @@ static const struct flash_info spi_nor_ids[] = {
+ 	{ "sst25wf040b", INFO(0x621613, 0, 64 * 1024,  8, SECT_4K) },
+ 	{ "sst25wf040",  INFO(0xbf2504, 0, 64 * 1024,  8, SECT_4K | SST_WRITE) },
+ 	{ "sst25wf080",  INFO(0xbf2505, 0, 64 * 1024, 16, SECT_4K | SST_WRITE) },
+-	{ "sst26vf064b", INFO(0xbf2643, 0, 64 * 1024, 128, SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
++	{
++		"sst26vf064b", INFO(0xbf2643, 0, 64 * 1024, 128,
++			SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ |
++			UNLOCK_GLOBAL_BLOCK)
++	},
+ 
+ 	/* ST Microelectronics -- newer production may have feature updates */
+ 	{ "m25p05",  INFO(0x202010,  0,  32 * 1024,   2, 0) },
 -- 
 2.9.4
