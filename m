@@ -1,21 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 11 Sep 2018 15:36:51 +0200
-Subject: [PATCH v3 00/15] soc: octeontx2: Add RVU admin function driver
-In-Reply-To: <CA+sq2CdNRkbGrk4rHOQX1qHrRc2+=DXBscw7cD9UKrX4G5OaVg@mail.gmail.com>
-References: <1536078525-31534-1-git-send-email-sunil.kovvuri@gmail.com>
- <CA+sq2CdNRkbGrk4rHOQX1qHrRc2+=DXBscw7cD9UKrX4G5OaVg@mail.gmail.com>
-Message-ID: <CAK8P3a32gpNX42NuzmbW1PbsHpq7v7LoQ6WDeKtt=QiYbuyM7w@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 11 Sep 2018 15:51:24 +0200
+Subject: [PATCH 2/3] arm64: Add Renesas R8A774C0 support
+In-Reply-To: <CAMuHMdWYGXydw1k+WOYF21FohNrp=5VXkr00KXmx_375_vJR7Q@mail.gmail.com>
+References: <1536580430-17432-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <1536580430-17432-3-git-send-email-fabrizio.castro@bp.renesas.com>
+ <CAMuHMdWYGXydw1k+WOYF21FohNrp=5VXkr00KXmx_375_vJR7Q@mail.gmail.com>
+Message-ID: <20180911135123.bu4vtmnlmit24wrc@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2018 at 2:37 PM Sunil Kovvuri <sunil.kovvuri@gmail.com> wrote:
->
-> Didn't receive any feedback for the v3 patch series over a week's time.
-> Can you please pick up these patches to merge into arm-soc ?
+On Mon, Sep 10, 2018 at 04:34:45PM +0200, Geert Uytterhoeven wrote:
+> On Mon, Sep 10, 2018 at 1:54 PM Fabrizio Castro
+> <fabrizio.castro@bp.renesas.com> wrote:
+> > Add configuration option for the RZ/G2E (R8A774C0) SoC.
+> >
+> > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> > Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+> 
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-I would still prefer to see the whole thing as part of drivers/net/
-instead of drivers/soc,
-and reviewed in full on the netdev side, including the parts that are
-not ethernet specific.
-
-       Arnd
+Thanks, applied.
