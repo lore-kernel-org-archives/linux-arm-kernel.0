@@ -1,146 +1,59 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Sep 2018 13:37:19 +0100
-Subject: [PATCH v3 3/5] dt-bindings: mfd: rk808: Add binding information
- for RK809 and RK817.
-In-Reply-To: <1535081441-20718-4-git-send-email-tony.xie@rock-chips.com>
-References: <1535081441-20718-1-git-send-email-tony.xie@rock-chips.com>
- <1535081441-20718-4-git-send-email-tony.xie@rock-chips.com>
-Message-ID: <20180911123719.GM4185@dell>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Tue, 11 Sep 2018 18:07:10 +0530
+Subject: [PATCH v3 00/15] soc: octeontx2: Add RVU admin function driver
+In-Reply-To: <1536078525-31534-1-git-send-email-sunil.kovvuri@gmail.com>
+References: <1536078525-31534-1-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <CA+sq2CdNRkbGrk4rHOQX1qHrRc2+=DXBscw7cD9UKrX4G5OaVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 24 Aug 2018, Tony Xie wrote:
+On Tue, Sep 4, 2018 at 9:58 PM <sunil.kovvuri@gmail.com> wrote:
+>
+> From: Sunil Goutham <sgoutham@marvell.com>
+>
+> Resource virtualization unit (RVU) on Marvell's OcteonTX2 SOC supports
+> multiple PCIe SRIOV physical functions (PFs) and virtual functions (VFs).
+> PF0 is called administrative / admin function (AF) and has privilege access
+> to registers to provision different RVU functional blocks to each of
+> PF/VF.
+>
+> This admin function (AF) driver acts as a configuration / administrative
+> software which provisions functional blocks to a PF/VF on demand for them
+> to work as one of the following
+>  - A basic network controller (i.e NIC).
+>  - NIC with packet filtering, shaping and scheduling capabilities.
+>  - A crypto device.
+>  - A combination of above etc.
+>
+> PF/VFs communicate with admin function via a shared memory region.
+> This patch series adds logic for the following
+>  - RVU AF driver with functional blocks provisioning support
+>  - Mailbox infrastructure for communication between AF and PFs.
+>  - CGX driver which provides information about physcial network
+>    interfaces which AF processes and forwards required info to
+>    PF/VF drivers.
+>
+> This is the first set of patches out of 70 odd patches.
+>
+> Note: This driver neither receives any data nor processes it i.e no I/O,
+>       just does the hardware configuration.
+>
+> Changes from v2:
+>  No changes, submitted again with netdev mailing list in loop.
+>    - Suggested by Arnd Bergmann and Andrew Lunn
+>
+> Changes from v1:
+>  1 Merged RVU admin function and CGX drivers into a single module
+>    - Suggested by Arnd Bergmann
+>  2 Pulled mbox communication APIs into a separate module to remove
+>    admin function driver dependency in a VM where AF is not attached.
+>    - Suggested by Arnd Bergmann
+>
 
-> Add device tree bindings documentation for Rockchip's RK809 & RK817 PMIC.
-> 
-> Signed-off-by: Tony Xie <tony.xie@rock-chips.com>
-> ---
->  Documentation/devicetree/bindings/mfd/rk808.txt | 56 +++++++++++++++++++++++++
->  1 file changed, 56 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/mfd/rk808.txt b/Documentation/devicetree/bindings/mfd/rk808.txt
-> index 91b6522..c025a99 100644
-> --- a/Documentation/devicetree/bindings/mfd/rk808.txt
-> +++ b/Documentation/devicetree/bindings/mfd/rk808.txt
-> @@ -3,11 +3,15 @@ RK8XX Power Management Integrated Circuit
->  The rk8xx family current members:
->  rk805
->  rk808
-> +rk809
-> +rk817
->  rk818
->  
->  Required properties:
->  - compatible: "rockchip,rk805"
->  - compatible: "rockchip,rk808"
-> +- compatible: "rockchip,rk809"
-> +- compatible: "rockchip,rk817"
->  - compatible: "rockchip,rk818"
->  - reg: I2C slave address
->  - interrupt-parent: The parent interrupt controller.
-> @@ -46,6 +50,28 @@ Optional RK808 properties:
->    the gpio controller. If DVS GPIOs aren't present, voltage changes will happen
->    very quickly with no slow ramp time.
->  
-> +Optional RK809 properties:
-> +- vcc1-supply:  The input supply for DCDC_REG1
-> +- vcc2-supply:  The input supply for DCDC_REG2
-> +- vcc3-supply:  The input supply for DCDC_REG3
-> +- vcc4-supply:  The input supply for DCDC_REG4
-> +- vcc5-supply:  The input supply for LDO_REG1, LDO_REG2, LDO_REG3
-> +- vcc6-supply:  The input supply for LDO_REG4, LDO_REG5, LDO_REG6
-> +- vcc7-supply:  The input supply for LDO_REG7, LDO_REG8, LDO_REG9
-> +- vcc8-supply:  The input supply for SWITCH_REG1
-> +- vcc9-supply:  The input supply for DCDC_REG5, SWITCH_REG2
-> +
-> +Optional RK817 properties:
-> +- vcc1-supply:  The input supply for DCDC_REG1
-> +- vcc2-supply:  The input supply for DCDC_REG2
-> +- vcc3-supply:  The input supply for DCDC_REG3
-> +- vcc4-supply:  The input supply for DCDC_REG4
-> +- vcc5-supply:  The input supply for LDO_REG1, LDO_REG2, LDO_REG3
-> +- vcc6-supply:  The input supply for LDO_REG4, LDO_REG5, LDO_REG6
-> +- vcc7-supply:  The input supply for LDO_REG7, LDO_REG8, LDO_REG9
-> +- vcc8-supply:  The input supply for BOOST
-> +- vcc9-supply:  The input supply for OTG_SWITCH
+Hi Arnd,
 
-I think I'd like to see these squashed down a bit.
+Didn't receive any feedback for the v3 patch series over a week's time.
+Can you please pick up these patches to merge into arm-soc ?
 
-Something like:
-
-> +Optional shared RK809 and RK817 properties:
-> +- vcc1-supply:  The input supply for DCDC_REG1
-> +- vcc2-supply:  The input supply for DCDC_REG2
-> +- vcc3-supply:  The input supply for DCDC_REG3
-> +- vcc4-supply:  The input supply for DCDC_REG4
-> +- vcc5-supply:  The input supply for LDO_REG1, LDO_REG2, LDO_REG3
-> +- vcc6-supply:  The input supply for LDO_REG4, LDO_REG5, LDO_REG6
-> +- vcc7-supply:  The input supply for LDO_REG7, LDO_REG8, LDO_REG9
-> +
-> +Optional RK809 properties:
-> +- vcc8-supply:  The input supply for SWITCH_REG1
-> +- vcc9-supply:  The input supply for DCDC_REG5, SWITCH_REG2
-> +
-> +Optional RK817 properties:
-> +- vcc8-supply:  The input supply for BOOST
-> +- vcc9-supply:  The input supply for OTG_SWITCH
-
-That's if 1-7 are as identical as they look at first glance.
-
->  Optional RK818 properties:
->  - vcc1-supply:  The input supply for DCDC_REG1
->  - vcc2-supply:  The input supply for DCDC_REG2
-> @@ -87,6 +113,28 @@ number as described in RK808 datasheet.
->  	- SWITCH_REGn
->  		- valid values for n are 1 to 2
->  
-> +Following regulators of the RK809 PMIC block are supported. Note that
-> +the 'n' in regulator name, as in DCDC_REGn or LDOn, represents the DCDC or LDO
-> +number as described in RK808 datasheet.
-> +
-> +	- DCDC_REGn
-> +		- valid values for n are 1 to 5.
-> +	- LDO_REGn
-> +		- valid values for n are 1 to 9.
-> +	- SWITCH_REGn
-> +		- valid values for n are 1 to 2.
-> +
-> +Following regulators of the RK817 PMIC block are supported. Note that
-> +the 'n' in regulator name, as in DCDC_REGn or LDOn, represents the DCDC or LDO
-> +number as described in RK818 datasheet.
-
-Is there any need to keep saying the same thing over and over?
-
-Especially for something fairly obvious.
-
-> +	- DCDC_REGn
-> +		- valid values for n are 1 to 4.
-> +	- LDO_REGn
-> +		- valid values for n are 1 to 9.
-> +	- BOOST
-> +	- OTG_SWITCH
-> +
->  Following regulators of the RK818 PMIC block are supported. Note that
->  the 'n' in regulator name, as in DCDC_REGn or LDOn, represents the DCDC or LDO
->  number as described in RK818 datasheet.
-> @@ -99,6 +147,14 @@ number as described in RK818 datasheet.
->  	- HDMI_SWITCH
->  	- OTG_SWITCH
->  
-> +There are three pins needed to config for each of RK809 and RK817,
-> +named "gpio_ts" "gpio_gt" "gpio_slp".
-> +	The gpio_gt and gpio_ts pins support the gpio function.
-> +	The gpio_slp pin is for controlling the pmic states, as below:
-> +		- reset
-> +		- power down
-> +		- sleep
-> +
->  Standard regulator bindings are used inside regulator subnodes. Check
->    Documentation/devicetree/bindings/regulator/regulator.txt
->  for more details
-
--- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+Sunil.
