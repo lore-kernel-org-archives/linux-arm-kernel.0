@@ -1,170 +1,69 @@
-From: anuragku@xilinx.com (Anurag Kumar Vulisha)
-Date: Tue, 11 Sep 2018 08:07:09 +0000
-Subject: [PATCH v3 2/2] phy: zynqmp: Add dt bindings for ZynqMP phy
-In-Reply-To: <20180910203059.GA7055@bogus>
-References: <1536165747-6405-1-git-send-email-anurag.kumar.vulisha@xilinx.com>
- <1536165747-6405-3-git-send-email-anurag.kumar.vulisha@xilinx.com>
- <20180910203059.GA7055@bogus>
-Message-ID: <BN3PR0201MB09934721CEEE6E9F3316644CA7040@BN3PR0201MB0993.namprd02.prod.outlook.com>
+From: pirea.radu@gmail.com (Radu Nicolae Pirea)
+Date: Tue, 11 Sep 2018 11:14:33 +0300
+Subject: [GIT PULL] Immutable branch between MFD, SPI and TTY due for
+ the v4.20 merge window
+In-Reply-To: <20180910151803.GX28860@dell>
+References: <20180713164736.26028-1-radu.pirea@microchip.com>
+ <20180910151803.GX28860@dell>
+Message-ID: <bd9104b702feec556ed01311e9efcb96790131d0.camel@upb.ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Lee,
 
-Thanks a lot for reviewing this code, please find my comments inline
+Thank you for taking the patch series, but you didn't take the latest
+version(v12) :)
 
->> +This binding describes a ZynqMP PHY device that is used to control
->> +ZynqMP High Speed Gigabit Transceiver(GT). ZynqMP PS GTR provides
->> +four lanes and are used by USB, SATA, PCIE, Display port and Ethernet SGMMI
->controllers.
->> +
->> +Phy provider node
->> +=================
->> +
->> +Required properties:
->> +- compatible	: Can be "xlnx,zynqmp-psgtr-v1.1" or "xlnx,zynqmp-psgtr"
->> +
->> +- reg           : Address and length of register sets for each device in
->> +                  "reg-names"
->> +
->> +- reg-names     : The names of the register addresses corresponding to the
->> +		  registers filled in "reg":
->> +			- serdes: SERDES block register set
->> +			- siou: SIOU block register set
->> +
->> +Optional properties:
->> +- xlnx,tx_termination_fix : Include this for fixing functional issue
->> +with the
->
->s/_/-/
->
 
-Will fix this in next series of the patch
-
->> +		  TX termination resistance in GT, which can be out of spec for
->> +		  the XCZU9EG silicon version. This property is not required for
->> +		  "xlnx,zynqmp-psgtr-v1.1"
->> +
->> +Required nodes	:  A sub-node is required for each lane the controller
->> +		   provides.
->> +
->> +Phy sub-nodes
->> +=============
->> +
->> +Required properties:
->> +lane0:
->
->lane0 or lane at 0? If you need or care about numbering then add a reg property.
->
-
-Thanks for correcting,  Will change this to lane at 0 and resend the patches
-
->> +- #phy-cells	: Should be 4
->> +
->> +lane1:
->> +- #phy-cells	: Should be 4
->> +
->> +lane2:
->> +- #phy-cells	: Should be 4
->> +
->> +lane3:
->> +- #phy-cells	: Should be 4
->> +
->> +Example:
->> +	zynqmp_phy: phy at fd400000 {
->> +		compatible = "xlnx,zynqmp-psgtr-v1.1";
->> +		status = "okay";
->> +		reg = <0x0 0xfd400000 0x0 0x40000>, <0x0 0xfd3d0000 0x0 0x1000>;
->> +		reg-names = "serdes", "siou";
->> +
->> +		lane0: lane at 0 {
->> +			#phy-cells = <4>;
->> +		};
->> +		lane1: lane at 1 {
->> +			#phy-cells = <4>;
->> +		};
->> +		lane2: lane at 2 {
->> +			#phy-cells = <4>;
->> +		};
->> +		lane3: lane at 3 {
->> +			#phy-cells = <4>;
->> +		};
->> +	};
->> +
->> +Specifying phy control of devices
->> +=================================
->> +
->> +Device nodes should specify the configuration required in their "phys"
->> +property, containing a phandle to the phy port node and a device type.
->> +
->> +phys = <PHANDLE CONTROLLER_TYPE CONTROLLER_INSTANCE LANE_NUM
->> +LANE_FREQ>;
->> +
->> +PHANDLE                 = &lane0 or &lane1 or &lane2 or &lane3
->> +CONTROLLER_TYPE         = PHY_TYPE_PCIE or PHY_TYPE_SATA or PHY_TYPE_USB
->> +			  or PHY_TYPE_DP or PHY_TYPE_SGMII
->> +CONTROLLER_INSTANCE     = Depends on controller type used, can be any of
->> +				PHY_TYPE_PCIE : 0 or 1 or 2 or 3
->> +				PHY_TYPE_SATA : 0 or 1
->> +				PHY_TYPE_USB  : 0 or 1
->> +				PHY_TYPE_DP   : 0 or 1
->> +				PHY_TYPE_SGMII: 0 or 1 or 2 or 3
->> +LANE_NUM                = Depends on which lane clock is used as ref clk, can be
->> +			  0 or 1 or 2 or 3
->
->I'm not really clear about what this is.
->
-
-ZynqMP phy has a feature that each individual lane (among the 4 lanes) can have its own PLL
-reference  clock or share the clock generated from other lanes. For example 
-
-Lane 0 can use its own ref clock for PLL: in this case LANE_NUM = 0
-Lane0 can use Lane 3's ref clock for PLL: in this case  LANE_NUM = 3
-
-Maybe I should change the name LANE_NUM to LANE_REF_CLK to give more readability. Please
-correct me if wrong.  
-
->> +LANE_FREQ               = Frequency that controller can operate, can be any of
->> +
->19.2Mhz,20Mhz,24Mhz,26Mhz,27Mhz,28.4Mhz,40Mhz,52Mhz,
->> +			  100Mhz,108Mhz,125Mhz,135Mhz,150Mhz
->
->This can't be implied by the mode/type? I wouldn't expect any frequency can be used
->for each mode.
->
-
-Yes you are correct, not all frequencies are supported by all protocols, but each protocol supports
-a limited set of multiple reference clock frequencies. For example USB3.0 protocol can operate with
-26, 52 & 100 MHZ. Providing any other frequency would make the phy fail to lock the PLL and error
-would be generated by the driver. As you suggested, I will add more details regarding the frequencies
-supported by different protocols in the next series of the patch. 
-  
->> +
->> +Example:
->> +
->> +#include <dt-bindings/phy/phy.h>
->> +
->> +	usb at fe200000 {
->> +		...
->> +		phys	  = <&lane2 PHY_TYPE_USB3 0 2 2600000>;
->> +		...
->> +	};
->> +
->> +	ahci at fd0c0000 {
->> +		...
->> +		phys	  = <&lane3 PHY_TYPE_SATA 1 1 125000000>;
->> +		...
->> +	};
->
->What if you are doing multiple lanes for 1 device? That would be more useful 2nd
->example if that's supported.
->
-
-Will add the multi lane example in the next series of the patch.
-
-Thanks,
-Anurag Kumar Vulisha
-
->> --
->> 2.1.1
->>
+On Mon, 2018-09-10 at 16:18 +0100, Lee Jones wrote:
+> Enjoy!
+> 
+> The following changes since commit
+> 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+> 
+>   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+> 
+> are available in the Git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/ib-
+> mfd-spi-tty-v4.20
+> 
+> for you to fetch changes up to
+> c24d25317a7c6bb3053d4c193b3cf57d1e9a3e4b:
+> 
+>   tty/serial: atmel: Change the driver to work under at91-usart MFD
+> (2018-09-10 16:12:43 +0100)
+> 
+> ----------------------------------------------------------------
+> Immutable branch between MFD, SPI and TTY due for the v4.20 merge
+> window
+> 
+> ----------------------------------------------------------------
+> Radu Pirea (6):
+>       MAINTAINERS: Add AT91 USART MFD entry
+>       dt-bindings: Add binding for atmel-usart in SPI mode
+>       mfd: at91-usart: Add MFD driver for USART
+>       MAINTAINERS: Add AT91 USART SPI entry
+>       spi: at91-usart: Add driver for at91-usart as SPI
+>       tty/serial: atmel: Change the driver to work under at91-usart
+> MFD
+> 
+>  .../bindings/{serial => mfd}/atmel-usart.txt       |  25 +-
+>  MAINTAINERS                                        |  16 +
+>  drivers/mfd/Kconfig                                |   9 +
+>  drivers/mfd/Makefile                               |   1 +
+>  drivers/mfd/at91-usart.c                           |  71 ++++
+>  drivers/spi/Kconfig                                |   8 +
+>  drivers/spi/Makefile                               |   1 +
+>  drivers/spi/spi-at91-usart.c                       | 432
+> +++++++++++++++++++++
+>  drivers/tty/serial/Kconfig                         |   1 +
+>  drivers/tty/serial/atmel_serial.c                  |  42 +-
+>  include/dt-bindings/mfd/at91-usart.h               |  17 +
+>  11 files changed, 606 insertions(+), 17 deletions(-)
+>  rename Documentation/devicetree/bindings/{serial => mfd}/atmel-
+> usart.txt (76%)
+>  create mode 100644 drivers/mfd/at91-usart.c
+>  create mode 100644 drivers/spi/spi-at91-usart.c
+>  create mode 100644 include/dt-bindings/mfd/at91-usart.h
+> 
