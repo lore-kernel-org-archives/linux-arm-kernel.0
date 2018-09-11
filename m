@@ -1,40 +1,35 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 11 Sep 2018 09:47:21 +0100
-Subject: [PATCH] dts: juno: Enable coresight tmc scatter gather in ETR
-Message-ID: <1536655641-26192-1-git-send-email-suzuki.poulose@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 11 Sep 2018 09:51:27 +0100
+Subject: [GIT PULL] Immutable branch between MFD, SPI and TTY due for the
+ v4.20 merge window
+In-Reply-To: <bd9104b702feec556ed01311e9efcb96790131d0.camel@upb.ro>
+References: <20180713164736.26028-1-radu.pirea@microchip.com>
+ <20180910151803.GX28860@dell>
+ <bd9104b702feec556ed01311e9efcb96790131d0.camel@upb.ro>
+Message-ID: <20180911085127.GD4185@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We do not enable scatter-gather mode in the TMC-ETR by default
-to prevent malfunctioning of systems where the ETR may not be
-properly connected to the memory subsystem to allow for simultaneous
-READ/WRITE transactions when used in SG mode. Instead we whitelist
-the platforms where we know that it is safe to use the mode.
+On Tue, 11 Sep 2018, Radu Nicolae Pirea wrote:
 
-All revisions of Juno have a proper ETR connection and hence
-white list them.
+> Hi Lee,
+> 
+> Thank you for taking the patch series, but you didn't take the latest
+> version(v12) :)
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Mike Leach <mike.leach@linaro.org>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Liviu Dudau <liviu.dudau@arm.com>
-Cc: Lorenzo Pierlisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/boot/dts/arm/juno-base.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+Both were marked for merging in my inbox, and since I am working
+though my (300+) post-vacation emails chronologically v11 was handled
+first.
 
-diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-index ce56a4a..3596e5d 100644
---- a/arch/arm64/boot/dts/arm/juno-base.dtsi
-+++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-@@ -199,6 +199,7 @@
- 		clocks = <&soc_smc50mhz>;
- 		clock-names = "apb_pclk";
- 		power-domains = <&scpi_devpd 0>;
-+		arm,scatter-gather;
- 		port {
- 			etr_in_port: endpoint {
- 				slave-mode;
+It appears as though there is an issue in the way 'struct
+of_device_id' was declared too.  The header file in which it was
+declared used to be included by proxy, however a separation has
+recently been made causing build errors.
+
+I will fix both issues and re-submit the PR.
+
 -- 
-2.7.4
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
