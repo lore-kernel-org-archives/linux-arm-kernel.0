@@ -1,67 +1,79 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 11 Sep 2018 17:41:53 +0100
-Subject: [PATCH v6 11/11] arm64: annotate user pointers casts detected by
- sparse
-In-Reply-To: <CA+55aFzQ+ykLu10q3AdyaaKJx8SDWWL9Qiu6WH2jbN_ugRUTOg@mail.gmail.com>
-References: <cover.1535629099.git.andreyknvl@google.com>
- <5d54526e5ff2e5ad63d0dfdd9ab17cf359afa4f2.1535629099.git.andreyknvl@google.com>
- <CA+55aFyW9N2tSb2bQvkthbVVyY6nt5yFeWQRLHp1zruBmb5ocw@mail.gmail.com>
- <CA+55aFy2t_MHgr_CgwbhtFkL+djaCq2qMM1G+f2DwJ0qEr1URQ@mail.gmail.com>
- <20180907152600.myidisza5o4kdmvf@armageddon.cambridge.arm.com>
- <CA+55aFzQ+ykLu10q3AdyaaKJx8SDWWL9Qiu6WH2jbN_ugRUTOg@mail.gmail.com>
-Message-ID: <20180911164152.GA29166@arrakis.emea.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 11 Sep 2018 17:50:30 +0100
+Subject: [PATCH] arm64: add NUMA emulation support
+In-Reply-To: <86aad702-9f42-c572-a8f1-74983cd1bf33@kernel.org>
+References: <20180829110802.GD10349@dhcp22.suse.cz>
+ <f041ba95-03e6-4a7d-c324-870b45a2f648@kernel.org>
+ <20180905064252.GW14951@dhcp22.suse.cz>
+ <c1b58f13-6190-20e9-7e4f-b8bc2b9d5f80@kernel.org>
+ <20180907083452.GC19621@dhcp22.suse.cz>
+ <e46e715c-f115-f054-eeb2-3cecbcd1192d@kernel.org>
+ <20180910134845.GH10951@dhcp22.suse.cz>
+ <4d7beb50-f778-507a-4c3c-f6de92f8cfb9@kernel.org>
+ <20180911091124.GP10951@dhcp22.suse.cz>
+ <86aad702-9f42-c572-a8f1-74983cd1bf33@kernel.org>
+Message-ID: <20180911165029.GA15022@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-On Fri, Sep 07, 2018 at 09:30:35AM -0700, Linus Torvalds wrote:
-> On Fri, Sep 7, 2018 at 8:26 AM Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > So it's not about casting to another pointer; it's rather about no
-> > longer using the value as a user pointer but as an actual (untyped,
-> > untagged) virtual address.
-[...]
-> I actually originally wanted to have sparse not just check types, but
-> actually do transformations too, in order to check more.
-[...]
-> But it sounds like this is exactly what you guys would want for the
-> tagged pointers. Some functions can take a "wild" pointer, because
-> they deal with the tag part natively. And others need to be "checked"
-> and have gone through the cleaning and verification.
+On Tue, Sep 11, 2018 at 09:27:49AM -0600, Shuah Khan wrote:
+> On 09/11/2018 03:11 AM, Michal Hocko wrote:
+> > On Mon 10-09-18 20:02:05, Shuah Khan wrote:
+> >> Hi Michal,
+> >>
+> >> On 09/10/2018 07:48 AM, Michal Hocko wrote:
+> >>> On Fri 07-09-18 16:30:59, Shuah Khan wrote:
+> >>>> On 09/07/2018 02:34 AM, Michal Hocko wrote:
+> >>>>> On Thu 06-09-18 15:53:34, Shuah Khan wrote:
+> >> [....]
+> >>>>
+> >>>> In addition to isolation, being able to reserve a block instead is one of the
+> >>>> issues I am looking to address. Unfortunately memory cgroups won't address that
+> >>>> issue.
+> >>>
+> >>> Could you be more specific why you need reservations other than
+> >>> isolation.
+> >>>
+> >>
+> >> Taking automotive as a specific example, there are two classes of applications:
+> >> 1. critical applications that must run
+> >> 2. Infotainment and misc. user-space.
+> >>
+> >> In this case, being able to reserve a block of memory for critical applications
+> >> will ensure the memory is available for them. If a critical application has to
+> >> restart and/or when an on-demand critical application starts, it might not be able
+> >> to allocate memory if it is not reserved.
+> >>
+> >> When a flat system has multiple memory blocks, with NUMA emulation in conjunction with
+> >> cpusets, one or more block can be reserved for critical applications configuring a set
+> >> of cpus and one of more memory nodes for them.
+> >>
+> >> Memory cgroups will not support such reservation. Hope this helps explain the use-case
+> >> I am trying to address with this patch.
+> > 
+> > OK, that is more clear. I still believe that you either have to have a
+> > very good control over memory allocations or a good luck to not see
+> > unexpected kernel allocations in your reserved memory which might easily
+> > break guarantees you would like to accomplish.
+> > 
 > 
-> But sparse is sadly not the right tool for this, and having a single
-> "__user" address space is not sufficient. I guess for the arm64 case,
-> you really could make up a *new* address space: "__user_untagged", and
-> then have functions that convert from "void __user *" to "void
-> __user_untagged *", and then mark the functions that need the tag
-> removed as taking that new kind of user pointer.
+> Thanks. Right. I am with you on the possibility that root cgroup can eat into
+> the reserved memory. However, with this solution I proposed, there is a guarantee
+> that the cpuset cgroup that is configured for non-critical Infotainment and misc.
+> user-space application will not be able to allocate from the reserved memory node.
+> 
+> I am hoping the proposed patch will allow critical apps. reserving memory with the
+> exception that root cgroup and kernel can still allocate from it when needed. Perhaps
+> cpuset exclusive logic could be extended to look for non-exclusive memory nodes first
+> if it doesn't already do that. This is inline with the current cpuset approach is that
+> the critical kernel allocations aren't starved to ensure memory reservations.
+> 
+> If you don't think this solution isn't ideal/good, do you have other suggestions
+> for solving the problem? If not would it be okay to start with what I proposed and
+> build on top of as needed?
 
-Fortunately, most (all) functions taking a __user pointer can cope with
-tagged pointers since they never dereference the pointer directly but
-pass it through uaccess functions (which can access tagged pointers
-without untagging). The problem appears when the pointer is no longer
-used for access but converted to a long for other uses like rbtree
-look-up, so not actually dereferenced. Such conversion, in a few cases,
-needs to lose the tag.
+I still don't understand why this can't be achieved by faking up some NUMA
+entries in the firmware table and just using the existing NUMA code that we
+have.
 
-Of course, there are lots of void __user * conversions to long where
-removing the tag is not always the right thing or required (hence the
-__force annotations in this patchset).
-
-As Luc mentioned in this thread, we can consider that __user pointers
-are always tagged. What I think we'd need is a few annotations where
-ulong must be an __untagged address (and I guess in smaller numbers than
-the __force ones proposed here). For example we can allow
-get_user_pages() to get an (ulong)(void __user *) conversion but
-find_vma() would only take an (unsigned long __untagged) argument. Such
-attribute conversion would be handled by an untagged_addr() macro. So we
-move the detection problem from pointer conversion to an ulong (tagged
-by default) to ulong __untagged conversion (I'm not sure sparse can do
-this).
-
-That's slightly different than trying to identify all the __user ptr to
-long conversions but, as you said, it's probably not a complete solution
-anyway and with lots of __force annotations throughout the kernel.
-
--- 
-Catalin
+Will
