@@ -1,43 +1,65 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Tue, 11 Sep 2018 10:44:48 +0200
-Subject: [PATCH] mfd: at91-usart: fix missing mod_devicetable.h
-In-Reply-To: <20180911125857.5e5c34f4@canb.auug.org.au>
-References: <20180911125857.5e5c34f4@canb.auug.org.au>
-Message-ID: <20180911084448.17878-1-nicolas.ferre@microchip.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 11 Sep 2018 09:45:48 +0100
+Subject: [GIT PULL] Immutable branch between MFD, SPI and TTY due for the
+ v4.20 merge window
+In-Reply-To: <20180910151803.GX28860@dell>
+References: <20180713164736.26028-1-radu.pirea@microchip.com>
+ <20180910151803.GX28860@dell>
+Message-ID: <20180911084548.GC4185@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following the inclusion of the patch ac3167257b9f ("headers:
-separate linux/mod_devicetable.h from linux/platform_device.h"), there is a
-build issue:
+On Mon, 10 Sep 2018, Lee Jones wrote:
 
-drivers/mfd/at91-usart.c:51:34: error: array type has incomplete element type
-'struct of_device_id'
-  static const struct of_device_id at91_usart_mode_of_match[] = {
+> Enjoy!
+> 
+> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+> 
+>   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+> 
+> are available in the Git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/ib-mfd-spi-tty-v4.20
+> 
+> for you to fetch changes up to c24d25317a7c6bb3053d4c193b3cf57d1e9a3e4b:
+> 
+>   tty/serial: atmel: Change the driver to work under at91-usart MFD (2018-09-10 16:12:43 +0100)
+> 
+> ----------------------------------------------------------------
+> Immutable branch between MFD, SPI and TTY due for the v4.20 merge window
 
-Before this patch, the definition was reached by its inclusion of
-linux/mfd/core.h.
+Due to a comedy of errors, I'm voiding this pull-request.
 
-The build issue is solved by simply adding the mod_devicetable.h in this
-driver.
+Please stand-by for a follow-up.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-Cc: Radu Pirea <radu_nicolae.pirea@upb.ro>
----
- drivers/mfd/at91-usart.c | 1 +
- 1 file changed, 1 insertion(+)
+> Radu Pirea (6):
+>       MAINTAINERS: Add AT91 USART MFD entry
+>       dt-bindings: Add binding for atmel-usart in SPI mode
+>       mfd: at91-usart: Add MFD driver for USART
+>       MAINTAINERS: Add AT91 USART SPI entry
+>       spi: at91-usart: Add driver for at91-usart as SPI
+>       tty/serial: atmel: Change the driver to work under at91-usart MFD
+> 
+>  .../bindings/{serial => mfd}/atmel-usart.txt       |  25 +-
+>  MAINTAINERS                                        |  16 +
+>  drivers/mfd/Kconfig                                |   9 +
+>  drivers/mfd/Makefile                               |   1 +
+>  drivers/mfd/at91-usart.c                           |  71 ++++
+>  drivers/spi/Kconfig                                |   8 +
+>  drivers/spi/Makefile                               |   1 +
+>  drivers/spi/spi-at91-usart.c                       | 432 +++++++++++++++++++++
+>  drivers/tty/serial/Kconfig                         |   1 +
+>  drivers/tty/serial/atmel_serial.c                  |  42 +-
+>  include/dt-bindings/mfd/at91-usart.h               |  17 +
+>  11 files changed, 606 insertions(+), 17 deletions(-)
+>  rename Documentation/devicetree/bindings/{serial => mfd}/atmel-usart.txt (76%)
+>  create mode 100644 drivers/mfd/at91-usart.c
+>  create mode 100644 drivers/spi/spi-at91-usart.c
+>  create mode 100644 include/dt-bindings/mfd/at91-usart.h
+> 
 
-diff --git a/drivers/mfd/at91-usart.c b/drivers/mfd/at91-usart.c
-index a4b9929c156f..ad743b8ca6be 100644
---- a/drivers/mfd/at91-usart.c
-+++ b/drivers/mfd/at91-usart.c
-@@ -11,6 +11,7 @@
- #include <dt-bindings/mfd/at91-usart.h>
- 
- #include <linux/module.h>
-+#include <linux/mod_devicetable.h>
- #include <linux/mfd/core.h>
- #include <linux/property.h>
- 
 -- 
-2.15.1
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
