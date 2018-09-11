@@ -1,28 +1,30 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Tue, 11 Sep 2018 18:10:07 +0200
-Subject: [PATCH v6 16/18] khwasan, mm, arm64: tag non slab memory
- allocated via pagealloc
-In-Reply-To: <3f2dee71-1615-4a34-d611-3ccaf407551e@virtuozzo.com>
-References: <cover.1535462971.git.andreyknvl@google.com>
- <db103bdc2109396af0c6007f1669ebbbb63b872b.1535462971.git.andreyknvl@google.com>
- <3f2dee71-1615-4a34-d611-3ccaf407551e@virtuozzo.com>
-Message-ID: <CAAeHK+wke5swBfwJUandKe=Oo643n7vHiwPGfUtarT3UmsHetg@mail.gmail.com>
+From: saiprakash.ranjan@codeaurora.org (Sai Prakash Ranjan)
+Date: Tue, 11 Sep 2018 21:41:55 +0530
+Subject: [PATCH 0/6] Tracing register accesses with pstore and dynamic
+ debug
+In-Reply-To: <20180911151148.GI2651@arm.com>
+References: <cover.1536430404.git.saiprakash.ranjan@codeaurora.org>
+ <20180911151148.GI2651@arm.com>
+Message-ID: <2714af83-d2f7-473e-c234-428d2b8a84f0@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 7, 2018 at 6:06 PM, Andrey Ryabinin <aryabinin@virtuozzo.com> wrote:
->
->
-> On 08/29/2018 02:35 PM, Andrey Konovalov wrote:
->
->>  void kasan_poison_slab(struct page *page)
->>  {
->> +     unsigned long i;
->> +
->> +     if (IS_ENABLED(CONFIG_SLAB))
->> +             page->s_mem = reset_tag(page->s_mem);
->
-> Why reinitialize here, instead of single initialization in alloc_slabmgmt()?
+On 9/11/2018 8:41 PM, Will Deacon wrote:
+> Hello,
+> 
+> On Sun, Sep 09, 2018 at 01:57:01AM +0530, Sai Prakash Ranjan wrote:
+>> This patch series adds Event tracing support to pstore and is continuation
+>> to the RFC patch introduced to add a new tracing facility for register
+>> accesses called Register Trace Buffer(RTB). Since we decided to not introduce
+>> a separate framework to trace register accesses and use existing framework
+>> like tracepoints, I have moved from RFC. Details of the RFC in link below:
+>>
+>> Link: https://lore.kernel.org/lkml/cover.1535119710.git.saiprakash.ranjan at codeaurora.org/
+> 
+> The arm64 backend bits look fine to be, but they're mixed up with core
+> changes that I haven't looked at closely.
+> 
+Hi Will,
 
-Hm, don't see why I did it this way, looks odd to me as well. Will fix
-in v7, thanks!
+Thanks for the review. Let me know if you have any suggestions or points 
+regarding this patch, I will be happy to incorporate it.
