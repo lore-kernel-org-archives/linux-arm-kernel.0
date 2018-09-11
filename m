@@ -1,325 +1,993 @@
-From: ladis@linux-mips.org (Ladislav Michl)
-Date: Tue, 11 Sep 2018 21:40:35 +0200
-Subject: [PATCH] gpio: omap: Remove custom PM calls and use cpu_pm instead
-In-Reply-To: <20180911183729.17110-1-tony@atomide.com>
-References: <20180911183729.17110-1-tony@atomide.com>
-Message-ID: <20180911194035.GA2180@lenoch>
+From: ezequiel@collabora.com (Ezequiel Garcia)
+Date: Tue, 11 Sep 2018 16:40:29 -0300
+Subject: [PATCH v2 1/4] arm64: dts: rockchip: Split out common nodes for
+ Rock960 based boards
+In-Reply-To: <20180911023031.4892-2-manivannan.sadhasivam@linaro.org>
+References: <20180911023031.4892-1-manivannan.sadhasivam@linaro.org>
+ <20180911023031.4892-2-manivannan.sadhasivam@linaro.org>
+Message-ID: <9e1868684ed851dfa19300ac2e648cfea7bf3eb9.camel@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
-
-On Tue, Sep 11, 2018 at 11:37:29AM -0700, Tony Lindgren wrote:
-> For a long time the gpio-omap custom PM calls have been annoying me so
-> let's replace them with cpu_pm instead. This will enable GPIO PM for
-> deeper idle states on omap4. And we can handle GPIO PM for omap2/3/4
-> in the same way.
+On Tue, 2018-09-11 at 08:00 +0530, Manivannan Sadhasivam wrote:
+> Since the same family members of Rock960 boards (Rock960 and Ficus)
+> share the same configuration, split out the common nodes into a common
+> dtsi file for reducing code duplication. The board specific nodes for
+> Ficus boards are then placed in corresponding board DTS file.
 > 
-> Note that with this patch we are also slightly changing GPIO PM to be
-> less aggressive for omap3 and only will idle GPIO when PER context
-> may be lost.
 
-I do not think it will make things any worse, but will run my favorite
-latency on test on this patch :)
+I think it should be possible to move the common USB nodes to the dtsi file,
+and keep the board-specific (phy-supply property) in the dts files:
 
-Meanwhile see nit bellow.
+&u2phy0_host {
+        phy-supply = <&vcc5v0_host>;
+};
 
-> For omap2, we don't need to save context and don't want to remove any
-> triggering so let's add a quirk flag for that.
-> 
-> Let's do this all in a single patch to avoid a situation where old
-> custom calls still are used with new code.
-> 
-> Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
-> Cc: Grygorii Strashko <grygorii.strashko@ti.com>
-> Cc: Keerthy <j-keerthy@ti.com>
-> Cc: Ladislav Michl <ladis@linux-mips.org>
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+&u2phy1_host {
+        phy-supply = <&vcc5v0_host>;
+};
+
+Also, I believe it would be good to have some more details
+in this commit log. The information on the cover letter is great,
+so I'd just repeat some of that here.
+
+Other than that, for the ficus bits:
+
+Reviewed-by: Ezequiel Garcia <ezequiel@collabora.com>
+
+Thanks very much for this work!
+Ezequiel
+
+
+> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 > ---
+>  arch/arm64/boot/dts/rockchip/rk3399-ficus.dts | 429 +----------------
+>  .../boot/dts/rockchip/rk3399-rock960.dtsi     | 439 ++++++++++++++++++
+>  2 files changed, 440 insertions(+), 428 deletions(-)
+>  create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
 > 
-> Note that this depends on previously posted patch:
-> 
-> [PATCH] gpio: omap: Add level wakeup handling for omap4 based SoCs
-> 
-> Linus, once people are happy with these, can you maybe set up an
-> immutable branch with both patches in it?
-> 
-> ---
->  arch/arm/mach-omap2/pm24xx.c            |  7 +--
->  arch/arm/mach-omap2/pm34xx.c            | 14 ++---
->  drivers/gpio/gpio-omap.c                | 78 +++++++++++++++----------
->  include/linux/platform_data/gpio-omap.h | 13 -----
->  4 files changed, 55 insertions(+), 57 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
-> --- a/arch/arm/mach-omap2/pm24xx.c
-> +++ b/arch/arm/mach-omap2/pm24xx.c
-> @@ -18,6 +18,7 @@
->   * published by the Free Software Foundation.
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
+> index 8978d924eb83..7f6ec37d5a69 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399-ficus.dts
+> @@ -7,8 +7,7 @@
 >   */
 >  
-> +#include <linux/cpu_pm.h>
->  #include <linux/suspend.h>
->  #include <linux/sched.h>
->  #include <linux/proc_fs.h>
-> @@ -29,8 +30,6 @@
->  #include <linux/clk-provider.h>
->  #include <linux/irq.h>
->  #include <linux/time.h>
-> -#include <linux/gpio.h>
-> -#include <linux/platform_data/gpio-omap.h>
+>  /dts-v1/;
+> -#include "rk3399.dtsi"
+> -#include "rk3399-opp.dtsi"
+> +#include "rk3399-rock960.dtsi"
 >  
->  #include <asm/fncpy.h>
+>  / {
+>  	model = "96boards RK3399 Ficus";
+> @@ -25,31 +24,6 @@
+>  		#clock-cells = <0>;
+>  	};
 >  
-> @@ -87,7 +86,7 @@ static int omap2_enter_full_retention(void)
->  	l = omap_ctrl_readl(OMAP2_CONTROL_DEVCONF0) | OMAP24XX_USBSTANDBYCTRL;
->  	omap_ctrl_writel(l, OMAP2_CONTROL_DEVCONF0);
->  
-> -	omap2_gpio_prepare_for_idle(0);
-> +	cpu_cluster_pm_enter();
->  
->  	/* One last check for pending IRQs to avoid extra latency due
->  	 * to sleeping unnecessarily. */
-> @@ -100,7 +99,7 @@ static int omap2_enter_full_retention(void)
->  			   OMAP_SDRC_REGADDR(SDRC_POWER));
->  
->  no_sleep:
-> -	omap2_gpio_resume_after_idle();
-> +	cpu_cluster_pm_exit();
->  
->  	clk_enable(osc_ck);
->  
-> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> --- a/arch/arm/mach-omap2/pm34xx.c
-> +++ b/arch/arm/mach-omap2/pm34xx.c
-> @@ -18,19 +18,18 @@
->   * published by the Free Software Foundation.
->   */
->  
-> +#include <linux/cpu_pm.h>
->  #include <linux/pm.h>
->  #include <linux/suspend.h>
->  #include <linux/interrupt.h>
->  #include <linux/module.h>
->  #include <linux/list.h>
->  #include <linux/err.h>
-> -#include <linux/gpio.h>
->  #include <linux/clk.h>
->  #include <linux/delay.h>
->  #include <linux/slab.h>
->  #include <linux/omap-dma.h>
->  #include <linux/omap-gpmc.h>
-> -#include <linux/platform_data/gpio-omap.h>
->  
->  #include <trace/events/power.h>
->  
-> @@ -197,7 +196,6 @@ void omap_sram_idle(void)
->  	int mpu_next_state = PWRDM_POWER_ON;
->  	int per_next_state = PWRDM_POWER_ON;
->  	int core_next_state = PWRDM_POWER_ON;
-> -	int per_going_off;
->  	u32 sdrc_pwr = 0;
->  
->  	mpu_next_state = pwrdm_read_next_pwrst(mpu_pwrdm);
-> @@ -227,10 +225,8 @@ void omap_sram_idle(void)
->  	pwrdm_pre_transition(NULL);
->  
->  	/* PER */
-> -	if (per_next_state < PWRDM_POWER_ON) {
-> -		per_going_off = (per_next_state == PWRDM_POWER_OFF) ? 1 : 0;
-> -		omap2_gpio_prepare_for_idle(per_going_off);
-> -	}
-> +	if (per_next_state == PWRDM_POWER_OFF)
-> +		cpu_cluster_pm_enter();
->  
->  	/* CORE */
->  	if (core_next_state < PWRDM_POWER_ON) {
-> @@ -295,8 +291,8 @@ void omap_sram_idle(void)
->  	pwrdm_post_transition(NULL);
->  
->  	/* PER */
-> -	if (per_next_state < PWRDM_POWER_ON)
-> -		omap2_gpio_resume_after_idle();
-> +	if (per_next_state == PWRDM_POWER_OFF)
-> +		cpu_cluster_pm_exit();
->  }
->  
->  static void omap3_pm_idle(void)
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -19,6 +19,7 @@
->  #include <linux/err.h>
->  #include <linux/clk.h>
->  #include <linux/io.h>
-> +#include <linux/cpu_pm.h>
->  #include <linux/device.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/pm.h>
-> @@ -31,6 +32,7 @@
->  #define OFF_MODE	1
->  #define OMAP4_GPIO_DEBOUNCINGTIME_MASK 0xFF
->  
-> +#define OMAP_GPIO_QUIRK_IDLE_REMOVE_TRIGGER	BIT(2)
->  #define OMAP_GPIO_QUIRK_DEFERRED_WKUP_EN	BIT(1)
->  
->  static LIST_HEAD(omap_gpio_list);
-> @@ -72,6 +74,7 @@ struct gpio_bank {
->  	raw_spinlock_t wa_lock;
->  	struct gpio_chip chip;
->  	struct clk *dbck;
-> +	struct notifier_block nb;
->  	u32 mod_usage;
->  	u32 irq_usage;
->  	u32 dbck_enable_mask;
-> @@ -1308,6 +1311,38 @@ static int omap_gpio_chip_init(struct gpio_bank *bank, struct irq_chip *irqc)
->  	return ret;
->  }
->  
-> +static int gpio_omap_cpu_notifier(struct notifier_block *nb,
-> +				  unsigned long cmd, void *v)
-> +{
-> +	struct gpio_bank *bank;
-> +	struct device *dev;
-> +	int error;
-> +
-> +	bank = container_of(nb, struct gpio_bank, nb);
-> +	dev = bank->chip.parent;
-> +
-> +	switch (cmd) {
-> +	case CPU_CLUSTER_PM_ENTER:
-> +		/* Gets cleard on runtime_suspend */
-
-"Gets cleared" perhaps...
-
-> +		bank->power_mode = OFF_MODE;
-> +
-> +		error = pm_runtime_put_sync(dev);
-> +		if (error < 0)
-> +			dev_warn(dev, "CPU PM enter: %i\n", error);
-> +		break;
-> +	case CPU_CLUSTER_PM_ENTER_FAILED:
-> +	case CPU_CLUSTER_PM_EXIT:
-> +		error = pm_runtime_get_sync(dev);
-> +		if (error < 0) {
-> +			dev_err(dev, "CPU PM exit %i\n", error);
-> +			pm_runtime_put_noidle(dev);
-> +		}
-> +		break;
-> +	}
-> +
-> +	return NOTIFY_OK;
-> +}
-> +
->  static const struct of_device_id omap_gpio_match[];
->  
->  static int omap_gpio_probe(struct platform_device *pdev)
-> @@ -1445,6 +1480,9 @@ static int omap_gpio_probe(struct platform_device *pdev)
->  
->  	omap_gpio_show_rev(bank);
->  
-> +	bank->nb.notifier_call = gpio_omap_cpu_notifier;
-> +	cpu_pm_register_notifier(&bank->nb);
-> +
->  	pm_runtime_put(dev);
->  
->  	list_add_tail(&bank->node, &omap_gpio_list);
-> @@ -1456,6 +1494,7 @@ static int omap_gpio_remove(struct platform_device *pdev)
->  {
->  	struct gpio_bank *bank = platform_get_drvdata(pdev);
->  
-> +	cpu_pm_unregister_notifier(&bank->nb);
->  	list_del(&bank->node);
->  	gpiochip_remove(&bank->chip);
->  	pm_runtime_disable(&pdev->dev);
-> @@ -1622,37 +1661,7 @@ static int omap_gpio_runtime_resume(struct device *dev)
->  
->  	return 0;
->  }
-> -#endif /* CONFIG_PM */
+> -	vcc1v8_s0: vcc1v8-s0 {
+> -		compatible = "regulator-fixed";
+> -		regulator-name = "vcc1v8_s0";
+> -		regulator-min-microvolt = <1800000>;
+> -		regulator-max-microvolt = <1800000>;
+> -		regulator-always-on;
+> -	};
 > -
-> -#if IS_BUILTIN(CONFIG_GPIO_OMAP)
-> -void omap2_gpio_prepare_for_idle(int pwr_mode)
-> -{
-> -	struct gpio_bank *bank;
->  
-> -	list_for_each_entry(bank, &omap_gpio_list, node) {
-> -		if (!BANK_USED(bank) || !bank->loses_context)
-> -			continue;
+> -	vcc_sys: vcc-sys {
+> -		compatible = "regulator-fixed";
+> -		regulator-name = "vcc_sys";
+> -		regulator-min-microvolt = <5000000>;
+> -		regulator-max-microvolt = <5000000>;
+> -		regulator-always-on;
+> -	};
 > -
-> -		bank->power_mode = pwr_mode;
+> -	vcc3v3_sys: vcc3v3-sys {
+> -		compatible = "regulator-fixed";
+> -		regulator-name = "vcc3v3_sys";
+> -		regulator-min-microvolt = <3300000>;
+> -		regulator-max-microvolt = <3300000>;
+> -		regulator-always-on;
+> -		vin-supply = <&vcc_sys>;
+> -	};
 > -
-> -		pm_runtime_put_sync_suspend(bank->chip.parent);
-> -	}
-> -}
+>  	vcc3v3_pcie: vcc3v3-pcie-regulator {
+>  		compatible = "regulator-fixed";
+>  		enable-active-high;
+> @@ -75,46 +49,6 @@
+>  		regulator-always-on;
+>  		vin-supply = <&vcc_sys>;
+>  	};
 > -
-> -void omap2_gpio_resume_after_idle(void)
-> -{
-> -	struct gpio_bank *bank;
+> -	vdd_log: vdd-log {
+> -		compatible = "pwm-regulator";
+> -		pwms = <&pwm2 0 25000 0>;
+> -		regulator-name = "vdd_log";
+> -		regulator-min-microvolt = <800000>;
+> -		regulator-max-microvolt = <1400000>;
+> -		regulator-always-on;
+> -		regulator-boot-on;
+> -		vin-supply = <&vcc_sys>;
+> -	};
 > -
-> -	list_for_each_entry(bank, &omap_gpio_list, node) {
-> -		if (!BANK_USED(bank) || !bank->loses_context)
-> -			continue;
+> -};
 > -
-> -		pm_runtime_get_sync(bank->chip.parent);
-> -	}
-> -}
-> -#endif
+> -&cpu_l0 {
+> -	cpu-supply = <&vdd_cpu_l>;
+> -};
 > -
-> -#if defined(CONFIG_PM)
->  static void omap_gpio_init_context(struct gpio_bank *p)
->  {
->  	struct omap_gpio_reg_offs *regs = p->regs;
-> @@ -1768,6 +1777,11 @@ static struct omap_gpio_reg_offs omap4_gpio_regs = {
->  	.fallingdetect =	OMAP4_GPIO_FALLINGDETECT,
+> -&cpu_l1 {
+> -	cpu-supply = <&vdd_cpu_l>;
+> -};
+> -
+> -&cpu_l2 {
+> -	cpu-supply = <&vdd_cpu_l>;
+> -};
+> -
+> -&cpu_l3 {
+> -	cpu-supply = <&vdd_cpu_l>;
+> -};
+> -
+> -&cpu_b0 {
+> -	cpu-supply = <&vdd_cpu_b>;
+> -};
+> -
+> -&cpu_b1 {
+> -	cpu-supply = <&vdd_cpu_b>;
+> -};
+> -
+> -&emmc_phy {
+> -	status = "okay";
 >  };
 >  
+>  &gmac {
+> @@ -133,263 +67,6 @@
+>  	status = "okay";
+>  };
+>  
+> -&hdmi {
+> -	ddc-i2c-bus = <&i2c3>;
+> -	pinctrl-names = "default";
+> -	pinctrl-0 = <&hdmi_cec>;
+> -	status = "okay";
+> -};
+> -
+> -&i2c0 {
+> -	clock-frequency = <400000>;
+> -	i2c-scl-rising-time-ns = <168>;
+> -	i2c-scl-falling-time-ns = <4>;
+> -	status = "okay";
+> -
+> -	vdd_cpu_b: regulator at 40 {
+> -		compatible = "silergy,syr827";
+> -		reg = <0x40>;
+> -		fcs,suspend-voltage-selector = <1>;
+> -		regulator-name = "vdd_cpu_b";
+> -		regulator-min-microvolt = <712500>;
+> -		regulator-max-microvolt = <1500000>;
+> -		regulator-ramp-delay = <1000>;
+> -		regulator-always-on;
+> -		regulator-boot-on;
+> -		vin-supply = <&vcc_sys>;
+> -		status = "okay";
+> -
+> -		regulator-state-mem {
+> -			regulator-off-in-suspend;
+> -		};
+> -	};
+> -
+> -	vdd_gpu: regulator at 41 {
+> -		compatible = "silergy,syr828";
+> -		reg = <0x41>;
+> -		fcs,suspend-voltage-selector = <1>;
+> -		regulator-name = "vdd_gpu";
+> -		regulator-min-microvolt = <712500>;
+> -		regulator-max-microvolt = <1500000>;
+> -		regulator-ramp-delay = <1000>;
+> -		regulator-always-on;
+> -		regulator-boot-on;
+> -		vin-supply = <&vcc_sys>;
+> -		regulator-state-mem {
+> -			regulator-off-in-suspend;
+> -		};
+> -	};
+> -
+> -	rk808: pmic at 1b {
+> -		compatible = "rockchip,rk808";
+> -		reg = <0x1b>;
+> -		interrupt-parent = <&gpio1>;
+> -		interrupts = <21 IRQ_TYPE_LEVEL_LOW>;
+> -		pinctrl-names = "default";
+> -		pinctrl-0 = <&pmic_int_l>;
+> -		rockchip,system-power-controller;
+> -		wakeup-source;
+> -		#clock-cells = <1>;
+> -		clock-output-names = "xin32k", "rk808-clkout2";
+> -
+> -		vcc1-supply = <&vcc_sys>;
+> -		vcc2-supply = <&vcc_sys>;
+> -		vcc3-supply = <&vcc_sys>;
+> -		vcc4-supply = <&vcc_sys>;
+> -		vcc6-supply = <&vcc_sys>;
+> -		vcc7-supply = <&vcc_sys>;
+> -		vcc8-supply = <&vcc3v3_sys>;
+> -		vcc9-supply = <&vcc_sys>;
+> -		vcc10-supply = <&vcc_sys>;
+> -		vcc11-supply = <&vcc_sys>;
+> -		vcc12-supply = <&vcc3v3_sys>;
+> -		vddio-supply = <&vcc_1v8>;
+> -
+> -		regulators {
+> -			vdd_center: DCDC_REG1 {
+> -				regulator-name = "vdd_center";
+> -				regulator-min-microvolt = <750000>;
+> -				regulator-max-microvolt = <1350000>;
+> -				regulator-always-on;
+> -				regulator-boot-on;
+> -				regulator-state-mem {
+> -					regulator-off-in-suspend;
+> -				};
+> -			};
+> -
+> -			vdd_cpu_l: DCDC_REG2 {
+> -				regulator-name = "vdd_cpu_l";
+> -				regulator-min-microvolt = <750000>;
+> -				regulator-max-microvolt = <1350000>;
+> -				regulator-always-on;
+> -				regulator-boot-on;
+> -				regulator-state-mem {
+> -					regulator-off-in-suspend;
+> -				};
+> -			};
+> -
+> -			vcc_ddr: DCDC_REG3 {
+> -				regulator-name = "vcc_ddr";
+> -				regulator-always-on;
+> -				regulator-boot-on;
+> -				regulator-state-mem {
+> -					regulator-on-in-suspend;
+> -				};
+> -			};
+> -
+> -			vcc_1v8: DCDC_REG4 {
+> -				regulator-name = "vcc_1v8";
+> -				regulator-min-microvolt = <1800000>;
+> -				regulator-max-microvolt = <1800000>;
+> -				regulator-always-on;
+> -				regulator-boot-on;
+> -				regulator-state-mem {
+> -					regulator-on-in-suspend;
+> -					regulator-suspend-microvolt = <1800000>;
+> -				};
+> -			};
+> -
+> -			vcc1v8_dvp: LDO_REG1 {
+> -				regulator-name = "vcc1v8_dvp";
+> -				regulator-min-microvolt = <1800000>;
+> -				regulator-max-microvolt = <1800000>;
+> -				regulator-always-on;
+> -				regulator-boot-on;
+> -				regulator-state-mem {
+> -					regulator-on-in-suspend;
+> -					regulator-suspend-microvolt = <1800000>;
+> -				};
+> -			};
+> -
+> -			vcca1v8_hdmi: LDO_REG2 {
+> -				regulator-name = "vcca1v8_hdmi";
+> -				regulator-min-microvolt = <1800000>;
+> -				regulator-max-microvolt = <1800000>;
+> -				regulator-always-on;
+> -				regulator-boot-on;
+> -				regulator-state-mem {
+> -					regulator-on-in-suspend;
+> -					regulator-suspend-microvolt = <1800000>;
+> -				};
+> -			};
+> -
+> -			vcca_1v8: LDO_REG3 {
+> -				regulator-name = "vcca_1v8";
+> -				regulator-min-microvolt = <1800000>;
+> -				regulator-max-microvolt = <1800000>;
+> -				regulator-always-on;
+> -				regulator-boot-on;
+> -				regulator-state-mem {
+> -					regulator-on-in-suspend;
+> -					regulator-suspend-microvolt = <1800000>;
+> -				};
+> -			};
+> -
+> -			vcc_sd: LDO_REG4 {
+> -				regulator-name = "vcc_sd";
+> -				regulator-min-microvolt = <1800000>;
+> -				regulator-max-microvolt = <3300000>;
+> -				regulator-always-on;
+> -				regulator-boot-on;
+> -				regulator-state-mem {
+> -					regulator-on-in-suspend;
+> -					regulator-suspend-microvolt = <3300000>;
+> -				};
+> -			};
+> -
+> -			vcc3v0_sd: LDO_REG5 {
+> -				regulator-name = "vcc3v0_sd";
+> -				regulator-min-microvolt = <3000000>;
+> -				regulator-max-microvolt = <3000000>;
+> -				regulator-always-on;
+> -				regulator-boot-on;
+> -				regulator-state-mem {
+> -					regulator-on-in-suspend;
+> -					regulator-suspend-microvolt = <3000000>;
+> -				};
+> -			};
+> -
+> -			vcc_1v5: LDO_REG6 {
+> -				regulator-name = "vcc_1v5";
+> -				regulator-min-microvolt = <1500000>;
+> -				regulator-max-microvolt = <1500000>;
+> -				regulator-always-on;
+> -				regulator-boot-on;
+> -				regulator-state-mem {
+> -					regulator-on-in-suspend;
+> -					regulator-suspend-microvolt = <1500000>;
+> -				};
+> -			};
+> -
+> -			vcca0v9_hdmi: LDO_REG7 {
+> -				regulator-name = "vcca0v9_hdmi";
+> -				regulator-min-microvolt = <900000>;
+> -				regulator-max-microvolt = <900000>;
+> -				regulator-always-on;
+> -				regulator-boot-on;
+> -				regulator-state-mem {
+> -					regulator-on-in-suspend;
+> -					regulator-suspend-microvolt = <900000>;
+> -				};
+> -			};
+> -
+> -			vcc_3v0: LDO_REG8 {
+> -				regulator-name = "vcc_3v0";
+> -				regulator-min-microvolt = <3000000>;
+> -				regulator-max-microvolt = <3000000>;
+> -				regulator-always-on;
+> -				regulator-boot-on;
+> -				regulator-state-mem {
+> -					regulator-on-in-suspend;
+> -					regulator-suspend-microvolt = <3000000>;
+> -				};
+> -			};
+> -
+> -			vcc3v3_s3: SWITCH_REG1 {
+> -				regulator-name = "vcc3v3_s3";
+> -				regulator-always-on;
+> -				regulator-boot-on;
+> -				regulator-state-mem {
+> -					regulator-on-in-suspend;
+> -				};
+> -			};
+> -
+> -			vcc3v3_s0: SWITCH_REG2 {
+> -				regulator-name = "vcc3v3_s0";
+> -				regulator-always-on;
+> -				regulator-boot-on;
+> -				regulator-state-mem {
+> -					regulator-on-in-suspend;
+> -				};
+> -			};
+> -		};
+> -	};
+> -};
+> -
+> -&i2c1 {
+> -	status = "okay";
+> -};
+> -
+> -&i2c2 {
+> -	status = "okay";
+> -};
+> -
+> -&i2c3 {
+> -	status = "okay";
+> -};
+> -
+> -&i2c4 {
+> -	status = "okay";
+> -};
+> -
+> -&io_domains {
+> -	bt656-supply = <&vcc1v8_s0>; /* bt656_gpio2ab_ms */
+> -	audio-supply = <&vcc1v8_s0>; /* audio_gpio3d4a_ms */
+> -	sdmmc-supply = <&vcc_sd>; /* sdmmc_gpio4b_ms */
+> -	gpio1830-supply = <&vcc_3v0>; /* gpio1833_gpio4cd_ms */
+> -	status = "okay";
+> -};
+> -
+>  &pcie_phy {
+>  	status = "okay";
+>  };
+> @@ -403,11 +80,6 @@
+>  	status = "okay";
+>  };
+>  
+> -&pmu_io_domains {
+> -	pmu1830-supply = <&vcc_1v8>;
+> -	status = "okay";
+> -};
+> -
+>  &pinctrl {
+>  	gmac {
+>  		rgmii_sleep_pins: rgmii-sleep-pins {
+> @@ -416,31 +88,6 @@
+>  		};
+>  	};
+>  
+> -	sdmmc {
+> -		sdmmc_bus1: sdmmc-bus1 {
+> -			rockchip,pins =
+> -				<4 8 RK_FUNC_1 &pcfg_pull_up_8ma>;
+> -		};
+> -
+> -		sdmmc_bus4: sdmmc-bus4 {
+> -			rockchip,pins =
+> -				<4 8 RK_FUNC_1 &pcfg_pull_up_8ma>,
+> -				<4 9 RK_FUNC_1 &pcfg_pull_up_8ma>,
+> -				<4 10 RK_FUNC_1 &pcfg_pull_up_8ma>,
+> -				<4 11 RK_FUNC_1 &pcfg_pull_up_8ma>;
+> -		};
+> -
+> -		sdmmc_clk: sdmmc-clk {
+> -			rockchip,pins =
+> -				<4 12 RK_FUNC_1 &pcfg_pull_none_18ma>;
+> -		};
+> -
+> -		sdmmc_cmd: sdmmc-cmd {
+> -			rockchip,pins =
+> -				<4 13 RK_FUNC_1 &pcfg_pull_up_8ma>;
+> -		};
+> -	};
+> -
+>  	pcie {
+>  		pcie_drv: pcie-drv {
+>  			rockchip,pins =
+> @@ -448,23 +95,6 @@
+>  			};
+>  	};
+>  
+> -	pmic {
+> -		pmic_int_l: pmic-int-l {
+> -			rockchip,pins =
+> -				<1 21 RK_FUNC_GPIO &pcfg_pull_up>;
+> -		};
+> -
+> -		vsel1_gpio: vsel1-gpio {
+> -			rockchip,pins =
+> -				<1 17 RK_FUNC_GPIO &pcfg_pull_down>;
+> -		};
+> -
+> -		vsel2_gpio: vsel2-gpio {
+> -			rockchip,pins =
+> -				<1 14 RK_FUNC_GPIO &pcfg_pull_down>;
+> -		};
+> -	};
+> -
+>  	usb2 {
+>  		host_vbus_drv: host-vbus-drv {
+>  			rockchip,pins =
+> @@ -473,37 +103,6 @@
+>  	};
+>  };
+>  
+> -&pwm2 {
+> -	status = "okay";
+> -};
+> -
+> -&pwm3 {
+> -	status = "okay";
+> -};
+> -
+> -&sdhci {
+> -	bus-width = <8>;
+> -	mmc-hs400-1_8v;
+> -	mmc-hs400-enhanced-strobe;
+> -	non-removable;
+> -	status = "okay";
+> -};
+> -
+> -&sdmmc {
+> -	bus-width = <4>;
+> -	cap-mmc-highspeed;
+> -	cap-sd-highspeed;
+> -	clock-frequency = <100000000>;
+> -	clock-freq-min-max = <100000 100000000>;
+> -	disable-wp;
+> -	sd-uhs-sdr104;
+> -	vqmmc-supply = <&vcc_sd>;
+> -	card-detect-delay = <800>;
+> -	pinctrl-names = "default";
+> -	pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_cd &sdmmc_bus4>;
+> -	status = "okay";
+> -};
+> -
+>  &tcphy0 {
+>  	status = "okay";
+>  };
+> @@ -538,16 +137,6 @@
+>  	status = "okay";
+>  };
+>  
+> -&uart0 {
+> -	pinctrl-names = "default";
+> -	pinctrl-0 = <&uart0_xfer &uart0_cts>;
+> -	status = "okay";
+> -};
+> -
+> -&uart2 {
+> -	status = "okay";
+> -};
+> -
+>  &usb_host0_ehci {
+>  	status = "okay";
+>  };
+> @@ -581,19 +170,3 @@
+>  	status = "okay";
+>  	dr_mode = "host";
+>  };
+> -
+> -&vopb {
+> -	status = "okay";
+> -};
+> -
+> -&vopb_mmu {
+> -	status = "okay";
+> -};
+> -
+> -&vopl {
+> -	status = "okay";
+> -};
+> -
+> -&vopl_mmu {
+> -	status = "okay";
+> -};
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
+> new file mode 100644
+> index 000000000000..5a5d8e28ef55
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
+> @@ -0,0 +1,439 @@
+> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 > +/*
-> + * Note that omap2 does not currently support idle modes with context loss so
-> + * no need to add OMAP_GPIO_QUIRK_IDLE_REMOVE_TRIGGER quirk flag to save
-> + * and restore context.
+> + * Copyright (c) 2018 Collabora Ltd.
+> + * Copyright (c) 2018 Fuzhou Rockchip Electronics Co., Ltd.
+> + * Copyright (c) 2018 Linaro Ltd.
 > + */
->  static const struct omap_gpio_platform_data omap2_pdata = {
->  	.regs = &omap2_gpio_regs,
->  	.bank_width = 32,
-> @@ -1778,13 +1792,15 @@ static const struct omap_gpio_platform_data omap3_pdata = {
->  	.regs = &omap2_gpio_regs,
->  	.bank_width = 32,
->  	.dbck_flag = true,
-> +	.quirks = OMAP_GPIO_QUIRK_IDLE_REMOVE_TRIGGER,
->  };
->  
->  static const struct omap_gpio_platform_data omap4_pdata = {
->  	.regs = &omap4_gpio_regs,
->  	.bank_width = 32,
->  	.dbck_flag = true,
-> -	.quirks = OMAP_GPIO_QUIRK_DEFERRED_WKUP_EN,
-> +	.quirks = OMAP_GPIO_QUIRK_IDLE_REMOVE_TRIGGER |
-> +		  OMAP_GPIO_QUIRK_DEFERRED_WKUP_EN,
->  };
->  
->  static const struct of_device_id omap_gpio_match[] = {
-> diff --git a/include/linux/platform_data/gpio-omap.h b/include/linux/platform_data/gpio-omap.h
-> --- a/include/linux/platform_data/gpio-omap.h
-> +++ b/include/linux/platform_data/gpio-omap.h
-> @@ -205,17 +205,4 @@ struct omap_gpio_platform_data {
->  	int (*get_context_loss_count)(struct device *dev);
->  };
->  
-> -#if IS_BUILTIN(CONFIG_GPIO_OMAP)
-> -extern void omap2_gpio_prepare_for_idle(int off_mode);
-> -extern void omap2_gpio_resume_after_idle(void);
-> -#else
-> -static inline void omap2_gpio_prepare_for_idle(int off_mode)
-> -{
-> -}
-> -
-> -static inline void omap2_gpio_resume_after_idle(void)
-> -{
-> -}
-> -#endif
-> -
->  #endif
-> -- 
-> 2.18.0
+> +
+> +#include "rk3399.dtsi"
+> +#include "rk3399-opp.dtsi"
+> +
+> +/ {
+> +	vcc1v8_s0: vcc1v8-s0 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "vcc1v8_s0";
+> +		regulator-min-microvolt = <1800000>;
+> +		regulator-max-microvolt = <1800000>;
+> +		regulator-always-on;
+> +	};
+> +
+> +	vcc_sys: vcc-sys {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "vcc_sys";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		regulator-always-on;
+> +	};
+> +
+> +	vcc3v3_sys: vcc3v3-sys {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "vcc3v3_sys";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		regulator-always-on;
+> +		vin-supply = <&vcc_sys>;
+> +	};
+> +
+> +	vdd_log: vdd-log {
+> +		compatible = "pwm-regulator";
+> +		pwms = <&pwm2 0 25000 0>;
+> +		regulator-name = "vdd_log";
+> +		regulator-min-microvolt = <800000>;
+> +		regulator-max-microvolt = <1400000>;
+> +		regulator-always-on;
+> +		regulator-boot-on;
+> +		vin-supply = <&vcc_sys>;
+> +	};
+> +
+> +};
+> +
+> +&cpu_l0 {
+> +	cpu-supply = <&vdd_cpu_l>;
+> +};
+> +
+> +&cpu_l1 {
+> +	cpu-supply = <&vdd_cpu_l>;
+> +};
+> +
+> +&cpu_l2 {
+> +	cpu-supply = <&vdd_cpu_l>;
+> +};
+> +
+> +&cpu_l3 {
+> +	cpu-supply = <&vdd_cpu_l>;
+> +};
+> +
+> +&cpu_b0 {
+> +	cpu-supply = <&vdd_cpu_b>;
+> +};
+> +
+> +&cpu_b1 {
+> +	cpu-supply = <&vdd_cpu_b>;
+> +};
+> +
+> +&emmc_phy {
+> +	status = "okay";
+> +};
+> +
+> +&hdmi {
+> +	ddc-i2c-bus = <&i2c3>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&hdmi_cec>;
+> +	status = "okay";
+> +};
+> +
+> +&i2c0 {
+> +	clock-frequency = <400000>;
+> +	i2c-scl-rising-time-ns = <168>;
+> +	i2c-scl-falling-time-ns = <4>;
+> +	status = "okay";
+> +
+> +	vdd_cpu_b: regulator at 40 {
+> +		compatible = "silergy,syr827";
+> +		reg = <0x40>;
+> +		fcs,suspend-voltage-selector = <1>;
+> +		regulator-name = "vdd_cpu_b";
+> +		regulator-min-microvolt = <712500>;
+> +		regulator-max-microvolt = <1500000>;
+> +		regulator-ramp-delay = <1000>;
+> +		regulator-always-on;
+> +		regulator-boot-on;
+> +		vin-supply = <&vcc_sys>;
+> +		status = "okay";
+> +
+> +		regulator-state-mem {
+> +			regulator-off-in-suspend;
+> +		};
+> +	};
+> +
+> +	vdd_gpu: regulator at 41 {
+> +		compatible = "silergy,syr828";
+> +		reg = <0x41>;
+> +		fcs,suspend-voltage-selector = <1>;
+> +		regulator-name = "vdd_gpu";
+> +		regulator-min-microvolt = <712500>;
+> +		regulator-max-microvolt = <1500000>;
+> +		regulator-ramp-delay = <1000>;
+> +		regulator-always-on;
+> +		regulator-boot-on;
+> +		vin-supply = <&vcc_sys>;
+> +		regulator-state-mem {
+> +			regulator-off-in-suspend;
+> +		};
+> +	};
+> +
+> +	rk808: pmic at 1b {
+> +		compatible = "rockchip,rk808";
+> +		reg = <0x1b>;
+> +		interrupt-parent = <&gpio1>;
+> +		interrupts = <21 IRQ_TYPE_LEVEL_LOW>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pmic_int_l>;
+> +		rockchip,system-power-controller;
+> +		wakeup-source;
+> +		#clock-cells = <1>;
+> +		clock-output-names = "xin32k", "rk808-clkout2";
+> +
+> +		vcc1-supply = <&vcc_sys>;
+> +		vcc2-supply = <&vcc_sys>;
+> +		vcc3-supply = <&vcc_sys>;
+> +		vcc4-supply = <&vcc_sys>;
+> +		vcc6-supply = <&vcc_sys>;
+> +		vcc7-supply = <&vcc_sys>;
+> +		vcc8-supply = <&vcc3v3_sys>;
+> +		vcc9-supply = <&vcc_sys>;
+> +		vcc10-supply = <&vcc_sys>;
+> +		vcc11-supply = <&vcc_sys>;
+> +		vcc12-supply = <&vcc3v3_sys>;
+> +		vddio-supply = <&vcc_1v8>;
+> +
+> +		regulators {
+> +			vdd_center: DCDC_REG1 {
+> +				regulator-name = "vdd_center";
+> +				regulator-min-microvolt = <750000>;
+> +				regulator-max-microvolt = <1350000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-state-mem {
+> +					regulator-off-in-suspend;
+> +				};
+> +			};
+> +
+> +			vdd_cpu_l: DCDC_REG2 {
+> +				regulator-name = "vdd_cpu_l";
+> +				regulator-min-microvolt = <750000>;
+> +				regulator-max-microvolt = <1350000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-state-mem {
+> +					regulator-off-in-suspend;
+> +				};
+> +			};
+> +
+> +			vcc_ddr: DCDC_REG3 {
+> +				regulator-name = "vcc_ddr";
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-state-mem {
+> +					regulator-on-in-suspend;
+> +				};
+> +			};
+> +
+> +			vcc_1v8: DCDC_REG4 {
+> +				regulator-name = "vcc_1v8";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-state-mem {
+> +					regulator-on-in-suspend;
+> +					regulator-suspend-microvolt = <1800000>;
+> +				};
+> +			};
+> +
+> +			vcc1v8_dvp: LDO_REG1 {
+> +				regulator-name = "vcc1v8_dvp";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-state-mem {
+> +					regulator-on-in-suspend;
+> +					regulator-suspend-microvolt = <1800000>;
+> +				};
+> +			};
+> +
+> +			vcca1v8_hdmi: LDO_REG2 {
+> +				regulator-name = "vcca1v8_hdmi";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-state-mem {
+> +					regulator-on-in-suspend;
+> +					regulator-suspend-microvolt = <1800000>;
+> +				};
+> +			};
+> +
+> +			vcca_1v8: LDO_REG3 {
+> +				regulator-name = "vcca_1v8";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-state-mem {
+> +					regulator-on-in-suspend;
+> +					regulator-suspend-microvolt = <1800000>;
+> +				};
+> +			};
+> +
+> +			vcc_sd: LDO_REG4 {
+> +				regulator-name = "vcc_sd";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-state-mem {
+> +					regulator-on-in-suspend;
+> +					regulator-suspend-microvolt = <3300000>;
+> +				};
+> +			};
+> +
+> +			vcc3v0_sd: LDO_REG5 {
+> +				regulator-name = "vcc3v0_sd";
+> +				regulator-min-microvolt = <3000000>;
+> +				regulator-max-microvolt = <3000000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-state-mem {
+> +					regulator-on-in-suspend;
+> +					regulator-suspend-microvolt = <3000000>;
+> +				};
+> +			};
+> +
+> +			vcc_1v5: LDO_REG6 {
+> +				regulator-name = "vcc_1v5";
+> +				regulator-min-microvolt = <1500000>;
+> +				regulator-max-microvolt = <1500000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-state-mem {
+> +					regulator-on-in-suspend;
+> +					regulator-suspend-microvolt = <1500000>;
+> +				};
+> +			};
+> +
+> +			vcca0v9_hdmi: LDO_REG7 {
+> +				regulator-name = "vcca0v9_hdmi";
+> +				regulator-min-microvolt = <900000>;
+> +				regulator-max-microvolt = <900000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-state-mem {
+> +					regulator-on-in-suspend;
+> +					regulator-suspend-microvolt = <900000>;
+> +				};
+> +			};
+> +
+> +			vcc_3v0: LDO_REG8 {
+> +				regulator-name = "vcc_3v0";
+> +				regulator-min-microvolt = <3000000>;
+> +				regulator-max-microvolt = <3000000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-state-mem {
+> +					regulator-on-in-suspend;
+> +					regulator-suspend-microvolt = <3000000>;
+> +				};
+> +			};
+> +
+> +			vcc3v3_s3: SWITCH_REG1 {
+> +				regulator-name = "vcc3v3_s3";
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-state-mem {
+> +					regulator-on-in-suspend;
+> +				};
+> +			};
+> +
+> +			vcc3v3_s0: SWITCH_REG2 {
+> +				regulator-name = "vcc3v3_s0";
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-state-mem {
+> +					regulator-on-in-suspend;
+> +				};
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +&i2c1 {
+> +	status = "okay";
+> +};
+> +
+> +&i2c2 {
+> +	status = "okay";
+> +};
+> +
+> +&i2c3 {
+> +	status = "okay";
+> +};
+> +
+> +&i2c4 {
+> +	status = "okay";
+> +};
+> +
+> +&io_domains {
+> +	bt656-supply = <&vcc1v8_s0>; /* bt656_gpio2ab_ms */
+> +	audio-supply = <&vcc1v8_s0>; /* audio_gpio3d4a_ms */
+> +	sdmmc-supply = <&vcc_sd>; /* sdmmc_gpio4b_ms */
+> +	gpio1830-supply = <&vcc_3v0>; /* gpio1833_gpio4cd_ms */
+> +	status = "okay";
+> +};
+> +
+> +&pmu_io_domains {
+> +	pmu1830-supply = <&vcc_1v8>;
+> +	status = "okay";
+> +};
+> +
+> +&pinctrl {
+> +	sdmmc {
+> +		sdmmc_bus1: sdmmc-bus1 {
+> +			rockchip,pins =
+> +				<4 8 RK_FUNC_1 &pcfg_pull_up_8ma>;
+> +		};
+> +
+> +		sdmmc_bus4: sdmmc-bus4 {
+> +			rockchip,pins =
+> +				<4 8 RK_FUNC_1 &pcfg_pull_up_8ma>,
+> +				<4 9 RK_FUNC_1 &pcfg_pull_up_8ma>,
+> +				<4 10 RK_FUNC_1 &pcfg_pull_up_8ma>,
+> +				<4 11 RK_FUNC_1 &pcfg_pull_up_8ma>;
+> +		};
+> +
+> +		sdmmc_clk: sdmmc-clk {
+> +			rockchip,pins =
+> +				<4 12 RK_FUNC_1 &pcfg_pull_none_18ma>;
+> +		};
+> +
+> +		sdmmc_cmd: sdmmc-cmd {
+> +			rockchip,pins =
+> +				<4 13 RK_FUNC_1 &pcfg_pull_up_8ma>;
+> +		};
+> +	};
+> +
+> +	pmic {
+> +		pmic_int_l: pmic-int-l {
+> +			rockchip,pins =
+> +				<1 21 RK_FUNC_GPIO &pcfg_pull_up>;
+> +		};
+> +
+> +		vsel1_gpio: vsel1-gpio {
+> +			rockchip,pins =
+> +				<1 17 RK_FUNC_GPIO &pcfg_pull_down>;
+> +		};
+> +
+> +		vsel2_gpio: vsel2-gpio {
+> +			rockchip,pins =
+> +				<1 14 RK_FUNC_GPIO &pcfg_pull_down>;
+> +		};
+> +	};
+> +};
+> +
+> +&pwm2 {
+> +	status = "okay";
+> +};
+> +
+> +&pwm3 {
+> +	status = "okay";
+> +};
+> +
+> +&sdhci {
+> +	bus-width = <8>;
+> +	mmc-hs400-1_8v;
+> +	mmc-hs400-enhanced-strobe;
+> +	non-removable;
+> +	status = "okay";
+> +};
+> +
+> +&sdmmc {
+> +	bus-width = <4>;
+> +	cap-mmc-highspeed;
+> +	cap-sd-highspeed;
+> +	clock-frequency = <100000000>;
+> +	clock-freq-min-max = <100000 100000000>;
+> +	disable-wp;
+> +	sd-uhs-sdr104;
+> +	vqmmc-supply = <&vcc_sd>;
+> +	card-detect-delay = <800>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_cd &sdmmc_bus4>;
+> +	status = "okay";
+> +};
+> +
+> +&uart0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart0_xfer &uart0_cts>;
+> +	status = "okay";
+> +};
+> +
+> +&uart2 {
+> +	status = "okay";
+> +};
+> +
+> +&vopb {
+> +	status = "okay";
+> +};
+> +
+> +&vopb_mmu {
+> +	status = "okay";
+> +};
+> +
+> +&vopl {
+> +	status = "okay";
+> +};
+> +
+> +&vopl_mmu {
+> +	status = "okay";
+> +};
