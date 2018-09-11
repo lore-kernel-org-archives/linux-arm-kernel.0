@@ -1,14 +1,13 @@
 From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Tue, 11 Sep 2018 09:26:55 +0200
-Subject: [PATCH v1 2/7] dt-bindings: stm32-dmamux: Add one cell to support
- DMA/MDMA chain
+Date: Tue, 11 Sep 2018 09:27:00 +0200
+Subject: [PATCH v1 7/7] dmaengine: stm32-mdma: enable descriptor_reuse
 In-Reply-To: <1536650820-16076-1-git-send-email-pierre-yves.mordret@st.com>
 References: <1536650820-16076-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <1536650820-16076-3-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <1536650820-16076-8-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add one cell to support DMA/MDMA chaining.
+enable reuse to spare descriptors creation on critical UC.
 
 Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 ---
@@ -17,31 +16,21 @@ Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
        * Initial
 ---
 ---
- Documentation/devicetree/bindings/dma/stm32-dmamux.txt | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+ drivers/dma/stm32-mdma.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/dma/stm32-dmamux.txt b/Documentation/devicetree/bindings/dma/stm32-dmamux.txt
-index 1b893b2..8e092d2 100644
---- a/Documentation/devicetree/bindings/dma/stm32-dmamux.txt
-+++ b/Documentation/devicetree/bindings/dma/stm32-dmamux.txt
-@@ -4,9 +4,6 @@ Required properties:
- - compatible:	"st,stm32h7-dmamux"
- - reg:		Memory map for accessing module
- - #dma-cells:	Should be set to <3>.
--		First parameter is request line number.
--		Second is DMA channel configuration
--		Third is Fifo threshold
- 		For more details about the three cells, please see
- 		stm32-dma.txt documentation binding file
- - dma-masters:	Phandle pointing to the DMA controllers.
-@@ -53,7 +50,7 @@ dma2: dma at 40020400 {
- 		     <68>,
- 		     <69>,
- 		     <70>;
--	clocks = <&timer_clk>;
-+	clocks = <&clk_hclk>;
- 	#dma-cells = <4>;
- 	st,mem2mem;
- 	resets = <&rcc 150>;
+diff --git a/drivers/dma/stm32-mdma.c b/drivers/dma/stm32-mdma.c
+index 6b6e63b..80a17dd 100644
+--- a/drivers/dma/stm32-mdma.c
++++ b/drivers/dma/stm32-mdma.c
+@@ -1715,6 +1715,8 @@ static int stm32_mdma_probe(struct platform_device *pdev)
+ 	dd->device_resume = stm32_mdma_resume;
+ 	dd->device_terminate_all = stm32_mdma_terminate_all;
+ 	dd->device_synchronize = stm32_mdma_synchronize;
++	dd->descriptor_reuse = true;
++
+ 	dd->src_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
+ 		BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
+ 		BIT(DMA_SLAVE_BUSWIDTH_4_BYTES) |
 -- 
 2.7.4
