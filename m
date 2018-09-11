@@ -1,54 +1,44 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 11 Sep 2018 11:57:36 +0100
-Subject: [PATCH] iommu/rockchip: Free irqs in shutdown handler
-In-Reply-To: <20180827105624.5593-1-heiko@sntech.de>
-References: <20180827105624.5593-1-heiko@sntech.de>
-Message-ID: <cd621b70-ddb1-1e04-0432-db69a50df081@arm.com>
+From: morten.rasmussen@arm.com (Morten Rasmussen)
+Date: Tue, 11 Sep 2018 12:04:09 +0100
+Subject: [PATCH 1/4] sched/topology: SD_ASYM_CPUCAPACITY flag detection
+In-Reply-To: <20180910082111.GA48257@gmail.com>
+References: <1532093554-30504-1-git-send-email-morten.rasmussen@arm.com>
+ <1532093554-30504-2-git-send-email-morten.rasmussen@arm.com>
+ <20180910082111.GA48257@gmail.com>
+Message-ID: <20180911110409.GA16613@e105550-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
-
-On 27/08/18 11:56, Heiko Stuebner wrote:
-> In the iommu's shutdown handler we disable runtime-pm which could
-> result in the irq-handler running unclocked and since commit
->     3fc7c5c0cff3 ("iommu/rockchip: Handle errors returned from PM framework")
-> we warn about that fact.
+On Mon, Sep 10, 2018 at 10:21:11AM +0200, Ingo Molnar wrote:
 > 
-> This can cause warnings on shutdown on some Rockchip machines, so
-> free the irqs in the shutdown handler before we disable runtime-pm.
+> * Morten Rasmussen <morten.rasmussen@arm.com> wrote:
 > 
-> Reported-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> Fixes: 3fc7c5c0cff3 ("iommu/rockchip: Handle errors returned from PM framework")
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  drivers/iommu/rockchip-iommu.c | 6 ++++++
->  1 file changed, 6 insertions(+)
+> > The SD_ASYM_CPUCAPACITY sched_domain flag is supposed to mark the
+> > sched_domain in the hierarchy where all cpu capacities are visible for
+> > any cpu's point of view on asymmetric cpu capacity systems. The
 > 
-> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-> index 258115b10fa9..ad3e2b97469e 100644
-> --- a/drivers/iommu/rockchip-iommu.c
-> +++ b/drivers/iommu/rockchip-iommu.c
-> @@ -1241,6 +1241,12 @@ static int rk_iommu_probe(struct platform_device *pdev)
->  
->  static void rk_iommu_shutdown(struct platform_device *pdev)
->  {
-> +	struct rk_iommu *iommu = platform_get_drvdata(pdev);
-> +	int i = 0, irq;
-> +
-> +	while ((irq = platform_get_irq(pdev, i++)) != -ENXIO)
-> +		devm_free_irq(iommu->dev, irq, iommu);
-> +
->  	pm_runtime_force_suspend(&pdev->dev);
->  }
->  
+> >  /*
+> > + * Find the sched_domain_topology_level where all cpu capacities are visible
+> > + * for all cpus.
+> > + */
 > 
+> > +	/*
+> > +	 * Examine topology from all cpu's point of views to detect the lowest
+> > +	 * sched_domain_topology_level where a highest capacity cpu is visible
+> > +	 * to everyone.
+> > +	 */
+> 
+> >  #define SD_WAKE_AFFINE               0x0020  /* Wake task to waking CPU */
+> > -#define SD_ASYM_CPUCAPACITY  0x0040  /* Groups have different max cpu capacities */
+> > +#define SD_ASYM_CPUCAPACITY  0x0040  /* Domain members have different cpu capacities */
+> 
+> For future reference: *please* capitalize 'CPU' and 'CPUs' in future patches like the rest of 
+> the scheduler does.
+> 
+> You can see it spelled right above the new definition: 'waking CPU' ;-)
+> 
+> (I fixed this up in this patch.)
 
-Looks OK to me. I don't think there is a point in using devm_irq* 
-anymore in this driver, but that's a separate issue.
+Noted. Thanks for fixing up the patch.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Morten
