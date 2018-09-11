@@ -1,35 +1,44 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Sep 2018 09:51:27 +0100
-Subject: [GIT PULL] Immutable branch between MFD, SPI and TTY due for the
- v4.20 merge window
-In-Reply-To: <bd9104b702feec556ed01311e9efcb96790131d0.camel@upb.ro>
-References: <20180713164736.26028-1-radu.pirea@microchip.com>
- <20180910151803.GX28860@dell>
- <bd9104b702feec556ed01311e9efcb96790131d0.camel@upb.ro>
-Message-ID: <20180911085127.GD4185@dell>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 11 Sep 2018 10:53:55 +0200
+Subject: [PATCH v9 0/9] Cedrus driver for the Allwinner Video Engine,
+ using media requests
+In-Reply-To: <20180906222442.14825-1-contact@paulk.fr>
+References: <20180906222442.14825-1-contact@paulk.fr>
+Message-ID: <20180911085355.bmd6gm24tkuxzdst@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Sep 2018, Radu Nicolae Pirea wrote:
-
-> Hi Lee,
+On Fri, Sep 07, 2018 at 12:24:33AM +0200, Paul Kocialkowski wrote:
+> This is the ninth iteration of the updated Cedrus driver,
+> that supports the Video Engine found on most Allwinner SoCs, starting
+> with the A10. It was tested on the A13, A20, A33 and H3.
 > 
-> Thank you for taking the patch series, but you didn't take the latest
-> version(v12) :)
+> The initial version of this driver[0] was originally written and
+> submitted by Florent Revest using a previous version of the request API
+> that is necessary to provide coherency between controls and the buffers
+> they apply to.
+> 
+> The driver was adapted to use the latest version of the media request
+> API[1], as submitted by Hans Verkuil. Media request API support is a
+> hard requirement for the Cedrus driver.
+> 
+> The driver itself currently only supports MPEG2 and more codecs will be
+> added eventually. The default output frame format provided by the Video
+> Engine is a multi-planar tiled YUV format (based on NV12). A specific
+> format is introduced in the V4L2 API to describe it. Starting with the
+> A33, the Video Engine can also output untiled YUV formats.
 
-Both were marked for merging in my inbox, and since I am working
-though my (300+) post-vacation emails chronologically v11 was handled
-first.
-
-It appears as though there is an issue in the way 'struct
-of_device_id' was declared too.  The header file in which it was
-declared used to be included by proxy, however a separation has
-recently been made causing build errors.
-
-I will fix both issues and re-submit the PR.
+Applied the DTS patches, thanks!
+Maxime
 
 -- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180911/d1ae15e4/attachment.sig>
