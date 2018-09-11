@@ -1,35 +1,53 @@
 From: tudor.ambarus@microchip.com (Tudor Ambarus)
-Date: Tue, 11 Sep 2018 11:22:31 +0300
-Subject: [PATCH v2 2/3] mtd: spi-nor: unlock global block protection on
- sst26vf064b
+Date: Tue, 11 Sep 2018 11:22:32 +0300
+Subject: [PATCH v2 3/3] mtd: spi-nor: add support for Microchip SST26 QSPI
+ flash memories
 In-Reply-To: <20180911082232.28678-1-tudor.ambarus@microchip.com>
 References: <20180911082232.28678-1-tudor.ambarus@microchip.com>
-Message-ID: <20180911082232.28678-3-tudor.ambarus@microchip.com>
+Message-ID: <20180911082232.28678-4-tudor.ambarus@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To avoid inadvertent writes during power-up, sst26vf064b is
-write-protected by default after a power-on reset cycle.
-Unlock the serial flash memory by using the Global Block Protection
-Unlock command - it offers a single command cycle that unlocks
-the entire memory array.
+The flash memories are write-protected by default at power-on and
+must be unlocked first, before being erased, then programmed.
+
+The erase block sizes are not uniform. The memory layout is uniform
+just for the 4K sector blocks.
 
 Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
 ---
- drivers/mtd/spi-nor/spi-nor.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ drivers/mtd/spi-nor/spi-nor.c | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
 diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
-index d3134fd..ba0fd8b 100644
+index ba0fd8b..dc8757e 100644
 --- a/drivers/mtd/spi-nor/spi-nor.c
 +++ b/drivers/mtd/spi-nor/spi-nor.c
-@@ -1163,7 +1163,11 @@ static const struct flash_info spi_nor_ids[] = {
- 	{ "sst25wf040b", INFO(0x621613, 0, 64 * 1024,  8, SECT_4K) },
+@@ -1164,10 +1164,30 @@ static const struct flash_info spi_nor_ids[] = {
  	{ "sst25wf040",  INFO(0xbf2504, 0, 64 * 1024,  8, SECT_4K | SST_WRITE) },
  	{ "sst25wf080",  INFO(0xbf2505, 0, 64 * 1024, 16, SECT_4K | SST_WRITE) },
--	{ "sst26vf064b", INFO(0xbf2643, 0, 64 * 1024, 128, SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ) },
+ 	{
++		"sst26vf016b", INFO(0xbf2641, 0, 64 * 1024, 32,
++			SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ |
++			UNLOCK_GLOBAL_BLOCK)
++	},
 +	{
-+		"sst26vf064b", INFO(0xbf2643, 0, 64 * 1024, 128,
++		"sst26vf032b", INFO(0xbf2642, 0, 64 * 1024, 64,
++			SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ |
++			UNLOCK_GLOBAL_BLOCK)
++	},
++	{
+ 		"sst26vf064b", INFO(0xbf2643, 0, 64 * 1024, 128,
+ 			SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ |
+ 			UNLOCK_GLOBAL_BLOCK)
+ 	},
++	{
++		"sst26vf040b", INFO(0xbf2654, 0, 64 * 1024, 8,
++			SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ |
++			UNLOCK_GLOBAL_BLOCK)
++	},
++	{
++		"sst26vf080b", INFO(0xbf2658, 0, 64 * 1024, 16,
 +			SECT_4K | SPI_NOR_DUAL_READ | SPI_NOR_QUAD_READ |
 +			UNLOCK_GLOBAL_BLOCK)
 +	},
