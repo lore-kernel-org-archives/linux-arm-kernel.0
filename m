@@ -1,91 +1,759 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 11 Sep 2018 11:17:08 +0100
-Subject: [PATCH 07/11] dts: arm: omap: Update coresight bindings for hardware
- ports
+Date: Tue, 11 Sep 2018 11:17:06 +0100
+Subject: [PATCH 05/11] dts: arm: hisilicon: Update coresight bindings for
+ hardware ports
 In-Reply-To: <1536661032-30481-1-git-send-email-suzuki.poulose@arm.com>
 References: <1536661032-30481-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1536661032-30481-8-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1536661032-30481-6-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch to the new coresight bindings for hardware ports
+Switch to the new the hardware port bindings.
 
-Cc: linux-omap at vger.kernel.org
-Cc: "Beno?t Cousson" <bcousson@baylibre.com>
-Cc: Tony Lindgren <tony@atomide.com>
+Cc: Wei Xu <xuwei5@hisilicon.com>
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm/boot/dts/omap3-beagle-xm.dts | 17 ++++++++++-------
- arch/arm/boot/dts/omap3-beagle.dts    | 17 ++++++++++-------
- 2 files changed, 20 insertions(+), 14 deletions(-)
+ arch/arm/boot/dts/hip04.dtsi | 322 ++++++++++++++++++++++++-------------------
+ 1 file changed, 183 insertions(+), 139 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
-index d80587d..9985ee2 100644
---- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-+++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-@@ -160,10 +160,11 @@
+diff --git a/arch/arm/boot/dts/hip04.dtsi b/arch/arm/boot/dts/hip04.dtsi
+index 44044f2..9ab1980 100644
+--- a/arch/arm/boot/dts/hip04.dtsi
++++ b/arch/arm/boot/dts/hip04.dtsi
+@@ -277,10 +277,11 @@
  
- 		clocks = <&emu_src_ck>;
+ 		clocks = <&clk_375m>;
  		clock-names = "apb_pclk";
 -		port {
--			etb_in: endpoint {
+-			etb0_in_port: endpoint at 0 {
 -				slave-mode;
--				remote-endpoint = <&etm_out>;
+-				remote-endpoint = <&replicator0_out_port0>;
 +		in-ports {
 +			port {
-+				etb_in: endpoint {
-+					remote-endpoint = <&etm_out>;
++				etb0_in_port: endpoint at 0 {
++					remote-endpoint = <&replicator0_out_port0>;
 +				};
  			};
  		};
  	};
-@@ -174,9 +175,11 @@
+@@ -291,10 +292,11 @@
  
- 		clocks = <&emu_src_ck>;
+ 		clocks = <&clk_375m>;
  		clock-names = "apb_pclk";
 -		port {
--			etm_out: endpoint {
--				remote-endpoint = <&etb_in>;
-+		out-ports {
-+			port {
-+				etm_out: endpoint {
-+					remote-endpoint = <&etb_in>;
-+				};
- 			};
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-index 3ca8991..91bb50a 100644
---- a/arch/arm/boot/dts/omap3-beagle.dts
-+++ b/arch/arm/boot/dts/omap3-beagle.dts
-@@ -147,10 +147,11 @@
- 
- 		clocks = <&emu_src_ck>;
- 		clock-names = "apb_pclk";
--		port {
--			etb_in: endpoint {
+-			etb1_in_port: endpoint at 0 {
 -				slave-mode;
--				remote-endpoint = <&etm_out>;
+-				remote-endpoint = <&replicator1_out_port0>;
 +		in-ports {
 +			port {
-+				etb_in: endpoint {
-+					remote-endpoint = <&etm_out>;
++				etb1_in_port: endpoint at 0 {
++					remote-endpoint = <&replicator1_out_port0>;
 +				};
  			};
  		};
  	};
-@@ -161,9 +162,11 @@
+@@ -305,10 +307,11 @@
  
- 		clocks = <&emu_src_ck>;
+ 		clocks = <&clk_375m>;
  		clock-names = "apb_pclk";
 -		port {
--			etm_out: endpoint {
--				remote-endpoint = <&etb_in>;
+-			etb2_in_port: endpoint at 0 {
+-				slave-mode;
+-				remote-endpoint = <&replicator2_out_port0>;
++		in-ports {
++			port {
++				etb2_in_port: endpoint at 0 {
++					remote-endpoint = <&replicator2_out_port0>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -319,10 +322,11 @@
+ 
+ 		clocks = <&clk_375m>;
+ 		clock-names = "apb_pclk";
+-		port {
+-			etb3_in_port: endpoint at 0 {
+-				slave-mode;
+-				remote-endpoint = <&replicator3_out_port0>;
++		in-ports {
++			port {
++				etb3_in_port: endpoint at 0 {
++					remote-endpoint = <&replicator3_out_port0>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -333,10 +337,11 @@
+ 
+ 		clocks = <&clk_375m>;
+ 		clock-names = "apb_pclk";
+-		port {
+-			tpiu_in_port: endpoint at 0 {
+-				slave-mode;
+-				remote-endpoint = <&funnel4_out_port0>;
++		in-ports {
++			port {
++				tpiu_in_port: endpoint at 0 {
++					remote-endpoint = <&funnel4_out_port0>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -347,7 +352,7 @@
+ 		 */
+ 		compatible = "arm,coresight-replicator";
+ 
+-		ports {
++		out-ports {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 
+@@ -365,12 +370,16 @@
+ 					remote-endpoint = <&funnel4_in_port0>;
+ 				};
+ 			};
++		};
++
++		in-ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 
+ 			/* replicator input port */
+-			port at 2 {
++			port at 0 {
+ 				reg = <0>;
+ 				replicator0_in_port0: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&funnel0_out_port0>;
+ 				};
+ 			};
+@@ -383,7 +392,7 @@
+ 		 */
+ 		compatible = "arm,coresight-replicator";
+ 
+-		ports {
++		out-ports {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 
+@@ -401,12 +410,16 @@
+ 					remote-endpoint = <&funnel4_in_port1>;
+ 				};
+ 			};
++		};
++
++		in-ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 
+ 			/* replicator input port */
+-			port at 2 {
++			port at 0 {
+ 				reg = <0>;
+ 				replicator1_in_port0: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&funnel1_out_port0>;
+ 				};
+ 			};
+@@ -419,11 +432,10 @@
+ 		 */
+ 		compatible = "arm,coresight-replicator";
+ 
+-		ports {
++		out-ports {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 
+-			/* replicator output ports */
+ 			port at 0 {
+ 				reg = <0>;
+ 				replicator2_out_port0: endpoint {
+@@ -437,12 +449,15 @@
+ 					remote-endpoint = <&funnel4_in_port2>;
+ 				};
+ 			};
++		};
+ 
+-			/* replicator input port */
+-			port at 2 {
++		in-ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
+ 				reg = <0>;
+ 				replicator2_in_port0: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&funnel2_out_port0>;
+ 				};
+ 			};
+@@ -455,11 +470,10 @@
+ 		 */
+ 		compatible = "arm,coresight-replicator";
+ 
+-		ports {
++		out-ports {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 
+-			/* replicator output ports */
+ 			port at 0 {
+ 				reg = <0>;
+ 				replicator3_out_port0: endpoint {
+@@ -473,12 +487,15 @@
+ 					remote-endpoint = <&funnel4_in_port3>;
+ 				};
+ 			};
++		};
+ 
+-			/* replicator input port */
+-			port at 2 {
++		in-ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
+ 				reg = <0>;
+ 				replicator3_in_port0: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&funnel3_out_port0>;
+ 				};
+ 			};
+@@ -491,11 +508,10 @@
+ 
+ 		clocks = <&clk_375m>;
+ 		clock-names = "apb_pclk";
+-		ports {
++		out-ports {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 
+-			/* funnel output port */
+ 			port at 0 {
+ 				reg = <0>;
+ 				funnel0_out_port0: endpoint {
+@@ -503,36 +519,36 @@
+ 						<&replicator0_in_port0>;
+ 				};
+ 			};
++		};
+ 
+-			/* funnel input ports */
+-			port at 1 {
++		in-ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
+ 				reg = <0>;
+ 				funnel0_in_port0: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&ptm0_out_port>;
+ 				};
+ 			};
+ 
+-			port at 2 {
++			port at 1 {
+ 				reg = <1>;
+ 				funnel0_in_port1: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&ptm1_out_port>;
+ 				};
+ 			};
+ 
+-			port at 3 {
++			port at 2 {
+ 				reg = <2>;
+ 				funnel0_in_port2: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&ptm2_out_port>;
+ 				};
+ 			};
+ 
+-			port at 4 {
++			port at 3 {
+ 				reg = <3>;
+ 				funnel0_in_port3: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&ptm3_out_port>;
+ 				};
+ 			};
+@@ -545,11 +561,10 @@
+ 
+ 		clocks = <&clk_375m>;
+ 		clock-names = "apb_pclk";
+-		ports {
++		out-ports {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 
+-			/* funnel output port */
+ 			port at 0 {
+ 				reg = <0>;
+ 				funnel1_out_port0: endpoint {
+@@ -557,36 +572,36 @@
+ 						<&replicator1_in_port0>;
+ 				};
+ 			};
++		};
+ 
+-			/* funnel input ports */
+-			port at 1 {
++		in-ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
+ 				reg = <0>;
+ 				funnel1_in_port0: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&ptm4_out_port>;
+ 				};
+ 			};
+ 
+-			port at 2 {
++			port at 1 {
+ 				reg = <1>;
+ 				funnel1_in_port1: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&ptm5_out_port>;
+ 				};
+ 			};
+ 
+-			port at 3 {
++			port at 2 {
+ 				reg = <2>;
+ 				funnel1_in_port2: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&ptm6_out_port>;
+ 				};
+ 			};
+ 
+-			port at 4 {
++			port at 3 {
+ 				reg = <3>;
+ 				funnel1_in_port3: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&ptm7_out_port>;
+ 				};
+ 			};
+@@ -599,11 +614,10 @@
+ 
+ 		clocks = <&clk_375m>;
+ 		clock-names = "apb_pclk";
+-		ports {
++		out-ports {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 
+-			/* funnel output port */
+ 			port at 0 {
+ 				reg = <0>;
+ 				funnel2_out_port0: endpoint {
+@@ -611,36 +625,36 @@
+ 						<&replicator2_in_port0>;
+ 				};
+ 			};
++		};
+ 
+-			/* funnel input ports */
+-			port at 1 {
++		in-ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
+ 				reg = <0>;
+ 				funnel2_in_port0: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&ptm8_out_port>;
+ 				};
+ 			};
+ 
+-			port at 2 {
++			port at 1 {
+ 				reg = <1>;
+ 				funnel2_in_port1: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&ptm9_out_port>;
+ 				};
+ 			};
+ 
+-			port at 3 {
++			port at 2 {
+ 				reg = <2>;
+ 				funnel2_in_port2: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&ptm10_out_port>;
+ 				};
+ 			};
+ 
+-			port at 4 {
++			port at 3 {
+ 				reg = <3>;
+ 				funnel2_in_port3: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&ptm11_out_port>;
+ 				};
+ 			};
+@@ -653,11 +667,10 @@
+ 
+ 		clocks = <&clk_375m>;
+ 		clock-names = "apb_pclk";
+-		ports {
++		out-ports {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 
+-			/* funnel output port */
+ 			port at 0 {
+ 				reg = <0>;
+ 				funnel3_out_port0: endpoint {
+@@ -665,36 +678,36 @@
+ 						<&replicator3_in_port0>;
+ 				};
+ 			};
++		};
+ 
+-			/* funnel input ports */
+-			port at 1 {
++		in-ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
+ 				reg = <0>;
+ 				funnel3_in_port0: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&ptm12_out_port>;
+ 				};
+ 			};
+ 
+-			port at 2 {
++			port at 1 {
+ 				reg = <1>;
+ 				funnel3_in_port1: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&ptm13_out_port>;
+ 				};
+ 			};
+ 
+-			port at 3 {
++			port at 2 {
+ 				reg = <2>;
+ 				funnel3_in_port2: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&ptm14_out_port>;
+ 				};
+ 			};
+ 
+-			port at 4 {
++			port at 3 {
+ 				reg = <3>;
+ 				funnel3_in_port3: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&ptm15_out_port>;
+ 				};
+ 			};
+@@ -707,50 +720,49 @@
+ 
+ 		clocks = <&clk_375m>;
+ 		clock-names = "apb_pclk";
+-		ports {
++		out-ports {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 
+-			/* funnel output port */
+ 			port at 0 {
+ 				reg = <0>;
+ 				funnel4_out_port0: endpoint {
+ 					remote-endpoint = <&tpiu_in_port>;
+ 				};
+ 			};
++		};
+ 
+-			/* funnel input ports */
+-			port at 1 {
++		in-ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
+ 				reg = <0>;
+ 				funnel4_in_port0: endpoint {
+-					slave-mode;
+ 					remote-endpoint =
+ 						<&replicator0_out_port1>;
+ 				};
+ 			};
+ 
+-			port at 2 {
++			port at 1 {
+ 				reg = <1>;
+ 				funnel4_in_port1: endpoint {
+-					slave-mode;
+ 					remote-endpoint =
+ 						<&replicator1_out_port1>;
+ 				};
+ 			};
+ 
+-			port at 3 {
++			port at 2 {
+ 				reg = <2>;
+ 				funnel4_in_port2: endpoint {
+-					slave-mode;
+ 					remote-endpoint =
+ 						<&replicator2_out_port1>;
+ 				};
+ 			};
+ 
+-			port at 4 {
++			port at 3 {
+ 				reg = <3>;
+ 				funnel4_in_port3: endpoint {
+-					slave-mode;
+ 					remote-endpoint =
+ 						<&replicator3_out_port1>;
+ 				};
+@@ -765,9 +777,11 @@
+ 		clocks = <&clk_375m>;
+ 		clock-names = "apb_pclk";
+ 		cpu = <&CPU0>;
+-		port {
+-			ptm0_out_port: endpoint {
+-				remote-endpoint = <&funnel0_in_port0>;
 +		out-ports {
 +			port {
-+				etm_out: endpoint {
-+					remote-endpoint = <&etb_in>;
++				ptm0_out_port: endpoint {
++					remote-endpoint = <&funnel0_in_port0>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -779,9 +793,11 @@
+ 		clocks = <&clk_375m>;
+ 		clock-names = "apb_pclk";
+ 		cpu = <&CPU1>;
+-		port {
+-			ptm1_out_port: endpoint {
+-				remote-endpoint = <&funnel0_in_port1>;
++		out-ports {
++			port {
++				ptm1_out_port: endpoint {
++					remote-endpoint = <&funnel0_in_port1>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -793,9 +809,11 @@
+ 		clocks = <&clk_375m>;
+ 		clock-names = "apb_pclk";
+ 		cpu = <&CPU2>;
+-		port {
+-			ptm2_out_port: endpoint {
+-				remote-endpoint = <&funnel0_in_port2>;
++		out-ports {
++			port {
++				ptm2_out_port: endpoint {
++					remote-endpoint = <&funnel0_in_port2>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -807,9 +825,11 @@
+ 		clocks = <&clk_375m>;
+ 		clock-names = "apb_pclk";
+ 		cpu = <&CPU3>;
+-		port {
+-			ptm3_out_port: endpoint {
+-				remote-endpoint = <&funnel0_in_port3>;
++		out-ports {
++			port {
++				ptm3_out_port: endpoint {
++					remote-endpoint = <&funnel0_in_port3>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -821,9 +841,11 @@
+ 		clocks = <&clk_375m>;
+ 		clock-names = "apb_pclk";
+ 		cpu = <&CPU4>;
+-		port {
+-			ptm4_out_port: endpoint {
+-				remote-endpoint = <&funnel1_in_port0>;
++		out-ports {
++			port {
++				ptm4_out_port: endpoint {
++					remote-endpoint = <&funnel1_in_port0>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -835,9 +857,11 @@
+ 		clocks = <&clk_375m>;
+ 		clock-names = "apb_pclk";
+ 		cpu = <&CPU5>;
+-		port {
+-			ptm5_out_port: endpoint {
+-				remote-endpoint = <&funnel1_in_port1>;
++		out-ports {
++			port {
++				ptm5_out_port: endpoint {
++					remote-endpoint = <&funnel1_in_port1>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -849,9 +873,11 @@
+ 		clocks = <&clk_375m>;
+ 		clock-names = "apb_pclk";
+ 		cpu = <&CPU6>;
+-		port {
+-			ptm6_out_port: endpoint {
+-				remote-endpoint = <&funnel1_in_port2>;
++		out-ports {
++			port {
++				ptm6_out_port: endpoint {
++					remote-endpoint = <&funnel1_in_port2>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -863,9 +889,11 @@
+ 		clocks = <&clk_375m>;
+ 		clock-names = "apb_pclk";
+ 		cpu = <&CPU7>;
+-		port {
+-			ptm7_out_port: endpoint {
+-				remote-endpoint = <&funnel1_in_port3>;
++		out-ports {
++			port {
++				ptm7_out_port: endpoint {
++					remote-endpoint = <&funnel1_in_port3>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -877,9 +905,11 @@
+ 		clocks = <&clk_375m>;
+ 		clock-names = "apb_pclk";
+ 		cpu = <&CPU8>;
+-		port {
+-			ptm8_out_port: endpoint {
+-				remote-endpoint = <&funnel2_in_port0>;
++		out-ports {
++			port {
++				ptm8_out_port: endpoint {
++					remote-endpoint = <&funnel2_in_port0>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -890,9 +920,11 @@
+ 		clocks = <&clk_375m>;
+ 		clock-names = "apb_pclk";
+ 		cpu = <&CPU9>;
+-		port {
+-			ptm9_out_port: endpoint {
+-				remote-endpoint = <&funnel2_in_port1>;
++		out-ports {
++			port {
++				ptm9_out_port: endpoint {
++					remote-endpoint = <&funnel2_in_port1>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -904,9 +936,11 @@
+ 		clocks = <&clk_375m>;
+ 		clock-names = "apb_pclk";
+ 		cpu = <&CPU10>;
+-		port {
+-			ptm10_out_port: endpoint {
+-				remote-endpoint = <&funnel2_in_port2>;
++		out-ports {
++			port {
++				ptm10_out_port: endpoint {
++					remote-endpoint = <&funnel2_in_port2>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -918,9 +952,11 @@
+ 		clocks = <&clk_375m>;
+ 		clock-names = "apb_pclk";
+ 		cpu = <&CPU11>;
+-		port {
+-			ptm11_out_port: endpoint {
+-				remote-endpoint = <&funnel2_in_port3>;
++		out-ports {
++			port {
++				ptm11_out_port: endpoint {
++					remote-endpoint = <&funnel2_in_port3>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -932,9 +968,11 @@
+ 		clocks = <&clk_375m>;
+ 		clock-names = "apb_pclk";
+ 		cpu = <&CPU12>;
+-		port {
+-			ptm12_out_port: endpoint {
+-				remote-endpoint = <&funnel3_in_port0>;
++		out-ports {
++			port {
++				ptm12_out_port: endpoint {
++					remote-endpoint = <&funnel3_in_port0>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -946,9 +984,11 @@
+ 		clocks = <&clk_375m>;
+ 		clock-names = "apb_pclk";
+ 		cpu = <&CPU13>;
+-		port {
+-			ptm13_out_port: endpoint {
+-				remote-endpoint = <&funnel3_in_port1>;
++		out-ports {
++			port {
++				ptm13_out_port: endpoint {
++					remote-endpoint = <&funnel3_in_port1>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -960,9 +1000,11 @@
+ 		clocks = <&clk_375m>;
+ 		clock-names = "apb_pclk";
+ 		cpu = <&CPU14>;
+-		port {
+-			ptm14_out_port: endpoint {
+-				remote-endpoint = <&funnel3_in_port2>;
++		out-ports {
++			port {
++				ptm14_out_port: endpoint {
++					remote-endpoint = <&funnel3_in_port2>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -974,9 +1016,11 @@
+ 		clocks = <&clk_375m>;
+ 		clock-names = "apb_pclk";
+ 		cpu = <&CPU15>;
+-		port {
+-			ptm15_out_port: endpoint {
+-				remote-endpoint = <&funnel3_in_port3>;
++		out-ports {
++			port {
++				ptm15_out_port: endpoint {
++					remote-endpoint = <&funnel3_in_port3>;
 +				};
  			};
  		};
