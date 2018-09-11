@@ -1,58 +1,51 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Tue, 11 Sep 2018 11:11:24 +0200
-Subject: [PATCH] arm64: add NUMA emulation support
-In-Reply-To: <4d7beb50-f778-507a-4c3c-f6de92f8cfb9@kernel.org>
-References: <20180828174011.GE20375@arm.com>
- <a58ad11f-3c22-ed7f-a0cd-938aabc4adaf@kernel.org>
- <20180829110802.GD10349@dhcp22.suse.cz>
- <f041ba95-03e6-4a7d-c324-870b45a2f648@kernel.org>
- <20180905064252.GW14951@dhcp22.suse.cz>
- <c1b58f13-6190-20e9-7e4f-b8bc2b9d5f80@kernel.org>
- <20180907083452.GC19621@dhcp22.suse.cz>
- <e46e715c-f115-f054-eeb2-3cecbcd1192d@kernel.org>
- <20180910134845.GH10951@dhcp22.suse.cz>
- <4d7beb50-f778-507a-4c3c-f6de92f8cfb9@kernel.org>
-Message-ID: <20180911091124.GP10951@dhcp22.suse.cz>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 11 Sep 2018 11:12:32 +0200
+Subject: [PATCH v3 14/30] dt-bindings: update the Allwinner GPADC device
+ tree binding for H3 & A83T
+In-Reply-To: <20180910194424.GA21461@bogus>
+References: <20180830154518.29507-1-embed3d@gmail.com>
+ <20180830154518.29507-15-embed3d@gmail.com>
+ <20180831084854.q2uh63pw5vprqlzt@flea>
+ <20180910194424.GA21461@bogus>
+Message-ID: <20180911091232.2ozypemfam5kayef@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 10-09-18 20:02:05, Shuah Khan wrote:
-> Hi Michal,
-> 
-> On 09/10/2018 07:48 AM, Michal Hocko wrote:
-> > On Fri 07-09-18 16:30:59, Shuah Khan wrote:
-> >> On 09/07/2018 02:34 AM, Michal Hocko wrote:
-> >>> On Thu 06-09-18 15:53:34, Shuah Khan wrote:
-> [....]
-> >>
-> >> In addition to isolation, being able to reserve a block instead is one of the
-> >> issues I am looking to address. Unfortunately memory cgroups won't address that
-> >> issue.
+On Mon, Sep 10, 2018 at 02:44:24PM -0500, Rob Herring wrote:
+> On Fri, Aug 31, 2018 at 10:48:54AM +0200, Maxime Ripard wrote:
+> > On Thu, Aug 30, 2018 at 05:45:02PM +0200, Philipp Rossak wrote:
+> > > Allwinner H3 features a thermal sensor like the one in A33, but has its
+> > > register re-arranged, the clock divider moved to CCU (originally the
+> > > clock divider is in ADC) and added a pair of bus clock and reset.
+> > > 
+> > > Allwinner A83T features a thermal sensor similar to the H3, the ths clock,
+> > > the bus clock and the reset was removed from the CCU. The THS in A83T
+> > > has a clock that is directly connected and runs with 24 MHz.
+> > > 
+> > > Update the binding document to cover H3 and A83T.
+> > > 
+> > > Signed-off-by: Philipp Rossak <embed3d@gmail.com>
 > > 
-> > Could you be more specific why you need reservations other than
-> > isolation.
-> > 
+> > You probably want to have a look at:
+> > https://www.spinics.net/lists/arm-kernel/msg670167.html
 > 
-> Taking automotive as a specific example, there are two classes of applications:
-> 1. critical applications that must run
-> 2. Infotainment and misc. user-space.
-> 
-> In this case, being able to reserve a block of memory for critical applications
-> will ensure the memory is available for them. If a critical application has to
-> restart and/or when an on-demand critical application starts, it might not be able
-> to allocate memory if it is not reserved.
-> 
-> When a flat system has multiple memory blocks, with NUMA emulation in conjunction with
-> cpusets, one or more block can be reserved for critical applications configuring a set
-> of cpus and one of more memory nodes for them.
-> 
-> Memory cgroups will not support such reservation. Hope this helps explain the use-case
-> I am trying to address with this patch.
+> Well, which is it? An ADC or thermal sensor?
 
-OK, that is more clear. I still believe that you either have to have a
-very good control over memory allocations or a good luck to not see
-unexpected kernel allocations in your reserved memory which might easily
-break guarantees you would like to accomplish.
+It's both actually. This IP used to be called GPADC, and had a thermal
+sensor + some ADC channels. The design evolved across several
+generations of SoCs to drop the ADC channels and be used only to have
+thermal sensors.
+
+Maxime
+
 -- 
-Michal Hocko
-SUSE Labs
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180911/a8af0196/attachment.sig>
