@@ -1,32 +1,55 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Tue, 11 Sep 2018 08:00:31 +0530
-Subject: [PATCH v2 4/4] arm64: dts: rockchip: Enable SD card detection for
- Rock960 boards
-In-Reply-To: <20180911023031.4892-1-manivannan.sadhasivam@linaro.org>
-References: <20180911023031.4892-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180911023031.4892-5-manivannan.sadhasivam@linaro.org>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Tue, 11 Sep 2018 06:36:35 +0200
+Subject: [PATCH v9 3/6] kernel/reboot.c: export pm_power_off_prepare
+In-Reply-To: <20180911015320.GA25790@dragon>
+References: <20180802103425.3053-1-o.rempel@pengutronix.de>
+ <20180802103425.3053-4-o.rempel@pengutronix.de>
+ <20180802104443.GH9117@sirena.org.uk>
+ <94d48ecb-7302-c7ed-e815-730be0426a04@pengutronix.de>
+ <20180802113552.GJ9117@sirena.org.uk> <20180827014815.GD29208@dragon>
+ <20180906101516.GA5360@sirena.org.uk> <20180909020021.GA18838@dragon>
+ <20180910151926.GA10889@sirena.org.uk> <20180911015320.GA25790@dragon>
+Message-ID: <134a7f76-6e0b-1a9f-26da-f01adaac44e6@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For proper working of SD cards, let's add the Card Detect GPIO property
-to the common devicetree for Rock960 family boards.
+Hi Shawn,
 
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
----
- arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+On 11.09.2018 03:53, Shawn Guo wrote:
+> On Mon, Sep 10, 2018 at 04:19:26PM +0100, Mark Brown wrote:
+>> On Sun, Sep 09, 2018 at 10:00:23AM +0800, Shawn Guo wrote:
+>>> On Thu, Sep 06, 2018 at 11:15:17AM +0100, Mark Brown wrote:
+>>
+>>>> I was expecting to get a pull request with the precursor patches in it -
+>>>> the regulator driver seems to get a moderate amount of development so
+>>>> there's a reasonable risk of conflicts.
+>>
+>>> What about you create a stable topic branch for regulator patches and I
+>>> pull it into IMX tree?
+>>
+>> Sure, I can send a pull request back but the first two patches in the
+>> series are ARM ones - are you OK with me just applying them and sending
+>> them in the pull request or do you want to apply them first?
+> 
+> I just took another look at the series.  It seems that there is no
+> build-time dependency between regulator and platform patches.  So I
+> think we can handle the series like:
+> 
+>  - You apply patch #3, #4 and #5 on regulator tree;
+>  - I apply the reset on IMX tree.
+> 
+> There shouldn't be any build or run time regression on either tree, and
+> the feature that the series adds will be available when both trees get
+> merged together on -next or Linus tree.
+> 
+> @Oleksij Is my understanding above correct?
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
-index 5a5d8e28ef55..f68254831ad9 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
-@@ -403,6 +403,7 @@
- 	cap-sd-highspeed;
- 	clock-frequency = <100000000>;
- 	clock-freq-min-max = <100000 100000000>;
-+	cd-gpios = <&gpio0 7 GPIO_ACTIVE_LOW>;
- 	disable-wp;
- 	sd-uhs-sdr104;
- 	vqmmc-supply = <&vcc_sd>;
--- 
-2.17.1
+Yes.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180911/72ac4272/attachment.sig>
