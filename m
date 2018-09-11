@@ -1,65 +1,70 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 11 Sep 2018 19:21:56 +0100 (BST)
-Subject: Applied "ASoC: rockchip: add missing INTERLEAVED PCM attribute" to
- the asoc tree
-In-Reply-To: <20180910163932.13722-1-katsuhiro@katsuster.net>
-Message-ID: <20180911182156.DD1611121B1F@debutante.sirena.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 11 Sep 2018 11:24:19 -0700
+Subject: [PATCH] gpio: omap: Add level wakeup handling for omap4 based SoCs
+In-Reply-To: <444bae18-9737-8e13-2a0f-c08863ae1336@ti.com>
+References: <20180910200624.4494-1-tony@atomide.com>
+ <444bae18-9737-8e13-2a0f-c08863ae1336@ti.com>
+Message-ID: <20180911182419.GC5662@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+* Grygorii Strashko <grygorii.strashko@ti.com> [180911 17:02]:
+> I agree with patch in general as it seems will not break anything and
+>  change localized for omap4 only.
 
-   ASoC: rockchip: add missing INTERLEAVED PCM attribute
+OK cool. I'll be posting a related patch to get rid of
+the custom PM functions too.
 
-has been applied to the asoc tree at
+> But I'd be very appreciated if you can provide more information about issue
+> which helps better understand it, so could you, if possible, collect dump of:
+> - GPIO bank regs right before entering WFI state in Idle (or as close as possible)
+>   I'm interesting in sysc/s, ctrl, irq's regs (+wakupen) and GPIO_DEBOUNCEN first of all
+> - GPIO bank CLKCTRL registers (is it "in transition" state).
+> in non working case.
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+The thing is there is nothing special in the GPIO registers in the
+non-working vs working case. The GPIO_DEBOUNCEN was my first suspect
+too, but that's not enabled.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+The only difference is that the related CLKSTCTRL CLKACTIVITY bit
+for the 32K_GFCLK clock stays stuck showing busy after a level interrupt
+and wkup_en set. The 32K_GFCLK bit will only clear after reset of the
+GPIO module in question until a new level interrupt is seen.
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+So with this patch we go from the following dump on omap4 gpio
+bank1 running before idle:
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+GPIO_IRQSTATUS_RAW      0x4a310024 = 0000000000
+GPIO_IRQSTATUS_RAW2     0x4a310028 = 0000000000
+GPIO_IRQSTATUS_0        0x4a31002c = 0000000000
+GPIO_IRQSTATUS_1        0x4a310030 = 0000000000
+GPIO_IRQSTATUS_SET_0    0x4a310034 = 0x00000080
+GPIO_IRQSTATUS_CLR_0    0x4a31003c = 0x00000080
+GPIO_IRQWAKEN_0         0x4a310044 = 0x00000080 <- set
+GPIO_LEVELDETECT0       0x4a310140 = 0000000000
+GPIO_LEVELDETECT1       0x4a310144 = 0x00000080
+GPIO_RISINGDETECT       0x4a310148 = 0000000000
+GPIO_FALLINGDETECT      0x4a31014c = 0000000000
+GPIO_DEBOUNCENABLE      0x4a310150 = 0000000000
+GPIO_DEBOUNCINGTIME     0x4a310154 = 0000000000
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+to the following dump where GPIO_IRQWAKEN_0 is not set until
+for idle:
 
-Thanks,
-Mark
+GPIO_IRQSTATUS_RAW      0x4a310024 = 0000000000
+GPIO_IRQSTATUS_RAW2     0x4a310028 = 0000000000
+GPIO_IRQSTATUS_0        0x4a31002c = 0000000000
+GPIO_IRQSTATUS_1        0x4a310030 = 0000000000
+GPIO_IRQSTATUS_SET_0    0x4a310034 = 0x00000080
+GPIO_IRQSTATUS_CLR_0    0x4a31003c = 0x00000080
+GPIO_IRQWAKEN_0         0x4a310044 = 0000000000 <- cleared
+GPIO_LEVELDETECT0       0x4a310140 = 0000000000
+GPIO_LEVELDETECT1       0x4a310144 = 0x00000080
+GPIO_RISINGDETECT       0x4a310148 = 0000000000
+GPIO_FALLINGDETECT      0x4a31014c = 0000000000
+GPIO_DEBOUNCENABLE      0x4a310150 = 0000000000
+GPIO_DEBOUNCINGTIME     0x4a310154 = 0000000000
 
->From 24d6638302b48328a58c13439276d4531af4ca7d Mon Sep 17 00:00:00 2001
-From: Katsuhiro Suzuki <katsuhiro@katsuster.net>
-Date: Tue, 11 Sep 2018 01:39:32 +0900
-Subject: [PATCH] ASoC: rockchip: add missing INTERLEAVED PCM attribute
+Regards,
 
-This patch adds SNDRV_PCM_INFO_INTERLEAVED into PCM hardware info.
-
-Signed-off-by: Katsuhiro Suzuki <katsuhiro@katsuster.net>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/rockchip/rockchip_pcm.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/sound/soc/rockchip/rockchip_pcm.c b/sound/soc/rockchip/rockchip_pcm.c
-index f77538319221..9e7b5fa4cf59 100644
---- a/sound/soc/rockchip/rockchip_pcm.c
-+++ b/sound/soc/rockchip/rockchip_pcm.c
-@@ -21,7 +21,8 @@ static const struct snd_pcm_hardware snd_rockchip_hardware = {
- 	.info			= SNDRV_PCM_INFO_MMAP |
- 				  SNDRV_PCM_INFO_MMAP_VALID |
- 				  SNDRV_PCM_INFO_PAUSE |
--				  SNDRV_PCM_INFO_RESUME,
-+				  SNDRV_PCM_INFO_RESUME |
-+				  SNDRV_PCM_INFO_INTERLEAVED,
- 	.period_bytes_min	= 32,
- 	.period_bytes_max	= 8192,
- 	.periods_min		= 1,
--- 
-2.19.0.rc2
+Tony
