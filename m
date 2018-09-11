@@ -1,30 +1,30 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 11 Sep 2018 17:10:47 -0300
-Subject: [PATCH 6/6] ARM: dts: vf610-zii-cfu1: Pass the 'no-sd' property
-In-Reply-To: <1536696647-8228-1-git-send-email-festevam@gmail.com>
-References: <1536696647-8228-1-git-send-email-festevam@gmail.com>
-Message-ID: <1536696647-8228-6-git-send-email-festevam@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 11 Sep 2018 21:10:27 +0100
+Subject: next-20180911 build: 1 failures 15 warnings (next-20180911)
+In-Reply-To: <E1fzodE-000398-4K@optimist>
+References: <E1fzodE-000398-4K@optimist>
+Message-ID: <20180911201027.GI10123@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pass the 'no-sd' for esdhc0 controller as it is wired to eMMC.
+On Tue, Sep 11, 2018 at 08:47:28PM +0100, Build bot for Mark Brown wrote:
 
-Signed-off-by: Fabio Estevam <festevam@gmail.com>
----
- arch/arm/boot/dts/vf610-zii-cfu1.dts | 1 +
- 1 file changed, 1 insertion(+)
+Today's -next fails to build an arm64 defconfig due to:
 
-diff --git a/arch/arm/boot/dts/vf610-zii-cfu1.dts b/arch/arm/boot/dts/vf610-zii-cfu1.dts
-index aba4cec..b76c3d0 100644
---- a/arch/arm/boot/dts/vf610-zii-cfu1.dts
-+++ b/arch/arm/boot/dts/vf610-zii-cfu1.dts
-@@ -123,6 +123,7 @@
- 	no-1-8-v;
- 	keep-power-in-suspend;
- 	no-sdio;
-+	no-sd;
- 	status = "okay";
- };
- 
--- 
-2.7.4
+> 	arm64-defconfig
+> ERROR: "sun8i_tcon_top_de_config" [drivers/gpu/drm/sun4i/sun4i-tcon.ko] undefined!
+> ERROR: "sun8i_tcon_top_set_hdmi_src" [drivers/gpu/drm/sun4i/sun4i-tcon.ko] undefined!
+> ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun4i-tcon.ko] undefined!
+
+DRM_SUN4I unconditionally uses these symbols which are only defined when
+DRM_SUN8I_TOP is enabled, not sure what the exact cause is but there's a
+few recent patches to that driver from Jonathan and Chen-Yu so CCing for
+that.  I've been missing arm64 builds for a little while so this
+could've been there before today.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180911/ba106954/attachment-0001.sig>
