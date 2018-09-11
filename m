@@ -1,50 +1,75 @@
-From: dmurphy@ti.com (Dan Murphy)
-Date: Tue, 11 Sep 2018 12:08:22 -0500
-Subject: [PATCH] mfd: ti-lmu: constify mfd_cell tables
-In-Reply-To: <20180911155355.GD4185@dell>
-References: <20180829093108.GB22065@amd> <20180907093954.GA26364@amd>
- <e10bdc74-8138-055e-c829-7befbc7161b4@ti.com> <20180911155355.GD4185@dell>
-Message-ID: <a74f7980-08bf-5ef0-106b-1e3f4e90b0e6@ti.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 11 Sep 2018 18:15:27 +0100
+Subject: [PATCH 11/11] dts: tc2: Update coresight bindings for hardware
+ ports
+In-Reply-To: <20180911170113.GA27663@e107155-lin>
+References: <1536661032-30481-1-git-send-email-suzuki.poulose@arm.com>
+ <1536661032-30481-12-git-send-email-suzuki.poulose@arm.com>
+ <20180911170113.GA27663@e107155-lin>
+Message-ID: <fbde78a0-6487-7bdb-d02b-4fbf556f536e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lee
+On 09/11/2018 06:01 PM, Sudeep Holla wrote:
+> On Tue, Sep 11, 2018 at 11:17:12AM +0100, Suzuki K Poulose wrote:
+>> Switch to the new coresight bindings
+>>
+> 
+> I still see the below warnings:
+> 
+> vexpress-v2p-ca15_a7.dtb: Warning (graph_child_address):
+> 	/replicator/in-ports: graph node has single child node 'port at 0',
+> 	#address-cells/#size-cells are not necessary
+> vexpress-v2p-ca15_a7.dtb: Warning (graph_child_address):
+> 	/funnel at 20040000/out-ports: graph node has single child node 'port at 0',
+> 	#address-cells/#size-cells are not necessary
+> 
+> I need the below patch to fix them, let me know if it looks OK, I can
+> amend and apply.
 
-On 09/11/2018 10:57 AM, Lee Jones wrote:
-> On Fri, 07 Sep 2018, Dan Murphy wrote:
-> 
->> Pavel
->>
->> On 09/07/2018 04:39 AM, Pavel Machek wrote:
->>> On Wed 2018-08-29 11:31:08, Pavel Machek wrote:
->>>> From: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
->>>>
->>>> mfd: ti-lmu: constify mfd_cell tables
->>>>     
->>>> Add const attribute to all mfd_cell structures.
->>>>     
->>>> Signed-off-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
->>>> Signed-off-by: Pavel Machek <pavel@ucw.cz>
->>>
->>> Lee, I guess this is for you to apply. Any news there?
->>>
->>> There are more patches ready,
->>
->> As I stated in another email thread.  I don't see the need for this level of LMU framework.
->>
->> Here is the reference thread
->>
->> https://lore.kernel.org/patchwork/patch/982550/
-> 
-> This driver has been present for 1.5 years.
-> 
-> Is that a NACK for *this* patch or are you hijacking? :)
-> 
+Thanks for reporting. I purposefully added the "address-cells" and 
+followed the format everywhere in the series thinking that, that is
+indeed the formal way of doing it, rather than having implicit port
+numbers. I can send an updated series fixing it everywhere.
 
-Its a NACK for adding this.  I am pushing a new series for the LM3697 and will end up
-sending LED drivers for the non-MFD devices contained within. I will try to match the
-feature set the best I can.
+Regards
+Suzuki
 
--- 
-------------------
-Dan Murphy
+
+> 
+> Regards,
+> Sudeep
+> 
+> -->8
+> 
+> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+> index 3a5090616bc6..8b926c30ccd1 100644
+> --- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+> +++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+> @@ -443,11 +443,7 @@
+>   		};
+>   
+>   		in-ports {
+> -			#address-cells = <1>;
+> -			#size-cells = <0>;
+> -
+> -			port at 0 {
+> -				reg = <0>;
+> +			port {
+>   				replicator_in_port0: endpoint {
+>   					remote-endpoint = <&funnel_out_port0>;
+>   				};
+> @@ -462,11 +458,7 @@
+>   		clocks = <&oscclk6a>;
+>   		clock-names = "apb_pclk";
+>   		out-ports {
+> -			#address-cells = <1>;
+> -			#size-cells = <0>;
+> -
+> -			port at 0 {
+> -				reg = <0>;
+> +			port {
+>   				funnel_out_port0: endpoint {
+>   					remote-endpoint =
+>   						<&replicator_in_port0>;
+> 
