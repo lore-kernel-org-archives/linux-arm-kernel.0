@@ -1,40 +1,67 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 11 Sep 2018 16:12:49 +0200
-Subject: [GIT PULL v2] Immutable branch between MFD, SPI and TTY due for
- the v4.20 merge window
-In-Reply-To: <20180911140733.GU4185@dell>
-References: <20180904111310.4049-1-radu_nicolae.pirea@upb.ro>
- <20180911111850.GJ4185@dell> <20180911140400.GB18410@kroah.com>
- <20180911140733.GU4185@dell>
-Message-ID: <20180911141249.GA19639@kroah.com>
+From: mhiramat@kernel.org (Masami Hiramatsu)
+Date: Tue, 11 Sep 2018 23:12:51 +0900
+Subject: [PATCH] ARM: linker script: GCOV kernel may refers data in __exit
+In-Reply-To: <153580549235.10130.1495077983569784123.stgit@devbox>
+References: <20180901185017.0a81bc3e61f5d021664f13f3@kernel.org>
+ <153580549235.10130.1495077983569784123.stgit@devbox>
+Message-ID: <20180911231251.ee101eec63dceceed8243ad5@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2018 at 03:07:33PM +0100, Lee Jones wrote:
-> On Tue, 11 Sep 2018, Greg KH wrote:
-> 
-> > On Tue, Sep 11, 2018 at 12:18:50PM +0100, Lee Jones wrote:
-> > > [In case you missed it]
-> > > 
-> > > This new pull-request contains the following changes since v1:
-> > > 
-> > >  - Uplift the submission version from v11 to v12
-> > >  - Include fix for build breakage due to missing Device Tree include file
-> > > 
-> > > Since it is based on the original pull-request, it can be pulled
-> > > in either directly on top of it or as a pull in its own right.
-> > > 
-> > > The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
-> > > 
-> > >   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
-> > > 
-> > > are available in the Git repository at:
-> > > 
-> > >   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/ib-mfd-spi-tty-v4.20-1
-> > 
-> > Ok, let's try this again, I've dropped that other patch and taken this
-> > branch into my tree.
-> 
-> What happened to not rebasing? :D
+Hi,
 
-Turned out I hadn't pushed to my immutable branch yet, we got lucky :)
+Please drop it, since Peter's patch fixes this problem better way.
+
+https://lkml.org/lkml/2018/9/6/403
+
+Thank you,
+
+On Sat,  1 Sep 2018 21:38:13 +0900
+Masami Hiramatsu <mhiramat@kernel.org> wrote:
+
+> GCOV kernel embeds counters in the kernel for each line
+> and a part of that embed in __exit text. So we need to
+> keep the __exit text if CONFIG_GCOV_KERNEL=y.
+> 
+> Without this patch, if we discards __exit text (e.g.
+> disables CONFIG_GENERIC_BUG, CONFIG_JUMP_LABEL and
+> CONFIG_SMP_ON_UP) but enables CONFIG_GCOV_PROFILE_FTRACE,
+> ld will error like below on ARM.
+> 
+> `.text.exit' referenced in section `.ARM.exidx.text.exit' of
+> kernel/trace/trace_clock.o: defined in discarded section `.text.exit'
+> of kernel/trace/trace_clock.o
+> 
+> To fix this issue, we keep __exit when CONFIG_GCOV_KERNEL=y.
+> 
+> The reason why not depending CONFIG_GCOV_PROFILE_X, is
+> that the Documentation/dev-tools/gcov.rst says that the
+> developer can enable gcov profile on a file or a directory
+> by customizing Makefile, and that will only depend on
+> CONFIG_GCOV_KERNEL.
+> 
+> Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/kernel/vmlinux.lds.h |    3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kernel/vmlinux.lds.h b/arch/arm/kernel/vmlinux.lds.h
+> index ae5fdff18406..baaacee9f5ce 100644
+> --- a/arch/arm/kernel/vmlinux.lds.h
+> +++ b/arch/arm/kernel/vmlinux.lds.h
+> @@ -9,7 +9,8 @@
+>  #endif
+>  
+>  #if (defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)) || \
+> -	defined(CONFIG_GENERIC_BUG) || defined(CONFIG_JUMP_LABEL)
+> +	defined(CONFIG_GENERIC_BUG) || defined(CONFIG_JUMP_LABEL) || \
+> +	defined(CONFIG_GCOV_KERNEL)
+>  #define ARM_EXIT_KEEP(x)	x
+>  #define ARM_EXIT_DISCARD(x)
+>  #else
+> 
+
+
+-- 
+Masami Hiramatsu <mhiramat@kernel.org>
