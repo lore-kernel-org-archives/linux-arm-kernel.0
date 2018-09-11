@@ -1,56 +1,54 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Tue, 11 Sep 2018 11:12:50 +0100
-Subject: [PATCH 09/10] ARM: shmobile: r8a7744: Basic SoC support
-In-Reply-To: <1536660771-32278-1-git-send-email-biju.das@bp.renesas.com>
-References: <1536660771-32278-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <1536660771-32278-10-git-send-email-biju.das@bp.renesas.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 11 Sep 2018 11:23:30 +0100
+Subject: [PATCH 1/4] arm-nommu: don't define arch_teardown_dma_ops
+In-Reply-To: <20180827084711.23407-2-hch@lst.de>
+References: <20180827084711.23407-1-hch@lst.de>
+ <20180827084711.23407-2-hch@lst.de>
+Message-ID: <8ae006ad-0aff-bab3-2c16-be1696d58b5f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add minimal support for the RZ/G1N (R8A7744) SoC.
+On 27/08/18 09:47, Christoph Hellwig wrote:
+> We can just use the default implementation.
+> 
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> ---
+>  arch/arm/include/asm/dma-mapping.h | 2 ++
+>  arch/arm/mm/dma-mapping-nommu.c    | 4 ----
+>  2 files changed, 2 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+> index 8436f6ade57d..965b7c846ecb 100644
+> --- a/arch/arm/include/asm/dma-mapping.h
+> +++ b/arch/arm/include/asm/dma-mapping.h
+> @@ -100,8 +100,10 @@ static inline unsigned long dma_max_pfn(struct device *dev)
+>  extern void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+>  			       const struct iommu_ops *iommu, bool coherent);
+>  
+> +#ifdef CONFIG_MMU
+>  #define arch_teardown_dma_ops arch_teardown_dma_ops
+>  extern void arch_teardown_dma_ops(struct device *dev);
+> +#endif
+>  
+>  /* do not use this function in a driver */
+>  static inline bool is_device_dma_coherent(struct device *dev)
+> diff --git a/arch/arm/mm/dma-mapping-nommu.c b/arch/arm/mm/dma-mapping-nommu.c
+> index f448a0663b10..aa7aba302e76 100644
+> --- a/arch/arm/mm/dma-mapping-nommu.c
+> +++ b/arch/arm/mm/dma-mapping-nommu.c
+> @@ -237,7 +237,3 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+>  
+>  	set_dma_ops(dev, dma_ops);
+>  }
+> -
+> -void arch_teardown_dma_ops(struct device *dev)
+> -{
+> -}
+> 
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
----
- arch/arm/mach-shmobile/Kconfig           | 5 +++++
- arch/arm/mach-shmobile/setup-rcar-gen2.c | 2 ++
- 2 files changed, 7 insertions(+)
+FWIW:
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 94e9431..34aedd2 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -78,6 +78,11 @@ config ARCH_R8A7743
- 	select ARCH_RCAR_GEN2
- 	select ARM_ERRATA_798181 if SMP
- 
-+config ARCH_R8A7744
-+	bool "RZ/G1N (R8A77440)"
-+	select ARCH_RCAR_GEN2
-+	select ARM_ERRATA_798181 if SMP
-+
- config ARCH_R8A7745
- 	bool "RZ/G1E (R8A77450)"
- 	select ARCH_RCAR_GEN2
-diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-index 013acc9..eea60b2 100644
---- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
-+++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-@@ -25,6 +25,7 @@
- static const struct of_device_id cpg_matches[] __initconst = {
- 	{ .compatible = "renesas,rcar-gen2-cpg-clocks", },
- 	{ .compatible = "renesas,r8a7743-cpg-mssr", .data = "extal" },
-+	{ .compatible = "renesas,r8a7744-cpg-mssr", .data = "extal" },
- 	{ .compatible = "renesas,r8a7790-cpg-mssr", .data = "extal" },
- 	{ .compatible = "renesas,r8a7791-cpg-mssr", .data = "extal" },
- 	{ .compatible = "renesas,r8a7793-cpg-mssr", .data = "extal" },
-@@ -193,6 +194,7 @@ MACHINE_END
- 
- static const char * const rz_g1_boards_compat_dt[] __initconst = {
- 	"renesas,r8a7743",
-+	"renesas,r8a7744",
- 	"renesas,r8a7745",
- 	"renesas,r8a77470",
- 	NULL,
--- 
-2.7.4
+Reviewed-by: Vladimir Murzin <vladimir.murzin@arm.com>
+
+Thanks
+Vladimir
