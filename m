@@ -1,42 +1,24 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 11 Sep 2018 20:55:58 +0200
-Subject: [PATCH v3 1/2] mtd: spi-nor: add support to non-uniform SFDP SPI
- NOR flash memories
-In-Reply-To: <20180911154007.17195-2-tudor.ambarus@microchip.com>
+Date: Tue, 11 Sep 2018 20:56:16 +0200
+Subject: [PATCH v3 2/2] mtd: spi-nor: parse SFDP Sector Map Parameter Table
+In-Reply-To: <20180911154007.17195-3-tudor.ambarus@microchip.com>
 References: <20180911154007.17195-1-tudor.ambarus@microchip.com>
- <20180911154007.17195-2-tudor.ambarus@microchip.com>
-Message-ID: <a62a8dc2-796d-8560-22d9-9377f39cbf52@gmail.com>
+ <20180911154007.17195-3-tudor.ambarus@microchip.com>
+Message-ID: <dbfc2491-5fd8-eec9-650f-183c63f9963b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 09/11/2018 05:40 PM, Tudor Ambarus wrote:
-> Based on Cyrille Pitchen's patch https://lkml.org/lkml/2017/3/22/935.
+> Add support for the SFDP (JESD216B) Sector Map Parameter Table. This
+> table is optional, but when available, we parse it to identify the
+> location and size of sectors within the main data array of the
+> flash memory device and to identify which Erase Types are supported by
+> each sector.
 > 
-> This patch is a transitional patch in introducing  the support of
-> SFDP SPI memories with non-uniform erase sizes like Spansion s25fs512s.
-> Non-uniform erase maps will be used later when initialized based on the
-> SFDP data.
-> 
-> Introduce the memory erase map which splits the memory array into one
-> or many erase regions. Each erase region supports up to 4 erase types,
-> as defined by the JEDEC JESD216B (SFDP) specification.
-> 
-> To be backward compatible, the erase map of uniform SPI NOR flash memories
-> is initialized so it contains only one erase region and this erase region
-> supports only one erase command. Hence a single size is used to erase any
-> sector/block of the memory.
-> 
-> Besides, since the algorithm used to erase sectors on non-uniform SPI NOR
-> flash memories is quite expensive, when possible, the erase map is tuned
-> to come back to the uniform case.
-> 
-> The 'erase with the best command, move forward and repeat' approach was
-> suggested by Cristian Birsan in a brainstorm session, so:
-> 
-> Suggested-by: Cristian Birsan <cristian.birsan@microchip.com>
 > Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
 
 Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
+
 
 -- 
 Best regards,
