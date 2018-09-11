@@ -1,41 +1,146 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 11 Sep 2018 20:03:45 +0800
-Subject: [PATCH 1/3] arm64: dts: actions: s900: Enable Tx DMA for UART5
-In-Reply-To: <20180901164215.3683-2-manivannan.sadhasivam@linaro.org>
-References: <20180901164215.3683-2-manivannan.sadhasivam@linaro.org>
-Message-ID: <201809112038.kp1QJLmT%fengguang.wu@intel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 11 Sep 2018 13:37:19 +0100
+Subject: [PATCH v3 3/5] dt-bindings: mfd: rk808: Add binding information
+ for RK809 and RK817.
+In-Reply-To: <1535081441-20718-4-git-send-email-tony.xie@rock-chips.com>
+References: <1535081441-20718-1-git-send-email-tony.xie@rock-chips.com>
+ <1535081441-20718-4-git-send-email-tony.xie@rock-chips.com>
+Message-ID: <20180911123719.GM4185@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Manivannan,
+On Fri, 24 Aug 2018, Tony Xie wrote:
 
-Thank you for the patch! Yet something to improve:
+> Add device tree bindings documentation for Rockchip's RK809 & RK817 PMIC.
+> 
+> Signed-off-by: Tony Xie <tony.xie@rock-chips.com>
+> ---
+>  Documentation/devicetree/bindings/mfd/rk808.txt | 56 +++++++++++++++++++++++++
+>  1 file changed, 56 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/rk808.txt b/Documentation/devicetree/bindings/mfd/rk808.txt
+> index 91b6522..c025a99 100644
+> --- a/Documentation/devicetree/bindings/mfd/rk808.txt
+> +++ b/Documentation/devicetree/bindings/mfd/rk808.txt
+> @@ -3,11 +3,15 @@ RK8XX Power Management Integrated Circuit
+>  The rk8xx family current members:
+>  rk805
+>  rk808
+> +rk809
+> +rk817
+>  rk818
+>  
+>  Required properties:
+>  - compatible: "rockchip,rk805"
+>  - compatible: "rockchip,rk808"
+> +- compatible: "rockchip,rk809"
+> +- compatible: "rockchip,rk817"
+>  - compatible: "rockchip,rk818"
+>  - reg: I2C slave address
+>  - interrupt-parent: The parent interrupt controller.
+> @@ -46,6 +50,28 @@ Optional RK808 properties:
+>    the gpio controller. If DVS GPIOs aren't present, voltage changes will happen
+>    very quickly with no slow ramp time.
+>  
+> +Optional RK809 properties:
+> +- vcc1-supply:  The input supply for DCDC_REG1
+> +- vcc2-supply:  The input supply for DCDC_REG2
+> +- vcc3-supply:  The input supply for DCDC_REG3
+> +- vcc4-supply:  The input supply for DCDC_REG4
+> +- vcc5-supply:  The input supply for LDO_REG1, LDO_REG2, LDO_REG3
+> +- vcc6-supply:  The input supply for LDO_REG4, LDO_REG5, LDO_REG6
+> +- vcc7-supply:  The input supply for LDO_REG7, LDO_REG8, LDO_REG9
+> +- vcc8-supply:  The input supply for SWITCH_REG1
+> +- vcc9-supply:  The input supply for DCDC_REG5, SWITCH_REG2
+> +
+> +Optional RK817 properties:
+> +- vcc1-supply:  The input supply for DCDC_REG1
+> +- vcc2-supply:  The input supply for DCDC_REG2
+> +- vcc3-supply:  The input supply for DCDC_REG3
+> +- vcc4-supply:  The input supply for DCDC_REG4
+> +- vcc5-supply:  The input supply for LDO_REG1, LDO_REG2, LDO_REG3
+> +- vcc6-supply:  The input supply for LDO_REG4, LDO_REG5, LDO_REG6
+> +- vcc7-supply:  The input supply for LDO_REG7, LDO_REG8, LDO_REG9
+> +- vcc8-supply:  The input supply for BOOST
+> +- vcc9-supply:  The input supply for OTG_SWITCH
 
-[auto build test ERROR on tty/tty-testing]
-[also build test ERROR on v4.19-rc3 next-20180910]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+I think I'd like to see these squashed down a bit.
 
-url:    https://github.com/0day-ci/linux/commits/Manivannan-Sadhasivam/Add-slave-DMA-support-for-Actios-Semi-S900-SoC/20180903-163744
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git tty-testing
-config: arm64-allmodconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
+Something like:
 
-All errors (new ones prefixed by >>):
+> +Optional shared RK809 and RK817 properties:
+> +- vcc1-supply:  The input supply for DCDC_REG1
+> +- vcc2-supply:  The input supply for DCDC_REG2
+> +- vcc3-supply:  The input supply for DCDC_REG3
+> +- vcc4-supply:  The input supply for DCDC_REG4
+> +- vcc5-supply:  The input supply for LDO_REG1, LDO_REG2, LDO_REG3
+> +- vcc6-supply:  The input supply for LDO_REG4, LDO_REG5, LDO_REG6
+> +- vcc7-supply:  The input supply for LDO_REG7, LDO_REG8, LDO_REG9
+> +
+> +Optional RK809 properties:
+> +- vcc8-supply:  The input supply for SWITCH_REG1
+> +- vcc9-supply:  The input supply for DCDC_REG5, SWITCH_REG2
+> +
+> +Optional RK817 properties:
+> +- vcc8-supply:  The input supply for BOOST
+> +- vcc9-supply:  The input supply for OTG_SWITCH
 
->> ERROR: Input tree has errors, aborting (use -f to force output)
+That's if 1-7 are as identical as they look at first glance.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 61011 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180911/02d33d9c/attachment-0001.gz>
+>  Optional RK818 properties:
+>  - vcc1-supply:  The input supply for DCDC_REG1
+>  - vcc2-supply:  The input supply for DCDC_REG2
+> @@ -87,6 +113,28 @@ number as described in RK808 datasheet.
+>  	- SWITCH_REGn
+>  		- valid values for n are 1 to 2
+>  
+> +Following regulators of the RK809 PMIC block are supported. Note that
+> +the 'n' in regulator name, as in DCDC_REGn or LDOn, represents the DCDC or LDO
+> +number as described in RK808 datasheet.
+> +
+> +	- DCDC_REGn
+> +		- valid values for n are 1 to 5.
+> +	- LDO_REGn
+> +		- valid values for n are 1 to 9.
+> +	- SWITCH_REGn
+> +		- valid values for n are 1 to 2.
+> +
+> +Following regulators of the RK817 PMIC block are supported. Note that
+> +the 'n' in regulator name, as in DCDC_REGn or LDOn, represents the DCDC or LDO
+> +number as described in RK818 datasheet.
+
+Is there any need to keep saying the same thing over and over?
+
+Especially for something fairly obvious.
+
+> +	- DCDC_REGn
+> +		- valid values for n are 1 to 4.
+> +	- LDO_REGn
+> +		- valid values for n are 1 to 9.
+> +	- BOOST
+> +	- OTG_SWITCH
+> +
+>  Following regulators of the RK818 PMIC block are supported. Note that
+>  the 'n' in regulator name, as in DCDC_REGn or LDOn, represents the DCDC or LDO
+>  number as described in RK818 datasheet.
+> @@ -99,6 +147,14 @@ number as described in RK818 datasheet.
+>  	- HDMI_SWITCH
+>  	- OTG_SWITCH
+>  
+> +There are three pins needed to config for each of RK809 and RK817,
+> +named "gpio_ts" "gpio_gt" "gpio_slp".
+> +	The gpio_gt and gpio_ts pins support the gpio function.
+> +	The gpio_slp pin is for controlling the pmic states, as below:
+> +		- reset
+> +		- power down
+> +		- sleep
+> +
+>  Standard regulator bindings are used inside regulator subnodes. Check
+>    Documentation/devicetree/bindings/regulator/regulator.txt
+>  for more details
+
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
