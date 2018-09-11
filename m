@@ -1,30 +1,111 @@
-From: saiprakash.ranjan@codeaurora.org (Sai Prakash Ranjan)
-Date: Tue, 11 Sep 2018 21:41:55 +0530
-Subject: [PATCH 0/6] Tracing register accesses with pstore and dynamic
- debug
-In-Reply-To: <20180911151148.GI2651@arm.com>
-References: <cover.1536430404.git.saiprakash.ranjan@codeaurora.org>
- <20180911151148.GI2651@arm.com>
-Message-ID: <2714af83-d2f7-473e-c234-428d2b8a84f0@codeaurora.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 11 Sep 2018 18:23:19 +0200
+Subject: [PATCH v12 0/6] Driver for at91 usart in spi mode
+In-Reply-To: <20180911153621.GP2494@piout.net>
+References: <20180904111310.4049-1-radu_nicolae.pirea@upb.ro>
+ <20180911093356.GE4185@dell> <20180911093917.GL2494@piout.net>
+ <CAMuHMdXH8gNjKGOHGFc+K03U2zsVCSN7G_Q4wtepQr859nRQKg@mail.gmail.com>
+ <20180911153621.GP2494@piout.net>
+Message-ID: <CAMuHMdV+=EgAYogwNHbY=RExkGox_+YSeHV6pJtQb6g6PzD-CQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/11/2018 8:41 PM, Will Deacon wrote:
-> Hello,
-> 
-> On Sun, Sep 09, 2018 at 01:57:01AM +0530, Sai Prakash Ranjan wrote:
->> This patch series adds Event tracing support to pstore and is continuation
->> to the RFC patch introduced to add a new tracing facility for register
->> accesses called Register Trace Buffer(RTB). Since we decided to not introduce
->> a separate framework to trace register accesses and use existing framework
->> like tracepoints, I have moved from RFC. Details of the RFC in link below:
->>
->> Link: https://lore.kernel.org/lkml/cover.1535119710.git.saiprakash.ranjan at codeaurora.org/
-> 
-> The arm64 backend bits look fine to be, but they're mixed up with core
-> changes that I haven't looked at closely.
-> 
-Hi Will,
+On Tue, Sep 11, 2018 at 5:36 PM Alexandre Belloni
+<alexandre.belloni@bootlin.com> wrote:
+> On 11/09/2018 16:59:09+0200, Geert Uytterhoeven wrote:
+> > On Tue, Sep 11, 2018 at 11:40 AM Alexandre Belloni
+> > <alexandre.belloni@bootlin.com> wrote:
+> > > On 11/09/2018 10:33:56+0100, Lee Jones wrote:
+> > > > On Tue, 04 Sep 2018, Radu Pirea wrote:
+> > > > > Radu Pirea (6):
+> > > > >   MAINTAINERS: add at91 usart mfd driver
+> > > > >   dt-bindings: add binding for atmel-usart in SPI mode
+> > > > >   mfd: at91-usart: added mfd driver for usart
+> > > > >   MAINTAINERS: add at91 usart spi driver
+> > > > >   spi: at91-usart: add driver for at91-usart as spi
+> > > > >   tty/serial: atmel: change the driver to work under at91-usart mfd
+> > > > >
+> > > > >  .../bindings/{serial => mfd}/atmel-usart.txt  |  25 +-
+> > > > >  MAINTAINERS                                   |  16 +
+> > > > >  drivers/mfd/Kconfig                           |   9 +
+> > > > >  drivers/mfd/Makefile                          |   1 +
+> > > > >  drivers/mfd/at91-usart.c                      |  71 +++
+> > > > >  drivers/spi/Kconfig                           |   8 +
+> > > > >  drivers/spi/Makefile                          |   1 +
+> > > > >  drivers/spi/spi-at91-usart.c                  | 432 ++++++++++++++++++
+> > > > >  drivers/tty/serial/Kconfig                    |   1 +
+> > > > >  drivers/tty/serial/atmel_serial.c             |  42 +-
+> > > > >  include/dt-bindings/mfd/at91-usart.h          |  17 +
+> > > > >  11 files changed, 606 insertions(+), 17 deletions(-)
+> > > > >  rename Documentation/devicetree/bindings/{serial => mfd}/atmel-usart.txt (76%)
+> > > > >  create mode 100644 drivers/mfd/at91-usart.c
+> > > > >  create mode 100644 drivers/spi/spi-at91-usart.c
+> > > > >  create mode 100644 include/dt-bindings/mfd/at91-usart.h
+> > > >
+> > > > Seeing as this patch-set has caused some issues this morning, I took
+> > > > the liberty to peruse back into its history to figure out where things
+> > > > started to go wrong.  I also re-reviewed the MFD driver - and I'm glad
+> > > > I did!
+> > > >
+> > > > My Acked-by has been attached to the MFD portion since v5, which is
+> > > > why the code hasn't caught my eye before today.  I reviewed the
+> > > > relocation of the *binding document* (serial => mfd with no changes)
+> > > > in v4 and nothing else.  It appears as though you mistakenly added it
+> > > > to the *MFD driver* instead.  This explains my confusion in v10 when I
+> > > > told you I'd already reviewed the binding document.
+> > > >
+> > > > As I said, I have re-reviewed the MFD driver and I'm afraid to say
+> > > > that I do not like what I see.  Besides the missing header file and
+> > > > the whitespace tabbing errors, I do not agree with the implementation.
+> > > > Using MFD as a shim to hack around driver selection is not a valid
+> > > > use-case.
+> > > >
+> > > > What's stopping you from just using the compatible string directly to
+> > > > select which driver you need to probe?
+> > > >
+> > >
+> > > Then you'd have multiple compatible strings for the same IP which is a
+> > > big no-no.
+> >
+> > It's still the same hardware device, isn't?
+> > What if the SPI or UART slave is not on-board, but on an expansion board?
+> > Then the SoC-specific .dtsi has no idea what mode should be used.
+> >
+> > Hence shouldn't the software derive the hardware mode from the full
+> > hardware description in DT? If that's impossible (I didn't look into detail
+> > whether an SPI bus can easily be distinguished from a UART bus), perhaps
+> > a mode property should be added?
+>
+> Yes, this is exactly what is done:
+>
+> https://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git/tree/drivers/mfd/at91-usart.c?h=ib-mfd-spi-tty-4.20-1#n33
 
-Thanks for the review. Let me know if you have any suggestions or points 
-regarding this patch, I will be happy to incorporate it.
+OK.
+
+I guess the main "hackish" part is that the mfd_cell uses of_compatible,
+which thus requires having additional compatible values?
+
+I think those can just be removed. AFAICS, the SPI and serial drivers already
+match against the "at91_usart_spi" resp. "atmel_usart_serial" platform device
+names?
+
+> Only one compatbile for the IP and a property to know what is the mode.
+> That property should indeed be set in the board dts and not the SoC
+> dtsi.
+>
+> the other, less robust alternative was to look for child nodes and
+> decide that if some where present it would indicate an SPI bus. But I
+> think at some point we may have child nodes under a UART node.
+
+Indeed, using the "new" serial bus.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
