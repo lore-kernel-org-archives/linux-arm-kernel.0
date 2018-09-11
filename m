@@ -1,51 +1,82 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 11 Sep 2018 11:12:32 +0200
-Subject: [PATCH v3 14/30] dt-bindings: update the Allwinner GPADC device
- tree binding for H3 & A83T
-In-Reply-To: <20180910194424.GA21461@bogus>
-References: <20180830154518.29507-1-embed3d@gmail.com>
- <20180830154518.29507-15-embed3d@gmail.com>
- <20180831084854.q2uh63pw5vprqlzt@flea>
- <20180910194424.GA21461@bogus>
-Message-ID: <20180911091232.2ozypemfam5kayef@flea>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Tue, 11 Sep 2018 10:18:44 +0100
+Subject: [PATCH v3 0/9] ARM: spectre-v1.1 mitigations
+In-Reply-To: <20180910163518.GW30658@n2100.armlinux.org.uk>
+References: <1536576168-40096-1-git-send-email-julien.thierry@arm.com>
+ <20180910163518.GW30658@n2100.armlinux.org.uk>
+Message-ID: <ad6c2175-d637-7a05-7f53-98bb6c08a1c6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2018 at 02:44:24PM -0500, Rob Herring wrote:
-> On Fri, Aug 31, 2018 at 10:48:54AM +0200, Maxime Ripard wrote:
-> > On Thu, Aug 30, 2018 at 05:45:02PM +0200, Philipp Rossak wrote:
-> > > Allwinner H3 features a thermal sensor like the one in A33, but has its
-> > > register re-arranged, the clock divider moved to CCU (originally the
-> > > clock divider is in ADC) and added a pair of bus clock and reset.
-> > > 
-> > > Allwinner A83T features a thermal sensor similar to the H3, the ths clock,
-> > > the bus clock and the reset was removed from the CCU. The THS in A83T
-> > > has a clock that is directly connected and runs with 24 MHz.
-> > > 
-> > > Update the binding document to cover H3 and A83T.
-> > > 
-> > > Signed-off-by: Philipp Rossak <embed3d@gmail.com>
-> > 
-> > You probably want to have a look at:
-> > https://www.spinics.net/lists/arm-kernel/msg670167.html
+Hi Russell,
+
+On 10/09/18 17:35, Russell King - ARM Linux wrote:
+> Hi Julien,
 > 
-> Well, which is it? An ADC or thermal sensor?
+> I think this now looks fine, please drop it into the patch system.
+> Thanks.
+> 
 
-It's both actually. This IP used to be called GPADC, and had a thermal
-sensor + some ADC channels. The design evolved across several
-generations of SoCs to drop the ADC channels and be used only to have
-thermal sensors.
+The patches are in the patch system now. Thanks for your reviews.
 
-Maxime
+Thanks,
+
+> On Mon, Sep 10, 2018 at 11:42:39AM +0100, Julien Thierry wrote:
+>> Hi,
+>>
+>> The series provides mitigations for spectre-v1.1. It is mostly mirroring
+>> what Russell did [1], but this time for writes to user provided addresses.
+>>
+>> * Patches 1-5 replace some __put_user_error calls with __copy_to_user, this
+>>    both reduces the number of time address sanitizing is performed and also
+>>    the number of time PAN needs to be toggled.
+>>
+>> * Patches 6-9 ensure user addresses used by __put_user* and
+>>    __copy_to_user functions are sanitized before being used.
+>>
+>> Changes since v2[2]:
+>> - Ensure padding in vfp_sigframe is properly initialized
+>> - Fix incorrect copy of oabi events
+>>
+>> Changes since v1[3]:
+>> - Fixed off-by-one error in uaccess_mask_range_ptr, spotted by Russell
+>> - Remove remaining calls to __put_user_error() and get rid of the macro
+>> - Reorder the patches to better reflect the spectre-v1 series
+>>
+>> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-July/589869.html
+>> [2] https://www.spinics.net/lists/arm-kernel/msg674995.html
+>> [3] https://www.spinics.net/lists/arm-kernel/msg671026.html
+>>
+>> Cheers,
+>>
+>> Julien
+>>
+>>
+>> Julien Thierry (9):
+>>    ARM: signal: copy registers using __copy_to_user()
+>>    ARM: signal: always use __copy_to_user to save iwmmxt context
+>>    ARM: vfp: use __copy_to_user() when saving VFP state
+>>    ARM: oabi-compat: copy oabi events using __copy_to_user()
+>>    ARM: signal: replace __put_user_error with __put_user
+>>    ARM: uaccess: Prevent speculative use of the current addr_limit
+>>    ARM: spectre-v1.1: use put_user() for __put_user()
+>>    ARM: spectre-v1,v1.1: provide helpers for address sanitization
+>>    ARM: spectre-v1.1: harden __copy_to_user
+>>
+>>   arch/arm/include/asm/assembler.h   | 11 ++++++
+>>   arch/arm/include/asm/thread_info.h |  4 +-
+>>   arch/arm/include/asm/uaccess.h     | 49 ++++++++++++++++++++---
+>>   arch/arm/kernel/signal.c           | 80 +++++++++++++++++++++-----------------
+>>   arch/arm/kernel/sys_oabi-compat.c  |  8 +++-
+>>   arch/arm/lib/copy_from_user.S      |  6 +--
+>>   arch/arm/lib/copy_to_user.S        |  6 ++-
+>>   arch/arm/lib/uaccess_with_memcpy.c |  3 +-
+>>   arch/arm/vfp/vfpmodule.c           | 20 ++++------
+>>   9 files changed, 122 insertions(+), 65 deletions(-)
+>>
+>> --
+>> 1.9.1
+> 
 
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180911/a8af0196/attachment.sig>
+Julien Thierry
