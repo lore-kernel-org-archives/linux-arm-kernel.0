@@ -1,41 +1,44 @@
-From: leo.yan@linaro.org (leo.yan at linaro.org)
-Date: Tue, 11 Sep 2018 15:58:35 +0800
-Subject: [PATCH 2/2] coresight: tmc: Fix writing barrier packets for ring
- buffer
-In-Reply-To: <CANLsYkxACMEfzLJ7MfWiwA8+GnsQBz885T8GT+ujOtCsAT0=bg@mail.gmail.com>
-References: <1536134144-2764-1-git-send-email-leo.yan@linaro.org>
- <1536134144-2764-2-git-send-email-leo.yan@linaro.org>
- <CANLsYkxACMEfzLJ7MfWiwA8+GnsQBz885T8GT+ujOtCsAT0=bg@mail.gmail.com>
-Message-ID: <20180911075835.GB6110@leoy-ThinkPad-X240s>
+From: anuragku@xilinx.com (Anurag Kumar Vulisha)
+Date: Tue, 11 Sep 2018 08:04:41 +0000
+Subject: [PATCH v3 1/2] phy: zynqmp: Add phy driver for xilinx zynqmp phy
+ core
+In-Reply-To: <20180910201523.GA4024@bogus>
+References: <1536165747-6405-1-git-send-email-anurag.kumar.vulisha@xilinx.com>
+ <1536165747-6405-2-git-send-email-anurag.kumar.vulisha@xilinx.com>
+ <20180910201523.GA4024@bogus>
+Message-ID: <BN3PR0201MB09937FA5CE658BFD974146CBA7040@BN3PR0201MB0993.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mathieu,
 
-On Mon, Sep 10, 2018 at 01:42:31PM -0600, Mathieu Poirier wrote:
+Hi Rob,
 
-[...]
+Thanks a lot for spending your time in reviewing this patch series, 
 
-> > diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> > index e310613..9c599c9 100644
-> > --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> > +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> > @@ -387,7 +387,7 @@ static void tmc_update_etf_buffer(struct coresight_device *csdev,
-> >         const u32 *barrier;
-> >         u32 *buf_ptr;
-> >         u64 read_ptr, write_ptr;
-> > -       u32 status, to_read;
-> > +       u32 status, to_read, barrier_sz = 0;
-> 
-> This doesn't apply on my next branch.  Please rebase and send both
-> patches again.
+>> Signed-off-by: Anurag Kumar Vulisha <anurag.kumar.vulisha@xilinx.com>
+>> ---
+>> Changes in v3:
+>> 	1. Corrected the Documentation as suggested by Vivek Gautam
+>>
+>> Changes in v2:
+>> 	1. Fixed the compilation error when compiled phy-zynqmp.c as a module
+>> 	2. Added CONFIG_PM macro in phy-zynqmp.c driver
+>> ---
+>>  drivers/phy/Kconfig            |    8 +
+>>  drivers/phy/Makefile           |    1 +
+>>  drivers/phy/phy-zynqmp.c       | 1581
+>++++++++++++++++++++++++++++++++++++++++
+>>  include/dt-bindings/phy/phy.h  |    2 +
+>
+>This goes in patch 2. And patch 2 should come first.
+>
 
-Done.  Rebased these two patches against to CoreSight next branch [1];
-please review the patch series v2 which has been sent out.
-
-[...]
+Will fix this in the next series of the patch
 
 Thanks,
-Leo Yan
+Anurag Kumar Vulisha
 
-[1] https://git.linaro.org/kernel/coresight.git/log/?h=next
+>>  include/linux/phy/phy-zynqmp.h |   52 ++
+>>  5 files changed, 1644 insertions(+)
+>>  create mode 100644 drivers/phy/phy-zynqmp.c  create mode 100644
+>> include/linux/phy/phy-zynqmp.h
