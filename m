@@ -1,154 +1,47 @@
-From: l.subrahmanya@mobiveil.co.in (Subrahmanya Lingappa)
-Date: Tue, 11 Sep 2018 12:56:24 +0530
-Subject: [PATCH] PCI: remove unnecessary check of device_type == pci
-In-Reply-To: <20180829183440.13601-1-robh@kernel.org>
-References: <20180829183440.13601-1-robh@kernel.org>
-Message-ID: <CAFZiPx18GLf5QypztjtMgb0uDF86PG9ky5mj6eOdyHNsqUpirA@mail.gmail.com>
+From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
+Date: Tue, 11 Sep 2018 09:26:53 +0200
+Subject: [PATCH v1 0/7] Add-DMA-MDMA-chaining-support
+Message-ID: <1536650820-16076-1-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This serie adds support for M2M transfer triggered by STM32 DMA in order to
+transfer data from/to SRAM to/from DDR.
 
-with regards to : drivers/pci/controller/pcie-mobiveil.c
-Acked-by: Subrahmaya Lingappa <l.subrahmanya@mobiveil.co.in>
+Normally, this mode should not be needed as transferring data from/to DDR
+is supported by the STM32 DMA.
+However, the STM32 DMA don't have the ability to generate burst transfer
+on the DDR as it only embeds only a 4-word FIFO although the minimal burst
+length on the DDR is 8 words.
+Due to this constraint, the STM32 DMA transfers data from/to DDR in a
+single way and could lead to pollute the DDR.
+To avoid this, we have to use SRAM for all transfers where STM32 DMA is
+involved.
 
-Thanks.
+An Hw design has been specially put in place to allow this chaining where DMA
+interrupt is connected on GIC and MDMA request line as well. This grants the
+possibility to trigger an MDMA transfer from the completion of DMA.
+At the same time MDMA has the ability to acknowlege DMA. The aim is to have an
+self refreching mechanism to transfer from/to device to/from DDR with minimal
+sw support.
+For instance the DMA is set in cyclic double buffering to feed SRAM and MDMA
+transfer to DDR thanks to LLI.
 
-On Thu, Aug 30, 2018 at 12:04 AM Rob Herring <robh@kernel.org> wrote:
->
-> PCI host drivers have already matched on compatible strings, so checking
-> device_type is redundant. Also, device_type is considered deprecated for
-> FDT though we've still been requiring it for PCI hosts as it is useful
-> for finding PCI buses.
->
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Alan Douglas <adouglas@cadence.com>
-> Cc: Subrahmanya Lingappa <l.subrahmanya@mobiveil.co.in>
-> Cc: Michal Simek <michal.simek@xilinx.com>
-> Cc: linux-pci at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
->  drivers/pci/controller/pci-host-common.c   | 8 --------
->  drivers/pci/controller/pcie-cadence-host.c | 7 -------
->  drivers/pci/controller/pcie-mobiveil.c     | 7 -------
->  drivers/pci/controller/pcie-xilinx-nwl.c   | 9 ---------
->  drivers/pci/controller/pcie-xilinx.c       | 7 -------
->  5 files changed, 38 deletions(-)
->
-> diff --git a/drivers/pci/controller/pci-host-common.c b/drivers/pci/controller/pci-host-common.c
-> index d8f10451f273..c742881b5061 100644
-> --- a/drivers/pci/controller/pci-host-common.c
-> +++ b/drivers/pci/controller/pci-host-common.c
-> @@ -58,9 +58,7 @@ static struct pci_config_window *gen_pci_init(struct device *dev,
->  int pci_host_common_probe(struct platform_device *pdev,
->                           struct pci_ecam_ops *ops)
->  {
-> -       const char *type;
->         struct device *dev = &pdev->dev;
-> -       struct device_node *np = dev->of_node;
->         struct pci_host_bridge *bridge;
->         struct pci_config_window *cfg;
->         struct list_head resources;
-> @@ -70,12 +68,6 @@ int pci_host_common_probe(struct platform_device *pdev,
->         if (!bridge)
->                 return -ENOMEM;
->
-> -       type = of_get_property(np, "device_type", NULL);
-> -       if (!type || strcmp(type, "pci")) {
-> -               dev_err(dev, "invalid \"device_type\" %s\n", type);
-> -               return -EINVAL;
-> -       }
-> -
->         of_pci_check_probe_only();
->
->         /* Parse and map our Configuration Space windows */
-> diff --git a/drivers/pci/controller/pcie-cadence-host.c b/drivers/pci/controller/pcie-cadence-host.c
-> index ec394f6a19c8..97e251090b4f 100644
-> --- a/drivers/pci/controller/pcie-cadence-host.c
-> +++ b/drivers/pci/controller/pcie-cadence-host.c
-> @@ -235,7 +235,6 @@ static int cdns_pcie_host_init(struct device *dev,
->
->  static int cdns_pcie_host_probe(struct platform_device *pdev)
->  {
-> -       const char *type;
->         struct device *dev = &pdev->dev;
->         struct device_node *np = dev->of_node;
->         struct pci_host_bridge *bridge;
-> @@ -268,12 +267,6 @@ static int cdns_pcie_host_probe(struct platform_device *pdev)
->         rc->device_id = 0xffff;
->         of_property_read_u16(np, "device-id", &rc->device_id);
->
-> -       type = of_get_property(np, "device_type", NULL);
-> -       if (!type || strcmp(type, "pci")) {
-> -               dev_err(dev, "invalid \"device_type\" %s\n", type);
-> -               return -EINVAL;
-> -       }
-> -
->         res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "reg");
->         pcie->reg_base = devm_ioremap_resource(dev, res);
->         if (IS_ERR(pcie->reg_base)) {
-> diff --git a/drivers/pci/controller/pcie-mobiveil.c b/drivers/pci/controller/pcie-mobiveil.c
-> index a939e8d31735..77052a0712d0 100644
-> --- a/drivers/pci/controller/pcie-mobiveil.c
-> +++ b/drivers/pci/controller/pcie-mobiveil.c
-> @@ -301,13 +301,6 @@ static int mobiveil_pcie_parse_dt(struct mobiveil_pcie *pcie)
->         struct platform_device *pdev = pcie->pdev;
->         struct device_node *node = dev->of_node;
->         struct resource *res;
-> -       const char *type;
-> -
-> -       type = of_get_property(node, "device_type", NULL);
-> -       if (!type || strcmp(type, "pci")) {
-> -               dev_err(dev, "invalid \"device_type\" %s\n", type);
-> -               return -EINVAL;
-> -       }
->
->         /* map config resource */
->         res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-> diff --git a/drivers/pci/controller/pcie-xilinx-nwl.c b/drivers/pci/controller/pcie-xilinx-nwl.c
-> index fb32840ce8e6..81538d77f790 100644
-> --- a/drivers/pci/controller/pcie-xilinx-nwl.c
-> +++ b/drivers/pci/controller/pcie-xilinx-nwl.c
-> @@ -777,16 +777,7 @@ static int nwl_pcie_parse_dt(struct nwl_pcie *pcie,
->                              struct platform_device *pdev)
->  {
->         struct device *dev = pcie->dev;
-> -       struct device_node *node = dev->of_node;
->         struct resource *res;
-> -       const char *type;
-> -
-> -       /* Check for device type */
-> -       type = of_get_property(node, "device_type", NULL);
-> -       if (!type || strcmp(type, "pci")) {
-> -               dev_err(dev, "invalid \"device_type\" %s\n", type);
-> -               return -EINVAL;
-> -       }
->
->         res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "breg");
->         pcie->breg_base = devm_ioremap_resource(dev, res);
-> diff --git a/drivers/pci/controller/pcie-xilinx.c b/drivers/pci/controller/pcie-xilinx.c
-> index 7b1389d8e2a5..9bd1a35cd5d8 100644
-> --- a/drivers/pci/controller/pcie-xilinx.c
-> +++ b/drivers/pci/controller/pcie-xilinx.c
-> @@ -574,15 +574,8 @@ static int xilinx_pcie_parse_dt(struct xilinx_pcie_port *port)
->         struct device *dev = port->dev;
->         struct device_node *node = dev->of_node;
->         struct resource regs;
-> -       const char *type;
->         int err;
->
-> -       type = of_get_property(node, "device_type", NULL);
-> -       if (!type || strcmp(type, "pci")) {
-> -               dev_err(dev, "invalid \"device_type\" %s\n", type);
-> -               return -EINVAL;
-> -       }
-> -
->         err = of_address_to_resource(node, 0, &regs);
->         if (err) {
->                 dev_err(dev, "missing \"reg\" property\n");
-> --
-> 2.17.1
->
+Pierre-Yves MORDRET (7):
+  dt-bindings: stm32-dma: Add DMA/MDMA chaining support bindings
+  dt-bindings: stm32-dmamux: Add one cell to support DMA/MDMA chain
+  dt-bindings: stm32-mdma: Add DMA/MDMA chaining support bindings
+  dmaengine: stm32-dma: Add DMA/MDMA chaining support
+  dmaengine: stm32-mdma: Add DMA/MDMA chaining support
+  dmaengine: stm32-dma: enable descriptor_reuse
+  dmaengine: stm32-mdma: enable descriptor_reuse
+
+ .../devicetree/bindings/dma/stm32-dma.txt          |  32 +-
+ .../devicetree/bindings/dma/stm32-dmamux.txt       |   5 +-
+ .../devicetree/bindings/dma/stm32-mdma.txt         |  22 +-
+ drivers/dma/stm32-dma.c                            | 903 ++++++++++++++++++---
+ drivers/dma/stm32-mdma.c                           | 133 ++-
+ 5 files changed, 954 insertions(+), 141 deletions(-)
+
+-- 
+2.7.4
