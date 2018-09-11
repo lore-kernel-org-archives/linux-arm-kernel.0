@@ -1,31 +1,15 @@
-From: greg@kroah.com (Greg KH)
-Date: Tue, 11 Sep 2018 11:02:11 +0200
-Subject: [PATCH] mfd: at91-usart: fix missing mod_devicetable.h
-In-Reply-To: <20180911084448.17878-1-nicolas.ferre@microchip.com>
-References: <20180911125857.5e5c34f4@canb.auug.org.au>
- <20180911084448.17878-1-nicolas.ferre@microchip.com>
-Message-ID: <20180911090211.GA25358@kroah.com>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Tue, 11 Sep 2018 17:00:30 +0800
+Subject: [4.14.y] request commit 94a5d8790e79 ("arm64: cpu_errata: include
+ required headers")
+Message-ID: <20180911170030.650928d8@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2018 at 10:44:48AM +0200, Nicolas Ferre wrote:
-> Following the inclusion of the patch ac3167257b9f ("headers:
-> separate linux/mod_devicetable.h from linux/platform_device.h"), there is a
-> build issue:
-> 
-> drivers/mfd/at91-usart.c:51:34: error: array type has incomplete element type
-> 'struct of_device_id'
->   static const struct of_device_id at91_usart_mode_of_match[] = {
-> 
-> Before this patch, the definition was reached by its inclusion of
-> linux/mfd/core.h.
-> 
-> The build issue is solved by simply adding the mod_devicetable.h in this
-> driver.
-> 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-> Cc: Radu Pirea <radu_nicolae.pirea@upb.ro>
+Hi Greg,
 
-You forgot a "reported-by" :(
+I think we missed the commit 94a5d8790e79 ("arm64: cpu_errata: include
+required headers"), could you please include it in next stable release?
 
-I'll go add it...
+Thanks,
+Jisheng
