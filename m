@@ -1,79 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 11 Sep 2018 17:50:30 +0100
-Subject: [PATCH] arm64: add NUMA emulation support
-In-Reply-To: <86aad702-9f42-c572-a8f1-74983cd1bf33@kernel.org>
-References: <20180829110802.GD10349@dhcp22.suse.cz>
- <f041ba95-03e6-4a7d-c324-870b45a2f648@kernel.org>
- <20180905064252.GW14951@dhcp22.suse.cz>
- <c1b58f13-6190-20e9-7e4f-b8bc2b9d5f80@kernel.org>
- <20180907083452.GC19621@dhcp22.suse.cz>
- <e46e715c-f115-f054-eeb2-3cecbcd1192d@kernel.org>
- <20180910134845.GH10951@dhcp22.suse.cz>
- <4d7beb50-f778-507a-4c3c-f6de92f8cfb9@kernel.org>
- <20180911091124.GP10951@dhcp22.suse.cz>
- <86aad702-9f42-c572-a8f1-74983cd1bf33@kernel.org>
-Message-ID: <20180911165029.GA15022@arm.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 11 Sep 2018 11:58:37 -0500
+Subject: [PATCH] gpio: omap: Add level wakeup handling for omap4 based SoCs
+In-Reply-To: <20180910200624.4494-1-tony@atomide.com>
+References: <20180910200624.4494-1-tony@atomide.com>
+Message-ID: <444bae18-9737-8e13-2a0f-c08863ae1336@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2018 at 09:27:49AM -0600, Shuah Khan wrote:
-> On 09/11/2018 03:11 AM, Michal Hocko wrote:
-> > On Mon 10-09-18 20:02:05, Shuah Khan wrote:
-> >> Hi Michal,
-> >>
-> >> On 09/10/2018 07:48 AM, Michal Hocko wrote:
-> >>> On Fri 07-09-18 16:30:59, Shuah Khan wrote:
-> >>>> On 09/07/2018 02:34 AM, Michal Hocko wrote:
-> >>>>> On Thu 06-09-18 15:53:34, Shuah Khan wrote:
-> >> [....]
-> >>>>
-> >>>> In addition to isolation, being able to reserve a block instead is one of the
-> >>>> issues I am looking to address. Unfortunately memory cgroups won't address that
-> >>>> issue.
-> >>>
-> >>> Could you be more specific why you need reservations other than
-> >>> isolation.
-> >>>
-> >>
-> >> Taking automotive as a specific example, there are two classes of applications:
-> >> 1. critical applications that must run
-> >> 2. Infotainment and misc. user-space.
-> >>
-> >> In this case, being able to reserve a block of memory for critical applications
-> >> will ensure the memory is available for them. If a critical application has to
-> >> restart and/or when an on-demand critical application starts, it might not be able
-> >> to allocate memory if it is not reserved.
-> >>
-> >> When a flat system has multiple memory blocks, with NUMA emulation in conjunction with
-> >> cpusets, one or more block can be reserved for critical applications configuring a set
-> >> of cpus and one of more memory nodes for them.
-> >>
-> >> Memory cgroups will not support such reservation. Hope this helps explain the use-case
-> >> I am trying to address with this patch.
-> > 
-> > OK, that is more clear. I still believe that you either have to have a
-> > very good control over memory allocations or a good luck to not see
-> > unexpected kernel allocations in your reserved memory which might easily
-> > break guarantees you would like to accomplish.
-> > 
-> 
-> Thanks. Right. I am with you on the possibility that root cgroup can eat into
-> the reserved memory. However, with this solution I proposed, there is a guarantee
-> that the cpuset cgroup that is configured for non-critical Infotainment and misc.
-> user-space application will not be able to allocate from the reserved memory node.
-> 
-> I am hoping the proposed patch will allow critical apps. reserving memory with the
-> exception that root cgroup and kernel can still allocate from it when needed. Perhaps
-> cpuset exclusive logic could be extended to look for non-exclusive memory nodes first
-> if it doesn't already do that. This is inline with the current cpuset approach is that
-> the critical kernel allocations aren't starved to ensure memory reservations.
-> 
-> If you don't think this solution isn't ideal/good, do you have other suggestions
-> for solving the problem? If not would it be okay to start with what I proposed and
-> build on top of as needed?
+Hi Tony,
 
-I still don't understand why this can't be achieved by faking up some NUMA
-entries in the firmware table and just using the existing NUMA code that we
-have.
+On 09/10/2018 03:06 PM, Tony Lindgren wrote:
+> I noticed that unlike omap2 and 3 based SoCs, omap4 based SoCs keep
+> the GPIO clocks enabled for GPIO level interrupts with wakeup enabled.
+> This blocks deeper idle states as the whole domain will stay busy.
+> 
+> The GPIO clock seems to stay enabled if the wakeup register is enabled
+> and a level interrupt is triggered. In that case the only way to have
+> the GPIO module idle is to reset it. It is possible this has gone
+> unnoticed with OSWR (Open SWitch Retention) and off mode during idle
+> resetting GPIO context most GPIO instances in the earlier Android trees
+> for example.
+> 
+> Looks like the way to deal with this is to have omap4 based SoCs
+> only set wake for the duration of idle and clear level registers for
+> the idle. With level interrupts we can do this as the level interrupt
+> from device will be still there on resume.
+> 
+> I've taken the long path to fixing this to avoid yet more hard to
+> read code. I've set up a quirks flag, and a struct for function
+> pointers so we can use these to clean up other quirk handling easier
+> in the later patches. The current level quirk handling is moved to
+> the new functions.
 
-Will
+I agree with patch in general as it seems will not break anything and
+ change localized for omap4 only.
+But I'd be very appreciated if you can provide more information about issue
+which helps better understand it, so could you, if possible, collect dump of:
+- GPIO bank regs right before entering WFI state in Idle (or as close as possible)
+  I'm interesting in sysc/s, ctrl, irq's regs (+wakupen) and GPIO_DEBOUNCEN first of all
+- GPIO bank CLKCTRL registers (is it "in transition" state).
+in non working case.
+
+> 
+> Cc: Grygorii Strashko <grygorii.strashko@ti.com>
+> Cc: Keerthy <j-keerthy@ti.com>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>   drivers/gpio/gpio-omap.c                | 145 ++++++++++++++++++------
+>   include/linux/platform_data/gpio-omap.h |   2 +
+>   2 files changed, 114 insertions(+), 33 deletions(-)
+> 
+
+-- 
+regards,
+-grygorii
