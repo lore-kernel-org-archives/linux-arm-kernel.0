@@ -1,44 +1,72 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Tue, 11 Sep 2018 12:04:09 +0100
-Subject: [PATCH 1/4] sched/topology: SD_ASYM_CPUCAPACITY flag detection
-In-Reply-To: <20180910082111.GA48257@gmail.com>
-References: <1532093554-30504-1-git-send-email-morten.rasmussen@arm.com>
- <1532093554-30504-2-git-send-email-morten.rasmussen@arm.com>
- <20180910082111.GA48257@gmail.com>
-Message-ID: <20180911110409.GA16613@e105550-lin.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 11 Sep 2018 12:18:50 +0100
+Subject: [GIT PULL v2] Immutable branch between MFD, SPI and TTY due for the
+ v4.20 merge window
+In-Reply-To: <20180904111310.4049-1-radu_nicolae.pirea@upb.ro>
+References: <20180904111310.4049-1-radu_nicolae.pirea@upb.ro>
+Message-ID: <20180911111850.GJ4185@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2018 at 10:21:11AM +0200, Ingo Molnar wrote:
-> 
-> * Morten Rasmussen <morten.rasmussen@arm.com> wrote:
-> 
-> > The SD_ASYM_CPUCAPACITY sched_domain flag is supposed to mark the
-> > sched_domain in the hierarchy where all cpu capacities are visible for
-> > any cpu's point of view on asymmetric cpu capacity systems. The
-> 
-> >  /*
-> > + * Find the sched_domain_topology_level where all cpu capacities are visible
-> > + * for all cpus.
-> > + */
-> 
-> > +	/*
-> > +	 * Examine topology from all cpu's point of views to detect the lowest
-> > +	 * sched_domain_topology_level where a highest capacity cpu is visible
-> > +	 * to everyone.
-> > +	 */
-> 
-> >  #define SD_WAKE_AFFINE               0x0020  /* Wake task to waking CPU */
-> > -#define SD_ASYM_CPUCAPACITY  0x0040  /* Groups have different max cpu capacities */
-> > +#define SD_ASYM_CPUCAPACITY  0x0040  /* Domain members have different cpu capacities */
-> 
-> For future reference: *please* capitalize 'CPU' and 'CPUs' in future patches like the rest of 
-> the scheduler does.
-> 
-> You can see it spelled right above the new definition: 'waking CPU' ;-)
-> 
-> (I fixed this up in this patch.)
+[In case you missed it]
 
-Noted. Thanks for fixing up the patch.
+This new pull-request contains the following changes since v1:
 
-Morten
+ - Uplift the submission version from v11 to v12
+ - Include fix for build breakage due to missing Device Tree include file
+
+Since it is based on the original pull-request, it can be pulled
+in either directly on top of it or as a pull in its own right.
+
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+
+  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git tags/ib-mfd-spi-tty-v4.20-1
+
+for you to fetch changes up to 65b80dfffeabd4eb253b93d07eadde4d89c18511:
+
+  mfd: at91-usart: Include Device Tree header (2018-09-11 11:44:56 +0100)
+
+----------------------------------------------------------------
+Immutable branch between MFD, SPI and TTY due for the v4.20 merge window (v2)
+
+----------------------------------------------------------------
+Lee Jones (4):
+      dt-bindings: mfd: atmel-usart: Correct interrupts property to include IRQ number
+      MAINTAINERS: Change Radu's email address
+      spi: at91-usart: Make local functions static
+      mfd: at91-usart: Include Device Tree header
+
+Radu Pirea (6):
+      MAINTAINERS: Add AT91 USART MFD entry
+      dt-bindings: Add binding for atmel-usart in SPI mode
+      mfd: at91-usart: Add MFD driver for USART
+      MAINTAINERS: Add AT91 USART SPI entry
+      spi: at91-usart: Add driver for at91-usart as SPI
+      tty/serial: atmel: Change the driver to work under at91-usart MFD
+
+ .../bindings/{serial => mfd}/atmel-usart.txt       |  25 +-
+ MAINTAINERS                                        |  16 +
+ drivers/mfd/Kconfig                                |   9 +
+ drivers/mfd/Makefile                               |   1 +
+ drivers/mfd/at91-usart.c                           |  72 ++++
+ drivers/spi/Kconfig                                |   8 +
+ drivers/spi/Makefile                               |   1 +
+ drivers/spi/spi-at91-usart.c                       | 432 +++++++++++++++++++++
+ drivers/tty/serial/Kconfig                         |   1 +
+ drivers/tty/serial/atmel_serial.c                  |  42 +-
+ include/dt-bindings/mfd/at91-usart.h               |  17 +
+ 11 files changed, 607 insertions(+), 17 deletions(-)
+ rename Documentation/devicetree/bindings/{serial => mfd}/atmel-usart.txt (76%)
+ create mode 100644 drivers/mfd/at91-usart.c
+ create mode 100644 drivers/spi/spi-at91-usart.c
+ create mode 100644 include/dt-bindings/mfd/at91-usart.h
+
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
