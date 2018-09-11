@@ -1,54 +1,119 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 11 Sep 2018 11:23:30 +0100
-Subject: [PATCH 1/4] arm-nommu: don't define arch_teardown_dma_ops
-In-Reply-To: <20180827084711.23407-2-hch@lst.de>
-References: <20180827084711.23407-1-hch@lst.de>
- <20180827084711.23407-2-hch@lst.de>
-Message-ID: <8ae006ad-0aff-bab3-2c16-be1696d58b5f@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 11 Sep 2018 11:24:54 +0100
+Subject: [PATCH v2 3/4] perf: add arm64 smmuv3 pmu driver
+In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA838785947@FRAEML521-MBX.china.huawei.com>
+References: <20180724114515.21764-1-shameerali.kolothum.thodi@huawei.com>
+ <20180724114515.21764-4-shameerali.kolothum.thodi@huawei.com>
+ <935f7572-38d7-070a-dba6-3f18189de4d3@arm.com>
+ <5FC3163CFD30C246ABAA99954A238FA838785947@FRAEML521-MBX.china.huawei.com>
+Message-ID: <5b98cd2c-02f7-0934-41c5-1da3e3557896@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/08/18 09:47, Christoph Hellwig wrote:
-> We can just use the default implementation.
+On 10/09/18 17:37, Shameerali Kolothum Thodi wrote:
+[...]
+>>> @@ -0,0 +1,838 @@
+>>> +// SPDX-License-Identifier: GPL-2.0+
+>>> +/* Copyright (c) 2017 The Linux Foundation. All rights reserved.
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or
+>>> +modify
+>>> + * it under the terms of the GNU General Public License version 2 and
+>>> + * only version 2 as published by the Free Software Foundation.
+>>> + *
+>>> + * This program is distributed in the hope that it will be useful,
+>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>> + * GNU General Public License for more details.
+>>
+>> You don't really need to add the license text as well as SPDX. Except for the fact
+>> that in this case they don't match - which is it?
 > 
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
-> ---
->  arch/arm/include/asm/dma-mapping.h | 2 ++
->  arch/arm/mm/dma-mapping-nommu.c    | 4 ----
->  2 files changed, 2 insertions(+), 4 deletions(-)
+> Right. I will stick to SPDX-License-Identifier: GPL-2.0+
+
+My question there is about the "+" - the license of the original patch 
+was GPL-2.0, and I'm not sure about the legitimacy of quietly changing 
+it to 2.0-or-later, especially without any visible agreement from 
+previous contributors.
+
+[...]
+>> Also, how relevant is it going to be for future DT support? We don't really want
+>> too many artificial dependencies on the way ACPI support happens to currently
+>> be implemented.
 > 
-> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> index 8436f6ade57d..965b7c846ecb 100644
-> --- a/arch/arm/include/asm/dma-mapping.h
-> +++ b/arch/arm/include/asm/dma-mapping.h
-> @@ -100,8 +100,10 @@ static inline unsigned long dma_max_pfn(struct device *dev)
->  extern void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
->  			       const struct iommu_ops *iommu, bool coherent);
->  
-> +#ifdef CONFIG_MMU
->  #define arch_teardown_dma_ops arch_teardown_dma_ops
->  extern void arch_teardown_dma_ops(struct device *dev);
-> +#endif
->  
->  /* do not use this function in a driver */
->  static inline bool is_device_dma_coherent(struct device *dev)
-> diff --git a/arch/arm/mm/dma-mapping-nommu.c b/arch/arm/mm/dma-mapping-nommu.c
-> index f448a0663b10..aa7aba302e76 100644
-> --- a/arch/arm/mm/dma-mapping-nommu.c
-> +++ b/arch/arm/mm/dma-mapping-nommu.c
-> @@ -237,7 +237,3 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
->  
->  	set_dma_ops(dev, dma_ops);
->  }
-> -
-> -void arch_teardown_dma_ops(struct device *dev)
-> -{
-> -}
+> Sorry, it's not clear to me what is proposed here as far as naming the PMU is
+> concerned. Please see below as well.
+
+Here I mean whether pdev->id is meaningful for OF platform devices in 
+the same way as for IORT devices in terms of uniqueness - it may well 
+be, but if it isn't then we should find a better alternative.
+
+>>> +out:
+>>> +	kfree(temp);
+>>> +	return ret;
+>>> +}
+>>> +
+>>> +
+>>> +static char *smmu_pmu_assign_name(struct smmu_pmu *pmu) {
+>>> +	unsigned long id;
+>>> +	struct device *smmu, *dev = pmu->dev;
+>>> +	char *s_name = NULL, *p_name = NULL;
+>>> +
+>>> +	smmu = iort_find_pmcg_ref_smmu(dev);
+>>> +	if (smmu) {
+>>> +		if (!smmu_pmu_get_dev_id(dev_name(smmu), &id))
+>>> +			s_name = kasprintf(GFP_KERNEL,
+>> "arm_smmu_v3_%lu", id);
+>>> +	}
+>>> +
+>>> +	if (!s_name)
+>>> +		s_name = kasprintf(GFP_KERNEL, "arm_smmu_v3");
+>>
+>> As I touched on before, I think it's worth generalising this from the start, and
+>> trying to resolve the component reference to a struct device rather than
+>> IORT/SMMU specific internals. However it also occurs to me that maybe this
+>> isn't as important as it first seemed - since the auto-numbered ID doesn't
+>> actually say which PMCG is which, the only way for the user to actually identify
+>> which PMU is the correct one to count events for a particular endpoint is still to
+>> grovel up the base address, so as long as the PMU name uniquely correlates to
+>> the PMCG device, I'm not sure anything really matters beyond that.
 > 
+> So If I understand this correctly,
+> 
+> iort_find_pmcg_ref_smmu() should be something like  iort_find_pmcg_ref()
+> which returns the associated struct device for the ref node and then, pmu is
+> named as,
+> 
+> arm_smmu_v3_x_pmcg_y
+> nc_dev_name_x_pmcg_y
+> pciXXXX_pmcg_y  (It?s a bit tricky for RC as we will end up with struct pci_bus)
+> 
+> (where x and y are auto ids)
+> 
+> Please let me know if this is what is proposed here.
 
-FWIW:
+That's more or less what I was angling at, but as mentioned I realise 
+it's fundamentally flawed (looking back at the original thread, I see it 
+was me that proposed the idea, quelle suprise!)
 
-Reviewed-by: Vladimir Murzin <vladimir.murzin@arm.com>
+Say you want to count events on one particular stream ID - how do you 
+determine which of "arm_smmu_v3_0_pmcg_0" to "arm_smmu_v3_0_pmcg_6" 
+represents the actual TBU that can see that SID? Sure, you have a *bit* 
+more information than if they were just named, say, "arm_pmcg_0" to 
+"arm_pmcg_6", but it's not actually *useful* information because those 
+IDs only really represent the probe order, and that depends entirely on 
+the IORT/DT order and whatever Linux felt like doing.
 
-Thanks
-Vladimir
+Thus if going to all this effort to compose a complex name still doesn't 
+actually help the user in most cases, is it worth it? I'm starting to 
+think not.
+
+> It is possible to include the pmcg base address instead of the auto-numbered id
+> as proposed in v1 series.
+
+That's probably the most robust option for now unless anyone can come up 
+with a better idea (I do wonder about doing something horrible with 
+pmu->dev.parent...) My bad for missing that rather subtle point the 
+first time around, sorry everyone!
+
+Robin.
