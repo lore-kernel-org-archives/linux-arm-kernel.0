@@ -1,82 +1,34 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 11 Sep 2018 10:18:44 +0100
-Subject: [PATCH v3 0/9] ARM: spectre-v1.1 mitigations
-In-Reply-To: <20180910163518.GW30658@n2100.armlinux.org.uk>
-References: <1536576168-40096-1-git-send-email-julien.thierry@arm.com>
- <20180910163518.GW30658@n2100.armlinux.org.uk>
-Message-ID: <ad6c2175-d637-7a05-7f53-98bb6c08a1c6@arm.com>
+From: radheys@xilinx.com (Radhey Shyam Pandey)
+Date: Tue, 11 Sep 2018 09:31:07 +0000
+Subject: [PATCH 3/3] dmaengine: xilinx_dma: Fix 64-bit simple CDMA transfer
+In-Reply-To: <20180911074122.GM2634@vkoul-mobl>
+References: <1532688639-32230-1-git-send-email-radhey.shyam.pandey@xilinx.com>
+ <1532688639-32230-4-git-send-email-radhey.shyam.pandey@xilinx.com>
+ <20180821155553.GI2388@vkoul-mobl>
+ <MWHPR0201MB362803E975383398B361330FC70A0@MWHPR0201MB3628.namprd02.prod.outlook.com>
+ <20180829040111.GD2388@vkoul-mobl>
+ <MWHPR0201MB36282BE6CB5BD242480757F8C7090@MWHPR0201MB3628.namprd02.prod.outlook.com>
+ <MWHPR0201MB362841247B08AFFA21CB0A18C7000@MWHPR0201MB3628.namprd02.prod.outlook.com>
+ <20180911074122.GM2634@vkoul-mobl>
+Message-ID: <MWHPR0201MB3628C8ED89865CA435DA4608C7040@MWHPR0201MB3628.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On 10/09/18 17:35, Russell King - ARM Linux wrote:
-> Hi Julien,
+> > > > Yeah that part was clear but the implementation can be better..
+> > I thought over it and it seems having a new interface dma_ctrl_write_64
+> > taking lsb and msb bits input looks better and scalable. It will be similar
+> > to existing vdma_desc_write_64 impl. I will send v2 if it looks ok.
 > 
-> I think this now looks fine, please drop it into the patch system.
-> Thanks.
+> Yes that is much better, btw why not reuse same routine as common xilinx
+> lib functions :)
+
+Thanks.  vdma_desc_write_64 uses a different offset i.e desc_offset.
+For reusing it we need to have an additional check to derive offset
+(ctrl_offset/desc_offset) based on channel config type. Considering
+it, i think a separate helper interface _64 for desc/control offset
+simplifies the flow. Please let me know your thoughts on it.
+
+-Radhey
 > 
-
-The patches are in the patch system now. Thanks for your reviews.
-
-Thanks,
-
-> On Mon, Sep 10, 2018 at 11:42:39AM +0100, Julien Thierry wrote:
->> Hi,
->>
->> The series provides mitigations for spectre-v1.1. It is mostly mirroring
->> what Russell did [1], but this time for writes to user provided addresses.
->>
->> * Patches 1-5 replace some __put_user_error calls with __copy_to_user, this
->>    both reduces the number of time address sanitizing is performed and also
->>    the number of time PAN needs to be toggled.
->>
->> * Patches 6-9 ensure user addresses used by __put_user* and
->>    __copy_to_user functions are sanitized before being used.
->>
->> Changes since v2[2]:
->> - Ensure padding in vfp_sigframe is properly initialized
->> - Fix incorrect copy of oabi events
->>
->> Changes since v1[3]:
->> - Fixed off-by-one error in uaccess_mask_range_ptr, spotted by Russell
->> - Remove remaining calls to __put_user_error() and get rid of the macro
->> - Reorder the patches to better reflect the spectre-v1 series
->>
->> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-July/589869.html
->> [2] https://www.spinics.net/lists/arm-kernel/msg674995.html
->> [3] https://www.spinics.net/lists/arm-kernel/msg671026.html
->>
->> Cheers,
->>
->> Julien
->>
->>
->> Julien Thierry (9):
->>    ARM: signal: copy registers using __copy_to_user()
->>    ARM: signal: always use __copy_to_user to save iwmmxt context
->>    ARM: vfp: use __copy_to_user() when saving VFP state
->>    ARM: oabi-compat: copy oabi events using __copy_to_user()
->>    ARM: signal: replace __put_user_error with __put_user
->>    ARM: uaccess: Prevent speculative use of the current addr_limit
->>    ARM: spectre-v1.1: use put_user() for __put_user()
->>    ARM: spectre-v1,v1.1: provide helpers for address sanitization
->>    ARM: spectre-v1.1: harden __copy_to_user
->>
->>   arch/arm/include/asm/assembler.h   | 11 ++++++
->>   arch/arm/include/asm/thread_info.h |  4 +-
->>   arch/arm/include/asm/uaccess.h     | 49 ++++++++++++++++++++---
->>   arch/arm/kernel/signal.c           | 80 +++++++++++++++++++++-----------------
->>   arch/arm/kernel/sys_oabi-compat.c  |  8 +++-
->>   arch/arm/lib/copy_from_user.S      |  6 +--
->>   arch/arm/lib/copy_to_user.S        |  6 ++-
->>   arch/arm/lib/uaccess_with_memcpy.c |  3 +-
->>   arch/arm/vfp/vfpmodule.c           | 20 ++++------
->>   9 files changed, 122 insertions(+), 65 deletions(-)
->>
->> --
->> 1.9.1
-> 
-
--- 
-Julien Thierry
+> --
+> ~Vinod
