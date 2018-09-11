@@ -1,34 +1,61 @@
-From: radheys@xilinx.com (Radhey Shyam Pandey)
-Date: Tue, 11 Sep 2018 09:31:07 +0000
-Subject: [PATCH 3/3] dmaengine: xilinx_dma: Fix 64-bit simple CDMA transfer
-In-Reply-To: <20180911074122.GM2634@vkoul-mobl>
-References: <1532688639-32230-1-git-send-email-radhey.shyam.pandey@xilinx.com>
- <1532688639-32230-4-git-send-email-radhey.shyam.pandey@xilinx.com>
- <20180821155553.GI2388@vkoul-mobl>
- <MWHPR0201MB362803E975383398B361330FC70A0@MWHPR0201MB3628.namprd02.prod.outlook.com>
- <20180829040111.GD2388@vkoul-mobl>
- <MWHPR0201MB36282BE6CB5BD242480757F8C7090@MWHPR0201MB3628.namprd02.prod.outlook.com>
- <MWHPR0201MB362841247B08AFFA21CB0A18C7000@MWHPR0201MB3628.namprd02.prod.outlook.com>
- <20180911074122.GM2634@vkoul-mobl>
-Message-ID: <MWHPR0201MB3628C8ED89865CA435DA4608C7040@MWHPR0201MB3628.namprd02.prod.outlook.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 11 Sep 2018 10:33:56 +0100
+Subject: [PATCH v12 0/6] Driver for at91 usart in spi mode
+In-Reply-To: <20180904111310.4049-1-radu_nicolae.pirea@upb.ro>
+References: <20180904111310.4049-1-radu_nicolae.pirea@upb.ro>
+Message-ID: <20180911093356.GE4185@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > > Yeah that part was clear but the implementation can be better..
-> > I thought over it and it seems having a new interface dma_ctrl_write_64
-> > taking lsb and msb bits input looks better and scalable. It will be similar
-> > to existing vdma_desc_write_64 impl. I will send v2 if it looks ok.
+On Tue, 04 Sep 2018, Radu Pirea wrote:
+> Radu Pirea (6):
+>   MAINTAINERS: add at91 usart mfd driver
+>   dt-bindings: add binding for atmel-usart in SPI mode
+>   mfd: at91-usart: added mfd driver for usart
+>   MAINTAINERS: add at91 usart spi driver
+>   spi: at91-usart: add driver for at91-usart as spi
+>   tty/serial: atmel: change the driver to work under at91-usart mfd
 > 
-> Yes that is much better, btw why not reuse same routine as common xilinx
-> lib functions :)
+>  .../bindings/{serial => mfd}/atmel-usart.txt  |  25 +-
+>  MAINTAINERS                                   |  16 +
+>  drivers/mfd/Kconfig                           |   9 +
+>  drivers/mfd/Makefile                          |   1 +
+>  drivers/mfd/at91-usart.c                      |  71 +++
+>  drivers/spi/Kconfig                           |   8 +
+>  drivers/spi/Makefile                          |   1 +
+>  drivers/spi/spi-at91-usart.c                  | 432 ++++++++++++++++++
+>  drivers/tty/serial/Kconfig                    |   1 +
+>  drivers/tty/serial/atmel_serial.c             |  42 +-
+>  include/dt-bindings/mfd/at91-usart.h          |  17 +
+>  11 files changed, 606 insertions(+), 17 deletions(-)
+>  rename Documentation/devicetree/bindings/{serial => mfd}/atmel-usart.txt (76%)
+>  create mode 100644 drivers/mfd/at91-usart.c
+>  create mode 100644 drivers/spi/spi-at91-usart.c
+>  create mode 100644 include/dt-bindings/mfd/at91-usart.h
 
-Thanks.  vdma_desc_write_64 uses a different offset i.e desc_offset.
-For reusing it we need to have an additional check to derive offset
-(ctrl_offset/desc_offset) based on channel config type. Considering
-it, i think a separate helper interface _64 for desc/control offset
-simplifies the flow. Please let me know your thoughts on it.
+Seeing as this patch-set has caused some issues this morning, I took
+the liberty to peruse back into its history to figure out where things
+started to go wrong.  I also re-reviewed the MFD driver - and I'm glad
+I did!
 
--Radhey
-> 
-> --
-> ~Vinod
+My Acked-by has been attached to the MFD portion since v5, which is
+why the code hasn't caught my eye before today.  I reviewed the
+relocation of the *binding document* (serial => mfd with no changes)
+in v4 and nothing else.  It appears as though you mistakenly added it
+to the *MFD driver* instead.  This explains my confusion in v10 when I
+told you I'd already reviewed the binding document.
+
+As I said, I have re-reviewed the MFD driver and I'm afraid to say
+that I do not like what I see.  Besides the missing header file and
+the whitespace tabbing errors, I do not agree with the implementation.
+Using MFD as a shim to hack around driver selection is not a valid
+use-case.
+
+What's stopping you from just using the compatible string directly to
+select which driver you need to probe?
+
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
