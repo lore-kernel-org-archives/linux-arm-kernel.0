@@ -1,47 +1,87 @@
 From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Tue, 11 Sep 2018 09:26:53 +0200
-Subject: [PATCH v1 0/7] Add-DMA-MDMA-chaining-support
-Message-ID: <1536650820-16076-1-git-send-email-pierre-yves.mordret@st.com>
+Date: Tue, 11 Sep 2018 09:26:56 +0200
+Subject: [PATCH v1 3/7] dt-bindings: stm32-mdma: Add DMA/MDMA chaining support
+ bindings
+In-Reply-To: <1536650820-16076-1-git-send-email-pierre-yves.mordret@st.com>
+References: <1536650820-16076-1-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <1536650820-16076-4-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This serie adds support for M2M transfer triggered by STM32 DMA in order to
-transfer data from/to SRAM to/from DDR.
+This patch adds the description of the 2 properties needed to support M2M
+transfer triggered by STM32 DMA when his transfer is complete.
 
-Normally, this mode should not be needed as transferring data from/to DDR
-is supported by the STM32 DMA.
-However, the STM32 DMA don't have the ability to generate burst transfer
-on the DDR as it only embeds only a 4-word FIFO although the minimal burst
-length on the DDR is 8 words.
-Due to this constraint, the STM32 DMA transfers data from/to DDR in a
-single way and could lead to pollute the DDR.
-To avoid this, we have to use SRAM for all transfers where STM32 DMA is
-involved.
+Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+---
+  Version history:
+    v1:
+       * Initial
+---
+---
+ .../devicetree/bindings/dma/stm32-mdma.txt         | 22 +++++++++++++---------
+ 1 file changed, 13 insertions(+), 9 deletions(-)
 
-An Hw design has been specially put in place to allow this chaining where DMA
-interrupt is connected on GIC and MDMA request line as well. This grants the
-possibility to trigger an MDMA transfer from the completion of DMA.
-At the same time MDMA has the ability to acknowlege DMA. The aim is to have an
-self refreching mechanism to transfer from/to device to/from DDR with minimal
-sw support.
-For instance the DMA is set in cyclic double buffering to feed SRAM and MDMA
-transfer to DDR thanks to LLI.
-
-Pierre-Yves MORDRET (7):
-  dt-bindings: stm32-dma: Add DMA/MDMA chaining support bindings
-  dt-bindings: stm32-dmamux: Add one cell to support DMA/MDMA chain
-  dt-bindings: stm32-mdma: Add DMA/MDMA chaining support bindings
-  dmaengine: stm32-dma: Add DMA/MDMA chaining support
-  dmaengine: stm32-mdma: Add DMA/MDMA chaining support
-  dmaengine: stm32-dma: enable descriptor_reuse
-  dmaengine: stm32-mdma: enable descriptor_reuse
-
- .../devicetree/bindings/dma/stm32-dma.txt          |  32 +-
- .../devicetree/bindings/dma/stm32-dmamux.txt       |   5 +-
- .../devicetree/bindings/dma/stm32-mdma.txt         |  22 +-
- drivers/dma/stm32-dma.c                            | 903 ++++++++++++++++++---
- drivers/dma/stm32-mdma.c                           | 133 ++-
- 5 files changed, 954 insertions(+), 141 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/dma/stm32-mdma.txt b/Documentation/devicetree/bindings/dma/stm32-mdma.txt
+index d18772d..1810f87 100644
+--- a/Documentation/devicetree/bindings/dma/stm32-mdma.txt
++++ b/Documentation/devicetree/bindings/dma/stm32-mdma.txt
+@@ -10,7 +10,7 @@ Required properties:
+ - interrupts: Should contain the MDMA interrupt.
+ - clocks: Should contain the input clock of the DMA instance.
+ - resets: Reference to a reset controller asserting the DMA controller.
+-- #dma-cells : Must be <5>. See DMA client paragraph for more details.
++- #dma-cells : Must be <6>. See DMA client paragraph for more details.
+ 
+ Optional properties:
+ - dma-channels: Number of DMA channels supported by the controller.
+@@ -26,7 +26,7 @@ Example:
+ 		interrupts = <122>;
+ 		clocks = <&timer_clk>;
+ 		resets = <&rcc 992>;
+-		#dma-cells = <5>;
++		#dma-cells = <6>;
+ 		dma-channels = <16>;
+ 		dma-requests = <32>;
+ 		st,ahb-addr-masks = <0x20000000>, <0x00000000>;
+@@ -35,8 +35,8 @@ Example:
+ * DMA client
+ 
+ DMA clients connected to the STM32 MDMA controller must use the format
+-described in the dma.txt file, using a five-cell specifier for each channel:
+-a phandle to the MDMA controller plus the following five integer cells:
++described in the dma.txt file, using a six-cell specifier for each channel:
++a phandle to the MDMA controller plus the following six integer cells:
+ 
+ 1. The request line number
+ 2. The priority level
+@@ -76,19 +76,23 @@ a phandle to the MDMA controller plus the following five integer cells:
+    if no HW ack signal is used by the MDMA client
+ 5. A 32bit mask specifying the value to be written to acknowledge the request
+    if no HW ack signal is used by the MDMA client
++6. A bitfield value specifying if the MDMA client wants to generate M2M
++   transfer with HW trigger (1) or not (0). This bitfield should be only
++   enabled for M2M transfer triggered by STM32 DMA client. The memory devices
++   involved in this kind of transfer are SRAM and DDR.
+ 
+ Example:
+ 
+ 	i2c4: i2c at 5c002000 {
+ 		compatible = "st,stm32f7-i2c";
+ 		reg = <0x5c002000 0x400>;
+-		interrupts = <95>,
+-			     <96>;
+-		clocks = <&timer_clk>;
++		interrupts = <GIC_SPI 95 IRQ_TYPE_NONE>,
++			     <GIC_SPI 96 IRQ_TYPE_NONE>;
++		clocks = <&clk_hsi>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		dmas = <&mdma1 36 0x0 0x40008 0x0 0x0>,
+-		       <&mdma1 37 0x0 0x40002 0x0 0x0>;
++		dmas = <&mdma1 36 0x0 0x40008 0x0 0x0 0>,
++		       <&mdma1 37 0x0 0x40002 0x0 0x0 0>;
+ 		dma-names = "rx", "tx";
+ 		status = "disabled";
+ 	};
 -- 
 2.7.4
