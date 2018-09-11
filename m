@@ -1,85 +1,32 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 11 Sep 2018 16:59:09 +0200
-Subject: [PATCH v12 0/6] Driver for at91 usart in spi mode
-In-Reply-To: <20180911093917.GL2494@piout.net>
-References: <20180904111310.4049-1-radu_nicolae.pirea@upb.ro>
- <20180911093356.GE4185@dell> <20180911093917.GL2494@piout.net>
-Message-ID: <CAMuHMdXH8gNjKGOHGFc+K03U2zsVCSN7G_Q4wtepQr859nRQKg@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 11 Sep 2018 08:03:06 -0700
+Subject: [PATCH v11 03/11] firmware: xilinx: Add zynqmp IOCTL API for
+ device control
+In-Reply-To: <CY1PR02MB2138BF2252E1CE2C1747A78AB8050@CY1PR02MB2138.namprd02.prod.outlook.com>
+References: <1533318808-10781-1-git-send-email-jollys@xilinx.com>
+ <1533318808-10781-4-git-send-email-jollys@xilinx.com>
+ <CAOesGMi7Q9L4oZkUubKtV-m8XD67MQ05ZFhPA_0Hwky_qVUxfg@mail.gmail.com>
+ <CY1PR02MB2138BF2252E1CE2C1747A78AB8050@CY1PR02MB2138.namprd02.prod.outlook.com>
+Message-ID: <CAOesGMhViv_D6GKYf3x02LGqthwEsfkUFWBdG7pCQqD2MGsEew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
+Hi Jolly,
 
-On Tue, Sep 11, 2018 at 11:40 AM Alexandre Belloni
-<alexandre.belloni@bootlin.com> wrote:
-> On 11/09/2018 10:33:56+0100, Lee Jones wrote:
-> > On Tue, 04 Sep 2018, Radu Pirea wrote:
-> > > Radu Pirea (6):
-> > >   MAINTAINERS: add at91 usart mfd driver
-> > >   dt-bindings: add binding for atmel-usart in SPI mode
-> > >   mfd: at91-usart: added mfd driver for usart
-> > >   MAINTAINERS: add at91 usart spi driver
-> > >   spi: at91-usart: add driver for at91-usart as spi
-> > >   tty/serial: atmel: change the driver to work under at91-usart mfd
-> > >
-> > >  .../bindings/{serial => mfd}/atmel-usart.txt  |  25 +-
-> > >  MAINTAINERS                                   |  16 +
-> > >  drivers/mfd/Kconfig                           |   9 +
-> > >  drivers/mfd/Makefile                          |   1 +
-> > >  drivers/mfd/at91-usart.c                      |  71 +++
-> > >  drivers/spi/Kconfig                           |   8 +
-> > >  drivers/spi/Makefile                          |   1 +
-> > >  drivers/spi/spi-at91-usart.c                  | 432 ++++++++++++++++++
-> > >  drivers/tty/serial/Kconfig                    |   1 +
-> > >  drivers/tty/serial/atmel_serial.c             |  42 +-
-> > >  include/dt-bindings/mfd/at91-usart.h          |  17 +
-> > >  11 files changed, 606 insertions(+), 17 deletions(-)
-> > >  rename Documentation/devicetree/bindings/{serial => mfd}/atmel-usart.txt (76%)
-> > >  create mode 100644 drivers/mfd/at91-usart.c
-> > >  create mode 100644 drivers/spi/spi-at91-usart.c
-> > >  create mode 100644 include/dt-bindings/mfd/at91-usart.h
-> >
-> > Seeing as this patch-set has caused some issues this morning, I took
-> > the liberty to peruse back into its history to figure out where things
-> > started to go wrong.  I also re-reviewed the MFD driver - and I'm glad
-> > I did!
-> >
-> > My Acked-by has been attached to the MFD portion since v5, which is
-> > why the code hasn't caught my eye before today.  I reviewed the
-> > relocation of the *binding document* (serial => mfd with no changes)
-> > in v4 and nothing else.  It appears as though you mistakenly added it
-> > to the *MFD driver* instead.  This explains my confusion in v10 when I
-> > told you I'd already reviewed the binding document.
-> >
-> > As I said, I have re-reviewed the MFD driver and I'm afraid to say
-> > that I do not like what I see.  Besides the missing header file and
-> > the whitespace tabbing errors, I do not agree with the implementation.
-> > Using MFD as a shim to hack around driver selection is not a valid
-> > use-case.
-> >
-> > What's stopping you from just using the compatible string directly to
-> > select which driver you need to probe?
-> >
+On Mon, Sep 10, 2018 at 12:17 PM, Jolly Shah <JOLLYS@xilinx.com> wrote:
+> Hi All,
 >
-> Then you'd have multiple compatible strings for the same IP which is a
-> big no-no.
+> Adding more clarification on top of what Michal said:
+> Here ioctl is not a system ioctl and just a eemi API like other interface APIs. It cannot be called from userspace. Only Linux drivers can use this API for defined ioctl operations. This API is meant for any platform specific operations which needs to be managed by firmware. Firmware will always validate the request for action being performed.
+> Debugfs interface is just for debugging during development. We can remove debugfs support for ioctl API if you suggest.
 
-It's still the same hardware device, isn't?
-What if the SPI or UART slave is not on-board, but on an expansion board?
-Then the SoC-specific .dtsi has no idea what mode should be used.
+Are there any pending patchsets that make use of the ioctl interface
+besides the debugfs piece? None of the ones in this pull request
+(besides the debugfs) seems to call into it.
 
-Hence shouldn't the software derive the hardware mode from the full
-hardware description in DT? If that's impossible (I didn't look into detail
-whether an SPI bus can easily be distinguished from a UART bus), perhaps
-a mode property should be added?
+It might just be easier to leave it out until you have a use case for
+it. The rest of the patchset looks fine to me, and I'd be happy to
+take it. Once you have a need for it we can discuss specifics.
 
-Gr{oetje,eeting}s,
 
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-Olof
