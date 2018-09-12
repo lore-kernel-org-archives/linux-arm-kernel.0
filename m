@@ -1,90 +1,615 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 12 Sep 2018 14:53:41 +0100
-Subject: [PATCH v2 00/11] dts: Update coresight device tree bindings
-Message-ID: <20180912135352.19722-1-suzuki.poulose@arm.com>
+Date: Wed, 12 Sep 2018 14:53:45 +0100
+Subject: [PATCH v2 04/11] arm64: dts: sc9836/sc9860: Update coresight bindings
+ for hardware ports
+In-Reply-To: <20180912135352.19722-1-suzuki.poulose@arm.com>
+References: <20180912135352.19722-1-suzuki.poulose@arm.com>
+Message-ID: <20180912135352.19722-5-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Coresight DT bindings have been updated to obey the DTS rules
-for label/address matching for graph nodes. The changes are in
-coresight/next tree scheduled for v4.20. This series updates the
-in kernel dts to match the new bindings along with updating a couple
-of new examples (e.,g CATU) in the Documentation (which were missed
-as they were still in flight when we created the series).
+Switch to the new coresight bindings for hw ports
 
-Please note that this should not be pulled for v4.19, which I think
-is a safe assumption. But please do pull it for v4.20.
-The dt updates for the Juno boards were sent earlier with the original
-DT update series and has been queued for v4.20.
-
-Applies on coresight/next (which is based on v4.19) and should apply
-cleanly on v4.19-rc3.
-
-Changes since V1:
- - Avoid "avoid_unnecessary_addr_size" warnings by removing
-   #address-cells/#size-cells for single port with address 0.
- - Fix TPIU inport for qcom msm8196.  (Leo Yan)
- - Fix documentation example for TPIU (Leo Yan)
- - Fix subject tags (as pointed out by Leo and Shawn)
- - Drop patch for TC2, which has been queued by Sudeep
-
-
-Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
-Cc: Andy Gross <andy.gross@linaro.org>
-Cc: Beno?t Cousson <bcousson@baylibre.com>
-Cc: David Brown <david.brown@linaro.org>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Frank Rowand <frowand.list@gmail.com>
-Cc: Ivan T. Ivanov <ivan.ivanov@linaro.org>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: linux-omap at vger.kernel.org
-Cc: lipengcheng8 at huawei.com
-Cc: Liviu Dudau <liviu.dudau@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
 Cc: orsonzhai at gmail.com
-Cc: Pengutronix Kernel Team <kernel@pengutronix.de>
-Cc: Rob Herring <robh@kernel.org>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Wei Xu <xuwei5@hisilicon.com>
-Cc: xuwei5 at hisilicon.com
 Cc: zhang.lyra at gmail.com
-Cc: arm at kernel.org
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/boot/dts/sprd/sc9836.dtsi |  82 +++++-----
+ arch/arm64/boot/dts/sprd/sc9860.dtsi | 215 ++++++++++++++-------------
+ 2 files changed, 153 insertions(+), 144 deletions(-)
 
-
-Suzuki K Poulose (11):
-  coresight: dts: binding: Fix example for TPIU component
-  coresight: dts: binding: Update coresight binding examples
-  arm64: dts: hi6220: Update coresight bindings for hardware ports
-  arm64: dts: sc9836/sc9860: Update coresight bindings for hardware
-    ports
-  arm64: dts: msm8916: Update coresight bindings for hardware ports
-  arm: dts: hip04: Update coresight bindings for hardware ports
-  arm: dts: imx7: Update coresight binding for hardware ports
-  arm: dts: omap: Update coresight bindings for hardware ports
-  arm: dts: qcom: Update coresight bindings for hardware ports
-  arm: dts: sama5d2: Update coresight bindings for hardware ports
-  arm: dts: ste-dbx5x0: Update coresight bindings for hardware port
-
- .../devicetree/bindings/arm/coresight.txt     |  27 +-
- arch/arm/boot/dts/hip04.dtsi                  | 346 +++++++++---------
- arch/arm/boot/dts/imx7d.dtsi                  |  14 +-
- arch/arm/boot/dts/imx7s.dtsi                  |  82 ++---
- arch/arm/boot/dts/omap3-beagle-xm.dts         |  17 +-
- arch/arm/boot/dts/omap3-beagle.dts            |  17 +-
- arch/arm/boot/dts/qcom-apq8064.dtsi           |  71 ++--
- arch/arm/boot/dts/qcom-msm8974.dtsi           | 104 +++---
- arch/arm/boot/dts/sama5d2.dtsi                |  17 +-
- arch/arm/boot/dts/ste-dbx5x0.dtsi             |  65 ++--
- .../boot/dts/hisilicon/hi6220-coresight.dtsi  | 181 +++++----
- arch/arm64/boot/dts/qcom/msm8916.dtsi         |  95 ++---
- arch/arm64/boot/dts/sprd/sc9836.dtsi          |  82 +++--
- arch/arm64/boot/dts/sprd/sc9860.dtsi          | 215 +++++------
- 14 files changed, 682 insertions(+), 651 deletions(-)
-
+diff --git a/arch/arm64/boot/dts/sprd/sc9836.dtsi b/arch/arm64/boot/dts/sprd/sc9836.dtsi
+index 63894c456969..4bcdbb709c01 100644
+--- a/arch/arm64/boot/dts/sprd/sc9836.dtsi
++++ b/arch/arm64/boot/dts/sprd/sc9836.dtsi
+@@ -50,10 +50,11 @@
+ 		reg = <0 0x10003000 0 0x1000>;
+ 		clocks = <&clk26mhz>;
+ 		clock-names = "apb_pclk";
+-		port {
+-			etf_in: endpoint {
+-				slave-mode;
+-				remote-endpoint = <&funnel_out_port0>;
++		in-ports {
++			port {
++				etf_in: endpoint {
++					remote-endpoint = <&funnel_out_port0>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -63,55 +64,50 @@
+ 		reg = <0 0x10001000 0 0x1000>;
+ 		clocks = <&clk26mhz>;
+ 		clock-names = "apb_pclk";
+-		ports {
++
++		out-ports {
++			port {
++				funnel_out_port0: endpoint {
++					remote-endpoint = <&etf_in>;
++				};
++			};
++		};
++
++		in-ports {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 
+-			/* funnel output port */
+ 			port at 0 {
+-				reg = <0>;
+-				funnel_out_port0: endpoint {
+-					remote-endpoint = <&etf_in>;
+-				};
+-			};
+-
+-			/* funnel input port 0-4 */
+-			port at 1 {
+ 				reg = <0>;
+ 				funnel_in_port0: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&etm0_out>;
+ 				};
+ 			};
+ 
+-			port at 2 {
++			port at 1 {
+ 				reg = <1>;
+ 				funnel_in_port1: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&etm1_out>;
+ 				};
+ 			};
+ 
+-			port at 3 {
++			port at 2 {
+ 				reg = <2>;
+ 				funnel_in_port2: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&etm2_out>;
+ 				};
+ 			};
+ 
+-			port at 4 {
++			port at 3 {
+ 				reg = <3>;
+ 				funnel_in_port3: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&etm3_out>;
+ 				};
+ 			};
+ 
+-			port at 5 {
++			port at 4 {
+ 				reg = <4>;
+ 				funnel_in_port4: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&stm_out>;
+ 				};
+ 			};
+@@ -126,9 +122,11 @@
+ 		cpu = <&cpu0>;
+ 		clocks = <&clk26mhz>;
+ 		clock-names = "apb_pclk";
+-		port {
+-			etm0_out: endpoint {
+-				remote-endpoint = <&funnel_in_port0>;
++		out-ports {
++			port {
++				etm0_out: endpoint {
++					remote-endpoint = <&funnel_in_port0>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -140,9 +138,11 @@
+ 		cpu = <&cpu1>;
+ 		clocks = <&clk26mhz>;
+ 		clock-names = "apb_pclk";
+-		port {
+-			etm1_out: endpoint {
+-				remote-endpoint = <&funnel_in_port1>;
++		out-ports {
++			port {
++				etm1_out: endpoint {
++					remote-endpoint = <&funnel_in_port1>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -154,9 +154,11 @@
+ 		cpu = <&cpu2>;
+ 		clocks = <&clk26mhz>;
+ 		clock-names = "apb_pclk";
+-		port {
+-			etm2_out: endpoint {
+-				remote-endpoint = <&funnel_in_port2>;
++		out-ports {
++			port {
++				etm2_out: endpoint {
++					remote-endpoint = <&funnel_in_port2>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -168,9 +170,11 @@
+ 		cpu = <&cpu3>;
+ 		clocks = <&clk26mhz>;
+ 		clock-names = "apb_pclk";
+-		port {
+-			etm3_out: endpoint {
+-				remote-endpoint = <&funnel_in_port3>;
++		out-ports {
++			port {
++				etm3_out: endpoint {
++					remote-endpoint = <&funnel_in_port3>;
++				};
+ 			};
+ 		};
+ 	};
+@@ -182,9 +186,11 @@
+ 		reg-names = "stm-base", "stm-stimulus-base";
+ 		clocks = <&clk26mhz>;
+ 		clock-names = "apb_pclk";
+-		port {
+-			stm_out: endpoint {
+-				remote-endpoint = <&funnel_in_port4>;
++		out-ports {
++			port {
++				stm_out: endpoint {
++					remote-endpoint = <&funnel_in_port4>;
++				};
+ 			};
+ 		};
+ 	};
+diff --git a/arch/arm64/boot/dts/sprd/sc9860.dtsi b/arch/arm64/boot/dts/sprd/sc9860.dtsi
+index 48f5928ed45c..5f57bf055cde 100644
+--- a/arch/arm64/boot/dts/sprd/sc9860.dtsi
++++ b/arch/arm64/boot/dts/sprd/sc9860.dtsi
+@@ -304,30 +304,29 @@
+ 			reg = <0 0x10001000 0 0x1000>;
+ 			clocks = <&ext_26m>;
+ 			clock-names = "apb_pclk";
+-			ports {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-
+-				port at 0 {
+-					reg = <0>;
++			out-ports {
++				port {
+ 					soc_funnel_out_port: endpoint {
+ 						remote-endpoint = <&etb_in>;
+ 					};
+ 				};
++			};
+ 
+-				port at 1 {
++			in-ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 0 {
+ 					reg = <0>;
+ 					soc_funnel_in_port0: endpoint {
+-						slave-mode;
+ 						remote-endpoint =
+ 						<&main_funnel_out_port>;
+ 					};
+ 				};
+ 
+-				port at 2 {
++				port at 4 {
+ 					reg = <4>;
+ 					soc_funnel_in_port1: endpoint {
+-						slave-mode;
+ 						remote-endpoint =
+ 							<&stm_out_port>;
+ 					};
+@@ -340,11 +339,12 @@
+ 			reg = <0 0x10003000 0 0x1000>;
+ 			clocks = <&ext_26m>;
+ 			clock-names = "apb_pclk";
+-			port {
+-				etb_in: endpoint {
+-					slave-mode;
+-					remote-endpoint =
+-						<&soc_funnel_out_port>;
++			out-ports {
++				port {
++					etb_in: endpoint {
++						remote-endpoint =
++							<&soc_funnel_out_port>;
++					};
+ 				};
+ 			};
+ 		};
+@@ -356,10 +356,12 @@
+ 			reg-names = "stm-base", "stm-stimulus-base";
+ 			clocks = <&ext_26m>;
+ 			clock-names = "apb_pclk";
+-			port {
+-				stm_out_port: endpoint {
+-					remote-endpoint =
+-						<&soc_funnel_in_port1>;
++			out-ports {
++				port {
++					stm_out_port: endpoint {
++						remote-endpoint =
++							<&soc_funnel_in_port1>;
++					};
+ 				};
+ 			};
+ 		};
+@@ -369,38 +371,36 @@
+ 			reg = <0 0x11001000 0 0x1000>;
+ 			clocks = <&ext_26m>;
+ 			clock-names = "apb_pclk";
+-			ports {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-
+-				port at 0 {
+-					reg = <0>;
++			out-ports {
++				port {
+ 					cluster0_funnel_out_port: endpoint {
+ 						remote-endpoint =
+ 							<&cluster0_etf_in>;
+ 					};
+ 				};
++			};
+ 
+-				port at 1 {
++			in-ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 0 {
+ 					reg = <0>;
+ 					cluster0_funnel_in_port0: endpoint {
+-						slave-mode;
+ 						remote-endpoint = <&etm0_out>;
+ 					};
+ 				};
+ 
+-				port at 2 {
++				port at 1 {
+ 					reg = <1>;
+ 					cluster0_funnel_in_port1: endpoint {
+-						slave-mode;
+ 						remote-endpoint = <&etm1_out>;
+ 					};
+ 				};
+ 
+-				port at 3 {
++				port at 2 {
+ 					reg = <2>;
+ 					cluster0_funnel_in_port2: endpoint {
+-						slave-mode;
+ 						remote-endpoint = <&etm2_out>;
+ 					};
+ 				};
+@@ -408,7 +408,6 @@
+ 				port at 4 {
+ 					reg = <4>;
+ 					cluster0_funnel_in_port3: endpoint {
+-						slave-mode;
+ 						remote-endpoint = <&etm3_out>;
+ 					};
+ 				};
+@@ -420,46 +419,43 @@
+ 			reg = <0 0x11002000 0 0x1000>;
+ 			clocks = <&ext_26m>;
+ 			clock-names = "apb_pclk";
+-			ports {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-
+-				port at 0 {
+-					reg = <0>;
++			out-ports {
++				port {
+ 					cluster1_funnel_out_port: endpoint {
+ 						remote-endpoint =
+ 							<&cluster1_etf_in>;
+ 					};
+ 				};
++			};
+ 
+-				port at 1 {
++			in-ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 0 {
+ 					reg = <0>;
+ 					cluster1_funnel_in_port0: endpoint {
+-						slave-mode;
+ 						remote-endpoint = <&etm4_out>;
+ 					};
+ 				};
+ 
+-				port at 2 {
++				port at 1 {
+ 					reg = <1>;
+ 					cluster1_funnel_in_port1: endpoint {
+-						slave-mode;
+ 						remote-endpoint = <&etm5_out>;
+ 					};
+ 				};
+ 
+-				port at 3 {
++				port at 2 {
+ 					reg = <2>;
+ 					cluster1_funnel_in_port2: endpoint {
+-						slave-mode;
+ 						remote-endpoint = <&etm6_out>;
+ 					};
+ 				};
+ 
+-				port at 4 {
++				port at 3 {
+ 					reg = <3>;
+ 					cluster1_funnel_in_port3: endpoint {
+-						slave-mode;
+ 						remote-endpoint = <&etm7_out>;
+ 					};
+ 				};
+@@ -472,22 +468,18 @@
+ 			clocks = <&ext_26m>;
+ 			clock-names = "apb_pclk";
+ 
+-			ports {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-
+-				port at 0 {
+-					reg = <0>;
++			out-ports {
++				port {
+ 					cluster0_etf_out: endpoint {
+ 						remote-endpoint =
+ 						<&main_funnel_in_port0>;
+ 					};
+ 				};
++			};
+ 
+-				port at 1 {
+-					reg = <0>;
++			in-ports {
++				port {
+ 					cluster0_etf_in: endpoint {
+-						slave-mode;
+ 						remote-endpoint =
+ 						<&cluster0_funnel_out_port>;
+ 					};
+@@ -501,22 +493,18 @@
+ 			clocks = <&ext_26m>;
+ 			clock-names = "apb_pclk";
+ 
+-			ports {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-
+-				port at 0 {
+-					reg = <0>;
++			out-ports {
++				port {
+ 					cluster1_etf_out: endpoint {
+ 						remote-endpoint =
+ 						<&main_funnel_in_port1>;
+ 					};
+ 				};
++			};
+ 
+-				port at 1 {
+-					reg = <0>;
++			in-ports {
++				port {
+ 					cluster1_etf_in: endpoint {
+-						slave-mode;
+ 						remote-endpoint =
+ 						<&cluster1_funnel_out_port>;
+ 					};
+@@ -530,31 +518,30 @@
+ 			clocks = <&ext_26m>;
+ 			clock-names = "apb_pclk";
+ 
+-			ports {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-
+-				port at 0 {
+-					reg = <0>;
++			out-ports {
++				port {
+ 					main_funnel_out_port: endpoint {
+ 						remote-endpoint =
+ 							<&soc_funnel_in_port0>;
+ 					};
+ 				};
++			};
+ 
+-				port at 1 {
++			in-ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 0 {
+ 					reg = <0>;
+ 					main_funnel_in_port0: endpoint {
+-						slave-mode;
+ 						remote-endpoint =
+ 							<&cluster0_etf_out>;
+ 					};
+ 				};
+ 
+-				port at 2 {
++				port at 1 {
+ 					reg = <1>;
+ 					main_funnel_in_port1: endpoint {
+-						slave-mode;
+ 						remote-endpoint =
+ 							<&cluster1_etf_out>;
+ 					};
+@@ -569,10 +556,12 @@
+ 			clocks = <&ext_26m>;
+ 			clock-names = "apb_pclk";
+ 
+-			port {
+-				etm0_out: endpoint {
+-					remote-endpoint =
+-						<&cluster0_funnel_in_port0>;
++			out-ports {
++				port {
++					etm0_out: endpoint {
++						remote-endpoint =
++							<&cluster0_funnel_in_port0>;
++					};
+ 				};
+ 			};
+ 		};
+@@ -584,10 +573,12 @@
+ 			clocks = <&ext_26m>;
+ 			clock-names = "apb_pclk";
+ 
+-			port {
+-				etm1_out: endpoint {
+-					remote-endpoint =
+-						<&cluster0_funnel_in_port1>;
++			out-ports {
++				port {
++					etm1_out: endpoint {
++						remote-endpoint =
++							<&cluster0_funnel_in_port1>;
++					};
+ 				};
+ 			};
+ 		};
+@@ -599,10 +590,12 @@
+ 			clocks = <&ext_26m>;
+ 			clock-names = "apb_pclk";
+ 
+-			port {
+-				etm2_out: endpoint {
+-					remote-endpoint =
+-						<&cluster0_funnel_in_port2>;
++			out-ports {
++				port {
++					etm2_out: endpoint {
++						remote-endpoint =
++							<&cluster0_funnel_in_port2>;
++					};
+ 				};
+ 			};
+ 		};
+@@ -614,10 +607,12 @@
+ 			clocks = <&ext_26m>;
+ 			clock-names = "apb_pclk";
+ 
+-			port {
+-				etm3_out: endpoint {
+-					remote-endpoint =
+-						<&cluster0_funnel_in_port3>;
++			out-ports {
++				port {
++					etm3_out: endpoint {
++						remote-endpoint =
++							<&cluster0_funnel_in_port3>;
++					};
+ 				};
+ 			};
+ 		};
+@@ -629,10 +624,12 @@
+ 			clocks = <&ext_26m>;
+ 			clock-names = "apb_pclk";
+ 
+-			port {
+-				etm4_out: endpoint {
+-					remote-endpoint =
+-						<&cluster1_funnel_in_port0>;
++			out-ports {
++				port {
++					etm4_out: endpoint {
++						remote-endpoint =
++							<&cluster1_funnel_in_port0>;
++					};
+ 				};
+ 			};
+ 		};
+@@ -644,10 +641,12 @@
+ 			clocks = <&ext_26m>;
+ 			clock-names = "apb_pclk";
+ 
+-			port {
+-				etm5_out: endpoint {
+-					remote-endpoint =
+-						<&cluster1_funnel_in_port1>;
++			out-ports {
++				port {
++					etm5_out: endpoint {
++						remote-endpoint =
++							<&cluster1_funnel_in_port1>;
++					};
+ 				};
+ 			};
+ 		};
+@@ -659,10 +658,12 @@
+ 			clocks = <&ext_26m>;
+ 			clock-names = "apb_pclk";
+ 
+-			port {
+-				etm6_out: endpoint {
+-					remote-endpoint =
+-						<&cluster1_funnel_in_port2>;
++			out-ports {
++				port {
++					etm6_out: endpoint {
++						remote-endpoint =
++							<&cluster1_funnel_in_port2>;
++					};
+ 				};
+ 			};
+ 		};
+@@ -674,10 +675,12 @@
+ 			clocks = <&ext_26m>;
+ 			clock-names = "apb_pclk";
+ 
+-			port {
+-				etm7_out: endpoint {
+-					remote-endpoint =
+-						<&cluster1_funnel_in_port3>;
++			out-ports {
++				port {
++					etm7_out: endpoint {
++						remote-endpoint =
++							<&cluster1_funnel_in_port3>;
++					};
+ 				};
+ 			};
+ 		};
 -- 
 2.19.0
