@@ -1,155 +1,242 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 12 Sep 2018 14:53:52 +0100
-Subject: [PATCH v2 11/11] arm: dts: ste-dbx5x0: Update coresight bindings for
- hardware port
+Date: Wed, 12 Sep 2018 14:53:46 +0100
+Subject: [PATCH v2 05/11] arm64: dts: msm8916: Update coresight bindings for
+ hardware ports
 In-Reply-To: <20180912135352.19722-1-suzuki.poulose@arm.com>
 References: <20180912135352.19722-1-suzuki.poulose@arm.com>
-Message-ID: <20180912135352.19722-12-suzuki.poulose@arm.com>
+Message-ID: <20180912135352.19722-6-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch to the new coresight bindings
+Switch to updated coresight bindings for hw ports
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Andy Gross <andy.gross@linaro.org>
+Cc: David Brown <david.brown@linaro.org>
+Cc: Ivan T. Ivanov <ivan.ivanov@linaro.org>
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm/boot/dts/ste-dbx5x0.dtsi | 65 ++++++++++++++++---------------
- 1 file changed, 33 insertions(+), 32 deletions(-)
+Changes since v1:
+ - Fixed TPIU port direction
+ - Use better subject tag for the patch
+---
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 95 ++++++++++++++-------------
+ 1 file changed, 51 insertions(+), 44 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-index 2310a4e97768..7f94b5a53205 100644
---- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-@@ -67,9 +67,11 @@
- 			clocks = <&prcmu_clk PRCMU_APETRACECLK>, <&prcmu_clk PRCMU_APEATCLK>;
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index 7b32b8990d62..fe375a9c218e 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -1099,10 +1099,11 @@
+ 			clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
  			clock-names = "apb_pclk", "atclk";
- 			cpu = <&CPU0>;
--			port {
--				ptm0_out_port: endpoint {
--					remote-endpoint = <&funnel_in_port0>;
-+			out-ports {
-+				port {
-+					ptm0_out_port: endpoint {
-+						remote-endpoint = <&funnel_in_port0>;
-+					};
- 				};
- 			};
- 		};
-@@ -81,9 +83,11 @@
- 			clocks = <&prcmu_clk PRCMU_APETRACECLK>, <&prcmu_clk PRCMU_APEATCLK>;
- 			clock-names = "apb_pclk", "atclk";
- 			cpu = <&CPU1>;
--			port {
--				ptm1_out_port: endpoint {
--					remote-endpoint = <&funnel_in_port1>;
-+			out-ports {
-+				port {
-+					ptm1_out_port: endpoint {
-+						remote-endpoint = <&funnel_in_port1>;
-+					};
- 				};
- 			};
- 		};
-@@ -94,32 +98,29 @@
  
- 			clocks = <&prcmu_clk PRCMU_APETRACECLK>, <&prcmu_clk PRCMU_APEATCLK>;
- 			clock-names = "apb_pclk", "atclk";
--			ports {
--				#address-cells = <1>;
--				#size-cells = <0>;
--
--				/* funnel output ports */
--				port at 0 {
--					reg = <0>;
-+			out-ports {
-+				port {
- 					funnel_out_port: endpoint {
- 						remote-endpoint =
- 							<&replicator_in_port0>;
- 					};
- 				};
-+			};
- 
--				/* funnel input ports */
--				port at 1 {
+-			port {
+-				tpiu_in: endpoint {
+-					slave-mode;
+-					remote-endpoint = <&replicator_out1>;
 +			in-ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 0 {
- 					reg = <0>;
- 					funnel_in_port0: endpoint {
--						slave-mode;
- 						remote-endpoint = <&ptm0_out_port>;
- 					};
++				port {
++					tpiu_in: endpoint {
++						remote-endpoint = <&replicator_out1>;
++					};
  				};
+ 			};
+ 		};
+@@ -1114,7 +1115,7 @@
+ 			clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
+ 			clock-names = "apb_pclk", "atclk";
  
--				port at 2 {
-+				port at 1 {
- 					reg = <1>;
- 					funnel_in_port1: endpoint {
+-			ports {
++			in-ports {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+ 
+@@ -1132,12 +1133,13 @@
+ 				port at 4 {
+ 					reg = <4>;
+ 					funnel0_in4: endpoint {
 -						slave-mode;
- 						remote-endpoint = <&ptm1_out_port>;
+ 						remote-endpoint = <&funnel1_out>;
  					};
  				};
-@@ -131,11 +132,10 @@
- 			clocks = <&prcmu_clk PRCMU_APEATCLK>;
- 			clock-names = "atclk";
+-				port at 8 {
+-					reg = <0>;
++			};
++
++			out-ports {
++				port {
+ 					funnel0_out: endpoint {
+ 						remote-endpoint = <&etf_in>;
+ 					};
+@@ -1152,7 +1154,7 @@
+ 			clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
+ 			clock-names = "apb_pclk", "atclk";
  
 -			ports {
 +			out-ports {
  				#address-cells = <1>;
  				#size-cells = <0>;
  
--				/* replicator output ports */
- 				port at 0 {
- 					reg = <0>;
- 					replicator_out_port0: endpoint {
-@@ -148,12 +148,11 @@
- 						remote-endpoint = <&etb_in_port>;
+@@ -1168,10 +1170,11 @@
+ 						remote-endpoint = <&tpiu_in>;
  					};
  				};
-+			};
- 
--				/* replicator input port */
 -				port at 2 {
+-					reg = <0>;
++			};
++
++			in-ports {
++				port {
+ 					replicator_in: endpoint {
+-						slave-mode;
+ 						remote-endpoint = <&etf_out>;
+ 					};
+ 				};
+@@ -1185,19 +1188,16 @@
+ 			clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
+ 			clock-names = "apb_pclk", "atclk";
+ 
+-			ports {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-
+-				port at 0 {
 -					reg = <0>;
 +			in-ports {
 +				port {
- 					replicator_in_port0: endpoint {
+ 					etf_in: endpoint {
 -						slave-mode;
- 						remote-endpoint = <&funnel_out_port>;
+ 						remote-endpoint = <&funnel0_out>;
  					};
  				};
-@@ -166,10 +165,11 @@
- 
- 			clocks = <&prcmu_clk PRCMU_APETRACECLK>, <&prcmu_clk PRCMU_APEATCLK>;
+-				port at 1 {
+-					reg = <0>;
++			};
++
++			out-ports {
++				port {
+ 					etf_out: endpoint {
+ 						remote-endpoint = <&replicator_in>;
+ 					};
+@@ -1212,10 +1212,11 @@
+ 			clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
  			clock-names = "apb_pclk", "atclk";
+ 
 -			port {
--				tpiu_in_port: endpoint {
+-				etr_in: endpoint {
 -					slave-mode;
--					remote-endpoint = <&replicator_out_port0>;
+-					remote-endpoint = <&replicator_out0>;
 +			in-ports {
 +				port {
-+					tpiu_in_port: endpoint {
-+						remote-endpoint = <&replicator_out_port0>;
++					etr_in: endpoint {
++						remote-endpoint = <&replicator_out0>;
 +					};
  				};
  			};
  		};
-@@ -180,10 +180,11 @@
- 
- 			clocks = <&prcmu_clk PRCMU_APETRACECLK>, <&prcmu_clk PRCMU_APEATCLK>;
+@@ -1227,40 +1228,38 @@
+ 			clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
  			clock-names = "apb_pclk", "atclk";
--			port {
--				etb_in_port: endpoint {
--					slave-mode;
--					remote-endpoint = <&replicator_out_port1>;
+ 
+-			ports {
 +			in-ports {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+ 
+ 				port at 0 {
+ 					reg = <0>;
+ 					funnel1_in0: endpoint {
+-						slave-mode;
+ 						remote-endpoint = <&etm0_out>;
+ 					};
+ 				};
+ 				port at 1 {
+ 					reg = <1>;
+ 					funnel1_in1: endpoint {
+-						slave-mode;
+ 						remote-endpoint = <&etm1_out>;
+ 					};
+ 				};
+ 				port at 2 {
+ 					reg = <2>;
+ 					funnel1_in2: endpoint {
+-						slave-mode;
+ 						remote-endpoint = <&etm2_out>;
+ 					};
+ 				};
+ 				port at 3 {
+ 					reg = <3>;
+ 					funnel1_in3: endpoint {
+-						slave-mode;
+ 						remote-endpoint = <&etm3_out>;
+ 					};
+ 				};
+-				port at 4 {
+-					reg = <0>;
++			};
++
++			out-ports {
 +				port {
-+					etb_in_port: endpoint {
-+						remote-endpoint = <&replicator_out_port1>;
+ 					funnel1_out: endpoint {
+ 						remote-endpoint = <&funnel0_in4>;
+ 					};
+@@ -1309,9 +1308,11 @@
+ 
+ 			cpu = <&CPU0>;
+ 
+-			port {
+-				etm0_out: endpoint {
+-				remote-endpoint = <&funnel1_in0>;
++			out-ports {
++				port {
++					etm0_out: endpoint {
++						remote-endpoint = <&funnel1_in0>;
++					};
+ 				};
+ 			};
+ 		};
+@@ -1325,9 +1326,11 @@
+ 
+ 			cpu = <&CPU1>;
+ 
+-			port {
+-				etm1_out: endpoint {
+-					remote-endpoint = <&funnel1_in1>;
++			out-ports {
++				port {
++					etm1_out: endpoint {
++						remote-endpoint = <&funnel1_in1>;
++					};
+ 				};
+ 			};
+ 		};
+@@ -1341,9 +1344,11 @@
+ 
+ 			cpu = <&CPU2>;
+ 
+-			port {
+-				etm2_out: endpoint {
+-					remote-endpoint = <&funnel1_in2>;
++			out-ports {
++				port {
++					etm2_out: endpoint {
++						remote-endpoint = <&funnel1_in2>;
++					};
+ 				};
+ 			};
+ 		};
+@@ -1357,9 +1362,11 @@
+ 
+ 			cpu = <&CPU3>;
+ 
+-			port {
+-				etm3_out: endpoint {
+-					remote-endpoint = <&funnel1_in3>;
++			out-ports {
++				port {
++					etm3_out: endpoint {
++						remote-endpoint = <&funnel1_in3>;
 +					};
  				};
  			};
