@@ -1,54 +1,80 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 12 Sep 2018 13:28:19 +0100
-Subject: [PATCH v5 05/27] arm64: Use daifflag_restore after bp_hardening
-In-Reply-To: <8f200315-1db9-1905-71ae-cb4269450b7c@arm.com>
-References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
- <1535471497-38854-6-git-send-email-julien.thierry@arm.com>
- <641119b9-3466-817d-3d6b-dd710c646b49@arm.com>
- <8f200315-1db9-1905-71ae-cb4269450b7c@arm.com>
-Message-ID: <71bb5289-b381-65da-c609-fa4a08640425@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 12 Sep 2018 20:29:45 +0800
+Subject: [PATCH 19/27] drm/sun4i: Add support for H6 DW HDMI controller
+In-Reply-To: <20180902072643.4917-20-jernej.skrabec@siol.net>
+References: <20180902072643.4917-1-jernej.skrabec@siol.net>
+ <20180902072643.4917-20-jernej.skrabec@siol.net>
+Message-ID: <CAGb2v67XJoJGQjF6bELkiRGnkG=ZumvScDb8_3j_yUi7nhuQtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julien,
+On Sun, Sep 2, 2018 at 3:27 PM Jernej Skrabec <jernej.skrabec@siol.net> wrote:
+>
+> H6 has DW HDMI 2.0 controller v2.12a.
+>
+> It supports 4K at 60 Hz and HDCP 2.2.
+>
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> ---
+>  drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+>
+> diff --git a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+> index 16a0c7a88ea8..44143c9f20d0 100644
+> --- a/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+> +++ b/drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+> @@ -43,6 +43,16 @@ sun8i_dw_hdmi_mode_valid_a83t(struct drm_connector *connector,
+>         return MODE_OK;
+>  }
+>
+> +static enum drm_mode_status
+> +sun8i_dw_hdmi_mode_valid_h6(struct drm_connector *connector,
+> +                           const struct drm_display_mode *mode)
+> +{
+> +       if (mode->clock > 600000)
 
-On 12/09/18 12:11, Julien Thierry wrote:
-> On 12/09/18 11:32, James Morse wrote:
->> On 28/08/18 16:51, Julien Thierry wrote:
->>> For EL0 entries requiring bp_hardening, daif status is kept at
->>> DAIF_PROCCTX_NOIRQ until after hardening has been done. Then interrupts
->>> are enabled through local_irq_enable().
->>>
->>> Before using local_irq_* functions, daifflags should be properly restored
->>> to a state where IRQs are enabled.
->>
->>> Enable IRQs by restoring DAIF_PROCCTX state after bp hardening.
->>
->> Is this just for symmetry, or are you going on to add something to the daifflags
->> state that local_irq_* functions won't change? (if so, could you allude to that
->> in the commit message)
+600 MHz seems slightly arbitrary. AFAIK the dot clock for 4K 60Hz is 594 MHz?
+A comment on this limit would be nice.
 
-> What happens is that once we use ICC_PMR_EL1, local_irq_enable will not touch
-> PSR.I. And we are coming back from an entry where PSR.I was kept to 1 so
-> local_irq_enable was not actually enabling the interrupts. On the otherhand,
-> restore will affect both.
+> +               return MODE_CLOCK_HIGH;
+> +
+> +       return MODE_OK;
+> +}
+> +
+>  static bool sun8i_dw_hdmi_node_is_tcon_top(struct device_node *node)
+>  {
+>         return IS_ENABLED(CONFIG_DRM_SUN8I_TCON_TOP) &&
+> @@ -220,12 +230,20 @@ static int sun8i_dw_hdmi_remove(struct platform_device *pdev)
+>         return 0;
+>  }
+>
+> +static const struct sun8i_dw_hdmi_quirks sun50i_h6_quirks = {
+> +       .mode_valid = sun8i_dw_hdmi_mode_valid_h6,
+> +};
+> +
 
-Got it. Thanks!
+Please "version" sort the SoC families and models.
 
-Does this mean stop_machine()s local_save_flags()/local_irq_restore() will not
-be symmetric around __apply_alternatives_multi_stop()?
-I see you add alternatives in these in patch 15, but I haven't got that far yet)
+>  static const struct sun8i_dw_hdmi_quirks sun8i_a83t_quirks = {
+>         .mode_valid = sun8i_dw_hdmi_mode_valid_a83t,
+>         .set_rate = true,
+>  };
+>
+>  static const struct of_device_id sun8i_dw_hdmi_dt_ids[] = {
+> +       {
+> +               .compatible = "allwinner,sun50i-h6-dw-hdmi",
+> +               .data = &sun50i_h6_quirks,
+> +       },
 
+Here also.
 
-> Another option is to have the asm macro "enable_da_f" also switch to PMR usage
-> (i.e. "just keep normal interrupts disabled"). Overall it would probably be
-> easier to reason with, but I'm just unsure whether it is acceptable to receive a
-> Pseudo NMI before having applied the bp_hardening.
+Once fixed,
 
-Wouldn't this give the interrupt controller a headache? I assume IRQs really are
-masked when handle_arch_irq is called. (I know nothing about the gic)
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 
-
-Thanks,
-
-James
+>         {
+>                 .compatible = "allwinner,sun8i-a83t-dw-hdmi",
+>                 .data = &sun8i_a83t_quirks,
+> --
+> 2.18.0
+>
