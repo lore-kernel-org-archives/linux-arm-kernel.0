@@ -1,8 +1,8 @@
 From: zhongjiang@huawei.com (zhong jiang)
-Date: Wed, 12 Sep 2018 11:40:28 +0800
-Subject: [PATCH] staging: remove unneeded static set .owner field in
+Date: Wed, 12 Sep 2018 11:41:49 +0800
+Subject: [PATCH] ASoC: remove unneeded static set .owner field in
  platform_driver
-Message-ID: <1536723628-50914-1-git-send-email-zhongjiang@huawei.com>
+Message-ID: <1536723709-51009-1-git-send-email-zhongjiang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,46 +13,46 @@ The issue is detected with the help of Coccinelle.
 
 Signed-off-by: zhong jiang <zhongjiang@huawei.com>
 ---
- drivers/staging/greybus/audio_codec.c    | 1 -
- drivers/staging/mt7621-eth/gsw_mt7621.c  | 1 -
- drivers/staging/mt7621-eth/mtk_eth_soc.c | 1 -
+ sound/soc/mediatek/mt2701/mt2701-wm8960.c | 1 -
+ sound/soc/mediatek/mt6797/mt6797-mt6351.c | 1 -
+ sound/soc/rockchip/rk3288_hdmi_analog.c   | 1 -
  3 files changed, 3 deletions(-)
 
-diff --git a/drivers/staging/greybus/audio_codec.c b/drivers/staging/greybus/audio_codec.c
-index 35acd55..08746c8 100644
---- a/drivers/staging/greybus/audio_codec.c
-+++ b/drivers/staging/greybus/audio_codec.c
-@@ -1087,7 +1087,6 @@ static int gbaudio_codec_remove(struct platform_device *pdev)
- static struct platform_driver gbaudio_codec_driver = {
+diff --git a/sound/soc/mediatek/mt2701/mt2701-wm8960.c b/sound/soc/mediatek/mt2701/mt2701-wm8960.c
+index 89f34ef..e5d49e6 100644
+--- a/sound/soc/mediatek/mt2701/mt2701-wm8960.c
++++ b/sound/soc/mediatek/mt2701/mt2701-wm8960.c
+@@ -150,7 +150,6 @@ static int mt2701_wm8960_machine_probe(struct platform_device *pdev)
+ static struct platform_driver mt2701_wm8960_machine = {
  	.driver = {
- 		.name = "apb-dummy-codec",
+ 		.name = "mt2701-wm8960",
 -		.owner = THIS_MODULE,
- #ifdef CONFIG_PM
- 		.pm = &gbaudio_codec_pm_ops,
+ #ifdef CONFIG_OF
+ 		.of_match_table = mt2701_wm8960_machine_dt_match,
  #endif
-diff --git a/drivers/staging/mt7621-eth/gsw_mt7621.c b/drivers/staging/mt7621-eth/gsw_mt7621.c
-index 2c07b55..53767b1 100644
---- a/drivers/staging/mt7621-eth/gsw_mt7621.c
-+++ b/drivers/staging/mt7621-eth/gsw_mt7621.c
-@@ -286,7 +286,6 @@ static int mt7621_gsw_remove(struct platform_device *pdev)
- 	.remove = mt7621_gsw_remove,
+diff --git a/sound/soc/mediatek/mt6797/mt6797-mt6351.c b/sound/soc/mediatek/mt6797/mt6797-mt6351.c
+index b1558c5..6e578e8 100644
+--- a/sound/soc/mediatek/mt6797/mt6797-mt6351.c
++++ b/sound/soc/mediatek/mt6797/mt6797-mt6351.c
+@@ -205,7 +205,6 @@ static int mt6797_mt6351_dev_probe(struct platform_device *pdev)
+ static struct platform_driver mt6797_mt6351_driver = {
  	.driver = {
- 		.name = "mt7621-gsw",
+ 		.name = "mt6797-mt6351",
 -		.owner = THIS_MODULE,
- 		.of_match_table = mediatek_gsw_match,
- 	},
- };
-diff --git a/drivers/staging/mt7621-eth/mtk_eth_soc.c b/drivers/staging/mt7621-eth/mtk_eth_soc.c
-index 7135075..363d3c9 100644
---- a/drivers/staging/mt7621-eth/mtk_eth_soc.c
-+++ b/drivers/staging/mt7621-eth/mtk_eth_soc.c
-@@ -2167,7 +2167,6 @@ static int mtk_remove(struct platform_device *pdev)
- 	.remove = mtk_remove,
+ #ifdef CONFIG_OF
+ 		.of_match_table = mt6797_mt6351_dt_match,
+ #endif
+diff --git a/sound/soc/rockchip/rk3288_hdmi_analog.c b/sound/soc/rockchip/rk3288_hdmi_analog.c
+index 929b3fe..a472d5e 100644
+--- a/sound/soc/rockchip/rk3288_hdmi_analog.c
++++ b/sound/soc/rockchip/rk3288_hdmi_analog.c
+@@ -286,7 +286,6 @@ static int snd_rk_mc_probe(struct platform_device *pdev)
+ 	.probe = snd_rk_mc_probe,
  	.driver = {
- 		.name = "mtk_soc_eth",
+ 		.name = DRV_NAME,
 -		.owner = THIS_MODULE,
- 		.of_match_table = of_mtk_match,
+ 		.pm = &snd_soc_pm_ops,
+ 		.of_match_table = rockchip_sound_of_match,
  	},
- };
 -- 
 1.7.12.4
