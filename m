@@ -1,35 +1,32 @@
 From: phil@raspberrypi.org (Phil Elwell)
-Date: Wed, 12 Sep 2018 17:42:32 +0100
-Subject: [PATCH 0/2] Improve VCHIQ cache line size handling
-Message-ID: <1536770554-107314-1-git-send-email-phil@raspberrypi.org>
+Date: Wed, 12 Sep 2018 17:42:34 +0100
+Subject: [PATCH 2/2] ARM: dts: bcm283x: Correct mailbox register sizes
+In-Reply-To: <1536770554-107314-1-git-send-email-phil@raspberrypi.org>
+References: <1536770554-107314-1-git-send-email-phil@raspberrypi.org>
+Message-ID: <1536770554-107314-3-git-send-email-phil@raspberrypi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both sides of the VCHIQ communications mechanism need to agree on the cache
-line size. Using an incorrect value can lead to data corruption, but having the
-two sides using different values is usually worse.
+The size field in a Device Tree "reg" property is encoded in bytes, not
+words.
 
-In the absence of an obvious convenient run-time method to determine the
-correct value in the ARCH=arm world, the downstream Raspberry Pi trees used a
-Device Tree property, written by the firmware, to configure the kernel driver.
-This method was vetoed during the upstreaming process, so a fixed value of 32
-was used instead, and some corruptions ensued. This is take 2 at arriving at
-the correct value.
+Signed-off-by: Phil Elwell <phil@raspberrypi.org>
+---
+ arch/arm/boot/dts/bcm2835-rpi.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Part one of the fix is deriving the correct value from the ARM's cpuid register.
-Part two is a (seemingly cosmetic) correction of the Device Tree reg declaration
-used by the driver, but it doubles as an indication to the Raspberry Pi firmware
-that the kernel driver is running a recent kernel driver that chooses the
-correct value. As such I would like very much for the DT patch not to be merged
-before the driver patch - just tell me what hoops I need to jump through.
-
-Phil Elwell (2):
-  staging/vc04_services: Derive g_cache_line_size
-  ARM: dts: bcm283x: Correct mailbox register sizes
-
- arch/arm/boot/dts/bcm2835-rpi.dtsi                 |  2 +-
- .../interface/vchiq_arm/vchiq_2835_arm.c           | 24 +++++++++++++++++-----
- 2 files changed, 20 insertions(+), 6 deletions(-)
-
+diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+index cb2d6d7..c481eab 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
++++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+@@ -32,7 +32,7 @@
+ 
+ 		mailbox at 7e00b840 {
+ 			compatible = "brcm,bcm2835-vchiq";
+-			reg = <0x7e00b840 0xf>;
++			reg = <0x7e00b840 0x3c>;
+ 			interrupts = <0 2>;
+ 		};
+ 	};
 -- 
 2.7.4
