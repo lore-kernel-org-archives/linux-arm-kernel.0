@@ -1,163 +1,708 @@
 From: horia.geanta@nxp.com (=?UTF-8?q?Horia=20Geant=C4=83?=)
-Date: Wed, 12 Sep 2018 11:59:32 +0300
-Subject: [PATCH v2 07/12] crypto: caam - add Queue Interface v2 error codes
+Date: Wed, 12 Sep 2018 11:59:34 +0300
+Subject: [PATCH v2 09/12] crypto: caam/qi2 - add skcipher algorithms
 In-Reply-To: <20180912085937.22489-1-horia.geanta@nxp.com>
 References: <20180912085937.22489-1-horia.geanta@nxp.com>
-Message-ID: <20180912085937.22489-8-horia.geanta@nxp.com>
+Message-ID: <20180912085937.22489-10-horia.geanta@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support to translate error codes returned by QI v2, i.e.
-Queue Interface present on DataPath Acceleration Architecture
-v2 (DPAA2).
+Add support to submit the following skcipher algorithms
+via the DPSECI backend:
+cbc({aes,des,des3_ede})
+ctr(aes), rfc3686(ctr(aes))
+xts(aes)
 
 Signed-off-by: Horia Geant? <horia.geanta@nxp.com>
 ---
- drivers/crypto/caam/error.c | 75 +++++++++++++++++++++++++++++++++++++++++++--
- drivers/crypto/caam/error.h |  6 +++-
- drivers/crypto/caam/regs.h  |  2 ++
- 3 files changed, 79 insertions(+), 4 deletions(-)
+ drivers/crypto/caam/Kconfig       |   1 +
+ drivers/crypto/caam/caamalg_qi2.c | 562 ++++++++++++++++++++++++++++++++++++++
+ drivers/crypto/caam/caamalg_qi2.h |  20 +-
+ 3 files changed, 582 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/crypto/caam/error.c b/drivers/crypto/caam/error.c
-index 8da88beb1abb..db0f0d96842e 100644
---- a/drivers/crypto/caam/error.c
-+++ b/drivers/crypto/caam/error.c
-@@ -108,6 +108,54 @@ static const struct {
- 	{ 0xF1, "3GPP HFN matches or exceeds the Threshold" },
+diff --git a/drivers/crypto/caam/Kconfig b/drivers/crypto/caam/Kconfig
+index a186b853b05c..8d162cb34591 100644
+--- a/drivers/crypto/caam/Kconfig
++++ b/drivers/crypto/caam/Kconfig
+@@ -157,6 +157,7 @@ config CRYPTO_DEV_FSL_DPAA2_CAAM
+ 	tristate "QorIQ DPAA2 CAAM (DPSECI) driver"
+ 	depends on FSL_MC_DPIO
+ 	select CRYPTO_DEV_FSL_CAAM_COMMON
++	select CRYPTO_BLKCIPHER
+ 	select CRYPTO_AUTHENC
+ 	select CRYPTO_AEAD
+ 	help
+diff --git a/drivers/crypto/caam/caamalg_qi2.c b/drivers/crypto/caam/caamalg_qi2.c
+index 9d97a51070b1..5bb77c778da6 100644
+--- a/drivers/crypto/caam/caamalg_qi2.c
++++ b/drivers/crypto/caam/caamalg_qi2.c
+@@ -56,6 +56,12 @@ struct caam_aead_alg {
+ 	bool registered;
  };
  
-+static const struct {
-+	u8 value;
-+	const char *error_text;
-+} qi_error_list[] = {
-+	{ 0x1F, "Job terminated by FQ or ICID flush" },
-+	{ 0x20, "FD format error"},
-+	{ 0x21, "FD command format error"},
-+	{ 0x23, "FL format error"},
-+	{ 0x25, "CRJD specified in FD, but not enabled in FLC"},
-+	{ 0x30, "Max. buffer size too small"},
-+	{ 0x31, "DHR exceeds max. buffer size (allocate mode, S/G format)"},
-+	{ 0x32, "SGT exceeds max. buffer size (allocate mode, S/G format"},
-+	{ 0x33, "Size over/underflow (allocate mode)"},
-+	{ 0x34, "Size over/underflow (reuse mode)"},
-+	{ 0x35, "Length exceeds max. short length (allocate mode, S/G/ format)"},
-+	{ 0x36, "Memory footprint exceeds max. value (allocate mode, S/G/ format)"},
-+	{ 0x41, "SBC frame format not supported (allocate mode)"},
-+	{ 0x42, "Pool 0 invalid / pool 1 size < pool 0 size (allocate mode)"},
-+	{ 0x43, "Annotation output enabled but ASAR = 0 (allocate mode)"},
-+	{ 0x44, "Unsupported or reserved frame format or SGHR = 1 (reuse mode)"},
-+	{ 0x45, "DHR correction underflow (reuse mode, single buffer format)"},
-+	{ 0x46, "Annotation length exceeds offset (reuse mode)"},
-+	{ 0x48, "Annotation output enabled but ASA limited by ASAR (reuse mode)"},
-+	{ 0x49, "Data offset correction exceeds input frame data length (reuse mode)"},
-+	{ 0x4B, "Annotation output enabled but ASA cannote be expanded (frame list)"},
-+	{ 0x51, "Unsupported IF reuse mode"},
-+	{ 0x52, "Unsupported FL use mode"},
-+	{ 0x53, "Unsupported RJD use mode"},
-+	{ 0x54, "Unsupported inline descriptor use mode"},
-+	{ 0xC0, "Table buffer pool 0 depletion"},
-+	{ 0xC1, "Table buffer pool 1 depletion"},
-+	{ 0xC2, "Data buffer pool 0 depletion, no OF allocated"},
-+	{ 0xC3, "Data buffer pool 1 depletion, no OF allocated"},
-+	{ 0xC4, "Data buffer pool 0 depletion, partial OF allocated"},
-+	{ 0xC5, "Data buffer pool 1 depletion, partial OF allocated"},
-+	{ 0xD0, "FLC read error"},
-+	{ 0xD1, "FL read error"},
-+	{ 0xD2, "FL write error"},
-+	{ 0xD3, "OF SGT write error"},
-+	{ 0xD4, "PTA read error"},
-+	{ 0xD5, "PTA write error"},
-+	{ 0xD6, "OF SGT F-bit write error"},
-+	{ 0xD7, "ASA write error"},
-+	{ 0xE1, "FLC[ICR]=0 ICID error"},
-+	{ 0xE2, "FLC[ICR]=1 ICID error"},
-+	{ 0xE4, "source of ICID flush not trusted (BDI = 0)"},
++struct caam_skcipher_alg {
++	struct skcipher_alg skcipher;
++	struct caam_alg_entry caam;
++	bool registered;
 +};
 +
- static const char * const cha_id_list[] = {
- 	"",
- 	"AES",
-@@ -236,6 +284,27 @@ static void report_deco_status(struct device *jrdev, const u32 status,
- 		status, error, idx_str, idx, err_str, err_err_code);
+ /**
+  * caam_ctx - per-session context
+  * @flc: Flow Contexts array
+@@ -794,6 +800,248 @@ static int rfc4543_setkey(struct crypto_aead *aead,
+ 	return rfc4543_set_sh_desc(aead);
  }
  
-+static void report_qi_status(struct device *qidev, const u32 status,
-+			     const char *error)
++static int skcipher_setkey(struct crypto_skcipher *skcipher, const u8 *key,
++			   unsigned int keylen)
 +{
-+	u8 err_id = status & JRSTA_QIERR_ERROR_MASK;
-+	const char *err_str = "unidentified error value 0x";
-+	char err_err_code[3] = { 0 };
-+	int i;
++	struct caam_ctx *ctx = crypto_skcipher_ctx(skcipher);
++	struct caam_skcipher_alg *alg =
++		container_of(crypto_skcipher_alg(skcipher),
++			     struct caam_skcipher_alg, skcipher);
++	struct device *dev = ctx->dev;
++	struct caam_flc *flc;
++	unsigned int ivsize = crypto_skcipher_ivsize(skcipher);
++	u32 *desc;
++	u32 ctx1_iv_off = 0;
++	const bool ctr_mode = ((ctx->cdata.algtype & OP_ALG_AAI_MASK) ==
++			       OP_ALG_AAI_CTR_MOD128);
++	const bool is_rfc3686 = alg->caam.rfc3686;
 +
-+	for (i = 0; i < ARRAY_SIZE(qi_error_list); i++)
-+		if (qi_error_list[i].value == err_id)
-+			break;
++	print_hex_dump_debug("key in @" __stringify(__LINE__)": ",
++			     DUMP_PREFIX_ADDRESS, 16, 4, key, keylen, 1);
 +
-+	if (i != ARRAY_SIZE(qi_error_list) && qi_error_list[i].error_text)
-+		err_str = qi_error_list[i].error_text;
-+	else
-+		snprintf(err_err_code, sizeof(err_err_code), "%02x", err_id);
++	/*
++	 * AES-CTR needs to load IV in CONTEXT1 reg
++	 * at an offset of 128bits (16bytes)
++	 * CONTEXT1[255:128] = IV
++	 */
++	if (ctr_mode)
++		ctx1_iv_off = 16;
 +
-+	dev_err(qidev, "%08x: %s: %s%s\n",
-+		status, error, err_str, err_err_code);
++	/*
++	 * RFC3686 specific:
++	 *	| CONTEXT1[255:128] = {NONCE, IV, COUNTER}
++	 *	| *key = {KEY, NONCE}
++	 */
++	if (is_rfc3686) {
++		ctx1_iv_off = 16 + CTR_RFC3686_NONCE_SIZE;
++		keylen -= CTR_RFC3686_NONCE_SIZE;
++	}
++
++	ctx->cdata.keylen = keylen;
++	ctx->cdata.key_virt = key;
++	ctx->cdata.key_inline = true;
++
++	/* skcipher_encrypt shared descriptor */
++	flc = &ctx->flc[ENCRYPT];
++	desc = flc->sh_desc;
++	cnstr_shdsc_skcipher_encap(desc, &ctx->cdata, ivsize, is_rfc3686,
++				   ctx1_iv_off);
++	flc->flc[1] = cpu_to_caam32(desc_len(desc)); /* SDL */
++	dma_sync_single_for_device(dev, ctx->flc_dma[ENCRYPT],
++				   sizeof(flc->flc) + desc_bytes(desc),
++				   ctx->dir);
++
++	/* skcipher_decrypt shared descriptor */
++	flc = &ctx->flc[DECRYPT];
++	desc = flc->sh_desc;
++	cnstr_shdsc_skcipher_decap(desc, &ctx->cdata, ivsize, is_rfc3686,
++				   ctx1_iv_off);
++	flc->flc[1] = cpu_to_caam32(desc_len(desc)); /* SDL */
++	dma_sync_single_for_device(dev, ctx->flc_dma[DECRYPT],
++				   sizeof(flc->flc) + desc_bytes(desc),
++				   ctx->dir);
++
++	return 0;
 +}
 +
- static void report_jr_status(struct device *jrdev, const u32 status,
- 			     const char *error)
++static int xts_skcipher_setkey(struct crypto_skcipher *skcipher, const u8 *key,
++			       unsigned int keylen)
++{
++	struct caam_ctx *ctx = crypto_skcipher_ctx(skcipher);
++	struct device *dev = ctx->dev;
++	struct caam_flc *flc;
++	u32 *desc;
++
++	if (keylen != 2 * AES_MIN_KEY_SIZE  && keylen != 2 * AES_MAX_KEY_SIZE) {
++		dev_err(dev, "key size mismatch\n");
++		crypto_skcipher_set_flags(skcipher, CRYPTO_TFM_RES_BAD_KEY_LEN);
++		return -EINVAL;
++	}
++
++	ctx->cdata.keylen = keylen;
++	ctx->cdata.key_virt = key;
++	ctx->cdata.key_inline = true;
++
++	/* xts_skcipher_encrypt shared descriptor */
++	flc = &ctx->flc[ENCRYPT];
++	desc = flc->sh_desc;
++	cnstr_shdsc_xts_skcipher_encap(desc, &ctx->cdata);
++	flc->flc[1] = cpu_to_caam32(desc_len(desc)); /* SDL */
++	dma_sync_single_for_device(dev, ctx->flc_dma[ENCRYPT],
++				   sizeof(flc->flc) + desc_bytes(desc),
++				   ctx->dir);
++
++	/* xts_skcipher_decrypt shared descriptor */
++	flc = &ctx->flc[DECRYPT];
++	desc = flc->sh_desc;
++	cnstr_shdsc_xts_skcipher_decap(desc, &ctx->cdata);
++	flc->flc[1] = cpu_to_caam32(desc_len(desc)); /* SDL */
++	dma_sync_single_for_device(dev, ctx->flc_dma[DECRYPT],
++				   sizeof(flc->flc) + desc_bytes(desc),
++				   ctx->dir);
++
++	return 0;
++}
++
++static struct skcipher_edesc *skcipher_edesc_alloc(struct skcipher_request *req)
++{
++	struct crypto_skcipher *skcipher = crypto_skcipher_reqtfm(req);
++	struct caam_request *req_ctx = skcipher_request_ctx(req);
++	struct dpaa2_fl_entry *in_fle = &req_ctx->fd_flt[1];
++	struct dpaa2_fl_entry *out_fle = &req_ctx->fd_flt[0];
++	struct caam_ctx *ctx = crypto_skcipher_ctx(skcipher);
++	struct device *dev = ctx->dev;
++	gfp_t flags = (req->base.flags & CRYPTO_TFM_REQ_MAY_SLEEP) ?
++		       GFP_KERNEL : GFP_ATOMIC;
++	int src_nents, mapped_src_nents, dst_nents = 0, mapped_dst_nents = 0;
++	struct skcipher_edesc *edesc;
++	dma_addr_t iv_dma;
++	u8 *iv;
++	int ivsize = crypto_skcipher_ivsize(skcipher);
++	int dst_sg_idx, qm_sg_ents, qm_sg_bytes;
++	struct dpaa2_sg_entry *sg_table;
++
++	src_nents = sg_nents_for_len(req->src, req->cryptlen);
++	if (unlikely(src_nents < 0)) {
++		dev_err(dev, "Insufficient bytes (%d) in src S/G\n",
++			req->cryptlen);
++		return ERR_PTR(src_nents);
++	}
++
++	if (unlikely(req->dst != req->src)) {
++		dst_nents = sg_nents_for_len(req->dst, req->cryptlen);
++		if (unlikely(dst_nents < 0)) {
++			dev_err(dev, "Insufficient bytes (%d) in dst S/G\n",
++				req->cryptlen);
++			return ERR_PTR(dst_nents);
++		}
++
++		mapped_src_nents = dma_map_sg(dev, req->src, src_nents,
++					      DMA_TO_DEVICE);
++		if (unlikely(!mapped_src_nents)) {
++			dev_err(dev, "unable to map source\n");
++			return ERR_PTR(-ENOMEM);
++		}
++
++		mapped_dst_nents = dma_map_sg(dev, req->dst, dst_nents,
++					      DMA_FROM_DEVICE);
++		if (unlikely(!mapped_dst_nents)) {
++			dev_err(dev, "unable to map destination\n");
++			dma_unmap_sg(dev, req->src, src_nents, DMA_TO_DEVICE);
++			return ERR_PTR(-ENOMEM);
++		}
++	} else {
++		mapped_src_nents = dma_map_sg(dev, req->src, src_nents,
++					      DMA_BIDIRECTIONAL);
++		if (unlikely(!mapped_src_nents)) {
++			dev_err(dev, "unable to map source\n");
++			return ERR_PTR(-ENOMEM);
++		}
++	}
++
++	qm_sg_ents = 1 + mapped_src_nents;
++	dst_sg_idx = qm_sg_ents;
++
++	qm_sg_ents += mapped_dst_nents > 1 ? mapped_dst_nents : 0;
++	qm_sg_bytes = qm_sg_ents * sizeof(struct dpaa2_sg_entry);
++	if (unlikely(offsetof(struct skcipher_edesc, sgt) + qm_sg_bytes +
++		     ivsize > CAAM_QI_MEMCACHE_SIZE)) {
++		dev_err(dev, "No space for %d S/G entries and/or %dB IV\n",
++			qm_sg_ents, ivsize);
++		caam_unmap(dev, req->src, req->dst, src_nents, dst_nents, 0,
++			   0, 0, 0);
++		return ERR_PTR(-ENOMEM);
++	}
++
++	/* allocate space for base edesc, link tables and IV */
++	edesc = qi_cache_zalloc(GFP_DMA | flags);
++	if (unlikely(!edesc)) {
++		dev_err(dev, "could not allocate extended descriptor\n");
++		caam_unmap(dev, req->src, req->dst, src_nents, dst_nents, 0,
++			   0, 0, 0);
++		return ERR_PTR(-ENOMEM);
++	}
++
++	/* Make sure IV is located in a DMAable area */
++	sg_table = &edesc->sgt[0];
++	iv = (u8 *)(sg_table + qm_sg_ents);
++	memcpy(iv, req->iv, ivsize);
++
++	iv_dma = dma_map_single(dev, iv, ivsize, DMA_TO_DEVICE);
++	if (dma_mapping_error(dev, iv_dma)) {
++		dev_err(dev, "unable to map IV\n");
++		caam_unmap(dev, req->src, req->dst, src_nents, dst_nents, 0,
++			   0, 0, 0);
++		qi_cache_free(edesc);
++		return ERR_PTR(-ENOMEM);
++	}
++
++	edesc->src_nents = src_nents;
++	edesc->dst_nents = dst_nents;
++	edesc->iv_dma = iv_dma;
++	edesc->qm_sg_bytes = qm_sg_bytes;
++
++	dma_to_qm_sg_one(sg_table, iv_dma, ivsize, 0);
++	sg_to_qm_sg_last(req->src, mapped_src_nents, sg_table + 1, 0);
++
++	if (mapped_dst_nents > 1)
++		sg_to_qm_sg_last(req->dst, mapped_dst_nents, sg_table +
++				 dst_sg_idx, 0);
++
++	edesc->qm_sg_dma = dma_map_single(dev, sg_table, edesc->qm_sg_bytes,
++					  DMA_TO_DEVICE);
++	if (dma_mapping_error(dev, edesc->qm_sg_dma)) {
++		dev_err(dev, "unable to map S/G table\n");
++		caam_unmap(dev, req->src, req->dst, src_nents, dst_nents,
++			   iv_dma, ivsize, 0, 0);
++		qi_cache_free(edesc);
++		return ERR_PTR(-ENOMEM);
++	}
++
++	memset(&req_ctx->fd_flt, 0, sizeof(req_ctx->fd_flt));
++	dpaa2_fl_set_final(in_fle, true);
++	dpaa2_fl_set_len(in_fle, req->cryptlen + ivsize);
++	dpaa2_fl_set_len(out_fle, req->cryptlen);
++
++	dpaa2_fl_set_format(in_fle, dpaa2_fl_sg);
++	dpaa2_fl_set_addr(in_fle, edesc->qm_sg_dma);
++
++	if (req->src == req->dst) {
++		dpaa2_fl_set_format(out_fle, dpaa2_fl_sg);
++		dpaa2_fl_set_addr(out_fle, edesc->qm_sg_dma +
++				  sizeof(*sg_table));
++	} else if (mapped_dst_nents > 1) {
++		dpaa2_fl_set_format(out_fle, dpaa2_fl_sg);
++		dpaa2_fl_set_addr(out_fle, edesc->qm_sg_dma + dst_sg_idx *
++				  sizeof(*sg_table));
++	} else {
++		dpaa2_fl_set_format(out_fle, dpaa2_fl_single);
++		dpaa2_fl_set_addr(out_fle, sg_dma_address(req->dst));
++	}
++
++	return edesc;
++}
++
+ static void aead_unmap(struct device *dev, struct aead_edesc *edesc,
+ 		       struct aead_request *req)
  {
-@@ -250,7 +319,7 @@ static void report_cond_code_status(struct device *jrdev, const u32 status,
- 		status, error, __func__);
+@@ -805,6 +1053,16 @@ static void aead_unmap(struct device *dev, struct aead_edesc *edesc,
+ 	dma_unmap_single(dev, edesc->assoclen_dma, 4, DMA_TO_DEVICE);
  }
  
--void caam_jr_strstatus(struct device *jrdev, u32 status)
-+void caam_strstatus(struct device *jrdev, u32 status, bool qi_v2)
++static void skcipher_unmap(struct device *dev, struct skcipher_edesc *edesc,
++			   struct skcipher_request *req)
++{
++	struct crypto_skcipher *skcipher = crypto_skcipher_reqtfm(req);
++	int ivsize = crypto_skcipher_ivsize(skcipher);
++
++	caam_unmap(dev, req->src, req->dst, edesc->src_nents, edesc->dst_nents,
++		   edesc->iv_dma, ivsize, edesc->qm_sg_dma, edesc->qm_sg_bytes);
++}
++
+ static void aead_encrypt_done(void *cbk_ctx, u32 status)
  {
- 	static const struct stat_src {
- 		void (*report_ssed)(struct device *jrdev, const u32 status,
-@@ -262,7 +331,7 @@ void caam_jr_strstatus(struct device *jrdev, u32 status)
- 		{ report_ccb_status, "CCB" },
- 		{ report_jump_status, "Jump" },
- 		{ report_deco_status, "DECO" },
--		{ NULL, "Queue Manager Interface" },
-+		{ report_qi_status, "Queue Manager Interface" },
- 		{ report_jr_status, "Job Ring" },
- 		{ report_cond_code_status, "Condition Code" },
- 		{ NULL, NULL },
-@@ -288,4 +357,4 @@ void caam_jr_strstatus(struct device *jrdev, u32 status)
- 	else
- 		dev_err(jrdev, "%d: unknown error source\n", ssrc);
+ 	struct crypto_async_request *areq = cbk_ctx;
+@@ -930,6 +1188,138 @@ static int ipsec_gcm_decrypt(struct aead_request *req)
+ 	return aead_decrypt(req);
  }
--EXPORT_SYMBOL(caam_jr_strstatus);
-+EXPORT_SYMBOL(caam_strstatus);
-diff --git a/drivers/crypto/caam/error.h b/drivers/crypto/caam/error.h
-index 5aa332bac4b0..67ea94079837 100644
---- a/drivers/crypto/caam/error.h
-+++ b/drivers/crypto/caam/error.h
-@@ -8,7 +8,11 @@
- #ifndef CAAM_ERROR_H
- #define CAAM_ERROR_H
- #define CAAM_ERROR_STR_MAX 302
--void caam_jr_strstatus(struct device *jrdev, u32 status);
-+
-+void caam_strstatus(struct device *dev, u32 status, bool qi_v2);
-+
-+#define caam_jr_strstatus(jrdev, status) caam_strstatus(jrdev, status, false)
-+#define caam_qi2_strstatus(qidev, status) caam_strstatus(qidev, status, true)
  
- void caam_dump_sg(const char *level, const char *prefix_str, int prefix_type,
- 		  int rowsize, int groupsize, struct scatterlist *sg,
-diff --git a/drivers/crypto/caam/regs.h b/drivers/crypto/caam/regs.h
-index ce3f9ad7120f..457815f965c0 100644
---- a/drivers/crypto/caam/regs.h
-+++ b/drivers/crypto/caam/regs.h
-@@ -633,6 +633,8 @@ struct caam_job_ring {
- #define JRSTA_DECOERR_INVSIGN       0x86
- #define JRSTA_DECOERR_DSASIGN       0x87
- 
-+#define JRSTA_QIERR_ERROR_MASK      0x00ff
++static void skcipher_encrypt_done(void *cbk_ctx, u32 status)
++{
++	struct crypto_async_request *areq = cbk_ctx;
++	struct skcipher_request *req = skcipher_request_cast(areq);
++	struct caam_request *req_ctx = to_caam_req(areq);
++	struct crypto_skcipher *skcipher = crypto_skcipher_reqtfm(req);
++	struct caam_ctx *ctx = crypto_skcipher_ctx(skcipher);
++	struct skcipher_edesc *edesc = req_ctx->edesc;
++	int ecode = 0;
++	int ivsize = crypto_skcipher_ivsize(skcipher);
 +
- #define JRSTA_CCBERR_JUMP           0x08000000
- #define JRSTA_CCBERR_INDEX_MASK     0xff00
- #define JRSTA_CCBERR_INDEX_SHIFT    8
++	dev_dbg(ctx->dev, "%s %d: err 0x%x\n", __func__, __LINE__, status);
++
++	if (unlikely(status)) {
++		caam_qi2_strstatus(ctx->dev, status);
++		ecode = -EIO;
++	}
++
++	print_hex_dump_debug("dstiv  @" __stringify(__LINE__)": ",
++			     DUMP_PREFIX_ADDRESS, 16, 4, req->iv,
++			     edesc->src_nents > 1 ? 100 : ivsize, 1);
++	caam_dump_sg(KERN_DEBUG, "dst    @" __stringify(__LINE__)": ",
++		     DUMP_PREFIX_ADDRESS, 16, 4, req->dst,
++		     edesc->dst_nents > 1 ? 100 : req->cryptlen, 1);
++
++	skcipher_unmap(ctx->dev, edesc, req);
++
++	/*
++	 * The crypto API expects us to set the IV (req->iv) to the last
++	 * ciphertext block. This is used e.g. by the CTS mode.
++	 */
++	scatterwalk_map_and_copy(req->iv, req->dst, req->cryptlen - ivsize,
++				 ivsize, 0);
++
++	qi_cache_free(edesc);
++	skcipher_request_complete(req, ecode);
++}
++
++static void skcipher_decrypt_done(void *cbk_ctx, u32 status)
++{
++	struct crypto_async_request *areq = cbk_ctx;
++	struct skcipher_request *req = skcipher_request_cast(areq);
++	struct caam_request *req_ctx = to_caam_req(areq);
++	struct crypto_skcipher *skcipher = crypto_skcipher_reqtfm(req);
++	struct caam_ctx *ctx = crypto_skcipher_ctx(skcipher);
++	struct skcipher_edesc *edesc = req_ctx->edesc;
++	int ecode = 0;
++	int ivsize = crypto_skcipher_ivsize(skcipher);
++
++	dev_dbg(ctx->dev, "%s %d: err 0x%x\n", __func__, __LINE__, status);
++
++	if (unlikely(status)) {
++		caam_qi2_strstatus(ctx->dev, status);
++		ecode = -EIO;
++	}
++
++	print_hex_dump_debug("dstiv  @" __stringify(__LINE__)": ",
++			     DUMP_PREFIX_ADDRESS, 16, 4, req->iv,
++			     edesc->src_nents > 1 ? 100 : ivsize, 1);
++	caam_dump_sg(KERN_DEBUG, "dst    @" __stringify(__LINE__)": ",
++		     DUMP_PREFIX_ADDRESS, 16, 4, req->dst,
++		     edesc->dst_nents > 1 ? 100 : req->cryptlen, 1);
++
++	skcipher_unmap(ctx->dev, edesc, req);
++	qi_cache_free(edesc);
++	skcipher_request_complete(req, ecode);
++}
++
++static int skcipher_encrypt(struct skcipher_request *req)
++{
++	struct skcipher_edesc *edesc;
++	struct crypto_skcipher *skcipher = crypto_skcipher_reqtfm(req);
++	struct caam_ctx *ctx = crypto_skcipher_ctx(skcipher);
++	struct caam_request *caam_req = skcipher_request_ctx(req);
++	int ret;
++
++	/* allocate extended descriptor */
++	edesc = skcipher_edesc_alloc(req);
++	if (IS_ERR(edesc))
++		return PTR_ERR(edesc);
++
++	caam_req->flc = &ctx->flc[ENCRYPT];
++	caam_req->flc_dma = ctx->flc_dma[ENCRYPT];
++	caam_req->cbk = skcipher_encrypt_done;
++	caam_req->ctx = &req->base;
++	caam_req->edesc = edesc;
++	ret = dpaa2_caam_enqueue(ctx->dev, caam_req);
++	if (ret != -EINPROGRESS &&
++	    !(ret == -EBUSY && req->base.flags & CRYPTO_TFM_REQ_MAY_BACKLOG)) {
++		skcipher_unmap(ctx->dev, edesc, req);
++		qi_cache_free(edesc);
++	}
++
++	return ret;
++}
++
++static int skcipher_decrypt(struct skcipher_request *req)
++{
++	struct skcipher_edesc *edesc;
++	struct crypto_skcipher *skcipher = crypto_skcipher_reqtfm(req);
++	struct caam_ctx *ctx = crypto_skcipher_ctx(skcipher);
++	struct caam_request *caam_req = skcipher_request_ctx(req);
++	int ivsize = crypto_skcipher_ivsize(skcipher);
++	int ret;
++
++	/* allocate extended descriptor */
++	edesc = skcipher_edesc_alloc(req);
++	if (IS_ERR(edesc))
++		return PTR_ERR(edesc);
++
++	/*
++	 * The crypto API expects us to set the IV (req->iv) to the last
++	 * ciphertext block.
++	 */
++	scatterwalk_map_and_copy(req->iv, req->src, req->cryptlen - ivsize,
++				 ivsize, 0);
++
++	caam_req->flc = &ctx->flc[DECRYPT];
++	caam_req->flc_dma = ctx->flc_dma[DECRYPT];
++	caam_req->cbk = skcipher_decrypt_done;
++	caam_req->ctx = &req->base;
++	caam_req->edesc = edesc;
++	ret = dpaa2_caam_enqueue(ctx->dev, caam_req);
++	if (ret != -EINPROGRESS &&
++	    !(ret == -EBUSY && req->base.flags & CRYPTO_TFM_REQ_MAY_BACKLOG)) {
++		skcipher_unmap(ctx->dev, edesc, req);
++		qi_cache_free(edesc);
++	}
++
++	return ret;
++}
++
+ static int caam_cra_init(struct caam_ctx *ctx, struct caam_alg_entry *caam,
+ 			 bool uses_dkp)
+ {
+@@ -958,6 +1348,16 @@ static int caam_cra_init(struct caam_ctx *ctx, struct caam_alg_entry *caam,
+ 	return 0;
+ }
+ 
++static int caam_cra_init_skcipher(struct crypto_skcipher *tfm)
++{
++	struct skcipher_alg *alg = crypto_skcipher_alg(tfm);
++	struct caam_skcipher_alg *caam_alg =
++		container_of(alg, typeof(*caam_alg), skcipher);
++
++	crypto_skcipher_set_reqsize(tfm, sizeof(struct caam_request));
++	return caam_cra_init(crypto_skcipher_ctx(tfm), &caam_alg->caam, false);
++}
++
+ static int caam_cra_init_aead(struct crypto_aead *tfm)
+ {
+ 	struct aead_alg *alg = crypto_aead_alg(tfm);
+@@ -976,11 +1376,124 @@ static void caam_exit_common(struct caam_ctx *ctx)
+ 			       DMA_ATTR_SKIP_CPU_SYNC);
+ }
+ 
++static void caam_cra_exit(struct crypto_skcipher *tfm)
++{
++	caam_exit_common(crypto_skcipher_ctx(tfm));
++}
++
+ static void caam_cra_exit_aead(struct crypto_aead *tfm)
+ {
+ 	caam_exit_common(crypto_aead_ctx(tfm));
+ }
+ 
++static struct caam_skcipher_alg driver_algs[] = {
++	{
++		.skcipher = {
++			.base = {
++				.cra_name = "cbc(aes)",
++				.cra_driver_name = "cbc-aes-caam-qi2",
++				.cra_blocksize = AES_BLOCK_SIZE,
++			},
++			.setkey = skcipher_setkey,
++			.encrypt = skcipher_encrypt,
++			.decrypt = skcipher_decrypt,
++			.min_keysize = AES_MIN_KEY_SIZE,
++			.max_keysize = AES_MAX_KEY_SIZE,
++			.ivsize = AES_BLOCK_SIZE,
++		},
++		.caam.class1_alg_type = OP_ALG_ALGSEL_AES | OP_ALG_AAI_CBC,
++	},
++	{
++		.skcipher = {
++			.base = {
++				.cra_name = "cbc(des3_ede)",
++				.cra_driver_name = "cbc-3des-caam-qi2",
++				.cra_blocksize = DES3_EDE_BLOCK_SIZE,
++			},
++			.setkey = skcipher_setkey,
++			.encrypt = skcipher_encrypt,
++			.decrypt = skcipher_decrypt,
++			.min_keysize = DES3_EDE_KEY_SIZE,
++			.max_keysize = DES3_EDE_KEY_SIZE,
++			.ivsize = DES3_EDE_BLOCK_SIZE,
++		},
++		.caam.class1_alg_type = OP_ALG_ALGSEL_3DES | OP_ALG_AAI_CBC,
++	},
++	{
++		.skcipher = {
++			.base = {
++				.cra_name = "cbc(des)",
++				.cra_driver_name = "cbc-des-caam-qi2",
++				.cra_blocksize = DES_BLOCK_SIZE,
++			},
++			.setkey = skcipher_setkey,
++			.encrypt = skcipher_encrypt,
++			.decrypt = skcipher_decrypt,
++			.min_keysize = DES_KEY_SIZE,
++			.max_keysize = DES_KEY_SIZE,
++			.ivsize = DES_BLOCK_SIZE,
++		},
++		.caam.class1_alg_type = OP_ALG_ALGSEL_DES | OP_ALG_AAI_CBC,
++	},
++	{
++		.skcipher = {
++			.base = {
++				.cra_name = "ctr(aes)",
++				.cra_driver_name = "ctr-aes-caam-qi2",
++				.cra_blocksize = 1,
++			},
++			.setkey = skcipher_setkey,
++			.encrypt = skcipher_encrypt,
++			.decrypt = skcipher_decrypt,
++			.min_keysize = AES_MIN_KEY_SIZE,
++			.max_keysize = AES_MAX_KEY_SIZE,
++			.ivsize = AES_BLOCK_SIZE,
++			.chunksize = AES_BLOCK_SIZE,
++		},
++		.caam.class1_alg_type = OP_ALG_ALGSEL_AES |
++					OP_ALG_AAI_CTR_MOD128,
++	},
++	{
++		.skcipher = {
++			.base = {
++				.cra_name = "rfc3686(ctr(aes))",
++				.cra_driver_name = "rfc3686-ctr-aes-caam-qi2",
++				.cra_blocksize = 1,
++			},
++			.setkey = skcipher_setkey,
++			.encrypt = skcipher_encrypt,
++			.decrypt = skcipher_decrypt,
++			.min_keysize = AES_MIN_KEY_SIZE +
++				       CTR_RFC3686_NONCE_SIZE,
++			.max_keysize = AES_MAX_KEY_SIZE +
++				       CTR_RFC3686_NONCE_SIZE,
++			.ivsize = CTR_RFC3686_IV_SIZE,
++			.chunksize = AES_BLOCK_SIZE,
++		},
++		.caam = {
++			.class1_alg_type = OP_ALG_ALGSEL_AES |
++					   OP_ALG_AAI_CTR_MOD128,
++			.rfc3686 = true,
++		},
++	},
++	{
++		.skcipher = {
++			.base = {
++				.cra_name = "xts(aes)",
++				.cra_driver_name = "xts-aes-caam-qi2",
++				.cra_blocksize = AES_BLOCK_SIZE,
++			},
++			.setkey = xts_skcipher_setkey,
++			.encrypt = skcipher_encrypt,
++			.decrypt = skcipher_decrypt,
++			.min_keysize = 2 * AES_MIN_KEY_SIZE,
++			.max_keysize = 2 * AES_MAX_KEY_SIZE,
++			.ivsize = AES_BLOCK_SIZE,
++		},
++		.caam.class1_alg_type = OP_ALG_ALGSEL_AES | OP_ALG_AAI_XTS,
++	}
++};
++
+ static struct caam_aead_alg driver_aeads[] = {
+ 	{
+ 		.aead = {
+@@ -2143,6 +2656,19 @@ static struct caam_aead_alg driver_aeads[] = {
+ 	},
+ };
+ 
++static void caam_skcipher_alg_init(struct caam_skcipher_alg *t_alg)
++{
++	struct skcipher_alg *alg = &t_alg->skcipher;
++
++	alg->base.cra_module = THIS_MODULE;
++	alg->base.cra_priority = CAAM_CRA_PRIORITY;
++	alg->base.cra_ctxsize = sizeof(struct caam_ctx);
++	alg->base.cra_flags = CRYPTO_ALG_ASYNC | CRYPTO_ALG_KERN_DRIVER_ONLY;
++
++	alg->init = caam_cra_init_skcipher;
++	alg->exit = caam_cra_exit;
++}
++
+ static void caam_aead_alg_init(struct caam_aead_alg *t_alg)
+ {
+ 	struct aead_alg *alg = &t_alg->aead;
+@@ -2701,6 +3227,35 @@ static int dpaa2_caam_probe(struct fsl_mc_device *dpseci_dev)
+ 	}
+ 
+ 	/* register crypto algorithms the device supports */
++	for (i = 0; i < ARRAY_SIZE(driver_algs); i++) {
++		struct caam_skcipher_alg *t_alg = driver_algs + i;
++		u32 alg_sel = t_alg->caam.class1_alg_type & OP_ALG_ALGSEL_MASK;
++
++		/* Skip DES algorithms if not supported by device */
++		if (!priv->sec_attr.des_acc_num &&
++		    (alg_sel == OP_ALG_ALGSEL_3DES ||
++		     alg_sel == OP_ALG_ALGSEL_DES))
++			continue;
++
++		/* Skip AES algorithms if not supported by device */
++		if (!priv->sec_attr.aes_acc_num &&
++		    alg_sel == OP_ALG_ALGSEL_AES)
++			continue;
++
++		t_alg->caam.dev = dev;
++		caam_skcipher_alg_init(t_alg);
++
++		err = crypto_register_skcipher(&t_alg->skcipher);
++		if (err) {
++			dev_warn(dev, "%s alg registration failed: %d\n",
++				 t_alg->skcipher.base.cra_driver_name, err);
++			continue;
++		}
++
++		t_alg->registered = true;
++		registered = true;
++	}
++
+ 	for (i = 0; i < ARRAY_SIZE(driver_aeads); i++) {
+ 		struct caam_aead_alg *t_alg = driver_aeads + i;
+ 		u32 c1_alg_sel = t_alg->caam.class1_alg_type &
+@@ -2774,6 +3329,13 @@ static int __cold dpaa2_caam_remove(struct fsl_mc_device *ls_dev)
+ 			crypto_unregister_aead(&t_alg->aead);
+ 	}
+ 
++	for (i = 0; i < ARRAY_SIZE(driver_algs); i++) {
++		struct caam_skcipher_alg *t_alg = driver_algs + i;
++
++		if (t_alg->registered)
++			crypto_unregister_skcipher(&t_alg->skcipher);
++	}
++
+ 	dpaa2_dpseci_disable(priv);
+ 	dpaa2_dpseci_dpio_free(priv);
+ 	dpaa2_dpseci_free(priv);
+diff --git a/drivers/crypto/caam/caamalg_qi2.h b/drivers/crypto/caam/caamalg_qi2.h
+index 811d88e10918..71a08330eb09 100644
+--- a/drivers/crypto/caam/caamalg_qi2.h
++++ b/drivers/crypto/caam/caamalg_qi2.h
+@@ -140,6 +140,24 @@ struct aead_edesc {
+ 	struct dpaa2_sg_entry sgt[0];
+ };
+ 
++/*
++ * skcipher_edesc - s/w-extended skcipher descriptor
++ * @src_nents: number of segments in input scatterlist
++ * @dst_nents: number of segments in output scatterlist
++ * @iv_dma: dma address of iv for checking continuity and link table
++ * @qm_sg_bytes: length of dma mapped qm_sg space
++ * @qm_sg_dma: I/O virtual address of h/w link table
++ * @sgt: the h/w link table, followed by IV
++ */
++struct skcipher_edesc {
++	int src_nents;
++	int dst_nents;
++	dma_addr_t iv_dma;
++	int qm_sg_bytes;
++	dma_addr_t qm_sg_dma;
++	struct dpaa2_sg_entry sgt[0];
++};
++
+ /**
+  * caam_flc - Flow Context (FLC)
+  * @flc: Flow Context options
+@@ -167,7 +185,7 @@ enum optype {
+  * @flc_dma: I/O virtual address of Flow Context
+  * @cbk: Callback function to invoke when job is completed
+  * @ctx: arbit context attached with request by the application
+- * @edesc: extended descriptor; points to aead_edesc
++ * @edesc: extended descriptor; points to one of {skcipher,aead}_edesc
+  */
+ struct caam_request {
+ 	struct dpaa2_fl_entry fd_flt[2];
 -- 
 2.16.2
