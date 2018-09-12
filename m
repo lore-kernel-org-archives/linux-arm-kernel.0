@@ -1,71 +1,64 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Wed, 12 Sep 2018 13:03:08 +0100
-Subject: [PATCH v5 02/27] arm64: cpufeature: Use alternatives for VHE
- cpu_enable
-In-Reply-To: <1d425320-aed3-b949-1ec5-f378248aac4d@arm.com>
-References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
- <1535471497-38854-3-git-send-email-julien.thierry@arm.com>
- <1d425320-aed3-b949-1ec5-f378248aac4d@arm.com>
-Message-ID: <85d74cec-2290-9e89-b155-f0f7c523b4a4@arm.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Wed, 12 Sep 2018 14:14:20 +0200
+Subject: [PATCH v12 0/6] Driver for at91 usart in spi mode
+In-Reply-To: <20180912114352.GT4185@dell>
+References: <20180911181838.GI4185@dell> <20180911185839.GA25212@piout.net>
+ <20180911224418.GK4185@dell> <20180911225440.GL4185@dell>
+ <20180912073355.GB2557@piout.net> <20180912084143.GN4185@dell>
+ <CAMuHMdWefU0pw=c9TKOa+wGHchpg8JRfE0OnC4+wKDt-qrbH1A@mail.gmail.com>
+ <20180912105407.GR4185@dell> <20180912111757.GC2760@piout.net>
+ <20180912114352.GT4185@dell>
+Message-ID: <20180912121420.GE2760@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
-
-On 12/09/18 11:28, James Morse wrote:
-> Hi Julien,
+On 12/09/2018 12:43:52+0100, Lee Jones wrote:
+> > > But ... we can't have it both ways.  *Either* it's a true MFD, in
+> > > which case it can/should have 2 separate compatible strings which can
+> > > be specified directly from the DT.  *Or* it's not an MFD.  In the
+> > > latter case, which I think we're all agreeing on (else we'd have 2
+> > > compatible strings), MFD is not the place to handle this (my original
+> > > point).
+> > > 
+> > 
+> > If that is what bothers you, then let's move it out of mfd.
 > 
-> On 28/08/18 16:51, Julien Thierry wrote:
->> The cpu_enable callback for VHE feature requires all alternatives to have
->> been applied. This prevents applying VHE alternative separately from the
->> rest.
->>
->> Use an alternative depending on VHE feature to know whether VHE
->> alternatives have already been applied.
-> 
->> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
->> index 1e433ac..3bc1c8b 100644
->> --- a/arch/arm64/kernel/cpufeature.c
->> +++ b/arch/arm64/kernel/cpufeature.c
->> @@ -1022,8 +1024,15 @@ static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
->>   	 * that, freshly-onlined CPUs will set tpidr_el2, so we don't need to
->>   	 * do anything here.
->>   	 */
->> -	if (!alternatives_applied)
->> -		write_sysreg(read_sysreg(tpidr_el1), tpidr_el2);
->> +	asm volatile(ALTERNATIVE(
->> +		"mrs	%0, tpidr_el1\n"
->> +		"msr	tpidr_el2, %0",
->> +		"nop\n"
->> +		"nop",
->> +		ARM64_HAS_VIRT_HOST_EXTN)
->> +		: "+r" (tmp)
->> +		:
->> +		: "memory");
->>   }
->>   #endif
-> 
-> Catalin's preference was to keep this all in C:
-> https://patchwork.kernel.org/patch/10007977/
-> , for which we need to know if 'the' alternative has been applied.
-> 
-> I suspect there may be more registers in this list if we have to switch to
-> another EL2 register using alternatives. (but I don't have an example).
-> 
-> Could we make 'alternatives_applied' a macro that takes the cap as an argument?
+> As I've already mentioned.  I don't just want it moved out of MFD and
+> shoved somewhere else.  My aim is to fix this properly.
 > 
 
-I wanted to do this initially, the issue was that the alternatives 
-framework works on regions to patch rather than caps to apply. So I 
-found it a bit odd to associate the "code corresponding to cap was 
-applied" with the alternative application.
+If it is out of MFD, then I'm not sure why you would care too much about
+it as you won't be maintaining that code. And I still this what was done
+was correct but I'm open to test what you suggest.
 
-Although in patch 3 with the feature mask I guess that at the end of the 
-__apply_alternatives loop, if the cap was part of the mask passed, it 
-can be considered as applied.
-If the asm inline is problematic I can go that route.
+> > > So ... this is a USART device which can do SPI, right?
+> > > 
+> > > My current thinking is that; as this is a USART device first &
+> > > foremost, the USART should be probed in the first instance regardless,
+> > > then if SPI mode is specified it (the USART driver) registers the SPI
+> > > platform driver (as MFD does currently) and exits gracefully, allowing
+> > > the SPI driver to take over.
+> > > 
+> > > Spanner in the works: is it physically possible to change the mode at
+> > > run-time?  :s
+> > 
+> > Yes it is possible but on Linux that will not happen without probing
+> > the drivers again.
+> 
+> Not sure I understand what you mean.
+> 
 
-Thanks,
+I was just commenting on changing the mode at runtime.
+
+> I'm suggesting that you use the same platform_* interfaces MFD uses to
+> register the SPI driver if SPI mode has been selected.  Only do so
+> from the appropriate driver i.e. USART.
+> 
+
+Yeah, I understood that but I didn't comment because I'm not sure this
+will work yet.
 
 -- 
-Julien Thierry
+Alexandre Belloni, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
