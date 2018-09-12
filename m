@@ -1,67 +1,43 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 12 Sep 2018 09:36:40 +0100
+Date: Wed, 12 Sep 2018 09:41:43 +0100
 Subject: [PATCH v12 0/6] Driver for at91 usart in spi mode
-In-Reply-To: <20180912073056.GA2557@piout.net>
-References: <20180904111310.4049-1-radu_nicolae.pirea@upb.ro>
- <20180911093356.GE4185@dell> <20180911093917.GL2494@piout.net>
+In-Reply-To: <20180912073355.GB2557@piout.net>
+References: <20180911093356.GE4185@dell> <20180911093917.GL2494@piout.net>
  <CAMuHMdXH8gNjKGOHGFc+K03U2zsVCSN7G_Q4wtepQr859nRQKg@mail.gmail.com>
  <20180911153621.GP2494@piout.net>
  <CAMuHMdV+=EgAYogwNHbY=RExkGox_+YSeHV6pJtQb6g6PzD-CQ@mail.gmail.com>
- <20180911181838.GI4185@dell>
- <CAMuHMdUMt=HJGCDZvJF99=45mecn5AjnTr-tA_LioxWrNKM2ag@mail.gmail.com>
- <20180911224302.GJ4185@dell> <20180912073056.GA2557@piout.net>
-Message-ID: <20180912083640.GM4185@dell>
+ <20180911181838.GI4185@dell> <20180911185839.GA25212@piout.net>
+ <20180911224418.GK4185@dell> <20180911225440.GL4185@dell>
+ <20180912073355.GB2557@piout.net>
+Message-ID: <20180912084143.GN4185@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, 12 Sep 2018, Alexandre Belloni wrote:
 
-> On 11/09/2018 23:43:02+0100, Lee Jones wrote:
-> > > I haven't read it, but I believe it's not unlike Renesas SCIF, which is
-> > > served by both drivers/tty/serial/sh-sci.c and drivers/spi/spi-sh-sci.c.
-> > > But the latter is not used from DT, so we haven't experienced (and solved)
-> > > the similar issue yet.
-> > > 
-> > > Would it work if the UART driver and SPI driver would match against the
-> > > same compatible value, but the UART driver would do in its probe()
-> > > function:
-> > > 
-> > >     device_property_read_u32(&pdev->dev, "atmel,usart-mode", &opmode);
-> > >     if (opmode != AT91_USART_MODE_SERIAL)
-> > >         return ENODEV;
-> > > 
-> > > while the SPI driver would do:
-> > > 
-> > >     device_property_read_u32(&pdev->dev, "atmel,usart-mode", &opmode);
-> > >     if (opmode != AT91_USART_MODE_SPI)
-> > >         return ENODEV;
-> > > 
-> > > ? No MFD driver involved.
+> On 11/09/2018 23:54:40+0100, Lee Jones wrote:
+> > > > http://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-6438-32-bit-ARM926-Embedded-Microprocessor-SAM9G45_Datasheet.pdf
+> > > > 
+> > > > USART doc starting p572, registers p621.
 > > 
-> > I haven't looked at the code in a while, but if memory serves I
-> > believe platform code gives up once it has found its first match, so
-> > by doing this, one of the drivers will never be matched/probed.
-> > 
-> > It's midnight here, so cracking out the datasheet isn't going to
-> > happen just now, but it's my current belief that if the IP serves 2
-> > very different modes of operation, even if the registers are in a
-> > shared space, they could have their own compatible strings in DT.
-> > 
-> > That is what the MFD driver provides after all.  Why would it be okay
-> > to allocate different compatible strings from the MFD, but not in the
-> > Device Tree?
-> > 
-> > It would be the easiest solution.
-> > 
-> > Has Rob commented on this yet?
+> > After looking at the datasheet, I don't see any reason why one of the
+> > two drivers can't be selected using different compatible strings.
 > 
-> V4 of the bindings were acked by Rob and you:
-> https://patchwork.kernel.org/patch/10428087/
+> Because there is only one IP and we don't use the device tree to selecet
+> linux specific drivers.
 
-We didn't Ack the bindings.  We Acked the location change.
+We do it all the time.  There are loads of MFDs (def: same IP, with
+different functions) which have separate compatibles for their various
+functions.  If you wish this IP to operate as an SPI controller, it
+should have an SPI compatible, if you wish it to operate as a U(S)ART,
+then it should have a UART compatible.  It's what we do for most of
+the other MFDs in the kernel.
 
-I mean, has Rob specifically spoken out about using a compatible
-string for each function.
+> If you are not happy having that in MFD, I guess we can move it out
+> somewhere else.
+
+My issue isn't pertaining to where the hack lives, it's that there is
+a hack in the first place.
 
 -- 
 Lee Jones [???]
