@@ -1,37 +1,126 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Wed, 12 Sep 2018 12:40:19 +0200
-Subject: [PATCH] ARM: dts: at91: sama5d4: add labels to soc dtsi for
- derivative boards
-In-Reply-To: <1536327489-22005-1-git-send-email-eugen.hristev@microchip.com>
-References: <1536327489-22005-1-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <20180912104019.GB2760@piout.net>
+From: leo.yan@linaro.org (leo.yan at linaro.org)
+Date: Wed, 12 Sep 2018 18:47:35 +0800
+Subject: [PATCH 02/11] dts: hisilicon: Update coresight bindings for
+ hardware ports
+In-Reply-To: <1536661032-30481-3-git-send-email-suzuki.poulose@arm.com>
+References: <1536661032-30481-1-git-send-email-suzuki.poulose@arm.com>
+ <1536661032-30481-3-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180912104735.GC3353@leoy-ThinkPad-X240s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/2018 16:38:09+0300, Eugen Hristev wrote:
-> This adds labels to commonly used device-tree nodes so that derivative
-> boards can avoid ahb/apb hierarchy.
-> 
-> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
-> ---
-> 
-> Hello,
-> 
-> This was already done for SoC sama5d3 and sam9x5, in commit:
-> "fc37204432d" ("ARM: dts: at91: add labels to soc dtsi for derivative boards")
-> 
-> This commit will do basically the same thing for sama5d4 SoC.
-> 
-> Based on top of at91-next branch of at91.git
-> 
-> Thanks.
-> 
->  arch/arm/boot/dts/sama5d4.dtsi | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-Applied, thanks.
+On Tue, Sep 11, 2018 at 11:17:03AM +0100, Suzuki K Poulose wrote:
+> Switch to updated coresight bindings for hw ports.
 
--- 
-Alexandre Belloni, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+As Shawn suggested, please change subject as "arm64: dts: hi6220:
+...."
+
+> Cc: xuwei5 at hisilicon.com
+> Cc: lipengcheng8 at huawei.com
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  .../arm64/boot/dts/hisilicon/hi6220-coresight.dtsi | 147 ++++++++++++---------
+>  1 file changed, 85 insertions(+), 62 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-coresight.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220-coresight.dtsi
+> index 7afee5d..2202816 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi6220-coresight.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hi6220-coresight.dtsi
+
+[...]
+
+> @@ -302,10 +315,12 @@
+>  
+>  			cpu = <&cpu3>;
+>  
+> -			port {
+> -				etm3_out: endpoint {
+> -					remote-endpoint =
+> -						<&acpu_funnel_in3>;
+> +			out-ports {
+> +				port {
+> +					etm3_out: endpoint {
+> +						remote-endpoint =
+> +							<&acpu_funnel_in3>;
+> +					};
+>  				};
+>  			};
+>  		};
+> @@ -319,10 +334,12 @@
+>  
+>  			cpu = <&cpu4>;
+>  
+> -			port {
+> +			out-ports {
+> +				port {
+>  				etm4_out: endpoint {
+
+Indent?
+
+After applied this patch and tested on Hikey board; FWIW:
+
+Tested-by: Leo Yan <leo.yan@linaro.org>
+
+> -					remote-endpoint =
+> -						<&acpu_funnel_in4>;
+> +						remote-endpoint =
+> +							<&acpu_funnel_in4>;
+> +					};
+>  				};
+>  			};
+>  		};
+> @@ -336,10 +353,12 @@
+>  
+>  			cpu = <&cpu5>;
+>  
+> -			port {
+> -				etm5_out: endpoint {
+> -					remote-endpoint =
+> -						<&acpu_funnel_in5>;
+> +			out-ports {
+> +				port {
+> +					etm5_out: endpoint {
+> +						remote-endpoint =
+> +							<&acpu_funnel_in5>;
+> +					};
+>  				};
+>  			};
+>  		};
+> @@ -353,10 +372,12 @@
+>  
+>  			cpu = <&cpu6>;
+>  
+> -			port {
+> -				etm6_out: endpoint {
+> -					remote-endpoint =
+> -						<&acpu_funnel_in6>;
+> +			out-ports {
+> +				port {
+> +					etm6_out: endpoint {
+> +						remote-endpoint =
+> +							<&acpu_funnel_in6>;
+> +					};
+>  				};
+>  			};
+>  		};
+> @@ -370,10 +391,12 @@
+>  
+>  			cpu = <&cpu7>;
+>  
+> -			port {
+> -				etm7_out: endpoint {
+> -					remote-endpoint =
+> -						<&acpu_funnel_in7>;
+> +			out-ports {
+> +				port {
+> +					etm7_out: endpoint {
+> +						remote-endpoint =
+> +							<&acpu_funnel_in7>;
+> +					};
+>  				};
+>  			};
+>  		};
+> -- 
+> 2.7.4
+> 
