@@ -1,65 +1,37 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 12 Sep 2018 16:24:12 +0100
-Subject: [PATCH v2 1/3] iommu: Add fast hook for getting DMA domains
-In-Reply-To: <cover.1536764440.git.robin.murphy@arm.com>
-References: <cover.1536764440.git.robin.murphy@arm.com>
-Message-ID: <0bf530fe4ae907facbb83080b07e06aeb9f6273f.1536764440.git.robin.murphy@arm.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 12 Sep 2018 17:27:02 +0200
+Subject: [PATCH] soc: imx: gpc: set DMA mask for PD platform devices
+Message-ID: <20180912152702.14640-1-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While iommu_get_domain_for_dev() is the robust way for arbitrary IOMMU
-API callers to retrieve the domain pointer, for DMA ops domains it
-doesn't scale well for large systems and multi-queue devices, since the
-momentary refcount adjustment will lead to exclusive cacheline contention
-when multiple CPUs are operating in parallel on different mappings for
-the same device.
+The PD platform devices aren't DMA capable (as is correctly reflected
+in with a zero mask coherent_dma_mask). As they have a of_node attached
+they will go through of_dma_configure, which will warn if it finds an
+uninitialized DMA mask. Let the driver core know that this isn't a
+missing configuration, but a non DMA capable device by pointing the
+dma_mask to the coherent_dma_mask.
 
-In the case of DMA ops domains, however, this refcounting is actually
-unnecessary, since they already imply that the group exists and is
-managed by platform code and IOMMU internals (by virtue of
-iommu_group_get_for_dev()) such that a reference will already be held
-for the lifetime of the device. Thus we can avoid the bottleneck by
-providing a fast lookup specifically for the DMA code to retrieve the
-default domain it already knows it has set up - a simple read-only
-dereference plays much nicer with cache-coherency protocols.
-
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- drivers/iommu/iommu.c | 9 +++++++++
- include/linux/iommu.h | 1 +
- 2 files changed, 10 insertions(+)
+Since the warning that is triggered with the incomplete configuration
+has been introduced in the v4.19 cycle, it would nice to get this in
+as a fix.
+---
+ drivers/soc/imx/gpc.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index 8c15c5980299..9d70344204fe 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -1415,6 +1415,15 @@ struct iommu_domain *iommu_get_domain_for_dev(struct device *dev)
- }
- EXPORT_SYMBOL_GPL(iommu_get_domain_for_dev);
+diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
+index f301fcd96c07..a897c851f305 100644
+--- a/drivers/soc/imx/gpc.c
++++ b/drivers/soc/imx/gpc.c
+@@ -493,6 +493,7 @@ static int imx_gpc_probe(struct platform_device *pdev)
  
-+/*
-+ * For IOMMU_DOMAIN_DMA implementations which already provide their own
-+ * guarantees that the group and its default domain are valid and correct.
-+ */
-+struct iommu_domain *iommu_get_dma_domain(struct device *dev)
-+{
-+	return dev->iommu_group->default_domain;
-+}
-+
- /*
-  * IOMMU groups are really the natrual working unit of the IOMMU, but
-  * the IOMMU API works on domains and devices.  Bridge that gap by
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index 87994c265bf5..c783648d4060 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -293,6 +293,7 @@ extern int iommu_attach_device(struct iommu_domain *domain,
- extern void iommu_detach_device(struct iommu_domain *domain,
- 				struct device *dev);
- extern struct iommu_domain *iommu_get_domain_for_dev(struct device *dev);
-+extern struct iommu_domain *iommu_get_dma_domain(struct device *dev);
- extern int iommu_map(struct iommu_domain *domain, unsigned long iova,
- 		     phys_addr_t paddr, size_t size, int prot);
- extern size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova,
+ 			pd_pdev->dev.parent = &pdev->dev;
+ 			pd_pdev->dev.of_node = np;
++			pd_pdev->dev.dma_mask = &pd_pdev->dev.coherent_dma_mask;
+ 
+ 			ret = platform_device_add(pd_pdev);
+ 			if (ret) {
 -- 
-2.19.0.dirty
+2.18.0
