@@ -1,45 +1,34 @@
 From: horia.geanta@nxp.com (=?UTF-8?q?Horia=20Geant=C4=83?=)
-Date: Wed, 12 Sep 2018 11:59:29 +0300
-Subject: [PATCH v2 04/12] soc: fsl: dpio: add congestion notification support
+Date: Wed, 12 Sep 2018 11:59:37 +0300
+Subject: [PATCH v2 12/12] arm64: defconfig: enable CAAM crypto engine on QorIQ
+ DPAA2 SoCs
 In-Reply-To: <20180912085937.22489-1-horia.geanta@nxp.com>
 References: <20180912085937.22489-1-horia.geanta@nxp.com>
-Message-ID: <20180912085937.22489-5-horia.geanta@nxp.com>
+Message-ID: <20180912085937.22489-13-horia.geanta@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for Congestion State Change Notifications (CSCN), which
-allow DPIO users to be notified when a congestion group changes its
-state (due to hitting the entrance / exit threshold).
+Enable CAAM (Cryptographic Accelerator and Assurance Module) driver
+for QorIQ Data Path Acceleration Architecture (DPAA) v2.
+It handles DPSECI (Data Path SEC Interface) DPAA2 objects that sit
+on the Management Complex (MC) fsl-mc bus.
 
-Acked-by: Li Yang <leoyang.li@nxp.com>
 Signed-off-by: Horia Geant? <horia.geanta@nxp.com>
 ---
- include/soc/fsl/dpaa2-global.h | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/include/soc/fsl/dpaa2-global.h b/include/soc/fsl/dpaa2-global.h
-index 9bc0713346a8..2bfc379d3dc9 100644
---- a/include/soc/fsl/dpaa2-global.h
-+++ b/include/soc/fsl/dpaa2-global.h
-@@ -174,4 +174,19 @@ static inline const struct dpaa2_fd *dpaa2_dq_fd(const struct dpaa2_dq *dq)
- 	return (const struct dpaa2_fd *)&dq->dq.fd[0];
- }
- 
-+#define DPAA2_CSCN_SIZE		sizeof(struct dpaa2_dq)
-+#define DPAA2_CSCN_ALIGN	16
-+#define DPAA2_CSCN_STATE_CG	BIT(0)
-+
-+/**
-+ * dpaa2_cscn_state_congested() - Check congestion state
-+ * @cscn: congestion SCN (delivered to WQ or memory)
-+ *
-+i * Return true is congested.
-+ */
-+static inline bool dpaa2_cscn_state_congested(struct dpaa2_dq *cscn)
-+{
-+	return !!(cscn->scn.state & DPAA2_CSCN_STATE_CG);
-+}
-+
- #endif /* __FSL_DPAA2_GLOBAL_H */
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 6815db53674e..3d165b4cdd2a 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -698,6 +698,7 @@ CONFIG_MEMTEST=y
+ CONFIG_SECURITY=y
+ CONFIG_CRYPTO_ECHAINIV=y
+ CONFIG_CRYPTO_ANSI_CPRNG=y
++CONFIG_CRYPTO_DEV_FSL_DPAA2_CAAM=y
+ CONFIG_ARM64_CRYPTO=y
+ CONFIG_CRYPTO_SHA1_ARM64_CE=y
+ CONFIG_CRYPTO_SHA2_ARM64_CE=y
 -- 
 2.16.2
