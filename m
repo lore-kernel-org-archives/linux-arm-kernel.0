@@ -1,62 +1,145 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 12 Sep 2018 17:45:51 +0100
-Subject: [PATCH] media: s5p-mfc: Fix memdev DMA configuration
-Message-ID: <d485dc3698304403620d5ed92d066942a6b68cfd.1536770587.git.robin.murphy@arm.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Wed, 12 Sep 2018 17:49:09 +0100
+Subject: [PATCH v5 03/27] arm64: alternative: Apply alternatives early in
+ boot process
+In-Reply-To: <3becf020-b230-beb8-b304-d8097377f234@arm.com>
+References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
+ <1535471497-38854-4-git-send-email-julien.thierry@arm.com>
+ <3becf020-b230-beb8-b304-d8097377f234@arm.com>
+Message-ID: <78781d82-e5c4-c590-6c0c-e7d2db456bf9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Having of_reserved_mem_device_init() forcibly reconfigure DMA for all
-callers, potentially overriding the work done by a bus-specific
-.dma_configure method earlier, is at best a bad idea and at worst
-actively harmful. If drivers really need virtual devices to own
-dma-coherent memory, they should explicitly configure those devices
-based on the appropriate firmware node as they create them.
+Hi James,
 
-It looks like the only driver not passing in a proper OF platform device
-is s5p-mfc, so move the rogue of_dma_configure() call into that driver
-where it logically belongs.
+On 12/09/18 11:29, James Morse wrote:
+> Hi Julien,
+> 
+> On 28/08/18 16:51, Julien Thierry wrote:
+>> From: Daniel Thompson <daniel.thompson@linaro.org>
+>>
+>> Currently alternatives are applied very late in the boot process (and
+>> a long time after we enable scheduling). Some alternative sequences,
+>> such as those that alter the way CPU context is stored, must be applied
+>> much earlier in the boot sequence.
+>>
+>> Introduce apply_boot_alternatives() to allow some alternatives to be
+>> applied immediately after we detect the CPU features of the boot CPU.
+> 
+> 
+>> diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
+>> index b5d6039..70c2604 100644
+>> --- a/arch/arm64/kernel/alternative.c
+>> +++ b/arch/arm64/kernel/alternative.c
+>> @@ -145,7 +145,8 @@ static void clean_dcache_range_nopatch(u64 start, u64 end)
+>>   	} while (cur += d_size, cur < end);
+>>   }
+>>   
+>> -static void __apply_alternatives(void *alt_region, bool is_module)
+>> +static void __apply_alternatives(void *alt_region,  bool is_module,
+>> +				 unsigned long feature_mask)
+> 
+> Shouldn't feature_mask be a DECLARE_BITMAP() maybe-array like cpu_hwcaps?
+> This means it keeps working when NR_CAPS grows over 64, which might happen
+> sooner than we think for backported errata...
+> 
+> 
+>> @@ -155,6 +156,9 @@ static void __apply_alternatives(void *alt_region, bool is_module)
+>>   	for (alt = region->begin; alt < region->end; alt++) {
+>>   		int nr_inst;
+>>   
+>> +		if ((BIT(alt->cpufeature) & feature_mask) == 0)
+>> +			continue;
+>> +
+>>   		/* Use ARM64_CB_PATCH as an unconditional patch */
+>>   		if (alt->cpufeature < ARM64_CB_PATCH &&
+>>   		    !cpus_have_cap(alt->cpufeature))
+>> @@ -213,7 +217,7 @@ static int __apply_alternatives_multi_stop(void *unused)
+>>   		isb();
+>>   	} else {
+>>   		BUG_ON(alternatives_applied);
+>> -		__apply_alternatives(&region, false);
+>> +		__apply_alternatives(&region, false, ~boot_capabilities);
+> 
+> Ah, this is tricky. There is a bitmap_complement() for the DECLARE_BITMAP()
+> stuff, but we'd need a second array...
+> 
+> We could pass the scope around, but then __apply_alternatives() would need to
+> lookup the struct arm64_cpu_capabilities up every time. This is only a problem
+> as we have one cap-number-space for errata/features, but separate sparse lists.
+> 
 
-CC: Smitha T Murthy <smitha.t@samsung.com>
-CC: Marek Szyprowski <m.szyprowski@samsung.com>
-CC: Rob Herring <robh@kernel.org>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/media/platform/s5p-mfc/s5p_mfc.c | 7 +++++++
- drivers/of/of_reserved_mem.c             | 4 ----
- 2 files changed, 7 insertions(+), 4 deletions(-)
+Since for each alternative we know the cpufeature associated with it, 
+the "lookup" is really just accessing an array with the given index, so 
+that could be an option.
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-index 927a1235408d..77eb4a4511c1 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-@@ -1094,6 +1094,13 @@ static struct device *s5p_mfc_alloc_memdev(struct device *dev,
- 	child->dma_mask = dev->dma_mask;
- 	child->release = s5p_mfc_memdev_release;
- 
-+	/*
-+	 * The memdevs are not proper OF platform devices, so in order for them
-+	 * to be treated as valid DMA masters we need a bit of a hack to force
-+	 * them to inherit the MFC node's DMA configuration.
-+	 */
-+	of_dma_configure(child, dev->of_node, true);
-+
- 	if (device_add(child) == 0) {
- 		ret = of_reserved_mem_device_init_by_idx(child, dev->of_node,
- 							 idx);
-diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
-index 895c83e0c7b6..4ef6f4485335 100644
---- a/drivers/of/of_reserved_mem.c
-+++ b/drivers/of/of_reserved_mem.c
-@@ -350,10 +350,6 @@ int of_reserved_mem_device_init_by_idx(struct device *dev,
- 		mutex_lock(&of_rmem_assigned_device_mutex);
- 		list_add(&rd->list, &of_rmem_assigned_device_list);
- 		mutex_unlock(&of_rmem_assigned_device_mutex);
--		/* ensure that dma_ops is set for virtual devices
--		 * using reserved memory
--		 */
--		of_dma_configure(dev, np, true);
- 
- 		dev_info(dev, "assigned reserved memory node %s\n", rmem->name);
- 	} else {
+> (I think applying the alternatives one cap at a time is a bad idea as we would
+> need to walk the alternative region NR_CAPS times)
+> 
+> 
+>> @@ -227,6 +231,24 @@ void __init apply_alternatives_all(void)
+>>   	stop_machine(__apply_alternatives_multi_stop, NULL, cpu_online_mask);
+>>   }
+>>   
+>> +/*
+>> + * This is called very early in the boot process (directly after we run
+>> + * a feature detect on the boot CPU). No need to worry about other CPUs
+>> + * here.
+>> + */
+>> +void __init apply_boot_alternatives(void)
+>> +{
+>> +	struct alt_region region = {
+>> +		.begin	= (struct alt_instr *)__alt_instructions,
+>> +		.end	= (struct alt_instr *)__alt_instructions_end,
+>> +	};
+>> +
+>> +	/* If called on non-boot cpu things could go wrong */
+>> +	WARN_ON(smp_processor_id() != 0);
+> 
+> Isn't the problem if there are multiple CPUs online?
+> 
+
+Yes, that makes more sense. I'll change this.
+
+> 
+>> +	__apply_alternatives(&region, false, boot_capabilities);
+>> +}
+>> +
+>>   #ifdef CONFIG_MODULES
+>>   void apply_alternatives_module(void *start, size_t length)
+>>   {
+> 
+>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+>> index 3bc1c8b..0d1e41e 100644
+>> --- a/arch/arm64/kernel/cpufeature.c
+>> +++ b/arch/arm64/kernel/cpufeature.c
+>> @@ -52,6 +52,8 @@
+>>   DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+>>   EXPORT_SYMBOL(cpu_hwcaps);
+>>   
+>> +unsigned long boot_capabilities;
+>> +
+>>   /*
+>>    * Flag to indicate if we have computed the system wide
+>>    * capabilities based on the boot time active CPUs. This
+>> @@ -1375,6 +1377,9 @@ static void __update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+>>   		if (!cpus_have_cap(caps->capability) && caps->desc)
+>>   			pr_info("%s %s\n", info, caps->desc);
+>>   		cpus_set_cap(caps->capability);
+> 
+> Hmm, the bitmap behind cpus_set_cap() is what cpus_have_cap() in
+> __apply_alternatives() looks at. If you had a call to __apply_alternatives after
+> update_cpu_capabilities(SCOPE_BOOT_CPU), but before any others, it would only
+> apply those alternatives...
+> 
+> (I don't think there is a problem re-applying the same alternative, but I
+> haven't checked).
+> 
+
+Interesting idea. If someone can confirm that patching alternatives 
+twice is safe, I think it would make things simpler.
+
+Thanks,
+
 -- 
-2.19.0.dirty
+Julien Thierry
