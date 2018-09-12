@@ -1,115 +1,128 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 12 Sep 2018 16:31:15 +0900
-Subject: [PATCH v2 2/2] dmaengine: uniphier-mdmac: add UniPhier MIO DMAC
- driver
-In-Reply-To: <20180912072657.GF2766@vkoul-mobl>
-References: <1535074873-15617-1-git-send-email-yamada.masahiro@socionext.com>
- <1535074873-15617-3-git-send-email-yamada.masahiro@socionext.com>
- <20180911070003.GI2634@vkoul-mobl>
- <CAK7LNASMhKfQT-Hqv48=HqOPRx3OVMtdNBEe=c7dE-B_5_Nuyw@mail.gmail.com>
- <20180912043530.GE2766@vkoul-mobl>
- <CAK7LNASFyxMTE_kVzja=bUvbDbT6Moz-nZn3=yBKdTWXEQdjXA@mail.gmail.com>
- <20180912072657.GF2766@vkoul-mobl>
-Message-ID: <CAK7LNATSNQBbxQHkbo2zG1G44=urpC_cutu_D126QfDpMg5TNA@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 12 Sep 2018 09:32:49 +0200
+Subject: [GIT PULL] arm64: zynqmp: Xilinx SoC changes for v4.20
+In-Reply-To: <CAOesGMhmxhkJO_=czVxB3-k+XbV_qeSEKB5nuvKmO9ETbMYQpQ@mail.gmail.com>
+References: <5e9c248d-c19c-1881-f406-d7bfd38ec479@xilinx.com>
+ <CAOesGMjh-Chhncw3cYaCvFpfhtOSz8hprC0xARmVXe8i4mvxHw@mail.gmail.com>
+ <b0df50fb-3889-a3dd-c92f-7877e287f5be@xilinx.com>
+ <CAOesGMhmxhkJO_=czVxB3-k+XbV_qeSEKB5nuvKmO9ETbMYQpQ@mail.gmail.com>
+Message-ID: <290ad8e1-9111-3350-f3e8-d6aa71d2f6df@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-09-12 16:26 GMT+09:00 Vinod <vkoul@kernel.org>:
-> On 12-09-18, 14:25, Masahiro Yamada wrote:
->> 2018-09-12 13:35 GMT+09:00 Vinod <vkoul@kernel.org>:
->> > On 12-09-18, 12:01, Masahiro Yamada wrote:
->> >> Hi Vinod,
->> >>
->> >>
->> >> 2018-09-11 16:00 GMT+09:00 Vinod <vkoul@kernel.org>:
->> >> > On 24-08-18, 10:41, Masahiro Yamada wrote:
->> >> >
->> >> >> +/* mc->vc.lock must be held by caller */
->> >> >> +static u32 __uniphier_mdmac_get_residue(struct uniphier_mdmac_desc *md)
->> >> >> +{
->> >> >> +     u32 residue = 0;
->> >> >> +     int i;
->> >> >> +
->> >> >> +     for (i = md->sg_cur; i < md->sg_len; i++)
->> >> >> +             residue += sg_dma_len(&md->sgl[i]);
->> >> >
->> >> > so if the descriptor is submitted to hardware, we return the descriptor
->> >> > length, which is not correct.
->> >> >
->> >> > Two cases are required to be handled:
->> >> > 1. Descriptor is in queue (IMO above logic is fine for that, but it can
->> >> > be calculated at descriptor submit and looked up here)
->> >>
->> >> Where do you want it to be calculated?
->> >
->> > where is it calculated now?
+On 11.9.2018 17:32, Olof Johansson wrote:
+> On Mon, Sep 10, 2018 at 5:20 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+>> On 9.9.2018 03:21, Olof Johansson wrote:
+>>> Hi Michal,
+>>>
+>>> On Fri, Sep 7, 2018 at 12:57 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+>>>> Hi,
+>>>>
+>>>> please pull the following firmware interface to your tree.
+>>>>
+>>>> Thanks,
+>>>> Michal
+>>>>
+>>>>
+>>>> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+>>>>
+>>>>   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+>>>>
+>>>> are available in the git repository at:
+>>>>
+>>>>   https://github.com/Xilinx/linux-xlnx.git tags/zynqmp-soc-for-v4.20
+>>>>
+>>>> for you to fetch changes up to bca7067d2d4e91f58162b07d73cd94e20437b4f6:
+>>>>
+>>>>   firmware: xilinx: Add debugfs for query data API (2018-09-07 09:44:44
+>>>> +0200)
+>>>>
+>>>> ----------------------------------------------------------------
+>>>> arm64: zynqmp: SoC changes for v4.20
+>>>>
+>>>> - Adding firmware API for SoC with debugfs interface
+>>>
+>>> This is a bit terse. Jolly has been good at writing cover letters, you
+>>> could have stolen the writeup from there. :)
 >>
->>
->> Please see __uniphier_mdmac_handle().
->>
->>
->> It gets the address and size by sg_dma_address(), sg_dma_len()
->> just before setting them to the hardware registers.
->>
->>
->>        sg = &md->sgl[md->sg_cur];
->>
->>        if (md->dir == DMA_MEM_TO_DEV) {
->>                src_mode = UNIPHIER_MDMAC_CH_MODE__ADDR_INC;
->>                src_addr = sg_dma_address(sg);
->>                dest_mode = UNIPHIER_MDMAC_CH_MODE__ADDR_FIXED;
->>                dest_addr = 0;
->>        } else {
->>                src_mode = UNIPHIER_MDMAC_CH_MODE__ADDR_FIXED;
->>                src_addr = 0;
->>                dest_mode = UNIPHIER_MDMAC_CH_MODE__ADDR_INC;
->>                dest_addr = sg_dma_address(sg);
->>        }
->>
->>
->>
->>
->>
->>
->>
->> >> This hardware provides only simple registers (address and size)
->> >> for one-shot transfer instead of descriptors.
->> >>
->> >> So, I used sgl as-is because I did not see a good reason
->> >> to transform sgl to another data structure.
->> >
->> >
->> >> > this seems missing stuff. Where do you do register calculation for the
->> >> > descriptor and where is slave_config here, how do you know where to
->> >> > send/receive data form/to (peripheral)
->> >>
->> >>
->> >> This dmac is really simple, and un-flexible.
->> >>
->> >> The peripheral address to send/receive data from/to is hard-weird.
->> >> cfg->{src_addr,dst_addr} is not configurable.
->> >>
->> >> Look at __uniphier_mdmac_handle().
->> >> 'dest_addr' and 'src_addr' must be set to 0 for the peripheral.
->> >
->> > Fair enough, what about other values like addr_width and maxburst?
->>
->>
->> None of them is configurable.
->
-> what is configurable here :-)
+>> Isn't it one line which is ending up in summary log?
+> 
+> If you do a 'git shortlog' you get the subject of your tag (arm64:
+> zynqmp: SoC changes for v4.20), but if someone looks at the git logs,
+> the merge commit will normally just have the tag description it in.
+> 
+> It's quite useful to capture some of the cover letter-type material
+> from the patch series in there. For example, the URL to the spec could
+> be a good thing to have either in there, or in one of the patch
+> descriptions.
+> 
+> Just as with patches, it's useful to provide a brief writeup of what a
+> series does and why it should be merged.
 
-The physical address of the memory, transfer size, direction
-are configurable, of course.
-But, they are out of scope of device_config hook.
+Ok. I will it in my mind.
 
 
-> Who are the users of this DMA?
+>>> I posted two comments on the patches -- one is a nit that can be
+>>> followed up on with an incremental patch.
+>>>
+>>> I'm more worried about the ioctl interface though, and what it opens
+>>> up. Maybe it's been discussed in the time the set has been reviewed, I
+>>> didn't search extensively for the history. If it had been, bringing
+>>> explanations into the patch description would have been nice for new
+>>> readers such as myself. And if it hasn't, well, let's talk about it.
+>>
+>> Anyway here is the full spec.
+>> https://www.xilinx.com/support/documentation/user_guides/ug1200-eemi-api.pdf
+>>
+>> I don't know all the details that's why please (Jolly) correct me if I
+>> am wrong.
+>> PMUFW which is microblaze running firmware was providing read/write
+>> interface which was checking ranges for accesses. One of that
+>> functionality was for example clock/pin muxing and others. This was done
+>> before any SCMI spec was created because Xilinx needs to deal with
+>> problems how to handle these interfaces.
+>> At that time non secure OS(linux) was owner of all these subsystems.
+>> Over the time it was clear that non secure SW shouldn't have such a big
+>> control over SoC because on this heterogeneous chip it is not covering
+>> all possible use cases.
+>> Based on this new EEMI spec was created to move a lot of functionality
+>> from non secure sw with also improve security of the system. IIRC at
+>> that time SCMI wasn't released that's why we were lacking any standard
+>> interface which we could use directly.
+>>
+>> We are also communicating with Arm about SCMI extension but still there
+>> are missing gaps which are not addressed and it will take a lot of time
+>> to have everything there.
+> 
+> ... and there will be platforms out there that, even when the SCMI
+> spec settles won't have that implemented in their firmware. So, I have
+> no objections to the patch set as a whole beyond the ioctl portions.
+> 
+>> I can copy here Jolly's description but these patches are adding
+>> communication layer/interface which provide API for clock, reset, pin
+>> control, secure, serdes, fpga and chip detection to communicate with
+>> PMUFW via ATF by using SMC instructions and then communication interface
+>> setup between A53 and Microblaze.
+>>
+>> Arm trusted firmware already contains this interface
+>> https://github.com/ARM-software/arm-trusted-firmware/tree/master/plat/xilinx/zynqmp/pm_service
+>>
+>> The v11 contained 11 patches and I have taken first 8 because clock part
+>> is not reviewed by Stephen yet.
+>> Other drivers (fpga, phy/serdes, reset) are sent as RFCs but needs this
+>> firmware interface to have basic stuff up and running before extension.
+>>
+>>>
+>>> Not merging based on the above. Hopefully it's something we can
+>>> straighten out pretty quickly.
+>>
+>> Please ask more question if something is unclear and I believe that
+>> Jolly is happy to answer them as quickly as possible.
+> 
+> Yep, it makes sense to continue the discussion on the other threads
+> where Jolly responded. Thanks!
 
-SD/eMMC controllers.
+Wonderful.
 
-
-
--- 
-Best Regards
-Masahiro Yamada
+Thanks,
+Michal
