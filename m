@@ -1,120 +1,106 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Wed, 12 Sep 2018 13:21:57 +0200
-Subject: [RFC PATCH] KVM: arm64: Treat FPEXC32_EL2 as a regular guest
- system register
-In-Reply-To: <20180912111624.GF17801@e103592.cambridge.arm.com>
-References: <1536153553-28767-1-git-send-email-Dave.Martin@arm.com>
- <20180912101704.GA23874@e113682-lin.lund.arm.com>
- <20180912111624.GF17801@e103592.cambridge.arm.com>
-Message-ID: <20180912112157.GA14516@e113682-lin.lund.arm.com>
+From: matthew.hart@linaro.org (Matt Hart)
+Date: Wed, 12 Sep 2018 12:25:54 +0100
+Subject: [PATCH] [v3] drm/sun4i: fix build failure with
+ CONFIG_DRM_SUN8I_MIXER=m
+In-Reply-To: <20180907114255.7j7r6wzolnz5qkk7@flea>
+References: <20180711144403.1022829-1-arnd@arndb.de>
+ <105cb1cf-577a-043a-9b50-248a37090bdd@nvidia.com>
+ <CAK8P3a1w0SrxFNRwjt1nWhQPdqgt=bZ8oqGaPE=z9iHp84R5mw@mail.gmail.com>
+ <20180907114255.7j7r6wzolnz5qkk7@flea>
+Message-ID: <CAH+k93F_xJMtXmkKZuZ45AAQgMkgNfSRSM3QyEtATgQSW6Mb9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2018 at 12:16:26PM +0100, Dave Martin wrote:
-> On Wed, Sep 12, 2018 at 12:17:04PM +0200, Christoffer Dall wrote:
-> > On Wed, Sep 05, 2018 at 02:19:13PM +0100, Dave Martin wrote:
-> > > Currently FPEXC32_EL2 is handled specially when context-switching.
-> > > This made sense for arm, where FPEXC affects host execution
-> > > (including VFP/SIMD register save/restore at Hyp).
-> > 
-> > I think the point was actually to avoid saving/restoring FPEXC32_EL2
-> > when VFP was being trapped to EL2
-> 
-> With what purpose in mind?
+On 7 September 2018 at 12:42, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> On Fri, Sep 07, 2018 at 01:26:30PM +0200, Arnd Bergmann wrote:
+>> On Fri, Sep 7, 2018 at 11:41 AM Jon Hunter <jonathanh@nvidia.com> wrote:
+>> >
+>> >
+>> > On 11/07/18 15:43, Arnd Bergmann wrote:
+>> > > Having DRM_SUN4I built-in but DRM_SUN8I_MIXER as a loadable module results in
+>> > > a link error, as we try to access a symbol from the sun8i_tcon_top.ko module:
+>> > >
+>> > > ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun8i-drm-hdmi.ko] undefined!
+>> > > ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun4i-drm.ko] undefined!
+>> > >
+>> > > This solves the problem by adding a silent symbol for the tcon_top module,
+>> > > building it as a separate module in exactly the cases that we need it,
+>> > > but in a way that it is reachable by the other modules.
+>> > >
+>> > > Fixes: 57e23de02f48 ("drm/sun4i: DW HDMI: Expand algorithm for possible crtcs")
+>> > > Fixes: ef0cf6441fbb ("drm/sun4i: Add support for traversing graph with TCON TOP")
+>> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> > I am seeing the following on today's -next (20180907) as well the last
+>> > few -next versions for that matter ...
+>> >
+>> > ERROR: "sun8i_tcon_top_de_config" [drivers/gpu/drm/sun4i/sun4i-tcon.ko] undefined!
+>> > ERROR: "sun8i_tcon_top_set_hdmi_src" [drivers/gpu/drm/sun4i/sun4i-tcon.ko] undefined!
+>> > ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun4i-tcon.ko] undefined!
+>> >
+>> > Seems like this issue has cropped up again as Arnd's fix is present. I
+>> > am seeing this on ARM64 builds.
+>>
+>> I have not started build testing on linux-next since the merge window, but
+>> looking at the changes that got queued up, I find commits cf77d79b4e29
+>> ("drm/sun4i: tcon: Add another way for matching mixers with tcon") and
+>> 0305189afb32 ("drm/sun4i: tcon: Add support for R40 TCON") that both
+>> introduced a reference to the tcon_top file from sun4i_tcon.c.
+>>
+>> More IS_ENABLED(CONFIG_DRM_SUN8I_TCON_TOP) checks in
+>> the caller like I did in my patch would help, or alternatively one could
+>> decide to give up and just always include the TCON_TOP.
+>
+> Sorry for the breakage.
+>
+> Can you test:
+>
+> ----8<----
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> index 4834c90b4912..c78cd35a1294 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> @@ -974,7 +974,8 @@ static bool sun4i_tcon_connected_to_tcon_top(struct device_node *node)
+>
+>         remote = of_graph_get_remote_node(node, 0, -1);
+>         if (remote) {
+> -               ret = !!of_match_node(sun8i_tcon_top_of_table, remote);
+> +               ret = !!(IS_ENABLED(CONFIG_DRM_SUN8I_TCON_TOP) &&
+> +                        of_match_node(sun8i_tcon_top_of_table, remote));
+>                 of_node_put(remote);
+>         }
+>
+> @@ -1402,13 +1403,20 @@ static int sun8i_r40_tcon_tv_set_mux(struct sun4i_tcon *tcon,
+>         if (!pdev)
+>                 return -EINVAL;
+>
+> -       if (encoder->encoder_type == DRM_MODE_ENCODER_TMDS) {
+> +       if (IS_ENABLED(CONFIG_DRM_SUN8I_TCON_TOP) &&
+> +           encoder->encoder_type == DRM_MODE_ENCODER_TMDS) {
+>                 ret = sun8i_tcon_top_set_hdmi_src(&pdev->dev, id);
+>                 if (ret)
+>                         return ret;
+>         }
+>
+> -       return sun8i_tcon_top_de_config(&pdev->dev, tcon->id, id);
+> +       if (IS_ENABLED(CONFIG_DRM_SUN8I_TCON_TOP)) {
+> +               ret = sun8i_tcon_top_de_config(&pdev->dev, tcon->id, id);
+> +               if (ret)
+> +                       return ret;
+> +       }
+> +
+> +       return 0;
+>  }
+>
+>  static const struct sun4i_tcon_quirks sun4i_a10_quirks = {
+> ----8<----
 
-I don't think we thought it through very carefully but just considered
-FPEXC32_EL2 as part of the VFP state, but as you say, that doesn't
-really make sense.
+Works for me, and still broken in todays next
 
-I was just objecting to the statement that this is a bring-over from the
-32-bit side, which confused me, and I don't think that's true.
-
-> 
-> We saved neither the trap (since the VFP registers needed switching
-> anyway) nor the FPEXC32_EL2 switch (since we had to do that at guest
-> entry).
-> 
-> I may have misunderstood something.
-> 
-
-No, we just didn't look at it that carefully back then.
-
-> 
-> I was somewhat guessing likely rationale, so if you can suggest a
-> way to reword this that reflects the situation better I'd be happy
-> to change it.
-
-"Christoffer was being stupid..." ;)  It was just the way
-it was, I don't think there was a good rationale, but I don't think it
-helps to understand the change to provide guesswork either, so just
-remove it.
-
-> 
-> Thinking about it, I don't see why FPEXC32_EL2 can't be handled via
-> vcpu_load()/_put().  This register doesn't matter for the host, and
-> I can't see why we would need to switch it when going through hyp.
-> 
-
-That's another good point, should be able to do that.
-
-> > > 
-> > > However, FPEXC has no architectural effect when running in AArch64.
-> > > The only case where an arm64 host may execute in AArch32 is when
-> > > running compat user code at EL0: the architecture explicitly
-> > > documents FPEXC as having no effect in this case either when the
-> > > kernel (EL2 in the VHE case; otherwise EL1) is AArch64.
-> > > 
-> > > So, we can just handle FPEXC32_EL2 (which is the AArch64 alias for
-> > > this register) as a regular AArch32-only system register and switch
-> > > it without any special handling or synchronisation.
-> > > 
-> > > This allows some gnarly special-case code to be eliminated from
-> > > hyp.  The extra isb() in __activate_traps_fpsimd32() is dropped
-> > > too: for the reasons explained above arm64 never required this
-> > > anyway.
-> > > 
-> > > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> > > Cc: Christoffer Dall <christoffer.dall@arm.com>
-> > > Cc: Alexander Graf <agraf@suse.de>
-> > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > > ---
-> > > 
-> > > I could do with some confirmation from someone that my interpretation of
-> > > the architecture is in fact correct here.  The CheckFPAdvSIMDEnabled64()
-> > > and CheckAdvSIMDEnabled() pseudocode functions may be a reasonable
-> > > starting point (this was my reference where the wordy text is unclear).
-> > 
-> > Which aspect do you want confirmed here?
-> 
-> I confess to a certain amount of "according to the spirit of the
-> architecture it obviously ought to work this way" reasoning.
-> 
-> Following the trail of documentation isn't trivial, so it would
-> be good if someone could check that they can reach the same conclusion
-> about FPEXC32_EL2 having no effect on the host.
-> 
-
-That was definitely my conclusion as well.
-
-> 
-> > > If Alexander could try this out, that would be good.
-> > > 
-> > > This cleanup applies on top of the following previously pubished fix:
-> > > [PULL 2/4] arm64: KVM: Only force FPEXC32_EL2.EN if trapping FPSIMD
-> > > http://lists.infradead.org/pipermail/linux-arm-kernel/2018-September/599537.html
-> > > 
-> > 
-> > We can queue this for the next merge window.
-> > 
-> > Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
-> 
-> Thanks, modulo the question of maybe moving this to the vcpu_load()/
-> _put() path.
-> 
-
-Sure, I'll look at the next version as well if you send a new version.
-
-
-Thanks,
-
-        Christoffer
+>
+> Thanks!
+> Maxime
+>
+> --
+> Maxime Ripard, Bootlin
+> Embedded Linux and Kernel engineering
+> https://bootlin.com
