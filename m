@@ -1,145 +1,97 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Wed, 12 Sep 2018 17:49:09 +0100
-Subject: [PATCH v5 03/27] arm64: alternative: Apply alternatives early in
- boot process
-In-Reply-To: <3becf020-b230-beb8-b304-d8097377f234@arm.com>
-References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
- <1535471497-38854-4-git-send-email-julien.thierry@arm.com>
- <3becf020-b230-beb8-b304-d8097377f234@arm.com>
-Message-ID: <78781d82-e5c4-c590-6c0c-e7d2db456bf9@arm.com>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Wed, 12 Sep 2018 09:54:51 -0700
+Subject: [PATCH i2c-next v6] i2c: aspeed: Handle master/slave combined irq
+ events properly
+In-Reply-To: <20180912013449.GA12612@roeck-us.net>
+References: <20180823225731.19063-1-jae.hyun.yoo@linux.intel.com>
+ <20180911183734.GA21976@roeck-us.net>
+ <1f34fe8c-69ef-5f2d-25dc-d5f6037cc558@linux.intel.com>
+ <20180911204107.GA26017@roeck-us.net>
+ <e5135af4-9105-214f-5de2-65cc03804222@linux.intel.com>
+ <CACPK8Xdv3aP_zOHAL0WMgwvkpBHAUesU7OdhW==jgvXjRmt-Zw@mail.gmail.com>
+ <20180911233302.GA18799@roeck-us.net>
+ <5698ca34-14c9-8d05-c4e6-5acf85ff9d14@linux.intel.com>
+ <20180912013449.GA12612@roeck-us.net>
+Message-ID: <7fd98646-fb5a-be4d-ce37-84b74e0fa8b3@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
-
-On 12/09/18 11:29, James Morse wrote:
-> Hi Julien,
-> 
-> On 28/08/18 16:51, Julien Thierry wrote:
->> From: Daniel Thompson <daniel.thompson@linaro.org>
+On 9/11/2018 6:34 PM, Guenter Roeck wrote:
+> On Tue, Sep 11, 2018 at 04:58:44PM -0700, Jae Hyun Yoo wrote:
+>> On 9/11/2018 4:33 PM, Guenter Roeck wrote:
+>>> Looking into the patch, clearing the interrupt status at the end of an
+>>> interrupt handler is always suspicious and tends to result in race
+>>> conditions (because additional interrupts may have arrived while handling
+>>> the existing interrupts, or because interrupt handling itself may trigger
+>>> another interrupt). With that in mind, the following patch fixes the
+>>> problem for me.
+>>>
+>>> Guenter
+>>>
+>>> ---
+>>>
+>>> diff --git a/drivers/i2c/busses/i2c-aspeed.c b/drivers/i2c/busses/i2c-aspeed.c
+>>> index c258c4d9a4c0..c488e6950b7c 100644
+>>> --- a/drivers/i2c/busses/i2c-aspeed.c
+>>> +++ b/drivers/i2c/busses/i2c-aspeed.c
+>>> @@ -552,6 +552,8 @@ static irqreturn_t aspeed_i2c_bus_irq(int irq, void *dev_id)
+>>>   	spin_lock(&bus->lock);
+>>>   	irq_received = readl(bus->base + ASPEED_I2C_INTR_STS_REG);
+>>> +	/* Ack all interrupt bits. */
+>>> +	writel(irq_received, bus->base + ASPEED_I2C_INTR_STS_REG);
+>>>   	irq_remaining = irq_received;
+>>>   #if IS_ENABLED(CONFIG_I2C_SLAVE)
+>>> @@ -584,8 +586,6 @@ static irqreturn_t aspeed_i2c_bus_irq(int irq, void *dev_id)
+>>>   			"irq handled != irq. expected 0x%08x, but was 0x%08x\n",
+>>>   			irq_received, irq_handled);
+>>> -	/* Ack all interrupt bits. */
+>>> -	writel(irq_received, bus->base + ASPEED_I2C_INTR_STS_REG);
+>>>   	spin_unlock(&bus->lock);
+>>>   	return irq_remaining ? IRQ_NONE : IRQ_HANDLED;
+>>>   }
+>>>
 >>
->> Currently alternatives are applied very late in the boot process (and
->> a long time after we enable scheduling). Some alternative sequences,
->> such as those that alter the way CPU context is stored, must be applied
->> much earlier in the boot sequence.
->>
->> Introduce apply_boot_alternatives() to allow some alternatives to be
->> applied immediately after we detect the CPU features of the boot CPU.
+>> My intention of putting the code at the end of interrupt handler was,
+>> to reduce possibility of combined irq calls which is explained in this
+>> patch. But YES, I agree with you. It could make a potential race
 > 
+> Hmm, yes, but that doesn't explain why it would make sense to acknowledge
+> the interrupt late. The interrupt ack only means "I am going to handle these
+> interrupts". If additional interrupts arrive while the interrupt handler
+> is active, those will have to be acknowledged separately.
 > 
->> diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
->> index b5d6039..70c2604 100644
->> --- a/arch/arm64/kernel/alternative.c
->> +++ b/arch/arm64/kernel/alternative.c
->> @@ -145,7 +145,8 @@ static void clean_dcache_range_nopatch(u64 start, u64 end)
->>   	} while (cur += d_size, cur < end);
->>   }
->>   
->> -static void __apply_alternatives(void *alt_region, bool is_module)
->> +static void __apply_alternatives(void *alt_region,  bool is_module,
->> +				 unsigned long feature_mask)
-> 
-> Shouldn't feature_mask be a DECLARE_BITMAP() maybe-array like cpu_hwcaps?
-> This means it keeps working when NR_CAPS grows over 64, which might happen
-> sooner than we think for backported errata...
-> 
-> 
->> @@ -155,6 +156,9 @@ static void __apply_alternatives(void *alt_region, bool is_module)
->>   	for (alt = region->begin; alt < region->end; alt++) {
->>   		int nr_inst;
->>   
->> +		if ((BIT(alt->cpufeature) & feature_mask) == 0)
->> +			continue;
->> +
->>   		/* Use ARM64_CB_PATCH as an unconditional patch */
->>   		if (alt->cpufeature < ARM64_CB_PATCH &&
->>   		    !cpus_have_cap(alt->cpufeature))
->> @@ -213,7 +217,7 @@ static int __apply_alternatives_multi_stop(void *unused)
->>   		isb();
->>   	} else {
->>   		BUG_ON(alternatives_applied);
->> -		__apply_alternatives(&region, false);
->> +		__apply_alternatives(&region, false, ~boot_capabilities);
-> 
-> Ah, this is tricky. There is a bitmap_complement() for the DECLARE_BITMAP()
-> stuff, but we'd need a second array...
-> 
-> We could pass the scope around, but then __apply_alternatives() would need to
-> lookup the struct arm64_cpu_capabilities up every time. This is only a problem
-> as we have one cap-number-space for errata/features, but separate sparse lists.
-> 
+> Sure, there is a risk that an interrupt arrives while the handler is
+> running, and that it is handled but not acknowledged. That can happen
+> with pretty much all interrupt handlers, and there are mitigations to
+> limit the impact (for example, read the interrupt status register in
+> a loop until no more interrupts are pending). But acknowledging
+> an interrupt that was possibly not handled is always bad idea.
 
-Since for each alternative we know the cpufeature associated with it, 
-the "lookup" is really just accessing an array with the given index, so 
-that could be an option.
+Well, that's generally right but not always. Sometimes that depends on
+hardware and Aspeed I2C is the case.
 
-> (I think applying the alternatives one cap at a time is a bad idea as we would
-> need to walk the alternative region NR_CAPS times)
-> 
-> 
->> @@ -227,6 +231,24 @@ void __init apply_alternatives_all(void)
->>   	stop_machine(__apply_alternatives_multi_stop, NULL, cpu_online_mask);
->>   }
->>   
->> +/*
->> + * This is called very early in the boot process (directly after we run
->> + * a feature detect on the boot CPU). No need to worry about other CPUs
->> + * here.
->> + */
->> +void __init apply_boot_alternatives(void)
->> +{
->> +	struct alt_region region = {
->> +		.begin	= (struct alt_instr *)__alt_instructions,
->> +		.end	= (struct alt_instr *)__alt_instructions_end,
->> +	};
->> +
->> +	/* If called on non-boot cpu things could go wrong */
->> +	WARN_ON(smp_processor_id() != 0);
-> 
-> Isn't the problem if there are multiple CPUs online?
-> 
+This is a description from Aspeed AST2500 datasheet:
+   I2CD10 Interrupt Status Register
+   bit 2 Receive Done Interrupt status
+         S/W needs to clear this status bit to allow next data receiving.
 
-Yes, that makes more sense. I'll change this.
+It means, driver should hold this bit to prevent transition of hardware
+state machine until the driver handles received data, so the bit should
+be cleared at the end of interrupt handler.
 
-> 
->> +	__apply_alternatives(&region, false, boot_capabilities);
->> +}
->> +
->>   #ifdef CONFIG_MODULES
->>   void apply_alternatives_module(void *start, size_t length)
->>   {
-> 
->> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
->> index 3bc1c8b..0d1e41e 100644
->> --- a/arch/arm64/kernel/cpufeature.c
->> +++ b/arch/arm64/kernel/cpufeature.c
->> @@ -52,6 +52,8 @@
->>   DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
->>   EXPORT_SYMBOL(cpu_hwcaps);
->>   
->> +unsigned long boot_capabilities;
->> +
->>   /*
->>    * Flag to indicate if we have computed the system wide
->>    * capabilities based on the boot time active CPUs. This
->> @@ -1375,6 +1377,9 @@ static void __update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
->>   		if (!cpus_have_cap(caps->capability) && caps->desc)
->>   			pr_info("%s %s\n", info, caps->desc);
->>   		cpus_set_cap(caps->capability);
-> 
-> Hmm, the bitmap behind cpus_set_cap() is what cpus_have_cap() in
-> __apply_alternatives() looks at. If you had a call to __apply_alternatives after
-> update_cpu_capabilities(SCOPE_BOOT_CPU), but before any others, it would only
-> apply those alternatives...
-> 
-> (I don't think there is a problem re-applying the same alternative, but I
-> haven't checked).
-> 
+Let me share my test result. Your code change works on 100KHz bus speed
+but doesn't work well on 1MHz bus speed. Investigated that interrupt
+handling is fast enough in 100KHz test but in 1MHz, most of data is
+corrupted because the bit is cleared at the beginning of interrupt
+handler so it allows receiving of the next data but the interrupt
+handler isn't fast enough to read the data buffer on time. I checked
+this problem on BMC-ME channel which ME sends lots of IPMB packets to
+BMC at 1MHz speed. You could simply check the data corruption problem on
+the BMC-ME channel.
 
-Interesting idea. If someone can confirm that patching alternatives 
-twice is safe, I think it would make things simpler.
+My thought is, the current code is right for real Aspeed I2C hardware.
+It seems that QEMU 3.0 model for witherspoon-bmc doesn't simulate the
+actual Aspeed I2C hardware correctly.
 
 Thanks,
-
--- 
-Julien Thierry
+Jae
