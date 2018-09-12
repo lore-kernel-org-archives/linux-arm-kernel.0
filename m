@@ -1,135 +1,170 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 12 Sep 2018 11:20:39 +0200
-Subject: [PATCH v2] ARM: dts: r9a06g032: Correct UART and add all other
- UARTs
-In-Reply-To: <20180910160254.3882-1-phil.edworthy@renesas.com>
-References: <20180910160254.3882-1-phil.edworthy@renesas.com>
-Message-ID: <20180912092035.lhzlebd6rh72yjgj@verge.net.au>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Wed, 12 Sep 2018 11:33:45 +0200
+Subject: [PATCH v3 16/21] nvmem: add a notifier chain
+In-Reply-To: <20180912075129.25185-17-brgl@bgdev.pl>
+References: <20180912075129.25185-1-brgl@bgdev.pl>
+ <20180912075129.25185-17-brgl@bgdev.pl>
+Message-ID: <CAMRc=MdoUon+cCOqLaNMN+814bg+t7Ltv_2ysOvztP9B93dAYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2018 at 05:02:54PM +0100, Phil Edworthy wrote:
-> - UART0 was missing the bus clock ("apb_pclk").
-> - Now that the relevant rzn1 bindings have been added, replace the Synopsys
->   compat string with the rzn1 strings.
-
-Perhaps: Use recently accepted r9a06g032 and rzn1 compat strings.
-
-> - Add all the other UARTs.
-> 
-> Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
-
-The above notwithstanding this looks good to me but I will wait to see if
-there are other reviews before applying.
-
-Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
-
+2018-09-12 9:51 GMT+02:00 Bartosz Golaszewski <brgl@bgdev.pl>:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>
+> Add a blocking notifier chain with four events (add and remove for
+> both devices and cells) so that users can get notified about the
+> addition of nvmem resources they're waiting for.
+>
+> We'll use this instead of the at24 setup callback in the mityomapl138
+> board file.
+>
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > ---
-> v2:
->  - Keep the "snps,dw-apb-uart" fallback for uarts 0..2 as these are unmodified
->    peripherals.
-> ---
->  arch/arm/boot/dts/r9a06g032.dtsi | 83 ++++++++++++++++++++++++++++++--
->  1 file changed, 80 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/r9a06g032.dtsi b/arch/arm/boot/dts/r9a06g032.dtsi
-> index 3e45375b79aa..eaf94976ed6d 100644
-> --- a/arch/arm/boot/dts/r9a06g032.dtsi
-> +++ b/arch/arm/boot/dts/r9a06g032.dtsi
-> @@ -78,13 +78,90 @@
->  		};
->  
->  		uart0: serial at 40060000 {
-> -			compatible = "snps,dw-apb-uart";
-> +			compatible = "renesas,r9a06g032-uart", "renesas,rzn1-uart", "snps,dw-apb-uart";
->  			reg = <0x40060000 0x400>;
->  			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
->  			reg-shift = <2>;
->  			reg-io-width = <4>;
-> -			clocks = <&sysctrl R9A06G032_CLK_UART0>;
-> -			clock-names = "baudclk";
-> +			clocks = <&sysctrl R9A06G032_CLK_UART0>, <&sysctrl R9A06G032_HCLK_UART0>;
-> +			clock-names = "baudclk", "apb_pclk";
-> +			status = "disabled";
-> +		};
+>  drivers/nvmem/core.c           | 36 ++++++++++++++++++++++++++++++++++
+>  include/linux/nvmem-consumer.h | 21 ++++++++++++++++++++
+>  2 files changed, 57 insertions(+)
+>
+> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+> index 9cc86d131e1e..af6f7163cb67 100644
+> --- a/drivers/nvmem/core.c
+> +++ b/drivers/nvmem/core.c
+> @@ -65,6 +65,8 @@ static LIST_HEAD(nvmem_cell_tables);
+>  static DEFINE_MUTEX(nvmem_lookup_mutex);
+>  static LIST_HEAD(nvmem_lookup_list);
+>
+> +static BLOCKING_NOTIFIER_HEAD(nvmem_notifier);
 > +
-> +		uart1: serial at 40061000 {
-> +			compatible = "renesas,r9a06g032-uart", "renesas,rzn1-uart", "snps,dw-apb-uart";
-> +			reg = <0x40061000 0x400>;
-> +			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-> +			reg-shift = <2>;
-> +			reg-io-width = <4>;
-> +			clocks = <&sysctrl R9A06G032_CLK_UART1>, <&sysctrl R9A06G032_HCLK_UART1>;
-> +			clock-names = "baudclk", "apb_pclk";
-> +			status = "disabled";
-> +		};
+>  #ifdef CONFIG_DEBUG_LOCK_ALLOC
+>  static struct lock_class_key eeprom_lock_key;
+>  #endif
+> @@ -300,6 +302,7 @@ static struct nvmem_device *nvmem_find(const char *name)
+>
+>  static void nvmem_cell_drop(struct nvmem_cell *cell)
+>  {
+> +       blocking_notifier_call_chain(&nvmem_notifier, NVMEM_CELL_REMOVE, cell);
+>         mutex_lock(&nvmem_mutex);
+>         list_del(&cell->node);
+>         mutex_unlock(&nvmem_mutex);
+> @@ -319,6 +322,7 @@ static void nvmem_cell_add(struct nvmem_cell *cell)
+>         mutex_lock(&nvmem_mutex);
+>         list_add_tail(&cell->node, &cell->nvmem->cells);
+>         mutex_unlock(&nvmem_mutex);
+> +       blocking_notifier_call_chain(&nvmem_notifier, NVMEM_CELL_ADD, cell);
+>  }
+>
+>  static int nvmem_cell_info_to_nvmem_cell(struct nvmem_device *nvmem,
+> @@ -434,6 +438,32 @@ static int nvmem_setup_compat(struct nvmem_device *nvmem,
+>         return 0;
+>  }
+>
+> +/**
+> + * nvmem_register_notifier() - Register a notifier block for nvmem events.
+> + *
+> + * @nb: notifier block to be called on nvmem events.
+> + *
+> + * Return: 0 on success, negative error number on failure.
+> + */
+> +int nvmem_register_notifier(struct notifier_block *nb)
+> +{
+> +       return blocking_notifier_chain_register(&nvmem_notifier, nb);
+> +}
+> +EXPORT_SYMBOL_GPL(nvmem_register_notifier);
 > +
-> +		uart2: serial at 40062000 {
-> +			compatible = "renesas,r9a06g032-uart", "renesas,rzn1-uart", "snps,dw-apb-uart";
-> +			reg = <0x40062000 0x400>;
-> +			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-> +			reg-shift = <2>;
-> +			reg-io-width = <4>;
-> +			clocks = <&sysctrl R9A06G032_CLK_UART2>, <&sysctrl R9A06G032_HCLK_UART2>;
-> +			clock-names = "baudclk", "apb_pclk";
-> +			status = "disabled";
-> +		};
+> +/**
+> + * nvmem_unregister_notifier() - Unregister a notifier block for nvmem events.
+> + *
+> + * @nb: notifier block to be unregistered.
+> + *
+> + * Return: 0 on success, negative error number on failure.
+> + */
+> +int nvmem_unregister_notifier(struct notifier_block *nb)
+> +{
+> +       return blocking_notifier_chain_unregister(&nvmem_notifier, nb);
+> +}
+> +EXPORT_SYMBOL_GPL(nvmem_unregister_notifier);
 > +
-> +		uart3: serial at 50000000 {
-> +			compatible = "renesas,r9a06g032-uart", "renesas,rzn1-uart";
-> +			reg = <0x50000000 0x400>;
-> +			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
-> +			reg-shift = <2>;
-> +			reg-io-width = <4>;
-> +			clocks = <&sysctrl R9A06G032_CLK_UART3>, <&sysctrl R9A06G032_HCLK_UART3>;
-> +			clock-names = "baudclk", "apb_pclk";
-> +			status = "disabled";
-> +		};
+>  static int nvmem_add_cells_from_table(struct nvmem_device *nvmem)
+>  {
+>         const struct nvmem_cell_info *info;
+> @@ -647,6 +677,10 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
+>         if (rval)
+>                 goto err_remove_cells;
+>
+> +       rval = blocking_notifier_call_chain(&nvmem_notifier, NVMEM_ADD, nvmem);
+> +       if (rval)
+> +               goto err_remove_cells;
 > +
-> +		uart4: serial at 50001000 {
-> +			compatible = "renesas,r9a06g032-uart", "renesas,rzn1-uart";
-> +			reg = <0x50001000 0x400>;
-> +			interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
-> +			reg-shift = <2>;
-> +			reg-io-width = <4>;
-> +			clocks = <&sysctrl R9A06G032_CLK_UART4>, <&sysctrl R9A06G032_HCLK_UART4>;
-> +			clock-names = "baudclk", "apb_pclk";
-> +			status = "disabled";
-> +		};
+>         return nvmem;
+>
+>  err_remove_cells:
+> @@ -675,6 +709,8 @@ static void nvmem_device_release(struct kref *kref)
+>         nvmem_device_remove_all_cells(nvmem);
+>         device_del(&nvmem->dev);
+>         put_device(&nvmem->dev);
 > +
-> +		uart5: serial at 50002000 {
-> +			compatible = "renesas,r9a06g032-uart", "renesas,rzn1-uart";
-> +			reg = <0x50002000 0x400>;
-> +			interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
-> +			reg-shift = <2>;
-> +			reg-io-width = <4>;
-> +			clocks = <&sysctrl R9A06G032_CLK_UART5>, <&sysctrl R9A06G032_HCLK_UART5>;
-> +			clock-names = "baudclk", "apb_pclk";
-> +			status = "disabled";
-> +		};
+> +       blocking_notifier_call_chain(&nvmem_notifier, NVMEM_REMOVE, nvmem);
+
+Ugh this is wrong, it should be called before all the other code in
+this function. I'll resend in the next version after reviews.
+
+Bart
+
+>  }
+>
+>  /**
+> diff --git a/include/linux/nvmem-consumer.h b/include/linux/nvmem-consumer.h
+> index 27eee3945405..0326b52e906b 100644
+> --- a/include/linux/nvmem-consumer.h
+> +++ b/include/linux/nvmem-consumer.h
+> @@ -14,6 +14,7 @@
+>
+>  #include <linux/err.h>
+>  #include <linux/errno.h>
+> +#include <linux/notifier.h>
+>
+>  struct device;
+>  struct device_node;
+> @@ -47,6 +48,13 @@ struct nvmem_cell_lookup {
+>         struct list_head        node;
+>  };
+>
+> +enum {
+> +       NVMEM_ADD = 1,
+> +       NVMEM_REMOVE,
+> +       NVMEM_CELL_ADD,
+> +       NVMEM_CELL_REMOVE,
+> +};
 > +
-> +		uart6: serial at 50003000 {
-> +			compatible = "renesas,r9a06g032-uart", "renesas,rzn1-uart";
-> +			reg = <0x50003000 0x400>;
-> +			interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
-> +			reg-shift = <2>;
-> +			reg-io-width = <4>;
-> +			clocks = <&sysctrl R9A06G032_CLK_UART6>, <&sysctrl R9A06G032_HCLK_UART6>;
-> +			clock-names = "baudclk", "apb_pclk";
-> +			status = "disabled";
-> +		};
+>  #if IS_ENABLED(CONFIG_NVMEM)
+>
+>  /* Cell based interface */
+> @@ -80,6 +88,9 @@ void nvmem_add_cell_lookups(struct nvmem_cell_lookup *entries,
+>  void nvmem_del_cell_lookups(struct nvmem_cell_lookup *entries,
+>                             size_t nentries);
+>
+> +int nvmem_register_notifier(struct notifier_block *nb);
+> +int nvmem_unregister_notifier(struct notifier_block *nb);
 > +
-> +		uart7: serial at 50004000 {
-> +			compatible = "renesas,r9a06g032-uart", "renesas,rzn1-uart";
-> +			reg = <0x50004000 0x400>;
-> +			interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
-> +			reg-shift = <2>;
-> +			reg-io-width = <4>;
-> +			clocks = <&sysctrl R9A06G032_CLK_UART7>, <&sysctrl R9A06G032_HCLK_UART7>;
-> +			clock-names = "baudclk", "apb_pclk";
->  			status = "disabled";
->  		};
->  
-> -- 
-> 2.17.1
-> 
+>  #else
+>
+>  static inline struct nvmem_cell *nvmem_cell_get(struct device *dev,
+> @@ -179,6 +190,16 @@ nvmem_add_cell_lookups(struct nvmem_cell_lookup *entries, size_t nentries) {}
+>  static inline void
+>  nvmem_del_cell_lookups(struct nvmem_cell_lookup *entries, size_t nentries) {}
+>
+> +static inline int nvmem_register_notifier(struct notifier_block *nb)
+> +{
+> +       return -ENOSYS;
+> +}
+> +
+> +static inline int nvmem_unregister_notifier(struct notifier_block *nb)
+> +{
+> +       return -ENOSYS;
+> +}
+> +
+>  #endif /* CONFIG_NVMEM */
+>
+>  #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
+> --
+> 2.18.0
+>
