@@ -1,22 +1,33 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 12 Sep 2018 09:11:19 +0800
-Subject: [PATCH v9 6/6] ARM: dts: imx6: RIoTboard provide standby on
- power off option
-In-Reply-To: <20180802103425.3053-7-o.rempel@pengutronix.de>
-References: <20180802103425.3053-1-o.rempel@pengutronix.de>
- <20180802103425.3053-7-o.rempel@pengutronix.de>
-Message-ID: <20180912011118.GC28469@dragon>
+Date: Wed, 12 Sep 2018 09:13:37 +0800
+Subject: [PATCH v3] ARM: dts: imx6ul: Add DTS for ConnectCore 6UL SBC Pro
+In-Reply-To: <1536572272-18590-2-git-send-email-alex.gonzalez@digi.com>
+References: <1536572272-18590-1-git-send-email-alex.gonzalez@digi.com>
+ <1536572272-18590-2-git-send-email-alex.gonzalez@digi.com>
+Message-ID: <20180912011336.GD28469@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 02, 2018 at 12:34:25PM +0200, Oleksij Rempel wrote:
-> This board, as well as some other boards with i.MX6 and a PMIC, uses a
-> "PMIC_STBY_REQ" line to notify the PMIC about a state change.
-> The PMIC is programmed for a specific state change before triggering the
-> line.
-> In this case, PMIC_STBY_REQ can be used for stand by, sleep
-> and power off modes.
+On Mon, Sep 10, 2018 at 11:37:52AM +0200, Alex Gonzalez wrote:
+> The ConnectCore 6UL Single Board Computer (SBC) Pro contains the
+> ConnectCore 6UL System-On-Module.
 > 
-> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
+> Its hardware specifications are:
+> 
+> * 256MB DDR3 memory
+> * On module 256MB NAND flash
+> * Dual 10/100 Ethernet
+> * USB Host and USB OTG
+> * Parallel RGB display header
+> * LVDS display header
+> * CSI camera
+> * GPIO header
+> * I2C, SPI, CAN headers
+> * PCIe mini card and micro SIM slot
+> * MicroSD external storage
+> * On board 4GB eMMC flash
+> * Audio headphone, line in/out, microphone lines
+> 
+> Signed-off-by: Alex Gonzalez <alex.gonzalez@digi.com>
 
 Applied, thanks.
