@@ -1,33 +1,72 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 12 Sep 2018 16:58:15 +0800
-Subject: [PATCH v2 0/6] drm/sun4i: Support color dithering for LCD panels
-In-Reply-To: <20180907112331.wjml25rfkyabvwwt@flea>
-References: <20180907041948.19913-1-wens@csie.org>
- <20180907112331.wjml25rfkyabvwwt@flea>
-Message-ID: <CAGb2v66PFTL+LJvi-d3LXNBfZCBZoRL06ORXsb4npvgEg7pZ4Q@mail.gmail.com>
+From: horia.geanta@nxp.com (=?UTF-8?q?Horia=20Geant=C4=83?=)
+Date: Wed, 12 Sep 2018 11:59:30 +0300
+Subject: [PATCH v2 05/12] crypto: caam - fix implicit casts in endianness
+ helpers
+In-Reply-To: <20180912085937.22489-1-horia.geanta@nxp.com>
+References: <20180912085937.22489-1-horia.geanta@nxp.com>
+Message-ID: <20180912085937.22489-6-horia.geanta@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 7, 2018 at 7:23 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->
-> On Fri, Sep 07, 2018 at 12:19:42PM +0800, Chen-Yu Tsai wrote:
-> >
-> > Hi,
-> >
-> > This is v2 of my sun4i-drm LCD color dithering series. v1 was from back
-> > in April [1]. Most of the driver code is unchanged.
-> >
-> > Changes since v1:
-> >
-> >   - Explicitly list properties from the simple-panel binding that apply
-> >     to the Bananapi 7" panel
-> >
-> >   - Moved an incorrectly squashed change from patch 3 to patch 1, where
-> >     it belongs
->
-> Applied the first three patches, thanks!
+Fix the following sparse endianness warnings:
 
-Any comments on patches 4 and 5?
+drivers/crypto/caam/regs.h:95:1: sparse: incorrect type in return expression (different base types) @@    expected unsigned int @@    got restricted __le32unsigned int @@
+drivers/crypto/caam/regs.h:95:1:    expected unsigned int
+drivers/crypto/caam/regs.h:95:1:    got restricted __le32 [usertype] <noident>
+drivers/crypto/caam/regs.h:95:1: sparse: incorrect type in return expression (different base types) @@    expected unsigned int @@    got restricted __be32unsigned int @@
+drivers/crypto/caam/regs.h:95:1:    expected unsigned int
+drivers/crypto/caam/regs.h:95:1:    got restricted __be32 [usertype] <noident>
 
-Thanks
-ChenYu
+drivers/crypto/caam/regs.h:92:1: sparse: cast to restricted __le32
+drivers/crypto/caam/regs.h:92:1: sparse: cast to restricted __be32
+
+Fixes: 261ea058f016 ("crypto: caam - handle core endianness != caam endianness")
+Reported-by: kbuild test robot <lkp@intel.com>
+Signed-off-by: Horia Geant? <horia.geanta@nxp.com>
+---
+ drivers/crypto/caam/regs.h | 28 ++++++++++++++--------------
+ 1 file changed, 14 insertions(+), 14 deletions(-)
+
+diff --git a/drivers/crypto/caam/regs.h b/drivers/crypto/caam/regs.h
+index 4fb91ba39c36..ce3f9ad7120f 100644
+--- a/drivers/crypto/caam/regs.h
++++ b/drivers/crypto/caam/regs.h
+@@ -70,22 +70,22 @@
+ extern bool caam_little_end;
+ extern bool caam_imx;
+ 
+-#define caam_to_cpu(len)				\
+-static inline u##len caam##len ## _to_cpu(u##len val)	\
+-{							\
+-	if (caam_little_end)				\
+-		return le##len ## _to_cpu(val);		\
+-	else						\
+-		return be##len ## _to_cpu(val);		\
++#define caam_to_cpu(len)						\
++static inline u##len caam##len ## _to_cpu(u##len val)			\
++{									\
++	if (caam_little_end)						\
++		return le##len ## _to_cpu((__force __le##len)val);	\
++	else								\
++		return be##len ## _to_cpu((__force __be##len)val);	\
+ }
+ 
+-#define cpu_to_caam(len)				\
+-static inline u##len cpu_to_caam##len(u##len val)	\
+-{							\
+-	if (caam_little_end)				\
+-		return cpu_to_le##len(val);		\
+-	else						\
+-		return cpu_to_be##len(val);		\
++#define cpu_to_caam(len)					\
++static inline u##len cpu_to_caam##len(u##len val)		\
++{								\
++	if (caam_little_end)					\
++		return (__force u##len)cpu_to_le##len(val);	\
++	else							\
++		return (__force u##len)cpu_to_be##len(val);	\
+ }
+ 
+ caam_to_cpu(16)
+-- 
+2.16.2
