@@ -1,37 +1,58 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 12 Sep 2018 17:27:02 +0200
-Subject: [PATCH] soc: imx: gpc: set DMA mask for PD platform devices
-Message-ID: <20180912152702.14640-1-l.stach@pengutronix.de>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Wed, 12 Sep 2018 17:30:35 +0200
+Subject: unexpected side effect of "gpiolib: override irq_enable/disable"
+In-Reply-To: <20180912145829.hzklqndjasac2ap4@M43218.corp.atmel.com>
+References: <20180912145829.hzklqndjasac2ap4@M43218.corp.atmel.com>
+Message-ID: <f64fcb6a-172f-45e8-af8f-f1e7bae3b4d8@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PD platform devices aren't DMA capable (as is correctly reflected
-in with a zero mask coherent_dma_mask). As they have a of_node attached
-they will go through of_dma_configure, which will warn if it finds an
-uninitialized DMA mask. Let the driver core know that this isn't a
-missing configuration, but a non DMA capable device by pointing the
-dma_mask to the coherent_dma_mask.
+Hi Ludovic,
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
-Since the warning that is triggered with the incomplete configuration
-has been introduced in the v4.19 cycle, it would nice to get this in
-as a fix.
----
- drivers/soc/imx/gpc.c | 1 +
- 1 file changed, 1 insertion(+)
+On 09/12/2018 04:58 PM, Ludovic Desroches wrote:
+> Hi,
+> 
+> Using next-20180912, my kernel hangs during the boot. Git bisect tell me
+> that the cause of my issue is the commit "gpiolib: override
+> irq_enable/disable"
+> 
+> I dug further and this patch can have some side effects. When booting, I
+> have an infinite loop when trying to enable a gpio irq. I don't know if
+> the pinctrl-at91 driver is the only one concerned or not.
+> 
+> The pattern leading to this issue is quite simple: we have several gpio
+> controllers sharing the same irq_chip structure. Installing the
+> irq_enable/irq_disable hook works well the first time. The second time,
+> since the irq_enable has been altered to use gpiochip_irq_enable,
+> this latest function will call itself again and again by calling
+> irq_enable.
+> 
+> I think it should be better to have one irq_chip structure per gpio
+> controller. I am going to do a patch for pinctrl-at91. Excepting if you
+> think it has to be solved in a different way.
+> 
+> 
+> Ludovic
+> 
 
-diff --git a/drivers/soc/imx/gpc.c b/drivers/soc/imx/gpc.c
-index f301fcd96c07..a897c851f305 100644
---- a/drivers/soc/imx/gpc.c
-+++ b/drivers/soc/imx/gpc.c
-@@ -493,6 +493,7 @@ static int imx_gpc_probe(struct platform_device *pdev)
- 
- 			pd_pdev->dev.parent = &pdev->dev;
- 			pd_pdev->dev.of_node = np;
-+			pd_pdev->dev.dma_mask = &pd_pdev->dev.coherent_dma_mask;
- 
- 			ret = platform_device_add(pd_pdev);
- 			if (ret) {
--- 
-2.18.0
+Can you try this patch first?
+
+Thanks!
+
+	Hans
+
+Signed-off-by: Hans Verkuil <hans.verkuil@cisco.com>
+---
+diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+index efce534a269b..e09e4e439928 100644
+--- a/drivers/gpio/gpiolib.c
++++ b/drivers/gpio/gpiolib.c
+@@ -1859,6 +1859,8 @@ static void gpiochip_set_irq_hooks(struct gpio_chip *gpiochip)
+ 	}
+ 	if (WARN_ON(gpiochip->irq.irq_enable))
+ 		return;
++	if (irqchip->irq_enable == gpiochip_irq_enable)
++		return;
+ 	gpiochip->irq.irq_enable = irqchip->irq_enable;
+ 	gpiochip->irq.irq_disable = irqchip->irq_disable;
+ 	irqchip->irq_enable = gpiochip_irq_enable;
