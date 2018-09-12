@@ -1,31 +1,73 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Wed, 12 Sep 2018 14:52:50 +0100
-Subject: [PATCH] arm64: defconfig: enable R8A774C0 SoC
-Message-ID: <1536760371-17300-1-git-send-email-fabrizio.castro@bp.renesas.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 12 Sep 2018 14:53:43 +0100
+Subject: [PATCH v2 02/11] coresight: dts: binding: Update coresight binding
+ examples
+In-Reply-To: <20180912135352.19722-1-suzuki.poulose@arm.com>
+References: <20180912135352.19722-1-suzuki.poulose@arm.com>
+Message-ID: <20180912135352.19722-3-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the Renesas RZ/G2E (R8A774C0) SoC in the ARM64 defconfig.
+While we updated the coresight DT bindings, some of the
+new examples were not updated due to the order in which they
+were merged. Let us update all the missed out ones to the
+new bindings to avoid confusion.
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: Rob Herring <robh@kernel.org>
+Cc: Frank Rowand <frowand.list@gmail.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
-This patch applies on top of next-20180912
+ .../devicetree/bindings/arm/coresight.txt     | 25 ++++++++-----------
+ 1 file changed, 10 insertions(+), 15 deletions(-)
 
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 47d7665..a8bce1b 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -51,6 +51,7 @@ CONFIG_ARCH_SEATTLE=y
- CONFIG_ARCH_SYNQUACER=y
- CONFIG_ARCH_RENESAS=y
- CONFIG_ARCH_R8A774A1=y
-+CONFIG_ARCH_R8A774C0=y
- CONFIG_ARCH_R8A7795=y
- CONFIG_ARCH_R8A7796=y
- CONFIG_ARCH_R8A77965=y
+diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
+index 13b6198ce01c..f8aff65ab921 100644
+--- a/Documentation/devicetree/bindings/arm/coresight.txt
++++ b/Documentation/devicetree/bindings/arm/coresight.txt
+@@ -147,22 +147,16 @@ Example:
+ 
+ 		clocks = <&oscclk6a>;
+ 		clock-names = "apb_pclk";
+-		ports {
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-
+-			/* input port */
+-			port at 0 {
+-				reg =  <0>;
++		in-ports {
++			port {
+ 				etr_in_port: endpoint {
+-					slave-mode;
+ 					remote-endpoint = <&replicator2_out_port0>;
+ 				};
+ 			};
++		};
+ 
+-			/* CATU link represented by output port */
+-			port at 1 {
+-				reg = <1>;
++		out-ports {
++			port {
+ 				etr_out_port: endpoint {
+ 					remote-endpoint = <&catu_in_port>;
+ 				};
+@@ -310,10 +304,11 @@ Example:
+ 		clock-names = "apb_pclk";
+ 
+ 		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
+-		port {
+-			catu_in_port: endpoint {
+-				slave-mode;
+-				remote-endpoint = <&etr_out_port>;
++		in-ports {
++			port {
++				catu_in_port: endpoint {
++					remote-endpoint = <&etr_out_port>;
++				};
+ 			};
+ 		};
+ 	};
 -- 
-2.7.4
+2.19.0
