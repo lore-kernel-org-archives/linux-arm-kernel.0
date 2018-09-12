@@ -1,43 +1,33 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed, 12 Sep 2018 09:51:11 +0200
-Subject: [PATCH v3 03/21] nvmem: use list_for_each_entry_safe in
- nvmem_device_remove_all_cells()
+Date: Wed, 12 Sep 2018 09:51:12 +0200
+Subject: [PATCH v3 04/21] nvmem: remove a stray newline
 In-Reply-To: <20180912075129.25185-1-brgl@bgdev.pl>
 References: <20180912075129.25185-1-brgl@bgdev.pl>
-Message-ID: <20180912075129.25185-4-brgl@bgdev.pl>
+Message-ID: <20180912075129.25185-5-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Use the provided helper for iterating over list entries without having
-to use the list_entry() macro.
+There are two empty lines between devm_nvmem_unregister() and
+__nvmem_device_get(). Remove one.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/nvmem/core.c | 7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
+ drivers/nvmem/core.c | 1 -
+ 1 file changed, 1 deletion(-)
 
 diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index 8987da0f7456..b69005367908 100644
+index b69005367908..b469f700c699 100644
 --- a/drivers/nvmem/core.c
 +++ b/drivers/nvmem/core.c
-@@ -308,14 +308,11 @@ static void nvmem_cell_drop(struct nvmem_cell *cell)
- 
- static void nvmem_device_remove_all_cells(const struct nvmem_device *nvmem)
- {
--	struct nvmem_cell *cell;
--	struct list_head *p, *n;
-+	struct nvmem_cell *cell, *p;
- 
--	list_for_each_safe(p, n, &nvmem_cells) {
--		cell = list_entry(p, struct nvmem_cell, node);
-+	list_for_each_entry_safe(cell, p, &nvmem_cells, node)
- 		if (cell->nvmem == nvmem)
- 			nvmem_cell_drop(cell);
--	}
+@@ -613,7 +613,6 @@ int devm_nvmem_unregister(struct device *dev, struct nvmem_device *nvmem)
  }
+ EXPORT_SYMBOL(devm_nvmem_unregister);
  
- static void nvmem_cell_add(struct nvmem_cell *cell)
+-
+ static struct nvmem_device *__nvmem_device_get(struct device_node *np,
+ 					       struct nvmem_cell **cellp,
+ 					       const char *cell_id)
 -- 
 2.18.0
