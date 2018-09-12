@@ -1,54 +1,48 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 12 Sep 2018 11:32:16 -0700
-Subject: [PATCH v2 2/8] drm/pl111: simplify bridge timing support
-In-Reply-To: <20180912183222.25414-1-stefan@agner.ch>
-References: <20180912183222.25414-1-stefan@agner.ch>
-Message-ID: <20180912183222.25414-3-stefan@agner.ch>
+Date: Wed, 12 Sep 2018 11:32:14 -0700
+Subject: [PATCH v2 0/8] drm/bridge: add bus flag support
+Message-ID: <20180912183222.25414-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simplify bridge timing support by only supporting pixel clock
-polarity. This aligns pixel clock polarity handling for bridges
-with displays.
+This v2 shifted a bit more to rework bridge timing support. While
+my use case mainly cares about complete bus flag support, it seems
+to me that bus timings have ended up to be more complex than
+necessary. Patch 2/3 are an attempt to simplify bus timings. This
+also aligns bridge timings with how display timings are specified
+today.
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- drivers/gpu/drm/pl111/pl111_display.c | 22 ++++++----------------
- 1 file changed, 6 insertions(+), 16 deletions(-)
+@Linus Walleij, Laurent Pinchart: Since you have been involved in
+the initial bus timings discussion, I would like to have your Ack
+on at least patch 2/3... If we want to keep the setup/hold timings,
+the patchset should also work without those two patches.
 
-diff --git a/drivers/gpu/drm/pl111/pl111_display.c b/drivers/gpu/drm/pl111/pl111_display.c
-index 754f6b25f265..31eb62e4476f 100644
---- a/drivers/gpu/drm/pl111/pl111_display.c
-+++ b/drivers/gpu/drm/pl111/pl111_display.c
-@@ -196,23 +196,13 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
- 		const struct drm_bridge_timings *btimings = bridge->timings;
- 
- 		/*
--		 * Here is when things get really fun. Sometimes the bridge
--		 * timings are such that the signal out from PL11x is not
--		 * stable before the receiving bridge (such as a dumb VGA DAC
--		 * or similar) samples it. If that happens, we compensate by
--		 * the only method we have: output the data on the opposite
--		 * edge of the clock so it is for sure stable when it gets
--		 * sampled.
--		 *
--		 * The PL111 manual does not contain proper timining diagrams
--		 * or data for these details, but we know from experiments
--		 * that the setup time is more than 3000 picoseconds (3 ns).
--		 * If we have a bridge that requires the signal to be stable
--		 * earlier than 3000 ps before the clock pulse, we have to
--		 * output the data on the opposite edge to avoid flicker.
-+		 * Use LCD Timing 2 Register Invert Pixel Clock (IPC) bit
-+		 * to make sure to drive data on falling edge if requested
-+		 * by bridge.
- 		 */
--		if (btimings && btimings->setup_time_ps >= 3000)
--			tim2 ^= TIM2_IPC;
-+		if (btimings && btimings->input_bus_flags &
-+		    DRM_BUS_FLAG_PIXDATA_NEGEDGE)
-+			tim2 |= TIM2_IPC;
- 	}
- 
- 	tim2 |= cpl << 16;
+--
+Stefan
+
+Changes in v2:
+- Rename bus_flags to simple_bus_flags
+- Reword dt-bindings for de-active
+- Add patch 2/3 which attempts to simplify bridge timings
+
+Stefan Agner (8):
+  drm/bridge: use bus flags in bridge timings
+  drm/pl111: simplify bridge timing support
+  drm/bridge: simplify bridge timing info
+  drm/bridge: allow to specify data-enable polarity
+  dt-bindings: display: add data-enable polarity property
+  drm/imx: support handling bridge timings bus flags
+  ARM: dts: imx6qdl-apalis: add VGA support
+  ARM: dts: imx6qdl-apalis: add GPIO I2C node for DDC
+
+ .../bindings/display/bridge/dumb-vga-dac.txt  |  2 +
+ arch/arm/boot/dts/imx6q-apalis-eval.dts       | 28 ++++++++
+ arch/arm/boot/dts/imx6qdl-apalis.dtsi         | 72 +++++++++++++++++++
+ drivers/gpu/drm/bridge/dumb-vga-dac.c         | 45 +++++++-----
+ drivers/gpu/drm/imx/parallel-display.c        |  3 +
+ drivers/gpu/drm/pl111/pl111_display.c         | 22 ++----
+ include/drm/drm_bridge.h                      | 25 ++-----
+ 7 files changed, 142 insertions(+), 55 deletions(-)
+
 -- 
 2.18.0
