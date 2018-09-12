@@ -1,160 +1,485 @@
-From: anurag.kumar.vulisha@xilinx.com (Anurag Kumar Vulisha)
-Date: Wed, 12 Sep 2018 21:52:45 +0530
-Subject: [PATCH v4 1/2] phy: zynqmp: Add dt bindings for ZynqMP phy
-In-Reply-To: <1536769366-31398-1-git-send-email-anurag.kumar.vulisha@xilinx.com>
-References: <1536769366-31398-1-git-send-email-anurag.kumar.vulisha@xilinx.com>
-Message-ID: <1536769366-31398-2-git-send-email-anurag.kumar.vulisha@xilinx.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Wed, 12 Sep 2018 18:11:17 +0200
+Subject: [PATCH v6 2/7] clocksource/drivers: Add a new driver for the Atmel
+ ARM TC blocks
+In-Reply-To: <20180912161122.7717-1-alexandre.belloni@bootlin.com>
+References: <20180912161122.7717-1-alexandre.belloni@bootlin.com>
+Message-ID: <20180912161122.7717-3-alexandre.belloni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the document describing dt bindings for ZynqMP
-phy. ZynqMP SOC has a High Speed Processing System Gigabit
-Transceiver which provides PHY capabilties to USB, SATA,
-PCIE, Display Port and Ehernet SGMII controllers.
+Add a driver for the Atmel Timer Counter Blocks. This driver provides a
+clocksource and two clockevent devices.
 
-Signed-off-by: Anurag Kumar Vulisha <anurag.kumar.vulisha@xilinx.com>
+One of the clockevent device is linked to the clocksource counter and so it
+will run at the same frequency. This will be used when there is only on TCB
+channel available for timers.
+
+The other clockevent device runs on a separate TCB channel when available.
+
+This driver uses regmap and syscon to be able to probe early in the boot
+and avoid having to switch on the TCB clocksource later. Using regmap also
+means that unused TCB channels may be used by other drivers (PWM for
+example). read/writel are still used to access channel specific registers
+to avoid the performance impact of regmap (mainly locking).
+
+Tested-by: Alexander Dahl <ada@thorsis.com>
+Tested-by: Andras Szemzo <szemzo.andras@gmail.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
 ---
- Changes in v4:
-	1. Fixed the changes in phy-zynqmp.txt as suggested by "Rob Herring"
-	2. Moved changes from include/dt-bindings/phy/phy.h into Patch 2 to 1
+ drivers/clocksource/Kconfig           |   8 +
+ drivers/clocksource/Makefile          |   3 +-
+ drivers/clocksource/timer-atmel-tcb.c | 409 ++++++++++++++++++++++++++
+ 3 files changed, 419 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clocksource/timer-atmel-tcb.c
 
- Changes in v3:
-	1. Corrected the Documentation as suggested by "Vivek Gautam"
-
- Changes in v2:
-	1. None
----
- .../devicetree/bindings/phy/phy-zynqmp.txt         | 109 +++++++++++++++++++++
- include/dt-bindings/phy/phy.h                      |   2 +
- 2 files changed, 111 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/phy-zynqmp.txt
-
-diff --git a/Documentation/devicetree/bindings/phy/phy-zynqmp.txt b/Documentation/devicetree/bindings/phy/phy-zynqmp.txt
-new file mode 100644
-index 0000000..ed501c4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/phy-zynqmp.txt
-@@ -0,0 +1,109 @@
-+Xilinx ZynqMP PHY binding
-+
-+This binding describes a ZynqMP PHY device that is used to control ZynqMP
-+High Speed Gigabit Transceiver(GT). ZynqMP PS GTR provides four lanes
-+and are used by USB, SATA, PCIE, Display port and Ethernet SGMMI controllers.
-+
-+Phy provider node
-+=================
-+
-+Required properties:
-+- compatible	: Can be "xlnx,zynqmp-psgtr-v1.1" or "xlnx,zynqmp-psgtr"
-+
-+- reg           : Address and length of register sets for each device in
-+                  "reg-names"
-+
-+- reg-names     : The names of the register addresses corresponding to the
-+		  registers filled in "reg":
-+			- serdes: SERDES block register set
-+			- siou: SIOU block register set
-+
-+Optional properties:
-+- xlnx,tx-termination-fix : Include this for fixing functional issue with the
-+		  TX termination resistance in GT, which can be out of spec for
-+		  the XCZU9EG silicon version. This property is not required for
-+		  "xlnx,zynqmp-psgtr-v1.1"
-+
-+Required nodes	:  A sub-node is required for each lane the controller
-+		   provides.
-+
-+Phy sub-nodes
-+=============
-+
-+Required properties:
-+lane at 0:
-+- #phy-cells	: Should be 4
-+
-+lane at 1:
-+- #phy-cells	: Should be 4
-+
-+lane at 2:
-+- #phy-cells	: Should be 4
-+
-+lane at 3:
-+- #phy-cells	: Should be 4
-+
-+Example:
-+	zynqmp_phy: phy at fd400000 {
-+		compatible = "xlnx,zynqmp-psgtr-v1.1";
-+		status = "okay";
-+		reg = <0x0 0xfd400000 0x0 0x40000>, <0x0 0xfd3d0000 0x0 0x1000>;
-+		reg-names = "serdes", "siou";
-+
-+		lane0: lane at 0 {
-+			#phy-cells = <4>;
-+		};
-+		lane1: lane at 1 {
-+			#phy-cells = <4>;
-+		};
-+		lane2: lane at 2 {
-+			#phy-cells = <4>;
-+		};
-+		lane3: lane at 3 {
-+			#phy-cells = <4>;
-+		};
-+	};
-+
-+Specifying phy control of devices
-+=================================
-+
-+Device nodes should specify the configuration required in their "phys"
-+property, containing a phandle to the phy port node and a device type.
-+
-+phys = <PHANDLE CONTROLLER_TYPE CONTROLLER_INSTANCE LANE_REF_CLK LANE_FREQ>;
-+
-+PHANDLE                 = &lane0 or &lane1 or &lane2 or &lane3
-+CONTROLLER_TYPE         = PHY_TYPE_PCIE or PHY_TYPE_SATA or PHY_TYPE_USB
-+			  or PHY_TYPE_DP or PHY_TYPE_SGMII
-+CONTROLLER_INSTANCE     = Depends on controller type used, can be any of
-+				PHY_TYPE_PCIE : 0 or 1 or 2 or 3
-+				PHY_TYPE_SATA : 0 or 1
-+				PHY_TYPE_USB  : 0 or 1
-+				PHY_TYPE_DP   : 0 or 1
-+				PHY_TYPE_SGMII: 0 or 1 or 2 or 3
-+LANE_REF_CLK            = Depends on which lane clock is used as ref clk, can be
-+			  0 or 1 or 2 or 3
-+LANE_FREQ               = Frequency of the reference clock, can be any of the
-+			  below mentioned based on the phy type used
-+- PHY_TYPE_PCIE         = 100Mhz
-+- PHY_TYPE_SGMII        = 125Mhz
-+- PHY_TYPE_SATA         = 125Mhz, 150Mhz
-+- PHY_TYPE_USB          = 26Mhz, 52Mhz, 100Mhz
-+- PHY_TYPE_DP           = 27Mhz, 108Mhz, 135Mhz
-+
-+Example:
-+
-+#include <dt-bindings/phy/phy.h>
-+
-+	usb at fe200000 {
-+		...
-+		phys = <&lane2 PHY_TYPE_USB3 0 2 2600000>;
-+		...
-+	};
-+
-+	zynqmp-display at fd4a0000 {
-+		...
-+		phys = <&lane1 PHY_TYPE_DP 0 1 27000000>,
-+		       <&lane0 PHY_TYPE_DP 1 1 27000000>;
-+		...
-+	};
-diff --git a/include/dt-bindings/phy/phy.h b/include/dt-bindings/phy/phy.h
-index d16e875..09cc0a6 100644
---- a/include/dt-bindings/phy/phy.h
-+++ b/include/dt-bindings/phy/phy.h
-@@ -16,5 +16,7 @@
- #define PHY_TYPE_USB2		3
- #define PHY_TYPE_USB3		4
- #define PHY_TYPE_UFS		5
-+#define PHY_TYPE_DP		6
-+#define PHY_TYPE_SGMII		7
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index a11f4ba98b05..8c7324e409f6 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -403,6 +403,14 @@ config ATMEL_ST
+ 	help
+ 	  Support for the Atmel ST timer.
  
- #endif /* _DT_BINDINGS_PHY */
++config ATMEL_ARM_TCB_CLKSRC
++	bool "Microchip ARM TC Block" if COMPILE_TEST
++	select REGMAP_MMIO
++	depends on GENERIC_CLOCKEVENTS
++	help
++	  This enables build of clocksource and clockevent driver for
++	  the integrated Timer Counter Blocks in Microchip ARM SoCs.
++
+ config CLKSRC_EXYNOS_MCT
+ 	bool "Exynos multi core timer driver" if COMPILE_TEST
+ 	depends on ARM || ARM64
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index db51b2427e8a..0df9384a1230 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -3,7 +3,8 @@ obj-$(CONFIG_TIMER_OF)		+= timer-of.o
+ obj-$(CONFIG_TIMER_PROBE)	+= timer-probe.o
+ obj-$(CONFIG_ATMEL_PIT)		+= timer-atmel-pit.o
+ obj-$(CONFIG_ATMEL_ST)		+= timer-atmel-st.o
+-obj-$(CONFIG_ATMEL_TCB_CLKSRC)	+= tcb_clksrc.o
++obj-$(CONFIG_ATMEL_TCB_CLKSRC) += tcb_clksrc.o
++obj-$(CONFIG_ATMEL_ARM_TCB_CLKSRC)	+= timer-atmel-tcb.o
+ obj-$(CONFIG_X86_PM_TIMER)	+= acpi_pm.o
+ obj-$(CONFIG_SCx200HR_TIMER)	+= scx200_hrt.o
+ obj-$(CONFIG_CS5535_CLOCK_EVENT_SRC)	+= cs5535-clockevt.o
+diff --git a/drivers/clocksource/timer-atmel-tcb.c b/drivers/clocksource/timer-atmel-tcb.c
+new file mode 100644
+index 000000000000..3064881af963
+--- /dev/null
++++ b/drivers/clocksource/timer-atmel-tcb.c
+@@ -0,0 +1,409 @@
++// SPDX-License-Identifier: GPL-2.0
++#include <linux/clk.h>
++#include <linux/clockchips.h>
++#include <linux/clocksource.h>
++#include <linux/interrupt.h>
++#include <linux/kernel.h>
++#include <linux/mfd/syscon.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/regmap.h>
++#include <linux/sched_clock.h>
++#include <soc/at91/atmel_tcb.h>
++
++struct atmel_tcb_clksrc {
++	struct clocksource clksrc;
++	struct clock_event_device clkevt;
++	struct regmap *regmap;
++	void __iomem *base;
++	struct clk *clk[2];
++	char name[20];
++	int channels[2];
++	int bits;
++	int irq;
++	struct {
++		u32 cmr;
++		u32 imr;
++		u32 rc;
++		bool clken;
++	} cache[2];
++	u32 bmr_cache;
++	bool registered;
++	bool clk_enabled;
++};
++
++static struct atmel_tcb_clksrc tc;
++
++static struct clk *tcb_clk_get(struct device_node *node, int channel)
++{
++	struct clk *clk;
++	char clk_name[] = "t0_clk";
++
++	clk_name[1] += channel;
++	clk = of_clk_get_by_name(node->parent, clk_name);
++	if (!IS_ERR(clk))
++		return clk;
++
++	return of_clk_get_by_name(node->parent, "t0_clk");
++}
++
++/*
++ * Clocksource and clockevent using the same channel(s)
++ */
++static u64 tc_get_cycles(struct clocksource *cs)
++{
++	u32 lower, upper;
++
++	do {
++		upper = readl_relaxed(tc.base + ATMEL_TC_CV(tc.channels[1]));
++		lower = readl_relaxed(tc.base + ATMEL_TC_CV(tc.channels[0]));
++	} while (upper != readl_relaxed(tc.base + ATMEL_TC_CV(tc.channels[1])));
++
++	return (upper << 16) | lower;
++}
++
++static u64 tc_get_cycles32(struct clocksource *cs)
++{
++	return readl_relaxed(tc.base + ATMEL_TC_CV(tc.channels[0]));
++}
++
++static u64 notrace tc_sched_clock_read(void)
++{
++	return tc_get_cycles(&tc.clksrc);
++}
++
++static u64 notrace tc_sched_clock_read32(void)
++{
++	return tc_get_cycles32(&tc.clksrc);
++}
++
++static int tcb_clkevt_next_event(unsigned long delta,
++				 struct clock_event_device *d)
++{
++	u32 old, next, cur;
++
++	old = readl(tc.base + ATMEL_TC_CV(tc.channels[0]));
++	next = old + delta;
++	writel(next, tc.base + ATMEL_TC_RC(tc.channels[0]));
++	cur = readl(tc.base + ATMEL_TC_CV(tc.channels[0]));
++
++	/* check whether the delta elapsed while setting the register */
++	if ((next < old && cur < old && cur > next) ||
++	    (next > old && (cur < old || cur > next))) {
++		/*
++		 * Clear the CPCS bit in the status register to avoid
++		 * generating a spurious interrupt next time a valid
++		 * timer event is configured.
++		 */
++		old = readl(tc.base + ATMEL_TC_SR(tc.channels[0]));
++		return -ETIME;
++	}
++
++	writel(ATMEL_TC_CPCS, tc.base + ATMEL_TC_IER(tc.channels[0]));
++
++	return 0;
++}
++
++static irqreturn_t tc_clkevt_irq(int irq, void *handle)
++{
++	unsigned int sr;
++
++	sr = readl(tc.base + ATMEL_TC_SR(tc.channels[0]));
++	if (sr & ATMEL_TC_CPCS) {
++		tc.clkevt.event_handler(&tc.clkevt);
++		return IRQ_HANDLED;
++	}
++
++	return IRQ_NONE;
++}
++
++static int tcb_clkevt_oneshot(struct clock_event_device *dev)
++{
++	if (clockevent_state_oneshot(dev))
++		return 0;
++
++	/*
++	 * Because both clockevent devices may share the same IRQ, we don't want
++	 * the less likely one to stay requested
++	 */
++	return request_irq(tc.irq, tc_clkevt_irq, IRQF_TIMER | IRQF_SHARED,
++			   tc.name, &tc);
++}
++
++static int tcb_clkevt_shutdown(struct clock_event_device *dev)
++{
++	writel(0xff, tc.base + ATMEL_TC_IDR(tc.channels[0]));
++	if (tc.bits == 16)
++		writel(0xff, tc.base + ATMEL_TC_IDR(tc.channels[1]));
++
++	if (!clockevent_state_detached(dev))
++		free_irq(tc.irq, &tc);
++
++	return 0;
++}
++
++static void __init tcb_setup_dual_chan(struct atmel_tcb_clksrc *tc,
++				       int mck_divisor_idx)
++{
++	/* first channel: waveform mode, input mclk/8, clock TIOA on overflow */
++	writel(mck_divisor_idx			/* likely divide-by-8 */
++	       | ATMEL_TC_CMR_WAVE
++	       | ATMEL_TC_CMR_WAVESEL_UP	/* free-run */
++	       | ATMEL_TC_CMR_ACPA(SET)		/* TIOA rises at 0 */
++	       | ATMEL_TC_CMR_ACPC(CLEAR),	/* (duty cycle 50%) */
++	       tc->base + ATMEL_TC_CMR(tc->channels[0]));
++	writel(0x0000, tc->base + ATMEL_TC_RA(tc->channels[0]));
++	writel(0x8000, tc->base + ATMEL_TC_RC(tc->channels[0]));
++	writel(0xff, tc->base + ATMEL_TC_IDR(tc->channels[0]));	/* no irqs */
++	writel(ATMEL_TC_CCR_CLKEN, tc->base + ATMEL_TC_CCR(tc->channels[0]));
++
++	/* second channel: waveform mode, input TIOA */
++	writel(ATMEL_TC_CMR_XC(tc->channels[1])		/* input: TIOA */
++	       | ATMEL_TC_CMR_WAVE
++	       | ATMEL_TC_CMR_WAVESEL_UP,		/* free-run */
++	       tc->base + ATMEL_TC_CMR(tc->channels[1]));
++	writel(0xff, tc->base + ATMEL_TC_IDR(tc->channels[1]));	/* no irqs */
++	writel(ATMEL_TC_CCR_CLKEN, tc->base + ATMEL_TC_CCR(tc->channels[1]));
++
++	/* chain both channel, we assume the previous channel */
++	regmap_write(tc->regmap, ATMEL_TC_BMR,
++		     ATMEL_TC_BMR_TCXC(1 + tc->channels[1], tc->channels[1]));
++	/* then reset all the timers */
++	regmap_write(tc->regmap, ATMEL_TC_BCR, ATMEL_TC_BCR_SYNC);
++}
++
++static void __init tcb_setup_single_chan(struct atmel_tcb_clksrc *tc,
++					 int mck_divisor_idx)
++{
++	/* channel 0:  waveform mode, input mclk/8 */
++	writel(mck_divisor_idx			/* likely divide-by-8 */
++	       | ATMEL_TC_CMR_WAVE
++	       | ATMEL_TC_CMR_WAVESEL_UP,	/* free-run */
++	       tc->base + ATMEL_TC_CMR(tc->channels[0]));
++	writel(0xff, tc->base + ATMEL_TC_IDR(tc->channels[0]));	/* no irqs */
++	writel(ATMEL_TC_CCR_CLKEN, tc->base + ATMEL_TC_CCR(tc->channels[0]));
++
++	/* then reset all the timers */
++	regmap_write(tc->regmap, ATMEL_TC_BCR, ATMEL_TC_BCR_SYNC);
++}
++
++static void tc_clksrc_suspend(struct clocksource *cs)
++{
++	int i;
++
++	for (i = 0; i < 1 + (tc.bits == 16); i++) {
++		tc.cache[i].cmr = readl(tc.base + ATMEL_TC_CMR(tc.channels[i]));
++		tc.cache[i].imr = readl(tc.base + ATMEL_TC_IMR(tc.channels[i]));
++		tc.cache[i].rc = readl(tc.base + ATMEL_TC_RC(tc.channels[i]));
++		tc.cache[i].clken = !!(readl(tc.base +
++					     ATMEL_TC_SR(tc.channels[i])) &
++				       ATMEL_TC_CLKSTA);
++	}
++
++	if (tc.bits == 16)
++		regmap_read(tc.regmap, ATMEL_TC_BMR, &tc.bmr_cache);
++}
++
++static void tc_clksrc_resume(struct clocksource *cs)
++{
++	int i;
++
++	for (i = 0; i < 1 + (tc.bits == 16); i++) {
++		/* Restore registers for the channel, RA and RB are not used  */
++		writel(tc.cache[i].cmr, tc.base + ATMEL_TC_CMR(tc.channels[i]));
++		writel(tc.cache[i].rc, tc.base + ATMEL_TC_RC(tc.channels[i]));
++		writel(0, tc.base + ATMEL_TC_RA(tc.channels[i]));
++		writel(0, tc.base + ATMEL_TC_RB(tc.channels[i]));
++		/* Disable all the interrupts */
++		writel(0xff, tc.base + ATMEL_TC_IDR(tc.channels[i]));
++		/* Reenable interrupts that were enabled before suspending */
++		writel(tc.cache[i].imr, tc.base + ATMEL_TC_IER(tc.channels[i]));
++
++		/* Start the clock if it was used */
++		if (tc.cache[i].clken)
++			writel(ATMEL_TC_CCR_CLKEN, tc.base +
++			       ATMEL_TC_CCR(tc.channels[i]));
++	}
++
++	/* in case of dual channel, chain channels */
++	if (tc.bits == 16)
++		regmap_write(tc.regmap, ATMEL_TC_BMR, tc.bmr_cache);
++	/* Finally, trigger all the channels*/
++	regmap_write(tc.regmap, ATMEL_TC_BCR, ATMEL_TC_BCR_SYNC);
++}
++
++static int __init tcb_clksrc_register(struct device_node *node,
++				      struct regmap *regmap, void __iomem *base,
++				      int channel, int channel1, int irq,
++				      int bits)
++{
++	u32 rate, divided_rate = 0;
++	int best_divisor_idx = -1;
++	int i, err = -1;
++	u64 (*tc_sched_clock)(void);
++
++	tc.regmap = regmap;
++	tc.base = base;
++	tc.channels[0] = channel;
++	tc.channels[1] = channel1;
++	tc.irq = irq;
++	tc.bits = bits;
++
++	tc.clk[0] = tcb_clk_get(node, tc.channels[0]);
++	if (IS_ERR(tc.clk[0]))
++		return PTR_ERR(tc.clk[0]);
++	err = clk_prepare_enable(tc.clk[0]);
++	if (err) {
++		pr_debug("can't enable T0 clk\n");
++		goto err_clk;
++	}
++
++	/* How fast will we be counting?  Pick something over 5 MHz.  */
++	rate = (u32)clk_get_rate(tc.clk[0]);
++	for (i = 0; i < 5; i++) {
++		unsigned int divisor = atmel_tc_divisors[i];
++		unsigned int tmp;
++
++		if (!divisor)
++			continue;
++
++		tmp = rate / divisor;
++		pr_debug("TC: %u / %-3u [%d] --> %u\n", rate, divisor, i, tmp);
++		if (best_divisor_idx > 0) {
++			if (tmp < 5 * 1000 * 1000)
++				continue;
++		}
++		divided_rate = tmp;
++		best_divisor_idx = i;
++	}
++
++	if (tc.bits == 32) {
++		tc.clksrc.read = tc_get_cycles32;
++		tcb_setup_single_chan(&tc, best_divisor_idx);
++		tc_sched_clock = tc_sched_clock_read32;
++		snprintf(tc.name, sizeof(tc.name), "%s:%d",
++			 kbasename(node->parent->full_name), tc.channels[0]);
++	} else {
++		tc.clk[1] = tcb_clk_get(node, tc.channels[1]);
++		if (IS_ERR(tc.clk[1]))
++			goto err_disable_t0;
++
++		err = clk_prepare_enable(tc.clk[1]);
++		if (err) {
++			pr_debug("can't enable T1 clk\n");
++			goto err_clk1;
++		}
++		tc.clksrc.read = tc_get_cycles,
++		tcb_setup_dual_chan(&tc, best_divisor_idx);
++		tc_sched_clock = tc_sched_clock_read;
++		snprintf(tc.name, sizeof(tc.name), "%s:%d,%d",
++			 kbasename(node->parent->full_name), tc.channels[0],
++			 tc.channels[1]);
++	}
++
++	pr_debug("%s at %d.%03d MHz\n", tc.name,
++		 divided_rate / 1000000,
++		 ((divided_rate + 500000) % 1000000) / 1000);
++
++	tc.clksrc.name = tc.name;
++	tc.clksrc.suspend = tc_clksrc_suspend;
++	tc.clksrc.resume = tc_clksrc_resume;
++	tc.clksrc.rating = 200;
++	tc.clksrc.mask = CLOCKSOURCE_MASK(32);
++	tc.clksrc.flags = CLOCK_SOURCE_IS_CONTINUOUS;
++
++	err = clocksource_register_hz(&tc.clksrc, divided_rate);
++	if (err)
++		goto err_disable_t1;
++
++	sched_clock_register(tc_sched_clock, 32, divided_rate);
++
++	tc.registered = true;
++
++	/* Set up and register clockevents */
++	tc.clkevt.name = tc.name;
++	tc.clkevt.cpumask = cpumask_of(0);
++	tc.clkevt.set_next_event = tcb_clkevt_next_event;
++	tc.clkevt.set_state_oneshot = tcb_clkevt_oneshot;
++	tc.clkevt.set_state_shutdown = tcb_clkevt_shutdown;
++	tc.clkevt.features = CLOCK_EVT_FEAT_ONESHOT;
++	tc.clkevt.rating = 125;
++
++	clockevents_config_and_register(&tc.clkevt, divided_rate, 1,
++					BIT(tc.bits) - 1);
++
++	return 0;
++
++err_disable_t1:
++	if (tc.bits == 16)
++		clk_disable_unprepare(tc.clk[1]);
++
++err_clk1:
++	if (tc.bits == 16)
++		clk_put(tc.clk[1]);
++
++err_disable_t0:
++	clk_disable_unprepare(tc.clk[0]);
++
++err_clk:
++	clk_put(tc.clk[0]);
++
++	pr_err("%s: unable to register clocksource/clockevent\n",
++	       tc.clksrc.name);
++
++	return err;
++}
++
++static int __init tcb_clksrc_init(struct device_node *node)
++{
++	const struct of_device_id *match;
++	struct regmap *regmap;
++	void __iomem *tcb_base;
++	u32 channel;
++	int bits, irq, err, chan1 = -1;
++
++	if (tc.registered)
++		return -ENODEV;
++
++	/*
++	 * The regmap has to be used to access registers that are shared
++	 * between channels on the same TCB but we keep direct IO access for
++	 * the counters to avoid the impact on performance
++	 */
++	regmap = syscon_node_to_regmap(node->parent);
++	if (IS_ERR(regmap))
++		return PTR_ERR(regmap);
++
++	tcb_base = of_iomap(node->parent, 0);
++	if (!tcb_base) {
++		pr_err("%s +%d %s\n", __FILE__, __LINE__, __func__);
++		return -ENXIO;
++	}
++
++	match = of_match_node(atmel_tcb_dt_ids, node->parent);
++	bits = (int)match->data;
++
++	err = of_property_read_u32_index(node, "reg", 0, &channel);
++	if (err)
++		return err;
++
++	irq = of_irq_get(node->parent, channel);
++	if (irq < 0) {
++		irq = of_irq_get(node->parent, 0);
++		if (irq < 0)
++			return irq;
++	}
++
++	if (bits == 16) {
++		of_property_read_u32_index(node, "reg", 1, &chan1);
++		if (chan1 == -1) {
++			pr_err("%s: clocksource needs two channels\n",
++			       node->parent->full_name);
++			return -EINVAL;
++		}
++	}
++
++	return tcb_clksrc_register(node, regmap, tcb_base, channel, chan1, irq,
++				   bits);
++}
++TIMER_OF_DECLARE(atmel_tcb_clksrc, "atmel,tcb-timer", tcb_clksrc_init);
 -- 
-2.1.1
+2.19.0.rc2
