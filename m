@@ -1,51 +1,103 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 12 Sep 2018 09:26:12 +0200
-Subject: [PATCH v2 1/4] arm64: dts: rockchip: Split out common nodes for
- Rock960 based boards
-In-Reply-To: <20180912031248.GA4880@Mani-XPS-13-9360>
-References: <20180911023031.4892-1-manivannan.sadhasivam@linaro.org>
- <9e1868684ed851dfa19300ac2e648cfea7bf3eb9.camel@collabora.com>
- <20180912031248.GA4880@Mani-XPS-13-9360>
-Message-ID: <11137562.zz0kzkSHxt@diego>
+From: vkoul@kernel.org (Vinod)
+Date: Wed, 12 Sep 2018 12:56:57 +0530
+Subject: [PATCH v2 2/2] dmaengine: uniphier-mdmac: add UniPhier MIO DMAC
+ driver
+In-Reply-To: <CAK7LNASFyxMTE_kVzja=bUvbDbT6Moz-nZn3=yBKdTWXEQdjXA@mail.gmail.com>
+References: <1535074873-15617-1-git-send-email-yamada.masahiro@socionext.com>
+ <1535074873-15617-3-git-send-email-yamada.masahiro@socionext.com>
+ <20180911070003.GI2634@vkoul-mobl>
+ <CAK7LNASMhKfQT-Hqv48=HqOPRx3OVMtdNBEe=c7dE-B_5_Nuyw@mail.gmail.com>
+ <20180912043530.GE2766@vkoul-mobl>
+ <CAK7LNASFyxMTE_kVzja=bUvbDbT6Moz-nZn3=yBKdTWXEQdjXA@mail.gmail.com>
+Message-ID: <20180912072657.GF2766@vkoul-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 12. September 2018, 05:12:48 CEST schrieb Manivannan Sadhasivam:
-> Hi Ezequiel,
+On 12-09-18, 14:25, Masahiro Yamada wrote:
+> 2018-09-12 13:35 GMT+09:00 Vinod <vkoul@kernel.org>:
+> > On 12-09-18, 12:01, Masahiro Yamada wrote:
+> >> Hi Vinod,
+> >>
+> >>
+> >> 2018-09-11 16:00 GMT+09:00 Vinod <vkoul@kernel.org>:
+> >> > On 24-08-18, 10:41, Masahiro Yamada wrote:
+> >> >
+> >> >> +/* mc->vc.lock must be held by caller */
+> >> >> +static u32 __uniphier_mdmac_get_residue(struct uniphier_mdmac_desc *md)
+> >> >> +{
+> >> >> +     u32 residue = 0;
+> >> >> +     int i;
+> >> >> +
+> >> >> +     for (i = md->sg_cur; i < md->sg_len; i++)
+> >> >> +             residue += sg_dma_len(&md->sgl[i]);
+> >> >
+> >> > so if the descriptor is submitted to hardware, we return the descriptor
+> >> > length, which is not correct.
+> >> >
+> >> > Two cases are required to be handled:
+> >> > 1. Descriptor is in queue (IMO above logic is fine for that, but it can
+> >> > be calculated at descriptor submit and looked up here)
+> >>
+> >> Where do you want it to be calculated?
+> >
+> > where is it calculated now?
 > 
-> On Tue, Sep 11, 2018 at 04:40:29PM -0300, Ezequiel Garcia wrote:
-> > On Tue, 2018-09-11 at 08:00 +0530, Manivannan Sadhasivam wrote:
-> > > Since the same family members of Rock960 boards (Rock960 and Ficus)
-> > > share the same configuration, split out the common nodes into a common
-> > > dtsi file for reducing code duplication. The board specific nodes for
-> > > Ficus boards are then placed in corresponding board DTS file.
-> > 
-> > I think it should be possible to move the common USB nodes to the dtsi
-> > file, and keep the board-specific (phy-supply property) in the dts files:
-> > 
-> > &u2phy0_host {
-> > 
-> >         phy-supply = <&vcc5v0_host>;
-> > 
-> > };
-> > 
-> > &u2phy1_host {
-> > 
-> >         phy-supply = <&vcc5v0_host>;
-> > 
-> > };
 > 
-> We can do that but my intention was to entirely partition the nodes
-> which are not common. So that it would be less confusing when someone
-> looks at it (please correct me if I'm wrong).
+> Please see __uniphier_mdmac_handle().
+> 
+> 
+> It gets the address and size by sg_dma_address(), sg_dma_len()
+> just before setting them to the hardware registers.
+> 
+> 
+>        sg = &md->sgl[md->sg_cur];
+> 
+>        if (md->dir == DMA_MEM_TO_DEV) {
+>                src_mode = UNIPHIER_MDMAC_CH_MODE__ADDR_INC;
+>                src_addr = sg_dma_address(sg);
+>                dest_mode = UNIPHIER_MDMAC_CH_MODE__ADDR_FIXED;
+>                dest_addr = 0;
+>        } else {
+>                src_mode = UNIPHIER_MDMAC_CH_MODE__ADDR_FIXED;
+>                src_addr = 0;
+>                dest_mode = UNIPHIER_MDMAC_CH_MODE__ADDR_INC;
+>                dest_addr = sg_dma_address(sg);
+>        }
+> 
+> 
+> 
+> 
+> 
+> 
+> 
+> >> This hardware provides only simple registers (address and size)
+> >> for one-shot transfer instead of descriptors.
+> >>
+> >> So, I used sgl as-is because I did not see a good reason
+> >> to transform sgl to another data structure.
+> >
+> >
+> >> > this seems missing stuff. Where do you do register calculation for the
+> >> > descriptor and where is slave_config here, how do you know where to
+> >> > send/receive data form/to (peripheral)
+> >>
+> >>
+> >> This dmac is really simple, and un-flexible.
+> >>
+> >> The peripheral address to send/receive data from/to is hard-weird.
+> >> cfg->{src_addr,dst_addr} is not configurable.
+> >>
+> >> Look at __uniphier_mdmac_handle().
+> >> 'dest_addr' and 'src_addr' must be set to 0 for the peripheral.
+> >
+> > Fair enough, what about other values like addr_width and maxburst?
+> 
+> 
+> None of them is configurable.
 
-The supply is actually named the same on both boards, so you could move
-all the usb-nodes to the main dtsi, including the reference to vcc5v0_host
-which would then get defined itself in the two board dts.
+what is configurable here :-)
 
-Then again, seeing that the vcc5v0_host also only differs in the actually
-used gpio another option would be to move the whole regulator node
-to the dtsi and just define the gpio properties in the board dts files.
+Who are the users of this DMA?
 
-
-Heiko
+-- 
+~Vinod
