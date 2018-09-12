@@ -1,33 +1,36 @@
-From: t.jag587@gmail.com (Jagdish Tirumala)
-Date: Wed, 12 Sep 2018 10:29:07 -0700
-Subject: [PATCH] watchdog: diag288_wdt: pointer location foo * bar should be
- foo *bar
-Message-ID: <20180912172907.1802-1-t.jag587@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 12 Sep 2018 10:38:16 -0700
+Subject: [PATCH] gpio: omap: Add level wakeup handling for omap4 based SoCs
+In-Reply-To: <2cfe2f9d-a465-0568-bf48-8dcde535ff99@ti.com>
+References: <20180910200624.4494-1-tony@atomide.com>
+ <444bae18-9737-8e13-2a0f-c08863ae1336@ti.com>
+ <20180911182419.GC5662@atomide.com>
+ <a10ae1a9-ed6a-468e-5a3e-8c120bab9acf@ti.com>
+ <20180912004252.GH5662@atomide.com>
+ <2cfe2f9d-a465-0568-bf48-8dcde535ff99@ti.com>
+Message-ID: <20180912173816.GL5662@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the following checkpatch error:
+* Grygorii Strashko <grygorii.strashko@ti.com> [180912 16:13]:
+> 
+> 
+> On 09/11/2018 07:42 PM, Tony Lindgren wrote:
+> > * Grygorii Strashko <grygorii.strashko@ti.com> [180912 00:27]:
+> > > Thanks Tony, but it's still not completely clear -
+> > > it's important to see values of CLKSTCTRL before/after idle for not working
+> > > case and GPIO SYSC/SYSS registers. There are some combinations which may
+> > > affect on this. So, if you can, pls.
+> > 
+> > Sure I'll do some reg dumps for you tomorrow as I just started
+> > an overnight test with randomly pinging the wlan interface
+> > from outside to make sure it wakes up and keeps idling.
+> 
+> Pls, postpone this until we finish our discussion/debugging
 
-ERROR: pointer location foo * bar should be foo *bar
-FILE: drivers/watchdog/diag288_wdt.c:202
+Yeah I just sent you three gpio dump files privately to avoid
+spamming the list with them.
 
-Signed-off-by: Jagdish Tirumala <t.jag587@gmail.com>
----
- drivers/watchdog/diag288_wdt.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Regards,
 
-diff --git a/drivers/watchdog/diag288_wdt.c b/drivers/watchdog/diag288_wdt.c
-index 806a04a676b7..046333d1beb2 100644
---- a/drivers/watchdog/diag288_wdt.c
-+++ b/drivers/watchdog/diag288_wdt.c
-@@ -199,7 +199,7 @@ static int wdt_ping(struct watchdog_device *dev)
- 	return ret;
- }
- 
--static int wdt_set_timeout(struct watchdog_device * dev, unsigned int new_to)
-+static int wdt_set_timeout(struct watchdog_device *dev, unsigned int new_to)
- {
- 	dev->timeout = new_to;
- 	return wdt_ping(dev);
--- 
-2.17.1
+Tony
