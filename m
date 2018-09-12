@@ -1,53 +1,56 @@
-From: leo.yan@linaro.org (leo.yan at linaro.org)
-Date: Wed, 12 Sep 2018 18:17:53 +0800
-Subject: [PATCH 04/11] dts: qcom: Update coresight bindings for hardware
- ports
-In-Reply-To: <1536661032-30481-5-git-send-email-suzuki.poulose@arm.com>
-References: <1536661032-30481-1-git-send-email-suzuki.poulose@arm.com>
- <1536661032-30481-5-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180912101753.GB3353@leoy-ThinkPad-X240s>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 12 Sep 2018 11:28:20 +0100
+Subject: [PATCH v5 02/27] arm64: cpufeature: Use alternatives for VHE
+ cpu_enable
+In-Reply-To: <1535471497-38854-3-git-send-email-julien.thierry@arm.com>
+References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
+ <1535471497-38854-3-git-send-email-julien.thierry@arm.com>
+Message-ID: <1d425320-aed3-b949-1ec5-f378248aac4d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
+Hi Julien,
 
-On Tue, Sep 11, 2018 at 11:17:05AM +0100, Suzuki K Poulose wrote:
-> Switch to updated coresight bindings for hw ports
+On 28/08/18 16:51, Julien Thierry wrote:
+> The cpu_enable callback for VHE feature requires all alternatives to have
+> been applied. This prevents applying VHE alternative separately from the
+> rest.
 > 
-> Cc: Andy Gross <andy.gross@linaro.org>
-> Cc: David Brown <david.brown@linaro.org>
-> Cc: Ivan T. Ivanov <ivan.ivanov@linaro.org>
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/boot/dts/qcom/msm8916.dtsi | 98 ++++++++++++++++++++++-------------
->  1 file changed, 63 insertions(+), 35 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> index 7b32b89..5bed52b 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> @@ -1099,10 +1099,11 @@
->  			clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
->  			clock-names = "apb_pclk", "atclk";
->  
-> -			port {
-> -				tpiu_in: endpoint {
-> -					slave-mode;
-> -					remote-endpoint = <&replicator_out1>;
-> +			out-ports {
+> Use an alternative depending on VHE feature to know whether VHE
+> alternatives have already been applied.
 
-Here should be in-ports for tpiu node?
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 1e433ac..3bc1c8b 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -1022,8 +1024,15 @@ static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
+>  	 * that, freshly-onlined CPUs will set tpidr_el2, so we don't need to
+>  	 * do anything here.
+>  	 */
+> -	if (!alternatives_applied)
+> -		write_sysreg(read_sysreg(tpidr_el1), tpidr_el2);
+> +	asm volatile(ALTERNATIVE(
+> +		"mrs	%0, tpidr_el1\n"
+> +		"msr	tpidr_el2, %0",
+> +		"nop\n"
+> +		"nop",
+> +		ARM64_HAS_VIRT_HOST_EXTN)
+> +		: "+r" (tmp)
+> +		:
+> +		: "memory");
+>  }
+>  #endif
 
-BTW, if upper comment is valid, this means the DT binding doc also
-gives wrong example for tpiu node [1].
+Catalin's preference was to keep this all in C:
+https://patchwork.kernel.org/patch/10007977/
+, for which we need to know if 'the' alternative has been applied.
 
-I tested this patch with upper changing to 'in-ports', etm with perf
-mode can work well on DB410c board.
+I suspect there may be more registers in this list if we have to switch to
+another EL2 register using alternatives. (but I don't have an example).
 
-[...]
+Could we make 'alternatives_applied' a macro that takes the cap as an argument?
+
 
 Thanks,
-Leo Yan
 
-[1] https://git.linaro.org/kernel/coresight.git/tree/Documentation/devicetree/bindings/arm/coresight.txt?h=next#n135
+James
