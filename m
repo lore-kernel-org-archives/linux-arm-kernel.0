@@ -1,129 +1,171 @@
 From: christophe.leroy@c-s.fr (Christophe Leroy)
-Date: Wed, 12 Sep 2018 15:58:44 +0000 (UTC)
-Subject: [PATCH v2 15/24] powerpc/mm: move __P and __S tables in the common
- pgtable.h
+Date: Wed, 12 Sep 2018 15:59:00 +0000 (UTC)
+Subject: [PATCH v2 23/24] powerpc/8xx: change name of a few page flags to
+ avoid confusion
 In-Reply-To: <cover.1536692743.git.christophe.leroy@c-s.fr>
 References: <cover.1536692743.git.christophe.leroy@c-s.fr>
-Message-ID: <e99eebcd2aafb379cdf8fd39f06399e6abaf3ced.1536692743.git.christophe.leroy@c-s.fr>
+Message-ID: <54802e1bb2df75a6e8352539e13ab7ec96eea43b.1536692743.git.christophe.leroy@c-s.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__P and __S flags are the same for all platform and should remain
-as is in the future, so avoid duplication.
+_PAGE_PRIVILEGED corresponds to the SH bit which doesn't protect
+against user access but only disables ASID verification on kernel
+accesses. User access is controlled with _PMD_USER flag.
+
+Name it _PAGE_SH instead of _PAGE_PRIVILEGED
+
+_PAGE_HUGE corresponds to the SPS bit which doesn't really tells
+that's it is a huge page but only that it is not a 4k page.
+
+Name it _PAGE_SPS instead of _PAGE_HUGE
 
 Reviewed-by: Aneesh Kumar K.V <aneesh.kumar@linux.ibm.com>
 Signed-off-by: Christophe Leroy <christophe.leroy@c-s.fr>
 ---
- arch/powerpc/include/asm/book3s/64/pgtable.h | 20 --------------------
- arch/powerpc/include/asm/pgtable.h           | 19 +++++++++++++++++++
- arch/powerpc/include/asm/pte-common.h        | 20 --------------------
- 3 files changed, 19 insertions(+), 40 deletions(-)
+ arch/powerpc/include/asm/nohash/32/pte-8xx.h | 28 ++++++++++++++--------------
+ arch/powerpc/kernel/head_8xx.S               |  6 +++---
+ arch/powerpc/mm/8xx_mmu.c                    |  2 +-
+ arch/powerpc/mm/dump_linuxpagetables-8xx.c   |  2 +-
+ 4 files changed, 19 insertions(+), 19 deletions(-)
 
-diff --git a/arch/powerpc/include/asm/book3s/64/pgtable.h b/arch/powerpc/include/asm/book3s/64/pgtable.h
-index 8cf44faa6ff3..6799bc02cb22 100644
---- a/arch/powerpc/include/asm/book3s/64/pgtable.h
-+++ b/arch/powerpc/include/asm/book3s/64/pgtable.h
-@@ -151,8 +151,6 @@
-  * Write permissions imply read permissions for now (we could make write-only
-  * pages on BookE but we don't bother for now). Execute permission control is
-  * possible on platforms that define _PAGE_EXEC
-- *
-- * Note due to the way vm flags are laid out, the bits are XWR
+diff --git a/arch/powerpc/include/asm/nohash/32/pte-8xx.h b/arch/powerpc/include/asm/nohash/32/pte-8xx.h
+index 2b4669b3badb..1c57efac089d 100644
+--- a/arch/powerpc/include/asm/nohash/32/pte-8xx.h
++++ b/arch/powerpc/include/asm/nohash/32/pte-8xx.h
+@@ -29,10 +29,10 @@
   */
- #define PAGE_NONE	__pgprot(_PAGE_BASE | _PAGE_PRIVILEGED)
- #define PAGE_SHARED	__pgprot(_PAGE_BASE | _PAGE_RW)
-@@ -162,24 +160,6 @@
- #define PAGE_READONLY	__pgprot(_PAGE_BASE | _PAGE_READ)
- #define PAGE_READONLY_X	__pgprot(_PAGE_BASE | _PAGE_READ | _PAGE_EXEC)
  
--#define __P000	PAGE_NONE
--#define __P001	PAGE_READONLY
--#define __P010	PAGE_COPY
--#define __P011	PAGE_COPY
--#define __P100	PAGE_READONLY_X
--#define __P101	PAGE_READONLY_X
--#define __P110	PAGE_COPY_X
--#define __P111	PAGE_COPY_X
--
--#define __S000	PAGE_NONE
--#define __S001	PAGE_READONLY
--#define __S010	PAGE_SHARED
--#define __S011	PAGE_SHARED
--#define __S100	PAGE_READONLY_X
--#define __S101	PAGE_READONLY_X
--#define __S110	PAGE_SHARED_X
--#define __S111	PAGE_SHARED_X
--
- /* Permission masks used for kernel mappings */
- #define PAGE_KERNEL	__pgprot(_PAGE_BASE | _PAGE_KERNEL_RW)
- #define PAGE_KERNEL_NC	__pgprot(_PAGE_BASE_NC | _PAGE_KERNEL_RW | \
-diff --git a/arch/powerpc/include/asm/pgtable.h b/arch/powerpc/include/asm/pgtable.h
-index 14c79a7dc855..fb4b85bba110 100644
---- a/arch/powerpc/include/asm/pgtable.h
-+++ b/arch/powerpc/include/asm/pgtable.h
-@@ -20,6 +20,25 @@ struct mm_struct;
- #include <asm/nohash/pgtable.h>
- #endif /* !CONFIG_PPC_BOOK3S */
+ /* Definitions for 8xx embedded chips. */
+-#define _PAGE_PRESENT	0x0001	/* Page is valid */
+-#define _PAGE_NO_CACHE	0x0002	/* I: cache inhibit */
+-#define _PAGE_PRIVILEGED	0x0004	/* No ASID (context) compare */
+-#define _PAGE_HUGE	0x0008	/* SPS: Small Page Size (1 if 16k, 512k or 8M)*/
++#define _PAGE_PRESENT	0x0001	/* V: Page is valid */
++#define _PAGE_NO_CACHE	0x0002	/* CI: cache inhibit */
++#define _PAGE_SH	0x0004	/* SH: No ASID (context) compare */
++#define _PAGE_SPS	0x0008	/* SPS: Small Page Size (1 if 16k, 512k or 8M)*/
+ #define _PAGE_DIRTY	0x0100	/* C: page changed */
  
-+/* Note due to the way vm flags are laid out, the bits are XWR */
-+#define __P000	PAGE_NONE
-+#define __P001	PAGE_READONLY
-+#define __P010	PAGE_COPY
-+#define __P011	PAGE_COPY
-+#define __P100	PAGE_READONLY_X
-+#define __P101	PAGE_READONLY_X
-+#define __P110	PAGE_COPY_X
-+#define __P111	PAGE_COPY_X
-+
-+#define __S000	PAGE_NONE
-+#define __S001	PAGE_READONLY
-+#define __S010	PAGE_SHARED
-+#define __S011	PAGE_SHARED
-+#define __S100	PAGE_READONLY_X
-+#define __S101	PAGE_READONLY_X
-+#define __S110	PAGE_SHARED_X
-+#define __S111	PAGE_SHARED_X
-+
- #ifndef __ASSEMBLY__
+ /* These 4 software bits must be masked out when the L2 entry is loaded
+@@ -50,15 +50,15 @@
+ #define _PAGE_COHERENT	0
+ #define _PAGE_WRITETHRU	0
  
- #include <asm/tlbflush.h>
-diff --git a/arch/powerpc/include/asm/pte-common.h b/arch/powerpc/include/asm/pte-common.h
-index 5a5ba43bdf98..4860dae76dae 100644
---- a/arch/powerpc/include/asm/pte-common.h
-+++ b/arch/powerpc/include/asm/pte-common.h
-@@ -139,8 +139,6 @@ static inline bool pte_user(pte_t pte)
-  * Write permissions imply read permissions for now (we could make write-only
-  * pages on BookE but we don't bother for now). Execute permission control is
-  * possible on platforms that define _PAGE_EXEC
-- *
-- * Note due to the way vm flags are laid out, the bits are XWR
-  */
- #define PAGE_NONE	__pgprot(_PAGE_BASE | _PAGE_NA)
- #define PAGE_SHARED	__pgprot(_PAGE_BASE | _PAGE_USER | _PAGE_RW)
-@@ -153,24 +151,6 @@ static inline bool pte_user(pte_t pte)
- #define PAGE_READONLY_X	__pgprot(_PAGE_BASE | _PAGE_USER | _PAGE_RO | \
- 				 _PAGE_EXEC)
+-#define _PAGE_KERNEL_RO		(_PAGE_PRIVILEGED | _PAGE_RO)
+-#define _PAGE_KERNEL_ROX	(_PAGE_PRIVILEGED | _PAGE_RO | _PAGE_EXEC)
+-#define _PAGE_KERNEL_RW		(_PAGE_PRIVILEGED | _PAGE_DIRTY)
+-#define _PAGE_KERNEL_RWX	(_PAGE_PRIVILEGED | _PAGE_DIRTY | _PAGE_EXEC)
++#define _PAGE_KERNEL_RO		(_PAGE_SH | _PAGE_RO)
++#define _PAGE_KERNEL_ROX	(_PAGE_SH | _PAGE_RO | _PAGE_EXEC)
++#define _PAGE_KERNEL_RW		(_PAGE_SH | _PAGE_DIRTY)
++#define _PAGE_KERNEL_RWX	(_PAGE_SH | _PAGE_DIRTY | _PAGE_EXEC)
  
--#define __P000	PAGE_NONE
--#define __P001	PAGE_READONLY
--#define __P010	PAGE_COPY
--#define __P011	PAGE_COPY
--#define __P100	PAGE_READONLY_X
--#define __P101	PAGE_READONLY_X
--#define __P110	PAGE_COPY_X
--#define __P111	PAGE_COPY_X
--
--#define __S000	PAGE_NONE
--#define __S001	PAGE_READONLY
--#define __S010	PAGE_SHARED
--#define __S011	PAGE_SHARED
--#define __S100	PAGE_READONLY_X
--#define __S101	PAGE_READONLY_X
--#define __S110	PAGE_SHARED_X
--#define __S111	PAGE_SHARED_X
--
- /* Permission masks used for kernel mappings */
- #define PAGE_KERNEL	__pgprot(_PAGE_BASE | _PAGE_KERNEL_RW)
- #define PAGE_KERNEL_NC	__pgprot(_PAGE_BASE_NC | _PAGE_KERNEL_RW | \
+ /* Mask of bits returned by pte_pgprot() */
+ #define PAGE_PROT_BITS	(_PAGE_GUARDED | _PAGE_NO_CACHE | \
+ 			 _PAGE_ACCESSED | _PAGE_RO | _PAGE_NA | \
+-			 _PAGE_PRIVILEGED | _PAGE_DIRTY | _PAGE_EXEC)
++			 _PAGE_SH | _PAGE_DIRTY | _PAGE_EXEC)
+ 
+ #define _PMD_PRESENT	0x0001
+ #define _PMD_PRESENT_MASK	_PMD_PRESENT
+@@ -74,7 +74,7 @@
+ #define PTE_ATOMIC_UPDATES	1
+ 
+ #ifdef CONFIG_PPC_16K_PAGES
+-#define _PAGE_PSIZE	_PAGE_HUGE
++#define _PAGE_PSIZE	_PAGE_SPS
+ #else
+ #define _PAGE_PSIZE		0
+ #endif
+@@ -115,28 +115,28 @@ static inline pte_t pte_mkwrite(pte_t pte)
+ 
+ static inline bool pte_user(pte_t pte)
+ {
+-	return !(pte_val(pte) & _PAGE_PRIVILEGED);
++	return !(pte_val(pte) & _PAGE_SH);
+ }
+ 
+ #define pte_user pte_user
+ 
+ static inline pte_t pte_mkprivileged(pte_t pte)
+ {
+-	return __pte(pte_val(pte) | _PAGE_PRIVILEGED);
++	return __pte(pte_val(pte) | _PAGE_SH);
+ }
+ 
+ #define pte_mkprivileged pte_mkprivileged
+ 
+ static inline pte_t pte_mkuser(pte_t pte)
+ {
+-	return __pte(pte_val(pte) & ~_PAGE_PRIVILEGED);
++	return __pte(pte_val(pte) & ~_PAGE_SH);
+ }
+ 
+ #define pte_mkuser pte_mkuser
+ 
+ static inline pte_t pte_mkhuge(pte_t pte)
+ {
+-	return __pte(pte_val(pte) | _PAGE_HUGE);
++	return __pte(pte_val(pte) | _PAGE_SPS);
+ }
+ 
+ #define pte_mkhuge pte_mkhuge
+diff --git a/arch/powerpc/kernel/head_8xx.S b/arch/powerpc/kernel/head_8xx.S
+index 6582f824d620..134a573a9f2d 100644
+--- a/arch/powerpc/kernel/head_8xx.S
++++ b/arch/powerpc/kernel/head_8xx.S
+@@ -642,7 +642,7 @@ DTLBMissIMMR:
+ 	mtspr	SPRN_MD_TWC, r10
+ 	mfspr	r10, SPRN_IMMR			/* Get current IMMR */
+ 	rlwinm	r10, r10, 0, 0xfff80000		/* Get 512 kbytes boundary */
+-	ori	r10, r10, 0xf0 | MD_SPS16K | _PAGE_PRIVILEGED | _PAGE_DIRTY | \
++	ori	r10, r10, 0xf0 | MD_SPS16K | _PAGE_SH | _PAGE_DIRTY | \
+ 			  _PAGE_PRESENT | _PAGE_NO_CACHE
+ 	mtspr	SPRN_MD_RPN, r10	/* Update TLB entry */
+ 
+@@ -660,7 +660,7 @@ DTLBMissLinear:
+ 	li	r11, MD_PS8MEG | MD_SVALID | M_APG2
+ 	mtspr	SPRN_MD_TWC, r11
+ 	rlwinm	r10, r10, 0, 0x0f800000	/* 8xx supports max 256Mb RAM */
+-	ori	r10, r10, 0xf0 | MD_SPS16K | _PAGE_PRIVILEGED | _PAGE_DIRTY | \
++	ori	r10, r10, 0xf0 | MD_SPS16K | _PAGE_SH | _PAGE_DIRTY | \
+ 			  _PAGE_PRESENT
+ 	mtspr	SPRN_MD_RPN, r10	/* Update TLB entry */
+ 
+@@ -679,7 +679,7 @@ ITLBMissLinear:
+ 	li	r11, MI_PS8MEG | MI_SVALID | M_APG2
+ 	mtspr	SPRN_MI_TWC, r11
+ 	rlwinm	r10, r10, 0, 0x0f800000	/* 8xx supports max 256Mb RAM */
+-	ori	r10, r10, 0xf0 | MI_SPS16K | _PAGE_PRIVILEGED | _PAGE_DIRTY | \
++	ori	r10, r10, 0xf0 | MI_SPS16K | _PAGE_SH | _PAGE_DIRTY | \
+ 			  _PAGE_PRESENT
+ 	mtspr	SPRN_MI_RPN, r10	/* Update TLB entry */
+ 
+diff --git a/arch/powerpc/mm/8xx_mmu.c b/arch/powerpc/mm/8xx_mmu.c
+index 9137361d687d..36484a2ef915 100644
+--- a/arch/powerpc/mm/8xx_mmu.c
++++ b/arch/powerpc/mm/8xx_mmu.c
+@@ -67,7 +67,7 @@ void __init MMU_init_hw(void)
+ 	/* PIN up to the 3 first 8Mb after IMMR in DTLB table */
+ #ifdef CONFIG_PIN_TLB_DATA
+ 	unsigned long ctr = mfspr(SPRN_MD_CTR) & 0xfe000000;
+-	unsigned long flags = 0xf0 | MD_SPS16K | _PAGE_PRIVILEGED | _PAGE_DIRTY;
++	unsigned long flags = 0xf0 | MD_SPS16K | _PAGE_SH | _PAGE_DIRTY;
+ #ifdef CONFIG_PIN_TLB_IMMR
+ 	int i = 29;
+ #else
+diff --git a/arch/powerpc/mm/dump_linuxpagetables-8xx.c b/arch/powerpc/mm/dump_linuxpagetables-8xx.c
+index 33f52a97975b..ab9e3f24db2f 100644
+--- a/arch/powerpc/mm/dump_linuxpagetables-8xx.c
++++ b/arch/powerpc/mm/dump_linuxpagetables-8xx.c
+@@ -11,7 +11,7 @@
+ 
+ static const struct flag_info flag_array[] = {
+ 	{
+-		.mask	= _PAGE_PRIVILEGED,
++		.mask	= _PAGE_SH,
+ 		.val	= 0,
+ 		.set	= "user",
+ 		.clear	= "    ",
 -- 
 2.13.3
