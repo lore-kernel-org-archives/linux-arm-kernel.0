@@ -1,45 +1,43 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed, 12 Sep 2018 09:51:13 +0200
-Subject: [PATCH v3 05/21] nvmem: check the return value of nvmem_add_cells()
+Date: Wed, 12 Sep 2018 09:51:11 +0200
+Subject: [PATCH v3 03/21] nvmem: use list_for_each_entry_safe in
+ nvmem_device_remove_all_cells()
 In-Reply-To: <20180912075129.25185-1-brgl@bgdev.pl>
 References: <20180912075129.25185-1-brgl@bgdev.pl>
-Message-ID: <20180912075129.25185-6-brgl@bgdev.pl>
+Message-ID: <20180912075129.25185-4-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-This function can fail so check its return value in nvmem_register()
-and act accordingly.
+Use the provided helper for iterating over list entries without having
+to use the list_entry() macro.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/nvmem/core.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+ drivers/nvmem/core.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index b469f700c699..ffed8fa16936 100644
+index 8987da0f7456..b69005367908 100644
 --- a/drivers/nvmem/core.c
 +++ b/drivers/nvmem/core.c
-@@ -512,11 +512,17 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
- 			goto err_device_del;
- 	}
+@@ -308,14 +308,11 @@ static void nvmem_cell_drop(struct nvmem_cell *cell)
  
--	if (config->cells)
--		nvmem_add_cells(nvmem, config->cells, config->ncells);
-+	if (config->cells) {
-+		rval = nvmem_add_cells(nvmem, config->cells, config->ncells);
-+		if (rval)
-+			goto err_teardown_compat;
-+	}
+ static void nvmem_device_remove_all_cells(const struct nvmem_device *nvmem)
+ {
+-	struct nvmem_cell *cell;
+-	struct list_head *p, *n;
++	struct nvmem_cell *cell, *p;
  
- 	return nvmem;
+-	list_for_each_safe(p, n, &nvmem_cells) {
+-		cell = list_entry(p, struct nvmem_cell, node);
++	list_for_each_entry_safe(cell, p, &nvmem_cells, node)
+ 		if (cell->nvmem == nvmem)
+ 			nvmem_cell_drop(cell);
+-	}
+ }
  
-+err_teardown_compat:
-+	if (config->compat)
-+		device_remove_bin_file(nvmem->base_dev, &nvmem->eeprom);
- err_device_del:
- 	device_del(&nvmem->dev);
- err_put_device:
+ static void nvmem_cell_add(struct nvmem_cell *cell)
 -- 
 2.18.0
