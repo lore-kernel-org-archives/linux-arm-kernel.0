@@ -1,136 +1,58 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 12 Sep 2018 11:29:41 +0100
-Subject: [PATCH v5 03/27] arm64: alternative: Apply alternatives early in
- boot process
-In-Reply-To: <1535471497-38854-4-git-send-email-julien.thierry@arm.com>
-References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
- <1535471497-38854-4-git-send-email-julien.thierry@arm.com>
-Message-ID: <3becf020-b230-beb8-b304-d8097377f234@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 12 Sep 2018 11:31:01 +0100
+Subject: [PATCH 04/11] dts: qcom: Update coresight bindings for hardware
+ ports
+In-Reply-To: <20180912101753.GB3353@leoy-ThinkPad-X240s>
+References: <1536661032-30481-1-git-send-email-suzuki.poulose@arm.com>
+ <1536661032-30481-5-git-send-email-suzuki.poulose@arm.com>
+ <20180912101753.GB3353@leoy-ThinkPad-X240s>
+Message-ID: <98004d69-8be3-ab3f-b622-92236489e9c2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julien,
+Hi Leo,
 
-On 28/08/18 16:51, Julien Thierry wrote:
-> From: Daniel Thompson <daniel.thompson@linaro.org>
+On 12/09/18 11:17, leo.yan at linaro.org wrote:
+> Hi Suzuki,
 > 
-> Currently alternatives are applied very late in the boot process (and
-> a long time after we enable scheduling). Some alternative sequences,
-> such as those that alter the way CPU context is stored, must be applied
-> much earlier in the boot sequence.
+> On Tue, Sep 11, 2018 at 11:17:05AM +0100, Suzuki K Poulose wrote:
+>> Switch to updated coresight bindings for hw ports
+>>
+>> Cc: Andy Gross <andy.gross@linaro.org>
+>> Cc: David Brown <david.brown@linaro.org>
+>> Cc: Ivan T. Ivanov <ivan.ivanov@linaro.org>
+>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>>   arch/arm64/boot/dts/qcom/msm8916.dtsi | 98 ++++++++++++++++++++++-------------
+>>   1 file changed, 63 insertions(+), 35 deletions(-)
+>>
+>> diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+>> index 7b32b89..5bed52b 100644
+>> --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
+>> +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+>> @@ -1099,10 +1099,11 @@
+>>   			clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
+>>   			clock-names = "apb_pclk", "atclk";
+>>   
+>> -			port {
+>> -				tpiu_in: endpoint {
+>> -					slave-mode;
+>> -					remote-endpoint = <&replicator_out1>;
+>> +			out-ports {
 > 
-> Introduce apply_boot_alternatives() to allow some alternatives to be
-> applied immediately after we detect the CPU features of the boot CPU.
+> Here should be in-ports for tpiu node?
+> 
+> BTW, if upper comment is valid, this means the DT binding doc also
+> gives wrong example for tpiu node [1].
 
+You are right on both counts.
 
-> diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
-> index b5d6039..70c2604 100644
-> --- a/arch/arm64/kernel/alternative.c
-> +++ b/arch/arm64/kernel/alternative.c
-> @@ -145,7 +145,8 @@ static void clean_dcache_range_nopatch(u64 start, u64 end)
->  	} while (cur += d_size, cur < end);
->  }
->  
-> -static void __apply_alternatives(void *alt_region, bool is_module)
-> +static void __apply_alternatives(void *alt_region,  bool is_module,
-> +				 unsigned long feature_mask)
+> 
+> I tested this patch with upper changing to 'in-ports', etm with perf
+> mode can work well on DB410c board.
+> 
 
-Shouldn't feature_mask be a DECLARE_BITMAP() maybe-array like cpu_hwcaps?
-This means it keeps working when NR_CAPS grows over 64, which might happen
-sooner than we think for backported errata...
+Thanks a lot for the testing. I will fix both the problems.
 
-
-> @@ -155,6 +156,9 @@ static void __apply_alternatives(void *alt_region, bool is_module)
->  	for (alt = region->begin; alt < region->end; alt++) {
->  		int nr_inst;
->  
-> +		if ((BIT(alt->cpufeature) & feature_mask) == 0)
-> +			continue;
-> +
->  		/* Use ARM64_CB_PATCH as an unconditional patch */
->  		if (alt->cpufeature < ARM64_CB_PATCH &&
->  		    !cpus_have_cap(alt->cpufeature))
-> @@ -213,7 +217,7 @@ static int __apply_alternatives_multi_stop(void *unused)
->  		isb();
->  	} else {
->  		BUG_ON(alternatives_applied);
-> -		__apply_alternatives(&region, false);
-> +		__apply_alternatives(&region, false, ~boot_capabilities);
-
-Ah, this is tricky. There is a bitmap_complement() for the DECLARE_BITMAP()
-stuff, but we'd need a second array...
-
-We could pass the scope around, but then __apply_alternatives() would need to
-lookup the struct arm64_cpu_capabilities up every time. This is only a problem
-as we have one cap-number-space for errata/features, but separate sparse lists.
-
-(I think applying the alternatives one cap at a time is a bad idea as we would
-need to walk the alternative region NR_CAPS times)
-
-
-> @@ -227,6 +231,24 @@ void __init apply_alternatives_all(void)
->  	stop_machine(__apply_alternatives_multi_stop, NULL, cpu_online_mask);
->  }
->  
-> +/*
-> + * This is called very early in the boot process (directly after we run
-> + * a feature detect on the boot CPU). No need to worry about other CPUs
-> + * here.
-> + */
-> +void __init apply_boot_alternatives(void)
-> +{
-> +	struct alt_region region = {
-> +		.begin	= (struct alt_instr *)__alt_instructions,
-> +		.end	= (struct alt_instr *)__alt_instructions_end,
-> +	};
-> +
-> +	/* If called on non-boot cpu things could go wrong */
-> +	WARN_ON(smp_processor_id() != 0);
-
-Isn't the problem if there are multiple CPUs online?
-
-
-> +	__apply_alternatives(&region, false, boot_capabilities);
-> +}
-> +
->  #ifdef CONFIG_MODULES
->  void apply_alternatives_module(void *start, size_t length)
->  {
-
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 3bc1c8b..0d1e41e 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -52,6 +52,8 @@
->  DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
->  EXPORT_SYMBOL(cpu_hwcaps);
->  
-> +unsigned long boot_capabilities;
-> +
->  /*
->   * Flag to indicate if we have computed the system wide
->   * capabilities based on the boot time active CPUs. This
-> @@ -1375,6 +1377,9 @@ static void __update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
->  		if (!cpus_have_cap(caps->capability) && caps->desc)
->  			pr_info("%s %s\n", info, caps->desc);
->  		cpus_set_cap(caps->capability);
-
-Hmm, the bitmap behind cpus_set_cap() is what cpus_have_cap() in
-__apply_alternatives() looks at. If you had a call to __apply_alternatives after
-update_cpu_capabilities(SCOPE_BOOT_CPU), but before any others, it would only
-apply those alternatives...
-
-(I don't think there is a problem re-applying the same alternative, but I
-haven't checked).
-
-
-> +
-> +		if (caps->type & SCOPE_BOOT_CPU)
-> +			__set_bit(caps->capability, &boot_capabilities);
->  	}
->  }
-
-
-Thanks,
-
-James
+Suzuki
