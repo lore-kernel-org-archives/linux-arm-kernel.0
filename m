@@ -1,44 +1,42 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed, 12 Sep 2018 09:51:15 +0200
-Subject: [PATCH v3 07/21] nvmem: lpc18xx_eeprom: use devm_nvmem_register()
+Date: Wed, 12 Sep 2018 09:51:17 +0200
+Subject: [PATCH v3 09/21] nvmem: mxs-ocotp: use devm_nvmem_register()
 In-Reply-To: <20180912075129.25185-1-brgl@bgdev.pl>
 References: <20180912075129.25185-1-brgl@bgdev.pl>
-Message-ID: <20180912075129.25185-8-brgl@bgdev.pl>
+Message-ID: <20180912075129.25185-10-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Use the managed version of nvmem_register().
+Use the resource managed variant of nvmem_register();
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/nvmem/lpc18xx_eeprom.c | 6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
+ drivers/nvmem/mxs-ocotp.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/nvmem/lpc18xx_eeprom.c b/drivers/nvmem/lpc18xx_eeprom.c
-index a9534a6e8636..b42dbaddb419 100644
---- a/drivers/nvmem/lpc18xx_eeprom.c
-+++ b/drivers/nvmem/lpc18xx_eeprom.c
-@@ -236,7 +236,7 @@ static int lpc18xx_eeprom_probe(struct platform_device *pdev)
- 	lpc18xx_nvmem_config.dev = dev;
- 	lpc18xx_nvmem_config.priv = eeprom;
- 
--	eeprom->nvmem = nvmem_register(&lpc18xx_nvmem_config);
-+	eeprom->nvmem = devm_nvmem_register(dev, &lpc18xx_nvmem_config);
- 	if (IS_ERR(eeprom->nvmem)) {
- 		ret = PTR_ERR(eeprom->nvmem);
+diff --git a/drivers/nvmem/mxs-ocotp.c b/drivers/nvmem/mxs-ocotp.c
+index 7018e2ef5714..53122f59c4b2 100644
+--- a/drivers/nvmem/mxs-ocotp.c
++++ b/drivers/nvmem/mxs-ocotp.c
+@@ -177,7 +177,7 @@ static int mxs_ocotp_probe(struct platform_device *pdev)
+ 	ocotp_config.size = data->size;
+ 	ocotp_config.priv = otp;
+ 	ocotp_config.dev = dev;
+-	otp->nvmem = nvmem_register(&ocotp_config);
++	otp->nvmem = devm_nvmem_register(dev, &ocotp_config);
+ 	if (IS_ERR(otp->nvmem)) {
+ 		ret = PTR_ERR(otp->nvmem);
  		goto err_clk;
-@@ -257,10 +257,6 @@ static int lpc18xx_eeprom_remove(struct platform_device *pdev)
- 	struct lpc18xx_eeprom_dev *eeprom = platform_get_drvdata(pdev);
- 	int ret;
+@@ -199,7 +199,7 @@ static int mxs_ocotp_remove(struct platform_device *pdev)
  
--	ret = nvmem_unregister(eeprom->nvmem);
--	if (ret < 0)
--		return ret;
--
- 	clk_disable_unprepare(eeprom->clk);
+ 	clk_unprepare(otp->clk);
  
- 	return 0;
+-	return nvmem_unregister(otp->nvmem);
++	return 0;
+ }
+ 
+ static struct platform_driver mxs_ocotp_driver = {
 -- 
 2.18.0
