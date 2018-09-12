@@ -1,125 +1,89 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 12 Sep 2018 15:50:03 +0200
-Subject: [PATCH v4 6/6] drm/rockchip: dw_hdmi: add dw-hdmi support for the
- rk3328
-In-Reply-To: <AM0PR03MB46769977FF55C3AC6F65E001AC050@AM0PR03MB4676.eurprd03.prod.outlook.com>
-References: <20180910092223.1106-1-heiko@sntech.de>
- <20180910092223.1106-7-heiko@sntech.de>
- <AM0PR03MB46769977FF55C3AC6F65E001AC050@AM0PR03MB4676.eurprd03.prod.outlook.com>
-Message-ID: <12703438.MgSoJEdsAQ@phil>
+Date: Wed, 12 Sep 2018 16:05:28 +0200
+Subject: [PATCH v2 1/4] arm64: dts: rockchip: Split out common nodes for
+ Rock960 based boards
+In-Reply-To: <20180912082244.GA16509@Mani-XPS-13-9360>
+References: <20180911023031.4892-1-manivannan.sadhasivam@linaro.org>
+ <11137562.zz0kzkSHxt@diego> <20180912082244.GA16509@Mani-XPS-13-9360>
+Message-ID: <2062942.2GzzSlpOsc@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 10. September 2018, 17:15:46 CEST schrieb Jonas Karlman:
-> Hi Heiko,
-> 
-> CEC is not working when CEC 5V is enabled
-> 
-> On 2018-09-10 11:22, Heiko Stuebner wrote:
-> 
-> > The rk3328 uses a dw-hdmi controller with an external hdmi phy from
-> > Innosilicon which uses the generic phy framework for access.
-> > Add the necessary data and the compatible for the rk3328 to the
-> > rockchip dw-hdmi driver.
+Am Mittwoch, 12. September 2018, 10:22:44 CEST schrieb Manivannan Sadhasivam:
+> On Wed, Sep 12, 2018 at 09:26:12AM +0200, Heiko St?bner wrote:
+> > Am Mittwoch, 12. September 2018, 05:12:48 CEST schrieb Manivannan Sadhasivam:
+> > > Hi Ezequiel,
+> > > 
+> > > On Tue, Sep 11, 2018 at 04:40:29PM -0300, Ezequiel Garcia wrote:
+> > > > On Tue, 2018-09-11 at 08:00 +0530, Manivannan Sadhasivam wrote:
+> > > > > Since the same family members of Rock960 boards (Rock960 and Ficus)
+> > > > > share the same configuration, split out the common nodes into a common
+> > > > > dtsi file for reducing code duplication. The board specific nodes for
+> > > > > Ficus boards are then placed in corresponding board DTS file.
+> > > > 
+> > > > I think it should be possible to move the common USB nodes to the dtsi
+> > > > file, and keep the board-specific (phy-supply property) in the dts files:
+> > > > 
+> > > > &u2phy0_host {
+> > > > 
+> > > >         phy-supply = <&vcc5v0_host>;
+> > > > 
+> > > > };
+> > > > 
+> > > > &u2phy1_host {
+> > > > 
+> > > >         phy-supply = <&vcc5v0_host>;
+> > > > 
+> > > > };
+> > > 
+> > > We can do that but my intention was to entirely partition the nodes
+> > > which are not common. So that it would be less confusing when someone
+> > > looks at it (please correct me if I'm wrong).
+> > 
+> > The supply is actually named the same on both boards, so you could move
+> > all the usb-nodes to the main dtsi, including the reference to vcc5v0_host
+> > which would then get defined itself in the two board dts.
+> > 
+> > Then again, seeing that the vcc5v0_host also only differs in the actually
+> > used gpio another option would be to move the whole regulator node
+> > to the dtsi and just define the gpio properties in the board dts files.
 > >
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > Tested-by: Robin Murphy <robin.murphy@arm.com>
-> > Acked-by: Rob Herring <robh@kernel.org>
-> >
-> > changes in v3:
-> > - reword as suggested by Rob to show that it's a dw-hdmi + Inno phy
-> > ---
-> >  .../display/rockchip/dw_hdmi-rockchip.txt     |   1 +
-> >  drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c   | 106 ++++++++++++++++++
-> >  2 files changed, 107 insertions(+)
-> >
-> > diff --git a/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-> > index 937bfb472e1d..39143424a474 100644
-> > --- a/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-> > +++ b/Documentation/devicetree/bindings/display/rockchip/dw_hdmi-rockchip.txt
-> > @@ -13,6 +13,7 @@ Required properties:
-> >  
-> >  - compatible: should be one of the following:
-> >  		"rockchip,rk3288-dw-hdmi"
-> > +		"rockchip,rk3328-dw-hdmi"
-> >  		"rockchip,rk3399-dw-hdmi"
-> >  - reg: See dw_hdmi.txt.
-> >  - reg-io-width: See dw_hdmi.txt. Shall be 4.
-> > diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-> > index 19f002fa0a09..237f31fd8403 100644
-> > --- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-> > +++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-> > @@ -25,6 +25,24 @@
-> >  
-> >  #define RK3288_GRF_SOC_CON6		0x025C
-> >  #define RK3288_HDMI_LCDC_SEL		BIT(4)
-> > +#define RK3328_GRF_SOC_CON2		0x0408
-> > +
-> > +#define RK3328_HDMI_SDAIN_MSK		BIT(11)
-> > +#define RK3328_HDMI_SCLIN_MSK		BIT(10)
-> > +#define RK3328_HDMI_HPD_IOE		BIT(2)
-> > +#define RK3328_GRF_SOC_CON3		0x040c
-> > +/* need to be unset if hdmi or i2c should control voltage */
-> > +#define RK3328_HDMI_SDA5V_GRF		BIT(15)
-> > +#define RK3328_HDMI_SCL5V_GRF		BIT(14)
-> > +#define RK3328_HDMI_HPD5V_GRF		BIT(13)
-> > +#define RK3328_HDMI_CEC5V_GRF		BIT(12)
-> > +#define RK3328_GRF_SOC_CON4		0x0410
-> > +#define RK3328_HDMI_HPD_SARADC		BIT(13)
-> > +#define RK3328_HDMI_CEC_5V		BIT(11)
-> > +#define RK3328_HDMI_SDA_5V		BIT(10)
-> > +#define RK3328_HDMI_SCL_5V		BIT(9)
-> > +#define RK3328_HDMI_HPD_5V		BIT(8)
-> > +
-> >  #define RK3399_GRF_SOC_CON20		0x6250
-> >  #define RK3399_HDMI_LCDC_SEL		BIT(6)
-> >  
-> > @@ -292,6 +310,68 @@ static const struct drm_encoder_helper_funcs dw_hdmi_rockchip_encoder_helper_fun
-> >  	.atomic_check = dw_hdmi_rockchip_encoder_atomic_check,
-> >  };
-> >  
-> > +static int dw_hdmi_rockchip_genphy_init(struct dw_hdmi *dw_hdmi, void *data,
-> > +			     struct drm_display_mode *mode)
-> > +{
-> > +	struct rockchip_hdmi *hdmi = (struct rockchip_hdmi *)data;
-> > +
-> > +	return phy_power_on(hdmi->phy);
-> > +}
-> > +
-> > +static void dw_hdmi_rockchip_genphy_disable(struct dw_hdmi *dw_hdmi, void *data)
-> > +{
-> > +	struct rockchip_hdmi *hdmi = (struct rockchip_hdmi *)data;
-> > +
-> > +	phy_power_off(hdmi->phy);
-> > +}
-> > +
-> > +static enum drm_connector_status
-> > +dw_hdmi_rk3328_read_hpd(struct dw_hdmi *dw_hdmi, void *data)
-> > +{
-> > +	struct rockchip_hdmi *hdmi = (struct rockchip_hdmi *)data;
-> > +	enum drm_connector_status status;
-> > +
-> > +	status = dw_hdmi_phy_read_hpd(dw_hdmi, data);
-> > +
-> > +	if (status == connector_status_connected)
-> > +		regmap_write(hdmi->regmap,
-> > +			RK3328_GRF_SOC_CON4,
-> > +			HIWORD_UPDATE(RK3328_HDMI_CEC_5V | RK3328_HDMI_SDA_5V |
-> > +				      RK3328_HDMI_SCL_5V,
-> > +				      RK3328_HDMI_CEC_5V | RK3328_HDMI_SDA_5V |
-> > +				      RK3328_HDMI_SCL_5V));
 > 
-> This differs from BSP kernel and enable of CEC 5V stops CEC from working.
-> BSP kernel do not set write enable bit for CEC 5V:
+> Hmm, if that's the preferred option then I guess this applies to pcie
+> nodes also. At the end, usb and pcie nodes will be shrinked to below in
+> board dts:
 > 
-> RK3328_IO_5V_DOMAIN ((7 << 9) | (3 << (9 + 16)))
+> &pinctrl {
+>         pcie {
+>                 pcie_drv: pcie-drv {
+>                         rockchip,pins =
+>                                 <2 RK_PA5 RK_FUNC_GPIO &pcfg_pull_none>;
+>                         };
+>         };
 > 
-> https://github.com/Kwiboo/linux-rockchip/commit/e74ac6a3a581bcb7b2ac9f4d70cf7298df01e417 makes CEC work on v3 of this patch.
+>         usb2 {
+>                 host_vbus_drv: host-vbus-drv {
+>                         rockchip,pins =
+>                                 <4 RK_PD1 RK_FUNC_GPIO &pcfg_pull_none>;
+>                 };
+>         };
+> };
+> 
+> &pcie0 {
+>         ep-gpios = <&gpio2 RK_PA2 GPIO_ACTIVE_HIGH>;
+>         status = "okay";
+> };
+> 
+> &vcc3v3_pcie {
+>         gpio = <&gpio2 5 GPIO_ACTIVE_HIGH>;
+> };
+> 
+> &vcc5v0_host {
+>         gpio = <&gpio4 25 GPIO_ACTIVE_HIGH>;
+> };
 
-thanks for checking the cec functionality. I've incorporated your change
-and sent off v6. Maybe you can take another look and possible provide
-some Tested-by (or even Reviewed-by/Acked-by) tags? :-)
+yep, ideally we could go that way. It's way easier to determine the
+actual differences between boards that way as well.
 
 
-Thanks
 Heiko
