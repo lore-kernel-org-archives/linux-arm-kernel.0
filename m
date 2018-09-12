@@ -1,161 +1,82 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed, 12 Sep 2018 09:51:24 +0200
-Subject: [PATCH v3 16/21] nvmem: add a notifier chain
+Date: Wed, 12 Sep 2018 09:51:25 +0200
+Subject: [PATCH v3 17/21] nvmem: use SPDX license identifiers
 In-Reply-To: <20180912075129.25185-1-brgl@bgdev.pl>
 References: <20180912075129.25185-1-brgl@bgdev.pl>
-Message-ID: <20180912075129.25185-17-brgl@bgdev.pl>
+Message-ID: <20180912075129.25185-18-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Add a blocking notifier chain with four events (add and remove for
-both devices and cells) so that users can get notified about the
-addition of nvmem resources they're waiting for.
-
-We'll use this instead of the at24 setup callback in the mityomapl138
-board file.
+Use SPDX license identiefiers to core nvmem files and remove GPL 2.0
+license boilerplate.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/nvmem/core.c           | 36 ++++++++++++++++++++++++++++++++++
- include/linux/nvmem-consumer.h | 21 ++++++++++++++++++++
- 2 files changed, 57 insertions(+)
+ drivers/nvmem/core.c           | 10 +---------
+ include/linux/nvmem-consumer.h |  5 +----
+ include/linux/nvmem-provider.h |  5 +----
+ 3 files changed, 3 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index 9cc86d131e1e..af6f7163cb67 100644
+index af6f7163cb67..6cdf4f2678f6 100644
 --- a/drivers/nvmem/core.c
 +++ b/drivers/nvmem/core.c
-@@ -65,6 +65,8 @@ static LIST_HEAD(nvmem_cell_tables);
- static DEFINE_MUTEX(nvmem_lookup_mutex);
- static LIST_HEAD(nvmem_lookup_list);
+@@ -1,17 +1,9 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * nvmem framework core.
+  *
+  * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+  * Copyright (C) 2013 Maxime Ripard <maxime.ripard@free-electrons.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 and
+- * only version 2 as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
  
-+static BLOCKING_NOTIFIER_HEAD(nvmem_notifier);
-+
- #ifdef CONFIG_DEBUG_LOCK_ALLOC
- static struct lock_class_key eeprom_lock_key;
- #endif
-@@ -300,6 +302,7 @@ static struct nvmem_device *nvmem_find(const char *name)
- 
- static void nvmem_cell_drop(struct nvmem_cell *cell)
- {
-+	blocking_notifier_call_chain(&nvmem_notifier, NVMEM_CELL_REMOVE, cell);
- 	mutex_lock(&nvmem_mutex);
- 	list_del(&cell->node);
- 	mutex_unlock(&nvmem_mutex);
-@@ -319,6 +322,7 @@ static void nvmem_cell_add(struct nvmem_cell *cell)
- 	mutex_lock(&nvmem_mutex);
- 	list_add_tail(&cell->node, &cell->nvmem->cells);
- 	mutex_unlock(&nvmem_mutex);
-+	blocking_notifier_call_chain(&nvmem_notifier, NVMEM_CELL_ADD, cell);
- }
- 
- static int nvmem_cell_info_to_nvmem_cell(struct nvmem_device *nvmem,
-@@ -434,6 +438,32 @@ static int nvmem_setup_compat(struct nvmem_device *nvmem,
- 	return 0;
- }
- 
-+/**
-+ * nvmem_register_notifier() - Register a notifier block for nvmem events.
-+ *
-+ * @nb: notifier block to be called on nvmem events.
-+ *
-+ * Return: 0 on success, negative error number on failure.
-+ */
-+int nvmem_register_notifier(struct notifier_block *nb)
-+{
-+	return blocking_notifier_chain_register(&nvmem_notifier, nb);
-+}
-+EXPORT_SYMBOL_GPL(nvmem_register_notifier);
-+
-+/**
-+ * nvmem_unregister_notifier() - Unregister a notifier block for nvmem events.
-+ *
-+ * @nb: notifier block to be unregistered.
-+ *
-+ * Return: 0 on success, negative error number on failure.
-+ */
-+int nvmem_unregister_notifier(struct notifier_block *nb)
-+{
-+	return blocking_notifier_chain_unregister(&nvmem_notifier, nb);
-+}
-+EXPORT_SYMBOL_GPL(nvmem_unregister_notifier);
-+
- static int nvmem_add_cells_from_table(struct nvmem_device *nvmem)
- {
- 	const struct nvmem_cell_info *info;
-@@ -647,6 +677,10 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
- 	if (rval)
- 		goto err_remove_cells;
- 
-+	rval = blocking_notifier_call_chain(&nvmem_notifier, NVMEM_ADD, nvmem);
-+	if (rval)
-+		goto err_remove_cells;
-+
- 	return nvmem;
- 
- err_remove_cells:
-@@ -675,6 +709,8 @@ static void nvmem_device_release(struct kref *kref)
- 	nvmem_device_remove_all_cells(nvmem);
- 	device_del(&nvmem->dev);
- 	put_device(&nvmem->dev);
-+
-+	blocking_notifier_call_chain(&nvmem_notifier, NVMEM_REMOVE, nvmem);
- }
- 
- /**
+ #include <linux/device.h>
 diff --git a/include/linux/nvmem-consumer.h b/include/linux/nvmem-consumer.h
-index 27eee3945405..0326b52e906b 100644
+index 0326b52e906b..d18caae2f7ac 100644
 --- a/include/linux/nvmem-consumer.h
 +++ b/include/linux/nvmem-consumer.h
-@@ -14,6 +14,7 @@
+@@ -1,12 +1,9 @@
++/* SPDX-License-Identifier: GPL-2.0 */
+ /*
+  * nvmem framework consumer.
+  *
+  * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+  * Copyright (C) 2013 Maxime Ripard <maxime.ripard@free-electrons.com>
+- *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+  */
  
- #include <linux/err.h>
- #include <linux/errno.h>
-+#include <linux/notifier.h>
+ #ifndef _LINUX_NVMEM_CONSUMER_H
+diff --git a/include/linux/nvmem-provider.h b/include/linux/nvmem-provider.h
+index df6c102b421e..d37785afd14d 100644
+--- a/include/linux/nvmem-provider.h
++++ b/include/linux/nvmem-provider.h
+@@ -1,12 +1,9 @@
++/* SPDX-License-Identifier: GPL-2.0 */
+ /*
+  * nvmem framework provider.
+  *
+  * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+  * Copyright (C) 2013 Maxime Ripard <maxime.ripard@free-electrons.com>
+- *
+- * This file is licensed under the terms of the GNU General Public
+- * License version 2.  This program is licensed "as is" without any
+- * warranty of any kind, whether express or implied.
+  */
  
- struct device;
- struct device_node;
-@@ -47,6 +48,13 @@ struct nvmem_cell_lookup {
- 	struct list_head	node;
- };
- 
-+enum {
-+	NVMEM_ADD = 1,
-+	NVMEM_REMOVE,
-+	NVMEM_CELL_ADD,
-+	NVMEM_CELL_REMOVE,
-+};
-+
- #if IS_ENABLED(CONFIG_NVMEM)
- 
- /* Cell based interface */
-@@ -80,6 +88,9 @@ void nvmem_add_cell_lookups(struct nvmem_cell_lookup *entries,
- void nvmem_del_cell_lookups(struct nvmem_cell_lookup *entries,
- 			    size_t nentries);
- 
-+int nvmem_register_notifier(struct notifier_block *nb);
-+int nvmem_unregister_notifier(struct notifier_block *nb);
-+
- #else
- 
- static inline struct nvmem_cell *nvmem_cell_get(struct device *dev,
-@@ -179,6 +190,16 @@ nvmem_add_cell_lookups(struct nvmem_cell_lookup *entries, size_t nentries) {}
- static inline void
- nvmem_del_cell_lookups(struct nvmem_cell_lookup *entries, size_t nentries) {}
- 
-+static inline int nvmem_register_notifier(struct notifier_block *nb)
-+{
-+	return -ENOSYS;
-+}
-+
-+static inline int nvmem_unregister_notifier(struct notifier_block *nb)
-+{
-+	return -ENOSYS;
-+}
-+
- #endif /* CONFIG_NVMEM */
- 
- #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
+ #ifndef _LINUX_NVMEM_PROVIDER_H
 -- 
 2.18.0
