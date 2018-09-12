@@ -1,32 +1,53 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 12 Sep 2018 14:46:52 +0800
-Subject: [PATCH] ARM: dts: imx53-qsb: disable 1.2GHz OPP
-In-Reply-To: <20180912062335.GB7949@pengutronix.de>
-References: <20180910125056.30813-1-s.hauer@pengutronix.de>
- <20180912012252.GE28469@dragon>
- <20180912062335.GB7949@pengutronix.de>
-Message-ID: <20180912064649.GC28239@dragon>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 12 Sep 2018 09:23:47 +0200
+Subject: [PATCH v9 5/9] media: platform: Add Cedrus VPU decoder driver
+In-Reply-To: <20180911124625.6759e429@coco.lan>
+References: <20180906222442.14825-1-contact@paulk.fr>
+ <20180906222442.14825-6-contact@paulk.fr>
+ <20180911124625.6759e429@coco.lan>
+Message-ID: <20180912072347.nqw4uu23fykjtz72@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2018 at 08:23:35AM +0200, Sascha Hauer wrote:
-> Hi Shawn,
+On Tue, Sep 11, 2018 at 12:46:25PM -0300, Mauro Carvalho Chehab wrote:
+> Em Fri,  7 Sep 2018 00:24:38 +0200
+> Paul Kocialkowski <contact@paulk.fr> escreveu:
 > 
-> On Wed, Sep 12, 2018 at 09:22:54AM +0800, Shawn Guo wrote:
-> > On Mon, Sep 10, 2018 at 02:50:56PM +0200, Sascha Hauer wrote:
-> > > The maximum CPU frequency for the i.MX53 QSB is 1GHz, so disable the
-> > > 1.2GHz OPP. This makes the board work with cpufreq again.
+> > From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 > > 
-> > I feel that the word 'again' and the Fixes tag below are a little
-> > confusing.  It makes impression that cpufreq worked fine on the board
-> > before and commit 791f416608 broke it.  However, this is not the case,
-> > right?
+> > This introduces the Cedrus VPU driver that supports the VPU found in
+> > Allwinner SoCs, also known as Video Engine. It is implemented through
+> > a V4L2 M2M decoder device and a media device (used for media requests).
+> > So far, it only supports MPEG-2 decoding.
+> > 
+> > Since this VPU is stateless, synchronization with media requests is
+> > required in order to ensure consistency between frame headers that
+> > contain metadata about the frame to process and the raw slice data that
+> > is used to generate the frame.
+> > 
+> > This driver was made possible thanks to the long-standing effort
+> > carried out by the linux-sunxi community in the interest of reverse
+> > engineering, documenting and implementing support for the Allwinner VPU.
+> > 
+> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> > Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 > 
-> You're right, the "again" shouldn't be there. I meant that the board
-> works "again" after the addition of cpufreq support broke it.
-> 
-> Just resent the patch with a rephrased commit message.
+> There are several checkpatch issues here. Ok, some can be
+> ignored, but there are at least some of them that sounda relevant.
 
-Thanks, Sascha.
+Sorry for that. Given that it's intended to be in staging, do you want
+us to send subsequent patches or the whole serie?
 
-Shawn
+Maxime
+
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180912/0416e9f3/attachment.sig>
