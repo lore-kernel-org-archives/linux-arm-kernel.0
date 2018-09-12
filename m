@@ -1,30 +1,33 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 12 Sep 2018 11:32:21 +0100
-Subject: [PATCH v5 05/27] arm64: Use daifflag_restore after bp_hardening
-In-Reply-To: <1535471497-38854-6-git-send-email-julien.thierry@arm.com>
-References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
- <1535471497-38854-6-git-send-email-julien.thierry@arm.com>
-Message-ID: <641119b9-3466-817d-3d6b-dd710c646b49@arm.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Wed, 12 Sep 2018 12:38:56 +0200
+Subject: [PATCH] ARM: dts: at91: sama5d2_ptc_ek: fix nand pinctrl
+In-Reply-To: <20180907081851.15911-1-ludovic.desroches@microchip.com>
+References: <20180907081851.15911-1-ludovic.desroches@microchip.com>
+Message-ID: <20180912103856.GA2760@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julien,
-
-On 28/08/18 16:51, Julien Thierry wrote:
-> For EL0 entries requiring bp_hardening, daif status is kept at
-> DAIF_PROCCTX_NOIRQ until after hardening has been done. Then interrupts
-> are enabled through local_irq_enable().
+On 07/09/2018 10:18:51+0200, Ludovic Desroches wrote:
+> The drive strength has to be set to medium otherwise some data
+> corruption may happen.
 > 
-> Before using local_irq_* functions, daifflags should be properly restored
-> to a state where IRQs are enabled.
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+> ---
+> 
+> Hi,
+> 
+> This fix depends on the support of the drive-strength for the atmel pio4
+> pinctroller. It has been added in v4.19 but I omitted to send it at the
+> same time.
+> 
+> Ludovic
+> 
+>  arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+Applied, thanks.
 
-> Enable IRQs by restoring DAIF_PROCCTX state after bp hardening.
-
-Is this just for symmetry, or are you going on to add something to the daifflags
-state that local_irq_* functions won't change? (if so, could you allude to that
-in the commit message)
-
-
-Either way,
-
-Acked-by: James Morse <james.morse@arm.com>
+-- 
+Alexandre Belloni, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
