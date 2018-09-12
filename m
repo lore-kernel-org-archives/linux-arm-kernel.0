@@ -1,36 +1,61 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 12 Sep 2018 10:38:16 -0700
-Subject: [PATCH] gpio: omap: Add level wakeup handling for omap4 based SoCs
-In-Reply-To: <2cfe2f9d-a465-0568-bf48-8dcde535ff99@ti.com>
-References: <20180910200624.4494-1-tony@atomide.com>
- <444bae18-9737-8e13-2a0f-c08863ae1336@ti.com>
- <20180911182419.GC5662@atomide.com>
- <a10ae1a9-ed6a-468e-5a3e-8c120bab9acf@ti.com>
- <20180912004252.GH5662@atomide.com>
- <2cfe2f9d-a465-0568-bf48-8dcde535ff99@ti.com>
-Message-ID: <20180912173816.GL5662@atomide.com>
+From: jannh@google.com (Jann Horn)
+Date: Wed, 12 Sep 2018 19:39:30 +0200
+Subject: [PATCH v6 15/18] khwasan,
+ arm64: add brk handler for inline instrumentation
+In-Reply-To: <CACT4Y+aEwYiaVN--RH_0VBh0wbCcrf-Ndz+_eOaBNi6nKxrfQA@mail.gmail.com>
+References: <cover.1535462971.git.andreyknvl@google.com>
+ <f5e73b5ead3355932ad8b5fc96b141c3f5b8c16c.1535462971.git.andreyknvl@google.com>
+ <CACT4Y+aEwYiaVN--RH_0VBh0wbCcrf-Ndz+_eOaBNi6nKxrfQA@mail.gmail.com>
+Message-ID: <CAG48ez2oT1dtDcH8SfPLnoX5F8d6Pd=M-eOKHhYJ83EuL_j6wQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grygorii Strashko <grygorii.strashko@ti.com> [180912 16:13]:
-> 
-> 
-> On 09/11/2018 07:42 PM, Tony Lindgren wrote:
-> > * Grygorii Strashko <grygorii.strashko@ti.com> [180912 00:27]:
-> > > Thanks Tony, but it's still not completely clear -
-> > > it's important to see values of CLKSTCTRL before/after idle for not working
-> > > case and GPIO SYSC/SYSS registers. There are some combinations which may
-> > > affect on this. So, if you can, pls.
-> > 
-> > Sure I'll do some reg dumps for you tomorrow as I just started
-> > an overnight test with randomly pinging the wlan interface
-> > from outside to make sure it wakes up and keeps idling.
-> 
-> Pls, postpone this until we finish our discussion/debugging
+On Wed, Sep 12, 2018 at 7:16 PM Dmitry Vyukov <dvyukov@google.com> wrote:
+> On Wed, Aug 29, 2018 at 1:35 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
+[...]
+> > +static int khwasan_handler(struct pt_regs *regs, unsigned int esr)
+> > +{
+> > +       bool recover = esr & KHWASAN_ESR_RECOVER;
+> > +       bool write = esr & KHWASAN_ESR_WRITE;
+> > +       size_t size = KHWASAN_ESR_SIZE(esr);
+> > +       u64 addr = regs->regs[0];
+> > +       u64 pc = regs->pc;
+> > +
+> > +       if (user_mode(regs))
+> > +               return DBG_HOOK_ERROR;
+> > +
+> > +       kasan_report(addr, size, write, pc);
+> > +
+> > +       /*
+> > +        * The instrumentation allows to control whether we can proceed after
+> > +        * a crash was detected. This is done by passing the -recover flag to
+> > +        * the compiler. Disabling recovery allows to generate more compact
+> > +        * code.
+> > +        *
+> > +        * Unfortunately disabling recovery doesn't work for the kernel right
+> > +        * now. KHWASAN reporting is disabled in some contexts (for example when
+> > +        * the allocator accesses slab object metadata; same is true for KASAN;
+> > +        * this is controlled by current->kasan_depth). All these accesses are
+> > +        * detected by the tool, even though the reports for them are not
+> > +        * printed.
+> > +        *
+> > +        * This is something that might be fixed at some point in the future.
+> > +        */
+> > +       if (!recover)
+> > +               die("Oops - KHWASAN", regs, 0);
+>
+> Why die and not panic? Die seems to be much less used function, and it
+> calls panic anyway, and we call panic in kasan_report if panic_on_warn
+> is set.
 
-Yeah I just sent you three gpio dump files privately to avoid
-spamming the list with them.
+die() is vaguely equivalent to BUG(); die() and BUG() normally only
+terminate the current process, which may or may not leave the system
+somewhat usable, while panic() always brings down the whole system.
+AFAIK panic() shouldn't be used unless you're in some very low-level
+code where you know that trying to just kill the current process can't
+work and the entire system is broken beyond repair.
 
-Regards,
-
-Tony
+If KASAN traps on some random memory access, there's a good chance
+that just killing the current process will allow at least parts of the
+system to continue. I'm not sure whether BUG() or die() is more
+appropriate here, but I think it definitely should not be a panic().
