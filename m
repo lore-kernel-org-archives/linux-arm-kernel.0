@@ -1,70 +1,57 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Wed, 12 Sep 2018 09:41:31 +0000
-Subject: [PATCH v2 01/12] bus: fsl-mc: add support for dpseci device type
-In-Reply-To: <20180912085937.22489-2-horia.geanta@nxp.com>
-References: <20180912085937.22489-1-horia.geanta@nxp.com>
- <20180912085937.22489-2-horia.geanta@nxp.com>
-Message-ID: <1d9bd63f-7170-d64a-71bf-07401fde32d3@nxp.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 12 Sep 2018 11:43:53 +0200
+Subject: [PATCH v12 0/6] Driver for at91 usart in spi mode
+In-Reply-To: <20180912084143.GN4185@dell>
+References: <20180911093356.GE4185@dell> <20180911093917.GL2494@piout.net>
+ <CAMuHMdXH8gNjKGOHGFc+K03U2zsVCSN7G_Q4wtepQr859nRQKg@mail.gmail.com>
+ <20180911153621.GP2494@piout.net>
+ <CAMuHMdV+=EgAYogwNHbY=RExkGox_+YSeHV6pJtQb6g6PzD-CQ@mail.gmail.com>
+ <20180911181838.GI4185@dell> <20180911185839.GA25212@piout.net>
+ <20180911224418.GK4185@dell> <20180911225440.GL4185@dell>
+ <20180912073355.GB2557@piout.net> <20180912084143.GN4185@dell>
+Message-ID: <CAMuHMdWefU0pw=c9TKOa+wGHchpg8JRfE0OnC4+wKDt-qrbH1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Lee,
 
+On Wed, Sep 12, 2018 at 10:41 AM Lee Jones <lee.jones@linaro.org> wrote:
+> On Wed, 12 Sep 2018, Alexandre Belloni wrote:
+> > On 11/09/2018 23:54:40+0100, Lee Jones wrote:
+> > > > > http://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-6438-32-bit-ARM926-Embedded-Microprocessor-SAM9G45_Datasheet.pdf
+> > > > >
+> > > > > USART doc starting p572, registers p621.
+> > >
+> > > After looking at the datasheet, I don't see any reason why one of the
+> > > two drivers can't be selected using different compatible strings.
+> >
+> > Because there is only one IP and we don't use the device tree to selecet
+> > linux specific drivers.
+>
+> We do it all the time.  There are loads of MFDs (def: same IP, with
+> different functions) which have separate compatibles for their various
+> functions.  If you wish this IP to operate as an SPI controller, it
+> should have an SPI compatible, if you wish it to operate as a U(S)ART,
+> then it should have a UART compatible.  It's what we do for most of
+> the other MFDs in the kernel.
 
-On 12.09.2018 11:59, Horia Geant? wrote:
-> Signed-off-by: Horia Geant? <horia.geanta@nxp.com>
+There is a big difference: MFD functions are(more or less) independent
+functions, which can be used at the same time. It makes perfect sense for a
+single IP block that has both SPI and UART interfaces, that can be used at
+the same time.
 
-Acked-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+In this case, there is a single piece of hardware that can perform
+different functions, but not at the same time. Performing a different
+function means configuring the hardware for that function, hence using a
+different driver (from a different subsystem).
 
-> ---
->   drivers/bus/fsl-mc/fsl-mc-bus.c | 5 +++++
->   include/linux/fsl/mc.h          | 6 ++++++
->   2 files changed, 11 insertions(+)
-> 
-> diff --git a/drivers/bus/fsl-mc/fsl-mc-bus.c b/drivers/bus/fsl-mc/fsl-mc-bus.c
-> index 5d8266c6571f..4552b06fe601 100644
-> --- a/drivers/bus/fsl-mc/fsl-mc-bus.c
-> +++ b/drivers/bus/fsl-mc/fsl-mc-bus.c
-> @@ -188,6 +188,10 @@ struct device_type fsl_mc_bus_dprtc_type = {
->   	.name = "fsl_mc_bus_dprtc"
->   };
->   
-> +struct device_type fsl_mc_bus_dpseci_type = {
-> +	.name = "fsl_mc_bus_dpseci"
-> +};
-> +
->   static struct device_type *fsl_mc_get_device_type(const char *type)
->   {
->   	static const struct {
-> @@ -203,6 +207,7 @@ static struct device_type *fsl_mc_get_device_type(const char *type)
->   		{ &fsl_mc_bus_dpmcp_type, "dpmcp" },
->   		{ &fsl_mc_bus_dpmac_type, "dpmac" },
->   		{ &fsl_mc_bus_dprtc_type, "dprtc" },
-> +		{ &fsl_mc_bus_dpseci_type, "dpseci" },
->   		{ NULL, NULL }
->   	};
->   	int i;
-> diff --git a/include/linux/fsl/mc.h b/include/linux/fsl/mc.h
-> index f27cb14088a4..5160f06ffbac 100644
-> --- a/include/linux/fsl/mc.h
-> +++ b/include/linux/fsl/mc.h
-> @@ -405,6 +405,7 @@ extern struct device_type fsl_mc_bus_dpcon_type;
->   extern struct device_type fsl_mc_bus_dpmcp_type;
->   extern struct device_type fsl_mc_bus_dpmac_type;
->   extern struct device_type fsl_mc_bus_dprtc_type;
-> +extern struct device_type fsl_mc_bus_dpseci_type;
->   
->   static inline bool is_fsl_mc_bus_dprc(const struct fsl_mc_device *mc_dev)
->   {
-> @@ -451,6 +452,11 @@ static inline bool is_fsl_mc_bus_dprtc(const struct fsl_mc_device *mc_dev)
->   	return mc_dev->dev.type == &fsl_mc_bus_dprtc_type;
->   }
->   
-> +static inline bool is_fsl_mc_bus_dpseci(const struct fsl_mc_device *mc_dev)
-> +{
-> +	return mc_dev->dev.type == &fsl_mc_bus_dpseci_type;
-> +}
-> +
->   /*
->    * Data Path Buffer Pool (DPBP) API
->    * Contains initialization APIs and runtime control APIs for DPBP
-> 
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
