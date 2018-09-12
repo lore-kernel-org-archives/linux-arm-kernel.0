@@ -1,31 +1,32 @@
-From: t.jag587@gmail.com (Jagdish Tirumala)
-Date: Wed, 12 Sep 2018 08:33:54 -0700
-Subject: [PATCH] WATCHDOG: uniphier_wdt.c: Fixed error do not initialise
- statics to 0
-Message-ID: <20180912153354.4658-1-t.jag587@gmail.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Wed, 12 Sep 2018 17:35:49 +0200
+Subject: [PATCH] clk: mvebu: ap806: Remove superfluous of_clk_add_provider
+Message-ID: <20180912153549.14437-1-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixed error do not initialise statics to 0
-in file drivers/watchdog/uniphier_wdt.c
+While applying the commit a8309cedcdce ("clk: apn806: Add eMMC clock to
+system controller driver"), of_clk_add_provider was added wheres it was
+already present in the probe function.
 
-Signed-off-by: Jagdish Tirumala <t.jag587@gmail.com>
+This extraneous call is harmless but not useful so remove it.
+
+Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- drivers/watchdog/uniphier_wdt.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/mvebu/ap806-system-controller.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/watchdog/uniphier_wdt.c b/drivers/watchdog/uniphier_wdt.c
-index e20a7a459d69..2c62ad7250fb 100644
---- a/drivers/watchdog/uniphier_wdt.c
-+++ b/drivers/watchdog/uniphier_wdt.c
-@@ -41,7 +41,7 @@
- #define WDT_PERIOD_MIN			1
- #define WDT_PERIOD_MAX			128
+diff --git a/drivers/clk/mvebu/ap806-system-controller.c b/drivers/clk/mvebu/ap806-system-controller.c
+index 9fbec3eb725f..ea54a874bbda 100644
+--- a/drivers/clk/mvebu/ap806-system-controller.c
++++ b/drivers/clk/mvebu/ap806-system-controller.c
+@@ -153,7 +153,6 @@ static int ap806_syscon_common_probe(struct platform_device *pdev,
+ 		goto fail4;
+ 	}
  
--static unsigned int timeout = 0;
-+static unsigned int timeout;
- static bool nowayout = WATCHDOG_NOWAYOUT;
- 
- struct uniphier_wdt_dev {
+-	of_clk_add_provider(np, of_clk_src_onecell_get, &ap806_clk_data);
+ 	ret = of_clk_add_provider(np, of_clk_src_onecell_get, &ap806_clk_data);
+ 	if (ret)
+ 		goto fail_clk_add;
 -- 
-2.17.1
+2.18.0
