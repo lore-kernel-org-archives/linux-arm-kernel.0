@@ -1,36 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 12 Sep 2018 10:09:15 -0700
-Subject: [PATCH] gpio: omap: Add level wakeup handling for omap4 based SoCs
-In-Reply-To: <20180910200624.4494-1-tony@atomide.com>
-References: <20180910200624.4494-1-tony@atomide.com>
-Message-ID: <20180912170915.GK5662@atomide.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 12 Sep 2018 18:12:57 +0100
+Subject: [PATCH v5 0/5] add non-strict mode support for arm-smmu-v3
+In-Reply-To: <20180912165700.GC16071@arm.com>
+References: <1534296510-12888-1-git-send-email-thunder.leizhen@huawei.com>
+ <20180912165700.GC16071@arm.com>
+Message-ID: <d0775377-206f-ae3e-051d-3b829b499471@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [180910 20:10]:
-> +static void __maybe_unused
-> +omap4_gpio_disable_level_quirk(struct gpio_bank *bank)
-> +{
-> +	/* Restore level registers after idle */
-> +	writel_relaxed(bank->context.leveldetect0,
-> +		       bank->base + bank->regs->leveldetect0);
-> +	writel_relaxed(bank->context.leveldetect1,
-> +		       bank->base + bank->regs->leveldetect1);
-> +
-> +	/* Clear wake after idle */
-> +	writel_relaxed(0, bank->base + bank->regs->wkup_en);
+On 12/09/18 17:57, Will Deacon wrote:
+> Hi all,
+> 
+> On Wed, Aug 15, 2018 at 09:28:25AM +0800, Zhen Lei wrote:
+>> v4 -> v5:
+>> 1. change the type of global variable and struct member named "non_strict" from
+>>     "int" to "bool".
+>> 2. cancel the unnecessary parameter "strict" of __arm_lpae_unmap which was added
+>>     in v4.
+>> 3. change boot option "arm_iommu" to "iommu.non_strict".
+>> 4. convert __iommu_dma_unmap to use iommu_unmap_fast()/iommu_tlb_sync(), because
+>>     non-leaf unmaps still need to be synchronous.
+>>
+>> Thanks for Robin's review comments.
+> 
+> Since this is 90% of the way there now, I suggest Robin picks up what's here
+> and incorporates his remaining review comments directly (especially since it
+> sounded like Zhen Lei hasn't got much free time lately). With that, I can
+> queue this lot via my smmu branch, which already has some stuff queued
+> for SMMUv3 and io-pgtable.
+> 
+> Please shout if you have any objections, but I'm keen for this not to
+> languish on the lists given how close it is!
 
-	/* Reset saved wkup_en, it will be set for next idle again */
-	bank->context.wake_en = 0;
-> +}
+Sure, having got this far I'd like to see it get done too. I'll make 
+some time and give it a go.
 
-Clearing the saved wkup_en is needed above I noticed
-testing again with gpio4 which has pdata->loses_context
-set.
-
-Otherwise runtime_resume will write to wkup_en enabling
-it for runtime which will the next idle fail.
-
-Regards,
-
-Tony
+Robin.
