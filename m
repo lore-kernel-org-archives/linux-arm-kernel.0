@@ -1,67 +1,123 @@
 From: christophe.leroy@c-s.fr (Christophe Leroy)
-Date: Wed, 12 Sep 2018 15:58:30 +0000 (UTC)
-Subject: [PATCH v2 08/24] powerpc/mm: don't use _PAGE_EXEC in book3s/32
+Date: Wed, 12 Sep 2018 15:58:42 +0000 (UTC)
+Subject: [PATCH v2 14/24] powerpc/mm: drop unused page flags
 In-Reply-To: <cover.1536692743.git.christophe.leroy@c-s.fr>
 References: <cover.1536692743.git.christophe.leroy@c-s.fr>
-Message-ID: <a48560779fc3cf321106b39c28b8ee58dc1c93e3.1536692743.git.christophe.leroy@c-s.fr>
+Message-ID: <d5036d6c9b61e9552eba111ceace1afa2c532df5.1536692743.git.christophe.leroy@c-s.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-book3s/32 doesn't define _PAGE_EXEC, so no need to use it.
+The following page flags in pte-common.h can be dropped:
 
-All other platforms define _PAGE_EXEC so no need to check
-it is not NUL when not book3s/32.
+_PAGE_ENDIAN is only used in mm/fsl_booke_mmu.c and is defined in
+asm/nohash/32/pte-fsl-booke.h
+
+_PAGE_4K_PFN is nowhere defined nor used
+
+_PAGE_READ, _PAGE_WRITE and _PAGE_PTE are only defined and used
+in book3s/64
+
+The following page flags in book3s/64/pgtable.h can be dropped as
+they are not used on this platform nor by common code.
+
+_PAGE_NA, _PAGE_RO, _PAGE_USER and _PAGE_PSIZE
 
 Reviewed-by: Aneesh Kumar K.V <aneesh.kumar@linux.ibm.com>
 Signed-off-by: Christophe Leroy <christophe.leroy@c-s.fr>
 ---
- arch/powerpc/include/asm/book3s/32/pgtable.h | 2 +-
- arch/powerpc/mm/pgtable.c                    | 6 +++---
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ arch/powerpc/include/asm/book3s/64/pgtable.h | 10 +---------
+ arch/powerpc/include/asm/pte-common.h        | 17 +----------------
+ 2 files changed, 2 insertions(+), 25 deletions(-)
 
-diff --git a/arch/powerpc/include/asm/book3s/32/pgtable.h b/arch/powerpc/include/asm/book3s/32/pgtable.h
-index 7a9f0ed599ff..3127cc529aa1 100644
---- a/arch/powerpc/include/asm/book3s/32/pgtable.h
-+++ b/arch/powerpc/include/asm/book3s/32/pgtable.h
-@@ -234,7 +234,7 @@ static inline void __ptep_set_access_flags(struct vm_area_struct *vma,
- 					   int psize)
- {
- 	unsigned long set = pte_val(entry) &
--		(_PAGE_DIRTY | _PAGE_ACCESSED | _PAGE_RW | _PAGE_EXEC);
-+		(_PAGE_DIRTY | _PAGE_ACCESSED | _PAGE_RW);
- 	unsigned long clr = ~pte_val(entry) & _PAGE_RO;
+diff --git a/arch/powerpc/include/asm/book3s/64/pgtable.h b/arch/powerpc/include/asm/book3s/64/pgtable.h
+index 56eddd79ab7d..8cf44faa6ff3 100644
+--- a/arch/powerpc/include/asm/book3s/64/pgtable.h
++++ b/arch/powerpc/include/asm/book3s/64/pgtable.h
+@@ -14,10 +14,6 @@
+  */
+ #define _PAGE_BIT_SWAP_TYPE	0
  
- 	pte_update(ptep, clr, set);
-diff --git a/arch/powerpc/mm/pgtable.c b/arch/powerpc/mm/pgtable.c
-index d71c7777669c..4f788f3762a9 100644
---- a/arch/powerpc/mm/pgtable.c
-+++ b/arch/powerpc/mm/pgtable.c
-@@ -73,7 +73,7 @@ static struct page *maybe_pte_to_page(pte_t pte)
- 	return page;
- }
- 
--#if defined(CONFIG_PPC_STD_MMU) || _PAGE_EXEC == 0
-+#ifdef CONFIG_PPC_BOOK3S
- 
- /* Server-style MMU handles coherency when hashing if HW exec permission
-  * is supposed per page (currently 64-bit only). If not, then, we always
-@@ -106,7 +106,7 @@ static pte_t set_access_flags_filter(pte_t pte, struct vm_area_struct *vma,
- 	return pte;
- }
- 
--#else /* defined(CONFIG_PPC_STD_MMU) || _PAGE_EXEC == 0 */
-+#else /* CONFIG_PPC_BOOK3S */
- 
- /* Embedded type MMU with HW exec support. This is a bit more complicated
-  * as we don't have two bits to spare for _PAGE_EXEC and _PAGE_HWEXEC so
-@@ -179,7 +179,7 @@ static pte_t set_access_flags_filter(pte_t pte, struct vm_area_struct *vma,
- 	return __pte(pte_val(pte) | _PAGE_EXEC);
- }
- 
--#endif /* !(defined(CONFIG_PPC_STD_MMU) || _PAGE_EXEC == 0) */
-+#endif /* CONFIG_PPC_BOOK3S */
- 
+-#define _PAGE_NA		0
+-#define _PAGE_RO		0
+-#define _PAGE_USER		0
+-
+ #define _PAGE_EXEC		0x00001 /* execute permission */
+ #define _PAGE_WRITE		0x00002 /* write access allowed */
+ #define _PAGE_READ		0x00004	/* read access allowed */
+@@ -123,10 +119,6 @@
+ #define _PAGE_KERNEL_RWX	(_PAGE_PRIVILEGED | _PAGE_DIRTY |	\
+ 				 _PAGE_RW | _PAGE_EXEC)
  /*
-  * set_pte stores a linux PTE into the linux page table.
+- * No page size encoding in the linux PTE
+- */
+-#define _PAGE_PSIZE		0
+-/*
+  * _PAGE_CHG_MASK masks of bits that are to be preserved across
+  * pgprot changes
+  */
+@@ -149,7 +141,7 @@
+  * pages. We always set _PAGE_COHERENT when SMP is enabled or
+  * the processor might need it for DMA coherency.
+  */
+-#define _PAGE_BASE_NC	(_PAGE_PRESENT | _PAGE_ACCESSED | _PAGE_PSIZE)
++#define _PAGE_BASE_NC	(_PAGE_PRESENT | _PAGE_ACCESSED)
+ #define _PAGE_BASE	(_PAGE_BASE_NC)
+ 
+ /* Permission masks used to generate the __P and __S table,
+diff --git a/arch/powerpc/include/asm/pte-common.h b/arch/powerpc/include/asm/pte-common.h
+index bef56141a549..5a5ba43bdf98 100644
+--- a/arch/powerpc/include/asm/pte-common.h
++++ b/arch/powerpc/include/asm/pte-common.h
+@@ -14,18 +14,12 @@
+ #ifndef _PAGE_EXEC
+ #define _PAGE_EXEC	0
+ #endif
+-#ifndef _PAGE_ENDIAN
+-#define _PAGE_ENDIAN	0
+-#endif
+ #ifndef _PAGE_COHERENT
+ #define _PAGE_COHERENT	0
+ #endif
+ #ifndef _PAGE_WRITETHRU
+ #define _PAGE_WRITETHRU	0
+ #endif
+-#ifndef _PAGE_4K_PFN
+-#define _PAGE_4K_PFN		0
+-#endif
+ #ifndef _PAGE_SAO
+ #define _PAGE_SAO	0
+ #endif
+@@ -39,9 +33,6 @@
+ #define _PAGE_RW 0
+ #endif
+ 
+-#ifndef _PAGE_PTE
+-#define _PAGE_PTE 0
+-#endif
+ /* At least one of _PAGE_PRIVILEGED or _PAGE_USER must be defined */
+ #ifndef _PAGE_PRIVILEGED
+ #define _PAGE_PRIVILEGED 0
+@@ -122,7 +113,7 @@ static inline bool pte_user(pte_t pte)
+ 
+ /* Mask of bits returned by pte_pgprot() */
+ #define PAGE_PROT_BITS	(_PAGE_GUARDED | _PAGE_COHERENT | _PAGE_NO_CACHE | \
+-			 _PAGE_WRITETHRU | _PAGE_ENDIAN | _PAGE_4K_PFN | \
++			 _PAGE_WRITETHRU | \
+ 			 _PAGE_USER | _PAGE_ACCESSED | _PAGE_RO | _PAGE_NA | \
+ 			 _PAGE_PRIVILEGED | \
+ 			 _PAGE_RW | _PAGE_HWWRITE | _PAGE_DIRTY | _PAGE_EXEC)
+@@ -208,12 +199,6 @@ static inline bool pte_user(pte_t pte)
+ #define PAGE_AGP		(PAGE_KERNEL_NC)
+ #define HAVE_PAGE_AGP
+ 
+-#ifndef _PAGE_READ
+-/* if not defined, we should not find _PAGE_WRITE too */
+-#define _PAGE_READ 0
+-#define _PAGE_WRITE _PAGE_RW
+-#endif
+-
+ #ifndef H_PAGE_4K_PFN
+ #define H_PAGE_4K_PFN 0
+ #endif
 -- 
 2.13.3
