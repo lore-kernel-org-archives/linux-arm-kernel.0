@@ -1,53 +1,90 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Wed, 12 Sep 2018 12:11:15 +0100
-Subject: [PATCH v5 05/27] arm64: Use daifflag_restore after bp_hardening
-In-Reply-To: <641119b9-3466-817d-3d6b-dd710c646b49@arm.com>
-References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
- <1535471497-38854-6-git-send-email-julien.thierry@arm.com>
- <641119b9-3466-817d-3d6b-dd710c646b49@arm.com>
-Message-ID: <8f200315-1db9-1905-71ae-cb4269450b7c@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 12 Sep 2018 12:16:26 +0100
+Subject: [RFC PATCH] KVM: arm64: Treat FPEXC32_EL2 as a regular guest
+ system register
+In-Reply-To: <20180912101704.GA23874@e113682-lin.lund.arm.com>
+References: <1536153553-28767-1-git-send-email-Dave.Martin@arm.com>
+ <20180912101704.GA23874@e113682-lin.lund.arm.com>
+Message-ID: <20180912111624.GF17801@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
-
-On 12/09/18 11:32, James Morse wrote:
-> Hi Julien,
+On Wed, Sep 12, 2018 at 12:17:04PM +0200, Christoffer Dall wrote:
+> On Wed, Sep 05, 2018 at 02:19:13PM +0100, Dave Martin wrote:
+> > Currently FPEXC32_EL2 is handled specially when context-switching.
+> > This made sense for arm, where FPEXC affects host execution
+> > (including VFP/SIMD register save/restore at Hyp).
 > 
-> On 28/08/18 16:51, Julien Thierry wrote:
->> For EL0 entries requiring bp_hardening, daif status is kept at
->> DAIF_PROCCTX_NOIRQ until after hardening has been done. Then interrupts
->> are enabled through local_irq_enable().
->>
->> Before using local_irq_* functions, daifflags should be properly restored
->> to a state where IRQs are enabled.
-> 
->> Enable IRQs by restoring DAIF_PROCCTX state after bp hardening.
-> 
-> Is this just for symmetry, or are you going on to add something to the daifflags
-> state that local_irq_* functions won't change? (if so, could you allude to that
-> in the commit message)
-> 
+> I think the point was actually to avoid saving/restoring FPEXC32_EL2
+> when VFP was being trapped to EL2
 
-What happens is that once we use ICC_PMR_EL1, local_irq_enable will not 
-touch PSR.I. And we are coming back from an entry where PSR.I was kept 
-to 1 so local_irq_enable was not actually enabling the interrupts. On 
-the otherhand, restore will affect both.
+With what purpose in mind?
 
-Another option is to have the asm macro "enable_da_f" also switch to PMR 
-usage (i.e. "just keep normal interrupts disabled"). Overall it would 
-probably be easier to reason with, but I'm just unsure whether it is 
-acceptable to receive a Pseudo NMI before having applied the bp_hardening.
+We saved neither the trap (since the VFP registers needed switching
+anyway) nor the FPEXC32_EL2 switch (since we had to do that at guest
+entry).
 
-If it is possible, I'm happy to solve this with enable_da_f.
+I may have misunderstood something.
 
-Thanks,
 
+I was somewhat guessing likely rationale, so if you can suggest a
+way to reword this that reflects the situation better I'd be happy
+to change it.
+
+Thinking about it, I don't see why FPEXC32_EL2 can't be handled via
+vcpu_load()/_put().  This register doesn't matter for the host, and
+I can't see why we would need to switch it when going through hyp.
+
+> > 
+> > However, FPEXC has no architectural effect when running in AArch64.
+> > The only case where an arm64 host may execute in AArch32 is when
+> > running compat user code at EL0: the architecture explicitly
+> > documents FPEXC as having no effect in this case either when the
+> > kernel (EL2 in the VHE case; otherwise EL1) is AArch64.
+> > 
+> > So, we can just handle FPEXC32_EL2 (which is the AArch64 alias for
+> > this register) as a regular AArch32-only system register and switch
+> > it without any special handling or synchronisation.
+> > 
+> > This allows some gnarly special-case code to be eliminated from
+> > hyp.  The extra isb() in __activate_traps_fpsimd32() is dropped
+> > too: for the reasons explained above arm64 never required this
+> > anyway.
+> > 
+> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > Cc: Christoffer Dall <christoffer.dall@arm.com>
+> > Cc: Alexander Graf <agraf@suse.de>
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > ---
+> > 
+> > I could do with some confirmation from someone that my interpretation of
+> > the architecture is in fact correct here.  The CheckFPAdvSIMDEnabled64()
+> > and CheckAdvSIMDEnabled() pseudocode functions may be a reasonable
+> > starting point (this was my reference where the wordy text is unclear).
 > 
-> Either way,
-> 
-> Acked-by: James Morse <james.morse@arm.com>
-> 
+> Which aspect do you want confirmed here?
 
--- 
-Julien Thierry
+I confess to a certain amount of "according to the spirit of the
+architecture it obviously ought to work this way" reasoning.
+
+Following the trail of documentation isn't trivial, so it would
+be good if someone could check that they can reach the same conclusion
+about FPEXC32_EL2 having no effect on the host.
+
+
+> > If Alexander could try this out, that would be good.
+> > 
+> > This cleanup applies on top of the following previously pubished fix:
+> > [PULL 2/4] arm64: KVM: Only force FPEXC32_EL2.EN if trapping FPSIMD
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2018-September/599537.html
+> > 
+> 
+> We can queue this for the next merge window.
+> 
+> Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+
+Thanks, modulo the question of maybe moving this to the vcpu_load()/
+_put() path.
+
+Cheers
+---Dave
