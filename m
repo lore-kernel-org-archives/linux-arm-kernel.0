@@ -1,162 +1,102 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 12 Sep 2018 13:12:31 +0530
-Subject: [PATCH 02/10] phy: Add configuration interface
-In-Reply-To: <20180906145622.kwxvkcuerbeqsj6b@flea>
-References: <cover.ee6158898d563fcc01d45c9652501180bccff0f0.1536138624.git-series.maxime.ripard@bootlin.com>
- <a739a2d623c3e60373a73e1ec206c2aa35c4a742.1536138624.git-series.maxime.ripard@bootlin.com>
- <1ed01c1f-76d5-fa96-572b-9bfd269ad11b@ti.com>
- <20180906145622.kwxvkcuerbeqsj6b@flea>
-Message-ID: <1a169fad-72b7-fac0-1254-cac5d8304740@ti.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Wed, 12 Sep 2018 09:51:08 +0200
+Subject: [PATCH v3 00/21] nvmem: rework of the subsystem for non-DT users
+Message-ID: <20180912075129.25185-1-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-On Thursday 06 September 2018 08:26 PM, Maxime Ripard wrote:
-> Hi Kishon,
-> 
-> On Thu, Sep 06, 2018 at 02:57:58PM +0530, Kishon Vijay Abraham I wrote:
->> On Wednesday 05 September 2018 02:46 PM, Maxime Ripard wrote:
->>> The phy framework is only allowing to configure the power state of the PHY
->>> using the init and power_on hooks, and their power_off and exit
->>> counterparts.
->>>
->>> While it works for most, simple, PHYs supported so far, some more advanced
->>> PHYs need some configuration depending on runtime parameters. These PHYs
->>> have been supported by a number of means already, often by using ad-hoc
->>> drivers in their consumer drivers.
->>>
->>> That doesn't work too well however, when a consumer device needs to deal
->>> multiple PHYs, or when multiple consumers need to deal with the same PHY (a
->>> DSI driver and a CSI driver for example).
->>>
->>> So we'll add a new interface, through two funtions, phy_validate and
->>> phy_configure. The first one will allow to check that a current
->>> configuration, for a given mode, is applicable. It will also allow the PHY
->>> driver to tune the settings given as parameters as it sees fit.
->>>
->>> phy_configure will actually apply that configuration in the phy itself.
->>>
->>> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
->>> ---
->>>  drivers/phy/phy-core.c  | 62 ++++++++++++++++++++++++++++++++++++++++++-
->>>  include/linux/phy/phy.h | 42 ++++++++++++++++++++++++++++-
->>>  2 files changed, 104 insertions(+)
->>>
->>> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
->>> index 35fd38c5a4a1..6eaf655e370f 100644
->>> --- a/drivers/phy/phy-core.c
->>> +++ b/drivers/phy/phy-core.c
->>> @@ -408,6 +408,68 @@ int phy_calibrate(struct phy *phy)
->>>  EXPORT_SYMBOL_GPL(phy_calibrate);
->>>  
->>>  /**
->>> + * phy_configure() - Changes the phy parameters
->>> + * @phy: the phy returned by phy_get()
->>> + * @mode: phy_mode the configuration is applicable to.
->>
->> mode should be used if the same PHY can be configured in multiple modes. But
->> with phy_set_mode() and phy_calibrate() we could achieve the same.
-> 
-> So you would change the prototype to have a configuration applying
-> only to the current mode set previously through set_mode?
+This series contains nvmem framework changes prerequisite for further
+development of my previous series[1] that aims at removal of the
+platform data struct from at24 EEPROM driver.
 
-yeah.
-With phy_configure, if the PHY is not in @mode, it should return an error? Or
-will it set the PHY to @mode and apply the configuration in @opts?
-> 
-> Can we have PHY that operate in multiple modes at the same time?
+The patches are conceptually split into a couple groups.
 
-Not at the same time. But the same PHY can operate in multiple modes (For
-example we have PHYs that can be used either with PCIe or USB3)
-> 
->>> + * @opts: New configuration to apply
->>
->> Should these configuration come from the consumer driver?
-> 
-> Yes
+First five patches fix issues with existing issues.
 
-How does the consumer driver get these configurations? Is it from user space or
-dt associated with consumer device.
-> 
->> Can't the helper functions be directly invoked by the PHY driver for
->> the configuration.
-> 
-> Not really. The helpers are here to introduce functions that give you
-> the defaults provided by the spec for a given configuration, and to
-> validate that a given configuration is within the spec boundaries. I
-> expect some consumers to need to change the defaults for some more
-> suited parameters that are still within the boundaries defined by the
-> spec.
-> 
-> And I'd really want to have that interface being quite generic, and
-> applicable to other phy modes as well. The allwinner USB PHY for
-> example require at the moment an extra function that could be moved to
-> this API:
-> https://elixir.bootlin.com/linux/latest/source/drivers/phy/allwinner/phy-sun4i-usb.c#L512
-> 
->>> + *
->>> + * Used to change the PHY parameters. phy_init() must have
->>> + * been called on the phy.
->>> + *
->>> + * Returns: 0 if successful, an negative error code otherwise
->>> + */
->>> +int phy_configure(struct phy *phy, enum phy_mode mode,
->>> +		  union phy_configure_opts *opts)
->>> +{> +	int ret;
->>> +
->>> +	if (!phy)
->>> +		return -EINVAL;
->>> +
->>> +	if (!phy->ops->configure)
->>> +		return 0;
->>> +
->>> +	mutex_lock(&phy->mutex);
->>> +	ret = phy->ops->configure(phy, mode, opts);
->>> +	mutex_unlock(&phy->mutex);
->>> +
->>> +	return ret;
->>> +}
->>> +
->>> +/**
->>> + * phy_validate() - Checks the phy parameters
->>> + * @phy: the phy returned by phy_get()
->>> + * @mode: phy_mode the configuration is applicable to.
->>> + * @opts: Configuration to check
->>> + *
->>> + * Used to check that the current set of parameters can be handled by
->>> + * the phy. Implementations are free to tune the parameters passed as
->>> + * arguments if needed by some implementation detail or
->>> + * constraints. It will not change any actual configuration of the
->>> + * PHY, so calling it as many times as deemed fit will have no side
->>> + * effect.
->>> + *
->>> + * Returns: 0 if successful, an negative error code otherwise
->>> + */
->>> +int phy_validate(struct phy *phy, enum phy_mode mode,
->>> +		  union phy_configure_opts *opts)
->>
->> IIUC the consumer driver will pass configuration options (or PHY parameters)
->> which will be validated by the PHY driver and in some cases the PHY driver can
->> modify the configuration options? And these modified configuration options will
->> again be given to phy_configure?
->>
->> Looks like it's a round about way of doing the same thing.
-> 
-> Not really. The validate callback allows to check whether a particular
-> configuration would work, and try to negotiate a set of configurations
-> that both the consumer and the PHY could work with.
+Patch 6 switches the nvmem providers to using kref which is necessary
+for removal of the return value from nvmem_unregister(). This is an
+approach similar to the one used in the clock framework where the
+provider is only removed after the last reference to it is dropped.
 
-Maybe the PHY should provide the list of supported features to the consumer
-driver and the consumer should select a supported feature?
+Patches 7-9 convert last remaining users of nvmem_unregister() who
+still check its return value to using devm_nvmem_unregister() and
+patch 10 changes its return value from int to void.
 
-> 
-> For example, DRM requires this to filter out display modes (ie,
-> resolutions) that wouldn't be achievable by the PHY so that it's never
+Patches 11-14 introduce the most significant changes of this series:
+we remove the global cell list, add support for static cell definitions
+external to the provider structure, change the way DT lookup works and
+allow to associate resources and consumers using lookup tables. The way
+nvmem_cell_get() for non-DT users is changed but there are no current
+users and it's currently broken anyway (cell being removed after a call
+to nvmem_cell_put()).
 
-Can't the consumer driver just tell the required resolution to the PHY and PHY
-figuring out all the parameters for the resolution or an error if that
-resolution cannot be supported?
+Patch 15 updates the documentation.
 
-Thanks
-Kishon
+Patch 16 adds support for notifiers to nvmem so that users can
+subscribe for events such as device or cell registration or removal.
+
+Patches 17 & 18 add some minor improvements to the codebase.
+
+Last three patches contain fixes to warnings emitted by checkpatch.
+It's a good moment to add them if we're already touching a big part
+of the subsystem's code.
+
+Tested both DT and non-DT use cases.
+
+[1] https://lkml.org/lkml/2018/8/10/149
+
+v1 -> v2:
+- extended the lookup structure with a proper con_id independent from the
+  cell name defined in the cell definition table
+- added a patch that makes the naming convention for the cell name argument
+  in the nvmem_cell_get() family of functions consistent
+- there were two users of nvmem_unregister() that still checked the return
+  value, now switched to devm_nvmem_register()
+- fixed build failures reported by kbuild test robot
+
+v2 -> v3:
+- dropped the patch removing unused APIs and introduced changes on top of
+  existing code instead
+- fixed nvmem provider reference decreasing in error paths
+- added checkpatch fixes
+- removed nvmem-machine.h and distributed new definitions among existing
+  consumer and provider headers
+- reordered patches thematically
+- added more patches fixing issues in existing codebase
+
+Bartosz Golaszewski (21):
+  nvmem: provide nvmem_dev_name()
+  nvmem: remove the name field from struct nvmem_device
+  nvmem: use list_for_each_entry_safe in nvmem_device_remove_all_cells()
+  nvmem: remove a stray newline
+  nvmem: check the return value of nvmem_add_cells()
+  nvmem: use kref
+  nvmem: lpc18xx_eeprom: use devm_nvmem_register()
+  nvmem: sunxi_sid: use devm_nvmem_register()
+  nvmem: mxs-ocotp: use devm_nvmem_register()
+  nvmem: change the signature of nvmem_unregister()
+  nvmem: remove the global cell list
+  nvmem: add support for cell info
+  nvmem: resolve cells from DT at registration time
+  nvmem: add support for cell lookups from machine code
+  Documentation: nvmem: document cell tables and lookup entries
+  nvmem: add a notifier chain
+  nvmem: use SPDX license identifiers
+  nvmem: make the naming of arguments in nvmem_cell_get() consistent
+  nvmem: use EOPNOTSUPP instead of ENOSYS
+  nvmem: fix commenting style
+  nvmem: use octal permissions instead of constants
+
+ Documentation/nvmem/nvmem.txt  |  31 ++
+ drivers/nvmem/core.c           | 527 ++++++++++++++++++++++-----------
+ drivers/nvmem/lpc18xx_eeprom.c |   6 +-
+ drivers/nvmem/mxs-ocotp.c      |   4 +-
+ drivers/nvmem/sunxi_sid.c      |  20 +-
+ include/linux/nvmem-consumer.h | 100 +++++--
+ include/linux/nvmem-provider.h |  49 +--
+ 7 files changed, 497 insertions(+), 240 deletions(-)
+
+-- 
+2.18.0
