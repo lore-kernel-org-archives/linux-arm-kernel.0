@@ -1,267 +1,238 @@
 From: christophe.leroy@c-s.fr (Christophe Leroy)
-Date: Wed, 12 Sep 2018 15:58:38 +0000 (UTC)
-Subject: [PATCH v2 12/24] powerpc/mm: use pte helpers in generic code
+Date: Wed, 12 Sep 2018 15:58:26 +0000 (UTC)
+Subject: [PATCH v2 06/24] powerpc/mm: properly set PAGE_KERNEL flags in
+ ioremap()
 In-Reply-To: <cover.1536692743.git.christophe.leroy@c-s.fr>
 References: <cover.1536692743.git.christophe.leroy@c-s.fr>
-Message-ID: <13f63620e6d21a07b48c85719793f4f0e88c894f.1536692743.git.christophe.leroy@c-s.fr>
+Message-ID: <8ef7110a902eea35755495c624d0fb64ade01998.1536692743.git.christophe.leroy@c-s.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Get rid of platform specific _PAGE_XXXX in powerpc common code and
-use helpers instead.
+Set PAGE_KERNEL directly in the caller and do not rely on a
+hack adding PAGE_KERNEL flags when _PAGE_PRESENT is not set.
 
-mm/dump_linuxpagetables.c will be handled separately
+As already done for PPC64, use pgprot_cache() helpers instead of
+_PAGE_XXX flags in PPC32 ioremap() derived functions.
 
-Reviewed-by: Aneesh Kumar K.V <aneesh.kumar@linux.ibm.com>
 Signed-off-by: Christophe Leroy <christophe.leroy@c-s.fr>
 ---
- arch/powerpc/include/asm/book3s/32/pgtable.h |  9 +++------
- arch/powerpc/include/asm/nohash/32/pgtable.h | 12 ++++++++----
- arch/powerpc/include/asm/nohash/pgtable.h    |  3 +--
- arch/powerpc/mm/pgtable.c                    | 19 ++++++-------------
- arch/powerpc/mm/pgtable_32.c                 | 15 ++++++++-------
- arch/powerpc/mm/pgtable_64.c                 | 14 +++++++-------
- arch/powerpc/xmon/xmon.c                     | 12 +++++++-----
- 7 files changed, 40 insertions(+), 44 deletions(-)
+ arch/powerpc/include/asm/nohash/pgtable.h |  2 ++
+ arch/powerpc/kernel/isa-bridge.c          |  6 +++---
+ arch/powerpc/kernel/pci_64.c              |  2 +-
+ arch/powerpc/mm/pgtable_32.c              | 28 ++++++++++++----------------
+ arch/powerpc/mm/pgtable_64.c              | 10 +++-------
+ arch/powerpc/platforms/4xx/ocm.c          |  7 ++-----
+ drivers/pcmcia/electra_cf.c               |  2 +-
+ 7 files changed, 24 insertions(+), 33 deletions(-)
 
-diff --git a/arch/powerpc/include/asm/book3s/32/pgtable.h b/arch/powerpc/include/asm/book3s/32/pgtable.h
-index 24ed0f45d92f..d4f2f396af70 100644
---- a/arch/powerpc/include/asm/book3s/32/pgtable.h
-+++ b/arch/powerpc/include/asm/book3s/32/pgtable.h
-@@ -326,17 +326,14 @@ static inline bool pte_ci(pte_t pte)
- #define pte_access_permitted pte_access_permitted
- static inline bool pte_access_permitted(pte_t pte, bool write)
- {
--	unsigned long pteval = pte_val(pte);
- 	/*
- 	 * A read-only access is controlled by _PAGE_USER bit.
- 	 * We have _PAGE_READ set for WRITE and EXECUTE
- 	 */
--	unsigned long need_pte_bits = _PAGE_PRESENT | _PAGE_USER;
--
--	if (write)
--		need_pte_bits |= _PAGE_WRITE;
-+	if (!pte_present(pte) || !pte_user(pte) || !pte_read(pte))
-+		return false;
- 
--	if ((pteval & need_pte_bits) != need_pte_bits)
-+	if (write && !pte_write(pte))
- 		return false;
- 
- 	return true;
-diff --git a/arch/powerpc/include/asm/nohash/32/pgtable.h b/arch/powerpc/include/asm/nohash/32/pgtable.h
-index 6fecfd7854f5..a4156da4a7a4 100644
---- a/arch/powerpc/include/asm/nohash/32/pgtable.h
-+++ b/arch/powerpc/include/asm/nohash/32/pgtable.h
-@@ -277,7 +277,10 @@ static inline pte_t ptep_get_and_clear(struct mm_struct *mm, unsigned long addr,
- static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long addr,
- 				      pte_t *ptep)
- {
--	pte_update(ptep, (_PAGE_RW | _PAGE_HWWRITE), _PAGE_RO);
-+	unsigned long clr = ~pte_val(pte_wrprotect(__pte(~0)));
-+	unsigned long set = pte_val(pte_wrprotect(__pte(0)));
-+
-+	pte_update(ptep, clr, set);
- }
- static inline void huge_ptep_set_wrprotect(struct mm_struct *mm,
- 					   unsigned long addr, pte_t *ptep)
-@@ -291,9 +294,10 @@ static inline void __ptep_set_access_flags(struct vm_area_struct *vma,
- 					   unsigned long address,
- 					   int psize)
- {
--	unsigned long set = pte_val(entry) &
--		(_PAGE_DIRTY | _PAGE_ACCESSED | _PAGE_RW | _PAGE_EXEC);
--	unsigned long clr = ~pte_val(entry) & (_PAGE_RO | _PAGE_NA);
-+	pte_t pte_set = pte_mkyoung(pte_mkdirty(pte_mkwrite(pte_mkexec(__pte(0)))));
-+	pte_t pte_clr = pte_mkyoung(pte_mkdirty(pte_mkwrite(pte_mkexec(__pte(~0)))));
-+	unsigned long set = pte_val(entry) & pte_val(pte_set);
-+	unsigned long clr = ~pte_val(entry) & ~pte_val(pte_clr);
- 
- 	pte_update(ptep, clr, set);
- 
 diff --git a/arch/powerpc/include/asm/nohash/pgtable.h b/arch/powerpc/include/asm/nohash/pgtable.h
-index f87cf446b01d..92def7088054 100644
+index b321c82b3624..5b82e44c4231 100644
 --- a/arch/powerpc/include/asm/nohash/pgtable.h
 +++ b/arch/powerpc/include/asm/nohash/pgtable.h
-@@ -32,8 +32,7 @@ static inline pgprot_t pte_pgprot(pte_t pte)	{ return __pgprot(pte_val(pte) & PA
-  */
- static inline int pte_protnone(pte_t pte)
- {
--	return (pte_val(pte) &
--		(_PAGE_PRESENT | _PAGE_USER)) == _PAGE_PRESENT;
-+	return pte_present(pte) && !pte_user(pte);
+@@ -197,6 +197,8 @@ extern int ptep_set_access_flags(struct vm_area_struct *vma, unsigned long addre
+ #if _PAGE_WRITETHRU != 0
+ #define pgprot_cached_wthru(prot) (__pgprot((pgprot_val(prot) & ~_PAGE_CACHE_CTL) | \
+ 				            _PAGE_COHERENT | _PAGE_WRITETHRU))
++#else
++#define pgprot_cached_wthru(prot)	pgprot_noncached(prot)
+ #endif
+ 
+ #define pgprot_cached_noncoherent(prot) \
+diff --git a/arch/powerpc/kernel/isa-bridge.c b/arch/powerpc/kernel/isa-bridge.c
+index 1df6c74aa731..072e384f8c86 100644
+--- a/arch/powerpc/kernel/isa-bridge.c
++++ b/arch/powerpc/kernel/isa-bridge.c
+@@ -110,14 +110,14 @@ static void pci_process_ISA_OF_ranges(struct device_node *isa_node,
+ 		size = 0x10000;
+ 
+ 	__ioremap_at(phb_io_base_phys, (void *)ISA_IO_BASE,
+-		     size, pgprot_val(pgprot_noncached(__pgprot(0))));
++		     size, pgprot_val(pgprot_noncached(PAGE_KERNEL)));
+ 	return;
+ 
+ inval_range:
+ 	printk(KERN_ERR "no ISA IO ranges or unexpected isa range, "
+ 	       "mapping 64k\n");
+ 	__ioremap_at(phb_io_base_phys, (void *)ISA_IO_BASE,
+-		     0x10000, pgprot_val(pgprot_noncached(__pgprot(0))));
++		     0x10000, pgprot_val(pgprot_noncached(PAGE_KERNEL)));
  }
  
- static inline int pmd_protnone(pmd_t pmd)
-diff --git a/arch/powerpc/mm/pgtable.c b/arch/powerpc/mm/pgtable.c
-index 4f788f3762a9..8558f01ed5c8 100644
---- a/arch/powerpc/mm/pgtable.c
-+++ b/arch/powerpc/mm/pgtable.c
-@@ -44,20 +44,13 @@ static inline int is_exec_fault(void)
- static inline int pte_looks_normal(pte_t pte)
- {
  
--#if defined(CONFIG_PPC_BOOK3S_64)
--	if ((pte_val(pte) & (_PAGE_PRESENT | _PAGE_SPECIAL)) == _PAGE_PRESENT) {
-+	if (pte_present(pte) && !pte_special(pte)) {
- 		if (pte_ci(pte))
- 			return 0;
- 		if (pte_user(pte))
- 			return 1;
- 	}
- 	return 0;
--#else
--	return (pte_val(pte) &
--		(_PAGE_PRESENT | _PAGE_SPECIAL | _PAGE_NO_CACHE | _PAGE_USER |
--		 _PAGE_PRIVILEGED)) ==
--		(_PAGE_PRESENT | _PAGE_USER);
--#endif
- }
- 
- static struct page *maybe_pte_to_page(pte_t pte)
-@@ -117,7 +110,7 @@ static pte_t set_pte_filter(pte_t pte)
- 	struct page *pg;
- 
- 	/* No exec permission in the first place, move on */
--	if (!(pte_val(pte) & _PAGE_EXEC) || !pte_looks_normal(pte))
-+	if (!pte_exec(pte) || !pte_looks_normal(pte))
- 		return pte;
- 
- 	/* If you set _PAGE_EXEC on weird pages you're on your own */
-@@ -137,7 +130,7 @@ static pte_t set_pte_filter(pte_t pte)
- 	}
- 
- 	/* Else, we filter out _PAGE_EXEC */
--	return __pte(pte_val(pte) & ~_PAGE_EXEC);
-+	return pte_exprotect(pte);
- }
- 
- static pte_t set_access_flags_filter(pte_t pte, struct vm_area_struct *vma,
-@@ -150,7 +143,7 @@ static pte_t set_access_flags_filter(pte_t pte, struct vm_area_struct *vma,
- 	 * if necessary. Also if _PAGE_EXEC is already set, same deal,
- 	 * we just bail out
+@@ -253,7 +253,7 @@ void __init isa_bridge_init_non_pci(struct device_node *np)
  	 */
--	if (dirty || (pte_val(pte) & _PAGE_EXEC) || !is_exec_fault())
-+	if (dirty || pte_exec(pte) || !is_exec_fault())
- 		return pte;
+ 	isa_io_base = ISA_IO_BASE;
+ 	__ioremap_at(pbase, (void *)ISA_IO_BASE,
+-		     size, pgprot_val(pgprot_noncached(__pgprot(0))));
++		     size, pgprot_val(pgprot_noncached(PAGE_KERNEL)));
  
- #ifdef CONFIG_DEBUG_VM
-@@ -176,7 +169,7 @@ static pte_t set_access_flags_filter(pte_t pte, struct vm_area_struct *vma,
- 	set_bit(PG_arch_1, &pg->flags);
- 
-  bail:
--	return __pte(pte_val(pte) | _PAGE_EXEC);
-+	return pte_mkexec(pte);
+ 	pr_debug("ISA: Non-PCI bridge is %pOF\n", np);
  }
+diff --git a/arch/powerpc/kernel/pci_64.c b/arch/powerpc/kernel/pci_64.c
+index dff28f903512..64bb4dd2b8f1 100644
+--- a/arch/powerpc/kernel/pci_64.c
++++ b/arch/powerpc/kernel/pci_64.c
+@@ -159,7 +159,7 @@ static int pcibios_map_phb_io_space(struct pci_controller *hose)
  
- #endif /* CONFIG_PPC_BOOK3S */
-@@ -195,7 +188,7 @@ void set_pte_at(struct mm_struct *mm, unsigned long addr, pte_t *ptep,
- 	VM_WARN_ON(pte_present(*ptep) && !pte_protnone(*ptep));
+ 	/* Establish the mapping */
+ 	if (__ioremap_at(phys_page, area->addr, size_page,
+-			 pgprot_val(pgprot_noncached(__pgprot(0)))) == NULL)
++			 pgprot_val(pgprot_noncached(PAGE_KERNEL))) == NULL)
+ 		return -ENOMEM;
  
- 	/* Add the pte bit when trying to set a pte */
--	pte = __pte(pte_val(pte) | _PAGE_PTE);
-+	pte = pte_mkpte(pte);
- 
- 	/* Note: mm->context.id might not yet have been assigned as
- 	 * this context might not have been activated yet when this
+ 	/* Fixup hose IO resource */
 diff --git a/arch/powerpc/mm/pgtable_32.c b/arch/powerpc/mm/pgtable_32.c
-index 01f348938328..5877f5aa8f5d 100644
+index 4c3adde09d95..6a81a2446c47 100644
 --- a/arch/powerpc/mm/pgtable_32.c
 +++ b/arch/powerpc/mm/pgtable_32.c
-@@ -112,15 +112,17 @@ EXPORT_SYMBOL(ioremap_coherent);
+@@ -76,32 +76,36 @@ pgtable_t pte_alloc_one(struct mm_struct *mm, unsigned long address)
  void __iomem *
- ioremap_prot(phys_addr_t addr, unsigned long size, unsigned long flags)
+ ioremap(phys_addr_t addr, unsigned long size)
  {
-+	pte_t pte = __pte(flags);
+-	return __ioremap_caller(addr, size, _PAGE_NO_CACHE | _PAGE_GUARDED,
+-				__builtin_return_address(0));
++	unsigned long flags = pgprot_val(pgprot_noncached(PAGE_KERNEL));
 +
- 	/* writeable implies dirty for kernel addresses */
--	if ((flags & (_PAGE_RW | _PAGE_RO)) != _PAGE_RO)
--		flags |= _PAGE_DIRTY | _PAGE_HWWRITE;
-+	if (pte_write(pte))
-+		pte = pte_mkdirty(pte);
- 
- 	/* we don't want to let _PAGE_USER and _PAGE_EXEC leak out */
--	flags &= ~(_PAGE_USER | _PAGE_EXEC);
--	flags |= _PAGE_PRIVILEGED;
-+	pte = pte_exprotect(pte);
-+	pte = pte_mkprivileged(pte);
- 
--	return __ioremap_caller(addr, size, __pgprot(flags), __builtin_return_address(0));
-+	return __ioremap_caller(addr, size, pte_pgprot(pte), __builtin_return_address(0));
++	return __ioremap_caller(addr, size, flags, __builtin_return_address(0));
  }
- EXPORT_SYMBOL(ioremap_prot);
+ EXPORT_SYMBOL(ioremap);
  
-@@ -235,8 +237,7 @@ int map_kernel_page(unsigned long va, phys_addr_t pa, pgprot_t prot)
- 		/* The PTE should never be already set nor present in the
- 		 * hash table
- 		 */
--		BUG_ON((pte_val(*pg) & (_PAGE_PRESENT | _PAGE_HASHPTE)) &&
--		       pgprot_val(prot));
-+		BUG_ON((pte_present(*pg) | pte_hashpte(*pg)) && pgprot_val(prot));
- 		set_pte_at(&init_mm, va, pg, pfn_pte(pa >> PAGE_SHIFT, prot));
- 	}
- 	smp_wmb();
+ void __iomem *
+ ioremap_wc(phys_addr_t addr, unsigned long size)
+ {
+-	return __ioremap_caller(addr, size, _PAGE_NO_CACHE,
+-				__builtin_return_address(0));
++	unsigned long flags = pgprot_val(pgprot_noncached_wc(PAGE_KERNEL));
++
++	return __ioremap_caller(addr, size, flags, __builtin_return_address(0));
+ }
+ EXPORT_SYMBOL(ioremap_wc);
+ 
+ void __iomem *
+ ioremap_wt(phys_addr_t addr, unsigned long size)
+ {
+-	return __ioremap_caller(addr, size, _PAGE_WRITETHRU,
+-				__builtin_return_address(0));
++	unsigned long flags = pgprot_val(pgprot_cached_wthru(PAGE_KERNEL));
++
++	return __ioremap_caller(addr, size, flags, __builtin_return_address(0));
+ }
+ EXPORT_SYMBOL(ioremap_wt);
+ 
+ void __iomem *
+ ioremap_coherent(phys_addr_t addr, unsigned long size)
+ {
+-	return __ioremap_caller(addr, size, _PAGE_COHERENT,
+-				__builtin_return_address(0));
++	unsigned long flags = pgprot_val(pgprot_cached(PAGE_KERNEL));
++
++	return __ioremap_caller(addr, size, flags, __builtin_return_address(0));
+ }
+ EXPORT_SYMBOL(ioremap_coherent);
+ 
+@@ -134,14 +138,6 @@ __ioremap_caller(phys_addr_t addr, unsigned long size, unsigned long flags,
+ 	phys_addr_t p;
+ 	int err;
+ 
+-	/* Make sure we have the base flags */
+-	if ((flags & _PAGE_PRESENT) == 0)
+-		flags |= pgprot_val(PAGE_KERNEL);
+-
+-	/* Non-cacheable page cannot be coherent */
+-	if (flags & _PAGE_NO_CACHE)
+-		flags &= ~_PAGE_COHERENT;
+-
+ 	/*
+ 	 * Choose an address to map it to.
+ 	 * Once the vmalloc system is running, we use it.
 diff --git a/arch/powerpc/mm/pgtable_64.c b/arch/powerpc/mm/pgtable_64.c
-index 5c889445bee9..a7569358522c 100644
+index cdccfac477e0..e9344d56fad3 100644
 --- a/arch/powerpc/mm/pgtable_64.c
 +++ b/arch/powerpc/mm/pgtable_64.c
-@@ -230,23 +230,23 @@ void __iomem *ioremap_coherent(phys_addr_t addr, unsigned long size)
- void __iomem * ioremap_prot(phys_addr_t addr, unsigned long size,
- 			     unsigned long flags)
+@@ -118,10 +118,6 @@ void __iomem * __ioremap_at(phys_addr_t pa, void *ea, unsigned long size,
  {
-+	pte_t pte = __pte(flags);
+ 	unsigned long i;
+ 
+-	/* Make sure we have the base flags */
+-	if ((flags & _PAGE_PRESENT) == 0)
+-		flags |= pgprot_val(PAGE_KERNEL);
+-
+ 	/* We don't support the 4K PFN hack with ioremap */
+ 	if (flags & H_PAGE_4K_PFN)
+ 		return NULL;
+@@ -204,7 +200,7 @@ void __iomem * __ioremap(phys_addr_t addr, unsigned long size,
+ 
+ void __iomem * ioremap(phys_addr_t addr, unsigned long size)
+ {
+-	unsigned long flags = pgprot_val(pgprot_noncached(__pgprot(0)));
++	unsigned long flags = pgprot_val(pgprot_noncached(PAGE_KERNEL));
  	void *caller = __builtin_return_address(0);
  
- 	/* writeable implies dirty for kernel addresses */
--	if (flags & _PAGE_WRITE)
--		flags |= _PAGE_DIRTY;
-+	if (pte_write(pte))
-+		pte = pte_mkdirty(pte);
+ 	if (ppc_md.ioremap)
+@@ -214,7 +210,7 @@ void __iomem * ioremap(phys_addr_t addr, unsigned long size)
  
- 	/* we don't want to let _PAGE_EXEC leak out */
--	flags &= ~_PAGE_EXEC;
-+	pte = pte_exprotect(pte);
- 	/*
- 	 * Force kernel mapping.
- 	 */
--	flags &= ~_PAGE_USER;
--	flags |= _PAGE_PRIVILEGED;
-+	pte = pte_mkprivileged(pte);
+ void __iomem * ioremap_wc(phys_addr_t addr, unsigned long size)
+ {
+-	unsigned long flags = pgprot_val(pgprot_noncached_wc(__pgprot(0)));
++	unsigned long flags = pgprot_val(pgprot_noncached_wc(PAGE_KERNEL));
+ 	void *caller = __builtin_return_address(0);
  
  	if (ppc_md.ioremap)
--		return ppc_md.ioremap(addr, size, __pgprot(flags), caller);
--	return __ioremap_caller(addr, size, __pgprot(flags), caller);
-+		return ppc_md.ioremap(addr, size, pte_pgprot(pte), caller);
-+	return __ioremap_caller(addr, size, pte_pgprot(pte), caller);
- }
+@@ -224,7 +220,7 @@ void __iomem * ioremap_wc(phys_addr_t addr, unsigned long size)
  
- 
-diff --git a/arch/powerpc/xmon/xmon.c b/arch/powerpc/xmon/xmon.c
-index 4264aedc7775..f65f2f38c441 100644
---- a/arch/powerpc/xmon/xmon.c
-+++ b/arch/powerpc/xmon/xmon.c
-@@ -2988,15 +2988,17 @@ static void show_task(struct task_struct *tsk)
- #ifdef CONFIG_PPC_BOOK3S_64
- void format_pte(void *ptep, unsigned long pte)
+ void __iomem *ioremap_coherent(phys_addr_t addr, unsigned long size)
  {
-+	pte_t entry = __pte(pte);
-+
- 	printf("ptep @ 0x%016lx = 0x%016lx\n", (unsigned long)ptep, pte);
- 	printf("Maps physical address = 0x%016lx\n", pte & PTE_RPN_MASK);
+-	unsigned long flags = pgprot_val(pgprot_cached(__pgprot(0)));
++	unsigned long flags = pgprot_val(pgprot_cached(PAGE_KERNEL));
+ 	void *caller = __builtin_return_address(0);
  
- 	printf("Flags = %s%s%s%s%s\n",
--	       (pte & _PAGE_ACCESSED) ? "Accessed " : "",
--	       (pte & _PAGE_DIRTY)    ? "Dirty " : "",
--	       (pte & _PAGE_READ)     ? "Read " : "",
--	       (pte & _PAGE_WRITE)    ? "Write " : "",
--	       (pte & _PAGE_EXEC)     ? "Exec " : "");
-+	       pte_young(entry) ? "Accessed " : "",
-+	       pte_dirty(entry) ? "Dirty " : "",
-+	       pte_read(entry)  ? "Read " : "",
-+	       pte_write(entry) ? "Write " : "",
-+	       pte_exec(entry)  ? "Exec " : "");
- }
+ 	if (ppc_md.ioremap)
+diff --git a/arch/powerpc/platforms/4xx/ocm.c b/arch/powerpc/platforms/4xx/ocm.c
+index 69d9f60d9fe5..f5bbd4563342 100644
+--- a/arch/powerpc/platforms/4xx/ocm.c
++++ b/arch/powerpc/platforms/4xx/ocm.c
+@@ -113,7 +113,6 @@ static void __init ocm_init_node(int count, struct device_node *node)
+ 	int len;
  
- static void show_pte(unsigned long addr)
+ 	struct resource rsrc;
+-	int ioflags;
+ 
+ 	ocm = ocm_get_node(count);
+ 
+@@ -179,9 +178,8 @@ static void __init ocm_init_node(int count, struct device_node *node)
+ 
+ 	/* ioremap the non-cached region */
+ 	if (ocm->nc.memtotal) {
+-		ioflags = _PAGE_NO_CACHE | _PAGE_GUARDED | _PAGE_EXEC;
+ 		ocm->nc.virt = __ioremap(ocm->nc.phys, ocm->nc.memtotal,
+-					  ioflags);
++					 _PAGE_EXEC | PAGE_KERNEL_NCG);
+ 
+ 		if (!ocm->nc.virt) {
+ 			printk(KERN_ERR
+@@ -195,9 +193,8 @@ static void __init ocm_init_node(int count, struct device_node *node)
+ 	/* ioremap the cached region */
+ 
+ 	if (ocm->c.memtotal) {
+-		ioflags = _PAGE_EXEC;
+ 		ocm->c.virt = __ioremap(ocm->c.phys, ocm->c.memtotal,
+-					 ioflags);
++					_PAGE_EXEC | PAGE_KERNEL);
+ 
+ 		if (!ocm->c.virt) {
+ 			printk(KERN_ERR
+diff --git a/drivers/pcmcia/electra_cf.c b/drivers/pcmcia/electra_cf.c
+index 9671ded549f0..34d6c1a0971e 100644
+--- a/drivers/pcmcia/electra_cf.c
++++ b/drivers/pcmcia/electra_cf.c
+@@ -230,7 +230,7 @@ static int electra_cf_probe(struct platform_device *ofdev)
+ 
+ 	if (!cf->mem_base || !cf->io_virt || !cf->gpio_base ||
+ 	    (__ioremap_at(io.start, cf->io_virt, cf->io_size,
+-		  pgprot_val(pgprot_noncached(__pgprot(0)))) == NULL)) {
++			  pgprot_val(pgprot_noncached(PAGE_KERNEL))) == NULL)) {
+ 		dev_err(device, "can't ioremap ranges\n");
+ 		status = -ENOMEM;
+ 		goto fail1;
 -- 
 2.13.3
