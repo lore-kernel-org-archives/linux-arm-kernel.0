@@ -1,29 +1,33 @@
 From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Wed, 12 Sep 2018 12:38:56 +0200
-Subject: [PATCH] ARM: dts: at91: sama5d2_ptc_ek: fix nand pinctrl
-In-Reply-To: <20180907081851.15911-1-ludovic.desroches@microchip.com>
-References: <20180907081851.15911-1-ludovic.desroches@microchip.com>
-Message-ID: <20180912103856.GA2760@piout.net>
+Date: Wed, 12 Sep 2018 12:40:19 +0200
+Subject: [PATCH] ARM: dts: at91: sama5d4: add labels to soc dtsi for
+ derivative boards
+In-Reply-To: <1536327489-22005-1-git-send-email-eugen.hristev@microchip.com>
+References: <1536327489-22005-1-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <20180912104019.GB2760@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/2018 10:18:51+0200, Ludovic Desroches wrote:
-> The drive strength has to be set to medium otherwise some data
-> corruption may happen.
+On 07/09/2018 16:38:09+0300, Eugen Hristev wrote:
+> This adds labels to commonly used device-tree nodes so that derivative
+> boards can avoid ahb/apb hierarchy.
 > 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
 > ---
 > 
-> Hi,
+> Hello,
 > 
-> This fix depends on the support of the drive-strength for the atmel pio4
-> pinctroller. It has been added in v4.19 but I omitted to send it at the
-> same time.
+> This was already done for SoC sama5d3 and sam9x5, in commit:
+> "fc37204432d" ("ARM: dts: at91: add labels to soc dtsi for derivative boards")
 > 
-> Ludovic
+> This commit will do basically the same thing for sama5d4 SoC.
 > 
->  arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts | 2 ++
->  1 file changed, 2 insertions(+)
+> Based on top of at91-next branch of at91.git
+> 
+> Thanks.
+> 
+>  arch/arm/boot/dts/sama5d4.dtsi | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
 > 
 Applied, thanks.
 
