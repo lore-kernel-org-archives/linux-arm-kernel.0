@@ -1,78 +1,52 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 12 Sep 2018 13:42:09 +0100
-Subject: [PATCH 02/11] dts: hisilicon: Update coresight bindings for
- hardware ports
-In-Reply-To: <20180912104735.GC3353@leoy-ThinkPad-X240s>
-References: <1536661032-30481-1-git-send-email-suzuki.poulose@arm.com>
- <1536661032-30481-3-git-send-email-suzuki.poulose@arm.com>
- <20180912104735.GC3353@leoy-ThinkPad-X240s>
-Message-ID: <22fd3ec6-bde0-87c6-673b-f95a15190bda@arm.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 12 Sep 2018 14:47:34 +0200
+Subject: [PATCH v5 0/6] drm/rockchip: hdmi support for rk3328
+Message-ID: <20180912124740.20343-1-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leo,
+The rk3228/rk3229 and rk3328 socs started using a new type of hdmi-phy
+from Innosilicon that resides completely separate from the dw-hdmi block
+and gets accessed via mmio.
 
-On 12/09/18 11:47, leo.yan at linaro.org wrote:
-> On Tue, Sep 11, 2018 at 11:17:03AM +0100, Suzuki K Poulose wrote:
->> Switch to updated coresight bindings for hw ports.
-> 
-> As Shawn suggested, please change subject as "arm64: dts: hi6220:
-> ...."
-> 
+Additionally the rk3328 dw-hdmi does not report the vendor-phy type
+but a different one instead, so add the possibility to override the
+phy type when the glue driver knows better than the ip block itself.
 
-Sure, will do.
+changes in v5:
+- disable CEC_5V option to make CEC actually work (Jonas)
 
->> Cc: xuwei5 at hisilicon.com
->> Cc: lipengcheng8 at huawei.com
->> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->>   .../arm64/boot/dts/hisilicon/hi6220-coresight.dtsi | 147 ++++++++++++---------
->>   1 file changed, 85 insertions(+), 62 deletions(-)
->>
->> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-coresight.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220-coresight.dtsi
->> index 7afee5d..2202816 100644
->> --- a/arch/arm64/boot/dts/hisilicon/hi6220-coresight.dtsi
->> +++ b/arch/arm64/boot/dts/hisilicon/hi6220-coresight.dtsi
-> 
-> [...]
-> 
->> @@ -302,10 +315,12 @@
->>   
->>   			cpu = <&cpu3>;
->>   
->> -			port {
->> -				etm3_out: endpoint {
->> -					remote-endpoint =
->> -						<&acpu_funnel_in3>;
->> +			out-ports {
->> +				port {
->> +					etm3_out: endpoint {
->> +						remote-endpoint =
->> +							<&acpu_funnel_in3>;
->> +					};
->>   				};
->>   			};
->>   		};
->> @@ -319,10 +334,12 @@
->>   
->>   			cpu = <&cpu4>;
->>   
->> -			port {
->> +			out-ports {
->> +				port {
->>   				etm4_out: endpoint {
-> 
-> Indent?
+changes in v4:
+- rebased onto 4.19-rc2 - no actual changes
+- added Rob's Ack on the dw-hdmi compatible
 
-Yes, I have fixed this locally for v2.
+changes in v3:
+- split off phy driver into a separate series
+- only allow forcing vendor phy type
+- wording fixes and other nits
 
-> 
-> After applied this patch and tested on Hikey board; FWIW:
-> 
-> Tested-by: Leo Yan <leo.yan@linaro.org>
+changes in v2:
+- phy: prevent overflow in tmdsclk calculation
+  as reported by Martin Cerveny
+- phy: use unsigned long for all tmdsclk rate uses
+- phy: simplify tmds rate calculation
+- dropped patch exporting some dw-hdmi phy functions
+  as a similar patch entered drm-misc already
 
-Thanks for the testing !
+Heiko Stuebner (6):
+  drm/bridge: dw-hdmi: allow forcing vendor phy-type
+  drm/rockchip: dw_hdmi: Allow outputs that don't need output switching
+  dt-bindings: allow optional phys in Rockchip dw_hdmi binding
+  drm/rockchip: dw_hdmi: allow including external phys
+  drm/rockchip: dw_hdmi: store rockchip_hdmi reference in phy_data
+    object
+  drm/rockchip: dw_hdmi: add dw-hdmi support for the rk3328
 
-Cheers
-Suzuki
+ .../display/rockchip/dw_hdmi-rockchip.txt     |   3 +
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi.c     |   4 +-
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c   | 126 +++++++++++++++++-
+ include/drm/bridge/dw_hdmi.h                  |   1 +
+ 4 files changed, 130 insertions(+), 4 deletions(-)
+
+-- 
+2.17.0
