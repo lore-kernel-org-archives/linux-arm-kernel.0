@@ -1,126 +1,71 @@
-From: leo.yan@linaro.org (leo.yan at linaro.org)
-Date: Wed, 12 Sep 2018 18:47:35 +0800
-Subject: [PATCH 02/11] dts: hisilicon: Update coresight bindings for
- hardware ports
-In-Reply-To: <1536661032-30481-3-git-send-email-suzuki.poulose@arm.com>
-References: <1536661032-30481-1-git-send-email-suzuki.poulose@arm.com>
- <1536661032-30481-3-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20180912104735.GC3353@leoy-ThinkPad-X240s>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 12 Sep 2018 11:54:07 +0100
+Subject: [PATCH v12 0/6] Driver for at91 usart in spi mode
+In-Reply-To: <CAMuHMdWefU0pw=c9TKOa+wGHchpg8JRfE0OnC4+wKDt-qrbH1A@mail.gmail.com>
+References: <CAMuHMdXH8gNjKGOHGFc+K03U2zsVCSN7G_Q4wtepQr859nRQKg@mail.gmail.com>
+ <20180911153621.GP2494@piout.net>
+ <CAMuHMdV+=EgAYogwNHbY=RExkGox_+YSeHV6pJtQb6g6PzD-CQ@mail.gmail.com>
+ <20180911181838.GI4185@dell> <20180911185839.GA25212@piout.net>
+ <20180911224418.GK4185@dell> <20180911225440.GL4185@dell>
+ <20180912073355.GB2557@piout.net> <20180912084143.GN4185@dell>
+ <CAMuHMdWefU0pw=c9TKOa+wGHchpg8JRfE0OnC4+wKDt-qrbH1A@mail.gmail.com>
+Message-ID: <20180912105407.GR4185@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2018 at 11:17:03AM +0100, Suzuki K Poulose wrote:
-> Switch to updated coresight bindings for hw ports.
-
-As Shawn suggested, please change subject as "arm64: dts: hi6220:
-...."
-
-> Cc: xuwei5 at hisilicon.com
-> Cc: lipengcheng8 at huawei.com
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  .../arm64/boot/dts/hisilicon/hi6220-coresight.dtsi | 147 ++++++++++++---------
->  1 file changed, 85 insertions(+), 62 deletions(-)
+On Wed, 12 Sep 2018, Geert Uytterhoeven wrote:
+> On Wed, Sep 12, 2018 at 10:41 AM Lee Jones <lee.jones@linaro.org> wrote:
+> > On Wed, 12 Sep 2018, Alexandre Belloni wrote:
+> > > On 11/09/2018 23:54:40+0100, Lee Jones wrote:
+> > > > > > http://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-6438-32-bit-ARM926-Embedded-Microprocessor-SAM9G45_Datasheet.pdf
+> > > > > >
+> > > > > > USART doc starting p572, registers p621.
+> > > >
+> > > > After looking at the datasheet, I don't see any reason why one of the
+> > > > two drivers can't be selected using different compatible strings.
+> > >
+> > > Because there is only one IP and we don't use the device tree to selecet
+> > > linux specific drivers.
+> >
+> > We do it all the time.  There are loads of MFDs (def: same IP, with
+> > different functions) which have separate compatibles for their various
+> > functions.  If you wish this IP to operate as an SPI controller, it
+> > should have an SPI compatible, if you wish it to operate as a U(S)ART,
+> > then it should have a UART compatible.  It's what we do for most of
+> > the other MFDs in the kernel.
 > 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-coresight.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220-coresight.dtsi
-> index 7afee5d..2202816 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi6220-coresight.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hi6220-coresight.dtsi
-
-[...]
-
-> @@ -302,10 +315,12 @@
->  
->  			cpu = <&cpu3>;
->  
-> -			port {
-> -				etm3_out: endpoint {
-> -					remote-endpoint =
-> -						<&acpu_funnel_in3>;
-> +			out-ports {
-> +				port {
-> +					etm3_out: endpoint {
-> +						remote-endpoint =
-> +							<&acpu_funnel_in3>;
-> +					};
->  				};
->  			};
->  		};
-> @@ -319,10 +334,12 @@
->  
->  			cpu = <&cpu4>;
->  
-> -			port {
-> +			out-ports {
-> +				port {
->  				etm4_out: endpoint {
-
-Indent?
-
-After applied this patch and tested on Hikey board; FWIW:
-
-Tested-by: Leo Yan <leo.yan@linaro.org>
-
-> -					remote-endpoint =
-> -						<&acpu_funnel_in4>;
-> +						remote-endpoint =
-> +							<&acpu_funnel_in4>;
-> +					};
->  				};
->  			};
->  		};
-> @@ -336,10 +353,12 @@
->  
->  			cpu = <&cpu5>;
->  
-> -			port {
-> -				etm5_out: endpoint {
-> -					remote-endpoint =
-> -						<&acpu_funnel_in5>;
-> +			out-ports {
-> +				port {
-> +					etm5_out: endpoint {
-> +						remote-endpoint =
-> +							<&acpu_funnel_in5>;
-> +					};
->  				};
->  			};
->  		};
-> @@ -353,10 +372,12 @@
->  
->  			cpu = <&cpu6>;
->  
-> -			port {
-> -				etm6_out: endpoint {
-> -					remote-endpoint =
-> -						<&acpu_funnel_in6>;
-> +			out-ports {
-> +				port {
-> +					etm6_out: endpoint {
-> +						remote-endpoint =
-> +							<&acpu_funnel_in6>;
-> +					};
->  				};
->  			};
->  		};
-> @@ -370,10 +391,12 @@
->  
->  			cpu = <&cpu7>;
->  
-> -			port {
-> -				etm7_out: endpoint {
-> -					remote-endpoint =
-> -						<&acpu_funnel_in7>;
-> +			out-ports {
-> +				port {
-> +					etm7_out: endpoint {
-> +						remote-endpoint =
-> +							<&acpu_funnel_in7>;
-> +					};
->  				};
->  			};
->  		};
-> -- 
-> 2.7.4
+> There is a big difference: MFD functions are(more or less) independent
+> functions, which can be used at the same time. It makes perfect sense for a
+> single IP block that has both SPI and UART interfaces, that can be used at
+> the same time.
 > 
+> In this case, there is a single piece of hardware that can perform
+> different functions, but not at the same time. Performing a different
+> function means configuring the hardware for that function, hence using a
+> different driver (from a different subsystem).
+
+Yes, I can see that PoV.
+
+But ... we can't have it both ways.  *Either* it's a true MFD, in
+which case it can/should have 2 separate compatible strings which can
+be specified directly from the DT.  *Or* it's not an MFD.  In the
+latter case, which I think we're all agreeing on (else we'd have 2
+compatible strings), MFD is not the place to handle this (my original
+point).
+
+So ... this is a USART device which can do SPI, right?
+
+My current thinking is that; as this is a USART device first &
+foremost, the USART should be probed in the first instance regardless,
+then if SPI mode is specified it (the USART driver) registers the SPI
+platform driver (as MFD does currently) and exits gracefully, allowing
+the SPI driver to take over.
+
+Spanner in the works: is it physically possible to change the mode at
+run-time?  :s
+
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
