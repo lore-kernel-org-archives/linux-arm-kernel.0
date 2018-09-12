@@ -1,115 +1,32 @@
-From: radu_nicolae.pirea@upb.ro (Radu Pirea)
-Date: Wed, 12 Sep 2018 22:36:40 +0300
-Subject: [PATCH v12 0/6] Driver for at91 usart in spi mode
-In-Reply-To: <20180912131248.GA21544@dell>
-References: <20180911185839.GA25212@piout.net> <20180911224418.GK4185@dell>
- <20180911225440.GL4185@dell> <20180912073355.GB2557@piout.net>
- <20180912084143.GN4185@dell>
- <CAMuHMdWefU0pw=c9TKOa+wGHchpg8JRfE0OnC4+wKDt-qrbH1A@mail.gmail.com>
- <20180912105407.GR4185@dell> <20180912111757.GC2760@piout.net>
- <20180912114352.GT4185@dell> <20180912121420.GE2760@piout.net>
- <20180912131248.GA21544@dell>
-Message-ID: <a143edd3c0de2ba98b64e642b4384edf4323be2b.camel@upb.ro>
+From: greg@kroah.com (Greg KH)
+Date: Wed, 12 Sep 2018 21:38:16 +0200
+Subject: [stable PATCH 1/2] arm64: Fix mismatched cache line size detection
+In-Reply-To: <1536052210-11625-1-git-send-email-suzuki.poulose@arm.com>
+References: <1536052210-11625-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180912193816.GF21563@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-09-12 at 14:12 +0100, Lee Jones wrote:
-> On Wed, 12 Sep 2018, Alexandre Belloni wrote:
+On Tue, Sep 04, 2018 at 10:10:09AM +0100, Suzuki K Poulose wrote:
+> commit 4c4a39dd5fe2d13e2d2fa5fceb8ef95d19fc389a upstream
 > 
-> > On 12/09/2018 12:43:52+0100, Lee Jones wrote:
-> > > > > But ... we can't have it both ways.  *Either* it's a true
-> > > > > MFD, in
-> > > > > which case it can/should have 2 separate compatible strings
-> > > > > which can
-> > > > > be specified directly from the DT.  *Or* it's not an MFD.  In
-> > > > > the
-> > > > > latter case, which I think we're all agreeing on (else we'd
-> > > > > have 2
-> > > > > compatible strings), MFD is not the place to handle this (my
-> > > > > original
-> > > > > point).
-> > > > > 
-> > > > 
-> > > > If that is what bothers you, then let's move it out of mfd.
-> > > 
-> > > As I've already mentioned.  I don't just want it moved out of MFD
-> > > and
-> > > shoved somewhere else.  My aim is to fix this properly.
-> > > 
-> > 
-> > If it is out of MFD, then I'm not sure why you would care too much
-> > about
-> > it as you won't be maintaining that code. And I still this what was
-> > done
-> > was correct but I'm open to test what you suggest.
+> If there is a mismatch in the I/D min line size, we must
+> always use the system wide safe value both in applications
+> and in the kernel, while performing cache operations. However,
+> we have been checking more bits than just the min line sizes,
+> which triggers false negatives. We may need to trap the user
+> accesses in such cases, but not necessarily patch the kernel.
 > 
-> I care for the kernel in general, not just the areas I'm responsible
-> for.  I guess I'm just that kinda guy! ;)
-
-Well, Lee, like you, I think this driver should not be a MFD driver,
-but Alex has a good point of view. 
-
+> This patch fixes the check to do the right thing as advertised.
+> A new capability will be added to check mismatches in other
+> fields and ensure we trap the CTR accesses.
 > 
-> > > > > So ... this is a USART device which can do SPI, right?
-> > > > > 
-> > > > > My current thinking is that; as this is a USART device first
-> > > > > &
-> > > > > foremost, the USART should be probed in the first instance
-> > > > > regardless,
-> > > > > then if SPI mode is specified it (the USART driver) registers
-> > > > > the SPI
-> > > > > platform driver (as MFD does currently) and exits gracefully,
-> > > > > allowing
-> > > > > the SPI driver to take over.
-> > > > > 
-> > > > > Spanner in the works: is it physically possible to change the
-> > > > > mode at
-> > > > > run-time?  :s
-> > > > 
-> > > > Yes it is possible but on Linux that will not happen without
-> > > > probing
-> > > > the drivers again.
-> > > 
-> > > Not sure I understand what you mean.
-> > 
-> > I was just commenting on changing the mode at runtime.
-> 
-> Oh I see.  My question was relating to whether the H/W is physically
-> capable of changing modes on-the-fly, rather than how Linux would
-> handle that.  If this is something we'd wish to support, then it
-> would
-> have to be a single driver, which is why I was asking.  By separating
-> the drivers this way, we are blocking that as a
-> possibility.  Although
-> I guess the OP has already thought about that and made the decision
-> not to support it.
+> Fixes: be68a8aaf925 ("arm64: cpufeature: Fix CTR_EL0 field definitions")
+> Cc: <stable@vger.kernel.org> # v4.9
 
-Is possible to change modes on-the-fly, but you have no reason to do
-that. On the PCB you will have a SPI slave or a serial console :)
-Anyway, the current form of the driver, and through this I want to say
-"this ugly hack", allows the user to switch from serial to SPI mode by
-adding only one property to the device tree node of USART. If the
-driver were in his first form, a simple SPI driver, how you will make a
-dtsi file for an IP like this? You will add two nodes for the same IP
-in dtsi and will take care to enable correct node in dts?
-I think this driver is only a tradeoff between having an ugly hack in
-kernel or having an messy device tree.
+Why 4.9?  be68a8aaf925 only showed up in 4.16 and was backported only to
+4.14-stable.  Not to 4.9-stable from what I can tell.
 
-> 
-> > > I'm suggesting that you use the same platform_* interfaces MFD
-> > > uses to
-> > > register the SPI driver if SPI mode has been selected.  Only do
-> > > so
-> > > from the appropriate driver i.e. USART.
-> > 
-> > Yeah, I understood that but I didn't comment because I'm not sure
-> > this
-> > will work yet.
-> 
-> Other drivers already do this.
+thanks,
 
-Can you give me an example please?
-I am open to suggestions.
-
-Sorry for that acked-by. There was a lot of "reviewed-by", "acked-by",
-etc in a single version and I messed up :).
+greg k-h
