@@ -1,63 +1,42 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed, 12 Sep 2018 09:51:23 +0200
-Subject: [PATCH v3 15/21] Documentation: nvmem: document cell tables and
- lookup entries
+Date: Wed, 12 Sep 2018 09:51:28 +0200
+Subject: [PATCH v3 20/21] nvmem: fix commenting style
 In-Reply-To: <20180912075129.25185-1-brgl@bgdev.pl>
 References: <20180912075129.25185-1-brgl@bgdev.pl>
-Message-ID: <20180912075129.25185-16-brgl@bgdev.pl>
+Message-ID: <20180912075129.25185-21-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Document the new nvmem kernel APIs.
+Remove a redundant '*/' as pointed out by checkpatch.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- Documentation/nvmem/nvmem.txt | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ drivers/nvmem/core.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/nvmem/nvmem.txt b/Documentation/nvmem/nvmem.txt
-index 8d8d8f58f96f..fc2fe4b18655 100644
---- a/Documentation/nvmem/nvmem.txt
-+++ b/Documentation/nvmem/nvmem.txt
-@@ -58,6 +58,37 @@ static int qfprom_probe(struct platform_device *pdev)
- It is mandatory that the NVMEM provider has a regmap associated with its
- struct device. Failure to do would return error code from nvmem_register().
- 
-+Users of board files can define and register nvmem cells using the
-+nvmem_cell_table struct:
-+
-+static struct nvmem_cell_info foo_nvmem_cells[] = {
-+	{
-+		.name		= "macaddr",
-+		.offset		= 0x7f00,
-+		.bytes		= ETH_ALEN,
-+	}
-+};
-+
-+static struct nvmem_cell_table foo_nvmem_cell_table = {
-+	.nvmem_name		= "i2c-eeprom",
-+	.cells			= foo_nvmem_cells,
-+	.ncells			= ARRAY_SIZE(foo_nvmem_cells),
-+};
-+
-+nvmem_add_cell_table(&foo_nvmem_cell_table);
-+
-+Additionally it is possible to create nvmem cell lookup entries and register
-+them with the nvmem framework from machine code as shown in the example below:
-+
-+static struct nvmem_cell_lookup foo_nvmem_lookup = {
-+	.nvmem_name		= "i2c-eeprom",
-+	.cell_name		= "macaddr",
-+	.dev_id			= "foo_mac.0",
-+	.con_id			= "mac-address",
-+};
-+
-+nvmem_add_cell_lookups(&foo_nvmem_lookup, 1);
-+
- NVMEM Consumers
- +++++++++++++++
- 
+diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+index f4930f605d4f..bc14ffd87ca3 100644
+--- a/drivers/nvmem/core.c
++++ b/drivers/nvmem/core.c
+@@ -1374,7 +1374,7 @@ EXPORT_SYMBOL_GPL(nvmem_device_cell_read);
+  * @buf: buffer to be written to cell.
+  *
+  * Return: length of bytes written or negative error code on failure.
+- * */
++ */
+ int nvmem_device_cell_write(struct nvmem_device *nvmem,
+ 			    struct nvmem_cell_info *info, void *buf)
+ {
+@@ -1430,7 +1430,7 @@ EXPORT_SYMBOL_GPL(nvmem_device_read);
+  * @buf: buffer to be written.
+  *
+  * Return: length of bytes written or negative error code on failure.
+- * */
++ */
+ int nvmem_device_write(struct nvmem_device *nvmem,
+ 		       unsigned int offset,
+ 		       size_t bytes, void *buf)
 -- 
 2.18.0
