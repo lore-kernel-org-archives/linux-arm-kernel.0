@@ -1,129 +1,154 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed, 12 Sep 2018 09:51:14 +0200
-Subject: [PATCH v3 06/21] nvmem: use kref
+Date: Wed, 12 Sep 2018 09:51:19 +0200
+Subject: [PATCH v3 11/21] nvmem: remove the global cell list
 In-Reply-To: <20180912075129.25185-1-brgl@bgdev.pl>
 References: <20180912075129.25185-1-brgl@bgdev.pl>
-Message-ID: <20180912075129.25185-7-brgl@bgdev.pl>
+Message-ID: <20180912075129.25185-12-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Use kref for reference counting. Use an approach similar to the one
-seen in the common clock subsystem: don't actually destroy the nvmem
-device until the last user puts it. This way we can get rid of the
-users check from nvmem_unregister().
+Nvmem subsystem keeps a global list of cells that, for non-DT systems,
+can only be referenced by cell name, which makes it impossible to have
+more than one nvmem device with cells named the same.
+
+This patch makes every nvmem device the owner of the list of its cells.
+This effectively removes the support for non-DT systems, but it will
+be reintroduced following a different approach in subsequent patches.
+
+This isn't a problem as support for board files in nvmem is currently
+broken anyway: any user that would try to get an nvmem cell from the
+global cell list would remove the cell after the calling
+nvmem_cell_put(). This can cause anything from a subsequent user not
+being able to get the cell to double free errors if more users hold
+reference to the same cell at the same time.
+
+Fortunately there are no such users which allows us to rework this part.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/nvmem/core.c | 44 ++++++++++++++++++++++----------------------
- 1 file changed, 22 insertions(+), 22 deletions(-)
+ drivers/nvmem/core.c | 64 +++++++++++---------------------------------
+ 1 file changed, 15 insertions(+), 49 deletions(-)
 
 diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index ffed8fa16936..552ffedce38e 100644
+index c950d54bb69d..585688ea2152 100644
 --- a/drivers/nvmem/core.c
 +++ b/drivers/nvmem/core.c
-@@ -19,6 +19,7 @@
- #include <linux/fs.h>
- #include <linux/idr.h>
- #include <linux/init.h>
-+#include <linux/kref.h>
- #include <linux/module.h>
- #include <linux/nvmem-consumer.h>
- #include <linux/nvmem-provider.h>
-@@ -31,7 +32,7 @@ struct nvmem_device {
- 	int			stride;
- 	int			word_size;
- 	int			id;
--	int			users;
-+	struct kref		refcnt;
- 	size_t			size;
- 	bool			read_only;
+@@ -38,6 +38,7 @@ struct nvmem_device {
  	int			flags;
-@@ -463,6 +464,8 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
- 		return ERR_PTR(rval);
+ 	struct bin_attribute	eeprom;
+ 	struct device		*base_dev;
++	struct list_head	cells;
+ 	nvmem_reg_read_t	reg_read;
+ 	nvmem_reg_write_t	reg_write;
+ 	void *priv;
+@@ -58,9 +59,6 @@ struct nvmem_cell {
+ static DEFINE_MUTEX(nvmem_mutex);
+ static DEFINE_IDA(nvmem_ida);
+ 
+-static LIST_HEAD(nvmem_cells);
+-static DEFINE_MUTEX(nvmem_cells_mutex);
+-
+ #ifdef CONFIG_DEBUG_LOCK_ALLOC
+ static struct lock_class_key eeprom_lock_key;
+ #endif
+@@ -282,28 +280,11 @@ static struct nvmem_device *of_nvmem_find(struct device_node *nvmem_np)
+ 	return to_nvmem_device(d);
+ }
+ 
+-static struct nvmem_cell *nvmem_find_cell(const char *cell_id)
+-{
+-	struct nvmem_cell *p;
+-
+-	mutex_lock(&nvmem_cells_mutex);
+-
+-	list_for_each_entry(p, &nvmem_cells, node)
+-		if (!strcmp(p->name, cell_id)) {
+-			mutex_unlock(&nvmem_cells_mutex);
+-			return p;
+-		}
+-
+-	mutex_unlock(&nvmem_cells_mutex);
+-
+-	return NULL;
+-}
+-
+ static void nvmem_cell_drop(struct nvmem_cell *cell)
+ {
+-	mutex_lock(&nvmem_cells_mutex);
++	mutex_lock(&nvmem_mutex);
+ 	list_del(&cell->node);
+-	mutex_unlock(&nvmem_cells_mutex);
++	mutex_unlock(&nvmem_mutex);
+ 	kfree(cell);
+ }
+ 
+@@ -311,16 +292,15 @@ static void nvmem_device_remove_all_cells(const struct nvmem_device *nvmem)
+ {
+ 	struct nvmem_cell *cell, *p;
+ 
+-	list_for_each_entry_safe(cell, p, &nvmem_cells, node)
+-		if (cell->nvmem == nvmem)
+-			nvmem_cell_drop(cell);
++	list_for_each_entry_safe(cell, p, &nvmem->cells, node)
++		nvmem_cell_drop(cell);
+ }
+ 
+ static void nvmem_cell_add(struct nvmem_cell *cell)
+ {
+-	mutex_lock(&nvmem_cells_mutex);
+-	list_add_tail(&cell->node, &nvmem_cells);
+-	mutex_unlock(&nvmem_cells_mutex);
++	mutex_lock(&nvmem_mutex);
++	list_add_tail(&cell->node, &cell->nvmem->cells);
++	mutex_unlock(&nvmem_mutex);
+ }
+ 
+ static int nvmem_cell_info_to_nvmem_cell(struct nvmem_device *nvmem,
+@@ -465,6 +445,7 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
  	}
  
-+	kref_init(&nvmem->refcnt);
-+
+ 	kref_init(&nvmem->refcnt);
++	INIT_LIST_HEAD(&nvmem->cells);
+ 
  	nvmem->id = rval;
  	nvmem->owner = config->owner;
- 	if (!nvmem->owner && config->dev->driver)
-@@ -532,6 +535,20 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
- }
- EXPORT_SYMBOL_GPL(nvmem_register);
- 
-+static void nvmem_device_release(struct kref *kref)
-+{
-+	struct nvmem_device *nvmem;
-+
-+	nvmem = container_of(kref, struct nvmem_device, refcnt);
-+
-+	if (nvmem->flags & FLAG_COMPAT)
-+		device_remove_bin_file(nvmem->base_dev, &nvmem->eeprom);
-+
-+	nvmem_device_remove_all_cells(nvmem);
-+	device_del(&nvmem->dev);
-+	put_device(&nvmem->dev);
-+}
-+
- /**
-  * nvmem_unregister() - Unregister previously registered nvmem device
-  *
-@@ -541,19 +558,7 @@ EXPORT_SYMBOL_GPL(nvmem_register);
-  */
- int nvmem_unregister(struct nvmem_device *nvmem)
+@@ -626,29 +607,14 @@ static struct nvmem_device *__nvmem_device_get(struct device_node *np,
  {
+ 	struct nvmem_device *nvmem = NULL;
+ 
 -	mutex_lock(&nvmem_mutex);
--	if (nvmem->users) {
--		mutex_unlock(&nvmem_mutex);
--		return -EBUSY;
+-
+-	if (np) {
+-		nvmem = of_nvmem_find(np);
+-		if (!nvmem) {
+-			mutex_unlock(&nvmem_mutex);
+-			return ERR_PTR(-EPROBE_DEFER);
+-		}
+-	} else {
+-		struct nvmem_cell *cell = nvmem_find_cell(cell_id);
+-
+-		if (cell) {
+-			nvmem = cell->nvmem;
+-			*cellp = cell;
+-		}
+-
+-		if (!nvmem) {
+-			mutex_unlock(&nvmem_mutex);
+-			return ERR_PTR(-ENOENT);
+-		}
 -	}
--	mutex_unlock(&nvmem_mutex);
--
--	if (nvmem->flags & FLAG_COMPAT)
--		device_remove_bin_file(nvmem->base_dev, &nvmem->eeprom);
--
--	nvmem_device_remove_all_cells(nvmem);
--	device_del(&nvmem->dev);
--	put_device(&nvmem->dev);
-+	kref_put(&nvmem->refcnt, nvmem_device_release);
++	if (!np)
++		return ERR_PTR(-ENOENT);
  
- 	return 0;
- }
-@@ -647,7 +652,6 @@ static struct nvmem_device *__nvmem_device_get(struct device_node *np,
- 		}
- 	}
- 
--	nvmem->users++;
++	mutex_lock(&nvmem_mutex);
++	nvmem = of_nvmem_find(np);
  	mutex_unlock(&nvmem_mutex);
++	if (!nvmem)
++		return ERR_PTR(-EPROBE_DEFER);
  
  	if (!try_module_get(nvmem->owner)) {
-@@ -655,22 +659,18 @@ static struct nvmem_device *__nvmem_device_get(struct device_node *np,
- 			"could not increase module refcount for cell %s\n",
- 			nvmem_dev_name(nvmem));
- 
--		mutex_lock(&nvmem_mutex);
--		nvmem->users--;
--		mutex_unlock(&nvmem_mutex);
--
- 		return ERR_PTR(-EINVAL);
- 	}
- 
-+	kref_get(&nvmem->refcnt);
-+
- 	return nvmem;
- }
- 
- static void __nvmem_device_put(struct nvmem_device *nvmem)
- {
- 	module_put(nvmem->owner);
--	mutex_lock(&nvmem_mutex);
--	nvmem->users--;
--	mutex_unlock(&nvmem_mutex);
-+	kref_put(&nvmem->refcnt, nvmem_device_release);
- }
- 
- static struct nvmem_device *nvmem_find(const char *name)
+ 		dev_err(&nvmem->dev,
 -- 
 2.18.0
