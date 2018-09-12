@@ -1,40 +1,87 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 12 Sep 2018 14:18:22 -0700
-Subject: [PATCH] watchdog: diag288_wdt: pointer location foo * bar should
- be foo *bar
-In-Reply-To: <20180912172907.1802-1-t.jag587@gmail.com>
-References: <20180912172907.1802-1-t.jag587@gmail.com>
-Message-ID: <20180912211822.GA12970@roeck-us.net>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 13 Sep 2018 05:44:20 +0800
+Subject: [xlnx:master 1783/1831] arch/arm64/include/asm/io.h:54:2: warning:
+ 'pmap' may be used uninitialized in this function
+Message-ID: <201809130516.IcTBWhuf%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2018 at 10:29:07AM -0700, Jagdish Tirumala wrote:
-> Fix the following checkpatch error:
-> 
-> ERROR: pointer location foo * bar should be foo *bar
-> FILE: drivers/watchdog/diag288_wdt.c:202
-> 
-> Signed-off-by: Jagdish Tirumala <t.jag587@gmail.com>
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   5a0f5d4c5b359939907b9cf874d3a9f8ad72d5e3
+commit: 71696811cb3f3c1e8c1ab40ae8f2f72de89363ba [1783/1831] net: xilinx: axiethernet: Split AXIDMA implementation in separate file
+config: arm64-allmodconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 71696811cb3f3c1e8c1ab40ae8f2f72de89363ba
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
+http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
 
-> ---
->  drivers/watchdog/diag288_wdt.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/watchdog/diag288_wdt.c b/drivers/watchdog/diag288_wdt.c
-> index 806a04a676b7..046333d1beb2 100644
-> --- a/drivers/watchdog/diag288_wdt.c
-> +++ b/drivers/watchdog/diag288_wdt.c
-> @@ -199,7 +199,7 @@ static int wdt_ping(struct watchdog_device *dev)
->  	return ret;
->  }
->  
-> -static int wdt_set_timeout(struct watchdog_device * dev, unsigned int new_to)
-> +static int wdt_set_timeout(struct watchdog_device *dev, unsigned int new_to)
->  {
->  	dev->timeout = new_to;
->  	return wdt_ping(dev);
-> -- 
-> 2.17.1
-> 
+All warnings (new ones prefixed by >>):
+
+   In file included from include/linux/scatterlist.h:9:0,
+                    from include/linux/dma-mapping.h:11,
+                    from include/linux/skbuff.h:35,
+                    from include/linux/if_ether.h:23,
+                    from include/uapi/linux/ethtool.h:19,
+                    from include/linux/ethtool.h:18,
+                    from include/linux/netdevice.h:41,
+                    from drivers/net/ethernet/xilinx/xilinx_axienet.h:12,
+                    from drivers/net/ethernet/xilinx/xilinx_tsn_switch.h:21,
+                    from drivers/net/ethernet/xilinx/xilinx_tsn_switch.c:18:
+   drivers/net/ethernet/xilinx/xilinx_tsn_switch.c: In function 'tsnswitch_probe':
+>> arch/arm64/include/asm/io.h:54:2: warning: 'pmap' may be used uninitialized in this function [-Wmaybe-uninitialized]
+     asm volatile("str %w0, [%1]" : : "rZ" (val), "r" (addr));
+     ^~~
+   drivers/net/ethernet/xilinx/xilinx_tsn_switch.c:723:6: note: 'pmap' was declared here
+     u32 pmap;
+         ^~~~
+--
+   In file included from include/linux/scatterlist.h:9:0,
+                    from include/linux/dma-mapping.h:11,
+                    from include/linux/skbuff.h:35,
+                    from include/linux/if_ether.h:23,
+                    from include/uapi/linux/ethtool.h:19,
+                    from include/linux/ethtool.h:18,
+                    from include/linux/netdevice.h:41,
+                    from drivers/net//ethernet/xilinx/xilinx_axienet.h:12,
+                    from drivers/net//ethernet/xilinx/xilinx_tsn_switch.h:21,
+                    from drivers/net//ethernet/xilinx/xilinx_tsn_switch.c:18:
+   drivers/net//ethernet/xilinx/xilinx_tsn_switch.c: In function 'tsnswitch_probe':
+>> arch/arm64/include/asm/io.h:54:2: warning: 'pmap' may be used uninitialized in this function [-Wmaybe-uninitialized]
+     asm volatile("str %w0, [%1]" : : "rZ" (val), "r" (addr));
+     ^~~
+   drivers/net//ethernet/xilinx/xilinx_tsn_switch.c:723:6: note: 'pmap' was declared here
+     u32 pmap;
+         ^~~~
+
+vim +/pmap +54 arch/arm64/include/asm/io.h
+
+fc47897d Catalin Marinas 2012-03-05  50  
+09a57239 Thierry Reding  2014-07-28  51  #define __raw_writel __raw_writel
+fc47897d Catalin Marinas 2012-03-05  52  static inline void __raw_writel(u32 val, volatile void __iomem *addr)
+fc47897d Catalin Marinas 2012-03-05  53  {
+ee5e41b5 Robin Murphy    2016-09-08 @54  	asm volatile("str %w0, [%1]" : : "rZ" (val), "r" (addr));
+fc47897d Catalin Marinas 2012-03-05  55  }
+fc47897d Catalin Marinas 2012-03-05  56  
+
+:::::: The code at line 54 was first introduced by commit
+:::::: ee5e41b5f21a5438664effce1ba5bdd11e03ee24 arm64/io: Allow I/O writes to use {W,X}ZR
+
+:::::: TO: Robin Murphy <robin.murphy@arm.com>
+:::::: CC: Will Deacon <will.deacon@arm.com>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 58068 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180913/0c432cb6/attachment-0001.gz>
