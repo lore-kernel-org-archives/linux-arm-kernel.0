@@ -1,54 +1,134 @@
 From: james.morse@arm.com (James Morse)
-Date: Wed, 12 Sep 2018 11:28:20 +0100
-Subject: [PATCH v5 02/27] arm64: cpufeature: Use alternatives for VHE
- cpu_enable
-In-Reply-To: <1535471497-38854-3-git-send-email-julien.thierry@arm.com>
+Date: Wed, 12 Sep 2018 11:29:41 +0100
+Subject: [PATCH v5 03/27] arm64: alternative: Apply alternatives early in
+ boot process
+In-Reply-To: <1535471497-38854-4-git-send-email-julien.thierry@arm.com>
 References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
- <1535471497-38854-3-git-send-email-julien.thierry@arm.com>
-Message-ID: <1d425320-aed3-b949-1ec5-f378248aac4d@arm.com>
+ <1535471497-38854-4-git-send-email-julien.thierry@arm.com>
+Message-ID: <3becf020-b230-beb8-b304-d8097377f234@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Julien,
 
 On 28/08/18 16:51, Julien Thierry wrote:
-> The cpu_enable callback for VHE feature requires all alternatives to have
-> been applied. This prevents applying VHE alternative separately from the
-> rest.
+> From: Daniel Thompson <daniel.thompson@linaro.org>
 > 
-> Use an alternative depending on VHE feature to know whether VHE
-> alternatives have already been applied.
+> Currently alternatives are applied very late in the boot process (and
+> a long time after we enable scheduling). Some alternative sequences,
+> such as those that alter the way CPU context is stored, must be applied
+> much earlier in the boot sequence.
+> 
+> Introduce apply_boot_alternatives() to allow some alternatives to be
+> applied immediately after we detect the CPU features of the boot CPU.
+
+
+> diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
+> index b5d6039..70c2604 100644
+> --- a/arch/arm64/kernel/alternative.c
+> +++ b/arch/arm64/kernel/alternative.c
+> @@ -145,7 +145,8 @@ static void clean_dcache_range_nopatch(u64 start, u64 end)
+>  	} while (cur += d_size, cur < end);
+>  }
+>  
+> -static void __apply_alternatives(void *alt_region, bool is_module)
+> +static void __apply_alternatives(void *alt_region,  bool is_module,
+> +				 unsigned long feature_mask)
+
+Shouldn't feature_mask be a DECLARE_BITMAP() maybe-array like cpu_hwcaps?
+This means it keeps working when NR_CAPS grows over 64, which might happen
+sooner than we think for backported errata...
+
+
+> @@ -155,6 +156,9 @@ static void __apply_alternatives(void *alt_region, bool is_module)
+>  	for (alt = region->begin; alt < region->end; alt++) {
+>  		int nr_inst;
+>  
+> +		if ((BIT(alt->cpufeature) & feature_mask) == 0)
+> +			continue;
+> +
+>  		/* Use ARM64_CB_PATCH as an unconditional patch */
+>  		if (alt->cpufeature < ARM64_CB_PATCH &&
+>  		    !cpus_have_cap(alt->cpufeature))
+> @@ -213,7 +217,7 @@ static int __apply_alternatives_multi_stop(void *unused)
+>  		isb();
+>  	} else {
+>  		BUG_ON(alternatives_applied);
+> -		__apply_alternatives(&region, false);
+> +		__apply_alternatives(&region, false, ~boot_capabilities);
+
+Ah, this is tricky. There is a bitmap_complement() for the DECLARE_BITMAP()
+stuff, but we'd need a second array...
+
+We could pass the scope around, but then __apply_alternatives() would need to
+lookup the struct arm64_cpu_capabilities up every time. This is only a problem
+as we have one cap-number-space for errata/features, but separate sparse lists.
+
+(I think applying the alternatives one cap at a time is a bad idea as we would
+need to walk the alternative region NR_CAPS times)
+
+
+> @@ -227,6 +231,24 @@ void __init apply_alternatives_all(void)
+>  	stop_machine(__apply_alternatives_multi_stop, NULL, cpu_online_mask);
+>  }
+>  
+> +/*
+> + * This is called very early in the boot process (directly after we run
+> + * a feature detect on the boot CPU). No need to worry about other CPUs
+> + * here.
+> + */
+> +void __init apply_boot_alternatives(void)
+> +{
+> +	struct alt_region region = {
+> +		.begin	= (struct alt_instr *)__alt_instructions,
+> +		.end	= (struct alt_instr *)__alt_instructions_end,
+> +	};
+> +
+> +	/* If called on non-boot cpu things could go wrong */
+> +	WARN_ON(smp_processor_id() != 0);
+
+Isn't the problem if there are multiple CPUs online?
+
+
+> +	__apply_alternatives(&region, false, boot_capabilities);
+> +}
+> +
+>  #ifdef CONFIG_MODULES
+>  void apply_alternatives_module(void *start, size_t length)
+>  {
 
 > diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 1e433ac..3bc1c8b 100644
+> index 3bc1c8b..0d1e41e 100644
 > --- a/arch/arm64/kernel/cpufeature.c
 > +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -1022,8 +1024,15 @@ static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
->  	 * that, freshly-onlined CPUs will set tpidr_el2, so we don't need to
->  	 * do anything here.
->  	 */
-> -	if (!alternatives_applied)
-> -		write_sysreg(read_sysreg(tpidr_el1), tpidr_el2);
-> +	asm volatile(ALTERNATIVE(
-> +		"mrs	%0, tpidr_el1\n"
-> +		"msr	tpidr_el2, %0",
-> +		"nop\n"
-> +		"nop",
-> +		ARM64_HAS_VIRT_HOST_EXTN)
-> +		: "+r" (tmp)
-> +		:
-> +		: "memory");
+> @@ -52,6 +52,8 @@
+>  DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+>  EXPORT_SYMBOL(cpu_hwcaps);
+>  
+> +unsigned long boot_capabilities;
+> +
+>  /*
+>   * Flag to indicate if we have computed the system wide
+>   * capabilities based on the boot time active CPUs. This
+> @@ -1375,6 +1377,9 @@ static void __update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+>  		if (!cpus_have_cap(caps->capability) && caps->desc)
+>  			pr_info("%s %s\n", info, caps->desc);
+>  		cpus_set_cap(caps->capability);
+
+Hmm, the bitmap behind cpus_set_cap() is what cpus_have_cap() in
+__apply_alternatives() looks at. If you had a call to __apply_alternatives after
+update_cpu_capabilities(SCOPE_BOOT_CPU), but before any others, it would only
+apply those alternatives...
+
+(I don't think there is a problem re-applying the same alternative, but I
+haven't checked).
+
+
+> +
+> +		if (caps->type & SCOPE_BOOT_CPU)
+> +			__set_bit(caps->capability, &boot_capabilities);
+>  	}
 >  }
->  #endif
-
-Catalin's preference was to keep this all in C:
-https://patchwork.kernel.org/patch/10007977/
-, for which we need to know if 'the' alternative has been applied.
-
-I suspect there may be more registers in this list if we have to switch to
-another EL2 register using alternatives. (but I don't have an example).
-
-Could we make 'alternatives_applied' a macro that takes the cap as an argument?
 
 
 Thanks,
