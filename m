@@ -1,167 +1,48 @@
-From: dvyukov@google.com (Dmitry Vyukov)
-Date: Wed, 12 Sep 2018 19:15:39 +0200
-Subject: [PATCH v6 15/18] khwasan,
- arm64: add brk handler for inline instrumentation
-In-Reply-To: <f5e73b5ead3355932ad8b5fc96b141c3f5b8c16c.1535462971.git.andreyknvl@google.com>
-References: <cover.1535462971.git.andreyknvl@google.com>
- <f5e73b5ead3355932ad8b5fc96b141c3f5b8c16c.1535462971.git.andreyknvl@google.com>
-Message-ID: <CACT4Y+aEwYiaVN--RH_0VBh0wbCcrf-Ndz+_eOaBNi6nKxrfQA@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 12 Sep 2018 12:17:07 -0500
+Subject: [PATCH 2/5] PCI: provide pci_match_id() with CONFIG_PCI=n
+In-Reply-To: <20180910115935.163121-3-lkundrak@v3.sk>
+References: <20180910115935.163121-1-lkundrak@v3.sk>
+ <20180910115935.163121-3-lkundrak@v3.sk>
+Message-ID: <20180912171707.GI118330@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 29, 2018 at 1:35 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
-> KHWASAN inline instrumentation mode (which embeds checks of shadow memory
-> into the generated code, instead of inserting a callback) generates a brk
-> instruction when a tag mismatch is detected.
->
-> This commit add a KHWASAN brk handler, that decodes the immediate value
-> passed to the brk instructions (to extract information about the memory
-> access that triggered the mismatch), reads the register values (x0 contains
-> the guilty address) and reports the bug.
->
-> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
+Please capitalize the subject as:
+
+  PCI: Provide pci_match_id() with CONFIG_PCI=n
+
+On Mon, Sep 10, 2018 at 01:59:32PM +0200, Lubomir Rintel wrote:
+> This spares drivers from #ifdef-ing on CONFIG_PCI if the driver can be
+> optionally built on machines without PCI bus.
+> 
+> Consistent with acpi_driver_match_device() and similar.
+> 
+> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+
+Thanks!
+
 > ---
->  arch/arm64/include/asm/brk-imm.h |  2 +
->  arch/arm64/kernel/traps.c        | 69 +++++++++++++++++++++++++++++++-
->  2 files changed, 69 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/brk-imm.h b/arch/arm64/include/asm/brk-imm.h
-> index ed693c5bcec0..e4a7013321dc 100644
-> --- a/arch/arm64/include/asm/brk-imm.h
-> +++ b/arch/arm64/include/asm/brk-imm.h
-> @@ -16,10 +16,12 @@
->   * 0x400: for dynamic BRK instruction
->   * 0x401: for compile time BRK instruction
->   * 0x800: kernel-mode BUG() and WARN() traps
-> + * 0x9xx: KHWASAN trap (allowed values 0x900 - 0x9ff)
->   */
->  #define FAULT_BRK_IMM                  0x100
->  #define KGDB_DYN_DBG_BRK_IMM           0x400
->  #define KGDB_COMPILED_DBG_BRK_IMM      0x401
->  #define BUG_BRK_IMM                    0x800
-> +#define KHWASAN_BRK_IMM                        0x900
->
->  #endif
-> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> index 039e9ff379cc..fd70347d1ce7 100644
-> --- a/arch/arm64/kernel/traps.c
-> +++ b/arch/arm64/kernel/traps.c
-> @@ -35,6 +35,7 @@
->  #include <linux/sizes.h>
->  #include <linux/syscalls.h>
->  #include <linux/mm_types.h>
-> +#include <linux/kasan.h>
->
->  #include <asm/atomic.h>
->  #include <asm/bug.h>
-> @@ -269,10 +270,14 @@ void arm64_notify_die(const char *str, struct pt_regs *regs,
->         }
->  }
->
-> -void arm64_skip_faulting_instruction(struct pt_regs *regs, unsigned long size)
-> +void __arm64_skip_faulting_instruction(struct pt_regs *regs, unsigned long size)
->  {
->         regs->pc += size;
-> +}
->
-> +void arm64_skip_faulting_instruction(struct pt_regs *regs, unsigned long size)
-> +{
-> +       __arm64_skip_faulting_instruction(regs, size);
->         /*
->          * If we were single stepping, we want to get the step exception after
->          * we return from the trap.
-> @@ -775,7 +780,7 @@ static int bug_handler(struct pt_regs *regs, unsigned int esr)
->         }
->
->         /* If thread survives, skip over the BUG instruction and continue: */
-> -       arm64_skip_faulting_instruction(regs, AARCH64_INSN_SIZE);
-> +       __arm64_skip_faulting_instruction(regs, AARCH64_INSN_SIZE);
->         return DBG_HOOK_HANDLED;
->  }
->
-> @@ -785,6 +790,59 @@ static struct break_hook bug_break_hook = {
->         .fn = bug_handler,
->  };
->
-> +#ifdef CONFIG_KASAN_HW
+>  include/linux/pci.h | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index e72ca8dd6241..d2f14eb23ea4 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -1702,6 +1702,10 @@ static inline int pci_irqd_intx_xlate(struct irq_domain *d,
+>  				      unsigned long *out_hwirq,
+>  				      unsigned int *out_type)
+>  { return -EINVAL; }
 > +
-> +#define KHWASAN_ESR_RECOVER    0x20
-> +#define KHWASAN_ESR_WRITE      0x10
-> +#define KHWASAN_ESR_SIZE_MASK  0x0f
-> +#define KHWASAN_ESR_SIZE(esr)  (1 << ((esr) & KHWASAN_ESR_SIZE_MASK))
-> +
-> +static int khwasan_handler(struct pt_regs *regs, unsigned int esr)
-> +{
-> +       bool recover = esr & KHWASAN_ESR_RECOVER;
-> +       bool write = esr & KHWASAN_ESR_WRITE;
-> +       size_t size = KHWASAN_ESR_SIZE(esr);
-> +       u64 addr = regs->regs[0];
-> +       u64 pc = regs->pc;
-> +
-> +       if (user_mode(regs))
-> +               return DBG_HOOK_ERROR;
-> +
-> +       kasan_report(addr, size, write, pc);
-> +
-> +       /*
-> +        * The instrumentation allows to control whether we can proceed after
-> +        * a crash was detected. This is done by passing the -recover flag to
-> +        * the compiler. Disabling recovery allows to generate more compact
-> +        * code.
-> +        *
-> +        * Unfortunately disabling recovery doesn't work for the kernel right
-> +        * now. KHWASAN reporting is disabled in some contexts (for example when
-> +        * the allocator accesses slab object metadata; same is true for KASAN;
-> +        * this is controlled by current->kasan_depth). All these accesses are
-> +        * detected by the tool, even though the reports for them are not
-> +        * printed.
-> +        *
-> +        * This is something that might be fixed at some point in the future.
-> +        */
-> +       if (!recover)
-> +               die("Oops - KHWASAN", regs, 0);
-
-Why die and not panic? Die seems to be much less used function, and it
-calls panic anyway, and we call panic in kasan_report if panic_on_warn
-is set.
-
-> +       /* If thread survives, skip over the brk instruction and continue: */
-> +       __arm64_skip_faulting_instruction(regs, AARCH64_INSN_SIZE);
-> +       return DBG_HOOK_HANDLED;
-> +}
-> +
-> +#define KHWASAN_ESR_VAL (0xf2000000 | KHWASAN_BRK_IMM)
-> +#define KHWASAN_ESR_MASK 0xffffff00
-> +
-> +static struct break_hook khwasan_break_hook = {
-> +       .esr_val = KHWASAN_ESR_VAL,
-> +       .esr_mask = KHWASAN_ESR_MASK,
-> +       .fn = khwasan_handler,
-> +};
-> +#endif
-> +
->  /*
->   * Initial handler for AArch64 BRK exceptions
->   * This handler only used until debug_traps_init().
-> @@ -792,6 +850,10 @@ static struct break_hook bug_break_hook = {
->  int __init early_brk64(unsigned long addr, unsigned int esr,
->                 struct pt_regs *regs)
->  {
-> +#ifdef CONFIG_KASAN_HW
-> +       if ((esr & KHWASAN_ESR_MASK) == KHWASAN_ESR_VAL)
-> +               return khwasan_handler(regs, esr) != DBG_HOOK_HANDLED;
-> +#endif
->         return bug_handler(regs, esr) != DBG_HOOK_HANDLED;
->  }
->
-> @@ -799,4 +861,7 @@ int __init early_brk64(unsigned long addr, unsigned int esr,
->  void __init trap_init(void)
->  {
->         register_break_hook(&bug_break_hook);
-> +#ifdef CONFIG_KASAN_HW
-> +       register_break_hook(&khwasan_break_hook);
-> +#endif
->  }
-> --
-> 2.19.0.rc0.228.g281dcd1b4d0-goog
->
+> +static inline const struct pci_device_id *pci_match_id(const struct pci_device_id *ids,
+> +							 struct pci_dev *dev)
+> +{ return NULL; }
+>  #endif /* CONFIG_PCI */
+>  
+>  /* Include architecture-dependent settings and functions */
+> -- 
+> 2.17.1
+> 
