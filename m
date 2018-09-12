@@ -1,32 +1,92 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Wed, 12 Sep 2018 16:13:29 +0800
-Subject: [PATCH] ARM: dts: imx6ull: update vdd_soc voltage for 900MHz
- operating point
-Message-ID: <1536740009-32735-1-git-send-email-Anson.Huang@nxp.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Wed, 12 Sep 2018 13:52:44 +0530
+Subject: [PATCH v2 1/4] arm64: dts: rockchip: Split out common nodes for
+ Rock960 based boards
+In-Reply-To: <11137562.zz0kzkSHxt@diego>
+References: <20180911023031.4892-1-manivannan.sadhasivam@linaro.org>
+ <9e1868684ed851dfa19300ac2e648cfea7bf3eb9.camel@collabora.com>
+ <20180912031248.GA4880@Mani-XPS-13-9360>
+ <11137562.zz0kzkSHxt@diego>
+Message-ID: <20180912082244.GA16509@Mani-XPS-13-9360>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update VDD_SOC voltage to 1.25V for 900MHz operating point
-according to datasheet Rev. 1.3, 08/2018, 25mV is added to
-the minimum allowed values to cover power supply ripple.
+On Wed, Sep 12, 2018 at 09:26:12AM +0200, Heiko St?bner wrote:
+> Am Mittwoch, 12. September 2018, 05:12:48 CEST schrieb Manivannan Sadhasivam:
+> > Hi Ezequiel,
+> > 
+> > On Tue, Sep 11, 2018 at 04:40:29PM -0300, Ezequiel Garcia wrote:
+> > > On Tue, 2018-09-11 at 08:00 +0530, Manivannan Sadhasivam wrote:
+> > > > Since the same family members of Rock960 boards (Rock960 and Ficus)
+> > > > share the same configuration, split out the common nodes into a common
+> > > > dtsi file for reducing code duplication. The board specific nodes for
+> > > > Ficus boards are then placed in corresponding board DTS file.
+> > > 
+> > > I think it should be possible to move the common USB nodes to the dtsi
+> > > file, and keep the board-specific (phy-supply property) in the dts files:
+> > > 
+> > > &u2phy0_host {
+> > > 
+> > >         phy-supply = <&vcc5v0_host>;
+> > > 
+> > > };
+> > > 
+> > > &u2phy1_host {
+> > > 
+> > >         phy-supply = <&vcc5v0_host>;
+> > > 
+> > > };
+> > 
+> > We can do that but my intention was to entirely partition the nodes
+> > which are not common. So that it would be less confusing when someone
+> > looks at it (please correct me if I'm wrong).
+> 
+> The supply is actually named the same on both boards, so you could move
+> all the usb-nodes to the main dtsi, including the reference to vcc5v0_host
+> which would then get defined itself in the two board dts.
+> 
+> Then again, seeing that the vcc5v0_host also only differs in the actually
+> used gpio another option would be to move the whole regulator node
+> to the dtsi and just define the gpio properties in the board dts files.
+>
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- arch/arm/boot/dts/imx6ull.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Hmm, if that's the preferred option then I guess this applies to pcie
+nodes also. At the end, usb and pcie nodes will be shrinked to below in
+board dts:
 
-diff --git a/arch/arm/boot/dts/imx6ull.dtsi b/arch/arm/boot/dts/imx6ull.dtsi
-index cd1776a..796ed35 100644
---- a/arch/arm/boot/dts/imx6ull.dtsi
-+++ b/arch/arm/boot/dts/imx6ull.dtsi
-@@ -22,7 +22,7 @@
- 	>;
- 	fsl,soc-operating-points = <
- 		/* KHz	uV */
--		900000	1175000
-+		900000	1250000
- 		792000	1175000
- 		528000	1175000
- 		396000	1175000
--- 
-2.7.4
+&pinctrl {
+        pcie {
+                pcie_drv: pcie-drv {
+                        rockchip,pins =
+                                <2 RK_PA5 RK_FUNC_GPIO &pcfg_pull_none>;
+                        };
+        };
+
+        usb2 {
+                host_vbus_drv: host-vbus-drv {
+                        rockchip,pins =
+                                <4 RK_PD1 RK_FUNC_GPIO &pcfg_pull_none>;
+                };
+        };
+};
+
+&pcie0 {
+        ep-gpios = <&gpio2 RK_PA2 GPIO_ACTIVE_HIGH>;
+        status = "okay";
+};
+
+&vcc3v3_pcie {
+        gpio = <&gpio2 5 GPIO_ACTIVE_HIGH>;
+};
+
+&vcc5v0_host {
+        gpio = <&gpio4 25 GPIO_ACTIVE_HIGH>;
+};
+
+Thanks,
+Mani
+
+> 
+> Heiko
+> 
+> 
