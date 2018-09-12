@@ -1,116 +1,95 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 12 Sep 2018 19:34:26 +0800
-Subject: [xlnx:master 1769/1831] drivers/fpga/zynqmp-fpga.c:173:2: error:
- implicit declaration of function 'seq_puts'; did you mean 'kset_put'?
-Message-ID: <201809121924.gynAEmzU%fengguang.wu@intel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 12 Sep 2018 12:43:52 +0100
+Subject: [PATCH v12 0/6] Driver for at91 usart in spi mode
+In-Reply-To: <20180912111757.GC2760@piout.net>
+References: <CAMuHMdV+=EgAYogwNHbY=RExkGox_+YSeHV6pJtQb6g6PzD-CQ@mail.gmail.com>
+ <20180911181838.GI4185@dell> <20180911185839.GA25212@piout.net>
+ <20180911224418.GK4185@dell> <20180911225440.GL4185@dell>
+ <20180912073355.GB2557@piout.net> <20180912084143.GN4185@dell>
+ <CAMuHMdWefU0pw=c9TKOa+wGHchpg8JRfE0OnC4+wKDt-qrbH1A@mail.gmail.com>
+ <20180912105407.GR4185@dell> <20180912111757.GC2760@piout.net>
+Message-ID: <20180912114352.GT4185@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/Xilinx/linux-xlnx master
-head:   5a0f5d4c5b359939907b9cf874d3a9f8ad72d5e3
-commit: bd1f10f8355edafc243f45ebdc234b4fcc218a33 [1769/1831] fpga: zynqmp-fpga: Add support for pl configuration readback
-config: sh-allmodconfig (attached as .config)
-compiler: sh4-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout bd1f10f8355edafc243f45ebdc234b4fcc218a33
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=sh 
+On Wed, 12 Sep 2018, Alexandre Belloni wrote:
 
-All errors (new ones prefixed by >>):
+> On 12/09/2018 11:54:07+0100, Lee Jones wrote:
+> > On Wed, 12 Sep 2018, Geert Uytterhoeven wrote:
+> > > On Wed, Sep 12, 2018 at 10:41 AM Lee Jones <lee.jones@linaro.org> wrote:
+> > > > On Wed, 12 Sep 2018, Alexandre Belloni wrote:
+> > > > > On 11/09/2018 23:54:40+0100, Lee Jones wrote:
+> > > > > > > > http://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-6438-32-bit-ARM926-Embedded-Microprocessor-SAM9G45_Datasheet.pdf
+> > > > > > > >
+> > > > > > > > USART doc starting p572, registers p621.
+> > > > > >
+> > > > > > After looking at the datasheet, I don't see any reason why one of the
+> > > > > > two drivers can't be selected using different compatible strings.
+> > > > >
+> > > > > Because there is only one IP and we don't use the device tree to selecet
+> > > > > linux specific drivers.
+> > > >
+> > > > We do it all the time.  There are loads of MFDs (def: same IP, with
+> > > > different functions) which have separate compatibles for their various
+> > > > functions.  If you wish this IP to operate as an SPI controller, it
+> > > > should have an SPI compatible, if you wish it to operate as a U(S)ART,
+> > > > then it should have a UART compatible.  It's what we do for most of
+> > > > the other MFDs in the kernel.
+> > > 
+> > > There is a big difference: MFD functions are(more or less) independent
+> > > functions, which can be used at the same time. It makes perfect sense for a
+> > > single IP block that has both SPI and UART interfaces, that can be used at
+> > > the same time.
+> > > 
+> > > In this case, there is a single piece of hardware that can perform
+> > > different functions, but not at the same time. Performing a different
+> > > function means configuring the hardware for that function, hence using a
+> > > different driver (from a different subsystem).
+> > 
+> > Yes, I can see that PoV.
+> > 
+> > But ... we can't have it both ways.  *Either* it's a true MFD, in
+> > which case it can/should have 2 separate compatible strings which can
+> > be specified directly from the DT.  *Or* it's not an MFD.  In the
+> > latter case, which I think we're all agreeing on (else we'd have 2
+> > compatible strings), MFD is not the place to handle this (my original
+> > point).
+> > 
+> 
+> If that is what bothers you, then let's move it out of mfd.
 
-   drivers/fpga/zynqmp-fpga.c: In function 'zynqmp_fpga_read_cfgreg':
->> drivers/fpga/zynqmp-fpga.c:173:2: error: implicit declaration of function 'seq_puts'; did you mean 'kset_put'? [-Werror=implicit-function-declaration]
-     seq_puts(s, "zynqMP FPGA Configuration register contents are\n");
-     ^~~~~~~~
-     kset_put
->> drivers/fpga/zynqmp-fpga.c:180:3: error: implicit declaration of function 'seq_printf'; did you mean 'dev_printk'? [-Werror=implicit-function-declaration]
-      seq_printf(s, "%s --> \t %x \t\r\n", p->reg, val);
-      ^~~~~~~~~~
-      dev_printk
-   drivers/fpga/zynqmp-fpga.c: In function 'zynqmp_fpga_read_cfgdata':
->> drivers/fpga/zynqmp-fpga.c:215:2: error: implicit declaration of function 'seq_write'; did you mean 'vfs_write'? [-Werror=implicit-function-declaration]
-     seq_write(s, &buf[data_offset], priv->size);
-     ^~~~~~~~~
-     vfs_write
-   cc1: some warnings being treated as errors
+As I've already mentioned.  I don't just want it moved out of MFD and
+shoved somewhere else.  My aim is to fix this properly.
 
-vim +173 drivers/fpga/zynqmp-fpga.c
+> > So ... this is a USART device which can do SPI, right?
+> > 
+> > My current thinking is that; as this is a USART device first &
+> > foremost, the USART should be probed in the first instance regardless,
+> > then if SPI mode is specified it (the USART driver) registers the SPI
+> > platform driver (as MFD does currently) and exits gracefully, allowing
+> > the SPI driver to take over.
+> > 
+> > Spanner in the works: is it physically possible to change the mode at
+> > run-time?  :s
+> 
+> Yes it is possible but on Linux that will not happen without probing
+> the drivers again.
 
-   158	
-   159	static int zynqmp_fpga_read_cfgreg(struct fpga_manager *mgr,
-   160					   struct seq_file *s)
-   161	{
-   162		const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
-   163		int ret, val;
-   164		unsigned int *buf;
-   165		dma_addr_t dma_addr;
-   166		struct zynqmp_configreg *p = cfgreg;
-   167	
-   168		buf = dma_zalloc_coherent(mgr->dev.parent, READ_DMA_SIZE,
-   169					  &dma_addr, GFP_KERNEL);
-   170		if (!buf)
-   171			return -ENOMEM;
-   172	
- > 173		seq_puts(s, "zynqMP FPGA Configuration register contents are\n");
-   174	
-   175		while (p->reg) {
-   176			ret = eemi_ops->fpga_read(p->offset, dma_addr, readback_type,
-   177						  &val);
-   178			if (ret)
-   179				goto free_dmabuf;
- > 180			seq_printf(s, "%s --> \t %x \t\r\n", p->reg, val);
-   181			p++;
-   182		}
-   183	
-   184	free_dmabuf:
-   185		dma_free_coherent(mgr->dev.parent, READ_DMA_SIZE, buf,
-   186				  dma_addr);
-   187	
-   188		return ret;
-   189	}
-   190	
-   191	static int zynqmp_fpga_read_cfgdata(struct fpga_manager *mgr,
-   192					    struct seq_file *s)
-   193	{
-   194		const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
-   195		struct zynqmp_fpga_priv *priv;
-   196		int ret, data_offset;
-   197		unsigned int *buf;
-   198		dma_addr_t dma_addr;
-   199		size_t size;
-   200	
-   201		priv = mgr->priv;
-   202		size = priv->size + READ_DMA_SIZE + DUMMY_FRAMES_SIZE;
-   203	
-   204		buf = dma_zalloc_coherent(mgr->dev.parent, size, &dma_addr,
-   205					  GFP_KERNEL);
-   206		if (!buf)
-   207			return -ENOMEM;
-   208	
-   209		seq_puts(s, "zynqMP FPGA Configuration data contents are\n");
-   210		ret = eemi_ops->fpga_read((priv->size + DUMMY_FRAMES_SIZE) / 4,
-   211					  dma_addr, readback_type, &data_offset);
-   212		if (ret)
-   213			goto free_dmabuf;
-   214	
- > 215		seq_write(s, &buf[data_offset], priv->size);
-   216	
-   217	free_dmabuf:
-   218		dma_free_coherent(mgr->dev.parent, size, buf, dma_addr);
-   219	
-   220		return ret;
-   221	}
-   222	
+Not sure I understand what you mean.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 46863 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180912/5e6eeeb0/attachment-0001.gz>
+I'm suggesting that you use the same platform_* interfaces MFD uses to
+register the SPI driver if SPI mode has been selected.  Only do so
+from the appropriate driver i.e. USART.
+
+> I think DT overlays will be the only possible use
+> case because on SPI, you'd still have to provide nodes for the connected
+> SPI devices.
+
+Since SPI is a function of the USART you should describe is as such
+via a child node.
+
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
