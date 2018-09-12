@@ -1,64 +1,73 @@
 From: christophe.leroy@c-s.fr (Christophe Leroy)
-Date: Wed, 12 Sep 2018 15:58:48 +0000 (UTC)
-Subject: [PATCH v2 17/24] powerpc/mm: Move pte_user() into nohash/pgtable.h
+Date: Wed, 12 Sep 2018 15:58:56 +0000 (UTC)
+Subject: [PATCH v2 21/24] powerpc/mm: Define platform default caches related
+ flags
 In-Reply-To: <cover.1536692743.git.christophe.leroy@c-s.fr>
 References: <cover.1536692743.git.christophe.leroy@c-s.fr>
-Message-ID: <c7144b5c3f3da430e4e75c40e8d1a758b3f40e85.1536692743.git.christophe.leroy@c-s.fr>
+Message-ID: <88c230e7629f287437cd7ea7fccf4c8abf090a4c.1536692743.git.christophe.leroy@c-s.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now the pte-common.h is only for nohash platforms, lets
-move pte_user() helper out of pte-common.h to put it
-together with other helpers.
+Cache related flags like _PAGE_COHERENT and _PAGE_WRITETHRU
+are defined on most platforms. The platforms not defining
+them don't define any alternative. So we can give them a NUL
+value directly for those platforms directly.
 
 Reviewed-by: Aneesh Kumar K.V <aneesh.kumar@linux.ibm.com>
 Signed-off-by: Christophe Leroy <christophe.leroy@c-s.fr>
 ---
- arch/powerpc/include/asm/nohash/pgtable.h | 10 ++++++++++
- arch/powerpc/include/asm/pte-common.h     | 13 -------------
- 2 files changed, 10 insertions(+), 13 deletions(-)
+ arch/powerpc/include/asm/nohash/32/pte-40x.h |  3 +++
+ arch/powerpc/include/asm/nohash/32/pte-8xx.h |  4 ++++
+ arch/powerpc/include/asm/pte-common.h        | 11 -----------
+ 3 files changed, 7 insertions(+), 11 deletions(-)
 
-diff --git a/arch/powerpc/include/asm/nohash/pgtable.h b/arch/powerpc/include/asm/nohash/pgtable.h
-index 92def7088054..a4c31b829071 100644
---- a/arch/powerpc/include/asm/nohash/pgtable.h
-+++ b/arch/powerpc/include/asm/nohash/pgtable.h
-@@ -47,6 +47,16 @@ static inline int pte_present(pte_t pte)
- }
+diff --git a/arch/powerpc/include/asm/nohash/32/pte-40x.h b/arch/powerpc/include/asm/nohash/32/pte-40x.h
+index ab043b3e9b99..7a8b3c94592f 100644
+--- a/arch/powerpc/include/asm/nohash/32/pte-40x.h
++++ b/arch/powerpc/include/asm/nohash/32/pte-40x.h
+@@ -53,6 +53,9 @@
+ /* No page size encoding in the linux PTE */
+ #define _PAGE_PSIZE		0
  
- /*
-+ * Don't just check for any non zero bits in __PAGE_USER, since for book3e
-+ * and PTE_64BIT, PAGE_KERNEL_X contains _PAGE_BAP_SR which is also in
-+ * _PAGE_USER.  Need to explicitly match _PAGE_BAP_UR bit in that case too.
-+ */
-+static inline bool pte_user(pte_t pte)
-+{
-+	return (pte_val(pte) & (_PAGE_USER | _PAGE_PRIVILEGED)) == _PAGE_USER;
-+}
++/* cache related flags non existing on 40x */
++#define _PAGE_COHERENT	0
 +
-+/*
-  * We only find page table entry in the last level
-  * Hence no need for other accessors
-  */
+ #define _PAGE_KERNEL_RO		0
+ #define _PAGE_KERNEL_ROX	_PAGE_EXEC
+ #define _PAGE_KERNEL_RW		(_PAGE_DIRTY | _PAGE_RW | _PAGE_HWWRITE)
+diff --git a/arch/powerpc/include/asm/nohash/32/pte-8xx.h b/arch/powerpc/include/asm/nohash/32/pte-8xx.h
+index b899c3c877ac..2b4669b3badb 100644
+--- a/arch/powerpc/include/asm/nohash/32/pte-8xx.h
++++ b/arch/powerpc/include/asm/nohash/32/pte-8xx.h
+@@ -46,6 +46,10 @@
+ #define _PAGE_NA	0x0200	/* Supervisor NA, User no access */
+ #define _PAGE_RO	0x0600	/* Supervisor RO, User no access */
+ 
++/* cache related flags non existing on 8xx */
++#define _PAGE_COHERENT	0
++#define _PAGE_WRITETHRU	0
++
+ #define _PAGE_KERNEL_RO		(_PAGE_PRIVILEGED | _PAGE_RO)
+ #define _PAGE_KERNEL_ROX	(_PAGE_PRIVILEGED | _PAGE_RO | _PAGE_EXEC)
+ #define _PAGE_KERNEL_RW		(_PAGE_PRIVILEGED | _PAGE_DIRTY)
 diff --git a/arch/powerpc/include/asm/pte-common.h b/arch/powerpc/include/asm/pte-common.h
-index 3a8ec18ffd22..556a914ff845 100644
+index 1a2102f8b1e7..ff01368a175a 100644
 --- a/arch/powerpc/include/asm/pte-common.h
 +++ b/arch/powerpc/include/asm/pte-common.h
-@@ -66,19 +66,6 @@
- #define _PTE_NONE_MASK	0
- #endif
+@@ -1,17 +1,6 @@
+ /* SPDX-License-Identifier: GPL-2.0 */
+ /* Included from asm/pgtable-*.h only ! */
  
--#ifndef __ASSEMBLY__
--
 -/*
-- * Don't just check for any non zero bits in __PAGE_USER, since for book3e
-- * and PTE_64BIT, PAGE_KERNEL_X contains _PAGE_BAP_SR which is also in
-- * _PAGE_USER.  Need to explicitly match _PAGE_BAP_UR bit in that case too.
+- * Some bits are only used on some cpu families... Make sure that all
+- * the undefined gets a sensible default
 - */
--static inline bool pte_user(pte_t pte)
--{
--	return (pte_val(pte) & (_PAGE_USER | _PAGE_PRIVILEGED)) == _PAGE_USER;
--}
--#endif /* __ASSEMBLY__ */
+-#ifndef _PAGE_COHERENT
+-#define _PAGE_COHERENT	0
+-#endif
+-#ifndef _PAGE_WRITETHRU
+-#define _PAGE_WRITETHRU	0
+-#endif
 -
  /* Location of the PFN in the PTE. Most 32-bit platforms use the same
   * as _PAGE_SHIFT here (ie, naturally aligned).
