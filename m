@@ -1,42 +1,45 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed, 12 Sep 2018 09:51:10 +0200
-Subject: [PATCH v3 02/21] nvmem: remove the name field from struct nvmem_device
+Date: Wed, 12 Sep 2018 09:51:13 +0200
+Subject: [PATCH v3 05/21] nvmem: check the return value of nvmem_add_cells()
 In-Reply-To: <20180912075129.25185-1-brgl@bgdev.pl>
 References: <20180912075129.25185-1-brgl@bgdev.pl>
-Message-ID: <20180912075129.25185-3-brgl@bgdev.pl>
+Message-ID: <20180912075129.25185-6-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-This field is never set and is only used in a single error message.
-Remove the field and use nvmem_dev_name() instead.
+This function can fail so check its return value in nvmem_register()
+and act accordingly.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/nvmem/core.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/nvmem/core.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index d96348ae0f37..8987da0f7456 100644
+index b469f700c699..ffed8fa16936 100644
 --- a/drivers/nvmem/core.c
 +++ b/drivers/nvmem/core.c
-@@ -26,7 +26,6 @@
- #include <linux/slab.h>
+@@ -512,11 +512,17 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
+ 			goto err_device_del;
+ 	}
  
- struct nvmem_device {
--	const char		*name;
- 	struct module		*owner;
- 	struct device		dev;
- 	int			stride;
-@@ -652,7 +651,7 @@ static struct nvmem_device *__nvmem_device_get(struct device_node *np,
- 	if (!try_module_get(nvmem->owner)) {
- 		dev_err(&nvmem->dev,
- 			"could not increase module refcount for cell %s\n",
--			nvmem->name);
-+			nvmem_dev_name(nvmem));
+-	if (config->cells)
+-		nvmem_add_cells(nvmem, config->cells, config->ncells);
++	if (config->cells) {
++		rval = nvmem_add_cells(nvmem, config->cells, config->ncells);
++		if (rval)
++			goto err_teardown_compat;
++	}
  
- 		mutex_lock(&nvmem_mutex);
- 		nvmem->users--;
+ 	return nvmem;
+ 
++err_teardown_compat:
++	if (config->compat)
++		device_remove_bin_file(nvmem->base_dev, &nvmem->eeprom);
+ err_device_del:
+ 	device_del(&nvmem->dev);
+ err_put_device:
 -- 
 2.18.0
