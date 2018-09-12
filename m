@@ -1,89 +1,84 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 12 Sep 2018 16:05:28 +0200
-Subject: [PATCH v2 1/4] arm64: dts: rockchip: Split out common nodes for
- Rock960 based boards
-In-Reply-To: <20180912082244.GA16509@Mani-XPS-13-9360>
-References: <20180911023031.4892-1-manivannan.sadhasivam@linaro.org>
- <11137562.zz0kzkSHxt@diego> <20180912082244.GA16509@Mani-XPS-13-9360>
-Message-ID: <2062942.2GzzSlpOsc@phil>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 12 Sep 2018 22:19:11 +0800
+Subject: [arm-platforms:irq/generic_handle_domain_irq 1/5]
+ include/linux/irqdomain.h:394:38: error: dereferencing pointer to incomplete
+ type 'struct irq_data'
+Message-ID: <201809122209.NdJVtEmE%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 12. September 2018, 10:22:44 CEST schrieb Manivannan Sadhasivam:
-> On Wed, Sep 12, 2018 at 09:26:12AM +0200, Heiko St?bner wrote:
-> > Am Mittwoch, 12. September 2018, 05:12:48 CEST schrieb Manivannan Sadhasivam:
-> > > Hi Ezequiel,
-> > > 
-> > > On Tue, Sep 11, 2018 at 04:40:29PM -0300, Ezequiel Garcia wrote:
-> > > > On Tue, 2018-09-11 at 08:00 +0530, Manivannan Sadhasivam wrote:
-> > > > > Since the same family members of Rock960 boards (Rock960 and Ficus)
-> > > > > share the same configuration, split out the common nodes into a common
-> > > > > dtsi file for reducing code duplication. The board specific nodes for
-> > > > > Ficus boards are then placed in corresponding board DTS file.
-> > > > 
-> > > > I think it should be possible to move the common USB nodes to the dtsi
-> > > > file, and keep the board-specific (phy-supply property) in the dts files:
-> > > > 
-> > > > &u2phy0_host {
-> > > > 
-> > > >         phy-supply = <&vcc5v0_host>;
-> > > > 
-> > > > };
-> > > > 
-> > > > &u2phy1_host {
-> > > > 
-> > > >         phy-supply = <&vcc5v0_host>;
-> > > > 
-> > > > };
-> > > 
-> > > We can do that but my intention was to entirely partition the nodes
-> > > which are not common. So that it would be less confusing when someone
-> > > looks at it (please correct me if I'm wrong).
-> > 
-> > The supply is actually named the same on both boards, so you could move
-> > all the usb-nodes to the main dtsi, including the reference to vcc5v0_host
-> > which would then get defined itself in the two board dts.
-> > 
-> > Then again, seeing that the vcc5v0_host also only differs in the actually
-> > used gpio another option would be to move the whole regulator node
-> > to the dtsi and just define the gpio properties in the board dts files.
-> >
-> 
-> Hmm, if that's the preferred option then I guess this applies to pcie
-> nodes also. At the end, usb and pcie nodes will be shrinked to below in
-> board dts:
-> 
-> &pinctrl {
->         pcie {
->                 pcie_drv: pcie-drv {
->                         rockchip,pins =
->                                 <2 RK_PA5 RK_FUNC_GPIO &pcfg_pull_none>;
->                         };
->         };
-> 
->         usb2 {
->                 host_vbus_drv: host-vbus-drv {
->                         rockchip,pins =
->                                 <4 RK_PD1 RK_FUNC_GPIO &pcfg_pull_none>;
->                 };
->         };
-> };
-> 
-> &pcie0 {
->         ep-gpios = <&gpio2 RK_PA2 GPIO_ACTIVE_HIGH>;
->         status = "okay";
-> };
-> 
-> &vcc3v3_pcie {
->         gpio = <&gpio2 5 GPIO_ACTIVE_HIGH>;
-> };
-> 
-> &vcc5v0_host {
->         gpio = <&gpio4 25 GPIO_ACTIVE_HIGH>;
-> };
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/generic_handle_domain_irq
+head:   feacd6dd425a07c6e54d2fcca04665ac792c6cb0
+commit: fc950b873d9bd2409655ced5b723abed6879c3c8 [1/5] irqdomain: Always store irq_data
+config: mips-allmodconfig (attached as .config)
+compiler: mips-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout fc950b873d9bd2409655ced5b723abed6879c3c8
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=mips 
 
-yep, ideally we could go that way. It's way easier to determine the
-actual differences between boards that way as well.
+All errors (new ones prefixed by >>):
 
+   In file included from arch/mips/include/asm/irq.h:14:0,
+                    from include/linux/irq.h:23,
+                    from include/asm-generic/hardirq.h:13,
+                    from arch/mips/include/asm/hardirq.h:16,
+                    from include/linux/hardirq.h:9,
+                    from include/linux/interrupt.h:11,
+                    from arch/mips/include/asm/highmem.h:24,
+                    from arch/mips/include/asm/pgtable-32.h:23,
+                    from arch/mips/include/asm/pgtable.h:14,
+                    from include/linux/memremap.h:7,
+                    from include/linux/mm.h:27,
+                    from arch/mips/kernel/asm-offsets.c:15:
+   include/linux/irqdomain.h: In function 'irq_linear_revmap':
+>> include/linux/irqdomain.h:394:38: error: dereferencing pointer to incomplete type 'struct irq_data'
+      return domain->linear_revmap[hwirq]->irq;
+                                         ^~
+   make[2]: *** [arch/mips/kernel/asm-offsets.s] Error 1
+   make[2]: Target '__build' not remade because of errors.
+   make[1]: *** [prepare0] Error 2
+   make[1]: Target 'prepare' not remade because of errors.
+   make: *** [sub-make] Error 2
 
-Heiko
+vim +394 include/linux/irqdomain.h
+
+   379	
+   380	/**
+   381	 * irq_linear_revmap() - Find a linux irq from a hw irq number.
+   382	 * @domain: domain owning this hardware interrupt
+   383	 * @hwirq: hardware irq number in that domain space
+   384	 *
+   385	 * This is a fast path alternative to irq_find_mapping() that can be
+   386	 * called directly by irq controller code to save a handful of
+   387	 * instructions. It is always safe to call, but won't find irqs mapped
+   388	 * using the radix tree.
+   389	 */
+   390	static inline unsigned int irq_linear_revmap(struct irq_domain *domain,
+   391						     irq_hw_number_t hwirq)
+   392	{
+   393		if (hwirq < domain->revmap_size && domain->linear_revmap[hwirq])
+ > 394			return domain->linear_revmap[hwirq]->irq;
+   395	
+   396		return 0;
+   397	}
+   398	extern unsigned int irq_find_mapping(struct irq_domain *host,
+   399					     irq_hw_number_t hwirq);
+   400	extern unsigned int irq_create_direct_mapping(struct irq_domain *host);
+   401	extern int irq_create_strict_mappings(struct irq_domain *domain,
+   402					      unsigned int irq_base,
+   403					      irq_hw_number_t hwirq_base, int count);
+   404	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 57390 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180912/7c73f195/attachment-0001.gz>
