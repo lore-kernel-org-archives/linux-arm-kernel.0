@@ -1,92 +1,66 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 12 Sep 2018 12:50:28 +0100
-Subject: [RFC PATCH] KVM: arm64: Treat FPEXC32_EL2 as a regular guest
- system register
-In-Reply-To: <20180912112157.GA14516@e113682-lin.lund.arm.com>
-References: <1536153553-28767-1-git-send-email-Dave.Martin@arm.com>
- <20180912101704.GA23874@e113682-lin.lund.arm.com>
- <20180912111624.GF17801@e103592.cambridge.arm.com>
- <20180912112157.GA14516@e113682-lin.lund.arm.com>
-Message-ID: <20180912115027.GG17801@e103592.cambridge.arm.com>
+From: andrew.murray@arm.com (Andrew Murray)
+Date: Wed, 12 Sep 2018 12:50:31 +0100
+Subject: [REGRESSION] Commit 5745392e0c2b ("PCI: Apply the new generic
+ I/O management on PCI IO hosts") breaks PCI for legacy virtio devices with
+ kvmtool on arm64
+In-Reply-To: <20180907174140.GI12788@arm.com>
+References: <20180907174140.GI12788@arm.com>
+Message-ID: <20180912115031.GG44256@e119886-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2018 at 01:21:57PM +0200, Christoffer Dall wrote:
-> On Wed, Sep 12, 2018 at 12:16:26PM +0100, Dave Martin wrote:
-> > On Wed, Sep 12, 2018 at 12:17:04PM +0200, Christoffer Dall wrote:
-
-[...]
-
-> > > I think the point was actually to avoid saving/restoring FPEXC32_EL2
-> > > when VFP was being trapped to EL2
-> > 
-> > With what purpose in mind?
+On Fri, Sep 07, 2018 at 06:41:40PM +0100, Will Deacon wrote:
+> Hi all,
 > 
-> I don't think we thought it through very carefully but just considered
-> FPEXC32_EL2 as part of the VFP state, but as you say, that doesn't
-> really make sense.
+> I'm seeing a regression in Linux guests since 4.17 under kvmtool, where
+> legacy virtio devices using the PCI transport fail to probe. Legacy virtio
+> PCI devices must be accessed via "I/O space" (e.g. BAR0, which is
+> IORESOURCE_IO) and kvmtool assigns this to the guest physical range
+> 0x0 - 0x10000.
 > 
-> I was just objecting to the statement that this is a bring-over from the
-> 32-bit side, which confused me, and I don't think that's true.
-
-[...]
-
-> > We saved neither the trap (since the VFP registers needed switching
-> > anyway) nor the FPEXC32_EL2 switch (since we had to do that at guest
-> > entry).
-> > 
-> > I may have misunderstood something.
-> > 
+> On arm64, when the virtio legacy PCI driver calls pci_iomap() for this BAR,
+> it expands to ioport_map():
 > 
-> No, we just didn't look at it that carefully back then.
+>   static inline void __iomem *ioport_map(unsigned long port, unsigned int nr)
+>   {
+>   	return PCI_IOBASE + (port & MMIO_UPPER_LIMIT);
+>   }
 > 
-> > 
-> > I was somewhat guessing likely rationale, so if you can suggest a
-> > way to reword this that reflects the situation better I'd be happy
-> > to change it.
+> Since the indirect PIO changes, MMIO_UPPER_LIMIT is defined as:
 > 
-> "Christoffer was being stupid..." ;)  It was just the way
-> it was, I don't think there was a good rationale, but I don't think it
-> helps to understand the change to provide guesswork either, so just
-> remove it.
-
-OK, I'll drop the bogus history lesson from this patch.  It doesn't
-really add anything here, especially if it's wrong.
-
-> > Thinking about it, I don't see why FPEXC32_EL2 can't be handled via
-> > vcpu_load()/_put().  This register doesn't matter for the host, and
-> > I can't see why we would need to switch it when going through hyp.
-> > 
+>   /*
+>    * We reserve 0x4000 bytes for Indirect IO as so far this library is only
+>    * used by the HiSilicon LPC Host. If needed, we can reserve a wider IO
+>    * area by redefining the macro below.
+>    */
+>   #define PIO_INDIRECT_SIZE 0x4000
+>   #define MMIO_UPPER_LIMIT (IO_SPACE_LIMIT - PIO_INDIRECT_SIZE)
 > 
-> That's another good point, should be able to do that.
-
-[...]
-
-> > I confess to a certain amount of "according to the spirit of the
-> > architecture it obviously ought to work this way" reasoning.
-> > 
-> > Following the trail of documentation isn't trivial, so it would
-> > be good if someone could check that they can reach the same conclusion
-> > about FPEXC32_EL2 having no effect on the host.
-> > 
+> which corrupts the BAR address. For example, kvmtool has the BAR pointing
+> at 0x6200 on my system, but pci_iomap() actually maps offset 0x2200.
+> Changing PIO_INDIRECT_SIZE to 0 gets things working again.
 > 
-> That was definitely my conclusion as well.
+> Since this stuff doesn't revert nicely, I'm not sure how to proceed. Any
+> thoughts? Generally, having a per-platform magic constant hardcoded in
+> the PCI mapping code makes me feel slightly ill...
 
-OK, sounds good.
+It seems that MMIO_UPPER_LIMIT (and some cases previously with IO_SPACE_LIMIT)
+are not always being treated as masks - therefore ioport_map should be updated
+to use the comparison operator and reject anything above MMIO_UPPER_LIMIT.
 
-[...]
+In any case modifying the address if it doesn't fit within the MMIO_UPPER_LIMIT
+(or IO_SPACE_LIMIT previously) will only break something further down the code
+path if the address was wrong in the first place. This function should probably
+work in the same was as GENERIC_IOMAP (given it shares the same name) whereby
+NULL is returned if the port is incorrect.
 
-> > > We can queue this for the next merge window.
-> > > 
-> > > Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
-> > 
-> > Thanks, modulo the question of maybe moving this to the vcpu_load()/
-> > _put() path.
-> > 
+I will prepare a patch.
+
+Thanks,
+
+Andrew Murray
+
 > 
-> Sure, I'll look at the next version as well if you send a new version.
-
-Will do.  Can't say exactly when.
-
-Cheers
----Dave
+> Cheers,
+> 
+> Will
