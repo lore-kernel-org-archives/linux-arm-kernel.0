@@ -1,116 +1,45 @@
 From: horia.geanta@nxp.com (=?UTF-8?q?Horia=20Geant=C4=83?=)
-Date: Wed, 12 Sep 2018 11:59:27 +0300
-Subject: [PATCH v2 02/12] soc: fsl: dpio: add back some frame queue functions
+Date: Wed, 12 Sep 2018 11:59:29 +0300
+Subject: [PATCH v2 04/12] soc: fsl: dpio: add congestion notification support
 In-Reply-To: <20180912085937.22489-1-horia.geanta@nxp.com>
 References: <20180912085937.22489-1-horia.geanta@nxp.com>
-Message-ID: <20180912085937.22489-3-horia.geanta@nxp.com>
+Message-ID: <20180912085937.22489-5-horia.geanta@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds back functions removed in
-commit a211c8170b3c ("staging: fsl-mc/dpio: remove couple of unused functions")
-since dpseci object will make use of them.
+Add support for Congestion State Change Notifications (CSCN), which
+allow DPIO users to be notified when a congestion group changes its
+state (due to hitting the entrance / exit threshold).
 
 Acked-by: Li Yang <leoyang.li@nxp.com>
 Signed-off-by: Horia Geant? <horia.geanta@nxp.com>
 ---
- drivers/soc/fsl/dpio/dpio-service.c | 58 +++++++++++++++++++++++++++++++++++++
- include/soc/fsl/dpaa2-io.h          |  4 +++
- 2 files changed, 62 insertions(+)
+ include/soc/fsl/dpaa2-global.h | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/drivers/soc/fsl/dpio/dpio-service.c b/drivers/soc/fsl/dpio/dpio-service.c
-index 9b17f72349ed..321a92613a7e 100644
---- a/drivers/soc/fsl/dpio/dpio-service.c
-+++ b/drivers/soc/fsl/dpio/dpio-service.c
-@@ -309,6 +309,37 @@ int dpaa2_io_service_rearm(struct dpaa2_io *d,
+diff --git a/include/soc/fsl/dpaa2-global.h b/include/soc/fsl/dpaa2-global.h
+index 9bc0713346a8..2bfc379d3dc9 100644
+--- a/include/soc/fsl/dpaa2-global.h
++++ b/include/soc/fsl/dpaa2-global.h
+@@ -174,4 +174,19 @@ static inline const struct dpaa2_fd *dpaa2_dq_fd(const struct dpaa2_dq *dq)
+ 	return (const struct dpaa2_fd *)&dq->dq.fd[0];
  }
- EXPORT_SYMBOL_GPL(dpaa2_io_service_rearm);
  
++#define DPAA2_CSCN_SIZE		sizeof(struct dpaa2_dq)
++#define DPAA2_CSCN_ALIGN	16
++#define DPAA2_CSCN_STATE_CG	BIT(0)
++
 +/**
-+ * dpaa2_io_service_pull_fq() - pull dequeue functions from a fq.
-+ * @d: the given DPIO service.
-+ * @fqid: the given frame queue id.
-+ * @s: the dpaa2_io_store object for the result.
++ * dpaa2_cscn_state_congested() - Check congestion state
++ * @cscn: congestion SCN (delivered to WQ or memory)
 + *
-+ * Return 0 for success, or error code for failure.
++i * Return true is congested.
 + */
-+int dpaa2_io_service_pull_fq(struct dpaa2_io *d, u32 fqid,
-+			     struct dpaa2_io_store *s)
++static inline bool dpaa2_cscn_state_congested(struct dpaa2_dq *cscn)
 +{
-+	struct qbman_pull_desc pd;
-+	int err;
-+
-+	qbman_pull_desc_clear(&pd);
-+	qbman_pull_desc_set_storage(&pd, s->vaddr, s->paddr, 1);
-+	qbman_pull_desc_set_numframes(&pd, (u8)s->max);
-+	qbman_pull_desc_set_fq(&pd, fqid);
-+
-+	d = service_select(d);
-+	if (!d)
-+		return -ENODEV;
-+	s->swp = d->swp;
-+	err = qbman_swp_pull(d->swp, &pd);
-+	if (err)
-+		s->swp = NULL;
-+
-+	return err;
++	return !!(cscn->scn.state & DPAA2_CSCN_STATE_CG);
 +}
-+EXPORT_SYMBOL(dpaa2_io_service_pull_fq);
 +
- /**
-  * dpaa2_io_service_pull_channel() - pull dequeue functions from a channel.
-  * @d: the given DPIO service.
-@@ -341,6 +372,33 @@ int dpaa2_io_service_pull_channel(struct dpaa2_io *d, u32 channelid,
- }
- EXPORT_SYMBOL_GPL(dpaa2_io_service_pull_channel);
- 
-+/**
-+ * dpaa2_io_service_enqueue_fq() - Enqueue a frame to a frame queue.
-+ * @d: the given DPIO service.
-+ * @fqid: the given frame queue id.
-+ * @fd: the frame descriptor which is enqueued.
-+ *
-+ * Return 0 for successful enqueue, -EBUSY if the enqueue ring is not ready,
-+ * or -ENODEV if there is no dpio service.
-+ */
-+int dpaa2_io_service_enqueue_fq(struct dpaa2_io *d,
-+				u32 fqid,
-+				const struct dpaa2_fd *fd)
-+{
-+	struct qbman_eq_desc ed;
-+
-+	d = service_select(d);
-+	if (!d)
-+		return -ENODEV;
-+
-+	qbman_eq_desc_clear(&ed);
-+	qbman_eq_desc_set_no_orp(&ed, 0);
-+	qbman_eq_desc_set_fq(&ed, fqid);
-+
-+	return qbman_swp_enqueue(d->swp, &ed, fd);
-+}
-+EXPORT_SYMBOL(dpaa2_io_service_enqueue_fq);
-+
- /**
-  * dpaa2_io_service_enqueue_qd() - Enqueue a frame to a QD.
-  * @d: the given DPIO service.
-diff --git a/include/soc/fsl/dpaa2-io.h b/include/soc/fsl/dpaa2-io.h
-index ab51e40d11db..70997ab2146c 100644
---- a/include/soc/fsl/dpaa2-io.h
-+++ b/include/soc/fsl/dpaa2-io.h
-@@ -97,9 +97,13 @@ void dpaa2_io_service_deregister(struct dpaa2_io *service,
- int dpaa2_io_service_rearm(struct dpaa2_io *service,
- 			   struct dpaa2_io_notification_ctx *ctx);
- 
-+int dpaa2_io_service_pull_fq(struct dpaa2_io *d, u32 fqid,
-+			     struct dpaa2_io_store *s);
- int dpaa2_io_service_pull_channel(struct dpaa2_io *d, u32 channelid,
- 				  struct dpaa2_io_store *s);
- 
-+int dpaa2_io_service_enqueue_fq(struct dpaa2_io *d, u32 fqid,
-+				const struct dpaa2_fd *fd);
- int dpaa2_io_service_enqueue_qd(struct dpaa2_io *d, u32 qdid, u8 prio,
- 				u16 qdbin, const struct dpaa2_fd *fd);
- int dpaa2_io_service_release(struct dpaa2_io *d, u32 bpid,
+ #endif /* __FSL_DPAA2_GLOBAL_H */
 -- 
 2.16.2
