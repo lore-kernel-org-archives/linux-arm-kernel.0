@@ -1,42 +1,69 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed, 12 Sep 2018 09:51:17 +0200
-Subject: [PATCH v3 09/21] nvmem: mxs-ocotp: use devm_nvmem_register()
+Date: Wed, 12 Sep 2018 09:51:16 +0200
+Subject: [PATCH v3 08/21] nvmem: sunxi_sid: use devm_nvmem_register()
 In-Reply-To: <20180912075129.25185-1-brgl@bgdev.pl>
 References: <20180912075129.25185-1-brgl@bgdev.pl>
-Message-ID: <20180912075129.25185-10-brgl@bgdev.pl>
+Message-ID: <20180912075129.25185-9-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Use the resource managed variant of nvmem_register();
+Use the resource managed variant of nvmem_register().
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/nvmem/mxs-ocotp.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/nvmem/sunxi_sid.c | 20 +++-----------------
+ 1 file changed, 3 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/nvmem/mxs-ocotp.c b/drivers/nvmem/mxs-ocotp.c
-index 7018e2ef5714..53122f59c4b2 100644
---- a/drivers/nvmem/mxs-ocotp.c
-+++ b/drivers/nvmem/mxs-ocotp.c
-@@ -177,7 +177,7 @@ static int mxs_ocotp_probe(struct platform_device *pdev)
- 	ocotp_config.size = data->size;
- 	ocotp_config.priv = otp;
- 	ocotp_config.dev = dev;
--	otp->nvmem = nvmem_register(&ocotp_config);
-+	otp->nvmem = devm_nvmem_register(dev, &ocotp_config);
- 	if (IS_ERR(otp->nvmem)) {
- 		ret = PTR_ERR(otp->nvmem);
- 		goto err_clk;
-@@ -199,7 +199,7 @@ static int mxs_ocotp_remove(struct platform_device *pdev)
+diff --git a/drivers/nvmem/sunxi_sid.c b/drivers/nvmem/sunxi_sid.c
+index d020f89248fd..0296c23db322 100644
+--- a/drivers/nvmem/sunxi_sid.c
++++ b/drivers/nvmem/sunxi_sid.c
+@@ -181,15 +181,13 @@ static int sunxi_sid_probe(struct platform_device *pdev)
+ 	else
+ 		econfig.reg_read = sunxi_sid_read;
+ 	econfig.priv = sid;
+-	nvmem = nvmem_register(&econfig);
++	nvmem = devm_nvmem_register(dev, &econfig);
+ 	if (IS_ERR(nvmem))
+ 		return PTR_ERR(nvmem);
  
- 	clk_unprepare(otp->clk);
+ 	randomness = kzalloc(size, GFP_KERNEL);
+-	if (!randomness) {
+-		ret = -EINVAL;
+-		goto err_unreg_nvmem;
+-	}
++	if (!randomness)
++		return PTR_ERR(-EINVAL);
  
--	return nvmem_unregister(otp->nvmem);
-+	return 0;
+ 	for (i = 0; i < size; i++)
+ 		econfig.reg_read(sid, i, &randomness[i], 1);
+@@ -200,17 +198,6 @@ static int sunxi_sid_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, nvmem);
+ 
+ 	return 0;
+-
+-err_unreg_nvmem:
+-	nvmem_unregister(nvmem);
+-	return ret;
+-}
+-
+-static int sunxi_sid_remove(struct platform_device *pdev)
+-{
+-	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
+-
+-	return nvmem_unregister(nvmem);
  }
  
- static struct platform_driver mxs_ocotp_driver = {
+ static const struct sunxi_sid_cfg sun4i_a10_cfg = {
+@@ -243,7 +230,6 @@ MODULE_DEVICE_TABLE(of, sunxi_sid_of_match);
+ 
+ static struct platform_driver sunxi_sid_driver = {
+ 	.probe = sunxi_sid_probe,
+-	.remove = sunxi_sid_remove,
+ 	.driver = {
+ 		.name = "eeprom-sunxi-sid",
+ 		.of_match_table = sunxi_sid_of_match,
 -- 
 2.18.0
