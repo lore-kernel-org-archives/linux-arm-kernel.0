@@ -1,56 +1,61 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 12 Sep 2018 14:47:35 +0200
-Subject: [PATCH v5 1/6] drm/bridge: dw-hdmi: allow forcing vendor phy-type
+Date: Wed, 12 Sep 2018 14:47:39 +0200
+Subject: [PATCH v5 5/6] drm/rockchip: dw_hdmi: store rockchip_hdmi reference
+ in phy_data object
 In-Reply-To: <20180912124740.20343-1-heiko@sntech.de>
 References: <20180912124740.20343-1-heiko@sntech.de>
-Message-ID: <20180912124740.20343-2-heiko@sntech.de>
+Message-ID: <20180912124740.20343-6-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some IP implementations the reading of the phy-type may be broken.
-One example are the Rockchip rk3228 and rk3328 socs that use a separate
-vendor-type phy from Innosilicon but still report the HDMI20_TX type.
+When using special phy handling operations we'll often need access to
+the rockchip_hdmi struct.
 
-So allow the glue driver to force the vendor-phy for these cases.
-In the future it may be necessary to allow forcing other types, but
-for now we'll keep it simply to the case actually seen in the wild.
+As the chip-data that occupies the phy_data pointer initially gets
+assigned to the rockchip_hdmi struct, we can now re-use this phy_data
+pointer to hold the reference to the rockchip_hdmi struct and use this
+reference later on.
 
-changes in v3:
-- only allow forcing vendor type, as suggested by Laurent
+Inspiration for this comes from meson and sunxi dw-hdmi, which are using
+the same method.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 Tested-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 4 +++-
- include/drm/bridge/dw_hdmi.h              | 1 +
- 2 files changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-index 5971976284bf..ac37c50d6c4b 100644
---- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-+++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-@@ -2205,7 +2205,9 @@ static int dw_hdmi_detect_phy(struct dw_hdmi *hdmi)
- 	unsigned int i;
- 	u8 phy_type;
+changes in v3:
+- reword commit message
+---
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+index 57e76dfd5f6d..19f002fa0a09 100644
+--- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
++++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+@@ -335,7 +335,7 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
+ 				 void *data)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+-	const struct dw_hdmi_plat_data *plat_data;
++	struct dw_hdmi_plat_data *plat_data;
+ 	const struct of_device_id *match;
+ 	struct drm_device *drm = data;
+ 	struct drm_encoder *encoder;
+@@ -350,9 +350,14 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
+ 		return -ENOMEM;
  
--	phy_type = hdmi_readb(hdmi, HDMI_CONFIG2_ID);
-+	phy_type = hdmi->plat_data->phy_force_vendor ?
-+				DW_HDMI_PHY_VENDOR_PHY :
-+				hdmi_readb(hdmi, HDMI_CONFIG2_ID);
+ 	match = of_match_node(dw_hdmi_rockchip_dt_ids, pdev->dev.of_node);
+-	plat_data = match->data;
++	plat_data = devm_kmemdup(&pdev->dev, match->data,
++					     sizeof(*plat_data), GFP_KERNEL);
++	if (!plat_data)
++		return -ENOMEM;
++
+ 	hdmi->dev = &pdev->dev;
+ 	hdmi->chip_data = plat_data->phy_data;
++	plat_data->phy_data = hdmi;
+ 	encoder = &hdmi->encoder;
  
- 	if (phy_type == DW_HDMI_PHY_VENDOR_PHY) {
- 		/* Vendor PHYs require support from the glue layer. */
-diff --git a/include/drm/bridge/dw_hdmi.h b/include/drm/bridge/dw_hdmi.h
-index ccb5aa8468e0..6ef3236bb6dd 100644
---- a/include/drm/bridge/dw_hdmi.h
-+++ b/include/drm/bridge/dw_hdmi.h
-@@ -133,6 +133,7 @@ struct dw_hdmi_plat_data {
- 	const struct dw_hdmi_phy_ops *phy_ops;
- 	const char *phy_name;
- 	void *phy_data;
-+	bool phy_force_vendor;
- 
- 	/* Synopsys PHY support */
- 	const struct dw_hdmi_mpll_config *mpll_cfg;
+ 	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm, dev->of_node);
 -- 
 2.17.0
