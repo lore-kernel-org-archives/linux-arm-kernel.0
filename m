@@ -1,30 +1,37 @@
-From: t.jag587@gmail.com (Jagdish Tirumala)
-Date: Wed, 12 Sep 2018 08:56:32 -0700
-Subject: [PATCH] WATCHDOG: DIAG288_WDT: Fixed error POINTER_LOCATION
-Message-ID: <20180912155632.8060-1-t.jag587@gmail.com>
+From: christophe.leroy@c-s.fr (Christophe Leroy)
+Date: Wed, 12 Sep 2018 15:58:21 +0000 (UTC)
+Subject: [PATCH v2 04/24] soc/fsl/qbman: use ioremap_cache() instead of
+ ioremap_prot(0)
+In-Reply-To: <cover.1536692743.git.christophe.leroy@c-s.fr>
+References: <cover.1536692743.git.christophe.leroy@c-s.fr>
+Message-ID: <34f570a52b8309984bbe500410098c85dcd28eaa.1536692743.git.christophe.leroy@c-s.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixed ERROR:POINTER_LOCATION: "foo * bar" should be "foo *bar" in
-file drivers/watchdog/diag288_wdt.c
+ioremap_prot() with flag set to 0 relies on a hack in
+__ioremap_caller() which adds PAGE_KERNEL flags when the
+handed flags don't look like a valid set of flags
+(ie don't include _PAGE_PRESENT)
 
-Signed-off-by: Jagdish Tirumala <t.jag587@gmail.com>
+The intention being to map cached memory, use ioremap_cache() instead.
+
+Signed-off-by: Christophe Leroy <christophe.leroy@c-s.fr>
 ---
- drivers/watchdog/diag288_wdt.c | 2 +-
+ drivers/soc/fsl/qbman/qman_ccsr.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/watchdog/diag288_wdt.c b/drivers/watchdog/diag288_wdt.c
-index 806a04a676b7..046333d1beb2 100644
---- a/drivers/watchdog/diag288_wdt.c
-+++ b/drivers/watchdog/diag288_wdt.c
-@@ -199,7 +199,7 @@ static int wdt_ping(struct watchdog_device *dev)
- 	return ret;
- }
- 
--static int wdt_set_timeout(struct watchdog_device * dev, unsigned int new_to)
-+static int wdt_set_timeout(struct watchdog_device *dev, unsigned int new_to)
+diff --git a/drivers/soc/fsl/qbman/qman_ccsr.c b/drivers/soc/fsl/qbman/qman_ccsr.c
+index 79cba58387a5..0fbb201346c7 100644
+--- a/drivers/soc/fsl/qbman/qman_ccsr.c
++++ b/drivers/soc/fsl/qbman/qman_ccsr.c
+@@ -418,7 +418,7 @@ static size_t fqd_sz, pfdr_sz;
+ static int zero_priv_mem(phys_addr_t addr, size_t sz)
  {
- 	dev->timeout = new_to;
- 	return wdt_ping(dev);
+ 	/* map as cacheable, non-guarded */
+-	void __iomem *tmpp = ioremap_prot(addr, sz, 0);
++	void __iomem *tmpp = ioremap_cache(addr, sz);
+ 
+ 	if (!tmpp)
+ 		return -ENOMEM;
 -- 
-2.17.1
+2.13.3
