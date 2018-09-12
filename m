@@ -1,71 +1,53 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 12 Sep 2018 11:54:07 +0100
-Subject: [PATCH v12 0/6] Driver for at91 usart in spi mode
-In-Reply-To: <CAMuHMdWefU0pw=c9TKOa+wGHchpg8JRfE0OnC4+wKDt-qrbH1A@mail.gmail.com>
-References: <CAMuHMdXH8gNjKGOHGFc+K03U2zsVCSN7G_Q4wtepQr859nRQKg@mail.gmail.com>
- <20180911153621.GP2494@piout.net>
- <CAMuHMdV+=EgAYogwNHbY=RExkGox_+YSeHV6pJtQb6g6PzD-CQ@mail.gmail.com>
- <20180911181838.GI4185@dell> <20180911185839.GA25212@piout.net>
- <20180911224418.GK4185@dell> <20180911225440.GL4185@dell>
- <20180912073355.GB2557@piout.net> <20180912084143.GN4185@dell>
- <CAMuHMdWefU0pw=c9TKOa+wGHchpg8JRfE0OnC4+wKDt-qrbH1A@mail.gmail.com>
-Message-ID: <20180912105407.GR4185@dell>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Wed, 12 Sep 2018 12:11:15 +0100
+Subject: [PATCH v5 05/27] arm64: Use daifflag_restore after bp_hardening
+In-Reply-To: <641119b9-3466-817d-3d6b-dd710c646b49@arm.com>
+References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
+ <1535471497-38854-6-git-send-email-julien.thierry@arm.com>
+ <641119b9-3466-817d-3d6b-dd710c646b49@arm.com>
+Message-ID: <8f200315-1db9-1905-71ae-cb4269450b7c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Sep 2018, Geert Uytterhoeven wrote:
-> On Wed, Sep 12, 2018 at 10:41 AM Lee Jones <lee.jones@linaro.org> wrote:
-> > On Wed, 12 Sep 2018, Alexandre Belloni wrote:
-> > > On 11/09/2018 23:54:40+0100, Lee Jones wrote:
-> > > > > > http://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-6438-32-bit-ARM926-Embedded-Microprocessor-SAM9G45_Datasheet.pdf
-> > > > > >
-> > > > > > USART doc starting p572, registers p621.
-> > > >
-> > > > After looking at the datasheet, I don't see any reason why one of the
-> > > > two drivers can't be selected using different compatible strings.
-> > >
-> > > Because there is only one IP and we don't use the device tree to selecet
-> > > linux specific drivers.
-> >
-> > We do it all the time.  There are loads of MFDs (def: same IP, with
-> > different functions) which have separate compatibles for their various
-> > functions.  If you wish this IP to operate as an SPI controller, it
-> > should have an SPI compatible, if you wish it to operate as a U(S)ART,
-> > then it should have a UART compatible.  It's what we do for most of
-> > the other MFDs in the kernel.
+Hi James,
+
+On 12/09/18 11:32, James Morse wrote:
+> Hi Julien,
 > 
-> There is a big difference: MFD functions are(more or less) independent
-> functions, which can be used at the same time. It makes perfect sense for a
-> single IP block that has both SPI and UART interfaces, that can be used at
-> the same time.
+> On 28/08/18 16:51, Julien Thierry wrote:
+>> For EL0 entries requiring bp_hardening, daif status is kept at
+>> DAIF_PROCCTX_NOIRQ until after hardening has been done. Then interrupts
+>> are enabled through local_irq_enable().
+>>
+>> Before using local_irq_* functions, daifflags should be properly restored
+>> to a state where IRQs are enabled.
 > 
-> In this case, there is a single piece of hardware that can perform
-> different functions, but not at the same time. Performing a different
-> function means configuring the hardware for that function, hence using a
-> different driver (from a different subsystem).
+>> Enable IRQs by restoring DAIF_PROCCTX state after bp hardening.
+> 
+> Is this just for symmetry, or are you going on to add something to the daifflags
+> state that local_irq_* functions won't change? (if so, could you allude to that
+> in the commit message)
+> 
 
-Yes, I can see that PoV.
+What happens is that once we use ICC_PMR_EL1, local_irq_enable will not 
+touch PSR.I. And we are coming back from an entry where PSR.I was kept 
+to 1 so local_irq_enable was not actually enabling the interrupts. On 
+the otherhand, restore will affect both.
 
-But ... we can't have it both ways.  *Either* it's a true MFD, in
-which case it can/should have 2 separate compatible strings which can
-be specified directly from the DT.  *Or* it's not an MFD.  In the
-latter case, which I think we're all agreeing on (else we'd have 2
-compatible strings), MFD is not the place to handle this (my original
-point).
+Another option is to have the asm macro "enable_da_f" also switch to PMR 
+usage (i.e. "just keep normal interrupts disabled"). Overall it would 
+probably be easier to reason with, but I'm just unsure whether it is 
+acceptable to receive a Pseudo NMI before having applied the bp_hardening.
 
-So ... this is a USART device which can do SPI, right?
+If it is possible, I'm happy to solve this with enable_da_f.
 
-My current thinking is that; as this is a USART device first &
-foremost, the USART should be probed in the first instance regardless,
-then if SPI mode is specified it (the USART driver) registers the SPI
-platform driver (as MFD does currently) and exits gracefully, allowing
-the SPI driver to take over.
+Thanks,
 
-Spanner in the works: is it physically possible to change the mode at
-run-time?  :s
+> 
+> Either way,
+> 
+> Acked-by: James Morse <james.morse@arm.com>
+> 
 
 -- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Julien Thierry
