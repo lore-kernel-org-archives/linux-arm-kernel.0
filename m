@@ -1,352 +1,85 @@
-From: jolly.shah@xilinx.com (Jolly Shah)
-Date: Wed, 12 Sep 2018 12:38:39 -0700
-Subject: [PATCH v12 5/6] firmware: xilinx: Add debugfs interface
-In-Reply-To: <1536781120-22794-1-git-send-email-jollys@xilinx.com>
-References: <1536781120-22794-1-git-send-email-jollys@xilinx.com>
-Message-ID: <1536781120-22794-6-git-send-email-jollys@xilinx.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 12 Sep 2018 13:42:37 -0600
+Subject: [PATCH v2 00/14] coresight: Implement device claim protocol
+In-Reply-To: <1536224915-31766-1-git-send-email-suzuki.poulose@arm.com>
+References: <1536224915-31766-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <CANLsYkxvF44MiX8RZtx3yU5yj=nyjbUXOYkv8oV2uYD6CbHENg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajan Vaja <rajanv@xilinx.com>
+On Thu, 6 Sep 2018 at 03:08, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+>
+> Coresight architecture defines CLAIM tags for a device to negotiate
+> control of the components (external agent vs self-hosted). Each device
+> has a pair of registers (CLAIMSET & CLAIMCLR) for managing the CLAIM
+> tags. However, the protocol for the CLAIM tags is IMPLEMENTATION DEFINED.
+> PSCI has recommendations for the use of the CLAIM tags to negotiate
+> controls for external agent vs self-hosted use, as defined in
+> ARM DEN 0022D, Section "6.8.1 Debug and Trace save and restore".
+>
+> This series implements the recommended protocol by PSCI.
+>
+> There were two options for the implementation.
+>  1) Have the claim/disclaim operations performed from the coresight
+>     generic driver - This doesn't work unfortunately for ETM devices
+>     as the need cross-CPU calls to access the CLAIM registers. Also,
+>     makes it complex for error recovery and reference counting.
+>
+>  2) Have the claim/disclaim operations performed from the device
+>     specific drivers. The disadvantage is that the calls are sprinkled
+>     in each driver, but this makes the operation much simpler.
+>
+> This series implements the method (2). The first part of the series
+> prepares different drivers to handle errors from the lower layer
+> and clean up the state. The second part of the series updates the
+> existing drivers to claim/disclaim the devices as necessary.
+>
+> Tested with a hacked coresight driver which modifies the external
+> claim tag via sysfs handle.
+>
+> Applies on coresight/next in Mathieu's tree.
+>
+> Changes since V1:
+>  - Handle errors is enabling path and disable only the components
+>    that were enabled in the iteration.
+>  - Fix build break on arm32 (etm3x)
+>  - Update commit description for "coresight: Add support for CLAIM tag protocol"
+>
+> Suzuki K Poulose (14):
+>   coresight: Handle failures in enabling a trace path
+>   coresight: tmc-etr: Refactor for handling errors
+>   coresight: tmc-etr: Handle errors enabling CATU
+>   coresight: tmc-etb/etf: Prepare to handle errors enabling
+>   coresight: etm4x: Add support for handling errors
+>   coresight: etm3: Add support for handling errors
+>   coresight: etb10: Handle errors enabling the device
+>   coresight: dynamic-replicator: Handle multiple connections
+>   coresight: Add support for CLAIM tag protocol
+>   coresight: etmx: Claim devices before use
+>   coresight: funnel: Claim devices before use
+>   coresight: catu: Claim device before use
+>   coresight: dynamic-replicator: Claim device for use
+>   coreisght: tmc: Claim device before use
+>
+>  drivers/hwtracing/coresight/coresight-catu.c       |   6 ++
+>  .../coresight/coresight-dynamic-replicator.c       |  79 ++++++++++----
+>  drivers/hwtracing/coresight/coresight-etb10.c      |  18 +++-
+>  drivers/hwtracing/coresight/coresight-etm3x.c      |  56 +++++++---
+>  drivers/hwtracing/coresight/coresight-etm4x.c      |  51 ++++++---
+>  drivers/hwtracing/coresight/coresight-funnel.c     |  26 ++++-
+>  drivers/hwtracing/coresight/coresight-priv.h       |   7 ++
+>  drivers/hwtracing/coresight/coresight-tmc-etf.c    |  95 +++++++++++------
+>  drivers/hwtracing/coresight/coresight-tmc-etr.c    |  80 +++++++++-----
+>  drivers/hwtracing/coresight/coresight.c            | 118 +++++++++++++++++++--
+>  include/linux/coresight.h                          |  20 ++++
+>  11 files changed, 434 insertions(+), 122 deletions(-)
 
-Firmware-debug provides debugfs interface to all APIs.
-Debugfs can be used to call firmware APIs with required
-parameters.
+I have applied this set.
 
-Usage:
-* Calling firmware API through debugfs:
-  # echo "<api-name> <arg1> .. <argn>" > /sys/.../zynqmp-firmware/pm
+Thanks,
+Mathieu
 
-* Read output of last called firmware API:
-  # cat /sys/.../zynqmp-firmware/pm
-
-Refer ug1200 for more information on these APIs:
-  * https://www.xilinx.com/support/documentation/user_guides/ug1200-eemi-api.pdf
-
-Add basic debugfs file to get API version.
-
-Signed-off-by: Rajan Vaja <rajanv@xilinx.com>
-Signed-off-by: Jolly Shah <jollys@xilinx.com>
----
- drivers/firmware/xilinx/Kconfig        |   7 ++
- drivers/firmware/xilinx/Makefile       |   1 +
- drivers/firmware/xilinx/zynqmp-debug.c | 222 +++++++++++++++++++++++++++++++++
- drivers/firmware/xilinx/zynqmp-debug.h |  24 ++++
- drivers/firmware/xilinx/zynqmp.c       |   5 +
- 5 files changed, 259 insertions(+)
- create mode 100644 drivers/firmware/xilinx/zynqmp-debug.c
- create mode 100644 drivers/firmware/xilinx/zynqmp-debug.h
-
-diff --git a/drivers/firmware/xilinx/Kconfig b/drivers/firmware/xilinx/Kconfig
-index 64d976e..8f44b9c 100644
---- a/drivers/firmware/xilinx/Kconfig
-+++ b/drivers/firmware/xilinx/Kconfig
-@@ -13,4 +13,11 @@ config ZYNQMP_FIRMWARE
- 	  Say yes to enable ZynqMP firmware interface driver.
- 	  If in doubt, say N.
- 
-+config ZYNQMP_FIRMWARE_DEBUG
-+	bool "Enable Xilinx Zynq MPSoC firmware debug APIs"
-+	depends on ZYNQMP_FIRMWARE && DEBUG_FS
-+	help
-+	  Say yes to enable ZynqMP firmware interface debug APIs.
-+	  If in doubt, say N.
-+
- endmenu
-diff --git a/drivers/firmware/xilinx/Makefile b/drivers/firmware/xilinx/Makefile
-index 29f7bf2..875a537 100644
---- a/drivers/firmware/xilinx/Makefile
-+++ b/drivers/firmware/xilinx/Makefile
-@@ -2,3 +2,4 @@
- # Makefile for Xilinx firmwares
- 
- obj-$(CONFIG_ZYNQMP_FIRMWARE) += zynqmp.o
-+obj-$(CONFIG_ZYNQMP_FIRMWARE_DEBUG) += zynqmp-debug.o
-diff --git a/drivers/firmware/xilinx/zynqmp-debug.c b/drivers/firmware/xilinx/zynqmp-debug.c
-new file mode 100644
-index 0000000..d65cfd2
---- /dev/null
-+++ b/drivers/firmware/xilinx/zynqmp-debug.c
-@@ -0,0 +1,222 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Xilinx Zynq MPSoC Firmware layer for debugfs APIs
-+ *
-+ *  Copyright (C) 2014-2018 Xilinx, Inc.
-+ *
-+ *  Michal Simek <michal.simek@xilinx.com>
-+ *  Davorin Mista <davorin.mista@aggios.com>
-+ *  Jolly Shah <jollys@xilinx.com>
-+ *  Rajan Vaja <rajanv@xilinx.com>
-+ */
-+
-+#include <linux/compiler.h>
-+#include <linux/module.h>
-+#include <linux/slab.h>
-+#include <linux/debugfs.h>
-+#include <linux/uaccess.h>
-+
-+#include <linux/firmware/xlnx-zynqmp.h>
-+#include "zynqmp-debug.h"
-+
-+#define PM_API_NAME_LEN			50
-+
-+struct pm_api_info {
-+	u32 api_id;
-+	char api_name[PM_API_NAME_LEN];
-+	char api_name_len;
-+};
-+
-+static char debugfs_buf[PAGE_SIZE];
-+
-+#define PM_API(id)		 {id, #id, strlen(#id)}
-+static struct pm_api_info pm_api_list[] = {
-+	PM_API(PM_GET_API_VERSION),
-+};
-+
-+struct dentry *firmware_debugfs_root;
-+
-+/**
-+ * zynqmp_pm_argument_value() - Extract argument value from a PM-API request
-+ * @arg:	Entered PM-API argument in string format
-+ *
-+ * Return: Argument value in unsigned integer format on success
-+ *	   0 otherwise
-+ */
-+static u64 zynqmp_pm_argument_value(char *arg)
-+{
-+	u64 value;
-+
-+	if (!arg)
-+		return 0;
-+
-+	if (!kstrtou64(arg, 0, &value))
-+		return value;
-+
-+	return 0;
-+}
-+
-+/**
-+ * get_pm_api_id() - Extract API-ID from a PM-API request
-+ * @pm_api_req:		Entered PM-API argument in string format
-+ * @pm_id:		API-ID
-+ *
-+ * Return: 0 on success else error code
-+ */
-+static int get_pm_api_id(char *pm_api_req, u32 *pm_id)
-+{
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(pm_api_list) ; i++) {
-+		if (!strncasecmp(pm_api_req, pm_api_list[i].api_name,
-+				 pm_api_list[i].api_name_len)) {
-+			*pm_id = pm_api_list[i].api_id;
-+			break;
-+		}
-+	}
-+
-+	/* If no name was entered look for PM-API ID instead */
-+	if (i == ARRAY_SIZE(pm_api_list) && kstrtouint(pm_api_req, 10, pm_id))
-+		return -EINVAL;
-+
-+	return 0;
-+}
-+
-+static int process_api_request(u32 pm_id, u64 *pm_api_arg, u32 *pm_api_ret)
-+{
-+	const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
-+	u32 pm_api_version;
-+	int ret;
-+
-+	if (!eemi_ops)
-+		return -ENXIO;
-+
-+	switch (pm_id) {
-+	case PM_GET_API_VERSION:
-+		ret = eemi_ops->get_api_version(&pm_api_version);
-+		sprintf(debugfs_buf, "PM-API Version = %d.%d\n",
-+			pm_api_version >> 16, pm_api_version & 0xffff);
-+		break;
-+	default:
-+		sprintf(debugfs_buf, "Unsupported PM-API request\n");
-+		ret = -EINVAL;
-+	}
-+
-+	return ret;
-+}
-+
-+/**
-+ * zynqmp_pm_debugfs_api_write() - debugfs write function
-+ * @file:	User file
-+ * @ptr:	User entered PM-API string
-+ * @len:	Length of the userspace buffer
-+ * @off:	Offset within the file
-+ *
-+ * Used for triggering pm api functions by writing
-+ * echo <pm_api_id>	> /sys/kernel/debug/zynqmp_pm/power or
-+ * echo <pm_api_name>	> /sys/kernel/debug/zynqmp_pm/power
-+ *
-+ * Return: Number of bytes copied if PM-API request succeeds,
-+ *	   the corresponding error code otherwise
-+ */
-+static ssize_t zynqmp_pm_debugfs_api_write(struct file *file,
-+					   const char __user *ptr, size_t len,
-+					   loff_t *off)
-+{
-+	char *kern_buff, *tmp_buff;
-+	char *pm_api_req;
-+	u32 pm_id = 0;
-+	u64 pm_api_arg[4] = {0, 0, 0, 0};
-+	/* Return values from PM APIs calls */
-+	u32 pm_api_ret[4] = {0, 0, 0, 0};
-+
-+	int ret;
-+	int i = 0;
-+
-+	strcpy(debugfs_buf, "");
-+
-+	if (*off != 0 || len == 0)
-+		return -EINVAL;
-+
-+	kern_buff = kzalloc(len, GFP_KERNEL);
-+	if (!kern_buff)
-+		return -ENOMEM;
-+
-+	tmp_buff = kern_buff;
-+
-+	ret = strncpy_from_user(kern_buff, ptr, len);
-+	if (ret < 0) {
-+		ret = -EFAULT;
-+		goto err;
-+	}
-+
-+	/* Read the API name from a user request */
-+	pm_api_req = strsep(&kern_buff, " ");
-+
-+	ret = get_pm_api_id(pm_api_req, &pm_id);
-+	if (ret < 0)
-+		goto err;
-+
-+	/* Read node_id and arguments from the PM-API request */
-+	pm_api_req = strsep(&kern_buff, " ");
-+	while ((i < ARRAY_SIZE(pm_api_arg)) && pm_api_req) {
-+		pm_api_arg[i++] = zynqmp_pm_argument_value(pm_api_req);
-+		pm_api_req = strsep(&kern_buff, " ");
-+	}
-+
-+	ret = process_api_request(pm_id, pm_api_arg, pm_api_ret);
-+
-+err:
-+	kfree(tmp_buff);
-+	if (ret)
-+		return ret;
-+
-+	return len;
-+}
-+
-+/**
-+ * zynqmp_pm_debugfs_api_read() - debugfs read function
-+ * @file:	User file
-+ * @ptr:	Requested pm_api_version string
-+ * @len:	Length of the userspace buffer
-+ * @off:	Offset within the file
-+ *
-+ * Return: Length of the version string on success
-+ *	   else error code
-+ */
-+static ssize_t zynqmp_pm_debugfs_api_read(struct file *file, char __user *ptr,
-+					  size_t len, loff_t *off)
-+{
-+	return simple_read_from_buffer(ptr, len, off, debugfs_buf,
-+				       strlen(debugfs_buf));
-+}
-+
-+/* Setup debugfs fops */
-+static const struct file_operations fops_zynqmp_pm_dbgfs = {
-+	.owner = THIS_MODULE,
-+	.write = zynqmp_pm_debugfs_api_write,
-+	.read = zynqmp_pm_debugfs_api_read,
-+};
-+
-+/**
-+ * zynqmp_pm_api_debugfs_init - Initialize debugfs interface
-+ *
-+ * Return:	None
-+ */
-+void zynqmp_pm_api_debugfs_init(void)
-+{
-+	/* Initialize debugfs interface */
-+	firmware_debugfs_root = debugfs_create_dir("zynqmp-firmware", NULL);
-+	debugfs_create_file("pm", 0660, firmware_debugfs_root, NULL,
-+			    &fops_zynqmp_pm_dbgfs);
-+}
-+
-+/**
-+ * zynqmp_pm_api_debugfs_exit - Remove debugfs interface
-+ *
-+ * Return:	None
-+ */
-+void zynqmp_pm_api_debugfs_exit(void)
-+{
-+	debugfs_remove_recursive(firmware_debugfs_root);
-+}
-diff --git a/drivers/firmware/xilinx/zynqmp-debug.h b/drivers/firmware/xilinx/zynqmp-debug.h
-new file mode 100644
-index 0000000..9929f8b
---- /dev/null
-+++ b/drivers/firmware/xilinx/zynqmp-debug.h
-@@ -0,0 +1,24 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * Xilinx Zynq MPSoC Firmware layer
-+ *
-+ *  Copyright (C) 2014-2018 Xilinx
-+ *
-+ *  Michal Simek <michal.simek@xilinx.com>
-+ *  Davorin Mista <davorin.mista@aggios.com>
-+ *  Jolly Shah <jollys@xilinx.com>
-+ *  Rajan Vaja <rajanv@xilinx.com>
-+ */
-+
-+#ifndef __FIRMWARE_ZYNQMP_DEBUG_H__
-+#define __FIRMWARE_ZYNQMP_DEBUG_H__
-+
-+#if IS_REACHABLE(CONFIG_ZYNQMP_FIRMWARE_DEBUG)
-+void zynqmp_pm_api_debugfs_init(void);
-+void zynqmp_pm_api_debugfs_exit(void);
-+#else
-+static inline void zynqmp_pm_api_debugfs_init(void) { }
-+static inline void zynqmp_pm_api_debugfs_exit(void) { }
-+#endif
-+
-+#endif /* __FIRMWARE_ZYNQMP_DEBUG_H__ */
-diff --git a/drivers/firmware/xilinx/zynqmp.c b/drivers/firmware/xilinx/zynqmp.c
-index 697f4fa..84b3fd2 100644
---- a/drivers/firmware/xilinx/zynqmp.c
-+++ b/drivers/firmware/xilinx/zynqmp.c
-@@ -21,6 +21,7 @@
- #include <linux/uaccess.h>
- 
- #include <linux/firmware/xlnx-zynqmp.h>
-+#include "zynqmp-debug.h"
- 
- /**
-  * zynqmp_pm_ret_code() - Convert PMU-FW error codes to Linux error codes
-@@ -493,11 +494,15 @@ static int zynqmp_firmware_probe(struct platform_device *pdev)
- 	pr_info("%s Trustzone version v%d.%d\n", __func__,
- 		pm_tz_version >> 16, pm_tz_version & 0xFFFF);
- 
-+	zynqmp_pm_api_debugfs_init();
-+
- 	return of_platform_populate(dev->of_node, NULL, NULL, dev);
- }
- 
- static int zynqmp_firmware_remove(struct platform_device *pdev)
- {
-+	zynqmp_pm_api_debugfs_exit();
-+
- 	return 0;
- }
- 
--- 
-2.7.4
+>
+> --
+> 2.7.4
+>
