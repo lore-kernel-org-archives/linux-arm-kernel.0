@@ -1,106 +1,116 @@
-From: matthew.hart@linaro.org (Matt Hart)
-Date: Wed, 12 Sep 2018 12:25:54 +0100
-Subject: [PATCH] [v3] drm/sun4i: fix build failure with
- CONFIG_DRM_SUN8I_MIXER=m
-In-Reply-To: <20180907114255.7j7r6wzolnz5qkk7@flea>
-References: <20180711144403.1022829-1-arnd@arndb.de>
- <105cb1cf-577a-043a-9b50-248a37090bdd@nvidia.com>
- <CAK8P3a1w0SrxFNRwjt1nWhQPdqgt=bZ8oqGaPE=z9iHp84R5mw@mail.gmail.com>
- <20180907114255.7j7r6wzolnz5qkk7@flea>
-Message-ID: <CAH+k93F_xJMtXmkKZuZ45AAQgMkgNfSRSM3QyEtATgQSW6Mb9A@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 12 Sep 2018 19:34:26 +0800
+Subject: [xlnx:master 1769/1831] drivers/fpga/zynqmp-fpga.c:173:2: error:
+ implicit declaration of function 'seq_puts'; did you mean 'kset_put'?
+Message-ID: <201809121924.gynAEmzU%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 September 2018 at 12:42, Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> On Fri, Sep 07, 2018 at 01:26:30PM +0200, Arnd Bergmann wrote:
->> On Fri, Sep 7, 2018 at 11:41 AM Jon Hunter <jonathanh@nvidia.com> wrote:
->> >
->> >
->> > On 11/07/18 15:43, Arnd Bergmann wrote:
->> > > Having DRM_SUN4I built-in but DRM_SUN8I_MIXER as a loadable module results in
->> > > a link error, as we try to access a symbol from the sun8i_tcon_top.ko module:
->> > >
->> > > ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun8i-drm-hdmi.ko] undefined!
->> > > ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun4i-drm.ko] undefined!
->> > >
->> > > This solves the problem by adding a silent symbol for the tcon_top module,
->> > > building it as a separate module in exactly the cases that we need it,
->> > > but in a way that it is reachable by the other modules.
->> > >
->> > > Fixes: 57e23de02f48 ("drm/sun4i: DW HDMI: Expand algorithm for possible crtcs")
->> > > Fixes: ef0cf6441fbb ("drm/sun4i: Add support for traversing graph with TCON TOP")
->> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->> > I am seeing the following on today's -next (20180907) as well the last
->> > few -next versions for that matter ...
->> >
->> > ERROR: "sun8i_tcon_top_de_config" [drivers/gpu/drm/sun4i/sun4i-tcon.ko] undefined!
->> > ERROR: "sun8i_tcon_top_set_hdmi_src" [drivers/gpu/drm/sun4i/sun4i-tcon.ko] undefined!
->> > ERROR: "sun8i_tcon_top_of_table" [drivers/gpu/drm/sun4i/sun4i-tcon.ko] undefined!
->> >
->> > Seems like this issue has cropped up again as Arnd's fix is present. I
->> > am seeing this on ARM64 builds.
->>
->> I have not started build testing on linux-next since the merge window, but
->> looking at the changes that got queued up, I find commits cf77d79b4e29
->> ("drm/sun4i: tcon: Add another way for matching mixers with tcon") and
->> 0305189afb32 ("drm/sun4i: tcon: Add support for R40 TCON") that both
->> introduced a reference to the tcon_top file from sun4i_tcon.c.
->>
->> More IS_ENABLED(CONFIG_DRM_SUN8I_TCON_TOP) checks in
->> the caller like I did in my patch would help, or alternatively one could
->> decide to give up and just always include the TCON_TOP.
->
-> Sorry for the breakage.
->
-> Can you test:
->
-> ----8<----
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> index 4834c90b4912..c78cd35a1294 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> @@ -974,7 +974,8 @@ static bool sun4i_tcon_connected_to_tcon_top(struct device_node *node)
->
->         remote = of_graph_get_remote_node(node, 0, -1);
->         if (remote) {
-> -               ret = !!of_match_node(sun8i_tcon_top_of_table, remote);
-> +               ret = !!(IS_ENABLED(CONFIG_DRM_SUN8I_TCON_TOP) &&
-> +                        of_match_node(sun8i_tcon_top_of_table, remote));
->                 of_node_put(remote);
->         }
->
-> @@ -1402,13 +1403,20 @@ static int sun8i_r40_tcon_tv_set_mux(struct sun4i_tcon *tcon,
->         if (!pdev)
->                 return -EINVAL;
->
-> -       if (encoder->encoder_type == DRM_MODE_ENCODER_TMDS) {
-> +       if (IS_ENABLED(CONFIG_DRM_SUN8I_TCON_TOP) &&
-> +           encoder->encoder_type == DRM_MODE_ENCODER_TMDS) {
->                 ret = sun8i_tcon_top_set_hdmi_src(&pdev->dev, id);
->                 if (ret)
->                         return ret;
->         }
->
-> -       return sun8i_tcon_top_de_config(&pdev->dev, tcon->id, id);
-> +       if (IS_ENABLED(CONFIG_DRM_SUN8I_TCON_TOP)) {
-> +               ret = sun8i_tcon_top_de_config(&pdev->dev, tcon->id, id);
-> +               if (ret)
-> +                       return ret;
-> +       }
-> +
-> +       return 0;
->  }
->
->  static const struct sun4i_tcon_quirks sun4i_a10_quirks = {
-> ----8<----
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   5a0f5d4c5b359939907b9cf874d3a9f8ad72d5e3
+commit: bd1f10f8355edafc243f45ebdc234b4fcc218a33 [1769/1831] fpga: zynqmp-fpga: Add support for pl configuration readback
+config: sh-allmodconfig (attached as .config)
+compiler: sh4-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout bd1f10f8355edafc243f45ebdc234b4fcc218a33
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=sh 
 
-Works for me, and still broken in todays next
+All errors (new ones prefixed by >>):
 
->
-> Thanks!
-> Maxime
->
-> --
-> Maxime Ripard, Bootlin
-> Embedded Linux and Kernel engineering
-> https://bootlin.com
+   drivers/fpga/zynqmp-fpga.c: In function 'zynqmp_fpga_read_cfgreg':
+>> drivers/fpga/zynqmp-fpga.c:173:2: error: implicit declaration of function 'seq_puts'; did you mean 'kset_put'? [-Werror=implicit-function-declaration]
+     seq_puts(s, "zynqMP FPGA Configuration register contents are\n");
+     ^~~~~~~~
+     kset_put
+>> drivers/fpga/zynqmp-fpga.c:180:3: error: implicit declaration of function 'seq_printf'; did you mean 'dev_printk'? [-Werror=implicit-function-declaration]
+      seq_printf(s, "%s --> \t %x \t\r\n", p->reg, val);
+      ^~~~~~~~~~
+      dev_printk
+   drivers/fpga/zynqmp-fpga.c: In function 'zynqmp_fpga_read_cfgdata':
+>> drivers/fpga/zynqmp-fpga.c:215:2: error: implicit declaration of function 'seq_write'; did you mean 'vfs_write'? [-Werror=implicit-function-declaration]
+     seq_write(s, &buf[data_offset], priv->size);
+     ^~~~~~~~~
+     vfs_write
+   cc1: some warnings being treated as errors
+
+vim +173 drivers/fpga/zynqmp-fpga.c
+
+   158	
+   159	static int zynqmp_fpga_read_cfgreg(struct fpga_manager *mgr,
+   160					   struct seq_file *s)
+   161	{
+   162		const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
+   163		int ret, val;
+   164		unsigned int *buf;
+   165		dma_addr_t dma_addr;
+   166		struct zynqmp_configreg *p = cfgreg;
+   167	
+   168		buf = dma_zalloc_coherent(mgr->dev.parent, READ_DMA_SIZE,
+   169					  &dma_addr, GFP_KERNEL);
+   170		if (!buf)
+   171			return -ENOMEM;
+   172	
+ > 173		seq_puts(s, "zynqMP FPGA Configuration register contents are\n");
+   174	
+   175		while (p->reg) {
+   176			ret = eemi_ops->fpga_read(p->offset, dma_addr, readback_type,
+   177						  &val);
+   178			if (ret)
+   179				goto free_dmabuf;
+ > 180			seq_printf(s, "%s --> \t %x \t\r\n", p->reg, val);
+   181			p++;
+   182		}
+   183	
+   184	free_dmabuf:
+   185		dma_free_coherent(mgr->dev.parent, READ_DMA_SIZE, buf,
+   186				  dma_addr);
+   187	
+   188		return ret;
+   189	}
+   190	
+   191	static int zynqmp_fpga_read_cfgdata(struct fpga_manager *mgr,
+   192					    struct seq_file *s)
+   193	{
+   194		const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
+   195		struct zynqmp_fpga_priv *priv;
+   196		int ret, data_offset;
+   197		unsigned int *buf;
+   198		dma_addr_t dma_addr;
+   199		size_t size;
+   200	
+   201		priv = mgr->priv;
+   202		size = priv->size + READ_DMA_SIZE + DUMMY_FRAMES_SIZE;
+   203	
+   204		buf = dma_zalloc_coherent(mgr->dev.parent, size, &dma_addr,
+   205					  GFP_KERNEL);
+   206		if (!buf)
+   207			return -ENOMEM;
+   208	
+   209		seq_puts(s, "zynqMP FPGA Configuration data contents are\n");
+   210		ret = eemi_ops->fpga_read((priv->size + DUMMY_FRAMES_SIZE) / 4,
+   211					  dma_addr, readback_type, &data_offset);
+   212		if (ret)
+   213			goto free_dmabuf;
+   214	
+ > 215		seq_write(s, &buf[data_offset], priv->size);
+   216	
+   217	free_dmabuf:
+   218		dma_free_coherent(mgr->dev.parent, size, buf, dma_addr);
+   219	
+   220		return ret;
+   221	}
+   222	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 46863 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180912/5e6eeeb0/attachment-0001.gz>
