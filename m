@@ -1,66 +1,71 @@
-From: andrew.murray@arm.com (Andrew Murray)
-Date: Wed, 12 Sep 2018 12:50:31 +0100
-Subject: [REGRESSION] Commit 5745392e0c2b ("PCI: Apply the new generic
- I/O management on PCI IO hosts") breaks PCI for legacy virtio devices with
- kvmtool on arm64
-In-Reply-To: <20180907174140.GI12788@arm.com>
-References: <20180907174140.GI12788@arm.com>
-Message-ID: <20180912115031.GG44256@e119886-lin.cambridge.arm.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Wed, 12 Sep 2018 13:03:08 +0100
+Subject: [PATCH v5 02/27] arm64: cpufeature: Use alternatives for VHE
+ cpu_enable
+In-Reply-To: <1d425320-aed3-b949-1ec5-f378248aac4d@arm.com>
+References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
+ <1535471497-38854-3-git-send-email-julien.thierry@arm.com>
+ <1d425320-aed3-b949-1ec5-f378248aac4d@arm.com>
+Message-ID: <85d74cec-2290-9e89-b155-f0f7c523b4a4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2018 at 06:41:40PM +0100, Will Deacon wrote:
-> Hi all,
-> 
-> I'm seeing a regression in Linux guests since 4.17 under kvmtool, where
-> legacy virtio devices using the PCI transport fail to probe. Legacy virtio
-> PCI devices must be accessed via "I/O space" (e.g. BAR0, which is
-> IORESOURCE_IO) and kvmtool assigns this to the guest physical range
-> 0x0 - 0x10000.
-> 
-> On arm64, when the virtio legacy PCI driver calls pci_iomap() for this BAR,
-> it expands to ioport_map():
-> 
->   static inline void __iomem *ioport_map(unsigned long port, unsigned int nr)
->   {
->   	return PCI_IOBASE + (port & MMIO_UPPER_LIMIT);
->   }
-> 
-> Since the indirect PIO changes, MMIO_UPPER_LIMIT is defined as:
-> 
->   /*
->    * We reserve 0x4000 bytes for Indirect IO as so far this library is only
->    * used by the HiSilicon LPC Host. If needed, we can reserve a wider IO
->    * area by redefining the macro below.
->    */
->   #define PIO_INDIRECT_SIZE 0x4000
->   #define MMIO_UPPER_LIMIT (IO_SPACE_LIMIT - PIO_INDIRECT_SIZE)
-> 
-> which corrupts the BAR address. For example, kvmtool has the BAR pointing
-> at 0x6200 on my system, but pci_iomap() actually maps offset 0x2200.
-> Changing PIO_INDIRECT_SIZE to 0 gets things working again.
-> 
-> Since this stuff doesn't revert nicely, I'm not sure how to proceed. Any
-> thoughts? Generally, having a per-platform magic constant hardcoded in
-> the PCI mapping code makes me feel slightly ill...
+Hi James,
 
-It seems that MMIO_UPPER_LIMIT (and some cases previously with IO_SPACE_LIMIT)
-are not always being treated as masks - therefore ioport_map should be updated
-to use the comparison operator and reject anything above MMIO_UPPER_LIMIT.
+On 12/09/18 11:28, James Morse wrote:
+> Hi Julien,
+> 
+> On 28/08/18 16:51, Julien Thierry wrote:
+>> The cpu_enable callback for VHE feature requires all alternatives to have
+>> been applied. This prevents applying VHE alternative separately from the
+>> rest.
+>>
+>> Use an alternative depending on VHE feature to know whether VHE
+>> alternatives have already been applied.
+> 
+>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+>> index 1e433ac..3bc1c8b 100644
+>> --- a/arch/arm64/kernel/cpufeature.c
+>> +++ b/arch/arm64/kernel/cpufeature.c
+>> @@ -1022,8 +1024,15 @@ static void cpu_copy_el2regs(const struct arm64_cpu_capabilities *__unused)
+>>   	 * that, freshly-onlined CPUs will set tpidr_el2, so we don't need to
+>>   	 * do anything here.
+>>   	 */
+>> -	if (!alternatives_applied)
+>> -		write_sysreg(read_sysreg(tpidr_el1), tpidr_el2);
+>> +	asm volatile(ALTERNATIVE(
+>> +		"mrs	%0, tpidr_el1\n"
+>> +		"msr	tpidr_el2, %0",
+>> +		"nop\n"
+>> +		"nop",
+>> +		ARM64_HAS_VIRT_HOST_EXTN)
+>> +		: "+r" (tmp)
+>> +		:
+>> +		: "memory");
+>>   }
+>>   #endif
+> 
+> Catalin's preference was to keep this all in C:
+> https://patchwork.kernel.org/patch/10007977/
+> , for which we need to know if 'the' alternative has been applied.
+> 
+> I suspect there may be more registers in this list if we have to switch to
+> another EL2 register using alternatives. (but I don't have an example).
+> 
+> Could we make 'alternatives_applied' a macro that takes the cap as an argument?
+> 
 
-In any case modifying the address if it doesn't fit within the MMIO_UPPER_LIMIT
-(or IO_SPACE_LIMIT previously) will only break something further down the code
-path if the address was wrong in the first place. This function should probably
-work in the same was as GENERIC_IOMAP (given it shares the same name) whereby
-NULL is returned if the port is incorrect.
+I wanted to do this initially, the issue was that the alternatives 
+framework works on regions to patch rather than caps to apply. So I 
+found it a bit odd to associate the "code corresponding to cap was 
+applied" with the alternative application.
 
-I will prepare a patch.
+Although in patch 3 with the feature mask I guess that at the end of the 
+__apply_alternatives loop, if the cap was part of the mask passed, it 
+can be considered as applied.
+If the asm inline is problematic I can go that route.
 
 Thanks,
 
-Andrew Murray
-
-> 
-> Cheers,
-> 
-> Will
+-- 
+Julien Thierry
