@@ -1,61 +1,58 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed, 12 Sep 2018 09:51:29 +0200
-Subject: [PATCH v3 21/21] nvmem: use octal permissions instead of constants
-In-Reply-To: <20180912075129.25185-1-brgl@bgdev.pl>
-References: <20180912075129.25185-1-brgl@bgdev.pl>
-Message-ID: <20180912075129.25185-22-brgl@bgdev.pl>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Wed, 12 Sep 2018 09:56:49 +0200
+Subject: [PATCH v9 5/9] media: platform: Add Cedrus VPU decoder driver
+In-Reply-To: <20180912072347.nqw4uu23fykjtz72@flea>
+References: <20180906222442.14825-1-contact@paulk.fr>
+ <20180906222442.14825-6-contact@paulk.fr> <20180911124625.6759e429@coco.lan>
+ <20180912072347.nqw4uu23fykjtz72@flea>
+Message-ID: <17cad39d-cc81-164c-58a2-00ea7d1f96b3@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On 09/12/2018 09:23 AM, Maxime Ripard wrote:
+> On Tue, Sep 11, 2018 at 12:46:25PM -0300, Mauro Carvalho Chehab wrote:
+>> Em Fri,  7 Sep 2018 00:24:38 +0200
+>> Paul Kocialkowski <contact@paulk.fr> escreveu:
+>>
+>>> From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+>>>
+>>> This introduces the Cedrus VPU driver that supports the VPU found in
+>>> Allwinner SoCs, also known as Video Engine. It is implemented through
+>>> a V4L2 M2M decoder device and a media device (used for media requests).
+>>> So far, it only supports MPEG-2 decoding.
+>>>
+>>> Since this VPU is stateless, synchronization with media requests is
+>>> required in order to ensure consistency between frame headers that
+>>> contain metadata about the frame to process and the raw slice data that
+>>> is used to generate the frame.
+>>>
+>>> This driver was made possible thanks to the long-standing effort
+>>> carried out by the linux-sunxi community in the interest of reverse
+>>> engineering, documenting and implementing support for the Allwinner VPU.
+>>>
+>>> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+>>> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+>>
+>> There are several checkpatch issues here. Ok, some can be
+>> ignored, but there are at least some of them that sounda relevant.
+> 
+> Sorry for that. Given that it's intended to be in staging, do you want
+> us to send subsequent patches or the whole serie?
 
-Checkpatch emits a warning when using symbolic permissions. Use octal
-permissions instead.
+I would actually prefer a v10 with the current follow-up patches merged
+into the main driver. I'm getting kbuild errors for the Kconfig missing
+select and the PHYS_PFN_OFFSET. So let's just spin a v10.
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- drivers/nvmem/core.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+It would help if you post a follow-up patch for the checkpatch changes
+(that's easy to review), then post a v10 with just that and the other
+follow-on patches merged into the driver patch itself, and that's
+what I'll use for the pull request.
 
-diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index bc14ffd87ca3..e174b282cc1f 100644
---- a/drivers/nvmem/core.c
-+++ b/drivers/nvmem/core.c
-@@ -154,7 +154,7 @@ static ssize_t bin_attr_nvmem_write(struct file *filp, struct kobject *kobj,
- static struct bin_attribute bin_attr_rw_nvmem = {
- 	.attr	= {
- 		.name	= "nvmem",
--		.mode	= S_IWUSR | S_IRUGO,
-+		.mode	= 0644,
- 	},
- 	.read	= bin_attr_nvmem_read,
- 	.write	= bin_attr_nvmem_write,
-@@ -178,7 +178,7 @@ static const struct attribute_group *nvmem_rw_dev_groups[] = {
- static struct bin_attribute bin_attr_ro_nvmem = {
- 	.attr	= {
- 		.name	= "nvmem",
--		.mode	= S_IRUGO,
-+		.mode	= 0444,
- 	},
- 	.read	= bin_attr_nvmem_read,
- };
-@@ -201,7 +201,7 @@ static const struct attribute_group *nvmem_ro_dev_groups[] = {
- static struct bin_attribute bin_attr_rw_root_nvmem = {
- 	.attr	= {
- 		.name	= "nvmem",
--		.mode	= S_IWUSR | S_IRUSR,
-+		.mode	= 0600,
- 	},
- 	.read	= bin_attr_nvmem_read,
- 	.write	= bin_attr_nvmem_write,
-@@ -225,7 +225,7 @@ static const struct attribute_group *nvmem_rw_root_dev_groups[] = {
- static struct bin_attribute bin_attr_ro_root_nvmem = {
- 	.attr	= {
- 		.name	= "nvmem",
--		.mode	= S_IRUSR,
-+		.mode	= 0400,
- 	},
- 	.read	= bin_attr_nvmem_read,
- };
--- 
-2.18.0
+Sorry, I should have seen those checkpatch.pl warnings myself, but I
+discovered that my git hooks didn't use the --strict option with
+checkpatch. I'd have sworn that I had added it in the past, but apparently
+not :-(
+
+Regards,
+
+	Hans
