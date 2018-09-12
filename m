@@ -1,28 +1,24 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 11 Sep 2018 17:41:02 -0700
-Subject: [PATCH] gpio: omap: Remove custom PM calls and use cpu_pm instead
-In-Reply-To: <01f5b04a-82ed-fafe-5b90-3e662f21d0db@ti.com>
-References: <20180911183729.17110-1-tony@atomide.com>
- <01f5b04a-82ed-fafe-5b90-3e662f21d0db@ti.com>
-Message-ID: <20180912004102.GG5662@atomide.com>
+Date: Tue, 11 Sep 2018 17:42:52 -0700
+Subject: [PATCH] gpio: omap: Add level wakeup handling for omap4 based SoCs
+In-Reply-To: <a10ae1a9-ed6a-468e-5a3e-8c120bab9acf@ti.com>
+References: <20180910200624.4494-1-tony@atomide.com>
+ <444bae18-9737-8e13-2a0f-c08863ae1336@ti.com>
+ <20180911182419.GC5662@atomide.com>
+ <a10ae1a9-ed6a-468e-5a3e-8c120bab9acf@ti.com>
+Message-ID: <20180912004252.GH5662@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grygorii Strashko <grygorii.strashko@ti.com> [180912 00:33]:
-> On 09/11/2018 01:37 PM, Tony Lindgren wrote:
-> > +	switch (cmd) {
-> > +	case CPU_CLUSTER_PM_ENTER:
-> > +		/* Gets cleard on runtime_suspend */
-> > +		bank->power_mode = OFF_MODE;
-> 
-> It has to be reset somewhere.
+* Grygorii Strashko <grygorii.strashko@ti.com> [180912 00:27]:
+> Thanks Tony, but it's still not completely clear -
+> it's important to see values of CLKSTCTRL before/after idle for not working
+> case and GPIO SYSC/SYSS registers. There are some combinations which may
+> affect on this. So, if you can, pls.
 
-Oh good catch omap_gpio_runtime_suspend() only clears it
-if (bank->power_mode != OFF_MODE).. This would certainly
-introduce some unexpected latencies..
-
-We can just clear it unconditionally at the end of
-CPU_CLUSTER_PM_ENTER handler now.
+Sure I'll do some reg dumps for you tomorrow as I just started
+an overnight test with randomly pinging the wlan interface
+from outside to make sure it wakes up and keeps idling.
 
 Regards,
 
