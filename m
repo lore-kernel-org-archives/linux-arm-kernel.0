@@ -1,108 +1,69 @@
-From: christian.koenig@amd.com (=?UTF-8?Q?Christian_K=c3=b6nig?=)
-Date: Wed, 12 Sep 2018 14:56:00 +0200
-Subject: [PATCH v2 01/40] iommu: Introduce Shared Virtual Addressing API
-In-Reply-To: <9445a0be-fb5b-d195-4fdf-7ad6cb36ef4f@arm.com>
-References: <20180511190641.23008-1-jean-philippe.brucker@arm.com>
- <20180511190641.23008-2-jean-philippe.brucker@arm.com>
- <bf42affd-e9d0-e4fc-6d28-f3c3f7795348@redhat.com>
- <03d31ba5-1eda-ea86-8c0c-91d14c86fe83@arm.com>
- <ed39159c-087e-7e56-7d29-d1de9fa1677f@amd.com>
- <f0b317d5-e2e9-5478-952c-05e8b97bd68b@arm.com>
- <2fd4a0a1-1a35-bf82-df84-b995cce011d9@amd.com>
- <65e7accd-4446-19f5-c667-c6407e89cfa6@arm.com>
- <5bbc0332-b94b-75cc-ca42-a9b196811daf@amd.com>
- <20180907142504.5034351e@jacob-builder>
- <3e3a6797-a233-911b-3a7d-d9b549160960@amd.com>
- <9445a0be-fb5b-d195-4fdf-7ad6cb36ef4f@arm.com>
-Message-ID: <4d68da96-0ad5-b412-5987-2f7a6aa796c3@amd.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Wed, 12 Sep 2018 14:03:43 +0100
+Subject: [PATCH v5 05/27] arm64: Use daifflag_restore after bp_hardening
+In-Reply-To: <71bb5289-b381-65da-c609-fa4a08640425@arm.com>
+References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
+ <1535471497-38854-6-git-send-email-julien.thierry@arm.com>
+ <641119b9-3466-817d-3d6b-dd710c646b49@arm.com>
+ <8f200315-1db9-1905-71ae-cb4269450b7c@arm.com>
+ <71bb5289-b381-65da-c609-fa4a08640425@arm.com>
+Message-ID: <1c6ede25-052f-c31e-255d-86055ee1e568@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 12.09.2018 um 14:40 schrieb Jean-Philippe Brucker:
-> On 08/09/2018 08:29, Christian K?nig wrote:
->> Yes, exactly. I just need a PASID which is never used by the OS for a
->> process and we can easily give that back when the last FD reference is
->> closed.
-> Alright, iommu-sva can get its PASID from this external allocator as
-> well, as long as it has an interface similar to idr. Where would it go,
-> drivers/base/, mm/, kernel/...?
 
-Good question, my initial instinct was to put it under drivers/pci.
-
-But AFAIKS now you are supporting SVA implementations which are not 
-based on PCI.
-
-So drivers/base sounds like a good place to me.
-
->
->>>>> The process dies, iommu-sva is notified and calls the mm_exit()
->>>>> function passed by the device driver to iommu_sva_device_init(). In
->>>>> mm_exit() the device driver needs to clear any reference to the
->>>>> PASID in hardware and in its own structures. When the device driver
->>>>> returns from mm_exit(), it effectively tells the core that it has
->>>>> finished using the PASID, and iommu-sva can reuse the PASID for
->>>>> another process. mm_exit() is allowed to block, so the device
->>>>> driver has time to clean up and flush the queues.
->>>>>
->>>>> If the device driver finishes using the PASID before the process
->>>>> exits, it just calls unbind().
->>>> Exactly that's what Michal Hocko is probably going to not like at all.
+On 12/09/18 13:28, James Morse wrote:
+> On 12/09/18 12:11, Julien Thierry wrote:
+>> On 12/09/18 11:32, James Morse wrote:
+>>> On 28/08/18 16:51, Julien Thierry wrote:
+>>>> For EL0 entries requiring bp_hardening, daif status is kept at
+>>>> DAIF_PROCCTX_NOIRQ until after hardening has been done. Then interrupts
+>>>> are enabled through local_irq_enable().
 >>>>
->>>> Can we have a different approach where each driver is informed by the
->>>> mm_exit(), but needs to explicitly call unbind() before a PASID is
->>>> reused?
-> It's awful from the IOMMU driver perspective. In addition to "enabled"
-> and "disabled" PASID states, you add "disabled but DMA still running
-> normally". Between that new state and "disabled", the IOMMU will be
-> flooded by translation faults (non-recoverable ones), which it needs to
-> ignore instead of reporting to the kernel. Not all IOMMUs can deal with
-> this in hardware (SMMU and VT-d can quiesce translation faults
-> per-PASID, but I don't think AMD IOMMU can.) Some drivers will have to
-> filter fault events themselves, depending on the PASID state.
+>>>> Before using local_irq_* functions, daifflags should be properly restored
+>>>> to a state where IRQs are enabled.
+>>>
+>>>> Enable IRQs by restoring DAIF_PROCCTX state after bp hardening.
+>>>
+>>> Is this just for symmetry, or are you going on to add something to the daifflags
+>>> state that local_irq_* functions won't change? (if so, could you allude to that
+>>> in the commit message)
+> 
+>> What happens is that once we use ICC_PMR_EL1, local_irq_enable will not touch
+>> PSR.I. And we are coming back from an entry where PSR.I was kept to 1 so
+>> local_irq_enable was not actually enabling the interrupts. On the otherhand,
+>> restore will affect both.
+> 
+> Got it. Thanks!
+> 
+> Does this mean stop_machine()s local_save_flags()/local_irq_restore() will not
+> be symmetric around __apply_alternatives_multi_stop()?
+> I see you add alternatives in these in patch 15, but I haven't got that far yet)
+> 
 
-Puh, yeah that is probably true.
+It's a good point but it should be fine.
+The changes to the irqflags make save/restore takes everything into 
+consideration (PMR + PSR.I) because of situtations like this, 
+enable/disable only toggle the PMR (so the goal is to not have PSR.I set 
+before reaching path calling enable/disable).
+Maybe I should add a comment for this in asm/irqflags.f when I add the 
+alternatives, so that at least arch code can be wary of this.
 
-Ok let us skip that for a moment, we just need to invest more work in 
-killing DMA operations quickly when the process address space is teared 
-down.
+> 
+>> Another option is to have the asm macro "enable_da_f" also switch to PMR usage
+>> (i.e. "just keep normal interrupts disabled"). Overall it would probably be
+>> easier to reason with, but I'm just unsure whether it is acceptable to receive a
+>> Pseudo NMI before having applied the bp_hardening.
+> 
+> Wouldn't this give the interrupt controller a headache? I assume IRQs really are
+> masked when handle_arch_irq is called. (I know nothing about the gic)
+> 
 
->>>> During that teardown transition it would be ideal if that PASID only
->>>> points to a dummy root page directory with only invalid entries.
->>>>
->>> I guess this can be vendor specific, In VT-d I plan to mark PASID
->>> entry not present and disable fault reporting while draining remaining
->>> activities.
->> Sounds good to me.
->>
->> Point is at least in the case where the process was killed by the OOM
->> killer we should not block in mm_exit().
->>
->> Instead operations issued by the process to a device driver which uses
->> SVA needs to be terminated as soon as possible to make sure that the OOM
->> killer can advance.
-> I don't see how we're preventing the OOM killer from advancing, so I'm
-> looking for a stronger argument that justifies adding this complexity to
-> IOMMU drivers. Time limit of the release MMU notifier, locking
-> requirement, a concrete example where things break, even a comment
-> somewhere in mm/ would do...
->
-> In my tests I can't manage to disturb the OOM killer, but I could be
-> missing some special case. Even if the mm_exit() callback
-> (unrealistically) sleeps for 60 seconds,
+Yes, you're right, I missed that da_f gets unmasked right before the 
+irq_handler... So unless I do some special case for irqs, enable_da_f is 
+not the way to go.
 
-Well you are *COMPLETELY* under estimating this. A compute task with a 
-huge wave launch can take multiple minutes to tear down.
+Thanks,
 
-That's why I'm so concerned about that, but to be honest I think that 
-just the hardware needs to become better and we need to be able to block 
-dead tasks from spawning threads again.
-
-Regards,
-Christian.
-
->   the OOM killer isn't affected
-> because oom_reap_task_mm() wipes the victim's address space in another
-> thread, either before or while the release notifier is running.
->
-> Thanks,
-> Jean
+-- 
+Julien Thierry
