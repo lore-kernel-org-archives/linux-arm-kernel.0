@@ -1,69 +1,255 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 11 Sep 2018 18:34:49 -0700
-Subject: [PATCH i2c-next v6] i2c: aspeed: Handle master/slave combined
- irq events properly
-In-Reply-To: <5698ca34-14c9-8d05-c4e6-5acf85ff9d14@linux.intel.com>
-References: <20180823225731.19063-1-jae.hyun.yoo@linux.intel.com>
- <20180911183734.GA21976@roeck-us.net>
- <1f34fe8c-69ef-5f2d-25dc-d5f6037cc558@linux.intel.com>
- <20180911204107.GA26017@roeck-us.net>
- <e5135af4-9105-214f-5de2-65cc03804222@linux.intel.com>
- <CACPK8Xdv3aP_zOHAL0WMgwvkpBHAUesU7OdhW==jgvXjRmt-Zw@mail.gmail.com>
- <20180911233302.GA18799@roeck-us.net>
- <5698ca34-14c9-8d05-c4e6-5acf85ff9d14@linux.intel.com>
-Message-ID: <20180912013449.GA12612@roeck-us.net>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 12 Sep 2018 10:21:57 +0800
+Subject: [PATCH 06/11] dts: arm: imx7{d,s}: Update coresight binding for
+ hardware ports
+In-Reply-To: <1536661032-30481-7-git-send-email-suzuki.poulose@arm.com>
+References: <1536661032-30481-1-git-send-email-suzuki.poulose@arm.com>
+ <1536661032-30481-7-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180912022152.GG28469@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2018 at 04:58:44PM -0700, Jae Hyun Yoo wrote:
-> On 9/11/2018 4:33 PM, Guenter Roeck wrote:
-> >Looking into the patch, clearing the interrupt status at the end of an
-> >interrupt handler is always suspicious and tends to result in race
-> >conditions (because additional interrupts may have arrived while handling
-> >the existing interrupts, or because interrupt handling itself may trigger
-> >another interrupt). With that in mind, the following patch fixes the
-> >problem for me.
-> >
-> >Guenter
-> >
-> >---
-> >
-> >diff --git a/drivers/i2c/busses/i2c-aspeed.c b/drivers/i2c/busses/i2c-aspeed.c
-> >index c258c4d9a4c0..c488e6950b7c 100644
-> >--- a/drivers/i2c/busses/i2c-aspeed.c
-> >+++ b/drivers/i2c/busses/i2c-aspeed.c
-> >@@ -552,6 +552,8 @@ static irqreturn_t aspeed_i2c_bus_irq(int irq, void *dev_id)
-> >  	spin_lock(&bus->lock);
-> >  	irq_received = readl(bus->base + ASPEED_I2C_INTR_STS_REG);
-> >+	/* Ack all interrupt bits. */
-> >+	writel(irq_received, bus->base + ASPEED_I2C_INTR_STS_REG);
-> >  	irq_remaining = irq_received;
-> >  #if IS_ENABLED(CONFIG_I2C_SLAVE)
-> >@@ -584,8 +586,6 @@ static irqreturn_t aspeed_i2c_bus_irq(int irq, void *dev_id)
-> >  			"irq handled != irq. expected 0x%08x, but was 0x%08x\n",
-> >  			irq_received, irq_handled);
-> >-	/* Ack all interrupt bits. */
-> >-	writel(irq_received, bus->base + ASPEED_I2C_INTR_STS_REG);
-> >  	spin_unlock(&bus->lock);
-> >  	return irq_remaining ? IRQ_NONE : IRQ_HANDLED;
-> >  }
-> >
+On Tue, Sep 11, 2018 at 11:17:07AM +0100, Suzuki K Poulose wrote:
+> Switch to the updated coresight bindings.
 > 
-> My intention of putting the code at the end of interrupt handler was,
-> to reduce possibility of combined irq calls which is explained in this
-> patch. But YES, I agree with you. It could make a potential race
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Pengutronix Kernel Team <kernel@pengutronix.de>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Hmm, yes, but that doesn't explain why it would make sense to acknowledge
-the interrupt late. The interrupt ack only means "I am going to handle these
-interrupts". If additional interrupts arrive while the interrupt handler
-is active, those will have to be acknowledged separately.
+As per the convention we use for subject prefix, I suggest you use
 
-Sure, there is a risk that an interrupt arrives while the handler is
-running, and that it is handled but not acknowledged. That can happen
-with pretty much all interrupt handlers, and there are mitigations to
-limit the impact (for example, read the interrupt status register in
-a loop until no more interrupts are pending). But acknowledging
-an interrupt that was possibly not handled is always bad idea.
+  'ARM: dts: imx7: ...'
 
-Thanks,
-Guenter
+Shawn
+
+> ---
+>  arch/arm/boot/dts/imx7d.dtsi | 11 ++++---
+>  arch/arm/boot/dts/imx7s.dtsi | 78 ++++++++++++++++++++++++++------------------
+>  2 files changed, 53 insertions(+), 36 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+> index 7cbc2ff..4ced17c 100644
+> --- a/arch/arm/boot/dts/imx7d.dtsi
+> +++ b/arch/arm/boot/dts/imx7d.dtsi
+> @@ -63,9 +63,11 @@
+>  			clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
+>  			clock-names = "apb_pclk";
+>  
+> -			port {
+> -				etm1_out_port: endpoint {
+> -					remote-endpoint = <&ca_funnel_in_port1>;
+> +			out-ports {
+> +				port {
+> +					etm1_out_port: endpoint {
+> +						remote-endpoint = <&ca_funnel_in_port1>;
+> +					};
+>  				};
+>  			};
+>  		};
+> @@ -148,11 +150,10 @@
+>  	};
+>  };
+>  
+> -&ca_funnel_ports {
+> +&ca_funnel_in_ports {
+>  	port at 1 {
+>  		reg = <1>;
+>  		ca_funnel_in_port1: endpoint {
+> -			slave-mode;
+>  			remote-endpoint = <&etm1_out_port>;
+>  		};
+>  	};
+> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+> index a052198..9176885 100644
+> --- a/arch/arm/boot/dts/imx7s.dtsi
+> +++ b/arch/arm/boot/dts/imx7s.dtsi
+> @@ -106,7 +106,7 @@
+>  		 */
+>  		compatible = "arm,coresight-replicator";
+>  
+> -		ports {
+> +		out-ports {
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+>  				/* replicator output ports */
+> @@ -123,12 +123,15 @@
+>  					remote-endpoint = <&etr_in_port>;
+>  				};
+>  			};
+> +		};
+>  
+> -			/* replicator input port */
+> -			port at 2 {
+> +		in-ports {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			port at 0 {
+>  				reg = <0>;
+>  				replicator_in_port0: endpoint {
+> -					slave-mode;
+>  					remote-endpoint = <&etf_out_port>;
+>  				};
+>  			};
+> @@ -168,28 +171,31 @@
+>  			clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
+>  			clock-names = "apb_pclk";
+>  
+> -			ca_funnel_ports: ports {
+> +			ca_funnel_in_ports: in-ports {
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+>  
+> -				/* funnel input ports */
+>  				port at 0 {
+>  					reg = <0>;
+>  					ca_funnel_in_port0: endpoint {
+> -						slave-mode;
+>  						remote-endpoint = <&etm0_out_port>;
+>  					};
+>  				};
+>  
+> -				/* funnel output port */
+> -				port at 2 {
+> +				/* the other input ports are not connect to anything */
+> +			};
+> +
+> +			out-ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				port at 0 {
+>  					reg = <0>;
+>  					ca_funnel_out_port0: endpoint {
+>  						remote-endpoint = <&hugo_funnel_in_port0>;
+>  					};
+>  				};
+>  
+> -				/* the other input ports are not connect to anything */
+>  			};
+>  		};
+>  
+> @@ -200,9 +206,11 @@
+>  			clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
+>  			clock-names = "apb_pclk";
+>  
+> -			port {
+> -				etm0_out_port: endpoint {
+> -					remote-endpoint = <&ca_funnel_in_port0>;
+> +			out-ports {
+> +				port {
+> +					etm0_out_port: endpoint {
+> +						remote-endpoint = <&ca_funnel_in_port0>;
+> +					};
+>  				};
+>  			};
+>  		};
+> @@ -213,15 +221,13 @@
+>  			clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
+>  			clock-names = "apb_pclk";
+>  
+> -			ports {
+> +			in-ports {
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+>  
+> -				/* funnel input ports */
+>  				port at 0 {
+>  					reg = <0>;
+>  					hugo_funnel_in_port0: endpoint {
+> -						slave-mode;
+>  						remote-endpoint = <&ca_funnel_out_port0>;
+>  					};
+>  				};
+> @@ -229,18 +235,22 @@
+>  				port at 1 {
+>  					reg = <1>;
+>  					hugo_funnel_in_port1: endpoint {
+> -						slave-mode; /* M4 input */
+> +						/* M4 input */
+>  					};
+>  				};
+> +				/* the other input ports are not connect to anything */
+> +			};
+>  
+> -				port at 2 {
+> +			out-ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				port at 0 {
+>  					reg = <0>;
+>  					hugo_funnel_out_port0: endpoint {
+>  						remote-endpoint = <&etf_in_port>;
+>  					};
+>  				};
+> -
+> -				/* the other input ports are not connect to anything */
+>  			};
+>  		};
+>  
+> @@ -250,19 +260,23 @@
+>  			clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
+>  			clock-names = "apb_pclk";
+>  
+> -			ports {
+> +			in-ports {
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+>  
+>  				port at 0 {
+>  					reg = <0>;
+>  					etf_in_port: endpoint {
+> -						slave-mode;
+>  						remote-endpoint = <&hugo_funnel_out_port0>;
+>  					};
+>  				};
+> +			};
+>  
+> -				port at 1 {
+> +			out-ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				port at 0 {
+>  					reg = <0>;
+>  					etf_out_port: endpoint {
+>  						remote-endpoint = <&replicator_in_port0>;
+> @@ -277,10 +291,11 @@
+>  			clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
+>  			clock-names = "apb_pclk";
+>  
+> -			port {
+> -				etr_in_port: endpoint {
+> -					slave-mode;
+> -					remote-endpoint = <&replicator_out_port1>;
+> +			in-ports {
+> +				port {
+> +					etr_in_port: endpoint {
+> +						remote-endpoint = <&replicator_out_port1>;
+> +					};
+>  				};
+>  			};
+>  		};
+> @@ -291,10 +306,11 @@
+>  			clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
+>  			clock-names = "apb_pclk";
+>  
+> -			port {
+> -				tpiu_in_port: endpoint {
+> -					slave-mode;
+> -					remote-endpoint = <&replicator_out_port0>;
+> +			in-ports {
+> +				port {
+> +					tpiu_in_port: endpoint {
+> +						remote-endpoint = <&replicator_out_port0>;
+> +					};
+>  				};
+>  			};
+>  		};
+> -- 
+> 2.7.4
+> 
