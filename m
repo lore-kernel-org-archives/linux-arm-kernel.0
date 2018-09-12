@@ -1,180 +1,53 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Wed, 12 Sep 2018 12:17:04 +0200
-Subject: [RFC PATCH] KVM: arm64: Treat FPEXC32_EL2 as a regular guest
- system register
-In-Reply-To: <1536153553-28767-1-git-send-email-Dave.Martin@arm.com>
-References: <1536153553-28767-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20180912101704.GA23874@e113682-lin.lund.arm.com>
+From: leo.yan@linaro.org (leo.yan at linaro.org)
+Date: Wed, 12 Sep 2018 18:17:53 +0800
+Subject: [PATCH 04/11] dts: qcom: Update coresight bindings for hardware
+ ports
+In-Reply-To: <1536661032-30481-5-git-send-email-suzuki.poulose@arm.com>
+References: <1536661032-30481-1-git-send-email-suzuki.poulose@arm.com>
+ <1536661032-30481-5-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20180912101753.GB3353@leoy-ThinkPad-X240s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2018 at 02:19:13PM +0100, Dave Martin wrote:
-> Currently FPEXC32_EL2 is handled specially when context-switching.
-> This made sense for arm, where FPEXC affects host execution
-> (including VFP/SIMD register save/restore at Hyp).
+Hi Suzuki,
 
-I think the point was actually to avoid saving/restoring FPEXC32_EL2
-when VFP was being trapped to EL2
-
+On Tue, Sep 11, 2018 at 11:17:05AM +0100, Suzuki K Poulose wrote:
+> Switch to updated coresight bindings for hw ports
 > 
-> However, FPEXC has no architectural effect when running in AArch64.
-> The only case where an arm64 host may execute in AArch32 is when
-> running compat user code at EL0: the architecture explicitly
-> documents FPEXC as having no effect in this case either when the
-> kernel (EL2 in the VHE case; otherwise EL1) is AArch64.
-> 
-> So, we can just handle FPEXC32_EL2 (which is the AArch64 alias for
-> this register) as a regular AArch32-only system register and switch
-> it without any special handling or synchronisation.
-> 
-> This allows some gnarly special-case code to be eliminated from
-> hyp.  The extra isb() in __activate_traps_fpsimd32() is dropped
-> too: for the reasons explained above arm64 never required this
-> anyway.
-> 
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@arm.com>
-> Cc: Alexander Graf <agraf@suse.de>
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Cc: Andy Gross <andy.gross@linaro.org>
+> Cc: David Brown <david.brown@linaro.org>
+> Cc: Ivan T. Ivanov <ivan.ivanov@linaro.org>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 > ---
+>  arch/arm64/boot/dts/qcom/msm8916.dtsi | 98 ++++++++++++++++++++++-------------
+>  1 file changed, 63 insertions(+), 35 deletions(-)
 > 
-> I could do with some confirmation from someone that my interpretation of
-> the architecture is in fact correct here.  The CheckFPAdvSIMDEnabled64()
-> and CheckAdvSIMDEnabled() pseudocode functions may be a reasonable
-> starting point (this was my reference where the wordy text is unclear).
+> diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> index 7b32b89..5bed52b 100644
+> --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> @@ -1099,10 +1099,11 @@
+>  			clocks = <&rpmcc RPM_QDSS_CLK>, <&rpmcc RPM_QDSS_A_CLK>;
+>  			clock-names = "apb_pclk", "atclk";
+>  
+> -			port {
+> -				tpiu_in: endpoint {
+> -					slave-mode;
+> -					remote-endpoint = <&replicator_out1>;
+> +			out-ports {
 
-Which aspect do you want confirmed here?
+Here should be in-ports for tpiu node?
 
-> 
-> If Alexander could try this out, that would be good.
-> 
-> This cleanup applies on top of the following previously pubished fix:
-> [PULL 2/4] arm64: KVM: Only force FPEXC32_EL2.EN if trapping FPSIMD
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2018-September/599537.html
-> 
+BTW, if upper comment is valid, this means the DT binding doc also
+gives wrong example for tpiu node [1].
 
-We can queue this for the next merge window.
+I tested this patch with upper changing to 'in-ports', etm with perf
+mode can work well on DB410c board.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+[...]
 
-> 
->  arch/arm64/kvm/hyp/switch.c    | 45 ++----------------------------------------
->  arch/arm64/kvm/hyp/sysreg-sr.c |  2 ++
->  2 files changed, 4 insertions(+), 43 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index ca46153..0450b85 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -43,32 +43,6 @@ static bool __hyp_text update_fp_enabled(struct kvm_vcpu *vcpu)
->  	return !!(vcpu->arch.flags & KVM_ARM64_FP_ENABLED);
->  }
->  
-> -/* Save the 32-bit only FPSIMD system register state */
-> -static void __hyp_text __fpsimd_save_fpexc32(struct kvm_vcpu *vcpu)
-> -{
-> -	if (!vcpu_el1_is_32bit(vcpu))
-> -		return;
-> -
-> -	vcpu->arch.ctxt.sys_regs[FPEXC32_EL2] = read_sysreg(fpexc32_el2);
-> -}
-> -
-> -static void __hyp_text __activate_traps_fpsimd32(struct kvm_vcpu *vcpu)
-> -{
-> -	/*
-> -	 * We are about to set CPTR_EL2.TFP to trap all floating point
-> -	 * register accesses to EL2, however, the ARM ARM clearly states that
-> -	 * traps are only taken to EL2 if the operation would not otherwise
-> -	 * trap to EL1.  Therefore, always make sure that for 32-bit guests,
-> -	 * we set FPEXC.EN to prevent traps to EL1, when setting the TFP bit.
-> -	 * If FP/ASIMD is not implemented, FPEXC is UNDEFINED and any access to
-> -	 * it will cause an exception.
-> -	 */
-> -	if (vcpu_el1_is_32bit(vcpu) && system_supports_fpsimd()) {
-> -		write_sysreg(1 << 30, fpexc32_el2);
-> -		isb();
-> -	}
-> -}
-> -
->  static void __hyp_text __activate_traps_common(struct kvm_vcpu *vcpu)
->  {
->  	/* Trap on AArch32 cp15 c15 (impdef sysregs) accesses (EL1 or EL0) */
-> @@ -98,10 +72,8 @@ static void activate_traps_vhe(struct kvm_vcpu *vcpu)
->  	val = read_sysreg(cpacr_el1);
->  	val |= CPACR_EL1_TTA;
->  	val &= ~CPACR_EL1_ZEN;
-> -	if (!update_fp_enabled(vcpu)) {
-> +	if (!update_fp_enabled(vcpu))
->  		val &= ~CPACR_EL1_FPEN;
-> -		__activate_traps_fpsimd32(vcpu);
-> -	}
->  
->  	write_sysreg(val, cpacr_el1);
->  
-> @@ -116,10 +88,8 @@ static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
->  
->  	val = CPTR_EL2_DEFAULT;
->  	val |= CPTR_EL2_TTA | CPTR_EL2_TZ;
-> -	if (!update_fp_enabled(vcpu)) {
-> +	if (!update_fp_enabled(vcpu))
->  		val |= CPTR_EL2_TFP;
-> -		__activate_traps_fpsimd32(vcpu);
-> -	}
->  
->  	write_sysreg(val, cptr_el2);
->  }
-> @@ -366,11 +336,6 @@ static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
->  
->  	__fpsimd_restore_state(&vcpu->arch.ctxt.gp_regs.fp_regs);
->  
-> -	/* Skip restoring fpexc32 for AArch64 guests */
-> -	if (!(read_sysreg(hcr_el2) & HCR_RW))
-> -		write_sysreg(vcpu->arch.ctxt.sys_regs[FPEXC32_EL2],
-> -			     fpexc32_el2);
-> -
->  	vcpu->arch.flags |= KVM_ARM64_FP_ENABLED;
->  
->  	return true;
-> @@ -522,9 +487,6 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
->  
->  	sysreg_restore_host_state_vhe(host_ctxt);
->  
-> -	if (vcpu->arch.flags & KVM_ARM64_FP_ENABLED)
-> -		__fpsimd_save_fpexc32(vcpu);
-> -
->  	__debug_switch_to_host(vcpu);
->  
->  	return exit_code;
-> @@ -580,9 +542,6 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
->  
->  	__sysreg_restore_state_nvhe(host_ctxt);
->  
-> -	if (vcpu->arch.flags & KVM_ARM64_FP_ENABLED)
-> -		__fpsimd_save_fpexc32(vcpu);
-> -
->  	/*
->  	 * This must come after restoring the host sysregs, since a non-VHE
->  	 * system may enable SPE here and make use of the TTBRs.
-> diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-> index 9ce2239..12994a9 100644
-> --- a/arch/arm64/kvm/hyp/sysreg-sr.c
-> +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-> @@ -195,6 +195,7 @@ void __hyp_text __sysreg32_save_state(struct kvm_vcpu *vcpu)
->  
->  	sysreg[DACR32_EL2] = read_sysreg(dacr32_el2);
->  	sysreg[IFSR32_EL2] = read_sysreg(ifsr32_el2);
-> +	sysreg[FPEXC32_EL2] = read_sysreg(fpexc32_el2);
->  
->  	if (has_vhe() || vcpu->arch.flags & KVM_ARM64_DEBUG_DIRTY)
->  		sysreg[DBGVCR32_EL2] = read_sysreg(dbgvcr32_el2);
-> @@ -217,6 +218,7 @@ void __hyp_text __sysreg32_restore_state(struct kvm_vcpu *vcpu)
->  
->  	write_sysreg(sysreg[DACR32_EL2], dacr32_el2);
->  	write_sysreg(sysreg[IFSR32_EL2], ifsr32_el2);
-> +	write_sysreg(sysreg[FPEXC32_EL2], fpexc32_el2);
->  
->  	if (has_vhe() || vcpu->arch.flags & KVM_ARM64_DEBUG_DIRTY)
->  		write_sysreg(sysreg[DBGVCR32_EL2], dbgvcr32_el2);
-> -- 
-> 2.1.4
-> 
+Thanks,
+Leo Yan
+
+[1] https://git.linaro.org/kernel/coresight.git/tree/Documentation/devicetree/bindings/arm/coresight.txt?h=next#n135
