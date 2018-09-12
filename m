@@ -1,54 +1,35 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 12 Sep 2018 09:22:54 +0800
-Subject: [PATCH] ARM: dts: imx53-qsb: disable 1.2GHz OPP
-In-Reply-To: <20180910125056.30813-1-s.hauer@pengutronix.de>
-References: <20180910125056.30813-1-s.hauer@pengutronix.de>
-Message-ID: <20180912012252.GE28469@dragon>
+Date: Wed, 12 Sep 2018 09:25:01 +0800
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select CONFIG_TMPFS_POSIX_ACL
+In-Reply-To: <1536601523-11797-1-git-send-email-festevam@gmail.com>
+References: <1536601523-11797-1-git-send-email-festevam@gmail.com>
+Message-ID: <20180912012459.GF28469@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2018 at 02:50:56PM +0200, Sascha Hauer wrote:
-> The maximum CPU frequency for the i.MX53 QSB is 1GHz, so disable the
-> 1.2GHz OPP. This makes the board work with cpufreq again.
-
-I feel that the word 'again' and the Fixes tag below are a little
-confusing.  It makes impression that cpufreq worked fine on the board
-before and commit 791f416608 broke it.  However, this is not the case,
-right?
-
+On Mon, Sep 10, 2018 at 02:45:23PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> Fixes: 791f416608 ("ARM: dts: imx53: add cpufreq-dt support")
+> Andreas M?ller reports:
+> 
+> "Fixes:
+> 
+> | Sep 04 09:05:10 imx6qdl-variscite-som systemd-udevd[220]: Failed to apply ACL on /dev/v4l-subdev0: Operation not supported
+> | Sep 04 09:05:10 imx6qdl-variscite-som systemd-udevd[224]: Failed to apply ACL on /dev/v4l-subdev1: Operation not supported
+> | Sep 04 09:05:10 imx6qdl-variscite-som systemd-udevd[215]: Failed to apply ACL on /dev/v4l-subdev10: Operation not supported
+> | Sep 04 09:05:10 imx6qdl-variscite-som systemd-udevd[228]: Failed to apply ACL on /dev/v4l-subdev2: Operation not supported
+> | Sep 04 09:05:10 imx6qdl-variscite-som systemd-udevd[232]: Failed to apply ACL on /dev/v4l-subdev5: Operation not supported
+> | Sep 04 09:05:10 imx6qdl-variscite-som systemd-udevd[217]: Failed to apply ACL on /dev/v4l-subdev11: Operation not supported
+> | Sep 04 09:05:10 imx6qdl-variscite-som systemd-udevd[214]: Failed to apply ACL on /dev/dri/card1: Operation not supported
+> | Sep 04 09:05:10 imx6qdl-variscite-som systemd-udevd[216]: Failed to apply ACL on /dev/v4l-subdev8: Operation not supported
+> | Sep 04 09:05:10 imx6qdl-variscite-som systemd-udevd[226]: Failed to apply ACL on /dev/v4l-subdev9: Operation not supported
+> 
+> and nasty follow-ups: Starting weston from sddm as unpriviledged user fails
+> with some hints on missing access rights."
+> 
+> Select the CONFIG_TMPFS_POSIX_ACL option to fix these issues.
+> 
+> Reported-by: Andreas M?ller <schnitzeltony@gmail.com>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Shawn
-
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  arch/arm/boot/dts/imx53-qsb-common.dtsi | 11 +++++++++++
->  1 file changed, 11 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx53-qsb-common.dtsi b/arch/arm/boot/dts/imx53-qsb-common.dtsi
-> index 7423d462d1e4..50dde84b72ed 100644
-> --- a/arch/arm/boot/dts/imx53-qsb-common.dtsi
-> +++ b/arch/arm/boot/dts/imx53-qsb-common.dtsi
-> @@ -123,6 +123,17 @@
->  	};
->  };
->  
-> +&cpu0 {
-> +	/* CPU rated to 1GHz, not 1.2GHz as per the default settings */
-> +	operating-points = <
-> +		/* kHz   uV */
-> +		166666  850000
-> +		400000  900000
-> +		800000  1050000
-> +		1000000 1200000
-> +	>;
-> +};
-> +
->  &esdhc1 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_esdhc1>;
-> -- 
-> 2.18.0
-> 
+Applied, thanks.
