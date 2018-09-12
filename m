@@ -1,63 +1,72 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 12 Sep 2018 23:37:24 +0800
-Subject: [linux-sunxi] Re: [PATCH 02/27] arm64: allwinner: h6: add system
- controller device tree node
-In-Reply-To: <CAGb2v64t40yTbrnkg33N2=jBdnvV45H1XSCF8U230LGAyuVySw@mail.gmail.com>
-References: <20180902072643.4917-1-jernej.skrabec@siol.net>
- <20180902072643.4917-3-jernej.skrabec@siol.net>
- <CAGb2v65y1W=52SAFFqyCOnHd80nx+oPHUDeysHWBy7o8_g=eeQ@mail.gmail.com>
- <9915D9F1-1C60-4AEF-9074-CE040FCD7BF0@aosc.io>
- <CAGb2v64t40yTbrnkg33N2=jBdnvV45H1XSCF8U230LGAyuVySw@mail.gmail.com>
-Message-ID: <B9D0F336-B0C0-453C-AD56-325DAA9883A0@aosc.io>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Wed, 12 Sep 2018 17:48:28 +0200
+Subject: [PATCHv2 0/3] PCI: emulated PCI bridge config space
+Message-ID: <20180912154831.2220-1-thomas.petazzoni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
+The pci-mvebu driver already contains some logic to emulate a root
+port PCI bridge configuration space. It turns out that we have a
+similar need for the pci-aardvark driver. Instead of duplicating the
+same logic in two drivers, this patch series starts by adding a small
+common infrastructure that helps emulate a root port PCI bridge config
+space, converts pci-mvebu to use it, and finally extends pci-aardvark
+to use it as well.
 
-? 2018?9?12? GMT+08:00 ??10:49:12, Chen-Yu Tsai <wens@csie.org> ??:
->On Tue, Sep 4, 2018 at 4:44 PM Icenowy Zheng <icenowy@aosc.io> wrote:
->>
->>
->>
->> ? 2018?9?4? GMT+08:00 ??4:40:56, Chen-Yu Tsai <wens@csie.org> ??:
->> >On Sun, Sep 2, 2018 at 3:27 PM Jernej Skrabec
-><jernej.skrabec@siol.net>
->> >wrote:
->> >>
->> >> From: Icenowy Zheng <icenowy@aosc.io>
->> >>
->> >> As we have already binding for the H6 system controller, add its
->node
->> >> to the device tree.
->> >>
->> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> >> [fixed compatible string]
->> >> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
->> >
->> >Reviewed-by: Chen-Yu Tsai <wens@csie.org>
->>
->> By the way can these patches be applied first? (patches
->> related to syscon).
->>
->> They're also needed for EMAC.
->
->Applied.
->
->BTW, the H6 system control EMAC register also has the internal PHY
->related controls seen on H3/H5. IIRC you previously mentioned that
->they have no effect?
+Thanks to this, Marvell Armada 3720 based systems, which use the
+Aarkvark PCI controller, will have better PCI support, by having a
+root port PCI bridge exposed.
 
-Yes, because the "internal PHY" on H6 is on AC200.
+The emulated PCI bridge common logic is a proposal, I very much
+welcome comments and suggestions. Also, if you feel that adding a
+common logic for only two drivers is too early, I'm fine with
+duplicating a bit of code betwen pci-mvebu and pci-aardvark.
 
-The internal/external mux bit has effect (although it will mux
-to a non-existent PHY when switching to "internal", render
-EMAC not usable), but it also has effect on A64 (same effect
-with H6), on which it's not documented.
+In this version 2, I have (hopefully) taken into account the comments
+from Bjorn Helgaas and Russell King. Here are the changes:
 
->
->ChenYu
->
->_______________________________________________
->linux-arm-kernel mailing list
->linux-arm-kernel at lists.infradead.org
->http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ - Rebased to 4.19-rc1
+
+ - The functions implementing the config space read/write emulation
+   now have the knowledge of which registers/bits are read-only,
+   read-write, reserved and write-1-to-clear, and behave according to
+   this information.
+
+ - I have renamed the function to use conf_read() and conf_write()
+   suffixes, as suggested by Bjorn.
+
+ - The whole thing is now named pci-bridge-emul instead of
+   pci-sw-bridge (and of course all functions, types and macros were
+   changed accordingly), as Bjorn wasn't happy about pci-sw-bridge.
+
+ - The header file was moved into drivers/pci (instead of being in
+   include/linux).
+
+Thanks a lot in advance for your review and feedback.
+
+Best regards,
+
+Thomas Petazzoni
+
+Thomas Petazzoni (2):
+  PCI: Introduce PCI bridge emulated config space common logic
+  PCI: mvebu: Convert to PCI emulated bridge config space
+
+Zachary Zhang (1):
+  PCI: aardvark: Implement emulated root PCI bridge config space
+
+ drivers/pci/Kconfig                   |   3 +
+ drivers/pci/Makefile                  |   1 +
+ drivers/pci/controller/Kconfig        |   2 +
+ drivers/pci/controller/pci-aardvark.c | 129 ++++++++++-
+ drivers/pci/controller/pci-mvebu.c    | 375 +++++++++----------------------
+ drivers/pci/pci-bridge-emul.c         | 408 ++++++++++++++++++++++++++++++++++
+ drivers/pci/pci-bridge-emul.h         | 124 +++++++++++
+ 7 files changed, 770 insertions(+), 272 deletions(-)
+ create mode 100644 drivers/pci/pci-bridge-emul.c
+ create mode 100644 drivers/pci/pci-bridge-emul.h
+
+-- 
+2.14.4
