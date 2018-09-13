@@ -1,103 +1,47 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 13 Sep 2018 17:51:55 +0200
-Subject: [PATCH v3 6/9] kbuild: consolidate Devicetree dtb build rules
-In-Reply-To: <CAK7LNAQFqhWw+LwDoypGG=OP6tH4qf2tT=LvtchK2GoiNyzDXg@mail.gmail.com>
-References: <20180910150403.19476-1-robh@kernel.org>
- <20180910150403.19476-7-robh@kernel.org>
- <CAL_Jsq+=VbdcVLiwXbOA5d+R2YY6=2Pw2bQpci-jj-JvereD1A@mail.gmail.com>
- <CAK7LNAQFqhWw+LwDoypGG=OP6tH4qf2tT=LvtchK2GoiNyzDXg@mail.gmail.com>
-Message-ID: <CAMuHMdWEnoh97_jiDWMq=ke4PrhSFbToYnx91CPLBuq3mOGzoQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 13 Sep 2018 16:53:02 +0100
+Subject: [RFC PATCH 00/11] Avoid synchronous TLB invalidation for
+ intermediate page-table entries on arm64
+In-Reply-To: <f8ba271b-87c0-29ef-1216-77d5d391d5c8@redhat.com>
+References: <1535125966-7666-1-git-send-email-will.deacon@arm.com>
+ <3dd55e21-7424-071a-0f7e-d24fc2396f2a@redhat.com>
+ <20180905122828.GF20186@arm.com>
+ <f8ba271b-87c0-29ef-1216-77d5d391d5c8@redhat.com>
+Message-ID: <20180913155301.GA20290@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yamada-san,
-
-On Wed, Sep 12, 2018 at 3:02 AM Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> 2018-09-12 0:40 GMT+09:00 Rob Herring <robh@kernel.org>:
-> > On Mon, Sep 10, 2018 at 10:04 AM Rob Herring <robh@kernel.org> wrote:
-> >> There is nothing arch specific about building dtb files other than their
-> >> location under /arch/*/boot/dts/. Keeping each arch aligned is a pain.
-> >> The dependencies and supported targets are all slightly different.
-> >> Also, a cross-compiler for each arch is needed, but really the host
-> >> compiler preprocessor is perfectly fine for building dtbs. Move the
-> >> build rules to a common location and remove the arch specific ones. This
-> >> is done in a single step to avoid warnings about overriding rules.
+On Fri, Sep 07, 2018 at 02:36:08AM -0400, Jon Masters wrote:
+> On 09/05/2018 08:28 AM, Will Deacon wrote:
+> > On Tue, Sep 04, 2018 at 02:38:02PM -0400, Jon Masters wrote:
+> >> On 08/24/2018 11:52 AM, Will Deacon wrote:
 > >>
-> >> The build dependencies had been a mixture of 'scripts' and/or 'prepare'.
-> >> These pull in several dependencies some of which need a target compiler
-> >> (specifically devicetable-offsets.h) and aren't needed to build dtbs.
-> >> All that is really needed is dtc, so adjust the dependencies to only be
-> >> dtc.
+> >>> I hacked up this RFC on the back of the recent changes to the mmu_gather
+> >>> stuff in mainline. It's had a bit of testing and it looks pretty good so
+> >>> far.
 > >>
-> >> This change enables support 'dtbs_install' on some arches which were
-> >> missing the target.
-> >
-> > [...]
-> >
-> >> @@ -1215,6 +1215,33 @@ kselftest-merge:
-> >>                 $(srctree)/tools/testing/selftests/*/config
-> >>         +$(Q)$(MAKE) -f $(srctree)/Makefile olddefconfig
-> >>
-> >> +# ---------------------------------------------------------------------------
-> >> +# Devicetree files
-> >> +
-> >> +ifneq ($(wildcard $(srctree)/arch/$(SRCARCH)/boot/dts/),)
-> >> +dtstree := arch/$(SRCARCH)/boot/dts
-> >> +endif
-> >> +
-> >> +ifdef CONFIG_OF_EARLY_FLATTREE
-> >
-> > This can be true when dtstree is unset. So this line should be this
-> > instead to fix the 0-day reported error:
-> >
-> > ifneq ($(dtstree),)
-> >
-> >> +
-> >> +%.dtb : scripts_dtc
-> >> +       $(Q)$(MAKE) $(build)=$(dtstree) $(dtstree)/$@
-> >> +
-> >> +PHONY += dtbs dtbs_install
-> >> +dtbs: scripts_dtc
-> >> +       $(Q)$(MAKE) $(build)=$(dtstree)
-> >> +
-> >> +dtbs_install: dtbs
-> >> +       $(Q)$(MAKE) $(dtbinst)=$(dtstree)
-> >> +
-> >> +all: dtbs
-> >> +
-> >> +endif
->
->
-> Ah, right.
-> Even x86 can enable OF and OF_UNITTEST.
->
->
->
-> Another solution might be,
-> guard it by 'depends on ARCH_SUPPORTS_OF'.
->
->
->
-> This is actually what ACPI does.
->
-> menuconfig ACPI
->         bool "ACPI (Advanced Configuration and Power Interface) Support"
->         depends on ARCH_SUPPORTS_ACPI
->          ...
+> >> I will request the server folks go and test this. You'll probably
+> >> remember a couple of parts we've seen where aggressive walker caches
+> >> ended up (correctly) seeing stale page table entries and we had all
+> >> manner of horrifically hard to debug problems. We have some fairly nice
+> >> reproducers that were able to find this last time that we can test.
+> > 
+> > Cheers, Jon, that would be very helpful. You're probably best off using
+> > my (rebasing) tlb branch rather than picking the RFC:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git tlb
+> > 
+> > Let me know if you'd prefer something stable (I can tag it with a date).
+> 
+> That would be useful. I've prodded each of the Arm server SoC vendors I
+> work with via our weekly call to have them each specifically check this.
+> A tag would be helpful to that effort I expect. They all claim to be
+> watching this thread now, so we'll see if they see cabbages here.
 
-ACPI is a real platform feature, as it depends on firmware.
+This is now all queued up in the (stable) arm64 for-next/core branch:
 
-CONFIG_OF can be enabled, and DT overlays can be loaded, on any platform,
-even if it has ACPI ;-)
+  https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=for-next/core
 
-Gr{oetje,eeting}s,
+so that's the best place to grab the patches.
 
-                        Geert
-
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Will
