@@ -1,177 +1,273 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 13 Sep 2018 14:17:12 +0100
-Subject: Clarifying dma_wmb behavior in presence of non-coherent masters
- and outer caches
-In-Reply-To: <72f67412-a011-6552-03be-6730a9302ebb@pengutronix.de>
-References: <1530275290.22468.69.camel@pengutronix.de>
- <20180629142539.GH17271@n2100.armlinux.org.uk>
- <20180629162248.GB20010@arm.com>
- <20180629164801.GJ17271@n2100.armlinux.org.uk>
- <20180629174321.GA20909@arm.com>
- <1530539366.22468.89.camel@pengutronix.de>
- <20180702174552.GD23687@arm.com> <20180706122610.GA6993@arm.com>
- <72f67412-a011-6552-03be-6730a9302ebb@pengutronix.de>
-Message-ID: <20180913131711.GB13242@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 13 Sep 2018 21:27:36 +0800
+Subject: [arm-platforms:irq/generic_handle_domain_irq 11/11]
+ arch/powerpc/platforms/ps3/interrupt.c:689:3: error: 'const struct
+ irq_domain_ops' has no member named 'map'
+Message-ID: <201809132126.Dvr0dBW5%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 09, 2018 at 08:20:22AM +0200, Oleksij Rempel wrote:
-> On 06.07.2018 14:26, Will Deacon wrote:
-> > On Mon, Jul 02, 2018 at 06:45:52PM +0100, Will Deacon wrote:
-> >> On Mon, Jul 02, 2018 at 03:49:26PM +0200, Lucas Stach wrote:
-> >>> Also the section "External caches", "Before AMBA4 ACE" seems to suggest
-> >>> that the barriers aren't fully propagated to the PL310 write-caches and
-> >>> master ports. I'm unsure if this is just an artifact of the mentioned
-> >>> MMIO access, so handling of normal vs. device memory transactions in
-> >>> the PL310.
-> >>
-> >> I'll check with the hardware folks about the PL310, but I don't see how
-> >> you could propagate barriers over AXI3 anyway because I don't think this
-> >> stuff existed back then.
-> > 
-> > Damn. As I feared, you can't propagate the barrier to the PL310, so the
-> > A9 is unable to enforce ordering beyond the responses it gets back. The
-> > PL310 will then re-order normal memory accesses (including non-cacheable)
-> > in its store buffer, so we do actually need a bloody CACHE SYNC here.
-> > 
-> > Patch below. Does it help?
-> 
-> Suddenly no.
+Hi Marc,
 
-I just noticed that I'm still carrying this patch in my tree. Are you saying
-it doesn't help on your system? It all went quiet, so I assume you fixed
-this issue one way or the other?
+First bad commit (maybe != root cause):
 
-Will
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/generic_handle_domain_irq
+head:   a20a4e3c0467a154a73e05293a853d5e7b24d63f
+commit: a20a4e3c0467a154a73e05293a853d5e7b24d63f [11/11] irqdomain: Kill irq_domain_add_legacy_isa
+config: powerpc-defconfig (attached as .config)
+compiler: powerpc64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout a20a4e3c0467a154a73e05293a853d5e7b24d63f
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=powerpc 
 
-> > From 5a2769b45e94b212d21bc44f5940ed5f3bde5cc2 Mon Sep 17 00:00:00 2001
-> > From: Will Deacon <will.deacon@arm.com>
-> > Date: Wed, 4 Jul 2018 10:56:22 +0100
-> > Subject: [PATCH] ARM: barrier: Kick outer-cache and SoC fabric in dma_wmb()
-> > 
-> > Prior to AMBA4-ACE, the AXI bus protocol had no support for barrier
-> > transactions or shareability domains and was therefore unable to enforce
-> > ordering between memory accesses either side of a barrier instruction,
-> > requiring the CPU to handle all of the ordering itself.
-> > 
-> > Unfortunately, IP such as the venerable PL310 will re-order stores to
-> > Normal memory inside its store-buffer, meaning that accesses to a coherent
-> > DMA buffer (i.e. one allocated by dma_alloc_coherent()) can be observed
-> > out-of-order by a non-coherent DMA engine unless the PL310 is kicked with
-> > a CACHE_SYNC command between buffering the accesses. Whilst this is already
-> > the case for mb() and wmb(), dma_wmb() just expands to a DMB OSHST, leading
-> > to sequences such as:
-> > 
-> > 	STR	Rdata, [Rbuf, #DATA_OFFSET]
-> > 	DMB	OSHST
-> > 	STR	Rvalid, [Rbuf, #VALID_OFFSET]
-> > 
-> > being reordered such that the DMA device sees the write of valid but not
-> > the write of data.
-> > 
-> > This patch ensures that the SoC fabric and the outer-cache are kicked
-> > by dma_wmb() if they are able to buffer transactions outside of the CPU
-> > but before the Point of Coherency.
-> > 
-> > Reported-by: Lucas Stach <l.stach@pengutronix.de>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm/include/asm/barrier.h    | 14 ++++++++++----
-> >  arch/arm/include/asm/outercache.h |  6 ++++++
-> >  arch/arm/mm/flush.c               | 24 +++++++++++++++++++++++-
-> >  3 files changed, 39 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/barrier.h b/arch/arm/include/asm/barrier.h
-> > index 69772e742a0a..e31833f72b69 100644
-> > --- a/arch/arm/include/asm/barrier.h
-> > +++ b/arch/arm/include/asm/barrier.h
-> > @@ -53,17 +53,23 @@
-> >  #ifdef CONFIG_ARM_HEAVY_MB
-> >  extern void (*soc_mb)(void);
-> >  extern void arm_heavy_mb(void);
-> > -#define __arm_heavy_mb(x...) do { dsb(x); arm_heavy_mb(); } while (0)
-> > +extern void arm_heavy_wmb(void);
-> > +extern void arm_heavy_dma_wmb(void);
-> > +#define __arm_heavy_mb()	arm_heavy_mb()
-> > +#define __arm_heavy_wmb()	arm_heavy_wmb()
-> > +#define __arm_heavy_dma_wmb()	arm_heavy_dma_wmb()
-> >  #else
-> > -#define __arm_heavy_mb(x...) dsb(x)
-> > +#define __arm_heavy_mb()	dsb()
-> > +#define __arm_heavy_wmb()	dsb(st)
-> > +#define __arm_heavy_dma_wmb()	dmb(oshst)
-> >  #endif
-> >  
-> >  #if defined(CONFIG_ARM_DMA_MEM_BUFFERABLE) || defined(CONFIG_SMP)
-> >  #define mb()		__arm_heavy_mb()
-> >  #define rmb()		dsb()
-> > -#define wmb()		__arm_heavy_mb(st)
-> > +#define wmb()		__arm_heavy_wmb()
-> >  #define dma_rmb()	dmb(osh)
-> > -#define dma_wmb()	dmb(oshst)
-> > +#define dma_wmb()	__arm_heavy_dma_wmb()
-> >  #else
-> >  #define mb()		barrier()
-> >  #define rmb()		barrier()
-> > diff --git a/arch/arm/include/asm/outercache.h b/arch/arm/include/asm/outercache.h
-> > index c2bf24f40177..e744efe6e2a7 100644
-> > --- a/arch/arm/include/asm/outercache.h
-> > +++ b/arch/arm/include/asm/outercache.h
-> > @@ -43,6 +43,12 @@ struct outer_cache_fns {
-> >  
-> >  extern struct outer_cache_fns outer_cache;
-> >  
-> > +#ifdef CONFIG_OUTER_CACHE_SYNC
-> > +static inline bool outer_cache_has_sync(void) { return outer_cache.sync; }
-> > +#else
-> > +static inline bool outer_cache_has_sync(void) { return 0; }
-> > +#endif
-> > +
-> >  #ifdef CONFIG_OUTER_CACHE
-> >  /**
-> >   * outer_inv_range - invalidate range of outer cache lines
-> > diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-> > index 58469623b015..1252689362d8 100644
-> > --- a/arch/arm/mm/flush.c
-> > +++ b/arch/arm/mm/flush.c
-> > @@ -24,7 +24,7 @@
-> >  #ifdef CONFIG_ARM_HEAVY_MB
-> >  void (*soc_mb)(void);
-> >  
-> > -void arm_heavy_mb(void)
-> > +static void __arm_heavy_sync(void)
-> >  {
-> >  #ifdef CONFIG_OUTER_CACHE_SYNC
-> >  	if (outer_cache.sync)
-> > @@ -33,7 +33,29 @@ void arm_heavy_mb(void)
-> >  	if (soc_mb)
-> >  		soc_mb();
-> >  }
-> > +
-> > +void arm_heavy_mb(void)
-> > +{
-> > +	dsb();
-> > +	__arm_heavy_sync();
-> > +}
-> >  EXPORT_SYMBOL(arm_heavy_mb);
-> > +
-> > +void arm_heavy_wmb(void)
-> > +{
-> > +	dsb(st);
-> > +	__arm_heavy_sync();
-> > +}
-> > +EXPORT_SYMBOL(arm_heavy_wmb);
-> > +
-> > +void arm_heavy_dma_wmb(void)
-> > +{
-> > +	if (outer_cache_has_sync() || soc_mb)
-> > +		arm_heavy_wmb();
-> > +	else
-> > +		dmb(oshst);
-> > +}
-> > +EXPORT_SYMBOL(arm_heavy_dma_wmb);
-> >  #endif
-> >  
-> >  #ifdef CONFIG_CPU_CACHE_VIPT
-> > 
-> 
+All errors (new ones prefixed by >>):
+
+   arch/powerpc/kernel/mce.c: In function 'init_debug_trig_function':
+>> arch/powerpc/kernel/mce.c:514:9: error: implicit declaration of function 'of_get_cpu_node'; did you mean 'set_dev_node'? [-Werror=implicit-function-declaration]
+     cpun = of_get_cpu_node(smp_processor_id(), NULL);
+            ^~~~~~~~~~~~~~~
+            set_dev_node
+>> arch/powerpc/kernel/mce.c:514:7: error: assignment makes pointer from integer without a cast [-Werror=int-conversion]
+     cpun = of_get_cpu_node(smp_processor_id(), NULL);
+          ^
+>> arch/powerpc/kernel/mce.c:516:3: error: implicit declaration of function 'of_property_for_each_string'; did you mean 'driver_for_each_device'? [-Werror=implicit-function-declaration]
+      of_property_for_each_string(cpun, "ibm,hmi-special-triggers",
+      ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+      driver_for_each_device
+>> arch/powerpc/kernel/mce.c:517:21: error: expected ';' before '{' token
+             prop, str) {
+                        ^
+   cc1: all warnings being treated as errors
+--
+   arch/powerpc/sysdev/xics/icp-hv.c: In function 'icp_hv_get_irq':
+>> arch/powerpc/sysdev/xics/icp-hv.c:117:8: error: implicit declaration of function 'irq_find_mapping'; did you mean 'kgid_has_mapping'? [-Werror=implicit-function-declaration]
+     irq = irq_find_mapping(xics_host, vec);
+           ^~~~~~~~~~~~~~~~
+           kgid_has_mapping
+   cc1: all warnings being treated as errors
+--
+   arch/powerpc/sysdev/xics/icp-opal.c: In function 'icp_opal_get_irq':
+>> arch/powerpc/sysdev/xics/icp-opal.c:76:8: error: implicit declaration of function 'irq_find_mapping'; did you mean 'page_file_mapping'? [-Werror=implicit-function-declaration]
+     irq = irq_find_mapping(xics_host, vec);
+           ^~~~~~~~~~~~~~~~
+           page_file_mapping
+   cc1: all warnings being treated as errors
+--
+   arch/powerpc/platforms/cell/pmu.c: In function 'cbe_init_pm_irq':
+>> arch/powerpc/platforms/cell/pmu.c:386:9: error: implicit declaration of function 'irq_create_mapping'; did you mean 'vmemmap_create_mapping'? [-Werror=implicit-function-declaration]
+      irq = irq_create_mapping(NULL, IIC_IRQ_IOEX_PMI |
+            ^~~~~~~~~~~~~~~~~~
+            vmemmap_create_mapping
+   arch/powerpc/platforms/cell/pmu.c: In function 'cbe_sync_irq':
+>> arch/powerpc/platforms/cell/pmu.c:411:8: error: implicit declaration of function 'irq_find_mapping'; did you mean 'page_file_mapping'? [-Werror=implicit-function-declaration]
+     irq = irq_find_mapping(NULL,
+           ^~~~~~~~~~~~~~~~
+           page_file_mapping
+   cc1: all warnings being treated as errors
+--
+   arch/powerpc/platforms/ps3/interrupt.c: In function 'ps3_virq_setup':
+>> arch/powerpc/platforms/ps3/interrupt.c:193:10: error: implicit declaration of function 'irq_create_mapping'; did you mean 'vmemmap_create_mapping'? [-Werror=implicit-function-declaration]
+     *virq = irq_create_mapping(NULL, outlet);
+             ^~~~~~~~~~~~~~~~~~
+             vmemmap_create_mapping
+>> arch/powerpc/platforms/ps3/interrupt.c:218:2: error: implicit declaration of function 'irq_dispose_mapping'; did you mean 'qid_has_mapping'? [-Werror=implicit-function-declaration]
+     irq_dispose_mapping(*virq);
+     ^~~~~~~~~~~~~~~~~~~
+     qid_has_mapping
+   arch/powerpc/platforms/ps3/interrupt.c: At top level:
+   arch/powerpc/platforms/ps3/interrupt.c:682:11: error: 'enum irq_domain_bus_token' declared inside parameter list will not be visible outside of this definition or declaration [-Werror]
+         enum irq_domain_bus_token bus_token)
+              ^~~~~~~~~~~~~~~~~~~~
+>> arch/powerpc/platforms/ps3/interrupt.c:682:32: error: parameter 3 ('bus_token') has incomplete type
+         enum irq_domain_bus_token bus_token)
+                                   ^~~~~~~~~
+>> arch/powerpc/platforms/ps3/interrupt.c:681:12: error: function declaration isn't a prototype [-Werror=strict-prototypes]
+    static int ps3_host_match(struct irq_domain *h, struct device_node *np,
+               ^~~~~~~~~~~~~~
+>> arch/powerpc/platforms/ps3/interrupt.c:688:21: error: variable 'ps3_host_ops' has initializer but incomplete type
+    static const struct irq_domain_ops ps3_host_ops = {
+                        ^~~~~~~~~~~~~~
+>> arch/powerpc/platforms/ps3/interrupt.c:689:3: error: 'const struct irq_domain_ops' has no member named 'map'
+     .map = ps3_host_map,
+      ^~~
+   arch/powerpc/platforms/ps3/interrupt.c:689:9: error: excess elements in struct initializer [-Werror]
+     .map = ps3_host_map,
+            ^~~~~~~~~~~~
+   arch/powerpc/platforms/ps3/interrupt.c:689:9: note: (near initialization for 'ps3_host_ops')
+>> arch/powerpc/platforms/ps3/interrupt.c:690:3: error: 'const struct irq_domain_ops' has no member named 'match'
+     .match = ps3_host_match,
+      ^~~~~
+   arch/powerpc/platforms/ps3/interrupt.c:690:11: error: excess elements in struct initializer [-Werror]
+     .match = ps3_host_match,
+              ^~~~~~~~~~~~~~
+   arch/powerpc/platforms/ps3/interrupt.c:690:11: note: (near initialization for 'ps3_host_ops')
+   arch/powerpc/platforms/ps3/interrupt.c: In function 'ps3_init_IRQ':
+>> arch/powerpc/platforms/ps3/interrupt.c:757:9: error: implicit declaration of function 'irq_domain_add_nomap'; did you mean 'irq_data_get_node'? [-Werror=implicit-function-declaration]
+     host = irq_domain_add_nomap(NULL, PS3_PLUG_MAX + 1, &ps3_host_ops, NULL);
+            ^~~~~~~~~~~~~~~~~~~~
+            irq_data_get_node
+>> arch/powerpc/platforms/ps3/interrupt.c:757:7: error: assignment makes pointer from integer without a cast [-Werror=int-conversion]
+     host = irq_domain_add_nomap(NULL, PS3_PLUG_MAX + 1, &ps3_host_ops, NULL);
+          ^
+>> arch/powerpc/platforms/ps3/interrupt.c:758:2: error: implicit declaration of function 'irq_set_default_host'; did you mean 'irq_set_affinity_hint'? [-Werror=implicit-function-declaration]
+     irq_set_default_host(host);
+     ^~~~~~~~~~~~~~~~~~~~
+     irq_set_affinity_hint
+   arch/powerpc/platforms/ps3/interrupt.c: At top level:
+>> arch/powerpc/platforms/ps3/interrupt.c:688:36: error: storage size of 'ps3_host_ops' isn't known
+    static const struct irq_domain_ops ps3_host_ops = {
+                                       ^~~~~~~~~~~~
+   cc1: all warnings being treated as errors
+--
+   arch/powerpc/platforms/pseries/ibmebus.c: In function 'ibmebus_request_irq':
+>> arch/powerpc/platforms/pseries/ibmebus.c:231:21: error: implicit declaration of function 'irq_create_mapping'; did you mean 'vmemmap_create_mapping'? [-Werror=implicit-function-declaration]
+     unsigned int irq = irq_create_mapping(NULL, ist);
+                        ^~~~~~~~~~~~~~~~~~
+                        vmemmap_create_mapping
+   arch/powerpc/platforms/pseries/ibmebus.c: In function 'ibmebus_free_irq':
+>> arch/powerpc/platforms/pseries/ibmebus.c:242:21: error: implicit declaration of function 'irq_find_mapping'; did you mean 'page_file_mapping'? [-Werror=implicit-function-declaration]
+     unsigned int irq = irq_find_mapping(NULL, ist);
+                        ^~~~~~~~~~~~~~~~
+                        page_file_mapping
+>> arch/powerpc/platforms/pseries/ibmebus.c:245:2: error: implicit declaration of function 'irq_dispose_mapping'; did you mean 'qid_has_mapping'? [-Werror=implicit-function-declaration]
+     irq_dispose_mapping(irq);
+     ^~~~~~~~~~~~~~~~~~~
+     qid_has_mapping
+   cc1: all warnings being treated as errors
+--
+   arch/powerpc/kvm/book3s_xive.c: In function 'xive_attach_escalation':
+>> arch/powerpc/kvm/book3s_xive.c:118:23: error: implicit declaration of function 'irq_create_mapping'; did you mean 'vmemmap_create_mapping'? [-Werror=implicit-function-declaration]
+     xc->esc_virq[prio] = irq_create_mapping(NULL, q->esc_irq);
+                          ^~~~~~~~~~~~~~~~~~
+                          vmemmap_create_mapping
+>> arch/powerpc/kvm/book3s_xive.c:169:2: error: implicit declaration of function 'irq_dispose_mapping'; did you mean 'qid_has_mapping'? [-Werror=implicit-function-declaration]
+     irq_dispose_mapping(xc->esc_virq[prio]);
+     ^~~~~~~~~~~~~~~~~~~
+     qid_has_mapping
+   cc1: all warnings being treated as errors
+
+vim +689 arch/powerpc/platforms/ps3/interrupt.c
+
+2832a81df Geoff Levand           2006-11-23  680  
+ad3aedfbb Marc Zyngier           2015-07-28 @681  static int ps3_host_match(struct irq_domain *h, struct device_node *np,
+ad3aedfbb Marc Zyngier           2015-07-28 @682  			  enum irq_domain_bus_token bus_token)
+8528ab84e Michael Ellerman       2007-08-28  683  {
+8528ab84e Michael Ellerman       2007-08-28  684  	/* Match all */
+8528ab84e Michael Ellerman       2007-08-28  685  	return 1;
+8528ab84e Michael Ellerman       2007-08-28  686  }
+8528ab84e Michael Ellerman       2007-08-28  687  
+9f70b8eb3 Grant Likely           2012-01-26 @688  static const struct irq_domain_ops ps3_host_ops = {
+9633ac8d1 Geoff Levand           2007-01-26 @689  	.map = ps3_host_map,
+8528ab84e Michael Ellerman       2007-08-28 @690  	.match = ps3_host_match,
+2832a81df Geoff Levand           2006-11-23  691  };
+2832a81df Geoff Levand           2006-11-23  692  
+2832a81df Geoff Levand           2006-11-23  693  void __init ps3_register_ipi_debug_brk(unsigned int cpu, unsigned int virq)
+2832a81df Geoff Levand           2006-11-23  694  {
+9633ac8d1 Geoff Levand           2007-01-26  695  	struct ps3_private *pd = &per_cpu(ps3_private, cpu);
+2832a81df Geoff Levand           2006-11-23  696  
+32b9074bf Geoff Levand           2011-11-29  697  	set_bit(63 - virq, &pd->ipi_debug_brk_mask);
+2832a81df Geoff Levand           2006-11-23  698  
+32b9074bf Geoff Levand           2011-11-29  699  	DBG("%s:%d: cpu %u, virq %u, mask %lxh\n", __func__, __LINE__,
+32b9074bf Geoff Levand           2011-11-29  700  		cpu, virq, pd->ipi_debug_brk_mask);
+2832a81df Geoff Levand           2006-11-23  701  }
+2832a81df Geoff Levand           2006-11-23  702  
+72f3bea07 Geoff Levand           2011-11-08  703  void __init ps3_register_ipi_irq(unsigned int cpu, unsigned int virq)
+72f3bea07 Geoff Levand           2011-11-08  704  {
+72f3bea07 Geoff Levand           2011-11-08  705  	struct ps3_private *pd = &per_cpu(ps3_private, cpu);
+72f3bea07 Geoff Levand           2011-11-08  706  
+72f3bea07 Geoff Levand           2011-11-08  707  	set_bit(63 - virq, &pd->ipi_mask);
+72f3bea07 Geoff Levand           2011-11-08  708  
+72f3bea07 Geoff Levand           2011-11-08  709  	DBG("%s:%d: cpu %u, virq %u, ipi_mask %lxh\n", __func__, __LINE__,
+72f3bea07 Geoff Levand           2011-11-08  710  		cpu, virq, pd->ipi_mask);
+72f3bea07 Geoff Levand           2011-11-08  711  }
+72f3bea07 Geoff Levand           2011-11-08  712  
+9263e85aa Geoff Levand           2007-06-16  713  static unsigned int ps3_get_irq(void)
+2832a81df Geoff Levand           2006-11-23  714  {
+69111bac4 Christoph Lameter      2014-10-21  715  	struct ps3_private *pd = this_cpu_ptr(&ps3_private);
+861be32ce Geoff Levand           2007-01-26  716  	u64 x = (pd->bmp.status & pd->bmp.mask);
+9cf9e1966 Benjamin Herrenschmidt 2007-01-26  717  	unsigned int plug;
+2832a81df Geoff Levand           2006-11-23  718  
+2832a81df Geoff Levand           2006-11-23  719  	/* check for ipi break first to stop this cpu ASAP */
+2832a81df Geoff Levand           2006-11-23  720  
+32b9074bf Geoff Levand           2011-11-29  721  	if (x & pd->ipi_debug_brk_mask)
+32b9074bf Geoff Levand           2011-11-29  722  		x &= pd->ipi_debug_brk_mask;
+2832a81df Geoff Levand           2006-11-23  723  
+9cf9e1966 Benjamin Herrenschmidt 2007-01-26  724  	asm volatile("cntlzd %0,%1" : "=r" (plug) : "r" (x));
+9cf9e1966 Benjamin Herrenschmidt 2007-01-26  725  	plug &= 0x3f;
+2832a81df Geoff Levand           2006-11-23  726  
+ef24ba709 Michael Ellerman       2016-09-06  727  	if (unlikely(!plug)) {
+32b9074bf Geoff Levand           2011-11-29  728  		DBG("%s:%d: no plug found: thread_id %llu\n", __func__,
+aab835007 Geoff Levand           2007-06-16  729  			__LINE__, pd->thread_id);
+9633ac8d1 Geoff Levand           2007-01-26  730  		dump_bmp(&per_cpu(ps3_private, 0));
+9633ac8d1 Geoff Levand           2007-01-26  731  		dump_bmp(&per_cpu(ps3_private, 1));
+ef24ba709 Michael Ellerman       2016-09-06  732  		return 0;
+2832a81df Geoff Levand           2006-11-23  733  	}
+2832a81df Geoff Levand           2006-11-23  734  
+2832a81df Geoff Levand           2006-11-23  735  #if defined(DEBUG)
+9cf9e1966 Benjamin Herrenschmidt 2007-01-26  736  	if (unlikely(plug < NUM_ISA_INTERRUPTS || plug > PS3_PLUG_MAX)) {
+9633ac8d1 Geoff Levand           2007-01-26  737  		dump_bmp(&per_cpu(ps3_private, 0));
+9633ac8d1 Geoff Levand           2007-01-26  738  		dump_bmp(&per_cpu(ps3_private, 1));
+2832a81df Geoff Levand           2006-11-23  739  		BUG();
+2832a81df Geoff Levand           2006-11-23  740  	}
+2832a81df Geoff Levand           2006-11-23  741  #endif
+72f3bea07 Geoff Levand           2011-11-08  742  
+72f3bea07 Geoff Levand           2011-11-08  743  	/* IPIs are EOIed here. */
+72f3bea07 Geoff Levand           2011-11-08  744  
+72f3bea07 Geoff Levand           2011-11-08  745  	if (test_bit(63 - plug, &pd->ipi_mask))
+72f3bea07 Geoff Levand           2011-11-08  746  		lv1_end_of_interrupt_ext(pd->ppe_id, pd->thread_id, plug);
+72f3bea07 Geoff Levand           2011-11-08  747  
+2832a81df Geoff Levand           2006-11-23  748  	return plug;
+2832a81df Geoff Levand           2006-11-23  749  }
+2832a81df Geoff Levand           2006-11-23  750  
+2832a81df Geoff Levand           2006-11-23  751  void __init ps3_init_IRQ(void)
+2832a81df Geoff Levand           2006-11-23  752  {
+2832a81df Geoff Levand           2006-11-23  753  	int result;
+2832a81df Geoff Levand           2006-11-23  754  	unsigned cpu;
+bae1d8f19 Grant Likely           2012-02-14  755  	struct irq_domain *host;
+2832a81df Geoff Levand           2006-11-23  756  
+6fa6c8e25 Grant Likely           2012-02-15 @757  	host = irq_domain_add_nomap(NULL, PS3_PLUG_MAX + 1, &ps3_host_ops, NULL);
+2832a81df Geoff Levand           2006-11-23 @758  	irq_set_default_host(host);
+2832a81df Geoff Levand           2006-11-23  759  
+2832a81df Geoff Levand           2006-11-23  760  	for_each_possible_cpu(cpu) {
+9633ac8d1 Geoff Levand           2007-01-26  761  		struct ps3_private *pd = &per_cpu(ps3_private, cpu);
+2832a81df Geoff Levand           2006-11-23  762  
+aab835007 Geoff Levand           2007-06-16  763  		lv1_get_logical_ppe_id(&pd->ppe_id);
+aab835007 Geoff Levand           2007-06-16  764  		pd->thread_id = get_hard_smp_processor_id(cpu);
+32b9074bf Geoff Levand           2011-11-29  765  		spin_lock_init(&pd->bmp_lock);
+2832a81df Geoff Levand           2006-11-23  766  
+32b9074bf Geoff Levand           2011-11-29  767  		DBG("%s:%d: ppe_id %llu, thread_id %llu, bmp %lxh\n",
+aab835007 Geoff Levand           2007-06-16  768  			__func__, __LINE__, pd->ppe_id, pd->thread_id,
+407e24a0c Geoff Levand           2007-01-26  769  			ps3_mm_phys_to_lpar(__pa(&pd->bmp)));
+407e24a0c Geoff Levand           2007-01-26  770  
+aab835007 Geoff Levand           2007-06-16  771  		result = lv1_configure_irq_state_bitmap(pd->ppe_id,
+aab835007 Geoff Levand           2007-06-16  772  			pd->thread_id, ps3_mm_phys_to_lpar(__pa(&pd->bmp)));
+2832a81df Geoff Levand           2006-11-23  773  
+2832a81df Geoff Levand           2006-11-23  774  		if (result)
+32b9074bf Geoff Levand           2011-11-29  775  			FAIL("%s:%d: lv1_configure_irq_state_bitmap failed:"
+2832a81df Geoff Levand           2006-11-23  776  				" %s\n", __func__, __LINE__,
+2832a81df Geoff Levand           2006-11-23  777  				ps3_result(result));
+2832a81df Geoff Levand           2006-11-23  778  	}
+2832a81df Geoff Levand           2006-11-23  779  
+2832a81df Geoff Levand           2006-11-23  780  	ppc_md.get_irq = ps3_get_irq;
+2832a81df Geoff Levand           2006-11-23  781  }
+9263e85aa Geoff Levand           2007-06-16  782  
+
+:::::: The code at line 689 was first introduced by commit
+:::::: 9633ac8d172f74b8ee51e0fe85c06eb726039aa8 [POWERPC] ps3: rename interrupt symbols
+
+:::::: TO: Geoff Levand <geoffrey.levand@am.sony.com>
+:::::: CC: Paul Mackerras <paulus@samba.org>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 23952 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180913/b876fed1/attachment-0001.gz>
