@@ -1,46 +1,85 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 13 Sep 2018 11:27:14 +0200
-Subject: unexpected side effect of "gpiolib: override irq_enable/disable"
-In-Reply-To: <a6ab8cfd-f245-5607-f720-8e5b607e7136@xs4all.nl>
-References: <20180912145829.hzklqndjasac2ap4@M43218.corp.atmel.com>
- <f64fcb6a-172f-45e8-af8f-f1e7bae3b4d8@xs4all.nl>
- <20180913074742.7cdvfiosb3nyc4ui@M43218.corp.atmel.com>
- <a6ab8cfd-f245-5607-f720-8e5b607e7136@xs4all.nl>
-Message-ID: <CACRpkdaDgWckvtwik4S8WRBOA-DvOobjAPBM2_6SN4U5gw+Omg@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 13 Sep 2018 11:09:47 +0200
+Subject: [PATCH 52/58] arm64: dts: renesas: r8a77990: Add all MSIOF nodes
+In-Reply-To: <cover.1536828567.git.horms+renesas@verge.net.au>
+References: <cover.1536828567.git.horms+renesas@verge.net.au>
+Message-ID: <4b7e3ab1916931dee402bd50a764c694df6f6a1c.1536828567.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2018 at 11:07 AM Hans Verkuil <hverkuil@xs4all.nl> wrote:
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-> > I am not sure which solution is the best. Of course I prefer this one as
-> > I don't have to modify the pinctrl-at91 driver but if I have to modify
-> > it to not share the same irq_chip structure, I'll handle it. Just let me
-> > know.
-(...)
-> One concern I have with the approach taken in this driver is that while placing
-> the hooks works fine (with this patch), but when the gpiochip that contains
-> the old callbacks for this irqchip is removed, the hooks are also removed for
-> all gpiochips using this irqchip. I don't think there is anything I can do
-> about that without hacking struct irq_chip.
->
-> So from that perspective it's better to have separate irq_chip structs. But
-> if there are (a lot?) more drivers doing this, than I need to look for a
-> better solution.
+Add the device nodes for all MSIOF SPI controllers, incl. clocks, power
+domains, and resets properties.
 
-I think it's something like that before it was an OK practice to have
-the same irqchip for multiple GPIO chips, but after this patch it
-becomes a bad practice.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a77990.dtsi | 52 +++++++++++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
 
-I do not think it is a big problem. Very few systems would even
-consider randomly unloading their gpiochips, they are mostly
-vital infrastructure, and we don't go building complex solutions
-around theoretical problems.
-
-I think what we should do is apply this fix, then annotate the
-drivers that use the same irqchip with multiple gpiochips with
-some
-FIXME: this is bad practice
-comments.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm64/boot/dts/renesas/r8a77990.dtsi b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
+index 6198768264be..e3009c5f5210 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77990.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
+@@ -429,6 +429,58 @@
+ 			status = "disabled";
+ 		};
+ 
++		msiof0: spi at e6e90000 {
++			compatible = "renesas,msiof-r8a77990",
++				     "renesas,rcar-gen3-msiof";
++			reg = <0 0xe6e90000 0 0x0064>;
++			interrupts = <GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 211>;
++			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
++			resets = <&cpg 211>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
++		msiof1: spi at e6ea0000 {
++			compatible = "renesas,msiof-r8a77990",
++				     "renesas,rcar-gen3-msiof";
++			reg = <0 0xe6ea0000 0 0x0064>;
++			interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 210>;
++			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
++			resets = <&cpg 210>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
++		msiof2: spi at e6c00000 {
++			compatible = "renesas,msiof-r8a77990",
++				     "renesas,rcar-gen3-msiof";
++			reg = <0 0xe6c00000 0 0x0064>;
++			interrupts = <GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 209>;
++			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
++			resets = <&cpg 209>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
++		msiof3: spi at e6c10000 {
++			compatible = "renesas,msiof-r8a77990",
++				     "renesas,rcar-gen3-msiof";
++			reg = <0 0xe6c10000 0 0x0064>;
++			interrupts = <GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 208>;
++			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
++			resets = <&cpg 208>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
+ 		xhci0: usb at ee000000 {
+ 			compatible = "renesas,xhci-r8a77990",
+ 				     "renesas,rcar-gen3-xhci";
+-- 
+2.11.0
