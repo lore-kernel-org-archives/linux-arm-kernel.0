@@ -1,70 +1,93 @@
-From: greg@kroah.com (Greg KH)
-Date: Thu, 13 Sep 2018 14:40:46 +0200
-Subject: [stable PATCH 1/2] arm64: Fix mismatched cache line size detection
-In-Reply-To: <20180913121951.GE2268@kroah.com>
-References: <1536052210-11625-1-git-send-email-suzuki.poulose@arm.com>
- <20180912193816.GF21563@kroah.com>
- <4b8db4d5-20d7-5597-7977-b8df1072ecc7@arm.com>
- <20180913121951.GE2268@kroah.com>
-Message-ID: <20180913124046.GA21180@kroah.com>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Thu, 13 Sep 2018 14:42:13 +0200
+Subject: [PATCH] pinctrl: at91: don't use the same irqchip with multiple
+ gpiochips
+Message-ID: <20180913124213.32065-1-ludovic.desroches@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2018 at 02:19:51PM +0200, Greg KH wrote:
-> On Thu, Sep 13, 2018 at 10:54:06AM +0100, Suzuki K Poulose wrote:
-> > Hi Greg,
-> > 
-> > On 12/09/18 20:38, Greg KH wrote:
-> > > On Tue, Sep 04, 2018 at 10:10:09AM +0100, Suzuki K Poulose wrote:
-> > > > commit 4c4a39dd5fe2d13e2d2fa5fceb8ef95d19fc389a upstream
-> > > > 
-> > > > If there is a mismatch in the I/D min line size, we must
-> > > > always use the system wide safe value both in applications
-> > > > and in the kernel, while performing cache operations. However,
-> > > > we have been checking more bits than just the min line sizes,
-> > > > which triggers false negatives. We may need to trap the user
-> > > > accesses in such cases, but not necessarily patch the kernel.
-> > > > 
-> > > > This patch fixes the check to do the right thing as advertised.
-> > > > A new capability will be added to check mismatches in other
-> > > > fields and ensure we trap the CTR accesses.
-> > > > 
-> > > > Fixes: be68a8aaf925 ("arm64: cpufeature: Fix CTR_EL0 field definitions")
-> > > > Cc: <stable@vger.kernel.org> # v4.9
-> > > 
-> > > Why 4.9?  be68a8aaf925 only showed up in 4.16 and was backported only to
-> > > 4.14-stable.  Not to 4.9-stable from what I can tell.
-> > 
-> > Now when you asked this, I realise that the Fixes tags were not sufficient.
-> > 
-> > Actually this series fixes a bit more than the commit: be68a8aaf925 ("arm64: cpufeature:
-> > Fix CTR_EL0 field definitions"). I think these patches should have :
-> > 
-> > Fixes: commit 116c81f427ff6c5 ("arm64: Work around systems with mismatched cache line sizes")
-> > 
-> > and
-> > 
-> > Enable trapping on mismatched bits in CTR for IDC/DIC, which were
-> > added to v8.3 onwards.
-> > 
-> > Essentially these patches makes sure that we trap accesses to
-> > CTR_EL0 when some of the fields are mismatched across CPUs, so
-> > that the CPUs get a consistent view of the cache properties
-> > throughout the system. It also makes sure that we put out
-> > correct information about why we trap accesses to the CTR_EL0
-> > accesses from the userspace.
-> > 
-> > Hope this helps. The same applies for the next patch.
-> 
-> Yes, it does help.  But these patches do not apply to the 4.14.y series,
-> which I also need to apply them to (you don't want to move from 4.9.y to
-> 4.14.y and get a regression.)
-> 
-> So can you provide backports for both of these patches for 4.14.y?  Then
-> I would be glad to queue these all up.
+Sharing the same irqchip with multiple gpiochips is not a good
+practice. For instance, when installing hooks, we change the state
+of the irqchip. The initial state of the irqchip for the second
+gpiochip to register is then disrupted.
 
-Oh nevermind, I found those patches in my queue, you already sent them!
+Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+---
+Hi,
 
-sorry for the noise.
+This patch fixes the issue encountered in linux-next because of
+"gpiolib: override irq_enable/disable". As discussed [1], the gpiolib
+can do some extra checks but sharing the same irqchip with multiple
+gpiochips is seen as a bad practice.
 
-greg k-h
+[1] https://www.spinics.net/lists/arm-kernel/msg676097.html
+
+ drivers/pinctrl/pinctrl-at91.c | 28 ++++++++++++++--------------
+ 1 file changed, 14 insertions(+), 14 deletions(-)
+
+diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+index cfd8239f2727..911ea0fe2a41 100644
+--- a/drivers/pinctrl/pinctrl-at91.c
++++ b/drivers/pinctrl/pinctrl-at91.c
+@@ -1574,16 +1574,6 @@ void at91_pinctrl_gpio_resume(void)
+ #define gpio_irq_set_wake	NULL
+ #endif /* CONFIG_PM */
+ 
+-static struct irq_chip gpio_irqchip = {
+-	.name		= "GPIO",
+-	.irq_ack	= gpio_irq_ack,
+-	.irq_disable	= gpio_irq_mask,
+-	.irq_mask	= gpio_irq_mask,
+-	.irq_unmask	= gpio_irq_unmask,
+-	/* .irq_set_type is set dynamically */
+-	.irq_set_wake	= gpio_irq_set_wake,
+-};
+-
+ static void gpio_irq_handler(struct irq_desc *desc)
+ {
+ 	struct irq_chip *chip = irq_desc_get_chip(desc);
+@@ -1624,12 +1614,22 @@ static int at91_gpio_of_irq_setup(struct platform_device *pdev,
+ 	struct gpio_chip	*gpiochip_prev = NULL;
+ 	struct at91_gpio_chip   *prev = NULL;
+ 	struct irq_data		*d = irq_get_irq_data(at91_gpio->pioc_virq);
++	struct irq_chip		*gpio_irqchip;
+ 	int ret, i;
+ 
++	gpio_irqchip = devm_kzalloc(&pdev->dev, sizeof(*gpio_irqchip), GFP_KERNEL);
++	if (!gpio_irqchip)
++		return -ENOMEM;
++
+ 	at91_gpio->pioc_hwirq = irqd_to_hwirq(d);
+ 
+-	/* Setup proper .irq_set_type function */
+-	gpio_irqchip.irq_set_type = at91_gpio->ops->irq_type;
++	gpio_irqchip->name = "GPIO";
++	gpio_irqchip->irq_ack = gpio_irq_ack;
++	gpio_irqchip->irq_disable = gpio_irq_mask;
++	gpio_irqchip->irq_mask = gpio_irq_mask;
++	gpio_irqchip->irq_unmask = gpio_irq_unmask;
++	gpio_irqchip->irq_set_wake = gpio_irq_set_wake,
++	gpio_irqchip->irq_set_type = at91_gpio->ops->irq_type;
+ 
+ 	/* Disable irqs of this PIO controller */
+ 	writel_relaxed(~0, at91_gpio->regbase + PIO_IDR);
+@@ -1640,7 +1640,7 @@ static int at91_gpio_of_irq_setup(struct platform_device *pdev,
+ 	 * interrupt.
+ 	 */
+ 	ret = gpiochip_irqchip_add(&at91_gpio->chip,
+-				   &gpio_irqchip,
++				   gpio_irqchip,
+ 				   0,
+ 				   handle_edge_irq,
+ 				   IRQ_TYPE_NONE);
+@@ -1658,7 +1658,7 @@ static int at91_gpio_of_irq_setup(struct platform_device *pdev,
+ 	if (!gpiochip_prev) {
+ 		/* Then register the chain on the parent IRQ */
+ 		gpiochip_set_chained_irqchip(&at91_gpio->chip,
+-					     &gpio_irqchip,
++					     gpio_irqchip,
+ 					     at91_gpio->pioc_virq,
+ 					     gpio_irq_handler);
+ 		return 0;
+-- 
+2.12.2
