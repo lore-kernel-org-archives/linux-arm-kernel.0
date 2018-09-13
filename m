@@ -1,34 +1,28 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 12 Sep 2018 21:18:50 -0700
-Subject: [PATCH] arm64: dts: meson-axg: sort nodes consistently
-In-Reply-To: <20180829154551.26729-1-jbrunet@baylibre.com> (Jerome Brunet's
- message of "Wed, 29 Aug 2018 17:45:51 +0200")
-References: <20180829154551.26729-1-jbrunet@baylibre.com>
-Message-ID: <7h4leuxc5x.fsf@baylibre.com>
+Date: Wed, 12 Sep 2018 21:20:53 -0700
+Subject: [PATCH] arm64: dts: meson: Switch simple-mfd and syscon order
+In-Reply-To: <7hh8iuxd1y.fsf@baylibre.com>
+References: <1532614438-7207-1-git-send-email-narmstrong@baylibre.com>
+ <7hh8iuxd1y.fsf@baylibre.com>
+Message-ID: <CAOi56cVESykxXg4zcdLh89Rpyiyg587XCkvFG55FnMSro4vH2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jerome Brunet <jbrunet@baylibre.com> writes:
+On Wed, Sep 12, 2018 at 8:59 PM Kevin Hilman <khilman@baylibre.com> wrote:
+>
+> Neil Armstrong <narmstrong@baylibre.com> writes:
+>
+> > The order between "syscon" and "simple-mfd" is important because in these
+> > particular cases, the node needs to be first a "simple-mfd" to expose
+> > it's sub-nodes, and later on a "syscon" to permit other nodes to access
+> > this register space through the "syscon" mechanism.
+> >
+> > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>
+> Applied to v4.20/dt64,
+>
 
-> Sort DT nodes by address when possible, by node node name otherwise.
->
-> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> ---
->
-> Hi Kevin,
->
-> This patch is same kind of clean-up we already did on gxbb and gxl some
-> time ago. In the same fashion, it ends up being and ugly and almost unreadable
-> patch, sorry about that :( I don't think there was a way to avoid it.
->
-> The patch applies on top v4.19-rc1 + 3 DT audio patches which are in your
-> v4.19/dt64 branch [0]
->
-> There should be no functional change after applying this patch.
-> I've tested it in on the s400 and so far, so good.
-
-Thanks for the cleanup,
-
-Applied to v4.20/dt64,
+I spoke too soon, this doesn't apply cleanly on top of Jeromes
+reorder/cleanup.  Please respin/resend.
 
 Kevin
