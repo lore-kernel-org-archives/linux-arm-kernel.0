@@ -1,56 +1,45 @@
 From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Thu, 13 Sep 2018 13:30:22 +0200
-Subject: [PATCH v7 5/7] ARM: at91: Implement clocksource selection
+Date: Thu, 13 Sep 2018 13:30:24 +0200
+Subject: [PATCH v7 7/7] ARM: configs: at91: unselect PIT
 In-Reply-To: <20180913113024.3571-1-alexandre.belloni@bootlin.com>
 References: <20180913113024.3571-1-alexandre.belloni@bootlin.com>
-Message-ID: <20180913113024.3571-6-alexandre.belloni@bootlin.com>
+Message-ID: <20180913113024.3571-8-alexandre.belloni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow selecting and unselecting the PIT clocksource driver so it doesn't
-have to be compile when unused.
+The PIT is not required anymore to successfully boot and may actually harm
+in case preempt-rt is used because the PIT interrupt is shared.
+Disable it so the TCB clocksource is used.
 
-Tested-by: Alexander Dahl <ada@thorsis.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
 ---
- arch/arm/mach-at91/Kconfig | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm/configs/at91_dt_defconfig | 1 +
+ arch/arm/configs/sama5_defconfig   | 1 +
+ 2 files changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 903f23c309df..fa493a86e2bb 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -107,6 +107,31 @@ config SOC_AT91SAM9
- 	    AT91SAM9X35
- 	    AT91SAM9XE
- 
-+comment "Clocksource driver selection"
-+
-+config ATMEL_CLOCKSOURCE_PIT
-+	bool "Periodic Interval Timer (PIT) support"
-+	depends on SOC_AT91SAM9 || SOC_SAMA5
-+	default SOC_AT91SAM9 || SOC_SAMA5
-+	select ATMEL_PIT
-+	help
-+	  Select this to get a clocksource based on the Atmel Periodic Interval
-+	  Timer. It has a relatively low resolution and the TC Block clocksource
-+	  should be preferred.
-+
-+config ATMEL_CLOCKSOURCE_TCB
-+	bool "Timer Counter Blocks (TCB) support"
-+	depends on SOC_AT91RM9200 || SOC_AT91SAM9 || SOC_SAMA5 || COMPILE_TEST
-+	default SOC_AT91RM9200 || SOC_AT91SAM9 || SOC_SAMA5
-+	depends on !ATMEL_TCLIB
-+	select ATMEL_ARM_TCB_CLKSRC
-+	help
-+	  Select this to get a high precision clocksource based on a
-+	  TC block with a 5+ MHz base clock rate.
-+	  On platforms with 16-bit counters, two timer channels are combined
-+	  to make a single 32-bit timer.
-+	  It can also be used as a clock event device supporting oneshot mode.
-+
- config HAVE_AT91_UTMI
- 	bool
- 
+diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
+index 09f262e59fef..f4b253bd05ed 100644
+--- a/arch/arm/configs/at91_dt_defconfig
++++ b/arch/arm/configs/at91_dt_defconfig
+@@ -19,6 +19,7 @@ CONFIG_ARCH_MULTI_V5=y
+ CONFIG_ARCH_AT91=y
+ CONFIG_SOC_AT91RM9200=y
+ CONFIG_SOC_AT91SAM9=y
++# CONFIG_ATMEL_CLOCKSOURCE_PIT is not set
+ CONFIG_AEABI=y
+ CONFIG_UACCESS_WITH_MEMCPY=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
+index f2bbc6339ca6..be92871ab155 100644
+--- a/arch/arm/configs/sama5_defconfig
++++ b/arch/arm/configs/sama5_defconfig
+@@ -20,6 +20,7 @@ CONFIG_ARCH_AT91=y
+ CONFIG_SOC_SAMA5D2=y
+ CONFIG_SOC_SAMA5D3=y
+ CONFIG_SOC_SAMA5D4=y
++# CONFIG_ATMEL_CLOCKSOURCE_PIT is not set
+ CONFIG_AEABI=y
+ CONFIG_UACCESS_WITH_MEMCPY=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
 -- 
 2.19.0
