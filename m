@@ -1,105 +1,85 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Thu, 13 Sep 2018 11:07:42 +0200
-Subject: unexpected side effect of "gpiolib: override irq_enable/disable"
-In-Reply-To: <20180913074742.7cdvfiosb3nyc4ui@M43218.corp.atmel.com>
-References: <20180912145829.hzklqndjasac2ap4@M43218.corp.atmel.com>
- <f64fcb6a-172f-45e8-af8f-f1e7bae3b4d8@xs4all.nl>
- <20180913074742.7cdvfiosb3nyc4ui@M43218.corp.atmel.com>
-Message-ID: <a6ab8cfd-f245-5607-f720-8e5b607e7136@xs4all.nl>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 13 Sep 2018 11:08:18 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.20
+Message-ID: <cover.1536824376.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(apologies if this is a repost, there was an email hickup when I sent it
-the first time)
+Hi Olof, Hi Kevin, Hi Arnd,
 
-On 09/13/18 09:47, Ludovic Desroches wrote:
-> Hi Hans,
-> 
-> On Wed, Sep 12, 2018 at 05:30:35PM +0200, Hans Verkuil wrote:
->> Hi Ludovic,
->>
->> On 09/12/2018 04:58 PM, Ludovic Desroches wrote:
->>> Hi,
->>>
->>> Using next-20180912, my kernel hangs during the boot. Git bisect tell me
->>> that the cause of my issue is the commit "gpiolib: override
->>> irq_enable/disable"
->>>
->>> I dug further and this patch can have some side effects. When booting, I
->>> have an infinite loop when trying to enable a gpio irq. I don't know if
->>> the pinctrl-at91 driver is the only one concerned or not.
->>>
->>> The pattern leading to this issue is quite simple: we have several gpio
->>> controllers sharing the same irq_chip structure. Installing the
->>> irq_enable/irq_disable hook works well the first time. The second time,
->>> since the irq_enable has been altered to use gpiochip_irq_enable,
->>> this latest function will call itself again and again by calling
->>> irq_enable.
->>>
->>> I think it should be better to have one irq_chip structure per gpio
->>> controller. I am going to do a patch for pinctrl-at91. Excepting if you
->>> think it has to be solved in a different way.
->>>
->>>
->>> Ludovic
->>>
->>
->> Can you try this patch first?
-> 
-> Yes it works, I also have this kind of change in mind.
+Please consider these Renesas ARM based SoC DT updates for v4.20.
 
-Good. I think this patch needs to go in regardless, since this makes it
-a lot more robust. My main question is whether this situation is indicative
-of a bad driver design, or if this is normal behavior that this code just
-has to support.
+I am sending out this pull-request at this time as there are a number
+of patches queued up in my arm (32) DT branch and I hope that this
+will ease the burden later on in the development cycle. I expect to
+send a follow-up pull-request for this branch at the usual pre-rc6 timing.
 
-> I am not sure which solution is the best. Of course I prefer this one as
-> I don't have to modify the pinctrl-at91 driver but if I have to modify
-> it to not share the same irq_chip structure, I'll handle it. Just let me
-> know.
 
-I tried to figure out where this happens exactly in this driver (sharing the
-same irq_chip structure), but I'm not quite sure I fully understand it. Can
-you point out where this happens?
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 
-One concern I have with the approach taken in this driver is that while placing
-the hooks works fine (with this patch), but when the gpiochip that contains
-the old callbacks for this irqchip is removed, the hooks are also removed for
-all gpiochips using this irqchip. I don't think there is anything I can do
-about that without hacking struct irq_chip.
+  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
 
-So from that perspective it's better to have separate irq_chip structs. But
-if there are (a lot?) more drivers doing this, than I need to look for a
-better solution.
+are available in the git repository at:
 
-Regards,
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm-dt-for-v4.20
 
-	Hans
+for you to fetch changes up to 1926bd6bf20fe306797fbf366902674d2d6c20cc:
 
-> 
-> Thanks
-> 
-> Regards
-> 
-> Ludovic
-> 
->>
->> Thanks!
->>
->> 	Hans
->>
->> Signed-off-by: Hans Verkuil <hans.verkuil@cisco.com>
->> ---
->> diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
->> index efce534a269b..e09e4e439928 100644
->> --- a/drivers/gpio/gpiolib.c
->> +++ b/drivers/gpio/gpiolib.c
->> @@ -1859,6 +1859,8 @@ static void gpiochip_set_irq_hooks(struct gpio_chip *gpiochip)
->>  	}
->>  	if (WARN_ON(gpiochip->irq.irq_enable))
->>  		return;
->> +	if (irqchip->irq_enable == gpiochip_irq_enable)
->> +		return;
->>  	gpiochip->irq.irq_enable = irqchip->irq_enable;
->>  	gpiochip->irq.irq_disable = irqchip->irq_disable;
->>  	irqchip->irq_enable = gpiochip_irq_enable;
+  ARM: dts: r9a06g032: Use r9a06g032-sysctrl binding definitions (2018-09-06 11:31:35 +0200)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC DT Updates for v4.20
+
+* R-Car Gen1 SoCs: Include product name in DTSI files for ease of maintenance
+* R-Car Gen2 SoCs:
+  - Convert to new DU DT bindings
+  - Correct SATA device sizes to 2 MiB
+* R-Car H2 (r8a7790) based Porter board: Add DA9063 OnKey PMIC node
+* R-Car E2 (r8a7794) based Silk board: Add DA9063 PMIC, RTC and OnKey nodes
+* R-Car M2-N (r8a7793) based Gose board: Add DA9210 node for CPU DVFS
+* RZ/G1C (R8A77470) SoC:
+  - Add GPIO nodes
+  - Add PFC support
+  - Use r8a77470-sysc binding definitions
+* RZ/G1C (r8a77470) iW-RainboW-G23S dev platform:
+  - Specify EtherAVB PHY IRQ
+  - Add pinctl support for scif1
+* RZ/N1D (r9a06g032) SoC: Use r9a06g032-sysctrl binding definitions
+
+----------------------------------------------------------------
+Biju Das (5):
+      ARM: dts: r8a77470: Use r8a77470-sysc binding definitions
+      ARM: dts: r8a77470: Add PFC support
+      ARM: dts: iwg23s-sbc: Add pinctl support for scif1
+      ARM: dts: r8a77470: Add GPIO support
+      ARM: dts: iwg23s-sbc: specify EtherAVB PHY IRQ
+
+Geert Uytterhoeven (2):
+      ARM: dts: rcar: Correct SATA device sizes to 2 MiB
+      ARM: dts: r9a06g032: Use r9a06g032-sysctrl binding definitions
+
+Laurent Pinchart (1):
+      ARM: dts: rcar-gen2: Convert to new DU DT bindings
+
+Magnus Damm (1):
+      ARM: dts: Include R-Car Gen1 product name in DTSI files
+
+Marek Vasut (4):
+      ARM: dts: gose: Add DA9210 node for CPU DVFS
+      ARM: dts: silk: Add DA9063 PMIC node
+      ARM: dts: silk: Add DA9063 RTC and OnKey node
+      ARM: dts: stout: Add DA9063 OnKey node
+
+ arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts |  12 +++
+ arch/arm/boot/dts/r8a77470.dtsi           | 123 ++++++++++++++++++++++++++----
+ arch/arm/boot/dts/r8a7778.dtsi            |   2 +-
+ arch/arm/boot/dts/r8a7779.dtsi            |   4 +-
+ arch/arm/boot/dts/r8a7790-stout.dts       |   4 +
+ arch/arm/boot/dts/r8a7790.dtsi            |   4 +-
+ arch/arm/boot/dts/r8a7791.dtsi            |   4 +-
+ arch/arm/boot/dts/r8a7792.dtsi            |   1 -
+ arch/arm/boot/dts/r8a7793-gose.dts        |  16 ++++
+ arch/arm/boot/dts/r8a7794-silk.dts        |  25 ++++++
+ arch/arm/boot/dts/r8a7794.dtsi            |   1 -
+ arch/arm/boot/dts/r9a06g032.dtsi          |   7 +-
+ 12 files changed, 178 insertions(+), 25 deletions(-)
