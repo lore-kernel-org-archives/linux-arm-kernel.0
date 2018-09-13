@@ -1,36 +1,60 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 13 Sep 2018 15:18:19 -0700
-Subject: [GIT PULL 3/3] bcm2835-defconfig-next-2018-09-09
-In-Reply-To: <1536817833-3900-3-git-send-email-stefan.wahren@i2se.com>
-References: <1536817833-3900-1-git-send-email-stefan.wahren@i2se.com>
- <1536817833-3900-3-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <ec141825-3eb4-1cfa-7d72-f44346f0aa2a@gmail.com>
+From: ndesaulniers@google.com (Nick Desaulniers)
+Date: Thu, 13 Sep 2018 15:20:07 -0700
+Subject: [PATCH] include/linux/compiler-clang.h: define __naked
+In-Reply-To: <CANiq72=BE8ygC6r4cJ2TshwOKCEv0C8F2xmpLRhSVMfqq16xUQ@mail.gmail.com>
+References: <20180910060455.20409-1-stefan@agner.ch>
+ <CAK8P3a2cc741UqFSk+hXpC2s4S+A+0FuiM1yP=Z4rC18sJHq9g@mail.gmail.com>
+ <CANiq72mGH3KW+FxVDF0PcAeaTCtnNz_oO=2-u4zZQ9kvbRDCtA@mail.gmail.com>
+ <CANiq72=BE8ygC6r4cJ2TshwOKCEv0C8F2xmpLRhSVMfqq16xUQ@mail.gmail.com>
+Message-ID: <CAKwvOdkgdbn76+jGEwUayGriGn+4GQVLtxkzszkBueP6XuOGLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Sep 12, 2018 at 9:03 PM Miguel Ojeda
+<miguel.ojeda.sandonis@gmail.com> wrote:
+>
+> Hi again,
+>
+> On Wed, Sep 12, 2018 at 6:19 AM, Miguel Ojeda
+> <miguel.ojeda.sandonis@gmail.com> wrote:
+> >
+> > I will do a bigger one tomorrow or so and see if there are any
+> > important differences. Regardless of what we do, I will send the
+> > __naked patches separately as well (requested by Nick on GitHub).
+>
+> So I did a comparison with a full allyesconfig between -rc2 and -rc2 +
+> v4. I find quite a lot binary differences, but not a single objdump -d
+> difference (object file by object file) just by fixing UTS_RELEASE to
+> the same value, so I guess that is a very good sign in case someone
+> wants to pick the entire series sooner than expected. Regardless, I
+> will send the separate __naked patches.
+>
+> I should note that, at some point in one of my allyesconfig builds I got this:
+>
+>   UPD     include/generated/compile.h
+>   CC      init/version.o
+>   AR      init/built-in.a
+>   AR      built-in.a
+>   LD      vmlinux.o
+>   MODPOST vmlinux.o
+> ld: drivers/edac/amd64_edac.o(.text+0x200031d2): reloc against
+> `__asan_load4_noabort': error 4
+> ld: final link failed: Nonrepresentable section on output
+> Makefile:1035: recipe for target 'vmlinux' failed
+> make: *** [vmlinux] Error 1
+
++ Dmitry for the KASAN error (Andrey was already cc'ed)
+
+>
+> Running make (without cleaning) didn't reproduce it, and the other
+> allyesconfig builds didn't suffer any problem either. Maybe my
+> hardware is failing, but I wanted to let you know nevertheless.
+>
+> Cheers,
+> Miguel
 
 
-On 09/12/18 22:50, Stefan Wahren wrote:
-> Hi Florian,
-> 
-> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
-> 
->   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/anholt/linux tags/bcm2835-defconfig-next-2018-09-09
-> 
-> for you to fetch changes up to 99fa3b0c6082bff346f7d09f29e5edcc93d40bd3:
-> 
->   ARM: bcm2835_defconfig: Enable bcm2835-audio (2018-09-02 18:49:33 +0200)
-> 
-> ----------------------------------------------------------------
-> This pull request brings enables the RPi audio driver in the
-> bcm2835_defconfig.
-> 
-> ----------------------------------------------------------------
 
-Merged into defconfig/next, thanks Stefan!
 -- 
-Florian
+Thanks,
+~Nick Desaulniers
