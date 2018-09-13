@@ -1,76 +1,117 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Sep 2018 11:09:11 +0200
-Subject: [PATCH 16/58] arm64: dts: renesas: r8a77965: m3nulcb: Initial device
- tree
-In-Reply-To: <cover.1536828567.git.horms+renesas@verge.net.au>
-References: <cover.1536828567.git.horms+renesas@verge.net.au>
-Message-ID: <83ff28c74b525aa33f42b829538017d3e8658e69.1536828567.git.horms+renesas@verge.net.au>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 13 Sep 2018 10:15:34 +0100
+Subject: [PATCH v3] PCI: dwc: fix scheduling while atomic issues
+In-Reply-To: <20180910165722.38218779@xhacker.debian>
+References: <20180829110408.556c3622@xhacker.debian>
+ <20180910165722.38218779@xhacker.debian>
+Message-ID: <20180913091534.GB32721@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eugeniu Rosca <roscaeugeniu@gmail.com>
+On Mon, Sep 10, 2018 at 04:57:22PM +0800, Jisheng Zhang wrote:
+> Hi all,
+> 
+> On Wed, 29 Aug 2018 11:04:08 +0800 Jisheng Zhang wrote:
+> 
+> > When programming inbound/outbound atu, we call usleep_range() after
+> > each checking PCIE_ATU_ENABLE bit. Unfortunately, the atu programming
+> > can be called in atomic context:
+> > 
+> > inbound atu programming could be called through
+> > pci_epc_write_header()
+> >   =>dw_pcie_ep_write_header()
+> >     =>dw_pcie_prog_inbound_atu()  
+> > 
+> > outbound atu programming could be called through
+> > pci_bus_read_config_dword()
+> >   =>dw_pcie_rd_conf()
+> >     =>dw_pcie_prog_outbound_atu()  
+> > 
+> > Fix this issue by calling mdelay() instead.
+> 
+> Any comments about this patch?
+> 
+> Thanks,
+> Jisheng
+> 
+> > 
+> > Fixes: f8aed6ec624f ("PCI: dwc: designware: Add EP mode support")
+> > Fixes: d8bbeb39fbf3 ("PCI: designware: Wait for iATU enable")
 
-Allow the bare M3-N-based ULCB board to boot.
+Can you split it into two patches and repost it please ? It will make
+everyone's life easier to backport it if there is need, I will apply
+then.
 
-Signed-off-by: Eugeniu Rosca <erosca@de.adit-jv.com>
-Reviewed-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/Makefile             |  1 +
- arch/arm64/boot/dts/renesas/r8a77965-m3nulcb.dts | 33 ++++++++++++++++++++++++
- 2 files changed, 34 insertions(+)
- create mode 100644 arch/arm64/boot/dts/renesas/r8a77965-m3nulcb.dts
+Thanks,
+Lorenzo
 
-diff --git a/arch/arm64/boot/dts/renesas/Makefile b/arch/arm64/boot/dts/renesas/Makefile
-index 9e2394bc3c62..eb158d1f90e9 100644
---- a/arch/arm64/boot/dts/renesas/Makefile
-+++ b/arch/arm64/boot/dts/renesas/Makefile
-@@ -8,6 +8,7 @@ dtb-$(CONFIG_ARCH_R8A7796) += r8a7796-salvator-x.dtb r8a7796-m3ulcb.dtb
- dtb-$(CONFIG_ARCH_R8A7796) += r8a7796-m3ulcb-kf.dtb
- dtb-$(CONFIG_ARCH_R8A7796) += r8a7796-salvator-xs.dtb
- dtb-$(CONFIG_ARCH_R8A77965) += r8a77965-salvator-x.dtb r8a77965-salvator-xs.dtb
-+dtb-$(CONFIG_ARCH_R8A77965) += r8a77965-m3nulcb.dtb
- dtb-$(CONFIG_ARCH_R8A77970) += r8a77970-eagle.dtb r8a77970-v3msk.dtb
- dtb-$(CONFIG_ARCH_R8A77980) += r8a77980-condor.dtb r8a77980-v3hsk.dtb
- dtb-$(CONFIG_ARCH_R8A77990) += r8a77990-ebisu.dtb
-diff --git a/arch/arm64/boot/dts/renesas/r8a77965-m3nulcb.dts b/arch/arm64/boot/dts/renesas/r8a77965-m3nulcb.dts
-new file mode 100644
-index 000000000000..964078b6cc49
---- /dev/null
-+++ b/arch/arm64/boot/dts/renesas/r8a77965-m3nulcb.dts
-@@ -0,0 +1,33 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Device Tree Source for the M3NULCB (R-Car Starter Kit Pro) board
-+ *
-+ * Copyright (C) 2018 Renesas Electronics Corp.
-+ * Copyright (C) 2018 Cogent Embedded, Inc.
-+ */
-+
-+/dts-v1/;
-+#include "r8a77965.dtsi"
-+#include "ulcb.dtsi"
-+
-+/ {
-+	model = "Renesas M3NULCB board based on r8a77965";
-+	compatible = "renesas,m3nulcb", "renesas,r8a77965";
-+
-+	memory at 48000000 {
-+		device_type = "memory";
-+		/* first 128MB is reserved for secure area. */
-+		reg = <0x0 0x48000000 0x0 0x78000000>;
-+	};
-+};
-+
-+&du {
-+	clocks = <&cpg CPG_MOD 724>,
-+		 <&cpg CPG_MOD 723>,
-+		 <&cpg CPG_MOD 721>,
-+		 <&versaclock5 1>,
-+		 <&versaclock5 3>,
-+		 <&versaclock5 2>;
-+	clock-names = "du.0", "du.1", "du.3",
-+		      "dclkin.0", "dclkin.1", "dclkin.3";
-+};
--- 
-2.11.0
+> > Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+> > Acked-by: Gustavo Pimentel <gustavo.pimentel@synopsys.com>
+> > ---
+> > 
+> > since v2:
+> >  - Add Fixes tag
+> >  - Add Gustavo's Ack
+> > 
+> > since v1:
+> >  - use mdelay() instead of udelay() to avoid __bad_udelay()
+> > 
+> >  drivers/pci/controller/dwc/pcie-designware.c | 8 ++++----
+> >  drivers/pci/controller/dwc/pcie-designware.h | 3 +--
+> >  2 files changed, 5 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/drivers/pci/controller/dwc/pcie-designware.c b/drivers/pci/controller/dwc/pcie-designware.c
+> > index 778c4f76a884..2153956a0b20 100644
+> > --- a/drivers/pci/controller/dwc/pcie-designware.c
+> > +++ b/drivers/pci/controller/dwc/pcie-designware.c
+> > @@ -135,7 +135,7 @@ static void dw_pcie_prog_outbound_atu_unroll(struct dw_pcie *pci, int index,
+> >  		if (val & PCIE_ATU_ENABLE)
+> >  			return;
+> >  
+> > -		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
+> > +		mdelay(LINK_WAIT_IATU);
+> >  	}
+> >  	dev_err(pci->dev, "Outbound iATU is not being enabled\n");
+> >  }
+> > @@ -178,7 +178,7 @@ void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index, int type,
+> >  		if (val & PCIE_ATU_ENABLE)
+> >  			return;
+> >  
+> > -		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
+> > +		mdelay(LINK_WAIT_IATU);
+> >  	}
+> >  	dev_err(pci->dev, "Outbound iATU is not being enabled\n");
+> >  }
+> > @@ -236,7 +236,7 @@ static int dw_pcie_prog_inbound_atu_unroll(struct dw_pcie *pci, int index,
+> >  		if (val & PCIE_ATU_ENABLE)
+> >  			return 0;
+> >  
+> > -		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
+> > +		mdelay(LINK_WAIT_IATU);
+> >  	}
+> >  	dev_err(pci->dev, "Inbound iATU is not being enabled\n");
+> >  
+> > @@ -282,7 +282,7 @@ int dw_pcie_prog_inbound_atu(struct dw_pcie *pci, int index, int bar,
+> >  		if (val & PCIE_ATU_ENABLE)
+> >  			return 0;
+> >  
+> > -		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
+> > +		mdelay(LINK_WAIT_IATU);
+> >  	}
+> >  	dev_err(pci->dev, "Inbound iATU is not being enabled\n");
+> >  
+> > diff --git a/drivers/pci/controller/dwc/pcie-designware.h b/drivers/pci/controller/dwc/pcie-designware.h
+> > index 96126fd8403c..9f1a5e399b70 100644
+> > --- a/drivers/pci/controller/dwc/pcie-designware.h
+> > +++ b/drivers/pci/controller/dwc/pcie-designware.h
+> > @@ -26,8 +26,7 @@
+> >  
+> >  /* Parameters for the waiting for iATU enabled routine */
+> >  #define LINK_WAIT_MAX_IATU_RETRIES	5
+> > -#define LINK_WAIT_IATU_MIN		9000
+> > -#define LINK_WAIT_IATU_MAX		10000
+> > +#define LINK_WAIT_IATU			9
+> >  
+> >  /* Synopsys-specific PCIe configuration registers */
+> >  #define PCIE_PORT_LINK_CONTROL		0x710
+> 
