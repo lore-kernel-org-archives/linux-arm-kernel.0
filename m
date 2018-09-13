@@ -1,42 +1,96 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 13 Sep 2018 13:12:33 -0500
-Subject: [PATCH] ARM: dts: lpc32xx: Fix SPI controller node names
-Message-ID: <20180913181245.25484-9-robh@kernel.org>
+From: jannh@google.com (Jann Horn)
+Date: Thu, 13 Sep 2018 20:23:03 +0200
+Subject: [PATCH v6 15/18] khwasan,
+ arm64: add brk handler for inline instrumentation
+In-Reply-To: <CAKwvOdns=3bktpXLEpo6o0J8OQPym6YE+x6Dvs_kYSBsuJKtSw@mail.gmail.com>
+References: <cover.1535462971.git.andreyknvl@google.com>
+ <f5e73b5ead3355932ad8b5fc96b141c3f5b8c16c.1535462971.git.andreyknvl@google.com>
+ <CACT4Y+aEwYiaVN--RH_0VBh0wbCcrf-Ndz+_eOaBNi6nKxrfQA@mail.gmail.com>
+ <CAG48ez2oT1dtDcH8SfPLnoX5F8d6Pd=M-eOKHhYJ83EuL_j6wQ@mail.gmail.com>
+ <CACT4Y+avu_68GoQcc32zpcOpAu-Pw7m71VmuKtEkOw=vKgxi7w@mail.gmail.com>
+ <CAKwvOdns=3bktpXLEpo6o0J8OQPym6YE+x6Dvs_kYSBsuJKtSw@mail.gmail.com>
+Message-ID: <CAG48ez2AoEiFdLH2aLSjxdkdFbBT1PimOByaWbFykObTA2yqKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SPI controller nodes should be named 'spi' rather than 'ssp'. Fixing the
-name enables dtc SPI bus checks.
+On Thu, Sep 13, 2018 at 8:09 PM Nick Desaulniers
+<ndesaulniers@google.com> wrote:
+>
+> On Thu, Sep 13, 2018 at 1:37 AM Dmitry Vyukov <dvyukov@google.com> wrote:
+> >
+> > On Wed, Sep 12, 2018 at 7:39 PM, Jann Horn <jannh@google.com> wrote:
+> > > On Wed, Sep 12, 2018 at 7:16 PM Dmitry Vyukov <dvyukov@google.com> wrote:
+> > >> On Wed, Aug 29, 2018 at 1:35 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
+> > > [...]
+> > >> > +static int khwasan_handler(struct pt_regs *regs, unsigned int esr)
+> > >> > +{
+> > >> > +       bool recover = esr & KHWASAN_ESR_RECOVER;
+> > >> > +       bool write = esr & KHWASAN_ESR_WRITE;
+> > >> > +       size_t size = KHWASAN_ESR_SIZE(esr);
+> > >> > +       u64 addr = regs->regs[0];
+> > >> > +       u64 pc = regs->pc;
+> > >> > +
+> > >> > +       if (user_mode(regs))
+> > >> > +               return DBG_HOOK_ERROR;
+> > >> > +
+> > >> > +       kasan_report(addr, size, write, pc);
+> > >> > +
+> > >> > +       /*
+> > >> > +        * The instrumentation allows to control whether we can proceed after
+> > >> > +        * a crash was detected. This is done by passing the -recover flag to
+> > >> > +        * the compiler. Disabling recovery allows to generate more compact
+> > >> > +        * code.
+> > >> > +        *
+> > >> > +        * Unfortunately disabling recovery doesn't work for the kernel right
+> > >> > +        * now. KHWASAN reporting is disabled in some contexts (for example when
+> > >> > +        * the allocator accesses slab object metadata; same is true for KASAN;
+> > >> > +        * this is controlled by current->kasan_depth). All these accesses are
+> > >> > +        * detected by the tool, even though the reports for them are not
+> > >> > +        * printed.
+> > >> > +        *
+> > >> > +        * This is something that might be fixed at some point in the future.
+> > >> > +        */
+> > >> > +       if (!recover)
+> > >> > +               die("Oops - KHWASAN", regs, 0);
+> > >>
+> > >> Why die and not panic? Die seems to be much less used function, and it
+> > >> calls panic anyway, and we call panic in kasan_report if panic_on_warn
+> > >> is set.
+> > >
+> > > die() is vaguely equivalent to BUG(); die() and BUG() normally only
+> > > terminate the current process, which may or may not leave the system
+> > > somewhat usable, while panic() always brings down the whole system.
+> > > AFAIK panic() shouldn't be used unless you're in some very low-level
+> > > code where you know that trying to just kill the current process can't
+> > > work and the entire system is broken beyond repair.
+> > >
+> > > If KASAN traps on some random memory access, there's a good chance
+> > > that just killing the current process will allow at least parts of the
+> > > system to continue. I'm not sure whether BUG() or die() is more
+> > > appropriate here, but I think it definitely should not be a panic().
+> >
+> >
+> > Nick, do you know if die() will be enough to catch problems on Android
+> > phones? panic_on_warn would turn this into panic, but I guess one does
+> > not want panic_on_warn on a canary phone.
+>
+> die() has arch specific implementations, so looking at:
+>
+> arch/arm64/kernel/traps.c:196#die
+>
+> it looks like panic is invoked if in_interrupt() or panic_on_oops(),
+> which is a configure option.  So maybe the config for KHWASAN should
+> also enable that? Otherwise seems easy to forget.  But maybe that
+> should remain configurable separately?
 
-Cc: Vladimir Zapolskiy <vz@mleia.com>
-Cc: Sylvain Lemieux <slemieux.tyco@gmail.com>
-Signed-off-by: Rob Herring <robh@kernel.org>
----
+In the upstream kernel, it is desirable to be able to discover bugs
+and debug them from inside the running system. When you detect a bug
+that makes it impossible for the current task to continue safely,
+you're supposed to use something like BUG() to terminate the task; if
+you can continue safely, you're supposed to use WARN(). Either way,
+you should *not* just shoot down the whole kernel unless the system is
+corrupted so badly that trying to keep running would be pointless.
 
- arch/arm/boot/dts/lpc32xx.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/lpc32xx.dtsi b/arch/arm/boot/dts/lpc32xx.dtsi
-index abff7ef7c9cd..b7303a4e4236 100644
---- a/arch/arm/boot/dts/lpc32xx.dtsi
-+++ b/arch/arm/boot/dts/lpc32xx.dtsi
-@@ -179,7 +179,7 @@
- 			 * ssp0 and spi1 are shared pins;
- 			 * enable one in your board dts, as needed.
- 			 */
--			ssp0: ssp at 20084000 {
-+			ssp0: spi at 20084000 {
- 				compatible = "arm,pl022", "arm,primecell";
- 				reg = <0x20084000 0x1000>;
- 				interrupts = <20 IRQ_TYPE_LEVEL_HIGH>;
-@@ -199,7 +199,7 @@
- 			 * ssp1 and spi2 are shared pins;
- 			 * enable one in your board dts, as needed.
- 			 */
--			ssp1: ssp at 2008c000 {
-+			ssp1: spi at 2008c000 {
- 				compatible = "arm,pl022", "arm,primecell";
- 				reg = <0x2008c000 0x1000>;
- 				interrupts = <21 IRQ_TYPE_LEVEL_HIGH>;
--- 
-2.17.1
+You can configure the kernel such that it crashes the device when such
+an event occurs, and doing so can sometimes be beneficial; but please
+don't hardcode such policies into the upstream kernel.
