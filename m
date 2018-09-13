@@ -1,219 +1,58 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Sep 2018 11:09:08 +0200
-Subject: [PATCH 13/58] arm64: dts: renesas: Initial r8a774a1 SoC device tree
+Date: Thu, 13 Sep 2018 11:09:10 +0200
+Subject: [PATCH 15/58] arm64: dts: renesas: r8a77965: Add CAN{0,
+ 1} placeholder nodes
 In-Reply-To: <cover.1536828567.git.horms+renesas@verge.net.au>
 References: <cover.1536828567.git.horms+renesas@verge.net.au>
-Message-ID: <90493b09df41a9c1dd0bf315e81d03b4212384f9.1536828567.git.horms+renesas@verge.net.au>
+Message-ID: <92bc66bfce99cd7d5b66cb1086812a32300c5705.1536828567.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Biju Das <biju.das@bp.renesas.com>
+From: Eugeniu Rosca <roscaeugeniu@gmail.com>
 
-Basic support for the RZ/G2M SoC.
+According to R-Car Gen3 HW manual rev1.00, R-Car M3-N has two CAN
+interfaces, similar to H3, M3-W and other SoCs from the same family.
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Add CAN placeholder nodes to avoid below DTC errors:
+Error: arch/arm64/boot/dts/renesas/ulcb-kf.dtsi:19.1-6 Label or path can0 not found
+Error: arch/arm64/boot/dts/renesas/ulcb-kf.dtsi:25.1-6 Label or path can1 not found
+
+These errors occur *after* the addition of r8a77965-m3nulcb-kf.dts.
+Fix them beforehand.
+
+CAN support is inspired from below commits:
+ - v4.7 commit 308b7e4ba62e ("arm64: dts: r8a7795: Add CAN support")
+ - v4.11 commit 909c16252415 ("arm64: dts: r8a7796: Add CAN support")
+ - v4.12 commit bec0948e810f ("arm64: dts: r8a7796: Add reset control properties")
+
+Signed-off-by: Eugeniu Rosca <erosca@de.adit-jv.com>
+Reviewed-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+[simon: make placeholder minimal by only including reg property]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a774a1.dtsi | 190 ++++++++++++++++++++++++++++++
- 1 file changed, 190 insertions(+)
- create mode 100644 arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+ arch/arm64/boot/dts/renesas/r8a77965.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-new file mode 100644
-index 000000000000..8e63e9aee456
---- /dev/null
-+++ b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-@@ -0,0 +1,190 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Device Tree Source for the r8a774a1 SoC
-+ *
-+ * Copyright (C) 2018 Renesas Electronics Corp.
-+ */
-+
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/renesas-cpg-mssr.h>
-+
-+/ {
-+	compatible = "renesas,r8a774a1";
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	/*
-+	 * The external audio clocks are configured as 0 Hz fixed frequency
-+	 * clocks by default.
-+	 * Boards that provide audio clocks should override them.
-+	 */
-+	audio_clk_a: audio_clk_a {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	audio_clk_b: audio_clk_b {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	audio_clk_c: audio_clk_c {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	/* External CAN clock - to be overridden by boards that provide it */
-+	can_clk: can {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		a57_0: cpu at 0 {
-+			compatible = "arm,cortex-a57", "arm,armv8";
-+			reg = <0x0>;
-+			device_type = "cpu";
-+			power-domains = <&sysc 0>;
-+			next-level-cache = <&L2_CA57>;
-+			enable-method = "psci";
-+			clocks =<&cpg CPG_CORE 0>;
+diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+index 7a75c351edd2..e7128fb65e33 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+@@ -862,6 +862,16 @@
+ 			status = "disabled";
+ 		};
+ 
++		can0: can at e6c30000 {
++			reg = <0 0xe6c30000 0 0x1000>;
++			/* placeholder */
 +		};
 +
-+		a57_1: cpu at 1 {
-+			compatible = "arm,cortex-a57", "arm,armv8";
-+			reg = <0x1>;
-+			device_type = "cpu";
-+			power-domains = <&sysc 1>;
-+			next-level-cache = <&L2_CA57>;
-+			enable-method = "psci";
-+			clocks =<&cpg CPG_CORE 0>;
++		can1: can at e6c38000 {
++			reg = <0 0xe6c38000 0 0x1000>;
++			/* placeholder */
 +		};
 +
-+		L2_CA57: cache-controller-0 {
-+			compatible = "cache";
-+			power-domains = <&sysc 12>;
-+			cache-unified;
-+			cache-level = <2>;
-+		};
-+	};
-+
-+	extal_clk: extal {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board */
-+		clock-frequency = <0>;
-+	};
-+
-+	extalr_clk: extalr {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board */
-+		clock-frequency = <0>;
-+	};
-+
-+	/* External PCIe clock - can be overridden by the board */
-+	pcie_bus_clk: pcie_bus {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	pmu_a57 {
-+		compatible = "arm,cortex-a57-pmu";
-+		interrupts-extended = <&gic GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
-+				      <&gic GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-affinity = <&a57_0>, <&a57_1>;
-+	};
-+
-+	psci {
-+		compatible = "arm,psci-1.0", "arm,psci-0.2";
-+		method = "smc";
-+	};
-+
-+	/* External SCIF clock - to be overridden by boards that provide it */
-+	scif_clk: scif {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		cpg: clock-controller at e6150000 {
-+			compatible = "renesas,r8a774a1-cpg-mssr";
-+			reg = <0 0xe6150000 0 0x0bb0>;
-+			clocks = <&extal_clk>, <&extalr_clk>;
-+			clock-names = "extal", "extalr";
-+			#clock-cells = <2>;
-+			#power-domain-cells = <0>;
-+			#reset-cells = <1>;
-+		};
-+
-+		rst: reset-controller at e6160000 {
-+			compatible = "renesas,r8a774a1-rst";
-+			reg = <0 0xe6160000 0 0x018c>;
-+		};
-+
-+		sysc: system-controller at e6180000 {
-+			compatible = "renesas,r8a774a1-sysc";
-+			reg = <0 0xe6180000 0 0x0400>;
-+			#power-domain-cells = <1>;
-+		};
-+
-+		gic: interrupt-controller at f1010000 {
-+			compatible = "arm,gic-400";
-+			#interrupt-cells = <3>;
-+			#address-cells = <0>;
-+			interrupt-controller;
-+			reg = <0x0 0xf1010000 0 0x1000>,
-+			      <0x0 0xf1020000 0 0x20000>,
-+			      <0x0 0xf1040000 0 0x20000>,
-+			      <0x0 0xf1060000 0 0x20000>;
-+			interrupts = <GIC_PPI 9
-+					(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
-+			clocks = <&cpg CPG_MOD 408>;
-+			clock-names = "clk";
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 408>;
-+		};
-+
-+		prr: chipid at fff00044 {
-+			compatible = "renesas,prr";
-+			reg = <0 0xfff00044 0 4>;
-+		};
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
-+
-+	/* External USB clocks - can be overridden by the board */
-+	usb3s0_clk: usb3s0 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	usb_extal_clk: usb_extal {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+};
+ 		pwm0: pwm at e6e30000 {
+ 			compatible = "renesas,pwm-r8a77965", "renesas,pwm-rcar";
+ 			reg = <0 0xe6e30000 0 8>;
 -- 
 2.11.0
