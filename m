@@ -1,75 +1,95 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 13 Sep 2018 09:52:55 +0200
-Subject: [PATCH 1/5] crypto: arm/aes-ce - enable module autoloading based
- on CPU feature bits
-In-Reply-To: <b6599928a8329748655072ec50ced80e@agner.ch>
-References: <1495362220-30044-1-git-send-email-ard.biesheuvel@linaro.org>
- <1495362220-30044-2-git-send-email-ard.biesheuvel@linaro.org>
- <f68937805ccdbdd296118ee6871fa25e@agner.ch>
- <CAKv+Gu_J0s4gcdVQOQ96dD7kpNj=po83wT0BRiiiYR9pu=e0aw@mail.gmail.com>
- <b6599928a8329748655072ec50ced80e@agner.ch>
-Message-ID: <CAKv+Gu-Ej0HAanaN3KLrbfVz4VMpR-vhh958tUszgBR+BFg0Gg@mail.gmail.com>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Thu, 13 Sep 2018 16:05:48 +0800
+Subject: [PATCH] i2c: designware: select gpio/default pin when
+ prepare/unprepare recovery
+Message-ID: <20180913160548.6ed41c43@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 September 2018 at 08:24, Stefan Agner <stefan@agner.ch> wrote:
-> On 10.09.2018 00:01, Ard Biesheuvel wrote:
->> On 10 September 2018 at 08:21, Stefan Agner <stefan@agner.ch> wrote:
->>> Hi Ard,
->>>
->>> On 21.05.2017 03:23, Ard Biesheuvel wrote:
->>>> Make the module autoloadable by tying it to the CPU feature bit that
->>>> describes whether the optional instructions it relies on are implemented
->>>> by the current CPU.
->>>>
->>>
->>> This leads to a compiler warning when compiling multi_v7_defconfig/ARM32
->>> using Clang 6.0.1:
->>>
->>> arch/arm/crypto/aes-ce-glue.c:450:1: warning: variable
->>> 'cpu_feature_match_AES' is not needed and will not
->>>       be emitted [-Wunneeded-internal-declaration]
->>> module_cpu_feature_match(AES, aes_init);
->>>
->>> ./include/linux/cpufeature.h:48:33: note: expanded from macro
->>> 'module_cpu_feature_match'
->>> static struct cpu_feature const cpu_feature_match_ ## x[] =     \
->>>
->>> <scratch space>:83:1: note: expanded from here
->>> cpu_feature_match_AES
->>> ^
->>> 1 warning generated.
->>>
->>> Do you happen to have an idea how to alleviate?
->>>
->>
->> I guess this only happens for modules that are selected as builtin,
->> and so MODULE_DEVICE_TABLE() resolves to nothing?
->> Does this only occur for CPU features?
->
-> So in the above case CONFIG_ARM_CRYPTO=y, CONFIG_CRYPTO_AES_ARM_CE=m...
->
-> Right now I only saw it with CPU features... I remember seen similar issues, which got resolved. Digging in the git history I found 1f318a8bafcf ("modules: mark __inittest/__exittest as __maybe_unused"),
->
-> This seems to resolve it:
->
-> --- a/include/linux/cpufeature.h
-> +++ b/include/linux/cpufeature.h
-> @@ -45,7 +45,7 @@
->   * 'asm/cpufeature.h' of your favorite architecture.
->   */
->  #define module_cpu_feature_match(x, __initfunc)                        \
-> -static struct cpu_feature const cpu_feature_match_ ## x[] =    \
-> +static struct cpu_feature const __maybe_unused cpu_feature_match_ ## x[] = \
->         { { .feature = cpu_feature(x) }, { } };                 \
->  MODULE_DEVICE_TABLE(cpu, cpu_feature_match_ ## x);             \
->                                                                 \
->
-> Also arch/arm/crypto/crc32-ce-glue.c needs an extra __maybe_unused.
->
+On some platforms, the sda/scl pins are muxed with gpio functions, so
+they could be used for recovery. Select the gpio/default pin function
+when prepare/unprepare recovery.
 
-Yes, that looks like the right approach to me. The difference between
-other uses of MODULE_DEVICE_TABLE() is that the second argument
-usually gets referenced in some way in the driver struct. It the CPU
-feature case, that does not happen and so the struct ends up being
-unreferenced when building the code into the kernel.
+Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+---
+ drivers/i2c/busses/i2c-designware-core.h   |  3 +++
+ drivers/i2c/busses/i2c-designware-master.c | 22 ++++++++++++++++++++++
+ 2 files changed, 25 insertions(+)
+
+diff --git a/drivers/i2c/busses/i2c-designware-core.h b/drivers/i2c/busses/i2c-designware-core.h
+index e367b1af4ab2..01d5f01691a4 100644
+--- a/drivers/i2c/busses/i2c-designware-core.h
++++ b/drivers/i2c/busses/i2c-designware-core.h
+@@ -271,6 +271,9 @@ struct dw_i2c_dev {
+ 	int			(*init)(struct dw_i2c_dev *dev);
+ 	int			mode;
+ 	struct i2c_bus_recovery_info rinfo;
++	struct pinctrl		*pinctrl;
++	struct pinctrl_state	*pins_default;
++	struct pinctrl_state	*pins_gpio;
+ };
+ 
+ #define ACCESS_SWAP		0x00000001
+diff --git a/drivers/i2c/busses/i2c-designware-master.c b/drivers/i2c/busses/i2c-designware-master.c
+index 94d94b4a9a0d..c1b5b51e3ecc 100644
+--- a/drivers/i2c/busses/i2c-designware-master.c
++++ b/drivers/i2c/busses/i2c-designware-master.c
+@@ -17,6 +17,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+ #include <linux/module.h>
++#include <linux/pinctrl/consumer.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/reset.h>
+ 
+@@ -629,6 +630,9 @@ static void i2c_dw_prepare_recovery(struct i2c_adapter *adap)
+ {
+ 	struct dw_i2c_dev *dev = i2c_get_adapdata(adap);
+ 
++	if (dev->pinctrl && dev->pins_gpio)
++		pinctrl_select_state(dev->pinctrl, dev->pins_gpio);
++
+ 	i2c_dw_disable(dev);
+ 	reset_control_assert(dev->rst);
+ 	i2c_dw_prepare_clk(dev, false);
+@@ -641,6 +645,9 @@ static void i2c_dw_unprepare_recovery(struct i2c_adapter *adap)
+ 	i2c_dw_prepare_clk(dev, true);
+ 	reset_control_deassert(dev->rst);
+ 	i2c_dw_init_master(dev);
++
++	if (dev->pinctrl && dev->pins_default)
++		pinctrl_select_state(dev->pinctrl, dev->pins_default);
+ }
+ 
+ static int i2c_dw_init_recovery_info(struct dw_i2c_dev *dev)
+@@ -648,6 +655,8 @@ static int i2c_dw_init_recovery_info(struct dw_i2c_dev *dev)
+ 	struct i2c_bus_recovery_info *rinfo = &dev->rinfo;
+ 	struct i2c_adapter *adap = &dev->adapter;
+ 	struct gpio_desc *gpio;
++	struct pinctrl *pinctrl;
++	struct pinctrl_state *s;
+ 	int r;
+ 
+ 	gpio = devm_gpiod_get(dev->dev, "scl", GPIOD_OUT_HIGH);
+@@ -664,6 +673,19 @@ static int i2c_dw_init_recovery_info(struct dw_i2c_dev *dev)
+ 		return PTR_ERR(gpio);
+ 	rinfo->sda_gpiod = gpio;
+ 
++	pinctrl = devm_pinctrl_get(dev->dev);
++	if (PTR_ERR(pinctrl) == -EPROBE_DEFER)
++		return -EPROBE_DEFER;
++	if (pinctrl && !IS_ERR(pinctrl)) {
++		dev->pinctrl = pinctrl;
++		s = pinctrl_lookup_state(pinctrl, PINCTRL_STATE_DEFAULT);
++		if (s && !IS_ERR(s))
++			dev->pins_default = s;
++		s = pinctrl_lookup_state(dev->pinctrl, "gpio");
++		if (s && !IS_ERR(s))
++			dev->pins_gpio = s;
++	}
++
+ 	rinfo->recover_bus = i2c_generic_scl_recovery;
+ 	rinfo->prepare_recovery = i2c_dw_prepare_recovery;
+ 	rinfo->unprepare_recovery = i2c_dw_unprepare_recovery;
+-- 
+2.19.0.rc2
