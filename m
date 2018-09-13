@@ -1,121 +1,49 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 13 Sep 2018 17:42:19 +0100
-Subject: [PATCH v6 2/7] iommu/dma: Add support for non-strict mode
-In-Reply-To: <cover.1536856828.git.robin.murphy@arm.com>
-References: <cover.1536856828.git.robin.murphy@arm.com>
-Message-ID: <c98d9eaa24dbfcbd6ee3fc7b697538cb494fcf13.1536856828.git.robin.murphy@arm.com>
+Date: Thu, 13 Sep 2018 17:42:17 +0100
+Subject: [PATCH v6 0/6] Add non-strict mode support for iommu-dma
+Message-ID: <cover.1536856828.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zhen Lei <thunder.leizhen@huawei.com>
+Hi all,
 
-1. Save the related domain pointer in struct iommu_dma_cookie, make iovad
-   capable call domain->ops->flush_iotlb_all to flush TLB.
-2. During the iommu domain initialization phase, base on domain->non_strict
-   field to check whether non-strict mode is supported or not. If so, call
-   init_iova_flush_queue to register iovad->flush_cb callback.
-3. All unmap(contains iova-free) APIs will finally invoke __iommu_dma_unmap
-   -->iommu_dma_free_iova. If the domain is non-strict, call queue_iova to
-   put off iova freeing, and omit iommu_tlb_sync operation.
+Since we'd like to get this polished up and merged and Leizhen has other
+commitments, here's v6 of the previous series[1] wherein I address all
+my own feedback :)
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-[rm: convert raw boolean to domain attribute]
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/iommu/dma-iommu.c | 31 ++++++++++++++++++++++++++++++-
- include/linux/iommu.h     |  1 +
- 2 files changed, 31 insertions(+), 1 deletion(-)
+The principal change is that I've inverted things slightly such that
+it's now a generic domain attribute controlled by iommu-dma given the
+necessary support from individual IOMMU drivers. That way we can easily
+enable other drivers straight away, as I've done for SMMUv2 here (which
+also allowed me to give it a quick test with MMU-401s on a Juno board).
+Otherwise it's really just cosmetic cleanup and rebasing onto Will's
+pending SMMU queue.
 
-diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-index 511ff9a1d6d9..d91849fe4ebe 100644
---- a/drivers/iommu/dma-iommu.c
-+++ b/drivers/iommu/dma-iommu.c
-@@ -55,8 +55,13 @@ struct iommu_dma_cookie {
- 	};
- 	struct list_head		msi_page_list;
- 	spinlock_t			msi_lock;
-+
-+	/* Only be assigned in non-strict mode, otherwise it's NULL */
-+	struct iommu_domain		*domain;
- };
- 
-+static bool iommu_dma_non_strict __read_mostly;
-+
- static inline size_t cookie_msi_granule(struct iommu_dma_cookie *cookie)
- {
- 	if (cookie->type == IOMMU_DMA_IOVA_COOKIE)
-@@ -257,6 +262,17 @@ static int iova_reserve_iommu_regions(struct device *dev,
- 	return ret;
- }
- 
-+static void iommu_dma_flush_iotlb_all(struct iova_domain *iovad)
-+{
-+	struct iommu_dma_cookie *cookie;
-+	struct iommu_domain *domain;
-+
-+	cookie = container_of(iovad, struct iommu_dma_cookie, iovad);
-+	domain = cookie->domain;
-+
-+	domain->ops->flush_iotlb_all(domain);
-+}
-+
- /**
-  * iommu_dma_init_domain - Initialise a DMA mapping domain
-  * @domain: IOMMU domain previously prepared by iommu_get_dma_cookie()
-@@ -275,6 +291,7 @@ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
- 	struct iommu_dma_cookie *cookie = domain->iova_cookie;
- 	struct iova_domain *iovad = &cookie->iovad;
- 	unsigned long order, base_pfn, end_pfn;
-+	int attr = 1;
- 
- 	if (!cookie || cookie->type != IOMMU_DMA_IOVA_COOKIE)
- 		return -EINVAL;
-@@ -308,6 +325,13 @@ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
- 	}
- 
- 	init_iova_domain(iovad, 1UL << order, base_pfn);
-+
-+	if (iommu_dma_non_strict && !iommu_domain_set_attr(domain,
-+			DOMAIN_ATTR_DMA_USE_FLUSH_QUEUE, &attr)) {
-+		cookie->domain = domain;
-+		init_iova_flush_queue(iovad, iommu_dma_flush_iotlb_all, NULL);
-+	}
-+
- 	if (!dev)
- 		return 0;
- 
-@@ -393,6 +417,9 @@ static void iommu_dma_free_iova(struct iommu_dma_cookie *cookie,
- 	/* The MSI case is only ever cleaning up its most recent allocation */
- 	if (cookie->type == IOMMU_DMA_MSI_COOKIE)
- 		cookie->msi_iova -= size;
-+	else if (cookie->domain)	/* non-strict mode */
-+		queue_iova(iovad, iova_pfn(iovad, iova),
-+				size >> iova_shift(iovad), 0);
- 	else
- 		free_iova_fast(iovad, iova_pfn(iovad, iova),
- 				size >> iova_shift(iovad));
-@@ -408,7 +435,9 @@ static void __iommu_dma_unmap(struct iommu_domain *domain, dma_addr_t dma_addr,
- 	dma_addr -= iova_off;
- 	size = iova_align(iovad, size + iova_off);
- 
--	WARN_ON(iommu_unmap(domain, dma_addr, size) != size);
-+	WARN_ON(iommu_unmap_fast(domain, dma_addr, size) != size);
-+	if (!cookie->domain)
-+		iommu_tlb_sync(domain);
- 	iommu_dma_free_iova(cookie, dma_addr, size);
- }
- 
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index 87994c265bf5..decabe8e8dbe 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -124,6 +124,7 @@ enum iommu_attr {
- 	DOMAIN_ATTR_FSL_PAMU_ENABLE,
- 	DOMAIN_ATTR_FSL_PAMUV1,
- 	DOMAIN_ATTR_NESTING,	/* two stages of translation */
-+	DOMAIN_ATTR_DMA_USE_FLUSH_QUEUE,
- 	DOMAIN_ATTR_MAX,
- };
- 
+Robin.
+
+[1] https://www.mail-archive.com/iommu at lists.linux-foundation.org/msg25150.html
+
+
+Robin Murphy (2):
+  iommu/io-pgtable: Add helper for toggling non-strict mode
+  iommu/arm-smmu: Support non-strict mode
+
+Zhen Lei (5):
+  iommu/arm-smmu-v3: Implement flush_iotlb_all hook
+  iommu/dma: Add support for non-strict mode
+  iommu/io-pgtable-arm: Add support for non-strict mode
+  iommu/arm-smmu-v3: Add support for non-strict mode
+  iommu/dma: Add bootup option "iommu.non_strict"
+
+ .../admin-guide/kernel-parameters.txt         | 13 +++++
+ drivers/iommu/arm-smmu-v3.c                   | 43 +++++++++++++---
+ drivers/iommu/arm-smmu.c                      | 43 +++++++++++++---
+ drivers/iommu/dma-iommu.c                     | 49 ++++++++++++++++++-
+ drivers/iommu/io-pgtable-arm.c                |  9 ++--
+ drivers/iommu/io-pgtable.c                    |  9 ++++
+ drivers/iommu/io-pgtable.h                    |  6 +++
+ include/linux/iommu.h                         |  1 +
+ 8 files changed, 155 insertions(+), 18 deletions(-)
+
 -- 
 2.19.0.dirty
