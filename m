@@ -1,76 +1,37 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Thu, 13 Sep 2018 13:23:53 +0200
-Subject: [PATCH v3 4/5] dt-bindings: drm/bridge Document Cadence MHDP
- DPI/DP bridge bindings
-In-Reply-To: <1535451894-2518-5-git-send-email-dkos@cadence.com>
-References: <1535451894-2518-1-git-send-email-dkos@cadence.com>
- <CGME20180828102614epcas1p2a0c803cdbee886d731135bd596549a0b@epcas1p2.samsung.com>
- <1535451894-2518-5-git-send-email-dkos@cadence.com>
-Message-ID: <20180913112356eucas1p2039ad3b69dc569313998d4de4cc00ff9~T8d6UiuPU0109501095eucas1p2n@eucas1p2.samsung.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Thu, 13 Sep 2018 13:30:21 +0200
+Subject: [PATCH v7 4/7] clocksource/drivers: atmel-pit: make option silent
+In-Reply-To: <20180913113024.3571-1-alexandre.belloni@bootlin.com>
+References: <20180913113024.3571-1-alexandre.belloni@bootlin.com>
+Message-ID: <20180913113024.3571-5-alexandre.belloni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28.08.2018 12:24, Damian Kos wrote:
-> From: Quentin Schulz <quentin.schulz@bootlin.com>
->
-> Signed-off-by: Damian Kos <dkos@cadence.com>
+To conform with the other option, make the ATMEL_PIT option silent so it
+can be selected from the platform
 
-No commit message, no author's signoff.
---
-Regards
-Andrzej
+Tested-by: Alexander Dahl <ada@thorsis.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+---
+ drivers/clocksource/Kconfig | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-> ---
->  .../bindings/display/bridge/cdns,mhdp.txt     | 43 +++++++++++++++++++
->  1 file changed, 43 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt
->
-> diff --git a/Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt b/Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt
-> new file mode 100644
-> index 000000000000..f8334c520b98
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt
-> @@ -0,0 +1,43 @@
-> +Cadence MHDP bridge
-> +==========================
-> +
-> +The Cadence MHDP bridge is a DPI to DP bridge.
-> +
-> +Required properties:
-> +- compatible: should be "cdns,mhdp8546",
-> +- reg: physical base address and length of the controller's registers,
-> +- clocks: DP bridge clock, it's used by the IP to know how to translate
-> +	a number of clock cycles into a time (which is used to comply
-> +	with DP standard timings and delays),
-> +
-> +Required subnodes:
-> +- ports: Ports as described in Documentation/devictree/bindings/graph.txt
-> +	Port 0 - input port representing the DP bridge input
-> +	Port 1 - output port representing the DP bridge output
-> +
-> +Example:
-> +
-> +	mhdp: dp-bridge at f0fb000000 {
-> +		compatible = "cdns,mhdp8546";
-> +		reg = <0xf0 0xfb000000 0x0 0x1000000>;
-> +		clocks = <&mhdp_clock>;
-> +
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			port at 0 {
-> +				reg = <0>;
-> +				dp_bridge_input: endpoint {
-> +					remote-endpoint = <&xxx_dpi_output>;
-> +				};
-> +			};
-> +
-> +			port at 1 {
-> +				reg = <1>;
-> +				dp_bridge_output: endpoint {
-> +					remote-endpoint = <&xxx_dp_connector_input>;
-> +				};
-> +			};
-> +		};
-> +	};
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 8c7324e409f6..2388fee46e99 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -392,8 +392,11 @@ config ARMV7M_SYSTICK
+ 	  This options enables support for the ARMv7M system timer unit
+ 
+ config ATMEL_PIT
++	bool "Microchip ARM Periodic Interval Timer (PIT)" if COMPILE_TEST
+ 	select TIMER_OF if OF
+-	def_bool SOC_AT91SAM9 || SOC_SAMA5
++	help
++	  This enables build of clocksource and clockevent driver for
++	  the integrated PIT in Microchip ARM SoCs.
+ 
+ config ATMEL_ST
+ 	bool "Atmel ST timer support" if COMPILE_TEST
+-- 
+2.19.0
