@@ -1,159 +1,105 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 13 Sep 2018 15:51:30 +0100
-Subject: [PATCH] PCI: remove unnecessary check of device_type == pci
-In-Reply-To: <20180829183440.13601-1-robh@kernel.org>
-References: <20180829183440.13601-1-robh@kernel.org>
-Message-ID: <20180913145130.GA5756@e107981-ln.cambridge.arm.com>
+Date: Thu, 13 Sep 2018 16:05:54 +0100
+Subject: [PATCH v3] PCI: dwc: fix scheduling while atomic issues
+In-Reply-To: <20180829110408.556c3622@xhacker.debian>
+References: <20180829110408.556c3622@xhacker.debian>
+Message-ID: <20180913150543.GA6199@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 29, 2018 at 01:34:40PM -0500, Rob Herring wrote:
-> PCI host drivers have already matched on compatible strings, so checking
-> device_type is redundant. Also, device_type is considered deprecated for
-> FDT though we've still been requiring it for PCI hosts as it is useful
-> for finding PCI buses.
+On Wed, Aug 29, 2018 at 11:04:08AM +0800, Jisheng Zhang wrote:
+> When programming inbound/outbound atu, we call usleep_range() after
+> each checking PCIE_ATU_ENABLE bit. Unfortunately, the atu programming
+> can be called in atomic context:
+> 
+> inbound atu programming could be called through
+> pci_epc_write_header()
+>   =>dw_pcie_ep_write_header()
+>     =>dw_pcie_prog_inbound_atu()
+> 
+> outbound atu programming could be called through
+> pci_bus_read_config_dword()
+>   =>dw_pcie_rd_conf()
+>     =>dw_pcie_prog_outbound_atu()
+> 
+> Fix this issue by calling mdelay() instead.
+> 
+> Fixes: f8aed6ec624f ("PCI: dwc: designware: Add EP mode support")
+> Fixes: d8bbeb39fbf3 ("PCI: designware: Wait for iATU enable")
+> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+> Acked-by: Gustavo Pimentel <gustavo.pimentel@synopsys.com>
+> ---
 
-Hi Rob,
-
-I have no problem with the patch per-se, I can't parse though the second
-paragraph, in particular what you mean by "useful for finding PCI
-buses".
-
-What about the corresponding dts files ? I suspect we had better leave
-them alone lest we can trigger regressions with new dts and older
-kernels.
+Applied to pci/controller-fixes aiming at one of the upcoming -rc*.
 
 Thanks,
 Lorenzo
 
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Alan Douglas <adouglas@cadence.com>
-> Cc: Subrahmanya Lingappa <l.subrahmanya@mobiveil.co.in>
-> Cc: Michal Simek <michal.simek@xilinx.com>
-> Cc: linux-pci at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
->  drivers/pci/controller/pci-host-common.c   | 8 --------
->  drivers/pci/controller/pcie-cadence-host.c | 7 -------
->  drivers/pci/controller/pcie-mobiveil.c     | 7 -------
->  drivers/pci/controller/pcie-xilinx-nwl.c   | 9 ---------
->  drivers/pci/controller/pcie-xilinx.c       | 7 -------
->  5 files changed, 38 deletions(-)
+> since v2:
+>  - Add Fixes tag
+>  - Add Gustavo's Ack
 > 
-> diff --git a/drivers/pci/controller/pci-host-common.c b/drivers/pci/controller/pci-host-common.c
-> index d8f10451f273..c742881b5061 100644
-> --- a/drivers/pci/controller/pci-host-common.c
-> +++ b/drivers/pci/controller/pci-host-common.c
-> @@ -58,9 +58,7 @@ static struct pci_config_window *gen_pci_init(struct device *dev,
->  int pci_host_common_probe(struct platform_device *pdev,
->  			  struct pci_ecam_ops *ops)
->  {
-> -	const char *type;
->  	struct device *dev = &pdev->dev;
-> -	struct device_node *np = dev->of_node;
->  	struct pci_host_bridge *bridge;
->  	struct pci_config_window *cfg;
->  	struct list_head resources;
-> @@ -70,12 +68,6 @@ int pci_host_common_probe(struct platform_device *pdev,
->  	if (!bridge)
->  		return -ENOMEM;
+> since v1:
+>  - use mdelay() instead of udelay() to avoid __bad_udelay()
+> 
+>  drivers/pci/controller/dwc/pcie-designware.c | 8 ++++----
+>  drivers/pci/controller/dwc/pcie-designware.h | 3 +--
+>  2 files changed, 5 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/pci/controller/dwc/pcie-designware.c b/drivers/pci/controller/dwc/pcie-designware.c
+> index 778c4f76a884..2153956a0b20 100644
+> --- a/drivers/pci/controller/dwc/pcie-designware.c
+> +++ b/drivers/pci/controller/dwc/pcie-designware.c
+> @@ -135,7 +135,7 @@ static void dw_pcie_prog_outbound_atu_unroll(struct dw_pcie *pci, int index,
+>  		if (val & PCIE_ATU_ENABLE)
+>  			return;
 >  
-> -	type = of_get_property(np, "device_type", NULL);
-> -	if (!type || strcmp(type, "pci")) {
-> -		dev_err(dev, "invalid \"device_type\" %s\n", type);
-> -		return -EINVAL;
-> -	}
-> -
->  	of_pci_check_probe_only();
+> -		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
+> +		mdelay(LINK_WAIT_IATU);
+>  	}
+>  	dev_err(pci->dev, "Outbound iATU is not being enabled\n");
+>  }
+> @@ -178,7 +178,7 @@ void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index, int type,
+>  		if (val & PCIE_ATU_ENABLE)
+>  			return;
 >  
->  	/* Parse and map our Configuration Space windows */
-> diff --git a/drivers/pci/controller/pcie-cadence-host.c b/drivers/pci/controller/pcie-cadence-host.c
-> index ec394f6a19c8..97e251090b4f 100644
-> --- a/drivers/pci/controller/pcie-cadence-host.c
-> +++ b/drivers/pci/controller/pcie-cadence-host.c
-> @@ -235,7 +235,6 @@ static int cdns_pcie_host_init(struct device *dev,
+> -		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
+> +		mdelay(LINK_WAIT_IATU);
+>  	}
+>  	dev_err(pci->dev, "Outbound iATU is not being enabled\n");
+>  }
+> @@ -236,7 +236,7 @@ static int dw_pcie_prog_inbound_atu_unroll(struct dw_pcie *pci, int index,
+>  		if (val & PCIE_ATU_ENABLE)
+>  			return 0;
 >  
->  static int cdns_pcie_host_probe(struct platform_device *pdev)
->  {
-> -	const char *type;
->  	struct device *dev = &pdev->dev;
->  	struct device_node *np = dev->of_node;
->  	struct pci_host_bridge *bridge;
-> @@ -268,12 +267,6 @@ static int cdns_pcie_host_probe(struct platform_device *pdev)
->  	rc->device_id = 0xffff;
->  	of_property_read_u16(np, "device-id", &rc->device_id);
+> -		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
+> +		mdelay(LINK_WAIT_IATU);
+>  	}
+>  	dev_err(pci->dev, "Inbound iATU is not being enabled\n");
 >  
-> -	type = of_get_property(np, "device_type", NULL);
-> -	if (!type || strcmp(type, "pci")) {
-> -		dev_err(dev, "invalid \"device_type\" %s\n", type);
-> -		return -EINVAL;
-> -	}
-> -
->  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "reg");
->  	pcie->reg_base = devm_ioremap_resource(dev, res);
->  	if (IS_ERR(pcie->reg_base)) {
-> diff --git a/drivers/pci/controller/pcie-mobiveil.c b/drivers/pci/controller/pcie-mobiveil.c
-> index a939e8d31735..77052a0712d0 100644
-> --- a/drivers/pci/controller/pcie-mobiveil.c
-> +++ b/drivers/pci/controller/pcie-mobiveil.c
-> @@ -301,13 +301,6 @@ static int mobiveil_pcie_parse_dt(struct mobiveil_pcie *pcie)
->  	struct platform_device *pdev = pcie->pdev;
->  	struct device_node *node = dev->of_node;
->  	struct resource *res;
-> -	const char *type;
-> -
-> -	type = of_get_property(node, "device_type", NULL);
-> -	if (!type || strcmp(type, "pci")) {
-> -		dev_err(dev, "invalid \"device_type\" %s\n", type);
-> -		return -EINVAL;
-> -	}
+> @@ -282,7 +282,7 @@ int dw_pcie_prog_inbound_atu(struct dw_pcie *pci, int index, int bar,
+>  		if (val & PCIE_ATU_ENABLE)
+>  			return 0;
 >  
->  	/* map config resource */
->  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-> diff --git a/drivers/pci/controller/pcie-xilinx-nwl.c b/drivers/pci/controller/pcie-xilinx-nwl.c
-> index fb32840ce8e6..81538d77f790 100644
-> --- a/drivers/pci/controller/pcie-xilinx-nwl.c
-> +++ b/drivers/pci/controller/pcie-xilinx-nwl.c
-> @@ -777,16 +777,7 @@ static int nwl_pcie_parse_dt(struct nwl_pcie *pcie,
->  			     struct platform_device *pdev)
->  {
->  	struct device *dev = pcie->dev;
-> -	struct device_node *node = dev->of_node;
->  	struct resource *res;
-> -	const char *type;
-> -
-> -	/* Check for device type */
-> -	type = of_get_property(node, "device_type", NULL);
-> -	if (!type || strcmp(type, "pci")) {
-> -		dev_err(dev, "invalid \"device_type\" %s\n", type);
-> -		return -EINVAL;
-> -	}
+> -		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
+> +		mdelay(LINK_WAIT_IATU);
+>  	}
+>  	dev_err(pci->dev, "Inbound iATU is not being enabled\n");
 >  
->  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "breg");
->  	pcie->breg_base = devm_ioremap_resource(dev, res);
-> diff --git a/drivers/pci/controller/pcie-xilinx.c b/drivers/pci/controller/pcie-xilinx.c
-> index 7b1389d8e2a5..9bd1a35cd5d8 100644
-> --- a/drivers/pci/controller/pcie-xilinx.c
-> +++ b/drivers/pci/controller/pcie-xilinx.c
-> @@ -574,15 +574,8 @@ static int xilinx_pcie_parse_dt(struct xilinx_pcie_port *port)
->  	struct device *dev = port->dev;
->  	struct device_node *node = dev->of_node;
->  	struct resource regs;
-> -	const char *type;
->  	int err;
+> diff --git a/drivers/pci/controller/dwc/pcie-designware.h b/drivers/pci/controller/dwc/pcie-designware.h
+> index 96126fd8403c..9f1a5e399b70 100644
+> --- a/drivers/pci/controller/dwc/pcie-designware.h
+> +++ b/drivers/pci/controller/dwc/pcie-designware.h
+> @@ -26,8 +26,7 @@
 >  
-> -	type = of_get_property(node, "device_type", NULL);
-> -	if (!type || strcmp(type, "pci")) {
-> -		dev_err(dev, "invalid \"device_type\" %s\n", type);
-> -		return -EINVAL;
-> -	}
-> -
->  	err = of_address_to_resource(node, 0, &regs);
->  	if (err) {
->  		dev_err(dev, "missing \"reg\" property\n");
+>  /* Parameters for the waiting for iATU enabled routine */
+>  #define LINK_WAIT_MAX_IATU_RETRIES	5
+> -#define LINK_WAIT_IATU_MIN		9000
+> -#define LINK_WAIT_IATU_MAX		10000
+> +#define LINK_WAIT_IATU			9
+>  
+>  /* Synopsys-specific PCIe configuration registers */
+>  #define PCIE_PORT_LINK_CONTROL		0x710
 > -- 
-> 2.17.1
+> 2.18.0
 > 
