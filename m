@@ -1,71 +1,74 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Thu, 13 Sep 2018 22:22:01 +0200
-Subject: [PATCH 3/5] ARM: dts: meson8b: add the I2C_A, PWM_C and UART_B pins
-In-Reply-To: <20180913202203.19636-1-martin.blumenstingl@googlemail.com>
-References: <20180913202203.19636-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20180913202203.19636-4-martin.blumenstingl@googlemail.com>
+From: sed@free.fr (Cedric Roux)
+Date: Thu, 13 Sep 2018 22:26:55 +0200
+Subject: [PATCH v3 1/2] ARM: s3c24xx: formatting cleanup in mach-mini2440.c
+In-Reply-To: <b97d7ccc921572ca5d783584eea1de04341ab02f.camel@perches.com>
+References: <20180907215446.15160-1-sed@free.fr>
+ <b97d7ccc921572ca5d783584eea1de04341ab02f.camel@perches.com>
+Message-ID: <4cf38559-b00d-ede4-def5-7cd832d8a506@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These are used for example on the Endless Mini (EC-100):
-- I2C_A is connected to the Realtek RT5640 audio codec
-- PWM_C (GPIODV_9) is connected to a PWM regulator which is used for
-  VCCK (CPU voltage supply)
-- UART_B is connected to the Bluetooth module (of the RTL8723BS SDIO
-  wifi and Bluetooth combo chip)
+Hi,
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
----
- arch/arm/boot/dts/meson8b.dtsi | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+On 09/12/2018 09:21 PM, Joe Perches wrote:
+> On Fri, 2018-09-07 at 23:54 +0200, Cedric Roux wrote:
+>> Running:
+>>     scripts/checkpatch.pl -f arch/arm/mach-s3c24xx/mach-mini2440.c
+>> revealed several errors and warnings.
+>>
+>> They were all removed, except one which is an #if 0 around the declaration
+>> of a gpio pin. This needs some more investigation and I prefer to let it
+>> here. This is not some dead code.
+> []
+>> diff --git a/arch/arm/mach-s3c24xx/mach-mini2440.c b/arch/arm/mach-s3c24xx/mach-mini2440.c
+> []
+>> @@ -674,17 +680,17 @@ static void __init mini2440_init(void)
+>>  		mini2440_fb_info.displays =
+>>  			&mini2440_lcd_cfg[features.lcd_index];
+>>  
+>> -		printk(KERN_INFO "MINI2440: LCD");
+>> +		pr_info("MINI2440: LCD");
+> 
+> OK
+> 
+>>  		for (li = 0; li < ARRAY_SIZE(mini2440_lcd_cfg); li++)
+>>  			if (li == features.lcd_index)
+>> -				printk(" [%d:%dx%d]", li,
+>> +				pr_info(" [%d:%dx%d]", li,
+>>  					mini2440_lcd_cfg[li].width,
+>>  					mini2440_lcd_cfg[li].height);
+> 
+> pr_cont
+> 
+>>  			else
+>> -				printk(" %d:%dx%d", li,
+>> +				pr_info(" %d:%dx%d", li,
+> 
+> pr_cont
+> 
+>>  					mini2440_lcd_cfg[li].width,
+>>  					mini2440_lcd_cfg[li].height);
+>> -		printk("\n");
+>> +		pr_info("\n");
+> 
+> pr_cont
+> 
+> So only the first printk should use pr_info().
+> The subsequent printk uses should use pr_cont()
 
-diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
-index f77e419c1c65..4bbbbc6bea83 100644
---- a/arch/arm/boot/dts/meson8b.dtsi
-+++ b/arch/arm/boot/dts/meson8b.dtsi
-@@ -223,6 +223,13 @@
- 			};
- 		};
- 
-+		i2c_a_pins: i2c-a {
-+			mux {
-+				groups = "i2c_sda_a", "i2c_sck_a";
-+				function = "i2c_a";
-+			};
-+		};
-+
- 		sd_b_pins: sd-b {
- 			mux {
- 				groups = "sd_d0_b", "sd_d1_b", "sd_d2_b",
-@@ -230,6 +237,29 @@
- 				function = "sd_b";
- 			};
- 		};
-+
-+		pwm_c1_pins: pwm-c1 {
-+			mux {
-+				groups = "pwm_c1";
-+				function = "pwm_c";
-+			};
-+		};
-+
-+		uart_b0_pins: uart-b0 {
-+			mux {
-+				groups = "uart_tx_b0",
-+				       "uart_rx_b0";
-+				function = "uart_b";
-+			};
-+		};
-+
-+		uart_b0_cts_rts_pins: uart-b0-cts-rts {
-+			mux {
-+				groups = "uart_cts_b0",
-+				       "uart_rts_b0";
-+				function = "uart_b";
-+			};
-+		};
- 	};
- };
- 
--- 
-2.19.0
+at this point, I don't know what to do.
+
+Should I resubmit the patches? Or is it in the hands of
+Krzysztof (krzk at kernel.org)? I would say a git rebase -i
+is enough to edit the patch and this rebase is obviously
+not to be done by me, but I don't know the process.
+
+Regards,
+C?dric.
+
+
+
+> 
+>>  		s3c24xx_fb_set_platdata(&mini2440_fb_info);
+>>  	}
+>>  
