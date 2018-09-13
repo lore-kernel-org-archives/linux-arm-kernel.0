@@ -1,36 +1,37 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Thu, 13 Sep 2018 22:29:19 +0200
-Subject: [PATCH 4/4] ARM: dts: meson8b: odroidc1: add stdout-path property
+Date: Thu, 13 Sep 2018 22:29:18 +0200
+Subject: [PATCH 3/4] ARM: dts: meson8b: odroidc1: enable the SAR ADC
 In-Reply-To: <20180913202919.20927-1-martin.blumenstingl@googlemail.com>
 References: <20180913202919.20927-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20180913202919.20927-5-martin.blumenstingl@googlemail.com>
+Message-ID: <20180913202919.20927-4-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To use the "earlycon" kernel command line parameter (without arguments)
-we need a stdout-path property under the /chosen node. Add this to make
-it easier to spot errors early in the boot process when looking for
-them.
+Odroid-C1 exposes ADC channels 0 and 1 on the GPIO headers. NOTE: Due
+to the SoC design these are limited to 1.8V (instead of 3.3V like all
+other pins).
+Enable the SAR ADC to enable voltage measurements on these pins.
 
 Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 ---
- arch/arm/boot/dts/meson8b-odroidc1.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/boot/dts/meson8b-odroidc1.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/arch/arm/boot/dts/meson8b-odroidc1.dts b/arch/arm/boot/dts/meson8b-odroidc1.dts
-index 7c1225658567..58669abda259 100644
+index a08dccccdb5e..7c1225658567 100644
 --- a/arch/arm/boot/dts/meson8b-odroidc1.dts
 +++ b/arch/arm/boot/dts/meson8b-odroidc1.dts
-@@ -57,6 +57,10 @@
- 		mmc0 = &sd_card_slot;
- 	};
+@@ -246,6 +246,11 @@
+ 	pinctrl-names = "default";
+ };
  
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
++&saradc {
++	status = "okay";
++	vref-supply = <&vcc_1v8>;
++};
 +
- 	memory {
- 		reg = <0x40000000 0x40000000>;
- 	};
+ &sdio {
+ 	status = "okay";
+ 
 -- 
 2.19.0
