@@ -1,64 +1,49 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Thu, 13 Sep 2018 18:29:54 +0800
-Subject: [PATCH v3] PCI: dwc: fix scheduling while atomic issues
-In-Reply-To: <20180913091534.GB32721@e107981-ln.cambridge.arm.com>
-References: <20180829110408.556c3622@xhacker.debian>
- <20180910165722.38218779@xhacker.debian>
- <20180913091534.GB32721@e107981-ln.cambridge.arm.com>
-Message-ID: <20180913182926.365d155b@xhacker.debian>
+From: kw@fieahl.im (Fieah Lim)
+Date: Thu, 13 Sep 2018 18:38:32 +0800
+Subject: [PATCH] ARM: Don't disable SRA optimization on recent GCC
+Message-ID: <20180913103832.23463-1-kw@fieahl.im>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+The issue addressed by
+commit a077224fd35b ("ARM: 8429/1: disable GCC SRA optimization")
+has been fixed in GCC version 5.4 and later:
+https://gcc.gnu.org/bugzilla/show_bug.cgi?id=65932#c33
+https://gcc.gnu.org/git/?p=gcc.git;a=commit;h=7fa02f018da21445e1b93eb89cd29ecbbb98617f
 
-On Thu, 13 Sep 2018 10:15:34 +0100 Lorenzo Pieralisi wrote:
+Since ARM/Linaro is releasing latest GNU Toolchain for ARM
+(up to version 8.2.1 till this date), we should only disable this
+when compiling with GCC version <= 5.3
 
-> On Mon, Sep 10, 2018 at 04:57:22PM +0800, Jisheng Zhang wrote:
-> > Hi all,
-> > 
-> > On Wed, 29 Aug 2018 11:04:08 +0800 Jisheng Zhang wrote:
-> >   
-> > > When programming inbound/outbound atu, we call usleep_range() after
-> > > each checking PCIE_ATU_ENABLE bit. Unfortunately, the atu programming
-> > > can be called in atomic context:
-> > > 
-> > > inbound atu programming could be called through
-> > > pci_epc_write_header()  
-> > >   =>dw_pcie_ep_write_header()
-> > >     =>dw_pcie_prog_inbound_atu()    
-> > > 
-> > > outbound atu programming could be called through
-> > > pci_bus_read_config_dword()  
-> > >   =>dw_pcie_rd_conf()
-> > >     =>dw_pcie_prog_outbound_atu()    
-> > > 
-> > > Fix this issue by calling mdelay() instead.  
-> > 
-> > Any comments about this patch?
-> > 
-> > Thanks,
-> > Jisheng
-> >   
-> > > 
-> > > Fixes: f8aed6ec624f ("PCI: dwc: designware: Add EP mode support")
-> > > Fixes: d8bbeb39fbf3 ("PCI: designware: Wait for iATU enable")  
-> 
-> Can you split it into two patches and repost it please ? It will make
-> everyone's life easier to backport it if there is need, I will apply
-> then.
+This patch add a GCC version check before passing -fno-ipa-sra
+and remove two unnecessary # in the comment block.
 
-IIUC, the purpose of this split is to make the backport to stable easier. If
-so, I realise that the Fixes tags were not enough, we missed:
+Signed-off-by: Fieah Lim <kw@fieahl.im>
+---
+ arch/arm/Makefile | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-Fixes: edd45e396829 ("PCI: dwc: designware: Move _unroll configurations to a
-separate function")
-
-I'm not sure how to handle this case. From another side, the issue to be
-fixed is the same: call sleep in atomic context in the same driver, is it
-better to use one patch?
-
-As for stable tree, I could send out separate patches instead. What do you
-think?
-
-Thanks,
-Jisheng
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index fc26c3d7b9b6..1fdd8eab21cd 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -54,13 +54,11 @@ AS		+= -EL
+ LD		+= -EL
+ endif
+ 
+-#
+-# The Scalar Replacement of Aggregates (SRA) optimization pass in GCC 4.9 and
+-# later may result in code being generated that handles signed short and signed
+-# char struct members incorrectly. So disable it.
++# The Scalar Replacement of Aggregates (SRA) optimization pass in GCC 5.3 and
++# earlier may result in code being generated that handles signed short and
++# signed char struct members incorrectly. So disable it.
+ # (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=65932)
+-#
+-KBUILD_CFLAGS	+= $(call cc-option,-fno-ipa-sra)
++KBUILD_CFLAGS	+= $(call cc-ifversion, -le, 0503, $(call cc-option,-fno-ipa-sra))
+ 
+ # This selects which instruction set is used.
+ # Note that GCC does not numerically define an architecture version
+-- 
+2.19.0
