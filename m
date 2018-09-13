@@ -1,60 +1,34 @@
-From: ndesaulniers@google.com (Nick Desaulniers)
-Date: Thu, 13 Sep 2018 15:20:07 -0700
-Subject: [PATCH] include/linux/compiler-clang.h: define __naked
-In-Reply-To: <CANiq72=BE8ygC6r4cJ2TshwOKCEv0C8F2xmpLRhSVMfqq16xUQ@mail.gmail.com>
-References: <20180910060455.20409-1-stefan@agner.ch>
- <CAK8P3a2cc741UqFSk+hXpC2s4S+A+0FuiM1yP=Z4rC18sJHq9g@mail.gmail.com>
- <CANiq72mGH3KW+FxVDF0PcAeaTCtnNz_oO=2-u4zZQ9kvbRDCtA@mail.gmail.com>
- <CANiq72=BE8ygC6r4cJ2TshwOKCEv0C8F2xmpLRhSVMfqq16xUQ@mail.gmail.com>
-Message-ID: <CAKwvOdkgdbn76+jGEwUayGriGn+4GQVLtxkzszkBueP6XuOGLw@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 13 Sep 2018 15:20:20 -0700
+Subject: [PATCH] ARM: dts: brcm: Fix SPI bus warnings
+In-Reply-To: <20180913181245.25484-6-robh@kernel.org>
+References: <20180913181245.25484-6-robh@kernel.org>
+Message-ID: <78e6100f-1932-108a-b3ec-7bb37765583b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2018 at 9:03 PM Miguel Ojeda
-<miguel.ojeda.sandonis@gmail.com> wrote:
->
-> Hi again,
->
-> On Wed, Sep 12, 2018 at 6:19 AM, Miguel Ojeda
-> <miguel.ojeda.sandonis@gmail.com> wrote:
-> >
-> > I will do a bigger one tomorrow or so and see if there are any
-> > important differences. Regardless of what we do, I will send the
-> > __naked patches separately as well (requested by Nick on GitHub).
->
-> So I did a comparison with a full allyesconfig between -rc2 and -rc2 +
-> v4. I find quite a lot binary differences, but not a single objdump -d
-> difference (object file by object file) just by fixing UTS_RELEASE to
-> the same value, so I guess that is a very good sign in case someone
-> wants to pick the entire series sooner than expected. Regardless, I
-> will send the separate __naked patches.
->
-> I should note that, at some point in one of my allyesconfig builds I got this:
->
->   UPD     include/generated/compile.h
->   CC      init/version.o
->   AR      init/built-in.a
->   AR      built-in.a
->   LD      vmlinux.o
->   MODPOST vmlinux.o
-> ld: drivers/edac/amd64_edac.o(.text+0x200031d2): reloc against
-> `__asan_load4_noabort': error 4
-> ld: final link failed: Nonrepresentable section on output
-> Makefile:1035: recipe for target 'vmlinux' failed
-> make: *** [vmlinux] Error 1
-
-+ Dmitry for the KASAN error (Andrey was already cc'ed)
-
->
-> Running make (without cleaning) didn't reproduce it, and the other
-> allyesconfig builds didn't suffer any problem either. Maybe my
-> hardware is failing, but I wanted to let you know nevertheless.
->
-> Cheers,
-> Miguel
 
 
+On 09/13/18 11:12, Rob Herring wrote:
+> dtc has new checks for SPI buses. Fix the warnings in node names.
+> 
+> arch/arm/boot/dts/bcm53340-ubnt-unifi-switch8.dtb: Warning (spi_bus_bridge): /axi at 18000000/qspi at 27200: node name for SPI buses should be 'spi'
+> arch/arm/boot/dts/bcm958525er.dtb: Warning (spi_bus_bridge): /axi/qspi at 27200: node name for SPI buses should be 'spi'
+> arch/arm/boot/dts/bcm958525xmc.dtb: Warning (spi_bus_bridge): /axi/qspi at 27200: node name for SPI buses should be 'spi'
+> arch/arm/boot/dts/bcm958622hr.dtb: Warning (spi_bus_bridge): /axi/qspi at 27200: node name for SPI buses should be 'spi'
+> arch/arm/boot/dts/bcm958625hr.dtb: Warning (spi_bus_bridge): /axi/qspi at 27200: node name for SPI buses should be 'spi'
+> arch/arm/boot/dts/bcm988312hr.dtb: Warning (spi_bus_bridge): /axi/qspi at 27200: node name for SPI buses should be 'spi'
+> 
+> Cc: Ray Jui <rjui@broadcom.com>
+> Cc: Scott Branden <sbranden@broadcom.com>
+> Cc: Jon Mason <jonmason@broadcom.com>
+> Cc: bcm-kernel-feedback-list at broadcom.com
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> ---
 
+Applied to devicetree/next, thanks Rob!
+
+NB: s/brcm/bcm/ to be somewhat consistent with file names and past
+submissions.
 -- 
-Thanks,
-~Nick Desaulniers
+Florian
