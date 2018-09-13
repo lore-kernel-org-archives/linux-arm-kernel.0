@@ -1,42 +1,56 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 13 Sep 2018 19:02:31 +0200
-Subject: [PATCH v2 02/24] drivers/video/fbdev: use ioremap_wc/wt()
- instead of __ioremap()
-In-Reply-To: <2f980cf32a05415662272cf052c2b9e2a94c756f.1536692743.git.christophe.leroy@c-s.fr>
-References: <cover.1536692743.git.christophe.leroy@c-s.fr>
- <CGME20180912155824epcas5p17cd1e14fa1cb246362ec47b15248cf71@epcas5p1.samsung.com>
- <2f980cf32a05415662272cf052c2b9e2a94c756f.1536692743.git.christophe.leroy@c-s.fr>
-Message-ID: <20180913170233eucas1p19e6cd20020f27bb4db0cd927bb9a3302~UBFkQTUaX2145421454eucas1p1M@eucas1p1.samsung.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 13 Sep 2018 10:03:05 -0700
+Subject: [PATCH v2 6/8] drm/imx: support handling bridge timings bus flags
+In-Reply-To: <1536827930.3452.4.camel@pengutronix.de>
+References: <20180912183222.25414-1-stefan@agner.ch>
+ <20180912183222.25414-7-stefan@agner.ch>
+ <1536827930.3452.4.camel@pengutronix.de>
+Message-ID: <c0814f7187159956c4a495986bdba01c@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 09/12/2018 05:58 PM, Christophe Leroy wrote:
-> _PAGE_NO_CACHE is a platform specific flag. In addition, this flag
-> is misleading because one would think it requests a noncached page
-> whereas a noncached page is _PAGE_NO_CACHE | _PAGE_GUARDED
+On 13.09.2018 01:38, Philipp Zabel wrote:
+> On Wed, 2018-09-12 at 11:32 -0700, Stefan Agner wrote:
+>> A bridge might require specific settings for the pixel data on
+>> the bus.
 > 
-> _PAGE_NO_CACHE alone means write combined noncached page, so lets
-> use ioremap_wc() instead.
+> On which bus? The bridge has input and output.
 > 
-> _PAGE_WRITETHRU is also platform specific flag. Use ioremap_wt()
-> instead.
+>> Copy the bus flags from the bridge timings if a bridge
+>> is in use.
+>>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> ---
+>>  drivers/gpu/drm/imx/parallel-display.c | 3 +++
+>>  1 file changed, 3 insertions(+)
+>>
+>> diff --git a/drivers/gpu/drm/imx/parallel-display.c b/drivers/gpu/drm/imx/parallel-display.c
+>> index aefd04e18f93..7798a0621df7 100644
+>> --- a/drivers/gpu/drm/imx/parallel-display.c
+>> +++ b/drivers/gpu/drm/imx/parallel-display.c
+>> @@ -239,6 +239,9 @@ static int imx_pd_bind(struct device *dev, struct device *master, void *data)
+>>  	if (ret && ret != -ENODEV)
+>>  		return ret;
+>>
+>> +	if (imxpd->bridge && imxpd->bridge->timings)
+>> +		imxpd->bus_flags = imxpd->bridge->timings->input_bus_flags;
 > 
-> Signed-off-by: Christophe Leroy <christophe.leroy@c-s.fr>
+> Oh, ok. I'd also specify input bus in the commit message.
+> 
 
-After reading patch #1 this one LGTM.
+Good point, will change in v3 to:
 
-Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+"A bridge might require specific settings for the pixel data on
+its input bus. Those are specified through optional bus timings.
+Copy the bridges input bus flags as to the imxpd bus flags."
 
-> ---
->  drivers/video/fbdev/chipsfb.c    |  3 +--
->  drivers/video/fbdev/controlfb.c  |  5 +----
->  drivers/video/fbdev/platinumfb.c |  5 +----
->  drivers/video/fbdev/valkyriefb.c | 12 ++++++------
->  4 files changed, 9 insertions(+), 16 deletions(-)
-
-Best regards,
 --
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Stefan
+
+>> +
+>>  	imxpd->dev = dev;
+>>
+>>  	ret = imx_pd_register(drm, imxpd);
+> 
+> regards
+> Philipp
