@@ -1,48 +1,57 @@
 From: wsa+renesas@sang-engineering.com (Wolfram Sang)
-Date: Thu, 13 Sep 2018 17:17:13 +0200
-Subject: [RFC PATCH 0/3] dma-mapping: clear dangling pointers consistently
-Message-ID: <20180913151716.6333-1-wsa+renesas@sang-engineering.com>
+Date: Thu, 13 Sep 2018 17:17:15 +0200
+Subject: [RFC PATCH 2/3] dma-mapping: clear dma_ops pointer also on ARM
+In-Reply-To: <20180913151716.6333-1-wsa+renesas@sang-engineering.com>
+References: <20180913151716.6333-1-wsa+renesas@sang-engineering.com>
+Message-ID: <20180913151716.6333-3-wsa+renesas@sang-engineering.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When working with dma_set_max_seg_size(), I noticed issues with a
-dangling dma_parms pointer. I saw Christoph just worked on handling
-something similar for the dma_ops pointer, too. I came up with three
-patches on top of Christoph's work which I send out for discussion here:
+The generic fallback of arch_teardown_dma_ops() clears the dma_ops
+pointer but the ARM specific version does not. Rename the generic one,
+so it can be called from ARM specific one, too. This will ensure
+consistent behaviour.
 
-Patch 1 fixes a meanwhile stale comment.
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+---
+ arch/arm/mm/dma-mapping.c   | 6 +++---
+ include/linux/dma-mapping.h | 5 +++--
+ 2 files changed, 6 insertions(+), 5 deletions(-)
 
-Patch 2 makes clearing the dma_ops pointer more consistent because it
-was missed on the custom ARM implementation to the best of my knowledge.
-
-Patch 3 generalizes teardown_dma_ops to teardown_dma, so that clearing
-dma_parms can be added there.
-
-All these patches are based on the dma-mapping for-next branch. They are
-build tested and runtime tested on a Renesas Salvator-XS board (R-Car
-M3-N, ARM64) and Renesas Lager board (R-Car H2, ARM32).
-
-A branch containing these (and dma_parms additions for the above boards)
-can be found here:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git renesas/sdhi/set_max_seg
-
-Looking forward to opinions.
-
-Regards,
-
-   Wolfram
-
-
-Wolfram Sang (3):
-  ARM: dma-mapping: update comment about handling dma_ops when detaching
-    from IOMMU
-  dma-mapping: clear dma_ops pointer also on ARM
-  dma-mapping: clear dma_parms on teardown, too
-
- arch/arm/mm/dma-mapping.c   | 8 ++++----
- include/linux/dma-mapping.h | 6 ++++--
- 2 files changed, 8 insertions(+), 6 deletions(-)
-
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index e3b04786838f..466b0242e8af 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -2396,8 +2396,8 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+ 
+ void arch_teardown_dma_ops(struct device *dev)
+ {
+-	if (!dev->archdata.dma_ops_setup)
+-		return;
++	if (dev->archdata.dma_ops_setup)
++		arm_teardown_iommu_dma_ops(dev);
+ 
+-	arm_teardown_iommu_dma_ops(dev);
++	generic_teardown_dma_ops(dev);
+ }
+diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+index eafd6f318e78..020512cb7f0e 100644
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -663,11 +663,12 @@ static inline void arch_setup_dma_ops(struct device *dev, u64 dma_base,
+ 				      bool coherent) { }
+ #endif
+ 
+-#ifndef arch_teardown_dma_ops
+-static inline void arch_teardown_dma_ops(struct device *dev)
++static inline void generic_teardown_dma_ops(struct device *dev)
+ {
+ 	dev->dma_ops = NULL;
+ }
++#ifndef arch_teardown_dma_ops
++#define arch_teardown_dma_ops generic_teardown_dma_ops
+ #endif
+ 
+ static inline unsigned int dma_get_max_seg_size(struct device *dev)
 -- 
 2.18.0
