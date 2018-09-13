@@ -1,34 +1,53 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Thu, 13 Sep 2018 23:35:43 +0530
-Subject: [PATCH v3 2/4] dt-bindings: arm: rockchip: Add binding for Rock960
- board
-In-Reply-To: <20180913180545.29756-1-manivannan.sadhasivam@linaro.org>
-References: <20180913180545.29756-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180913180545.29756-3-manivannan.sadhasivam@linaro.org>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 13 Sep 2018 11:06:26 -0700
+Subject: [GIT PULL] Amlogic ARM64 DT updates for v4.20
+Message-ID: <7hva79uva5.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add devicetree binding for Rock960 board from Vamrs Limited.
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
----
- Documentation/devicetree/bindings/arm/rockchip.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
 
-diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
-index acfd3c773dd0..4b6888a21db2 100644
---- a/Documentation/devicetree/bindings/arm/rockchip.txt
-+++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-@@ -5,6 +5,10 @@ Rockchip platforms device tree bindings
-     Required root node properties:
-       - compatible = "vamrs,ficus", "rockchip,rk3399";
- 
-+- 96boards RK3399 Rock960 (ROCK960 Consumer Edition)
-+    Required root node properties:
-+      - compatible = "vamrs,rock960", "rockchip,rk3399";
-+
- - Amarula Vyasa RK3288 board
-     Required root node properties:
-       - compatible = "amarula,vyasa-rk3288", "rockchip,rk3288";
--- 
-2.17.1
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64
+
+for you to fetch changes up to 445f2bda3501508b801b3571baee33de0ac44e1f:
+
+  arm64: dts: meson: Switch simple-mfd and syscon order (2018-09-13 09:16:36 -0700)
+
+----------------------------------------------------------------
+Amlogic ARM64 DT updates for v4.20
+- AXG: cleanup/reorder nodes
+- AXG: add audio PDM support for s400 board
+- GX: increase CMA memory size
+- GX: new canvas driver
+
+----------------------------------------------------------------
+Christian Hewitt (1):
+      arm64: dts: meson-gx: increase default shared CMA pool size
+
+Jerome Brunet (8):
+      arm64: dts: meson-axg: add audio fifos
+      arm64: dts: meson-axg: s400: enable audio devices
+      arm64: dts: meson-axg: s400: add sound card
+      arm64: dts: meson-axg: sort nodes consistently
+      arm64: dts: meson: libretech: update board model
+      arm64: dts: meson-axg: add pdm
+      arm64: dts: meson-axg: s400: add dmic codec
+      arm64: dts: meson-axg: s400: add pdm to the sound card
+
+Maxime Jourdan (1):
+      arm64: dts: meson-gx: add dmcbus and canvas nodes.
+
+Neil Armstrong (3):
+      arm64: dts: meson-axg: use the proper compatible for ethmac
+      arm64: dts: meson-axg-s400: Add chosen and memory nodes
+      arm64: dts: meson: Switch simple-mfd and syscon order
+
+ arch/arm64/boot/dts/amlogic/meson-axg-s400.dts               |  368 +++++++++++---
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi                   | 1615 ++++++++++++++++++++++++++++++++-----------------------------
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi                    |   19 +-
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts |    2 +-
+ 4 files changed, 1156 insertions(+), 848 deletions(-)
