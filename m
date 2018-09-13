@@ -1,90 +1,90 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 13 Sep 2018 15:55:15 +0200
-Subject: [GIT PULL] Rockchip ARM64 devicetree updates for 4.20
-Message-ID: <2349272.dkc8ODN2Us@phil>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 13 Sep 2018 21:58:09 +0800
+Subject: [arm-platforms:irq/generic_handle_domain_irq 5/12]
+ arch/powerpc/sysdev/fsl_mpic_err.c:116:17: error: implicit declaration of
+ function 'irq_linear_revmap'
+Message-ID: <201809132104.A0T71LnM%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof,
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/generic_handle_domain_irq
+head:   1cd5475f4e5ee8d056a26731de9ef22f941775b4
+commit: dcf82fd21b0681fb1aed451940eb125e36213d08 [5/12] irqdomain: Kill irq_domain_add_legacy_isa
+config: powerpc-ksi8560_defconfig (attached as .config)
+compiler: powerpc-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout dcf82fd21b0681fb1aed451940eb125e36213d08
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=powerpc 
 
-please find below the first set of arm64 dt updates for 4.20
-(or however it will be named).
+All errors (new ones prefixed by >>):
 
-It's really only 64 bit changes so far [I have one 32bit patch queued up,
-but that isn't really useful on its own, so I'll keep it a bit longer,
-to not send needless 1-patch pull requests ;-) ]
+   arch/powerpc/sysdev/fsl_mpic_err.c: In function 'fsl_error_int_handler':
+>> arch/powerpc/sysdev/fsl_mpic_err.c:116:17: error: implicit declaration of function 'irq_linear_revmap' [-Werror=implicit-function-declaration]
+      cascade_irq = irq_linear_revmap(mpic->irqhost,
+                    ^~~~~~~~~~~~~~~~~
+   arch/powerpc/sysdev/fsl_mpic_err.c: In function 'mpic_err_int_init':
+>> arch/powerpc/sysdev/fsl_mpic_err.c:136:9: error: implicit declaration of function 'irq_create_mapping'; did you mean 'irq_set_parent'? [-Werror=implicit-function-declaration]
+     virq = irq_create_mapping(mpic->irqhost, irqnum);
+            ^~~~~~~~~~~~~~~~~~
+            irq_set_parent
+   cc1: all warnings being treated as errors
 
-The tag describes the included changes, so if ok please pull
+vim +/irq_linear_revmap +116 arch/powerpc/sysdev/fsl_mpic_err.c
 
-Thanks
-Heiko
+0a4081641 Varun Sethi      2012-08-08  100  
+0a4081641 Varun Sethi      2012-08-08  101  static irqreturn_t fsl_error_int_handler(int irq, void *data)
+0a4081641 Varun Sethi      2012-08-08  102  {
+0a4081641 Varun Sethi      2012-08-08  103  	struct mpic *mpic = (struct mpic *) data;
+0a4081641 Varun Sethi      2012-08-08  104  	u32 eisr, eimr;
+0a4081641 Varun Sethi      2012-08-08  105  	int errint;
+0a4081641 Varun Sethi      2012-08-08  106  	unsigned int cascade_irq;
+0a4081641 Varun Sethi      2012-08-08  107  
+0a4081641 Varun Sethi      2012-08-08  108  	eisr = mpic_fsl_err_read(mpic->err_regs, MPIC_ERR_INT_EISR);
+0a4081641 Varun Sethi      2012-08-08  109  	eimr = mpic_fsl_err_read(mpic->err_regs, MPIC_ERR_INT_EIMR);
+0a4081641 Varun Sethi      2012-08-08  110  
+0a4081641 Varun Sethi      2012-08-08  111  	if (!(eisr & ~eimr))
+0a4081641 Varun Sethi      2012-08-08  112  		return IRQ_NONE;
+0a4081641 Varun Sethi      2012-08-08  113  
+0a4081641 Varun Sethi      2012-08-08  114  	while (eisr) {
+0a4081641 Varun Sethi      2012-08-08  115  		errint = __builtin_clz(eisr);
+0a4081641 Varun Sethi      2012-08-08 @116  		cascade_irq = irq_linear_revmap(mpic->irqhost,
+0a4081641 Varun Sethi      2012-08-08  117  				 mpic->err_int_vecs[errint]);
+ef24ba709 Michael Ellerman 2016-09-06  118  		WARN_ON(!cascade_irq);
+ef24ba709 Michael Ellerman 2016-09-06  119  		if (cascade_irq) {
+0a4081641 Varun Sethi      2012-08-08  120  			generic_handle_irq(cascade_irq);
+0a4081641 Varun Sethi      2012-08-08  121  		} else {
+0a4081641 Varun Sethi      2012-08-08  122  			eimr |=  1 << (31 - errint);
+0a4081641 Varun Sethi      2012-08-08  123  			mpic_fsl_err_write(mpic->err_regs, eimr);
+0a4081641 Varun Sethi      2012-08-08  124  		}
+0a4081641 Varun Sethi      2012-08-08  125  		eisr &= ~(1 << (31 - errint));
+0a4081641 Varun Sethi      2012-08-08  126  	}
+0a4081641 Varun Sethi      2012-08-08  127  
+0a4081641 Varun Sethi      2012-08-08  128  	return IRQ_HANDLED;
+0a4081641 Varun Sethi      2012-08-08  129  }
+0a4081641 Varun Sethi      2012-08-08  130  
+0a4081641 Varun Sethi      2012-08-08  131  void mpic_err_int_init(struct mpic *mpic, irq_hw_number_t irqnum)
+0a4081641 Varun Sethi      2012-08-08  132  {
+0a4081641 Varun Sethi      2012-08-08  133  	unsigned int virq;
+0a4081641 Varun Sethi      2012-08-08  134  	int ret;
+0a4081641 Varun Sethi      2012-08-08  135  
+0a4081641 Varun Sethi      2012-08-08 @136  	virq = irq_create_mapping(mpic->irqhost, irqnum);
 
+:::::: The code at line 116 was first introduced by commit
+:::::: 0a4081641d722d3dee140505a86330ecf44db0fe powerpc/mpic: FSL MPIC error interrupt support.
 
-The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+:::::: TO: Varun Sethi <Varun.Sethi@freescale.com>
+:::::: CC: Kumar Gala <galak@kernel.crashing.org>
 
-  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
-
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.20-rockchip-dts64-1
-
-for you to fetch changes up to 78f26da3ffbce0ea3692a89fe3f5487cb8dda068:
-
-  arm64: dts: rockchip: Add type-c port supply on rk3399-sapphire board (2018-09-10 19:16:26 +0200)
-
-----------------------------------------------------------------
-New soc support for the px30 quad-core Cortex-A35.
-New boards are the px30 eval board and roc-rk3399-pc.
-The rk3328 got support for the one gpio controlled via the general
-register files and the rk3399 finally got its idle-states defined.
-And finally fixes and improvements for firefly-rk3399 (wifi),
-roc-rk3328-cc (sdmmc-uhs, io-domains), rk3328-rock64 (gpio-regulator
-pin fix) and rk3399-sapphire (gpio-regulator pin fix, pmic pin fix
-and type-c port supply).
-
-----------------------------------------------------------------
-Katsuhiro Suzuki (1):
-      arm64: dts: rockchip: fix vcc_host1_5v pin assign on rk3328-rock64
-
-Levin Du (4):
-      arm64: dts: rockchip: add support for ROC-RK3399-PC board
-      arm64: dts: rockchip: add io-domain to roc-rk3328-cc
-      arm64: dts: rockchip: add GRF GPIO controller to rk3328
-      arm64: dts: rockchip: add sdmmc UHS support for roc-rk3328-cc
-
-Liang Chen (3):
-      dt-bindings: rockchip: grf: add grf and pmugrf description for px30
-      arm64: dts: rockchip: add core dtsi file for PX30 SoCs
-      arm64: dts: rockchip: add PX30 evaluation board devicetree
-
-Sandy Huang (1):
-      arm64: dts: rockchip: add missing vop properties for px30
-
-Shohei Maruyama (1):
-      arm64: dts: rockchip: add WiFi module support for Firefly-RK3399
-
-Tony Xie (1):
-      arm64: dts: rockchip: Add idle-states to device tree for rk3399
-
-Vicente Bergas (4):
-      arm64: dts: rockchip: re-order vcc_sys on rk3399-sapphire
-      arm64: dts: rockchip: Fix VCC5V0_HOST_EN on rk3399-sapphire
-      arm64: dts: rockchip: remove dvs2 pinctrl from pmic on rk3399-sapphire
-      arm64: dts: rockchip: Add type-c port supply on rk3399-sapphire board
-
- Documentation/devicetree/bindings/arm/rockchip.txt |    8 +
- .../devicetree/bindings/soc/rockchip/grf.txt       |    2 +
- arch/arm64/boot/dts/rockchip/Makefile              |    2 +
- arch/arm64/boot/dts/rockchip/px30-evb.dts          |  231 +++
- arch/arm64/boot/dts/rockchip/px30.dtsi             | 2031 ++++++++++++++++++++
- arch/arm64/boot/dts/rockchip/rk3328-roc-cc.dts     |   30 +
- arch/arm64/boot/dts/rockchip/rk3328-rock64.dts     |    4 +-
- arch/arm64/boot/dts/rockchip/rk3328.dtsi           |    7 +-
- arch/arm64/boot/dts/rockchip/rk3399-firefly.dts    |   36 +
- arch/arm64/boot/dts/rockchip/rk3399-roc-pc.dts     |  680 +++++++
- arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi  |   44 +-
- arch/arm64/boot/dts/rockchip/rk3399.dtsi           |   28 +
- 12 files changed, 3083 insertions(+), 20 deletions(-)
- create mode 100644 arch/arm64/boot/dts/rockchip/px30-evb.dts
- create mode 100644 arch/arm64/boot/dts/rockchip/px30.dtsi
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-roc-pc.dts
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 11673 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180913/adfe97f6/attachment-0001.gz>
