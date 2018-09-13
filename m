@@ -1,94 +1,132 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 13 Sep 2018 10:40:16 -0700
-Subject: [PATCH v2 2/4] crypto: skcipher - Enforce non-ASYNC for on-stack
- requests
-In-Reply-To: <CAGXu5j+ti_nzxeu64e-X+igNEsnXiW1rjkn7R63DMBCxBOeTNg@mail.gmail.com>
-References: <20180906225854.40989-1-keescook@chromium.org>
- <20180906225854.40989-3-keescook@chromium.org>
- <20180907034242.zhm4dglzkldhvh3x@gondor.apana.org.au>
- <CAKv+Gu9kHpBTKjQKA3W4Q424FeY+Zq4srq2-r0MxjfCNKHT_5A@mail.gmail.com>
- <20180911055230.iiiq2uu5gczlwjon@gondor.apana.org.au>
- <CAGXu5j+ti_nzxeu64e-X+igNEsnXiW1rjkn7R63DMBCxBOeTNg@mail.gmail.com>
-Message-ID: <CAGXu5j+bpLK=EQ9LHkO8V=sdaQwt==6fbGhgn2Vi1E9_WxSGRQ@mail.gmail.com>
+From: JOLLYS@xilinx.com (Jolly Shah)
+Date: Thu, 13 Sep 2018 17:51:17 +0000
+Subject: [PATCH v2 1/3] dt-bindings: power: Add ZynqMP power domain
+ bindings
+In-Reply-To: <20180820194628.GA26783@bogus>
+References: <1534447304-12919-1-git-send-email-jollys@xilinx.com>
+ <1534447304-12919-2-git-send-email-jollys@xilinx.com>
+ <20180820194628.GA26783@bogus>
+Message-ID: <CY1PR02MB2138C05E97C1EFAEA921CB5CB81A0@CY1PR02MB2138.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2018 at 9:46 AM, Kees Cook <keescook@chromium.org> wrote:
-> On Mon, Sep 10, 2018 at 10:52 PM, Herbert Xu
-> <herbert@gondor.apana.org.au> wrote:
->> On Fri, Sep 07, 2018 at 08:56:23AM +0200, Ard Biesheuvel wrote:
->>>
->>> OK, so given that all SKCIPHER_REQUEST_ON_STACK occurrences are
->>> updated in this series anyway, perhaps we should add
->>> skcipher_[en|de]crypt_onstack() flavors that encapsulate the
->>> additional check? Only question is how to enforce at compile time that
->>> those are used instead of the ordinary ones when using a stack
->>> allocated request. Would you mind using some macro foo here involving
->>> __builtin_types_compatible_p() ?
->>
->> Something like a completely new type which in reality is just a
->> wrapper around skcipher:
->>
->>         struct crypto_sync_skcipher {
->>                 struct crypto_skcipher base;
->>         } tfm;
->>
->>         tfm = crypto_alloc_sync_skcipher(...);
->>
->>         crypto_sync_skcipher_encrypt(...)
->>         crypto_sync_skcipher_decrypt(...)
->>
->> These functions would just be trivial inline functions around their
->> crypto_skcipher counterparts.
->
-> This means new wrappers for the other helpers too, yes? For example:
->
->         SKCIPHER_REQUEST_ON_STACK(nreq, ctx->null);
->
->         skcipher_request_set_tfm(nreq, ctx->null);
->         skcipher_request_set_callback(nreq, req->base.flags, NULL, NULL);
->         skcipher_request_set_crypt(nreq, req->src, req->dst, nbytes, NULL);
->
->         return crypto_skcipher_encrypt(nreq);
->
-> For the above, we'd also need:
->
-> sync_skcipher_request_set_tfm()
-> sync_skcipher_request_set_callback()
-> sync_skcipher_request_set_crypt()
+Hi Rob,
 
-Wait, I think I misunderstood you. Did you mean a new top-level thing
-(tfm?) not a new request type?
+> -----Original Message-----
+> From: Rob Herring [mailto:robh at kernel.org]
+> Sent: Monday, August 20, 2018 12:46 PM
+> To: Jolly Shah <JOLLYS@xilinx.com>
+> Cc: matthias.bgg at gmail.com; andy.gross at linaro.org; shawnguo at kernel.org;
+> geert+renesas at glider.be; bjorn.andersson at linaro.org;
+> sean.wang at mediatek.com; m.szyprowski at samsung.com; Michal Simek
+> <michals@xilinx.com>; mark.rutland at arm.com; Rajan Vaja
+> <RAJANV@xilinx.com>; devicetree at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Rajan Vaja
+> <RAJANV@xilinx.com>; Jolly Shah <JOLLYS@xilinx.com>
+> Subject: Re: [PATCH v2 1/3] dt-bindings: power: Add ZynqMP power domain
+> bindings
+> 
+> On Thu, Aug 16, 2018 at 12:21:42PM -0700, Jolly Shah wrote:
+> > From: Rajan Vaja <rajan.vaja@xilinx.com>
+> >
+> > Add documentation to describe ZynqMP power domain bindings.
+> >
+> > Signed-off-by: Rajan Vaja <rajan.vaja@xilinx.com>
+> > Signed-off-by: Jolly Shah <jollys@xilinx.com>
+> > ---
+> >  .../firmware/xilinx/xlnx,zynqmp-firmware.txt       | 47
+> ++++++++++++++++++++++
+> 
+> This should be with all the other power domain bindings.
+> 
+> >  1 file changed, 47 insertions(+)
+> >
+> > diff --git
+> > a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmwa
+> > re.txt
+> > b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmwa
+> > re.txt
+> > index d215d15..5fa10a0 100644
+> > ---
+> > a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmwa
+> > re.txt
+> > +++ b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-fi
+> > +++ rmware.txt
+> > @@ -64,6 +64,29 @@ Output clocks are registered based on clock
+> > information received  from firmware. Output clocks indexes are
+> > mentioned in  include/dt-bindings/clock/xlnx,zynqmp-clk.h.
+> >
+> > +-----------------------------------------------------------
+> > +Device Tree Bindings for the Xilinx Zynq MPSoC PM domains
+> > +-----------------------------------------------------------
+> > +The binding for zynqmp-power-controller follow the common generic PM
+> > +domain binding[1].
+> > +
+> > +[1] Documentation/devicetree/bindings/power/power_domain.txt
+> > +
+> > +== Zynq MPSoC Generic PM Domain Node ==
+> > +
+> > +Required properties:
+> > + - compatible:	Must be: "xlnx,zynqmp-power-controller"
+> > +
+> > +This node contains a number of subnodes, each representing a single
+> > +PM domain that PM domain consumer devices reference.
+> > +
+> > +== PM Domain Nodes ==
+> > +
+> > +Required properties:
+> > + - #power-domain-cells:	Number of cells in a PM domain specifier. Must
+> be 0.
+> > + - pd-id:		Domain identifier as defined by platform firmware.
+> > +			This identifier is passed to the PM firmware.
+> 
+> Make this a cell for the power domain consumer.
+[Jolly] We have more than one Ids for GPU device. Also they don't have parent child relationship and hence are defined as flat hierarchy. (shown in example below)
 
-That would mean at least replacing skcipher_request_set_tfm() with a
-wrapper (since the tfm argument is different), but _not_
-encrypt/decrypt like you mention. I could perform a type test in
-SKCIPHER_REQUEST_ON_STACK().
+Thanks,
+Jolly Shah
 
-Globally:
-- add struct crypto_sync_skcipher wrapper
-- add crypto_alloc_sync_skcipher() to check non-ASYNC and request size
-of actual tfm
-- add skcipher_request_set_sync_tfm() to attach the wrapped tfm to the request
-- SKCIPHER_REQUEST_ON_STACK() would verify the tfm was a struct
-crypto_sync_skcipher.
-
-Two changes per user:
-- change allocation to use new crypto_alloc_sync_skcipher() which does
-the runtime checking
-- change skcipher_request_set_tfm() to skcipher_request_set_sync_tfm()
-
-This means struct skcipher_request is unchanged, along with
-_set_callback, _set_crypt, _zero, and en/decrypt.
-
-API misuse would be caught at build-time (via
-SKCIPHER_REQUEST_ON_STACK type checking) and any request size problems
-would be caught at allocation time.
-
-Does this sound like what you had in mind?
-
--Kees
-
--- 
-Kees Cook
-Pixel Security
+> 
+> > +
+> >  -------
+> >  Example
+> >  -------
+> > @@ -78,5 +101,29 @@ firmware {
+> >  			clocks = <&pss_ref_clk>, <&video_clk>,
+> <&pss_alt_ref_clk>, <&aux_ref_clk>, <&gt_crx_ref_clk>;
+> >  			clock-names = "pss_ref_clk", "video_clk",
+> "pss_alt_ref_clk","aux_ref_clk", "gt_crx_ref_clk";
+> >  		};
+> > +		zynqmp-power-controller {
+> > +			compatible = "xlnx,zynqmp-power-controller";
+> > +
+> > +			pd_usb0: pd-usb0 {
+> > +				pd-id = <22>;
+> > +				#power-domain-cells = <0>;
+> > +			};
+> > +
+> > +			pd_sata: pd-sata {
+> > +				pd-id = <28>;
+> > +				#power-domain-cells = <0>;
+> > +			};
+> > +
+> > +			pd_gpu : pd-gpu {
+> > +				pd-id = <58 20 21>;
+> > +				#power-domain-cells = <0>;
+> > +			};
+> > +		};
+> >  	};
+> >  };
+> > +
+> > +sata0: ahci at SATA_AHCI_HBA {
+> 
+> Don't use defines in unit-addresses (or reg for that matter). It's pointless
+> indirection.
+> 
+> > +	...
+> > +	power-domains = <&pd_sata>;
+> > +	...
+> > +};
+> > --
+> > 2.7.4
+> >
