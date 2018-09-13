@@ -1,43 +1,152 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 13 Sep 2018 09:40:55 +0200
-Subject: [4.14.y] request commit 94a5d8790e79 ("arm64: cpu_errata: include
- required headers")
-In-Reply-To: <20180913073822.GA31299@kroah.com>
-References: <20180911170030.650928d8@xhacker.debian>
- <20180913071216.GH11496@kroah.com>
- <20180913152420.6c6324f4@xhacker.debian> <20180913073822.GA31299@kroah.com>
-Message-ID: <CAK8P3a03PedvHW+Njkdsb-0khiTLYLtLfbQ26BwnHCrdNRKdAQ@mail.gmail.com>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Thu, 13 Sep 2018 09:45:15 +0200
+Subject: [BISECTED] Regression: Solidrun Clearfog Base won't boot since
+ "PCI: mvebu: Only remap I/O space if configured"
+In-Reply-To: <20180912231050.GX30658@n2100.armlinux.org.uk>
+References: <61fdfd69-2bb6-478c-b0d5-69d8744adae3@cesnet.cz>
+ <87zhwm4kl6.fsf@tkos.co.il>
+ <20180912231050.GX30658@n2100.armlinux.org.uk>
+Message-ID: <20180913094515.351967bb@windsurf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2018 at 9:38 AM Greg Kroah-Hartman
-<gregkh@linuxfoundation.org> wrote:
->
-> On Thu, Sep 13, 2018 at 03:24:20PM +0800, Jisheng Zhang wrote:
-> > Hi Greg,
-> >
-> > On Thu, 13 Sep 2018 09:12:16 +0200 Greg Kroah-Hartman wrote:
-> >
-> > > On Tue, Sep 11, 2018 at 05:00:30PM +0800, Jisheng Zhang wrote:
-> > > > Hi Greg,
-> > > >
-> > > > I think we missed the commit 94a5d8790e79 ("arm64: cpu_errata: include
-> > > > required headers"), could you please include it in next stable release?
-> > >
-> > > Really, you are seeing build failures on 4.14.y without this patch
-> > > applied?  I haven't gotten any reports of this, what is wrong with our
-> >
-> > yes. I see similar build errors as the commit mentioned. Per my test, setting
-> > CONFIG_ARM64_SSBD as y will trigger the errors.
->
-> Odd that no one else is seeing this, perhaps you might want to look into
-> that :)
->
-> Anyway, it's a safe patch, now queued up.
+Russell, Baruch, Jan,
 
-It's a fairly unusual configuration, but not hard to hit in randconfig
-builds. I've been meaning to resume doing randconfig builds on stable
-kernels for a while to catch more of those, hopefully after Linux Connect
-I'll get to that.
+On Thu, 13 Sep 2018 00:10:51 +0100, Russell King - ARM Linux wrote:
 
-      Arnd
+> It's probably the latter - the region is probably already mapped, that
+> being the PCI IO region.
+> 
+> The original driver was setup to call pci_ioremap_io() as the very
+> last thing - and as the driver is non-removable, we were guaranteed
+> to never tear down this mapping (which is sensible, it's published
+> to userspace.)
+> 
+> However, the current code calls pci_ioremap_io() much earlier, in
+> a path where probe failures can occur.  This breaks pci_ioremap_io()'s
+> requirements - it must not be called more than once.  So:
+> 
+> ee1604381a37 ("PCI: mvebu: Only remap I/O space if configured")
+> 
+> is basically incorrect - pci_ioremap_io() needs to move back to a
+> place where it is only called in a path which will never fail.
+> However, looking at the generic host bits, I'm not sure such a place
+> exists in the new effort to make stuff more generic.
+
+What about something like the below. I tested it, including the error
+case by forcing an -EPROBE_DEFER. The new pci_unmap_io() is modeled
+after pci_unmap_iospace(). Actually, I would prefer to use
+pci_remap_iospace() and pci_unmap_iospace() but for now this API
+doesn't allow overloading the memory type used for the mapping.
+
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index 2cfbc531f63b..cee0e2be5ac7 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -185,6 +185,7 @@ static inline void pci_ioremap_set_mem_type(int mem_type) {}
+ #endif
+ 
+ extern int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr);
++extern void pci_unmap_io(unsigned int offset);
+ 
+ /*
+  * PCI configuration space mapping function.
+diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+index fc91205ff46c..f3a4df44bb27 100644
+--- a/arch/arm/mm/ioremap.c
++++ b/arch/arm/mm/ioremap.c
+@@ -482,6 +482,14 @@ int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
+ }
+ EXPORT_SYMBOL_GPL(pci_ioremap_io);
+ 
++void pci_unmap_io(unsigned int offset)
++{
++	BUG_ON(offset + SZ_64K > IO_SPACE_LIMIT);
++
++	unmap_kernel_range(PCI_IO_VIRT_BASE + offset, SZ_64K);
++}
++EXPORT_SYMBOL_GPL(pci_unmap_io);
++
+ void __iomem *pci_remap_cfgspace(resource_size_t res_cookie, size_t size)
+ {
+ 	return arch_ioremap_caller(res_cookie, size, MT_UNCACHED,
+diff --git a/drivers/pci/controller/pci-mvebu.c b/drivers/pci/controller/pci-mvebu.c
+index 50eb0729385b..772cff19c2ce 100644
+--- a/drivers/pci/controller/pci-mvebu.c
++++ b/drivers/pci/controller/pci-mvebu.c
+@@ -1145,7 +1145,6 @@ static int mvebu_pcie_parse_request_resources(struct mvebu_pcie *pcie)
+ {
+ 	struct device *dev = &pcie->pdev->dev;
+ 	struct device_node *np = dev->of_node;
+-	unsigned int i;
+ 	int ret;
+ 
+ 	INIT_LIST_HEAD(&pcie->resources);
+@@ -1179,15 +1178,34 @@ static int mvebu_pcie_parse_request_resources(struct mvebu_pcie *pcie)
+ 					 resource_size(&pcie->io) - 1);
+ 		pcie->realio.name = "PCI I/O";
+ 
+-		for (i = 0; i < resource_size(&pcie->realio); i += SZ_64K)
+-			pci_ioremap_io(i, pcie->io.start + i);
+-
+ 		pci_add_resource(&pcie->resources, &pcie->realio);
+ 	}
+ 
+ 	return devm_request_pci_bus_resources(dev, &pcie->resources);
+ }
+ 
++static void mvebu_pcie_map_io(struct mvebu_pcie *pcie)
++{
++	int i;
++
++	if (resource_size(&pcie->io) == 0)
++		return;
++
++	for (i = 0; i < resource_size(&pcie->realio); i += SZ_64K)
++		pci_ioremap_io(i, pcie->io.start + i);
++}
++
++static void mvebu_pcie_unmap_io(struct mvebu_pcie *pcie)
++{
++	int i;
++
++	if (resource_size(&pcie->io) == 0)
++		return;
++
++	for (i = 0; i < resource_size(&pcie->realio); i += SZ_64K)
++		pci_unmap_io(i);
++}
++
+ static int mvebu_pcie_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -1258,6 +1276,8 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+ 
+ 	pcie->nports = i;
+ 
++	mvebu_pcie_map_io(pcie);
++
+ 	list_splice_init(&pcie->resources, &bridge->windows);
+ 	bridge->dev.parent = dev;
+ 	bridge->sysdata = pcie;
+@@ -1268,7 +1288,13 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+ 	bridge->align_resource = mvebu_pcie_align_resource;
+ 	bridge->msi = pcie->msi;
+ 
+-	return pci_host_probe(bridge);
++	ret = pci_host_probe(bridge);
++	if (ret) {
++		mvebu_pcie_unmap_io(pcie);
++		return ret;
++	}
++
++	return 0;
+ }
+ 
+ static const struct of_device_id mvebu_pcie_of_match_table[] = {
+
+
+-- 
+Thomas Petazzoni, CTO, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
