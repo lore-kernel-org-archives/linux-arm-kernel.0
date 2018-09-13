@@ -1,53 +1,189 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Sep 2018 11:09:43 +0200
-Subject: [PATCH 48/58] arm64: dts: renesas: salvator-xs: Improve SATA switch
- settings comments
+Date: Thu, 13 Sep 2018 11:09:44 +0200
+Subject: [PATCH 49/58] arm64: dts: renesas: r8a77990: Use CPG/MSSR and SYSC
+ binding definitions
 In-Reply-To: <cover.1536828567.git.horms+renesas@verge.net.au>
 References: <cover.1536828567.git.horms+renesas@verge.net.au>
-Message-ID: <48e1f50bd67a4ee6c168e5d869cc49096cb2d203.1536828567.git.horms+renesas@verge.net.au>
+Message-ID: <83e7d2ec0d7bd57666c6f8fd210255e0ec155c38.1536828567.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-The comments describing the non-default switch settings to use SATA are
-confusing: 'Off' refers to the switch position, not to the MD12 logic
-value, while the parentheses suggest otherwise.  Rephrase to fix this.
+Use the SoC-specific CPG/MSSR include file to allow future use of
+R8A77990_CLK_* symbols.
+Replace the hardcoded power domain indices by R8A77990_PD_* symbols.
 
-Fixes: bec000784d5bb571 ("arm64: dts: renesas: salvator-xs: enable SATA")
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts  | 2 +-
- arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/renesas/r8a77990.dtsi | 36 +++++++++++++++----------------
+ 1 file changed, 18 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts
-index ba3357636fdb..cf08a119eec0 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts
-@@ -184,7 +184,7 @@
- 	};
- };
+diff --git a/arch/arm64/boot/dts/renesas/r8a77990.dtsi b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
+index 2ee0edfb18d4..e2c2d1480a68 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77990.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
+@@ -5,7 +5,7 @@
+  * Copyright (C) 2018 Renesas Electronics Corp.
+  */
  
--/* MD12 (SW12-7) must be set 'Off' which is not the default! */
-+/* SW12-7 must be set 'Off' (MD12 set to 1) which is not the default! */
- &sata {
- 	status = "okay";
- };
-diff --git a/arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts b/arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts
-index 45016a06fab1..f03a5e9e0c42 100644
---- a/arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts
-@@ -57,7 +57,7 @@
- 	};
- };
+-#include <dt-bindings/clock/renesas-cpg-mssr.h>
++#include <dt-bindings/clock/r8a77990-cpg-mssr.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/power/r8a77990-sysc.h>
  
--/* MD12 (SW12-7) must be set 'Off' which is not the default! */
-+/* SW12-7 must be set 'Off' (MD12 set to 1) which is not the default! */
- &sata {
- 	status = "okay";
- };
+@@ -22,7 +22,7 @@
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0>;
+ 			device_type = "cpu";
+-			power-domains = <&sysc 5>;
++			power-domains = <&sysc R8A77990_PD_CA53_CPU0>;
+ 			next-level-cache = <&L2_CA53>;
+ 			enable-method = "psci";
+ 		};
+@@ -31,14 +31,14 @@
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <1>;
+ 			device_type = "cpu";
+-			power-domains = <&sysc 6>;
++			power-domains = <&sysc R8A77990_PD_CA53_CPU1>;
+ 			next-level-cache = <&L2_CA53>;
+ 			enable-method = "psci";
+ 		};
+ 
+ 		L2_CA53: cache-controller-0 {
+ 			compatible = "cache";
+-			power-domains = <&sysc 21>;
++			power-domains = <&sysc R8A77990_PD_CA53_SCU>;
+ 			cache-unified;
+ 			cache-level = <2>;
+ 		};
+@@ -75,7 +75,7 @@
+ 				     "renesas,rcar-gen3-wdt";
+ 			reg = <0 0xe6020000 0 0x0c>;
+ 			clocks = <&cpg CPG_MOD 402>;
+-			power-domains = <&sysc 32>;
++			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
+ 			resets = <&cpg 402>;
+ 			status = "disabled";
+ 		};
+@@ -91,7 +91,7 @@
+ 			#interrupt-cells = <2>;
+ 			interrupt-controller;
+ 			clocks = <&cpg CPG_MOD 912>;
+-			power-domains = <&sysc 32>;
++			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
+ 			resets = <&cpg 912>;
+ 		};
+ 
+@@ -106,7 +106,7 @@
+ 			#interrupt-cells = <2>;
+ 			interrupt-controller;
+ 			clocks = <&cpg CPG_MOD 911>;
+-			power-domains = <&sysc 32>;
++			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
+ 			resets = <&cpg 911>;
+ 		};
+ 
+@@ -121,7 +121,7 @@
+ 			#interrupt-cells = <2>;
+ 			interrupt-controller;
+ 			clocks = <&cpg CPG_MOD 910>;
+-			power-domains = <&sysc 32>;
++			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
+ 			resets = <&cpg 910>;
+ 		};
+ 
+@@ -136,7 +136,7 @@
+ 			#interrupt-cells = <2>;
+ 			interrupt-controller;
+ 			clocks = <&cpg CPG_MOD 909>;
+-			power-domains = <&sysc 32>;
++			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
+ 			resets = <&cpg 909>;
+ 		};
+ 
+@@ -151,7 +151,7 @@
+ 			#interrupt-cells = <2>;
+ 			interrupt-controller;
+ 			clocks = <&cpg CPG_MOD 908>;
+-			power-domains = <&sysc 32>;
++			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
+ 			resets = <&cpg 908>;
+ 		};
+ 
+@@ -166,7 +166,7 @@
+ 			#interrupt-cells = <2>;
+ 			interrupt-controller;
+ 			clocks = <&cpg CPG_MOD 907>;
+-			power-domains = <&sysc 32>;
++			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
+ 			resets = <&cpg 907>;
+ 		};
+ 
+@@ -181,7 +181,7 @@
+ 			#interrupt-cells = <2>;
+ 			interrupt-controller;
+ 			clocks = <&cpg CPG_MOD 906>;
+-			power-domains = <&sysc 32>;
++			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
+ 			resets = <&cpg 906>;
+ 		};
+ 
+@@ -329,7 +329,7 @@
+ 					  "ch20", "ch21", "ch22", "ch23",
+ 					  "ch24";
+ 			clocks = <&cpg CPG_MOD 812>;
+-			power-domains = <&sysc 32>;
++			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
+ 			resets = <&cpg 812>;
+ 			phy-mode = "rgmii";
+ 			#address-cells = <1>;
+@@ -414,7 +414,7 @@
+ 			interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 310>;
+ 			clock-names = "fck";
+-			power-domains = <&sysc 32>;
++			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
+ 			resets = <&cpg 310>;
+ 			status = "disabled";
+ 		};
+@@ -437,7 +437,7 @@
+ 			clocks = <&cpg CPG_MOD 703>;
+ 			phys = <&usb2_phy0>;
+ 			phy-names = "usb";
+-			power-domains = <&sysc 32>;
++			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
+ 			resets = <&cpg 703>;
+ 			status = "disabled";
+ 		};
+@@ -450,7 +450,7 @@
+ 			phys = <&usb2_phy0>;
+ 			phy-names = "usb";
+ 			companion = <&ohci0>;
+-			power-domains = <&sysc 32>;
++			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
+ 			resets = <&cpg 703>;
+ 			status = "disabled";
+ 		};
+@@ -461,7 +461,7 @@
+ 			reg = <0 0xee080200 0 0x700>;
+ 			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 703>;
+-			power-domains = <&sysc 32>;
++			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
+ 			resets = <&cpg 703>;
+ 			#phy-cells = <0>;
+ 			status = "disabled";
+@@ -480,7 +480,7 @@
+ 					(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
+ 			clocks = <&cpg CPG_MOD 408>;
+ 			clock-names = "clk";
+-			power-domains = <&sysc 32>;
++			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
+ 			resets = <&cpg 408>;
+ 		};
+ 
 -- 
 2.11.0
