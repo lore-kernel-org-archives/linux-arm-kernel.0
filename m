@@ -1,32 +1,43 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Thu, 13 Sep 2018 23:35:45 +0530
-Subject: [PATCH v3 4/4] arm64: dts: rockchip: Enable SD card detection for
- Rock960 boards
-In-Reply-To: <20180913180545.29756-1-manivannan.sadhasivam@linaro.org>
-References: <20180913180545.29756-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180913180545.29756-5-manivannan.sadhasivam@linaro.org>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 13 Sep 2018 11:08:56 -0700
+Subject: [GIT PULL] Amlogic driver updates for v4.20
+Message-ID: <7hpnxhuv5z.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For proper working of SD cards, let's add the Card Detect GPIO property
-to the common devicetree for Rock960 family boards.
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
----
- arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
-index cc9c373f3a37..6c8c4ab044aa 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
-@@ -439,6 +439,7 @@
- 	cap-sd-highspeed;
- 	clock-frequency = <100000000>;
- 	clock-freq-min-max = <100000 100000000>;
-+	cd-gpios = <&gpio0 7 GPIO_ACTIVE_LOW>;
- 	disable-wp;
- 	sd-uhs-sdr104;
- 	vqmmc-supply = <&vcc_sd>;
--- 
-2.17.1
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-drivers
+
+for you to fetch changes up to d4983983d98710e4927fdb8de8e987c303b3fba3:
+
+  soc: amlogic: add meson-canvas driver (2018-09-12 21:38:45 -0700)
+
+----------------------------------------------------------------
+Amlogic ARM64 driver updates for v4.20
+- add meson-canvas driver and bindings
+- firmware: Add serial number sysfs entry
+
+----------------------------------------------------------------
+Maxime Jourdan (2):
+      dt-bindings: soc: amlogic: add meson-canvas documentation
+      soc: amlogic: add meson-canvas driver
+
+Neil Armstrong (1):
+      firmware: meson_sm: Add serial number sysfs entry
+
+ Documentation/devicetree/bindings/soc/amlogic/amlogic,canvas.txt |  29 +++++++++
+ drivers/firmware/meson/meson_sm.c                                |  56 ++++++++++++++++++
+ drivers/soc/amlogic/Kconfig                                      |   7 +++
+ drivers/soc/amlogic/Makefile                                     |   1 +
+ drivers/soc/amlogic/meson-canvas.c                               | 185 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/firmware/meson/meson_sm.h                          |   1 +
+ include/linux/soc/amlogic/meson-canvas.h                         |  65 +++++++++++++++++++++
+ 7 files changed, 344 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/amlogic/amlogic,canvas.txt
+ create mode 100644 drivers/soc/amlogic/meson-canvas.c
+ create mode 100644 include/linux/soc/amlogic/meson-canvas.h
