@@ -1,40 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Sep 2018 11:08:33 +0200
-Subject: [PATCH 10/13] ARM: dts: silk: Add DA9063 RTC and OnKey node
+Date: Thu, 13 Sep 2018 11:08:32 +0200
+Subject: [PATCH 09/13] ARM: dts: iwg23s-sbc: specify EtherAVB PHY IRQ
 In-Reply-To: <cover.1536824376.git.horms+renesas@verge.net.au>
 References: <cover.1536824376.git.horms+renesas@verge.net.au>
-Message-ID: <d688a83aa6e33654d14d1d79e59a340ed4d08332.1536824376.git.horms+renesas@verge.net.au>
+Message-ID: <938fbd1ae2aca6e0547411687f0cc32d18427eae.1536824376.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marek Vasut <marek.vasut@gmail.com>
+From: Biju Das <biju.das@bp.renesas.com>
 
-Add DA9063 RTC and OnKey subnode to DA9063 PMIC node on Silk.
+Specify  EtherAVB PHY IRQ  in the board specific device tree, now that we
+have GPIO support.
 
-Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794-silk.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
-index 6ea60e1faf75..60e91ebfa65d 100644
---- a/arch/arm/boot/dts/r8a7794-silk.dts
-+++ b/arch/arm/boot/dts/r8a7794-silk.dts
-@@ -416,6 +416,14 @@
- 		interrupts = <31 IRQ_TYPE_LEVEL_LOW>;
- 		interrupt-controller;
+diff --git a/arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts b/arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts
+index 56182eec81fb..22da819f186b 100644
+--- a/arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts
++++ b/arch/arm/boot/dts/r8a77470-iwg23s-sbc.dts
+@@ -35,6 +35,8 @@
  
-+		onkey {
-+			compatible = "dlg,da9063-onkey";
-+		};
-+
-+		rtc {
-+			compatible = "dlg,da9063-rtc";
-+		};
-+
- 		wdt {
- 			compatible = "dlg,da9063-watchdog";
- 		};
+ 	phy3: ethernet-phy at 3 {
+ 		reg = <3>;
++		interrupt-parent = <&gpio5>;
++		interrupts = <16 IRQ_TYPE_LEVEL_LOW>;
+ 		micrel,led-mode = <1>;
+ 	};
+ };
 -- 
 2.11.0
