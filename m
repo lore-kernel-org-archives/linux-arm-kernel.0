@@ -1,37 +1,67 @@
 From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Thu, 13 Sep 2018 13:30:21 +0200
-Subject: [PATCH v7 4/7] clocksource/drivers: atmel-pit: make option silent
-In-Reply-To: <20180913113024.3571-1-alexandre.belloni@bootlin.com>
-References: <20180913113024.3571-1-alexandre.belloni@bootlin.com>
-Message-ID: <20180913113024.3571-5-alexandre.belloni@bootlin.com>
+Date: Thu, 13 Sep 2018 13:30:17 +0200
+Subject: [PATCH v7 0/7] clocksource: rework Atmel TCB timer driver
+Message-ID: <20180913113024.3571-1-alexandre.belloni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To conform with the other option, make the ATMEL_PIT option silent so it
-can be selected from the platform
+Hi,
 
-Tested-by: Alexander Dahl <ada@thorsis.com>
-Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
----
- drivers/clocksource/Kconfig | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+This series reworks the Atmel TCB drivers. It introduces a new driver to handle
+the clocksource and clockevent devices.
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 8c7324e409f6..2388fee46e99 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -392,8 +392,11 @@ config ARMV7M_SYSTICK
- 	  This options enables support for the ARMv7M system timer unit
- 
- config ATMEL_PIT
-+	bool "Microchip ARM Periodic Interval Timer (PIT)" if COMPILE_TEST
- 	select TIMER_OF if OF
--	def_bool SOC_AT91SAM9 || SOC_SAMA5
-+	help
-+	  This enables build of clocksource and clockevent driver for
-+	  the integrated PIT in Microchip ARM SoCs.
- 
- config ATMEL_ST
- 	bool "Atmel ST timer support" if COMPILE_TEST
+This is necessary because:
+ - the current tcb_clksrc driver is probed too late to be able to be used at
+   boot and we now have SoCs that don't have a PIT. They currently are not able
+   to boot a mainline kernel.
+ - using the PIT doesn't work well with preempt-rt because its interrupt is
+   shared (in particular with the UART and their interrupt flags are
+   incompatible)
+ - the current solution is wasting some TCB channels
+
+The plan is to get this driver upstream, then convert the TCB PWM driver to be
+able to get rid of the tcb_clksrc driver along with atmel_tclib now that AVR32
+is gone.
+
+changes in v7:
+ - fixed a warning when building on 64 bit platforms
+
+changes in v6:
+ - rebased on v4.19-rc1
+ - separated the clocksource/clockevent and the single clockevent in two
+   different patches
+ - removed struct tc_clkevt_device and simply use struct atmel_tcb_clksrc
+ - removed struct atmel_tcb_info
+ - moved tcb_clk_get and tcb_irq_get to users
+
+changes in v5:
+ - rebased on v4.18-rc1
+ - fixed the clock enabling/disabling in atomic context under preempt-rt
+
+Changes in v4:
+ - rebased on top of v4.17-rc1
+ - fixed an issue when setting max_delta for clockevents_config_and_register
+
+Alexandre Belloni (7):
+  ARM: at91: add TCB registers definitions
+  clocksource/drivers: Add a new driver for the Atmel ARM TC blocks
+  clocksource/drivers: timer-atmel-tcb: add clockevent device on
+    separate channel
+  clocksource/drivers: atmel-pit: make option silent
+  ARM: at91: Implement clocksource selection
+  ARM: configs: at91: use new TCB timer driver
+  ARM: configs: at91: unselect PIT
+
+ arch/arm/configs/at91_dt_defconfig    |   2 +-
+ arch/arm/configs/sama5_defconfig      |   2 +-
+ arch/arm/mach-at91/Kconfig            |  25 ++
+ drivers/clocksource/Kconfig           |  13 +-
+ drivers/clocksource/Makefile          |   3 +-
+ drivers/clocksource/timer-atmel-tcb.c | 617 ++++++++++++++++++++++++++
+ include/soc/at91/atmel_tcb.h          | 183 ++++++++
+ 7 files changed, 841 insertions(+), 4 deletions(-)
+ create mode 100644 drivers/clocksource/timer-atmel-tcb.c
+ create mode 100644 include/soc/at91/atmel_tcb.h
+
 -- 
 2.19.0
