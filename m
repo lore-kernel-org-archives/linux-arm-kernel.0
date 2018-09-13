@@ -1,71 +1,34 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Thu, 13 Sep 2018 09:27:04 +0200
-Subject: [PATCH v2 1/2] ARM: dts: socfpga: Add fpga2hps and fpga2sdram
- bridges
-In-Reply-To: <20180822084110.14969-1-s.trumtrar@pengutronix.de>
-References: <20180822084110.14969-1-s.trumtrar@pengutronix.de>
-Message-ID: <73lg85luwn.fsf@pengutronix.de>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Thu, 13 Sep 2018 15:24:20 +0800
+Subject: [4.14.y] request commit 94a5d8790e79 ("arm64: cpu_errata:
+ include required headers")
+In-Reply-To: <20180913071216.GH11496@kroah.com>
+References: <20180911170030.650928d8@xhacker.debian>
+ <20180913071216.GH11496@kroah.com>
+Message-ID: <20180913152420.6c6324f4@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Greg,
 
-Hi!
+On Thu, 13 Sep 2018 09:12:16 +0200 Greg Kroah-Hartman wrote:
 
-Steffen Trumtrar <s.trumtrar@pengutronix.de> writes:
+> On Tue, Sep 11, 2018 at 05:00:30PM +0800, Jisheng Zhang wrote:
+> > Hi Greg,
+> > 
+> > I think we missed the commit 94a5d8790e79 ("arm64: cpu_errata: include
+> > required headers"), could you please include it in next stable release?  
+> 
+> Really, you are seeing build failures on 4.14.y without this patch
+> applied?  I haven't gotten any reports of this, what is wrong with our
 
-> Add the remaining two bridges on the Cyclone-V SoCFPGA SoCs.
->
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> ---
-> Changes in v2:
->   - set status to disabled, so there are no accidental users of 
->   the bridges
->
->  arch/arm/boot/dts/socfpga.dtsi | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/socfpga.dtsi 
-> b/arch/arm/boot/dts/socfpga.dtsi
-> index b38f8c240558..11781f795de2 100644
-> --- a/arch/arm/boot/dts/socfpga.dtsi
-> +++ b/arch/arm/boot/dts/socfpga.dtsi
-> @@ -543,6 +543,20 @@
->  			clocks = <&l4_main_clk>;
->  		};
->  
-> +		fpga_bridge2: fpga-bridge at ff600000 {
-> +			compatible = 
-> "altr,socfpga-fpga2hps-bridge";
-> +			reg = <0xff600000 0x100000>;
-> +			resets = <&rst FPGA2HPS_RESET>;
-> +			clocks = <&l4_main_clk>;
-> +			status = "disabled";
-> +		};
-> +
-> +		fpga_bridge3: fpga-bridge at ffc25080 {
-> +			compatible = 
-> "altr,socfpga-fpga2sdram-bridge";
-> +			reg = <0xffc25080 0x4>;
-> +			status = "disabled";
-> +		};
-> +
->  		fpgamgr0: fpgamgr at ff706000 {
->  			compatible = "altr,socfpga-fpga-mgr";
->  			reg = <0xff706000 0x1000
+yes. I see similar build errors as the commit mentioned. Per my test, setting
+CONFIG_ARM64_SSBD as y will trigger the errors.
 
-Any opinion on this? There shouldn't be any accidental use of the 
-bridges now with status=disabled.
+Thanks
 
-
-Best regards,
-Steffen
-
--- 
-Pengutronix e.K.                          | Steffen Trumtrar 
-|
-Industrial Linux Solutions                | 
-http://www.pengutronix.de/ |
-Peiner Str. 6-8, 31137 Hildesheim, Germany| Phone: 
-+49-5121-206917-0   |
-Amtsgericht Hildesheim, HRA 2686          | Fax: 
-+49-5121-206917-5555|
+> build tests that this isn't being caught?
+> 
+> thanks,
+> 
+> greg k-h
