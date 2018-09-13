@@ -1,35 +1,30 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 13 Sep 2018 22:17:39 +0200
-Subject: [PATCH] ARM: dts: aspeed: Adding Facebook TioagaPass BMC
-In-Reply-To: <20180913195751.1833227-1-vijaykhemka@fb.com>
-References: <20180913195751.1833227-1-vijaykhemka@fb.com>
-Message-ID: <20180913201739.GG23892@lunn.ch>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Thu, 13 Sep 2018 22:21:59 +0200
+Subject: [PATCH 1/5] dt-bindings: add vendor prefix for "Endless Mobile, Inc."
+In-Reply-To: <20180913202203.19636-1-martin.blumenstingl@googlemail.com>
+References: <20180913202203.19636-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20180913202203.19636-2-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -1206,4 +1206,5 @@ dtb-$(CONFIG_ARCH_ASPEED) += \
->  	aspeed-bmc-opp-witherspoon.dtb \
->  	aspeed-bmc-opp-zaius.dtb \
->  	aspeed-bmc-portwell-neptune.dtb \
-> +	aspeed-bmc-facebook-tiogapass.dtb \
+Endless Mobile, Inc. started selling (small) computers in 2015.
 
-Hi Vijay
+Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-These entries are normally kept in alphabetic order.
-
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		postcode0 {
-> +			label="BMC_UP";
-
-Documentation/leds/leds-class.txt
-
-LED Device Naming
-=================
-
-Is currently of the form:
-
-"devicename:colour:function"
-
-	Andrew
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 2c3fc512e746..1c63d2c2d48f 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -114,6 +114,7 @@ elan	Elan Microelectronic Corp.
+ embest	Shenzhen Embest Technology Co., Ltd.
+ emmicro	EM Microelectronic
+ emtrion	emtrion GmbH
++endless	Endless Mobile, Inc.
+ energymicro	Silicon Laboratories (formerly Energy Micro AS)
+ engicam	Engicam S.r.l.
+ epcos	EPCOS AG
+-- 
+2.19.0
