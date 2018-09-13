@@ -1,162 +1,176 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 13 Sep 2018 06:33:29 -0700
-Subject: [PATCH i2c-next v6] i2c: aspeed: Handle master/slave combined irq
- events properly
-In-Reply-To: <fb185839-3ae0-01dc-09e8-f22db55ecb04@kaod.org>
-References: <1f34fe8c-69ef-5f2d-25dc-d5f6037cc558@linux.intel.com>
- <20180911204107.GA26017@roeck-us.net>
- <e5135af4-9105-214f-5de2-65cc03804222@linux.intel.com>
- <CACPK8Xdv3aP_zOHAL0WMgwvkpBHAUesU7OdhW==jgvXjRmt-Zw@mail.gmail.com>
- <20180911233302.GA18799@roeck-us.net>
- <5698ca34-14c9-8d05-c4e6-5acf85ff9d14@linux.intel.com>
- <20180912013449.GA12612@roeck-us.net>
- <7fd98646-fb5a-be4d-ce37-84b74e0fa8b3@linux.intel.com>
- <20180912195844.GA6893@roeck-us.net>
- <da7f4691-7428-3114-32bb-e0171f6c7228@linux.intel.com>
- <20180912203059.GA18201@roeck-us.net>
- <fb185839-3ae0-01dc-09e8-f22db55ecb04@kaod.org>
-Message-ID: <3f86e75f-1502-eae8-0633-d087937111c8@roeck-us.net>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Thu, 13 Sep 2018 15:33:46 +0200
+Subject: [PATCH v2 02/24] drivers/video/fbdev: use ioremap_wc/wt()
+ instead of __ioremap()
+In-Reply-To: <2f980cf32a05415662272cf052c2b9e2a94c756f.1536692743.git.christophe.leroy@c-s.fr>
+References: <cover.1536692743.git.christophe.leroy@c-s.fr>
+ <2f980cf32a05415662272cf052c2b9e2a94c756f.1536692743.git.christophe.leroy@c-s.fr>
+Message-ID: <20180913133346.GD11082@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/12/2018 10:45 PM, C?dric Le Goater wrote
+On Wed, Sep 12, 2018 at 03:58:17PM +0000, Christophe Leroy wrote:
+> _PAGE_NO_CACHE is a platform specific flag. In addition, this flag
+> is misleading because one would think it requests a noncached page
+> whereas a noncached page is _PAGE_NO_CACHE | _PAGE_GUARDED
+> 
+> _PAGE_NO_CACHE alone means write combined noncached page, so lets
+> use ioremap_wc() instead.
+> 
+> _PAGE_WRITETHRU is also platform specific flag. Use ioremap_wt()
+> instead.
+> 
+> Signed-off-by: Christophe Leroy <christophe.leroy@c-s.fr>
 
-[ ... ]
+I wondered why this all showed up in my gfx inbox, then spotted this patch
+here.
 
->> ---
->> qemu:
->>
->> diff --git a/hw/i2c/aspeed_i2c.c b/hw/i2c/aspeed_i2c.c
->> index c762c73..0d4aa08 100644
->> --- a/hw/i2c/aspeed_i2c.c
->> +++ b/hw/i2c/aspeed_i2c.c
->> @@ -180,6 +180,33 @@ static uint8_t aspeed_i2c_get_state(AspeedI2CBus *bus)
->>       return (bus->cmd >> I2CD_TX_STATE_SHIFT) & I2CD_TX_STATE_MASK;
->>   }
->>   
->> +static void aspeed_i2c_handle_rx_cmd(AspeedI2CBus *bus)
->> +{
->> +    int ret;
->> +
->> +    if (!(bus->cmd & (I2CD_M_RX_CMD | I2CD_M_S_RX_CMD_LAST))) {
->> +        return;
->> +    }
-> 
-> it deserves a comment to understand which scenario we are trying to handle.
-> 
->> +    if (bus->intr_status & I2CD_INTR_RX_DONE) {
->> +        return;
->> +    }
-> 
-> should be handled in aspeed_i2c_bus_handle_cmd() I think
-> 
+I trust you way more on the _PAGE_ flags than me, but this looks
+reasonable.
 
-I moved those two checks into the calling code.
+Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
 
+> ---
+>  drivers/video/fbdev/chipsfb.c    |  3 +--
+>  drivers/video/fbdev/controlfb.c  |  5 +----
+>  drivers/video/fbdev/platinumfb.c |  5 +----
+>  drivers/video/fbdev/valkyriefb.c | 12 ++++++------
+>  4 files changed, 9 insertions(+), 16 deletions(-)
+> 
+> diff --git a/drivers/video/fbdev/chipsfb.c b/drivers/video/fbdev/chipsfb.c
+> index f103665cad43..40182ed85648 100644
+> --- a/drivers/video/fbdev/chipsfb.c
+> +++ b/drivers/video/fbdev/chipsfb.c
+> @@ -27,7 +27,6 @@
+>  #include <linux/init.h>
+>  #include <linux/pci.h>
+>  #include <linux/console.h>
+> -#include <asm/io.h>
+>  
+>  #ifdef CONFIG_PMAC_BACKLIGHT
+>  #include <asm/backlight.h>
+> @@ -401,7 +400,7 @@ static int chipsfb_pci_init(struct pci_dev *dp, const struct pci_device_id *ent)
+>  #endif /* CONFIG_PMAC_BACKLIGHT */
+>  
+>  #ifdef CONFIG_PPC
+> -	p->screen_base = __ioremap(addr, 0x200000, _PAGE_NO_CACHE);
+> +	p->screen_base = ioremap_wc(addr, 0x200000);
+>  #else
+>  	p->screen_base = ioremap(addr, 0x200000);
+>  #endif
+> diff --git a/drivers/video/fbdev/controlfb.c b/drivers/video/fbdev/controlfb.c
+> index 8d14b29aafea..9cb0ef7ac29e 100644
+> --- a/drivers/video/fbdev/controlfb.c
+> +++ b/drivers/video/fbdev/controlfb.c
+> @@ -48,9 +48,7 @@
+>  #include <linux/nvram.h>
+>  #include <linux/adb.h>
+>  #include <linux/cuda.h>
+> -#include <asm/io.h>
+>  #include <asm/prom.h>
+> -#include <asm/pgtable.h>
+>  #include <asm/btext.h>
+>  
+>  #include "macmodes.h"
+> @@ -715,8 +713,7 @@ static int __init control_of_init(struct device_node *dp)
+>  		goto error_out;
+>  	}
+>  	/* map at most 8MB for the frame buffer */
+> -	p->frame_buffer = __ioremap(p->frame_buffer_phys, 0x800000,
+> -				    _PAGE_WRITETHRU);
+> +	p->frame_buffer = ioremap_wt(p->frame_buffer_phys, 0x800000);
+>  
+>  	if (!p->control_regs_phys ||
+>  	    !request_mem_region(p->control_regs_phys, p->control_regs_size,
+> diff --git a/drivers/video/fbdev/platinumfb.c b/drivers/video/fbdev/platinumfb.c
+> index 377d3399a3ad..bf6b7fb83cf4 100644
+> --- a/drivers/video/fbdev/platinumfb.c
+> +++ b/drivers/video/fbdev/platinumfb.c
+> @@ -32,9 +32,7 @@
+>  #include <linux/nvram.h>
+>  #include <linux/of_device.h>
+>  #include <linux/of_platform.h>
+> -#include <asm/io.h>
+>  #include <asm/prom.h>
+> -#include <asm/pgtable.h>
+>  
+>  #include "macmodes.h"
+>  #include "platinumfb.h"
+> @@ -577,8 +575,7 @@ static int platinumfb_probe(struct platform_device* odev)
+>  
+>  	/* frame buffer - map only 4MB */
+>  	pinfo->frame_buffer_phys = pinfo->rsrc_fb.start;
+> -	pinfo->frame_buffer = __ioremap(pinfo->rsrc_fb.start, 0x400000,
+> -					_PAGE_WRITETHRU);
+> +	pinfo->frame_buffer = ioremap_wt(pinfo->rsrc_fb.start, 0x400000);
+>  	pinfo->base_frame_buffer = pinfo->frame_buffer;
+>  
+>  	/* registers */
+> diff --git a/drivers/video/fbdev/valkyriefb.c b/drivers/video/fbdev/valkyriefb.c
+> index 275fb98236d3..d51c3a8009cb 100644
+> --- a/drivers/video/fbdev/valkyriefb.c
+> +++ b/drivers/video/fbdev/valkyriefb.c
+> @@ -54,13 +54,11 @@
+>  #include <linux/nvram.h>
+>  #include <linux/adb.h>
+>  #include <linux/cuda.h>
+> -#include <asm/io.h>
+>  #ifdef CONFIG_MAC
+>  #include <asm/macintosh.h>
+>  #else
+>  #include <asm/prom.h>
+>  #endif
+> -#include <asm/pgtable.h>
+>  
+>  #include "macmodes.h"
+>  #include "valkyriefb.h"
+> @@ -318,7 +316,7 @@ static void __init valkyrie_choose_mode(struct fb_info_valkyrie *p)
+>  int __init valkyriefb_init(void)
+>  {
+>  	struct fb_info_valkyrie	*p;
+> -	unsigned long frame_buffer_phys, cmap_regs_phys, flags;
+> +	unsigned long frame_buffer_phys, cmap_regs_phys;
+>  	int err;
+>  	char *option = NULL;
+>  
+> @@ -337,7 +335,6 @@ int __init valkyriefb_init(void)
+>  	/* Hardcoded addresses... welcome to 68k Macintosh country :-) */
+>  	frame_buffer_phys = 0xf9000000;
+>  	cmap_regs_phys = 0x50f24000;
+> -	flags = IOMAP_NOCACHE_SER; /* IOMAP_WRITETHROUGH?? */
+>  #else /* ppc (!CONFIG_MAC) */
+>  	{
+>  		struct device_node *dp;
+> @@ -354,7 +351,6 @@ int __init valkyriefb_init(void)
+>  
+>  		frame_buffer_phys = r.start;
+>  		cmap_regs_phys = r.start + 0x304000;
+> -		flags = _PAGE_WRITETHRU;
+>  	}
+>  #endif /* ppc (!CONFIG_MAC) */
+>  
+> @@ -369,7 +365,11 @@ int __init valkyriefb_init(void)
+>  	}
+>  	p->total_vram = 0x100000;
+>  	p->frame_buffer_phys = frame_buffer_phys;
+> -	p->frame_buffer = __ioremap(frame_buffer_phys, p->total_vram, flags);
+> +#ifdef CONFIG_MAC
+> +	p->frame_buffer = ioremap_nocache(frame_buffer_phys, p->total_vram);
+> +#else
+> +	p->frame_buffer = ioremap_wt(frame_buffer_phys, p->total_vram);
+> +#endif
+>  	p->cmap_regs_phys = cmap_regs_phys;
+>  	p->cmap_regs = ioremap(p->cmap_regs_phys, 0x1000);
+>  	p->valkyrie_regs_phys = cmap_regs_phys+0x6000;
+> -- 
+> 2.13.3
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
->> +    aspeed_i2c_set_state(bus, I2CD_MRXD);
->> +    ret = i2c_recv(bus->bus);
->> +    if (ret < 0) {
->> +        qemu_log_mask(LOG_GUEST_ERROR, "%s: read failed\n", __func__);
->> +        ret = 0xff;
->> +    } else {
->> +        bus->intr_status |= I2CD_INTR_RX_DONE;
->> +    }
->> +    bus->buf = (ret & I2CD_BYTE_BUF_RX_MASK) << I2CD_BYTE_BUF_RX_SHIFT;
->> +    if (bus->cmd & I2CD_M_S_RX_CMD_LAST) {
->> +        i2c_nack(bus->bus);
->> +    }
->> +    bus->cmd &= ~(I2CD_M_RX_CMD | I2CD_M_S_RX_CMD_LAST);
->> +    aspeed_i2c_set_state(bus, I2CD_MACTIVE);
->> +}
->> +
->>   /*
->>    * The state machine needs some refinement. It is only used to track
->>    * invalid STOP commands for the moment.
->> @@ -188,7 +215,7 @@ static void aspeed_i2c_bus_handle_cmd(AspeedI2CBus *bus, uint64_t value)
->>   {
->>       bus->cmd &= ~0xFFFF;
->>       bus->cmd |= value & 0xFFFF;
->> -    bus->intr_status = 0;> +    bus->intr_status &= I2CD_INTR_RX_DONE;
-> 
-> it deserves a comment to understand which scenario we are trying to handle.
->    
-
-Ok. FWIW, I wonder if intr_status should be touched here in the first place,
-but I neither have the hardware nor a datasheet, so I don't know if any bits
-are auto-cleared.
-
->>       if (bus->cmd & I2CD_M_START_CMD) {
->>           uint8_t state = aspeed_i2c_get_state(bus) & I2CD_MACTIVE ?
->> @@ -227,22 +254,7 @@ static void aspeed_i2c_bus_handle_cmd(AspeedI2CBus *bus, uint64_t value)
->>       }
->>   
->>       if (bus->cmd & (I2CD_M_RX_CMD | I2CD_M_S_RX_CMD_LAST)) {
->> -        int ret;
->> -
->> -        aspeed_i2c_set_state(bus, I2CD_MRXD);
->> -        ret = i2c_recv(bus->bus);
->> -        if (ret < 0) {
->> -            qemu_log_mask(LOG_GUEST_ERROR, "%s: read failed\n", __func__);
->> -            ret = 0xff;
->> -        } else {
->> -            bus->intr_status |= I2CD_INTR_RX_DONE;
->> -        }
->> -        bus->buf = (ret & I2CD_BYTE_BUF_RX_MASK) << I2CD_BYTE_BUF_RX_SHIFT;
->> -        if (bus->cmd & I2CD_M_S_RX_CMD_LAST) {
->> -            i2c_nack(bus->bus);
->> -        }
->> -        bus->cmd &= ~(I2CD_M_RX_CMD | I2CD_M_S_RX_CMD_LAST);
->> -        aspeed_i2c_set_state(bus, I2CD_MACTIVE);
->> +        aspeed_i2c_handle_rx_cmd(bus);
->>       }
->>   
->>       if (bus->cmd & I2CD_M_STOP_CMD) {
->> @@ -263,6 +275,7 @@ static void aspeed_i2c_bus_write(void *opaque, hwaddr offset,
->>                                    uint64_t value, unsigned size)
->>   {
->>       AspeedI2CBus *bus = opaque;
->> +    int status;
->>   
->>       switch (offset) {
->>       case I2CD_FUN_CTRL_REG:
->> @@ -283,9 +296,16 @@ static void aspeed_i2c_bus_write(void *opaque, hwaddr offset,
->>           bus->intr_ctrl = value & 0x7FFF;
->>           break;
->>       case I2CD_INTR_STS_REG:
->> +        status = bus->intr_status;
->>           bus->intr_status &= ~(value & 0x7FFF);
->> -        bus->controller->intr_status &= ~(1 << bus->id);
->> -        qemu_irq_lower(bus->controller->irq);
->> +        if (!bus->intr_status) {
->> +            bus->controller->intr_status &= ~(1 << bus->id);
->> +            qemu_irq_lower(bus->controller->irq);
->> +        }
-> 
-> That part below is indeed something to fix. I had a similar patch.
-> 
-
-Should I split it out as separate patch ? Alternatively, if you submitted
-your patch already, I'll be happy to use it as base for mine.
-
-Thanks,
-Guenter
-
-> 
->> +        if ((status & I2CD_INTR_RX_DONE) && !(bus->intr_status & I2CD_INTR_RX_DONE)) {
->> +            aspeed_i2c_handle_rx_cmd(bus);
->> +            aspeed_i2c_bus_raise_interrupt(bus);
->> +        }
-> 
-> ok.
-> 
-> Thanks for looking into this.
-> 
-> C.
-> 
->>           break;
->>       case I2CD_DEV_ADDR_REG:
->>           qemu_log_mask(LOG_UNIMP, "%s: slave mode not implemented\n",
->>
-> 
-> 
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
