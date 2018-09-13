@@ -1,43 +1,90 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 13 Sep 2018 11:08:56 -0700
-Subject: [GIT PULL] Amlogic driver updates for v4.20
-Message-ID: <7hpnxhuv5z.fsf@baylibre.com>
+From: ndesaulniers@google.com (Nick Desaulniers)
+Date: Thu, 13 Sep 2018 11:09:39 -0700
+Subject: [PATCH v6 15/18] khwasan,
+ arm64: add brk handler for inline instrumentation
+In-Reply-To: <CACT4Y+avu_68GoQcc32zpcOpAu-Pw7m71VmuKtEkOw=vKgxi7w@mail.gmail.com>
+References: <cover.1535462971.git.andreyknvl@google.com>
+ <f5e73b5ead3355932ad8b5fc96b141c3f5b8c16c.1535462971.git.andreyknvl@google.com>
+ <CACT4Y+aEwYiaVN--RH_0VBh0wbCcrf-Ndz+_eOaBNi6nKxrfQA@mail.gmail.com>
+ <CAG48ez2oT1dtDcH8SfPLnoX5F8d6Pd=M-eOKHhYJ83EuL_j6wQ@mail.gmail.com>
+ <CACT4Y+avu_68GoQcc32zpcOpAu-Pw7m71VmuKtEkOw=vKgxi7w@mail.gmail.com>
+Message-ID: <CAKwvOdns=3bktpXLEpo6o0J8OQPym6YE+x6Dvs_kYSBsuJKtSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+On Thu, Sep 13, 2018 at 1:37 AM Dmitry Vyukov <dvyukov@google.com> wrote:
+>
+> On Wed, Sep 12, 2018 at 7:39 PM, Jann Horn <jannh@google.com> wrote:
+> > On Wed, Sep 12, 2018 at 7:16 PM Dmitry Vyukov <dvyukov@google.com> wrote:
+> >> On Wed, Aug 29, 2018 at 1:35 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
+> > [...]
+> >> > +static int khwasan_handler(struct pt_regs *regs, unsigned int esr)
+> >> > +{
+> >> > +       bool recover = esr & KHWASAN_ESR_RECOVER;
+> >> > +       bool write = esr & KHWASAN_ESR_WRITE;
+> >> > +       size_t size = KHWASAN_ESR_SIZE(esr);
+> >> > +       u64 addr = regs->regs[0];
+> >> > +       u64 pc = regs->pc;
+> >> > +
+> >> > +       if (user_mode(regs))
+> >> > +               return DBG_HOOK_ERROR;
+> >> > +
+> >> > +       kasan_report(addr, size, write, pc);
+> >> > +
+> >> > +       /*
+> >> > +        * The instrumentation allows to control whether we can proceed after
+> >> > +        * a crash was detected. This is done by passing the -recover flag to
+> >> > +        * the compiler. Disabling recovery allows to generate more compact
+> >> > +        * code.
+> >> > +        *
+> >> > +        * Unfortunately disabling recovery doesn't work for the kernel right
+> >> > +        * now. KHWASAN reporting is disabled in some contexts (for example when
+> >> > +        * the allocator accesses slab object metadata; same is true for KASAN;
+> >> > +        * this is controlled by current->kasan_depth). All these accesses are
+> >> > +        * detected by the tool, even though the reports for them are not
+> >> > +        * printed.
+> >> > +        *
+> >> > +        * This is something that might be fixed at some point in the future.
+> >> > +        */
+> >> > +       if (!recover)
+> >> > +               die("Oops - KHWASAN", regs, 0);
+> >>
+> >> Why die and not panic? Die seems to be much less used function, and it
+> >> calls panic anyway, and we call panic in kasan_report if panic_on_warn
+> >> is set.
+> >
+> > die() is vaguely equivalent to BUG(); die() and BUG() normally only
+> > terminate the current process, which may or may not leave the system
+> > somewhat usable, while panic() always brings down the whole system.
+> > AFAIK panic() shouldn't be used unless you're in some very low-level
+> > code where you know that trying to just kill the current process can't
+> > work and the entire system is broken beyond repair.
+> >
+> > If KASAN traps on some random memory access, there's a good chance
+> > that just killing the current process will allow at least parts of the
+> > system to continue. I'm not sure whether BUG() or die() is more
+> > appropriate here, but I think it definitely should not be a panic().
+>
+>
+> Nick, do you know if die() will be enough to catch problems on Android
+> phones? panic_on_warn would turn this into panic, but I guess one does
+> not want panic_on_warn on a canary phone.
 
-  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+die() has arch specific implementations, so looking at:
 
-are available in the git repository at:
+arch/arm64/kernel/traps.c:196#die
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-drivers
+it looks like panic is invoked if in_interrupt() or panic_on_oops(),
+which is a configure option.  So maybe the config for KHWASAN should
+also enable that? Otherwise seems easy to forget.  But maybe that
+should remain configurable separately?
 
-for you to fetch changes up to d4983983d98710e4927fdb8de8e987c303b3fba3:
+Looking at the kernel configs for the Pixel 2, it does seem like
+CONFIG_PANIC_ON_OOPS=y is already enabled.
+https://android.googlesource.com/kernel/msm/+/android-msm-wahoo-4.4-pie/arch/arm64/configs/wahoo_defconfig#746
 
-  soc: amlogic: add meson-canvas driver (2018-09-12 21:38:45 -0700)
-
-----------------------------------------------------------------
-Amlogic ARM64 driver updates for v4.20
-- add meson-canvas driver and bindings
-- firmware: Add serial number sysfs entry
-
-----------------------------------------------------------------
-Maxime Jourdan (2):
-      dt-bindings: soc: amlogic: add meson-canvas documentation
-      soc: amlogic: add meson-canvas driver
-
-Neil Armstrong (1):
-      firmware: meson_sm: Add serial number sysfs entry
-
- Documentation/devicetree/bindings/soc/amlogic/amlogic,canvas.txt |  29 +++++++++
- drivers/firmware/meson/meson_sm.c                                |  56 ++++++++++++++++++
- drivers/soc/amlogic/Kconfig                                      |   7 +++
- drivers/soc/amlogic/Makefile                                     |   1 +
- drivers/soc/amlogic/meson-canvas.c                               | 185 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/firmware/meson/meson_sm.h                          |   1 +
- include/linux/soc/amlogic/meson-canvas.h                         |  65 +++++++++++++++++++++
- 7 files changed, 344 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/soc/amlogic/amlogic,canvas.txt
- create mode 100644 drivers/soc/amlogic/meson-canvas.c
- create mode 100644 include/linux/soc/amlogic/meson-canvas.h
+Specifically to catch problems on Android, our internal debug builds
+can report on panics, but not oops, IIUC.
+-- 
+Thanks,
+~Nick Desaulniers
