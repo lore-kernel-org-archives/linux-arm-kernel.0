@@ -1,68 +1,44 @@
-From: dvyukov@google.com (Dmitry Vyukov)
-Date: Thu, 13 Sep 2018 10:37:00 +0200
-Subject: [PATCH v6 15/18] khwasan,
- arm64: add brk handler for inline instrumentation
-In-Reply-To: <CAG48ez2oT1dtDcH8SfPLnoX5F8d6Pd=M-eOKHhYJ83EuL_j6wQ@mail.gmail.com>
-References: <cover.1535462971.git.andreyknvl@google.com>
- <f5e73b5ead3355932ad8b5fc96b141c3f5b8c16c.1535462971.git.andreyknvl@google.com>
- <CACT4Y+aEwYiaVN--RH_0VBh0wbCcrf-Ndz+_eOaBNi6nKxrfQA@mail.gmail.com>
- <CAG48ez2oT1dtDcH8SfPLnoX5F8d6Pd=M-eOKHhYJ83EuL_j6wQ@mail.gmail.com>
-Message-ID: <CACT4Y+avu_68GoQcc32zpcOpAu-Pw7m71VmuKtEkOw=vKgxi7w@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 13 Sep 2018 10:38:50 +0200
+Subject: [PATCH v2 6/8] drm/imx: support handling bridge timings bus flags
+In-Reply-To: <20180912183222.25414-7-stefan@agner.ch>
+References: <20180912183222.25414-1-stefan@agner.ch>
+ <20180912183222.25414-7-stefan@agner.ch>
+Message-ID: <1536827930.3452.4.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2018 at 7:39 PM, Jann Horn <jannh@google.com> wrote:
-> On Wed, Sep 12, 2018 at 7:16 PM Dmitry Vyukov <dvyukov@google.com> wrote:
->> On Wed, Aug 29, 2018 at 1:35 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
-> [...]
->> > +static int khwasan_handler(struct pt_regs *regs, unsigned int esr)
->> > +{
->> > +       bool recover = esr & KHWASAN_ESR_RECOVER;
->> > +       bool write = esr & KHWASAN_ESR_WRITE;
->> > +       size_t size = KHWASAN_ESR_SIZE(esr);
->> > +       u64 addr = regs->regs[0];
->> > +       u64 pc = regs->pc;
->> > +
->> > +       if (user_mode(regs))
->> > +               return DBG_HOOK_ERROR;
->> > +
->> > +       kasan_report(addr, size, write, pc);
->> > +
->> > +       /*
->> > +        * The instrumentation allows to control whether we can proceed after
->> > +        * a crash was detected. This is done by passing the -recover flag to
->> > +        * the compiler. Disabling recovery allows to generate more compact
->> > +        * code.
->> > +        *
->> > +        * Unfortunately disabling recovery doesn't work for the kernel right
->> > +        * now. KHWASAN reporting is disabled in some contexts (for example when
->> > +        * the allocator accesses slab object metadata; same is true for KASAN;
->> > +        * this is controlled by current->kasan_depth). All these accesses are
->> > +        * detected by the tool, even though the reports for them are not
->> > +        * printed.
->> > +        *
->> > +        * This is something that might be fixed at some point in the future.
->> > +        */
->> > +       if (!recover)
->> > +               die("Oops - KHWASAN", regs, 0);
->>
->> Why die and not panic? Die seems to be much less used function, and it
->> calls panic anyway, and we call panic in kasan_report if panic_on_warn
->> is set.
->
-> die() is vaguely equivalent to BUG(); die() and BUG() normally only
-> terminate the current process, which may or may not leave the system
-> somewhat usable, while panic() always brings down the whole system.
-> AFAIK panic() shouldn't be used unless you're in some very low-level
-> code where you know that trying to just kill the current process can't
-> work and the entire system is broken beyond repair.
->
-> If KASAN traps on some random memory access, there's a good chance
-> that just killing the current process will allow at least parts of the
-> system to continue. I'm not sure whether BUG() or die() is more
-> appropriate here, but I think it definitely should not be a panic().
+On Wed, 2018-09-12 at 11:32 -0700, Stefan Agner wrote:
+> A bridge might require specific settings for the pixel data on
+> the bus.
 
+On which bus? The bridge has input and output.
 
-Nick, do you know if die() will be enough to catch problems on Android
-phones? panic_on_warn would turn this into panic, but I guess one does
-not want panic_on_warn on a canary phone.
+> Copy the bus flags from the bridge timings if a bridge
+> is in use.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  drivers/gpu/drm/imx/parallel-display.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/drivers/gpu/drm/imx/parallel-display.c b/drivers/gpu/drm/imx/parallel-display.c
+> index aefd04e18f93..7798a0621df7 100644
+> --- a/drivers/gpu/drm/imx/parallel-display.c
+> +++ b/drivers/gpu/drm/imx/parallel-display.c
+> @@ -239,6 +239,9 @@ static int imx_pd_bind(struct device *dev, struct device *master, void *data)
+>  	if (ret && ret != -ENODEV)
+>  		return ret;
+>  
+> +	if (imxpd->bridge && imxpd->bridge->timings)
+> +		imxpd->bus_flags = imxpd->bridge->timings->input_bus_flags;
+
+Oh, ok. I'd also specify input bus in the commit message.
+
+> +
+>  	imxpd->dev = dev;
+>  
+>  	ret = imx_pd_register(drm, imxpd);
+
+regards
+Philipp
