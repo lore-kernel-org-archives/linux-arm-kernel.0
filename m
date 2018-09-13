@@ -1,48 +1,64 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Sep 2018 11:09:36 +0200
-Subject: [PATCH 41/58] arm64: dts: renesas: condor: add PCIe support
+Date: Thu, 13 Sep 2018 11:09:39 +0200
+Subject: [PATCH 44/58] arm64: dts: renesas: v3hsk: Move lvds0 node
 In-Reply-To: <cover.1536828567.git.horms+renesas@verge.net.au>
 References: <cover.1536828567.git.horms+renesas@verge.net.au>
-Message-ID: <c6eb20473f0b296c671dc6f7a7766ea6bedf2d59.1536828567.git.horms+renesas@verge.net.au>
+Message-ID: <47d7f6822864a8cf2f09d27cb1321bd36ab6d9e4.1536828567.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Enable PCIe PHY and PCIEC and specify the PCIe bus clock for the Condor
-board.
+To preserve alphabetical sort order.
 
-Based on the original (and large) patch by Vladimir Barinov.
-
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Fixes: 4edac426aff11a37 ("arm64: dts: renesas: condor/v3hsk: add DU/LVDS/HDMI support")
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77980-condor.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts | 24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77980-condor.dts b/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-index 59db4c152fb8..fe2e2c051cc9 100644
---- a/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-@@ -223,6 +223,18 @@
- 	status = "okay";
+diff --git a/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts b/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts
+index 44ab7344f8aa..dd14a41b32cd 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts
++++ b/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts
+@@ -119,18 +119,6 @@
+ 	};
  };
  
-+&pciec {
+-&lvds0 {
+-	status = "okay";
+-
+-	ports {
+-		port at 1 {
+-			lvds0_out: endpoint {
+-				remote-endpoint = <&thc63lvd1024_in>;
+-			};
+-		};
+-	};
+-};
+-
+ &i2c0 {
+ 	pinctrl-0 = <&i2c0_pins>;
+ 	pinctrl-names = "default";
+@@ -177,6 +165,18 @@
+ 	};
+ };
+ 
++&lvds0 {
 +	status = "okay";
-+};
 +
-+&pcie_bus_clk {
-+	clock-frequency = <100000000>;
-+};
-+
-+&pcie_phy {
-+	status = "okay";
++	ports {
++		port at 1 {
++			lvds0_out: endpoint {
++				remote-endpoint = <&thc63lvd1024_in>;
++			};
++		};
++	};
 +};
 +
  &pfc {
- 	avb_pins: avb {
- 		groups = "avb_mdio", "avb_rgmii";
+ 	gether_pins: gether {
+ 		groups = "gether_mdio_a", "gether_rgmii",
 -- 
 2.11.0
