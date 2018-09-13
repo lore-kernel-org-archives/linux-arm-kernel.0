@@ -1,44 +1,38 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Thu, 13 Sep 2018 13:30:23 +0200
-Subject: [PATCH v7 6/7] ARM: configs: at91: use new TCB timer driver
-In-Reply-To: <20180913113024.3571-1-alexandre.belloni@bootlin.com>
-References: <20180913113024.3571-1-alexandre.belloni@bootlin.com>
-Message-ID: <20180913113024.3571-7-alexandre.belloni@bootlin.com>
+From: andrew.murray@arm.com (Andrew Murray)
+Date: Thu, 13 Sep 2018 12:56:40 +0100
+Subject: [PATCH] arm64: Remove unused VGA console support
+Message-ID: <1536839800-14918-1-git-send-email-andrew.murray@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unselecting ATMEL_TCLIB switches the TCB timer driver from tcb_clksrc to
-timer-atmel-tcb.
+Support for VGA_CONSOLE is not allowable due to commit ee23794b8668
+("video: vgacon: Don't build on arm64"), thus remove the associated
+unused code.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+Whilst PCI on arm64 would support VGA a valid screen_info structure
+is missing.
+
+Signed-off-by: Andrew Murray <andrew.murray@arm.com>
 ---
- arch/arm/configs/at91_dt_defconfig | 1 -
- arch/arm/configs/sama5_defconfig   | 1 -
- 2 files changed, 2 deletions(-)
+ arch/arm64/kernel/setup.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
-index e4b1be66b3f5..09f262e59fef 100644
---- a/arch/arm/configs/at91_dt_defconfig
-+++ b/arch/arm/configs/at91_dt_defconfig
-@@ -64,7 +64,6 @@ CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_COUNT=4
- CONFIG_BLK_DEV_RAM_SIZE=8192
--CONFIG_ATMEL_TCLIB=y
- CONFIG_ATMEL_SSC=y
- CONFIG_SCSI=y
- CONFIG_BLK_DEV_SD=y
-diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
-index 2080025556b5..f2bbc6339ca6 100644
---- a/arch/arm/configs/sama5_defconfig
-+++ b/arch/arm/configs/sama5_defconfig
-@@ -75,7 +75,6 @@ CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_COUNT=4
- CONFIG_BLK_DEV_RAM_SIZE=8192
--CONFIG_ATMEL_TCLIB=y
- CONFIG_ATMEL_SSC=y
- CONFIG_EEPROM_AT24=y
- CONFIG_SCSI=y
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 5b4fac4..95670a1 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -351,12 +351,8 @@ void __init setup_arch(char **cmdline_p)
+ #endif
+ 
+ #ifdef CONFIG_VT
+-#if defined(CONFIG_VGA_CONSOLE)
+-	conswitchp = &vga_con;
+-#elif defined(CONFIG_DUMMY_CONSOLE)
+ 	conswitchp = &dummy_con;
+ #endif
+-#endif
+ 	if (boot_args[1] || boot_args[2] || boot_args[3]) {
+ 		pr_err("WARNING: x1-x3 nonzero in violation of boot protocol:\n"
+ 			"\tx1: %016llx\n\tx2: %016llx\n\tx3: %016llx\n"
 -- 
-2.19.0
+2.7.4
