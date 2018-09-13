@@ -1,58 +1,73 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Sep 2018 11:09:10 +0200
-Subject: [PATCH 15/58] arm64: dts: renesas: r8a77965: Add CAN{0,
- 1} placeholder nodes
+Date: Thu, 13 Sep 2018 11:09:09 +0200
+Subject: [PATCH 14/58] arm64: dts: renesas: r8a77965: Attach the SYS-DMAC to
+ the IPMMU
 In-Reply-To: <cover.1536828567.git.horms+renesas@verge.net.au>
 References: <cover.1536828567.git.horms+renesas@verge.net.au>
-Message-ID: <92bc66bfce99cd7d5b66cb1086812a32300c5705.1536828567.git.horms+renesas@verge.net.au>
+Message-ID: <4d76ad7d9de05506f1ee9a7b22416440468be090.1536828567.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eugeniu Rosca <roscaeugeniu@gmail.com>
+From: Magnus Damm <damm+renesas@opensource.se>
 
-According to R-Car Gen3 HW manual rev1.00, R-Car M3-N has two CAN
-interfaces, similar to H3, M3-W and other SoCs from the same family.
+For R-Car M3-N hook up SYS-DMAC0, SYS-DMAC1 and SYS-DMAC2 to
+IPMMU-DS0 and IPMMU-DS1 in same way as for R-Car M3-W.
+This follows the R-Car Gen3 Rev.1.00 (April 2018) datasheet.
 
-Add CAN placeholder nodes to avoid below DTC errors:
-Error: arch/arm64/boot/dts/renesas/ulcb-kf.dtsi:19.1-6 Label or path can0 not found
-Error: arch/arm64/boot/dts/renesas/ulcb-kf.dtsi:25.1-6 Label or path can1 not found
-
-These errors occur *after* the addition of r8a77965-m3nulcb-kf.dts.
-Fix them beforehand.
-
-CAN support is inspired from below commits:
- - v4.7 commit 308b7e4ba62e ("arm64: dts: r8a7795: Add CAN support")
- - v4.11 commit 909c16252415 ("arm64: dts: r8a7796: Add CAN support")
- - v4.12 commit bec0948e810f ("arm64: dts: r8a7796: Add reset control properties")
-
-Signed-off-by: Eugeniu Rosca <erosca@de.adit-jv.com>
-Reviewed-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
-[simon: make placeholder minimal by only including reg property]
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77965.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77965.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-index 7a75c351edd2..e7128fb65e33 100644
+index 52205be430d0..7a75c351edd2 100644
 --- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-@@ -862,6 +862,16 @@
- 			status = "disabled";
+@@ -634,6 +634,14 @@
+ 			resets = <&cpg 219>;
+ 			#dma-cells = <1>;
+ 			dma-channels = <16>;
++			iommus = <&ipmmu_ds0 0>, <&ipmmu_ds0 1>,
++			       <&ipmmu_ds0 2>, <&ipmmu_ds0 3>,
++			       <&ipmmu_ds0 4>, <&ipmmu_ds0 5>,
++			       <&ipmmu_ds0 6>, <&ipmmu_ds0 7>,
++			       <&ipmmu_ds0 8>, <&ipmmu_ds0 9>,
++			       <&ipmmu_ds0 10>, <&ipmmu_ds0 11>,
++			       <&ipmmu_ds0 12>, <&ipmmu_ds0 13>,
++			       <&ipmmu_ds0 14>, <&ipmmu_ds0 15>;
  		};
  
-+		can0: can at e6c30000 {
-+			reg = <0 0xe6c30000 0 0x1000>;
-+			/* placeholder */
-+		};
-+
-+		can1: can at e6c38000 {
-+			reg = <0 0xe6c38000 0 0x1000>;
-+			/* placeholder */
-+		};
-+
- 		pwm0: pwm at e6e30000 {
- 			compatible = "renesas,pwm-r8a77965", "renesas,pwm-rcar";
- 			reg = <0 0xe6e30000 0 8>;
+ 		dmac1: dma-controller at e7300000 {
+@@ -668,6 +676,14 @@
+ 			resets = <&cpg 218>;
+ 			#dma-cells = <1>;
+ 			dma-channels = <16>;
++			iommus = <&ipmmu_ds1 0>, <&ipmmu_ds1 1>,
++			       <&ipmmu_ds1 2>, <&ipmmu_ds1 3>,
++			       <&ipmmu_ds1 4>, <&ipmmu_ds1 5>,
++			       <&ipmmu_ds1 6>, <&ipmmu_ds1 7>,
++			       <&ipmmu_ds1 8>, <&ipmmu_ds1 9>,
++			       <&ipmmu_ds1 10>, <&ipmmu_ds1 11>,
++			       <&ipmmu_ds1 12>, <&ipmmu_ds1 13>,
++			       <&ipmmu_ds1 14>, <&ipmmu_ds1 15>;
+ 		};
+ 
+ 		dmac2: dma-controller at e7310000 {
+@@ -702,6 +718,14 @@
+ 			resets = <&cpg 217>;
+ 			#dma-cells = <1>;
+ 			dma-channels = <16>;
++			iommus = <&ipmmu_ds1 16>, <&ipmmu_ds1 17>,
++			       <&ipmmu_ds1 18>, <&ipmmu_ds1 19>,
++			       <&ipmmu_ds1 20>, <&ipmmu_ds1 21>,
++			       <&ipmmu_ds1 22>, <&ipmmu_ds1 23>,
++			       <&ipmmu_ds1 24>, <&ipmmu_ds1 25>,
++			       <&ipmmu_ds1 26>, <&ipmmu_ds1 27>,
++			       <&ipmmu_ds1 28>, <&ipmmu_ds1 29>,
++			       <&ipmmu_ds1 30>, <&ipmmu_ds1 31>;
+ 		};
+ 
+ 		ipmmu_ds0: mmu at e6740000 {
 -- 
 2.11.0
