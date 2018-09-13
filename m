@@ -1,57 +1,125 @@
-From: joe@perches.com (Joe Perches)
-Date: Wed, 12 Sep 2018 12:21:37 -0700
-Subject: [PATCH v3 1/2] ARM: s3c24xx: formatting cleanup in mach-mini2440.c
-In-Reply-To: <20180907215446.15160-1-sed@free.fr>
-References: <20180907215446.15160-1-sed@free.fr>
-Message-ID: <b97d7ccc921572ca5d783584eea1de04341ab02f.camel@perches.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Thu, 13 Sep 2018 13:20:30 +0200
+Subject: [PATCH v3 3/5] drm/dp: make dp_link_status and
+ dp_get_lane_status usable from outside of the core
+In-Reply-To: <1535451894-2518-4-git-send-email-dkos@cadence.com>
+References: <1535451894-2518-1-git-send-email-dkos@cadence.com>
+ <CGME20180828102610epcas4p37c400fbe4836e18dfd1862c3d12e8998@epcas4p3.samsung.com>
+ <1535451894-2518-4-git-send-email-dkos@cadence.com>
+Message-ID: <20180913112032eucas1p1f2b270b3bdcc8a434130bf52d18d45fe~T8a8z3f662504225042eucas1p1P@eucas1p1.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-09-07 at 23:54 +0200, Cedric Roux wrote:
-> Running:
->     scripts/checkpatch.pl -f arch/arm/mach-s3c24xx/mach-mini2440.c
-> revealed several errors and warnings.
-> 
-> They were all removed, except one which is an #if 0 around the declaration
-> of a gpio pin. This needs some more investigation and I prefer to let it
-> here. This is not some dead code.
-[]
-> diff --git a/arch/arm/mach-s3c24xx/mach-mini2440.c b/arch/arm/mach-s3c24xx/mach-mini2440.c
-[]
-> @@ -674,17 +680,17 @@ static void __init mini2440_init(void)
->  		mini2440_fb_info.displays =
->  			&mini2440_lcd_cfg[features.lcd_index];
+On 28.08.2018 12:24, Damian Kos wrote:
+> From: Quentin Schulz <quentin.schulz@bootlin.com>
+>
+> dp_link_status and dp_get_lane_status are pretty generic and can be used for
+> other means, so let's make it "public".
+>
+> This adds drm_dp_link_status and drm_dp_get_lane_status to the header file and
+> add the appropriate EXPORT_SYMBOL for it so that it can be used by other
+> drivers, be they compiled built-in or as modules.
+
+If you want to export them please document functions and their arguments.
+Moreover, these functions are so tiny, so they can be defined as inline.
+
+
+>
+> Signed-off-by: Damian Kos <dkos@cadence.com>
+No author sign-off.
+
+Regards
+Andrzej
+
+
+> ---
+>  drivers/gpu/drm/drm_dp_helper.c | 20 +++++++++++---------
+>  include/drm/drm_dp_helper.h     |  3 +++
+>  2 files changed, 14 insertions(+), 9 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/drm_dp_helper.c b/drivers/gpu/drm/drm_dp_helper.c
+> index 4b5bf6ee7fa7..ee9ec2ccf878 100644
+> --- a/drivers/gpu/drm/drm_dp_helper.c
+> +++ b/drivers/gpu/drm/drm_dp_helper.c
+> @@ -43,19 +43,21 @@
+>   */
 >  
-> -		printk(KERN_INFO "MINI2440: LCD");
-> +		pr_info("MINI2440: LCD");
-
-OK
-
->  		for (li = 0; li < ARRAY_SIZE(mini2440_lcd_cfg); li++)
->  			if (li == features.lcd_index)
-> -				printk(" [%d:%dx%d]", li,
-> +				pr_info(" [%d:%dx%d]", li,
->  					mini2440_lcd_cfg[li].width,
->  					mini2440_lcd_cfg[li].height);
-
-pr_cont
-
->  			else
-> -				printk(" %d:%dx%d", li,
-> +				pr_info(" %d:%dx%d", li,
-
-pr_cont
-
->  					mini2440_lcd_cfg[li].width,
->  					mini2440_lcd_cfg[li].height);
-> -		printk("\n");
-> +		pr_info("\n");
-
-pr_cont
-
-So only the first printk should use pr_info().
-The subsequent printk uses should use pr_cont()
-
->  		s3c24xx_fb_set_platdata(&mini2440_fb_info);
+>  /* Helpers for DP link training */
+> -static u8 dp_link_status(const u8 link_status[DP_LINK_STATUS_SIZE], int r)
+> +u8 drm_dp_link_status(const u8 link_status[DP_LINK_STATUS_SIZE], int r)
+>  {
+>  	return link_status[r - DP_LANE0_1_STATUS];
+>  }
+> +EXPORT_SYMBOL(drm_dp_link_status);
+>  
+> -static u8 dp_get_lane_status(const u8 link_status[DP_LINK_STATUS_SIZE],
+> +u8 drm_dp_get_lane_status(const u8 link_status[DP_LINK_STATUS_SIZE],
+>  			     int lane)
+>  {
+>  	int i = DP_LANE0_1_STATUS + (lane >> 1);
+>  	int s = (lane & 1) * 4;
+> -	u8 l = dp_link_status(link_status, i);
+> +	u8 l = drm_dp_link_status(link_status, i);
+>  	return (l >> s) & 0xf;
+>  }
+> +EXPORT_SYMBOL(drm_dp_get_lane_status);
+>  
+>  bool drm_dp_channel_eq_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
+>  			  int lane_count)
+> @@ -64,12 +66,12 @@ bool drm_dp_channel_eq_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
+>  	u8 lane_status;
+>  	int lane;
+>  
+> -	lane_align = dp_link_status(link_status,
+> -				    DP_LANE_ALIGN_STATUS_UPDATED);
+> +	lane_align = drm_dp_link_status(link_status,
+> +					DP_LANE_ALIGN_STATUS_UPDATED);
+>  	if ((lane_align & DP_INTERLANE_ALIGN_DONE) == 0)
+>  		return false;
+>  	for (lane = 0; lane < lane_count; lane++) {
+> -		lane_status = dp_get_lane_status(link_status, lane);
+> +		lane_status = drm_dp_get_lane_status(link_status, lane);
+>  		if ((lane_status & DP_CHANNEL_EQ_BITS) != DP_CHANNEL_EQ_BITS)
+>  			return false;
 >  	}
+> @@ -84,7 +86,7 @@ bool drm_dp_clock_recovery_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
+>  	u8 lane_status;
 >  
+>  	for (lane = 0; lane < lane_count; lane++) {
+> -		lane_status = dp_get_lane_status(link_status, lane);
+> +		lane_status = drm_dp_get_lane_status(link_status, lane);
+>  		if ((lane_status & DP_LANE_CR_DONE) == 0)
+>  			return false;
+>  	}
+> @@ -99,7 +101,7 @@ u8 drm_dp_get_adjust_request_voltage(const u8 link_status[DP_LINK_STATUS_SIZE],
+>  	int s = ((lane & 1) ?
+>  		 DP_ADJUST_VOLTAGE_SWING_LANE1_SHIFT :
+>  		 DP_ADJUST_VOLTAGE_SWING_LANE0_SHIFT);
+> -	u8 l = dp_link_status(link_status, i);
+> +	u8 l = drm_dp_link_status(link_status, i);
+>  
+>  	return ((l >> s) & 0x3) << DP_TRAIN_VOLTAGE_SWING_SHIFT;
+>  }
+> @@ -112,7 +114,7 @@ u8 drm_dp_get_adjust_request_pre_emphasis(const u8 link_status[DP_LINK_STATUS_SI
+>  	int s = ((lane & 1) ?
+>  		 DP_ADJUST_PRE_EMPHASIS_LANE1_SHIFT :
+>  		 DP_ADJUST_PRE_EMPHASIS_LANE0_SHIFT);
+> -	u8 l = dp_link_status(link_status, i);
+> +	u8 l = drm_dp_link_status(link_status, i);
+>  
+>  	return ((l >> s) & 0x3) << DP_TRAIN_PRE_EMPHASIS_SHIFT;
+>  }
+> diff --git a/include/drm/drm_dp_helper.h b/include/drm/drm_dp_helper.h
+> index 06a478679781..9930b2b269f2 100644
+> --- a/include/drm/drm_dp_helper.h
+> +++ b/include/drm/drm_dp_helper.h
+> @@ -952,6 +952,9 @@
+>  #define DP_MST_LOGICAL_PORT_0 8
+>  
+>  #define DP_LINK_STATUS_SIZE	   6
+> +
+> +u8 drm_dp_link_status(const u8 link_status[DP_LINK_STATUS_SIZE], int r);
+> +u8 drm_dp_get_lane_status(const u8 link_status[DP_LINK_STATUS_SIZE], int lane);
+>  bool drm_dp_channel_eq_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
+>  			  int lane_count);
+>  bool drm_dp_clock_recovery_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
