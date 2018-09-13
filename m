@@ -1,315 +1,136 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Sep 2018 11:09:15 +0200
-Subject: [PATCH 20/58] arm64: dts: renesas: condor/v3hsk: add DU/LVDS/HDMI
- support
+Date: Thu, 13 Sep 2018 11:09:16 +0200
+Subject: [PATCH 21/58] arm64: dts: renesas: r8a774a1: Add SYS-DMAC controller
+ nodes
 In-Reply-To: <cover.1536828567.git.horms+renesas@verge.net.au>
 References: <cover.1536828567.git.horms+renesas@verge.net.au>
-Message-ID: <70fd8b6a4846362991ead7b68f951d519a9c71df.1536828567.git.horms+renesas@verge.net.au>
+Message-ID: <37a61e4d9f9486bfccd699bb1d52ebbea0019ac4.1536828567.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Biju Das <biju.das@bp.renesas.com>
 
-Define the Condor/V3HSK board dependent parts of the DU and  LVDS device
-nodes. Also add the device nodes for Thine THC63LVD1024 LVDS decoder and
-Analog Devices ADV7511W HDMI transmitter...
+Add sys-dmac[0-2] device nodes for RZ/G2M (r8a774a1) SoC.
 
-Based on the original (and large) patch by Vladimir Barinov.
-
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77980-condor.dts | 106 +++++++++++++++++++
- arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts  | 129 ++++++++++++++++++++++++
- 2 files changed, 235 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a774a1.dtsi | 102 ++++++++++++++++++++++++++++++
+ 1 file changed, 102 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77980-condor.dts b/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-index 494f4ef37a4e..59db4c152fb8 100644
---- a/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77980-condor.dts
-@@ -45,6 +45,56 @@
- 		regulator-boot-on;
- 		regulator-always-on;
- 	};
-+
-+	d1_8v: regulator-2 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "D1.8V";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+
-+	hdmi-out {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_con: endpoint {
-+				remote-endpoint = <&adv7511_out>;
-+			};
-+		};
-+	};
-+
-+	lvds-decoder {
-+		compatible = "thine,thc63lvd1024";
-+		vcc-supply = <&d3_3v>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				thc63lvd1024_in: endpoint {
-+					remote-endpoint = <&lvds0_out>;
-+				};
-+			};
-+
-+			port at 2 {
-+				reg = <2>;
-+				thc63lvd1024_out: endpoint {
-+					remote-endpoint = <&adv7511_in>;
-+				};
-+			};
-+		};
-+	};
-+
-+	x1_clk: x1-clock {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <148500000>;
-+	};
- };
+diff --git a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+index 8e63e9aee456..4a4cf352208e 100644
+--- a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+@@ -144,6 +144,108 @@
+ 			#power-domain-cells = <1>;
+ 		};
  
- &avb {
-@@ -74,6 +124,13 @@
- 	};
- };
- 
-+&du {
-+	clocks = <&cpg CPG_MOD 724>,
-+		 <&x1_clk>;
-+	clock-names = "du.0", "dclkin.0";
-+	status = "okay";
-+};
-+
- &extal_clk {
- 	clock-frequency = <16666666>;
- };
-@@ -102,6 +159,55 @@
- 		gpio-controller;
- 		#gpio-cells = <2>;
- 	};
-+
-+	hdmi at 39 {
-+		compatible = "adi,adv7511w";
-+		reg = <0x39>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <20 IRQ_TYPE_LEVEL_LOW>;
-+		avdd-supply = <&d1_8v>;
-+		dvdd-supply = <&d1_8v>;
-+		pvdd-supply = <&d1_8v>;
-+		bgvdd-supply = <&d1_8v>;
-+		dvdd-3v-supply = <&d3_3v>;
-+
-+		adi,input-depth = <8>;
-+		adi,input-colorspace = "rgb";
-+		adi,input-clock = "1x";
-+		adi,input-style = <1>;
-+		adi,input-justification = "evenly";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				adv7511_in: endpoint {
-+					remote-endpoint = <&thc63lvd1024_out>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				adv7511_out: endpoint {
-+					remote-endpoint = <&hdmi_con>;
-+				};
-+			};
++		dmac0: dma-controller at e6700000 {
++			compatible = "renesas,dmac-r8a774a1",
++				     "renesas,rcar-dmac";
++			reg = <0 0xe6700000 0 0x10000>;
++			interrupts = <GIC_SPI 199 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 200 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 201 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 202 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 203 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 204 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 205 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 206 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 207 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 209 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 210 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 211 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 212 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 213 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 214 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 215 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "error",
++					"ch0", "ch1", "ch2", "ch3",
++					"ch4", "ch5", "ch6", "ch7",
++					"ch8", "ch9", "ch10", "ch11",
++					"ch12", "ch13", "ch14", "ch15";
++			clocks = <&cpg CPG_MOD 219>;
++			clock-names = "fck";
++			power-domains = <&sysc 32>;
++			resets = <&cpg 219>;
++			#dma-cells = <1>;
++			dma-channels = <16>;
 +		};
-+	};
-+};
 +
-+&lvds0 {
-+	status = "okay";
-+
-+	ports {
-+		port at 1 {
-+			lvds0_out: endpoint {
-+				remote-endpoint = <&thc63lvd1024_in>;
-+			};
++		dmac1: dma-controller at e7300000 {
++			compatible = "renesas,dmac-r8a774a1",
++				     "renesas,rcar-dmac";
++			reg = <0 0xe7300000 0 0x10000>;
++			interrupts = <GIC_SPI 220 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 216 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 218 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 219 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 308 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 309 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 310 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 311 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 312 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 313 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 314 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 315 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 316 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 317 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 318 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 319 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "error",
++					"ch0", "ch1", "ch2", "ch3",
++					"ch4", "ch5", "ch6", "ch7",
++					"ch8", "ch9", "ch10", "ch11",
++					"ch12", "ch13", "ch14", "ch15";
++			clocks = <&cpg CPG_MOD 218>;
++			clock-names = "fck";
++			power-domains = <&sysc 32>;
++			resets = <&cpg 218>;
++			#dma-cells = <1>;
++			dma-channels = <16>;
 +		};
-+	};
- };
- 
- &mmc0 {
-diff --git a/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts b/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts
-index 9147d8564557..44ab7344f8aa 100644
---- a/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77980-v3hsk.dts
-@@ -27,6 +27,72 @@
- 		/* first 128MB is reserved for secure area. */
- 		reg = <0 0x48000000 0 0x78000000>;
- 	};
 +
-+	hdmi-out {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_con: endpoint {
-+				remote-endpoint = <&adv7511_out>;
-+			};
++		dmac2: dma-controller at e7310000 {
++			compatible = "renesas,dmac-r8a774a1",
++				     "renesas,rcar-dmac";
++			reg = <0 0xe7310000 0 0x10000>;
++			interrupts = <GIC_SPI 416 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 417 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 418 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 419 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 420 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 421 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 422 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 423 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 424 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 425 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 426 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 427 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 428 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 429 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 430 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 431 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 397 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "error",
++					"ch0", "ch1", "ch2", "ch3",
++					"ch4", "ch5", "ch6", "ch7",
++					"ch8", "ch9", "ch10", "ch11",
++					"ch12", "ch13", "ch14", "ch15";
++			clocks = <&cpg CPG_MOD 217>;
++			clock-names = "fck";
++			power-domains = <&sysc 32>;
++			resets = <&cpg 217>;
++			#dma-cells = <1>;
++			dma-channels = <16>;
 +		};
-+	};
 +
-+	lvds-decoder {
-+		compatible = "thine,thc63lvd1024";
-+		vcc-supply = <&vcc3v3_d5>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				thc63lvd1024_in: endpoint {
-+					remote-endpoint = <&lvds0_out>;
-+				};
-+			};
-+
-+			port at 2 {
-+				reg = <2>;
-+				thc63lvd1024_out: endpoint {
-+					remote-endpoint = <&adv7511_in>;
-+				};
-+			};
-+		};
-+	};
-+
-+	osc1_clk: osc1-clock {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <148500000>;
-+	};
-+
-+	vcc1v8_d4: regulator-0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VCC1V8_D4";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+
-+	vcc3v3_d5: regulator-1 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VCC3V3_D5";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+};
-+
-+&du {
-+	clocks = <&cpg CPG_MOD 724>,
-+		 <&osc1_clk>;
-+	clock-names = "du.0", "dclkin.0";
-+	status = "okay";
- };
- 
- &extal_clk {
-@@ -53,6 +119,64 @@
- 	};
- };
- 
-+&lvds0 {
-+	status = "okay";
-+
-+	ports {
-+		port at 1 {
-+			lvds0_out: endpoint {
-+				remote-endpoint = <&thc63lvd1024_in>;
-+			};
-+		};
-+	};
-+};
-+
-+&i2c0 {
-+	pinctrl-0 = <&i2c0_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+	clock-frequency = <400000>;
-+
-+	hdmi at 39 {
-+		compatible = "adi,adv7511w";
-+		#sound-dai-cells = <0>;
-+		reg = <0x39>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <20 IRQ_TYPE_LEVEL_LOW>;
-+		avdd-supply = <&vcc1v8_d4>;
-+		dvdd-supply = <&vcc1v8_d4>;
-+		pvdd-supply = <&vcc1v8_d4>;
-+		bgvdd-supply = <&vcc1v8_d4>;
-+		dvdd-3v-supply = <&vcc3v3_d5>;
-+
-+		adi,input-depth = <8>;
-+		adi,input-colorspace = "rgb";
-+		adi,input-clock = "1x";
-+		adi,input-style = <1>;
-+		adi,input-justification = "evenly";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				adv7511_in: endpoint {
-+					remote-endpoint = <&thc63lvd1024_out>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				adv7511_out: endpoint {
-+					remote-endpoint = <&hdmi_con>;
-+				};
-+			};
-+		};
-+	};
-+};
-+
- &pfc {
- 	gether_pins: gether {
- 		groups = "gether_mdio_a", "gether_rgmii",
-@@ -60,6 +184,11 @@
- 		function = "gether";
- 	};
- 
-+	i2c0_pins: i2c0 {
-+		groups = "i2c0";
-+		function = "i2c0";
-+	};
-+
- 	scif0_pins: scif0 {
- 		groups = "scif0_data";
- 		function = "scif0";
+ 		gic: interrupt-controller at f1010000 {
+ 			compatible = "arm,gic-400";
+ 			#interrupt-cells = <3>;
 -- 
 2.11.0
