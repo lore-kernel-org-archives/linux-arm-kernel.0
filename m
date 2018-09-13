@@ -1,50 +1,31 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 13 Sep 2018 09:07:12 -0700 (PDT)
-Subject: [PATCH] knav: qmss: Introduce queue descriptors monitor
-In-Reply-To: <20180911211549.12092-1-gomonovych@gmail.com>
-References: <20180911211549.12092-1-gomonovych@gmail.com>
-Message-ID: <20180913.090712.1849966692069488441.davem@davemloft.net>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 13 Sep 2018 09:17:54 -0700
+Subject: [PATCH RESEND] arm64: dts: meson: Switch simple-mfd and syscon
+ order
+In-Reply-To: <1536822747-13918-1-git-send-email-narmstrong@baylibre.com> (Neil
+ Armstrong's message of "Thu, 13 Sep 2018 09:12:27 +0200")
+References: <1536822747-13918-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <7hzhwlv0b1.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vasyl Gomonovych <gomonovych@gmail.com>
-Date: Tue, 11 Sep 2018 23:15:47 +0200
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-> Monitor and record available descriptors in knav_qmss queues
-> Get amount of available descriptors in free-descriptor queue
-> base on event-triggered RX traffic.
-> Also monitor free-descriptor queue base on periodic time interval
-> in kernel thread.
-> To start monitoring available descriptors in queue earlyi,
-> module parameters, enable start monitoring in boottime
-> 
-> This queue descriptor monitor helps debugging starvation issue.
-> The monitor should help debug queue under traffic pressure
-> and can describe the shape of this pressure when a queue
-> faced descriptors starvation.
-> Monitor helpful for IP blocks which do not have dedicated
-> descriptor starvation interrupt like RapidIO IP.
-> 
-> Registration and enable file in debugfs hierarchy
-> 
-> |-/sys/kernel/debug
-> |-- knav_qmssm_soc:hwqueue at 2a40000
-> |   |-- 8710
-> |   |   |-- buffer_size
-> |   |   |-- enable
-> |   |   |-- monitor_stats
-> |   |   -- unregister
-> 
+> The order between "syscon" and "simple-mfd" is important because in these
+> particular cases, the node needs to be first a "simple-mfd" to expose
+> it's sub-nodes, and later on a "syscon" to permit other nodes to access
+> this register space through the "syscon" mechanism.
+>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+
+Applied to v4.20/dt64.
+
 > ---
-> 
-> The current implementation is the first iteration
-> and require additional work.
-> By this patch I would like to know does this could be
-> helpful for other components and continue my work in a right way.
-> 
-> Signed-off-by: Vasyl Gomonovych <vasyl.gomonovych@nokia.com>
+> Hi Kevin,
+>
+> I rebased the patch on top of your v4.20/dt64 branch.
+>
 
-This is way over engineered for just keeping some statistics around.
+Thanks for the quick respin.
 
-Just have a periodic timer or a workqueue that does the necessary
-sampling.
+Kevin
