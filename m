@@ -1,50 +1,56 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Sep 2018 11:08:30 +0200
-Subject: [PATCH 07/13] ARM: dts: silk: Add DA9063 PMIC node
+Date: Thu, 13 Sep 2018 11:08:29 +0200
+Subject: [PATCH 06/13] ARM: dts: gose: Add DA9210 node for CPU DVFS
 In-Reply-To: <cover.1536824376.git.horms+renesas@verge.net.au>
 References: <cover.1536824376.git.horms+renesas@verge.net.au>
-Message-ID: <bce6d67d035eeaea20dcee12b1362cebde6d9b35.1536824376.git.horms+renesas@verge.net.au>
+Message-ID: <d17f45eb718172088e3460fc9fadc735b1df8a20.1536824376.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marek Vasut <marek.vasut@gmail.com>
 
-Add DA9063 PMIC node to the I2C bus.
+Add DA9210 DVFS node to the I2C bus and link it to CPU0 for DVFS.
 
 Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794-silk.dts | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm/boot/dts/r8a7793-gose.dts | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
-index daec965889d3..6ea60e1faf75 100644
---- a/arch/arm/boot/dts/r8a7794-silk.dts
-+++ b/arch/arm/boot/dts/r8a7794-silk.dts
-@@ -405,6 +405,23 @@
- 	clock-frequency = <400000>;
+diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
+index 6b2f3a4fd13d..f51601af89a2 100644
+--- a/arch/arm/boot/dts/r8a7793-gose.dts
++++ b/arch/arm/boot/dts/r8a7793-gose.dts
+@@ -596,6 +596,10 @@
+ 	status = "okay";
  };
  
-+&i2c7 {
-+	status = "okay";
-+	clock-frequency = <100000>;
-+
-+	pmic at 58 {
-+		compatible = "dlg,da9063";
-+		reg = <0x58>;
-+		interrupt-parent = <&gpio3>;
-+		interrupts = <31 IRQ_TYPE_LEVEL_LOW>;
-+		interrupt-controller;
-+
-+		wdt {
-+			compatible = "dlg,da9063-watchdog";
-+		};
-+	};
++&cpu0 {
++	cpu0-supply = <&vdd_dvfs>;
 +};
 +
- &mmcif0 {
- 	pinctrl-0 = <&mmcif0_pins>;
- 	pinctrl-names = "default";
+ &rwdt {
+ 	timeout-sec = <60>;
+ 	status = "okay";
+@@ -725,6 +729,18 @@
+ 			compatible = "dlg,da9063-watchdog";
+ 		};
+ 	};
++
++	vdd_dvfs: regulator at 68 {
++		compatible = "dlg,da9210";
++		reg = <0x68>;
++		interrupt-parent = <&irqc0>;
++		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
++
++		regulator-min-microvolt = <1000000>;
++		regulator-max-microvolt = <1000000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
+ };
+ 
+ &i2c4 {
 -- 
 2.11.0
