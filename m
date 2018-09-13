@@ -1,55 +1,64 @@
-From: dkos@cadence.com (Damian Kos)
-Date: Thu, 13 Sep 2018 10:15:19 +0000
-Subject: [PATCH v3 1/5] drm/rockchip: prepare common code for cdns and rk
- dpi/dp driver
-In-Reply-To: <20180913100100eucas1p23e7e33035b6cba51d6219a58b34eea92~T7VgDpN8L3204732047eucas1p2_@eucas1p2.samsung.com>
-References: <1535451894-2518-1-git-send-email-dkos@cadence.com>
- <CGME20180828102612epcas2p376fa6f21ce57f4753a8d0f80f5359842@epcas2p3.samsung.com>
- <1535451894-2518-2-git-send-email-dkos@cadence.com>
- <20180913100100eucas1p23e7e33035b6cba51d6219a58b34eea92~T7VgDpN8L3204732047eucas1p2_@eucas1p2.samsung.com>
-Message-ID: <CO2PR07MB255146DAA1B87BB046E64BAECD1A0@CO2PR07MB2551.namprd07.prod.outlook.com>
+From: niklas.cassel@linaro.org (Niklas Cassel)
+Date: Thu, 13 Sep 2018 12:21:13 +0200
+Subject: [PATCH 00/11] OPP: Don't create multiple OPP tables for devices
+ sharing OPP table
+In-Reply-To: <CAKohpomVR_U9cA2yFLWjQ0pLdjp_d8=s2C7cvbauacha0Uv8xw@mail.gmail.com>
+References: <cover.1536736872.git.viresh.kumar@linaro.org>
+ <20180912135537.GA9985@centauri.ideon.se>
+ <CAKohpomVR_U9cA2yFLWjQ0pLdjp_d8=s2C7cvbauacha0Uv8xw@mail.gmail.com>
+Message-ID: <20180913102113.GA25222@centauri.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thank you, Andrzej! I was a bit afraid that our patches are a bit too messy and thus ignored ?
-Anyway, this patch (1/5) should be the last one that will cause such chaos in the DRM area.
+On Thu, Sep 13, 2018 at 01:18:34PM +0530, Viresh Kumar wrote:
+> On 12 September 2018 at 19:25, Niklas Cassel <niklas.cassel@linaro.org> wrote:
+> > On Wed, Sep 12, 2018 at 01:58:39PM +0530, Viresh Kumar wrote:
+> >> Hello,
+> >>
+> >> Niklas Cassle recently reported some regressions with his Qcom cpufreq
+> >> driver where he was getting some errors while creating the OPPs tables.
+> >>
+> >> After looking into it I realized that the OPP core incorrectly creates
+> >> multiple OPP tables for the devices even if they are sharing the OPP
+> >> table in DT. This happens when the request comes using different CPU
+> >> devices. For example, dev_pm_opp_set_supported_hw() getting called using
+> >> CPU0 and dev_pm_opp_of_add_table() getting called using CPU1.
+> >>
+> >> This series redesigns the internals of the OPP core to fix that. The
+> >> redesign has simplified the core itself though.
+> >>
+> >> @Niklas: Can you please confirm that this series fixes the issues you
+> >> have reported ? I have already tested it on Hikey960.
+> >
+> > Hello Viresh,
+> >
+> > This fixes the OPP error messages that I previously reported.
+> >
+> > However, I also tested to add a duplicate OPP to the opp-table.
+> >
+> > Before this series, I got the first two error prints.
+> > After this series, I get the first two error prints + the use after free splat.
+> 
+> This looks to be an old bug. Can you please try this branch:
 
-Regards,
-Damian
+Hello Viresh,
 
------Original Message-----
-From: Andrzej Hajda <a.hajda@samsung.com> 
-Sent: Thursday, September 13, 2018 12:01
-To: Damian Kos <dkos@cadence.com>; David Airlie <airlied@linux.ie>; Rob Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>; Archit Taneja <architt@codeaurora.org>; Laurent Pinchart <Laurent.pinchart@ideasonboard.com>; Gustavo Padovan <gustavo@padovan.org>; Maarten Lankhorst <maarten.lankhorst@linux.intel.com>; Sean Paul <sean@poorly.run>; Sandy Huang <hjc@rock-chips.com>; Heiko St?bner <heiko@sntech.de>; Quentin Schulz <quentin.schulz@bootlin.com>; dri-devel at lists.freedesktop.org; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-rockchip at lists.infradead.org
-Cc: Przemyslaw Gaj <pgaj@cadence.com>; Lukasz Tyrala <ltyrala@cadence.com>; Scott Telford <stelford@cadence.com>; Artur Jedrysek <jartur@cadence.com>; Piotr Sroka <piotrs@cadence.com>
-Subject: Re: [PATCH v3 1/5] drm/rockchip: prepare common code for cdns and rk dpi/dp driver
+You confused me here, since you did hide the fix for this old bug in the
+middle of your new patch series :)
 
-EXTERNAL MAIL
+I think that it would have been more obvious to simply paste the fix/diff
+in your reply directly, since that is the most common way to post a
+potential fix. Or, if you are really confident in your fix, post a V2
+directly.
 
+However, your branch works like a charm, so feel free to add:
+Tested-by: Niklas Cassel <niklas.cassel@linaro.org>
+when sending out your branch as a V2.
 
-Hi Damian,
+Kind regards,
+Niklas
 
-Quite late but.
-
-On 28.08.2018 12:24, Damian Kos wrote:
-> - Extracted common fields from cdn_dp_device to a new cdns_mhdp_device
->   structure which will be used by two separate drivers later on.
-> - Moved some datatypes (audio_format, audio_info, vic_pxl_encoding_format,
->   video_info) from cdn-dp-core.c to cdn-dp-reg.h.
-> - Changed prefixes from cdn_dp to cdns_mhdp
->     cdn -> cdns to match the other Cadence's drivers
->     dp -> mhdp to distinguish it from a "just a DP" as the IP underneath
->       this registers map can be a HDMI (which is internally different,
->       but the interface for commands, events is pretty much the same).
-> - Modified cdn-dp-core.c to use the new driver structure and new function
->   names.
->
-> Signed-off-by: Damian Kos <dkos@cadence.com>
-
-Many changes, hard to review. Anyway:
-
-Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
-
-?--
-Regards
-Andrzej
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/vireshk/pm.git opp/qcom-fix
+> 
+> ?
