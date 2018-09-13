@@ -1,414 +1,219 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Sep 2018 11:09:06 +0200
-Subject: [PATCH 11/58] arm64: dts: renesas: r8a77980: add CSI2/VIN support
+Date: Thu, 13 Sep 2018 11:09:08 +0200
+Subject: [PATCH 13/58] arm64: dts: renesas: Initial r8a774a1 SoC device tree
 In-Reply-To: <cover.1536828567.git.horms+renesas@verge.net.au>
 References: <cover.1536828567.git.horms+renesas@verge.net.au>
-Message-ID: <3182aa4e0bf4d0ee0b29fea4b5ca21290d6d6251.1536828567.git.horms+renesas@verge.net.au>
+Message-ID: <90493b09df41a9c1dd0bf315e81d03b4212384f9.1536828567.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Biju Das <biju.das@bp.renesas.com>
 
-Describe the CSI2 and VIN (and their interconnections) in the R8A77980
-device tree.
+Basic support for the RZ/G2M SoC.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77980.dtsi | 374 ++++++++++++++++++++++++++++++
- 1 file changed, 374 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a774a1.dtsi | 190 ++++++++++++++++++++++++++++++
+ 1 file changed, 190 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/renesas/r8a774a1.dtsi
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77980.dtsi b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-index 4bc99d6763ce..c099053cf5fe 100644
---- a/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-@@ -579,6 +579,302 @@
- 			status = "disabled";
- 		};
- 
-+		vin0: video at e6ef0000 {
-+			compatible = "renesas,vin-r8a77980";
-+			reg = <0 0xe6ef0000 0 0x1000>;
-+			interrupts = <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 811>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 811>;
-+			status = "disabled";
+diff --git a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+new file mode 100644
+index 000000000000..8e63e9aee456
+--- /dev/null
++++ b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
+@@ -0,0 +1,190 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Device Tree Source for the r8a774a1 SoC
++ *
++ * Copyright (C) 2018 Renesas Electronics Corp.
++ */
 +
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/clock/renesas-cpg-mssr.h>
 +
-+				port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
++/ {
++	compatible = "renesas,r8a774a1";
++	#address-cells = <2>;
++	#size-cells = <2>;
 +
-+					reg = <1>;
++	/*
++	 * The external audio clocks are configured as 0 Hz fixed frequency
++	 * clocks by default.
++	 * Boards that provide audio clocks should override them.
++	 */
++	audio_clk_a: audio_clk_a {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
 +
-+					vin0csi40: endpoint at 2 {
-+						reg = <2>;
-+						remote-endpoint= <&csi40vin0>;
-+					};
-+				};
-+			};
++	audio_clk_b: audio_clk_b {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
++	audio_clk_c: audio_clk_c {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
++	/* External CAN clock - to be overridden by boards that provide it */
++	can_clk: can {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		a57_0: cpu at 0 {
++			compatible = "arm,cortex-a57", "arm,armv8";
++			reg = <0x0>;
++			device_type = "cpu";
++			power-domains = <&sysc 0>;
++			next-level-cache = <&L2_CA57>;
++			enable-method = "psci";
++			clocks =<&cpg CPG_CORE 0>;
 +		};
 +
-+		vin1: video at e6ef1000 {
-+			compatible = "renesas,vin-r8a77980";
-+			reg = <0 0xe6ef1000 0 0x1000>;
-+			interrupts = <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 810>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			status = "disabled";
-+			resets = <&cpg 810>;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+
-+					reg = <1>;
-+
-+					vin1csi40: endpoint at 2 {
-+						reg = <2>;
-+						remote-endpoint= <&csi40vin1>;
-+					};
-+				};
-+			};
++		a57_1: cpu at 1 {
++			compatible = "arm,cortex-a57", "arm,armv8";
++			reg = <0x1>;
++			device_type = "cpu";
++			power-domains = <&sysc 1>;
++			next-level-cache = <&L2_CA57>;
++			enable-method = "psci";
++			clocks =<&cpg CPG_CORE 0>;
 +		};
 +
-+		vin2: video at e6ef2000 {
-+			compatible = "renesas,vin-r8a77980";
-+			reg = <0 0xe6ef2000 0 0x1000>;
-+			interrupts = <GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 809>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 809>;
-+			status = "disabled";
++		L2_CA57: cache-controller-0 {
++			compatible = "cache";
++			power-domains = <&sysc 12>;
++			cache-unified;
++			cache-level = <2>;
++		};
++	};
 +
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
++	extal_clk: extal {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		/* This value must be overridden by the board */
++		clock-frequency = <0>;
++	};
 +
-+				port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
++	extalr_clk: extalr {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		/* This value must be overridden by the board */
++		clock-frequency = <0>;
++	};
 +
-+					reg = <1>;
++	/* External PCIe clock - can be overridden by the board */
++	pcie_bus_clk: pcie_bus {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
 +
-+					vin2csi40: endpoint at 2 {
-+						reg = <2>;
-+						remote-endpoint= <&csi40vin2>;
-+					};
-+				};
-+			};
++	pmu_a57 {
++		compatible = "arm,cortex-a57-pmu";
++		interrupts-extended = <&gic GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
++				      <&gic GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-affinity = <&a57_0>, <&a57_1>;
++	};
++
++	psci {
++		compatible = "arm,psci-1.0", "arm,psci-0.2";
++		method = "smc";
++	};
++
++	/* External SCIF clock - to be overridden by boards that provide it */
++	scif_clk: scif {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
++	soc {
++		compatible = "simple-bus";
++		interrupt-parent = <&gic>;
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		cpg: clock-controller at e6150000 {
++			compatible = "renesas,r8a774a1-cpg-mssr";
++			reg = <0 0xe6150000 0 0x0bb0>;
++			clocks = <&extal_clk>, <&extalr_clk>;
++			clock-names = "extal", "extalr";
++			#clock-cells = <2>;
++			#power-domain-cells = <0>;
++			#reset-cells = <1>;
 +		};
 +
-+		vin3: video at e6ef3000 {
-+			compatible = "renesas,vin-r8a77980";
-+			reg = <0 0xe6ef3000 0 0x1000>;
-+			interrupts = <GIC_SPI 191 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 808>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 808>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+
-+					reg = <1>;
-+
-+					vin3csi40: endpoint at 2 {
-+						reg = <2>;
-+						remote-endpoint= <&csi40vin3>;
-+					};
-+				};
-+			};
++		rst: reset-controller at e6160000 {
++			compatible = "renesas,r8a774a1-rst";
++			reg = <0 0xe6160000 0 0x018c>;
 +		};
 +
-+		vin4: video at e6ef4000 {
-+			compatible = "renesas,vin-r8a77980";
-+			reg = <0 0xe6ef4000 0 0x1000>;
-+			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 807>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 807>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+
-+					reg = <1>;
-+
-+					vin4csi41: endpoint at 2 {
-+						reg = <2>;
-+						remote-endpoint= <&csi41vin4>;
-+					};
-+				};
-+			};
++		sysc: system-controller at e6180000 {
++			compatible = "renesas,r8a774a1-sysc";
++			reg = <0 0xe6180000 0 0x0400>;
++			#power-domain-cells = <1>;
 +		};
 +
-+		vin5: video at e6ef5000 {
-+			compatible = "renesas,vin-r8a77980";
-+			reg = <0 0xe6ef5000 0 0x1000>;
-+			interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 806>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 806>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+
-+					reg = <1>;
-+
-+					vin5csi41: endpoint at 2 {
-+						reg = <2>;
-+						remote-endpoint= <&csi41vin5>;
-+					};
-+				};
-+			};
++		gic: interrupt-controller at f1010000 {
++			compatible = "arm,gic-400";
++			#interrupt-cells = <3>;
++			#address-cells = <0>;
++			interrupt-controller;
++			reg = <0x0 0xf1010000 0 0x1000>,
++			      <0x0 0xf1020000 0 0x20000>,
++			      <0x0 0xf1040000 0 0x20000>,
++			      <0x0 0xf1060000 0 0x20000>;
++			interrupts = <GIC_PPI 9
++					(GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
++			clocks = <&cpg CPG_MOD 408>;
++			clock-names = "clk";
++			power-domains = <&sysc 32>;
++			resets = <&cpg 408>;
 +		};
 +
-+		vin6: video at e6ef6000 {
-+			compatible = "renesas,vin-r8a77980";
-+			reg = <0 0xe6ef6000 0 0x1000>;
-+			interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 805>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 805>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+
-+					reg = <1>;
-+
-+					vin6csi41: endpoint at 2 {
-+						reg = <2>;
-+						remote-endpoint= <&csi41vin6>;
-+					};
-+				};
-+			};
++		prr: chipid at fff00044 {
++			compatible = "renesas,prr";
++			reg = <0 0xfff00044 0 4>;
 +		};
++	};
 +
-+		vin7: video at e6ef7000 {
-+			compatible = "renesas,vin-r8a77980";
-+			reg = <0 0xe6ef7000 0 0x1000>;
-+			interrupts = <GIC_SPI 171 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 804>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 804>;
-+			status = "disabled";
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
++				      <&gic GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
++	};
 +
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
++	/* External USB clocks - can be overridden by the board */
++	usb3s0_clk: usb3s0 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
 +
-+				port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+
-+					reg = <1>;
-+
-+					vin7csi41: endpoint at 2 {
-+						reg = <2>;
-+						remote-endpoint= <&csi41vin7>;
-+					};
-+				};
-+			};
-+		};
-+
-+		vin8: video at e6ef8000 {
-+			compatible = "renesas,vin-r8a77980";
-+			reg = <0 0xe6ef8000 0 0x1000>;
-+			interrupts = <GIC_SPI 268 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 628>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 628>;
-+			status = "disabled";
-+		};
-+
-+		vin9: video at e6ef9000 {
-+			compatible = "renesas,vin-r8a77980";
-+			reg = <0 0xe6ef9000 0 0x1000>;
-+			interrupts = <GIC_SPI 269 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 627>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 627>;
-+			status = "disabled";
-+		};
-+
-+		vin10: video at e6efa000 {
-+			compatible = "renesas,vin-r8a77980";
-+			reg = <0 0xe6efa000 0 0x1000>;
-+			interrupts = <GIC_SPI 289 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 625>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 625>;
-+			status = "disabled";
-+		};
-+
-+		vin11: video at e6efb000 {
-+			compatible = "renesas,vin-r8a77980";
-+			reg = <0 0xe6efb000 0 0x1000>;
-+			interrupts = <GIC_SPI 296 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 618>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 618>;
-+			status = "disabled";
-+		};
-+
-+		vin12: video at e6efc000 {
-+			compatible = "renesas,vin-r8a77980";
-+			reg = <0 0xe6efc000 0 0x1000>;
-+			interrupts = <GIC_SPI 298 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 612>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 612>;
-+			status = "disabled";
-+		};
-+
-+		vin13: video at e6efd000 {
-+			compatible = "renesas,vin-r8a77980";
-+			reg = <0 0xe6efd000 0 0x1000>;
-+			interrupts = <GIC_SPI 299 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 608>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 608>;
-+			status = "disabled";
-+		};
-+
-+		vin14: video at e6efe000 {
-+			compatible = "renesas,vin-r8a77980";
-+			reg = <0 0xe6efe000 0 0x1000>;
-+			interrupts = <GIC_SPI 301 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 605>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 605>;
-+			status = "disabled";
-+		};
-+
-+		vin15: video at e6eff000 {
-+			compatible = "renesas,vin-r8a77980";
-+			reg = <0 0xe6eff000 0 0x1000>;
-+			interrupts = <GIC_SPI 302 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 604>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 604>;
-+			status = "disabled";
-+		};
-+
- 		dmac1: dma-controller at e7300000 {
- 			compatible = "renesas,dmac-r8a77980",
- 				     "renesas,rcar-dmac";
-@@ -769,6 +1065,84 @@
- 			resets = <&cpg 603>;
- 		};
- 
-+		csi40: csi2 at feaa0000 {
-+			compatible = "renesas,r8a77980-csi2";
-+			reg = <0 0xfeaa0000 0 0x10000>;
-+			interrupts = <GIC_SPI 246 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 716>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 716>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+
-+					reg = <1>;
-+
-+					csi40vin0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&vin0csi40>;
-+					};
-+					csi40vin1: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&vin1csi40>;
-+					};
-+					csi40vin2: endpoint at 2 {
-+						reg = <2>;
-+						remote-endpoint = <&vin2csi40>;
-+					};
-+					csi40vin3: endpoint at 3 {
-+						reg = <3>;
-+						remote-endpoint = <&vin3csi40>;
-+					};
-+				};
-+			};
-+		};
-+
-+		csi41: csi2 at feab0000 {
-+			compatible = "renesas,r8a77980-csi2";
-+			reg = <0 0xfeab0000 0 0x10000>;
-+			interrupts = <GIC_SPI 241 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 715>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 715>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+
-+					reg = <1>;
-+
-+					csi41vin4: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&vin4csi41>;
-+					};
-+					csi41vin5: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&vin5csi41>;
-+					};
-+					csi41vin6: endpoint at 2 {
-+						reg = <2>;
-+						remote-endpoint = <&vin6csi41>;
-+					};
-+					csi41vin7: endpoint at 3 {
-+						reg = <3>;
-+						remote-endpoint = <&vin7csi41>;
-+					};
-+				};
-+			};
-+		};
-+
- 		du: display at feb00000 {
- 			compatible = "renesas,du-r8a77980",
- 				     "renesas,du-r8a77970";
++	usb_extal_clk: usb_extal {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++};
 -- 
 2.11.0
