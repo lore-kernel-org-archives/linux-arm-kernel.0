@@ -1,40 +1,53 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Sep 2018 11:09:42 +0200
-Subject: [PATCH 47/58] arm64: dts: renesas: r8a77965: Fix clock/reset for
- usb2_phy1
+Date: Thu, 13 Sep 2018 11:09:43 +0200
+Subject: [PATCH 48/58] arm64: dts: renesas: salvator-xs: Improve SATA switch
+ settings comments
 In-Reply-To: <cover.1536828567.git.horms+renesas@verge.net.au>
 References: <cover.1536828567.git.horms+renesas@verge.net.au>
-Message-ID: <7a590fe317488783a229e5a80e91868942e8463f.1536828567.git.horms+renesas@verge.net.au>
+Message-ID: <48e1f50bd67a4ee6c168e5d869cc49096cb2d203.1536828567.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-usb2_phy1 accidentally uses the same clock/reset as usb2_phy0.
+The comments describing the non-default switch settings to use SATA are
+confusing: 'Off' refers to the switch position, not to the MD12 logic
+value, while the parentheses suggest otherwise.  Rephrase to fix this.
 
-Fixes: b5857630a829a8d5 ("arm64: dts: renesas: r8a77965: add usb2_phy nodes")
+Fixes: bec000784d5bb571 ("arm64: dts: renesas: salvator-xs: enable SATA")
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77965.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts  | 2 +-
+ arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-index 108f53cfef5c..77fb909cc839 100644
---- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-@@ -1530,9 +1530,9 @@
- 			compatible = "renesas,usb2-phy-r8a77965",
- 				     "renesas,rcar-gen3-usb2-phy";
- 			reg = <0 0xee0a0200 0 0x700>;
--			clocks = <&cpg CPG_MOD 703>;
-+			clocks = <&cpg CPG_MOD 702>;
- 			power-domains = <&sysc R8A77965_PD_ALWAYS_ON>;
--			resets = <&cpg 703>;
-+			resets = <&cpg 702>;
- 			#phy-cells = <0>;
- 			status = "disabled";
- 		};
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts
+index ba3357636fdb..cf08a119eec0 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts
+@@ -184,7 +184,7 @@
+ 	};
+ };
+ 
+-/* MD12 (SW12-7) must be set 'Off' which is not the default! */
++/* SW12-7 must be set 'Off' (MD12 set to 1) which is not the default! */
+ &sata {
+ 	status = "okay";
+ };
+diff --git a/arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts b/arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts
+index 45016a06fab1..f03a5e9e0c42 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts
++++ b/arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts
+@@ -57,7 +57,7 @@
+ 	};
+ };
+ 
+-/* MD12 (SW12-7) must be set 'Off' which is not the default! */
++/* SW12-7 must be set 'Off' (MD12 set to 1) which is not the default! */
+ &sata {
+ 	status = "okay";
+ };
 -- 
 2.11.0
