@@ -1,49 +1,77 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 13 Sep 2018 17:42:17 +0100
-Subject: [PATCH v6 0/6] Add non-strict mode support for iommu-dma
-Message-ID: <cover.1536856828.git.robin.murphy@arm.com>
+Date: Thu, 13 Sep 2018 17:42:24 +0100
+Subject: [PATCH v6 7/7] iommu/dma: Add bootup option "iommu.non_strict"
+In-Reply-To: <cover.1536856828.git.robin.murphy@arm.com>
+References: <cover.1536856828.git.robin.murphy@arm.com>
+Message-ID: <94fe2e15d36565e13218b007b9d5d9d08f190e5e.1536856828.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+From: Zhen Lei <thunder.leizhen@huawei.com>
 
-Since we'd like to get this polished up and merged and Leizhen has other
-commitments, here's v6 of the previous series[1] wherein I address all
-my own feedback :)
+Add a bootup option to make the system manager can choose which mode to
+be used. The default mode is strict.
 
-The principal change is that I've inverted things slightly such that
-it's now a generic domain attribute controlled by iommu-dma given the
-necessary support from individual IOMMU drivers. That way we can easily
-enable other drivers straight away, as I've done for SMMUv2 here (which
-also allowed me to give it a quick test with MMU-401s on a Juno board).
-Otherwise it's really just cosmetic cleanup and rebasing onto Will's
-pending SMMU queue.
+Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+[rm: make it a generic iommu-dma feature]
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ .../admin-guide/kernel-parameters.txt          | 13 +++++++++++++
+ drivers/iommu/dma-iommu.c                      | 18 ++++++++++++++++++
+ 2 files changed, 31 insertions(+)
 
-Robin.
-
-[1] https://www.mail-archive.com/iommu at lists.linux-foundation.org/msg25150.html
-
-
-Robin Murphy (2):
-  iommu/io-pgtable: Add helper for toggling non-strict mode
-  iommu/arm-smmu: Support non-strict mode
-
-Zhen Lei (5):
-  iommu/arm-smmu-v3: Implement flush_iotlb_all hook
-  iommu/dma: Add support for non-strict mode
-  iommu/io-pgtable-arm: Add support for non-strict mode
-  iommu/arm-smmu-v3: Add support for non-strict mode
-  iommu/dma: Add bootup option "iommu.non_strict"
-
- .../admin-guide/kernel-parameters.txt         | 13 +++++
- drivers/iommu/arm-smmu-v3.c                   | 43 +++++++++++++---
- drivers/iommu/arm-smmu.c                      | 43 +++++++++++++---
- drivers/iommu/dma-iommu.c                     | 49 ++++++++++++++++++-
- drivers/iommu/io-pgtable-arm.c                |  9 ++--
- drivers/iommu/io-pgtable.c                    |  9 ++++
- drivers/iommu/io-pgtable.h                    |  6 +++
- include/linux/iommu.h                         |  1 +
- 8 files changed, 155 insertions(+), 18 deletions(-)
-
+diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+index 9871e649ffef..406b91759b62 100644
+--- a/Documentation/admin-guide/kernel-parameters.txt
++++ b/Documentation/admin-guide/kernel-parameters.txt
+@@ -1749,6 +1749,19 @@
+ 		nobypass	[PPC/POWERNV]
+ 			Disable IOMMU bypass, using IOMMU for PCI devices.
+ 
++	iommu.non_strict=	[ARM64]
++			Format: { "0" | "1" }
++			0 - strict mode, default.
++			    Release IOVAs after the related TLBs are invalid
++			    completely.
++			1 - non-strict mode.
++			    Put off TLBs invalidation and release memory first.
++			    It's good for scatter-gather performance but lacks
++			    full isolation, an untrusted device can access the
++			    reused memory because the TLBs may still valid.
++			    Please take	full consideration before choosing this
++			    mode. Note that, VFIO will always use strict mode.
++
+ 	iommu.passthrough=
+ 			[ARM64] Configure DMA to bypass the IOMMU by default.
+ 			Format: { "0" | "1" }
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index d91849fe4ebe..04d4c5453acd 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -62,6 +62,24 @@ struct iommu_dma_cookie {
+ 
+ static bool iommu_dma_non_strict __read_mostly;
+ 
++static int __init iommu_dma_setup(char *str)
++{
++	int ret;
++
++	ret = kstrtobool(str, &iommu_dma_non_strict);
++	if (ret)
++		return ret;
++
++	if (iommu_dma_non_strict) {
++		pr_warn("WARNING: iommu non-strict mode is chosen.\n"
++			"It's good for scatter-gather performance but lacks full isolation\n");
++		add_taint(TAINT_WARN, LOCKDEP_STILL_OK);
++	}
++
++	return 0;
++}
++early_param("iommu.non_strict", iommu_dma_setup);
++
+ static inline size_t cookie_msi_granule(struct iommu_dma_cookie *cookie)
+ {
+ 	if (cookie->type == IOMMU_DMA_IOVA_COOKIE)
 -- 
 2.19.0.dirty
