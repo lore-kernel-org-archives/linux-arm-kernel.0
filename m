@@ -1,74 +1,64 @@
-From: sed@free.fr (Cedric Roux)
-Date: Thu, 13 Sep 2018 22:26:55 +0200
-Subject: [PATCH v3 1/2] ARM: s3c24xx: formatting cleanup in mach-mini2440.c
-In-Reply-To: <b97d7ccc921572ca5d783584eea1de04341ab02f.camel@perches.com>
-References: <20180907215446.15160-1-sed@free.fr>
- <b97d7ccc921572ca5d783584eea1de04341ab02f.camel@perches.com>
-Message-ID: <4cf38559-b00d-ede4-def5-7cd832d8a506@free.fr>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 13 Sep 2018 15:28:26 -0500
+Subject: [PATCH 1/3] libfdt: Ensure INT_MAX is defined in libfdt_env.h
+Message-ID: <20180913202828.15372-1-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The next update of libfdt has a new dependency on INT_MAX. Update the
+instances of libfdt_env.h in the kernel to either include the necessary
+header with the definition or define it locally.
 
-On 09/12/2018 09:21 PM, Joe Perches wrote:
-> On Fri, 2018-09-07 at 23:54 +0200, Cedric Roux wrote:
->> Running:
->>     scripts/checkpatch.pl -f arch/arm/mach-s3c24xx/mach-mini2440.c
->> revealed several errors and warnings.
->>
->> They were all removed, except one which is an #if 0 around the declaration
->> of a gpio pin. This needs some more investigation and I prefer to let it
->> here. This is not some dead code.
-> []
->> diff --git a/arch/arm/mach-s3c24xx/mach-mini2440.c b/arch/arm/mach-s3c24xx/mach-mini2440.c
-> []
->> @@ -674,17 +680,17 @@ static void __init mini2440_init(void)
->>  		mini2440_fb_info.displays =
->>  			&mini2440_lcd_cfg[features.lcd_index];
->>  
->> -		printk(KERN_INFO "MINI2440: LCD");
->> +		pr_info("MINI2440: LCD");
-> 
-> OK
-> 
->>  		for (li = 0; li < ARRAY_SIZE(mini2440_lcd_cfg); li++)
->>  			if (li == features.lcd_index)
->> -				printk(" [%d:%dx%d]", li,
->> +				pr_info(" [%d:%dx%d]", li,
->>  					mini2440_lcd_cfg[li].width,
->>  					mini2440_lcd_cfg[li].height);
-> 
-> pr_cont
-> 
->>  			else
->> -				printk(" %d:%dx%d", li,
->> +				pr_info(" %d:%dx%d", li,
-> 
-> pr_cont
-> 
->>  					mini2440_lcd_cfg[li].width,
->>  					mini2440_lcd_cfg[li].height);
->> -		printk("\n");
->> +		pr_info("\n");
-> 
-> pr_cont
-> 
-> So only the first printk should use pr_info().
-> The subsequent printk uses should use pr_cont()
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Paul Mackerras <paulus@samba.org>
+Cc: Michael Ellerman <mpe@ellerman.id.au>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linuxppc-dev at lists.ozlabs.org
+Signed-off-by: Rob Herring <robh@kernel.org>
+---
+ arch/arm/boot/compressed/libfdt_env.h | 2 ++
+ arch/powerpc/boot/libfdt_env.h        | 2 ++
+ include/linux/libfdt_env.h            | 1 +
+ 3 files changed, 5 insertions(+)
 
-at this point, I don't know what to do.
-
-Should I resubmit the patches? Or is it in the hands of
-Krzysztof (krzk at kernel.org)? I would say a git rebase -i
-is enough to edit the patch and this rebase is obviously
-not to be done by me, but I don't know the process.
-
-Regards,
-C?dric.
-
-
-
-> 
->>  		s3c24xx_fb_set_platdata(&mini2440_fb_info);
->>  	}
->>  
+diff --git a/arch/arm/boot/compressed/libfdt_env.h b/arch/arm/boot/compressed/libfdt_env.h
+index 07437816e098..b36c0289a308 100644
+--- a/arch/arm/boot/compressed/libfdt_env.h
++++ b/arch/arm/boot/compressed/libfdt_env.h
+@@ -6,6 +6,8 @@
+ #include <linux/string.h>
+ #include <asm/byteorder.h>
+ 
++#define INT_MAX			((int)(~0U>>1))
++
+ typedef __be16 fdt16_t;
+ typedef __be32 fdt32_t;
+ typedef __be64 fdt64_t;
+diff --git a/arch/powerpc/boot/libfdt_env.h b/arch/powerpc/boot/libfdt_env.h
+index 2a0c8b1bf147..2abc8e83b95e 100644
+--- a/arch/powerpc/boot/libfdt_env.h
++++ b/arch/powerpc/boot/libfdt_env.h
+@@ -5,6 +5,8 @@
+ #include <types.h>
+ #include <string.h>
+ 
++#define INT_MAX			((int)(~0U>>1))
++
+ #include "of.h"
+ 
+ typedef unsigned long uintptr_t;
+diff --git a/include/linux/libfdt_env.h b/include/linux/libfdt_env.h
+index c6ac1fe7ec68..edb0f0c30904 100644
+--- a/include/linux/libfdt_env.h
++++ b/include/linux/libfdt_env.h
+@@ -2,6 +2,7 @@
+ #ifndef LIBFDT_ENV_H
+ #define LIBFDT_ENV_H
+ 
++#include <linux/kernel.h>	/* For INT_MAX */
+ #include <linux/string.h>
+ 
+ #include <asm/byteorder.h>
+-- 
+2.17.1
