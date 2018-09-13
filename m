@@ -1,64 +1,64 @@
-From: niklas.cassel@linaro.org (Niklas Cassel)
-Date: Thu, 13 Sep 2018 12:21:13 +0200
-Subject: [PATCH 00/11] OPP: Don't create multiple OPP tables for devices
- sharing OPP table
-In-Reply-To: <CAKohpomVR_U9cA2yFLWjQ0pLdjp_d8=s2C7cvbauacha0Uv8xw@mail.gmail.com>
-References: <cover.1536736872.git.viresh.kumar@linaro.org>
- <20180912135537.GA9985@centauri.ideon.se>
- <CAKohpomVR_U9cA2yFLWjQ0pLdjp_d8=s2C7cvbauacha0Uv8xw@mail.gmail.com>
-Message-ID: <20180913102113.GA25222@centauri.lan>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Thu, 13 Sep 2018 18:29:54 +0800
+Subject: [PATCH v3] PCI: dwc: fix scheduling while atomic issues
+In-Reply-To: <20180913091534.GB32721@e107981-ln.cambridge.arm.com>
+References: <20180829110408.556c3622@xhacker.debian>
+ <20180910165722.38218779@xhacker.debian>
+ <20180913091534.GB32721@e107981-ln.cambridge.arm.com>
+Message-ID: <20180913182926.365d155b@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2018 at 01:18:34PM +0530, Viresh Kumar wrote:
-> On 12 September 2018 at 19:25, Niklas Cassel <niklas.cassel@linaro.org> wrote:
-> > On Wed, Sep 12, 2018 at 01:58:39PM +0530, Viresh Kumar wrote:
-> >> Hello,
-> >>
-> >> Niklas Cassle recently reported some regressions with his Qcom cpufreq
-> >> driver where he was getting some errors while creating the OPPs tables.
-> >>
-> >> After looking into it I realized that the OPP core incorrectly creates
-> >> multiple OPP tables for the devices even if they are sharing the OPP
-> >> table in DT. This happens when the request comes using different CPU
-> >> devices. For example, dev_pm_opp_set_supported_hw() getting called using
-> >> CPU0 and dev_pm_opp_of_add_table() getting called using CPU1.
-> >>
-> >> This series redesigns the internals of the OPP core to fix that. The
-> >> redesign has simplified the core itself though.
-> >>
-> >> @Niklas: Can you please confirm that this series fixes the issues you
-> >> have reported ? I have already tested it on Hikey960.
-> >
-> > Hello Viresh,
-> >
-> > This fixes the OPP error messages that I previously reported.
-> >
-> > However, I also tested to add a duplicate OPP to the opp-table.
-> >
-> > Before this series, I got the first two error prints.
-> > After this series, I get the first two error prints + the use after free splat.
+Hi Lorenzo,
+
+On Thu, 13 Sep 2018 10:15:34 +0100 Lorenzo Pieralisi wrote:
+
+> On Mon, Sep 10, 2018 at 04:57:22PM +0800, Jisheng Zhang wrote:
+> > Hi all,
+> > 
+> > On Wed, 29 Aug 2018 11:04:08 +0800 Jisheng Zhang wrote:
+> >   
+> > > When programming inbound/outbound atu, we call usleep_range() after
+> > > each checking PCIE_ATU_ENABLE bit. Unfortunately, the atu programming
+> > > can be called in atomic context:
+> > > 
+> > > inbound atu programming could be called through
+> > > pci_epc_write_header()  
+> > >   =>dw_pcie_ep_write_header()
+> > >     =>dw_pcie_prog_inbound_atu()    
+> > > 
+> > > outbound atu programming could be called through
+> > > pci_bus_read_config_dword()  
+> > >   =>dw_pcie_rd_conf()
+> > >     =>dw_pcie_prog_outbound_atu()    
+> > > 
+> > > Fix this issue by calling mdelay() instead.  
+> > 
+> > Any comments about this patch?
+> > 
+> > Thanks,
+> > Jisheng
+> >   
+> > > 
+> > > Fixes: f8aed6ec624f ("PCI: dwc: designware: Add EP mode support")
+> > > Fixes: d8bbeb39fbf3 ("PCI: designware: Wait for iATU enable")  
 > 
-> This looks to be an old bug. Can you please try this branch:
+> Can you split it into two patches and repost it please ? It will make
+> everyone's life easier to backport it if there is need, I will apply
+> then.
 
-Hello Viresh,
+IIUC, the purpose of this split is to make the backport to stable easier. If
+so, I realise that the Fixes tags were not enough, we missed:
 
-You confused me here, since you did hide the fix for this old bug in the
-middle of your new patch series :)
+Fixes: edd45e396829 ("PCI: dwc: designware: Move _unroll configurations to a
+separate function")
 
-I think that it would have been more obvious to simply paste the fix/diff
-in your reply directly, since that is the most common way to post a
-potential fix. Or, if you are really confident in your fix, post a V2
-directly.
+I'm not sure how to handle this case. From another side, the issue to be
+fixed is the same: call sleep in atomic context in the same driver, is it
+better to use one patch?
 
-However, your branch works like a charm, so feel free to add:
-Tested-by: Niklas Cassel <niklas.cassel@linaro.org>
-when sending out your branch as a V2.
+As for stable tree, I could send out separate patches instead. What do you
+think?
 
-Kind regards,
-Niklas
-
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/vireshk/pm.git opp/qcom-fix
-> 
-> ?
+Thanks,
+Jisheng
