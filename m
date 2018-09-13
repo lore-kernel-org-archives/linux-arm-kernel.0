@@ -1,79 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Sep 2018 11:09:19 +0200
-Subject: [PATCH 24/58] arm64: dts: renesas: r8a774a1: Add Ethernet AVB node
+Date: Thu, 13 Sep 2018 11:09:21 +0200
+Subject: [PATCH 26/58] arm64: dts: renesas: r8a774a1: Add pinctrl device node
 In-Reply-To: <cover.1536828567.git.horms+renesas@verge.net.au>
 References: <cover.1536828567.git.horms+renesas@verge.net.au>
-Message-ID: <71bddde2a2dfcba2c2caad35d6933345960907e5.1536828567.git.horms+renesas@verge.net.au>
+Message-ID: <3698dbd02c93545f08dd309d159ef20956e07355.1536828567.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-This patch adds the SoC specific part of the Ethernet AVB
-device tree node.
+This patch adds pinctrl device node for R8A774A1 SoC.
 
 Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Reviewed-by: Biju Das <biju.das@bp.renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a774a1.dtsi | 45 +++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a774a1.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-index 15d7785fb177..b771211a8444 100644
+index b9a381808417..c956bf7ecde9 100644
 --- a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-@@ -350,6 +350,51 @@
- 			dma-channels = <16>;
+@@ -133,6 +133,11 @@
+ 			status = "disabled";
  		};
  
-+		avb: ethernet at e6800000 {
-+			compatible = "renesas,etheravb-r8a774a1",
-+				     "renesas,etheravb-rcar-gen3";
-+			reg = <0 0xe6800000 0 0x800>;
-+			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "ch0", "ch1", "ch2", "ch3",
-+					  "ch4", "ch5", "ch6", "ch7",
-+					  "ch8", "ch9", "ch10", "ch11",
-+					  "ch12", "ch13", "ch14", "ch15",
-+					  "ch16", "ch17", "ch18", "ch19",
-+					  "ch20", "ch21", "ch22", "ch23",
-+					  "ch24";
-+			clocks = <&cpg CPG_MOD 812>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 812>;
-+			phy-mode = "rgmii";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
++		pfc: pin-controller at e6060000 {
++			compatible = "renesas,pfc-r8a774a1";
++			reg = <0 0xe6060000 0 0x50c>;
 +		};
 +
- 		scif0: serial at e6e60000 {
- 			compatible = "renesas,scif-r8a774a1",
- 				     "renesas,rcar-gen3-scif", "renesas,scif";
+ 		cpg: clock-controller at e6150000 {
+ 			compatible = "renesas,r8a774a1-cpg-mssr";
+ 			reg = <0 0xe6150000 0 0x0bb0>;
 -- 
 2.11.0
