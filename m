@@ -1,98 +1,51 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 14 Sep 2018 09:38:38 +0100
-Subject: [RESEND PATCH v4 5/6] arm64/mm: Populate the swapper_pg_dir by
- fixmap.
-In-Reply-To: <20180913105021.GA25870@toy>
-References: <20180822095432.12125-1-yaojun8558363@gmail.com>
- <20180822095432.12125-6-yaojun8558363@gmail.com>
- <2bf9b9d1-271c-f85e-5a98-0eb74f2fedd9@arm.com> <20180913105021.GA25870@toy>
-Message-ID: <c5831e37-d199-b533-c57c-b801d0de61f9@arm.com>
+From: vabhav.sharma@nxp.com (Vabhav Sharma)
+Date: Fri, 14 Sep 2018 02:07:50 +0530
+Subject: [PATCH v2 0/5] arm64: dts: NXP: add basic dts file for LX2160A SoC
+Message-ID: <1536871075-3732-1-git-send-email-vabhav.sharma@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jun,
+Changes for v2:
+- Modified cmux_to_group array to include -1 terminator
+- Revert NUM_CMUX to original value 8 from 16
+- Remove ?As LX2160A is 16 core, so modified value for NUM_CMUX?
+  in patch "[PATCH 3/5] drivers: clk-qoriq: Add clockgen support for
+  lx2160a" description
+- Populated cache properties for L1 and L2 cache in lx2160a device-tree.
+- Removed reboot node from lx2160a device-tree as PSCI is implemented.
+- Removed incorrect comment for timer node interrupt property in
+  lx2160a device-tree.
+- Modified pmu node compatible property from "arm,armv8-pmuv3" to
+  "arm,cortex-a72-pmu" in lx2160a device-tree
+- Non-standard aliases removed in lx2160a rdb board device-tree
+- Updated i2c child nodes to generic name in lx2160a rdb device-tree.
 
-On 13/09/18 11:50, Jun Yao wrote:
-> On Fri, Sep 07, 2018 at 10:58:22AM +0100, James Morse wrote:
->> On 22/08/18 10:54, Jun Yao wrote:
->>>  	WRITE_ONCE(*pmdp, pmd);
->>>  	dsb(ishst);
->>>  }
->>> @@ -480,6 +511,19 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
->>>  
->>>  static inline void set_pud(pud_t *pudp, pud_t pud)
->>>  {
->>> +#ifdef __PAGETABLE_PUD_FOLDED
->>> +	if (in_swapper_pgdir(pudp)) {
->>> +		pud_t *fixmap_pudp;
->>> +
->>> +		spin_lock(&swapper_pgdir_lock);
->>> +		fixmap_pudp = (pud_t *)pgd_set_fixmap(__pa(pudp));
->>
->> I see this called 68 times during boot on a 64K/42bit-VA, 65 of which appear to
->> be during paging_init(). What do you think to keeping paging_init()s use of the
->> pgd fixmap for swapper_pg_dir, deliberately to skip the in_swapper_pgdir() test
->> during paging_init()?
-> 
-> I find that the __create_pgd_mapping() is used to set up the page table
-> during paging_init(). And there are six functions calling it with
-> different pgdps:
-> 
-> update_mapping_prot()		init_mm.pgd(swapper_pg_dir)
-> create_mapping_noalloc()	init_mm.pgd(swapper_pg_dir)
-> __map_memblock()		pgdp(swapper_pg_dir)
-> map_kernel_segment()		pgdp(swapper_pg_dir)
-> create_pgd_mapping()		!(init_mm.pgd)
-> map_entry_trampoline()		tramp_pg_dir
-> 
-> In order to skip the in_swapper_pgdir() test during paging_init(), We
-> need a way to determine if we are currently in paging_init().
+Changes for v1:
+- Add compatible string for LX2160A clockgen support
+- Add compatible string to initialize LX2160A guts driver
+- Add compatible string for LX2160A support in dt-bindings
+- Add dts file to enable support for LX2160A SoC and LX2160A RDB
+  (Reference design board)
 
-We don't need to know paging_init() is the caller, we just want to fool
-in_swapper_pgdir() into not matching the address. Using pgd_set_fixmap() in
-paging_init(), as we do today would do this, as the value passed to
-map_kernel()/map_mem() would never match swapper_pg_dir().
+Vabhav Sharma (4):
+  dt-bindings: arm64: add compatible for LX2160A
+  soc/fsl/guts: Add compatible string for LX2160A
+  arm64: dts: add QorIQ LX2160A SoC support
+  arm64: dts: add LX2160ARDB board support
 
-(this is just to stop unnecessary tlbi for every write to swapper_pg_dir, as we
-don't need to do that during early boot when it isn't loaded)
+Yogesh Gaur (1):
+  drivers: clk-qoriq: Add clockgen support for lx2160a
 
+ Documentation/devicetree/bindings/arm/fsl.txt     |  12 +
+ arch/arm64/boot/dts/freescale/Makefile            |   1 +
+ arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts |  88 +++
+ arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi    | 693 ++++++++++++++++++++++
+ drivers/clk/clk-qoriq.c                           |  14 +-
+ drivers/cpufreq/qoriq-cpufreq.c                   |   1 +
+ drivers/soc/fsl/guts.c                            |   1 +
+ 7 files changed, 809 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
 
-> The way I
-> can think of is to create a function similar to __create_pgd_mapping().
-> And it is used to create the page table during paging_init(). It differs
-> from the __create_pgd_mapping() only in that it calls
-> p?d_populate_without_test(). However, in this way, I'm worried that I am
-> reinventing the wheel.
-
-I agree duplicating the code doesn't sound good.
-
-Something like this? (barely tested):
-----------------%<----------------
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 691a05bbf87b..64ba422482cc 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -644,8 +690,12 @@ void __init set_init_mm_pgd(pgd_t *pgd)
-  */
- void __init paging_init(void)
- {
--       map_kernel(swapper_pg_dir);
--       map_mem(swapper_pg_dir);
-+       pgd_t *pgdp = pgd_set_fixmap(__pa_symbol(swapper_pg_dir));
-+
-+       map_kernel(pgdp);
-+       map_mem(pgdp);
-+       pgd_clear_fixmap();
-+
-        cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
-        set_init_mm_pgd(swapper_pg_dir);
- }
-----------------%<----------------
-
-
-This reduced the pgd-fixmap setup/teardown calls during boot from 68 to 2...
-
-
-Thanks,
-
-James
+-- 
+2.7.4
