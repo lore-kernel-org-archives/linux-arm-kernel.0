@@ -1,125 +1,76 @@
 From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Thu, 13 Sep 2018 13:20:30 +0200
-Subject: [PATCH v3 3/5] drm/dp: make dp_link_status and
- dp_get_lane_status usable from outside of the core
-In-Reply-To: <1535451894-2518-4-git-send-email-dkos@cadence.com>
+Date: Thu, 13 Sep 2018 13:23:53 +0200
+Subject: [PATCH v3 4/5] dt-bindings: drm/bridge Document Cadence MHDP
+ DPI/DP bridge bindings
+In-Reply-To: <1535451894-2518-5-git-send-email-dkos@cadence.com>
 References: <1535451894-2518-1-git-send-email-dkos@cadence.com>
- <CGME20180828102610epcas4p37c400fbe4836e18dfd1862c3d12e8998@epcas4p3.samsung.com>
- <1535451894-2518-4-git-send-email-dkos@cadence.com>
-Message-ID: <20180913112032eucas1p1f2b270b3bdcc8a434130bf52d18d45fe~T8a8z3f662504225042eucas1p1P@eucas1p1.samsung.com>
+ <CGME20180828102614epcas1p2a0c803cdbee886d731135bd596549a0b@epcas1p2.samsung.com>
+ <1535451894-2518-5-git-send-email-dkos@cadence.com>
+Message-ID: <20180913112356eucas1p2039ad3b69dc569313998d4de4cc00ff9~T8d6UiuPU0109501095eucas1p2n@eucas1p2.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 28.08.2018 12:24, Damian Kos wrote:
 > From: Quentin Schulz <quentin.schulz@bootlin.com>
 >
-> dp_link_status and dp_get_lane_status are pretty generic and can be used for
-> other means, so let's make it "public".
->
-> This adds drm_dp_link_status and drm_dp_get_lane_status to the header file and
-> add the appropriate EXPORT_SYMBOL for it so that it can be used by other
-> drivers, be they compiled built-in or as modules.
-
-If you want to export them please document functions and their arguments.
-Moreover, these functions are so tiny, so they can be defined as inline.
-
-
->
 > Signed-off-by: Damian Kos <dkos@cadence.com>
-No author sign-off.
 
+No commit message, no author's signoff.
+--
 Regards
 Andrzej
 
-
 > ---
->  drivers/gpu/drm/drm_dp_helper.c | 20 +++++++++++---------
->  include/drm/drm_dp_helper.h     |  3 +++
->  2 files changed, 14 insertions(+), 9 deletions(-)
+>  .../bindings/display/bridge/cdns,mhdp.txt     | 43 +++++++++++++++++++
+>  1 file changed, 43 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt
 >
-> diff --git a/drivers/gpu/drm/drm_dp_helper.c b/drivers/gpu/drm/drm_dp_helper.c
-> index 4b5bf6ee7fa7..ee9ec2ccf878 100644
-> --- a/drivers/gpu/drm/drm_dp_helper.c
-> +++ b/drivers/gpu/drm/drm_dp_helper.c
-> @@ -43,19 +43,21 @@
->   */
->  
->  /* Helpers for DP link training */
-> -static u8 dp_link_status(const u8 link_status[DP_LINK_STATUS_SIZE], int r)
-> +u8 drm_dp_link_status(const u8 link_status[DP_LINK_STATUS_SIZE], int r)
->  {
->  	return link_status[r - DP_LANE0_1_STATUS];
->  }
-> +EXPORT_SYMBOL(drm_dp_link_status);
->  
-> -static u8 dp_get_lane_status(const u8 link_status[DP_LINK_STATUS_SIZE],
-> +u8 drm_dp_get_lane_status(const u8 link_status[DP_LINK_STATUS_SIZE],
->  			     int lane)
->  {
->  	int i = DP_LANE0_1_STATUS + (lane >> 1);
->  	int s = (lane & 1) * 4;
-> -	u8 l = dp_link_status(link_status, i);
-> +	u8 l = drm_dp_link_status(link_status, i);
->  	return (l >> s) & 0xf;
->  }
-> +EXPORT_SYMBOL(drm_dp_get_lane_status);
->  
->  bool drm_dp_channel_eq_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
->  			  int lane_count)
-> @@ -64,12 +66,12 @@ bool drm_dp_channel_eq_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
->  	u8 lane_status;
->  	int lane;
->  
-> -	lane_align = dp_link_status(link_status,
-> -				    DP_LANE_ALIGN_STATUS_UPDATED);
-> +	lane_align = drm_dp_link_status(link_status,
-> +					DP_LANE_ALIGN_STATUS_UPDATED);
->  	if ((lane_align & DP_INTERLANE_ALIGN_DONE) == 0)
->  		return false;
->  	for (lane = 0; lane < lane_count; lane++) {
-> -		lane_status = dp_get_lane_status(link_status, lane);
-> +		lane_status = drm_dp_get_lane_status(link_status, lane);
->  		if ((lane_status & DP_CHANNEL_EQ_BITS) != DP_CHANNEL_EQ_BITS)
->  			return false;
->  	}
-> @@ -84,7 +86,7 @@ bool drm_dp_clock_recovery_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
->  	u8 lane_status;
->  
->  	for (lane = 0; lane < lane_count; lane++) {
-> -		lane_status = dp_get_lane_status(link_status, lane);
-> +		lane_status = drm_dp_get_lane_status(link_status, lane);
->  		if ((lane_status & DP_LANE_CR_DONE) == 0)
->  			return false;
->  	}
-> @@ -99,7 +101,7 @@ u8 drm_dp_get_adjust_request_voltage(const u8 link_status[DP_LINK_STATUS_SIZE],
->  	int s = ((lane & 1) ?
->  		 DP_ADJUST_VOLTAGE_SWING_LANE1_SHIFT :
->  		 DP_ADJUST_VOLTAGE_SWING_LANE0_SHIFT);
-> -	u8 l = dp_link_status(link_status, i);
-> +	u8 l = drm_dp_link_status(link_status, i);
->  
->  	return ((l >> s) & 0x3) << DP_TRAIN_VOLTAGE_SWING_SHIFT;
->  }
-> @@ -112,7 +114,7 @@ u8 drm_dp_get_adjust_request_pre_emphasis(const u8 link_status[DP_LINK_STATUS_SI
->  	int s = ((lane & 1) ?
->  		 DP_ADJUST_PRE_EMPHASIS_LANE1_SHIFT :
->  		 DP_ADJUST_PRE_EMPHASIS_LANE0_SHIFT);
-> -	u8 l = dp_link_status(link_status, i);
-> +	u8 l = drm_dp_link_status(link_status, i);
->  
->  	return ((l >> s) & 0x3) << DP_TRAIN_PRE_EMPHASIS_SHIFT;
->  }
-> diff --git a/include/drm/drm_dp_helper.h b/include/drm/drm_dp_helper.h
-> index 06a478679781..9930b2b269f2 100644
-> --- a/include/drm/drm_dp_helper.h
-> +++ b/include/drm/drm_dp_helper.h
-> @@ -952,6 +952,9 @@
->  #define DP_MST_LOGICAL_PORT_0 8
->  
->  #define DP_LINK_STATUS_SIZE	   6
+> diff --git a/Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt b/Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt
+> new file mode 100644
+> index 000000000000..f8334c520b98
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/bridge/cdns,mhdp.txt
+> @@ -0,0 +1,43 @@
+> +Cadence MHDP bridge
+> +==========================
 > +
-> +u8 drm_dp_link_status(const u8 link_status[DP_LINK_STATUS_SIZE], int r);
-> +u8 drm_dp_get_lane_status(const u8 link_status[DP_LINK_STATUS_SIZE], int lane);
->  bool drm_dp_channel_eq_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
->  			  int lane_count);
->  bool drm_dp_clock_recovery_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
+> +The Cadence MHDP bridge is a DPI to DP bridge.
+> +
+> +Required properties:
+> +- compatible: should be "cdns,mhdp8546",
+> +- reg: physical base address and length of the controller's registers,
+> +- clocks: DP bridge clock, it's used by the IP to know how to translate
+> +	a number of clock cycles into a time (which is used to comply
+> +	with DP standard timings and delays),
+> +
+> +Required subnodes:
+> +- ports: Ports as described in Documentation/devictree/bindings/graph.txt
+> +	Port 0 - input port representing the DP bridge input
+> +	Port 1 - output port representing the DP bridge output
+> +
+> +Example:
+> +
+> +	mhdp: dp-bridge at f0fb000000 {
+> +		compatible = "cdns,mhdp8546";
+> +		reg = <0xf0 0xfb000000 0x0 0x1000000>;
+> +		clocks = <&mhdp_clock>;
+> +
+> +		ports {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			port at 0 {
+> +				reg = <0>;
+> +				dp_bridge_input: endpoint {
+> +					remote-endpoint = <&xxx_dpi_output>;
+> +				};
+> +			};
+> +
+> +			port at 1 {
+> +				reg = <1>;
+> +				dp_bridge_output: endpoint {
+> +					remote-endpoint = <&xxx_dp_connector_input>;
+> +				};
+> +			};
+> +		};
+> +	};
