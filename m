@@ -1,78 +1,95 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 13 Sep 2018 13:12:32 -0500
-Subject: [PATCH] ARM: dts: sunxi: Fix I2C bus warnings
-Message-ID: <20180913181245.25484-8-robh@kernel.org>
+Date: Thu, 13 Sep 2018 13:12:31 -0500
+Subject: [PATCH] ARM: dts: marvell: Fix SPI and I2C bus warnings
+Message-ID: <20180913181245.25484-7-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dtc has new checks for I2C buses. Fix the warnings in unit-addresses.
+dtc has new checks for I2C and SPI buses. Fix the warnings in node names
+and unit-addresses.
 
-arch/arm/boot/dts/sun8i-a23-gt90h-v4.dtb: Warning (i2c_bus_reg): /soc at 1c00000/i2c at 1c2ac00/touchscreen at 0: I2C bus unit address format error, expected "40"
-arch/arm/boot/dts/sun8i-a23-inet86dz.dtb: Warning (i2c_bus_reg): /soc at 1c00000/i2c at 1c2ac00/touchscreen at 0: I2C bus unit address format error, expected "40"
-arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dtb: Warning (i2c_bus_reg): /soc at 1c00000/i2c at 1c2ac00/touchscreen at 0: I2C bus unit address format error, expected "40"
-arch/arm/boot/dts/sun8i-a23-polaroid-mid2809pxe04.dtb: Warning (i2c_bus_reg): /soc at 1c00000/i2c at 1c2ac00/touchscreen at 0: I2C bus unit address format error, expected "40"
-arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dtb: Warning (i2c_bus_reg): /soc at 1c00000/i2c at 1c2ac00/touchscreen at 0: I2C bus unit address format error, expected "40"
-arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dtb: Warning (i2c_bus_reg): /soc at 1c00000/i2c at 1c2ac00/touchscreen at 0: missing or empty reg property
-arch/arm/boot/dts/sun8i-a33-ippo-q8h-v1.2.dtb: Warning (i2c_bus_reg): /soc at 1c00000/i2c at 1c2ac00/touchscreen at 0: missing or empty reg property
-arch/arm/boot/dts/sun8i-a33-q8-tablet.dtb: Warning (i2c_bus_reg): /soc at 1c00000/i2c at 1c2ac00/touchscreen at 0: missing or empty reg property
-arch/arm/boot/dts/sun5i-a13-utoo-p66.dtb: Warning (i2c_bus_reg): /soc at 1c00000/i2c at 1c2b000/touchscreen: I2C bus unit address format error, expected "40"
-arch/arm/boot/dts/sun5i-a13-difrnce-dit4350.dtb: Warning (i2c_bus_reg): /soc at 1c00000/i2c at 1c2b000/touchscreen: missing or empty reg property
-arch/arm/boot/dts/sun5i-a13-empire-electronix-m712.dtb: Warning (i2c_bus_reg): /soc at 1c00000/i2c at 1c2b000/touchscreen: missing or empty reg property
-arch/arm/boot/dts/sun5i-a13-inet-98v-rev2.dtb: Warning (i2c_bus_reg): /soc at 1c00000/i2c at 1c2b000/touchscreen: missing or empty reg property
-arch/arm/boot/dts/sun5i-a13-q8-tablet.dtb: Warning (i2c_bus_reg): /soc at 1c00000/i2c at 1c2b000/touchscreen: missing or empty reg property
+arch/arm/boot/dts/dove-cubox.dtb: Warning (i2c_bus_reg): /i2c-mux/i2c at 0/clock-generator: I2C bus unit address format error, expected "60"
+arch/arm/boot/dts/dove-cubox-es.dtb: Warning (i2c_bus_reg): /i2c-mux/i2c at 0/clock-generator: I2C bus unit address format error, expected "60"
+arch/arm/boot/dts/dove-cubox.dtb: Warning (spi_bus_bridge): /mbus/internal-regs/spi-ctrl at 10600: node name for SPI buses should be 'spi'
+arch/arm/boot/dts/dove-cubox-es.dtb: Warning (spi_bus_bridge): /mbus/internal-regs/spi-ctrl at 10600: node name for SPI buses should be 'spi'
+arch/arm/boot/dts/dove-dove-db.dtb: Warning (spi_bus_bridge): /mbus/internal-regs/spi-ctrl at 10600: node name for SPI buses should be 'spi'
+arch/arm/boot/dts/dove-sbc-a510.dtb: Warning (spi_bus_bridge): /mbus/internal-regs/spi-ctrl at 10600: node name for SPI buses should be 'spi'
+arch/arm/boot/dts/dove-sbc-a510.dtb: Warning (spi_bus_bridge): /mbus/internal-regs/spi-ctrl at 14600: node name for SPI buses should be 'spi'
+arch/arm/boot/dts/orion5x-kuroboxpro.dtb: Warning (i2c_bus_reg): /soc/internal-regs/i2c at 11000/rtc: I2C bus unit address format error, expected "32"
+arch/arm/boot/dts/orion5x-linkstation-lschl.dtb: Warning (i2c_bus_reg): /soc/internal-regs/i2c at 11000/rtc: I2C bus unit address format error, expected "32"
+arch/arm/boot/dts/orion5x-linkstation-lsgl.dtb: Warning (i2c_bus_reg): /soc/internal-regs/i2c at 11000/rtc: I2C bus unit address format error, expected "32"
+arch/arm/boot/dts/orion5x-linkstation-lswtgl.dtb: Warning (i2c_bus_reg): /soc/internal-regs/i2c at 11000/rtc: I2C bus unit address format error, expected "32"
 
-Cc: Maxime Ripard <maxime.ripard@bootlin.com>
-Cc: Chen-Yu Tsai <wens@csie.org>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Gregory Clement <gregory.clement@bootlin.com>
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
 Please apply to the sub-arch tree. The dtc changes haven't landed, but 
 will for 4.20.
 
- arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi | 3 ++-
- arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi | 3 ++-
- arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts    | 2 +-
- 3 files changed, 5 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/dove-cubox.dts           | 2 +-
+ arch/arm/boot/dts/dove.dtsi                | 6 +++---
+ arch/arm/boot/dts/orion5x-linkstation.dtsi | 2 +-
+ 3 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi b/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
-index 8acbaab14fe5..d2a2eb8b3f26 100644
---- a/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
-+++ b/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
-@@ -92,7 +92,8 @@
- 	 */
- 	clock-frequency = <400000>;
+diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
+index 580e3cbcfbf7..3e1584e787ae 100644
+--- a/arch/arm/boot/dts/dove-cubox.dts
++++ b/arch/arm/boot/dts/dove-cubox.dts
+@@ -87,7 +87,7 @@
+ 	status = "okay";
+ 	clock-frequency = <100000>;
  
--	touchscreen: touchscreen {
-+	touchscreen: touchscreen at 40 {
-+		reg = <0x40>;
- 		interrupt-parent = <&pio>;
- 		interrupts = <6 11 IRQ_TYPE_EDGE_FALLING>; /* EINT11 (PG11) */
- 		pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi b/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
-index 880096c7e252..5e8a95af89b8 100644
---- a/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
-+++ b/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
-@@ -69,7 +69,8 @@
- 	 */
- 	clock-frequency = <400000>;
+-	si5351: clock-generator {
++	si5351: clock-generator at 60 {
+ 		compatible = "silabs,si5351a-msop";
+ 		reg = <0x60>;
+ 		#address-cells = <1>;
+diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+index 4a0a5115b298..250ad0535e8c 100644
+--- a/arch/arm/boot/dts/dove.dtsi
++++ b/arch/arm/boot/dts/dove.dtsi
+@@ -155,7 +155,7 @@
+ 				  0xffffe000 MBUS_ID(0x03, 0x01) 0 0x0000800   /* CESA SRAM  2k */
+ 				  0xfffff000 MBUS_ID(0x0d, 0x00) 0 0x0000800>; /* PMU  SRAM  2k */
  
--	touchscreen: touchscreen at 0 {
-+	touchscreen: touchscreen at 40 {
-+		reg = <0x40>;
- 		interrupt-parent = <&pio>;
- 		interrupts = <1 5 IRQ_TYPE_EDGE_FALLING>; /* PB5 */
- 		pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts b/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
-index 35859d8f3267..bf97f6244c23 100644
---- a/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
-+++ b/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
-@@ -95,7 +95,7 @@
- &i2c0 {
+-			spi0: spi-ctrl at 10600 {
++			spi0: spi at 10600 {
+ 				compatible = "marvell,orion-spi";
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+@@ -168,7 +168,7 @@
+ 				status = "disabled";
+ 			};
+ 
+-			i2c: i2c-ctrl at 11000 {
++			i2c: i2c at 11000 {
+ 				compatible = "marvell,mv64xxx-i2c";
+ 				reg = <0x11000 0x20>;
+ 				#address-cells = <1>;
+@@ -218,7 +218,7 @@
+ 				status = "disabled";
+ 			};
+ 
+-			spi1: spi-ctrl at 14600 {
++			spi1: spi at 14600 {
+ 				compatible = "marvell,orion-spi";
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+diff --git a/arch/arm/boot/dts/orion5x-linkstation.dtsi b/arch/arm/boot/dts/orion5x-linkstation.dtsi
+index ebd93df5d07a..b6c9b85951ea 100644
+--- a/arch/arm/boot/dts/orion5x-linkstation.dtsi
++++ b/arch/arm/boot/dts/orion5x-linkstation.dtsi
+@@ -156,7 +156,7 @@
+ &i2c {
  	status = "okay";
  
--	axp22x: pmic at 68 {
-+	axp22x: pmic at 34 {
- 		compatible = "x-powers,axp221";
- 		reg = <0x34>;
- 		interrupt-parent = <&nmi_intc>;
+-	rtc {
++	rtc at 32 {
+ 		compatible = "ricoh,rs5c372a";
+ 		reg = <0x32>;
+ 	};
 -- 
 2.17.1
