@@ -1,57 +1,93 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 13 Sep 2018 13:12:30 -0500
-Subject: [PATCH] ARM: dts: brcm: Fix SPI bus warnings
-Message-ID: <20180913181245.25484-6-robh@kernel.org>
+From: scott.branden@broadcom.com (Scott Branden)
+Date: Thu, 13 Sep 2018 11:26:04 -0700
+Subject: [PATCH] arm64: dts: broadcom: Fix I2C and SPI bus warnings
+In-Reply-To: <20180913181245.25484-18-robh@kernel.org>
+References: <20180913181245.25484-18-robh@kernel.org>
+Message-ID: <21defa20-50d7-a016-0771-256b8bdd05a4@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dtc has new checks for SPI buses. Fix the warnings in node names.
+Thanks.
 
-arch/arm/boot/dts/bcm53340-ubnt-unifi-switch8.dtb: Warning (spi_bus_bridge): /axi at 18000000/qspi at 27200: node name for SPI buses should be 'spi'
-arch/arm/boot/dts/bcm958525er.dtb: Warning (spi_bus_bridge): /axi/qspi at 27200: node name for SPI buses should be 'spi'
-arch/arm/boot/dts/bcm958525xmc.dtb: Warning (spi_bus_bridge): /axi/qspi at 27200: node name for SPI buses should be 'spi'
-arch/arm/boot/dts/bcm958622hr.dtb: Warning (spi_bus_bridge): /axi/qspi at 27200: node name for SPI buses should be 'spi'
-arch/arm/boot/dts/bcm958625hr.dtb: Warning (spi_bus_bridge): /axi/qspi at 27200: node name for SPI buses should be 'spi'
-arch/arm/boot/dts/bcm988312hr.dtb: Warning (spi_bus_bridge): /axi/qspi at 27200: node name for SPI buses should be 'spi'
 
-Cc: Ray Jui <rjui@broadcom.com>
-Cc: Scott Branden <sbranden@broadcom.com>
-Cc: Jon Mason <jonmason@broadcom.com>
-Cc: bcm-kernel-feedback-list at broadcom.com
-Signed-off-by: Rob Herring <robh@kernel.org>
----
-Please apply to the sub-arch tree. The dtc changes haven't landed, but 
-will for 4.20.
-
- arch/arm/boot/dts/bcm-hr2.dtsi | 2 +-
- arch/arm/boot/dts/bcm-nsp.dtsi | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/bcm-hr2.dtsi b/arch/arm/boot/dts/bcm-hr2.dtsi
-index 3084a7c95733..e4d49731287f 100644
---- a/arch/arm/boot/dts/bcm-hr2.dtsi
-+++ b/arch/arm/boot/dts/bcm-hr2.dtsi
-@@ -216,7 +216,7 @@
- 			reg = <0x33000 0x14>;
- 		};
- 
--		qspi: qspi at 27200 {
-+		qspi: spi at 27200 {
- 			compatible = "brcm,spi-bcm-qspi", "brcm,spi-nsp-qspi";
- 			reg = <0x027200 0x184>,
- 			      <0x027000 0x124>,
-diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-index 09ba85046322..2b219addeb44 100644
---- a/arch/arm/boot/dts/bcm-nsp.dtsi
-+++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-@@ -273,7 +273,7 @@
- 			brcm,nand-has-wp;
- 		};
- 
--		qspi: qspi at 27200 {
-+		qspi: spi at 27200 {
- 			compatible = "brcm,spi-bcm-qspi", "brcm,spi-nsp-qspi";
- 			reg = <0x027200 0x184>,
- 			      <0x027000 0x124>,
--- 
-2.17.1
+On 18-09-13 11:12 AM, Rob Herring wrote:
+> dtc has new checks for I2C and SPI buses. Fix the warnings in node names
+> and unit-addresses.
+>
+> arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dtb: Warning (i2c_bus_reg): /hsls/i2c at e0000/pcf8574 at 20: I2C bus unit address format error, expected "27"
+> arch/arm64/boot/dts/broadcom/stingray/bcm958742t.dtb: Warning (i2c_bus_reg): /hsls/i2c at e0000/pcf8574 at 20: I2C bus unit address format error, expected "27"
+> arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dtb: Warning (spi_bus_bridge): /hsls/ssp at 180000: node name for SPI buses should be 'spi'
+> arch/arm64/boot/dts/broadcom/stingray/bcm958742k.dtb: Warning (spi_bus_bridge): /hsls/ssp at 190000: node name for SPI buses should be 'spi'
+>
+> Cc: Ray Jui <rjui@broadcom.com>
+> Cc: Scott Branden <sbranden@broadcom.com>
+> Cc: Jon Mason <jonmason@broadcom.com>
+> Cc: bcm-kernel-feedback-list at broadcom.com
+> Signed-off-by: Rob Herring <robh@kernel.org>
+Acked-by: Scott Branden <sbranden@broadcom.com>
+> ---
+> Please apply to the sub-arch tree. The dtc changes haven't landed, but
+> will for 4.20.
+>
+>   arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi          | 4 ++--
+>   arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi | 2 +-
+>   arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi       | 4 ++--
+>   3 files changed, 5 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi b/arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi
+> index 1a406a76c86a..ea854f689fda 100644
+> --- a/arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi
+> +++ b/arch/arm64/boot/dts/broadcom/northstar2/ns2.dtsi
+> @@ -639,7 +639,7 @@
+>   			status = "disabled";
+>   		};
+>   
+> -		ssp0: ssp at 66180000 {
+> +		ssp0: spi at 66180000 {
+>   			compatible = "arm,pl022", "arm,primecell";
+>   			reg = <0x66180000 0x1000>;
+>   			interrupts = <GIC_SPI 404 IRQ_TYPE_LEVEL_HIGH>;
+> @@ -650,7 +650,7 @@
+>   			status = "disabled";
+>   		};
+>   
+> -		ssp1: ssp at 66190000 {
+> +		ssp1: spi at 66190000 {
+>   			compatible = "arm,pl022", "arm,primecell";
+>   			reg = <0x66190000 0x1000>;
+>   			interrupts = <GIC_SPI 405 IRQ_TYPE_LEVEL_HIGH>;
+> diff --git a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
+> index bc299c3d9068..a9b92e52d50e 100644
+> --- a/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
+> +++ b/arch/arm64/boot/dts/broadcom/stingray/bcm958742-base.dtsi
+> @@ -138,7 +138,7 @@
+>   &i2c1 {
+>   	status = "okay";
+>   
+> -	pcf8574: pcf8574 at 20 {
+> +	pcf8574: pcf8574 at 27 {
+>   		compatible = "nxp,pcf8574a";
+>   		gpio-controller;
+>   		#gpio-cells = <2>;
+> diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
+> index e283480bfc7e..cfeaa855bd05 100644
+> --- a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
+> +++ b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
+> @@ -521,7 +521,7 @@
+>   			status = "disabled";
+>   		};
+>   
+> -		ssp0: ssp at 180000 {
+> +		ssp0: spi at 180000 {
+>   			compatible = "arm,pl022", "arm,primecell";
+>   			reg = <0x00180000 0x1000>;
+>   			interrupts = <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
+> @@ -533,7 +533,7 @@
+>   			status = "disabled";
+>   		};
+>   
+> -		ssp1: ssp at 190000 {
+> +		ssp1: spi at 190000 {
+>   			compatible = "arm,pl022", "arm,primecell";
+>   			reg = <0x00190000 0x1000>;
+>   			interrupts = <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>;
