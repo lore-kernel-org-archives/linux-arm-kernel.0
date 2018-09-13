@@ -1,128 +1,50 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 13 Sep 2018 17:42:23 +0100
-Subject: [PATCH v6 6/7] iommu/arm-smmu: Support non-strict mode
+Date: Thu, 13 Sep 2018 17:42:21 +0100
+Subject: [PATCH v6 4/7] iommu/io-pgtable: Add helper for toggling non-strict
+ mode
 In-Reply-To: <cover.1536856828.git.robin.murphy@arm.com>
 References: <cover.1536856828.git.robin.murphy@arm.com>
-Message-ID: <95986001c4e7e9a9ffec3d8d1555f8f3c92ed14f.1536856828.git.robin.murphy@arm.com>
+Message-ID: <63a2a074219ff045c4616b9f5680d0dd9e922b59.1536856828.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All we need is to wire up .flush_iotlb_all properly and implement the
-domain attribute, and iommu-dma and io-pgtable-arm will do the rest for
-us. Rather than bother implementing it for v7s format for the highly
-unlikely chance of that being relevant, we can simply hide the
-non-strict flag from io-pgtable for that combination just so anyone who
-does actually try it will simply get over-invalidation instead of
-failure to initialise domains.
+Since this might become a repeated idiom in drivers, let's add a tidy
+encapsulation from the outset.
 
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/iommu/arm-smmu.c | 43 +++++++++++++++++++++++++++++++++-------
- 1 file changed, 36 insertions(+), 7 deletions(-)
+ drivers/iommu/io-pgtable.c | 9 +++++++++
+ drivers/iommu/io-pgtable.h | 1 +
+ 2 files changed, 10 insertions(+)
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index fd1b80ef9490..c727080e7acd 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -246,6 +246,7 @@ struct arm_smmu_domain {
- 	const struct iommu_gather_ops	*tlb_ops;
- 	struct arm_smmu_cfg		cfg;
- 	enum arm_smmu_domain_stage	stage;
-+	bool				non_strict;
- 	struct mutex			init_mutex; /* Protects smmu pointer */
- 	spinlock_t			cb_lock; /* Serialises ATS1* ops and TLB syncs */
- 	struct iommu_domain		domain;
-@@ -863,6 +864,9 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
- 	if (smmu->features & ARM_SMMU_FEAT_COHERENT_WALK)
- 		pgtbl_cfg.quirks = IO_PGTABLE_QUIRK_NO_DMA;
- 
-+	if (smmu_domain->non_strict && cfg->fmt != ARM_SMMU_CTX_FMT_AARCH32_S)
-+		pgtbl_cfg.quirks |= IO_PGTABLE_QUIRK_NON_STRICT;
-+
- 	smmu_domain->smmu = smmu;
- 	pgtbl_ops = alloc_io_pgtable_ops(fmt, &pgtbl_cfg, smmu_domain);
- 	if (!pgtbl_ops) {
-@@ -1252,6 +1256,14 @@ static size_t arm_smmu_unmap(struct iommu_domain *domain, unsigned long iova,
- 	return ops->unmap(ops, iova, size);
+diff --git a/drivers/iommu/io-pgtable.c b/drivers/iommu/io-pgtable.c
+index 127558d83667..af9abe52cf06 100644
+--- a/drivers/iommu/io-pgtable.c
++++ b/drivers/iommu/io-pgtable.c
+@@ -77,3 +77,12 @@ void free_io_pgtable_ops(struct io_pgtable_ops *ops)
+ 	io_pgtable_tlb_flush_all(iop);
+ 	io_pgtable_init_table[iop->fmt]->free(iop);
  }
- 
-+static void arm_smmu_flush_iotlb_all(struct iommu_domain *domain)
-+{
-+	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
 +
-+	if (smmu_domain->tlb_ops)
-+		smmu_domain->tlb_ops->tlb_flush_all(smmu_domain);
++void io_pgtable_set_non_strict(struct io_pgtable_ops *ops, bool val) {
++	struct io_pgtable *iop = io_pgtable_ops_to_pgtable(ops);
++
++	if (val)
++		iop->cfg.quirks |= IO_PGTABLE_QUIRK_NON_STRICT;
++	else
++		iop->cfg.quirks &= ~IO_PGTABLE_QUIRK_NON_STRICT;
 +}
-+
- static void arm_smmu_iotlb_sync(struct iommu_domain *domain)
- {
- 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
-@@ -1470,13 +1482,17 @@ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
- {
- 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
+index 47d5ae559329..0602a132655c 100644
+--- a/drivers/iommu/io-pgtable.h
++++ b/drivers/iommu/io-pgtable.h
+@@ -153,6 +153,7 @@ struct io_pgtable_ops *alloc_io_pgtable_ops(enum io_pgtable_fmt fmt,
+  */
+ void free_io_pgtable_ops(struct io_pgtable_ops *ops);
  
--	if (domain->type != IOMMU_DOMAIN_UNMANAGED)
--		return -EINVAL;
--
- 	switch (attr) {
- 	case DOMAIN_ATTR_NESTING:
-+		if (domain->type != IOMMU_DOMAIN_UNMANAGED)
-+			return -EINVAL;
- 		*(int *)data = (smmu_domain->stage == ARM_SMMU_DOMAIN_NESTED);
- 		return 0;
-+	case DOMAIN_ATTR_DMA_USE_FLUSH_QUEUE:
-+		if (domain->type != IOMMU_DOMAIN_DMA)
-+			return -EINVAL;
-+		*(int *)data = smmu_domain->non_strict;
-+		return 0;
- 	default:
- 		return -ENODEV;
- 	}
-@@ -1488,13 +1504,15 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
- 	int ret = 0;
- 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
++void io_pgtable_set_non_strict(struct io_pgtable_ops *ops, bool val);
  
--	if (domain->type != IOMMU_DOMAIN_UNMANAGED)
--		return -EINVAL;
--
- 	mutex_lock(&smmu_domain->init_mutex);
- 
- 	switch (attr) {
- 	case DOMAIN_ATTR_NESTING:
-+		if (domain->type != IOMMU_DOMAIN_UNMANAGED) {
-+			ret = -EINVAL;
-+			goto out_unlock;
-+		}
-+
- 		if (smmu_domain->smmu) {
- 			ret = -EPERM;
- 			goto out_unlock;
-@@ -1506,6 +1524,17 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
- 			smmu_domain->stage = ARM_SMMU_DOMAIN_S1;
- 
- 		break;
-+	case DOMAIN_ATTR_DMA_USE_FLUSH_QUEUE:
-+		if (domain->type != IOMMU_DOMAIN_DMA) {
-+			ret = -EINVAL;
-+			goto out_unlock;
-+		}
-+
-+		smmu_domain->non_strict = *(int *)data;
-+		if (smmu_domain->pgtbl_ops)
-+			io_pgtable_set_non_strict(smmu_domain->pgtbl_ops,
-+						  smmu_domain->non_strict);
-+		break;
- 	default:
- 		ret = -ENODEV;
- 	}
-@@ -1562,7 +1591,7 @@ static struct iommu_ops arm_smmu_ops = {
- 	.attach_dev		= arm_smmu_attach_dev,
- 	.map			= arm_smmu_map,
- 	.unmap			= arm_smmu_unmap,
--	.flush_iotlb_all	= arm_smmu_iotlb_sync,
-+	.flush_iotlb_all	= arm_smmu_flush_iotlb_all,
- 	.iotlb_sync		= arm_smmu_iotlb_sync,
- 	.iova_to_phys		= arm_smmu_iova_to_phys,
- 	.add_device		= arm_smmu_add_device,
+ /*
+  * Internal structures for page table allocator implementations.
 -- 
 2.19.0.dirty
