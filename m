@@ -1,39 +1,78 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Sep 2018 11:09:07 +0200
-Subject: [PATCH 12/58] arm64: dts: renesas: salvator-common: adv748x: Override
- secondary addresses
+Date: Thu, 13 Sep 2018 11:09:05 +0200
+Subject: [PATCH 10/58] arm64: dts: renesas: salvator-xs: enable SATA
 In-Reply-To: <cover.1536828567.git.horms+renesas@verge.net.au>
 References: <cover.1536828567.git.horms+renesas@verge.net.au>
-Message-ID: <e3da41a6c28f9b61ea03df987f1c9ffffc8b8e60.1536828567.git.horms+renesas@verge.net.au>
+Message-ID: <3a0832d093693ede13f5bbc6a641775aa1f9dfbf.1536828567.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kieran Bingham <kieran.bingham@ideasonboard.com>
+From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-Ensure that the ADV748x device addresses do not conflict, and group them
-together (visually in i2cdetect)
+Add the nodes to enable SATA. Note that MD12 (SW12-7) must be switched
+off for that to work.
 
-Signed-off-by: Kieran Bingham <kieran.bingham@ideasonboard.com>
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/salvator-common.dtsi | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts  | 14 ++++++++++++++
+ arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts | 14 ++++++++++++++
+ 2 files changed, 28 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-index 7d3d866a0063..3b90f816dfef 100644
---- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-+++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-@@ -420,7 +420,10 @@
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts
+index 8c142affee49..ba3357636fdb 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dts
+@@ -151,6 +151,15 @@
+ 	};
+ };
  
- 	video-receiver at 70 {
- 		compatible = "adi,adv7482";
--		reg = <0x70>;
-+		reg = <0x70 0x71 0x72 0x73 0x74 0x75
-+		       0x60 0x61 0x62 0x63 0x64 0x65>;
-+		reg-names = "main", "dpll", "cp", "hdmi", "edid", "repeater",
-+			    "infoframe", "cbus", "cec", "sdp", "txa", "txb" ;
++&pca9654 {
++	pcie_sata_switch {
++		gpio-hog;
++		gpios = <7 GPIO_ACTIVE_HIGH>;
++		output-low; /* enable SATA by default */
++		line-name = "PCIE/SATA switch";
++	};
++};
++
+ &pfc {
+ 	usb2_pins: usb2 {
+ 		groups = "usb2";
+@@ -175,6 +184,11 @@
+ 	};
+ };
  
- 		#address-cells = <1>;
- 		#size-cells = <0>;
++/* MD12 (SW12-7) must be set 'Off' which is not the default! */
++&sata {
++	status = "okay";
++};
++
+ &usb2_phy2 {
+ 	pinctrl-0 = <&usb2_pins>;
+ 	pinctrl-names = "default";
+diff --git a/arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts b/arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts
+index 9de4e3db1621..45016a06fab1 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts
++++ b/arch/arm64/boot/dts/renesas/r8a77965-salvator-xs.dts
+@@ -47,3 +47,17 @@
+ &hdmi0_con {
+ 	remote-endpoint = <&rcar_dw_hdmi0_out>;
+ };
++
++&pca9654 {
++	pcie_sata_switch {
++		gpio-hog;
++		gpios = <7 GPIO_ACTIVE_HIGH>;
++		output-low; /* enable SATA by default */
++		line-name = "PCIE/SATA switch";
++	};
++};
++
++/* MD12 (SW12-7) must be set 'Off' which is not the default! */
++&sata {
++	status = "okay";
++};
 -- 
 2.11.0
