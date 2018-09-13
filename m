@@ -1,56 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Sep 2018 11:08:29 +0200
-Subject: [PATCH 06/13] ARM: dts: gose: Add DA9210 node for CPU DVFS
+Date: Thu, 13 Sep 2018 11:08:34 +0200
+Subject: [PATCH 11/13] ARM: dts: stout: Add DA9063 OnKey node
 In-Reply-To: <cover.1536824376.git.horms+renesas@verge.net.au>
 References: <cover.1536824376.git.horms+renesas@verge.net.au>
-Message-ID: <d17f45eb718172088e3460fc9fadc735b1df8a20.1536824376.git.horms+renesas@verge.net.au>
+Message-ID: <180814bb9cd217e7cefc76f817c6f316dcd1e195.1536824376.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marek Vasut <marek.vasut@gmail.com>
 
-Add DA9210 DVFS node to the I2C bus and link it to CPU0 for DVFS.
+Add DA9063 OnKey subnode to DA9063 PMIC node on Stout.
 
 Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7793-gose.dts | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/boot/dts/r8a7790-stout.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
-index 6b2f3a4fd13d..f51601af89a2 100644
---- a/arch/arm/boot/dts/r8a7793-gose.dts
-+++ b/arch/arm/boot/dts/r8a7793-gose.dts
-@@ -596,6 +596,10 @@
- 	status = "okay";
- };
+diff --git a/arch/arm/boot/dts/r8a7790-stout.dts b/arch/arm/boot/dts/r8a7790-stout.dts
+index a13a92c26645..629da4cee1b9 100644
+--- a/arch/arm/boot/dts/r8a7790-stout.dts
++++ b/arch/arm/boot/dts/r8a7790-stout.dts
+@@ -318,6 +318,10 @@
+ 		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
+ 		interrupt-controller;
  
-+&cpu0 {
-+	cpu0-supply = <&vdd_dvfs>;
-+};
++		onkey {
++			compatible = "dlg,da9063-onkey";
++		};
 +
- &rwdt {
- 	timeout-sec = <60>;
- 	status = "okay";
-@@ -725,6 +729,18 @@
- 			compatible = "dlg,da9063-watchdog";
+ 		rtc {
+ 			compatible = "dlg,da9063-rtc";
  		};
- 	};
-+
-+	vdd_dvfs: regulator at 68 {
-+		compatible = "dlg,da9210";
-+		reg = <0x68>;
-+		interrupt-parent = <&irqc0>;
-+		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
-+
-+		regulator-min-microvolt = <1000000>;
-+		regulator-max-microvolt = <1000000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
- };
- 
- &i2c4 {
 -- 
 2.11.0
