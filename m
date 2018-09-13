@@ -1,217 +1,206 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 13 Sep 2018 11:23:28 -0700
-Subject: [PATCH][RFC] crypto: skcipher: Remove VLA usage
-Message-ID: <20180913182328.GA9812@beast>
+From: vijaykhemka@fb.com (Vijay Khemka)
+Date: Thu, 13 Sep 2018 12:57:51 -0700
+Subject: [PATCH] ARM: dts: aspeed: Adding Facebook TioagaPass BMC
+Message-ID: <20180913195751.1833227-1-vijaykhemka@fb.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RFC follow-up to https://lkml.kernel.org/r/CAGXu5j+bpLK=EQ9LHkO8V=sdaQwt==6fbGhgn2Vi1E9_WxSGRQ at mail.gmail.com
+Initial introduction of Facebook TioagaPass family equipped with
+Aspeed 2500 BMC SoC. Neptune is a x86 server development kit
+with a ASPEED ast2500 BMC manufactured by Facebook.
+Specifically, This adds the tiogapass platform device tree file
+including the flash layout used by the tiogapass BMC machines.
 
-The core API changes:
+This also adds an entry of tiogapass device tree file in Makefile
+as well an entry of Facebook in Documentation for vendor prefix
 
-	struct crypto_sync_skcipher
-	crypto_alloc_sync_skcipher()
-	crypto_free_sync_skcipher()
-	crypto_sync_skcipher_setkey()
-	skcipher_request_set_sync_tfm()
-	SKCIPHER_REQUEST_ON_STACK type check
-
-and a single user's refactoring as an example:
-
-	drivers/crypto/ccp/ccp-crypto.h
-	drivers/crypto/ccp/ccp-crypto-aes-xts.c
-
-Does this look correct? If so, I can continue and do the other 60
-instances of SKCIPHER_REQUEST_ON_STACK().
-
-Signed-off-by: Kees Cook <keescook@chromium.org>
+Signed-off-by: Vijay Khemka <vijaykhemka@fb.com>
 ---
- crypto/skcipher.c                       | 24 +++++++++++++++++
- drivers/crypto/ccp/ccp-crypto-aes-xts.c | 10 ++++----
- drivers/crypto/ccp/ccp-crypto.h         |  2 +-
- include/crypto/skcipher.h               | 34 ++++++++++++++++++++++++-
- 4 files changed, 63 insertions(+), 7 deletions(-)
+ .../devicetree/bindings/vendor-prefixes.txt   |   1 +
+ arch/arm/boot/dts/Makefile                    |   1 +
+ .../dts/aspeed-bmc-facebook-tiogapass.dts     | 152 ++++++++++++++++++
+ 3 files changed, 154 insertions(+)
+ create mode 100644 arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts
 
-diff --git a/crypto/skcipher.c b/crypto/skcipher.c
-index 0bd8c6caa498..4caab81d2d02 100644
---- a/crypto/skcipher.c
-+++ b/crypto/skcipher.c
-@@ -949,6 +949,30 @@ struct crypto_skcipher *crypto_alloc_skcipher(const char *alg_name,
- }
- EXPORT_SYMBOL_GPL(crypto_alloc_skcipher);
- 
-+struct crypto_sync_skcipher *crypto_alloc_sync_skcipher(
-+				const char *alg_name, u32 type, u32 mask)
-+{
-+	struct crypto_skcipher *tfm;
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 2c3fc512e746..733b2d523642 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -127,6 +127,7 @@ everspin	Everspin Technologies, Inc.
+ exar	Exar Corporation
+ excito	Excito
+ ezchip	EZchip Semiconductor
++facebook  Facebook
+ fairphone	Fairphone B.V.
+ faraday	Faraday Technology Corporation
+ fastrax	Fastrax Oy
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index b5bd3de87c33..9c82c1681c38 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -1206,4 +1206,5 @@ dtb-$(CONFIG_ARCH_ASPEED) += \
+ 	aspeed-bmc-opp-witherspoon.dtb \
+ 	aspeed-bmc-opp-zaius.dtb \
+ 	aspeed-bmc-portwell-neptune.dtb \
++	aspeed-bmc-facebook-tiogapass.dtb \
+ 	aspeed-bmc-quanta-q71l.dtb
+diff --git a/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts b/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts
+new file mode 100644
+index 000000000000..859a00581e34
+--- /dev/null
++++ b/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts
+@@ -0,0 +1,152 @@
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (c) 2017 Facebook Inc.
++/dts-v1/;
 +
-+	/* Only sync algorithms allowed. */
-+	mask |= CRYPTO_ALG_ASYNC;
++#include "aspeed-g5.dtsi"
++#include <dt-bindings/gpio/aspeed-gpio.h>
 +
-+	tfm = crypto_alloc_tfm(alg_name, &crypto_skcipher_type2, type, mask);
++/ {
++	model = "Facebook TiogaPass BMC";
++	compatible = "facebook,tiogapass-bmc", "aspeed,ast2500";
++	aliases {
++		serial0 = &uart1;
++		serial4 = &uart5;
++	};
++	chosen {
++		stdout-path = &uart5;
++		bootargs = "console=ttyS4,115200 earlyprintk";
++	};
 +
-+	/*
-+	 * Make sure we do not allocate something that might get used with
-+	 * an on-stack request: check the request size.
-+	 */
-+	if (!IS_ERR(tfm) && WARN_ON(crypto_skcipher_reqsize(tfm) >
-+				    MAX_SYNC_SKCIPHER_REQSIZE)) {
-+		crypto_free_skcipher(tfm);
-+		return ERR_PTR(-EINVAL);
-+	}
++	memory {
++		reg = <0x80000000 0x20000000>;
++	};
 +
-+	return (struct crypto_sync_skcipher *)tfm;
-+}
-+EXPORT_SYMBOL_GPL(crypto_alloc_sync_skcipher);
-+
- int crypto_has_skcipher2(const char *alg_name, u32 type, u32 mask)
- {
- 	return crypto_type_has_alg(alg_name, &crypto_skcipher_type2,
-diff --git a/drivers/crypto/ccp/ccp-crypto-aes-xts.c b/drivers/crypto/ccp/ccp-crypto-aes-xts.c
-index 94b5bcf5b628..983c921736b4 100644
---- a/drivers/crypto/ccp/ccp-crypto-aes-xts.c
-+++ b/drivers/crypto/ccp/ccp-crypto-aes-xts.c
-@@ -102,7 +102,7 @@ static int ccp_aes_xts_setkey(struct crypto_ablkcipher *tfm, const u8 *key,
- 	ctx->u.aes.key_len = key_len / 2;
- 	sg_init_one(&ctx->u.aes.key_sg, ctx->u.aes.key, key_len);
- 
--	return crypto_skcipher_setkey(ctx->u.aes.tfm_skcipher, key, key_len);
-+	return crypto_sync_skcipher_setkey(ctx->u.aes.tfm_skcipher, key, key_len);
- }
- 
- static int ccp_aes_xts_crypt(struct ablkcipher_request *req,
-@@ -156,7 +156,7 @@ static int ccp_aes_xts_crypt(struct ablkcipher_request *req,
- 		/* Use the fallback to process the request for any
- 		 * unsupported unit sizes or key sizes
- 		 */
--		skcipher_request_set_tfm(subreq, ctx->u.aes.tfm_skcipher);
-+		skcipher_request_set_sync_tfm(subreq, ctx->u.aes.tfm_skcipher);
- 		skcipher_request_set_callback(subreq, req->base.flags,
- 					      NULL, NULL);
- 		skcipher_request_set_crypt(subreq, req->src, req->dst,
-@@ -203,12 +203,12 @@ static int ccp_aes_xts_decrypt(struct ablkcipher_request *req)
- static int ccp_aes_xts_cra_init(struct crypto_tfm *tfm)
- {
- 	struct ccp_ctx *ctx = crypto_tfm_ctx(tfm);
--	struct crypto_skcipher *fallback_tfm;
-+	struct crypto_sync_skcipher *fallback_tfm;
- 
- 	ctx->complete = ccp_aes_xts_complete;
- 	ctx->u.aes.key_len = 0;
- 
--	fallback_tfm = crypto_alloc_skcipher("xts(aes)", 0,
-+	fallback_tfm = crypto_alloc_sync_skcipher("xts(aes)", 0,
- 					     CRYPTO_ALG_ASYNC |
- 					     CRYPTO_ALG_NEED_FALLBACK);
- 	if (IS_ERR(fallback_tfm)) {
-@@ -226,7 +226,7 @@ static void ccp_aes_xts_cra_exit(struct crypto_tfm *tfm)
- {
- 	struct ccp_ctx *ctx = crypto_tfm_ctx(tfm);
- 
--	crypto_free_skcipher(ctx->u.aes.tfm_skcipher);
-+	crypto_free_sync_skcipher(ctx->u.aes.tfm_skcipher);
- }
- 
- static int ccp_register_aes_xts_alg(struct list_head *head,
-diff --git a/drivers/crypto/ccp/ccp-crypto.h b/drivers/crypto/ccp/ccp-crypto.h
-index b9fd090c46c2..28819e11db96 100644
---- a/drivers/crypto/ccp/ccp-crypto.h
-+++ b/drivers/crypto/ccp/ccp-crypto.h
-@@ -88,7 +88,7 @@ static inline struct ccp_crypto_ahash_alg *
- /***** AES related defines *****/
- struct ccp_aes_ctx {
- 	/* Fallback cipher for XTS with unsupported unit sizes */
--	struct crypto_skcipher *tfm_skcipher;
-+	struct crypto_sync_skcipher *tfm_skcipher;
- 
- 	/* Cipher used to generate CMAC K1/K2 keys */
- 	struct crypto_cipher *tfm_cipher;
-diff --git a/include/crypto/skcipher.h b/include/crypto/skcipher.h
-index 2f327f090c3e..4435f3a3d621 100644
---- a/include/crypto/skcipher.h
-+++ b/include/crypto/skcipher.h
-@@ -65,6 +65,10 @@ struct crypto_skcipher {
- 	struct crypto_tfm base;
- };
- 
-+struct crypto_sync_skcipher {
-+	struct crypto_skcipher base;
++	leds {
++		compatible = "gpio-leds";
++		postcode0 {
++			label="BMC_UP";
++			gpios = <&gpio ASPEED_GPIO(H, 0) GPIO_ACTIVE_HIGH>;
++			default-state = "on";
++		};
++		postcode1 {
++			label="BMC_HB";
++			gpios = <&gpio ASPEED_GPIO(H, 1) GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "heartbeat";
++		};
++		postcode2 {
++			label="FAULT";
++			gpios = <&gpio ASPEED_GPIO(H, 2) GPIO_ACTIVE_HIGH>;
++		};
++		// postcode3-7 are GPIOH3-H7
++	};
 +};
 +
- /**
-  * struct skcipher_alg - symmetric key cipher definition
-  * @min_keysize: Minimum key size supported by the transformation. This is the
-@@ -139,9 +143,17 @@ struct skcipher_alg {
- 	struct crypto_alg base;
- };
- 
-+#define MAX_SYNC_SKCIPHER_REQSIZE      384
-+/*
-+ * This performs a type-check against the "tfm" argument to make sure
-+ * all users have the correct skcipher tfm for doing on-stack requests.
-+ */
- #define SKCIPHER_REQUEST_ON_STACK(name, tfm) \
- 	char __##name##_desc[sizeof(struct skcipher_request) + \
--		crypto_skcipher_reqsize(tfm)] CRYPTO_MINALIGN_ATTR; \
-+			     MAX_SYNC_SKCIPHER_REQSIZE + \
-+			     (!(sizeof((struct crypto_sync_skcipher *)1 == \
-+				       (typeof(tfm))1))) \
-+			    ] CRYPTO_MINALIGN_ATTR; \
- 	struct skcipher_request *name = (void *)__##name##_desc
- 
- /**
-@@ -197,6 +209,9 @@ static inline struct crypto_skcipher *__crypto_skcipher_cast(
- struct crypto_skcipher *crypto_alloc_skcipher(const char *alg_name,
- 					      u32 type, u32 mask);
- 
-+struct crypto_sync_skcipher *crypto_alloc_sync_skcipher(const char *alg_name,
-+					      u32 type, u32 mask);
++&fmc {
++	status = "okay";
++	flash at 0 {
++		status = "okay";
++		m25p,fast-read;
++#include "openbmc-flash-layout.dtsi"
++	};
++};
 +
- static inline struct crypto_tfm *crypto_skcipher_tfm(
- 	struct crypto_skcipher *tfm)
- {
-@@ -212,6 +227,11 @@ static inline void crypto_free_skcipher(struct crypto_skcipher *tfm)
- 	crypto_destroy_tfm(tfm, crypto_skcipher_tfm(tfm));
- }
- 
-+static inline void crypto_free_sync_skcipher(struct crypto_sync_skcipher *tfm)
-+{
-+	crypto_free_skcipher(&tfm->base);
-+}
++&spi1 {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_spi1_default>;
++	flash at 0 {
++		status = "okay";
++		m25p,fast-read;
++		label = "pnor";
++	};
++};
 +
- /**
-  * crypto_has_skcipher() - Search for the availability of an skcipher.
-  * @alg_name: is the cra_name / name or cra_driver_name / driver name of the
-@@ -401,6 +421,12 @@ static inline int crypto_skcipher_setkey(struct crypto_skcipher *tfm,
- 	return tfm->setkey(tfm, key, keylen);
- }
- 
-+static inline int crypto_sync_skcipher_setkey(struct crypto_sync_skcipher *tfm,
-+					 const u8 *key, unsigned int keylen)
-+{
-+	return crypto_skcipher_setkey(&tfm->base, key, keylen);
-+}
++&uart1 {
++	// Host Console
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_txd1_default
++		     &pinctrl_rxd1_default>;
++};
 +
- static inline unsigned int crypto_skcipher_default_keysize(
- 	struct crypto_skcipher *tfm)
- {
-@@ -500,6 +526,12 @@ static inline void skcipher_request_set_tfm(struct skcipher_request *req,
- 	req->base.tfm = crypto_skcipher_tfm(tfm);
- }
- 
-+static inline void skcipher_request_set_sync_tfm(struct skcipher_request *req,
-+					    struct crypto_sync_skcipher *tfm)
-+{
-+	skcipher_request_set_tfm(req, &tfm->base);
-+}
++&uart5 {
++	// BMC Console
++	status = "okay";
++};
 +
- static inline struct skcipher_request *skcipher_request_cast(
- 	struct crypto_async_request *req)
- {
++&mac0 {
++	status = "okay";
++
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_rmii1_default>;
++	use-ncsi;
++};
++
++&i2c1 {
++	status = "okay";
++	// To PCIe slot SMBUS
++};
++
++&i2c2 {
++	status = "okay";
++	// To LAN I210
++};
++
++&i2c3 {
++	status = "okay";
++	// SMBus to COMe AB
++};
++
++&i2c4 {
++	status = "okay";
++	// I2C to COMe AB
++};
++
++&i2c5 {
++	status = "okay";
++  //USB Debug card
++	pca9555 at 27 {
++		compatible = "nxp,pca9555";
++		reg = <0x27>;
++	};
++};
++
++&i2c6 {
++	status = "okay";
++	tpm at 20 {
++		compatible = "infineon,slb9645tt";
++		reg = <0x20>;
++	};
++	tmp421 at 4e {
++		compatible = "ti,tmp421";
++		reg = <0x4e>;
++	};
++	tmp421 at 4f {
++		compatible = "ti,tmp421";
++		reg = <0x4f>;
++	};
++};
++
++&i2c8 {
++	status = "okay";
++	eeprom at 51 {
++		compatible = "atmel,24c128";
++		reg = <0x51>;
++		pagesize = <32>;
++	};
++};
++
++&pwm_tacho {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm0_default &pinctrl_pwm1_default>;
++	fan at 0 {
++		reg = <0x00>;
++		aspeed,fan-tach-ch = /bits/ 8 <0x00>;
++	};
++
++	fan at 1 {
++		reg = <0x00>;
++		aspeed,fan-tach-ch = /bits/ 8 <0x01>;
++	};
++};
 -- 
 2.17.1
-
-
--- 
-Kees Cook
-Pixel Security
