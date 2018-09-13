@@ -1,56 +1,38 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 13 Sep 2018 10:54:06 +0100
-Subject: [stable PATCH 1/2] arm64: Fix mismatched cache line size detection
-In-Reply-To: <20180912193816.GF21563@kroah.com>
-References: <1536052210-11625-1-git-send-email-suzuki.poulose@arm.com>
- <20180912193816.GF21563@kroah.com>
-Message-ID: <4b8db4d5-20d7-5597-7977-b8df1072ecc7@arm.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Thu, 13 Sep 2018 12:00:57 +0200
+Subject: [PATCH v3 1/5] drm/rockchip: prepare common code for cdns and
+ rk dpi/dp driver
+In-Reply-To: <1535451894-2518-2-git-send-email-dkos@cadence.com>
+References: <1535451894-2518-1-git-send-email-dkos@cadence.com>
+ <CGME20180828102612epcas2p376fa6f21ce57f4753a8d0f80f5359842@epcas2p3.samsung.com>
+ <1535451894-2518-2-git-send-email-dkos@cadence.com>
+Message-ID: <20180913100100eucas1p23e7e33035b6cba51d6219a58b34eea92~T7VgDpN8L3204732047eucas1p2_@eucas1p2.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+Hi Damian,
 
-On 12/09/18 20:38, Greg KH wrote:
-> On Tue, Sep 04, 2018 at 10:10:09AM +0100, Suzuki K Poulose wrote:
->> commit 4c4a39dd5fe2d13e2d2fa5fceb8ef95d19fc389a upstream
->>
->> If there is a mismatch in the I/D min line size, we must
->> always use the system wide safe value both in applications
->> and in the kernel, while performing cache operations. However,
->> we have been checking more bits than just the min line sizes,
->> which triggers false negatives. We may need to trap the user
->> accesses in such cases, but not necessarily patch the kernel.
->>
->> This patch fixes the check to do the right thing as advertised.
->> A new capability will be added to check mismatches in other
->> fields and ensure we trap the CTR accesses.
->>
->> Fixes: be68a8aaf925 ("arm64: cpufeature: Fix CTR_EL0 field definitions")
->> Cc: <stable@vger.kernel.org> # v4.9
-> 
-> Why 4.9?  be68a8aaf925 only showed up in 4.16 and was backported only to
-> 4.14-stable.  Not to 4.9-stable from what I can tell.
+Quite late but.
 
-Now when you asked this, I realise that the Fixes tags were not sufficient.
+On 28.08.2018 12:24, Damian Kos wrote:
+> - Extracted common fields from cdn_dp_device to a new cdns_mhdp_device
+>   structure which will be used by two separate drivers later on.
+> - Moved some datatypes (audio_format, audio_info, vic_pxl_encoding_format,
+>   video_info) from cdn-dp-core.c to cdn-dp-reg.h.
+> - Changed prefixes from cdn_dp to cdns_mhdp
+>     cdn -> cdns to match the other Cadence's drivers
+>     dp -> mhdp to distinguish it from a "just a DP" as the IP underneath
+>       this registers map can be a HDMI (which is internally different,
+>       but the interface for commands, events is pretty much the same).
+> - Modified cdn-dp-core.c to use the new driver structure and new function
+>   names.
+>
+> Signed-off-by: Damian Kos <dkos@cadence.com>
 
-Actually this series fixes a bit more than the commit: be68a8aaf925 ("arm64: cpufeature:
-Fix CTR_EL0 field definitions"). I think these patches should have :
+Many changes, hard to review. Anyway:
 
-Fixes: commit 116c81f427ff6c5 ("arm64: Work around systems with mismatched cache line sizes")
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 
-and
-
-Enable trapping on mismatched bits in CTR for IDC/DIC, which were
-added to v8.3 onwards.
-
-Essentially these patches makes sure that we trap accesses to
-CTR_EL0 when some of the fields are mismatched across CPUs, so
-that the CPUs get a consistent view of the cache properties
-throughout the system. It also makes sure that we put out
-correct information about why we trap accesses to the CTR_EL0
-accesses from the userspace.
-
-Hope this helps. The same applies for the next patch.
-
-
-Suzuki
+?--
+Regards
+Andrzej
