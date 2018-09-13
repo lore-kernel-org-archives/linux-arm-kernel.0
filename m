@@ -1,85 +1,78 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 13 Sep 2018 13:12:34 -0500
-Subject: [PATCH] ARM: dts: ste: Fix SPI controller node names
-Message-ID: <20180913181245.25484-10-robh@kernel.org>
+Date: Thu, 13 Sep 2018 13:12:32 -0500
+Subject: [PATCH] ARM: dts: sunxi: Fix I2C bus warnings
+Message-ID: <20180913181245.25484-8-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SPI controller nodes should be named 'spi' rather than 'ssp'. Fixing the
-name enables dtc SPI bus checks.
+dtc has new checks for I2C buses. Fix the warnings in unit-addresses.
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
+arch/arm/boot/dts/sun8i-a23-gt90h-v4.dtb: Warning (i2c_bus_reg): /soc at 1c00000/i2c at 1c2ac00/touchscreen at 0: I2C bus unit address format error, expected "40"
+arch/arm/boot/dts/sun8i-a23-inet86dz.dtb: Warning (i2c_bus_reg): /soc at 1c00000/i2c at 1c2ac00/touchscreen at 0: I2C bus unit address format error, expected "40"
+arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dtb: Warning (i2c_bus_reg): /soc at 1c00000/i2c at 1c2ac00/touchscreen at 0: I2C bus unit address format error, expected "40"
+arch/arm/boot/dts/sun8i-a23-polaroid-mid2809pxe04.dtb: Warning (i2c_bus_reg): /soc at 1c00000/i2c at 1c2ac00/touchscreen at 0: I2C bus unit address format error, expected "40"
+arch/arm/boot/dts/sun8i-a33-ga10h-v1.1.dtb: Warning (i2c_bus_reg): /soc at 1c00000/i2c at 1c2ac00/touchscreen at 0: I2C bus unit address format error, expected "40"
+arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dtb: Warning (i2c_bus_reg): /soc at 1c00000/i2c at 1c2ac00/touchscreen at 0: missing or empty reg property
+arch/arm/boot/dts/sun8i-a33-ippo-q8h-v1.2.dtb: Warning (i2c_bus_reg): /soc at 1c00000/i2c at 1c2ac00/touchscreen at 0: missing or empty reg property
+arch/arm/boot/dts/sun8i-a33-q8-tablet.dtb: Warning (i2c_bus_reg): /soc at 1c00000/i2c at 1c2ac00/touchscreen at 0: missing or empty reg property
+arch/arm/boot/dts/sun5i-a13-utoo-p66.dtb: Warning (i2c_bus_reg): /soc at 1c00000/i2c at 1c2b000/touchscreen: I2C bus unit address format error, expected "40"
+arch/arm/boot/dts/sun5i-a13-difrnce-dit4350.dtb: Warning (i2c_bus_reg): /soc at 1c00000/i2c at 1c2b000/touchscreen: missing or empty reg property
+arch/arm/boot/dts/sun5i-a13-empire-electronix-m712.dtb: Warning (i2c_bus_reg): /soc at 1c00000/i2c at 1c2b000/touchscreen: missing or empty reg property
+arch/arm/boot/dts/sun5i-a13-inet-98v-rev2.dtb: Warning (i2c_bus_reg): /soc at 1c00000/i2c at 1c2b000/touchscreen: missing or empty reg property
+arch/arm/boot/dts/sun5i-a13-q8-tablet.dtb: Warning (i2c_bus_reg): /soc at 1c00000/i2c at 1c2b000/touchscreen: missing or empty reg property
+
+Cc: Maxime Ripard <maxime.ripard@bootlin.com>
+Cc: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
 Please apply to the sub-arch tree. The dtc changes haven't landed, but 
 will for 4.20.
 
- arch/arm/boot/dts/ste-dbx5x0.dtsi     | 4 ++--
- arch/arm/boot/dts/ste-hrefprev60.dtsi | 2 +-
- arch/arm/boot/dts/ste-snowball.dts    | 2 +-
- arch/arm/boot/dts/ste-u300.dts        | 2 +-
- 4 files changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi | 3 ++-
+ arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi | 3 ++-
+ arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts    | 2 +-
+ 3 files changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-index 2310a4e97768..8b5288172085 100644
---- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
-@@ -878,7 +878,7 @@
- 			power-domains = <&pm_domains DOMAIN_VAPE>;
- 		};
+diff --git a/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi b/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
+index 8acbaab14fe5..d2a2eb8b3f26 100644
+--- a/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
++++ b/arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi
+@@ -92,7 +92,8 @@
+ 	 */
+ 	clock-frequency = <400000>;
  
--		ssp at 80002000 {
-+		spi at 80002000 {
- 			compatible = "arm,pl022", "arm,primecell";
- 			reg = <0x80002000 0x1000>;
- 			interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
-@@ -892,7 +892,7 @@
- 			power-domains = <&pm_domains DOMAIN_VAPE>;
- 		};
+-	touchscreen: touchscreen {
++	touchscreen: touchscreen at 40 {
++		reg = <0x40>;
+ 		interrupt-parent = <&pio>;
+ 		interrupts = <6 11 IRQ_TYPE_EDGE_FALLING>; /* EINT11 (PG11) */
+ 		pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi b/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
+index 880096c7e252..5e8a95af89b8 100644
+--- a/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
++++ b/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
+@@ -69,7 +69,8 @@
+ 	 */
+ 	clock-frequency = <400000>;
  
--		ssp at 80003000 {
-+		spi at 80003000 {
- 			compatible = "arm,pl022", "arm,primecell";
- 			reg = <0x80003000 0x1000>;
- 			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
-diff --git a/arch/arm/boot/dts/ste-hrefprev60.dtsi b/arch/arm/boot/dts/ste-hrefprev60.dtsi
-index 3f14b4df69b4..94eeb7f1c947 100644
---- a/arch/arm/boot/dts/ste-hrefprev60.dtsi
-+++ b/arch/arm/boot/dts/ste-hrefprev60.dtsi
-@@ -57,7 +57,7 @@
- 			};
- 		};
+-	touchscreen: touchscreen at 0 {
++	touchscreen: touchscreen at 40 {
++		reg = <0x40>;
+ 		interrupt-parent = <&pio>;
+ 		interrupts = <1 5 IRQ_TYPE_EDGE_FALLING>; /* PB5 */
+ 		pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts b/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
+index 35859d8f3267..bf97f6244c23 100644
+--- a/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
++++ b/arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts
+@@ -95,7 +95,7 @@
+ &i2c0 {
+ 	status = "okay";
  
--		ssp at 80002000 {
-+		spi at 80002000 {
- 			/*
- 			 * On the first generation boards, this SSP/SPI port was connected
- 			 * to the AB8500.
-diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
-index b0b94d053098..603890461ae0 100644
---- a/arch/arm/boot/dts/ste-snowball.dts
-+++ b/arch/arm/boot/dts/ste-snowball.dts
-@@ -376,7 +376,7 @@
- 			pinctrl-1 = <&i2c3_sleep_mode>;
- 		};
- 
--		ssp at 80002000 {
-+		spi at 80002000 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&ssp0_snowball_mode>;
- 		};
-diff --git a/arch/arm/boot/dts/ste-u300.dts b/arch/arm/boot/dts/ste-u300.dts
-index 62ecb6a2fa39..1bd1aba3322f 100644
---- a/arch/arm/boot/dts/ste-u300.dts
-+++ b/arch/arm/boot/dts/ste-u300.dts
-@@ -442,7 +442,7 @@
- 			dma-names = "rx";
- 		};
- 
--		spi: ssp at c0006000 {
-+		spi: spi at c0006000 {
- 			compatible = "arm,pl022", "arm,primecell";
- 			reg = <0xc0006000 0x1000>;
- 			interrupt-parent = <&vica>;
+-	axp22x: pmic at 68 {
++	axp22x: pmic at 34 {
+ 		compatible = "x-powers,axp221";
+ 		reg = <0x34>;
+ 		interrupt-parent = <&nmi_intc>;
 -- 
 2.17.1
