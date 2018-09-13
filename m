@@ -1,66 +1,88 @@
-From: greg@kroah.com (Greg KH)
-Date: Thu, 13 Sep 2018 14:19:51 +0200
-Subject: [stable PATCH 1/2] arm64: Fix mismatched cache line size detection
-In-Reply-To: <4b8db4d5-20d7-5597-7977-b8df1072ecc7@arm.com>
-References: <1536052210-11625-1-git-send-email-suzuki.poulose@arm.com>
- <20180912193816.GF21563@kroah.com>
- <4b8db4d5-20d7-5597-7977-b8df1072ecc7@arm.com>
-Message-ID: <20180913121951.GE2268@kroah.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 13 Sep 2018 14:30:17 +0200
+Subject: [PATCH v3 5/5] drm/bridge: add preliminary driver for cadence
+ dpi/dp bridge
+In-Reply-To: <1535451894-2518-6-git-send-email-dkos@cadence.com>
+References: <1535451894-2518-1-git-send-email-dkos@cadence.com>
+ <1535451894-2518-6-git-send-email-dkos@cadence.com>
+Message-ID: <1794131.JE1BxD2NGT@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2018 at 10:54:06AM +0100, Suzuki K Poulose wrote:
-> Hi Greg,
+Am Dienstag, 28. August 2018, 12:24:48 CEST schrieb Damian Kos:
+> From: Quentin Schulz <quentin.schulz@bootlin.com>
 > 
-> On 12/09/18 20:38, Greg KH wrote:
-> > On Tue, Sep 04, 2018 at 10:10:09AM +0100, Suzuki K Poulose wrote:
-> > > commit 4c4a39dd5fe2d13e2d2fa5fceb8ef95d19fc389a upstream
-> > > 
-> > > If there is a mismatch in the I/D min line size, we must
-> > > always use the system wide safe value both in applications
-> > > and in the kernel, while performing cache operations. However,
-> > > we have been checking more bits than just the min line sizes,
-> > > which triggers false negatives. We may need to trap the user
-> > > accesses in such cases, but not necessarily patch the kernel.
-> > > 
-> > > This patch fixes the check to do the right thing as advertised.
-> > > A new capability will be added to check mismatches in other
-> > > fields and ensure we trap the CTR accesses.
-> > > 
-> > > Fixes: be68a8aaf925 ("arm64: cpufeature: Fix CTR_EL0 field definitions")
-> > > Cc: <stable@vger.kernel.org> # v4.9
-> > 
-> > Why 4.9?  be68a8aaf925 only showed up in 4.16 and was backported only to
-> > 4.14-stable.  Not to 4.9-stable from what I can tell.
+> This patch finally adds the preliminary driver for Cadence MHDP DPI/DP bridge.
 > 
-> Now when you asked this, I realise that the Fixes tags were not sufficient.
+> Changes made in the low level driver (cdn-dp-reg.*):
+> - moved it to from drivers/gpu/drm/rockchip to
+>   drivers/gpu/drm/bridge/cdns-mhdp-common.*
+> - functions for sending/receiving commands are now public
+> - added functions for reading registers and link training
+>   adjustment
 > 
-> Actually this series fixes a bit more than the commit: be68a8aaf925 ("arm64: cpufeature:
-> Fix CTR_EL0 field definitions"). I think these patches should have :
+> Changes made in RK's driver (cdn-dp-core.*):
+> - Moved audio_info and audio_pdev fields from cdn_dp_device to
+>   cdns_mhdp_device structure.
 > 
-> Fixes: commit 116c81f427ff6c5 ("arm64: Work around systems with mismatched cache line sizes")
+> Signed-off-by: Damian Kos <dkos@cadence.com>
+> ---
+>  drivers/gpu/drm/bridge/Kconfig                |    9 +
+>  drivers/gpu/drm/bridge/Makefile               |    3 +
+>  .../cdns-mhdp-common.c}                       |  137 +-
+>  .../cdns-mhdp-common.h}                       |   21 +-
+>  drivers/gpu/drm/bridge/cdns-mhdp.c            | 1308 +++++++++++++++++
+>  drivers/gpu/drm/rockchip/Kconfig              |    1 +
+>  drivers/gpu/drm/rockchip/Makefile             |    4 +-
+>  drivers/gpu/drm/rockchip/cdn-dp-core.c        |   16 +-
+>  drivers/gpu/drm/rockchip/cdn-dp-core.h        |    4 +-
+>  9 files changed, 1484 insertions(+), 19 deletions(-)
+>  rename drivers/gpu/drm/{rockchip/cdn-dp-reg.c => bridge/cdns-mhdp-common.c} (87%)
+>  rename drivers/gpu/drm/{rockchip/cdn-dp-reg.h => bridge/cdns-mhdp-common.h} (95%)
+>  create mode 100644 drivers/gpu/drm/bridge/cdns-mhdp.c
 > 
-> and
-> 
-> Enable trapping on mismatched bits in CTR for IDC/DIC, which were
-> added to v8.3 onwards.
-> 
-> Essentially these patches makes sure that we trap accesses to
-> CTR_EL0 when some of the fields are mismatched across CPUs, so
-> that the CPUs get a consistent view of the cache properties
-> throughout the system. It also makes sure that we put out
-> correct information about why we trap accesses to the CTR_EL0
-> accesses from the userspace.
-> 
-> Hope this helps. The same applies for the next patch.
+> diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
+> index 9eeb8ef0b174..90a4810a8c96 100644
+> --- a/drivers/gpu/drm/bridge/Kconfig
+> +++ b/drivers/gpu/drm/bridge/Kconfig
+> @@ -35,6 +35,15 @@ config DRM_CDNS_DSI
+>  	  Support Cadence DPI to DSI bridge. This is an internal
+>  	  bridge and is meant to be directly embedded in a SoC.
+>  
+> +config DRM_CDNS_MHDP
+> +	tristate "Cadence DPI/DP bridge"
+> +	select DRM_KMS_HELPER
+> +	select DRM_PANEL_BRIDGE
+> +	depends on OF
+> +	help
+> +	  Support Cadence DPI to DP bridge. This is an internal
+> +	  bridge and is meant to be directly embedded in a SoC.
+> +
 
-Yes, it does help.  But these patches do not apply to the 4.14.y series,
-which I also need to apply them to (you don't want to move from 4.9.y to
-4.14.y and get a regression.)
+This ends up with a Kconfig error on my kernel, with:
 
-So can you provide backports for both of these patches for 4.14.y?  Then
-I would be glad to queue these all up.
+scripts/kconfig/conf  --oldconfig Kconfig
+drivers/i2c/Kconfig:7:error: recursive dependency detected!
+drivers/i2c/Kconfig:7:  symbol I2C is selected by FB_DDC
+drivers/video/fbdev/Kconfig:63: symbol FB_DDC depends on FB
+drivers/video/fbdev/Kconfig:5:  symbol FB is selected by DRM_KMS_FB_HELPER
+drivers/gpu/drm/Kconfig:74:     symbol DRM_KMS_FB_HELPER depends on DRM_KMS_HELPER
+drivers/gpu/drm/Kconfig:68:     symbol DRM_KMS_HELPER is selected by DRM_CDNS_MHDP
+drivers/gpu/drm/bridge/Kconfig:38:      symbol DRM_CDNS_MHDP is selected by ROCKCHIP_CDN_DP
+drivers/gpu/drm/rockchip/Kconfig:29:    symbol ROCKCHIP_CDN_DP depends on EXTCON
+drivers/extcon/Kconfig:1:       symbol EXTCON is selected by CHARGER_MANAGER
+drivers/power/supply/Kconfig:467:       symbol CHARGER_MANAGER depends on POWER_SUPPLY
+drivers/power/supply/Kconfig:1: symbol POWER_SUPPLY is selected by HID_BATTERY_STRENGTH
+drivers/hid/Kconfig:28: symbol HID_BATTERY_STRENGTH depends on HID
+drivers/hid/Kconfig:7:  symbol HID is selected by I2C_HID
+drivers/hid/i2c-hid/Kconfig:4:  symbol I2C_HID depends on I2C
+For a resolution refer to Documentation/kbuild/kconfig-language.txt
+subsection "Kconfig recursive dependency limitations"
 
-thanks,
 
-greg k-h
+The culprit being the dependency on EXTCON in the Rockchip cdn-dp driver.
+Moving to "select EXTCON" seems to fix the issue, but I'm not sure yet if that
+is the correct solution.
+
+
+Heiko
