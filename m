@@ -1,162 +1,116 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 12 Sep 2018 16:30:35 -0700
-Subject: [PATCH i2c-next v6] i2c: aspeed: Handle master/slave combined
- irq events properly
-In-Reply-To: <6a99dc09-b06d-88ee-2843-3bd88f883dc2@linux.intel.com>
-References: <e5135af4-9105-214f-5de2-65cc03804222@linux.intel.com>
- <CACPK8Xdv3aP_zOHAL0WMgwvkpBHAUesU7OdhW==jgvXjRmt-Zw@mail.gmail.com>
- <20180911233302.GA18799@roeck-us.net>
- <5698ca34-14c9-8d05-c4e6-5acf85ff9d14@linux.intel.com>
- <20180912013449.GA12612@roeck-us.net>
- <7fd98646-fb5a-be4d-ce37-84b74e0fa8b3@linux.intel.com>
- <20180912195844.GA6893@roeck-us.net>
- <da7f4691-7428-3114-32bb-e0171f6c7228@linux.intel.com>
- <20180912203059.GA18201@roeck-us.net>
- <6a99dc09-b06d-88ee-2843-3bd88f883dc2@linux.intel.com>
-Message-ID: <20180912233035.GA10713@roeck-us.net>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 13 Sep 2018 08:00:27 +0800
+Subject: [xlnx:master 1769/1831] drivers/fpga/zynqmp-fpga.c:215:2: error:
+ implicit declaration of function 'seq_write'; did you mean 'pmd_write'?
+Message-ID: <201809130821.P6WlkmKm%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2018 at 03:31:06PM -0700, Jae Hyun Yoo wrote:
-> >
-> >I played with the code on both sides. I had to make changes in both
-> >the linux kernel and in qemu to get the code to work again.
-> >See attached.
-> >
-> >Guenter
-> >
-> >---
-> >Linux:
-> >
-> >diff --git a/drivers/i2c/busses/i2c-aspeed.c b/drivers/i2c/busses/i2c-aspeed.c
-> >index c258c4d9a4c0..3d518e09369f 100644
-> >--- a/drivers/i2c/busses/i2c-aspeed.c
-> >+++ b/drivers/i2c/busses/i2c-aspeed.c
-> >@@ -552,6 +552,9 @@ static irqreturn_t aspeed_i2c_bus_irq(int irq, void *dev_id)
-> >  	spin_lock(&bus->lock);
-> >  	irq_received = readl(bus->base + ASPEED_I2C_INTR_STS_REG);
-> >+	/* Ack all interrupts except for Rx done */
-> >+	writel(irq_received & ~ASPEED_I2CD_INTR_RX_DONE,
-> >+	       bus->base + ASPEED_I2C_INTR_STS_REG);
-> >  	irq_remaining = irq_received;
-> >  #if IS_ENABLED(CONFIG_I2C_SLAVE)
-> >@@ -584,8 +587,10 @@ static irqreturn_t aspeed_i2c_bus_irq(int irq, void *dev_id)
-> >  			"irq handled != irq. expected 0x%08x, but was 0x%08x\n",
-> >  			irq_received, irq_handled);
-> >-	/* Ack all interrupt bits. */
-> >-	writel(irq_received, bus->base + ASPEED_I2C_INTR_STS_REG);
-> >+	/* Ack Rx done */
-> >+	if (irq_received & ASPEED_I2CD_INTR_RX_DONE)
-> >+		writel(ASPEED_I2CD_INTR_RX_DONE,
-> >+		       bus->base + ASPEED_I2C_INTR_STS_REG);
-> >  	spin_unlock(&bus->lock);
-> >  	return irq_remaining ? IRQ_NONE : IRQ_HANDLED;
-> >  }
-> >
-> >---
-> >qemu:
-> >
-> >diff --git a/hw/i2c/aspeed_i2c.c b/hw/i2c/aspeed_i2c.c
-> >index c762c73..0d4aa08 100644
-> >--- a/hw/i2c/aspeed_i2c.c
-> >+++ b/hw/i2c/aspeed_i2c.c
-> >@@ -180,6 +180,33 @@ static uint8_t aspeed_i2c_get_state(AspeedI2CBus *bus)
-> >      return (bus->cmd >> I2CD_TX_STATE_SHIFT) & I2CD_TX_STATE_MASK;
-> >  }
-> >+static void aspeed_i2c_handle_rx_cmd(AspeedI2CBus *bus)
-> >+{
-> >+    int ret;
-> >+
-> >+    if (!(bus->cmd & (I2CD_M_RX_CMD | I2CD_M_S_RX_CMD_LAST))) {
-> >+        return;
-> >+    }
-> >+    if (bus->intr_status & I2CD_INTR_RX_DONE) {
-> >+        return;
-> >+    }
-> >+
-> >+    aspeed_i2c_set_state(bus, I2CD_MRXD);
-> >+    ret = i2c_recv(bus->bus);
-> >+    if (ret < 0) {
-> >+        qemu_log_mask(LOG_GUEST_ERROR, "%s: read failed\n", __func__);
-> >+        ret = 0xff;
-> >+    } else {
-> >+        bus->intr_status |= I2CD_INTR_RX_DONE;
-> >+    }
-> >+    bus->buf = (ret & I2CD_BYTE_BUF_RX_MASK) << I2CD_BYTE_BUF_RX_SHIFT;
-> >+    if (bus->cmd & I2CD_M_S_RX_CMD_LAST) {
-> >+        i2c_nack(bus->bus);
-> >+    }
-> >+    bus->cmd &= ~(I2CD_M_RX_CMD | I2CD_M_S_RX_CMD_LAST);
-> >+    aspeed_i2c_set_state(bus, I2CD_MACTIVE);
-> >+}
-> >+
-> >  /*
-> >   * The state machine needs some refinement. It is only used to track
-> >   * invalid STOP commands for the moment.
-> >@@ -188,7 +215,7 @@ static void aspeed_i2c_bus_handle_cmd(AspeedI2CBus *bus, uint64_t value)
-> >  {
-> >      bus->cmd &= ~0xFFFF;
-> >      bus->cmd |= value & 0xFFFF;
-> >-    bus->intr_status = 0;
-> >+    bus->intr_status &= I2CD_INTR_RX_DONE;
-> >      if (bus->cmd & I2CD_M_START_CMD) {
-> >          uint8_t state = aspeed_i2c_get_state(bus) & I2CD_MACTIVE ?
-> >@@ -227,22 +254,7 @@ static void aspeed_i2c_bus_handle_cmd(AspeedI2CBus *bus, uint64_t value)
-> >      }
-> >      if (bus->cmd & (I2CD_M_RX_CMD | I2CD_M_S_RX_CMD_LAST)) {
-> >-        int ret;
-> >-
-> >-        aspeed_i2c_set_state(bus, I2CD_MRXD);
-> >-        ret = i2c_recv(bus->bus);
-> >-        if (ret < 0) {
-> >-            qemu_log_mask(LOG_GUEST_ERROR, "%s: read failed\n", __func__);
-> >-            ret = 0xff;
-> >-        } else {
-> >-            bus->intr_status |= I2CD_INTR_RX_DONE;
-> >-        }
-> >-        bus->buf = (ret & I2CD_BYTE_BUF_RX_MASK) << I2CD_BYTE_BUF_RX_SHIFT;
-> >-        if (bus->cmd & I2CD_M_S_RX_CMD_LAST) {
-> >-            i2c_nack(bus->bus);
-> >-        }
-> >-        bus->cmd &= ~(I2CD_M_RX_CMD | I2CD_M_S_RX_CMD_LAST);
-> >-        aspeed_i2c_set_state(bus, I2CD_MACTIVE);
-> >+        aspeed_i2c_handle_rx_cmd(bus);
-> >      }
-> >      if (bus->cmd & I2CD_M_STOP_CMD) {
-> >@@ -263,6 +275,7 @@ static void aspeed_i2c_bus_write(void *opaque, hwaddr offset,
-> >                                   uint64_t value, unsigned size)
-> >  {
-> >      AspeedI2CBus *bus = opaque;
-> >+    int status;
-> >      switch (offset) {
-> >      case I2CD_FUN_CTRL_REG:
-> >@@ -283,9 +296,16 @@ static void aspeed_i2c_bus_write(void *opaque, hwaddr offset,
-> >          bus->intr_ctrl = value & 0x7FFF;
-> >          break;
-> >      case I2CD_INTR_STS_REG:
-> >+        status = bus->intr_status;
-> >          bus->intr_status &= ~(value & 0x7FFF);
-> >-        bus->controller->intr_status &= ~(1 << bus->id);
-> >-        qemu_irq_lower(bus->controller->irq);
-> >+        if (!bus->intr_status) {
-> >+            bus->controller->intr_status &= ~(1 << bus->id);
-> >+            qemu_irq_lower(bus->controller->irq);
-> >+        }
-> >+        if ((status & I2CD_INTR_RX_DONE) && !(bus->intr_status & I2CD_INTR_RX_DONE)) {
-> >+            aspeed_i2c_handle_rx_cmd(bus);
-> >+            aspeed_i2c_bus_raise_interrupt(bus);
-> >+        }
-> >          break;
-> >      case I2CD_DEV_ADDR_REG:
-> >          qemu_log_mask(LOG_UNIMP, "%s: slave mode not implemented\n",
-> >
-> 
-> Nice fix! LGTM. I've tested the new patch and checked that it works well
-> on both low and high bus speed environments. Thanks a lot!
-> 
-> Can you please submit this patch?
-> 
-Assuming you mean both patches, sure, can do. I'll need to clean up
-the qemu patch a bit, though; it looks too messy for my liking.
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   5a0f5d4c5b359939907b9cf874d3a9f8ad72d5e3
+commit: bd1f10f8355edafc243f45ebdc234b4fcc218a33 [1769/1831] fpga: zynqmp-fpga: Add support for pl configuration readback
+config: sparc64-allyesconfig (attached as .config)
+compiler: sparc64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout bd1f10f8355edafc243f45ebdc234b4fcc218a33
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=sparc64 
 
-Guenter
+All errors (new ones prefixed by >>):
+
+   drivers/fpga/zynqmp-fpga.c: In function 'zynqmp_fpga_read_cfgreg':
+   drivers/fpga/zynqmp-fpga.c:173:2: error: implicit declaration of function 'seq_puts'; did you mean 'kset_put'? [-Werror=implicit-function-declaration]
+     seq_puts(s, "zynqMP FPGA Configuration register contents are\n");
+     ^~~~~~~~
+     kset_put
+   drivers/fpga/zynqmp-fpga.c:180:3: error: implicit declaration of function 'seq_printf'; did you mean 'dev_printk'? [-Werror=implicit-function-declaration]
+      seq_printf(s, "%s --> \t %x \t\r\n", p->reg, val);
+      ^~~~~~~~~~
+      dev_printk
+   drivers/fpga/zynqmp-fpga.c: In function 'zynqmp_fpga_read_cfgdata':
+>> drivers/fpga/zynqmp-fpga.c:215:2: error: implicit declaration of function 'seq_write'; did you mean 'pmd_write'? [-Werror=implicit-function-declaration]
+     seq_write(s, &buf[data_offset], priv->size);
+     ^~~~~~~~~
+     pmd_write
+   cc1: some warnings being treated as errors
+
+vim +215 drivers/fpga/zynqmp-fpga.c
+
+   158	
+   159	static int zynqmp_fpga_read_cfgreg(struct fpga_manager *mgr,
+   160					   struct seq_file *s)
+   161	{
+   162		const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
+   163		int ret, val;
+   164		unsigned int *buf;
+   165		dma_addr_t dma_addr;
+   166		struct zynqmp_configreg *p = cfgreg;
+   167	
+   168		buf = dma_zalloc_coherent(mgr->dev.parent, READ_DMA_SIZE,
+   169					  &dma_addr, GFP_KERNEL);
+   170		if (!buf)
+   171			return -ENOMEM;
+   172	
+ > 173		seq_puts(s, "zynqMP FPGA Configuration register contents are\n");
+   174	
+   175		while (p->reg) {
+   176			ret = eemi_ops->fpga_read(p->offset, dma_addr, readback_type,
+   177						  &val);
+   178			if (ret)
+   179				goto free_dmabuf;
+   180			seq_printf(s, "%s --> \t %x \t\r\n", p->reg, val);
+   181			p++;
+   182		}
+   183	
+   184	free_dmabuf:
+   185		dma_free_coherent(mgr->dev.parent, READ_DMA_SIZE, buf,
+   186				  dma_addr);
+   187	
+   188		return ret;
+   189	}
+   190	
+   191	static int zynqmp_fpga_read_cfgdata(struct fpga_manager *mgr,
+   192					    struct seq_file *s)
+   193	{
+   194		const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
+   195		struct zynqmp_fpga_priv *priv;
+   196		int ret, data_offset;
+   197		unsigned int *buf;
+   198		dma_addr_t dma_addr;
+   199		size_t size;
+   200	
+   201		priv = mgr->priv;
+   202		size = priv->size + READ_DMA_SIZE + DUMMY_FRAMES_SIZE;
+   203	
+   204		buf = dma_zalloc_coherent(mgr->dev.parent, size, &dma_addr,
+   205					  GFP_KERNEL);
+   206		if (!buf)
+   207			return -ENOMEM;
+   208	
+   209		seq_puts(s, "zynqMP FPGA Configuration data contents are\n");
+   210		ret = eemi_ops->fpga_read((priv->size + DUMMY_FRAMES_SIZE) / 4,
+   211					  dma_addr, readback_type, &data_offset);
+   212		if (ret)
+   213			goto free_dmabuf;
+   214	
+ > 215		seq_write(s, &buf[data_offset], priv->size);
+   216	
+   217	free_dmabuf:
+   218		dma_free_coherent(mgr->dev.parent, size, buf, dma_addr);
+   219	
+   220		return ret;
+   221	}
+   222	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 52316 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180913/4a92f8e2/attachment-0001.gz>
