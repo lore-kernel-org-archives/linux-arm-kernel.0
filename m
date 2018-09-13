@@ -1,99 +1,104 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Sep 2018 11:09:27 +0200
-Subject: [PATCH 32/58] arm64: dts: renesas: r8a774a1: Add all MSIOF nodes
+Date: Thu, 13 Sep 2018 11:09:29 +0200
+Subject: [PATCH 34/58] arm64: dts: renesas: r8a774a1: Add PWM device nodes
 In-Reply-To: <cover.1536828567.git.horms+renesas@verge.net.au>
 References: <cover.1536828567.git.horms+renesas@verge.net.au>
-Message-ID: <c512110d64a00cc0714061d54261b0f03c7202be.1536828567.git.horms+renesas@verge.net.au>
+Message-ID: <9567a8566850936688c08a6392a3324631f9daeb.1536828567.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Biju Das <biju.das@bp.renesas.com>
+From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-Add the device nodes for all MSIOF SPI controllers on RZ/G2M SoC.
+This patch adds PWM[0123456] device nodes to the RZ/G2M (a.k.a R8A774A1)
+device tree.
 
-Based on several similar patches of the R8A7796 device tree
-by Geert Uytterhoeven <geert+renesas@glider.be>
-and Simon Horman <horms+renesas@verge.net.au>.
-
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Reviewed-by: Biju Das <biju.das@bp.renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a774a1.dtsi | 62 +++++++++++++++++++++++++++++++
- 1 file changed, 62 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a774a1.dtsi | 70 +++++++++++++++++++++++++++++++
+ 1 file changed, 70 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-index 8589122e3c94..f379de8404cb 100644
+index dde188004283..c9ac545f08f3 100644
 --- a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-@@ -857,6 +857,68 @@
+@@ -816,6 +816,76 @@
  			status = "disabled";
  		};
  
-+		msiof0: spi at e6e90000 {
-+			compatible = "renesas,msiof-r8a774a1",
-+				     "renesas,rcar-gen3-msiof";
-+			reg = <0 0xe6e90000 0 0x0064>;
-+			interrupts = <GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 211>;
-+			dmas = <&dmac1 0x41>, <&dmac1 0x40>,
-+			       <&dmac2 0x41>, <&dmac2 0x40>;
-+			dma-names = "tx", "rx", "tx", "rx";
++		pwm0: pwm at e6e30000 {
++			compatible = "renesas,pwm-r8a774a1", "renesas,pwm-rcar";
++			reg = <0 0xe6e30000 0 0x8>;
++			#pwm-cells = <2>;
++			clocks = <&cpg CPG_MOD 523>;
++			resets = <&cpg 523>;
 +			power-domains = <&sysc 32>;
-+			resets = <&cpg 211>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
 +			status = "disabled";
 +		};
 +
-+		msiof1: spi at e6ea0000 {
-+			compatible = "renesas,msiof-r8a774a1",
-+				     "renesas,rcar-gen3-msiof";
-+			reg = <0 0xe6ea0000 0 0x0064>;
-+			interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 210>;
-+			dmas = <&dmac1 0x43>, <&dmac1 0x42>,
-+			       <&dmac2 0x43>, <&dmac2 0x42>;
-+			dma-names = "tx", "rx", "tx", "rx";
++		pwm1: pwm at e6e31000 {
++			compatible = "renesas,pwm-r8a774a1", "renesas,pwm-rcar";
++			reg = <0 0xe6e31000 0 0x8>;
++			#pwm-cells = <2>;
++			clocks = <&cpg CPG_MOD 523>;
++			resets = <&cpg 523>;
 +			power-domains = <&sysc 32>;
-+			resets = <&cpg 210>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
 +			status = "disabled";
 +		};
 +
-+		msiof2: spi at e6c00000 {
-+			compatible = "renesas,msiof-r8a774a1",
-+				     "renesas,rcar-gen3-msiof";
-+			reg = <0 0xe6c00000 0 0x0064>;
-+			interrupts = <GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 209>;
-+			dmas = <&dmac0 0x45>, <&dmac0 0x44>;
-+			dma-names = "tx", "rx";
++		pwm2: pwm at e6e32000 {
++			compatible = "renesas,pwm-r8a774a1", "renesas,pwm-rcar";
++			reg = <0 0xe6e32000 0 0x8>;
++			#pwm-cells = <2>;
++			clocks = <&cpg CPG_MOD 523>;
++			resets = <&cpg 523>;
 +			power-domains = <&sysc 32>;
-+			resets = <&cpg 209>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
 +			status = "disabled";
 +		};
 +
-+		msiof3: spi at e6c10000 {
-+			compatible = "renesas,msiof-r8a774a1",
-+				     "renesas,rcar-gen3-msiof";
-+			reg = <0 0xe6c10000 0 0x0064>;
-+			interrupts = <GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 208>;
-+			dmas = <&dmac0 0x47>, <&dmac0 0x46>;
-+			dma-names = "tx", "rx";
++		pwm3: pwm at e6e33000 {
++			compatible = "renesas,pwm-r8a774a1", "renesas,pwm-rcar";
++			reg = <0 0xe6e33000 0 0x8>;
++			#pwm-cells = <2>;
++			clocks = <&cpg CPG_MOD 523>;
++			resets = <&cpg 523>;
 +			power-domains = <&sysc 32>;
-+			resets = <&cpg 208>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
 +			status = "disabled";
 +		};
 +
- 		sdhi0: sd at ee100000 {
- 			compatible = "renesas,sdhi-r8a774a1",
- 				     "renesas,rcar-gen3-sdhi";
++		pwm4: pwm at e6e34000 {
++			compatible = "renesas,pwm-r8a774a1", "renesas,pwm-rcar";
++			reg = <0 0xe6e34000 0 0x8>;
++			#pwm-cells = <2>;
++			clocks = <&cpg CPG_MOD 523>;
++			resets = <&cpg 523>;
++			power-domains = <&sysc 32>;
++			status = "disabled";
++		};
++
++		pwm5: pwm at e6e35000 {
++			compatible = "renesas,pwm-r8a774a1", "renesas,pwm-rcar";
++			reg = <0 0xe6e35000 0 0x8>;
++			#pwm-cells = <2>;
++			clocks = <&cpg CPG_MOD 523>;
++			resets = <&cpg 523>;
++			power-domains = <&sysc 32>;
++			status = "disabled";
++		};
++
++		pwm6: pwm at e6e36000 {
++			compatible = "renesas,pwm-r8a774a1", "renesas,pwm-rcar";
++			reg = <0 0xe6e36000 0 0x8>;
++			#pwm-cells = <2>;
++			clocks = <&cpg CPG_MOD 523>;
++			resets = <&cpg 523>;
++			power-domains = <&sysc 32>;
++			status = "disabled";
++		};
++
+ 		scif0: serial at e6e60000 {
+ 			compatible = "renesas,scif-r8a774a1",
+ 				     "renesas,rcar-gen3-scif", "renesas,scif";
 -- 
 2.11.0
