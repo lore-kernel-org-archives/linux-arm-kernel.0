@@ -1,45 +1,44 @@
 From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Thu, 13 Sep 2018 13:30:24 +0200
-Subject: [PATCH v7 7/7] ARM: configs: at91: unselect PIT
+Date: Thu, 13 Sep 2018 13:30:23 +0200
+Subject: [PATCH v7 6/7] ARM: configs: at91: use new TCB timer driver
 In-Reply-To: <20180913113024.3571-1-alexandre.belloni@bootlin.com>
 References: <20180913113024.3571-1-alexandre.belloni@bootlin.com>
-Message-ID: <20180913113024.3571-8-alexandre.belloni@bootlin.com>
+Message-ID: <20180913113024.3571-7-alexandre.belloni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PIT is not required anymore to successfully boot and may actually harm
-in case preempt-rt is used because the PIT interrupt is shared.
-Disable it so the TCB clocksource is used.
+Unselecting ATMEL_TCLIB switches the TCB timer driver from tcb_clksrc to
+timer-atmel-tcb.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
 ---
- arch/arm/configs/at91_dt_defconfig | 1 +
- arch/arm/configs/sama5_defconfig   | 1 +
- 2 files changed, 2 insertions(+)
+ arch/arm/configs/at91_dt_defconfig | 1 -
+ arch/arm/configs/sama5_defconfig   | 1 -
+ 2 files changed, 2 deletions(-)
 
 diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
-index 09f262e59fef..f4b253bd05ed 100644
+index e4b1be66b3f5..09f262e59fef 100644
 --- a/arch/arm/configs/at91_dt_defconfig
 +++ b/arch/arm/configs/at91_dt_defconfig
-@@ -19,6 +19,7 @@ CONFIG_ARCH_MULTI_V5=y
- CONFIG_ARCH_AT91=y
- CONFIG_SOC_AT91RM9200=y
- CONFIG_SOC_AT91SAM9=y
-+# CONFIG_ATMEL_CLOCKSOURCE_PIT is not set
- CONFIG_AEABI=y
- CONFIG_UACCESS_WITH_MEMCPY=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
+@@ -64,7 +64,6 @@ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_COUNT=4
+ CONFIG_BLK_DEV_RAM_SIZE=8192
+-CONFIG_ATMEL_TCLIB=y
+ CONFIG_ATMEL_SSC=y
+ CONFIG_SCSI=y
+ CONFIG_BLK_DEV_SD=y
 diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
-index f2bbc6339ca6..be92871ab155 100644
+index 2080025556b5..f2bbc6339ca6 100644
 --- a/arch/arm/configs/sama5_defconfig
 +++ b/arch/arm/configs/sama5_defconfig
-@@ -20,6 +20,7 @@ CONFIG_ARCH_AT91=y
- CONFIG_SOC_SAMA5D2=y
- CONFIG_SOC_SAMA5D3=y
- CONFIG_SOC_SAMA5D4=y
-+# CONFIG_ATMEL_CLOCKSOURCE_PIT is not set
- CONFIG_AEABI=y
- CONFIG_UACCESS_WITH_MEMCPY=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
+@@ -75,7 +75,6 @@ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_COUNT=4
+ CONFIG_BLK_DEV_RAM_SIZE=8192
+-CONFIG_ATMEL_TCLIB=y
+ CONFIG_ATMEL_SSC=y
+ CONFIG_EEPROM_AT24=y
+ CONFIG_SCSI=y
 -- 
 2.19.0
