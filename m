@@ -1,10 +1,10 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 13 Sep 2018 15:18:00 -0700
-Subject: [GIT PULL 2/3] bcm2835-dt-64-next-2018-09-09
-In-Reply-To: <1536817833-3900-2-git-send-email-stefan.wahren@i2se.com>
+Date: Thu, 13 Sep 2018 15:18:19 -0700
+Subject: [GIT PULL 3/3] bcm2835-defconfig-next-2018-09-09
+In-Reply-To: <1536817833-3900-3-git-send-email-stefan.wahren@i2se.com>
 References: <1536817833-3900-1-git-send-email-stefan.wahren@i2se.com>
- <1536817833-3900-2-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <6b7d2a13-8f41-414d-0f00-58b130bc12c2@gmail.com>
+ <1536817833-3900-3-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <ec141825-3eb4-1cfa-7d72-f44346f0aa2a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,18 +19,18 @@ On 09/12/18 22:50, Stefan Wahren wrote:
 > 
 > are available in the git repository at:
 > 
->   git://github.com/anholt/linux tags/bcm2835-dt-64-next-2018-09-09
+>   git://github.com/anholt/linux tags/bcm2835-defconfig-next-2018-09-09
 > 
-> for you to fetch changes up to a7eb26392b893bff92b1eb6483f4af3d2eb19510:
+> for you to fetch changes up to 99fa3b0c6082bff346f7d09f29e5edcc93d40bd3:
 > 
->   arm64: dts: broadcom: Add reference to Compute Module IO Board V3 (2018-08-31 07:01:34 +0200)
+>   ARM: bcm2835_defconfig: Enable bcm2835-audio (2018-09-02 18:49:33 +0200)
 > 
 > ----------------------------------------------------------------
-> This pull request brings in the arm64 reference for Raspberry Pi Compute
-> Module 3.
+> This pull request brings enables the RPi audio driver in the
+> bcm2835_defconfig.
 > 
 > ----------------------------------------------------------------
 
-Merged into devicetree-arm64/next, thanks Stefan!
+Merged into defconfig/next, thanks Stefan!
 -- 
 Florian
