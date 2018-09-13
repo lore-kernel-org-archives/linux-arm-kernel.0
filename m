@@ -1,99 +1,62 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Sep 2018 11:09:35 +0200
-Subject: [PATCH 40/58] arm64: dts: renesas: r8a77980: add PCIe support
+Date: Thu, 13 Sep 2018 11:09:37 +0200
+Subject: [PATCH 42/58] arm64: dts: renesas: r8a77965: m3nulcb-kf: Initial
+ device tree
 In-Reply-To: <cover.1536828567.git.horms+renesas@verge.net.au>
 References: <cover.1536828567.git.horms+renesas@verge.net.au>
-Message-ID: <ffa967e24c5817b48a3d5ecea2c12b9cdd807f0c.1536828567.git.horms+renesas@verge.net.au>
+Message-ID: <c41fc11850782c2e4115af683793bbb111c2d0ff.1536828567.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Eugeniu Rosca <roscaeugeniu@gmail.com>
 
-Describe the PCIe PHY, PCIEC, and PCIe bus clock in the R8A77980 device
-tree.
+This is based on the existing KF device tree sources:
+$ ls -1 arch/arm64/boot/dts/renesas/*-kf.dts
+arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb-kf.dts
+arch/arm64/boot/dts/renesas/r8a7795-h3ulcb-kf.dts
+arch/arm64/boot/dts/renesas/r8a7796-m3ulcb-kf.dts
 
-Based on the original (and large) patch by Vladimir Barinov.
-
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Eugeniu Rosca <erosca@de.adit-jv.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77980.dtsi | 49 +++++++++++++++++++++++++++++++
- 1 file changed, 49 insertions(+)
+ arch/arm64/boot/dts/renesas/Makefile                |  1 +
+ arch/arm64/boot/dts/renesas/r8a77965-m3nulcb-kf.dts | 16 ++++++++++++++++
+ 2 files changed, 17 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/renesas/r8a77965-m3nulcb-kf.dts
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77980.dtsi b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-index c099053cf5fe..d58e9f2c9883 100644
---- a/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-@@ -98,6 +98,13 @@
- 		clock-frequency = <0>;
- 	};
- 
-+	/* External PCIe clock - can be overridden by the board */
-+	pcie_bus_clk: pcie_bus {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
+diff --git a/arch/arm64/boot/dts/renesas/Makefile b/arch/arm64/boot/dts/renesas/Makefile
+index eb158d1f90e9..a8ce6594342d 100644
+--- a/arch/arm64/boot/dts/renesas/Makefile
++++ b/arch/arm64/boot/dts/renesas/Makefile
+@@ -9,6 +9,7 @@ dtb-$(CONFIG_ARCH_R8A7796) += r8a7796-m3ulcb-kf.dtb
+ dtb-$(CONFIG_ARCH_R8A7796) += r8a7796-salvator-xs.dtb
+ dtb-$(CONFIG_ARCH_R8A77965) += r8a77965-salvator-x.dtb r8a77965-salvator-xs.dtb
+ dtb-$(CONFIG_ARCH_R8A77965) += r8a77965-m3nulcb.dtb
++dtb-$(CONFIG_ARCH_R8A77965) += r8a77965-m3nulcb-kf.dtb
+ dtb-$(CONFIG_ARCH_R8A77970) += r8a77970-eagle.dtb r8a77970-v3msk.dtb
+ dtb-$(CONFIG_ARCH_R8A77980) += r8a77980-condor.dtb r8a77980-v3hsk.dtb
+ dtb-$(CONFIG_ARCH_R8A77990) += r8a77990-ebisu.dtb
+diff --git a/arch/arm64/boot/dts/renesas/r8a77965-m3nulcb-kf.dts b/arch/arm64/boot/dts/renesas/r8a77965-m3nulcb-kf.dts
+new file mode 100644
+index 000000000000..dadad97051b9
+--- /dev/null
++++ b/arch/arm64/boot/dts/renesas/r8a77965-m3nulcb-kf.dts
+@@ -0,0 +1,16 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Device Tree Source for the M3NULCB Kingfisher board
++ *
++ * Copyright (C) 2018 Renesas Electronics Corp.
++ * Copyright (C) 2018 Cogent Embedded, Inc.
++ */
 +
- 	pmu_a53 {
- 		compatible = "arm,cortex-a53-pmu";
- 		interrupts-extended = <&gic GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>,
-@@ -437,6 +444,16 @@
- 			status = "disabled";
- 		};
- 
-+		pcie_phy: pcie-phy at e65d0000 {
-+			compatible = "renesas,r8a77980-pcie-phy";
-+			reg = <0 0xe65d0000 0 0x8000>;
-+			#phy-cells = <0>;
-+			clocks = <&cpg CPG_MOD 319>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 319>;
-+			status = "disabled";
-+		};
++#include "r8a77965-m3nulcb.dts"
++#include "ulcb-kf.dtsi"
 +
- 		canfd: can at e66c0000 {
- 			compatible = "renesas,r8a77980-canfd",
- 				     "renesas,rcar-gen3-canfd";
-@@ -1047,6 +1064,38 @@
- 			resets = <&cpg 408>;
- 		};
- 
-+		pciec: pcie at fe000000 {
-+			compatible = "renesas,pcie-r8a77980",
-+				     "renesas,pcie-rcar-gen3";
-+			reg = <0 0xfe000000 0 0x80000>;
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+			bus-range = <0x00 0xff>;
-+			device_type = "pci";
-+			ranges = <
-+				0x01000000 0 0x00000000 0 0xfe100000 0 0x0100000
-+				0x02000000 0 0xfe200000 0 0xfe200000 0 0x0200000
-+				0x02000000 0 0x30000000 0 0x30000000 0 0x8000000
-+				0x42000000 0 0x38000000 0 0x38000000 0 0x8000000
-+			>;
-+			dma-ranges = <0x42000000 0 0x40000000 0 0x40000000
-+				      0 0x80000000>;
-+			interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
-+			#interrupt-cells = <1>;
-+			interrupt-map-mask = <0 0 0 0>;
-+			interrupt-map = <0 0 0 0 &gic GIC_SPI 148
-+					 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 319>, <&pcie_bus_clk>;
-+			clock-names = "pcie", "pcie_bus";
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 319>;
-+			phys = <&pcie_phy>;
-+			phy-names = "pcie";
-+			status = "disabled";
-+		};
-+
- 		vspd0: vsp at fea20000 {
- 			compatible = "renesas,vsp2";
- 			reg = <0 0xfea20000 0 0x5000>;
++/ {
++	model = "Renesas M3NULCB Kingfisher board based on r8a77965";
++	compatible = "shimafuji,kingfisher", "renesas,m3nulcb",
++		     "renesas,r8a77965";
++};
 -- 
 2.11.0
