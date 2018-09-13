@@ -1,28 +1,24 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 12 Sep 2018 21:20:53 -0700
-Subject: [PATCH] arm64: dts: meson: Switch simple-mfd and syscon order
-In-Reply-To: <7hh8iuxd1y.fsf@baylibre.com>
-References: <1532614438-7207-1-git-send-email-narmstrong@baylibre.com>
- <7hh8iuxd1y.fsf@baylibre.com>
-Message-ID: <CAOi56cVESykxXg4zcdLh89Rpyiyg587XCkvFG55FnMSro4vH2w@mail.gmail.com>
+Date: Wed, 12 Sep 2018 21:40:35 -0700
+Subject: [PATCH v3 3/3] ARM64: dts: meson-gx: add dmcbus and canvas nodes.
+In-Reply-To: <20180823114954.30704-4-mjourdan@baylibre.com> (Maxime Jourdan's
+ message of "Thu, 23 Aug 2018 13:49:54 +0200")
+References: <20180823114954.30704-1-mjourdan@baylibre.com>
+ <20180823114954.30704-4-mjourdan@baylibre.com>
+Message-ID: <7hworqvwl8.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2018 at 8:59 PM Kevin Hilman <khilman@baylibre.com> wrote:
->
-> Neil Armstrong <narmstrong@baylibre.com> writes:
->
-> > The order between "syscon" and "simple-mfd" is important because in these
-> > particular cases, the node needs to be first a "simple-mfd" to expose
-> > it's sub-nodes, and later on a "syscon" to permit other nodes to access
-> > this register space through the "syscon" mechanism.
-> >
-> > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->
-> Applied to v4.20/dt64,
->
+Maxime Jourdan <mjourdan@baylibre.com> writes:
 
-I spoke too soon, this doesn't apply cleanly on top of Jeromes
-reorder/cleanup.  Please respin/resend.
+> DMC is a small memory region with various registers,
+> including the ones needed for the canvas module.
+>
+> Reviewed-by: Jerome Brunet <jbrunet@baylibre.com>
+> Signed-off-by: Maxime Jourdan <mjourdan@baylibre.com>
+
+Applied to v4.20/dt64 with s/ARM64/arm64/ as requested.
+
+Thanks,
 
 Kevin
