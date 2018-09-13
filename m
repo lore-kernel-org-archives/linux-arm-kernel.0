@@ -1,77 +1,103 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 13 Sep 2018 17:42:24 +0100
-Subject: [PATCH v6 7/7] iommu/dma: Add bootup option "iommu.non_strict"
+Date: Thu, 13 Sep 2018 17:42:22 +0100
+Subject: [PATCH v6 5/7] iommu/arm-smmu-v3: Add support for non-strict mode
 In-Reply-To: <cover.1536856828.git.robin.murphy@arm.com>
 References: <cover.1536856828.git.robin.murphy@arm.com>
-Message-ID: <94fe2e15d36565e13218b007b9d5d9d08f190e5e.1536856828.git.robin.murphy@arm.com>
+Message-ID: <9804a057ac2fcd4d7a5c3878a7e6daa33751c9fc.1536856828.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Zhen Lei <thunder.leizhen@huawei.com>
 
-Add a bootup option to make the system manager can choose which mode to
-be used. The default mode is strict.
+Dynamically choose strict or non-strict mode for page table config based
+on the iommu domain type.
 
 Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-[rm: make it a generic iommu-dma feature]
+[rm: convert to domain attribute]
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- .../admin-guide/kernel-parameters.txt          | 13 +++++++++++++
- drivers/iommu/dma-iommu.c                      | 18 ++++++++++++++++++
- 2 files changed, 31 insertions(+)
+ drivers/iommu/arm-smmu-v3.c | 33 +++++++++++++++++++++++++++------
+ 1 file changed, 27 insertions(+), 6 deletions(-)
 
-diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-index 9871e649ffef..406b91759b62 100644
---- a/Documentation/admin-guide/kernel-parameters.txt
-+++ b/Documentation/admin-guide/kernel-parameters.txt
-@@ -1749,6 +1749,19 @@
- 		nobypass	[PPC/POWERNV]
- 			Disable IOMMU bypass, using IOMMU for PCI devices.
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index f10c852479fc..e2f0e4a3374d 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -612,6 +612,7 @@ struct arm_smmu_domain {
+ 	struct mutex			init_mutex; /* Protects smmu pointer */
  
-+	iommu.non_strict=	[ARM64]
-+			Format: { "0" | "1" }
-+			0 - strict mode, default.
-+			    Release IOVAs after the related TLBs are invalid
-+			    completely.
-+			1 - non-strict mode.
-+			    Put off TLBs invalidation and release memory first.
-+			    It's good for scatter-gather performance but lacks
-+			    full isolation, an untrusted device can access the
-+			    reused memory because the TLBs may still valid.
-+			    Please take	full consideration before choosing this
-+			    mode. Note that, VFIO will always use strict mode.
-+
- 	iommu.passthrough=
- 			[ARM64] Configure DMA to bypass the IOMMU by default.
- 			Format: { "0" | "1" }
-diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-index d91849fe4ebe..04d4c5453acd 100644
---- a/drivers/iommu/dma-iommu.c
-+++ b/drivers/iommu/dma-iommu.c
-@@ -62,6 +62,24 @@ struct iommu_dma_cookie {
+ 	struct io_pgtable_ops		*pgtbl_ops;
++	bool				non_strict;
  
- static bool iommu_dma_non_strict __read_mostly;
+ 	enum arm_smmu_domain_stage	stage;
+ 	union {
+@@ -1633,6 +1634,9 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
+ 	if (smmu->features & ARM_SMMU_FEAT_COHERENCY)
+ 		pgtbl_cfg.quirks = IO_PGTABLE_QUIRK_NO_DMA;
  
-+static int __init iommu_dma_setup(char *str)
-+{
-+	int ret;
++	if (smmu_domain->non_strict)
++		pgtbl_cfg.quirks |= IO_PGTABLE_QUIRK_NON_STRICT;
 +
-+	ret = kstrtobool(str, &iommu_dma_non_strict);
-+	if (ret)
-+		return ret;
-+
-+	if (iommu_dma_non_strict) {
-+		pr_warn("WARNING: iommu non-strict mode is chosen.\n"
-+			"It's good for scatter-gather performance but lacks full isolation\n");
-+		add_taint(TAINT_WARN, LOCKDEP_STILL_OK);
-+	}
-+
-+	return 0;
-+}
-+early_param("iommu.non_strict", iommu_dma_setup);
-+
- static inline size_t cookie_msi_granule(struct iommu_dma_cookie *cookie)
+ 	pgtbl_ops = alloc_io_pgtable_ops(fmt, &pgtbl_cfg, smmu_domain);
+ 	if (!pgtbl_ops)
+ 		return -ENOMEM;
+@@ -1934,13 +1938,17 @@ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
  {
- 	if (cookie->type == IOMMU_DMA_IOVA_COOKIE)
+ 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+ 
+-	if (domain->type != IOMMU_DOMAIN_UNMANAGED)
+-		return -EINVAL;
+-
+ 	switch (attr) {
+ 	case DOMAIN_ATTR_NESTING:
++		if (domain->type != IOMMU_DOMAIN_UNMANAGED)
++			return -EINVAL;
+ 		*(int *)data = (smmu_domain->stage == ARM_SMMU_DOMAIN_NESTED);
+ 		return 0;
++	case DOMAIN_ATTR_DMA_USE_FLUSH_QUEUE:
++		if (domain->type != IOMMU_DOMAIN_DMA)
++			return -EINVAL;
++		*(int *)data = smmu_domain->non_strict;
++		return 0;
+ 	default:
+ 		return -ENODEV;
+ 	}
+@@ -1952,13 +1960,15 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
+ 	int ret = 0;
+ 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+ 
+-	if (domain->type != IOMMU_DOMAIN_UNMANAGED)
+-		return -EINVAL;
+-
+ 	mutex_lock(&smmu_domain->init_mutex);
+ 
+ 	switch (attr) {
+ 	case DOMAIN_ATTR_NESTING:
++		if (domain->type != IOMMU_DOMAIN_UNMANAGED) {
++			ret = -EINVAL;
++			goto out_unlock;
++		}
++
+ 		if (smmu_domain->smmu) {
+ 			ret = -EPERM;
+ 			goto out_unlock;
+@@ -1970,6 +1980,17 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
+ 			smmu_domain->stage = ARM_SMMU_DOMAIN_S1;
+ 
+ 		break;
++	case DOMAIN_ATTR_DMA_USE_FLUSH_QUEUE:
++		if (domain->type != IOMMU_DOMAIN_DMA) {
++			ret = -EINVAL;
++			goto out_unlock;
++		}
++
++		smmu_domain->non_strict = *(int *)data;
++		if (smmu_domain->pgtbl_ops)
++			io_pgtable_set_non_strict(smmu_domain->pgtbl_ops,
++						  smmu_domain->non_strict);
++		break;
+ 	default:
+ 		ret = -ENODEV;
+ 	}
 -- 
 2.19.0.dirty
