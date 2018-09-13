@@ -1,132 +1,59 @@
-From: JOLLYS@xilinx.com (Jolly Shah)
-Date: Thu, 13 Sep 2018 17:51:17 +0000
-Subject: [PATCH v2 1/3] dt-bindings: power: Add ZynqMP power domain
- bindings
-In-Reply-To: <20180820194628.GA26783@bogus>
-References: <1534447304-12919-1-git-send-email-jollys@xilinx.com>
- <1534447304-12919-2-git-send-email-jollys@xilinx.com>
- <20180820194628.GA26783@bogus>
-Message-ID: <CY1PR02MB2138C05E97C1EFAEA921CB5CB81A0@CY1PR02MB2138.namprd02.prod.outlook.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Thu, 13 Sep 2018 23:35:41 +0530
+Subject: [PATCH v3 0/4] Add 96Boards Rock960 CE board support
+Message-ID: <20180913180545.29756-1-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+This patchset adds 96Boards Rock960 CE board support. Rock960 CE
+(Consumer Edition) board is one of the member of 96Boards Consumer
+Edition and AI platform and is manufactured by Vamrs Limited. Most of
+the board configuration is shared with the Ficus board manufactured by
+vamrs, which is an Enterprise 96Board.
 
-> -----Original Message-----
-> From: Rob Herring [mailto:robh at kernel.org]
-> Sent: Monday, August 20, 2018 12:46 PM
-> To: Jolly Shah <JOLLYS@xilinx.com>
-> Cc: matthias.bgg at gmail.com; andy.gross at linaro.org; shawnguo at kernel.org;
-> geert+renesas at glider.be; bjorn.andersson at linaro.org;
-> sean.wang at mediatek.com; m.szyprowski at samsung.com; Michal Simek
-> <michals@xilinx.com>; mark.rutland at arm.com; Rajan Vaja
-> <RAJANV@xilinx.com>; devicetree at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Rajan Vaja
-> <RAJANV@xilinx.com>; Jolly Shah <JOLLYS@xilinx.com>
-> Subject: Re: [PATCH v2 1/3] dt-bindings: power: Add ZynqMP power domain
-> bindings
-> 
-> On Thu, Aug 16, 2018 at 12:21:42PM -0700, Jolly Shah wrote:
-> > From: Rajan Vaja <rajan.vaja@xilinx.com>
-> >
-> > Add documentation to describe ZynqMP power domain bindings.
-> >
-> > Signed-off-by: Rajan Vaja <rajan.vaja@xilinx.com>
-> > Signed-off-by: Jolly Shah <jollys@xilinx.com>
-> > ---
-> >  .../firmware/xilinx/xlnx,zynqmp-firmware.txt       | 47
-> ++++++++++++++++++++++
-> 
-> This should be with all the other power domain bindings.
-> 
-> >  1 file changed, 47 insertions(+)
-> >
-> > diff --git
-> > a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmwa
-> > re.txt
-> > b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmwa
-> > re.txt
-> > index d215d15..5fa10a0 100644
-> > ---
-> > a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmwa
-> > re.txt
-> > +++ b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-fi
-> > +++ rmware.txt
-> > @@ -64,6 +64,29 @@ Output clocks are registered based on clock
-> > information received  from firmware. Output clocks indexes are
-> > mentioned in  include/dt-bindings/clock/xlnx,zynqmp-clk.h.
-> >
-> > +-----------------------------------------------------------
-> > +Device Tree Bindings for the Xilinx Zynq MPSoC PM domains
-> > +-----------------------------------------------------------
-> > +The binding for zynqmp-power-controller follow the common generic PM
-> > +domain binding[1].
-> > +
-> > +[1] Documentation/devicetree/bindings/power/power_domain.txt
-> > +
-> > +== Zynq MPSoC Generic PM Domain Node ==
-> > +
-> > +Required properties:
-> > + - compatible:	Must be: "xlnx,zynqmp-power-controller"
-> > +
-> > +This node contains a number of subnodes, each representing a single
-> > +PM domain that PM domain consumer devices reference.
-> > +
-> > +== PM Domain Nodes ==
-> > +
-> > +Required properties:
-> > + - #power-domain-cells:	Number of cells in a PM domain specifier. Must
-> be 0.
-> > + - pd-id:		Domain identifier as defined by platform firmware.
-> > +			This identifier is passed to the PM firmware.
-> 
-> Make this a cell for the power domain consumer.
-[Jolly] We have more than one Ids for GPU device. Also they don't have parent child relationship and hence are defined as flat hierarchy. (shown in example below)
+For the sake of avoiding code duplication, a common rock960.dtsi file
+with common DT nodes for both boards and separate board specific DTS
+files has been added.
+
+To be specific, below are some of the key differences between both
+boards:
+
+1. Different host enable GPIO for USB
+2. Different power and reset GPIO for PCI-E
+3. No Ethernet port on Rock960
+
+While adding the board support, SD card Chip detection support is also
+added to the common dtsi file, shared by both boards.
+
+This series has been tested on Rock960 CE v1.2 board.
 
 Thanks,
-Jolly Shah
+Mani
 
-> 
-> > +
-> >  -------
-> >  Example
-> >  -------
-> > @@ -78,5 +101,29 @@ firmware {
-> >  			clocks = <&pss_ref_clk>, <&video_clk>,
-> <&pss_alt_ref_clk>, <&aux_ref_clk>, <&gt_crx_ref_clk>;
-> >  			clock-names = "pss_ref_clk", "video_clk",
-> "pss_alt_ref_clk","aux_ref_clk", "gt_crx_ref_clk";
-> >  		};
-> > +		zynqmp-power-controller {
-> > +			compatible = "xlnx,zynqmp-power-controller";
-> > +
-> > +			pd_usb0: pd-usb0 {
-> > +				pd-id = <22>;
-> > +				#power-domain-cells = <0>;
-> > +			};
-> > +
-> > +			pd_sata: pd-sata {
-> > +				pd-id = <28>;
-> > +				#power-domain-cells = <0>;
-> > +			};
-> > +
-> > +			pd_gpu : pd-gpu {
-> > +				pd-id = <58 20 21>;
-> > +				#power-domain-cells = <0>;
-> > +			};
-> > +		};
-> >  	};
-> >  };
-> > +
-> > +sata0: ahci at SATA_AHCI_HBA {
-> 
-> Don't use defines in unit-addresses (or reg for that matter). It's pointless
-> indirection.
-> 
-> > +	...
-> > +	power-domains = <&pd_sata>;
-> > +	...
-> > +};
-> > --
-> > 2.7.4
-> >
+Changes in v3:
+
+* Moved usb and pcie nodes to common dtsi and kept only the properties
+  which differ in board specific dts.
+* Updated the common dtsi commit description.
+
+Changes in v2:
+
+* Changed the board compatible to "vamrs,rock960"
+
+Manivannan Sadhasivam (4):
+  arm64: dts: rockchip: Split out common nodes for Rock960 based boards
+  dt-bindings: arm: rockchip: Add binding for Rock960 board
+  arm64: boot: dts: rockchip: Add support for Rock960 board
+  arm64: dts: rockchip: Enable SD card detection for Rock960 boards
+
+ .../devicetree/bindings/arm/rockchip.txt      |   4 +
+ arch/arm64/boot/dts/rockchip/Makefile         |   1 +
+ arch/arm64/boot/dts/rockchip/rk3399-ficus.dts | 524 +----------------
+ .../boot/dts/rockchip/rk3399-rock960.dts      |  52 ++
+ .../boot/dts/rockchip/rk3399-rock960.dtsi     | 542 ++++++++++++++++++
+ 5 files changed, 604 insertions(+), 519 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-rock960.dts
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
+
+-- 
+2.17.1
