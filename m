@@ -1,50 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Sep 2018 11:09:18 +0200
-Subject: [PATCH 23/58] arm64: dts: renesas: r8a774a1: Add INTC-EX device node
+Date: Thu, 13 Sep 2018 11:09:41 +0200
+Subject: [PATCH 46/58] arm64: dts: renesas: r8a77965: Fix HS-USB compatible
 In-Reply-To: <cover.1536828567.git.horms+renesas@verge.net.au>
 References: <cover.1536828567.git.horms+renesas@verge.net.au>
-Message-ID: <a21c572ce8bc7466816ea8601d7eb0b4ca12d40c.1536828567.git.horms+renesas@verge.net.au>
+Message-ID: <99584d93e301d820d817bba2eb77b9152e13009c.1536828567.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Biju Das <biju.das@bp.renesas.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Add support for the Interrupt Controller for External Devices
-(INTC-EX) on RZ/G2M.
+Should be "renesas,usbhs-r8a77965", not "renesas,usbhs-r8a7796".
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Fixes: a06e8af801760a98 ("arm64: dts: renesas: r8a77965: add HS-USB node")
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Reviewed-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a774a1.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77965.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-index 81fba7f19d44..15d7785fb177 100644
---- a/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a774a1.dtsi
-@@ -144,6 +144,22 @@
- 			#power-domain-cells = <1>;
+diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+index 7f477a15fa59..108f53cfef5c 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
+@@ -589,7 +589,7 @@
  		};
  
-+		intc_ex: interrupt-controller at e61c0000 {
-+			compatible = "renesas,intc-ex-r8a774a1", "renesas,irqc";
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			reg = <0 0xe61c0000 0 0x200>;
-+			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 407>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 407>;
-+		};
-+
- 		hscif0: serial at e6540000 {
- 			compatible = "renesas,hscif-r8a774a1",
- 				     "renesas,rcar-gen3-hscif",
+ 		hsusb: usb at e6590000 {
+-			compatible = "renesas,usbhs-r8a7796",
++			compatible = "renesas,usbhs-r8a77965",
+ 				     "renesas,rcar-gen3-usbhs";
+ 			reg = <0 0xe6590000 0 0x100>;
+ 			interrupts = <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
 -- 
 2.11.0
