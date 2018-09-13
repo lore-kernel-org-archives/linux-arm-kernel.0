@@ -1,9 +1,10 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 13 Sep 2018 15:17:32 -0700
-Subject: [GIT PULL 1/3] bcm2835-dt-next-2018-09-09
-In-Reply-To: <1536817833-3900-1-git-send-email-stefan.wahren@i2se.com>
+Date: Thu, 13 Sep 2018 15:18:00 -0700
+Subject: [GIT PULL 2/3] bcm2835-dt-64-next-2018-09-09
+In-Reply-To: <1536817833-3900-2-git-send-email-stefan.wahren@i2se.com>
 References: <1536817833-3900-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <824f8cea-d80c-e2ec-11f1-154f97479fd2@gmail.com>
+ <1536817833-3900-2-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <6b7d2a13-8f41-414d-0f00-58b130bc12c2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,18 +19,18 @@ On 09/12/18 22:50, Stefan Wahren wrote:
 > 
 > are available in the git repository at:
 > 
->   git://github.com/anholt/linux tags/bcm2835-dt-next-2018-09-09
+>   git://github.com/anholt/linux tags/bcm2835-dt-64-next-2018-09-09
 > 
-> for you to fetch changes up to 6ef5bd6cfd5da9fe67aea031fd0a66ff77d64ad6:
+> for you to fetch changes up to a7eb26392b893bff92b1eb6483f4af3d2eb19510:
 > 
->   ARM: dts: bcm283x-rpi-lan7515: Enable Ethernet LEDs (2018-09-05 21:31:25 +0200)
+>   arm64: dts: broadcom: Add reference to Compute Module IO Board V3 (2018-08-31 07:01:34 +0200)
 > 
 > ----------------------------------------------------------------
-> This pull request brings in a board DT for the Raspberry Pi Compute
-> Module 3, its I/O board and enables the Ethernet LEDs for the RPi 3B+.
+> This pull request brings in the arm64 reference for Raspberry Pi Compute
+> Module 3.
 > 
 > ----------------------------------------------------------------
 
-Merged into devicetree/next, thanks Stefan!
+Merged into devicetree-arm64/next, thanks Stefan!
 -- 
 Florian
