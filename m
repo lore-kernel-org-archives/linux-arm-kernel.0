@@ -1,95 +1,75 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Sep 2018 11:09:12 +0200
-Subject: [PATCH 17/58] arm64: dts: renesas: r8a77965: Add OPPs table for cpu
- devices
+Date: Thu, 13 Sep 2018 11:09:14 +0200
+Subject: [PATCH 19/58] arm64: dts: renesas: v3msk: add eMMC support
 In-Reply-To: <cover.1536828567.git.horms+renesas@verge.net.au>
 References: <cover.1536828567.git.horms+renesas@verge.net.au>
-Message-ID: <62531104428b39e2794a015af17154415fc33c4f.1536828567.git.horms+renesas@verge.net.au>
+Message-ID: <8d9923b3a2f6c0e4ad3f9d9cad6e9010cf0d67e6.1536828567.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dien Pham <dien.pham.ry@renesas.com>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-This patch adds OPPs table for CA57{0,1} cpu devices
+Add the eMMC chip support for the V3M Started Kit board.
 
-Signed-off-by: Dien Pham <dien.pham.ry@renesas.com>
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
-Tested-by: Simon Horman <horms+renesas@verge.net.au>
-[simon: do not give nodes unit names as they have no bus addresses]
+Based on the original (and large) patches by Vladimir Barinov.
+
+Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77965.dtsi | 44 +++++++++++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77965.dtsi b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-index e7128fb65e33..5ce978502ee9 100644
---- a/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77965.dtsi
-@@ -60,6 +60,46 @@
- 		clock-frequency = <0>;
+diff --git a/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts b/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts
+index 8eac8ca6550b..0dbcb4cccc18 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts
++++ b/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts
+@@ -51,6 +51,15 @@
+ 		regulator-always-on;
  	};
  
-+	cluster0_opp: opp_table0 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp-500000000 {
-+			opp-hz = /bits/ 64 <500000000>;
-+			opp-microvolt = <830000>;
-+			clock-latency-ns = <300000>;
-+		};
-+		opp-1000000000 {
-+			opp-hz = /bits/ 64 <1000000000>;
-+			opp-microvolt = <830000>;
-+			clock-latency-ns = <300000>;
-+		};
-+		opp-1500000000 {
-+			opp-hz = /bits/ 64 <1500000000>;
-+			opp-microvolt = <830000>;
-+			clock-latency-ns = <300000>;
-+			opp-suspend;
-+		};
-+		opp-1600000000 {
-+			opp-hz = /bits/ 64 <1600000000>;
-+			opp-microvolt = <900000>;
-+			clock-latency-ns = <300000>;
-+			turbo-mode;
-+		};
-+		opp-1700000000 {
-+			opp-hz = /bits/ 64 <1700000000>;
-+			opp-microvolt = <900000>;
-+			clock-latency-ns = <300000>;
-+			turbo-mode;
-+		};
-+		opp-1800000000 {
-+			opp-hz = /bits/ 64 <1800000000>;
-+			opp-microvolt = <960000>;
-+			clock-latency-ns = <300000>;
-+			turbo-mode;
-+		};
++	vcc_vddq_vin0: regulator-2 {
++		compatible = "regulator-fixed";
++		regulator-name = "VCC_VDDQ_VIN0";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-boot-on;
++		regulator-always-on;
 +	};
 +
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -71,6 +111,8 @@
- 			power-domains = <&sysc R8A77965_PD_CA57_CPU0>;
- 			next-level-cache = <&L2_CA57>;
- 			enable-method = "psci";
-+			clocks =<&cpg CPG_CORE R8A77965_CLK_Z>;
-+			operating-points-v2 = <&cluster0_opp>;
- 		};
+ 	lvds-decoder {
+ 		compatible = "thine,thc63lvd1024";
+ 		vcc-supply = <&vcc_d3_3v>;
+@@ -128,6 +137,12 @@
+ 		function = "i2c0";
+ 	};
  
- 		a57_1: cpu at 1 {
-@@ -80,6 +122,8 @@
- 			power-domains = <&sysc R8A77965_PD_CA57_CPU1>;
- 			next-level-cache = <&L2_CA57>;
- 			enable-method = "psci";
-+			clocks =<&cpg CPG_CORE R8A77965_CLK_Z>;
-+			operating-points-v2 = <&cluster0_opp>;
- 		};
++	mmc_pins: mmc_3_3v {
++		groups = "mmc_data8", "mmc_ctrl";
++		function = "mmc";
++		power-source = <3300>;
++	};
++
+ 	scif0_pins: scif0 {
+ 		groups = "scif0_data";
+ 		function = "scif0";
+@@ -192,6 +207,17 @@
+ 	};
+ };
  
- 		L2_CA57: cache-controller-0 {
++&mmc0 {
++	pinctrl-0 = <&mmc_pins>;
++	pinctrl-names = "default";
++
++	vmmc-supply = <&vcc_d3_3v>;
++	vqmmc-supply = <&vcc_vddq_vin0>;
++	bus-width = <8>;
++	non-removable;
++	status = "okay";
++};
++
+ &scif0 {
+ 	pinctrl-0 = <&scif0_pins>;
+ 	pinctrl-names = "default";
 -- 
 2.11.0
