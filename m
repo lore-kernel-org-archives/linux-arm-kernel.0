@@ -1,47 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 13 Sep 2018 16:53:02 +0100
-Subject: [RFC PATCH 00/11] Avoid synchronous TLB invalidation for
- intermediate page-table entries on arm64
-In-Reply-To: <f8ba271b-87c0-29ef-1216-77d5d391d5c8@redhat.com>
-References: <1535125966-7666-1-git-send-email-will.deacon@arm.com>
- <3dd55e21-7424-071a-0f7e-d24fc2396f2a@redhat.com>
- <20180905122828.GF20186@arm.com>
- <f8ba271b-87c0-29ef-1216-77d5d391d5c8@redhat.com>
-Message-ID: <20180913155301.GA20290@arm.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 13 Sep 2018 08:57:03 -0700
+Subject: [PATCH i2c-next v6] i2c: aspeed: Handle master/slave combined
+ irq events properly
+In-Reply-To: <f47b3050-3abd-caa4-cc71-4b13ef60e2c0@kaod.org>
+References: <20180911233302.GA18799@roeck-us.net>
+ <5698ca34-14c9-8d05-c4e6-5acf85ff9d14@linux.intel.com>
+ <20180912013449.GA12612@roeck-us.net>
+ <7fd98646-fb5a-be4d-ce37-84b74e0fa8b3@linux.intel.com>
+ <20180912195844.GA6893@roeck-us.net>
+ <da7f4691-7428-3114-32bb-e0171f6c7228@linux.intel.com>
+ <20180912203059.GA18201@roeck-us.net>
+ <fb185839-3ae0-01dc-09e8-f22db55ecb04@kaod.org>
+ <3f86e75f-1502-eae8-0633-d087937111c8@roeck-us.net>
+ <f47b3050-3abd-caa4-cc71-4b13ef60e2c0@kaod.org>
+Message-ID: <20180913155703.GA22605@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 07, 2018 at 02:36:08AM -0400, Jon Masters wrote:
-> On 09/05/2018 08:28 AM, Will Deacon wrote:
-> > On Tue, Sep 04, 2018 at 02:38:02PM -0400, Jon Masters wrote:
-> >> On 08/24/2018 11:52 AM, Will Deacon wrote:
+On Thu, Sep 13, 2018 at 05:48:59PM +0200, C?dric Le Goater wrote:
+> On 09/13/2018 03:33 PM, Guenter Roeck wrote:
+[ ... ]
+> >>> ? /*
+> >>> ?? * The state machine needs some refinement. It is only used to track
+> >>> ?? * invalid STOP commands for the moment.
+> >>> @@ -188,7 +215,7 @@ static void aspeed_i2c_bus_handle_cmd(AspeedI2CBus *bus, uint64_t value)
+> >>> ? {
+> >>> ????? bus->cmd &= ~0xFFFF;
+> >>> ????? bus->cmd |= value & 0xFFFF;
+> >>> -??? bus->intr_status = 0;> +??? bus->intr_status &= I2CD_INTR_RX_DONE;
 > >>
-> >>> I hacked up this RFC on the back of the recent changes to the mmu_gather
-> >>> stuff in mainline. It's had a bit of testing and it looks pretty good so
-> >>> far.
-> >>
-> >> I will request the server folks go and test this. You'll probably
-> >> remember a couple of parts we've seen where aggressive walker caches
-> >> ended up (correctly) seeing stale page table entries and we had all
-> >> manner of horrifically hard to debug problems. We have some fairly nice
-> >> reproducers that were able to find this last time that we can test.
+> >> it deserves a comment to understand which scenario we are trying to handle.
+> >> ?? 
 > > 
-> > Cheers, Jon, that would be very helpful. You're probably best off using
-> > my (rebasing) tlb branch rather than picking the RFC:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git tlb
-> > 
-> > Let me know if you'd prefer something stable (I can tag it with a date).
+> > Ok. FWIW, I wonder if intr_status should be touched here in the first place,
+> > but I neither have the hardware nor a datasheet, so I don't know if any bits
+> > are auto-cleared.
 > 
-> That would be useful. I've prodded each of the Arm server SoC vendors I
-> work with via our weekly call to have them each specifically check this.
-> A tag would be helpful to that effort I expect. They all claim to be
-> watching this thread now, so we'll see if they see cabbages here.
+> I just pushed a patch on my branch with some more explanation : 
+> 
+> 	https://github.com/legoater/qemu/commits/aspeed-3.1
+> 
+That seems to suggest that none of the status bits auto-clears, and that
+the above code clearing intr_status should be removed entirely.
+Am I missing something ?
 
-This is now all queued up in the (stable) arm64 for-next/core branch:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=for-next/core
-
-so that's the best place to grab the patches.
-
-Will
+Thanks,
+Guenter
