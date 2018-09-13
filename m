@@ -1,21 +1,21 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 12 Sep 2018 20:59:37 -0700
-Subject: [PATCH] arm64: dts: meson: Switch simple-mfd and syscon order
-In-Reply-To: <1532614438-7207-1-git-send-email-narmstrong@baylibre.com> (Neil
- Armstrong's message of "Thu, 26 Jul 2018 16:13:58 +0200")
-References: <1532614438-7207-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <7hh8iuxd1y.fsf@baylibre.com>
+Date: Wed, 12 Sep 2018 20:59:54 -0700
+Subject: [PATCH] ARM64: dts: meson-gx: increase default shared CMA pool
+ size
+In-Reply-To: <1536085844-29328-1-git-send-email-christianshewitt@gmail.com>
+ (Christian Hewitt's message of "Tue, 4 Sep 2018 22:30:43 +0400")
+References: <1536085844-29328-1-git-send-email-christianshewitt@gmail.com>
+Message-ID: <7hd0tixd1h.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
+Christian Hewitt <christianshewitt@gmail.com> writes:
 
-> The order between "syscon" and "simple-mfd" is important because in these
-> particular cases, the node needs to be first a "simple-mfd" to expose
-> it's sub-nodes, and later on a "syscon" to permit other nodes to access
-> this register space through the "syscon" mechanism.
+> Devices using the new V4L2 mem2mem vdec require a larger CMA pool. As
+> nearly all GX* devices are video/media focused and will use it, set a
+> larger (256MB) default value.
 >
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> Signed-off-by: Christian Hewitt <christianshewitt@gmail.com>
 
 Applied to v4.20/dt64,
 
