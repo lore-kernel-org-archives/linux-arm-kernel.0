@@ -1,62 +1,56 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 13 Sep 2018 09:46:17 -0700
-Subject: [PATCH v2 2/4] crypto: skcipher - Enforce non-ASYNC for on-stack
- requests
-In-Reply-To: <20180911055230.iiiq2uu5gczlwjon@gondor.apana.org.au>
-References: <20180906225854.40989-1-keescook@chromium.org>
- <20180906225854.40989-3-keescook@chromium.org>
- <20180907034242.zhm4dglzkldhvh3x@gondor.apana.org.au>
- <CAKv+Gu9kHpBTKjQKA3W4Q424FeY+Zq4srq2-r0MxjfCNKHT_5A@mail.gmail.com>
- <20180911055230.iiiq2uu5gczlwjon@gondor.apana.org.au>
-Message-ID: <CAGXu5j+ti_nzxeu64e-X+igNEsnXiW1rjkn7R63DMBCxBOeTNg@mail.gmail.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Thu, 13 Sep 2018 12:53:30 -0400 (EDT)
+Subject: [RFC PATCH 00/11] Avoid synchronous TLB invalidation for
+ intermediate page-table entries on arm64
+In-Reply-To: <20180913155301.GA20290@arm.com>
+References: <1535125966-7666-1-git-send-email-will.deacon@arm.com>
+ <3dd55e21-7424-071a-0f7e-d24fc2396f2a@redhat.com>
+ <20180905122828.GF20186@arm.com>
+ <f8ba271b-87c0-29ef-1216-77d5d391d5c8@redhat.com>
+ <20180913155301.GA20290@arm.com>
+Message-ID: <0D8B76BD-C09D-4B51-97DD-3DB57EB85DB6@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2018 at 10:52 PM, Herbert Xu
-<herbert@gondor.apana.org.au> wrote:
-> On Fri, Sep 07, 2018 at 08:56:23AM +0200, Ard Biesheuvel wrote:
->>
->> OK, so given that all SKCIPHER_REQUEST_ON_STACK occurrences are
->> updated in this series anyway, perhaps we should add
->> skcipher_[en|de]crypt_onstack() flavors that encapsulate the
->> additional check? Only question is how to enforce at compile time that
->> those are used instead of the ordinary ones when using a stack
->> allocated request. Would you mind using some macro foo here involving
->> __builtin_types_compatible_p() ?
->
-> Something like a completely new type which in reality is just a
-> wrapper around skcipher:
->
->         struct crypto_sync_skcipher {
->                 struct crypto_skcipher base;
->         } tfm;
->
->         tfm = crypto_alloc_sync_skcipher(...);
->
->         crypto_sync_skcipher_encrypt(...)
->         crypto_sync_skcipher_decrypt(...)
->
-> These functions would just be trivial inline functions around their
-> crypto_skcipher counterparts.
-
-This means new wrappers for the other helpers too, yes? For example:
-
-        SKCIPHER_REQUEST_ON_STACK(nreq, ctx->null);
-
-        skcipher_request_set_tfm(nreq, ctx->null);
-        skcipher_request_set_callback(nreq, req->base.flags, NULL, NULL);
-        skcipher_request_set_crypt(nreq, req->src, req->dst, nbytes, NULL);
-
-        return crypto_skcipher_encrypt(nreq);
-
-For the above, we'd also need:
-
-sync_skcipher_request_set_tfm()
-sync_skcipher_request_set_callback()
-sync_skcipher_request_set_crypt()
-
--Kees
+Tnx
 
 -- 
-Kees Cook
-Pixel Security
+Computer Architect
+
+
+> On Sep 13, 2018, at 11:52, Will Deacon <will.deacon@arm.com> wrote:
+> 
+>> On Fri, Sep 07, 2018 at 02:36:08AM -0400, Jon Masters wrote:
+>>> On 09/05/2018 08:28 AM, Will Deacon wrote:
+>>>> On Tue, Sep 04, 2018 at 02:38:02PM -0400, Jon Masters wrote:
+>>>>> On 08/24/2018 11:52 AM, Will Deacon wrote:
+>>>>> 
+>>>>> I hacked up this RFC on the back of the recent changes to the mmu_gather
+>>>>> stuff in mainline. It's had a bit of testing and it looks pretty good so
+>>>>> far.
+>>>> 
+>>>> I will request the server folks go and test this. You'll probably
+>>>> remember a couple of parts we've seen where aggressive walker caches
+>>>> ended up (correctly) seeing stale page table entries and we had all
+>>>> manner of horrifically hard to debug problems. We have some fairly nice
+>>>> reproducers that were able to find this last time that we can test.
+>>> 
+>>> Cheers, Jon, that would be very helpful. You're probably best off using
+>>> my (rebasing) tlb branch rather than picking the RFC:
+>>> 
+>>>  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git tlb
+>>> 
+>>> Let me know if you'd prefer something stable (I can tag it with a date).
+>> 
+>> That would be useful. I've prodded each of the Arm server SoC vendors I
+>> work with via our weekly call to have them each specifically check this.
+>> A tag would be helpful to that effort I expect. They all claim to be
+>> watching this thread now, so we'll see if they see cabbages here.
+> 
+> This is now all queued up in the (stable) arm64 for-next/core branch:
+> 
+>  https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=for-next/core
+> 
+> so that's the best place to grab the patches.
+> 
+> Will
