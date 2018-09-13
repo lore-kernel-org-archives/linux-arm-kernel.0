@@ -1,109 +1,52 @@
-From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Thu, 13 Sep 2018 14:53:47 +0200
-Subject: Patch "irqchip/gicv3-its: Fix memory leak in its_free_tables()" has
- been added to the 4.4-stable tree
-Message-ID: <1536843227189203@kroah.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 13 Sep 2018 14:02:14 +0100
+Subject: [PATCH] asm-generic: io: Fix ioport_map() for
+ !CONFIG_GENERIC_IOMAP && CONFIG_INDIRECT_PIO
+In-Reply-To: <1536842907-51732-1-git-send-email-andrew.murray@arm.com>
+References: <1536842907-51732-1-git-send-email-andrew.murray@arm.com>
+Message-ID: <20180913130214.GA13242@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Sep 13, 2018 at 01:48:27PM +0100, Andrew Murray wrote:
+> The !CONFIG_GENERIC_IOMAP version of ioport_map uses MMIO_UPPER_LIMIT to
+> prevent users from making I/O accesses outside the expected I/O range -
+> however it erroneously treats MMIO_UPPER_LIMIT as a mask which is
+> contradictory to its other users.
+> 
+> The introduction of CONFIG_INDIRECT_PIO, which subtracts an arbitrary
+> amount from IO_SPACE_LIMIT to form MMIO_UPPER_LIMIT, results in ioport_map
+> mangling the given port rather than capping it.
+> 
+> We address this by aligning more closely with the CONFIG_GENERIC_IOMAP
+> implementation of ioport_map by using the comparison operator and
+> returning NULL where the port exceeds MMIO_UPPER_LIMIT. Though note that
+> we preserve the existing behavior of masking with IO_SPACE_LIMIT such that
+> we don't break existing buggy drivers that somehow rely on this masking.
+> 
+> Fixes: 5745392e0c2b ("PCI: Apply the new generic I/O management on PCI IO hosts")
+> Reported-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> ---
+>  include/asm-generic/io.h | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
+> index 66d1d45..d356f80 100644
+> --- a/include/asm-generic/io.h
+> +++ b/include/asm-generic/io.h
+> @@ -1026,7 +1026,8 @@ static inline void __iomem *ioremap_wt(phys_addr_t offset, size_t size)
+>  #define ioport_map ioport_map
+>  static inline void __iomem *ioport_map(unsigned long port, unsigned int nr)
+>  {
+> -	return PCI_IOBASE + (port & MMIO_UPPER_LIMIT);
+> +	port &= IO_SPACE_LIMIT;
+> +	return (port > MMIO_UPPER_LIMIT) ? NULL : PCI_IOBASE + port;
+>  }
+>  #endif
 
-This is a note to let you know that I've just added the patch titled
+Thanks, that fixes legacy virtio PCI devices under kvmtool, so:
 
-    irqchip/gicv3-its: Fix memory leak in its_free_tables()
+Tested-by: Will Deacon <will.deacon@arm.com>
 
-to the 4.4-stable tree which can be found at:
-    http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
-
-The filename of the patch is:
-     irqchip-gicv3-its-fix-memory-leak-in-its_free_tables.patch
-and it can be found in the queue-4.4 subdirectory.
-
-If you, or anyone else, feels it should not be added to the stable tree,
-please let <stable@vger.kernel.org> know about it.
-
-
->From 1a485f4d2e28efd77075b2952926683d6c245633 Mon Sep 17 00:00:00 2001
-From: Shanker Donthineni <shankerd@codeaurora.org>
-Date: Mon, 1 Feb 2016 20:19:44 -0600
-Subject: irqchip/gicv3-its: Fix memory leak in its_free_tables()
-
-From: Shanker Donthineni <shankerd@codeaurora.org>
-
-commit 1a485f4d2e28efd77075b2952926683d6c245633 upstream.
-
-The current ITS driver has a memory leak in its_free_tables(). It
-happens on tear down path of the driver when its_probe() call fails.
-its_free_tables() should free the exact number of pages that have
-been allocated, not just a single page as current code does.
-
-This patch records the memory size for each ITS_BASERn at the time of
-page allocation and uses the same size information when freeing pages
-to fix the issue.
-
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Vikram Sethi <vikrams@codeaurora.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Link: http://lkml.kernel.org/r/1454379584-21772-1-git-send-email-shankerd at codeaurora.org
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
----
- drivers/irqchip/irq-gic-v3-its.c |   17 +++++++++++------
- 1 file changed, 11 insertions(+), 6 deletions(-)
-
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -67,7 +67,10 @@ struct its_node {
- 	unsigned long		phys_base;
- 	struct its_cmd_block	*cmd_base;
- 	struct its_cmd_block	*cmd_write;
--	void			*tables[GITS_BASER_NR_REGS];
-+	struct {
-+		void		*base;
-+		u32		order;
-+	} tables[GITS_BASER_NR_REGS];
- 	struct its_collection	*collections;
- 	struct list_head	its_device_list;
- 	u64			flags;
-@@ -816,9 +819,10 @@ static void its_free_tables(struct its_n
- 	int i;
- 
- 	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
--		if (its->tables[i]) {
--			free_page((unsigned long)its->tables[i]);
--			its->tables[i] = NULL;
-+		if (its->tables[i].base) {
-+			free_pages((unsigned long)its->tables[i].base,
-+				   its->tables[i].order);
-+			its->tables[i].base = NULL;
- 		}
- 	}
- }
-@@ -899,7 +903,8 @@ retry_alloc_baser:
- 			goto out_free;
- 		}
- 
--		its->tables[i] = base;
-+		its->tables[i].base = base;
-+		its->tables[i].order = order;
- 
- retry_baser:
- 		val = (virt_to_phys(base) 				 |
-@@ -949,7 +954,7 @@ retry_baser:
- 			 * something is horribly wrong...
- 			 */
- 			free_pages((unsigned long)base, order);
--			its->tables[i] = NULL;
-+			its->tables[i].base = NULL;
- 
- 			switch (psz) {
- 			case SZ_16K:
-
-
-Patches currently in stable-queue which might be from shankerd at codeaurora.org are
-
-queue-4.4/irqchip-gicv3-its-avoid-cache-flush-beyond-its_basern-memory-size.patch
-queue-4.4/irqchip-gicv3-its-fix-memory-leak-in-its_free_tables.patch
+Will
