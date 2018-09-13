@@ -1,68 +1,57 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 13 Sep 2018 11:49:14 +0100
-Subject: [PATCH v3] PCI: dwc: fix scheduling while atomic issues
-In-Reply-To: <20180913182926.365d155b@xhacker.debian>
-References: <20180829110408.556c3622@xhacker.debian>
- <20180910165722.38218779@xhacker.debian>
- <20180913091534.GB32721@e107981-ln.cambridge.arm.com>
- <20180913182926.365d155b@xhacker.debian>
-Message-ID: <20180913104914.GA2051@e107981-ln.cambridge.arm.com>
+From: yaojun8558363@gmail.com (Jun Yao)
+Date: Thu, 13 Sep 2018 18:50:21 +0800
+Subject: [RESEND PATCH v4 5/6] arm64/mm: Populate the swapper_pg_dir by
+ fixmap.
+In-Reply-To: <2bf9b9d1-271c-f85e-5a98-0eb74f2fedd9@arm.com>
+References: <20180822095432.12125-1-yaojun8558363@gmail.com>
+ <20180822095432.12125-6-yaojun8558363@gmail.com>
+ <2bf9b9d1-271c-f85e-5a98-0eb74f2fedd9@arm.com>
+Message-ID: <20180913105021.GA25870@toy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2018 at 06:29:54PM +0800, Jisheng Zhang wrote:
-> Hi Lorenzo,
-> 
-> On Thu, 13 Sep 2018 10:15:34 +0100 Lorenzo Pieralisi wrote:
-> 
-> > On Mon, Sep 10, 2018 at 04:57:22PM +0800, Jisheng Zhang wrote:
-> > > Hi all,
-> > > 
-> > > On Wed, 29 Aug 2018 11:04:08 +0800 Jisheng Zhang wrote:
-> > >   
-> > > > When programming inbound/outbound atu, we call usleep_range() after
-> > > > each checking PCIE_ATU_ENABLE bit. Unfortunately, the atu programming
-> > > > can be called in atomic context:
-> > > > 
-> > > > inbound atu programming could be called through
-> > > > pci_epc_write_header()  
-> > > >   =>dw_pcie_ep_write_header()
-> > > >     =>dw_pcie_prog_inbound_atu()    
-> > > > 
-> > > > outbound atu programming could be called through
-> > > > pci_bus_read_config_dword()  
-> > > >   =>dw_pcie_rd_conf()
-> > > >     =>dw_pcie_prog_outbound_atu()    
-> > > > 
-> > > > Fix this issue by calling mdelay() instead.  
-> > > 
-> > > Any comments about this patch?
-> > > 
-> > > Thanks,
-> > > Jisheng
-> > >   
-> > > > 
-> > > > Fixes: f8aed6ec624f ("PCI: dwc: designware: Add EP mode support")
-> > > > Fixes: d8bbeb39fbf3 ("PCI: designware: Wait for iATU enable")  
-> > 
-> > Can you split it into two patches and repost it please ? It will make
-> > everyone's life easier to backport it if there is need, I will apply
-> > then.
-> 
-> IIUC, the purpose of this split is to make the backport to stable easier. If
-> so, I realise that the Fixes tags were not enough, we missed:
-> 
-> Fixes: edd45e396829 ("PCI: dwc: designware: Move _unroll configurations to a
-> separate function")
-> 
-> I'm not sure how to handle this case. From another side, the issue to be
-> fixed is the same: call sleep in atomic context in the same driver, is it
-> better to use one patch?
-> 
-> As for stable tree, I could send out separate patches instead. What do you
-> think?
+Hi James,
 
-OK, I will merge the patch as-is and we will handle the stable backports
-when Greg sends the patches out.
+On Fri, Sep 07, 2018 at 10:58:22AM +0100, James Morse wrote:
+> On 22/08/18 10:54, Jun Yao wrote:
+> >  	WRITE_ONCE(*pmdp, pmd);
+> >  	dsb(ishst);
+> >  }
+> > @@ -480,6 +511,19 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
+> >  
+> >  static inline void set_pud(pud_t *pudp, pud_t pud)
+> >  {
+> > +#ifdef __PAGETABLE_PUD_FOLDED
+> > +	if (in_swapper_pgdir(pudp)) {
+> > +		pud_t *fixmap_pudp;
+> > +
+> > +		spin_lock(&swapper_pgdir_lock);
+> > +		fixmap_pudp = (pud_t *)pgd_set_fixmap(__pa(pudp));
+>
+> I see this called 68 times during boot on a 64K/42bit-VA, 65 of which appear to
+> be during paging_init(). What do you think to keeping paging_init()s use of the
+> pgd fixmap for swapper_pg_dir, deliberately to skip the in_swapper_pgdir() test
+> during paging_init()?
 
-Lorenzo
+I find that the __create_pgd_mapping() is used to set up the page table
+during paging_init(). And there are six functions calling it with
+different pgdps:
+
+update_mapping_prot()		init_mm.pgd(swapper_pg_dir)
+create_mapping_noalloc()	init_mm.pgd(swapper_pg_dir)
+__map_memblock()		pgdp(swapper_pg_dir)
+map_kernel_segment()		pgdp(swapper_pg_dir)
+create_pgd_mapping()		!(init_mm.pgd)
+map_entry_trampoline()		tramp_pg_dir
+
+In order to skip the in_swapper_pgdir() test during paging_init(), We
+need a way to determine if we are currently in paging_init(). The way I
+can think of is to create a function similar to __create_pgd_mapping().
+And it is used to create the page table during paging_init(). It differs
+from the __create_pgd_mapping() only in that it calls
+p?d_populate_without_test(). However, in this way, I'm worried that I am
+reinventing the wheel.
+
+Thanks,
+
+Jun
