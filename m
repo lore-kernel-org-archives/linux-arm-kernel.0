@@ -1,67 +1,38 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 14 Sep 2018 13:30:37 +0100
-Subject: [PATCH v8 07/26] PM / Domains: Add genpd governor for CPUs
-In-Reply-To: <CAJZ5v0j27p9XHsLsJ+Eg9PGh1bbF5CRNFOrVW8qvNx1Am6W-2A@mail.gmail.com>
-References: <20180620172226.15012-1-ulf.hansson@linaro.org>
- <CAJZ5v0hX3gC0J_z1tMu-KkNBRf3GuJ91tbFC2Z+0D1BnHkY8kg@mail.gmail.com>
- <20180809153925.GA20329@red-moon>
- <5398488.CyAMIAYSYI@aspire.rjw.lan>
- <20180914104431.GA20567@e107981-ln.cambridge.arm.com>
- <CAJZ5v0j27p9XHsLsJ+Eg9PGh1bbF5CRNFOrVW8qvNx1Am6W-2A@mail.gmail.com>
-Message-ID: <20180914123037.GA22926@e107981-ln.cambridge.arm.com>
+From: yannick.fertre@st.com (Yannick FERTRE)
+Date: Fri, 14 Sep 2018 12:39:07 +0000
+Subject: [PATCH 1/6] ARM: multi_v7_defconfig: enable backlight gpio
+In-Reply-To: <1534772815-3083-1-git-send-email-yannick.fertre@st.com>
+References: <1534772815-3083-1-git-send-email-yannick.fertre@st.com>
+Message-ID: <ebce075a-f644-93a8-4aed-09867f259235@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2018 at 01:34:14PM +0200, Rafael J. Wysocki wrote:
+Hi,
 
-[...]
+Gentle ping
 
-> > > So for example, if your logical CPU has an idle state A that may trigger an
-> > > idle state X at the cluster level (if the other logical CPUs happen to be in
-> > > the right states and so on), then the worst-case exit latency for that
-> > > is the one of state X.
-> >
-> > I will provide an example:
-> >
-> > IDLE STATE A (affects CPU {0,1}): exit latency 1ms, min-residency 1.5ms
-> >
-> > CPU 0 is about to enter IDLE state A since its "next-event" fulfill the
-> > residency requirements and exit latency constraints.
-> >
-> > CPU 1 is in idle state A (given that CPU 0 is ON, some of the common
-> > logic shared between CPU {0,1} is still ON, but, as soon as CPU 0
-> > enters idle state A CPU {0,1} can enter the "full" idle state A
-> > power savings mode).
-> >
-> > The current CPUidle governor does not check the "next-event" for CPU 1,
-> > that it may wake up in, say, 10us.
-> 
-> Right.
-> 
-> > Requesting IDLE STATE A is a waste of power (if firmware or hardware
-> > does not demote it since it does peek at CPU 1 next-event and actually
-> > demote CPU 0 request).
-> 
-> OK, I see.
-> 
-> That's because the state is "collaborative" so to speak.  But was't
-> that supposed to be covered by the "coupled" thing?
 
-The coupled idle states code was merged because on some early SMP
-ARM platforms CPUs must enter cluster idle states orderly otherwise
-the system would break; "coupled" as-in "syncronized idle state entry".
+On 08/20/2018 03:46 PM, Yannick Fertr? wrote:
+> Enable generic GPIO based backlight driver.
+>
+> Signed-off-by: Yannick Fertr? <yannick.fertre@st.com>
+> ---
+>   arch/arm/configs/multi_v7_defconfig | 1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 23f5b67..bbd5c8c 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -664,6 +664,7 @@ CONFIG_BACKLIGHT_CLASS_DEVICE=y
+>   CONFIG_LCD_PLATFORM=m
+>   CONFIG_BACKLIGHT_PWM=y
+>   CONFIG_BACKLIGHT_AS3711=y
+> +CONFIG_BACKLIGHT_GPIO=y
+>   CONFIG_FRAMEBUFFER_CONSOLE=y
+>   CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
+>   CONFIG_SOUND=m
 
-Basically coupled idle code fixed a HW bug. This series code instead
-applies to all arches where an idle state may span multiple CPUs (x86
-inclusive, but as I mentioned it is probably not needed since FW/HW
-behind mwait is capable of detecting whether that's wortwhile to shut
-down, say, a package. PSCI, whether OSI or PC mode can work the same way).
-
-Entering an idle state spanning multiple cpus need not be synchronized
-but a sort of cpumask aware governor may help optimize idle state
-selection.
-
-I hope this makes the whole point clearer.
-
-Cheers,
-Lorenzo
+-- 
+Yannick Fertr? | TINA: 166 7152 | Tel: +33 244027152 | Mobile: +33 620600270
+Microcontrollers and Digital ICs Group | Microcontrolleurs Division
