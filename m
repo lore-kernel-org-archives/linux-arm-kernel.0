@@ -1,145 +1,301 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 14 Sep 2018 16:40:08 +0200
-Subject: [PATCH v4 19/22] nvmem: make the naming of arguments in
- nvmem_cell_get() consistent
+Date: Fri, 14 Sep 2018 16:40:04 +0200
+Subject: [PATCH v4 15/22] nvmem: add support for cell lookups from machine code
 In-Reply-To: <20180914144011.27614-1-brgl@bgdev.pl>
 References: <20180914144011.27614-1-brgl@bgdev.pl>
-Message-ID: <20180914144011.27614-20-brgl@bgdev.pl>
+Message-ID: <20180914144011.27614-16-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-The argument representing the cell name in the nvmem_cell_get() family
-of functions is not consistend between function prototypes and
-definitions. Name it 'id' in all those routines. This is in line with
-other frameworks and can represent both the DT cell name from the
-nvmem-cell-names property as well as the con_id field from cell
+Add a way for machine code users to associate devices with nvmem cells.
+
+This restores the support for non-DT systems but following a different
+approach. Cells must now be associated with devices using provided
+routines and data structures before they can be retrieved using
+nvmem_cell_get().
+
+It's still possible to define cells statically in nvmem_config but
+cells created this way still need to be associated with consumers using
 lookup entries.
+
+Note that nvmem_find() must be moves higher in the source file as we
+want to call it from __nvmem_device_get() for devices that don't have
+a device node.
+
+The signature of __nvmem_device_get() is also changed as it's no longer
+used to retrieve cells.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/nvmem/core.c           | 27 ++++++++++++++-------------
- include/linux/nvmem-consumer.h | 12 ++++++------
- 2 files changed, 20 insertions(+), 19 deletions(-)
+ drivers/nvmem/core.c           | 129 ++++++++++++++++++++++++++-------
+ include/linux/nvmem-consumer.h |  28 +++++++
+ 2 files changed, 131 insertions(+), 26 deletions(-)
 
 diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index ea05219e60b4..ff21402fbd7d 100644
+index 13568e7ad178..9cc86d131e1e 100644
 --- a/drivers/nvmem/core.c
 +++ b/drivers/nvmem/core.c
-@@ -977,16 +977,15 @@ nvmem_cell_get_from_lookup(struct device *dev, const char *con_id)
-  * of_nvmem_cell_get() - Get a nvmem cell from given device node and cell id
-  *
-  * @np: Device tree node that uses the nvmem cell.
-- * @name: nvmem cell name from nvmem-cell-names property, or NULL
-- *	  for the cell at index 0 (the lone cell with no accompanying
-- *	  nvmem-cell-names property).
-+ * @id: nvmem cell name from nvmem-cell-names property, or NULL
-+ *      for the cell at index 0 (the lone cell with no accompanying
-+ *      nvmem-cell-names property).
-  *
-  * Return: Will be an ERR_PTR() on error or a valid pointer
-  * to a struct nvmem_cell.  The nvmem_cell will be freed by the
-  * nvmem_cell_put().
-  */
--struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
--					    const char *name)
-+struct nvmem_cell *of_nvmem_cell_get(struct device_node *np, const char *id)
+@@ -62,6 +62,9 @@ static DEFINE_IDA(nvmem_ida);
+ static DEFINE_MUTEX(nvmem_cell_mutex);
+ static LIST_HEAD(nvmem_cell_tables);
+ 
++static DEFINE_MUTEX(nvmem_lookup_mutex);
++static LIST_HEAD(nvmem_lookup_list);
++
+ #ifdef CONFIG_DEBUG_LOCK_ALLOC
+ static struct lock_class_key eeprom_lock_key;
+ #endif
+@@ -283,6 +286,18 @@ static struct nvmem_device *of_nvmem_find(struct device_node *nvmem_np)
+ 	return to_nvmem_device(d);
+ }
+ 
++static struct nvmem_device *nvmem_find(const char *name)
++{
++	struct device *d;
++
++	d = bus_find_device_by_name(&nvmem_bus_type, NULL, name);
++
++	if (!d)
++		return NULL;
++
++	return to_nvmem_device(d);
++}
++
+ static void nvmem_cell_drop(struct nvmem_cell *cell)
  {
- 	struct device_node *cell_np, *nvmem_np;
- 	struct nvmem_device *nvmem;
-@@ -994,8 +993,8 @@ struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
- 	int index = 0;
+ 	mutex_lock(&nvmem_mutex);
+@@ -472,6 +487,21 @@ nvmem_find_cell_by_index(struct nvmem_device *nvmem, int index)
+ 	return cell;
+ }
  
- 	/* if cell name exists, find index to the name */
--	if (name)
--		index = of_property_match_string(np, "nvmem-cell-names", name);
-+	if (id)
-+		index = of_property_match_string(np, "nvmem-cell-names", id);
- 
- 	cell_np = of_parse_phandle(np, "nvmem-cells", index);
- 	if (!cell_np)
-@@ -1025,27 +1024,29 @@ EXPORT_SYMBOL_GPL(of_nvmem_cell_get);
-  * nvmem_cell_get() - Get nvmem cell of device form a given cell name
-  *
-  * @dev: Device that requests the nvmem cell.
-- * @cell_id: nvmem cell name to get.
-+ * @id: nvmem cell name to get (this corresponds with the name from the
-+ *      nvmem-cell-names property for DT systems and with the con_id from
-+ *      the lookup entry for non-DT systems).
-  *
-  * Return: Will be an ERR_PTR() on error or a valid pointer
-  * to a struct nvmem_cell.  The nvmem_cell will be freed by the
-  * nvmem_cell_put().
-  */
--struct nvmem_cell *nvmem_cell_get(struct device *dev, const char *cell_id)
-+struct nvmem_cell *nvmem_cell_get(struct device *dev, const char *id)
++static struct nvmem_cell *
++nvmem_find_cell_by_name(struct nvmem_device *nvmem, const char *cell_id)
++{
++	struct nvmem_cell *cell = NULL;
++
++	mutex_lock(&nvmem_mutex);
++	list_for_each_entry(cell, &nvmem->cells, node) {
++		if (strcmp(cell_id, cell->name) == 0)
++			break;
++	}
++	mutex_unlock(&nvmem_mutex);
++
++	return cell;
++}
++
+ static int nvmem_add_cells_from_of(struct nvmem_device *nvmem)
  {
- 	struct nvmem_cell *cell;
+ 	struct device_node *parent, *child;
+@@ -719,16 +749,12 @@ int devm_nvmem_unregister(struct device *dev, struct nvmem_device *nvmem)
+ EXPORT_SYMBOL(devm_nvmem_unregister);
  
- 	if (dev->of_node) { /* try dt first */
--		cell = of_nvmem_cell_get(dev->of_node, cell_id);
-+		cell = of_nvmem_cell_get(dev->of_node, id);
- 		if (!IS_ERR(cell) || PTR_ERR(cell) == -EPROBE_DEFER)
- 			return cell;
- 	}
+ static struct nvmem_device *__nvmem_device_get(struct device_node *np,
+-					       struct nvmem_cell **cellp,
+-					       const char *cell_id)
++					       const char *nvmem_name)
+ {
+ 	struct nvmem_device *nvmem = NULL;
  
--	/* NULL cell_id only allowed for device tree; invalid otherwise */
--	if (!cell_id)
-+	/* NULL cell id only allowed for device tree; invalid otherwise */
-+	if (!id)
+-	if (!np)
+-		return ERR_PTR(-ENOENT);
+-
+ 	mutex_lock(&nvmem_mutex);
+-	nvmem = of_nvmem_find(np);
++	nvmem = np ? of_nvmem_find(np) : nvmem_find(nvmem_name);
+ 	mutex_unlock(&nvmem_mutex);
+ 	if (!nvmem)
+ 		return ERR_PTR(-EPROBE_DEFER);
+@@ -752,18 +778,6 @@ static void __nvmem_device_put(struct nvmem_device *nvmem)
+ 	kref_put(&nvmem->refcnt, nvmem_device_release);
+ }
+ 
+-static struct nvmem_device *nvmem_find(const char *name)
+-{
+-	struct device *d;
+-
+-	d = bus_find_device_by_name(&nvmem_bus_type, NULL, name);
+-
+-	if (!d)
+-		return NULL;
+-
+-	return to_nvmem_device(d);
+-}
+-
+ #if IS_ENABLED(CONFIG_OF)
+ /**
+  * of_nvmem_device_get() - Get nvmem device from a given id
+@@ -786,7 +800,7 @@ struct nvmem_device *of_nvmem_device_get(struct device_node *np, const char *id)
+ 	if (!nvmem_np)
  		return ERR_PTR(-EINVAL);
  
--	return nvmem_cell_get_from_lookup(dev, cell_id);
-+	return nvmem_cell_get_from_lookup(dev, id);
+-	return __nvmem_device_get(nvmem_np, NULL, NULL);
++	return __nvmem_device_get(nvmem_np, NULL);
+ }
+ EXPORT_SYMBOL_GPL(of_nvmem_device_get);
+ #endif
+@@ -890,15 +904,43 @@ struct nvmem_device *devm_nvmem_device_get(struct device *dev, const char *id)
+ }
+ EXPORT_SYMBOL_GPL(devm_nvmem_device_get);
+ 
+-static struct nvmem_cell *nvmem_cell_get_from_list(const char *cell_id)
++static struct nvmem_cell *
++nvmem_cell_get_from_lookup(struct device *dev, const char *con_id)
+ {
+-	struct nvmem_cell *cell = NULL;
++	struct nvmem_cell *cell = ERR_PTR(-ENOENT);
++	struct nvmem_cell_lookup *lookup;
+ 	struct nvmem_device *nvmem;
++	const char *dev_id;
+ 
+-	nvmem = __nvmem_device_get(NULL, &cell, cell_id);
+-	if (IS_ERR(nvmem))
+-		return ERR_CAST(nvmem);
++	if (!dev)
++		return ERR_PTR(-EINVAL);
++
++	dev_id = dev_name(dev);
++
++	mutex_lock(&nvmem_lookup_mutex);
++
++	list_for_each_entry(lookup, &nvmem_lookup_list, node) {
++		if ((strcmp(lookup->dev_id, dev_id) == 0) &&
++		    (strcmp(lookup->con_id, con_id) == 0)) {
++			/* This is the right entry. */
++			nvmem = __nvmem_device_get(NULL, lookup->nvmem_name);
++			if (!nvmem) {
++				/* Provider may not be registered yet. */
++				cell = ERR_PTR(-EPROBE_DEFER);
++				goto out;
++			}
++
++			cell = nvmem_find_cell_by_name(nvmem,
++						       lookup->cell_name);
++			if (!cell) {
++				__nvmem_device_put(nvmem);
++				goto out;
++			}
++		}
++	}
+ 
++out:
++	mutex_unlock(&nvmem_lookup_mutex);
+ 	return cell;
+ }
+ 
+@@ -935,7 +977,7 @@ struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+ 	if (!nvmem_np)
+ 		return ERR_PTR(-EINVAL);
+ 
+-	nvmem = __nvmem_device_get(nvmem_np, NULL, NULL);
++	nvmem = __nvmem_device_get(nvmem_np, NULL);
+ 	of_node_put(nvmem_np);
+ 	if (IS_ERR(nvmem))
+ 		return ERR_CAST(nvmem);
+@@ -975,7 +1017,7 @@ struct nvmem_cell *nvmem_cell_get(struct device *dev, const char *cell_id)
+ 	if (!cell_id)
+ 		return ERR_PTR(-EINVAL);
+ 
+-	return nvmem_cell_get_from_list(cell_id);
++	return nvmem_cell_get_from_lookup(dev, cell_id);
  }
  EXPORT_SYMBOL_GPL(nvmem_cell_get);
  
+@@ -1405,6 +1447,41 @@ void nvmem_del_cell_table(struct nvmem_cell_table *table)
+ }
+ EXPORT_SYMBOL_GPL(nvmem_del_cell_table);
+ 
++/**
++ * nvmem_add_cell_lookups() - register a list of cell lookup entries
++ *
++ * @entries: array of cell lookup entries
++ * @nentries: number of cell lookup entries in the array
++ */
++void nvmem_add_cell_lookups(struct nvmem_cell_lookup *entries, size_t nentries)
++{
++	int i;
++
++	mutex_lock(&nvmem_lookup_mutex);
++	for (i = 0; i < nentries; i++)
++		list_add_tail(&entries[i].node, &nvmem_lookup_list);
++	mutex_unlock(&nvmem_lookup_mutex);
++}
++EXPORT_SYMBOL_GPL(nvmem_add_cell_lookups);
++
++/**
++ * nvmem_del_cell_lookups() - remove a list of previously added cell lookup
++ *                            entries
++ *
++ * @entries: array of cell lookup entries
++ * @nentries: number of cell lookup entries in the array
++ */
++void nvmem_del_cell_lookups(struct nvmem_cell_lookup *entries, size_t nentries)
++{
++	int i;
++
++	mutex_lock(&nvmem_lookup_mutex);
++	for (i = 0; i < nentries; i++)
++		list_del(&entries[i].node);
++	mutex_unlock(&nvmem_lookup_mutex);
++}
++EXPORT_SYMBOL_GPL(nvmem_del_cell_lookups);
++
+ /**
+  * nvmem_dev_name() - Get the name of a given nvmem device.
+  *
 diff --git a/include/linux/nvmem-consumer.h b/include/linux/nvmem-consumer.h
-index d18caae2f7ac..e17617fa034f 100644
+index 0389fe00b177..27eee3945405 100644
 --- a/include/linux/nvmem-consumer.h
 +++ b/include/linux/nvmem-consumer.h
-@@ -55,8 +55,8 @@ enum {
+@@ -29,6 +29,24 @@ struct nvmem_cell_info {
+ 	unsigned int		nbits;
+ };
+ 
++/**
++ * struct nvmem_cell_lookup - cell lookup entry
++ *
++ * @nvmem_name:	Name of the provider.
++ * @cell_name:	Name of the nvmem cell as defined in the name field of
++ *		struct nvmem_cell_info.
++ * @dev_id:	Name of the consumer device that will be associated with
++ *		this cell.
++ * @con_id:	Connector id for this cell lookup.
++ */
++struct nvmem_cell_lookup {
++	const char		*nvmem_name;
++	const char		*cell_name;
++	const char		*dev_id;
++	const char		*con_id;
++	struct list_head	node;
++};
++
  #if IS_ENABLED(CONFIG_NVMEM)
  
  /* Cell based interface */
--struct nvmem_cell *nvmem_cell_get(struct device *dev, const char *name);
--struct nvmem_cell *devm_nvmem_cell_get(struct device *dev, const char *name);
-+struct nvmem_cell *nvmem_cell_get(struct device *dev, const char *id);
-+struct nvmem_cell *devm_nvmem_cell_get(struct device *dev, const char *id);
- void nvmem_cell_put(struct nvmem_cell *cell);
- void devm_nvmem_cell_put(struct device *dev, struct nvmem_cell *cell);
- void *nvmem_cell_read(struct nvmem_cell *cell, size_t *len);
-@@ -91,13 +91,13 @@ int nvmem_unregister_notifier(struct notifier_block *nb);
+@@ -57,6 +75,11 @@ int nvmem_device_cell_write(struct nvmem_device *nvmem,
+ 
+ const char *nvmem_dev_name(struct nvmem_device *nvmem);
+ 
++void nvmem_add_cell_lookups(struct nvmem_cell_lookup *entries,
++			    size_t nentries);
++void nvmem_del_cell_lookups(struct nvmem_cell_lookup *entries,
++			    size_t nentries);
++
  #else
  
  static inline struct nvmem_cell *nvmem_cell_get(struct device *dev,
--						const char *name)
-+						const char *id)
- {
- 	return ERR_PTR(-ENOSYS);
+@@ -151,6 +174,11 @@ static inline const char *nvmem_dev_name(struct nvmem_device *nvmem)
+ 	return NULL;
  }
  
- static inline struct nvmem_cell *devm_nvmem_cell_get(struct device *dev,
--				       const char *name)
-+						     const char *id)
- {
- 	return ERR_PTR(-ENOSYS);
- }
-@@ -201,12 +201,12 @@ static inline int nvmem_unregister_notifier(struct notifier_block *nb)
++static inline void
++nvmem_add_cell_lookups(struct nvmem_cell_lookup *entries, size_t nentries) {}
++static inline void
++nvmem_del_cell_lookups(struct nvmem_cell_lookup *entries, size_t nentries) {}
++
+ #endif /* CONFIG_NVMEM */
  
  #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
- struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
--				     const char *name);
-+				     const char *id);
- struct nvmem_device *of_nvmem_device_get(struct device_node *np,
- 					 const char *name);
- #else
- static inline struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
--				     const char *name)
-+						   const char *id)
- {
- 	return ERR_PTR(-ENOSYS);
- }
 -- 
 2.18.0
