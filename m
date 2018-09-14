@@ -1,29 +1,44 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Fri, 14 Sep 2018 17:34:21 +0200
-Subject: [PATCH] clk: mvebu: armada-37xx-tbg: Balance devm_clk_get in probe
-Message-ID: <20180914153421.7090-1-gregory.clement@bootlin.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Fri, 14 Sep 2018 17:48:10 +0200
+Subject: [PATCH] net: macb: disable scatter-gather for macb on sama5d3
+Message-ID: <20180914154811.12090-1-nicolas.ferre@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The parent clock is get only to have its name, and then the clock is no
-more used, so we can safely free it using devm_clk_put.
+Create a new configuration for the sama5d3-macb new compatibility string.
+This configuration disables scatter-gather because we experienced lock down
+of the macb interface of this particular SoC under very high load.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 ---
- drivers/clk/mvebu/armada-37xx-tbg.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/net/ethernet/cadence/macb_main.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/clk/mvebu/armada-37xx-tbg.c b/drivers/clk/mvebu/armada-37xx-tbg.c
-index 71f30149e80e..caaa91a41683 100644
---- a/drivers/clk/mvebu/armada-37xx-tbg.c
-+++ b/drivers/clk/mvebu/armada-37xx-tbg.c
-@@ -102,6 +102,7 @@ static int armada_3700_tbg_clock_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
- 	parent_name = __clk_get_name(parent);
-+	devm_clk_put(dev, parent);
+diff --git a/drivers/net/ethernet/cadence/macb_main.c b/drivers/net/ethernet/cadence/macb_main.c
+index 16e4ef7d7185..f1a86b422617 100644
+--- a/drivers/net/ethernet/cadence/macb_main.c
++++ b/drivers/net/ethernet/cadence/macb_main.c
+@@ -3837,6 +3837,13 @@ static const struct macb_config at91sam9260_config = {
+ 	.init = macb_init,
+ };
  
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	reg = devm_ioremap_resource(dev, res);
++static const struct macb_config sama5d3macb_config = {
++	.caps = MACB_CAPS_SG_DISABLED
++	      | MACB_CAPS_USRIO_HAS_CLKEN | MACB_CAPS_USRIO_DEFAULT_IS_MII_GMII,
++	.clk_init = macb_clk_init,
++	.init = macb_init,
++};
++
+ static const struct macb_config pc302gem_config = {
+ 	.caps = MACB_CAPS_SG_DISABLED | MACB_CAPS_GIGABIT_MODE_AVAILABLE,
+ 	.dma_burst_length = 16,
+@@ -3904,6 +3911,7 @@ static const struct of_device_id macb_dt_ids[] = {
+ 	{ .compatible = "cdns,gem", .data = &pc302gem_config },
+ 	{ .compatible = "atmel,sama5d2-gem", .data = &sama5d2_config },
+ 	{ .compatible = "atmel,sama5d3-gem", .data = &sama5d3_config },
++	{ .compatible = "atmel,sama5d3-macb", .data = &sama5d3macb_config },
+ 	{ .compatible = "atmel,sama5d4-gem", .data = &sama5d4_config },
+ 	{ .compatible = "cdns,at91rm9200-emac", .data = &emac_config },
+ 	{ .compatible = "cdns,emac", .data = &emac_config },
 -- 
-2.18.0
+2.15.1
