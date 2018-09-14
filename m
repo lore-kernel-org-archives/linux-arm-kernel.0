@@ -1,25 +1,40 @@
 From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Fri, 14 Sep 2018 12:13:37 +0200
-Subject: [PATCH 0/2] Fixes for the SAMA5D2/SAMA5D4 watchdog
-Message-ID: <20180914101339.7382-1-romain.izard.pro@gmail.com>
+Date: Fri, 14 Sep 2018 12:13:38 +0200
+Subject: [PATCH 1/2] watchdog: sama5d4: fix timeout-sec usage
+In-Reply-To: <20180914101339.7382-1-romain.izard.pro@gmail.com>
+References: <20180914101339.7382-1-romain.izard.pro@gmail.com>
+Message-ID: <20180914101339.7382-2-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A previous change of the sama5d4_wdt driver broke the device probing
-with the device tree configuration described in existing DTS files,
-when no value is set for the "timeout-sec" property.
+When using watchdog_init_timeout to update the default timeout value,
+an error means that there is no "timeout-sec" in the relevant device
+tree node.
 
-Moreover, specifying any other value than 16 seconds for "timeout-sec"
-leads to a watchdog reset immediately when opening the watchdog device.
-Fix this by respecting hardware constraints added in recent versions of
-the SAMA5D2 and SAMA5D4 datasheet.
+This should not prevent binding of the driver to the device.
 
-Romain Izard (2):
-  watchdog: sama5d4: fix timeout-sec usage
-  watchdog: sama5d4: write the mode register in two steps
+Fixes: 976932e40036 ("watchdog: sama5d4: make use of timeout-secs provided in devicetree")
+Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+---
+ drivers/watchdog/sama5d4_wdt.c | 6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
- drivers/watchdog/sama5d4_wdt.c | 33 +++++++++++++++++++++------------
- 1 file changed, 21 insertions(+), 12 deletions(-)
-
+diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
+index 255169916dbb..1e93c1b0e3cf 100644
+--- a/drivers/watchdog/sama5d4_wdt.c
++++ b/drivers/watchdog/sama5d4_wdt.c
+@@ -247,11 +247,7 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
+-	ret = watchdog_init_timeout(wdd, wdt_timeout, &pdev->dev);
+-	if (ret) {
+-		dev_err(&pdev->dev, "unable to set timeout value\n");
+-		return ret;
+-	}
++	watchdog_init_timeout(wdd, wdt_timeout, &pdev->dev);
+ 
+ 	timeout = WDT_SEC2TICKS(wdd->timeout);
+ 
 -- 
 2.17.1
