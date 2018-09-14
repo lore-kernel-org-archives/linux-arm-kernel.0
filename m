@@ -1,46 +1,34 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Fri, 14 Sep 2018 19:22:03 +0200
-Subject: [PATCH 5/5] ARM: dts: meson8b: Add support for the Endless Mini
- (EC-100)
-In-Reply-To: <CAD8Lp47sSFrv9QopqPn6Ohv-2aupeGbX_Bb2dBXubUzFqjK=-Q@mail.gmail.com>
-References: <20180913202203.19636-1-martin.blumenstingl@googlemail.com>
- <20180913202203.19636-6-martin.blumenstingl@googlemail.com>
- <CAD8Lp47sSFrv9QopqPn6Ohv-2aupeGbX_Bb2dBXubUzFqjK=-Q@mail.gmail.com>
-Message-ID: <CAFBinCCU566Ki+fqNL_LdK_BhihWmM158fp-V4MJE6rjX9WD7w@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 14 Sep 2018 18:23:42 +0100
+Subject: [PATCH] arm64: sysreg: Clean up instructions for modifying PSTATE
+ fields
+In-Reply-To: <20180914171238.ztf6qcy6ws7sjzkf@armageddon.cambridge.arm.com>
+References: <20180914090749.18562-1-suzuki.poulose@arm.com>
+ <20180914171238.ztf6qcy6ws7sjzkf@armageddon.cambridge.arm.com>
+Message-ID: <ddf76575-fd1e-a45f-64e1-1ba54be47d51@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Hi Catalin,
 
-On Fri, Sep 14, 2018 at 8:24 AM Daniel Drake <drake@endlessm.com> wrote:
->
-> Hi Martin,
->
-> On Fri, Sep 14, 2018 at 4:22 AM, Martin Blumenstingl
-> <martin.blumenstingl@googlemail.com> wrote:
-> > The Endless Mini (EC-100) is a grapefruit-sized computer based on the
-> > Amlogic Meson8b (S805) SoC which comes in two variants.
->
-> Thanks for your work here, really happy to see this go by!
-you're welcome - actually having a EC-100 helped a lot! :)
+On 14/09/18 18:12, Catalin Marinas wrote:
+> Hi Suzuki,
+> 
+> On Fri, Sep 14, 2018 at 10:07:49AM +0100, Suzuki K. Poulose wrote:
+>> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+>> index c1470931b897..68c22360551e 100644
+>> --- a/arch/arm64/include/asm/sysreg.h
+>> +++ b/arch/arm64/include/asm/sysreg.h
 
-> Would it be possible to adjust the compatible string to
-> "endless,ec100" without the hyphen to match what we've already been
-> shipping?
-sure, I'll wait a few days if more questions come up then I'll send a v2
+..
 
-> Just curious, is there now working USB and HDMI support in mainline on
-> this platform?
-USB is working fine - you just need d9707490077bee "usb: dwc2: Fix
-call location of dwc2_check_core_endianness" (which hit mainline
-today) or test this against linux-next
-HDMI is not supported
+>> +#define SET_PSTATE_PAN(x)		__emit_inst(0xd500401f | PSTATE_PAN | ((!!x) << PSTATE_Imm_shift))
+>> +#define SET_PSTATE_UAO(x)		__emit_inst(0xd500401f | PSTATE_UAO | ((!!x) << PSTATE_Imm_shift))
+> 
+> Could you please rebase this on top of arm64 for-next/core and also fix
+> Will's SSBS macros which conflict with the above?
+> 
 
-other topics I'm working on:
-- CPU frequency scaling
-- temperature sensor support in the SAR ADC driver
-- ...whatever attracts my attention / interest ;)
+Sure, will do.
 
-
-Regards
-Martin
+Suzuki
