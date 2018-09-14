@@ -1,57 +1,50 @@
-From: erosca@de.adit-jv.com (Eugeniu Rosca)
-Date: Fri, 14 Sep 2018 20:50:51 +0200
-Subject: [PATCH v11 0/3] remain and optimize memblock_next_valid_pfn on
- arm and arm64
-In-Reply-To: <20180907144447.GD12788@arm.com>
-References: <1534907237-2982-1-git-send-email-jia.he@hxt-semitech.com>
- <CAKv+Gu9u8RcrzSHdgXiqHS9HK1aSrjbPxVUSCP0DT4erAhx0pw@mail.gmail.com>
- <20180907144447.GD12788@arm.com>
-Message-ID: <20180914185051.GA22530@vmlxhi-102.adit-jv.com>
+From: rsalveti@rsalveti.net (Ricardo Salveti)
+Date: Fri, 14 Sep 2018 15:53:02 -0300
+Subject: [PATCH v13 3/8] clk: Use devm_ in the register fixed factor clock
+In-Reply-To: <20180614215358.11264-4-ilia.lin@gmail.com>
+References: <20180614215358.11264-1-ilia.lin@gmail.com>
+ <20180614215358.11264-4-ilia.lin@gmail.com>
+Message-ID: <CAHYQr0rR=mcV-SxZFW+5M4CTUaTv_f_bruyq91HiGP6sqUZ3Yw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Renesas people
+On Thu, Jun 14, 2018 at 6:55 PM <ilia.lin@gmail.com> wrote:
+>
+> From: Ilia Lin <ilialin@codeaurora.org>
+>
+> Use devm_clk_hw_register instead of clk_hw_register
+> to simplify the usage of this API. This way drivers that call
+> the clk_hw_register_fixed_factor won't need to maintain
+> a data structure for further cleanup.
+>
+> Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
+> Tested-by: Amit Kucheria <amit.kucheria@linaro.org>
+> ---
+>  drivers/clk/clk-fixed-factor.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
+> index a5d402de5584..8e39bda8e596 100644
+> --- a/drivers/clk/clk-fixed-factor.c
+> +++ b/drivers/clk/clk-fixed-factor.c
+> @@ -94,7 +94,7 @@ struct clk_hw *clk_hw_register_fixed_factor(struct device *dev,
+>         init.num_parents = 1;
+>
+>         hw = &fix->hw;
+> -       ret = clk_hw_register(dev, hw);
+> +       ret = devm_clk_hw_register(dev, hw);
 
-Hello Will, hello Ard, 
+Not sure what is the current state of this patch-set, but this change
+breaks drivers calling clk_hw_register_fixed_factor with a NULL dev
+(e.g. imx_clk_fixed_factor), as devm_clk_hw_register needs a valid dev
+for devres_add to work.
 
-On Fri, Sep 07, 2018 at 03:44:47PM +0100, Will Deacon wrote:
-> On Thu, Sep 06, 2018 at 01:24:22PM +0200, Ard Biesheuvel wrote:
-> > OK so we can summarize the benefits of this series as follows:
-> > - boot time on a virtual model of a Samurai CPU drops from 109 to 62 seconds
-> > - boot time on a QDF2400 arm64 server with 96 GB of RAM drops by ~15
-> > *milliseconds*
-> > 
-> > Google was not very helpful in figuring out what a Samurai CPU is and
-> > why we should care about the boot time of Linux running on a virtual
-> > model of it, and the 15 ms speedup is not that compelling either.
-> > 
-> > Apologies to Jia that it took 11 revisions to reach this conclusion,
-> > but in /my/ opinion, tweaking the fragile memblock/pfn handling code
-> > for this reason is totally unjustified, and we're better off
-> > disregarding these patches.
-> 
-> Oh, we're talking about a *simulator* for the significant boot time
-> improvement here? I didn't realise that, so I agree that the premise of
-> this patch set looks pretty questionable given how much "fun" we've had
-> with the memmap on arm and arm64.
-> 
-> Will
+>         if (ret) {
+>                 kfree(fix);
+>                 hw = ERR_PTR(ret);
+> --
+> 2.11.0
 
-Similar to https://lkml.org/lkml/2018/1/24/420, my measurements show that
-the boot time of R-Car H3-ES2.0 Salvator-X (having 4GiB RAM) is decreased
-by ~135-140ms with this patch-set applied on top of v4.19-rc3.
-
-I agree that in the Desktop realm you would barely perceive the 140ms
-difference, but saving 140ms on the automotive SoC (designed for products
-which must comply with 2s-to-rear-view-camera NHTSA US regulations) *is*
-significant.
-
-FWIW, cppcheck and `checkpatch --strict` report style issues for
-patches #2 and #3. I hope these can be fixed and the review process
-can go on? From functional standpoint, I did some dynamic testing on
-H3-Salvator-X with UBSAN/KASAN=y and didn't observe any regressions, so:
-
-Tested-by: Eugeniu Rosca <erosca@de.adit-jv.com>
-
-Best regards,
-Eugeniu.
+Cheers,
+-- 
+Ricardo Salveti de Araujo
