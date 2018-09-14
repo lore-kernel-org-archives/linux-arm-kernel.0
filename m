@@ -1,33 +1,45 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 14 Sep 2018 16:39:53 +0200
-Subject: [PATCH v4 04/22] nvmem: remove a stray newline
+Date: Fri, 14 Sep 2018 16:39:54 +0200
+Subject: [PATCH v4 05/22] nvmem: check the return value of nvmem_add_cells()
 In-Reply-To: <20180914144011.27614-1-brgl@bgdev.pl>
 References: <20180914144011.27614-1-brgl@bgdev.pl>
-Message-ID: <20180914144011.27614-5-brgl@bgdev.pl>
+Message-ID: <20180914144011.27614-6-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-There are two empty lines between devm_nvmem_unregister() and
-__nvmem_device_get(). Remove one.
+This function can fail so check its return value in nvmem_register()
+and act accordingly.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/nvmem/core.c | 1 -
- 1 file changed, 1 deletion(-)
+ drivers/nvmem/core.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index b69005367908..b469f700c699 100644
+index b469f700c699..ffed8fa16936 100644
 --- a/drivers/nvmem/core.c
 +++ b/drivers/nvmem/core.c
-@@ -613,7 +613,6 @@ int devm_nvmem_unregister(struct device *dev, struct nvmem_device *nvmem)
- }
- EXPORT_SYMBOL(devm_nvmem_unregister);
+@@ -512,11 +512,17 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
+ 			goto err_device_del;
+ 	}
  
--
- static struct nvmem_device *__nvmem_device_get(struct device_node *np,
- 					       struct nvmem_cell **cellp,
- 					       const char *cell_id)
+-	if (config->cells)
+-		nvmem_add_cells(nvmem, config->cells, config->ncells);
++	if (config->cells) {
++		rval = nvmem_add_cells(nvmem, config->cells, config->ncells);
++		if (rval)
++			goto err_teardown_compat;
++	}
+ 
+ 	return nvmem;
+ 
++err_teardown_compat:
++	if (config->compat)
++		device_remove_bin_file(nvmem->base_dev, &nvmem->eeprom);
+ err_device_del:
+ 	device_del(&nvmem->dev);
+ err_put_device:
 -- 
 2.18.0
