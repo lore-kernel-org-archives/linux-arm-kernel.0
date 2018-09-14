@@ -1,160 +1,69 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 14 Sep 2018 18:46:36 +0200 (CEST)
-Subject: [PATCH v2 1/4] staging/vc04_services: Use correct cache line size
-In-Reply-To: <9d43a912-0928-fe8e-7719-b327a1667b30@raspberrypi.org>
-References: <1536931375-48769-1-git-send-email-phil@raspberrypi.org>
- <1536931375-48769-2-git-send-email-phil@raspberrypi.org>
- <9d43a912-0928-fe8e-7719-b327a1667b30@raspberrypi.org>
-Message-ID: <1959663666.203679.1536943596158@email.1und1.de>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Fri, 14 Sep 2018 09:52:35 -0700
+Subject: [PATCH i2c-next v6] i2c: aspeed: Handle master/slave combined irq
+ events properly
+In-Reply-To: <94a2aa4e-69ac-7042-92d9-1ada46d5fc33@roeck-us.net>
+References: <20180911233302.GA18799@roeck-us.net>
+ <5698ca34-14c9-8d05-c4e6-5acf85ff9d14@linux.intel.com>
+ <20180912013449.GA12612@roeck-us.net>
+ <7fd98646-fb5a-be4d-ce37-84b74e0fa8b3@linux.intel.com>
+ <20180912195844.GA6893@roeck-us.net>
+ <da7f4691-7428-3114-32bb-e0171f6c7228@linux.intel.com>
+ <20180912203059.GA18201@roeck-us.net>
+ <fb185839-3ae0-01dc-09e8-f22db55ecb04@kaod.org>
+ <3f86e75f-1502-eae8-0633-d087937111c8@roeck-us.net>
+ <f47b3050-3abd-caa4-cc71-4b13ef60e2c0@kaod.org>
+ <20180913155703.GA22605@roeck-us.net>
+ <2c481986-7ee0-4887-5c9b-64e2cd9d8c04@kaod.org>
+ <b4da2b68-e6e3-e068-cd6e-9e638aa67889@roeck-us.net>
+ <ccbf7059-77fd-44e8-daee-516582814cb3@kaod.org>
+ <94a2aa4e-69ac-7042-92d9-1ada46d5fc33@roeck-us.net>
+Message-ID: <3e319dd0-17e6-679d-18fd-43ed59f7075d@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Phil,
+On 9/14/2018 6:23 AM, Guenter Roeck wrote:
+> On 09/13/2018 10:38 PM, C?dric Le Goater wrote:
+>>>>> That seems to suggest that none of the status bits auto-clears, and 
+>>>>> that
+>>>>> the above code clearing intr_status should be removed entirely.
+>>>>> Am I missing something ?
+>>>>
+>>>> You are right. I just pushed another version of the previous patch 
+>>>> with this
+>>>> new hunk :
+>>>>
+>>>> @@ -188,7 +200,6 @@ static void aspeed_i2c_bus_handle_cmd(As
+>>>> ?? {
+>>>> ?????? bus->cmd &= ~0xFFFF;
+>>>> ?????? bus->cmd |= value & 0xFFFF;
+>>>> -??? bus->intr_status = 0;
+>>>> ?? ????? if (bus->cmd & I2CD_M_START_CMD) {
+>>>> ?????????? uint8_t state = aspeed_i2c_get_state(bus) & I2CD_MACTIVE ?
+>>>>
+>>>>
+>>>> The QEMU palmetto and witherspoon machines seem to behave fine. Can 
+>>>> you give
+>>>> it a try ?
+>>>>
+>>>
+>>> Works fine for me for all affected qemu platforms.
+>>>
+>>> How do you want to proceed with the qemu patches ? I attached my patches
+>>> for reference. Maybe you can add them to your tree if they are ok and 
+>>> submit
+>>> the entire series together to the qemu mailing list ?
+>>
+>> yes. They are pushed in my aspeed-3.1 branch. I will send the series
+>> on the list.
+>>
+> 
+> Excellent. Thanks a lot!
+> 
+> Guenter
+> 
 
-> Phil Elwell <phil@raspberrypi.org> hat am 14. September 2018 um 17:22 geschrieben:
-> 
-> 
-> On 14/09/2018 14:22, Phil Elwell wrote:
-> > Use the compatible string in the DTB to select the correct cache line
-> > size for the SoC - 32 for BCM2835, and 64 for BCM2836 and BCM2837.
-> > 
-> > Signed-off-by: Phil Elwell <phil@raspberrypi.org>
-> > ---
-> >   .../interface/vchiq_arm/vchiq_2835_arm.c           |  4 ++-
-> >   .../vc04_services/interface/vchiq_arm/vchiq_arm.c  | 36 ++++++++++++++++------
-> >   .../vc04_services/interface/vchiq_arm/vchiq_arm.h  |  5 +++
-> >   3 files changed, 34 insertions(+), 11 deletions(-)
-> > 
-> > diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
-> > index e767209..83d740f 100644
-> > --- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
-> > +++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
-> > @@ -109,7 +109,8 @@ free_pagelist(struct vchiq_pagelist_info *pagelistinfo,
-> >   int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
-> >   {
-> >   	struct device *dev = &pdev->dev;
-> > -	struct rpi_firmware *fw = platform_get_drvdata(pdev);
-> > +	struct vchiq_drvdata *drvdata = platform_get_drvdata(pdev);
-> > +	struct rpi_firmware *fw = drvdata->fw;
-> >   	VCHIQ_SLOT_ZERO_T *vchiq_slot_zero;
-> >   	struct resource *res;
-> >   	void *slot_mem;
-> > @@ -127,6 +128,7 @@ int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
-> >   	if (err < 0)
-> >   		return err;
-> >   
-> > +	g_cache_line_size = drvdata->cache_line_size;
-> >   	g_fragments_size = 2 * g_cache_line_size;
-> >   
-> >   	/* Allocate space for the channels in coherent memory */
-> > diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-> > index bc05c69..b2ae9259 100644
-> > --- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-> > +++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-> > @@ -170,6 +170,14 @@ static struct device *vchiq_dev;
-> >   static DEFINE_SPINLOCK(msg_queue_spinlock);
-> >   static struct platform_device *bcm2835_camera;
-> >   
-> > +static struct vchiq_drvdata bcm2835_drvdata = {
-> > +	.cache_line_size = 32,
-> > +};
-> > +
-> > +static struct vchiq_drvdata bcm2836_drvdata = {
-> > +	.cache_line_size = 64,
-> > +};
-> > +
-> >   static const char *const ioctl_names[] = {
-> >   	"CONNECT",
-> >   	"SHUTDOWN",
-> > @@ -3573,12 +3581,26 @@ void vchiq_platform_conn_state_changed(VCHIQ_STATE_T *state,
-> >   	}
-> >   }
-> >   
-> > +static const struct of_device_id vchiq_of_match[] = {
-> > +	{ .compatible = "brcm,bcm2835-vchiq", .data = &bcm2835_drvdata },
-> > +	{ .compatible = "brcm,bcm2836-vchiq", .data = &bcm2836_drvdata },
-> > +	{},
-> > +};
-> > +MODULE_DEVICE_TABLE(of, vchiq_of_match);
-> > +
-> >   static int vchiq_probe(struct platform_device *pdev)
-> >   {
-> >   	struct device_node *fw_node;
-> > -	struct rpi_firmware *fw;
-> > +	const struct of_device_id *of_id;
-> > +	struct vchiq_drvdata *drvdata;
-> >   	int err;
-> >   
-> > +	snd_rpi_simple.dev = &pdev->dev;
-> > +	of_id = of_match_node(vchiq_of_match, pdev->dev.of_node);
-> > +	drvdata = of_id->data;
-> > +	if (!drvdata)
-> > +		return -EINVAL;
-> > +
-> >   	fw_node = of_find_compatible_node(NULL, NULL,
-> >   					  "raspberrypi,bcm2835-firmware");
-> >   	if (!fw_node) {
-> > @@ -3586,12 +3608,12 @@ static int vchiq_probe(struct platform_device *pdev)
-> >   		return -ENOENT;
-> >   	}
-> >   
-> > -	fw = rpi_firmware_get(fw_node);
-> > +	drvdata->fw = rpi_firmware_get(fw_node);
-> >   	of_node_put(fw_node);
-> > -	if (!fw)
-> > +	if (!drvdata->fw)
-> >   		return -EPROBE_DEFER;
-> >   
-> > -	platform_set_drvdata(pdev, fw);
-> > +	platform_set_drvdata(pdev, drvdata);
-> >   
-> >   	err = vchiq_platform_init(pdev, &g_state);
-> >   	if (err != 0)
-> > @@ -3661,12 +3683,6 @@ static int vchiq_remove(struct platform_device *pdev)
-> >   	return 0;
-> >   }
-> >   
-> > -static const struct of_device_id vchiq_of_match[] = {
-> > -	{ .compatible = "brcm,bcm2835-vchiq", },
-> > -	{},
-> > -};
-> > -MODULE_DEVICE_TABLE(of, vchiq_of_match);
-> > -
-> >   static struct platform_driver vchiq_driver = {
-> >   	.driver = {
-> >   		.name = "bcm2835_vchiq",
-> > diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.h b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.h
-> > index 40bb0c6..2f3ebc9 100644
-> > --- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.h
-> > +++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.h
-> > @@ -123,6 +123,11 @@ typedef struct vchiq_arm_state_struct {
-> >   
-> >   } VCHIQ_ARM_STATE_T;
-> >   
-> > +struct vchiq_drvdata {
-> > +	const unsigned int cache_line_size;
-> > +	struct rpi_firmware *fw;
-> > +};
-> > +
-> >   extern int vchiq_arm_log_level;
-> >   extern int vchiq_susp_log_level;
-> >   
-> > 
-> 
-> This version doesn't compile (wrong defconfig used when building), but any criticism of the
-> approach before v3 is welcome.
+Awesome! Many thanks to Guenter, C?dric and Joel. I really appreciate
+it.
 
-no need to hurry, my pull requests for 4.20 are already out. Please take the time to test this properly.
-
-Patch 2-4 are:
-
-Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
-
-> 
-> Phil
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Jae
