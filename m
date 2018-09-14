@@ -1,96 +1,135 @@
-From: phil@raspberrypi.org (Phil Elwell)
-Date: Fri, 14 Sep 2018 11:26:55 +0100
-Subject: [PATCH 1/2] staging/vc04_services: Derive g_cache_line_size
-In-Reply-To: <107b707e-1f8c-1305-2582-0a131011758d@i2se.com>
-References: <1536770554-107314-1-git-send-email-phil@raspberrypi.org>
- <1536770554-107314-2-git-send-email-phil@raspberrypi.org>
- <107b707e-1f8c-1305-2582-0a131011758d@i2se.com>
-Message-ID: <2f836805-79dc-adee-e2b7-21c45781afff@raspberrypi.org>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Fri, 14 Sep 2018 12:27:32 +0200
+Subject: [PATCH 2/2] watchdog: sama5d4: write the mode register in two
+ steps
+In-Reply-To: <20180914101339.7382-3-romain.izard.pro@gmail.com>
+References: <20180914101339.7382-1-romain.izard.pro@gmail.com>
+ <20180914101339.7382-3-romain.izard.pro@gmail.com>
+Message-ID: <20180914102732.GP14988@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
-
-On 14/09/2018 11:11, Stefan Wahren wrote:
-> Hi Phil,
+On 14/09/2018 12:13:39+0200, Romain Izard wrote:
+> The specification for SAMA5D2 and SAMA5D4 chips, that use this IP for
+> their watchdog timer, has the following advice regarding the Mode Register:
 > 
-> Am 12.09.2018 um 18:42 schrieb Phil Elwell:
->> The ARM coprocessor registers include dcache line size, but there is no
->> function to expose this value. Rather than create a new one, use the
->> read_cpuid_id function to derive the correct value, which is 32 for
->> BCM2835 and 64 for BCM2836/7.
->>
->> Signed-off-by: Phil Elwell <phil@raspberrypi.org>
->> ---
->>  .../interface/vchiq_arm/vchiq_2835_arm.c           | 24 +++++++++++++++++-----
->>  1 file changed, 19 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
->> index e767209..3537f60 100644
->> --- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
->> +++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
->> @@ -42,6 +42,7 @@
->>  #include <linux/uaccess.h>
->>  #include <linux/mm.h>
->>  #include <linux/of.h>
->> +#include <asm/cputype.h>
->>  #include <soc/bcm2835/raspberrypi-firmware.h>
->>  
->>  #define TOTAL_SLOTS (VCHIQ_SLOT_ZERO_SLOTS + 2 * 32)
->> @@ -81,13 +82,15 @@ static void __iomem *g_regs;
->>   * VPU firmware, which determines the required alignment of the
->>   * offsets/sizes in pagelists.
->>   *
->> - * Modern VPU firmware looks for a DT "cache-line-size" property in
->> - * the VCHIQ node and will overwrite it with the actual L2 cache size,
->> + * Previous VPU firmware looked for a DT "cache-line-size" property in
->> + * the VCHIQ node and would overwrite it with the actual L2 cache size,
->>   * which the kernel must then respect.  That property was rejected
->> - * upstream, so we have to use the VPU firmware's compatibility value
->> - * of 32.
->> + * upstream, so we now rely on both sides to "do the right thing" independently
->> + * of the other. To improve backwards compatibility, this new behaviour is
->> + * signalled to the firmware by the use of a corrected "reg" property on the
->> + * relevant Device Tree node.
->>   */
->> -static unsigned int g_cache_line_size = 32;
->> +static unsigned int g_cache_line_size;
->>  static unsigned int g_fragments_size;
->>  static char *g_fragments_base;
->>  static char *g_free_fragments;
->> @@ -127,6 +130,17 @@ int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
->>  	if (err < 0)
->>  		return err;
->>  
->> +	/*
->> +	 * The tempting L1_CACHE_BYTES macro doesn't work in the case of
->> +	 * a kernel built with bcm2835_defconfig running on a BCM2836/7
->> +	 * processor, hence the need for a runtime check. The dcache line size
->> +	 * is encoded in one of the coprocessor registers, but there is no
->> +	 * convenient way to access it short of embedded assembler, hence
->> +	 * the use of read_cpuid_id(). The following test evaluates to true
->> +	 * on a BCM2835 showing that it is ARMv6-ish, whereas
->> +	 * cpu_architecture() will indicate that it is an ARMv7.
->> +	 */
->> +	g_cache_line_size = ((read_cpuid_id() & 0x7f000) == 0x7b000) ? 32 : 64;
+> "When setting the WDDIS bit, and while it is set, the fields WDV and WDD
+> must not be modified."
 > 
-> is there a chance to use ARM_CPU_PART_ARM1176 or something else instead
-> of this magic numbers?
-
-One could. It's a trade-off between specific and human-readable vs. generic and less-so,
-and possibly moot given the next question.
-
-> Sorry, i cannot remember the whole discussion but why we can use
-> different compatible here instead of using ARM specific stuff.
+> I have observed on a board based on a SAMA5D2 chip that using any other
+> timeout duration than the default 16s in the device tree will reset the
+> board when the watchdog device is opened; this is probably due to ignoring
+> the aforementioned constraint.
 > 
-> compatible = "brcm,bcm2836-vchiq", "brcm,bcm2835-vchiq"; // for BCM2836/7
+> To fix this, read the content of the Mode Register before writing it,
+> and split the access into two parts if WDV or WDD need to be changed.
 > 
-> compatible = "brcm,bcm2835"; // only for BCM2835
 
-It wasn't an option you raised in the offline discussion. Assuming you meant
-"brcm,bcm2835-vchiq", I suppose you could think of it as being a different type
-of device if that is more acceptable.
+Hum, that is really weird because when I developed
+015b528644a84b0018d3286ecd6ea5f82dce0180, I tested with a program doing:
 
->>  	g_fragments_size = 2 * g_cache_line_size;
->>  
->>  	/* Allocate space for the channels in coherent memory */
+	flags = WDIOS_DISABLECARD;
+	ioctl(fd, WDIOC_SETOPTIONS, &flags);
+	for (i = 16; i > 2; i--) {
+		ioctl(fd, WDIOC_SETTIMEOUT, &i);
+	}
+
+	ioctl(fd, WDIOC_KEEPALIVE, &dummy);
+
+	flags = WDIOS_ENABLECARD;
+	ioctl(fd, WDIOC_SETOPTIONS, &flags);
+
+	for (i = 16; i > 2; i--) {
+		ioctl(fd, WDIOC_SETTIMEOUT, &i);
+	}
+
+This would immediately reproduce the reset when changing WDV/WDD with
+WDDIS set.
+
+I'll test again.
+
+> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+> ---
+>  drivers/watchdog/sama5d4_wdt.c | 27 ++++++++++++++++++++-------
+>  1 file changed, 20 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
+> index 1e93c1b0e3cf..1e05268ad94b 100644
+> --- a/drivers/watchdog/sama5d4_wdt.c
+> +++ b/drivers/watchdog/sama5d4_wdt.c
+> @@ -46,7 +46,10 @@ MODULE_PARM_DESC(nowayout,
+>  	"Watchdog cannot be stopped once started (default="
+>  	__MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
+>  
+> -#define wdt_enabled (!(wdt->mr & AT91_WDT_WDDIS))
+> +#define wdt_enabled(reg) (!((reg) & AT91_WDT_WDDIS))
+> +
+> +#define wdt_different_counters(reg_a, reg_b) \
+> +	(((reg_a) ^ (reg_b)) & (AT91_WDT_WDV | AT91_WDT_WDD))
+>  
+>  #define wdt_read(wdt, field) \
+>  	readl_relaxed((wdt)->reg_base + (field))
+> @@ -78,8 +81,11 @@ static void wdt_write_nosleep(struct sama5d4_wdt *wdt, u32 field, u32 val)
+>  static int sama5d4_wdt_start(struct watchdog_device *wdd)
+>  {
+>  	struct sama5d4_wdt *wdt = watchdog_get_drvdata(wdd);
+> +	u32 reg = wdt_read(wdt, AT91_WDT_MR);
+>  
+>  	wdt->mr &= ~AT91_WDT_WDDIS;
+> +	if (!wdt_enabled(reg) && wdt_different_counters(reg, wdt->mr))
+> +		wdt_write(wdt, AT91_WDT_MR, reg & ~AT91_WDT_WDDIS);
+>  	wdt_write(wdt, AT91_WDT_MR, wdt->mr);
+>  
+>  	return 0;
+> @@ -88,8 +94,11 @@ static int sama5d4_wdt_start(struct watchdog_device *wdd)
+>  static int sama5d4_wdt_stop(struct watchdog_device *wdd)
+>  {
+>  	struct sama5d4_wdt *wdt = watchdog_get_drvdata(wdd);
+> +	u32 reg = wdt_read(wdt, AT91_WDT_MR);
+>  
+>  	wdt->mr |= AT91_WDT_WDDIS;
+> +	if (wdt_enabled(reg) && wdt_different_counters(reg, wdt->mr))
+> +		wdt_write(wdt, AT91_WDT_MR, wdt->mr & ~AT91_WDT_WDDIS);
+>  	wdt_write(wdt, AT91_WDT_MR, wdt->mr);
+>  
+>  	return 0;
+> @@ -122,7 +131,7 @@ static int sama5d4_wdt_set_timeout(struct watchdog_device *wdd,
+>  	 * If the watchdog is enabled, then the timeout can be updated. Else,
+>  	 * wait that the user enables it.
+>  	 */
+> -	if (wdt_enabled)
+> +	if (wdt_enabled(wdt->mr))
+>  		wdt_write(wdt, AT91_WDT_MR, wdt->mr & ~AT91_WDT_WDDIS);
+>  
+>  	wdd->timeout = timeout;
+> @@ -186,13 +195,17 @@ static int sama5d4_wdt_init(struct sama5d4_wdt *wdt)
+>  	 * If the watchdog is already running, we can safely update it.
+>  	 * Else, we have to disable it properly.
+>  	 */
+> -	if (wdt_enabled) {
+> +	reg = wdt_read(wdt, AT91_WDT_MR);
+> +	if (wdt_enabled(reg)) {
+> +		if (!wdt_enabled(wdt->mr))
+> +			wdt_write_nosleep(wdt, AT91_WDT_MR,
+> +					  wdt->mr & ~AT91_WDT_WDDIS);
+>  		wdt_write_nosleep(wdt, AT91_WDT_MR, wdt->mr);
+> -	} else {
+> -		reg = wdt_read(wdt, AT91_WDT_MR);
+> -		if (!(reg & AT91_WDT_WDDIS))
+> +	} else if (wdt_enabled(wdt->mr)) {
+> +		if (wdt_different_counters(reg, wdt->mr))
+>  			wdt_write_nosleep(wdt, AT91_WDT_MR,
+> -					  reg | AT91_WDT_WDDIS);
+> +					  reg & ~AT91_WDT_WDDIS);
+> +		wdt_write_nosleep(wdt, AT91_WDT_MR, wdt->mr);
+>  	}
+>  	return 0;
+>  }
+> -- 
+> 2.17.1
+> 
+
+-- 
+Alexandre Belloni, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
