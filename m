@@ -1,44 +1,56 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 14 Sep 2018 16:28:26 +0100
-Subject: [PATCH v6 00/18] khwasan: kernel hardware assisted address
- sanitizer
-In-Reply-To: <CAAeHK+wStsNwh2oKv-KCG4kx5538FuDMQ6Yw2X=sK5LPrw2DZg@mail.gmail.com>
-References: <cover.1535462971.git.andreyknvl@google.com>
- <20180905141032.b1ddaab53d1b2b3bada95415@linux-foundation.org>
- <20180906100543.GI3592@arm.com>
- <CAAeHK+wStsNwh2oKv-KCG4kx5538FuDMQ6Yw2X=sK5LPrw2DZg@mail.gmail.com>
-Message-ID: <20180914152825.GC6236@arm.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Fri, 14 Sep 2018 17:30:12 +0200
+Subject: [PATCH] ARM: at91/dt: fix typo in sama5d2 pinmux descriptions
+In-Reply-To: <b996f1c2271834bbf1220431ed0a08af09a6fb55.1536938317.git.mirq-linux@rere.qmqm.pl>
+References: <b996f1c2271834bbf1220431ed0a08af09a6fb55.1536938317.git.mirq-linux@rere.qmqm.pl>
+Message-ID: <2d8dcf62-eb7b-03de-7774-b5b4017db949@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2018 at 01:06:23PM +0200, Andrey Konovalov wrote:
-> On Thu, Sep 6, 2018 at 12:05 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Wed, Sep 05, 2018 at 02:10:32PM -0700, Andrew Morton wrote:
-> >> On Wed, 29 Aug 2018 13:35:04 +0200 Andrey Konovalov <andreyknvl@google.com> wrote:
-> >>
-> >> > This patchset adds a new mode to KASAN [1], which is called KHWASAN
-> >> > (Kernel HardWare assisted Address SANitizer).
-> >>
-> >> We're at v6 and there are no reviewed-by's or acked-by's to be seen.
-> >> Is that a fair commentary on what has been happening, or have people
-> >> been remiss in sending and gathering such things?
-> >
-> > I still have concerns about the consequences of merging this as anything
-> > other than a debug option [1]. Unfortunately, merging it as a debug option
-> > defeats the whole point, so I think we need to spend more effort on developing
-> > tools that can help us to find and fix the subtle bugs which will arise from
-> > enabling tagged pointers in the kernel.
+On 14/09/2018 at 17:20, Micha? Miros?aw wrote:
+> Fix SSC0 pin TD0 where wrongly called TDO.
 > 
-> I totally don't mind calling it a debug option. Do I need to somehow
-> specify it somewhere?
+> Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
 
-Ok, sorry, I completely misunderstood you earlier on then! For some reason
-I thought you wanted this on by default.
+Micha?,
 
-In which case, I'm ok with the overall idea as long as we make the caveats
-clear in the Kconfig text. In particular, that enabling this option may
-introduce problems relating to pointer casting and comparison, but can
-offer better coverage and lower memory consumption than a fully
-software-based KASAN solution.
+Thanks for your patch. But the exact same one is already integrated in 
+Linus' tree as:
+c8cbc1c20c29 ("ARM: dts: at91: fix typos for SSC TD functions")
 
-Will
+Best regards,
+   Nicolas
+
+> ---
+> Against v4.18.7
+> 
+>   arch/arm/boot/dts/sama5d2-pinfunc.h | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/sama5d2-pinfunc.h b/arch/arm/boot/dts/sama5d2-pinfunc.h
+> index e57191fb83de..1c01a6f843d8 100644
+> --- a/arch/arm/boot/dts/sama5d2-pinfunc.h
+> +++ b/arch/arm/boot/dts/sama5d2-pinfunc.h
+> @@ -375,7 +375,7 @@
+>   #define PIN_PB22__GPIO			PINMUX_PIN(PIN_PB22, 0, 0)
+>   #define PIN_PB22__LCDDAT11		PINMUX_PIN(PIN_PB22, 1, 1)
+>   #define PIN_PB22__A11			PINMUX_PIN(PIN_PB22, 2, 1)
+> -#define PIN_PB22__TDO			PINMUX_PIN(PIN_PB22, 3, 1)
+> +#define PIN_PB22__TD0			PINMUX_PIN(PIN_PB22, 3, 1)
+>   #define PIN_PB22__TIOA2			PINMUX_PIN(PIN_PB22, 4, 2)
+>   #define PIN_PB22__FLEXCOM3_IO1		PINMUX_PIN(PIN_PB22, 5, 3)
+>   #define PIN_PB22__GMDC			PINMUX_PIN(PIN_PB22, 6, 3)
+> @@ -556,7 +556,7 @@
+>   #define PIN_PC14__LCDDAT6		PINMUX_PIN(PIN_PC14, 1, 2)
+>   #define PIN_PC14__GRX0			PINMUX_PIN(PIN_PC14, 2, 1)
+>   #define PIN_PC14__ISC_D5		PINMUX_PIN(PIN_PC14, 3, 1)
+> -#define PIN_PC14__TDO			PINMUX_PIN(PIN_PC14, 5, 2)
+> +#define PIN_PC14__TD0			PINMUX_PIN(PIN_PC14, 5, 2)
+>   #define PIN_PC14__A3			PINMUX_PIN(PIN_PC14, 6, 2)
+>   #define PIN_PC15			79
+>   #define PIN_PC15__GPIO			PINMUX_PIN(PIN_PC15, 0, 0)
+> 
+
+
+-- 
+Nicolas Ferre
