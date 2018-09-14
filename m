@@ -1,82 +1,32 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 15 Sep 2018 07:52:42 +0800
-Subject: [PATCH] arm: common: use match_string() helper to simplify the
- code
-In-Reply-To: <1536937519-31611-1-git-send-email-zhongjiang@huawei.com>
-References: <1536937519-31611-1-git-send-email-zhongjiang@huawei.com>
-Message-ID: <201809150710.kyiQ0EXh%fengguang.wu@intel.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 14 Sep 2018 16:59:26 -0700
+Subject: [GIT PULL 1/3] Broadcom defconfig changes for 4.20
+Message-ID: <20180914235928.20551-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi zhong,
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 
-Thank you for the patch! Yet something to improve:
+  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
 
-[auto build test ERROR on arm-soc/for-next]
-[also build test ERROR on v4.19-rc3 next-20180913]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+are available in the Git repository at:
 
-url:    https://github.com/0day-ci/linux/commits/zhong-jiang/arm-common-use-match_string-helper-to-simplify-the-code/20180915-035510
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git for-next
-config: arm-multi_v5_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=arm 
+  https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.20/defconfig
 
-All errors (new ones prefixed by >>):
+for you to fetch changes up to 99fa3b0c6082bff346f7d09f29e5edcc93d40bd3:
 
-   arch/arm/plat-orion/common.c: In function 'orion_ge00_switch_init':
->> arch/arm/plat-orion/common.c:487:23: error: passing argument 1 of 'match_string' from incompatible pointer type [-Werror=incompatible-pointer-types]
-     index = match_string(d->port_names, ARRAY_SIZE(d->port_names), "cpu");
-                          ^
-   In file included from include/linux/bitmap.h:9:0,
-                    from include/linux/cpumask.h:12,
-                    from include/linux/rcupdate.h:44,
-                    from include/linux/radix-tree.h:28,
-                    from include/linux/idr.h:15,
-                    from include/linux/kernfs.h:14,
-                    from include/linux/sysfs.h:16,
-                    from include/linux/kobject.h:20,
-                    from include/linux/device.h:16,
-                    from include/linux/platform_device.h:14,
-                    from arch/arm/plat-orion/common.c:13:
-   include/linux/string.h:184:5: note: expected 'const char * const*' but argument is of type 'char **'
-    int match_string(const char * const *array, size_t n, const char *string);
-        ^~~~~~~~~~~~
-   cc1: some warnings being treated as errors
+  ARM: bcm2835_defconfig: Enable bcm2835-audio (2018-09-02 18:49:33 +0200)
 
-vim +/match_string +487 arch/arm/plat-orion/common.c
+----------------------------------------------------------------
+This pull request contains Broadcom ARM-based SoCs defconfig changes for
+4.20, please pull the following:
 
-   479	
-   480	void __init orion_ge00_switch_init(struct dsa_chip_data *d)
-   481	{
-   482		int index;
-   483	
-   484		if (!IS_BUILTIN(CONFIG_PHYLIB))
-   485			return;
-   486	
- > 487		index = match_string(d->port_names, ARRAY_SIZE(d->port_names), "cpu");
-   488		if (index >= 0)
-   489			d->netdev[index] = &orion_ge00.dev;
-   490	
-   491		orion_ge00_switch_board_info.mdio_addr = d->sw_addr;
-   492		orion_ge00_switch_board_info.platform_data = d;
-   493	
-   494		mdiobus_register_board_info(&orion_ge00_switch_board_info, 1);
-   495	}
-   496	#endif
-   497	
+- Stefan updates the bcm2835_defconfig file to turn on the bcm2835-audio
+  driver.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 30074 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180915/ccfea8eb/attachment-0001.gz>
+----------------------------------------------------------------
+Stefan Wahren (1):
+      ARM: bcm2835_defconfig: Enable bcm2835-audio
+
+ arch/arm/configs/bcm2835_defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
