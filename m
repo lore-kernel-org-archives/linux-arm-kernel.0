@@ -1,72 +1,79 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 14 Sep 2018 11:41:49 +0100
-Subject: [PATCH 1/2] staging/vc04_services: Derive g_cache_line_size
-In-Reply-To: <107b707e-1f8c-1305-2582-0a131011758d@i2se.com>
-References: <1536770554-107314-1-git-send-email-phil@raspberrypi.org>
- <1536770554-107314-2-git-send-email-phil@raspberrypi.org>
- <107b707e-1f8c-1305-2582-0a131011758d@i2se.com>
-Message-ID: <20180914104148.GB30658@n2100.armlinux.org.uk>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 14 Sep 2018 18:43:42 +0800
+Subject: [arm-platforms:irq/generic_handle_domain_irq 12/13]
+ drivers//irqchip/irq-keystone.c:109:4: error: 'ret' undeclared; did you mean
+ 'rseq'?
+Message-ID: <201809141839.vRQEyjGT%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2018 at 12:11:54PM +0200, Stefan Wahren wrote:
-> Hi Phil,
-> 
-> Am 12.09.2018 um 18:42 schrieb Phil Elwell:
-> > +	/*
-> > +	 * The tempting L1_CACHE_BYTES macro doesn't work in the case of
-> > +	 * a kernel built with bcm2835_defconfig running on a BCM2836/7
-> > +	 * processor, hence the need for a runtime check. The dcache line size
-> > +	 * is encoded in one of the coprocessor registers, but there is no
-> > +	 * convenient way to access it short of embedded assembler, hence
-> > +	 * the use of read_cpuid_id(). The following test evaluates to true
-> > +	 * on a BCM2835 showing that it is ARMv6-ish, whereas
-> > +	 * cpu_architecture() will indicate that it is an ARMv7.
-> > +	 */
-> > +	g_cache_line_size = ((read_cpuid_id() & 0x7f000) == 0x7b000) ? 32 : 64;
-> 
-> is there a chance to use ARM_CPU_PART_ARM1176 or something else instead
-> of this magic numbers?
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/generic_handle_domain_irq
+head:   878c6d8883cfc2fc6f8e557f61e13765449fa2f1
+commit: bf0e815fd99bf71a4f6fc78eb5c2fc5de751c192 [12/13] irqdomain: Generalize usage of generic_handle_domain_irq
+config: arm-multi_v7_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout bf0e815fd99bf71a4f6fc78eb5c2fc5de751c192
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=arm 
 
-In any case, reading the CPU ID and masking it in this way is really
-not on.
+All errors (new ones prefixed by >>):
 
-The above checks that the ID _may_ be a "new ID" format, and that the
-top four bits of the CPU part number are 11.  However, there are three
-formats of the CPU ID register which can conflict if you do this kind
-of trivial mask-and-test.
+   drivers//irqchip/irq-keystone.c: In function 'keystone_irq_handler':
+>> drivers//irqchip/irq-keystone.c:109:4: error: 'ret' undeclared (first use in this function); did you mean 'rseq'?
+       ret = generic_handle_domain_irq(kirq->irqd, src);
+       ^~~
+       rseq
+   drivers//irqchip/irq-keystone.c:109:4: note: each undeclared identifier is reported only once for each function it appears in
 
-The relevant cases for are:
+vim +109 drivers//irqchip/irq-keystone.c
 
-bits 19:16 inclusive being all ones define whether the ID is "new ID"
-format with the additional CPU ID registers.  This is used for all
-modern CPUs.
+    86	
+    87	static irqreturn_t keystone_irq_handler(int irq, void *keystone_irq)
+    88	{
+    89		struct keystone_irq_device *kirq = keystone_irq;
+    90		unsigned long wa_lock_flags;
+    91		unsigned long pending;
+    92		int src;
+    93	
+    94		dev_dbg(kirq->dev, "start irq %d\n", irq);
+    95	
+    96		pending = keystone_irq_readl(kirq);
+    97		keystone_irq_writel(kirq, pending);
+    98	
+    99		dev_dbg(kirq->dev, "pending 0x%lx, mask 0x%x\n", pending, kirq->mask);
+   100	
+   101		pending = (pending >> BIT_OFS) & ~kirq->mask;
+   102	
+   103		dev_dbg(kirq->dev, "pending after mask 0x%lx\n", pending);
+   104	
+   105		for (src = 0; src < KEYSTONE_N_IRQ; src++) {
+   106			if (BIT(src) & pending) {
+   107				dev_dbg(kirq->dev, "dispatch bit %d\n", src);
+   108				raw_spin_lock_irqsave(&kirq->wa_lock, wa_lock_flags);
+ > 109				ret = generic_handle_domain_irq(kirq->irqd, src);
+   110				raw_spin_unlock_irqrestore(&kirq->wa_lock,
+   111							   wa_lock_flags);
+   112				if (ret)
+   113					dev_warn(kirq->dev, "spurious irq detected hwirq %d\n",
+   114						 src);
+   115			}
+   116		}
+   117	
+   118		dev_dbg(kirq->dev, "end irq %d\n", irq);
+   119		return IRQ_HANDLED;
+   120	}
+   121	
 
-Otherwise, if bit 19 is clear, it is an older ID format, and bits
-18:16 may contain '7'.
-
-The value of bits 15:4 depend on the implementer - "1011" in 15:12 are
-used by Intel for StrongARM1110 (though they won't have '7' in 18:16),
-ARM Ltd for ARM1136, ARM1156, ARM1176 and ARM11MPCore (which will have
-'7' in 18:16) - and hence will match this test.
-
-So, the above code does not match just BCM2835, but also matches other
-CPUs.
-
-There is a reason why the old macros that allow the part number to be
-fetched in asm/cputype.h are marked as deprecated, and that is to
-encourage correct behaviour - to use both the part number and
-implementer fields.
-
-The comment is also wrong.  It claims that in order to read the cache
-line size, one needs to use assembler.  asm/cputype.h has macros and
-inline functions (of which read_cpuid_id() is one of them) to allow
-access without having assembler encoded in drivers.  However, there is
-a gotcha - the format of the cache type register also depends on the
-CPU architecture, so it's not a simple case of grabbing the value of a
-bitfield.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
-According to speedtest.net: 13Mbps down 490kbps up
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 44389 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180914/b13096fa/attachment-0001.gz>
