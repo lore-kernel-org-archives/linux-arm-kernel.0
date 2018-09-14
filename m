@@ -1,161 +1,195 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 14 Sep 2018 16:40:06 +0200
-Subject: [PATCH v4 17/22] nvmem: add a notifier chain
+Date: Fri, 14 Sep 2018 16:40:03 +0200
+Subject: [PATCH v4 14/22] nvmem: resolve cells from DT at registration time
 In-Reply-To: <20180914144011.27614-1-brgl@bgdev.pl>
 References: <20180914144011.27614-1-brgl@bgdev.pl>
-Message-ID: <20180914144011.27614-18-brgl@bgdev.pl>
+Message-ID: <20180914144011.27614-15-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Add a blocking notifier chain with four events (add and remove for
-both devices and cells) so that users can get notified about the
-addition of nvmem resources they're waiting for.
+Currently we're creating a new cell structure everytime a DT user
+calls nvmem_cell_get().
 
-We'll use this instead of the at24 setup callback in the mityomapl138
-board file.
+Change this behavior by resolving the cells during nvmem provider
+registration and adding all cells to the provider's list. Make
+of_nvmem_cell_get() just parse the phandle and look the cell up
+in the relevant provider's list.
+
+Don't drop the cell in nvmem_cell_put().
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/nvmem/core.c           | 36 ++++++++++++++++++++++++++++++++++
- include/linux/nvmem-consumer.h | 21 ++++++++++++++++++++
- 2 files changed, 57 insertions(+)
+ drivers/nvmem/core.c | 123 ++++++++++++++++++++++++++-----------------
+ 1 file changed, 75 insertions(+), 48 deletions(-)
 
 diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index 9cc86d131e1e..da441019b609 100644
+index 9329857f6137..13568e7ad178 100644
 --- a/drivers/nvmem/core.c
 +++ b/drivers/nvmem/core.c
-@@ -65,6 +65,8 @@ static LIST_HEAD(nvmem_cell_tables);
- static DEFINE_MUTEX(nvmem_lookup_mutex);
- static LIST_HEAD(nvmem_lookup_list);
- 
-+static BLOCKING_NOTIFIER_HEAD(nvmem_notifier);
-+
- #ifdef CONFIG_DEBUG_LOCK_ALLOC
- static struct lock_class_key eeprom_lock_key;
- #endif
-@@ -300,6 +302,7 @@ static struct nvmem_device *nvmem_find(const char *name)
- 
- static void nvmem_cell_drop(struct nvmem_cell *cell)
- {
-+	blocking_notifier_call_chain(&nvmem_notifier, NVMEM_CELL_REMOVE, cell);
- 	mutex_lock(&nvmem_mutex);
- 	list_del(&cell->node);
- 	mutex_unlock(&nvmem_mutex);
-@@ -319,6 +322,7 @@ static void nvmem_cell_add(struct nvmem_cell *cell)
- 	mutex_lock(&nvmem_mutex);
- 	list_add_tail(&cell->node, &cell->nvmem->cells);
- 	mutex_unlock(&nvmem_mutex);
-+	blocking_notifier_call_chain(&nvmem_notifier, NVMEM_CELL_ADD, cell);
+@@ -456,6 +456,73 @@ static int nvmem_add_cells_from_table(struct nvmem_device *nvmem)
+ 	return rval;
  }
  
- static int nvmem_cell_info_to_nvmem_cell(struct nvmem_device *nvmem,
-@@ -434,6 +438,32 @@ static int nvmem_setup_compat(struct nvmem_device *nvmem,
- 	return 0;
- }
- 
-+/**
-+ * nvmem_register_notifier() - Register a notifier block for nvmem events.
-+ *
-+ * @nb: notifier block to be called on nvmem events.
-+ *
-+ * Return: 0 on success, negative error number on failure.
-+ */
-+int nvmem_register_notifier(struct notifier_block *nb)
++static struct nvmem_cell *
++nvmem_find_cell_by_index(struct nvmem_device *nvmem, int index)
 +{
-+	return blocking_notifier_chain_register(&nvmem_notifier, nb);
-+}
-+EXPORT_SYMBOL_GPL(nvmem_register_notifier);
++	struct nvmem_cell *cell = NULL;
++	int i = 0;
 +
-+/**
-+ * nvmem_unregister_notifier() - Unregister a notifier block for nvmem events.
-+ *
-+ * @nb: notifier block to be unregistered.
-+ *
-+ * Return: 0 on success, negative error number on failure.
-+ */
-+int nvmem_unregister_notifier(struct notifier_block *nb)
++	mutex_lock(&nvmem_mutex);
++	list_for_each_entry(cell, &nvmem->cells, node) {
++		if (index == i++)
++			break;
++	}
++	mutex_unlock(&nvmem_mutex);
++
++	return cell;
++}
++
++static int nvmem_add_cells_from_of(struct nvmem_device *nvmem)
 +{
-+	return blocking_notifier_chain_unregister(&nvmem_notifier, nb);
-+}
-+EXPORT_SYMBOL_GPL(nvmem_unregister_notifier);
++	struct device_node *parent, *child;
++	struct device *dev = &nvmem->dev;
++	struct nvmem_cell *cell;
++	const __be32 *addr;
++	int len;
 +
- static int nvmem_add_cells_from_table(struct nvmem_device *nvmem)
- {
- 	const struct nvmem_cell_info *info;
-@@ -647,6 +677,10 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
++	parent = dev->of_node;
++
++	for_each_child_of_node(parent, child) {
++		addr = of_get_property(child, "reg", &len);
++		if (!addr || (len < 2 * sizeof(u32))) {
++			dev_err(dev, "nvmem: invalid reg on %pOF\n", child);
++			return -EINVAL;
++		}
++
++		cell = kzalloc(sizeof(*cell), GFP_KERNEL);
++		if (!cell)
++			return -ENOMEM;
++
++		cell->nvmem = nvmem;
++		cell->offset = be32_to_cpup(addr++);
++		cell->bytes = be32_to_cpup(addr);
++		cell->name = child->name;
++
++		addr = of_get_property(child, "bits", &len);
++		if (addr && len == (2 * sizeof(u32))) {
++			cell->bit_offset = be32_to_cpup(addr++);
++			cell->nbits = be32_to_cpup(addr);
++		}
++
++		if (cell->nbits)
++			cell->bytes = DIV_ROUND_UP(
++					cell->nbits + cell->bit_offset,
++					BITS_PER_BYTE);
++
++		if (!IS_ALIGNED(cell->offset, nvmem->stride)) {
++			dev_err(dev, "cell %s unaligned to nvmem stride %d\n",
++				cell->name, nvmem->stride);
++			/* Cells already added will be freed later. */
++			kfree(cell);
++			return -EINVAL;
++		}
++
++		nvmem_cell_add(cell);
++	}
++
++	return 0;
++}
++
+ /**
+  * nvmem_register() - Register a nvmem device for given nvmem_config.
+  * Also creates an binary entry in /sys/bus/nvmem/devices/dev-name/nvmem
+@@ -546,6 +613,10 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
  	if (rval)
  		goto err_remove_cells;
  
-+	rval = blocking_notifier_call_chain(&nvmem_notifier, NVMEM_ADD, nvmem);
++	rval = nvmem_add_cells_from_of(nvmem);
 +	if (rval)
 +		goto err_remove_cells;
 +
  	return nvmem;
  
  err_remove_cells:
-@@ -669,6 +703,8 @@ static void nvmem_device_release(struct kref *kref)
+@@ -848,10 +919,8 @@ struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+ 					    const char *name)
+ {
+ 	struct device_node *cell_np, *nvmem_np;
+-	struct nvmem_cell *cell;
+ 	struct nvmem_device *nvmem;
+-	const __be32 *addr;
+-	int rval, len;
++	struct nvmem_cell *cell;
+ 	int index = 0;
  
- 	nvmem = container_of(kref, struct nvmem_device, refcnt);
+ 	/* if cell name exists, find index to the name */
+@@ -871,54 +940,13 @@ struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
+ 	if (IS_ERR(nvmem))
+ 		return ERR_CAST(nvmem);
  
-+	blocking_notifier_call_chain(&nvmem_notifier, NVMEM_REMOVE, nvmem);
-+
- 	if (nvmem->flags & FLAG_COMPAT)
- 		device_remove_bin_file(nvmem->base_dev, &nvmem->eeprom);
+-	addr = of_get_property(cell_np, "reg", &len);
+-	if (!addr || (len < 2 * sizeof(u32))) {
+-		dev_err(&nvmem->dev, "nvmem: invalid reg on %pOF\n",
+-			cell_np);
+-		rval  = -EINVAL;
+-		goto err_mem;
+-	}
+-
+-	cell = kzalloc(sizeof(*cell), GFP_KERNEL);
++	cell = nvmem_find_cell_by_index(nvmem, index);
+ 	if (!cell) {
+-		rval = -ENOMEM;
+-		goto err_mem;
+-	}
+-
+-	cell->nvmem = nvmem;
+-	cell->offset = be32_to_cpup(addr++);
+-	cell->bytes = be32_to_cpup(addr);
+-	cell->name = cell_np->name;
+-
+-	addr = of_get_property(cell_np, "bits", &len);
+-	if (addr && len == (2 * sizeof(u32))) {
+-		cell->bit_offset = be32_to_cpup(addr++);
+-		cell->nbits = be32_to_cpup(addr);
+-	}
+-
+-	if (cell->nbits)
+-		cell->bytes = DIV_ROUND_UP(cell->nbits + cell->bit_offset,
+-					   BITS_PER_BYTE);
+-
+-	if (!IS_ALIGNED(cell->offset, nvmem->stride)) {
+-			dev_err(&nvmem->dev,
+-				"cell %s unaligned to nvmem stride %d\n",
+-				cell->name, nvmem->stride);
+-		rval  = -EINVAL;
+-		goto err_sanity;
++		__nvmem_device_put(nvmem);
++		return ERR_PTR(-ENOENT);
+ 	}
  
-diff --git a/include/linux/nvmem-consumer.h b/include/linux/nvmem-consumer.h
-index 27eee3945405..0326b52e906b 100644
---- a/include/linux/nvmem-consumer.h
-+++ b/include/linux/nvmem-consumer.h
-@@ -14,6 +14,7 @@
+-	nvmem_cell_add(cell);
+-
+ 	return cell;
+-
+-err_sanity:
+-	kfree(cell);
+-
+-err_mem:
+-	__nvmem_device_put(nvmem);
+-
+-	return ERR_PTR(rval);
+ }
+ EXPORT_SYMBOL_GPL(of_nvmem_cell_get);
+ #endif
+@@ -1024,7 +1052,6 @@ void nvmem_cell_put(struct nvmem_cell *cell)
+ 	struct nvmem_device *nvmem = cell->nvmem;
  
- #include <linux/err.h>
- #include <linux/errno.h>
-+#include <linux/notifier.h>
+ 	__nvmem_device_put(nvmem);
+-	nvmem_cell_drop(cell);
+ }
+ EXPORT_SYMBOL_GPL(nvmem_cell_put);
  
- struct device;
- struct device_node;
-@@ -47,6 +48,13 @@ struct nvmem_cell_lookup {
- 	struct list_head	node;
- };
- 
-+enum {
-+	NVMEM_ADD = 1,
-+	NVMEM_REMOVE,
-+	NVMEM_CELL_ADD,
-+	NVMEM_CELL_REMOVE,
-+};
-+
- #if IS_ENABLED(CONFIG_NVMEM)
- 
- /* Cell based interface */
-@@ -80,6 +88,9 @@ void nvmem_add_cell_lookups(struct nvmem_cell_lookup *entries,
- void nvmem_del_cell_lookups(struct nvmem_cell_lookup *entries,
- 			    size_t nentries);
- 
-+int nvmem_register_notifier(struct notifier_block *nb);
-+int nvmem_unregister_notifier(struct notifier_block *nb);
-+
- #else
- 
- static inline struct nvmem_cell *nvmem_cell_get(struct device *dev,
-@@ -179,6 +190,16 @@ nvmem_add_cell_lookups(struct nvmem_cell_lookup *entries, size_t nentries) {}
- static inline void
- nvmem_del_cell_lookups(struct nvmem_cell_lookup *entries, size_t nentries) {}
- 
-+static inline int nvmem_register_notifier(struct notifier_block *nb)
-+{
-+	return -ENOSYS;
-+}
-+
-+static inline int nvmem_unregister_notifier(struct notifier_block *nb)
-+{
-+	return -ENOSYS;
-+}
-+
- #endif /* CONFIG_NVMEM */
- 
- #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
 -- 
 2.18.0
