@@ -1,68 +1,44 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 14 Sep 2018 16:28:01 +0100
-Subject: [PATCH] arm64: lib: use C string functions with KASAN enabled.
-In-Reply-To: <cc08dd75-79f9-bece-8803-772123ebb0d6@virtuozzo.com>
-References: <20180906170534.20726-1-aryabinin@virtuozzo.com>
- <20180907145605.GE12788@arm.com>
- <9634affa-b210-d931-e40b-6e8a20f105fc@virtuozzo.com>
- <20180910113257.7rjj5qseu3m2tj6y@lakrids.cambridge.arm.com>
- <20180910125303.dlysg3jba4wv7bhg@lakrids.cambridge.arm.com>
- <20180910130631.GB24619@arm.com>
- <cc08dd75-79f9-bece-8803-772123ebb0d6@virtuozzo.com>
-Message-ID: <20180914152800.GB6236@arm.com>
+Date: Fri, 14 Sep 2018 16:28:26 +0100
+Subject: [PATCH v6 00/18] khwasan: kernel hardware assisted address
+ sanitizer
+In-Reply-To: <CAAeHK+wStsNwh2oKv-KCG4kx5538FuDMQ6Yw2X=sK5LPrw2DZg@mail.gmail.com>
+References: <cover.1535462971.git.andreyknvl@google.com>
+ <20180905141032.b1ddaab53d1b2b3bada95415@linux-foundation.org>
+ <20180906100543.GI3592@arm.com>
+ <CAAeHK+wStsNwh2oKv-KCG4kx5538FuDMQ6Yw2X=sK5LPrw2DZg@mail.gmail.com>
+Message-ID: <20180914152825.GC6236@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2018 at 04:01:28PM +0300, Andrey Ryabinin wrote:
-> 
-> 
-> On 09/10/2018 04:06 PM, Will Deacon wrote:
-> > On Mon, Sep 10, 2018 at 01:53:03PM +0100, Mark Rutland wrote:
-> >> On Mon, Sep 10, 2018 at 12:33:22PM +0100, Mark Rutland wrote:
-> >>> On Fri, Sep 07, 2018 at 06:48:10PM +0300, Andrey Ryabinin wrote:
-> >>>> On 09/07/2018 05:56 PM, Will Deacon wrote:
-> >>>>> I don't understand this bit: efistub uses the __pi_ prefixed
-> >>>>> versions of the routines, so why do we need to declare them as weak?
-> >>>>
-> >>>> Weak needed because we can't have two non-weak functions with the same
-> >>>> name.
-> >>>>
-> >>>> Alternative approach would be to never use e.g. "strlen" name for asm
-> >>>> implementation of strlen() under CONFIG_KASAN=y.  But that would
-> >>>> require adding some special ENDPIPROC_KASAN() macro since we want
-> >>>> __pi_strlen() to point to the asm_strlen().
-> >>>
-> >>> Somehow, what we have today works with CONFIG_FORTIFY_SOURCE, which
-> >>> AFAICT would suffer from texactly the same problem with things like
-> >>> memcpy.
-> >>>
-> 
-> FORTIFY_SOURCE seems uses "extern inline" to redefine functions.
-> I obviously cannot make the whole lib/string.c 'extern inline'.
-> 
-> 
-> >>> So either we're getting away with that by chance already (and should fix
-> >>> that regardless of this patch), or this is not actually a problem.
+On Thu, Sep 06, 2018 at 01:06:23PM +0200, Andrey Konovalov wrote:
+> On Thu, Sep 6, 2018 at 12:05 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Wed, Sep 05, 2018 at 02:10:32PM -0700, Andrew Morton wrote:
+> >> On Wed, 29 Aug 2018 13:35:04 +0200 Andrey Konovalov <andreyknvl@google.com> wrote:
 > >>
-> >> I now see those functions are marked weak in the assembly
-> >> implementation; sorry for the noise.
+> >> > This patchset adds a new mode to KASAN [1], which is called KHWASAN
+> >> > (Kernel HardWare assisted Address SANitizer).
 > >>
-> >> Regardless, I still think it's preferable to avoid weak wherever
-> >> possible.
-> > 
-> > I was thinking along the same lines, but having played around with the code,
-> > I agree with Andrey that this appears to be the cleanest solution.
-> > 
-> > Andrey -- could you respin using WEAK instead of .weak, removing any
-> > redundant uses of ENTRY in the process? We might also need to throw an
-> > ALIGN directive into the WEAK definition.
-> > 
+> >> We're at v6 and there are no reviewed-by's or acked-by's to be seen.
+> >> Is that a fair commentary on what has been happening, or have people
+> >> been remiss in sending and gathering such things?
+> >
+> > I still have concerns about the consequences of merging this as anything
+> > other than a debug option [1]. Unfortunately, merging it as a debug option
+> > defeats the whole point, so I think we need to spend more effort on developing
+> > tools that can help us to find and fix the subtle bugs which will arise from
+> > enabling tagged pointers in the kernel.
 > 
-> Actually I come up with something that looks decent, without using weak symbols, see below.
-> "#ifndef CONFIG_KASAN" could be moved to the header. In that ALIAS probably should be renamed to
-> something like NOKASAN_ALIAS().
+> I totally don't mind calling it a debug option. Do I need to somehow
+> specify it somewhere?
 
-Hmm, to be honest, I'd kinda got used to the version using weak symbols
-and I reckon it'd be cleaner still if you respin it using WEAK.
+Ok, sorry, I completely misunderstood you earlier on then! For some reason
+I thought you wanted this on by default.
+
+In which case, I'm ok with the overall idea as long as we make the caveats
+clear in the Kconfig text. In particular, that enabling this option may
+introduce problems relating to pointer casting and comparison, but can
+offer better coverage and lower memory consumption than a fully
+software-based KASAN solution.
 
 Will
