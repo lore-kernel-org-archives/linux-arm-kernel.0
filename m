@@ -1,48 +1,273 @@
 From: manish.narani@xilinx.com (Manish Narani)
-Date: Fri, 14 Sep 2018 12:48:26 +0530
-Subject: [PATCH v2 0/4] Add Xilinx AMS Driver
-Message-ID: <1536909510-7166-1-git-send-email-manish.narani@xilinx.com>
+Date: Fri, 14 Sep 2018 12:48:28 +0530
+Subject: [PATCH v2 2/4] iio: Documentation: Add Xilinx AMS sysfs documentation
+In-Reply-To: <1536909510-7166-1-git-send-email-manish.narani@xilinx.com>
+References: <1536909510-7166-1-git-send-email-manish.narani@xilinx.com>
+Message-ID: <1536909510-7166-3-git-send-email-manish.narani@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Xilinx AMS driver which is used for Xilinx's ZynqMP AMS controller.
-This AMS driver is used to report various interface voltages and temperatures
-across the system.
-This driver handles AMS module including PS-Sysmon & PL-Sysmon. The binding
-documentation is added for understanding of AMS, PS, PL Sysmon Channels.
+Add documentation for xilinx-ams driver. This contains information about
+various voltages and temperatures on PS (Processing System), PL
+(Programmable Logic) and AMS Control Block.
 
-Changes in v2:
-	- Added documentation for sysfs (Patch-2)
-	- Addressed code style review comments
-	- Patch-2 (Now it is Patch-3)
-		- Arranged the includes in alphabetical order
-		- Removed the wrapper 'ams_pl_write_reg()' and used writel
-		  instead
-		- Removed the unnecessary delay of 1ms and used polling of EOC
-		  instead
-		- Removed spin_lock and used mutex only.
-		- Used request_irq() instead of devm_request_irq() and handled
-		  respective error conditions
-		- Moved contents of xilinx-ams.h to inline with xilinx-ams.c
-	- Patch-1
-		- Addressed Documentation style comments
-
-Manish Narani (4):
-  dt-bindings: iio: adc: Add Xilinx AMS binding documentation
-  iio: Documentation: Add Xilinx AMS sysfs documentation
-  iio: adc: Add Xilinx AMS driver
-  arm64: zynqmp: DT: Add Xilinx AMS node
-
- .../ABI/testing/sysfs-bus-iio-adc-xilinx-ams       |  246 ++++
- .../devicetree/bindings/iio/adc/xilinx-ams.txt     |  180 +++
- arch/arm64/boot/dts/xilinx/zynqmp.dtsi             |   26 +
- drivers/iio/adc/Kconfig                            |   10 +
- drivers/iio/adc/Makefile                           |    1 +
- drivers/iio/adc/xilinx-ams.c                       | 1337 ++++++++++++++++++++
- 6 files changed, 1800 insertions(+)
+Signed-off-by: Manish Narani <manish.narani@xilinx.com>
+---
+ .../ABI/testing/sysfs-bus-iio-adc-xilinx-ams       | 246 +++++++++++++++++++++
+ 1 file changed, 246 insertions(+)
  create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-adc-xilinx-ams
- create mode 100644 Documentation/devicetree/bindings/iio/adc/xilinx-ams.txt
- create mode 100644 drivers/iio/adc/xilinx-ams.c
 
+diff --git a/Documentation/ABI/testing/sysfs-bus-iio-adc-xilinx-ams b/Documentation/ABI/testing/sysfs-bus-iio-adc-xilinx-ams
+new file mode 100644
+index 0000000..589c389
+--- /dev/null
++++ b/Documentation/ABI/testing/sysfs-bus-iio-adc-xilinx-ams
+@@ -0,0 +1,246 @@
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccpsintlp
++Date:		September 2018
++KernelVersion:	4.19.0
++Contact:	mnarani at xilinx.com
++Description:
++		Voltage input for PS (Processing System) LPD (Low Power Domain)
++		power supply.
++
++
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccpsintfp
++Date:		September 2018
++KernelVersion:	4.19.0
++Contact:	mnarani at xilinx.com
++Description:
++		Voltage input for PS (Processing System) FPD (Full Power Domain)
++		power supply.
++
++
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccpsaux
++Date:		September 2018
++KernelVersion:	4.19.0
++Contact:	mnarani at xilinx.com
++Description:
++		Voltage input for PS (Processing System) Auxiliary power
++		supply.
++
++
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccpsddr
++Date:		September 2018
++KernelVersion:	4.19.0
++Contact:	mnarani at xilinx.com
++Description:
++		Voltage input for PS (Processing System) I/O bank 504 (DDR
++		PHY) power supply.
++
++
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccpsio3
++Date:		September 2018
++KernelVersion:	4.19.0
++Contact:	mnarani at xilinx.com
++Description:
++		Voltage input for PS (Processing System) I/O bank 503
++		(boot, config, JTAG, SRST, POR) power supply.
++
++
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccpsio0
++Date:		September 2018
++KernelVersion:	4.19.0
++Contact:	mnarani at xilinx.com
++Description:
++		Voltage input for PS (Processing System) I/O bank 500
++		(MIO[0:25]) power supply.
++
++
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccpsio1
++Date:		September 2018
++KernelVersion:	4.19.0
++Contact:	mnarani at xilinx.com
++Description:
++		Voltage input for PS (Processing System) I/O bank 501
++		(MIO[26:51]) power supply.
++
++
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccpsio2
++Date:		September 2018
++KernelVersion:	4.19.0
++Contact:	mnarani at xilinx.com
++Description:
++		Voltage input for PS (Processing System) I/O bank 502
++		(MIO[52:77]) power supply.
++
++
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_psmgtravcc
++Date:		September 2018
++KernelVersion:	4.19.0
++Contact:	mnarani at xilinx.com
++Description:
++		Voltage input for PS (Processing System) GTR SerDes I/O
++		power supply.
++
++
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_psmgtravtt
++Date:		September 2018
++KernelVersion:	4.19.0
++Contact:	mnarani at xilinx.com
++Description:
++		Voltage input for PS (Processing System) GTR SerDes
++		terminators power supply.
++
++
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccams
++Date:		September 2018
++KernelVersion:	4.19.0
++Contact:	mnarani at xilinx.com
++Description:
++		Voltage input for PS (Processing System) SYSMON ADC circuitry
++		power supply.
++
++
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccint
++Date:		September 2018
++KernelVersion:	4.19.0
++Contact:	mnarani at xilinx.com
++Description:
++		Voltage input for PL (Programmable Logic) internal power supply.
++
++
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccvrefp
++Date:		September 2018
++KernelVersion:	4.19.0
++Contact:	mnarani at xilinx.com
++Description:
++		Voltage input for PL (Programmable Logic) ADC positive V
++		reference power supply.
++
++
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccvrefn
++Date:		September 2018
++KernelVersion:	4.19.0
++Contact:	mnarani at xilinx.com
++Description:
++		Voltage input for PL (Programmable Logic) ADC negative V
++		reference power supply.
++
++
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccplintlp
++Date:		September 2018
++KernelVersion:	4.19.0
++Contact:	mnarani at xilinx.com
++Description:
++		Voltage input for PL (Programmable Logic) LPD (Low Power Domain)
++		power supply.
++
++
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccplintfp
++Date:		September 2018
++KernelVersion:	4.19.0
++Contact:	mnarani at xilinx.com
++Description:
++		Voltage input for PL (Programmable Logic) FPD (Full Power
++		Domain) power supply.
++
++
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccplaux
++Date:		September 2018
++KernelVersion:	4.19.0
++Contact:	mnarani at xilinx.com
++Description:
++		Voltage input for PL (Programmable Logic) Auxiliary power
++		supply.
++
++
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccvpvn
++Date:		September 2018
++KernelVersion:	4.19.0
++Contact:	mnarani at xilinx.com
++Description:
++		Voltage input for PL (Programmable Logic) Analog Input Pins
++		power supply.
++
++
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vuserZ
++Date:		September 2018
++KernelVersion:	4.19.0
++Contact:	mnarani at xilinx.com
++Description:
++		Voltage input for PL (Programmable Logic) Fabric Analog Wires 
++		power supply. Z is the number in range of 0 to 3.
++
++
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vcc_pspll0
++Date:		September 2018
++KernelVersion:	4.19.0
++Contact:	mnarani at xilinx.com
++Description:
++		Voltage input for AMS (Analog Monitoring System) Systems PLLs
++		power supply.
++
++
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vcc_psbatt
++Date:		September 2018
++KernelVersion:	4.19.0
++Contact:	mnarani at xilinx.com
++Description:
++		Voltage input for AMS (Analog Monitoring System) Battery power
++		supply.
++
++
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccbram
++Date:		September 2018
++KernelVersion:	4.19.0
++Contact:	mnarani at xilinx.com
++Description:
++		Voltage input for AMS (Analog Monitoring System) Block RAM power
++		supply.
++
++
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccaux
++Date:		September 2018
++KernelVersion:	4.19.0
++Contact:	mnarani at xilinx.com
++Description:
++		Voltage input for AMS (Analog Monitoring System) Auxiliary power
++		supply.
++
++
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_psddrpll
++Date:		September 2018
++KernelVersion:	4.19.0
++Contact:	mnarani at xilinx.com
++Description:
++		Voltage input for AMS (Analog Monitoring System) DDR I/O
++		PLLs [0:5] power supply.
++
++
++What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_psintfpddr
++Date:		September 2018
++KernelVersion:	4.19.0
++Contact:	mnarani at xilinx.com
++Description:
++		Voltage input for AMS (Analog Monitoring System) DDR controller
++		power supply.
++
++
++What:		/sys/bus/iio/devices/iio:deviceX/in_tempY_ps_temp
++Date:		September 2018
++KernelVersion:	4.19.0
++Contact:	mnarani at xilinx.com
++Description:
++		Temperature input for PS (Processing System) RPU MPCore.
++
++
++What:		/sys/bus/iio/devices/iio:deviceX/in_tempY_remote_temp
++Date:		September 2018
++KernelVersion:	4.19.0
++Contact:	mnarani at xilinx.com
++Description:
++		Temperature input for PS (Processing System) APU MPCore.
++
++
++What:		/sys/bus/iio/devices/iio:deviceX/in_tempY_pl_temp
++Date:		September 2018
++KernelVersion:	4.19.0
++Contact:	mnarani at xilinx.com
++Description:
++		Temperature input for PL (Programmable Logic) SYSMON.
 -- 
 2.1.1
