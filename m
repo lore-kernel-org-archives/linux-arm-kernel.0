@@ -1,63 +1,47 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 14 Sep 2018 15:30:24 +0100
-Subject: [PATCH v7 6/6] iommu/arm-smmu: Support non-strict mode
+Date: Fri, 14 Sep 2018 15:30:23 +0100
+Subject: [PATCH v7 5/6] iommu/arm-smmu-v3: Add support for non-strict mode
 In-Reply-To: <cover.1536935328.git.robin.murphy@arm.com>
 References: <cover.1536935328.git.robin.murphy@arm.com>
-Message-ID: <09be4304bf23dde899be48dbddd93b09296f76bd.1536935328.git.robin.murphy@arm.com>
+Message-ID: <4f9444c7224ea0e6e4cef8ddbf77bb5292a383e3.1536935328.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All we need is to wire up .flush_iotlb_all properly and implement the
-domain attribute, and iommu-dma and io-pgtable-arm will do the rest for
-us. Rather than bother implementing it for v7s format for the highly
-unlikely chance of that being relevant, we can simply hide the
-non-strict flag from io-pgtable for that combination just so anyone who
-does actually try it will simply get over-invalidation instead of
-failure to initialise domains.
+From: Zhen Lei <thunder.leizhen@huawei.com>
 
+Dynamically choose strict or non-strict mode for page table config based
+on the iommu domain type.
+
+Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+[rm: convert to domain attribute]
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/iommu/arm-smmu.c | 40 +++++++++++++++++++++++++++++++++-------
- 1 file changed, 33 insertions(+), 7 deletions(-)
+ drivers/iommu/arm-smmu-v3.c | 30 ++++++++++++++++++++++++------
+ 1 file changed, 24 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index fd1b80ef9490..aa5be334753b 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -246,6 +246,7 @@ struct arm_smmu_domain {
- 	const struct iommu_gather_ops	*tlb_ops;
- 	struct arm_smmu_cfg		cfg;
- 	enum arm_smmu_domain_stage	stage;
-+	bool				non_strict;
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index f10c852479fc..7bbfa5f7ce8e 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -612,6 +612,7 @@ struct arm_smmu_domain {
  	struct mutex			init_mutex; /* Protects smmu pointer */
- 	spinlock_t			cb_lock; /* Serialises ATS1* ops and TLB syncs */
- 	struct iommu_domain		domain;
-@@ -863,6 +864,9 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
- 	if (smmu->features & ARM_SMMU_FEAT_COHERENT_WALK)
+ 
+ 	struct io_pgtable_ops		*pgtbl_ops;
++	bool				non_strict;
+ 
+ 	enum arm_smmu_domain_stage	stage;
+ 	union {
+@@ -1633,6 +1634,9 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
+ 	if (smmu->features & ARM_SMMU_FEAT_COHERENCY)
  		pgtbl_cfg.quirks = IO_PGTABLE_QUIRK_NO_DMA;
  
-+	if (smmu_domain->non_strict && cfg->fmt != ARM_SMMU_CTX_FMT_AARCH32_S)
++	if (smmu_domain->non_strict)
 +		pgtbl_cfg.quirks |= IO_PGTABLE_QUIRK_NON_STRICT;
 +
- 	smmu_domain->smmu = smmu;
  	pgtbl_ops = alloc_io_pgtable_ops(fmt, &pgtbl_cfg, smmu_domain);
- 	if (!pgtbl_ops) {
-@@ -1252,6 +1256,14 @@ static size_t arm_smmu_unmap(struct iommu_domain *domain, unsigned long iova,
- 	return ops->unmap(ops, iova, size);
- }
- 
-+static void arm_smmu_flush_iotlb_all(struct iommu_domain *domain)
-+{
-+	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
-+
-+	if (smmu_domain->tlb_ops)
-+		smmu_domain->tlb_ops->tlb_flush_all(smmu_domain);
-+}
-+
- static void arm_smmu_iotlb_sync(struct iommu_domain *domain)
- {
- 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
-@@ -1470,13 +1482,17 @@ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
+ 	if (!pgtbl_ops)
+ 		return -ENOMEM;
+@@ -1934,13 +1938,17 @@ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
  {
  	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
  
@@ -78,7 +62,7 @@ index fd1b80ef9490..aa5be334753b 100644
  	default:
  		return -ENODEV;
  	}
-@@ -1488,13 +1504,15 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
+@@ -1952,13 +1960,15 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
  	int ret = 0;
  	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
  
@@ -97,7 +81,7 @@ index fd1b80ef9490..aa5be334753b 100644
  		if (smmu_domain->smmu) {
  			ret = -EPERM;
  			goto out_unlock;
-@@ -1505,6 +1523,14 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
+@@ -1969,6 +1979,14 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
  		else
  			smmu_domain->stage = ARM_SMMU_DOMAIN_S1;
  
@@ -112,14 +96,5 @@ index fd1b80ef9490..aa5be334753b 100644
  		break;
  	default:
  		ret = -ENODEV;
-@@ -1562,7 +1588,7 @@ static struct iommu_ops arm_smmu_ops = {
- 	.attach_dev		= arm_smmu_attach_dev,
- 	.map			= arm_smmu_map,
- 	.unmap			= arm_smmu_unmap,
--	.flush_iotlb_all	= arm_smmu_iotlb_sync,
-+	.flush_iotlb_all	= arm_smmu_flush_iotlb_all,
- 	.iotlb_sync		= arm_smmu_iotlb_sync,
- 	.iova_to_phys		= arm_smmu_iova_to_phys,
- 	.add_device		= arm_smmu_add_device,
 -- 
 2.19.0.dirty
