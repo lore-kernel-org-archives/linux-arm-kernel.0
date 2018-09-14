@@ -1,123 +1,224 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 14 Sep 2018 09:41:12 +0800
-Subject: [arm-platforms:irq/generic_handle_domain_irq 6/14]
- drivers/scsi/ibmvscsi_tgt/ibmvscsi_tgt.c:3667:11: error: implicit
- declaration of function 'of_find_node_by_path'; did you mean
- '__inc_node_state'?
-Message-ID: <201809140908.tFTTHUPU%fengguang.wu@intel.com>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Thu, 13 Sep 2018 18:42:35 -0700
+Subject: [PATCH v14 06/16] of/fdt: add helper functions for handling
+ properties
+In-Reply-To: <20180910023819.GA30795@linaro.org>
+References: <20180907080040.4967-1-takahiro.akashi@linaro.org>
+ <a535515a-92f1-fc33-bdb9-6f5e0392cb11@gmail.com>
+ <20180910023819.GA30795@linaro.org>
+Message-ID: <59d0bc6f-ab71-eb21-d438-da3cd09aaa79@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/generic_handle_domain_irq
-head:   7d998f9af090acce9f3cef3ef2c6de074f6a1875
-commit: f329c5fa9758ad65a4c4c3f0b0c3f43696ff417b [6/14] irqdomain: Kill irq_domain_add_legacy_isa
-config: powerpc64-allmodconfig (attached as .config)
-compiler: powerpc64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout f329c5fa9758ad65a4c4c3f0b0c3f43696ff417b
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=powerpc64 
+On 09/09/18 19:38, AKASHI Takahiro wrote:
+> Frank,
+> 
+> Thank you for the comments. I will address all of them, but
+> have one question:
+> 
+> On Fri, Sep 07, 2018 at 12:53:58PM -0700, Frank Rowand wrote:
+>> On 09/07/18 01:00, AKASHI Takahiro wrote:
+>>> These functions will be used later to handle kexec-specific properties
+>>> in arm64's kexec_file implementation.
+>>>
+>>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>>> Cc: Rob Herring <robh+dt@kernel.org>
+>>> Cc: Frank Rowand <frowand.list@gmail.com>
+>>> ---
+>>>  drivers/of/fdt.c       | 62 ++++++++++++++++++++++++++++++++++++++++--
+>>>  include/linux/of_fdt.h | 10 +++++--
+>>>  2 files changed, 68 insertions(+), 4 deletions(-)
+>>>
+>>> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+>>> index 800ad252cf9c..dc960cea1355 100644
+>>> --- a/drivers/of/fdt.c
+>>> +++ b/drivers/of/fdt.c
+>>> @@ -25,6 +25,7 @@
+>>>  #include <linux/debugfs.h>
+>>>  #include <linux/serial_core.h>
+>>>  #include <linux/sysfs.h>
+>>> +#include <linux/types.h>
+>>>  
+>>>  #include <asm/setup.h>  /* for COMMAND_LINE_SIZE */
+>>>  #include <asm/page.h>
+>>> @@ -537,8 +538,8 @@ void *of_fdt_unflatten_tree(const unsigned long *blob,
+>>>  EXPORT_SYMBOL_GPL(of_fdt_unflatten_tree);
+>>>  
+>>>  /* Everything below here references initial_boot_params directly. */
+>>> -int __initdata dt_root_addr_cells;
+>>> -int __initdata dt_root_size_cells;
+>>> +int dt_root_addr_cells;
+>>> +int dt_root_size_cells;
+>>>  
+>>>  void *initial_boot_params;
+>>>  
+>>> @@ -1323,3 +1324,60 @@ late_initcall(of_fdt_raw_init);
+>>>  #endif
+>>>  
+>>>  #endif /* CONFIG_OF_EARLY_FLATTREE */
+>>> +
+>>
+>> Please add comment:
+>>
+>> /* helper functions for arm64 kexec */
+>>
+>>
+>>> +bool of_fdt_cells_size_fitted(u64 base, u64 size)
+>>
+>> Please rename as of_fdt_range_valid()
+>>
+>>
+>>> +{
+>>> +	/* if *_cells >= 2, cells can hold 64-bit values anyway */
+>>> +	if ((dt_root_addr_cells == 1) && (base > U32_MAX))
+>>> +		return false;
+>>> +
+>>> +	if ((dt_root_size_cells == 1) && (size > U32_MAX))
+>>> +		return false;
+>>
+>> Should also check that base + size does not wrap around.
+> 
+> What is the upper limit here?
+> For instance, #address_cells = <1> and #size_cells = <1>,
+> and can 'base + size' be over U32_MAX?
+> Assuming 'not' is quite reasonable, but it seems to me
+> that devicetree spec doesn't exclude it, as least I couldn't
+> find any notes about such a case.
+> (In my understands, #address_cells only restricts a size in 'reg' property.)
 
-All error/warnings (new ones prefixed by >>):
+(See my other reply in this thread a few minutes ago -- the context of the
+ranges is essentially what is valid for the "reg" property of the "/memory"
+nodes.)
 
-   drivers/scsi/ibmvscsi_tgt/ibmvscsi_tgt.c: In function 'ibmvscsis_get_system_info':
->> drivers/scsi/ibmvscsi_tgt/ibmvscsi_tgt.c:3667:11: error: implicit declaration of function 'of_find_node_by_path'; did you mean '__inc_node_state'? [-Werror=implicit-function-declaration]
-     rootdn = of_find_node_by_path("/");
-              ^~~~~~~~~~~~~~~~~~~~
-              __inc_node_state
->> drivers/scsi/ibmvscsi_tgt/ibmvscsi_tgt.c:3667:9: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-     rootdn = of_find_node_by_path("/");
-            ^
->> drivers/scsi/ibmvscsi_tgt/ibmvscsi_tgt.c:3671:10: error: implicit declaration of function 'of_get_property'; did you mean '__get_order'? [-Werror=implicit-function-declaration]
-     model = of_get_property(rootdn, "model", NULL);
-             ^~~~~~~~~~~~~~~
-             __get_order
-   drivers/scsi/ibmvscsi_tgt/ibmvscsi_tgt.c:3671:8: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-     model = of_get_property(rootdn, "model", NULL);
-           ^
-   drivers/scsi/ibmvscsi_tgt/ibmvscsi_tgt.c:3672:5: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-     id = of_get_property(rootdn, "system-id", NULL);
-        ^
-   drivers/scsi/ibmvscsi_tgt/ibmvscsi_tgt.c:3676:7: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-     name = of_get_property(rootdn, "ibm,partition-name", NULL);
-          ^
-   drivers/scsi/ibmvscsi_tgt/ibmvscsi_tgt.c:3680:6: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-     num = of_get_property(rootdn, "ibm,partition-no", NULL);
-         ^
->> drivers/scsi/ibmvscsi_tgt/ibmvscsi_tgt.c:3682:22: error: implicit declaration of function 'of_read_number'; did you mean 'down_read_nested'? [-Werror=implicit-function-declaration]
-      partition_number = of_read_number(num, 1);
-                         ^~~~~~~~~~~~~~
-                         down_read_nested
->> drivers/scsi/ibmvscsi_tgt/ibmvscsi_tgt.c:3684:2: error: implicit declaration of function 'of_node_put'; did you mean '__node_set'? [-Werror=implicit-function-declaration]
-     of_node_put(rootdn);
-     ^~~~~~~~~~~
-     __node_set
-   drivers/scsi/ibmvscsi_tgt/ibmvscsi_tgt.c:3686:9: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-     vdevdn = of_find_node_by_path("/vdevice");
-            ^
-   drivers/scsi/ibmvscsi_tgt/ibmvscsi_tgt.c:3690:8: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-      mvds = of_get_property(vdevdn, "ibm,max-virtual-dma-size",
-           ^
-   cc1: some warnings being treated as errors
+The "Devicetree Specification" does not specify whether a memory range can
+wrap around.  For example, can a region of size 0x2000 that wraps around
+the highest 32 bit address be specified as:
 
-vim +3667 drivers/scsi/ibmvscsi_tgt/ibmvscsi_tgt.c
+   / memory at 0xfffff000 {
+        reg = <0xfffff000 0x2000>;
+     }
 
-88a678bb Bryant G. Ly 2016-06-28  3660  
-88a678bb Bryant G. Ly 2016-06-28  3661  static int ibmvscsis_get_system_info(void)
-88a678bb Bryant G. Ly 2016-06-28  3662  {
-88a678bb Bryant G. Ly 2016-06-28  3663  	struct device_node *rootdn, *vdevdn;
-88a678bb Bryant G. Ly 2016-06-28  3664  	const char *id, *model, *name;
-88a678bb Bryant G. Ly 2016-06-28  3665  	const uint *num;
-88a678bb Bryant G. Ly 2016-06-28  3666  
-88a678bb Bryant G. Ly 2016-06-28 @3667  	rootdn = of_find_node_by_path("/");
-88a678bb Bryant G. Ly 2016-06-28  3668  	if (!rootdn)
-88a678bb Bryant G. Ly 2016-06-28  3669  		return -ENOENT;
-88a678bb Bryant G. Ly 2016-06-28  3670  
-88a678bb Bryant G. Ly 2016-06-28 @3671  	model = of_get_property(rootdn, "model", NULL);
-88a678bb Bryant G. Ly 2016-06-28 @3672  	id = of_get_property(rootdn, "system-id", NULL);
-88a678bb Bryant G. Ly 2016-06-28  3673  	if (model && id)
-88a678bb Bryant G. Ly 2016-06-28  3674  		snprintf(system_id, sizeof(system_id), "%s-%s", model, id);
-88a678bb Bryant G. Ly 2016-06-28  3675  
-88a678bb Bryant G. Ly 2016-06-28  3676  	name = of_get_property(rootdn, "ibm,partition-name", NULL);
-88a678bb Bryant G. Ly 2016-06-28  3677  	if (name)
-88a678bb Bryant G. Ly 2016-06-28  3678  		strncpy(partition_name, name, sizeof(partition_name));
-88a678bb Bryant G. Ly 2016-06-28  3679  
-88a678bb Bryant G. Ly 2016-06-28 @3680  	num = of_get_property(rootdn, "ibm,partition-no", NULL);
-88a678bb Bryant G. Ly 2016-06-28  3681  	if (num)
-9c93cf03 Michael Cyr  2016-10-13 @3682  		partition_number = of_read_number(num, 1);
-88a678bb Bryant G. Ly 2016-06-28  3683  
-88a678bb Bryant G. Ly 2016-06-28 @3684  	of_node_put(rootdn);
-88a678bb Bryant G. Ly 2016-06-28  3685  
-88a678bb Bryant G. Ly 2016-06-28  3686  	vdevdn = of_find_node_by_path("/vdevice");
-88a678bb Bryant G. Ly 2016-06-28  3687  	if (vdevdn) {
-88a678bb Bryant G. Ly 2016-06-28  3688  		const uint *mvds;
-88a678bb Bryant G. Ly 2016-06-28  3689  
-88a678bb Bryant G. Ly 2016-06-28  3690  		mvds = of_get_property(vdevdn, "ibm,max-virtual-dma-size",
-88a678bb Bryant G. Ly 2016-06-28  3691  				       NULL);
-88a678bb Bryant G. Ly 2016-06-28  3692  		if (mvds)
-88a678bb Bryant G. Ly 2016-06-28  3693  			max_vdma_size = *mvds;
-88a678bb Bryant G. Ly 2016-06-28  3694  		of_node_put(vdevdn);
-88a678bb Bryant G. Ly 2016-06-28  3695  	}
-88a678bb Bryant G. Ly 2016-06-28  3696  
-88a678bb Bryant G. Ly 2016-06-28  3697  	return 0;
-88a678bb Bryant G. Ly 2016-06-28  3698  }
-88a678bb Bryant G. Ly 2016-06-28  3699  
+or must it be specified as (option 1):
 
-:::::: The code at line 3667 was first introduced by commit
-:::::: 88a678bbc34cecce36bf2c7a8af4cba38f9f77ce ibmvscsis: Initial commit of IBM VSCSI Tgt Driver
+   / memory at 0xfffff000 {
+        reg = <0xfffff000 0x1000 0x0 0x1000>
+     }
 
-:::::: TO: Bryant G. Ly <bryantly@linux.vnet.ibm.com>
-:::::: CC: Nicholas Bellinger <nab@linux-iscsi.org>
+or (option 2):
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 58607 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180914/3a5b7a66/attachment-0001.gz>
+   / memory at 0xfffff000 {
+        reg = <0xfffff000 0x1000>;
+     }
+     memory at 0 {
+        reg = <0x0 0x1000>;
+     }
+
+
+I suggest you start a thread on the devicetree specification list asking
+that the spec be updated to state whether wrap around is allowed.
+
+
+> 
+> Thanks,
+> -Takahiro Akashi
+> 
+>>
+>>> +
+>>> +	return true;
+>>> +}
+>>> +
+>>> +size_t of_fdt_reg_cells_size(void)
+>>
+>> Please rename as of_fdt_root_range_size()
+>>
+>>
+>>> +{
+>>> +	return (dt_root_addr_cells + dt_root_size_cells) * sizeof(u32);
+>>> +}
+>>> +
+>>> +#define FDT_ALIGN(x, a)	(((x) + (a) - 1) & ~((a) - 1))
+>>> +#define FDT_TAGALIGN(x)	(FDT_ALIGN((x), FDT_TAGSIZE))
+>>> +
+>>> +int fdt_prop_len(const char *prop_name, int len)
+>>
+>> Please rename as fdt_len_added_prop()
+>>
+>>
+>>> +{
+>>> +	return (strlen(prop_name) + 1) +
+>>> +		sizeof(struct fdt_property) +
+>>> +		FDT_TAGALIGN(len);
+>>> +}
+>>> +
+>>
+>> Please add comment, something like:
+>>
+>> /* cells must be 1 or 2 */
+>>
+>>
+>>> +static void fill_property(void *buf, u64 val64, int cells)
+>>
+>> Please rename as cpu64_to_fdt_cells()
+>>
+>> Thanks,
+>>
+>> Frank
+>>
+>>> +{
+>>> +	__be32 val32;
+>>> +
+>>> +	while (cells) {
+>>> +		val32 = cpu_to_fdt32((val64 >> (32 * (--cells))) & U32_MAX);
+>>> +		memcpy(buf, &val32, sizeof(val32));
+>>> +		buf += sizeof(val32);
+>>> +	}
+>>> +}
+>>> +
+>>> +int fdt_setprop_reg(void *fdt, int nodeoffset, const char *name,
+>>> +						u64 addr, u64 size)
+>>> +{
+>>> +	char buf[sizeof(__be32) * 2 * 2];
+>>> +		/* assume dt_root_[addr|size]_cells <= 2 */
+>>> +	void *prop;
+>>> +	size_t buf_size;
+>>> +
+>>> +	buf_size = of_fdt_reg_cells_size();
+>>> +	prop = buf;
+>>> +
+>>> +	fill_property(prop, addr, dt_root_addr_cells);
+>>> +	prop += dt_root_addr_cells * sizeof(u32);
+>>> +
+>>> +	fill_property(prop, size, dt_root_size_cells);
+>>> +
+>>> +	return fdt_setprop(fdt, nodeoffset, name, buf, buf_size);
+>>> +}
+>>> diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
+>>> index b9cd9ebdf9b9..9615d6142578 100644
+>>> --- a/include/linux/of_fdt.h
+>>> +++ b/include/linux/of_fdt.h
+>>> @@ -37,8 +37,8 @@ extern void *of_fdt_unflatten_tree(const unsigned long *blob,
+>>>  				   struct device_node **mynodes);
+>>>  
+>>>  /* TBD: Temporary export of fdt globals - remove when code fully merged */
+>>> -extern int __initdata dt_root_addr_cells;
+>>> -extern int __initdata dt_root_size_cells;
+>>> +extern int dt_root_addr_cells;
+>>> +extern int dt_root_size_cells;
+>>>  extern void *initial_boot_params;
+>>>  
+>>>  extern char __dtb_start[];
+>>> @@ -108,5 +108,11 @@ static inline void unflatten_device_tree(void) {}
+>>>  static inline void unflatten_and_copy_device_tree(void) {}
+>>>  #endif /* CONFIG_OF_EARLY_FLATTREE */
+>>>  
+>>> +bool of_fdt_cells_size_fitted(u64 base, u64 size);
+>>> +size_t of_fdt_reg_cells_size(void);
+>>> +int fdt_prop_len(const char *prop_name, int len);
+>>> +int fdt_setprop_reg(void *fdt, int nodeoffset, const char *name,
+>>> +						u64 addr, u64 size);
+>>> +
+>>>  #endif /* __ASSEMBLY__ */
+>>>  #endif /* _LINUX_OF_FDT_H */
+>>>
+>>
+> 
