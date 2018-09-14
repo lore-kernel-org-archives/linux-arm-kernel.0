@@ -1,64 +1,99 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 14 Sep 2018 15:30:19 +0100
-Subject: [PATCH v7 1/6] iommu/arm-smmu-v3: Implement flush_iotlb_all hook
+Date: Fri, 14 Sep 2018 15:30:22 +0100
+Subject: [PATCH v7 4/6] iommu: Add bootup option "iommu.non_strict"
 In-Reply-To: <cover.1536935328.git.robin.murphy@arm.com>
 References: <cover.1536935328.git.robin.murphy@arm.com>
-Message-ID: <f2c5d38962c1f7ceccdf5faafb90d7076eef0752.1536935328.git.robin.murphy@arm.com>
+Message-ID: <41f81c46348db4acd9a542184f10e7ca24f6c219.1536935328.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Zhen Lei <thunder.leizhen@huawei.com>
 
-.flush_iotlb_all is currently stubbed to arm_smmu_iotlb_sync() since the
-only time it would ever need to actually do anything is for callers
-doing their own explicit batching, e.g.:
-
-	iommu_unmap_fast(domain, ...);
-	iommu_unmap_fast(domain, ...);
-	iommu_iotlb_flush_all(domain, ...);
-
-where since io-pgtable still issues the TLBI commands implicitly in the
-unmap instead of implementing .iotlb_range_add, the "flush" only needs
-to ensure completion of those already-in-flight invalidations.
-
-However, we're about to start using it in anger with flush queues, so
-let's get a proper implementation wired up.
+Add a bootup option to make the system manager can choose which mode to
+be used. The default mode is strict.
 
 Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-[rm: expand commit message]
+[rm: move handling out of SMMUv3 driver]
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ .../admin-guide/kernel-parameters.txt         | 13 ++++++++++
+ drivers/iommu/iommu.c                         | 26 +++++++++++++++++++
+ 2 files changed, 39 insertions(+)
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index e395f1ff3f81..f10c852479fc 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1781,6 +1781,14 @@ arm_smmu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
- 	return ops->unmap(ops, iova, size);
- }
+diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+index 9871e649ffef..406b91759b62 100644
+--- a/Documentation/admin-guide/kernel-parameters.txt
++++ b/Documentation/admin-guide/kernel-parameters.txt
+@@ -1749,6 +1749,19 @@
+ 		nobypass	[PPC/POWERNV]
+ 			Disable IOMMU bypass, using IOMMU for PCI devices.
  
-+static void arm_smmu_flush_iotlb_all(struct iommu_domain *domain)
++	iommu.non_strict=	[ARM64]
++			Format: { "0" | "1" }
++			0 - strict mode, default.
++			    Release IOVAs after the related TLBs are invalid
++			    completely.
++			1 - non-strict mode.
++			    Put off TLBs invalidation and release memory first.
++			    It's good for scatter-gather performance but lacks
++			    full isolation, an untrusted device can access the
++			    reused memory because the TLBs may still valid.
++			    Please take	full consideration before choosing this
++			    mode. Note that, VFIO will always use strict mode.
++
+ 	iommu.passthrough=
+ 			[ARM64] Configure DMA to bypass the IOMMU by default.
+ 			Format: { "0" | "1" }
+diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+index 8c15c5980299..2cabd0c0a4f3 100644
+--- a/drivers/iommu/iommu.c
++++ b/drivers/iommu/iommu.c
+@@ -41,6 +41,7 @@ static unsigned int iommu_def_domain_type = IOMMU_DOMAIN_IDENTITY;
+ #else
+ static unsigned int iommu_def_domain_type = IOMMU_DOMAIN_DMA;
+ #endif
++static bool iommu_dma_non_strict __read_mostly;
+ 
+ struct iommu_callback_data {
+ 	const struct iommu_ops *ops;
+@@ -131,6 +132,24 @@ static int __init iommu_set_def_domain_type(char *str)
+ }
+ early_param("iommu.passthrough", iommu_set_def_domain_type);
+ 
++static int __init iommu_dma_setup(char *str)
 +{
-+	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
++	int ret;
 +
-+	if (smmu_domain->smmu)
-+		arm_smmu_tlb_inv_context(smmu_domain);
++	ret = kstrtobool(str, &iommu_dma_non_strict);
++	if (ret)
++		return ret;
++
++	if (iommu_dma_non_strict) {
++		pr_warn("WARNING: iommu non-strict mode is chosen.\n"
++			"It's good for scatter-gather performance but lacks full isolation\n");
++		add_taint(TAINT_WARN, LOCKDEP_STILL_OK);
++	}
++
++	return 0;
 +}
++early_param("iommu.non_strict", iommu_dma_setup);
 +
- static void arm_smmu_iotlb_sync(struct iommu_domain *domain)
+ static ssize_t iommu_group_attr_show(struct kobject *kobj,
+ 				     struct attribute *__attr, char *buf)
  {
- 	struct arm_smmu_device *smmu = to_smmu_domain(domain)->smmu;
-@@ -2008,7 +2016,7 @@ static struct iommu_ops arm_smmu_ops = {
- 	.attach_dev		= arm_smmu_attach_dev,
- 	.map			= arm_smmu_map,
- 	.unmap			= arm_smmu_unmap,
--	.flush_iotlb_all	= arm_smmu_iotlb_sync,
-+	.flush_iotlb_all	= arm_smmu_flush_iotlb_all,
- 	.iotlb_sync		= arm_smmu_iotlb_sync,
- 	.iova_to_phys		= arm_smmu_iova_to_phys,
- 	.add_device		= arm_smmu_add_device,
+@@ -1072,6 +1091,13 @@ struct iommu_group *iommu_group_get_for_dev(struct device *dev)
+ 		group->default_domain = dom;
+ 		if (!group->domain)
+ 			group->domain = dom;
++
++		if (dom && iommu_dma_non_strict) {
++			int attr = 1;
++			iommu_domain_set_attr(dom,
++					      DOMAIN_ATTR_DMA_USE_FLUSH_QUEUE,
++					      &attr);
++		}
+ 	}
+ 
+ 	ret = iommu_group_add_device(group, dev);
 -- 
 2.19.0.dirty
