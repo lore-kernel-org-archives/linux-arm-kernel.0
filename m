@@ -1,73 +1,52 @@
-From: shy828301@gmail.com (Yang Shi)
-Date: Fri, 14 Sep 2018 10:12:00 -0700
-Subject: KSM not working in 4.9 Kernel
-In-Reply-To: <CAOuPNLj1wx4sznrtLdKjcvuTf0dECPWzPaR946FoYRXB6YAGCw@mail.gmail.com>
-References: <CAOuPNLj1wx4sznrtLdKjcvuTf0dECPWzPaR946FoYRXB6YAGCw@mail.gmail.com>
-Message-ID: <CAHbLzkojdPxgrEiPLcJUX9c4muw8eupStJ_0xPnAuFM7g4V1jA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 14 Sep 2018 18:12:39 +0100
+Subject: [PATCH] arm64: sysreg: Clean up instructions for modifying
+ PSTATE fields
+In-Reply-To: <20180914090749.18562-1-suzuki.poulose@arm.com>
+References: <20180914090749.18562-1-suzuki.poulose@arm.com>
+Message-ID: <20180914171238.ztf6qcy6ws7sjzkf@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pintu,
+Hi Suzuki,
 
-I recall there are some ksm test cases in LTP. Did you try them out?
-On Fri, Sep 14, 2018 at 7:28 AM Pintu Kumar <pintu.ping@gmail.com> wrote:
->
-> Hi All,
->
-> Board: Hikey620 ARM64
-> Kernel: 4.9.20
->
-> I am trying to verify KSM (Kernel Same Page Merging) functionality on
-> 4.9 Kernel using "mmap" and madvise user space test utility.
-> But to my observation, it seems KSM is not working for me.
-> CONFIG_KSM=y is enabled in kernel.
-> ksm_init is also called during boot up.
->   443 ?        SN     0:00 [ksmd]
->
-> ksmd thread is also running.
->
-> However, when I see the sysfs, no values are written.
-> ~ # grep -H '' /sys/kernel/mm/ksm/*
-> /sys/kernel/mm/ksm/pages_hashed:0
-> /sys/kernel/mm/ksm/pages_scanned:0
-> /sys/kernel/mm/ksm/pages_shared:0
-> /sys/kernel/mm/ksm/pages_sharing:0
-> /sys/kernel/mm/ksm/pages_to_scan:200
-> /sys/kernel/mm/ksm/pages_unshared:0
-> /sys/kernel/mm/ksm/pages_volatile:0
-> /sys/kernel/mm/ksm/run:1
-> /sys/kernel/mm/ksm/sleep_millisecs:1000
->
-> So, please let me know if I am doing any thing wrong.
->
-> This is the test utility:
-> int main(int argc, char *argv[])
-> {
->         int i, n, size;
->         char *buffer;
->         void *addr;
->
->         n = 100;
->         size = 100 * getpagesize();
->         for (i = 0; i < n; i++) {
->                 buffer = (char *)malloc(size);
->                 memset(buffer, 0xff, size);
->                 addr =  mmap(NULL, size,
->                            PROT_READ | PROT_EXEC | PROT_WRITE,
-> MAP_PRIVATE | MAP_ANONYMOUS,
->                            -1, 0);
->                 madvise(addr, size, MADV_MERGEABLE);
->                 sleep(1);
->         }
->         printf("Done....press ^C\n");
->
->         pause();
->
->         return 0;
-> }
->
->
->
-> Thanks,
-> Pintu
->
+On Fri, Sep 14, 2018 at 10:07:49AM +0100, Suzuki K. Poulose wrote:
+> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+> index c1470931b897..68c22360551e 100644
+> --- a/arch/arm64/include/asm/sysreg.h
+> +++ b/arch/arm64/include/asm/sysreg.h
+> @@ -84,13 +84,23 @@
+>  
+>  #endif	/* CONFIG_BROKEN_GAS_INST */
+>  
+> -#define REG_PSTATE_PAN_IMM		sys_reg(0, 0, 4, 0, 4)
+> -#define REG_PSTATE_UAO_IMM		sys_reg(0, 0, 4, 0, 3)
+> +/*
+> + * Instructions for modifying PSTATE fields.
+> + * As per Arm ARM for v8-A, Section "C.5.1.3 op0 == 0b00, architectural hints,
+> + * barriers and CLREX, and PSTATE access", ARM DDI 0487 C.a, system instructions
+> + * for accessing PSTATE fields have the following encoding:
+> + *	Op0 = 0, CRn = 4
+> + *	Op1, Op2 encodes the PSTATE field modified and defines the constraints.
+> + *	CRm = Imm4 for the instruction.
+> + *	Rt = 0x1f
+> + */
+> +#define pstate_field(op1, op2)		((op1) << Op1_shift | (op2) << Op2_shift)
+> +#define PSTATE_Imm_shift		CRm_shift
+> +#define PSTATE_PAN			pstate_field(0, 4)
+> +#define PSTATE_UAO			pstate_field(0, 3)
+>  
+> -#define SET_PSTATE_PAN(x) __emit_inst(0xd5000000 | REG_PSTATE_PAN_IMM |	\
+> -				      (!!x)<<8 | 0x1f)
+> -#define SET_PSTATE_UAO(x) __emit_inst(0xd5000000 | REG_PSTATE_UAO_IMM |	\
+> -				      (!!x)<<8 | 0x1f)
+> +#define SET_PSTATE_PAN(x)		__emit_inst(0xd500401f | PSTATE_PAN | ((!!x) << PSTATE_Imm_shift))
+> +#define SET_PSTATE_UAO(x)		__emit_inst(0xd500401f | PSTATE_UAO | ((!!x) << PSTATE_Imm_shift))
+
+Could you please rebase this on top of arm64 for-next/core and also fix
+Will's SSBS macros which conflict with the above?
+
+Thanks.
+
+-- 
+Catalin
