@@ -1,40 +1,141 @@
-From: mirq-linux@rere.qmqm.pl (=?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?=)
-Date: Fri, 14 Sep 2018 17:20:47 +0200
-Subject: [PATCH] ARM: at91/dt: fix typo in sama5d2 pinmux descriptions
-Message-ID: <b996f1c2271834bbf1220431ed0a08af09a6fb55.1536938317.git.mirq-linux@rere.qmqm.pl>
+From: phil@raspberrypi.org (Phil Elwell)
+Date: Fri, 14 Sep 2018 16:22:33 +0100
+Subject: [PATCH v2 1/4] staging/vc04_services: Use correct cache line size
+In-Reply-To: <1536931375-48769-2-git-send-email-phil@raspberrypi.org>
+References: <1536931375-48769-1-git-send-email-phil@raspberrypi.org>
+ <1536931375-48769-2-git-send-email-phil@raspberrypi.org>
+Message-ID: <9d43a912-0928-fe8e-7719-b327a1667b30@raspberrypi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix SSC0 pin TD0 where wrongly called TDO.
+On 14/09/2018 14:22, Phil Elwell wrote:
+> Use the compatible string in the DTB to select the correct cache line
+> size for the SoC - 32 for BCM2835, and 64 for BCM2836 and BCM2837.
+> 
+> Signed-off-by: Phil Elwell <phil@raspberrypi.org>
+> ---
+>   .../interface/vchiq_arm/vchiq_2835_arm.c           |  4 ++-
+>   .../vc04_services/interface/vchiq_arm/vchiq_arm.c  | 36 ++++++++++++++++------
+>   .../vc04_services/interface/vchiq_arm/vchiq_arm.h  |  5 +++
+>   3 files changed, 34 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
+> index e767209..83d740f 100644
+> --- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
+> +++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
+> @@ -109,7 +109,8 @@ free_pagelist(struct vchiq_pagelist_info *pagelistinfo,
+>   int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
+>   {
+>   	struct device *dev = &pdev->dev;
+> -	struct rpi_firmware *fw = platform_get_drvdata(pdev);
+> +	struct vchiq_drvdata *drvdata = platform_get_drvdata(pdev);
+> +	struct rpi_firmware *fw = drvdata->fw;
+>   	VCHIQ_SLOT_ZERO_T *vchiq_slot_zero;
+>   	struct resource *res;
+>   	void *slot_mem;
+> @@ -127,6 +128,7 @@ int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
+>   	if (err < 0)
+>   		return err;
+>   
+> +	g_cache_line_size = drvdata->cache_line_size;
+>   	g_fragments_size = 2 * g_cache_line_size;
+>   
+>   	/* Allocate space for the channels in coherent memory */
+> diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+> index bc05c69..b2ae9259 100644
+> --- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+> +++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+> @@ -170,6 +170,14 @@ static struct device *vchiq_dev;
+>   static DEFINE_SPINLOCK(msg_queue_spinlock);
+>   static struct platform_device *bcm2835_camera;
+>   
+> +static struct vchiq_drvdata bcm2835_drvdata = {
+> +	.cache_line_size = 32,
+> +};
+> +
+> +static struct vchiq_drvdata bcm2836_drvdata = {
+> +	.cache_line_size = 64,
+> +};
+> +
+>   static const char *const ioctl_names[] = {
+>   	"CONNECT",
+>   	"SHUTDOWN",
+> @@ -3573,12 +3581,26 @@ void vchiq_platform_conn_state_changed(VCHIQ_STATE_T *state,
+>   	}
+>   }
+>   
+> +static const struct of_device_id vchiq_of_match[] = {
+> +	{ .compatible = "brcm,bcm2835-vchiq", .data = &bcm2835_drvdata },
+> +	{ .compatible = "brcm,bcm2836-vchiq", .data = &bcm2836_drvdata },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, vchiq_of_match);
+> +
+>   static int vchiq_probe(struct platform_device *pdev)
+>   {
+>   	struct device_node *fw_node;
+> -	struct rpi_firmware *fw;
+> +	const struct of_device_id *of_id;
+> +	struct vchiq_drvdata *drvdata;
+>   	int err;
+>   
+> +	snd_rpi_simple.dev = &pdev->dev;
+> +	of_id = of_match_node(vchiq_of_match, pdev->dev.of_node);
+> +	drvdata = of_id->data;
+> +	if (!drvdata)
+> +		return -EINVAL;
+> +
+>   	fw_node = of_find_compatible_node(NULL, NULL,
+>   					  "raspberrypi,bcm2835-firmware");
+>   	if (!fw_node) {
+> @@ -3586,12 +3608,12 @@ static int vchiq_probe(struct platform_device *pdev)
+>   		return -ENOENT;
+>   	}
+>   
+> -	fw = rpi_firmware_get(fw_node);
+> +	drvdata->fw = rpi_firmware_get(fw_node);
+>   	of_node_put(fw_node);
+> -	if (!fw)
+> +	if (!drvdata->fw)
+>   		return -EPROBE_DEFER;
+>   
+> -	platform_set_drvdata(pdev, fw);
+> +	platform_set_drvdata(pdev, drvdata);
+>   
+>   	err = vchiq_platform_init(pdev, &g_state);
+>   	if (err != 0)
+> @@ -3661,12 +3683,6 @@ static int vchiq_remove(struct platform_device *pdev)
+>   	return 0;
+>   }
+>   
+> -static const struct of_device_id vchiq_of_match[] = {
+> -	{ .compatible = "brcm,bcm2835-vchiq", },
+> -	{},
+> -};
+> -MODULE_DEVICE_TABLE(of, vchiq_of_match);
+> -
+>   static struct platform_driver vchiq_driver = {
+>   	.driver = {
+>   		.name = "bcm2835_vchiq",
+> diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.h b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.h
+> index 40bb0c6..2f3ebc9 100644
+> --- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.h
+> +++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.h
+> @@ -123,6 +123,11 @@ typedef struct vchiq_arm_state_struct {
+>   
+>   } VCHIQ_ARM_STATE_T;
+>   
+> +struct vchiq_drvdata {
+> +	const unsigned int cache_line_size;
+> +	struct rpi_firmware *fw;
+> +};
+> +
+>   extern int vchiq_arm_log_level;
+>   extern int vchiq_susp_log_level;
+>   
+> 
 
-Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
----
-Against v4.18.7
+This version doesn't compile (wrong defconfig used when building), but any criticism of the
+approach before v3 is welcome.
 
- arch/arm/boot/dts/sama5d2-pinfunc.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/sama5d2-pinfunc.h b/arch/arm/boot/dts/sama5d2-pinfunc.h
-index e57191fb83de..1c01a6f843d8 100644
---- a/arch/arm/boot/dts/sama5d2-pinfunc.h
-+++ b/arch/arm/boot/dts/sama5d2-pinfunc.h
-@@ -375,7 +375,7 @@
- #define PIN_PB22__GPIO			PINMUX_PIN(PIN_PB22, 0, 0)
- #define PIN_PB22__LCDDAT11		PINMUX_PIN(PIN_PB22, 1, 1)
- #define PIN_PB22__A11			PINMUX_PIN(PIN_PB22, 2, 1)
--#define PIN_PB22__TDO			PINMUX_PIN(PIN_PB22, 3, 1)
-+#define PIN_PB22__TD0			PINMUX_PIN(PIN_PB22, 3, 1)
- #define PIN_PB22__TIOA2			PINMUX_PIN(PIN_PB22, 4, 2)
- #define PIN_PB22__FLEXCOM3_IO1		PINMUX_PIN(PIN_PB22, 5, 3)
- #define PIN_PB22__GMDC			PINMUX_PIN(PIN_PB22, 6, 3)
-@@ -556,7 +556,7 @@
- #define PIN_PC14__LCDDAT6		PINMUX_PIN(PIN_PC14, 1, 2)
- #define PIN_PC14__GRX0			PINMUX_PIN(PIN_PC14, 2, 1)
- #define PIN_PC14__ISC_D5		PINMUX_PIN(PIN_PC14, 3, 1)
--#define PIN_PC14__TDO			PINMUX_PIN(PIN_PC14, 5, 2)
-+#define PIN_PC14__TD0			PINMUX_PIN(PIN_PC14, 5, 2)
- #define PIN_PC14__A3			PINMUX_PIN(PIN_PC14, 6, 2)
- #define PIN_PC15			79
- #define PIN_PC15__GPIO			PINMUX_PIN(PIN_PC15, 0, 0)
--- 
-2.18.0
+Phil
