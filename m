@@ -1,44 +1,46 @@
-From: phil@raspberrypi.org (Phil Elwell)
-Date: Fri, 14 Sep 2018 19:12:06 +0100
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 14 Sep 2018 11:20:18 -0700
 Subject: [PATCH v2 1/4] staging/vc04_services: Use correct cache line size
-In-Reply-To: <c4807226-6738-d9da-6f08-4b0a782b9cae@gmail.com>
+In-Reply-To: <6097c969-4290-bb92-3569-72e89561490c@raspberrypi.org>
 References: <1536931375-48769-1-git-send-email-phil@raspberrypi.org>
  <1536931375-48769-2-git-send-email-phil@raspberrypi.org>
  <c4807226-6738-d9da-6f08-4b0a782b9cae@gmail.com>
-Message-ID: <6097c969-4290-bb92-3569-72e89561490c@raspberrypi.org>
+ <6097c969-4290-bb92-3569-72e89561490c@raspberrypi.org>
+Message-ID: <0f4f1497-f076-09ac-49e0-625f64bbe2dd@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/09/2018 18:03, Florian Fainelli wrote:
-> On 09/14/2018 06:22 AM, Phil Elwell wrote:
->> Use the compatible string in the DTB to select the correct cache line
->> size for the SoC - 32 for BCM2835, and 64 for BCM2836 and BCM2837.
+On 09/14/2018 11:12 AM, Phil Elwell wrote:
+> On 14/09/2018 18:03, Florian Fainelli wrote:
+>> On 09/14/2018 06:22 AM, Phil Elwell wrote:
+>>> Use the compatible string in the DTB to select the correct cache line
+>>> size for the SoC - 32 for BCM2835, and 64 for BCM2836 and BCM2837.
+>>>
+>>> Signed-off-by: Phil Elwell <phil@raspberrypi.org>
+>>> ---
 >>
->> Signed-off-by: Phil Elwell <phil@raspberrypi.org>
->> ---
+>> [snip]
+>>
+>>> @@ -170,6 +170,14 @@ static struct device *vchiq_dev;
+>>> ? static DEFINE_SPINLOCK(msg_queue_spinlock);
+>>> ? static struct platform_device *bcm2835_camera;
+>>> ? +static struct vchiq_drvdata bcm2835_drvdata = {
+>>> +??? .cache_line_size = 32,
+>>> +};
+>>> +
+>>> +static struct vchiq_drvdata bcm2836_drvdata = {
+>>> +??? .cache_line_size = 64,
+>>> +};
+>>
+>> Those two structures could probably be marked const. Other than that,
+>> the approach definitively looks good to me.
 > 
-> [snip]
-> 
->> @@ -170,6 +170,14 @@ static struct device *vchiq_dev;
->>   static DEFINE_SPINLOCK(msg_queue_spinlock);
->>   static struct platform_device *bcm2835_camera;
->>   
->> +static struct vchiq_drvdata bcm2835_drvdata = {
->> +	.cache_line_size = 32,
->> +};
->> +
->> +static struct vchiq_drvdata bcm2836_drvdata = {
->> +	.cache_line_size = 64,
->> +};
-> 
-> Those two structures could probably be marked const. Other than that,
-> the approach definitively looks good to me.
+> The mutability is intentional - the structure pointer to the firmware is
+> also
+> stored there. This isn't the only piece of mutable static data in a driver
+> that will only have a single instance, so allocating and initialising a
+> per-instance structure seems needlessly complicated.
 
-The mutability is intentional - the structure pointer to the firmware is also
-stored there. This isn't the only piece of mutable static data in a driver
-that will only have a single instance, so allocating and initialising a
-per-instance structure seems needlessly complicated.
-
-Thanks for the feedback.
-
-Phil
+Fair enough, thanks for the explanation.
+-- 
+Florian
