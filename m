@@ -1,47 +1,39 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Fri, 14 Sep 2018 17:48:11 +0200
-Subject: [PATCH] ARM: dts: at91: add new compatibility string for macb on
- sama5d3
-In-Reply-To: <20180914154811.12090-1-nicolas.ferre@microchip.com>
-References: <20180914154811.12090-1-nicolas.ferre@microchip.com>
-Message-ID: <20180914154811.12090-2-nicolas.ferre@microchip.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 14 Sep 2018 17:57:06 +0200
+Subject: [RFC PATCH 3/3] dma-mapping: clear dma_parms on teardown, too
+In-Reply-To: <874f7cd9-ac51-5968-de40-14a0addf9c96@arm.com>
+References: <20180913151716.6333-1-wsa+renesas@sang-engineering.com>
+ <20180913151716.6333-4-wsa+renesas@sang-engineering.com>
+ <874f7cd9-ac51-5968-de40-14a0addf9c96@arm.com>
+Message-ID: <20180914155706.GA906@kunai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need this new compatibility string as we experienced different behavior
-for this 10/100Mbits/s macb interface on this particular SoC.
-Backward compatibility is preserved as we keep the alternative strings.
+On Fri, Sep 14, 2018 at 02:23:51PM +0100, Robin Murphy wrote:
+> On 13/09/18 16:17, Wolfram Sang wrote:
+> > While sanitizig the pointer for dma_ops on teardown, do the same for
+> > dma_parms, too. Rename the function to have a more generic name.
+> 
+> Upon closer inspection, it looks like there are some cases (at least PCI and
+> MFD) where dma_parms is installed by the parent/bus at device creation, and
+> therefore remains valid and *would* be expected to persist across the child
+> device's driver unbinding and rebinding - seems this is more complex than I
+> first thought, sorry.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
----
- Documentation/devicetree/bindings/net/macb.txt | 1 +
- arch/arm/boot/dts/sama5d3_emac.dtsi            | 2 +-
- 2 files changed, 2 insertions(+), 1 deletion(-)
+No problem. I am thankful I understand more details. So, the life cycle
+of dma_parms is truly that of the device. Which means that the drivers
+using devm_kzalloc in their probe, should ideally clear the pointer on
+unbind. Otherwise, it is not possible to say if the non-NULL dma_parms
+is intended or dangling. Which makes my initial dmam_set_dma_parms()
+approach look not too bad, I'd think?
 
-diff --git a/Documentation/devicetree/bindings/net/macb.txt b/Documentation/devicetree/bindings/net/macb.txt
-index 457d5ae16f23..3e17ac1d5d58 100644
---- a/Documentation/devicetree/bindings/net/macb.txt
-+++ b/Documentation/devicetree/bindings/net/macb.txt
-@@ -10,6 +10,7 @@ Required properties:
-   Use "cdns,pc302-gem" for Picochip picoXcell pc302 and later devices based on
-   the Cadence GEM, or the generic form: "cdns,gem".
-   Use "atmel,sama5d2-gem" for the GEM IP (10/100) available on Atmel sama5d2 SoCs.
-+  Use "atmel,sama5d3-macb" for the 10/100Mbit IP available on Atmel sama5d3 SoCs.
-   Use "atmel,sama5d3-gem" for the Gigabit IP available on Atmel sama5d3 SoCs.
-   Use "atmel,sama5d4-gem" for the GEM IP (10/100) available on Atmel sama5d4 SoCs.
-   Use "cdns,zynq-gem" Xilinx Zynq-7xxx SoC.
-diff --git a/arch/arm/boot/dts/sama5d3_emac.dtsi b/arch/arm/boot/dts/sama5d3_emac.dtsi
-index 7cb235ef0fb6..6e9e1c2f9def 100644
---- a/arch/arm/boot/dts/sama5d3_emac.dtsi
-+++ b/arch/arm/boot/dts/sama5d3_emac.dtsi
-@@ -41,7 +41,7 @@
- 			};
- 
- 			macb1: ethernet at f802c000 {
--				compatible = "cdns,at91sam9260-macb", "cdns,macb";
-+				compatible = "atmel,sama5d3-macb", "cdns,at91sam9260-macb", "cdns,macb";
- 				reg = <0xf802c000 0x100>;
- 				interrupts = <35 IRQ_TYPE_LEVEL_HIGH 3>;
- 				pinctrl-names = "default";
--- 
-2.15.1
+However, I don't want to push hard with this one. If you think this is
+too academic, I'll just leave it for now...
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180914/0e62acbc/attachment.sig>
