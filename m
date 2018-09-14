@@ -1,28 +1,25 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 14 Sep 2018 17:00:04 +0800
-Subject: [PATCH] ARM: dts: sun9i: Fix I2C bus warnings
-In-Reply-To: <20180913181245.25484-14-robh@kernel.org>
-References: <20180913181245.25484-14-robh@kernel.org>
-Message-ID: <CAGb2v66L9EGHBiJqPbK_YEEgmoFncgbQDzHMq4GuatnzxuLOgA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 14 Sep 2018 11:07:03 +0200
+Subject: [PATCH v2 0/8] drm/bridge: add bus flag support
+In-Reply-To: <20180912183222.25414-1-stefan@agner.ch>
+References: <20180912183222.25414-1-stefan@agner.ch>
+Message-ID: <CACRpkdZdxLMkECq8BBJHDqKszHPMt2uUPFbwbPVNKXyxu-SWGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2018 at 2:13 AM Rob Herring <robh@kernel.org> wrote:
->
-> dtc has new checks for I2C buses. The sun9i-a80 dts file has a node named
-> 'i2c' which causes a false positive warning. As the node is a RSB bus,
-> correct the node name to be 'rsb' to fix the warnings.
->
-> arch/arm/boot/dts/sun9i-a80-cubieboard4.dtb: Warning (i2c_bus_reg): /soc/i2c at 8003400/codec at e89:reg: I2C address must be less than 10-bits, got "0xe89"
-> arch/arm/boot/dts/sun9i-a80-cubieboard4.dtb: Warning (i2c_bus_reg): /soc/i2c at 8003400/pmic at 745:reg: I2C address must be less than 10-bits, got "0x745"
-> arch/arm/boot/dts/sun9i-a80-optimus.dtb: Warning (i2c_bus_reg): /soc/i2c at 8003400/codec at e89:reg: I2C address must be less than 10-bits, got "0xe89"
-> arch/arm/boot/dts/sun9i-a80-optimus.dtb: Warning (i2c_bus_reg): /soc/i2c at 8003400/pmic at 745:reg: I2C address must be less than 10-bits, got "0x745"
->
-> Cc: Maxime Ripard <maxime.ripard@bootlin.com>
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
-> Please apply to the sub-arch tree. The dtc changes haven't landed, but
-> will for 4.20.
+On Wed, Sep 12, 2018 at 8:32 PM Stefan Agner <stefan@agner.ch> wrote:
 
-Applied for 4.20. Thanks!
+> @Linus Walleij, Laurent Pinchart: Since you have been involved in
+> the initial bus timings discussion, I would like to have your Ack
+> on at least patch 2/3... If we want to keep the setup/hold timings,
+> the patchset should also work without those two patches.
+
+AFAICT this ends up with the PL111 code identical to what I
+proposed in my first patch set to support the latching properly,
+so I am pretty much happy as long as my hardware does not
+flicker. (Rough consensus and running code.) I'm not very invested
+in either idea to represent these timings, so
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
