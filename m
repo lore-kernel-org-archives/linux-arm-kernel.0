@@ -1,50 +1,45 @@
-From: rsalveti@rsalveti.net (Ricardo Salveti)
-Date: Fri, 14 Sep 2018 15:53:02 -0300
-Subject: [PATCH v13 3/8] clk: Use devm_ in the register fixed factor clock
-In-Reply-To: <20180614215358.11264-4-ilia.lin@gmail.com>
-References: <20180614215358.11264-1-ilia.lin@gmail.com>
- <20180614215358.11264-4-ilia.lin@gmail.com>
-Message-ID: <CAHYQr0rR=mcV-SxZFW+5M4CTUaTv_f_bruyq91HiGP6sqUZ3Yw@mail.gmail.com>
+From: vijaykhemka@fb.com (Vijay Khemka)
+Date: Fri, 14 Sep 2018 18:57:23 +0000
+Subject: [PATCH] ARM: dts: aspeed: Adding Facebook TioagaPass BMC
+In-Reply-To: <20180913201739.GG23892@lunn.ch>
+References: <20180913195751.1833227-1-vijaykhemka@fb.com>
+ <20180913201739.GG23892@lunn.ch>
+Message-ID: <781180F5-B7E7-44CD-9747-8E2908ACF5E2@fb.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 14, 2018 at 6:55 PM <ilia.lin@gmail.com> wrote:
->
-> From: Ilia Lin <ilialin@codeaurora.org>
->
-> Use devm_clk_hw_register instead of clk_hw_register
-> to simplify the usage of this API. This way drivers that call
-> the clk_hw_register_fixed_factor won't need to maintain
-> a data structure for further cleanup.
->
-> Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
-> Tested-by: Amit Kucheria <amit.kucheria@linaro.org>
-> ---
->  drivers/clk/clk-fixed-factor.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
-> index a5d402de5584..8e39bda8e596 100644
-> --- a/drivers/clk/clk-fixed-factor.c
-> +++ b/drivers/clk/clk-fixed-factor.c
-> @@ -94,7 +94,7 @@ struct clk_hw *clk_hw_register_fixed_factor(struct device *dev,
->         init.num_parents = 1;
->
->         hw = &fix->hw;
-> -       ret = clk_hw_register(dev, hw);
-> +       ret = devm_clk_hw_register(dev, hw);
+Thanks Andrew,
+I have revised patch as I found some more changes. Sent a new version.
 
-Not sure what is the current state of this patch-set, but this change
-breaks drivers calling clk_hw_register_fixed_factor with a NULL dev
-(e.g. imx_clk_fixed_factor), as devm_clk_hw_register needs a valid dev
-for devres_add to work.
+Regards
+-Vijay
 
->         if (ret) {
->                 kfree(fix);
->                 hw = ERR_PTR(ret);
-> --
-> 2.11.0
+?On 9/13/18, 1:18 PM, "Andrew Lunn" <andrew@lunn.ch> wrote:
 
-Cheers,
--- 
-Ricardo Salveti de Araujo
+    > +++ b/arch/arm/boot/dts/Makefile
+    > @@ -1206,4 +1206,5 @@ dtb-$(CONFIG_ARCH_ASPEED) += \
+    >  	aspeed-bmc-opp-witherspoon.dtb \
+    >  	aspeed-bmc-opp-zaius.dtb \
+    >  	aspeed-bmc-portwell-neptune.dtb \
+    > +	aspeed-bmc-facebook-tiogapass.dtb \
+    
+    Hi Vijay
+    
+    These entries are normally kept in alphabetic order.
+    
+    > +	leds {
+    > +		compatible = "gpio-leds";
+    > +		postcode0 {
+    > +			label="BMC_UP";
+    
+    Documentation/leds/leds-class.txt
+    
+    LED Device Naming
+    =================
+    
+    Is currently of the form:
+    
+    "devicename:colour:function"
+    
+    	Andrew
+    
