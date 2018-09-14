@@ -1,34 +1,60 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 14 Sep 2018 18:11:56 +0200
-Subject: [RFC PATCH 1/3] ARM: dma-mapping: update comment about handling
- dma_ops when detaching from IOMMU
-In-Reply-To: <CAMuHMdV_xpj62BkqwoTAaaugM3BkDRQTC=E0cEDqKBg3sUYNBg@mail.gmail.com>
-References: <20180913151716.6333-1-wsa+renesas@sang-engineering.com>
- <20180913151716.6333-2-wsa+renesas@sang-engineering.com>
- <CAMuHMdV_xpj62BkqwoTAaaugM3BkDRQTC=E0cEDqKBg3sUYNBg@mail.gmail.com>
-Message-ID: <20180914161156.GB906@kunai>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 14 Sep 2018 17:19:08 +0100
+Subject: [GIT PULL] arm64: fixes for -rc4
+Message-ID: <20180914161908.GF6236@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2018 at 02:15:01PM +0200, Geert Uytterhoeven wrote:
-> On Thu, Sep 13, 2018 at 5:18 PM Wolfram Sang
-> <wsa+renesas@sang-engineering.com> wrote:
-> > Update the comment because we don't set the pointer to NULL anymore.
-> > Also use the correct pointer name 'dma_ops' instead of 'dma_map_ops'.
-> >
-> > Fixes: 1874619a7df4 ("ARM: dma-mapping: Set proper DMA ops in arm_iommu_detach_device()")
-> > Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> 
-> Nice catch!
-> 
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Linus,
 
-Thanks, so I sent this seperately via ALKML now.
+The trickle of arm64 fixes continues to come in. Nothing that's the end
+of the world, but we've got a fix for PCI IO port accesses, an accidental
+naked "asm goto" and a fix to the vmcoreinfo PT_NOTE merged this time
+around which we'd like to get sorted before it becomes ABI.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180914/5324eb38/attachment.sig>
+Details in the tag, but please pull.
+
+Thanks,
+
+Will
+
+--->8
+
+The following changes since commit 11da3a7f84f19c26da6f86af878298694ede0804:
+
+  Linux 4.19-rc3 (2018-09-09 17:26:43 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
+
+for you to fetch changes up to 500dd232449e7c07500e713dc6970aa713f8e4f1:
+
+  asm-generic: io: Fix ioport_map() for !CONFIG_GENERIC_IOMAP && CONFIG_INDIRECT_PIO (2018-09-14 09:49:21 +0100)
+
+----------------------------------------------------------------
+arm64 fixes
+
+- Fix ioport_map() mapping the wrong physical address for some I/O BARs
+
+- Remove direct use of "asm goto", since some compilers don't like that
+
+- Ensure kimage_voffset is always present in vmcoreinfo PT_NOTE
+
+----------------------------------------------------------------
+Andrew Murray (1):
+      asm-generic: io: Fix ioport_map() for !CONFIG_GENERIC_IOMAP && CONFIG_INDIRECT_PIO
+
+James Morse (1):
+      arm64: kernel: arch_crash_save_vmcoreinfo() should depend on CONFIG_CRASH_CORE
+
+Miguel Ojeda (1):
+      arm64: jump_label.h: use asm_volatile_goto macro instead of "asm goto"
+
+ arch/arm64/include/asm/jump_label.h |  4 ++--
+ arch/arm64/kernel/Makefile          |  1 +
+ arch/arm64/kernel/crash_core.c      | 19 +++++++++++++++++++
+ arch/arm64/kernel/machine_kexec.c   | 11 -----------
+ include/asm-generic/io.h            |  3 ++-
+ 5 files changed, 24 insertions(+), 14 deletions(-)
+ create mode 100644 arch/arm64/kernel/crash_core.c
