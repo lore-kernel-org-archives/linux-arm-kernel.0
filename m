@@ -1,46 +1,57 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 14 Sep 2018 11:20:18 -0700
-Subject: [PATCH v2 1/4] staging/vc04_services: Use correct cache line size
-In-Reply-To: <6097c969-4290-bb92-3569-72e89561490c@raspberrypi.org>
-References: <1536931375-48769-1-git-send-email-phil@raspberrypi.org>
- <1536931375-48769-2-git-send-email-phil@raspberrypi.org>
- <c4807226-6738-d9da-6f08-4b0a782b9cae@gmail.com>
- <6097c969-4290-bb92-3569-72e89561490c@raspberrypi.org>
-Message-ID: <0f4f1497-f076-09ac-49e0-625f64bbe2dd@gmail.com>
+From: erosca@de.adit-jv.com (Eugeniu Rosca)
+Date: Fri, 14 Sep 2018 20:50:51 +0200
+Subject: [PATCH v11 0/3] remain and optimize memblock_next_valid_pfn on
+ arm and arm64
+In-Reply-To: <20180907144447.GD12788@arm.com>
+References: <1534907237-2982-1-git-send-email-jia.he@hxt-semitech.com>
+ <CAKv+Gu9u8RcrzSHdgXiqHS9HK1aSrjbPxVUSCP0DT4erAhx0pw@mail.gmail.com>
+ <20180907144447.GD12788@arm.com>
+Message-ID: <20180914185051.GA22530@vmlxhi-102.adit-jv.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/14/2018 11:12 AM, Phil Elwell wrote:
-> On 14/09/2018 18:03, Florian Fainelli wrote:
->> On 09/14/2018 06:22 AM, Phil Elwell wrote:
->>> Use the compatible string in the DTB to select the correct cache line
->>> size for the SoC - 32 for BCM2835, and 64 for BCM2836 and BCM2837.
->>>
->>> Signed-off-by: Phil Elwell <phil@raspberrypi.org>
->>> ---
->>
->> [snip]
->>
->>> @@ -170,6 +170,14 @@ static struct device *vchiq_dev;
->>> ? static DEFINE_SPINLOCK(msg_queue_spinlock);
->>> ? static struct platform_device *bcm2835_camera;
->>> ? +static struct vchiq_drvdata bcm2835_drvdata = {
->>> +??? .cache_line_size = 32,
->>> +};
->>> +
->>> +static struct vchiq_drvdata bcm2836_drvdata = {
->>> +??? .cache_line_size = 64,
->>> +};
->>
->> Those two structures could probably be marked const. Other than that,
->> the approach definitively looks good to me.
-> 
-> The mutability is intentional - the structure pointer to the firmware is
-> also
-> stored there. This isn't the only piece of mutable static data in a driver
-> that will only have a single instance, so allocating and initialising a
-> per-instance structure seems needlessly complicated.
++ Renesas people
 
-Fair enough, thanks for the explanation.
--- 
-Florian
+Hello Will, hello Ard, 
+
+On Fri, Sep 07, 2018 at 03:44:47PM +0100, Will Deacon wrote:
+> On Thu, Sep 06, 2018 at 01:24:22PM +0200, Ard Biesheuvel wrote:
+> > OK so we can summarize the benefits of this series as follows:
+> > - boot time on a virtual model of a Samurai CPU drops from 109 to 62 seconds
+> > - boot time on a QDF2400 arm64 server with 96 GB of RAM drops by ~15
+> > *milliseconds*
+> > 
+> > Google was not very helpful in figuring out what a Samurai CPU is and
+> > why we should care about the boot time of Linux running on a virtual
+> > model of it, and the 15 ms speedup is not that compelling either.
+> > 
+> > Apologies to Jia that it took 11 revisions to reach this conclusion,
+> > but in /my/ opinion, tweaking the fragile memblock/pfn handling code
+> > for this reason is totally unjustified, and we're better off
+> > disregarding these patches.
+> 
+> Oh, we're talking about a *simulator* for the significant boot time
+> improvement here? I didn't realise that, so I agree that the premise of
+> this patch set looks pretty questionable given how much "fun" we've had
+> with the memmap on arm and arm64.
+> 
+> Will
+
+Similar to https://lkml.org/lkml/2018/1/24/420, my measurements show that
+the boot time of R-Car H3-ES2.0 Salvator-X (having 4GiB RAM) is decreased
+by ~135-140ms with this patch-set applied on top of v4.19-rc3.
+
+I agree that in the Desktop realm you would barely perceive the 140ms
+difference, but saving 140ms on the automotive SoC (designed for products
+which must comply with 2s-to-rear-view-camera NHTSA US regulations) *is*
+significant.
+
+FWIW, cppcheck and `checkpatch --strict` report style issues for
+patches #2 and #3. I hope these can be fixed and the review process
+can go on? From functional standpoint, I did some dynamic testing on
+H3-Salvator-X with UBSAN/KASAN=y and didn't observe any regressions, so:
+
+Tested-by: Eugeniu Rosca <erosca@de.adit-jv.com>
+
+Best regards,
+Eugeniu.
