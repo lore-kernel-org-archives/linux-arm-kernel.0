@@ -1,57 +1,52 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 14 Sep 2018 06:23:05 -0700
-Subject: [PATCH i2c-next v6] i2c: aspeed: Handle master/slave combined irq
- events properly
-In-Reply-To: <ccbf7059-77fd-44e8-daee-516582814cb3@kaod.org>
-References: <20180911233302.GA18799@roeck-us.net>
- <5698ca34-14c9-8d05-c4e6-5acf85ff9d14@linux.intel.com>
- <20180912013449.GA12612@roeck-us.net>
- <7fd98646-fb5a-be4d-ce37-84b74e0fa8b3@linux.intel.com>
- <20180912195844.GA6893@roeck-us.net>
- <da7f4691-7428-3114-32bb-e0171f6c7228@linux.intel.com>
- <20180912203059.GA18201@roeck-us.net>
- <fb185839-3ae0-01dc-09e8-f22db55ecb04@kaod.org>
- <3f86e75f-1502-eae8-0633-d087937111c8@roeck-us.net>
- <f47b3050-3abd-caa4-cc71-4b13ef60e2c0@kaod.org>
- <20180913155703.GA22605@roeck-us.net>
- <2c481986-7ee0-4887-5c9b-64e2cd9d8c04@kaod.org>
- <b4da2b68-e6e3-e068-cd6e-9e638aa67889@roeck-us.net>
- <ccbf7059-77fd-44e8-daee-516582814cb3@kaod.org>
-Message-ID: <94a2aa4e-69ac-7042-92d9-1ada46d5fc33@roeck-us.net>
+From: phil@raspberrypi.org (Phil Elwell)
+Date: Fri, 14 Sep 2018 14:22:51 +0100
+Subject: [PATCH v2 0/4] Improve VCHIQ cache line size handling
+Message-ID: <1536931375-48769-1-git-send-email-phil@raspberrypi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/13/2018 10:38 PM, C?dric Le Goater wrote:
->>>> That seems to suggest that none of the status bits auto-clears, and that
->>>> the above code clearing intr_status should be removed entirely.
->>>> Am I missing something ?
->>>
->>> You are right. I just pushed another version of the previous patch with this
->>> new hunk :
->>>
->>> @@ -188,7 +200,6 @@ static void aspeed_i2c_bus_handle_cmd(As
->>>  ? {
->>>  ????? bus->cmd &= ~0xFFFF;
->>>  ????? bus->cmd |= value & 0xFFFF;
->>> -??? bus->intr_status = 0;
->>>  ? ????? if (bus->cmd & I2CD_M_START_CMD) {
->>>  ????????? uint8_t state = aspeed_i2c_get_state(bus) & I2CD_MACTIVE ?
->>>
->>>
->>> The QEMU palmetto and witherspoon machines seem to behave fine. Can you give
->>> it a try ?
->>>
->>
->> Works fine for me for all affected qemu platforms.
->>
->> How do you want to proceed with the qemu patches ? I attached my patches
->> for reference. Maybe you can add them to your tree if they are ok and submit
->> the entire series together to the qemu mailing list ?
-> 
-> yes. They are pushed in my aspeed-3.1 branch. I will send the series
-> on the list.
-> 
+Both sides of the VCHIQ communications mechanism need to agree on the cache
+line size. Using an incorrect value can lead to data corruption, but having the
+two sides using different values is usually worse.
 
-Excellent. Thanks a lot!
+In the absence of an obvious convenient run-time method to determine the
+correct value in the ARCH=arm world, the downstream Raspberry Pi trees used a
+Device Tree property, written by the firmware, to configure the kernel driver.
+This method was vetoed during the upstreaming process, so a fixed value of 32
+was used instead, and some corruptions ensued. This is take 2 at arriving at
+the correct value.
 
-Guenter
+Add a new compatible string - "brcm,bcm2836-vchiq" - to indicate an SoC with
+a 64-byte cache line. Document the new string in the binding, and use it on
+the appropriate platforms.
+
+The final patch is a (seemingly cosmetic) correction of the Device Tree "reg"
+declaration for the device node, but it doubles as an indication to the
+Raspberry Pi firmware that the kernel driver is running a recent kernel driver
+that chooses the correct value. As such it would help if the DT patches are
+not merged before the driver patch.
+
+v2: Replaced ARM-specific logic used to determine cache line size with
+    a new compatible string for BCM2836 and BCM2837.
+
+Phil Elwell (4):
+  staging/vc04_services: Use correct cache line size
+  dt-bindings: soc: Document "brcm,bcm2836-vchiq"
+  ARM: dts: bcm283x: Correct vchiq compatible string
+  ARM: dts: bcm283x: Correct mailbox register sizes
+
+ .../bindings/soc/bcm/brcm,bcm2835-vchiq.txt        |  3 +-
+ arch/arm/boot/dts/bcm2835-rpi.dtsi                 |  4 +--
+ arch/arm/boot/dts/bcm2836-rpi-2-b.dts              |  2 +-
+ arch/arm/boot/dts/bcm2836-rpi.dtsi                 |  6 ++++
+ arch/arm/boot/dts/bcm2837-rpi-3-b-plus.dts         |  2 +-
+ arch/arm/boot/dts/bcm2837-rpi-3-b.dts              |  2 +-
+ arch/arm/boot/dts/bcm2837-rpi-cm3.dtsi             |  2 +-
+ .../interface/vchiq_arm/vchiq_2835_arm.c           |  4 ++-
+ .../vc04_services/interface/vchiq_arm/vchiq_arm.c  | 36 ++++++++++++++++------
+ .../vc04_services/interface/vchiq_arm/vchiq_arm.h  |  5 +++
+ 10 files changed, 48 insertions(+), 18 deletions(-)
+ create mode 100644 arch/arm/boot/dts/bcm2836-rpi.dtsi
+
+-- 
+2.7.4
