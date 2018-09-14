@@ -1,33 +1,17 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 14 Sep 2018 12:35:42 +0300
-Subject: [PATCH v2 0/8] drm/bridge: add bus flag support
-In-Reply-To: <CACRpkdZdxLMkECq8BBJHDqKszHPMt2uUPFbwbPVNKXyxu-SWGQ@mail.gmail.com>
-References: <20180912183222.25414-1-stefan@agner.ch>
- <CACRpkdZdxLMkECq8BBJHDqKszHPMt2uUPFbwbPVNKXyxu-SWGQ@mail.gmail.com>
-Message-ID: <4703489.BS6gAglWfc@avalon>
+From: mjourdan@baylibre.com (Maxime Jourdan)
+Date: Fri, 14 Sep 2018 11:48:08 +0200
+Subject: [PATCH v2 0/3] Add Amlogic video decoder driver
+In-Reply-To: <20180911150938.3844-1-mjourdan@baylibre.com>
+References: <20180911150938.3844-1-mjourdan@baylibre.com>
+Message-ID: <CAMO6naz46zu5qiN=9LCixMKOHbXLW6qYGqarHf9ciNUsMRQ6sQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Please note: the canvas patches required for this series (and causing
+the kbuild fail) were merged by Kevin Hilman with a tag.
 
-On Friday, 14 September 2018 12:07:03 EEST Linus Walleij wrote:
-> On Wed, Sep 12, 2018 at 8:32 PM Stefan Agner <stefan@agner.ch> wrote:
-> > @Linus Walleij, Laurent Pinchart: Since you have been involved in
-> > the initial bus timings discussion, I would like to have your Ack
-> > on at least patch 2/3... If we want to keep the setup/hold timings,
-> > the patchset should also work without those two patches.
-> 
-> AFAICT this ends up with the PL111 code identical to what I
-> proposed in my first patch set to support the latching properly,
-> so I am pretty much happy as long as my hardware does not
-> flicker. (Rough consensus and running code.) I'm not very invested
-> in either idea to represent these timings, so
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Repo: https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git
+Tag: amlogic-drivers-canvas
 
-I've just replied to patch 3/8 with an explanation of why we have added this 
-particular API, and why we need to keep it.
-
--- 
 Regards,
-
-Laurent Pinchart
+Maxime
