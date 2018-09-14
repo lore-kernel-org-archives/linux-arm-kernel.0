@@ -1,45 +1,65 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Fri, 14 Sep 2018 15:55:21 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: enable panel OTM8009A
-In-Reply-To: <8833c439-bc75-d364-f27f-18af31318f02@st.com>
-References: <1534776349-4036-1-git-send-email-yannick.fertre@st.com>
- <8833c439-bc75-d364-f27f-18af31318f02@st.com>
-Message-ID: <dc069d13-baa3-cf31-2f12-2380ca824edb@st.com>
+From: pintu.ping@gmail.com (Pintu Kumar)
+Date: Fri, 14 Sep 2018 19:58:01 +0530
+Subject: KSM not working in 4.9 Kernel
+Message-ID: <CAOuPNLj1wx4sznrtLdKjcvuTf0dECPWzPaR946FoYRXB6YAGCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi All,
+
+Board: Hikey620 ARM64
+Kernel: 4.9.20
+
+I am trying to verify KSM (Kernel Same Page Merging) functionality on
+4.9 Kernel using "mmap" and madvise user space test utility.
+But to my observation, it seems KSM is not working for me.
+CONFIG_KSM=y is enabled in kernel.
+ksm_init is also called during boot up.
+  443 ?        SN     0:00 [ksmd]
+
+ksmd thread is also running.
+
+However, when I see the sysfs, no values are written.
+~ # grep -H '' /sys/kernel/mm/ksm/*
+/sys/kernel/mm/ksm/pages_hashed:0
+/sys/kernel/mm/ksm/pages_scanned:0
+/sys/kernel/mm/ksm/pages_shared:0
+/sys/kernel/mm/ksm/pages_sharing:0
+/sys/kernel/mm/ksm/pages_to_scan:200
+/sys/kernel/mm/ksm/pages_unshared:0
+/sys/kernel/mm/ksm/pages_volatile:0
+/sys/kernel/mm/ksm/run:1
+/sys/kernel/mm/ksm/sleep_millisecs:1000
+
+So, please let me know if I am doing any thing wrong.
+
+This is the test utility:
+int main(int argc, char *argv[])
+{
+        int i, n, size;
+        char *buffer;
+        void *addr;
+
+        n = 100;
+        size = 100 * getpagesize();
+        for (i = 0; i < n; i++) {
+                buffer = (char *)malloc(size);
+                memset(buffer, 0xff, size);
+                addr =  mmap(NULL, size,
+                           PROT_READ | PROT_EXEC | PROT_WRITE,
+MAP_PRIVATE | MAP_ANONYMOUS,
+                           -1, 0);
+                madvise(addr, size, MADV_MERGEABLE);
+                sleep(1);
+        }
+        printf("Done....press ^C\n");
+
+        pause();
+
+        return 0;
+}
 
 
-On 09/14/2018 02:39 PM, Yannick FERTRE wrote:
-> Hi,
-> 
-> Gentle ping
-> 
 
-It'll be merged in my next PR for 4.20
-
-> 
-> On 08/20/2018 04:45 PM, Yannick Fertr? wrote:
->> Enable panel OTM8009A as loadable module.
->>
->> Signed-off-by: Yannick Fertr? <yannick.fertre@st.com>
->> ---
->>?? arch/arm/configs/multi_v7_defconfig | 1 +
->>?? 1 file changed, 1 insertion(+)
->>
->> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
->> index d2b7f35..b6732df 100644
->> --- a/arch/arm/configs/multi_v7_defconfig
->> +++ b/arch/arm/configs/multi_v7_defconfig
->> @@ -648,6 +648,7 @@ CONFIG_DRM_TEGRA=y
->>?? CONFIG_DRM_STM=m
->>?? CONFIG_DRM_STM_DSI=m
->>?? CONFIG_DRM_PANEL_SAMSUNG_LD9040=m
->> +CONFIG_DRM_PANEL_ORISETECH_OTM8009A=m
->>?? CONFIG_DRM_PANEL_SAMSUNG_S6E63J0X03=m
->>?? CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=m
->>?? CONFIG_DRM_PANEL_SIMPLE=y
-> 
-> -- 
-> Yannick Fertr? | TINA: 166 7152 | Tel: +33 244027152 | Mobile: +33 620600270
-> Microcontrollers and Digital ICs Group | Microcontrolleurs Division
+Thanks,
+Pintu
