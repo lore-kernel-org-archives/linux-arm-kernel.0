@@ -1,56 +1,29 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Fri, 14 Sep 2018 17:30:12 +0200
-Subject: [PATCH] ARM: at91/dt: fix typo in sama5d2 pinmux descriptions
-In-Reply-To: <b996f1c2271834bbf1220431ed0a08af09a6fb55.1536938317.git.mirq-linux@rere.qmqm.pl>
-References: <b996f1c2271834bbf1220431ed0a08af09a6fb55.1536938317.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <2d8dcf62-eb7b-03de-7774-b5b4017db949@microchip.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Fri, 14 Sep 2018 17:34:21 +0200
+Subject: [PATCH] clk: mvebu: armada-37xx-tbg: Balance devm_clk_get in probe
+Message-ID: <20180914153421.7090-1-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/09/2018 at 17:20, Micha? Miros?aw wrote:
-> Fix SSC0 pin TD0 where wrongly called TDO.
-> 
-> Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
+The parent clock is get only to have its name, and then the clock is no
+more used, so we can safely free it using devm_clk_put.
 
-Micha?,
+Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+---
+ drivers/clk/mvebu/armada-37xx-tbg.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks for your patch. But the exact same one is already integrated in 
-Linus' tree as:
-c8cbc1c20c29 ("ARM: dts: at91: fix typos for SSC TD functions")
-
-Best regards,
-   Nicolas
-
-> ---
-> Against v4.18.7
-> 
->   arch/arm/boot/dts/sama5d2-pinfunc.h | 4 ++--
->   1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/sama5d2-pinfunc.h b/arch/arm/boot/dts/sama5d2-pinfunc.h
-> index e57191fb83de..1c01a6f843d8 100644
-> --- a/arch/arm/boot/dts/sama5d2-pinfunc.h
-> +++ b/arch/arm/boot/dts/sama5d2-pinfunc.h
-> @@ -375,7 +375,7 @@
->   #define PIN_PB22__GPIO			PINMUX_PIN(PIN_PB22, 0, 0)
->   #define PIN_PB22__LCDDAT11		PINMUX_PIN(PIN_PB22, 1, 1)
->   #define PIN_PB22__A11			PINMUX_PIN(PIN_PB22, 2, 1)
-> -#define PIN_PB22__TDO			PINMUX_PIN(PIN_PB22, 3, 1)
-> +#define PIN_PB22__TD0			PINMUX_PIN(PIN_PB22, 3, 1)
->   #define PIN_PB22__TIOA2			PINMUX_PIN(PIN_PB22, 4, 2)
->   #define PIN_PB22__FLEXCOM3_IO1		PINMUX_PIN(PIN_PB22, 5, 3)
->   #define PIN_PB22__GMDC			PINMUX_PIN(PIN_PB22, 6, 3)
-> @@ -556,7 +556,7 @@
->   #define PIN_PC14__LCDDAT6		PINMUX_PIN(PIN_PC14, 1, 2)
->   #define PIN_PC14__GRX0			PINMUX_PIN(PIN_PC14, 2, 1)
->   #define PIN_PC14__ISC_D5		PINMUX_PIN(PIN_PC14, 3, 1)
-> -#define PIN_PC14__TDO			PINMUX_PIN(PIN_PC14, 5, 2)
-> +#define PIN_PC14__TD0			PINMUX_PIN(PIN_PC14, 5, 2)
->   #define PIN_PC14__A3			PINMUX_PIN(PIN_PC14, 6, 2)
->   #define PIN_PC15			79
->   #define PIN_PC15__GPIO			PINMUX_PIN(PIN_PC15, 0, 0)
-> 
-
-
+diff --git a/drivers/clk/mvebu/armada-37xx-tbg.c b/drivers/clk/mvebu/armada-37xx-tbg.c
+index 71f30149e80e..caaa91a41683 100644
+--- a/drivers/clk/mvebu/armada-37xx-tbg.c
++++ b/drivers/clk/mvebu/armada-37xx-tbg.c
+@@ -102,6 +102,7 @@ static int armada_3700_tbg_clock_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 	parent_name = __clk_get_name(parent);
++	devm_clk_put(dev, parent);
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	reg = devm_ioremap_resource(dev, res);
 -- 
-Nicolas Ferre
+2.18.0
