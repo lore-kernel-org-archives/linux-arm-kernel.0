@@ -1,44 +1,47 @@
 From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Fri, 14 Sep 2018 17:48:10 +0200
-Subject: [PATCH] net: macb: disable scatter-gather for macb on sama5d3
-Message-ID: <20180914154811.12090-1-nicolas.ferre@microchip.com>
+Date: Fri, 14 Sep 2018 17:48:11 +0200
+Subject: [PATCH] ARM: dts: at91: add new compatibility string for macb on
+ sama5d3
+In-Reply-To: <20180914154811.12090-1-nicolas.ferre@microchip.com>
+References: <20180914154811.12090-1-nicolas.ferre@microchip.com>
+Message-ID: <20180914154811.12090-2-nicolas.ferre@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create a new configuration for the sama5d3-macb new compatibility string.
-This configuration disables scatter-gather because we experienced lock down
-of the macb interface of this particular SoC under very high load.
+We need this new compatibility string as we experienced different behavior
+for this 10/100Mbits/s macb interface on this particular SoC.
+Backward compatibility is preserved as we keep the alternative strings.
 
 Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 ---
- drivers/net/ethernet/cadence/macb_main.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ Documentation/devicetree/bindings/net/macb.txt | 1 +
+ arch/arm/boot/dts/sama5d3_emac.dtsi            | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/net/ethernet/cadence/macb_main.c b/drivers/net/ethernet/cadence/macb_main.c
-index 16e4ef7d7185..f1a86b422617 100644
---- a/drivers/net/ethernet/cadence/macb_main.c
-+++ b/drivers/net/ethernet/cadence/macb_main.c
-@@ -3837,6 +3837,13 @@ static const struct macb_config at91sam9260_config = {
- 	.init = macb_init,
- };
+diff --git a/Documentation/devicetree/bindings/net/macb.txt b/Documentation/devicetree/bindings/net/macb.txt
+index 457d5ae16f23..3e17ac1d5d58 100644
+--- a/Documentation/devicetree/bindings/net/macb.txt
++++ b/Documentation/devicetree/bindings/net/macb.txt
+@@ -10,6 +10,7 @@ Required properties:
+   Use "cdns,pc302-gem" for Picochip picoXcell pc302 and later devices based on
+   the Cadence GEM, or the generic form: "cdns,gem".
+   Use "atmel,sama5d2-gem" for the GEM IP (10/100) available on Atmel sama5d2 SoCs.
++  Use "atmel,sama5d3-macb" for the 10/100Mbit IP available on Atmel sama5d3 SoCs.
+   Use "atmel,sama5d3-gem" for the Gigabit IP available on Atmel sama5d3 SoCs.
+   Use "atmel,sama5d4-gem" for the GEM IP (10/100) available on Atmel sama5d4 SoCs.
+   Use "cdns,zynq-gem" Xilinx Zynq-7xxx SoC.
+diff --git a/arch/arm/boot/dts/sama5d3_emac.dtsi b/arch/arm/boot/dts/sama5d3_emac.dtsi
+index 7cb235ef0fb6..6e9e1c2f9def 100644
+--- a/arch/arm/boot/dts/sama5d3_emac.dtsi
++++ b/arch/arm/boot/dts/sama5d3_emac.dtsi
+@@ -41,7 +41,7 @@
+ 			};
  
-+static const struct macb_config sama5d3macb_config = {
-+	.caps = MACB_CAPS_SG_DISABLED
-+	      | MACB_CAPS_USRIO_HAS_CLKEN | MACB_CAPS_USRIO_DEFAULT_IS_MII_GMII,
-+	.clk_init = macb_clk_init,
-+	.init = macb_init,
-+};
-+
- static const struct macb_config pc302gem_config = {
- 	.caps = MACB_CAPS_SG_DISABLED | MACB_CAPS_GIGABIT_MODE_AVAILABLE,
- 	.dma_burst_length = 16,
-@@ -3904,6 +3911,7 @@ static const struct of_device_id macb_dt_ids[] = {
- 	{ .compatible = "cdns,gem", .data = &pc302gem_config },
- 	{ .compatible = "atmel,sama5d2-gem", .data = &sama5d2_config },
- 	{ .compatible = "atmel,sama5d3-gem", .data = &sama5d3_config },
-+	{ .compatible = "atmel,sama5d3-macb", .data = &sama5d3macb_config },
- 	{ .compatible = "atmel,sama5d4-gem", .data = &sama5d4_config },
- 	{ .compatible = "cdns,at91rm9200-emac", .data = &emac_config },
- 	{ .compatible = "cdns,emac", .data = &emac_config },
+ 			macb1: ethernet at f802c000 {
+-				compatible = "cdns,at91sam9260-macb", "cdns,macb";
++				compatible = "atmel,sama5d3-macb", "cdns,at91sam9260-macb", "cdns,macb";
+ 				reg = <0xf802c000 0x100>;
+ 				interrupts = <35 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
 -- 
 2.15.1
