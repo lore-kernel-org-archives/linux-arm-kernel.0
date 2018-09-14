@@ -1,54 +1,86 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 14 Sep 2018 13:00:29 +0300
-Subject: [PATCH v2 6/8] drm/imx: support handling bridge timings bus flags
-In-Reply-To: <20180912183222.25414-7-stefan@agner.ch>
-References: <20180912183222.25414-1-stefan@agner.ch>
- <20180912183222.25414-7-stefan@agner.ch>
-Message-ID: <1666767.e3BgH42IGz@avalon>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 14 Sep 2018 12:11:54 +0200
+Subject: [PATCH 1/2] staging/vc04_services: Derive g_cache_line_size
+In-Reply-To: <1536770554-107314-2-git-send-email-phil@raspberrypi.org>
+References: <1536770554-107314-1-git-send-email-phil@raspberrypi.org>
+ <1536770554-107314-2-git-send-email-phil@raspberrypi.org>
+Message-ID: <107b707e-1f8c-1305-2582-0a131011758d@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+Hi Phil,
 
-Thank you for the patch.
-
-On Wednesday, 12 September 2018 21:32:20 EEST Stefan Agner wrote:
-> A bridge might require specific settings for the pixel data on
-> the bus. Copy the bus flags from the bridge timings if a bridge
-> is in use.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+Am 12.09.2018 um 18:42 schrieb Phil Elwell:
+> The ARM coprocessor registers include dcache line size, but there is no
+> function to expose this value. Rather than create a new one, use the
+> read_cpuid_id function to derive the correct value, which is 32 for
+> BCM2835 and 64 for BCM2836/7.
+>
+> Signed-off-by: Phil Elwell <phil@raspberrypi.org>
 > ---
->  drivers/gpu/drm/imx/parallel-display.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/imx/parallel-display.c
-> b/drivers/gpu/drm/imx/parallel-display.c index aefd04e18f93..7798a0621df7
-> 100644
-> --- a/drivers/gpu/drm/imx/parallel-display.c
-> +++ b/drivers/gpu/drm/imx/parallel-display.c
-> @@ -239,6 +239,9 @@ static int imx_pd_bind(struct device *dev, struct device
-> *master, void *data) if (ret && ret != -ENODEV)
->  		return ret;
-> 
-> +	if (imxpd->bridge && imxpd->bridge->timings)
-> +		imxpd->bus_flags = imxpd->bridge->timings->input_bus_flags;
+>  .../interface/vchiq_arm/vchiq_2835_arm.c           | 24 +++++++++++++++++-----
+>  1 file changed, 19 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
+> index e767209..3537f60 100644
+> --- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
+> +++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
+> @@ -42,6 +42,7 @@
+>  #include <linux/uaccess.h>
+>  #include <linux/mm.h>
+>  #include <linux/of.h>
+> +#include <asm/cputype.h>
+>  #include <soc/bcm2835/raspberrypi-firmware.h>
+>  
+>  #define TOTAL_SLOTS (VCHIQ_SLOT_ZERO_SLOTS + 2 * 32)
+> @@ -81,13 +82,15 @@ static void __iomem *g_regs;
+>   * VPU firmware, which determines the required alignment of the
+>   * offsets/sizes in pagelists.
+>   *
+> - * Modern VPU firmware looks for a DT "cache-line-size" property in
+> - * the VCHIQ node and will overwrite it with the actual L2 cache size,
+> + * Previous VPU firmware looked for a DT "cache-line-size" property in
+> + * the VCHIQ node and would overwrite it with the actual L2 cache size,
+>   * which the kernel must then respect.  That property was rejected
+> - * upstream, so we have to use the VPU firmware's compatibility value
+> - * of 32.
+> + * upstream, so we now rely on both sides to "do the right thing" independently
+> + * of the other. To improve backwards compatibility, this new behaviour is
+> + * signalled to the firmware by the use of a corrected "reg" property on the
+> + * relevant Device Tree node.
+>   */
+> -static unsigned int g_cache_line_size = 32;
+> +static unsigned int g_cache_line_size;
+>  static unsigned int g_fragments_size;
+>  static char *g_fragments_base;
+>  static char *g_free_fragments;
+> @@ -127,6 +130,17 @@ int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
+>  	if (err < 0)
+>  		return err;
+>  
+> +	/*
+> +	 * The tempting L1_CACHE_BYTES macro doesn't work in the case of
+> +	 * a kernel built with bcm2835_defconfig running on a BCM2836/7
+> +	 * processor, hence the need for a runtime check. The dcache line size
+> +	 * is encoded in one of the coprocessor registers, but there is no
+> +	 * convenient way to access it short of embedded assembler, hence
+> +	 * the use of read_cpuid_id(). The following test evaluates to true
+> +	 * on a BCM2835 showing that it is ARMv6-ish, whereas
+> +	 * cpu_architecture() will indicate that it is an ARMv7.
+> +	 */
+> +	g_cache_line_size = ((read_cpuid_id() & 0x7f000) == 0x7b000) ? 32 : 64;
 
-As explained in different replies in this mail thread (and in v1), we need 
-something more complex than this.
+is there a chance to use ARM_CPU_PART_ARM1176 or something else instead
+of this magic numbers?
 
-How about creating a helper function that would take a sampling edge, setup 
-and hold times, clock frequency and internal delay on the driving side, and 
-return which edge to drive the data on ? I agree with you that the logic is 
-complex, so we shouldn't duplicate it in multiple drivers. If you submit such 
-a patch I'll implement support for configuring the clock edge in the R-Car DU 
-driver and test it with the ADV7123.
+Sorry, i cannot remember the whole discussion but why we can use
+different compatible here instead of using ARM specific stuff.
 
->  	imxpd->dev = dev;
-> 
->  	ret = imx_pd_register(drm, imxpd);
+compatible = "brcm,bcm2836-vchiq", "brcm,bcm2835-vchiq"; // for BCM2836/7
 
--- 
-Regards,
+compatible = "brcm,bcm2835"; // only for BCM2835
 
-Laurent Pinchart
+
+>  	g_fragments_size = 2 * g_cache_line_size;
+>  
+>  	/* Allocate space for the channels in coherent memory */
