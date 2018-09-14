@@ -1,25 +1,18 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 14 Sep 2018 14:00:39 +0100
-Subject: [PATCH] arm64: Remove unused VGA console support
-In-Reply-To: <1536839800-14918-1-git-send-email-andrew.murray@arm.com>
-References: <1536839800-14918-1-git-send-email-andrew.murray@arm.com>
-Message-ID: <20180914130039.GB4010@arm.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Fri, 14 Sep 2018 15:12:04 +0200
+Subject: [RFC PATCH 2/3] dma-mapping: clear dma_ops pointer also on ARM
+In-Reply-To: <20180913151716.6333-3-wsa+renesas@sang-engineering.com>
+References: <20180913151716.6333-1-wsa+renesas@sang-engineering.com>
+ <20180913151716.6333-3-wsa+renesas@sang-engineering.com>
+Message-ID: <20180914131204.GA27141@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2018 at 12:56:40PM +0100, Andrew Murray wrote:
-> Support for VGA_CONSOLE is not allowable due to commit ee23794b8668
-> ("video: vgacon: Don't build on arm64"), thus remove the associated
-> unused code.
-> 
-> Whilst PCI on arm64 would support VGA a valid screen_info structure
-> is missing.
-> 
-> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
-> ---
->  arch/arm64/kernel/setup.c | 4 ----
->  1 file changed, 4 deletions(-)
+On Thu, Sep 13, 2018 at 05:17:15PM +0200, Wolfram Sang wrote:
+> The generic fallback of arch_teardown_dma_ops() clears the dma_ops
+> pointer but the ARM specific version does not. Rename the generic one,
+> so it can be called from ARM specific one, too. This will ensure
+> consistent behaviour.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
+Hmm.  I'd rather remove your new generic version entirely and move
+the ops clearing into the two callers.
