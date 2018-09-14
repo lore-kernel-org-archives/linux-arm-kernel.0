@@ -1,108 +1,160 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 14 Sep 2018 12:49:40 +0300
-Subject: [PATCH 1/6] drm/bridge: use bus flags in bridge timings
-In-Reply-To: <b1cb586397a4cd444c33dd83d72fa544@agner.ch>
-References: <20180905052113.21262-1-stefan@agner.ch>
- <CACRpkdbw0VjkHYcUpox+DorRG0oRdPARL4ShgPfV2eFaUF_w0g@mail.gmail.com>
- <b1cb586397a4cd444c33dd83d72fa544@agner.ch>
-Message-ID: <2015108.bT6A7b8iLH@avalon>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 14 Sep 2018 11:50:15 +0200
+Subject: [PATCH v8 07/26] PM / Domains: Add genpd governor for CPUs
+In-Reply-To: <20180809153925.GA20329@red-moon>
+References: <20180620172226.15012-1-ulf.hansson@linaro.org>
+ <CAJZ5v0hX3gC0J_z1tMu-KkNBRf3GuJ91tbFC2Z+0D1BnHkY8kg@mail.gmail.com>
+ <20180809153925.GA20329@red-moon>
+Message-ID: <5398488.CyAMIAYSYI@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
-
-On Thursday, 6 September 2018 23:25:56 EEST Stefan Agner wrote:
-> On 06.09.2018 04:07, Linus Walleij wrote:
-> > On Wed, Sep 5, 2018 at 8:32 PM Stefan Agner <stefan@agner.ch> wrote:
-> >> On 05.09.2018 00:44, Laurent Pinchart wrote:
-> >> 
-> >> Good point! I actually really don't like that we use the same flags here
-> >> but from a different perspective. Especially since the flags defines
-> >> document things differently:
-> >> 
-> >> /* drive data on pos. edge */
-> >> #define DRM_BUS_FLAG_PIXDATA_POSEDGE    (1<<2)
-> >> /* drive data on neg. edge */
-> >> #define DRM_BUS_FLAG_PIXDATA_NEGEDGE    (1<<3)
+On Thursday, August 9, 2018 5:39:25 PM CEST Lorenzo Pieralisi wrote:
+> On Mon, Aug 06, 2018 at 11:20:59AM +0200, Rafael J. Wysocki wrote:
+> 
+> [...]
+> 
+> > >>> > @@ -245,6 +248,56 @@ static bool always_on_power_down_ok(struct dev_pm_domain *domain)
+> > >>> >     return false;
+> > >>> >  }
+> > >>> >
+> > >>> > +static bool cpu_power_down_ok(struct dev_pm_domain *pd)
+> > >>> > +{
+> > >>> > +   struct generic_pm_domain *genpd = pd_to_genpd(pd);
+> > >>> > +   ktime_t domain_wakeup, cpu_wakeup;
+> > >>> > +   s64 idle_duration_ns;
+> > >>> > +   int cpu, i;
+> > >>> > +
+> > >>> > +   if (!(genpd->flags & GENPD_FLAG_CPU_DOMAIN))
+> > >>> > +           return true;
+> > >>> > +
+> > >>> > +   /*
+> > >>> > +    * Find the next wakeup for any of the online CPUs within the PM domain
+> > >>> > +    * and its subdomains. Note, we only need the genpd->cpus, as it already
+> > >>> > +    * contains a mask of all CPUs from subdomains.
+> > >>> > +    */
+> > >>> > +   domain_wakeup = ktime_set(KTIME_SEC_MAX, 0);
+> > >>> > +   for_each_cpu_and(cpu, genpd->cpus, cpu_online_mask) {
+> > >>> > +           cpu_wakeup = tick_nohz_get_next_wakeup(cpu);
+> > >>> > +           if (ktime_before(cpu_wakeup, domain_wakeup))
+> > >>> > +                   domain_wakeup = cpu_wakeup;
+> > >>> > +   }
+> > >>
+> > >> Here's a concern I have missed before. :-/
+> > >>
+> > >> Say, one of the CPUs you're walking here is woken up in the meantime.
+> > >
+> > > Yes, that can happen - when we miss-predicted "next wakeup".
+> > >
+> > >>
+> > >> I don't think it is valid to evaluate tick_nohz_get_next_wakeup() for it then
+> > >> to update domain_wakeup.  We really should just avoid the domain power off in
+> > >> that case at all IMO.
+> > >
+> > > Correct.
+> > >
+> > > However, we also want to avoid locking contentions in the idle path,
+> > > which is what this boils done to.
 > > 
-> > Maybe a stupid comment from my side, but can't we just change the
-> > documentation to match the usecases?
+> > This already is done under genpd_lock() AFAICS, so I'm not quite sure
+> > what exactly you mean.
 > > 
-> > /* Trigger pixel data latch on positive edge */
-> > #define DRM_BUS_FLAG_PIXDATA_POSEDGE    (1<<2)
+> > Besides, this is not just about increased latency, which is a concern
+> > by itself but maybe not so much in all environments, but also about
+> > possibility of missing a CPU wakeup, which is a major issue.
 > > 
-> >> Using the opposite perspective would also need translation in crtc
-> >> drivers... So far no driver uses sampling_edge.
-> >> 
-> >> I would prefer if we always use the meaning as documented by the flags.
-> >> 
-> >> I guess we would need to convert DRM_BUS_FLAG_PIXDATA_POSEDGE ->
-> >> DRM_BUS_FLAG_PIXDATA_NEGEDGE.
-> >> 
-> >> Linus Walleij, you added sampling edge, any thoughts?
+> > If one of the CPUs sharing the domain with the current one is woken up
+> > during cpu_power_down_ok() and the wakeup is an edge-triggered
+> > interrupt and the domain is turned off regardless, the wakeup may be
+> > missed entirely if I'm not mistaken.
 > > 
-> > I just thought it was generally useful to have triggering edge encoded
-> > into the bridge as it makes it clear that this edge is something
-> > that is a delayed version of the driving edge which is subject to
-> > clock skew caused by the speed of electrons in silicon and
-> > copper and slew rate caused by parasitic capacitance.
+> > It looks like there needs to be a way for the hardware to prevent a
+> > domain poweroff when there's a pending interrupt or I don't quite see
+> > how this can be handled correctly.
+> > 
+> > >> Sure enough, if the domain power off is already started and one of the CPUs
+> > >> in the domain is woken up then, too bad, it will suffer the latency (but in
+> > >> that case the hardware should be able to help somewhat), but otherwise CPU
+> > >> wakeup should prevent domain power off from being carried out.
+> > >
+> > > The CPU is not prevented from waking up, as we rely on the FW to deal with that.
+> > >
+> > > Even if the above computation turns out to wrongly suggest that the
+> > > cluster can be powered off, the FW shall together with the genpd
+> > > backend driver prevent it.
+> > 
+> > Fine, but then the solution depends on specific FW/HW behavior, so I'm
+> > not sure how generic it really is.  At least, that expectation should
+> > be clearly documented somewhere, preferably in code comments.
+> > 
+> > > To cover this case for PSCI, we also use a per cpu variable for the
+> > > CPU's power off state, as can be seen later in the series.
+> > 
+> > Oh great, but the generic part should be independent on the underlying
+> > implementation of the driver.  If it isn't, then it also is not
+> > generic.
+> > 
+> > > Hope this clarifies your concern, else tell and will to elaborate a bit more.
+> > 
+> > Not really.
+> > 
+> > There also is one more problem and that is the interaction between
+> > this code and the idle governor.
+> > 
+> > Namely, the idle governor may select a shallower state for some
+> > reason, for example due to an additional latency limit derived from
+> > CPU utilization (like in the menu governor), and how does the code in
+> > cpu_power_down_ok() know what state has been selected and how does it
+> > honor the selection made by the idle governor?
 > 
-> Ok, I read a bit up on the history of bridge timing, especially:
-> https://www.spinics.net/lists/dri-devel/msg155618.html
+> That's a good question and it maybe gives a path towards a solution.
 > 
-> IMHO, this got overengineered. For displays we do not need all that
-> setup/sample delay timing information, and much longer cables are in
-> use. So why is all that needed for bridges?
-> 
-> For Linus case, the THS8134(A/B) data sheet I found (revised March 2010)
-> clearly states:
-> Clock input. A rising edge on CLK latches RPr0-7, GY0-7, BPb0-7.
-> 
-> So we need to drive on negative edge, hence DRM_BUS_FLAG_PIXDATA_NEGEDGE
-> should be used, which makes the pl111 driver setting TIM2_IPC:
-> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0121d/index.h
-> tml
-> 
-> > DRM_BUS_FLAG_PIXDATA_POSEDGE is the right value for my use cases, but it
-> > doesn't match how the ADV7123 operates. Using DRM_BUS_FLAG_PIXDATA_NEGEDGE
-> > would match the hardware, but would break display for some modes,
-> > depending on the display clock frequency as the internal 8.5ns output
-> > delay applied to a falling clock edge would fall right into the 1.7ns
-> > setup + hold time window of the ADV7123 around the rising edge. I can't
-> > test this right now as I don't have local access to boards using the
-> > ADV7123, but from a quick calculation that ignores the PCB transmission
-> > delay modes with frequencies between 57MHz and 71MHz could break if the
-> > data was output on the falling edge of the clock.
-> 
-> If clocks vs. data signal are really that much off on R-Car DU, then
-> parallel displays must have the very same issue...
-> 
-> Are you sure that only the clock signal has an output delay? And that
-> this output delay is a fixed value, clock independent?
-> 
-> Typically, delays apply to all signals equally, and often are clock
-> frequency dependent...
-> 
-> Without really looking at the signals, I would not jump to conclusions
-> here! I am pretty sure that driving on negative edge works just as well.
+> AFAICS the genPD governor only selects the idle state parameter that
+> determines the idle state at, say, GenPD cpumask level it does not touch
+> the CPUidle decision, that works on a subset of idle states (at cpu
+> level).
 
-I've tested Linus' original patch and it broke display on R-Car, so, no, it 
-doesn't work :-)
+I've deferred responding to this as I wasn't quite sure if I followed you
+at that time, but I'm afraid I'm still not following you now. :-)
 
-The R-Car display engine delays the clock internally (in some cases that delay 
-is even configurable, and that's not uncommon in display controllers). We 
-really need all this information, and I believe we need it for panels too, not 
-just for bridges. The fact that we managed to get away without adding it to 
-panels is likely due to the large number of panels out there, which makes it 
-less likely that the same panel gets used by different systems in mainline 
-with different clock delays. I expect that some panel drivers report the wrong 
-clock edge to make things work on the board they were tested with, and I 
-expect we'll eventually need to add the same information for panels too.
+The idle governor has to take the total worst-case wakeup latency into
+account.  Not just from the logical CPU itself, but also from whatever
+state the SoC may end up in as a result of this particular logical CPU
+going idle, this way or another.
 
-So please don't remove this useful API, otherwise you'll break my board, and I 
-won't be happy.
+So for example, if your logical CPU has an idle state A that may trigger an
+idle state X at the cluster level (if the other logical CPUs happen to be in
+the right states and so on), then the worst-case exit latency for that
+is the one of state X.
 
--- 
-Regards,
+> That's my understanding, which can be wrong so please correct me
+> if that's the case because that's a bit confusing.
+> 
+> Let's imagine that we flattened out the list of idle states and feed
+> CPUidle with it (all of them - cpu, cluster, package, system - as it is
+> in the mainline _now_). Then the GenPD governor can run-through the
+> CPUidle selection and _demote_ the idle state if necessary since it
+> understands that some CPUs in the GenPD will wake up shortly and break
+> the target residency hyphothesis the CPUidle governor is expecting.
+> 
+> The whole idea about this series is improving CPUidle decision when
+> the target idle state is _shared_ among groups of cpus (again, please
+> do correct me if I am wrong).
+> 
+> It is obvious that a GenPD governor must only demote - never promote a
+> CPU idle state selection given that hierarchy implies more power
+> savings and higher target residencies required.
 
-Laurent Pinchart
+So I see a problem here, because the way patch 9 in this series is done,
+the genpd governor for CPUs has no idea what states have been selected by
+the idle governor, so how does it know how deep it can go with turning
+off domains?
+
+My point is that the selection made by the idle governor need not be
+based only on timers which is the only thing that the genpd governor
+seems to be looking at.  The genpd governor should rather look at what
+idle states have been selected for each CPU in the domain by the idle
+governor and work within the boundaries of those.
+
+Thanks,
+Rafael
