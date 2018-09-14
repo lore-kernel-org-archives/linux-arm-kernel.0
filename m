@@ -1,113 +1,120 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 14 Sep 2018 11:26:08 +0200
-Subject: [PATCH v8 04/26] PM / Domains: Add support for CPU devices to
- genpd
-In-Reply-To: <CAPDyKFpatx81aMrbDtaeNPH=FXBYPCHsog3i=a0VN5=Q8if0=Q@mail.gmail.com>
-References: <20180620172226.15012-1-ulf.hansson@linaro.org>
- <CAJZ5v0jah=aiYoV_b_p=-x+puO0sxeGRBCtJnQAD8xb8p1QGfg@mail.gmail.com>
- <CAPDyKFpatx81aMrbDtaeNPH=FXBYPCHsog3i=a0VN5=Q8if0=Q@mail.gmail.com>
-Message-ID: <3110675.RLi9TDTF77@aspire.rjw.lan>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 14 Sep 2018 12:34:47 +0300
+Subject: [PATCH v2 3/8] drm/bridge: simplify bridge timing info
+In-Reply-To: <20180912183222.25414-4-stefan@agner.ch>
+References: <20180912183222.25414-1-stefan@agner.ch>
+ <20180912183222.25414-4-stefan@agner.ch>
+Message-ID: <1573320.Q96Iu7qNKK@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, August 24, 2018 8:47:21 AM CEST Ulf Hansson wrote:
-> On 6 August 2018 at 11:36, Rafael J. Wysocki <rafael@kernel.org> wrote:
-> > On Fri, Aug 3, 2018 at 1:43 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> >> On 19 July 2018 at 12:25, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> >>> On Wednesday, June 20, 2018 7:22:04 PM CEST Ulf Hansson wrote:
-> >>>> To enable a device belonging to a CPU to be attached to a PM domain managed
-> >>>> by genpd, let's do a few changes to genpd as to make it convenient to
-> >>>> manage the specifics around CPUs.
-> >>>>
-> >>>> First, as to be able to quickly find out what CPUs that are attached to a
-> >>>> genpd, which typically becomes useful from a genpd governor as following
-> >>>> changes is about to show, let's add a cpumask 'cpus' to the struct
-> >>>> generic_pm_domain.
-> >>>>
-> >>>> At the point when a device that belongs to a CPU, is attached/detached to
-> >>>> its corresponding PM domain via genpd_add_device(), let's update the
-> >>>> cpumask in genpd->cpus. Moreover, propagate the update of the cpumask to
-> >>>> the master domains, which makes the genpd->cpus to contain a cpumask that
-> >>>> hierarchically reflect all CPUs for a genpd, including CPUs attached to
-> >>>> subdomains.
-> >>>>
-> >>>> Second, to unconditionally manage CPUs and the cpumask in genpd->cpus, is
-> >>>> unnecessary for cases when only non-CPU devices are parts of a genpd.
-> >>>> Let's avoid this by adding a new configuration bit, GENPD_FLAG_CPU_DOMAIN.
-> >>>> Clients must set the bit before they call pm_genpd_init(), as to instruct
-> >>>> genpd that it shall deal with CPUs and thus manage the cpumask in
-> >>>> genpd->cpus.
-> >>>>
-> >>>> Cc: Lina Iyer <ilina@codeaurora.org>
-> >>>> Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
-> >>>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> >>>> ---
-> >>>>  drivers/base/power/domain.c | 69 ++++++++++++++++++++++++++++++++++++-
-> >>>>  include/linux/pm_domain.h   |  3 ++
-> >>>>  2 files changed, 71 insertions(+), 1 deletion(-)
-> >>>>
-> >>>> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> >>>> index 21d298e1820b..6149ce0bfa7b 100644
-> >>>> --- a/drivers/base/power/domain.c
-> >>>> +++ b/drivers/base/power/domain.c
-> >>>> @@ -20,6 +20,7 @@
-> >>>>  #include <linux/sched.h>
-> >>>>  #include <linux/suspend.h>
-> >>>>  #include <linux/export.h>
-> >>>> +#include <linux/cpu.h>
-> >>>>
-> >>>>  #include "power.h"
-> >>>>
-> >>>> @@ -126,6 +127,7 @@ static const struct genpd_lock_ops genpd_spin_ops = {
-> >>>>  #define genpd_is_irq_safe(genpd)     (genpd->flags & GENPD_FLAG_IRQ_SAFE)
-> >>>>  #define genpd_is_always_on(genpd)    (genpd->flags & GENPD_FLAG_ALWAYS_ON)
-> >>>>  #define genpd_is_active_wakeup(genpd)        (genpd->flags & GENPD_FLAG_ACTIVE_WAKEUP)
-> >>>> +#define genpd_is_cpu_domain(genpd)   (genpd->flags & GENPD_FLAG_CPU_DOMAIN)
-> >>>>
-> >>>>  static inline bool irq_safe_dev_in_no_sleep_domain(struct device *dev,
-> >>>>               const struct generic_pm_domain *genpd)
-> >>>> @@ -1377,6 +1379,62 @@ static void genpd_free_dev_data(struct device *dev,
-> >>>>       dev_pm_put_subsys_data(dev);
-> >>>>  }
-> >>>>
-> >>>> +static void __genpd_update_cpumask(struct generic_pm_domain *genpd,
-> >>>> +                                int cpu, bool set, unsigned int depth)
-> >>>> +{
-> >>>> +     struct gpd_link *link;
-> >>>> +
-> >>>> +     if (!genpd_is_cpu_domain(genpd))
-> >>>> +             return;
-> >>>> +
-> >>>> +     list_for_each_entry(link, &genpd->slave_links, slave_node) {
-> >>>> +             struct generic_pm_domain *master = link->master;
-> >>>> +
-> >>>> +             genpd_lock_nested(master, depth + 1);
-> >>>> +             __genpd_update_cpumask(master, cpu, set, depth + 1);
-> >>>> +             genpd_unlock(master);
-> >>>> +     }
-> >>>> +
-> >>>> +     if (set)
-> >>>> +             cpumask_set_cpu(cpu, genpd->cpus);
-> >>>> +     else
-> >>>> +             cpumask_clear_cpu(cpu, genpd->cpus);
-> >>>> +}
-> >>>
-> >>> As noted elsewhere, there is a concern about the possible weight of this
-> >>> cpumask and I think that it would be good to explicitly put a limit on it.
-> >>
-> >> I have been digesting your comments on the series, but wonder if this
-> >> is still a relevant concern?
-> >
-> > Well, there are systems with very large cpumasks and it is sort of
-> > good to have that in mind when designing any code using them.
-> 
-> Right.
-> 
-> So, if I avoid allocating the cpumask for those genpd structures that
-> doesn't need it (those not having GENPD_FLAG_CPU_DOMAIN set), would
-> that be sufficient to deal with your concern?
+Hi Stefan,
 
-Yes, it would, if I understand you correctly.
+On Wednesday, 12 September 2018 21:32:17 EEST Stefan Agner wrote:
+> Bridges are typically connected to a parallel display signal with
+> pixel clock, sync signals and data lines. Parallel display signals
+> are also used in lower-end embedded display panels. For parallel
+> display panels we currently do not specify setup/hold times. From
+> discussions on the mailing list it seems not convincing that this
+> is currently really required for bridges either.
+> 
+> Remove setup/hold timings again to better align timing information
+> of displays and briges.
 
-Thanks,
-Rafael
+The setup and hold timings were the result of a long discussion with Linux 
+Walleij, who was confronted with a system that didn't work properly unless he 
+flipped the clock polarity. His initial patch contradicted the bridge 
+datasheet, and after investigating we found out that timings played a major 
+role.
+
+In a nutshell, given the setup and hold time requirements, the polarity on the 
+driving side depends on the pixel clock frequency. As the frequency increases, 
+when the half clock period reaches the setup time, you can't latch on the 
+opposite edge anymore or you will violate the setup time. The component 
+connected to the bridge thus needs to select a driving edge based on the 
+sampling edge of the bridge, on the bridge's setup time requirement, and on 
+the pixel clock frequency.
+
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  drivers/gpu/drm/bridge/dumb-vga-dac.c | 17 +++++------------
+>  include/drm/drm_bridge.h              | 14 --------------
+>  2 files changed, 5 insertions(+), 26 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/bridge/dumb-vga-dac.c
+> b/drivers/gpu/drm/bridge/dumb-vga-dac.c index d5aa0f931ef2..b2309ad228cf
+> 100644
+> --- a/drivers/gpu/drm/bridge/dumb-vga-dac.c
+> +++ b/drivers/gpu/drm/bridge/dumb-vga-dac.c
+> @@ -229,14 +229,14 @@ static int dumb_vga_remove(struct platform_device
+> *pdev) /*
+>   * We assume the ADV7123 DAC is the "default" for historical reasons
+>   * Information taken from the ADV7123 datasheet, revision D.
+> - * NOTE: the ADV7123EP seems to have other timings and need a new timings
+> - * set if used.
+>   */
+>  static const struct drm_bridge_timings default_dac_timings = {
+> -	/* Timing specifications, datasheet page 7 */
+> +	/*
+> +	 * From Timing diagram, datasheet page 7. The bridge samples
+> +	 * on pixel clocks positive edge, hence the display controller
+> +	 * should drive signals on the negative edge.
+> +	 */
+>  	.input_bus_flags = DRM_BUS_FLAG_PIXDATA_NEGEDGE,
+> -	.setup_time_ps = 500,
+> -	.hold_time_ps = 1500,
+>  };
+> 
+>  /*
+> @@ -246,10 +246,6 @@ static const struct drm_bridge_timings
+> default_dac_timings = { static const struct drm_bridge_timings
+> ti_ths8134_dac_timings = { /* From timing diagram, datasheet page 9 */
+>  	.input_bus_flags = DRM_BUS_FLAG_PIXDATA_NEGEDGE,
+> -	/* From datasheet, page 12 */
+> -	.setup_time_ps = 3000,
+> -	/* I guess this means latched input */
+> -	.hold_time_ps = 0,
+>  };
+> 
+>  /*
+> @@ -259,9 +255,6 @@ static const struct drm_bridge_timings
+> ti_ths8134_dac_timings = { static const struct drm_bridge_timings
+> ti_ths8135_dac_timings = { /* From timing diagram, datasheet page 14 */
+>  	.input_bus_flags = DRM_BUS_FLAG_PIXDATA_NEGEDGE,
+> -	/* From datasheet, page 16 */
+> -	.setup_time_ps = 2000,
+> -	.hold_time_ps = 500,
+>  };
+> 
+>  static const struct of_device_id dumb_vga_match[] = {
+> diff --git a/include/drm/drm_bridge.h b/include/drm/drm_bridge.h
+> index 45e90f4b46c3..1a1d08350eaf 100644
+> --- a/include/drm/drm_bridge.h
+> +++ b/include/drm/drm_bridge.h
+> @@ -251,20 +251,6 @@ struct drm_bridge_timings {
+>  	 * &drm_display_info->bus_flags.
+>  	 */
+>  	u32 input_bus_flags;
+> -	/**
+> -	 * @setup_time_ps:
+> -	 *
+> -	 * Defines the time in picoseconds the input data lines must be
+> -	 * stable before the clock edge.
+> -	 */
+> -	u32 setup_time_ps;
+> -	/**
+> -	 * @hold_time_ps:
+> -	 *
+> -	 * Defines the time in picoseconds taken for the bridge to sample the
+> -	 * input signal after the clock edge.
+> -	 */
+> -	u32 hold_time_ps;
+>  };
+> 
+>  /**
+
+
+-- 
+Regards,
+
+Laurent Pinchart
