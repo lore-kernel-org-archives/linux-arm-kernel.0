@@ -1,50 +1,117 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 14 Sep 2018 15:30:18 +0100
-Subject: [PATCH v7 0/6] Add non-strict mode support for iommu-dma
-Message-ID: <cover.1536935328.git.robin.murphy@arm.com>
+Date: Fri, 14 Sep 2018 15:30:20 +0100
+Subject: [PATCH v7 2/6] iommu/dma: Add support for non-strict mode
+In-Reply-To: <cover.1536935328.git.robin.murphy@arm.com>
+References: <cover.1536935328.git.robin.murphy@arm.com>
+Message-ID: <0a891cec4bb164f8cf2f57c753791a7d1f5f1d81.1536935328.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+From: Zhen Lei <thunder.leizhen@huawei.com>
 
-Since we'd like to get this polished up and merged and Leizhen has other
-commitments, here's v7 of the previous series[1] wherein I address all
-my own feedback :) This is a quick tweak of the v6 I sent yesterday
-since I figured out slightly too late a much neater way of setting the
-attribute at the appropriate time.
+1. Save the related domain pointer in struct iommu_dma_cookie, make iovad
+   capable call domain->ops->flush_iotlb_all to flush TLB.
+2. During the iommu domain initialization phase, base on domain->non_strict
+   field to check whether non-strict mode is supported or not. If so, call
+   init_iova_flush_queue to register iovad->flush_cb callback.
+3. All unmap(contains iova-free) APIs will finally invoke __iommu_dma_unmap
+   -->iommu_dma_free_iova. If the domain is non-strict, call queue_iova to
+   put off iova freeing, and omit iommu_tlb_sync operation.
 
-The principal change is that I've inverted things slightly such that
-it's now a generic domain attribute controlled by iommu-dma given the
-necessary support from individual IOMMU drivers. That way we can easily
-enable other drivers straight away, as I've done for SMMUv2 here (which
-also allowed me to give it a quick test with MMU-401s on a Juno board).
-Otherwise it's really just cosmetic cleanup and rebasing onto Will's
-pending SMMU queue.
+Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+[rm: convert raw boolean to domain attribute]
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/iommu/dma-iommu.c | 29 ++++++++++++++++++++++++++++-
+ include/linux/iommu.h     |  1 +
+ 2 files changed, 29 insertions(+), 1 deletion(-)
 
-Robin.
-
-[1] https://www.mail-archive.com/iommu at lists.linux-foundation.org/msg25150.html
-
-
-Robin Murphy (1):
-  iommu/arm-smmu: Support non-strict mode
-
-Zhen Lei (5):
-  iommu/arm-smmu-v3: Implement flush_iotlb_all hook
-  iommu/dma: Add support for non-strict mode
-  iommu/io-pgtable-arm: Add support for non-strict mode
-  iommu: Add bootup option "iommu.non_strict"
-  iommu/arm-smmu-v3: Add support for non-strict mode
-
- .../admin-guide/kernel-parameters.txt         | 13 ++++++
- drivers/iommu/arm-smmu-v3.c                   | 40 +++++++++++++++----
- drivers/iommu/arm-smmu.c                      | 40 +++++++++++++++----
- drivers/iommu/dma-iommu.c                     | 29 +++++++++++++-
- drivers/iommu/io-pgtable-arm.c                |  9 +++--
- drivers/iommu/io-pgtable.h                    |  5 +++
- drivers/iommu/iommu.c                         | 26 ++++++++++++
- include/linux/iommu.h                         |  1 +
- 8 files changed, 145 insertions(+), 18 deletions(-)
-
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index 511ff9a1d6d9..092e6926dc3c 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -55,6 +55,9 @@ struct iommu_dma_cookie {
+ 	};
+ 	struct list_head		msi_page_list;
+ 	spinlock_t			msi_lock;
++
++	/* Only be assigned in non-strict mode, otherwise it's NULL */
++	struct iommu_domain		*domain;
+ };
+ 
+ static inline size_t cookie_msi_granule(struct iommu_dma_cookie *cookie)
+@@ -257,6 +260,17 @@ static int iova_reserve_iommu_regions(struct device *dev,
+ 	return ret;
+ }
+ 
++static void iommu_dma_flush_iotlb_all(struct iova_domain *iovad)
++{
++	struct iommu_dma_cookie *cookie;
++	struct iommu_domain *domain;
++
++	cookie = container_of(iovad, struct iommu_dma_cookie, iovad);
++	domain = cookie->domain;
++
++	domain->ops->flush_iotlb_all(domain);
++}
++
+ /**
+  * iommu_dma_init_domain - Initialise a DMA mapping domain
+  * @domain: IOMMU domain previously prepared by iommu_get_dma_cookie()
+@@ -275,6 +289,7 @@ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
+ 	struct iommu_dma_cookie *cookie = domain->iova_cookie;
+ 	struct iova_domain *iovad = &cookie->iovad;
+ 	unsigned long order, base_pfn, end_pfn;
++	int attr = 1;
+ 
+ 	if (!cookie || cookie->type != IOMMU_DMA_IOVA_COOKIE)
+ 		return -EINVAL;
+@@ -308,6 +323,13 @@ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
+ 	}
+ 
+ 	init_iova_domain(iovad, 1UL << order, base_pfn);
++
++	if (!iommu_domain_get_attr(domain, DOMAIN_ATTR_DMA_USE_FLUSH_QUEUE,
++			&attr) && attr) {
++		cookie->domain = domain;
++		init_iova_flush_queue(iovad, iommu_dma_flush_iotlb_all, NULL);
++	}
++
+ 	if (!dev)
+ 		return 0;
+ 
+@@ -393,6 +415,9 @@ static void iommu_dma_free_iova(struct iommu_dma_cookie *cookie,
+ 	/* The MSI case is only ever cleaning up its most recent allocation */
+ 	if (cookie->type == IOMMU_DMA_MSI_COOKIE)
+ 		cookie->msi_iova -= size;
++	else if (cookie->domain)	/* non-strict mode */
++		queue_iova(iovad, iova_pfn(iovad, iova),
++				size >> iova_shift(iovad), 0);
+ 	else
+ 		free_iova_fast(iovad, iova_pfn(iovad, iova),
+ 				size >> iova_shift(iovad));
+@@ -408,7 +433,9 @@ static void __iommu_dma_unmap(struct iommu_domain *domain, dma_addr_t dma_addr,
+ 	dma_addr -= iova_off;
+ 	size = iova_align(iovad, size + iova_off);
+ 
+-	WARN_ON(iommu_unmap(domain, dma_addr, size) != size);
++	WARN_ON(iommu_unmap_fast(domain, dma_addr, size) != size);
++	if (!cookie->domain)
++		iommu_tlb_sync(domain);
+ 	iommu_dma_free_iova(cookie, dma_addr, size);
+ }
+ 
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 87994c265bf5..decabe8e8dbe 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -124,6 +124,7 @@ enum iommu_attr {
+ 	DOMAIN_ATTR_FSL_PAMU_ENABLE,
+ 	DOMAIN_ATTR_FSL_PAMUV1,
+ 	DOMAIN_ATTR_NESTING,	/* two stages of translation */
++	DOMAIN_ATTR_DMA_USE_FLUSH_QUEUE,
+ 	DOMAIN_ATTR_MAX,
+ };
+ 
 -- 
 2.19.0.dirty
