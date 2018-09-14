@@ -1,92 +1,54 @@
-From: dvyukov@google.com (Dmitry Vyukov)
-Date: Fri, 14 Sep 2018 07:11:09 +0200
-Subject: [PATCH v6 15/18] khwasan,
- arm64: add brk handler for inline instrumentation
-In-Reply-To: <CAKwvOdns=3bktpXLEpo6o0J8OQPym6YE+x6Dvs_kYSBsuJKtSw@mail.gmail.com>
-References: <cover.1535462971.git.andreyknvl@google.com>
- <f5e73b5ead3355932ad8b5fc96b141c3f5b8c16c.1535462971.git.andreyknvl@google.com>
- <CACT4Y+aEwYiaVN--RH_0VBh0wbCcrf-Ndz+_eOaBNi6nKxrfQA@mail.gmail.com>
- <CAG48ez2oT1dtDcH8SfPLnoX5F8d6Pd=M-eOKHhYJ83EuL_j6wQ@mail.gmail.com>
- <CACT4Y+avu_68GoQcc32zpcOpAu-Pw7m71VmuKtEkOw=vKgxi7w@mail.gmail.com>
- <CAKwvOdns=3bktpXLEpo6o0J8OQPym6YE+x6Dvs_kYSBsuJKtSw@mail.gmail.com>
-Message-ID: <CACT4Y+ahqiUrcfqfLjy1CKsG=NYMLZNOtQW6ofRYXh6ZHjpkrw@mail.gmail.com>
+From: clg@kaod.org (=?UTF-8?Q?C=c3=a9dric_Le_Goater?=)
+Date: Fri, 14 Sep 2018 07:38:37 +0200
+Subject: [PATCH i2c-next v6] i2c: aspeed: Handle master/slave combined irq
+ events properly
+In-Reply-To: <b4da2b68-e6e3-e068-cd6e-9e638aa67889@roeck-us.net>
+References: <20180911233302.GA18799@roeck-us.net>
+ <5698ca34-14c9-8d05-c4e6-5acf85ff9d14@linux.intel.com>
+ <20180912013449.GA12612@roeck-us.net>
+ <7fd98646-fb5a-be4d-ce37-84b74e0fa8b3@linux.intel.com>
+ <20180912195844.GA6893@roeck-us.net>
+ <da7f4691-7428-3114-32bb-e0171f6c7228@linux.intel.com>
+ <20180912203059.GA18201@roeck-us.net>
+ <fb185839-3ae0-01dc-09e8-f22db55ecb04@kaod.org>
+ <3f86e75f-1502-eae8-0633-d087937111c8@roeck-us.net>
+ <f47b3050-3abd-caa4-cc71-4b13ef60e2c0@kaod.org>
+ <20180913155703.GA22605@roeck-us.net>
+ <2c481986-7ee0-4887-5c9b-64e2cd9d8c04@kaod.org>
+ <b4da2b68-e6e3-e068-cd6e-9e638aa67889@roeck-us.net>
+Message-ID: <ccbf7059-77fd-44e8-daee-516582814cb3@kaod.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2018 at 8:09 PM, 'Nick Desaulniers' via kasan-dev
-<kasan-dev@googlegroups.com> wrote:
-> On Thu, Sep 13, 2018 at 1:37 AM Dmitry Vyukov <dvyukov@google.com> wrote:
+>>> That seems to suggest that none of the status bits auto-clears, and that
+>>> the above code clearing intr_status should be removed entirely.
+>>> Am I missing something ?
 >>
->> On Wed, Sep 12, 2018 at 7:39 PM, Jann Horn <jannh@google.com> wrote:
->> > On Wed, Sep 12, 2018 at 7:16 PM Dmitry Vyukov <dvyukov@google.com> wrote:
->> >> On Wed, Aug 29, 2018 at 1:35 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
->> > [...]
->> >> > +static int khwasan_handler(struct pt_regs *regs, unsigned int esr)
->> >> > +{
->> >> > +       bool recover = esr & KHWASAN_ESR_RECOVER;
->> >> > +       bool write = esr & KHWASAN_ESR_WRITE;
->> >> > +       size_t size = KHWASAN_ESR_SIZE(esr);
->> >> > +       u64 addr = regs->regs[0];
->> >> > +       u64 pc = regs->pc;
->> >> > +
->> >> > +       if (user_mode(regs))
->> >> > +               return DBG_HOOK_ERROR;
->> >> > +
->> >> > +       kasan_report(addr, size, write, pc);
->> >> > +
->> >> > +       /*
->> >> > +        * The instrumentation allows to control whether we can proceed after
->> >> > +        * a crash was detected. This is done by passing the -recover flag to
->> >> > +        * the compiler. Disabling recovery allows to generate more compact
->> >> > +        * code.
->> >> > +        *
->> >> > +        * Unfortunately disabling recovery doesn't work for the kernel right
->> >> > +        * now. KHWASAN reporting is disabled in some contexts (for example when
->> >> > +        * the allocator accesses slab object metadata; same is true for KASAN;
->> >> > +        * this is controlled by current->kasan_depth). All these accesses are
->> >> > +        * detected by the tool, even though the reports for them are not
->> >> > +        * printed.
->> >> > +        *
->> >> > +        * This is something that might be fixed at some point in the future.
->> >> > +        */
->> >> > +       if (!recover)
->> >> > +               die("Oops - KHWASAN", regs, 0);
->> >>
->> >> Why die and not panic? Die seems to be much less used function, and it
->> >> calls panic anyway, and we call panic in kasan_report if panic_on_warn
->> >> is set.
->> >
->> > die() is vaguely equivalent to BUG(); die() and BUG() normally only
->> > terminate the current process, which may or may not leave the system
->> > somewhat usable, while panic() always brings down the whole system.
->> > AFAIK panic() shouldn't be used unless you're in some very low-level
->> > code where you know that trying to just kill the current process can't
->> > work and the entire system is broken beyond repair.
->> >
->> > If KASAN traps on some random memory access, there's a good chance
->> > that just killing the current process will allow at least parts of the
->> > system to continue. I'm not sure whether BUG() or die() is more
->> > appropriate here, but I think it definitely should not be a panic().
+>> You are right. I just pushed another version of the previous patch with this
+>> new hunk :
+>>
+>> @@ -188,7 +200,6 @@ static void aspeed_i2c_bus_handle_cmd(As
+>> ? {
+>> ????? bus->cmd &= ~0xFFFF;
+>> ????? bus->cmd |= value & 0xFFFF;
+>> -??? bus->intr_status = 0;
+>> ? ????? if (bus->cmd & I2CD_M_START_CMD) {
+>> ????????? uint8_t state = aspeed_i2c_get_state(bus) & I2CD_MACTIVE ?
 >>
 >>
->> Nick, do you know if die() will be enough to catch problems on Android
->> phones? panic_on_warn would turn this into panic, but I guess one does
->> not want panic_on_warn on a canary phone.
->
-> die() has arch specific implementations, so looking at:
->
-> arch/arm64/kernel/traps.c:196#die
->
-> it looks like panic is invoked if in_interrupt() or panic_on_oops(),
-> which is a configure option.  So maybe the config for KHWASAN should
-> also enable that? Otherwise seems easy to forget.  But maybe that
-> should remain configurable separately?
->
-> Looking at the kernel configs for the Pixel 2, it does seem like
-> CONFIG_PANIC_ON_OOPS=y is already enabled.
-> https://android.googlesource.com/kernel/msm/+/android-msm-wahoo-4.4-pie/arch/arm64/configs/wahoo_defconfig#746
+>> The QEMU palmetto and witherspoon machines seem to behave fine. Can you give
+>> it a try ?
+>>
+> 
+> Works fine for me for all affected qemu platforms.
+> 
+> How do you want to proceed with the qemu patches ? I attached my patches
+> for reference. Maybe you can add them to your tree if they are ok and submit
+> the entire series together to the qemu mailing list ?
 
-Then I think we are good here.
+yes. They are pushed in my aspeed-3.1 branch. I will send the series 
+on the list.
 
-> Specifically to catch problems on Android, our internal debug builds
-> can report on panics, but not oops, IIUC.
+Thanks,
+
+C. 
