@@ -1,39 +1,28 @@
-From: yannick.fertre@st.com (Yannick FERTRE)
-Date: Fri, 14 Sep 2018 12:39:58 +0000
-Subject: [PATCH] ARM: multi_v7_defconfig: enable STM32 MIPI DSI
-In-Reply-To: <1534776782-4941-1-git-send-email-yannick.fertre@st.com>
-References: <1534776782-4941-1-git-send-email-yannick.fertre@st.com>
-Message-ID: <e996cebb-f268-b144-4acb-af58e81eac4a@st.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 14 Sep 2018 14:48:18 +0200
+Subject: [PATCH 09/10] ARM: shmobile: r8a7744: Basic SoC support
+In-Reply-To: <1536660771-32278-10-git-send-email-biju.das@bp.renesas.com>
+References: <1536660771-32278-1-git-send-email-biju.das@bp.renesas.com>
+ <1536660771-32278-10-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <CAMuHMdXTnV0rWRUGjJ9bf6GZ67bR0VvuGhgEOZnJQ=vWb6pLNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Gentle ping
-
-
-On 08/20/2018 04:53 PM, Yannick Fertr? wrote:
-> Enable STMicroelectronics specific extensions for Synopsis MIPI DSI
-> as loadable module.
+On Tue, Sep 11, 2018 at 12:19 PM Biju Das <biju.das@bp.renesas.com> wrote:
+> Add minimal support for the RZ/G1N (R8A7744) SoC.
 >
-> Signed-off-by: Yannick Fertr? <yannick.fertre@st.com>
-> ---
->   arch/arm/configs/multi_v7_defconfig | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 7e1c543..4c88cba 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -645,6 +645,7 @@ CONFIG_DRM_RCAR_LVDS=y
->   CONFIG_DRM_SUN4I=m
->   CONFIG_DRM_FSL_DCU=m
->   CONFIG_DRM_TEGRA=y
-> +CONFIG_DRM_STM_DSI=m
->   CONFIG_DRM_PANEL_SAMSUNG_LD9040=m
->   CONFIG_DRM_PANEL_SAMSUNG_S6E63J0X03=m
->   CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=m
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Gr{oetje,eeting}s,
+
+                        Geert
 
 -- 
-Yannick Fertr? | TINA: 166 7152 | Tel: +33 244027152 | Mobile: +33 620600270
-Microcontrollers and Digital ICs Group | Microcontrolleurs Division
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
