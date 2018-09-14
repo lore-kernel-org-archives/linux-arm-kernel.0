@@ -1,44 +1,32 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 14 Sep 2018 06:37:04 -0700
-Subject: [PATCH 1/2] watchdog: sama5d4: fix timeout-sec usage
-In-Reply-To: <20180914101339.7382-2-romain.izard.pro@gmail.com>
-References: <20180914101339.7382-1-romain.izard.pro@gmail.com>
- <20180914101339.7382-2-romain.izard.pro@gmail.com>
-Message-ID: <0953b2f9-83b1-b57b-2a26-fa0527c8a548@roeck-us.net>
+From: phil@raspberrypi.org (Phil Elwell)
+Date: Fri, 14 Sep 2018 14:22:55 +0100
+Subject: [PATCH v2 4/4] ARM: dts: bcm283x: Correct mailbox register sizes
+In-Reply-To: <1536931375-48769-1-git-send-email-phil@raspberrypi.org>
+References: <1536931375-48769-1-git-send-email-phil@raspberrypi.org>
+Message-ID: <1536931375-48769-5-git-send-email-phil@raspberrypi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/14/2018 03:13 AM, Romain Izard wrote:
-> When using watchdog_init_timeout to update the default timeout value,
-> an error means that there is no "timeout-sec" in the relevant device
-> tree node.
-> 
-> This should not prevent binding of the driver to the device.
-> 
-> Fixes: 976932e40036 ("watchdog: sama5d4: make use of timeout-secs provided in devicetree")
-> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+The size field in a Device Tree "reg" property is encoded in bytes, not
+words.
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Signed-off-by: Phil Elwell <phil@raspberrypi.org>
+---
+ arch/arm/boot/dts/bcm2835-rpi.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> ---
->   drivers/watchdog/sama5d4_wdt.c | 6 +-----
->   1 file changed, 1 insertion(+), 5 deletions(-)
-> 
-> diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
-> index 255169916dbb..1e93c1b0e3cf 100644
-> --- a/drivers/watchdog/sama5d4_wdt.c
-> +++ b/drivers/watchdog/sama5d4_wdt.c
-> @@ -247,11 +247,7 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
->   		}
->   	}
->   
-> -	ret = watchdog_init_timeout(wdd, wdt_timeout, &pdev->dev);
-> -	if (ret) {
-> -		dev_err(&pdev->dev, "unable to set timeout value\n");
-> -		return ret;
-> -	}
-> +	watchdog_init_timeout(wdd, wdt_timeout, &pdev->dev);
->   
->   	timeout = WDT_SEC2TICKS(wdd->timeout);
->   
-> 
+diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+index 215d8cc..29f970f 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
++++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+@@ -32,7 +32,7 @@
+ 
+ 		vchiq: mailbox at 7e00b840 {
+ 			compatible = "brcm,bcm2835-vchiq";
+-			reg = <0x7e00b840 0xf>;
++			reg = <0x7e00b840 0x3c>;
+ 			interrupts = <0 2>;
+ 		};
+ 	};
+-- 
+2.7.4
