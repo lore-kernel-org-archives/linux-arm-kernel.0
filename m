@@ -1,81 +1,44 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 14 Sep 2018 19:55:12 +0200
-Subject: [PATCH v3 0/4] Add 96Boards Rock960 CE board support
-In-Reply-To: <a40ed76f22fd43f68af07d9bb56a0ff38171eef9.camel@collabora.com>
-References: <20180913180545.29756-1-manivannan.sadhasivam@linaro.org>
- <a40ed76f22fd43f68af07d9bb56a0ff38171eef9.camel@collabora.com>
-Message-ID: <3932568.1d4PiNsIum@phil>
+From: phil@raspberrypi.org (Phil Elwell)
+Date: Fri, 14 Sep 2018 19:12:06 +0100
+Subject: [PATCH v2 1/4] staging/vc04_services: Use correct cache line size
+In-Reply-To: <c4807226-6738-d9da-6f08-4b0a782b9cae@gmail.com>
+References: <1536931375-48769-1-git-send-email-phil@raspberrypi.org>
+ <1536931375-48769-2-git-send-email-phil@raspberrypi.org>
+ <c4807226-6738-d9da-6f08-4b0a782b9cae@gmail.com>
+Message-ID: <6097c969-4290-bb92-3569-72e89561490c@raspberrypi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 14. September 2018, 19:42:51 CEST schrieb Ezequiel Garcia:
-> On Thu, 2018-09-13 at 23:35 +0530, Manivannan Sadhasivam wrote:
-> > This patchset adds 96Boards Rock960 CE board support. Rock960 CE
-> > (Consumer Edition) board is one of the member of 96Boards Consumer
-> > Edition and AI platform and is manufactured by Vamrs Limited. Most of
-> > the board configuration is shared with the Ficus board manufactured by
-> > vamrs, which is an Enterprise 96Board.
-> > 
-> > For the sake of avoiding code duplication, a common rock960.dtsi file
-> > with common DT nodes for both boards and separate board specific DTS
-> > files has been added.
-> > 
-> > To be specific, below are some of the key differences between both
-> > boards:
-> > 
-> > 1. Different host enable GPIO for USB
-> > 2. Different power and reset GPIO for PCI-E
-> > 3. No Ethernet port on Rock960
-> > 
-> > While adding the board support, SD card Chip detection support is also
-> > added to the common dtsi file, shared by both boards.
-> > 
-> > This series has been tested on Rock960 CE v1.2 board.
-> > 
-> > Thanks,
-> > Mani
-> > 
-> > Changes in v3:
-> > 
-> > * Moved usb and pcie nodes to common dtsi and kept only the properties
-> >   which differ in board specific dts.
-> > * Updated the common dtsi commit description.
-> > 
-> > Changes in v2:
-> > 
-> > * Changed the board compatible to "vamrs,rock960"
-> > 
-> > Manivannan Sadhasivam (4):
-> >   arm64: dts: rockchip: Split out common nodes for Rock960 based boards
-> >   dt-bindings: arm: rockchip: Add binding for Rock960 board
-> >   arm64: boot: dts: rockchip: Add support for Rock960 board
-> >   arm64: dts: rockchip: Enable SD card detection for Rock960 boards
-> > 
-> >  .../devicetree/bindings/arm/rockchip.txt      |   4 +
-> >  arch/arm64/boot/dts/rockchip/Makefile         |   1 +
-> >  arch/arm64/boot/dts/rockchip/rk3399-ficus.dts | 524 +----------------
-> >  .../boot/dts/rockchip/rk3399-rock960.dts      |  52 ++
-> >  .../boot/dts/rockchip/rk3399-rock960.dtsi     | 542 ++++++++++++++++++
-> >  5 files changed, 604 insertions(+), 519 deletions(-)
-> >  create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-rock960.dts
-> >  create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
-> > 
+On 14/09/2018 18:03, Florian Fainelli wrote:
+> On 09/14/2018 06:22 AM, Phil Elwell wrote:
+>> Use the compatible string in the DTB to select the correct cache line
+>> size for the SoC - 32 for BCM2835, and 64 for BCM2836 and BCM2837.
+>>
+>> Signed-off-by: Phil Elwell <phil@raspberrypi.org>
+>> ---
 > 
-> Looks pretty good!
+> [snip]
 > 
-> When applying this series, I noticed that it conflicts with
+>> @@ -170,6 +170,14 @@ static struct device *vchiq_dev;
+>>   static DEFINE_SPINLOCK(msg_queue_spinlock);
+>>   static struct platform_device *bcm2835_camera;
+>>   
+>> +static struct vchiq_drvdata bcm2835_drvdata = {
+>> +	.cache_line_size = 32,
+>> +};
+>> +
+>> +static struct vchiq_drvdata bcm2836_drvdata = {
+>> +	.cache_line_size = 64,
+>> +};
 > 
-> commit 8bb878cf20ae10809c36db96993bfce7026d062b
-> Author: Levin Du <djw@t-chip.com.cn>
-> Date:   Mon Jul 30 10:12:01 2018 +0800
-> 
->     arm64: dts: rockchip: add support for ROC-RK3399-PC board
-> 
-> resolution is trivial, but you might want to rebase and resend,
-> to make Heiko's life easier.
+> Those two structures could probably be marked const. Other than that,
+> the approach definitively looks good to me.
 
-nah, that's ok as it is ;-)
-Such a Makefile conflict I can fix up myself.
+The mutability is intentional - the structure pointer to the firmware is also
+stored there. This isn't the only piece of mutable static data in a driver
+that will only have a single instance, so allocating and initialising a
+per-instance structure seems needlessly complicated.
 
-As it looks pretty good, I'd like to just give Rob a chance
-to look at the added binding before applying.
+Thanks for the feedback.
+
+Phil
