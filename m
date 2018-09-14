@@ -1,39 +1,38 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 14 Sep 2018 17:57:06 +0200
-Subject: [RFC PATCH 3/3] dma-mapping: clear dma_parms on teardown, too
-In-Reply-To: <874f7cd9-ac51-5968-de40-14a0addf9c96@arm.com>
-References: <20180913151716.6333-1-wsa+renesas@sang-engineering.com>
- <20180913151716.6333-4-wsa+renesas@sang-engineering.com>
- <874f7cd9-ac51-5968-de40-14a0addf9c96@arm.com>
-Message-ID: <20180914155706.GA906@kunai>
+From: wsa+renesas@sang-engineering.com (Wolfram Sang)
+Date: Fri, 14 Sep 2018 18:11:05 +0200
+Subject: [PATCH] ARM: dma-mapping: update comment about handling dma_ops when
+ detaching from IOMMU
+Message-ID: <20180914161105.1438-1-wsa+renesas@sang-engineering.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2018 at 02:23:51PM +0100, Robin Murphy wrote:
-> On 13/09/18 16:17, Wolfram Sang wrote:
-> > While sanitizig the pointer for dma_ops on teardown, do the same for
-> > dma_parms, too. Rename the function to have a more generic name.
-> 
-> Upon closer inspection, it looks like there are some cases (at least PCI and
-> MFD) where dma_parms is installed by the parent/bus at device creation, and
-> therefore remains valid and *would* be expected to persist across the child
-> device's driver unbinding and rebinding - seems this is more complex than I
-> first thought, sorry.
+Update the comment because we don't set the pointer to NULL anymore.
+Also use the correct pointer name 'dma_ops' instead of 'dma_map_ops'.
 
-No problem. I am thankful I understand more details. So, the life cycle
-of dma_parms is truly that of the device. Which means that the drivers
-using devm_kzalloc in their probe, should ideally clear the pointer on
-unbind. Otherwise, it is not possible to say if the non-NULL dma_parms
-is intended or dangling. Which makes my initial dmam_set_dma_parms()
-approach look not too bad, I'd think?
+Fixes: 1874619a7df4 ("ARM: dma-mapping: Set proper DMA ops in arm_iommu_detach_device()")
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
 
-However, I don't want to push hard with this one. If you think this is
-too academic, I'll just leave it for now...
+Changes from RFC:
+	* split out from bigger series and sent seperately to alkml
+	* added Geert's tag (thanks!)
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180914/0e62acbc/attachment.sig>
+ arch/arm/mm/dma-mapping.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 66566472c153..e3b04786838f 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -2287,7 +2287,7 @@ EXPORT_SYMBOL_GPL(arm_iommu_attach_device);
+  * @dev: valid struct device pointer
+  *
+  * Detaches the provided device from a previously attached map.
+- * This voids the dma operations (dma_map_ops pointer)
++ * This overwrites the dma_ops pointer with appropriate non-IOMMU ops.
+  */
+ void arm_iommu_detach_device(struct device *dev)
+ {
+-- 
+2.18.0
