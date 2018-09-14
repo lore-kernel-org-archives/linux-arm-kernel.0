@@ -1,100 +1,113 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 14 Sep 2018 12:55:21 +0300
+Date: Fri, 14 Sep 2018 12:57:45 +0300
 Subject: [PATCH 1/6] drm/bridge: use bus flags in bridge timings
-In-Reply-To: <3c048938d12a070c03f0cbdbc89c86e8@agner.ch>
+In-Reply-To: <2015108.bT6A7b8iLH@avalon>
 References: <20180905052113.21262-1-stefan@agner.ch>
- <CACRpkdaUuWUHZgT0b64hMNZm3oy=7rece3H0p5VVe4d8jpFRaw@mail.gmail.com>
- <3c048938d12a070c03f0cbdbc89c86e8@agner.ch>
-Message-ID: <2058139.n7KhRLb94F@avalon>
+ <b1cb586397a4cd444c33dd83d72fa544@agner.ch> <2015108.bT6A7b8iLH@avalon>
+Message-ID: <4320623.81Q3F1DtM1@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
-
-On Friday, 7 September 2018 21:25:40 EEST Stefan Agner wrote:
-> On 07.09.2018 00:10, Linus Walleij wrote:
-> > On Thu, Sep 6, 2018 at 10:25 PM Stefan Agner <stefan@agner.ch> wrote:
-> >> Ok, I read a bit up on the history of bridge timing, especially:
-> >> https://www.spinics.net/lists/dri-devel/msg155618.html
-> >> 
-> >> IMHO, this got overengineered. For displays we do not need all that
-> >> setup/sample delay timing information, and much longer cables are in
-> >> use. So why is all that needed for bridges?
+On Friday, 14 September 2018 12:49:40 EEST Laurent Pinchart wrote:
+> Hi Stefan,
+> 
+> On Thursday, 6 September 2018 23:25:56 EEST Stefan Agner wrote:
+> > On 06.09.2018 04:07, Linus Walleij wrote:
+> > > On Wed, Sep 5, 2018 at 8:32 PM Stefan Agner <stefan@agner.ch> wrote:
+> > >> On 05.09.2018 00:44, Laurent Pinchart wrote:
+> > >> 
+> > >> Good point! I actually really don't like that we use the same flags
+> > >> here
+> > >> but from a different perspective. Especially since the flags defines
+> > >> document things differently:
+> > >> 
+> > >> /* drive data on pos. edge */
+> > >> #define DRM_BUS_FLAG_PIXDATA_POSEDGE    (1<<2)
+> > >> /* drive data on neg. edge */
+> > >> #define DRM_BUS_FLAG_PIXDATA_NEGEDGE    (1<<3)
+> > > 
+> > > Maybe a stupid comment from my side, but can't we just change the
+> > > documentation to match the usecases?
+> > > 
+> > > /* Trigger pixel data latch on positive edge */
+> > > #define DRM_BUS_FLAG_PIXDATA_POSEDGE    (1<<2)
+> > > 
+> > >> Using the opposite perspective would also need translation in crtc
+> > >> drivers... So far no driver uses sampling_edge.
+> > >> 
+> > >> I would prefer if we always use the meaning as documented by the flags.
+> > >> 
+> > >> I guess we would need to convert DRM_BUS_FLAG_PIXDATA_POSEDGE ->
+> > >> DRM_BUS_FLAG_PIXDATA_NEGEDGE.
+> > >> 
+> > >> Linus Walleij, you added sampling edge, any thoughts?
+> > > 
+> > > I just thought it was generally useful to have triggering edge encoded
+> > > into the bridge as it makes it clear that this edge is something
+> > > that is a delayed version of the driving edge which is subject to
+> > > clock skew caused by the speed of electrons in silicon and
+> > > copper and slew rate caused by parasitic capacitance.
 > > 
-> > I also avoided the overhead of creating this abstraction initially.
+> > Ok, I read a bit up on the history of bridge timing, especially:
+> > https://www.spinics.net/lists/dri-devel/msg155618.html
 > > 
-> > But after doing it I have this Stockholm syndrome that I start
-> > liking what Laurent told me to do.
+> > IMHO, this got overengineered. For displays we do not need all that
+> > setup/sample delay timing information, and much longer cables are in
+> > use. So why is all that needed for bridges?
 > > 
-> >> For Linus case, the THS8134(A/B) data sheet I found (revised March 2010)
-> >> clearly states:
-> >> Clock input. A rising edge on CLK latches RPr0-7, GY0-7, BPb0-7.
-> >> 
-> >> So we need to drive on negative edge, hence DRM_BUS_FLAG_PIXDATA_NEGEDGE
-> >> should be used, which makes the pl111 driver setting TIM2_IPC:
-> >> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0121d/inde
-> >> x.html
+> > For Linus case, the THS8134(A/B) data sheet I found (revised March 2010)
+> > clearly states:
+> > Clock input. A rising edge on CLK latches RPr0-7, GY0-7, BPb0-7.
 > > 
-> > That is easy to say, but if I just set that up in code, even with a good
-> > comment it is hard for the next reader to understand what is going
-> > on. The central question will be, why does PL111 need to do this
-> > but not R-Car though they are using the same bridge?
-> 
-> That is something I have experienced before. Depending on drive
-> strength, and I guess sampling delay etc, it might sample just late
-> enough that signals are stable and no issues are really visible on the
-> screen. In those cases different cabling, changes in drive strength, or
-> even production variations might suddenly show artefacts though... My
-> point being, just because it supposedly works, does not mean that it is
-> right.
-> 
-> I did introduce the bus flags a while ago:
-> https://patchwork.kernel.org/patch/8254801/
-> https://patchwork.kernel.org/patch/8254821/
-> 
-> And then had to debug quite some controller and display issues around
-> pixel clock polarity:
-> https://patchwork.kernel.org/patch/8117181/
-> https://patchwork.kernel.org/patch/9465485/
-> 
-> E.g. in that last case, the pixel clock polarity flags were interpreted
-> wrong on both controller and display side. Hence this worked fine for
-> the case already upstream, but it did not work in my case...
-> 
-> In the end, best thing is to look on the bus. Parallel display signals
-> are still rather slow, and usually rather easy to scope.
-> 
-> PL111 needs to do this because its standard setting is driving on rising
-> edge. However, most displays as well as that bridge sample data on
-> rising edge.
-> 
-> I guess R-Car DU drives on negative edge by default, but can't say for
-> sure without hardware/data sheet.
-
-No, it drives on the rising edge by default.
-
-> As far as I can tell the R-Car DU driver also does not use the
-> DRM_BUS_FLAG_PIXDATA_*EDGE flags currently.
-
-That's because the hardware default happens to work. As soon as I'll need to 
-support a system that requires the other edge, I'll have to add the 
-corresponding logic to the driver. So far it hasn't been needed, so I haven't 
-bothered.
-
-> > So this elaborate model gives a better transfer of abstract concepts
-> > to whoever needs to touch that code next. The code is not just
-> > logic, but also our map of the world and the documentation of our
-> > problem space.
+> > So we need to drive on negative edge, hence DRM_BUS_FLAG_PIXDATA_NEGEDGE
+> > should be used, which makes the pl111 driver setting TIM2_IPC:
+> > http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0121d/index
+> > .h tml
 > > 
-> > Donald Knuth has this idea about literate programming which even
-> > turns the documentation/implementation process around. We are
-> > not there, not even remotely, but IMO the more complex the problem.
-> > the more we need to convey our thinking, not just our solution.
+> > > DRM_BUS_FLAG_PIXDATA_POSEDGE is the right value for my use cases, but it
+> > > doesn't match how the ADV7123 operates. Using
+> > > DRM_BUS_FLAG_PIXDATA_NEGEDGE
+> > > would match the hardware, but would break display for some modes,
+> > > depending on the display clock frequency as the internal 8.5ns output
+> > > delay applied to a falling clock edge would fall right into the 1.7ns
+> > > setup + hold time window of the ADV7123 around the rising edge. I can't
+> > > test this right now as I don't have local access to boards using the
+> > > ADV7123, but from a quick calculation that ignores the PCB transmission
+> > > delay modes with frequencies between 57MHz and 71MHz could break if the
+> > > data was output on the falling edge of the clock.
+> > 
+> > If clocks vs. data signal are really that much off on R-Car DU, then
+> > parallel displays must have the very same issue...
+> > 
+> > Are you sure that only the clock signal has an output delay? And that
+> > this output delay is a fixed value, clock independent?
+> > 
+> > Typically, delays apply to all signals equally, and often are clock
+> > frequency dependent...
+> > 
+> > Without really looking at the signals, I would not jump to conclusions
+> > here! I am pretty sure that driving on negative edge works just as well.
 > 
-> Fully agree.
+> I've tested Linus' original patch and it broke display on R-Car, so, no, it
+> doesn't work :-)
 > 
-> My argument here is, that the map of the world (code) and the problem
-> are not aligned.
+> The R-Car display engine delays the clock internally (in some cases that
+> delay is even configurable, and that's not uncommon in display
+> controllers). We really need all this information, and I believe we need it
+> for panels too, not just for bridges. The fact that we managed to get away
+> without adding it to panels is likely due to the large number of panels out
+> there, which makes it less likely that the same panel gets used by
+> different systems in mainline with different clock delays. I expect that
+> some panel drivers report the wrong clock edge to make things work on the
+> board they were tested with, and I expect we'll eventually need to add the
+> same information for panels too.
+> 
+> So please don't remove this useful API, otherwise you'll break my board, and
+> I won't be happy.
+
+Or, to be precise, the board won't break now, but as soon as I need to 
+implement support for configuring the output clock edge, it will break as the 
+ADV7123 driver won't give me the right information to make the right choice.
 
 -- 
 Regards,
