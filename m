@@ -1,54 +1,104 @@
-From: clg@kaod.org (=?UTF-8?Q?C=c3=a9dric_Le_Goater?=)
-Date: Fri, 14 Sep 2018 07:38:37 +0200
-Subject: [PATCH i2c-next v6] i2c: aspeed: Handle master/slave combined irq
- events properly
-In-Reply-To: <b4da2b68-e6e3-e068-cd6e-9e638aa67889@roeck-us.net>
-References: <20180911233302.GA18799@roeck-us.net>
- <5698ca34-14c9-8d05-c4e6-5acf85ff9d14@linux.intel.com>
- <20180912013449.GA12612@roeck-us.net>
- <7fd98646-fb5a-be4d-ce37-84b74e0fa8b3@linux.intel.com>
- <20180912195844.GA6893@roeck-us.net>
- <da7f4691-7428-3114-32bb-e0171f6c7228@linux.intel.com>
- <20180912203059.GA18201@roeck-us.net>
- <fb185839-3ae0-01dc-09e8-f22db55ecb04@kaod.org>
- <3f86e75f-1502-eae8-0633-d087937111c8@roeck-us.net>
- <f47b3050-3abd-caa4-cc71-4b13ef60e2c0@kaod.org>
- <20180913155703.GA22605@roeck-us.net>
- <2c481986-7ee0-4887-5c9b-64e2cd9d8c04@kaod.org>
- <b4da2b68-e6e3-e068-cd6e-9e638aa67889@roeck-us.net>
-Message-ID: <ccbf7059-77fd-44e8-daee-516582814cb3@kaod.org>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Fri, 14 Sep 2018 07:45:37 +0200
+Subject: [PATCH v2 1/2] ARM: dts: socfpga: Add fpga2hps and fpga2sdram
+ bridges
+In-Reply-To: <CANk1AXRicxbojUmtp8e7wzDcMNOX-Z4-P=oWw4dzfcR69rP+rw@mail.gmail.com>
+References: <20180822084110.14969-1-s.trumtrar@pengutronix.de>
+ <73lg85luwn.fsf@pengutronix.de>
+ <CANk1AXRicxbojUmtp8e7wzDcMNOX-Z4-P=oWw4dzfcR69rP+rw@mail.gmail.com>
+Message-ID: <73ftyceiny.fsf@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> That seems to suggest that none of the status bits auto-clears, and that
->>> the above code clearing intr_status should be removed entirely.
->>> Am I missing something ?
->>
->> You are right. I just pushed another version of the previous patch with this
->> new hunk :
->>
->> @@ -188,7 +200,6 @@ static void aspeed_i2c_bus_handle_cmd(As
->> ? {
->> ????? bus->cmd &= ~0xFFFF;
->> ????? bus->cmd |= value & 0xFFFF;
->> -??? bus->intr_status = 0;
->> ? ????? if (bus->cmd & I2CD_M_START_CMD) {
->> ????????? uint8_t state = aspeed_i2c_get_state(bus) & I2CD_MACTIVE ?
->>
->>
->> The QEMU palmetto and witherspoon machines seem to behave fine. Can you give
->> it a try ?
->>
-> 
-> Works fine for me for all affected qemu platforms.
-> 
-> How do you want to proceed with the qemu patches ? I attached my patches
-> for reference. Maybe you can add them to your tree if they are ok and submit
-> the entire series together to the qemu mailing list ?
 
-yes. They are pushed in my aspeed-3.1 branch. I will send the series 
-on the list.
+Hi!
 
-Thanks,
+Alan Tull <atull@kernel.org> writes:
 
-C. 
+> On Thu, Sep 13, 2018 at 2:27 AM Steffen Trumtrar
+> <s.trumtrar@pengutronix.de> wrote:
+>>
+>>
+>> Hi!
+>>
+>> Steffen Trumtrar <s.trumtrar@pengutronix.de> writes:
+>>
+>> > Add the remaining two bridges on the Cyclone-V SoCFPGA SoCs.
+>> >
+>> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+>> > ---
+>> > Changes in v2:
+>> >   - set status to disabled, so there are no accidental users 
+>> >   of
+>> >   the bridges
+>> >
+>> >  arch/arm/boot/dts/socfpga.dtsi | 14 ++++++++++++++
+>> >  1 file changed, 14 insertions(+)
+>> >
+>> > diff --git a/arch/arm/boot/dts/socfpga.dtsi
+>> > b/arch/arm/boot/dts/socfpga.dtsi
+>> > index b38f8c240558..11781f795de2 100644
+>> > --- a/arch/arm/boot/dts/socfpga.dtsi
+>> > +++ b/arch/arm/boot/dts/socfpga.dtsi
+>> > @@ -543,6 +543,20 @@
+>> >                       clocks = <&l4_main_clk>;
+>> >               };
+>> >
+>> > +             fpga_bridge2: fpga-bridge at ff600000 {
+>> > +                     compatible =
+>> > "altr,socfpga-fpga2hps-bridge";
+>> > +                     reg = <0xff600000 0x100000>;
+>> > +                     resets = <&rst FPGA2HPS_RESET>;
+>> > +                     clocks = <&l4_main_clk>;
+>> > +                     status = "disabled";
+>> > +             };
+>> > +
+>> > +             fpga_bridge3: fpga-bridge at ffc25080 {
+>> > +                     compatible =
+>> > "altr,socfpga-fpga2sdram-bridge";
+>> > +                     reg = <0xffc25080 0x4>;
+>> > +                     status = "disabled";
+>> > +             };
+>> > +
+>> >               fpgamgr0: fpgamgr at ff706000 {
+>> >                       compatible = "altr,socfpga-fpga-mgr";
+>> >                       reg = <0xff706000 0x1000
+>>
+>> Any opinion on this? There shouldn't be any accidental use of 
+>> the
+>> bridges now with status=disabled.
+>
+> Hi Steffen,
+>
+> Do you have a use case you need this for?
+>
+
+Yes, of course. I think all our SoCFPGA customers use these 
+bridges.
+
+> I don't mind leaving it that way it is and letting people who 
+> are
+> actually enabling the bridges in their designs add the whole 
+> node.
+>
+
+Why do you think, that these bridges are different from the other 
+ones?
+Or other IP blocks on the SoCFPGA even?
+This is the socfpga.dtsi file, it describes the hardware common to 
+all
+Cyclone5 SoCs. All SoCs have these bridges, so why not add it?
+
+
+Best regards,
+Steffen
+
+-- 
+Pengutronix e.K.                          | Steffen Trumtrar 
+|
+Industrial Linux Solutions                | 
+http://www.pengutronix.de/ |
+Peiner Str. 6-8, 31137 Hildesheim, Germany| Phone: 
++49-5121-206917-0   |
+Amtsgericht Hildesheim, HRA 2686          | Fax: 
++49-5121-206917-5555|
