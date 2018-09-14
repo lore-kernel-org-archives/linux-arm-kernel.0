@@ -1,100 +1,47 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 14 Sep 2018 15:30:23 +0100
-Subject: [PATCH v7 5/6] iommu/arm-smmu-v3: Add support for non-strict mode
-In-Reply-To: <cover.1536935328.git.robin.murphy@arm.com>
-References: <cover.1536935328.git.robin.murphy@arm.com>
-Message-ID: <4f9444c7224ea0e6e4cef8ddbf77bb5292a383e3.1536935328.git.robin.murphy@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 14 Sep 2018 15:38:49 +0100
+Subject: [PATCHv2 1/3] PCI: Introduce PCI bridge emulated config space
+ common logic
+In-Reply-To: <20180912154831.2220-2-thomas.petazzoni@bootlin.com>
+References: <20180912154831.2220-1-thomas.petazzoni@bootlin.com>
+ <20180912154831.2220-2-thomas.petazzoni@bootlin.com>
+Message-ID: <20180914143849.GC30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zhen Lei <thunder.leizhen@huawei.com>
+On Wed, Sep 12, 2018 at 05:48:29PM +0200, Thomas Petazzoni wrote:
+> Some PCI host controllers do not expose a configuration space for the
+> root port PCI bridge. Due to this, the Marvell Armada 370/38x/XP PCI
+> controller driver (pci-mvebu) emulates a root port PCI bridge
+> configuration space, and uses that to (among other things) dynamically
+> create the memory windows that correspond to the PCI MEM and I/O
+> regions.
+> 
+> Since we now need to add a very similar logic for the Marvell Armada
+> 37xx PCI controller driver (pci-aardvark), instead of duplicating the
+> code, we create in this commit a common logic called pci-bridge-emul.
+> 
+> The idea of this logic is to emulate a root port PCI bridge
+> configuration space by providing configuration space read/write
+> operations, and faking behind the scenes the configuration space of a
+> PCI bridge. A PCI host controller driver simply has to call
+> pci_bridge_emul_conf_read() and pci_bridge_emul_conf_write() to
+> read/write the configuration space of the bridge.
+> 
+> By default, the PCI bridge configuration space is simply emulated by a
+> chunk of memory, but the PCI host controller can override the behavior
+> of the read and write operations on a per-register basis to do
+> additional actions if needed. We take care of complying with the
+> behavior of the PCI configuration space registers in terms of bits
+> that are read-write, read-only, reserved and write-1-to-clear.
 
-Dynamically choose strict or non-strict mode for page table config based
-on the iommu domain type.
+Thanks, for the patch.  I don't see anything technically wrong from
+a PCIe device behaviour point of view, although I haven't compared
+the behaviour tables with the specs.
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-[rm: convert to domain attribute]
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/iommu/arm-smmu-v3.c | 30 ++++++++++++++++++++++++------
- 1 file changed, 24 insertions(+), 6 deletions(-)
+Reviewed-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index f10c852479fc..7bbfa5f7ce8e 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -612,6 +612,7 @@ struct arm_smmu_domain {
- 	struct mutex			init_mutex; /* Protects smmu pointer */
- 
- 	struct io_pgtable_ops		*pgtbl_ops;
-+	bool				non_strict;
- 
- 	enum arm_smmu_domain_stage	stage;
- 	union {
-@@ -1633,6 +1634,9 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
- 	if (smmu->features & ARM_SMMU_FEAT_COHERENCY)
- 		pgtbl_cfg.quirks = IO_PGTABLE_QUIRK_NO_DMA;
- 
-+	if (smmu_domain->non_strict)
-+		pgtbl_cfg.quirks |= IO_PGTABLE_QUIRK_NON_STRICT;
-+
- 	pgtbl_ops = alloc_io_pgtable_ops(fmt, &pgtbl_cfg, smmu_domain);
- 	if (!pgtbl_ops)
- 		return -ENOMEM;
-@@ -1934,13 +1938,17 @@ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
- {
- 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
- 
--	if (domain->type != IOMMU_DOMAIN_UNMANAGED)
--		return -EINVAL;
--
- 	switch (attr) {
- 	case DOMAIN_ATTR_NESTING:
-+		if (domain->type != IOMMU_DOMAIN_UNMANAGED)
-+			return -EINVAL;
- 		*(int *)data = (smmu_domain->stage == ARM_SMMU_DOMAIN_NESTED);
- 		return 0;
-+	case DOMAIN_ATTR_DMA_USE_FLUSH_QUEUE:
-+		if (domain->type != IOMMU_DOMAIN_DMA)
-+			return -EINVAL;
-+		*(int *)data = smmu_domain->non_strict;
-+		return 0;
- 	default:
- 		return -ENODEV;
- 	}
-@@ -1952,13 +1960,15 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
- 	int ret = 0;
- 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
- 
--	if (domain->type != IOMMU_DOMAIN_UNMANAGED)
--		return -EINVAL;
--
- 	mutex_lock(&smmu_domain->init_mutex);
- 
- 	switch (attr) {
- 	case DOMAIN_ATTR_NESTING:
-+		if (domain->type != IOMMU_DOMAIN_UNMANAGED) {
-+			ret = -EINVAL;
-+			goto out_unlock;
-+		}
-+
- 		if (smmu_domain->smmu) {
- 			ret = -EPERM;
- 			goto out_unlock;
-@@ -1969,6 +1979,14 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
- 		else
- 			smmu_domain->stage = ARM_SMMU_DOMAIN_S1;
- 
-+		break;
-+	case DOMAIN_ATTR_DMA_USE_FLUSH_QUEUE:
-+		if (domain->type != IOMMU_DOMAIN_DMA) {
-+			ret = -EINVAL;
-+			goto out_unlock;
-+		}
-+
-+		smmu_domain->non_strict = *(int *)data;
- 		break;
- 	default:
- 		ret = -ENODEV;
 -- 
-2.19.0.dirty
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
