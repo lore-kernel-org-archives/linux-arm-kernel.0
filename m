@@ -1,65 +1,50 @@
-From: pintu.ping@gmail.com (Pintu Kumar)
-Date: Fri, 14 Sep 2018 19:58:01 +0530
-Subject: KSM not working in 4.9 Kernel
-Message-ID: <CAOuPNLj1wx4sznrtLdKjcvuTf0dECPWzPaR946FoYRXB6YAGCw@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 14 Sep 2018 15:30:18 +0100
+Subject: [PATCH v7 0/6] Add non-strict mode support for iommu-dma
+Message-ID: <cover.1536935328.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Hi all,
 
-Board: Hikey620 ARM64
-Kernel: 4.9.20
+Since we'd like to get this polished up and merged and Leizhen has other
+commitments, here's v7 of the previous series[1] wherein I address all
+my own feedback :) This is a quick tweak of the v6 I sent yesterday
+since I figured out slightly too late a much neater way of setting the
+attribute at the appropriate time.
 
-I am trying to verify KSM (Kernel Same Page Merging) functionality on
-4.9 Kernel using "mmap" and madvise user space test utility.
-But to my observation, it seems KSM is not working for me.
-CONFIG_KSM=y is enabled in kernel.
-ksm_init is also called during boot up.
-  443 ?        SN     0:00 [ksmd]
+The principal change is that I've inverted things slightly such that
+it's now a generic domain attribute controlled by iommu-dma given the
+necessary support from individual IOMMU drivers. That way we can easily
+enable other drivers straight away, as I've done for SMMUv2 here (which
+also allowed me to give it a quick test with MMU-401s on a Juno board).
+Otherwise it's really just cosmetic cleanup and rebasing onto Will's
+pending SMMU queue.
 
-ksmd thread is also running.
+Robin.
 
-However, when I see the sysfs, no values are written.
-~ # grep -H '' /sys/kernel/mm/ksm/*
-/sys/kernel/mm/ksm/pages_hashed:0
-/sys/kernel/mm/ksm/pages_scanned:0
-/sys/kernel/mm/ksm/pages_shared:0
-/sys/kernel/mm/ksm/pages_sharing:0
-/sys/kernel/mm/ksm/pages_to_scan:200
-/sys/kernel/mm/ksm/pages_unshared:0
-/sys/kernel/mm/ksm/pages_volatile:0
-/sys/kernel/mm/ksm/run:1
-/sys/kernel/mm/ksm/sleep_millisecs:1000
-
-So, please let me know if I am doing any thing wrong.
-
-This is the test utility:
-int main(int argc, char *argv[])
-{
-        int i, n, size;
-        char *buffer;
-        void *addr;
-
-        n = 100;
-        size = 100 * getpagesize();
-        for (i = 0; i < n; i++) {
-                buffer = (char *)malloc(size);
-                memset(buffer, 0xff, size);
-                addr =  mmap(NULL, size,
-                           PROT_READ | PROT_EXEC | PROT_WRITE,
-MAP_PRIVATE | MAP_ANONYMOUS,
-                           -1, 0);
-                madvise(addr, size, MADV_MERGEABLE);
-                sleep(1);
-        }
-        printf("Done....press ^C\n");
-
-        pause();
-
-        return 0;
-}
+[1] https://www.mail-archive.com/iommu at lists.linux-foundation.org/msg25150.html
 
 
+Robin Murphy (1):
+  iommu/arm-smmu: Support non-strict mode
 
-Thanks,
-Pintu
+Zhen Lei (5):
+  iommu/arm-smmu-v3: Implement flush_iotlb_all hook
+  iommu/dma: Add support for non-strict mode
+  iommu/io-pgtable-arm: Add support for non-strict mode
+  iommu: Add bootup option "iommu.non_strict"
+  iommu/arm-smmu-v3: Add support for non-strict mode
+
+ .../admin-guide/kernel-parameters.txt         | 13 ++++++
+ drivers/iommu/arm-smmu-v3.c                   | 40 +++++++++++++++----
+ drivers/iommu/arm-smmu.c                      | 40 +++++++++++++++----
+ drivers/iommu/dma-iommu.c                     | 29 +++++++++++++-
+ drivers/iommu/io-pgtable-arm.c                |  9 +++--
+ drivers/iommu/io-pgtable.h                    |  5 +++
+ drivers/iommu/iommu.c                         | 26 ++++++++++++
+ include/linux/iommu.h                         |  1 +
+ 8 files changed, 145 insertions(+), 18 deletions(-)
+
+-- 
+2.19.0.dirty
