@@ -1,112 +1,52 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 14 Sep 2018 14:29:15 -0700
-Subject: [PATCH 2/2] watchdog: sama5d4: write the mode register in two
- steps
-In-Reply-To: <20180914101339.7382-3-romain.izard.pro@gmail.com>
-References: <20180914101339.7382-1-romain.izard.pro@gmail.com>
- <20180914101339.7382-3-romain.izard.pro@gmail.com>
-Message-ID: <20180914212915.GA31857@roeck-us.net>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Fri, 14 Sep 2018 14:30:11 -0700
+Subject: [PATCH v2 3/4] iio: adc: Add Xilinx AMS driver
+In-Reply-To: <1536909510-7166-4-git-send-email-manish.narani@xilinx.com>
+References: <1536909510-7166-1-git-send-email-manish.narani@xilinx.com>
+ <1536909510-7166-4-git-send-email-manish.narani@xilinx.com>
+Message-ID: <f169ebb6-6c2c-6f30-d59c-e89561622ecb@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2018 at 12:13:39PM +0200, Romain Izard wrote:
-> The specification for SAMA5D2 and SAMA5D4 chips, that use this IP for
-> their watchdog timer, has the following advice regarding the Mode Register:
-> 
-> "When setting the WDDIS bit, and while it is set, the fields WDV and WDD
-> must not be modified."
-> 
-> I have observed on a board based on a SAMA5D2 chip that using any other
-> timeout duration than the default 16s in the device tree will reset the
-> board when the watchdog device is opened; this is probably due to ignoring
-> the aforementioned constraint.
-> 
-> To fix this, read the content of the Mode Register before writing it,
-> and split the access into two parts if WDV or WDD need to be changed.
-> 
-> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+Hi,
 
-That code now looks terribly complicated. Assuming it is indeed necessary,
-would it be possible to update the affected register in its own function ?
-
-Guenter
-
+On 9/14/18 12:18 AM, Manish Narani wrote:
+> 
+> Signed-off-by: Manish Narani <manish.narani@xilinx.com>
 > ---
->  drivers/watchdog/sama5d4_wdt.c | 27 ++++++++++++++++++++-------
->  1 file changed, 20 insertions(+), 7 deletions(-)
+>  drivers/iio/adc/Kconfig      |   10 +
+>  drivers/iio/adc/Makefile     |    1 +
+>  drivers/iio/adc/xilinx-ams.c | 1337 ++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 1348 insertions(+)
+>  create mode 100644 drivers/iio/adc/xilinx-ams.c
 > 
-> diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
-> index 1e93c1b0e3cf..1e05268ad94b 100644
-> --- a/drivers/watchdog/sama5d4_wdt.c
-> +++ b/drivers/watchdog/sama5d4_wdt.c
-> @@ -46,7 +46,10 @@ MODULE_PARM_DESC(nowayout,
->  	"Watchdog cannot be stopped once started (default="
->  	__MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
+> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
+> index 4a75492..405ea00 100644
+> --- a/drivers/iio/adc/Kconfig
+> +++ b/drivers/iio/adc/Kconfig
+> @@ -941,4 +941,14 @@ config XILINX_XADC
+>  	  The driver can also be build as a module. If so, the module will be called
+
+oops (some other driver:)
+	                         built
+
+>  	  xilinx-xadc.
 >  
-> -#define wdt_enabled (!(wdt->mr & AT91_WDT_WDDIS))
-> +#define wdt_enabled(reg) (!((reg) & AT91_WDT_WDDIS))
+> +config XILINX_AMS
+> +	tristate "Xilinx AMS driver"
+> +	depends on ARCH_ZYNQMP || COMPILE_TEST
+> +	depends on HAS_IOMEM
+> +	help
+> +	  Say yes here to have support for the Xilinx AMS.
 > +
-> +#define wdt_different_counters(reg_a, reg_b) \
-> +	(((reg_a) ^ (reg_b)) & (AT91_WDT_WDV | AT91_WDT_WDD))
->  
->  #define wdt_read(wdt, field) \
->  	readl_relaxed((wdt)->reg_base + (field))
-> @@ -78,8 +81,11 @@ static void wdt_write_nosleep(struct sama5d4_wdt *wdt, u32 field, u32 val)
->  static int sama5d4_wdt_start(struct watchdog_device *wdd)
->  {
->  	struct sama5d4_wdt *wdt = watchdog_get_drvdata(wdd);
-> +	u32 reg = wdt_read(wdt, AT91_WDT_MR);
->  
->  	wdt->mr &= ~AT91_WDT_WDDIS;
-> +	if (!wdt_enabled(reg) && wdt_different_counters(reg, wdt->mr))
-> +		wdt_write(wdt, AT91_WDT_MR, reg & ~AT91_WDT_WDDIS);
->  	wdt_write(wdt, AT91_WDT_MR, wdt->mr);
->  
->  	return 0;
-> @@ -88,8 +94,11 @@ static int sama5d4_wdt_start(struct watchdog_device *wdd)
->  static int sama5d4_wdt_stop(struct watchdog_device *wdd)
->  {
->  	struct sama5d4_wdt *wdt = watchdog_get_drvdata(wdd);
-> +	u32 reg = wdt_read(wdt, AT91_WDT_MR);
->  
->  	wdt->mr |= AT91_WDT_WDDIS;
-> +	if (wdt_enabled(reg) && wdt_different_counters(reg, wdt->mr))
-> +		wdt_write(wdt, AT91_WDT_MR, wdt->mr & ~AT91_WDT_WDDIS);
->  	wdt_write(wdt, AT91_WDT_MR, wdt->mr);
->  
->  	return 0;
-> @@ -122,7 +131,7 @@ static int sama5d4_wdt_set_timeout(struct watchdog_device *wdd,
->  	 * If the watchdog is enabled, then the timeout can be updated. Else,
->  	 * wait that the user enables it.
->  	 */
-> -	if (wdt_enabled)
-> +	if (wdt_enabled(wdt->mr))
->  		wdt_write(wdt, AT91_WDT_MR, wdt->mr & ~AT91_WDT_WDDIS);
->  
->  	wdd->timeout = timeout;
-> @@ -186,13 +195,17 @@ static int sama5d4_wdt_init(struct sama5d4_wdt *wdt)
->  	 * If the watchdog is already running, we can safely update it.
->  	 * Else, we have to disable it properly.
->  	 */
-> -	if (wdt_enabled) {
-> +	reg = wdt_read(wdt, AT91_WDT_MR);
-> +	if (wdt_enabled(reg)) {
-> +		if (!wdt_enabled(wdt->mr))
-> +			wdt_write_nosleep(wdt, AT91_WDT_MR,
-> +					  wdt->mr & ~AT91_WDT_WDDIS);
->  		wdt_write_nosleep(wdt, AT91_WDT_MR, wdt->mr);
-> -	} else {
-> -		reg = wdt_read(wdt, AT91_WDT_MR);
-> -		if (!(reg & AT91_WDT_WDDIS))
-> +	} else if (wdt_enabled(wdt->mr)) {
-> +		if (wdt_different_counters(reg, wdt->mr))
->  			wdt_write_nosleep(wdt, AT91_WDT_MR,
-> -					  reg | AT91_WDT_WDDIS);
-> +					  reg & ~AT91_WDT_WDDIS);
-> +		wdt_write_nosleep(wdt, AT91_WDT_MR, wdt->mr);
->  	}
->  	return 0;
->  }
-> -- 
-> 2.17.1
-> 
+> +	  The driver can also be build as a module. If so, the module will be called
+
+	                         built
+
+> +	  xilinx-ams.
+> +
+>  endmenu
+
+
+-- 
+~Randy
