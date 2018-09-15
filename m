@@ -1,49 +1,22 @@
-From: yuehaibing@huawei.com (YueHaibing)
-Date: Sat, 15 Sep 2018 19:29:20 +0800
-Subject: [PATCH v2] ARM: dma-mapping: always clear allocated buffers
-In-Reply-To: <20180725070706.19576-1-yuehaibing@huawei.com>
-References: <20180725070706.19576-1-yuehaibing@huawei.com>
-Message-ID: <dd77bd05-074b-c331-7ce5-30f78c75d3c3@huawei.com>
+From: info@adp-development.com (Western Union Refund Payment)
+Date: Sat, 15 Sep 2018 16:30:25 +0300
+Subject: Attn: linux-arm-kernel@lists.infradead.org (ID:dev)
+Message-ID: <mailman.1.1537018290.2368.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The Western Union Company (Western Union)?
+Englewood, Colorado, 
+United States.
 
-Ping.
+Dear customer,
 
-On 2018/7/25 15:07, YueHaibing wrote:
-> Sean Wang reported dma_zalloc_coherent doesn't work as expect on his
-> armv7,the allocated mem is not zeroed.The reason is __alloc_from_pool
-> doesn't honor __GFP_ZERO.
-> 
-> As commit 6829e274a623 ("arm64: dma-mapping: always clear allocated buffers")
-> has pointed out,buffers allocated by dma_alloc_coherent() are always zeroed
-> on most architectures. some drivers rely on this 'feature'. Allocated buffer
-> might be also exposed to userspace with dma_mmap() call,so clearing it is
-> desired from security point of view to avoid exposing random memory to userspace.
-> 
-> This patch unifies dma_alloc_coherent() behavior on ARM architecture with other
-> implementations by unconditionally zeroing allocated buffer.Also to fix
-> dma_zalloc_coherent behavior.
-> 
-> Reported-by: Sean Wang <sean.wang@mediatek.com>
-> Signed-off-by: YueHaibing <yuehaibing@huawei.com>
-> Reviewed-by: zhong jiang <zhongjiang@huawei.com>
-> ---
-> v2: reference more argument from arm64 commit as Christoph suggested
-> ---
->  arch/arm/mm/dma-mapping.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 6656647..cf5882f 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -564,6 +564,7 @@ static void *__alloc_from_pool(size_t size, struct page **ret_page)
->  
->  		*ret_page = phys_to_page(phys);
->  		ptr = (void *)val;
-> +		memset(ptr, 0, size);
->  	}
->  
->  	return ptr;
-> 
+You are eligible to file a claim for refund of up to $480,000.00 in the ongoing Western Union Remission settlement reached by attorneys general of all 50 states and the District of Columbia with Western Union in January of 2017. The settlement includes a $586 million fund to refund consumers who unknowingly wired money to scam artists using Western Union.
+
+Kindly confirm with abc eyewitness link below for more details.
+https://abc7chicago.com/victims-of-western-union-money-transfer-scams-may-file-for-refunds/2647958/
+
+You will be contacting Jeffrey Miller directly by replying to this email for the release of your $480,000.00 refund payment, he's the official representative from ("OFAC").You are to provide him with your full name, house address and phone number further verification.
+
+Hikmet Ersek
+CEO of Western Union.
