@@ -1,22 +1,21 @@
-From: info@adp-development.com (Western Union Refund Payment)
-Date: Sat, 15 Sep 2018 16:30:25 +0300
-Subject: Attn: linux-arm-kernel@lists.infradead.org (ID:dev)
-Message-ID: <mailman.1.1537018290.2368.linux-arm-kernel@lists.infradead.org>
+From: marcus.folkesson@gmail.com (Marcus Folkesson)
+Date: Sat, 15 Sep 2018 15:46:01 +0200
+Subject: [PATCH 1/2] watchdog: sama5d4: fix timeout-sec usage
+In-Reply-To: <20180914101339.7382-2-romain.izard.pro@gmail.com>
+References: <20180914101339.7382-1-romain.izard.pro@gmail.com>
+ <20180914101339.7382-2-romain.izard.pro@gmail.com>
+Message-ID: <20180915134601.GA947@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Western Union Company (Western Union)?
-Englewood, Colorado, 
-United States.
+On Fri, Sep 14, 2018 at 12:13:38PM +0200, Romain Izard wrote:
+> When using watchdog_init_timeout to update the default timeout value,
+> an error means that there is no "timeout-sec" in the relevant device
+> tree node.
+> 
+> This should not prevent binding of the driver to the device.
+> 
+> Fixes: 976932e40036 ("watchdog: sama5d4: make use of timeout-secs provided in devicetree")
+> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
 
-Dear customer,
-
-You are eligible to file a claim for refund of up to $480,000.00 in the ongoing Western Union Remission settlement reached by attorneys general of all 50 states and the District of Columbia with Western Union in January of 2017. The settlement includes a $586 million fund to refund consumers who unknowingly wired money to scam artists using Western Union.
-
-Kindly confirm with abc eyewitness link below for more details.
-https://abc7chicago.com/victims-of-western-union-money-transfer-scams-may-file-for-refunds/2647958/
-
-You will be contacting Jeffrey Miller directly by replying to this email for the release of your $480,000.00 refund payment, he's the official representative from ("OFAC").You are to provide him with your full name, house address and phone number further verification.
-
-Hikmet Ersek
-CEO of Western Union.
+Reviewed-by: Marcus Folkesson <marcus.folkesson@gmail.com>
