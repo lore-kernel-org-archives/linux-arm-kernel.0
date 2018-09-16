@@ -1,86 +1,101 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Sun, 16 Sep 2018 15:10:33 +0100
-Subject: [RFC PATCH v2 2/3] dt-bindings: fpga: Add bindings for ZynqMP
- nvmem driver
-In-Reply-To: <1536054754-3119-3-git-send-email-nava.manne@xilinx.com>
+Date: Sun, 16 Sep 2018 15:10:37 +0100
+Subject: [RFC PATCH v2 3/3] nvmem: zynqmp: Added zynqmp nvmem firmware
+ driver
+In-Reply-To: <1536054754-3119-4-git-send-email-nava.manne@xilinx.com>
 References: <1536054754-3119-1-git-send-email-nava.manne@xilinx.com>
- <1536054754-3119-3-git-send-email-nava.manne@xilinx.com>
-Message-ID: <62a85f77-ee9d-e6fa-1356-9b68f65882c6@linaro.org>
+ <1536054754-3119-4-git-send-email-nava.manne@xilinx.com>
+Message-ID: <d9cab203-9637-3233-4b44-96222ba3551c@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Few minor Nits...
 
-Do you have any comments on the bindings side of it.
-
-I would like to queue this for next release..
-
+I remember asking about this in the last review!
 
 On 04/09/18 10:52, Nava kishore Manne wrote:
-> Add documentation to describe Xilinx ZynqMP nvmem driver
-> bindings.
+> This patch adds zynqmp nvmem firmware driver to access the
+> SoC revision information from the hardware register.
 > 
 > Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
 > ---
-> Changes for v2:
-> 		-Moved nvmem_firmware node as a child to
-> 		 firwmare node.
-> 
->   .../firmware/xilinx/xlnx,zynqmp-firmware.txt       | 35 ++++++++++++++++++++++
->   1 file changed, 35 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-> index 1b431d9..4b95fcc 100644
-> --- a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-> +++ b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-> @@ -17,6 +17,19 @@ Required properties:
->   		  - "smc" : SMC #0, following the SMCCC
->   		  - "hvc" : HVC #0, following the SMCCC
->   
-> +--------------------------------------------------------------------------
-> +=  Zynq UltraScale+ MPSoC nvmem firmware driver binding =
-> +--------------------------------------------------------------------------
-> +The nvmem_firmware node provides access to the hardware related data
-> +like soc revision, IDCODE... etc, By using the firmware interface.
+> diff --git a/drivers/nvmem/zynqmp_nvmem.c b/drivers/nvmem/zynqmp_nvmem.c
+> new file mode 100644
+> index 0000000..e377900
+> --- /dev/null
+> +++ b/drivers/nvmem/zynqmp_nvmem.c
+> @@ -0,0 +1,84 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * Copyright (C) 2018 Xilinx, Inc.
+> + */
 > +
-> +Required properties:
-> +- compatible: should be "xlnx,zynqmp-nvmem-fw"
+> +#include <linux/module.h>
+> +#include <linux/nvmem-provider.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/firmware/xlnx-zynqmp.h>
 > +
-> += Data cells =
-> +Are child nodes of silicon id, bindings of which as described in
-> +bindings/nvmem/nvmem.txt
+> +#define SILICON_REVISION_MASK 0xF
 > +
->   -------
->   Example
->   -------
-> @@ -25,5 +38,27 @@ firmware {
->   	zynqmp_firmware: zynqmp-firmware {
->   		compatible = "xlnx,zynqmp-firmware";
->   		method = "smc";
-> +		nvmem_firmware {
-> +			compatible = "xlnx,zynqmp-nvmem-fw";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
+> +static int zynqmp_nvmem_read(void *context, unsigned int offset,
+> +			     void *val, size_t bytes)
+> +{
+> +	int ret;
+> +	int idcode, version;
+> +	const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
 > +
-> +			/* Data cells */
-> +			soc_revision: soc_revision {
-> +				reg = <0x0 0x4>;
-> +			};
-> +		};
->   	};
->   };
+> +	if (!eemi_ops || !eemi_ops->get_chipid)
+> +		return -ENXIO;
 > +
-> += Data consumers =
-> +Are device nodes which consume nvmem data cells.
+> +	ret = eemi_ops->get_chipid(&idcode, &version);
+> +	if (ret < 0)
+> +		return ret;
 > +
-> +For example:
+> +	pr_debug("Read chipid val %x %x\n", idcode, version);
+> +	*(int *)val = version & SILICON_REVISION_MASK;
+
+Use dev_dbg here.
 > +
-> +	pcap {
-> +		...
-> +		nvmem-cells = <&soc_revision>;
-> +		nvmem-cell-names = "soc_revision";
-> +	};
+> +	return 0;
+> +}
 > +
-> 
-Thanks,
-srni
+> +static struct nvmem_config econfig = {
+> +	.name = "zynqmp-nvmem",
+> +	.owner = THIS_MODULE,
+> +	.word_size = 1,
+> +	.size = 1,
+> +	.read_only = true,
+> +};
+> +
+> +static const struct of_device_id zynqmp_nvmem_match[] = {
+> +	{ .compatible = "xlnx,zynqmp-nvmem-fw", },
+> +	{ /* sentinel */ },
+> +};
+> +MODULE_DEVICE_TABLE(of, zynqmp_nvmem_match);
+> +
+> +static int zynqmp_nvmem_probe(struct platform_device *pdev)
+> +{
+> +	struct nvmem_device *nvmem;
+> +
+> +	econfig.dev = &pdev->dev;
+> +	econfig.reg_read = zynqmp_nvmem_read;
+> +
+> +	nvmem = nvmem_register(&econfig);
+You can use devm_ variant and remove the zynqmp_nvmem_remove() totally
+
+> +	if (IS_ERR(nvmem))
+> +		return PTR_ERR(nvmem);
+> +
+> +	platform_set_drvdata(pdev, nvmem);
+> +
+> +	return 0;
+> +}
+> +
+> +static int zynqmp_nvmem_remove(struct platform_device *pdev)
+> +{
+> +	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
+> +
+> +	return nvmem_unregister(nvmem);
+> +}
+> +
