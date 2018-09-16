@@ -1,124 +1,86 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Sun, 16 Sep 2018 15:08:46 +0100
-Subject: [PATCH v4 00/22] nvmem: rework of the subsystem for non-DT users
-In-Reply-To: <20180914144011.27614-1-brgl@bgdev.pl>
-References: <20180914144011.27614-1-brgl@bgdev.pl>
-Message-ID: <2507f7cc-89ec-0cd2-9dec-68aee1350ac8@linaro.org>
+Date: Sun, 16 Sep 2018 15:10:33 +0100
+Subject: [RFC PATCH v2 2/3] dt-bindings: fpga: Add bindings for ZynqMP
+ nvmem driver
+In-Reply-To: <1536054754-3119-3-git-send-email-nava.manne@xilinx.com>
+References: <1536054754-3119-1-git-send-email-nava.manne@xilinx.com>
+ <1536054754-3119-3-git-send-email-nava.manne@xilinx.com>
+Message-ID: <62a85f77-ee9d-e6fa-1356-9b68f65882c6@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Rob,
+
+Do you have any comments on the bindings side of it.
+
+I would like to queue this for next release..
 
 
-On 14/09/18 15:39, Bartosz Golaszewski wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On 04/09/18 10:52, Nava kishore Manne wrote:
+> Add documentation to describe Xilinx ZynqMP nvmem driver
+> bindings.
 > 
-> NOTE: I decided to post v4 despite no new reviews from Srinivas as I'll
-> be off next week. There were a couple issues reported by the kbuild bot
-> and one bug I noticed after sending v3.
+> Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
+> ---
+> Changes for v2:
+> 		-Moved nvmem_firmware node as a child to
+> 		 firwmare node.
 > 
-> This series contains nvmem framework changes prerequisite for further
-> development of my previous series[1] that aims at removal of the
-> platform data struct from at24 EEPROM driver.
+>   .../firmware/xilinx/xlnx,zynqmp-firmware.txt       | 35 ++++++++++++++++++++++
+>   1 file changed, 35 insertions(+)
 > 
-> The patches are conceptually split into a couple groups.
+> diff --git a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
+> index 1b431d9..4b95fcc 100644
+> --- a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
+> +++ b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
+> @@ -17,6 +17,19 @@ Required properties:
+>   		  - "smc" : SMC #0, following the SMCCC
+>   		  - "hvc" : HVC #0, following the SMCCC
+>   
+> +--------------------------------------------------------------------------
+> +=  Zynq UltraScale+ MPSoC nvmem firmware driver binding =
+> +--------------------------------------------------------------------------
+> +The nvmem_firmware node provides access to the hardware related data
+> +like soc revision, IDCODE... etc, By using the firmware interface.
+> +
+> +Required properties:
+> +- compatible: should be "xlnx,zynqmp-nvmem-fw"
+> +
+> += Data cells =
+> +Are child nodes of silicon id, bindings of which as described in
+> +bindings/nvmem/nvmem.txt
+> +
+>   -------
+>   Example
+>   -------
+> @@ -25,5 +38,27 @@ firmware {
+>   	zynqmp_firmware: zynqmp-firmware {
+>   		compatible = "xlnx,zynqmp-firmware";
+>   		method = "smc";
+> +		nvmem_firmware {
+> +			compatible = "xlnx,zynqmp-nvmem-fw";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +
+> +			/* Data cells */
+> +			soc_revision: soc_revision {
+> +				reg = <0x0 0x4>;
+> +			};
+> +		};
+>   	};
+>   };
+> +
+> += Data consumers =
+> +Are device nodes which consume nvmem data cells.
+> +
+> +For example:
+> +
+> +	pcap {
+> +		...
+> +		nvmem-cells = <&soc_revision>;
+> +		nvmem-cell-names = "soc_revision";
+> +	};
+> +
 > 
-> First five patches fix issues with existing issues.
-> 
-> Patch 6 switches the nvmem providers to using kref which is necessary
-> for removal of the return value from nvmem_unregister(). This is an
-> approach similar to the one used in the clock framework where the
-> provider is only removed after the last reference to it is dropped.
-> 
-> Patch 7 changes the errno returned from the driver after kzalloc()
-> fails from -EINVAL to -ENOMEM which makes more sense.
-> 
-> Patches 8-10 convert last remaining users of nvmem_unregister() who
-> still check its return value to using devm_nvmem_unregister() and
-> patch 11 changes its return value from int to void.
-> 
-> Patches 12-15 introduce the most significant changes of this series:
-> we remove the global cell list, add support for static cell definitions
-> external to the provider structure, change the way DT lookup works and
-> allow to associate resources and consumers using lookup tables. The way
-> nvmem_cell_get() for non-DT users is changed but there are no current
-> users and it's currently broken anyway (cell being removed after a call
-> to nvmem_cell_put()).
-> 
-> Patch 16 updates the documentation.
-> 
-> Patch 17 adds support for notifiers to nvmem so that users can
-> subscribe for events such as device or cell registration or removal.
-> 
-> Patches 18 & 19 add some minor improvements to the codebase.
-> 
-> Last three patches contain fixes to warnings emitted by checkpatch.
-> It's a good moment to add them if we're already touching a big part
-> of the subsystem's code.
-> 
-> Tested both DT and non-DT use cases.
-> 
-> [1] https://lkml.org/lkml/2018/8/10/149
-> 
-> v1 -> v2:
-> - extended the lookup structure with a proper con_id independent from the
->    cell name defined in the cell definition table
-> - added a patch that makes the naming convention for the cell name argument
->    in the nvmem_cell_get() family of functions consistent
-> - there were two users of nvmem_unregister() that still checked the return
->    value, now switched to devm_nvmem_register()
-> - fixed build failures reported by kbuild test robot
-> 
-> v2 -> v3:
-> - dropped the patch removing unused APIs and introduced changes on top of
->    existing code instead
-> - fixed nvmem provider reference decreasing in error paths
-> - added checkpatch fixes
-> - removed nvmem-machine.h and distributed new definitions among existing
->    consumer and provider headers
-> - reordered patches thematically
-> - added more patches fixing issues in existing codebase
-> 
-> v3 -> v4:
-> - fixed the notifier chain call when removing nvmem devices: call the
->    notifier chain for NVMEM_REMOVE before releasing any resources
-> - added patch 7/22 ("sunxi_sid: return -ENOMEM if kzalloc() fails")
-> - fixed the return value in error path for patch 8/22 ("sunxi_sid: use
->    devm_nvmem_register())"
-> - fixed the return value of devm_nvmem_unregister() in
->    patch 11/22 ("change the signature of nvmem_unregister()")
-> 
-> Bartosz Golaszewski (22):
->    nvmem: provide nvmem_dev_name()
->    nvmem: remove the name field from struct nvmem_device
->    nvmem: use list_for_each_entry_safe in nvmem_device_remove_all_cells()
->    nvmem: remove a stray newline
->    nvmem: check the return value of nvmem_add_cells()
->    nvmem: use kref
->    nvmem: sunxi_sid: return -ENOMEM if kzalloc() fails
->    nvmem: sunxi_sid: use devm_nvmem_register()
->    nvmem: lpc18xx_eeprom: use devm_nvmem_register()
->    nvmem: mxs-ocotp: use devm_nvmem_register()
->    nvmem: change the signature of nvmem_unregister()
->    nvmem: remove the global cell list
->    nvmem: add support for cell info
->    nvmem: resolve cells from DT at registration time
->    nvmem: add support for cell lookups from machine code
->    Documentation: nvmem: document cell tables and lookup entries
->    nvmem: add a notifier chain
->    nvmem: use SPDX license identifiers
->    nvmem: make the naming of arguments in nvmem_cell_get() consistent
->    nvmem: use EOPNOTSUPP instead of ENOSYS
->    nvmem: fix commenting style
->    nvmem: use octal permissions instead of constants
-
-Thanks for working on this!
-Nice work!
-
-Overall the patchset looks good!
-
-I will send these to Greg KH along with other nvmem patches sometime 
-this week!
-
-
-
--srini
+Thanks,
+srni
