@@ -1,29 +1,78 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 17 Sep 2018 01:44:46 -0400
-Subject: [PATCH 18/27] dt-bindings: display: sunxi: add DT binding for
- Allwinner H6 DW HDMI
-In-Reply-To: <20180902072643.4917-19-jernej.skrabec@siol.net>
-References: <20180902072643.4917-1-jernej.skrabec@siol.net>
- <20180902072643.4917-19-jernej.skrabec@siol.net>
-Message-ID: <5b9f3f4f.1c69fb81.e9b3c.3a5f@mx.google.com>
+Date: Sun, 16 Sep 2018 17:26:16 -0500
+Subject: [PATCH 01/13] dt-bindings: mediatek: Add binding for mt8183
+ IOMMU and SMI
+In-Reply-To: <1535954502-30646-2-git-send-email-yong.wu@mediatek.com>
+References: <1535954502-30646-1-git-send-email-yong.wu@mediatek.com>
+ <1535954502-30646-2-git-send-email-yong.wu@mediatek.com>
+Message-ID: <5b9f3f52.1c69fb81.a7f7c.f34e@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun,  2 Sep 2018 09:26:34 +0200, Jernej Skrabec wrote:
-> From: Icenowy Zheng <icenowy@aosc.io>
+On Mon, Sep 03, 2018 at 02:01:30PM +0800, Yong Wu wrote:
+> This patch adds decriptions for mt8183 IOMMU and SMI.
 > 
-> The Allwinner H6 SoC uses a v2.12a DesignWare HDMI controller, with
-> dedicated CEC and HDCP clocks added; the PHY connected is a standard
-> DesignWare HDMI PHY.
+> mt8183 has one M4U like mt8173 and is also MTK IOMMU gen2 which
+> uses ARM Short-Descriptor translation table format.
 > 
-> Add binding for it.
+> The mt8183 M4U-SMI HW diagram is as below:
 > 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> [added HDCP clock and reset]
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+>                           EMI
+>                            |
+>                           M4U
+>                            |
+>                        ----------
+>                        |        |
+>                    gals0-rx   gals1-rx
+>                        |        |
+>                        |        |
+>                    gals0-tx   gals1-tx
+>                        |        |
+>                       ------------
+>                        SMI Common
+>                       ------------
+>                            |
+>   +-----+-----+--------+-----+-----+-------+-------+
+>   |     |     |        |     |     |       |       |
+>   |     |  gals-rx  gals-rx  |   gals-rx gals-rx gals-rx
+>   |     |     |        |     |     |       |       |
+>   |     |     |        |     |     |       |       |
+>   |     |  gals-tx  gals-tx  |   gals-tx gals-tx gals-tx
+>   |     |     |        |     |     |       |       |
+> larb0 larb1  larb2   larb3  larb4 larb5  larb6    CCU
+> disp  vdec   IPU0    IPU1   venc  IPU1    cam
+> 
+> All the connections are HW fixed, SW can NOT adjust it.
+> 
+> Compared with mt8173, we add a GALS(Global Async Local Sync) module
+> between SMI-common and M4U, and additional between larb2/3/5/6 and
+> SMI-common. GALS can help synchronize for the modules in different
+> clock frequence, it can be seen as a "asynchronous fifo".
+
+s/frequence/frequency/
+
+
+> GALS can only help transfer the command/data while it don't have the
+> register, thus it has the special "smi" clock and it don't have the
+> "apb" clock. From the diagram above, we add "gals0" and "gals1"
+> clockes for smi-common and add a "gals" clock for smi-larb.
+
+s/clockes/clocks/
+s/don't/doesn't/
+
+> From the diagram above, CCU(Camera Control Unit) is connected with
+> smi-common directly, we can look it as "larb7" but its register space
+> is different with the normal larb.
+> 
+> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
 > ---
->  .../devicetree/bindings/display/sunxi/sun4i-drm.txt   | 11 +++++++++--
->  1 file changed, 9 insertions(+), 2 deletions(-)
-> 
+>  .../devicetree/bindings/iommu/mediatek,iommu.txt   |  15 ++-
+>  .../memory-controllers/mediatek,smi-common.txt     |  11 +-
+>  .../memory-controllers/mediatek,smi-larb.txt       |   3 +
+>  include/dt-bindings/memory/mt8183-larb-port.h      | 130 +++++++++++++++++++++
+>  4 files changed, 153 insertions(+), 6 deletions(-)
+>  create mode 100644 include/dt-bindings/memory/mt8183-larb-port.h
+
+With those fixed,
 
 Reviewed-by: Rob Herring <robh@kernel.org>
