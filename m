@@ -1,37 +1,48 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun, 16 Sep 2018 12:34:06 +0800
-Subject: [PATCH v2 1/4] drm: sun4i: drop second PLL from A64 HDMI PHY
+Date: Sun, 16 Sep 2018 12:34:07 +0800
+Subject: [PATCH v2 2/4] dt-bindings: sun4i-drm: add compatible for R40 HDMI PHY
 In-Reply-To: <20180916043409.62374-1-icenowy@aosc.io>
 References: <20180916043409.62374-1-icenowy@aosc.io>
-Message-ID: <20180916043409.62374-2-icenowy@aosc.io>
+Message-ID: <20180916043409.62374-3-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A64 HDMI PHY seems to be not able to use the second video PLL as
-clock parent in experiments.
+The Allwinner R40 HDMI PHY is currently the only one that seems to be
+able to select between two PLL inputs.
 
-Drop the support for the second PLL from A64 HDMI PHY driver.
+Add a compatible string for it, and the pll-1 clock input definition.
 
-Fixes: b46e2c9f5f64 ("drm/sun4i: Add support for A64 HDMI PHY")
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
 Changes in v2:
-- none.
+- Rebased when removing original A64 binding patch.
 
- drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c | 1 -
- 1 file changed, 1 deletion(-)
+ .../devicetree/bindings/display/sunxi/sun4i-drm.txt          | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-index 82502b351aec..a564b5dfe082 100644
---- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-@@ -398,7 +398,6 @@ static struct regmap_config sun8i_hdmi_phy_regmap_config = {
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index f8773ecb7525..dcec1a6f8ee4 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -103,6 +103,7 @@ Required properties:
+   - compatible: value must be one of:
+     * allwinner,sun8i-a83t-hdmi-phy
+     * allwinner,sun8i-h3-hdmi-phy
++    * allwinner,sun8i-r40-hdmi-phy
+     * allwinner,sun50i-a64-hdmi-phy
+   - reg: base address and size of memory-mapped region
+   - clocks: phandles to the clocks feeding the HDMI PHY
+@@ -112,9 +113,9 @@ Required properties:
+   - resets: phandle to the reset controller driving the PHY
+   - reset-names: must be "phy"
  
- static const struct sun8i_hdmi_phy_variant sun50i_a64_hdmi_phy = {
- 	.has_phy_clk = true,
--	.has_second_pll = true,
- 	.phy_init = &sun8i_hdmi_phy_init_h3,
- 	.phy_disable = &sun8i_hdmi_phy_disable_h3,
- 	.phy_config = &sun8i_hdmi_phy_config_h3,
+-H3 and A64 HDMI PHY require additional clocks:
++H3, A64 and R40 HDMI PHY require additional clocks:
+   - pll-0: parent of phy clock
+-  - pll-1: second possible phy clock parent (A64 only)
++  - pll-1: second possible phy clock parent (A64/R40 only)
+ 
+ TV Encoder
+ ----------
 -- 
 2.18.0
