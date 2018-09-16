@@ -1,219 +1,315 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 16 Sep 2018 11:01:20 +0100
-Subject: [PATCH v2 1/4] dt-bindings: iio: adc: Add Xilinx AMS binding
+Date: Sun, 16 Sep 2018 11:12:42 +0100
+Subject: [PATCH v2 2/4] iio: Documentation: Add Xilinx AMS sysfs
  documentation
-In-Reply-To: <1536909510-7166-2-git-send-email-manish.narani@xilinx.com>
+In-Reply-To: <1536909510-7166-3-git-send-email-manish.narani@xilinx.com>
 References: <1536909510-7166-1-git-send-email-manish.narani@xilinx.com>
- <1536909510-7166-2-git-send-email-manish.narani@xilinx.com>
-Message-ID: <20180916110120.243fcf11@archlinux>
+ <1536909510-7166-3-git-send-email-manish.narani@xilinx.com>
+Message-ID: <20180916111242.73af71ed@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 14 Sep 2018 12:48:27 +0530
+On Fri, 14 Sep 2018 12:48:28 +0530
 Manish Narani <manish.narani@xilinx.com> wrote:
 
-> Xilinx AMS have several ADC channels that can be used for measurement of
-> different voltages and temperatures. Document the same in the bindings.
+> Add documentation for xilinx-ams driver. This contains information about
+> various voltages and temperatures on PS (Processing System), PL
+> (Programmable Logic) and AMS Control Block.
 > 
 > Signed-off-by: Manish Narani <manish.narani@xilinx.com>
+The more I look at this device the more I'm convinced it is very much a dedicated
+hardware monitoring function, not a generic ADC sensing unit at all.
+
+Hmm.  It is still fine to have it in IIO but you need to think in detail
+about how you are going to interface this to hwmon via the iio-hwmon bridge.
+
+Some of the interface complexity should only really be apparent when we hit
+hwmon perhaps rather than having so many different custom interfaces in IIO.
+
+Please also loop in the maintainers and lists for hwmon in the next
+version so we can get their input.
+
+Thanks,
+
+Jonathan
 > ---
->  .../devicetree/bindings/iio/adc/xilinx-ams.txt     | 180 +++++++++++++++++++++
->  1 file changed, 180 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iio/adc/xilinx-ams.txt
+>  .../ABI/testing/sysfs-bus-iio-adc-xilinx-ams       | 246 +++++++++++++++++++++
+>  1 file changed, 246 insertions(+)
+>  create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-adc-xilinx-ams
 > 
-> diff --git a/Documentation/devicetree/bindings/iio/adc/xilinx-ams.txt b/Documentation/devicetree/bindings/iio/adc/xilinx-ams.txt
+> diff --git a/Documentation/ABI/testing/sysfs-bus-iio-adc-xilinx-ams b/Documentation/ABI/testing/sysfs-bus-iio-adc-xilinx-ams
 > new file mode 100644
-> index 0000000..d0958a1
+> index 0000000..589c389
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iio/adc/xilinx-ams.txt
-> @@ -0,0 +1,180 @@
-> +Xilinx AMS controller
-> +`````````````````````
-> +The AMS includes an ADC as well as on-chip sensors that can be used to
-> +sample external voltages and monitor on-die operating conditions, such as
-> +temperature and supply voltage levels.
-> +The AMS has two SYSMON blocks which are PL (Programmable Logic) SYSMON and
-> +PS (Processing System) SYSMON.
-> +All designs should have AMS registers, but PS and PL are optional. The
-> +AMS controller can work with only PS, only PL and both PS and PL
-> +configurations. Please specify registers according to your design. Devicetree
-> +should always have AMS module property. Providing PS & PL module is optional.
-> +
-> +Required properties:
-> +	- compatible: Should be "xlnx,zynqmp-ams"
-> +	- reg: Should specify AMS register space
-> +	- interrupts: Interrupt number for the AMS control interface
-> +	- interrupt-names: Interrupt name, must be "ams-irq"
-> +	- clocks: Should contain a clock specifier for the device
-> +	- ranges: keep the property empty to map child address space
-> +	          (for PS and/or PL) nodes 1:1 onto the parent address
-> +	          space
-> +
-> +	AMS sub-nodes:
-> +		- ams_ps : Used as PS-SYSMON node
-> +		- ams_pl : Used as PL-SYSMON node
+> +++ b/Documentation/ABI/testing/sysfs-bus-iio-adc-xilinx-ams
+> @@ -0,0 +1,246 @@
+> +What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccpsintlp
+> +Date:		September 2018
+> +KernelVersion:	4.19.0
+> +Contact:	mnarani at xilinx.com
+> +Description:
+> +		Voltage input for PS (Processing System) LPD (Low Power Domain)
+> +		power supply.
 > +
 > +
-> +
-> +AMS PS-SYSMON
-> +`````````````
-> +PS (Processing System) SYSMON is memory mapped to PS. This block has built-in
-> +alarm generation logic that is used to interrupt the processor based on
-> +condition set.
-> +
-> +Required properties:
-> +	- compatible: Should be "xlnx,zynqmp-ams-ps"
-> +	- reg: Register space for PS-SYSMON
+> +What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccpsintfp
+> +Date:		September 2018
+> +KernelVersion:	4.19.0
+> +Contact:	mnarani at xilinx.com
+> +Description:
+> +		Voltage input for PS (Processing System) FPD (Full Power Domain)
+> +		power supply.
 > +
 > +
-> +
-> +AMS PL-SYSMON
-> +`````````````
-> +PL-SYSMON is capable of monitoring off chip voltage and temperature. PL-SYSMON
-> +block has DRP, JTAG and I2C interface to enable monitoring from external master.
-> +Out of this interface currently only DRP is supported. This block has alarm
-> +generation logic that is used to interrupt the processor based on condition set.
-> +
-> +Required properties:
-> +	- compatible: Should be "xlnx,zynqmp-ams-pl"
-> +	- reg: Register space for PL-SYSMON
-> +
-> +PL-SYSMON optional sub-nodes:
-> +	- xlnx,ext-channels: List of external channels that are connected to the
-> +	                     AMS PL module.
-> +
-> +	  The child nodes of PL-SYSMON represent the external channels which are
-> +	  connected to this Module. If the property is not present
-> +	  no external channels will be assumed to be connected.
-> +
-> +	  Each child node represents one channel and has the following
-> +	  properties:
-> +
-> +	Required properties:
-> +		* reg: Pair of pins the channel is connected to.
-> +
-> +		    'reg' value		Channel Name		Channel Number
-> +		    -----------		------------		--------------
-> +			 0		VP/VN			      30
-> +			 1		VUSER0			      31
-> +			 2		VUSER1			      32
-> +			 3		VUSER3			      33
-> +			 4		VUSER4			      34
-> +			 5		VAUXP[0]/VAUXN[0]	      35
-> +			 6		VAUXP[1]/VAUXN[1]	      36
-> +			...
-> +			20		VAUXP[15]/VAUXN[15]	      50
-> +
-> +		Each channel number should only be used at most once. For
-> +		more details on channels, refer table given at the end.
-> +
-> +	Optional properties:
-> +		* xlnx,bipolar: If set the channel is used in bipolar
-> +		  mode.
+> +What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccpsaux
+> +Date:		September 2018
+> +KernelVersion:	4.19.0
+> +Contact:	mnarani at xilinx.com
+> +Description:
+> +		Voltage input for PS (Processing System) Auxiliary power
+> +		supply.
 > +
 > +
-> +Example:
-> +	xilinx_ams: ams at ffa50000 {
-> +		compatible = "xlnx,zynqmp-ams";
-> +		interrupt-parent = <&gic>;
-> +		interrupts = <0 56 4>;
-> +		interrupt-names = "ams-irq";
-> +		clocks = <&clkc 70>;
-> +		reg = <0x0 0xffa50000 0x0 0x800>;
-> +		reg-names = "ams-base";
-> +		ranges;
+> +What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccpsddr
+> +Date:		September 2018
+> +KernelVersion:	4.19.0
+> +Contact:	mnarani at xilinx.com
+> +Description:
+> +		Voltage input for PS (Processing System) I/O bank 504 (DDR
+> +		PHY) power supply.
 > +
-> +		ams_ps: ams_ps at ffa50800 {
-> +			compatible = "xlnx,zynqmp-ams-ps";
-> +			reg = <0x0 0xffa50800 0x0 0x400>;
+> +
+> +What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccpsio3
+> +Date:		September 2018
+> +KernelVersion:	4.19.0
+> +Contact:	mnarani at xilinx.com
+> +Description:
+> +		Voltage input for PS (Processing System) I/O bank 503
+> +		(boot, config, JTAG, SRST, POR) power supply.
+> +
+> +
+> +What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccpsio0
+> +Date:		September 2018
+> +KernelVersion:	4.19.0
+> +Contact:	mnarani at xilinx.com
+> +Description:
+> +		Voltage input for PS (Processing System) I/O bank 500
+> +		(MIO[0:25]) power supply.
+> +
+> +
+> +What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccpsio1
+> +Date:		September 2018
+> +KernelVersion:	4.19.0
+> +Contact:	mnarani at xilinx.com
+> +Description:
+> +		Voltage input for PS (Processing System) I/O bank 501
+> +		(MIO[26:51]) power supply.
+> +
+> +
+> +What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccpsio2
+> +Date:		September 2018
+> +KernelVersion:	4.19.0
+> +Contact:	mnarani at xilinx.com
+> +Description:
+> +		Voltage input for PS (Processing System) I/O bank 502
+> +		(MIO[52:77]) power supply.
+> +
+> +
+> +What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_psmgtravcc
+> +Date:		September 2018
+> +KernelVersion:	4.19.0
+> +Contact:	mnarani at xilinx.com
+> +Description:
+> +		Voltage input for PS (Processing System) GTR SerDes I/O
+> +		power supply.
+> +
+> +
+> +What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_psmgtravtt
+> +Date:		September 2018
+> +KernelVersion:	4.19.0
+> +Contact:	mnarani at xilinx.com
+> +Description:
+> +		Voltage input for PS (Processing System) GTR SerDes
+> +		terminators power supply.
+> +
+> +
+> +What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccams
+> +Date:		September 2018
+> +KernelVersion:	4.19.0
+> +Contact:	mnarani at xilinx.com
+> +Description:
+> +		Voltage input for PS (Processing System) SYSMON ADC circuitry
+> +		power supply.
+> +
+> +
+> +What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccint
+> +Date:		September 2018
+> +KernelVersion:	4.19.0
+> +Contact:	mnarani at xilinx.com
+> +Description:
+> +		Voltage input for PL (Programmable Logic) internal power supply.
+> +
+> +
+> +What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccvrefp
+> +Date:		September 2018
+> +KernelVersion:	4.19.0
+> +Contact:	mnarani at xilinx.com
+> +Description:
+> +		Voltage input for PL (Programmable Logic) ADC positive V
+> +		reference power supply.
+> +
+> +
+> +What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccvrefn
+> +Date:		September 2018
+> +KernelVersion:	4.19.0
+> +Contact:	mnarani at xilinx.com
+> +Description:
+> +		Voltage input for PL (Programmable Logic) ADC negative V
+> +		reference power supply.
+> +
+> +
+> +What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccplintlp
+> +Date:		September 2018
+> +KernelVersion:	4.19.0
+> +Contact:	mnarani at xilinx.com
+> +Description:
+> +		Voltage input for PL (Programmable Logic) LPD (Low Power Domain)
+> +		power supply.
+> +
+> +
+> +What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccplintfp
+> +Date:		September 2018
+> +KernelVersion:	4.19.0
+> +Contact:	mnarani at xilinx.com
+> +Description:
+> +		Voltage input for PL (Programmable Logic) FPD (Full Power
+> +		Domain) power supply.
+> +
+> +
+> +What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccplaux
+> +Date:		September 2018
+> +KernelVersion:	4.19.0
+> +Contact:	mnarani at xilinx.com
+> +Description:
+> +		Voltage input for PL (Programmable Logic) Auxiliary power
+> +		supply.
+> +
+> +
+> +What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccvpvn
+> +Date:		September 2018
+> +KernelVersion:	4.19.0
+> +Contact:	mnarani at xilinx.com
+> +Description:
+> +		Voltage input for PL (Programmable Logic) Analog Input Pins
+> +		power supply.
+> +
+> +
+> +What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vuserZ
+> +Date:		September 2018
+> +KernelVersion:	4.19.0
+> +Contact:	mnarani at xilinx.com
+> +Description:
+> +		Voltage input for PL (Programmable Logic) Fabric Analog Wires 
+> +		power supply. Z is the number in range of 0 to 3.
+This one superficially sounds like a general purpose input?  The vuser part
+doesn't mean anything to the user.  If you care about the pin mapping use the
+datasheet name fields.
 
-Rob Herring mentioned this in the previous version.
-Why 64 bit addresses?
-
-Also this isn't how I understand ranges to be used...
-
-https://elinux.org/Device_Tree_Usage#Ranges_.28Address_Translation.29
-
-
-
-> +		};
-> +
-> +		ams_pl: ams_pl at ffa50c00 {
-> +			compatible = "xlnx,zynqmp-ams-pl";
-> +			reg = <0x0 0xffa50c00 0x0 0x400>;
-> +			xlnx,ext-channels {
-> +				channel at 0 {
-> +					reg = <0>;
-> +					xlnx,bipolar;
-> +				};
-> +				channel at 1 {
-> +					reg = <1>;
-> +				};
-> +				channel at 8 {
-> +					reg = <8>;
-> +					xlnx,bipolar;
-> +				};
-> +			};
-> +		};
-> +	};
 > +
 > +
-> +AMS Channels Details
-> +````````````````````
-> +Sysmon Block	|Channel|			Details					|Measurement
-> +		 Number									 Type
-> +---------------------------------------------------------------------------------------------------------
-> +AMS CTRL	|0	|System PLLs voltage measurement, VCC_PSPLL.			|Voltage
-> +		|1	|Battery voltage measurement, VCC_PSBATT.			|Voltage
-> +		|2	|PL Internal voltage measurement, VCCINT.			|Voltage
-> +		|3	|Block RAM voltage measurement, VCCBRAM.			|Voltage
-> +		|4	|PL Aux voltage measurement, VCCAUX.				|Voltage
-> +		|5	|Voltage measurement for six DDR I/O PLLs, VCC_PSDDR_PLL.	|Voltage
-> +		|6	|VCC_PSINTFP_DDR voltage measurement.				|Voltage
-> +---------------------------------------------------------------------------------------------------------
-> +PS Sysmon	|7	|LPD temperature measurement.					|Temperature
-> +		|8	|FPD Temperature Measurment (REMOTE).				|Temperature
-> +		|9	|VCC PS LPD voltage measurement (supply1).			|Voltage
-> +		|10	|VCC PS FPD voltage measurement (supply2).			|Voltage
-> +		|11	|PS Aux voltage reference (supply3).				|Voltage
-> +		|12	|DDR I/O VCC voltage measurement.				|Voltage
-> +		|13	|PS IO Bank 503 voltage measurement (supply5).			|Voltage
-> +		|14	|PS IO Bank 500 voltage measurement (supply6).			|Voltage
-> +		|15	|VCCO_PSIO1 voltage measurement.				|Voltage
-> +		|16	|VCCO_PSIO2 voltage measurement.				|Voltage
-> +		|17	|VCC_PS_GTR voltage measurement (VPS_MGTRAVCC).			|Voltage
-> +		|18	|VTT_PS_GTR voltage measurement (VPS_MGTRAVTT).			|Voltage
-> +		|19	|VCC_PSADC voltage measurement.					|Voltage
-> +---------------------------------------------------------------------------------------------------------
-> +PL Sysmon	|20	|PL Temperature measurement.					|Temperature
-> +		|21	|PL Internal Voltage Voltage measurement, VCCINT.		|Voltage
-> +		|22	|PL Auxiliary Voltage measurement, VCCAUX.			|Voltage
-> +		|23	|ADC Reference P+ Voltage measurement.				|Voltage
-> +		|24	|ADC Reference N- Voltage measurement.				|Voltage
-> +		|25	|PL Block RAM Voltage measurement, VCCBRAM.			|Voltage
-> +		|26	|LPD Internal Voltage measurement, VCC_PSINTLP (supply4).	|Voltage
-> +		|27	|FPD Internal Voltage measurement, VCC_PSINTFP (supply5).	|Voltage
-> +		|28	|PS Auxiliary Voltage measurement (supply6).			|Voltage
-> +		|29	|PL VCCADC Voltage measurement (vccams).			|Voltage
-> +		|30	|Differencial analog input signal Voltage measurment.		|Voltage
-> +		|31	|VUser0 Voltage measurement (supply7).				|Voltage
-> +		|32	|VUser1 Voltage measurement (supply8).				|Voltage
-> +		|33	|VUser2 Voltage measurement (supply9).				|Voltage
-> +		|34	|VUser3 Voltage measurement (supply10).				|Voltage
-> +		|35	|Auxiliary ch 0 Voltage measurement (VAux0).			|Voltage
-> +		|36	|Auxiliary ch 1 Voltage measurement (VAux1).			|Voltage
-> +		|37	|Auxiliary ch 2 Voltage measurement (VAux2).			|Voltage
-> +		|38	|Auxiliary ch 3 Voltage measurement (VAux3).			|Voltage
-> +		|39	|Auxiliary ch 4 Voltage measurement (VAux4).			|Voltage
-> +		|40	|Auxiliary ch 5 Voltage measurement (VAux5).			|Voltage
-> +		|41	|Auxiliary ch 6 Voltage measurement (VAux6).			|Voltage
-> +		|42	|Auxiliary ch 7 Voltage measurement (VAux7).			|Voltage
-> +		|43	|Auxiliary ch 8 Voltage measurement (VAux8).			|Voltage
-> +		|44	|Auxiliary ch 9 Voltage measurement (VAux9).			|Voltage
-> +		|45	|Auxiliary ch 10 Voltage measurement (VAux10).			|Voltage
-> +		|46	|Auxiliary ch 11 Voltage measurement (VAux11).			|Voltage
-> +		|47	|Auxiliary ch 12 Voltage measurement (VAux12).			|Voltage
-> +		|48	|Auxiliary ch 13 Voltage measurement (VAux13).			|Voltage
-> +		|49	|Auxiliary ch 14 Voltage measurement (VAux14).			|Voltage
-> +		|50	|Auxiliary ch 15 Voltage measurement (VAux15).			|Voltage
-> +---------------------------------------------------------------------------------------------------------
+> +What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vcc_pspll0
+> +Date:		September 2018
+> +KernelVersion:	4.19.0
+> +Contact:	mnarani at xilinx.com
+> +Description:
+> +		Voltage input for AMS (Analog Monitoring System) Systems PLLs
+> +		power supply.
+> +
+> +
+> +What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vcc_psbatt
+> +Date:		September 2018
+> +KernelVersion:	4.19.0
+> +Contact:	mnarani at xilinx.com
+> +Description:
+> +		Voltage input for AMS (Analog Monitoring System) Battery power
+> +		supply.
+
+Why does this one merit a ps in it's name and the extra underscore by the vccbram
+doesn't?  These need to be consistent.
+
+> +
+> +
+> +What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccbram
+> +Date:		September 2018
+> +KernelVersion:	4.19.0
+> +Contact:	mnarani at xilinx.com
+> +Description:
+> +		Voltage input for AMS (Analog Monitoring System) Block RAM power
+> +		supply.
+> +
+> +
+> +What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_vccaux
+> +Date:		September 2018
+> +KernelVersion:	4.19.0
+> +Contact:	mnarani at xilinx.com
+> +Description:
+> +		Voltage input for AMS (Analog Monitoring System) Auxiliary power
+> +		supply.
+> +
+> +
+> +What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_psddrpll
+> +Date:		September 2018
+> +KernelVersion:	4.19.0
+> +Contact:	mnarani at xilinx.com
+> +Description:
+> +		Voltage input for AMS (Analog Monitoring System) DDR I/O
+> +		PLLs [0:5] power supply.
+> +
+> +
+> +What:		/sys/bus/iio/devices/iio:deviceX/in_voltageY_psintfpddr
+
+That is not a human readable bit of naming...
+What is the intf part about for example?  Perhaps use some underscores to break
+up the name. Stringing acronyms into one doesn't make it easy to parse in my
+head!
+
+> +Date:		September 2018
+> +KernelVersion:	4.19.0
+> +Contact:	mnarani at xilinx.com
+> +Description:
+> +		Voltage input for AMS (Analog Monitoring System) DDR controller
+> +		power supply.
+
+> +
+> +
+> +What:		/sys/bus/iio/devices/iio:deviceX/in_tempY_ps_temp
+> +Date:		September 2018
+> +KernelVersion:	4.19.0
+> +Contact:	mnarani at xilinx.com
+> +Description:
+> +		Temperature input for PS (Processing System) RPU MPCore.
+> +
+> +
+> +What:		/sys/bus/iio/devices/iio:deviceX/in_tempY_remote_temp
+> +Date:		September 2018
+> +KernelVersion:	4.19.0
+> +Contact:	mnarani at xilinx.com
+> +Description:
+> +		Temperature input for PS (Processing System) APU MPCore.
+
+This presumably is a separate external sensor attached to some pins?
+If that's the case then perhaps it needs describing as something like...
+
+Remote temperature sensor attached to the PS (procesisng system) APU MPCore.
+
+For all these temperatures, do you intend to expose them as hwmon?
+(which would be more conventional) via the iio-hmwon bridge/
+
+> +
+> +
+> +What:		/sys/bus/iio/devices/iio:deviceX/in_tempY_pl_temp
+> +Date:		September 2018
+> +KernelVersion:	4.19.0
+> +Contact:	mnarani at xilinx.com
+> +Description:
+> +		Temperature input for PL (Programmable Logic) SYSMON.
