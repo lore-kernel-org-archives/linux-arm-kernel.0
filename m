@@ -1,98 +1,28 @@
-From: pintu.ping@gmail.com (Pintu Kumar)
-Date: Sun, 16 Sep 2018 22:35:17 +0530
-Subject: KSM not working in 4.9 Kernel
-In-Reply-To: <20180916153237.GC15699@rapoport-lnx>
-References: <CAOuPNLj1wx4sznrtLdKjcvuTf0dECPWzPaR946FoYRXB6YAGCw@mail.gmail.com>
- <20180916153237.GC15699@rapoport-lnx>
-Message-ID: <CAOuPNLj0HyC+yzwTpN-EWpzHTJ58u7pBfOja1MyweF4pbct1eQ@mail.gmail.com>
+From: beagleboard@davidjohnsummers.uk (David Summers)
+Date: Sun, 16 Sep 2018 19:16:33 +0100
+Subject: [PATCH] Device Tree for ASUS Tinker Board S (v2)
+Message-ID: <20180916181636.7938-1-beagleboard@davidjohnsummers.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 16, 2018 at 9:02 PM Mike Rapoport <rppt@linux.vnet.ibm.com> wrote:
->
-> On Fri, Sep 14, 2018 at 07:58:01PM +0530, Pintu Kumar wrote:
-> > Hi All,
-> >
-> > Board: Hikey620 ARM64
-> > Kernel: 4.9.20
-> >
-> > I am trying to verify KSM (Kernel Same Page Merging) functionality on
-> > 4.9 Kernel using "mmap" and madvise user space test utility.
-> > But to my observation, it seems KSM is not working for me.
-> > CONFIG_KSM=y is enabled in kernel.
-> > ksm_init is also called during boot up.
-> >   443 ?        SN     0:00 [ksmd]
-> >
-> > ksmd thread is also running.
-> >
-> > However, when I see the sysfs, no values are written.
-> > ~ # grep -H '' /sys/kernel/mm/ksm/*
-> > /sys/kernel/mm/ksm/pages_hashed:0
-> > /sys/kernel/mm/ksm/pages_scanned:0
-> > /sys/kernel/mm/ksm/pages_shared:0
-> > /sys/kernel/mm/ksm/pages_sharing:0
-> > /sys/kernel/mm/ksm/pages_to_scan:200
-> > /sys/kernel/mm/ksm/pages_unshared:0
-> > /sys/kernel/mm/ksm/pages_volatile:0
-> > /sys/kernel/mm/ksm/run:1
-> > /sys/kernel/mm/ksm/sleep_millisecs:1000
-> >
-> > So, please let me know if I am doing any thing wrong.
-> >
-> > This is the test utility:
-> > int main(int argc, char *argv[])
-> > {
-> >         int i, n, size;
-> >         char *buffer;
-> >         void *addr;
-> >
-> >         n = 100;
-> >         size = 100 * getpagesize();
-> >         for (i = 0; i < n; i++) {
-> >                 buffer = (char *)malloc(size);
-> >                 memset(buffer, 0xff, size);
-> >                 addr =  mmap(NULL, size,
-> >                            PROT_READ | PROT_EXEC | PROT_WRITE,
-> > MAP_PRIVATE | MAP_ANONYMOUS,
-> >                            -1, 0);
-> >                 madvise(addr, size, MADV_MERGEABLE);
->
-> Just mmap'ing an area does not allocate any physical pages, so KSM has
-> nothing to merge.
->
-> You need to memset(addr,...) after mmap().
->
+Thanks to Heiko for comments on the first
 
-Yes, I am doing memset also.
-memset(addr, 0xff, size);
+The tinkerboard S is an ASUS device, it is similar to the tinker board
+but with an eMMC chip, which needs enabling in the device tree.
 
-But still no effect.
-And I checked LTP test cases. It almost doing the same thing.
+This patch is split into 3 parts
+1) It creates a common include file rk3288-tinker.dtsi and sets up
+rk3288-tinker.dts and rk3288-tinker-s.dts to do device trees for the two boards
+2) It patches the rk3288-tinker-s.dts to enable eMMC
+3) It patches the rk3299-tinker-s.dts to enable WiFi and Bluetooth
 
-I observed that [ksmd] thread is not waking up at all.
-I gave some print inside it, but I could never saw that prints coming.
-I could not find it running either in top command during the operation.
-Is there anything needs to be done, to wakw up ksmd?
-I already set: echo 1 > /sys/kernel/mm/ksm.
+I'm not sure if the wifi should be common for both boards (so in the dtsi)
+But am sure its needed to enable wifi on the S variant.
 
+I have asked for the dtb to be tested - but sending these patches anyway
+to get comments back.
 
+Regards
 
-> >                 sleep(1);
-> >         }
-> >         printf("Done....press ^C\n");
-> >
-> >         pause();
-> >
-> >         return 0;
-> > }
-> >
-> >
-> >
-> > Thanks,
-> > Pintu
-> >
->
-> --
-> Sincerely yours,
-> Mike.
->
+David Summers
+signed-off: "David Summers" <beagleboard@davidjohnsummers.uk>
