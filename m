@@ -1,77 +1,38 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Sun, 16 Sep 2018 13:24:57 +0000
-Subject: [PATCH V6 0/4] clk: new APIs to handle all available clocks
-In-Reply-To: <AM0PR04MB4211EF6D783562BA8C8D690380010@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1535690756-22234-1-git-send-email-aisheng.dong@nxp.com>
- <AM0PR04MB4211EF6D783562BA8C8D690380010@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <AM0PR04MB4211A3900BC5A2DF857F7451801F0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: zhongjiang@huawei.com (zhong jiang)
+Date: Sun, 16 Sep 2018 21:29:04 +0800
+Subject: [PATCH] hwtracing: coresight: remove redundant null pointer check
+ before of_node_put and put_device
+Message-ID: <1537104544-64355-1-git-send-email-zhongjiang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping again
+of_node_put and put_device has taken the null pointer check into account.
+So it is safe to remove the duplicated check.
 
-> -----Original Message-----
-> From: A.s. Dong
-> Sent: Thursday, September 6, 2018 11:23 AM
-> To: linux-clk at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> sboyd at kernel.org; mturquette at baylibre.com; shawnguo at kernel.org;
-> thor.thayer at linux.intel.com; dl-linux-imx <linux-imx@nxp.com>;
-> hdegoede at redhat.com
-> Subject: RE: [PATCH V6 0/4] clk: new APIs to handle all available clocks
-> 
-> Gently ping...
-> 
-> > -----Original Message-----
-> > From: A.s. Dong
-> > Sent: Friday, August 31, 2018 12:46 PM
-> > To: linux-clk at vger.kernel.org
-> > Cc: linux-kernel at vger.kernel.org;
-> > linux-arm-kernel at lists.infradead.org;
-> > sboyd at kernel.org; mturquette at baylibre.com; shawnguo at kernel.org;
-> > thor.thayer at linux.intel.com; dl-linux-imx <linux-imx@nxp.com>;
-> > hdegoede at redhat.com; A.s. Dong <aisheng.dong@nxp.com>
-> > Subject: [PATCH V6 0/4] clk: new APIs to handle all available clocks
-> >
-> > This patch series is a continue of discussion from here,
-> > https://patchwork.kernel.org/patch/9986293/
-> > that some users may want to handle all available clocks from device
-> > tree without need to know the detailed clock information likes clock
-> > numbers and names. This is useful in writing some generic drivers to handle
-> clock part.
-> >
-> > Note:
-> > This patch series is tested on MX6Q SDB cpufreq driver with a minor
-> > change to switch to use clk_bulk_get_all.
-> > But patch 4 only test compiling. Hopefully someone could help test the
-> > function.
-> >
-> > v3->v4:
-> >  * improve 'devres->clks = *clks' according to Stephen's suggestion
-> > v2->v3:
-> >  * address all comments from Stephen
-> >  * fix build warnings on other architectures.
-> > v1->v2:
-> >  * add clk_bulk_{get|put}_all() which only supports DT platform
-> > currently
-> >  * remove _all variants and the wrapper struct clk_bulk
-> >  * make of_clk_bulk_get and of_clk_bulk_get_all private until someone
-> >    proves they need it because they don't have a struct device pointer.
-> >
-> > Dong Aisheng (4):
-> >   clk: bulk: add of_clk_bulk_get()
-> >   clk: add new APIs to operate on all available clocks
-> >   clk: add managed version of clk_bulk_get_all
-> >   video: simplefb: switch to use clk_bulk API to simplify clock
-> >     operations
-> >
-> >  drivers/clk/clk-bulk.c         | 80
-> > ++++++++++++++++++++++++++++++++++++++++++
-> >  drivers/clk/clk-devres.c       | 24 +++++++++++++
-> >  drivers/video/fbdev/simplefb.c | 72 ++++++++++---------------------------
-> >  include/linux/clk.h            | 65
-> > +++++++++++++++++++++++++++++++++-
-> >  4 files changed, 186 insertions(+), 55 deletions(-)
-> >
-> > --
-> > 2.7.4
+Signed-off-by: zhong jiang <zhongjiang@huawei.com>
+---
+ drivers/hwtracing/coresight/of_coresight.c | 9 +++------
+ 1 file changed, 3 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
+index da71c97..89092f8 100644
+--- a/drivers/hwtracing/coresight/of_coresight.c
++++ b/drivers/hwtracing/coresight/of_coresight.c
+@@ -219,12 +219,9 @@ static int of_coresight_parse_endpoint(struct device *dev,
+ 		ret = 1;
+ 	} while (0);
+ 
+-	if (rparent)
+-		of_node_put(rparent);
+-	if (rep)
+-		of_node_put(rep);
+-	if (rdev)
+-		put_device(rdev);
++	of_node_put(rparent);
++	of_node_put(rep);
++	put_device(rdev);
+ 
+ 	return ret;
+ }
+-- 
+1.7.12.4
