@@ -1,80 +1,78 @@
-From: wcohen@redhat.com (William Cohen)
-Date: Sun, 16 Sep 2018 16:39:17 -0400
-Subject: [PATCH v2] perf vendor events arm64: Revise core JSON events for
- eMAG
-In-Reply-To: <20180910002625.22253-1-seanvk.dev@oregontracks.org>
-References: <20180910002625.22253-1-seanvk.dev@oregontracks.org>
-Message-ID: <1d601b30-5065-b778-9927-b7d9f04f6b6f@redhat.com>
+From: sebastian.reichel@collabora.com (Sebastian Reichel)
+Date: Sun, 16 Sep 2018 22:43:23 +0200
+Subject: [PATCH 0/6] shutdown procedure verification for SAMA5D2
+In-Reply-To: <20180916104301.dcrm333ydo5kh5bj@earth.universe>
+References: <1535629811-13403-1-git-send-email-claudiu.beznea@microchip.com>
+ <20180916104301.dcrm333ydo5kh5bj@earth.universe>
+Message-ID: <20180916204323.ysvt4axagxyx7hsc@earth.universe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/9/18 8:26 PM, Sean V Kelley wrote:
-> Split the PMU events into meaningful functional groups.  Update core
-> pmu events based on supported ARMv8 recommended IMPLEMENTATION DEFINED
-> events.
+Hi Nicolas,
+
+On Sun, Sep 16, 2018 at 12:43:01PM +0200, Sebastian Reichel wrote:
+> Hi,
 > 
-> The JSON files are updated with reference to a PMU table shared here:
+> On Thu, Aug 30, 2018 at 02:50:05PM +0300, Claudiu Beznea wrote:
+> > Hi,
+> > 
+> > Patch 1 from this series implement a fix for shutdown procedure
+> > for SAMA5D2.
+> > 
+> > The rest of the patch are improvements as follows:
+> > patch 2 - use only one function for poweroff
+> > patches 3-6 - cosmetic improvements
+> > 
+> > The patches are based on latest sys-reset/for-next [1].
+> > 
+> > Thank you,
+> > Claudiu Beznea
+> > 
+> > [1] https://git.kernel.org/pub/scm/linux/kernel/git/sre/linux-power-supply.git
 > 
-> https://github.com/AmpereComputing/ampere-centos-kernel/blob/amp-centos-7.5-kernel/Documentation/arm64/eMAG-ARM-CoreImpDefined.pdf
-> 
-> --
-> Changes in V2:
-> - Provided documentation for changes - John, William
-> - Broke up into meaningful groups - William
-> --
-> 
-> Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
-> Cc: William Cohen <wcohen@redhat.com>
-> Cc: John Garry <john.garry@huawei.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> 
-> Signed-off-by: Sean V Kelley <seanvk.dev@oregontracks.org>
-> ---
->  .../arch/arm64/ampere/emag/branch.json        |  23 +++
->  .../arch/arm64/ampere/emag/bus.json           |  26 +++
->  .../arch/arm64/ampere/emag/cache.json         | 191 ++++++++++++++++++
->  .../arch/arm64/ampere/emag/clock.json         |  20 ++
->  .../arch/arm64/ampere/emag/core-imp-def.json  |  32 ---
->  .../arch/arm64/ampere/emag/counter.json       |   8 +
->  .../arch/arm64/ampere/emag/exception.json     |  50 +++++
->  .../arch/arm64/ampere/emag/instruction.json   |  89 ++++++++
->  .../arch/arm64/ampere/emag/intrinsic.json     |  14 ++
->  .../arch/arm64/ampere/emag/memory.json        |  29 +++
->  .../arch/arm64/ampere/emag/pipeline.json      |  50 +++++
->  11 files changed, 500 insertions(+), 32 deletions(-)
->  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/branch.json
->  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/bus.json
->  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/cache.json
->  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/clock.json
->  delete mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/core-imp-def.json
->  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/counter.json
->  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/exception.json
->  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/instruction.json
->  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/intrinsic.json
->  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/memory.json
->  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/pipeline.json
+> Thanks, queued.
 
-Hi,
+I merged this via a immutable branch, that you can pull into at91 or
+ignore:
 
-The patch looks okay for most part. It would be good to factor out the events 0x00-0x38 from "Table D5-8 PMU common architectural and microarchitectural event numbers" in https://static.docs.arm.com/ddi0487/ca/DDI0487C_a_armv8_arm.pdf and have them in armv8-recommended.json so events like BR_MIS_PRED and BR_PRED (and anything else in the range of 0x000-0x038) just end up be ArchStdEvent like the other predefined events.  Maybe do the factoring out as a follow on patch to this patch.
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 
-The following counter.json wouldn't be that useful.  Perf doesn't allow layout of what goes in which PMU register. It should be removed:
+  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
 
-> diff --git a/tools/perf/pmu-events/arch/arm64/ampere/emag/counter.json b/tools/perf/pmu-events/arch/arm64/ampere/emag/counter.json
-> new file mode 100644
-> index 000000000000..6561ed58f13f
-> --- /dev/null
-> +++ b/tools/perf/pmu-events/arch/arm64/ampere/emag/counter.json
-> @@ -0,0 +1,8 @@
-> +[
-> +    {
-> +        "PublicDescription": "For odd-numbered counters, increments the count by one for each overflow of the preceding even-numbered counter. For even-numbered counters there is no increment.",
-> +        "EventCode": "0x1e",
-> +        "EventName": "CHAIN",
-> +        "BriefDescription": "Chain counter"
-> +    },
-> +]
+are available in the Git repository at:
 
+  ssh://git at gitolite.kernel.org/pub/scm/linux/kernel/git/sre/linux-power-supply.git tags/psy-at91-poweroff-immutable-for-v4.20-signed
 
+for you to fetch changes up to 9f1e44774be578fb92776add95f1fcaf8284d692:
 
--Will Cohen
+  power: reset: at91-poweroff: do not procede if at91_shdwc is allocated (2018-09-16 12:32:17 +0200)
+
+----------------------------------------------------------------
+Immutable branch for mach-at91 and power-supply for v4.20
+
+Immutable branch between mach-at91 and power-supply for driver
+changes in at91-poweroff.
+
+Signed-off-by: Sebastian Reichel <sebastian.reichel@collabora.com>
+
+----------------------------------------------------------------
+Claudiu Beznea (6):
+      power: reset: at91-poweroff: switch to slow clock before shutdown
+      power: reset: at91-poweroff: use only one poweroff function
+      power: reset: at91-poweroff: make mpddrc_base part of struct shdwc
+      power: reset: at91-poweroff: make sclk part of struct shdwc
+      power: reset: at91-poweroff: rename at91_shdwc_base member of struct shdwc
+      power: reset: at91-poweroff: do not procede if at91_shdwc is allocated
+
+ arch/arm/mach-at91/pm_suspend.S          |   8 +++
+ drivers/power/reset/at91-sama5d2_shdwc.c | 119 +++++++++++++++++++++----------
+ 2 files changed, 88 insertions(+), 39 deletions(-)
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180916/1a41f556/attachment.sig>
