@@ -1,47 +1,38 @@
-From: oss@buserror.net (Scott Wood)
-Date: Sat, 15 Sep 2018 14:24:21 -0500
-Subject: [PATCH v2 3/5] drivers: clk-qoriq: Add clockgen support for
- lx2160a
-In-Reply-To: <1536871075-3732-4-git-send-email-vabhav.sharma@nxp.com>
-References: <1536871075-3732-1-git-send-email-vabhav.sharma@nxp.com>
- <1536871075-3732-4-git-send-email-vabhav.sharma@nxp.com>
-Message-ID: <4fa10f679ad4b1b619daa521a8641c145cf8537e.camel@buserror.net>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Sun, 16 Sep 2018 12:34:05 +0800
+Subject: [PATCH v2 0/4] Fix A64/R40 HDMI PHY device tree binding
+Message-ID: <20180916043409.62374-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-09-14 at 02:07 +0530, Vabhav Sharma wrote:
-> From: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
-> 
-> Add clockgen support for lx2160a.
-> Added entry for compat 'fsl,lx2160a-clockgen'.
-> 
-> Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
-> Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
-> Signed-off-by: Vabhav Sharma <vabhav.sharma@nxp.com>
-> Acked-by: Stephen Boyd <sboyd@kernel.org>
-> ---
->  drivers/clk/clk-qoriq.c         | 14 +++++++++++++-
->  drivers/cpufreq/qoriq-cpufreq.c |  1 +
->  2 files changed, 14 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/clk-qoriq.c b/drivers/clk/clk-qoriq.c
-> index 3a1812f..e9ae70b 100644
-> --- a/drivers/clk/clk-qoriq.c
-> +++ b/drivers/clk/clk-qoriq.c
-> @@ -79,7 +79,7 @@ struct clockgen_chipinfo {
->  	const struct clockgen_muxinfo *cmux_groups[2];
->  	const struct clockgen_muxinfo *hwaccel[NUM_HWACCEL];
->  	void (*init_periph)(struct clockgen *cg);
-> -	int cmux_to_group[NUM_CMUX]; /* -1 terminates if fewer than
-> NUM_CMUX */
-> +	int cmux_to_group[NUM_CMUX+1]; /* -1 terminate if fewer to
-> NUM_CMUX+1 */
+When adding support for A64 HDMI PHY in 4.19, we assumed that the two
+PLL-VIDEOs can both feed the HDMI PHY clock. However experiments show
+that the mux bit discovered in R40 blob is not applicable on A64. This
+is not discovered, as normally with a single display pipeline only
+PLL-VIDEO0 will be used.
 
-You need to add the -1 terminator to p4080, and remove the "if fewer" comment
-since the whole point of this is that every array gets -1 terminated.
+In this patchset the second PLL is dropped, and a binding specially for
+R40 HDMI PHY is added (which seems to have the mux).
 
-Why did you change "terminates" to "terminate" and "than" to "to"?
+PATCH 1 is dropping second PLL for A64 HDMI PHY, and PATCH 2 to 4
+are adding R40 HDMI PHY binding, as R40 behaves differently with A64
+with this.
 
-This +1 change should be a separate patch from lx2160a support.
+This patchset targets v4.19 fixes tree, because the binding is
+introduced in v4.19, and if we don't fix it there a wrong binding will
+be left in a stable version released. A64 display pipeline support is
+not yet in v4.19, but R40 support is in it.
 
--Scott
+Icenowy Zheng (4):
+  drm: sun4i: drop second PLL from A64 HDMI PHY
+  dt-bindings: sun4i-drm: add compatible for R40 HDMI PHY
+  drm/sun4i: add support for R40 HDMI PHY
+  ARM: sun8i: dts: drop A64 HDMI PHY fallback compatible from R40 DT
+
+ .../devicetree/bindings/display/sunxi/sun4i-drm.txt |  5 +++--
+ arch/arm/boot/dts/sun8i-r40.dtsi                    |  3 +--
+ drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c              | 13 ++++++++++++-
+ 3 files changed, 16 insertions(+), 5 deletions(-)
+
+-- 
+2.18.0
