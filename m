@@ -1,103 +1,77 @@
 From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Sun, 16 Sep 2018 13:23:28 +0000
-Subject: [PATCH V5 2/5] soc: imx: add SC firmware IPC and APIs
-In-Reply-To: <AM0PR04MB4211DE42F39592DF40E91C1080040@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1534781305-4770-1-git-send-email-aisheng.dong@nxp.com>
- <1534781305-4770-3-git-send-email-aisheng.dong@nxp.com>
- <20180910084042.3zihiimzrvappdjj@pengutronix.de>
- <AM0PR04MB42114BE452BB4305A3EBE9DF80050@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <20180910121152.qyuuwxqesznzac7t@pengutronix.de>
- <AM0PR04MB4211DE42F39592DF40E91C1080040@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <AM0PR04MB4211D9BF36DC5C520F18D242801F0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Date: Sun, 16 Sep 2018 13:24:57 +0000
+Subject: [PATCH V6 0/4] clk: new APIs to handle all available clocks
+In-Reply-To: <AM0PR04MB4211EF6D783562BA8C8D690380010@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1535690756-22234-1-git-send-email-aisheng.dong@nxp.com>
+ <AM0PR04MB4211EF6D783562BA8C8D690380010@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <AM0PR04MB4211A3900BC5A2DF857F7451801F0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+Ping again
 
 > -----Original Message-----
 > From: A.s. Dong
-
-[...]
-
-> > > > You export a sc_ipc_open() but it's only ever used once, in your
-> > > > internal
-> > code.
-> > > > Every other user uses sc_ipc_get_handle() which returns the same
-> > > > global handle for every user. In fact, I think sc_ipc_open()
-> > > > *can* only be used once, because every other user would get -EBUSY
-> > > > when requesting the same mailboxes again.
-> > > >
-> > > > Please drop all this pseudo resource management nonsense. You
-> > > > simply do no resource management. Face it, there is only one
-> > > > global handle that is used, don't try to hide it.
-> > > >
-> > >
-> > > The original purpose of this code is that there're 5 MUs can be used
-> > > by the system, that means other users can choose to not use the
-> > > default SCU MU. So sc_ipc_open() may not be used only once.
-> > > e.g.
-> > > SCU MU1 sc_ipc_open()
-> > > CLK MU1 sc_ipc_get_handle()
-> > > Power Domain MU2 sc_ipc_open()
-> > > Pinctrl MU3 sc_ipc_open()
-> > > and etc...
+> Sent: Thursday, September 6, 2018 11:23 AM
+> To: linux-clk at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> sboyd at kernel.org; mturquette at baylibre.com; shawnguo at kernel.org;
+> thor.thayer at linux.intel.com; dl-linux-imx <linux-imx@nxp.com>;
+> hdegoede at redhat.com
+> Subject: RE: [PATCH V6 0/4] clk: new APIs to handle all available clocks
+> 
+> Gently ping...
+> 
+> > -----Original Message-----
+> > From: A.s. Dong
+> > Sent: Friday, August 31, 2018 12:46 PM
+> > To: linux-clk at vger.kernel.org
+> > Cc: linux-kernel at vger.kernel.org;
+> > linux-arm-kernel at lists.infradead.org;
+> > sboyd at kernel.org; mturquette at baylibre.com; shawnguo at kernel.org;
+> > thor.thayer at linux.intel.com; dl-linux-imx <linux-imx@nxp.com>;
+> > hdegoede at redhat.com; A.s. Dong <aisheng.dong@nxp.com>
+> > Subject: [PATCH V6 0/4] clk: new APIs to handle all available clocks
 > >
-> > Your code started by busy polling the MU units until it would send an answer.
-> > The communication is completely synchronous and on the SCU side we
-> > have a single core cortex M4 processor. Why should we use another SCU
-> > channel? I bet the SCU side services the MUs round robin, so changing
-> > the MU won't change much.
-> 
-> I carefully went through our SCU side code, SCU messages are completely
-> handled asynchronously by interrupt driven and it does not have to wait for
-> one SCU Message to be completed handled before being able to handle the
-> next one.
-> 
-> The pseudo-code is like:
-> Handle_mu_irq()
-> {
-> 	For (mu = 0; mu < NUM_MU; mu++) {
-> 		If (mu_pending()) {
-> 			Read(mu); // if available
-> 			Handle(mu); //if rx done
-> 			Write(mu);
-> 		}
-> 	}
-> 	...
-> }
-> 
-> That means Read and Write process for all MUs channels can be processed
-> sequentially within one IRQ, Don't have to wait one of them to be fully
-> completed first.
-> 
-> For example, the follow could be:
-> MU IRQ #0 -> Read MU0 word 0-1 -> Read MU1 word 0-2 -> Read MU2 word 0
-> -> Exit.
-> MU IRQ #1 -> Read MU0 word 2 -> Read MU1 word 3 -> Handle MU1 -> Write
-> MU1
-> 		 -> Read MU2 word 1 -> Exit.
-> MU IRQ #2 -> Read MU0 word 3 -> Handle MU0 -> Write MU0 -> Read MU2
-> word 2
-> 		 -> Handle MU2 -> Write MU2 -> Exit.
-> (Assume MU0 msg size 4, MU1 msg size 4, MU2 msg size 3)
-> 
-> But if we only support one SCU MU in kernel, then all SCU messages must be
-> handled one by one. So it seems like using multiple SCU MUs in kernel are still
-> better than using a single one. Am I understand correct?
-> 
-> Furthermore, If I understand correct, even SCU msg are processed one by one
-> in SCU side.
-> Using multiple channels in kernel side still can improve the performance a bit
-> in theory Because it saves the MU lock contention time. Just like the Async
-> request feature supported By MMC subsystem(saving MMC command prepare
-> time asynchronously). And multiple MU channels actually are better because
-> they're individual instances than mmc controller.
-> 
-
-Would you mind give some hints about this?
-Can you help clarify a bit if you still think we don't need support multi channels
-In kernels regardless of the performance issue?
-Then I can just drop it and go ahead.
-
-Regards
-Dong Aisheng
+> > This patch series is a continue of discussion from here,
+> > https://patchwork.kernel.org/patch/9986293/
+> > that some users may want to handle all available clocks from device
+> > tree without need to know the detailed clock information likes clock
+> > numbers and names. This is useful in writing some generic drivers to handle
+> clock part.
+> >
+> > Note:
+> > This patch series is tested on MX6Q SDB cpufreq driver with a minor
+> > change to switch to use clk_bulk_get_all.
+> > But patch 4 only test compiling. Hopefully someone could help test the
+> > function.
+> >
+> > v3->v4:
+> >  * improve 'devres->clks = *clks' according to Stephen's suggestion
+> > v2->v3:
+> >  * address all comments from Stephen
+> >  * fix build warnings on other architectures.
+> > v1->v2:
+> >  * add clk_bulk_{get|put}_all() which only supports DT platform
+> > currently
+> >  * remove _all variants and the wrapper struct clk_bulk
+> >  * make of_clk_bulk_get and of_clk_bulk_get_all private until someone
+> >    proves they need it because they don't have a struct device pointer.
+> >
+> > Dong Aisheng (4):
+> >   clk: bulk: add of_clk_bulk_get()
+> >   clk: add new APIs to operate on all available clocks
+> >   clk: add managed version of clk_bulk_get_all
+> >   video: simplefb: switch to use clk_bulk API to simplify clock
+> >     operations
+> >
+> >  drivers/clk/clk-bulk.c         | 80
+> > ++++++++++++++++++++++++++++++++++++++++++
+> >  drivers/clk/clk-devres.c       | 24 +++++++++++++
+> >  drivers/video/fbdev/simplefb.c | 72 ++++++++++---------------------------
+> >  include/linux/clk.h            | 65
+> > +++++++++++++++++++++++++++++++++-
+> >  4 files changed, 186 insertions(+), 55 deletions(-)
+> >
+> > --
+> > 2.7.4
