@@ -1,53 +1,28 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Mon, 17 Sep 2018 17:15:14 +0000
-Subject: [PATCH v4 0/6] PCI: imx: Initial imx7d suspend/resume support
-In-Reply-To: <20180917165257.GJ7239@e107981-ln.cambridge.arm.com>
-References: <cover.1534264292.git.leonard.crestez@nxp.com>
- <20180917150941.GH7239@e107981-ln.cambridge.arm.com>
- <16d68541fd499dfda88e79d4386be7ad6d0919d9.camel@nxp.com>
- <20180917165257.GJ7239@e107981-ln.cambridge.arm.com>
-Message-ID: <e367a04f3b5652aa9ed3baefbb7d0b12eb5eb8dd.camel@nxp.com>
+From: saiprakash.ranjan@codeaurora.org (Sai Prakash Ranjan)
+Date: Mon, 17 Sep 2018 22:45:43 +0530
+Subject: [PATCH 1/6] dt-bindings: ramoops: Add event-size property
+In-Reply-To: <5b9f3f67.1c69fb81.3125b.c205@mx.google.com>
+References: <cover.1536430404.git.saiprakash.ranjan@codeaurora.org>
+ <4ec22906649fb3f6ab9570d8d4bf214e61512664.1536430404.git.saiprakash.ranjan@codeaurora.org>
+ <5b9f3f67.1c69fb81.3125b.c205@mx.google.com>
+Message-ID: <fa192e16-67e7-412c-96d1-ab781acd8092@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-09-17 at 17:52 +0100, Lorenzo Pieralisi wrote:
-> On Mon, Sep 17, 2018 at 04:01:21PM +0000, Leonard Crestez wrote:
-> > On Mon, 2018-09-17 at 16:09 +0100, Lorenzo Pieralisi wrote:
-> > > On Tue, Aug 14, 2018 at 07:50:14PM +0300, Leonard Crestez wrote:
-> > > > V4 adds 4 more patches with PME_Turn_Off support on top, using a new
-> > > > reset bit. I generally try to keep series short but in this case some
-> > > > planning might be needed to get patches into 4.20.
-> > > > 
-> > > > Since the new reset is treated as optional with old DTB there should be
-> > > > again no problem if reset and pci are merged out of order.
-> > > > 
-> > > > Shawn/Philipp/Lorenzo: Would it make sense to merge this series through a
-> > > > single specific tree, such as the one for imx?
-> > > 
-> > > This series is a bit of a mixture of multiple things hard to discern
-> > > (actually I already merged patch 2 and patch 1 seems completely
-> > > unrelated).
-> > > 
-> > > I would take the series through the PCI tree but I need an ACK for
-> > > patches 5 and 6, please let me know how you want to handle it.
-> > 
-> > Patches 1 and 2 are already in, the rest need review. I can now just
-> > resend patches 3-6 as a separate series, unless somebody complains
-> > about spam.
+On 9/17/2018 11:15 AM, Rob Herring wrote:
+> On Sun,  9 Sep 2018 01:57:02 +0530, Sai Prakash Ranjan wrote:
+>> Add an optional property called event-size to reserve
+>> log buffer for trace events.
+>>
+>> Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
+>> ---
+>>   .../devicetree/bindings/reserved-memory/ramoops.txt        | 7 +++++--
+>>   1 file changed, 5 insertions(+), 2 deletions(-)
+>>
 > 
-> What do you mean by "are already in" ? Patch 2 I queued via the PCI
-> tree, patch 1 ? Can I drop it from the PCI patch queue ?
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> 
 
-Sorry, what I meant here is "accepted by a maintainer". So keep patch 2
-please; patch 1 was accepted by Shawn few weeks ago.
+Thanks a lot for the review Rob.
 
-> I do not think there is any need to resend, I can merge patches 3-4
-> since they have been reviewed but patches 5 and 6 need review.
-
-Patches 3-4 were acked by Rob Herring mostly from the devicetree
-perspective. Since patches 3-6 are not useful independently somebody
-like Lucas should review the whole series and then it can be merged.
-
---
-Regards,
-Leonard
+- Sai
