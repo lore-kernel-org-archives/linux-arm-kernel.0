@@ -1,60 +1,30 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 17 Sep 2018 10:51:56 -0700
-Subject: [PATCH v3 0/4] Improve VCHIQ cache line size handling
-In-Reply-To: <1ffe9824-d254-6dfb-7bd6-e146d6c9eada@raspberrypi.org>
-References: <1537172544-104852-1-git-send-email-phil@raspberrypi.org>
- <f1e38c0c-0702-5df2-7f7c-40bbb93115b2@i2se.com>
- <1ffe9824-d254-6dfb-7bd6-e146d6c9eada@raspberrypi.org>
-Message-ID: <13b74c54-d115-8ff1-3c1d-a8888b43578c@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 17 Sep 2018 10:57:53 -0700
+Subject: [PATCH v2 1/5] dt-bindings: spi/spi-pxa2xx: add PXA2xx SSP SPI
+ Controller
+In-Reply-To: <20180917113559.11101-2-lkundrak@v3.sk>
+References: <20180917113559.11101-1-lkundrak@v3.sk>
+ <20180917113559.11101-2-lkundrak@v3.sk>
+Message-ID: <20180917175753.GE2471@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/17/2018 04:47 AM, Phil Elwell wrote:
-> Hi Stefan,
-> 
-> On 17/09/2018 12:39, Stefan Wahren wrote:
->> Hi Phil,
->>
->> Am 17.09.2018 um 10:22 schrieb Phil Elwell:
->>> Both sides of the VCHIQ communications mechanism need to agree on the cache
->>> line size. Using an incorrect value can lead to data corruption, but having the
->>> two sides using different values is usually worse.
->>>
->>> In the absence of an obvious convenient run-time method to determine the
->>> correct value in the ARCH=arm world, the downstream Raspberry Pi trees used a
->>> Device Tree property, written by the firmware, to configure the kernel driver.
->>> This method was vetoed during the upstreaming process, so a fixed value of 32
->>> was used instead, and some corruptions ensued. This is take 2 at arriving at
->>> the correct value.
->>>
->>> Add a new compatible string - "brcm,bcm2836-vchiq" - to indicate an SoC with
->>> a 64-byte cache line. Document the new string in the binding, and use it on
->>> the appropriate platforms.
->>>
->>> The final patch is a (seemingly cosmetic) correction of the Device Tree "reg"
->>> declaration for the device node, but it doubles as an indication to the
->>> Raspberry Pi firmware that the kernel driver is running a recent kernel driver
->>> that chooses the correct value. As such it would help if the DT patches are
->>> not merged before the driver patch.
->>>
->>> v3: Builds without errors, tested on multiple Raspberry Pi models.
->>> v2: Replaced ARM-specific logic used to determine cache line size with
->>>     a new compatible string for BCM2836 and BCM2837.
->>>
->>> Phil Elwell (4):
->>>   staging/vc04_services: Use correct cache line size
->>>   dt-bindings: soc: Document "brcm,bcm2836-vchiq"
->>>   ARM: dts: bcm283x: Correct vchiq compatible string
->>>   ARM: dts: bcm283x: Correct mailbox register sizes
->>
->> since my pull requests are out, would it be okay to apply patch #1 for
->> 4.20 and the DT stuff for 4.21 (with the assumption Rob is okay with
->> these patches)?
-> 
-> Patch 4 is the only one I'd like to be delayed, but delaying 2-4 is fine with me.
+On Mon, Sep 17, 2018 at 01:35:55PM +0200, Lubomir Rintel wrote:
+> This is the SPI controller found on Marvel MMP2 and perhaps more
+> platforms.
 
-Humm, did you mean you would like not to be delayed? In any case Stefan,
-you can send an additional pull request, and I will merge it and send a
-second pull request towards ARM SoC maintainers, that's not a problem.
--- 
-Florian
+I'm missing patches 2 and 5 from this series.  What's going on with
+them, are there any dependencies?
+
+> Changes since v1:
+> - s/ssp at d4035000/spi at d4035000/
+
+As covered in SubmittingPatches please put inter-version changelogs
+after the --- so they don't end up in the commits.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180917/1a841def/attachment.sig>
