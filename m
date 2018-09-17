@@ -1,47 +1,59 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 17 Sep 2018 10:35:09 +0100
-Subject: Wsometimes-uninitialized warning
-In-Reply-To: <137d09a45fb990ecf6f5a4af4cb04eaf@codeaurora.org>
-References: <137d09a45fb990ecf6f5a4af4cb04eaf@codeaurora.org>
-Message-ID: <20180917093508.GA19927@arm.com>
+From: yogeshnarayan.gaur@nxp.com (Yogesh Gaur)
+Date: Mon, 17 Sep 2018 15:18:25 +0530
+Subject: [PATCH v2 0/5] spi: spi-mem: Add driver for NXP FlexSPI controller
+Message-ID: <1537177710-9379-1-git-send-email-yogeshnarayan.gaur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 15, 2018 at 08:48:36AM -0700, Sodagudi Prasad wrote:
-> Hi All,
-> 
-> I have observed compile time issues with modules incremental compilation
-> using clang.
-> I referred to following clang documentation about this warning.
-> http://releases.llvm.org/3.2/tools/clang/docs/ReleaseNotes.html
-> 
-> But in kernel code, PERCPU_OP macro default case is not reachable to throw
-> this  -Wsometimes-uninitialized warning.
-> BUILD_BUG() is getting used for the default cases of the PERCPU_OP macro.
-> Have you observed -Wsometimes-uninitialized  warnings with clang when
-> compiling 4.14.6?
-> 
-> 
-> /arch/arm64/include/asm/percpu.h:102:1: note: variable 'ret' is declared
-> here
-> /arch/arm64/include/asm/percpu.h:52:2: note: expanded from macro 'PERCPU_OP'
->         unsigned long loop, ret;                                        \
->         ^
-> /arch/arm64/include/asm/percpu.h:103:1: error: variable 'ret' is used
-> uninitialized whenever switch default is taken
-> [-Werror,-Wsometimes-uninitialized]
-> PERCPU_OP(and, and)
-> ^~~~~~~~~~~~~~~~~~~
-> /arch/arm64/include/asm/percpu.h:95:2: note: expanded from macro 'PERCPU_OP'
->         default:                                                        \
-> 
-> 
-> Do you have any suggestions/comments?
+- Add a driver for NXP FlexSPI host controller
 
-FWIW, I had a go at rewriting that file last week:
+ FlexSPI is a flexsible SPI host controller [1], Chapter 30 page 1475,
+ which supports two SPI channels and up to 4 external devices.
+ Each channel supports Single/Dual/Quad/Octal mode data transfer (1/2/4/8 bidirectional data lines)
+ i.e. FlexSPI acts as an interface to external devices, maximum 4, each with up to 8
+ bidirectional data lines.
 
-https://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git/commit/?h=pcpu&id=126c36f538d494d0342ba8e95013936b85d7c5e2
+- Tested this driver with mtd_debug(Erase/Write/Read) utility and JFFS2
+ filesystem mounting and booting on NXP LX2160ARDB[2] and LX2160AQDS targets.
+ LX2160ARDB is having two NOR slave device connected on single bus A
+ i.e. A0 and A1 (CS0 and CS1).
+ LX2160AQDS is having two NOR slave device connected on separate buses
+ one flash on A0 and second on B1 i.e. (CS0 and CS3).
+ Verified this driver on following SPI NOR flashes:
+   Micron, mt35xu512aba[3], [Read - 1 bit mode]
+   Cypress, s25fl512s, [Read - 1/2/4 bit mode]
 
-With that, the switch statement disappears altogether.
+ Support for octal flash commands and other Octal data transfer related framework
+ changes work is in progress.
 
-Will
+[1] https://www.nxp.com/docs/en/reference-manual/IMXRT1050RM.pdf
+[2] https://patchwork.kernel.org/project/linux-arm-kernel/list/?series=9721
+[3] https://patchwork.ozlabs.org/project/linux-mtd/list/?series=63445
+
+Yogesh Gaur (5):
+  spi: spi-mem: Add driver for NXP FlexSPI controller
+  dt-bindings: spi: add binding file for NXP FlexSPI controller
+  arm64: dts: lx2160a: add FlexSPI node property
+  arm64: defconfig: enable NXP FlexSPI driver
+  MAINTAINERS: add maintainers for the NXP FlexSPI driver
+
+Changes for v2:
+- Incorporated Boris review comments and drop below patches as per the comments.
+ - Patch 'spi: add slave device size in spi_device struct'
+ - Patch 'spi: add flags for octal I/O data transfer'
+- Incorporated DTS and Binding file review comments of Shawn Guo and Rob Herring.
+
+ .../devicetree/bindings/spi/spi-nxp-fspi.txt       |   42 +
+ MAINTAINERS                                        |    6 +
+ arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts  |   22 +
+ arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi     |   12 +
+ arch/arm64/configs/defconfig                       |    1 +
+ drivers/spi/Kconfig                                |   10 +
+ drivers/spi/Makefile                               |    1 +
+ drivers/spi/spi-nxp-fspi.c                         | 1246 ++++++++++++++++++++
+ 8 files changed, 1340 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
+ create mode 100644 drivers/spi/spi-nxp-fspi.c
+
+-- 
+2.7.4
