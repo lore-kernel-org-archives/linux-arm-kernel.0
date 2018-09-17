@@ -1,21 +1,23 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 17 Sep 2018 01:45:11 -0400
-Subject: [PATCH 1/6] dt-bindings: ramoops: Add event-size property
-In-Reply-To: <4ec22906649fb3f6ab9570d8d4bf214e61512664.1536430404.git.saiprakash.ranjan@codeaurora.org>
-References: <cover.1536430404.git.saiprakash.ranjan@codeaurora.org>
- <4ec22906649fb3f6ab9570d8d4bf214e61512664.1536430404.git.saiprakash.ranjan@codeaurora.org>
-Message-ID: <5b9f3f67.1c69fb81.3125b.c205@mx.google.com>
+Date: Mon, 17 Sep 2018 01:45:09 -0400
+Subject: [PATCH 1/2] dt-bindings: marvell,
+ prestera: Add common compatible string
+In-Reply-To: <20180907005926.27134-2-chris.packham@alliedtelesis.co.nz>
+References: <20180907005926.27134-1-chris.packham@alliedtelesis.co.nz>
+ <20180907005926.27134-2-chris.packham@alliedtelesis.co.nz>
+Message-ID: <5b9f3f66.1c69fb81.e9b3c.3a62@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun,  9 Sep 2018 01:57:02 +0530, Sai Prakash Ranjan wrote:
-> Add an optional property called event-size to reserve
-> log buffer for trace events.
+On Fri,  7 Sep 2018 12:59:25 +1200, Chris Packham wrote:
+> Add "marvell,prestera" as a compatible string so that drivers can be
+> written to account for any prestera variant without needing to
+> specialise to the more specific values.
 > 
-> Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
+> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
 > ---
->  .../devicetree/bindings/reserved-memory/ramoops.txt        | 7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
+>  Documentation/devicetree/bindings/net/marvell,prestera.txt | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
 
 Reviewed-by: Rob Herring <robh@kernel.org>
