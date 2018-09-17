@@ -1,53 +1,27 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 17 Sep 2018 14:30:44 +0100
-Subject: [PATCH RESEND 5/6] arm64: add sysfs vulnerability show for
- speculative store bypass
-In-Reply-To: <20180827143310.641-6-ykaukab@suse.de>
-References: <20180827143310.641-1-ykaukab@suse.de>
- <20180827143310.641-6-ykaukab@suse.de>
-Message-ID: <20180917133043.GD23040@arm.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Mon, 17 Sep 2018 15:33:59 +0200
+Subject: [PATCH v2 0/3] iommu: Avoid DMA ops domain refcount contention
+In-Reply-To: <20180914124858.GA4010@arm.com>
+References: <cover.1536764440.git.robin.murphy@arm.com>
+ <20180914124858.GA4010@arm.com>
+Message-ID: <20180917133359.GA972@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 27, 2018 at 04:33:09PM +0200, Mian Yousaf Kaukab wrote:
-> Return status based no ssbd_state. Return string "Unknown" in case
-> CONFIG_ARM64_SSBD is disabled or arch workaround2 is not available
-> in the firmware.
+On Fri, Sep 14, 2018 at 01:48:59PM +0100, Will Deacon wrote:
+> > As far as merging goes, I don't mind at all whether this goes via IOMMU,
+> > or via dma-mapping provided Joerg's happy to ack it.
 > 
-> Signed-off-by: Mian Yousaf Kaukab <ykaukab@suse.de>
-> ---
->  arch/arm64/kernel/cpu_errata.c | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
-> 
-> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> index 8469d3be7b15..8b60aa30a3fa 100644
-> --- a/arch/arm64/kernel/cpu_errata.c
-> +++ b/arch/arm64/kernel/cpu_errata.c
-> @@ -744,4 +744,24 @@ ssize_t cpu_show_spectre_v2(struct device *dev, struct device_attribute *attr,
->  	return sprintf(buf, "Not affected\n");
->  }
->  
-> +ssize_t cpu_show_spec_store_bypass(struct device *dev,
-> +		struct device_attribute *attr, char *buf)
-> +{
-> +	switch (arm64_get_ssbd_state()) {
-> +	case ARM64_SSBD_MITIGATED:
-> +		return sprintf(buf, "Not affected\n");
-> +
-> +	case ARM64_SSBD_KERNEL:
-> +	case ARM64_SSBD_FORCE_ENABLE:
-> +		return sprintf(buf,
-> +			"Mitigation: Speculative Store Bypass disabled");
-> +
-> +	case ARM64_SSBD_FORCE_DISABLE:
-> +		return sprintf(buf, "Vulnerable\n");
-> +
-> +	default: /* ARM64_SSBD_UNKNOWN*/
-> +		return sprintf(buf, "Unknown\n");
-> +	}
-> +}
+> I think it makes most sense for Joerg to take this series via his tree.
 
-This probably wants extending for CPUs that support SSBS (see
-for-next/core).
+FYI, I have WIP patches to move the arm dma-iommu wrappers to common
+code:
 
-Will
+http://git.infradead.org/users/hch/misc.git/shortlog/refs/heads/dma-maybe-coherent
+
+which will require some synchronization of the involved trees.  In the
+end it is iommu code, so the actual iommu patches should probably
+go into the iommu tree after all, but it might have to pull in the
+dma-mapping branch for that.  Or we just punt it until the next merge
+window.  Not sure how fast Tom needs the common dma-iommu code for
+the x86 AMD iommu conversion.
