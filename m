@@ -1,51 +1,47 @@
-From: navam@xilinx.com (Nava kishore Manne)
-Date: Mon, 17 Sep 2018 09:09:45 +0000
-Subject: [RFC PATCH v3 2/3] dt-bindings: reset: Add bindings for ZynqMP
- reset driver
-In-Reply-To: <20180910201224.GA31501@bogus>
-References: <1536131342-28041-1-git-send-email-nava.manne@xilinx.com>
- <1536131342-28041-3-git-send-email-nava.manne@xilinx.com>
- <20180910201224.GA31501@bogus>
-Message-ID: <BYAPR02MB471009755B88F55A97DA5694C21E0@BYAPR02MB4710.namprd02.prod.outlook.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 17 Sep 2018 10:35:09 +0100
+Subject: Wsometimes-uninitialized warning
+In-Reply-To: <137d09a45fb990ecf6f5a4af4cb04eaf@codeaurora.org>
+References: <137d09a45fb990ecf6f5a4af4cb04eaf@codeaurora.org>
+Message-ID: <20180917093508.GA19927@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-Thanks for providing the comments...
-Please find my response inline.
-
-> -----Original Message-----
-> From: Rob Herring [mailto:robh at kernel.org]
-> Sent: Tuesday, September 11, 2018 1:42 AM
-> To: Nava kishore Manne <navam@xilinx.com>
-> Cc: mark.rutland at arm.com; Michal Simek <michals@xilinx.com>;
-> p.zabel at pengutronix.de; Rajan Vaja <RAJANV@xilinx.com>; Jolly Shah
-> <JOLLYS@xilinx.com>; devicetree at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-> Subject: Re: [RFC PATCH v3 2/3] dt-bindings: reset: Add bindings for ZynqMP
-> reset driver
+On Sat, Sep 15, 2018 at 08:48:36AM -0700, Sodagudi Prasad wrote:
+> Hi All,
 > 
-> On Wed, Sep 05, 2018 at 12:39:01PM +0530, Nava kishore Manne wrote:
-> > Add documentation to describe Xilinx ZynqMP reset driver bindings.
-> >
-> > Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
-> > ---
-> > Changes for v3:
-> > 		-Corrected Commit Msg.
-> > Changes for v2:
-> > 		-Moved reset node as a child to firwmare
-> > 		 node.
+> I have observed compile time issues with modules incremental compilation
+> using clang.
+> I referred to following clang documentation about this warning.
+> http://releases.llvm.org/3.2/tools/clang/docs/ReleaseNotes.html
 > 
-> Why? There's no reason for that. The parent can be multiple providers.
-> You only need child nodes if the sub functions have their own DT resources.
+> But in kernel code, PERCPU_OP macro default case is not reachable to throw
+> this  -Wsometimes-uninitialized warning.
+> BUILD_BUG() is getting used for the default cases of the PERCPU_OP macro.
+> Have you observed -Wsometimes-uninitialized  warnings with clang when
+> compiling 4.14.6?
 > 
+> 
+> /arch/arm64/include/asm/percpu.h:102:1: note: variable 'ret' is declared
+> here
+> /arch/arm64/include/asm/percpu.h:52:2: note: expanded from macro 'PERCPU_OP'
+>         unsigned long loop, ret;                                        \
+>         ^
+> /arch/arm64/include/asm/percpu.h:103:1: error: variable 'ret' is used
+> uninitialized whenever switch default is taken
+> [-Werror,-Wsometimes-uninitialized]
+> PERCPU_OP(and, and)
+> ^~~~~~~~~~~~~~~~~~~
+> /arch/arm64/include/asm/percpu.h:95:2: note: expanded from macro 'PERCPU_OP'
+>         default:                                                        \
+> 
+> 
+> Do you have any suggestions/comments?
 
-This driver having a dependency on firmware. So I have moved this node as a child to firmware
-As per other drivers which is using this firmware interface 
-https://lkml.org/lkml/2018/8/14/432 
-I didn't get your comment could you please elaborate more??? 
-Did you mean I should move the changes in the file to Documentation/devicetree/bindings/reset/ ???
+FWIW, I had a go at rewriting that file last week:
 
-Regards,
-Navakishore.
+https://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git/commit/?h=pcpu&id=126c36f538d494d0342ba8e95013936b85d7c5e2
+
+With that, the switch statement disappears altogether.
+
+Will
