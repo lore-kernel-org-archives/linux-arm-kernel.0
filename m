@@ -1,64 +1,65 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 17 Sep 2018 11:13:53 +0100
-Subject: [PATCH 0/2] Workaround for IMX7d PCI-e PLL lock failure
-In-Reply-To: <20180718194424.8844-1-tpiepho@impinj.com>
-References: <20180718194424.8844-1-tpiepho@impinj.com>
-Message-ID: <20180917101353.GA7239@e107981-ln.cambridge.arm.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 17 Sep 2018 12:23:29 +0200
+Subject: [PATCH v2 2/4] iio: Documentation: Add Xilinx AMS sysfs
+ documentation
+In-Reply-To: <20180917110215.00002846@huawei.com>
+References: <1536909510-7166-1-git-send-email-manish.narani@xilinx.com>
+ <1536909510-7166-3-git-send-email-manish.narani@xilinx.com>
+ <20180916111242.73af71ed@archlinux>
+ <cf2acc8a-ed2d-27f4-ca58-3e2132e17d2a@xilinx.com>
+ <20180917110215.00002846@huawei.com>
+Message-ID: <469597c5-724f-08c9-ccbc-f076673e1744@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 18, 2018 at 12:44:22PM -0700, Trent Piepho wrote:
-> This is the workaround for the IMX7d Erratum e10728, failure of
-> initialize PCIe PLL VCO oscillation resulting in PLL lock failure and
-> failure of the PCI-e link to come up.
+On 17.9.2018 12:06, Jonathan Cameron wrote:
+> On Mon, 17 Sep 2018 11:56:08 +0200
+> Michal Simek <michal.simek@xilinx.com> wrote:
 > 
-> The registers used in the workaround are based on the latest patch in
-> the NXP kernel, but many things around that have been changed.
+>> On 16.9.2018 12:12, Jonathan Cameron wrote:
+>>> On Fri, 14 Sep 2018 12:48:28 +0530
+>>> Manish Narani <manish.narani@xilinx.com> wrote:
+>>>   
+>>>> Add documentation for xilinx-ams driver. This contains information about
+>>>> various voltages and temperatures on PS (Processing System), PL
+>>>> (Programmable Logic) and AMS Control Block.
+>>>>
+>>>> Signed-off-by: Manish Narani <manish.narani@xilinx.com>  
+>>> The more I look at this device the more I'm convinced it is very much a dedicated
+>>> hardware monitoring function, not a generic ADC sensing unit at all.
+>>>
+>>> Hmm.  It is still fine to have it in IIO but you need to think in detail
+>>> about how you are going to interface this to hwmon via the iio-hwmon bridge.
+>>>
+>>> Some of the interface complexity should only really be apparent when we hit
+>>> hwmon perhaps rather than having so many different custom interfaces in IIO.
+>>>
+>>> Please also loop in the maintainers and lists for hwmon in the next
+>>> version so we can get their input.  
+>>
+>> Isn't there iio-hwmon driver for this?
+>>
+>> Thanks,
+>> Michal
 > 
-> This uses a new node of type fsl,imx-pcie-phy to get the PHY's
-> registers.  The node is found via a phandle added to the PCI-e
-> controller's node, rather than the incorrect way done in the NXP kernel.
-> 
-> There is no error if the phandle is not preset (since it's needed except
-> for the imx7d workaround and no existing dtses have it), but if preset
-> it is an error if something relating to it does not work.
-> 
-> ** Should the node be fsl,imx7d-pcie-phy?  snps,dw-pcie-phy?  
-> 
-> There is little to no documenation from NXP and Synopsis about this, so I'm
-> unsure of the PHY's lineage.
-> 
-> The imx6 PCI-e driver does not use the generic phy layer to interact
-> with the PHY.  It appears PHY related hardware, like clocks, regulators,
-> and resets, are part of the fsl,imx6q-pcie node.  But again, the
-> topology of this hardware is not documented very well.
-> 
-> Another approach would be to add the PHY registers as another bank in
-> the PCI-e node.  This would match how the PHY reset, clock, etc.  are
-> done.  However, the PHY is attached to a different AXI master than the
-> PCI-e controller, so the register range really does not belong there.
-> 
-> Trent Piepho (2):
->   ARM: dts: imx7d: Add node for PCIe PHY
->   PCI: imx: Add workaround for e10728, IMX7d PCIe PLL failure
+> Absolutely.  The interesting bit is that if we are planning to actually expose
+> the many monitoring channels via iio-hwmon IIRC it won't use the extended names
+> at all (I may have missremembered this thogh).  As such we may want to reduced
+> the amount of custom ABI in IIO in favour of a level of opaqueness with the
+> 'real' interface provided by the iio-hwmon bridge driver.  A quick glance
+> suggested we may need to increase the information exposed by the iio-hwmon
+> driver to make this work.
 
-Marked as "changes requested", following Lucas' review, please
-respin as appropriate.
+ok.
 
-Lorenzo
 
->  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     | 11 ++++
->  arch/arm/boot/dts/imx7d.dtsi                       |  9 ++++
->  drivers/pci/dwc/pci-imx6.c                         | 59 ++++++++++++++++++++++
->  3 files changed, 79 insertions(+)
-> 
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Richard Zhu <hongxing.zhu@nxp.com>
-> Cc: Lucas Stach <l.stach@pengutronix.de>
-> 
-> -- 
-> 2.14.4
-> 
-> 
+> When we have run into cases like this (a very much hardware monitoring oriented
+> device with a few general purpose channels) in the past we have always gotten
+> agreement from the hwmon maintainers that they are happy with using an IIO provider
+> and the iio-hwmon driver route. It is just nice to keep everyone in agreement
+> and have no surprises!
+
+Definitely I agree with this.
+
+Thanks,
+Michal
