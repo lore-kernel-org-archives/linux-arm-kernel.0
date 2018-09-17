@@ -1,42 +1,39 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 17 Sep 2018 17:57:49 +0200
-Subject: [PATCH v3] dt-bindings: arm: Explicitly mark Samsung Exynos SoC
- as unstable
-In-Reply-To: <20180830180205.18121-1-krzk@kernel.org>
-References: <20180830180205.18121-1-krzk@kernel.org>
-Message-ID: <20180917155749.i6jx7k4vo32y56kd@kozik-lap>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Mon, 17 Sep 2018 17:59:40 +0200
+Subject: [PATCH] net: macb: disable scatter-gather for macb on sama5d3
+In-Reply-To: <20180917.075813.1145409055019392182.davem@davemloft.net>
+References: <20180914154811.12090-1-nicolas.ferre@microchip.com>
+ <20180917.075813.1145409055019392182.davem@davemloft.net>
+Message-ID: <8da68995-4019-e0c7-0471-4fdbe40ad52a@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 30, 2018 at 08:02:05PM +0200, Krzysztof Kozlowski wrote:
-> Samsung Exynos SoCs and boards related bindings evolved since the initial
-> introduction, but initially the bindings were minimal and a bit incomplete
-> (they never described all the hardware modules available in the SoCs).
-> Since then some significant (not fully compatible) changes have been
-> already committed a few times (like gpio replaced by pinctrl, display ddc,
-> mfc reserved memory, some core clocks added to various hardware modules,
-> added more required nodes).
+On 17/09/2018 at 16:58, David Miller wrote:
+> From: Nicolas Ferre <nicolas.ferre@microchip.com>
+> Date: Fri, 14 Sep 2018 17:48:10 +0200
 > 
-> On the other side there are no boards which have device tree embedded in
-> the bootloader. Device tree blob is always compiled from the kernel tree
-> and updated together with the kernel image.
+>> Create a new configuration for the sama5d3-macb new compatibility string.
+>> This configuration disables scatter-gather because we experienced lock down
+>> of the macb interface of this particular SoC under very high load.
+>>
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 > 
-> Thus to avoid further adding a bunch of workarounds for old/missing
-> bindings, make development of new platforms easier and allow to make
-> cleanup of the existing code and device tree files, lets mark some
-> Samsung Exynos SoC platform bindings as unstable. This means that
-> bindings can may change at any time and users should use the dtb file
-> compiled from the same kernel source tree as the kernel image.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> [krzk: Explicitly list unstable bindings instead of marking entire
-> Exynos]
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> 
+> Applied, but are you really sure it isn't just some bug in the driver
+> or somesuch?
 
-Applied.
+Actually, the same IP on other SoCs behaves correctly with same driver. 
+We tried hard to find the root cause of the problem without success and 
+we didn't have confirmation of an issue on Cadence's side either.
+
+The symptom is that we have a receive overrun on this interface under 
+heavy load but I think that it is more a result of the issue than the 
+real problem: I cannot escape from this overrun condition: the IP itself 
+is completely blocked.
+
+Even if the problem is very difficult to reproduce (simple *perf tools 
+not sufficient), we play safe by simply disabling this feature on this 
+SoC only.
 
 Best regards,
-Krzysztof
+-- 
+Nicolas Ferre
