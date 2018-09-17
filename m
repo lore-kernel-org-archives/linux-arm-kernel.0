@@ -1,88 +1,58 @@
-From: pintu.ping@gmail.com (Pintu Kumar)
-Date: Mon, 17 Sep 2018 17:25:27 +0530
-Subject: KSM not working in 4.9 Kernel
-In-Reply-To: <CAOuPNLidXFHgkBmwOPj_xFkU_OpLaXbpJg04Le7MPxu8cYg_RQ@mail.gmail.com>
-References: <CAOuPNLj1wx4sznrtLdKjcvuTf0dECPWzPaR946FoYRXB6YAGCw@mail.gmail.com>
- <20180916153237.GC15699@rapoport-lnx>
- <CAOuPNLj0HyC+yzwTpN-EWpzHTJ58u7pBfOja1MyweF4pbct1eQ@mail.gmail.com>
- <20180917043724.GA12866@rapoport-lnx>
- <CAOuPNLidXFHgkBmwOPj_xFkU_OpLaXbpJg04Le7MPxu8cYg_RQ@mail.gmail.com>
-Message-ID: <CAOuPNLj+4pMnEy5EyZmzDWszqMb_PQb3q7t_hvG_50BTz1He2Q@mail.gmail.com>
+From: lkundrak@v3.sk (Lubomir Rintel)
+Date: Mon, 17 Sep 2018 13:39:46 +0200
+Subject: [PATCH 1/2] DT: marvell,mmp2: fix TWSI2
+In-Reply-To: <20180917113947.12626-1-lkundrak@v3.sk>
+References: <20180917113947.12626-1-lkundrak@v3.sk>
+Message-ID: <20180917113947.12626-2-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 17, 2018 at 11:46 AM Pintu Kumar <pintu.ping@gmail.com> wrote:
-> > > But still no effect.
-> > > And I checked LTP test cases. It almost doing the same thing.
-> > >
-> > > I observed that [ksmd] thread is not waking up at all.
-> > > I gave some print inside it, but I could never saw that prints coming.
-> > > I could not find it running either in top command during the operation.
-> > > Is there anything needs to be done, to wakw up ksmd?
-> > > I already set: echo 1 > /sys/kernel/mm/ksm.
-> >
-> > It should be echo 1 > /sys/kernel/mm/ksm/run
-> >
->
-> Oh yes, sorry for the typo.
-> I tried the same, but still ksm is not getting invoked.
-> Could someone confirm if KSM was working in 4.9 kernel?
->
+Marvell keeps their MMP2 datasheet secret, but there are good clues
+that TWSI2 is not on 0xd4025000 on that platform, not does it use
+IRQ 58. In fact, the IRQ 58 on MMP2 seems to be a signal processor:
 
-Ok, it's working now. I have to explicitly stop the ksm thread to see
-the statistics.
-Also there was some internal patch that was setting vm_flags to
-VM_MERGABLE thus causing ksm_advise call to return.
+   arch/arm/mach-mmp/irqs.h:#define IRQ_MMP2_MSP  58
 
-# echo 1 > /sys/kernel/mm/ksm/run
-# ./malloc-test.out &
-# echo 0 > /sys/kernel/mm/ksm/run
+I'm taking a somewhat educated guess that is probably a copy & paste
+error from PXA168 or PXA910 and that the real controller in fact hides
+at address 0xd4031000 and uses an interrupt line multiplexed via IRQ 17.
 
-~ # grep -H '' /sys/kernel/mm/ksm/*
-/sys/kernel/mm/ksm/full_scans:105
-/sys/kernel/mm/ksm/pages_shared:1
-/sys/kernel/mm/ksm/pages_sharing:999
-/sys/kernel/mm/ksm/pages_to_scan:100
-/sys/kernel/mm/ksm/pages_unshared:0
-/sys/kernel/mm/ksm/pages_volatile:0
-/sys/kernel/mm/ksm/run:0
-/sys/kernel/mm/ksm/sleep_millisecs:20
+I'm also copying some properties from TWSI1 that were missing or
+incorrect.
 
+Tested on a OLPC XO 1.75 machine, where the RTC is on TWSI2.
 
-However, I have one doubt.
-Is the above data correct, for the below program?
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+---
+ arch/arm/boot/dts/mmp2.dtsi | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-int main(int argc, char *argv[])
-{
-        int i, n, size, ret;
-        char *buffer;
-        void *addr;
-
-        n = 10;
-        size = 100 * getpagesize();
-        for (i = 0; i < n; i++) {
-                buffer = (char *)malloc(size);
-                memset(buffer, 0xff, size);
-                madvise(buffer, size, MADV_MERGEABLE);
-                addr =  mmap(NULL, size,
-                           PROT_READ | PROT_EXEC | PROT_WRITE,
-MAP_PRIVATE | MAP_ANONYMOUS,
-                           -1, 0);
-                memset(addr, 0xff, size);
-                ret = madvise(addr, size, MADV_MERGEABLE);
-                if (ret < 0) {
-                        fprintf(stderr, "madvise failed: ret: %d,
-reason: %s\n", ret, strerror(errno));
-                }
-                usleep(500);
-        }
-        printf("Done....press ^C\n");
-
-        pause();
-
-        return 0;
-}
-
-
-Thanks,
-Pintu
+diff --git a/arch/arm/boot/dts/mmp2.dtsi b/arch/arm/boot/dts/mmp2.dtsi
+index 766bbb8495b6..47e5b63339d1 100644
+--- a/arch/arm/boot/dts/mmp2.dtsi
++++ b/arch/arm/boot/dts/mmp2.dtsi
+@@ -220,12 +220,15 @@
+ 				status = "disabled";
+ 			};
+ 
+-			twsi2: i2c at d4025000 {
++			twsi2: i2c at d4031000 {
+ 				compatible = "mrvl,mmp-twsi";
+-				reg = <0xd4025000 0x1000>;
+-				interrupts = <58>;
++				reg = <0xd4031000 0x1000>;
++				interrupt-parent = <&intcmux17>;
++				interrupts = <0>;
+ 				clocks = <&soc_clocks MMP2_CLK_TWSI1>;
+ 				resets = <&soc_clocks MMP2_CLK_TWSI1>;
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				status = "disabled";
+ 			};
+ 
+-- 
+2.17.1
