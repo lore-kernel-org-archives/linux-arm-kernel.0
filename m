@@ -1,63 +1,100 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Mon, 17 Sep 2018 19:22:07 +0200
-Subject: [PATCH RESEND 3/6] arm64: add sysfs vulnerability show for
- spectre v1
-In-Reply-To: <20180827143310.641-4-ykaukab@suse.de>
-References: <20180827143310.641-1-ykaukab@suse.de>
- <20180827143310.641-4-ykaukab@suse.de>
-Message-ID: <20180917172206.GA3795@rric.localdomain>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Mon, 17 Sep 2018 10:38:20 -0700
+Subject: [PATCH 2/6] pstore: Add event tracing support
+In-Reply-To: <444d7b13-2653-ba0e-e9e6-a448fded2a77@codeaurora.org>
+References: <cover.1536430404.git.saiprakash.ranjan@codeaurora.org>
+ <b9b60ff2864a17fb05481aa33f90114ab051d6ce.1536430404.git.saiprakash.ranjan@codeaurora.org>
+ <444d7b13-2653-ba0e-e9e6-a448fded2a77@codeaurora.org>
+Message-ID: <153720590027.119890.15984895820368075914@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27.08.18 16:33:07, Mian Yousaf Kaukab wrote:
-> Hard-coded since patches are merged and there are no configuration
-> options.
-
-Could you add a list of upstream patches to the description that are
-required to solve this? This would be a strict definition for the
-mitigation being enabled and makes it easier to check if backports are
-affected or not. A build-time check would be ideal (e.g. checking for
-certain macros).
-
-Looking at arm64/kpti I see the following patches:
-
-f84a56f73ddd^..f3804203306e 669474e772b9^..91b2d3442f6a
-
-v4.16-rc1  f84a56f73ddd Documentation: Document array_index_nospec
-v4.16-rc1  f3804203306e array_index_nospec: Sanitize speculative array de-references
-v4.16-rc1  669474e772b9 arm64: barrier: Add CSDB macros to control data-value prediction
-v4.16-rc1  022620eed3d0 arm64: Implement array_index_mask_nospec()
-v4.16-rc1  51369e398d0d arm64: Make USER_DS an inclusive limit
-v4.16-rc1  4d8efc2d5ee4 arm64: Use pointer masking to limit uaccess speculation
-v4.16-rc1  6314d90e6493 arm64: entry: Ensure branch through syscall table is bounded under speculation
-v4.16-rc1  c2f0ad4fc089 arm64: uaccess: Prevent speculative use of the current addr_limit
-v4.16-rc1  84624087dd7e arm64: uaccess: Don't bother eliding access_ok checks in __{get, put}_user
-v4.16-rc1  f71c2ffcb20d arm64: uaccess: Mask __user pointers for __arch_{clear, copy_*}_user
-v4.16-rc1  91b2d3442f6a arm64: futex: Mask __user pointers prior to dereference
-
--Robert
-
+Quoting Sai Prakash Ranjan (2018-09-11 03:46:01)
+> On 9/9/2018 1:57 AM, Sai Prakash Ranjan wrote:
+> > +void notrace pstore_event_call(struct trace_event_buffer *fbuffer)
+> > +{
+> > +     struct trace_iterator *iter;
+> > +     struct trace_seq *s;
+> > +     struct trace_event_call *event_call;
+> > +     struct pstore_record record;
+> > +     struct trace_event *event;
+> > +     struct seq_buf *seq;
+> > +     unsigned long flags;
+> > +
+> > +     if (!psinfo)
+> > +             return;
+> > +
+> > +     if (unlikely(oops_in_progress))
+> > +             return;
+> > +
+> > +     pstore_record_init(&record, psinfo);
+> > +     record.type = PSTORE_TYPE_EVENT;
+> > +
+> > +     iter = kmalloc(sizeof(*iter), GFP_KERNEL);
+> > +     if (!iter)
+> > +             return;
+> > +
+> > +     event_call = fbuffer->trace_file->event_call;
+> > +     if (!event_call || !event_call->event.funcs ||
+> > +         !event_call->event.funcs->trace)
+> > +             goto fail_event;
+> > +
+> > +     event = &fbuffer->trace_file->event_call->event;
+> > +
+> > +     spin_lock_irqsave(&psinfo->buf_lock, flags);
+> > +
+> > +     trace_seq_init(&iter->seq);
+> > +     iter->ent = fbuffer->entry;
+> > +     event_call->event.funcs->trace(iter, 0, event);
+> > +     trace_seq_putc(&iter->seq, 0);
+> > +
+> > +     if (seq->size > psinfo->bufsize)
+> > +             seq->size = psinfo->bufsize;
+> > +
+> > +     s = &iter->seq;
+> > +     seq = &s->seq;
+> > +
+> > +     record.buf = (char *)(seq->buffer);
+> > +     record.size = seq->len;
+> > +     psinfo->write(&record);
+> > +
+> > +     spin_unlock_irqrestore(&psinfo->buf_lock, flags);
+> > +
+> > +fail_event:
+> > +     kfree(iter);
+> > +}
+> > +
+> > 
 > 
-> Signed-off-by: Mian Yousaf Kaukab <ykaukab@suse.de>
-> ---
->  arch/arm64/kernel/cpu_errata.c | 6 ++++++
->  1 file changed, 6 insertions(+)
+> When tracing sched events on sdm845 mtp, I hit below bug repeatedly.
+> Seems like pstore_event_call can be called in atomic context.
+> I will respin the below fix in next version of the patch.
+> Reviews on other parts would be appreciated, thanks.
 > 
-> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> index 996edb4e18ad..92616431ae4e 100644
-> --- a/arch/arm64/kernel/cpu_errata.c
-> +++ b/arch/arm64/kernel/cpu_errata.c
-> @@ -706,4 +706,10 @@ ssize_t cpu_show_meltdown(struct device *dev, struct device_attribute *attr,
->         return sprintf(buf, "Vulnerable\n");
->  }
+> diff --git a/fs/pstore/ftrace.c b/fs/pstore/ftrace.c
+> index d47dc93ac098..a497cf782ee8 100644
+> --- a/fs/pstore/ftrace.c
+> +++ b/fs/pstore/ftrace.c
+> @@ -73,6 +73,7 @@ void notrace pstore_event_call(struct 
+> trace_event_buffer *fbuffer)
+>          struct trace_event *event;
+>          struct seq_buf *seq;
+>          unsigned long flags;
+> +       gfp_t gfpflags;
 > 
-> +ssize_t cpu_show_spectre_v1(struct device *dev, struct device_attribute *attr,
-> +               char *buf)
-> +{
-> +       return sprintf(buf, "Mitigation: __user pointer sanitization\n");
-> +}
+>          if (!psinfo)
+>                  return;
+> @@ -83,7 +84,9 @@ void notrace pstore_event_call(struct 
+> trace_event_buffer *fbuffer)
+>          pstore_record_init(&record, psinfo);
+>          record.type = PSTORE_TYPE_EVENT;
+> 
+> -       iter = kmalloc(sizeof(*iter), GFP_KERNEL);
+> +       gfpflags = (in_atomic() || irqs_disabled()) ? GFP_ATOMIC : 
+> GFP_KERNEL;
 > +
->  #endif
-> --
-> 2.11.0
-> 
+
+Do you need to allocate at all? Can you throw the iter on the stack?
+
+Using in_atomic() and irqs_disabled() to figure out if an atomic or a
+non-atomic allocation should be used is not a good solution.
