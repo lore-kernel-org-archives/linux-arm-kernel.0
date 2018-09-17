@@ -1,90 +1,40 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Mon, 17 Sep 2018 13:20:51 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: enable MMP2 platform
-Message-ID: <20180917112051.8173-1-lkundrak@v3.sk>
+Date: Mon, 17 Sep 2018 13:35:56 +0200
+Subject: [PATCH v2 2/5] PCI: Provide pci_match_id() with CONFIG_PCI=n
+In-Reply-To: <20180917113559.11101-1-lkundrak@v3.sk>
+References: <20180917113559.11101-1-lkundrak@v3.sk>
+Message-ID: <20180917113559.11101-3-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marvell MMP/PXA/MMP2 platforms seem to be excluded from the defconfig
-for no good reasons. Enable the DT-based boards and the modules for
-their peripherals.
+This spares drivers from #ifdef-ing on CONFIG_PCI if the driver can be
+optionally built on machines without PCI bus.
 
-Cc: Russell King <linux@armlinux.org.uk>
+Consistent with acpi_driver_match_device() and similar.
+
+Changes since v1:
+- Capitalization in the commit message
+
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
 ---
- arch/arm/configs/multi_v7_defconfig | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ include/linux/pci.h | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index fc33444e94f0..f8655c35effa 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -54,6 +54,8 @@ CONFIG_SOC_VF610=y
- CONFIG_ARCH_KEYSTONE=y
- CONFIG_ARCH_MEDIATEK=y
- CONFIG_ARCH_MESON=y
-+CONFIG_ARCH_MMP=y
-+CONFIG_MACH_MMP2_DT=y
- CONFIG_ARCH_MVEBU=y
- CONFIG_MACH_ARMADA_370=y
- CONFIG_MACH_ARMADA_375=y
-@@ -274,6 +276,7 @@ CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_QT1070=m
- CONFIG_KEYBOARD_GPIO=y
- CONFIG_KEYBOARD_TEGRA=y
-+CONFIG_KEYBOARD_PXA27x=m
- CONFIG_KEYBOARD_SAMSUNG=m
- CONFIG_KEYBOARD_ST_KEYSCAN=y
- CONFIG_KEYBOARD_SPEAR=y
-@@ -304,6 +307,7 @@ CONFIG_SERIAL_8250_DW=y
- CONFIG_SERIAL_8250_EM=y
- CONFIG_SERIAL_8250_MT6577=y
- CONFIG_SERIAL_8250_UNIPHIER=y
-+CONFIG_SERIAL_8250_PXA=m
- CONFIG_SERIAL_OF_PLATFORM=y
- CONFIG_SERIAL_AMBA_PL011=y
- CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
-@@ -567,6 +571,7 @@ CONFIG_VIDEO_V4L2_SUBDEV_API=y
- CONFIG_MEDIA_USB_SUPPORT=y
- CONFIG_USB_VIDEO_CLASS=m
- CONFIG_V4L_PLATFORM_DRIVERS=y
-+CONFIG_VIDEO_MMP_CAMERA=m
- CONFIG_VIDEO_STM32_DCMI=m
- CONFIG_SOC_CAMERA=m
- CONFIG_SOC_CAMERA_PLATFORM=m
-@@ -652,6 +657,9 @@ CONFIG_SND_ATMEL_SOC_WM8904=m
- CONFIG_SND_ATMEL_SOC_PDMIC=m
- CONFIG_SND_BCM2835_SOC_I2S=m
- CONFIG_SND_SOC_FSL_SAI=m
-+CONFIG_SND_MMP_SOC=y
-+CONFIG_SND_PXA_SOC_SSP=m
-+CONFIG_SND_PXA910_SOC=m
- CONFIG_SND_SOC_ROCKCHIP=m
- CONFIG_SND_SOC_ROCKCHIP_SPDIF=m
- CONFIG_SND_SOC_ROCKCHIP_MAX98090=m
-@@ -691,6 +699,7 @@ CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_HCD_STI=y
- CONFIG_USB_EHCI_TEGRA=y
- CONFIG_USB_EHCI_EXYNOS=y
-+CONFIG_USB_EHCI_MV=m
- CONFIG_USB_OHCI_HCD=y
- CONFIG_USB_OHCI_HCD_STI=y
- CONFIG_USB_OHCI_EXYNOS=m
-@@ -760,6 +769,7 @@ CONFIG_MMC_SDHCI_DOVE=y
- CONFIG_MMC_SDHCI_TEGRA=y
- CONFIG_MMC_SDHCI_S3C=y
- CONFIG_MMC_SDHCI_PXAV3=y
-+CONFIG_MMC_SDHCI_PXAV2=m
- CONFIG_MMC_SDHCI_SPEAR=y
- CONFIG_MMC_SDHCI_S3C_DMA=y
- CONFIG_MMC_SDHCI_BCM_KONA=y
-@@ -823,6 +833,7 @@ CONFIG_RTC_DRV_DA9063=m
- CONFIG_RTC_DRV_EFI=m
- CONFIG_RTC_DRV_DIGICOLOR=m
- CONFIG_RTC_DRV_S3C=m
-+CONFIG_RTC_DRV_SA1100=m
- CONFIG_RTC_DRV_PL031=y
- CONFIG_RTC_DRV_AT91RM9200=m
- CONFIG_RTC_DRV_AT91SAM9=m
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 6925828f9f25..2c4755032475 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -1705,6 +1705,10 @@ static inline int pci_irqd_intx_xlate(struct irq_domain *d,
+ 				      unsigned long *out_hwirq,
+ 				      unsigned int *out_type)
+ { return -EINVAL; }
++
++static inline const struct pci_device_id *pci_match_id(const struct pci_device_id *ids,
++							 struct pci_dev *dev)
++{ return NULL; }
+ #endif /* CONFIG_PCI */
+ 
+ /* Include architecture-dependent settings and functions */
 -- 
 2.17.1
