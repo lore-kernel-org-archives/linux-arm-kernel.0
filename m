@@ -1,47 +1,41 @@
-From: sed@free.fr (Cedric Roux)
-Date: Mon, 17 Sep 2018 22:43:50 +0200
-Subject: [PATCH] ARM: s3c24xx: fix usage of pr_info/pr_cont
-Message-ID: <20180917204350.15192-1-sed@free.fr>
+From: leoyang.li@nxp.com (Li Yang)
+Date: Mon, 17 Sep 2018 16:09:57 -0500
+Subject: [PATCH -next] fsl/qe: Fix copy-paste error in
+ ucc_get_tdm_sync_shift
+In-Reply-To: <20180915111005.10028-1-yuehaibing@huawei.com>
+References: <20180915111005.10028-1-yuehaibing@huawei.com>
+Message-ID: <CADRPPNSQp78jioP8Eao3ku_vqYCddRTuz1sydskUiPWTfmSUGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit fixes the wrong usage of pr_info introduced by the
-commit e728e4f20100 ("ARM: s3c24xx: formatting cleanup in
-mach-mini2440.c").
+On Sat, Sep 15, 2018 at 6:11 AM YueHaibing <yuehaibing@huawei.com> wrote:
+>
+> if 'mode' is COMM_DIR_TX, 'shift' should use TX_SYNC_SHIFT_BASE
+>
+> Fixes: bb8b2062aff3 ("fsl/qe: setup clock source for TDM mode")
+> Signed-off-by: YueHaibing <yuehaibing@huawei.com>
 
-Since the idea is to print on a single line, pr_cont has to be used.
+Thanks for submitting the patch, but there is already the same fix in
+the queue from Zhao Qiang and Dan Carpenter.
 
-Signed-off-by: Cedric Roux <sed@free.fr>
----
- arch/arm/mach-s3c24xx/mach-mini2440.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-s3c24xx/mach-mini2440.c b/arch/arm/mach-s3c24xx/mach-mini2440.c
-index 9f830abe701c..50d67d760efd 100644
---- a/arch/arm/mach-s3c24xx/mach-mini2440.c
-+++ b/arch/arm/mach-s3c24xx/mach-mini2440.c
-@@ -684,14 +684,14 @@ static void __init mini2440_init(void)
- 		pr_info("MINI2440: LCD");
- 		for (li = 0; li < ARRAY_SIZE(mini2440_lcd_cfg); li++)
- 			if (li == features.lcd_index)
--				pr_info(" [%d:%dx%d]", li,
-+				pr_cont(" [%d:%dx%d]", li,
- 					mini2440_lcd_cfg[li].width,
- 					mini2440_lcd_cfg[li].height);
- 			else
--				pr_info(" %d:%dx%d", li,
-+				pr_cont(" %d:%dx%d", li,
- 					mini2440_lcd_cfg[li].width,
- 					mini2440_lcd_cfg[li].height);
--		pr_info("\n");
-+		pr_cont("\n");
- 		s3c24xx_fb_set_platdata(&mini2440_fb_info);
- 	}
- 
--- 
-2.18.0
-
-Note: running: scripts/checkpatch.pl 000*
-reports 3 warnings about the use of pr_cont.
-Since this modification was required by Joe Perches, I think this patch
-doest the correct thing.
+> ---
+>  drivers/soc/fsl/qe/ucc.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/soc/fsl/qe/ucc.c b/drivers/soc/fsl/qe/ucc.c
+> index c646d87..681f7d4 100644
+> --- a/drivers/soc/fsl/qe/ucc.c
+> +++ b/drivers/soc/fsl/qe/ucc.c
+> @@ -626,7 +626,7 @@ static u32 ucc_get_tdm_sync_shift(enum comm_dir mode, u32 tdm_num)
+>  {
+>         u32 shift;
+>
+> -       shift = (mode == COMM_DIR_RX) ? RX_SYNC_SHIFT_BASE : RX_SYNC_SHIFT_BASE;
+> +       shift = (mode == COMM_DIR_RX) ? RX_SYNC_SHIFT_BASE : TX_SYNC_SHIFT_BASE;
+>         shift -= tdm_num * 2;
+>
+>         return shift;
+> --
+> 1.8.3.1
+>
+>
