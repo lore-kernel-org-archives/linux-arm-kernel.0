@@ -1,21 +1,96 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 17 Sep 2018 10:48:05 +0200
-Subject: [PATCH 09/10] ARM: shmobile: r8a7744: Basic SoC support
-In-Reply-To: <CAMuHMdXTnV0rWRUGjJ9bf6GZ67bR0VvuGhgEOZnJQ=vWb6pLNA@mail.gmail.com>
-References: <1536660771-32278-1-git-send-email-biju.das@bp.renesas.com>
- <1536660771-32278-10-git-send-email-biju.das@bp.renesas.com>
- <CAMuHMdXTnV0rWRUGjJ9bf6GZ67bR0VvuGhgEOZnJQ=vWb6pLNA@mail.gmail.com>
-Message-ID: <20180917084804.kwv3iab6mnemhsz2@verge.net.au>
+From: john.garry@huawei.com (John Garry)
+Date: Mon, 17 Sep 2018 09:53:57 +0100
+Subject: [PATCH v2] perf vendor events arm64: Revise core JSON events for
+ eMAG
+In-Reply-To: <1d601b30-5065-b778-9927-b7d9f04f6b6f@redhat.com>
+References: <20180910002625.22253-1-seanvk.dev@oregontracks.org>
+ <1d601b30-5065-b778-9927-b7d9f04f6b6f@redhat.com>
+Message-ID: <bb09333a-ac9c-4163-98a0-4f50b6ff9079@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2018 at 02:48:18PM +0200, Geert Uytterhoeven wrote:
-> On Tue, Sep 11, 2018 at 12:19 PM Biju Das <biju.das@bp.renesas.com> wrote:
-> > Add minimal support for the RZ/G1N (R8A7744) SoC.
-> >
-> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> > Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> 
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+On 16/09/2018 21:39, William Cohen wrote:
+> On 9/9/18 8:26 PM, Sean V Kelley wrote:
+>> Split the PMU events into meaningful functional groups.  Update core
+>> pmu events based on supported ARMv8 recommended IMPLEMENTATION DEFINED
+>> events.
+>>
+>> The JSON files are updated with reference to a PMU table shared here:
+>>
+>> https://github.com/AmpereComputing/ampere-centos-kernel/blob/amp-centos-7.5-kernel/Documentation/arm64/eMAG-ARM-CoreImpDefined.pdf
+>>
+>> --
+>> Changes in V2:
+>> - Provided documentation for changes - John, William
+>> - Broke up into meaningful groups - William
+>> --
+>>
+>> Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
+>> Cc: William Cohen <wcohen@redhat.com>
+>> Cc: John Garry <john.garry@huawei.com>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>>
+>> Signed-off-by: Sean V Kelley <seanvk.dev@oregontracks.org>
+>> ---
+>>  .../arch/arm64/ampere/emag/branch.json        |  23 +++
+>>  .../arch/arm64/ampere/emag/bus.json           |  26 +++
+>>  .../arch/arm64/ampere/emag/cache.json         | 191 ++++++++++++++++++
+>>  .../arch/arm64/ampere/emag/clock.json         |  20 ++
+>>  .../arch/arm64/ampere/emag/core-imp-def.json  |  32 ---
+>>  .../arch/arm64/ampere/emag/counter.json       |   8 +
+>>  .../arch/arm64/ampere/emag/exception.json     |  50 +++++
+>>  .../arch/arm64/ampere/emag/instruction.json   |  89 ++++++++
+>>  .../arch/arm64/ampere/emag/intrinsic.json     |  14 ++
+>>  .../arch/arm64/ampere/emag/memory.json        |  29 +++
+>>  .../arch/arm64/ampere/emag/pipeline.json      |  50 +++++
+>>  11 files changed, 500 insertions(+), 32 deletions(-)
+>>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/branch.json
+>>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/bus.json
+>>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/cache.json
+>>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/clock.json
+>>  delete mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/core-imp-def.json
+>>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/counter.json
+>>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/exception.json
+>>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/instruction.json
+>>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/intrinsic.json
+>>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/memory.json
+>>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/pipeline.json
+>
+> Hi,
+>
+> The patch looks okay for most part. It would be good to factor out the events 0x00-0x38 from "Table D5-8 PMU common architectural and microarchitectural event numbers" in https://static.docs.arm.com/ddi0487/ca/DDI0487C_a_armv8_arm.pdf and have them in armv8-recommended.json so events like BR_MIS_PRED and BR_PRED (and anything else in the range of 0x000-0x038) just end up be ArchStdEvent like the other predefined events.  Maybe do the factoring out as a follow on patch to this patch.
+>
 
-Thanks, applied for v4.20.
+I know it's not ideal, but I think it would be better to only use the 
+common arch events exposed by the pmu kernel driver, as:
+- it's generally bad to replicate
+- the common arch event support are detected by PMCEIDx, so there is 
+need to add perf tool churn in defining per-SoC support
+- potential problems in enabling replicated events
+
+Thanks,
+John
+
+> The following counter.json wouldn't be that useful.  Perf doesn't allow layout of what goes in which PMU register. It should be removed:
+>
+>> diff --git a/tools/perf/pmu-events/arch/arm64/ampere/emag/counter.json b/tools/perf/pmu-events/arch/arm64/ampere/emag/counter.json
+>> new file mode 100644
+>> index 000000000000..6561ed58f13f
+>> --- /dev/null
+>> +++ b/tools/perf/pmu-events/arch/arm64/ampere/emag/counter.json
+>> @@ -0,0 +1,8 @@
+>> +[
+>> +    {
+>> +        "PublicDescription": "For odd-numbered counters, increments the count by one for each overflow of the preceding even-numbered counter. For even-numbered counters there is no increment.",
+>> +        "EventCode": "0x1e",
+>> +        "EventName": "CHAIN",
+>> +        "BriefDescription": "Chain counter"
+>> +    },
+>> +]
+>
+>
+>
+> -Will Cohen
+>
+> .
+>
