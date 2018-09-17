@@ -1,34 +1,64 @@
 From: andreyknvl@google.com (Andrey Konovalov)
-Date: Mon, 17 Sep 2018 20:59:05 +0200
-Subject: [PATCH v6 07/18] khwasan: add tag related helper functions
-In-Reply-To: <CACT4Y+adO3n4Nb4XOPyXdt43DbYjb=Kz6__tPTmb1CX=00qNSQ@mail.gmail.com>
+Date: Mon, 17 Sep 2018 21:12:00 +0200
+Subject: [PATCH v6 15/18] khwasan,
+ arm64: add brk handler for inline instrumentation
+In-Reply-To: <CACT4Y+ZwLnk7V1cY-EAHbrfXPBxs6qyynZPhxoSKZZDWSK8Fuw@mail.gmail.com>
 References: <cover.1535462971.git.andreyknvl@google.com>
- <6cd298a90d02068969713f2fd440eae21227467b.1535462971.git.andreyknvl@google.com>
- <CACT4Y+adO3n4Nb4XOPyXdt43DbYjb=Kz6__tPTmb1CX=00qNSQ@mail.gmail.com>
-Message-ID: <CAAeHK+w+Znw-t_wd29PO5B+pNegS3wqzS1mUVCmfrgdCXpavWw@mail.gmail.com>
+ <f5e73b5ead3355932ad8b5fc96b141c3f5b8c16c.1535462971.git.andreyknvl@google.com>
+ <CACT4Y+ZwLnk7V1cY-EAHbrfXPBxs6qyynZPhxoSKZZDWSK8Fuw@mail.gmail.com>
+Message-ID: <CAAeHK+wVgmp2G63c5w4sMH1i97Ju-YW7RUQgOQjr5d8aMgh1EQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2018 at 6:21 PM, Dmitry Vyukov <dvyukov@google.com> wrote:
+On Wed, Sep 12, 2018 at 7:13 PM, Dmitry Vyukov <dvyukov@google.com> wrote:
 > On Wed, Aug 29, 2018 at 1:35 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
 
->> +void *khwasan_preset_slub_tag(struct kmem_cache *cache, const void *addr)
+>> +static int khwasan_handler(struct pt_regs *regs, unsigned int esr)
+>> +{
+>> +       bool recover = esr & KHWASAN_ESR_RECOVER;
+>> +       bool write = esr & KHWASAN_ESR_WRITE;
+>> +       size_t size = KHWASAN_ESR_SIZE(esr);
+>> +       u64 addr = regs->regs[0];
+>> +       u64 pc = regs->pc;
+>> +
+>> +       if (user_mode(regs))
+>> +               return DBG_HOOK_ERROR;
+>> +
+>> +       kasan_report(addr, size, write, pc);
+>> +
+>> +       /*
+>> +        * The instrumentation allows to control whether we can proceed after
+>> +        * a crash was detected. This is done by passing the -recover flag to
+>> +        * the compiler. Disabling recovery allows to generate more compact
+>> +        * code.
+>> +        *
+>> +        * Unfortunately disabling recovery doesn't work for the kernel right
+>> +        * now. KHWASAN reporting is disabled in some contexts (for example when
+>> +        * the allocator accesses slab object metadata; same is true for KASAN;
+>> +        * this is controlled by current->kasan_depth). All these accesses are
+>> +        * detected by the tool, even though the reports for them are not
+>> +        * printed.
 >
-> Can't we do this in the existing kasan_init_slab_obj() hook? It looks
-> like it should do exactly this -- allow any one-time initialization
-> for objects. We could extend it to accept index and return a new
-> pointer.
-> If that does not work for some reason, I would try to at least unify
-> the hook for slab/slub, e.g. pass idx=-1 from slub and then use
-> random_tag().
-> It also seems that we do preset tag for slab multiple times (from
-> slab_get_obj()). Using kasan_init_slab_obj() should resolve this too
-> (hopefully we don't call it multiple times).
+>
+> I am not following this part.
+> Slab accesses metadata. OK.
+> This is detected as bad access. OK.
+> Report is not printed. OK.
+> We skip BRK and resume execution.
+> What is the problem?
 
-The issue is that SLAB stores freelist as an array of indexes instead
-of using an actual linked list like SLUB. So you can't store the tag
-in the pointer while the object is in the freelist, since there's no
-pointer. And, technically, we don't preset tags for SLAB, we just use
-the id as the tag every time a pointer is used, so perhaps we should
-rename the callback. As to unifying the callbacks, sure, we can do
-that.
+When the kernel is compiled with -fsanitize=kernel-hwaddress without
+any additional flags (like it's done now with KASAN_HW) everything
+works as you described and there's no problem. However if one were to
+recompile the kernel with hwasan recovery disabled, KHWASAN wouldn't
+work due to the reasons described in the comment. Should I make it
+more clear?
+
+>
+>
+>
+>> +        *
+>> +        * This is something that might be fixed at some point in the future.
+>> +        */
+>> +       if (!recover)
+>> +               die("Oops - KHWASAN", regs, 0);
