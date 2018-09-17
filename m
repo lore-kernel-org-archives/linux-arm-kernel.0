@@ -1,97 +1,107 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Mon, 17 Sep 2018 11:29:49 +0800
-Subject: [PATCH v3 3/3] i2c: designware: select gpio/default pin when
- prepare/unprepare recovery
-In-Reply-To: <20180917112633.252c591c@xhacker.debian>
-References: <20180917112633.252c591c@xhacker.debian>
-Message-ID: <20180917112949.414dd56f@xhacker.debian>
+From: rppt@linux.vnet.ibm.com (Mike Rapoport)
+Date: Mon, 17 Sep 2018 07:37:24 +0300
+Subject: KSM not working in 4.9 Kernel
+In-Reply-To: <CAOuPNLj0HyC+yzwTpN-EWpzHTJ58u7pBfOja1MyweF4pbct1eQ@mail.gmail.com>
+References: <CAOuPNLj1wx4sznrtLdKjcvuTf0dECPWzPaR946FoYRXB6YAGCw@mail.gmail.com>
+ <20180916153237.GC15699@rapoport-lnx>
+ <CAOuPNLj0HyC+yzwTpN-EWpzHTJ58u7pBfOja1MyweF4pbct1eQ@mail.gmail.com>
+Message-ID: <20180917043724.GA12866@rapoport-lnx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some platforms, the sda/scl pins are muxed with gpio functions, so
-they could be used for recovery. Select the gpio/default pin function
-when prepare/unprepare recovery.
+On Sun, Sep 16, 2018 at 10:35:17PM +0530, Pintu Kumar wrote:
+> On Sun, Sep 16, 2018 at 9:02 PM Mike Rapoport <rppt@linux.vnet.ibm.com> wrote:
+> >
+> > On Fri, Sep 14, 2018 at 07:58:01PM +0530, Pintu Kumar wrote:
+> > > Hi All,
+> > >
+> > > Board: Hikey620 ARM64
+> > > Kernel: 4.9.20
+> > >
+> > > I am trying to verify KSM (Kernel Same Page Merging) functionality on
+> > > 4.9 Kernel using "mmap" and madvise user space test utility.
+> > > But to my observation, it seems KSM is not working for me.
+> > > CONFIG_KSM=y is enabled in kernel.
+> > > ksm_init is also called during boot up.
+> > >   443 ?        SN     0:00 [ksmd]
+> > >
+> > > ksmd thread is also running.
+> > >
+> > > However, when I see the sysfs, no values are written.
+> > > ~ # grep -H '' /sys/kernel/mm/ksm/*
+> > > /sys/kernel/mm/ksm/pages_hashed:0
+> > > /sys/kernel/mm/ksm/pages_scanned:0
+> > > /sys/kernel/mm/ksm/pages_shared:0
+> > > /sys/kernel/mm/ksm/pages_sharing:0
+> > > /sys/kernel/mm/ksm/pages_to_scan:200
+> > > /sys/kernel/mm/ksm/pages_unshared:0
+> > > /sys/kernel/mm/ksm/pages_volatile:0
+> > > /sys/kernel/mm/ksm/run:1
+> > > /sys/kernel/mm/ksm/sleep_millisecs:1000
+> > >
+> > > So, please let me know if I am doing any thing wrong.
+> > >
+> > > This is the test utility:
+> > > int main(int argc, char *argv[])
+> > > {
+> > >         int i, n, size;
+> > >         char *buffer;
+> > >         void *addr;
+> > >
+> > >         n = 100;
+> > >         size = 100 * getpagesize();
+> > >         for (i = 0; i < n; i++) {
+> > >                 buffer = (char *)malloc(size);
+> > >                 memset(buffer, 0xff, size);
+> > >                 addr =  mmap(NULL, size,
+> > >                            PROT_READ | PROT_EXEC | PROT_WRITE,
+> > > MAP_PRIVATE | MAP_ANONYMOUS,
+> > >                            -1, 0);
+> > >                 madvise(addr, size, MADV_MERGEABLE);
+> >
+> > Just mmap'ing an area does not allocate any physical pages, so KSM has
+> > nothing to merge.
+> >
+> > You need to memset(addr,...) after mmap().
+> >
+> 
+> Yes, I am doing memset also.
+> memset(addr, 0xff, size);
+> 
+> But still no effect.
+> And I checked LTP test cases. It almost doing the same thing.
+> 
+> I observed that [ksmd] thread is not waking up at all.
+> I gave some print inside it, but I could never saw that prints coming.
+> I could not find it running either in top command during the operation.
+> Is there anything needs to be done, to wakw up ksmd?
+> I already set: echo 1 > /sys/kernel/mm/ksm.
 
-Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
----
- drivers/i2c/busses/i2c-designware-core.h   |  3 +++
- drivers/i2c/busses/i2c-designware-master.c | 22 ++++++++++++++++++++++
- 2 files changed, 25 insertions(+)
+It should be echo 1 > /sys/kernel/mm/ksm/run
+ 
+> 
+> 
+> > >                 sleep(1);
+> > >         }
+> > >         printf("Done....press ^C\n");
+> > >
+> > >         pause();
+> > >
+> > >         return 0;
+> > > }
+> > >
+> > >
+> > >
+> > > Thanks,
+> > > Pintu
+> > >
+> >
+> > --
+> > Sincerely yours,
+> > Mike.
+> >
+> 
 
-diff --git a/drivers/i2c/busses/i2c-designware-core.h b/drivers/i2c/busses/i2c-designware-core.h
-index e367b1af4ab2..01d5f01691a4 100644
---- a/drivers/i2c/busses/i2c-designware-core.h
-+++ b/drivers/i2c/busses/i2c-designware-core.h
-@@ -271,6 +271,9 @@ struct dw_i2c_dev {
- 	int			(*init)(struct dw_i2c_dev *dev);
- 	int			mode;
- 	struct i2c_bus_recovery_info rinfo;
-+	struct pinctrl		*pinctrl;
-+	struct pinctrl_state	*pins_default;
-+	struct pinctrl_state	*pins_gpio;
- };
- 
- #define ACCESS_SWAP		0x00000001
-diff --git a/drivers/i2c/busses/i2c-designware-master.c b/drivers/i2c/busses/i2c-designware-master.c
-index 94d94b4a9a0d..384d6630366a 100644
---- a/drivers/i2c/busses/i2c-designware-master.c
-+++ b/drivers/i2c/busses/i2c-designware-master.c
-@@ -17,6 +17,7 @@
- #include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/module.h>
-+#include <linux/pinctrl/consumer.h>
- #include <linux/pm_runtime.h>
- #include <linux/reset.h>
- 
-@@ -629,6 +630,9 @@ static void i2c_dw_prepare_recovery(struct i2c_adapter *adap)
- {
- 	struct dw_i2c_dev *dev = i2c_get_adapdata(adap);
- 
-+	if (dev->pinctrl && dev->pins_gpio)
-+		pinctrl_select_state(dev->pinctrl, dev->pins_gpio);
-+
- 	i2c_dw_disable(dev);
- 	reset_control_assert(dev->rst);
- 	i2c_dw_prepare_clk(dev, false);
-@@ -641,6 +645,9 @@ static void i2c_dw_unprepare_recovery(struct i2c_adapter *adap)
- 	i2c_dw_prepare_clk(dev, true);
- 	reset_control_deassert(dev->rst);
- 	i2c_dw_init_master(dev);
-+
-+	if (dev->pinctrl && dev->pins_default)
-+		pinctrl_select_state(dev->pinctrl, dev->pins_default);
- }
- 
- static int i2c_dw_init_recovery_info(struct dw_i2c_dev *dev)
-@@ -648,6 +655,8 @@ static int i2c_dw_init_recovery_info(struct dw_i2c_dev *dev)
- 	struct i2c_bus_recovery_info *rinfo = &dev->rinfo;
- 	struct i2c_adapter *adap = &dev->adapter;
- 	struct gpio_desc *gpio;
-+	struct pinctrl *pinctrl;
-+	struct pinctrl_state *s;
- 	int r;
- 
- 	gpio = devm_gpiod_get(dev->dev, "scl", GPIOD_OUT_HIGH);
-@@ -664,6 +673,19 @@ static int i2c_dw_init_recovery_info(struct dw_i2c_dev *dev)
- 		return PTR_ERR(gpio);
- 	rinfo->sda_gpiod = gpio;
- 
-+	pinctrl = devm_pinctrl_get(dev->dev);
-+	if (PTR_ERR(pinctrl) == -EPROBE_DEFER)
-+		return -EPROBE_DEFER;
-+	if (!IS_ERR_OR_NULL(pinctrl)) {
-+		dev->pinctrl = pinctrl;
-+		s = pinctrl_lookup_state(pinctrl, PINCTRL_STATE_DEFAULT);
-+		if (!IS_ERR_OR_NULL(s))
-+			dev->pins_default = s;
-+		s = pinctrl_lookup_state(pinctrl, "gpio");
-+		if (!IS_ERR_OR_NULL(s))
-+			dev->pins_gpio = s;
-+	}
-+
- 	rinfo->recover_bus = i2c_generic_scl_recovery;
- 	rinfo->prepare_recovery = i2c_dw_prepare_recovery;
- 	rinfo->unprepare_recovery = i2c_dw_unprepare_recovery;
 -- 
-2.19.0
+Sincerely yours,
+Mike.
