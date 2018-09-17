@@ -1,66 +1,99 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 17 Sep 2018 16:09:41 +0100
-Subject: [PATCH v4 0/6] PCI: imx: Initial imx7d suspend/resume support
-In-Reply-To: <cover.1534264292.git.leonard.crestez@nxp.com>
-References: <cover.1534264292.git.leonard.crestez@nxp.com>
-Message-ID: <20180917150941.GH7239@e107981-ln.cambridge.arm.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Mon, 17 Sep 2018 10:10:29 -0500
+Subject: [PATCH] ARM: dts: socfpga: add timer resets for SoCFPGA platform
+Message-ID: <1537197029-27693-1-git-send-email-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 14, 2018 at 07:50:14PM +0300, Leonard Crestez wrote:
-> On imx7d the pcie-phy power domain is turned off in suspend and this can
-> make the system hang on resume when attempting any read from PCI.
-> 
-> Fix this by adding PM_SLEEP support to the imx6 pci driver. This is
-> currently only enabled for imx7d but the suspend/resume sequence also
-> applies to other socs.
-> 
-> V3 of this series was reviewed by Lucas but stalled because the merge
-> window opened.
-> 
-> There was also some confusion about how to deal with the dependence on
-> commit 26fce0557fa6 ("reset: imx7: Fix always writing bits as 0"). To
-> clarify: both patch 2 and 26fce0557fa6 are required to fix imx7d suspend
-> but merging one without the other shouldn't cause other issues.
-> 
-> 
-> V4 adds 4 more patches with PME_Turn_Off support on top, using a new
-> reset bit. I generally try to keep series short but in this case some
-> planning might be needed to get patches into 4.20.
-> 
-> Since the new reset is treated as optional with old DTB there should be
-> again no problem if reset and pci are merged out of order.
-> 
-> 
-> Shawn/Philipp/Lorenzo: Would it make sense to merge this series through a
-> single specific tree, such as the one for imx?
+Add the resets property for all the timers on the Cyclone5/Arria5/Arria10
+platforms.
 
-This series is a bit of a mixture of multiple things hard to discern
-(actually I already merged patch 2 and patch 1 seems completely
-unrelated).
+Signed-off-by: Marek Vasut <marex@denx.de>
+Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
+---
+ arch/arm/boot/dts/socfpga.dtsi         | 8 ++++++++
+ arch/arm/boot/dts/socfpga_arria10.dtsi | 8 ++++++++
+ 2 files changed, 16 insertions(+)
 
-I would take the series through the PCI tree but I need an ACK for
-patches 5 and 6, please let me know how you want to handle it.
-
-Lorenzo
-
-> Link to v3: https://lkml.org/lkml/2018/7/24/713
-> 
-> Leonard Crestez (6):
->   Revert "ARM: dts: imx7d: Invert legacy PCI irq mapping"
->   PCI: imx: Initial imx7d pm support
->   reset: imx7: Add PCIE_CTRL_APPS_TURNOFF
->   dt-bindings: imx6q-pcie: Add turnoff reset for imx7d
->   ARM: dts: imx7d: Add turnoff reset
->   PCI: imx: Add PME_Turn_Off support
-> 
->  .../bindings/pci/fsl,imx6q-pcie.txt           |   1 +
->  arch/arm/boot/dts/imx7d.dtsi                  |  17 ++-
->  drivers/pci/controller/dwc/pci-imx6.c         | 112 +++++++++++++++++-
->  drivers/reset/reset-imx7.c                    |   1 +
->  include/dt-bindings/reset/imx7-reset.h        |   4 +-
->  5 files changed, 123 insertions(+), 12 deletions(-)
-> 
-> -- 
-> 2.17.1
-> 
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index b38f8c2..fa33cd1 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -841,6 +841,8 @@
+ 			reg = <0xffc08000 0x1000>;
+ 			clocks = <&l4_sp_clk>;
+ 			clock-names = "timer";
++			resets = <&rst SPTIMER0_RESET>;
++			reset-names = "timer";
+ 		};
+ 
+ 		timer1: timer1 at ffc09000 {
+@@ -849,6 +851,8 @@
+ 			reg = <0xffc09000 0x1000>;
+ 			clocks = <&l4_sp_clk>;
+ 			clock-names = "timer";
++			resets = <&rst SPTIMER1_RESET>;
++			reset-names = "timer";
+ 		};
+ 
+ 		timer2: timer2 at ffd00000 {
+@@ -857,6 +861,8 @@
+ 			reg = <0xffd00000 0x1000>;
+ 			clocks = <&osc1>;
+ 			clock-names = "timer";
++			resets = <&rst OSC1TIMER0_RESET>;
++			reset-names = "timer";
+ 		};
+ 
+ 		timer3: timer3 at ffd01000 {
+@@ -865,6 +871,8 @@
+ 			reg = <0xffd01000 0x1000>;
+ 			clocks = <&osc1>;
+ 			clock-names = "timer";
++			resets = <&rst OSC1TIMER1_RESET>;
++			reset-names = "timer";
+ 		};
+ 
+ 		uart0: serial0 at ffc02000 {
+diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
+index a4dcb68..c84c5b8 100644
+--- a/arch/arm/boot/dts/socfpga_arria10.dtsi
++++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
+@@ -770,6 +770,8 @@
+ 			reg = <0xffc02700 0x100>;
+ 			clocks = <&l4_sp_clk>;
+ 			clock-names = "timer";
++			resets = <&rst SPTIMER0_RESET>;
++			reset-names = "timer";
+ 		};
+ 
+ 		timer1: timer1 at ffc02800 {
+@@ -778,6 +780,8 @@
+ 			reg = <0xffc02800 0x100>;
+ 			clocks = <&l4_sp_clk>;
+ 			clock-names = "timer";
++			resets = <&rst SPTIMER1_RESET>;
++			reset-names = "timer";
+ 		};
+ 
+ 		timer2: timer2 at ffd00000 {
+@@ -786,6 +790,8 @@
+ 			reg = <0xffd00000 0x100>;
+ 			clocks = <&l4_sys_free_clk>;
+ 			clock-names = "timer";
++			resets = <&rst L4SYSTIMER0_RESET>;
++			reset-names = "timer";
+ 		};
+ 
+ 		timer3: timer3 at ffd00100 {
+@@ -794,6 +800,8 @@
+ 			reg = <0xffd01000 0x100>;
+ 			clocks = <&l4_sys_free_clk>;
+ 			clock-names = "timer";
++			resets = <&rst L4SYSTIMER1_RESET>;
++			reset-names = "timer";
+ 		};
+ 
+ 		uart0: serial0 at ffc02000 {
+-- 
+2.7.4
