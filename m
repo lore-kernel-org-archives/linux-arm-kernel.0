@@ -1,90 +1,37 @@
-From: andrew.murray@arm.com (Andrew Murray)
-Date: Mon, 17 Sep 2018 16:19:17 +0100
-Subject: [PATCH] asm-generic: io: Fix ioport_map() for
- !CONFIG_GENERIC_IOMAP && CONFIG_INDIRECT_PIO
-In-Reply-To: <464e07ab-797e-971a-0839-5fd55e3e2ad3@huawei.com>
-References: <1536842907-51732-1-git-send-email-andrew.murray@arm.com>
- <464e07ab-797e-971a-0839-5fd55e3e2ad3@huawei.com>
-Message-ID: <20180917151917.GB5390@e119886-lin.cambridge.arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 17 Sep 2018 17:24:41 +0200
+Subject: [PATCH 0/2] add Ethernet driver support for mt2712
+In-Reply-To: <1537165763-13112-1-git-send-email-biao.huang@mediatek.com>
+References: <1537165763-13112-1-git-send-email-biao.huang@mediatek.com>
+Message-ID: <20180917152441.GD5458@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 17, 2018 at 03:42:32PM +0100, John Garry wrote:
-> - dead e-mail addresses (Zhichang, Gabriele)
-> 
-> On 13/09/2018 13:48, Andrew Murray wrote:
-> 
-> Hi Andrew,
-> 
-> > The !CONFIG_GENERIC_IOMAP version of ioport_map uses MMIO_UPPER_LIMIT to
-> > prevent users from making I/O accesses outside the expected I/O range -
-> > however it erroneously treats MMIO_UPPER_LIMIT as a mask which is
-> > contradictory to its other users.
-> > 
-> > The introduction of CONFIG_INDIRECT_PIO, which subtracts an arbitrary
-> > amount from IO_SPACE_LIMIT to form MMIO_UPPER_LIMIT, results in ioport_map
-> > mangling the given port rather than capping it.
-> > 
-> > We address this by aligning more closely with the CONFIG_GENERIC_IOMAP
-> > implementation of ioport_map by using the comparison operator and
-> > returning NULL where the port exceeds MMIO_UPPER_LIMIT. Though note that
-> > we preserve the existing behavior of masking with IO_SPACE_LIMIT such that
-> > we don't break existing buggy drivers that somehow rely on this masking.
-> 
-> I wouldn't say any drivers rely on this - for the only device driver which
-> uses the "Indirect" IO space region above MMIO_UPPER_LIMIT (HiSilicon LPC),
-> no child device driver for that host uses ioport_map() [those being ipmi si
-> and 8250 generic+of drivers].
+On Mon, Sep 17, 2018 at 02:29:21PM +0800, Biao Huang wrote:
 
-I was really referring to the existing !CONFIG_GENERIC_IOMAP && 
-!CONFIG_INDIRECT_PIO use cases where there may be drivers (however unlikely)
-that provide ioport_map an incorrect address which, due to the masking, gets
-converted into a valid address. Returning NULL for these would result in new
-run-time errors therefore it seemed safer to change this to support the new
-"indirect IO" whilst not breaking existing bad drivers.
+Adding in the STMMAC driver maintainers.
 
-A more correct implementation would always return NULL if
-port > IO_SPACE_LIMIT - it would fully align it with the CONFIG_GENERIC_IOMAP
-implementation - in my view these two implementations should behave the same
-with respect to error handling - at the moment they don't.
+> Ethernet in mt2712 is totally different from that in
+> drivers/net/ethernet/mediatek/*, so we add new folder for mt2712 SoC.
+> 
+> The mt2712 Ethernet IP is from Synopsys, and we notice that there is a
+> reference driver in drivers/net/ethernet/synopsys/*. But
+> 1. our version is only for 10/100/1000Mbps, not for 2.5/4/5Gbps.
+> mt2712 Ethernet design is differnet from that in synopsys folder in many
+> aspects, and some key features are not included in mt2712, such as rss
+> and split header. At the same time, some features we need have not been
+> implenmented in synopsys folder.
 
+In general, we don't have two very similar drivers. We try to have one
+driver. If the problem was just missing features in the stmmac driver,
+you can add them. I doubt not supporting 2.5/4/5Gbps in your silicon
+is an issue, since very few STMMAC devices have this. By split header,
+do you mean support for TSO? That seems to be a gmac4 or newer
+feature, but the driver supports not having tso support in hardware.
 
-> 
-> Regardless of that, it seems better to return NULL when the port is
-> out-of-range, rather than masking it.
-> 
-> Cheers
-> 
-> > 
-> > Fixes: 5745392e0c2b ("PCI: Apply the new generic I/O management on PCI IO hosts")
-> > Reported-by: Will Deacon <will.deacon@arm.com>
-> > Signed-off-by: Andrew Murray <andrew.murray@arm.com>
-> 
-> Reviewed-by: John Garry <john.garry@huawei.com>
+Giuseppe, Alexandre, Jose: Please can you look at the proposed driver
+and see how much it really differs from the STMMAC driver. How easy
+would it be to extend stmmac it to support the mt2712?
 
-Thanks for the review.
-
-Andrew Murray
-
-> 
-> > ---
-> >  include/asm-generic/io.h | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
-> > index 66d1d45..d356f80 100644
-> > --- a/include/asm-generic/io.h
-> > +++ b/include/asm-generic/io.h
-> > @@ -1026,7 +1026,8 @@ static inline void __iomem *ioremap_wt(phys_addr_t offset, size_t size)
-> >  #define ioport_map ioport_map
-> >  static inline void __iomem *ioport_map(unsigned long port, unsigned int nr)
-> >  {
-> > -	return PCI_IOBASE + (port & MMIO_UPPER_LIMIT);
-> > +	port &= IO_SPACE_LIMIT;
-> > +	return (port > MMIO_UPPER_LIMIT) ? NULL : PCI_IOBASE + port;
-> >  }
-> >  #endif
-> > 
-> > 
-> 
-> 
+Thanks
+	Andrew
