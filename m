@@ -1,64 +1,58 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Mon, 17 Sep 2018 21:12:00 +0200
-Subject: [PATCH v6 15/18] khwasan,
- arm64: add brk handler for inline instrumentation
-In-Reply-To: <CACT4Y+ZwLnk7V1cY-EAHbrfXPBxs6qyynZPhxoSKZZDWSK8Fuw@mail.gmail.com>
-References: <cover.1535462971.git.andreyknvl@google.com>
- <f5e73b5ead3355932ad8b5fc96b141c3f5b8c16c.1535462971.git.andreyknvl@google.com>
- <CACT4Y+ZwLnk7V1cY-EAHbrfXPBxs6qyynZPhxoSKZZDWSK8Fuw@mail.gmail.com>
-Message-ID: <CAAeHK+wVgmp2G63c5w4sMH1i97Ju-YW7RUQgOQjr5d8aMgh1EQ@mail.gmail.com>
+From: sam@ravnborg.org (Sam Ravnborg)
+Date: Mon, 17 Sep 2018 21:37:48 +0200
+Subject: [RESEND 4/5] drm/mxsfb: Add PM_SLEEP support
+In-Reply-To: <7d661819825a36f4aebe412e7bed8fe24c7292ae.1535367027.git.leonard.crestez@nxp.com>
+References: <cover.1535367027.git.leonard.crestez@nxp.com>
+ <7d661819825a36f4aebe412e7bed8fe24c7292ae.1535367027.git.leonard.crestez@nxp.com>
+Message-ID: <20180917193748.GA13165@ravnborg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2018 at 7:13 PM, Dmitry Vyukov <dvyukov@google.com> wrote:
-> On Wed, Aug 29, 2018 at 1:35 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
+Hi Leonard.
 
->> +static int khwasan_handler(struct pt_regs *regs, unsigned int esr)
->> +{
->> +       bool recover = esr & KHWASAN_ESR_RECOVER;
->> +       bool write = esr & KHWASAN_ESR_WRITE;
->> +       size_t size = KHWASAN_ESR_SIZE(esr);
->> +       u64 addr = regs->regs[0];
->> +       u64 pc = regs->pc;
->> +
->> +       if (user_mode(regs))
->> +               return DBG_HOOK_ERROR;
->> +
->> +       kasan_report(addr, size, write, pc);
->> +
->> +       /*
->> +        * The instrumentation allows to control whether we can proceed after
->> +        * a crash was detected. This is done by passing the -recover flag to
->> +        * the compiler. Disabling recovery allows to generate more compact
->> +        * code.
->> +        *
->> +        * Unfortunately disabling recovery doesn't work for the kernel right
->> +        * now. KHWASAN reporting is disabled in some contexts (for example when
->> +        * the allocator accesses slab object metadata; same is true for KASAN;
->> +        * this is controlled by current->kasan_depth). All these accesses are
->> +        * detected by the tool, even though the reports for them are not
->> +        * printed.
->
->
-> I am not following this part.
-> Slab accesses metadata. OK.
-> This is detected as bad access. OK.
-> Report is not printed. OK.
-> We skip BRK and resume execution.
-> What is the problem?
+On Mon, Aug 27, 2018 at 02:10:40PM +0300, Leonard Crestez wrote:
+> Since power to the lcdif block can be lost on suspend implement
+> PM_SLEEP_OPS using drm_mode_config_helper_suspend/resume to save/restore
+> the current mode.
+> 
+> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+> Reviewed-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  drivers/gpu/drm/mxsfb/mxsfb_drv.c | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
+> 
+> diff --git a/drivers/gpu/drm/mxsfb/mxsfb_drv.c b/drivers/gpu/drm/mxsfb/mxsfb_drv.c
+> index 68d79f5dc0d3..d797dfd40d98 100644
+> --- a/drivers/gpu/drm/mxsfb/mxsfb_drv.c
+> +++ b/drivers/gpu/drm/mxsfb/mxsfb_drv.c
+> @@ -416,17 +416,38 @@ static int mxsfb_remove(struct platform_device *pdev)
+>  	drm_dev_unref(drm);
+>  
+>  	return 0;
+>  }
+>  
+> +#ifdef CONFIG_PM_SLEEP
+> +static int mxsfb_suspend(struct device *dev)
+> +{
+> +       struct drm_device *drm = dev_get_drvdata(dev);
+> +
+> +       return drm_mode_config_helper_suspend(drm);
+> +}
+> +
+> +static int mxsfb_resume(struct device *dev)
+> +{
+> +       struct drm_device *drm = dev_get_drvdata(dev);
+> +
+> +       return drm_mode_config_helper_resume(drm);
+> +}
+> +#endif
 
-When the kernel is compiled with -fsanitize=kernel-hwaddress without
-any additional flags (like it's done now with KASAN_HW) everything
-works as you described and there's no problem. However if one were to
-recompile the kernel with hwasan recovery disabled, KHWASAN wouldn't
-work due to the reasons described in the comment. Should I make it
-more clear?
+Other suspend/resume users skip the #ifdef and declare
+the functions __maybe_unused
+See for example arm/hdlcd_drv.c.
 
->
->
->
->> +        *
->> +        * This is something that might be fixed at some point in the future.
->> +        */
->> +       if (!recover)
->> +               die("Oops - KHWASAN", regs, 0);
+The resulting code is a bit simpler to read and you
+have the added benefit that the suspend/resume functions
+are always compiled so bit-rotting is less likely.
+
+	Sam
