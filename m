@@ -1,33 +1,59 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 17 Sep 2018 15:20:15 +0100
-Subject: [PATCH v5 18/18] kvm: arm64: Allow tuning the physical address
- size for VM
-In-Reply-To: <20180917104144.19188-19-suzuki.poulose@arm.com>
-References: <20180917104144.19188-1-suzuki.poulose@arm.com>
- <20180917104144.19188-19-suzuki.poulose@arm.com>
-Message-ID: <CAFEAcA-AKpkzSpMofMFxxf5XdYPii3PTB8xXDAvmyFWno7nZeA@mail.gmail.com>
+From: manish.narani@xilinx.com (Manish Narani)
+Date: Mon, 17 Sep 2018 19:54:58 +0530
+Subject: [PATCH v7 0/7] EDAC: Enhancements to Synopsys EDAC driver
+Message-ID: <1537194305-9243-1-git-send-email-manish.narani@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 September 2018 at 11:41, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
-> Allow specifying the physical address size limit for a new
-> VM via the kvm_type argument for the KVM_CREATE_VM ioctl. This
-> allows us to finalise the stage2 page table as early as possible
-> and hence perform the right checks on the memory slots
-> without complication. The size is ecnoded as Log2(PA_Size) in
-> bits[7:0] of the type field. For backward compatibility the
-> value 0 is reserved and implies 40bits. Also, lift the limit
-> of the IPA to host limit and allow lower IPA sizes (e.g, 32).
->
-> The userspace could check the extension KVM_CAP_ARM_VM_PHYS_SHIFT
-> for the availability of this feature. The cap check returns the
-> maximum limit for the physical address shift supported by the host.
->
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Christoffer Dall <cdall@kernel.org>
-> Cc: Peter Maydel <peter.maydell@linaro.org>
+This patch series enhances the current EDAC driver to support different
+platforms. This series adds support for ZynqMP DDRC controller in synopsys
+EDAC driver. This series also adds Device tree properties and relevant
+binding documentation.
 
-Typo: my surname has two "l"s in it.
+Changes in v2:
+	- Moved checking of DDR_ECC_INTR_SUPPORT from (1/4) to (3/4) as it is
+	  a feature of ZynqMP DDRC
+	- The Binding Documentation in (2/4) is modified as per the review
+	  comments
 
-thanks
--- PMM
+Changes in v3:
+	- The commit message in (2/4) is modified (Synopsys EDAC Driver -->
+	  ZynqMP DDRC)
+
+Changes in v4:
+	- Updated the commit message in (1/4)
+	- Renamed function pointer names removing 'synps_' in (1/4)
+	- Shortened unnecessary long lines as per the review comment on (1/4)
+
+Changes in v5:
+	- Updated the commit message in (2/4) and (4/4).
+	- Removed the unnecessary check for match data in probe() in (1/4)
+	- Some Indentation changes for better readability in (1/4) and (3/4)
+	- Removed repeated code in (3/4)
+	- Used 'zynq' and 'zynqmp' instead of 'synps_enh_edac' in function names
+
+Changes in v6:
+	- Splitted the patches according to functionalities
+	- Addressed code style comments from v5 review
+	- Moved the Error Injection to CONFIG_EDAC_DEBUG mode
+
+Changes in v7:
+	- Included DTS patch (6/7) which was missed in v6 patch set
+
+Manish Narani (7):
+  edac: synopsys: Fix code comments and naming convention
+  edac: synps: Add platform specific structures for ddrc controller
+  dt: bindings: Document ZynqMP DDRC in Synopsys documentation
+  edac: synopsys: Add macro defines for ZynqMP DDRC
+  edac: synopsys: Add EDAC ECC support for ZynqMP DDRC
+  arm64: zynqmp: Add DDRC node
+  edac: synopsys: Add Error Injection support for ZynqMP DDRC
+
+ .../bindings/memory-controllers/synopsys.txt       |   27 +-
+ arch/arm64/boot/dts/xilinx/zynqmp.dtsi             |    7 +
+ drivers/edac/Kconfig                               |    2 +-
+ drivers/edac/synopsys_edac.c                       | 1098 ++++++++++++++++++--
+ 4 files changed, 1014 insertions(+), 120 deletions(-)
+
+-- 
+2.1.1
