@@ -1,96 +1,77 @@
-From: john.garry@huawei.com (John Garry)
-Date: Mon, 17 Sep 2018 09:53:57 +0100
-Subject: [PATCH v2] perf vendor events arm64: Revise core JSON events for
- eMAG
-In-Reply-To: <1d601b30-5065-b778-9927-b7d9f04f6b6f@redhat.com>
-References: <20180910002625.22253-1-seanvk.dev@oregontracks.org>
- <1d601b30-5065-b778-9927-b7d9f04f6b6f@redhat.com>
-Message-ID: <bb09333a-ac9c-4163-98a0-4f50b6ff9079@huawei.com>
+From: katsuhiro@katsuster.net (Katsuhiro Suzuki)
+Date: Mon, 17 Sep 2018 17:55:55 +0900
+Subject: [PATCH v2] arm64: dts: rockchip: add i2s and spdif endpoints of rk3328
+Message-ID: <20180917085555.21775-1-katsuhiro@katsuster.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/09/2018 21:39, William Cohen wrote:
-> On 9/9/18 8:26 PM, Sean V Kelley wrote:
->> Split the PMU events into meaningful functional groups.  Update core
->> pmu events based on supported ARMv8 recommended IMPLEMENTATION DEFINED
->> events.
->>
->> The JSON files are updated with reference to a PMU table shared here:
->>
->> https://github.com/AmpereComputing/ampere-centos-kernel/blob/amp-centos-7.5-kernel/Documentation/arm64/eMAG-ARM-CoreImpDefined.pdf
->>
->> --
->> Changes in V2:
->> - Provided documentation for changes - John, William
->> - Broke up into meaningful groups - William
->> --
->>
->> Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
->> Cc: William Cohen <wcohen@redhat.com>
->> Cc: John Garry <john.garry@huawei.com>
->> Cc: linux-arm-kernel at lists.infradead.org
->>
->> Signed-off-by: Sean V Kelley <seanvk.dev@oregontracks.org>
->> ---
->>  .../arch/arm64/ampere/emag/branch.json        |  23 +++
->>  .../arch/arm64/ampere/emag/bus.json           |  26 +++
->>  .../arch/arm64/ampere/emag/cache.json         | 191 ++++++++++++++++++
->>  .../arch/arm64/ampere/emag/clock.json         |  20 ++
->>  .../arch/arm64/ampere/emag/core-imp-def.json  |  32 ---
->>  .../arch/arm64/ampere/emag/counter.json       |   8 +
->>  .../arch/arm64/ampere/emag/exception.json     |  50 +++++
->>  .../arch/arm64/ampere/emag/instruction.json   |  89 ++++++++
->>  .../arch/arm64/ampere/emag/intrinsic.json     |  14 ++
->>  .../arch/arm64/ampere/emag/memory.json        |  29 +++
->>  .../arch/arm64/ampere/emag/pipeline.json      |  50 +++++
->>  11 files changed, 500 insertions(+), 32 deletions(-)
->>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/branch.json
->>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/bus.json
->>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/cache.json
->>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/clock.json
->>  delete mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/core-imp-def.json
->>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/counter.json
->>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/exception.json
->>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/instruction.json
->>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/intrinsic.json
->>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/memory.json
->>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/pipeline.json
->
-> Hi,
->
-> The patch looks okay for most part. It would be good to factor out the events 0x00-0x38 from "Table D5-8 PMU common architectural and microarchitectural event numbers" in https://static.docs.arm.com/ddi0487/ca/DDI0487C_a_armv8_arm.pdf and have them in armv8-recommended.json so events like BR_MIS_PRED and BR_PRED (and anything else in the range of 0x000-0x038) just end up be ArchStdEvent like the other predefined events.  Maybe do the factoring out as a follow on patch to this patch.
->
+This patch adds port and endpoint of i2s and spdif nodes for rk3328.
+Because to use modern sound card interface such as audio-graph-card.
 
-I know it's not ideal, but I think it would be better to only use the 
-common arch events exposed by the pmu kernel driver, as:
-- it's generally bad to replicate
-- the common arch event support are detected by PMCEIDx, so there is 
-need to add perf tool churn in defining per-SoC support
-- potential problems in enabling replicated events
+Signed-off-by: Katsuhiro Suzuki <katsuhiro@katsuster.net>
+---
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-Thanks,
-John
-
-> The following counter.json wouldn't be that useful.  Perf doesn't allow layout of what goes in which PMU register. It should be removed:
->
->> diff --git a/tools/perf/pmu-events/arch/arm64/ampere/emag/counter.json b/tools/perf/pmu-events/arch/arm64/ampere/emag/counter.json
->> new file mode 100644
->> index 000000000000..6561ed58f13f
->> --- /dev/null
->> +++ b/tools/perf/pmu-events/arch/arm64/ampere/emag/counter.json
->> @@ -0,0 +1,8 @@
->> +[
->> +    {
->> +        "PublicDescription": "For odd-numbered counters, increments the count by one for each overflow of the preceding even-numbered counter. For even-numbered counters there is no increment.",
->> +        "EventCode": "0x1e",
->> +        "EventName": "CHAIN",
->> +        "BriefDescription": "Chain counter"
->> +    },
->> +]
->
->
->
-> -Will Cohen
->
-> .
->
+diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+index d3ef6566325e..fd35dbd37ee2 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+@@ -179,7 +179,13 @@
+ 		clock-names = "i2s_clk", "i2s_hclk";
+ 		dmas = <&dmac 11>, <&dmac 12>;
+ 		dma-names = "tx", "rx";
++		#sound-dai-cells = <0>;
+ 		status = "disabled";
++
++		i2s0_p0: port {
++			i2s0_p0_0: endpoint {
++			};
++		};
+ 	};
+ 
+ 	i2s1: i2s at ff010000 {
+@@ -190,7 +196,13 @@
+ 		clock-names = "i2s_clk", "i2s_hclk";
+ 		dmas = <&dmac 14>, <&dmac 15>;
+ 		dma-names = "tx", "rx";
++		#sound-dai-cells = <0>;
+ 		status = "disabled";
++
++		i2s1_p0: port {
++			i2s1_p0_0: endpoint {
++			};
++		};
+ 	};
+ 
+ 	i2s2: i2s at ff020000 {
+@@ -201,7 +213,13 @@
+ 		clock-names = "i2s_clk", "i2s_hclk";
+ 		dmas = <&dmac 0>, <&dmac 1>;
+ 		dma-names = "tx", "rx";
++		#sound-dai-cells = <0>;
+ 		status = "disabled";
++
++		i2s2_p0: port {
++			i2s2_p0_0: endpoint {
++			};
++		};
+ 	};
+ 
+ 	spdif: spdif at ff030000 {
+@@ -214,7 +232,13 @@
+ 		dma-names = "tx";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&spdifm2_tx>;
++		#sound-dai-cells = <0>;
+ 		status = "disabled";
++
++		spdif_p0: port {
++			spdif_p0_0: endpoint {
++			};
++		};
+ 	};
+ 
+ 	pdm: pdm at ff040000 {
+-- 
+2.18.0
