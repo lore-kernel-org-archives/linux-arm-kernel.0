@@ -1,86 +1,45 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Mon, 17 Sep 2018 19:01:00 +0200
-Subject: [PATCH v6 11/11] arm64: annotate user pointers casts detected by
- sparse
-In-Reply-To: <20180911164152.GA29166@arrakis.emea.arm.com>
-References: <cover.1535629099.git.andreyknvl@google.com>
- <5d54526e5ff2e5ad63d0dfdd9ab17cf359afa4f2.1535629099.git.andreyknvl@google.com>
- <CA+55aFyW9N2tSb2bQvkthbVVyY6nt5yFeWQRLHp1zruBmb5ocw@mail.gmail.com>
- <CA+55aFy2t_MHgr_CgwbhtFkL+djaCq2qMM1G+f2DwJ0qEr1URQ@mail.gmail.com>
- <20180907152600.myidisza5o4kdmvf@armageddon.cambridge.arm.com>
- <CA+55aFzQ+ykLu10q3AdyaaKJx8SDWWL9Qiu6WH2jbN_ugRUTOg@mail.gmail.com>
- <20180911164152.GA29166@arrakis.emea.arm.com>
-Message-ID: <CAAeHK+z4HOF_PobxSys8svftWt8dhbuUXEpq2sdXBTCXwTEH2g@mail.gmail.com>
+From: tudor.ambarus@microchip.com (Tudor Ambarus)
+Date: Mon, 17 Sep 2018 20:03:21 +0300
+Subject: [PATCH v3 1/2] mtd: spi-nor: add support to non-uniform SFDP SPI
+ NOR flash memories
+In-Reply-To: <20180911154007.17195-2-tudor.ambarus@microchip.com>
+References: <20180911154007.17195-1-tudor.ambarus@microchip.com>
+ <20180911154007.17195-2-tudor.ambarus@microchip.com>
+Message-ID: <9953d6e5-1049-5645-31e3-7c05071c09aa@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I took another look at the changes this patchset does to the kernel
-and here are my thoughts:
+Hi, Boris,
 
-I see two ways how a (potentially tagged) user pointer gets into the kernel:
+On 09/11/2018 06:40 PM, Tudor Ambarus wrote:
+> diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
 
-1. A pointer is passed to a syscall (directly as an argument or
-indirectly as a struct field).
-2. A pointer is extracted from user context (registers, etc.) by some
-kind of a trap/fault handler.
-(Is there something else?)
+[cut]
 
-In case 1 we also have a special case of a pointer passed to one of
-the memory syscalls (mmap, mprotect, etc.). These syscalls "are not
-doing memory accesses but rather dealing with the memory range, hence
-an untagged pointer is better suited" as pointed out by Catalin (these
-syscalls do not always use "unsigned long" instead of "void __user *"
-though, for example shmat uses "void __user *").
+>  /*
+I missed to use the opening comment mark for kernel-doc comments: "/**". This
+observation applies to all newly introduced function descriptions, in this patch
+and in the next as well.
+> + * spi_nor_div_by_erase_size() - calculate remainder and update new dividend
+> + * @erase:	pointer to a structure that describes a SPI NOR erase type
+> + * @dividend:	dividend value
+> + * @remainder:	pointer to u32 remainder (will be updated)
+> + *
+> + * Returns two values: remainder and the new dividend
 
-Looking at patch #8 ("usb, arm64: untag user addresses in devio") in
-this series, it seems that that devio ioctl actually accepts a pointer
-into a vma, so we shouldn't actually be untagging its argument and the
-patch needs to be dropped. Otherwise there's quite a few more cases
-that needs to be changed (like tcp_zerocopy_receive() for example,
-more can be found by grepping find_vma() in generic code).
+I should have used "Return: describe the return value" in order to be aligned
+with the example from kernel-doc. This also applies to most of the function
+descriptions.
 
-Regarding case 2, it seems that analyzing casts of __user pointers
-won't really help, since the code (arch/arm64/mm/fault.c) doesn't
-really use them. However all of this code is arch specific, so it
-shouldn't really change over time (right?). It looks like dealing with
-tags passed to the kernel through these fault handlers is already
-resolved with these patches (and therefore patch #6 ("arm64: untag
-user address in __do_user_fault") in this series is not actually
-needed and can be dropped (need to test that)):
+[cut]
 
-276e9327 ("arm64: entry: improve data abort handling of tagged pointers"),
-81cddd65 ("arm64: traps: fix userspace cache maintenance emulation on
-a tagged pointer")
-7dcd9dd8 ("arm64: hw_breakpoint: fix watchpoint matching for tagged pointers")
+> +/*
+> + *spi_nor_init_uniform_erase_map() - Initialize uniform erase map
 
-Now, I also see two cases when kernel behavior changes depending on
-whether a pointer is tagged:
+add a space after that "*"
 
-1. Kernel code checks that a pointer belongs to userspace by comparing
-it with TASK_SIZE/addr_limit/user_addr_max()/USER_DS/... .
-2. A pointer gets passed to find_vma() or similar functions.
-(Is there something else?)
+I will gladly submit a new version if there are no other comments. Please let me
+know.
 
-The initial thought that I had here is that the pointers that reach
-find_vma() must be passed through memory syscalls and therefore
-shouldn't be untagged and don't require any fixes. There are at least
-two exceptions to this: 1. get_user_pages() (see patch #4 ("mm, arm64:
-untag user addresses in mm/gup.c") in this patch series) and 2.
-__do_page_fault() in arch/arm64/mm/fault.c. Are there any other
-obvious exceptions? I've tried adding BUG_ON(has_tag(addr)) to
-find_vma() and running a modified syzkaller version that passes tagged
-pointers to the kernel and failed to find anything else.
-
-As for case 1, the places where pointers are compared with TASK_SIZE
-and others can be found with grep. Maybe it makes sense to introduce
-some kind of routine like is_user_pointer() that handles tagged
-pointers and refactor the existing code to use it? And maybe add a
-rule to checkpatch.pl that forbids the direct usage of TASK_SIZE and
-others.
-
-So I think detecting direct comparisons with TASK_SIZE and others
-would more useful than finding __user pointer casts (it seems that the
-latter requires a lot of annotations to be fixed/added), and I should
-just drop this patch with annotations.
-
-WDYT?
+Cheers,
+ta
