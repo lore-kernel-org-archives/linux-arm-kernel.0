@@ -1,107 +1,42 @@
-From: rppt@linux.vnet.ibm.com (Mike Rapoport)
-Date: Mon, 17 Sep 2018 07:37:24 +0300
-Subject: KSM not working in 4.9 Kernel
-In-Reply-To: <CAOuPNLj0HyC+yzwTpN-EWpzHTJ58u7pBfOja1MyweF4pbct1eQ@mail.gmail.com>
-References: <CAOuPNLj1wx4sznrtLdKjcvuTf0dECPWzPaR946FoYRXB6YAGCw@mail.gmail.com>
- <20180916153237.GC15699@rapoport-lnx>
- <CAOuPNLj0HyC+yzwTpN-EWpzHTJ58u7pBfOja1MyweF4pbct1eQ@mail.gmail.com>
-Message-ID: <20180917043724.GA12866@rapoport-lnx>
+From: yaojun8558363@gmail.com (Jun Yao)
+Date: Mon, 17 Sep 2018 12:43:27 +0800
+Subject: [PATCH v5 0/6] Move swapper_pg_dir to rodata section.
+Message-ID: <20180917044333.30051-1-yaojun8558363@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 16, 2018 at 10:35:17PM +0530, Pintu Kumar wrote:
-> On Sun, Sep 16, 2018 at 9:02 PM Mike Rapoport <rppt@linux.vnet.ibm.com> wrote:
-> >
-> > On Fri, Sep 14, 2018 at 07:58:01PM +0530, Pintu Kumar wrote:
-> > > Hi All,
-> > >
-> > > Board: Hikey620 ARM64
-> > > Kernel: 4.9.20
-> > >
-> > > I am trying to verify KSM (Kernel Same Page Merging) functionality on
-> > > 4.9 Kernel using "mmap" and madvise user space test utility.
-> > > But to my observation, it seems KSM is not working for me.
-> > > CONFIG_KSM=y is enabled in kernel.
-> > > ksm_init is also called during boot up.
-> > >   443 ?        SN     0:00 [ksmd]
-> > >
-> > > ksmd thread is also running.
-> > >
-> > > However, when I see the sysfs, no values are written.
-> > > ~ # grep -H '' /sys/kernel/mm/ksm/*
-> > > /sys/kernel/mm/ksm/pages_hashed:0
-> > > /sys/kernel/mm/ksm/pages_scanned:0
-> > > /sys/kernel/mm/ksm/pages_shared:0
-> > > /sys/kernel/mm/ksm/pages_sharing:0
-> > > /sys/kernel/mm/ksm/pages_to_scan:200
-> > > /sys/kernel/mm/ksm/pages_unshared:0
-> > > /sys/kernel/mm/ksm/pages_volatile:0
-> > > /sys/kernel/mm/ksm/run:1
-> > > /sys/kernel/mm/ksm/sleep_millisecs:1000
-> > >
-> > > So, please let me know if I am doing any thing wrong.
-> > >
-> > > This is the test utility:
-> > > int main(int argc, char *argv[])
-> > > {
-> > >         int i, n, size;
-> > >         char *buffer;
-> > >         void *addr;
-> > >
-> > >         n = 100;
-> > >         size = 100 * getpagesize();
-> > >         for (i = 0; i < n; i++) {
-> > >                 buffer = (char *)malloc(size);
-> > >                 memset(buffer, 0xff, size);
-> > >                 addr =  mmap(NULL, size,
-> > >                            PROT_READ | PROT_EXEC | PROT_WRITE,
-> > > MAP_PRIVATE | MAP_ANONYMOUS,
-> > >                            -1, 0);
-> > >                 madvise(addr, size, MADV_MERGEABLE);
-> >
-> > Just mmap'ing an area does not allocate any physical pages, so KSM has
-> > nothing to merge.
-> >
-> > You need to memset(addr,...) after mmap().
-> >
-> 
-> Yes, I am doing memset also.
-> memset(addr, 0xff, size);
-> 
-> But still no effect.
-> And I checked LTP test cases. It almost doing the same thing.
-> 
-> I observed that [ksmd] thread is not waking up at all.
-> I gave some print inside it, but I could never saw that prints coming.
-> I could not find it running either in top command during the operation.
-> Is there anything needs to be done, to wakw up ksmd?
-> I already set: echo 1 > /sys/kernel/mm/ksm.
+Version 5 changes:
+	1. Correct spelling and indentation errors[1].
+	2. Update init_mm.pgd by assembly[2].
+	3. Simplify set_p?d() by introducing set_swapper_pgd()[3].
+	4. Reduce unnecessary tlbi for every write to swapper_pg_dir
+	   during paging_init()[3].
 
-It should be echo 1 > /sys/kernel/mm/ksm/run
- 
-> 
-> 
-> > >                 sleep(1);
-> > >         }
-> > >         printf("Done....press ^C\n");
-> > >
-> > >         pause();
-> > >
-> > >         return 0;
-> > > }
-> > >
-> > >
-> > >
-> > > Thanks,
-> > > Pintu
-> > >
-> >
-> > --
-> > Sincerely yours,
-> > Mike.
-> >
-> 
+v4: https://www.spinics.net/lists/arm-kernel/msg672195.html
+v3: https://www.spinics.net/lists/arm-kernel/msg662537.html
+v2: https://patchwork.kernel.org/patch/10485641/
+v1: https://patchwork.kernel.org/patch/10476595/
+
+[1] https://www.spinics.net/lists/arm-kernel/msg675189.html
+[2] https://www.spinics.net/lists/arm-kernel/msg675193.html
+[3] https://www.spinics.net/lists/arm-kernel/msg675196.html
+
+Jun Yao (6):
+  arm64/mm: Introduce the init_pg_dir.
+  arm64/mm: Pass ttbr1 as a parameter to __enable_mmu().
+  arm64/mm: Create the initial page table in the init_pg_dir.
+  arm64/mm: Create the final page table directly in swapper_pg_dir.
+  arm64/mm: Populate the swapper_pg_dir by fixmap.
+  arm64/mm: Move {idmap_pg_dir .. swapper_pg_dir} to rodata section.
+
+ arch/arm64/include/asm/assembler.h | 29 ++++++++++++++++++
+ arch/arm64/include/asm/pgtable.h   | 36 ++++++++++++++++++----
+ arch/arm64/kernel/asm-offsets.c    |  1 +
+ arch/arm64/kernel/head.S           | 48 ++++++++++++++++++++----------
+ arch/arm64/kernel/sleep.S          |  1 +
+ arch/arm64/kernel/vmlinux.lds.S    | 47 +++++++++++++++++++----------
+ arch/arm64/mm/mmu.c                | 45 +++++++++++++---------------
+ 7 files changed, 147 insertions(+), 60 deletions(-)
 
 -- 
-Sincerely yours,
-Mike.
+2.17.1
