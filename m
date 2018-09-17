@@ -1,86 +1,38 @@
-From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Mon, 17 Sep 2018 13:39:47 +0200
-Subject: [PATCH 2/2] DT: marvell,mmp2: add more TWSI controllers
-In-Reply-To: <20180917113947.12626-1-lkundrak@v3.sk>
-References: <20180917113947.12626-1-lkundrak@v3.sk>
-Message-ID: <20180917113947.12626-3-lkundrak@v3.sk>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Mon, 17 Sep 2018 13:37:51 +0200
+Subject: [PATCH v2 1/5] spi: spi-mem: Add driver for NXP FlexSPI controller
+In-Reply-To: <1537177710-9379-2-git-send-email-yogeshnarayan.gaur@nxp.com>
+References: <1537177710-9379-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <1537177710-9379-2-git-send-email-yogeshnarayan.gaur@nxp.com>
+Message-ID: <20180917133751.453ea6ed@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've gotten the base addresses, clocks and interrupts from an rusty and old
-out-of-tree driver. I haven't actually checked against the datasheet, since
-that one is reserved for the Marvell inner circle.
+Hi Yogesh,
 
-Tested with an accelerometer on TWSI6 on an OLPC XO 1.75 machine.
+On Mon, 17 Sep 2018 15:18:26 +0530
+Yogesh Gaur <yogeshnarayan.gaur@nxp.com> wrote:
 
-Cc: Eric Miao <eric.y.miao@gmail.com>
-Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
----
- arch/arm/boot/dts/mmp2.dtsi | 49 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 49 insertions(+)
+> +
+> +	/*
+> +	 * R/W functions for big- or little-endian registers:
+> +	 * The FSPI controller's endianness is independent of
+> +	 * the CPU core's endianness. So far, although the CPU
+> +	 * core is little-endian the FSPI controller can use
+> +	 * big-endian or little-endian.
+> +	 */
+> +	if (of_property_read_bool(np, "big-endian")) {
+> +		f->write = fspi_writel_be;
+> +		f->read = fspi_readl_be;
+> +	} else {
+> +		f->write = fspi_writel;
+> +		f->read = fspi_readl;
+> +	}
 
-diff --git a/arch/arm/boot/dts/mmp2.dtsi b/arch/arm/boot/dts/mmp2.dtsi
-index 47e5b63339d1..2bd4e94501ce 100644
---- a/arch/arm/boot/dts/mmp2.dtsi
-+++ b/arch/arm/boot/dts/mmp2.dtsi
-@@ -232,6 +232,55 @@
- 				status = "disabled";
- 			};
- 
-+			twsi3: i2c at d4032000 {
-+				compatible = "mrvl,mmp-twsi";
-+				reg = <0xd4032000 0x1000>;
-+				interrupt-parent = <&intcmux17>;
-+				interrupts = <1>;
-+				clocks = <&soc_clocks MMP2_CLK_TWSI2>;
-+				resets = <&soc_clocks MMP2_CLK_TWSI2>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				status = "disabled";
-+			};
-+
-+			twsi4: i2c at d4033000 {
-+				compatible = "mrvl,mmp-twsi";
-+				reg = <0xd4033000 0x1000>;
-+				interrupt-parent = <&intcmux17>;
-+				interrupts = <2>;
-+				clocks = <&soc_clocks MMP2_CLK_TWSI3>;
-+				resets = <&soc_clocks MMP2_CLK_TWSI3>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				status = "disabled";
-+			};
-+
-+
-+			twsi5: i2c at d4033800 {
-+				compatible = "mrvl,mmp-twsi";
-+				reg = <0xd4033800 0x1000>;
-+				interrupt-parent = <&intcmux17>;
-+				interrupts = <3>;
-+				clocks = <&soc_clocks MMP2_CLK_TWSI4>;
-+				resets = <&soc_clocks MMP2_CLK_TWSI4>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				status = "disabled";
-+			};
-+
-+			twsi6: i2c at d4034000 {
-+				compatible = "mrvl,mmp-twsi";
-+				reg = <0xd4034000 0x1000>;
-+				interrupt-parent = <&intcmux17>;
-+				interrupts = <4>;
-+				clocks = <&soc_clocks MMP2_CLK_TWSI5>;
-+				resets = <&soc_clocks MMP2_CLK_TWSI5>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				status = "disabled";
-+			};
-+
- 			rtc: rtc at d4010000 {
- 				compatible = "mrvl,mmp-rtc";
- 				reg = <0xd4010000 0x1000>;
--- 
-2.17.1
+Hm, isn't it something you can extract from the compatible string? I'd
+rather not allow users to set that in their DT if it's not something
+you can change.
+
+Regards,
+
+Boris
