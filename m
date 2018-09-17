@@ -1,27 +1,30 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 17 Sep 2018 01:45:33 -0400
-Subject: [PATCH 01/11] Documentation: dts: Update coresight binding
- examples
-In-Reply-To: <1536661032-30481-2-git-send-email-suzuki.poulose@arm.com>
-References: <1536661032-30481-1-git-send-email-suzuki.poulose@arm.com>
- <1536661032-30481-2-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <5b9f3f7e.1c69fb81.ba4c4.0282@mx.google.com>
+Date: Sun, 16 Sep 2018 22:05:28 -0500
+Subject: [PATCH 01/27] dt-bindings: sunxi-sram: add binding for Allwinner
+ H6  SRAM C
+In-Reply-To: <20180902072643.4917-2-jernej.skrabec@siol.net>
+References: <20180902072643.4917-1-jernej.skrabec@siol.net>
+ <20180902072643.4917-2-jernej.skrabec@siol.net>
+Message-ID: <5b9f3f79.1c69fb81.21dc2.1e01@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Sep 2018 11:17:02 +0100, Suzuki K Poulose wrote:
-> While we updated the coresight DT bindings, some of the
-> new examples were not updated due to the order in which they
-> were merged. Let us update all the missed out ones to the
-> new bindings to avoid confusion.
+On Sun,  2 Sep 2018 09:26:17 +0200, Jernej Skrabec wrote:
+> From: Icenowy Zheng <icenowy@aosc.io>
 > 
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Cc: Rob Herring <robh@kernel.org>
-> Cc: Frank Rowand <frowand.list@gmail.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> The Allwinner H6 SoC's DE3 needs the SRAM C section being claimed in the
+> system controller to work, like A64 DE2.
+> 
+> As H6 and A64 system controller are quite similar, code is reused now,
+> and the A64 fallback compatible string is added after the H6 compatible
+> string.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> [fixed typo in compatible string]
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 > ---
->  Documentation/devicetree/bindings/arm/coresight.txt | 20 +++++++++++++-------
->  1 file changed, 13 insertions(+), 7 deletions(-)
+>  Documentation/devicetree/bindings/sram/sunxi-sram.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
 
 Reviewed-by: Rob Herring <robh@kernel.org>
