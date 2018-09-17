@@ -1,38 +1,63 @@
 From: manish.narani@xilinx.com (Manish Narani)
-Date: Mon, 17 Sep 2018 19:55:04 +0530
-Subject: [PATCH v7 6/7] arm64: zynqmp: Add DDRC node
+Date: Mon, 17 Sep 2018 19:55:01 +0530
+Subject: [PATCH v7 3/7] dt: bindings: Document ZynqMP DDRC in Synopsys
+ documentation
 In-Reply-To: <1537194305-9243-1-git-send-email-manish.narani@xilinx.com>
 References: <1537194305-9243-1-git-send-email-manish.narani@xilinx.com>
-Message-ID: <1537194305-9243-7-git-send-email-manish.narani@xilinx.com>
+Message-ID: <1537194305-9243-4-git-send-email-manish.narani@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ddrc memory controller node in dts. The size mentioned in dts is
-0x30000, because we need to access DDR_QOS INTR registers located at
-0xFD090208 from this driver.
+Add information of ZynqMP DDRC which reports the single bit errors that
+are corrected and the double bit errors that are detected.
 
 Signed-off-by: Manish Narani <manish.narani@xilinx.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ .../bindings/memory-controllers/synopsys.txt       | 27 ++++++++++++++++++----
+ 1 file changed, 22 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-index 29ce234..a81d3b16 100644
---- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-+++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-@@ -355,6 +355,13 @@
- 			xlnx,bus-width = <64>;
- 		};
+diff --git a/Documentation/devicetree/bindings/memory-controllers/synopsys.txt b/Documentation/devicetree/bindings/memory-controllers/synopsys.txt
+index a43d26d..9d32762 100644
+--- a/Documentation/devicetree/bindings/memory-controllers/synopsys.txt
++++ b/Documentation/devicetree/bindings/memory-controllers/synopsys.txt
+@@ -1,15 +1,32 @@
+ Binding for Synopsys IntelliDDR Multi Protocol Memory Controller
  
-+		mc: memory-controller at fd070000 {
-+			compatible = "xlnx,zynqmp-ddrc-2.40a";
-+			reg = <0x0 0xfd070000 0x0 0x30000>;
-+			interrupt-parent = <&gic>;
-+			interrupts = <0 112 4>;
-+		};
+-This controller has an optional ECC support in half-bus width (16-bit)
+-configuration. The ECC controller corrects one bit error and detects
+-two bit errors.
++The ZynqMP DDR ECC controller has an optional ECC support in 64-bit and 32-bit
++bus width configurations.
 +
- 		gem0: ethernet at ff0b0000 {
- 			compatible = "cdns,zynqmp-gem", "cdns,gem";
- 			status = "disabled";
++The Zynq DDR ECC controller has an optional ECC support in half-bus width
++(16-bit) configuration.
++
++These both ECC controllers correct single bit ECC errors and detect double bit
++ECC errors.
+ 
+ Required properties:
+- - compatible: Should be 'xlnx,zynq-ddrc-a05'
+- - reg: Base address and size of the controllers memory area
++ - compatible: One of:
++	- 'xlnx,zynq-ddrc-a05' : Zynq DDR ECC controller
++	- 'xlnx,zynqmp-ddrc-2.40a' : ZynqMP DDR ECC controller
++ - reg: Should contain DDR controller registers location and length.
++
++Required properties for "xlnx,zynqmp-ddrc-2.40a":
++ - interrupts: Property with a value describing the interrupt number.
+ 
+ Example:
+ 	memory-controller at f8006000 {
+ 		compatible = "xlnx,zynq-ddrc-a05";
+ 		reg = <0xf8006000 0x1000>;
+ 	};
++
++	mc: memory-controller at fd070000 {
++		compatible = "xlnx,zynqmp-ddrc-2.40a";
++		reg = <0x0 0xfd070000 0x0 0x30000>;
++		interrupt-parent = <&gic>;
++		interrupts = <0 112 4>;
++	};
 -- 
 2.1.1
