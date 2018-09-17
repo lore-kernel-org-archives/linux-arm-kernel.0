@@ -1,54 +1,88 @@
-From: phil@raspberrypi.org (Phil Elwell)
-Date: Mon, 17 Sep 2018 12:47:25 +0100
-Subject: [PATCH v3 0/4] Improve VCHIQ cache line size handling
-In-Reply-To: <f1e38c0c-0702-5df2-7f7c-40bbb93115b2@i2se.com>
-References: <1537172544-104852-1-git-send-email-phil@raspberrypi.org>
- <f1e38c0c-0702-5df2-7f7c-40bbb93115b2@i2se.com>
-Message-ID: <1ffe9824-d254-6dfb-7bd6-e146d6c9eada@raspberrypi.org>
+From: pintu.ping@gmail.com (Pintu Kumar)
+Date: Mon, 17 Sep 2018 17:25:27 +0530
+Subject: KSM not working in 4.9 Kernel
+In-Reply-To: <CAOuPNLidXFHgkBmwOPj_xFkU_OpLaXbpJg04Le7MPxu8cYg_RQ@mail.gmail.com>
+References: <CAOuPNLj1wx4sznrtLdKjcvuTf0dECPWzPaR946FoYRXB6YAGCw@mail.gmail.com>
+ <20180916153237.GC15699@rapoport-lnx>
+ <CAOuPNLj0HyC+yzwTpN-EWpzHTJ58u7pBfOja1MyweF4pbct1eQ@mail.gmail.com>
+ <20180917043724.GA12866@rapoport-lnx>
+ <CAOuPNLidXFHgkBmwOPj_xFkU_OpLaXbpJg04Le7MPxu8cYg_RQ@mail.gmail.com>
+Message-ID: <CAOuPNLj+4pMnEy5EyZmzDWszqMb_PQb3q7t_hvG_50BTz1He2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+On Mon, Sep 17, 2018 at 11:46 AM Pintu Kumar <pintu.ping@gmail.com> wrote:
+> > > But still no effect.
+> > > And I checked LTP test cases. It almost doing the same thing.
+> > >
+> > > I observed that [ksmd] thread is not waking up at all.
+> > > I gave some print inside it, but I could never saw that prints coming.
+> > > I could not find it running either in top command during the operation.
+> > > Is there anything needs to be done, to wakw up ksmd?
+> > > I already set: echo 1 > /sys/kernel/mm/ksm.
+> >
+> > It should be echo 1 > /sys/kernel/mm/ksm/run
+> >
+>
+> Oh yes, sorry for the typo.
+> I tried the same, but still ksm is not getting invoked.
+> Could someone confirm if KSM was working in 4.9 kernel?
+>
 
-On 17/09/2018 12:39, Stefan Wahren wrote:
-> Hi Phil,
-> 
-> Am 17.09.2018 um 10:22 schrieb Phil Elwell:
->> Both sides of the VCHIQ communications mechanism need to agree on the cache
->> line size. Using an incorrect value can lead to data corruption, but having the
->> two sides using different values is usually worse.
->>
->> In the absence of an obvious convenient run-time method to determine the
->> correct value in the ARCH=arm world, the downstream Raspberry Pi trees used a
->> Device Tree property, written by the firmware, to configure the kernel driver.
->> This method was vetoed during the upstreaming process, so a fixed value of 32
->> was used instead, and some corruptions ensued. This is take 2 at arriving at
->> the correct value.
->>
->> Add a new compatible string - "brcm,bcm2836-vchiq" - to indicate an SoC with
->> a 64-byte cache line. Document the new string in the binding, and use it on
->> the appropriate platforms.
->>
->> The final patch is a (seemingly cosmetic) correction of the Device Tree "reg"
->> declaration for the device node, but it doubles as an indication to the
->> Raspberry Pi firmware that the kernel driver is running a recent kernel driver
->> that chooses the correct value. As such it would help if the DT patches are
->> not merged before the driver patch.
->>
->> v3: Builds without errors, tested on multiple Raspberry Pi models.
->> v2: Replaced ARM-specific logic used to determine cache line size with
->>     a new compatible string for BCM2836 and BCM2837.
->>
->> Phil Elwell (4):
->>   staging/vc04_services: Use correct cache line size
->>   dt-bindings: soc: Document "brcm,bcm2836-vchiq"
->>   ARM: dts: bcm283x: Correct vchiq compatible string
->>   ARM: dts: bcm283x: Correct mailbox register sizes
-> 
-> since my pull requests are out, would it be okay to apply patch #1 for
-> 4.20 and the DT stuff for 4.21 (with the assumption Rob is okay with
-> these patches)?
+Ok, it's working now. I have to explicitly stop the ksm thread to see
+the statistics.
+Also there was some internal patch that was setting vm_flags to
+VM_MERGABLE thus causing ksm_advise call to return.
 
-Patch 4 is the only one I'd like to be delayed, but delaying 2-4 is fine with me.
+# echo 1 > /sys/kernel/mm/ksm/run
+# ./malloc-test.out &
+# echo 0 > /sys/kernel/mm/ksm/run
 
-Phil
+~ # grep -H '' /sys/kernel/mm/ksm/*
+/sys/kernel/mm/ksm/full_scans:105
+/sys/kernel/mm/ksm/pages_shared:1
+/sys/kernel/mm/ksm/pages_sharing:999
+/sys/kernel/mm/ksm/pages_to_scan:100
+/sys/kernel/mm/ksm/pages_unshared:0
+/sys/kernel/mm/ksm/pages_volatile:0
+/sys/kernel/mm/ksm/run:0
+/sys/kernel/mm/ksm/sleep_millisecs:20
+
+
+However, I have one doubt.
+Is the above data correct, for the below program?
+
+int main(int argc, char *argv[])
+{
+        int i, n, size, ret;
+        char *buffer;
+        void *addr;
+
+        n = 10;
+        size = 100 * getpagesize();
+        for (i = 0; i < n; i++) {
+                buffer = (char *)malloc(size);
+                memset(buffer, 0xff, size);
+                madvise(buffer, size, MADV_MERGEABLE);
+                addr =  mmap(NULL, size,
+                           PROT_READ | PROT_EXEC | PROT_WRITE,
+MAP_PRIVATE | MAP_ANONYMOUS,
+                           -1, 0);
+                memset(addr, 0xff, size);
+                ret = madvise(addr, size, MADV_MERGEABLE);
+                if (ret < 0) {
+                        fprintf(stderr, "madvise failed: ret: %d,
+reason: %s\n", ret, strerror(errno));
+                }
+                usleep(500);
+        }
+        printf("Done....press ^C\n");
+
+        pause();
+
+        return 0;
+}
+
+
+Thanks,
+Pintu
