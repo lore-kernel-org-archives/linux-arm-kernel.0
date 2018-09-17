@@ -1,95 +1,138 @@
 From: yaojun8558363@gmail.com (Jun Yao)
-Date: Mon, 17 Sep 2018 12:43:33 +0800
-Subject: [PATCH v5 6/6] arm64/mm: Move {idmap_pg_dir .. swapper_pg_dir} to
- rodata section.
+Date: Mon, 17 Sep 2018 12:43:32 +0800
+Subject: [PATCH v5 5/6] arm64/mm: Populate the swapper_pg_dir by fixmap.
 In-Reply-To: <20180917044333.30051-1-yaojun8558363@gmail.com>
 References: <20180917044333.30051-1-yaojun8558363@gmail.com>
-Message-ID: <20180917044333.30051-7-yaojun8558363@gmail.com>
+Message-ID: <20180917044333.30051-6-yaojun8558363@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the idmap_pg_dir/tramp_pg_dir/reserved_ttbr0/swapper_pg_dir to
-the rodata section. When the kernel is initialized, the
-idmap_pg_dir, tramp_pg_dir and reserved_ttbr0 will not change. And
-it's safe to move them to rodata section.
+Since we will move the swapper_pg_dir to rodata section, we need a
+way to update it. The fixmap can handle it. When the swapper_pg_dir
+needs to be updated, we map it dynamically. The map will be
+canceled after the update is complete. In this way, we can defend
+against KSMA(Kernel Space Mirror Attack).
 
 Signed-off-by: Jun Yao <yaojun8558363@gmail.com>
 ---
- arch/arm64/kernel/vmlinux.lds.S | 39 ++++++++++++++++++++-------------
- 1 file changed, 24 insertions(+), 15 deletions(-)
+ arch/arm64/include/asm/pgtable.h | 38 ++++++++++++++++++++++++++------
+ arch/arm64/mm/mmu.c              | 25 +++++++++++++++++++--
+ 2 files changed, 54 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index a634def77442..328925b308fc 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -64,8 +64,13 @@ jiffies = jiffies_64;
- 	*(.entry.tramp.text)				\
- 	. = ALIGN(PAGE_SIZE);				\
- 	__entry_tramp_text_end = .;
-+
-+#define TRAMP_PG_TABLE					\
-+	tramp_pg_dir = .;				\
-+	. += PAGE_SIZE;
- #else
- #define TRAMP_TEXT
-+#define TRAMP_PG_TABLE
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index b11d6fc62a62..9e643fc2453d 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -429,8 +429,29 @@ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+ 				 PUD_TYPE_TABLE)
  #endif
  
- #define INIT_PG_TABLES					\
-@@ -74,6 +79,24 @@ jiffies = jiffies_64;
- 	. += SWAPPER_DIR_SIZE;				\
- 	init_pg_end = .;
- 
-+#ifdef CONFIG_ARM64_SW_TTBR0_PAN
-+#define RESERVED_PG_TABLE				\
-+	reserved_ttbr0 = .;				\
-+	. += RESERVED_TTBR0_SIZE;
-+#else
-+#define RESERVED_PG_TABLE
++extern pgd_t init_pg_dir[PTRS_PER_PGD];
++extern pgd_t init_pg_end[];
++extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
++extern pgd_t swapper_pg_end[];
++extern pgd_t idmap_pg_dir[PTRS_PER_PGD];
++extern pgd_t tramp_pg_dir[PTRS_PER_PGD];
++
++extern void set_swapper_pgd(pgd_t *pgdp, pgd_t pgd);
++
++static inline bool in_swapper_pgdir(void *addr)
++{
++	return ((unsigned long)addr & PAGE_MASK) ==
++		((unsigned long)swapper_pg_dir & PAGE_MASK);
++}
++
+ static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
+ {
++#ifdef __PAGETABLE_PMD_FOLDED
++	if (in_swapper_pgdir(pmdp)) {
++		set_swapper_pgd((pgd_t *)pmdp, __pgd(pmd_val(pmd)));
++		return;
++	}
 +#endif
-+
-+#define KERNEL_PG_TABLES				\
-+	. = ALIGN(PAGE_SIZE);                           \
-+	idmap_pg_dir = .;				\
-+	. += IDMAP_DIR_SIZE;				\
-+	TRAMP_PG_TABLE					\
-+	RESERVED_PG_TABLE				\
-+	swapper_pg_dir = .;				\
-+	. += PAGE_SIZE;					\
-+	swapper_pg_end = .;
-+
+ 	WRITE_ONCE(*pmdp, pmd);
+ 
+ 	if (pmd_valid(pmd))
+@@ -484,6 +505,12 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
+ 
+ static inline void set_pud(pud_t *pudp, pud_t pud)
+ {
++#ifdef __PAGETABLE_PUD_FOLDED
++	if (in_swapper_pgdir(pudp)) {
++		set_swapper_pgd((pgd_t *)pudp, __pgd(pud_val(pud)));
++		return;
++	}
++#endif
+ 	WRITE_ONCE(*pudp, pud);
+ 
+ 	if (pud_valid(pud))
+@@ -538,6 +565,10 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
+ 
+ static inline void set_pgd(pgd_t *pgdp, pgd_t pgd)
+ {
++	if (in_swapper_pgdir(pgdp)) {
++		set_swapper_pgd(pgdp, pgd);
++		return;
++	}
+ 	WRITE_ONCE(*pgdp, pgd);
+ 	dsb(ishst);
+ }
+@@ -718,13 +749,6 @@ static inline pmd_t pmdp_establish(struct vm_area_struct *vma,
+ }
+ #endif
+ 
+-extern pgd_t init_pg_dir[PTRS_PER_PGD];
+-extern pgd_t init_pg_end[];
+-extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
+-extern pgd_t swapper_pg_end[];
+-extern pgd_t idmap_pg_dir[PTRS_PER_PGD];
+-extern pgd_t tramp_pg_dir[PTRS_PER_PGD];
+-
  /*
-  * The size of the PE/COFF section that covers the kernel image, which
-  * runs from stext to _edata, must be a round multiple of the PE/COFF
-@@ -143,6 +166,7 @@ SECTIONS
- 	RO_DATA(PAGE_SIZE)		/* everything from this point to     */
- 	EXCEPTION_TABLE(8)		/* __init_begin will be marked RO NX */
- 	NOTES
-+	KERNEL_PG_TABLES
+  * Encode and decode a swap entry:
+  *	bits 0-1:	present (must be zero)
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 71532bcd76c1..a8a60927f716 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -67,6 +67,24 @@ static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
+ static pmd_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss __maybe_unused;
+ static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss __maybe_unused;
  
- 	. = ALIGN(SEGMENT_ALIGN);
- 	__init_begin = .;
-@@ -224,21 +248,6 @@ SECTIONS
- 	BSS_SECTION(0, 0, 0)
- 
- 	. = ALIGN(PAGE_SIZE);
--	idmap_pg_dir = .;
--	. += IDMAP_DIR_SIZE;
--
--#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
--	tramp_pg_dir = .;
--	. += PAGE_SIZE;
--#endif
--
--#ifdef CONFIG_ARM64_SW_TTBR0_PAN
--	reserved_ttbr0 = .;
--	. += RESERVED_TTBR0_SIZE;
--#endif
--	swapper_pg_dir = .;
--	. += PAGE_SIZE;
--	swapper_pg_end = .;
- 
- 	__pecoff_data_size = ABSOLUTE(. - __initdata_begin);
- 	_end = .;
++static DEFINE_SPINLOCK(swapper_pgdir_lock);
++
++void set_swapper_pgd(pgd_t *pgdp, pgd_t pgd)
++{
++	pgd_t *fixmap_pgdp;
++
++	spin_lock(&swapper_pgdir_lock);
++	fixmap_pgdp = pgd_set_fixmap(__pa(pgdp));
++	WRITE_ONCE(*fixmap_pgdp, pgd);
++	/*
++	 * We need dsb(ishst) here to ensure the page-table-walker sees
++	 * our new entry before set_p?d() returns. The fixmap's
++	 * flush_tlb_kernel_range() via clear_fixmap() does this for us.
++	 */
++	pgd_clear_fixmap();
++	spin_unlock(&swapper_pgdir_lock);
++}
++
+ pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+ 			      unsigned long size, pgprot_t vma_prot)
+ {
+@@ -629,8 +647,11 @@ static void __init map_kernel(pgd_t *pgdp)
+  */
+ void __init paging_init(void)
+ {
+-	map_kernel(swapper_pg_dir);
+-	map_mem(swapper_pg_dir);
++	pgd_t *pgdp = pgd_set_fixmap(__pa_symbol(swapper_pg_dir));
++
++	map_kernel(pgdp);
++	map_mem(pgdp);
++	pgd_clear_fixmap();
+ 	cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
+ 	init_mm.pgd = swapper_pg_dir;
+ }
 -- 
 2.17.1
