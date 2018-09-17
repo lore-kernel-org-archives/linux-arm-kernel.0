@@ -1,103 +1,90 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 17 Sep 2018 12:47:17 +0200
-Subject: [PATCH v2] arm64: dts: rockchip: add i2s and spdif endpoints of
- rk3328
-In-Reply-To: <20180917085555.21775-1-katsuhiro@katsuster.net>
-References: <20180917085555.21775-1-katsuhiro@katsuster.net>
-Message-ID: <9920488.EWSIgOMfRJ@phil>
+From: lkundrak@v3.sk (Lubomir Rintel)
+Date: Mon, 17 Sep 2018 13:20:51 +0200
+Subject: [PATCH] ARM: multi_v7_defconfig: enable MMP2 platform
+Message-ID: <20180917112051.8173-1-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Marvell MMP/PXA/MMP2 platforms seem to be excluded from the defconfig
+for no good reasons. Enable the DT-based boards and the modules for
+their peripherals.
 
-Am Montag, 17. September 2018, 10:55:55 CEST schrieb Katsuhiro Suzuki:
-> This patch adds port and endpoint of i2s and spdif nodes for rk3328.
-> Because to use modern sound card interface such as audio-graph-card.
-> 
-> Signed-off-by: Katsuhiro Suzuki <katsuhiro@katsuster.net>
-> ---
->  arch/arm64/boot/dts/rockchip/rk3328.dtsi | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-> index d3ef6566325e..fd35dbd37ee2 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-> +++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-> @@ -179,7 +179,13 @@
->  		clock-names = "i2s_clk", "i2s_hclk";
->  		dmas = <&dmac 11>, <&dmac 12>;
->  		dma-names = "tx", "rx";
-> +		#sound-dai-cells = <0>;
->  		status = "disabled";
-> +
-> +		i2s0_p0: port {
-> +			i2s0_p0_0: endpoint {
-> +			};
-> +		};
+Cc: Russell King <linux@armlinux.org.uk>
+Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+---
+ arch/arm/configs/multi_v7_defconfig | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-I'm still pondering this. I.e. I'm not sure I really like adding all these
-empty nodes only to have them filled in board devicetrees.
-
-This is specific to the audio-graph-card, and neither simple-audio-card
-nor the Rockchip-specific cards we have use something like this, so
-currently I'm tending to just have all audio-graph-nodes defined in the
-board devicetree using it.
-
-For example similar to arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-or zte/zx296718-pcbox.dts do it.
-
-It would be different if the graph-links were actually on the soc-level
-like vop<->hdmi or so, but this is completely board-specific.
-
-Same for the others below.
-
-Thoughts?
-Heiko
-
-
->  	};
->  
->  	i2s1: i2s at ff010000 {
-> @@ -190,7 +196,13 @@
->  		clock-names = "i2s_clk", "i2s_hclk";
->  		dmas = <&dmac 14>, <&dmac 15>;
->  		dma-names = "tx", "rx";
-> +		#sound-dai-cells = <0>;
->  		status = "disabled";
-> +
-> +		i2s1_p0: port {
-> +			i2s1_p0_0: endpoint {
-> +			};
-> +		};
->  	};
->  
->  	i2s2: i2s at ff020000 {
-> @@ -201,7 +213,13 @@
->  		clock-names = "i2s_clk", "i2s_hclk";
->  		dmas = <&dmac 0>, <&dmac 1>;
->  		dma-names = "tx", "rx";
-> +		#sound-dai-cells = <0>;
->  		status = "disabled";
-> +
-> +		i2s2_p0: port {
-> +			i2s2_p0_0: endpoint {
-> +			};
-> +		};
->  	};
->  
->  	spdif: spdif at ff030000 {
-> @@ -214,7 +232,13 @@
->  		dma-names = "tx";
->  		pinctrl-names = "default";
->  		pinctrl-0 = <&spdifm2_tx>;
-> +		#sound-dai-cells = <0>;
->  		status = "disabled";
-> +
-> +		spdif_p0: port {
-> +			spdif_p0_0: endpoint {
-> +			};
-> +		};
->  	};
->  
->  	pdm: pdm at ff040000 {
-> 
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index fc33444e94f0..f8655c35effa 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -54,6 +54,8 @@ CONFIG_SOC_VF610=y
+ CONFIG_ARCH_KEYSTONE=y
+ CONFIG_ARCH_MEDIATEK=y
+ CONFIG_ARCH_MESON=y
++CONFIG_ARCH_MMP=y
++CONFIG_MACH_MMP2_DT=y
+ CONFIG_ARCH_MVEBU=y
+ CONFIG_MACH_ARMADA_370=y
+ CONFIG_MACH_ARMADA_375=y
+@@ -274,6 +276,7 @@ CONFIG_INPUT_EVDEV=y
+ CONFIG_KEYBOARD_QT1070=m
+ CONFIG_KEYBOARD_GPIO=y
+ CONFIG_KEYBOARD_TEGRA=y
++CONFIG_KEYBOARD_PXA27x=m
+ CONFIG_KEYBOARD_SAMSUNG=m
+ CONFIG_KEYBOARD_ST_KEYSCAN=y
+ CONFIG_KEYBOARD_SPEAR=y
+@@ -304,6 +307,7 @@ CONFIG_SERIAL_8250_DW=y
+ CONFIG_SERIAL_8250_EM=y
+ CONFIG_SERIAL_8250_MT6577=y
+ CONFIG_SERIAL_8250_UNIPHIER=y
++CONFIG_SERIAL_8250_PXA=m
+ CONFIG_SERIAL_OF_PLATFORM=y
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+@@ -567,6 +571,7 @@ CONFIG_VIDEO_V4L2_SUBDEV_API=y
+ CONFIG_MEDIA_USB_SUPPORT=y
+ CONFIG_USB_VIDEO_CLASS=m
+ CONFIG_V4L_PLATFORM_DRIVERS=y
++CONFIG_VIDEO_MMP_CAMERA=m
+ CONFIG_VIDEO_STM32_DCMI=m
+ CONFIG_SOC_CAMERA=m
+ CONFIG_SOC_CAMERA_PLATFORM=m
+@@ -652,6 +657,9 @@ CONFIG_SND_ATMEL_SOC_WM8904=m
+ CONFIG_SND_ATMEL_SOC_PDMIC=m
+ CONFIG_SND_BCM2835_SOC_I2S=m
+ CONFIG_SND_SOC_FSL_SAI=m
++CONFIG_SND_MMP_SOC=y
++CONFIG_SND_PXA_SOC_SSP=m
++CONFIG_SND_PXA910_SOC=m
+ CONFIG_SND_SOC_ROCKCHIP=m
+ CONFIG_SND_SOC_ROCKCHIP_SPDIF=m
+ CONFIG_SND_SOC_ROCKCHIP_MAX98090=m
+@@ -691,6 +699,7 @@ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_EHCI_HCD_STI=y
+ CONFIG_USB_EHCI_TEGRA=y
+ CONFIG_USB_EHCI_EXYNOS=y
++CONFIG_USB_EHCI_MV=m
+ CONFIG_USB_OHCI_HCD=y
+ CONFIG_USB_OHCI_HCD_STI=y
+ CONFIG_USB_OHCI_EXYNOS=m
+@@ -760,6 +769,7 @@ CONFIG_MMC_SDHCI_DOVE=y
+ CONFIG_MMC_SDHCI_TEGRA=y
+ CONFIG_MMC_SDHCI_S3C=y
+ CONFIG_MMC_SDHCI_PXAV3=y
++CONFIG_MMC_SDHCI_PXAV2=m
+ CONFIG_MMC_SDHCI_SPEAR=y
+ CONFIG_MMC_SDHCI_S3C_DMA=y
+ CONFIG_MMC_SDHCI_BCM_KONA=y
+@@ -823,6 +833,7 @@ CONFIG_RTC_DRV_DA9063=m
+ CONFIG_RTC_DRV_EFI=m
+ CONFIG_RTC_DRV_DIGICOLOR=m
+ CONFIG_RTC_DRV_S3C=m
++CONFIG_RTC_DRV_SA1100=m
+ CONFIG_RTC_DRV_PL031=y
+ CONFIG_RTC_DRV_AT91RM9200=m
+ CONFIG_RTC_DRV_AT91SAM9=m
+-- 
+2.17.1
