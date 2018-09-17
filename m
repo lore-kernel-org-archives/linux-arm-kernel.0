@@ -1,25 +1,27 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 17 Sep 2018 01:44:42 -0400
-Subject: [PATCH 07/27] dt-bindings: clock: sun8i-de2: Add H6 DE3 clock
- description
-In-Reply-To: <20180902072643.4917-8-jernej.skrabec@siol.net>
-References: <20180902072643.4917-1-jernej.skrabec@siol.net>
- <20180902072643.4917-8-jernej.skrabec@siol.net>
-Message-ID: <5b9f3f4b.1c69fb81.21dc0.dc17@mx.google.com>
+Date: Mon, 17 Sep 2018 01:44:51 -0400
+Subject: [PATCH 13/13] iommu/mediatek: Switch to SPDX license identifier
+In-Reply-To: <1535954502-30646-14-git-send-email-yong.wu@mediatek.com>
+References: <1535954502-30646-1-git-send-email-yong.wu@mediatek.com>
+ <1535954502-30646-14-git-send-email-yong.wu@mediatek.com>
+Message-ID: <5b9f3f54.1c69fb81.5265f.c120@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun,  2 Sep 2018 09:26:23 +0200, Jernej Skrabec wrote:
-> This commit adds necessary description and dt includes for H6 DE3 clock.
-> It is very similar to others, but memory region has some additional
-> registers not found in DE2.
+On Mon, 3 Sep 2018 14:01:42 +0800, Yong Wu wrote:
+> Switch to SPDX license identifier for MediaTek iommu/smi and their
+> header files.
 > 
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
 > ---
->  Documentation/devicetree/bindings/clock/sun8i-de2.txt | 5 +++--
->  include/dt-bindings/clock/sun8i-de2.h                 | 3 +++
->  include/dt-bindings/reset/sun8i-de2.h                 | 1 +
->  3 files changed, 7 insertions(+), 2 deletions(-)
+>  drivers/iommu/mtk_iommu.c                     | 10 +---------
+>  drivers/iommu/mtk_iommu.h                     | 10 +---------
+>  drivers/iommu/mtk_iommu_v1.c                  | 10 +---------
+>  drivers/memory/mtk-smi.c                      | 10 +---------
+>  include/dt-bindings/memory/mt2701-larb-port.h | 10 +---------
+>  include/dt-bindings/memory/mt8173-larb-port.h | 10 +---------
+>  include/soc/mediatek/smi.h                    | 10 +---------
+>  7 files changed, 7 insertions(+), 63 deletions(-)
 > 
 
 Reviewed-by: Rob Herring <robh@kernel.org>
