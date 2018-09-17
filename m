@@ -1,44 +1,52 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Mon, 17 Sep 2018 16:01:21 +0000
-Subject: [PATCH v4 0/6] PCI: imx: Initial imx7d suspend/resume support
-In-Reply-To: <20180917150941.GH7239@e107981-ln.cambridge.arm.com>
-References: <cover.1534264292.git.leonard.crestez@nxp.com>
- <20180917150941.GH7239@e107981-ln.cambridge.arm.com>
-Message-ID: <16d68541fd499dfda88e79d4386be7ad6d0919d9.camel@nxp.com>
+From: Jose.Abreu@synopsys.com (Jose Abreu)
+Date: Mon, 17 Sep 2018 17:18:14 +0100
+Subject: [PATCH 0/2] add Ethernet driver support for mt2712
+In-Reply-To: <20180917152441.GD5458@lunn.ch>
+References: <1537165763-13112-1-git-send-email-biao.huang@mediatek.com>
+ <20180917152441.GD5458@lunn.ch>
+Message-ID: <a8c0a091-6bee-6504-04cd-36e214e805aa@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-09-17 at 16:09 +0100, Lorenzo Pieralisi wrote:
-> On Tue, Aug 14, 2018 at 07:50:14PM +0300, Leonard Crestez wrote:
+Hi Andrew, Biao,
 
-> > V4 adds 4 more patches with PME_Turn_Off support on top, using a new
-> > reset bit. I generally try to keep series short but in this case some
-> > planning might be needed to get patches into 4.20.
-> > 
-> > Since the new reset is treated as optional with old DTB there should be
-> > again no problem if reset and pci are merged out of order.
-> > 
-> > Shawn/Philipp/Lorenzo: Would it make sense to merge this series through a
-> > single specific tree, such as the one for imx?
-> 
-> This series is a bit of a mixture of multiple things hard to discern
-> (actually I already merged patch 2 and patch 1 seems completely
-> unrelated).
-> 
-> I would take the series through the PCI tree but I need an ACK for
-> patches 5 and 6, please let me know how you want to handle it.
+On 17-09-2018 16:24, Andrew Lunn wrote:
+> On Mon, Sep 17, 2018 at 02:29:21PM +0800, Biao Huang wrote:
+>
+> Adding in the STMMAC driver maintainers.
+>
+>> Ethernet in mt2712 is totally different from that in
+>> drivers/net/ethernet/mediatek/*, so we add new folder for mt2712 SoC.
+>>
+>> The mt2712 Ethernet IP is from Synopsys, and we notice that there is a
+>> reference driver in drivers/net/ethernet/synopsys/*. But
+>> 1. our version is only for 10/100/1000Mbps, not for 2.5/4/5Gbps.
+>> mt2712 Ethernet design is differnet from that in synopsys folder in many
+>> aspects, and some key features are not included in mt2712, such as rss
+>> and split header. At the same time, some features we need have not been
+>> implenmented in synopsys folder.
+> In general, we don't have two very similar drivers. We try to have one
+> driver. If the problem was just missing features in the stmmac driver,
+> you can add them. I doubt not supporting 2.5/4/5Gbps in your silicon
+> is an issue, since very few STMMAC devices have this. By split header,
+> do you mean support for TSO? That seems to be a gmac4 or newer
+> feature, but the driver supports not having tso support in hardware.
+>
+> Giuseppe, Alexandre, Jose: Please can you look at the proposed driver
+> and see how much it really differs from the STMMAC driver. 
 
-Patches 1 and 2 are already in, the rest need review. I can now just
-resend patches 3-6 as a separate series, unless somebody complains
-about spam.
+Thanks for the cc Andrew, indeed this looks very similar and the
+register bank matches, by what I've seen, GMAC 4+.
 
-Multiple separate patches are required because it touches reset + dt +
-pci. I guess adding the include constant should be moved from the dts
-patch to dt-bindings though.
+> How easy
+> would it be to extend stmmac it to support the mt2712?
 
-Merging reset and pci out of order should be fine here and is required
-by DT compatibility rules anyway.
+Very easy, as I've just done with XGMAC2. If Biao wants to expand
+stmmac functionality I'm all in favor!
 
---
-Regards,
-Leonard
+Thanks and Best Regards,
+Jose Miguel Abreu
+
+>
+> Thanks
+> 	Andrew
