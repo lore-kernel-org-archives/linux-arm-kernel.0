@@ -1,120 +1,35 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Mon, 17 Sep 2018 11:17:44 +0800
-Subject: [PATCH V2 2/2] cpufreq: imx6q: read OCOTP through nvmem for
- imx6ul/imx6ull
-In-Reply-To: <1537154264-23252-1-git-send-email-Anson.Huang@nxp.com>
-References: <1537154264-23252-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1537154264-23252-2-git-send-email-Anson.Huang@nxp.com>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Mon, 17 Sep 2018 11:26:33 +0800
+Subject: [PATCH v3 0/3] i2c: designware: select gpio/default pin when
+ prepare/unprepare recovery
+Message-ID: <20180917112633.252c591c@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On i.MX6UL/i.MX6ULL, accessing OCOTP directly is wrong because
-the ocotp clock needs to be enabled first. Add support for reading
-OCOTP through the nvmem API, and keep the old method there to
-support old dtb.
+On some platforms, the sda/scl pins are muxed with gpio functions, so
+they could be used for recovery. Select the gpio/default pin function
+when prepare/unprepare recovery.
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
-changes since V1:
-	add old dtb support.
- drivers/cpufreq/imx6q-cpufreq.c | 52 +++++++++++++++++++++++++++--------------
- 1 file changed, 35 insertions(+), 17 deletions(-)
+patch1 adds the missing scl-gpios, sda-gpios properties binding doc.
+patch2 adds the pintrl property for i2c bus recovery.
+patch3 selects gpio/default pin when prepare/unprepare recovery.
 
-diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-index b2ff423..518386c4 100644
---- a/drivers/cpufreq/imx6q-cpufreq.c
-+++ b/drivers/cpufreq/imx6q-cpufreq.c
-@@ -12,6 +12,7 @@
- #include <linux/cpu_cooling.h>
- #include <linux/err.h>
- #include <linux/module.h>
-+#include <linux/nvmem-consumer.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/pm_opp.h>
-@@ -290,20 +291,32 @@ static void imx6q_opp_check_speed_grading(struct device *dev)
- #define OCOTP_CFG3_6ULL_SPEED_792MHZ	0x2
- #define OCOTP_CFG3_6ULL_SPEED_900MHZ	0x3
- 
--static void imx6ul_opp_check_speed_grading(struct device *dev)
-+static int imx6ul_opp_check_speed_grading(struct device *dev)
- {
--	struct device_node *np;
--	void __iomem *base;
- 	u32 val;
-+	int ret = 0;
- 
--	np = of_find_compatible_node(NULL, NULL, "fsl,imx6ul-ocotp");
--	if (!np)
--		return;
-+	if (of_find_property(dev->of_node, "nvmem-cells", NULL)) {
-+		ret = nvmem_cell_read_u32(dev, "speed_grade", &val);
-+		if (ret)
-+			return ret;
-+	} else {
-+		struct device_node *np;
-+		void __iomem *base;
-+
-+		np = of_find_compatible_node(NULL, NULL, "fsl,imx6ul-ocotp");
-+		if (!np)
-+			return -ENOENT;
-+
-+		base = of_iomap(np, 0);
-+		if (!base) {
-+			dev_err(dev, "failed to map ocotp\n");
-+			of_node_put(np);
-+			return -EFAULT;
-+		}
- 
--	base = of_iomap(np, 0);
--	if (!base) {
--		dev_err(dev, "failed to map ocotp\n");
--		goto put_node;
-+		val = readl_relaxed(base + OCOTP_CFG3);
-+		iounmap(base);
- 	}
- 
- 	/*
-@@ -314,7 +327,6 @@ static void imx6ul_opp_check_speed_grading(struct device *dev)
- 	 * 2b'11: 900000000Hz on i.MX6ULL only;
- 	 * We need to set the max speed of ARM according to fuse map.
- 	 */
--	val = readl_relaxed(base + OCOTP_CFG3);
- 	val >>= OCOTP_CFG3_SPEED_SHIFT;
- 	val &= 0x3;
- 
-@@ -334,9 +346,7 @@ static void imx6ul_opp_check_speed_grading(struct device *dev)
- 				dev_warn(dev, "failed to disable 900MHz OPP\n");
- 	}
- 
--	iounmap(base);
--put_node:
--	of_node_put(np);
-+	return ret;
- }
- 
- static int imx6q_cpufreq_probe(struct platform_device *pdev)
-@@ -394,10 +404,18 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
- 	}
- 
- 	if (of_machine_is_compatible("fsl,imx6ul") ||
--	    of_machine_is_compatible("fsl,imx6ull"))
--		imx6ul_opp_check_speed_grading(cpu_dev);
--	else
-+	    of_machine_is_compatible("fsl,imx6ull")) {
-+		ret = imx6ul_opp_check_speed_grading(cpu_dev);
-+		if (ret == -EPROBE_DEFER)
-+			return ret;
-+		if (ret) {
-+			dev_err(cpu_dev, "failed to read ocotp: %d\n",
-+				ret);
-+			return ret;
-+		}
-+	} else {
- 		imx6q_opp_check_speed_grading(cpu_dev);
-+	}
- 
- 	/* Because we have added the OPPs here, we must free them */
- 	free_opp = true;
+Since v2:
+ - add missing property dt-binding
+
+Since v1:
+ - use IS_ERR_OR_NULL
+
+Jisheng Zhang (3):
+  dt-bindings: i2c: designware: add optional gpio recovery properties
+  dt-bindings: i2c: designware: add optional pinctrl for bus recovery
+  i2c: designware: select gpio/default pin when prepare/unprepare
+    recovery
+
+ .../bindings/i2c/i2c-designware.txt           | 12 ++++++++++
+ drivers/i2c/busses/i2c-designware-core.h      |  3 +++
+ drivers/i2c/busses/i2c-designware-master.c    | 22 +++++++++++++++++++
+ 3 files changed, 37 insertions(+)
+
 -- 
-2.7.4
+2.19.0
