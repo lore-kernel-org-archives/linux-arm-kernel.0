@@ -1,121 +1,50 @@
-From: katsuhiro@katsuster.net (Katsuhiro Suzuki)
-Date: Mon, 17 Sep 2018 20:12:18 +0900
-Subject: [PATCH v2] arm64: dts: rockchip: add i2s and spdif endpoints of
- rk3328
-In-Reply-To: <9920488.EWSIgOMfRJ@phil>
-References: <20180917085555.21775-1-katsuhiro@katsuster.net>
- <9920488.EWSIgOMfRJ@phil>
-Message-ID: <71ab1337-3681-ecdc-4eb8-57ad5656db27@katsuster.net>
+From: john.garry@huawei.com (John Garry)
+Date: Mon, 17 Sep 2018 12:20:04 +0100
+Subject: [PATCH v2 0/3] iommu: Avoid DMA ops domain refcount contention
+In-Reply-To: <20180914124858.GA4010@arm.com>
+References: <cover.1536764440.git.robin.murphy@arm.com>
+ <20180914124858.GA4010@arm.com>
+Message-ID: <dbb9e48f-e31b-b8a1-0287-378c35e9fdb9@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Heiko,
+On 14/09/2018 13:48, Will Deacon wrote:
+> Hi Robin,
+>
 
-On 2018?09?17? 19:47, Heiko Stuebner wrote:
-> Hi,
-> 
-> Am Montag, 17. September 2018, 10:55:55 CEST schrieb Katsuhiro Suzuki:
->> This patch adds port and endpoint of i2s and spdif nodes for rk3328.
->> Because to use modern sound card interface such as audio-graph-card.
+Hi Robin,
+
+I just spoke with Dongdong and we will test this version also so that we 
+may provide a "Tested-by" tag.
+
+Thanks,
+John
+
+> On Wed, Sep 12, 2018 at 04:24:11PM +0100, Robin Murphy wrote:
+>> John raised the issue[1] that we have some unnecessary refcount contention
+>> in the DMA ops path which shows scalability problems now that we have more
+>> real high-performance hardware using iommu-dma. The x86 IOMMU drivers are
+>> sidestepping this by stashing domain references in archdata, but since
+>> that's not very nice for architecture-agnostic code, I think it's time to
+>> look at a generic API-level solution.
 >>
->> Signed-off-by: Katsuhiro Suzuki <katsuhiro@katsuster.net>
->> ---
->>   arch/arm64/boot/dts/rockchip/rk3328.dtsi | 24 ++++++++++++++++++++++++
->>   1 file changed, 24 insertions(+)
+>> These are a couple of quick patches based on the idea I had back when
+>> first implementing iommu-dma, but didn't have any way to justify at the
+>> time. However, the reports of 10-25% better networking performance on v1
+>> suggest that it's very worthwhile (and far more significant than I ever
+>> would have guessed).
 >>
->> diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
->> index d3ef6566325e..fd35dbd37ee2 100644
->> --- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
->> +++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
->> @@ -179,7 +179,13 @@
->>   		clock-names = "i2s_clk", "i2s_hclk";
->>   		dmas = <&dmac 11>, <&dmac 12>;
->>   		dma-names = "tx", "rx";
->> +		#sound-dai-cells = <0>;
->>   		status = "disabled";
->> +
->> +		i2s0_p0: port {
->> +			i2s0_p0_0: endpoint {
->> +			};
->> +		};
-> 
-> I'm still pondering this. I.e. I'm not sure I really like adding all these
-> empty nodes only to have them filled in board devicetrees.
-> 
-> This is specific to the audio-graph-card, and neither simple-audio-card
-> nor the Rockchip-specific cards we have use something like this, so
-> currently I'm tending to just have all audio-graph-nodes defined in the
-> board devicetree using it.
-> 
-> For example similar to arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> or zte/zx296718-pcbox.dts do it.
-> 
-> It would be different if the graph-links were actually on the soc-level
-> like vop<->hdmi or so, but this is completely board-specific.
-> 
-> Same for the others below.
-> 
-> Thoughts?
-> Heiko
-
-Hmm, OK. These nodes will move into the device tree of ROCK64.
-Thank you for your advise!
-
-Regards,
---
-Katsuhiro Suzuki
-
-
-> 
-> 
->>   	};
->>   
->>   	i2s1: i2s at ff010000 {
->> @@ -190,7 +196,13 @@
->>   		clock-names = "i2s_clk", "i2s_hclk";
->>   		dmas = <&dmac 14>, <&dmac 15>;
->>   		dma-names = "tx", "rx";
->> +		#sound-dai-cells = <0>;
->>   		status = "disabled";
->> +
->> +		i2s1_p0: port {
->> +			i2s1_p0_0: endpoint {
->> +			};
->> +		};
->>   	};
->>   
->>   	i2s2: i2s at ff020000 {
->> @@ -201,7 +213,13 @@
->>   		clock-names = "i2s_clk", "i2s_hclk";
->>   		dmas = <&dmac 0>, <&dmac 1>;
->>   		dma-names = "tx", "rx";
->> +		#sound-dai-cells = <0>;
->>   		status = "disabled";
->> +
->> +		i2s2_p0: port {
->> +			i2s2_p0_0: endpoint {
->> +			};
->> +		};
->>   	};
->>   
->>   	spdif: spdif at ff030000 {
->> @@ -214,7 +232,13 @@
->>   		dma-names = "tx";
->>   		pinctrl-names = "default";
->>   		pinctrl-0 = <&spdifm2_tx>;
->> +		#sound-dai-cells = <0>;
->>   		status = "disabled";
->> +
->> +		spdif_p0: port {
->> +			spdif_p0_0: endpoint {
->> +			};
->> +		};
->>   	};
->>   
->>   	pdm: pdm at ff040000 {
->>
-> 
-> 
-> 
-> 
-> 
+>> As far as merging goes, I don't mind at all whether this goes via IOMMU,
+>> or via dma-mapping provided Joerg's happy to ack it.
+>
+> I think it makes most sense for Joerg to take this series via his tree.
+>
+> Anyway, I've been running them on my TX2 box and things are happy enough,
+> so:
+>
+> Tested-by: Will Deacon <will.deacon@arm.com>
+>
+> Will
+>
+> .
+>
