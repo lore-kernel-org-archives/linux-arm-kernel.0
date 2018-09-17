@@ -1,79 +1,103 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 17 Sep 2018 11:41:39 +0100
-Subject: [PATCH v5 17/18] kvm: arm64: Limit the minimum number of page table
- levels
-In-Reply-To: <20180917104144.19188-1-suzuki.poulose@arm.com>
-References: <20180917104144.19188-1-suzuki.poulose@arm.com>
-Message-ID: <20180917104144.19188-18-suzuki.poulose@arm.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 17 Sep 2018 12:47:17 +0200
+Subject: [PATCH v2] arm64: dts: rockchip: add i2s and spdif endpoints of
+ rk3328
+In-Reply-To: <20180917085555.21775-1-katsuhiro@katsuster.net>
+References: <20180917085555.21775-1-katsuhiro@katsuster.net>
+Message-ID: <9920488.EWSIgOMfRJ@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we are about to remove the lower limit on the IPA size,
-make sure that we do not go to 1 level page table (e.g, with
-32bit IPA on 64K host with concatenation) to avoid splitting
-the host PMD huge pages at stage2.
+Hi,
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <cdall@kernel.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/include/asm/stage2_pgtable.h |  8 +++++++-
- arch/arm64/kvm/reset.c                  | 12 +++++++++++-
- 2 files changed, 18 insertions(+), 2 deletions(-)
+Am Montag, 17. September 2018, 10:55:55 CEST schrieb Katsuhiro Suzuki:
+> This patch adds port and endpoint of i2s and spdif nodes for rk3328.
+> Because to use modern sound card interface such as audio-graph-card.
+> 
+> Signed-off-by: Katsuhiro Suzuki <katsuhiro@katsuster.net>
+> ---
+>  arch/arm64/boot/dts/rockchip/rk3328.dtsi | 24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+> index d3ef6566325e..fd35dbd37ee2 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+> @@ -179,7 +179,13 @@
+>  		clock-names = "i2s_clk", "i2s_hclk";
+>  		dmas = <&dmac 11>, <&dmac 12>;
+>  		dma-names = "tx", "rx";
+> +		#sound-dai-cells = <0>;
+>  		status = "disabled";
+> +
+> +		i2s0_p0: port {
+> +			i2s0_p0_0: endpoint {
+> +			};
+> +		};
 
-diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
-index 352ec4158fdf..6a56fdff0823 100644
---- a/arch/arm64/include/asm/stage2_pgtable.h
-+++ b/arch/arm64/include/asm/stage2_pgtable.h
-@@ -72,8 +72,14 @@
- /*
-  * The number of PTRS across all concatenated stage2 tables given by the
-  * number of bits resolved at the initial level.
-+ * If we force more number of levels than necessary, we may have
-+ * stage2_pgdir_shift > IPA, in which case, stage2_pgd_ptrs will have
-+ * one entry.
-  */
--#define __s2_pgd_ptrs(ipa, lvls)	(1 << ((ipa) - pt_levels_pgdir_shift((lvls))))
-+#define pgd_ptrs_shift(ipa, pgdir_shift)	\
-+	((ipa) > (pgdir_shift) ? ((ipa) - (pgdir_shift)) : 0)
-+#define __s2_pgd_ptrs(ipa, lvls)		\
-+	(1 << (pgd_ptrs_shift((ipa), pt_levels_pgdir_shift(lvls))))
- #define __s2_pgd_size(ipa, lvls)	(__s2_pgd_ptrs((ipa), (lvls)) * sizeof(pgd_t))
- 
- #define stage2_pgd_ptrs(kvm)		__s2_pgd_ptrs(kvm_phys_shift(kvm), kvm_stage2_levels(kvm))
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index 76972b19bdd7..0393bb974b23 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -190,10 +190,19 @@ int kvm_arm_config_vm(struct kvm *kvm, unsigned long type)
- {
- 	u64 vtcr = VTCR_EL2_FLAGS;
- 	u64 parange;
-+	u8 lvls;
- 
- 	if (type)
- 		return -EINVAL;
- 
-+	/*
-+	 * Use a minimum 2 level page table to prevent splitting
-+	 * host PMD huge pages@stage2.
-+	 */
-+	lvls = stage2_pgtable_levels(KVM_PHYS_SHIFT);
-+	if (lvls < 2)
-+		lvls = 2;
-+
- 	parange = read_sanitised_ftr_reg(SYS_ID_AA64MMFR0_EL1) & 7;
- 	if (parange > ID_AA64MMFR0_PARANGE_MAX)
- 		parange = ID_AA64MMFR0_PARANGE_MAX;
-@@ -210,7 +219,8 @@ int kvm_arm_config_vm(struct kvm *kvm, unsigned long type)
- 	vtcr |= (kvm_get_vmid_bits() == 16) ?
- 		VTCR_EL2_VS_16BIT :
- 		VTCR_EL2_VS_8BIT;
--	vtcr |= VTCR_EL2_LVLS_TO_SL0(stage2_pgtable_levels(KVM_PHYS_SHIFT));
-+
-+	vtcr |= VTCR_EL2_LVLS_TO_SL0(lvls);
- 	vtcr |= VTCR_EL2_T0SZ(KVM_PHYS_SHIFT);
- 
- 	kvm->arch.vtcr = vtcr;
--- 
-2.19.0
+I'm still pondering this. I.e. I'm not sure I really like adding all these
+empty nodes only to have them filled in board devicetrees.
+
+This is specific to the audio-graph-card, and neither simple-audio-card
+nor the Rockchip-specific cards we have use something like this, so
+currently I'm tending to just have all audio-graph-nodes defined in the
+board devicetree using it.
+
+For example similar to arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+or zte/zx296718-pcbox.dts do it.
+
+It would be different if the graph-links were actually on the soc-level
+like vop<->hdmi or so, but this is completely board-specific.
+
+Same for the others below.
+
+Thoughts?
+Heiko
+
+
+>  	};
+>  
+>  	i2s1: i2s at ff010000 {
+> @@ -190,7 +196,13 @@
+>  		clock-names = "i2s_clk", "i2s_hclk";
+>  		dmas = <&dmac 14>, <&dmac 15>;
+>  		dma-names = "tx", "rx";
+> +		#sound-dai-cells = <0>;
+>  		status = "disabled";
+> +
+> +		i2s1_p0: port {
+> +			i2s1_p0_0: endpoint {
+> +			};
+> +		};
+>  	};
+>  
+>  	i2s2: i2s at ff020000 {
+> @@ -201,7 +213,13 @@
+>  		clock-names = "i2s_clk", "i2s_hclk";
+>  		dmas = <&dmac 0>, <&dmac 1>;
+>  		dma-names = "tx", "rx";
+> +		#sound-dai-cells = <0>;
+>  		status = "disabled";
+> +
+> +		i2s2_p0: port {
+> +			i2s2_p0_0: endpoint {
+> +			};
+> +		};
+>  	};
+>  
+>  	spdif: spdif at ff030000 {
+> @@ -214,7 +232,13 @@
+>  		dma-names = "tx";
+>  		pinctrl-names = "default";
+>  		pinctrl-0 = <&spdifm2_tx>;
+> +		#sound-dai-cells = <0>;
+>  		status = "disabled";
+> +
+> +		spdif_p0: port {
+> +			spdif_p0_0: endpoint {
+> +			};
+> +		};
+>  	};
+>  
+>  	pdm: pdm at ff040000 {
+> 
