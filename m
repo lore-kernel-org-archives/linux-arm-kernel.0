@@ -1,200 +1,134 @@
-From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Mon, 17 Sep 2018 16:02:52 +0800
-Subject: [PATCH v2 3/3] arm64: dts: synaptics: add dtsi file for Synaptics
- AS370 SoC
-In-Reply-To: <20180917160015.05a1fc5b@xhacker.debian>
-References: <20180917160015.05a1fc5b@xhacker.debian>
-Message-ID: <20180917160252.6c016dbc@xhacker.debian>
+From: phil@raspberrypi.org (Phil Elwell)
+Date: Mon, 17 Sep 2018 09:22:21 +0100
+Subject: [PATCH v3 1/4] staging/vc04_services: Use correct cache line size
+In-Reply-To: <1537172544-104852-1-git-send-email-phil@raspberrypi.org>
+References: <1537172544-104852-1-git-send-email-phil@raspberrypi.org>
+Message-ID: <1537172544-104852-2-git-send-email-phil@raspberrypi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial dtsi file to support Synaptics AS370 SoC with quad
-Cortex-A53 CPUs.
+Use the compatible string in the DTB to select the correct cache line
+size for the SoC - 32 for BCM2835, and 64 for BCM2836 and BCM2837.
 
-Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+Signed-off-by: Phil Elwell <phil@raspberrypi.org>
 ---
- arch/arm64/boot/dts/synaptics/as370.dtsi | 173 +++++++++++++++++++++++
- 1 file changed, 173 insertions(+)
- create mode 100644 arch/arm64/boot/dts/synaptics/as370.dtsi
+ .../interface/vchiq_arm/vchiq_2835_arm.c           |  4 ++-
+ .../vc04_services/interface/vchiq_arm/vchiq_arm.c  | 35 +++++++++++++++-------
+ .../vc04_services/interface/vchiq_arm/vchiq_arm.h  |  5 ++++
+ 3 files changed, 33 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/synaptics/as370.dtsi b/arch/arm64/boot/dts/synaptics/as370.dtsi
-new file mode 100644
-index 000000000000..7331acf3874e
---- /dev/null
-+++ b/arch/arm64/boot/dts/synaptics/as370.dtsi
-@@ -0,0 +1,173 @@
-+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
-+/*
-+ * Copyright (C) 2018 Synaptics Incorporated
-+ *
-+ * Author: Jisheng Zhang <jszhang@kernel.org>
-+ */
-+
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	compatible = "syna,as370";
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	psci {
-+		compatible = "arm,psci-1.0";
-+		method = "smc";
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu0: cpu at 0 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0>;
-+			enable-method = "psci";
-+			next-level-cache = <&l2>;
-+			cpu-idle-states = <&CPU_SLEEP_0>;
-+		};
-+
-+		cpu1: cpu at 1 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x1>;
-+			enable-method = "psci";
-+			next-level-cache = <&l2>;
-+			cpu-idle-states = <&CPU_SLEEP_0>;
-+		};
-+
-+		cpu2: cpu at 2 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x2>;
-+			enable-method = "psci";
-+			next-level-cache = <&l2>;
-+			cpu-idle-states = <&CPU_SLEEP_0>;
-+		};
-+
-+		cpu3: cpu at 3 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x3>;
-+			enable-method = "psci";
-+			next-level-cache = <&l2>;
-+			cpu-idle-states = <&CPU_SLEEP_0>;
-+		};
-+
-+		l2: cache {
-+			compatible = "cache";
-+		};
-+
-+		idle-states {
-+			entry-method = "psci";
-+			CPU_SLEEP_0: cpu-sleep-0 {
-+				compatible = "arm,idle-state";
-+				local-timer-stop;
-+				arm,psci-suspend-param = <0x0010000>;
-+				entry-latency-us = <75>;
-+				exit-latency-us = <155>;
-+				min-residency-us = <1000>;
-+			};
-+		};
-+	};
-+
-+	osc: osc {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <25000000>;
-+	};
-+
-+	pmu {
-+		compatible = "arm,cortex-a53-pmu";
-+		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-affinity = <&cpu0>,
-+				     <&cpu1>,
-+				     <&cpu2>,
-+				     <&cpu3>;
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
-+
-+	soc at f7000000 {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0 0xf7000000 0x1000000>;
-+
-+		gic: interrupt-controller at 901000 {
-+			compatible = "arm,gic-400";
-+			#interrupt-cells = <3>;
-+			interrupt-controller;
-+			reg = <0x901000 0x1000>,
-+			      <0x902000 0x2000>,
-+			      <0x904000 0x2000>,
-+			      <0x906000 0x2000>;
-+			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-+		};
-+
-+		apb at e80000 {
-+			compatible = "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 0xe80000 0x10000>;
-+
-+			uart0: serial at c00 {
-+				compatible = "snps,dw-apb-uart";
-+				reg = <0xc00 0x100>;
-+				interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&osc>;
-+				reg-shift = <2>;
-+				status = "disabled";
-+			};
-+
-+			gpio0: gpio at 1800 {
-+				compatible = "snps,dw-apb-gpio";
-+				reg = <0x1800 0x400>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				porta: gpio-port at 0 {
-+					compatible = "snps,dw-apb-gpio-port";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					snps,nr-gpios = <32>;
-+					reg = <0>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+					interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
-+				};
-+			};
-+
-+			gpio1: gpio at 2000 {
-+				compatible = "snps,dw-apb-gpio";
-+				reg = <0x2000 0x400>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				portb: gpio-port at 1 {
-+					compatible = "snps,dw-apb-gpio-port";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					snps,nr-gpios = <32>;
-+					reg = <0>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+					interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
-+				};
-+			};
-+		};
-+	};
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
+index e767209..83d740f 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
+@@ -109,7 +109,8 @@ free_pagelist(struct vchiq_pagelist_info *pagelistinfo,
+ int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
+ {
+ 	struct device *dev = &pdev->dev;
+-	struct rpi_firmware *fw = platform_get_drvdata(pdev);
++	struct vchiq_drvdata *drvdata = platform_get_drvdata(pdev);
++	struct rpi_firmware *fw = drvdata->fw;
+ 	VCHIQ_SLOT_ZERO_T *vchiq_slot_zero;
+ 	struct resource *res;
+ 	void *slot_mem;
+@@ -127,6 +128,7 @@ int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
+ 	if (err < 0)
+ 		return err;
+ 
++	g_cache_line_size = drvdata->cache_line_size;
+ 	g_fragments_size = 2 * g_cache_line_size;
+ 
+ 	/* Allocate space for the channels in coherent memory */
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+index bc05c69..ea78937 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+@@ -170,6 +170,14 @@ static struct device *vchiq_dev;
+ static DEFINE_SPINLOCK(msg_queue_spinlock);
+ static struct platform_device *bcm2835_camera;
+ 
++static struct vchiq_drvdata bcm2835_drvdata = {
++	.cache_line_size = 32,
 +};
++
++static struct vchiq_drvdata bcm2836_drvdata = {
++	.cache_line_size = 64,
++};
++
+ static const char *const ioctl_names[] = {
+ 	"CONNECT",
+ 	"SHUTDOWN",
+@@ -3573,12 +3581,25 @@ void vchiq_platform_conn_state_changed(VCHIQ_STATE_T *state,
+ 	}
+ }
+ 
++static const struct of_device_id vchiq_of_match[] = {
++	{ .compatible = "brcm,bcm2835-vchiq", .data = &bcm2835_drvdata },
++	{ .compatible = "brcm,bcm2836-vchiq", .data = &bcm2836_drvdata },
++	{},
++};
++MODULE_DEVICE_TABLE(of, vchiq_of_match);
++
+ static int vchiq_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *fw_node;
+-	struct rpi_firmware *fw;
++	const struct of_device_id *of_id;
++	struct vchiq_drvdata *drvdata;
+ 	int err;
+ 
++	of_id = of_match_node(vchiq_of_match, pdev->dev.of_node);
++	drvdata = (struct vchiq_drvdata *)of_id->data;
++	if (!drvdata)
++		return -EINVAL;
++
+ 	fw_node = of_find_compatible_node(NULL, NULL,
+ 					  "raspberrypi,bcm2835-firmware");
+ 	if (!fw_node) {
+@@ -3586,12 +3607,12 @@ static int vchiq_probe(struct platform_device *pdev)
+ 		return -ENOENT;
+ 	}
+ 
+-	fw = rpi_firmware_get(fw_node);
++	drvdata->fw = rpi_firmware_get(fw_node);
+ 	of_node_put(fw_node);
+-	if (!fw)
++	if (!drvdata->fw)
+ 		return -EPROBE_DEFER;
+ 
+-	platform_set_drvdata(pdev, fw);
++	platform_set_drvdata(pdev, drvdata);
+ 
+ 	err = vchiq_platform_init(pdev, &g_state);
+ 	if (err != 0)
+@@ -3661,12 +3682,6 @@ static int vchiq_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static const struct of_device_id vchiq_of_match[] = {
+-	{ .compatible = "brcm,bcm2835-vchiq", },
+-	{},
+-};
+-MODULE_DEVICE_TABLE(of, vchiq_of_match);
+-
+ static struct platform_driver vchiq_driver = {
+ 	.driver = {
+ 		.name = "bcm2835_vchiq",
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.h b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.h
+index 40bb0c6..2f3ebc9 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.h
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.h
+@@ -123,6 +123,11 @@ typedef struct vchiq_arm_state_struct {
+ 
+ } VCHIQ_ARM_STATE_T;
+ 
++struct vchiq_drvdata {
++	const unsigned int cache_line_size;
++	struct rpi_firmware *fw;
++};
++
+ extern int vchiq_arm_log_level;
+ extern int vchiq_susp_log_level;
+ 
 -- 
-2.19.0
+2.7.4
