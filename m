@@ -1,125 +1,52 @@
-From: seanvk.dev@oregontracks.org (Sean V Kelley)
-Date: Mon, 17 Sep 2018 08:40:30 -0700
-Subject: [PATCH v2] perf vendor events arm64: Revise core JSON events for
- eMAG
-In-Reply-To: <0c154237-0c1f-cc9d-c697-1ca66e9297ae@redhat.com>
-References: <20180910002625.22253-1-seanvk.dev@oregontracks.org>
- <1d601b30-5065-b778-9927-b7d9f04f6b6f@redhat.com>
- <bb09333a-ac9c-4163-98a0-4f50b6ff9079@huawei.com>
- <0c154237-0c1f-cc9d-c697-1ca66e9297ae@redhat.com>
-Message-ID: <43F96985-80D1-4398-8614-59678FF7B32C@oregontracks.org>
+From: mjourdan@baylibre.com (Maxime Jourdan)
+Date: Mon, 17 Sep 2018 18:36:33 +0200
+Subject: [PATCH v2 0/3] Add Amlogic video decoder driver
+In-Reply-To: <9c33c57e-2ce2-8752-b851-f85c03a7d761@xs4all.nl>
+References: <20180911150938.3844-1-mjourdan@baylibre.com>
+ <9c33c57e-2ce2-8752-b851-f85c03a7d761@xs4all.nl>
+Message-ID: <CAMO6nay7u4nMZcND6+g-GJAFsFcGrp_GDKBhVjeXVzpjF0ND4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2018-09-17 16:51 GMT+02:00 Hans Verkuil <hverkuil@xs4all.nl>:
+> On 09/11/2018 05:09 PM, Maxime Jourdan wrote:
+>>  - Moved the single instance check (returning -EBUSY) to start/stop streaming
+>>  The check was previously in queue_setup but there was no great location to
+>>  clear it except for .close().
+>
+> Actually, you can clear it by called VIDIOC_REQBUFS with count set to 0. That
+> freed all buffers and clears this.
+>
+> Now, the difference between queue_setup and start/stop streaming is that if you
+> do this in queue_setup you'll know early on that the device is busy. It is
+> reasonable to assume that you only allocate buffers when you also want to start
+> streaming, so that it a good place to know this quickly.
+>
+> Whereas with start_streaming you won't know until you call STREAMON, or even later
+> if you start streaming with no buffers queued, since start_streaming won't
+> be called until you have at least 'min_buffers_needed' buffers queued (1 for this
+> driver). So in that case EBUSY won't be returned until the first VIDIOC_QBUF.
+>
+> My preference is to check this in queue_setup, but it is up to you to decide.
+> Just be aware of the difference between the two options.
+>
+> Regards,
+>
+>         Hans
 
+I could for instance keep track of which queue(s) have been called
+with queue_setup, catch calls to VIDIOC_REQBUFS with count set to 0,
+and clear the current session once both queues have been reset ?
 
-Sent from my iPhone
+You leverage another issue with min_buffers_needed. It's indeed set to
+1 but this value is wrong for the CAPTURE queue. The problem is that
+this value changes depending on the codec and the amount of CAPTURE
+buffers requested by userspace.
+Ultimately I want it set to the total amount of CAPTURE buffers,
+because the hardware needs the full buffer list before starting a
+decode job.
+Am I free to change this queue parameter later, or is m2m_queue_init
+the only place to do it ?
 
-> On Sep 17, 2018, at 7:39 AM, William Cohen <wcohen@redhat.com> wrote:
-> 
->> On 9/17/18 4:53 AM, John Garry wrote:
->>> On 16/09/2018 21:39, William Cohen wrote:
->>>> On 9/9/18 8:26 PM, Sean V Kelley wrote:
->>>> Split the PMU events into meaningful functional groups.  Update core
->>>> pmu events based on supported ARMv8 recommended IMPLEMENTATION DEFINED
->>>> events.
->>>> 
->>>> The JSON files are updated with reference to a PMU table shared here:
->>>> 
->>>> https://github.com/AmpereComputing/ampere-centos-kernel/blob/amp-centos-7.5-kernel/Documentation/arm64/eMAG-ARM-CoreImpDefined.pdf
->>>> 
->>>> -- 
->>>> Changes in V2:
->>>> - Provided documentation for changes - John, William
->>>> - Broke up into meaningful groups - William
->>>> -- 
->>>> 
->>>> Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
->>>> Cc: William Cohen <wcohen@redhat.com>
->>>> Cc: John Garry <john.garry@huawei.com>
->>>> Cc: linux-arm-kernel at lists.infradead.org
->>>> 
->>>> Signed-off-by: Sean V Kelley <seanvk.dev@oregontracks.org>
->>>> ---
->>>>  .../arch/arm64/ampere/emag/branch.json        |  23 +++
->>>>  .../arch/arm64/ampere/emag/bus.json           |  26 +++
->>>>  .../arch/arm64/ampere/emag/cache.json         | 191 ++++++++++++++++++
->>>>  .../arch/arm64/ampere/emag/clock.json         |  20 ++
->>>>  .../arch/arm64/ampere/emag/core-imp-def.json  |  32 ---
->>>>  .../arch/arm64/ampere/emag/counter.json       |   8 +
->>>>  .../arch/arm64/ampere/emag/exception.json     |  50 +++++
->>>>  .../arch/arm64/ampere/emag/instruction.json   |  89 ++++++++
->>>>  .../arch/arm64/ampere/emag/intrinsic.json     |  14 ++
->>>>  .../arch/arm64/ampere/emag/memory.json        |  29 +++
->>>>  .../arch/arm64/ampere/emag/pipeline.json      |  50 +++++
->>>>  11 files changed, 500 insertions(+), 32 deletions(-)
->>>>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/branch.json
->>>>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/bus.json
->>>>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/cache.json
->>>>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/clock.json
->>>>  delete mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/core-imp-def.json
->>>>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/counter.json
->>>>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/exception.json
->>>>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/instruction.json
->>>>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/intrinsic.json
->>>>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/memory.json
->>>>  create mode 100644 tools/perf/pmu-events/arch/arm64/ampere/emag/pipeline.json
->>> 
->>> Hi,
->>> 
->>> The patch looks okay for most part. It would be good to factor out the events 0x00-0x38 from "Table D5-8 PMU common architectural and microarchitectural event numbers" in https://static.docs.arm.com/ddi0487/ca/DDI0487C_a_armv8_arm.pdf and have them in armv8-recommended.json so events like BR_MIS_PRED and BR_PRED (and anything else in the range of 0x000-0x038) just end up be ArchStdEvent like the other predefined events.  Maybe do the factoring out as a follow on patch to this patch.
->>> 
->> 
->> I know it's not ideal, but I think it would be better to only use the common arch events exposed by the pmu kernel driver, as:
->> - it's generally bad to replicate
->> - the common arch event support are detected by PMCEIDx, so there is need to add perf tool churn in defining per-SoC support
->> - potential problems in enabling replicated events
->> 
->> Thanks,
->> John
-> 
-> Yes, definitely want minimize duplication.  If the kernel is already determing which common events are available in an AARCH64 process then should be able to eliminate any entry that is below ARMV8_PMUV3_MAX_COMMON_EVENTS (0x40) from the event maps:
-
-Hi
-
-Definitely would like to reduce duplication while providing descriptive and meaningful access to users. I can strip the sub 0x40 common events already exposed  in the PMU perf driver in a v4 patch for now. 
-
-But as you say, the kernel already knows what is exposed by the core pmu driver and could eliminate the duplication. 
-
-Thanks
-
-Sean 
-
-
-> 
-> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/linux/perf/arm_pmu.h#n104
-> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm64/kernel/perf_event.c#n1007
-> 
-> -Will Cohen
->> Hi 
->>> The following counter.json wouldn't be that useful.  Perf doesn't allow layout of what goes in which PMU register. It should be removed:
->>> 
->>>> diff --git a/tools/perf/pmu-events/arch/arm64/ampere/emag/counter.json b/tools/perf/pmu-events/arch/arm64/ampere/emag/counter.json
->>>> new file mode 100644
->>>> index 000000000000..6561ed58f13f
->>>> --- /dev/null
->>>> +++ b/tools/perf/pmu-events/arch/arm64/ampere/emag/counter.json
->>>> @@ -0,0 +1,8 @@
->>>> +[
->>>> +    {
->>>> +        "PublicDescription": "For odd-numbered counters, increments the count by one for each overflow of the preceding even-numbered counter. For even-numbered counters there is no increment.",
->>>> +        "EventCode": "0x1e",
->>>> +        "EventName": "CHAIN",
->>>> +        "BriefDescription": "Chain counter"
->>>> +    },
->>>> +]
->>> 
->>> 
->>> 
->>> -Will Cohen
->>> 
->>> .
->>> 
->> 
->> 
-> 
+Thanks,
+Maxime
