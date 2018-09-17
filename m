@@ -1,58 +1,121 @@
-From: sam@ravnborg.org (Sam Ravnborg)
-Date: Mon, 17 Sep 2018 21:37:48 +0200
-Subject: [RESEND 4/5] drm/mxsfb: Add PM_SLEEP support
-In-Reply-To: <7d661819825a36f4aebe412e7bed8fe24c7292ae.1535367027.git.leonard.crestez@nxp.com>
-References: <cover.1535367027.git.leonard.crestez@nxp.com>
- <7d661819825a36f4aebe412e7bed8fe24c7292ae.1535367027.git.leonard.crestez@nxp.com>
-Message-ID: <20180917193748.GA13165@ravnborg.org>
+From: saiprakash.ranjan@codeaurora.org (Sai Prakash Ranjan)
+Date: Tue, 18 Sep 2018 01:13:30 +0530
+Subject: [PATCH 2/6] pstore: Add event tracing support
+In-Reply-To: <153720590027.119890.15984895820368075914@swboyd.mtv.corp.google.com>
+References: <cover.1536430404.git.saiprakash.ranjan@codeaurora.org>
+ <b9b60ff2864a17fb05481aa33f90114ab051d6ce.1536430404.git.saiprakash.ranjan@codeaurora.org>
+ <444d7b13-2653-ba0e-e9e6-a448fded2a77@codeaurora.org>
+ <153720590027.119890.15984895820368075914@swboyd.mtv.corp.google.com>
+Message-ID: <03d47d84-a237-a94e-04ee-4447d8620697@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leonard.
+On 9/17/2018 11:08 PM, Stephen Boyd wrote:
+> Quoting Sai Prakash Ranjan (2018-09-11 03:46:01)
+>> On 9/9/2018 1:57 AM, Sai Prakash Ranjan wrote:
+>>> +void notrace pstore_event_call(struct trace_event_buffer *fbuffer)
+>>> +{
+>>> +     struct trace_iterator *iter;
+>>> +     struct trace_seq *s;
+>>> +     struct trace_event_call *event_call;
+>>> +     struct pstore_record record;
+>>> +     struct trace_event *event;
+>>> +     struct seq_buf *seq;
+>>> +     unsigned long flags;
+>>> +
+>>> +     if (!psinfo)
+>>> +             return;
+>>> +
+>>> +     if (unlikely(oops_in_progress))
+>>> +             return;
+>>> +
+>>> +     pstore_record_init(&record, psinfo);
+>>> +     record.type = PSTORE_TYPE_EVENT;
+>>> +
+>>> +     iter = kmalloc(sizeof(*iter), GFP_KERNEL);
+>>> +     if (!iter)
+>>> +             return;
+>>> +
+>>> +     event_call = fbuffer->trace_file->event_call;
+>>> +     if (!event_call || !event_call->event.funcs ||
+>>> +         !event_call->event.funcs->trace)
+>>> +             goto fail_event;
+>>> +
+>>> +     event = &fbuffer->trace_file->event_call->event;
+>>> +
+>>> +     spin_lock_irqsave(&psinfo->buf_lock, flags);
+>>> +
+>>> +     trace_seq_init(&iter->seq);
+>>> +     iter->ent = fbuffer->entry;
+>>> +     event_call->event.funcs->trace(iter, 0, event);
+>>> +     trace_seq_putc(&iter->seq, 0);
+>>> +
+>>> +     if (seq->size > psinfo->bufsize)
+>>> +             seq->size = psinfo->bufsize;
+>>> +
+>>> +     s = &iter->seq;
+>>> +     seq = &s->seq;
+>>> +
+>>> +     record.buf = (char *)(seq->buffer);
+>>> +     record.size = seq->len;
+>>> +     psinfo->write(&record);
+>>> +
+>>> +     spin_unlock_irqrestore(&psinfo->buf_lock, flags);
+>>> +
+>>> +fail_event:
+>>> +     kfree(iter);
+>>> +}
+>>> +
+>>>
+>>
+>> When tracing sched events on sdm845 mtp, I hit below bug repeatedly.
+>> Seems like pstore_event_call can be called in atomic context.
+>> I will respin the below fix in next version of the patch.
+>> Reviews on other parts would be appreciated, thanks.
+>>
+>> diff --git a/fs/pstore/ftrace.c b/fs/pstore/ftrace.c
+>> index d47dc93ac098..a497cf782ee8 100644
+>> --- a/fs/pstore/ftrace.c
+>> +++ b/fs/pstore/ftrace.c
+>> @@ -73,6 +73,7 @@ void notrace pstore_event_call(struct
+>> trace_event_buffer *fbuffer)
+>>           struct trace_event *event;
+>>           struct seq_buf *seq;
+>>           unsigned long flags;
+>> +       gfp_t gfpflags;
+>>
+>>           if (!psinfo)
+>>                   return;
+>> @@ -83,7 +84,9 @@ void notrace pstore_event_call(struct
+>> trace_event_buffer *fbuffer)
+>>           pstore_record_init(&record, psinfo);
+>>           record.type = PSTORE_TYPE_EVENT;
+>>
+>> -       iter = kmalloc(sizeof(*iter), GFP_KERNEL);
+>> +       gfpflags = (in_atomic() || irqs_disabled()) ? GFP_ATOMIC :
+>> GFP_KERNEL;
+>> +
+>
 
-On Mon, Aug 27, 2018 at 02:10:40PM +0300, Leonard Crestez wrote:
-> Since power to the lcdif block can be lost on suspend implement
-> PM_SLEEP_OPS using drm_mode_config_helper_suspend/resume to save/restore
-> the current mode.
+Hi Stephen
+
+Thanks for the comments.
+
+> Do you need to allocate at all? Can you throw the iter on the stack?
 > 
-> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-> Reviewed-by: Stefan Agner <stefan@agner.ch>
-> ---
->  drivers/gpu/drm/mxsfb/mxsfb_drv.c | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
+
+Yes since we need to copy the contents to pstore buffer.
+
+> Using in_atomic() and irqs_disabled() to figure out if an atomic or a
+> non-atomic allocation should be used is not a good solution.
 > 
-> diff --git a/drivers/gpu/drm/mxsfb/mxsfb_drv.c b/drivers/gpu/drm/mxsfb/mxsfb_drv.c
-> index 68d79f5dc0d3..d797dfd40d98 100644
-> --- a/drivers/gpu/drm/mxsfb/mxsfb_drv.c
-> +++ b/drivers/gpu/drm/mxsfb/mxsfb_drv.c
-> @@ -416,17 +416,38 @@ static int mxsfb_remove(struct platform_device *pdev)
->  	drm_dev_unref(drm);
->  
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_PM_SLEEP
-> +static int mxsfb_suspend(struct device *dev)
-> +{
-> +       struct drm_device *drm = dev_get_drvdata(dev);
-> +
-> +       return drm_mode_config_helper_suspend(drm);
-> +}
-> +
-> +static int mxsfb_resume(struct device *dev)
-> +{
-> +       struct drm_device *drm = dev_get_drvdata(dev);
-> +
-> +       return drm_mode_config_helper_resume(drm);
-> +}
-> +#endif
 
-Other suspend/resume users skip the #ifdef and declare
-the functions __maybe_unused
-See for example arm/hdlcd_drv.c.
+I took reference from a similar use by graph_trace_open() which can be 
+called in atomic context via ftrace_dump(). I am open to correct this if 
+there is some other way.
 
-The resulting code is a bit simpler to read and you
-have the added benefit that the suspend/resume functions
-are always compiled so bit-rotting is less likely.
+Sai
 
-	Sam
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
