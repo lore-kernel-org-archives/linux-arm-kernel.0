@@ -1,26 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 17 Sep 2018 14:35:08 +0100
-Subject: [PATCH RESEND 0/6] arm64: add support for generic cpu
- vulnerabilities
-In-Reply-To: <20180905092533.GB17376@suse.de>
-References: <20180827143310.641-1-ykaukab@suse.de>
- <20180905092533.GB17376@suse.de>
-Message-ID: <20180917133508.GE23040@arm.com>
+From: manish.narani@xilinx.com (Manish Narani)
+Date: Mon, 17 Sep 2018 19:14:27 +0530
+Subject: [PATCH v6 0/6] EDAC: Enhancements to Synopsys EDAC driver
+Message-ID: <1537191873-6582-1-git-send-email-manish.narani@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2018 at 11:25:33AM +0200, Mian Yousaf Kaukab wrote:
-> On Mon, Aug 27, 2018 at 04:33:04PM +0200, Mian Yousaf Kaukab wrote:
-> > GENERIC_CPU_VULNERABILITIES provide a common way to figure out if a
-> > system is affected by vulnerabilities like meltdown and other variants
-> > of spectre. This small series adds support for it in arm64.
-> 
-> Marc, Will, Can you please review this series?
+This patch series enhances the current EDAC driver to support different
+platforms. This series adds support for ZynqMP DDRC controller in synopsys
+EDAC driver. This series also adds Device tree properties and relevant
+binding documentation.
 
-Sorry it took so long to get to this, it's just consistently failed to
-get to the top of my review queue. I had a quick look just now and there
-are a few things to address before we can take the series.
+Changes in v2:
+	- Moved checking of DDR_ECC_INTR_SUPPORT from (1/4) to (3/4) as it is
+	  a feature of ZynqMP DDRC
+	- The Binding Documentation in (2/4) is modified as per the review
+	  comments
 
-Cheers,
+Changes in v3:
+	- The commit message in (2/4) is modified (Synopsys EDAC Driver -->
+	  ZynqMP DDRC)
 
-Will
+Changes in v4:
+	- Updated the commit message in (1/4)
+	- Renamed function pointer names removing 'synps_' in (1/4)
+	- Shortened unnecessary long lines as per the review comment on (1/4)
+
+Changes in v5:
+	- Updated the commit message in (2/4) and (4/4).
+	- Removed the unnecessary check for match data in probe() in (1/4)
+	- Some Indentation changes for better readability in (1/4) and (3/4)
+	- Removed repeated code in (3/4)
+	- Used 'zynq' and 'zynqmp' instead of 'synps_enh_edac' in function names
+
+Changes in v6:
+	- Splitted the patches according to functionalities
+	- Addressed code style comments from v5 review
+	- Moved the Error Injection to CONFIG_EDAC_DEBUG mode
+
+Manish Narani (6):
+  edac: synopsys: Fix code comments and naming convention
+  edac: synps: Add platform specific structures for ddrc controller
+  dt: bindings: Document ZynqMP DDRC in Synopsys documentation
+  edac: synopsys: Add macro defines for ZynqMP DDRC
+  edac: synopsys: Add EDAC ECC support for ZynqMP DDRC
+  edac: synopsys: Add Error Injection support for ZynqMP DDRC
+
+ .../bindings/memory-controllers/synopsys.txt       |   27 +-
+ drivers/edac/Kconfig                               |    2 +-
+ drivers/edac/synopsys_edac.c                       | 1098 ++++++++++++++++++--
+ 3 files changed, 1007 insertions(+), 120 deletions(-)
+
+-- 
+2.1.1
