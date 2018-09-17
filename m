@@ -1,34 +1,21 @@
-From: phil@raspberrypi.org (Phil Elwell)
-Date: Mon, 17 Sep 2018 09:22:24 +0100
-Subject: [PATCH v3 4/4] ARM: dts: bcm283x: Correct mailbox register sizes
-In-Reply-To: <1537172544-104852-1-git-send-email-phil@raspberrypi.org>
-References: <1537172544-104852-1-git-send-email-phil@raspberrypi.org>
-Message-ID: <1537172544-104852-5-git-send-email-phil@raspberrypi.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 17 Sep 2018 10:48:05 +0200
+Subject: [PATCH 09/10] ARM: shmobile: r8a7744: Basic SoC support
+In-Reply-To: <CAMuHMdXTnV0rWRUGjJ9bf6GZ67bR0VvuGhgEOZnJQ=vWb6pLNA@mail.gmail.com>
+References: <1536660771-32278-1-git-send-email-biju.das@bp.renesas.com>
+ <1536660771-32278-10-git-send-email-biju.das@bp.renesas.com>
+ <CAMuHMdXTnV0rWRUGjJ9bf6GZ67bR0VvuGhgEOZnJQ=vWb6pLNA@mail.gmail.com>
+Message-ID: <20180917084804.kwv3iab6mnemhsz2@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The size field in a Device Tree "reg" property is encoded in bytes, not
-words.
+On Fri, Sep 14, 2018 at 02:48:18PM +0200, Geert Uytterhoeven wrote:
+> On Tue, Sep 11, 2018 at 12:19 PM Biju Das <biju.das@bp.renesas.com> wrote:
+> > Add minimal support for the RZ/G1N (R8A7744) SoC.
+> >
+> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> > Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> 
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Fixes: 614fa22119d6 ("ARM: dts: bcm2835: Add VCHIQ node to the Raspberry Pi boards. (v3)")
-Signed-off-by: Phil Elwell <phil@raspberrypi.org>
-Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- arch/arm/boot/dts/bcm2835-rpi.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-index 215d8cc..29f970f 100644
---- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
-+++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-@@ -32,7 +32,7 @@
- 
- 		vchiq: mailbox at 7e00b840 {
- 			compatible = "brcm,bcm2835-vchiq";
--			reg = <0x7e00b840 0xf>;
-+			reg = <0x7e00b840 0x3c>;
- 			interrupts = <0 2>;
- 		};
- 	};
--- 
-2.7.4
+Thanks, applied for v4.20.
