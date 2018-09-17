@@ -1,121 +1,47 @@
-From: saiprakash.ranjan@codeaurora.org (Sai Prakash Ranjan)
-Date: Tue, 18 Sep 2018 01:13:30 +0530
-Subject: [PATCH 2/6] pstore: Add event tracing support
-In-Reply-To: <153720590027.119890.15984895820368075914@swboyd.mtv.corp.google.com>
-References: <cover.1536430404.git.saiprakash.ranjan@codeaurora.org>
- <b9b60ff2864a17fb05481aa33f90114ab051d6ce.1536430404.git.saiprakash.ranjan@codeaurora.org>
- <444d7b13-2653-ba0e-e9e6-a448fded2a77@codeaurora.org>
- <153720590027.119890.15984895820368075914@swboyd.mtv.corp.google.com>
-Message-ID: <03d47d84-a237-a94e-04ee-4447d8620697@codeaurora.org>
+From: sed@free.fr (Cedric Roux)
+Date: Mon, 17 Sep 2018 22:43:50 +0200
+Subject: [PATCH] ARM: s3c24xx: fix usage of pr_info/pr_cont
+Message-ID: <20180917204350.15192-1-sed@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/17/2018 11:08 PM, Stephen Boyd wrote:
-> Quoting Sai Prakash Ranjan (2018-09-11 03:46:01)
->> On 9/9/2018 1:57 AM, Sai Prakash Ranjan wrote:
->>> +void notrace pstore_event_call(struct trace_event_buffer *fbuffer)
->>> +{
->>> +     struct trace_iterator *iter;
->>> +     struct trace_seq *s;
->>> +     struct trace_event_call *event_call;
->>> +     struct pstore_record record;
->>> +     struct trace_event *event;
->>> +     struct seq_buf *seq;
->>> +     unsigned long flags;
->>> +
->>> +     if (!psinfo)
->>> +             return;
->>> +
->>> +     if (unlikely(oops_in_progress))
->>> +             return;
->>> +
->>> +     pstore_record_init(&record, psinfo);
->>> +     record.type = PSTORE_TYPE_EVENT;
->>> +
->>> +     iter = kmalloc(sizeof(*iter), GFP_KERNEL);
->>> +     if (!iter)
->>> +             return;
->>> +
->>> +     event_call = fbuffer->trace_file->event_call;
->>> +     if (!event_call || !event_call->event.funcs ||
->>> +         !event_call->event.funcs->trace)
->>> +             goto fail_event;
->>> +
->>> +     event = &fbuffer->trace_file->event_call->event;
->>> +
->>> +     spin_lock_irqsave(&psinfo->buf_lock, flags);
->>> +
->>> +     trace_seq_init(&iter->seq);
->>> +     iter->ent = fbuffer->entry;
->>> +     event_call->event.funcs->trace(iter, 0, event);
->>> +     trace_seq_putc(&iter->seq, 0);
->>> +
->>> +     if (seq->size > psinfo->bufsize)
->>> +             seq->size = psinfo->bufsize;
->>> +
->>> +     s = &iter->seq;
->>> +     seq = &s->seq;
->>> +
->>> +     record.buf = (char *)(seq->buffer);
->>> +     record.size = seq->len;
->>> +     psinfo->write(&record);
->>> +
->>> +     spin_unlock_irqrestore(&psinfo->buf_lock, flags);
->>> +
->>> +fail_event:
->>> +     kfree(iter);
->>> +}
->>> +
->>>
->>
->> When tracing sched events on sdm845 mtp, I hit below bug repeatedly.
->> Seems like pstore_event_call can be called in atomic context.
->> I will respin the below fix in next version of the patch.
->> Reviews on other parts would be appreciated, thanks.
->>
->> diff --git a/fs/pstore/ftrace.c b/fs/pstore/ftrace.c
->> index d47dc93ac098..a497cf782ee8 100644
->> --- a/fs/pstore/ftrace.c
->> +++ b/fs/pstore/ftrace.c
->> @@ -73,6 +73,7 @@ void notrace pstore_event_call(struct
->> trace_event_buffer *fbuffer)
->>           struct trace_event *event;
->>           struct seq_buf *seq;
->>           unsigned long flags;
->> +       gfp_t gfpflags;
->>
->>           if (!psinfo)
->>                   return;
->> @@ -83,7 +84,9 @@ void notrace pstore_event_call(struct
->> trace_event_buffer *fbuffer)
->>           pstore_record_init(&record, psinfo);
->>           record.type = PSTORE_TYPE_EVENT;
->>
->> -       iter = kmalloc(sizeof(*iter), GFP_KERNEL);
->> +       gfpflags = (in_atomic() || irqs_disabled()) ? GFP_ATOMIC :
->> GFP_KERNEL;
->> +
->
+This commit fixes the wrong usage of pr_info introduced by the
+commit e728e4f20100 ("ARM: s3c24xx: formatting cleanup in
+mach-mini2440.c").
 
-Hi Stephen
+Since the idea is to print on a single line, pr_cont has to be used.
 
-Thanks for the comments.
+Signed-off-by: Cedric Roux <sed@free.fr>
+---
+ arch/arm/mach-s3c24xx/mach-mini2440.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-> Do you need to allocate at all? Can you throw the iter on the stack?
-> 
-
-Yes since we need to copy the contents to pstore buffer.
-
-> Using in_atomic() and irqs_disabled() to figure out if an atomic or a
-> non-atomic allocation should be used is not a good solution.
-> 
-
-I took reference from a similar use by graph_trace_open() which can be 
-called in atomic context via ftrace_dump(). I am open to correct this if 
-there is some other way.
-
-Sai
-
+diff --git a/arch/arm/mach-s3c24xx/mach-mini2440.c b/arch/arm/mach-s3c24xx/mach-mini2440.c
+index 9f830abe701c..50d67d760efd 100644
+--- a/arch/arm/mach-s3c24xx/mach-mini2440.c
++++ b/arch/arm/mach-s3c24xx/mach-mini2440.c
+@@ -684,14 +684,14 @@ static void __init mini2440_init(void)
+ 		pr_info("MINI2440: LCD");
+ 		for (li = 0; li < ARRAY_SIZE(mini2440_lcd_cfg); li++)
+ 			if (li == features.lcd_index)
+-				pr_info(" [%d:%dx%d]", li,
++				pr_cont(" [%d:%dx%d]", li,
+ 					mini2440_lcd_cfg[li].width,
+ 					mini2440_lcd_cfg[li].height);
+ 			else
+-				pr_info(" %d:%dx%d", li,
++				pr_cont(" %d:%dx%d", li,
+ 					mini2440_lcd_cfg[li].width,
+ 					mini2440_lcd_cfg[li].height);
+-		pr_info("\n");
++		pr_cont("\n");
+ 		s3c24xx_fb_set_platdata(&mini2440_fb_info);
+ 	}
+ 
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+2.18.0
+
+Note: running: scripts/checkpatch.pl 000*
+reports 3 warnings about the use of pr_cont.
+Since this modification was required by Joe Perches, I think this patch
+doest the correct thing.
