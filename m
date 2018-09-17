@@ -1,40 +1,42 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 17 Sep 2018 15:43:53 +0100
-Subject: [PATCH v5 18/18] kvm: arm64: Allow tuning the physical address
- size for VM
-In-Reply-To: <CAFEAcA-AKpkzSpMofMFxxf5XdYPii3PTB8xXDAvmyFWno7nZeA@mail.gmail.com>
-References: <20180917104144.19188-1-suzuki.poulose@arm.com>
- <20180917104144.19188-19-suzuki.poulose@arm.com>
- <CAFEAcA-AKpkzSpMofMFxxf5XdYPii3PTB8xXDAvmyFWno7nZeA@mail.gmail.com>
-Message-ID: <a3d37f11-3d09-390d-8df9-9635a9e55660@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 17 Sep 2018 22:46:49 +0800
+Subject: [PATCH] arm64: dts: rockchip: add spdif sound node for rock64
+In-Reply-To: <20180917090236.21948-1-katsuhiro@katsuster.net>
+References: <20180917090236.21948-1-katsuhiro@katsuster.net>
+Message-ID: <201809172243.C2EHNtuW%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Hi Katsuhiro,
 
-On 17/09/2018 15:20, Peter Maydell wrote:
-> On 17 September 2018 at 11:41, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
->> Allow specifying the physical address size limit for a new
->> VM via the kvm_type argument for the KVM_CREATE_VM ioctl. This
->> allows us to finalise the stage2 page table as early as possible
->> and hence perform the right checks on the memory slots
->> without complication. The size is ecnoded as Log2(PA_Size) in
->> bits[7:0] of the type field. For backward compatibility the
->> value 0 is reserved and implies 40bits. Also, lift the limit
->> of the IPA to host limit and allow lower IPA sizes (e.g, 32).
->>
->> The userspace could check the extension KVM_CAP_ARM_VM_PHYS_SHIFT
->> for the availability of this feature. The cap check returns the
->> maximum limit for the physical address shift supported by the host.
->>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Christoffer Dall <cdall@kernel.org>
->> Cc: Peter Maydel <peter.maydell@linaro.org>
-> 
-> Typo: my surname has two "l"s in it.
+I love your patch! Yet something to improve:
 
-Sorry about that. I have fixed this locally. Btw, did you get
-a chance to look at the patch itself ? If you did, are you fine
-with the API ?
+[auto build test ERROR on rockchip/for-next]
+[also build test ERROR on v4.19-rc4 next-20180913]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Suzuki
+url:    https://github.com/0day-ci/linux/commits/Katsuhiro-Suzuki/arm64-dts-rockchip-add-spdif-sound-node-for-rock64/20180917-172217
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git for-next
+config: arm64-allmodconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
+
+All errors (new ones prefixed by >>):
+
+>> Error: arch/arm64/boot/dts/rockchip/rk3328-rock64.dts:286.1-12 Label or path spdif_p0_0 not found
+>> FATAL ERROR: Syntax error parsing input tree
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 60972 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180917/087c6ff3/attachment-0001.gz>
