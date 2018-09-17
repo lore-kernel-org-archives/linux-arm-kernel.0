@@ -1,43 +1,66 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 17 Sep 2018 07:54:49 -0700
-Subject: [PATCH 2/6] pstore: Add event tracing support
-In-Reply-To: <CAEXW_YSPNqVgoYWjVAMvGg_WoRV4SC2xDH1wQWTdQfBUOMQbbQ@mail.gmail.com>
-References: <cover.1536430404.git.saiprakash.ranjan@codeaurora.org>
- <b9b60ff2864a17fb05481aa33f90114ab051d6ce.1536430404.git.saiprakash.ranjan@codeaurora.org>
- <141901b8-0a9a-2e7a-f7a4-cdefd157f4c6@codeaurora.org>
- <CAEXW_YSPNqVgoYWjVAMvGg_WoRV4SC2xDH1wQWTdQfBUOMQbbQ@mail.gmail.com>
-Message-ID: <CAGXu5jLkE+mZkVSFPeOq75im0Kozm+NzfqL9CD-OMe7b7=3O5g@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 17 Sep 2018 16:09:41 +0100
+Subject: [PATCH v4 0/6] PCI: imx: Initial imx7d suspend/resume support
+In-Reply-To: <cover.1534264292.git.leonard.crestez@nxp.com>
+References: <cover.1534264292.git.leonard.crestez@nxp.com>
+Message-ID: <20180917150941.GH7239@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 16, 2018 at 6:55 AM, Joel Fernandes <joel@joelfernandes.org> wrote:
-> On Sun, Sep 16, 2018, 12:08 AM Sai Prakash Ranjan
-> <saiprakash.ranjan@codeaurora.org> wrote:
->>
->> On 9/9/2018 1:57 AM, Sai Prakash Ranjan wrote:
->> > Currently pstore has function trace support which can be
->> > used to get the function call chain with limited data.
->> > Event tracing has extra data which is useful to debug wide
->> > variety of issues and is heavily used across the kernel.
->> >
->> > Adding this support to pstore can be very helpful to debug
->> > different subsystems since almost all of them have trace
->> > events already available. And also it is useful to debug
->> > unknown resets or crashes since we can get lot more info
->> > from event tracing by viewing the last occurred events.
->>
->> Anyone here?
->
-> Sorry for the top post. I've been wanting to do this as well for some time.
-> It's quite useful. I am out of office this week and away from work machine.
-> I will take a look at your patches next week once I'm back at work. Thanks.
+On Tue, Aug 14, 2018 at 07:50:14PM +0300, Leonard Crestez wrote:
+> On imx7d the pcie-phy power domain is turned off in suspend and this can
+> make the system hang on resume when attempting any read from PCI.
+> 
+> Fix this by adding PM_SLEEP support to the imx6 pci driver. This is
+> currently only enabled for imx7d but the suspend/resume sequence also
+> applies to other socs.
+> 
+> V3 of this series was reviewed by Lucas but stalled because the merge
+> window opened.
+> 
+> There was also some confusion about how to deal with the dependence on
+> commit 26fce0557fa6 ("reset: imx7: Fix always writing bits as 0"). To
+> clarify: both patch 2 and 26fce0557fa6 are required to fix imx7d suspend
+> but merging one without the other shouldn't cause other issues.
+> 
+> 
+> V4 adds 4 more patches with PME_Turn_Off support on top, using a new
+> reset bit. I generally try to keep series short but in this case some
+> planning might be needed to get patches into 4.20.
+> 
+> Since the new reset is treated as optional with old DTB there should be
+> again no problem if reset and pci are merged out of order.
+> 
+> 
+> Shawn/Philipp/Lorenzo: Would it make sense to merge this series through a
+> single specific tree, such as the one for imx?
 
-If Steven agrees this shouldn't live in ftrace directly and Joel
-reviews these patches, I think it should be fine. I'm travelling, but
-I can review it hopefully later this week.
+This series is a bit of a mixture of multiple things hard to discern
+(actually I already merged patch 2 and patch 1 seems completely
+unrelated).
 
--Kees
+I would take the series through the PCI tree but I need an ACK for
+patches 5 and 6, please let me know how you want to handle it.
 
--- 
-Kees Cook
-Pixel Security
+Lorenzo
+
+> Link to v3: https://lkml.org/lkml/2018/7/24/713
+> 
+> Leonard Crestez (6):
+>   Revert "ARM: dts: imx7d: Invert legacy PCI irq mapping"
+>   PCI: imx: Initial imx7d pm support
+>   reset: imx7: Add PCIE_CTRL_APPS_TURNOFF
+>   dt-bindings: imx6q-pcie: Add turnoff reset for imx7d
+>   ARM: dts: imx7d: Add turnoff reset
+>   PCI: imx: Add PME_Turn_Off support
+> 
+>  .../bindings/pci/fsl,imx6q-pcie.txt           |   1 +
+>  arch/arm/boot/dts/imx7d.dtsi                  |  17 ++-
+>  drivers/pci/controller/dwc/pci-imx6.c         | 112 +++++++++++++++++-
+>  drivers/reset/reset-imx7.c                    |   1 +
+>  include/dt-bindings/reset/imx7-reset.h        |   4 +-
+>  5 files changed, 123 insertions(+), 12 deletions(-)
+> 
+> -- 
+> 2.17.1
+> 
