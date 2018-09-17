@@ -1,63 +1,491 @@
 From: manish.narani@xilinx.com (Manish Narani)
-Date: Mon, 17 Sep 2018 19:14:30 +0530
-Subject: [PATCH v6 3/6] dt: bindings: Document ZynqMP DDRC in Synopsys
- documentation
+Date: Mon, 17 Sep 2018 19:14:33 +0530
+Subject: [PATCH v6 6/6] edac: synopsys: Add Error Injection support for ZynqMP
+ DDRC
 In-Reply-To: <1537191873-6582-1-git-send-email-manish.narani@xilinx.com>
 References: <1537191873-6582-1-git-send-email-manish.narani@xilinx.com>
-Message-ID: <1537191873-6582-4-git-send-email-manish.narani@xilinx.com>
+Message-ID: <1537191873-6582-7-git-send-email-manish.narani@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add information of ZynqMP DDRC which reports the single bit errors that
-are corrected and the double bit errors that are detected.
+Add support for Error Injection for ZynqMP DDRC IP. For injecting
+errors, the Row, Column, Bank, Bank Group and Rank bits positions are
+determined via Address Map registers of Synopsys DDRC.
 
 Signed-off-by: Manish Narani <manish.narani@xilinx.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- .../bindings/memory-controllers/synopsys.txt       | 27 ++++++++++++++++++----
- 1 file changed, 22 insertions(+), 5 deletions(-)
+ drivers/edac/synopsys_edac.c | 423 ++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 417 insertions(+), 6 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/memory-controllers/synopsys.txt b/Documentation/devicetree/bindings/memory-controllers/synopsys.txt
-index a43d26d..9d32762 100644
---- a/Documentation/devicetree/bindings/memory-controllers/synopsys.txt
-+++ b/Documentation/devicetree/bindings/memory-controllers/synopsys.txt
-@@ -1,15 +1,32 @@
- Binding for Synopsys IntelliDDR Multi Protocol Memory Controller
+diff --git a/drivers/edac/synopsys_edac.c b/drivers/edac/synopsys_edac.c
+index 7ab5b9a..177b5c3 100644
+--- a/drivers/edac/synopsys_edac.c
++++ b/drivers/edac/synopsys_edac.c
+@@ -302,12 +302,18 @@ struct synps_ecc_status {
  
--This controller has an optional ECC support in half-bus width (16-bit)
--configuration. The ECC controller corrects one bit error and detects
--two bit errors.
-+The ZynqMP DDR ECC controller has an optional ECC support in 64-bit and 32-bit
-+bus width configurations.
-+
-+The Zynq DDR ECC controller has an optional ECC support in half-bus width
-+(16-bit) configuration.
-+
-+These both ECC controllers correct single bit ECC errors and detect double bit
-+ECC errors.
+ /**
+  * struct synps_edac_priv - DDR memory controller private instance data.
+- * @baseaddr:	Base address of the DDR controller.
+- * @message:	Buffer for framing the event specific info.
+- * @stat:	ECC status information.
+- * @p_data:	Platform data
+- * @ce_cnt:	Correctable Error count.
+- * @ue_cnt:	Uncorrectable Error count.
++ * @baseaddr:		Base address of the DDR controller.
++ * @message:		Buffer for framing the event specific info.
++ * @stat:		ECC status information.
++ * @p_data:		Platform data
++ * @ce_cnt:		Correctable Error count.
++ * @ue_cnt:		Uncorrectable Error count.
++ * @poison_addr:	Data poison address.
++ * @row_shift:		Bit shifts for row bit.
++ * @col_shift:		Bit shifts for column bit.
++ * @bank_shift:		Bit shifts for bank bit.
++ * @bankgrp_shift:	Bit shifts for bank group bit.
++ * @rank_shift:		Bit shifts for rank bit.
+  */
+ struct synps_edac_priv {
+ 	void __iomem *baseaddr;
+@@ -316,6 +322,14 @@ struct synps_edac_priv {
+ 	const struct synps_platform_data *p_data;
+ 	u32 ce_cnt;
+ 	u32 ue_cnt;
++#ifdef CONFIG_EDAC_DEBUG
++	ulong poison_addr;
++	u32 row_shift[18];
++	u32 col_shift[14];
++	u32 bank_shift[3];
++	u32 bankgrp_shift[2];
++	u32 rank_shift[1];
++#endif
+ };
  
- Required properties:
-- - compatible: Should be 'xlnx,zynq-ddrc-a05'
-- - reg: Base address and size of the controllers memory area
-+ - compatible: One of:
-+	- 'xlnx,zynq-ddrc-a05' : Zynq DDR ECC controller
-+	- 'xlnx,zynqmp-ddrc-2.40a' : ZynqMP DDR ECC controller
-+ - reg: Should contain DDR controller registers location and length.
-+
-+Required properties for "xlnx,zynqmp-ddrc-2.40a":
-+ - interrupts: Property with a value describing the interrupt number.
+ /**
+@@ -842,7 +856,12 @@ static const struct synps_platform_data zynqmp_edac_def = {
+ 	.get_mtype	= zynqmp_get_mtype,
+ 	.get_dtype	= zynqmp_get_dtype,
+ 	.get_eccstate	= zynqmp_get_eccstate,
++#ifdef CONFIG_EDAC_DEBUG
++	.quirks		= (DDR_ECC_INTR_SUPPORT |
++			   DDR_ECC_DATA_POISON_SUPPORT),
++#else
+ 	.quirks		= DDR_ECC_INTR_SUPPORT,
++#endif
+ };
  
- Example:
- 	memory-controller at f8006000 {
- 		compatible = "xlnx,zynq-ddrc-a05";
- 		reg = <0xf8006000 0x1000>;
- 	};
+ static const struct of_device_id synps_edac_match[] = {
+@@ -861,6 +880,380 @@ static const struct of_device_id synps_edac_match[] = {
+ 
+ MODULE_DEVICE_TABLE(of, synps_edac_match);
+ 
++#ifdef CONFIG_EDAC_DEBUG
++#define to_mci(k) container_of(k, struct mem_ctl_info, dev)
 +
-+	mc: memory-controller at fd070000 {
-+		compatible = "xlnx,zynqmp-ddrc-2.40a";
-+		reg = <0x0 0xfd070000 0x0 0x30000>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 112 4>;
-+	};
++/**
++ * ddr_poison_setup -	Update poison registers.
++ * @priv:		DDR memory controller private instance data.
++ *
++ * Update poison registers as per DDR mapping.
++ * Return: none.
++ */
++static void ddr_poison_setup(struct synps_edac_priv *priv)
++{
++	int col = 0, row = 0, bank = 0, bankgrp = 0, rank = 0, regval;
++	int index;
++	ulong hif_addr = 0;
++
++	hif_addr = priv->poison_addr >> 3;
++
++	for (index = 0; index < DDR_MAX_ROW_SHIFT; index++) {
++		if (priv->row_shift[index])
++			row |= (((hif_addr >> priv->row_shift[index]) &
++						BIT(0)) << index);
++		else
++			break;
++	}
++
++	for (index = 0; index < DDR_MAX_COL_SHIFT; index++) {
++		if (priv->col_shift[index] || index < 3)
++			col |= (((hif_addr >> priv->col_shift[index]) &
++						BIT(0)) << index);
++		else
++			break;
++	}
++
++	for (index = 0; index < DDR_MAX_BANK_SHIFT; index++) {
++		if (priv->bank_shift[index])
++			bank |= (((hif_addr >> priv->bank_shift[index]) &
++						BIT(0)) << index);
++		else
++			break;
++	}
++
++	for (index = 0; index < DDR_MAX_BANKGRP_SHIFT; index++) {
++		if (priv->bankgrp_shift[index])
++			bankgrp |= (((hif_addr >> priv->bankgrp_shift[index])
++						& BIT(0)) << index);
++		else
++			break;
++	}
++
++	if (priv->rank_shift[0])
++		rank = (hif_addr >> priv->rank_shift[0]) & BIT(0);
++
++	regval = (rank << ECC_POISON0_RANK_SHIFT) & ECC_POISON0_RANK_MASK;
++	regval |= (col << ECC_POISON0_COLUMN_SHIFT) & ECC_POISON0_COLUMN_MASK;
++	writel(regval, priv->baseaddr + ECC_POISON0_OFST);
++
++	regval = (bankgrp << ECC_POISON1_BG_SHIFT) & ECC_POISON1_BG_MASK;
++	regval |= (bank << ECC_POISON1_BANKNR_SHIFT) & ECC_POISON1_BANKNR_MASK;
++	regval |= (row << ECC_POISON1_ROW_SHIFT) & ECC_POISON1_ROW_MASK;
++	writel(regval, priv->baseaddr + ECC_POISON1_OFST);
++}
++
++static ssize_t inject_data_error_show(struct device *dev,
++				      struct device_attribute *mattr,
++				      char *data)
++{
++	struct mem_ctl_info *mci = to_mci(dev);
++	struct synps_edac_priv *priv = mci->pvt_info;
++
++	return sprintf(data, "Poison0 Addr: 0x%08x\n\rPoison1 Addr: 0x%08x\n\r"
++			"Error injection Address: 0x%lx\n\r",
++			readl(priv->baseaddr + ECC_POISON0_OFST),
++			readl(priv->baseaddr + ECC_POISON1_OFST),
++			priv->poison_addr);
++}
++
++static ssize_t inject_data_error_store(struct device *dev,
++				       struct device_attribute *mattr,
++				       const char *data, size_t count)
++{
++	struct mem_ctl_info *mci = to_mci(dev);
++	struct synps_edac_priv *priv = mci->pvt_info;
++
++	if (kstrtoul(data, 0, &priv->poison_addr))
++		return -EINVAL;
++
++	ddr_poison_setup(priv);
++
++	return count;
++}
++
++static ssize_t inject_data_poison_show(struct device *dev,
++				       struct device_attribute *mattr,
++				       char *data)
++{
++	struct mem_ctl_info *mci = to_mci(dev);
++	struct synps_edac_priv *priv = mci->pvt_info;
++
++	return sprintf(data, "Data Poisoning: %s\n\r",
++			(((readl(priv->baseaddr + ECC_CFG1_OFST)) & 0x3) == 0x3)
++			? ("Correctable Error") : ("UnCorrectable Error"));
++}
++
++static ssize_t inject_data_poison_store(struct device *dev,
++					struct device_attribute *mattr,
++					const char *data, size_t count)
++{
++	struct mem_ctl_info *mci = to_mci(dev);
++	struct synps_edac_priv *priv = mci->pvt_info;
++
++	writel(0, priv->baseaddr + DDRC_SWCTL);
++	if (strncmp(data, "CE", 2) == 0)
++		writel(ECC_CEPOISON_MASK, priv->baseaddr + ECC_CFG1_OFST);
++	else
++		writel(ECC_UEPOISON_MASK, priv->baseaddr + ECC_CFG1_OFST);
++	writel(1, priv->baseaddr + DDRC_SWCTL);
++
++	return count;
++}
++
++static DEVICE_ATTR_RW(inject_data_error);
++static DEVICE_ATTR_RW(inject_data_poison);
++
++static int synps_edac_create_sysfs_attributes(struct mem_ctl_info *mci)
++{
++	int rc;
++
++	rc = device_create_file(&mci->dev, &dev_attr_inject_data_error);
++	if (rc < 0)
++		return rc;
++	rc = device_create_file(&mci->dev, &dev_attr_inject_data_poison);
++	if (rc < 0)
++		return rc;
++	return 0;
++}
++
++static void synps_edac_remove_sysfs_attributes(struct mem_ctl_info *mci)
++{
++	device_remove_file(&mci->dev, &dev_attr_inject_data_error);
++	device_remove_file(&mci->dev, &dev_attr_inject_data_poison);
++}
++
++static void setup_row_address_map(struct synps_edac_priv *priv, u32 *addrmap)
++{
++	u32 addrmap_row_b2_10;
++	int index;
++
++	priv->row_shift[0] = (addrmap[5] & ROW_MAX_VAL_MASK) + ROW_B0_BASE;
++	priv->row_shift[1] = ((addrmap[5] >> 8) &
++			ROW_MAX_VAL_MASK) + ROW_B1_BASE;
++
++	addrmap_row_b2_10 = (addrmap[5] >> 16) & ROW_MAX_VAL_MASK;
++	if (addrmap_row_b2_10 != ROW_MAX_VAL_MASK) {
++		for (index = 2; index < 11; index++)
++			priv->row_shift[index] = addrmap_row_b2_10 +
++				index + ROW_B0_BASE;
++
++	} else {
++		priv->row_shift[2] = (addrmap[9] &
++				ROW_MAX_VAL_MASK) + ROW_B2_BASE;
++		priv->row_shift[3] = ((addrmap[9] >> 8) &
++				ROW_MAX_VAL_MASK) + ROW_B3_BASE;
++		priv->row_shift[4] = ((addrmap[9] >> 16) &
++				ROW_MAX_VAL_MASK) + ROW_B4_BASE;
++		priv->row_shift[5] = ((addrmap[9] >> 24) &
++				ROW_MAX_VAL_MASK) + ROW_B5_BASE;
++		priv->row_shift[6] = (addrmap[10] &
++				ROW_MAX_VAL_MASK) + ROW_B6_BASE;
++		priv->row_shift[7] = ((addrmap[10] >> 8) &
++				ROW_MAX_VAL_MASK) + ROW_B7_BASE;
++		priv->row_shift[8] = ((addrmap[10] >> 16) &
++				ROW_MAX_VAL_MASK) + ROW_B8_BASE;
++		priv->row_shift[9] = ((addrmap[10] >> 24) &
++				ROW_MAX_VAL_MASK) + ROW_B9_BASE;
++		priv->row_shift[10] = (addrmap[11] &
++				ROW_MAX_VAL_MASK) + ROW_B10_BASE;
++	}
++
++	priv->row_shift[11] = (((addrmap[5] >> 24) & ROW_MAX_VAL_MASK) ==
++				ROW_MAX_VAL_MASK) ? 0 : (((addrmap[5] >> 24) &
++				ROW_MAX_VAL_MASK) + ROW_B11_BASE);
++	priv->row_shift[12] = ((addrmap[6] & ROW_MAX_VAL_MASK) ==
++				ROW_MAX_VAL_MASK) ? 0 : ((addrmap[6] &
++				ROW_MAX_VAL_MASK) + ROW_B12_BASE);
++	priv->row_shift[13] = (((addrmap[6] >> 8) & ROW_MAX_VAL_MASK) ==
++				ROW_MAX_VAL_MASK) ? 0 : (((addrmap[6] >> 8) &
++				ROW_MAX_VAL_MASK) + ROW_B13_BASE);
++	priv->row_shift[14] = (((addrmap[6] >> 16) & ROW_MAX_VAL_MASK) ==
++				ROW_MAX_VAL_MASK) ? 0 : (((addrmap[6] >> 16) &
++				ROW_MAX_VAL_MASK) + ROW_B14_BASE);
++	priv->row_shift[15] = (((addrmap[6] >> 24) & ROW_MAX_VAL_MASK) ==
++				ROW_MAX_VAL_MASK) ? 0 : (((addrmap[6] >> 24) &
++				ROW_MAX_VAL_MASK) + ROW_B15_BASE);
++	priv->row_shift[16] = ((addrmap[7] & ROW_MAX_VAL_MASK) ==
++				ROW_MAX_VAL_MASK) ? 0 : ((addrmap[7] &
++				ROW_MAX_VAL_MASK) + ROW_B16_BASE);
++	priv->row_shift[17] = (((addrmap[7] >> 8) & ROW_MAX_VAL_MASK) ==
++				ROW_MAX_VAL_MASK) ? 0 : (((addrmap[7] >> 8) &
++				ROW_MAX_VAL_MASK) + ROW_B17_BASE);
++}
++
++static void setup_column_address_map(struct synps_edac_priv *priv, u32 *addrmap)
++{
++	u32 width, memtype;
++	int index;
++
++	memtype = readl(priv->baseaddr + CTRL_OFST);
++	width = (memtype & ECC_CTRL_BUSWIDTH_MASK) >> ECC_CTRL_BUSWIDTH_SHIFT;
++
++	priv->col_shift[0] = 0;
++	priv->col_shift[1] = 1;
++	priv->col_shift[2] = (addrmap[2] & COL_MAX_VAL_MASK) + COL_B2_BASE;
++	priv->col_shift[3] = ((addrmap[2] >> 8) &
++			COL_MAX_VAL_MASK) + COL_B3_BASE;
++	priv->col_shift[4] = (((addrmap[2] >> 16) & COL_MAX_VAL_MASK) ==
++			COL_MAX_VAL_MASK) ? 0 : (((addrmap[2] >> 16) &
++					COL_MAX_VAL_MASK) + COL_B4_BASE);
++	priv->col_shift[5] = (((addrmap[2] >> 24) & COL_MAX_VAL_MASK) ==
++			COL_MAX_VAL_MASK) ? 0 : (((addrmap[2] >> 24) &
++					COL_MAX_VAL_MASK) + COL_B5_BASE);
++	priv->col_shift[6] = ((addrmap[3] & COL_MAX_VAL_MASK) ==
++			COL_MAX_VAL_MASK) ? 0 : ((addrmap[3] &
++					COL_MAX_VAL_MASK) + COL_B6_BASE);
++	priv->col_shift[7] = (((addrmap[3] >> 8) & COL_MAX_VAL_MASK) ==
++			COL_MAX_VAL_MASK) ? 0 : (((addrmap[3] >> 8) &
++					COL_MAX_VAL_MASK) + COL_B7_BASE);
++	priv->col_shift[8] = (((addrmap[3] >> 16) & COL_MAX_VAL_MASK) ==
++			COL_MAX_VAL_MASK) ? 0 : (((addrmap[3] >> 16) &
++					COL_MAX_VAL_MASK) + COL_B8_BASE);
++	priv->col_shift[9] = (((addrmap[3] >> 24) & COL_MAX_VAL_MASK) ==
++			COL_MAX_VAL_MASK) ? 0 : (((addrmap[3] >> 24) &
++					COL_MAX_VAL_MASK) + COL_B9_BASE);
++	if (width == DDRCTL_EWDTH_64) {
++		if (memtype & MEM_TYPE_LPDDR3) {
++			priv->col_shift[10] = ((addrmap[4] &
++				COL_MAX_VAL_MASK) == COL_MAX_VAL_MASK) ? 0 :
++				((addrmap[4] & COL_MAX_VAL_MASK) +
++				 COL_B10_BASE);
++			priv->col_shift[11] = (((addrmap[4] >> 8) &
++				COL_MAX_VAL_MASK) == COL_MAX_VAL_MASK) ? 0 :
++				(((addrmap[4] >> 8) & COL_MAX_VAL_MASK) +
++				 COL_B11_BASE);
++		} else {
++			priv->col_shift[11] = ((addrmap[4] &
++				COL_MAX_VAL_MASK) == COL_MAX_VAL_MASK) ? 0 :
++				((addrmap[4] & COL_MAX_VAL_MASK) +
++				 COL_B10_BASE);
++			priv->col_shift[13] = (((addrmap[4] >> 8) &
++				COL_MAX_VAL_MASK) == COL_MAX_VAL_MASK) ? 0 :
++				(((addrmap[4] >> 8) & COL_MAX_VAL_MASK) +
++				 COL_B11_BASE);
++		}
++	} else if (width == DDRCTL_EWDTH_32) {
++		if (memtype & MEM_TYPE_LPDDR3) {
++			priv->col_shift[10] = (((addrmap[3] >> 24) &
++				COL_MAX_VAL_MASK) == COL_MAX_VAL_MASK) ? 0 :
++				(((addrmap[3] >> 24) & COL_MAX_VAL_MASK) +
++				 COL_B9_BASE);
++			priv->col_shift[11] = ((addrmap[4] &
++				COL_MAX_VAL_MASK) == COL_MAX_VAL_MASK) ? 0 :
++				((addrmap[4] & COL_MAX_VAL_MASK) +
++				 COL_B10_BASE);
++		} else {
++			priv->col_shift[11] = (((addrmap[3] >> 24) &
++				COL_MAX_VAL_MASK) == COL_MAX_VAL_MASK) ? 0 :
++				(((addrmap[3] >> 24) & COL_MAX_VAL_MASK) +
++				 COL_B9_BASE);
++			priv->col_shift[13] = ((addrmap[4] &
++				COL_MAX_VAL_MASK) == COL_MAX_VAL_MASK) ? 0 :
++				((addrmap[4] & COL_MAX_VAL_MASK) +
++				 COL_B10_BASE);
++		}
++	} else {
++		if (memtype & MEM_TYPE_LPDDR3) {
++			priv->col_shift[10] = (((addrmap[3] >> 16) &
++				COL_MAX_VAL_MASK) == COL_MAX_VAL_MASK) ? 0 :
++				(((addrmap[3] >> 16) & COL_MAX_VAL_MASK) +
++				 COL_B8_BASE);
++			priv->col_shift[11] = (((addrmap[3] >> 24) &
++				COL_MAX_VAL_MASK) == COL_MAX_VAL_MASK) ? 0 :
++				(((addrmap[3] >> 24) & COL_MAX_VAL_MASK) +
++				 COL_B9_BASE);
++			priv->col_shift[13] = ((addrmap[4] &
++				COL_MAX_VAL_MASK) == COL_MAX_VAL_MASK) ? 0 :
++				((addrmap[4] & COL_MAX_VAL_MASK) +
++				 COL_B10_BASE);
++		} else {
++			priv->col_shift[11] = (((addrmap[3] >> 16) &
++				COL_MAX_VAL_MASK) == COL_MAX_VAL_MASK) ? 0 :
++				(((addrmap[3] >> 16) & COL_MAX_VAL_MASK) +
++				 COL_B8_BASE);
++			priv->col_shift[13] = (((addrmap[3] >> 24) &
++				COL_MAX_VAL_MASK) == COL_MAX_VAL_MASK) ? 0 :
++				(((addrmap[3] >> 24) & COL_MAX_VAL_MASK) +
++				 COL_B9_BASE);
++		}
++	}
++
++	if (width) {
++		for (index = 9; index > width; index--) {
++			priv->col_shift[index] = priv->col_shift[index - width];
++			priv->col_shift[index - width] = 0;
++		}
++	}
++
++}
++
++static void setup_bank_address_map(struct synps_edac_priv *priv, u32 *addrmap)
++{
++	priv->bank_shift[0] = (addrmap[1] & BANK_MAX_VAL_MASK) + BANK_B0_BASE;
++	priv->bank_shift[1] = ((addrmap[1] >> 8) &
++				BANK_MAX_VAL_MASK) + BANK_B1_BASE;
++	priv->bank_shift[2] = (((addrmap[1] >> 16) &
++				BANK_MAX_VAL_MASK) == BANK_MAX_VAL_MASK) ? 0 :
++				(((addrmap[1] >> 16) & BANK_MAX_VAL_MASK) +
++				 BANK_B2_BASE);
++
++}
++
++static void setup_bg_address_map(struct synps_edac_priv *priv, u32 *addrmap)
++{
++	priv->bankgrp_shift[0] = (addrmap[8] &
++				BANKGRP_MAX_VAL_MASK) + BANKGRP_B0_BASE;
++	priv->bankgrp_shift[1] = (((addrmap[8] >> 8) & BANKGRP_MAX_VAL_MASK) ==
++				BANKGRP_MAX_VAL_MASK) ? 0 : (((addrmap[8] >> 8)
++				& BANKGRP_MAX_VAL_MASK) + BANKGRP_B1_BASE);
++
++}
++
++static void setup_rank_address_map(struct synps_edac_priv *priv, u32 *addrmap)
++{
++	priv->rank_shift[0] = ((addrmap[0] & RANK_MAX_VAL_MASK) ==
++				RANK_MAX_VAL_MASK) ? 0 : ((addrmap[0] &
++				RANK_MAX_VAL_MASK) + RANK_B0_BASE);
++}
++
++/**
++ * setup_address_map -	Set Address Map by querying ADDRMAP registers.
++ * @priv:		DDR memory controller private instance data.
++ *
++ * Set Address Map by querying ADDRMAP registers.
++ *
++ * Return: none.
++ */
++static void setup_address_map(struct synps_edac_priv *priv)
++{
++	u32 addrmap[12];
++	int index;
++
++	for (index = 0; index < 12; index++) {
++		u32 addrmap_offset;
++
++		addrmap_offset = ECC_ADDRMAP0_OFFSET + (index * 4);
++		addrmap[index] = readl(priv->baseaddr + addrmap_offset);
++	}
++
++	/* Set Row Address Map */
++	setup_row_address_map(priv, addrmap);
++
++	/* Set Column Address Map */
++	setup_column_address_map(priv, addrmap);
++
++	/* Set Bank Address Map */
++	setup_bank_address_map(priv, addrmap);
++
++	/* Set Bank Group Address Map */
++	setup_bg_address_map(priv, addrmap);
++
++	/* Set Rank Address Map */
++	setup_rank_address_map(priv, addrmap);
++}
++#endif /* CONFIG_EDAC_DEBUG */
++
+ /**
+  * synps_edac_mc_probe - Check controller and bind driver.
+  * @pdev:	platform_device struct.
+@@ -941,6 +1334,20 @@ static int synps_edac_mc_probe(struct platform_device *pdev)
+ 		goto free_edac_mc;
+ 	}
+ 
++#ifdef CONFIG_EDAC_DEBUG
++	if (priv->p_data->quirks & DDR_ECC_DATA_POISON_SUPPORT) {
++		if (synps_edac_create_sysfs_attributes(mci)) {
++			edac_printk(KERN_ERR, EDAC_MC,
++					"Failed to create sysfs entries\n");
++			goto free_edac_mc;
++		}
++	}
++
++	if (of_device_is_compatible(pdev->dev.of_node,
++				    "xlnx,zynqmp-ddrc-2.40a"))
++		setup_address_map(priv);
++#endif
++
+ 	/*
+ 	 * Start capturing the correctable and uncorrectable errors. A write of
+ 	 * 0 starts the counters.
+@@ -972,6 +1379,10 @@ static int synps_edac_mc_remove(struct platform_device *pdev)
+ 		writel((DDR_QOSUE_MASK | DDR_QOSCE_MASK),
+ 			priv->baseaddr + DDR_QOS_IRQ_DB_OFST);
+ 	edac_mc_del_mc(&pdev->dev);
++#ifdef CONFIG_EDAC_DEBUG
++	if (priv->p_data->quirks & DDR_ECC_DATA_POISON_SUPPORT)
++		synps_edac_remove_sysfs_attributes(mci);
++#endif
+ 	edac_mc_free(mci);
+ 
+ 	return 0;
 -- 
 2.1.1
