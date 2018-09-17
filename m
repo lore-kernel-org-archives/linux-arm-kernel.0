@@ -1,54 +1,86 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 17 Sep 2018 17:52:57 +0100
-Subject: [PATCH v4 0/6] PCI: imx: Initial imx7d suspend/resume support
-In-Reply-To: <16d68541fd499dfda88e79d4386be7ad6d0919d9.camel@nxp.com>
-References: <cover.1534264292.git.leonard.crestez@nxp.com>
- <20180917150941.GH7239@e107981-ln.cambridge.arm.com>
- <16d68541fd499dfda88e79d4386be7ad6d0919d9.camel@nxp.com>
-Message-ID: <20180917165257.GJ7239@e107981-ln.cambridge.arm.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Mon, 17 Sep 2018 19:01:00 +0200
+Subject: [PATCH v6 11/11] arm64: annotate user pointers casts detected by
+ sparse
+In-Reply-To: <20180911164152.GA29166@arrakis.emea.arm.com>
+References: <cover.1535629099.git.andreyknvl@google.com>
+ <5d54526e5ff2e5ad63d0dfdd9ab17cf359afa4f2.1535629099.git.andreyknvl@google.com>
+ <CA+55aFyW9N2tSb2bQvkthbVVyY6nt5yFeWQRLHp1zruBmb5ocw@mail.gmail.com>
+ <CA+55aFy2t_MHgr_CgwbhtFkL+djaCq2qMM1G+f2DwJ0qEr1URQ@mail.gmail.com>
+ <20180907152600.myidisza5o4kdmvf@armageddon.cambridge.arm.com>
+ <CA+55aFzQ+ykLu10q3AdyaaKJx8SDWWL9Qiu6WH2jbN_ugRUTOg@mail.gmail.com>
+ <20180911164152.GA29166@arrakis.emea.arm.com>
+Message-ID: <CAAeHK+z4HOF_PobxSys8svftWt8dhbuUXEpq2sdXBTCXwTEH2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 17, 2018 at 04:01:21PM +0000, Leonard Crestez wrote:
-> On Mon, 2018-09-17 at 16:09 +0100, Lorenzo Pieralisi wrote:
-> > On Tue, Aug 14, 2018 at 07:50:14PM +0300, Leonard Crestez wrote:
-> 
-> > > V4 adds 4 more patches with PME_Turn_Off support on top, using a new
-> > > reset bit. I generally try to keep series short but in this case some
-> > > planning might be needed to get patches into 4.20.
-> > > 
-> > > Since the new reset is treated as optional with old DTB there should be
-> > > again no problem if reset and pci are merged out of order.
-> > > 
-> > > Shawn/Philipp/Lorenzo: Would it make sense to merge this series through a
-> > > single specific tree, such as the one for imx?
-> > 
-> > This series is a bit of a mixture of multiple things hard to discern
-> > (actually I already merged patch 2 and patch 1 seems completely
-> > unrelated).
-> > 
-> > I would take the series through the PCI tree but I need an ACK for
-> > patches 5 and 6, please let me know how you want to handle it.
-> 
-> Patches 1 and 2 are already in, the rest need review. I can now just
-> resend patches 3-6 as a separate series, unless somebody complains
-> about spam.
+I took another look at the changes this patchset does to the kernel
+and here are my thoughts:
 
-What do you mean by "are already in" ? Patch 2 I queued via the PCI
-tree, patch 1 ? Can I drop it from the PCI patch queue ?
+I see two ways how a (potentially tagged) user pointer gets into the kernel:
 
-I do not think there is any need to resend, I can merge patches 3-4
-since they have been reviewed but patches 5 and 6 need review.
+1. A pointer is passed to a syscall (directly as an argument or
+indirectly as a struct field).
+2. A pointer is extracted from user context (registers, etc.) by some
+kind of a trap/fault handler.
+(Is there something else?)
 
-Lorenzo
+In case 1 we also have a special case of a pointer passed to one of
+the memory syscalls (mmap, mprotect, etc.). These syscalls "are not
+doing memory accesses but rather dealing with the memory range, hence
+an untagged pointer is better suited" as pointed out by Catalin (these
+syscalls do not always use "unsigned long" instead of "void __user *"
+though, for example shmat uses "void __user *").
 
-> Multiple separate patches are required because it touches reset + dt +
-> pci. I guess adding the include constant should be moved from the dts
-> patch to dt-bindings though.
-> 
-> Merging reset and pci out of order should be fine here and is required
-> by DT compatibility rules anyway.
-> 
-> --
-> Regards,
-> Leonard
+Looking at patch #8 ("usb, arm64: untag user addresses in devio") in
+this series, it seems that that devio ioctl actually accepts a pointer
+into a vma, so we shouldn't actually be untagging its argument and the
+patch needs to be dropped. Otherwise there's quite a few more cases
+that needs to be changed (like tcp_zerocopy_receive() for example,
+more can be found by grepping find_vma() in generic code).
+
+Regarding case 2, it seems that analyzing casts of __user pointers
+won't really help, since the code (arch/arm64/mm/fault.c) doesn't
+really use them. However all of this code is arch specific, so it
+shouldn't really change over time (right?). It looks like dealing with
+tags passed to the kernel through these fault handlers is already
+resolved with these patches (and therefore patch #6 ("arm64: untag
+user address in __do_user_fault") in this series is not actually
+needed and can be dropped (need to test that)):
+
+276e9327 ("arm64: entry: improve data abort handling of tagged pointers"),
+81cddd65 ("arm64: traps: fix userspace cache maintenance emulation on
+a tagged pointer")
+7dcd9dd8 ("arm64: hw_breakpoint: fix watchpoint matching for tagged pointers")
+
+Now, I also see two cases when kernel behavior changes depending on
+whether a pointer is tagged:
+
+1. Kernel code checks that a pointer belongs to userspace by comparing
+it with TASK_SIZE/addr_limit/user_addr_max()/USER_DS/... .
+2. A pointer gets passed to find_vma() or similar functions.
+(Is there something else?)
+
+The initial thought that I had here is that the pointers that reach
+find_vma() must be passed through memory syscalls and therefore
+shouldn't be untagged and don't require any fixes. There are at least
+two exceptions to this: 1. get_user_pages() (see patch #4 ("mm, arm64:
+untag user addresses in mm/gup.c") in this patch series) and 2.
+__do_page_fault() in arch/arm64/mm/fault.c. Are there any other
+obvious exceptions? I've tried adding BUG_ON(has_tag(addr)) to
+find_vma() and running a modified syzkaller version that passes tagged
+pointers to the kernel and failed to find anything else.
+
+As for case 1, the places where pointers are compared with TASK_SIZE
+and others can be found with grep. Maybe it makes sense to introduce
+some kind of routine like is_user_pointer() that handles tagged
+pointers and refactor the existing code to use it? And maybe add a
+rule to checkpatch.pl that forbids the direct usage of TASK_SIZE and
+others.
+
+So I think detecting direct comparisons with TASK_SIZE and others
+would more useful than finding __user pointer casts (it seems that the
+latter requires a lot of annotations to be fixed/added), and I should
+just drop this patch with annotations.
+
+WDYT?
