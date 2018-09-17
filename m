@@ -1,65 +1,119 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 17 Sep 2018 12:23:29 +0200
-Subject: [PATCH v2 2/4] iio: Documentation: Add Xilinx AMS sysfs
- documentation
-In-Reply-To: <20180917110215.00002846@huawei.com>
-References: <1536909510-7166-1-git-send-email-manish.narani@xilinx.com>
- <1536909510-7166-3-git-send-email-manish.narani@xilinx.com>
- <20180916111242.73af71ed@archlinux>
- <cf2acc8a-ed2d-27f4-ca58-3e2132e17d2a@xilinx.com>
- <20180917110215.00002846@huawei.com>
-Message-ID: <469597c5-724f-08c9-ccbc-f076673e1744@xilinx.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 17 Sep 2018 11:31:42 +0100
+Subject: [PATCH] PCI: imx6: support MPLL reconfiguration for 100MHz and
+ 200MHz refclock
+In-Reply-To: <20180731102149.8537-1-l.stach@pengutronix.de>
+References: <20180731102149.8537-1-l.stach@pengutronix.de>
+Message-ID: <20180917103142.GB7239@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.9.2018 12:06, Jonathan Cameron wrote:
-> On Mon, 17 Sep 2018 11:56:08 +0200
-> Michal Simek <michal.simek@xilinx.com> wrote:
+On Tue, Jul 31, 2018 at 12:21:49PM +0200, Lucas Stach wrote:
+> The power up defaults of the MPLL are designed for the standard 125MHz
+> refclock derived from the ENET PLL. As this clock has a jitter that
+> violates the PCIe Gen2 timing requirements, some board designs use
+> an external reference clock generator. Those clock generators may
+> output a clock at a different rate than what the MPLL expects
+> (usually a 100MHz clock, to re-use the PCIe bus clock).
 > 
->> On 16.9.2018 12:12, Jonathan Cameron wrote:
->>> On Fri, 14 Sep 2018 12:48:28 +0530
->>> Manish Narani <manish.narani@xilinx.com> wrote:
->>>   
->>>> Add documentation for xilinx-ams driver. This contains information about
->>>> various voltages and temperatures on PS (Processing System), PL
->>>> (Programmable Logic) and AMS Control Block.
->>>>
->>>> Signed-off-by: Manish Narani <manish.narani@xilinx.com>  
->>> The more I look at this device the more I'm convinced it is very much a dedicated
->>> hardware monitoring function, not a generic ADC sensing unit at all.
->>>
->>> Hmm.  It is still fine to have it in IIO but you need to think in detail
->>> about how you are going to interface this to hwmon via the iio-hwmon bridge.
->>>
->>> Some of the interface complexity should only really be apparent when we hit
->>> hwmon perhaps rather than having so many different custom interfaces in IIO.
->>>
->>> Please also loop in the maintainers and lists for hwmon in the next
->>> version so we can get their input.  
->>
->> Isn't there iio-hwmon driver for this?
->>
->> Thanks,
->> Michal
+> In that case the MPLL must be reconfigured via overrides to use
+> different refclock dividers and loop multipliers. The i.MX6
+> reference manual lists both 100MHz and 200MHz as supported refclock
+> rates and the associated mult and div values.
 > 
-> Absolutely.  The interesting bit is that if we are planning to actually expose
-> the many monitoring channels via iio-hwmon IIRC it won't use the extended names
-> at all (I may have missremembered this thogh).  As such we may want to reduced
-> the amount of custom ABI in IIO in favour of a level of opaqueness with the
-> 'real' interface provided by the iio-hwmon bridge driver.  A quick glance
-> suggested we may need to increase the information exposed by the iio-hwmon
-> driver to make this work.
+> Only the 100MHz setup has been tested on a real board, but since the
+> 200MHz setup only differs in the used pre-divider it seems safe to
+> add it now.
+> 
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  drivers/pci/controller/dwc/pci-imx6.c | 55 +++++++++++++++++++++++++++
+>  1 file changed, 55 insertions(+)
 
-ok.
+Applied to pci/dwc for v4.20, thanks.
 
+Lorenzo
 
-> When we have run into cases like this (a very much hardware monitoring oriented
-> device with a few general purpose channels) in the past we have always gotten
-> agreement from the hwmon maintainers that they are happy with using an IIO provider
-> and the iio-hwmon driver route. It is just nice to keep everyone in agreement
-> and have no surprises!
-
-Definitely I agree with this.
-
-Thanks,
-Michal
+> diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
+> index 80f604602783..c481c61a41b8 100644
+> --- a/drivers/pci/controller/dwc/pci-imx6.c
+> +++ b/drivers/pci/controller/dwc/pci-imx6.c
+> @@ -97,6 +97,16 @@ struct imx6_pcie {
+>  #define PORT_LOGIC_SPEED_CHANGE		(0x1 << 17)
+>  
+>  /* PHY registers (not memory-mapped) */
+> +#define PCIE_PHY_ATEOVRD			0x10
+> +#define  PCIE_PHY_ATEOVRD_EN			(0x1 << 2)
+> +#define  PCIE_PHY_ATEOVRD_REF_CLKDIV_SHIFT	0
+> +#define  PCIE_PHY_ATEOVRD_REF_CLKDIV_MASK	0x1
+> +
+> +#define PCIE_PHY_MPLL_OVRD_IN_LO		0x11
+> +#define  PCIE_PHY_MPLL_MULTIPLIER_SHIFT		2
+> +#define  PCIE_PHY_MPLL_MULTIPLIER_MASK		0x7f
+> +#define  PCIE_PHY_MPLL_MULTIPLIER_OVRD		(0x1 << 9)
+> +
+>  #define PCIE_PHY_RX_ASIC_OUT 0x100D
+>  #define PCIE_PHY_RX_ASIC_OUT_VALID	(1 << 0)
+>  
+> @@ -508,6 +518,50 @@ static void imx6_pcie_init_phy(struct imx6_pcie *imx6_pcie)
+>  			IMX6Q_GPR12_DEVICE_TYPE, PCI_EXP_TYPE_ROOT_PORT << 12);
+>  }
+>  
+> +static int imx6_setup_phy_mpll(struct imx6_pcie *imx6_pcie)
+> +{
+> +	unsigned long phy_rate = clk_get_rate(imx6_pcie->pcie_phy);
+> +	int mult, div;
+> +	u32 val;
+> +
+> +	switch (phy_rate) {
+> +	case 125000000:
+> +		/*
+> +		 * The default settings of the MPLL are for a 125MHz input
+> +		 * clock, so no need to reconfigure anything in that case.
+> +		 */
+> +		return 0;
+> +	case 100000000:
+> +		mult = 25;
+> +		div = 0;
+> +		break;
+> +	case 200000000:
+> +		mult = 25;
+> +		div = 1;
+> +		break;
+> +	default:
+> +		dev_err(imx6_pcie->pci->dev,
+> +			"Unsupported PHY reference clock rate %lu\n", phy_rate);
+> +		return -EINVAL;
+> +	}
+> +
+> +	pcie_phy_read(imx6_pcie, PCIE_PHY_MPLL_OVRD_IN_LO, &val);
+> +	val &= ~(PCIE_PHY_MPLL_MULTIPLIER_MASK <<
+> +		 PCIE_PHY_MPLL_MULTIPLIER_SHIFT);
+> +	val |= mult << PCIE_PHY_MPLL_MULTIPLIER_SHIFT;
+> +	val |= PCIE_PHY_MPLL_MULTIPLIER_OVRD;
+> +	pcie_phy_write(imx6_pcie, PCIE_PHY_MPLL_OVRD_IN_LO, val);
+> +
+> +	pcie_phy_read(imx6_pcie, PCIE_PHY_ATEOVRD, &val);
+> +	val &= ~(PCIE_PHY_ATEOVRD_REF_CLKDIV_MASK <<
+> +		 PCIE_PHY_ATEOVRD_REF_CLKDIV_SHIFT);
+> +	val |= div << PCIE_PHY_ATEOVRD_REF_CLKDIV_SHIFT;
+> +	val |= PCIE_PHY_ATEOVRD_EN;
+> +	pcie_phy_write(imx6_pcie, PCIE_PHY_ATEOVRD, val);
+> +
+> +	return 0;
+> +}
+> +
+>  static int imx6_pcie_wait_for_link(struct imx6_pcie *imx6_pcie)
+>  {
+>  	struct dw_pcie *pci = imx6_pcie->pci;
+> @@ -632,6 +686,7 @@ static int imx6_pcie_host_init(struct pcie_port *pp)
+>  	imx6_pcie_assert_core_reset(imx6_pcie);
+>  	imx6_pcie_init_phy(imx6_pcie);
+>  	imx6_pcie_deassert_core_reset(imx6_pcie);
+> +	imx6_setup_phy_mpll(imx6_pcie);
+>  	dw_pcie_setup_rc(pp);
+>  	imx6_pcie_establish_link(imx6_pcie);
+>  
+> -- 
+> 2.18.0
+> 
