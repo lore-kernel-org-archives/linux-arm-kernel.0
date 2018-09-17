@@ -1,84 +1,55 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Mon, 17 Sep 2018 14:15:19 +0800
-Subject: [PATCH 01/13] dt-bindings: mediatek: Add binding for mt8183
- IOMMU and SMI
-In-Reply-To: <5b9f3f52.1c69fb81.a7f7c.f34e@mx.google.com>
-References: <1535954502-30646-1-git-send-email-yong.wu@mediatek.com>
- <1535954502-30646-2-git-send-email-yong.wu@mediatek.com>
- <5b9f3f52.1c69fb81.a7f7c.f34e@mx.google.com>
-Message-ID: <1537164919.12287.0.camel@mhfsdcap03>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Mon, 17 Sep 2018 09:21:16 +0300
+Subject: [PATCH mmc-next] mmc: sdhci: fix __sdhci_adma_write_desc
+In-Reply-To: <20180917133041.66100101@xhacker.debian>
+References: <20180917133041.66100101@xhacker.debian>
+Message-ID: <0bec0d01-9fde-1df3-3cc3-fb922dd5350d@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2018-09-16 at 17:26 -0500, Rob Herring wrote:
-> On Mon, Sep 03, 2018 at 02:01:30PM +0800, Yong Wu wrote:
-> > This patch adds decriptions for mt8183 IOMMU and SMI.
-> > 
-> > mt8183 has one M4U like mt8173 and is also MTK IOMMU gen2 which
-> > uses ARM Short-Descriptor translation table format.
-> > 
-> > The mt8183 M4U-SMI HW diagram is as below:
-> > 
-> >                           EMI
-> >                            |
-> >                           M4U
-> >                            |
-> >                        ----------
-> >                        |        |
-> >                    gals0-rx   gals1-rx
-> >                        |        |
-> >                        |        |
-> >                    gals0-tx   gals1-tx
-> >                        |        |
-> >                       ------------
-> >                        SMI Common
-> >                       ------------
-> >                            |
-> >   +-----+-----+--------+-----+-----+-------+-------+
-> >   |     |     |        |     |     |       |       |
-> >   |     |  gals-rx  gals-rx  |   gals-rx gals-rx gals-rx
-> >   |     |     |        |     |     |       |       |
-> >   |     |     |        |     |     |       |       |
-> >   |     |  gals-tx  gals-tx  |   gals-tx gals-tx gals-tx
-> >   |     |     |        |     |     |       |       |
-> > larb0 larb1  larb2   larb3  larb4 larb5  larb6    CCU
-> > disp  vdec   IPU0    IPU1   venc  IPU1    cam
-> > 
-> > All the connections are HW fixed, SW can NOT adjust it.
-> > 
-> > Compared with mt8173, we add a GALS(Global Async Local Sync) module
-> > between SMI-common and M4U, and additional between larb2/3/5/6 and
-> > SMI-common. GALS can help synchronize for the modules in different
-> > clock frequence, it can be seen as a "asynchronous fifo".
+On 17/09/18 08:30, Jisheng Zhang wrote:
+> If hosts provides ops->adma_write_desc, we should not fall back to the
+> general sdhci_adma_write_desc().
 > 
-> s/frequence/frequency/
+> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+> ---
 > 
+> Hi Ulf, Adrian,
 > 
-> > GALS can only help transfer the command/data while it don't have the
-> > register, thus it has the special "smi" clock and it don't have the
-> > "apb" clock. From the diagram above, we add "gals0" and "gals1"
-> > clockes for smi-common and add a "gals" clock for smi-larb.
-> 
-> s/clockes/clocks/
-> s/don't/doesn't/
-> 
-> > From the diagram above, CCU(Camera Control Unit) is connected with
-> > smi-common directly, we can look it as "larb7" but its register space
-> > is different with the normal larb.
-> > 
-> > Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> > ---
-> >  .../devicetree/bindings/iommu/mediatek,iommu.txt   |  15 ++-
-> >  .../memory-controllers/mediatek,smi-common.txt     |  11 +-
-> >  .../memory-controllers/mediatek,smi-larb.txt       |   3 +
-> >  include/dt-bindings/memory/mt8183-larb-port.h      | 130 +++++++++++++++++++++
-> >  4 files changed, 153 insertions(+), 6 deletions(-)
-> >  create mode 100644 include/dt-bindings/memory/mt8183-larb-port.h
-> 
-> With those fixed,
-> 
-> Reviewed-by: Rob Herring <robh@kernel.org>
+> When I introduced .adma_write_desc, I made a mistake since v4 -- if the host
+> provide ops->adma_write_desc, we should just call it and don't fall back
+> to the general sdhci_adma_write_desc(). Before v4, the adma_write_desc return
+> int, since v4 there's no return value, so when I prepared the v4, I just
+> removed return, this is where the mistake is from. I dunno how to handle
+> this case, fold the patch into previous commit or apply it as a separate patch?
 
-Thanks Rob. I will fix them in next version.
+Up to Ulf, but in any case:
 
+Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+
+> 
+> I'm very sorry for this. In fact, Adrian caught another similar bug during
+> review.
+> 
+> Sorry about the inconvenience,
+> Jisheng
+> 
+>  drivers/mmc/host/sdhci.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index 0dda6f4b6a24..99bdae53fa2e 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -649,8 +649,8 @@ static inline void __sdhci_adma_write_desc(struct sdhci_host *host,
+>  {
+>  	if (host->ops->adma_write_desc)
+>  		host->ops->adma_write_desc(host, desc, addr, len, cmd);
+> -
+> -	sdhci_adma_write_desc(host, desc, addr, len, cmd);
+> +	else
+> +		sdhci_adma_write_desc(host, desc, addr, len, cmd);
+>  }
+>  
+>  static void sdhci_adma_mark_end(void *desc)
 > 
