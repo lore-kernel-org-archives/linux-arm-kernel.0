@@ -1,73 +1,81 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 17 Sep 2018 10:33:03 +0200
-Subject: [PATCH v3 1/2] ARM: s3c24xx: formatting cleanup in mach-mini2440.c
-In-Reply-To: <4cf38559-b00d-ede4-def5-7cd832d8a506@free.fr>
-References: <20180907215446.15160-1-sed@free.fr>
- <b97d7ccc921572ca5d783584eea1de04341ab02f.camel@perches.com>
- <4cf38559-b00d-ede4-def5-7cd832d8a506@free.fr>
-Message-ID: <CAJKOXPdvDrWOEkj3kEJ2KhHqp7NVmLeMTVdwB8suH8PWQXf-Pg@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 17 Sep 2018 11:33:22 +0300
+Subject: [PATCH 1/2] dt-binding: mediatek: Add binding document for
+ MediaTek GMAC
+In-Reply-To: <1537165763-13112-2-git-send-email-biao.huang@mediatek.com>
+References: <1537165763-13112-1-git-send-email-biao.huang@mediatek.com>
+ <1537165763-13112-2-git-send-email-biao.huang@mediatek.com>
+Message-ID: <fb327132-0830-9df0-434e-06bb0033bac4@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Sep 2018 at 22:24, Cedric Roux <sed@free.fr> wrote:
->
-> Hi,
->
-> On 09/12/2018 09:21 PM, Joe Perches wrote:
-> > On Fri, 2018-09-07 at 23:54 +0200, Cedric Roux wrote:
-> >> Running:
-> >>     scripts/checkpatch.pl -f arch/arm/mach-s3c24xx/mach-mini2440.c
-> >> revealed several errors and warnings.
-> >>
-> >> They were all removed, except one which is an #if 0 around the declaration
-> >> of a gpio pin. This needs some more investigation and I prefer to let it
-> >> here. This is not some dead code.
-> > []
-> >> diff --git a/arch/arm/mach-s3c24xx/mach-mini2440.c b/arch/arm/mach-s3c24xx/mach-mini2440.c
-> > []
-> >> @@ -674,17 +680,17 @@ static void __init mini2440_init(void)
-> >>              mini2440_fb_info.displays =
-> >>                      &mini2440_lcd_cfg[features.lcd_index];
-> >>
-> >> -            printk(KERN_INFO "MINI2440: LCD");
-> >> +            pr_info("MINI2440: LCD");
-> >
-> > OK
-> >
-> >>              for (li = 0; li < ARRAY_SIZE(mini2440_lcd_cfg); li++)
-> >>                      if (li == features.lcd_index)
-> >> -                            printk(" [%d:%dx%d]", li,
-> >> +                            pr_info(" [%d:%dx%d]", li,
-> >>                                      mini2440_lcd_cfg[li].width,
-> >>                                      mini2440_lcd_cfg[li].height);
-> >
-> > pr_cont
-> >
-> >>                      else
-> >> -                            printk(" %d:%dx%d", li,
-> >> +                            pr_info(" %d:%dx%d", li,
-> >
-> > pr_cont
-> >
-> >>                                      mini2440_lcd_cfg[li].width,
-> >>                                      mini2440_lcd_cfg[li].height);
-> >> -            printk("\n");
-> >> +            pr_info("\n");
-> >
-> > pr_cont
-> >
-> > So only the first printk should use pr_info().
-> > The subsequent printk uses should use pr_cont()
->
-> at this point, I don't know what to do.
->
-> Should I resubmit the patches? Or is it in the hands of
-> Krzysztof (krzk at kernel.org)? I would say a git rebase -i
-> is enough to edit the patch and this rebase is obviously
-> not to be done by me, but I don't know the process.
+On 9/17/2018 9:29 AM, Biao Huang wrote:
 
-Can you send a incremental fix for this, restoring the original
-continued printks?
+> The commit adds the device tree binding documentation for the MediaTek
+> GMAC found on Mediatek MT2712.
+> 
+> Signed-off-by: Biao Huang <biao.huang@mediatek.com>
+> ---
+>   .../devicetree/bindings/net/mediatek-gmac.txt      |   45 ++++++++++++++++++++
+>   1 file changed, 45 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/net/mediatek-gmac.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/net/mediatek-gmac.txt b/Documentation/devicetree/bindings/net/mediatek-gmac.txt
+> new file mode 100644
+> index 0000000..14876ed
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/mediatek-gmac.txt
+> @@ -0,0 +1,45 @@
+> +MediaTek Gigabit Ethernet controller
+> +=========================================
+> +
+> +The gigabit ethernet controller can be found on MediaTek SoCs.
+> +
+> +* Ethernet controller node
+> +
+> +Required properties:
+> +- compatible: Should be
+> +	"mediatek,mt2712-eth": for MT2712 SoC
+> +- reg: Address and length of the register set for the device
+> +- interrupts: Should contain the MAC interrupts
+> +- interrupt-names: the name of interrupt in the interrupts property. These are
+> +	"macirq": For MT2712 SoC
+> +- clocks: the clock used by the controller
+> +- clock-names: the names of the clock listed in the clocks property. These are
+> +	"axi", "apb", "mac_ext", "ptp", "ptp_parent", "ptp_top": For MT2712 SoC
+> +- mac-address: See ethernet.txt in the same directory
+> +- power-domains: phandle to the power domain that the ethernet is part of
 
-Best regards,
-Krzysztof
+    This (required) prop is absent in your example.
+
+> +- phy-mode: See ethernet.txt file in the same directory.
+> +- reset-gpio: gpio number for phy reset.
+> +
+> +Example:
+> +
+> +eth: eth at 1101c000 {
+
+eth: ethernet at 1101c000 {
+
+> +		compatible = "mediatek,mt2712-eth";
+> +		reg = <0 0x1101c000 0 0x1200>;
+> +		interrupts = <GIC_SPI 237 IRQ_TYPE_LEVEL_LOW>;
+> +		interrupt-names = "macirq";
+> +		phy-mode ="rgmii";
+> +		mac-address = [00 55 7b b5 7d f7];
+> +		clock-names = "axi",
+> +			      "apb",
+> +			      "mac_ext",
+> +			      "ptp",
+> +			      "ptp_parent",
+> +			      "ptp_top";
+> +		clocks = <&pericfg CLK_PERI_GMAC>,
+> +			 <&pericfg CLK_PERI_GMAC_PCLK>,
+> +			 <&topckgen CLK_TOP_ETHER_125M_SEL>,
+> +			 <&topckgen CLK_TOP_ETHER_50M_SEL>,
+> +			 <&topckgen CLK_TOP_APLL1_D3>,
+> +			 <&topckgen CLK_TOP_APLL1>;
+> +		reset-gpio = <&pio 87 GPIO_ACTIVE_HIGH>;
+> +	};
+
+MBR, Sergei
