@@ -1,69 +1,39 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Mon, 17 Sep 2018 15:58:45 +0200
-Subject: [PATCH 2/2] watchdog: sama5d4: write the mode register in two
- steps
-In-Reply-To: <20180914102732.GP14988@piout.net>
-References: <20180914101339.7382-1-romain.izard.pro@gmail.com>
- <20180914101339.7382-3-romain.izard.pro@gmail.com>
- <20180914102732.GP14988@piout.net>
-Message-ID: <CAGkQfmPydsn6cH2pHQ9HQeGQo0J4qJ9vXjkQD+_W5iyz---KEA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 17 Sep 2018 15:17:46 +0100
+Subject: [PATCH] arm64: sysreg: Clean up instructions for modifying
+ PSTATE fields
+In-Reply-To: <20180916221723.4306-1-suzuki.poulose@arm.com>
+References: <20180916221723.4306-1-suzuki.poulose@arm.com>
+Message-ID: <20180917141745.gwxahsxdmpee42zu@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-09-14 12:27 GMT+02:00 Alexandre Belloni <alexandre.belloni@bootlin.com>:
-> On 14/09/2018 12:13:39+0200, Romain Izard wrote:
->> The specification for SAMA5D2 and SAMA5D4 chips, that use this IP for
->> their watchdog timer, has the following advice regarding the Mode Register:
->>
->> "When setting the WDDIS bit, and while it is set, the fields WDV and WDD
->> must not be modified."
->>
->> I have observed on a board based on a SAMA5D2 chip that using any other
->> timeout duration than the default 16s in the device tree will reset the
->> board when the watchdog device is opened; this is probably due to ignoring
->> the aforementioned constraint.
->>
->> To fix this, read the content of the Mode Register before writing it,
->> and split the access into two parts if WDV or WDD need to be changed.
->>
->
-> Hum, that is really weird because when I developed
-> 015b528644a84b0018d3286ecd6ea5f82dce0180, I tested with a program doing:
->
->         flags = WDIOS_DISABLECARD;
->         ioctl(fd, WDIOC_SETOPTIONS, &flags);
->         for (i = 16; i > 2; i--) {
->                 ioctl(fd, WDIOC_SETTIMEOUT, &i);
->         }
->
->         ioctl(fd, WDIOC_KEEPALIVE, &dummy);
->
->         flags = WDIOS_ENABLECARD;
->         ioctl(fd, WDIOC_SETOPTIONS, &flags);
->
->         for (i = 16; i > 2; i--) {
->                 ioctl(fd, WDIOC_SETTIMEOUT, &i);
->         }
->
-> This would immediately reproduce the reset when changing WDV/WDD with
-> WDDIS set.
->
-> I'll test again.
->
+On Sun, Sep 16, 2018 at 11:17:23PM +0100, Suzuki K. Poulose wrote:
+> Instructions for modifying the PSTATE fields which were not supported
+> in the older toolchains (e.g, PAN, UAO) are generated using macros.
+> We have so far used the normal sys_reg() helper for defining the PSTATE
+> fields. While this works fine, it is really difficult to correlate the
+> code with the Arm ARM definition.
+> 
+> As per Arm ARM, the PSTATE fields are defined only using Op1, Op2 fields,
+> with fixed values for Op0, CRn. Also the CRm field has been reserved
+> for the Immediate value for the instruction. So using the sys_reg()
+> looks quite confusing.
+> 
+> This patch cleans up the instruction helpers by bringing them
+> in line with the Arm ARM definitions to make it easier to correlate
+> code with the document. No functional changes.
+> 
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+> Changes since v1
+>  - Rebased to arm64 for-next/core.
+>  - Cleanup SSBS defintions and replace CRm_shift => PSTATE_Imm_shift
 
-The issue is visible when setting a custom value for the timeout on startup.
-In the past it was only possible to do so with a module parameter, and the
-previous patch in the series makes it possible to do with the device tree.
+Applied for 4.20. Thanks.
 
-When using the Linux4SAM 5.7 release, it is sufficient to set the timeout on
-the command line to reproduce the issue:
-
-In the bootloader:
-# setenv bootargs $bootargs sama5d4_wdt.wdt_timeout=10
-
-To trigger an immediate reset (with some code that should work):
-# (echo 1; while sleep 3; do echo 1; done) > /dev/watchdog
-
-Best regards,
 -- 
-Romain Izard
+Catalin
