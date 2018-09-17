@@ -1,117 +1,82 @@
-From: pintu.ping@gmail.com (Pintu Kumar)
-Date: Mon, 17 Sep 2018 11:46:17 +0530
-Subject: KSM not working in 4.9 Kernel
-In-Reply-To: <20180917043724.GA12866@rapoport-lnx>
-References: <CAOuPNLj1wx4sznrtLdKjcvuTf0dECPWzPaR946FoYRXB6YAGCw@mail.gmail.com>
- <20180916153237.GC15699@rapoport-lnx>
- <CAOuPNLj0HyC+yzwTpN-EWpzHTJ58u7pBfOja1MyweF4pbct1eQ@mail.gmail.com>
- <20180917043724.GA12866@rapoport-lnx>
-Message-ID: <CAOuPNLidXFHgkBmwOPj_xFkU_OpLaXbpJg04Le7MPxu8cYg_RQ@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Sun, 16 Sep 2018 22:53:30 -0500
+Subject: [PATCH] ARM: dts: aspeed: Adding Facebook TioagaPass BMC
+In-Reply-To: <20180913195751.1833227-1-vijaykhemka@fb.com>
+References: <20180913195751.1833227-1-vijaykhemka@fb.com>
+Message-ID: <5b9f3f8c.1c69fb81.8e0e4.d5a8@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 17, 2018 at 10:07 AM Mike Rapoport <rppt@linux.vnet.ibm.com> wrote:
->
-> On Sun, Sep 16, 2018 at 10:35:17PM +0530, Pintu Kumar wrote:
-> > On Sun, Sep 16, 2018 at 9:02 PM Mike Rapoport <rppt@linux.vnet.ibm.com> wrote:
-> > >
-> > > On Fri, Sep 14, 2018 at 07:58:01PM +0530, Pintu Kumar wrote:
-> > > > Hi All,
-> > > >
-> > > > Board: Hikey620 ARM64
-> > > > Kernel: 4.9.20
-> > > >
-> > > > I am trying to verify KSM (Kernel Same Page Merging) functionality on
-> > > > 4.9 Kernel using "mmap" and madvise user space test utility.
-> > > > But to my observation, it seems KSM is not working for me.
-> > > > CONFIG_KSM=y is enabled in kernel.
-> > > > ksm_init is also called during boot up.
-> > > >   443 ?        SN     0:00 [ksmd]
-> > > >
-> > > > ksmd thread is also running.
-> > > >
-> > > > However, when I see the sysfs, no values are written.
-> > > > ~ # grep -H '' /sys/kernel/mm/ksm/*
-> > > > /sys/kernel/mm/ksm/pages_hashed:0
-> > > > /sys/kernel/mm/ksm/pages_scanned:0
-> > > > /sys/kernel/mm/ksm/pages_shared:0
-> > > > /sys/kernel/mm/ksm/pages_sharing:0
-> > > > /sys/kernel/mm/ksm/pages_to_scan:200
-> > > > /sys/kernel/mm/ksm/pages_unshared:0
-> > > > /sys/kernel/mm/ksm/pages_volatile:0
-> > > > /sys/kernel/mm/ksm/run:1
-> > > > /sys/kernel/mm/ksm/sleep_millisecs:1000
-> > > >
-> > > > So, please let me know if I am doing any thing wrong.
-> > > >
-> > > > This is the test utility:
-> > > > int main(int argc, char *argv[])
-> > > > {
-> > > >         int i, n, size;
-> > > >         char *buffer;
-> > > >         void *addr;
-> > > >
-> > > >         n = 100;
-> > > >         size = 100 * getpagesize();
-> > > >         for (i = 0; i < n; i++) {
-> > > >                 buffer = (char *)malloc(size);
-> > > >                 memset(buffer, 0xff, size);
-> > > >                 addr =  mmap(NULL, size,
-> > > >                            PROT_READ | PROT_EXEC | PROT_WRITE,
-> > > > MAP_PRIVATE | MAP_ANONYMOUS,
-> > > >                            -1, 0);
-> > > >                 madvise(addr, size, MADV_MERGEABLE);
-> > >
-> > > Just mmap'ing an area does not allocate any physical pages, so KSM has
-> > > nothing to merge.
-> > >
-> > > You need to memset(addr,...) after mmap().
-> > >
-> >
-> > Yes, I am doing memset also.
-> > memset(addr, 0xff, size);
-> >
-> > But still no effect.
-> > And I checked LTP test cases. It almost doing the same thing.
-> >
-> > I observed that [ksmd] thread is not waking up at all.
-> > I gave some print inside it, but I could never saw that prints coming.
-> > I could not find it running either in top command during the operation.
-> > Is there anything needs to be done, to wakw up ksmd?
-> > I already set: echo 1 > /sys/kernel/mm/ksm.
->
-> It should be echo 1 > /sys/kernel/mm/ksm/run
->
+On Thu, Sep 13, 2018 at 12:57:51PM -0700, Vijay Khemka wrote:
+> Initial introduction of Facebook TioagaPass family equipped with
+> Aspeed 2500 BMC SoC. Neptune is a x86 server development kit
+> with a ASPEED ast2500 BMC manufactured by Facebook.
+> Specifically, This adds the tiogapass platform device tree file
+> including the flash layout used by the tiogapass BMC machines.
+> 
+> This also adds an entry of tiogapass device tree file in Makefile
+> as well an entry of Facebook in Documentation for vendor prefix
+> 
+> Signed-off-by: Vijay Khemka <vijaykhemka@fb.com>
+> ---
+>  .../devicetree/bindings/vendor-prefixes.txt   |   1 +
+>  arch/arm/boot/dts/Makefile                    |   1 +
+>  .../dts/aspeed-bmc-facebook-tiogapass.dts     | 152 ++++++++++++++++++
+>  3 files changed, 154 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts
+> 
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index 2c3fc512e746..733b2d523642 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -127,6 +127,7 @@ everspin	Everspin Technologies, Inc.
+>  exar	Exar Corporation
+>  excito	Excito
+>  ezchip	EZchip Semiconductor
+> +facebook  Facebook
+>  fairphone	Fairphone B.V.
+>  faraday	Faraday Technology Corporation
+>  fastrax	Fastrax Oy
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index b5bd3de87c33..9c82c1681c38 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -1206,4 +1206,5 @@ dtb-$(CONFIG_ARCH_ASPEED) += \
+>  	aspeed-bmc-opp-witherspoon.dtb \
+>  	aspeed-bmc-opp-zaius.dtb \
+>  	aspeed-bmc-portwell-neptune.dtb \
+> +	aspeed-bmc-facebook-tiogapass.dtb \
+>  	aspeed-bmc-quanta-q71l.dtb
+> diff --git a/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts b/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts
+> new file mode 100644
+> index 000000000000..859a00581e34
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts
+> @@ -0,0 +1,152 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +// Copyright (c) 2017 Facebook Inc.
+> +/dts-v1/;
+> +
+> +#include "aspeed-g5.dtsi"
+> +#include <dt-bindings/gpio/aspeed-gpio.h>
+> +
+> +/ {
+> +	model = "Facebook TiogaPass BMC";
+> +	compatible = "facebook,tiogapass-bmc", "aspeed,ast2500";
+> +	aliases {
+> +		serial0 = &uart1;
+> +		serial4 = &uart5;
+> +	};
+> +	chosen {
+> +		stdout-path = &uart5;
+> +		bootargs = "console=ttyS4,115200 earlyprintk";
+> +	};
+> +
+> +	memory {
 
-Oh yes, sorry for the typo.
-I tried the same, but still ksm is not getting invoked.
-Could someone confirm if KSM was working in 4.9 kernel?
+This should have a unit-address (as should whatever is defined in 
+aspeed-g5.dtsi).
 
 
-> >
-> >
-> > > >                 sleep(1);
-> > > >         }
-> > > >         printf("Done....press ^C\n");
-> > > >
-> > > >         pause();
-> > > >
-> > > >         return 0;
-> > > > }
-> > > >
-> > > >
-> > > >
-> > > > Thanks,
-> > > > Pintu
-> > > >
-> > >
-> > > --
-> > > Sincerely yours,
-> > > Mike.
-> > >
-> >
->
-> --
-> Sincerely yours,
-> Mike.
->
+> +		reg = <0x80000000 0x20000000>;
+> +	};
