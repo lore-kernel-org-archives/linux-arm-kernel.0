@@ -1,86 +1,96 @@
 From: yaojun8558363@gmail.com (Jun Yao)
-Date: Mon, 17 Sep 2018 12:43:29 +0800
-Subject: [PATCH v5 2/6] arm64/mm: Pass ttbr1 as a parameter to __enable_mmu().
+Date: Mon, 17 Sep 2018 12:43:30 +0800
+Subject: [PATCH v5 3/6] arm64/mm: Create the initial page table in the
+ init_pg_dir.
 In-Reply-To: <20180917044333.30051-1-yaojun8558363@gmail.com>
 References: <20180917044333.30051-1-yaojun8558363@gmail.com>
-Message-ID: <20180917044333.30051-3-yaojun8558363@gmail.com>
+Message-ID: <20180917044333.30051-4-yaojun8558363@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kernel will set up the initial page table in the init_pg_dir.
-However, it will create the final page table in the swapper_pg_dir
-during the initialization process. We need to let __enable_mmu()
-know which page table to use.
+Create the initial page table in the init_pg_dir. And update the
+init_mm.pgd to make sure that pgd_offset_k() works correctly. When
+the final page table is created, we redirect the init_mm.pgd to the
+swapper_pg_dir.
 
 Signed-off-by: Jun Yao <yaojun8558363@gmail.com>
 ---
- arch/arm64/kernel/head.S  | 19 +++++++++++--------
- arch/arm64/kernel/sleep.S |  1 +
- 2 files changed, 12 insertions(+), 8 deletions(-)
+ arch/arm64/include/asm/pgtable.h | 2 ++
+ arch/arm64/kernel/asm-offsets.c  | 1 +
+ arch/arm64/kernel/head.S         | 9 +++++++--
+ arch/arm64/mm/mmu.c              | 1 +
+ 4 files changed, 11 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 2ab2031b778c..b11d6fc62a62 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -718,6 +718,8 @@ static inline pmd_t pmdp_establish(struct vm_area_struct *vma,
+ }
+ #endif
+ 
++extern pgd_t init_pg_dir[PTRS_PER_PGD];
++extern pgd_t init_pg_end[];
+ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
+ extern pgd_t swapper_pg_end[];
+ extern pgd_t idmap_pg_dir[PTRS_PER_PGD];
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 323aeb5f2fe6..43f52cfdfad4 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -82,6 +82,7 @@ int main(void)
+   DEFINE(S_FRAME_SIZE,		sizeof(struct pt_regs));
+   BLANK();
+   DEFINE(MM_CONTEXT_ID,		offsetof(struct mm_struct, context.id.counter));
++  DEFINE(MM_PGD,		offsetof(struct mm_struct, pgd));
+   BLANK();
+   DEFINE(VMA_VM_MM,		offsetof(struct vm_area_struct, vm_mm));
+   DEFINE(VMA_VM_FLAGS,		offsetof(struct vm_area_struct, vm_flags));
 diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 2c83a8c47e3f..de2aaea00bd2 100644
+index de2aaea00bd2..cf8a58211b80 100644
 --- a/arch/arm64/kernel/head.S
 +++ b/arch/arm64/kernel/head.S
-@@ -714,6 +714,7 @@ secondary_startup:
- 	 * Common entry point for secondary CPUs.
+@@ -376,7 +376,7 @@ __create_page_tables:
+ 	/*
+ 	 * Map the kernel image (starting with PHYS_OFFSET).
  	 */
- 	bl	__cpu_setup			// initialise processor
-+	adrp	x1, swapper_pg_dir
- 	bl	__enable_mmu
- 	ldr	x8, =__secondary_switched
- 	br	x8
-@@ -756,6 +757,7 @@ ENDPROC(__secondary_switched)
-  * Enable the MMU.
-  *
-  *  x0  = SCTLR_EL1 value for turning on the MMU.
-+ *  x1  = TTBR1_EL1 value for turning on the MMU.
-  *
-  * Returns to the caller via x30/lr. This requires the caller to be covered
-  * by the .idmap.text section.
-@@ -764,15 +766,15 @@ ENDPROC(__secondary_switched)
-  * If it isn't, park the CPU
-  */
- ENTRY(__enable_mmu)
--	mrs	x1, ID_AA64MMFR0_EL1
--	ubfx	x2, x1, #ID_AA64MMFR0_TGRAN_SHIFT, 4
--	cmp	x2, #ID_AA64MMFR0_TGRAN_SUPPORTED
-+	mrs	x5, ID_AA64MMFR0_EL1
-+	ubfx	x6, x5, #ID_AA64MMFR0_TGRAN_SHIFT, 4
-+	cmp	x6, #ID_AA64MMFR0_TGRAN_SUPPORTED
- 	b.ne	__no_granule_support
--	update_early_cpu_boot_status 0, x1, x2
--	adrp	x1, idmap_pg_dir
--	adrp	x2, swapper_pg_dir
--	phys_to_ttbr x3, x1
--	phys_to_ttbr x4, x2
-+	update_early_cpu_boot_status 0, x5, x6
-+	adrp	x5, idmap_pg_dir
-+	mov	x6, x1
-+	phys_to_ttbr x3, x5
-+	phys_to_ttbr x4, x6
- 	msr	ttbr0_el1, x3			// load TTBR0
- 	msr	ttbr1_el1, x4			// load TTBR1
- 	isb
-@@ -831,6 +833,7 @@ __primary_switch:
+-	adrp	x0, swapper_pg_dir
++	adrp	x0, init_pg_dir
+ 	mov_q	x5, KIMAGE_VADDR + TEXT_OFFSET	// compile time __va(_text)
+ 	add	x5, x5, x23			// add KASLR displacement
+ 	mov	x4, PTRS_PER_PGD
+@@ -439,6 +439,11 @@ __primary_switched:
+ 	bl	__pi_memset
+ 	dsb	ishst				// Make zero page visible to PTW
+ 
++	// Update init_mm.pgd
++	adrp	x0, init_pg_dir
++	adr_l	x1, init_mm
++	str	x0, [x1, #MM_PGD]
++
+ #ifdef CONFIG_KASAN
+ 	bl	kasan_early_init
+ #endif
+@@ -833,7 +838,7 @@ __primary_switch:
  	mrs	x20, sctlr_el1			// preserve old SCTLR_EL1 value
  #endif
  
-+	adrp	x1, swapper_pg_dir
+-	adrp	x1, swapper_pg_dir
++	adrp	x1, init_pg_dir
  	bl	__enable_mmu
  #ifdef CONFIG_RELOCATABLE
  	bl	__relocate_kernel
-diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
-index bebec8ef9372..3e53ffa07994 100644
---- a/arch/arm64/kernel/sleep.S
-+++ b/arch/arm64/kernel/sleep.S
-@@ -101,6 +101,7 @@ ENTRY(cpu_resume)
- 	bl	el2_setup		// if in EL2 drop to EL1 cleanly
- 	bl	__cpu_setup
- 	/* enable the MMU early - so we can access sleep_save_stash by va */
-+	adrp	x1, swapper_pg_dir
- 	bl	__enable_mmu
- 	ldr	x8, =_cpu_resume
- 	br	x8
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 65f86271f02b..af80dca335ce 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -646,6 +646,7 @@ void __init paging_init(void)
+ 	cpu_replace_ttbr1(__va(pgd_phys));
+ 	memcpy(swapper_pg_dir, pgdp, PGD_SIZE);
+ 	cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
++	init_mm.pgd = swapper_pg_dir;
+ 
+ 	pgd_clear_fixmap();
+ 	memblock_free(pgd_phys, PAGE_SIZE);
 -- 
 2.17.1
