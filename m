@@ -1,42 +1,94 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 17 Sep 2018 22:46:49 +0800
-Subject: [PATCH] arm64: dts: rockchip: add spdif sound node for rock64
-In-Reply-To: <20180917090236.21948-1-katsuhiro@katsuster.net>
-References: <20180917090236.21948-1-katsuhiro@katsuster.net>
-Message-ID: <201809172243.C2EHNtuW%fengguang.wu@intel.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 17 Sep 2018 16:51:56 +0200
+Subject: [PATCH v2 0/3] Add Amlogic video decoder driver
+In-Reply-To: <20180911150938.3844-1-mjourdan@baylibre.com>
+References: <20180911150938.3844-1-mjourdan@baylibre.com>
+Message-ID: <9c33c57e-2ce2-8752-b851-f85c03a7d761@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Katsuhiro,
+On 09/11/2018 05:09 PM, Maxime Jourdan wrote:
+> Hi everyone,
+> 
+> This patch series adds support for the Amlogic video decoder,
+> as well as the corresponding dt bindings for GXBB/GXL/GXM chips.
+> 
+> It features decoding for the following formats:
+> - MPEG 1
+> - MPEG 2
+> 
+> The following formats will be added in future patches:
+> - MJPEG
+> - MPEG 4 (incl. Xvid, H.263)
+> - H.264
+> - HEVC (incl. 10-bit)
+> 
+> The following formats' development has still not started, but they are
+> supported by the hardware:
+> - VC1
+> - VP9
+> 
+> The code was made in such a way to allow easy inclusion of those formats
+> in the future.
+> 
+> The decoder is single instance.
+> 
+> Files:
+>  - vdec.c handles the V4L2 M2M logic
+>  - esparser.c manages the hardware bitstream parser
+>  - vdec_helpers.c provides helpers to DONE the dst buffers as well as
+>  various common code used by the codecs
+>  - vdec_1.c manages the VDEC_1 block of the vdec IP
+>  - codec_mpeg12.c enables decoding for MPEG 1/2.
+>  - vdec_platform.c links codec units with vdec units
+>  (e.g vdec_1 with codec_mpeg12) and lists all the available
+>  src/dst formats and requirements (max width/height, etc.),
+>  per compatible chip.
+> 
+> Firmwares are necessary to run the vdec. They can currently be found at:
+> https://github.com/chewitt/meson-firmware
+> 
+> It was tested primarily with ffmpeg's v4l2-m2m implementation. For instance:
+> $ ffmpeg -c:v mpeg2_v4l2m2m -i sample_mpeg2.mkv -f null -
+> 
+> Note: This patch series depends on
+> "[PATCH v3 0/3] soc: amlogic: add meson-canvas"
+> https://patchwork.kernel.org/cover/10573763/
+> 
+> The v4l2-compliance results are available below the patch diff.
+> 
+> Changes since v1 [0]:
+>  - use named interrupts in the bindings
+>  - rewrite description in the bindings doc
+>  - don't include the dts changes in the patch series
+>  - fill the vb2 queues locks
+>  - fill the video_device lock
+>  - use helpers for wait_prepare and wait_finish vb2_ops
+>  - remove unnecessary usleep in between esparser writes.
+>  Extensive testing of every codec on GXBB/GXL didn't reveal
+>  any fails without it, so just remove it.
+>  - compile v4l2_compliance inside the git repo
+>  - Check for plane number/plane size to pass the latest v4l2-compliance test
+>  - Moved the single instance check (returning -EBUSY) to start/stop streaming
+>  The check was previously in queue_setup but there was no great location to
+>  clear it except for .close().
 
-I love your patch! Yet something to improve:
+Actually, you can clear it by called VIDIOC_REQBUFS with count set to 0. That
+freed all buffers and clears this.
 
-[auto build test ERROR on rockchip/for-next]
-[also build test ERROR on v4.19-rc4 next-20180913]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Now, the difference between queue_setup and start/stop streaming is that if you
+do this in queue_setup you'll know early on that the device is busy. It is
+reasonable to assume that you only allocate buffers when you also want to start
+streaming, so that it a good place to know this quickly.
 
-url:    https://github.com/0day-ci/linux/commits/Katsuhiro-Suzuki/arm64-dts-rockchip-add-spdif-sound-node-for-rock64/20180917-172217
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git for-next
-config: arm64-allmodconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
+Whereas with start_streaming you won't know until you call STREAMON, or even later
+if you start streaming with no buffers queued, since start_streaming won't
+be called until you have at least 'min_buffers_needed' buffers queued (1 for this
+driver). So in that case EBUSY won't be returned until the first VIDIOC_QBUF.
 
-All errors (new ones prefixed by >>):
+My preference is to check this in queue_setup, but it is up to you to decide.
+Just be aware of the difference between the two options.
 
->> Error: arch/arm64/boot/dts/rockchip/rk3328-rock64.dts:286.1-12 Label or path spdif_p0_0 not found
->> FATAL ERROR: Syntax error parsing input tree
+Regards,
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 60972 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180917/087c6ff3/attachment-0001.gz>
+	Hans
