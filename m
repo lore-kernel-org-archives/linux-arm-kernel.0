@@ -1,78 +1,95 @@
 From: yaojun8558363@gmail.com (Jun Yao)
-Date: Mon, 17 Sep 2018 12:43:31 +0800
-Subject: [PATCH v5 4/6] arm64/mm: Create the final page table directly in
- swapper_pg_dir.
+Date: Mon, 17 Sep 2018 12:43:33 +0800
+Subject: [PATCH v5 6/6] arm64/mm: Move {idmap_pg_dir .. swapper_pg_dir} to
+ rodata section.
 In-Reply-To: <20180917044333.30051-1-yaojun8558363@gmail.com>
 References: <20180917044333.30051-1-yaojun8558363@gmail.com>
-Message-ID: <20180917044333.30051-5-yaojun8558363@gmail.com>
+Message-ID: <20180917044333.30051-7-yaojun8558363@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the initial page table is created in the init_pg_dir, we can set
-up the final page table directly in the swapper_pg_dir. And it only
-contains the top level page table, so we can reduce it to a page
-size.
+Move the idmap_pg_dir/tramp_pg_dir/reserved_ttbr0/swapper_pg_dir to
+the rodata section. When the kernel is initialized, the
+idmap_pg_dir, tramp_pg_dir and reserved_ttbr0 will not change. And
+it's safe to move them to rodata section.
 
 Signed-off-by: Jun Yao <yaojun8558363@gmail.com>
 ---
- arch/arm64/kernel/vmlinux.lds.S |  2 +-
- arch/arm64/mm/mmu.c             | 29 ++---------------------------
- 2 files changed, 3 insertions(+), 28 deletions(-)
+ arch/arm64/kernel/vmlinux.lds.S | 39 ++++++++++++++++++++-------------
+ 1 file changed, 24 insertions(+), 15 deletions(-)
 
 diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 612ffc0bbe11..a634def77442 100644
+index a634def77442..328925b308fc 100644
 --- a/arch/arm64/kernel/vmlinux.lds.S
 +++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -237,7 +237,7 @@ SECTIONS
- 	. += RESERVED_TTBR0_SIZE;
- #endif
- 	swapper_pg_dir = .;
--	. += SWAPPER_DIR_SIZE;
+@@ -64,8 +64,13 @@ jiffies = jiffies_64;
+ 	*(.entry.tramp.text)				\
+ 	. = ALIGN(PAGE_SIZE);				\
+ 	__entry_tramp_text_end = .;
++
++#define TRAMP_PG_TABLE					\
++	tramp_pg_dir = .;				\
 +	. += PAGE_SIZE;
- 	swapper_pg_end = .;
+ #else
+ #define TRAMP_TEXT
++#define TRAMP_PG_TABLE
+ #endif
+ 
+ #define INIT_PG_TABLES					\
+@@ -74,6 +79,24 @@ jiffies = jiffies_64;
+ 	. += SWAPPER_DIR_SIZE;				\
+ 	init_pg_end = .;
+ 
++#ifdef CONFIG_ARM64_SW_TTBR0_PAN
++#define RESERVED_PG_TABLE				\
++	reserved_ttbr0 = .;				\
++	. += RESERVED_TTBR0_SIZE;
++#else
++#define RESERVED_PG_TABLE
++#endif
++
++#define KERNEL_PG_TABLES				\
++	. = ALIGN(PAGE_SIZE);                           \
++	idmap_pg_dir = .;				\
++	. += IDMAP_DIR_SIZE;				\
++	TRAMP_PG_TABLE					\
++	RESERVED_PG_TABLE				\
++	swapper_pg_dir = .;				\
++	. += PAGE_SIZE;					\
++	swapper_pg_end = .;
++
+ /*
+  * The size of the PE/COFF section that covers the kernel image, which
+  * runs from stext to _edata, must be a round multiple of the PE/COFF
+@@ -143,6 +166,7 @@ SECTIONS
+ 	RO_DATA(PAGE_SIZE)		/* everything from this point to     */
+ 	EXCEPTION_TABLE(8)		/* __init_begin will be marked RO NX */
+ 	NOTES
++	KERNEL_PG_TABLES
+ 
+ 	. = ALIGN(SEGMENT_ALIGN);
+ 	__init_begin = .;
+@@ -224,21 +248,6 @@ SECTIONS
+ 	BSS_SECTION(0, 0, 0)
+ 
+ 	. = ALIGN(PAGE_SIZE);
+-	idmap_pg_dir = .;
+-	. += IDMAP_DIR_SIZE;
+-
+-#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+-	tramp_pg_dir = .;
+-	. += PAGE_SIZE;
+-#endif
+-
+-#ifdef CONFIG_ARM64_SW_TTBR0_PAN
+-	reserved_ttbr0 = .;
+-	. += RESERVED_TTBR0_SIZE;
+-#endif
+-	swapper_pg_dir = .;
+-	. += PAGE_SIZE;
+-	swapper_pg_end = .;
  
  	__pecoff_data_size = ABSOLUTE(. - __initdata_begin);
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index af80dca335ce..71532bcd76c1 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -629,35 +629,10 @@ static void __init map_kernel(pgd_t *pgdp)
-  */
- void __init paging_init(void)
- {
--	phys_addr_t pgd_phys = early_pgtable_alloc();
--	pgd_t *pgdp = pgd_set_fixmap(pgd_phys);
--
--	map_kernel(pgdp);
--	map_mem(pgdp);
--
--	/*
--	 * We want to reuse the original swapper_pg_dir so we don't have to
--	 * communicate the new address to non-coherent secondaries in
--	 * secondary_entry, and so cpu_switch_mm can generate the address with
--	 * adrp+add rather than a load from some global variable.
--	 *
--	 * To do this we need to go via a temporary pgd.
--	 */
--	cpu_replace_ttbr1(__va(pgd_phys));
--	memcpy(swapper_pg_dir, pgdp, PGD_SIZE);
-+	map_kernel(swapper_pg_dir);
-+	map_mem(swapper_pg_dir);
- 	cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
- 	init_mm.pgd = swapper_pg_dir;
--
--	pgd_clear_fixmap();
--	memblock_free(pgd_phys, PAGE_SIZE);
--
--	/*
--	 * We only reuse the PGD from the swapper_pg_dir, not the pud + pmd
--	 * allocated with it.
--	 */
--	memblock_free(__pa_symbol(swapper_pg_dir) + PAGE_SIZE,
--		      __pa_symbol(swapper_pg_end) - __pa_symbol(swapper_pg_dir)
--		      - PAGE_SIZE);
- }
- 
- /*
+ 	_end = .;
 -- 
 2.17.1
