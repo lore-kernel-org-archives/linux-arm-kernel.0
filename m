@@ -1,63 +1,80 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 17 Sep 2018 20:35:15 +0200
-Subject: [PATCH mmc-next] mmc: sdhci: fix __sdhci_adma_write_desc
-In-Reply-To: <20180917133041.66100101@xhacker.debian>
-References: <20180917133041.66100101@xhacker.debian>
-Message-ID: <CAPDyKFrBQHxOr5qfWir7SorJEvmvCjT_jNABwFXhGoR=_Zcc=Q@mail.gmail.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Mon, 17 Sep 2018 20:42:36 +0200
+Subject: [PATCH v6 03/18] khwasan: add CONFIG_KASAN_GENERIC and
+ CONFIG_KASAN_HW
+In-Reply-To: <CACT4Y+baDKvmpKJ4SKoEuZG4ir2xRGscQ7Ro4hkVAX3jwiWnFg@mail.gmail.com>
+References: <cover.1535462971.git.andreyknvl@google.com>
+ <868c9168481ff5103034ac1e37b830d28ed5f4ee.1535462971.git.andreyknvl@google.com>
+ <CACT4Y+baDKvmpKJ4SKoEuZG4ir2xRGscQ7Ro4hkVAX3jwiWnFg@mail.gmail.com>
+Message-ID: <CAAeHK+yvVgV6LA8PgJz6ysCo+X38tCyLrMVhKOe08tFyZP_F0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 September 2018 at 07:30, Jisheng Zhang
-<Jisheng.Zhang@synaptics.com> wrote:
-> If hosts provides ops->adma_write_desc, we should not fall back to the
-> general sdhci_adma_write_desc().
->
-> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
-> ---
->
-> Hi Ulf, Adrian,
->
-> When I introduced .adma_write_desc, I made a mistake since v4 -- if the host
-> provide ops->adma_write_desc, we should just call it and don't fall back
-> to the general sdhci_adma_write_desc(). Before v4, the adma_write_desc return
-> int, since v4 there's no return value, so when I prepared the v4, I just
-> removed return, this is where the mistake is from. I dunno how to handle
-> this case, fold the patch into previous commit or apply it as a separate patch?
->
-> I'm very sorry for this. In fact, Adrian caught another similar bug during
-> review.
->
-> Sorry about the inconvenience,
-> Jisheng
+On Wed, Sep 12, 2018 at 4:47 PM, Dmitry Vyukov <dvyukov@google.com> wrote:
+> On Wed, Aug 29, 2018 at 1:35 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
 
-No worries, mistakes happens - the important thing is that we fix them!
+>>
+>>  #define __no_sanitize_address __attribute__((no_sanitize("address")))
+>> +#define __no_sanitize_hwaddress __attribute__((no_sanitize("hwaddress")))
+>
+> It seems that it would be better to have just 1 attribute for both types.
+> Currently __no_sanitize_address is used just in a single place. But if
+> it ever used more, people will need to always spell both which looks
+> unnecessary, or, worse will only fix asan but forget about khwasan.
+>
+> If we do just:
+>
+> #define __no_sanitize_address __attribute__((no_sanitize("address",
+> "hwaddress")))
+>
+> Then we don't need any changes in compiler-gcc.h nor in compiler.h,
+> and no chance or forgetting one of them.
 
-Thanks for providing the information above.
+Will do in v7.
 
-I have applied this as is for next.
+>>  config KASAN
+>> -       bool "KASan: runtime memory debugger"
+>> +       bool "KASAN: runtime memory debugger"
+>> +       help
+>> +         Enables KASAN (KernelAddressSANitizer) - runtime memory debugger,
+>> +         designed to find out-of-bounds accesses and use-after-free bugs.
+>
+> Perhaps also give link to Documentation/dev-tools/kasan.rst while we are here.
 
-Kind regards
-Uffe
+Will do in v7.
 
 >
->  drivers/mmc/host/sdhci.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>> +
+>> +choice
+>> +       prompt "KASAN mode"
+>> +       depends on KASAN
+>> +       default KASAN_GENERIC
+>> +       help
+>> +         KASAN has two modes: KASAN (a classic version, similar to userspace
 >
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> index 0dda6f4b6a24..99bdae53fa2e 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -649,8 +649,8 @@ static inline void __sdhci_adma_write_desc(struct sdhci_host *host,
->  {
->         if (host->ops->adma_write_desc)
->                 host->ops->adma_write_desc(host, desc, addr, len, cmd);
-> -
-> -       sdhci_adma_write_desc(host, desc, addr, len, cmd);
-> +       else
-> +               sdhci_adma_write_desc(host, desc, addr, len, cmd);
->  }
+> In these few sentences we call the old mode with 3 different terms:
+> "generic", "classic" and "KASAN" :)
+> This is somewhat confusing. Let's call it "generic" throughout (here
+> and in the docs patch). "Generic" as in "supported on multiple arch
+> and not-dependent on hardware features". "Classic" makes sense for
+> people who knew KASAN before, but for future readers in won't make
+> sense.
+
+Will use "generic" in v7.
+
+>>
+>> +if HAVE_ARCH_KASAN_HW
 >
->  static void sdhci_adma_mark_end(void *desc)
-> --
-> 2.19.0
->
+> This choice looks somewhat weird on non-arm64. It's kinda a choice
+> menu, but one can't really choose anything. Should we put the whole
+> choice under HAVE_ARCH_KASAN_HW, and just select KASAN_GENERIC
+> otherwise? I don't know what't the practice here. Andrey R?
+
+I think having one option that is auto selected is fine.
+
+>> +config KASAN_HW
+>> +       bool "KHWASAN: the hardware assisted mode"
+
+Do we need a hyphen here? hardware-assisted?
+
+Yes, will fix in v7.
