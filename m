@@ -1,94 +1,77 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 17 Sep 2018 16:51:56 +0200
-Subject: [PATCH v2 0/3] Add Amlogic video decoder driver
-In-Reply-To: <20180911150938.3844-1-mjourdan@baylibre.com>
-References: <20180911150938.3844-1-mjourdan@baylibre.com>
-Message-ID: <9c33c57e-2ce2-8752-b851-f85c03a7d761@xs4all.nl>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 17 Sep 2018 16:54:52 +0200
+Subject: [PATCH 5/5] ARM: sun8i: dts: drop A64 HDMI PHY fallback
+ compatible from R40 DT
+In-Reply-To: <1926288.mXGsSvSKgU@jernej-laptop>
+References: <20180907072234.48282-1-icenowy@aosc.io>
+ <20180907072234.48282-6-icenowy@aosc.io>
+ <20180910142354.5ldexkvnan6ohz4x@flea>
+ <1926288.mXGsSvSKgU@jernej-laptop>
+Message-ID: <20180917145452.ewfuqkrxjjosbawd@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/11/2018 05:09 PM, Maxime Jourdan wrote:
-> Hi everyone,
+On Mon, Sep 10, 2018 at 04:32:30PM +0200, Jernej ?krabec wrote:
+> Dne ponedeljek, 10. september 2018 ob 16:23:54 CEST je Maxime Ripard 
+> napisal(a):
+> > On Fri, Sep 07, 2018 at 03:22:34PM +0800, Icenowy Zheng wrote:
+> > > The R40 HDMI PHY seems to be different to the A64 one, the A64 one
+> > > has no input mux, but the R40 one has.
+> > > 
+> > > Drop the A64 fallback compatible from the HDMI PHY node in R40 DT.
+> > > 
+> > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> > > ---
+> > > 
+> > >  arch/arm/boot/dts/sun8i-r40.dtsi | 3 +--
+> > >  1 file changed, 1 insertion(+), 2 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi
+> > > b/arch/arm/boot/dts/sun8i-r40.dtsi index ffd9f00f74a4..5f547c161baf
+> > > 100644
+> > > --- a/arch/arm/boot/dts/sun8i-r40.dtsi
+> > > +++ b/arch/arm/boot/dts/sun8i-r40.dtsi
+> > > @@ -800,8 +800,7 @@
+> > > 
+> > >  		};
+> > >  		
+> > >  		hdmi_phy: hdmi-phy at 1ef0000 {
+> > > 
+> > > -			compatible = "allwinner,sun8i-r40-hdmi-phy",
+> > > -				     "allwinner,sun50i-a64-hdmi-phy";
+> > > +			compatible = "allwinner,sun8i-r40-hdmi-phy";
+> > 
+> > If you could use the A64 phy before, you can still use it now.
 > 
-> This patch series adds support for the Amlogic video decoder,
-> as well as the corresponding dt bindings for GXBB/GXL/GXM chips.
+> Not exactly. Given that we don't know how to switch between HDMI PHY clock 
+> parents on A64 (if it is actually connected at all, there is no information 
+> about that in manual and AW didn't answered our questions, despite asking them 
+> through different channels), A64 compatible will be associated with quirk, 
+> which will tell that only one clock parent is usable.
 > 
-> It features decoding for the following formats:
-> - MPEG 1
-> - MPEG 2
-> 
-> The following formats will be added in future patches:
-> - MJPEG
-> - MPEG 4 (incl. Xvid, H.263)
-> - H.264
-> - HEVC (incl. 10-bit)
-> 
-> The following formats' development has still not started, but they are
-> supported by the hardware:
-> - VC1
-> - VP9
-> 
-> The code was made in such a way to allow easy inclusion of those formats
-> in the future.
-> 
-> The decoder is single instance.
-> 
-> Files:
->  - vdec.c handles the V4L2 M2M logic
->  - esparser.c manages the hardware bitstream parser
->  - vdec_helpers.c provides helpers to DONE the dst buffers as well as
->  various common code used by the codecs
->  - vdec_1.c manages the VDEC_1 block of the vdec IP
->  - codec_mpeg12.c enables decoding for MPEG 1/2.
->  - vdec_platform.c links codec units with vdec units
->  (e.g vdec_1 with codec_mpeg12) and lists all the available
->  src/dst formats and requirements (max width/height, etc.),
->  per compatible chip.
-> 
-> Firmwares are necessary to run the vdec. They can currently be found at:
-> https://github.com/chewitt/meson-firmware
-> 
-> It was tested primarily with ffmpeg's v4l2-m2m implementation. For instance:
-> $ ffmpeg -c:v mpeg2_v4l2m2m -i sample_mpeg2.mkv -f null -
-> 
-> Note: This patch series depends on
-> "[PATCH v3 0/3] soc: amlogic: add meson-canvas"
-> https://patchwork.kernel.org/cover/10573763/
-> 
-> The v4l2-compliance results are available below the patch diff.
-> 
-> Changes since v1 [0]:
->  - use named interrupts in the bindings
->  - rewrite description in the bindings doc
->  - don't include the dts changes in the patch series
->  - fill the vb2 queues locks
->  - fill the video_device lock
->  - use helpers for wait_prepare and wait_finish vb2_ops
->  - remove unnecessary usleep in between esparser writes.
->  Extensive testing of every codec on GXBB/GXL didn't reveal
->  any fails without it, so just remove it.
->  - compile v4l2_compliance inside the git repo
->  - Check for plane number/plane size to pass the latest v4l2-compliance test
->  - Moved the single instance check (returning -EBUSY) to start/stop streaming
->  The check was previously in queue_setup but there was no great location to
->  clear it except for .close().
+> However, R40 HDMI PHY has definetly two clock parents, as it was tested by me 
+> and Icenowy and we know how to switch between them without issues. 
+> Technically, we could have A64 compatible there, but that would mean only 
+> single PHY parent is considered instead of two.
 
-Actually, you can clear it by called VIDIOC_REQBUFS with count set to 0. That
-freed all buffers and clears this.
+The DT change above would mean that you can't operate the R40 phy in
+the same way than the A64's. From what you're telling me now, this
+isn't exactly what is going on: you can operate the R40 phy just like
+the A64: with a single PLL instead of two. You operate in a degraded
+and non-optimal mode, but it still works.
 
-Now, the difference between queue_setup and start/stop streaming is that if you
-do this in queue_setup you'll know early on that the device is busy. It is
-reasonable to assume that you only allocate buffers when you also want to start
-streaming, so that it a good place to know this quickly.
+And it's exactly what the DT is already saying.
 
-Whereas with start_streaming you won't know until you call STREAMON, or even later
-if you start streaming with no buffers queued, since start_streaming won't
-be called until you have at least 'min_buffers_needed' buffers queued (1 for this
-driver). So in that case EBUSY won't be returned until the first VIDIOC_QBUF.
+Maxime
 
-My preference is to check this in queue_setup, but it is up to you to decide.
-Just be aware of the difference between the two options.
-
-Regards,
-
-	Hans
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180917/f6fa302a/attachment.sig>
