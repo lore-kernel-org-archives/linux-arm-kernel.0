@@ -1,90 +1,81 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 18 Sep 2018 16:18:43 +0100
-Subject: Huge page(contiguous bit) slow down
-In-Reply-To: <20180918113300.GC16498@arm.com> (Will Deacon's message of "Tue,
- 18 Sep 2018 12:33:01 +0100")
-References: <8898674D84E3B24BA3A2D289B872026A69FE8F27@G01JPEXMBKW03>
- <20180918113300.GC16498@arm.com>
-Message-ID: <87sh26x298.fsf@e105922-lin.cambridge.arm.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 18 Sep 2018 16:36:55 +0100
+Subject: [PATCH v5 18/18] kvm: arm64: Allow tuning the physical address
+ size for VM
+In-Reply-To: <218b64d5-741d-97ef-8aae-bc0a2ac3e56c@arm.com>
+References: <20180917104144.19188-1-suzuki.poulose@arm.com>
+ <20180917104144.19188-19-suzuki.poulose@arm.com>
+ <CAFEAcA8eWYkzwFYHyP49dasK-NDVbbm=6DbEFNNPq9ZAdUM7JQ@mail.gmail.com>
+ <218b64d5-741d-97ef-8aae-bc0a2ac3e56c@arm.com>
+Message-ID: <CAFEAcA8qjJJ0FkQj4yBMKFrwNFiJj3Q4FBi4GbnK2PN3B3J-mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will Deacon <will.deacon@arm.com> writes:
+On 18 September 2018 at 16:16, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+> Hi Peter,
+>
+> On 18/09/2018 02:55, Peter Maydell wrote:
+>>
+>> On 17 September 2018 at 11:41, Suzuki K Poulose <suzuki.poulose@arm.com>
+>> wrote:
+>>>
+>>> --- a/Documentation/virtual/kvm/api.txt
+>>> +++ b/Documentation/virtual/kvm/api.txt
+>>> @@ -122,6 +122,14 @@ the default trap & emulate implementation (which
+>>> changes the virtual
+>>>   memory layout to fit in user mode), check KVM_CAP_MIPS_VZ and use the
+>>>   flag KVM_VM_MIPS_VZ.
+>>>
+>>> +To configure the physical address space size for a VM (IPA size) on
+>>> arm64,
+>>> +check KVM_CAP_ARM_VM_PHYS_SHIFT (which returns the maximum limit for the
+>>> +IPA shift) and use KVM_VM_TYPE_ARM_PHYS_SHIFT(PHYS_SHIFT). Bits[7-0] of
+>>> the
+>>> +machine type has been reserved for specifying the PHYS_SHIFT.
+>>> +The supported range is [32...IPA_LIMIT], where IPA_LIMIT could be
+>>> +identified by checking KVM_CAP_ARM_VM_PHYS_SHIFT. For backward
+>>> compatibility
+>>> +a value of 0 selects 40bits.
+>>> +
+>>
+>>
+>> Given this as the API documentation, I don't think I could figure out
+>> what I as a userspace user of it need to do without looking at the
+>> kernel code. Could I ask you to expand it so that it is a bit less
+>> terse and a bit more detailed? (For instance, what is a PHYS_SHIFT
+>> and why do I have to specify it rather than just telling the kernel
+>> I want a 48 bit guest address space?)
+>
+>
+> Thanks for the feedback.  I acknowledge that the documentation is not
+> quite clear for a userspace user. How about:
+>
+> "To configure the physical address space size for a VM (IPA size) on arm64,
+> check KVM_CAP_ARM_VM_IPA_SIZE and use KVM_VM_TYPE_ARM_IPA_SIZE(IPA_Bits)
+> as the argument to KVM_CREATE_VM, where IPA_Bits is the maximum width of
+> any physical address used by the VM. The IPA_Bits is encoded in Bits[7-0]
+> of the machine type, and must be one of { 0, 32, ... , Host_IPA_Limit },
+> where :
+> 1) IPA_Bits = 0 implies 40bits IPA (for backward compatibility)
+> 2) Host_IPA_Limit is the maximum limit for IPA_Bits on the host, which is
+>    dependent on the CPU capability and the host kernel configuration.
+>    This can be detected by checking the extension KVM_CAP_ARM_VM_IPA_SIZE
+> "
 
-> Hi Lei Zhang,
->
-> Thanks for the report and the initial diagnosis.
->
-> On Tue, Sep 18, 2018 at 03:02:17AM +0000, Zhang, Lei wrote:
->> I found a slowdown problem when we uses a huge page on arm64 chip.
->> I think the cause of this problem is a bug of huge_ptep_set_access_flags()
->> with contiguous pte.
->> Could you review and merge my patch?
->
-> Before we get to that, here are some things that might help you when
-> reporting problems in the future:
->
-> 1. Please keep your line lengths to <= 80 columns, since this makes the
->    email easier to read. (I've reflowed your text in my reply)
->
-> 2. Please try to CC the right maintainers on your report. If you're not
->    sure who they are, then you can run ./scripts/get_maintainer.pl:
->
->    $ ./scripts/get_maintainer.pl arch/arm64/mm/hugetlbpage.c
->
->    identifies me and Catalin, for example. You can also use git blame,
->    which shows that Steve and Punit wrote a lot of this function. I've
->    added these people to CC.
->
-> 3. If you have a patch that you'd like to be merged, you'll need a
->    commit message that includes your "Signed-off-by:" line. You can use
->    git format-patch to generate this, but you should also have a look at
->    Documentation/process/submitting-patches.rst.
->
-> 4. Please always mention the kernel version that you're seeing problems
->    with, in case we've applied fixes to the problematic area in the
->    meantime.
->
->> Incident:
->> Multiple threaded process repeats page fault again and again, so the PC in
->> EL0 doesn't move to the next operation.
->> 
->> Multiple threads occur page fault at the same time and the same VA. It may
->> cause slowdown or hang of a process.
->> Because a race problem on updating pte maybe happened when the condition
->> matched as below.
->> 1. Multiple threads are running
->> 2. All threads are ld/st-ing to the same huge page
->> 3. The huge page is consist of contiguous ptes (2MiB page = 64KiB page x 32)
->> 4. The huge page is mapped without MAP_POPULATE flag.
->> 
->> Mechanism:
->> The mechanism of this problem is as below.
->> Updating pte use 4 steps.
->> 
->> step1: create pte content
->> step2: zero-clear pte at ptep_get_and_clear
->> step3: flush tlb at flush_tlb_range
->> step4: set pte at set_pte_at(pte becomes non-zero)
->> 
->> When thread1 is doing between step2 and step4, thread2 accesses the same huge
->> page at the same time.
->> It cause a new page fault at thread2.
->> After that, when thread2 is doing between step2 and step4, thread1 retries
->> the access to the same page.
->> It cause a new page fault at thread1 again.
->> Multi-threads repeat this flow again and again.
->
-> Hmm, yes, I can see how this happens. Whilst the mmap_sem should serialise
-> the faults, the contig hugepage code always clears the pte as part of the
-> BBM sequence, so we can get stuck in a fault cycle.
+I think this is still somewhat confusing. In particular, you're
+describing both the "ask the kernel what it supports" API and
+the "tell the kernel what we want" API in a single sentence
+("...check KVM_CAP_ARM_VM_IPA_SIZE and use KVM_VM_TYPE_ARM_IPA_SIZE...").
+There isn't a length limit on documentation, so why not describe
+them both clearly in separate sentences?
 
-A similar issue was reported/fixed for stage 2 fault handling recently
-as well. Instead of userspace, vcpus were stuck in the fault cycle
-there.
+Also, can I use any IPA value between 32 and Host_IPA_Limit, or
+are only certain values in that range supported (if so, which)?
 
-See commit 976d34e2dab1 ("KVM: arm/arm64: Skip updating PTE entry if no
-change"), and commit 86658b819cd0 ("KVM: arm/arm64: Skip updating PMD
-entry if no change").
+> note: I have renamed the KVM_CAP_ARM_VM_PHYS_SHIFT =>
+> KVM_CAP_ARM_VM_IPA_SIZE
+> above and can update the code, if the latter is better.
 
-[...]
+I think the new name is definitely clearer, thanks.
+
+-- PMM
