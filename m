@@ -1,30 +1,34 @@
 From: saiprakash.ranjan@codeaurora.org (Sai Prakash Ranjan)
-Date: Tue, 18 Sep 2018 11:54:21 +0530
-Subject: [PATCH 2/6] pstore: Add event tracing support
-In-Reply-To: <20180917190454.3cfbe7e3@gandalf.local.home>
+Date: Tue, 18 Sep 2018 12:40:57 +0530
+Subject: [PATCH 5/6] arm64/io: Add header for instrumentation of io
+ operations
+In-Reply-To: <20180917193940.3d68ef88@gandalf.local.home>
 References: <cover.1536430404.git.saiprakash.ranjan@codeaurora.org>
- <b9b60ff2864a17fb05481aa33f90114ab051d6ce.1536430404.git.saiprakash.ranjan@codeaurora.org>
- <141901b8-0a9a-2e7a-f7a4-cdefd157f4c6@codeaurora.org>
- <20180917190454.3cfbe7e3@gandalf.local.home>
-Message-ID: <a041a44b-91cc-8b98-0147-ce983ae83cf2@codeaurora.org>
+ <bb322d763aa6c58f036e5209a481c769be92ab9b.1536430404.git.saiprakash.ranjan@codeaurora.org>
+ <20180917193940.3d68ef88@gandalf.local.home>
+Message-ID: <c6470671-3abf-c296-586e-cca5131cc437@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/18/2018 4:34 AM, Steven Rostedt wrote:
-> On Sun, 16 Sep 2018 12:37:52 +0530
+On 9/18/2018 5:09 AM, Steven Rostedt wrote:
+> On Sun,  9 Sep 2018 01:57:06 +0530
 > Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org> wrote:
 > 
->> Hi,
+>> The new asm-generic/io-instrumented.h will keep arch code
+>> clean and separate from instrumented version which traces
+>> io register accesses. This instrumented header can later
+>> be included in arm as well for tracing io register accesses.
 >>
->> Anyone here?
 > 
-> You also just caught me from coming back from a trip. I'm looking at
-> your patches now.
+> Looks good to me.
+> 
+> Acked-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
 > 
 > -- Steve
-> 
 
-Thanks Steve, I just thought you guys might have missed the patch.
+Thanks for the ack Steve.
+
+@Will/Mark/Robin Let me know if you have any review comments, thanks.
 
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
