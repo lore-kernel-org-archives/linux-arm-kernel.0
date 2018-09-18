@@ -1,120 +1,55 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 18 Sep 2018 18:10:13 +0100
-Subject: [PATCH v7 4/6] iommu: Add bootup option "iommu.non_strict"
-In-Reply-To: <41f81c46348db4acd9a542184f10e7ca24f6c219.1536935328.git.robin.murphy@arm.com>
-References: <cover.1536935328.git.robin.murphy@arm.com>
- <41f81c46348db4acd9a542184f10e7ca24f6c219.1536935328.git.robin.murphy@arm.com>
-Message-ID: <20180918171013.GK16498@arm.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 18 Sep 2018 18:15:04 +0100
+Subject: [PATCH v5 18/18] kvm: arm64: Allow tuning the physical address
+ size for VM
+In-Reply-To: <fec1a2e0-a45a-eb51-6ffe-2ac9b35acc45@arm.com>
+References: <20180917104144.19188-1-suzuki.poulose@arm.com>
+ <20180917104144.19188-19-suzuki.poulose@arm.com>
+ <CAFEAcA8eWYkzwFYHyP49dasK-NDVbbm=6DbEFNNPq9ZAdUM7JQ@mail.gmail.com>
+ <218b64d5-741d-97ef-8aae-bc0a2ac3e56c@arm.com>
+ <CAFEAcA8qjJJ0FkQj4yBMKFrwNFiJj3Q4FBi4GbnK2PN3B3J-mg@mail.gmail.com>
+ <fec1a2e0-a45a-eb51-6ffe-2ac9b35acc45@arm.com>
+Message-ID: <CAFEAcA_tphfZ_BKfAYuefStTipta0notyAR=NCnWFJ6nRfERpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2018 at 03:30:22PM +0100, Robin Murphy wrote:
-> From: Zhen Lei <thunder.leizhen@huawei.com>
-> 
-> Add a bootup option to make the system manager can choose which mode to
-> be used. The default mode is strict.
-> 
-> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> [rm: move handling out of SMMUv3 driver]
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+On 18 September 2018 at 17:27, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
 > ---
->  .../admin-guide/kernel-parameters.txt         | 13 ++++++++++
->  drivers/iommu/iommu.c                         | 26 +++++++++++++++++++
->  2 files changed, 39 insertions(+)
-> 
-> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-> index 9871e649ffef..406b91759b62 100644
-> --- a/Documentation/admin-guide/kernel-parameters.txt
-> +++ b/Documentation/admin-guide/kernel-parameters.txt
-> @@ -1749,6 +1749,19 @@
->  		nobypass	[PPC/POWERNV]
->  			Disable IOMMU bypass, using IOMMU for PCI devices.
->  
-> +	iommu.non_strict=	[ARM64]
-> +			Format: { "0" | "1" }
-> +			0 - strict mode, default.
-> +			    Release IOVAs after the related TLBs are invalid
-> +			    completely.
-> +			1 - non-strict mode.
-> +			    Put off TLBs invalidation and release memory first.
-> +			    It's good for scatter-gather performance but lacks
-> +			    full isolation, an untrusted device can access the
-> +			    reused memory because the TLBs may still valid.
-> +			    Please take	full consideration before choosing this
-> +			    mode. Note that, VFIO will always use strict mode.
+>
+> "On arm64, the physical address size for a VM (IPA Size limit) is limited
+> to 40bits by default. The limit can be configured if the host supports the
+> extension KVM_CAP_ARM_VM_IPA_SIZE. When supported, use
+> KVM_VM_TYPE_ARM_IPA_SIZE(IPA_Bits) to set the size in the machine type
+> identifier, where IPA_Bits is the maximum width of any physical
+> address used by the VM. The IPA_Bits is encoded in bits[7-0] of the
+> machine type identifier.
+>
+> e.g, to configure a guest to use 48bit physical address size :
+>
+>         vm_fd = ioctl(dev_fd, KVM_CREATE_VM, KVM_VM_TYPE_ARM_IPA_SIZE(48));
+>
+> The requested size (IPA_Bits) must be :
+>   0 - Implies default 40bits (for backward compatibility)
+>
+>   or
+>
+>   N - Implies N bits, where N is a positive integer such that 32 <= N <=
+> Host_IPA_Limit
+>
+> Host_IPA_Limit is the maximum possible value for IPA_Bits on the host and
+> is dependent on the CPU capability and the kernel configuration. The limit
+> can
+> be retrieved using KVM_CAP_ARM_VM_IPA_SIZE of the KVM_CHECK_EXTENSION
+> ioctl() at run-time.
+>
+> Please note that configuring the IPA size does not affect the capability
+> exposed by the guest CPUs in ID_AA64MMFR0_EL1[PARange]. It only affects
+> the guest to host physical address (stage2) translations setup by the host.
+> "
 
-This text needs help. How about something like:
+Thanks, this is much clearer. The only bit I'm not sure about is that
+last paragraph -- if I ask for a VM with a 48 bit address space why
+don't we tell the guest that that's what it has ?
 
-	0 - strict mode, default.
-	    Invalidate the TLB of the IOMMU hardware as part of every
-	    unmap() operation.
-	1 - lazy mode.
-	    Defer TLB invalidation so that the TLB of the IOMMU hardware
-	    is invalidated periodically, rather than as part of every
-	    unmap() operation.
-
-(generally, I think I'd s/non strict/lazy/ in this patch to avoid the double
-negatives)
-
-> +
->  	iommu.passthrough=
->  			[ARM64] Configure DMA to bypass the IOMMU by default.
->  			Format: { "0" | "1" }
-> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-> index 8c15c5980299..2cabd0c0a4f3 100644
-> --- a/drivers/iommu/iommu.c
-> +++ b/drivers/iommu/iommu.c
-> @@ -41,6 +41,7 @@ static unsigned int iommu_def_domain_type = IOMMU_DOMAIN_IDENTITY;
->  #else
->  static unsigned int iommu_def_domain_type = IOMMU_DOMAIN_DMA;
->  #endif
-> +static bool iommu_dma_non_strict __read_mostly;
->  
->  struct iommu_callback_data {
->  	const struct iommu_ops *ops;
-> @@ -131,6 +132,24 @@ static int __init iommu_set_def_domain_type(char *str)
->  }
->  early_param("iommu.passthrough", iommu_set_def_domain_type);
->  
-> +static int __init iommu_dma_setup(char *str)
-> +{
-> +	int ret;
-> +
-> +	ret = kstrtobool(str, &iommu_dma_non_strict);
-> +	if (ret)
-> +		return ret;
-> +
-> +	if (iommu_dma_non_strict) {
-> +		pr_warn("WARNING: iommu non-strict mode is chosen.\n"
-> +			"It's good for scatter-gather performance but lacks full isolation\n");
-
-Hmm, not sure about this message either and tainting is probably over the
-top. Maybe drop the taint and just pr_info something like "IOMMU DMA ops
-using lazy TLB invalidation: unable to protect against malicious devices"
-
-> +		add_taint(TAINT_WARN, LOCKDEP_STILL_OK);
-> +	}
-> +
-> +	return 0;
-> +}
-> +early_param("iommu.non_strict", iommu_dma_setup);
-> +
->  static ssize_t iommu_group_attr_show(struct kobject *kobj,
->  				     struct attribute *__attr, char *buf)
->  {
-> @@ -1072,6 +1091,13 @@ struct iommu_group *iommu_group_get_for_dev(struct device *dev)
->  		group->default_domain = dom;
->  		if (!group->domain)
->  			group->domain = dom;
-> +
-> +		if (dom && iommu_dma_non_strict) {
-> +			int attr = 1;
-> +			iommu_domain_set_attr(dom,
-> +					      DOMAIN_ATTR_DMA_USE_FLUSH_QUEUE,
-> +					      &attr);
-> +		}
-
-Hmm, I don't think we can guarantee that we're working with the DMA domain
-here. Does this all fall out in the wash for the identity domain?
-
-Will
+thanks
+-- PMM
