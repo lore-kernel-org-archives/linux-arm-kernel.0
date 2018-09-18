@@ -1,82 +1,259 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 18 Sep 2018 20:16:48 +0800
-Subject: [arm-platforms:kvm-arm64/nv-wip 88/115]
- arch/arm64/kvm/sys_regs.c:1908:26: error: passing argument 1 of
- 'vcpu_el2_e2h_is_set' from incompatible pointer type
-Message-ID: <201809182046.6943Edly%fengguang.wu@intel.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 18 Sep 2018 14:23:40 +0200
+Subject: [PATCH V6] ARM: shmobile: Rework the PMIC IRQ line quirk
+Message-ID: <20180918122340.5478-1-marek.vasut+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/nv-wip
-head:   173677c6812ce2b5748dfec2f9814f30c2cf01ce
-commit: 2a4367529d7b477d7cde07b0720fa0b56a4f0f5e [88/115] KVM: arm64: Emulate AT S1E[01] instructions
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 2a4367529d7b477d7cde07b0720fa0b56a4f0f5e
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
+Rather than hard-coding the quirk topology, which stopped scaling,
+parse the information from DT. The code looks for all compatible
+PMICs -- da9063 and da9210 -- and checks if their IRQ line is tied
+to the same pin. If so, the code sends a matching sequence to the
+PMIC to deassert the IRQ.
 
-Note: the arm-platforms/kvm-arm64/nv-wip HEAD 173677c6812ce2b5748dfec2f9814f30c2cf01ce builds fine.
-      It only hurts bisectibility.
-
-All errors (new ones prefixed by >>):
-
-   arch/arm64/kvm/sys_regs.c: In function 'handle_s1e01':
->> arch/arm64/kvm/sys_regs.c:1908:26: error: passing argument 1 of 'vcpu_el2_e2h_is_set' from incompatible pointer type [-Werror=incompatible-pointer-types]
-     if (vcpu_el2_e2h_is_set(vcpu) && vcpu_el2_tge_is_set(vcpu))
-                             ^~~~
-   In file included from arch/arm64/kvm/sys_regs.c:35:0:
-   arch/arm64/include/asm/kvm_emulate.h:219:20: note: expected 'const struct kvm_cpu_context *' but argument is of type 'struct kvm_vcpu *'
-    static inline bool vcpu_el2_e2h_is_set(const struct kvm_cpu_context *ctxt)
-                       ^~~~~~~~~~~~~~~~~~~
->> arch/arm64/kvm/sys_regs.c:1909:9: error: 'struct kvm_cpu_context' has no member named 'hw_sys_regs'; did you mean 'sys_regs'?
-      ctxt->hw_sys_regs = ctxt->shadow_sys_regs;
-            ^~~~~~~~~~~
-            sys_regs
->> arch/arm64/kvm/sys_regs.c:1909:29: error: 'struct kvm_cpu_context' has no member named 'shadow_sys_regs'; did you mean 'sys_regs'?
-      ctxt->hw_sys_regs = ctxt->shadow_sys_regs;
-                                ^~~~~~~~~~~~~~~
-                                sys_regs
-   arch/arm64/kvm/sys_regs.c:1911:9: error: 'struct kvm_cpu_context' has no member named 'hw_sys_regs'; did you mean 'sys_regs'?
-      ctxt->hw_sys_regs = ctxt->sys_regs;
-            ^~~~~~~~~~~
-            sys_regs
-   cc1: some warnings being treated as errors
-
-vim +/vcpu_el2_e2h_is_set +1908 arch/arm64/kvm/sys_regs.c
-
-  1899	
-  1900	static bool handle_s1e01(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
-  1901				 const struct sys_reg_desc *r)
-  1902	{
-  1903		struct kvm_cpu_context *ctxt = &vcpu->arch.ctxt;
-  1904		bool el2_format;
-  1905		int sys_encoding = sys_insn(p->Op0, p->Op1, p->CRn, p->CRm, p->Op2);
-  1906	
-  1907		/* See '2. EL0/EL1 AT instructions: S1E[01]x, S12E1x' table. */
-> 1908		if (vcpu_el2_e2h_is_set(vcpu) && vcpu_el2_tge_is_set(vcpu))
-> 1909			ctxt->hw_sys_regs = ctxt->shadow_sys_regs;
-  1910		else
-  1911			ctxt->hw_sys_regs = ctxt->sys_regs;
-  1912	
-  1913		el2_format = vcpu_el2_format_used(vcpu);
-  1914	
-  1915		kvm_call_hyp(__kvm_at_insn, vcpu, p->regval, el2_format, sys_encoding);
-  1916	
-  1917		return true;
-  1918	}
-  1919	
-
+Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Cc: Simon Horman <horms+renesas@verge.net.au>
+Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Cc: linux-renesas-soc at vger.kernel.org
+Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Tested-by: Geert Uytterhoeven <geert+renesas@glider.be> (on Koelsch)
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 40248 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180918/4b78d347/attachment-0001.gz>
+V2: - Replace the DT shared IRQ check loop with memcmp()
+    - Send the I2C message to deassert the IRQ line to all PMICs
+      in the list with shared IRQ line instead of just one
+    - Add comment that this works only in case all the PMICs are
+      on the same I2C bus
+V3: - Drop the addr = 0x00 init
+    - Drop reinit of argsa in rcar_gen2_regulator_quirk
+V4: - Squash regulator_quirk on single line
+    - Drop !np check in for_each_matching_node_and_match()
+    - Use argsa in of_irq_parse_one
+V5: - Check kzalloc failure
+    - Rename da...._msgs to da...._msg
+    - Don't reinit quirk->shared
+V6: - Skip invalid entries instead of aborting on them
+---
+ .../mach-shmobile/regulator-quirk-rcar-gen2.c | 139 ++++++++++++++----
+ 1 file changed, 110 insertions(+), 29 deletions(-)
+
+diff --git a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
+index 21ebc7678ffd..8e50daa99151 100644
+--- a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
++++ b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
+@@ -23,11 +23,12 @@
+ #include <linux/i2c.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
++#include <linux/list.h>
+ #include <linux/notifier.h>
+ #include <linux/of.h>
++#include <linux/of_irq.h>
+ #include <linux/mfd/da9063/registers.h>
+ 
+-
+ #define IRQC_BASE		0xe61c0000
+ #define IRQC_MONITOR		0x104	/* IRQn Signal Level Monitor Register */
+ 
+@@ -36,34 +37,45 @@
+ /* start of DA9210 System Control and Event Registers */
+ #define DA9210_REG_MASK_A		0x54
+ 
++struct regulator_quirk {
++	struct list_head		list;
++	const struct of_device_id	*id;
++	struct of_phandle_args		irq_args;
++	struct i2c_msg			i2c_msg;
++	bool				shared;	/* IRQ line is shared */
++};
++
++static LIST_HEAD(quirk_list);
+ static void __iomem *irqc;
+ 
+ /* first byte sets the memory pointer, following are consecutive reg values */
+ static u8 da9063_irq_clr[] = { DA9063_REG_IRQ_MASK_A, 0xff, 0xff, 0xff, 0xff };
+ static u8 da9210_irq_clr[] = { DA9210_REG_MASK_A, 0xff, 0xff };
+ 
+-static struct i2c_msg da9xxx_msgs[3] = {
+-	{
+-		.addr = 0x58,
+-		.len = ARRAY_SIZE(da9063_irq_clr),
+-		.buf = da9063_irq_clr,
+-	}, {
+-		.addr = 0x68,
+-		.len = ARRAY_SIZE(da9210_irq_clr),
+-		.buf = da9210_irq_clr,
+-	}, {
+-		.addr = 0x70,
+-		.len = ARRAY_SIZE(da9210_irq_clr),
+-		.buf = da9210_irq_clr,
+-	},
++static struct i2c_msg da9063_msg = {
++	.len = ARRAY_SIZE(da9063_irq_clr),
++	.buf = da9063_irq_clr,
++};
++
++static struct i2c_msg da9210_msg = {
++	.len = ARRAY_SIZE(da9210_irq_clr),
++	.buf = da9210_irq_clr,
++};
++
++static const struct of_device_id rcar_gen2_quirk_match[] = {
++	{ .compatible = "dlg,da9063", .data = &da9063_msg },
++	{ .compatible = "dlg,da9210", .data = &da9210_msg },
++	{},
+ };
+ 
+ static int regulator_quirk_notify(struct notifier_block *nb,
+ 				  unsigned long action, void *data)
+ {
++	struct regulator_quirk *pos, *tmp;
+ 	struct device *dev = data;
+ 	struct i2c_client *client;
+ 	static bool done;
++	int ret;
+ 	u32 mon;
+ 
+ 	if (done)
+@@ -80,17 +92,20 @@ static int regulator_quirk_notify(struct notifier_block *nb,
+ 	client = to_i2c_client(dev);
+ 	dev_dbg(dev, "Detected %s\n", client->name);
+ 
+-	if ((client->addr == 0x58 && !strcmp(client->name, "da9063")) ||
+-	    (client->addr == 0x68 && !strcmp(client->name, "da9210")) ||
+-	    (client->addr == 0x70 && !strcmp(client->name, "da9210"))) {
+-		int ret, len;
++	/*
++	 * Send message to all PMICs that share an IRQ line to deassert it.
++	 *
++	 * WARNING: This works only if all the PMICs are on the same I2C bus.
++	 */
++	list_for_each_entry(pos, &quirk_list, list) {
++		if (!pos->shared)
++			continue;
+ 
+-		/* There are two DA9210 on Stout, one on the other boards. */
+-		len = of_machine_is_compatible("renesas,stout") ? 3 : 2;
++		dev_info(&client->dev, "clearing %s at 0x%02x interrupts\n",
++			 pos->id->compatible, pos->i2c_msg.addr);
+ 
+-		dev_info(&client->dev, "clearing da9063/da9210 interrupts\n");
+-		ret = i2c_transfer(client->adapter, da9xxx_msgs, len);
+-		if (ret != len)
++		ret = i2c_transfer(client->adapter, &pos->i2c_msg, 1);
++		if (ret != 1)
+ 			dev_err(&client->dev, "i2c error %d\n", ret);
+ 	}
+ 
+@@ -103,6 +118,11 @@ static int regulator_quirk_notify(struct notifier_block *nb,
+ remove:
+ 	dev_info(dev, "IRQ2 is not asserted, removing quirk\n");
+ 
++	list_for_each_entry_safe(pos, tmp, &quirk_list, list) {
++		list_del(&pos->list);
++		kfree(pos);
++	}
++
+ 	done = true;
+ 	iounmap(irqc);
+ 	return 0;
+@@ -114,7 +134,12 @@ static struct notifier_block regulator_quirk_nb = {
+ 
+ static int __init rcar_gen2_regulator_quirk(void)
+ {
+-	u32 mon;
++	struct regulator_quirk *quirk, *pos, *tmp;
++	struct of_phandle_args *argsa, *argsb;
++	const struct of_device_id *id;
++	struct device_node *np;
++	u32 mon, addr;
++	int ret;
+ 
+ 	if (!of_machine_is_compatible("renesas,koelsch") &&
+ 	    !of_machine_is_compatible("renesas,lager") &&
+@@ -122,22 +147,78 @@ static int __init rcar_gen2_regulator_quirk(void)
+ 	    !of_machine_is_compatible("renesas,gose"))
+ 		return -ENODEV;
+ 
++	for_each_matching_node_and_match(np, rcar_gen2_quirk_match, &id) {
++		if (!of_device_is_available(np))
++			break;
++
++		ret = of_property_read_u32(np, "reg", &addr);
++		if (ret)	/* Skip invalid entry and continue */
++			continue;
++
++		quirk = kzalloc(sizeof(*quirk), GFP_KERNEL);
++		if (!quirk) {
++			ret = -ENOMEM;
++			goto err_mem;
++		}
++
++		argsa = &quirk->irq_args;
++		memcpy(&quirk->i2c_msg, id->data, sizeof(quirk->i2c_msg));
++
++		quirk->id = id;
++		quirk->i2c_msg.addr = addr;
++
++		ret = of_irq_parse_one(np, 0, argsa);
++		if (ret) {	/* Skip invalid entry and continue */
++			kfree(quirk);
++			continue;
++		}
++
++		list_for_each_entry(pos, &quirk_list, list) {
++			argsb = &pos->irq_args;
++
++			if (argsa->args_count != argsb->args_count)
++				continue;
++
++			ret = memcmp(argsa->args, argsb->args,
++				     argsa->args_count *
++				     sizeof(argsa->args[0]));
++			if (!ret) {
++				pos->shared = true;
++				quirk->shared = true;
++			}
++		}
++
++		list_add_tail(&quirk->list, &quirk_list);
++	}
++
+ 	irqc = ioremap(IRQC_BASE, PAGE_SIZE);
+-	if (!irqc)
+-		return -ENOMEM;
++	if (!irqc) {
++		ret = -ENOMEM;
++		goto err_mem;
++	}
+ 
+ 	mon = ioread32(irqc + IRQC_MONITOR);
+ 	if (mon & REGULATOR_IRQ_MASK) {
+ 		pr_debug("%s: IRQ2 is not asserted, not installing quirk\n",
+ 			 __func__);
+-		iounmap(irqc);
+-		return 0;
++		ret = 0;
++		goto err_free;
+ 	}
+ 
+ 	pr_info("IRQ2 is asserted, installing da9063/da9210 regulator quirk\n");
+ 
+ 	bus_register_notifier(&i2c_bus_type, &regulator_quirk_nb);
+ 	return 0;
++
++err_free:
++	iounmap(irqc);
++err_mem:
++	list_for_each_entry_safe(pos, tmp, &quirk_list, list) {
++		list_del(&pos->list);
++		kfree(pos);
++	}
++
++	return ret;
+ }
+ 
+ arch_initcall(rcar_gen2_regulator_quirk);
+-- 
+2.18.0
