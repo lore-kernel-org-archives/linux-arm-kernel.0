@@ -1,42 +1,99 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Tue, 18 Sep 2018 20:42:56 +0200
-Subject: [PATCH v6 17/18] khwasan: update kasan documentation
-In-Reply-To: <CACT4Y+a0A1n+FjbiQSEh4UMUPkq4KnqEOEXkfo-X+EwsVFZxMg@mail.gmail.com>
-References: <cover.1535462971.git.andreyknvl@google.com>
- <1a3b3030b6ee01931b397583b69f3af94e2a2308.1535462971.git.andreyknvl@google.com>
- <CACT4Y+a0A1n+FjbiQSEh4UMUPkq4KnqEOEXkfo-X+EwsVFZxMg@mail.gmail.com>
-Message-ID: <CAAeHK+wDhpX_E7cL8D4-BnM4WCT_Bb2Gp6wfqk7+P-4XAoiMOg@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 18 Sep 2018 19:52:04 +0100
+Subject: [PATCH v7 2/6] iommu/dma: Add support for non-strict mode
+In-Reply-To: <20180918171007.GJ16498@arm.com>
+References: <cover.1536935328.git.robin.murphy@arm.com>
+ <0a891cec4bb164f8cf2f57c753791a7d1f5f1d81.1536935328.git.robin.murphy@arm.com>
+ <20180918171007.GJ16498@arm.com>
+Message-ID: <60410578-64f3-9bb3-0b88-27cde93335d0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2018 at 8:39 PM, Dmitry Vyukov <dvyukov@google.com> wrote:
-> On Wed, Aug 29, 2018 at 1:35 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
->> This patch updates KASAN documentation to reflect the addition of KHWASAN.
+On 2018-09-18 6:10 PM, Will Deacon wrote:
+> Hi Robin,
+> 
+> On Fri, Sep 14, 2018 at 03:30:20PM +0100, Robin Murphy wrote:
+>> From: Zhen Lei <thunder.leizhen@huawei.com>
+>>
+>> 1. Save the related domain pointer in struct iommu_dma_cookie, make iovad
+>>     capable call domain->ops->flush_iotlb_all to flush TLB.
+>> 2. During the iommu domain initialization phase, base on domain->non_strict
+>>     field to check whether non-strict mode is supported or not. If so, call
+>>     init_iova_flush_queue to register iovad->flush_cb callback.
+>> 3. All unmap(contains iova-free) APIs will finally invoke __iommu_dma_unmap
+>>     -->iommu_dma_free_iova. If the domain is non-strict, call queue_iova to
+>>     put off iova freeing, and omit iommu_tlb_sync operation.
+> 
+> Hmm, this is basically just a commentary on the code. Please could you write
+> it more in terms of the problem that's being solved?
 
->> -Currently KASAN is supported only for the x86_64 and arm64 architectures.
->> +KASAN uses compile-time instrumentation to insert validity checks before every
->> +memory access, and therefore requires a compiler version that supports that.
->> +For classic KASAN you need GCC version 4.9.2 or later. GCC 5.0 or later is
->> +required for detection of out-of-bounds accesses on stack and global variables.
->> +KHWASAN in turns is only supported in clang and requires revision 330044 or
->
-> in turn?
->
+Sure - I intentionally kept a light touch when it came to the 
+documentation and commit messages in this rework (other than patch #1 
+where I eventually remembered the original reasoning and that it wasn't 
+a bug). If we're more-or-less happy with the shape of the technical side 
+I'll make sure to take a final pass through v8 to tidy up all the prose.
 
->> -and choose between CONFIG_KASAN_OUTLINE and CONFIG_KASAN_INLINE. Outline and
->> -inline are compiler instrumentation types. The former produces smaller binary
->> -the latter is 1.1 - 2 times faster. Inline instrumentation requires a GCC
->> +and choose between CONFIG_KASAN_GENERIC (to enable classic KASAN) and
->> +CONFIG_KASAN_HW (to enabled KHWASAN). You also need to choose choose between
->
-> to enable
->
+>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+>> [rm: convert raw boolean to domain attribute]
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>   drivers/iommu/dma-iommu.c | 29 ++++++++++++++++++++++++++++-
+>>   include/linux/iommu.h     |  1 +
+>>   2 files changed, 29 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+>> index 511ff9a1d6d9..092e6926dc3c 100644
+>> --- a/drivers/iommu/dma-iommu.c
+>> +++ b/drivers/iommu/dma-iommu.c
+>> @@ -55,6 +55,9 @@ struct iommu_dma_cookie {
+>>   	};
+>>   	struct list_head		msi_page_list;
+>>   	spinlock_t			msi_lock;
+>> +
+>> +	/* Only be assigned in non-strict mode, otherwise it's NULL */
+>> +	struct iommu_domain		*domain;
+>>   };
+>>   
+>>   static inline size_t cookie_msi_granule(struct iommu_dma_cookie *cookie)
+>> @@ -257,6 +260,17 @@ static int iova_reserve_iommu_regions(struct device *dev,
+>>   	return ret;
+>>   }
+>>   
+>> +static void iommu_dma_flush_iotlb_all(struct iova_domain *iovad)
+>> +{
+>> +	struct iommu_dma_cookie *cookie;
+>> +	struct iommu_domain *domain;
+>> +
+>> +	cookie = container_of(iovad, struct iommu_dma_cookie, iovad);
+>> +	domain = cookie->domain;
+>> +
+>> +	domain->ops->flush_iotlb_all(domain);
+> 
+> Can we rely on this function pointer being non-NULL? I think it would
+> be better to call iommu_flush_tlb_all(cookie->domain) instead.
 
->> +     print_address_description+0x73/0x280 mm/kasan/report.c:254
->
->
-> KASAN does not print line numbers per se.
-> I think we need to show unmodified output to not confuse readers
-> (probably remove the useless ? lines).
+Yeah, that's deliberate - in fact got as far as writing that change, 
+then undid it as I realised that although the attribute conversion got 
+rid of the explicit ops->flush_iotlb_all check, it still makes zero 
+sense for an IOMMU driver to claim to support the flush queue attribute 
+without also providing the relevant callback, so I do actually want this 
+to blow up rather than silently do nothing if that assumption isn't met.
 
-Will fix all in v7.
+>> +}
+>> +
+>>   /**
+>>    * iommu_dma_init_domain - Initialise a DMA mapping domain
+>>    * @domain: IOMMU domain previously prepared by iommu_get_dma_cookie()
+>> @@ -275,6 +289,7 @@ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
+>>   	struct iommu_dma_cookie *cookie = domain->iova_cookie;
+>>   	struct iova_domain *iovad = &cookie->iovad;
+>>   	unsigned long order, base_pfn, end_pfn;
+>> +	int attr = 1;
+> 
+> Do we actually need to initialise this?
+
+Oops, no, that's a left-over from the turned-out-messier-that-I-thought 
+v6 implementation.
+
+Thanks,
+Robin.
