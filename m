@@ -1,112 +1,86 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 18 Sep 2018 11:14:22 -0700
-Subject: [PATCH v2 1/8] drm/bridge: use bus flags in bridge timings
-In-Reply-To: <6714863.eJMplaj6yU@avalon>
-References: <20180912183222.25414-1-stefan@agner.ch>
- <20180912183222.25414-2-stefan@agner.ch> <6714863.eJMplaj6yU@avalon>
-Message-ID: <bf38f469923e1c2a16252c6d1d2bcb2b@agner.ch>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 18 Sep 2018 18:11:34 +0100
+Subject: Huge page(contiguous bit) slow down
+In-Reply-To: <20180918161432.GH16498@arm.com>
+References: <8898674D84E3B24BA3A2D289B872026A69FE8F27@G01JPEXMBKW03>
+ <20180918113300.GC16498@arm.com>
+ <20180918145832.h24u5tbsqksvmrtq@armageddon.cambridge.arm.com>
+ <20180918151625.GG16498@arm.com>
+ <20180918160927.hxtipnq6z6qrh7hw@armageddon.cambridge.arm.com>
+ <20180918161432.GH16498@arm.com>
+Message-ID: <20180918171133.2suapy5le7lfp5gf@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14.09.2018 02:23, Laurent Pinchart wrote:
-> Hi Stefan,
+On Tue, Sep 18, 2018 at 05:14:33PM +0100, Will Deacon wrote:
+> On Tue, Sep 18, 2018 at 05:09:28PM +0100, Catalin Marinas wrote:
+> > On Tue, Sep 18, 2018 at 04:16:26PM +0100, Will Deacon wrote:
+> > > On Tue, Sep 18, 2018 at 03:58:32PM +0100, Catalin Marinas wrote:
+> > > > On Tue, Sep 18, 2018 at 12:33:01PM +0100, Will Deacon wrote:
+> > > > > On Tue, Sep 18, 2018 at 03:02:17AM +0000, Zhang, Lei wrote:
+> > > > > > --- a/arch/arm64/mm/hugetlbpage.c
+> > > > > > +++ b/arch/arm64/mm/hugetlbpage.c
+> > > > > > @@ -332,6 +332,9 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
+> > > > > >         if (!pte_cont(pte))
+> > > > > >                 return ptep_set_access_flags(vma, addr, ptep, pte, dirty);
+> > > > > > 
+> > > > > > +       if(pte_same(pte, READ_ONCE(*ptep)))
+> > > > > > +               return 0;
+> > > > > > +
+> > > > > 
+> > > > > This broadly seems to follow the non-contiguous code, but I wonder if we
+> > > > > can then drop the subsequent pte_same() check on this path and always return
+> > > > > 1 when we actually update the entries?
+> > > > 
+> > > > I don't remember why we went for first clearing and then checking
+> > > > pte_same() (maybe Steve knows) but I think we can leave pte_same()
+> > > > outside the get_clear_flush()/set_pte_at() block. This code is executed
+> > > > with the mmap_sem taken, so there shouldn't be any race on the
+> > > > individual ptes.
+> > > 
+> > > I suspect it's just to avoid the additional load of the page-table entry,
+> > > since we still have to use get_clear_flush() even with this change.
+> > > 
+> > > One thing I don't really grok is the interaction between the contiguous
+> > > hint and HW_AFDBM. Is it possible for us to be e.g. halfway through the
+> > > set_pte_at() loop and then for the hardware to perform atomic PTE updates
+> > > for entries later in the loop? If so, we've got a race and need to use
+> > > cmpxchg() like we do for the non-contiguous code.
+> > 
+> > With the current code, no, since get_clear_flush() sets all of them to
+> > 0, so no hardware updates before set_pte_at().
 > 
-> Thankk you for the patch.
-> 
-> On Wednesday, 12 September 2018 21:32:15 EEST Stefan Agner wrote:
->> The DRM bus flags conveys additional information on pixel data on
->> the bus. All currently available bus flags might be of interest for
->> a bridge. In the case at hand a dumb VGA bridge needs a specific
->> data enable polarity (DRM_BUS_FLAG_DE_LOW).
->>
->> Replace the sampling_edge field with input_bus_flags and allow all
->> currently documented bus flags.
->>
->> This changes the perspective from sampling side to the driving
->> side for the currently supported flags. We assume that the sampling
->> edge is always the opposite of the driving edge (hence we need to
->> invert the DRM_BUS_FLAG_PIXDATA_[POS|NEG]EDGE flags). This is an
->> assumption we already make for displays. For all we know it is a
->> safe assumption for bridges too.
-> 
-> Please don't, that will get confusing very quickly. Flag names such as 
-> DRM_BUS_FLAG_PIXDATA_NEGEDGE don't mention sampling or driving. There's only a 
-> small comment next to their definition, which will easily be overlooked. I'd 
-> rather update the definition to cover both sampling and driving, and document 
-> the input_bus_flags field to explain that all flags refer to sampling.
-> 
+> The case I'm concerned about is when we've set_pte_at() half of the mapping,
+> though. At this point, a CPU can get a translation via one of the entries
+> that we've put down, and it's not clear to me whether this could establish
+> a contiguous TLB entry which could then result in access/dirty updates to
+> PTEs that we haven't yet written out.
 
-There is history to that, and I'd really rather prefer to keep that similar across the kernel. There is already precedence in the kernel, the display timings (which is a consumer) defines it from the driving perspective too (see DISPLAY_FLAGS_PIXDATA_POSEDGE).
+Ah, I see what you meant. The actual updates are not done based on the
+TLB information but rather the CPU performs a read-modify-write of the
+entry (when an existing TLB entry would give fault; for writes as we
+don't cache the no access flag in the TLB).
 
-That is why I introduced the bus flags using the same perspective.
+The AF case is simpler as the hardware doesn't cache an AF=0 pte in the
+TLB. For DBM, we could indeed have a contiguous writable+clean (DBM=1,
+AP[2] = 1) entry covering not yet written ptes. The ARM ARM describes
+that the AP[2] bit is updated (cleared) atomically only if the DBM bit
+is set in the pte:
 
-If we _really_ want it from sampling side, we should create new defines which are explicit about that, e.g.: DRM_BUS_FLAG_PIXDATA_SAMPLE_NEGEDGE.
+  If, for a write access, the PE finds that a cached copy of the
+  descriptor in a TLB had the DBM bit set to 1 and the AP[2] or S2AP[1]
+  bit set to the value that forbids writes, then the PE must check that
+  the cached copy is not stale with regard to the descriptor entry in
+  memory, and if necessary perform an atomic read-modify-write update of
+  the descriptor in memory. This applies if the cached copy of the
+  descriptor in a TLB is either:
+  - A stage 1 descriptor in which DBM has the value 1 and AP[2] has the
+    value 1.
+  - A stage 2 descriptor in which DBM has the value 1 and S2AP[1] has
+    the value 0.
 
-But again, since even the display flags use the driving perspective, I'd rather prefer to have it that way also for bridges too.
+(and there are some further notes in the ARM ARM; I think we don't
+have an issue here)
 
---
-Stefan
-
-
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
->> ---
->>  drivers/gpu/drm/bridge/dumb-vga-dac.c |  6 +++---
->>  include/drm/drm_bridge.h              | 11 +++++------
->>  2 files changed, 8 insertions(+), 9 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/bridge/dumb-vga-dac.c
->> b/drivers/gpu/drm/bridge/dumb-vga-dac.c index 9b706789a341..d5aa0f931ef2
->> 100644
->> --- a/drivers/gpu/drm/bridge/dumb-vga-dac.c
->> +++ b/drivers/gpu/drm/bridge/dumb-vga-dac.c
->> @@ -234,7 +234,7 @@ static int dumb_vga_remove(struct platform_device *pdev)
->> */
->>  static const struct drm_bridge_timings default_dac_timings = {
->>  	/* Timing specifications, datasheet page 7 */
->> -	.sampling_edge = DRM_BUS_FLAG_PIXDATA_POSEDGE,
->> +	.input_bus_flags = DRM_BUS_FLAG_PIXDATA_NEGEDGE,
->>  	.setup_time_ps = 500,
->>  	.hold_time_ps = 1500,
->>  };
->> @@ -245,7 +245,7 @@ static const struct drm_bridge_timings
->> default_dac_timings = { */
->>  static const struct drm_bridge_timings ti_ths8134_dac_timings = {
->>  	/* From timing diagram, datasheet page 9 */
->> -	.sampling_edge = DRM_BUS_FLAG_PIXDATA_POSEDGE,
->> +	.input_bus_flags = DRM_BUS_FLAG_PIXDATA_NEGEDGE,
->>  	/* From datasheet, page 12 */
->>  	.setup_time_ps = 3000,
->>  	/* I guess this means latched input */
->> @@ -258,7 +258,7 @@ static const struct drm_bridge_timings
->> ti_ths8134_dac_timings = { */
->>  static const struct drm_bridge_timings ti_ths8135_dac_timings = {
->>  	/* From timing diagram, datasheet page 14 */
->> -	.sampling_edge = DRM_BUS_FLAG_PIXDATA_POSEDGE,
->> +	.input_bus_flags = DRM_BUS_FLAG_PIXDATA_NEGEDGE,
->>  	/* From datasheet, page 16 */
->>  	.setup_time_ps = 2000,
->>  	.hold_time_ps = 500,
->> diff --git a/include/drm/drm_bridge.h b/include/drm/drm_bridge.h
->> index bd850747ce54..45e90f4b46c3 100644
->> --- a/include/drm/drm_bridge.h
->> +++ b/include/drm/drm_bridge.h
->> @@ -244,14 +244,13 @@ struct drm_bridge_funcs {
->>   */
->>  struct drm_bridge_timings {
->>  	/**
->> -	 * @sampling_edge:
->> +	 * @input_bus_flags:
->>  	 *
->> -	 * Tells whether the bridge samples the digital input signal
->> -	 * from the display engine on the positive or negative edge of the
->> -	 * clock, this should reuse the DRM_BUS_FLAG_PIXDATA_[POS|NEG]EDGE
->> -	 * bitwise flags from the DRM connector (bit 2 and 3 valid).
->> +	 * Additional settings this bridge requires for the pixel data on
->> +	 * the input bus (e.g. pixel signal polarity). See also
->> +	 * &drm_display_info->bus_flags.
->>  	 */
->> -	u32 sampling_edge;
->> +	u32 input_bus_flags;
->>  	/**
->>  	 * @setup_time_ps:
->>  	 *
+-- 
+Catalin
