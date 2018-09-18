@@ -1,69 +1,36 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Tue, 18 Sep 2018 01:15:02 +0000
-Subject: [PATCH] ARM: dts: imx6ull: update vdd_soc voltage for 900MHz
- operating point
-In-Reply-To: <DB3PR0402MB3916249305E241849A32DC05F51B0@DB3PR0402MB3916.eurprd04.prod.outlook.com>
-References: <1536740009-32735-1-git-send-email-Anson.Huang@nxp.com>
- <d989e700-0cf1-607a-b333-bdead49ae813@i2se.com>
- <DB3PR0402MB3916249305E241849A32DC05F51B0@DB3PR0402MB3916.eurprd04.prod.outlook.com>
-Message-ID: <DB3PR0402MB3916936F80C14D00F5D07966F51D0@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 18 Sep 2018 02:55:05 +0100
+Subject: [PATCH v5 18/18] kvm: arm64: Allow tuning the physical address
+ size for VM
+In-Reply-To: <20180917104144.19188-19-suzuki.poulose@arm.com>
+References: <20180917104144.19188-1-suzuki.poulose@arm.com>
+ <20180917104144.19188-19-suzuki.poulose@arm.com>
+Message-ID: <CAFEAcA8eWYkzwFYHyP49dasK-NDVbbm=6DbEFNNPq9ZAdUM7JQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Stefan
+On 17 September 2018 at 11:41, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+> --- a/Documentation/virtual/kvm/api.txt
+> +++ b/Documentation/virtual/kvm/api.txt
+> @@ -122,6 +122,14 @@ the default trap & emulate implementation (which changes the virtual
+>  memory layout to fit in user mode), check KVM_CAP_MIPS_VZ and use the
+>  flag KVM_VM_MIPS_VZ.
+>
+> +To configure the physical address space size for a VM (IPA size) on arm64,
+> +check KVM_CAP_ARM_VM_PHYS_SHIFT (which returns the maximum limit for the
+> +IPA shift) and use KVM_VM_TYPE_ARM_PHYS_SHIFT(PHYS_SHIFT). Bits[7-0] of the
+> +machine type has been reserved for specifying the PHYS_SHIFT.
+> +The supported range is [32...IPA_LIMIT], where IPA_LIMIT could be
+> +identified by checking KVM_CAP_ARM_VM_PHYS_SHIFT. For backward compatibility
+> +a value of 0 selects 40bits.
+> +
 
-Anson Huang
-Best Regards!
+Given this as the API documentation, I don't think I could figure out
+what I as a userspace user of it need to do without looking at the
+kernel code. Could I ask you to expand it so that it is a bit less
+terse and a bit more detailed? (For instance, what is a PHYS_SHIFT
+and why do I have to specify it rather than just telling the kernel
+I want a 48 bit guest address space?)
 
-
-> -----Original Message-----
-> From: Anson Huang
-> Sent: Wednesday, September 12, 2018 4:30 PM
-> To: Stefan Wahren <stefan.wahren@i2se.com>; shawnguo at kernel.org;
-> s.hauer at pengutronix.de; kernel at pengutronix.de; Fabio Estevam
-> <fabio.estevam@nxp.com>; robh+dt at kernel.org; mark.rutland at arm.com;
-> linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
-> linux-kernel at vger.kernel.org
-> Cc: dl-linux-imx <linux-imx@nxp.com>
-> Subject: RE: [PATCH] ARM: dts: imx6ull: update vdd_soc voltage for 900MHz
-> operating point
-> 
-> Hi, Stefan
-> 
-> Anson Huang
-> Best Regards!
-> 
-> 
-> > -----Original Message-----
-> > From: Stefan Wahren <stefan.wahren@i2se.com>
-> > Sent: Wednesday, September 12, 2018 4:28 PM
-> > To: Anson Huang <anson.huang@nxp.com>; shawnguo at kernel.org;
-> > s.hauer at pengutronix.de; kernel at pengutronix.de; Fabio Estevam
-> > <fabio.estevam@nxp.com>; robh+dt at kernel.org; mark.rutland at arm.com;
-> > linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
-> > linux-kernel at vger.kernel.org
-> > Cc: dl-linux-imx <linux-imx@nxp.com>
-> > Subject: Re: [PATCH] ARM: dts: imx6ull: update vdd_soc voltage for
-> > 900MHz operating point
-> >
-> > Hi Anson,
-> >
-> > Am 12.09.2018 um 10:13 schrieb Anson Huang:
-> > > Update VDD_SOC voltage to 1.25V for 900MHz operating point according
-> > > to datasheet Rev. 1.3, 08/2018, 25mV is added to the minimum allowed
-> > > values to cover power supply ripple.
-> >
-> > is there a reason why the new datasheet isn't published yet?
-> 
-> We just got this new datasheet recently, it will be published soon.
-> 
-> Anson 
-
-The v1.3 datasheet has been published. Please check it from NXP website, thanks.
-
-Anson.
-
-> 
-> >
-> > Regards
-> > Stefan
+thanks
+-- PMM
