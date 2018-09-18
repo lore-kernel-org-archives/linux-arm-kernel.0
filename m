@@ -1,114 +1,85 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Tue, 18 Sep 2018 12:55:18 +0200
-Subject: [PATCH V2 01/27] mmc: mmci: internalize dma map/unmap into mmci dma
- functions
+Date: Tue, 18 Sep 2018 12:55:22 +0200
+Subject: [PATCH V2 05/27] mmc: mmci: move mmci next cookie to mci host
 In-Reply-To: <1537268144-21152-1-git-send-email-ludovic.Barre@st.com>
 References: <1537268144-21152-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1537268144-21152-2-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1537268144-21152-6-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Barre <ludovic.barre@st.com>
 
-This patch internalizes the management of dma map/unmap into
-mmci dma interfaces. This allows to simplify and prepare the next dma
-callbacks for mmci host ops.
-mmci_dma_unmap was called in mmci_data_irq & mmci_cmd_irq functions
-and can be integrated in mmci_dma_data_error.
+This patch moves next cookie to mmci host structure to
+share same cookie management between all variants.
 
 Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 ---
- drivers/mmc/host/mmci.c | 40 +++++++++++++++++-----------------------
- 1 file changed, 17 insertions(+), 23 deletions(-)
+ drivers/mmc/host/mmci.c | 10 ++++------
+ drivers/mmc/host/mmci.h |  2 ++
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 1841d250..bf0bb07 100644
+index 6de7c8d..43f2a1a 100644
 --- a/drivers/mmc/host/mmci.c
 +++ b/drivers/mmc/host/mmci.c
-@@ -482,16 +482,6 @@ static inline void mmci_dma_release(struct mmci_host *host)
- 	host->dma_rx_channel = host->dma_tx_channel = NULL;
- }
+@@ -418,7 +418,6 @@ static void mmci_init_sg(struct mmci_host *host, struct mmc_data *data)
+ struct mmci_dmae_next {
+ 	struct dma_async_tx_descriptor *desc;
+ 	struct dma_chan	*chan;
+-	s32 cookie;
+ };
  
--static void mmci_dma_data_error(struct mmci_host *host)
--{
--	dev_err(mmc_dev(host->mmc), "error during DMA transfer!\n");
--	dmaengine_terminate_all(host->dma_current);
--	host->dma_in_progress = false;
--	host->dma_current = NULL;
--	host->dma_desc_current = NULL;
--	host->data->host_cookie = 0;
--}
--
- static void mmci_dma_unmap(struct mmci_host *host, struct mmc_data *data)
- {
- 	struct dma_chan *chan;
-@@ -505,6 +495,18 @@ static void mmci_dma_unmap(struct mmci_host *host, struct mmc_data *data)
- 		     mmc_get_dma_dir(data));
- }
+ struct mmci_dmae_priv {
+@@ -449,7 +448,7 @@ static int mmci_dma_setup(struct mmci_host *host)
+ 						     "tx");
  
-+static void mmci_dma_data_error(struct mmci_host *host)
-+{
-+	dev_err(mmc_dev(host->mmc), "error during DMA transfer!\n");
-+	dmaengine_terminate_all(host->dma_current);
-+	host->dma_in_progress = false;
-+	host->dma_current = NULL;
-+	host->dma_desc_current = NULL;
-+	host->data->host_cookie = 0;
-+
-+	mmci_dma_unmap(host, host->data);
-+}
-+
- static void mmci_dma_finalize(struct mmci_host *host, struct mmc_data *data)
- {
- 	u32 status;
-@@ -528,10 +530,9 @@ static void mmci_dma_finalize(struct mmci_host *host, struct mmc_data *data)
- 		mmci_dma_data_error(host);
- 		if (!data->error)
- 			data->error = -EIO;
--	}
--
--	if (!data->host_cookie)
-+	} else if (!data->host_cookie) {
- 		mmci_dma_unmap(host, data);
-+	}
+ 	/* initialize pre request cookie */
+-	dmae->next_data.cookie = 1;
++	host->next_cookie = 1;
  
  	/*
- 	 * Use of DMA with scatter-gather is impossible.
-@@ -742,10 +743,6 @@ static inline void mmci_dma_release(struct mmci_host *host)
+ 	 * If only an RX channel is specified, the driver will
+@@ -716,7 +715,7 @@ static void mmci_get_next_data(struct mmci_host *host, struct mmc_data *data)
+ 	struct mmci_dmae_priv *dmae = host->dma_priv;
+ 	struct mmci_dmae_next *next = &dmae->next_data;
+ 
+-	WARN_ON(data->host_cookie && data->host_cookie != next->cookie);
++	WARN_ON(data->host_cookie && data->host_cookie != host->next_cookie);
+ 	WARN_ON(!data->host_cookie && (next->desc || next->chan));
+ 
+ 	dmae->desc_current = next->desc;
+@@ -728,9 +727,7 @@ static void mmci_get_next_data(struct mmci_host *host, struct mmc_data *data)
+ static void mmci_pre_request(struct mmc_host *mmc, struct mmc_request *mrq)
  {
+ 	struct mmci_host *host = mmc_priv(mmc);
+-	struct mmci_dmae_priv *dmae = host->dma_priv;
+ 	struct mmc_data *data = mrq->data;
+-	struct mmci_dmae_next *nd = &dmae->next_data;
+ 
+ 	if (!data)
+ 		return;
+@@ -741,7 +738,8 @@ static void mmci_pre_request(struct mmc_host *mmc, struct mmc_request *mrq)
+ 		return;
+ 
+ 	if (!mmci_dma_prep_next(host, data))
+-		data->host_cookie = ++nd->cookie < 0 ? 1 : nd->cookie;
++		data->host_cookie = ++host->next_cookie < 0 ?
++			1 : host->next_cookie;
  }
  
--static inline void mmci_dma_unmap(struct mmci_host *host, struct mmc_data *data)
--{
--}
--
- static inline void mmci_dma_finalize(struct mmci_host *host,
- 				     struct mmc_data *data)
- {
-@@ -906,10 +903,8 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
- 		u32 remain, success;
+ static void mmci_post_request(struct mmc_host *mmc, struct mmc_request *mrq,
+diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+index 260a1de..d2ec4fd 100644
+--- a/drivers/mmc/host/mmci.h
++++ b/drivers/mmc/host/mmci.h
+@@ -318,6 +318,8 @@ struct mmci_host {
+ 	int (*get_rx_fifocnt)(struct mmci_host *h, u32 status, int remain);
  
- 		/* Terminate the DMA transfer */
--		if (dma_inprogress(host)) {
-+		if (dma_inprogress(host))
- 			mmci_dma_data_error(host);
--			mmci_dma_unmap(host, data);
--		}
- 
- 		/*
- 		 * Calculate how far we are into the transfer.  Note that
-@@ -1055,10 +1050,9 @@ mmci_cmd_irq(struct mmci_host *host, struct mmc_command *cmd,
- 	if ((!sbc && !cmd->data) || cmd->error) {
- 		if (host->data) {
- 			/* Terminate the DMA transfer */
--			if (dma_inprogress(host)) {
-+			if (dma_inprogress(host))
- 				mmci_dma_data_error(host);
--				mmci_dma_unmap(host, host->data);
--			}
+ 	void			*dma_priv;
 +
- 			mmci_stop_data(host);
- 		}
- 		mmci_request_end(host, host->mrq);
++	s32			next_cookie;
+ };
+ 
+ void qcom_variant_init(struct mmci_host *host);
 -- 
 2.7.4
