@@ -1,25 +1,63 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 18 Sep 2018 12:47:47 -0700
-Subject: [PATCH v2 07/22] pinctrl: mediatek: add drv register support to
- pinctrl-mtk-common-v2.c
-In-Reply-To: <5a7880e3885ba8a1c51ca28a0753228eeeeb9ec7.1536404280.git.sean.wang@mediatek.com>
-References: <cover.1536404280.git.sean.wang@mediatek.com>
- <5a7880e3885ba8a1c51ca28a0753228eeeeb9ec7.1536404280.git.sean.wang@mediatek.com>
-Message-ID: <CACRpkdZM-og+p10vdCeOz5dJ=tSMrLmvntqRFz=8v6LTo92ikA@mail.gmail.com>
+From: Steve.Capper@arm.com (Steve Capper)
+Date: Tue, 18 Sep 2018 20:26:26 +0000
+Subject: Huge page(contiguous bit) slow down
+In-Reply-To: <20180918151625.GG16498@arm.com>
+References: <8898674D84E3B24BA3A2D289B872026A69FE8F27@G01JPEXMBKW03>
+ <20180918113300.GC16498@arm.com>
+ <20180918145832.h24u5tbsqksvmrtq@armageddon.cambridge.arm.com>
+ <20180918151625.GG16498@arm.com>
+Message-ID: <20180918202612.gnzs4qaurgoumwum@capper-debian.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 8, 2018 at 4:07 AM <sean.wang@mediatek.com> wrote:
+On Tue, Sep 18, 2018 at 04:16:26PM +0100, Will Deacon wrote:
+> On Tue, Sep 18, 2018 at 03:58:32PM +0100, Catalin Marinas wrote:
+> > On Tue, Sep 18, 2018 at 12:33:01PM +0100, Will Deacon wrote:
+> > > On Tue, Sep 18, 2018 at 03:02:17AM +0000, Zhang, Lei wrote:
+> > > > --- a/arch/arm64/mm/hugetlbpage.c
+> > > > +++ b/arch/arm64/mm/hugetlbpage.c
+> > > > @@ -332,6 +332,9 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
+> > > >         if (!pte_cont(pte))
+> > > >                 return ptep_set_access_flags(vma, addr, ptep, pte, dirty);
+> > > > 
+> > > > +       if(pte_same(pte, READ_ONCE(*ptep)))
+> > > > +               return 0;
+> > > > +
+> > > 
+> > > This broadly seems to follow the non-contiguous code, but I wonder if we
+> > > can then drop the subsequent pte_same() check on this path and always return
+> > > 1 when we actually update the entries?
+> > 
+> > I don't remember why we went for first clearing and then checking
+> > pte_same() (maybe Steve knows) but I think we can leave pte_same()
+> > outside the get_clear_flush()/set_pte_at() block. This code is executed
+> > with the mmap_sem taken, so there shouldn't be any race on the
+> > individual ptes.
+> 
+> I suspect it's just to avoid the additional load of the page-table entry,
+> since we still have to use get_clear_flush() even with this change.
+> 
+> One thing I don't really grok is the interaction between the contiguous
+> hint and HW_AFDBM. Is it possible for us to be e.g. halfway through the
+> set_pte_at() loop and then for the hardware to perform atomic PTE updates
+> for entries later in the loop? If so, we've got a race and need to use
+> cmpxchg() like we do for the non-contiguous code.
 
-> From: Sean Wang <sean.wang@mediatek.com>
->
-> Certain SoCs have to program DRV register to configure driving
-> strength so that we add it in the existing path as an option.
->
-> Signed-off-by: Ryder.Lee <ryder.lee@mediatek.com>
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+Hi,
+Yes this was precisely the case, I think I "over-optimised" the code
+path in huge_ptep_set_access_flags.
 
-Patch applied.
+I think it would be better to check first to see if a change is needed
+in a similar manner as Lei Zhang's patch.
 
-Yours,
-Linus Walleij
+One thing worth considering is that some ptes from the contiguous range
+may be dirty so rather than just a:
+ if(pte_same(pte, READ_ONCE(*ptep)))
+                 return 0;
+
+We may instead want to check all the ptes in the contiguous range for
+dirty ones?
+
+Cheers,
+-- 
+Steve
