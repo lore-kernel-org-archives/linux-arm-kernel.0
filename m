@@ -1,24 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 18 Sep 2018 13:03:08 -0700
-Subject: [PATCH v2 20/22] pintcrl: mediatek: add pull tweaks for I2C
- related pins on MT8183
-In-Reply-To: <3d957d32b5b0f67548f63ae4ba7176dba9e61faa.1536404280.git.sean.wang@mediatek.com>
-References: <cover.1536404280.git.sean.wang@mediatek.com>
- <3d957d32b5b0f67548f63ae4ba7176dba9e61faa.1536404280.git.sean.wang@mediatek.com>
-Message-ID: <CACRpkdYp8PFVgdc1=mtaNk5oxEh4om+5T-BwGh_TN2OkA2sYKg@mail.gmail.com>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Tue, 18 Sep 2018 13:09:00 -0700
+Subject: [PATCH 3/3] scripts/dtc: Update to upstream version
+ v1.4.7-14-gc86da84d30e4
+In-Reply-To: <CAL_JsqLTcLVGCmjTMi8GojomP=VbFQ5EqKcGnOPo=Wwh5Lc_mw@mail.gmail.com>
+References: <20180913202828.15372-1-robh@kernel.org>
+ <20180913202828.15372-3-robh@kernel.org>
+ <f9684222-fae0-c305-d48a-be77ebb985a3@gmail.com>
+ <CAL_JsqLTcLVGCmjTMi8GojomP=VbFQ5EqKcGnOPo=Wwh5Lc_mw@mail.gmail.com>
+Message-ID: <6414499d-2261-ef50-617e-a743173a3041@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 8, 2018 at 4:07 AM <sean.wang@mediatek.com> wrote:
+On 09/18/18 11:55, Rob Herring wrote:
+> On Fri, Sep 14, 2018 at 2:32 PM Frank Rowand <frowand.list@gmail.com> wrote:
+>>
+>> On 09/13/18 13:28, Rob Herring wrote:
+>>> Major changes are I2C and SPI bus checks, YAML output format (for
+>>> future validation), some new libfdt functions, and more libfdt
+>>> validation of dtbs.
+>>>
+>>> The YAML addition adds an optional dependency on libyaml. pkg-config is
+>>> used to test for it and pkg-config became a kconfig dependency in 4.18.
+>>
+>> For Ubuntu, the libyaml dependency is provided by the packages:
+>>
+>>    libyaml-0-2
+>>    libyaml-dev
+> 
+> Yes, but as it is not yet required by anything in the kernel I don't
+> think that needs to be documented yet. Also, offhand, I don't think we
+> generally document in the kernel distro specifics like package names.
+> 
+> Rob
+> 
 
-> From: Zhiyong Tao <zhiyong.tao@mediatek.com>
->
-> This patch provides the advanced pull for I2C used pins on MT8183.
->
-> Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-
-Patch applied.
-
-Yours,
-Linus Walleij
+Agreed.  I was providing information that might save other people a bit
+of research.  It is sufficiently visible in the email thread and does
+not need to be in the commit message.
