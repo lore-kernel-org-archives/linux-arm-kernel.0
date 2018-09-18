@@ -1,155 +1,97 @@
-From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Tue, 18 Sep 2018 22:54:55 +0200
-Subject: [PATCH 4/4] ARM: mmp/mmp2: dt: enable the clock
-In-Reply-To: <20180918205455.25464-1-lkundrak@v3.sk>
-References: <20180918205455.25464-1-lkundrak@v3.sk>
-Message-ID: <20180918205455.25464-5-lkundrak@v3.sk>
+From: saiprakash.ranjan@codeaurora.org (Sai Prakash Ranjan)
+Date: Wed, 19 Sep 2018 02:43:34 +0530
+Subject: [PATCH 2/6] pstore: Add event tracing support
+In-Reply-To: <20180918164434.472294f3@gandalf.local.home>
+References: <cover.1536430404.git.saiprakash.ranjan@codeaurora.org>
+ <b9b60ff2864a17fb05481aa33f90114ab051d6ce.1536430404.git.saiprakash.ranjan@codeaurora.org>
+ <20180917193426.41c99fd5@gandalf.local.home>
+ <cb17a8c9-fca1-5492-3255-eab0ea33577c@codeaurora.org>
+ <20180918164434.472294f3@gandalf.local.home>
+Message-ID: <bad69c36-2600-f0b3-5bfd-c865039ae97f@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The device-tree booted MMP2 needs to enable the timer clock, otherwise
-the it would stop ticking when the boot finishes.
+On 9/19/2018 2:14 AM, Steven Rostedt wrote:
+> On Tue, 18 Sep 2018 23:22:48 +0530
+> Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org> wrote:
+> 
+>> On 9/18/2018 5:04 AM, Steven Rostedt wrote:
+>>>
+>>> It looks like pstore_event_call() gets called from a trace event. You
+>>> can't call kmalloc() from one. One thing is that kmalloc has
+>>> tracepoints itself. You trace those you just entered an infinite loop.
+>>>
+>>>    
+>>
+>> Ok will remove it in v2. But any alternative way to do this?
+> 
+> I think I describe it below.
+> 
 
-It can also use the clock rate from the clk, the non-DT boards need to
-keep using the hardcoded rates.
+Ok got it, will change and post the 2nd version soon.
 
-Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+>>
+>>>> +
+>>>> +	event_call = fbuffer->trace_file->event_call;
+>>>> +	if (!event_call || !event_call->event.funcs ||
+>>>> +	    !event_call->event.funcs->trace)
+>>>> +		goto fail_event;
+>>>> +
+>>>> +	event = &fbuffer->trace_file->event_call->event;
+>>>> +
+>>>> +	spin_lock_irqsave(&psinfo->buf_lock, flags);
+>>>> +
+>>>> +	trace_seq_init(&iter->seq);
+>>>> +	iter->ent = fbuffer->entry;
+>>>
+>>> I guess what you are doing is needing to translate the raw data into
+>>> ascii output, and need the trace_iterator to do so.
+>>>
+>>> You are already under a psinfo->buf_lock. Add a dummy iterator to that
+>>> and use it instead.
+>>>
+>>> 	trace_seq_init(&psinfo->iter->seq);
+>>>    
+>>>> +	event_call->event.funcs->trace(iter, 0, event);
+>>>
+>>> 				      (psinfo->iter, 0 , event);
+>>>
+>>> etc.
+>>>    
+>>
+>> Sure, will update in v2.
+>>
+>>>> +	trace_seq_putc(&iter->seq, 0);
+>>>> +
+>>>> +	if (seq->size > psinfo->bufsize)
+>>>> +		seq->size = psinfo->bufsize;
+>>>> +
+>>>> +	s = &iter->seq;
+>>>> +	seq = &s->seq;
+>>>> +
+>>>> +	record.buf = (char *)(seq->buffer);
+>>>> +	record.size = seq->len;
+>>>> +	psinfo->write(&record);
+>>>> +
+>>>> +	spin_unlock_irqrestore(&psinfo->buf_lock, flags);
+>>>
+>>> You may also need to convert these spin_locks into raw_spin_locks as
+>>> when PREEMPT_RT enters the kernel you don't want them to turn into
+>>> mutexes.
+>>>
+>>> But that can be another patch.
+>>>    
+>>
+>> I will change this in v2, but can't we have it in same patch?
+> 
+> I suggested a separate patch because buf_lock is used elsewhere.
+> Changing it to "raw_spin_lock" will affect more than just what this
+> patch series does. Thus, I recommend making it a separate patch to keep
+> this patch series from being more intrusive than it needs to be.
+> 
 
----
-Changes since v1:
-- Made the clock optional, to keep compatibility with DTs without it
+Sure, thanks a lot.
 
- arch/arm/mach-mmp/common.h |  2 +-
- arch/arm/mach-mmp/mmp2.c   |  2 +-
- arch/arm/mach-mmp/pxa168.c |  2 +-
- arch/arm/mach-mmp/time.c   | 32 ++++++++++++++++++++------------
- 4 files changed, 23 insertions(+), 15 deletions(-)
-
-diff --git a/arch/arm/mach-mmp/common.h b/arch/arm/mach-mmp/common.h
-index 7e284d9c429f..5ac2851ef5d3 100644
---- a/arch/arm/mach-mmp/common.h
-+++ b/arch/arm/mach-mmp/common.h
-@@ -2,7 +2,7 @@
- #include <linux/reboot.h>
- #define ARRAY_AND_SIZE(x)	(x), ARRAY_SIZE(x)
- 
--extern void timer_init(int irq);
-+extern void timer_init(int irq, unsigned long rate);
- 
- extern void __init mmp_map_io(void);
- extern void mmp_restart(enum reboot_mode, const char *);
-diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
-index afba5460cdaf..fb3e7e32c882 100644
---- a/arch/arm/mach-mmp/mmp2.c
-+++ b/arch/arm/mach-mmp/mmp2.c
-@@ -134,7 +134,7 @@ void __init mmp2_timer_init(void)
- 	clk_rst = APBC_APBCLK | APBC_FNCLK | APBC_FNCLKSEL(1);
- 	__raw_writel(clk_rst, APBC_TIMERS);
- 
--	timer_init(IRQ_MMP2_TIMER1);
-+	timer_init(IRQ_MMP2_TIMER1, 6500000);
- }
- 
- /* on-chip devices */
-diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
-index 0f5f16fb8c66..77a358165a56 100644
---- a/arch/arm/mach-mmp/pxa168.c
-+++ b/arch/arm/mach-mmp/pxa168.c
-@@ -79,7 +79,7 @@ void __init pxa168_timer_init(void)
- 	/* 3.25MHz, bus/functional clock enabled, release reset */
- 	__raw_writel(TIMER_CLK_RST, APBC_TIMERS);
- 
--	timer_init(IRQ_PXA168_TIMER1);
-+	timer_init(IRQ_PXA168_TIMER1, 6500000);
- }
- 
- void pxa168_clear_keypad_wakeup(void)
-diff --git a/arch/arm/mach-mmp/time.c b/arch/arm/mach-mmp/time.c
-index 96ad1db0b04b..351f4714bba6 100644
---- a/arch/arm/mach-mmp/time.c
-+++ b/arch/arm/mach-mmp/time.c
-@@ -22,6 +22,7 @@
- #include <linux/kernel.h>
- #include <linux/interrupt.h>
- #include <linux/clockchips.h>
-+#include <linux/clk.h>
- 
- #include <linux/io.h>
- #include <linux/irq.h>
-@@ -38,12 +39,6 @@
- #include "cputype.h"
- #include "clock.h"
- 
--#ifdef CONFIG_CPU_MMP2
--#define MMP_CLOCK_FREQ		6500000
--#else
--#define MMP_CLOCK_FREQ		3250000
--#endif
--
- #define TIMERS_VIRT_BASE	TIMERS1_VIRT_BASE
- 
- #define MAX_DELTA		(0xfffffffe)
-@@ -189,19 +184,18 @@ static struct irqaction timer_irq = {
- 	.dev_id		= &ckevt,
- };
- 
--void __init timer_init(int irq)
-+void __init timer_init(int irq, unsigned long rate)
- {
- 	timer_config();
- 
--	sched_clock_register(mmp_read_sched_clock, 32, MMP_CLOCK_FREQ);
-+	sched_clock_register(mmp_read_sched_clock, 32, rate);
- 
- 	ckevt.cpumask = cpumask_of(0);
- 
- 	setup_irq(irq, &timer_irq);
- 
--	clocksource_register_hz(&cksrc, MMP_CLOCK_FREQ);
--	clockevents_config_and_register(&ckevt, MMP_CLOCK_FREQ,
--					MIN_DELTA, MAX_DELTA);
-+	clocksource_register_hz(&cksrc, rate);
-+	clockevents_config_and_register(&ckevt, rate, MIN_DELTA, MAX_DELTA);
- }
- 
- #ifdef CONFIG_OF
-@@ -213,7 +207,9 @@ static const struct of_device_id mmp_timer_dt_ids[] = {
- void __init mmp_dt_init_timer(void)
- {
- 	struct device_node *np;
-+	struct clk *clk;
- 	int irq, ret;
-+	unsigned long rate;
- 
- 	np = of_find_matching_node(NULL, mmp_timer_dt_ids);
- 	if (!np) {
-@@ -221,6 +217,18 @@ void __init mmp_dt_init_timer(void)
- 		goto out;
- 	}
- 
-+	clk = of_clk_get(np, 0);
-+	if (!IS_ERR(clk)) {
-+		ret = clk_prepare_enable(clk);
-+		if (ret)
-+			goto out;
-+		rate = clk_get_rate(clk) / 2;
-+	} else if (cpu_is_pj4 ()) {
-+		rate = 6500000;
-+	} else {
-+		rate = 3250000;
-+	}
-+
- 	irq = irq_of_parse_and_map(np, 0);
- 	if (!irq) {
- 		ret = -EINVAL;
-@@ -231,7 +239,7 @@ void __init mmp_dt_init_timer(void)
- 		ret = -ENOMEM;
- 		goto out;
- 	}
--	timer_init(irq);
-+	timer_init(irq, rate);
- 	return;
- out:
- 	pr_err("Failed to get timer from device tree with error:%d\n", ret);
 -- 
-2.17.1
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
