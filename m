@@ -1,57 +1,87 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 17 Sep 2018 16:44:00 -0700
-Subject: [PATCH v5 03/27] arm64: alternative: Apply alternatives early in
- boot process
-In-Reply-To: <78781d82-e5c4-c590-6c0c-e7d2db456bf9@arm.com>
-References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
- <1535471497-38854-4-git-send-email-julien.thierry@arm.com>
- <3becf020-b230-beb8-b304-d8097377f234@arm.com>
- <78781d82-e5c4-c590-6c0c-e7d2db456bf9@arm.com>
-Message-ID: <20180917234400.ctq3w2u6fi5s5coj@holly.lan>
+From: biao.huang@mediatek.com (biao huang)
+Date: Tue, 18 Sep 2018 09:14:19 +0800
+Subject: [PATCH 1/2] dt-binding: mediatek: Add binding document for
+ MediaTek GMAC
+In-Reply-To: <fb327132-0830-9df0-434e-06bb0033bac4@cogentembedded.com>
+References: <1537165763-13112-1-git-send-email-biao.huang@mediatek.com>
+ <1537165763-13112-2-git-send-email-biao.huang@mediatek.com>
+ <fb327132-0830-9df0-434e-06bb0033bac4@cogentembedded.com>
+Message-ID: <1537233259.12247.3.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2018 at 05:49:09PM +0100, Julien Thierry wrote:
-> > > +	__apply_alternatives(&region, false, boot_capabilities);
-> > > +}
-> > > +
-> > >   #ifdef CONFIG_MODULES
-> > >   void apply_alternatives_module(void *start, size_t length)
-> > >   {
-> > 
-> > > diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> > > index 3bc1c8b..0d1e41e 100644
-> > > --- a/arch/arm64/kernel/cpufeature.c
-> > > +++ b/arch/arm64/kernel/cpufeature.c
-> > > @@ -52,6 +52,8 @@
-> > >   DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
-> > >   EXPORT_SYMBOL(cpu_hwcaps);
-> > > +unsigned long boot_capabilities;
-> > > +
-> > >   /*
-> > >    * Flag to indicate if we have computed the system wide
-> > >    * capabilities based on the boot time active CPUs. This
-> > > @@ -1375,6 +1377,9 @@ static void __update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
-> > >   		if (!cpus_have_cap(caps->capability) && caps->desc)
-> > >   			pr_info("%s %s\n", info, caps->desc);
-> > >   		cpus_set_cap(caps->capability);
-> > 
-> > Hmm, the bitmap behind cpus_set_cap() is what cpus_have_cap() in
-> > __apply_alternatives() looks at. If you had a call to __apply_alternatives after
-> > update_cpu_capabilities(SCOPE_BOOT_CPU), but before any others, it would only
-> > apply those alternatives...
-> > 
-> > (I don't think there is a problem re-applying the same alternative, but I
-> > haven't checked).
-> > 
+On Mon, 2018-09-17 at 11:33 +0300, Sergei Shtylyov wrote:
+> On 9/17/2018 9:29 AM, Biao Huang wrote:
 > 
-> Interesting idea. If someone can confirm that patching alternatives twice is
-> safe, I think it would make things simpler.
-
-Early versions of this patch applied the alternatives twice. I never
-noticed any problems with double patching (second time round it will
-write out code that is identical to what is already there so it is
-merely inefficient rather than unsafe.
-
-
-Daniel.
+> > The commit adds the device tree binding documentation for the MediaTek
+> > GMAC found on Mediatek MT2712.
+> > 
+> > Signed-off-by: Biao Huang <biao.huang@mediatek.com>
+> > ---
+> >   .../devicetree/bindings/net/mediatek-gmac.txt      |   45 ++++++++++++++++++++
+> >   1 file changed, 45 insertions(+)
+> >   create mode 100644 Documentation/devicetree/bindings/net/mediatek-gmac.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/net/mediatek-gmac.txt b/Documentation/devicetree/bindings/net/mediatek-gmac.txt
+> > new file mode 100644
+> > index 0000000..14876ed
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/net/mediatek-gmac.txt
+> > @@ -0,0 +1,45 @@
+> > +MediaTek Gigabit Ethernet controller
+> > +=========================================
+> > +
+> > +The gigabit ethernet controller can be found on MediaTek SoCs.
+> > +
+> > +* Ethernet controller node
+> > +
+> > +Required properties:
+> > +- compatible: Should be
+> > +	"mediatek,mt2712-eth": for MT2712 SoC
+> > +- reg: Address and length of the register set for the device
+> > +- interrupts: Should contain the MAC interrupts
+> > +- interrupt-names: the name of interrupt in the interrupts property. These are
+> > +	"macirq": For MT2712 SoC
+> > +- clocks: the clock used by the controller
+> > +- clock-names: the names of the clock listed in the clocks property. These are
+> > +	"axi", "apb", "mac_ext", "ptp", "ptp_parent", "ptp_top": For MT2712 SoC
+> > +- mac-address: See ethernet.txt in the same directory
+> > +- power-domains: phandle to the power domain that the ethernet is part of
+> 
+>     This (required) prop is absent in your example.
+thanks for your comments, power-domains is not a required property, and
+I'll modify this property in next version.
+> 
+> > +- phy-mode: See ethernet.txt file in the same directory.
+> > +- reset-gpio: gpio number for phy reset.
+> > +
+> > +Example:
+> > +
+> > +eth: eth at 1101c000 {
+> 
+> eth: ethernet at 1101c000 {
+> 
+> > +		compatible = "mediatek,mt2712-eth";
+> > +		reg = <0 0x1101c000 0 0x1200>;
+> > +		interrupts = <GIC_SPI 237 IRQ_TYPE_LEVEL_LOW>;
+> > +		interrupt-names = "macirq";
+> > +		phy-mode ="rgmii";
+> > +		mac-address = [00 55 7b b5 7d f7];
+> > +		clock-names = "axi",
+> > +			      "apb",
+> > +			      "mac_ext",
+> > +			      "ptp",
+> > +			      "ptp_parent",
+> > +			      "ptp_top";
+> > +		clocks = <&pericfg CLK_PERI_GMAC>,
+> > +			 <&pericfg CLK_PERI_GMAC_PCLK>,
+> > +			 <&topckgen CLK_TOP_ETHER_125M_SEL>,
+> > +			 <&topckgen CLK_TOP_ETHER_50M_SEL>,
+> > +			 <&topckgen CLK_TOP_APLL1_D3>,
+> > +			 <&topckgen CLK_TOP_APLL1>;
+> > +		reset-gpio = <&pio 87 GPIO_ACTIVE_HIGH>;
+> > +	};
+> 
+> MBR, Sergei
+Best Regards!
+Biao
