@@ -1,122 +1,141 @@
 From: Anson.Huang@nxp.com (Anson Huang)
-Date: Tue, 18 Sep 2018 14:19:05 +0800
-Subject: [PATCH 1/4] ARM: dts: imx: add i.mx6ulz and i.mx6ulz 14x14 evk support
+Date: Tue, 18 Sep 2018 14:19:06 +0800
+Subject: [PATCH 2/4] ARM: imx: add i.mx6ulz msl support
 In-Reply-To: <1537251548-27845-1-git-send-email-Anson.Huang@nxp.com>
 References: <1537251548-27845-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1537251548-27845-2-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <1537251548-27845-3-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6ULZ is new SoC of i.MX6 family, compared to i.MX6ULL,
-it removes below modules:
+The i.MX 6ULZ processor is a high-performance, ultra
+cost-efficient consumer Linux processor featuring an
+advanced implementation of a single Arm? Cortex?-A7 core,
+which operates at speeds up to 900 MHz.
 
-- UART5/UART6/UART7/UART8;
-- PWM5/PWM6/PWM7/PWM8;
-- eCSPI3/eCSPI4;
-- CAN1/CAN2;
-- FEC1/FEC2;
-- I2C3/I2C4;
-- EPIT2;
-- LCDIF;
-- GPT2;
-- ADC1;
-- TSC;
-
-This patch adds support for i.MX6ULZ and i.MX6ULZ 14x14 EVK
-board.
+This patch adds basic MSL support for i.MX6ULZ, the
+i.MX6ULZ has same soc_id as i.MX6ULL, and SRC_SBMR2 bit[6]
+is to differentiate i.MX6ULZ from i.MX6ULL, 1'b1 means
+i.MX6ULZ and 1'b0 means i.MX6ULL.
 
 Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 ---
- arch/arm/boot/dts/Makefile              |  3 ++-
- arch/arm/boot/dts/imx6ulz-14x14-evk.dts | 20 +++++++++++++++++
- arch/arm/boot/dts/imx6ulz.dtsi          | 38 +++++++++++++++++++++++++++++++++
- 3 files changed, 60 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/imx6ulz-14x14-evk.dts
- create mode 100644 arch/arm/boot/dts/imx6ulz.dtsi
+ arch/arm/mach-imx/anatop.c      | 20 ++++++++++++++++++++
+ arch/arm/mach-imx/cpu.c         |  3 +++
+ arch/arm/mach-imx/mach-imx6ul.c |  1 +
+ arch/arm/mach-imx/mxc.h         |  7 +++++++
+ arch/arm/mach-imx/pm-imx6.c     |  4 ++--
+ 5 files changed, 33 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b3ec70d..d7268ae 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -560,7 +560,8 @@ dtb-$(CONFIG_SOC_IMX6UL) += \
- 	imx6ul-tx6ul-mainboard.dtb \
- 	imx6ull-14x14-evk.dtb \
- 	imx6ull-colibri-eval-v3.dtb \
--	imx6ull-colibri-wifi-eval-v3.dtb
-+	imx6ull-colibri-wifi-eval-v3.dtb \
-+	imx6ulz-14x14-evk.dtb
- dtb-$(CONFIG_SOC_IMX7D) += \
- 	imx7d-cl-som-imx7.dtb \
- 	imx7d-colibri-emmc-eval-v3.dtb \
-diff --git a/arch/arm/boot/dts/imx6ulz-14x14-evk.dts b/arch/arm/boot/dts/imx6ulz-14x14-evk.dts
-new file mode 100644
-index 0000000..e2d67a3
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6ulz-14x14-evk.dts
-@@ -0,0 +1,20 @@
-+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
-+//
-+// Copyright 2018 NXP.
+diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
+index 61f3d94..45d618a 100644
+--- a/arch/arm/mach-imx/anatop.c
++++ b/arch/arm/mach-imx/anatop.c
+@@ -31,6 +31,8 @@
+ #define ANADIG_DIGPROG_IMX6SL	0x280
+ #define ANADIG_DIGPROG_IMX7D	0x800
+ 
++#define SRC_SBMR2		0x1c
 +
-+/dts-v1/;
+ #define BM_ANADIG_REG_2P5_ENABLE_WEAK_LINREG	0x40000
+ #define BM_ANADIG_REG_2P5_ENABLE_PULLDOWN	0x8
+ #define BM_ANADIG_REG_CORE_FET_ODRIVE		0x20000000
+@@ -148,6 +150,24 @@ void __init imx_init_revision_from_anatop(void)
+ 		major_part = (digprog >> 8) & 0xf;
+ 		minor_part = digprog & 0xf;
+ 		revision = ((major_part + 1) << 4) | minor_part;
 +
-+#include "imx6ulz.dtsi"
-+#include "imx6ul-14x14-evk.dtsi"
++		if ((digprog >> 16) == MXC_CPU_IMX6ULL) {
++			void __iomem *src_base;
++			u32 sbmr2;
 +
-+/delete-node/ &fec1;
-+/delete-node/ &fec2;
-+/delete-node/ &lcdif;
-+/delete-node/ &tsc;
++			np = of_find_compatible_node(NULL, NULL,
++						     "fsl,imx6ul-src");
++			src_base = of_iomap(np, 0);
++			WARN_ON(!src_base);
++			sbmr2 = readl_relaxed(src_base + SRC_SBMR2);
++			iounmap(src_base);
 +
-+/ {
-+	model = "Freescale i.MX6 ULZ 14x14 EVK Board";
-+	compatible = "fsl,imx6ulz-14x14-evk", "fsl,imx6ulz";
++			/* src_sbmr2 bit 6 is to identify if it is i.MX6ULZ */
++			if (sbmr2 & (1 << 6)) {
++				digprog &= ~(0xff << 16);
++				digprog |= (MXC_CPU_IMX6ULZ << 16);
++			}
++		}
+ 	}
+ 
+ 	mxc_set_cpu_type(digprog >> 16 & 0xff);
+diff --git a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c
+index c6b1bf9..c73593e 100644
+--- a/arch/arm/mach-imx/cpu.c
++++ b/arch/arm/mach-imx/cpu.c
+@@ -136,6 +136,9 @@ struct device * __init imx_soc_device_init(void)
+ 	case MXC_CPU_IMX6ULL:
+ 		soc_id = "i.MX6ULL";
+ 		break;
++	case MXC_CPU_IMX6ULZ:
++		soc_id = "i.MX6ULZ";
++		break;
+ 	case MXC_CPU_IMX6SLL:
+ 		soc_id = "i.MX6SLL";
+ 		break;
+diff --git a/arch/arm/mach-imx/mach-imx6ul.c b/arch/arm/mach-imx/mach-imx6ul.c
+index 6cb8a22..4ffe3c8 100644
+--- a/arch/arm/mach-imx/mach-imx6ul.c
++++ b/arch/arm/mach-imx/mach-imx6ul.c
+@@ -90,6 +90,7 @@ static void __init imx6ul_init_late(void)
+ static const char * const imx6ul_dt_compat[] __initconst = {
+ 	"fsl,imx6ul",
+ 	"fsl,imx6ull",
++	"fsl,imx6ulz",
+ 	NULL,
+ };
+ 
+diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h
+index 026e2ca..b130a53 100644
+--- a/arch/arm/mach-imx/mxc.h
++++ b/arch/arm/mach-imx/mxc.h
+@@ -40,6 +40,8 @@
+ #define MXC_CPU_IMX6Q		0x63
+ #define MXC_CPU_IMX6UL		0x64
+ #define MXC_CPU_IMX6ULL		0x65
++/* virtual cpu id for i.mx6ulz */
++#define MXC_CPU_IMX6ULZ		0x6b
+ #define MXC_CPU_IMX6SLL		0x67
+ #define MXC_CPU_IMX7D		0x72
+ 
+@@ -80,6 +82,11 @@ static inline bool cpu_is_imx6ull(void)
+ 	return __mxc_cpu_type == MXC_CPU_IMX6ULL;
+ }
+ 
++static inline bool cpu_is_imx6ulz(void)
++{
++	return __mxc_cpu_type == MXC_CPU_IMX6ULZ;
++}
 +
-+	/delete-node/ panel;
-+};
-diff --git a/arch/arm/boot/dts/imx6ulz.dtsi b/arch/arm/boot/dts/imx6ulz.dtsi
-new file mode 100644
-index 0000000..ae6d7e5
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6ulz.dtsi
-@@ -0,0 +1,38 @@
-+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
-+//
-+// Copyright 2018 NXP.
-+
-+#include "imx6ull.dtsi"
-+
-+/ {
-+	aliases {
-+		/delete-property/ ethernet0;
-+		/delete-property/ ethernet1;
-+		/delete-property/ i2c2;
-+		/delete-property/ i2c3;
-+		/delete-property/ serial4;
-+		/delete-property/ serial5;
-+		/delete-property/ serial6;
-+		/delete-property/ serial7;
-+		/delete-property/ spi2;
-+		/delete-property/ spi3;
-+	};
-+};
-+
-+/delete-node/ &adc1;
-+/delete-node/ &can1;
-+/delete-node/ &can2;
-+/delete-node/ &ecspi3;
-+/delete-node/ &ecspi4;
-+/delete-node/ &epit2;
-+/delete-node/ &gpt2;
-+/delete-node/ &i2c3;
-+/delete-node/ &i2c4;
-+/delete-node/ &pwm5;
-+/delete-node/ &pwm6;
-+/delete-node/ &pwm7;
-+/delete-node/ &pwm8;
-+/delete-node/ &uart5;
-+/delete-node/ &uart6;
-+/delete-node/ &uart7;
-+/delete-node/ &uart8;
+ static inline bool cpu_is_imx6sll(void)
+ {
+ 	return __mxc_cpu_type == MXC_CPU_IMX6SLL;
+diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
+index 529f4b5..87f45b9 100644
+--- a/arch/arm/mach-imx/pm-imx6.c
++++ b/arch/arm/mach-imx/pm-imx6.c
+@@ -313,7 +313,7 @@ int imx6_set_lpm(enum mxc_cpu_pwr_mode mode)
+ 		if (cpu_is_imx6sl())
+ 			val |= BM_CLPCR_BYPASS_PMIC_READY;
+ 		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul() ||
+-		    cpu_is_imx6ull() || cpu_is_imx6sll())
++		    cpu_is_imx6ull() || cpu_is_imx6sll() || cpu_is_imx6ulz())
+ 			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
+ 		else
+ 			val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
+@@ -331,7 +331,7 @@ int imx6_set_lpm(enum mxc_cpu_pwr_mode mode)
+ 		if (cpu_is_imx6sl() || cpu_is_imx6sx())
+ 			val |= BM_CLPCR_BYPASS_PMIC_READY;
+ 		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul() ||
+-		    cpu_is_imx6ull() || cpu_is_imx6sll())
++		    cpu_is_imx6ull() || cpu_is_imx6sll() || cpu_is_imx6ulz())
+ 			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
+ 		else
+ 			val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
 -- 
 2.7.4
