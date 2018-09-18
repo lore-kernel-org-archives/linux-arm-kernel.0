@@ -1,33 +1,36 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 18 Sep 2018 08:43:31 -0300
-Subject: [PATCH 1/2] ARM: dts: imx51-zii-rdu1: Fix the rtc compatible string
-Message-ID: <1537271012-5159-1-git-send-email-festevam@gmail.com>
+Date: Tue, 18 Sep 2018 08:43:32 -0300
+Subject: [PATCH 2/2] ARM: dts: imx6qdl-zii-rdu2: Disable the internal RTC
+In-Reply-To: <1537271012-5159-1-git-send-email-festevam@gmail.com>
+References: <1537271012-5159-1-git-send-email-festevam@gmail.com>
+Message-ID: <1537271012-5159-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to Documentation/devicetree/bindings/rtc/rtc-ds1307.txt the
-original compatible "maxim,ds1341" is not a valid entry.
-
-Switch to the documented "dallas,ds1341" compatible.
+On the imx6qdl-zii-rdu2 board the RTC functionality is provided via
+a DS1341 RTC connected via I2C bus, so we can safely disable the internal
+one. 
 
 Reported-by: Chris Healy <cphealy@gmail.com>
 Signed-off-by: Fabio Estevam <festevam@gmail.com>
 ---
- arch/arm/boot/dts/imx51-zii-rdu1.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx51-zii-rdu1.dts b/arch/arm/boot/dts/imx51-zii-rdu1.dts
-index 469cce2..e45a15c 100644
---- a/arch/arm/boot/dts/imx51-zii-rdu1.dts
-+++ b/arch/arm/boot/dts/imx51-zii-rdu1.dts
-@@ -508,7 +508,7 @@
- 	};
+diff --git a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+index 7fff371..85e79a3 100644
+--- a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+@@ -813,6 +813,10 @@
+ 	status = "okay";
+ };
  
- 	ds1341: rtc at 68 {
--		compatible = "maxim,ds1341";
-+		compatible = "dallas,ds1341";
- 		reg = <0x68>;
- 	};
- 
++&snvs_rtc {
++	status = "disabled";
++};
++
+ &ssi1 {
+ 	status = "okay";
+ };
 -- 
 2.7.4
