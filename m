@@ -1,81 +1,69 @@
-From: ebiggers@kernel.org (Eric Biggers)
-Date: Tue, 18 Sep 2018 15:55:53 -0700
-Subject: [PATCH net-next v5 09/20] zinc: Poly1305 ARM and ARM64
- implementations
-In-Reply-To: <20180918161646.19105-10-Jason@zx2c4.com>
-References: <20180918161646.19105-1-Jason@zx2c4.com>
- <20180918161646.19105-10-Jason@zx2c4.com>
-Message-ID: <20180918225552.GA74746@gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 19 Sep 2018 06:56:58 +0800
+Subject: [arm-platforms:kvm-arm64/nv-wip 108/116]
+ arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-v2-nested.c:228:11: error:
+ 'KVM_VGIC_V2_HYP_SIZE' undeclared; did you mean 'KVM_VGIC_V2_CPU_SIZE'?
+Message-ID: <201809190657.U9zRwSkJ%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2018 at 06:16:35PM +0200, Jason A. Donenfeld wrote:
-> diff --git a/lib/zinc/poly1305/poly1305-arm-glue.h b/lib/zinc/poly1305/poly1305-arm-glue.h
-> new file mode 100644
-> index 000000000000..dd3fa5a38c62
-> --- /dev/null
-> +++ b/lib/zinc/poly1305/poly1305-arm-glue.h
-> @@ -0,0 +1,65 @@
-> +/* SPDX-License-Identifier: MIT
-> + *
-> + * Copyright (C) 2015-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
-> + */
-> +
-> +#include <asm/hwcap.h>
-> +#include <asm/neon.h>
-> +
-> +asmlinkage void poly1305_init_arm(void *ctx, const u8 key[16]);
-> +asmlinkage void poly1305_blocks_arm(void *ctx, const u8 *inp, const size_t len,
-> +				    const u32 padbit);
-> +asmlinkage void poly1305_emit_arm(void *ctx, u8 mac[16], const u32 nonce[4]);
-> +#if IS_ENABLED(CONFIG_KERNEL_MODE_NEON) &&                                     \
-> +	(defined(CONFIG_64BIT) || __LINUX_ARM_ARCH__ >= 7)
-> +#define ARM_USE_NEON
-> +asmlinkage void poly1305_blocks_neon(void *ctx, const u8 *inp, const size_t len,
-> +				     const u32 padbit);
-> +asmlinkage void poly1305_emit_neon(void *ctx, u8 mac[16], const u32 nonce[4]);
-> +#endif
-> +
-> +static bool poly1305_use_neon __ro_after_init;
-> +
-> +static void __init poly1305_fpu_init(void)
-> +{
-> +#if defined(CONFIG_ARM64)
-> +	poly1305_use_neon = elf_hwcap & HWCAP_ASIMD;
-> +#elif defined(CONFIG_ARM)
-> +	poly1305_use_neon = elf_hwcap & HWCAP_NEON;
-> +#endif
-> +}
-> +
-> +static inline bool poly1305_init_arch(void *ctx,
-> +				      const u8 key[POLY1305_KEY_SIZE])
-> +{
-> +	poly1305_init_arm(ctx, key);
-> +	return true;
-> +}
-> +
-> +static inline bool poly1305_blocks_arch(void *ctx, const u8 *inp,
-> +					const size_t len, const u32 padbit,
-> +					simd_context_t *simd_context)
-> +{
-> +#if defined(ARM_USE_NEON)
-> +	if (poly1305_use_neon && simd_use(simd_context)) {
-> +		poly1305_blocks_neon(ctx, inp, len, padbit);
-> +		return true;
-> +	}
-> +#endif
-> +	poly1305_blocks_arm(ctx, inp, len, padbit);
-> +	return true;
-> +}
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/nv-wip
+head:   b7b336b71aac5dbb02b53a82e7032524ba292713
+commit: a528c9e903228ced99ab50ff8589a5bb8826f6e5 [108/116] KVM: arm/arm64: register GICH iodev for the guest hypervisor
+config: arm-axm55xx_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout a528c9e903228ced99ab50ff8589a5bb8826f6e5
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=arm 
 
-This will compute the wrong digest if called with simd_context=HAVE_FULL_SIMD
-and then later with simd_context=HAVE_NO_SIMD, since poly1305_blocks_neon()
-converts the accumulator from base 32 to base 26, whereas poly1305_blocks_arm()
-assumes it is still in base 32.  Is that intentional?  I'm sure this is a rare
-case, but my understanding is that the existing crypto API doesn't preclude
-calling successive steps in different contexts.  And I'm concerned that it could
-be relevant in some cases, e.g. especially if people are importing a hash state
-that was exported earlier.  Handling it by silently computing the wrong digest
-is not a great idea...
+All errors (new ones prefixed by >>):
 
-- Eric
+   arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-v2-nested.c: In function 'vgic_register_gich_iodev':
+>> arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-v2-nested.c:228:11: error: 'KVM_VGIC_V2_HYP_SIZE' undeclared (first use in this function); did you mean 'KVM_VGIC_V2_CPU_SIZE'?
+              KVM_VGIC_V2_HYP_SIZE, &io_device->dev);
+              ^~~~~~~~~~~~~~~~~~~~
+              KVM_VGIC_V2_CPU_SIZE
+   arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-v2-nested.c:228:11: note: each undeclared identifier is reported only once for each function it appears in
+
+vim +228 arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-v2-nested.c
+
+   208	
+   209	int vgic_register_gich_iodev(struct kvm *kvm, struct vgic_dist *dist)
+   210	{
+   211		struct vgic_io_device *io_device = &kvm->arch.vgic.hyp_iodev;
+   212		int ret = 0;
+   213	
+   214		if (!nested_virt_in_use(kvm->vcpus[0]))
+   215			return 0;
+   216	
+   217		io_device->regions = vgic_v2_gich_registers;
+   218		io_device->nr_regions = ARRAY_SIZE(vgic_v2_gich_registers);
+   219		kvm_iodevice_init(&io_device->dev, &kvm_io_gic_ops);
+   220	
+   221		io_device->base_addr = kvm->arch.vgic.vgic_hyp_base;
+   222		io_device->iodev_type = IODEV_GICH;
+   223		io_device->redist_vcpu = NULL;
+   224	
+   225		mutex_lock(&kvm->slots_lock);
+   226		ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS,
+   227					      io_device->base_addr,
+ > 228					      KVM_VGIC_V2_HYP_SIZE, &io_device->dev);
+   229		mutex_unlock(&kvm->slots_lock);
+   230	
+   231		return ret;
+   232	}
+   233	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 20256 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180919/2586e03d/attachment-0001.gz>
