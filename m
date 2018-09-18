@@ -1,49 +1,38 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 18 Sep 2018 08:52:00 -0700
-Subject: [PATCH 2/2] crypto: arm/crc32 - avoid warning when compiling with
- Clang
-In-Reply-To: <20180916043825.23247-2-stefan@agner.ch>
-References: <20180916043825.23247-1-stefan@agner.ch>
- <20180916043825.23247-2-stefan@agner.ch>
-Message-ID: <CAKv+Gu8xkeKb1-ce_hNCcXLrdj+qdi2DsXWPUuAiZQY1Rz+rmw@mail.gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 18 Sep 2018 18:09:31 +0200
+Subject: [PATCH 1/2] ARM: dts: imx51-zii-rdu1: Fix the rtc compatible
+ string
+In-Reply-To: <1537271012-5159-1-git-send-email-festevam@gmail.com>
+References: <1537271012-5159-1-git-send-email-festevam@gmail.com>
+Message-ID: <1537286971.3362.143.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 September 2018 at 21:38, Stefan Agner <stefan@agner.ch> wrote:
-> The table id (second) argument to MODULE_DEVICE_TABLE is often
-> referenced otherwise. This is not the case for CPU features. This
-> leads to a warning when building the kernel with Clang:
->   arch/arm/crypto/crc32-ce-glue.c:239:33: warning: variable
->     'crc32_cpu_feature' is not needed and will not be emitted
->     [-Wunneeded-internal-declaration]
->   static const struct cpu_feature crc32_cpu_feature[] = {
->                                   ^
->
-> Avoid warnings by using __maybe_unused, similar to commit 1f318a8bafcf
-> ("modules: mark __inittest/__exittest as __maybe_unused").
->
-> Fixes: 2a9faf8b7e43 ("crypto: arm/crc32 - enable module autoloading based on CPU feature bits")
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+Am Dienstag, den 18.09.2018, 08:43 -0300 schrieb Fabio Estevam:
+> According to Documentation/devicetree/bindings/rtc/rtc-ds1307.txt the
+> original compatible "maxim,ds1341" is not a valid entry.
+> 
+> Switch to the documented "dallas,ds1341" compatible.
+> 
+> Reported-by: Chris Healy <cphealy@gmail.com>
+> Signed-off-by: Fabio Estevam <festevam@gmail.com>
 
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 
 > ---
->  arch/arm/crypto/crc32-ce-glue.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/crypto/crc32-ce-glue.c b/arch/arm/crypto/crc32-ce-glue.c
-> index 96e62ec105d0..cd9e93b46c2d 100644
-> --- a/arch/arm/crypto/crc32-ce-glue.c
-> +++ b/arch/arm/crypto/crc32-ce-glue.c
-> @@ -236,7 +236,7 @@ static void __exit crc32_pmull_mod_exit(void)
->                                   ARRAY_SIZE(crc32_pmull_algs));
->  }
->
-> -static const struct cpu_feature crc32_cpu_feature[] = {
-> +static const struct cpu_feature __maybe_unused crc32_cpu_feature[] = {
->         { cpu_feature(CRC32) }, { cpu_feature(PMULL) }, { }
->  };
->  MODULE_DEVICE_TABLE(cpu, crc32_cpu_feature);
-> --
-> 2.19.0
->
+> ?arch/arm/boot/dts/imx51-zii-rdu1.dts | 2 +-
+> ?1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx51-zii-rdu1.dts b/arch/arm/boot/dts/imx51-zii-rdu1.dts
+> index 469cce2..e45a15c 100644
+> --- a/arch/arm/boot/dts/imx51-zii-rdu1.dts
+> +++ b/arch/arm/boot/dts/imx51-zii-rdu1.dts
+> @@ -508,7 +508,7 @@
+> > ?	};
+> ?
+> > > ?	ds1341: rtc at 68 {
+> > -		compatible = "maxim,ds1341";
+> > +		compatible = "dallas,ds1341";
+> > ?		reg = <0x68>;
+> > ?	};
+> ?
