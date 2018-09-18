@@ -1,148 +1,113 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Tue, 18 Sep 2018 12:55:37 +0200
-Subject: [PATCH V2 20/27] mmc: mmci: add variant property to define irq pio
- mask
+Date: Tue, 18 Sep 2018 12:55:34 +0200
+Subject: [PATCH V2 17/27] mmc: mmci: expand startbiterr to irqmask and error
+ check
 In-Reply-To: <1537268144-21152-1-git-send-email-ludovic.Barre@st.com>
 References: <1537268144-21152-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1537268144-21152-21-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1537268144-21152-18-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Barre <ludovic.barre@st.com>
 
-This patch allows to define specific pio mask for variants.
-Needed to support the STM32 sdmmc variant which has some bits
-with different meaning (bits: 21,20,13,12,9)
+All variants don't pretend to have a startbiterr.
+-While data error check, if status register return an error
+(like  MCI_DATACRCFAIL) we must avoid to check MCI_STARTBITERR
+(if not desired).
+-expand start_err to MCI_IRQENABLE to avoid to set this bit by default.
 
 Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 ---
- drivers/mmc/host/mmci.c | 13 +++++++++++--
- drivers/mmc/host/mmci.h |  5 ++++-
- 2 files changed, 15 insertions(+), 3 deletions(-)
+ drivers/mmc/host/mmci.c | 27 ++++++++++++++++-----------
+ drivers/mmc/host/mmci.h |  6 +++---
+ 2 files changed, 19 insertions(+), 14 deletions(-)
 
 diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 761b50f..f61b10b 100644
+index e2272c7..53f613f 100644
 --- a/drivers/mmc/host/mmci.c
 +++ b/drivers/mmc/host/mmci.c
-@@ -62,6 +62,7 @@ static struct variant_data variant_arm = {
- 	.f_max			= 100000000,
- 	.reversed_irq_handling	= true,
- 	.mmcimask1		= true,
-+	.irq_pio_mask		= MCI_IRQ_PIO_MASK,
- 	.start_err		= MCI_STARTBITERR,
- 	.opendrain		= MCI_ROD,
- 	.init			= mmci_variant_init,
-@@ -80,6 +81,7 @@ static struct variant_data variant_arm_extended_fifo = {
- 	.pwrreg_powerup		= MCI_PWR_UP,
- 	.f_max			= 100000000,
- 	.mmcimask1		= true,
-+	.irq_pio_mask		= MCI_IRQ_PIO_MASK,
- 	.start_err		= MCI_STARTBITERR,
- 	.opendrain		= MCI_ROD,
- 	.init			= mmci_variant_init,
-@@ -99,6 +101,7 @@ static struct variant_data variant_arm_extended_fifo_hwfc = {
- 	.pwrreg_powerup		= MCI_PWR_UP,
- 	.f_max			= 100000000,
- 	.mmcimask1		= true,
-+	.irq_pio_mask		= MCI_IRQ_PIO_MASK,
- 	.start_err		= MCI_STARTBITERR,
- 	.opendrain		= MCI_ROD,
- 	.init			= mmci_variant_init,
-@@ -124,6 +127,7 @@ static struct variant_data variant_u300 = {
- 	.pwrreg_clkgate		= true,
- 	.pwrreg_nopower		= true,
- 	.mmcimask1		= true,
-+	.irq_pio_mask		= MCI_IRQ_PIO_MASK,
- 	.start_err		= MCI_STARTBITERR,
- 	.opendrain		= MCI_OD,
- 	.init			= mmci_variant_init,
-@@ -150,6 +154,7 @@ static struct variant_data variant_nomadik = {
- 	.pwrreg_clkgate		= true,
- 	.pwrreg_nopower		= true,
- 	.mmcimask1		= true,
-+	.irq_pio_mask		= MCI_IRQ_PIO_MASK,
- 	.start_err		= MCI_STARTBITERR,
- 	.opendrain		= MCI_OD,
- 	.init			= mmci_variant_init,
-@@ -182,6 +187,7 @@ static struct variant_data variant_ux500 = {
- 	.busy_detect_mask	= MCI_ST_BUSYENDMASK,
- 	.pwrreg_nopower		= true,
- 	.mmcimask1		= true,
-+	.irq_pio_mask		= MCI_IRQ_PIO_MASK,
- 	.start_err		= MCI_STARTBITERR,
- 	.opendrain		= MCI_OD,
- 	.init			= mmci_variant_init,
-@@ -216,6 +222,7 @@ static struct variant_data variant_ux500v2 = {
- 	.busy_detect_mask	= MCI_ST_BUSYENDMASK,
- 	.pwrreg_nopower		= true,
- 	.mmcimask1		= true,
-+	.irq_pio_mask		= MCI_IRQ_PIO_MASK,
- 	.start_err		= MCI_STARTBITERR,
- 	.opendrain		= MCI_OD,
- 	.init			= mmci_variant_init,
-@@ -232,6 +239,7 @@ static struct variant_data variant_stm32 = {
- 	.cmdreg_lrsp_crc	= MCI_CPSM_RESPONSE | MCI_CPSM_LONGRSP,
- 	.cmdreg_srsp_crc	= MCI_CPSM_RESPONSE,
- 	.cmdreg_srsp		= MCI_CPSM_RESPONSE,
-+	.irq_pio_mask		= MCI_IRQ_PIO_MASK,
- 	.datalength_bits	= 24,
- 	.datactrl_blocksz	= 11,
- 	.datactrl_dpsm_enable	= MCI_DPSM_ENABLE,
-@@ -268,6 +276,7 @@ static struct variant_data variant_qcom = {
- 	.qcom_fifo		= true,
- 	.qcom_dml		= true,
- 	.mmcimask1		= true,
-+	.irq_pio_mask		= MCI_IRQ_PIO_MASK,
- 	.start_err		= MCI_STARTBITERR,
- 	.opendrain		= MCI_ROD,
- 	.init			= qcom_variant_init,
-@@ -537,7 +546,7 @@ static void mmci_set_mask1(struct mmci_host *host, unsigned int mask)
- 	if (host->singleirq) {
- 		unsigned int mask0 = readl(base + MMCIMASK0);
+@@ -1014,14 +1014,18 @@ static void
+ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
+ 	      unsigned int status)
+ {
++	unsigned int status_err;
++
+ 	/* Make sure we have data to handle */
+ 	if (!data)
+ 		return;
  
--		mask0 &= ~MCI_IRQ1MASK;
-+		mask0 &= ~variant->irq_pio_mask;
- 		mask0 |= mask;
+ 	/* First check for errors */
+-	if (status & (MCI_DATACRCFAIL | MCI_DATATIMEOUT |
+-		      host->variant->start_err |
+-		      MCI_TXUNDERRUN | MCI_RXOVERRUN)) {
++	status_err = status & (host->variant->start_err |
++			       MCI_DATACRCFAIL | MCI_DATATIMEOUT |
++			       MCI_TXUNDERRUN | MCI_RXOVERRUN);
++
++	if (status_err) {
+ 		u32 remain, success;
  
- 		writel(mask0, base + MMCIMASK0);
-@@ -1430,7 +1439,7 @@ static irqreturn_t mmci_irq(int irq, void *dev_id)
- 			if (status & host->mask1_reg)
- 				mmci_pio_irq(irq, dev_id);
+ 		/* Terminate the DMA transfer */
+@@ -1038,18 +1042,18 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
+ 		success = data->blksz * data->blocks - remain;
  
--			status &= ~MCI_IRQ1MASK;
-+			status &= ~host->variant->irq_pio_mask;
- 		}
+ 		dev_dbg(mmc_dev(host->mmc), "MCI ERROR IRQ, status 0x%08x at 0x%08x\n",
+-			status, success);
+-		if (status & MCI_DATACRCFAIL) {
++			status_err, success);
++		if (status_err & MCI_DATACRCFAIL) {
+ 			/* Last block was not successful */
+ 			success -= 1;
+ 			data->error = -EILSEQ;
+-		} else if (status & MCI_DATATIMEOUT) {
++		} else if (status_err & MCI_DATATIMEOUT) {
+ 			data->error = -ETIMEDOUT;
+-		} else if (status & MCI_STARTBITERR) {
++		} else if (status_err & MCI_STARTBITERR) {
+ 			data->error = -ECOMM;
+-		} else if (status & MCI_TXUNDERRUN) {
++		} else if (status_err & MCI_TXUNDERRUN) {
+ 			data->error = -EIO;
+-		} else if (status & MCI_RXOVERRUN) {
++		} else if (status_err & MCI_RXOVERRUN) {
+ 			if (success > host->variant->fifosize)
+ 				success -= host->variant->fifosize;
+ 			else
+@@ -1911,7 +1915,7 @@ static int mmci_probe(struct amba_device *dev,
+ 			goto clk_disable;
+ 	}
  
- 		/*
+-	writel(MCI_IRQENABLE, host->base + MMCIMASK0);
++	writel(MCI_IRQENABLE | variant->start_err, host->base + MMCIMASK0);
+ 
+ 	amba_set_drvdata(dev, mmc);
+ 
+@@ -2000,7 +2004,8 @@ static void mmci_restore(struct mmci_host *host)
+ 		writel(host->datactrl_reg, host->base + MMCIDATACTRL);
+ 		writel(host->pwr_reg, host->base + MMCIPOWER);
+ 	}
+-	writel(MCI_IRQENABLE, host->base + MMCIMASK0);
++	writel(MCI_IRQENABLE | host->variant->start_err,
++	       host->base + MMCIMASK0);
+ 	mmci_reg_delay(host);
+ 
+ 	spin_unlock_irqrestore(&host->lock, flags);
 diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index 94ce73c..bb25160 100644
+index 9d347ca..59c952f 100644
 --- a/drivers/mmc/host/mmci.h
 +++ b/drivers/mmc/host/mmci.h
-@@ -186,7 +186,7 @@
- 	MCI_CMDRESPENDMASK | MCI_CMDSENTMASK)
+@@ -181,9 +181,9 @@
+ #define MMCIFIFO		0x080 /* to 0x0bc */
+ 
+ #define MCI_IRQENABLE	\
+-	(MCI_CMDCRCFAILMASK|MCI_DATACRCFAILMASK|MCI_CMDTIMEOUTMASK|	\
+-	MCI_DATATIMEOUTMASK|MCI_TXUNDERRUNMASK|MCI_RXOVERRUNMASK|	\
+-	MCI_CMDRESPENDMASK|MCI_CMDSENTMASK|MCI_STARTBITERRMASK)
++	(MCI_CMDCRCFAILMASK | MCI_DATACRCFAILMASK | MCI_CMDTIMEOUTMASK | \
++	MCI_DATATIMEOUTMASK | MCI_TXUNDERRUNMASK | MCI_RXOVERRUNMASK |	\
++	MCI_CMDRESPENDMASK | MCI_CMDSENTMASK)
  
  /* These interrupts are directed to IRQ1 when two IRQ lines are available */
--#define MCI_IRQ1MASK \
-+#define MCI_IRQ_PIO_MASK \
- 	(MCI_RXFIFOHALFFULLMASK | MCI_RXDATAAVLBLMASK | \
- 	 MCI_TXFIFOHALFEMPTYMASK)
- 
-@@ -239,6 +239,8 @@ struct mmci_host;
-  * @qcom_dml: enables qcom specific dma glue for dma transfers.
-  * @reversed_irq_handling: handle data irq before cmd irq.
-  * @mmcimask1: true if variant have a MMCIMASK1 register.
-+ * @irq_pio_mask: bitmask used to manage interrupt pio transfert in mmcimask
-+ *		  register
-  * @start_err: bitmask identifying the STARTBITERR bit inside MMCISTATUS
-  *	       register.
-  * @opendrain: bitmask identifying the OPENDRAIN bit inside MMCIPOWER register
-@@ -278,6 +280,7 @@ struct variant_data {
- 	bool			qcom_dml;
- 	bool			reversed_irq_handling;
- 	bool			mmcimask1;
-+	unsigned int		irq_pio_mask;
- 	u32			start_err;
- 	u32			opendrain;
- 	void (*init)(struct mmci_host *host);
+ #define MCI_IRQ1MASK \
 -- 
 2.7.4
