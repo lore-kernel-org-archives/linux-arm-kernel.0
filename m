@@ -1,70 +1,57 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Tue, 18 Sep 2018 18:11:13 +0200
-Subject: move swiotlb noncoherent dma support from arm64 to generic code
-In-Reply-To: <d6a4f58e-975f-e7dc-d622-d56760710a92@arm.com>
-References: <20180917153826.28052-1-hch@lst.de>
- <d6a4f58e-975f-e7dc-d622-d56760710a92@arm.com>
-Message-ID: <20180918161112.GA4713@lst.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 18 Sep 2018 17:14:33 +0100
+Subject: Huge page(contiguous bit) slow down
+In-Reply-To: <20180918160927.hxtipnq6z6qrh7hw@armageddon.cambridge.arm.com>
+References: <8898674D84E3B24BA3A2D289B872026A69FE8F27@G01JPEXMBKW03>
+ <20180918113300.GC16498@arm.com>
+ <20180918145832.h24u5tbsqksvmrtq@armageddon.cambridge.arm.com>
+ <20180918151625.GG16498@arm.com>
+ <20180918160927.hxtipnq6z6qrh7hw@armageddon.cambridge.arm.com>
+Message-ID: <20180918161432.GH16498@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2018 at 02:28:42PM +0100, Robin Murphy wrote:
-> On 17/09/18 16:38, Christoph Hellwig wrote:
->> Hi all,
->>
->> this series starts with various swiotlb cleanups, then adds support for
->> non-cache coherent devices to the generic swiotlb support, and finally
->> switches arm64 to use the generic code.
->
-> I think there's going to be an issue with the embedded folks' grubby hack 
-> in arm64's mem_init() which skips initialising SWIOTLB at all with 
-> sufficiently little DRAM. I've been waiting for 
-> dma-direct-noncoherent-merge so that I could fix that case to swizzle in 
-> dma_direct_ops and avoid swiotlb_dma_ops entirely.
+On Tue, Sep 18, 2018 at 05:09:28PM +0100, Catalin Marinas wrote:
+> On Tue, Sep 18, 2018 at 04:16:26PM +0100, Will Deacon wrote:
+> > On Tue, Sep 18, 2018 at 03:58:32PM +0100, Catalin Marinas wrote:
+> > > On Tue, Sep 18, 2018 at 12:33:01PM +0100, Will Deacon wrote:
+> > > > On Tue, Sep 18, 2018 at 03:02:17AM +0000, Zhang, Lei wrote:
+> > > > > --- a/arch/arm64/mm/hugetlbpage.c
+> > > > > +++ b/arch/arm64/mm/hugetlbpage.c
+> > > > > @@ -332,6 +332,9 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
+> > > > >         if (!pte_cont(pte))
+> > > > >                 return ptep_set_access_flags(vma, addr, ptep, pte, dirty);
+> > > > > 
+> > > > > +       if(pte_same(pte, READ_ONCE(*ptep)))
+> > > > > +               return 0;
+> > > > > +
+> > > > 
+> > > > This broadly seems to follow the non-contiguous code, but I wonder if we
+> > > > can then drop the subsequent pte_same() check on this path and always return
+> > > > 1 when we actually update the entries?
+> > > 
+> > > I don't remember why we went for first clearing and then checking
+> > > pte_same() (maybe Steve knows) but I think we can leave pte_same()
+> > > outside the get_clear_flush()/set_pte_at() block. This code is executed
+> > > with the mmap_sem taken, so there shouldn't be any race on the
+> > > individual ptes.
+> > 
+> > I suspect it's just to avoid the additional load of the page-table entry,
+> > since we still have to use get_clear_flush() even with this change.
+> > 
+> > One thing I don't really grok is the interaction between the contiguous
+> > hint and HW_AFDBM. Is it possible for us to be e.g. halfway through the
+> > set_pte_at() loop and then for the hardware to perform atomic PTE updates
+> > for entries later in the loop? If so, we've got a race and need to use
+> > cmpxchg() like we do for the non-contiguous code.
+> 
+> With the current code, no, since get_clear_flush() sets all of them to
+> 0, so no hardware updates before set_pte_at().
 
-I wait for your review of dma-direct-noncoherent-merge to put it
-into dma-mapping for-next..
+The case I'm concerned about is when we've set_pte_at() half of the mapping,
+though. At this point, a CPU can get a translation via one of the entries
+that we've put down, and it's not clear to me whether this could establish
+a contiguous TLB entry which could then result in access/dirty updates to
+PTEs that we haven't yet written out.
 
-That being said one thing I'm investigating is to eventually further
-merge dma_direct_ops and swiotlb_ops - the reason for that beeing that
-I want to remove the indirect calls for the common direct mapping case,
-and if we don't merge them that will get complicated.  Note that
-swiotlb will generally just work if you don't initialize the buffer
-as long as we never see a physical address large enough to cause bounce
-buffering.
-
->
->> Given that this series depends on patches in the dma-mapping tree, or
->> pending for it I've also published a git tree here:
->>
->>      git://git.infradead.org/users/hch/misc.git swiotlb-noncoherent
->
-> However, upon sitting down to eagerly write that patch I've just 
-> boot-tested the above branch as-is for a baseline and discovered a rather 
-> more significant problem: arch_dma_alloc() is recursing back into 
-> __swiotlb_alloc() and blowing the stack. Not good :(
-
-Oops, I messed up when renaming things.  Try this patch on top:
-
-diff --git a/kernel/dma/swiotlb.c b/kernel/dma/swiotlb.c
-index 83e597101c6a..c75c721eb74e 100644
---- a/kernel/dma/swiotlb.c
-+++ b/kernel/dma/swiotlb.c
-@@ -955,7 +955,7 @@ void *__swiotlb_alloc(struct device *dev, size_t size, dma_addr_t *dma_handle,
- 	 */
- 	gfp |= __GFP_NOWARN;
- 
--	vaddr = dma_direct_alloc(dev, size, dma_handle, gfp, attrs);
-+	vaddr = dma_direct_alloc_pages(dev, size, dma_handle, gfp, attrs);
- 	if (!vaddr)
- 		vaddr = swiotlb_alloc_buffer(dev, size, dma_handle, attrs);
- 	return vaddr;
-@@ -973,7 +973,7 @@ void __swiotlb_free(struct device *dev, size_t size, void *vaddr,
- 		dma_addr_t dma_addr, unsigned long attrs)
- {
- 	if (!swiotlb_free_buffer(dev, size, dma_addr))
--		dma_direct_free(dev, size, vaddr, dma_addr, attrs);
-+		dma_direct_free_pages(dev, size, vaddr, dma_addr, attrs);
- }
- 
- static void swiotlb_free(struct device *dev, size_t size, void *vaddr,
+Will
