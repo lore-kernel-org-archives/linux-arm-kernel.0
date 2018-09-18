@@ -1,51 +1,45 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 18 Sep 2018 12:17:17 +0100
-Subject: [GIT PULL] firmware: scmi: updates for v4.20
-Message-ID: <20180918111716.GA23868@e107155-lin>
+Date: Tue, 18 Sep 2018 12:17:53 +0100
+Subject: [GIT PULL] arm64: dts: juno: updates for v4.20
+Message-ID: <20180918111752.GB23868@e107155-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi ARM-SoC team,
 
-I have based this one on v4.19-rc3 in order to avoid conflicts with the
-driver fix that went in after -rc2. Please pull !
+Please pull !
 
 Regards,
 Sudeep
 
 --
-The following changes since commit 11da3a7f84f19c26da6f86af878298694ede0804:
 
-  Linux 4.19-rc3 (2018-09-09 17:26:43 -0700)
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+
+  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/scmi-updates-4.20
+  git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/juno-updates-4.20
 
-for you to fetch changes up to 1a63fe9a2b1f47af5b2b7436b41824b14999c17a:
+for you to fetch changes up to 79daf2a4089f6a817e5e0202362cdc764b535561:
 
-  firmware: arm_scmi: add a getter for power of performance states (2018-09-10 17:37:06 +0100)
-
-----------------------------------------------------------------
-SCMI updates for v4.20
-
-1. Addition of interface to fetch estimated power from the firmware
-   corresponding to each OPP of a device
-
-2. Cleanup using strlcpy to ensure NULL-terminated strings for name
-   strings instead of relying on the firmware to do the same
+  arm64: dts: juno: Enable coresight tmc scatter gather in ETR (2018-09-11 11:41:28 +0100)
 
 ----------------------------------------------------------------
-Quentin Perret (1):
-      firmware: arm_scmi: add a getter for power of performance states
+ARMv8 Juno/Vexpress updates for v4.20
 
-Sudeep Holla (1):
-      firmware: arm_scmi: use strlcpy to ensure NULL-terminated strings
+1. Enablement of scatter gather mode for CoreSight TMC-ETR routing
 
- drivers/firmware/arm_scmi/base.c    |  2 +-
- drivers/firmware/arm_scmi/clock.c   |  2 +-
- drivers/firmware/arm_scmi/perf.c    | 30 +++++++++++++++++++++++++++++-
- drivers/firmware/arm_scmi/power.c   |  2 +-
- drivers/firmware/arm_scmi/sensors.c |  2 +-
- include/linux/scmi_protocol.h       |  4 ++++
- 6 files changed, 37 insertions(+), 5 deletions(-)
+2. Usage of updated coresight graph bindings that eliminates loads of
+   dtc warnings
+
+----------------------------------------------------------------
+Suzuki K Poulose (2):
+      arm64: dts: juno: Update entries to match latest coresight bindings
+      arm64: dts: juno: Enable coresight tmc scatter gather in ETR
+
+ arch/arm64/boot/dts/arm/juno-base.dtsi    | 162 +++++++++++++++---------------
+ arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi |  52 ++++------
+ arch/arm64/boot/dts/arm/juno.dts          |  13 +--
+ 3 files changed, 106 insertions(+), 121 deletions(-)
