@@ -1,57 +1,23 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 18 Sep 2018 17:14:33 +0100
-Subject: Huge page(contiguous bit) slow down
-In-Reply-To: <20180918160927.hxtipnq6z6qrh7hw@armageddon.cambridge.arm.com>
-References: <8898674D84E3B24BA3A2D289B872026A69FE8F27@G01JPEXMBKW03>
- <20180918113300.GC16498@arm.com>
- <20180918145832.h24u5tbsqksvmrtq@armageddon.cambridge.arm.com>
- <20180918151625.GG16498@arm.com>
- <20180918160927.hxtipnq6z6qrh7hw@armageddon.cambridge.arm.com>
-Message-ID: <20180918161432.GH16498@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 18 Sep 2018 09:15:04 -0700
+Subject: [PATCH v2] spi: mediatek: Don't modify spi_transfer when transfer.
+In-Reply-To: <20180910035421.101505-1-pihsun@chromium.org>
+References: <20180910035047.98496-1-pihsun@chromium.org>
+ <20180910035421.101505-1-pihsun@chromium.org>
+Message-ID: <20180918161504.GM2471@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2018 at 05:09:28PM +0100, Catalin Marinas wrote:
-> On Tue, Sep 18, 2018 at 04:16:26PM +0100, Will Deacon wrote:
-> > On Tue, Sep 18, 2018 at 03:58:32PM +0100, Catalin Marinas wrote:
-> > > On Tue, Sep 18, 2018 at 12:33:01PM +0100, Will Deacon wrote:
-> > > > On Tue, Sep 18, 2018 at 03:02:17AM +0000, Zhang, Lei wrote:
-> > > > > --- a/arch/arm64/mm/hugetlbpage.c
-> > > > > +++ b/arch/arm64/mm/hugetlbpage.c
-> > > > > @@ -332,6 +332,9 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
-> > > > >         if (!pte_cont(pte))
-> > > > >                 return ptep_set_access_flags(vma, addr, ptep, pte, dirty);
-> > > > > 
-> > > > > +       if(pte_same(pte, READ_ONCE(*ptep)))
-> > > > > +               return 0;
-> > > > > +
-> > > > 
-> > > > This broadly seems to follow the non-contiguous code, but I wonder if we
-> > > > can then drop the subsequent pte_same() check on this path and always return
-> > > > 1 when we actually update the entries?
-> > > 
-> > > I don't remember why we went for first clearing and then checking
-> > > pte_same() (maybe Steve knows) but I think we can leave pte_same()
-> > > outside the get_clear_flush()/set_pte_at() block. This code is executed
-> > > with the mmap_sem taken, so there shouldn't be any race on the
-> > > individual ptes.
-> > 
-> > I suspect it's just to avoid the additional load of the page-table entry,
-> > since we still have to use get_clear_flush() even with this change.
-> > 
-> > One thing I don't really grok is the interaction between the contiguous
-> > hint and HW_AFDBM. Is it possible for us to be e.g. halfway through the
-> > set_pte_at() loop and then for the hardware to perform atomic PTE updates
-> > for entries later in the loop? If so, we've got a race and need to use
-> > cmpxchg() like we do for the non-contiguous code.
-> 
-> With the current code, no, since get_clear_flush() sets all of them to
-> 0, so no hardware updates before set_pte_at().
+On Mon, Sep 10, 2018 at 11:54:21AM +0800, Peter Shih wrote:
 
-The case I'm concerned about is when we've set_pte_at() half of the mapping,
-though. At this point, a CPU can get a translation via one of the entries
-that we've put down, and it's not clear to me whether this could establish
-a contiguous TLB entry which could then result in access/dirty updates to
-PTEs that we haven't yet written out.
+> Change-Id: I23e218cd964f16c0b2b26127d4a5ca6529867673
 
-Will
+Please don't include noise like this in upstream submissions, it doesn't
+mean anything outside of your company's systems.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180918/496debc6/attachment.sig>
