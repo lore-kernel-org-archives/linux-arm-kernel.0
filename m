@@ -1,97 +1,76 @@
-From: saiprakash.ranjan@codeaurora.org (Sai Prakash Ranjan)
-Date: Wed, 19 Sep 2018 02:43:34 +0530
-Subject: [PATCH 2/6] pstore: Add event tracing support
-In-Reply-To: <20180918164434.472294f3@gandalf.local.home>
-References: <cover.1536430404.git.saiprakash.ranjan@codeaurora.org>
- <b9b60ff2864a17fb05481aa33f90114ab051d6ce.1536430404.git.saiprakash.ranjan@codeaurora.org>
- <20180917193426.41c99fd5@gandalf.local.home>
- <cb17a8c9-fca1-5492-3255-eab0ea33577c@codeaurora.org>
- <20180918164434.472294f3@gandalf.local.home>
-Message-ID: <bad69c36-2600-f0b3-5bfd-c865039ae97f@codeaurora.org>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Tue, 18 Sep 2018 14:51:13 -0700
+Subject: [PATCH v8 01/12] dt-bindings: Add a document of PECI subsystem
+In-Reply-To: <20180918215124.14003-1-jae.hyun.yoo@linux.intel.com>
+References: <20180918215124.14003-1-jae.hyun.yoo@linux.intel.com>
+Message-ID: <20180918215124.14003-2-jae.hyun.yoo@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/19/2018 2:14 AM, Steven Rostedt wrote:
-> On Tue, 18 Sep 2018 23:22:48 +0530
-> Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org> wrote:
-> 
->> On 9/18/2018 5:04 AM, Steven Rostedt wrote:
->>>
->>> It looks like pstore_event_call() gets called from a trace event. You
->>> can't call kmalloc() from one. One thing is that kmalloc has
->>> tracepoints itself. You trace those you just entered an infinite loop.
->>>
->>>    
->>
->> Ok will remove it in v2. But any alternative way to do this?
-> 
-> I think I describe it below.
-> 
+This commit adds a document of generic PECI bus, adapter and client
+driver.
 
-Ok got it, will change and post the 2nd version soon.
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Andrew Jeffery <andrew@aj.id.au>
+Cc: Joel Stanley <joel@jms.id.au>
+Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+Reviewed-by: Haiyue Wang <haiyue.wang@linux.intel.com>
+Reviewed-by: James Feist <james.feist@linux.intel.com>
+Reviewed-by: Vernon Mauery <vernon.mauery@linux.intel.com>
+---
+ .../devicetree/bindings/peci/peci.txt         | 43 +++++++++++++++++++
+ 1 file changed, 43 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/peci/peci.txt
 
->>
->>>> +
->>>> +	event_call = fbuffer->trace_file->event_call;
->>>> +	if (!event_call || !event_call->event.funcs ||
->>>> +	    !event_call->event.funcs->trace)
->>>> +		goto fail_event;
->>>> +
->>>> +	event = &fbuffer->trace_file->event_call->event;
->>>> +
->>>> +	spin_lock_irqsave(&psinfo->buf_lock, flags);
->>>> +
->>>> +	trace_seq_init(&iter->seq);
->>>> +	iter->ent = fbuffer->entry;
->>>
->>> I guess what you are doing is needing to translate the raw data into
->>> ascii output, and need the trace_iterator to do so.
->>>
->>> You are already under a psinfo->buf_lock. Add a dummy iterator to that
->>> and use it instead.
->>>
->>> 	trace_seq_init(&psinfo->iter->seq);
->>>    
->>>> +	event_call->event.funcs->trace(iter, 0, event);
->>>
->>> 				      (psinfo->iter, 0 , event);
->>>
->>> etc.
->>>    
->>
->> Sure, will update in v2.
->>
->>>> +	trace_seq_putc(&iter->seq, 0);
->>>> +
->>>> +	if (seq->size > psinfo->bufsize)
->>>> +		seq->size = psinfo->bufsize;
->>>> +
->>>> +	s = &iter->seq;
->>>> +	seq = &s->seq;
->>>> +
->>>> +	record.buf = (char *)(seq->buffer);
->>>> +	record.size = seq->len;
->>>> +	psinfo->write(&record);
->>>> +
->>>> +	spin_unlock_irqrestore(&psinfo->buf_lock, flags);
->>>
->>> You may also need to convert these spin_locks into raw_spin_locks as
->>> when PREEMPT_RT enters the kernel you don't want them to turn into
->>> mutexes.
->>>
->>> But that can be another patch.
->>>    
->>
->> I will change this in v2, but can't we have it in same patch?
-> 
-> I suggested a separate patch because buf_lock is used elsewhere.
-> Changing it to "raw_spin_lock" will affect more than just what this
-> patch series does. Thus, I recommend making it a separate patch to keep
-> this patch series from being more intrusive than it needs to be.
-> 
-
-Sure, thanks a lot.
-
+diff --git a/Documentation/devicetree/bindings/peci/peci.txt b/Documentation/devicetree/bindings/peci/peci.txt
+new file mode 100644
+index 000000000000..864b7ab4e9fa
+--- /dev/null
++++ b/Documentation/devicetree/bindings/peci/peci.txt
+@@ -0,0 +1,43 @@
++Generic device tree configuration for PECI adapters
++===================================================
++
++Required properties:
++- #address-cells : Should be <1>. Read more about client addresses below.
++- #size-cells    : Should be <0>. Read more about client addresses below.
++
++The cells properties above define that an address of CPU clients of a PECI bus
++are described by a single value.
++
++Example:
++	peci0: peci-bus at 0 {
++		compatible = "vendor,soc-peci";
++		reg = <0x0 0x1000>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
++
++Generic device tree configuration for PECI clients
++==================================================
++
++Required properties:
++- compatible : Should contain name of PECI client.
++- reg        : Should contain address of a client CPU. Address range of CPU
++	       clients starts from 0x30 based on PECI specification.
++
++Example:
++	peci-bus at 0 {
++		compatible = "vendor,soc-peci";
++		reg = <0x0 0x1000>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		peci-client at 30 {
++			compatible = "intel,peci-client";
++			reg = <0x30>;
++		};
++
++		peci-client at 31 {
++			compatible = "intel,peci-client";
++			reg = <0x31>;
++		};
++	};
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+2.18.0
