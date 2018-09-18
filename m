@@ -1,34 +1,28 @@
-From: vkoul@kernel.org (Vinod)
-Date: Tue, 18 Sep 2018 09:35:12 -0700
-Subject: [PATCH 2/3] dmaengine: Add Slave and Cyclic mode support for
- Actions Semi Owl S900 SoC
-In-Reply-To: <20180901164215.3683-3-manivannan.sadhasivam@linaro.org>
-References: <20180901164215.3683-1-manivannan.sadhasivam@linaro.org>
- <20180901164215.3683-3-manivannan.sadhasivam@linaro.org>
-Message-ID: <20180918163512.GE2613@vkoul-mobl>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Tue, 18 Sep 2018 18:50:45 +0200
+Subject: [PATCH v6 08/18] khwasan: preassign tags to objects with ctors or
+ SLAB_TYPESAFE_BY_RCU
+In-Reply-To: <CACT4Y+awX48sFAYFCgx1Q-nJ=QrBhr08psMmHr+hDeCsQc0NRw@mail.gmail.com>
+References: <cover.1535462971.git.andreyknvl@google.com>
+ <95b5beb7ec13b7e998efe84c9a7a5c1fa49a9fe3.1535462971.git.andreyknvl@google.com>
+ <CACT4Y+awX48sFAYFCgx1Q-nJ=QrBhr08psMmHr+hDeCsQc0NRw@mail.gmail.com>
+Message-ID: <CAAeHK+z3W+JqC2d=-ZddsLv5D7BWa6oKpEdJFiyS1DbEYVnmqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01-09-18, 22:12, Manivannan Sadhasivam wrote:
+On Wed, Sep 12, 2018 at 6:36 PM, Dmitry Vyukov <dvyukov@google.com> wrote:
+> On Wed, Aug 29, 2018 at 1:35 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
 
-> @@ -364,6 +372,26 @@ static inline int owl_dma_cfg_lli(struct owl_dma_vchan *vchan,
->  			OWL_DMA_MODE_DT_DCU | OWL_DMA_MODE_SAM_INC |
->  			OWL_DMA_MODE_DAM_INC;
->  
-> +		break;
-> +	case DMA_MEM_TO_DEV:
-> +		mode |= OWL_DMA_MODE_TS(vchan->drq)
-> +			| OWL_DMA_MODE_ST_DCU | OWL_DMA_MODE_DT_DEV
-> +			| OWL_DMA_MODE_SAM_INC | OWL_DMA_MODE_DAM_CONST;
-> +
-> +		/* Handle bus width for UART */
-> +		if (sconfig->dst_addr_width == DMA_SLAVE_BUSWIDTH_1_BYTE)
-> +			mode |= OWL_DMA_MODE_NDDBW_8BIT;
+>>         if (!shuffle) {
+>> +               start = khwasan_preset_slub_tag(s, start);
+>>                 for_each_object_idx(p, idx, s, start, page->objects) {
+>>                         setup_object(s, page, p);
+>> +                       p = khwasan_preset_slub_tag(s, p);
+>
+>
+> As I commented in the previous patch, can't we do this in
+> kasan_init_slab_obj(), which should be called in all the right places
+> already?
+>
 
-this is fine per se, but not correct way to handle in dmaengine driver.
-You should be agnostic to user of dmaengine, so handle all the buswidths
-the IP block supports and update the values accordingly. That way new
-uses can be added w/o requiring change in dmaengine driver
-
--- 
-~Vinod
+As per offline discussion, will do in v7.
