@@ -1,39 +1,70 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 18 Sep 2018 18:09:59 +0200
-Subject: [PATCH 2/2] ARM: dts: imx6qdl-zii-rdu2: Disable the internal RTC
-In-Reply-To: <1537271012-5159-2-git-send-email-festevam@gmail.com>
-References: <1537271012-5159-1-git-send-email-festevam@gmail.com>
- <1537271012-5159-2-git-send-email-festevam@gmail.com>
-Message-ID: <1537286999.3362.144.camel@pengutronix.de>
+From: hch@lst.de (Christoph Hellwig)
+Date: Tue, 18 Sep 2018 18:11:13 +0200
+Subject: move swiotlb noncoherent dma support from arm64 to generic code
+In-Reply-To: <d6a4f58e-975f-e7dc-d622-d56760710a92@arm.com>
+References: <20180917153826.28052-1-hch@lst.de>
+ <d6a4f58e-975f-e7dc-d622-d56760710a92@arm.com>
+Message-ID: <20180918161112.GA4713@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 18.09.2018, 08:43 -0300 schrieb Fabio Estevam:
-> On the imx6qdl-zii-rdu2 board the RTC functionality is provided via
-> a DS1341 RTC connected via I2C bus, so we can safely disable the internal
-> one.?
-> 
-> Reported-by: Chris Healy <cphealy@gmail.com>
-> Signed-off-by: Fabio Estevam <festevam@gmail.com>
+On Tue, Sep 18, 2018 at 02:28:42PM +0100, Robin Murphy wrote:
+> On 17/09/18 16:38, Christoph Hellwig wrote:
+>> Hi all,
+>>
+>> this series starts with various swiotlb cleanups, then adds support for
+>> non-cache coherent devices to the generic swiotlb support, and finally
+>> switches arm64 to use the generic code.
+>
+> I think there's going to be an issue with the embedded folks' grubby hack 
+> in arm64's mem_init() which skips initialising SWIOTLB at all with 
+> sufficiently little DRAM. I've been waiting for 
+> dma-direct-noncoherent-merge so that I could fix that case to swizzle in 
+> dma_direct_ops and avoid swiotlb_dma_ops entirely.
 
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+I wait for your review of dma-direct-noncoherent-merge to put it
+into dma-mapping for-next..
 
-> ---
-> ?arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi | 4 ++++
-> ?1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
-> index 7fff371..85e79a3 100644
-> --- a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
-> @@ -813,6 +813,10 @@
-> > ?	status = "okay";
-> ?};
-> ?
-> +&snvs_rtc {
-> > +	status = "disabled";
-> +};
-> +
-> ?&ssi1 {
-> > ?	status = "okay";
-> ?};
+That being said one thing I'm investigating is to eventually further
+merge dma_direct_ops and swiotlb_ops - the reason for that beeing that
+I want to remove the indirect calls for the common direct mapping case,
+and if we don't merge them that will get complicated.  Note that
+swiotlb will generally just work if you don't initialize the buffer
+as long as we never see a physical address large enough to cause bounce
+buffering.
+
+>
+>> Given that this series depends on patches in the dma-mapping tree, or
+>> pending for it I've also published a git tree here:
+>>
+>>      git://git.infradead.org/users/hch/misc.git swiotlb-noncoherent
+>
+> However, upon sitting down to eagerly write that patch I've just 
+> boot-tested the above branch as-is for a baseline and discovered a rather 
+> more significant problem: arch_dma_alloc() is recursing back into 
+> __swiotlb_alloc() and blowing the stack. Not good :(
+
+Oops, I messed up when renaming things.  Try this patch on top:
+
+diff --git a/kernel/dma/swiotlb.c b/kernel/dma/swiotlb.c
+index 83e597101c6a..c75c721eb74e 100644
+--- a/kernel/dma/swiotlb.c
++++ b/kernel/dma/swiotlb.c
+@@ -955,7 +955,7 @@ void *__swiotlb_alloc(struct device *dev, size_t size, dma_addr_t *dma_handle,
+ 	 */
+ 	gfp |= __GFP_NOWARN;
+ 
+-	vaddr = dma_direct_alloc(dev, size, dma_handle, gfp, attrs);
++	vaddr = dma_direct_alloc_pages(dev, size, dma_handle, gfp, attrs);
+ 	if (!vaddr)
+ 		vaddr = swiotlb_alloc_buffer(dev, size, dma_handle, attrs);
+ 	return vaddr;
+@@ -973,7 +973,7 @@ void __swiotlb_free(struct device *dev, size_t size, void *vaddr,
+ 		dma_addr_t dma_addr, unsigned long attrs)
+ {
+ 	if (!swiotlb_free_buffer(dev, size, dma_addr))
+-		dma_direct_free(dev, size, vaddr, dma_addr, attrs);
++		dma_direct_free_pages(dev, size, vaddr, dma_addr, attrs);
+ }
+ 
+ static void swiotlb_free(struct device *dev, size_t size, void *vaddr,
