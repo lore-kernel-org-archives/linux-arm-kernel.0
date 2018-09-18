@@ -1,71 +1,46 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 18 Sep 2018 08:37:49 +0100
-Subject: [PATCH v5 03/27] arm64: alternative: Apply alternatives early in
- boot process
-In-Reply-To: <20180917234400.ctq3w2u6fi5s5coj@holly.lan>
-References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
- <1535471497-38854-4-git-send-email-julien.thierry@arm.com>
- <3becf020-b230-beb8-b304-d8097377f234@arm.com>
- <78781d82-e5c4-c590-6c0c-e7d2db456bf9@arm.com>
- <20180917234400.ctq3w2u6fi5s5coj@holly.lan>
-Message-ID: <9505fbcc-796f-78bd-80b7-21d879c5e0bc@arm.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 18 Sep 2018 09:38:22 +0200
+Subject: [PATCH 0/4] Add i.MX6ULZ SoC support
+In-Reply-To: <1537251548-27845-1-git-send-email-Anson.Huang@nxp.com>
+References: <1537251548-27845-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <e82e2894-2a0d-0084-913c-b7c6d966fc13@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Anson,
 
+Am 18.09.2018 um 08:19 schrieb Anson Huang:
+> This patch set adds i.MX6ULZ SoC support, i.MX6ULZ is a new SoC of
+> i.MX6 family, compared to i.MX6ULL, it removes below modules:
+>
+>     - UART5/UART6/UART7/UART8;
+>     - PWM5/PWM6/PWM7/PWM8;
+>     - eCSPI3/eCSPI4;
+>     - CAN1/CAN2;
+>     - FEC1/FEC2;
+>     - I2C3/I2C4;
+>     - EPIT2;
+>     - LCDIF;
+>     - GPT2;
+>     - TSC;
+>
+> And i.MX6ULZ has same soc_id as i.MX6ULL, but SRC_SBMR2 bit[6] is
+> to differentiate i.MX6ULZ from i.MX6ULL, 1'b1 means i.MX6ULZ and
+> 1'b0 means i.MX6ULL. i.MX6ULZ reuse most of i.MX6UL/i.MX6ULL code,
+> just add the new CPU type and remove those non-exist modules from dtb.
+>
+> Anson Huang (4):
+>   ARM: dts: imx: add i.mx6ulz and i.mx6ulz 14x14 evk support
+>   ARM: imx: add i.mx6ulz msl support
+>   clk: imx6ul: add i.mx6ulz support
+>   dt-bindings: arm: add compatible for i.MX6ULZ 14x14 EVK board
+>
+>  
 
-On 18/09/18 00:44, Daniel Thompson wrote:
-> On Wed, Sep 12, 2018 at 05:49:09PM +0100, Julien Thierry wrote:
->>>> +	__apply_alternatives(&region, false, boot_capabilities);
->>>> +}
->>>> +
->>>>    #ifdef CONFIG_MODULES
->>>>    void apply_alternatives_module(void *start, size_t length)
->>>>    {
->>>
->>>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
->>>> index 3bc1c8b..0d1e41e 100644
->>>> --- a/arch/arm64/kernel/cpufeature.c
->>>> +++ b/arch/arm64/kernel/cpufeature.c
->>>> @@ -52,6 +52,8 @@
->>>>    DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
->>>>    EXPORT_SYMBOL(cpu_hwcaps);
->>>> +unsigned long boot_capabilities;
->>>> +
->>>>    /*
->>>>     * Flag to indicate if we have computed the system wide
->>>>     * capabilities based on the boot time active CPUs. This
->>>> @@ -1375,6 +1377,9 @@ static void __update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
->>>>    		if (!cpus_have_cap(caps->capability) && caps->desc)
->>>>    			pr_info("%s %s\n", info, caps->desc);
->>>>    		cpus_set_cap(caps->capability);
->>>
->>> Hmm, the bitmap behind cpus_set_cap() is what cpus_have_cap() in
->>> __apply_alternatives() looks at. If you had a call to __apply_alternatives after
->>> update_cpu_capabilities(SCOPE_BOOT_CPU), but before any others, it would only
->>> apply those alternatives...
->>>
->>> (I don't think there is a problem re-applying the same alternative, but I
->>> haven't checked).
->>>
->>
->> Interesting idea. If someone can confirm that patching alternatives twice is
->> safe, I think it would make things simpler.
-> 
-> Early versions of this patch applied the alternatives twice. I never
-> noticed any problems with double patching (second time round it will
-> write out code that is identical to what is already there so it is
-> merely inefficient rather than unsafe.
-> 
+i recommend the following patch order:
+ARM: imx: add i.mx6ulz msl support
+clk: imx6ul: add i.mx6ulz support
+dt-bindings: arm: add compatible for i.MX6ULZ 14x14 EVK board
+ARM: dts: imx: add i.mx6ulz and i.mx6ulz 14x14 evk support
 
-When you say early version, do you mean the first ones you did? Because 
-the one I picked up (v4 I believe) had a feature mask to select which 
-ones to apply early and then which ones to exclude when applying the 
-rest of the features.
-
-But I admit I have not looked at the previous versions.
-
-Cheers,
-
--- 
-Julien Thierry
+Stefan
