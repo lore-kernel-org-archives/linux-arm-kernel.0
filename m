@@ -1,35 +1,40 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 18 Sep 2018 08:42:07 -0700
-Subject: [PATCH v2 1/5] dt-bindings: spi/spi-pxa2xx: add PXA2xx SSP SPI
- Controller
-In-Reply-To: <54f5d070c8b0615baa26983e97e2a22401973096.camel@v3.sk>
-References: <20180917113559.11101-1-lkundrak@v3.sk>
- <20180917113559.11101-2-lkundrak@v3.sk>
- <20180917175753.GE2471@sirena.org.uk>
- <54f5d070c8b0615baa26983e97e2a22401973096.camel@v3.sk>
-Message-ID: <20180918154207.GJ2471@sirena.org.uk>
+From: dvyukov@google.com (Dmitry Vyukov)
+Date: Tue, 18 Sep 2018 17:45:11 +0200
+Subject: [PATCH v6 07/18] khwasan: add tag related helper functions
+In-Reply-To: <CAAeHK+w+Znw-t_wd29PO5B+pNegS3wqzS1mUVCmfrgdCXpavWw@mail.gmail.com>
+References: <cover.1535462971.git.andreyknvl@google.com>
+ <6cd298a90d02068969713f2fd440eae21227467b.1535462971.git.andreyknvl@google.com>
+ <CACT4Y+adO3n4Nb4XOPyXdt43DbYjb=Kz6__tPTmb1CX=00qNSQ@mail.gmail.com>
+ <CAAeHK+w+Znw-t_wd29PO5B+pNegS3wqzS1mUVCmfrgdCXpavWw@mail.gmail.com>
+Message-ID: <CACT4Y+a=tctG9PXkQmaeLtU3cGbBCSA==uwHasX+XzNVB66kcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2018 at 02:15:12PM +0200, Lubomir Rintel wrote:
+On Mon, Sep 17, 2018 at 8:59 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
+> On Wed, Sep 12, 2018 at 6:21 PM, Dmitry Vyukov <dvyukov@google.com> wrote:
+>> On Wed, Aug 29, 2018 at 1:35 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
+>
+>>> +void *khwasan_preset_slub_tag(struct kmem_cache *cache, const void *addr)
+>>
+>> Can't we do this in the existing kasan_init_slab_obj() hook? It looks
+>> like it should do exactly this -- allow any one-time initialization
+>> for objects. We could extend it to accept index and return a new
+>> pointer.
+>> If that does not work for some reason, I would try to at least unify
+>> the hook for slab/slub, e.g. pass idx=-1 from slub and then use
+>> random_tag().
+>> It also seems that we do preset tag for slab multiple times (from
+>> slab_get_obj()). Using kasan_init_slab_obj() should resolve this too
+>> (hopefully we don't call it multiple times).
+>
+> The issue is that SLAB stores freelist as an array of indexes instead
+> of using an actual linked list like SLUB. So you can't store the tag
+> in the pointer while the object is in the freelist, since there's no
+> pointer. And, technically, we don't preset tags for SLAB, we just use
+> the id as the tag every time a pointer is used, so perhaps we should
+> rename the callback. As to unifying the callbacks, sure, we can do
+> that.
 
-> Should I've Cc'd everyone on the full series, even if only a patch or
-> two might be really interesting to them? How do I decide whether the
-
-It's a judgement call about who gets the patches but in general it's
-good to either do that or make sure that everyone sees the cover letter
-which explains what the whole series is.
-
-> recipient needs to be in the commit's commit message (as opposed to
-> just --cc on a command line)?
-
-Using CCs in the commit message is entirely optional TBH - a lot of
-people just don't do it at all, often when it is done it's a list of
-everyone who got the mail.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180918/2770405c/attachment.sig>
+As per offline discussion: potentially we can use
+kasan_init_slab_obj() if we add tag in kmalloc hook by using
+obj_to_idx().
