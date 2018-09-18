@@ -1,65 +1,51 @@
-From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Tue, 18 Sep 2018 12:55:39 +0200
-Subject: [PATCH V2 22/27] mmc: mmci: add variant property to not read datacnt
-In-Reply-To: <1537268144-21152-1-git-send-email-ludovic.Barre@st.com>
-References: <1537268144-21152-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1537268144-21152-23-git-send-email-ludovic.Barre@st.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 18 Sep 2018 12:17:17 +0100
+Subject: [GIT PULL] firmware: scmi: updates for v4.20
+Message-ID: <20180918111716.GA23868@e107155-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Barre <ludovic.barre@st.com>
+Hi ARM-SoC team,
 
-This patch adds a boolean property to not read datacnt register.
-Needed to support the STM32 sdmmc variant. MMCIDATACNT
-register should be read only after the data transfer is completed.
-When reading after an error event the read data count value may be
-different from the real number of data bytes transferred.
+I have based this one on v4.19-rc3 in order to avoid conflicts with the
+driver fix that went in after -rc2. Please pull !
 
-Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
----
- drivers/mmc/host/mmci.c | 8 ++++++--
- drivers/mmc/host/mmci.h | 3 +++
- 2 files changed, 9 insertions(+), 2 deletions(-)
+Regards,
+Sudeep
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index b525ba4..b1d5bc5 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -1095,8 +1095,12 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
- 		 * can be as much as a FIFO-worth of data ahead.  This
- 		 * matters for FIFO overruns only.
- 		 */
--		remain = readl(host->base + MMCIDATACNT);
--		success = data->blksz * data->blocks - remain;
-+		if (!host->variant->datacnt_useless) {
-+			remain = readl(host->base + MMCIDATACNT);
-+			success = data->blksz * data->blocks - remain;
-+		} else {
-+			success = 0;
-+		}
- 
- 		dev_dbg(mmc_dev(host->mmc), "MCI ERROR IRQ, status 0x%08x at 0x%08x\n",
- 			status_err, success);
-diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index 89e6733..7fd89b7 100644
---- a/drivers/mmc/host/mmci.h
-+++ b/drivers/mmc/host/mmci.h
-@@ -224,6 +224,8 @@ struct mmci_host;
-  * @datactrl_blksz: block size in power of two
-  * @datactrl_dpsm_enable: enable value for DPSM
-  * @datactrl_first: true if data must be setup before send command
-+ * @datacnt_useless: true if you could not use datacnt register to read
-+ *		     remaining data
-  * @pwrreg_powerup: power up value for MMCIPOWER register
-  * @f_max: maximum clk frequency supported by the controller.
-  * @signal_direction: input/out direction of bus signals can be indicated
-@@ -264,6 +266,7 @@ struct variant_data {
- 	unsigned int		datactrl_blocksz;
- 	unsigned int		datactrl_dpsm_enable;
- 	bool			datactrl_first;
-+	bool			datacnt_useless;
- 	bool			st_sdio;
- 	bool			st_clkdiv;
- 	bool			blksz_datactrl16;
--- 
-2.7.4
+--
+The following changes since commit 11da3a7f84f19c26da6f86af878298694ede0804:
+
+  Linux 4.19-rc3 (2018-09-09 17:26:43 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/scmi-updates-4.20
+
+for you to fetch changes up to 1a63fe9a2b1f47af5b2b7436b41824b14999c17a:
+
+  firmware: arm_scmi: add a getter for power of performance states (2018-09-10 17:37:06 +0100)
+
+----------------------------------------------------------------
+SCMI updates for v4.20
+
+1. Addition of interface to fetch estimated power from the firmware
+   corresponding to each OPP of a device
+
+2. Cleanup using strlcpy to ensure NULL-terminated strings for name
+   strings instead of relying on the firmware to do the same
+
+----------------------------------------------------------------
+Quentin Perret (1):
+      firmware: arm_scmi: add a getter for power of performance states
+
+Sudeep Holla (1):
+      firmware: arm_scmi: use strlcpy to ensure NULL-terminated strings
+
+ drivers/firmware/arm_scmi/base.c    |  2 +-
+ drivers/firmware/arm_scmi/clock.c   |  2 +-
+ drivers/firmware/arm_scmi/perf.c    | 30 +++++++++++++++++++++++++++++-
+ drivers/firmware/arm_scmi/power.c   |  2 +-
+ drivers/firmware/arm_scmi/sensors.c |  2 +-
+ include/linux/scmi_protocol.h       |  4 ++++
+ 6 files changed, 37 insertions(+), 5 deletions(-)
