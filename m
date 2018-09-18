@@ -1,48 +1,122 @@
 From: Anson.Huang@nxp.com (Anson Huang)
-Date: Tue, 18 Sep 2018 14:19:04 +0800
-Subject: [PATCH 0/4] Add i.MX6ULZ SoC support
-Message-ID: <1537251548-27845-1-git-send-email-Anson.Huang@nxp.com>
+Date: Tue, 18 Sep 2018 14:19:05 +0800
+Subject: [PATCH 1/4] ARM: dts: imx: add i.mx6ulz and i.mx6ulz 14x14 evk support
+In-Reply-To: <1537251548-27845-1-git-send-email-Anson.Huang@nxp.com>
+References: <1537251548-27845-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <1537251548-27845-2-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set adds i.MX6ULZ SoC support, i.MX6ULZ is a new SoC of
-i.MX6 family, compared to i.MX6ULL, it removes below modules:
+i.MX6ULZ is new SoC of i.MX6 family, compared to i.MX6ULL,
+it removes below modules:
 
-    - UART5/UART6/UART7/UART8;
-    - PWM5/PWM6/PWM7/PWM8;
-    - eCSPI3/eCSPI4;
-    - CAN1/CAN2;
-    - FEC1/FEC2;
-    - I2C3/I2C4;
-    - EPIT2;
-    - LCDIF;
-    - GPT2;
-    - TSC;
+- UART5/UART6/UART7/UART8;
+- PWM5/PWM6/PWM7/PWM8;
+- eCSPI3/eCSPI4;
+- CAN1/CAN2;
+- FEC1/FEC2;
+- I2C3/I2C4;
+- EPIT2;
+- LCDIF;
+- GPT2;
+- ADC1;
+- TSC;
 
-And i.MX6ULZ has same soc_id as i.MX6ULL, but SRC_SBMR2 bit[6] is
-to differentiate i.MX6ULZ from i.MX6ULL, 1'b1 means i.MX6ULZ and
-1'b0 means i.MX6ULL. i.MX6ULZ reuse most of i.MX6UL/i.MX6ULL code,
-just add the new CPU type and remove those non-exist modules from dtb.
+This patch adds support for i.MX6ULZ and i.MX6ULZ 14x14 EVK
+board.
 
-Anson Huang (4):
-  ARM: dts: imx: add i.mx6ulz and i.mx6ulz 14x14 evk support
-  ARM: imx: add i.mx6ulz msl support
-  clk: imx6ul: add i.mx6ulz support
-  dt-bindings: arm: add compatible for i.MX6ULZ 14x14 EVK board
-
- Documentation/devicetree/bindings/arm/fsl.txt |  4 +++
- arch/arm/boot/dts/Makefile                    |  3 ++-
- arch/arm/boot/dts/imx6ulz-14x14-evk.dts       | 20 ++++++++++++++
- arch/arm/boot/dts/imx6ulz.dtsi                | 38 +++++++++++++++++++++++++++
- arch/arm/mach-imx/anatop.c                    | 20 ++++++++++++++
- arch/arm/mach-imx/cpu.c                       |  3 +++
- arch/arm/mach-imx/mach-imx6ul.c               |  1 +
- arch/arm/mach-imx/mxc.h                       |  7 +++++
- arch/arm/mach-imx/pm-imx6.c                   |  4 +--
- drivers/clk/imx/clk-imx6ul.c                  |  3 ++-
- 10 files changed, 99 insertions(+), 4 deletions(-)
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ arch/arm/boot/dts/Makefile              |  3 ++-
+ arch/arm/boot/dts/imx6ulz-14x14-evk.dts | 20 +++++++++++++++++
+ arch/arm/boot/dts/imx6ulz.dtsi          | 38 +++++++++++++++++++++++++++++++++
+ 3 files changed, 60 insertions(+), 1 deletion(-)
  create mode 100644 arch/arm/boot/dts/imx6ulz-14x14-evk.dts
  create mode 100644 arch/arm/boot/dts/imx6ulz.dtsi
 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index b3ec70d..d7268ae 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -560,7 +560,8 @@ dtb-$(CONFIG_SOC_IMX6UL) += \
+ 	imx6ul-tx6ul-mainboard.dtb \
+ 	imx6ull-14x14-evk.dtb \
+ 	imx6ull-colibri-eval-v3.dtb \
+-	imx6ull-colibri-wifi-eval-v3.dtb
++	imx6ull-colibri-wifi-eval-v3.dtb \
++	imx6ulz-14x14-evk.dtb
+ dtb-$(CONFIG_SOC_IMX7D) += \
+ 	imx7d-cl-som-imx7.dtb \
+ 	imx7d-colibri-emmc-eval-v3.dtb \
+diff --git a/arch/arm/boot/dts/imx6ulz-14x14-evk.dts b/arch/arm/boot/dts/imx6ulz-14x14-evk.dts
+new file mode 100644
+index 0000000..e2d67a3
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6ulz-14x14-evk.dts
+@@ -0,0 +1,20 @@
++// SPDX-License-Identifier: (GPL-2.0 OR MIT)
++//
++// Copyright 2018 NXP.
++
++/dts-v1/;
++
++#include "imx6ulz.dtsi"
++#include "imx6ul-14x14-evk.dtsi"
++
++/delete-node/ &fec1;
++/delete-node/ &fec2;
++/delete-node/ &lcdif;
++/delete-node/ &tsc;
++
++/ {
++	model = "Freescale i.MX6 ULZ 14x14 EVK Board";
++	compatible = "fsl,imx6ulz-14x14-evk", "fsl,imx6ulz";
++
++	/delete-node/ panel;
++};
+diff --git a/arch/arm/boot/dts/imx6ulz.dtsi b/arch/arm/boot/dts/imx6ulz.dtsi
+new file mode 100644
+index 0000000..ae6d7e5
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6ulz.dtsi
+@@ -0,0 +1,38 @@
++// SPDX-License-Identifier: (GPL-2.0 OR MIT)
++//
++// Copyright 2018 NXP.
++
++#include "imx6ull.dtsi"
++
++/ {
++	aliases {
++		/delete-property/ ethernet0;
++		/delete-property/ ethernet1;
++		/delete-property/ i2c2;
++		/delete-property/ i2c3;
++		/delete-property/ serial4;
++		/delete-property/ serial5;
++		/delete-property/ serial6;
++		/delete-property/ serial7;
++		/delete-property/ spi2;
++		/delete-property/ spi3;
++	};
++};
++
++/delete-node/ &adc1;
++/delete-node/ &can1;
++/delete-node/ &can2;
++/delete-node/ &ecspi3;
++/delete-node/ &ecspi4;
++/delete-node/ &epit2;
++/delete-node/ &gpt2;
++/delete-node/ &i2c3;
++/delete-node/ &i2c4;
++/delete-node/ &pwm5;
++/delete-node/ &pwm6;
++/delete-node/ &pwm7;
++/delete-node/ &pwm8;
++/delete-node/ &uart5;
++/delete-node/ &uart6;
++/delete-node/ &uart7;
++/delete-node/ &uart8;
 -- 
 2.7.4
