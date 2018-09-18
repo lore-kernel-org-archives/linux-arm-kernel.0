@@ -1,144 +1,43 @@
-From: manish.narani@xilinx.com (Manish Narani)
-Date: Tue, 18 Sep 2018 19:15:38 +0530
-Subject: [RFC PATCH 3/4] mmc: sdhci-of-arasan: Add auto tuning support for
- ZynqMP platform
-In-Reply-To: <1537278339-9257-1-git-send-email-manish.narani@xilinx.com>
-References: <1537278339-9257-1-git-send-email-manish.narani@xilinx.com>
-Message-ID: <1537278339-9257-4-git-send-email-manish.narani@xilinx.com>
+From: gustavo@embeddedor.com (Gustavo A. R. Silva)
+Date: Tue, 18 Sep 2018 08:55:55 -0500
+Subject: [PATCH v2] mtd: rawnand: atmel: Fix potential NULL pointer dereference
+Message-ID: <20180918135555.GA18114@embeddedor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support of SD auto tuning for ZynqMP platform. Before tuning
-execution, reset the DLL and after the auto tuning process gets
-completed, reset the DLL to load the newly obtained SDHC tuned tap
-value.
+There is a potential execution path in which function
+of_find_compatible_node() returns NULL. In such a case,
+we end up having a NULL pointer dereference when accessing
+pointer *nfc_np* in function of_clk_get().
 
-Signed-off-by: Manish Narani <manish.narani@xilinx.com>
+So, we better don't take any chances and fix this by null
+checking pointer *nfc_np* before calling of_clk_get().
+
+Addresses-Coverity-ID: 1473052 ("Dereference null return value")
+Fixes: f88fc122cc34 ("mtd: nand: Cleanup/rework the atmel_nand driver")
+Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
 ---
- drivers/mmc/host/sdhci-of-arasan.c | 83 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 83 insertions(+)
+Changes in v2:
+ - Add Fixes tag to the commit log.
+ - Remove blank line before null checking nfc_np.
 
-diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
-index a40bcc2..1a8bbd2 100644
---- a/drivers/mmc/host/sdhci-of-arasan.c
-+++ b/drivers/mmc/host/sdhci-of-arasan.c
-@@ -26,6 +26,7 @@
- #include <linux/phy/phy.h>
- #include <linux/regmap.h>
- #include <linux/of.h>
-+#include <linux/firmware/xlnx-zynqmp.h>
- 
- #include "cqhci.h"
- #include "sdhci-pltfm.h"
-@@ -98,6 +99,7 @@ struct sdhci_arasan_data {
- 
- 	struct regmap	*soc_ctl_base;
- 	const struct sdhci_arasan_soc_ctl_map *soc_ctl_map;
-+	unsigned int	device_id;
- 	unsigned int	quirks; /* Arasan deviations from spec */
- 
- /* Controller does not have CD wired and will not function normally without */
-@@ -163,6 +165,72 @@ static int sdhci_arasan_syscon_write(struct sdhci_host *host,
- 	return ret;
- }
- 
-+static void zynqmp_dll_reset(u8 deviceid)
-+{
-+	const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
-+
-+	if (!eemi_ops || !eemi_ops->ioctl)
-+		return;
-+
-+	/* Issue DLL Reset */
-+	if (deviceid == 0)
-+		eemi_ops->ioctl(NODE_SD_0, IOCTL_SD_DLL_RESET,
-+				PM_DLL_RESET_PULSE, 0, NULL);
-+	else
-+		eemi_ops->ioctl(NODE_SD_1, IOCTL_SD_DLL_RESET,
-+				PM_DLL_RESET_PULSE, 0, NULL);
-+}
-+
-+static void arasan_zynqmp_dll_reset(struct sdhci_host *host, u8 deviceid)
-+{
-+	u16 clk;
-+	unsigned long timeout;
-+
-+	clk = sdhci_readw(host, SDHCI_CLOCK_CONTROL);
-+	clk &= ~(SDHCI_CLOCK_CARD_EN | SDHCI_CLOCK_INT_EN);
-+	sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
-+
-+	/* Issue DLL Reset */
-+	zynqmp_dll_reset(deviceid);
-+
-+	clk = sdhci_readw(host, SDHCI_CLOCK_CONTROL);
-+	clk |= SDHCI_CLOCK_INT_EN;
-+	sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
-+
-+	/* Wait max 20 ms */
-+	timeout = 20;
-+	while (!((clk = sdhci_readw(host, SDHCI_CLOCK_CONTROL))
-+				& SDHCI_CLOCK_INT_STABLE)) {
-+		if (timeout == 0) {
-+			dev_err(mmc_dev(host->mmc),
-+				": Internal clock never stabilised.\n");
-+			return;
-+		}
-+		timeout--;
-+		mdelay(1);
+ drivers/mtd/nand/raw/atmel/nand-controller.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/mtd/nand/raw/atmel/nand-controller.c b/drivers/mtd/nand/raw/atmel/nand-controller.c
+index a38633a..5bfbe97 100644
+--- a/drivers/mtd/nand/raw/atmel/nand-controller.c
++++ b/drivers/mtd/nand/raw/atmel/nand-controller.c
+@@ -2034,6 +2034,10 @@ atmel_hsmc_nand_controller_legacy_init(struct atmel_hsmc_nand_controller *nc)
+ 	nand_np = dev->of_node;
+ 	nfc_np = of_find_compatible_node(dev->of_node, NULL,
+ 					 "atmel,sama5d3-nfc");
++	if (!nfc_np) {
++		dev_err(dev, "Could not find device node for sama5d3-nfc\n");
++		return -ENODEV;
 +	}
-+
-+	clk |= SDHCI_CLOCK_CARD_EN;
-+	sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
-+}
-+
-+static int arasan_zynqmp_execute_tuning(struct mmc_host *mmc, u32 opcode) {
-+	struct sdhci_host *host = mmc_priv(mmc);
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct sdhci_arasan_data *sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
-+	int err;
-+
-+	arasan_zynqmp_dll_reset(host, sdhci_arasan->device_id);
-+
-+	err = sdhci_execute_tuning(mmc, opcode);
-+	if (err)
-+		return err;
-+
-+	arasan_zynqmp_dll_reset(host, sdhci_arasan->device_id);
-+
-+	return 0;
-+}
-+
- static void sdhci_arasan_set_clock(struct sdhci_host *host, unsigned int clock)
- {
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-@@ -469,6 +537,7 @@ static const struct of_device_id sdhci_arasan_of_match[] = {
- 	{ .compatible = "arasan,sdhci-8.9a" },
- 	{ .compatible = "arasan,sdhci-5.1" },
- 	{ .compatible = "arasan,sdhci-4.9a" },
-+	{ .compatible = "xlnx,zynqmp-8.9a" },
  
- 	{ /* sentinel */ }
- };
-@@ -792,6 +861,20 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
- 		goto unreg_clk;
- 	}
- 
-+	if (of_device_is_compatible(pdev->dev.of_node, "xlnx,zynqmp-8.9a")) {
-+		ret = of_property_read_u32(pdev->dev.of_node,
-+					   "xlnx,device_id",
-+					   &sdhci_arasan->device_id);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev,
-+				"\"xlnx,device_id \" property is missing.\n");
-+			goto unreg_clk;
-+		}
-+
-+		host->mmc_host_ops.execute_tuning =
-+			arasan_zynqmp_execute_tuning;
-+	}
-+
- 	sdhci_arasan->phy = ERR_PTR(-ENODEV);
- 	if (of_device_is_compatible(pdev->dev.of_node,
- 				    "arasan,sdhci-5.1")) {
+ 	nc->clk = of_clk_get(nfc_np, 0);
+ 	if (IS_ERR(nc->clk)) {
 -- 
-2.1.1
+2.7.4
