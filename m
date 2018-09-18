@@ -1,88 +1,47 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 18 Sep 2018 14:01:40 +0200
-Subject: [PATCH v3 00/10] serial: uartps: Add run time support for more
- IPs than hardcoded 2
-In-Reply-To: <ac23383e-3d54-1cd2-c1f4-219c8ee306d2@xilinx.com>
-References: <cover.1535980253.git.michal.simek@xilinx.com>
- <ac23383e-3d54-1cd2-c1f4-219c8ee306d2@xilinx.com>
-Message-ID: <20180918120140.GA31835@kroah.com>
+From: lkundrak@v3.sk (Lubomir Rintel)
+Date: Tue, 18 Sep 2018 14:15:12 +0200
+Subject: [PATCH v2 1/5] dt-bindings: spi/spi-pxa2xx: add PXA2xx SSP SPI
+ Controller
+In-Reply-To: <20180917175753.GE2471@sirena.org.uk>
+References: <20180917113559.11101-1-lkundrak@v3.sk>
+ <20180917113559.11101-2-lkundrak@v3.sk>
+ <20180917175753.GE2471@sirena.org.uk>
+Message-ID: <54f5d070c8b0615baa26983e97e2a22401973096.camel@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2018 at 01:54:31PM +0200, Michal Simek wrote:
-> Hi Greg,
+On Mon, 2018-09-17 at 10:57 -0700, Mark Brown wrote:
+> On Mon, Sep 17, 2018 at 01:35:55PM +0200, Lubomir Rintel wrote:
+> > This is the SPI controller found on Marvel MMP2 and perhaps more
+> > platforms.
 > 
-> On 3.9.2018 15:10, Michal Simek wrote:
-> > Hi,
-> > 
-> > this series is trying to address discussion I had with Alan in past
-> > https://patchwork.kernel.org/patch/9738445/ and also with Rob in v1
-> > https://lkml.org/lkml/2018/4/26/551.
-> > 
-> > These patches are doing preparation to enable dynamic ID port allocation
-> > which is capable to create devices with higher IDs.
-> > 
-> > For example this is how it works.
-> > uart0 on higher alias
-> > serial0 = &uart1;
-> > serial30 = &uart0;
-> > 
-> > ~# ls -la /dev/ttyPS*
-> > crw-------    1 root     root      252,   0 Jun  6 12:19 /dev/ttyPS0
-> > crw--w----    1 root     root      253, 100 Jan  1  1970 /dev/ttyPS30
-> > 
-> > Thanks,
-> > Michal
-> > 
-> > Changes in v3:
-> > - New patch found by testing
-> > - New patch - can be sent separately but there is dependency that's why
-> >   sent in this series
-> > - Fix uart_unregister_driver() in error path or when driver is removed.
-> > - Change commit message
-> > - s/,/;/ in filling structure
-> > - get cdns_uart_uart_driver out of PS_UART_CONSOLE ifdefs
-> > - New patch in series
-> > - Rebase on the top of previous broken patch
-> > - Change patch subject ("was serial: uartps: Remove CDNS_UART_NR_PORTS
-> >   macro")
-> > - Keep CDNS_UART_NR_PORTS in this patch and remove it in next one and
-> >   align commit message to reflect this
-> > - Allocate struct console dynamically too to be unique for every
-> >   instance
-> > - Cleanup error path
-> > - New patch in series
-> > 
-> > Changes in v2:
-> > - new patch - it can be sent separately too
-> > - new patch - it can be sent separately too
-> > - new patch - it can be sent separately too
-> > - Remove nr field logic
-> > - new patch - it can be sent separately too
-> > - Register one uart_driver with unique minor at probe time
-> > 
-> > Michal Simek (9):
-> >   serial: uartps: console_setup() can't be placed to init section
-> >   serial: uartps: Do not initialize field to zero again
-> >   serial: uartps: Do not use static struct uart_driver out of probe()
-> >   serial: uartps: Move alias reading higher in probe()
-> >   serial: uartps: Move register to probe based on run time detection
-> >   serial: uartps: Fill struct uart_driver in probe()
-> >   serial: uartps: Change logic how console_port is setup
-> >   serial: uartps: Register own uart console and driver structures
-> >   serial: uartps: Move Port ID to device data structure
-> > 
-> > Nava kishore Manne (1):
-> >   serial: uartps: Fix suspend functionality
-> > 
-> >  drivers/tty/serial/xilinx_uartps.c | 203 +++++++++++++++++++------------------
-> >  1 file changed, 107 insertions(+), 96 deletions(-)
-> > 
+> I'm missing patches 2 and 5 from this series.  What's going on with
+> them, are there any dependencies?
+
+Sorry, I was not sure how to Cc people properly. I haven't dealt with a
+patchset that spanned multiple subsystems before.
+
+I thought it might have been a good idea to add individual people
+suggested by get_maintainer.pl in commits' "Cc:" tag, while passing the
+lists to --cc argument of git send-email.
+
+Should I've Cc'd everyone on the full series, even if only a patch or
+two might be really interesting to them? How do I decide whether the
+recipient needs to be in the commit's commit message (as opposed to
+just --cc on a command line)?
+
+https://lore.kernel.org/lkml/20180917113559.11101-1-lkundrak at v3.sk/
+
 > 
-> Can you please look at this series?
-> I have sent 2 more patches on the top of this series where OF patch was
-> reviewed by Rob already.
+> > Changes since v1:
+> > - s/ssp at d4035000/spi at d4035000/
+> 
+> As covered in SubmittingPatches please put inter-version changelogs
+> after the --- so they don't end up in the commits.
 
-My tty queue is a bit lagging right now, sorry, will get to that soon...
+Will do. I was actually not sure about that, so I took a short look at
+the git log, and it seemed to me that commit messages with the
+changelogs are quite common.
 
-greg k-h
+Thanks you,
+Lubo
