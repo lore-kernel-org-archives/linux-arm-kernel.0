@@ -1,44 +1,80 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 18 Sep 2018 14:48:14 -0300
-Subject: [PATCH 2/2] soc: imx: gpcv2: Switch to SPDX identifier
-In-Reply-To: <1537292894-22728-1-git-send-email-festevam@gmail.com>
-References: <1537292894-22728-1-git-send-email-festevam@gmail.com>
-Message-ID: <1537292894-22728-2-git-send-email-festevam@gmail.com>
+From: saiprakash.ranjan@codeaurora.org (Sai Prakash Ranjan)
+Date: Tue, 18 Sep 2018 23:22:48 +0530
+Subject: [PATCH 2/6] pstore: Add event tracing support
+In-Reply-To: <20180917193426.41c99fd5@gandalf.local.home>
+References: <cover.1536430404.git.saiprakash.ranjan@codeaurora.org>
+ <b9b60ff2864a17fb05481aa33f90114ab051d6ce.1536430404.git.saiprakash.ranjan@codeaurora.org>
+ <20180917193426.41c99fd5@gandalf.local.home>
+Message-ID: <cb17a8c9-fca1-5492-3255-eab0ea33577c@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+On 9/18/2018 5:04 AM, Steven Rostedt wrote:
+> 
+> It looks like pstore_event_call() gets called from a trace event. You
+> can't call kmalloc() from one. One thing is that kmalloc has
+> tracepoints itself. You trace those you just entered an infinite loop.
+> 
+> 
 
-Adopt the SPDX license identifier headers to ease license compliance
-management.
+Ok will remove it in v2. But any alternative way to do this?
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- drivers/soc/imx/gpcv2.c | 8 +-------
- 1 file changed, 1 insertion(+), 7 deletions(-)
+>> +
+>> +	event_call = fbuffer->trace_file->event_call;
+>> +	if (!event_call || !event_call->event.funcs ||
+>> +	    !event_call->event.funcs->trace)
+>> +		goto fail_event;
+>> +
+>> +	event = &fbuffer->trace_file->event_call->event;
+>> +
+>> +	spin_lock_irqsave(&psinfo->buf_lock, flags);
+>> +
+>> +	trace_seq_init(&iter->seq);
+>> +	iter->ent = fbuffer->entry;
+> 
+> I guess what you are doing is needing to translate the raw data into
+> ascii output, and need the trace_iterator to do so.
+> 
+> You are already under a psinfo->buf_lock. Add a dummy iterator to that
+> and use it instead.
+> 
+> 	trace_seq_init(&psinfo->iter->seq);
+> 
+>> +	event_call->event.funcs->trace(iter, 0, event);
+> 
+> 				      (psinfo->iter, 0 , event);
+> 
+> etc.
+> 
 
-diff --git a/drivers/soc/imx/gpcv2.c b/drivers/soc/imx/gpcv2.c
-index 938103a..e7b5994 100644
---- a/drivers/soc/imx/gpcv2.c
-+++ b/drivers/soc/imx/gpcv2.c
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0+
- /*
-  * Copyright 2017 Impinj, Inc
-  * Author: Andrey Smirnov <andrew.smirnov@gmail.com>
-@@ -5,13 +6,6 @@
-  * Based on the code of analogus driver:
-  *
-  * Copyright 2015-2017 Pengutronix, Lucas Stach <kernel@pengutronix.de>
-- *
-- * The code contained herein is licensed under the GNU General Public
-- * License. You may obtain a copy of the GNU General Public License
-- * Version 2 or later at the following locations:
-- *
-- * http://www.opensource.org/licenses/gpl-license.html
-- * http://www.gnu.org/copyleft/gpl.html
-  */
- 
- #include <linux/of_device.h>
+Sure, will update in v2.
+
+>> +	trace_seq_putc(&iter->seq, 0);
+>> +
+>> +	if (seq->size > psinfo->bufsize)
+>> +		seq->size = psinfo->bufsize;
+>> +
+>> +	s = &iter->seq;
+>> +	seq = &s->seq;
+>> +
+>> +	record.buf = (char *)(seq->buffer);
+>> +	record.size = seq->len;
+>> +	psinfo->write(&record);
+>> +
+>> +	spin_unlock_irqrestore(&psinfo->buf_lock, flags);
+> 
+> You may also need to convert these spin_locks into raw_spin_locks as
+> when PREEMPT_RT enters the kernel you don't want them to turn into
+> mutexes.
+> 
+> But that can be another patch.
+> 
+
+I will change this in v2, but can't we have it in same patch?
+
+Thanks,
+Sai
+
 -- 
-2.7.4
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
