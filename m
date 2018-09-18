@@ -1,87 +1,69 @@
-From: biao.huang@mediatek.com (biao huang)
-Date: Tue, 18 Sep 2018 09:14:19 +0800
-Subject: [PATCH 1/2] dt-binding: mediatek: Add binding document for
- MediaTek GMAC
-In-Reply-To: <fb327132-0830-9df0-434e-06bb0033bac4@cogentembedded.com>
-References: <1537165763-13112-1-git-send-email-biao.huang@mediatek.com>
- <1537165763-13112-2-git-send-email-biao.huang@mediatek.com>
- <fb327132-0830-9df0-434e-06bb0033bac4@cogentembedded.com>
-Message-ID: <1537233259.12247.3.camel@mhfsdcap03>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Tue, 18 Sep 2018 01:15:02 +0000
+Subject: [PATCH] ARM: dts: imx6ull: update vdd_soc voltage for 900MHz
+ operating point
+In-Reply-To: <DB3PR0402MB3916249305E241849A32DC05F51B0@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+References: <1536740009-32735-1-git-send-email-Anson.Huang@nxp.com>
+ <d989e700-0cf1-607a-b333-bdead49ae813@i2se.com>
+ <DB3PR0402MB3916249305E241849A32DC05F51B0@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+Message-ID: <DB3PR0402MB3916936F80C14D00F5D07966F51D0@DB3PR0402MB3916.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-09-17 at 11:33 +0300, Sergei Shtylyov wrote:
-> On 9/17/2018 9:29 AM, Biao Huang wrote:
-> 
-> > The commit adds the device tree binding documentation for the MediaTek
-> > GMAC found on Mediatek MT2712.
-> > 
-> > Signed-off-by: Biao Huang <biao.huang@mediatek.com>
-> > ---
-> >   .../devicetree/bindings/net/mediatek-gmac.txt      |   45 ++++++++++++++++++++
-> >   1 file changed, 45 insertions(+)
-> >   create mode 100644 Documentation/devicetree/bindings/net/mediatek-gmac.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/net/mediatek-gmac.txt b/Documentation/devicetree/bindings/net/mediatek-gmac.txt
-> > new file mode 100644
-> > index 0000000..14876ed
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/net/mediatek-gmac.txt
-> > @@ -0,0 +1,45 @@
-> > +MediaTek Gigabit Ethernet controller
-> > +=========================================
-> > +
-> > +The gigabit ethernet controller can be found on MediaTek SoCs.
-> > +
-> > +* Ethernet controller node
-> > +
-> > +Required properties:
-> > +- compatible: Should be
-> > +	"mediatek,mt2712-eth": for MT2712 SoC
-> > +- reg: Address and length of the register set for the device
-> > +- interrupts: Should contain the MAC interrupts
-> > +- interrupt-names: the name of interrupt in the interrupts property. These are
-> > +	"macirq": For MT2712 SoC
-> > +- clocks: the clock used by the controller
-> > +- clock-names: the names of the clock listed in the clocks property. These are
-> > +	"axi", "apb", "mac_ext", "ptp", "ptp_parent", "ptp_top": For MT2712 SoC
-> > +- mac-address: See ethernet.txt in the same directory
-> > +- power-domains: phandle to the power domain that the ethernet is part of
-> 
->     This (required) prop is absent in your example.
-thanks for your comments, power-domains is not a required property, and
-I'll modify this property in next version.
-> 
-> > +- phy-mode: See ethernet.txt file in the same directory.
-> > +- reset-gpio: gpio number for phy reset.
-> > +
-> > +Example:
-> > +
-> > +eth: eth at 1101c000 {
-> 
-> eth: ethernet at 1101c000 {
-> 
-> > +		compatible = "mediatek,mt2712-eth";
-> > +		reg = <0 0x1101c000 0 0x1200>;
-> > +		interrupts = <GIC_SPI 237 IRQ_TYPE_LEVEL_LOW>;
-> > +		interrupt-names = "macirq";
-> > +		phy-mode ="rgmii";
-> > +		mac-address = [00 55 7b b5 7d f7];
-> > +		clock-names = "axi",
-> > +			      "apb",
-> > +			      "mac_ext",
-> > +			      "ptp",
-> > +			      "ptp_parent",
-> > +			      "ptp_top";
-> > +		clocks = <&pericfg CLK_PERI_GMAC>,
-> > +			 <&pericfg CLK_PERI_GMAC_PCLK>,
-> > +			 <&topckgen CLK_TOP_ETHER_125M_SEL>,
-> > +			 <&topckgen CLK_TOP_ETHER_50M_SEL>,
-> > +			 <&topckgen CLK_TOP_APLL1_D3>,
-> > +			 <&topckgen CLK_TOP_APLL1>;
-> > +		reset-gpio = <&pio 87 GPIO_ACTIVE_HIGH>;
-> > +	};
-> 
-> MBR, Sergei
+Hi, Stefan
+
+Anson Huang
 Best Regards!
-Biao
+
+
+> -----Original Message-----
+> From: Anson Huang
+> Sent: Wednesday, September 12, 2018 4:30 PM
+> To: Stefan Wahren <stefan.wahren@i2se.com>; shawnguo at kernel.org;
+> s.hauer at pengutronix.de; kernel at pengutronix.de; Fabio Estevam
+> <fabio.estevam@nxp.com>; robh+dt at kernel.org; mark.rutland at arm.com;
+> linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
+> linux-kernel at vger.kernel.org
+> Cc: dl-linux-imx <linux-imx@nxp.com>
+> Subject: RE: [PATCH] ARM: dts: imx6ull: update vdd_soc voltage for 900MHz
+> operating point
+> 
+> Hi, Stefan
+> 
+> Anson Huang
+> Best Regards!
+> 
+> 
+> > -----Original Message-----
+> > From: Stefan Wahren <stefan.wahren@i2se.com>
+> > Sent: Wednesday, September 12, 2018 4:28 PM
+> > To: Anson Huang <anson.huang@nxp.com>; shawnguo at kernel.org;
+> > s.hauer at pengutronix.de; kernel at pengutronix.de; Fabio Estevam
+> > <fabio.estevam@nxp.com>; robh+dt at kernel.org; mark.rutland at arm.com;
+> > linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
+> > linux-kernel at vger.kernel.org
+> > Cc: dl-linux-imx <linux-imx@nxp.com>
+> > Subject: Re: [PATCH] ARM: dts: imx6ull: update vdd_soc voltage for
+> > 900MHz operating point
+> >
+> > Hi Anson,
+> >
+> > Am 12.09.2018 um 10:13 schrieb Anson Huang:
+> > > Update VDD_SOC voltage to 1.25V for 900MHz operating point according
+> > > to datasheet Rev. 1.3, 08/2018, 25mV is added to the minimum allowed
+> > > values to cover power supply ripple.
+> >
+> > is there a reason why the new datasheet isn't published yet?
+> 
+> We just got this new datasheet recently, it will be published soon.
+> 
+> Anson 
+
+The v1.3 datasheet has been published. Please check it from NXP website, thanks.
+
+Anson.
+
+> 
+> >
+> > Regards
+> > Stefan
