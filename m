@@ -1,85 +1,124 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Tue, 18 Sep 2018 12:55:22 +0200
-Subject: [PATCH V2 05/27] mmc: mmci: move mmci next cookie to mci host
+Date: Tue, 18 Sep 2018 12:55:20 +0200
+Subject: [PATCH V2 03/27] mmc: mmci: convert dma_setup callback to return an
+ int
 In-Reply-To: <1537268144-21152-1-git-send-email-ludovic.Barre@st.com>
 References: <1537268144-21152-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1537268144-21152-6-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1537268144-21152-4-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Barre <ludovic.barre@st.com>
 
-This patch moves next cookie to mmci host structure to
-share same cookie management between all variants.
+This patch converts dma_setup callback to return an integer
+This patch is needed to prepare sdmmc variant with internal dma
 
 Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 ---
- drivers/mmc/host/mmci.c | 10 ++++------
- drivers/mmc/host/mmci.h |  2 ++
- 2 files changed, 6 insertions(+), 6 deletions(-)
+ drivers/mmc/host/mmci.c          | 16 +++++++++++-----
+ drivers/mmc/host/mmci.h          |  2 +-
+ drivers/mmc/host/mmci_qcom_dml.c |  6 ++++--
+ 3 files changed, 16 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 6de7c8d..43f2a1a 100644
+index 7d22cb9..077d4a7 100644
 --- a/drivers/mmc/host/mmci.c
 +++ b/drivers/mmc/host/mmci.c
-@@ -418,7 +418,6 @@ static void mmci_init_sg(struct mmci_host *host, struct mmc_data *data)
- struct mmci_dmae_next {
- 	struct dma_async_tx_descriptor *desc;
- 	struct dma_chan	*chan;
--	s32 cookie;
- };
- 
- struct mmci_dmae_priv {
-@@ -449,7 +448,7 @@ static int mmci_dma_setup(struct mmci_host *host)
- 						     "tx");
- 
- 	/* initialize pre request cookie */
--	dmae->next_data.cookie = 1;
-+	host->next_cookie = 1;
- 
- 	/*
- 	 * If only an RX channel is specified, the driver will
-@@ -716,7 +715,7 @@ static void mmci_get_next_data(struct mmci_host *host, struct mmc_data *data)
- 	struct mmci_dmae_priv *dmae = host->dma_priv;
- 	struct mmci_dmae_next *next = &dmae->next_data;
- 
--	WARN_ON(data->host_cookie && data->host_cookie != next->cookie);
-+	WARN_ON(data->host_cookie && data->host_cookie != host->next_cookie);
- 	WARN_ON(!data->host_cookie && (next->desc || next->chan));
- 
- 	dmae->desc_current = next->desc;
-@@ -728,9 +727,7 @@ static void mmci_get_next_data(struct mmci_host *host, struct mmc_data *data)
- static void mmci_pre_request(struct mmc_host *mmc, struct mmc_request *mrq)
+@@ -415,7 +415,7 @@ static void mmci_init_sg(struct mmci_host *host, struct mmc_data *data)
+  * no custom DMA interfaces are supported.
+  */
+ #ifdef CONFIG_DMA_ENGINE
+-static void mmci_dma_setup(struct mmci_host *host)
++static int mmci_dma_setup(struct mmci_host *host)
  {
- 	struct mmci_host *host = mmc_priv(mmc);
--	struct mmci_dmae_priv *dmae = host->dma_priv;
- 	struct mmc_data *data = mrq->data;
--	struct mmci_dmae_next *nd = &dmae->next_data;
+ 	const char *rxname, *txname;
  
- 	if (!data)
- 		return;
-@@ -741,7 +738,8 @@ static void mmci_pre_request(struct mmc_host *mmc, struct mmc_request *mrq)
- 		return;
+@@ -466,7 +466,9 @@ static void mmci_dma_setup(struct mmci_host *host)
+ 	}
  
- 	if (!mmci_dma_prep_next(host, data))
--		data->host_cookie = ++nd->cookie < 0 ? 1 : nd->cookie;
-+		data->host_cookie = ++host->next_cookie < 0 ?
-+			1 : host->next_cookie;
+ 	if (host->ops && host->ops->dma_setup)
+-		host->ops->dma_setup(host);
++		return host->ops->dma_setup(host);
++
++	return 0;
  }
  
- static void mmci_post_request(struct mmc_host *mmc, struct mmc_request *mrq,
+ /*
+@@ -515,7 +517,7 @@ static void mmci_dma_finalize(struct mmci_host *host, struct mmc_data *data)
+ 	u32 status;
+ 	int i;
+ 
+-	if (!__dma_inprogress(dmae))
++	if (!__dma_inprogress(host))
+ 		return;
+ 
+ 	/* Wait up to 1ms for the DMA to complete */
+@@ -741,8 +743,10 @@ static void mmci_post_request(struct mmc_host *mmc, struct mmc_request *mrq,
+ static void mmci_get_next_data(struct mmci_host *host, struct mmc_data *data)
+ {
+ }
+-static inline void mmci_dma_setup(struct mmci_host *host)
++
++static inline int mmci_dma_setup(struct mmci_host *host)
+ {
++	return 0;
+ }
+ 
+ static inline void mmci_dma_release(struct mmci_host *host)
+@@ -1796,7 +1800,9 @@ static int mmci_probe(struct amba_device *dev,
+ 		 amba_rev(dev), (unsigned long long)dev->res.start,
+ 		 dev->irq[0], dev->irq[1]);
+ 
+-	mmci_dma_setup(host);
++	ret = mmci_dma_setup(host);
++	if (ret)
++		goto clk_disable;
+ 
+ 	pm_runtime_set_autosuspend_delay(&dev->dev, 50);
+ 	pm_runtime_use_autosuspend(&dev->dev);
 diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index 260a1de..d2ec4fd 100644
+index f1ec066..312ad5c 100644
 --- a/drivers/mmc/host/mmci.h
 +++ b/drivers/mmc/host/mmci.h
-@@ -318,6 +318,8 @@ struct mmci_host {
- 	int (*get_rx_fifocnt)(struct mmci_host *h, u32 status, int remain);
+@@ -273,7 +273,7 @@ struct variant_data {
  
- 	void			*dma_priv;
-+
-+	s32			next_cookie;
+ /* mmci variant callbacks */
+ struct mmci_host_ops {
+-	void (*dma_setup)(struct mmci_host *host);
++	int (*dma_setup)(struct mmci_host *host);
  };
  
- void qcom_variant_init(struct mmci_host *host);
+ struct mmci_host_next {
+diff --git a/drivers/mmc/host/mmci_qcom_dml.c b/drivers/mmc/host/mmci_qcom_dml.c
+index be3fab5..1bb59cf 100644
+--- a/drivers/mmc/host/mmci_qcom_dml.c
++++ b/drivers/mmc/host/mmci_qcom_dml.c
+@@ -119,7 +119,7 @@ static int of_get_dml_pipe_index(struct device_node *np, const char *name)
+ }
+ 
+ /* Initialize the dml hardware connected to SD Card controller */
+-static void qcom_dma_setup(struct mmci_host *host)
++static int qcom_dma_setup(struct mmci_host *host)
+ {
+ 	u32 config;
+ 	void __iomem *base;
+@@ -131,7 +131,7 @@ static void qcom_dma_setup(struct mmci_host *host)
+ 
+ 	if (producer_id < 0 || consumer_id < 0) {
+ 		host->variant->qcom_dml = false;
+-		return;
++		return -EINVAL;
+ 	}
+ 
+ 	base = host->base + DML_OFFSET;
+@@ -175,6 +175,8 @@ static void qcom_dma_setup(struct mmci_host *host)
+ 
+ 	/* Make sure dml initialization is finished */
+ 	mb();
++
++	return 0;
+ }
+ 
+ static struct mmci_host_ops qcom_variant_ops = {
 -- 
 2.7.4
