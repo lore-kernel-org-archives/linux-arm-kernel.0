@@ -1,35 +1,32 @@
-From: saiprakash.ranjan@codeaurora.org (Sai Prakash Ranjan)
-Date: Tue, 18 Sep 2018 12:40:57 +0530
-Subject: [PATCH 5/6] arm64/io: Add header for instrumentation of io
- operations
-In-Reply-To: <20180917193940.3d68ef88@gandalf.local.home>
-References: <cover.1536430404.git.saiprakash.ranjan@codeaurora.org>
- <bb322d763aa6c58f036e5209a481c769be92ab9b.1536430404.git.saiprakash.ranjan@codeaurora.org>
- <20180917193940.3d68ef88@gandalf.local.home>
-Message-ID: <c6470671-3abf-c296-586e-cca5131cc437@codeaurora.org>
+From: zhongjiang@huawei.com (zhong jiang)
+Date: Tue, 18 Sep 2018 15:25:20 +0800
+Subject: [PATCH] drm: sun4i: Fix a uninitialized variable warning.
+Message-ID: <1537255520-41614-1-git-send-email-zhongjiang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/18/2018 5:09 AM, Steven Rostedt wrote:
-> On Sun,  9 Sep 2018 01:57:06 +0530
-> Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org> wrote:
-> 
->> The new asm-generic/io-instrumented.h will keep arch code
->> clean and separate from instrumented version which traces
->> io register accesses. This instrumented header can later
->> be included in arm as well for tracing io register accesses.
->>
-> 
-> Looks good to me.
-> 
-> Acked-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
-> 
-> -- Steve
+Fix the following compile warning:
 
-Thanks for the ack Steve.
+drivers/gpu/drm/sun4i/sun4i_tcon.c:1088: warning: 'has_lvds_alt' may be used uninitialized in this function [-Wmaybe-uninitialized]
+bool has_lvds_rst, has_lvds_alt, can_lvds;
 
-@Will/Mark/Robin Let me know if you have any review comments, thanks.
+Signed-off-by: zhong jiang <zhongjiang@huawei.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index c78cd35..563cc8f 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -1086,7 +1086,7 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+ 	struct device_node *remote;
+ 	struct sun4i_tcon *tcon;
+ 	struct reset_control *edp_rstc;
+-	bool has_lvds_rst, has_lvds_alt, can_lvds;
++	bool has_lvds_rst, has_lvds_alt = false, can_lvds;
+ 	int ret;
+ 
+ 	engine = sun4i_tcon_find_engine(drv, dev->of_node);
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+1.7.12.4
