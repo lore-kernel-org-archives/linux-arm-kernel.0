@@ -1,118 +1,88 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 18 Sep 2018 17:27:22 +0100
-Subject: [PATCH v5 18/18] kvm: arm64: Allow tuning the physical address
- size for VM
-In-Reply-To: <CAFEAcA8qjJJ0FkQj4yBMKFrwNFiJj3Q4FBi4GbnK2PN3B3J-mg@mail.gmail.com>
-References: <20180917104144.19188-1-suzuki.poulose@arm.com>
- <20180917104144.19188-19-suzuki.poulose@arm.com>
- <CAFEAcA8eWYkzwFYHyP49dasK-NDVbbm=6DbEFNNPq9ZAdUM7JQ@mail.gmail.com>
- <218b64d5-741d-97ef-8aae-bc0a2ac3e56c@arm.com>
- <CAFEAcA8qjJJ0FkQj4yBMKFrwNFiJj3Q4FBi4GbnK2PN3B3J-mg@mail.gmail.com>
-Message-ID: <fec1a2e0-a45a-eb51-6ffe-2ac9b35acc45@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 18 Sep 2018 09:30:48 -0700
+Subject: [PATCH v3 2/3] spis: mediatek: add spi slave for Mediatek MT2712
+In-Reply-To: <1537150762-7072-3-git-send-email-leilk.liu@mediatek.com>
+References: <1537150762-7072-1-git-send-email-leilk.liu@mediatek.com>
+ <1537150762-7072-3-git-send-email-leilk.liu@mediatek.com>
+Message-ID: <20180918163048.GN2471@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Mon, Sep 17, 2018 at 10:19:21AM +0800, Leilk Liu wrote:
 
-On 18/09/18 16:36, Peter Maydell wrote:
-> On 18 September 2018 at 16:16, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
->> Hi Peter,
->>
->> On 18/09/2018 02:55, Peter Maydell wrote:
->>>
->>> On 17 September 2018 at 11:41, Suzuki K Poulose <suzuki.poulose@arm.com>
->>> wrote:
->>>>
->>>> --- a/Documentation/virtual/kvm/api.txt
->>>> +++ b/Documentation/virtual/kvm/api.txt
->>>> @@ -122,6 +122,14 @@ the default trap & emulate implementation (which
->>>> changes the virtual
->>>>    memory layout to fit in user mode), check KVM_CAP_MIPS_VZ and use the
->>>>    flag KVM_VM_MIPS_VZ.
->>>>
->>>> +To configure the physical address space size for a VM (IPA size) on
->>>> arm64,
->>>> +check KVM_CAP_ARM_VM_PHYS_SHIFT (which returns the maximum limit for the
->>>> +IPA shift) and use KVM_VM_TYPE_ARM_PHYS_SHIFT(PHYS_SHIFT). Bits[7-0] of
->>>> the
->>>> +machine type has been reserved for specifying the PHYS_SHIFT.
->>>> +The supported range is [32...IPA_LIMIT], where IPA_LIMIT could be
->>>> +identified by checking KVM_CAP_ARM_VM_PHYS_SHIFT. For backward
->>>> compatibility
->>>> +a value of 0 selects 40bits.
->>>> +
->>>
->>>
->>> Given this as the API documentation, I don't think I could figure out
->>> what I as a userspace user of it need to do without looking at the
->>> kernel code. Could I ask you to expand it so that it is a bit less
->>> terse and a bit more detailed? (For instance, what is a PHYS_SHIFT
->>> and why do I have to specify it rather than just telling the kernel
->>> I want a 48 bit guest address space?)
->>
->>
->> Thanks for the feedback.  I acknowledge that the documentation is not
->> quite clear for a userspace user. How about:
->>
->> "To configure the physical address space size for a VM (IPA size) on arm64,
->> check KVM_CAP_ARM_VM_IPA_SIZE and use KVM_VM_TYPE_ARM_IPA_SIZE(IPA_Bits)
->> as the argument to KVM_CREATE_VM, where IPA_Bits is the maximum width of
->> any physical address used by the VM. The IPA_Bits is encoded in Bits[7-0]
->> of the machine type, and must be one of { 0, 32, ... , Host_IPA_Limit },
->> where :
->> 1) IPA_Bits = 0 implies 40bits IPA (for backward compatibility)
->> 2) Host_IPA_Limit is the maximum limit for IPA_Bits on the host, which is
->>     dependent on the CPU capability and the host kernel configuration.
->>     This can be detected by checking the extension KVM_CAP_ARM_VM_IPA_SIZE
->> "
-> 
-> I think this is still somewhat confusing. In particular, you're
-> describing both the "ask the kernel what it supports" API and
-> the "tell the kernel what we want" API in a single sentence
-> ("...check KVM_CAP_ARM_VM_IPA_SIZE and use KVM_VM_TYPE_ARM_IPA_SIZE...").
-> There isn't a length limit on documentation, so why not describe
-> them both clearly in separate sentences?
+This looks overall pretty good, a few smallish comments below:
 
-Sure, will do. I didn't want to hijack the KVM_CREATE_VM ioctl command
-section to explain a kvm CAP.
+Please use subject lines matching the style for the subsystem.  This
+makes it easier for people to identify relevant patches.
 
-> 
-> Also, can I use any IPA value between 32 and Host_IPA_Limit, or
-> are only certain values in that range supported (if so, which)?
+>  if SPI_SLAVE
+> +config SPI_SLAVE_MT27XX
+> +	tristate "MediaTek SPI slave device"
+> +	depends on ARCH_MEDIATEK || COMPILE_TEST
+> +	help
+> +	  This selects the MediaTek(R) SPI slave device driver.
+> +	  If you want to use MediaTek(R) SPI slave interface,
+> +	  say Y or M here.If you are not sure, say N.
+> +	  SPI slave drivers for Mediatek MT27XX series ARM SoCs.
+>  
+>  config SPI_SLAVE_TIME
 
-Any value in the range is supported. I should probably add that
-"The configured IPA size is different from what is observed by guest in
-ID_AA64MMFR0_EL1[PARange] to avoid the confusion." So here it goes :
+This is a driver not a slave implementation, it should be with the other
+drivers in the Kconfig.  The slave implementations are for the
+functionality that uses the drivers, not the drivers themselves.
 
----
+> +	/* set the tx/rx endian */
+> +#ifdef __LITTLE_ENDIAN
+> +	reg_val &= ~SPIS_TX_ENDIAN;
+> +	reg_val &= ~SPIS_RX_ENDIAN;
+> +#else
+> +	reg_val |= SPIS_TX_ENDIAN;
+> +	reg_val |= SPIS_RX_ENDIAN;
+> +#endif
+> +	writel(reg_val, mdata->base + SPIS_CFG_REG);
 
-"On arm64, the physical address size for a VM (IPA Size limit) is limited
-to 40bits by default. The limit can be configured if the host supports the
-extension KVM_CAP_ARM_VM_IPA_SIZE. When supported, use
-KVM_VM_TYPE_ARM_IPA_SIZE(IPA_Bits) to set the size in the machine type
-identifier, where IPA_Bits is the maximum width of any physical
-address used by the VM. The IPA_Bits is encoded in bits[7-0] of the
-machine type identifier.
+This seems weird - it looks like it's changing the endianess of the
+protocol based on the endianness the processor is running in.  What's
+going on here?  I'd expect the driver to be just treating everything as
+a byte stream and letting the protocol driver handle the endianness
+issues, otherwise we might end up with double converions.
 
-e.g, to configure a guest to use 48bit physical address size :
+> +		xfer->tx_dma = dma_map_single(dev, (void *)xfer->tx_buf,
+> +					      xfer->len, DMA_TO_DEVICE);
 
-	vm_fd = ioctl(dev_fd, KVM_CREATE_VM, KVM_VM_TYPE_ARM_IPA_SIZE(48));
+Why is there a cast to void here?  That's usually a sign that there's a
+type safety issue, the whole point with void is that it's compatible
+with any other pointer.
 
-The requested size (IPA_Bits) must be :
-   0 - Implies default 40bits (for backward compatibility)
+> +static irqreturn_t mtk_spi_slave_interrupt(int irq, void *dev_id)
+> +{
+> +	struct spi_controller *ctlr = dev_id;
+> +	struct mtk_spi_slave *mdata = spi_controller_get_devdata(ctlr);
+> +	struct spi_transfer *trans = mdata->cur_transfer;
+> +	u32 int_status, reg_val, cnt, remainder;
+> +
+> +	int_status = readl(mdata->base + SPIS_IRQ_ST_REG);
+> +	writel(int_status, mdata->base + SPIS_IRQ_CLR_REG);
+> +
+> +	if (!trans)
+> +		return IRQ_HANDLED;
 
-   or
+Are you sure that this is the right thing to do if we get a spurious
+interrupt - the normal thing would be to return IRQ_NONE, possibly
+logging a warning as well?
 
-   N - Implies N bits, where N is a positive integer such that 32 <= N <= Host_IPA_Limit
+> +	if (int_status & CMD_INVALID_ST)
+> +		dev_err(&ctlr->dev, "cmd invalid\n");
 
-Host_IPA_Limit is the maximum possible value for IPA_Bits on the host and
-is dependent on the CPU capability and the kernel configuration. The limit can
-be retrieved using KVM_CAP_ARM_VM_IPA_SIZE of the KVM_CHECK_EXTENSION
-ioctl()@run-time.
-
-Please note that configuring the IPA size does not affect the capability
-exposed by the guest CPUs in ID_AA64MMFR0_EL1[PARange]. It only affects
-the guest to host physical address (stage2) translations setup by the host.
-"
-
-Suzuki
+If there's an interrupt that doesn't have any of the interrupt status
+flags set I'd expect to see a warning and probably IRQ_NONE being
+returned.  That way if the interrupt line is shared we work correctly
+and if something goes wrong and the interrupt gets stuck on then the
+core interrupt code's error handling can kick in.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180918/354dd5c7/attachment.sig>
