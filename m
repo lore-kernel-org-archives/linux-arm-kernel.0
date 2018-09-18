@@ -1,36 +1,68 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 18 Sep 2018 02:55:05 +0100
-Subject: [PATCH v5 18/18] kvm: arm64: Allow tuning the physical address
- size for VM
-In-Reply-To: <20180917104144.19188-19-suzuki.poulose@arm.com>
-References: <20180917104144.19188-1-suzuki.poulose@arm.com>
- <20180917104144.19188-19-suzuki.poulose@arm.com>
-Message-ID: <CAFEAcA8eWYkzwFYHyP49dasK-NDVbbm=6DbEFNNPq9ZAdUM7JQ@mail.gmail.com>
+From: zhang.lei@jp.fujitsu.com (Zhang, Lei)
+Date: Tue, 18 Sep 2018 03:02:17 +0000
+Subject: Huge page(contiguous bit) slow down
+Message-ID: <8898674D84E3B24BA3A2D289B872026A69FE8F27@G01JPEXMBKW03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 September 2018 at 11:41, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
-> --- a/Documentation/virtual/kvm/api.txt
-> +++ b/Documentation/virtual/kvm/api.txt
-> @@ -122,6 +122,14 @@ the default trap & emulate implementation (which changes the virtual
->  memory layout to fit in user mode), check KVM_CAP_MIPS_VZ and use the
->  flag KVM_VM_MIPS_VZ.
->
-> +To configure the physical address space size for a VM (IPA size) on arm64,
-> +check KVM_CAP_ARM_VM_PHYS_SHIFT (which returns the maximum limit for the
-> +IPA shift) and use KVM_VM_TYPE_ARM_PHYS_SHIFT(PHYS_SHIFT). Bits[7-0] of the
-> +machine type has been reserved for specifying the PHYS_SHIFT.
-> +The supported range is [32...IPA_LIMIT], where IPA_LIMIT could be
-> +identified by checking KVM_CAP_ARM_VM_PHYS_SHIFT. For backward compatibility
-> +a value of 0 selects 40bits.
-> +
+I found a slowdown problem when we uses a huge page on arm64 chip.
+I think the cause of this problem is a bug of huge_ptep_set_access_flags() with contiguous pte.
+Could you review and merge my patch?
 
-Given this as the API documentation, I don't think I could figure out
-what I as a userspace user of it need to do without looking at the
-kernel code. Could I ask you to expand it so that it is a bit less
-terse and a bit more detailed? (For instance, what is a PHYS_SHIFT
-and why do I have to specify it rather than just telling the kernel
-I want a 48 bit guest address space?)
 
-thanks
--- PMM
+Incident:
+Multiple threaded process repeats page fault again and again, so the PC in EL0 doesn't move to the next operation.
+
+Multiple threads occur page fault at the same time and the same VA. It may cause slowdown or hang of a process.
+Because a race problem on updating pte maybe happened when the condition matched as below.
+1. Multiple threads are running
+2. All threads are ld/st-ing to the same huge page
+3. The huge page is consist of contiguous ptes (2MiB page = 64KiB page x 32)
+4. The huge page is mapped without MAP_POPULATE flag.
+
+Mechanism:
+The mechanism of this problem is as below.
+Updating pte use 4 steps.
+
+step1: create pte content
+step2: zero-clear pte at ptep_get_and_clear
+step3: flush tlb at flush_tlb_range
+step4: set pte at set_pte_at(pte becomes non-zero)
+
+When thread1 is doing between step2 and step4, thread2 accesses the same huge page at the same time.
+It cause a new page fault at thread2.
+After that, when thread2 is doing between step2 and step4, thread1 retries the access to the same page.
+It cause a new page fault at thread1 again.
+Multi-threads repeat this flow again and again.
+
+On the other hand, if the pte is not a contiguous pte, slowdown or hang will not occur.
+Because it check whether a correct pte has been already presented by other thread using pte_same before step2(0 clear pte).
+
+Call tree information:
+hugetlb_fault
+  huge_ptep_set_access_flags
+    ptep_set_access_flags  -> ( contiguous pte route not call this)
+      pte_same
+    ptep_get_and_clear
+    flush_tlb_range
+    set_pte_at
+
+So our patch calls the same check function not only for non-contiguous pte but also for contiguous pte.
+
+-----------------------------
+--- a/arch/arm64/mm/hugetlbpage.c
++++ b/arch/arm64/mm/hugetlbpage.c
+@@ -332,6 +332,9 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
+        if (!pte_cont(pte))
+                return ptep_set_access_flags(vma, addr, ptep, pte, dirty);
+
++       if(pte_same(pte, READ_ONCE(*ptep)))
++               return 0;
++
+        ncontig = find_num_contig(vma->vm_mm, addr, ptep, &pgsize);
+        dpfn = pgsize >> PAGE_SHIFT;
+
+Best Regards
+Lei Zhang
+Email: zhang.lei at jp.fujitsu.com
+FUJTISU LIMITED.
