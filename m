@@ -1,44 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 18 Sep 2018 16:28:47 -0700
-Subject: [PATCH] gpio: omap: Add level wakeup handling for omap4 based SoCs
-In-Reply-To: <20180910200624.4494-1-tony@atomide.com>
-References: <20180910200624.4494-1-tony@atomide.com>
-Message-ID: <CACRpkdbXuvWyp+UzxAjKo85bTBvdFuYXMt+wo56eN9KWOcLW+g@mail.gmail.com>
+From: vkoul@kernel.org (Vinod)
+Date: Tue, 18 Sep 2018 16:32:00 -0700
+Subject: [PATCH 2/3] dmaengine: Add Slave and Cyclic mode support for
+ Actions Semi Owl S900 SoC
+In-Reply-To: <20180918225236.GA17306@Mani-XPS-13-9360>
+References: <20180901164215.3683-1-manivannan.sadhasivam@linaro.org>
+ <20180901164215.3683-3-manivannan.sadhasivam@linaro.org>
+ <20180918163512.GE2613@vkoul-mobl>
+ <20180918225236.GA17306@Mani-XPS-13-9360>
+Message-ID: <20180918233200.GK2613@vkoul-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2018 at 1:06 PM Tony Lindgren <tony@atomide.com> wrote:
+Hi Mani,
 
-> I noticed that unlike omap2 and 3 based SoCs, omap4 based SoCs keep
-> the GPIO clocks enabled for GPIO level interrupts with wakeup enabled.
-> This blocks deeper idle states as the whole domain will stay busy.
->
-> The GPIO clock seems to stay enabled if the wakeup register is enabled
-> and a level interrupt is triggered. In that case the only way to have
-> the GPIO module idle is to reset it. It is possible this has gone
-> unnoticed with OSWR (Open SWitch Retention) and off mode during idle
-> resetting GPIO context most GPIO instances in the earlier Android trees
-> for example.
->
-> Looks like the way to deal with this is to have omap4 based SoCs
-> only set wake for the duration of idle and clear level registers for
-> the idle. With level interrupts we can do this as the level interrupt
-> from device will be still there on resume.
->
-> I've taken the long path to fixing this to avoid yet more hard to
-> read code. I've set up a quirks flag, and a struct for function
-> pointers so we can use these to clean up other quirk handling easier
-> in the later patches. The current level quirk handling is moved to
-> the new functions.
->
-> Cc: Grygorii Strashko <grygorii.strashko@ti.com>
-> Cc: Keerthy <j-keerthy@ti.com>
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+On 18-09-18, 15:52, Manivannan Sadhasivam wrote:
+> On Tue, Sep 18, 2018 at 09:35:12AM -0700, Vinod wrote:
+> > On 01-09-18, 22:12, Manivannan Sadhasivam wrote:
+> > 
+> > > @@ -364,6 +372,26 @@ static inline int owl_dma_cfg_lli(struct owl_dma_vchan *vchan,
+> > >  			OWL_DMA_MODE_DT_DCU | OWL_DMA_MODE_SAM_INC |
+> > >  			OWL_DMA_MODE_DAM_INC;
+> > >  
+> > > +		break;
+> > > +	case DMA_MEM_TO_DEV:
+> > > +		mode |= OWL_DMA_MODE_TS(vchan->drq)
+> > > +			| OWL_DMA_MODE_ST_DCU | OWL_DMA_MODE_DT_DEV
+> > > +			| OWL_DMA_MODE_SAM_INC | OWL_DMA_MODE_DAM_CONST;
+> > > +
+> > > +		/* Handle bus width for UART */
+> > > +		if (sconfig->dst_addr_width == DMA_SLAVE_BUSWIDTH_1_BYTE)
+> > > +			mode |= OWL_DMA_MODE_NDDBW_8BIT;
+> > 
+> > this is fine per se, but not correct way to handle in dmaengine driver.
+> > You should be agnostic to user of dmaengine, so handle all the buswidths
+> > the IP block supports and update the values accordingly. That way new
+> > uses can be added w/o requiring change in dmaengine driver
+> 
+> Currently, all members of Owl family supports only 32bit and 8bit
+> bus widths. 32bit is common for all peripherals and 8bit applies to only
+> UART since the internal buffer is 8bit wide. So, this makes sense to me!
 
-Do we have a conclusion on this? Shall I apply the patch on
-an immutable branch and pull into next, or do you folks need
-more time?
+Above you are onky handing DMA_SLAVE_BUSWIDTH_1_BYTE and not 32bit which
+this IP supports.. You should handle all widths supported vt hardware..
 
-Yours,
-Linus Walleij
+-- 
+~Vinod
