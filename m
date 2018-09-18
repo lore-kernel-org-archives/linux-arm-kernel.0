@@ -1,77 +1,66 @@
 From: james.morse@arm.com (James Morse)
-Date: Tue, 18 Sep 2018 18:46:25 +0100
-Subject: [PATCH v5 02/27] arm64: cpufeature: Use alternatives for VHE
- cpu_enable
-In-Reply-To: <85d74cec-2290-9e89-b155-f0f7c523b4a4@arm.com>
+Date: Tue, 18 Sep 2018 18:47:43 +0100
+Subject: [PATCH v5 03/27] arm64: alternative: Apply alternatives early in
+ boot process
+In-Reply-To: <20180917234400.ctq3w2u6fi5s5coj@holly.lan>
 References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
- <1535471497-38854-3-git-send-email-julien.thierry@arm.com>
- <1d425320-aed3-b949-1ec5-f378248aac4d@arm.com>
- <85d74cec-2290-9e89-b155-f0f7c523b4a4@arm.com>
-Message-ID: <afc7dcf8-7a10-ed8b-3dde-62c4710391c1@arm.com>
+ <1535471497-38854-4-git-send-email-julien.thierry@arm.com>
+ <3becf020-b230-beb8-b304-d8097377f234@arm.com>
+ <78781d82-e5c4-c590-6c0c-e7d2db456bf9@arm.com>
+ <20180917234400.ctq3w2u6fi5s5coj@holly.lan>
+Message-ID: <46463b3d-7ceb-f5a5-4061-e988bfc53a6e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julien,
+Hi Daniel, Julien,
 
-On 09/12/2018 01:03 PM, Julien Thierry wrote:
-> On 12/09/18 11:28, James Morse wrote:
->> On 28/08/18 16:51, Julien Thierry wrote:
->>> The cpu_enable callback for VHE feature requires all alternatives to have
->>> been applied. This prevents applying VHE alternative separately from the
->>> rest.
+On 09/18/2018 12:44 AM, Daniel Thompson wrote:
+> On Wed, Sep 12, 2018 at 05:49:09PM +0100, Julien Thierry wrote:
+>>>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+>>>> index 3bc1c8b..0d1e41e 100644
+>>>> --- a/arch/arm64/kernel/cpufeature.c
+>>>> +++ b/arch/arm64/kernel/cpufeature.c
+>>>> @@ -52,6 +52,8 @@
+>>>>    DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+>>>>    EXPORT_SYMBOL(cpu_hwcaps);
+>>>> +unsigned long boot_capabilities;
+>>>> +
+>>>>    /*
+>>>>     * Flag to indicate if we have computed the system wide
+>>>>     * capabilities based on the boot time active CPUs. This
+>>>> @@ -1375,6 +1377,9 @@ static void __update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+>>>>    		if (!cpus_have_cap(caps->capability) && caps->desc)
+>>>>    			pr_info("%s %s\n", info, caps->desc);
+>>>>    		cpus_set_cap(caps->capability);
 >>>
->>> Use an alternative depending on VHE feature to know whether VHE
->>> alternatives have already been applied.
+>>> Hmm, the bitmap behind cpus_set_cap() is what cpus_have_cap() in
+>>> __apply_alternatives() looks at. If you had a call to __apply_alternatives after
+>>> update_cpu_capabilities(SCOPE_BOOT_CPU), but before any others, it would only
+>>> apply those alternatives...
+>>>
+>>> (I don't think there is a problem re-applying the same alternative, but I
+>>> haven't checked).
 
->>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
->>> index 1e433ac..3bc1c8b 100644
->>> --- a/arch/arm64/kernel/cpufeature.c
->>> +++ b/arch/arm64/kernel/cpufeature.c
->>> @@ -1022,8 +1024,15 @@ static void cpu_copy_el2regs(const struct 
->>> arm64_cpu_capabilities *__unused)
->>> ?????? * that, freshly-onlined CPUs will set tpidr_el2, so we don't need to
->>> ?????? * do anything here.
->>> ?????? */
->>> -??? if (!alternatives_applied)
->>> -??????? write_sysreg(read_sysreg(tpidr_el1), tpidr_el2);
->>> +??? asm volatile(ALTERNATIVE(
->>> +??????? "mrs??? %0, tpidr_el1\n"
->>> +??????? "msr??? tpidr_el2, %0",
->>> +??????? "nop\n"
->>> +??????? "nop",
->>> +??????? ARM64_HAS_VIRT_HOST_EXTN)
->>> +??????? : "+r" (tmp)
->>> +??????? :
->>> +??????? : "memory");
->>> ? }
->>> ? #endif
->>
->> Catalin's preference was to keep this all in C:
->> https://patchwork.kernel.org/patch/10007977/
->> , for which we need to know if 'the' alternative has been applied.
->>
->> I suspect there may be more registers in this list if we have to switch to
->> another EL2 register using alternatives. (but I don't have an example).
->>
->> Could we make 'alternatives_applied' a macro that takes the cap as an argument?
+>> Interesting idea. If someone can confirm that patching alternatives twice is
+>> safe, I think it would make things simpler.
 
-> I wanted to do this initially, the issue was that the alternatives framework works on 
-> regions to patch rather than caps to apply. So I found it a bit odd to associate the 
-> "code corresponding to cap was applied" with the alternative application.
+Sounds good, I think we need to avoid adding a limit to the number of caps.
 
-I agree it looks funny, but for the kernel text, its can only be one region. If we 
-ever had two we would still have to apply them at the same time as its not safe to 
-run code with alternatives partially applied.
-
-(modules should be fine too as we apply the same alternatives as the kernel has 
-before we run any of the code)
+The extra-work is inefficient, but if it saves merging those lists as part of this 
+series its probably fine. (we only do this stuff once during boot)
 
 
-I wonder if we can kill-off this function entirely... its only necessary because 
-set_my_cpu_offset() sets the 'wrong' tpidr register, and we need to copy them before 
-applying the alternatives.
-... we only call set_my_cpu_offset() when we bring a cpu online, we could make it set 
-both tpidr registers if we're running at EL2.
+
+> Early versions of this patch applied the alternatives twice. I never
+> noticed any problems with double patching (second time round it will
+> write out code that is identical to what is already there so it is
+> merely inefficient rather than unsafe.
+
+For the regular kind, I agree. But we've recently grown some fancy dynamic patching 
+where the code is generated at runtime, instead of swapping in an alternative 
+sequence. Details in commit dea5e2a4 ("arm64: alternatives: Add dynamic patching 
+feature"). Its unlikely we would ever apply these twice as they can't have a scope, 
+... and they all look safe.
 
 
 Thanks,
