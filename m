@@ -1,80 +1,52 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 18 Sep 2018 18:10:07 +0100
-Subject: [PATCH v7 2/6] iommu/dma: Add support for non-strict mode
-In-Reply-To: <0a891cec4bb164f8cf2f57c753791a7d1f5f1d81.1536935328.git.robin.murphy@arm.com>
+Date: Tue, 18 Sep 2018 18:10:20 +0100
+Subject: [PATCH v7 6/6] iommu/arm-smmu: Support non-strict mode
+In-Reply-To: <09be4304bf23dde899be48dbddd93b09296f76bd.1536935328.git.robin.murphy@arm.com>
 References: <cover.1536935328.git.robin.murphy@arm.com>
- <0a891cec4bb164f8cf2f57c753791a7d1f5f1d81.1536935328.git.robin.murphy@arm.com>
-Message-ID: <20180918171007.GJ16498@arm.com>
+ <09be4304bf23dde899be48dbddd93b09296f76bd.1536935328.git.robin.murphy@arm.com>
+Message-ID: <20180918171020.GM16498@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
-
-On Fri, Sep 14, 2018 at 03:30:20PM +0100, Robin Murphy wrote:
-> From: Zhen Lei <thunder.leizhen@huawei.com>
+On Fri, Sep 14, 2018 at 03:30:24PM +0100, Robin Murphy wrote:
+> All we need is to wire up .flush_iotlb_all properly and implement the
+> domain attribute, and iommu-dma and io-pgtable-arm will do the rest for
+> us. Rather than bother implementing it for v7s format for the highly
+> unlikely chance of that being relevant, we can simply hide the
+> non-strict flag from io-pgtable for that combination just so anyone who
+> does actually try it will simply get over-invalidation instead of
+> failure to initialise domains.
 > 
-> 1. Save the related domain pointer in struct iommu_dma_cookie, make iovad
->    capable call domain->ops->flush_iotlb_all to flush TLB.
-> 2. During the iommu domain initialization phase, base on domain->non_strict
->    field to check whether non-strict mode is supported or not. If so, call
->    init_iova_flush_queue to register iovad->flush_cb callback.
-> 3. All unmap(contains iova-free) APIs will finally invoke __iommu_dma_unmap
->    -->iommu_dma_free_iova. If the domain is non-strict, call queue_iova to
->    put off iova freeing, and omit iommu_tlb_sync operation.
-
-Hmm, this is basically just a commentary on the code. Please could you write
-it more in terms of the problem that's being solved?
-
-> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> [rm: convert raw boolean to domain attribute]
 > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 > ---
->  drivers/iommu/dma-iommu.c | 29 ++++++++++++++++++++++++++++-
->  include/linux/iommu.h     |  1 +
->  2 files changed, 29 insertions(+), 1 deletion(-)
+>  drivers/iommu/arm-smmu.c | 40 +++++++++++++++++++++++++++++++++-------
+>  1 file changed, 33 insertions(+), 7 deletions(-)
 > 
-> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-> index 511ff9a1d6d9..092e6926dc3c 100644
-> --- a/drivers/iommu/dma-iommu.c
-> +++ b/drivers/iommu/dma-iommu.c
-> @@ -55,6 +55,9 @@ struct iommu_dma_cookie {
->  	};
->  	struct list_head		msi_page_list;
->  	spinlock_t			msi_lock;
-> +
-> +	/* Only be assigned in non-strict mode, otherwise it's NULL */
-> +	struct iommu_domain		*domain;
->  };
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index fd1b80ef9490..aa5be334753b 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -246,6 +246,7 @@ struct arm_smmu_domain {
+>  	const struct iommu_gather_ops	*tlb_ops;
+>  	struct arm_smmu_cfg		cfg;
+>  	enum arm_smmu_domain_stage	stage;
+> +	bool				non_strict;
+>  	struct mutex			init_mutex; /* Protects smmu pointer */
+>  	spinlock_t			cb_lock; /* Serialises ATS1* ops and TLB syncs */
+>  	struct iommu_domain		domain;
+> @@ -863,6 +864,9 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+>  	if (smmu->features & ARM_SMMU_FEAT_COHERENT_WALK)
+>  		pgtbl_cfg.quirks = IO_PGTABLE_QUIRK_NO_DMA;
 >  
->  static inline size_t cookie_msi_granule(struct iommu_dma_cookie *cookie)
-> @@ -257,6 +260,17 @@ static int iova_reserve_iommu_regions(struct device *dev,
->  	return ret;
->  }
->  
-> +static void iommu_dma_flush_iotlb_all(struct iova_domain *iovad)
-> +{
-> +	struct iommu_dma_cookie *cookie;
-> +	struct iommu_domain *domain;
-> +
-> +	cookie = container_of(iovad, struct iommu_dma_cookie, iovad);
-> +	domain = cookie->domain;
-> +
-> +	domain->ops->flush_iotlb_all(domain);
+> +	if (smmu_domain->non_strict && cfg->fmt != ARM_SMMU_CTX_FMT_AARCH32_S)
+> +		pgtbl_cfg.quirks |= IO_PGTABLE_QUIRK_NON_STRICT;
 
-Can we rely on this function pointer being non-NULL? I think it would
-be better to call iommu_flush_tlb_all(cookie->domain) instead.
+Does this mean we end up over-invalidating when using short-descriptor?
+Could we not bypass the flush queue in this case instead? Ideally, we'd
+just reject the domain attribute but I don't know if we know about the
+page-table format early enough for that. Alternatively, we could force
+long format if the attribute is set.
 
-> +}
-> +
->  /**
->   * iommu_dma_init_domain - Initialise a DMA mapping domain
->   * @domain: IOMMU domain previously prepared by iommu_get_dma_cookie()
-> @@ -275,6 +289,7 @@ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
->  	struct iommu_dma_cookie *cookie = domain->iova_cookie;
->  	struct iova_domain *iovad = &cookie->iovad;
->  	unsigned long order, base_pfn, end_pfn;
-> +	int attr = 1;
-
-Do we actually need to initialise this?
+What do you think?
 
 Will
