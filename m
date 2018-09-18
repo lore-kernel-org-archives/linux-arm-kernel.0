@@ -1,34 +1,31 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Tue, 18 Sep 2018 14:19:08 +0800
-Subject: [PATCH 4/4] dt-bindings: arm: add compatible for i.MX6ULZ 14x14 EVK
- board
-In-Reply-To: <1537251548-27845-1-git-send-email-Anson.Huang@nxp.com>
-References: <1537251548-27845-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1537251548-27845-5-git-send-email-Anson.Huang@nxp.com>
+From: saiprakash.ranjan@codeaurora.org (Sai Prakash Ranjan)
+Date: Tue, 18 Sep 2018 11:54:21 +0530
+Subject: [PATCH 2/6] pstore: Add event tracing support
+In-Reply-To: <20180917190454.3cfbe7e3@gandalf.local.home>
+References: <cover.1536430404.git.saiprakash.ranjan@codeaurora.org>
+ <b9b60ff2864a17fb05481aa33f90114ab051d6ce.1536430404.git.saiprakash.ranjan@codeaurora.org>
+ <141901b8-0a9a-2e7a-f7a4-cdefd157f4c6@codeaurora.org>
+ <20180917190454.3cfbe7e3@gandalf.local.home>
+Message-ID: <a041a44b-91cc-8b98-0147-ce983ae83cf2@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds compatible for i.MX6ULZ 14x14 EVK board.
+On 9/18/2018 4:34 AM, Steven Rostedt wrote:
+> On Sun, 16 Sep 2018 12:37:52 +0530
+> Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org> wrote:
+> 
+>> Hi,
+>>
+>> Anyone here?
+> 
+> You also just caught me from coming back from a trip. I'm looking at
+> your patches now.
+> 
+> -- Steve
+> 
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- Documentation/devicetree/bindings/arm/fsl.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+Thanks Steve, I just thought you guys might have missed the patch.
 
-diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-index 968f238..9a0ffce 100644
---- a/Documentation/devicetree/bindings/arm/fsl.txt
-+++ b/Documentation/devicetree/bindings/arm/fsl.txt
-@@ -85,6 +85,10 @@ i.MX6 UltraLiteLite 14x14 EVK Board
- Required root node properties:
-     - compatible = "fsl,imx6ull-14x14-evk", "fsl,imx6ull";
- 
-+i.MX6 ULZ 14x14 EVK Board
-+Required root node properties:
-+    - compatible = "fsl,imx6ulz-14x14-evk", "fsl,imx6ulz";
-+
- i.MX6 SoloX SDB Board
- Required root node properties:
-     - compatible = "fsl,imx6sx-sdb", "fsl,imx6sx";
 -- 
-2.7.4
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
