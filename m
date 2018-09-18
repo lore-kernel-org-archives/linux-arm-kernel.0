@@ -1,83 +1,118 @@
-From: vkoul@kernel.org (Vinod)
-Date: Tue, 18 Sep 2018 09:25:08 -0700
-Subject: [PATCH v5 4/7] dmaengine: xilinx_dma: program hardware supported
- buffer length
-In-Reply-To: <20180907062502.8241-4-andrea.merello@gmail.com>
-References: <20180907062502.8241-1-andrea.merello@gmail.com>
- <20180907062502.8241-4-andrea.merello@gmail.com>
-Message-ID: <20180918162508.GD2613@vkoul-mobl>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 18 Sep 2018 17:27:22 +0100
+Subject: [PATCH v5 18/18] kvm: arm64: Allow tuning the physical address
+ size for VM
+In-Reply-To: <CAFEAcA8qjJJ0FkQj4yBMKFrwNFiJj3Q4FBi4GbnK2PN3B3J-mg@mail.gmail.com>
+References: <20180917104144.19188-1-suzuki.poulose@arm.com>
+ <20180917104144.19188-19-suzuki.poulose@arm.com>
+ <CAFEAcA8eWYkzwFYHyP49dasK-NDVbbm=6DbEFNNPq9ZAdUM7JQ@mail.gmail.com>
+ <218b64d5-741d-97ef-8aae-bc0a2ac3e56c@arm.com>
+ <CAFEAcA8qjJJ0FkQj4yBMKFrwNFiJj3Q4FBi4GbnK2PN3B3J-mg@mail.gmail.com>
+Message-ID: <fec1a2e0-a45a-eb51-6ffe-2ac9b35acc45@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07-09-18, 08:24, Andrea Merello wrote:
-> From: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
-> 
-> AXI-DMA IP supports configurable (c_sg_length_width) buffer length
-> register width, hence read buffer length (xlnx,sg-length-width) DT
-> property and ensure that driver doesn't program buffer length
-> exceeding the supported limit. For VDMA and CDMA there is no change.
-> 
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> Signed-off-by: Andrea Merello <andrea.merello@gmail.com> [rebase, reword]
-> ---
-> Changes in v2:
->         - drop original patch and replace with the one in Xilinx tree
-> Changes in v3:
-> 	- cc DT maintainers/ML
-> Changes in v4:
-> 	- upper bound for the property should be 26, not 23
-> 	- add warn for width > 23 as per xilinx original patch
-> 	- rework due to changes introduced in 1/6
-> Changes in v5:
-> 	None
-> ---
->  drivers/dma/xilinx/xilinx_dma.c | 36 +++++++++++++++++++++++++--------
->  1 file changed, 28 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-> index aaa6de8a70e4..b17f24e4ec35 100644
-> --- a/drivers/dma/xilinx/xilinx_dma.c
-> +++ b/drivers/dma/xilinx/xilinx_dma.c
-> @@ -158,7 +158,9 @@
->  #define XILINX_DMA_REG_BTT		0x28
->  
->  /* AXI DMA Specific Masks/Bit fields */
-> -#define XILINX_DMA_MAX_TRANS_LEN	GENMASK(22, 0)
-> +#define XILINX_DMA_MAX_TRANS_LEN_MIN	8
-> +#define XILINX_DMA_MAX_TRANS_LEN_MAX	23
-> +#define XILINX_DMA_V2_MAX_TRANS_LEN_MAX	26
->  #define XILINX_DMA_CR_COALESCE_MAX	GENMASK(23, 16)
->  #define XILINX_DMA_CR_CYCLIC_BD_EN_MASK	BIT(4)
->  #define XILINX_DMA_CR_COALESCE_SHIFT	16
-> @@ -418,6 +420,7 @@ struct xilinx_dma_config {
->   * @rxs_clk: DMA s2mm stream clock
->   * @nr_channels: Number of channels DMA device supports
->   * @chan_id: DMA channel identifier
-> + * @max_buffer_len: Max buffer length
->   */
->  struct xilinx_dma_device {
->  	void __iomem *regs;
-> @@ -437,6 +440,7 @@ struct xilinx_dma_device {
->  	struct clk *rxs_clk;
->  	u32 nr_channels;
->  	u32 chan_id;
-> +	u32 max_buffer_len;
->  };
->  
->  /* Macros */
-> @@ -964,7 +968,7 @@ static int xilinx_dma_calc_copysize(struct xilinx_dma_chan *chan,
->  				    int size, int done)
->  {
->  	size_t copy = min_t(size_t, size - done,
-> -		     XILINX_DMA_MAX_TRANS_LEN);
-> +			    chan->xdev->max_buffer_len);
+Hi Peter,
 
-hmm why not add max_buffer_len in patch 1 again, and then use default
-len as XILINX_DMA_MAX_TRANS_LEN and add multiple lengths here :)
+On 18/09/18 16:36, Peter Maydell wrote:
+> On 18 September 2018 at 16:16, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+>> Hi Peter,
+>>
+>> On 18/09/2018 02:55, Peter Maydell wrote:
+>>>
+>>> On 17 September 2018 at 11:41, Suzuki K Poulose <suzuki.poulose@arm.com>
+>>> wrote:
+>>>>
+>>>> --- a/Documentation/virtual/kvm/api.txt
+>>>> +++ b/Documentation/virtual/kvm/api.txt
+>>>> @@ -122,6 +122,14 @@ the default trap & emulate implementation (which
+>>>> changes the virtual
+>>>>    memory layout to fit in user mode), check KVM_CAP_MIPS_VZ and use the
+>>>>    flag KVM_VM_MIPS_VZ.
+>>>>
+>>>> +To configure the physical address space size for a VM (IPA size) on
+>>>> arm64,
+>>>> +check KVM_CAP_ARM_VM_PHYS_SHIFT (which returns the maximum limit for the
+>>>> +IPA shift) and use KVM_VM_TYPE_ARM_PHYS_SHIFT(PHYS_SHIFT). Bits[7-0] of
+>>>> the
+>>>> +machine type has been reserved for specifying the PHYS_SHIFT.
+>>>> +The supported range is [32...IPA_LIMIT], where IPA_LIMIT could be
+>>>> +identified by checking KVM_CAP_ARM_VM_PHYS_SHIFT. For backward
+>>>> compatibility
+>>>> +a value of 0 selects 40bits.
+>>>> +
+>>>
+>>>
+>>> Given this as the API documentation, I don't think I could figure out
+>>> what I as a userspace user of it need to do without looking at the
+>>> kernel code. Could I ask you to expand it so that it is a bit less
+>>> terse and a bit more detailed? (For instance, what is a PHYS_SHIFT
+>>> and why do I have to specify it rather than just telling the kernel
+>>> I want a 48 bit guest address space?)
+>>
+>>
+>> Thanks for the feedback.  I acknowledge that the documentation is not
+>> quite clear for a userspace user. How about:
+>>
+>> "To configure the physical address space size for a VM (IPA size) on arm64,
+>> check KVM_CAP_ARM_VM_IPA_SIZE and use KVM_VM_TYPE_ARM_IPA_SIZE(IPA_Bits)
+>> as the argument to KVM_CREATE_VM, where IPA_Bits is the maximum width of
+>> any physical address used by the VM. The IPA_Bits is encoded in Bits[7-0]
+>> of the machine type, and must be one of { 0, 32, ... , Host_IPA_Limit },
+>> where :
+>> 1) IPA_Bits = 0 implies 40bits IPA (for backward compatibility)
+>> 2) Host_IPA_Limit is the maximum limit for IPA_Bits on the host, which is
+>>     dependent on the CPU capability and the host kernel configuration.
+>>     This can be detected by checking the extension KVM_CAP_ARM_VM_IPA_SIZE
+>> "
+> 
+> I think this is still somewhat confusing. In particular, you're
+> describing both the "ask the kernel what it supports" API and
+> the "tell the kernel what we want" API in a single sentence
+> ("...check KVM_CAP_ARM_VM_IPA_SIZE and use KVM_VM_TYPE_ARM_IPA_SIZE...").
+> There isn't a length limit on documentation, so why not describe
+> them both clearly in separate sentences?
 
-- 
-~Vinod
+Sure, will do. I didn't want to hijack the KVM_CREATE_VM ioctl command
+section to explain a kvm CAP.
+
+> 
+> Also, can I use any IPA value between 32 and Host_IPA_Limit, or
+> are only certain values in that range supported (if so, which)?
+
+Any value in the range is supported. I should probably add that
+"The configured IPA size is different from what is observed by guest in
+ID_AA64MMFR0_EL1[PARange] to avoid the confusion." So here it goes :
+
+---
+
+"On arm64, the physical address size for a VM (IPA Size limit) is limited
+to 40bits by default. The limit can be configured if the host supports the
+extension KVM_CAP_ARM_VM_IPA_SIZE. When supported, use
+KVM_VM_TYPE_ARM_IPA_SIZE(IPA_Bits) to set the size in the machine type
+identifier, where IPA_Bits is the maximum width of any physical
+address used by the VM. The IPA_Bits is encoded in bits[7-0] of the
+machine type identifier.
+
+e.g, to configure a guest to use 48bit physical address size :
+
+	vm_fd = ioctl(dev_fd, KVM_CREATE_VM, KVM_VM_TYPE_ARM_IPA_SIZE(48));
+
+The requested size (IPA_Bits) must be :
+   0 - Implies default 40bits (for backward compatibility)
+
+   or
+
+   N - Implies N bits, where N is a positive integer such that 32 <= N <= Host_IPA_Limit
+
+Host_IPA_Limit is the maximum possible value for IPA_Bits on the host and
+is dependent on the CPU capability and the kernel configuration. The limit can
+be retrieved using KVM_CAP_ARM_VM_IPA_SIZE of the KVM_CHECK_EXTENSION
+ioctl()@run-time.
+
+Please note that configuring the IPA size does not affect the capability
+exposed by the guest CPUs in ID_AA64MMFR0_EL1[PARange]. It only affects
+the guest to host physical address (stage2) translations setup by the host.
+"
+
+Suzuki
