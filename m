@@ -1,44 +1,42 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 18 Sep 2018 19:28:25 +0100
-Subject: [PATCH v7 0/6] Add non-strict mode support for iommu-dma
-In-Reply-To: <20180918171000.GI16498@arm.com>
-References: <cover.1536935328.git.robin.murphy@arm.com>
- <20180918171000.GI16498@arm.com>
-Message-ID: <139139a7-a769-006c-2cb7-491cc69379c8@arm.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Tue, 18 Sep 2018 20:42:56 +0200
+Subject: [PATCH v6 17/18] khwasan: update kasan documentation
+In-Reply-To: <CACT4Y+a0A1n+FjbiQSEh4UMUPkq4KnqEOEXkfo-X+EwsVFZxMg@mail.gmail.com>
+References: <cover.1535462971.git.andreyknvl@google.com>
+ <1a3b3030b6ee01931b397583b69f3af94e2a2308.1535462971.git.andreyknvl@google.com>
+ <CACT4Y+a0A1n+FjbiQSEh4UMUPkq4KnqEOEXkfo-X+EwsVFZxMg@mail.gmail.com>
+Message-ID: <CAAeHK+wDhpX_E7cL8D4-BnM4WCT_Bb2Gp6wfqk7+P-4XAoiMOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Wed, Sep 12, 2018 at 8:39 PM, Dmitry Vyukov <dvyukov@google.com> wrote:
+> On Wed, Aug 29, 2018 at 1:35 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
+>> This patch updates KASAN documentation to reflect the addition of KHWASAN.
 
-On 2018-09-18 6:10 PM, Will Deacon wrote:
-> Hi Robin,
-> 
-> Thanks for turning this around so quickly.
+>> -Currently KASAN is supported only for the x86_64 and arm64 architectures.
+>> +KASAN uses compile-time instrumentation to insert validity checks before every
+>> +memory access, and therefore requires a compiler version that supports that.
+>> +For classic KASAN you need GCC version 4.9.2 or later. GCC 5.0 or later is
+>> +required for detection of out-of-bounds accesses on stack and global variables.
+>> +KHWASAN in turns is only supported in clang and requires revision 330044 or
+>
+> in turn?
+>
 
-Cheers for a pretty rapid review too :)
+>> -and choose between CONFIG_KASAN_OUTLINE and CONFIG_KASAN_INLINE. Outline and
+>> -inline are compiler instrumentation types. The former produces smaller binary
+>> -the latter is 1.1 - 2 times faster. Inline instrumentation requires a GCC
+>> +and choose between CONFIG_KASAN_GENERIC (to enable classic KASAN) and
+>> +CONFIG_KASAN_HW (to enabled KHWASAN). You also need to choose choose between
+>
+> to enable
+>
 
-> On Fri, Sep 14, 2018 at 03:30:18PM +0100, Robin Murphy wrote:
->> Since we'd like to get this polished up and merged and Leizhen has other
->> commitments, here's v7 of the previous series[1] wherein I address all
->> my own feedback :) This is a quick tweak of the v6 I sent yesterday
->> since I figured out slightly too late a much neater way of setting the
->> attribute at the appropriate time.
->>
->> The principal change is that I've inverted things slightly such that
->> it's now a generic domain attribute controlled by iommu-dma given the
->> necessary support from individual IOMMU drivers. That way we can easily
->> enable other drivers straight away, as I've done for SMMUv2 here (which
->> also allowed me to give it a quick test with MMU-401s on a Juno board).
->> Otherwise it's really just cosmetic cleanup and rebasing onto Will's
->> pending SMMU queue.
-> 
-> I've been through and had a look, leaving some small comments on the patches
-> themselves. The only part I failed to figure out is how you tie the lifetime
-> of the flush queue to the lifetime of the domain so that the timer callback
-> can't fire after e.g. the DMA cookie has been freed. How does that work?
+>> +     print_address_description+0x73/0x280 mm/kasan/report.c:254
+>
+>
+> KASAN does not print line numbers per se.
+> I think we need to show unmodified output to not confuse readers
+> (probably remove the useless ? lines).
 
-Er, to be honest I haven't looked or even considered it! Other than the 
-parts I've massaged I kinda took the functionality of the previous 
-series for granted. Let me cross-check the x86 code and figure it out.
-
-Robin.
+Will fix all in v7.
