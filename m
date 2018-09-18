@@ -1,47 +1,58 @@
-From: vkoul@kernel.org (Vinod)
-Date: Tue, 18 Sep 2018 16:32:00 -0700
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Tue, 18 Sep 2018 16:34:14 -0700
 Subject: [PATCH 2/3] dmaengine: Add Slave and Cyclic mode support for
  Actions Semi Owl S900 SoC
-In-Reply-To: <20180918225236.GA17306@Mani-XPS-13-9360>
+In-Reply-To: <20180918233200.GK2613@vkoul-mobl>
 References: <20180901164215.3683-1-manivannan.sadhasivam@linaro.org>
  <20180901164215.3683-3-manivannan.sadhasivam@linaro.org>
  <20180918163512.GE2613@vkoul-mobl>
  <20180918225236.GA17306@Mani-XPS-13-9360>
-Message-ID: <20180918233200.GK2613@vkoul-mobl>
+ <20180918233200.GK2613@vkoul-mobl>
+Message-ID: <20180918233414.GA19844@Mani-XPS-13-9360>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mani,
-
-On 18-09-18, 15:52, Manivannan Sadhasivam wrote:
-> On Tue, Sep 18, 2018 at 09:35:12AM -0700, Vinod wrote:
-> > On 01-09-18, 22:12, Manivannan Sadhasivam wrote:
-> > 
-> > > @@ -364,6 +372,26 @@ static inline int owl_dma_cfg_lli(struct owl_dma_vchan *vchan,
-> > >  			OWL_DMA_MODE_DT_DCU | OWL_DMA_MODE_SAM_INC |
-> > >  			OWL_DMA_MODE_DAM_INC;
-> > >  
-> > > +		break;
-> > > +	case DMA_MEM_TO_DEV:
-> > > +		mode |= OWL_DMA_MODE_TS(vchan->drq)
-> > > +			| OWL_DMA_MODE_ST_DCU | OWL_DMA_MODE_DT_DEV
-> > > +			| OWL_DMA_MODE_SAM_INC | OWL_DMA_MODE_DAM_CONST;
-> > > +
-> > > +		/* Handle bus width for UART */
-> > > +		if (sconfig->dst_addr_width == DMA_SLAVE_BUSWIDTH_1_BYTE)
-> > > +			mode |= OWL_DMA_MODE_NDDBW_8BIT;
-> > 
-> > this is fine per se, but not correct way to handle in dmaengine driver.
-> > You should be agnostic to user of dmaengine, so handle all the buswidths
-> > the IP block supports and update the values accordingly. That way new
-> > uses can be added w/o requiring change in dmaengine driver
+On Tue, Sep 18, 2018 at 04:32:00PM -0700, Vinod wrote:
+> Hi Mani,
 > 
-> Currently, all members of Owl family supports only 32bit and 8bit
-> bus widths. 32bit is common for all peripherals and 8bit applies to only
-> UART since the internal buffer is 8bit wide. So, this makes sense to me!
+> On 18-09-18, 15:52, Manivannan Sadhasivam wrote:
+> > On Tue, Sep 18, 2018 at 09:35:12AM -0700, Vinod wrote:
+> > > On 01-09-18, 22:12, Manivannan Sadhasivam wrote:
+> > > 
+> > > > @@ -364,6 +372,26 @@ static inline int owl_dma_cfg_lli(struct owl_dma_vchan *vchan,
+> > > >  			OWL_DMA_MODE_DT_DCU | OWL_DMA_MODE_SAM_INC |
+> > > >  			OWL_DMA_MODE_DAM_INC;
+> > > >  
+> > > > +		break;
+> > > > +	case DMA_MEM_TO_DEV:
+> > > > +		mode |= OWL_DMA_MODE_TS(vchan->drq)
+> > > > +			| OWL_DMA_MODE_ST_DCU | OWL_DMA_MODE_DT_DEV
+> > > > +			| OWL_DMA_MODE_SAM_INC | OWL_DMA_MODE_DAM_CONST;
+> > > > +
+> > > > +		/* Handle bus width for UART */
+> > > > +		if (sconfig->dst_addr_width == DMA_SLAVE_BUSWIDTH_1_BYTE)
+> > > > +			mode |= OWL_DMA_MODE_NDDBW_8BIT;
+> > > 
+> > > this is fine per se, but not correct way to handle in dmaengine driver.
+> > > You should be agnostic to user of dmaengine, so handle all the buswidths
+> > > the IP block supports and update the values accordingly. That way new
+> > > uses can be added w/o requiring change in dmaengine driver
+> > 
+> > Currently, all members of Owl family supports only 32bit and 8bit
+> > bus widths. 32bit is common for all peripherals and 8bit applies to only
+> > UART since the internal buffer is 8bit wide. So, this makes sense to me!
+> 
+> Above you are onky handing DMA_SLAVE_BUSWIDTH_1_BYTE and not 32bit which
+> this IP supports.. You should handle all widths supported vt hardware..
+>
 
-Above you are onky handing DMA_SLAVE_BUSWIDTH_1_BYTE and not 32bit which
-this IP supports.. You should handle all widths supported vt hardware..
+Hi Vinod,
 
--- 
-~Vinod
+Default width is 32bit and we will only override it for UART... Should I
+add a comment stating this?
+
+Thanks,
+Mani
+
+> -- 
+> ~Vinod
