@@ -1,37 +1,36 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Tue, 18 Sep 2018 19:09:22 +0200
-Subject: [PATCH v6 06/18] khwasan, arm64: untag virt address in
- __kimg_to_phys and _virt_addr_is_linear
-In-Reply-To: <CACT4Y+aJ36LGLG=TVOGQoJ+fB4Xc9CjdxAs8KZpUm3AsNEoHFw@mail.gmail.com>
-References: <cover.1535462971.git.andreyknvl@google.com>
- <19d757c2cafc277f0143a8ac34e179061f3487f5.1535462971.git.andreyknvl@google.com>
- <CACT4Y+aJ36LGLG=TVOGQoJ+fB4Xc9CjdxAs8KZpUm3AsNEoHFw@mail.gmail.com>
-Message-ID: <CAAeHK+xBX4X0oxhjOrjJfwdqcvU80VPhUsi38mEczzHRb01Wew@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 18 Sep 2018 18:10:00 +0100
+Subject: [PATCH v7 0/6] Add non-strict mode support for iommu-dma
+In-Reply-To: <cover.1536935328.git.robin.murphy@arm.com>
+References: <cover.1536935328.git.robin.murphy@arm.com>
+Message-ID: <20180918171000.GI16498@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2018 at 6:33 PM, Dmitry Vyukov <dvyukov@google.com> wrote:
-> On Wed, Aug 29, 2018 at 1:35 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
+Hi Robin,
 
->> +#ifdef CONFIG_KASAN_HW
->> +#define KASAN_TAG_SHIFTED(tag)         ((unsigned long)(tag) << 56)
->> +#define KASAN_SET_TAG(addr, tag)       (((addr) & ~KASAN_TAG_SHIFTED(0xff)) | \
->> +                                               KASAN_TAG_SHIFTED(tag))
->> +#define KASAN_RESET_TAG(addr)          KASAN_SET_TAG(addr, 0xff)
->> +#endif
->> +
->
->
-> Wouldn't it be better to
-> #define KASAN_RESET_TAG(addr) addr
-> when CONFIG_KASAN_HW is not enabled, and then not duplicate the macros
-> below? That's what we do in kasan.h for all hooks.
-> I see that a subsequent patch duplicates yet another macro in this
-> file. While we could use:
->
-> #define __kimg_to_phys(addr)   (KASAN_RESET_TAG(addr) - kimage_voffset)
->
-> with and without kasan. Duplicating them increases risk that somebody
-> will change only the non-kasan version but forget kasan version.
+Thanks for turning this around so quickly.
 
-Will do in v7.
+On Fri, Sep 14, 2018 at 03:30:18PM +0100, Robin Murphy wrote:
+> Since we'd like to get this polished up and merged and Leizhen has other
+> commitments, here's v7 of the previous series[1] wherein I address all
+> my own feedback :) This is a quick tweak of the v6 I sent yesterday
+> since I figured out slightly too late a much neater way of setting the
+> attribute at the appropriate time.
+> 
+> The principal change is that I've inverted things slightly such that
+> it's now a generic domain attribute controlled by iommu-dma given the
+> necessary support from individual IOMMU drivers. That way we can easily
+> enable other drivers straight away, as I've done for SMMUv2 here (which
+> also allowed me to give it a quick test with MMU-401s on a Juno board).
+> Otherwise it's really just cosmetic cleanup and rebasing onto Will's
+> pending SMMU queue.
+
+I've been through and had a look, leaving some small comments on the patches
+themselves. The only part I failed to figure out is how you tie the lifetime
+of the flush queue to the lifetime of the domain so that the timer callback
+can't fire after e.g. the DMA cookie has been freed. How does that work?
+
+Cheers,
+
+Will
