@@ -1,44 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 18 Sep 2018 16:16:26 +0100
-Subject: Huge page(contiguous bit) slow down
-In-Reply-To: <20180918145832.h24u5tbsqksvmrtq@armageddon.cambridge.arm.com>
-References: <8898674D84E3B24BA3A2D289B872026A69FE8F27@G01JPEXMBKW03>
- <20180918113300.GC16498@arm.com>
- <20180918145832.h24u5tbsqksvmrtq@armageddon.cambridge.arm.com>
-Message-ID: <20180918151625.GG16498@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 18 Sep 2018 16:16:27 +0100
+Subject: [PATCH v5 18/18] kvm: arm64: Allow tuning the physical address
+ size for VM
+In-Reply-To: <CAFEAcA8eWYkzwFYHyP49dasK-NDVbbm=6DbEFNNPq9ZAdUM7JQ@mail.gmail.com>
+References: <20180917104144.19188-1-suzuki.poulose@arm.com>
+ <20180917104144.19188-19-suzuki.poulose@arm.com>
+ <CAFEAcA8eWYkzwFYHyP49dasK-NDVbbm=6DbEFNNPq9ZAdUM7JQ@mail.gmail.com>
+Message-ID: <218b64d5-741d-97ef-8aae-bc0a2ac3e56c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2018 at 03:58:32PM +0100, Catalin Marinas wrote:
-> On Tue, Sep 18, 2018 at 12:33:01PM +0100, Will Deacon wrote:
-> > On Tue, Sep 18, 2018 at 03:02:17AM +0000, Zhang, Lei wrote:
-> > > --- a/arch/arm64/mm/hugetlbpage.c
-> > > +++ b/arch/arm64/mm/hugetlbpage.c
-> > > @@ -332,6 +332,9 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
-> > >         if (!pte_cont(pte))
-> > >                 return ptep_set_access_flags(vma, addr, ptep, pte, dirty);
-> > > 
-> > > +       if(pte_same(pte, READ_ONCE(*ptep)))
-> > > +               return 0;
-> > > +
-> > 
-> > This broadly seems to follow the non-contiguous code, but I wonder if we
-> > can then drop the subsequent pte_same() check on this path and always return
-> > 1 when we actually update the entries?
+Hi Peter,
+
+On 18/09/2018 02:55, Peter Maydell wrote:
+> On 17 September 2018 at 11:41, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+>> --- a/Documentation/virtual/kvm/api.txt
+>> +++ b/Documentation/virtual/kvm/api.txt
+>> @@ -122,6 +122,14 @@ the default trap & emulate implementation (which changes the virtual
+>>   memory layout to fit in user mode), check KVM_CAP_MIPS_VZ and use the
+>>   flag KVM_VM_MIPS_VZ.
+>>
+>> +To configure the physical address space size for a VM (IPA size) on arm64,
+>> +check KVM_CAP_ARM_VM_PHYS_SHIFT (which returns the maximum limit for the
+>> +IPA shift) and use KVM_VM_TYPE_ARM_PHYS_SHIFT(PHYS_SHIFT). Bits[7-0] of the
+>> +machine type has been reserved for specifying the PHYS_SHIFT.
+>> +The supported range is [32...IPA_LIMIT], where IPA_LIMIT could be
+>> +identified by checking KVM_CAP_ARM_VM_PHYS_SHIFT. For backward compatibility
+>> +a value of 0 selects 40bits.
+>> +
 > 
-> I don't remember why we went for first clearing and then checking
-> pte_same() (maybe Steve knows) but I think we can leave pte_same()
-> outside the get_clear_flush()/set_pte_at() block. This code is executed
-> with the mmap_sem taken, so there shouldn't be any race on the
-> individual ptes.
+> Given this as the API documentation, I don't think I could figure out
+> what I as a userspace user of it need to do without looking at the
+> kernel code. Could I ask you to expand it so that it is a bit less
+> terse and a bit more detailed? (For instance, what is a PHYS_SHIFT
+> and why do I have to specify it rather than just telling the kernel
+> I want a 48 bit guest address space?)
 
-I suspect it's just to avoid the additional load of the page-table entry,
-since we still have to use get_clear_flush() even with this change.
+Thanks for the feedback.  I acknowledge that the documentation is not
+quite clear for a userspace user. How about:
 
-One thing I don't really grok is the interaction between the contiguous
-hint and HW_AFDBM. Is it possible for us to be e.g. halfway through the
-set_pte_at() loop and then for the hardware to perform atomic PTE updates
-for entries later in the loop? If so, we've got a race and need to use
-cmpxchg() like we do for the non-contiguous code.
+"To configure the physical address space size for a VM (IPA size) on arm64,
+check KVM_CAP_ARM_VM_IPA_SIZE and use KVM_VM_TYPE_ARM_IPA_SIZE(IPA_Bits)
+as the argument to KVM_CREATE_VM, where IPA_Bits is the maximum width of
+any physical address used by the VM. The IPA_Bits is encoded in Bits[7-0]
+of the machine type, and must be one of { 0, 32, ... , Host_IPA_Limit },
+where :
+1) IPA_Bits = 0 implies 40bits IPA (for backward compatibility)
+2) Host_IPA_Limit is the maximum limit for IPA_Bits on the host, which is
+    dependent on the CPU capability and the host kernel configuration.
+    This can be detected by checking the extension KVM_CAP_ARM_VM_IPA_SIZE
+"
 
-Will
+note: I have renamed the KVM_CAP_ARM_VM_PHYS_SHIFT => KVM_CAP_ARM_VM_IPA_SIZE
+above and can update the code, if the latter is better.
+
+Suzuki
