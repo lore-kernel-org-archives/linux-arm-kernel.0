@@ -1,89 +1,131 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Tue, 18 Sep 2018 15:09:34 +0200
-Subject: [PATCH v3 0/2] add support to non-uniform SFDP SPI NOR flash
- memories
-In-Reply-To: <20180911154007.17195-1-tudor.ambarus@microchip.com>
-References: <20180911154007.17195-1-tudor.ambarus@microchip.com>
-Message-ID: <20180918150934.6c55b1d4@bbrezillon>
+From: john.garry@huawei.com (John Garry)
+Date: Tue, 18 Sep 2018 14:15:19 +0100
+Subject: [PATCH v2 3/4] perf: add arm64 smmuv3 pmu driver
+In-Reply-To: <527f47d7-20a2-d74a-1b0a-9901b8981f91@arm.com>
+References: <20180724114515.21764-1-shameerali.kolothum.thodi@huawei.com>
+ <20180724114515.21764-4-shameerali.kolothum.thodi@huawei.com>
+ <935f7572-38d7-070a-dba6-3f18189de4d3@arm.com>
+ <a7481657-1551-8f3e-e679-8bfbee8f1ab4@huawei.com>
+ <20180918114718.GD16498@arm.com>
+ <527f47d7-20a2-d74a-1b0a-9901b8981f91@arm.com>
+Message-ID: <254a3626-c904-287c-92a9-bc056aa97ed2@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Sep 2018 18:40:05 +0300
-Tudor Ambarus <tudor.ambarus@microchip.com> wrote:
+On 18/09/2018 13:16, Robin Murphy wrote:
+> On 18/09/18 12:47, Will Deacon wrote:
+>> On Mon, Sep 17, 2018 at 06:10:05PM +0100, John Garry wrote:
+>>>
+>>>>> +
+>>>>> +#define SMMU_EVENT_ATTR(_name, _id)                      \
+>>>>> +    (&((struct perf_pmu_events_attr[]) {                  \
+>>>>> +        { .attr = __ATTR(_name, 0444, smmu_pmu_event_show, NULL), \
+>>>>> +          .id = _id, }                          \
+>>>>> +    })[0].attr.attr)
+>>>>> +
+>>>>> +static struct attribute *smmu_pmu_events[] = {
+>>>>> +    SMMU_EVENT_ATTR(cycles, SMMU_PMU_CYCLES),
+>>>>> +    SMMU_EVENT_ATTR(transaction, SMMU_PMU_TRANSACTION),
+>>>>> +    SMMU_EVENT_ATTR(tlb_miss, SMMU_PMU_TLB_MISS),
+>>>>> +    SMMU_EVENT_ATTR(config_cache_miss, SMMU_PMU_CONFIG_CACHE_MISS),
+>>>>> +    SMMU_EVENT_ATTR(trans_table_walk, SMMU_PMU_TRANS_TABLE_WALK),
+>>>>> +    SMMU_EVENT_ATTR(config_struct_access,
+>>>>> SMMU_PMU_CONFIG_STRUCT_ACCESS),
+>>>>> +    SMMU_EVENT_ATTR(pcie_ats_trans_rq, SMMU_PMU_PCIE_ATS_TRANS_RQ),
+>>>>> +    SMMU_EVENT_ATTR(pcie_ats_trans_passed,
+>>>>> SMMU_PMU_PCIE_ATS_TRANS_PASSED),
+>>>>> +    NULL
+>>>>> +};
+>>>>> +
+>>>>> +static umode_t smmu_pmu_event_is_visible(struct kobject *kobj,
+>>>>> +                     struct attribute *attr, int unused)
+>>>>> +{
+>>>>> +    struct device *dev = kobj_to_dev(kobj);
+>>>>> +    struct smmu_pmu *smmu_pmu = to_smmu_pmu(dev_get_drvdata(dev));
+>>>>> +    struct perf_pmu_events_attr *pmu_attr;
+>>>>> +
+>>>>> +    pmu_attr = container_of(attr, struct perf_pmu_events_attr,
+>>>>> attr.attr);
+>>>>> +
+>>>>> +    if (test_bit(pmu_attr->id, smmu_pmu->supported_events))
+>>>>> +        return attr->mode;
+>>>>> +
+>>>>> +    return 0;
+>>>>> +}
+>>>>> +static struct attribute_group smmu_pmu_events_group = {
+>>>>> +    .name = "events",
+>>>>> +    .attrs = smmu_pmu_events,
+>>>>> +    .is_visible = smmu_pmu_event_is_visible,
+>>>>> +};
+>>>>> +
+>>>>> +/* Formats */
+>>>>> +PMU_FORMAT_ATTR(event,           "config:0-15");
+>>>>> +PMU_FORMAT_ATTR(filter_stream_id,  "config1:0-31");
+>>>>> +PMU_FORMAT_ATTR(filter_span,       "config1:32");
+>>>>> +PMU_FORMAT_ATTR(filter_enable,       "config1:33");
+>>>>> +
+>>>>> +static struct attribute *smmu_pmu_formats[] = {
+>>>>> +    &format_attr_event.attr,
+>>>>> +    &format_attr_filter_stream_id.attr,
+>>>>> +    &format_attr_filter_span.attr,
+>>>>> +    &format_attr_filter_enable.attr,
+>>>>> +    NULL
+>>>>> +};
+>>>>> +
+>>>>> +static struct attribute_group smmu_pmu_format_group = {
+>>>>> +    .name = "format",
+>>>>> +    .attrs = smmu_pmu_formats,
+>>>>> +};
+>>>>> +
+>>>>> +static const struct attribute_group *smmu_pmu_attr_grps[] = {
+>>>>> +    &smmu_pmu_cpumask_group,
+>>>>> +    &smmu_pmu_events_group,
+>>>>> +    &smmu_pmu_format_group,
+>>>>> +    NULL,
+>>>>> +};
+>>>>> +
+>>>
+>>>
+>>> Question: If we wanted to add proper named event support for the
+>>> IMPLEMENTATION DEFINED events, how to add (if at all)?
+>>>
+>>> So currently the driver only supports the Architected events, which
+>>> is fine.
+>>> And we support raw events for the IMPLEMENTATION DEFINED events
+>>> (0x80-0xFFFF).
+>>>
+>>> But to add named event support for the IMP DEF events, I assume we would
+>>> want to do something similar to arm64 CPU PMU events - that is, common
+>>> architected events in kernel pmu driver, and implementation defined
+>>> events
+>>> defined in perf tool. However I don't know if it's even feasible
+>>> considering
+>>> there does not seem to be a mandatory/standard PMCG ID register to
+>>> detect
+>>> the implementation.
+>>
+>> I guess we'd need something from firmware to identify the SMMU/PMU
+>> implementation, so that we could probe the driver correctly. Once we have
+>> that, it seems like it's just a matter of exposing a different name to
+>> userspace, like we do for the CPU PMU.
+>
+> Indeed - in fact a while ago I raised it with the architects that PMCGs
+> don't have an equivalent to IIDR, so you can't interpret the imp-def
+> PMCG_ID_REGS without already knowing what the thing is some other way.
+> For IORT it should already be somewhat feasible to figure out the
+> implementation by way of chasing the node reference to figure out what
+> device the the PMCG is part of, however that might require some sort of
+> API between the PMCG driver and SMMUv3 (and other component) driver(s)
+> to communicate runtime-probed stuff.
+>
 
-> Backward compatibility test done on mx25l3273fm2i-08g with
-> CONFIG_MTD_SPI_NOR_USE_4K_SECTORS set and unset.
-> Non-uniform erase test done on sst26vf064b-104i/sn with
-> CONFIG_MTD_SPI_NOR_USE_4K_SECTORS set and unset.
-> 
-> Note that in order to do the non-uniform test you'll have to force the
-> spi_nor_has_uniform_erase() to return false, because the erase map is
-> tuned to come back to the uniform case. Also, for the SST flashes, you'll
-> have to unlock the global protection (see
-> https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1763887.html).
-> 
-> Changes in v3:
-> - drop "mtd: spi-nor: parse SFDP 4-byte Address Instruction Table":
->   let's add just a feature per patch set to make it easily digestible.
->   No worries, will resubmit it once the non-uniform erase supports gets
->   approved.
-> - SNOR_ERASE_FLAGS_OFFSET was buggy and since it's used only once
->   in the uniform erase case, remove it entirely and do the init by
->   hand
-> - describe all introduced functions together with arguments and
->   return value
-> - various minor updates: drop a cast, rename a function - cosmetics ...
-> 
-> Changes in v2:
-> - add JESD216B SFDP optional parsers: Sector Map Parameter Table parser and
->   4-byte Address Instruction Table parser (patch 2/3 and patch 3/3).
-> 
-> - save the Erase Types from bfpt to determine the Erase Type sizes. Sort all
->   the map's Erase Types in ascending order with the smallest erase size being
->   the first member in the erase_type array. Sort in the same way the Erase Type
->   mask in regions in order to have a 1-to-1 correspondence with the Erase
->   Types defined in the map. We sort the Erase Type by size, at init, in order to
->   speed up the process of finding the best erase command at run-time.
-> 
-> - remove setting of mtd->erasesize and nor->erase_opcode when parsing the Basic
->   Flash Parameter Table. mtd->erasesize was set to the maximum supported Erase
->   Type size, without verifying if that Erase Type can erase the entire flash.
->   mtd->erasesize is now set just in spi_nor_select_erase(), after we find which
->   Erase Types are supported in the uniform case.
-> 
-> - spi_nor_select_erase(): pass directly info->sector_size instead of the whole
->   flash_info structure in order to simplify the code.
-> 
-> - fix condition on finding erase regions:
->   while (addr < region_start || addr >= region_end) {
-> - fix the list command adding: list_add_tail() instead of list_add()
-> - write_enable(nor); before erasing the sectors
-> - As Boris suggested, remove likely() because it doesn't make any difference
->   given the time it takes to actually erase the block.
-> - bool return value for spi_nor_has_uniform_erase().
-> 
-> Changes in v1 or what I've done on top of Cyrille's work (https://lkml.org/lkml//
-> 2017/4/15/70):
-> - minimize the amount of erase() calls by using the best sequence of erase
->   type commands depending on alignment.
-> - build the list of best fitted erase commands to be executed once we
->   validate that the erase can be performed.
-> - add improvements on how the erase map is handled. The regions are
->   consecutive in the address space, walk through the regions incrementally.
-> - speed up finding the best erase type command. Order erase types by
->   size, iterate them from the biggest to the smallest and stop when best
->   fitted command is found.
-> - determine at init if there are erase types that can erase the entire
->   memory
-> - fix support for overlaid regions.
-> 
-> 
-> Tudor Ambarus (2):
->   mtd: spi-nor: add support to non-uniform SFDP SPI NOR flash memories
->   mtd: spi-nor: parse SFDP Sector Map Parameter Table
-
-Queued to spi-nor/next after fixing the kerneldoc headers.
+OK, so it should be feasiable to achieve this by knowing the associated 
+SMMUv3, but seems a bit painful to support in software.
 
 Thanks,
+John
 
-Boris
+> Robin.
+>
+> .
+>
