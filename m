@@ -1,33 +1,34 @@
 From: Anson.Huang@nxp.com (Anson Huang)
-Date: Tue, 18 Sep 2018 14:19:07 +0800
-Subject: [PATCH 3/4] clk: imx6ul: add i.mx6ulz support
+Date: Tue, 18 Sep 2018 14:19:08 +0800
+Subject: [PATCH 4/4] dt-bindings: arm: add compatible for i.MX6ULZ 14x14 EVK
+ board
 In-Reply-To: <1537251548-27845-1-git-send-email-Anson.Huang@nxp.com>
 References: <1537251548-27845-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1537251548-27845-4-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <1537251548-27845-5-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6ULZ has same CCM IP as i.MX6ULL, and it reuses
-i.MX6UL clock driver, this patch adds support for it.
+This patch adds compatible for i.MX6ULZ 14x14 EVK board.
 
 Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 ---
- drivers/clk/imx/clk-imx6ul.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/arm/fsl.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/clk/imx/clk-imx6ul.c b/drivers/clk/imx/clk-imx6ul.c
-index 361b43f..42b857e 100644
---- a/drivers/clk/imx/clk-imx6ul.c
-+++ b/drivers/clk/imx/clk-imx6ul.c
-@@ -116,7 +116,8 @@ static inline int clk_on_imx6ul(void)
+diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+index 968f238..9a0ffce 100644
+--- a/Documentation/devicetree/bindings/arm/fsl.txt
++++ b/Documentation/devicetree/bindings/arm/fsl.txt
+@@ -85,6 +85,10 @@ i.MX6 UltraLiteLite 14x14 EVK Board
+ Required root node properties:
+     - compatible = "fsl,imx6ull-14x14-evk", "fsl,imx6ull";
  
- static inline int clk_on_imx6ull(void)
- {
--	return of_machine_is_compatible("fsl,imx6ull");
-+	return of_machine_is_compatible("fsl,imx6ull") ||
-+		of_machine_is_compatible("fsl,imx6ulz");
- }
- 
- static void __init imx6ul_clocks_init(struct device_node *ccm_node)
++i.MX6 ULZ 14x14 EVK Board
++Required root node properties:
++    - compatible = "fsl,imx6ulz-14x14-evk", "fsl,imx6ulz";
++
+ i.MX6 SoloX SDB Board
+ Required root node properties:
+     - compatible = "fsl,imx6sx-sdb", "fsl,imx6sx";
 -- 
 2.7.4
