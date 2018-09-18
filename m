@@ -1,104 +1,197 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 18 Sep 2018 12:47:18 +0100
-Subject: [PATCH v2 3/4] perf: add arm64 smmuv3 pmu driver
-In-Reply-To: <a7481657-1551-8f3e-e679-8bfbee8f1ab4@huawei.com>
-References: <20180724114515.21764-1-shameerali.kolothum.thodi@huawei.com>
- <20180724114515.21764-4-shameerali.kolothum.thodi@huawei.com>
- <935f7572-38d7-070a-dba6-3f18189de4d3@arm.com>
- <a7481657-1551-8f3e-e679-8bfbee8f1ab4@huawei.com>
-Message-ID: <20180918114718.GD16498@arm.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 18 Sep 2018 13:51:20 +0200
+Subject: [PATCH v2 2/2] serial: uartps: Change uart ID port allocation
+In-Reply-To: <6b07b21f60dcf07e1f6d6e39bae1f3750c4aa804.1537271478.git.michal.simek@xilinx.com>
+References: <6b07b21f60dcf07e1f6d6e39bae1f3750c4aa804.1537271478.git.michal.simek@xilinx.com>
+Message-ID: <f3eda25d9143251778b96a945b7c2975d503c6e1.1537271478.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 17, 2018 at 06:10:05PM +0100, John Garry wrote:
-> 
-> >>+
-> >>+#define SMMU_EVENT_ATTR(_name, _id)                      \
-> >>+    (&((struct perf_pmu_events_attr[]) {                  \
-> >>+        { .attr = __ATTR(_name, 0444, smmu_pmu_event_show, NULL), \
-> >>+          .id = _id, }                          \
-> >>+    })[0].attr.attr)
-> >>+
-> >>+static struct attribute *smmu_pmu_events[] = {
-> >>+    SMMU_EVENT_ATTR(cycles, SMMU_PMU_CYCLES),
-> >>+    SMMU_EVENT_ATTR(transaction, SMMU_PMU_TRANSACTION),
-> >>+    SMMU_EVENT_ATTR(tlb_miss, SMMU_PMU_TLB_MISS),
-> >>+    SMMU_EVENT_ATTR(config_cache_miss, SMMU_PMU_CONFIG_CACHE_MISS),
-> >>+    SMMU_EVENT_ATTR(trans_table_walk, SMMU_PMU_TRANS_TABLE_WALK),
-> >>+    SMMU_EVENT_ATTR(config_struct_access,
-> >>SMMU_PMU_CONFIG_STRUCT_ACCESS),
-> >>+    SMMU_EVENT_ATTR(pcie_ats_trans_rq, SMMU_PMU_PCIE_ATS_TRANS_RQ),
-> >>+    SMMU_EVENT_ATTR(pcie_ats_trans_passed,
-> >>SMMU_PMU_PCIE_ATS_TRANS_PASSED),
-> >>+    NULL
-> >>+};
-> >>+
-> >>+static umode_t smmu_pmu_event_is_visible(struct kobject *kobj,
-> >>+                     struct attribute *attr, int unused)
-> >>+{
-> >>+    struct device *dev = kobj_to_dev(kobj);
-> >>+    struct smmu_pmu *smmu_pmu = to_smmu_pmu(dev_get_drvdata(dev));
-> >>+    struct perf_pmu_events_attr *pmu_attr;
-> >>+
-> >>+    pmu_attr = container_of(attr, struct perf_pmu_events_attr,
-> >>attr.attr);
-> >>+
-> >>+    if (test_bit(pmu_attr->id, smmu_pmu->supported_events))
-> >>+        return attr->mode;
-> >>+
-> >>+    return 0;
-> >>+}
-> >>+static struct attribute_group smmu_pmu_events_group = {
-> >>+    .name = "events",
-> >>+    .attrs = smmu_pmu_events,
-> >>+    .is_visible = smmu_pmu_event_is_visible,
-> >>+};
-> >>+
-> >>+/* Formats */
-> >>+PMU_FORMAT_ATTR(event,           "config:0-15");
-> >>+PMU_FORMAT_ATTR(filter_stream_id,  "config1:0-31");
-> >>+PMU_FORMAT_ATTR(filter_span,       "config1:32");
-> >>+PMU_FORMAT_ATTR(filter_enable,       "config1:33");
-> >>+
-> >>+static struct attribute *smmu_pmu_formats[] = {
-> >>+    &format_attr_event.attr,
-> >>+    &format_attr_filter_stream_id.attr,
-> >>+    &format_attr_filter_span.attr,
-> >>+    &format_attr_filter_enable.attr,
-> >>+    NULL
-> >>+};
-> >>+
-> >>+static struct attribute_group smmu_pmu_format_group = {
-> >>+    .name = "format",
-> >>+    .attrs = smmu_pmu_formats,
-> >>+};
-> >>+
-> >>+static const struct attribute_group *smmu_pmu_attr_grps[] = {
-> >>+    &smmu_pmu_cpumask_group,
-> >>+    &smmu_pmu_events_group,
-> >>+    &smmu_pmu_format_group,
-> >>+    NULL,
-> >>+};
-> >>+
-> 
-> 
-> Question: If we wanted to add proper named event support for the
-> IMPLEMENTATION DEFINED events, how to add (if at all)?
-> 
-> So currently the driver only supports the Architected events, which is fine.
-> And we support raw events for the IMPLEMENTATION DEFINED events
-> (0x80-0xFFFF).
-> 
-> But to add named event support for the IMP DEF events, I assume we would
-> want to do something similar to arm64 CPU PMU events - that is, common
-> architected events in kernel pmu driver, and implementation defined events
-> defined in perf tool. However I don't know if it's even feasible considering
-> there does not seem to be a mandatory/standard PMCG ID register to detect
-> the implementation.
+For IPs which have alias algorightm all the time using that alias and
+minor number. It means serial20 alias ends up as ttyPS20.
 
-I guess we'd need something from firmware to identify the SMMU/PMU
-implementation, so that we could probe the driver correctly. Once we have
-that, it seems like it's just a matter of exposing a different name to
-userspace, like we do for the CPU PMU.
+If alias is not setup for probed IP instance the first unused position is
+used but that needs to be checked if it is really empty because another
+instance doesn't need to be probed at that time. of_alias_get_alias_list()
+fills alias bitmap which exactly shows which ID is free.
+If alias pointing to different not compatible IP, it is free to use.
 
-Will
+cdns_get_id() call is placed below structure allocation to simplify
+error path.
+
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
+
+Changes in v2:
+- Add handle of return value from of_alias_get_alias_list
+
+Needs to be applied on the top of
+https://lkml.org/lkml/2018/9/3/404
+https://lkml.org/lkml/2018/9/3/400 (minor that's why just in case)
+
+---
+ drivers/tty/serial/xilinx_uartps.c | 109 ++++++++++++++++++++++++++++++++-----
+ 1 file changed, 96 insertions(+), 13 deletions(-)
+
+diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+index 71c032744dae..f77200a0f461 100644
+--- a/drivers/tty/serial/xilinx_uartps.c
++++ b/drivers/tty/serial/xilinx_uartps.c
+@@ -30,7 +30,6 @@
+ #define CDNS_UART_TTY_NAME	"ttyPS"
+ #define CDNS_UART_NAME		"xuartps"
+ #define CDNS_UART_MAJOR		0	/* use dynamic node allocation */
+-#define CDNS_UART_NR_PORTS	2
+ #define CDNS_UART_FIFO_SIZE	64	/* FIFO size */
+ #define CDNS_UART_REGISTER_SPACE	0x1000
+ 
+@@ -1370,6 +1369,88 @@ static int __maybe_unused cdns_runtime_resume(struct device *dev)
+ };
+ MODULE_DEVICE_TABLE(of, cdns_uart_of_match);
+ 
++/*
++ * Maximum number of instances without alias IDs but if there is alias
++ * which target "< MAX_UART_INSTANCES" range this ID can't be used.
++ */
++#define MAX_UART_INSTANCES	32
++
++/* Stores static aliases list */
++static DECLARE_BITMAP(alias_bitmap, MAX_UART_INSTANCES);
++static int alias_bitmap_initialized;
++
++/* Stores actual bitmap of allocated IDs with alias IDs together */
++static DECLARE_BITMAP(bitmap, MAX_UART_INSTANCES);
++/* Protect bitmap operations to have unique IDs */
++static DEFINE_MUTEX(bitmap_lock);
++
++static int cdns_get_id(struct platform_device *pdev)
++{
++	int id, ret;
++
++	mutex_lock(&bitmap_lock);
++
++	/* Alias list is stable that's why get alias bitmap only once */
++	if (!alias_bitmap_initialized) {
++		ret = of_alias_get_alias_list(cdns_uart_of_match, "serial",
++					      alias_bitmap, MAX_UART_INSTANCES);
++		if (ret)
++			return ret;
++
++		alias_bitmap_initialized++;
++	}
++
++	/* Make sure that alias ID is not taken by instance without alias */
++	bitmap_or(bitmap, bitmap, alias_bitmap, MAX_UART_INSTANCES);
++
++	dev_dbg(&pdev->dev, "Alias bitmap: %*pb\n",
++		MAX_UART_INSTANCES, bitmap);
++
++	/* Look for a serialN alias */
++	id = of_alias_get_id(pdev->dev.of_node, "serial");
++	if (id < 0) {
++		dev_warn(&pdev->dev,
++			 "No serial alias passed. Using the first free id\n");
++
++		/*
++		 * Start with id 0 and check if there is no serial0 alias
++		 * which points to device which is compatible with this driver.
++		 * If alias exists then try next free position.
++		 */
++		id = 0;
++
++		for (;;) {
++			dev_info(&pdev->dev, "Checking id %d\n", id);
++			id = find_next_zero_bit(bitmap, MAX_UART_INSTANCES, id);
++
++			/* No free empty instance */
++			if (id == MAX_UART_INSTANCES) {
++				dev_err(&pdev->dev, "No free ID\n");
++				mutex_unlock(&bitmap_lock);
++				return -EINVAL;
++			}
++
++			dev_dbg(&pdev->dev, "The empty id is %d\n", id);
++			/* Check if ID is empty */
++			if (!test_and_set_bit(id, bitmap)) {
++				/* Break the loop if bit is taken */
++				dev_dbg(&pdev->dev,
++					"Selected ID %d allocation passed\n",
++					id);
++				break;
++			}
++			dev_dbg(&pdev->dev,
++				"Selected ID %d allocation failed\n", id);
++			/* if taking bit fails then try next one */
++			id++;
++		}
++	}
++
++	mutex_unlock(&bitmap_lock);
++
++	return id;
++}
++
+ /**
+  * cdns_uart_probe - Platform driver probe
+  * @pdev: Pointer to the platform device structure
+@@ -1403,21 +1484,17 @@ static int cdns_uart_probe(struct platform_device *pdev)
+ 	if (!cdns_uart_uart_driver)
+ 		return -ENOMEM;
+ 
+-	/* Look for a serialN alias */
+-	cdns_uart_data->id = of_alias_get_id(pdev->dev.of_node, "serial");
++	cdns_uart_data->id = cdns_get_id(pdev);
+ 	if (cdns_uart_data->id < 0)
+-		cdns_uart_data->id = 0;
+-
+-	if (cdns_uart_data->id >= CDNS_UART_NR_PORTS) {
+-		dev_err(&pdev->dev, "Cannot get uart_port structure\n");
+-		return -ENODEV;
+-	}
++		return cdns_uart_data->id;
+ 
+ 	/* There is a need to use unique driver name */
+ 	driver_name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "%s%d",
+ 				     CDNS_UART_NAME, cdns_uart_data->id);
+-	if (!driver_name)
+-		return -ENOMEM;
++	if (!driver_name) {
++		rc = -ENOMEM;
++		goto err_out_id;
++	}
+ 
+ 	cdns_uart_uart_driver->owner = THIS_MODULE;
+ 	cdns_uart_uart_driver->driver_name = driver_name;
+@@ -1446,7 +1523,7 @@ static int cdns_uart_probe(struct platform_device *pdev)
+ 	rc = uart_register_driver(cdns_uart_uart_driver);
+ 	if (rc < 0) {
+ 		dev_err(&pdev->dev, "Failed to register driver\n");
+-		return rc;
++		goto err_out_id;
+ 	}
+ 
+ 	cdns_uart_data->cdns_uart_driver = cdns_uart_uart_driver;
+@@ -1587,7 +1664,10 @@ static int cdns_uart_probe(struct platform_device *pdev)
+ 	clk_disable_unprepare(cdns_uart_data->pclk);
+ err_out_unregister_driver:
+ 	uart_unregister_driver(cdns_uart_data->cdns_uart_driver);
+-
++err_out_id:
++	mutex_lock(&bitmap_lock);
++	clear_bit(cdns_uart_data->id, bitmap);
++	mutex_unlock(&bitmap_lock);
+ 	return rc;
+ }
+ 
+@@ -1610,6 +1690,9 @@ static int cdns_uart_remove(struct platform_device *pdev)
+ #endif
+ 	rc = uart_remove_one_port(cdns_uart_data->cdns_uart_driver, port);
+ 	port->mapbase = 0;
++	mutex_lock(&bitmap_lock);
++	clear_bit(cdns_uart_data->id, bitmap);
++	mutex_unlock(&bitmap_lock);
+ 	clk_disable_unprepare(cdns_uart_data->uartclk);
+ 	clk_disable_unprepare(cdns_uart_data->pclk);
+ 	pm_runtime_disable(&pdev->dev);
+-- 
+1.9.1
