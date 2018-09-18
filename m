@@ -1,81 +1,35 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 18 Sep 2018 16:36:55 +0100
-Subject: [PATCH v5 18/18] kvm: arm64: Allow tuning the physical address
- size for VM
-In-Reply-To: <218b64d5-741d-97ef-8aae-bc0a2ac3e56c@arm.com>
-References: <20180917104144.19188-1-suzuki.poulose@arm.com>
- <20180917104144.19188-19-suzuki.poulose@arm.com>
- <CAFEAcA8eWYkzwFYHyP49dasK-NDVbbm=6DbEFNNPq9ZAdUM7JQ@mail.gmail.com>
- <218b64d5-741d-97ef-8aae-bc0a2ac3e56c@arm.com>
-Message-ID: <CAFEAcA8qjJJ0FkQj4yBMKFrwNFiJj3Q4FBi4GbnK2PN3B3J-mg@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 18 Sep 2018 08:42:07 -0700
+Subject: [PATCH v2 1/5] dt-bindings: spi/spi-pxa2xx: add PXA2xx SSP SPI
+ Controller
+In-Reply-To: <54f5d070c8b0615baa26983e97e2a22401973096.camel@v3.sk>
+References: <20180917113559.11101-1-lkundrak@v3.sk>
+ <20180917113559.11101-2-lkundrak@v3.sk>
+ <20180917175753.GE2471@sirena.org.uk>
+ <54f5d070c8b0615baa26983e97e2a22401973096.camel@v3.sk>
+Message-ID: <20180918154207.GJ2471@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 September 2018 at 16:16, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
-> Hi Peter,
->
-> On 18/09/2018 02:55, Peter Maydell wrote:
->>
->> On 17 September 2018 at 11:41, Suzuki K Poulose <suzuki.poulose@arm.com>
->> wrote:
->>>
->>> --- a/Documentation/virtual/kvm/api.txt
->>> +++ b/Documentation/virtual/kvm/api.txt
->>> @@ -122,6 +122,14 @@ the default trap & emulate implementation (which
->>> changes the virtual
->>>   memory layout to fit in user mode), check KVM_CAP_MIPS_VZ and use the
->>>   flag KVM_VM_MIPS_VZ.
->>>
->>> +To configure the physical address space size for a VM (IPA size) on
->>> arm64,
->>> +check KVM_CAP_ARM_VM_PHYS_SHIFT (which returns the maximum limit for the
->>> +IPA shift) and use KVM_VM_TYPE_ARM_PHYS_SHIFT(PHYS_SHIFT). Bits[7-0] of
->>> the
->>> +machine type has been reserved for specifying the PHYS_SHIFT.
->>> +The supported range is [32...IPA_LIMIT], where IPA_LIMIT could be
->>> +identified by checking KVM_CAP_ARM_VM_PHYS_SHIFT. For backward
->>> compatibility
->>> +a value of 0 selects 40bits.
->>> +
->>
->>
->> Given this as the API documentation, I don't think I could figure out
->> what I as a userspace user of it need to do without looking at the
->> kernel code. Could I ask you to expand it so that it is a bit less
->> terse and a bit more detailed? (For instance, what is a PHYS_SHIFT
->> and why do I have to specify it rather than just telling the kernel
->> I want a 48 bit guest address space?)
->
->
-> Thanks for the feedback.  I acknowledge that the documentation is not
-> quite clear for a userspace user. How about:
->
-> "To configure the physical address space size for a VM (IPA size) on arm64,
-> check KVM_CAP_ARM_VM_IPA_SIZE and use KVM_VM_TYPE_ARM_IPA_SIZE(IPA_Bits)
-> as the argument to KVM_CREATE_VM, where IPA_Bits is the maximum width of
-> any physical address used by the VM. The IPA_Bits is encoded in Bits[7-0]
-> of the machine type, and must be one of { 0, 32, ... , Host_IPA_Limit },
-> where :
-> 1) IPA_Bits = 0 implies 40bits IPA (for backward compatibility)
-> 2) Host_IPA_Limit is the maximum limit for IPA_Bits on the host, which is
->    dependent on the CPU capability and the host kernel configuration.
->    This can be detected by checking the extension KVM_CAP_ARM_VM_IPA_SIZE
-> "
+On Tue, Sep 18, 2018 at 02:15:12PM +0200, Lubomir Rintel wrote:
 
-I think this is still somewhat confusing. In particular, you're
-describing both the "ask the kernel what it supports" API and
-the "tell the kernel what we want" API in a single sentence
-("...check KVM_CAP_ARM_VM_IPA_SIZE and use KVM_VM_TYPE_ARM_IPA_SIZE...").
-There isn't a length limit on documentation, so why not describe
-them both clearly in separate sentences?
+> Should I've Cc'd everyone on the full series, even if only a patch or
+> two might be really interesting to them? How do I decide whether the
 
-Also, can I use any IPA value between 32 and Host_IPA_Limit, or
-are only certain values in that range supported (if so, which)?
+It's a judgement call about who gets the patches but in general it's
+good to either do that or make sure that everyone sees the cover letter
+which explains what the whole series is.
 
-> note: I have renamed the KVM_CAP_ARM_VM_PHYS_SHIFT =>
-> KVM_CAP_ARM_VM_IPA_SIZE
-> above and can update the code, if the latter is better.
+> recipient needs to be in the commit's commit message (as opposed to
+> just --cc on a command line)?
 
-I think the new name is definitely clearer, thanks.
-
--- PMM
+Using CCs in the commit message is entirely optional TBH - a lot of
+people just don't do it at all, often when it is done it's a list of
+everyone who got the mail.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180918/2770405c/attachment.sig>
