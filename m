@@ -1,34 +1,34 @@
-From: murphyt7@tcd.ie (Tom Murphy)
-Date: Tue, 18 Sep 2018 14:28:55 +0100
-Subject: [PATCH v2 0/3] iommu: Avoid DMA ops domain refcount contention
-In-Reply-To: <20180917133359.GA972@lst.de>
-References: <cover.1536764440.git.robin.murphy@arm.com>
- <20180914124858.GA4010@arm.com> <20180917133359.GA972@lst.de>
-Message-ID: <CALQxJusfn_d0X34RAevfunjj9-dA6_qq97efjUriBZWMJoX4QA@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 18 Sep 2018 15:28:56 +0200
+Subject: [PATCH v4 2/2] tty/serial: atmel: add ISO7816 support
+In-Reply-To: <20180906134214.29031-3-ludovic.desroches@microchip.com>
+References: <20180906134214.29031-1-ludovic.desroches@microchip.com>
+ <20180906134214.29031-3-ludovic.desroches@microchip.com>
+Message-ID: <20180918132856.GA14333@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->Not sure how fast Tom needs the common dma-iommu code for the x86 AMD iommu conversion.
+On Thu, Sep 06, 2018 at 03:42:14PM +0200, Ludovic Desroches wrote:
+> From: Nicolas Ferre <nicolas.ferre@microchip.com>
+> 
+> When mode is set in atmel_config_iso7816() we backup last RS232 mode
+> for coming back to this mode if requested.
+> Also allow setup of T=0 and T=1 parameter and basic support in set_termios
+> function as well.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> [ludovic.desroches at microchip.com: rebase, add check on fidi ratio, checkpatch fixes]
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+> Acked-by: Richard Genoud <richard.genoud@gmail.com>
+> ---
+>  drivers/tty/serial/atmel_serial.c | 190 +++++++++++++++++++++++++++++++++++---
+>  drivers/tty/serial/atmel_serial.h |   3 +-
+>  2 files changed, 181 insertions(+), 12 deletions(-)
 
-I am currently busy working on something else and won't be able to
-do/test the x86 AMD iommu conversion anytime soon. So I don't need the
-common dma-iommu code anytime soon.
+This doesn't apply to my tree :(
 
-On 17 September 2018 at 14:33, Christoph Hellwig <hch@lst.de> wrote:
-> On Fri, Sep 14, 2018 at 01:48:59PM +0100, Will Deacon wrote:
->> > As far as merging goes, I don't mind at all whether this goes via IOMMU,
->> > or via dma-mapping provided Joerg's happy to ack it.
->>
->> I think it makes most sense for Joerg to take this series via his tree.
->
-> FYI, I have WIP patches to move the arm dma-iommu wrappers to common
-> code:
->
-> http://git.infradead.org/users/hch/misc.git/shortlog/refs/heads/dma-maybe-coherent
->
-> which will require some synchronization of the involved trees.  In the
-> end it is iommu code, so the actual iommu patches should probably
-> go into the iommu tree after all, but it might have to pull in the
-> dma-mapping branch for that.  Or we just punt it until the next merge
-> window.  Not sure how fast Tom needs the common dma-iommu code for
-> the x86 AMD iommu conversion.
+Also, shouldn't this new ioctl be documented somewhere?
+
+thanks,
+
+greg k-h
