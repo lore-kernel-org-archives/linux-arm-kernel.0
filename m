@@ -1,24 +1,27 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 19 Sep 2018 19:11:05 +0200
-Subject: [PATCH] ARM: s3c24xx: fix usage of pr_info/pr_cont
-In-Reply-To: <20180917204350.15192-1-sed@free.fr>
-References: <20180917204350.15192-1-sed@free.fr>
-Message-ID: <20180919171105.GA10129@kozik-lap>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Wed, 19 Sep 2018 19:11:20 +0200
+Subject: [PATCH] ARM: dts: at91: sama5d27_som1_ek: add adc regulators
+In-Reply-To: <1537360793-10264-1-git-send-email-eugen.hristev@microchip.com>
+References: <1537360793-10264-1-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <20180919171120.GE2479@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 17, 2018 at 10:43:50PM +0200, Cedric Roux wrote:
-> This commit fixes the wrong usage of pr_info introduced by the
-> commit e728e4f20100 ("ARM: s3c24xx: formatting cleanup in
-> mach-mini2440.c").
+On 19/09/2018 15:39:53+0300, Eugen Hristev wrote:
+> Add fixed regulators for the ADC. This board does not have
+> a programmable PMIC, but fixed regulators.
+> Adding them to DT so the ADC can probe correctly.
 > 
-> Since the idea is to print on a single line, pr_cont has to be used.
-> 
-> Signed-off-by: Cedric Roux <sed@free.fr>
+> Tested-by: Swapna Gurumani <swapna.gurumani@microchip.com>
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
 > ---
->  arch/arm/mach-s3c24xx/mach-mini2440.c | 6 +++---
+>  arch/arm/boot/dts/at91-sama5d27_som1_ek.dts | 42 +++++++++++++++++++++++++++++
+>  1 file changed, 42 insertions(+)
+> 
+Applied, thanks.
 
-Thanks, applied.
-
-Best regards,
-Krzysztof
+-- 
+Alexandre Belloni, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
