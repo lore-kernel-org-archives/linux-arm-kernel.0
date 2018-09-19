@@ -1,153 +1,59 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Wed, 19 Sep 2018 15:35:57 +0300
-Subject: [PATCH 05/21] soc/fsl/qbman: add APIs to retrieve the probing status
+Date: Wed, 19 Sep 2018 15:36:02 +0300
+Subject: [PATCH 10/21] fsl/fman: add API to get the device behind a fman port
 In-Reply-To: <20180919123613.15092-1-laurentiu.tudor@nxp.com>
 References: <20180919123613.15092-1-laurentiu.tudor@nxp.com>
-Message-ID: <20180919123613.15092-6-laurentiu.tudor@nxp.com>
+Message-ID: <20180919123613.15092-11-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-Add a couple of new APIs to check the probing status of qman and bman:
- 'int bman_is_probed()' and 'int qman_is_probed()'.
-They return the following values.
- *  1 if qman/bman were probed correctly
- *  0 if qman/bman were not yet probed
- * -1 if probing of qman/bman failed
-Drivers that use qman/bman driver services are required to use these
-APIs before calling any functions exported by qman or bman drivers
-or otherwise they will crash the kernel.
-The APIs will be used in the following couple of qbman portal patches
-and later in the series in the dpaa1 ethernet driver.
+Add an API that retrieves the 'struct device' that the specified fman
+port probed against. The new API will be used in a subsequent iommu
+enablement related patch.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
- drivers/soc/fsl/qbman/bman_ccsr.c | 11 +++++++++++
- drivers/soc/fsl/qbman/qman_ccsr.c | 11 +++++++++++
- include/soc/fsl/bman.h            |  8 ++++++++
- include/soc/fsl/qman.h            |  8 ++++++++
- 4 files changed, 38 insertions(+)
+ drivers/net/ethernet/freescale/fman/fman_port.c | 14 ++++++++++++++
+ drivers/net/ethernet/freescale/fman/fman_port.h |  2 ++
+ 2 files changed, 16 insertions(+)
 
-diff --git a/drivers/soc/fsl/qbman/bman_ccsr.c b/drivers/soc/fsl/qbman/bman_ccsr.c
-index 680f67f04fb4..2c11883d42a5 100644
---- a/drivers/soc/fsl/qbman/bman_ccsr.c
-+++ b/drivers/soc/fsl/qbman/bman_ccsr.c
-@@ -121,6 +121,7 @@ static void bm_set_memory(u64 ba, u32 size)
-  */
- static dma_addr_t fbpr_a;
- static size_t fbpr_sz;
-+static int __bman_probed;
- 
- static int bman_fbpr(struct reserved_mem *rmem)
- {
-@@ -167,6 +168,12 @@ static irqreturn_t bman_isr(int irq, void *ptr)
- 	return IRQ_HANDLED;
+diff --git a/drivers/net/ethernet/freescale/fman/fman_port.c b/drivers/net/ethernet/freescale/fman/fman_port.c
+index ee82ee1384eb..bd76c9730692 100644
+--- a/drivers/net/ethernet/freescale/fman/fman_port.c
++++ b/drivers/net/ethernet/freescale/fman/fman_port.c
+@@ -1728,6 +1728,20 @@ u32 fman_port_get_qman_channel_id(struct fman_port *port)
  }
- 
-+int bman_is_probed(void)
-+{
-+	return __bman_probed;
-+}
-+EXPORT_SYMBOL_GPL(bman_is_probed);
-+
- static int fsl_bman_probe(struct platform_device *pdev)
- {
- 	int ret, err_irq;
-@@ -177,6 +184,8 @@ static int fsl_bman_probe(struct platform_device *pdev)
- 	u16 id, bm_pool_cnt;
- 	u8 major, minor;
- 
-+	__bman_probed = -1;
-+
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!res) {
- 		dev_err(dev, "Can't get %pOF property 'IORESOURCE_MEM'\n",
-@@ -267,6 +276,8 @@ static int fsl_bman_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	__bman_probed = 1;
-+
- 	return 0;
- };
- 
-diff --git a/drivers/soc/fsl/qbman/qman_ccsr.c b/drivers/soc/fsl/qbman/qman_ccsr.c
-index 7163f7511ce1..0bfbe24b479a 100644
---- a/drivers/soc/fsl/qbman/qman_ccsr.c
-+++ b/drivers/soc/fsl/qbman/qman_ccsr.c
-@@ -274,6 +274,7 @@ static const struct qman_error_info_mdata error_mdata[] = {
- static u32 __iomem *qm_ccsr_start;
- /* A SDQCR mask comprising all the available/visible pool channels */
- static u32 qm_pools_sdqcr;
-+static int __qman_probed;
- 
- static inline u32 qm_ccsr_in(u32 offset)
- {
-@@ -689,6 +690,12 @@ static int qman_resource_init(struct device *dev)
- 	return 0;
- }
- 
-+int qman_is_probed(void)
-+{
-+	return __qman_probed;
-+}
-+EXPORT_SYMBOL_GPL(qman_is_probed);
-+
- static int fsl_qman_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-@@ -699,6 +706,8 @@ static int fsl_qman_probe(struct platform_device *pdev)
- 	u16 id;
- 	u8 major, minor;
- 
-+	__qman_probed = -1;
-+
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!res) {
- 		dev_err(dev, "Can't get %pOF property 'IORESOURCE_MEM'\n",
-@@ -847,6 +856,8 @@ static int fsl_qman_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
-+	__qman_probed = 1;
-+
- 	return 0;
- }
- 
-diff --git a/include/soc/fsl/bman.h b/include/soc/fsl/bman.h
-index eaaf56df4086..5b99cb2ea5ef 100644
---- a/include/soc/fsl/bman.h
-+++ b/include/soc/fsl/bman.h
-@@ -126,4 +126,12 @@ int bman_release(struct bman_pool *pool, const struct bm_buffer *bufs, u8 num);
-  */
- int bman_acquire(struct bman_pool *pool, struct bm_buffer *bufs, u8 num);
+ EXPORT_SYMBOL(fman_port_get_qman_channel_id);
  
 +/**
-+ * bman_is_probed - Check if bman is probed
++ * fman_port_get_device
++ * port:	Pointer to the FMan port device
 + *
-+ * Returns 1 if the bman driver successfully probed, -1 if the bman driver
-+ * failed to probe or 0 if the bman driver did not probed yet.
++ * Get the 'struct device' associated to the specified FMan port device
++ *
++ * Return: pointer to associated 'struct device'
 + */
-+int bman_is_probed(void);
++struct device *fman_port_get_device(struct fman_port *port)
++{
++	return port->dev;
++}
++EXPORT_SYMBOL(fman_port_get_device);
 +
- #endif	/* __FSL_BMAN_H */
-diff --git a/include/soc/fsl/qman.h b/include/soc/fsl/qman.h
-index d4dfefdee6c1..597783b8a3a0 100644
---- a/include/soc/fsl/qman.h
-+++ b/include/soc/fsl/qman.h
-@@ -1186,4 +1186,12 @@ int qman_alloc_cgrid_range(u32 *result, u32 count);
-  */
- int qman_release_cgrid(u32 id);
+ int fman_port_get_hash_result_offset(struct fman_port *port, u32 *offset)
+ {
+ 	if (port->buffer_offsets.hash_result_offset == ILLEGAL_BASE)
+diff --git a/drivers/net/ethernet/freescale/fman/fman_port.h b/drivers/net/ethernet/freescale/fman/fman_port.h
+index 9dbb69f40121..82f12661a46d 100644
+--- a/drivers/net/ethernet/freescale/fman/fman_port.h
++++ b/drivers/net/ethernet/freescale/fman/fman_port.h
+@@ -157,4 +157,6 @@ int fman_port_get_tstamp(struct fman_port *port, const void *data, u64 *tstamp);
  
-+/**
-+ * qman_is_probed - Check if qman is probed
-+ *
-+ * Returns 1 if the qman driver successfully probed, -1 if the qman driver
-+ * failed to probe or 0 if the qman driver did not probed yet.
-+ */
-+int qman_is_probed(void);
+ struct fman_port *fman_port_bind(struct device *dev);
+ 
++struct device *fman_port_get_device(struct fman_port *port);
 +
- #endif	/* __FSL_QMAN_H */
+ #endif /* __FMAN_PORT_H */
 -- 
 2.17.1
