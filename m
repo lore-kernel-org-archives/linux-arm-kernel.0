@@ -1,69 +1,37 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Wed, 19 Sep 2018 17:20:16 +0200
-Subject: [PATCH 07/11] cpufreq: mvebu: Remove OPPs using
- dev_pm_opp_remove()
-In-Reply-To: <b6e58baec5ee4cf56f82c4b14dad7320cf01ce7f.1536736872.git.viresh.kumar@linaro.org>
- (Viresh Kumar's message of "Wed, 12 Sep 2018 13:58:46 +0530")
-References: <cover.1536736872.git.viresh.kumar@linaro.org>
- <b6e58baec5ee4cf56f82c4b14dad7320cf01ce7f.1536736872.git.viresh.kumar@linaro.org>
-Message-ID: <87o9ctjyz3.fsf@bootlin.com>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Wed, 19 Sep 2018 11:31:40 -0400
+Subject: [PATCH] MAINTAINERS: Remove self from Broadcom SoCs
+Message-ID: <1537371100-8245-1-git-send-email-jon.mason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
- 
- On mer., sept. 12 2018, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+I'm leaving Broadcom, and will no longer have access to hardware and
+documentation necessary to be effective in a maintainership role.
 
-> dev_pm_opp_cpumask_remove_table() is going to change in the next commit
-> and will not remove dynamic OPPs automatically. They must be removed
-> with a call to dev_pm_opp_remove().
+Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+---
+ MAINTAINERS | 2 --
+ 1 file changed, 2 deletions(-)
 
-So now that mean when adding more than 2 OPPs, we should have the list
-of them available in the driver to be able to remove them, right?
-
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-
-Reviewed-by: Gregory CLEMENT <gregory.clement@bootlin.com>
-
-Gregory
-
-> ---
->  drivers/cpufreq/mvebu-cpufreq.c | 9 ++-------
->  1 file changed, 2 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/cpufreq/mvebu-cpufreq.c b/drivers/cpufreq/mvebu-cpufreq.c
-> index 31513bd42705..6d33a639f902 100644
-> --- a/drivers/cpufreq/mvebu-cpufreq.c
-> +++ b/drivers/cpufreq/mvebu-cpufreq.c
-> @@ -84,9 +84,10 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
->  
->  		ret = dev_pm_opp_add(cpu_dev, clk_get_rate(clk) / 2, 0);
->  		if (ret) {
-> +			dev_pm_opp_remove(cpu_dev, clk_get_rate(clk));
->  			clk_put(clk);
->  			dev_err(cpu_dev, "Failed to register OPPs\n");
-> -			goto opp_register_failed;
-> +			return ret;
->  		}
->  
->  		ret = dev_pm_opp_set_sharing_cpus(cpu_dev,
-> @@ -99,11 +100,5 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
->  
->  	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
->  	return 0;
-> -
-> -opp_register_failed:
-> -	/* As registering has failed remove all the opp for all cpus */
-> -	dev_pm_opp_cpumask_remove_table(cpu_possible_mask);
-> -
-> -	return ret;
->  }
->  device_initcall(armada_xp_pmsu_cpufreq_init);
-> -- 
-> 2.18.0.rc1.242.g61856ae69a2c
->
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 4ece30f15777..d063c605074e 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2886,7 +2886,6 @@ F:	arch/mips/include/asm/mach-bcm47xx/*
+ BROADCOM BCM5301X ARM ARCHITECTURE
+ M:	Hauke Mehrtens <hauke@hauke-m.de>
+ M:	Rafa? Mi?ecki <zajec5@gmail.com>
+-M:	Jon Mason <jonmason@broadcom.com>
+ M:	bcm-kernel-feedback-list at broadcom.com
+ L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
+@@ -3024,7 +3023,6 @@ F:	drivers/net/ethernet/broadcom/genet/
+ BROADCOM IPROC ARM ARCHITECTURE
+ M:	Ray Jui <rjui@broadcom.com>
+ M:	Scott Branden <sbranden@broadcom.com>
+-M:	Jon Mason <jonmason@broadcom.com>
+ M:	bcm-kernel-feedback-list at broadcom.com
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ T:	git git://github.com/broadcom/cygnus-linux.git
 -- 
-Gregory Clement, Bootlin
-Embedded Linux and Kernel engineering
-http://bootlin.com
+2.7.4
