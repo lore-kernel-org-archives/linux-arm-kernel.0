@@ -1,73 +1,47 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Wed, 19 Sep 2018 15:36:08 +0300
-Subject: [PATCH 16/21] arm64: dts: ls1046a: add smmu node
+Date: Wed, 19 Sep 2018 15:36:11 +0300
+Subject: [PATCH 19/21] arm64: dts: ls104x: add missing dma ranges property
 In-Reply-To: <20180919123613.15092-1-laurentiu.tudor@nxp.com>
 References: <20180919123613.15092-1-laurentiu.tudor@nxp.com>
-Message-ID: <20180919123613.15092-17-laurentiu.tudor@nxp.com>
+Message-ID: <20180919123613.15092-20-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-This allows for the SMMU device to be probed by the SMMU kernel driver.
+These chips have a 48-bit address size so make sure that the dma-ranges
+reflects this. Otherwise the linux kernel's dma sub-system will set
+the default dma masks to full 64-bit, badly breaking dmas.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
- .../arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 42 +++++++++++++++++++
- 1 file changed, 42 insertions(+)
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 1 +
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 1 +
+ 2 files changed, 2 insertions(+)
 
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+index 90296b9fb171..48091409c472 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+@@ -214,6 +214,7 @@
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
+ 		ranges;
++		dma-ranges = <0x0 0x0 0x0 0x0 0x10000 0x00000000>;
+ 
+ 		clockgen: clocking at 1ee1000 {
+ 			compatible = "fsl,ls1043a-clockgen";
 diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-index ef83786b8b90..06863d3e4a7d 100644
+index 15094dd8400e..40484f6f6d42 100644
 --- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
 +++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-@@ -228,6 +228,48 @@
- 			bus-width = <4>;
- 		};
+@@ -187,6 +187,7 @@
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
+ 		ranges;
++		dma-ranges = <0x0 0x0 0x0 0x0 0x10000 0x00000000>;
  
-+		mmu: iommu at 9000000 {
-+			compatible = "arm,mmu-500";
-+			reg = <0 0x9000000 0 0x400000>;
-+			dma-coherent;
-+			#global-interrupts = <2>;
-+			#iommu-cells = <1>;
-+			interrupts = <0 142 4>, /* global secure fault */
-+				     <0 143 4>, /* combined secure interrupt */
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>,
-+				     <0 142 4>;
-+		};
-+
- 		scfg: scfg at 1570000 {
- 			compatible = "fsl,ls1046a-scfg", "syscon";
- 			reg = <0x0 0x1570000 0x0 0x10000>;
+ 		ddr: memory-controller at 1080000 {
+ 			compatible = "fsl,qoriq-memory-controller";
 -- 
 2.17.1
