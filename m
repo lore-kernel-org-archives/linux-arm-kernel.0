@@ -1,47 +1,64 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Wed, 19 Sep 2018 20:53:52 +0200
-Subject: [PATCH v6 00/18] khwasan: kernel hardware assisted address
- sanitizer
-In-Reply-To: <20180914152825.GC6236@arm.com>
-References: <cover.1535462971.git.andreyknvl@google.com>
- <20180905141032.b1ddaab53d1b2b3bada95415@linux-foundation.org>
- <20180906100543.GI3592@arm.com>
- <CAAeHK+wStsNwh2oKv-KCG4kx5538FuDMQ6Yw2X=sK5LPrw2DZg@mail.gmail.com>
- <20180914152825.GC6236@arm.com>
-Message-ID: <CAAeHK+x1MO4Q+11No8prngHCspy36EoPVv01SvQBsyuOYCKUcQ@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 19 Sep 2018 21:54:08 +0300
+Subject: [GIT PULL] arm64: dts: TI AM65x changes for 4.20
+Message-ID: <404ebcc1-7e8c-c505-a6ac-10a94f6bd608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 14, 2018 at 5:28 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, Sep 06, 2018 at 01:06:23PM +0200, Andrey Konovalov wrote:
->> On Thu, Sep 6, 2018 at 12:05 PM, Will Deacon <will.deacon@arm.com> wrote:
->> > On Wed, Sep 05, 2018 at 02:10:32PM -0700, Andrew Morton wrote:
->> >> On Wed, 29 Aug 2018 13:35:04 +0200 Andrey Konovalov <andreyknvl@google.com> wrote:
->> >>
->> >> > This patchset adds a new mode to KASAN [1], which is called KHWASAN
->> >> > (Kernel HardWare assisted Address SANitizer).
->> >>
->> >> We're at v6 and there are no reviewed-by's or acked-by's to be seen.
->> >> Is that a fair commentary on what has been happening, or have people
->> >> been remiss in sending and gathering such things?
->> >
->> > I still have concerns about the consequences of merging this as anything
->> > other than a debug option [1]. Unfortunately, merging it as a debug option
->> > defeats the whole point, so I think we need to spend more effort on developing
->> > tools that can help us to find and fix the subtle bugs which will arise from
->> > enabling tagged pointers in the kernel.
->>
->> I totally don't mind calling it a debug option. Do I need to somehow
->> specify it somewhere?
->
-> Ok, sorry, I completely misunderstood you earlier on then! For some reason
-> I thought you wanted this on by default.
->
-> In which case, I'm ok with the overall idea as long as we make the caveats
-> clear in the Kconfig text. In particular, that enabling this option may
-> introduce problems relating to pointer casting and comparison, but can
-> offer better coverage and lower memory consumption than a fully
-> software-based KASAN solution.
+Hi ARM-SoC team,
 
-Great! I'll explicitly call it debug feature and mention the caveats
-in v7. Thanks!
+Here are the TI AM65x DTS changes towards 4.20 merge window. Applied on 
+top of 4.19-rc2 basically just because of some testing considerations, 
+please let me know if that is not fine.
+
+-Tero
+
+---
+
+The following changes since commit 57361846b52bc686112da6ca5368d11210796804:
+
+   Linux 4.19-rc2 (2018-09-02 14:37:30 -0700)
+
+are available in the git repository at:
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/kristo/linux 
+tags/am654-for-v4.20
+
+for you to fetch changes up to 42e54f6467ecc25f464d74c0fcea0c9fab1c2e3b:
+
+   arm64: dts: ti: k3-am6: Add Device Management Security Controller 
+support (2018-09-18 18:25:06 +0300)
+
+----------------------------------------------------------------
+TI AM654 support for v4.20 merge window.
+
+This branch adds changes for the Texas Instruments AM654 SoC. Included
+changes are:
+- Add uart nodes
+- Change address cells and size-cells of interconnect tfrom 1 to 2
+- Add secure proxy instance for main domain
+- Add DMSC support
+
+----------------------------------------------------------------
+Kishon Vijay Abraham I (1):
+       arm64: dts: ti: k3-am65: Change #address-cells and #size-cells of 
+interconnect to 2
+
+Nishanth Menon (3):
+       arm64: dts: ti: am654: Add uart nodes
+       arm64: dts: ti: am654: Add secure proxy instance for main domain
+       arm64: dts: ti: k3-am6: Add Device Management Security Controller 
+support
+
+  arch/arm64/boot/dts/ti/k3-am65-main.dtsi       | 51 
++++++++++++++++++++++---
+  arch/arm64/boot/dts/ti/k3-am65-mcu.dtsi        | 18 +++++++++
+  arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi     | 46 ++++++++++++++++++++++
+  arch/arm64/boot/dts/ti/k3-am65.dtsi            | 54 
++++++++++++++++-----------
+  arch/arm64/boot/dts/ti/k3-am654-base-board.dts |  5 +++
+  5 files changed, 147 insertions(+), 27 deletions(-)
+  create mode 100644 arch/arm64/boot/dts/ti/k3-am65-mcu.dtsi
+  create mode 100644 arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi
+--
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
