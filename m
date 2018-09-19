@@ -1,43 +1,53 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Tue, 18 Sep 2018 21:37:22 -0700
-Subject: [PATCH v2 00/22] Unify MediaTek pinctrl in preparation for
- MT8183 and MT6765
-In-Reply-To: <1537325650.572.9.camel@mtkswgap22>
-References: <cover.1536404280.git.sean.wang@mediatek.com>
- <CACRpkdZtVBjYGs5C7-HWEyX7f7pnCqvnRYBH=fFmLKhN4FGymA@mail.gmail.com>
- <1537325650.572.9.camel@mtkswgap22>
-Message-ID: <20180919043722.GA14181@Mani-XPS-13-9360>
+From: MNARANI@xilinx.com (Manish Narani)
+Date: Wed, 19 Sep 2018 05:08:50 +0000
+Subject: [PATCH v7 1/7] edac: synopsys: Fix code comments and naming
+ convention
+In-Reply-To: <20180918075311.GB22202@nazgul.tnic>
+References: <1537194305-9243-1-git-send-email-manish.narani@xilinx.com>
+ <1537194305-9243-2-git-send-email-manish.narani@xilinx.com>
+ <20180918075311.GB22202@nazgul.tnic>
+Message-ID: <DM6PR02MB52271CFF653377B4810CD305C11C0@DM6PR02MB5227.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 19, 2018 at 10:54:10AM +0800, Sean Wang wrote:
-> On Tue, 2018-09-18 at 15:07 -0700, Linus Walleij wrote:
-> > On Sat, Sep 8, 2018 at 4:07 AM <sean.wang@mediatek.com> wrote:
-> > 
-> > > v2 and changes since v1:
-> > 
-> > I had trouble applying the last patches in the series so I applied
-> > all on an immutable branch (ib-mtk) then merged that into devel
-> > and added a patch on top to fix up some GPIO includes (just sent).
-> > 
-> > Please check the result!
-> > 
-> 
-> Sure, I'll take a look and and test on the devel branch.
-> 
-> On the top, I'll add a fix for the issue recently reported by kbuild
-> test robot about implicit declaration and a new MT6765 driver based
-> on the series.
->
+Hi Boris,
 
-Hi Sean,
+Thanks a lot for the review.
 
-Do you have any plans to add support for MT6797?
+> -----Original Message-----
+> From: Borislav Petkov [mailto:bp at alien8.de]
+> Sent: Tuesday, September 18, 2018 1:23 PM
+> To: Manish Narani <MNARANI@xilinx.com>
+> Cc: robh+dt at kernel.org; mark.rutland at arm.com; mchehab at kernel.org;
+> Michal Simek <michals@xilinx.com>; leoyang.li at nxp.com;
+> sudeep.holla at arm.com; amit.kucheria at linaro.org;
+> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
+> edac at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v7 1/7] edac: synopsys: Fix code comments and naming
+> convention
+> 
+> On Mon, Sep 17, 2018 at 07:54:59PM +0530, Manish Narani wrote:
+> > Update the comments in the Synopsys EDAC driver. Minor changes to
+> > function names and return types are also included.
+> >
+> > Signed-off-by: Manish Narani <manish.narani@xilinx.com>
+> > ---
+> >  drivers/edac/synopsys_edac.c | 176
+> > ++++++++++++++++++++-----------------------
+> >  1 file changed, 80 insertions(+), 96 deletions(-)
+> 
+> So this patch does a bunch of things together and should be split into:
+> 
+> * functional changes like code cleanup
+> * functions renaming
+> * comments cleanup
+> 
+> Maybe in that order.
+> 
+> This way you'll have one logical set of changes per patch and review will be
+> almost trivial.
+> 
+Okay, I will do that in v8.
 
 Thanks,
-Mani
-
-> > Yours,
-> > Linus Walleij
-> 
-> 
+Manish
