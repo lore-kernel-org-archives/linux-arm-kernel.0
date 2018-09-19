@@ -1,80 +1,99 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 19 Sep 2018 14:28:11 +0900
-Subject: [PATCH 1/3] serial: 8250_uniphier: remove unused "fifo-size" property
-In-Reply-To: <1537334893-26079-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1537334893-26079-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1537334893-26079-2-git-send-email-yamada.masahiro@socionext.com>
+From: leilk.liu@mediatek.com (lei liu)
+Date: Wed, 19 Sep 2018 13:50:05 +0800
+Subject: [PATCH v3 2/3] spis: mediatek: add spi slave for Mediatek MT2712
+In-Reply-To: <20180918163048.GN2471@sirena.org.uk>
+References: <1537150762-7072-1-git-send-email-leilk.liu@mediatek.com>
+ <1537150762-7072-3-git-send-email-leilk.liu@mediatek.com>
+ <20180918163048.GN2471@sirena.org.uk>
+Message-ID: <1537336205.27607.23.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The FIFO size of the UART devices is 64 on almost all UniPhier SoCs
-with the exception Pro4TV SoC (MN2WS0230), which used 128 FIFO size.
-However, Pro4TV SoC was never upstreamed, and out of production.
+Hi Mark,
+  Thanks for your comments.
 
-So, this property has never been used in a useful way.
-Let's remove old unused code.
+On Tue, 2018-09-18 at 09:30 -0700, Mark Brown wrote:
+> On Mon, Sep 17, 2018 at 10:19:21AM +0800, Leilk Liu wrote:
+> 
+> This looks overall pretty good, a few smallish comments below:
+> 
+> Please use subject lines matching the style for the subsystem.  This
+> makes it easier for people to identify relevant patches.
+> 
+OK, I'll fix it, thanks.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+> >  if SPI_SLAVE
+> > +config SPI_SLAVE_MT27XX
+> > +	tristate "MediaTek SPI slave device"
+> > +	depends on ARCH_MEDIATEK || COMPILE_TEST
+> > +	help
+> > +	  This selects the MediaTek(R) SPI slave device driver.
+> > +	  If you want to use MediaTek(R) SPI slave interface,
+> > +	  say Y or M here.If you are not sure, say N.
+> > +	  SPI slave drivers for Mediatek MT27XX series ARM SoCs.
+> >  
+> >  config SPI_SLAVE_TIME
+> 
+> This is a driver not a slave implementation, it should be with the other
+> drivers in the Kconfig.  The slave implementations are for the
+> functionality that uses the drivers, not the drivers themselves.
+> 
+OK, I'll fix it, thanks.
 
- Documentation/devicetree/bindings/serial/uniphier-uart.txt |  4 ----
- drivers/tty/serial/8250/8250_uniphier.c                    | 10 +---------
- 2 files changed, 1 insertion(+), 13 deletions(-)
+> > +	/* set the tx/rx endian */
+> > +#ifdef __LITTLE_ENDIAN
+> > +	reg_val &= ~SPIS_TX_ENDIAN;
+> > +	reg_val &= ~SPIS_RX_ENDIAN;
+> > +#else
+> > +	reg_val |= SPIS_TX_ENDIAN;
+> > +	reg_val |= SPIS_RX_ENDIAN;
+> > +#endif
+> > +	writel(reg_val, mdata->base + SPIS_CFG_REG);
+> 
+> This seems weird - it looks like it's changing the endianess of the
+> protocol based on the endianness the processor is running in.  What's
+> going on here?  I'd expect the driver to be just treating everything as
+> a byte stream and letting the protocol driver handle the endianness
+> issues, otherwise we might end up with double converions.
+> 
+OK, I'll set the endian of SPI the same with the processor. Thanks.
 
-diff --git a/Documentation/devicetree/bindings/serial/uniphier-uart.txt b/Documentation/devicetree/bindings/serial/uniphier-uart.txt
-index 0b3892a..811c479 100644
---- a/Documentation/devicetree/bindings/serial/uniphier-uart.txt
-+++ b/Documentation/devicetree/bindings/serial/uniphier-uart.txt
-@@ -6,9 +6,6 @@ Required properties:
- - interrupts: a single interrupt specifier.
- - clocks: phandle to the input clock.
- 
--Optional properties:
--- fifo-size: the RX/TX FIFO size.  Defaults to 64 if not specified.
--
- Example:
- 	aliases {
- 		serial0 = &serial0;
-@@ -19,5 +16,4 @@ Example:
- 		reg = <0x54006800 0x40>;
- 		interrupts = <0 33 4>;
- 		clocks = <&uart_clk>;
--		fifo-size = <64>;
- 	};
-diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
-index 28d88ccf..d292654 100644
---- a/drivers/tty/serial/8250/8250_uniphier.c
-+++ b/drivers/tty/serial/8250/8250_uniphier.c
-@@ -12,9 +12,6 @@
- 
- #include "8250.h"
- 
--/* Most (but not all) of UniPhier UART devices have 64-depth FIFO. */
--#define UNIPHIER_UART_DEFAULT_FIFO_SIZE	64
--
- /*
-  * This hardware is similar to 8250, but its register map is a bit different:
-  *   - MMIO32 (regshift = 2)
-@@ -185,12 +182,6 @@ static int uniphier_of_serial_setup(struct device *dev, struct uart_port *port,
- 
- 	port->uartclk = clk_get_rate(priv->clk);
- 
--	/* Check for fifo size */
--	if (of_property_read_u32(np, "fifo-size", &prop) == 0)
--		port->fifosize = prop;
--	else
--		port->fifosize = UNIPHIER_UART_DEFAULT_FIFO_SIZE;
--
- 	return 0;
- }
- 
-@@ -241,6 +232,7 @@ static int uniphier_uart_probe(struct platform_device *pdev)
- 
- 	up.port.type = PORT_16550A;
- 	up.port.iotype = UPIO_MEM32;
-+	up.port.fifosize = 64;
- 	up.port.regshift = UNIPHIER_UART_REGSHIFT;
- 	up.port.flags = UPF_FIXED_PORT | UPF_FIXED_TYPE;
- 	up.capabilities = UART_CAP_FIFO;
--- 
-2.7.4
+> > +		xfer->tx_dma = dma_map_single(dev, (void *)xfer->tx_buf,
+> > +					      xfer->len, DMA_TO_DEVICE);
+> 
+> Why is there a cast to void here?  That's usually a sign that there's a
+> type safety issue, the whole point with void is that it's compatible
+> with any other pointer.
+> 
+tx_buf is a const void*, here it need a void * for the dma mapping.
+And I'll remove void * from dma_map_single((void *)rx_buf).
+Thanks.
+
+> > +static irqreturn_t mtk_spi_slave_interrupt(int irq, void *dev_id)
+> > +{
+> > +	struct spi_controller *ctlr = dev_id;
+> > +	struct mtk_spi_slave *mdata = spi_controller_get_devdata(ctlr);
+> > +	struct spi_transfer *trans = mdata->cur_transfer;
+> > +	u32 int_status, reg_val, cnt, remainder;
+> > +
+> > +	int_status = readl(mdata->base + SPIS_IRQ_ST_REG);
+> > +	writel(int_status, mdata->base + SPIS_IRQ_CLR_REG);
+> > +
+> > +	if (!trans)
+> > +		return IRQ_HANDLED;
+> 
+> Are you sure that this is the right thing to do if we get a spurious
+> interrupt - the normal thing would be to return IRQ_NONE, possibly
+> logging a warning as well?
+> 
+OK, it should reture IRQ_NONE here, thanks.
+
+> > +	if (int_status & CMD_INVALID_ST)
+> > +		dev_err(&ctlr->dev, "cmd invalid\n");
+> 
+> If there's an interrupt that doesn't have any of the interrupt status
+> flags set I'd expect to see a warning and probably IRQ_NONE being
+> returned.  That way if the interrupt line is shared we work correctly
+> and if something goes wrong and the interrupt gets stuck on then the
+> core interrupt code's error handling can kick in.
+OK, I'll fix it, thanks.
