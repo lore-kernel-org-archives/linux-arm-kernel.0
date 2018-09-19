@@ -1,197 +1,48 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Wed, 19 Sep 2018 10:49:12 +0100
-Subject: [PATCH 5/5] ARM: spectre-v2: per-CPU vtables to work around
- big.Little systems
+Date: Wed, 19 Sep 2018 10:49:02 +0100
+Subject: [PATCH 3/5] ARM: clean up per-processor check_bugs method call
 In-Reply-To: <20180919094802.GH30658@n2100.armlinux.org.uk>
 References: <20180919094802.GH30658@n2100.armlinux.org.uk>
-Message-ID: <E1g2Z6e-0003es-CI@rmk-PC.armlinux.org.uk>
+Message-ID: <E1g2Z6U-0003eX-1M@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In big.Little systems, some CPUs require the Spectre workarounds in
-paths such as the context switch, but other CPUs do not.  In order
-to handle these differences, we need per-CPU vtables.
-
-We are unable to use the kernel's per-CPU variables to support this
-as per-CPU is not initialised at times when we need access to the
-vtables, so we have to use an array indexed by logical CPU number.
+Call the per-processor type check_bugs() method in the same way as we
+do other per-processor functions - move the "processor." detail into
+proc-fns.h.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm/include/asm/proc-fns.h | 14 ++++++++++++++
- arch/arm/kernel/setup.c         |  5 +++++
- arch/arm/kernel/smp.c           | 31 +++++++++++++++++++++++++++++++
- arch/arm/mm/proc-v7-bugs.c      | 17 ++---------------
- 4 files changed, 52 insertions(+), 15 deletions(-)
+ arch/arm/include/asm/proc-fns.h | 1 +
+ arch/arm/kernel/bugs.c          | 4 ++--
+ 2 files changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
-index 571a1346245b..ddbb25cb8968 100644
+index e25f4392e1b2..30c499146320 100644
 --- a/arch/arm/include/asm/proc-fns.h
 +++ b/arch/arm/include/asm/proc-fns.h
-@@ -104,11 +104,25 @@ extern void cpu_do_resume(void *);
+@@ -99,6 +99,7 @@ extern void cpu_do_suspend(void *);
+ extern void cpu_do_resume(void *);
  #else
- 
- extern struct processor processor;
-+#if defined(CONFIG_BIG_LITTLE) && defined(CONFIG_HARDEN_BRANCH_PREDICTOR)
-+#include <linux/smp.h>
-+/*
-+ * This can't be a per-cpu variable because we need to access it before
-+ * per-cpu has been initialised.
-+ */
-+extern struct processor *cpu_vtable[];
-+#define PROC_VTABLE(f)			cpu_vtable[smp_processor_id()]->f
-+static inline void init_proc_vtable(const struct processor *p)
-+{
-+	*cpu_vtable[smp_processor_id()] = *p;
-+}
-+#else
- #define PROC_VTABLE(f)			processor.f
- static inline void init_proc_vtable(const struct processor *p)
+ #define cpu_proc_init			processor._proc_init
++#define cpu_check_bugs			processor.check_bugs
+ #define cpu_proc_fin			processor._proc_fin
+ #define cpu_reset			processor.reset
+ #define cpu_do_idle			processor._do_idle
+diff --git a/arch/arm/kernel/bugs.c b/arch/arm/kernel/bugs.c
+index 7be511310191..d41d3598e5e5 100644
+--- a/arch/arm/kernel/bugs.c
++++ b/arch/arm/kernel/bugs.c
+@@ -6,8 +6,8 @@
+ void check_other_bugs(void)
  {
- 	processor = *p;
- }
-+#endif
- 
- #define cpu_proc_init			PROC_VTABLE(_proc_init)
- #define cpu_check_bugs			PROC_VTABLE(check_bugs)
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index c214bd14a1fe..cd46a595422c 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -115,6 +115,11 @@ EXPORT_SYMBOL(elf_hwcap2);
- 
  #ifdef MULTI_CPU
- struct processor processor __ro_after_init;
-+#if defined(CONFIG_BIG_LITTLE) && defined(CONFIG_HARDEN_BRANCH_PREDICTOR)
-+struct processor *cpu_vtable[NR_CPUS] = {
-+	[0] = &processor,
-+};
-+#endif
- #endif
- #ifdef MULTI_TLB
- struct cpu_tlb_fns cpu_tlb __ro_after_init;
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 5ad0b67b9e33..82b879db32ee 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -42,6 +42,7 @@
- #include <asm/mmu_context.h>
- #include <asm/pgtable.h>
- #include <asm/pgalloc.h>
-+#include <asm/procinfo.h>
- #include <asm/processor.h>
- #include <asm/sections.h>
- #include <asm/tlbflush.h>
-@@ -102,6 +103,30 @@ static unsigned long get_arch_pgd(pgd_t *pgd)
+-	if (processor.check_bugs)
+-		processor.check_bugs();
++	if (cpu_check_bugs)
++		cpu_check_bugs();
  #endif
  }
  
-+#if defined(CONFIG_BIG_LITTLE) && defined(CONFIG_HARDEN_BRANCH_PREDICTOR)
-+static int secondary_biglittle_prepare(unsigned int cpu)
-+{
-+	if (!cpu_vtable[cpu])
-+		cpu_vtable[cpu] = kzalloc(sizeof(*cpu_vtable[cpu]), GFP_KERNEL);
-+
-+	return cpu_vtable[cpu] ? 0 : -ENOMEM;
-+}
-+
-+static void secondary_biglittle_init(void)
-+{
-+	init_proc_vtable(lookup_processor(read_cpuid_id())->proc);
-+}
-+#else
-+static int secondary_biglittle_prepare(unsigned int cpu)
-+{
-+	return 0;
-+}
-+
-+static void secondary_biglittle_init(void)
-+{
-+}
-+#endif
-+
- int __cpu_up(unsigned int cpu, struct task_struct *idle)
- {
- 	int ret;
-@@ -109,6 +134,10 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
- 	if (!smp_ops.smp_boot_secondary)
- 		return -ENOSYS;
- 
-+	ret = secondary_biglittle_prepare(cpu);
-+	if (ret)
-+		return ret;
-+
- 	/*
- 	 * We need to tell the secondary core where to find
- 	 * its stack and the page tables.
-@@ -360,6 +389,8 @@ asmlinkage void secondary_start_kernel(void)
- 	struct mm_struct *mm = &init_mm;
- 	unsigned int cpu;
- 
-+	secondary_biglittle_init();
-+
- 	/*
- 	 * The identity mapping is uncached (strongly ordered), so
- 	 * switch away from it before attempting any exclusive accesses.
-diff --git a/arch/arm/mm/proc-v7-bugs.c b/arch/arm/mm/proc-v7-bugs.c
-index 5544b82a2e7a..9a07916af8dd 100644
---- a/arch/arm/mm/proc-v7-bugs.c
-+++ b/arch/arm/mm/proc-v7-bugs.c
-@@ -52,8 +52,6 @@ static void cpu_v7_spectre_init(void)
- 	case ARM_CPU_PART_CORTEX_A17:
- 	case ARM_CPU_PART_CORTEX_A73:
- 	case ARM_CPU_PART_CORTEX_A75:
--		if (processor.switch_mm != cpu_v7_bpiall_switch_mm)
--			goto bl_error;
- 		per_cpu(harden_branch_predictor_fn, cpu) =
- 			harden_branch_predictor_bpiall;
- 		spectre_v2_method = "BPIALL";
-@@ -61,8 +59,6 @@ static void cpu_v7_spectre_init(void)
- 
- 	case ARM_CPU_PART_CORTEX_A15:
- 	case ARM_CPU_PART_BRAHMA_B15:
--		if (processor.switch_mm != cpu_v7_iciallu_switch_mm)
--			goto bl_error;
- 		per_cpu(harden_branch_predictor_fn, cpu) =
- 			harden_branch_predictor_iciallu;
- 		spectre_v2_method = "ICIALLU";
-@@ -88,11 +84,9 @@ static void cpu_v7_spectre_init(void)
- 					  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
- 			if ((int)res.a0 != 0)
- 				break;
--			if (processor.switch_mm != cpu_v7_hvc_switch_mm && cpu)
--				goto bl_error;
- 			per_cpu(harden_branch_predictor_fn, cpu) =
- 				call_hvc_arch_workaround_1;
--			processor.switch_mm = cpu_v7_hvc_switch_mm;
-+			cpu_do_switch_mm = cpu_v7_hvc_switch_mm;
- 			spectre_v2_method = "hypervisor";
- 			break;
- 
-@@ -101,11 +95,9 @@ static void cpu_v7_spectre_init(void)
- 					  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
- 			if ((int)res.a0 != 0)
- 				break;
--			if (processor.switch_mm != cpu_v7_smc_switch_mm && cpu)
--				goto bl_error;
- 			per_cpu(harden_branch_predictor_fn, cpu) =
- 				call_smc_arch_workaround_1;
--			processor.switch_mm = cpu_v7_smc_switch_mm;
-+			cpu_do_switch_mm = cpu_v7_smc_switch_mm;
- 			spectre_v2_method = "firmware";
- 			break;
- 
-@@ -119,11 +111,6 @@ static void cpu_v7_spectre_init(void)
- 	if (spectre_v2_method)
- 		pr_info("CPU%u: Spectre v2: using %s workaround\n",
- 			smp_processor_id(), spectre_v2_method);
--	return;
--
--bl_error:
--	pr_err("CPU%u: Spectre v2: incorrect context switching function, system vulnerable\n",
--		cpu);
- }
- #else
- static void cpu_v7_spectre_init(void)
 -- 
 2.7.4
