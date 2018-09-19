@@ -1,186 +1,139 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 18 Sep 2018 23:51:36 -0700
-Subject: [PATCH v3 1/9] kernel/jump_label: abstract jump_entry member accessors
+Date: Tue, 18 Sep 2018 23:51:38 -0700
+Subject: [PATCH v3 3/9] arm64/kernel: jump_label: switch to relative references
 In-Reply-To: <20180919065144.25010-1-ard.biesheuvel@linaro.org>
 References: <20180919065144.25010-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180919065144.25010-2-ard.biesheuvel@linaro.org>
+Message-ID: <20180919065144.25010-4-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation of allowing architectures to use relative references
-in jump_label entries [which can dramatically reduce the memory
-footprint], introduce abstractions for references to the 'code' and
-'key' members of struct jump_entry.
+On a randomly chosen distro kernel build for arm64, vmlinux.o shows the
+following sections, containing jump label entries, and the associated
+RELA relocation records, respectively:
 
+  ...
+  [38088] __jump_table      PROGBITS         0000000000000000  00e19f30
+       000000000002ea10  0000000000000000  WA       0     0     8
+  [38089] .rela__jump_table RELA             0000000000000000  01fd8bb0
+       000000000008be30  0000000000000018   I      38178   38088     8
+  ...
+
+In other words, we have 190 KB worth of 'struct jump_entry' instances,
+and 573 KB worth of RELA entries to relocate each entry's code, target
+and key members. This means the RELA section occupies 10% of the .init
+segment, and the two sections combined represent 5% of vmlinux's entire
+memory footprint.
+
+So let's switch from 64-bit absolute references to 32-bit relative
+references for the code and target field, and a 64-bit relative
+reference for the 'key' field (which may reside in another module or the
+core kernel, which may be more than 4 GB way on arm64 when running with
+KASLR enable): this reduces the size of the __jump_table by 33%, and
+gets rid of the RELA section entirely.
+
+Acked-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- include/linux/jump_label.h | 34 +++++++++++++++++
- kernel/jump_label.c        | 40 ++++++++------------
- 2 files changed, 49 insertions(+), 25 deletions(-)
+ arch/arm64/Kconfig                  |  1 +
+ arch/arm64/include/asm/jump_label.h | 38 ++++++++++----------
+ arch/arm64/kernel/jump_label.c      |  6 ++--
+ 3 files changed, 22 insertions(+), 23 deletions(-)
 
-diff --git a/include/linux/jump_label.h b/include/linux/jump_label.h
-index 1a0b6f17a5d6..2eadff9b3b90 100644
---- a/include/linux/jump_label.h
-+++ b/include/linux/jump_label.h
-@@ -119,6 +119,40 @@ struct static_key {
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 1b1a0e95c751..16e1e2c1e77b 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -104,6 +104,7 @@ config ARM64
+ 	select HAVE_ARCH_BITREVERSE
+ 	select HAVE_ARCH_HUGE_VMAP
+ 	select HAVE_ARCH_JUMP_LABEL
++	select HAVE_ARCH_JUMP_LABEL_RELATIVE
+ 	select HAVE_ARCH_KASAN if !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
+ 	select HAVE_ARCH_KGDB
+ 	select HAVE_ARCH_MMAP_RND_BITS
+diff --git a/arch/arm64/include/asm/jump_label.h b/arch/arm64/include/asm/jump_label.h
+index 7e2b3e360086..472023498d71 100644
+--- a/arch/arm64/include/asm/jump_label.h
++++ b/arch/arm64/include/asm/jump_label.h
+@@ -26,13 +26,16 @@
  
- #ifdef HAVE_JUMP_LABEL
- #include <asm/jump_label.h>
-+
-+#ifndef __ASSEMBLY__
-+
-+static inline unsigned long jump_entry_code(const struct jump_entry *entry)
-+{
-+	return entry->code;
-+}
-+
-+static inline unsigned long jump_entry_target(const struct jump_entry *entry)
-+{
-+	return entry->target;
-+}
-+
-+static inline struct static_key *jump_entry_key(const struct jump_entry *entry)
-+{
-+	return (struct static_key *)((unsigned long)entry->key & ~1UL);
-+}
-+
-+static inline bool jump_entry_is_branch(const struct jump_entry *entry)
-+{
-+	return (unsigned long)entry->key & 1UL;
-+}
-+
-+static inline bool jump_entry_is_init(const struct jump_entry *entry)
-+{
-+	return entry->code == 0;
-+}
-+
-+static inline void jump_entry_set_init(struct jump_entry *entry)
-+{
-+	entry->code = 0;
-+}
-+
-+#endif
- #endif
+ #define JUMP_LABEL_NOP_SIZE		AARCH64_INSN_SIZE
  
- #ifndef __ASSEMBLY__
-diff --git a/kernel/jump_label.c b/kernel/jump_label.c
-index 2e62503bea0d..834e43de0daf 100644
---- a/kernel/jump_label.c
-+++ b/kernel/jump_label.c
-@@ -38,10 +38,10 @@ static int jump_label_cmp(const void *a, const void *b)
- 	const struct jump_entry *jea = a;
- 	const struct jump_entry *jeb = b;
- 
--	if (jea->key < jeb->key)
-+	if (jump_entry_key(jea) < jump_entry_key(jeb))
- 		return -1;
- 
--	if (jea->key > jeb->key)
-+	if (jump_entry_key(jea) > jump_entry_key(jeb))
- 		return 1;
- 
- 	return 0;
-@@ -261,8 +261,8 @@ EXPORT_SYMBOL_GPL(jump_label_rate_limit);
- 
- static int addr_conflict(struct jump_entry *entry, void *start, void *end)
+-static __always_inline bool arch_static_branch(struct static_key *key, bool branch)
++static __always_inline bool arch_static_branch(struct static_key *key,
++					       bool branch)
  {
--	if (entry->code <= (unsigned long)end &&
--		entry->code + JUMP_LABEL_NOP_SIZE > (unsigned long)start)
-+	if (jump_entry_code(entry) <= (unsigned long)end &&
-+	    jump_entry_code(entry) + JUMP_LABEL_NOP_SIZE > (unsigned long)start)
- 		return 1;
+-	asm_volatile_goto("1: nop\n\t"
+-		 ".pushsection __jump_table,  \"aw\"\n\t"
+-		 ".align 3\n\t"
+-		 ".quad 1b, %l[l_yes], %c0\n\t"
+-		 ".popsection\n\t"
++	asm_volatile_goto(
++		"1:	nop					\n\t"
++		 "	.pushsection	__jump_table, \"aw\"	\n\t"
++		 "	.align		3			\n\t"
++		 "	.long		1b - ., %l[l_yes] - .	\n\t"
++		 "	.quad		%c0 - .			\n\t"
++		 "	.popsection				\n\t"
+ 		 :  :  "i"(&((char *)key)[branch]) :  : l_yes);
  
- 	return 0;
-@@ -321,16 +321,6 @@ static inline void static_key_set_linked(struct static_key *key)
- 	key->type |= JUMP_TYPE_LINKED;
+ 	return false;
+@@ -40,13 +43,16 @@ static __always_inline bool arch_static_branch(struct static_key *key, bool bran
+ 	return true;
  }
  
--static inline struct static_key *jump_entry_key(struct jump_entry *entry)
--{
--	return (struct static_key *)((unsigned long)entry->key & ~1UL);
--}
+-static __always_inline bool arch_static_branch_jump(struct static_key *key, bool branch)
++static __always_inline bool arch_static_branch_jump(struct static_key *key,
++						    bool branch)
+ {
+-	asm_volatile_goto("1: b %l[l_yes]\n\t"
+-		 ".pushsection __jump_table,  \"aw\"\n\t"
+-		 ".align 3\n\t"
+-		 ".quad 1b, %l[l_yes], %c0\n\t"
+-		 ".popsection\n\t"
++	asm_volatile_goto(
++		"1:	b		%l[l_yes]		\n\t"
++		 "	.pushsection	__jump_table, \"aw\"	\n\t"
++		 "	.align		3			\n\t"
++		 "	.long		1b - ., %l[l_yes] - .	\n\t"
++		 "	.quad		%c0 - .			\n\t"
++		 "	.popsection				\n\t"
+ 		 :  :  "i"(&((char *)key)[branch]) :  : l_yes);
+ 
+ 	return false;
+@@ -54,13 +60,5 @@ static __always_inline bool arch_static_branch_jump(struct static_key *key, bool
+ 	return true;
+ }
+ 
+-typedef u64 jump_label_t;
 -
--static bool jump_entry_branch(struct jump_entry *entry)
--{
--	return (unsigned long)entry->key & 1UL;
--}
+-struct jump_entry {
+-	jump_label_t code;
+-	jump_label_t target;
+-	jump_label_t key;
+-};
 -
- /***
-  * A 'struct static_key' uses a union such that it either points directly
-  * to a table of 'struct jump_entry' or to a linked list of modules which in
-@@ -355,7 +345,7 @@ static enum jump_label_type jump_label_type(struct jump_entry *entry)
+ #endif  /* __ASSEMBLY__ */
+ #endif	/* __ASM_JUMP_LABEL_H */
+diff --git a/arch/arm64/kernel/jump_label.c b/arch/arm64/kernel/jump_label.c
+index e0756416e567..646b9562ee64 100644
+--- a/arch/arm64/kernel/jump_label.c
++++ b/arch/arm64/kernel/jump_label.c
+@@ -25,12 +25,12 @@
+ void arch_jump_label_transform(struct jump_entry *entry,
+ 			       enum jump_label_type type)
  {
- 	struct static_key *key = jump_entry_key(entry);
- 	bool enabled = static_key_enabled(key);
--	bool branch = jump_entry_branch(entry);
-+	bool branch = jump_entry_is_branch(entry);
+-	void *addr = (void *)entry->code;
++	void *addr = (void *)jump_entry_code(entry);
+ 	u32 insn;
  
- 	/* See the comment in linux/jump_label.h */
- 	return enabled ^ branch;
-@@ -370,12 +360,12 @@ static void __jump_label_update(struct static_key *key,
- 		 * An entry->code of 0 indicates an entry which has been
- 		 * disabled because it was in an init text area.
- 		 */
--		if (entry->code) {
--			if (kernel_text_address(entry->code))
-+		if (!jump_entry_is_init(entry)) {
-+			if (kernel_text_address(jump_entry_code(entry)))
- 				arch_jump_label_transform(entry, jump_label_type(entry));
- 			else
- 				WARN_ONCE(1, "can't patch jump_label at %pS",
--					  (void *)(unsigned long)entry->code);
-+					  (void *)jump_entry_code(entry));
- 		}
- 	}
- }
-@@ -430,8 +420,8 @@ void __init jump_label_invalidate_initmem(void)
- 	struct jump_entry *iter;
- 
- 	for (iter = iter_start; iter < iter_stop; iter++) {
--		if (init_section_contains((void *)(unsigned long)iter->code, 1))
--			iter->code = 0;
-+		if (init_section_contains((void *)jump_entry_code(iter), 1))
-+			jump_entry_set_init(iter);
- 	}
- }
- 
-@@ -441,7 +431,7 @@ static enum jump_label_type jump_label_init_type(struct jump_entry *entry)
- {
- 	struct static_key *key = jump_entry_key(entry);
- 	bool type = static_key_type(key);
--	bool branch = jump_entry_branch(entry);
-+	bool branch = jump_entry_is_branch(entry);
- 
- 	/* See the comment in linux/jump_label.h */
- 	return type ^ branch;
-@@ -565,7 +555,7 @@ static int jump_label_add_module(struct module *mod)
- 			continue;
- 
- 		key = iterk;
--		if (within_module(iter->key, mod)) {
-+		if (within_module((unsigned long)key, mod)) {
- 			static_key_set_entries(key, iter);
- 			continue;
- 		}
-@@ -615,7 +605,7 @@ static void jump_label_del_module(struct module *mod)
- 
- 		key = jump_entry_key(iter);
- 
--		if (within_module(iter->key, mod))
-+		if (within_module((unsigned long)key, mod))
- 			continue;
- 
- 		/* No memory during module load */
-@@ -659,8 +649,8 @@ static void jump_label_invalidate_module_init(struct module *mod)
- 	struct jump_entry *iter;
- 
- 	for (iter = iter_start; iter < iter_stop; iter++) {
--		if (within_module_init(iter->code, mod))
--			iter->code = 0;
-+		if (within_module_init(jump_entry_code(iter), mod))
-+			jump_entry_set_init(iter);
- 	}
- }
- 
+ 	if (type == JUMP_LABEL_JMP) {
+-		insn = aarch64_insn_gen_branch_imm(entry->code,
+-						   entry->target,
++		insn = aarch64_insn_gen_branch_imm(jump_entry_code(entry),
++						   jump_entry_target(entry),
+ 						   AARCH64_INSN_BRANCH_NOLINK);
+ 	} else {
+ 		insn = aarch64_insn_gen_nop();
 -- 
 2.17.1
