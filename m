@@ -1,16 +1,89 @@
-From: cphealy@gmail.com (Chris Healy)
-Date: Wed, 19 Sep 2018 07:44:41 -0700
-Subject: [PATCH 1/2] ARM: dts: imx51-zii-rdu1: Fix the rtc compatible
- string
-In-Reply-To: <1537271012-5159-1-git-send-email-festevam@gmail.com>
-References: <1537271012-5159-1-git-send-email-festevam@gmail.com>
-Message-ID: <CAFXsbZo+VoGQy5aKg=_zFCgN54NU-ZaQhgqcRSgSDXtVaF2_zw@mail.gmail.com>
+From: thor.thayer@linux.intel.com (Thor Thayer)
+Date: Wed, 19 Sep 2018 09:47:22 -0500
+Subject: [PATCH V6 0/4] clk: new APIs to handle all available clocks
+In-Reply-To: <AM0PR04MB4211A3900BC5A2DF857F7451801F0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1535690756-22234-1-git-send-email-aisheng.dong@nxp.com>
+ <AM0PR04MB4211EF6D783562BA8C8D690380010@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <AM0PR04MB4211A3900BC5A2DF857F7451801F0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <7e612f6f-e9d2-2f6f-1903-3a6bcf1b65ba@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> According to Documentation/devicetree/bindings/rtc/rtc-ds1307.txt the
-> original compatible "maxim,ds1341" is not a valid entry.
->
-> Switch to the documented "dallas,ds1341" compatible.
+Hi,
 
-Tested-by: Chris Healy <cphealy@gmail.com>
+On 09/16/2018 08:24 AM, A.s. Dong wrote:
+> Ping again
+> 
+>> -----Original Message-----
+>> From: A.s. Dong
+>> Sent: Thursday, September 6, 2018 11:23 AM
+>> To: linux-clk at vger.kernel.org
+>> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+>> sboyd at kernel.org; mturquette at baylibre.com; shawnguo at kernel.org;
+>> thor.thayer at linux.intel.com; dl-linux-imx <linux-imx@nxp.com>;
+>> hdegoede at redhat.com
+>> Subject: RE: [PATCH V6 0/4] clk: new APIs to handle all available clocks
+>>
+>> Gently ping...
+>>
+>>> -----Original Message-----
+>>> From: A.s. Dong
+>>> Sent: Friday, August 31, 2018 12:46 PM
+>>> To: linux-clk at vger.kernel.org
+>>> Cc: linux-kernel at vger.kernel.org;
+>>> linux-arm-kernel at lists.infradead.org;
+>>> sboyd at kernel.org; mturquette at baylibre.com; shawnguo at kernel.org;
+>>> thor.thayer at linux.intel.com; dl-linux-imx <linux-imx@nxp.com>;
+>>> hdegoede at redhat.com; A.s. Dong <aisheng.dong@nxp.com>
+>>> Subject: [PATCH V6 0/4] clk: new APIs to handle all available clocks
+>>>
+>>> This patch series is a continue of discussion from here,
+>>> https://patchwork.kernel.org/patch/9986293/
+>>> that some users may want to handle all available clocks from device
+>>> tree without need to know the detailed clock information likes clock
+>>> numbers and names. This is useful in writing some generic drivers to handle
+>> clock part.
+>>>
+>>> Note:
+>>> This patch series is tested on MX6Q SDB cpufreq driver with a minor
+>>> change to switch to use clk_bulk_get_all.
+>>> But patch 4 only test compiling. Hopefully someone could help test the
+>>> function.
+>>>
+>>> v3->v4:
+>>>   * improve 'devres->clks = *clks' according to Stephen's suggestion
+>>> v2->v3:
+>>>   * address all comments from Stephen
+>>>   * fix build warnings on other architectures.
+>>> v1->v2:
+>>>   * add clk_bulk_{get|put}_all() which only supports DT platform
+>>> currently
+>>>   * remove _all variants and the wrapper struct clk_bulk
+>>>   * make of_clk_bulk_get and of_clk_bulk_get_all private until someone
+>>>     proves they need it because they don't have a struct device pointer.
+>>>
+>>> Dong Aisheng (4):
+>>>    clk: bulk: add of_clk_bulk_get()
+>>>    clk: add new APIs to operate on all available clocks
+>>>    clk: add managed version of clk_bulk_get_all
+>>>    video: simplefb: switch to use clk_bulk API to simplify clock
+>>>      operations
+>>>
+>>>   drivers/clk/clk-bulk.c         | 80
+>>> ++++++++++++++++++++++++++++++++++++++++++
+>>>   drivers/clk/clk-devres.c       | 24 +++++++++++++
+>>>   drivers/video/fbdev/simplefb.c | 72 ++++++++++---------------------------
+>>>   include/linux/clk.h            | 65
+>>> +++++++++++++++++++++++++++++++++-
+>>>   4 files changed, 186 insertions(+), 55 deletions(-)
+>>>
+>>> --
+>>> 2.7.4
+> 
+Just checking on the status of this patch. The clock routines (patches 
+1-3) are useful for one of my drivers but if they aren't accepted or 
+will take a long time to be accepted, I'll need to refactor my driver.
+
+Thanks,
+
+Thor
