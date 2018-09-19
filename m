@@ -1,79 +1,114 @@
-From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Wed, 19 Sep 2018 15:36:12 +0300
-Subject: [PATCH 20/21] arm64: dts: ls104x: add iommu-map to pci controllers
-In-Reply-To: <20180919123613.15092-1-laurentiu.tudor@nxp.com>
-References: <20180919123613.15092-1-laurentiu.tudor@nxp.com>
-Message-ID: <20180919123613.15092-21-laurentiu.tudor@nxp.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 19 Sep 2018 15:01:04 +0200
+Subject: [PATCH 1/2] libata: add ledtrig support
+In-Reply-To: <1537328730-9156-2-git-send-email-aditya@kobol.io>
+References: <1537328730-9156-1-git-send-email-aditya@kobol.io>
+ <1537328730-9156-2-git-send-email-aditya@kobol.io>
+Message-ID: <20180919130104.GD26940@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+On Wed, Sep 19, 2018 at 11:45:29AM +0800, Aditya Prayoga wrote:
+> From: Daniel Golle <daniel@makrotopia.org>
+> 
+> This adds a LED trigger for each ATA port indicating disk activity.
+> 
+> As this is needed only on specific platforms (NAS SoCs and such),
+> these platforms should define ARCH_WANTS_LIBATA_LEDS if there
+> are boards with LED(s) intended to indicate ATA disk activity and
+> need the OS to take care of that.
+> In that way, if not selected, LED trigger support not will be
+> included in libata-core and both, codepaths and structures remain
+> untouched.
+> 
+> I'm currently deploying this for the oxnas target in OpenWrt
+> https://dev.openwrt.org/changeset/43675/
+> 
+> v2: rebased to kernel/git/tj/libata.git
+>     plus small corrections and comments added
+> 
+> Signed-off-by: Daniel Golle <daniel@makrotopia.org>
+> URL: https://patchwork.ozlabs.org/patch/420733/
+> [Aditya Prayoga:
+> * Port forward
+> * Change ATA_LEDS default to no
+> * Reduce performance impact by moving ata_led_act() call from
+>     ata_qc_new() to ata_qc_complete()]
+> Signed-off-by: Aditya Prayoga <aditya@kobol.io>
+> 
+> ---
+> 
+> If there is anything fundamentally wrong with that approach, I'd be
+> glad for some advise on how to do it better.
+> I conciously choose an #ifdev approach to make sure performance will
+> not be affected for non-users of that code.
 
-The pci controllers are also behind the smmu so add the iommu-map
-property to reflect this. The bootloader needs to patch the stream id
-ranges to some sane values.
+Hi Aditya
 
-Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 3 +++
- arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 3 +++
- 2 files changed, 6 insertions(+)
+I remember something like this being discussed a long time ago, and it
+was rejected because of the overheads. So it is good you have some
+performance numbers. I will let others decide if the approach is
+acceptable.
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-index 48091409c472..3b7b2e60bd9a 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-@@ -716,6 +716,7 @@
- 			#size-cells = <2>;
- 			device_type = "pci";
- 			dma-coherent;
-+			iommu-map = <0 &mmu 0 1>;
- 			num-lanes = <4>;
- 			bus-range = <0x0 0xff>;
- 			ranges = <0x81000000 0x0 0x00000000 0x40 0x00010000 0x0 0x00010000   /* downstream I/O */
-@@ -741,6 +742,7 @@
- 			#size-cells = <2>;
- 			device_type = "pci";
- 			dma-coherent;
-+			iommu-map = <0 &mmu 0 1>;
- 			num-lanes = <2>;
- 			bus-range = <0x0 0xff>;
- 			ranges = <0x81000000 0x0 0x00000000 0x48 0x00010000 0x0 0x00010000   /* downstream I/O */
-@@ -766,6 +768,7 @@
- 			#size-cells = <2>;
- 			device_type = "pci";
- 			dma-coherent;
-+			iommu-map = <0 &mmu 0 1>;
- 			num-lanes = <2>;
- 			bus-range = <0x0 0xff>;
- 			ranges = <0x81000000 0x0 0x00000000 0x50 0x00010000 0x0 0x00010000   /* downstream I/O */
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-index 40484f6f6d42..890d1565791f 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-@@ -685,6 +685,7 @@
- 			#size-cells = <2>;
- 			device_type = "pci";
- 			dma-coherent;
-+			iommu-map = <0 &mmu 0 1>;
- 			num-lanes = <4>;
- 			bus-range = <0x0 0xff>;
- 			ranges = <0x81000000 0x0 0x00000000 0x40 0x00010000 0x0 0x00010000   /* downstream I/O */
-@@ -710,6 +711,7 @@
- 			#size-cells = <2>;
- 			device_type = "pci";
- 			dma-coherent;
-+			iommu-map = <0 &mmu 0 1>;
- 			num-lanes = <2>;
- 			bus-range = <0x0 0xff>;
- 			ranges = <0x81000000 0x0 0x00000000 0x48 0x00010000 0x0 0x00010000   /* downstream I/O */
-@@ -735,6 +737,7 @@
- 			#size-cells = <2>;
- 			device_type = "pci";
- 			dma-coherent;
-+			iommu-map = <0 &mmu 0 1>;
- 			num-lanes = <2>;
- 			bus-range = <0x0 0xff>;
- 			ranges = <0x81000000 0x0 0x00000000 0x50 0x00010000 0x0 0x00010000   /* downstream I/O */
--- 
-2.17.1
+>  /**
+> + *	ata_led_act - Trigger port activity LED
+> + *	@ap: indicating port
+> + *
+> + *	Blinks any LEDs registered to the trigger.
+> + *	Commonly used with leds-gpio on NAS systems with disk activity
+> + *	indicator LEDs.
+> + *
+> + *	LOCKING:
+> + *	None.
+> + */
+> +static inline void ata_led_act(struct ata_port *ap)
+
+inline should not be used in C code, just header files. A function
+this small the compiler is likely to inline anyway.
+
+> +{
+> +#ifdef CONFIG_ATA_LEDS
+
+It is better to use if (IS_ENABLED(CONFIG_ATA_LEDS) {}.  That gets
+turned into if(0) {}, so the code still gets compiled to find any
+errors, but then optimised out. This is important if the code is going
+to be disabled by default.
+
+> +#define LIBATA_BLINK_DELAY 20 /* ms */
+> +	unsigned long led_delay = LIBATA_BLINK_DELAY;
+> +
+> +	if (unlikely(!ap->ledtrig))
+> +		return;
+> +
+> +	led_trigger_blink_oneshot(ap->ledtrig, &led_delay, &led_delay, 0);
+> +#endif /* CONFIG_ATA_LEDS */
+> +}
+> +
+> +/**
+>   *	ata_qc_new_init - Request an available ATA command, and initialize it
+>   *	@dev: Device from whom we request an available command structure
+>   *	@tag: tag
+> @@ -5249,6 +5273,10 @@ void ata_qc_complete(struct ata_queued_cmd *qc)
+>  	/* Trigger the LED (if available) */
+>  	ledtrig_disk_activity(!!(qc->tf.flags & ATA_TFLAG_WRITE));
+>  
+> +#ifdef CONFIG_ATA_LEDS
+> +	ata_led_act(ap);
+> +#endif
+
+No need for this #ifdef'ery.
+
+> +
+>  	/* XXX: New EH and old EH use different mechanisms to
+>  	 * synchronize EH with regular execution path.
+>  	 *
+> @@ -6028,6 +6056,9 @@ struct ata_port *ata_port_alloc(struct ata_host *host)
+>  	ap->stats.unhandled_irq = 1;
+>  	ap->stats.idle_irq = 1;
+>  #endif
+> +#ifdef CONFIG_ATA_LEDS
+> +	ap->ledtrig = kzalloc(sizeof(struct led_trigger), GFP_KERNEL);
+
+Maybe use devm_kzalloc() and devm_led_trigger_register()?
+
+      Andrew
