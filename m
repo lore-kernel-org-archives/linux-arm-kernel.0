@@ -1,63 +1,35 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 19 Sep 2018 11:41:04 +0200
-Subject: [PATCH V6] ARM: shmobile: Rework the PMIC IRQ line quirk
-In-Reply-To: <7d214a60-e703-c53d-5c98-5da29c34650f@gmail.com>
-References: <20180918122340.5478-1-marek.vasut+renesas@gmail.com>
- <CAMuHMdVOMZ+o4osu7zGJm3YBQ-Mxest1kkJGgiH53joW1i__jg@mail.gmail.com>
- <20180919091330.yxnehm2fy5llb2bb@verge.net.au>
- <7d214a60-e703-c53d-5c98-5da29c34650f@gmail.com>
-Message-ID: <20180919094100.gtlxbthzgamixequ@verge.net.au>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 19 Sep 2018 10:48:02 +0100
+Subject: [PATCH 0/5] Spectre big.Little updates
+Message-ID: <20180919094802.GH30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 19, 2018 at 11:21:42AM +0200, Marek Vasut wrote:
-> On 09/19/2018 11:13 AM, Simon Horman wrote:
-> > On Tue, Sep 18, 2018 at 02:52:53PM +0200, Geert Uytterhoeven wrote:
-> >> On Tue, Sep 18, 2018 at 2:23 PM Marek Vasut <marek.vasut@gmail.com> wrote:
-> >>> Rather than hard-coding the quirk topology, which stopped scaling,
-> >>> parse the information from DT. The code looks for all compatible
-> >>> PMICs -- da9063 and da9210 -- and checks if their IRQ line is tied
-> >>> to the same pin. If so, the code sends a matching sequence to the
-> >>> PMIC to deassert the IRQ.
-> >>>
-> >>> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-> >>> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> >>> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> >>> Cc: Simon Horman <horms+renesas@verge.net.au>
-> >>> Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> >>> Cc: linux-renesas-soc at vger.kernel.org
-> >>> Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> >>> Tested-by: Geert Uytterhoeven <geert+renesas@glider.be> (on Koelsch)
-> >>> ---
-> >>> V2: - Replace the DT shared IRQ check loop with memcmp()
-> >>>     - Send the I2C message to deassert the IRQ line to all PMICs
-> >>>       in the list with shared IRQ line instead of just one
-> >>>     - Add comment that this works only in case all the PMICs are
-> >>>       on the same I2C bus
-> >>> V3: - Drop the addr = 0x00 init
-> >>>     - Drop reinit of argsa in rcar_gen2_regulator_quirk
-> >>> V4: - Squash regulator_quirk on single line
-> >>>     - Drop !np check in for_each_matching_node_and_match()
-> >>>     - Use argsa in of_irq_parse_one
-> >>> V5: - Check kzalloc failure
-> >>>     - Rename da...._msgs to da...._msg
-> >>>     - Don't reinit quirk->shared
-> >>> V6: - Skip invalid entries instead of aborting on them
-> >>
-> >> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > 
-> > Thanks, applied for v4.20.
-> > 
-> > Marek, these days checkpatch complains if the author of the patch does not
-> > have a signed offline, and the inconsistency between your
-> > from and Sign-off the email address trips that check.
-> > 
-> > Could you consider either a) enhancing checkpatch or b) using
-> > the same address twice? No need to take any action for this patch.
-> 
-> Sure, do you know if there's some tweak to git config , so git
-> send-email uses the m.v+foo@ From address ?
+This series of patches allows Spectre to be worked around on
+big.Little systems, and as far as I'm aware, completes the Spectre
+workarounds as were known at the beginning of the year for 32-bit
+ARM.
 
-Some sort of local config change sounds good to me.
+In order to solve Spectre for such systems, we need to introduce
+per-CPU indirection of the "processor" vtable, but we are unable to
+use the kernel's per-CPU infrastructure as this is not initialised
+early enough.
 
-As per the follow-up from Geert, it may require some experimentation.
+To work around that, we fall back to using a static array of
+processor vtables indexed by the logical CPU number.  This should
+not be a problem as 32-bit ARM systems are limited to 8 logical
+CPUs.
+
+ arch/arm/include/asm/cputype.h  |  2 ++
+ arch/arm/include/asm/proc-fns.h | 49 ++++++++++++++++++++++++++++++++---------
+ arch/arm/kernel/bugs.c          |  4 ++--
+ arch/arm/kernel/head-common.S   |  6 ++---
+ arch/arm/kernel/setup.c         | 40 ++++++++++++++++++++-------------
+ arch/arm/kernel/smp.c           | 31 ++++++++++++++++++++++++++
+ arch/arm/mm/proc-v7-bugs.c      | 17 ++------------
+ 7 files changed, 103 insertions(+), 46 deletions(-)
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+According to speedtest.net: 13Mbps down 490kbps up
