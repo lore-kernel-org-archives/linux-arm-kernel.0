@@ -1,128 +1,97 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 18 Sep 2018 23:51:37 -0700
-Subject: [PATCH v3 2/9] kernel/jump_label: implement generic support for
- relative references
+Date: Tue, 18 Sep 2018 23:51:39 -0700
+Subject: [PATCH v3 4/9] x86: add support for 64-bit place relative relocations
 In-Reply-To: <20180919065144.25010-1-ard.biesheuvel@linaro.org>
 References: <20180919065144.25010-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180919065144.25010-3-ard.biesheuvel@linaro.org>
+Message-ID: <20180919065144.25010-5-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To reduce the size taken up by absolute references in jump label
-entries themselves and the associated relocation records in the
-.init segment, add support for emitting them as relative references
-instead.
-
-Note that this requires some extra care in the sorting routine, given
-that the offsets change when entries are moved around in the jump_entry
-table.
+Add support for R_X86_64_PC64 relocations, which operate on 64-bit
+quantities holding a relative symbol reference. Also remove the
+definition of R_X86_64_NUM: given that it is currently unused, it
+is unclear what the new value should be.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/Kconfig               |  3 +++
- include/linux/jump_label.h | 28 ++++++++++++++++++++
- kernel/jump_label.c        | 22 ++++++++++++++-
- 3 files changed, 52 insertions(+), 1 deletion(-)
+ arch/x86/include/asm/elf.h |  3 +--
+ arch/x86/kernel/module.c   |  6 ++++++
+ arch/x86/tools/relocs.c    | 10 ++++++++++
+ arch/x86/um/asm/elf.h      |  3 +--
+ 4 files changed, 18 insertions(+), 4 deletions(-)
 
-diff --git a/arch/Kconfig b/arch/Kconfig
-index 6801123932a5..9d329608913e 100644
---- a/arch/Kconfig
-+++ b/arch/Kconfig
-@@ -359,6 +359,9 @@ config HAVE_PERF_USER_STACK_DUMP
- config HAVE_ARCH_JUMP_LABEL
- 	bool
+diff --git a/arch/x86/include/asm/elf.h b/arch/x86/include/asm/elf.h
+index 0d157d2a1e2a..a357031d85b5 100644
+--- a/arch/x86/include/asm/elf.h
++++ b/arch/x86/include/asm/elf.h
+@@ -62,8 +62,7 @@ typedef struct user_fxsr_struct elf_fpxregset_t;
+ #define R_X86_64_PC16		13	/* 16 bit sign extended pc relative */
+ #define R_X86_64_8		14	/* Direct 8 bit sign extended  */
+ #define R_X86_64_PC8		15	/* 8 bit sign extended pc relative */
+-
+-#define R_X86_64_NUM		16
++#define R_X86_64_PC64		24	/* Place relative 64-bit signed */
  
-+config HAVE_ARCH_JUMP_LABEL_RELATIVE
-+	bool
-+
- config HAVE_RCU_TABLE_FREE
- 	bool
+ /*
+  * These are used to set parameters in the core dumps.
+diff --git a/arch/x86/kernel/module.c b/arch/x86/kernel/module.c
+index f58336af095c..b052e883dd8c 100644
+--- a/arch/x86/kernel/module.c
++++ b/arch/x86/kernel/module.c
+@@ -201,6 +201,12 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
+ 				goto overflow;
+ #endif
+ 			break;
++		case R_X86_64_PC64:
++			if (*(u64 *)loc != 0)
++				goto invalid_relocation;
++			val -= (u64)loc;
++			*(u64 *)loc = val;
++			break;
+ 		default:
+ 			pr_err("%s: Unknown rela relocation: %llu\n",
+ 			       me->name, ELF64_R_TYPE(rel[i].r_info));
+diff --git a/arch/x86/tools/relocs.c b/arch/x86/tools/relocs.c
+index 3a6c8ebc8032..0b08067c45f3 100644
+--- a/arch/x86/tools/relocs.c
++++ b/arch/x86/tools/relocs.c
+@@ -196,6 +196,7 @@ static const char *rel_type(unsigned type)
+ #if ELF_BITS == 64
+ 		REL_TYPE(R_X86_64_NONE),
+ 		REL_TYPE(R_X86_64_64),
++		REL_TYPE(R_X86_64_PC64),
+ 		REL_TYPE(R_X86_64_PC32),
+ 		REL_TYPE(R_X86_64_GOT32),
+ 		REL_TYPE(R_X86_64_PLT32),
+@@ -782,6 +783,15 @@ static int do_reloc64(struct section *sec, Elf_Rel *rel, ElfW(Sym) *sym,
+ 			add_reloc(&relocs32neg, offset);
+ 		break;
  
-diff --git a/include/linux/jump_label.h b/include/linux/jump_label.h
-index 2eadff9b3b90..2768a925bafa 100644
---- a/include/linux/jump_label.h
-+++ b/include/linux/jump_label.h
-@@ -121,6 +121,32 @@ struct static_key {
- #include <asm/jump_label.h>
++	case R_X86_64_PC64:
++		/*
++		 * Only used by jump labels
++		 */
++		if (is_percpu_sym(sym, symname))
++			die("Invalid R_X86_64_PC64 relocation against per-CPU symbol %s\n",
++			    symname);
++		break;
++
+ 	case R_X86_64_32:
+ 	case R_X86_64_32S:
+ 	case R_X86_64_64:
+diff --git a/arch/x86/um/asm/elf.h b/arch/x86/um/asm/elf.h
+index 548197212a45..413f3519d9a1 100644
+--- a/arch/x86/um/asm/elf.h
++++ b/arch/x86/um/asm/elf.h
+@@ -116,8 +116,7 @@ do {								\
+ #define R_X86_64_PC16		13	/* 16 bit sign extended pc relative */
+ #define R_X86_64_8		14	/* Direct 8 bit sign extended  */
+ #define R_X86_64_PC8		15	/* 8 bit sign extended pc relative */
+-
+-#define R_X86_64_NUM		16
++#define R_X86_64_PC64		24	/* Place relative 64-bit signed */
  
- #ifndef __ASSEMBLY__
-+#ifdef CONFIG_HAVE_ARCH_JUMP_LABEL_RELATIVE
-+
-+struct jump_entry {
-+	s32 code;
-+	s32 target;
-+	long key;	// key may be far away from the core kernel under KASLR
-+};
-+
-+static inline unsigned long jump_entry_code(const struct jump_entry *entry)
-+{
-+	return (unsigned long)&entry->code + entry->code;
-+}
-+
-+static inline unsigned long jump_entry_target(const struct jump_entry *entry)
-+{
-+	return (unsigned long)&entry->target + entry->target;
-+}
-+
-+static inline struct static_key *jump_entry_key(const struct jump_entry *entry)
-+{
-+	long offset = entry->key & ~1L;
-+
-+	return (struct static_key *)((unsigned long)&entry->key + offset);
-+}
-+
-+#else
- 
- static inline unsigned long jump_entry_code(const struct jump_entry *entry)
- {
-@@ -137,6 +163,8 @@ static inline struct static_key *jump_entry_key(const struct jump_entry *entry)
- 	return (struct static_key *)((unsigned long)entry->key & ~1UL);
- }
- 
-+#endif
-+
- static inline bool jump_entry_is_branch(const struct jump_entry *entry)
- {
- 	return (unsigned long)entry->key & 1UL;
-diff --git a/kernel/jump_label.c b/kernel/jump_label.c
-index 834e43de0daf..898a1d0c38dc 100644
---- a/kernel/jump_label.c
-+++ b/kernel/jump_label.c
-@@ -47,14 +47,34 @@ static int jump_label_cmp(const void *a, const void *b)
- 	return 0;
- }
- 
-+static void jump_label_swap(void *a, void *b, int size)
-+{
-+	long delta = (unsigned long)a - (unsigned long)b;
-+	struct jump_entry *jea = a;
-+	struct jump_entry *jeb = b;
-+	struct jump_entry tmp = *jea;
-+
-+	jea->code	= jeb->code - delta;
-+	jea->target	= jeb->target - delta;
-+	jea->key	= jeb->key - delta;
-+
-+	jeb->code	= tmp.code + delta;
-+	jeb->target	= tmp.target + delta;
-+	jeb->key	= tmp.key + delta;
-+}
-+
- static void
- jump_label_sort_entries(struct jump_entry *start, struct jump_entry *stop)
- {
- 	unsigned long size;
-+	void *swapfn = NULL;
-+
-+	if (IS_ENABLED(CONFIG_HAVE_ARCH_JUMP_LABEL_RELATIVE))
-+		swapfn = jump_label_swap;
- 
- 	size = (((unsigned long)stop - (unsigned long)start)
- 					/ sizeof(struct jump_entry));
--	sort(start, size, sizeof(struct jump_entry), jump_label_cmp, NULL);
-+	sort(start, size, sizeof(struct jump_entry), jump_label_cmp, swapfn);
- }
- 
- static void jump_label_update(struct static_key *key);
+ /*
+  * This is used to ensure we don't load something for the wrong architecture.
 -- 
 2.17.1
