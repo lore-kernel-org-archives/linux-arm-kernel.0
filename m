@@ -1,114 +1,114 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Wed, 19 Sep 2018 13:54:23 +0200
-Subject: [PATCH v6 14/18] khwasan: add hooks implementation
-In-Reply-To: <CACT4Y+YicYhmzrKf84=oJJErdFKSNM70cmoN3m_zzERcUQ_-Fg@mail.gmail.com>
-References: <cover.1535462971.git.andreyknvl@google.com>
- <4267d0903e0fdf9c261b91cf8a2bf0f71047a43c.1535462971.git.andreyknvl@google.com>
- <CACT4Y+YicYhmzrKf84=oJJErdFKSNM70cmoN3m_zzERcUQ_-Fg@mail.gmail.com>
-Message-ID: <CAAeHK+xMjDwZkKDn_0aVWERkjv6B-hFKjn0coGo4LbcPBds4Ew@mail.gmail.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Wed, 19 Sep 2018 19:56:35 +0800
+Subject: [PATCH v1 1/1] drm/mediatek: add function to match the
+ connector and crtc
+In-Reply-To: <1536732170-30046-2-git-send-email-stu.hsieh@mediatek.com>
+References: <1536732170-30046-1-git-send-email-stu.hsieh@mediatek.com>
+ <1536732170-30046-2-git-send-email-stu.hsieh@mediatek.com>
+Message-ID: <1537358195.5124.6.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2018 at 8:30 PM, Dmitry Vyukov <dvyukov@google.com> wrote:
-> On Wed, Aug 29, 2018 at 1:35 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
+Hi, Stu:
 
->>  void kasan_unpoison_shadow(const void *address, size_t size)
->>  {
->> -       kasan_poison_shadow(address, size, 0);
->> +       u8 tag = get_tag(address);
->> +
->> +       /* Perform shadow offset calculation based on untagged address */
->
-> The comment is not super-useful. It would be more useful to say why we
-> need to do this.
-> Most callers explicitly untag pointer passed to this function, for
-> some it's unclear if the pointer contains tag or not.
-> For example, __hwasan_tag_memory -- what does it accept? Tagged or untagged?
+On Wed, 2018-09-12 at 14:02 +0800, Stu Hsieh wrote:
+> This patch add function to match the connector and crtc
+> 
+> Because the connector set the possible_crtc to match the crtc.
+> 
+> This function would search the connector in every ddp path and
+> return the corresponding value for possible_crtc.
+> 
+> Change-Id: Id51de53b95039f8174462d483eb9bfee31b3b93b
+> Signed-off-by: Stu Hsieh <stu.hsieh@mediatek.com>
+> ---
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c | 41 +++++++++++++++++++++++++++++
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |  2 ++
+>  2 files changed, 43 insertions(+)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> index ff974d82a4a6..1f734b806a00 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> @@ -245,6 +245,22 @@ static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
+>  	[DDP_COMPONENT_WDMA1]	= { MTK_DISP_WDMA,	1, NULL },
+>  };
+>  
+> +static bool mtk_drm_find_comp_in_ddp(struct mtk_ddp_comp ddp_comp,
+> +				     const enum mtk_ddp_comp_id *path,
+> +				     unsigned int path_len)
+> +{
+> +	int i;
+> +
+> +	if (!path)
+> +		return false;
+> +
+> +	for (i = 0; i < path_len; i++)
+> +		if (ddp_comp.id == path[i])
+> +			return true;
+> +
+> +	return false;
+> +}
+> +
+>  int mtk_ddp_comp_get_id(struct device_node *node,
+>  			enum mtk_ddp_comp_type comp_type)
+>  {
+> @@ -260,6 +276,31 @@ int mtk_ddp_comp_get_id(struct device_node *node,
+>  	return -EINVAL;
+>  }
+>  
+> +unsigned int mtk_drm_find_possible_crtc_by_comp(struct drm_device *drm,
+> +						struct mtk_ddp_comp ddp_comp)
+> +{
+> +	struct mtk_drm_private *private = drm->dev_private;
+> +	unsigned int ret;
+> +
+> +	if (mtk_drm_find_comp_in_ddp(ddp_comp, private->data->main_path,
+> +				     private->data->main_len) == true) {
+> +		ret = BIT(0);
+> +	} else if (mtk_drm_find_comp_in_ddp(ddp_comp,
+> +					    private->data->ext_path,
+> +					    private->data->ext_len) == true) {
+> +		ret = BIT(1);
+> +	} else if (mtk_drm_find_comp_in_ddp(ddp_comp,
+> +					    private->data->third_path,
+> +					    private->data->third_len) == true) {
+> +		ret = BIT(2);
+> +	} else {
+> +		DRM_INFO("Failed to find comp in ddp table\n");
+> +		ret = 0;
+> +	}
 
-There are some callers that pass tagged pointers to this functions,
-e.g. ksize or kasan_unpoison_object_data. I'll expand the comment.
+The variable naming is very important. If one day there are fourth path,
+fifth path, and sixth path, you would find everywhere where are such 'if
+else'. So I would like you to change main_path, ext_path, third_path to
+an array such as path[]. So this patch would be only a simple for-loop
+and when you add more path, you need not to modify this function.
 
->
->
->> +       address = reset_tag(address);
->> +
->> +       kasan_poison_shadow(address, size, tag);
->>
->>         if (size & KASAN_SHADOW_MASK) {
->>                 u8 *shadow = (u8 *)kasan_mem_to_shadow(address + size);
->> -               *shadow = size & KASAN_SHADOW_MASK;
->> +
->> +               if (IS_ENABLED(CONFIG_KASAN_HW))
->> +                       *shadow = tag;
->> +               else
->> +                       *shadow = size & KASAN_SHADOW_MASK;
->>         }
->>  }
->
->
-> It seems that this function is just different for kasan and khwasan.
-> Currently for kasan we have:
->
-> kasan_poison_shadow(address, size, tag);
-> if (size & KASAN_SHADOW_MASK) {
->         u8 *shadow = (u8 *)kasan_mem_to_shadow(address + size);
->         *shadow = size & KASAN_SHADOW_MASK;
-> }
->
-> But what we want to say for khwasan is:
->
-> kasan_poison_shadow(address, round_up(size, KASAN_SHADOW_SCALE_SIZE),
-> get_tag(address));
->
-> Not sure if we want to keep a common implementation or just have
-> separate implementations...
+And would you also send the patch that include the caller call
+mtk_drm_find_possible_crtc_by_comp(), so I could understand how do you
+pass the parameter.
 
-As per offline discussion leaving as is.
+Regards,
+CK
 
-
->>  void kasan_free_pages(struct page *page, unsigned int order)
->> @@ -235,6 +248,7 @@ void kasan_cache_create(struct kmem_cache *cache, unsigned int *size,
->>                         slab_flags_t *flags)
->>  {
->>         unsigned int orig_size = *size;
->> +       unsigned int redzone_size = 0;
->
-> This variable seems to be always initialized below. We don't general
-> initialize local variables in this case.
-
-Will fix in v7.
-
->>  void check_memory_region(unsigned long addr, size_t size, bool write,
->>                                 unsigned long ret_ip)
->>  {
->> +       u8 tag;
->> +       u8 *shadow_first, *shadow_last, *shadow;
->> +       void *untagged_addr;
->> +
->> +       tag = get_tag((const void *)addr);
->> +
->> +       /* Ignore accesses for pointers tagged with 0xff (native kernel
->
-> /* on a separate line
-
-Will fix in v7.
-
->
->> +        * pointer tag) to suppress false positives caused by kmap.
->> +        *
->> +        * Some kernel code was written to account for archs that don't keep
->> +        * high memory mapped all the time, but rather map and unmap particular
->> +        * pages when needed. Instead of storing a pointer to the kernel memory,
->> +        * this code saves the address of the page structure and offset within
->> +        * that page for later use. Those pages are then mapped and unmapped
->> +        * with kmap/kunmap when necessary and virt_to_page is used to get the
->> +        * virtual address of the page. For arm64 (that keeps the high memory
->> +        * mapped all the time), kmap is turned into a page_address call.
->> +
->> +        * The issue is that with use of the page_address + virt_to_page
->> +        * sequence the top byte value of the original pointer gets lost (gets
->> +        * set to KHWASAN_TAG_KERNEL (0xFF).
->
-> Missed closing bracket.
-
-Will fix in v7.
+> +
+> +	return ret;
+> +}
+> +
+>  int mtk_ddp_comp_init(struct device *dev, struct device_node *node,
+>  		      struct mtk_ddp_comp *comp, enum mtk_ddp_comp_id comp_id,
+>  		      const struct mtk_ddp_comp_funcs *funcs)
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+> index 8399229e6ad2..f882e69088b8 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+> @@ -166,6 +166,8 @@ static inline void mtk_ddp_gamma_set(struct mtk_ddp_comp *comp,
+>  		comp->funcs->gamma_set(comp, state);
+>  }
+>  
+> +unsigned int mtk_drm_find_possible_crtc_by_comp(struct drm_device *drm,
+> +						struct mtk_ddp_comp ddp_comp);
+>  int mtk_ddp_comp_get_id(struct device_node *node,
+>  			enum mtk_ddp_comp_type comp_type);
+>  int mtk_ddp_comp_init(struct device *dev, struct device_node *comp_node,
