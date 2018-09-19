@@ -1,36 +1,65 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 19 Sep 2018 14:40:58 -0700
-Subject: [PATCH 07/11] cpufreq: mvebu: Remove OPPs using
- dev_pm_opp_remove()
-In-Reply-To: <87o9ctjyz3.fsf@bootlin.com>
-References: <cover.1536736872.git.viresh.kumar@linaro.org>
- <b6e58baec5ee4cf56f82c4b14dad7320cf01ce7f.1536736872.git.viresh.kumar@linaro.org>
- <87o9ctjyz3.fsf@bootlin.com>
-Message-ID: <20180919214058.bp325gyowqyveil2@vireshk-mac-ubuntu>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 19 Sep 2018 14:45:52 -0700
+Subject: [PATCH 2/2] pinctrl: bcm: add Northstar driver
+In-Reply-To: <20180919210219.21921-2-zajec5@gmail.com>
+References: <20180919210219.21921-1-zajec5@gmail.com>
+ <20180919210219.21921-2-zajec5@gmail.com>
+Message-ID: <da0992c4-f8c8-7e3c-6d54-35a8cfdcd7bc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19-09-18, 17:20, Gregory CLEMENT wrote:
-> Hi Viresh,
->  
->  On mer., sept. 12 2018, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+On 09/19/2018 02:02 PM, Rafa? Mi?ecki wrote:
+> From: Rafa? Mi?ecki <rafal@milecki.pl>
 > 
-> > dev_pm_opp_cpumask_remove_table() is going to change in the next commit
-> > and will not remove dynamic OPPs automatically. They must be removed
-> > with a call to dev_pm_opp_remove().
+> This driver provides support for Northstar mux controller. It differs
+> from Northstar Plus one so a new binding and driver were needed.
 > 
-> So now that mean when adding more than 2 OPPs, we should have the list
-> of them available in the driver to be able to remove them, right?
-
-Right. Maybe we will add a separate API to remove all dynamic ones in
-one go but I couldn't find any platform which needs to do it right
-now.
-
-> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Right now it includes support for SPI pins only which is caused by a
+> lack of access to Broadcom's datasheet. SPI pins info was extracted from
+> the Broadcom's SDK. Once more pins are discovered they can be added to
+> the driver without breaking any existing setups.
 > 
-> Reviewed-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+> ---
 
-Thanks.
+[snip]
 
+> +static const struct pinctrl_pin_desc ns_pinctrl_pins[] = {
+> +	{ 0, "spi_clk" },
+> +	{ 1, "spi_ss" },
+> +	{ 2, "spi_mosi" },
+> +	{ 3, "spi_miso" },
+> +};
+
+In case you are interested, here are the additional functions:
+
+4: i2c_scl
+5: i2c_sda
+
+6: mdc
+7: mdio
+
+8: pwm0
+9: pwm1
+10: pwm2
+11: pwm3
+
+12: uart1_rx
+13: uart1_tx
+14: uart1_cts
+15: uart1_rts
+
+On BCM53012:
+
+16: uart2_rx
+17: uart2_tx
+22: sdio_card_power_ctl
+23: sdio_en_1p8
+
+On BCM53013:
+
+21: 25Mhz crystal output for I2S
+
+Not an expert on pinctrl drivers, but it looks reasonable to me.
 -- 
-viresh
+Florian
