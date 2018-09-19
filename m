@@ -1,86 +1,203 @@
-From: anshuman.khandual@arm.com (Anshuman Khandual)
-Date: Wed, 19 Sep 2018 09:04:09 +0530
-Subject: [PATCH 2/3] arm64/cpufeatures: Factorize emulate_mrs()
-In-Reply-To: <1537328050-29176-1-git-send-email-anshuman.khandual@arm.com>
-References: <1537328050-29176-1-git-send-email-anshuman.khandual@arm.com>
-Message-ID: <1537328050-29176-3-git-send-email-anshuman.khandual@arm.com>
+From: aditya@kobol.io (Aditya Prayoga)
+Date: Wed, 19 Sep 2018 11:45:29 +0800
+Subject: [PATCH 1/2] libata: add ledtrig support
+In-Reply-To: <1537328730-9156-1-git-send-email-aditya@kobol.io>
+References: <1537328730-9156-1-git-send-email-aditya@kobol.io>
+Message-ID: <1537328730-9156-2-git-send-email-aditya@kobol.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MRS emulation gets triggered with exception class (0x00 or 0x18) eventually
-calling the function emulate_mrs() which fetches the user space instruction
-and analyses it's encodings (OP0, OP1, OP2, CRN, CRM, RT). The kernel tries
-to emulate the given instruction looking into the encoding details. Going
-forward these encodings can also be parsed from ESR_ELx.ISS fields without
-requiring to fetch/decode faulting userspace instruction which can improve
-performance. This factorizes emulate_mrs() function in a way that it can be
-called directly with MRS encodings (OP0, OP1, OP2, CRN, CRM) for any given
-target register which can then be used directly from 0x18 exception class.
+From: Daniel Golle <daniel@makrotopia.org>
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Anshuman Khandual <anshuman.khandual@arm.com>
+This adds a LED trigger for each ATA port indicating disk activity.
+
+As this is needed only on specific platforms (NAS SoCs and such),
+these platforms should define ARCH_WANTS_LIBATA_LEDS if there
+are boards with LED(s) intended to indicate ATA disk activity and
+need the OS to take care of that.
+In that way, if not selected, LED trigger support not will be
+included in libata-core and both, codepaths and structures remain
+untouched.
+
+I'm currently deploying this for the oxnas target in OpenWrt
+https://dev.openwrt.org/changeset/43675/
+
+v2: rebased to kernel/git/tj/libata.git
+    plus small corrections and comments added
+
+Signed-off-by: Daniel Golle <daniel@makrotopia.org>
+URL: https://patchwork.ozlabs.org/patch/420733/
+[Aditya Prayoga:
+* Port forward
+* Change ATA_LEDS default to no
+* Reduce performance impact by moving ata_led_act() call from
+    ata_qc_new() to ata_qc_complete()]
+Signed-off-by: Aditya Prayoga <aditya@kobol.io>
+
 ---
- arch/arm64/include/asm/cpufeature.h |  1 +
- arch/arm64/kernel/cpufeature.c      | 23 ++++++++++++++---------
- 2 files changed, 15 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 1717ba1..7fcaaa4 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -530,6 +530,7 @@ void arm64_set_ssbd_mitigation(bool state);
- static inline void arm64_set_ssbd_mitigation(bool state) {}
- #endif
+If there is anything fundamentally wrong with that approach, I'd be
+glad for some advise on how to do it better.
+I conciously choose an #ifdev approach to make sure performance will
+not be affected for non-users of that code.
+
+Thanks
+
+Daniel
+
+---
+---
+ drivers/ata/Kconfig       | 16 ++++++++++++++
+ drivers/ata/libata-core.c | 56 +++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/libata.h    |  7 ++++++
+ 3 files changed, 79 insertions(+)
+
+diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+index 39b181d..a2c64ce 100644
+--- a/drivers/ata/Kconfig
++++ b/drivers/ata/Kconfig
+@@ -46,6 +46,22 @@ config ATA_VERBOSE_ERROR
  
-+extern int do_emulate_mrs(struct pt_regs *regs, u32 sys_reg, u32 rt);
- #endif /* __ASSEMBLY__ */
+ 	  If unsure, say Y.
  
- #endif
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index e238b79..b9e0bcb 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -1719,27 +1719,32 @@ static int emulate_sys_reg(u32 id, u64 *valp)
- 	return 0;
- }
- 
--static int emulate_mrs(struct pt_regs *regs, u32 insn)
-+int do_emulate_mrs(struct pt_regs *regs, u32 sys_reg, u32 dst)
- {
- 	int rc;
--	u32 sys_reg, dst;
- 	u64 val;
- 
--	/*
--	 * sys_reg values are defined as used in mrs/msr instruction.
--	 * shift the imm value to get the encoding.
--	 */
--	sys_reg = (u32)aarch64_insn_decode_immediate(AARCH64_INSN_IMM_16, insn) << 5;
- 	rc = emulate_sys_reg(sys_reg, &val);
- 	if (!rc) {
--		dst = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RT, insn);
- 		pt_regs_write_reg(regs, dst, val);
- 		arm64_skip_faulting_instruction(regs, AARCH64_INSN_SIZE);
- 	}
--
- 	return rc;
- }
- 
-+static int emulate_mrs(struct pt_regs *regs, u32 insn)
-+{
-+	u32 sys_reg, dst;
++config ARCH_WANT_LIBATA_LEDS
++	bool
 +
-+	/*
-+	 * sys_reg values are defined as used in mrs/msr instruction.
-+	 * shift the imm value to get the encoding.
-+	 */
-+	sys_reg = (u32)aarch64_insn_decode_immediate(AARCH64_INSN_IMM_16, insn) << 5;
-+	dst = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RT, insn);
-+	return do_emulate_mrs(regs, sys_reg, dst);
++config ATA_LEDS
++	bool "support ATA port LED triggers"
++	depends on ARCH_WANT_LIBATA_LEDS
++	select NEW_LEDS
++	select LEDS_CLASS
++	select LEDS_TRIGGERS
++	default n
++	help
++	  This option adds a LED trigger for each registered ATA port.
++	  It is used to drive disk activity leds connected via GPIO.
++
++	  If unsure, say N.
++
+ config ATA_ACPI
+ 	bool "ATA ACPI Support"
+ 	depends on ACPI
+diff --git a/drivers/ata/libata-core.c b/drivers/ata/libata-core.c
+index 599e01b..65228f5 100644
+--- a/drivers/ata/libata-core.c
++++ b/drivers/ata/libata-core.c
+@@ -5105,6 +5105,30 @@ void swap_buf_le16(u16 *buf, unsigned int buf_words)
+ }
+ 
+ /**
++ *	ata_led_act - Trigger port activity LED
++ *	@ap: indicating port
++ *
++ *	Blinks any LEDs registered to the trigger.
++ *	Commonly used with leds-gpio on NAS systems with disk activity
++ *	indicator LEDs.
++ *
++ *	LOCKING:
++ *	None.
++ */
++static inline void ata_led_act(struct ata_port *ap)
++{
++#ifdef CONFIG_ATA_LEDS
++#define LIBATA_BLINK_DELAY 20 /* ms */
++	unsigned long led_delay = LIBATA_BLINK_DELAY;
++
++	if (unlikely(!ap->ledtrig))
++		return;
++
++	led_trigger_blink_oneshot(ap->ledtrig, &led_delay, &led_delay, 0);
++#endif /* CONFIG_ATA_LEDS */
 +}
 +
- static struct undef_hook mrs_hook = {
- 	.instr_mask = 0xfff00000,
- 	.instr_val  = 0xd5300000,
++/**
+  *	ata_qc_new_init - Request an available ATA command, and initialize it
+  *	@dev: Device from whom we request an available command structure
+  *	@tag: tag
+@@ -5249,6 +5273,10 @@ void ata_qc_complete(struct ata_queued_cmd *qc)
+ 	/* Trigger the LED (if available) */
+ 	ledtrig_disk_activity(!!(qc->tf.flags & ATA_TFLAG_WRITE));
+ 
++#ifdef CONFIG_ATA_LEDS
++	ata_led_act(ap);
++#endif
++
+ 	/* XXX: New EH and old EH use different mechanisms to
+ 	 * synchronize EH with regular execution path.
+ 	 *
+@@ -6028,6 +6056,9 @@ struct ata_port *ata_port_alloc(struct ata_host *host)
+ 	ap->stats.unhandled_irq = 1;
+ 	ap->stats.idle_irq = 1;
+ #endif
++#ifdef CONFIG_ATA_LEDS
++	ap->ledtrig = kzalloc(sizeof(struct led_trigger), GFP_KERNEL);
++#endif
+ 	ata_sff_port_init(ap);
+ 
+ 	return ap;
+@@ -6063,6 +6094,12 @@ static void ata_host_release(struct kref *kref)
+ 
+ 		kfree(ap->pmp_link);
+ 		kfree(ap->slave_link);
++#ifdef CONFIG_ATA_LEDS
++		if (ap->ledtrig) {
++			led_trigger_unregister(ap->ledtrig);
++			kfree(ap->ledtrig);
++		};
++#endif
+ 		kfree(ap);
+ 		host->ports[i] = NULL;
+ 	}
+@@ -6527,6 +6564,25 @@ int ata_host_register(struct ata_host *host, struct scsi_host_template *sht)
+ 		host->ports[i]->local_port_no = i + 1;
+ 	}
+ 
++#ifdef CONFIG_ATA_LEDS
++	/* register LED triggers for all ports */
++	for (i = 0; i < host->n_ports; i++) {
++		if (unlikely(!host->ports[i]->ledtrig))
++			continue;
++
++		snprintf(host->ports[i]->ledtrig_name,
++			sizeof(host->ports[i]->ledtrig_name), "ata%u",
++			host->ports[i]->print_id);
++
++		host->ports[i]->ledtrig->name = host->ports[i]->ledtrig_name;
++
++		if (led_trigger_register(host->ports[i]->ledtrig)) {
++			kfree(host->ports[i]->ledtrig);
++			host->ports[i]->ledtrig = NULL;
++		}
++	}
++#endif
++
+ 	/* Create associated sysfs transport objects  */
+ 	for (i = 0; i < host->n_ports; i++) {
+ 		rc = ata_tport_add(host->dev,host->ports[i]);
+diff --git a/include/linux/libata.h b/include/linux/libata.h
+index 38c95d6..3cc5f63 100644
+--- a/include/linux/libata.h
++++ b/include/linux/libata.h
+@@ -38,6 +38,7 @@
+ #include <linux/acpi.h>
+ #include <linux/cdrom.h>
+ #include <linux/sched.h>
++#include <linux/leds.h>
+ 
+ /*
+  * Define if arch has non-standard setup.  This is a _PCI_ standard
+@@ -893,6 +894,12 @@ struct ata_port {
+ #ifdef CONFIG_ATA_ACPI
+ 	struct ata_acpi_gtm	__acpi_init_gtm; /* use ata_acpi_init_gtm() */
+ #endif
++
++#ifdef CONFIG_ATA_LEDS
++	struct led_trigger	*ledtrig;
++	char			ledtrig_name[8];
++#endif
++
+ 	/* owned by EH */
+ 	u8			sector_buf[ATA_SECT_SIZE] ____cacheline_aligned;
+ };
 -- 
 2.7.4
