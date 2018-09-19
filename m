@@ -1,34 +1,43 @@
-From: aditya@kobol.io (Aditya Prayoga)
-Date: Wed, 19 Sep 2018 11:45:30 +0800
-Subject: [PATCH 2/2] ARM: mvebu: Enable ARCH_WANT_LIBATA_LEDS in Armada 38x
-In-Reply-To: <1537328730-9156-1-git-send-email-aditya@kobol.io>
-References: <1537328730-9156-1-git-send-email-aditya@kobol.io>
-Message-ID: <1537328730-9156-3-git-send-email-aditya@kobol.io>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Tue, 18 Sep 2018 21:37:22 -0700
+Subject: [PATCH v2 00/22] Unify MediaTek pinctrl in preparation for
+ MT8183 and MT6765
+In-Reply-To: <1537325650.572.9.camel@mtkswgap22>
+References: <cover.1536404280.git.sean.wang@mediatek.com>
+ <CACRpkdZtVBjYGs5C7-HWEyX7f7pnCqvnRYBH=fFmLKhN4FGymA@mail.gmail.com>
+ <1537325650.572.9.camel@mtkswgap22>
+Message-ID: <20180919043722.GA14181@Mani-XPS-13-9360>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable hidden symbol ARCH_WANT_LIBATA_LEDS so CONFIG_ATA_LEDS can be
-used in kernel configuration.
+On Wed, Sep 19, 2018 at 10:54:10AM +0800, Sean Wang wrote:
+> On Tue, 2018-09-18 at 15:07 -0700, Linus Walleij wrote:
+> > On Sat, Sep 8, 2018 at 4:07 AM <sean.wang@mediatek.com> wrote:
+> > 
+> > > v2 and changes since v1:
+> > 
+> > I had trouble applying the last patches in the series so I applied
+> > all on an immutable branch (ib-mtk) then merged that into devel
+> > and added a patch on top to fix up some GPIO includes (just sent).
+> > 
+> > Please check the result!
+> > 
+> 
+> Sure, I'll take a look and and test on the devel branch.
+> 
+> On the top, I'll add a fix for the issue recently reported by kbuild
+> test robot about implicit declaration and a new MT6765 driver based
+> on the series.
+>
 
-URL: https://lists.openwrt.org/pipermail/openwrt-
-devel/2017-March/006582.html
+Hi Sean,
 
-Signed-off-by: Aditya Prayoga <aditya@kobol.io>
----
- arch/arm/mach-mvebu/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+Do you have any plans to add support for MT6797?
 
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 2c20599..51f3256 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -68,6 +68,7 @@ config MACH_ARMADA_38X
- 	select HAVE_SMP
- 	select MACH_MVEBU_V7
- 	select PINCTRL_ARMADA_38X
-+	select ARCH_WANT_LIBATA_LEDS
- 	help
- 	  Say 'Y' here if you want your kernel to support boards based
- 	  on the Marvell Armada 380/385 SoC with device tree.
--- 
-2.7.4
+Thanks,
+Mani
+
+> > Yours,
+> > Linus Walleij
+> 
+> 
