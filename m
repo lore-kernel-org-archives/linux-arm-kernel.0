@@ -1,81 +1,54 @@
 From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Wed, 19 Sep 2018 15:27:48 +0200
-Subject: [PATCH v2 6/7] ARM: dts: stm32: add joystick support on stm32746g-eval
-In-Reply-To: <1537363669-25991-1-git-send-email-amelie.delaunay@st.com>
-References: <1537363669-25991-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <1537363669-25991-7-git-send-email-amelie.delaunay@st.com>
+Date: Wed, 19 Sep 2018 15:27:42 +0200
+Subject: [PATCH v2 0/7] Introduce STMFX I2C Multi-Function eXpander
+Message-ID: <1537363669-25991-1-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The joystick (B3) on stm32746g-eval uses gpios on STMFX gpio expander.
-These gpios need a pin configuration (push-pull and bias-pull-up),
-described under stmfx_pinctrl node.
+This series adds support for STMicroelectronics Multi-Function eXpander
+(STMFX), used on some STM32 discovery and evaluation boards.
 
-Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+STMFX is an STM32L152 slave controller whose firmware embeds the following
+features:
+- I/O expander (16 GPIOs + 8 extra if the other features are not enabled),
+- resistive touchscreen controller,
+- IDD measurement.
+
+I2C stuff and chip initialization is based on an MFD parent driver, which
+registers a pinctrl MFD child.
+
 ---
- arch/arm/boot/dts/stm32746g-eval.dts | 43 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
+Changes in v2:
+- move to MFD parent driver for i2c stuff and chip initialization
+- improve regmap configuration
+- take advantage of the use of gpio-ranges
 
-diff --git a/arch/arm/boot/dts/stm32746g-eval.dts b/arch/arm/boot/dts/stm32746g-eval.dts
-index 203faf0..b86ad83 100644
---- a/arch/arm/boot/dts/stm32746g-eval.dts
-+++ b/arch/arm/boot/dts/stm32746g-eval.dts
-@@ -86,6 +86,43 @@
- 		};
- 	};
- 
-+	joystick {
-+		compatible = "gpio-keys";
-+		#size-cells = <0>;
-+		pinctrl-0 = <&joystick_pins>;
-+		pinctrl-names = "default";
-+		button-0 {
-+			label = "JoySel";
-+			linux,code = <KEY_ENTER>;
-+			interrupt-parent = <&stmfx_pinctrl>;
-+			interrupts = <0 IRQ_TYPE_EDGE_FALLING>;
-+		};
-+		button-1 {
-+			label = "JoyDown";
-+			linux,code = <KEY_DOWN>;
-+			interrupt-parent = <&stmfx_pinctrl>;
-+			interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
-+		};
-+		button-2 {
-+			label = "JoyLeft";
-+			linux,code = <KEY_LEFT>;
-+			interrupt-parent = <&stmfx_pinctrl>;
-+			interrupts = <2 IRQ_TYPE_EDGE_FALLING>;
-+		};
-+		button-3 {
-+			label = "JoyRight";
-+			linux,code = <KEY_RIGHT>;
-+			interrupt-parent = <&stmfx_pinctrl>;
-+			interrupts = <3 IRQ_TYPE_EDGE_FALLING>;
-+		};
-+		button-4 {
-+			label = "JoyUp";
-+			linux,code = <KEY_UP>;
-+			interrupt-parent = <&stmfx_pinctrl>;
-+			interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
-+		};
-+	};
-+
- 	usbotg_hs_phy: usb-phy {
- 		#phy-cells = <0>;
- 		compatible = "usb-nop-xceiv";
-@@ -129,6 +166,12 @@
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
- 			gpio-ranges = <&stmfx_pinctrl 0 0 24>;
-+
-+			joystick_pins: joystick {
-+				pins = "gpio0", "gpio1", "gpio2", "gpio3", "gpio4";
-+				drive-push-pull;
-+				bias-pull-up;
-+			};
- 		};
- 	};
- };
+
+Amelie Delaunay (7):
+  dt-bindings: mfd: Add ST Multi-Function eXpander (STMFX) core bindings
+  mfd: Add ST Multi-Function eXpander (STMFX) core driver
+  dt-bindings: pinctrl: document the STMFX pinctrl bindings
+  pinctrl: Add STMFX GPIO expander Pinctrl/GPIO driver
+  ARM: dts: stm32: add STMFX support on stm32746g-eval
+  ARM: dts: stm32: add joystick support on stm32746g-eval
+  ARM: dts: stm32: add orange and blue leds on stm32746g-eval
+
+ Documentation/devicetree/bindings/mfd/stmfx.txt    |  28 +
+ .../devicetree/bindings/pinctrl/pinctrl-stmfx.txt  | 116 +++
+ arch/arm/boot/dts/stm32746g-eval.dts               |  66 ++
+ drivers/mfd/Kconfig                                |  14 +
+ drivers/mfd/Makefile                               |   2 +-
+ drivers/mfd/stmfx.c                                | 626 ++++++++++++++++
+ drivers/pinctrl/Kconfig                            |  12 +
+ drivers/pinctrl/Makefile                           |   1 +
+ drivers/pinctrl/pinctrl-stmfx.c                    | 821 +++++++++++++++++++++
+ include/linux/mfd/stmfx.h                          |  27 +
+ 10 files changed, 1712 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/stmfx.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-stmfx.txt
+ create mode 100644 drivers/mfd/stmfx.c
+ create mode 100644 drivers/pinctrl/pinctrl-stmfx.c
+ create mode 100644 include/linux/mfd/stmfx.h
+
 -- 
 2.7.4
