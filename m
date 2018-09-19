@@ -1,29 +1,78 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Wed, 19 Sep 2018 15:08:03 +0200
-Subject: [PATCH v3 0/9] add support for relative references in jump tables
-In-Reply-To: <20180919065144.25010-1-ard.biesheuvel@linaro.org>
-References: <20180919065144.25010-1-ard.biesheuvel@linaro.org>
-Message-ID: <20180919130803.GH24124@hirez.programming.kicks-ass.net>
+From: eugen.hristev@microchip.com (Eugen Hristev)
+Date: Wed, 19 Sep 2018 15:39:53 +0300
+Subject: [PATCH] ARM: dts: at91: sama5d27_som1_ek: add adc regulators
+Message-ID: <1537360793-10264-1-git-send-email-eugen.hristev@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2018 at 11:51:35PM -0700, Ard Biesheuvel wrote:
+Add fixed regulators for the ADC. This board does not have
+a programmable PMIC, but fixed regulators.
+Adding them to DT so the ADC can probe correctly.
 
-> Ard Biesheuvel (8):
->   kernel/jump_label: abstract jump_entry member accessors
->   kernel/jump_label: implement generic support for relative references
->   arm64/kernel: jump_label: switch to relative references
->   x86: add support for 64-bit place relative relocations
->   x86: jump_label: switch to jump_entry accessors
->   x86/kernel: jump_table: use relative references
->   jump_label: annotate entries that operate on __init code earlier
->   jump_table: move entries into ro_after_init region
-> 
-> Heiko Carstens (1):
->   s390/jump_label: switch to relative references
+Tested-by: Swapna Gurumani <swapna.gurumani@microchip.com>
+Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+---
+ arch/arm/boot/dts/at91-sama5d27_som1_ek.dts | 42 +++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
-This all looks good to me;
-
-Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
-
-Ingo, could you queue this?
+diff --git a/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts b/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
+index e86e0c0..363a43d 100644
+--- a/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
++++ b/arch/arm/boot/dts/at91-sama5d27_som1_ek.dts
+@@ -283,6 +283,13 @@
+ 				status = "okay";
+ 			};
+ 
++			adc: adc at fc030000 {
++				vddana-supply = <&vddana>;
++				vref-supply = <&advref>;
++
++				status = "disabled";
++			};
++
+ 			pinctrl at fc038000 {
+ 
+ 				pinctrl_can1_default: can1_default {
+@@ -549,4 +556,39 @@
+ 			linux,default-trigger = "heartbeat";
+ 		};
+ 	};
++
++	vddin_3v3: fixed-regulator-vddin_3v3 {
++		compatible = "regulator-fixed";
++
++		regulator-name = "VDDIN_3V3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++		regulator-boot-on;
++		status = "okay";
++	};
++
++	vddana: fixed-regulator-vddana {
++		compatible = "regulator-fixed";
++
++		regulator-name = "VDDANA";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++		regulator-boot-on;
++		vin-supply = <&vddin_3v3>;
++		status = "okay";
++	};
++
++	advref: fixed-regulator-advref {
++		compatible = "regulator-fixed";
++
++		regulator-name = "advref";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++		regulator-boot-on;
++		vin-supply = <&vddana>;
++		status = "okay";
++	};
+ };
+-- 
+2.7.4
