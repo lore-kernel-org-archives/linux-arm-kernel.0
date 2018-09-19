@@ -1,117 +1,60 @@
 From: andreyknvl@google.com (Andrey Konovalov)
-Date: Wed, 19 Sep 2018 20:54:48 +0200
-Subject: [PATCH v8 09/20] kasan: preassign tags to objects with ctors or
- SLAB_TYPESAFE_BY_RCU
+Date: Wed, 19 Sep 2018 20:54:51 +0200
+Subject: [PATCH v8 12/20] kasan, arm64: enable top byte ignore for the kernel
 In-Reply-To: <cover.1537383101.git.andreyknvl@google.com>
 References: <cover.1537383101.git.andreyknvl@google.com>
-Message-ID: <d74e710797323db0e43f047ea698fbc85060fc57.1537383101.git.andreyknvl@google.com>
+Message-ID: <5e610a513c44a69b2b78476c20f21960696259c6.1537383101.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An object constructor can initialize pointers within this objects based on
-the address of the object. Since the object address might be tagged, we
-need to assign a tag before calling constructor.
-
-The implemented approach is to assign tags to objects with constructors
-when a slab is allocated and call constructors once as usual. The
-downside is that such object would always have the same tag when it is
-reallocated, so we won't catch use-after-frees on it.
-
-Also pressign tags for objects from SLAB_TYPESAFE_BY_RCU caches, since
-they can be validy accessed after having been freed.
+Tag-based KASAN uses the Top Byte Ignore feature of arm64 CPUs to store a
+pointer tag in the top byte of each pointer. This commit enables the
+TCR_TBI1 bit, which enables Top Byte Ignore for the kernel, when tag-based
+KASAN is used.
 
 Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
 ---
- mm/slab.c |  2 +-
- mm/slub.c | 24 ++++++++++++++----------
- 2 files changed, 15 insertions(+), 11 deletions(-)
+ arch/arm64/include/asm/pgtable-hwdef.h | 1 +
+ arch/arm64/mm/proc.S                   | 8 +++++++-
+ 2 files changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/mm/slab.c b/mm/slab.c
-index 6fdca9ec2ea4..fe0ddf08aa2c 100644
---- a/mm/slab.c
-+++ b/mm/slab.c
-@@ -2574,7 +2574,7 @@ static void cache_init_objs(struct kmem_cache *cachep,
+diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+index fd208eac9f2a..483aceedad76 100644
+--- a/arch/arm64/include/asm/pgtable-hwdef.h
++++ b/arch/arm64/include/asm/pgtable-hwdef.h
+@@ -289,6 +289,7 @@
+ #define TCR_A1			(UL(1) << 22)
+ #define TCR_ASID16		(UL(1) << 36)
+ #define TCR_TBI0		(UL(1) << 37)
++#define TCR_TBI1		(UL(1) << 38)
+ #define TCR_HA			(UL(1) << 39)
+ #define TCR_HD			(UL(1) << 40)
+ #define TCR_NFD1		(UL(1) << 54)
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 03646e6a2ef4..b2b44dbdb063 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -47,6 +47,12 @@
+ /* PTWs cacheable, inner/outer WBWA */
+ #define TCR_CACHE_FLAGS	TCR_IRGN_WBWA | TCR_ORGN_WBWA
  
- 	for (i = 0; i < cachep->num; i++) {
- 		objp = index_to_obj(cachep, page, i);
--		kasan_init_slab_obj(cachep, objp);
-+		objp = kasan_init_slab_obj(cachep, objp);
- 
- 		/* constructor could break poison info */
- 		if (DEBUG == 0 && cachep->ctor) {
-diff --git a/mm/slub.c b/mm/slub.c
-index c4d5f4442ff1..75fc76e42a1e 100644
---- a/mm/slub.c
-+++ b/mm/slub.c
-@@ -1413,16 +1413,17 @@ static inline bool slab_free_freelist_hook(struct kmem_cache *s,
- #endif
- }
- 
--static void setup_object(struct kmem_cache *s, struct page *page,
-+static void *setup_object(struct kmem_cache *s, struct page *page,
- 				void *object)
- {
- 	setup_object_debug(s, page, object);
--	kasan_init_slab_obj(s, object);
-+	object = kasan_init_slab_obj(s, object);
- 	if (unlikely(s->ctor)) {
- 		kasan_unpoison_object_data(s, object);
- 		s->ctor(object);
- 		kasan_poison_object_data(s, object);
- 	}
-+	return object;
- }
++#ifdef CONFIG_KASAN_SW_TAGS
++#define TCR_KASAN_FLAGS TCR_TBI1
++#else
++#define TCR_KASAN_FLAGS 0
++#endif
++
+ #define MAIR(attr, mt)	((attr) << ((mt) * 8))
  
  /*
-@@ -1530,16 +1531,16 @@ static bool shuffle_freelist(struct kmem_cache *s, struct page *page)
- 	/* First entry is used as the base of the freelist */
- 	cur = next_freelist_entry(s, page, &pos, start, page_limit,
- 				freelist_count);
-+	cur = setup_object(s, page, cur);
- 	page->freelist = cur;
+@@ -440,7 +446,7 @@ ENTRY(__cpu_setup)
+ 	 */
+ 	ldr	x10, =TCR_TxSZ(VA_BITS) | TCR_CACHE_FLAGS | TCR_SMP_FLAGS | \
+ 			TCR_TG_FLAGS | TCR_KASLR_FLAGS | TCR_ASID16 | \
+-			TCR_TBI0 | TCR_A1
++			TCR_TBI0 | TCR_A1 | TCR_KASAN_FLAGS
+ 	tcr_set_idmap_t0sz	x10, x9
  
- 	for (idx = 1; idx < page->objects; idx++) {
--		setup_object(s, page, cur);
- 		next = next_freelist_entry(s, page, &pos, start, page_limit,
- 			freelist_count);
-+		next = setup_object(s, page, next);
- 		set_freepointer(s, cur, next);
- 		cur = next;
- 	}
--	setup_object(s, page, cur);
- 	set_freepointer(s, cur, NULL);
- 
- 	return true;
-@@ -1561,7 +1562,7 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
- 	struct page *page;
- 	struct kmem_cache_order_objects oo = s->oo;
- 	gfp_t alloc_gfp;
--	void *start, *p;
-+	void *start, *p, *next;
- 	int idx, order;
- 	bool shuffle;
- 
-@@ -1613,13 +1614,16 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
- 
- 	if (!shuffle) {
- 		for_each_object_idx(p, idx, s, start, page->objects) {
--			setup_object(s, page, p);
--			if (likely(idx < page->objects))
--				set_freepointer(s, p, p + s->size);
--			else
-+			if (likely(idx < page->objects)) {
-+				next = p + s->size;
-+				next = setup_object(s, page, next);
-+				set_freepointer(s, p, next);
-+			} else
- 				set_freepointer(s, p, NULL);
- 		}
--		page->freelist = fixup_red_left(s, start);
-+		start = fixup_red_left(s, start);
-+		start = setup_object(s, page, start);
-+		page->freelist = start;
- 	}
- 
- 	page->inuse = page->objects;
+ 	/*
 -- 
 2.19.0.397.gdd90340f6a-goog
