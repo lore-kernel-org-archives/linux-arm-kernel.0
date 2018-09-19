@@ -1,49 +1,117 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 19 Sep 2018 17:05:12 +0100
-Subject: Huge page(contiguous bit) slow down
-In-Reply-To: <20180919153658.udwxks7p4saqvmt2@capper-debian.cambridge.arm.com>
-References: <8898674D84E3B24BA3A2D289B872026A69FE8F27@G01JPEXMBKW03>
- <20180918113300.GC16498@arm.com>
- <20180918145832.h24u5tbsqksvmrtq@armageddon.cambridge.arm.com>
- <20180918151625.GG16498@arm.com>
- <20180918160927.hxtipnq6z6qrh7hw@armageddon.cambridge.arm.com>
- <20180918161432.GH16498@arm.com>
- <20180918171133.2suapy5le7lfp5gf@armageddon.cambridge.arm.com>
- <20180919102937.GD25094@arm.com>
- <20180919153658.udwxks7p4saqvmt2@capper-debian.cambridge.arm.com>
-Message-ID: <20180919160511.GE22723@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 20 Sep 2018 00:20:19 +0800
+Subject: [linux-sunxi] Re: [PATCH 5/5] ARM: sun8i: dts: drop A64 HDMI PHY
+ fallback compatible from R40 DT
+In-Reply-To: <f968f15fec21ba5b0415b1792536af3e5aba6e57.camel@aosc.io>
+References: <20180907072234.48282-1-icenowy@aosc.io>
+ <20180907072234.48282-6-icenowy@aosc.io>
+ <20180910142354.5ldexkvnan6ohz4x@flea> <1926288.mXGsSvSKgU@jernej-laptop>
+ <20180917145452.ewfuqkrxjjosbawd@flea>
+ <f968f15fec21ba5b0415b1792536af3e5aba6e57.camel@aosc.io>
+Message-ID: <CAGb2v64N16=3APDnNN5R+EB0524KR86eq1itOnQ8bXsv-HDUOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 19, 2018 at 04:37:08PM +0100, Steve Capper wrote:
-> On Wed, Sep 19, 2018 at 11:29:37AM +0100, Will Deacon wrote:
-> > diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-> > index 192b3ba07075..edae6774132d 100644
-> > --- a/arch/arm64/mm/hugetlbpage.c
-> > +++ b/arch/arm64/mm/hugetlbpage.c
-> > @@ -324,7 +324,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
-> >  			       unsigned long addr, pte_t *ptep,
-> >  			       pte_t pte, int dirty)
-> >  {
-> > -	int ncontig, i, changed = 0;
-> > +	int ncontig, i;
-> >  	size_t pgsize = 0;
-> >  	unsigned long pfn = pte_pfn(pte), dpfn;
-> >  	pgprot_t hugeprot;
-> > @@ -336,9 +336,14 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
-> >  	ncontig = find_num_contig(vma->vm_mm, addr, ptep, &pgsize);
-> >  	dpfn = pgsize >> PAGE_SHIFT;
-> >  
-> > +	for (i = 0; i < ncontig; i++)
-> > +		if (!pte_same(huge_ptep_get(ptep + i), pte))
-> > +			break;
-> > +
-> 
-> This comparison will always fail as our pfns will be different. I have a work
-> in progress fix (a separate function to go through the contiguous range
-> to preserve the dirty information) that I'll test and post shortly.
+On Tue, Sep 18, 2018 at 6:57 AM Icenowy Zheng <icenowy@aosc.io> wrote:
+>
+> ? 2018-09-17?? 16:54 +0200?Maxime Ripard???
+> > On Mon, Sep 10, 2018 at 04:32:30PM +0200, Jernej ?krabec wrote:
+> > > Dne ponedeljek, 10. september 2018 ob 16:23:54 CEST je Maxime
+> > > Ripard
+> > > napisal(a):
+> > > > On Fri, Sep 07, 2018 at 03:22:34PM +0800, Icenowy Zheng wrote:
+> > > > > The R40 HDMI PHY seems to be different to the A64 one, the A64
+> > > > > one
+> > > > > has no input mux, but the R40 one has.
+> > > > >
+> > > > > Drop the A64 fallback compatible from the HDMI PHY node in R40
+> > > > > DT.
+> > > > >
+> > > > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> > > > > ---
+> > > > >
+> > > > >  arch/arm/boot/dts/sun8i-r40.dtsi | 3 +--
+> > > > >  1 file changed, 1 insertion(+), 2 deletions(-)
+> > > > >
+> > > > > diff --git a/arch/arm/boot/dts/sun8i-r40.dtsi
+> > > > > b/arch/arm/boot/dts/sun8i-r40.dtsi index
+> > > > > ffd9f00f74a4..5f547c161baf
+> > > > > 100644
+> > > > > --- a/arch/arm/boot/dts/sun8i-r40.dtsi
+> > > > > +++ b/arch/arm/boot/dts/sun8i-r40.dtsi
+> > > > > @@ -800,8 +800,7 @@
+> > > > >
+> > > > >                 };
+> > > > >
+> > > > >                 hdmi_phy: hdmi-phy at 1ef0000 {
+> > > > >
+> > > > > -                       compatible = "allwinner,sun8i-r40-hdmi-
+> > > > > phy",
+> > > > > -                                    "allwinner,sun50i-a64-
+> > > > > hdmi-phy";
+> > > > > +                       compatible = "allwinner,sun8i-r40-hdmi-
+> > > > > phy";
+> > > >
+> > > > If you could use the A64 phy before, you can still use it now.
+> > >
+> > > Not exactly. Given that we don't know how to switch between HDMI
+> > > PHY clock
+> > > parents on A64 (if it is actually connected at all, there is no
+> > > information
+> > > about that in manual and AW didn't answered our questions, despite
+> > > asking them
+> > > through different channels), A64 compatible will be associated with
+> > > quirk,
+> > > which will tell that only one clock parent is usable.
+> > >
+> > > However, R40 HDMI PHY has definetly two clock parents, as it was
+> > > tested by me
+> > > and Icenowy and we know how to switch between them without issues.
+> > > Technically, we could have A64 compatible there, but that would
+> > > mean only
+> > > single PHY parent is considered instead of two.
+> >
+> > The DT change above would mean that you can't operate the R40 phy in
+> > the same way than the A64's. From what you're telling me now, this
+> > isn't exactly what is going on: you can operate the R40 phy just like
+> > the A64: with a single PLL instead of two. You operate in a degraded
+> > and non-optimal mode, but it still works.
 
-Ha, yes of course. I forgot about the most useful part of the pte!
-I'll take a look at your patch when you post it.
+I suppose it's a slightly different semantic. While we have no definite
+data regarding the A64, there are some possibilities:
 
-Will
+  1. The muxing mechanism isn't present on the A64, and the HDMI PHY
+     only takes one clock.
+
+  2. The muxing is present, but only the first parent is connected.
+     Switching to the second input causes it to stop working.
+
+  3. Same as above, but both parents are connected to video0-pll.
+     This might be indistinguishable from 1., even if checking whether
+     the bit modifications stick or not.
+
+In any case, I think this deserves proper experimentation, and subsequent
+documentation in the bindings of our "assumptions" (i.e. educated guess)
+about what the hardware is doing.
+
+>
+> The status of R40 HDMI PHY input mux is not determined when use A64
+> driver, which makes it not working when the bootloader initializes it
+> to use the second PLL (the A64 driver will assume the parent is the
+> first PLL).
+
+That doesn't sound good. But it really depends on what we assume the
+A64 is doing.
+
+ChenYu
+
+> >
+> > And it's exactly what the DT is already saying.
+> >
+> > Maxime
+> >
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
