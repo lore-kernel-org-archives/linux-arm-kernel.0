@@ -1,51 +1,34 @@
 From: aditya@kobol.io (Aditya Prayoga)
-Date: Wed, 19 Sep 2018 11:45:28 +0800
-Subject: [PATCH 0/2] Add support per ATA port ledtrigger on armada 38x
-Message-ID: <1537328730-9156-1-git-send-email-aditya@kobol.io>
+Date: Wed, 19 Sep 2018 11:45:30 +0800
+Subject: [PATCH 2/2] ARM: mvebu: Enable ARCH_WANT_LIBATA_LEDS in Armada 38x
+In-Reply-To: <1537328730-9156-1-git-send-email-aditya@kobol.io>
+References: <1537328730-9156-1-git-send-email-aditya@kobol.io>
+Message-ID: <1537328730-9156-3-git-send-email-aditya@kobol.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+Enable hidden symbol ARCH_WANT_LIBATA_LEDS so CONFIG_ATA_LEDS can be
+used in kernel configuration.
 
-This series adds support LED trigger for each ATA port indicating disk activity
-in Armada 38x. I pick up the work done by Daniel Golle which can be found at [1]
+URL: https://lists.openwrt.org/pipermail/openwrt-
+devel/2017-March/006582.html
 
-Helios4 which is based on Armada 388, has four LEDs designed to indicate disk
-activity on each SATA ports. As the final switch (CONFIG_ATA_LEDS) to enable
-the codepath by default is no, it should not affect the rest of Armada 38x 
-based boards.
-
-[1] https://patchwork.ozlabs.org/patch/420733/ 
+Signed-off-by: Aditya Prayoga <aditya@kobol.io>
 ---
-Notes
-  checkpatch.pl complains about "WARNING: please write a paragraph that
-    describes the config symbol fully" but I think the description is clear
-    enough to ignore the warning.
+ arch/arm/mach-mvebu/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-  Some performance number tested on Western Digital Red 2TB WD20EFRX
-    using fio randrw
-    * CONFIG_ATA_LEDS disabled and selected trigger is none
-      read : iops=326
-      write : iops=109
-    * CONFIG_ATA_LEDS disabled and selected trigger is disk-activity
-      read : iops=325
-      write : iops=108
-    * CONFIG_ATA_LEDS enabled and selected trigger is ata1
-      read : iops=325
-      write : iops=108
-
----
-Aditya Prayoga (1):
-  ARM: mvebu: Enable ARCH_WANT_LIBATA_LEDS in Armada 38x
-
-Daniel Golle (1):
-  libata: add ledtrig support
-
- arch/arm/mach-mvebu/Kconfig |  1 +
- drivers/ata/Kconfig         | 16 +++++++++++++
- drivers/ata/libata-core.c   | 56 +++++++++++++++++++++++++++++++++++++++++++++
- include/linux/libata.h      |  7 ++++++
- 4 files changed, 80 insertions(+)
-
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 2c20599..51f3256 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -68,6 +68,7 @@ config MACH_ARMADA_38X
+ 	select HAVE_SMP
+ 	select MACH_MVEBU_V7
+ 	select PINCTRL_ARMADA_38X
++	select ARCH_WANT_LIBATA_LEDS
+ 	help
+ 	  Say 'Y' here if you want your kernel to support boards based
+ 	  on the Marvell Armada 380/385 SoC with device tree.
 -- 
 2.7.4
