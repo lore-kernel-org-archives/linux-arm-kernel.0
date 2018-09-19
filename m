@@ -1,48 +1,42 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 19 Sep 2018 17:33:01 +0100
-Subject: [PATCH] PCI: remove unnecessary check of device_type == pci
-In-Reply-To: <CAL_JsqKoOJigMkiWqoG77+nstr-6=qiAeTePZkSThcfbVAtEQQ@mail.gmail.com>
-References: <20180829183440.13601-1-robh@kernel.org>
- <20180913145130.GA5756@e107981-ln.cambridge.arm.com>
- <CAL_JsqKoOJigMkiWqoG77+nstr-6=qiAeTePZkSThcfbVAtEQQ@mail.gmail.com>
-Message-ID: <20180919163301.GA21474@e107981-ln.cambridge.arm.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Wed, 19 Sep 2018 19:09:06 +0200
+Subject: [PATCH] ARM: dts: atmel: Fix I2C and SPI bus warnings
+In-Reply-To: <20180913181245.25484-4-robh@kernel.org>
+References: <20180913181245.25484-4-robh@kernel.org>
+Message-ID: <20180919170906.GD2479@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2018 at 12:05:40PM -0700, Rob Herring wrote:
-> On Thu, Sep 13, 2018 at 7:51 AM Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com> wrote:
-> >
-> > On Wed, Aug 29, 2018 at 01:34:40PM -0500, Rob Herring wrote:
-> > > PCI host drivers have already matched on compatible strings, so checking
-> > > device_type is redundant. Also, device_type is considered deprecated for
-> > > FDT though we've still been requiring it for PCI hosts as it is useful
-> > > for finding PCI buses.
-> >
-> > Hi Rob,
-> >
-> > I have no problem with the patch per-se, I can't parse though the second
-> > paragraph, in particular what you mean by "useful for finding PCI
-> > buses".
+On 13/09/2018 13:12:28-0500, Rob Herring wrote:
+> dtc has new checks for I2C and SPI buses. Fix the warnings in node names
+> and unit-addresses.
 > 
-> Device_type is the only generic way we can identify PCI buses which is
-> useful for dtc for example to do PCI binding checks. Maybe we can use
-> the node name which is what I'm doing for cpu nodes, but we've been
-> less consistent about that for PCI.
+> arch/arm/boot/dts/at91-dvk_som60.dtb: Warning (i2c_bus_reg): /ahb/apb/i2c at f0018000/eeprom at 87: I2C bus unit address format error, expected "57"
+> arch/arm/boot/dts/at91-dvk_som60.dtb: Warning (i2c_bus_reg): /ahb/apb/i2c at f0018000/ft5426 at 56: I2C bus unit address format error, expected "38"
+> arch/arm/boot/dts/at91-vinco.dtb: Warning (i2c_bus_reg): /ahb/apb/i2c at f8024000/rtc at 64: I2C bus unit address format error, expected "32"
+> arch/arm/boot/dts/at91sam9260ek.dtb: Warning (spi_bus_reg): /ahb/apb/spi at fffc8000/mtd_dataflash at 0: SPI bus unit address format error, expected "1"
+> arch/arm/boot/dts/at91sam9g20ek_2mmc.dtb: Warning (spi_bus_reg): /ahb/apb/spi at fffc8000/mtd_dataflash at 0: SPI bus unit address format error, expected "1"
+> arch/arm/boot/dts/at91sam9g20ek.dtb: Warning (spi_bus_reg): /ahb/apb/spi at fffc8000/mtd_dataflash at 0: SPI bus unit address format error, expected "1"
+> arch/arm/boot/dts/at91sam9261ek.dtb: Warning (spi_bus_reg): /ahb/apb/spi at fffc8000/tsc2046 at 0: SPI bus unit address format error, expected "2"
 > 
-> >
-> > What about the corresponding dts files ? I suspect we had better leave
-> > them alone lest we can trigger regressions with new dts and older
-> > kernels.
+> Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
+> Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> ---
+> Please apply to the sub-arch tree. The dtc changes haven't landed, but 
+> will for 4.20.
 > 
-> Yes. it will take some time before we can remove from dts files. Or
-> maybe only new ones change.
+>  arch/arm/boot/dts/at91-dvk_su60_somc.dtsi     | 4 ++--
+>  arch/arm/boot/dts/at91-dvk_su60_somc_lcm.dtsi | 4 ++--
+>  arch/arm/boot/dts/at91-vinco.dts              | 2 +-
+>  arch/arm/boot/dts/at91sam9260ek.dts           | 2 +-
+>  arch/arm/boot/dts/at91sam9261ek.dts           | 2 +-
+>  arch/arm/boot/dts/at91sam9g20ek_common.dtsi   | 2 +-
+>  6 files changed, 8 insertions(+), 8 deletions(-)
+> 
+Applied, thanks.
 
-OK, thanks. What about PCI host controllers bindings ? I assume we leave
-the bindings (that enforce device_type) unchanged too.
-
-If Will and Michal have no objections I will queue this patch as-is
-for v4.20.
-
-Thanks,
-Lorenzo
+-- 
+Alexandre Belloni, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
