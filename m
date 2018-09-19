@@ -1,227 +1,89 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Wed, 19 Sep 2018 11:04:06 +0800
-Subject: [PATCH V6 3/3] firmware: imx: add misc svc support
-In-Reply-To: <1537326246-28558-1-git-send-email-aisheng.dong@nxp.com>
-References: <1537326246-28558-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1537326246-28558-4-git-send-email-aisheng.dong@nxp.com>
+From: anshuman.khandual@arm.com (Anshuman Khandual)
+Date: Wed, 19 Sep 2018 09:04:08 +0530
+Subject: [PATCH 1/3] arm64/cpufeatures: Introduce ESR_ELx_SYS64_ISS_RT()
+In-Reply-To: <1537328050-29176-1-git-send-email-anshuman.khandual@arm.com>
+References: <1537328050-29176-1-git-send-email-anshuman.khandual@arm.com>
+Message-ID: <1537328050-29176-2-git-send-email-anshuman.khandual@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SCU MISC SVC support which provides misc control get/set functions.
+Extracting target register from ESR.ISS encoding has already been required
+at multiple instances. Just make it a macro definition and replace all the
+existing use cases.
 
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Anshuman Khandual <anshuman.khandual@arm.com>
 ---
-v5->v6:
- * move into drivers/firmware/imx
- * using structure sc_ipc as handle instread of sc_ipc_t
- * patch title changed
-v4->v5:
- * new patch
----
- drivers/firmware/imx/Makefile  |   2 +-
- drivers/firmware/imx/misc.c    | 106 +++++++++++++++++++++++++++++++++++++++++
- include/soc/imx/scu/sci.h      |   1 +
- include/soc/imx/scu/svc/misc.h |  59 +++++++++++++++++++++++
- 4 files changed, 167 insertions(+), 1 deletion(-)
- create mode 100644 drivers/firmware/imx/misc.c
- create mode 100644 include/soc/imx/scu/svc/misc.h
+ arch/arm64/include/asm/esr.h         | 2 ++
+ arch/arm64/include/asm/kvm_emulate.h | 2 +-
+ arch/arm64/kernel/traps.c            | 8 ++++----
+ 3 files changed, 7 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/firmware/imx/Makefile b/drivers/firmware/imx/Makefile
-index 9b1e2fe..0ac04df 100644
---- a/drivers/firmware/imx/Makefile
-+++ b/drivers/firmware/imx/Makefile
-@@ -1,2 +1,2 @@
- # SPDX-License-Identifier: GPL-2.0
--obj-$(CONFIG_IMX_SCU)	+= imx-scu.o
-+obj-$(CONFIG_IMX_SCU)	+= imx-scu.o misc.o
-diff --git a/drivers/firmware/imx/misc.c b/drivers/firmware/imx/misc.c
-new file mode 100644
-index 0000000..af98710
---- /dev/null
-+++ b/drivers/firmware/imx/misc.c
-@@ -0,0 +1,106 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * Copyright (C) 2016 Freescale Semiconductor, Inc.
-+ * Copyright 2017~2018 NXP
-+ *  Author: Dong Aisheng <aisheng.dong@nxp.com>
-+ *
-+ * File containing client-side RPC functions for the MISC service. These
-+ * function are ported to clients that communicate to the SC.
-+ *
-+ */
-+
-+#include <soc/imx/scu/svc/misc.h>
-+
-+/*
-+ * This type is used to indicate RPC MISC function calls.
-+ */
-+enum misc_func_e {
-+	MISC_FUNC_UNKNOWN = 0,
-+	MISC_FUNC_SET_CONTROL = 1,
-+	MISC_FUNC_GET_CONTROL = 2,
-+	MISC_FUNC_SET_MAX_DMA_GROUP = 4,
-+	MISC_FUNC_SET_DMA_GROUP = 5,
-+	MISC_FUNC_SECO_IMAGE_LOAD = 8,
-+	MISC_FUNC_SECO_AUTHENTICATE = 9,
-+	MISC_FUNC_DEBUG_OUT = 10,
-+	MISC_FUNC_WAVEFORM_CAPTURE = 6,
-+	MISC_FUNC_BUILD_INFO = 15,
-+	MISC_FUNC_UNIQUE_ID = 19,
-+	MISC_FUNC_SET_ARI = 3,
-+	MISC_FUNC_BOOT_STATUS = 7,
-+	MISC_FUNC_BOOT_DONE = 14,
-+	MISC_FUNC_OTP_FUSE_READ = 11,
-+	MISC_FUNC_OTP_FUSE_WRITE = 17,
-+	MISC_FUNC_SET_TEMP = 12,
-+	MISC_FUNC_GET_TEMP = 13,
-+	MISC_FUNC_GET_BOOT_DEV = 16,
-+	MISC_FUNC_GET_BUTTON_STATUS = 18,
-+};
-+
-+struct imx_sc_msg_req_misc_set_ctrl {
-+	struct sc_rpc_msg hdr;
-+	u32 ctrl;
-+	u32 val;
-+	u16 resource;
-+} __packed;
-+
-+struct imx_sc_msg_req_misc_get_ctrl {
-+	struct sc_rpc_msg hdr;
-+	u32 ctrl;
-+	u16 resource;
-+} __packed;
-+
-+struct imx_sc_msg_resp_misc_get_ctrl {
-+	struct sc_rpc_msg hdr;
-+	u32 val;
-+} __packed;
-+
-+sc_err_t sc_misc_set_control(struct sc_ipc *ipc, sc_rsrc_t resource,
-+			     sc_ctrl_t ctrl, uint32_t val)
-+{
-+	struct imx_sc_msg_req_misc_set_ctrl msg;
-+	struct sc_rpc_msg *hdr = &msg.hdr;
-+	int ret;
-+
-+	hdr->ver = SC_RPC_VERSION;
-+	hdr->svc = (uint8_t)SC_RPC_SVC_MISC;
-+	hdr->func = (uint8_t)MISC_FUNC_SET_CONTROL;
-+	hdr->size = 4;
-+
-+	msg.ctrl = ctrl;
-+	msg.val = val;
-+	msg.resource = resource;
-+
-+	ret = sc_call_rpc(ipc, (void *)&msg, false);
-+	if (ret)
-+		return SC_ERR_FAIL;
-+
-+	return (sc_err_t)hdr->func;
-+}
-+
-+sc_err_t sc_misc_get_control(struct sc_ipc *ipc, sc_rsrc_t resource,
-+			     sc_ctrl_t ctrl, uint32_t *val)
-+{
-+	struct imx_sc_msg_req_misc_get_ctrl msg;
-+	struct imx_sc_msg_resp_misc_get_ctrl *resp;
-+	struct sc_rpc_msg *hdr = &msg.hdr;
-+	int ret;
-+
-+	hdr->ver = SC_RPC_VERSION;
-+	hdr->svc = (uint8_t)SC_RPC_SVC_MISC;
-+	hdr->func = (uint8_t)MISC_FUNC_GET_CONTROL;
-+	hdr->size = 3;
-+
-+	msg.ctrl = ctrl;
-+	msg.resource = resource;
-+
-+	ret = sc_call_rpc(ipc, (void *)&msg, false);
-+	if (ret)
-+		return SC_ERR_FAIL;
-+
-+	resp = (struct imx_sc_msg_resp_misc_get_ctrl *)&msg;
-+	if (val != NULL)
-+		*val = resp->val;
-+
-+	return (sc_err_t)resp->hdr.func;
-+}
-diff --git a/include/soc/imx/scu/sci.h b/include/soc/imx/scu/sci.h
-index e0657d3..4a60d70 100644
---- a/include/soc/imx/scu/sci.h
-+++ b/include/soc/imx/scu/sci.h
-@@ -13,4 +13,5 @@
- #include <soc/imx/scu/ipc.h>
- #include <soc/imx/scu/types.h>
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index ce70c3f..cc2d9e7 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -187,6 +187,8 @@
  
-+#include <soc/imx/scu/svc/misc.h>
- #endif /* _SC_SCI_H */
-diff --git a/include/soc/imx/scu/svc/misc.h b/include/soc/imx/scu/svc/misc.h
-new file mode 100644
-index 0000000..1e083fb
---- /dev/null
-+++ b/include/soc/imx/scu/svc/misc.h
-@@ -0,0 +1,59 @@
-+/* SPDX-License-Identifier: GPL-2.0+ */
-+/*
-+ * Copyright (C) 2016 Freescale Semiconductor, Inc.
-+ * Copyright 2017~2018 NXP
-+ *
-+ * Header file containing the public API for the System Controller (SC)
-+ * Miscellaneous (MISC) function.
-+ *
-+ * MISC_SVC (SVC) Miscellaneous Service
-+ *
-+ * Module for the Miscellaneous (MISC) service.
-+ */
-+
-+#ifndef _SC_MISC_API_H
-+#define _SC_MISC_API_H
-+
-+#include <soc/imx/scu/sci.h>
-+
-+/*
-+ * Control Functions
-+ */
-+
-+/*
-+ * This function sets a miscellaneous control value.
-+ *
-+ * @param[in]     ipc         IPC handle
-+ * @param[in]     resource    resource the control is associated with
-+ * @param[in]     ctrl        control to change
-+ * @param[in]     val         value to apply to the control
-+ *
-+ * @return Returns an error code (SC_ERR_NONE = success).
-+ *
-+ * Return errors:
-+ * - SC_PARM if arguments out of range or invalid,
-+ * - SC_ERR_NOACCESS if caller's partition is not the resource owner or parent
-+ *   of the owner
-+ */
-+sc_err_t sc_misc_set_control(struct sc_ipc *ipc, sc_rsrc_t resource,
-+			     sc_ctrl_t ctrl, uint32_t val);
-+
-+/*
-+ * This function gets a miscellaneous control value.
-+ *
-+ * @param[in]     ipc         IPC handle
-+ * @param[in]     resource    resource the control is associated with
-+ * @param[in]     ctrl        control to get
-+ * @param[out]    val         pointer to return the control value
-+ *
-+ * @return Returns an error code (SC_ERR_NONE = success).
-+ *
-+ * Return errors:
-+ * - SC_PARM if arguments out of range or invalid,
-+ * - SC_ERR_NOACCESS if caller's partition is not the resource owner or parent
-+ *   of the owner
-+ */
-+sc_err_t sc_misc_get_control(struct sc_ipc *ipc, sc_rsrc_t resource,
-+			     sc_ctrl_t ctrl, uint32_t *val);
-+
-+#endif /* _SC_MISC_API_H */
+ #define ESR_ELx_SYS64_ISS_SYS_OP_MASK	(ESR_ELx_SYS64_ISS_SYS_MASK | \
+ 					 ESR_ELx_SYS64_ISS_DIR_MASK)
++#define ESR_ELx_SYS64_ISS_RT(esr) \
++	(((esr) & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT)
+ /*
+  * User space cache operations have the following sysreg encoding
+  * in System instructions.
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index 6106a85..2124787 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -335,7 +335,7 @@ static inline bool kvm_vcpu_dabt_isextabt(const struct kvm_vcpu *vcpu)
+ static inline int kvm_vcpu_sys_get_rt(struct kvm_vcpu *vcpu)
+ {
+ 	u32 esr = kvm_vcpu_get_hsr(vcpu);
+-	return (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
++	return ESR_ELx_SYS64_ISS_RT(esr);
+ }
+ 
+ static inline unsigned long kvm_vcpu_get_mpidr_aff(struct kvm_vcpu *vcpu)
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 039e9ff..15276b2 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -437,7 +437,7 @@ void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused)
+ static void user_cache_maint_handler(unsigned int esr, struct pt_regs *regs)
+ {
+ 	unsigned long address;
+-	int rt = (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
++	int rt = ESR_ELx_SYS64_ISS_RT(esr);
+ 	int crm = (esr & ESR_ELx_SYS64_ISS_CRM_MASK) >> ESR_ELx_SYS64_ISS_CRM_SHIFT;
+ 	int ret = 0;
+ 
+@@ -472,7 +472,7 @@ static void user_cache_maint_handler(unsigned int esr, struct pt_regs *regs)
+ 
+ static void ctr_read_handler(unsigned int esr, struct pt_regs *regs)
+ {
+-	int rt = (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
++	int rt = ESR_ELx_SYS64_ISS_RT(esr);
+ 	unsigned long val = arm64_ftr_reg_user_value(&arm64_ftr_reg_ctrel0);
+ 
+ 	pt_regs_write_reg(regs, rt, val);
+@@ -482,7 +482,7 @@ static void ctr_read_handler(unsigned int esr, struct pt_regs *regs)
+ 
+ static void cntvct_read_handler(unsigned int esr, struct pt_regs *regs)
+ {
+-	int rt = (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
++	int rt = ESR_ELx_SYS64_ISS_RT(esr);
+ 
+ 	pt_regs_write_reg(regs, rt, arch_counter_get_cntvct());
+ 	arm64_skip_faulting_instruction(regs, AARCH64_INSN_SIZE);
+@@ -490,7 +490,7 @@ static void cntvct_read_handler(unsigned int esr, struct pt_regs *regs)
+ 
+ static void cntfrq_read_handler(unsigned int esr, struct pt_regs *regs)
+ {
+-	int rt = (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
++	int rt = ESR_ELx_SYS64_ISS_RT(esr);
+ 
+ 	pt_regs_write_reg(regs, rt, arch_timer_get_rate());
+ 	arm64_skip_faulting_instruction(regs, AARCH64_INSN_SIZE);
 -- 
 2.7.4
