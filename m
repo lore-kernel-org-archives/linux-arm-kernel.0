@@ -1,31 +1,49 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Wed, 19 Sep 2018 10:54:10 +0800
-Subject: [PATCH v2 00/22] Unify MediaTek pinctrl in preparation for
- MT8183 and MT6765
-In-Reply-To: <CACRpkdZtVBjYGs5C7-HWEyX7f7pnCqvnRYBH=fFmLKhN4FGymA@mail.gmail.com>
-References: <cover.1536404280.git.sean.wang@mediatek.com>
- <CACRpkdZtVBjYGs5C7-HWEyX7f7pnCqvnRYBH=fFmLKhN4FGymA@mail.gmail.com>
-Message-ID: <1537325650.572.9.camel@mtkswgap22>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Wed, 19 Sep 2018 11:04:03 +0800
+Subject: [PATCH V6 0/3] soc: imx: add scu firmware api support
+Message-ID: <1537326246-28558-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-09-18 at 15:07 -0700, Linus Walleij wrote:
-> On Sat, Sep 8, 2018 at 4:07 AM <sean.wang@mediatek.com> wrote:
-> 
-> > v2 and changes since v1:
-> 
-> I had trouble applying the last patches in the series so I applied
-> all on an immutable branch (ib-mtk) then merged that into devel
-> and added a patch on top to fix up some GPIO includes (just sent).
-> 
-> Please check the result!
-> 
+Unlike the former i.MX Architectures, the new generation i.MX8 SoCs
+(e.g. MX8QXP and MX8QM) contain a system controller which runs on a
+dedicated Cortex-M core to provide power, clock, Pad, and resource
+management. Communication between the host processor running
+an OS and the system controller happens through a SCU protocol.
+This patchset adds the SCU APIs which is implemented based on MU
+and will be used by different system components.
 
-Sure, I'll take a look and and test on the devel branch.
+It mainly consists of below parts:
+1) SCU IPC
+   Basic IPC mechanism implemention based on mailbox which is used
+   for communication between AP and SCU firmware.
+2) SCU IPC Service API
 
-On the top, I'll add a fix for the issue recently reported by kbuild
-test robot about implicit declaration and a new MT6765 driver based
-on the series.
+Dong Aisheng (3):
+  dt-bindings: arm: fsl: add scu binding doc
+  firmware: imx: add SCU firmware driver support
+  firmware: imx: add misc svc support
 
-> Yours,
-> Linus Walleij
+ .../devicetree/bindings/arm/freescale/fsl,scu.txt  | 183 ++++++
+ drivers/firmware/Kconfig                           |   1 +
+ drivers/firmware/imx/Kconfig                       |  11 +
+ drivers/firmware/imx/Makefile                      |   2 +
+ drivers/firmware/imx/imx-scu.c                     | 223 ++++++++
+ drivers/firmware/imx/misc.c                        | 106 ++++
+ include/soc/imx/scu/ipc.h                          |  59 ++
+ include/soc/imx/scu/sci.h                          |  17 +
+ include/soc/imx/scu/svc/misc.h                     |  59 ++
+ include/soc/imx/scu/types.h                        | 636 +++++++++++++++++++++
+ 10 files changed, 1297 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+ create mode 100644 drivers/firmware/imx/Kconfig
+ create mode 100644 drivers/firmware/imx/Makefile
+ create mode 100644 drivers/firmware/imx/imx-scu.c
+ create mode 100644 drivers/firmware/imx/misc.c
+ create mode 100644 include/soc/imx/scu/ipc.h
+ create mode 100644 include/soc/imx/scu/sci.h
+ create mode 100644 include/soc/imx/scu/svc/misc.h
+ create mode 100644 include/soc/imx/scu/types.h
+
+-- 
+2.7.4
