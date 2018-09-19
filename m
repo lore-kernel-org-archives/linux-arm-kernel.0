@@ -1,55 +1,40 @@
 From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Wed, 19 Sep 2018 15:27:43 +0200
-Subject: [PATCH v2 1/7] dt-bindings: mfd: Add ST Multi-Function eXpander
- (STMFX) core bindings
+Date: Wed, 19 Sep 2018 15:27:49 +0200
+Subject: [PATCH v2 7/7] ARM: dts: stm32: add orange and blue leds on
+ stm32746g-eval
 In-Reply-To: <1537363669-25991-1-git-send-email-amelie.delaunay@st.com>
 References: <1537363669-25991-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <1537363669-25991-2-git-send-email-amelie.delaunay@st.com>
+Message-ID: <1537363669-25991-8-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation of device tree bindings for the
-STMicroelectronics Multi-Function eXpander (STMFX) MFD core.
+Orange (LD2) and blue (LD4) leds on stm32746g-eval are connected on
+STMFX gpio expander, offset 17 and 19.
 
 Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 ---
- Documentation/devicetree/bindings/mfd/stmfx.txt | 28 +++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/stmfx.txt
+ arch/arm/boot/dts/stm32746g-eval.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mfd/stmfx.txt b/Documentation/devicetree/bindings/mfd/stmfx.txt
-new file mode 100644
-index 0000000..21cf798
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/stmfx.txt
-@@ -0,0 +1,28 @@
-+STMicroelectonics Multi-Function eXpander (STMFX) Core bindings
-+
-+ST Multi-Function eXpander (STMFX) is a slave controller using I2C for
-+communication with the main MCU. Its main features are GPIO expansion, main
-+MCU IDD measurement (IDD is the amount of current that flows through VDD) and
-+resistive touchscreen controller.
-+
-+Required properties:
-+- compatible: should be "st,stmfx-0300".
-+- reg: I2C slave address of the device.
-+- interrupt-parent: phandle of the STMFX parent interrupt controller.
-+- interrutps: interrupt specifier triggered by MFX_IRQ_OUT signal.
-+
-+Optional properties:
-+- drive-open-drain: configure MFX_IRQ_OUT as open drain.
-+- vdd-supply: phandle of the regulator supplying STMFX.
-+
-+Example:
-+
-+	stmfx: stmfx at 42 {
-+		compatible = "st,stmfx-0300";
-+		reg = <0x42>;
-+		interrupts = <8 IRQ_TYPE_EDGE_RISING>;
-+		interrupt-parent = <&gpioi>;
-+		vdd-supply = <&v3v3>;
-+	};
-+
-+Please refer to ../pinctrl/pinctrl-stmfx.txt for STMFX GPIO expander function bindings.
+diff --git a/arch/arm/boot/dts/stm32746g-eval.dts b/arch/arm/boot/dts/stm32746g-eval.dts
+index b86ad83..a5fa73f 100644
+--- a/arch/arm/boot/dts/stm32746g-eval.dts
++++ b/arch/arm/boot/dts/stm32746g-eval.dts
+@@ -69,9 +69,15 @@
+ 			gpios = <&gpiof 10 1>;
+ 			linux,default-trigger = "heartbeat";
+ 		};
++		orange {
++			gpios = <&stmfx_pinctrl 17 1>;
++		};
+ 		red {
+ 			gpios = <&gpiob 7 1>;
+ 		};
++		blue {
++			gpios = <&stmfx_pinctrl 19 1>;
++		};
+ 	};
+ 
+ 	gpio_keys {
 -- 
 2.7.4
