@@ -1,61 +1,72 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 19 Sep 2018 11:21:42 +0200
-Subject: [PATCH V6] ARM: shmobile: Rework the PMIC IRQ line quirk
-In-Reply-To: <20180919091330.yxnehm2fy5llb2bb@verge.net.au>
-References: <20180918122340.5478-1-marek.vasut+renesas@gmail.com>
- <CAMuHMdVOMZ+o4osu7zGJm3YBQ-Mxest1kkJGgiH53joW1i__jg@mail.gmail.com>
- <20180919091330.yxnehm2fy5llb2bb@verge.net.au>
-Message-ID: <7d214a60-e703-c53d-5c98-5da29c34650f@gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 19 Sep 2018 12:26:40 +0300
+Subject: [PATCH v3 RESEND 0/4] clk: clk: Add functions to save/restore
+ clock context en-masse
+In-Reply-To: <2b898faf-ca7d-1ef9-f862-9a3f05717884@ti.com>
+References: <1536043778-2232-1-git-send-email-j-keerthy@ti.com>
+ <2b898faf-ca7d-1ef9-f862-9a3f05717884@ti.com>
+Message-ID: <ff898a7e-5fef-2057-d8ea-7e0c234c3ab6@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19/2018 11:13 AM, Simon Horman wrote:
-> On Tue, Sep 18, 2018 at 02:52:53PM +0200, Geert Uytterhoeven wrote:
->> On Tue, Sep 18, 2018 at 2:23 PM Marek Vasut <marek.vasut@gmail.com> wrote:
->>> Rather than hard-coding the quirk topology, which stopped scaling,
->>> parse the information from DT. The code looks for all compatible
->>> PMICs -- da9063 and da9210 -- and checks if their IRQ line is tied
->>> to the same pin. If so, the code sends a matching sequence to the
->>> PMIC to deassert the IRQ.
->>>
->>> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
->>> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
->>> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
->>> Cc: Simon Horman <horms+renesas@verge.net.au>
->>> Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
->>> Cc: linux-renesas-soc at vger.kernel.org
->>> Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
->>> Tested-by: Geert Uytterhoeven <geert+renesas@glider.be> (on Koelsch)
->>> ---
->>> V2: - Replace the DT shared IRQ check loop with memcmp()
->>>     - Send the I2C message to deassert the IRQ line to all PMICs
->>>       in the list with shared IRQ line instead of just one
->>>     - Add comment that this works only in case all the PMICs are
->>>       on the same I2C bus
->>> V3: - Drop the addr = 0x00 init
->>>     - Drop reinit of argsa in rcar_gen2_regulator_quirk
->>> V4: - Squash regulator_quirk on single line
->>>     - Drop !np check in for_each_matching_node_and_match()
->>>     - Use argsa in of_irq_parse_one
->>> V5: - Check kzalloc failure
->>>     - Rename da...._msgs to da...._msg
->>>     - Don't reinit quirk->shared
->>> V6: - Skip invalid entries instead of aborting on them
+On 19/09/18 10:50, Keerthy wrote:
+> 
+> 
+> On Tuesday 04 September 2018 12:19 PM, Keerthy wrote:
+>> Deep enough power saving mode can result into losing context of the clock
+>> registers also, and they need to be restored once coming back from the power
+>> saving mode. Hence add functions to save/restore clock context.
+> 
+> A gentle ping on this series.
+
+Stephen,
+
+what is your take on this? I can pick this up as part of my changes for 
+4.20 and send a pull-req, however it contains changes to clock core so I 
+am somewhat hesitant to do that.
+
+-Tero
+
+> 
 >>
->> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> 
-> Thanks, applied for v4.20.
-> 
-> Marek, these days checkpatch complains if the author of the patch does not
-> have a signed offline, and the inconsistency between your
-> from and Sign-off the email address trips that check.
-> 
-> Could you consider either a) enhancing checkpatch or b) using
-> the same address twice? No need to take any action for this patch.
+>> Tested for DS0 on am437x-gp-evm
+>>
+>> Based on top of linux-next
+>>
+>> Resend Series:
+>>
+>>    * Rebased on top of Linux 4.19-rc2
+>>    * Added Tony's Ack.
+>>
+>> Changes in v2:
+>>
+>>          * Renamed clk_dflt_restore to clk_gate_restore_context
+>>
+>> Changes in v3: Corrected the e-mail address of linux-omap list
+>>
+>> Keerthy (2):
+>>    clk: clk: Add clk_gate_restore_context function
+>>    ti: pm33xx: Save/restore clk context based on enable_off_mode setting
+>>
+>> Russ Dill (2):
+>>    clk: clk: Add functions to save/restore clock context en-masse
+>>    clk: ti: Add functions to save/restore clk context
+>>
+>>   arch/arm/mach-omap2/pm33xx-core.c    |  15 +++++
+>>   drivers/clk/clk.c                    |  93 ++++++++++++++++++++++++++
+>>   drivers/clk/ti/clock.h               |   2 +
+>>   drivers/clk/ti/divider.c             |  36 ++++++++++
+>>   drivers/clk/ti/dpll.c                |   6 ++
+>>   drivers/clk/ti/dpll3xxx.c            | 124 +++++++++++++++++++++++++++++++++++
+>>   drivers/clk/ti/gate.c                |   3 +
+>>   drivers/clk/ti/mux.c                 |  29 ++++++++
+>>   drivers/soc/ti/pm33xx.c              |  13 ++++
+>>   include/linux/clk-provider.h         |   9 +++
+>>   include/linux/clk.h                  |  25 +++++++
+>>   include/linux/clk/ti.h               |   6 ++
+>>   include/linux/platform_data/pm33xx.h |   1 +
+>>   13 files changed, 362 insertions(+)
+>>
 
-Sure, do you know if there's some tweak to git config , so git
-send-email uses the m.v+foo@ From address ?
-
--- 
-Best regards,
-Marek Vasut
+--
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
