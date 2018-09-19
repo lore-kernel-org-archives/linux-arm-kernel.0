@@ -1,37 +1,46 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Wed, 19 Sep 2018 11:31:40 -0400
-Subject: [PATCH] MAINTAINERS: Remove self from Broadcom SoCs
-Message-ID: <1537371100-8245-1-git-send-email-jon.mason@broadcom.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Wed, 19 Sep 2018 16:32:15 +0100
+Subject: [PATCH 0/4] Add HiSilicon Hi3670 SoC and HiKey970 board
+In-Reply-To: <20180810175339.25421-1-manivannan.sadhasivam@linaro.org>
+References: <20180810175339.25421-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <5BA26BFF.1020906@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm leaving Broadcom, and will no longer have access to hardware and
-documentation necessary to be effective in a maintainership role.
+Hi Manivannan,
 
-Signed-off-by: Jon Mason <jon.mason@broadcom.com>
----
- MAINTAINERS | 2 --
- 1 file changed, 2 deletions(-)
+On 2018/8/10 18:53, Manivannan Sadhasivam wrote:
+> This patchset adds support for Hi3670 SoC and HiKey970 board. Hi3670 SoC
+> is very similar to the Hi3660 SoC with additional NPU support. For now,
+> only UART6 has been enabled which is configured by the bootloader for
+> console support.
+> 
+> HiKey970 board is one of the 96Boards Consumer Edition and AI platform
+> based on the Hi3670 SoC.
+> 
+> With this patchset, the Hikey970 board is able to boot into ramdisk with
+> 8 cores.
+> 
+> Thanks,
+> Mani
+> 
+> Manivannan Sadhasivam (4):
+>   dt-bindings: arm: hisilicon: Add binding for Hi3670 SoC
+>   arm64: dts: Add devicetree for Hisilicon Hi3670 SoC
+>   dt-bindings: arm: hisilicon: Add binding for HiKey970 board
+>   arm64: dts: Add devicetree support for HiKey970 board
+> 
+>  .../bindings/arm/hisilicon/hisilicon.txt      |   8 +
+>  arch/arm64/boot/dts/hisilicon/Makefile        |   1 +
+>  .../boot/dts/hisilicon/hi3670-hikey970.dts    |  35 ++++
+>  arch/arm64/boot/dts/hisilicon/hi3670.dtsi     | 162 ++++++++++++++++++
+>  4 files changed, 206 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/hisilicon/hi3670-hikey970.dts
+>  create mode 100644 arch/arm64/boot/dts/hisilicon/hi3670.dtsi
+> 
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 4ece30f15777..d063c605074e 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2886,7 +2886,6 @@ F:	arch/mips/include/asm/mach-bcm47xx/*
- BROADCOM BCM5301X ARM ARCHITECTURE
- M:	Hauke Mehrtens <hauke@hauke-m.de>
- M:	Rafa? Mi?ecki <zajec5@gmail.com>
--M:	Jon Mason <jonmason@broadcom.com>
- M:	bcm-kernel-feedback-list at broadcom.com
- L:	linux-arm-kernel at lists.infradead.org
- S:	Maintained
-@@ -3024,7 +3023,6 @@ F:	drivers/net/ethernet/broadcom/genet/
- BROADCOM IPROC ARM ARCHITECTURE
- M:	Ray Jui <rjui@broadcom.com>
- M:	Scott Branden <sbranden@broadcom.com>
--M:	Jon Mason <jonmason@broadcom.com>
- M:	bcm-kernel-feedback-list at broadcom.com
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- T:	git git://github.com/broadcom/cygnus-linux.git
--- 
-2.7.4
+Thanks!
+Fine to me and applied the series to the hisilicon dts tree.
+
+Best Regards,
+Wei
