@@ -1,70 +1,114 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Wed, 19 Sep 2018 06:10:16 +0000
-Subject: [PATCH 0/4] Add i.MX6ULZ SoC support
-In-Reply-To: <e82e2894-2a0d-0084-913c-b7c6d966fc13@i2se.com>
-References: <1537251548-27845-1-git-send-email-Anson.Huang@nxp.com>
- <e82e2894-2a0d-0084-913c-b7c6d966fc13@i2se.com>
-Message-ID: <DB3PR0402MB39162EA4FD240720276A4482F51C0@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+From: pihsun@chromium.org (Peter Shih)
+Date: Wed, 19 Sep 2018 14:29:27 +0800
+Subject: [PATCH v3] spi: mediatek: Don't modify spi_transfer when transfer.
+In-Reply-To: <20180918161504.GM2471@sirena.org.uk>
+References: <20180918161504.GM2471@sirena.org.uk>
+Message-ID: <20180919062928.238917-1-pihsun@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Stefan
+Mediatek SPI driver modifies some fields (tx_buf, rx_buf, len, tx_dma,
+rx_dma) of the spi_transfer* passed in when doing transfer_one and in
+interrupt handler. This is somewhat unexpected, and there are some
+caller (e.g. Cr50 spi driver) that reuse the spi_transfer for multiple
+messages. Add a field to record how many bytes have been transferred,
+and calculate the right len / buffer based on it instead.
 
-Anson Huang
-Best Regards!
+Signed-off-by: Pi-Hsun Shih <pihsun@chromium.org>
+---
+ drivers/spi/spi-mt65xx.c | 37 +++++++++++++++++++++----------------
+ 1 file changed, 21 insertions(+), 16 deletions(-)
 
-
-> -----Original Message-----
-> From: Stefan Wahren <stefan.wahren@i2se.com>
-> Sent: Tuesday, September 18, 2018 3:38 PM
-> To: Anson Huang <anson.huang@nxp.com>; robh+dt at kernel.org;
-> mark.rutland at arm.com; shawnguo at kernel.org; s.hauer at pengutronix.de;
-> kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>;
-> linux at armlinux.org.uk; mturquette at baylibre.com; sboyd at kernel.org; Jacky
-> Bai <ping.bai@nxp.com>; A.s. Dong <aisheng.dong@nxp.com>;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org; linux-clk at vger.kernel.org
-> Cc: dl-linux-imx <linux-imx@nxp.com>
-> Subject: Re: [PATCH 0/4] Add i.MX6ULZ SoC support
-> 
-> Hi Anson,
-> 
-> Am 18.09.2018 um 08:19 schrieb Anson Huang:
-> > This patch set adds i.MX6ULZ SoC support, i.MX6ULZ is a new SoC of
-> > i.MX6 family, compared to i.MX6ULL, it removes below modules:
-> >
-> >     - UART5/UART6/UART7/UART8;
-> >     - PWM5/PWM6/PWM7/PWM8;
-> >     - eCSPI3/eCSPI4;
-> >     - CAN1/CAN2;
-> >     - FEC1/FEC2;
-> >     - I2C3/I2C4;
-> >     - EPIT2;
-> >     - LCDIF;
-> >     - GPT2;
-> >     - TSC;
-> >
-> > And i.MX6ULZ has same soc_id as i.MX6ULL, but SRC_SBMR2 bit[6] is to
-> > differentiate i.MX6ULZ from i.MX6ULL, 1'b1 means i.MX6ULZ and
-> > 1'b0 means i.MX6ULL. i.MX6ULZ reuse most of i.MX6UL/i.MX6ULL code,
-> > just add the new CPU type and remove those non-exist modules from dtb.
-> >
-> > Anson Huang (4):
-> >   ARM: dts: imx: add i.mx6ulz and i.mx6ulz 14x14 evk support
-> >   ARM: imx: add i.mx6ulz msl support
-> >   clk: imx6ul: add i.mx6ulz support
-> >   dt-bindings: arm: add compatible for i.MX6ULZ 14x14 EVK board
-> >
-> >
-> 
-> i recommend the following patch order:
-> ARM: imx: add i.mx6ulz msl support
-> clk: imx6ul: add i.mx6ulz support
-> dt-bindings: arm: add compatible for i.MX6ULZ 14x14 EVK board
-> ARM: dts: imx: add i.mx6ulz and i.mx6ulz 14x14 evk support
-> 
-> Stefan
+diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
+index 86bf45667a040..3dc31627c6558 100644
+--- a/drivers/spi/spi-mt65xx.c
++++ b/drivers/spi/spi-mt65xx.c
+@@ -98,6 +98,7 @@ struct mtk_spi {
+ 	struct clk *parent_clk, *sel_clk, *spi_clk;
+ 	struct spi_transfer *cur_transfer;
+ 	u32 xfer_len;
++	u32 num_xfered;
+ 	struct scatterlist *tx_sgl, *rx_sgl;
+ 	u32 tx_sgl_len, rx_sgl_len;
+ 	const struct mtk_spi_compatible *dev_comp;
+@@ -385,6 +386,7 @@ static int mtk_spi_fifo_transfer(struct spi_master *master,
  
-Thanks, I resend the V2 patch set with the patch order you recommended.
-
-Anson.
+ 	mdata->cur_transfer = xfer;
+ 	mdata->xfer_len = min(MTK_SPI_MAX_FIFO_SIZE, xfer->len);
++	mdata->num_xfered = 0;
+ 	mtk_spi_prepare_transfer(master, xfer);
+ 	mtk_spi_setup_packet(master);
+ 
+@@ -415,6 +417,7 @@ static int mtk_spi_dma_transfer(struct spi_master *master,
+ 	mdata->tx_sgl_len = 0;
+ 	mdata->rx_sgl_len = 0;
+ 	mdata->cur_transfer = xfer;
++	mdata->num_xfered = 0;
+ 
+ 	mtk_spi_prepare_transfer(master, xfer);
+ 
+@@ -482,7 +485,7 @@ static int mtk_spi_setup(struct spi_device *spi)
+ 
+ static irqreturn_t mtk_spi_interrupt(int irq, void *dev_id)
+ {
+-	u32 cmd, reg_val, cnt, remainder;
++	u32 cmd, reg_val, cnt, remainder, len;
+ 	struct spi_master *master = dev_id;
+ 	struct mtk_spi *mdata = spi_master_get_devdata(master);
+ 	struct spi_transfer *trans = mdata->cur_transfer;
+@@ -497,36 +500,38 @@ static irqreturn_t mtk_spi_interrupt(int irq, void *dev_id)
+ 		if (trans->rx_buf) {
+ 			cnt = mdata->xfer_len / 4;
+ 			ioread32_rep(mdata->base + SPI_RX_DATA_REG,
+-				     trans->rx_buf, cnt);
++				     trans->rx_buf + mdata->num_xfered, cnt);
+ 			remainder = mdata->xfer_len % 4;
+ 			if (remainder > 0) {
+ 				reg_val = readl(mdata->base + SPI_RX_DATA_REG);
+-				memcpy(trans->rx_buf + (cnt * 4),
+-					&reg_val, remainder);
++				memcpy(trans->rx_buf +
++					mdata->num_xfered +
++					(cnt * 4),
++					&reg_val,
++					remainder);
+ 			}
+ 		}
+ 
+-		trans->len -= mdata->xfer_len;
+-		if (!trans->len) {
++		mdata->num_xfered += mdata->xfer_len;
++		if (mdata->num_xfered == trans->len) {
+ 			spi_finalize_current_transfer(master);
+ 			return IRQ_HANDLED;
+ 		}
+ 
+-		if (trans->tx_buf)
+-			trans->tx_buf += mdata->xfer_len;
+-		if (trans->rx_buf)
+-			trans->rx_buf += mdata->xfer_len;
+-
+-		mdata->xfer_len = min(MTK_SPI_MAX_FIFO_SIZE, trans->len);
++		len = trans->len - mdata->num_xfered;
++		mdata->xfer_len = min(MTK_SPI_MAX_FIFO_SIZE, len);
+ 		mtk_spi_setup_packet(master);
+ 
+-		cnt = trans->len / 4;
+-		iowrite32_rep(mdata->base + SPI_TX_DATA_REG, trans->tx_buf, cnt);
++		cnt = len / 4;
++		iowrite32_rep(mdata->base + SPI_TX_DATA_REG,
++				trans->tx_buf + mdata->num_xfered, cnt);
+ 
+-		remainder = trans->len % 4;
++		remainder = len % 4;
+ 		if (remainder > 0) {
+ 			reg_val = 0;
+-			memcpy(&reg_val, trans->tx_buf + (cnt * 4), remainder);
++			memcpy(&reg_val,
++				trans->tx_buf + (cnt * 4) + mdata->num_xfered,
++				remainder);
+ 			writel(reg_val, mdata->base + SPI_TX_DATA_REG);
+ 		}
+ 
+-- 
+2.19.0.rc2.392.g5ba43deb5a-goog
