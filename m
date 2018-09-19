@@ -1,38 +1,35 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 19 Sep 2018 11:59:41 +0100
-Subject: [PATCH] arm64: cpu_errata: Remove ARM64_MISMATCHED_CACHE_LINE_SIZE
-In-Reply-To: <20180919105615.GG25094@arm.com>
-References: <1537353681-19677-1-git-send-email-will.deacon@arm.com>
- <233e9a8d-b3ef-9b9c-208b-f0fd9ea4e3fe@arm.com>
- <20180919105615.GG25094@arm.com>
-Message-ID: <5b097208-bb52-a7ba-fd0f-a1e1e46502a3@arm.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Wed, 19 Sep 2018 13:15:53 +0200
+Subject: [PATCH v7 2/7] edac: synps: Add platform specific structures for
+ ddrc controller
+In-Reply-To: <DM6PR02MB5227F5B1B329C903BA64A27CC11C0@DM6PR02MB5227.namprd02.prod.outlook.com>
+References: <1537194305-9243-1-git-send-email-manish.narani@xilinx.com>
+ <1537194305-9243-3-git-send-email-manish.narani@xilinx.com>
+ <20180918075522.GC22202@nazgul.tnic>
+ <DM6PR02MB5227F5B1B329C903BA64A27CC11C0@DM6PR02MB5227.namprd02.prod.outlook.com>
+Message-ID: <20180919111553.GA9140@nazgul.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19/2018 11:56 AM, Will Deacon wrote:
-> On Wed, Sep 19, 2018 at 11:53:43AM +0100, Suzuki K Poulose wrote:
->> On 09/19/2018 11:41 AM, Will Deacon wrote:
->>> There's no need to treat mismatched cache-line sizes reported by CTR_EL0
->>> differently to any other mismatched fields that we treat as "STRICT" in
->>> the cpufeature code. In both cases we need to trap and emulate EL0
->>> accesses to the register, so drop ARM64_MISMATCHED_CACHE_LINE_SIZE and
->>> rely on ARM64_MISMATCHED_CACHE_TYPE instead.
->>
->> The only reason was to avoid trapping the kernel accesses of CTR_EL0
->> for cache line sizes if there were no differences. If we are ok with
->> that, I am fine with the patch.
-> 
-> It's not a "trap" as such though, is it? We just load the safe val and
+On Wed, Sep 19, 2018 at 05:14:51AM +0000, Manish Narani wrote:
+> > So I'm going to stop reviewing this patchset until you go through the old review
+> > round again and make sure you've incorporated *all* review feedback and
+> > haven't forgotten some, like the one above.
+> > 
+> Okay, I will double check again for the comments from previous review
+> and rectify the same in v8. Can you please review the remaining
+> patches so that I can accommodate any changes for them in v8?
 
-Oh, yes, it is not a "trap" as such.
+Read again what I said: "I'm going to stop reviewing this patchset until
+you go through the old review..." You can go through the old review and
+check your v7. If you haven't missed anything, lemme know and I'll look
+at the rest.
 
-> return that. I think that makes more sense, because if somebody uses
-> read_ctr to try and read something like IDC or DIC, they probably want
-> a sanitised copy on a mismatch.
+If you have, I'll wait for v8.
 
-Yes, true. And there is a indeed a helper for fetching the raw values on
-the current PE.
+-- 
+Regards/Gruss,
+    Boris.
 
-FWIW,
-
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+ECO tip #101: Trim your mails when you reply.
+--
