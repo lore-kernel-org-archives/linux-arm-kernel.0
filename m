@@ -1,51 +1,58 @@
-From: tudor.ambarus@microchip.com (Tudor Ambarus)
-Date: Wed, 19 Sep 2018 10:44:54 +0300
-Subject: [PATCH v2] mtd: rawnand: atmel: Fix potential NULL pointer
- dereference
-In-Reply-To: <20180918135555.GA18114@embeddedor.com>
-References: <20180918135555.GA18114@embeddedor.com>
-Message-ID: <61472393-b699-45b4-6d74-cfa774669ad2@microchip.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Wed, 19 Sep 2018 13:20:59 +0530
+Subject: [PATCH v3 RESEND 0/4] clk: clk: Add functions to save/restore
+ clock context en-masse
+In-Reply-To: <1536043778-2232-1-git-send-email-j-keerthy@ti.com>
+References: <1536043778-2232-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <2b898faf-ca7d-1ef9-f862-9a3f05717884@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 09/18/2018 04:55 PM, Gustavo A. R. Silva wrote:
-> There is a potential execution path in which function
-> of_find_compatible_node() returns NULL. In such a case,
-> we end up having a NULL pointer dereference when accessing
-> pointer *nfc_np* in function of_clk_get().
-> 
-> So, we better don't take any chances and fix this by null
-> checking pointer *nfc_np* before calling of_clk_get().
-> 
-> Addresses-Coverity-ID: 1473052 ("Dereference null return value")
-> Fixes: f88fc122cc34 ("mtd: nand: Cleanup/rework the atmel_nand driver")
-> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
+On Tuesday 04 September 2018 12:19 PM, Keerthy wrote:
+> Deep enough power saving mode can result into losing context of the clock
+> registers also, and they need to be restored once coming back from the power
+> saving mode. Hence add functions to save/restore clock context.
 
-Acked-by: Tudor Ambarus <tudor.ambarus@microchip.com>
+A gentle ping on this series.
 
-> ---
+> 
+> Tested for DS0 on am437x-gp-evm
+> 
+> Based on top of linux-next
+> 
+> Resend Series:
+> 
+>   * Rebased on top of Linux 4.19-rc2
+>   * Added Tony's Ack.
+> 
 > Changes in v2:
->  - Add Fixes tag to the commit log.
->  - Remove blank line before null checking nfc_np.
 > 
->  drivers/mtd/nand/raw/atmel/nand-controller.c | 4 ++++
->  1 file changed, 4 insertions(+)
+>         * Renamed clk_dflt_restore to clk_gate_restore_context
 > 
-> diff --git a/drivers/mtd/nand/raw/atmel/nand-controller.c b/drivers/mtd/nand/raw/atmel/nand-controller.c
-> index a38633a..5bfbe97 100644
-> --- a/drivers/mtd/nand/raw/atmel/nand-controller.c
-> +++ b/drivers/mtd/nand/raw/atmel/nand-controller.c
-> @@ -2034,6 +2034,10 @@ atmel_hsmc_nand_controller_legacy_init(struct atmel_hsmc_nand_controller *nc)
->  	nand_np = dev->of_node;
->  	nfc_np = of_find_compatible_node(dev->of_node, NULL,
->  					 "atmel,sama5d3-nfc");
-> +	if (!nfc_np) {
-> +		dev_err(dev, "Could not find device node for sama5d3-nfc\n");
-> +		return -ENODEV;
-> +	}
->  
->  	nc->clk = of_clk_get(nfc_np, 0);
->  	if (IS_ERR(nc->clk)) {
+> Changes in v3: Corrected the e-mail address of linux-omap list 
+> 
+> Keerthy (2):
+>   clk: clk: Add clk_gate_restore_context function
+>   ti: pm33xx: Save/restore clk context based on enable_off_mode setting
+> 
+> Russ Dill (2):
+>   clk: clk: Add functions to save/restore clock context en-masse
+>   clk: ti: Add functions to save/restore clk context
+> 
+>  arch/arm/mach-omap2/pm33xx-core.c    |  15 +++++
+>  drivers/clk/clk.c                    |  93 ++++++++++++++++++++++++++
+>  drivers/clk/ti/clock.h               |   2 +
+>  drivers/clk/ti/divider.c             |  36 ++++++++++
+>  drivers/clk/ti/dpll.c                |   6 ++
+>  drivers/clk/ti/dpll3xxx.c            | 124 +++++++++++++++++++++++++++++++++++
+>  drivers/clk/ti/gate.c                |   3 +
+>  drivers/clk/ti/mux.c                 |  29 ++++++++
+>  drivers/soc/ti/pm33xx.c              |  13 ++++
+>  include/linux/clk-provider.h         |   9 +++
+>  include/linux/clk.h                  |  25 +++++++
+>  include/linux/clk/ti.h               |   6 ++
+>  include/linux/platform_data/pm33xx.h |   1 +
+>  13 files changed, 362 insertions(+)
 > 
