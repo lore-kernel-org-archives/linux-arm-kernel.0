@@ -1,31 +1,50 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Wed, 19 Sep 2018 02:17:10 +0200
-Subject: [PATCH net-next v5 09/20] zinc: Poly1305 ARM and ARM64
- implementations
-In-Reply-To: <20180918225552.GA74746@gmail.com>
-References: <20180918161646.19105-1-Jason@zx2c4.com>
- <20180918161646.19105-10-Jason@zx2c4.com>
- <20180918225552.GA74746@gmail.com>
-Message-ID: <CAHmME9r_qbbYo=sxOvUauXDetJ3uA2A=WdpvjzQwMgqYF3=h1A@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 18 Sep 2018 17:28:41 -0700
+Subject: [PATCH] gpio: omap: Add level wakeup handling for omap4 based SoCs
+In-Reply-To: <CACRpkdbXuvWyp+UzxAjKo85bTBvdFuYXMt+wo56eN9KWOcLW+g@mail.gmail.com>
+References: <20180910200624.4494-1-tony@atomide.com>
+ <CACRpkdbXuvWyp+UzxAjKo85bTBvdFuYXMt+wo56eN9KWOcLW+g@mail.gmail.com>
+Message-ID: <20180919002841.GN5662@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+* Linus Walleij <linus.walleij@linaro.org> [180918 23:33]:
+> On Mon, Sep 10, 2018 at 1:06 PM Tony Lindgren <tony@atomide.com> wrote:
+> 
+> > I noticed that unlike omap2 and 3 based SoCs, omap4 based SoCs keep
+> > the GPIO clocks enabled for GPIO level interrupts with wakeup enabled.
+> > This blocks deeper idle states as the whole domain will stay busy.
+> >
+> > The GPIO clock seems to stay enabled if the wakeup register is enabled
+> > and a level interrupt is triggered. In that case the only way to have
+> > the GPIO module idle is to reset it. It is possible this has gone
+> > unnoticed with OSWR (Open SWitch Retention) and off mode during idle
+> > resetting GPIO context most GPIO instances in the earlier Android trees
+> > for example.
+> >
+> > Looks like the way to deal with this is to have omap4 based SoCs
+> > only set wake for the duration of idle and clear level registers for
+> > the idle. With level interrupts we can do this as the level interrupt
+> > from device will be still there on resume.
+> >
+> > I've taken the long path to fixing this to avoid yet more hard to
+> > read code. I've set up a quirks flag, and a struct for function
+> > pointers so we can use these to clean up other quirk handling easier
+> > in the later patches. The current level quirk handling is moved to
+> > the new functions.
+> >
+> > Cc: Grygorii Strashko <grygorii.strashko@ti.com>
+> > Cc: Keerthy <j-keerthy@ti.com>
+> > Cc: Tero Kristo <t-kristo@ti.com>
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
+> Do we have a conclusion on this? Shall I apply the patch on
+> an immutable branch and pull into next, or do you folks need
+> more time?
 
-On Wed, Sep 19, 2018 at 12:55 AM Eric Biggers <ebiggers@kernel.org> wrote:
-> This will compute the wrong digest if called with simd_context=HAVE_FULL_SIMD
-> and then later with simd_context=HAVE_NO_SIMD, since poly1305_blocks_neon()
-> converts the accumulator from base 32 to base 26, whereas poly1305_blocks_arm()
-> assumes it is still in base 32.  Is that intentional?  I'm sure this is a rare
-> case, but my understanding is that the existing crypto API doesn't preclude
-> calling successive steps in different contexts.  And I'm concerned that it could
-> be relevant in some cases, e.g. especially if people are importing a hash state
-> that was exported earlier.  Handling it by silently computing the wrong digest
-> is not a great idea...
+Thanks for checking, let's wait on this. There are few more things
+I still need to check and test before reposting.
 
-Indeed you're right; Samuel and I were just discussing that recently.
-I'd rather handle this correctly even if the contexts change, so I'll
-see if I can fix this up properly for that unlikely case in the next
-revision.
+Regards,
 
-Jason
+Tony
