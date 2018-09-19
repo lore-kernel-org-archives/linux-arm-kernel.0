@@ -1,64 +1,49 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 19 Sep 2018 15:20:19 -0700
-Subject: [PATCH V2 00/12] OPP: Don't create multiple OPP tables for devices
- sharing OPP table
-Message-ID: <cover.1537394233.git.viresh.kumar@linaro.org>
+Date: Wed, 19 Sep 2018 15:20:27 -0700
+Subject: [PATCH V2 08/12] cpufreq: mvebu: Remove OPPs using dev_pm_opp_remove()
+In-Reply-To: <cover.1537394233.git.viresh.kumar@linaro.org>
+References: <cover.1537394233.git.viresh.kumar@linaro.org>
+Message-ID: <883071c4bd9a6e45bf0b5e45575d110eaeb2e6d0.1537394233.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+dev_pm_opp_cpumask_remove_table() is going to change in the next commit
+and will not remove dynamic OPPs automatically. They must be removed
+with a call to dev_pm_opp_remove().
 
-Niklas Cassle recently reported some regressions with his Qcom cpufreq
-driver where he was getting some errors while creating the OPPs tables.
+Reviewed-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ drivers/cpufreq/mvebu-cpufreq.c | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
 
-After looking into it I realized that the OPP core incorrectly creates
-multiple OPP tables for the devices even if they are sharing the OPP
-table in DT. This happens when the request comes using different CPU
-devices. For example, dev_pm_opp_set_supported_hw() getting called using
-CPU0 and dev_pm_opp_of_add_table() getting called using CPU1.
-
-This series redesigns the internals of the OPP core to fix that. The
-redesign has simplified the core itself though.
-
-The first three patches are fixes really for the current code and the rest
-of them are making necessary changes to fix the issue defined in
-$subject here.
-
-Nikklas already tested this series and his Tested-by is already applied
-to series here. I would like to get this merged during the 4.20 merge
-window and will push the series to linux-next soon to get more test
-coverage. Please provide comments as soon as possible, else will send it
-as part of the pull request to Rafael for 4.20.
-
---
-viresh
-
-V1->V2:
-- Nikklas reported another regressions which is fixed by the 2nd commit
-  in this series.
-
-Viresh Kumar (12):
-  OPP: Free OPP table properly on performance state irregularities
-  OPP: Don't try to remove all OPP tables on failure
-  OPP: Protect dev_list with opp_table lock
-  OPP: Pass index to _of_init_opp_table()
-  OPP: Parse OPP table's DT properties from _of_init_opp_table()
-  OPP: Don't take OPP table's kref for static OPPs
-  OPP: Create separate kref for static OPPs list
-  cpufreq: mvebu: Remove OPPs using dev_pm_opp_remove()
-  OPP: Don't remove dynamic OPPs from _dev_pm_opp_remove_table()
-  OPP: Use a single mechanism to free the OPP table
-  OPP: Prevent creating multiple OPP tables for devices sharing OPP
-    nodes
-  OPP: Pass OPP table to _of_add_opp_table_v{1|2}()
-
- drivers/cpufreq/mvebu-cpufreq.c |   9 +-
- drivers/opp/core.c              | 147 ++++++++++++++++++++-----------
- drivers/opp/cpu.c               |  15 ++--
- drivers/opp/of.c                | 188 +++++++++++++++++++++-------------------
- drivers/opp/opp.h               |  19 ++--
- include/linux/pm_opp.h          |   6 ++
- 6 files changed, 226 insertions(+), 158 deletions(-)
-
+diff --git a/drivers/cpufreq/mvebu-cpufreq.c b/drivers/cpufreq/mvebu-cpufreq.c
+index 31513bd42705..6d33a639f902 100644
+--- a/drivers/cpufreq/mvebu-cpufreq.c
++++ b/drivers/cpufreq/mvebu-cpufreq.c
+@@ -84,9 +84,10 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
+ 
+ 		ret = dev_pm_opp_add(cpu_dev, clk_get_rate(clk) / 2, 0);
+ 		if (ret) {
++			dev_pm_opp_remove(cpu_dev, clk_get_rate(clk));
+ 			clk_put(clk);
+ 			dev_err(cpu_dev, "Failed to register OPPs\n");
+-			goto opp_register_failed;
++			return ret;
+ 		}
+ 
+ 		ret = dev_pm_opp_set_sharing_cpus(cpu_dev,
+@@ -99,11 +100,5 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
+ 
+ 	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
+ 	return 0;
+-
+-opp_register_failed:
+-	/* As registering has failed remove all the opp for all cpus */
+-	dev_pm_opp_cpumask_remove_table(cpu_possible_mask);
+-
+-	return ret;
+ }
+ device_initcall(armada_xp_pmsu_cpufreq_init);
 -- 
 2.14.1
