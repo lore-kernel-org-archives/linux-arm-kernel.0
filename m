@@ -1,64 +1,62 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 19 Sep 2018 21:54:08 +0300
-Subject: [GIT PULL] arm64: dts: TI AM65x changes for 4.20
-Message-ID: <404ebcc1-7e8c-c505-a6ac-10a94f6bd608@ti.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Wed, 19 Sep 2018 20:54:46 +0200
+Subject: [PATCH v8 07/20] kasan,
+ arm64: untag address in __kimg_to_phys and _virt_addr_is_linear
+In-Reply-To: <cover.1537383101.git.andreyknvl@google.com>
+References: <cover.1537383101.git.andreyknvl@google.com>
+Message-ID: <ad3107bea7e337ded9b7192cb637cd4dd983c87b.1537383101.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM-SoC team,
+__kimg_to_phys (which is used by virt_to_phys) and _virt_addr_is_linear
+(which is used by virt_addr_valid) assume that the top byte of the address
+is 0xff, which isn't always the case with tag-based KASAN.
 
-Here are the TI AM65x DTS changes towards 4.20 merge window. Applied on 
-top of 4.19-rc2 basically just because of some testing considerations, 
-please let me know if that is not fine.
+This patch resets the tag in those macros.
 
--Tero
-
+Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
 ---
+ arch/arm64/include/asm/memory.h | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
-The following changes since commit 57361846b52bc686112da6ca5368d11210796804:
-
-   Linux 4.19-rc2 (2018-09-02 14:37:30 -0700)
-
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/kristo/linux 
-tags/am654-for-v4.20
-
-for you to fetch changes up to 42e54f6467ecc25f464d74c0fcea0c9fab1c2e3b:
-
-   arm64: dts: ti: k3-am6: Add Device Management Security Controller 
-support (2018-09-18 18:25:06 +0300)
-
-----------------------------------------------------------------
-TI AM654 support for v4.20 merge window.
-
-This branch adds changes for the Texas Instruments AM654 SoC. Included
-changes are:
-- Add uart nodes
-- Change address cells and size-cells of interconnect tfrom 1 to 2
-- Add secure proxy instance for main domain
-- Add DMSC support
-
-----------------------------------------------------------------
-Kishon Vijay Abraham I (1):
-       arm64: dts: ti: k3-am65: Change #address-cells and #size-cells of 
-interconnect to 2
-
-Nishanth Menon (3):
-       arm64: dts: ti: am654: Add uart nodes
-       arm64: dts: ti: am654: Add secure proxy instance for main domain
-       arm64: dts: ti: k3-am6: Add Device Management Security Controller 
-support
-
-  arch/arm64/boot/dts/ti/k3-am65-main.dtsi       | 51 
-+++++++++++++++++++++---
-  arch/arm64/boot/dts/ti/k3-am65-mcu.dtsi        | 18 +++++++++
-  arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi     | 46 ++++++++++++++++++++++
-  arch/arm64/boot/dts/ti/k3-am65.dtsi            | 54 
-+++++++++++++++-----------
-  arch/arm64/boot/dts/ti/k3-am654-base-board.dts |  5 +++
-  5 files changed, 147 insertions(+), 27 deletions(-)
-  create mode 100644 arch/arm64/boot/dts/ti/k3-am65-mcu.dtsi
-  create mode 100644 arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi
---
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index 0f1e024a951f..3226a0218b0b 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -92,6 +92,15 @@
+ #define KASAN_THREAD_SHIFT	0
+ #endif
+ 
++#ifdef CONFIG_KASAN_SW_TAGS
++#define KASAN_TAG_SHIFTED(tag)		((unsigned long)(tag) << 56)
++#define KASAN_SET_TAG(addr, tag)	(((addr) & ~KASAN_TAG_SHIFTED(0xff)) | \
++						KASAN_TAG_SHIFTED(tag))
++#define KASAN_RESET_TAG(addr)		KASAN_SET_TAG(addr, 0xff)
++#else
++#define KASAN_RESET_TAG(addr)		addr
++#endif
++
+ #define MIN_THREAD_SHIFT	(14 + KASAN_THREAD_SHIFT)
+ 
+ /*
+@@ -232,7 +241,7 @@ static inline unsigned long kaslr_offset(void)
+ #define __is_lm_address(addr)	(!!((addr) & BIT(VA_BITS - 1)))
+ 
+ #define __lm_to_phys(addr)	(((addr) & ~PAGE_OFFSET) + PHYS_OFFSET)
+-#define __kimg_to_phys(addr)	((addr) - kimage_voffset)
++#define __kimg_to_phys(addr)	(KASAN_RESET_TAG(addr) - kimage_voffset)
+ 
+ #define __virt_to_phys_nodebug(x) ({					\
+ 	phys_addr_t __x = (phys_addr_t)(x);				\
+@@ -308,7 +317,8 @@ static inline void *phys_to_virt(phys_addr_t x)
+ #endif
+ #endif
+ 
+-#define _virt_addr_is_linear(kaddr)	(((u64)(kaddr)) >= PAGE_OFFSET)
++#define _virt_addr_is_linear(kaddr)	(KASAN_RESET_TAG((u64)(kaddr)) >= \
++						PAGE_OFFSET)
+ #define virt_addr_valid(kaddr)		(_virt_addr_is_linear(kaddr) && \
+ 					 _virt_addr_valid(kaddr))
+ 
+-- 
+2.19.0.397.gdd90340f6a-goog
