@@ -1,187 +1,46 @@
-From: hoan.tran@amperecomputing.com (Hoan Tran)
-Date: Wed, 19 Sep 2018 18:37:47 +0000
-Subject: [PATCH] perf: xgene: Add CPU hotplug support
-In-Reply-To: <20180911151749.3vvvgovguuyyugma@lakrids.cambridge.arm.com>
-References: <1534357895-19031-1-git-send-email-hoan.tran@amperecomputing.com>
- <20180911151749.3vvvgovguuyyugma@lakrids.cambridge.arm.com>
-Message-ID: <5BBDA14E-2D6B-47B1-AEE9-7450FE54AA4C@amperecomputing.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 19 Sep 2018 21:41:50 +0300
+Subject: [PATCH v3] arm64: dts: ti: k3-am65: Change #address-cells and
+ #size-cells of interconnect to 2
+In-Reply-To: <20180905134037.szkh3wnugrtnrrfh@kahuna>
+References: <20180905111738.8280-1-kishon@ti.com>
+ <20180905134037.szkh3wnugrtnrrfh@kahuna>
+Message-ID: <ab5fa0c0-8b45-fcaf-baaf-1f948328d9ed@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-> On Sep 11, 2018, at 8:17 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> 
-> [NOTICE: This email originated from an external sender. Please be mindful of safe email handling and proprietary information protection practices.] ________________________________________________________________________________________________________________________
-> 
-> On Wed, Aug 15, 2018 at 11:31:35AM -0700, Hoan Tran wrote:
->> This patch adds CPU hotplug support where the PMU migrates the context to
->> another online CPU when its CPU is offline.
->> 
->> It fixes the below issue where the user does offline the CPU which is assigned
->> to this PMU.
->> 
->> Assuming, CPU0 is assigned for this PMU. When the user does offline CPU0
->>        [root@(none) ~]# echo 0 > /sys/devices/system/cpu/cpu0/online
->> This PMU does not work anymore and shows the below error.
->>        [root@(none) ~]# perf stat -a -e l3c0/cycle-count/,l3c0/write/ sleep 1
->>        Error:
->>        The sys_perf_event_open() syscall returned with 19 (No such device) for event (l3c0/cycle-count/).
->>        /bin/dmesg may provide additional information.
->>        No CONFIG_PERF_EVENTS=y kernel support configured?
->> 
->> With this patch, when CPU0 is offline, PMU migrates to another online CPU and
->> works on that CPU.
->> 
->> Signed-off-by: Hoan Tran <hoan.tran@amperecomputing.com>
+On 05/09/18 16:40, Nishanth Menon wrote:
+> On 11:17-20180905, Kishon Vijay Abraham I wrote:
+>> AM65 has two PCIe controllers and each PCIe controller has '2' address
+>> spaces one within the 4GB address space of the SoC and the other above
+>> the 4GB address space of the SoC (cbass_main) in addition to the
+>> register space. The size of the address space above the 4GB SoC address
+>> space is 4GB. These address ranges will be used by CPU/DMA to access
+>> the PCIe address space. In order to represent the address space above
+>> the 4GB SoC address space and to represent the size of this address
+>> space as 4GB, change address-cells and size-cells of interconnect to 2.
+>>
+>> Since OSPI has similar need in MCU Domain Memory Map, change
+>> address-cells and size-cells of cbass_mcu interconnect also to 2.
+>>
+>> Fixes: ea47eed33a3fe3d919 ("arm64: dts: ti: Add Support for AM654 SoC")
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> Acked-by: Tony Lindgren <tony@atomide.com>
+>> Acked-by: Vignesh R <vigneshr@ti.com>
 >> ---
->> drivers/perf/xgene_pmu.c   | 71 ++++++++++++++++++++++++++++++++++++++++++----
->> include/linux/cpuhotplug.h |  1 +
->> 2 files changed, 66 insertions(+), 6 deletions(-)
->> 
->> diff --git a/drivers/perf/xgene_pmu.c b/drivers/perf/xgene_pmu.c
->> index 0e31f13..248a3f7 100644
->> --- a/drivers/perf/xgene_pmu.c
->> +++ b/drivers/perf/xgene_pmu.c
->> @@ -21,6 +21,7 @@
->> 
->> #include <linux/acpi.h>
->> #include <linux/clk.h>
->> +#include <linux/cpuhotplug.h>
->> #include <linux/cpumask.h>
->> #include <linux/interrupt.h>
->> #include <linux/io.h>
->> @@ -130,12 +131,14 @@ struct xgene_pmu_ops {
->> 
->> struct xgene_pmu {
->>        struct device *dev;
->> +       struct hlist_node node;
->>        int version;
->>        void __iomem *pcppmu_csr;
->>        u32 mcb_active_mask;
->>        u32 mc_active_mask;
->>        u32 l3c_active_mask;
->>        cpumask_t cpu;
->> +       int irq;
->>        raw_spinlock_t lock;
->>        const struct xgene_pmu_ops *ops;
->>        struct list_head l3cpmus;
->> @@ -1806,6 +1809,53 @@ static const struct acpi_device_id xgene_pmu_acpi_match[] = {
->> MODULE_DEVICE_TABLE(acpi, xgene_pmu_acpi_match);
->> #endif
->> 
->> +static int xgene_pmu_online_cpu(unsigned int cpu, struct hlist_node *node)
->> +{
->> +       struct xgene_pmu *xgene_pmu = hlist_entry_safe(node, struct xgene_pmu,
->> +                                                      node);
->> +
->> +       if (cpumask_empty(&xgene_pmu->cpu))
->> +               cpumask_set_cpu(cpu, &xgene_pmu->cpu);
->> +
->> +       /* Overflow interrupt also should use the same CPU */
->> +       WARN_ON(irq_set_affinity(xgene_pmu->irq, &xgene_pmu->cpu));
->> +
->> +       return 0;
->> +}
->> +
->> +static int xgene_pmu_offline_cpu(unsigned int cpu, struct hlist_node *node)
->> +{
->> +       struct xgene_pmu *xgene_pmu = hlist_entry_safe(node, struct xgene_pmu,
->> +                                                      node);
->> +       struct xgene_pmu_dev_ctx *ctx;
->> +       unsigned int target;
->> +
->> +       if (!cpumask_test_and_clear_cpu(cpu, &xgene_pmu->cpu))
->> +               return 0;
->> +       target = cpumask_any_but(cpu_online_mask, cpu);
->> +       if (target >= nr_cpu_ids)
->> +               return 0;
->> +
->> +       list_for_each_entry(ctx, &xgene_pmu->mcpmus, next) {
->> +               perf_pmu_migrate_context(&ctx->pmu_dev->pmu, cpu, target);
->> +       }
->> +       list_for_each_entry(ctx, &xgene_pmu->mcbpmus, next) {
->> +               perf_pmu_migrate_context(&ctx->pmu_dev->pmu, cpu, target);
->> +       }
->> +       list_for_each_entry(ctx, &xgene_pmu->l3cpmus, next) {
->> +               perf_pmu_migrate_context(&ctx->pmu_dev->pmu, cpu, target);
->> +       }
->> +       list_for_each_entry(ctx, &xgene_pmu->iobpmus, next) {
->> +               perf_pmu_migrate_context(&ctx->pmu_dev->pmu, cpu, target);
->> +       }
->> +
->> +       cpumask_set_cpu(target, &xgene_pmu->cpu);
->> +       /* Overflow interrupt also should use the same CPU */
->> +       WARN_ON(irq_set_affinity(xgene_pmu->irq, &xgene_pmu->cpu));
->> +
->> +       return 0;
->> +}
->> +
->> static int xgene_pmu_probe(struct platform_device *pdev)
->> {
->>        const struct xgene_pmu_data *dev_data;
->> @@ -1815,6 +1865,14 @@ static int xgene_pmu_probe(struct platform_device *pdev)
->>        int irq, rc;
->>        int version;
->> 
->> +       /* Install a hook to update the reader CPU in case it goes offline */
->> +       rc = cpuhp_setup_state_multi(CPUHP_AP_PERF_XGENE_ONLINE,
->> +                                     "CPUHP_AP_PERF_XGENE_ONLINE",
->> +                                     xgene_pmu_online_cpu,
->> +                                     xgene_pmu_offline_cpu);
->> +       if (rc)
->> +               return rc;
->> +
->>        xgene_pmu = devm_kzalloc(&pdev->dev, sizeof(*xgene_pmu), GFP_KERNEL);
->>        if (!xgene_pmu)
->>                return -ENOMEM;
->> @@ -1865,6 +1923,7 @@ static int xgene_pmu_probe(struct platform_device *pdev)
->>                dev_err(&pdev->dev, "No IRQ resource\n");
->>                return -EINVAL;
->>        }
->> +
->>        rc = devm_request_irq(&pdev->dev, irq, xgene_pmu_isr,
->>                                IRQF_NOBALANCING | IRQF_NO_THREAD,
->>                                dev_name(&pdev->dev), xgene_pmu);
->> @@ -1873,6 +1932,8 @@ static int xgene_pmu_probe(struct platform_device *pdev)
->>                return rc;
->>        }
->> 
->> +       xgene_pmu->irq = irq;
->> +
->>        raw_spin_lock_init(&xgene_pmu->lock);
->> 
->>        /* Check for active MCBs and MCUs */
->> @@ -1883,13 +1944,11 @@ static int xgene_pmu_probe(struct platform_device *pdev)
->>                xgene_pmu->mc_active_mask = 0x1;
->>        }
->> 
->> -       /* Pick one core to use for cpumask attributes */
->> -       cpumask_set_cpu(smp_processor_id(), &xgene_pmu->cpu);
->> -
->> -       /* Make sure that the overflow interrupt is handled by this CPU */
->> -       rc = irq_set_affinity(irq, &xgene_pmu->cpu);
->> +       /* Add this instance to the list used by the hotplug callback */
->> +       rc = cpuhp_state_add_instance(CPUHP_AP_PERF_XGENE_ONLINE,
->> +                                     &xgene_pmu->node);
->>        if (rc) {
->> -               dev_err(&pdev->dev, "Failed to set interrupt affinity!\n");
->> +               dev_err(&pdev->dev, "Error %d registering hotplug", rc);
->>                return rc;
->>        }
+>> Changes from v2:
+>> Added Fixes tag.
 > 
-> You also need to remove the cpuhp instances when unregistering the PMUs
-> in xgene_pmu_dev_cleanup().
-
-Yes, I'll fix it.
-
-Thanks and Regards
-Hoan
-
+> Thanks.
+> Acked-by: Nishanth Menon <nm@ti.com>
 > 
-> Otherwise this looks fine to me, on the assumption the system PMU is
-> accessible from all CPUs in the system (e.g. it's not lcoal to a socket
-> or anything like that).
+> Tero: Could we take this for v4.20 ? While this is a bug fix, I think
+> it might be better in v4.20 window since it will help provide a clean merge
+> of follow on nodes.
 > 
-> Thanks,
-> Mark.
+
+Yes, queuing up for 4.20, thanks.
+
+-Tero
+--
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
