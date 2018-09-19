@@ -1,89 +1,65 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 19 Sep 2018 11:41:21 +0100
-Subject: [PATCH] arm64: cpu_errata: Remove ARM64_MISMATCHED_CACHE_LINE_SIZE
-Message-ID: <1537353681-19677-1-git-send-email-will.deacon@arm.com>
+From: yuehaibing@huawei.com (YueHaibing)
+Date: Wed, 19 Sep 2018 18:45:12 +0800
+Subject: [PATCH net-next] net: broadcom: fix return type of ndo_start_xmit
+ function
+Message-ID: <20180919104512.27068-1-yuehaibing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no need to treat mismatched cache-line sizes reported by CTR_EL0
-differently to any other mismatched fields that we treat as "STRICT" in
-the cpufeature code. In both cases we need to trap and emulate EL0
-accesses to the register, so drop ARM64_MISMATCHED_CACHE_LINE_SIZE and
-rely on ARM64_MISMATCHED_CACHE_TYPE instead.
+The method ndo_start_xmit() is defined as returning an 'netdev_tx_t',
+which is a typedef for an enum type, so make sure the implementation in
+this driver has returns 'netdev_tx_t' value, and change the function
+return type to netdev_tx_t.
 
-Cc: Suzuki Poulose <suzuki.poulose@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+Found by coccinelle.
+
+Signed-off-by: YueHaibing <yuehaibing@huawei.com>
 ---
- arch/arm64/include/asm/assembler.h |  7 +++----
- arch/arm64/include/asm/cpucaps.h   |  2 +-
- arch/arm64/kernel/cpu_errata.c     | 15 ++-------------
- 3 files changed, 6 insertions(+), 18 deletions(-)
+ drivers/net/ethernet/broadcom/bcm63xx_enet.c | 5 +++--
+ drivers/net/ethernet/broadcom/sb1250-mac.c   | 4 ++--
+ 2 files changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 0bcc98dbba56..6142402c2eb4 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -286,12 +286,11 @@ alternative_endif
- 	ldr	\rd, [\rn, #MM_CONTEXT_ID]
- 	.endm
+diff --git a/drivers/net/ethernet/broadcom/bcm63xx_enet.c b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
+index 02e7dfc..6bae973 100644
+--- a/drivers/net/ethernet/broadcom/bcm63xx_enet.c
++++ b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
+@@ -568,12 +568,13 @@ static irqreturn_t bcm_enet_isr_dma(int irq, void *dev_id)
  /*
-- * read_ctr - read CTR_EL0. If the system has mismatched
-- * cache line sizes, provide the system wide safe value
-- * from arm64_ftr_reg_ctrel0.sys_val
-+ * read_ctr - read CTR_EL0. If the system has mismatched register fields,
-+ * provide the system wide safe value from arm64_ftr_reg_ctrel0.sys_val
+  * tx request callback
   */
- 	.macro	read_ctr, reg
--alternative_if_not ARM64_MISMATCHED_CACHE_LINE_SIZE
-+alternative_if_not ARM64_MISMATCHED_CACHE_TYPE
- 	mrs	\reg, ctr_el0			// read CTR
- 	nop
- alternative_else
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index ae1f70450fb2..028eac8fc79d 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -33,7 +33,7 @@
- #define ARM64_WORKAROUND_CAVIUM_27456		12
- #define ARM64_HAS_32BIT_EL0			13
- #define ARM64_HARDEN_EL2_VECTORS		14
--#define ARM64_MISMATCHED_CACHE_LINE_SIZE	15
-+/* #define ARM64_YOUR_CAP_HERE			15 */
- #define ARM64_HAS_NO_FPSIMD			16
- #define ARM64_WORKAROUND_REPEAT_TLBI		17
- #define ARM64_WORKAROUND_QCOM_FALKOR_E1003	18
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index dec10898d688..ef3cc061d815 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -68,11 +68,7 @@ static bool
- has_mismatched_cache_type(const struct arm64_cpu_capabilities *entry,
- 			  int scope)
+-static int bcm_enet_start_xmit(struct sk_buff *skb, struct net_device *dev)
++static netdev_tx_t
++bcm_enet_start_xmit(struct sk_buff *skb, struct net_device *dev)
  {
--	u64 mask = CTR_CACHE_MINLINE_MASK;
--
--	/* Skip matching the min line sizes for cache type check */
--	if (entry->capability == ARM64_MISMATCHED_CACHE_TYPE)
--		mask ^= arm64_ftr_reg_ctrel0.strict_mask;
-+	u64 mask = arm64_ftr_reg_ctrel0.strict_mask;;
+ 	struct bcm_enet_priv *priv;
+ 	struct bcm_enet_desc *desc;
+ 	u32 len_stat;
+-	int ret;
++	netdev_tx_t ret;
  
- 	WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
- 	return (read_cpuid_cachetype() & mask) !=
-@@ -616,14 +612,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 	},
- #endif
- 	{
--		.desc = "Mismatched cache line size",
--		.capability = ARM64_MISMATCHED_CACHE_LINE_SIZE,
--		.matches = has_mismatched_cache_type,
--		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
--		.cpu_enable = cpu_enable_trap_ctr_access,
--	},
--	{
--		.desc = "Mismatched cache type",
-+		.desc = "Mismatched cache type (CTR_EL0)",
- 		.capability = ARM64_MISMATCHED_CACHE_TYPE,
- 		.matches = has_mismatched_cache_type,
- 		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
+ 	priv = netdev_priv(dev);
+ 
+diff --git a/drivers/net/ethernet/broadcom/sb1250-mac.c b/drivers/net/ethernet/broadcom/sb1250-mac.c
+index c44cff5..5db9f41 100644
+--- a/drivers/net/ethernet/broadcom/sb1250-mac.c
++++ b/drivers/net/ethernet/broadcom/sb1250-mac.c
+@@ -299,7 +299,7 @@ static enum sbmac_state sbmac_set_channel_state(struct sbmac_softc *,
+ static void sbmac_promiscuous_mode(struct sbmac_softc *sc, int onoff);
+ static uint64_t sbmac_addr2reg(unsigned char *ptr);
+ static irqreturn_t sbmac_intr(int irq, void *dev_instance);
+-static int sbmac_start_tx(struct sk_buff *skb, struct net_device *dev);
++static netdev_tx_t sbmac_start_tx(struct sk_buff *skb, struct net_device *dev);
+ static void sbmac_setmulti(struct sbmac_softc *sc);
+ static int sbmac_init(struct platform_device *pldev, long long base);
+ static int sbmac_set_speed(struct sbmac_softc *s, enum sbmac_speed speed);
+@@ -2028,7 +2028,7 @@ static irqreturn_t sbmac_intr(int irq,void *dev_instance)
+  *  Return value:
+  *  	   nothing
+  ********************************************************************* */
+-static int sbmac_start_tx(struct sk_buff *skb, struct net_device *dev)
++static netdev_tx_t sbmac_start_tx(struct sk_buff *skb, struct net_device *dev)
+ {
+ 	struct sbmac_softc *sc = netdev_priv(dev);
+ 	unsigned long flags;
 -- 
-2.1.4
+1.8.3.1
