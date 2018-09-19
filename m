@@ -1,33 +1,26 @@
-From: trong@android.com (Tri Vo)
-Date: Wed, 19 Sep 2018 12:27:50 -0700
-Subject: [RFC] arm64: lse: remove -fcall-used-x0 flag
-Message-ID: <20180919192750.200491-1-trong@android.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 19 Sep 2018 12:46:36 -0700
+Subject: [PATCH v2 4/7] pinctrl: Add STMFX GPIO expander Pinctrl/GPIO
+ driver
+In-Reply-To: <1537363669-25991-5-git-send-email-amelie.delaunay@st.com>
+References: <1537363669-25991-1-git-send-email-amelie.delaunay@st.com>
+ <1537363669-25991-5-git-send-email-amelie.delaunay@st.com>
+Message-ID: <CACRpkdaAN2c8AXSN7Hzvsp_N-VfnzS-EOqbiN2SR+HrtoUp6SA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-x0 is not callee-saved in the PCS. So there is no need to specify
--fcall-used-x0.
+On Wed, Sep 19, 2018 at 6:28 AM Amelie Delaunay <amelie.delaunay@st.com> wrote:
 
-Clang doesn't currently support -fcall-used flags. This patch will help
-building the kernel with clang.
+> This patch adds pinctrl/GPIO driver for STMicroelectronics
+> Multi-Function eXpander (STMFX) GPIO expander.
+> STMFX is an I2C slave controller, offering up to 24 GPIOs.
+> The driver relies on generic pin config interface to configure the GPIOs.
+>
+> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 
-Signed-off-by: Tri Vo <trong@android.com>
----
- arch/arm64/lib/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This looks very good, exactly as I wanted it, easy to understand
+and maintain.
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
-index c86b7909ef31..2f7c60c8e588 100644
---- a/arch/arm64/lib/Makefile
-+++ b/arch/arm64/lib/Makefile
-@@ -11,7 +11,7 @@ lib-y		:= bitops.o clear_user.o delay.o copy_from_user.o	\
- # when supported by the CPU. Result and argument registers are handled
- # correctly, based on the function prototype.
- lib-$(CONFIG_ARM64_LSE_ATOMICS) += atomic_ll_sc.o
--CFLAGS_atomic_ll_sc.o	:= -fcall-used-x0 -ffixed-x1 -ffixed-x2		\
-+CFLAGS_atomic_ll_sc.o	:= -ffixed-x1 -ffixed-x2        		\
- 		   -ffixed-x3 -ffixed-x4 -ffixed-x5 -ffixed-x6		\
- 		   -ffixed-x7 -fcall-saved-x8 -fcall-saved-x9		\
- 		   -fcall-saved-x10 -fcall-saved-x11 -fcall-saved-x12	\
---
-2.19.0.397.gdd90340f6a-goog
+Yours,
+Linus Walleij
