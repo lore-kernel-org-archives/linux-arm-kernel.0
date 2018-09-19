@@ -1,59 +1,317 @@
 From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Wed, 19 Sep 2018 23:02:18 +0200
-Subject: [PATCH 1/2] dt-bindings: pinctrl: document Broadcom Northstar pin mux
- controller
-Message-ID: <20180919210219.21921-1-zajec5@gmail.com>
+Date: Wed, 19 Sep 2018 23:02:19 +0200
+Subject: [PATCH 2/2] pinctrl: bcm: add Northstar driver
+In-Reply-To: <20180919210219.21921-1-zajec5@gmail.com>
+References: <20180919210219.21921-1-zajec5@gmail.com>
+Message-ID: <20180919210219.21921-2-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rafa? Mi?ecki <rafal@milecki.pl>
 
-Northstar has mux controller just like Northstar Plus and Northstar2.
-It's a bit different though (different registers & pins) so it requires
-its own binding.
+This driver provides support for Northstar mux controller. It differs
+from Northstar Plus one so a new binding and driver were needed.
 
-It's needed to allow other block bindings specify required mux setup.
+Right now it includes support for SPI pins only which is caused by a
+lack of access to Broadcom's datasheet. SPI pins info was extracted from
+the Broadcom's SDK. Once more pins are discovered they can be added to
+the driver without breaking any existing setups.
 
 Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
 ---
- .../devicetree/bindings/pinctrl/brcm,ns-pinmux.txt | 29 ++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,ns-pinmux.txt
+ drivers/pinctrl/bcm/Kconfig      |  13 +++
+ drivers/pinctrl/bcm/Makefile     |   1 +
+ drivers/pinctrl/bcm/pinctrl-ns.c | 246 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 260 insertions(+)
+ create mode 100644 drivers/pinctrl/bcm/pinctrl-ns.c
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,ns-pinmux.txt b/Documentation/devicetree/bindings/pinctrl/brcm,ns-pinmux.txt
+diff --git a/drivers/pinctrl/bcm/Kconfig b/drivers/pinctrl/bcm/Kconfig
+index 0f38d51f47c6..c8575399d6f7 100644
+--- a/drivers/pinctrl/bcm/Kconfig
++++ b/drivers/pinctrl/bcm/Kconfig
+@@ -73,6 +73,19 @@ config PINCTRL_CYGNUS_MUX
+ 	  configuration, with the exception that certain individual pins
+ 	  can be overridden to GPIO function
+ 
++config PINCTRL_NS
++	bool "Broadcom Northstar pins driver"
++	depends on OF && (ARCH_BCM_5301X || COMPILE_TEST)
++	select PINMUX
++	select GENERIC_PINCONF
++	default ARCH_BCM_5301X
++	help
++	  Say yes here to enable the Broadcom NS SoC pins driver.
++
++	  The Broadcom Northstar pins driver supports muxing multi-purpose pins
++	  that can be used for various functions (e.g. SPI, I2C, UART) as well
++	  as GPIOs.
++
+ config PINCTRL_NSP_GPIO
+ 	bool "Broadcom NSP GPIO (with PINCONF) driver"
+ 	depends on OF_GPIO && (ARCH_BCM_NSP || COMPILE_TEST)
+diff --git a/drivers/pinctrl/bcm/Makefile b/drivers/pinctrl/bcm/Makefile
+index 80ceb9dae944..79d5e49fdd9a 100644
+--- a/drivers/pinctrl/bcm/Makefile
++++ b/drivers/pinctrl/bcm/Makefile
+@@ -5,6 +5,7 @@ obj-$(CONFIG_PINCTRL_BCM281XX)		+= pinctrl-bcm281xx.o
+ obj-$(CONFIG_PINCTRL_BCM2835)		+= pinctrl-bcm2835.o
+ obj-$(CONFIG_PINCTRL_IPROC_GPIO)	+= pinctrl-iproc-gpio.o
+ obj-$(CONFIG_PINCTRL_CYGNUS_MUX)	+= pinctrl-cygnus-mux.o
++obj-$(CONFIG_PINCTRL_NS)		+= pinctrl-ns.o
+ obj-$(CONFIG_PINCTRL_NSP_GPIO)		+= pinctrl-nsp-gpio.o
+ obj-$(CONFIG_PINCTRL_NS2_MUX)		+= pinctrl-ns2-mux.o
+ obj-$(CONFIG_PINCTRL_NSP_MUX)		+= pinctrl-nsp-mux.o
+diff --git a/drivers/pinctrl/bcm/pinctrl-ns.c b/drivers/pinctrl/bcm/pinctrl-ns.c
 new file mode 100644
-index 000000000000..0e913721ae9e
+index 000000000000..bf7703c4a2e3
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/pinctrl/brcm,ns-pinmux.txt
-@@ -0,0 +1,29 @@
-+Broadcom Northstar pins mux controller
++++ b/drivers/pinctrl/bcm/pinctrl-ns.c
+@@ -0,0 +1,246 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (C) 2018 Rafa? Mi?ecki <rafal@milecki.pl>
++ */
 +
-+Some of Northstar SoCs's pins can be used for various purposes thanks to the mux
-+controller. This binding allows describing mux controller and listing available
-+functions. They can be referenced later by other bindings to let system
-+configure controller correctly.
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/pinctrl/pinconf-generic.h>
++#include <linux/pinctrl/pinctrl.h>
++#include <linux/pinctrl/pinmux.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
 +
-+Required properties:
-+- compatible: brcm,ns-pinmux
-+- reg: iomem address range of CRU (Central Resource Unit) pin registers
-+- reg-names: "cru_pins_control" - the only needed & supported reg right now
++struct ns_pinctrl {
++	struct pinctrl_dev *pctldev;
++	struct device *dev;
++	void __iomem *base;
++};
 +
-+List of supported functions and their groups:
-+- "spi": "spi_grp"
++/*
++ * Pins
++ */
 +
-+For documentation of subnodes see:
-+Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
++struct ns_pin_data {
++	unsigned int reg;
++	unsigned int bit;
++};
 +
-+Example:
-+	pinctrl at 1800c1c0 {
-+		compatible = "brcm,ns-pinmux";
-+		reg = <0x1800c1c0 0x24>;
-+		reg-names = "cru_pins_control";
++static const struct ns_pin_data ns_pins_data[] = {
++	[0] = { 0, 0 },
++	[1] = { 0, 1 },
++	[2] = { 0, 2 },
++	[3] = { 0, 3 },
++};
 +
-+		spi {
-+			function = "spi";
-+			groups = "spi_grp";
-+		};
-+	};
++static const struct pinctrl_pin_desc ns_pinctrl_pins[] = {
++	{ 0, "spi_clk" },
++	{ 1, "spi_ss" },
++	{ 2, "spi_mosi" },
++	{ 3, "spi_miso" },
++};
++
++/*
++ * Groups
++ */
++
++struct ns_pinctrl_group {
++	const char *name;
++	const unsigned int *pins;
++	const unsigned int num_pins;
++};
++
++static const unsigned int spi_pins[] = { 0, 1, 2, 3 };
++
++#define NS_GROUP(_name, _pins)			\
++{						\
++	.name = _name,				\
++	.pins = _pins,				\
++	.num_pins = ARRAY_SIZE(_pins),		\
++}
++
++static const struct ns_pinctrl_group ns_pinctrl_groups[] = {
++	NS_GROUP("spi_grp", spi_pins),
++};
++
++/*
++ * Functions
++ */
++
++struct ns_pinctrl_function {
++	const char *name;
++	const char * const *groups;
++	const unsigned int num_groups;
++};
++
++static const char * const spi_groups[] = { "spi_grp" };
++
++#define NS_FUNCTION(_name, _groups)		\
++{						\
++	.name = _name,				\
++	.groups = _groups,			\
++	.num_groups = ARRAY_SIZE(_groups),	\
++}
++
++static const struct ns_pinctrl_function ns_pinctrl_functions[] = {
++	NS_FUNCTION("spi", spi_groups),
++};
++
++/*
++ * Groups code
++ */
++
++static int ns_pinctrl_get_groups_count(struct pinctrl_dev *pctrl_dev)
++{
++	return ARRAY_SIZE(ns_pinctrl_groups);
++}
++
++static const char *ns_pinctrl_get_group_name(struct pinctrl_dev *pctrl_dev,
++					     unsigned int selector)
++{
++	return ns_pinctrl_groups[selector].name;
++}
++
++static int ns_pinctrl_get_group_pins(struct pinctrl_dev *pctrl_dev,
++				     unsigned int selector,
++				     const unsigned int **pins,
++				     unsigned int *num_pins)
++{
++	*pins = ns_pinctrl_groups[selector].pins;
++	*num_pins = ns_pinctrl_groups[selector].num_pins;
++
++	return 0;
++}
++
++static const struct pinctrl_ops ns_pinctrl_ops = {
++	.get_groups_count = ns_pinctrl_get_groups_count,
++	.get_group_name = ns_pinctrl_get_group_name,
++	.get_group_pins = ns_pinctrl_get_group_pins,
++	.dt_node_to_map = pinconf_generic_dt_node_to_map_group,
++	.dt_free_map = pinconf_generic_dt_free_map,
++};
++
++/*
++ * Functions code
++ */
++
++static int ns_pinctrl_get_functions_count(struct pinctrl_dev *pctrl_dev)
++{
++	return ARRAY_SIZE(ns_pinctrl_functions);
++}
++
++static const char *ns_pinctrl_get_function_name(struct pinctrl_dev *pctrl_dev,
++						unsigned int selector)
++{
++	return ns_pinctrl_functions[selector].name;
++}
++
++static int ns_pinctrl_get_function_groups(struct pinctrl_dev *pctrl_dev,
++					  unsigned int selector,
++					  const char * const **groups,
++					  unsigned * const num_groups)
++{
++	*groups = ns_pinctrl_functions[selector].groups;
++	*num_groups = ns_pinctrl_functions[selector].num_groups;
++
++	return 0;
++}
++
++static int ns_pinctrl_set_mux(struct pinctrl_dev *pctrl_dev,
++			      unsigned int func_select,
++			      unsigned int grp_select)
++{
++	struct ns_pinctrl *ns_pinctrl = pinctrl_dev_get_drvdata(pctrl_dev);
++	u32 unset[9] = { };
++	int i;
++
++	for (i = 0; i < ns_pinctrl_groups[grp_select].num_pins; i++) {
++		int pin_number = ns_pinctrl_groups[grp_select].pins[i];
++		const struct ns_pin_data *data = &ns_pins_data[pin_number];
++
++		unset[data->reg] |= BIT(data->bit);
++	}
++
++	for (i = 0; i < ARRAY_SIZE(unset); i++) {
++		u32 tmp;
++
++		if (!unset[i])
++			continue;
++
++		tmp = readl(ns_pinctrl->base + i);
++		tmp &= ~unset[i];
++		writel(tmp, ns_pinctrl->base + i);
++	}
++
++	return 0;
++}
++
++static const struct pinmux_ops ns_pinctrl_pmxops = {
++	.get_functions_count = ns_pinctrl_get_functions_count,
++	.get_function_name = ns_pinctrl_get_function_name,
++	.get_function_groups = ns_pinctrl_get_function_groups,
++	.set_mux = ns_pinctrl_set_mux,
++};
++
++/*
++ * Controller code
++ */
++
++static struct pinctrl_desc ns_pinctrl_desc = {
++	.name = "pinctrl-ns",
++	.pins = ns_pinctrl_pins,
++	.npins = ARRAY_SIZE(ns_pinctrl_pins),
++	.pctlops = &ns_pinctrl_ops,
++	.pmxops = &ns_pinctrl_pmxops,
++};
++
++static int ns_pinctrl_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct ns_pinctrl *ns_pinctrl;
++	struct resource *res;
++
++	ns_pinctrl = devm_kzalloc(dev, sizeof(*ns_pinctrl), GFP_KERNEL);
++	if (!ns_pinctrl)
++		return -ENOMEM;
++	ns_pinctrl->dev = dev;
++
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
++					   "cru_pins_control");
++	ns_pinctrl->base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(ns_pinctrl->base)) {
++		dev_err(dev, "Failed to map pinctrl regs\n");
++		return PTR_ERR(ns_pinctrl->base);
++	}
++
++	platform_set_drvdata(pdev, ns_pinctrl);
++
++	ns_pinctrl->pctldev = devm_pinctrl_register(dev, &ns_pinctrl_desc,
++						    ns_pinctrl);
++	if (IS_ERR(ns_pinctrl->pctldev)) {
++		dev_err(dev, "Failed to register pinctrl\n");
++		return PTR_ERR(ns_pinctrl->pctldev);
++	}
++
++	return 0;
++}
++
++static const struct of_device_id ns_pinctrl_of_match_table[] = {
++	{ .compatible = "brcm,ns-pinmux" },
++	{ }
++};
++
++static struct platform_driver ns_pinctrl_driver = {
++	.probe = ns_pinctrl_probe,
++	.driver = {
++		.name = "ns-pinmux",
++		.of_match_table = ns_pinctrl_of_match_table,
++	},
++};
++
++module_platform_driver(ns_pinctrl_driver);
++
++MODULE_AUTHOR("Rafa? Mi?ecki");
++MODULE_LICENSE("GPL v2");
 -- 
 2.13.7
