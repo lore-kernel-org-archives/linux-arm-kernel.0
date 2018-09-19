@@ -1,51 +1,32 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 19 Sep 2018 14:21:57 -0700
-Subject: [PATCH 1/2] dt-bindings: pinctrl: document Broadcom Northstar pin
- mux controller
-In-Reply-To: <20180919210219.21921-1-zajec5@gmail.com>
-References: <20180919210219.21921-1-zajec5@gmail.com>
-Message-ID: <7e381fba-a7bf-f587-7bbf-d6b30d9874c9@gmail.com>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Wed, 19 Sep 2018 23:27:45 +0200
+Subject: [PATCH v2] mtd: rawnand: atmel: Fix potential NULL pointer
+ dereference
+In-Reply-To: <20180918135555.GA18114@embeddedor.com>
+References: <20180918135555.GA18114@embeddedor.com>
+Message-ID: <20180919232745.4ed2197c@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/19/2018 02:02 PM, Rafa? Mi?ecki wrote:
-> From: Rafa? Mi?ecki <rafal@milecki.pl>
+Hi Gustavo,
+
+"Gustavo A. R. Silva" <gustavo@embeddedor.com> wrote on Tue, 18 Sep
+2018 08:55:55 -0500:
+
+> There is a potential execution path in which function
+> of_find_compatible_node() returns NULL. In such a case,
+> we end up having a NULL pointer dereference when accessing
+> pointer *nfc_np* in function of_clk_get().
 > 
-> Northstar has mux controller just like Northstar Plus and Northstar2.
-> It's a bit different though (different registers & pins) so it requires
-> its own binding.
+> So, we better don't take any chances and fix this by null
+> checking pointer *nfc_np* before calling of_clk_get().
 > 
-> It's needed to allow other block bindings specify required mux setup.
-> 
-> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+> Addresses-Coverity-ID: 1473052 ("Dereference null return value")
+> Fixes: f88fc122cc34 ("mtd: nand: Cleanup/rework the atmel_nand driver")
+> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
 > ---
->  .../devicetree/bindings/pinctrl/brcm,ns-pinmux.txt | 29 ++++++++++++++++++++++
->  1 file changed, 29 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,ns-pinmux.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,ns-pinmux.txt b/Documentation/devicetree/bindings/pinctrl/brcm,ns-pinmux.txt
-> new file mode 100644
-> index 000000000000..0e913721ae9e
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pinctrl/brcm,ns-pinmux.txt
-> @@ -0,0 +1,29 @@
-> +Broadcom Northstar pins mux controller
-> +
-> +Some of Northstar SoCs's pins can be used for various purposes thanks to the mux
-> +controller. This binding allows describing mux controller and listing available
-> +functions. They can be referenced later by other bindings to let system
-> +configure controller correctly.
-> +
-> +Required properties:
-> +- compatible: brcm,ns-pinmux
-> +- reg: iomem address range of CRU (Central Resource Unit) pin registers
-> +- reg-names: "cru_pins_control" - the only needed & supported reg right now
 
-Technically the register range that you cover is named CRU_GPIO_CONTROLx
-with x being in [0-8].
+Applied to nand/next.
 
-Other than that:
-
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
--- 
-Florian
+Thanks,
+Miqu?l
