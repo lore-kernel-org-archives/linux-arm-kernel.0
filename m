@@ -1,78 +1,117 @@
 From: andreyknvl@google.com (Andrey Konovalov)
-Date: Wed, 19 Sep 2018 20:54:49 +0200
-Subject: [PATCH v8 10/20] mm: move obj_to_index to include/linux/slab_def.h
+Date: Wed, 19 Sep 2018 20:54:48 +0200
+Subject: [PATCH v8 09/20] kasan: preassign tags to objects with ctors or
+ SLAB_TYPESAFE_BY_RCU
 In-Reply-To: <cover.1537383101.git.andreyknvl@google.com>
 References: <cover.1537383101.git.andreyknvl@google.com>
-Message-ID: <d306ffa81d2416a26d17586e8196367f8e9d6102.1537383101.git.andreyknvl@google.com>
+Message-ID: <d74e710797323db0e43f047ea698fbc85060fc57.1537383101.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While with SLUB we can actually preassign tags for caches with contructors
-and store them in pointers in the freelist, SLAB doesn't allow that since
-the freelist is stored as an array of indexes, so there are no pointers to
-store the tags.
+An object constructor can initialize pointers within this objects based on
+the address of the object. Since the object address might be tagged, we
+need to assign a tag before calling constructor.
 
-Instead we compute the tag twice, once when a slab is created before
-calling the constructor and then again each time when an object is
-allocated with kmalloc. Tag is computed simply by taking the lowest byte of
-the index that corresponds to the object. However in kasan_kmalloc we only
-have access to the objects pointer, so we need a way to find out which
-index this object corresponds to.
+The implemented approach is to assign tags to objects with constructors
+when a slab is allocated and call constructors once as usual. The
+downside is that such object would always have the same tag when it is
+reallocated, so we won't catch use-after-frees on it.
 
-This patch moves obj_to_index from slab.c to include/linux/slab_def.h to
-be reused by KASAN.
+Also pressign tags for objects from SLAB_TYPESAFE_BY_RCU caches, since
+they can be validy accessed after having been freed.
 
 Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
 ---
- include/linux/slab_def.h | 13 +++++++++++++
- mm/slab.c                | 13 -------------
- 2 files changed, 13 insertions(+), 13 deletions(-)
+ mm/slab.c |  2 +-
+ mm/slub.c | 24 ++++++++++++++----------
+ 2 files changed, 15 insertions(+), 11 deletions(-)
 
-diff --git a/include/linux/slab_def.h b/include/linux/slab_def.h
-index 3485c58cfd1c..9a5eafb7145b 100644
---- a/include/linux/slab_def.h
-+++ b/include/linux/slab_def.h
-@@ -104,4 +104,17 @@ static inline void *nearest_obj(struct kmem_cache *cache, struct page *page,
- 		return object;
- }
- 
-+/*
-+ * We want to avoid an expensive divide : (offset / cache->size)
-+ *   Using the fact that size is a constant for a particular cache,
-+ *   we can replace (offset / cache->size) by
-+ *   reciprocal_divide(offset, cache->reciprocal_buffer_size)
-+ */
-+static inline unsigned int obj_to_index(const struct kmem_cache *cache,
-+					const struct page *page, void *obj)
-+{
-+	u32 offset = (obj - page->s_mem);
-+	return reciprocal_divide(offset, cache->reciprocal_buffer_size);
-+}
-+
- #endif	/* _LINUX_SLAB_DEF_H */
 diff --git a/mm/slab.c b/mm/slab.c
-index fe0ddf08aa2c..6d8de7630944 100644
+index 6fdca9ec2ea4..fe0ddf08aa2c 100644
 --- a/mm/slab.c
 +++ b/mm/slab.c
-@@ -406,19 +406,6 @@ static inline void *index_to_obj(struct kmem_cache *cache, struct page *page,
- 	return page->s_mem + cache->size * idx;
+@@ -2574,7 +2574,7 @@ static void cache_init_objs(struct kmem_cache *cachep,
+ 
+ 	for (i = 0; i < cachep->num; i++) {
+ 		objp = index_to_obj(cachep, page, i);
+-		kasan_init_slab_obj(cachep, objp);
++		objp = kasan_init_slab_obj(cachep, objp);
+ 
+ 		/* constructor could break poison info */
+ 		if (DEBUG == 0 && cachep->ctor) {
+diff --git a/mm/slub.c b/mm/slub.c
+index c4d5f4442ff1..75fc76e42a1e 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -1413,16 +1413,17 @@ static inline bool slab_free_freelist_hook(struct kmem_cache *s,
+ #endif
  }
  
--/*
-- * We want to avoid an expensive divide : (offset / cache->size)
-- *   Using the fact that size is a constant for a particular cache,
-- *   we can replace (offset / cache->size) by
-- *   reciprocal_divide(offset, cache->reciprocal_buffer_size)
-- */
--static inline unsigned int obj_to_index(const struct kmem_cache *cache,
--					const struct page *page, void *obj)
--{
--	u32 offset = (obj - page->s_mem);
--	return reciprocal_divide(offset, cache->reciprocal_buffer_size);
--}
--
- #define BOOT_CPUCACHE_ENTRIES	1
- /* internal cache of cache description objs */
- static struct kmem_cache kmem_cache_boot = {
+-static void setup_object(struct kmem_cache *s, struct page *page,
++static void *setup_object(struct kmem_cache *s, struct page *page,
+ 				void *object)
+ {
+ 	setup_object_debug(s, page, object);
+-	kasan_init_slab_obj(s, object);
++	object = kasan_init_slab_obj(s, object);
+ 	if (unlikely(s->ctor)) {
+ 		kasan_unpoison_object_data(s, object);
+ 		s->ctor(object);
+ 		kasan_poison_object_data(s, object);
+ 	}
++	return object;
+ }
+ 
+ /*
+@@ -1530,16 +1531,16 @@ static bool shuffle_freelist(struct kmem_cache *s, struct page *page)
+ 	/* First entry is used as the base of the freelist */
+ 	cur = next_freelist_entry(s, page, &pos, start, page_limit,
+ 				freelist_count);
++	cur = setup_object(s, page, cur);
+ 	page->freelist = cur;
+ 
+ 	for (idx = 1; idx < page->objects; idx++) {
+-		setup_object(s, page, cur);
+ 		next = next_freelist_entry(s, page, &pos, start, page_limit,
+ 			freelist_count);
++		next = setup_object(s, page, next);
+ 		set_freepointer(s, cur, next);
+ 		cur = next;
+ 	}
+-	setup_object(s, page, cur);
+ 	set_freepointer(s, cur, NULL);
+ 
+ 	return true;
+@@ -1561,7 +1562,7 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
+ 	struct page *page;
+ 	struct kmem_cache_order_objects oo = s->oo;
+ 	gfp_t alloc_gfp;
+-	void *start, *p;
++	void *start, *p, *next;
+ 	int idx, order;
+ 	bool shuffle;
+ 
+@@ -1613,13 +1614,16 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
+ 
+ 	if (!shuffle) {
+ 		for_each_object_idx(p, idx, s, start, page->objects) {
+-			setup_object(s, page, p);
+-			if (likely(idx < page->objects))
+-				set_freepointer(s, p, p + s->size);
+-			else
++			if (likely(idx < page->objects)) {
++				next = p + s->size;
++				next = setup_object(s, page, next);
++				set_freepointer(s, p, next);
++			} else
+ 				set_freepointer(s, p, NULL);
+ 		}
+-		page->freelist = fixup_red_left(s, start);
++		start = fixup_red_left(s, start);
++		start = setup_object(s, page, start);
++		page->freelist = start;
+ 	}
+ 
+ 	page->inuse = page->objects;
 -- 
 2.19.0.397.gdd90340f6a-goog
