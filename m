@@ -1,72 +1,48 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 19 Sep 2018 12:26:40 +0300
-Subject: [PATCH v3 RESEND 0/4] clk: clk: Add functions to save/restore
- clock context en-masse
-In-Reply-To: <2b898faf-ca7d-1ef9-f862-9a3f05717884@ti.com>
-References: <1536043778-2232-1-git-send-email-j-keerthy@ti.com>
- <2b898faf-ca7d-1ef9-f862-9a3f05717884@ti.com>
-Message-ID: <ff898a7e-5fef-2057-d8ea-7e0c234c3ab6@ti.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 19 Sep 2018 11:28:04 +0200
+Subject: [PATCH V6] ARM: shmobile: Rework the PMIC IRQ line quirk
+In-Reply-To: <7d214a60-e703-c53d-5c98-5da29c34650f@gmail.com>
+References: <20180918122340.5478-1-marek.vasut+renesas@gmail.com>
+ <CAMuHMdVOMZ+o4osu7zGJm3YBQ-Mxest1kkJGgiH53joW1i__jg@mail.gmail.com>
+ <20180919091330.yxnehm2fy5llb2bb@verge.net.au>
+ <7d214a60-e703-c53d-5c98-5da29c34650f@gmail.com>
+Message-ID: <CAMuHMdWdxFNuPkbXCigw_K8G9NR0r+V1hqbq1TBXM6rJxh5bAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/09/18 10:50, Keerthy wrote:
-> 
-> 
-> On Tuesday 04 September 2018 12:19 PM, Keerthy wrote:
->> Deep enough power saving mode can result into losing context of the clock
->> registers also, and they need to be restored once coming back from the power
->> saving mode. Hence add functions to save/restore clock context.
-> 
-> A gentle ping on this series.
+Hi Marek,
 
-Stephen,
+On Wed, Sep 19, 2018 at 11:22 AM Marek Vasut <marek.vasut@gmail.com> wrote:
+> On 09/19/2018 11:13 AM, Simon Horman wrote:
+> > Marek, these days checkpatch complains if the author of the patch does not
+> > have a signed offline, and the inconsistency between your
+> > from and Sign-off the email address trips that check.
+> >
+> > Could you consider either a) enhancing checkpatch or b) using
 
-what is your take on this? I can pick this up as part of my changes for 
-4.20 and send a pull-req, however it contains changes to clock core so I 
-am somewhat hesitant to do that.
+I'm the one who enhanced checkpatch with the new check ;-)
 
--Tero
+> > the same address twice? No need to take any action for this patch.
+>
+> Sure, do you know if there's some tweak to git config , so git
+> send-email uses the m.v+foo@ From address ?
 
-> 
->>
->> Tested for DS0 on am437x-gp-evm
->>
->> Based on top of linux-next
->>
->> Resend Series:
->>
->>    * Rebased on top of Linux 4.19-rc2
->>    * Added Tony's Ack.
->>
->> Changes in v2:
->>
->>          * Renamed clk_dflt_restore to clk_gate_restore_context
->>
->> Changes in v3: Corrected the e-mail address of linux-omap list
->>
->> Keerthy (2):
->>    clk: clk: Add clk_gate_restore_context function
->>    ti: pm33xx: Save/restore clk context based on enable_off_mode setting
->>
->> Russ Dill (2):
->>    clk: clk: Add functions to save/restore clock context en-masse
->>    clk: ti: Add functions to save/restore clk context
->>
->>   arch/arm/mach-omap2/pm33xx-core.c    |  15 +++++
->>   drivers/clk/clk.c                    |  93 ++++++++++++++++++++++++++
->>   drivers/clk/ti/clock.h               |   2 +
->>   drivers/clk/ti/divider.c             |  36 ++++++++++
->>   drivers/clk/ti/dpll.c                |   6 ++
->>   drivers/clk/ti/dpll3xxx.c            | 124 +++++++++++++++++++++++++++++++++++
->>   drivers/clk/ti/gate.c                |   3 +
->>   drivers/clk/ti/mux.c                 |  29 ++++++++
->>   drivers/soc/ti/pm33xx.c              |  13 ++++
->>   include/linux/clk-provider.h         |   9 +++
->>   include/linux/clk.h                  |  25 +++++++
->>   include/linux/clk/ti.h               |   6 ++
->>   include/linux/platform_data/pm33xx.h |   1 +
->>   13 files changed, 362 insertions(+)
->>
+Git send-email uses the address from user.email in gitconfig, just
+like git commit.
 
---
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+However, I see you're using Gmail's SMTP server. That one replaces the
+From-line in the header by your primary email address as configured in Gmail
+(even if you have configured Gmail to know the other address is yours, too).
+
+I use my ISP's SMTP server to work around that.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
