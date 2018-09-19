@@ -1,47 +1,64 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Wed, 19 Sep 2018 15:35:59 +0300
-Subject: [PATCH 07/21] soc/fsl/bman_portals: defer probe after bman's probe
+Date: Wed, 19 Sep 2018 15:35:56 +0300
+Subject: [PATCH 04/21] soc/fsl/qman-portal: map CENA area in the iommu
 In-Reply-To: <20180919123613.15092-1-laurentiu.tudor@nxp.com>
 References: <20180919123613.15092-1-laurentiu.tudor@nxp.com>
-Message-ID: <20180919123613.15092-8-laurentiu.tudor@nxp.com>
+Message-ID: <20180919123613.15092-5-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-A crash in bman portal probing could not be triggered (as is the case
-with qman portals) but it does make calls [1] into the bman driver so
-lets make sure the bman portal probing happens after bman's.
-
-[1]  bman_p_irqsource_add() (in bman) called by:
-       init_pcfg() called by:
-         bman_portal_probe()
+Add a one-to-one iommu mapping for qman portal CENA register area.
+This is required for QMAN stashing to work without faults behind
+an iommu.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
- drivers/soc/fsl/qbman/bman_portal.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ drivers/soc/fsl/qbman/qman_portal.c | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/drivers/soc/fsl/qbman/bman_portal.c b/drivers/soc/fsl/qbman/bman_portal.c
-index 2f71f7df3465..f9edd28894fd 100644
---- a/drivers/soc/fsl/qbman/bman_portal.c
-+++ b/drivers/soc/fsl/qbman/bman_portal.c
-@@ -91,7 +91,15 @@ static int bman_portal_probe(struct platform_device *pdev)
- 	struct device_node *node = dev->of_node;
- 	struct bm_portal_config *pcfg;
- 	struct resource *addr_phys[2];
--	int irq, cpu;
-+	int irq, cpu, err;
-+
-+	err = bman_is_probed();
-+	if (!err)
-+		return -EPROBE_DEFER;
-+	if (err < 0) {
-+		dev_err(&pdev->dev, "failing probe due to bman probe error\n");
-+		return -ENODEV;
-+	}
+diff --git a/drivers/soc/fsl/qbman/qman_portal.c b/drivers/soc/fsl/qbman/qman_portal.c
+index a120002b630e..012bb95e87e1 100644
+--- a/drivers/soc/fsl/qbman/qman_portal.c
++++ b/drivers/soc/fsl/qbman/qman_portal.c
+@@ -29,6 +29,7 @@
+  */
  
- 	pcfg = devm_kmalloc(dev, sizeof(*pcfg), GFP_KERNEL);
- 	if (!pcfg)
+ #include "qman_priv.h"
++#include <linux/iommu.h>
+ 
+ struct qman_portal *qman_dma_portal;
+ EXPORT_SYMBOL(qman_dma_portal);
+@@ -222,6 +223,7 @@ static int qman_portal_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+ 	struct device_node *node = dev->of_node;
++	struct iommu_domain *domain;
+ 	struct qm_portal_config *pcfg;
+ 	struct resource *addr_phys[2];
+ 	int irq, cpu, err;
+@@ -276,6 +278,21 @@ static int qman_portal_probe(struct platform_device *pdev)
+ 		goto err_ioremap2;
+ 	}
+ 
++	/* Create an 1-to-1 iommu mapping for cena portal area */
++	domain = iommu_get_domain_for_dev(dev);
++	if (domain) {
++		/*
++		 * Note: not mapping this as cacheable triggers the infamous
++		 * QMan CIDE error.
++		 */
++		err = iommu_map(iommu_get_domain_for_dev(dev),
++				addr_phys[0]->start, addr_phys[0]->start,
++				resource_size(addr_phys[0]),
++				IOMMU_READ | IOMMU_WRITE | IOMMU_CACHE);
++		if (err)
++			dev_warn(dev, "failed to iommu_map() %d\n", err);
++	}
++
+ 	pcfg->pools = qm_get_pools_sdqcr();
+ 
+ 	spin_lock(&qman_lock);
 -- 
 2.17.1
