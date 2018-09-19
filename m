@@ -1,77 +1,45 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Wed, 19 Sep 2018 14:06:53 +0000
-Subject: [PATCH 18/21] arm64: dts: ls104xa: set mask to drop TBU ID from
- StreamID
-In-Reply-To: <fe2af486-3d7d-a38f-ef62-6754f809298f@arm.com>
-References: <20180919123613.15092-1-laurentiu.tudor@nxp.com>
- <20180919123613.15092-19-laurentiu.tudor@nxp.com>
- <fe2af486-3d7d-a38f-ef62-6754f809298f@arm.com>
-Message-ID: <a4324a5b-abeb-f43a-cac3-7721577e183d@nxp.com>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Wed, 19 Sep 2018 16:11:55 +0200
+Subject: Kernel memory leak on CDC-ACM device plug/unplug
+Message-ID: <CAGkQfmP6o+e_nanviTfRt7Ej9U+4BdqDYvMM83FjHhSCECcH3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+While trying to debug a memory leak problem, I encountered the following
+problem:
 
-On 19.09.2018 16:41, Robin Murphy wrote:
-> On 19/09/18 13:36, laurentiu.tudor at nxp.com wrote:
->> From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
->>
->> The StreamID entering the SMMU is actually a concatenation of the
->> SMMU TBU ID and the ICID configured in software.
->> Since the TBU ID is internal to the SoC and since we want that the
->> actual the ICID configured in software to enter the SMMU witout any
->> additional set bits, mask out the TBU ID bits and leave only the
->> relevant ICID bits to enter SMMU.
->>
->> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
->> ---
->> ? arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 1 +
->> ? arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 1 +
->> ? 2 files changed, 2 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi 
->> b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
->> index 8b3eba167508..90296b9fb171 100644
->> --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
->> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
->> @@ -226,6 +226,7 @@
->> ????????????? compatible = "arm,mmu-500";
->> ????????????? reg = <0 0x9000000 0 0x400000>;
->> ????????????? dma-coherent;
->> +??????????? stream-match-mask = <0x7f00>;
-> 
-> The TBU ID only forms the top 5 bits, so also ignoring bits 9:8 raises 
-> an eyebrow - if the LS104x SMMU really is configured for 8-bit SID input 
-> then it's harmless, 
+After plugging/unplugging an USB CDC-ACM device, kmemleak reports multiple
+copies of the following leak. It is not necessary to open the port for the
+leak to happen.
 
-On these lower-end platforms the SID input is configured and documented 
-as 8-bit.
+unreferenced object 0xddbfd500 (size 128):
+  comm "kworker/0:3", pid 675, jiffies 69734 (age 916.580s)
+  hex dump (first 32 bytes):
+    01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
+    00 00 00 00 00 00 00 00 00 00 00 00 1c d5 bf dd  ................
+  backtrace:
+    [<da0194da>] acm_probe+0x868/0xc3c
+    [<cc72c809>] usb_probe_interface+0x11c/0x274
+    [<bbce212c>] driver_probe_device+0x22c/0x320
+    [<544a5b43>] bus_for_each_drv+0x58/0xb8
+    [<fe5944dc>] __device_attach+0xd0/0x138
+    [<d807c1e5>] bus_probe_device+0x84/0x8c
+    [<16645f2c>] device_add+0x3cc/0x5c0
+    [<80c11c88>] usb_set_configuration+0x448/0x7b0
+    [<76bdbcdf>] generic_probe+0x2c/0x78
+    [<bbce212c>] driver_probe_device+0x22c/0x320
+    [<544a5b43>] bus_for_each_drv+0x58/0xb8
+    [<fe5944dc>] __device_attach+0xd0/0x138
+    [<d807c1e5>] bus_probe_device+0x84/0x8c
+    [<16645f2c>] device_add+0x3cc/0x5c0
+    [<02a49898>] usb_new_device+0x264/0x424
+    [<865a481b>] hub_event+0xa20/0x1154
 
-> but if it's actually a 9 or 10-bit configuration 
-> then you probably want to avoid masking them (or at least document why) 
-> - IIRC there *was* stuff wired there on LS2085 at least.
+For each additional plug/unplug cycle, around 30 such new leaks are created.
 
-Yes, on LS2s there are 2 extra-bits in there carrying some signaling. 
-However, on LS1s they are not present.
+Tested on a SAMA5D2 Xplained demo board, with a v4.18.8 kernel.
+The CDC-ACM device was another SAMA5D2 device, with a composite profile
+including a CDC-ACM port implemented with configfs.
 
----
-Thanks & Best Regards, Laurentiu
-
-> 
->> ????????????? #global-interrupts = <2>;
->> ????????????? #iommu-cells = <1>;
->> ????????????? interrupts = <0 142 4>, /* global secure fault */
->> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi 
->> b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
->> index 06863d3e4a7d..15094dd8400e 100644
->> --- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
->> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
->> @@ -232,6 +232,7 @@
->> ????????????? compatible = "arm,mmu-500";
->> ????????????? reg = <0 0x9000000 0 0x400000>;
->> ????????????? dma-coherent;
->> +??????????? stream-match-mask = <0x7f00>;
->> ????????????? #global-interrupts = <2>;
->> ????????????? #iommu-cells = <1>;
->> ????????????? interrupts = <0 142 4>, /* global secure fault */
->>
+-- 
+Romain Izard
