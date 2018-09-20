@@ -1,33 +1,90 @@
 From: anshuman.khandual@arm.com (Anshuman Khandual)
-Date: Thu, 20 Sep 2018 09:36:18 +0530
-Subject: [PATCH V2 0/3] Emulate MRS instructions by parsing ESR_ELx.ISS
-Message-ID: <1537416381-13674-1-git-send-email-anshuman.khandual@arm.com>
+Date: Thu, 20 Sep 2018 09:36:19 +0530
+Subject: [PATCH V2 1/3] arm64/cpufeatures: Introduce ESR_ELx_SYS64_ISS_RT()
+In-Reply-To: <1537416381-13674-1-git-send-email-anshuman.khandual@arm.com>
+References: <1537416381-13674-1-git-send-email-anshuman.khandual@arm.com>
+Message-ID: <1537416381-13674-2-git-send-email-anshuman.khandual@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Armv8.4-A extension enables MRS instruction encodings inside ESR_ELx.ISS
-during exception class ESR_ELx_EC_SYS64 (0x18). This encoding can be used
-to emulate MRS instructions which can avoid fetch/decode from user space
-thus improving performance. The patch series here enables this new method
-of emulating MRS instruction. For this purpose we factorizes the existing
-emulate_mrs() function and while here, add new macro ESR_ELx_SYS64_ISS_RT.
+Extracting target register from ESR.ISS encoding has already been required
+at multiple instances. Just make it a macro definition and replace all the
+existing use cases.
 
-Changes in V2:
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Anshuman Khandual <anshuman.khandual@arm.com>
+---
+ arch/arm64/include/asm/esr.h         | 2 ++
+ arch/arm64/include/asm/kvm_emulate.h | 2 +-
+ arch/arm64/kernel/traps.c            | 8 ++++----
+ 3 files changed, 7 insertions(+), 5 deletions(-)
 
-- Replaced the argument 'dst' as 'rt' in second patch per Suzuki
-- Added review tags from Suzuki
-
-Anshuman Khandual (3):
-  arm64/cpufeatures: Introduce ESR_ELx_SYS64_ISS_RT()
-  arm64/cpufeatures: Factorize emulate_mrs()
-  arm64/cpufeatures: Emulate MRS instructions by parsing ESR_ELx.ISS
-
- arch/arm64/include/asm/cpufeature.h  |  1 +
- arch/arm64/include/asm/esr.h         | 14 ++++++++++++++
- arch/arm64/include/asm/kvm_emulate.h |  2 +-
- arch/arm64/kernel/cpufeature.c       | 25 +++++++++++++++----------
- arch/arm64/kernel/traps.c            | 25 +++++++++++++++++++++----
- 5 files changed, 52 insertions(+), 15 deletions(-)
-
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index ce70c3f..cc2d9e7 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -187,6 +187,8 @@
+ 
+ #define ESR_ELx_SYS64_ISS_SYS_OP_MASK	(ESR_ELx_SYS64_ISS_SYS_MASK | \
+ 					 ESR_ELx_SYS64_ISS_DIR_MASK)
++#define ESR_ELx_SYS64_ISS_RT(esr) \
++	(((esr) & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT)
+ /*
+  * User space cache operations have the following sysreg encoding
+  * in System instructions.
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index 6106a85..2124787 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -335,7 +335,7 @@ static inline bool kvm_vcpu_dabt_isextabt(const struct kvm_vcpu *vcpu)
+ static inline int kvm_vcpu_sys_get_rt(struct kvm_vcpu *vcpu)
+ {
+ 	u32 esr = kvm_vcpu_get_hsr(vcpu);
+-	return (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
++	return ESR_ELx_SYS64_ISS_RT(esr);
+ }
+ 
+ static inline unsigned long kvm_vcpu_get_mpidr_aff(struct kvm_vcpu *vcpu)
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 039e9ff..15276b2 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -437,7 +437,7 @@ void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused)
+ static void user_cache_maint_handler(unsigned int esr, struct pt_regs *regs)
+ {
+ 	unsigned long address;
+-	int rt = (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
++	int rt = ESR_ELx_SYS64_ISS_RT(esr);
+ 	int crm = (esr & ESR_ELx_SYS64_ISS_CRM_MASK) >> ESR_ELx_SYS64_ISS_CRM_SHIFT;
+ 	int ret = 0;
+ 
+@@ -472,7 +472,7 @@ static void user_cache_maint_handler(unsigned int esr, struct pt_regs *regs)
+ 
+ static void ctr_read_handler(unsigned int esr, struct pt_regs *regs)
+ {
+-	int rt = (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
++	int rt = ESR_ELx_SYS64_ISS_RT(esr);
+ 	unsigned long val = arm64_ftr_reg_user_value(&arm64_ftr_reg_ctrel0);
+ 
+ 	pt_regs_write_reg(regs, rt, val);
+@@ -482,7 +482,7 @@ static void ctr_read_handler(unsigned int esr, struct pt_regs *regs)
+ 
+ static void cntvct_read_handler(unsigned int esr, struct pt_regs *regs)
+ {
+-	int rt = (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
++	int rt = ESR_ELx_SYS64_ISS_RT(esr);
+ 
+ 	pt_regs_write_reg(regs, rt, arch_counter_get_cntvct());
+ 	arm64_skip_faulting_instruction(regs, AARCH64_INSN_SIZE);
+@@ -490,7 +490,7 @@ static void cntvct_read_handler(unsigned int esr, struct pt_regs *regs)
+ 
+ static void cntfrq_read_handler(unsigned int esr, struct pt_regs *regs)
+ {
+-	int rt = (esr & ESR_ELx_SYS64_ISS_RT_MASK) >> ESR_ELx_SYS64_ISS_RT_SHIFT;
++	int rt = ESR_ELx_SYS64_ISS_RT(esr);
+ 
+ 	pt_regs_write_reg(regs, rt, arch_timer_get_rate());
+ 	arm64_skip_faulting_instruction(regs, AARCH64_INSN_SIZE);
 -- 
 2.7.4
