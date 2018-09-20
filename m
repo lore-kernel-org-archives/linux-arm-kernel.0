@@ -1,202 +1,131 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 20 Sep 2018 13:41:53 +0200
-Subject: [RESEND PATCH v3 2/2] serial: uartps: Change uart ID port allocation
-In-Reply-To: <b1772d99d4e8b788448cde0fc5c7dccb1f63b507.1537443710.git.michal.simek@xilinx.com>
-References: <b1772d99d4e8b788448cde0fc5c7dccb1f63b507.1537443710.git.michal.simek@xilinx.com>
-Message-ID: <39e840d1f727fe6338ea14b882ca9bf831f53e32.1537443710.git.michal.simek@xilinx.com>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Thu, 20 Sep 2018 17:11:53 +0530
+Subject: [PATCH 1/1] iommu/arm-smmu: Add support to use Last level cache
+In-Reply-To: <20180627163749.GA8729@arm.com>
+References: <20180615105329.26800-1-vivek.gautam@codeaurora.org>
+ <20180615165232.GE2202@arm.com>
+ <CAFp+6iFm29ufb2Pr7Gb-2O_aN3GQLH4rcyWhbQGZ3QiwCC8vPg@mail.gmail.com>
+ <20180627163749.GA8729@arm.com>
+Message-ID: <CAFp+6iFNhk7xZRHp0hNb2S7Cdn3muvsWqTEX-vjPGmxM8TNM9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For IPs which have alias algorightm all the time using that alias and
-minor number. It means serial20 alias ends up as ttyPS20.
+Hi Will,
 
-If alias is not setup for probed IP instance the first unused position is
-used but that needs to be checked if it is really empty because another
-instance doesn't need to be probed at that time. of_alias_get_alias_list()
-fills alias bitmap which exactly shows which ID is free.
-If alias pointing to different not compatible IP, it is free to use.
+On Wed, Jun 27, 2018 at 10:07 PM Will Deacon <will.deacon@arm.com> wrote:
+>
+> Hi Vivek,
+>
+> On Tue, Jun 19, 2018 at 02:04:44PM +0530, Vivek Gautam wrote:
+> > On Fri, Jun 15, 2018 at 10:22 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > > On Fri, Jun 15, 2018 at 04:23:29PM +0530, Vivek Gautam wrote:
+> > >> Qualcomm SoCs have an additional level of cache called as
+> > >> System cache or Last level cache[1]. This cache sits right
+> > >> before the DDR, and is tightly coupled with the memory
+> > >> controller.
+> > >> The cache is available to all the clients present in the
+> > >> SoC system. The clients request their slices from this system
+> > >> cache, make it active, and can then start using it. For these
+> > >> clients with smmu, to start using the system cache for
+> > >> dma buffers and related page tables [2], few of the memory
+> > >> attributes need to be set accordingly.
+> > >> This change makes the related memory Outer-Shareable, and
+> > >> updates the MAIR with necessary protection.
+> > >>
+> > >> The MAIR attribute requirements are:
+> > >>     Inner Cacheablity = 0
+> > >>     Outer Cacheablity = 1, Write-Back Write Allocate
+> > >>     Outer Shareablity = 1
+> > >
+> > > Hmm, so is this cache coherent with the CPU or not?
+> >
+> > Thanks for reviewing.
+> > Yes, this LLC is cache coherent with CPU, so we mark for Outer-cacheable.
+> > The different masters such as GPU as able to allocated and activate a slice
+> > in this Last Level Cache.
+>
+> What I mean is, for example, if the CPU writes some data using Normal, Inner
+> Shareable, Inner/Outer Cacheable, Inner/Outer Write-back, Non-transient
+> Read/Write-allocate and a device reads that data using your MAIR encoding
+> above, is the device guaranteed to see the CPU writes after the CPU has
+> executed a DSB instruction?
 
-cdns_get_id() call is placed below structure allocation to simplify
-error path.
+No, these MAIR configurations don't guarantee that devices will have
+coherent view
+of what CPU writes. Not all devices can snoop into CPU caches (only IO-Coherent
+devices can).
+So a normal cached memory configuration in CPU MMU tables, and SMMU page tables
+is valid only for few devices that are IO-coherent.
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+Moreover, CPU can lookup in system cache, and so do all devices;
+allocation will depend on h/w configurations and memory attributes.
+So anything that CPU caches in system cache will be coherently visible
+to devices.
 
-Changes in v3: None
-Changes in v2:
-- Add handle of return value from of_alias_get_alias_list
+>
+> I don't think so, because the ARM ARM would say that there's a mismatch on
+> the Inner Cacheability attribute.
+>
+> > > Why don't normal
+> > > non-cacheable mappings allocated in the LLC by default?
+> >
+> > Sorry, I couldn't fully understand your question here.
+> > Few of the masters on qcom socs are not io-coherent, so for them
+> > the IC has to be marked as 0.
+>
+> By IC you mean Inner Cacheability? In your MAIR encoding above, it is zero
+> so I don't understand the problem. What goes wrong if non-coherent devices
+> use your MAIR encoding for their DMA buffers?
+>
+> > But they are able to use the LLC with OC marked as 1.
+>
+> The issue here is that whatever attributes we put in the SMMU need to align
+> with the attributes used by the CPU in order to avoid introducing mismatched
+> aliases.
 
-Needs to be applied on the top of
-https://lkml.org/lkml/2018/9/3/404
-https://lkml.org/lkml/2018/9/3/400 (minor that's why just in case)
+Not really, right?
+Devices can use Inner non-Cacheable, Outer-cacheable (IC=0, OC=1) to allocate
+into the system cache (as these devices don't want to allocate in
+their inner caches),
+and the CPU will have a coherent view of these buffers/page-tables.
+This should be
+a normal cached non-IO-Coherent memory.
 
-Greg: Please apply it with
-"of: base: Introduce of_alias_get_alias_list() to check alias IDs
-Rob is ok with that.
+But anything that CPU writes using Normal, Inner Shareable,
+Inner/Outer Cacheable,
+Inner/Outer Write-back, Non-transient Read/Write-allocate, may not be visible
+to the device.
 
----
- drivers/tty/serial/xilinx_uartps.c | 109 ++++++++++++++++++++++++++++++++-----
- 1 file changed, 96 insertions(+), 13 deletions(-)
+Also added Jordan, and Pratik to this thread.
 
-diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index 71c032744dae..f77200a0f461 100644
---- a/drivers/tty/serial/xilinx_uartps.c
-+++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -30,7 +30,6 @@
- #define CDNS_UART_TTY_NAME	"ttyPS"
- #define CDNS_UART_NAME		"xuartps"
- #define CDNS_UART_MAJOR		0	/* use dynamic node allocation */
--#define CDNS_UART_NR_PORTS	2
- #define CDNS_UART_FIFO_SIZE	64	/* FIFO size */
- #define CDNS_UART_REGISTER_SPACE	0x1000
- 
-@@ -1370,6 +1369,88 @@ static int __maybe_unused cdns_runtime_resume(struct device *dev)
- };
- MODULE_DEVICE_TABLE(of, cdns_uart_of_match);
- 
-+/*
-+ * Maximum number of instances without alias IDs but if there is alias
-+ * which target "< MAX_UART_INSTANCES" range this ID can't be used.
-+ */
-+#define MAX_UART_INSTANCES	32
-+
-+/* Stores static aliases list */
-+static DECLARE_BITMAP(alias_bitmap, MAX_UART_INSTANCES);
-+static int alias_bitmap_initialized;
-+
-+/* Stores actual bitmap of allocated IDs with alias IDs together */
-+static DECLARE_BITMAP(bitmap, MAX_UART_INSTANCES);
-+/* Protect bitmap operations to have unique IDs */
-+static DEFINE_MUTEX(bitmap_lock);
-+
-+static int cdns_get_id(struct platform_device *pdev)
-+{
-+	int id, ret;
-+
-+	mutex_lock(&bitmap_lock);
-+
-+	/* Alias list is stable that's why get alias bitmap only once */
-+	if (!alias_bitmap_initialized) {
-+		ret = of_alias_get_alias_list(cdns_uart_of_match, "serial",
-+					      alias_bitmap, MAX_UART_INSTANCES);
-+		if (ret)
-+			return ret;
-+
-+		alias_bitmap_initialized++;
-+	}
-+
-+	/* Make sure that alias ID is not taken by instance without alias */
-+	bitmap_or(bitmap, bitmap, alias_bitmap, MAX_UART_INSTANCES);
-+
-+	dev_dbg(&pdev->dev, "Alias bitmap: %*pb\n",
-+		MAX_UART_INSTANCES, bitmap);
-+
-+	/* Look for a serialN alias */
-+	id = of_alias_get_id(pdev->dev.of_node, "serial");
-+	if (id < 0) {
-+		dev_warn(&pdev->dev,
-+			 "No serial alias passed. Using the first free id\n");
-+
-+		/*
-+		 * Start with id 0 and check if there is no serial0 alias
-+		 * which points to device which is compatible with this driver.
-+		 * If alias exists then try next free position.
-+		 */
-+		id = 0;
-+
-+		for (;;) {
-+			dev_info(&pdev->dev, "Checking id %d\n", id);
-+			id = find_next_zero_bit(bitmap, MAX_UART_INSTANCES, id);
-+
-+			/* No free empty instance */
-+			if (id == MAX_UART_INSTANCES) {
-+				dev_err(&pdev->dev, "No free ID\n");
-+				mutex_unlock(&bitmap_lock);
-+				return -EINVAL;
-+			}
-+
-+			dev_dbg(&pdev->dev, "The empty id is %d\n", id);
-+			/* Check if ID is empty */
-+			if (!test_and_set_bit(id, bitmap)) {
-+				/* Break the loop if bit is taken */
-+				dev_dbg(&pdev->dev,
-+					"Selected ID %d allocation passed\n",
-+					id);
-+				break;
-+			}
-+			dev_dbg(&pdev->dev,
-+				"Selected ID %d allocation failed\n", id);
-+			/* if taking bit fails then try next one */
-+			id++;
-+		}
-+	}
-+
-+	mutex_unlock(&bitmap_lock);
-+
-+	return id;
-+}
-+
- /**
-  * cdns_uart_probe - Platform driver probe
-  * @pdev: Pointer to the platform device structure
-@@ -1403,21 +1484,17 @@ static int cdns_uart_probe(struct platform_device *pdev)
- 	if (!cdns_uart_uart_driver)
- 		return -ENOMEM;
- 
--	/* Look for a serialN alias */
--	cdns_uart_data->id = of_alias_get_id(pdev->dev.of_node, "serial");
-+	cdns_uart_data->id = cdns_get_id(pdev);
- 	if (cdns_uart_data->id < 0)
--		cdns_uart_data->id = 0;
--
--	if (cdns_uart_data->id >= CDNS_UART_NR_PORTS) {
--		dev_err(&pdev->dev, "Cannot get uart_port structure\n");
--		return -ENODEV;
--	}
-+		return cdns_uart_data->id;
- 
- 	/* There is a need to use unique driver name */
- 	driver_name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "%s%d",
- 				     CDNS_UART_NAME, cdns_uart_data->id);
--	if (!driver_name)
--		return -ENOMEM;
-+	if (!driver_name) {
-+		rc = -ENOMEM;
-+		goto err_out_id;
-+	}
- 
- 	cdns_uart_uart_driver->owner = THIS_MODULE;
- 	cdns_uart_uart_driver->driver_name = driver_name;
-@@ -1446,7 +1523,7 @@ static int cdns_uart_probe(struct platform_device *pdev)
- 	rc = uart_register_driver(cdns_uart_uart_driver);
- 	if (rc < 0) {
- 		dev_err(&pdev->dev, "Failed to register driver\n");
--		return rc;
-+		goto err_out_id;
- 	}
- 
- 	cdns_uart_data->cdns_uart_driver = cdns_uart_uart_driver;
-@@ -1587,7 +1664,10 @@ static int cdns_uart_probe(struct platform_device *pdev)
- 	clk_disable_unprepare(cdns_uart_data->pclk);
- err_out_unregister_driver:
- 	uart_unregister_driver(cdns_uart_data->cdns_uart_driver);
--
-+err_out_id:
-+	mutex_lock(&bitmap_lock);
-+	clear_bit(cdns_uart_data->id, bitmap);
-+	mutex_unlock(&bitmap_lock);
- 	return rc;
- }
- 
-@@ -1610,6 +1690,9 @@ static int cdns_uart_remove(struct platform_device *pdev)
- #endif
- 	rc = uart_remove_one_port(cdns_uart_data->cdns_uart_driver, port);
- 	port->mapbase = 0;
-+	mutex_lock(&bitmap_lock);
-+	clear_bit(cdns_uart_data->id, bitmap);
-+	mutex_unlock(&bitmap_lock);
- 	clk_disable_unprepare(cdns_uart_data->uartclk);
- 	clk_disable_unprepare(cdns_uart_data->pclk);
- 	pm_runtime_disable(&pdev->dev);
+Thanks & Regards
+Vivek
+
+> Currently, we support three types of mapping in the SMMU:
+>
+> 1. DMA non-coherent (e.g. "dma-coherent" is not set on the device)
+>         Normal, Inner Shareable, Inner/Outer Non-Cacheable
+>
+> 2. DMA coherent (e.g. "dma-coherent" is set on the device) [IOMMU_CACHE]
+>         Normal, Inner Shareable, Inner/Outer Cacheable, Inner/Outer
+>         Write-back, Non-transient Read/Write-allocate
+>
+> 3. MMIO (e.g. MSI doorbell) [IOMMU_MMIO]
+>         Device-nGnRE (Outer Shareable)
+>
+> So either you override one of these types (I was suggesting (1)) or you need
+> to create a new memory type, along with the infrastructure for it to be
+> recognised on a per-device basis and used by the DMA API so that we don't
+> get mismatched aliases on the CPU.
+>
+> Will
+> _______________________________________________
+> iommu mailing list
+> iommu at lists.linux-foundation.org
+> https://lists.linuxfoundation.org/mailman/listinfo/iommu
+
+
+
 -- 
-1.9.1
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
