@@ -1,72 +1,46 @@
-From: john.garry@huawei.com (John Garry)
-Date: Thu, 20 Sep 2018 13:51:40 +0100
-Subject: [PATCH v2 0/3] iommu: Avoid DMA ops domain refcount contention
-In-Reply-To: <dbb9e48f-e31b-b8a1-0287-378c35e9fdb9@huawei.com>
-References: <cover.1536764440.git.robin.murphy@arm.com>
- <20180914124858.GA4010@arm.com>
- <dbb9e48f-e31b-b8a1-0287-378c35e9fdb9@huawei.com>
-Message-ID: <ba379973-2b34-2be4-7cdf-4ad3a3dd6dee@huawei.com>
+From: yuehaibing@huawei.com (YueHaibing)
+Date: Thu, 20 Sep 2018 20:33:03 +0800
+Subject: [PATCH net-next 19/22] net: plip: fix return type of ndo_start_xmit
+ function
+In-Reply-To: <20180920123306.14772-1-yuehaibing@huawei.com>
+References: <20180920123306.14772-1-yuehaibing@huawei.com>
+Message-ID: <20180920123306.14772-20-yuehaibing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/09/2018 12:20, John Garry wrote:
-> On 14/09/2018 13:48, Will Deacon wrote:
->> Hi Robin,
->>
->
-> Hi Robin,
->
-> I just spoke with Dongdong and we will test this version also so that we
-> may provide a "Tested-by" tag.
->
+The method ndo_start_xmit() is defined as returning an 'netdev_tx_t',
+which is a typedef for an enum type, so make sure the implementation in
+this driver has returns 'netdev_tx_t' value, and change the function
+return type to netdev_tx_t.
 
-I tested this, so for series:
-Tested-by: John Garry <john.garry@huawei.com>
+Found by coccinelle.
 
-Thanks,
-John
+Signed-off-by: YueHaibing <yuehaibing@huawei.com>
+---
+ drivers/net/plip/plip.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> Thanks,
-> John
->
->> On Wed, Sep 12, 2018 at 04:24:11PM +0100, Robin Murphy wrote:
->>> John raised the issue[1] that we have some unnecessary refcount
->>> contention
->>> in the DMA ops path which shows scalability problems now that we have
->>> more
->>> real high-performance hardware using iommu-dma. The x86 IOMMU drivers
->>> are
->>> sidestepping this by stashing domain references in archdata, but since
->>> that's not very nice for architecture-agnostic code, I think it's
->>> time to
->>> look at a generic API-level solution.
->>>
->>> These are a couple of quick patches based on the idea I had back when
->>> first implementing iommu-dma, but didn't have any way to justify at the
->>> time. However, the reports of 10-25% better networking performance on v1
->>> suggest that it's very worthwhile (and far more significant than I ever
->>> would have guessed).
->>>
->>> As far as merging goes, I don't mind at all whether this goes via IOMMU,
->>> or via dma-mapping provided Joerg's happy to ack it.
->>
->> I think it makes most sense for Joerg to take this series via his tree.
->>
->> Anyway, I've been running them on my TX2 box and things are happy enough,
->> so:
->>
->> Tested-by: Will Deacon <will.deacon@arm.com>
->>
->> Will
->>
->> .
->>
->
->
-> _______________________________________________
-> iommu mailing list
-> iommu at lists.linux-foundation.org
-> https://lists.linuxfoundation.org/mailman/listinfo/iommu
->
-> .
->
+diff --git a/drivers/net/plip/plip.c b/drivers/net/plip/plip.c
+index feb92ec..0b354e6 100644
+--- a/drivers/net/plip/plip.c
++++ b/drivers/net/plip/plip.c
+@@ -146,7 +146,7 @@
+ static void plip_interrupt(void *dev_id);
+ 
+ /* Functions for DEV methods */
+-static int plip_tx_packet(struct sk_buff *skb, struct net_device *dev);
++static netdev_tx_t plip_tx_packet(struct sk_buff *skb, struct net_device *dev);
+ static int plip_hard_header(struct sk_buff *skb, struct net_device *dev,
+                             unsigned short type, const void *daddr,
+ 			    const void *saddr, unsigned len);
+@@ -962,7 +962,7 @@ static __be16 plip_type_trans(struct sk_buff *skb, struct net_device *dev)
+ 	spin_unlock_irqrestore(&nl->lock, flags);
+ }
+ 
+-static int
++static netdev_tx_t
+ plip_tx_packet(struct sk_buff *skb, struct net_device *dev)
+ {
+ 	struct net_local *nl = netdev_priv(dev);
+-- 
+1.8.3.1
