@@ -1,21 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 20 Sep 2018 15:00:31 -0700
-Subject: [PATCH] ARM: dts: ste: Fix SPI controller node names
-In-Reply-To: <20180913181245.25484-10-robh@kernel.org>
-References: <20180913181245.25484-10-robh@kernel.org>
-Message-ID: <CACRpkdY+oza3sFbp_vOAS2w-9DkhaywzX4kaz-7sWCpkXaNbpg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 20 Sep 2018 15:01:11 -0700
+Subject: [PATCH v2 08/11] arm: dts: omap: Update coresight bindings for
+ hardware ports
+In-Reply-To: <20180912135352.19722-9-suzuki.poulose@arm.com>
+References: <20180912135352.19722-1-suzuki.poulose@arm.com>
+ <20180912135352.19722-9-suzuki.poulose@arm.com>
+Message-ID: <20180920220111.GZ5662@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2018 at 11:12 AM Rob Herring <robh@kernel.org> wrote:
+* Suzuki K Poulose <suzuki.poulose@arm.com> [180912 06:58]:
+> Switch to the new coresight bindings for hardware ports
+> 
+> Cc: linux-omap at vger.kernel.org
+> Cc: "Beno?t Cousson" <bcousson@baylibre.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  arch/arm/boot/dts/omap3-beagle-xm.dts | 17 ++++++++++-------
+>  arch/arm/boot/dts/omap3-beagle.dts    | 17 ++++++++++-------
+>  2 files changed, 20 insertions(+), 14 deletions(-)
 
-> SPI controller nodes should be named 'spi' rather than 'ssp'. Fixing the
-> name enables dtc SPI bus checks.
->
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Rob Herring <robh@kernel.org>
+Thanks applying this into omap-for-v4.20/dt.
 
-Applied to the ux500 tree, thanks!
-
-Yours,
-Linus Walleij
+Tony
