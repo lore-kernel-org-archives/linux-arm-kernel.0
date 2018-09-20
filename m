@@ -1,25 +1,39 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 20 Sep 2018 12:04:58 -0500
-Subject: [PATCH net-next 00/22] net: fix return type of ndo_start_xmit
- function
-In-Reply-To: <20180920123306.14772-1-yuehaibing@huawei.com>
-References: <20180920123306.14772-1-yuehaibing@huawei.com>
-Message-ID: <46f95cf9-8f8f-e3ab-3142-947faeee9fa9@ti.com>
+From: leoyang.li@nxp.com (Li Yang)
+Date: Thu, 20 Sep 2018 12:06:34 -0500
+Subject: [GIT PULL] soc/fsl drivers updates for next(v4.20)
+Message-ID: <20180920170634.32046-1-leoyang.li@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi arm-soc maintainers,
 
+Please merge the following updates for soc/fsl drivers.
 
-On 09/20/2018 07:32 AM, YueHaibing wrote:
-> The method ndo_start_xmit() is defined as returning an 'netdev_tx_t',
-> which is a typedef for an enum type, so make sure the implementation in
-> this driver has returns 'netdev_tx_t' value, and change the function
-> return type to netdev_tx_t.
-> 
+Regards,
+Leo
 
-May be I missed smth, but it's acceptable to report standard error codes from
-.xmit() callback as per dev_xmit_complete().
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 
--- 
-regards,
--grygorii
+  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/leo/linux.git tags/soc-fsl-for-next-4.20
+
+for you to fetch changes up to afa86d264a7ce62ba214bc7c6012e2129141421e:
+
+  soc: fsl: dpio: remove redundant pointer 'priv' (2018-08-30 12:19:02 -0500)
+
+----------------------------------------------------------------
+soc/fsl for next
+
+----------------------------------------------------------------
+Colin Ian King (1):
+      soc: fsl: dpio: remove redundant pointer 'priv'
+
+Rob Herring (1):
+      soc: fsl/qe: Use of_get_child_by_name helper
+
+ drivers/soc/fsl/dpio/dpio-driver.c | 3 ---
+ drivers/soc/fsl/qe/qe.c            | 6 +-----
+ 2 files changed, 1 insertion(+), 8 deletions(-)
