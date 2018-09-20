@@ -1,10 +1,10 @@
 From: yuehaibing@huawei.com (YueHaibing)
-Date: Thu, 20 Sep 2018 20:32:56 +0800
-Subject: [PATCH net-next 12/22] net: ovs: fix return type of ndo_start_xmit
+Date: Thu, 20 Sep 2018 20:32:54 +0800
+Subject: [PATCH net-next 10/22] net: ti: fix return type of ndo_start_xmit
  function
 In-Reply-To: <20180920123306.14772-1-yuehaibing@huawei.com>
 References: <20180920123306.14772-1-yuehaibing@huawei.com>
-Message-ID: <20180920123306.14772-13-yuehaibing@huawei.com>
+Message-ID: <20180920123306.14772-11-yuehaibing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,31 +17,76 @@ Found by coccinelle.
 
 Signed-off-by: YueHaibing <yuehaibing@huawei.com>
 ---
- net/openvswitch/vport-internal_dev.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/net/ethernet/ti/cpmac.c        | 2 +-
+ drivers/net/ethernet/ti/davinci_emac.c | 2 +-
+ drivers/net/ethernet/ti/netcp_core.c   | 8 ++++----
+ 3 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/net/openvswitch/vport-internal_dev.c b/net/openvswitch/vport-internal_dev.c
-index bb95c43..26f71cb 100644
---- a/net/openvswitch/vport-internal_dev.c
-+++ b/net/openvswitch/vport-internal_dev.c
-@@ -43,7 +43,8 @@ static struct internal_dev *internal_dev_priv(struct net_device *netdev)
+diff --git a/drivers/net/ethernet/ti/cpmac.c b/drivers/net/ethernet/ti/cpmac.c
+index 9b8a30b..64c45eb 100644
+--- a/drivers/net/ethernet/ti/cpmac.c
++++ b/drivers/net/ethernet/ti/cpmac.c
+@@ -544,7 +544,7 @@ static int cpmac_poll(struct napi_struct *napi, int budget)
+ 
  }
  
- /* Called with rcu_read_lock_bh. */
--static int internal_dev_xmit(struct sk_buff *skb, struct net_device *netdev)
-+static netdev_tx_t
-+internal_dev_xmit(struct sk_buff *skb, struct net_device *netdev)
+-static int cpmac_start_xmit(struct sk_buff *skb, struct net_device *dev)
++static netdev_tx_t cpmac_start_xmit(struct sk_buff *skb, struct net_device *dev)
  {
- 	int len, err;
- 
-@@ -62,7 +63,7 @@ static int internal_dev_xmit(struct sk_buff *skb, struct net_device *netdev)
- 	} else {
- 		netdev->stats.tx_errors++;
- 	}
--	return 0;
-+	return NETDEV_TX_OK;
+ 	int queue;
+ 	unsigned int len;
+diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
+index f270bee..b83f32d 100644
+--- a/drivers/net/ethernet/ti/davinci_emac.c
++++ b/drivers/net/ethernet/ti/davinci_emac.c
+@@ -943,7 +943,7 @@ static void emac_tx_handler(void *token, int len, int status)
+  *
+  * Returns success(NETDEV_TX_OK) or error code (typically out of desc's)
+  */
+-static int emac_dev_xmit(struct sk_buff *skb, struct net_device *ndev)
++static netdev_tx_t emac_dev_xmit(struct sk_buff *skb, struct net_device *ndev)
+ {
+ 	struct device *emac_dev = &ndev->dev;
+ 	int ret_code;
+diff --git a/drivers/net/ethernet/ti/netcp_core.c b/drivers/net/ethernet/ti/netcp_core.c
+index 1f61226..2d8cfe8 100644
+--- a/drivers/net/ethernet/ti/netcp_core.c
++++ b/drivers/net/ethernet/ti/netcp_core.c
+@@ -1270,7 +1270,8 @@ static int netcp_tx_submit_skb(struct netcp_intf *netcp,
  }
  
- static int internal_dev_open(struct net_device *netdev)
+ /* Submit the packet */
+-static int netcp_ndo_start_xmit(struct sk_buff *skb, struct net_device *ndev)
++static netdev_tx_t
++netcp_ndo_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ {
+ 	struct netcp_intf *netcp = netdev_priv(ndev);
+ 	struct netcp_stats *tx_stats = &netcp->stats;
+@@ -1290,7 +1291,7 @@ static int netcp_ndo_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ 			dev_warn(netcp->ndev_dev, "padding failed (%d), packet dropped\n",
+ 				 ret);
+ 			tx_stats->tx_dropped++;
+-			return ret;
++			return NETDEV_TX_BUSY;
+ 		}
+ 		skb->len = NETCP_MIN_PACKET_SIZE;
+ 	}
+@@ -1298,7 +1299,6 @@ static int netcp_ndo_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ 	desc = netcp_tx_map_skb(skb, netcp);
+ 	if (unlikely(!desc)) {
+ 		netif_stop_subqueue(ndev, subqueue);
+-		ret = -ENOBUFS;
+ 		goto drop;
+ 	}
+ 
+@@ -1319,7 +1319,7 @@ static int netcp_ndo_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ 	if (desc)
+ 		netcp_free_tx_desc_chain(netcp, desc, sizeof(*desc));
+ 	dev_kfree_skb(skb);
+-	return ret;
++	return NETDEV_TX_BUSY;
+ }
+ 
+ int netcp_txpipe_close(struct netcp_tx_pipe *tx_pipe)
 -- 
 1.8.3.1
