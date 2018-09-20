@@ -1,28 +1,25 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Thu, 20 Sep 2018 18:17:06 +0200
-Subject: [PATCH] ARM: dts: stm32: update HASH1 dma property on stm32mp157c
-Message-ID: <1537460226-1435-1-git-send-email-alexandre.torgue@st.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Thu, 20 Sep 2018 18:19:47 +0200
+Subject: [RESEND PATCH v3 0/3] sh: make early_platform code SuperH-specific
+In-Reply-To: <9963d3f3-ba14-0d18-d669-53fc79b783c2@linaro.org>
+References: <20180827090651.25062-1-brgl@bgdev.pl>
+ <CAMRc=McWre+5PRuozF69YKONvzy4X31=MzZim-QjhaAZ9iAVTw@mail.gmail.com>
+ <9963d3f3-ba14-0d18-d669-53fc79b783c2@linaro.org>
+Message-ID: <CAMRc=MeC8gwEpjNf5AEX4oocHYv8c_CJXkCDMM9CQvaqxrbdXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove unused parameter from HASH1 dma property on stm32mp157c SoC.
+2018-09-20 18:09 GMT+02:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
+> On 20/09/2018 15:00, Bartosz Golaszewski wrote:
+>
+> [ ... ]
+>
+>> Ping for 4.20. This is the third release cycle I'm trying to get this
+>> merged and there never were any objections.
+>
+> Thanks for the heads up, it is in the pipe.
+>
 
-Fixes: 1e726a40e067 ("ARM: dts: stm32: Add HASH support on stm32mp157c")
+I guess you mean only the clocksource patch?
 
-Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
-
-diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
-index 185541a..04cf534 100644
---- a/arch/arm/boot/dts/stm32mp157c.dtsi
-+++ b/arch/arm/boot/dts/stm32mp157c.dtsi
-@@ -923,7 +923,7 @@
- 			interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&rcc HASH1>;
- 			resets = <&rcc HASH1_R>;
--			dmas = <&mdma1 31 0x10 0x1000A02 0x0 0x0 0x0>;
-+			dmas = <&mdma1 31 0x10 0x1000A02 0x0 0x0>;
- 			dma-names = "in";
- 			dma-maxburst = <2>;
- 			status = "disabled";
--- 
-2.7.4
+Bart
