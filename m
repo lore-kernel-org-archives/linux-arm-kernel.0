@@ -1,19 +1,15 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 20 Sep 2018 14:23:54 -0700
-Subject: [PATCH] ARM: OMAP1: ams-delta-fiq: Use
- <linux/platform_data/gpio-omap.h>
-In-Reply-To: <20180910174722.15679-1-jmkrzyszt@gmail.com>
-References: <20180910174722.15679-1-jmkrzyszt@gmail.com>
-Message-ID: <20180920212354.GT5662@atomide.com>
+Date: Thu, 20 Sep 2018 14:24:59 -0700
+Subject: [PATCH] ARM: OMAP1: ams-delta: Don't request unused GPIOs
+In-Reply-To: <20180910195008.24127-1-jmkrzyszt@gmail.com>
+References: <20180910195008.24127-1-jmkrzyszt@gmail.com>
+Message-ID: <20180920212459.GU5662@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Janusz Krzysztofik <jmkrzyszt@gmail.com> [180910 10:50]:
-> Instead of defining symbols already defined in
-> linux/platform_data/gpio-omap.h, use that header file.
-> 
-> Since we include the header into an assembler code, prevent C only bits
-> from being read in.
+* Janusz Krzysztofik <jmkrzyszt@gmail.com> [180910 12:53]:
+> GPIOs with no kernel drivers can still be used from user space, don't
+> request them from the board file.
 > 
 > Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
 
