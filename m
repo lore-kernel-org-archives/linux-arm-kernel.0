@@ -1,96 +1,108 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Thu, 20 Sep 2018 10:05:48 +0100
-Subject: [PATCH 2/5] ARM: split out processor lookup
-In-Reply-To: <E1g2Z6O-0003eQ-Lh@rmk-PC.armlinux.org.uk>
-References: <20180919094802.GH30658@n2100.armlinux.org.uk>
- <E1g2Z6O-0003eQ-Lh@rmk-PC.armlinux.org.uk>
-Message-ID: <2b7eb8fd-4ec4-efe3-89bf-b442f3b11fa6@arm.com>
+From: jonas.gorski@gmail.com (Jonas Gorski)
+Date: Thu, 20 Sep 2018 11:06:12 +0200
+Subject: [PATCH v5 02/12] dt-bindings: pci: add DT docs for Brcmstb PCIe
+ device
+In-Reply-To: <1537367527-20773-3-git-send-email-jim2101024@gmail.com>
+References: <1537367527-20773-1-git-send-email-jim2101024@gmail.com>
+ <1537367527-20773-3-git-send-email-jim2101024@gmail.com>
+Message-ID: <CAOiHx=mEKoHz6t=PbnG801e2u8GG=ct7ypMTKZ=EALKJhBZf=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On 19 September 2018 at 16:31, Jim Quinlan <jim2101024@gmail.com> wrote:
+> The DT bindings description of the Brcmstb PCIe device is described.
+> This node can be used by almost all Broadcom settop box chips, using
+> ARM, ARM64, or MIPS CPU architectures.
 
-On 19/09/18 10:48, Russell King wrote:
-> Split out the lookup of the processor type and associated error handling
-> from the rest of setup_processor() - we will need to use this in the
-> secondary CPU bringup path for big.Little Spectre variant 2 mitigation.
-> 
+Oh, hey, *one* email made it finally through :P
 
-Reviewed-by: Julien Thierry <julien.thierry@arm.com>
-
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+>
+> Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
+> Acked-by: Rob Herring <robh@kernel.org>
 > ---
->   arch/arm/include/asm/cputype.h |  1 +
->   arch/arm/kernel/setup.c        | 31 +++++++++++++++++++------------
->   2 files changed, 20 insertions(+), 12 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-> index 26021980504d..f6df4bb4e543 100644
-> --- a/arch/arm/include/asm/cputype.h
-> +++ b/arch/arm/include/asm/cputype.h
-> @@ -107,6 +107,7 @@
->   #define ARM_CPU_PART_SCORPION		0x510002d0
->   
->   extern unsigned int processor_id;
-> +struct proc_info_list *lookup_processor(u32 midr);
->   
->   #ifdef CONFIG_CPU_CP15
->   #define read_cpuid(reg)							\
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index fc40a2b40595..05a4eb6b0d01 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -667,22 +667,29 @@ static void __init smp_build_mpidr_hash(void)
->   }
->   #endif
->   
-> -static void __init setup_processor(void)
-> +/*
-> + * locate processor in the list of supported processor types.  The linker
-> + * builds this table for us from the entries in arch/arm/mm/proc-*.S
-> + */
-> +struct proc_info_list *lookup_processor(u32 midr)
->   {
-> -	struct proc_info_list *list;
-> +	struct proc_info_list *list = lookup_processor_type(midr);
->   
-> -	/*
-> -	 * locate processor in the list of supported processor
-> -	 * types.  The linker builds this table for us from the
-> -	 * entries in arch/arm/mm/proc-*.S
-> -	 */
-> -	list = lookup_processor_type(read_cpuid_id());
->   	if (!list) {
-> -		pr_err("CPU configuration botched (ID %08x), unable to continue.\n",
-> -		       read_cpuid_id());
-> -		while (1);
-> +		pr_err("CPU%u: configuration botched (ID %08x), CPU halted\n",
-> +		       smp_processor_id(), midr);
-> +		while (1)
-> +		/* can't use cpu_relax() here as it may require MMU setup */;
->   	}
->   
-> +	return list;
-> +}
+>  .../devicetree/bindings/pci/brcmstb-pcie.txt       | 59 ++++++++++++++++++++++
+>  1 file changed, 59 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/brcmstb-pcie.txt
+>
+> diff --git a/Documentation/devicetree/bindings/pci/brcmstb-pcie.txt b/Documentation/devicetree/bindings/pci/brcmstb-pcie.txt
+> new file mode 100644
+> index 0000000..a1a9ad5
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/brcmstb-pcie.txt
+> @@ -0,0 +1,59 @@
+> +Brcmstb PCIe Host Controller Device Tree Bindings
 > +
-> +static void __init setup_processor(void)
-> +{
-> +	unsigned int midr = read_cpuid_id();
-> +	struct proc_info_list *list = lookup_processor(midr);
+> +Required Properties:
+> +- compatible
+> +  "brcm,bcm7425-pcie" -- for 7425 family MIPS-based SOCs.
+> +  "brcm,bcm7435-pcie" -- for 7435 family MIPS-based SOCs.
+> +  "brcm,bcm7445-pcie" -- for 7445 and later ARM based SOCs (not including
+> +      the 7278).
+> +  "brcm,bcm7278-pcie"  -- for 7278 family ARM-based SOCs.
 > +
->   	cpu_name = list->cpu_name;
->   	__cpu_architecture = __get_cpu_architecture();
->   
-> @@ -700,7 +707,7 @@ static void __init setup_processor(void)
->   #endif
->   
->   	pr_info("CPU: %s [%08x] revision %d (ARMv%s), cr=%08lx\n",
-> -		cpu_name, read_cpuid_id(), read_cpuid_id() & 15,
-> +		list->cpu_name, midr, midr & 15,
->   		proc_arch[cpu_architecture()], get_cr());
->   
->   	snprintf(init_utsname()->machine, __NEW_UTS_LEN + 1, "%s%c",
-> 
+> +- reg -- the register start address and length for the PCIe reg block.
+> +- interrupts -- two interrupts are specified; the first interrupt is for
+> +     the PCI host controller and the second is for MSI if the built-in
+> +     MSI controller is to be used.
+> +- interrupt-names -- names of the interrupts (above): "pcie" and "msi".
+> +- #address-cells -- set to <3>.
+> +- #size-cells -- set to <2>.
+> +- #interrupt-cells: set to <1>.
+> +- interrupt-map-mask and interrupt-map, standard PCI properties to define the
+> +     mapping of the PCIe interface to interrupt numbers.
+> +- ranges: ranges for the PCI memory and I/O regions.
+> +- linux,pci-domain -- should be unique per host controller.
+> +
+> +Optional Properties:
+> +- clocks -- phandle of pcie clock.
+> +- clock-names -- set to "sw_pcie" if clocks is used.
+> +- dma-ranges -- Specifies the inbound memory mapping regions when
+> +     an "identity map" is not possible.
+> +- msi-controller -- this property is typically specified to have the
+> +     PCIe controller use its internal MSI controller.
+> +- msi-parent -- set to use an external MSI interrupt controller.
+> +- brcm,enable-ssc -- (boolean) indicates usage of spread-spectrum clocking.
+> +- max-link-speed --  (integer) indicates desired generation of link:
+> +     1 => 2.5 Gbps (gen1), 2 => 5.0 Gbps (gen2), 3 => 8.0 Gbps (gen3).
+> +
+> +Example Node:
+> +
+> +pcie0: pcie at f0460000 {
+> +               reg = <0x0 0xf0460000 0x0 0x9310>;
+> +               interrupts = <0x0 0x0 0x4>;
 
--- 
-Julien Thierry
+Your binding says two interrupts, your example has three - what's the
+third interrupt for? Also you define the same for MSI and PCIe (I
+assume) - is that expected? Are there systems where they are
+different? I would expect the msi interrupt to be optional for the
+case where its the same as the pcie one, and only required if it is
+different.
+
+Also your binding requires an interrupt-names propery, but it's
+missing from the example.
+
+> +               compatible = "brcm,bcm7445-pcie";
+> +               #address-cells = <3>;
+> +               #size-cells = <2>;
+> +               ranges = <0x02000000 0x00000000 0x00000000 0x00000000 0xc0000000 0x00000000 0x08000000
+> +                         0x02000000 0x00000000 0x08000000 0x00000000 0xc8000000 0x00000000 0x08000000>;
+> +               #interrupt-cells = <1>;
+> +               interrupt-map-mask = <0 0 0 7>;
+> +               interrupt-map = <0 0 0 1 &intc 0 47 3
+> +                                0 0 0 2 &intc 0 48 3
+> +                                0 0 0 3 &intc 0 49 3
+> +                                0 0 0 4 &intc 0 50 3>;
+> +               clocks = <&sw_pcie0>;
+> +               clock-names = "sw_pcie";
+> +               msi-parent = <&pcie0>;  /* use PCIe's internal MSI controller */
+> +               msi-controller;         /* use PCIe's internal MSI controller */
+> +               brcm,ssc;
+> +               max-link-speed = <1>;
+> +               linux,pci-domain = <0>;
+> +       };
+> --
+> 1.9.0.138.g2de3478
+>
+
+Regards
+Jonas
