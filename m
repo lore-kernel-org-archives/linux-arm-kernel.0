@@ -1,10 +1,10 @@
 From: yuehaibing@huawei.com (YueHaibing)
-Date: Thu, 20 Sep 2018 20:33:03 +0800
-Subject: [PATCH net-next 19/22] net: plip: fix return type of ndo_start_xmit
+Date: Thu, 20 Sep 2018 20:33:01 +0800
+Subject: [PATCH net-next 17/22] hv_netvsc: fix return type of ndo_start_xmit
  function
 In-Reply-To: <20180920123306.14772-1-yuehaibing@huawei.com>
 References: <20180920123306.14772-1-yuehaibing@huawei.com>
-Message-ID: <20180920123306.14772-20-yuehaibing@huawei.com>
+Message-ID: <20180920123306.14772-18-yuehaibing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,30 +17,36 @@ Found by coccinelle.
 
 Signed-off-by: YueHaibing <yuehaibing@huawei.com>
 ---
- drivers/net/plip/plip.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/net/hyperv/netvsc_drv.c | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/net/plip/plip.c b/drivers/net/plip/plip.c
-index feb92ec..0b354e6 100644
---- a/drivers/net/plip/plip.c
-+++ b/drivers/net/plip/plip.c
-@@ -146,7 +146,7 @@
- static void plip_interrupt(void *dev_id);
- 
- /* Functions for DEV methods */
--static int plip_tx_packet(struct sk_buff *skb, struct net_device *dev);
-+static netdev_tx_t plip_tx_packet(struct sk_buff *skb, struct net_device *dev);
- static int plip_hard_header(struct sk_buff *skb, struct net_device *dev,
-                             unsigned short type, const void *daddr,
- 			    const void *saddr, unsigned len);
-@@ -962,7 +962,7 @@ static __be16 plip_type_trans(struct sk_buff *skb, struct net_device *dev)
- 	spin_unlock_irqrestore(&nl->lock, flags);
+diff --git a/drivers/net/hyperv/netvsc_drv.c b/drivers/net/hyperv/netvsc_drv.c
+index 3af6d8d..056c472 100644
+--- a/drivers/net/hyperv/netvsc_drv.c
++++ b/drivers/net/hyperv/netvsc_drv.c
+@@ -511,7 +511,8 @@ static int netvsc_vf_xmit(struct net_device *net, struct net_device *vf_netdev,
+ 	return rc;
  }
  
--static int
+-static int netvsc_start_xmit(struct sk_buff *skb, struct net_device *net)
 +static netdev_tx_t
- plip_tx_packet(struct sk_buff *skb, struct net_device *dev)
++netvsc_start_xmit(struct sk_buff *skb, struct net_device *net)
  {
- 	struct net_local *nl = netdev_priv(dev);
+ 	struct net_device_context *net_device_ctx = netdev_priv(net);
+ 	struct hv_netvsc_packet *packet = NULL;
+@@ -528,8 +529,11 @@ static int netvsc_start_xmit(struct sk_buff *skb, struct net_device *net)
+ 	 */
+ 	vf_netdev = rcu_dereference_bh(net_device_ctx->vf_netdev);
+ 	if (vf_netdev && netif_running(vf_netdev) &&
+-	    !netpoll_tx_running(net))
+-		return netvsc_vf_xmit(net, vf_netdev, skb);
++	    !netpoll_tx_running(net)) {
++		ret = netvsc_vf_xmit(net, vf_netdev, skb);
++		if (ret)
++			return NETDEV_TX_BUSY;
++	}
+ 
+ 	/* We will atmost need two pages to describe the rndis
+ 	 * header. We can only transmit MAX_PAGE_BUFFER_COUNT number
 -- 
 1.8.3.1
