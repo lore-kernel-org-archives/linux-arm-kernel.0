@@ -1,107 +1,119 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Thu, 20 Sep 2018 17:56:56 +0200
-Subject: [PATCH 0/4] ARM: dts: mvebu: updates and new board
-In-Reply-To: <20180726040257.22285-1-chris.packham@alliedtelesis.co.nz> (Chris
- Packham's message of "Thu, 26 Jul 2018 16:02:53 +1200")
-References: <20180726040257.22285-1-chris.packham@alliedtelesis.co.nz>
-Message-ID: <87bm8sjh6f.fsf@bootlin.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 20 Sep 2018 18:08:32 +0200
+Subject: [PATCH 02/10] locking/qspinlock: Remove unbounded cmpxchg loop
+ from locking slowpath
+In-Reply-To: <20180409171959.GB9661@arm.com>
+References: <1522947547-24081-1-git-send-email-will.deacon@arm.com>
+ <1522947547-24081-3-git-send-email-will.deacon@arm.com>
+ <dc5f5e43-a60a-05f2-16fb-46960c40459e@redhat.com>
+ <20180409105835.GC23134@arm.com> <20180409145409.GA9661@arm.com>
+ <20180409155420.GB4082@hirez.programming.kicks-ass.net>
+ <20180409171959.GB9661@arm.com>
+Message-ID: <20180920160832.GZ24124@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
- 
- On jeu., juil. 26 2018, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
+On Mon, Apr 09, 2018 at 06:19:59PM +0100, Will Deacon wrote:
+> On Mon, Apr 09, 2018 at 05:54:20PM +0200, Peter Zijlstra wrote:
+> > On Mon, Apr 09, 2018 at 03:54:09PM +0100, Will Deacon wrote:
 
-> This series updates the armada-xp-98dx3236 SoC and related boards to use the
-> new style dts bindings for nand.
->
-> I've also added a new db-88f6820-amc board which is an Armada-385 based
-> reference board from Marvell's switch team. It's a plugin card for either the
-> db-dxbc2 or db-xc3-24g4 which can be used if you disable the internal CPU on
-> those platforms.
->
-> Chris Packham (4):
->   ARM: dts: mvebu: 98dx3236: Rename nand controller node
->   ARM: dts: mvebu: db-dxbc2: use new style nand binding
->   ARM: dts: mvebu: db-xc3-24g4: use new style nand binding
->   ARM: dts: mvebu: Add device tree for db-88f6820-amc board
+> > > +/**
+> > > + * set_pending_fetch_acquire - set the pending bit and return the old lock
+> > > + *                             value with acquire semantics.
+> > > + * @lock: Pointer to queued spinlock structure
+> > > + *
+> > > + * *,*,* -> *,1,*
+> > > + */
+> > > +static __always_inline u32 set_pending_fetch_acquire(struct qspinlock *lock)
+> > > +{
+> > > +       u32 val = xchg_relaxed(&lock->pending, 1) << _Q_PENDING_OFFSET;
 
-While applying this series mvebu/dt, I got few warning with "ARM: dts:
-mvebu: 98dx3236: Rename nand controller node".
+	smp_mb();
 
-I fix them and also use the new partition binding, the diff is the
-following:
+> > > +       val |= (atomic_read_acquire(&lock->val) & ~_Q_PENDING_MASK);
+> > > +       return val;
+> > > +}
 
-iff --git a/arch/arm/boot/dts/armada-385-db-88f6820-amc.dts b/arch/arm/boot/dts/armada-385-db-88f6820-amc.dts
-index d87614057e3f..dc9ccce1d4a1 100644
---- a/arch/arm/boot/dts/armada-385-db-88f6820-amc.dts
-+++ b/arch/arm/boot/dts/armada-385-db-88f6820-amc.dts
-@@ -102,9 +102,14 @@
-                nand-ecc-strength = <4>;
-                nand-ecc-step-size = <512>;
- 
--               partition at user {
--                       reg = <0x00000000 0x40000000>;
--                       label = "user";
-+               partitions {
-+                       compatible = "fixed-partitions";
-+                       #address-cells = <1>;
-+                       #size-cells = <1>;
-+                       partition at 0 {
-+                               reg = <0x00000000 0x40000000>;
-+                               label = "user";
-+                       };
-                };
-        };
- };
-@@ -131,13 +136,18 @@
-                spi-max-frequency = <50000000>;
-                m25p,fast-read;
- 
--               partition at u-boot {
--                       reg = <0x00000000 0x00100000>;
--                       label = "u-boot";
--               };
--               partition at u-boot-env {
--                       reg = <0x00100000 0x00040000>;
--                       label = "u-boot-env";
-+               partitions {
-+                       compatible = "fixed-partitions";
-+                       #address-cells = <1>;
-+                       #size-cells = <1>;
-+                       partition at 0 {
-+                               reg = <0x00000000 0x00100000>;
-+                               label = "u-boot";
-+                       };
-+                       partition at 100000 {
-+                               reg = <0x00100000 0x00040000>;
-+                               label = "u-boot-env";
-+                       };
-                };
-        };
- };
+> > > @@ -289,18 +315,26 @@ void queued_spin_lock_slowpath(struct qspinlock *lock, u32 val)
+> > >  		return;
+> > >  
+> > >  	/*
+> > > -	 * If we observe any contention; queue.
+> > > +	 * If we observe queueing, then queue ourselves.
+> > >  	 */
+> > > -	if (val & ~_Q_LOCKED_MASK)
+> > > +	if (val & _Q_TAIL_MASK)
+> > >  		goto queue;
+> > >  
+> > >  	/*
+> > > +	 * We didn't see any queueing, so have one more try at snatching
+> > > +	 * the lock in case it became available whilst we were taking the
+> > > +	 * slow path.
+> > > +	 */
+> > > +	if (queued_spin_trylock(lock))
+> > > +		return;
+> > > +
+> > > +	/*
+> > >  	 * trylock || pending
+> > >  	 *
+> > >  	 * 0,0,0 -> 0,0,1 ; trylock
+> > >  	 * 0,0,1 -> 0,1,1 ; pending
+> > >  	 */
+> > > +	val = set_pending_fetch_acquire(lock);
+> > >  	if (!(val & ~_Q_LOCKED_MASK)) {
+> > 
+> > So, if I remember that partial paper correctly, the atomc_read_acquire()
+> > can see 'arbitrary' old values for everything except the pending byte,
+> > which it just wrote and will fwd into our load, right?
+> > 
+> > But I think coherence requires the read to not be older than the one
+> > observed by the trylock before (since it uses c-cas its acquire can be
+> > elided).
+> > 
+> > I think this means we can miss a concurrent unlock vs the fetch_or. And
+> > I think that's fine, if we still see the lock set we'll needlessly 'wait'
+> > for it go become unlocked.
+> 
+> Ah, but there is a related case that doesn't work. If the lock becomes
+> free just before we set pending, then another CPU can succeed on the
+> fastpath. We'll then set pending, but the lockword we get back may still
+> have the locked byte of 0, so two people end up holding the lock.
+> 
+> I think it's worth giving this a go with the added trylock, but I can't
+> see a way to avoid the atomic_fetch_or at the moment.
 
-I amended your patch with it, but if you don't agree with it, I can
-still modify it, the branch is not immutable yet.
+So IIRC the addition of the smp_mb() above should ensure the @val load
+is later than the @pending store.
 
-Thanks,
+Which makes the thing work again, right?
 
-Gregory
+Now, obviously you don't actually want that on ARM64, but I can do that
+on x86 just fine (our xchg() implies smp_mb() after all).
 
->
->  arch/arm/boot/dts/Makefile                    |   1 +
->  .../boot/dts/armada-385-db-88f6820-amc.dts    | 184 ++++++++++++++++++
->  arch/arm/boot/dts/armada-xp-98dx3236.dtsi     |   2 +-
->  arch/arm/boot/dts/armada-xp-db-dxbc2.dts      |  18 +-
->  arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts |  18 +-
->  5 files changed, 208 insertions(+), 15 deletions(-)
->  create mode 100644 arch/arm/boot/dts/armada-385-db-88f6820-amc.dts
->
-> -- 
-> 2.18.0
->
 
--- 
-Gregory Clement, Bootlin
-Embedded Linux and Kernel engineering
-http://bootlin.com
+Another approach might be to use something like:
+
+	val = xchg_relaxed(&lock->locked_pending, _Q_PENDING_VAL | _Q_LOCKED_VAL);
+	val |= atomic_read_acquire(&lock->val) & _Q_TAIL_MASK;
+
+combined with something like:
+
+	/* 0,0,0 -> 0,1,1 - we won trylock */
+	if (!(val & _Q_LOCKED_MASK)) {
+		clear_pending(lock);
+		return;
+	}
+
+	/* 0,0,1 -> 0,1,1 - we won pending */
+	if (!(val & ~_Q_LOCKED_MASK)) {
+		...
+	}
+
+	/* *,0,1 -> *,1,1 - we won pending, but there's queueing */
+	if (!(val & _Q_PENDING_VAL))
+		clear_pending(lock);
+
+	...
+
+
+Hmmm?
