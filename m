@@ -1,100 +1,234 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Thu, 20 Sep 2018 07:44:27 +0200
-Subject: [PATCH 2/2] pinctrl: bcm: add Northstar driver
-In-Reply-To: <da0992c4-f8c8-7e3c-6d54-35a8cfdcd7bc@gmail.com>
-References: <20180919210219.21921-1-zajec5@gmail.com>
- <20180919210219.21921-2-zajec5@gmail.com>
- <da0992c4-f8c8-7e3c-6d54-35a8cfdcd7bc@gmail.com>
-Message-ID: <b14fda92-14a1-0da7-02bf-758fa3751abe@gmail.com>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Thu, 20 Sep 2018 13:54:30 +0800
+Subject: [PATCH 04/13] iommu/io-pgtable-arm-v7s: Extend MediaTek 4GB mode
+In-Reply-To: <1535954502-30646-5-git-send-email-yong.wu@mediatek.com>
+References: <1535954502-30646-1-git-send-email-yong.wu@mediatek.com>
+ <1535954502-30646-5-git-send-email-yong.wu@mediatek.com>
+Message-ID: <1537422870.17684.1.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/19/18 11:45 PM, Florian Fainelli wrote:
-> On 09/19/2018 02:02 PM, Rafa? Mi?ecki wrote:
->> From: Rafa? Mi?ecki <rafal@milecki.pl>
->>
->> This driver provides support for Northstar mux controller. It differs
->> from Northstar Plus one so a new binding and driver were needed.
->>
->> Right now it includes support for SPI pins only which is caused by a
->> lack of access to Broadcom's datasheet. SPI pins info was extracted from
->> the Broadcom's SDK. Once more pins are discovered they can be added to
->> the driver without breaking any existing setups.
->>
->> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
->> ---
-> 
-> [snip]
-> 
->> +static const struct pinctrl_pin_desc ns_pinctrl_pins[] = {
->> +	{ 0, "spi_clk" },
->> +	{ 1, "spi_ss" },
->> +	{ 2, "spi_mosi" },
->> +	{ 3, "spi_miso" },
->> +};
-> 
-> In case you are interested, here are the additional functions:
-> 
-> 4: i2c_scl
-> 5: i2c_sda
-> 
-> 6: mdc
-> 7: mdio
-> 
-> 8: pwm0
-> 9: pwm1
-> 10: pwm2
-> 11: pwm3
-> 
-> 12: uart1_rx
-> 13: uart1_tx
-> 14: uart1_cts
-> 15: uart1_rts
-> 
-> On BCM53012:
-> 
-> 16: uart2_rx
-> 17: uart2_tx
-> 22: sdio_card_power_ctl
-> 23: sdio_en_1p8
-> 
-> On BCM53013:
-> 
-> 21: 25Mhz crystal output for I2S
+Hi Robin,
 
-I believe what you provided are name of bits in the cru_genpll_control0
-register. FWIW that info would be part of ns_pins_data rather than
-ns_pinctrl_pins.
+   Could you help take a look at this patch since I changed the v7s
+here?
+   Thanks.
 
-I was aware of most of them thanks to analyzing bcm5301x_dmu.c from the
-SDK but some are still new to me, so thanks for that!
-
-What I'm really missing are SoC pin numbers for all above. E.g. what
-hardware pin number is used for the uart2_rx? Or sdio_card_power_ctl?
-And all the other ones.
-
-If you could provide that info it'd be extremely helpful.
-
-***
-
-If you take a look at pinctrl-nsp-mux.c, you'll see that there isn't 1:1
-mapping used on Broadcom platforms.
-
-E.g. Northstar Plus has SoC pins 4 and 5 used for I2C:
-i2c_pins[] = {4, 5};
-but they are controlled by BIT(3) and BIT(4) of the BASE0 register:
-NSP_PIN_GROUP(i2c, NSP_MUX_BASE0, 3, 0x03, 0x00),
-(0x03 << 3)
-
-Another NSP example: SoC pins 16 and 17 are used for UART2:
-uart2_pins[] = {16, 17};
-but they are controlled by BIT(15) and BIT(16) of the BASE0 register:
-NSP_PIN_GROUP(uart2, NSP_MUX_BASE0, 15, 0x03, 0x00),
-(0x03 << 15)
-
-Of course, some pins map 1:1, e.g. pin 26 for LED of switch port 5:
-switch_p05_led0_pins[] = {26};
-maps nicely to BIT(26) of the BASE0 register:
-NSP_PIN_GROUP(switch_p05_led0, NSP_MUX_BASE0, 26, 0x01, 0x01),
-(0x01 << 26)
-but it clearly isn't a rule.
+On Mon, 2018-09-03 at 14:01 +0800, Yong Wu wrote:
+> MediaTek extend the arm v7s descriptor to support the dram over 4GB.
+> 
+> In the mt2712 and mt8173, it's called "4GB mode", the physical address
+> is from 0x4000_0000 to 0x1_3fff_ffff, but from EMI point of view, it
+> is remapped to high address from 0x1_0000_0000 to 0x1_ffff_ffff, the
+> bit32 is always enabled. thus, in the M4U, we always enable the bit9
+> for all PTEs which means to enable bit32 of physical address.
+> 
+> but in mt8183, M4U support the dram from 0x4000_0000 to 0x3_ffff_ffff
+> which isn't remaped. We extend the PTEs: the bit9 represent bit32 of
+> PA and the bit4 represent bit33 of PA. Meanwhile the iova still is
+> 32bits.
+> 
+> In order to unify code, in the "4GB mode", we add the bit32 for the
+> physical address manually in our driver.
+> 
+> Correspondingly, Adding bit32 and bit33 for the PA in the iova_to_phys
+> has to been moved into v7s.
+> 
+> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+> ---
+> In mt8183, the PA is from 0x4000_0000 to 0x3_ffff_ffff while the iova
+> still is 32bits. Acturally, our HW extend the v7s pgtable. currently
+> the lvl1 pgtable is 16KB, our HW double it. but 32bit iova is enough
+> for us currently, thus we don't change it.
+> ---
+>  drivers/iommu/io-pgtable-arm-v7s.c | 38 ++++++++++++++++++++++++++++++--------
+>  drivers/iommu/io-pgtable.h         |  8 ++++----
+>  drivers/iommu/mtk_iommu.c          | 15 +++++++++------
+>  drivers/iommu/mtk_iommu.h          |  1 +
+>  4 files changed, 44 insertions(+), 18 deletions(-)
+> 
+> diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
+> index b5948ba..47538dd 100644
+> --- a/drivers/iommu/io-pgtable-arm-v7s.c
+> +++ b/drivers/iommu/io-pgtable-arm-v7s.c
+> @@ -124,7 +124,9 @@
+>  #define ARM_V7S_TEX_MASK		0x7
+>  #define ARM_V7S_ATTR_TEX(val)		(((val) & ARM_V7S_TEX_MASK) << ARM_V7S_TEX_SHIFT)
+>  
+> -#define ARM_V7S_ATTR_MTK_4GB		BIT(9) /* MTK extend it for 4GB mode */
+> +/* MTK extend the two bits below for over 4GB mode */
+> +#define ARM_V7S_ATTR_MTK_PA_BIT32	BIT(9)
+> +#define ARM_V7S_ATTR_MTK_PA_BIT33	BIT(4)
+>  
+>  /* *well, except for TEX on level 2 large pages, of course :( */
+>  #define ARM_V7S_CONT_PAGE_TEX_SHIFT	6
+> @@ -268,7 +270,8 @@ static void __arm_v7s_set_pte(arm_v7s_iopte *ptep, arm_v7s_iopte pte,
+>  }
+>  
+>  static arm_v7s_iopte arm_v7s_prot_to_pte(int prot, int lvl,
+> -					 struct io_pgtable_cfg *cfg)
+> +					 struct io_pgtable_cfg *cfg,
+> +					 phys_addr_t paddr) /* Only for MTK */
+>  {
+>  	bool ap = !(cfg->quirks & IO_PGTABLE_QUIRK_NO_PERMS);
+>  	arm_v7s_iopte pte = ARM_V7S_ATTR_NG | ARM_V7S_ATTR_S;
+> @@ -295,8 +298,12 @@ static arm_v7s_iopte arm_v7s_prot_to_pte(int prot, int lvl,
+>  	if (lvl == 1 && (cfg->quirks & IO_PGTABLE_QUIRK_ARM_NS))
+>  		pte |= ARM_V7S_ATTR_NS_SECTION;
+>  
+> -	if (cfg->quirks & IO_PGTABLE_QUIRK_ARM_MTK_4GB)
+> -		pte |= ARM_V7S_ATTR_MTK_4GB;
+> +	if (cfg->quirks & IO_PGTABLE_QUIRK_ARM_MTK_4GB) {
+> +		if (paddr & BIT_ULL(32))
+> +			pte |= ARM_V7S_ATTR_MTK_PA_BIT32;
+> +		if (paddr & BIT_ULL(33))
+> +			pte |= ARM_V7S_ATTR_MTK_PA_BIT33;
+> +	}
+>  
+>  	return pte;
+>  }
+> @@ -392,7 +399,7 @@ static int arm_v7s_init_pte(struct arm_v7s_io_pgtable *data,
+>  			return -EEXIST;
+>  		}
+>  
+> -	pte = arm_v7s_prot_to_pte(prot, lvl, cfg);
+> +	pte = arm_v7s_prot_to_pte(prot, lvl, cfg, paddr);
+>  	if (num_entries > 1)
+>  		pte = arm_v7s_pte_to_cont(pte, lvl);
+>  
+> @@ -484,7 +491,11 @@ static int arm_v7s_map(struct io_pgtable_ops *ops, unsigned long iova,
+>  	if (!(prot & (IOMMU_READ | IOMMU_WRITE)))
+>  		return 0;
+>  
+> -	if (WARN_ON(upper_32_bits(iova) || upper_32_bits(paddr)))
+> +	if (WARN_ON(upper_32_bits(iova)))
+> +		return -ERANGE;
+> +
+> +	if (WARN_ON(upper_32_bits(paddr) &&
+> +		    !(iop->cfg.quirks & IO_PGTABLE_QUIRK_ARM_MTK_4GB)))
+>  		return -ERANGE;
+>  
+>  	ret = __arm_v7s_map(data, iova, paddr, size, prot, 1, data->pgd);
+> @@ -563,7 +574,7 @@ static size_t arm_v7s_split_blk_unmap(struct arm_v7s_io_pgtable *data,
+>  	num_entries = size >> ARM_V7S_LVL_SHIFT(2);
+>  	unmap_idx = ARM_V7S_LVL_IDX(iova, 2);
+>  
+> -	pte = arm_v7s_prot_to_pte(arm_v7s_pte_to_prot(blk_pte, 1), 2, cfg);
+> +	pte = arm_v7s_prot_to_pte(arm_v7s_pte_to_prot(blk_pte, 1), 2, cfg, 0);
+>  	if (num_entries > 1)
+>  		pte = arm_v7s_pte_to_cont(pte, 2);
+>  
+> @@ -677,7 +688,9 @@ static phys_addr_t arm_v7s_iova_to_phys(struct io_pgtable_ops *ops,
+>  					unsigned long iova)
+>  {
+>  	struct arm_v7s_io_pgtable *data = io_pgtable_ops_to_data(ops);
+> +	struct io_pgtable_cfg *cfg = &data->iop.cfg;
+>  	arm_v7s_iopte *ptep = data->pgd, pte;
+> +	phys_addr_t paddr;
+>  	int lvl = 0;
+>  	u32 mask;
+>  
+> @@ -693,7 +706,16 @@ static phys_addr_t arm_v7s_iova_to_phys(struct io_pgtable_ops *ops,
+>  	mask = ARM_V7S_LVL_MASK(lvl);
+>  	if (arm_v7s_pte_is_cont(pte, lvl))
+>  		mask *= ARM_V7S_CONT_PAGES;
+> -	return (pte & mask) | (iova & ~mask);
+> +	paddr = (pte & mask) | (iova & ~mask);
+> +
+> +	if (IS_ENABLED(CONFIG_PHYS_ADDR_T_64BIT) &&
+> +	    cfg->quirks & IO_PGTABLE_QUIRK_ARM_MTK_4GB) {
+> +		if (pte & ARM_V7S_ATTR_MTK_PA_BIT32)
+> +			paddr |= BIT_ULL(32);
+> +		if (pte & ARM_V7S_ATTR_MTK_PA_BIT33)
+> +			paddr |= BIT_ULL(33);
+> +	}
+> +	return paddr;
+>  }
+>  
+>  static struct io_pgtable *arm_v7s_alloc_pgtable(struct io_pgtable_cfg *cfg,
+> diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
+> index 2df7909..0eeed94 100644
+> --- a/drivers/iommu/io-pgtable.h
+> +++ b/drivers/iommu/io-pgtable.h
+> @@ -62,10 +62,10 @@ struct io_pgtable_cfg {
+>  	 *	(unmapped) entries but the hardware might do so anyway, perform
+>  	 *	TLB maintenance when mapping as well as when unmapping.
+>  	 *
+> -	 * IO_PGTABLE_QUIRK_ARM_MTK_4GB: (ARM v7s format) Set bit 9 in all
+> -	 *	PTEs, for Mediatek IOMMUs which treat it as a 33rd address bit
+> -	 *	when the SoC is in "4GB mode" and they can only access the high
+> -	 *	remap of DRAM (0x1_00000000 to 0x1_ffffffff).
+> +	 * IO_PGTABLE_QUIRK_ARM_MTK_4GB: (ARM v7s format) Set bit 4 and 9 in all
+> +	 *	PTEs, for Mediatek IOMMUs which treat it as the 33rd and 32rd
+> +	 *	address bit when the SoC dram is over 4GB and they can access
+> +	 *	the physical address from 0x4000_0000 to 0x3_ffff_ffff.
+>  	 *
+>  	 * IO_PGTABLE_QUIRK_NO_DMA: Guarantees that the tables will only ever
+>  	 *	be accessed by a fully cache-coherent IOMMU or CPU (e.g. for a
+> diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
+> index c0e2da5..86bf647 100644
+> --- a/drivers/iommu/mtk_iommu.c
+> +++ b/drivers/iommu/mtk_iommu.c
+> @@ -367,12 +367,17 @@ static int mtk_iommu_map(struct iommu_domain *domain, unsigned long iova,
+>  			 phys_addr_t paddr, size_t size, int prot)
+>  {
+>  	struct mtk_iommu_domain *dom = to_mtk_domain(domain);
+> +	struct mtk_iommu_data *data = mtk_iommu_get_m4u_data();
+>  	unsigned long flags;
+>  	int ret;
+>  
+> +	if (IS_ENABLED(CONFIG_PHYS_ADDR_T_64BIT) &&
+> +	    data->plat_data->has_4gb_mode &&
+> +	    data->enable_4GB)
+> +		paddr |= BIT_ULL(32);
+> +
+>  	spin_lock_irqsave(&dom->pgtlock, flags);
+> -	ret = dom->iop->map(dom->iop, iova, paddr & DMA_BIT_MASK(32),
+> -			    size, prot);
+> +	ret = dom->iop->map(dom->iop, iova, paddr, size, prot);
+>  	spin_unlock_irqrestore(&dom->pgtlock, flags);
+>  
+>  	return ret;
+> @@ -401,7 +406,6 @@ static phys_addr_t mtk_iommu_iova_to_phys(struct iommu_domain *domain,
+>  					  dma_addr_t iova)
+>  {
+>  	struct mtk_iommu_domain *dom = to_mtk_domain(domain);
+> -	struct mtk_iommu_data *data = mtk_iommu_get_m4u_data();
+>  	unsigned long flags;
+>  	phys_addr_t pa;
+>  
+> @@ -409,9 +413,6 @@ static phys_addr_t mtk_iommu_iova_to_phys(struct iommu_domain *domain,
+>  	pa = dom->iop->iova_to_phys(dom->iop, iova);
+>  	spin_unlock_irqrestore(&dom->pgtlock, flags);
+>  
+> -	if (data->enable_4GB)
+> -		pa |= BIT_ULL(32);
+> -
+>  	return pa;
+>  }
+>  
+> @@ -735,10 +736,12 @@ static int __maybe_unused mtk_iommu_resume(struct device *dev)
+>  
+>  static const struct mtk_iommu_plat_data mt2712_data = {
+>  	.m4u_plat = M4U_MT2712,
+> +	.has_4gb_mode = true,
+>  };
+>  
+>  static const struct mtk_iommu_plat_data mt8173_data = {
+>  	.m4u_plat = M4U_MT8173,
+> +	.has_4gb_mode = true,
+>  };
+>  
+>  static const struct of_device_id mtk_iommu_of_ids[] = {
+> diff --git a/drivers/iommu/mtk_iommu.h b/drivers/iommu/mtk_iommu.h
+> index 333a0ef..a243047 100644
+> --- a/drivers/iommu/mtk_iommu.h
+> +++ b/drivers/iommu/mtk_iommu.h
+> @@ -43,6 +43,7 @@ enum mtk_iommu_plat {
+>  
+>  struct mtk_iommu_plat_data {
+>  	enum mtk_iommu_plat m4u_plat;
+> +	bool has_4gb_mode;
+>  };
+>  
+>  struct mtk_iommu_domain;
