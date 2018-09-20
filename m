@@ -1,10 +1,10 @@
 From: yuehaibing@huawei.com (YueHaibing)
-Date: Thu, 20 Sep 2018 20:32:45 +0800
-Subject: [PATCH net-next 01/22] net: micrel: fix return type of ndo_start_xmit
+Date: Thu, 20 Sep 2018 20:32:47 +0800
+Subject: [PATCH net-next 03/22] net: seeq: fix return type of ndo_start_xmit
  function
 In-Reply-To: <20180920123306.14772-1-yuehaibing@huawei.com>
 References: <20180920123306.14772-1-yuehaibing@huawei.com>
-Message-ID: <20180920123306.14772-2-yuehaibing@huawei.com>
+Message-ID: <20180920123306.14772-4-yuehaibing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,38 +17,46 @@ Found by coccinelle.
 
 Signed-off-by: YueHaibing <yuehaibing@huawei.com>
 ---
- drivers/net/ethernet/micrel/ks8695net.c  | 2 +-
- drivers/net/ethernet/micrel/ks8851_mll.c | 4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ drivers/net/ethernet/seeq/ether3.c  | 5 +++--
+ drivers/net/ethernet/seeq/sgiseeq.c | 3 ++-
+ 2 files changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/net/ethernet/micrel/ks8695net.c b/drivers/net/ethernet/micrel/ks8695net.c
-index bd51e05..b881f5d 100644
---- a/drivers/net/ethernet/micrel/ks8695net.c
-+++ b/drivers/net/ethernet/micrel/ks8695net.c
-@@ -1164,7 +1164,7 @@ static int ks8695_poll(struct napi_struct *napi, int budget)
-  *	sk_buff and adds it to the TX ring. It then kicks the TX DMA
-  *	engine to ensure transmission begins.
+diff --git a/drivers/net/ethernet/seeq/ether3.c b/drivers/net/ethernet/seeq/ether3.c
+index c5bc124..d1bb73b 100644
+--- a/drivers/net/ethernet/seeq/ether3.c
++++ b/drivers/net/ethernet/seeq/ether3.c
+@@ -77,7 +77,8 @@
+ static int	ether3_rx(struct net_device *dev, unsigned int maxcnt);
+ static void	ether3_tx(struct net_device *dev);
+ static int	ether3_open (struct net_device *dev);
+-static int	ether3_sendpacket (struct sk_buff *skb, struct net_device *dev);
++static netdev_tx_t	ether3_sendpacket(struct sk_buff *skb,
++					  struct net_device *dev);
+ static irqreturn_t ether3_interrupt (int irq, void *dev_id);
+ static int	ether3_close (struct net_device *dev);
+ static void	ether3_setmulticastlist (struct net_device *dev);
+@@ -481,7 +482,7 @@ static void ether3_timeout(struct net_device *dev)
+ /*
+  * Transmit a packet
   */
 -static int
 +static netdev_tx_t
- ks8695_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ ether3_sendpacket(struct sk_buff *skb, struct net_device *dev)
  {
- 	struct ks8695_priv *ksp = netdev_priv(ndev);
-diff --git a/drivers/net/ethernet/micrel/ks8851_mll.c b/drivers/net/ethernet/micrel/ks8851_mll.c
-index 0e9719f..35f8c9e 100644
---- a/drivers/net/ethernet/micrel/ks8851_mll.c
-+++ b/drivers/net/ethernet/micrel/ks8851_mll.c
-@@ -1021,9 +1021,9 @@ static void ks_write_qmu(struct ks_net *ks, u8 *pdata, u16 len)
-  * spin_lock_irqsave is required because tx and rx should be mutual exclusive.
-  * So while tx is in-progress, prevent IRQ interrupt from happenning.
-  */
--static int ks_start_xmit(struct sk_buff *skb, struct net_device *netdev)
-+static netdev_tx_t ks_start_xmit(struct sk_buff *skb, struct net_device *netdev)
- {
--	int retv = NETDEV_TX_OK;
-+	netdev_tx_t retv = NETDEV_TX_OK;
- 	struct ks_net *ks = netdev_priv(netdev);
+ 	unsigned long flags;
+diff --git a/drivers/net/ethernet/seeq/sgiseeq.c b/drivers/net/ethernet/seeq/sgiseeq.c
+index 573691b..70cce63 100644
+--- a/drivers/net/ethernet/seeq/sgiseeq.c
++++ b/drivers/net/ethernet/seeq/sgiseeq.c
+@@ -578,7 +578,8 @@ static inline int sgiseeq_reset(struct net_device *dev)
+ 	return 0;
+ }
  
- 	disable_irq(netdev->irq);
+-static int sgiseeq_start_xmit(struct sk_buff *skb, struct net_device *dev)
++static netdev_tx_t
++sgiseeq_start_xmit(struct sk_buff *skb, struct net_device *dev)
+ {
+ 	struct sgiseeq_private *sp = netdev_priv(dev);
+ 	struct hpc3_ethregs *hregs = sp->hregs;
 -- 
 1.8.3.1
