@@ -1,56 +1,122 @@
-From: madalin.bucur@nxp.com (Madalin Bucur)
-Date: Thu, 20 Sep 2018 18:06:50 +0300
-Subject: [PATCH 3/4] soc/fsl/qbman: Use last response to determine valid bit
-In-Reply-To: <1537456011-10769-1-git-send-email-madalin.bucur@nxp.com>
-References: <1537456011-10769-1-git-send-email-madalin.bucur@nxp.com>
-Message-ID: <1537456011-10769-4-git-send-email-madalin.bucur@nxp.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 20 Sep 2018 16:22:35 +0100
+Subject: [PATCH v5 11/18] kvm: arm64: Dynamic configuration of VTTBR mask
+In-Reply-To: <15830d79-cfc3-964a-c232-a508758ba1b9@redhat.com>
+References: <20180917104144.19188-1-suzuki.poulose@arm.com>
+ <20180917104144.19188-12-suzuki.poulose@arm.com>
+ <15830d79-cfc3-964a-c232-a508758ba1b9@redhat.com>
+Message-ID: <77c89ec4-9e27-92b8-1d7c-91fb98496808@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Roy Pledge <roy.pledge@nxp.com>
 
-Use the last valid response when determining what valid bit
-to use next for management commands. This is needed in the
-case that the portal was previously used by other software
-like a bootloader or if the kernel is restarted without a
-hardware reset.
 
-Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
-Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
----
- drivers/soc/fsl/qbman/qman.c | 16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+On 20/09/18 15:07, Auger Eric wrote:
+> Hi Suzuki,
+> On 9/17/18 12:41 PM, Suzuki K Poulose wrote:
+>> On arm64 VTTBR_EL2:BADDR holds the base address for the stage2
+>> translation table. The Arm ARM mandates that the bits BADDR[x-1:0]
+>> should be 0, where 'x' is defined for a given IPA Size and the
+>> number of levels for a translation granule size. It is defined
+>> using some magical constants. This patch is a reverse engineered
+>> implementation to calculate the 'x' at runtime for a given ipa and
+>> number of page table levels. See patch for more details.
+>>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Christoffer Dall <cdall@kernel.org>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>
+>> ---
+>> Changes since V3:
+>>   - Update reference to latest ARM ARM and improve commentary
+>> ---
+>>   arch/arm64/include/asm/kvm_arm.h | 63 +++++++++++++++++++++++++++++---
+>>   arch/arm64/include/asm/kvm_mmu.h | 25 ++++++++++++-
+>>   2 files changed, 81 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+>> index 14317b3a1820..3fb1d440be6e 100644
+>> --- a/arch/arm64/include/asm/kvm_arm.h
+>> +++ b/arch/arm64/include/asm/kvm_arm.h
+>> @@ -123,7 +123,6 @@
+>>   #define VTCR_EL2_SL0_MASK  (3 << VTCR_EL2_SL0_SHIFT)
+>>   #define VTCR_EL2_SL0_LVL1  (1 << VTCR_EL2_SL0_SHIFT)
+>>   #define VTCR_EL2_T0SZ_MASK 0x3f
+>> -#define VTCR_EL2_T0SZ_40B   24
+>>   #define VTCR_EL2_VS_SHIFT  19
+>>   #define VTCR_EL2_VS_8BIT   (0 << VTCR_EL2_VS_SHIFT)
+>>   #define VTCR_EL2_VS_16BIT  (1 << VTCR_EL2_VS_SHIFT)
+>> @@ -140,11 +139,8 @@
+>>    * Note that when using 4K pages, we concatenate two first level page tables
+>>    * together. With 16K pages, we concatenate 16 first level page tables.
+>>    *
+>> - * The magic numbers used for VTTBR_X in this patch can be found in Tables
+>> - * D4-23 and D4-25 in ARM DDI 0487A.b.
+>>    */
+>>
+>> -#define VTCR_EL2_T0SZ_IPA   VTCR_EL2_T0SZ_40B
+>>   #define VTCR_EL2_COMMON_BITS       (VTCR_EL2_SH0_INNER | VTCR_EL2_ORGN0_WBWA | \
+>>                               VTCR_EL2_IRGN0_WBWA | VTCR_EL2_RES1)
+>>
+>> @@ -175,9 +171,64 @@
+>>   #endif
+>>
+>>   #define VTCR_EL2_FLAGS                     (VTCR_EL2_COMMON_BITS | VTCR_EL2_TGRAN_FLAGS)
+>> -#define VTTBR_X                             (VTTBR_X_TGRAN_MAGIC - VTCR_EL2_T0SZ_IPA)
+>> +/*
+>> + * ARM VMSAv8-64 defines an algorithm for finding the translation table
+>> + * descriptors in section D4.2.8 in ARM DDI 0487C.a.
+>> + *
+>> + * The algorithm defines the expectations on the BaseAddress (for the page
+>> + * table) bits resolved at each level based on the page size, entry level
+>> + * and T0SZ. The variable "x" in the algorithm also affects the VTTBR:BADDR
+>> + * for stage2 page table.
+>> + *
+>> + * The value of "x" is calculated as :
+>> + *  x = Magic_N - T0SZ
+>
+> What is not crystal clear to me is the "if SL0b,c = n" case where x get
+> a value not based on Magic_N. Please could you explain why it is not
+> relevant?
 
-diff --git a/drivers/soc/fsl/qbman/qman.c b/drivers/soc/fsl/qbman/qman.c
-index 7dbcb475a59c..7f4c57999e08 100644
---- a/drivers/soc/fsl/qbman/qman.c
-+++ b/drivers/soc/fsl/qbman/qman.c
-@@ -850,12 +850,24 @@ static inline void qm_mr_set_ithresh(struct qm_portal *portal, u8 ithresh)
- 
- static inline int qm_mc_init(struct qm_portal *portal)
- {
-+	u8 rr0, rr1;
- 	struct qm_mc *mc = &portal->mc;
- 
- 	mc->cr = portal->addr.ce + QM_CL_CR;
- 	mc->rr = portal->addr.ce + QM_CL_RR0;
--	mc->rridx = (mc->cr->_ncw_verb & QM_MCC_VERB_VBIT)
--		    ? 0 : 1;
-+	/*
-+	 * The expected valid bit polarity for the next CR command is 0
-+	 * if RR1 contains a valid response, and is 1 if RR0 contains a
-+	 * valid response. If both RR contain all 0, this indicates either
-+	 * that no command has been executed since reset (in which case the
-+	 * expected valid bit polarity is 1)
-+	 */
-+	rr0 = mc->rr->verb;
-+	rr1 = (mc->rr+1)->verb;
-+	if ((rr0 == 0 && rr1 == 0) || rr0 != 0)
-+		mc->rridx = 1;
-+	else
-+		mc->rridx = 0;
- 	mc->vbit = mc->rridx ? QM_MCC_VERB_VBIT : 0;
- #ifdef CONFIG_FSL_DPAA_CHECKING
- 	mc->state = qman_mc_idle;
--- 
-2.1.0
+We only care about the "x" for the "entry" level of the table look up
+to make sure that the VTTBR is physical address meets the required
+alignment. In both cases, if SL0 b,c == n, x is (PAGE_SHIFT) iff the
+level you are looking at is not the "entry level". So this should always
+be page aligned, like any intermediate level table.
+
+The Magic value is needed only needed for the "entry" level due to the
+fact that we may have lesser bits to resolve (i.e, depending on your
+PAMax or in other words T0SZ) than the intermediate levels (where we
+always resolve {PAGE_SHIFT - 3} bits. This is further complicated by the
+fact that Stage2 could use different number of levels for a given T0SZ
+than the stage1.
+I acknowledge that the algorithm is a bit too cryptic and I spent quite
+sometime decode it to the formula we use below ;-).
+
+I could update the comment to :
+
+/*
+  * ARM VMSAv8-64 defines an algorithm for finding the translation table
+  * descriptors in section D4.2.8 in ARM DDI 0487C.a.
+  *
+  * The algorithm defines the expectations on the translation table
+  * addresses for each level, based on PAGE_SIZE, entry level
+  * and the translation table size (T0SZ). The variable "x" in the
+  * algorithm determines the alignment of a table base address at a given
+  * level and thus determines the alignment of VTTBR:BADDR for stage2
+  * page table entry level.
+  * Since the number of bits resolved at the entry level could vary
+  * depending on the T0SZ, the value of "x" is defined based on a
+  * Magic constant for a given PAGE_SIZE and Entry Level. The
+  * intermediate levels must be always aligned to the PAGE_SIZE (i.e,
+  * x = PAGE_SHIFT).
+  *
+  * The value of "x" for entry level is calculated as :
+  *     x = Magic_N - T0SZ
+  *
+
+...
+
+Suzuki
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
