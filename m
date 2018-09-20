@@ -1,100 +1,105 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Thu, 20 Sep 2018 19:41:05 +0200
-Subject: [RFC PATCH 4/4] i2c: core: introduce master_xfer_irqless callback
-In-Reply-To: <20180920161423.13990-5-wsa+renesas@sang-engineering.com>
-References: <20180920161423.13990-1-wsa+renesas@sang-engineering.com>
- <20180920161423.13990-5-wsa+renesas@sang-engineering.com>
-Message-ID: <ca62f8b1-26e2-2b40-d8ce-39a920d90063@axentia.se>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 20 Sep 2018 19:56:07 +0200
+Subject: [PATCH V2 02/27] mmc: mmci: internalize dma_inprogress into mmci
+ dma functions
+In-Reply-To: <1537268144-21152-3-git-send-email-ludovic.Barre@st.com>
+References: <1537268144-21152-1-git-send-email-ludovic.Barre@st.com>
+ <1537268144-21152-3-git-send-email-ludovic.Barre@st.com>
+Message-ID: <CAPDyKFrwiQv-EFfSrY7TwxXN-AnOsbbPop88GPo8_32hcjBzsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-09-20 18:14, Wolfram Sang wrote:
-> We had the request to access devices very late when interrupts are not
-> available anymore multiple times now. Mostly to prepare shutdown or
-
-The first sentence is a bit backwards, I'd rephrase like so:
-
-Multiple times now we've had the request to access devices very late, when
-interrupts are no longer available.
-
-> reboot. Allow adapters to specify a specific callback for this case.
-> Note that we fall back to the generic master_xfer callback if this new
-> irqless one is not present. This is intentional to preserve the previous
-> behaviour and avoid regressions. Because there are drivers not using
-> interrupts or because it might have worked "accidently" before.
-
-accidentally
-
-> 
-> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+On 18 September 2018 at 12:55, Ludovic Barre <ludovic.Barre@st.com> wrote:
+> From: Ludovic Barre <ludovic.barre@st.com>
+>
+> This patch internalizes the dma_inprogress into mmci dma interfaces.
+> This allows to simplify and prepare the next dma callbacks
+> for mmci host ops. __dma_inprogress is called in mmci_dma_data_error
+> and mmci_dma_finalize.
+>
+> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 > ---
->  drivers/i2c/i2c-core-base.c |  6 +++++-
->  include/linux/i2c.h         | 10 +++++++---
->  2 files changed, 12 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/i2c/i2c-core-base.c b/drivers/i2c/i2c-core-base.c
-> index 904b4d2ebefa..f827446c3089 100644
-> --- a/drivers/i2c/i2c-core-base.c
-> +++ b/drivers/i2c/i2c-core-base.c
-> @@ -1887,7 +1887,11 @@ int __i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
->  	/* Retry automatically on arbitration loss */
->  	orig_jiffies = jiffies;
->  	for (ret = 0, try = 0; try <= adap->retries; try++) {
-> -		ret = adap->algo->master_xfer(adap, msgs, num);
-> +		if ((in_atomic() || irqs_disabled()) && adap->algo->master_xfer_irqless)
-> +			ret = adap->algo->master_xfer_irqless(adap, msgs, num);
-> +		else
-> +			ret = adap->algo->master_xfer(adap, msgs, num);
+>  drivers/mmc/host/mmci.c | 16 ++++++++++------
+>  drivers/mmc/host/mmci.h |  4 +---
+>  2 files changed, 11 insertions(+), 9 deletions(-)
+>
+> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+> index bf0bb07..7d22cb9 100644
+> --- a/drivers/mmc/host/mmci.c
+> +++ b/drivers/mmc/host/mmci.c
+> @@ -497,6 +497,9 @@ static void mmci_dma_unmap(struct mmci_host *host, struct mmc_data *data)
+>
+>  static void mmci_dma_data_error(struct mmci_host *host)
+>  {
+> +       if (!__dma_inprogress(host))
+> +               return;
 > +
->  		if (ret != -EAGAIN)
->  			break;
->  		if (time_after(jiffies, orig_jiffies + adap->timeout))
-> diff --git a/include/linux/i2c.h b/include/linux/i2c.h
-> index 65b4eaed1d96..11e615123bd0 100644
-> --- a/include/linux/i2c.h
-> +++ b/include/linux/i2c.h
-> @@ -498,6 +498,8 @@ i2c_register_board_info(int busnum, struct i2c_board_info const *info,
->   * @master_xfer: Issue a set of i2c transactions to the given I2C adapter
->   *   defined by the msgs array, with num messages available to transfer via
->   *   the adapter specified by adap.
-> + * @master_xfer_irqless: same as master_xfer. Yet, not using any interrupts
+>         dev_err(mmc_dev(host->mmc), "error during DMA transfer!\n");
+>         dmaengine_terminate_all(host->dma_current);
+>         host->dma_in_progress = false;
+> @@ -512,6 +515,9 @@ static void mmci_dma_finalize(struct mmci_host *host, struct mmc_data *data)
+>         u32 status;
+>         int i;
+>
+> +       if (!__dma_inprogress(dmae))
+> +               return;
+> +
+>         /* Wait up to 1ms for the DMA to complete */
+>         for (i = 0; ; i++) {
+>                 status = readl(host->base + MMCISTATUS);
+> @@ -903,8 +909,7 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
+>                 u32 remain, success;
+>
+>                 /* Terminate the DMA transfer */
+> -               if (dma_inprogress(host))
+> -                       mmci_dma_data_error(host);
+> +               mmci_dma_data_error(host);
+>
+>                 /*
+>                  * Calculate how far we are into the transfer.  Note that
+> @@ -942,8 +947,8 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
+>                 dev_err(mmc_dev(host->mmc), "stray MCI_DATABLOCKEND interrupt\n");
+>
+>         if (status & MCI_DATAEND || data->error) {
+> -               if (dma_inprogress(host))
+> -                       mmci_dma_finalize(host, data);
+> +               mmci_dma_finalize(host, data);
+> +
+>                 mmci_stop_data(host);
+>
+>                 if (!data->error)
+> @@ -1050,8 +1055,7 @@ mmci_cmd_irq(struct mmci_host *host, struct mmc_command *cmd,
+>         if ((!sbc && !cmd->data) || cmd->error) {
+>                 if (host->data) {
+>                         /* Terminate the DMA transfer */
+> -                       if (dma_inprogress(host))
+> -                               mmci_dma_data_error(host);
+> +                       mmci_dma_data_error(host);
+>
+>                         mmci_stop_data(host);
+>                 }
+> diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+> index 696a066..f1ec066 100644
+> --- a/drivers/mmc/host/mmci.h
+> +++ b/drivers/mmc/host/mmci.h
+> @@ -332,9 +332,7 @@ struct mmci_host {
+>         struct mmci_host_next   next_data;
+>         bool                    dma_in_progress;
+>
+> -#define dma_inprogress(host)   ((host)->dma_in_progress)
+> -#else
+> -#define dma_inprogress(host)   (0)
+> +#define __dma_inprogress(host) ((host)->dma_in_progress)
 
-"Same" (with capital 'S') to match the other entries. Also, should it
-not be @master_xfer to help the tools do the right thing?
+Overall the change makes good sense to me, however I don't get why you
+want to rename the macro-function. Please don't.
 
-> + *   so e.g. PMICs can be accessed very late before shutdown
+>  #endif
+>  };
+>
+> --
+> 2.7.4
+>
 
-Trailing period.
-
-I'm fine with this change, but should it not wait until there is a user?
-(I think there is one in the wings, so that's a very weak objection...)
-
-Acked-by: Peter Rosin <peda@axentia.se>
-
-
->   * @smbus_xfer: Issue smbus transactions to the given I2C adapter. If this
->   *   is not present, then the bus layer will try and convert the SMBus calls
->   *   into I2C transfers instead.
-> @@ -511,9 +513,9 @@ i2c_register_board_info(int busnum, struct i2c_board_info const *info,
->   * be addressed using the same bus algorithms - i.e. bit-banging or the PCF8584
->   * to name two of the most common.
->   *
-> - * The return codes from the @master_xfer field should indicate the type of
-> - * error code that occurred during the transfer, as documented in the kernel
-> - * Documentation file Documentation/i2c/fault-codes.
-> + * The return codes from the @master_xfer{_irqless} field should indicate the
-> + * type of error code that occurred during the transfer, as documented in the
-> + * Kernel Documentation file Documentation/i2c/fault-codes.
->   */
->  struct i2c_algorithm {
->  	/* If an adapter algorithm can't do I2C-level access, set master_xfer
-> @@ -524,6 +526,8 @@ struct i2c_algorithm {
->  	   processed, or a negative value on error */
->  	int (*master_xfer)(struct i2c_adapter *adap, struct i2c_msg *msgs,
->  			   int num);
-> +	int (*master_xfer_irqless)(struct i2c_adapter *adap,
-> +				   struct i2c_msg *msgs, int num);
->  	int (*smbus_xfer) (struct i2c_adapter *adap, u16 addr,
->  			   unsigned short flags, char read_write,
->  			   u8 command, int size, union i2c_smbus_data *data);
-> 
+Kind regards
+Uffe
