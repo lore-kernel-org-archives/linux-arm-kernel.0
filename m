@@ -1,53 +1,112 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Thu, 20 Sep 2018 17:58:26 +0000
-Subject: [PATCHv3 7/7] mmc: dw_mmc-exynos: Add tuning for sdr and ddr timing
- for USH-I mode
-In-Reply-To: <20180920175826.1284-1-linux.amoon@gmail.com>
-References: <20180920175826.1284-1-linux.amoon@gmail.com>
-Message-ID: <20180920175826.1284-8-linux.amoon@gmail.com>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Thu, 20 Sep 2018 11:29:03 -0700
+Subject: [RFC] i2c: qup: Use the interconnect API
+Message-ID: <20180920182903.19991-1-georgi.djakov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add tuning for sdr and ddr timing for USH-I mode sdr104/sdr50/ddr50
-for host controller.
+The interconnect API provides an interface for consumer drivers to express
+their bandwidth needs in the SoC. This data is aggregated and the on-chip
+interconnect hardware is configured to the appropriate power/performance
+profile.
 
-CC: Jaehoon Chung <jh80.chung@samsung.com>
-CC: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Anand Moon <linux.amoon@gmail.com>
----
-This patch is new to this series
----
- drivers/mmc/host/dw_mmc-exynos.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+Use the interconnect API to get() the path between the endpoints used for
+data transfers by the I2C QUP and report the needed bandwidth based on the
+i2c mode.
 
-diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
-index ab47b018716a..d46c3439b508 100644
---- a/drivers/mmc/host/dw_mmc-exynos.c
-+++ b/drivers/mmc/host/dw_mmc-exynos.c
-@@ -253,6 +253,8 @@ static void dw_mci_exynos_config_hs400(struct dw_mci *host, u32 timing)
- 	if (timing == MMC_TIMING_MMC_HS400) {
- 		dqs |= DATA_STROBE_EN;
- 		strobe = DQS_CTRL_RD_DELAY(strobe, priv->dqs_delay);
-+	} else if (timing == MMC_TIMING_UHS_SDR104) {
-+		dqs &= 0xffffff00;
+Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+---
+
+This patch depends on the interconnect API: https://lkml.org/lkml/2018/8/31/444
+
+TODO: Use a macro for converting and rounding to icc units instead of
+converting between kilobits, kilobytes etc. in the consumer drivers.
+
+ drivers/i2c/busses/i2c-qup.c | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+
+diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
+index c86c3ae1318f..436747a74dc6 100644
+--- a/drivers/i2c/busses/i2c-qup.c
++++ b/drivers/i2c/busses/i2c-qup.c
+@@ -14,6 +14,7 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/err.h>
+ #include <linux/i2c.h>
++#include <linux/interconnect.h>
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+ #include <linux/module.h>
+@@ -280,6 +281,11 @@ struct qup_i2c_dev {
+ 	void (*read_rx_fifo)(struct qup_i2c_dev *qup);
+ 	/* function to write tags in tx fifo for i2c read transfer */
+ 	void (*write_rx_tags)(struct qup_i2c_dev *qup);
++
++	/* frequency mode standard */
++	u32			clk_freq;
++	/* interconnect path to scale according to bandwidth needs */
++	struct icc_path		*path;
+ };
+ 
+ static irqreturn_t qup_i2c_interrupt(int irq, void *dev)
+@@ -1657,6 +1663,16 @@ static void qup_i2c_disable_clocks(struct qup_i2c_dev *qup)
+ 	clk_disable_unprepare(qup->pclk);
+ }
+ 
++static void qup_i2c_enable_icc(struct qup_i2c_dev *qup)
++{
++	icc_set(qup->path, 0, qup->clk_freq / 8000);
++}
++
++static void qup_i2c_disable_icc(struct qup_i2c_dev *qup)
++{
++	icc_set(qup->path, 0, 0);
++}
++
+ static const struct acpi_device_id qup_i2c_acpi_match[] = {
+ 	{ "QCOM8010"},
+ 	{ },
+@@ -1784,6 +1800,10 @@ static int qup_i2c_probe(struct platform_device *pdev)
+ 		}
+ 		ACPI_COMPANION_SET(&qup->adap.dev, ACPI_COMPANION(qup->dev));
  	} else {
- 		dqs &= ~DATA_STROBE_EN;
++		qup->path = of_icc_get(qup->dev, "i2c-mem");
++		if (IS_ERR(qup->path))
++			return PTR_ERR(qup->path);
++
+ 		qup->clk = devm_clk_get(qup->dev, "core");
+ 		if (IS_ERR(qup->clk)) {
+ 			dev_err(qup->dev, "Could not get core clock\n");
+@@ -1795,6 +1815,8 @@ static int qup_i2c_probe(struct platform_device *pdev)
+ 			dev_err(qup->dev, "Could not get iface clock\n");
+ 			return PTR_ERR(qup->pclk);
+ 		}
++		qup->clk_freq = clk_freq;
++		qup_i2c_enable_icc(qup);
+ 		qup_i2c_enable_clocks(qup);
+ 		src_clk_freq = clk_get_rate(qup->clk);
  	}
-@@ -312,6 +314,15 @@ static void dw_mci_exynos_set_ios(struct dw_mci *host, struct mmc_ios *ios)
- 		if (ios->bus_width == MMC_BUS_WIDTH_8)
- 			wanted <<= 1;
- 		break;
-+	case MMC_TIMING_UHS_SDR104:
-+	case MMC_TIMING_UHS_SDR50:
-+		clksel = (priv->sdr_timing & 0xfff8ffff) |
-+			(priv->ciu_div << 16);
-+		break;
-+	case MMC_TIMING_UHS_DDR50:
-+		clksel = (priv->ddr_timing & 0xfff8ffff) |
-+			(priv->ciu_div << 16);
-+		break;
- 	default:
- 		clksel = priv->sdr_timing;
- 	}
--- 
-2.17.1
+@@ -1927,6 +1949,7 @@ static int qup_i2c_remove(struct platform_device *pdev)
+ 
+ 	disable_irq(qup->irq);
+ 	qup_i2c_disable_clocks(qup);
++	icc_put(qup->path);
+ 	i2c_del_adapter(&qup->adap);
+ 	pm_runtime_disable(qup->dev);
+ 	pm_runtime_set_suspended(qup->dev);
+@@ -1939,6 +1962,7 @@ static int qup_i2c_pm_suspend_runtime(struct device *device)
+ 	struct qup_i2c_dev *qup = dev_get_drvdata(device);
+ 
+ 	dev_dbg(device, "pm_runtime: suspending...\n");
++	qup_i2c_disable_icc(qup);
+ 	qup_i2c_disable_clocks(qup);
+ 	return 0;
+ }
+@@ -1948,6 +1972,7 @@ static int qup_i2c_pm_resume_runtime(struct device *device)
+ 	struct qup_i2c_dev *qup = dev_get_drvdata(device);
+ 
+ 	dev_dbg(device, "pm_runtime: resuming...\n");
++	qup_i2c_enable_icc(qup);
+ 	qup_i2c_enable_clocks(qup);
+ 	return 0;
+ }
