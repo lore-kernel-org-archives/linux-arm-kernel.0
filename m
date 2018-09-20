@@ -1,61 +1,69 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 20 Sep 2018 18:18:09 +0930
-Subject: [GIT PULL] ARM: aspeed: dts changes for 4.20
-Message-ID: <CACPK8XfwK85_os-Kjqvkwp-V8YqV3JDPZEepdgXNA+6ievOLSQ@mail.gmail.com>
+From: jianxin.pan@amlogic.com (Jianxin Pan)
+Date: Thu, 20 Sep 2018 16:50:47 +0800
+Subject: [PATCH v4 0/2] mtd: rawnand: meson: add Amlogic NAND driver support
+Message-ID: <1537433449-65213-1-git-send-email-jianxin.pan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello ARM Maintainers,
+  These two patches try to add initial NAND driver support for Amlogic Meson
+SoCs, current it has been tested on GXL(p212) and AXG(s400) platform.
 
-Here's the ASPEED device tree changes for 4.20. Please pull if they
-look good. Thanks!
 
-The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+Changes since v3 at [4]:
+ - remove partition table and some used props from dt-bindings 
 
-  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+Changes since v2 at [3]:
+ - remove some hardcode time value, like twb
+ - use dev wait R/B instead of nand_soft_waitrdy
+ - implement nfc ecc init by ecc helper
+ - rework nfc buffer init to register the maximun buffer when several chips
+ - free nfc buffer when error and cleanup
+ - add variable to teack all the already assigned CS lines
+ - fix mtd->name use the first cs line only
+ - remove dt "nand-enable-scrambler" and use NAND_NEED_SCRAMBLING instead.
+ - move setuping ECC fileds after the identification phase
+ - use nand_scan() and attach_chip()
+ - check one event to return IRQ_NONE
+ - delete cast when of_device_get_match_data
+ - use nand_controller_init() helper
+ - remove nfc driver complains when calling devm_ioremap_resource
+ - clear irqs before setting up irq handler
 
-are available in the Git repository at:
+Changes since v1 at [1]:
+  - adopt property amlogic,nand-enable-scrambler - thanks Martin
+  - drop nand pins in DT
+  - convert clk access to emmc clkc model 
+  - fix regiser field definition alignment
+  - drop nand-user-mode 
+  - parse cs id from DT
+  - rework n2m, m2n function
+  - explain why insert two "IDLE" command
+  - implement exec_op()
+  - drop meson_nfc_get_nand_chip_dts()
+  - release resource once error occur in meson_nfc_nand_chips_init(), 
+  - call nand_cleanup(nand) once mtd_device_register fail
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/joel/aspeed.git \
-    tags/aspeed-4.20-devicetree
+Items not addressed ( or confirmed ) in this version:
+  - convert to ECC conf helper() 
+  - convert to dma coherent API
+  - how to construct mtd->name
 
-for you to fetch changes up to 3368e06e2a91a65cff59e520acc51b9adf4900bf:
+[1] https://lkml.kernel.org/r/20180613161314.14894-1-yixun.lan at amlogic.com
+[2] https://lkml.kernel.org/r/20180712211244.11428-1-yixun.lan at amlogic.com
+[3] https://lkml.kernel.org/r/20180719094612.5833-1-yixun.lan at amlogic.com
+[4] https://lkml.kernel.org/r/1536317831-58056-1-git-send-email-jianxin.pan at amlogic.com/
 
-  ARM: dts: aspeed: Adding Facebook TiogaPass BMC (2018-09-20 17:25:48 +0930)
+Liang Yang (2):
+  dt-bindings: nand: meson: add Amlogic NAND controller driver
+  mtd: rawnand: meson: add support for Amlogic NAND flash controller
 
-----------------------------------------------------------------
-ASPEED device tree updates for 4.20
+ .../devicetree/bindings/mtd/amlogic,meson-nand.txt |   60 +
+ drivers/mtd/nand/raw/Kconfig                       |   10 +
+ drivers/mtd/nand/raw/Makefile                      |    1 +
+ drivers/mtd/nand/raw/meson_nand.c                  | 1372 ++++++++++++++++++++
+ 4 files changed, 1443 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt
+ create mode 100644 drivers/mtd/nand/raw/meson_nand.c
 
- - Two new ast2500-based machines:
-
-   * Facebook TiogaPass (x86 server)
-   * HXT StarDragon 4800 Reference Evaluation Platform 2 (arm64 server)
-
- - Updates for the Quanta q71l system
-
- - i2c device tree cleanups
-
-----------------------------------------------------------------
-Patrick Venture (3):
-      ARM: dts: aspeed: quanta-q71l: add aliases for i2c
-      ARM: dts: aspeed: quanta-q71l: Add four PSUs
-      ARM: dts: aspeed: quanta-q71l: Enable adc & ibt nodes
-
-Rob Herring (1):
-      ARM: dts: aspeed: Fix I2C bus warnings
-
-Vijay Khemka (1):
-      ARM: dts: aspeed: Adding Facebook TiogaPass BMC
-
-Yuan Yao (1):
-      ARM: dts: aspeed: Add HXT StarDragon 4800 REP2 BMC
-
- arch/arm/boot/dts/Makefile                         |   2 +
- .../dts/aspeed-bmc-arm-stardragon4800-rep2.dts     | 207 +++++++++++++++++++++
- .../arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts | 146 +++++++++++++++
- arch/arm/boot/dts/aspeed-bmc-quanta-q71l.dts       |  47 +++++
- arch/arm/boot/dts/aspeed-g4.dtsi                   |   2 +-
- arch/arm/boot/dts/aspeed-g5.dtsi                   |   2 +-
- 6 files changed, 404 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/boot/dts/aspeed-bmc-arm-stardragon4800-rep2.dts
- create mode 100644 arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts
+-- 
+1.9.1
