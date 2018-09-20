@@ -1,34 +1,38 @@
 From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Thu, 20 Sep 2018 17:29:17 +0200
-Subject: [PATCH v2] ARM: multi_v7_defconfig: enable STM32 SPI
-In-Reply-To: <1534934989-22292-1-git-send-email-amelie.delaunay@st.com>
-References: <1534934989-22292-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <eb5a90e1-d3d6-fef7-7595-29f3ae38af55@st.com>
+Date: Thu, 20 Sep 2018 17:50:33 +0200
+Subject: [PATCH] ARM: dts: stm32: update SPI6 dmas property on stm32mp157c
+In-Reply-To: <1537171487-15191-1-git-send-email-amelie.delaunay@st.com>
+References: <1537171487-15191-1-git-send-email-amelie.delaunay@st.com>
+Message-ID: <1efc3bad-cea0-95c4-078d-67463f2b9e6d@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Am?lie
 
-On 08/22/2018 12:49 PM, Amelie Delaunay wrote:
-> Enable the STM32 SPI driver, implemented on STM32MP1 SoC.
+On 09/17/2018 10:04 AM, Amelie Delaunay wrote:
+> Remove unused parameter from SPI6 dmas property on stm32mp157c SoC.
 > 
+> Fixes: dc3f8c86c10d ("ARM: dts: stm32: add SPI support on stm32mp157c")
 > Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 > ---
->   arch/arm/configs/multi_v7_defconfig | 1 +
->   1 file changed, 1 insertion(+)
+>   arch/arm/boot/dts/stm32mp157c.dtsi | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index b749d1e..4cdb622 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -417,6 +417,7 @@ CONFIG_SPI_S3C64XX=m
->   CONFIG_SPI_SH_MSIOF=m
->   CONFIG_SPI_SH_HSPI=y
->   CONFIG_SPI_SIRF=y
-> +CONFIG_SPI_STM32=m
->   CONFIG_SPI_SUN4I=y
->   CONFIG_SPI_SUN6I=y
->   CONFIG_SPI_TEGRA114=y
+> diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
+> index 661be94..185541a 100644
+> --- a/arch/arm/boot/dts/stm32mp157c.dtsi
+> +++ b/arch/arm/boot/dts/stm32mp157c.dtsi
+> @@ -1078,8 +1078,8 @@
+>   			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
+>   			clocks = <&rcc SPI6_K>;
+>   			resets = <&rcc SPI6_R>;
+> -			dmas = <&mdma1 34 0x0 0x40008 0x0 0x0 0>,
+> -			       <&mdma1 35 0x0 0x40002 0x0 0x0 0>;
+> +			dmas = <&mdma1 34 0x0 0x40008 0x0 0x0>,
+> +			       <&mdma1 35 0x0 0x40002 0x0 0x0>;
+>   			dma-names = "rx", "tx";
+>   			status = "disabled";
+>   		};
 > 
 
 Applied on stm32-next.
