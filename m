@@ -1,169 +1,286 @@
-From: weiyi.lu@mediatek.com (Weiyi Lu)
-Date: Thu, 20 Sep 2018 17:57:27 +0800
-Subject: [PATCH v1 3/3] clk: mediatek: mt2712: add pll reference support
-In-Reply-To: <20180920095727.11868-1-weiyi.lu@mediatek.com>
-References: <20180920095727.11868-1-weiyi.lu@mediatek.com>
-Message-ID: <20180920095727.11868-5-weiyi.lu@mediatek.com>
+From: abel.vesa@nxp.com (Abel Vesa)
+Date: Thu, 20 Sep 2018 13:06:37 +0300
+Subject: [PATCH v7 2/5] clk: imx: add fractional PLL output clock
+In-Reply-To: <1537438000-20313-1-git-send-email-abel.vesa@nxp.com>
+References: <1537438000-20313-1-git-send-email-abel.vesa@nxp.com>
+Message-ID: <1537438000-20313-3-git-send-email-abel.vesa@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For some MT2712 projects, audpll could select another reference
-clock source if there exists an extra Crystal Oscillators than
-the default clk26m XTAL.
-Declare with the property "mediatek,refclk-aud" to switch
-the audpll reference clock.
-And also support to modify the reference clock of all PLL with
-property "mediatek,refclk" instead of the default source "clk26m".
+From: Lucas Stach <l.stach@pengutronix.de>
 
-Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
+This is a new clock type introduced on i.MX8.
+
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
 ---
- drivers/clk/mediatek/clk-mt2712.c | 87 ++++++++++++++++++++++++++++++---------
- 1 file changed, 68 insertions(+), 19 deletions(-)
+ drivers/clk/imx/Makefile       |   1 +
+ drivers/clk/imx/clk-frac-pll.c | 230 +++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/imx/clk.h          |   3 +
+ 3 files changed, 234 insertions(+)
+ create mode 100644 drivers/clk/imx/clk-frac-pll.c
 
-diff --git a/drivers/clk/mediatek/clk-mt2712.c b/drivers/clk/mediatek/clk-mt2712.c
-index e36f4aab634d..2a4db1718089 100644
---- a/drivers/clk/mediatek/clk-mt2712.c
-+++ b/drivers/clk/mediatek/clk-mt2712.c
-@@ -1174,7 +1174,7 @@ static const struct mtk_gate peri_clks[] = {
- #define PLL_B(_id, _name, _reg, _pwr_reg, _en_mask, _flags, _pcwbits,	\
- 			_pd_reg, _pd_shift, _tuner_reg, _tuner_en_reg,	\
- 			_tuner_en_bit, _pcw_reg, _pcw_shift,		\
--			_div_table) {					\
-+			_div_table, _parent_name) {			\
- 		.id = _id,						\
- 		.name = _name,						\
- 		.reg = _reg,						\
-@@ -1192,15 +1192,17 @@ static const struct mtk_gate peri_clks[] = {
- 		.pcw_reg = _pcw_reg,					\
- 		.pcw_shift = _pcw_shift,				\
- 		.div_table = _div_table,				\
-+		.parent_name = _parent_name,				\
- 	}
- 
- #define PLL(_id, _name, _reg, _pwr_reg, _en_mask, _flags, _pcwbits,	\
- 			_pd_reg, _pd_shift, _tuner_reg, _tuner_en_reg,	\
--			_tuner_en_bit, _pcw_reg, _pcw_shift)		\
-+			_tuner_en_bit, _pcw_reg, _pcw_shift,		\
-+			_parent_name)					\
- 		PLL_B(_id, _name, _reg, _pwr_reg, _en_mask, _flags,	\
- 			_pcwbits, _pd_reg, _pd_shift, _tuner_reg,	\
- 			_tuner_en_reg, _tuner_en_bit, _pcw_reg,		\
--			_pcw_shift, NULL)
-+			_pcw_shift, NULL, _parent_name)
- 
- static const struct mtk_pll_div_table armca35pll_div_table[] = {
- 	{ .div = 0, .freq = MT2712_PLL_FMAX },
-@@ -1229,48 +1231,95 @@ static const struct mtk_pll_div_table mmpll_div_table[] = {
- 	{ } /* sentinel */
- };
- 
--static const struct mtk_pll_data plls[] = {
-+static struct mtk_pll_data plls[] = {
- 	PLL(CLK_APMIXED_MAINPLL, "mainpll", 0x0230, 0x023C, 0xf0000101,
--		HAVE_RST_BAR, 31, 0x0230, 4, 0, 0, 0, 0x0234, 0),
-+		HAVE_RST_BAR, 31, 0x0230, 4, 0, 0, 0, 0x0234, 0, "clk26m"),
- 	PLL(CLK_APMIXED_UNIVPLL, "univpll", 0x0240, 0x024C, 0xfe000101,
--		HAVE_RST_BAR, 31, 0x0240, 4, 0, 0, 0, 0x0244, 0),
-+		HAVE_RST_BAR, 31, 0x0240, 4, 0, 0, 0, 0x0244, 0, "clk26m"),
- 	PLL(CLK_APMIXED_VCODECPLL, "vcodecpll", 0x0320, 0x032C, 0xc0000101,
--		0, 31, 0x0320, 4, 0, 0, 0, 0x0324, 0),
-+		0, 31, 0x0320, 4, 0, 0, 0, 0x0324, 0, "clk26m"),
- 	PLL(CLK_APMIXED_VENCPLL, "vencpll", 0x0280, 0x028C, 0x00000101,
--		0, 31, 0x0280, 4, 0, 0, 0, 0x0284, 0),
-+		0, 31, 0x0280, 4, 0, 0, 0, 0x0284, 0, "clk26m"),
- 	PLL(CLK_APMIXED_APLL1, "apll1", 0x0330, 0x0340, 0x00000101,
--		0, 31, 0x0330, 4, 0x0338, 0x0014, 0, 0x0334, 0),
-+		0, 31, 0x0330, 4, 0x0338, 0x0014, 0, 0x0334, 0, "clk26m"),
- 	PLL(CLK_APMIXED_APLL2, "apll2", 0x0350, 0x0360, 0x00000101,
--		0, 31, 0x0350, 4, 0x0358, 0x0014, 1, 0x0354, 0),
-+		0, 31, 0x0350, 4, 0x0358, 0x0014, 1, 0x0354, 0, "clk26m"),
- 	PLL(CLK_APMIXED_LVDSPLL, "lvdspll", 0x0370, 0x037c, 0x00000101,
--		0, 31, 0x0370, 4, 0, 0, 0, 0x0374, 0),
-+		0, 31, 0x0370, 4, 0, 0, 0, 0x0374, 0, "clk26m"),
- 	PLL(CLK_APMIXED_LVDSPLL2, "lvdspll2", 0x0390, 0x039C, 0x00000101,
--		0, 31, 0x0390, 4, 0, 0, 0, 0x0394, 0),
-+		0, 31, 0x0390, 4, 0, 0, 0, 0x0394, 0, "clk26m"),
- 	PLL(CLK_APMIXED_MSDCPLL, "msdcpll", 0x0270, 0x027C, 0x00000101,
--		0, 31, 0x0270, 4, 0, 0, 0, 0x0274, 0),
-+		0, 31, 0x0270, 4, 0, 0, 0, 0x0274, 0, "clk26m"),
- 	PLL(CLK_APMIXED_MSDCPLL2, "msdcpll2", 0x0410, 0x041C, 0x00000101,
--		0, 31, 0x0410, 4, 0, 0, 0, 0x0414, 0),
-+		0, 31, 0x0410, 4, 0, 0, 0, 0x0414, 0, "clk26m"),
- 	PLL(CLK_APMIXED_TVDPLL, "tvdpll", 0x0290, 0x029C, 0xc0000101,
--		0, 31, 0x0290, 4, 0, 0, 0, 0x0294, 0),
-+		0, 31, 0x0290, 4, 0, 0, 0, 0x0294, 0, "clk26m"),
- 	PLL_B(CLK_APMIXED_MMPLL, "mmpll", 0x0250, 0x0260, 0x00000101,
- 		0, 31, 0x0250, 4, 0, 0, 0, 0x0254, 0,
--		mmpll_div_table),
-+		mmpll_div_table, "clk26m"),
- 	PLL_B(CLK_APMIXED_ARMCA35PLL, "armca35pll", 0x0100, 0x0110, 0xf0000101,
- 		HAVE_RST_BAR, 31, 0x0100, 4, 0, 0, 0, 0x0104, 0,
--		armca35pll_div_table),
-+		armca35pll_div_table, "clk26m"),
- 	PLL_B(CLK_APMIXED_ARMCA72PLL, "armca72pll", 0x0210, 0x0220, 0x00000101,
- 		0, 31, 0x0210, 4, 0, 0, 0, 0x0214, 0,
--		armca72pll_div_table),
-+		armca72pll_div_table, "clk26m"),
- 	PLL(CLK_APMIXED_ETHERPLL, "etherpll", 0x0300, 0x030C, 0xc0000101,
--		0, 31, 0x0300, 4, 0, 0, 0, 0x0304, 0),
-+		0, 31, 0x0300, 4, 0, 0, 0, 0x0304, 0, "clk26m"),
- };
- 
-+static void clk_mt2712_set_pll_reference(struct device_node *node,
-+		struct mtk_pll_data *plls, size_t num_plls)
+diff --git a/drivers/clk/imx/Makefile b/drivers/clk/imx/Makefile
+index 8c3baa7..4893c1f 100644
+--- a/drivers/clk/imx/Makefile
++++ b/drivers/clk/imx/Makefile
+@@ -6,6 +6,7 @@ obj-y += \
+ 	clk-cpu.o \
+ 	clk-fixup-div.o \
+ 	clk-fixup-mux.o \
++	clk-frac-pll.o \
+ 	clk-gate-exclusive.o \
+ 	clk-gate2.o \
+ 	clk-pllv1.o \
+diff --git a/drivers/clk/imx/clk-frac-pll.c b/drivers/clk/imx/clk-frac-pll.c
+new file mode 100644
+index 0000000..c80c6ed
+--- /dev/null
++++ b/drivers/clk/imx/clk-frac-pll.c
+@@ -0,0 +1,230 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright 2018 NXP.
++ */
++
++#include <linux/clk-provider.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/iopoll.h>
++#include <linux/jiffies.h>
++#include <linux/slab.h>
++
++#include "clk.h"
++
++#define PLL_CFG0		0x0
++#define PLL_CFG1		0x4
++
++#define PLL_LOCK_STATUS		BIT(31)
++#define PLL_PD			19
++#define PLL_PD_MASK		BIT(PLL_PD)
++#define PLL_BYPASS		14
++#define PLL_BYPASS_MASK		BIT(PLL_BYPASS)
++#define PLL_NEWDIV_VAL		BIT(12)
++#define PLL_NEWDIV_ACK		BIT(11)
++#define PLL_FRAC_DIV_MASK	0xffffff
++#define PLL_INT_DIV_MASK	0x7f
++#define PLL_OUTPUT_DIV_MASK	0x1f
++#define PLL_FRAC_DENOM		0x1000000
++
++struct clk_frac_pll {
++	struct clk_hw	hw;
++	void __iomem	*base;
++};
++
++#define to_clk_frac_pll(_hw) container_of(_hw, struct clk_frac_pll, hw)
++
++static int clk_wait_lock(struct clk_frac_pll *pll)
 +{
-+	void __iomem *base, *sel_addr;
-+	struct of_phandle_args refclk, refclk_aud;
-+	const char *refclk_name = "clk26m";
-+	const char *refclk_aud_name;
-+	int rc;
-+	size_t i;
-+	u32 r;
++	unsigned long timeout = jiffies + msecs_to_jiffies(10);
++	u32 val;
 +
-+	base = of_iomap(node, 0);
-+	if (base) {
-+		sel_addr = base + 0x40;
-+	} else {
-+		pr_err("%s(): ioremap failed\n", __func__);
-+		return;
-+	}
++	/* Wait for PLL to lock */
++	do {
++		if (readl_relaxed(pll->base) & PLL_LOCK_STATUS)
++			break;
++		if (time_after(jiffies, timeout))
++			break;
++	} while (1);
 +
-+	rc = of_parse_phandle_with_args(node, "mediatek,refclk",
-+			"#clock-cells", 0, &refclk);
-+	if (!rc) {
-+		of_property_read_string(refclk.np, "clock-output-names",
-+				&refclk_name);
-+		for (i = 0; i < num_plls; i++)
-+			plls[i].parent_name = refclk_name;
-+	}
-+
-+	rc = of_parse_phandle_with_args(node, "mediatek,refclk-aud",
-+			"#clock-cells", 0, &refclk_aud);
-+	if (!rc) {
-+		of_property_read_string(refclk_aud.np, "clock-output-names",
-+				&refclk_aud_name);
-+		if (strcmp(refclk_name, refclk_aud_name)) {
-+			plls[CLK_APMIXED_APLL1].parent_name = refclk_aud_name;
-+			plls[CLK_APMIXED_APLL2].parent_name = refclk_aud_name;
-+			r = readl(sel_addr) | 0x60000;
-+		} else {
-+			r = readl(sel_addr) & ~0x60000;
-+		}
-+
-+		writel(r, sel_addr);
-+	}
++	return readl_poll_timeout(pll->base, val,
++					val & PLL_LOCK_STATUS, 0, 1000);
 +}
 +
- static int clk_mt2712_apmixed_probe(struct platform_device *pdev)
- {
- 	struct clk_onecell_data *clk_data;
- 	int r;
- 	struct device_node *node = pdev->dev.of_node;
- 
-+	clk_mt2712_set_pll_reference(node, plls, ARRAY_SIZE(plls));
++static int clk_wait_ack(struct clk_frac_pll *pll)
++{
++	unsigned long timeout = jiffies + msecs_to_jiffies(50);
++	u32 val;
 +
- 	clk_data = mtk_alloc_clk_data(CLK_APMIXED_NR_CLK);
++	/* return directly if the pll is in powerdown or in bypass */
++	if (readl_relaxed(pll->base) & (PLL_PD_MASK | PLL_BYPASS_MASK))
++		return 0;
++
++	/* Wait for the pll's divfi and divff to be reloaded */
++	do {
++		if (readl_relaxed(pll->base) & PLL_NEWDIV_ACK)
++			break;
++		if (time_after(jiffies, timeout))
++			break;
++	} while (1);
++
++	return readl_poll_timeout(pll->base, val,
++					val & PLL_NEWDIV_ACK, 0, 1000);
++}
++
++static int clk_pll_prepare(struct clk_hw *hw)
++{
++	struct clk_frac_pll *pll = to_clk_frac_pll(hw);
++	u32 val;
++
++	val = readl_relaxed(pll->base + PLL_CFG0);
++	val &= ~PLL_PD_MASK;
++	writel_relaxed(val, pll->base + PLL_CFG0);
++
++	return clk_wait_lock(pll);
++}
++
++static void clk_pll_unprepare(struct clk_hw *hw)
++{
++	struct clk_frac_pll *pll = to_clk_frac_pll(hw);
++	u32 val;
++
++	val = readl_relaxed(pll->base + PLL_CFG0);
++	val |= PLL_PD_MASK;
++	writel_relaxed(val, pll->base + PLL_CFG0);
++}
++
++static int clk_pll_is_prepared(struct clk_hw *hw)
++{
++	struct clk_frac_pll *pll = to_clk_frac_pll(hw);
++	u32 val;
++
++	val = readl_relaxed(pll->base + PLL_CFG0);
++	return (val & PLL_PD_MASK) ? 0 : 1;
++}
++
++static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
++					 unsigned long parent_rate)
++{
++	struct clk_frac_pll *pll = to_clk_frac_pll(hw);
++	u32 val, divff, divfi, divq;
++	u64 temp64;
++
++	val = readl_relaxed(pll->base + PLL_CFG0);
++	divq = ((val & PLL_OUTPUT_DIV_MASK) + 1) * 2;
++	val = readl_relaxed(pll->base + PLL_CFG1);
++	divff = (val >> 7) & PLL_FRAC_DIV_MASK;
++	divfi = (val & PLL_INT_DIV_MASK);
++
++	temp64 = (u64)parent_rate * 8;
++	temp64 *= divff;
++	do_div(temp64, PLL_FRAC_DENOM);
++	temp64 /= divq;
++
++	return parent_rate * 8 * (divfi + 1) / divq + (unsigned long)temp64;
++}
++
++static long clk_pll_round_rate(struct clk_hw *hw, unsigned long rate,
++			       unsigned long *prate)
++{
++	unsigned long parent_rate = *prate;
++	u32 divff, divfi;
++	u64 temp64;
++
++	parent_rate *= 8;
++	rate *= 2;
++	divfi = rate / parent_rate;
++	temp64 = (u64)(rate - divfi * parent_rate);
++	temp64 *= PLL_FRAC_DENOM;
++	do_div(temp64, parent_rate);
++	divff = temp64;
++
++	temp64 = (u64)parent_rate;
++	temp64 *= divff;
++	do_div(temp64, PLL_FRAC_DENOM);
++
++	return (parent_rate * divfi + (unsigned long)temp64) / 2;
++}
++
++/*
++ * To simplify the clock calculation, we can keep the 'PLL_OUTPUT_VAL' at zero
++ * (means the PLL output will be divided by 2). So the PLL output can use
++ * the below formula:
++ * pllout = parent_rate * 8 / 2 * DIVF_VAL;
++ * where DIVF_VAL = 1 + DIVFI + DIVFF / 2^24.
++ */
++static int clk_pll_set_rate(struct clk_hw *hw, unsigned long rate,
++			    unsigned long parent_rate)
++{
++	struct clk_frac_pll *pll = to_clk_frac_pll(hw);
++	u32 val, divfi, divff;
++	u64 temp64;
++	int ret;
++
++	parent_rate *= 8;
++	rate *= 2;
++	divfi = rate / parent_rate;
++	temp64 = (u64) (rate - divfi * parent_rate);
++	temp64 *= PLL_FRAC_DENOM;
++	do_div(temp64, parent_rate);
++	divff = temp64;
++
++	val = readl_relaxed(pll->base + PLL_CFG1);
++	val &= ~((PLL_FRAC_DIV_MASK << 7) | (PLL_INT_DIV_MASK));
++	val |= ((divff << 7) | (divfi - 1));
++	writel_relaxed(val, pll->base + PLL_CFG1);
++
++	val = readl_relaxed(pll->base + PLL_CFG0);
++	val &= ~0x1f;
++	writel_relaxed(val, pll->base + PLL_CFG0);
++
++	/* Set the NEV_DIV_VAL to reload the DIVFI and DIVFF */
++	val = readl_relaxed(pll->base + PLL_CFG0);
++	val |= PLL_NEWDIV_VAL;
++	writel_relaxed(val, pll->base + PLL_CFG0);
++
++	ret = clk_wait_ack(pll);
++
++	/* clear the NEV_DIV_VAL */
++	val = readl_relaxed(pll->base + PLL_CFG0);
++	val &= ~PLL_NEWDIV_VAL;
++	writel_relaxed(val, pll->base + PLL_CFG0);
++
++	return ret;
++}
++
++static const struct clk_ops clk_frac_pll_ops = {
++	.prepare	= clk_pll_prepare,
++	.unprepare	= clk_pll_unprepare,
++	.is_prepared	= clk_pll_is_prepared,
++	.recalc_rate	= clk_pll_recalc_rate,
++	.round_rate	= clk_pll_round_rate,
++	.set_rate	= clk_pll_set_rate,
++};
++
++struct clk *imx_clk_frac_pll(const char *name, const char *parent_name,
++			     void __iomem *base)
++{
++	struct clk_init_data init;
++	struct clk_frac_pll *pll;
++	struct clk *clk;
++
++	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
++	if (!pll)
++		return ERR_PTR(-ENOMEM);
++
++	pll->base = base;
++	init.name = name;
++	init.ops = &clk_frac_pll_ops;
++	init.flags = 0;
++	init.parent_names = &parent_name;
++	init.num_parents = 1;
++
++	pll->hw.init = &init;
++
++	clk = clk_register(NULL, &pll->hw);
++	if (IS_ERR(clk))
++		kfree(pll);
++
++	return clk;
++}
+diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
+index 8076ec0..13daf1c 100644
+--- a/drivers/clk/imx/clk.h
++++ b/drivers/clk/imx/clk.h
+@@ -27,6 +27,9 @@ struct clk *imx_clk_pllv1(enum imx_pllv1_type type, const char *name,
+ struct clk *imx_clk_pllv2(const char *name, const char *parent,
+ 		void __iomem *base);
  
- 	mtk_clk_register_plls(node, plls, ARRAY_SIZE(plls), clk_data);
++struct clk *imx_clk_frac_pll(const char *name, const char *parent_name,
++			     void __iomem *base);
++
+ enum imx_pllv3_type {
+ 	IMX_PLLV3_GENERIC,
+ 	IMX_PLLV3_SYS,
 -- 
-2.12.5.2.gbdf23ab
+2.7.4
