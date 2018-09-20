@@ -1,111 +1,87 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 20 Sep 2018 16:37:49 -0500
-Subject: [PATCH v3] PCI: dwc: fix scheduling while atomic issues
-In-Reply-To: <20180913150543.GA6199@e107981-ln.cambridge.arm.com>
-References: <20180829110408.556c3622@xhacker.debian>
- <20180913150543.GA6199@e107981-ln.cambridge.arm.com>
-Message-ID: <20180920213749.GC224714@bhelgaas-glaptop.roam.corp.google.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 20 Sep 2018 14:39:21 -0700
+Subject: [PATCH v5 04/12] PCI: brcmstb: add dma-range mapping for inbound
+ traffic
+In-Reply-To: <CAKv+Gu8ZbN3BDRyuFzt4o--SSUmhuOh+jnpq8ZR-Ay13DJrAqg@mail.gmail.com>
+References: <1537367527-20773-1-git-send-email-jim2101024@gmail.com>
+ <1537367527-20773-5-git-send-email-jim2101024@gmail.com>
+ <CAKv+Gu_d-r0ubyqZcDzERYd5FVTSpjBk++iACHqVgtHrOK0F7A@mail.gmail.com>
+ <7fa897cf-4d58-c63f-afdd-a3ec5a6a56bf@gmail.com>
+ <CAKv+Gu8aJRV4nqq1e-5HRLvbrANQsYuMf-pwWB53BhxLgX7iWg@mail.gmail.com>
+ <b74d3c16-a512-73dc-c94a-ef6adde5f757@gmail.com>
+ <CAKv+Gu8ZbN3BDRyuFzt4o--SSUmhuOh+jnpq8ZR-Ay13DJrAqg@mail.gmail.com>
+Message-ID: <fa285694-c3e1-adf8-032a-202e7598de41@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2018 at 04:05:54PM +0100, Lorenzo Pieralisi wrote:
-> On Wed, Aug 29, 2018 at 11:04:08AM +0800, Jisheng Zhang wrote:
-> > When programming inbound/outbound atu, we call usleep_range() after
-> > each checking PCIE_ATU_ENABLE bit. Unfortunately, the atu programming
-> > can be called in atomic context:
-> > 
-> > inbound atu programming could be called through
-> > pci_epc_write_header()
-> >   =>dw_pcie_ep_write_header()
-> >     =>dw_pcie_prog_inbound_atu()
-> > 
-> > outbound atu programming could be called through
-> > pci_bus_read_config_dword()
-> >   =>dw_pcie_rd_conf()
-> >     =>dw_pcie_prog_outbound_atu()
-> > 
-> > Fix this issue by calling mdelay() instead.
-> > 
-> > Fixes: f8aed6ec624f ("PCI: dwc: designware: Add EP mode support")
-> > Fixes: d8bbeb39fbf3 ("PCI: designware: Wait for iATU enable")
-> > Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
-> > Acked-by: Gustavo Pimentel <gustavo.pimentel@synopsys.com>
-> > ---
+On 09/20/2018 02:33 PM, Ard Biesheuvel wrote:
+> On 20 September 2018 at 14:31, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>> On 09/20/2018 02:04 PM, Ard Biesheuvel wrote:
+>>> On 20 September 2018 at 13:55, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>>>> On 09/19/2018 07:19 PM, Ard Biesheuvel wrote:
+>>>>> On 19 September 2018 at 07:31, Jim Quinlan <jim2101024@gmail.com> wrote:
+>>>>>> The Broadcom STB PCIe host controller is intimately related to the
+>>>>>> memory subsystem.  This close relationship adds complexity to how cpu
+>>>>>> system memory is mapped to PCIe memory.  Ideally, this mapping is an
+>>>>>> identity mapping, or an identity mapping off by a constant.  Not so in
+>>>>>> this case.
+>>>>>>
+>>>>>> Consider the Broadcom reference board BCM97445LCC_4X8 which has 6 GB
+>>>>>> of system memory.  Here is how the PCIe controller maps the
+>>>>>> system memory to PCIe memory:
+>>>>>>
+>>>>>>   memc0-a@[        0....3fffffff] <=> pci@[        0....3fffffff]
+>>>>>>   memc0-b@[100000000...13fffffff] <=> pci@[ 40000000....7fffffff]
+>>>>>>   memc1-a@[ 40000000....7fffffff] <=> pci@[ 80000000....bfffffff]
+>>>>>>   memc1-b@[300000000...33fffffff] <=> pci@[ c0000000....ffffffff]
+>>>>>>   memc2-a@[ 80000000....bfffffff] <=> pci@[100000000...13fffffff]
+>>>>>>   memc2-b@[c00000000...c3fffffff] <=> pci@[140000000...17fffffff]
+>>>>>>
+>>>>>
+>>>>> So is describing this as
+>>>>>
+>>>>> dma-ranges = <0x0 0x0 0x0 0x0 0x0 0x40000000>,
+>>>>>              <0x0 0x40000000 0x1 0x0 0x0 0x40000000>,
+>>>>>              <0x0 0x80000000 0x0 0x40000000 0x0 0x40000000>,
+>>>>>              <0x0 0xc0000000 0x3 0x0 0x0 0x40000000>,
+>>>>>              <0x1 0x0 0x0 0x80000000 0x0 0x40000000>,
+>>>>>              <0x1 0x40000000 0x0 0xc0000000 0x0 0x40000000>;
+>>>>>
+>>>>> not working for you? I haven't tried this myself, but since DT permits
+>>>>> describing the inbound mappings this way, we should fix the code if it
+>>>>> doesn't work at the moment.
+>>>>
+>>>> You mean encoding the memory controller index in the first cell? If that
+>>>> works, that's indeed a much cleaner solution, though is it standard
+>>>> compliant in any form?
+>>>
+>>> No those are just memory addresses (although I may have screwed up the
+>>> order). From Documentation/devicetree/booting-without-of.txt:
+>>>
+>>> """
+>>> Optional property:
+>>> - dma-ranges: <prop-encoded-array> encoded as arbitrary number of triplets of
+>>>         (child-bus-address, parent-bus-address, length). Each triplet specified
+>>>         describes a contiguous DMA address range.
+>>> """
+>>>
+>>
+>> Then I am confused by your comment, that's what this patch does, it adds
+>> support for reading "dma-ranges" from Device Tree and setting up inbound
+>> windows using that. The only caveat is that because the PCIe root
+>> complex has some ties with the memory bus architecture it is connected
+>> to (SCB in our case) there is still a requirement to know the
+>> translation between a given physical address and its backing memory
+>> controller/aperture.
+>>
 > 
-> Applied to pci/controller-fixes aiming at one of the upcoming -rc*.
-
-I cherry-picked this into for-linus for v4.19.
-
-> > since v2:
-> >  - Add Fixes tag
-> >  - Add Gustavo's Ack
-> > 
-> > since v1:
-> >  - use mdelay() instead of udelay() to avoid __bad_udelay()
-> > 
-> >  drivers/pci/controller/dwc/pcie-designware.c | 8 ++++----
-> >  drivers/pci/controller/dwc/pcie-designware.h | 3 +--
-> >  2 files changed, 5 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/drivers/pci/controller/dwc/pcie-designware.c b/drivers/pci/controller/dwc/pcie-designware.c
-> > index 778c4f76a884..2153956a0b20 100644
-> > --- a/drivers/pci/controller/dwc/pcie-designware.c
-> > +++ b/drivers/pci/controller/dwc/pcie-designware.c
-> > @@ -135,7 +135,7 @@ static void dw_pcie_prog_outbound_atu_unroll(struct dw_pcie *pci, int index,
-> >  		if (val & PCIE_ATU_ENABLE)
-> >  			return;
-> >  
-> > -		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
-> > +		mdelay(LINK_WAIT_IATU);
-> >  	}
-> >  	dev_err(pci->dev, "Outbound iATU is not being enabled\n");
-> >  }
-> > @@ -178,7 +178,7 @@ void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index, int type,
-> >  		if (val & PCIE_ATU_ENABLE)
-> >  			return;
-> >  
-> > -		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
-> > +		mdelay(LINK_WAIT_IATU);
-> >  	}
-> >  	dev_err(pci->dev, "Outbound iATU is not being enabled\n");
-> >  }
-> > @@ -236,7 +236,7 @@ static int dw_pcie_prog_inbound_atu_unroll(struct dw_pcie *pci, int index,
-> >  		if (val & PCIE_ATU_ENABLE)
-> >  			return 0;
-> >  
-> > -		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
-> > +		mdelay(LINK_WAIT_IATU);
-> >  	}
-> >  	dev_err(pci->dev, "Inbound iATU is not being enabled\n");
-> >  
-> > @@ -282,7 +282,7 @@ int dw_pcie_prog_inbound_atu(struct dw_pcie *pci, int index, int bar,
-> >  		if (val & PCIE_ATU_ENABLE)
-> >  			return 0;
-> >  
-> > -		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
-> > +		mdelay(LINK_WAIT_IATU);
-> >  	}
-> >  	dev_err(pci->dev, "Inbound iATU is not being enabled\n");
-> >  
-> > diff --git a/drivers/pci/controller/dwc/pcie-designware.h b/drivers/pci/controller/dwc/pcie-designware.h
-> > index 96126fd8403c..9f1a5e399b70 100644
-> > --- a/drivers/pci/controller/dwc/pcie-designware.h
-> > +++ b/drivers/pci/controller/dwc/pcie-designware.h
-> > @@ -26,8 +26,7 @@
-> >  
-> >  /* Parameters for the waiting for iATU enabled routine */
-> >  #define LINK_WAIT_MAX_IATU_RETRIES	5
-> > -#define LINK_WAIT_IATU_MIN		9000
-> > -#define LINK_WAIT_IATU_MAX		10000
-> > +#define LINK_WAIT_IATU			9
-> >  
-> >  /* Synopsys-specific PCIe configuration registers */
-> >  #define PCIE_PORT_LINK_CONTROL		0x710
-> > -- 
-> > 2.18.0
-> > 
+> Ah ok, apologies for the noise then.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> I was hoping that having working support for dma-ranges would remove
+> the need for the special phys<->dma conversion routines.
+
+What you describe definitively works with platform devices, but I am not
+sure this is working for PCIe devices, although, conceptually it should,
+yes.
+-- 
+Florian
