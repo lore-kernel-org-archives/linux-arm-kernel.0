@@ -1,10 +1,10 @@
 From: yuehaibing@huawei.com (YueHaibing)
-Date: Thu, 20 Sep 2018 20:32:54 +0800
-Subject: [PATCH net-next 10/22] net: ti: fix return type of ndo_start_xmit
+Date: Thu, 20 Sep 2018 20:32:48 +0800
+Subject: [PATCH net-next 04/22] net: cirrus: fix return type of ndo_start_xmit
  function
 In-Reply-To: <20180920123306.14772-1-yuehaibing@huawei.com>
 References: <20180920123306.14772-1-yuehaibing@huawei.com>
-Message-ID: <20180920123306.14772-11-yuehaibing@huawei.com>
+Message-ID: <20180920123306.14772-5-yuehaibing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,76 +17,44 @@ Found by coccinelle.
 
 Signed-off-by: YueHaibing <yuehaibing@huawei.com>
 ---
- drivers/net/ethernet/ti/cpmac.c        | 2 +-
- drivers/net/ethernet/ti/davinci_emac.c | 2 +-
- drivers/net/ethernet/ti/netcp_core.c   | 8 ++++----
- 3 files changed, 6 insertions(+), 6 deletions(-)
+ drivers/net/ethernet/cirrus/ep93xx_eth.c | 2 +-
+ drivers/net/ethernet/cirrus/mac89x0.c    | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/net/ethernet/ti/cpmac.c b/drivers/net/ethernet/ti/cpmac.c
-index 9b8a30b..64c45eb 100644
---- a/drivers/net/ethernet/ti/cpmac.c
-+++ b/drivers/net/ethernet/ti/cpmac.c
-@@ -544,7 +544,7 @@ static int cpmac_poll(struct napi_struct *napi, int budget)
- 
+diff --git a/drivers/net/ethernet/cirrus/ep93xx_eth.c b/drivers/net/ethernet/cirrus/ep93xx_eth.c
+index e2a7029..13dfdfc 100644
+--- a/drivers/net/ethernet/cirrus/ep93xx_eth.c
++++ b/drivers/net/ethernet/cirrus/ep93xx_eth.c
+@@ -332,7 +332,7 @@ static int ep93xx_poll(struct napi_struct *napi, int budget)
+ 	return rx;
  }
  
--static int cpmac_start_xmit(struct sk_buff *skb, struct net_device *dev)
-+static netdev_tx_t cpmac_start_xmit(struct sk_buff *skb, struct net_device *dev)
+-static int ep93xx_xmit(struct sk_buff *skb, struct net_device *dev)
++static netdev_tx_t ep93xx_xmit(struct sk_buff *skb, struct net_device *dev)
  {
- 	int queue;
- 	unsigned int len;
-diff --git a/drivers/net/ethernet/ti/davinci_emac.c b/drivers/net/ethernet/ti/davinci_emac.c
-index f270bee..b83f32d 100644
---- a/drivers/net/ethernet/ti/davinci_emac.c
-+++ b/drivers/net/ethernet/ti/davinci_emac.c
-@@ -943,7 +943,7 @@ static void emac_tx_handler(void *token, int len, int status)
-  *
-  * Returns success(NETDEV_TX_OK) or error code (typically out of desc's)
-  */
--static int emac_dev_xmit(struct sk_buff *skb, struct net_device *ndev)
-+static netdev_tx_t emac_dev_xmit(struct sk_buff *skb, struct net_device *ndev)
- {
- 	struct device *emac_dev = &ndev->dev;
- 	int ret_code;
-diff --git a/drivers/net/ethernet/ti/netcp_core.c b/drivers/net/ethernet/ti/netcp_core.c
-index 1f61226..2d8cfe8 100644
---- a/drivers/net/ethernet/ti/netcp_core.c
-+++ b/drivers/net/ethernet/ti/netcp_core.c
-@@ -1270,7 +1270,8 @@ static int netcp_tx_submit_skb(struct netcp_intf *netcp,
+ 	struct ep93xx_priv *ep = netdev_priv(dev);
+ 	struct ep93xx_tdesc *txd;
+diff --git a/drivers/net/ethernet/cirrus/mac89x0.c b/drivers/net/ethernet/cirrus/mac89x0.c
+index 3f8fe8f..6324e80 100644
+--- a/drivers/net/ethernet/cirrus/mac89x0.c
++++ b/drivers/net/ethernet/cirrus/mac89x0.c
+@@ -113,7 +113,7 @@ struct net_local {
+ 
+ /* Index to functions, as function prototypes. */
+ static int net_open(struct net_device *dev);
+-static int net_send_packet(struct sk_buff *skb, struct net_device *dev);
++static netdev_tx_t net_send_packet(struct sk_buff *skb, struct net_device *dev);
+ static irqreturn_t net_interrupt(int irq, void *dev_id);
+ static void set_multicast_list(struct net_device *dev);
+ static void net_rx(struct net_device *dev);
+@@ -324,7 +324,7 @@ static int mac89x0_device_probe(struct platform_device *pdev)
+ 	return 0;
  }
  
- /* Submit the packet */
--static int netcp_ndo_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+-static int
 +static netdev_tx_t
-+netcp_ndo_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+ net_send_packet(struct sk_buff *skb, struct net_device *dev)
  {
- 	struct netcp_intf *netcp = netdev_priv(ndev);
- 	struct netcp_stats *tx_stats = &netcp->stats;
-@@ -1290,7 +1291,7 @@ static int netcp_ndo_start_xmit(struct sk_buff *skb, struct net_device *ndev)
- 			dev_warn(netcp->ndev_dev, "padding failed (%d), packet dropped\n",
- 				 ret);
- 			tx_stats->tx_dropped++;
--			return ret;
-+			return NETDEV_TX_BUSY;
- 		}
- 		skb->len = NETCP_MIN_PACKET_SIZE;
- 	}
-@@ -1298,7 +1299,6 @@ static int netcp_ndo_start_xmit(struct sk_buff *skb, struct net_device *ndev)
- 	desc = netcp_tx_map_skb(skb, netcp);
- 	if (unlikely(!desc)) {
- 		netif_stop_subqueue(ndev, subqueue);
--		ret = -ENOBUFS;
- 		goto drop;
- 	}
- 
-@@ -1319,7 +1319,7 @@ static int netcp_ndo_start_xmit(struct sk_buff *skb, struct net_device *ndev)
- 	if (desc)
- 		netcp_free_tx_desc_chain(netcp, desc, sizeof(*desc));
- 	dev_kfree_skb(skb);
--	return ret;
-+	return NETDEV_TX_BUSY;
- }
- 
- int netcp_txpipe_close(struct netcp_tx_pipe *tx_pipe)
+ 	struct net_local *lp = netdev_priv(dev);
 -- 
 1.8.3.1
