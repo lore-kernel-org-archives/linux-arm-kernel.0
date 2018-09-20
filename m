@@ -1,50 +1,85 @@
-From: eugen.hristev@microchip.com (Eugen Hristev)
-Date: Thu, 20 Sep 2018 15:40:38 +0300
-Subject: [PATCH 2/2] iio: adc: at91: fix wrong channel number in triggered
- buffer mode
-In-Reply-To: <1537447238-18674-1-git-send-email-eugen.hristev@microchip.com>
-References: <1537447238-18674-1-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <1537447238-18674-2-git-send-email-eugen.hristev@microchip.com>
+From: yuehaibing@huawei.com (YueHaibing)
+Date: Thu, 20 Sep 2018 20:32:44 +0800
+Subject: [PATCH net-next 00/22] net: fix return type of ndo_start_xmit function
+Message-ID: <20180920123306.14772-1-yuehaibing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When channels are registered, the hardware channel number is not the
-actual iio channel number.
-This is because the driver is probed with a certain number of accessible
-channels. Some pins are routed and some not, depending on the description of
-the board in the DT.
-Because of that, channels 0,1,2,3 can correspond to hardware channels
-2,3,4,5 for example.
-In the buffered triggered case, we need to do the translation accordingly.
-Fixed the channel number to stop reading the wrong channel.
+The method ndo_start_xmit() is defined as returning an 'netdev_tx_t',
+which is a typedef for an enum type, so make sure the implementation in
+this driver has returns 'netdev_tx_t' value, and change the function
+return type to netdev_tx_t.
 
-Fixes 0e589d5fb "ARM: AT91: IIO: Add AT91 ADC driver."
-Cc: Maxime Ripard <maxime.ripard@bootlin.com>
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
----
- drivers/iio/adc/at91_adc.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+YueHaibing (22):
+  net: micrel: fix return type of ndo_start_xmit function
+  net: freescale: fix return type of ndo_start_xmit function
+  net: seeq: fix return type of ndo_start_xmit function
+  net: cirrus: fix return type of ndo_start_xmit function
+  net: sgi: fix return type of ndo_start_xmit function
+  net: wiznet: fix return type of ndo_start_xmit function
+  net: i825xx: fix return type of ndo_start_xmit function
+  net: apple: fix return type of ndo_start_xmit function
+  net: smsc: fix return type of ndo_start_xmit function
+  net: ti: fix return type of ndo_start_xmit function
+  net: faraday: fix return type of ndo_start_xmit function
+  net: ovs: fix return type of ndo_start_xmit function
+  net: xen-netback: fix return type of ndo_start_xmit function
+  net: caif: fix return type of ndo_start_xmit function
+  net: hamradio: fix return type of ndo_start_xmit function
+  usbnet: ipheth: fix return type of ndo_start_xmit function
+  hv_netvsc: fix return type of ndo_start_xmit function
+  can: xilinx: fix return type of ndo_start_xmit function
+  net: plip: fix return type of ndo_start_xmit function
+  rionet: fix return type of ndo_start_xmit function
+  l2tp: fix return type of ndo_start_xmit function
+  net: hsr: fix return type of ndo_start_xmit function
 
-diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-index e85f859..6698804 100644
---- a/drivers/iio/adc/at91_adc.c
-+++ b/drivers/iio/adc/at91_adc.c
-@@ -248,12 +248,14 @@ static irqreturn_t at91_adc_trigger_handler(int irq, void *p)
- 	struct iio_poll_func *pf = p;
- 	struct iio_dev *idev = pf->indio_dev;
- 	struct at91_adc_state *st = iio_priv(idev);
-+	struct iio_chan_spec *chan;
- 	int i, j = 0;
- 
- 	for (i = 0; i < idev->masklength; i++) {
- 		if (!test_bit(i, idev->active_scan_mask))
- 			continue;
--		st->buffer[j] = at91_adc_readl(st, AT91_ADC_CHAN(st, i));
-+		chan = idev->channels + i;
-+		st->buffer[j] = at91_adc_readl(st, AT91_ADC_CHAN(st, chan->channel));
- 		j++;
- 	}
- 
+ drivers/net/caif/caif_hsi.c                           | 10 +++++-----
+ drivers/net/caif/caif_serial.c                        |  7 +++++--
+ drivers/net/caif/caif_spi.c                           |  6 +++---
+ drivers/net/caif/caif_virtio.c                        |  2 +-
+ drivers/net/can/xilinx_can.c                          |  2 +-
+ drivers/net/ethernet/apple/bmac.c                     |  4 ++--
+ drivers/net/ethernet/apple/mace.c                     |  4 ++--
+ drivers/net/ethernet/apple/macmace.c                  |  4 ++--
+ drivers/net/ethernet/cirrus/ep93xx_eth.c              |  2 +-
+ drivers/net/ethernet/cirrus/mac89x0.c                 |  4 ++--
+ drivers/net/ethernet/faraday/ftgmac100.c              |  4 ++--
+ drivers/net/ethernet/faraday/ftmac100.c               |  7 ++++---
+ drivers/net/ethernet/freescale/dpaa/dpaa_eth.c        |  3 ++-
+ drivers/net/ethernet/freescale/fec_mpc52xx.c          |  3 ++-
+ drivers/net/ethernet/freescale/fs_enet/fs_enet-main.c |  3 ++-
+ drivers/net/ethernet/freescale/gianfar.c              |  4 ++--
+ drivers/net/ethernet/freescale/ucc_geth.c             |  3 ++-
+ drivers/net/ethernet/i825xx/ether1.c                  |  5 +++--
+ drivers/net/ethernet/i825xx/lib82596.c                |  4 ++--
+ drivers/net/ethernet/i825xx/sun3_82586.c              |  6 ++++--
+ drivers/net/ethernet/micrel/ks8695net.c               |  2 +-
+ drivers/net/ethernet/micrel/ks8851_mll.c              |  4 ++--
+ drivers/net/ethernet/seeq/ether3.c                    |  5 +++--
+ drivers/net/ethernet/seeq/sgiseeq.c                   |  3 ++-
+ drivers/net/ethernet/sgi/ioc3-eth.c                   |  4 ++--
+ drivers/net/ethernet/sgi/meth.c                       |  2 +-
+ drivers/net/ethernet/smsc/smc911x.c                   |  3 ++-
+ drivers/net/ethernet/smsc/smc91x.c                    |  3 ++-
+ drivers/net/ethernet/smsc/smsc911x.c                  |  3 ++-
+ drivers/net/ethernet/ti/cpmac.c                       |  2 +-
+ drivers/net/ethernet/ti/davinci_emac.c                |  2 +-
+ drivers/net/ethernet/ti/netcp_core.c                  |  8 ++++----
+ drivers/net/ethernet/wiznet/w5100.c                   |  2 +-
+ drivers/net/ethernet/wiznet/w5300.c                   |  2 +-
+ drivers/net/hamradio/baycom_epp.c                     |  3 ++-
+ drivers/net/hamradio/dmascc.c                         |  4 ++--
+ drivers/net/hyperv/netvsc_drv.c                       | 10 +++++++---
+ drivers/net/plip/plip.c                               |  4 ++--
+ drivers/net/rionet.c                                  |  3 ++-
+ drivers/net/usb/ipheth.c                              |  2 +-
+ drivers/net/xen-netback/interface.c                   |  3 ++-
+ net/caif/chnl_net.c                                   |  3 ++-
+ net/hsr/hsr_device.c                                  |  2 +-
+ net/l2tp/l2tp_eth.c                                   |  3 ++-
+ net/openvswitch/vport-internal_dev.c                  |  5 +++--
+ 45 files changed, 100 insertions(+), 74 deletions(-)
+
 -- 
-2.7.4
+1.8.3.1
