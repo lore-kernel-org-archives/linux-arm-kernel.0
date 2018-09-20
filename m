@@ -1,115 +1,64 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Thu, 20 Sep 2018 10:38:53 +0000
-Subject: [PATCH 00/21] SMMU enablement for NXP LS1043A and LS1046A
-In-Reply-To: <39211e7a-034b-cdca-f182-1b6f6e5fbc53@arm.com>
-References: <20180919123613.15092-1-laurentiu.tudor@nxp.com>
- <7d7646dc-9d0b-013d-75d7-a6cb4453f41f@arm.com>
- <fd8ab351-46aa-f73e-593b-502a57de1975@nxp.com>
- <39211e7a-034b-cdca-f182-1b6f6e5fbc53@arm.com>
-Message-ID: <33eac426-cbb7-f899-5a35-aea28f8e5dc4@nxp.com>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Thu, 20 Sep 2018 13:18:47 +0200
+Subject: [PATCH] ARM: dts: BCM5301X: Relicense BCM47081/BCM4709 files to the
+ GPL 2.0+ / MIT
+Message-ID: <20180920111847.25513-1-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Rafa? Mi?ecki <rafal@milecki.pl>
 
+This matches licensing used by other BCM5301X files and is preferred as:
+1) GPL 2.0+ makes it clearly compatible with Linux kernel
+2) MIT is also permissive but preferred over ISC
 
-On 19.09.2018 17:37, Robin Murphy wrote:
-> On 19/09/18 15:18, Laurentiu Tudor wrote:
->> Hi Robin,
->>
->> On 19.09.2018 16:25, Robin Murphy wrote:
->>> Hi Laurentiu,
->>>
->>> On 19/09/18 13:35, laurentiu.tudor at nxp.com wrote:
->>>> From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
->>>>
->>>> This patch series adds SMMU support for NXP LS1043A and LS1046A chips
->>>> and consists mostly in important driver fixes and the required device
->>>> tree updates. It touches several subsystems and consists of three main
->>>> parts:
->>>> ?? - changes in soc/drivers/fsl/qbman drivers adding iommu mapping of
->>>> ???? reserved memory areas, fixes and defered probe support
->>>> ?? - changes in drivers/net/ethernet/freescale/dpaa_eth drivers
->>>> ???? consisting in misc dma mapping related fixes and probe ordering
->>>> ?? - addition of the actual arm smmu device tree node together with
->>>> ???? various adjustments to the device trees
->>>>
->>>> Performance impact
->>>>
->>>> ????? Running iperf benchmarks in a back-to-back setup (both sides
->>>> ????? having smmu enabled) on a 10GBps port show an important
->>>> ????? networking performance degradation of around %40 (9.48Gbps
->>>> ????? linerate vs 5.45Gbps). If you need performance but without
->>>> ????? SMMU support you can use "iommu.passthrough=1" to disable
->>>> ????? SMMU.
->>>>
->>>> USB issue and workaround
->>>>
->>>> ????? There's a problem with the usb controllers in these chips
->>>> ????? generating smaller, 40-bit wide dma addresses instead of the 
->>>> 48-bit
->>>> ????? supported at the smmu input. So you end up in a situation 
->>>> where the
->>>> ????? smmu is mapped with 48-bit address translations, but the device
->>>> ????? generates transactions with clipped 40-bit addresses, thus smmu
->>>> ????? context faults are triggered. I encountered a similar 
->>>> situation for
->>>> ????? mmc that I? managed to fix in software [1] however for USB I 
->>>> did not
->>>> ????? find a proper place in the code to add a similar fix. The only
->>>> ????? workaround I found was to add this kernel parameter which 
->>>> limits the
->>>> ????? usb dma to 32-bit size: "xhci-hcd.quirks=0x800000".
->>>> ????? This workaround if far from ideal, so any suggestions for a code
->>>> ????? based workaround in this area would be greatly appreciated.
->>>
->>> If you have a nominally-64-bit device with a
->>> narrower-than-the-main-interconnect link in front of it, that should
->>> already be fixed in 4.19-rc by bus_dma_mask picking up DT dma-ranges,
->>> provided the interconnect hierarchy can be described appropriately (or
->>> at least massaged sufficiently to satisfy the binding), e.g.:
->>>
->>> / {
->>> ? ????...
->>>
->>> ? ????soc {
->>> ? ??????? ranges;
->>> ? ??????? dma-ranges = <0 0 10000 0>;
->>>
->>> ? ??????? dev_48bit { ... };
->>>
->>> ? ??????? periph_bus {
->>> ? ??????????? ranges;
->>> ? ??????????? dma-ranges = <0 0 100 0>;
->>>
->>> ? ??????????? dev_40bit { ... };
->>> ? ??????? };
->>> ? ????};
->>> };
->>>
->>> and if that fails to work as expected (except for PCI hosts where
->>> handling dma-ranges properly still needs sorting out), please do let us
->>> know ;)
->>>
->>
->> Just to confirm, Is this [1] the change I was supposed to test?
-> 
-> Not quite - dma-ranges is only valid for nodes representing a bus, so 
-> putting it directly in the USB device nodes doesn't work (FWIW that's 
-> why PCI is broken, because the parser doesn't expect the 
-> bus-as-leaf-node case). That's teh point of that intermediate simple-bus 
-> node represented by "periph_bus" in my example (sorry, I should have put 
-> compatibles in to make it clearer) - often that's actually true to life 
-> (i.e. "soc" is something like a CCI and "periph_bus" is something like 
-> an AXI NIC gluing a bunch of lower-bandwidth DMA masters to one of the 
-> CCI ports) but at worst it's just a necessary evil to make the binding 
-> happy (if it literally only represents the point-to-point link between 
-> the device master port and interconnect slave port).
-> 
+Both files were fully developed by me. Commits touching them were signed
+by Florian and Hauke due to submitting process only.
 
-Quick update: so I adjusted to device tree according to your example and 
-it works so now I can get rid of that nasty kernel arg based workaround, 
-yey! :-)
-Thanks a lot, that was really helpful.
-
+Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
 ---
-Best Regards, Laurentiu
+ arch/arm/boot/dts/bcm47081.dtsi | 13 +------------
+ arch/arm/boot/dts/bcm4709.dtsi  |  3 +--
+ 2 files changed, 2 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm/boot/dts/bcm47081.dtsi b/arch/arm/boot/dts/bcm47081.dtsi
+index 9829d044aaf4..ed13af028528 100644
+--- a/arch/arm/boot/dts/bcm47081.dtsi
++++ b/arch/arm/boot/dts/bcm47081.dtsi
+@@ -1,20 +1,9 @@
++// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+ /*
+  * Broadcom BCM470X / BCM5301X ARM platform code.
+  * DTS for BCM47081 SoC.
+  *
+  * Copyright ? 2014 Rafa? Mi?ecki <zajec5@gmail.com>
+- *
+- * Permission to use, copy, modify, and/or distribute this software for any
+- * purpose with or without fee is hereby granted, provided that the above
+- * copyright notice and this permission notice appear in all copies.
+- *
+- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+- * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+- * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+- * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
+- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+- * PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
+ #include "bcm5301x.dtsi"
+diff --git a/arch/arm/boot/dts/bcm4709.dtsi b/arch/arm/boot/dts/bcm4709.dtsi
+index c645fea2b7f7..e1bb8661955f 100644
+--- a/arch/arm/boot/dts/bcm4709.dtsi
++++ b/arch/arm/boot/dts/bcm4709.dtsi
+@@ -1,7 +1,6 @@
++// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+ /*
+  * Copyright (C) 2016 Rafa? Mi?ecki <rafal@milecki.pl>
+- *
+- * Licensed under the ISC license.
+  */
+ 
+ #include "bcm4708.dtsi"
+-- 
+2.13.7
