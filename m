@@ -1,64 +1,93 @@
-From: jianxin.pan@amlogic.com (Jianxin Pan)
-Date: Thu, 20 Sep 2018 16:54:10 +0800
-Subject: [PATCH v4 2/2] arm64: dts: meson-g12a: add initial g12a s905d2
- SoC DT support
-In-Reply-To: <c16ae8cf-5802-778b-1fd8-494dfb2d8d1b@baylibre.com>
-References: <1537427368-11104-1-git-send-email-jianxin.pan@amlogic.com>
- <1537427368-11104-3-git-send-email-jianxin.pan@amlogic.com>
- <c16ae8cf-5802-778b-1fd8-494dfb2d8d1b@baylibre.com>
-Message-ID: <282176bb-2780-b8f4-5619-4edb24d37469@amlogic.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Thu, 20 Sep 2018 10:28:51 +0100
+Subject: [PATCH 5/5] ARM: spectre-v2: per-CPU vtables to work around
+ big.Little systems
+In-Reply-To: <20180920092129.GJ30658@n2100.armlinux.org.uk>
+References: <20180919094802.GH30658@n2100.armlinux.org.uk>
+ <E1g2Z6e-0003es-CI@rmk-PC.armlinux.org.uk>
+ <1d5260c4-6d4f-a6c9-210e-25b8aeda1bde@arm.com>
+ <20180920092129.GJ30658@n2100.armlinux.org.uk>
+Message-ID: <42b426db-3d7f-0bcc-4c16-c2b36ea786e0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/20/2018 3:54 PM, Neil Armstrong wrote:
-> On 20/09/2018 09:09, Jianxin Pan wrote:
->> Try to add basic DT support for the Amlogic's Meson-G12A S905D2 SoC,
->> which describe components as follows: Reserve Memory, CPU, GIC, IRQ,
->> Timer, UART. It's capable of booting up into the serial console.
+
+
+On 20/09/18 10:21, Russell King - ARM Linux wrote:
+> On Thu, Sep 20, 2018 at 10:04:44AM +0100, Julien Thierry wrote:
+>> Hi Russell,
 >>
->> Signed-off-by: Jianxin Pan <jianxin.pan@amlogic.com>
->> Reviewed-by: Jerome Brunet <jbrunet@baylibre.com>
->> ---
->>  arch/arm64/boot/dts/amlogic/Makefile            |   1 +
->>  arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts |  22 +++
->>  arch/arm64/boot/dts/amlogic/meson-g12a.dtsi     | 172 ++++++++++++++++++++++++
-[...]
->> +#include "meson-g12a.dtsi"
->> +
->> +/ {
->> +	compatible = "amlogic,u200", "amlogic,g12a";
->> +	model = "Amlogic Meson G12A U200 Development Board";
->> +
->> +	aliases {
->> +		serial0 = &uart_AO;
->> +	};
+>> On 19/09/18 10:49, Russell King wrote:
+>>> In big.Little systems, some CPUs require the Spectre workarounds in
+>>> paths such as the context switch, but other CPUs do not.  In order
+>>> to handle these differences, we need per-CPU vtables.
+>>>
+>>> We are unable to use the kernel's per-CPU variables to support this
+>>> as per-CPU is not initialised at times when we need access to the
+>>> vtables, so we have to use an array indexed by logical CPU number.
+>>>
+>>> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+>>> ---
+>>>   arch/arm/include/asm/proc-fns.h | 14 ++++++++++++++
+>>>   arch/arm/kernel/setup.c         |  5 +++++
+>>>   arch/arm/kernel/smp.c           | 31 +++++++++++++++++++++++++++++++
+>>>   arch/arm/mm/proc-v7-bugs.c      | 17 ++---------------
+>>>   4 files changed, 52 insertions(+), 15 deletions(-)
+>>>
+>>> diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
+>>> index 571a1346245b..ddbb25cb8968 100644
+>>> --- a/arch/arm/include/asm/proc-fns.h
+>>> +++ b/arch/arm/include/asm/proc-fns.h
+>>> @@ -104,11 +104,25 @@ extern void cpu_do_resume(void *);
+>>>   #else
+>>>   extern struct processor processor;
+>>> +#if defined(CONFIG_BIG_LITTLE) && defined(CONFIG_HARDEN_BRANCH_PREDICTOR)
+>>> +#include <linux/smp.h>
+>>> +/*
+>>> + * This can't be a per-cpu variable because we need to access it before
+>>> + * per-cpu has been initialised.
+>>> + */
+>>> +extern struct processor *cpu_vtable[];
+>>> +#define PROC_VTABLE(f)			cpu_vtable[smp_processor_id()]->f
+>>> +static inline void init_proc_vtable(const struct processor *p)
+>>> +{
+>>> +	*cpu_vtable[smp_processor_id()] = *p;
+>>> +}
+>>
+>> As you stated, 32-bit ARM can only have up to 8 logical CPUs. So, do we save
+>> much by having an added level of indirection? (i.e. having a table of
+>> pointers instead of directly having a table of struct processor)
 > 
-> Hi Jianxin,
+> Yes we do - in a word, security.
 > 
-> Please add the /memory and /chosen nodes.
+> If we made this a table of struct processor, because it is written to
+> after boot, it would need to be writable for the lifetime of the kernel.
+> Since it is in the kernel's static data section, it will be at a well-
+> known offset, which means it's a target for attackers to change the
+> function pointers.
 > 
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +
-> +	memory at 0 {
-> +		device_type = "memory";
-> +		reg = <0x0 0x0 0x0 0x40000000>;
-> +	};
+> Exactly this was true of the 'processor' variable, which gained a
+> __ro_after_init annotation a while back - and going to a table of
+> struct processor would mean that we end up back in that situation.
 > 
-> Thanks,
-> Neil
+> Having a table of pointers to struct processor means there is an
+> additional level of complexity for attackers to get around - they would
+> first need to copy an existing table, change its contents, and then
+> change the appropriate CPU's cpu_vtable pointer to point to their table.
+> Having a table of struct processor just means an attacker would only
+> need to poke one 32-bit word in the array for the appropriate CPU to
+> gain control.
 > 
+> So yes, this is slightly more complex, but it's that way to avoid
+> undoing the benefits that have previously been gained through
+> facilities such as read-only data after kernel initialisation.
 > 
-Hi Neil
-Thanks for the review! I will add them.
->> +};
->> +
->> +&uart_AO {
->> +	status = "okay";
->> +};
->> +
-> [...]
-> 
-> .
-> 
+
+I see, thanks for explaining. A very good reason for it then :) .
+
+Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+
+Thanks,
+
+-- 
+Julien Thierry
