@@ -1,254 +1,100 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 20 Sep 2018 18:31:31 +0100
-Subject: [PATCH 04/13] iommu/io-pgtable-arm-v7s: Extend MediaTek 4GB mode
-In-Reply-To: <1535954502-30646-5-git-send-email-yong.wu@mediatek.com>
-References: <1535954502-30646-1-git-send-email-yong.wu@mediatek.com>
- <1535954502-30646-5-git-send-email-yong.wu@mediatek.com>
-Message-ID: <12f5d150-8fa1-f742-36c0-e1f59d319a26@arm.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Thu, 20 Sep 2018 19:41:05 +0200
+Subject: [RFC PATCH 4/4] i2c: core: introduce master_xfer_irqless callback
+In-Reply-To: <20180920161423.13990-5-wsa+renesas@sang-engineering.com>
+References: <20180920161423.13990-1-wsa+renesas@sang-engineering.com>
+ <20180920161423.13990-5-wsa+renesas@sang-engineering.com>
+Message-ID: <ca62f8b1-26e2-2b40-d8ce-39a920d90063@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/18 07:01, Yong Wu wrote:
-> MediaTek extend the arm v7s descriptor to support the dram over 4GB.
+On 2018-09-20 18:14, Wolfram Sang wrote:
+> We had the request to access devices very late when interrupts are not
+> available anymore multiple times now. Mostly to prepare shutdown or
+
+The first sentence is a bit backwards, I'd rephrase like so:
+
+Multiple times now we've had the request to access devices very late, when
+interrupts are no longer available.
+
+> reboot. Allow adapters to specify a specific callback for this case.
+> Note that we fall back to the generic master_xfer callback if this new
+> irqless one is not present. This is intentional to preserve the previous
+> behaviour and avoid regressions. Because there are drivers not using
+> interrupts or because it might have worked "accidently" before.
+
+accidentally
+
 > 
-> In the mt2712 and mt8173, it's called "4GB mode", the physical address
-> is from 0x4000_0000 to 0x1_3fff_ffff, but from EMI point of view, it
-> is remapped to high address from 0x1_0000_0000 to 0x1_ffff_ffff, the
-> bit32 is always enabled. thus, in the M4U, we always enable the bit9
-> for all PTEs which means to enable bit32 of physical address.
-> 
-> but in mt8183, M4U support the dram from 0x4000_0000 to 0x3_ffff_ffff
-> which isn't remaped. We extend the PTEs: the bit9 represent bit32 of
-> PA and the bit4 represent bit33 of PA. Meanwhile the iova still is
-> 32bits.
-> 
-> In order to unify code, in the "4GB mode", we add the bit32 for the
-> physical address manually in our driver.
-> 
-> Correspondingly, Adding bit32 and bit33 for the PA in the iova_to_phys
-> has to been moved into v7s.
-> 
-> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 > ---
-> In mt8183, the PA is from 0x4000_0000 to 0x3_ffff_ffff while the iova
-> still is 32bits. Acturally, our HW extend the v7s pgtable. currently
-> the lvl1 pgtable is 16KB, our HW double it. but 32bit iova is enough
-> for us currently, thus we don't change it.
-> ---
->   drivers/iommu/io-pgtable-arm-v7s.c | 38 ++++++++++++++++++++++++++++++--------
->   drivers/iommu/io-pgtable.h         |  8 ++++----
->   drivers/iommu/mtk_iommu.c          | 15 +++++++++------
->   drivers/iommu/mtk_iommu.h          |  1 +
->   4 files changed, 44 insertions(+), 18 deletions(-)
+>  drivers/i2c/i2c-core-base.c |  6 +++++-
+>  include/linux/i2c.h         | 10 +++++++---
+>  2 files changed, 12 insertions(+), 4 deletions(-)
 > 
-> diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
-> index b5948ba..47538dd 100644
-> --- a/drivers/iommu/io-pgtable-arm-v7s.c
-> +++ b/drivers/iommu/io-pgtable-arm-v7s.c
-> @@ -124,7 +124,9 @@
->   #define ARM_V7S_TEX_MASK		0x7
->   #define ARM_V7S_ATTR_TEX(val)		(((val) & ARM_V7S_TEX_MASK) << ARM_V7S_TEX_SHIFT)
->   
-> -#define ARM_V7S_ATTR_MTK_4GB		BIT(9) /* MTK extend it for 4GB mode */
-> +/* MTK extend the two bits below for over 4GB mode */
-> +#define ARM_V7S_ATTR_MTK_PA_BIT32	BIT(9)
-> +#define ARM_V7S_ATTR_MTK_PA_BIT33	BIT(4)
->   
->   /* *well, except for TEX on level 2 large pages, of course :( */
->   #define ARM_V7S_CONT_PAGE_TEX_SHIFT	6
-> @@ -268,7 +270,8 @@ static void __arm_v7s_set_pte(arm_v7s_iopte *ptep, arm_v7s_iopte pte,
->   }
->   
->   static arm_v7s_iopte arm_v7s_prot_to_pte(int prot, int lvl,
-> -					 struct io_pgtable_cfg *cfg)
-> +					 struct io_pgtable_cfg *cfg,
-> +					 phys_addr_t paddr) /* Only for MTK */
-
-I'd rather keep this function dedicated to just generating the 
-permissions and attributes. If necessary I'm quite happy to add 
-additional helpers for getting/setting the address, much like LPAE now 
-has for handling 52-bit IOVAs.
-
->   {
->   	bool ap = !(cfg->quirks & IO_PGTABLE_QUIRK_NO_PERMS);
->   	arm_v7s_iopte pte = ARM_V7S_ATTR_NG | ARM_V7S_ATTR_S;
-> @@ -295,8 +298,12 @@ static arm_v7s_iopte arm_v7s_prot_to_pte(int prot, int lvl,
->   	if (lvl == 1 && (cfg->quirks & IO_PGTABLE_QUIRK_ARM_NS))
->   		pte |= ARM_V7S_ATTR_NS_SECTION;
->   
-> -	if (cfg->quirks & IO_PGTABLE_QUIRK_ARM_MTK_4GB)
-> -		pte |= ARM_V7S_ATTR_MTK_4GB;
-> +	if (cfg->quirks & IO_PGTABLE_QUIRK_ARM_MTK_4GB) {
-> +		if (paddr & BIT_ULL(32))
-> +			pte |= ARM_V7S_ATTR_MTK_PA_BIT32;
-> +		if (paddr & BIT_ULL(33))
-> +			pte |= ARM_V7S_ATTR_MTK_PA_BIT33;
-> +	}
->   
->   	return pte;
->   }
-> @@ -392,7 +399,7 @@ static int arm_v7s_init_pte(struct arm_v7s_io_pgtable *data,
->   			return -EEXIST;
->   		}
->   
-> -	pte = arm_v7s_prot_to_pte(prot, lvl, cfg);
-> +	pte = arm_v7s_prot_to_pte(prot, lvl, cfg, paddr);
->   	if (num_entries > 1)
->   		pte = arm_v7s_pte_to_cont(pte, lvl);
->   
-> @@ -484,7 +491,11 @@ static int arm_v7s_map(struct io_pgtable_ops *ops, unsigned long iova,
->   	if (!(prot & (IOMMU_READ | IOMMU_WRITE)))
->   		return 0;
->   
-> -	if (WARN_ON(upper_32_bits(iova) || upper_32_bits(paddr)))
-> +	if (WARN_ON(upper_32_bits(iova)))
-> +		return -ERANGE;
+> diff --git a/drivers/i2c/i2c-core-base.c b/drivers/i2c/i2c-core-base.c
+> index 904b4d2ebefa..f827446c3089 100644
+> --- a/drivers/i2c/i2c-core-base.c
+> +++ b/drivers/i2c/i2c-core-base.c
+> @@ -1887,7 +1887,11 @@ int __i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
+>  	/* Retry automatically on arbitration loss */
+>  	orig_jiffies = jiffies;
+>  	for (ret = 0, try = 0; try <= adap->retries; try++) {
+> -		ret = adap->algo->master_xfer(adap, msgs, num);
+> +		if ((in_atomic() || irqs_disabled()) && adap->algo->master_xfer_irqless)
+> +			ret = adap->algo->master_xfer_irqless(adap, msgs, num);
+> +		else
+> +			ret = adap->algo->master_xfer(adap, msgs, num);
 > +
-> +	if (WARN_ON(upper_32_bits(paddr) &&
-> +		    !(iop->cfg.quirks & IO_PGTABLE_QUIRK_ARM_MTK_4GB)))
+>  		if (ret != -EAGAIN)
+>  			break;
+>  		if (time_after(jiffies, orig_jiffies + adap->timeout))
+> diff --git a/include/linux/i2c.h b/include/linux/i2c.h
+> index 65b4eaed1d96..11e615123bd0 100644
+> --- a/include/linux/i2c.h
+> +++ b/include/linux/i2c.h
+> @@ -498,6 +498,8 @@ i2c_register_board_info(int busnum, struct i2c_board_info const *info,
+>   * @master_xfer: Issue a set of i2c transactions to the given I2C adapter
+>   *   defined by the msgs array, with num messages available to transfer via
+>   *   the adapter specified by adap.
+> + * @master_xfer_irqless: same as master_xfer. Yet, not using any interrupts
 
-TBH I'd just cram the quirk check into the right-hand-side of the || 
-rather than introduce a separate if() - there's already too many 
-parentheses to read the whole thing easily ;)
+"Same" (with capital 'S') to match the other entries. Also, should it
+not be @master_xfer to help the tools do the right thing?
 
->   		return -ERANGE;
->   
->   	ret = __arm_v7s_map(data, iova, paddr, size, prot, 1, data->pgd);
-> @@ -563,7 +574,7 @@ static size_t arm_v7s_split_blk_unmap(struct arm_v7s_io_pgtable *data,
->   	num_entries = size >> ARM_V7S_LVL_SHIFT(2);
->   	unmap_idx = ARM_V7S_LVL_IDX(iova, 2);
->   
-> -	pte = arm_v7s_prot_to_pte(arm_v7s_pte_to_prot(blk_pte, 1), 2, cfg);
-> +	pte = arm_v7s_prot_to_pte(arm_v7s_pte_to_prot(blk_pte, 1), 2, cfg, 0);
->   	if (num_entries > 1)
->   		pte = arm_v7s_pte_to_cont(pte, 2);
->   
-> @@ -677,7 +688,9 @@ static phys_addr_t arm_v7s_iova_to_phys(struct io_pgtable_ops *ops,
->   					unsigned long iova)
->   {
->   	struct arm_v7s_io_pgtable *data = io_pgtable_ops_to_data(ops);
-> +	struct io_pgtable_cfg *cfg = &data->iop.cfg;
->   	arm_v7s_iopte *ptep = data->pgd, pte;
-> +	phys_addr_t paddr;
->   	int lvl = 0;
->   	u32 mask;
->   
-> @@ -693,7 +706,16 @@ static phys_addr_t arm_v7s_iova_to_phys(struct io_pgtable_ops *ops,
->   	mask = ARM_V7S_LVL_MASK(lvl);
->   	if (arm_v7s_pte_is_cont(pte, lvl))
->   		mask *= ARM_V7S_CONT_PAGES;
-> -	return (pte & mask) | (iova & ~mask);
-> +	paddr = (pte & mask) | (iova & ~mask);
-> +
-> +	if (IS_ENABLED(CONFIG_PHYS_ADDR_T_64BIT) &&
-> +	    cfg->quirks & IO_PGTABLE_QUIRK_ARM_MTK_4GB) {
-> +		if (pte & ARM_V7S_ATTR_MTK_PA_BIT32)
-> +			paddr |= BIT_ULL(32);
-> +		if (pte & ARM_V7S_ATTR_MTK_PA_BIT33)
-> +			paddr |= BIT_ULL(33);
-> +	}
-> +	return paddr;
->   }
->   
->   static struct io_pgtable *arm_v7s_alloc_pgtable(struct io_pgtable_cfg *cfg,
-> diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
-> index 2df7909..0eeed94 100644
-> --- a/drivers/iommu/io-pgtable.h
-> +++ b/drivers/iommu/io-pgtable.h
-> @@ -62,10 +62,10 @@ struct io_pgtable_cfg {
->   	 *	(unmapped) entries but the hardware might do so anyway, perform
->   	 *	TLB maintenance when mapping as well as when unmapping.
->   	 *
-> -	 * IO_PGTABLE_QUIRK_ARM_MTK_4GB: (ARM v7s format) Set bit 9 in all
-> -	 *	PTEs, for Mediatek IOMMUs which treat it as a 33rd address bit
-> -	 *	when the SoC is in "4GB mode" and they can only access the high
-> -	 *	remap of DRAM (0x1_00000000 to 0x1_ffffffff).
-> +	 * IO_PGTABLE_QUIRK_ARM_MTK_4GB: (ARM v7s format) Set bit 4 and 9 in all
-> +	 *	PTEs, for Mediatek IOMMUs which treat it as the 33rd and 32rd
+> + *   so e.g. PMICs can be accessed very late before shutdown
 
-The "all PTEs" part referred to the fact that io-pgtable was forcing bit 
-9 on unconditionally. Since that logic is now moving into the MTK driver 
-itself, all the quirk means now from io-pgtable's point of view is that 
-PAs may be up to 34 bits where bits 32 and 33 of the address are encoded 
-in bits 9 and 4 of the PTE respectively...
+Trailing period.
 
-> +	 *	address bit when the SoC dram is over 4GB and they can access
-> +	 *	the physical address from 0x4000_0000 to 0x3_ffff_ffff.
->   	 *
->   	 * IO_PGTABLE_QUIRK_NO_DMA: Guarantees that the tables will only ever
->   	 *	be accessed by a fully cache-coherent IOMMU or CPU (e.g. for a
-> diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
-> index c0e2da5..86bf647 100644
-> --- a/drivers/iommu/mtk_iommu.c
-> +++ b/drivers/iommu/mtk_iommu.c
-> @@ -367,12 +367,17 @@ static int mtk_iommu_map(struct iommu_domain *domain, unsigned long iova,
->   			 phys_addr_t paddr, size_t size, int prot)
->   {
->   	struct mtk_iommu_domain *dom = to_mtk_domain(domain);
-> +	struct mtk_iommu_data *data = mtk_iommu_get_m4u_data();
->   	unsigned long flags;
->   	int ret;
->   
-> +	if (IS_ENABLED(CONFIG_PHYS_ADDR_T_64BIT) &&
-> +	    data->plat_data->has_4gb_mode &&
-> +	    data->enable_4GB)
-> +		paddr |= BIT_ULL(32);
+I'm fine with this change, but should it not wait until there is a user?
+(I think there is one in the wings, so that's a very weak objection...)
 
-...so it might be worth moving the rationale part of the current quirk 
-comment (i.e. that the "4GB mode" IOMMUs physically cannot use the lower 
-remap of RAM) to here where it now applies.
+Acked-by: Peter Rosin <peda@axentia.se>
 
-Robin.
 
-> +
->   	spin_lock_irqsave(&dom->pgtlock, flags);
-> -	ret = dom->iop->map(dom->iop, iova, paddr & DMA_BIT_MASK(32),
-> -			    size, prot);
-> +	ret = dom->iop->map(dom->iop, iova, paddr, size, prot);
->   	spin_unlock_irqrestore(&dom->pgtlock, flags);
->   
->   	return ret;
-> @@ -401,7 +406,6 @@ static phys_addr_t mtk_iommu_iova_to_phys(struct iommu_domain *domain,
->   					  dma_addr_t iova)
->   {
->   	struct mtk_iommu_domain *dom = to_mtk_domain(domain);
-> -	struct mtk_iommu_data *data = mtk_iommu_get_m4u_data();
->   	unsigned long flags;
->   	phys_addr_t pa;
->   
-> @@ -409,9 +413,6 @@ static phys_addr_t mtk_iommu_iova_to_phys(struct iommu_domain *domain,
->   	pa = dom->iop->iova_to_phys(dom->iop, iova);
->   	spin_unlock_irqrestore(&dom->pgtlock, flags);
->   
-> -	if (data->enable_4GB)
-> -		pa |= BIT_ULL(32);
-> -
->   	return pa;
->   }
->   
-> @@ -735,10 +736,12 @@ static int __maybe_unused mtk_iommu_resume(struct device *dev)
->   
->   static const struct mtk_iommu_plat_data mt2712_data = {
->   	.m4u_plat = M4U_MT2712,
-> +	.has_4gb_mode = true,
->   };
->   
->   static const struct mtk_iommu_plat_data mt8173_data = {
->   	.m4u_plat = M4U_MT8173,
-> +	.has_4gb_mode = true,
->   };
->   
->   static const struct of_device_id mtk_iommu_of_ids[] = {
-> diff --git a/drivers/iommu/mtk_iommu.h b/drivers/iommu/mtk_iommu.h
-> index 333a0ef..a243047 100644
-> --- a/drivers/iommu/mtk_iommu.h
-> +++ b/drivers/iommu/mtk_iommu.h
-> @@ -43,6 +43,7 @@ enum mtk_iommu_plat {
->   
->   struct mtk_iommu_plat_data {
->   	enum mtk_iommu_plat m4u_plat;
-> +	bool has_4gb_mode;
->   };
->   
->   struct mtk_iommu_domain;
+>   * @smbus_xfer: Issue smbus transactions to the given I2C adapter. If this
+>   *   is not present, then the bus layer will try and convert the SMBus calls
+>   *   into I2C transfers instead.
+> @@ -511,9 +513,9 @@ i2c_register_board_info(int busnum, struct i2c_board_info const *info,
+>   * be addressed using the same bus algorithms - i.e. bit-banging or the PCF8584
+>   * to name two of the most common.
+>   *
+> - * The return codes from the @master_xfer field should indicate the type of
+> - * error code that occurred during the transfer, as documented in the kernel
+> - * Documentation file Documentation/i2c/fault-codes.
+> + * The return codes from the @master_xfer{_irqless} field should indicate the
+> + * type of error code that occurred during the transfer, as documented in the
+> + * Kernel Documentation file Documentation/i2c/fault-codes.
+>   */
+>  struct i2c_algorithm {
+>  	/* If an adapter algorithm can't do I2C-level access, set master_xfer
+> @@ -524,6 +526,8 @@ struct i2c_algorithm {
+>  	   processed, or a negative value on error */
+>  	int (*master_xfer)(struct i2c_adapter *adap, struct i2c_msg *msgs,
+>  			   int num);
+> +	int (*master_xfer_irqless)(struct i2c_adapter *adap,
+> +				   struct i2c_msg *msgs, int num);
+>  	int (*smbus_xfer) (struct i2c_adapter *adap, u16 addr,
+>  			   unsigned short flags, char read_write,
+>  			   u8 command, int size, union i2c_smbus_data *data);
 > 
