@@ -1,54 +1,50 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 20 Sep 2018 22:07:36 +0100
-Subject: [PATCH] iommu/rockchip: Free irqs in shutdown handler
-In-Reply-To: <20180827105624.5593-1-heiko@sntech.de>
-References: <20180827105624.5593-1-heiko@sntech.de>
-Message-ID: <86musbx4h3.wl-marc.zyngier@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 20 Sep 2018 14:23:26 -0700
+Subject: [PATCH v2 0/3] ARM: OMAP1: ams-delta: Clean up GPIO setup for
+ MODEM
+In-Reply-To: <2690911.AdkODg5D9b@z50>
+References: <20180820181333.2527-1-jmkrzyszt@gmail.com>
+ <20180909234419.31261-1-jmkrzyszt@gmail.com>
+ <2690911.AdkODg5D9b@z50>
+Message-ID: <20180920212326.GS5662@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 27 Aug 2018 11:56:24 +0100,
-Heiko Stuebner <heiko@sntech.de> wrote:
+* Janusz Krzysztofik <jmkrzyszt@gmail.com> [180910 21:52]:
+> On Monday, September 10, 2018 1:44:16 AM CEST Janusz Krzysztofik wrote:
+> > 
+> > Convert modem related GPIO setup from integer space to GPIO descriptors.
+> > Also, restore original initialization order of the MODEM device and its
+> > related GPIO pins.
+> > 
+> > Cleanup of MODEM relaated regulator setup is postponed while waiting for
+> > upcoming conversion of fixed regulator API to GPIO descriptors.
+> > 
+> > 
+> > Janusz Krzysztofik (3):
+> >       ARM: OMAP1: ams-delta: assign MODEM IRQ from GPIO descriptor
+> >       ARM: OMAP1: ams-delta: initialize latch2 pins to safe values
+> >       ARM: OMAP1: ams-delta: register MODEM device earlier
+> > 
+> > 
+> > Changelog:
+> > v2:
+> > - rebased on v4.19-rc1
 > 
-> In the iommu's shutdown handler we disable runtime-pm which could
-> result in the irq-handler running unclocked and since commit
->     3fc7c5c0cff3 ("iommu/rockchip: Handle errors returned from PM framework")
-> we warn about that fact.
+> Hi Tony,
 > 
-> This can cause warnings on shutdown on some Rockchip machines, so
-> free the irqs in the shutdown handler before we disable runtime-pm.
-> 
-> Reported-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> Fixes: 3fc7c5c0cff3 ("iommu/rockchip: Handle errors returned from PM framework")
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  drivers/iommu/rockchip-iommu.c | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-> index 258115b10fa9..ad3e2b97469e 100644
-> --- a/drivers/iommu/rockchip-iommu.c
-> +++ b/drivers/iommu/rockchip-iommu.c
-> @@ -1241,6 +1241,12 @@ static int rk_iommu_probe(struct platform_device *pdev)
->  
->  static void rk_iommu_shutdown(struct platform_device *pdev)
->  {
-> +	struct rk_iommu *iommu = platform_get_drvdata(pdev);
-> +	int i = 0, irq;
-> +
-> +	while ((irq = platform_get_irq(pdev, i++)) != -ENXIO)
-> +		devm_free_irq(iommu->dev, irq, iommu);
-> +
->  	pm_runtime_force_suspend(&pdev->dev);
->  }
->  
-> -- 
-> 2.17.0
-> 
+> I forgot to mention: please apply on top of "[PATCH v3 0/3] ARM: OMAP1: ams-
+> delta: Complete driver gpiod migration" series. Sorry.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Hmm but then in that thread you said that it won't apply.. So I'm applying
+this series into omap-for-v4.20/omap1 branch. I just modified the second
+patch in this series for the unchanged header location.
 
-	M.
+I suggest you send the mtd patch separately to mtd maintainers, the fb patch
+separately to fb maintainers and then let's do the header move after all
+those are merged as a clean-up. That avoids some dependencies between these
+branches.
 
--- 
-Jazz is not dead, it just smell funny.
+Regards,
+
+Tony
