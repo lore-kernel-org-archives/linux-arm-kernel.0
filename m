@@ -1,43 +1,43 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Thu, 20 Sep 2018 13:20:19 +0200
-Subject: [PATCH] ARM: dts: BCM5301X: Relicense BCM47094 file to the GPL 2.0+ /
- MIT
-Message-ID: <20180920112019.25622-1-zajec5@gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 20 Sep 2018 13:32:25 +0200
+Subject: [PATCH v3 2/2] serial: uartps: Change uart ID port allocation
+In-Reply-To: <dcf1c72203baf2629492dce765ce2d555316be0c.1537282676.git.michal.simek@xilinx.com>
+References: <b1772d99d4e8b788448cde0fc5c7dccb1f63b507.1537282676.git.michal.simek@xilinx.com>
+ <dcf1c72203baf2629492dce765ce2d555316be0c.1537282676.git.michal.simek@xilinx.com>
+Message-ID: <20180920113225.GA19956@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rafa? Mi?ecki <rafal@milecki.pl>
+On Tue, Sep 18, 2018 at 04:57:59PM +0200, Michal Simek wrote:
+> For IPs which have alias algorightm all the time using that alias and
+> minor number. It means serial20 alias ends up as ttyPS20.
+> 
+> If alias is not setup for probed IP instance the first unused position is
+> used but that needs to be checked if it is really empty because another
+> instance doesn't need to be probed at that time. of_alias_get_alias_list()
+> fills alias bitmap which exactly shows which ID is free.
+> If alias pointing to different not compatible IP, it is free to use.
+> 
+> cdns_get_id() call is placed below structure allocation to simplify
+> error path.
+> 
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+> 
+> Changes in v3: None
+> Changes in v2:
+> - Add handle of return value from of_alias_get_alias_list
+> 
+> Needs to be applied on the top of
+> https://lkml.org/lkml/2018/9/3/404
+> https://lkml.org/lkml/2018/9/3/400 (minor that's why just in case)
+> 
+> Greg: Please apply it with
+> "of: base: Introduce of_alias_get_alias_list() to check alias IDs
+> Rob is ok with that.
 
-This matches licensing used by other BCM5301X files and is preferred as:
-1) GPL 2.0+ makes it clearly compatible with Linux kernel
-2) MIT is also permissive but preferred over ISC
+I don't have that patch, can you resend the whole series?
 
-This file has been developed by me & once modified by Vivek.
+thanks,
 
-Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
----
-Vivek: you have touched this file in the commit 37f6130ec39f ("ARM: dts:
-BCM5301X: Make USB 3.0 PHY use MDIO PHY driver").
-
-If you are OK with this relicensing, can you reply with
-Acked-by
-with your name, please?
----
- arch/arm/boot/dts/bcm47094.dtsi | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/bcm47094.dtsi b/arch/arm/boot/dts/bcm47094.dtsi
-index f7c3e274b354..cdc5ff593adb 100644
---- a/arch/arm/boot/dts/bcm47094.dtsi
-+++ b/arch/arm/boot/dts/bcm47094.dtsi
-@@ -1,7 +1,6 @@
-+// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
- /*
-  * Copyright (C) 2016 Rafa? Mi?ecki <rafal@milecki.pl>
-- *
-- * Licensed under the ISC license.
-  */
- 
- #include "bcm4708.dtsi"
--- 
-2.13.7
+greg k-h
