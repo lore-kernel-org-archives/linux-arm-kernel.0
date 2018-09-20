@@ -1,81 +1,36 @@
-From: dkos@cadence.com (Damian Kos)
-Date: Thu, 20 Sep 2018 15:54:38 +0100
-Subject: [PATCH v4 3/5] drm/dp: make dp_get_lane_status usable from outside of
- the core
-In-Reply-To: <1537455288-20223-1-git-send-email-dkos@cadence.com>
-References: <1537455288-20223-1-git-send-email-dkos@cadence.com>
-Message-ID: <1537455288-20223-4-git-send-email-dkos@cadence.com>
+From: madalin.bucur@nxp.com (Madalin Bucur)
+Date: Thu, 20 Sep 2018 18:06:49 +0300
+Subject: [PATCH 2/4] soc/fsl/qbman: Add 64 bit DMA addressing requirement to
+ QBMan
+In-Reply-To: <1537456011-10769-1-git-send-email-madalin.bucur@nxp.com>
+References: <1537456011-10769-1-git-send-email-madalin.bucur@nxp.com>
+Message-ID: <1537456011-10769-3-git-send-email-madalin.bucur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Quentin Schulz <quentin.schulz@free-electrons.com>
+From: Roy Pledge <roy.pledge@nxp.com>
 
-dp_get_lane_status is pretty generic and can be used for other means,
-so let's make it "public".
+The QBMan block is memory mapped on SoCs above a 32 bit (4 Gigabyte)
+boundary so enabling 64 bit DMA addressing is needed for QBMan to
+be usable.
 
-This adds drm_dp_get_lane_status to the header file and add the appropriate
-EXPORT_SYMBOL for it so that it can be used by other drivers, be they compiled
-built-in or as modules.
-
-Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-Signed-off-by: Damian Kos <dkos@cadence.com>
+Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
+Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
 ---
- drivers/gpu/drm/drm_dp_helper.c | 9 +++++----
- include/drm/drm_dp_helper.h     | 2 ++
- 2 files changed, 7 insertions(+), 4 deletions(-)
+ drivers/soc/fsl/qbman/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/drm_dp_helper.c b/drivers/gpu/drm/drm_dp_helper.c
-index 735ebde5c2f0..169db52f92f5 100644
---- a/drivers/gpu/drm/drm_dp_helper.c
-+++ b/drivers/gpu/drm/drm_dp_helper.c
-@@ -48,14 +48,15 @@ static u8 dp_link_status(const u8 link_status[DP_LINK_STATUS_SIZE], int r)
- 	return link_status[r - DP_LANE0_1_STATUS];
- }
- 
--static u8 dp_get_lane_status(const u8 link_status[DP_LINK_STATUS_SIZE],
--			     int lane)
-+u8 drm_dp_get_lane_status(const u8 link_status[DP_LINK_STATUS_SIZE],
-+			  int lane)
- {
- 	int i = DP_LANE0_1_STATUS + (lane >> 1);
- 	int s = (lane & 1) * 4;
- 	u8 l = dp_link_status(link_status, i);
- 	return (l >> s) & 0xf;
- }
-+EXPORT_SYMBOL(drm_dp_get_lane_status);
- 
- bool drm_dp_channel_eq_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
- 			  int lane_count)
-@@ -69,7 +70,7 @@ bool drm_dp_channel_eq_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
- 	if ((lane_align & DP_INTERLANE_ALIGN_DONE) == 0)
- 		return false;
- 	for (lane = 0; lane < lane_count; lane++) {
--		lane_status = dp_get_lane_status(link_status, lane);
-+		lane_status = drm_dp_get_lane_status(link_status, lane);
- 		if ((lane_status & DP_CHANNEL_EQ_BITS) != DP_CHANNEL_EQ_BITS)
- 			return false;
- 	}
-@@ -84,7 +85,7 @@ bool drm_dp_clock_recovery_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
- 	u8 lane_status;
- 
- 	for (lane = 0; lane < lane_count; lane++) {
--		lane_status = dp_get_lane_status(link_status, lane);
-+		lane_status = drm_dp_get_lane_status(link_status, lane);
- 		if ((lane_status & DP_LANE_CR_DONE) == 0)
- 			return false;
- 	}
-diff --git a/include/drm/drm_dp_helper.h b/include/drm/drm_dp_helper.h
-index 698082a02b97..973d2fda9654 100644
---- a/include/drm/drm_dp_helper.h
-+++ b/include/drm/drm_dp_helper.h
-@@ -952,6 +952,8 @@
- #define DP_MST_LOGICAL_PORT_0 8
- 
- #define DP_LINK_STATUS_SIZE	   6
-+
-+u8 drm_dp_get_lane_status(const u8 link_status[DP_LINK_STATUS_SIZE], int lane);
- bool drm_dp_channel_eq_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
- 			  int lane_count);
- bool drm_dp_clock_recovery_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
+diff --git a/drivers/soc/fsl/qbman/Kconfig b/drivers/soc/fsl/qbman/Kconfig
+index d570cb5fd381..19d6f4621e23 100644
+--- a/drivers/soc/fsl/qbman/Kconfig
++++ b/drivers/soc/fsl/qbman/Kconfig
+@@ -1,6 +1,6 @@
+ menuconfig FSL_DPAA
+ 	bool "QorIQ DPAA1 framework support"
+-	depends on (FSL_SOC_BOOKE || ARCH_LAYERSCAPE)
++	depends on ((FSL_SOC_BOOKE || ARCH_LAYERSCAPE || ARM) && ARCH_DMA_ADDR_T_64BIT)
+ 	select GENERIC_ALLOCATOR
+ 	help
+ 	  The Freescale Data Path Acceleration Architecture (DPAA) is a set of
 -- 
-2.17.1
+2.1.0
