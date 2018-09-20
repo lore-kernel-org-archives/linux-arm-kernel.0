@@ -1,41 +1,23 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Thu, 20 Sep 2018 17:50:33 +0200
-Subject: [PATCH] ARM: dts: stm32: update SPI6 dmas property on stm32mp157c
-In-Reply-To: <1537171487-15191-1-git-send-email-amelie.delaunay@st.com>
-References: <1537171487-15191-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <1efc3bad-cea0-95c4-078d-67463f2b9e6d@st.com>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 20 Sep 2018 08:50:55 -0700 (PDT)
+Subject: [PATCH net-next 00/22] net: fix return type of ndo_start_xmit
+ function
+In-Reply-To: <20180920123306.14772-1-yuehaibing@huawei.com>
+References: <20180920123306.14772-1-yuehaibing@huawei.com>
+Message-ID: <20180920.085055.1188796939437872993.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Am?lie
+From: YueHaibing <yuehaibing@huawei.com>
+Date: Thu, 20 Sep 2018 20:32:44 +0800
 
-On 09/17/2018 10:04 AM, Amelie Delaunay wrote:
-> Remove unused parameter from SPI6 dmas property on stm32mp157c SoC.
-> 
-> Fixes: dc3f8c86c10d ("ARM: dts: stm32: add SPI support on stm32mp157c")
-> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
-> ---
->   arch/arm/boot/dts/stm32mp157c.dtsi | 4 ++--
->   1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
-> index 661be94..185541a 100644
-> --- a/arch/arm/boot/dts/stm32mp157c.dtsi
-> +++ b/arch/arm/boot/dts/stm32mp157c.dtsi
-> @@ -1078,8 +1078,8 @@
->   			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
->   			clocks = <&rcc SPI6_K>;
->   			resets = <&rcc SPI6_R>;
-> -			dmas = <&mdma1 34 0x0 0x40008 0x0 0x0 0>,
-> -			       <&mdma1 35 0x0 0x40002 0x0 0x0 0>;
-> +			dmas = <&mdma1 34 0x0 0x40008 0x0 0x0>,
-> +			       <&mdma1 35 0x0 0x40002 0x0 0x0>;
->   			dma-names = "rx", "tx";
->   			status = "disabled";
->   		};
-> 
+> The method ndo_start_xmit() is defined as returning an 'netdev_tx_t',
+> which is a typedef for an enum type, so make sure the implementation in
+> this driver has returns 'netdev_tx_t' value, and change the function
+> return type to netdev_tx_t.
 
-Applied on stm32-next.
+I would advise you not to send so many of these changes as a group.
 
-Thanks.
-Alex
+If one of the patches needs feedback addressed, which is already the
+case, you will have to resubmit the entire series all over again with
+the fixes.
