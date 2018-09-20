@@ -1,56 +1,61 @@
-From: daniel@makrotopia.org (Daniel Golle)
-Date: Thu, 20 Sep 2018 10:24:29 +0200
-Subject: [PATCH 1/2] libata: add ledtrig support
-In-Reply-To: <20180920072354.GA20392@amd>
-References: <1537328730-9156-1-git-send-email-aditya@kobol.io>
- <1537328730-9156-2-git-send-email-aditya@kobol.io>
- <20180920072354.GA20392@amd>
-Message-ID: <20180920082425.GB20006@makrotopia.org>
+From: joel@jms.id.au (Joel Stanley)
+Date: Thu, 20 Sep 2018 18:18:09 +0930
+Subject: [GIT PULL] ARM: aspeed: dts changes for 4.20
+Message-ID: <CACPK8XfwK85_os-Kjqvkwp-V8YqV3JDPZEepdgXNA+6ievOLSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hello ARM Maintainers,
 
-On Thu, Sep 20, 2018 at 09:23:54AM +0200, Pavel Machek wrote:
-> Hi!
-> 
-> > +#ifdef CONFIG_ATA_LEDS
-> > +	/* register LED triggers for all ports */
-> > +	for (i = 0; i < host->n_ports; i++) {
-> > +		if (unlikely(!host->ports[i]->ledtrig))
-> > +			continue;
-> > +
-> > +		snprintf(host->ports[i]->ledtrig_name,
-> > +			sizeof(host->ports[i]->ledtrig_name), "ata%u",
-> > +			host->ports[i]->print_id);
-> 
-> > +		host->ports[i]->ledtrig->name = host->ports[i]->ledtrig_name;
-> > +
-> > +		if (led_trigger_register(host->ports[i]->ledtrig)) {
-> > +			kfree(host->ports[i]->ledtrig);
-> > +			host->ports[i]->ledtrig = NULL;
-> > +		}
-> > +	}
-> > +#endif
-> 
-> No, we don't want you to register multiple triggers. We want one
-> trigger, than has parameter "which port to watch". (Number of triggers
-> is limited as by sysfs limitations).
+Here's the ASPEED device tree changes for 4.20. Please pull if they
+look good. Thanks!
 
-Back then I implemented it that way to be able to define the
-default trigger for each LED in device tree and "trigger-sources"
-didn't exist yet (it was introduced for USB ports and isn't yet used
-for anything other than that)
-However, the problem till today is also that ATA ports are often not
-individual device-tree objects we can refer to, see for example
-marvell,armada-370-sata which appears as one opaque controller. Ie.
-all SATA drivers have to be converted to expose individual ports on
-device-tree before the trigger-sources approach can be applied...
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 
+  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
 
-> 
-> Otherwise yes, ata trigger makes sense.
-> 									Pavel
-> -- 
-> (english) http://www.livejournal.com/~pavelmachek
-> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/joel/aspeed.git \
+    tags/aspeed-4.20-devicetree
+
+for you to fetch changes up to 3368e06e2a91a65cff59e520acc51b9adf4900bf:
+
+  ARM: dts: aspeed: Adding Facebook TiogaPass BMC (2018-09-20 17:25:48 +0930)
+
+----------------------------------------------------------------
+ASPEED device tree updates for 4.20
+
+ - Two new ast2500-based machines:
+
+   * Facebook TiogaPass (x86 server)
+   * HXT StarDragon 4800 Reference Evaluation Platform 2 (arm64 server)
+
+ - Updates for the Quanta q71l system
+
+ - i2c device tree cleanups
+
+----------------------------------------------------------------
+Patrick Venture (3):
+      ARM: dts: aspeed: quanta-q71l: add aliases for i2c
+      ARM: dts: aspeed: quanta-q71l: Add four PSUs
+      ARM: dts: aspeed: quanta-q71l: Enable adc & ibt nodes
+
+Rob Herring (1):
+      ARM: dts: aspeed: Fix I2C bus warnings
+
+Vijay Khemka (1):
+      ARM: dts: aspeed: Adding Facebook TiogaPass BMC
+
+Yuan Yao (1):
+      ARM: dts: aspeed: Add HXT StarDragon 4800 REP2 BMC
+
+ arch/arm/boot/dts/Makefile                         |   2 +
+ .../dts/aspeed-bmc-arm-stardragon4800-rep2.dts     | 207 +++++++++++++++++++++
+ .../arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts | 146 +++++++++++++++
+ arch/arm/boot/dts/aspeed-bmc-quanta-q71l.dts       |  47 +++++
+ arch/arm/boot/dts/aspeed-g4.dtsi                   |   2 +-
+ arch/arm/boot/dts/aspeed-g5.dtsi                   |   2 +-
+ 6 files changed, 404 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/boot/dts/aspeed-bmc-arm-stardragon4800-rep2.dts
+ create mode 100644 arch/arm/boot/dts/aspeed-bmc-facebook-tiogapass.dts
