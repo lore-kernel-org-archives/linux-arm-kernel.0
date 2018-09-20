@@ -1,39 +1,56 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 20 Sep 2018 23:33:20 +0100
-Subject: [PATCH] arm64: Trap WFI executed in userspace
-In-Reply-To: <20180920220430.GA27468@xo-6d-61-c0.localdomain>
-References: <20180807093326.5090-1-marc.zyngier@arm.com>
- <20180920220430.GA27468@xo-6d-61-c0.localdomain>
-Message-ID: <86lg7vx0i7.wl-marc.zyngier@arm.com>
+From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
+Date: Fri, 21 Sep 2018 00:43:49 +0200
+Subject: [PATCH v2 0/3] ARM: OMAP1: ams-delta: Clean up GPIO setup for
+ MODEM
+In-Reply-To: <20180920212326.GS5662@atomide.com>
+References: <20180820181333.2527-1-jmkrzyszt@gmail.com>
+ <2690911.AdkODg5D9b@z50> <20180920212326.GS5662@atomide.com>
+Message-ID: <4137539.DlEMru2qd5@z50>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Sep 2018 23:04:30 +0100,
-Pavel Machek <pavel@ucw.cz> wrote:
-> 
-> On Tue 2018-08-07 10:33:26, Marc Zyngier wrote:
-> > It recently came to light that userspace can execute WFI, and that
-> > the arm64 kernel doesn trap this event. This sounds rather benign,
-> > but the kernel should decide when it wants to wait for an interrupt,
-> > and not userspace.
+Hi Tony,
+
+On Thursday, September 20, 2018 11:23:26 PM CEST Tony Lindgren wrote:
+> * Janusz Krzysztofik <jmkrzyszt@gmail.com> [180910 21:52]:
+> > On Monday, September 10, 2018 1:44:16 AM CEST Janusz Krzysztofik wrote:
+> > > 
+> > > Convert modem related GPIO setup from integer space to GPIO descriptors.
+> > > Also, restore original initialization order of the MODEM device and its
+> > > related GPIO pins.
+> > > 
+> > > Cleanup of MODEM relaated regulator setup is postponed while waiting for
+> > > upcoming conversion of fixed regulator API to GPIO descriptors.
+> > > 
+> > > 
+> > > Janusz Krzysztofik (3):
+> > >       ARM: OMAP1: ams-delta: assign MODEM IRQ from GPIO descriptor
+> > >       ARM: OMAP1: ams-delta: initialize latch2 pins to safe values
+> > >       ARM: OMAP1: ams-delta: register MODEM device earlier
+> > > 
+> > > 
+> > > Changelog:
+> > > v2:
+> > > - rebased on v4.19-rc1
 > > 
-> > Let's trap WFI and treat it as a way to yield the CPU to another
-> > process.
+> > Hi Tony,
+> > 
+> > I forgot to mention: please apply on top of "[PATCH v3 0/3] ARM: OMAP1: ams-
+> > delta: Complete driver gpiod migration" series. Sorry.
 > 
-> I don't think that's reasonable. Userspace should not be doing that,
-> and we do not want to encourage it. SIGILL would be reasonable, I'd
-> say.
+> Hmm but then in that thread you said that it won't apply.. So I'm applying
+> this series into omap-for-v4.20/omap1 branch. I just modified the second
+> patch in this series for the unchanged header location.
 
-This ship has already sailed. Sending SIGILL changes the ABI in an
-incompatible way. Immediately returning to userspace without doing
-anything else (see v2 [1]) is the best we can do without changing the
-behaviour of userspace.
+OK, thank you.
+Janusz
 
-Thanks,
-
-	M.
-
-[1] https://patchwork.kernel.org/patch/10562517/
-
--- 
-Jazz is not dead, it just smell funny.
+> I suggest you send the mtd patch separately to mtd maintainers, the fb patch
+> separately to fb maintainers and then let's do the header move after all
+> those are merged as a clean-up. That avoids some dependencies between these
+> branches.
+> 
+> Regards,
+> 
+> Tony
+> 
