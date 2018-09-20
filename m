@@ -1,49 +1,121 @@
 From: leoyang.li@nxp.com (Li Yang)
-Date: Thu, 20 Sep 2018 13:54:28 -0500
-Subject: [PATCH 2/4] soc/fsl/qbman: Add 64 bit DMA addressing requirement
- to QBMan
-In-Reply-To: <1537456011-10769-3-git-send-email-madalin.bucur@nxp.com>
-References: <1537456011-10769-1-git-send-email-madalin.bucur@nxp.com>
- <1537456011-10769-3-git-send-email-madalin.bucur@nxp.com>
-Message-ID: <CADRPPNSz-x1uf98+cKUjj54sSxQbJOXWk7xn_ExhbcjdAYKUpw@mail.gmail.com>
+Date: Thu, 20 Sep 2018 14:07:07 -0500
+Subject: [PATCH 00/21] SMMU enablement for NXP LS1043A and LS1046A
+In-Reply-To: <33eac426-cbb7-f899-5a35-aea28f8e5dc4@nxp.com>
+References: <20180919123613.15092-1-laurentiu.tudor@nxp.com>
+ <7d7646dc-9d0b-013d-75d7-a6cb4453f41f@arm.com>
+ <fd8ab351-46aa-f73e-593b-502a57de1975@nxp.com>
+ <39211e7a-034b-cdca-f182-1b6f6e5fbc53@arm.com>
+ <33eac426-cbb7-f899-5a35-aea28f8e5dc4@nxp.com>
+Message-ID: <CADRPPNTot7U6vARqtrRrw4XqhDQPSXP1QO9ZbGpNQByJPcU37Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 20, 2018 at 10:09 AM Madalin Bucur <madalin.bucur@nxp.com> wrote:
+On Thu, Sep 20, 2018 at 5:39 AM Laurentiu Tudor <laurentiu.tudor@nxp.com> wrote:
 >
-> From: Roy Pledge <roy.pledge@nxp.com>
 >
-> The QBMan block is memory mapped on SoCs above a 32 bit (4 Gigabyte)
-> boundary so enabling 64 bit DMA addressing is needed for QBMan to
-> be usable.
 >
-> Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
-> Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
-> ---
->  drivers/soc/fsl/qbman/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> On 19.09.2018 17:37, Robin Murphy wrote:
+> > On 19/09/18 15:18, Laurentiu Tudor wrote:
+> >> Hi Robin,
+> >>
+> >> On 19.09.2018 16:25, Robin Murphy wrote:
+> >>> Hi Laurentiu,
+> >>>
+> >>> On 19/09/18 13:35, laurentiu.tudor at nxp.com wrote:
+> >>>> From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+> >>>>
+> >>>> This patch series adds SMMU support for NXP LS1043A and LS1046A chips
+> >>>> and consists mostly in important driver fixes and the required device
+> >>>> tree updates. It touches several subsystems and consists of three main
+> >>>> parts:
+> >>>>    - changes in soc/drivers/fsl/qbman drivers adding iommu mapping of
+> >>>>      reserved memory areas, fixes and defered probe support
+> >>>>    - changes in drivers/net/ethernet/freescale/dpaa_eth drivers
+> >>>>      consisting in misc dma mapping related fixes and probe ordering
+> >>>>    - addition of the actual arm smmu device tree node together with
+> >>>>      various adjustments to the device trees
+> >>>>
+> >>>> Performance impact
+> >>>>
+> >>>>       Running iperf benchmarks in a back-to-back setup (both sides
+> >>>>       having smmu enabled) on a 10GBps port show an important
+> >>>>       networking performance degradation of around %40 (9.48Gbps
+> >>>>       linerate vs 5.45Gbps). If you need performance but without
+> >>>>       SMMU support you can use "iommu.passthrough=1" to disable
+> >>>>       SMMU.
+> >>>>
+> >>>> USB issue and workaround
+> >>>>
+> >>>>       There's a problem with the usb controllers in these chips
+> >>>>       generating smaller, 40-bit wide dma addresses instead of the
+> >>>> 48-bit
+> >>>>       supported at the smmu input. So you end up in a situation
+> >>>> where the
+> >>>>       smmu is mapped with 48-bit address translations, but the device
+> >>>>       generates transactions with clipped 40-bit addresses, thus smmu
+> >>>>       context faults are triggered. I encountered a similar
+> >>>> situation for
+> >>>>       mmc that I  managed to fix in software [1] however for USB I
+> >>>> did not
+> >>>>       find a proper place in the code to add a similar fix. The only
+> >>>>       workaround I found was to add this kernel parameter which
+> >>>> limits the
+> >>>>       usb dma to 32-bit size: "xhci-hcd.quirks=0x800000".
+> >>>>       This workaround if far from ideal, so any suggestions for a code
+> >>>>       based workaround in this area would be greatly appreciated.
+> >>>
+> >>> If you have a nominally-64-bit device with a
+> >>> narrower-than-the-main-interconnect link in front of it, that should
+> >>> already be fixed in 4.19-rc by bus_dma_mask picking up DT dma-ranges,
+> >>> provided the interconnect hierarchy can be described appropriately (or
+> >>> at least massaged sufficiently to satisfy the binding), e.g.:
+> >>>
+> >>> / {
+> >>>       ...
+> >>>
+> >>>       soc {
+> >>>           ranges;
+> >>>           dma-ranges = <0 0 10000 0>;
+> >>>
+> >>>           dev_48bit { ... };
+> >>>
+> >>>           periph_bus {
+> >>>               ranges;
+> >>>               dma-ranges = <0 0 100 0>;
+> >>>
+> >>>               dev_40bit { ... };
+> >>>           };
+> >>>       };
+> >>> };
+> >>>
+> >>> and if that fails to work as expected (except for PCI hosts where
+> >>> handling dma-ranges properly still needs sorting out), please do let us
+> >>> know ;)
+> >>>
+> >>
+> >> Just to confirm, Is this [1] the change I was supposed to test?
+> >
+> > Not quite - dma-ranges is only valid for nodes representing a bus, so
+> > putting it directly in the USB device nodes doesn't work (FWIW that's
+> > why PCI is broken, because the parser doesn't expect the
+> > bus-as-leaf-node case). That's teh point of that intermediate simple-bus
+> > node represented by "periph_bus" in my example (sorry, I should have put
+> > compatibles in to make it clearer) - often that's actually true to life
+> > (i.e. "soc" is something like a CCI and "periph_bus" is something like
+> > an AXI NIC gluing a bunch of lower-bandwidth DMA masters to one of the
+> > CCI ports) but at worst it's just a necessary evil to make the binding
+> > happy (if it literally only represents the point-to-point link between
+> > the device master port and interconnect slave port).
+> >
 >
-> diff --git a/drivers/soc/fsl/qbman/Kconfig b/drivers/soc/fsl/qbman/Kconfig
-> index d570cb5fd381..19d6f4621e23 100644
-> --- a/drivers/soc/fsl/qbman/Kconfig
-> +++ b/drivers/soc/fsl/qbman/Kconfig
-> @@ -1,6 +1,6 @@
->  menuconfig FSL_DPAA
->         bool "QorIQ DPAA1 framework support"
-> -       depends on (FSL_SOC_BOOKE || ARCH_LAYERSCAPE)
-> +       depends on ((FSL_SOC_BOOKE || ARCH_LAYERSCAPE || ARM) && ARCH_DMA_ADDR_T_64BIT)
+> Quick update: so I adjusted to device tree according to your example and
+> it works so now I can get rid of that nasty kernel arg based workaround,
+> yey! :-)
 
-You also added ARM support here.  Actually the dependency on
-ARCH_DMA_ADDR_T_64BIT is only explicitly needed by ARM(other platforms
-already implies ARCH_DMA_ADDR_T_64BIT).  So I think the patch title
-should be like: adding 32-bit ARM support.  The ARCH_DMA_ADDR_T_64BIT
-is enabled by ARM_LPAE on ARM.  Probably we should make that
-straightforward in the Kconfig, so that people better understand what
-is needed for 32-bit ARM.
+Great that we have a generic solution like I hoped for!  So you will
+submit a new revision of the series to include these dts updates,
+right?
 
->         select GENERIC_ALLOCATOR
->         help
->           The Freescale Data Path Acceleration Architecture (DPAA) is a set of
-> --
-> 2.1.0
->
+Regards,
+Leo
