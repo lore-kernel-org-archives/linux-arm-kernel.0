@@ -1,36 +1,41 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 20 Sep 2018 18:48:57 +0200
-Subject: [RESEND PATCH v3 0/3] sh: make early_platform code SuperH-specific
-In-Reply-To: <CAMRc=MeC8gwEpjNf5AEX4oocHYv8c_CJXkCDMM9CQvaqxrbdXQ@mail.gmail.com>
-References: <20180827090651.25062-1-brgl@bgdev.pl>
- <CAMRc=McWre+5PRuozF69YKONvzy4X31=MzZim-QjhaAZ9iAVTw@mail.gmail.com>
- <9963d3f3-ba14-0d18-d669-53fc79b783c2@linaro.org>
- <CAMRc=MeC8gwEpjNf5AEX4oocHYv8c_CJXkCDMM9CQvaqxrbdXQ@mail.gmail.com>
-Message-ID: <0622b4da-20d3-5f05-5774-85c1dbabe00e@linaro.org>
+From: leoyang.li@nxp.com (Li Yang)
+Date: Thu, 20 Sep 2018 11:56:56 -0500
+Subject: [GIT PULL] fixes for soc/fsl drivers for v4.19
+Message-ID: <20180920165656.31902-1-leoyang.li@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/09/2018 18:19, Bartosz Golaszewski wrote:
-> 2018-09-20 18:09 GMT+02:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
->> On 20/09/2018 15:00, Bartosz Golaszewski wrote:
->>
->> [ ... ]
->>
->>> Ping for 4.20. This is the third release cycle I'm trying to get this
->>> merged and there never were any objections.
->>
->> Thanks for the heads up, it is in the pipe.
->>
-> 
-> I guess you mean only the clocksource patch?
+Hi arm-soc maintainers,
 
+Please merge the following fixes for soc/fsl drivers.
 
-I meant it is in the pipe of things to review :)
+Regards,
+Leo
 
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/leo/linux.git tags/soc-fsl-fixes-for-4.19
+
+for you to fetch changes up to 3cb31b634052ed458922e0c8e2b4b093d7fb60b9:
+
+  soc: fsl: qe: Fix copy/paste bug in ucc_get_tdm_sync_shift() (2018-09-17 16:01:46 -0500)
+
+----------------------------------------------------------------
+soc/fsl fixes for 4.19
+
+----------------------------------------------------------------
+Alexandre Belloni (2):
+      soc: fsl: qbman: qman_portal: defer probing when qman is not available
+      soc: fsl: qbman: qman: avoid allocating from non existing gen_pool
+
+Zhao Qiang (1):
+      soc: fsl: qe: Fix copy/paste bug in ucc_get_tdm_sync_shift()
+
+ drivers/soc/fsl/qbman/qman.c        | 3 +++
+ drivers/soc/fsl/qbman/qman_portal.c | 2 ++
+ drivers/soc/fsl/qe/ucc.c            | 2 +-
+ 3 files changed, 6 insertions(+), 1 deletion(-)
