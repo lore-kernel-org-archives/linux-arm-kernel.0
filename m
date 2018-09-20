@@ -1,17 +1,27 @@
-From: aditya@kobol.io (Aditya Prayoga)
-Date: Thu, 20 Sep 2018 16:53:26 +0700
-Subject: [PATCH 1/2] libata: add ledtrig support
-In-Reply-To: <20180919130104.GD26940@lunn.ch>
-References: <1537328730-9156-1-git-send-email-aditya@kobol.io>
- <1537328730-9156-2-git-send-email-aditya@kobol.io>
- <20180919130104.GD26940@lunn.ch>
-Message-ID: <CAFTRUBdcGqroAfiG__e0nwP2GqK3Xh9PVOGQsk9Jj_jkrcU9ag@mail.gmail.com>
+From: weiyi.lu@mediatek.com (Weiyi Lu)
+Date: Thu, 20 Sep 2018 17:57:24 +0800
+Subject: [PATCH v1 0/3] update Mediatek MT2712 clock
+In-Reply-To: <20180920095727.11868-1-weiyi.lu@mediatek.com>
+References: <20180920095727.11868-1-weiyi.lu@mediatek.com>
+Message-ID: <20180920095727.11868-2-weiyi.lu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+This series is based on v4.19-rc1.
+Basically, it's for the 3rd ECO design change of MT2712.
+And also add support for switching pll reference source
+for some MT2712 projects.
 
-thank you for your feedback. It seem i also need to resolve the issue
-reported by kbuild test robot.
+*** BLURB HERE ***
 
-Aditya
+Weiyi Lu (3):
+  dt-bindings: clock: add clock for MT2712
+  clk: mediatek: update clock driver of MT2712
+  clk: mediatek: mt2712: add pll reference support
+
+ drivers/clk/mediatek/clk-mt2712.c      | 95 ++++++++++++++++++++++++++--------
+ include/dt-bindings/clock/mt2712-clk.h |  3 +-
+ 2 files changed, 76 insertions(+), 22 deletions(-)
+
+-- 
+2.12.5.2.gbdf23ab
