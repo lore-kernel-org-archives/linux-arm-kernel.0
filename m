@@ -1,217 +1,123 @@
-From: Steve.Capper@arm.com (Steve Capper)
-Date: Thu, 20 Sep 2018 16:40:58 +0000
-Subject: [PATCH] arm64: hugetlb: Avoid unnecessary clearing in
- huge_ptep_set_access_flags
-In-Reply-To: <20180920093900.GB17617@arm.com>
-References: <20180919174437.1866-1-steve.capper@arm.com>
- <20180920093900.GB17617@arm.com>
-Message-ID: <20180920163920.mrob4v6ijr4syjgx@capper-debian.cambridge.arm.com>
+From: JOLLYS@xilinx.com (Jolly Shah)
+Date: Thu, 20 Sep 2018 16:46:36 +0000
+Subject: [PATCH v12 0/6] drivers: Introduce firmware driver for ZynqMP core
+In-Reply-To: <1536781120-22794-1-git-send-email-jollys@xilinx.com>
+References: <1536781120-22794-1-git-send-email-jollys@xilinx.com>
+Message-ID: <CY1PR02MB21385F71D8BC4498654CD0BFB8130@CY1PR02MB2138.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 20, 2018 at 10:39:01AM +0100, Will Deacon wrote:
-> Hi Steve,
+Hi Olof,
 
-Hi Will,
+As suggested, this patchset is generated without ioctl interface. Please review. If you are ok, Michal can create a pull request for merge.
 
-> 
-> On Wed, Sep 19, 2018 at 06:44:37PM +0100, Steve Capper wrote:
-> > For contiguous hugetlb, huge_ptep_set_access_flags performs a
-> > get_clear_flush (which then flushes the TLBs) even when no change of ptes
-> > is necessary.
-> > 
-> > Unfortunately, this behaviour can lead to back-to-back page faults being
-> > generated when running with multiple threads that access the same
-> > contiguous huge page.
-> > 
-> > Thread 1                     |  Thread 2
-> > -----------------------------+------------------------------
-> > hugetlb_fault                |
-> > huge_ptep_set_access_flags   |
-> >   -> invalidate pte range    | hugetlb_fault
-> > continue processing          | wait for hugetlb fault mutex
-> > release mutex and return     | huge_ptep_set_access_flags
-> >                              |   -> invalidate pte range
-> > hugetlb_fault
-> 
-> Is this serialised by a mutex of the mmap_sem? (or both?)
+Thanks,
+Jolly Shah
 
-The serialisation point I was looking at was from hugetlb_fault_mutex_table,
-I will make this clearer in the commit log.
 
+> -----Original Message-----
+> From: Jolly Shah [mailto:jolly.shah at xilinx.com]
+> Sent: Wednesday, September 12, 2018 12:39 PM
+> To: olof at lixom.net; Michal Simek <michals@xilinx.com>; arm at kernel.org
+> Cc: Rajan Vaja <RAJANV@xilinx.com>; linux-arm-kernel at lists.infradead.org;
+> linux-kernel at vger.kernel.org; Jolly Shah <JOLLYS@xilinx.com>
+> Subject: [PATCH v12 0/6] drivers: Introduce firmware driver for ZynqMP core
 > 
-> > This patch changes huge_ptep_set_access_flags s.t. we first read the
-> > contiguous range of ptes (whilst preserving dirty information); the pte
-> > range is only then invalidated where necessary and this prevents further
-> > spurious page faults.
-> > 
-> > Fixes: d8bdcff28764 ("arm64: hugetlb: Add break-before-make logic for contiguous entries")
-> > Reported-by: Lei Zhang <zhang.lei@jp.fujitsu.com>
-> > Signed-off-by: Steve Capper <steve.capper@arm.com>
-> > 
-> > ---
-> > 
-> > I was unable to test this on any hardware as I'm away from the office.
-> > 
-> > Can you please test this Lei Zhang?
-> > 
-> > Cheers,
-> > --
-> > Steve
-> > ---
-> >  arch/arm64/mm/hugetlbpage.c | 36 ++++++++++++++++++++++++++++++++----
-> >  1 file changed, 32 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-> > index 192b3ba07075..76d229eb6ba1 100644
-> > --- a/arch/arm64/mm/hugetlbpage.c
-> > +++ b/arch/arm64/mm/hugetlbpage.c
-> > @@ -131,6 +131,27 @@ static pte_t get_clear_flush(struct mm_struct *mm,
-> >  	return orig_pte;
-> >  }
-> >  
-> > +static pte_t get_contig_pte(pte_t *ptep, unsigned long pgsize,
-> > +		unsigned long ncontig)
-> > +{
-> > +	unsigned long i;
-> > +	pte_t orig_pte = huge_ptep_get(ptep);
-> > +
-> > +	for (i = 0; i < ncontig; i++, ptep++) {
-> > +		pte_t pte = huge_ptep_get(ptep);
-> > +
-> > +		/*
-> > +		 * If HW_AFDBM is enabled, then the HW could turn on
-> > +		 * the dirty bit for any page in the set, so check
-> > +		 * them all.  All hugetlb entries are already young.
+> Firmware driver enables APU to communicate to PMUFW(Platform
+> Management Unit) via ATF by using SMC instructions. This patchset is adding
+> support for base firmware driver with query and clock control APIs. More API
+> support will be added with incremental patchsets along with their user driver.
 > 
-> Maybe mention that young implies that AF is set?
-> Having said that, are you sure that these entries are already young?
-> If so, why does hugetlb_fault() call pte_mkyoung() on the pte before
-> passing it into huge_ptep_set_access_flags()? Also, since
-> huge_ptep_set_access_flags() can only ever relax the permissions for
-> an entry, if everything was young then it would imply that the only
-> operation it ever does is to set dirty. In which case, we could
-> assert pte_dirty(pte) and parts of the current code are redundant.
+> v12:
+>  - Removed clock driver patches from set
+>  - Removed ioctl api support
+>  - Incorporated minor review comments from v11 patch series
 > 
-> What's going on here?
+> v11:
+>  - Removed "Reveiwed-by:Stephen Boyd" tag from firmware binding
+>  - Updated clock and firmware driver to use probe method instead of init
+>  - Marked PMU payload arguments with __le32 for proper endienness code
 > 
-
-Huge ptes are created young in make_huge_pte, I suspect the call to
-pte_mkyoung in hugetlb_fault is to prevent huge_ptep_set_access_flags
-from losing the young information. I will scrutinise the young logic
-further.
-
-> > +		 */
-> > +		if (pte_dirty(pte))
-> > +			orig_pte = pte_mkdirty(orig_pte);
-> > +	}
-> > +
-> > +	return orig_pte;
-> > +}
-> > +
-> >  /*
-> >   * Changing some bits of contiguous entries requires us to follow a
-> >   * Break-Before-Make approach, breaking the whole contiguous set
-> > @@ -324,7 +345,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
-> >  			       unsigned long addr, pte_t *ptep,
-> >  			       pte_t pte, int dirty)
-> >  {
-> > -	int ncontig, i, changed = 0;
-> > +	int ncontig, i;
-> >  	size_t pgsize = 0;
-> >  	unsigned long pfn = pte_pfn(pte), dpfn;
-> >  	pgprot_t hugeprot;
-> > @@ -336,9 +357,16 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
-> >  	ncontig = find_num_contig(vma->vm_mm, addr, ptep, &pgsize);
-> >  	dpfn = pgsize >> PAGE_SHIFT;
-> >  
-> > +	orig_pte = get_contig_pte(ptep, pgsize, ncontig);
-> > +	if (pte_same(orig_pte, pte))
-> > +		return 0;
+> v10:
+>  - Incorporated code review comments from v9 patch series. Discussed below:
+> 	https://patchwork.kernel.org/patch/10478575/
+> 	https://patchwork.kernel.org/patch/10478457/
+> 	https://patchwork.kernel.org/patch/10478461/
+> 	https://patchwork.kernel.org/patch/10478463/
 > 
-> Hmm, I don't understand how this solves the other problem we found. Imagine
-> we have a contiguous range of ptes [pte0 ... pteN] and we have a CPU that
-> doesn't support the contiguous hint and also doesn't support HW_AFDBM.
-> Further, imagine that another CPU in the system *does* support HW_AFDBM.
+> v9:
+>  - Fixed minor typo comments
 > 
-
-:-(
-
-> In this case, it would be possible for the first CPU to take a fault on
-> pteN as a result of trying to write to a clean page. If the other CPU had
-> already set the dirty bit for pte0, then your get_contig_pte() function
-> will return a dirty orig_pte and the pte_same() check will pass for the
-> faulting CPU, causing it to get stuck in a recursive fault.
+> v8:
+>  - Corrected typo in clk Kconfig
 > 
-> Ideally, we'd solve this by only performing the pte_same() check on the
-> pte that is offset by the faulting address, but unfortunately the address
-> we get passed here has already been rounded down. That's why I bailed and
-> simply tried to check pte_same() on every pte. Really, we just to check
-> the access and dirty flags -- another diff below.
+> v7:
+>  - Removed xilinx specific clock debugfs API support
+>  - Added reviewed-by tags for FW and clock bindings
+>  - Updated clock node name to clock-controller
 > 
-
-Thanks I understand, apologies for missing this before (I'll blame
-jetlag ;-) ). I'll have a think about this and will post a V2.
-
-> > +	/*
-> > +	 * we need to get our orig_pte again as HW DBM may have happened since
-> > +	 * above. get_clear_flush will ultimately cmpxchg with 0 to ensure
+> v6:
+>  - Broke patch series to have base FW driver and Clock driver user
+>  - Incorporated code review comments from last FW and Clock driver patch
+> series. Discussed below:
+> 	https://patchwork.kernel.org/patch/10230759/
+> 	https://patchwork.kernel.org/patch/10250047/
 > 
-> s/cmpxchg/xchg/
-
-Gah, thanks :-)
-
+> v5:
+>  - Added ATF version check support
+>  - Updated some functions to be static
+>  - Minor function name corrections
 > 
-> Will
+> v4:
+>  - Changed clock setrate/getrate API prototype to support 64 bit rate
+>  - Defined macros for get_node_status return values
+>  - Moved DT node as a child of firmware
+>  - Changed debugfs APIs to return data to debugfs buffer instead of dumping to
+> kernel log
+>  - Minor changes to incorporate other review comments from v3 patch series
 > 
-> --->8
+> v3:
+>  - added some fixes to firmware-ggs.c
+>  - updated pinmux get/set function argument names to specify function id
+> instead of node id
+>  - added new pinctrl query macros
+>  - incorporated review comments from v2 patch series
 > 
-> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-> index 192b3ba07075..0b7738d76f14 100644
-> --- a/arch/arm64/mm/hugetlbpage.c
-> +++ b/arch/arm64/mm/hugetlbpage.c
-> @@ -324,7 +324,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
->  			       unsigned long addr, pte_t *ptep,
->  			       pte_t pte, int dirty)
->  {
-> -	int ncontig, i, changed = 0;
-> +	int ncontig, i;
->  	size_t pgsize = 0;
->  	unsigned long pfn = pte_pfn(pte), dpfn;
->  	pgprot_t hugeprot;
-> @@ -336,9 +336,20 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
->  	ncontig = find_num_contig(vma->vm_mm, addr, ptep, &pgsize);
->  	dpfn = pgsize >> PAGE_SHIFT;
->  
-> +	for (i = 0; i < ncontig; i++) {
-> +		orig_pte = huge_ptep_get(ptep + i);
-> +
-> +		if (pte_dirty(orig_pte) != pte_dirty(pte))
-> +			break;
-> +
-> +		if (pte_young(orig_pte) != pte_young(pte))
-> +			break;
-> +	}
-> +
-> +	if (i == ncontig)
-> +		return 0;
-> +
->  	orig_pte = get_clear_flush(vma->vm_mm, addr, ptep, pgsize, ncontig);
-> -	if (!pte_same(orig_pte, pte))
-> -		changed = 1;
->  
->  	/* Make sure we don't lose the dirty state */
->  	if (pte_dirty(orig_pte))
-> @@ -348,7 +359,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
->  	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn)
->  		set_pte_at(vma->vm_mm, addr, ptep, pfn_pte(pfn, hugeprot));
->  
-> -	return changed;
-> +	return 1;
->  }
->  
->  void huge_ptep_set_wrprotect(struct mm_struct *mm,
-
-Cheers,
--- 
-Steve
+> v2:
+>  - change SPDX-License-Identifier license text style
+>  - split patch into multiple patches
+>  - Updated copyrights
+>  - Added ABI documentation
+>  - incorporated logical review comments from previuos patch. Discussed below:
+> 	https://patchwork.kernel.org/patch/10150665/
+> 
+> Rajan Vaja (6):
+>   dt-bindings: firmware: Add bindings for ZynqMP firmware
+>   firmware: xilinx: Add Zynqmp firmware driver
+>   firmware: xilinx: Add query data API
+>   firmware: xilinx: Add clock APIs
+>   firmware: xilinx: Add debugfs interface
+>   firmware: xilinx: Add debugfs for query data API
+> 
+>  .../firmware/xilinx/xlnx,zynqmp-firmware.txt       |  29 ++
+>  arch/arm64/Kconfig.platforms                       |   1 +
+>  drivers/firmware/Kconfig                           |   1 +
+>  drivers/firmware/Makefile                          |   1 +
+>  drivers/firmware/xilinx/Kconfig                    |  23 +
+>  drivers/firmware/xilinx/Makefile                   |   5 +
+>  drivers/firmware/xilinx/zynqmp-debug.c             | 250 ++++++++++
+>  drivers/firmware/xilinx/zynqmp-debug.h             |  24 +
+>  drivers/firmware/xilinx/zynqmp.c                   | 523 +++++++++++++++++++++
+>  include/linux/firmware/xlnx-zynqmp.h               | 113 +++++
+>  10 files changed, 970 insertions(+)
+>  create mode 100644
+> Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
+>  create mode 100644 drivers/firmware/xilinx/Kconfig  create mode 100644
+> drivers/firmware/xilinx/Makefile  create mode 100644
+> drivers/firmware/xilinx/zynqmp-debug.c
+>  create mode 100644 drivers/firmware/xilinx/zynqmp-debug.h
+>  create mode 100644 drivers/firmware/xilinx/zynqmp.c  create mode 100644
+> include/linux/firmware/xlnx-zynqmp.h
+> 
+> --
+> 2.7.4
