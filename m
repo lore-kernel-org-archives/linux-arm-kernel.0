@@ -1,26 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 20 Sep 2018 15:02:03 -0700
-Subject: [RFC PATCH 0/4] i2c: core: introduce master_xfer_irqless
-In-Reply-To: <20180920161423.13990-1-wsa+renesas@sang-engineering.com>
-References: <20180920161423.13990-1-wsa+renesas@sang-engineering.com>
-Message-ID: <20180920220203.GA5662@atomide.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 20 Sep 2018 23:33:20 +0100
+Subject: [PATCH] arm64: Trap WFI executed in userspace
+In-Reply-To: <20180920220430.GA27468@xo-6d-61-c0.localdomain>
+References: <20180807093326.5090-1-marc.zyngier@arm.com>
+ <20180920220430.GA27468@xo-6d-61-c0.localdomain>
+Message-ID: <86lg7vx0i7.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Wolfram Sang <wsa+renesas@sang-engineering.com> [180920 09:19]:
-> To keep the discussion about master_xfer_irqless going, I post here a
-> draft how I envision the changes to the I2C core. They are only build
-> tested. I am unsure if I can test them on hardware before next week, so
-> I'll send them around as RFC already, so people can get an idea and
-> comment. Maybe Stefan has some bandwidth to test his imx driver
-> implementation on top of this?
+On Thu, 20 Sep 2018 23:04:30 +0100,
+Pavel Machek <pavel@ucw.cz> wrote:
 > 
-> A branch can be found here:
+> On Tue 2018-08-07 10:33:26, Marc Zyngier wrote:
+> > It recently came to light that userspace can execute WFI, and that
+> > the arm64 kernel doesn trap this event. This sounds rather benign,
+> > but the kernel should decide when it wants to wait for an interrupt,
+> > and not userspace.
+> > 
+> > Let's trap WFI and treat it as a way to yield the CPU to another
+> > process.
 > 
-> git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git renesas/i2c/xfer_irqless
-> 
-> Happy hacking and thanks for all the input to this,
+> I don't think that's reasonable. Userspace should not be doing that,
+> and we do not want to encourage it. SIGILL would be reasonable, I'd
+> say.
 
-Thanks looks nice to me:
+This ship has already sailed. Sending SIGILL changes the ABI in an
+incompatible way. Immediately returning to userspace without doing
+anything else (see v2 [1]) is the best we can do without changing the
+behaviour of userspace.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Thanks,
+
+	M.
+
+[1] https://patchwork.kernel.org/patch/10562517/
+
+-- 
+Jazz is not dead, it just smell funny.
