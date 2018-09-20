@@ -1,86 +1,88 @@
 From: anshuman.khandual@arm.com (Anshuman Khandual)
-Date: Thu, 20 Sep 2018 09:36:21 +0530
-Subject: [PATCH V2 3/3] arm64/cpufeatures: Emulate MRS instructions by parsing
- ESR_ELx.ISS
+Date: Thu, 20 Sep 2018 09:36:20 +0530
+Subject: [PATCH V2 2/3] arm64/cpufeatures: Factorize emulate_mrs()
 In-Reply-To: <1537416381-13674-1-git-send-email-anshuman.khandual@arm.com>
 References: <1537416381-13674-1-git-send-email-anshuman.khandual@arm.com>
-Message-ID: <1537416381-13674-4-git-send-email-anshuman.khandual@arm.com>
+Message-ID: <1537416381-13674-3-git-send-email-anshuman.khandual@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Armv8.4-A extension enables MRS instruction encodings inside ESR_ELx.ISS
-during exception class ESR_ELx_EC_SYS64 (0x18). This encoding can be used
-to emulate MRS instructions which can avoid fetch/decode from user space
-thus improving performance. This adds a new sys64_hook structure element
-with applicable ESR mask/value pair for MRS instructions on various system
-registers but constrained by sysreg encodings which is currently allowed
-to be emulated.
+MRS emulation gets triggered with exception class (0x00 or 0x18) eventually
+calling the function emulate_mrs() which fetches the user space instruction
+and analyses it's encodings (OP0, OP1, OP2, CRN, CRM, RT). The kernel tries
+to emulate the given instruction looking into the encoding details. Going
+forward these encodings can also be parsed from ESR_ELx.ISS fields without
+requiring to fetch/decode faulting userspace instruction which can improve
+performance. This factorizes emulate_mrs() function in a way that it can be
+called directly with MRS encodings (OP0, OP1, OP2, CRN, CRM) for any given
+target register which can then be used directly from 0x18 exception class.
 
 Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Anshuman Khandual <anshuman.khandual@arm.com>
 ---
- arch/arm64/include/asm/esr.h | 12 ++++++++++++
- arch/arm64/kernel/traps.c    | 17 +++++++++++++++++
- 2 files changed, 29 insertions(+)
+ arch/arm64/include/asm/cpufeature.h |  1 +
+ arch/arm64/kernel/cpufeature.c      | 25 +++++++++++++++----------
+ 2 files changed, 16 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
-index cc2d9e7..37e84f2 100644
---- a/arch/arm64/include/asm/esr.h
-+++ b/arch/arm64/include/asm/esr.h
-@@ -208,6 +208,18 @@
- #define ESR_ELx_SYS64_ISS_EL0_CACHE_OP_VAL \
- 				(ESR_ELx_SYS64_ISS_SYS_VAL(1, 3, 1, 7, 0) | \
- 				 ESR_ELx_SYS64_ISS_DIR_WRITE)
-+/*
-+ * User space MRS operations which are supported for emulation
-+ * have the following sysreg encoding in System instructions.
-+ * op0 = 3, op1= 0, crn = 0, {crm = 0, 4-7}, READ (L = 1)
-+ */
-+#define ESR_ELx_SYS64_ISS_SYS_MRS_OP_MASK	(ESR_ELx_SYS64_ISS_OP0_MASK | \
-+						 ESR_ELx_SYS64_ISS_OP1_MASK | \
-+						 ESR_ELx_SYS64_ISS_CRN_MASK | \
-+						 ESR_ELx_SYS64_ISS_DIR_MASK)
-+#define ESR_ELx_SYS64_ISS_SYS_MRS_OP_VAL \
-+				(ESR_ELx_SYS64_ISS_SYS_VAL(3, 0, 0, 0, 0) | \
-+				 ESR_ELx_SYS64_ISS_DIR_READ)
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 1717ba1..7fcaaa4 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -530,6 +530,7 @@ void arm64_set_ssbd_mitigation(bool state);
+ static inline void arm64_set_ssbd_mitigation(bool state) {}
+ #endif
  
- #define ESR_ELx_SYS64_ISS_SYS_CTR	ESR_ELx_SYS64_ISS_SYS_VAL(3, 3, 1, 0, 0)
- #define ESR_ELx_SYS64_ISS_SYS_CTR_READ	(ESR_ELx_SYS64_ISS_SYS_CTR | \
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 15276b2..3a2e61b 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -496,6 +496,17 @@ static void cntfrq_read_handler(unsigned int esr, struct pt_regs *regs)
- 	arm64_skip_faulting_instruction(regs, AARCH64_INSN_SIZE);
++extern int do_emulate_mrs(struct pt_regs *regs, u32 sys_reg, u32 rt);
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index e238b79..6126583 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -1719,27 +1719,32 @@ static int emulate_sys_reg(u32 id, u64 *valp)
+ 	return 0;
  }
  
-+static void mrs_handler(unsigned int esr, struct pt_regs *regs)
+-static int emulate_mrs(struct pt_regs *regs, u32 insn)
++int do_emulate_mrs(struct pt_regs *regs, u32 sys_reg, u32 rt)
+ {
+ 	int rc;
+-	u32 sys_reg, dst;
+ 	u64 val;
+ 
+-	/*
+-	 * sys_reg values are defined as used in mrs/msr instruction.
+-	 * shift the imm value to get the encoding.
+-	 */
+-	sys_reg = (u32)aarch64_insn_decode_immediate(AARCH64_INSN_IMM_16, insn) << 5;
+ 	rc = emulate_sys_reg(sys_reg, &val);
+ 	if (!rc) {
+-		dst = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RT, insn);
+-		pt_regs_write_reg(regs, dst, val);
++		pt_regs_write_reg(regs, rt, val);
+ 		arm64_skip_faulting_instruction(regs, AARCH64_INSN_SIZE);
+ 	}
+-
+ 	return rc;
+ }
+ 
++static int emulate_mrs(struct pt_regs *regs, u32 insn)
 +{
-+	u32 sysreg, rt;
++	u32 sys_reg, rt;
 +
-+	rt = ESR_ELx_SYS64_ISS_RT(esr);
-+	sysreg = esr_sys64_to_sysreg(esr);
-+
-+	if (do_emulate_mrs(regs, sysreg, rt) != 0)
-+		force_signal_inject(SIGILL, ILL_ILLOPC, regs->pc);
++	/*
++	 * sys_reg values are defined as used in mrs/msr instruction.
++	 * shift the imm value to get the encoding.
++	 */
++	sys_reg = (u32)aarch64_insn_decode_immediate(AARCH64_INSN_IMM_16, insn) << 5;
++	rt = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RT, insn);
++	return do_emulate_mrs(regs, sys_reg, rt);
 +}
 +
- struct sys64_hook {
- 	unsigned int esr_mask;
- 	unsigned int esr_val;
-@@ -526,6 +537,12 @@ static struct sys64_hook sys64_hooks[] = {
- 		.esr_val = ESR_ELx_SYS64_ISS_SYS_CNTFRQ,
- 		.handler = cntfrq_read_handler,
- 	},
-+	{
-+		/* Trap read access to CPUID registers */
-+		.esr_mask = ESR_ELx_SYS64_ISS_SYS_MRS_OP_MASK,
-+		.esr_val = ESR_ELx_SYS64_ISS_SYS_MRS_OP_VAL,
-+		.handler = mrs_handler,
-+	},
- 	{},
- };
- 
+ static struct undef_hook mrs_hook = {
+ 	.instr_mask = 0xfff00000,
+ 	.instr_val  = 0xd5300000,
 -- 
 2.7.4
