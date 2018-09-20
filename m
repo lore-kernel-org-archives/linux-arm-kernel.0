@@ -1,53 +1,56 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 20 Sep 2018 09:59:25 +0200
-Subject: [PATCH V2 08/12] cpufreq: mvebu: Remove OPPs using
- dev_pm_opp_remove()
-In-Reply-To: <883071c4bd9a6e45bf0b5e45575d110eaeb2e6d0.1537394233.git.viresh.kumar@linaro.org>
-References: <cover.1537394233.git.viresh.kumar@linaro.org>
- <883071c4bd9a6e45bf0b5e45575d110eaeb2e6d0.1537394233.git.viresh.kumar@linaro.org>
-Message-ID: <1645527.R4f0u0jryK@aspire.rjw.lan>
+From: daniel@makrotopia.org (Daniel Golle)
+Date: Thu, 20 Sep 2018 10:24:29 +0200
+Subject: [PATCH 1/2] libata: add ledtrig support
+In-Reply-To: <20180920072354.GA20392@amd>
+References: <1537328730-9156-1-git-send-email-aditya@kobol.io>
+ <1537328730-9156-2-git-send-email-aditya@kobol.io>
+ <20180920072354.GA20392@amd>
+Message-ID: <20180920082425.GB20006@makrotopia.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, September 20, 2018 12:20:27 AM CEST Viresh Kumar wrote:
-> dev_pm_opp_cpumask_remove_table() is going to change in the next commit
-> and will not remove dynamic OPPs automatically. They must be removed
-> with a call to dev_pm_opp_remove().
-> 
-> Reviewed-by: Gregory CLEMENT <gregory.clement@bootlin.com>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  drivers/cpufreq/mvebu-cpufreq.c | 9 ++-------
->  1 file changed, 2 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/cpufreq/mvebu-cpufreq.c b/drivers/cpufreq/mvebu-cpufreq.c
-> index 31513bd42705..6d33a639f902 100644
-> --- a/drivers/cpufreq/mvebu-cpufreq.c
-> +++ b/drivers/cpufreq/mvebu-cpufreq.c
-> @@ -84,9 +84,10 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
->  
->  		ret = dev_pm_opp_add(cpu_dev, clk_get_rate(clk) / 2, 0);
->  		if (ret) {
-> +			dev_pm_opp_remove(cpu_dev, clk_get_rate(clk));
->  			clk_put(clk);
->  			dev_err(cpu_dev, "Failed to register OPPs\n");
-> -			goto opp_register_failed;
-> +			return ret;
->  		}
->  
->  		ret = dev_pm_opp_set_sharing_cpus(cpu_dev,
-> @@ -99,11 +100,5 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
->  
->  	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
->  	return 0;
-> -
-> -opp_register_failed:
-> -	/* As registering has failed remove all the opp for all cpus */
-> -	dev_pm_opp_cpumask_remove_table(cpu_possible_mask);
-> -
-> -	return ret;
->  }
->  device_initcall(armada_xp_pmsu_cpufreq_init);
-> 
+Hi!
 
-Please feel free to take this one via OPP.
+On Thu, Sep 20, 2018 at 09:23:54AM +0200, Pavel Machek wrote:
+> Hi!
+> 
+> > +#ifdef CONFIG_ATA_LEDS
+> > +	/* register LED triggers for all ports */
+> > +	for (i = 0; i < host->n_ports; i++) {
+> > +		if (unlikely(!host->ports[i]->ledtrig))
+> > +			continue;
+> > +
+> > +		snprintf(host->ports[i]->ledtrig_name,
+> > +			sizeof(host->ports[i]->ledtrig_name), "ata%u",
+> > +			host->ports[i]->print_id);
+> 
+> > +		host->ports[i]->ledtrig->name = host->ports[i]->ledtrig_name;
+> > +
+> > +		if (led_trigger_register(host->ports[i]->ledtrig)) {
+> > +			kfree(host->ports[i]->ledtrig);
+> > +			host->ports[i]->ledtrig = NULL;
+> > +		}
+> > +	}
+> > +#endif
+> 
+> No, we don't want you to register multiple triggers. We want one
+> trigger, than has parameter "which port to watch". (Number of triggers
+> is limited as by sysfs limitations).
+
+Back then I implemented it that way to be able to define the
+default trigger for each LED in device tree and "trigger-sources"
+didn't exist yet (it was introduced for USB ports and isn't yet used
+for anything other than that)
+However, the problem till today is also that ATA ports are often not
+individual device-tree objects we can refer to, see for example
+marvell,armada-370-sata which appears as one opaque controller. Ie.
+all SATA drivers have to be converted to expose individual ports on
+device-tree before the trigger-sources approach can be applied...
+
+
+> 
+> Otherwise yes, ata trigger makes sense.
+> 									Pavel
+> -- 
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
