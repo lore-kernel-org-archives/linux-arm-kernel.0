@@ -1,44 +1,133 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 20 Sep 2018 13:43:05 +0200
-Subject: [PATCH v3 2/2] serial: uartps: Change uart ID port allocation
-In-Reply-To: <20180920113225.GA19956@kroah.com>
-References: <b1772d99d4e8b788448cde0fc5c7dccb1f63b507.1537282676.git.michal.simek@xilinx.com>
- <dcf1c72203baf2629492dce765ce2d555316be0c.1537282676.git.michal.simek@xilinx.com>
- <20180920113225.GA19956@kroah.com>
-Message-ID: <cf4e77fe-5ac0-b7f6-4124-90910eca5206@xilinx.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 20 Sep 2018 12:49:41 +0100
+Subject: [PATCH 00/21] SMMU enablement for NXP LS1043A and LS1046A
+In-Reply-To: <33eac426-cbb7-f899-5a35-aea28f8e5dc4@nxp.com>
+References: <20180919123613.15092-1-laurentiu.tudor@nxp.com>
+ <7d7646dc-9d0b-013d-75d7-a6cb4453f41f@arm.com>
+ <fd8ab351-46aa-f73e-593b-502a57de1975@nxp.com>
+ <39211e7a-034b-cdca-f182-1b6f6e5fbc53@arm.com>
+ <33eac426-cbb7-f899-5a35-aea28f8e5dc4@nxp.com>
+Message-ID: <c2acecc8-5357-6cbe-f93c-00d71470dff5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.9.2018 13:32, Greg Kroah-Hartman wrote:
-> On Tue, Sep 18, 2018 at 04:57:59PM +0200, Michal Simek wrote:
->> For IPs which have alias algorightm all the time using that alias and
->> minor number. It means serial20 alias ends up as ttyPS20.
->>
->> If alias is not setup for probed IP instance the first unused position is
->> used but that needs to be checked if it is really empty because another
->> instance doesn't need to be probed at that time. of_alias_get_alias_list()
->> fills alias bitmap which exactly shows which ID is free.
->> If alias pointing to different not compatible IP, it is free to use.
->>
->> cdns_get_id() call is placed below structure allocation to simplify
->> error path.
->>
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->> ---
->>
->> Changes in v3: None
->> Changes in v2:
->> - Add handle of return value from of_alias_get_alias_list
->>
->> Needs to be applied on the top of
->> https://lkml.org/lkml/2018/9/3/404
->> https://lkml.org/lkml/2018/9/3/400 (minor that's why just in case)
->>
->> Greg: Please apply it with
->> "of: base: Introduce of_alias_get_alias_list() to check alias IDs
->> Rob is ok with that.
+On 20/09/18 11:38, Laurentiu Tudor wrote:
 > 
-> I don't have that patch, can you resend the whole series?
+> 
+> On 19.09.2018 17:37, Robin Murphy wrote:
+>> On 19/09/18 15:18, Laurentiu Tudor wrote:
+>>> Hi Robin,
+>>>
+>>> On 19.09.2018 16:25, Robin Murphy wrote:
+>>>> Hi Laurentiu,
+>>>>
+>>>> On 19/09/18 13:35, laurentiu.tudor at nxp.com wrote:
+>>>>> From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+>>>>>
+>>>>> This patch series adds SMMU support for NXP LS1043A and LS1046A chips
+>>>>> and consists mostly in important driver fixes and the required device
+>>>>> tree updates. It touches several subsystems and consists of three main
+>>>>> parts:
+>>>>>  ?? - changes in soc/drivers/fsl/qbman drivers adding iommu mapping of
+>>>>>  ???? reserved memory areas, fixes and defered probe support
+>>>>>  ?? - changes in drivers/net/ethernet/freescale/dpaa_eth drivers
+>>>>>  ???? consisting in misc dma mapping related fixes and probe ordering
+>>>>>  ?? - addition of the actual arm smmu device tree node together with
+>>>>>  ???? various adjustments to the device trees
+>>>>>
+>>>>> Performance impact
+>>>>>
+>>>>>  ????? Running iperf benchmarks in a back-to-back setup (both sides
+>>>>>  ????? having smmu enabled) on a 10GBps port show an important
+>>>>>  ????? networking performance degradation of around %40 (9.48Gbps
+>>>>>  ????? linerate vs 5.45Gbps). If you need performance but without
+>>>>>  ????? SMMU support you can use "iommu.passthrough=1" to disable
+>>>>>  ????? SMMU.
 
-done.
-M
+I should have said before - thanks for the numbers there as well. Always 
+good to add another datapoint to my collection. If you're interested 
+I've added SMMUv2 support to the "non-strict mode" series (of which I 
+should be posting v8 soon), so it might be fun to see how well that 
+works on MMU-500 in the real world.
+
+>>>>>
+>>>>> USB issue and workaround
+>>>>>
+>>>>>  ????? There's a problem with the usb controllers in these chips
+>>>>>  ????? generating smaller, 40-bit wide dma addresses instead of the
+>>>>> 48-bit
+>>>>>  ????? supported at the smmu input. So you end up in a situation
+>>>>> where the
+>>>>>  ????? smmu is mapped with 48-bit address translations, but the device
+>>>>>  ????? generates transactions with clipped 40-bit addresses, thus smmu
+>>>>>  ????? context faults are triggered. I encountered a similar
+>>>>> situation for
+>>>>>  ????? mmc that I? managed to fix in software [1] however for USB I
+>>>>> did not
+>>>>>  ????? find a proper place in the code to add a similar fix. The only
+>>>>>  ????? workaround I found was to add this kernel parameter which
+>>>>> limits the
+>>>>>  ????? usb dma to 32-bit size: "xhci-hcd.quirks=0x800000".
+>>>>>  ????? This workaround if far from ideal, so any suggestions for a code
+>>>>>  ????? based workaround in this area would be greatly appreciated.
+>>>>
+>>>> If you have a nominally-64-bit device with a
+>>>> narrower-than-the-main-interconnect link in front of it, that should
+>>>> already be fixed in 4.19-rc by bus_dma_mask picking up DT dma-ranges,
+>>>> provided the interconnect hierarchy can be described appropriately (or
+>>>> at least massaged sufficiently to satisfy the binding), e.g.:
+>>>>
+>>>> / {
+>>>>  ? ????...
+>>>>
+>>>>  ? ????soc {
+>>>>  ? ??????? ranges;
+>>>>  ? ??????? dma-ranges = <0 0 10000 0>;
+>>>>
+>>>>  ? ??????? dev_48bit { ... };
+>>>>
+>>>>  ? ??????? periph_bus {
+>>>>  ? ??????????? ranges;
+>>>>  ? ??????????? dma-ranges = <0 0 100 0>;
+>>>>
+>>>>  ? ??????????? dev_40bit { ... };
+>>>>  ? ??????? };
+>>>>  ? ????};
+>>>> };
+>>>>
+>>>> and if that fails to work as expected (except for PCI hosts where
+>>>> handling dma-ranges properly still needs sorting out), please do let us
+>>>> know ;)
+>>>>
+>>>
+>>> Just to confirm, Is this [1] the change I was supposed to test?
+>>
+>> Not quite - dma-ranges is only valid for nodes representing a bus, so
+>> putting it directly in the USB device nodes doesn't work (FWIW that's
+>> why PCI is broken, because the parser doesn't expect the
+>> bus-as-leaf-node case). That's teh point of that intermediate simple-bus
+>> node represented by "periph_bus" in my example (sorry, I should have put
+>> compatibles in to make it clearer) - often that's actually true to life
+>> (i.e. "soc" is something like a CCI and "periph_bus" is something like
+>> an AXI NIC gluing a bunch of lower-bandwidth DMA masters to one of the
+>> CCI ports) but at worst it's just a necessary evil to make the binding
+>> happy (if it literally only represents the point-to-point link between
+>> the device master port and interconnect slave port).
+>>
+> 
+> Quick update: so I adjusted to device tree according to your example and
+> it works so now I can get rid of that nasty kernel arg based workaround,
+> yey! :-)
+
+Cool! In fact, judging by the block diagrams on the website, the "basic 
+peripherals and interconnect" section hanging off the side of the CCI 
+implies that probably is true to the real topology as I imagined, so it 
+doesn't even count as a horrible hack :)
+
+> Thanks a lot, that was really helpful.
+
+No problem. FWIW if you ever come to doing ACPI support for these SoCs, 
+the equivalent is merely a case of setting the device memory address 
+size limit field appropriately for all the named components.
+
+Robin.
