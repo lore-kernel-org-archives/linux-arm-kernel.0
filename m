@@ -1,62 +1,47 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Thu, 20 Sep 2018 06:58:08 +0000
-Subject: [PATCH V6 2/3] firmware: imx: add SCU firmware driver support
-In-Reply-To: <20180920065219.GT4097@pengutronix.de>
-References: <1537326246-28558-1-git-send-email-aisheng.dong@nxp.com>
- <1537326246-28558-3-git-send-email-aisheng.dong@nxp.com>
- <20180919194100.GQ4097@pengutronix.de>
- <AM0PR04MB42118370CE61B3A5E86DFFE980130@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <20180920063358.GS4097@pengutronix.de>
- <AM0PR04MB4211FB690E079766D364E94F80130@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <20180920065219.GT4097@pengutronix.de>
-Message-ID: <AM0PR04MB4211D52E299818DA41C0299880130@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: jianxin.pan@amlogic.com (Jianxin Pan)
+Date: Thu, 20 Sep 2018 15:09:25 +0800
+Subject: [PATCH v4 0/2] arm64: dts: meson-g12a: Introduce new DT files for
+ Meson-G12A SoC
+Message-ID: <1537427368-11104-1-git-send-email-jianxin.pan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
-> Sent: Thursday, September 20, 2018 2:52 PM
-> To: A.s. Dong <aisheng.dong@nxp.com>
-> Cc: linux-arm-kernel at lists.infradead.org; dongas86 at gmail.com; Jassi Brar
-> <jassisinghbrar@gmail.com>; dl-linux-imx <linux-imx@nxp.com>;
-> kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>;
-> shawnguo at kernel.org
-> Subject: Re: [PATCH V6 2/3] firmware: imx: add SCU firmware driver support
-> 
-> On Thu, Sep 20, 2018 at 06:41:15AM +0000, A.s. Dong wrote:
-> > > > > Could you give the exported functions a better namespace like
-> imx_scu_*?
-> > > > >
-> > > >
-> > > > Good idea.
-> > > > Should we change all the rest as well?
-> > >
-> > > You mean enums and such? Yes, that would be good.
-> >
-> > I mean other functions and struct names. All prefixed by imx_scu.
-> > Enums still not changed.
-> 
-> I don't really care about stuff that's internal to a single C file, but everything
-> that is globally visible should have a proper namespace,
-> 
+This attempt will try to add new DT files to support Meson-G12A SoC.
 
-Okay, I got your point. Thanks
+1) first, Please notice that, in this patch series, the DT node about 16M reserved
+memory for hwrom is removed, since it's not needed by G12A SoC.
+2) second, the pclk for uart_AO need to be fixed once G12A clock_ao driver is
+merged. In this version, it rely on bootloader to enable the pclk gate which 
+belong to AO clock domain. Please add clk_ignore_unused to bootargs.
 
-Regards
-Dong Aisheng
+Changes since v3 [2]:
+ - collect Rob's Reviewed-by
+ - test on latest v4.20/integ
 
-> Sascha
-> 
-> --
-> Pengutronix e.K.                           |
-> |
-> Industrial Linux Solutions                 |
-> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fwww.
-> pengutronix.de%2F&amp;data=02%7C01%7Caisheng.dong%40nxp.com%7Cd7
-> bf1b2ed455456369a708d61ec59d9d%7C686ea1d3bc2b4c6fa92cd99c5c3016
-> 35%7C0%7C0%7C636730231447513240&amp;sdata=y7JI70I5V6KZ0RGlASub
-> qEZ5qW02wrFKcEDZgaglAk8%3D&amp;reserved=0  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0
-> |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:
-> +49-5121-206917-5555 |
+Changes since v2 [1]:
+ - reorder subnodes
+ - collect Rob's Reviewed-by
+
+Changes since v1 [0]:
+ - fix signoff typo
+ - order subnodes by addresses when there is one and alphabetically when there is none
+
+
+[0] https://lore.kernel.org/lkml/1533802951-49919-2-git-send-email-jianxin.pan at amlogic.com
+[1] https://lore.kernel.org/lkml/1534160901-22889-1-git-send-email-jianxin.pan at amlogic.com
+[2] https://lore.kernel.org/lkml/1534243121-33589-1-git-send-email-jianxin.pan at amlogic.com
+
+Jianxin Pan (2):
+  dt-bindings: arm: amlogic: Add Meson G12A binding
+  arm64: dts: meson-g12a: add initial g12a s905d2 SoC DT support
+
+ Documentation/devicetree/bindings/arm/amlogic.txt |   6 +
+ arch/arm64/boot/dts/amlogic/Makefile              |   1 +
+ arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts   |  22 +++
+ arch/arm64/boot/dts/amlogic/meson-g12a.dtsi       | 172 ++++++++++++++++++++++
+ 4 files changed, 201 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-g12a.dtsi
+
+-- 
+1.9.1
