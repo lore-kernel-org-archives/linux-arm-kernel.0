@@ -1,124 +1,36 @@
-From: long.cheng@mediatek.com (Long Cheng)
-Date: Thu, 20 Sep 2018 14:41:13 +0800
-Subject: [PATCH 4/4] arm: dts: mt2701: add uart APDMA to device tree
-In-Reply-To: <1537425673-18807-1-git-send-email-long.cheng@mediatek.com>
-References: <1537425673-18807-1-git-send-email-long.cheng@mediatek.com>
-Message-ID: <1537425673-18807-5-git-send-email-long.cheng@mediatek.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 20 Sep 2018 08:52:20 +0200
+Subject: [PATCH V6 2/3] firmware: imx: add SCU firmware driver support
+In-Reply-To: <AM0PR04MB4211FB690E079766D364E94F80130@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1537326246-28558-1-git-send-email-aisheng.dong@nxp.com>
+ <1537326246-28558-3-git-send-email-aisheng.dong@nxp.com>
+ <20180919194100.GQ4097@pengutronix.de>
+ <AM0PR04MB42118370CE61B3A5E86DFFE980130@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <20180920063358.GS4097@pengutronix.de>
+ <AM0PR04MB4211FB690E079766D364E94F80130@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <20180920065219.GT4097@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1. add uart APDMA controller device node
-2. add uart 0/1/2/3 DMA function
-3. uart0 is console, So disable DMA
-4. enable uart2 port to test DMA function.
+On Thu, Sep 20, 2018 at 06:41:15AM +0000, A.s. Dong wrote:
+> > > > Could you give the exported functions a better namespace like imx_scu_*?
+> > > >
+> > >
+> > > Good idea.
+> > > Should we change all the rest as well?
+> > 
+> > You mean enums and such? Yes, that would be good.
+> 
+> I mean other functions and struct names. All prefixed by imx_scu.
+> Enums still not changed.
 
-Signed-off-by: Long Cheng <long.cheng@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/mt2712e.dtsi |   50 +++++++++++++++++++++++++++++
- 1 file changed, 50 insertions(+)
+I don't really care about stuff that's internal to a single C file, but
+everything that is globally visible should have a proper namespace,
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-index 593ddc7..ff94437 100644
---- a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-@@ -299,6 +299,9 @@
- 		interrupts = <GIC_SPI 127 IRQ_TYPE_LEVEL_LOW>;
- 		clocks = <&baud_clk>, <&sys_clk>;
- 		clock-names = "baud", "bus";
-+		dmas = <&apdma 10
-+			&apdma 11>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
-@@ -366,6 +369,38 @@
- 		status = "disabled";
- 	};
- 
-+	apdma: dma-controller at 11000400 {
-+		compatible = "mediatek,mt2712-uart-dma",
-+			     "mediatek,mt6577-uart-dma";
-+		reg = <0 0x11000400 0 0x80>,
-+		      <0 0x11000480 0 0x80>,
-+		      <0 0x11000500 0 0x80>,
-+		      <0 0x11000580 0 0x80>,
-+		      <0 0x11000600 0 0x80>,
-+		      <0 0x11000680 0 0x80>,
-+		      <0 0x11000700 0 0x80>,
-+		      <0 0x11000780 0 0x80>,
-+		      <0 0x11000800 0 0x80>,
-+		      <0 0x11000880 0 0x80>,
-+		      <0 0x11000900 0 0x80>,
-+		      <0 0x11000980 0 0x80>;
-+		interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 104 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 105 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 106 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 107 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 108 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 109 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 110 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 111 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 112 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 113 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 114 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&pericfg CLK_PERI_AP_DMA>;
-+		clock-names = "apdma";
-+		#dma-cells = <1>;
-+	};
-+
- 	uart0: serial at 11002000 {
- 		compatible = "mediatek,mt2712-uart",
- 			     "mediatek,mt6577-uart";
-@@ -373,6 +408,9 @@
- 		interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>;
- 		clocks = <&baud_clk>, <&sys_clk>;
- 		clock-names = "baud", "bus";
-+		dmas = <&apdma 0
-+			&apdma 1>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
-@@ -383,6 +421,9 @@
- 		interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_LOW>;
- 		clocks = <&baud_clk>, <&sys_clk>;
- 		clock-names = "baud", "bus";
-+		dmas = <&apdma 2
-+			&apdma 3>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
-@@ -393,6 +434,9 @@
- 		interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_LOW>;
- 		clocks = <&baud_clk>, <&sys_clk>;
- 		clock-names = "baud", "bus";
-+		dmas = <&apdma 4
-+			&apdma 5>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
-@@ -403,6 +447,9 @@
- 		interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_LOW>;
- 		clocks = <&baud_clk>, <&sys_clk>;
- 		clock-names = "baud", "bus";
-+		dmas = <&apdma 6
-+			&apdma 7>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
-@@ -503,6 +550,9 @@
- 		interrupts = <GIC_SPI 126 IRQ_TYPE_LEVEL_LOW>;
- 		clocks = <&baud_clk>, <&sys_clk>;
- 		clock-names = "baud", "bus";
-+		dmas = <&apdma 8
-+			&apdma 9>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- 
+Sascha
+
 -- 
-1.7.9.5
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
