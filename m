@@ -1,77 +1,145 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Thu, 20 Sep 2018 16:17:20 +0200
-Subject: Kernel memory leak on CDC-ACM device plug/unplug
-In-Reply-To: <20180919203222.GA1492@kroah.com>
-References: <CAGkQfmP6o+e_nanviTfRt7Ej9U+4BdqDYvMM83FjHhSCECcH3w@mail.gmail.com>
- <20180919203222.GA1492@kroah.com>
-Message-ID: <CAGkQfmNEAeETcOqkX9Hh_RndT67VYTRs_sm4pCZkYy=VU+MzRg@mail.gmail.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Thu, 20 Sep 2018 16:25:54 +0200
+Subject: [PATCH v5 12/18] kvm: arm64: Configure VTCR_EL2.SL0 per VM
+In-Reply-To: <20180917104144.19188-13-suzuki.poulose@arm.com>
+References: <20180917104144.19188-1-suzuki.poulose@arm.com>
+ <20180917104144.19188-13-suzuki.poulose@arm.com>
+Message-ID: <dcc855e4-eb78-ea1b-9456-8efa36deda4e@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-09-19 22:32 GMT+02:00 Greg KH <gregkh@linuxfoundation.org>:
-> On Wed, Sep 19, 2018 at 04:11:55PM +0200, Romain Izard wrote:
->> While trying to debug a memory leak problem, I encountered the following
->> problem:
->>
->> After plugging/unplugging an USB CDC-ACM device, kmemleak reports multiple
->> copies of the following leak. It is not necessary to open the port for the
->> leak to happen.
->>
->> unreferenced object 0xddbfd500 (size 128):
->>   comm "kworker/0:3", pid 675, jiffies 69734 (age 916.580s)
->>   hex dump (first 32 bytes):
->>     01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................
->>     00 00 00 00 00 00 00 00 00 00 00 00 1c d5 bf dd  ................
->>   backtrace:
->>     [<da0194da>] acm_probe+0x868/0xc3c
->>     [<cc72c809>] usb_probe_interface+0x11c/0x274
->>     [<bbce212c>] driver_probe_device+0x22c/0x320
->>     [<544a5b43>] bus_for_each_drv+0x58/0xb8
->>     [<fe5944dc>] __device_attach+0xd0/0x138
->>     [<d807c1e5>] bus_probe_device+0x84/0x8c
->>     [<16645f2c>] device_add+0x3cc/0x5c0
->>     [<80c11c88>] usb_set_configuration+0x448/0x7b0
->>     [<76bdbcdf>] generic_probe+0x2c/0x78
->>     [<bbce212c>] driver_probe_device+0x22c/0x320
->>     [<544a5b43>] bus_for_each_drv+0x58/0xb8
->>     [<fe5944dc>] __device_attach+0xd0/0x138
->>     [<d807c1e5>] bus_probe_device+0x84/0x8c
->>     [<16645f2c>] device_add+0x3cc/0x5c0
->>     [<02a49898>] usb_new_device+0x264/0x424
->>     [<865a481b>] hub_event+0xa20/0x1154
->>
->> For each additional plug/unplug cycle, around 30 such new leaks are created.
->>
->> Tested on a SAMA5D2 Xplained demo board, with a v4.18.8 kernel.
->> The CDC-ACM device was another SAMA5D2 device, with a composite profile
->> including a CDC-ACM port implemented with configfs.
->
-> Have you come up with any patches that might resolve this?  It's hard to
-> see what exactly is "leaking" here.
->
+Hi Suzuki,
+On 9/17/18 12:41 PM, Suzuki K Poulose wrote:
+> VTCR_EL2 holds the following key stage2 translation table
+> parameters:
+>   SL0  - Entry level in the page table lookup.
+>   T0SZ - Denotes the size of the memory addressed by the table.
+> 
+> We have been using fixed values for the SL0 depending on the
+> page size as we have a fixed IPA size. But since we are about
+> to make it dynamic, we need to calculate the SL0 at runtime
+> per VM. This patch adds a helper to compute the value of SL0
+> for a VM based on the IPA size.
+> 
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <cdall@kernel.org>
+> Cc: Eric Auger <eric.auger@redhat.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+> Changes since v3:
+>  - Update reference to latest ARM ARM.
+>  - Update per-vm VTCR value of SL0.
+>  - Add helpers to decode levels from SL0.
+>  - Didn't pick up Reviewed-by tag from Eric, as there
+>    are some new changes in this version
+> ---
+>  arch/arm64/include/asm/kvm_arm.h | 51 +++++++++++++++++++++++++-------
+>  arch/arm64/kvm/reset.c           |  1 +
+>  2 files changed, 41 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> index 3fb1d440be6e..5c1487dc5dca 100644
+> --- a/arch/arm64/include/asm/kvm_arm.h
+> +++ b/arch/arm64/include/asm/kvm_arm.h
+> @@ -121,7 +121,6 @@
+>  #define VTCR_EL2_IRGN0_WBWA	TCR_IRGN0_WBWA
+>  #define VTCR_EL2_SL0_SHIFT	6
+>  #define VTCR_EL2_SL0_MASK	(3 << VTCR_EL2_SL0_SHIFT)
+> -#define VTCR_EL2_SL0_LVL1	(1 << VTCR_EL2_SL0_SHIFT)
+>  #define VTCR_EL2_T0SZ_MASK	0x3f
+>  #define VTCR_EL2_VS_SHIFT	19
+>  #define VTCR_EL2_VS_8BIT	(0 << VTCR_EL2_VS_SHIFT)
+> @@ -148,29 +147,59 @@
+>  /*
+>   * Stage2 translation configuration:
+>   * 64kB pages (TG0 = 1)
+> - * 2 level page tables (SL = 1)
+>   */
+> -#define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SL0_LVL1)
+> -#define VTTBR_X_TGRAN_MAGIC		38
+> +#define VTCR_EL2_TGRAN			VTCR_EL2_TG0_64K
+> +#define VTCR_EL2_TGRAN_SL0_BASE		3UL
+the name if not obvious. I understand this is yet another magic number
+used in the formulae below:
+SL0(PAGE_SIZE, Entry_level) = SL0_BASE(PAGE_SIZE) - Entry_Level
+I first tried to map this onto some spec fields. May be worth a comment?
 
-I finally found that Linux v4.9 was not affected.
-git-bisect gives the following output:
+Besides
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 
-ba8c931ded8d96c8923662099416bc2096644eab is the first bad commit
-commit ba8c931ded8d96c8923662099416bc2096644eab
-Author: Ladislav Michl <ladis@linux-mips.org>
-Date:   Fri Nov 18 19:07:08 2016 +0100
+Thanks
 
-    cdc-acm: refactor killing urbs
-
-    Move urb killing code into separate function and use it
-    instead of copying that code pattern over.
-
-    Signed-off-by: Ladislav Michl <ladis@linux-mips.org>
-    Acked-by: Oliver Neukum <oneukum@suse.com>
-    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
-:040000 040000 bb64a6003aa575fb459cd64cb63ff0189134db8f
-68ad7dc597533eaff2d33c9ac2b23d49906f6551 M      drivers
-
-I found a bug in that commit, I'm sending a fix for it.
-
-Best regards
--- 
-Romain Izard
+Eric
+> +
+>  #elif defined(CONFIG_ARM64_16K_PAGES)
+>  /*
+>   * Stage2 translation configuration:
+>   * 16kB pages (TG0 = 2)
+> - * 2 level page tables (SL = 1)
+>   */
+> -#define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_16K | VTCR_EL2_SL0_LVL1)
+> -#define VTTBR_X_TGRAN_MAGIC		42
+> +#define VTCR_EL2_TGRAN			VTCR_EL2_TG0_16K
+> +#define VTCR_EL2_TGRAN_SL0_BASE		3UL
+>  #else	/* 4K */
+>  /*
+>   * Stage2 translation configuration:
+>   * 4kB pages (TG0 = 0)
+> - * 3 level page tables (SL = 1)
+>   */
+> -#define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SL0_LVL1)
+> -#define VTTBR_X_TGRAN_MAGIC		37
+> +#define VTCR_EL2_TGRAN			VTCR_EL2_TG0_4K
+> +#define VTCR_EL2_TGRAN_SL0_BASE		2UL
+>  #endif
+>  
+> -#define VTCR_EL2_FLAGS			(VTCR_EL2_COMMON_BITS | VTCR_EL2_TGRAN_FLAGS)
+> +#define VTCR_EL2_FLAGS			(VTCR_EL2_COMMON_BITS | VTCR_EL2_TGRAN)
+> +/*
+> + * VTCR_EL2:SL0 indicates the entry level for Stage2 translation.
+> + * Interestingly, it depends on the page size.
+> + * See D.10.2.121, VTCR_EL2, in ARM DDI 0487C.a
+> + *
+> + *	-----------------------------------------
+> + *	| Entry level		|  4K  | 16K/64K |
+> + *	------------------------------------------
+> + *	| Level: 0		|  2   |   -     |
+> + *	------------------------------------------
+> + *	| Level: 1		|  1   |   2     |
+> + *	------------------------------------------
+> + *	| Level: 2		|  0   |   1     |
+> + *	------------------------------------------
+> + *	| Level: 3		|  -   |   0     |
+> + *	------------------------------------------
+> + *
+> + * That table roughly translates to :
+> + *
+> + *	SL0(PAGE_SIZE, Entry_level) = SL0_BASE(PAGE_SIZE) - Entry_Level
+> + *
+> + * Where SL0_BASE(4K) = 2 and SL0_BASE(16K) = 3, SL0_BASE(64K) = 3, provided
+> + * we take care of ruling out the unsupported cases and
+> + * Entry_Level = 4 - Number_of_levels.
+> + *
+> + */
+> +#define VTCR_EL2_LVLS_TO_SL0(levels)	\
+> +	((VTCR_EL2_TGRAN_SL0_BASE - (4 - (levels))) << VTCR_EL2_SL0_SHIFT)
+> +#define VTCR_EL2_SL0_TO_LVLS(sl0)	\
+> +	((sl0) + 4 - VTCR_EL2_TGRAN_SL0_BASE)
+> +#define VTCR_EL2_LVLS(vtcr)		\
+> +	VTCR_EL2_SL0_TO_LVLS(((vtcr) & VTCR_EL2_SL0_MASK) >> VTCR_EL2_SL0_SHIFT)
+>  /*
+>   * ARM VMSAv8-64 defines an algorithm for finding the translation table
+>   * descriptors in section D4.2.8 in ARM DDI 0487C.a.
+> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+> index e0c49377b771..d9b7a00993b6 100644
+> --- a/arch/arm64/kvm/reset.c
+> +++ b/arch/arm64/kvm/reset.c
+> @@ -167,6 +167,7 @@ int kvm_arm_config_vm(struct kvm *kvm, unsigned long type)
+>  	vtcr |= (kvm_get_vmid_bits() == 16) ?
+>  		VTCR_EL2_VS_16BIT :
+>  		VTCR_EL2_VS_8BIT;
+> +	vtcr |= VTCR_EL2_LVLS_TO_SL0(kvm_stage2_levels(kvm));
+>  	kvm->arch.vtcr = vtcr;
+>  	return 0;
+>  }
+> 
