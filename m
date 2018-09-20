@@ -1,10 +1,10 @@
 From: yuehaibing@huawei.com (YueHaibing)
-Date: Thu, 20 Sep 2018 20:32:47 +0800
-Subject: [PATCH net-next 03/22] net: seeq: fix return type of ndo_start_xmit
+Date: Thu, 20 Sep 2018 20:32:49 +0800
+Subject: [PATCH net-next 05/22] net: sgi: fix return type of ndo_start_xmit
  function
 In-Reply-To: <20180920123306.14772-1-yuehaibing@huawei.com>
 References: <20180920123306.14772-1-yuehaibing@huawei.com>
-Message-ID: <20180920123306.14772-4-yuehaibing@huawei.com>
+Message-ID: <20180920123306.14772-6-yuehaibing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,46 +17,44 @@ Found by coccinelle.
 
 Signed-off-by: YueHaibing <yuehaibing@huawei.com>
 ---
- drivers/net/ethernet/seeq/ether3.c  | 5 +++--
- drivers/net/ethernet/seeq/sgiseeq.c | 3 ++-
- 2 files changed, 5 insertions(+), 3 deletions(-)
+ drivers/net/ethernet/sgi/ioc3-eth.c | 4 ++--
+ drivers/net/ethernet/sgi/meth.c     | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/net/ethernet/seeq/ether3.c b/drivers/net/ethernet/seeq/ether3.c
-index c5bc124..d1bb73b 100644
---- a/drivers/net/ethernet/seeq/ether3.c
-+++ b/drivers/net/ethernet/seeq/ether3.c
-@@ -77,7 +77,8 @@
- static int	ether3_rx(struct net_device *dev, unsigned int maxcnt);
- static void	ether3_tx(struct net_device *dev);
- static int	ether3_open (struct net_device *dev);
--static int	ether3_sendpacket (struct sk_buff *skb, struct net_device *dev);
-+static netdev_tx_t	ether3_sendpacket(struct sk_buff *skb,
-+					  struct net_device *dev);
- static irqreturn_t ether3_interrupt (int irq, void *dev_id);
- static int	ether3_close (struct net_device *dev);
- static void	ether3_setmulticastlist (struct net_device *dev);
-@@ -481,7 +482,7 @@ static void ether3_timeout(struct net_device *dev)
- /*
-  * Transmit a packet
-  */
--static int
-+static netdev_tx_t
- ether3_sendpacket(struct sk_buff *skb, struct net_device *dev)
- {
- 	unsigned long flags;
-diff --git a/drivers/net/ethernet/seeq/sgiseeq.c b/drivers/net/ethernet/seeq/sgiseeq.c
-index 573691b..70cce63 100644
---- a/drivers/net/ethernet/seeq/sgiseeq.c
-+++ b/drivers/net/ethernet/seeq/sgiseeq.c
-@@ -578,7 +578,8 @@ static inline int sgiseeq_reset(struct net_device *dev)
- 	return 0;
- }
+diff --git a/drivers/net/ethernet/sgi/ioc3-eth.c b/drivers/net/ethernet/sgi/ioc3-eth.c
+index 18d533f..3140999 100644
+--- a/drivers/net/ethernet/sgi/ioc3-eth.c
++++ b/drivers/net/ethernet/sgi/ioc3-eth.c
+@@ -99,7 +99,7 @@ struct ioc3_private {
  
--static int sgiseeq_start_xmit(struct sk_buff *skb, struct net_device *dev)
-+static netdev_tx_t
-+sgiseeq_start_xmit(struct sk_buff *skb, struct net_device *dev)
+ static int ioc3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
+ static void ioc3_set_multicast_list(struct net_device *dev);
+-static int ioc3_start_xmit(struct sk_buff *skb, struct net_device *dev);
++static netdev_tx_t ioc3_start_xmit(struct sk_buff *skb, struct net_device *dev);
+ static void ioc3_timeout(struct net_device *dev);
+ static inline unsigned int ioc3_hash(const unsigned char *addr);
+ static inline void ioc3_stop(struct ioc3_private *ip);
+@@ -1390,7 +1390,7 @@ static void ioc3_remove_one(struct pci_dev *pdev)
+ 	.remove		= ioc3_remove_one,
+ };
+ 
+-static int ioc3_start_xmit(struct sk_buff *skb, struct net_device *dev)
++static netdev_tx_t ioc3_start_xmit(struct sk_buff *skb, struct net_device *dev)
  {
- 	struct sgiseeq_private *sp = netdev_priv(dev);
- 	struct hpc3_ethregs *hregs = sp->hregs;
+ 	unsigned long data;
+ 	struct ioc3_private *ip = netdev_priv(dev);
+diff --git a/drivers/net/ethernet/sgi/meth.c b/drivers/net/ethernet/sgi/meth.c
+index ea55abd..703fbbe 100644
+--- a/drivers/net/ethernet/sgi/meth.c
++++ b/drivers/net/ethernet/sgi/meth.c
+@@ -697,7 +697,7 @@ static void meth_add_to_tx_ring(struct meth_private *priv, struct sk_buff *skb)
+ /*
+  * Transmit a packet (called by the kernel)
+  */
+-static int meth_tx(struct sk_buff *skb, struct net_device *dev)
++static netdev_tx_t meth_tx(struct sk_buff *skb, struct net_device *dev)
+ {
+ 	struct meth_private *priv = netdev_priv(dev);
+ 	unsigned long flags;
 -- 
 1.8.3.1
