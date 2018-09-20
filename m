@@ -1,33 +1,291 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 20 Sep 2018 09:26:35 +0200
-Subject: [PATCH 2/2] ARM: mvebu: Enable ARCH_WANT_LIBATA_LEDS in Armada 38x
-In-Reply-To: <1537328730-9156-3-git-send-email-aditya@kobol.io>
-References: <1537328730-9156-1-git-send-email-aditya@kobol.io>
- <1537328730-9156-3-git-send-email-aditya@kobol.io>
-Message-ID: <20180920072635.GB20392@amd>
+From: joel@jms.id.au (Joel Stanley)
+Date: Thu, 20 Sep 2018 17:01:00 +0930
+Subject: [PATCH] ARM: dts: aspeed: Add HXT StarDragon 4800 REP2 BMC
+In-Reply-To: <CA+eB3AxTuxNFvQFk+bLrcXAfUx2O0U3Qmga+u2UsfKpfNmHfcw@mail.gmail.com>
+References: <1536805516-21484-1-git-send-email-yao.yuan@linaro.org>
+ <CACPK8Xc6g9R9SyaJT3XzgKrxzZiV0ccTwAddf5Ot2tzQ0bmeag@mail.gmail.com>
+ <CA+eB3AxTuxNFvQFk+bLrcXAfUx2O0U3Qmga+u2UsfKpfNmHfcw@mail.gmail.com>
+Message-ID: <CACPK8Xejx4xSucid34WADrP6R+fLRdxChnxUBK++2Cb7VdHeig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2018-09-19 11:45:30, Aditya Prayoga wrote:
-> Enable hidden symbol ARCH_WANT_LIBATA_LEDS so CONFIG_ATA_LEDS can be
-> used in kernel configuration.
+On Thu, 13 Sep 2018 at 15:32, Yao Yuan <yao.yuan@linaro.org> wrote:
+>
+> On 13 September 2018 at 11:01, Joel Stanley <joel@jms.id.au> wrote:
+>>
+>> > The HXT StarDragon 4800 REP2 (Reference Evaluation Platform) is
+>> > an aarch64 ARMv8 server platform with an ast2520 BMC.
+>> >
+>> Looks good. I will apply it to the Aspeed tree in a few days, after
+>> giving others a chance to review.
+>>
+>> Out of interest, are you planning on running OpenBMC on this platform?
+>
+>
+> Yes, I will running OpenBMC on this platform.
+> And In fact, the OpenBMC basic startup is already running on REP2.
+> I'm also trying to push the OpenBMC patch for this platform.
 
-Should that be hidden symbol and should that be architecture specific?
+Great!
 
-For a notebook, I may want scrolllock LED to indicate ATA activity
-(because I'm using USB keyboard and can't see the disk led).
+>> >  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+>> >  arch/arm/boot/dts/Makefile                         |   1 +
+>> >  .../dts/aspeed-bmc-arm-stardragon4800-rep2.dts     | 207 +++++++++++++++++++++
+>> >  3 files changed, 209 insertions(+)
+>> >  create mode 100644 arch/arm/boot/dts/aspeed-bmc-arm-stardragon4800-rep2.dts
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> > index 2c3fc51..c65c0c1 100644
+>> > --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> > +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> > @@ -165,6 +165,7 @@ honeywell   Honeywell
+>> >  hp     Hewlett Packard
+>> >  holtek Holtek Semiconductor, Inc.
+>> >  hwacom HwaCom Systems Inc.
+>> > +hxt            Huaxintong Semiconductor Technology Co., Ltd.
+>> >  i2se   I2SE GmbH
+>> >  ibm    International Business Machines (IBM)
+>> >  idt    Integrated Device Technologies, Inc.
 
-Hmm. And while at it... it would be nice to have option to watch all
-ATA ports combined, as well.
+This part of the patch should go to the device tree mailing list in
+it's own patch. That saves maintainers having to deal with conflicting
+additions.
 
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180920/93ca1b5b/attachment.sig>
+>> > diff --git a/arch/arm/boot/dts/aspeed-bmc-arm-stardragon4800-rep2.dts b/arch/arm/boot/dts/aspeed-bmc-arm-stardragon4800-rep2.dts
+>> > new file mode 100644
+>> > index 0000000..83335c0
+>> > --- /dev/null
+>> > +++ b/arch/arm/boot/dts/aspeed-bmc-arm-stardragon4800-rep2.dts
+>> > @@ -0,0 +1,207 @@
+>> > +// SPDX-License-Identifier: GPL-2.0+
+>> > +/dts-v1/;
+>> > +
+>> > +#include "aspeed-g5.dtsi"
+>> > +#include <dt-bindings/gpio/aspeed-gpio.h>
+>> > +
+>> > +/ {
+>> > +       model = "HXT StarDragon 4800 REP2 AST2520";
+>> > +       compatible = "hxt,stardragon4800-rep2-bmc", "aspeed,ast2500";
+>> > +
+>> > +       chosen {
+>> > +               stdout-path = &uart5;
+>> > +               bootargs = "console=ttyS4,115200 earlyprintk";
+>> > +       };
+>> > +
+>> > +       memory {
+
+When building with W=1:
+
+  Warning (unit_address_vs_reg): /memory: node has a reg or ranges
+property, but no unit name
+
+It should instead look like this:
+
+ memory at 80000000 {
+
+The rest looks good to me. I made the fix for you and applied this to
+the aspeed v4.20 device tree branch.
+
+I added the device tree maintainers to cc so they could take a look.
+If any comments come up please address them in follow up patches.
+
+Cheers,
+
+Joel
+
+>> > +               reg = <0x80000000 0x40000000>;
+>> > +       };
+>> > +
+>> > +       iio-hwmon {
+>> > +               compatible = "iio-hwmon";
+>> > +               io-channels = <&adc 0>, <&adc 1>, <&adc 2>, <&adc 3>,
+>> > +                                               <&adc 4>, <&adc 5>, <&adc 6>, <&adc 8>;
+>> > +       };
+>> > +
+>> > +       iio-hwmon-battery {
+>> > +               compatible = "iio-hwmon";
+>> > +               io-channels = <&adc 7>;
+>> > +       };
+>> > +
+>> > +       leds {
+>> > +               compatible = "gpio-leds";
+>> > +
+>> > +               system_fault1 {
+>> > +                       label = "System_fault1";
+>> > +                       gpios = <&gpio ASPEED_GPIO(I, 3) GPIO_ACTIVE_LOW>;
+>> > +               };
+>> > +
+>> > +               system_fault2 {
+>> > +                       label = "System_fault2";
+>> > +                       gpios = <&gpio ASPEED_GPIO(I, 2) GPIO_ACTIVE_LOW>;
+>> > +               };
+>> > +       };
+>> > +};
+>> > +
+>> > +&fmc {
+>> > +       status = "okay";
+>> > +       flash at 0 {
+>> > +               status = "okay";
+>> > +               m25p,fast-read;
+>> > +               label = "bmc";
+>> > +#include "openbmc-flash-layout.dtsi"
+>> > +       };
+>> > +};
+>> > +
+>> > +&spi1 {
+>> > +       status = "okay";
+>> > +       pinctrl-names = "default";
+>> > +       pinctrl-0 = <&pinctrl_spi1_default>;
+>> > +       flash at 0 {
+>> > +               status = "okay";
+>> > +       };
+>> > +};
+>> > +
+>> > +&spi2 {
+>> > +       pinctrl-names = "default";
+>> > +       pinctrl-0 = <&pinctrl_spi2ck_default
+>> > +                       &pinctrl_spi2miso_default
+>> > +                       &pinctrl_spi2mosi_default
+>> > +                       &pinctrl_spi2cs0_default>;
+>> > +};
+>> > +
+>> > +&uart3 {
+>> > +       status = "okay";
+>> > +
+>> > +       pinctrl-names = "default";
+>> > +       pinctrl-0 = <&pinctrl_txd3_default &pinctrl_rxd3_default>;
+>> > +       current-speed = <115200>;
+>> > +};
+>> > +
+>> > +&uart5 {
+>> > +       status = "okay";
+>> > +};
+>> > +
+>> > +&mac0 {
+>> > +       status = "okay";
+>> > +       pinctrl-names = "default";
+>> > +       pinctrl-0 = <&pinctrl_rgmii1_default &pinctrl_mdio1_default>;
+>> > +};
+>> > +
+>> > +&mac1 {
+>> > +       status = "okay";
+>> > +       pinctrl-names = "default";
+>> > +       pinctrl-0 = <&pinctrl_rmii2_default>;
+>> > +       use-ncsi;
+>> > +};
+>> > +
+>> > +&i2c0 {
+>> > +       status = "okay";
+>> > +};
+>> > +
+>> > +&i2c1 {
+>> > +       status = "okay";
+>> > +
+>> > +       tmp421 at 1e {
+>> > +               compatible = "ti,tmp421";
+>> > +               reg = <0x1e>;
+>> > +       };
+>> > +       tmp421 at 2a {
+>> > +               compatible = "ti,tmp421";
+>> > +               reg = <0x2a>;
+>> > +       };
+>> > +       tmp421 at 1c {
+>> > +               compatible = "ti,tmp421";
+>> > +               reg = <0x1c>;
+>> > +       };
+>> > +};
+>> > +
+>> > +&i2c2 {
+>> > +       status = "okay";
+>> > +};
+>> > +
+>> > +&i2c3 {
+>> > +       status = "okay";
+>> > +};
+>> > +
+>> > +&i2c4 {
+>> > +       status = "okay";
+>> > +};
+>> > +
+>> > +&i2c5 {
+>> > +       status = "okay";
+>> > +};
+>> > +
+>> > +&i2c6 {
+>> > +       status = "okay";
+>> > +
+>> > +       tmp421 at 1f {
+>> > +               compatible = "ti,tmp421";
+>> > +               reg = <0x1f>;
+>> > +       };
+>> > +       nvt210 at 4c {
+>> > +               compatible = "nvt210";
+>> > +               reg = <0x4c>;
+>> > +       };
+>> > +       eeprom at 50 {
+>> > +               compatible = "atmel,24c128";
+>> > +               reg = <0x50>;
+>> > +               pagesize = <128>;
+>> > +       };
+>> > +};
+>> > +
+>> > +&i2c7 {
+>> > +       status = "okay";
+>> > +};
+>> > +
+>> > +&i2c8 {
+>> > +       status = "okay";
+>> > +
+>> > +       pca9641 at 70 {
+>> > +               compatible = "nxp,pca9641";
+>> > +               reg = <0x70>;
+>> > +               i2c-arb {
+>> > +                       #address-cells = <1>;
+>> > +                       #size-cells = <0>;
+>> > +                       eeprom at 50 {
+>> > +                               compatible = "atmel,24c02";
+>> > +                               reg = <0x50>;
+>> > +                       };
+>> > +                       dps650ab at 58 {
+>> > +                               compatible = "dps650ab";
+>> > +                               reg = <0x58>;
+>> > +                       };
+>> > +               };
+>> > +       };
+>> > +};
+>> > +
+>> > +&i2c9 {
+>> > +       status = "okay";
+>> > +};
+>> > +
+>> > +&vuart {
+>> > +       status = "okay";
+>> > +};
+>> > +
+>> > +&gfx {
+>> > +       status = "okay";
+>> > +};
+>> > +
+>> > +&pinctrl {
+>> > +       aspeed,external-nodes = <&gfx &lhc>;
+>> > +};
+>> > +
+>> > +&gpio {
+>> > +       pin_gpio_c7 {
+>> > +               gpio-hog;
+>> > +               gpios = <ASPEED_GPIO(C, 7) GPIO_ACTIVE_HIGH>;
+>> > +               output-low;
+>> > +               line-name = "BIOS_SPI_MUX_S";
+>> > +       };
+>> > +       pin_gpio_d1 {
+>> > +               gpio-hog;
+>> > +               gpios = <ASPEED_GPIO(D, 1) GPIO_ACTIVE_HIGH>;
+>> > +               output-high;
+>> > +               line-name = "PHY2_RESET_N";
+>> > +       };
+>> > +};
+>> > --
+>> > 1.8.3.1
+>> >
+>
+>
