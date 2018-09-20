@@ -1,298 +1,156 @@
-From: ctatlor97@gmail.com (Craig)
-Date: Thu, 20 Sep 2018 15:27:21 +0100
-Subject: [PATCH V12 00/14] Krait clocks + Krait CPUfreq
-In-Reply-To: <d6d3a76c-43eb-4a37-55eb-a407b5267aa4@codeaurora.org>
-References: <1534248753-2440-1-git-send-email-sricharan@codeaurora.org>
- <2ae96741-94c0-ba4c-fc19-05d33179683c@codeaurora.org>
- <d682580d-5070-0271-197f-29d988172937@codeaurora.org>
- <D8FC68C0-2572-4A86-81D9-D0099D314A45@gmail.com>
- <F5A89365-C613-4FE2-AD32-DC0AC6DF380B@gmail.com>
- <d6d3a76c-43eb-4a37-55eb-a407b5267aa4@codeaurora.org>
-Message-ID: <132152AA-E8D1-49AF-87C7-3A9ECA0766FA@gmail.com>
+From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
+Date: Thu, 20 Sep 2018 14:33:14 +0000
+Subject: [PATCH 00/21] SMMU enablement for NXP LS1043A and LS1046A
+In-Reply-To: <c2acecc8-5357-6cbe-f93c-00d71470dff5@arm.com>
+References: <20180919123613.15092-1-laurentiu.tudor@nxp.com>
+ <7d7646dc-9d0b-013d-75d7-a6cb4453f41f@arm.com>
+ <fd8ab351-46aa-f73e-593b-502a57de1975@nxp.com>
+ <39211e7a-034b-cdca-f182-1b6f6e5fbc53@arm.com>
+ <33eac426-cbb7-f899-5a35-aea28f8e5dc4@nxp.com>
+ <c2acecc8-5357-6cbe-f93c-00d71470dff5@arm.com>
+Message-ID: <bb973ba9-ca45-c9f1-38d6-67e9bc05e429@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 20 September 2018 14:01:57 BST, Sricharan R <sricharan@codeaurora.org> wrote:
->
->
->On 9/20/2018 1:54 AM, Craig wrote:
->> Yup, this patch seems to have fixed the higher frequencies from the
->quick test I did.
->> 
->  Thanks !!. Can i take that as Craig Tatlor <ctatlor97@gmail.com> ?
-Sure, no problem
->
->Regards,
-> Sricharan
->
->       tested-by: 
->> On 7 September 2018 15:28:53 BST, Craig Tatlor <ctatlor97@gmail.com>
->wrote:
->>>
->>>
->>> On 7 September 2018 10:57:34 BST, Sricharan R
->>> <sricharan@codeaurora.org> wrote:
->>>> Hi Craig,
+On 20.09.2018 14:49, Robin Murphy wrote:
+> On 20/09/18 11:38, Laurentiu Tudor wrote:
+>>
+>>
+>> On 19.09.2018 17:37, Robin Murphy wrote:
+>>> On 19/09/18 15:18, Laurentiu Tudor wrote:
+>>>> Hi Robin,
 >>>>
->>>>
->>>>>> [v12]
->>>>>>   * Added my signed-off that was missing in some patches.
->>>>>>   * Added Bjorn's acked that i missed earlier.
+>>>> On 19.09.2018 16:25, Robin Murphy wrote:
+>>>>> Hi Laurentiu,
+>>>>>
+>>>>> On 19/09/18 13:35, laurentiu.tudor at nxp.com wrote:
+>>>>>> From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 >>>>>>
->>>>>
->>>>>   Can you give this a try on your 8974 device and check if the
->>>>>   pvs version reporting, scaling for higher frequencies are fine ?
->>>>>   Sorry, i could not get hold of a 8974 device. So in-case if you
->>>> still
->>>>>   have the issues with higher frequencies, can you give a quick
->>> debug
->>>>>   and report. That would be of great help.
->>>>>
->>>>   Ping on this ..
->>>
->>> Hi, didn't see your last message,
->>>
->>> Will have a try on mine in the weekend and report back.
->>>>
->>>> Regards,
->>>> Sricharan
->>>>
->>>>> Regards,
->>>>>  Sricharan
->>>>>
->>>>>
->>>>>> [v11]
->>>>>>   * Dropped patch 13 and 14 from v10 and
->>>>>>     merged the qcom-cpufreq-krait driver to the existing
->>>> qcom-cpufreq-kryo.c
->>>>>>   * Rebased on top of clk-next
->>>>>>   * Fixed a bug while populating the pvs version for krait.
+>>>>>> This patch series adds SMMU support for NXP LS1043A and LS1046A chips
+>>>>>> and consists mostly in important driver fixes and the required device
+>>>>>> tree updates. It touches several subsystems and consists of three 
+>>>>>> main
+>>>>>> parts:
+>>>>>> ??? - changes in soc/drivers/fsl/qbman drivers adding iommu 
+>>>>>> mapping of
+>>>>>> ????? reserved memory areas, fixes and defered probe support
+>>>>>> ??? - changes in drivers/net/ethernet/freescale/dpaa_eth drivers
+>>>>>> ????? consisting in misc dma mapping related fixes and probe ordering
+>>>>>> ??? - addition of the actual arm smmu device tree node together with
+>>>>>> ????? various adjustments to the device trees
 >>>>>>
->>>>>> [v10]
->>>>>>   * Addressed Stephen's comments to add clocks bindings
->properties
->>>>>>     to the newly introduced nodes.
->>>>>>   * Added a change to include opp-supported-hw to qcom-cpufreq.c
->>>>>>   * Rebased on top of clk-next
->>>>>>   * Although there were minor changes to bindings and the driver
->>>>>>     retained the acked-by tags from Rob and Viresh respectively. 
+>>>>>> Performance impact
+>>>>>>
+>>>>>> ?????? Running iperf benchmarks in a back-to-back setup (both sides
+>>>>>> ?????? having smmu enabled) on a 10GBps port show an important
+>>>>>> ?????? networking performance degradation of around %40 (9.48Gbps
+>>>>>> ?????? linerate vs 5.45Gbps). If you need performance but without
+>>>>>> ?????? SMMU support you can use "iommu.passthrough=1" to disable
+>>>>>> ?????? SMMU.
 > 
->>>
->>>>>>
->>>>>> [v9]
->>>>>>   * Fixed a rebase issue in Makefile and added Tag from Robh.
->>>>>>
->>>>>> [v8]
->>>>>>   * Fixed a bug in path#14 pointed out by Viresh and also added
->>>> tags.
->>>>>>     No change in any other patch.
->>>>>>
->>>>>> [v7]
->>>>>>   * Fixed comments from Viresh for cleaning up the error handling
->>>>>>     in qcom-cpufreq.c. Also changed the init function to lateinit
->>>>>>     call. This is required because nvmem which gets initialised
->>> with
->>>>>>     module_init needs to go first.
->>>>>>   * Fixed Rob's comments for bindings documentation
->>>>>>   * Fixed kbuild build issue in clk-lpc32xx.c
->>>>>>   * Rebased on top of clk-next
->>>>>>
->>>>>> [v6]
->>>>>>   * Adrressed comments from Viresh for patch #14 in v5 [5]
->>>>>>   * Introduced a new binding operating-points-v2-krait-cpu
->>>>>>     as per discussion with Rob
->>>>>>   * Added Review tags
->>>>>>
->>>>>> [v5]
->>>>>>   * Addressed comments from Rob for bindings
->>>>>>   * Addressed comments from Viresh to use
->dev_pm_opp_set_prop_name,
->>>> accordingly
->>>>>>     dropped patch #12 and corrected patch #11 from previous patch
->>>> set in [4]
->>>>>>   * Converted to use #spdx tags for newly introduced files
->>>>>>
->>>>>> Mostly a resend of the v3 posted by Stephen quite some time back
->>> [1]
->>>>>> except for few changes.
->>>>>>   Based on reading some feedback from list,
->>>>>>   * Dropped the patch "clk: Add safe switch hook" from v3 [2].
->>>>>>     Now this is taken care by patch#10 in this series only for
->>>> Krait.
->>>>>>   * Dropped the path "clk: Avoid sending high rates to downstream
->>>>>> 		      clocks during set_rate" from v3 [3].
->>>>>>   * Rebased on top of clk-next.
->>>>>>   * Dropped the DT update from the series. Will send separately
->>>>>>   * Now with cpufreq-dt+opp supporting voltage scaling,
->registering
->>>> the
->>>>>>     krait cpu supplies in DT should be sufficient. But one issue
->>> is,
->>>>>>     the qcom-cpufreq drivers reads the efuse and based on that
->>>> registers
->>>>>>     the opp data and then registers the cpufreq-dt device. So
->when
->>>>>>     cpufreq-dt driver probes and registers the regulator to the
->OPP
->>>> framework,
->>>>>>     it expects that the opp data for the device should not be
->>>> registered before
->>>>>>     the regulator. Will send a RFC patch removing that check, to
->>>> find out the
->>>>>>     right way of doing it.
->>>>>>
->>>>>> These patches provide cpufreq scaling on devices with Krait CPUs.
->>>>>> In Krait CPU designs there's one PLL and two muxes per CPU,
->>> allowing
->>>>>> us to switch CPU frequencies independently.
->>>>>>
->>>>>> 				 secondary
->>>>>> 	 +-----+                    +
->>>>>> 	 | QSB |-------+------------|\
->>>>>> 	 +-----+       |            | |-+
->>>>>> 		       |    +-------|/  |
->>>>>> 		       |    |       +   |
->>>>>> 	 +-----+       |    |           |
->>>>>> 	 | PLL |----+-------+           |   primary
->>>>>> 	 +-----+    |  |                |     +
->>>>>> 		    |  |                +-----|\       +------+
->>>>>> 	 +-------+  |  |                      | \      |      |
->>>>>> 	 | HFPLL |----------+-----------------|  |-----| CPU0 |
->>>>>> 	 +-------+  |  |    |                 |  |     |      |
->>>>>> 		    |  |    | +-----+         | /      +------+
->>>>>> 		    |  |    +-| / 2 |---------|/
->>>>>> 		    |  |      +-----+         +
->>>>>> 		    |  |         secondary
->>>>>> 		    |  |            +
->>>>>> 		    |  +------------|\
->>>>>> 		    |               | |-+
->>>>>> 		    +---------------|/  |   primary
->>>>>> 				    +   |     +
->>>>>> 					+-----|\       +------+
->>>>>> 	 +-------+                            | \      |      |
->>>>>> 	 | HFPLL |----------------------------|  |-----| CPU1 |
->>>>>> 	 +-------+          |                 |  |     |      |
->>>>>> 			    | +-----+         | /      +------+
->>>>>> 			    +-| / 2 |---------|/
->>>>>> 			      +-----+         +
->>>>>>
->>>>>> To support this in the common clock framework we model the muxes,
->>>>>> dividers, and PLLs as different clocks. CPUfreq only interacts
->>>>>> with the primary mux (farthest right in the diagram). When
->CPUfreq
->>>>>> sets a rate, the mux code finds the best parent that can provide
->>> the
->>>> rate.
->>>>>> Due to the design, QSB and the top PLL are always a fixed rate
->and
->>>> thus
->>>>>> only support one frequency each. These sources provide the lowest
->>>>>> frequencies for the CPUs. The HFPLLs are where we can make the
->CPU
->>>> go
->>>>>> faster (GHz range). Sometimes we need to run the HFPLL twice as
->>>>>> fast and divide it by two to get a particular frequency.
->>>>>>
->>>>>> When switching rates we can't leave the CPU clocked by the HFPLL
->>>> because
->>>>>> we need to turn off the output of the PLL when changing its
->>>> frequency.
->>>>>> This means we have to switch over to the secondary mux and use
->one
->>>> of the
->>>>>> fixed sources. This is why we need something like the safe parent
->>>> patch.
->>>>>>
->>>>>> [1]
->>>>
->http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/332607.html
->>>>>> [2]
->>>>
->http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/332615.html
->>>>>> [3]
->>>>
->http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/332608.html
->>>>>> [4] https://lwn.net/Articles/740994/ 
->>>>>> [5] https://lkml.org/lkml/2017/12/19/537
->>>>>>
->>>>>>
->>>>>> Sricharan R (3):
->>>>>>   clk: qcom: Add safe switch hook for krait mux clocks
->>>>>>   cpufreq: qcom: Re-organise kryo cpufreq to use it for other
->nvmem
->>>>>>     based qcom socs
->>>>>>   cpufreq: qcom: Add support for krait based socs
->>>>>>
->>>>>> Stephen Boyd (11):
->>>>>>   ARM: Add Krait L2 register accessor functions
->>>>>>   clk: qcom: Add support for High-Frequency PLLs (HFPLLs)
->>>>>>   clk: qcom: Add HFPLL driver
->>>>>>   dt-bindings: clock: Document qcom,hfpll
->>>>>>   clk: qcom: Add MSM8960/APQ8064's HFPLLs
->>>>>>   clk: qcom: Add IPQ806X's HFPLLs
->>>>>>   clk: qcom: Add support for Krait clocks
->>>>>>   clk: qcom: Add KPSS ACC/GCC driver
->>>>>>   dt-bindings: arm: Document qcom,kpss-gcc
->>>>>>   clk: qcom: Add Krait clock controller driver
->>>>>>   dt-bindings: clock: Document qcom,krait-cc
->>>>>>
->>>>>>  .../devicetree/bindings/arm/msm/qcom,kpss-acc.txt  |  19 +
->>>>>>  .../devicetree/bindings/arm/msm/qcom,kpss-gcc.txt  |  44 +++
->>>>>>  .../devicetree/bindings/clock/qcom,hfpll.txt       |  60 ++++
->>>>>>  .../devicetree/bindings/clock/qcom,krait-cc.txt    |  34 ++
->>>>>>  .../{kryo-cpufreq.txt => qcom-nvmem-cpufreq.txt}   |   7 +-
->>>>>>  arch/arm/common/Kconfig                            |   3 +
->>>>>>  arch/arm/common/Makefile                           |   1 +
->>>>>>  arch/arm/common/krait-l2-accessors.c               |  48 +++
->>>>>>  arch/arm/include/asm/krait-l2-accessors.h          |   9 +
->>>>>>  drivers/clk/qcom/Kconfig                           |  28 ++
->>>>>>  drivers/clk/qcom/Makefile                          |   5 +
->>>>>>  drivers/clk/qcom/clk-hfpll.c                       | 244
->>>> +++++++++++++
->>>>>>  drivers/clk/qcom/clk-hfpll.h                       |  44 +++
->>>>>>  drivers/clk/qcom/clk-krait.c                       | 126 +++++++
->>>>>>  drivers/clk/qcom/clk-krait.h                       |  40 +++
->>>>>>  drivers/clk/qcom/gcc-ipq806x.c                     |  82 +++++
->>>>>>  drivers/clk/qcom/gcc-msm8960.c                     | 172
->+++++++++
->>>>>>  drivers/clk/qcom/hfpll.c                           |  96 +++++
->>>>>>  drivers/clk/qcom/kpss-xcc.c                        |  87 +++++
->>>>>>  drivers/clk/qcom/krait-cc.c                        | 397
->>>> +++++++++++++++++++++
->>>>>>  drivers/cpufreq/Kconfig.arm                        |   6 +-
->>>>>>  drivers/cpufreq/Makefile                           |   2 +-
->>>>>>  drivers/cpufreq/cpufreq-dt-platdev.c               |   5 +
->>>>>>  drivers/cpufreq/qcom-cpufreq-kryo.c                | 232
->>>> ------------
->>>>>>  drivers/cpufreq/qcom-cpufreq-nvmem.c               | 387
->>>> ++++++++++++++++++++
->>>>>>  include/dt-bindings/clock/qcom,gcc-msm8960.h       |   2 +
->>>>>>  26 files changed, 1941 insertions(+), 239 deletions(-)
->>>>>>  create mode 100644
->>>> Documentation/devicetree/bindings/arm/msm/qcom,kpss-gcc.txt
->>>>>>  create mode 100644
->>>> Documentation/devicetree/bindings/clock/qcom,hfpll.txt
->>>>>>  create mode 100644
->>>> Documentation/devicetree/bindings/clock/qcom,krait-cc.txt
->>>>>>  rename Documentation/devicetree/bindings/opp/{kryo-cpufreq.txt
->=>
->>>> qcom-nvmem-cpufreq.txt} (98%)
->>>>>>  create mode 100644 arch/arm/common/krait-l2-accessors.c
->>>>>>  create mode 100644 arch/arm/include/asm/krait-l2-accessors.h
->>>>>>  create mode 100644 drivers/clk/qcom/clk-hfpll.c
->>>>>>  create mode 100644 drivers/clk/qcom/clk-hfpll.h
->>>>>>  create mode 100644 drivers/clk/qcom/clk-krait.c
->>>>>>  create mode 100644 drivers/clk/qcom/clk-krait.h
->>>>>>  create mode 100644 drivers/clk/qcom/hfpll.c
->>>>>>  create mode 100644 drivers/clk/qcom/kpss-xcc.c
->>>>>>  create mode 100644 drivers/clk/qcom/krait-cc.c
->>>>>>  delete mode 100644 drivers/cpufreq/qcom-cpufreq-kryo.c
->>>>>>  create mode 100644 drivers/cpufreq/qcom-cpufreq-nvmem.c
->>>>>>
->>>>>
->> 
+> I should have said before - thanks for the numbers there as well. Always 
+> good to add another datapoint to my collection. If you're interested 
+> I've added SMMUv2 support to the "non-strict mode" series (of which I 
+> should be posting v8 soon), so it might be fun to see how well that 
+> works on MMU-500 in the real world.
 
--- 
-Please, Don't Panic
+Hmm, I think I gave those a try some weeks ago and vaguely remember that 
+I did see improvements. Can't remember the numbers off the top of my 
+head but I'll re-test with the latest spin and update the numbers.
+
+>>>>>>
+>>>>>> USB issue and workaround
+>>>>>>
+>>>>>> ?????? There's a problem with the usb controllers in these chips
+>>>>>> ?????? generating smaller, 40-bit wide dma addresses instead of the
+>>>>>> 48-bit
+>>>>>> ?????? supported at the smmu input. So you end up in a situation
+>>>>>> where the
+>>>>>> ?????? smmu is mapped with 48-bit address translations, but the 
+>>>>>> device
+>>>>>> ?????? generates transactions with clipped 40-bit addresses, thus 
+>>>>>> smmu
+>>>>>> ?????? context faults are triggered. I encountered a similar
+>>>>>> situation for
+>>>>>> ?????? mmc that I? managed to fix in software [1] however for USB I
+>>>>>> did not
+>>>>>> ?????? find a proper place in the code to add a similar fix. The only
+>>>>>> ?????? workaround I found was to add this kernel parameter which
+>>>>>> limits the
+>>>>>> ?????? usb dma to 32-bit size: "xhci-hcd.quirks=0x800000".
+>>>>>> ?????? This workaround if far from ideal, so any suggestions for a 
+>>>>>> code
+>>>>>> ?????? based workaround in this area would be greatly appreciated.
+>>>>>
+>>>>> If you have a nominally-64-bit device with a
+>>>>> narrower-than-the-main-interconnect link in front of it, that should
+>>>>> already be fixed in 4.19-rc by bus_dma_mask picking up DT dma-ranges,
+>>>>> provided the interconnect hierarchy can be described appropriately (or
+>>>>> at least massaged sufficiently to satisfy the binding), e.g.:
+>>>>>
+>>>>> / {
+>>>>> ?? ????...
+>>>>>
+>>>>> ?? ????soc {
+>>>>> ?? ??????? ranges;
+>>>>> ?? ??????? dma-ranges = <0 0 10000 0>;
+>>>>>
+>>>>> ?? ??????? dev_48bit { ... };
+>>>>>
+>>>>> ?? ??????? periph_bus {
+>>>>> ?? ??????????? ranges;
+>>>>> ?? ??????????? dma-ranges = <0 0 100 0>;
+>>>>>
+>>>>> ?? ??????????? dev_40bit { ... };
+>>>>> ?? ??????? };
+>>>>> ?? ????};
+>>>>> };
+>>>>>
+>>>>> and if that fails to work as expected (except for PCI hosts where
+>>>>> handling dma-ranges properly still needs sorting out), please do 
+>>>>> let us
+>>>>> know ;)
+>>>>>
+>>>>
+>>>> Just to confirm, Is this [1] the change I was supposed to test?
+>>>
+>>> Not quite - dma-ranges is only valid for nodes representing a bus, so
+>>> putting it directly in the USB device nodes doesn't work (FWIW that's
+>>> why PCI is broken, because the parser doesn't expect the
+>>> bus-as-leaf-node case). That's teh point of that intermediate simple-bus
+>>> node represented by "periph_bus" in my example (sorry, I should have put
+>>> compatibles in to make it clearer) - often that's actually true to life
+>>> (i.e. "soc" is something like a CCI and "periph_bus" is something like
+>>> an AXI NIC gluing a bunch of lower-bandwidth DMA masters to one of the
+>>> CCI ports) but at worst it's just a necessary evil to make the binding
+>>> happy (if it literally only represents the point-to-point link between
+>>> the device master port and interconnect slave port).
+>>>
+>>
+>> Quick update: so I adjusted to device tree according to your example and
+>> it works so now I can get rid of that nasty kernel arg based workaround,
+>> yey! :-)
+> 
+> Cool! In fact, judging by the block diagrams on the website, the "basic 
+> peripherals and interconnect" section hanging off the side of the CCI 
+> implies that probably is true to the real topology as I imagined, so it 
+> doesn't even count as a horrible hack :)
+
+Indeed, on this chip there's a NoC lumping behind it several low-speed 
+devices such as usb, sata, esdhc.
+
+>> Thanks a lot, that was really helpful.
+> 
+> No problem. FWIW if you ever come to doing ACPI support for these SoCs, 
+> the equivalent is merely a case of setting the device memory address 
+> size limit field appropriately for all the named components.
+> 
+
+Thanks, I'll keep this in mind. If i remember correctly, there are 
+people over here working on UEFI + ACPI support for some LS chips but 
+progress appears to be slow.
+
+---
+Best Regards, Laurentiu
