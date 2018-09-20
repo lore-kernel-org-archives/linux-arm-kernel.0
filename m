@@ -1,188 +1,530 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 20 Sep 2018 10:39:01 +0100
-Subject: [PATCH] arm64: hugetlb: Avoid unnecessary clearing in
- huge_ptep_set_access_flags
-In-Reply-To: <20180919174437.1866-1-steve.capper@arm.com>
-References: <20180919174437.1866-1-steve.capper@arm.com>
-Message-ID: <20180920093900.GB17617@arm.com>
+From: pn@denx.de (Parthiban Nallathambi)
+Date: Thu, 20 Sep 2018 11:42:17 +0200
+Subject: [PATCH v2 2/3] drivers/irqchip: Add Actions external interrupts
+ support
+In-Reply-To: <e8ff35c7-813c-2597-ab51-781336d551c5@denx.de>
+References: <20180812122215.1079590-1-pn@denx.de>
+ <20180812122215.1079590-3-pn@denx.de>
+ <64b9ae63-c2b9-a2e0-f648-4bf80f34a57a@arm.com>
+ <e8ff35c7-813c-2597-ab51-781336d551c5@denx.de>
+Message-ID: <50398e6b-0dff-48e3-c3ed-b8578fe0b138@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
+Hello Marc,
 
-On Wed, Sep 19, 2018 at 06:44:37PM +0100, Steve Capper wrote:
-> For contiguous hugetlb, huge_ptep_set_access_flags performs a
-> get_clear_flush (which then flushes the TLBs) even when no change of ptes
-> is necessary.
+Ping on this patch for feedback.
+
+On 08/26/2018 05:20 PM, Parthiban Nallathambi wrote:
+> Hello Marc,
 > 
-> Unfortunately, this behaviour can lead to back-to-back page faults being
-> generated when running with multiple threads that access the same
-> contiguous huge page.
+> Thanks for your feedback.
 > 
-> Thread 1                     |  Thread 2
-> -----------------------------+------------------------------
-> hugetlb_fault                |
-> huge_ptep_set_access_flags   |
->   -> invalidate pte range    | hugetlb_fault
-> continue processing          | wait for hugetlb fault mutex
-> release mutex and return     | huge_ptep_set_access_flags
->                              |   -> invalidate pte range
-> hugetlb_fault
-
-Is this serialised by a mutex of the mmap_sem? (or both?)
-
-> This patch changes huge_ptep_set_access_flags s.t. we first read the
-> contiguous range of ptes (whilst preserving dirty information); the pte
-> range is only then invalidated where necessary and this prevents further
-> spurious page faults.
+> On 8/13/18 1:46 PM, Marc Zyngier wrote:
+>> On 12/08/18 13:22, Parthiban Nallathambi wrote:
+>>> Actions Semi Owl family SoC's S500, S700 and S900 provides support
+>>> for 3 external interrupt controllers through SIRQ pins.
+>>>
+>>> Each line can be independently configured as interrupt and triggers
+>>> on either of the edges (raising or falling) or either of the levels
+>>> (high or low) . Each line can also be masked independently.
+>>>
+>>> Signed-off-by: Parthiban Nallathambi <pn@denx.de>
+>>> Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
+>>> ---
+>>>   drivers/irqchip/Makefile       |   1 +
+>>>   drivers/irqchip/irq-owl-sirq.c | 305 +++++++++++++++++++++++++++++++++++++++++
+>>>   2 files changed, 306 insertions(+)
+>>>   create mode 100644 drivers/irqchip/irq-owl-sirq.c
+>>>
+>>> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+>>> index 15f268f646bf..072c4409e7c4 100644
+>>> --- a/drivers/irqchip/Makefile
+>>> +++ b/drivers/irqchip/Makefile
+>>> @@ -7,6 +7,7 @@ obj-$(CONFIG_ATH79)			+= irq-ath79-misc.o
+>>>   obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2835.o
+>>>   obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2836.o
+>>>   obj-$(CONFIG_ARCH_EXYNOS)		+= exynos-combiner.o
+>>> +obj-$(CONFIG_ARCH_ACTIONS)		+= irq-owl-sirq.o
+>>>   obj-$(CONFIG_FARADAY_FTINTC010)		+= irq-ftintc010.o
+>>>   obj-$(CONFIG_ARCH_HIP04)		+= irq-hip04.o
+>>>   obj-$(CONFIG_ARCH_LPC32XX)		+= irq-lpc32xx.o
+>>> diff --git a/drivers/irqchip/irq-owl-sirq.c b/drivers/irqchip/irq-owl-sirq.c
+>>> new file mode 100644
+>>> index 000000000000..b69301388300
+>>> --- /dev/null
+>>> +++ b/drivers/irqchip/irq-owl-sirq.c
+>>> @@ -0,0 +1,305 @@
+>>> +// SPDX-License-Identifier: GPL-2.0+
+>>> +/*
+>>> + *
+>>> + * Actions Semi Owl SoCs SIRQ interrupt controller driver
+>>> + *
+>>> + * Copyright (C) 2014 Actions Semi Inc.
+>>> + * David Liu <liuwei@actions-semi.com>
+>>> + *
+>>> + * Author: Parthiban Nallathambi <pn@denx.de>
+>>> + * Author: Saravanan Sekar <sravanhome@gmail.com>
+>>> + */
+>>> +
+>>> +#include <linux/interrupt.h>
+>>> +#include <linux/irqchip.h>
+>>> +#include <linux/of_irq.h>
+>>> +#include <linux/of_address.h>
+>>> +
+>>> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+>>> +
+>>> +#define INTC_GIC_INTERRUPT_PIN		13
+>>
+>> Why isn't that coming from the DT?
 > 
-> Fixes: d8bdcff28764 ("arm64: hugetlb: Add break-before-make logic for contiguous entries")
-> Reported-by: Lei Zhang <zhang.lei@jp.fujitsu.com>
-> Signed-off-by: Steve Capper <steve.capper@arm.com>
+> DT numbering is taken irqchip local, by which hwirq is directly used to
+> calculate the offset into register when it is shared. Even if this is
+> directly from DT, I need the value to offset into the register. So maintianed
+> inside the driver.
 > 
-> ---
+> Should it make sense to move it to DT and use another macro (different name)
+> for offsetting?
 > 
-> I was unable to test this on any hardware as I'm away from the office.
+>>
+>>> +#define INTC_EXTCTL_PENDING		BIT(0)
+>>> +#define INTC_EXTCTL_CLK_SEL		BIT(4)
+>>> +#define INTC_EXTCTL_EN			BIT(5)
+>>> +#define	INTC_EXTCTL_TYPE_MASK		GENMASK(6, 7)
+>>> +#define	INTC_EXTCTL_TYPE_HIGH		0
+>>> +#define	INTC_EXTCTL_TYPE_LOW		BIT(6)
+>>> +#define	INTC_EXTCTL_TYPE_RISING		BIT(7)
+>>> +#define	INTC_EXTCTL_TYPE_FALLING	(BIT(6) | BIT(7))
+>>> +
+>>> +#define get_sirq_offset(x)	chip_data->sirq[x].offset
+>>> +
+>>> +/* Per SIRQ data */
+>>> +struct owl_sirq {
+>>> +	u16 offset;
+>>> +	/* software is responsible to clear interrupt pending bit when
+>>> +	 * type is edge triggered. This value is for per SIRQ line.
+>>> +	 */
+>>
+>> Please follow the normal multi-line comment style:
+>>
+>> /*
+>>   * This is a comment, starting with a capital letter and ending with
+>>   * a full stop.
+>>   */
 > 
-> Can you please test this Lei Zhang?
+> Sure, thanks.
 > 
-> Cheers,
-> --
-> Steve
-> ---
->  arch/arm64/mm/hugetlbpage.c | 36 ++++++++++++++++++++++++++++++++----
->  1 file changed, 32 insertions(+), 4 deletions(-)
+>>
+>>> +	bool type_edge;
+>>> +};
+>>> +
+>>> +struct owl_sirq_chip_data {
+>>> +	void __iomem *base;
+>>> +	raw_spinlock_t lock;
+>>> +	/* some SoC's share the register for all SIRQ lines, so maintain
+>>> +	 * register is shared or not here. This value is from DT.
+>>> +	 */
+>>> +	bool shared_reg;
+>>> +	struct owl_sirq *sirq;
+>>
+>> Given that this driver handles at most 3 interrupts, do we need the
+>> overhead of a pointer and an additional allocation, while we could store
+>> all of this data in the space taken by the pointer itself?
+>>
+>> Something like:
+>>
+>> 	u16 offset[3];
+>> 	u8  trigger; // Bit mask indicating edge-triggered interrupts
+>>
+>> and we're done.
 > 
-> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-> index 192b3ba07075..76d229eb6ba1 100644
-> --- a/arch/arm64/mm/hugetlbpage.c
-> +++ b/arch/arm64/mm/hugetlbpage.c
-> @@ -131,6 +131,27 @@ static pte_t get_clear_flush(struct mm_struct *mm,
->  	return orig_pte;
->  }
->  
-> +static pte_t get_contig_pte(pte_t *ptep, unsigned long pgsize,
-> +		unsigned long ncontig)
-> +{
-> +	unsigned long i;
-> +	pte_t orig_pte = huge_ptep_get(ptep);
-> +
-> +	for (i = 0; i < ncontig; i++, ptep++) {
-> +		pte_t pte = huge_ptep_get(ptep);
-> +
-> +		/*
-> +		 * If HW_AFDBM is enabled, then the HW could turn on
-> +		 * the dirty bit for any page in the set, so check
-> +		 * them all.  All hugetlb entries are already young.
+> Sure, I will modify with one allocation.
+> 
+>>
+>>> +};
+>>> +
+>>> +static struct owl_sirq_chip_data *sirq_data;
+>>> +
+>>> +static unsigned int sirq_read_extctl(struct irq_data *data)
+>>
+>> Why isn't this taking a struct owl_sirq_chip_data as a parameter instead
+>> of always passing irq_data?
+>>
+>> Also, this should return a well defined size, which "unsigned int"
+>> isn't. Make that u32.
+> 
+> Sure, will adapt this.
+> 
+>>
+>>> +{
+>>> +	struct owl_sirq_chip_data *chip_data = data->chip_data;
+>>> +	unsigned int val;
+>>
+>> u32;
+> 
+> Sure.
+> 
+>>
+>>> +
+>>> +	val = readl_relaxed(chip_data->base + get_sirq_offset(data->hwirq));
+>>> +	if (chip_data->shared_reg)
+>>> +		val = (val >> (2 - data->hwirq) * 8) & 0xff;
+>>> +
+>>> +	return val;
+>>> +}
+>>> +
+>>> +static void sirq_write_extctl(struct irq_data *data, unsigned int extctl)
+>>
+>> Same comments.
+> 
+> Sure.
+> 
+>>
+>>> +{
+>>> +	struct owl_sirq_chip_data *chip_data = data->chip_data;
+>>> +	unsigned int val;
+>>
+>> u32;
+> 
+> Sure.
+> 
+>>
+>>> +
+>>> +	if (chip_data->shared_reg) {
+>>> +		val = readl_relaxed(chip_data->base +
+>>> +				get_sirq_offset(data->hwirq));
+>>
+>> Single line, please.
+> 
+> Sure.
+> 
+>>
+>>> +		val &= ~(0xff << (2 - data->hwirq) * 8);
+>>> +		extctl &= 0xff;
+>>> +		extctl = (extctl << (2 - data->hwirq) * 8) | val;
+>>> +	}
+>>> +
+>>> +	writel_relaxed(extctl, chip_data->base +
+>>> +			get_sirq_offset(data->hwirq));
+>>
+>> Single line.
+> 
+> Sure.
+> 
+>>
+>>> +}
+>>> +
+>>> +static void owl_sirq_ack(struct irq_data *data)
+>>> +{
+>>> +	struct owl_sirq_chip_data *chip_data = data->chip_data;
+>>> +	unsigned int extctl;
+>>> +	unsigned long flags;
+>>> +
+>>> +	/* software must clear external interrupt pending, when interrupt type
+>>> +	 * is edge triggered, so we need per SIRQ based clearing.
+>>> +	 */
+>>> +	if (chip_data->sirq[data->hwirq].type_edge) {
+>>> +		raw_spin_lock_irqsave(&chip_data->lock, flags);
+>>> +
+>>> +		extctl = sirq_read_extctl(data);
+>>> +		extctl |= INTC_EXTCTL_PENDING;
+>>> +		sirq_write_extctl(data, extctl);
+>>> +
+>>> +		raw_spin_unlock_irqrestore(&chip_data->lock, flags);
+>>
+>> It would make a lot more sense if the lock was taken inside the accessor
+>> so that the rest of the driver doesn't have to deal with it. Something
+>> along of the line of:
+>>
+>> static void sirq_clear_set_extctl(struct owl_sirq_chip_data *d,
+>>                                    u32 clear, u32 set)
+>> {
+>> 	unsigned long flags;
+>> 	u32 val;
+>>
+>> 	raw_spin_lock_irqsave(&d->lock, flags);
+>> 	val = sirq_read_extctl(d);
+>> 	val &= ~clear;
+>> 	val |= set;
+>> 	sirq_write_extctl(d, val);
+>> 	raw_spin_unlock_irqrestore(&d->lock, flags)
+>> }
+>>
+>> And use that throughout the driver.
+> 
+> Thanks for sharing the function with lock, will update it.
+> 
+>>
+>>> +	}
+>>> +	irq_chip_ack_parent(data);
+>>
+>> That being said, I'm terribly sceptical about this whole function. At
+>> the end of the day, the flow handler used by the GIC is
+>> handle_fasteoi_irq, which doesn't call the ack callback at all. So how
+>> does this work?
+> 
+> That's my mistake. I will move this function for ".irq_eoi". Will that be fine?
+> In short, all the devices/interrupt controller connected to sirq lines are level
+> triggered in my board. So, I couldn't test this part last time.
+> 
+>>
+>>> +}
+>>> +
+>>> +static void owl_sirq_mask(struct irq_data *data)
+>>> +{
+>>> +	struct owl_sirq_chip_data *chip_data = data->chip_data;
+>>> +	unsigned int extctl;
+>>> +	unsigned long flags;
+>>> +
+>>> +	raw_spin_lock_irqsave(&chip_data->lock, flags);
+>>> +
+>>> +	extctl = sirq_read_extctl(data);
+>>> +	extctl &= ~(INTC_EXTCTL_EN);
+>>> +	sirq_write_extctl(data, extctl);
+>>> +
+>>> +	raw_spin_unlock_irqrestore(&chip_data->lock, flags);
+>>> +	irq_chip_mask_parent(data);
+>>> +}
+>>> +
+>>> +static void owl_sirq_unmask(struct irq_data *data)
+>>> +{
+>>> +	struct owl_sirq_chip_data *chip_data = data->chip_data;
+>>> +	unsigned int extctl;
+>>> +	unsigned long flags;
+>>> +
+>>> +	raw_spin_lock_irqsave(&chip_data->lock, flags);
+>>> +
+>>> +	extctl = sirq_read_extctl(data);
+>>> +	extctl |= INTC_EXTCTL_EN;
+>>> +	sirq_write_extctl(data, extctl);
+>>> +
+>>> +	raw_spin_unlock_irqrestore(&chip_data->lock, flags);
+>>> +	irq_chip_unmask_parent(data);
+>>> +}
+>>> +
+>>> +/* PAD_PULLCTL needs to be defined in pinctrl */
+>>> +static int owl_sirq_set_type(struct irq_data *data, unsigned int flow_type)
+>>> +{
+>>> +	struct owl_sirq_chip_data *chip_data = data->chip_data;
+>>> +	unsigned int extctl, type;
+>>> +	unsigned long flags;
+>>> +
+>>> +	switch (flow_type) {
+>>> +	case IRQF_TRIGGER_LOW:
+>>> +		type = INTC_EXTCTL_TYPE_LOW;
+>>> +		break;
+>>> +	case IRQF_TRIGGER_HIGH:
+>>> +		type = INTC_EXTCTL_TYPE_HIGH;
+>>> +		break;
+>>> +	case IRQF_TRIGGER_FALLING:
+>>> +		type = INTC_EXTCTL_TYPE_FALLING;
+>>> +		chip_data->sirq[data->hwirq].type_edge = true;
+>>> +		break;
+>>> +	case IRQF_TRIGGER_RISING:
+>>> +		type = INTC_EXTCTL_TYPE_RISING;
+>>> +		chip_data->sirq[data->hwirq].type_edge = true;
+>>> +		break;
+>>
+>> So let's say I configure an interrupt as edge, then switch it to level.
+>> The edge setting remains and bad things will happen.
+> 
+> Ok, I will update the value to false for edge cases.
+> 
+>>
+>>> +	default:
+>>> +		return  -EINVAL;
+>>> +	}
+>>> +
+>>> +	raw_spin_lock_irqsave(&chip_data->lock, flags);
+>>> +
+>>> +	extctl = sirq_read_extctl(data);
+>>> +	extctl &= ~INTC_EXTCTL_TYPE_MASK;
+>>> +	extctl |= type;
+>>> +	sirq_write_extctl(data, extctl);
+>>> +
+>>> +	raw_spin_unlock_irqrestore(&chip_data->lock, flags);
+>>> +	data = data->parent_data;
+>>> +	return irq_chip_set_type_parent(data, flow_type);
+>>> +}
+>>> +
+>>> +static struct irq_chip owl_sirq_chip = {
+>>> +	.name		= "owl-sirq",
+>>> +	.irq_ack	= owl_sirq_ack,
+>>> +	.irq_mask	= owl_sirq_mask,
+>>> +	.irq_unmask	= owl_sirq_unmask,
+>>> +	.irq_set_type	= owl_sirq_set_type,
+>>> +	.irq_eoi	= irq_chip_eoi_parent,
+>>> +	.irq_retrigger	= irq_chip_retrigger_hierarchy,
+>>> +};
+>>> +
+>>> +static int owl_sirq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+>>> +				 unsigned int nr_irqs, void *arg)
+>>> +{
+>>> +	struct irq_fwspec *fwspec = arg;
+>>> +	struct irq_fwspec parent_fwspec = {
+>>> +		.param_count	= 3,
+>>> +		.param[0]	= GIC_SPI,
+>>> +		.param[1]	= fwspec->param[0] + INTC_GIC_INTERRUPT_PIN,
+>>> +		.param[2]	= fwspec->param[1],
+>>
+>> param[2] is supposed to be the trigger configuration. Your driver
+>> supports LEVEL_LOW and EDGE_FALLING, which the GIC cannot handle. And
+>> yet you're passing it directly.
+> 
+> That's my mistake. I will translate and restrict LEVEL_HIGH and EDGE_RISING
+> for GIC here. Thanks.
+> 
+>>
+>>> +		.fwnode		= domain->parent->fwnode,
+>>> +	};
+>>> +
+>>> +	if (WARN_ON(nr_irqs != 1))
+>>> +		return -EINVAL;
+>>> +
+>>> +	irq_domain_set_hwirq_and_chip(domain, virq, fwspec->param[0],
+>>> +				      &owl_sirq_chip,
+>>> +				      domain->host_data);
+>>> +
+>>> +	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs,
+>>> +					    &parent_fwspec);
+>>> +}
+>>> +
+>>> +static const struct irq_domain_ops sirq_domain_ops = {
+>>> +	.alloc	= owl_sirq_domain_alloc,
+>>> +	.free	= irq_domain_free_irqs_common,
+>>
+>> No translation method? Again, how does this work?
+> 
+> Missed this part, I will update this next version.
+> 
+>>
+>>> +};
+>>> +
+>>> +static void owl_sirq_clk_init(int offset, int hwirq)
+>>> +{
+>>> +	unsigned int val;
+>>> +
+>>> +	/* register default clock is 32Khz, change to 24Mhz only when defined */
+>>> +	val = readl_relaxed(sirq_data->base + offset);
+>>> +	if (sirq_data->shared_reg)
+>>> +		val |= INTC_EXTCTL_CLK_SEL << (2 - hwirq) * 8;
+>>> +	else
+>>> +		val |= INTC_EXTCTL_CLK_SEL;
+>>> +
+>>> +	writel_relaxed(val, sirq_data->base + offset);
+>>> +}
+>>
+>> I've asked questions about this in the first review, and you didn't
+>> answer. Why is it even configurable? How do you choose the sample rate?
+>> What's the drawback of always setting it one way or the other?
+> 
+> The provision for selecting sampling rate here seems meant for power
+> management, which I wasn't aware of. So this configuration doesn't need
+> to come from DT.
+> 
+> Possibly this needs to be implemented as "syscore_ops" suspend and resume
+> calls. Should I register this as "register_syscore_ops" or leaving 32MHz
+> is fine?
+> 
+>>
+>>> +
+>>> +static int __init owl_sirq_of_init(struct device_node *node,
+>>> +					struct device_node *parent)
+>>> +{
+>>> +	struct irq_domain *domain, *domain_parent;
+>>> +	int ret = 0, i, sirq_cnt = 0;
+>>> +	struct owl_sirq_chip_data *chip_data;
+>>> +
+>>> +	sirq_cnt = of_property_count_u32_elems(node, "actions,sirq-offset");
+>>> +	if (sirq_cnt <= 0) {
+>>> +		pr_err("owl_sirq: register offset not specified\n");
+>>> +		return -EINVAL;
+>>> +	}
+>>> +
+>>> +	chip_data = kzalloc(sizeof(*chip_data), GFP_KERNEL);
+>>> +	if (!chip_data)
+>>> +		return -ENOMEM;
+>>> +	sirq_data = chip_data;
+>>> +
+>>> +	chip_data->sirq = kcalloc(sirq_cnt, sizeof(*chip_data->sirq),
+>>> +				GFP_KERNEL);
+>>> +	if (!chip_data->sirq)
+>>> +		goto out_free;
+>>> +
+>>> +	raw_spin_lock_init(&chip_data->lock);
+>>> +	chip_data->base = of_iomap(node, 0);
+>>> +	if (!chip_data->base) {
+>>> +		pr_err("owl_sirq: unable to map sirq register\n");
+>>> +		ret = -ENXIO;
+>>> +		goto out_free;
+>>> +	}
+>>> +
+>>> +	chip_data->shared_reg = of_property_read_bool(node,
+>>> +						"actions,sirq-shared-reg");
+>>> +	for (i = 0; i < sirq_cnt; i++) {
+>>> +		u32 value;
+>>> +
+>>> +		ret = of_property_read_u32_index(node, "actions,sirq-offset",
+>>> +						i, &value);
+>>> +		if (ret)
+>>> +			goto out_unmap;
+>>> +
+>>> +		get_sirq_offset(i) = (u16)value;
+>>> +
+>>> +		ret = of_property_read_u32_index(node, "actions,sirq-clk-sel",
+>>> +						i, &value);
+>>> +		if (ret || !value)
+>>> +			continue;
+>>> +
+>>> +		/* external interrupt controller can be either connect to 32Khz/
+>>> +		 * 24Mhz external/internal clock. This shall be configured for
+>>> +		 * per SIRQ line. It can be defined from DT, failing defaults to
+>>> +		 * 24Mhz clock.
+>>> +		 */
+>>> +		owl_sirq_clk_init(get_sirq_offset(i), i);
+>>> +	}
+>>> +
+>>> +	domain_parent = irq_find_host(parent);
+>>> +	if (!domain_parent) {
+>>> +		pr_err("owl_sirq: interrupt-parent not found\n");
+>>> +		goto out_unmap;
+>>> +	}
+>>> +
+>>> +	domain = irq_domain_add_hierarchy(domain_parent, 0,
+>>> +			sirq_cnt, node,
+>>> +			&sirq_domain_ops, chip_data);
+>>> +	if (!domain) {
+>>> +		ret = -ENOMEM;
+>>> +		goto out_unmap;
+>>> +	}
+>>> +
+>>> +	return 0;
+>>> +
+>>> +out_unmap:
+>>> +	iounmap(chip_data->base);
+>>> +out_free:
+>>> +	kfree(chip_data);
+>>> +	kfree(chip_data->sirq);
+>>> +	return ret;
+>>> +}
+>>> +
+>>> +IRQCHIP_DECLARE(owl_sirq, "actions,owl-sirq", owl_sirq_of_init);
+>>>
+>>
+>> As it stands, this driver is nowhere near ready. I don't even understand
+>> how edge signalling works. Also, I'd appreciate if you could answer my
+>> comments before respining another version.
+> 
+> As the previous version wasn't based on hierarchy, which I was working on
+> after your feedback. Apologize!
+> 
+>>
+>> Thanks,
+>>
+>> 	M.
+>>
+> 
 
-Maybe mention that young implies that AF is set?
-Having said that, are you sure that these entries are already young?
-If so, why does hugetlb_fault() call pte_mkyoung() on the pte before
-passing it into huge_ptep_set_access_flags()? Also, since
-huge_ptep_set_access_flags() can only ever relax the permissions for
-an entry, if everything was young then it would imply that the only
-operation it ever does is to set dirty. In which case, we could
-assert pte_dirty(pte) and parts of the current code are redundant.
-
-What's going on here?
-
-> +		 */
-> +		if (pte_dirty(pte))
-> +			orig_pte = pte_mkdirty(orig_pte);
-> +	}
-> +
-> +	return orig_pte;
-> +}
-> +
->  /*
->   * Changing some bits of contiguous entries requires us to follow a
->   * Break-Before-Make approach, breaking the whole contiguous set
-> @@ -324,7 +345,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
->  			       unsigned long addr, pte_t *ptep,
->  			       pte_t pte, int dirty)
->  {
-> -	int ncontig, i, changed = 0;
-> +	int ncontig, i;
->  	size_t pgsize = 0;
->  	unsigned long pfn = pte_pfn(pte), dpfn;
->  	pgprot_t hugeprot;
-> @@ -336,9 +357,16 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
->  	ncontig = find_num_contig(vma->vm_mm, addr, ptep, &pgsize);
->  	dpfn = pgsize >> PAGE_SHIFT;
->  
-> +	orig_pte = get_contig_pte(ptep, pgsize, ncontig);
-> +	if (pte_same(orig_pte, pte))
-> +		return 0;
-
-Hmm, I don't understand how this solves the other problem we found. Imagine
-we have a contiguous range of ptes [pte0 ... pteN] and we have a CPU that
-doesn't support the contiguous hint and also doesn't support HW_AFDBM.
-Further, imagine that another CPU in the system *does* support HW_AFDBM.
-
-In this case, it would be possible for the first CPU to take a fault on
-pteN as a result of trying to write to a clean page. If the other CPU had
-already set the dirty bit for pte0, then your get_contig_pte() function
-will return a dirty orig_pte and the pte_same() check will pass for the
-faulting CPU, causing it to get stuck in a recursive fault.
-
-Ideally, we'd solve this by only performing the pte_same() check on the
-pte that is offset by the faulting address, but unfortunately the address
-we get passed here has already been rounded down. That's why I bailed and
-simply tried to check pte_same() on every pte. Really, we just to check
-the access and dirty flags -- another diff below.
-
-> +	/*
-> +	 * we need to get our orig_pte again as HW DBM may have happened since
-> +	 * above. get_clear_flush will ultimately cmpxchg with 0 to ensure
-
-s/cmpxchg/xchg/
-
-Will
-
---->8
-
-diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index 192b3ba07075..0b7738d76f14 100644
---- a/arch/arm64/mm/hugetlbpage.c
-+++ b/arch/arm64/mm/hugetlbpage.c
-@@ -324,7 +324,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
- 			       unsigned long addr, pte_t *ptep,
- 			       pte_t pte, int dirty)
- {
--	int ncontig, i, changed = 0;
-+	int ncontig, i;
- 	size_t pgsize = 0;
- 	unsigned long pfn = pte_pfn(pte), dpfn;
- 	pgprot_t hugeprot;
-@@ -336,9 +336,20 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
- 	ncontig = find_num_contig(vma->vm_mm, addr, ptep, &pgsize);
- 	dpfn = pgsize >> PAGE_SHIFT;
- 
-+	for (i = 0; i < ncontig; i++) {
-+		orig_pte = huge_ptep_get(ptep + i);
-+
-+		if (pte_dirty(orig_pte) != pte_dirty(pte))
-+			break;
-+
-+		if (pte_young(orig_pte) != pte_young(pte))
-+			break;
-+	}
-+
-+	if (i == ncontig)
-+		return 0;
-+
- 	orig_pte = get_clear_flush(vma->vm_mm, addr, ptep, pgsize, ncontig);
--	if (!pte_same(orig_pte, pte))
--		changed = 1;
- 
- 	/* Make sure we don't lose the dirty state */
- 	if (pte_dirty(orig_pte))
-@@ -348,7 +359,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
- 	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn)
- 		set_pte_at(vma->vm_mm, addr, ptep, pfn_pte(pfn, hugeprot));
- 
--	return changed;
-+	return 1;
- }
- 
- void huge_ptep_set_wrprotect(struct mm_struct *mm,
+-- 
+Thanks,
+Parthiban N
