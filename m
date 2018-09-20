@@ -1,38 +1,33 @@
-From: yuehaibing@huawei.com (YueHaibing)
-Date: Thu, 20 Sep 2018 20:33:05 +0800
-Subject: [PATCH net-next 21/22] l2tp: fix return type of ndo_start_xmit
- function
-In-Reply-To: <20180920123306.14772-1-yuehaibing@huawei.com>
-References: <20180920123306.14772-1-yuehaibing@huawei.com>
-Message-ID: <20180920123306.14772-22-yuehaibing@huawei.com>
+From: aryabinin@virtuozzo.com (Andrey Ryabinin)
+Date: Thu, 20 Sep 2018 16:56:29 +0300
+Subject: [PATCH v2 1/3] linkage.h: Align weak symbols.
+In-Reply-To: <20180914152800.GB6236@arm.com>
+References: <20180914152800.GB6236@arm.com>
+Message-ID: <20180920135631.23833-1-aryabinin@virtuozzo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The method ndo_start_xmit() is defined as returning an 'netdev_tx_t',
-which is a typedef for an enum type, so make sure the implementation in
-this driver has returns 'netdev_tx_t' value, and change the function
-return type to netdev_tx_t.
+Since WEAK() supposed to be used instead of ENTRY() to define weak
+symbols, but unlike ENTRY() it doesn't have ALIGN directive.
+It seems there is no actual reason to not have, so let's add
+ALIGN to WEAK() too.
 
-Found by coccinelle.
-
-Signed-off-by: YueHaibing <yuehaibing@huawei.com>
+Signed-off-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
 ---
- net/l2tp/l2tp_eth.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ include/linux/linkage.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/net/l2tp/l2tp_eth.c b/net/l2tp/l2tp_eth.c
-index 8aadc4f..4173cb1 100644
---- a/net/l2tp/l2tp_eth.c
-+++ b/net/l2tp/l2tp_eth.c
-@@ -77,7 +77,8 @@ static void l2tp_eth_dev_uninit(struct net_device *dev)
- 	 */
- }
+diff --git a/include/linux/linkage.h b/include/linux/linkage.h
+index d7618c41f74c..7c47b1a471d4 100644
+--- a/include/linux/linkage.h
++++ b/include/linux/linkage.h
+@@ -90,6 +90,7 @@
+ #ifndef WEAK
+ #define WEAK(name)	   \
+ 	.weak name ASM_NL   \
++	ALIGN ASM_NL \
+ 	name:
+ #endif
  
--static int l2tp_eth_dev_xmit(struct sk_buff *skb, struct net_device *dev)
-+static netdev_tx_t
-+l2tp_eth_dev_xmit(struct sk_buff *skb, struct net_device *dev)
- {
- 	struct l2tp_eth *priv = netdev_priv(dev);
- 	struct l2tp_session *session = priv->session;
 -- 
-1.8.3.1
+2.16.4
