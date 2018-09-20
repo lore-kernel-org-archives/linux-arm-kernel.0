@@ -1,10 +1,10 @@
 From: yuehaibing@huawei.com (YueHaibing)
-Date: Thu, 20 Sep 2018 20:33:02 +0800
-Subject: [PATCH net-next 18/22] can: xilinx: fix return type of ndo_start_xmit
+Date: Thu, 20 Sep 2018 20:33:06 +0800
+Subject: [PATCH net-next 22/22] net: hsr: fix return type of ndo_start_xmit
  function
 In-Reply-To: <20180920123306.14772-1-yuehaibing@huawei.com>
 References: <20180920123306.14772-1-yuehaibing@huawei.com>
-Message-ID: <20180920123306.14772-19-yuehaibing@huawei.com>
+Message-ID: <20180920123306.14772-23-yuehaibing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,21 +17,21 @@ Found by coccinelle.
 
 Signed-off-by: YueHaibing <yuehaibing@huawei.com>
 ---
- drivers/net/can/xilinx_can.c | 2 +-
+ net/hsr/hsr_device.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/net/can/xilinx_can.c b/drivers/net/can/xilinx_can.c
-index 045f084..6de5004 100644
---- a/drivers/net/can/xilinx_can.c
-+++ b/drivers/net/can/xilinx_can.c
-@@ -612,7 +612,7 @@ static int xcan_start_xmit_mailbox(struct sk_buff *skb, struct net_device *ndev)
-  *
-  * Return: NETDEV_TX_OK on success and NETDEV_TX_BUSY when the tx queue is full
-  */
--static int xcan_start_xmit(struct sk_buff *skb, struct net_device *ndev)
-+static netdev_tx_t xcan_start_xmit(struct sk_buff *skb, struct net_device *ndev)
+diff --git a/net/hsr/hsr_device.c b/net/hsr/hsr_device.c
+index b8cd43c..a067150 100644
+--- a/net/hsr/hsr_device.c
++++ b/net/hsr/hsr_device.c
+@@ -233,7 +233,7 @@ static netdev_features_t hsr_fix_features(struct net_device *dev,
+ }
+ 
+ 
+-static int hsr_dev_xmit(struct sk_buff *skb, struct net_device *dev)
++static netdev_tx_t hsr_dev_xmit(struct sk_buff *skb, struct net_device *dev)
  {
- 	struct xcan_priv *priv = netdev_priv(ndev);
- 	int ret;
+ 	struct hsr_priv *hsr = netdev_priv(dev);
+ 	struct hsr_port *master;
 -- 
 1.8.3.1
