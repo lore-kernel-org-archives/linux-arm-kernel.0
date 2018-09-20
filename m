@@ -1,10 +1,10 @@
 From: yuehaibing@huawei.com (YueHaibing)
-Date: Thu, 20 Sep 2018 20:32:49 +0800
-Subject: [PATCH net-next 05/22] net: sgi: fix return type of ndo_start_xmit
+Date: Thu, 20 Sep 2018 20:32:52 +0800
+Subject: [PATCH net-next 08/22] net: apple: fix return type of ndo_start_xmit
  function
 In-Reply-To: <20180920123306.14772-1-yuehaibing@huawei.com>
 References: <20180920123306.14772-1-yuehaibing@huawei.com>
-Message-ID: <20180920123306.14772-6-yuehaibing@huawei.com>
+Message-ID: <20180920123306.14772-9-yuehaibing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,44 +17,76 @@ Found by coccinelle.
 
 Signed-off-by: YueHaibing <yuehaibing@huawei.com>
 ---
- drivers/net/ethernet/sgi/ioc3-eth.c | 4 ++--
- drivers/net/ethernet/sgi/meth.c     | 2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ drivers/net/ethernet/apple/bmac.c    | 4 ++--
+ drivers/net/ethernet/apple/mace.c    | 4 ++--
+ drivers/net/ethernet/apple/macmace.c | 4 ++--
+ 3 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/net/ethernet/sgi/ioc3-eth.c b/drivers/net/ethernet/sgi/ioc3-eth.c
-index 18d533f..3140999 100644
---- a/drivers/net/ethernet/sgi/ioc3-eth.c
-+++ b/drivers/net/ethernet/sgi/ioc3-eth.c
-@@ -99,7 +99,7 @@ struct ioc3_private {
+diff --git a/drivers/net/ethernet/apple/bmac.c b/drivers/net/ethernet/apple/bmac.c
+index 024998d..6a8e256 100644
+--- a/drivers/net/ethernet/apple/bmac.c
++++ b/drivers/net/ethernet/apple/bmac.c
+@@ -154,7 +154,7 @@ struct bmac_data {
+ static irqreturn_t bmac_rxdma_intr(int irq, void *dev_id);
+ static void bmac_set_timeout(struct net_device *dev);
+ static void bmac_tx_timeout(struct timer_list *t);
+-static int bmac_output(struct sk_buff *skb, struct net_device *dev);
++static netdev_tx_t bmac_output(struct sk_buff *skb, struct net_device *dev);
+ static void bmac_start(struct net_device *dev);
  
- static int ioc3_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
- static void ioc3_set_multicast_list(struct net_device *dev);
--static int ioc3_start_xmit(struct sk_buff *skb, struct net_device *dev);
-+static netdev_tx_t ioc3_start_xmit(struct sk_buff *skb, struct net_device *dev);
- static void ioc3_timeout(struct net_device *dev);
- static inline unsigned int ioc3_hash(const unsigned char *addr);
- static inline void ioc3_stop(struct ioc3_private *ip);
-@@ -1390,7 +1390,7 @@ static void ioc3_remove_one(struct pci_dev *pdev)
- 	.remove		= ioc3_remove_one,
- };
+ #define	DBDMA_SET(x)	( ((x) | (x) << 16) )
+@@ -1456,7 +1456,7 @@ static int bmac_close(struct net_device *dev)
+ 	spin_unlock_irqrestore(&bp->lock, flags);
+ }
  
--static int ioc3_start_xmit(struct sk_buff *skb, struct net_device *dev)
-+static netdev_tx_t ioc3_start_xmit(struct sk_buff *skb, struct net_device *dev)
+-static int
++static netdev_tx_t
+ bmac_output(struct sk_buff *skb, struct net_device *dev)
  {
- 	unsigned long data;
- 	struct ioc3_private *ip = netdev_priv(dev);
-diff --git a/drivers/net/ethernet/sgi/meth.c b/drivers/net/ethernet/sgi/meth.c
-index ea55abd..703fbbe 100644
---- a/drivers/net/ethernet/sgi/meth.c
-+++ b/drivers/net/ethernet/sgi/meth.c
-@@ -697,7 +697,7 @@ static void meth_add_to_tx_ring(struct meth_private *priv, struct sk_buff *skb)
- /*
-  * Transmit a packet (called by the kernel)
+ 	struct bmac_data *bp = netdev_priv(dev);
+diff --git a/drivers/net/ethernet/apple/mace.c b/drivers/net/ethernet/apple/mace.c
+index 0b5429d..68b9ee4 100644
+--- a/drivers/net/ethernet/apple/mace.c
++++ b/drivers/net/ethernet/apple/mace.c
+@@ -78,7 +78,7 @@ struct mace_data {
+ 
+ static int mace_open(struct net_device *dev);
+ static int mace_close(struct net_device *dev);
+-static int mace_xmit_start(struct sk_buff *skb, struct net_device *dev);
++static netdev_tx_t mace_xmit_start(struct sk_buff *skb, struct net_device *dev);
+ static void mace_set_multicast(struct net_device *dev);
+ static void mace_reset(struct net_device *dev);
+ static int mace_set_address(struct net_device *dev, void *addr);
+@@ -525,7 +525,7 @@ static inline void mace_set_timeout(struct net_device *dev)
+     mp->timeout_active = 1;
+ }
+ 
+-static int mace_xmit_start(struct sk_buff *skb, struct net_device *dev)
++static netdev_tx_t mace_xmit_start(struct sk_buff *skb, struct net_device *dev)
+ {
+     struct mace_data *mp = netdev_priv(dev);
+     volatile struct dbdma_regs __iomem *td = mp->tx_dma;
+diff --git a/drivers/net/ethernet/apple/macmace.c b/drivers/net/ethernet/apple/macmace.c
+index 137cbb4..376f2c2 100644
+--- a/drivers/net/ethernet/apple/macmace.c
++++ b/drivers/net/ethernet/apple/macmace.c
+@@ -89,7 +89,7 @@ struct mace_frame {
+ 
+ static int mace_open(struct net_device *dev);
+ static int mace_close(struct net_device *dev);
+-static int mace_xmit_start(struct sk_buff *skb, struct net_device *dev);
++static netdev_tx_t mace_xmit_start(struct sk_buff *skb, struct net_device *dev);
+ static void mace_set_multicast(struct net_device *dev);
+ static int mace_set_address(struct net_device *dev, void *addr);
+ static void mace_reset(struct net_device *dev);
+@@ -444,7 +444,7 @@ static int mace_close(struct net_device *dev)
+  * Transmit a frame
   */
--static int meth_tx(struct sk_buff *skb, struct net_device *dev)
-+static netdev_tx_t meth_tx(struct sk_buff *skb, struct net_device *dev)
+ 
+-static int mace_xmit_start(struct sk_buff *skb, struct net_device *dev)
++static netdev_tx_t mace_xmit_start(struct sk_buff *skb, struct net_device *dev)
  {
- 	struct meth_private *priv = netdev_priv(dev);
+ 	struct mace_data *mp = netdev_priv(dev);
  	unsigned long flags;
 -- 
 1.8.3.1
