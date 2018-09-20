@@ -1,99 +1,115 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 20 Sep 2018 11:38:51 +0100
-Subject: [PATCH v5 07/18] kvm: arm64: Configure VTCR_EL2 per VM
-In-Reply-To: <3c4d3139-1b8b-12fd-bd41-10a21b86e7b5@redhat.com>
-References: <20180917104144.19188-1-suzuki.poulose@arm.com>
- <20180917104144.19188-8-suzuki.poulose@arm.com>
- <3c4d3139-1b8b-12fd-bd41-10a21b86e7b5@redhat.com>
-Message-ID: <b9d1aa2d-4c9d-5da4-d627-aad7a8e110ee@arm.com>
+From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
+Date: Thu, 20 Sep 2018 10:38:53 +0000
+Subject: [PATCH 00/21] SMMU enablement for NXP LS1043A and LS1046A
+In-Reply-To: <39211e7a-034b-cdca-f182-1b6f6e5fbc53@arm.com>
+References: <20180919123613.15092-1-laurentiu.tudor@nxp.com>
+ <7d7646dc-9d0b-013d-75d7-a6cb4453f41f@arm.com>
+ <fd8ab351-46aa-f73e-593b-502a57de1975@nxp.com>
+ <39211e7a-034b-cdca-f182-1b6f6e5fbc53@arm.com>
+Message-ID: <33eac426-cbb7-f899-5a35-aea28f8e5dc4@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
 
-On 20/09/18 11:21, Auger Eric wrote:
-> Hi Suzuki,
->
-> On 9/17/18 12:41 PM, Suzuki K Poulose wrote:
->> Add support for setting the VTCR_EL2 per VM, rather than hard
->> coding a value at boot time per CPU. This would allow us to tune
->> the stage2 page table parameters per VM in the later changes.
+
+On 19.09.2018 17:37, Robin Murphy wrote:
+> On 19/09/18 15:18, Laurentiu Tudor wrote:
+>> Hi Robin,
 >>
->> We compute the VTCR fields based on the system wide sanitised
->> feature registers, except for the hardware management of Access
->> Flags (VTCR_EL2.HA). It is fine to run a system with a mix of
->> CPUs that may or may not update the page table Access Flags.
->> Since the bit is RES0 on CPUs that don't support it, the bit
->> should be ignored on them.
+>> On 19.09.2018 16:25, Robin Murphy wrote:
+>>> Hi Laurentiu,
+>>>
+>>> On 19/09/18 13:35, laurentiu.tudor at nxp.com wrote:
+>>>> From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+>>>>
+>>>> This patch series adds SMMU support for NXP LS1043A and LS1046A chips
+>>>> and consists mostly in important driver fixes and the required device
+>>>> tree updates. It touches several subsystems and consists of three main
+>>>> parts:
+>>>> ?? - changes in soc/drivers/fsl/qbman drivers adding iommu mapping of
+>>>> ???? reserved memory areas, fixes and defered probe support
+>>>> ?? - changes in drivers/net/ethernet/freescale/dpaa_eth drivers
+>>>> ???? consisting in misc dma mapping related fixes and probe ordering
+>>>> ?? - addition of the actual arm smmu device tree node together with
+>>>> ???? various adjustments to the device trees
+>>>>
+>>>> Performance impact
+>>>>
+>>>> ????? Running iperf benchmarks in a back-to-back setup (both sides
+>>>> ????? having smmu enabled) on a 10GBps port show an important
+>>>> ????? networking performance degradation of around %40 (9.48Gbps
+>>>> ????? linerate vs 5.45Gbps). If you need performance but without
+>>>> ????? SMMU support you can use "iommu.passthrough=1" to disable
+>>>> ????? SMMU.
+>>>>
+>>>> USB issue and workaround
+>>>>
+>>>> ????? There's a problem with the usb controllers in these chips
+>>>> ????? generating smaller, 40-bit wide dma addresses instead of the 
+>>>> 48-bit
+>>>> ????? supported at the smmu input. So you end up in a situation 
+>>>> where the
+>>>> ????? smmu is mapped with 48-bit address translations, but the device
+>>>> ????? generates transactions with clipped 40-bit addresses, thus smmu
+>>>> ????? context faults are triggered. I encountered a similar 
+>>>> situation for
+>>>> ????? mmc that I? managed to fix in software [1] however for USB I 
+>>>> did not
+>>>> ????? find a proper place in the code to add a similar fix. The only
+>>>> ????? workaround I found was to add this kernel parameter which 
+>>>> limits the
+>>>> ????? usb dma to 32-bit size: "xhci-hcd.quirks=0x800000".
+>>>> ????? This workaround if far from ideal, so any suggestions for a code
+>>>> ????? based workaround in this area would be greatly appreciated.
+>>>
+>>> If you have a nominally-64-bit device with a
+>>> narrower-than-the-main-interconnect link in front of it, that should
+>>> already be fixed in 4.19-rc by bus_dma_mask picking up DT dma-ranges,
+>>> provided the interconnect hierarchy can be described appropriately (or
+>>> at least massaged sufficiently to satisfy the binding), e.g.:
+>>>
+>>> / {
+>>> ? ????...
+>>>
+>>> ? ????soc {
+>>> ? ??????? ranges;
+>>> ? ??????? dma-ranges = <0 0 10000 0>;
+>>>
+>>> ? ??????? dev_48bit { ... };
+>>>
+>>> ? ??????? periph_bus {
+>>> ? ??????????? ranges;
+>>> ? ??????????? dma-ranges = <0 0 100 0>;
+>>>
+>>> ? ??????????? dev_40bit { ... };
+>>> ? ??????? };
+>>> ? ????};
+>>> };
+>>>
+>>> and if that fails to work as expected (except for PCI hosts where
+>>> handling dma-ranges properly still needs sorting out), please do let us
+>>> know ;)
+>>>
 >>
->> Suggested-by: Marc Zyngier <marc.zyngier@arm.com>
->> Acked-by: Christoffer Dall <cdall@kernel.org>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> Just to confirm, Is this [1] the change I was supposed to test?
+> 
+> Not quite - dma-ranges is only valid for nodes representing a bus, so 
+> putting it directly in the USB device nodes doesn't work (FWIW that's 
+> why PCI is broken, because the parser doesn't expect the 
+> bus-as-leaf-node case). That's teh point of that intermediate simple-bus 
+> node represented by "periph_bus" in my example (sorry, I should have put 
+> compatibles in to make it clearer) - often that's actually true to life 
+> (i.e. "soc" is something like a CCI and "periph_bus" is something like 
+> an AXI NIC gluing a bunch of lower-bandwidth DMA masters to one of the 
+> CCI ports) but at worst it's just a necessary evil to make the binding 
+> happy (if it literally only represents the point-to-point link between 
+> the device master port and interconnect slave port).
+> 
 
->> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
->> index b0c07dab5cb3..e0c49377b771 100644
->> --- a/arch/arm64/kvm/reset.c
->> +++ b/arch/arm64/kvm/reset.c
->> @@ -26,6 +26,7 @@
->>
->>   #include <kvm/arm_arch_timer.h>
->>
->> +#include <asm/cpufeature.h>
->>   #include <asm/cputype.h>
->>   #include <asm/ptrace.h>
->>   #include <asm/kvm_arm.h>
->> @@ -134,9 +135,38 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
->>      return kvm_timer_vcpu_reset(vcpu);
->>   }
->>
->> +/*
->> + * Configure the VTCR_EL2 for this VM. The VTCR value is common
->> + * across all the physical CPUs on the system. We use system wide
->> + * sanitised values to fill in different fields, except for Hardware
->> + * Management of Access Flags. HA Flag is set unconditionally on
->> + * all CPUs, as it is safe to run with or without the feature and
->> + * the bit is RES0 on CPUs that don't support it.
->> + */
->>   int kvm_arm_config_vm(struct kvm *kvm, unsigned long type)
->>   {
->> +    u64 vtcr = VTCR_EL2_FLAGS;
-> #define VTCR_EL2_FLAGS                        (VTCR_EL2_COMMON_BITS | VTCR_EL2_TGRAN_FLAGS)
->
-> in include/asm/kvm_arm.h
->
-> I don't see T0SZ=24 encoded there and I don't see it set either in the
-> code below? For bisection purpose.
+Quick update: so I adjusted to device tree according to your example and 
+it works so now I can get rid of that nasty kernel arg based workaround, 
+yey! :-)
+Thanks a lot, that was really helpful.
 
-You're right, I am missing it here. I have fixed this up for v6,
-with the following hunk.
-
-
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index e0c49377b771..fa897eafc2c9 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -147,6 +147,7 @@ int kvm_arm_config_vm(struct kvm *kvm, unsigned long
-type)
-  {
-        u64 vtcr = VTCR_EL2_FLAGS;
-        u64 parange;
-+       u32 phys_shift;
-
-        if (type)
-                return -EINVAL;
-@@ -156,6 +157,9 @@ int kvm_arm_config_vm(struct kvm *kvm, unsigned long
-type)
-                parange = ID_AA64MMFR0_PARANGE_MAX;
-        vtcr |= parange << VTCR_EL2_PS_SHIFT;
-
-+       phys_shift = id_aa64mmfr0_parange_to_phys_shift(parange);
-+
-+       vtcr |= VTCR_EL2_T0SZ(phys_shift > 40 ? 40 : phys_shift);
-        /*
-         * Enable the Hardware Access Flag management, unconditionally
-         * on all CPUs. The features is RES0 on CPUs without the support
-
-
-Thanks
-Suzuki
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+---
+Best Regards, Laurentiu
