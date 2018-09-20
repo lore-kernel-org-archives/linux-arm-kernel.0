@@ -1,56 +1,33 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Thu, 20 Sep 2018 06:59:41 +0200
-Subject: [PATCH 1/2] dt-bindings: pinctrl: document Broadcom Northstar pin
- mux controller
-In-Reply-To: <7e381fba-a7bf-f587-7bbf-d6b30d9874c9@gmail.com>
-References: <20180919210219.21921-1-zajec5@gmail.com>
- <7e381fba-a7bf-f587-7bbf-d6b30d9874c9@gmail.com>
-Message-ID: <CACna6rz13XswdcNqq1JHRAms5LpdRFuOT4RU=n6YTeydTGh5JA@mail.gmail.com>
+From: daniel@zonque.org (Daniel Mack)
+Date: Thu, 20 Sep 2018 07:03:06 +0200
+Subject: [PATCH] arm: dts: pxa3xx: provide correct clk-names property for
+ nand controller node
+In-Reply-To: <f3e704f5-a5ac-ea4a-65f2-9dc11a67c9f2@zonque.org>
+References: <20180624174205.20648-1-daniel@zonque.org>
+ <87po0emxhg.fsf@belgarion.home>
+ <f3e704f5-a5ac-ea4a-65f2-9dc11a67c9f2@zonque.org>
+Message-ID: <4099fb7b-5815-33ac-9131-c052631599c6@zonque.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Sep 2018 at 23:22, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> On 09/19/2018 02:02 PM, Rafa? Mi?ecki wrote:
-> > From: Rafa? Mi?ecki <rafal@milecki.pl>
-> >
-> > Northstar has mux controller just like Northstar Plus and Northstar2.
-> > It's a bit different though (different registers & pins) so it requires
-> > its own binding.
-> >
-> > It's needed to allow other block bindings specify required mux setup.
-> >
-> > Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
-> > ---
-> >  .../devicetree/bindings/pinctrl/brcm,ns-pinmux.txt | 29 ++++++++++++++++++++++
-> >  1 file changed, 29 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,ns-pinmux.txt
-> >
-> > diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,ns-pinmux.txt b/Documentation/devicetree/bindings/pinctrl/brcm,ns-pinmux.txt
-> > new file mode 100644
-> > index 000000000000..0e913721ae9e
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/pinctrl/brcm,ns-pinmux.txt
-> > @@ -0,0 +1,29 @@
-> > +Broadcom Northstar pins mux controller
-> > +
-> > +Some of Northstar SoCs's pins can be used for various purposes thanks to the mux
-> > +controller. This binding allows describing mux controller and listing available
-> > +functions. They can be referenced later by other bindings to let system
-> > +configure controller correctly.
-> > +
-> > +Required properties:
-> > +- compatible: brcm,ns-pinmux
-> > +- reg: iomem address range of CRU (Central Resource Unit) pin registers
-> > +- reg-names: "cru_pins_control" - the only needed & supported reg right now
->
-> Technically the register range that you cover is named CRU_GPIO_CONTROLx
-> with x being in [0-8].
+On 19/9/2018 6:20 PM, Daniel Mack wrote:
+> On 25/6/2018 10:18 PM, Robert Jarzmik wrote:
+>> Daniel Mack <daniel@zonque.org> writes:
+>>
+>>> The NAND driver looks for a clock named "core" and falls back to a pdev
+>>> clock that has a wrong rate if not set.
+>>>
+>>> Signed-off-by: Daniel Mack <daniel@zonque.org>
+>> Applied to pxa/dt with a small "line swap", ie. clock-names is one line below
+>> "clocks" line.
+> 
+> This patch got applied twice in mainline, as ce4313f318de and as
+> 267a113cec97. Not sure what went wrong here, but the same property npow
+> occurs twice in the node, which leads to an error during dtb complication.
 
-Thanks! Do you think
-reg-names: "cru_gpio_controls"
-will be fine? Or should I keep it singular like:
-reg-names: "cru_gpio_control"
-?
+Ooops, sorry. Forget it, all is good. I've messed up a local branch.
 
--- 
-Rafa?
+Sorry for the noise. :(
+
+
+Daniel
