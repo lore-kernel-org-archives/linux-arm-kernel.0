@@ -1,84 +1,53 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 20 Sep 2018 09:54:35 +0200
-Subject: [PATCH v4 2/2] arm64: dts: meson-g12a: add initial g12a s905d2
- SoC DT support
-In-Reply-To: <1537427368-11104-3-git-send-email-jianxin.pan@amlogic.com>
-References: <1537427368-11104-1-git-send-email-jianxin.pan@amlogic.com>
- <1537427368-11104-3-git-send-email-jianxin.pan@amlogic.com>
-Message-ID: <c16ae8cf-5802-778b-1fd8-494dfb2d8d1b@baylibre.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 20 Sep 2018 09:59:25 +0200
+Subject: [PATCH V2 08/12] cpufreq: mvebu: Remove OPPs using
+ dev_pm_opp_remove()
+In-Reply-To: <883071c4bd9a6e45bf0b5e45575d110eaeb2e6d0.1537394233.git.viresh.kumar@linaro.org>
+References: <cover.1537394233.git.viresh.kumar@linaro.org>
+ <883071c4bd9a6e45bf0b5e45575d110eaeb2e6d0.1537394233.git.viresh.kumar@linaro.org>
+Message-ID: <1645527.R4f0u0jryK@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/09/2018 09:09, Jianxin Pan wrote:
-> Try to add basic DT support for the Amlogic's Meson-G12A S905D2 SoC,
-> which describe components as follows: Reserve Memory, CPU, GIC, IRQ,
-> Timer, UART. It's capable of booting up into the serial console.
+On Thursday, September 20, 2018 12:20:27 AM CEST Viresh Kumar wrote:
+> dev_pm_opp_cpumask_remove_table() is going to change in the next commit
+> and will not remove dynamic OPPs automatically. They must be removed
+> with a call to dev_pm_opp_remove().
 > 
-> Signed-off-by: Jianxin Pan <jianxin.pan@amlogic.com>
-> Reviewed-by: Jerome Brunet <jbrunet@baylibre.com>
+> Reviewed-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 > ---
->  arch/arm64/boot/dts/amlogic/Makefile            |   1 +
->  arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts |  22 +++
->  arch/arm64/boot/dts/amlogic/meson-g12a.dtsi     | 172 ++++++++++++++++++++++++
->  3 files changed, 195 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts
->  create mode 100644 arch/arm64/boot/dts/amlogic/meson-g12a.dtsi
+>  drivers/cpufreq/mvebu-cpufreq.c | 9 ++-------
+>  1 file changed, 2 insertions(+), 7 deletions(-)
 > 
-> diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
-> index a97c0e2..c31f29d6 100644
-> --- a/arch/arm64/boot/dts/amlogic/Makefile
-> +++ b/arch/arm64/boot/dts/amlogic/Makefile
-> @@ -1,5 +1,6 @@
->  # SPDX-License-Identifier: GPL-2.0
->  dtb-$(CONFIG_ARCH_MESON) += meson-axg-s400.dtb
-> +dtb-$(CONFIG_ARCH_MESON) += meson-g12a-u200.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-nanopi-k2.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-nexbox-a95x.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-odroidc2.dtb
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts b/arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts
-> new file mode 100644
-> index 0000000..d267a37
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts
-> @@ -0,0 +1,22 @@
-> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-> +/*
-> + * Copyright (c) 2018 Amlogic, Inc. All rights reserved.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "meson-g12a.dtsi"
-> +
-> +/ {
-> +	compatible = "amlogic,u200", "amlogic,g12a";
-> +	model = "Amlogic Meson G12A U200 Development Board";
-> +
-> +	aliases {
-> +		serial0 = &uart_AO;
-> +	};
+> diff --git a/drivers/cpufreq/mvebu-cpufreq.c b/drivers/cpufreq/mvebu-cpufreq.c
+> index 31513bd42705..6d33a639f902 100644
+> --- a/drivers/cpufreq/mvebu-cpufreq.c
+> +++ b/drivers/cpufreq/mvebu-cpufreq.c
+> @@ -84,9 +84,10 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
+>  
+>  		ret = dev_pm_opp_add(cpu_dev, clk_get_rate(clk) / 2, 0);
+>  		if (ret) {
+> +			dev_pm_opp_remove(cpu_dev, clk_get_rate(clk));
+>  			clk_put(clk);
+>  			dev_err(cpu_dev, "Failed to register OPPs\n");
+> -			goto opp_register_failed;
+> +			return ret;
+>  		}
+>  
+>  		ret = dev_pm_opp_set_sharing_cpus(cpu_dev,
+> @@ -99,11 +100,5 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
+>  
+>  	platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
+>  	return 0;
+> -
+> -opp_register_failed:
+> -	/* As registering has failed remove all the opp for all cpus */
+> -	dev_pm_opp_cpumask_remove_table(cpu_possible_mask);
+> -
+> -	return ret;
+>  }
+>  device_initcall(armada_xp_pmsu_cpufreq_init);
+> 
 
-Hi Jianxin,
-
-Please add the /memory and /chosen nodes.
-
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory at 0 {
-+		device_type = "memory";
-+		reg = <0x0 0x0 0x0 0x40000000>;
-+	};
-
-Thanks,
-Neil
-
-
-> +};
-> +
-> +&uart_AO {
-> +	status = "okay";
-> +};
-> +
-[...]
+Please feel free to take this one via OPP.
