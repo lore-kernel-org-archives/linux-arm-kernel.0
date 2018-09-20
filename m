@@ -1,60 +1,54 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 20 Sep 2018 14:04:36 -0700
-Subject: [PATCH v5 04/12] PCI: brcmstb: add dma-range mapping for inbound
- traffic
-In-Reply-To: <7fa897cf-4d58-c63f-afdd-a3ec5a6a56bf@gmail.com>
-References: <1537367527-20773-1-git-send-email-jim2101024@gmail.com>
- <1537367527-20773-5-git-send-email-jim2101024@gmail.com>
- <CAKv+Gu_d-r0ubyqZcDzERYd5FVTSpjBk++iACHqVgtHrOK0F7A@mail.gmail.com>
- <7fa897cf-4d58-c63f-afdd-a3ec5a6a56bf@gmail.com>
-Message-ID: <CAKv+Gu8aJRV4nqq1e-5HRLvbrANQsYuMf-pwWB53BhxLgX7iWg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 20 Sep 2018 22:07:36 +0100
+Subject: [PATCH] iommu/rockchip: Free irqs in shutdown handler
+In-Reply-To: <20180827105624.5593-1-heiko@sntech.de>
+References: <20180827105624.5593-1-heiko@sntech.de>
+Message-ID: <86musbx4h3.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 September 2018 at 13:55, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> On 09/19/2018 07:19 PM, Ard Biesheuvel wrote:
->> On 19 September 2018 at 07:31, Jim Quinlan <jim2101024@gmail.com> wrote:
->>> The Broadcom STB PCIe host controller is intimately related to the
->>> memory subsystem.  This close relationship adds complexity to how cpu
->>> system memory is mapped to PCIe memory.  Ideally, this mapping is an
->>> identity mapping, or an identity mapping off by a constant.  Not so in
->>> this case.
->>>
->>> Consider the Broadcom reference board BCM97445LCC_4X8 which has 6 GB
->>> of system memory.  Here is how the PCIe controller maps the
->>> system memory to PCIe memory:
->>>
->>>   memc0-a@[        0....3fffffff] <=> pci@[        0....3fffffff]
->>>   memc0-b@[100000000...13fffffff] <=> pci@[ 40000000....7fffffff]
->>>   memc1-a@[ 40000000....7fffffff] <=> pci@[ 80000000....bfffffff]
->>>   memc1-b@[300000000...33fffffff] <=> pci@[ c0000000....ffffffff]
->>>   memc2-a@[ 80000000....bfffffff] <=> pci@[100000000...13fffffff]
->>>   memc2-b@[c00000000...c3fffffff] <=> pci@[140000000...17fffffff]
->>>
->>
->> So is describing this as
->>
->> dma-ranges = <0x0 0x0 0x0 0x0 0x0 0x40000000>,
->>              <0x0 0x40000000 0x1 0x0 0x0 0x40000000>,
->>              <0x0 0x80000000 0x0 0x40000000 0x0 0x40000000>,
->>              <0x0 0xc0000000 0x3 0x0 0x0 0x40000000>,
->>              <0x1 0x0 0x0 0x80000000 0x0 0x40000000>,
->>              <0x1 0x40000000 0x0 0xc0000000 0x0 0x40000000>;
->>
->> not working for you? I haven't tried this myself, but since DT permits
->> describing the inbound mappings this way, we should fix the code if it
->> doesn't work at the moment.
->
-> You mean encoding the memory controller index in the first cell? If that
-> works, that's indeed a much cleaner solution, though is it standard
-> compliant in any form?
+On Mon, 27 Aug 2018 11:56:24 +0100,
+Heiko Stuebner <heiko@sntech.de> wrote:
+> 
+> In the iommu's shutdown handler we disable runtime-pm which could
+> result in the irq-handler running unclocked and since commit
+>     3fc7c5c0cff3 ("iommu/rockchip: Handle errors returned from PM framework")
+> we warn about that fact.
+> 
+> This can cause warnings on shutdown on some Rockchip machines, so
+> free the irqs in the shutdown handler before we disable runtime-pm.
+> 
+> Reported-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> Fixes: 3fc7c5c0cff3 ("iommu/rockchip: Handle errors returned from PM framework")
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  drivers/iommu/rockchip-iommu.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+> index 258115b10fa9..ad3e2b97469e 100644
+> --- a/drivers/iommu/rockchip-iommu.c
+> +++ b/drivers/iommu/rockchip-iommu.c
+> @@ -1241,6 +1241,12 @@ static int rk_iommu_probe(struct platform_device *pdev)
+>  
+>  static void rk_iommu_shutdown(struct platform_device *pdev)
+>  {
+> +	struct rk_iommu *iommu = platform_get_drvdata(pdev);
+> +	int i = 0, irq;
+> +
+> +	while ((irq = platform_get_irq(pdev, i++)) != -ENXIO)
+> +		devm_free_irq(iommu->dev, irq, iommu);
+> +
+>  	pm_runtime_force_suspend(&pdev->dev);
+>  }
+>  
+> -- 
+> 2.17.0
+> 
 
-No those are just memory addresses (although I may have screwed up the
-order). From Documentation/devicetree/booting-without-of.txt:
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-"""
-Optional property:
-- dma-ranges: <prop-encoded-array> encoded as arbitrary number of triplets of
-        (child-bus-address, parent-bus-address, length). Each triplet specified
-        describes a contiguous DMA address range.
-"""
+	M.
+
+-- 
+Jazz is not dead, it just smell funny.
