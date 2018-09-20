@@ -1,93 +1,38 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Thu, 20 Sep 2018 10:28:51 +0100
-Subject: [PATCH 5/5] ARM: spectre-v2: per-CPU vtables to work around
- big.Little systems
-In-Reply-To: <20180920092129.GJ30658@n2100.armlinux.org.uk>
-References: <20180919094802.GH30658@n2100.armlinux.org.uk>
- <E1g2Z6e-0003es-CI@rmk-PC.armlinux.org.uk>
- <1d5260c4-6d4f-a6c9-210e-25b8aeda1bde@arm.com>
- <20180920092129.GJ30658@n2100.armlinux.org.uk>
-Message-ID: <42b426db-3d7f-0bcc-4c16-c2b36ea786e0@arm.com>
+From: manish.narani@xilinx.com (Manish Narani)
+Date: Thu, 20 Sep 2018 15:00:41 +0530
+Subject: [RFC PATCH v2 0/4] Add support for SD Tap Delay setting for ZynqMP
+Message-ID: <1537435845-6682-1-git-send-email-manish.narani@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This series of patches are created On top of the
+below series of patches.
+1. https://lkml.org/lkml/2018/8/3/687 
+2. https://lkml.org/lkml/2018/9/18/1034
 
+As the ZynqMP Firmware Driver is not yet merged, sending RFC to make
+modifications before sending the final patches.
 
-On 20/09/18 10:21, Russell King - ARM Linux wrote:
-> On Thu, Sep 20, 2018 at 10:04:44AM +0100, Julien Thierry wrote:
->> Hi Russell,
->>
->> On 19/09/18 10:49, Russell King wrote:
->>> In big.Little systems, some CPUs require the Spectre workarounds in
->>> paths such as the context switch, but other CPUs do not.  In order
->>> to handle these differences, we need per-CPU vtables.
->>>
->>> We are unable to use the kernel's per-CPU variables to support this
->>> as per-CPU is not initialised at times when we need access to the
->>> vtables, so we have to use an array indexed by logical CPU number.
->>>
->>> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
->>> ---
->>>   arch/arm/include/asm/proc-fns.h | 14 ++++++++++++++
->>>   arch/arm/kernel/setup.c         |  5 +++++
->>>   arch/arm/kernel/smp.c           | 31 +++++++++++++++++++++++++++++++
->>>   arch/arm/mm/proc-v7-bugs.c      | 17 ++---------------
->>>   4 files changed, 52 insertions(+), 15 deletions(-)
->>>
->>> diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
->>> index 571a1346245b..ddbb25cb8968 100644
->>> --- a/arch/arm/include/asm/proc-fns.h
->>> +++ b/arch/arm/include/asm/proc-fns.h
->>> @@ -104,11 +104,25 @@ extern void cpu_do_resume(void *);
->>>   #else
->>>   extern struct processor processor;
->>> +#if defined(CONFIG_BIG_LITTLE) && defined(CONFIG_HARDEN_BRANCH_PREDICTOR)
->>> +#include <linux/smp.h>
->>> +/*
->>> + * This can't be a per-cpu variable because we need to access it before
->>> + * per-cpu has been initialised.
->>> + */
->>> +extern struct processor *cpu_vtable[];
->>> +#define PROC_VTABLE(f)			cpu_vtable[smp_processor_id()]->f
->>> +static inline void init_proc_vtable(const struct processor *p)
->>> +{
->>> +	*cpu_vtable[smp_processor_id()] = *p;
->>> +}
->>
->> As you stated, 32-bit ARM can only have up to 8 logical CPUs. So, do we save
->> much by having an added level of indirection? (i.e. having a table of
->> pointers instead of directly having a table of struct processor)
-> 
-> Yes we do - in a word, security.
-> 
-> If we made this a table of struct processor, because it is written to
-> after boot, it would need to be writable for the lifetime of the kernel.
-> Since it is in the kernel's static data section, it will be at a well-
-> known offset, which means it's a target for attackers to change the
-> function pointers.
-> 
-> Exactly this was true of the 'processor' variable, which gained a
-> __ro_after_init annotation a while back - and going to a table of
-> struct processor would mean that we end up back in that situation.
-> 
-> Having a table of pointers to struct processor means there is an
-> additional level of complexity for attackers to get around - they would
-> first need to copy an existing table, change its contents, and then
-> change the appropriate CPU's cpu_vtable pointer to point to their table.
-> Having a table of struct processor just means an attacker would only
-> need to poke one 32-bit word in the array for the appropriate CPU to
-> gain control.
-> 
-> So yes, this is slightly more complex, but it's that way to avoid
-> undoing the benefits that have previously been gained through
-> facilities such as read-only data after kernel initialisation.
-> 
+Changes in v2:
+- s/_/-/ in the property name
+- Changed order of the patches : DT binding change -> driver change -> DT change
 
-I see, thanks for explaining. A very good reason for it then :) .
+Manish Narani (4):
+  dt: bindings: Add SD tap value properties details for
+    'xlnx,zynqmp-8.9a'
+  firmware: xilinx: Add macros and API for SD tap delays
+  sdhci: arasan: Add support to read and set tap delays from DT for
+    ZynqMP
+  arm64: zynqmp: Add 'xlnx,mio-bank' property in SDHCI node
 
-Reviewed-by: Julien Thierry <julien.thierry@arm.com>
-
-Thanks,
+ .../devicetree/bindings/mmc/arasan,sdhci.txt       |  19 ++
+ arch/arm64/boot/dts/xilinx/zynqmp.dtsi             |   2 +
+ drivers/firmware/xilinx/Makefile                   |   1 +
+ drivers/firmware/xilinx/zynqmp-tap-delays.c        |  39 ++++
+ drivers/mmc/host/sdhci-of-arasan.c                 | 215 +++++++++++++++++++++
+ include/linux/firmware/xlnx-zynqmp.h               |  33 +++-
+ 6 files changed, 308 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/firmware/xilinx/zynqmp-tap-delays.c
 
 -- 
-Julien Thierry
+2.1.1
