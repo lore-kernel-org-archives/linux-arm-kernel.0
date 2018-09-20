@@ -1,87 +1,46 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 20 Sep 2018 14:39:21 -0700
-Subject: [PATCH v5 04/12] PCI: brcmstb: add dma-range mapping for inbound
- traffic
-In-Reply-To: <CAKv+Gu8ZbN3BDRyuFzt4o--SSUmhuOh+jnpq8ZR-Ay13DJrAqg@mail.gmail.com>
-References: <1537367527-20773-1-git-send-email-jim2101024@gmail.com>
- <1537367527-20773-5-git-send-email-jim2101024@gmail.com>
- <CAKv+Gu_d-r0ubyqZcDzERYd5FVTSpjBk++iACHqVgtHrOK0F7A@mail.gmail.com>
- <7fa897cf-4d58-c63f-afdd-a3ec5a6a56bf@gmail.com>
- <CAKv+Gu8aJRV4nqq1e-5HRLvbrANQsYuMf-pwWB53BhxLgX7iWg@mail.gmail.com>
- <b74d3c16-a512-73dc-c94a-ef6adde5f757@gmail.com>
- <CAKv+Gu8ZbN3BDRyuFzt4o--SSUmhuOh+jnpq8ZR-Ay13DJrAqg@mail.gmail.com>
-Message-ID: <fa285694-c3e1-adf8-032a-202e7598de41@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 20 Sep 2018 14:52:49 -0700
+Subject: [PATCH] ARM: dts: ti: Fix SPI and I2C bus warnings
+In-Reply-To: <20180913181245.25484-1-robh@kernel.org>
+References: <20180913181245.25484-1-robh@kernel.org>
+Message-ID: <20180920215249.GY5662@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/20/2018 02:33 PM, Ard Biesheuvel wrote:
-> On 20 September 2018 at 14:31, Florian Fainelli <f.fainelli@gmail.com> wrote:
->> On 09/20/2018 02:04 PM, Ard Biesheuvel wrote:
->>> On 20 September 2018 at 13:55, Florian Fainelli <f.fainelli@gmail.com> wrote:
->>>> On 09/19/2018 07:19 PM, Ard Biesheuvel wrote:
->>>>> On 19 September 2018 at 07:31, Jim Quinlan <jim2101024@gmail.com> wrote:
->>>>>> The Broadcom STB PCIe host controller is intimately related to the
->>>>>> memory subsystem.  This close relationship adds complexity to how cpu
->>>>>> system memory is mapped to PCIe memory.  Ideally, this mapping is an
->>>>>> identity mapping, or an identity mapping off by a constant.  Not so in
->>>>>> this case.
->>>>>>
->>>>>> Consider the Broadcom reference board BCM97445LCC_4X8 which has 6 GB
->>>>>> of system memory.  Here is how the PCIe controller maps the
->>>>>> system memory to PCIe memory:
->>>>>>
->>>>>>   memc0-a@[        0....3fffffff] <=> pci@[        0....3fffffff]
->>>>>>   memc0-b@[100000000...13fffffff] <=> pci@[ 40000000....7fffffff]
->>>>>>   memc1-a@[ 40000000....7fffffff] <=> pci@[ 80000000....bfffffff]
->>>>>>   memc1-b@[300000000...33fffffff] <=> pci@[ c0000000....ffffffff]
->>>>>>   memc2-a@[ 80000000....bfffffff] <=> pci@[100000000...13fffffff]
->>>>>>   memc2-b@[c00000000...c3fffffff] <=> pci@[140000000...17fffffff]
->>>>>>
->>>>>
->>>>> So is describing this as
->>>>>
->>>>> dma-ranges = <0x0 0x0 0x0 0x0 0x0 0x40000000>,
->>>>>              <0x0 0x40000000 0x1 0x0 0x0 0x40000000>,
->>>>>              <0x0 0x80000000 0x0 0x40000000 0x0 0x40000000>,
->>>>>              <0x0 0xc0000000 0x3 0x0 0x0 0x40000000>,
->>>>>              <0x1 0x0 0x0 0x80000000 0x0 0x40000000>,
->>>>>              <0x1 0x40000000 0x0 0xc0000000 0x0 0x40000000>;
->>>>>
->>>>> not working for you? I haven't tried this myself, but since DT permits
->>>>> describing the inbound mappings this way, we should fix the code if it
->>>>> doesn't work at the moment.
->>>>
->>>> You mean encoding the memory controller index in the first cell? If that
->>>> works, that's indeed a much cleaner solution, though is it standard
->>>> compliant in any form?
->>>
->>> No those are just memory addresses (although I may have screwed up the
->>> order). From Documentation/devicetree/booting-without-of.txt:
->>>
->>> """
->>> Optional property:
->>> - dma-ranges: <prop-encoded-array> encoded as arbitrary number of triplets of
->>>         (child-bus-address, parent-bus-address, length). Each triplet specified
->>>         describes a contiguous DMA address range.
->>> """
->>>
->>
->> Then I am confused by your comment, that's what this patch does, it adds
->> support for reading "dma-ranges" from Device Tree and setting up inbound
->> windows using that. The only caveat is that because the PCIe root
->> complex has some ties with the memory bus architecture it is connected
->> to (SCB in our case) there is still a requirement to know the
->> translation between a given physical address and its backing memory
->> controller/aperture.
->>
+* Rob Herring <robh@kernel.org> [180913 11:17]:
+> dtc has new checks for I2C and SPI buses. Fix the warnings in node names
+> and unit-addresses.
 > 
-> Ah ok, apologies for the noise then.
+> arch/arm/boot/dts/am437x-idk-evm.dtb: Warning (spi_bus_bridge): /ocp at 44000000/qspi at 47900000: node name for SPI buses should be 'spi'
+> arch/arm/boot/dts/am437x-sk-evm.dtb: Warning (spi_bus_bridge): /ocp at 44000000/qspi at 47900000: node name for SPI buses should be 'spi'
+> arch/arm/boot/dts/am43x-epos-evm.dtb: Warning (spi_bus_bridge): /ocp at 44000000/qspi at 47900000: node name for SPI buses should be 'spi'
+> arch/arm/boot/dts/omap3-n9.dtb: Warning (i2c_bus_reg): /ocp at 68000000/i2c at 48060000/ak8975 at 0f: I2C bus unit address format error, expected "f"
+> arch/arm/boot/dts/am335x-osd3358-sm-red.dtb: Warning (i2c_bus_reg): /ocp/i2c at 44e0b000/pressure at 78: I2C bus unit address format error, expected "76"
+> arch/arm/boot/dts/am335x-boneblack.dtb: Warning (i2c_bus_reg): /ocp/i2c at 44e0b000/tda19988: I2C bus unit address format error, expected "70"
+> arch/arm/boot/dts/am335x-boneblack-wireless.dtb: Warning (i2c_bus_reg): /ocp/i2c at 44e0b000/tda19988: I2C bus unit address format error, expected "70"
+> arch/arm/boot/dts/am335x-sancloud-bbe.dtb: Warning (i2c_bus_reg): /ocp/i2c at 44e0b000/tda19988: I2C bus unit address format error, expected "70"
+> arch/arm/boot/dts/am571x-idk.dtb: Warning (spi_bus_bridge): /ocp/qspi at 4b300000: node name for SPI buses should be 'spi'
+> arch/arm/boot/dts/am572x-idk.dtb: Warning (spi_bus_bridge): /ocp/qspi at 4b300000: node name for SPI buses should be 'spi'
+> arch/arm/boot/dts/am574x-idk.dtb: Warning (spi_bus_bridge): /ocp/qspi at 4b300000: node name for SPI buses should be 'spi'
+> arch/arm/boot/dts/am57xx-cl-som-am57x.dtb: Warning (spi_bus_bridge): /ocp/qspi at 4b300000: node name for SPI buses should be 'spi'
+> arch/arm/boot/dts/am57xx-sbc-am57x.dtb: Warning (spi_bus_bridge): /ocp/qspi at 4b300000: node name for SPI buses should be 'spi'
+> arch/arm/boot/dts/dra72-evm.dtb: Warning (spi_bus_bridge): /ocp/qspi at 4b300000: node name for SPI buses should be 'spi'
+> arch/arm/boot/dts/dra72-evm-revc.dtb: Warning (spi_bus_bridge): /ocp/qspi at 4b300000: node name for SPI buses should be 'spi'
+> arch/arm/boot/dts/dra76-evm.dtb: Warning (spi_bus_bridge): /ocp/qspi at 4b300000: node name for SPI buses should be 'spi'
+> arch/arm/boot/dts/dra7-evm.dtb: Warning (spi_bus_bridge): /ocp/qspi at 4b300000: node name for SPI buses should be 'spi'
+> arch/arm/boot/dts/am335x-pdu001.dtb: Warning (spi_bus_reg): /ocp/spi at 481a0000/cfaf240320a032t: SPI bus unit address format error, expected "0"
+> arch/arm/boot/dts/keystone-k2g-evm.dtb: Warning (spi_bus_bridge): /soc at 0/qspi at 2940000: node name for SPI buses should be 'spi'
+> arch/arm/boot/dts/keystone-k2g-ice.dtb: Warning (spi_bus_bridge): /soc at 0/qspi at 2940000: node name for SPI buses should be 'spi'
 > 
-> I was hoping that having working support for dma-ranges would remove
-> the need for the special phys<->dma conversion routines.
+> Cc: "Beno?t Cousson" <bcousson@baylibre.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Santosh Shilimkar <ssantosh@kernel.org>
+> Cc: linux-omap at vger.kernel.org
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> ---
+> Please apply to the sub-arch tree. The dtc changes haven't landed, but 
+> will for 4.20.
 
-What you describe definitively works with platform devices, but I am not
-sure this is working for PCIe devices, although, conceptually it should,
-yes.
--- 
-Florian
+OK thanks applying this into omap-for-v4.20/dt.
+
+Tony
