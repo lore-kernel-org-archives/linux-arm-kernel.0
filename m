@@ -1,36 +1,121 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 21 Sep 2018 01:01:32 +0200
-Subject: [RFC PATCH 0/4] i2c: core: introduce master_xfer_irqless
-In-Reply-To: <20180920161423.13990-1-wsa+renesas@sang-engineering.com>
-References: <20180920161423.13990-1-wsa+renesas@sang-engineering.com>
-Message-ID: <20180920230132.GE988@kunai>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 20 Sep 2018 18:01:22 -0500
+Subject: [PATCH 2/3] gpio: omap: Remove custom PM calls and use cpu_pm
+ instead
+In-Reply-To: <20180920193532.7714-3-tony@atomide.com>
+References: <20180920193532.7714-1-tony@atomide.com>
+ <20180920193532.7714-3-tony@atomide.com>
+Message-ID: <35a1dccf-2b15-2d61-9210-7f3893c27795@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 20, 2018 at 06:14:19PM +0200, Wolfram Sang wrote:
-> To keep the discussion about master_xfer_irqless going, I post here a
-> draft how I envision the changes to the I2C core. They are only build
-> tested. I am unsure if I can test them on hardware before next week, so
-> I'll send them around as RFC already, so people can get an idea and
-> comment. Maybe Stefan has some bandwidth to test his imx driver
-> implementation on top of this?
+
+
+On 09/20/2018 02:35 PM, Tony Lindgren wrote:
+> For a long time the gpio-omap custom PM calls have been annoying me so
+> let's replace them with cpu_pm instead. This will enable GPIO PM for
+> deeper idle states on omap4. And we can handle GPIO PM for omap2/3/4
+> in the same way.
 > 
-> A branch can be found here:
+> Note that with this patch we are also slightly changing GPIO PM to be
+> less aggressive for omap3 and only will idle GPIO when PER context
+> may be lost.
 > 
-> git://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git renesas/i2c/xfer_irqless
+> For omap2, we don't need to save context and don't want to remove any
+> triggering so let's add a quirk flag for that.
+> 
+> Let's do this all in a single patch to avoid a situation where old
+> custom calls still are used with new code.
+> 
+> Cc: Aaro Koskinen <aaro.koskinen@iki.fi>
+> Cc: Grygorii Strashko <grygorii.strashko@ti.com>
+> Cc: Keerthy <j-keerthy@ti.com>
+> Cc: Ladislav Michl <ladis@linux-mips.org>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>   arch/arm/mach-omap2/pm24xx.c            |   7 +-
+>   arch/arm/mach-omap2/pm34xx.c            |  14 +-
+>   drivers/gpio/gpio-omap.c                | 178 ++++++++++++++----------
+>   include/linux/platform_data/gpio-omap.h |  13 --
+>   4 files changed, 116 insertions(+), 96 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
+> --- a/arch/arm/mach-omap2/pm24xx.c
+> +++ b/arch/arm/mach-omap2/pm24xx.c
+> @@ -18,6 +18,7 @@
+>    * published by the Free Software Foundation.
+>    */
+>   
 
-What I forgot to mention:
+[...]
 
-At some point, I'd like an adiitional check if the device is flagged to
-have very late I2C transfers and trigger a fat warning if not. To keep
-bugs visible.
+>   
+> +static int __maybe_unused omap_gpio_runtime_suspend(struct device *dev)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct gpio_bank *bank = platform_get_drvdata(pdev);
+> +	unsigned long flags;
+> +	int error = 0;
+> +
+> +	raw_spin_lock_irqsave(&bank->lock, flags);
+> +	/* Must be idled only by CPU_CLUSTER_PM_ENTER? */
+> +	if (bank->irq_usage) {
+> +		error = -EBUSY;
 
-I have ideas but not perfect yet, so I'll leave this as the next step.
+Sry, I didn't get how will it work with suspend to ram?
+omap_device will call this handler and, seems, abort suspend always
+if gpio bank has gpios requested as IRQ. Am I missing smth?
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180921/79fdf3e8/attachment.sig>
+> +		goto unlock;
+> +	}
+> +	omap_gpio_idle(bank, true);
+> +	bank->is_suspended = true;
+> +unlock:
+> +	raw_spin_unlock_irqrestore(&bank->lock, flags);
+> +
+> +	return error;
+> +}
+> +
+> +static int __maybe_unused omap_gpio_runtime_resume(struct device *dev)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct gpio_bank *bank = platform_get_drvdata(pdev);
+> +	unsigned long flags;
+> +	int error = 0;
+> +
+> +	raw_spin_lock_irqsave(&bank->lock, flags);
+> +	/* Must be unidled only by CPU_CLUSTER_PM_ENTER? */
+> +	if (bank->irq_usage) {
+> +		error = -EBUSY;
+> +		goto unlock;
+> +	}
+> +	omap_gpio_unidle(bank);
+> +	bank->is_suspended = false;
+> +unlock:
+> +	raw_spin_unlock_irqrestore(&bank->lock, flags);
+> +
+> +	return error;
+> +}
+> +
+> +#ifdef CONFIG_ARCH_OMAP2PLUS
+>   static const struct dev_pm_ops gpio_pm_ops = {
+>   	SET_RUNTIME_PM_OPS(omap_gpio_runtime_suspend, omap_gpio_runtime_resume,
+>   									NULL)
+>   };
+> +#else
+> +static const struct dev_pm_ops gpio_pm_ops;
+> +#endif	/* CONFIG_ARCH_OMAP2PLUS */
+>   
+>   #if defined(CONFIG_OF)
+>   static struct omap_gpio_reg_offs omap2_gpio_regs = {
+> @@ -1774,6 +1805,11 @@ static struct omap_gpio_reg_offs omap4_gpio_regs = {
+>   	.fallingdetect =	OMAP4_GPIO_FALLINGDETECT,
+>   };
+>   
+
+[...]
+
+-- 
+regards,
+-grygorii
