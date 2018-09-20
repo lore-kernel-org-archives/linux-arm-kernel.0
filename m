@@ -1,30 +1,26 @@
-From: weiyongjun1@huawei.com (Wei Yongjun)
-Date: Thu, 20 Sep 2018 06:21:42 +0000
-Subject: [PATCH -next] pinctrl: mediatek: make symbol 'mtk_drive' static
-Message-ID: <1537424502-23554-1-git-send-email-weiyongjun1@huawei.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Thu, 20 Sep 2018 08:29:46 +0200
+Subject: clean up physical merging helpers
+In-Reply-To: <b8f3621a-f789-d737-649f-7b3645912888@kernel.dk>
+References: <20180904191431.20102-1-hch@lst.de> <20180915070300.GA10555@lst.de>
+ <b8f3621a-f789-d737-649f-7b3645912888@kernel.dk>
+Message-ID: <20180920062946.GA12893@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes the following sparse warning:
+On Sat, Sep 15, 2018 at 08:47:13AM -0600, Jens Axboe wrote:
+> >> this series moves various helpers related to merging based on physical
+> >> addresses from the public headers into block/, moves the Xen special
+> >> case from arch hooks into common code, cleans up the code a bit, and
+> >> removes not nessecary includes from the block headers.
+> > ---end quoted text---
+> > 
+> 
+> It's a good cleanup, I like it. Would prefer if the arm/xen folks could
+> ack the first bits,
 
-drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c:37:29: warning:
- symbol 'mtk_drive' was not declared. Should it be static?
+Konread, can you look at the series (or delegate).
 
-Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
----
- drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> and 13/13 should probably just to in differently.
 
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c
-index 167ebf4..4a9e0d4 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c
-+++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.c
-@@ -34,7 +34,7 @@ struct mtk_drive_desc {
- };
- 
- /* The groups of drive strength */
--const struct mtk_drive_desc mtk_drive[] = {
-+static const struct mtk_drive_desc mtk_drive[] = {
- 	[DRV_GRP0] = { 4, 16, 4, 1 },
- 	[DRV_GRP1] = { 4, 16, 4, 2 },
- 	[DRV_GRP2] = { 2, 8, 2, 1 },
+I can't parse this setence.
