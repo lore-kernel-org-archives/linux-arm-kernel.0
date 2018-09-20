@@ -1,62 +1,106 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Thu, 20 Sep 2018 22:13:57 +0200
-Subject: [PATCH] ARM: add serial.h and set BASE_BAUD to 0
-Message-ID: <20180920201357.16426-1-zajec5@gmail.com>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Thu, 20 Sep 2018 20:38:54 +0000
+Subject: [PATCH 0/4] ARM: dts: mvebu: updates and new board
+References: <20180726040257.22285-1-chris.packham@alliedtelesis.co.nz>
+ <87bm8sjh6f.fsf@bootlin.com>
+Message-ID: <e627c26d707f4a20a5a427a5a64232d3@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rafa? Mi?ecki <rafal@milecki.pl>
+On 21/09/18 03:57, Gregory CLEMENT wrote:
+> Hi Chris,
+>   
+>   On jeu., juil. 26 2018, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
+> 
+>> This series updates the armada-xp-98dx3236 SoC and related boards to use the
+>> new style dts bindings for nand.
+>>
+>> I've also added a new db-88f6820-amc board which is an Armada-385 based
+>> reference board from Marvell's switch team. It's a plugin card for either the
+>> db-dxbc2 or db-xc3-24g4 which can be used if you disable the internal CPU on
+>> those platforms.
+>>
+>> Chris Packham (4):
+>>    ARM: dts: mvebu: 98dx3236: Rename nand controller node
+>>    ARM: dts: mvebu: db-dxbc2: use new style nand binding
+>>    ARM: dts: mvebu: db-xc3-24g4: use new style nand binding
+>>    ARM: dts: mvebu: Add device tree for db-88f6820-amc board
+> 
+> While applying this series mvebu/dt, I got few warning with "ARM: dts:
+> mvebu: 98dx3236: Rename nand controller node".
+> 
+> I fix them and also use the new partition binding, the diff is the
+> following:
+> 
+> iff --git a/arch/arm/boot/dts/armada-385-db-88f6820-amc.dts b/arch/arm/boot/dts/armada-385-db-88f6820-amc.dts
+> index d87614057e3f..dc9ccce1d4a1 100644
+> --- a/arch/arm/boot/dts/armada-385-db-88f6820-amc.dts
+> +++ b/arch/arm/boot/dts/armada-385-db-88f6820-amc.dts
+> @@ -102,9 +102,14 @@
+>                  nand-ecc-strength = <4>;
+>                  nand-ecc-step-size = <512>;
+>   
+> -               partition at user {
+> -                       reg = <0x00000000 0x40000000>;
+> -                       label = "user";
+> +               partitions {
+> +                       compatible = "fixed-partitions";
+> +                       #address-cells = <1>;
+> +                       #size-cells = <1>;
+> +                       partition at 0 {
+> +                               reg = <0x00000000 0x40000000>;
+> +                               label = "user";
+> +                       };
+>                  };
+>          };
+>   };
+> @@ -131,13 +136,18 @@
+>                  spi-max-frequency = <50000000>;
+>                  m25p,fast-read;
+>   
+> -               partition at u-boot {
+> -                       reg = <0x00000000 0x00100000>;
+> -                       label = "u-boot";
+> -               };
+> -               partition at u-boot-env {
+> -                       reg = <0x00100000 0x00040000>;
+> -                       label = "u-boot-env";
+> +               partitions {
+> +                       compatible = "fixed-partitions";
+> +                       #address-cells = <1>;
+> +                       #size-cells = <1>;
+> +                       partition at 0 {
+> +                               reg = <0x00000000 0x00100000>;
+> +                               label = "u-boot";
+> +                       };
+> +                       partition at 100000 {
+> +                               reg = <0x00100000 0x00040000>;
+> +                               label = "u-boot-env";
+> +                       };
+>                  };
+>          };
+>   };
+> 
+> I amended your patch with it, but if you don't agree with it, I can
+> still modify it, the branch is not immutable yet.
 
-For years arm has been using serial.h from asm-generic which sets
-BASE_BAUD value to the (1843200 / 16). This is incorrect as:
-1) This value obviously isn't correct for all devices
-2) There are no device specific serial.h with CONFIG_ARCH_MULTIPLATFORM
+Looks good to me. Thanks.
 
-That value breaks early serial console e.g. on Broadcom Northstar boards
-(CONFIG_ARCH_BCM_5301X) which need BASE_BAUD = (99532800 / 16).
-
-The problem remained unnoticed until 4.14 and the commit 31cb9a8575ca0
-("earlycon: initialise baud field of earlycon device structure").
-
-Above commit started filling "baud" in the "struct earlycon_device" (it
-seems to be a correct behavior) and changed behavior of the 8250/16550
-early console driver. Starting with 4.14 kernel's 8250_early.c sets UART
-divisor if both: "uartclk" and "baud" are set. Having wrong value for
-BASE_BAUD (and so "uartclk") results in broken console setup.
-
-Solution to that has been introduced in commit 0ff3ab701963 ("serial:
-8250_early: Only set divisor if valid clk & baud") and requires setting
-BASE_BAUD (and so "uartclk") to 0.
-
-A change similar to this action has been pushed for MIPS in the commit
-c8ec2041f549 ("MIPS: Add custom serial.h with BASE_BAUD override for
-generic kernel"). Another platform using 0 for BASE_BAUD is s390.
-
-Fixes: 31cb9a8575ca ("earlycon: initialise baud field of earlycon device structure")
-Cc: stable at vger.kernel.org # v4.14+
-Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
----
-This problem has been originally reported by me in the e-mail:
-ns16550 earlycon baud broken on BCM5301X since commit 31cb9a8575ca0 ("earlycon: initialise baud field of earlycon device structure")
-https://www.spinics.net/lists/arm-kernel/msg644295.html
----
- arch/arm/include/asm/serial.h | 8 ++++++++
- 1 file changed, 8 insertions(+)
- create mode 100644 arch/arm/include/asm/serial.h
-
-diff --git a/arch/arm/include/asm/serial.h b/arch/arm/include/asm/serial.h
-new file mode 100644
-index 000000000000..e12f262290ad
---- /dev/null
-+++ b/arch/arm/include/asm/serial.h
-@@ -0,0 +1,8 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+#ifndef _ASM_ARM_SERIAL_H
-+#define _ASM_ARM_SERIAL_H
-+
-+/* ARM kernels support multiple devices so there isn't a single valid value. */
-+#define BASE_BAUD 0
-+
-+#endif /* _ASM_ARM_SERIAL_H */
--- 
-2.13.7
+> 
+> Thanks,
+> 
+> Gregory
+> 
+>>
+>>   arch/arm/boot/dts/Makefile                    |   1 +
+>>   .../boot/dts/armada-385-db-88f6820-amc.dts    | 184 ++++++++++++++++++
+>>   arch/arm/boot/dts/armada-xp-98dx3236.dtsi     |   2 +-
+>>   arch/arm/boot/dts/armada-xp-db-dxbc2.dts      |  18 +-
+>>   arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts |  18 +-
+>>   5 files changed, 208 insertions(+), 15 deletions(-)
+>>   create mode 100644 arch/arm/boot/dts/armada-385-db-88f6820-amc.dts
+>>
+>> -- 
+>> 2.18.0
+>>
+> 
