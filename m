@@ -1,56 +1,31 @@
-From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
-Date: Fri, 21 Sep 2018 00:43:49 +0200
-Subject: [PATCH v2 0/3] ARM: OMAP1: ams-delta: Clean up GPIO setup for
- MODEM
-In-Reply-To: <20180920212326.GS5662@atomide.com>
-References: <20180820181333.2527-1-jmkrzyszt@gmail.com>
- <2690911.AdkODg5D9b@z50> <20180920212326.GS5662@atomide.com>
-Message-ID: <4137539.DlEMru2qd5@z50>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 21 Sep 2018 00:46:44 +0200
+Subject: [RFC PATCH 2/4] i2c: core: remove level of indentation in
+ i2c_transfer
+In-Reply-To: <c7ee2547-1b3b-3e43-e933-234516031770@axentia.se>
+References: <20180920161423.13990-1-wsa+renesas@sang-engineering.com>
+ <20180920161423.13990-3-wsa+renesas@sang-engineering.com>
+ <c7ee2547-1b3b-3e43-e933-234516031770@axentia.se>
+Message-ID: <20180920224644.GA988@kunai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On Thursday, September 20, 2018 11:23:26 PM CEST Tony Lindgren wrote:
-> * Janusz Krzysztofik <jmkrzyszt@gmail.com> [180910 21:52]:
-> > On Monday, September 10, 2018 1:44:16 AM CEST Janusz Krzysztofik wrote:
-> > > 
-> > > Convert modem related GPIO setup from integer space to GPIO descriptors.
-> > > Also, restore original initialization order of the MODEM device and its
-> > > related GPIO pins.
-> > > 
-> > > Cleanup of MODEM relaated regulator setup is postponed while waiting for
-> > > upcoming conversion of fixed regulator API to GPIO descriptors.
-> > > 
-> > > 
-> > > Janusz Krzysztofik (3):
-> > >       ARM: OMAP1: ams-delta: assign MODEM IRQ from GPIO descriptor
-> > >       ARM: OMAP1: ams-delta: initialize latch2 pins to safe values
-> > >       ARM: OMAP1: ams-delta: register MODEM device earlier
-> > > 
-> > > 
-> > > Changelog:
-> > > v2:
-> > > - rebased on v4.19-rc1
+On Thu, Sep 20, 2018 at 07:26:21PM +0200, Peter Rosin wrote:
+> On 2018-09-20 18:14, Wolfram Sang wrote:
+> > Using the common kernel pattern to bail out at the beginning if some
+> > conditions are not met, we can save a level of indentation. No
+> > functional change.
 > > 
-> > Hi Tony,
-> > 
-> > I forgot to mention: please apply on top of "[PATCH v3 0/3] ARM: OMAP1: ams-
-> > delta: Complete driver gpiod migration" series. Sorry.
+> > Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 > 
-> Hmm but then in that thread you said that it won't apply.. So I'm applying
-> this series into omap-for-v4.20/omap1 branch. I just modified the second
-> patch in this series for the unchanged header location.
+> Yes please!
 
-OK, thank you.
-Janusz
+:)
 
-> I suggest you send the mtd patch separately to mtd maintainers, the fb patch
-> separately to fb maintainers and then let's do the header move after all
-> those are merged as a clean-up. That avoids some dependencies between these
-> branches.
-> 
-> Regards,
-> 
-> Tony
-> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180921/fc7e981a/attachment.sig>
