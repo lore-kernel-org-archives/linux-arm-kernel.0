@@ -1,23 +1,22 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 20 Sep 2018 15:02:11 -0700
-Subject: [PATCH v2 11/11] arm: dts: ste-dbx5x0: Update coresight bindings
- for hardware port
-In-Reply-To: <20180912135352.19722-12-suzuki.poulose@arm.com>
-References: <20180912135352.19722-1-suzuki.poulose@arm.com>
- <20180912135352.19722-12-suzuki.poulose@arm.com>
-Message-ID: <CACRpkdZ8HnbLKMcFcROa1h6+SN9zH_QKE=1LMFiiaNUmTnzV4w@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 21 Sep 2018 00:04:30 +0200
+Subject: [PATCH] arm64: Trap WFI executed in userspace
+In-Reply-To: <20180807093326.5090-1-marc.zyngier@arm.com>
+References: <20180807093326.5090-1-marc.zyngier@arm.com>
+Message-ID: <20180920220430.GA27468@xo-6d-61-c0.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 12, 2018 at 6:54 AM Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+On Tue 2018-08-07 10:33:26, Marc Zyngier wrote:
+> It recently came to light that userspace can execute WFI, and that
+> the arm64 kernel doesn trap this event. This sounds rather benign,
+> but the kernel should decide when it wants to wait for an interrupt,
+> and not userspace.
+> 
+> Let's trap WFI and treat it as a way to yield the CPU to another
+> process.
 
-> Switch to the new coresight bindings
->
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+I don't think that's reasonable. Userspace should not be doing that, and we do not want
+to encourage it. SIGILL would be reasonable, I'd  say.
 
-Applied to the ux500 tree.
-
-Yours,
-Linus Walleij
+(Very old mail, was forgotton in the queue)
