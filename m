@@ -1,38 +1,40 @@
 From: manish.narani@xilinx.com (Manish Narani)
-Date: Thu, 20 Sep 2018 15:00:41 +0530
-Subject: [RFC PATCH v2 0/4] Add support for SD Tap Delay setting for ZynqMP
-Message-ID: <1537435845-6682-1-git-send-email-manish.narani@xilinx.com>
+Date: Thu, 20 Sep 2018 15:00:45 +0530
+Subject: [RFC PATCH v2 4/4] arm64: zynqmp: Add 'xlnx,
+ mio-bank' property in SDHCI node
+In-Reply-To: <1537435845-6682-1-git-send-email-manish.narani@xilinx.com>
+References: <1537435845-6682-1-git-send-email-manish.narani@xilinx.com>
+Message-ID: <1537435845-6682-5-git-send-email-manish.narani@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series of patches are created On top of the
-below series of patches.
-1. https://lkml.org/lkml/2018/8/3/687 
-2. https://lkml.org/lkml/2018/9/18/1034
+Add a required property indicating the MIO Bank number for SDHCI
+controller in ZynqMP.
 
-As the ZynqMP Firmware Driver is not yet merged, sending RFC to make
-modifications before sending the final patches.
+Signed-off-by: Manish Narani <manish.narani@xilinx.com>
+---
+ arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Changes in v2:
-- s/_/-/ in the property name
-- Changed order of the patches : DT binding change -> driver change -> DT change
-
-Manish Narani (4):
-  dt: bindings: Add SD tap value properties details for
-    'xlnx,zynqmp-8.9a'
-  firmware: xilinx: Add macros and API for SD tap delays
-  sdhci: arasan: Add support to read and set tap delays from DT for
-    ZynqMP
-  arm64: zynqmp: Add 'xlnx,mio-bank' property in SDHCI node
-
- .../devicetree/bindings/mmc/arasan,sdhci.txt       |  19 ++
- arch/arm64/boot/dts/xilinx/zynqmp.dtsi             |   2 +
- drivers/firmware/xilinx/Makefile                   |   1 +
- drivers/firmware/xilinx/zynqmp-tap-delays.c        |  39 ++++
- drivers/mmc/host/sdhci-of-arasan.c                 | 215 +++++++++++++++++++++
- include/linux/firmware/xlnx-zynqmp.h               |  33 +++-
- 6 files changed, 308 insertions(+), 1 deletion(-)
- create mode 100644 drivers/firmware/xilinx/zynqmp-tap-delays.c
-
+diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+index 1def7e1..7ef002d 100644
+--- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
++++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+@@ -492,6 +492,7 @@
+ 			reg = <0x0 0xff160000 0x0 0x1000>;
+ 			clock-names = "clk_xin", "clk_ahb";
+ 			xlnx,device_id = <0>;
++			xlnx,mio-bank = <0>;
+ 		};
+ 
+ 		sdhci1: sdhci at ff170000 {
+@@ -502,6 +503,7 @@
+ 			reg = <0x0 0xff170000 0x0 0x1000>;
+ 			clock-names = "clk_xin", "clk_ahb";
+ 			xlnx,device_id = <1>;
++			xlnx,mio-bank = <1>;
+ 		};
+ 
+ 		smmu: smmu at fd800000 {
 -- 
 2.1.1
