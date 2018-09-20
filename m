@@ -1,57 +1,71 @@
 From: manish.narani@xilinx.com (Manish Narani)
-Date: Thu, 20 Sep 2018 15:00:42 +0530
-Subject: [RFC PATCH v2 1/4] dt: bindings: Add SD tap value properties details
- for 'xlnx, zynqmp-8.9a'
+Date: Thu, 20 Sep 2018 15:00:43 +0530
+Subject: [RFC PATCH v2 2/4] firmware: xilinx: Add macros and API for SD tap
+ delays
 In-Reply-To: <1537435845-6682-1-git-send-email-manish.narani@xilinx.com>
 References: <1537435845-6682-1-git-send-email-manish.narani@xilinx.com>
-Message-ID: <1537435845-6682-2-git-send-email-manish.narani@xilinx.com>
+Message-ID: <1537435845-6682-3-git-send-email-manish.narani@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add documentation for MIO bank required property and Tap Delays optional
-properties in devicetree bindings.
+Add ZynqMP firmware SD tap delay macros and API for setting tap values.
 
 Signed-off-by: Manish Narani <manish.narani@xilinx.com>
 ---
- .../devicetree/bindings/mmc/arasan,sdhci.txt          | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ include/linux/firmware/xlnx-zynqmp.h | 29 ++++++++++++++++++++++++++++-
+ 1 file changed, 28 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-index 72769e0..6cc95fa 100644
---- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-+++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-@@ -27,6 +27,7 @@ Required Properties for "arasan,sdhci-5.1":
+diff --git a/include/linux/firmware/xlnx-zynqmp.h b/include/linux/firmware/xlnx-zynqmp.h
+index 743687b..40feebc 100644
+--- a/include/linux/firmware/xlnx-zynqmp.h
++++ b/include/linux/firmware/xlnx-zynqmp.h
+@@ -22,6 +22,27 @@
+ #define ZYNQMP_TZ_VERSION_MAJOR	1
+ #define ZYNQMP_TZ_VERSION_MINOR	0
  
- Required Properties for "xlnx,zynqmp-8.9a":
-   - xlnx,device_id: SD controller device ID. Must be either <0> or <1>.
-+  - xlnx,mio-bank: The value will be 0/1/2 depending on MIO bank selection.
- 
- Optional Properties:
-   - arasan,soc-ctl-syscon: A phandle to a syscon device (see ../mfd/syscon.txt)
-@@ -44,6 +45,24 @@ Optional Properties:
-   - xlnx,int-clock-stable-broken: when present, the controller always reports
-     that the internal clock is stable even when it is not.
- 
-+Optional Properties for "xlnx,zynqmp-8.9a":
-+ - xlnx,itap-delay-sd-hsd: Input Tap Delay for SD HS.
-+ - xlnx,itap-delay-sdr25: Input Tap Delay for SDR25.
-+ - xlnx,itap-delay-sdr50: Input Tap Delay for SDR50.
-+ - xlnx,itap-delay-sdr104: Input Tap Delay for SDR104.
-+ - xlnx,itap-delay-sd-ddr50: Input Tap Delay for SD DDR50.
-+ - xlnx,itap-delay-mmc-hsd: Input Tap Delay for MMC HS.
-+ - xlnx,itap-delay-mmc-ddr52: Input Tap Delay for MMC DDR52.
-+ - xlnx,itap-delay-mmc-hs200: Input Tap Delay for MMC HS200.
-+ - xlnx,otap-delay-sd-hsd: Output Tap Delay for SD HS.
-+ - xlnx,otap-delay-sdr25: Output Tap Delay for SDR25.
-+ - xlnx,otap-delay-sdr50: Output Tap Delay for SDR50.
-+ - xlnx,otap-delay-sdr104: Output Tap Delay for SDR104.
-+ - xlnx,otap-delay-sd-ddr50: Output Tap Delay for DDR50.
-+ - xlnx,otap-delay-mmc-hsd: Output Tap Delay for MMC HS.
-+ - xlnx,otap-delay-mmc-ddr52: Output Tap Delay for MMC DDR52.
-+ - xlnx,otap-delay-mmc-hs200: Output Tap Delay for MMC HS200.
++#define ZYNQMP_ITAPDLYSEL_SD_HSD	0x15
++#define ZYNQMP_ITAPDLYSEL_SDR25		0x15
++#define ZYNQMP_ITAPDLYSEL_SDR50		0x0
++#define ZYNQMP_ITAPDLYSEL_SDR104_B2	0x0
++#define ZYNQMP_ITAPDLYSEL_SDR104_B0	0x0
++#define ZYNQMP_ITAPDLYSEL_MMC_HSD	0x15
++#define ZYNQMP_ITAPDLYSEL_SD_DDR50	0x3D
++#define ZYNQMP_ITAPDLYSEL_MMC_DDR52	0x12
++#define ZYNQMP_ITAPDLYSEL_MMC_HS200_B2	0x0
++#define ZYNQMP_ITAPDLYSEL_MMC_HS200_B0	0x0
++#define ZYNQMP_OTAPDLYSEL_SD_HSD	0x05
++#define ZYNQMP_OTAPDLYSEL_SDR25		0x05
++#define ZYNQMP_OTAPDLYSEL_SDR50		0x03
++#define ZYNQMP_OTAPDLYSEL_SDR104_B0	0x03
++#define ZYNQMP_OTAPDLYSEL_SDR104_B2	0x02
++#define ZYNQMP_OTAPDLYSEL_MMC_HSD	0x06
++#define ZYNQMP_OTAPDLYSEL_SD_DDR50	0x04
++#define ZYNQMP_OTAPDLYSEL_MMC_DDR52	0x06
++#define ZYNQMP_OTAPDLYSEL_MMC_HS200_B0	0x03
++#define ZYNQMP_OTAPDLYSEL_MMC_HS200_B2	0x02
 +
- Example:
- 	sdhci at e0100000 {
- 		compatible = "arasan,sdhci-8.9a";
+ #define ZYNQMP_TZ_VERSION	((ZYNQMP_TZ_VERSION_MAJOR << 16) | \
+ 					ZYNQMP_TZ_VERSION_MINOR)
+ 
+@@ -65,12 +86,18 @@ enum pm_node_id {
+ 
+ enum pm_ioctl_id {
+ 	IOCTL_SD_DLL_RESET = 6,
+-	IOCTL_SET_PLL_FRAC_MODE = 8,
++	IOCTL_SET_SD_TAPDELAY,
++	IOCTL_SET_PLL_FRAC_MODE,
+ 	IOCTL_GET_PLL_FRAC_MODE,
+ 	IOCTL_SET_PLL_FRAC_DATA,
+ 	IOCTL_GET_PLL_FRAC_DATA,
+ };
+ 
++enum tap_delay_type {
++	PM_TAPDELAY_INPUT,
++	PM_TAPDELAY_OUTPUT,
++};
++
+ enum dll_reset_type {
+ 	PM_DLL_RESET_ASSERT,
+ 	PM_DLL_RESET_RELEASE,
 -- 
 2.1.1
