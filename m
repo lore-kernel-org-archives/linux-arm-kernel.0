@@ -1,40 +1,31 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Thu, 20 Sep 2018 09:14:15 +0200
-Subject: [PATCH] ARM: dts: stm32: Add clk-lse node's label on stm32f429
-In-Reply-To: <1532007308-10861-1-git-send-email-patrice.chotard@st.com>
-References: <1532007308-10861-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <440caae7-3885-d858-f2e2-8840ca054d5d@st.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Thu, 20 Sep 2018 16:52:18 +0930
+Subject: [PATCH v3] ARM: dts: aspeed: Adding Facebook TiogaPass BMC
+In-Reply-To: <20180918234110.1908926-1-vijaykhemka@fb.com>
+References: <20180918234110.1908926-1-vijaykhemka@fb.com>
+Message-ID: <CACPK8Xd_ZKrQa3b98Bpb=wy_P3=FDUjPDfBSHx5Wx_NHk6Y5og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Patrice
+Hello Vijay,
 
-On 07/19/2018 03:35 PM, patrice.chotard at st.com wrote:
-> From: Patrice Chotard <patrice.chotard@st.com>
-> 
-> Add missing clk_lse label for node clk-lse.
-> 
-> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
-> ---
->   arch/arm/boot/dts/stm32f429.dtsi | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-> index ede77e0f1c41..64278e81bc08 100644
-> --- a/arch/arm/boot/dts/stm32f429.dtsi
-> +++ b/arch/arm/boot/dts/stm32f429.dtsi
-> @@ -58,7 +58,7 @@
->   			clock-frequency = <0>;
->   		};
->   
-> -		clk-lse {
-> +		clk_lse: clk-lse {
->   			#clock-cells = <0>;
->   			compatible = "fixed-clock";
->   			clock-frequency = <32768>;
-> 
+On Wed, 19 Sep 2018 at 09:11, Vijay Khemka <vijaykhemka@fb.com> wrote:
+> Initial introduction of Facebook TiogaPass family equipped with
+> Aspeed 2500 BMC SoC. TiogaPass is a x86 server development kit
+> with a ASPEED ast2500 BMC manufactured by Facebook.
+> Specifically, This adds the tiogapass platform device tree file
+> including the flash layout used by the tiogapass BMC machines.
+>
+> This also adds an entry of tiogapass device tree file in Makefile
+>
+> Signed-off-by: Vijay Khemka <vijaykhemka@fb.com>
 
-Applied on stm32-next.
+It looks like you've addressed the concerns from previous reviews. If
+any comments come up please address them in follow up patches.
 
-Thanks.
-Alex
+I made some minor whitespace fixes and applied this to the aspeed
+v4.20 device tree branch.
+
+Cheers,
+
+Joel
