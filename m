@@ -1,112 +1,49 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Thu, 20 Sep 2018 11:29:03 -0700
-Subject: [RFC] i2c: qup: Use the interconnect API
-Message-ID: <20180920182903.19991-1-georgi.djakov@linaro.org>
+From: leoyang.li@nxp.com (Li Yang)
+Date: Thu, 20 Sep 2018 13:54:28 -0500
+Subject: [PATCH 2/4] soc/fsl/qbman: Add 64 bit DMA addressing requirement
+ to QBMan
+In-Reply-To: <1537456011-10769-3-git-send-email-madalin.bucur@nxp.com>
+References: <1537456011-10769-1-git-send-email-madalin.bucur@nxp.com>
+ <1537456011-10769-3-git-send-email-madalin.bucur@nxp.com>
+Message-ID: <CADRPPNSz-x1uf98+cKUjj54sSxQbJOXWk7xn_ExhbcjdAYKUpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The interconnect API provides an interface for consumer drivers to express
-their bandwidth needs in the SoC. This data is aggregated and the on-chip
-interconnect hardware is configured to the appropriate power/performance
-profile.
+On Thu, Sep 20, 2018 at 10:09 AM Madalin Bucur <madalin.bucur@nxp.com> wrote:
+>
+> From: Roy Pledge <roy.pledge@nxp.com>
+>
+> The QBMan block is memory mapped on SoCs above a 32 bit (4 Gigabyte)
+> boundary so enabling 64 bit DMA addressing is needed for QBMan to
+> be usable.
+>
+> Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
+> Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
+> ---
+>  drivers/soc/fsl/qbman/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/soc/fsl/qbman/Kconfig b/drivers/soc/fsl/qbman/Kconfig
+> index d570cb5fd381..19d6f4621e23 100644
+> --- a/drivers/soc/fsl/qbman/Kconfig
+> +++ b/drivers/soc/fsl/qbman/Kconfig
+> @@ -1,6 +1,6 @@
+>  menuconfig FSL_DPAA
+>         bool "QorIQ DPAA1 framework support"
+> -       depends on (FSL_SOC_BOOKE || ARCH_LAYERSCAPE)
+> +       depends on ((FSL_SOC_BOOKE || ARCH_LAYERSCAPE || ARM) && ARCH_DMA_ADDR_T_64BIT)
 
-Use the interconnect API to get() the path between the endpoints used for
-data transfers by the I2C QUP and report the needed bandwidth based on the
-i2c mode.
+You also added ARM support here.  Actually the dependency on
+ARCH_DMA_ADDR_T_64BIT is only explicitly needed by ARM(other platforms
+already implies ARCH_DMA_ADDR_T_64BIT).  So I think the patch title
+should be like: adding 32-bit ARM support.  The ARCH_DMA_ADDR_T_64BIT
+is enabled by ARM_LPAE on ARM.  Probably we should make that
+straightforward in the Kconfig, so that people better understand what
+is needed for 32-bit ARM.
 
-Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
----
-
-This patch depends on the interconnect API: https://lkml.org/lkml/2018/8/31/444
-
-TODO: Use a macro for converting and rounding to icc units instead of
-converting between kilobits, kilobytes etc. in the consumer drivers.
-
- drivers/i2c/busses/i2c-qup.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
-
-diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
-index c86c3ae1318f..436747a74dc6 100644
---- a/drivers/i2c/busses/i2c-qup.c
-+++ b/drivers/i2c/busses/i2c-qup.c
-@@ -14,6 +14,7 @@
- #include <linux/dma-mapping.h>
- #include <linux/err.h>
- #include <linux/i2c.h>
-+#include <linux/interconnect.h>
- #include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/module.h>
-@@ -280,6 +281,11 @@ struct qup_i2c_dev {
- 	void (*read_rx_fifo)(struct qup_i2c_dev *qup);
- 	/* function to write tags in tx fifo for i2c read transfer */
- 	void (*write_rx_tags)(struct qup_i2c_dev *qup);
-+
-+	/* frequency mode standard */
-+	u32			clk_freq;
-+	/* interconnect path to scale according to bandwidth needs */
-+	struct icc_path		*path;
- };
- 
- static irqreturn_t qup_i2c_interrupt(int irq, void *dev)
-@@ -1657,6 +1663,16 @@ static void qup_i2c_disable_clocks(struct qup_i2c_dev *qup)
- 	clk_disable_unprepare(qup->pclk);
- }
- 
-+static void qup_i2c_enable_icc(struct qup_i2c_dev *qup)
-+{
-+	icc_set(qup->path, 0, qup->clk_freq / 8000);
-+}
-+
-+static void qup_i2c_disable_icc(struct qup_i2c_dev *qup)
-+{
-+	icc_set(qup->path, 0, 0);
-+}
-+
- static const struct acpi_device_id qup_i2c_acpi_match[] = {
- 	{ "QCOM8010"},
- 	{ },
-@@ -1784,6 +1800,10 @@ static int qup_i2c_probe(struct platform_device *pdev)
- 		}
- 		ACPI_COMPANION_SET(&qup->adap.dev, ACPI_COMPANION(qup->dev));
- 	} else {
-+		qup->path = of_icc_get(qup->dev, "i2c-mem");
-+		if (IS_ERR(qup->path))
-+			return PTR_ERR(qup->path);
-+
- 		qup->clk = devm_clk_get(qup->dev, "core");
- 		if (IS_ERR(qup->clk)) {
- 			dev_err(qup->dev, "Could not get core clock\n");
-@@ -1795,6 +1815,8 @@ static int qup_i2c_probe(struct platform_device *pdev)
- 			dev_err(qup->dev, "Could not get iface clock\n");
- 			return PTR_ERR(qup->pclk);
- 		}
-+		qup->clk_freq = clk_freq;
-+		qup_i2c_enable_icc(qup);
- 		qup_i2c_enable_clocks(qup);
- 		src_clk_freq = clk_get_rate(qup->clk);
- 	}
-@@ -1927,6 +1949,7 @@ static int qup_i2c_remove(struct platform_device *pdev)
- 
- 	disable_irq(qup->irq);
- 	qup_i2c_disable_clocks(qup);
-+	icc_put(qup->path);
- 	i2c_del_adapter(&qup->adap);
- 	pm_runtime_disable(qup->dev);
- 	pm_runtime_set_suspended(qup->dev);
-@@ -1939,6 +1962,7 @@ static int qup_i2c_pm_suspend_runtime(struct device *device)
- 	struct qup_i2c_dev *qup = dev_get_drvdata(device);
- 
- 	dev_dbg(device, "pm_runtime: suspending...\n");
-+	qup_i2c_disable_icc(qup);
- 	qup_i2c_disable_clocks(qup);
- 	return 0;
- }
-@@ -1948,6 +1972,7 @@ static int qup_i2c_pm_resume_runtime(struct device *device)
- 	struct qup_i2c_dev *qup = dev_get_drvdata(device);
- 
- 	dev_dbg(device, "pm_runtime: resuming...\n");
-+	qup_i2c_enable_icc(qup);
- 	qup_i2c_enable_clocks(qup);
- 	return 0;
- }
+>         select GENERIC_ALLOCATOR
+>         help
+>           The Freescale Data Path Acceleration Architecture (DPAA) is a set of
+> --
+> 2.1.0
+>
