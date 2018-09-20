@@ -1,36 +1,26 @@
 From: madalin.bucur@nxp.com (Madalin Bucur)
-Date: Thu, 20 Sep 2018 18:06:49 +0300
-Subject: [PATCH 2/4] soc/fsl/qbman: Add 64 bit DMA addressing requirement to
- QBMan
-In-Reply-To: <1537456011-10769-1-git-send-email-madalin.bucur@nxp.com>
-References: <1537456011-10769-1-git-send-email-madalin.bucur@nxp.com>
-Message-ID: <1537456011-10769-3-git-send-email-madalin.bucur@nxp.com>
+Date: Thu, 20 Sep 2018 18:06:47 +0300
+Subject: [PATCH 0/4] soc/fsl/qbman: DPAA QBMan fixes and additions
+Message-ID: <1537456011-10769-1-git-send-email-madalin.bucur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Roy Pledge <roy.pledge@nxp.com>
+This patch set brings a number of fixes and the option to control
+the QMan portal interrupt coalescing.
 
-The QBMan block is memory mapped on SoCs above a 32 bit (4 Gigabyte)
-boundary so enabling 64 bit DMA addressing is needed for QBMan to
-be usable.
+Madalin Bucur (1):
+  soc/fsl_qbman: export coalesce change API
 
-Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
-Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
----
- drivers/soc/fsl/qbman/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Roy Pledge (3):
+  soc/fsl/qbman: Check if CPU is offline when initializing portals
+  soc/fsl/qbman: Add 64 bit DMA addressing requirement to QBMan
+  soc/fsl/qbman: Use last response to determine valid bit
 
-diff --git a/drivers/soc/fsl/qbman/Kconfig b/drivers/soc/fsl/qbman/Kconfig
-index d570cb5fd381..19d6f4621e23 100644
---- a/drivers/soc/fsl/qbman/Kconfig
-+++ b/drivers/soc/fsl/qbman/Kconfig
-@@ -1,6 +1,6 @@
- menuconfig FSL_DPAA
- 	bool "QorIQ DPAA1 framework support"
--	depends on (FSL_SOC_BOOKE || ARCH_LAYERSCAPE)
-+	depends on ((FSL_SOC_BOOKE || ARCH_LAYERSCAPE || ARM) && ARCH_DMA_ADDR_T_64BIT)
- 	select GENERIC_ALLOCATOR
- 	help
- 	  The Freescale Data Path Acceleration Architecture (DPAA) is a set of
+ drivers/soc/fsl/qbman/Kconfig |  2 +-
+ drivers/soc/fsl/qbman/bman.c  | 17 ++++++++---
+ drivers/soc/fsl/qbman/qman.c  | 65 ++++++++++++++++++++++++++++++++++++++-----
+ include/soc/fsl/qman.h        | 27 ++++++++++++++++++
+ 4 files changed, 99 insertions(+), 12 deletions(-)
+
 -- 
 2.1.0
