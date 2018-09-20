@@ -1,55 +1,56 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 20 Sep 2018 12:24:53 +0800
-Subject: [GIT PULL] Allwinner fixes for v4.19 - Round 2
-Message-ID: <20180920042453.GA18194@wens.csie.org>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Thu, 20 Sep 2018 06:59:41 +0200
+Subject: [PATCH 1/2] dt-bindings: pinctrl: document Broadcom Northstar pin
+ mux controller
+In-Reply-To: <7e381fba-a7bf-f587-7bbf-d6b30d9874c9@gmail.com>
+References: <20180919210219.21921-1-zajec5@gmail.com>
+ <7e381fba-a7bf-f587-7bbf-d6b30d9874c9@gmail.com>
+Message-ID: <CACna6rz13XswdcNqq1JHRAms5LpdRFuOT4RU=n6YTeydTGh5JA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 19 Sep 2018 at 23:22, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> On 09/19/2018 02:02 PM, Rafa? Mi?ecki wrote:
+> > From: Rafa? Mi?ecki <rafal@milecki.pl>
+> >
+> > Northstar has mux controller just like Northstar Plus and Northstar2.
+> > It's a bit different though (different registers & pins) so it requires
+> > its own binding.
+> >
+> > It's needed to allow other block bindings specify required mux setup.
+> >
+> > Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+> > ---
+> >  .../devicetree/bindings/pinctrl/brcm,ns-pinmux.txt | 29 ++++++++++++++++++++++
+> >  1 file changed, 29 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/pinctrl/brcm,ns-pinmux.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/pinctrl/brcm,ns-pinmux.txt b/Documentation/devicetree/bindings/pinctrl/brcm,ns-pinmux.txt
+> > new file mode 100644
+> > index 000000000000..0e913721ae9e
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/pinctrl/brcm,ns-pinmux.txt
+> > @@ -0,0 +1,29 @@
+> > +Broadcom Northstar pins mux controller
+> > +
+> > +Some of Northstar SoCs's pins can be used for various purposes thanks to the mux
+> > +controller. This binding allows describing mux controller and listing available
+> > +functions. They can be referenced later by other bindings to let system
+> > +configure controller correctly.
+> > +
+> > +Required properties:
+> > +- compatible: brcm,ns-pinmux
+> > +- reg: iomem address range of CRU (Central Resource Unit) pin registers
+> > +- reg-names: "cru_pins_control" - the only needed & supported reg right now
+>
+> Technically the register range that you cover is named CRU_GPIO_CONTROLx
+> with x being in [0-8].
 
-This is a second fixes pull request for arm-soc, based on the first pull
-request I sent earlier.
+Thanks! Do you think
+reg-names: "cru_gpio_controls"
+will be fine? Or should I keep it singular like:
+reg-names: "cru_gpio_control"
+?
 
-Also, I seem to remember seeing on ksummit-discuss that single patch PRs
-are a bit annoying. Would the maintainers prefer we just resend single
-patches instead? I'm not sure how that would work out if we later had
-to base -next material on it, but I guess we could base it off a -fixes
-branch in arm-soc.
-
-Thanks
-ChenYu
-
-The following changes since commit d177c8b61d6b4ef360b1c2682e4d8e3bae01738b:
-
-  arm64: allwinner: dts: h6: fix Pine H64 MMC bus width (2018-08-27 09:21:00 +0200)
-
-are available in the Git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-fixes-for-4.19-2
-
-for you to fetch changes up to 13b91ed77a65cf3bf23353880245d0cbd9138294:
-
-  ARM: dts: sun8i: drop A64 HDMI PHY fallback compatible from R40 DT (2018-09-20 11:48:01 +0800)
-
-----------------------------------------------------------------
-Allwinner fixes - round 2
-
-One additional fix regarding HDMI on the R40 SoC.
-
-Based on preliminary tests and code dumps for the R40, it was thought
-that the whole HDMI block was the same on the R40 and A64.
-
-Recent tests regarding the A64 showed that this was not the case. The
-HDMI PHY on the A64 only has one clock parent. How this occurs at the
-hardware level is unclear, as Allwinner has not given any feedback on
-this matter. Nevertheless it is clear that the hardware acts differently
-between the A64 and R40 in such a way that the R40's HDMI PHY is not
-backward compatible with the A64's. As such we need to drop the fallback
-compatible string in the R40's device tree. This was added in v4.19-rc1.
-
-----------------------------------------------------------------
-Icenowy Zheng (1):
-      ARM: dts: sun8i: drop A64 HDMI PHY fallback compatible from R40 DT
-
- arch/arm/boot/dts/sun8i-r40.dtsi | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+-- 
+Rafa?
