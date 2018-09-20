@@ -1,156 +1,37 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Thu, 20 Sep 2018 14:33:14 +0000
-Subject: [PATCH 00/21] SMMU enablement for NXP LS1043A and LS1046A
-In-Reply-To: <c2acecc8-5357-6cbe-f93c-00d71470dff5@arm.com>
-References: <20180919123613.15092-1-laurentiu.tudor@nxp.com>
- <7d7646dc-9d0b-013d-75d7-a6cb4453f41f@arm.com>
- <fd8ab351-46aa-f73e-593b-502a57de1975@nxp.com>
- <39211e7a-034b-cdca-f182-1b6f6e5fbc53@arm.com>
- <33eac426-cbb7-f899-5a35-aea28f8e5dc4@nxp.com>
- <c2acecc8-5357-6cbe-f93c-00d71470dff5@arm.com>
-Message-ID: <bb973ba9-ca45-c9f1-38d6-67e9bc05e429@nxp.com>
+From: axboe@kernel.dk (Jens Axboe)
+Date: Thu, 20 Sep 2018 08:39:08 -0600
+Subject: clean up physical merging helpers
+In-Reply-To: <20180920062946.GA12893@lst.de>
+References: <20180904191431.20102-1-hch@lst.de> <20180915070300.GA10555@lst.de>
+ <b8f3621a-f789-d737-649f-7b3645912888@kernel.dk>
+ <20180920062946.GA12893@lst.de>
+Message-ID: <6e7fa8d3-4839-726d-572c-1678f5450880@kernel.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 20.09.2018 14:49, Robin Murphy wrote:
-> On 20/09/18 11:38, Laurentiu Tudor wrote:
->>
->>
->> On 19.09.2018 17:37, Robin Murphy wrote:
->>> On 19/09/18 15:18, Laurentiu Tudor wrote:
->>>> Hi Robin,
->>>>
->>>> On 19.09.2018 16:25, Robin Murphy wrote:
->>>>> Hi Laurentiu,
->>>>>
->>>>> On 19/09/18 13:35, laurentiu.tudor at nxp.com wrote:
->>>>>> From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
->>>>>>
->>>>>> This patch series adds SMMU support for NXP LS1043A and LS1046A chips
->>>>>> and consists mostly in important driver fixes and the required device
->>>>>> tree updates. It touches several subsystems and consists of three 
->>>>>> main
->>>>>> parts:
->>>>>> ??? - changes in soc/drivers/fsl/qbman drivers adding iommu 
->>>>>> mapping of
->>>>>> ????? reserved memory areas, fixes and defered probe support
->>>>>> ??? - changes in drivers/net/ethernet/freescale/dpaa_eth drivers
->>>>>> ????? consisting in misc dma mapping related fixes and probe ordering
->>>>>> ??? - addition of the actual arm smmu device tree node together with
->>>>>> ????? various adjustments to the device trees
->>>>>>
->>>>>> Performance impact
->>>>>>
->>>>>> ?????? Running iperf benchmarks in a back-to-back setup (both sides
->>>>>> ?????? having smmu enabled) on a 10GBps port show an important
->>>>>> ?????? networking performance degradation of around %40 (9.48Gbps
->>>>>> ?????? linerate vs 5.45Gbps). If you need performance but without
->>>>>> ?????? SMMU support you can use "iommu.passthrough=1" to disable
->>>>>> ?????? SMMU.
-> 
-> I should have said before - thanks for the numbers there as well. Always 
-> good to add another datapoint to my collection. If you're interested 
-> I've added SMMUv2 support to the "non-strict mode" series (of which I 
-> should be posting v8 soon), so it might be fun to see how well that 
-> works on MMU-500 in the real world.
-
-Hmm, I think I gave those a try some weeks ago and vaguely remember that 
-I did see improvements. Can't remember the numbers off the top of my 
-head but I'll re-test with the latest spin and update the numbers.
-
->>>>>>
->>>>>> USB issue and workaround
->>>>>>
->>>>>> ?????? There's a problem with the usb controllers in these chips
->>>>>> ?????? generating smaller, 40-bit wide dma addresses instead of the
->>>>>> 48-bit
->>>>>> ?????? supported at the smmu input. So you end up in a situation
->>>>>> where the
->>>>>> ?????? smmu is mapped with 48-bit address translations, but the 
->>>>>> device
->>>>>> ?????? generates transactions with clipped 40-bit addresses, thus 
->>>>>> smmu
->>>>>> ?????? context faults are triggered. I encountered a similar
->>>>>> situation for
->>>>>> ?????? mmc that I? managed to fix in software [1] however for USB I
->>>>>> did not
->>>>>> ?????? find a proper place in the code to add a similar fix. The only
->>>>>> ?????? workaround I found was to add this kernel parameter which
->>>>>> limits the
->>>>>> ?????? usb dma to 32-bit size: "xhci-hcd.quirks=0x800000".
->>>>>> ?????? This workaround if far from ideal, so any suggestions for a 
->>>>>> code
->>>>>> ?????? based workaround in this area would be greatly appreciated.
->>>>>
->>>>> If you have a nominally-64-bit device with a
->>>>> narrower-than-the-main-interconnect link in front of it, that should
->>>>> already be fixed in 4.19-rc by bus_dma_mask picking up DT dma-ranges,
->>>>> provided the interconnect hierarchy can be described appropriately (or
->>>>> at least massaged sufficiently to satisfy the binding), e.g.:
->>>>>
->>>>> / {
->>>>> ?? ????...
->>>>>
->>>>> ?? ????soc {
->>>>> ?? ??????? ranges;
->>>>> ?? ??????? dma-ranges = <0 0 10000 0>;
->>>>>
->>>>> ?? ??????? dev_48bit { ... };
->>>>>
->>>>> ?? ??????? periph_bus {
->>>>> ?? ??????????? ranges;
->>>>> ?? ??????????? dma-ranges = <0 0 100 0>;
->>>>>
->>>>> ?? ??????????? dev_40bit { ... };
->>>>> ?? ??????? };
->>>>> ?? ????};
->>>>> };
->>>>>
->>>>> and if that fails to work as expected (except for PCI hosts where
->>>>> handling dma-ranges properly still needs sorting out), please do 
->>>>> let us
->>>>> know ;)
->>>>>
->>>>
->>>> Just to confirm, Is this [1] the change I was supposed to test?
->>>
->>> Not quite - dma-ranges is only valid for nodes representing a bus, so
->>> putting it directly in the USB device nodes doesn't work (FWIW that's
->>> why PCI is broken, because the parser doesn't expect the
->>> bus-as-leaf-node case). That's teh point of that intermediate simple-bus
->>> node represented by "periph_bus" in my example (sorry, I should have put
->>> compatibles in to make it clearer) - often that's actually true to life
->>> (i.e. "soc" is something like a CCI and "periph_bus" is something like
->>> an AXI NIC gluing a bunch of lower-bandwidth DMA masters to one of the
->>> CCI ports) but at worst it's just a necessary evil to make the binding
->>> happy (if it literally only represents the point-to-point link between
->>> the device master port and interconnect slave port).
+On 9/20/18 12:29 AM, Christoph Hellwig wrote:
+> On Sat, Sep 15, 2018 at 08:47:13AM -0600, Jens Axboe wrote:
+>>>> this series moves various helpers related to merging based on physical
+>>>> addresses from the public headers into block/, moves the Xen special
+>>>> case from arch hooks into common code, cleans up the code a bit, and
+>>>> removes not nessecary includes from the block headers.
+>>> ---end quoted text---
 >>>
 >>
->> Quick update: so I adjusted to device tree according to your example and
->> it works so now I can get rid of that nasty kernel arg based workaround,
->> yey! :-)
+>> It's a good cleanup, I like it. Would prefer if the arm/xen folks could
+>> ack the first bits,
 > 
-> Cool! In fact, judging by the block diagrams on the website, the "basic 
-> peripherals and interconnect" section hanging off the side of the CCI 
-> implies that probably is true to the real topology as I imagined, so it 
-> doesn't even count as a horrible hack :)
-
-Indeed, on this chip there's a NoC lumping behind it several low-speed 
-devices such as usb, sata, esdhc.
-
->> Thanks a lot, that was really helpful.
+> Konread, can you look at the series (or delegate).
 > 
-> No problem. FWIW if you ever come to doing ACPI support for these SoCs, 
-> the equivalent is merely a case of setting the device memory address 
-> size limit field appropriately for all the named components.
+>> and 13/13 should probably just to in differently.
 > 
+> I can't parse this setence.
 
-Thanks, I'll keep this in mind. If i remember correctly, there are 
-people over here working on UEFI + ACPI support for some LS chips but 
-progress appears to be slow.
+The irony is thick :-)
 
----
-Best Regards, Laurentiu
+Anyway, s/to/go for that sentence. I don't mind carrying it if Konrad
+is happy with it, but it could go in separately after this series is
+merged.
+
+-- 
+Jens Axboe
