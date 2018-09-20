@@ -1,133 +1,203 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 20 Sep 2018 12:49:41 +0100
-Subject: [PATCH 00/21] SMMU enablement for NXP LS1043A and LS1046A
-In-Reply-To: <33eac426-cbb7-f899-5a35-aea28f8e5dc4@nxp.com>
-References: <20180919123613.15092-1-laurentiu.tudor@nxp.com>
- <7d7646dc-9d0b-013d-75d7-a6cb4453f41f@arm.com>
- <fd8ab351-46aa-f73e-593b-502a57de1975@nxp.com>
- <39211e7a-034b-cdca-f182-1b6f6e5fbc53@arm.com>
- <33eac426-cbb7-f899-5a35-aea28f8e5dc4@nxp.com>
-Message-ID: <c2acecc8-5357-6cbe-f93c-00d71470dff5@arm.com>
+From: pintu.ping@gmail.com (Pintu Kumar)
+Date: Thu, 20 Sep 2018 17:21:20 +0530
+Subject: KSM not working in 4.9 Kernel
+In-Reply-To: <20180917145936.GA20945@rapoport-lnx>
+References: <CAOuPNLj1wx4sznrtLdKjcvuTf0dECPWzPaR946FoYRXB6YAGCw@mail.gmail.com>
+ <20180916153237.GC15699@rapoport-lnx>
+ <CAOuPNLj0HyC+yzwTpN-EWpzHTJ58u7pBfOja1MyweF4pbct1eQ@mail.gmail.com>
+ <20180917043724.GA12866@rapoport-lnx>
+ <CAOuPNLidXFHgkBmwOPj_xFkU_OpLaXbpJg04Le7MPxu8cYg_RQ@mail.gmail.com>
+ <CAOuPNLj+4pMnEy5EyZmzDWszqMb_PQb3q7t_hvG_50BTz1He2Q@mail.gmail.com>
+ <20180917145936.GA20945@rapoport-lnx>
+Message-ID: <CAOuPNLiqntJspBgAyP4OSEiajbg1mWmeFBb6j4akPp-OULQpUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/09/18 11:38, Laurentiu Tudor wrote:
-> 
-> 
-> On 19.09.2018 17:37, Robin Murphy wrote:
->> On 19/09/18 15:18, Laurentiu Tudor wrote:
->>> Hi Robin,
->>>
->>> On 19.09.2018 16:25, Robin Murphy wrote:
->>>> Hi Laurentiu,
->>>>
->>>> On 19/09/18 13:35, laurentiu.tudor at nxp.com wrote:
->>>>> From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
->>>>>
->>>>> This patch series adds SMMU support for NXP LS1043A and LS1046A chips
->>>>> and consists mostly in important driver fixes and the required device
->>>>> tree updates. It touches several subsystems and consists of three main
->>>>> parts:
->>>>>  ?? - changes in soc/drivers/fsl/qbman drivers adding iommu mapping of
->>>>>  ???? reserved memory areas, fixes and defered probe support
->>>>>  ?? - changes in drivers/net/ethernet/freescale/dpaa_eth drivers
->>>>>  ???? consisting in misc dma mapping related fixes and probe ordering
->>>>>  ?? - addition of the actual arm smmu device tree node together with
->>>>>  ???? various adjustments to the device trees
->>>>>
->>>>> Performance impact
->>>>>
->>>>>  ????? Running iperf benchmarks in a back-to-back setup (both sides
->>>>>  ????? having smmu enabled) on a 10GBps port show an important
->>>>>  ????? networking performance degradation of around %40 (9.48Gbps
->>>>>  ????? linerate vs 5.45Gbps). If you need performance but without
->>>>>  ????? SMMU support you can use "iommu.passthrough=1" to disable
->>>>>  ????? SMMU.
+Hi,
 
-I should have said before - thanks for the numbers there as well. Always 
-good to add another datapoint to my collection. If you're interested 
-I've added SMMUv2 support to the "non-strict mode" series (of which I 
-should be posting v8 soon), so it might be fun to see how well that 
-works on MMU-500 in the real world.
+Thank you so much for all your reply so far.
+I have few more doubts to understand the output from ksm sysfs.
+Device: Hikey620 - ARM64 - Linux 4.9.20
+With HUGE page enabled:
+CONFIG_TRANSPARENT_HUGEPAGE=y
+CONFIG_TRANSPARENT_HUGEPAGE_ALWAYS=y
+# CONFIG_TRANSPARENT_HUGEPAGE_MADVISE is not set
 
->>>>>
->>>>> USB issue and workaround
->>>>>
->>>>>  ????? There's a problem with the usb controllers in these chips
->>>>>  ????? generating smaller, 40-bit wide dma addresses instead of the
->>>>> 48-bit
->>>>>  ????? supported at the smmu input. So you end up in a situation
->>>>> where the
->>>>>  ????? smmu is mapped with 48-bit address translations, but the device
->>>>>  ????? generates transactions with clipped 40-bit addresses, thus smmu
->>>>>  ????? context faults are triggered. I encountered a similar
->>>>> situation for
->>>>>  ????? mmc that I? managed to fix in software [1] however for USB I
->>>>> did not
->>>>>  ????? find a proper place in the code to add a similar fix. The only
->>>>>  ????? workaround I found was to add this kernel parameter which
->>>>> limits the
->>>>>  ????? usb dma to 32-bit size: "xhci-hcd.quirks=0x800000".
->>>>>  ????? This workaround if far from ideal, so any suggestions for a code
->>>>>  ????? based workaround in this area would be greatly appreciated.
->>>>
->>>> If you have a nominally-64-bit device with a
->>>> narrower-than-the-main-interconnect link in front of it, that should
->>>> already be fixed in 4.19-rc by bus_dma_mask picking up DT dma-ranges,
->>>> provided the interconnect hierarchy can be described appropriately (or
->>>> at least massaged sufficiently to satisfy the binding), e.g.:
->>>>
->>>> / {
->>>>  ? ????...
->>>>
->>>>  ? ????soc {
->>>>  ? ??????? ranges;
->>>>  ? ??????? dma-ranges = <0 0 10000 0>;
->>>>
->>>>  ? ??????? dev_48bit { ... };
->>>>
->>>>  ? ??????? periph_bus {
->>>>  ? ??????????? ranges;
->>>>  ? ??????????? dma-ranges = <0 0 100 0>;
->>>>
->>>>  ? ??????????? dev_40bit { ... };
->>>>  ? ??????? };
->>>>  ? ????};
->>>> };
->>>>
->>>> and if that fails to work as expected (except for PCI hosts where
->>>> handling dma-ranges properly still needs sorting out), please do let us
->>>> know ;)
->>>>
->>>
->>> Just to confirm, Is this [1] the change I was supposed to test?
->>
->> Not quite - dma-ranges is only valid for nodes representing a bus, so
->> putting it directly in the USB device nodes doesn't work (FWIW that's
->> why PCI is broken, because the parser doesn't expect the
->> bus-as-leaf-node case). That's teh point of that intermediate simple-bus
->> node represented by "periph_bus" in my example (sorry, I should have put
->> compatibles in to make it clearer) - often that's actually true to life
->> (i.e. "soc" is something like a CCI and "periph_bus" is something like
->> an AXI NIC gluing a bunch of lower-bandwidth DMA masters to one of the
->> CCI ports) but at worst it's just a necessary evil to make the binding
->> happy (if it literally only represents the point-to-point link between
->> the device master port and interconnect slave port).
->>
-> 
-> Quick update: so I adjusted to device tree according to your example and
-> it works so now I can get rid of that nasty kernel arg based workaround,
-> yey! :-)
+Currently, I get this output, when I run below program with ksm:
 
-Cool! In fact, judging by the block diagrams on the website, the "basic 
-peripherals and interconnect" section hanging off the side of the CCI 
-implies that probably is true to the real topology as I imagined, so it 
-doesn't even count as a horrible hack :)
+~ # grep -H '' /sys/kernel/mm/ksm/*
+/sys/kernel/mm/ksm/full_scans:29
+/sys/kernel/mm/ksm/page_comparisons:39584
+/sys/kernel/mm/ksm/pages_hashed:11672
+/sys/kernel/mm/ksm/pages_scanned:21766
+/sys/kernel/mm/ksm/pages_shared:3
+/sys/kernel/mm/ksm/pages_sharing:10097
+/sys/kernel/mm/ksm/pages_to_scan:200
+/sys/kernel/mm/ksm/pages_unshared:53
+/sys/kernel/mm/ksm/pages_volatile:1
+/sys/kernel/mm/ksm/run:0
+/sys/kernel/mm/ksm/sleep_millisecs:1000
+---------------------------
 
-> Thanks a lot, that was really helpful.
+int main(int argc, char *argv[])
+{
+        int i, n, size, ret;
+        char *buffer;
+        void *addr;
 
-No problem. FWIW if you ever come to doing ACPI support for these SoCs, 
-the equivalent is merely a case of setting the device memory address 
-size limit field appropriately for all the named components.
+        n = 100;
+        size = 100 * getpagesize();
+        for (i = 0; i < n; i++) {
+                buffer = (char *)malloc(size);
+                memset(buffer, 0xff, size);
+                madvise(buffer, size, MADV_MERGEABLE);
+                if (ret < 0) {
+                        fprintf(stderr, "malloc madvise failed: ret:
+%d, reason: %s\n", ret, strerror(errno));
+                }
+                usleep(500);
+        }
+        printf("Done....press ^C\n");
+        pause();
+        return 0;
+}
+Note: madvise() system call is not failing here, as mentioned earlier.
+I guess the page is aligned with getpagesize().
+Then I do this to invoke ksm:
+# echo 1 > /sys/kernel/mm/ksm/run
+# ./malloc-test.out &
+# sleep 5
+# echo 0 > /sys/kernel/mm/ksm/run
+#
 
-Robin.
+Also, the anon pages in the system shows like this:
+BEFORE:
+-------------
+~ # cat /proc/meminfo | grep -i anon
+Active(anon):      40740 kB
+Inactive(anon):        0 kB
+AnonPages:         40760 kB
+AnonHugePages:         0 kB
+
+AFTER MERGING:
+--------------------------
+~ # cat /proc/meminfo | grep -i anon
+Active(anon):        440 kB
+Inactive(anon):        0 kB
+AnonPages:           188 kB
+AnonHugePages:         0 kB
+
+I want to understand the KSM output w.r.t to the above program, and
+cross-check if the output is correct.
+Can someone help me to understand it?
+
+As of now, what I understood is that:
+- I am allocating around 400KB of memory 100 times. That is: 100 * 100
+* 4K = 10000 pages (which are all with similar content).
+- Output says: 10097 page_sharing happened.
+- Pages currently shared is: 3
+- So total pages are: 10097 + 3 = 10100
+
+I could not understand from where the additional 100 pages came from?
+Also, why some pages are shown as: pages_unshared ?
+What can I interpret from this?
+And, what does it mean by: pages_volatile:1 ?
+
+Basically, I wanted to understand, is there any problem with the above
+output, or it is fine.
+If it is fine, how to prove it?
+
+
+
+Thanks,
+Pintu
+
+On Mon, Sep 17, 2018 at 8:29 PM Mike Rapoport <rppt@linux.vnet.ibm.com> wrote:
+>
+> On Mon, Sep 17, 2018 at 05:25:27PM +0530, Pintu Kumar wrote:
+> > On Mon, Sep 17, 2018 at 11:46 AM Pintu Kumar <pintu.ping@gmail.com> wrote:
+> > > > > But still no effect.
+> > > > > And I checked LTP test cases. It almost doing the same thing.
+> > > > >
+> > > > > I observed that [ksmd] thread is not waking up at all.
+> > > > > I gave some print inside it, but I could never saw that prints coming.
+> > > > > I could not find it running either in top command during the operation.
+> > > > > Is there anything needs to be done, to wakw up ksmd?
+> > > > > I already set: echo 1 > /sys/kernel/mm/ksm.
+> > > >
+> > > > It should be echo 1 > /sys/kernel/mm/ksm/run
+> > > >
+> > >
+> > > Oh yes, sorry for the typo.
+> > > I tried the same, but still ksm is not getting invoked.
+> > > Could someone confirm if KSM was working in 4.9 kernel?
+> > >
+> >
+> > Ok, it's working now. I have to explicitly stop the ksm thread to see
+> > the statistics.
+> > Also there was some internal patch that was setting vm_flags to
+> > VM_MERGABLE thus causing ksm_advise call to return.
+> >
+> > # echo 1 > /sys/kernel/mm/ksm/run
+> > # ./malloc-test.out &
+> > # echo 0 > /sys/kernel/mm/ksm/run
+> >
+> > ~ # grep -H '' /sys/kernel/mm/ksm/*
+> > /sys/kernel/mm/ksm/full_scans:105
+> > /sys/kernel/mm/ksm/pages_shared:1
+> > /sys/kernel/mm/ksm/pages_sharing:999
+> > /sys/kernel/mm/ksm/pages_to_scan:100
+> > /sys/kernel/mm/ksm/pages_unshared:0
+> > /sys/kernel/mm/ksm/pages_volatile:0
+> > /sys/kernel/mm/ksm/run:0
+> > /sys/kernel/mm/ksm/sleep_millisecs:20
+> >
+> >
+> > However, I have one doubt.
+> > Is the above data correct, for the below program?
+>
+> You have 1 shared page and 999 additional references to that page
+>
+> > int main(int argc, char *argv[])
+> > {
+> >         int i, n, size, ret;
+> >         char *buffer;
+> >         void *addr;
+> >
+> >         n = 10;
+> >         size = 100 * getpagesize();
+> >         for (i = 0; i < n; i++) {
+> >                 buffer = (char *)malloc(size);
+> >                 memset(buffer, 0xff, size);
+> >                 madvise(buffer, size, MADV_MERGEABLE);o
+>
+> This madvise() call should fail because buffer won't be page aligned
+>
+> >                 addr =  mmap(NULL, size,
+> >                            PROT_READ | PROT_EXEC | PROT_WRITE,
+> > MAP_PRIVATE | MAP_ANONYMOUS,
+> >                            -1, 0);
+> >                 memset(addr, 0xff, size);
+> >                 ret = madvise(addr, size, MADV_MERGEABLE);
+> >                 if (ret < 0) {
+> >                         fprintf(stderr, "madvise failed: ret: %d,
+> > reason: %s\n", ret, strerror(errno));
+> >                 }
+> >                 usleep(500);
+> >         }
+> >         printf("Done....press ^C\n");
+> >
+> >         pause();
+> >
+> >         return 0;
+> > }
+> >
+> >
+> > Thanks,
+> > Pintu
+> >
+>
+> --
+> Sincerely yours,
+> Mike.
+>
