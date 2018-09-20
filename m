@@ -1,31 +1,47 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 20 Sep 2018 16:52:18 +0930
-Subject: [PATCH v3] ARM: dts: aspeed: Adding Facebook TiogaPass BMC
-In-Reply-To: <20180918234110.1908926-1-vijaykhemka@fb.com>
-References: <20180918234110.1908926-1-vijaykhemka@fb.com>
-Message-ID: <CACPK8Xd_ZKrQa3b98Bpb=wy_P3=FDUjPDfBSHx5Wx_NHk6Y5og@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 20 Sep 2018 09:23:54 +0200
+Subject: [PATCH 1/2] libata: add ledtrig support
+In-Reply-To: <1537328730-9156-2-git-send-email-aditya@kobol.io>
+References: <1537328730-9156-1-git-send-email-aditya@kobol.io>
+ <1537328730-9156-2-git-send-email-aditya@kobol.io>
+Message-ID: <20180920072354.GA20392@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Vijay,
+Hi!
 
-On Wed, 19 Sep 2018 at 09:11, Vijay Khemka <vijaykhemka@fb.com> wrote:
-> Initial introduction of Facebook TiogaPass family equipped with
-> Aspeed 2500 BMC SoC. TiogaPass is a x86 server development kit
-> with a ASPEED ast2500 BMC manufactured by Facebook.
-> Specifically, This adds the tiogapass platform device tree file
-> including the flash layout used by the tiogapass BMC machines.
->
-> This also adds an entry of tiogapass device tree file in Makefile
->
-> Signed-off-by: Vijay Khemka <vijaykhemka@fb.com>
+> +#ifdef CONFIG_ATA_LEDS
+> +	/* register LED triggers for all ports */
+> +	for (i = 0; i < host->n_ports; i++) {
+> +		if (unlikely(!host->ports[i]->ledtrig))
+> +			continue;
+> +
+> +		snprintf(host->ports[i]->ledtrig_name,
+> +			sizeof(host->ports[i]->ledtrig_name), "ata%u",
+> +			host->ports[i]->print_id);
 
-It looks like you've addressed the concerns from previous reviews. If
-any comments come up please address them in follow up patches.
+> +		host->ports[i]->ledtrig->name = host->ports[i]->ledtrig_name;
+> +
+> +		if (led_trigger_register(host->ports[i]->ledtrig)) {
+> +			kfree(host->ports[i]->ledtrig);
+> +			host->ports[i]->ledtrig = NULL;
+> +		}
+> +	}
+> +#endif
 
-I made some minor whitespace fixes and applied this to the aspeed
-v4.20 device tree branch.
+No, we don't want you to register multiple triggers. We want one
+trigger, than has parameter "which port to watch". (Number of triggers
+is limited as by sysfs limitations).
 
-Cheers,
-
-Joel
+Otherwise yes, ata trigger makes sense.
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180920/35ad8ce6/attachment.sig>
