@@ -1,8 +1,8 @@
 From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Thu, 20 Sep 2018 13:37:47 +0200
+Date: Thu, 20 Sep 2018 13:38:35 +0200
 Subject: [PATCH] ARM: dts: BCM53573: Relicense Tenda AC9 file to the GPL 2.0+
  / MIT
-Message-ID: <20180920113747.26832-1-zajec5@gmail.com>
+Message-ID: <20180920113835.26928-1-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
