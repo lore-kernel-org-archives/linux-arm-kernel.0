@@ -1,63 +1,66 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Fri, 21 Sep 2018 11:46:16 +0200
-Subject: [PATCH V2 22/27] mmc: mmci: add variant property to not read datacnt
+Date: Fri, 21 Sep 2018 11:46:15 +0200
+Subject: [PATCH V2 21/27] mmc: mmci: add variant property to write datactrl
+ before command
 In-Reply-To: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
 References: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1537523181-14578-23-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1537523181-14578-22-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Barre <ludovic.barre@st.com>
 
-This patch adds a boolean property to not read datacnt register.
-Needed to support the STM32 sdmmc variant. MMCIDATACNT
-register should be read only after the data transfer is completed.
-When reading after an error event the read data count value may be
-different from the real number of data bytes transferred.
+This patch adds a boolean property to allow to write datactrl
+before to send command, whatever the command type (read or write).
+Needed to support the STM32 sdmmc variant.
 
 Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 ---
- drivers/mmc/host/mmci.c | 8 ++++++--
- drivers/mmc/host/mmci.h | 3 +++
- 2 files changed, 9 insertions(+), 2 deletions(-)
+ drivers/mmc/host/mmci.c | 6 ++++--
+ drivers/mmc/host/mmci.h | 2 ++
+ 2 files changed, 6 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index b525ba4..b1d5bc5 100644
+index f61b10b..b525ba4 100644
 --- a/drivers/mmc/host/mmci.c
 +++ b/drivers/mmc/host/mmci.c
-@@ -1095,8 +1095,12 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
- 		 * can be as much as a FIFO-worth of data ahead.  This
- 		 * matters for FIFO overruns only.
- 		 */
--		remain = readl(host->base + MMCIDATACNT);
--		success = data->blksz * data->blocks - remain;
-+		if (!host->variant->datacnt_useless) {
-+			remain = readl(host->base + MMCIDATACNT);
-+			success = data->blksz * data->blocks - remain;
-+		} else {
-+			success = 0;
-+		}
+@@ -1239,7 +1239,8 @@ mmci_cmd_irq(struct mmci_host *host, struct mmc_command *cmd,
+ 		mmci_request_end(host, host->mrq);
+ 	} else if (sbc) {
+ 		mmci_start_command(host, host->mrq->cmd, 0);
+-	} else if (!(cmd->data->flags & MMC_DATA_READ)) {
++	} else if (!host->variant->datactrl_first &&
++		   !(cmd->data->flags & MMC_DATA_READ)) {
+ 		mmci_start_data(host, cmd->data);
+ 	}
+ }
+@@ -1503,7 +1504,8 @@ static void mmci_request(struct mmc_host *mmc, struct mmc_request *mrq)
+ 	if (mrq->data)
+ 		mmci_get_next_data(host, mrq->data);
  
- 		dev_dbg(mmc_dev(host->mmc), "MCI ERROR IRQ, status 0x%08x at 0x%08x\n",
- 			status_err, success);
+-	if (mrq->data && mrq->data->flags & MMC_DATA_READ)
++	if (mrq->data &&
++	    (host->variant->datactrl_first || mrq->data->flags & MMC_DATA_READ))
+ 		mmci_start_data(host, mrq->data);
+ 
+ 	if (mrq->sbc)
 diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index 93e879b..e130689 100644
+index cd72c2e..93e879b 100644
 --- a/drivers/mmc/host/mmci.h
 +++ b/drivers/mmc/host/mmci.h
-@@ -224,6 +224,8 @@ struct mmci_host;
+@@ -223,6 +223,7 @@ struct mmci_host;
+  * @datactrl_mask_sdio: SDIO enable mask in datactrl register
   * @datactrl_blksz: block size in power of two
   * @datactrl_dpsm_enable: enable value for DPSM
-  * @datactrl_first: true if data must be setup before send command
-+ * @datacnt_useless: true if you could not use datacnt register to read
-+ *		     remaining data
++ * @datactrl_first: true if data must be setup before send command
   * @pwrreg_powerup: power up value for MMCIPOWER register
   * @f_max: maximum clk frequency supported by the controller.
   * @signal_direction: input/out direction of bus signals can be indicated
-@@ -264,6 +266,7 @@ struct variant_data {
+@@ -262,6 +263,7 @@ struct variant_data {
+ 	unsigned int		datactrl_mask_sdio;
  	unsigned int		datactrl_blocksz;
  	unsigned int		datactrl_dpsm_enable;
- 	bool			datactrl_first;
-+	bool			datacnt_useless;
++	bool			datactrl_first;
  	bool			st_sdio;
  	bool			st_clkdiv;
  	bool			blksz_datactrl16;
