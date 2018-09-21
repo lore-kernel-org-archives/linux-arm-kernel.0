@@ -1,73 +1,33 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 21 Sep 2018 22:47:42 +0800
-Subject: [kvmarm:kvm-arm64/nv-wip 2/5]
- arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c:84:7: error: implicit
- declaration of function 'is_hyp_ctxt'; did you mean '__hyp_text'?
-Message-ID: <201809212238.0QYAZ1zq%fengguang.wu@intel.com>
+From: rodrigo@tjader.xyz (=?UTF-8?Q?Rodrigo_Exterck=C3=B6tter_Tj=C3=A4der?=)
+Date: Fri, 21 Sep 2018 11:54:07 -0300
+Subject: [PATCH 1/2] arm64: dts: allwinner: Olimex A64-OLinuXino: enable
+ eMMC.
+In-Reply-To: <20180921142811.h5jraemk565alh3i@flea>
+References: <20180919141815.18737-1-rodrigo@tjader.xyz>
+ <20180921142811.h5jraemk565alh3i@flea>
+Message-ID: <CAG7TQgE_KU_cK_4E+NG8Qcw-QB2=C6YoqBYR2svmWxywFyySCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git kvm-arm64/nv-wip
-head:   03b558f083eda25ac9bd2e7af7d751ba34a2124a
-commit: e6b4cd37fbd22bd9f9964141628fe5db75fb6a8d [2/5] KVM: arm/arm64: timer: Support hyp timer emulation for nested virt
-config: arm-axm55xx_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout e6b4cd37fbd22bd9f9964141628fe5db75fb6a8d
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=arm 
+On Fri, Sep 21, 2018 at 11:28 AM Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+> Expanding a bit more that commit log would be helpful. What is the
+> eMMC connected to that board? Do all versions have it? Which modes are
+> supposed to be supported, and which one have been tested?
 
-All errors (new ones prefixed by >>):
+The terseness of the commit message was already pointed out to me on
+#linux-sunxi. I was waiting for more comments before sending a v2.
 
-   arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c: In function 'get_timer_map':
->> arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c:84:7: error: implicit declaration of function 'is_hyp_ctxt'; did you mean '__hyp_text'? [-Werror=implicit-function-declaration]
-      if (is_hyp_ctxt(vcpu)) {
-          ^~~~~~~~~~~
-          __hyp_text
-   cc1: some warnings being treated as errors
+But you do touch on something I also realized: there are actually
+three versions of the A64-OLinuXino. In fact only one of them has the
+WiFi board, which is already enabled in the current device tree.
+Wouldn't it be better to split it into three separate device trees? I
+have made a patch that does that[1], if you think that is a good
+approach I can submit that as a patch and then later submit a patch on
+top of that to enable the eMMC only on the two boards that have it.
 
-vim +84 arch/arm/kvm/../../../virt/kvm/arm/arch_timer.c
+I only have the A64-OLinuXino model that has both eMMC and WiFi. I
+have tested all three of the split device trees on it and they worked
+as expected.
 
-    80	
-    81	static void get_timer_map(struct kvm_vcpu *vcpu, struct timer_map *map)
-    82	{
-    83		if (nested_virt_in_use(vcpu)) {
-  > 84			if (is_hyp_ctxt(vcpu)) {
-    85				map->direct_vtimer = vcpu_hvtimer(vcpu);
-    86				map->direct_ptimer = vcpu_hptimer(vcpu);
-    87				map->emul_vtimer = vcpu_vtimer(vcpu);
-    88				map->emul_ptimer = vcpu_ptimer(vcpu);
-    89			} else {
-    90				map->direct_vtimer = vcpu_vtimer(vcpu);
-    91				map->direct_ptimer = vcpu_ptimer(vcpu);
-    92				map->emul_vtimer = vcpu_hvtimer(vcpu);
-    93				map->emul_ptimer = vcpu_hptimer(vcpu);
-    94			}
-    95		}
-    96	
-    97		if (has_vhe()) {
-    98			map->direct_vtimer = vcpu_vtimer(vcpu);
-    99			map->direct_ptimer = vcpu_ptimer(vcpu);
-   100			map->emul_vtimer = NULL;
-   101			map->emul_ptimer = NULL;
-   102		} else {
-   103			map->direct_vtimer = vcpu_vtimer(vcpu);
-   104			map->direct_ptimer = NULL;
-   105			map->emul_vtimer = NULL;
-   106			map->emul_ptimer = vcpu_ptimer(vcpu);
-   107		}
-   108	}
-   109	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 20259 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180921/feb22874/attachment-0001.gz>
+[1] https://github.com/RodrigoTjader/linux/commit/9f7cb025afbcb4b40d24c038fd976c7090d87d24
