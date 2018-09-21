@@ -1,62 +1,56 @@
 From: andreyknvl@google.com (Andrey Konovalov)
-Date: Fri, 21 Sep 2018 17:13:27 +0200
-Subject: [PATCH v9 05/20] kasan, arm64: adjust shadow size for tag-based mode
+Date: Fri, 21 Sep 2018 17:13:25 +0200
+Subject: [PATCH v9 03/20] kasan: rename source files to reflect the new naming
+ scheme
 In-Reply-To: <cover.1537542735.git.andreyknvl@google.com>
 References: <cover.1537542735.git.andreyknvl@google.com>
-Message-ID: <10cf432f0ffdb67fbd495acc61bdd9517af5b7b7.1537542735.git.andreyknvl@google.com>
+Message-ID: <875284629f1727911c2388ebe724fdd0b609eefa.1537542735.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tag-based KASAN uses 1 shadow byte for 16 bytes of kernel memory, so it
-requires 1/16th of the kernel virtual address space for the shadow memory.
-
-This commit sets KASAN_SHADOW_SCALE_SHIFT to 4 when the tag-based KASAN
-mode is enabled.
+We now have two KASAN modes: generic KASAN and tag-based KASAN. Rename
+kasan.c to generic.c to reflect that. Also rename kasan_init.c to init.c
+as it contains initialization code for both KASAN modes.
 
 Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
 ---
- arch/arm64/Makefile             |  2 +-
- arch/arm64/include/asm/memory.h | 13 +++++++++----
- 2 files changed, 10 insertions(+), 5 deletions(-)
+ mm/kasan/Makefile                 | 8 ++++----
+ mm/kasan/{kasan.c => generic.c}   | 0
+ mm/kasan/{kasan_init.c => init.c} | 0
+ 3 files changed, 4 insertions(+), 4 deletions(-)
+ rename mm/kasan/{kasan.c => generic.c} (100%)
+ rename mm/kasan/{kasan_init.c => init.c} (100%)
 
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 106039d25e2f..11f4750d8d41 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -94,7 +94,7 @@ endif
- # KASAN_SHADOW_OFFSET = VA_START + (1 << (VA_BITS - KASAN_SHADOW_SCALE_SHIFT))
- #				 - (1 << (64 - KASAN_SHADOW_SCALE_SHIFT))
- # in 32-bit arithmetic
--KASAN_SHADOW_SCALE_SHIFT := 3
-+KASAN_SHADOW_SCALE_SHIFT := $(if $(CONFIG_KASAN_SW_TAGS), 4, 3)
- KASAN_SHADOW_OFFSET := $(shell printf "0x%08x00000000\n" $$(( \
- 	(0xffffffff & (-1 << ($(CONFIG_ARM64_VA_BITS) - 32))) \
- 	+ (1 << ($(CONFIG_ARM64_VA_BITS) - 32 - $(KASAN_SHADOW_SCALE_SHIFT))) \
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index b96442960aea..0f1e024a951f 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -74,12 +74,17 @@
- #define KERNEL_END        _end
+diff --git a/mm/kasan/Makefile b/mm/kasan/Makefile
+index a6df14bffb6b..d643530b24aa 100644
+--- a/mm/kasan/Makefile
++++ b/mm/kasan/Makefile
+@@ -1,14 +1,14 @@
+ # SPDX-License-Identifier: GPL-2.0
+ KASAN_SANITIZE := n
+ UBSAN_SANITIZE_common.o := n
+-UBSAN_SANITIZE_kasan.o := n
++UBSAN_SANITIZE_generic.o := n
+ KCOV_INSTRUMENT := n
  
- /*
-- * KASAN requires 1/8th of the kernel virtual address space for the shadow
-- * region. KASAN can bloat the stack significantly, so double the (minimum)
-- * stack size when KASAN is in use.
-+ * Generic and tag-based KASAN require 1/8th and 1/16th of the kernel virtual
-+ * address space for the shadow region respectively. They can bloat the stack
-+ * significantly, so double the (minimum) stack size when they are in use.
-  */
--#ifdef CONFIG_KASAN
-+#ifdef CONFIG_KASAN_GENERIC
- #define KASAN_SHADOW_SCALE_SHIFT 3
-+#endif
-+#ifdef CONFIG_KASAN_SW_TAGS
-+#define KASAN_SHADOW_SCALE_SHIFT 4
-+#endif
-+#ifdef CONFIG_KASAN
- #define KASAN_SHADOW_SIZE	(UL(1) << (VA_BITS - KASAN_SHADOW_SCALE_SHIFT))
- #define KASAN_THREAD_SHIFT	1
- #else
+-CFLAGS_REMOVE_kasan.o = -pg
++CFLAGS_REMOVE_generic.o = -pg
+ # Function splitter causes unnecessary splits in __asan_load1/__asan_store1
+ # see: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=63533
+ 
+ CFLAGS_common.o := $(call cc-option, -fno-conserve-stack -fno-stack-protector)
+-CFLAGS_kasan.o := $(call cc-option, -fno-conserve-stack -fno-stack-protector)
++CFLAGS_generic.o := $(call cc-option, -fno-conserve-stack -fno-stack-protector)
+ 
+-obj-y := common.o kasan.o report.o kasan_init.o quarantine.o
++obj-y := common.o generic.o report.o init.o quarantine.o
+diff --git a/mm/kasan/kasan.c b/mm/kasan/generic.c
+similarity index 100%
+rename from mm/kasan/kasan.c
+rename to mm/kasan/generic.c
+diff --git a/mm/kasan/kasan_init.c b/mm/kasan/init.c
+similarity index 100%
+rename from mm/kasan/kasan_init.c
+rename to mm/kasan/init.c
 -- 
 2.19.0.444.g18242da7ef-goog
