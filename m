@@ -1,53 +1,54 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Fri, 21 Sep 2018 15:09:48 +0200
-Subject: [GIT PULL] STM32 defconfig changes for v4.20 #1
-Message-ID: <000b0ae8-a88d-9e0a-e8cc-4ec381817db0@st.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Fri, 21 Sep 2018 18:00:18 +0530
+Subject: [PATCHv3 0/7] Add support for UHS-I on Exynos5422 odroid boards
+In-Reply-To: <CAJKOXPdsAK1_9JRzq7_pVfDwBK6WGkFbYUsbcsujCh31Fzsz6g@mail.gmail.com>
+References: <20180920175826.1284-1-linux.amoon@gmail.com>
+ <CAJKOXPdsAK1_9JRzq7_pVfDwBK6WGkFbYUsbcsujCh31Fzsz6g@mail.gmail.com>
+Message-ID: <CANAwSgT-1pz-NQMb68F7m0rAFNkpCOyFqFPf7-HbZe+92+sPPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof and Kevin,
+Hi Krzysztof,
 
-Please consider this first round of STM32 defconfig updates for v4.20.
-This time it concerns only multi_v7_defconfig.
+On Fri, 21 Sep 2018 at 16:26, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>
+> On Thu, 20 Sep 2018 at 19:58, Anand Moon <linux.amoon@gmail.com> wrote:
+> >
+> > This is series v3 since my previous patches we incomplete with driver
+> > changes missing.
+> >
+> > These changes add UHS-I tuning for dw_mmc-exynos driver.
+> > Some new patches are added to enhance the performace.
+>
+> Patches look like based on some older version of kernel tree (or
+> current mainline) and probably they will not apply on my tree. The
+> easiest is to base on top of linux-next or, for DTS patches, on my
+> next/dt branch.
+>
+> Best regards,
+> Krzysztof
+>
+Yes this patch is based on current mainline.
+I will try to re-base on your next/dt branch and resend them.
 
-Thanks.
-Alex
-
-The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
-
-   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
-
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git 
-tags/stm32-defconfig-for-v4.20-1
-
-for you to fetch changes up to 4c736c22d954c81d430558ff62738a35f96f29da:
-
-   ARM: multi_v7_defconfig: enable backlight gpio (2018-09-21 14:59:29 
-+0200)
-
-----------------------------------------------------------------
-STM32 defconfig updates for v4.20, round 1
-
-Highlights:
-----------
-
-In multi_v7_defconfig, add support of:
-
--STM32 SPI (module)
--STM32 DRM and MIPI DSI (modules)
--Pannels OTM8009A and RM68200 (modules)
--Enable backlight gpio
-
-----------------------------------------------------------------
-Amelie Delaunay (1):
-       ARM: multi_v7_defconfig: enable STM32 SPI
-
-Yannick Fertr? (3):
-       ARM: multi_v7_defconfig: enable STM32 DRM and MIPI DSI support
-       ARM: multi_v7_defconfig: enable panels OTM8009A and RM68200
-       ARM: multi_v7_defconfig: enable backlight gpio
-
-  arch/arm/configs/multi_v7_defconfig | 6 ++++++
-  1 file changed, 6 insertions(+)
+Best Regards
+-Anand
+> >
+> > Anand Moon (7):
+> >   ARM: dts: exynos5422: Added UHS-I bus speed support
+> >   ARM: dts: exynos5422: fix regulator min values of LDO13 for Odroid
+> >     XU3/XU4
+> >   ARM: dts: exynos5422: update maximum frequency for sdcard to 200MHz
+> >   ARM: dts: exynos5422: use cd-gpio method to detect sd-card
+> >   ARM: dts: exynos5422: use wp-gpio method to detect sd-card
+> >   ARM: dts: exynos5422: update maximum frequency for emmc to 200MHz
+> >   mmc: dw_mmc-exynos: Add tuning for sdr and ddr timing for USH-I mode
+> >
+> >  arch/arm/boot/dts/exynos5422-odroid-core.dtsi      |  8 +++++++-
+> >  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  1 +
+> >  drivers/mmc/host/dw_mmc-exynos.c                   | 11 +++++++++++
+> >  3 files changed, 19 insertions(+), 1 deletion(-)
+> >
+> > --
+> > 2.17.1
+> >
