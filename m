@@ -1,152 +1,29 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 21 Sep 2018 20:59:50 +0100
-Subject: [PATCH 06/10] irqchip/gic-v3-its: Allow use of pre-programmed LPI
- tables
-In-Reply-To: <20180921195954.21574-1-marc.zyngier@arm.com>
-References: <20180921195954.21574-1-marc.zyngier@arm.com>
-Message-ID: <20180921195954.21574-7-marc.zyngier@arm.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 21 Sep 2018 22:34:03 +0200
+Subject: [PATCH 3/5] spi: pxa2xx: use an enum for type
+In-Reply-To: <20180910115935.163121-4-lkundrak@v3.sk> (Lubomir Rintel's
+ message of "Mon, 10 Sep 2018 13:59:33 +0200")
+References: <20180910115935.163121-1-lkundrak@v3.sk>
+ <20180910115935.163121-4-lkundrak@v3.sk>
+Message-ID: <87d0t64mkk.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to cope with kexec and GICv3, let's try and spot when
-we're booting with LPIs already enabled, and the tables already
-programmed into the redistributors.
+Lubomir Rintel <lkundrak@v3.sk> writes:
 
-This code is currently guarded by a predicate that is always false,
-meaning this is not functionnal just yet.
+> That seems to be the correct type.
+Okay, but what happens here when adev_id->driver_data is a value out of enum
+range ? Does the following assignment make sense ?
+> +		type = (enum pxa_ssp_type)adev_id->driver_data;
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/irqchip/irq-gic-v3-its.c | 73 ++++++++++++++++++++++++++------
- 1 file changed, 61 insertions(+), 12 deletions(-)
+As a side note, could you join for the next throw to the review :
+ - Jarkko Nikula <jarkko.nikula@linux.intel.com>
+ - Mika Westerberg <mika.westerberg@linux.intel.com>
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index c2f1138034fd..e29ce9f2ac8a 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -52,6 +52,7 @@
- #define ITS_FLAGS_SAVE_SUSPEND_STATE		(1ULL << 3)
- 
- #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
-+#define RDIST_FLAGS_RD_TABLES_PREALLOCATED	(1 << 1)
- 
- static u32 lpi_id_bits;
- 
-@@ -1628,18 +1629,32 @@ static void its_free_prop_table(struct page *prop_page)
- 
- static int __init its_alloc_lpi_prop_table(void)
- {
--	struct page *page;
-+	if (gic_rdists->flags & RDIST_FLAGS_RD_TABLES_PREALLOCATED) {
-+		u64 val;
- 
--	lpi_id_bits = min_t(u32, GICD_TYPER_ID_BITS(gic_rdists->gicd_typer),
--				ITS_MAX_LPI_NRBITS);
--	page = its_allocate_prop_table(GFP_NOWAIT);
--	if (!page) {
--		pr_err("Failed to allocate PROPBASE\n");
--		return -ENOMEM;
--	}
-+		val = gicr_read_propbaser(gic_data_rdist_rd_base() + GICR_PROPBASER);
-+		lpi_id_bits = (val & GICR_PROPBASER_IDBITS_MASK) + 1;
- 
--	gic_rdists->prop_table_pa = page_to_phys(page);
--	gic_rdists->prop_table_va = page_address(page);
-+		gic_rdists->prop_table_pa = val & GENMASK_ULL(51, 12);
-+		gic_rdists->prop_table_va = memremap(gic_rdists->prop_table_pa,
-+						     LPI_PROPBASE_SZ,
-+						     MEMREMAP_WB);
-+		gic_reset_prop_table(gic_rdists->prop_table_va);
-+	} else {
-+		struct page *page;
-+
-+		lpi_id_bits = min_t(u32,
-+				    GICD_TYPER_ID_BITS(gic_rdists->gicd_typer),
-+				    ITS_MAX_LPI_NRBITS);
-+		page = its_allocate_prop_table(GFP_NOWAIT);
-+		if (!page) {
-+			pr_err("Failed to allocate PROPBASE\n");
-+			return -ENOMEM;
-+		}
-+
-+		gic_rdists->prop_table_pa = page_to_phys(page);
-+		gic_rdists->prop_table_va = page_address(page);
-+	}
- 
- 	pr_info("GICv3: using LPI property table @%pa\n",
- 		&gic_rdists->prop_table_pa);
-@@ -1948,10 +1963,27 @@ static void its_free_pending_table(struct page *pt)
- 	free_pages((unsigned long)page_address(pt), get_order(LPI_PENDBASE_SZ));
- }
- 
-+static bool enabled_lpis_allowed(void)
-+{
-+	return false;
-+}
-+
- static int __init allocate_lpi_tables(void)
- {
-+	u64 val;
- 	int err, cpu;
- 
-+	/*
-+	 * If LPIs are enabled while we run this from the boot CPU,
-+	 * flag the RD tables as pre-allocated if the stars do align.
-+	 */
-+	val = readl_relaxed(gic_data_rdist_rd_base() + GICR_CTLR);
-+	if ((val & GICR_CTLR_ENABLE_LPIS) && enabled_lpis_allowed()) {
-+		gic_rdists->flags |= (RDIST_FLAGS_RD_TABLES_PREALLOCATED |
-+				      RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING);
-+		pr_info("GICv3: Using preallocated redistributor tables\n");
-+	}
-+
- 	err = its_alloc_lpi_prop_table();
- 	if (err)
- 		return err;
-@@ -1986,6 +2018,18 @@ static void its_cpu_init_lpis(void)
- 	if (gic_data_rdist()->lpi_enabled)
- 		return;
- 
-+	val = readl_relaxed(rbase + GICR_CTLR);
-+	if ((gic_rdists->flags & RDIST_FLAGS_RD_TABLES_PREALLOCATED) &&
-+	    (val & GICR_CTLR_ENABLE_LPIS)) {
-+		paddr = gicr_read_pendbaser(rbase + GICR_PENDBASER);
-+		paddr &= GENMASK_ULL(51, 16);
-+
-+		its_free_pending_table(gic_data_rdist()->pend_page);
-+		gic_data_rdist()->pend_page = NULL;
-+
-+		goto out;
-+	}
-+
- 	pend_page = gic_data_rdist()->pend_page;
- 	paddr = page_to_phys(pend_page);
- 
-@@ -2040,9 +2084,11 @@ static void its_cpu_init_lpis(void)
- 
- 	/* Make sure the GIC has seen the above */
- 	dsb(sy);
-+out:
- 	gic_data_rdist()->lpi_enabled = true;
--	pr_info("GICv3: CPU%d: using LPI pending table @%pa\n",
-+	pr_info("GICv3: CPU%d: using %s LPI pending table @%pa\n",
- 		smp_processor_id(),
-+		gic_data_rdist()->pend_page ? "allocated" : "reserved",
- 		&paddr);
- }
- 
-@@ -3535,8 +3581,11 @@ static int redist_disable_lpis(void)
- 	 * If coming via a CPU hotplug event, we don't need to disable
- 	 * LPIs before trying to re-enable them. They are already
- 	 * configured and all is well in the world.
-+	 *
-+	 * If running with preallocated tables, there is nothing to do.
- 	 */
--	if (gic_data_rdist()->lpi_enabled)
-+	if (gic_data_rdist()->lpi_enabled ||
-+	    (gic_rdists->flags & RDIST_FLAGS_RD_TABLES_PREALLOCATED))
- 		return 0;
- 
- 	/*
+Even if they are Intel, I think they have worked a lot on this driver for Intel
+platforms.
+
+Cheers.
+
 -- 
-2.18.0
+Robert
