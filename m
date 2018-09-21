@@ -1,143 +1,95 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 21 Sep 2018 15:51:48 +0530
-Subject: [RFC PATCH 33/40] dt-bindings: phy: ti: Add dt binding documentation
- for SERDES in AM654x SoC
+Date: Fri, 21 Sep 2018 15:51:38 +0530
+Subject: [RFC PATCH 23/40] PCI: keystone: Cleanup macros defined in
+ pci-keystone.c
 In-Reply-To: <20180921102155.22839-1-kishon@ti.com>
 References: <20180921102155.22839-1-kishon@ti.com>
-Message-ID: <20180921102155.22839-34-kishon@ti.com>
+Message-ID: <20180921102155.22839-24-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM654x has two SERDES instances. Each instance has three input clocks
-(left input, externel reference clock and right input) and two output
-clocks (left output and right output) in addition to a PLL mux clock
-which the SERDES uses for Clock Multiplier Unit (CMU refclock).
-The PLL mux clock can select from one of the three input clocks.
-The right output can select between left input and external reference
-clock while the left output can select between the right input and
-external reference clock.
-
-The left and right input reference clock of SERDES0 and SERDES1
-respectively are connected to the SoC clock. In the case of two lane
-SERDES personality card, the left input of SERDES1 is connected to
-the right output of SERDES0 in a chained fashion.
-
-See section "Reference Clock Distribution" of AM65x Sitara Processors
-TRM (SPRUID7 ? April 2018) for more details.
-
-Add dt-binding documentation in order to represent all these different
-configurations in device tree.
+No functional change. Cleanup macros defined in pci-keystone.c
+by removing unused macros, grouping the macros and aligning
+it properly.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- .../devicetree/bindings/phy/ti-phy.txt        | 77 +++++++++++++++++++
- include/dt-bindings/phy/phy-am654-serdes.h    | 13 ++++
- 2 files changed, 90 insertions(+)
- create mode 100644 include/dt-bindings/phy/phy-am654-serdes.h
+ drivers/pci/controller/dwc/pci-keystone.c | 41 +++++++++--------------
+ 1 file changed, 16 insertions(+), 25 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/phy/ti-phy.txt b/Documentation/devicetree/bindings/phy/ti-phy.txt
-index 57dfda8a7a1d..fc2fff6b2c37 100644
---- a/Documentation/devicetree/bindings/phy/ti-phy.txt
-+++ b/Documentation/devicetree/bindings/phy/ti-phy.txt
-@@ -132,3 +132,80 @@ sata_phy: phy at 4a096000 {
- 	syscon-pllreset = <&scm_conf 0x3fc>;
- 	#phy-cells = <0>;
- };
-+
-+
-+TI AM654 SERDES
-+
-+Required properties:
-+ - compatible: Should be "ti,phy-am654-serdes"
-+ - reg : Address and length of the register set for the device.
-+ - reg-names: Should be "serdes" which corresponds to the register space
-+	populated in "reg".
-+ - #phy-cells: determine the number of cells that should be given in the
-+	phandle while referencing this phy. Should be "2". The 1st cell
-+	corresponds to the phy type (should be one of the types specified in
-+	include/dt-bindings/phy/phy.h) and the 2nd cell should be the serdes
-+	lane function.
-+	If SERDES0 is referenced 2nd cell should be:
-+		0 - USB3
-+		1 - PCIe0 Lane0
-+		2 - ICSS2 SGMII Lane0
-+	If SERDES1 is referenced 2nd cell should be:
-+		0 - PCIe1 Lane0
-+		1 - PCIe0 Lane1
-+		2 - ICSS2 SGMII Lane1
-+ - clocks: List of clock-specifiers representing the input to the SERDES.
-+	Should have 3 items representing the left input clock, external
-+	reference clock and right input clock in that order.
-+ - clock-output-names: List of clock names for each of the clock outputs of
-+	SERDES. Should have 3 items for CMU reference clock,
-+	left output clock and right output clock in that order.
-+ - assigned-clocks: As defined in
-+	Documentation/devicetree/bindings/clock/clock-bindings.txt
-+ - assigned-clock-parents: As defined in
-+	Documentation/devicetree/bindings/clock/clock-bindings.txt
-+ - #clock-cells: Should be <1> to choose between the 3 output clocks.
-+	Defined in Documentation/devicetree/bindings/clock/clock-bindings.txt
-+
-+   The following macros are defined in dt-bindings/phy/phy-am654-serdes.h
-+   for selecting the correct reference clock. This can be used while
-+   specifying the clocks created by SERDES.
-+	=> AM654_SERDES_CMU_REFCLK
-+	=> AM654_SERDES_LO_REFCLK
-+	=> AM654_SERDES_RO_REFCLK
-+
-+ - mux-controls: phandle to the multiplexer
-+
-+Example:
-+
-+Example for SERDES0 is given below. It has 3 clock inputs;
-+left input reference clock as indicated by <&k3_clks 153 4>, external
-+reference clock as indicated by <&k3_clks 153 1> and right input
-+reference clock as indicated by <&serdes1 AM654_SERDES_LO_REFCLK>. (The
-+right input of SERDES0 is connected to the left output of SERDES1).
-+
-+SERDES0 registers 3 clock outputs as indicated in clock-output-names. The
-+first refers to the CMU reference clock, second refers to the left output
-+reference clock and the third refers to the right output reference clock.
-+
-+The assigned-clocks and assigned-clock-parents is used here to set the
-+parent of left input reference clock to MAINHSDIV_CLKOUT4 and parent of
-+CMU reference clock to left input reference clock.
-+
-+serdes0: serdes at 900000 {
-+	compatible = "ti,phy-am654-serdes";
-+	reg = <0x0 0x900000 0x0 0x2000>;
-+	reg-names = "serdes";
-+	#phy-cells = <2>;
-+	power-domains = <&k3_pds 153>;
-+	clocks = <&k3_clks 153 4>, <&k3_clks 153 1>,
-+			<&serdes1 AM654_SERDES_LO_REFCLK>;
-+	clock-output-names = "serdes0_cmu_refclk", "serdes0_lo_refclk",
-+				"serdes0_ro_refclk";
-+	assigned-clocks = <&k3_clks 153 4>, <&serdes0 AM654_SERDES_CMU_REFCLK>;
-+	assigned-clock-parents = <&k3_clks 153 8>, <&k3_clks 153 4>;
-+	ti,serdes-clk = <&serdes0_clk>;
-+	mux-controls = <&serdes_mux 0>;
-+	#clock-cells = <1>;
-+	status = "disabled";
-+};
-diff --git a/include/dt-bindings/phy/phy-am654-serdes.h b/include/dt-bindings/phy/phy-am654-serdes.h
-new file mode 100644
-index 000000000000..e8d901729ed9
---- /dev/null
-+++ b/include/dt-bindings/phy/phy-am654-serdes.h
-@@ -0,0 +1,13 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * This header provides constants for AM654 SERDES.
-+ */
-+
-+#ifndef _DT_BINDINGS_AM654_SERDES
-+#define _DT_BINDINGS_AM654_SERDES
-+
-+#define AM654_SERDES_CMU_REFCLK	0
-+#define AM654_SERDES_LO_REFCLK	1
-+#define AM654_SERDES_RO_REFCLK	2
-+
-+#endif /* _DT_BINDINGS_AM654_SERDES */
+diff --git a/drivers/pci/controller/dwc/pci-keystone.c b/drivers/pci/controller/dwc/pci-keystone.c
+index b1dfaea29530..75d007148804 100644
+--- a/drivers/pci/controller/dwc/pci-keystone.c
++++ b/drivers/pci/controller/dwc/pci-keystone.c
+@@ -28,21 +28,14 @@
+ 
+ #include "pcie-designware.h"
+ 
+-#define DRIVER_NAME	"keystone-pcie"
+-
+ #define PCIE_VENDORID_MASK	0xffff
+ #define PCIE_DEVICEID_SHIFT	16
+ 
+-/* DEV_STAT_CTRL */
+-#define PCIE_CAP_BASE		0x70
+-
+-/* Application register defines */
+-#define LTSSM_EN_VAL		        BIT(0)
+-#define DBI_CS2				BIT(5)
+-#define OB_XLAT_EN_VAL		        BIT(1)
+-
+ /* Application registers */
+ #define CMD_STATUS			0x004
++#define LTSSM_EN_VAL		        BIT(0)
++#define OB_XLAT_EN_VAL		        BIT(1)
++#define DBI_CS2				BIT(5)
+ 
+ #define CFG_SETUP			0x008
+ #define CFG_BUS(x)			(((x) & 0xff) << 16)
+@@ -65,18 +58,16 @@
+ #define IRQ_ENABLE_SET(n)		(0x188 + ((n) << 4))
+ #define INTx_EN				BIT(0)
+ 
+-/* Error IRQ bits */
+-#define ERR_AER		BIT(5)	/* ECRC error */
+-#define ERR_AXI		BIT(4)	/* AXI tag lookup fatal error */
+-#define ERR_CORR	BIT(3)	/* Correctable error */
+-#define ERR_NONFATAL	BIT(2)	/* Non-fatal error */
+-#define ERR_FATAL	BIT(1)	/* Fatal error */
+-#define ERR_SYS		BIT(0)	/* System (fatal, non-fatal, or correctable) */
+-#define ERR_IRQ_ALL	(ERR_AER | ERR_AXI | ERR_CORR | \
+-			 ERR_NONFATAL | ERR_FATAL | ERR_SYS)
+ #define ERR_IRQ_STATUS			0x1c4
+ #define ERR_IRQ_ENABLE_SET		0x1c8
+-#define ERR_IRQ_ENABLE_CLR		0x1cc
++#define ERR_AER				BIT(5)	/* ECRC error */
++#define ERR_AXI				BIT(4)	/* AXI tag lookup fatal error */
++#define ERR_CORR			BIT(3)	/* Correctable error */
++#define ERR_NONFATAL			BIT(2)	/* Non-fatal error */
++#define ERR_FATAL			BIT(1)	/* Fatal error */
++#define ERR_SYS				BIT(0)	/* System error */
++#define ERR_IRQ_ALL			(ERR_AER | ERR_AXI | ERR_CORR | \
++					 ERR_NONFATAL | ERR_FATAL | ERR_SYS)
+ 
+ #define OB_OFFSET_INDEX(n)		(0x200 + (8 * (n)))
+ #define OB_ENABLEN			BIT(0)
+@@ -84,12 +75,12 @@
+ #define OB_OFFSET_HI(n)			(0x204 + (8 * (n)))
+ 
+ /* PCIE controller device IDs */
+-#define PCIE_RC_K2HK		0xb008
+-#define PCIE_RC_K2E		0xb009
+-#define PCIE_RC_K2L		0xb00a
+-#define PCIE_RC_K2G		0xb00b
++#define PCIE_RC_K2HK			0xb008
++#define PCIE_RC_K2E			0xb009
++#define PCIE_RC_K2L			0xb00a
++#define PCIE_RC_K2G			0xb00b
+ 
+-#define to_keystone_pcie(x)	dev_get_drvdata((x)->dev)
++#define to_keystone_pcie(x)		dev_get_drvdata((x)->dev)
+ 
+ static int ks_pcie_start_link(struct dw_pcie *pci);
+ static void ks_pcie_stop_link(struct dw_pcie *pci);
 -- 
 2.17.1
