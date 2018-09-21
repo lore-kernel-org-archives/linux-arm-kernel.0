@@ -1,39 +1,51 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 21 Sep 2018 15:05:04 +0100
-Subject: [PATCH] arm64: defconfig: enable HiSilicon HNS3 driver
-In-Reply-To: <1536836203-173901-1-git-send-email-wangzhou1@hisilicon.com>
-References: <1536836203-173901-1-git-send-email-wangzhou1@hisilicon.com>
-Message-ID: <5BA4FA90.1060607@hisilicon.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Fri, 21 Sep 2018 16:05:33 +0200
+Subject: [PATCH] ARM: dts: clearfog: fix sdhci supply property name
+In-Reply-To: <20180921135120.GL30658@n2100.armlinux.org.uk> (Russell King's
+ message of "Fri, 21 Sep 2018 14:51:20 +0100")
+References: <606cef37c2776bdc7dfa3ef578a18c40004e17af.1534878753.git.baruch@tkos.co.il>
+ <871s9nhsr2.fsf@bootlin.com>
+ <20180921135120.GL30658@n2100.armlinux.org.uk>
+Message-ID: <87sh23gd3m.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Zhou,
+Hi Russell King,
+ 
+ On ven., sept. 21 2018, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
 
-On 2018/9/13 11:56, Zhou Wang wrote:
-> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
+> On Fri, Sep 21, 2018 at 03:42:09PM +0200, Gregory CLEMENT wrote:
+>> Hi Baruch,
+>>  
+>>  On mar., ao?t 21 2018, Baruch Siach <baruch@tkos.co.il> wrote:
+>> 
+>> > The vmmc phandle, like all power supply property names, must have the
+>> > '-supply' suffix.
+>> >
+>> 
+>> I also noticed it a few months ago and then I forgot. However, does it
+>> add any value to have this regulator?
+>> 
+>> Now that I found my note, I considered to just remove this line as well
+>> as the regulator node.
+>
+> The "value" is it's a fuller description of the hardware, and DT is a
+> hardware description, not a description of what the software requires.
+> So, imho, it's completely correct to specify the vmmc.  As maintainer
+> for the Clearfog DT, I'd like it to stay (and be fixed).  Thanks.
 
-Thanks!
-Applied to the hisilicon defconfig tree.
+OK so: applied on mvebu/dt
 
-Best Regards,
-Wei
+Thanks,
 
-> ---
->  arch/arm64/configs/defconfig | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index db8d364..101ad54 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -222,6 +222,9 @@ CONFIG_THUNDER_NIC_PF=y
->  CONFIG_HIX5HD2_GMAC=y
->  CONFIG_HNS_DSAF=y
->  CONFIG_HNS_ENET=y
-> +CONFIG_HNS3=y
-> +CONFIG_HNS3_HCLGE=y
-> +CONFIG_HNS3_ENET=y
->  CONFIG_E1000E=y
->  CONFIG_IGB=y
->  CONFIG_IGBVF=y
-> 
+Gregory
+>
+> -- 
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line in suburbia: sync at 13.8Mbps down 630kbps up
+> According to speedtest.net: 13Mbps down 490kbps up
+
+-- 
+Gregory Clement, Bootlin
+Embedded Linux and Kernel engineering
+http://bootlin.com
