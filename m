@@ -1,51 +1,103 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 21 Sep 2018 20:59:51 +0100
-Subject: [PATCH 07/10] irqchip/gic-v3-its: Use pre-programmed redistributor
- tables with kdump kernels
+Date: Fri, 21 Sep 2018 20:59:54 +0100
+Subject: [PATCH 10/10] irqchip/gic-v3-its: Allow use of LPI tables in reserved
+ memory
 In-Reply-To: <20180921195954.21574-1-marc.zyngier@arm.com>
 References: <20180921195954.21574-1-marc.zyngier@arm.com>
-Message-ID: <20180921195954.21574-8-marc.zyngier@arm.com>
+Message-ID: <20180921195954.21574-11-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If using a kdump kernel, and that we cannot disable LPIs to install
-our own tables, let's switch to using the already allocated tables.
+If the LPI tables have been reserved with the EFI reservation
+mechanism, we assume that these tables are safe to use even
+when we find the redistributors to have LPIs enabled at
+boot time, meaning that kexec can now work with GICv3.
 
-This means that we'll change some of the initial kernel's memory,
-but at least we'll be able to have LPIs in this secondary kernel.
+You're welcome.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/irqchip/irq-gic-v3-its.c | 43 ++++++++++++++++++++++++++++----
+ 1 file changed, 38 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index e29ce9f2ac8a..0b3e76cdde26 100644
+index 4912dc57bf07..0235b69160bc 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -19,6 +19,7 @@
- #include <linux/acpi_iort.h>
- #include <linux/bitmap.h>
- #include <linux/cpu.h>
-+#include <linux/crash_dump.h>
- #include <linux/delay.h>
- #include <linux/dma-iommu.h>
- #include <linux/interrupt.h>
-@@ -1963,8 +1964,15 @@ static void its_free_pending_table(struct page *pt)
- 	free_pages((unsigned long)page_address(pt), get_order(LPI_PENDBASE_SZ));
+@@ -28,6 +28,7 @@
+ #include <linux/list.h>
+ #include <linux/list_sort.h>
+ #include <linux/log2.h>
++#include <linux/memblock.h>
+ #include <linux/mm.h>
+ #include <linux/msi.h>
+ #include <linux/of.h>
+@@ -1629,6 +1630,33 @@ static void its_free_prop_table(struct page *prop_page)
+ 		   get_order(LPI_PROPBASE_SZ));
  }
  
-+/*
-+ * Booting with kdump and LPIs enabled is generally fine.
-+ */
- static bool enabled_lpis_allowed(void)
- {
-+	/* Allow a kdump kernel */
++static bool gic_check_reserved_range(phys_addr_t addr, unsigned long size)
++{
++	phys_addr_t start, end, addr_end;
++	u64 i;
++
++	/*
++	 * We don't bother checking for a kdump kernel as by
++	 * construction, the LPI tables are out of this kernel's
++	 * memory map.
++	 */
 +	if (is_kdump_kernel())
 +		return true;
 +
- 	return false;
++	addr_end = addr + size - 1;
++
++	for_each_reserved_mem_region(i, &start, &end) {
++		if (addr >= start && addr_end <= end)
++			return true;
++	}
++
++	/* Not found, not a good sign... */
++	pr_warn("GICv3: Expected reserved range [%pa:%pa], not found\n",
++		&addr, &addr_end);
++	add_taint(TAINT_CRAP, LOCKDEP_STILL_OK);
++	return false;
++}
++
+ static int gic_reserve_range(phys_addr_t addr, unsigned long size)
+ {
+ 	if (efi_enabled(EFI_CONFIG_TABLES))
+@@ -1976,15 +2004,19 @@ static void its_free_pending_table(struct page *pt)
  }
+ 
+ /*
+- * Booting with kdump and LPIs enabled is generally fine.
++ * Booting with kdump and LPIs enabled is generally fine. Any other
++ * case is wrong in the absence of firmware/EFI support.
+  */
+ static bool enabled_lpis_allowed(void)
+ {
+-	/* Allow a kdump kernel */
+-	if (is_kdump_kernel())
+-		return true;
++	phys_addr_t addr;
++	u64 val;
+ 
+-	return false;
++	/* Check whether the property table is in a reserved region */
++	val = gicr_read_propbaser(gic_data_rdist_rd_base() + GICR_PROPBASER);
++	addr = val & GENMASK_ULL(51, 12);
++
++	return gic_check_reserved_range(addr, LPI_PROPBASE_SZ);
+ }
+ 
+ static int __init allocate_lpi_tables(void)
+@@ -2052,6 +2084,7 @@ static void its_cpu_init_lpis(void)
+ 		paddr = gicr_read_pendbaser(rbase + GICR_PENDBASER);
+ 		paddr &= GENMASK_ULL(51, 16);
+ 
++		WARN_ON(!gic_check_reserved_range(paddr, LPI_PENDBASE_SZ));
+ 		its_free_pending_table(gic_data_rdist()->pend_page);
+ 		gic_data_rdist()->pend_page = NULL;
  
 -- 
 2.18.0
