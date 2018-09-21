@@ -1,32 +1,31 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Fri, 21 Sep 2018 12:11:33 +0200
-Subject: Kernel memory leak on CDC-ACM device plug/unplug
-In-Reply-To: <1537517304.15252.0.camel@suse.com>
-References: <CAGkQfmP6o+e_nanviTfRt7Ej9U+4BdqDYvMM83FjHhSCECcH3w@mail.gmail.com>
- <1537517304.15252.0.camel@suse.com>
-Message-ID: <CAGkQfmNYHtBwt14e-gqSKfg7iUQSpitxkCOo9m-q+rcSvp656w@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 21 Sep 2018 11:10:23 +0100
+Subject: [PATCH V2 0/3] Emulate MRS instructions by parsing ESR_ELx.ISS
+In-Reply-To: <1537416381-13674-1-git-send-email-anshuman.khandual@arm.com>
+References: <1537416381-13674-1-git-send-email-anshuman.khandual@arm.com>
+Message-ID: <20180921101022.GB166997@arrakis.emea.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2018-09-21 10:08 GMT+02:00 Oliver Neukum <oneukum@suse.com>:
-> On Mi, 2018-09-19 at 16:11 +0200, Romain Izard wrote:
->> While trying to debug a memory leak problem, I encountered the following
->> problem:
->>
->> After plugging/unplugging an USB CDC-ACM device, kmemleak reports multiple
->> copies of the following leak. It is not necessary to open the port for the
->> leak to happen.
->
-> Hi,
->
-> nothing is immediately obvious to me. Could you compile a kernel with
-> CONFIG_DEBUG_KMEMLEAK?
->
+On Thu, Sep 20, 2018 at 09:36:18AM +0530, Anshuman Khandual wrote:
+> Armv8.4-A extension enables MRS instruction encodings inside ESR_ELx.ISS
+> during exception class ESR_ELx_EC_SYS64 (0x18). This encoding can be used
+> to emulate MRS instructions which can avoid fetch/decode from user space
+> thus improving performance. The patch series here enables this new method
+> of emulating MRS instruction. For this purpose we factorizes the existing
+> emulate_mrs() function and while here, add new macro ESR_ELx_SYS64_ISS_RT.
+> 
+> Changes in V2:
+> 
+> - Replaced the argument 'dst' as 'rt' in second patch per Suzuki
+> - Added review tags from Suzuki
+> 
+> Anshuman Khandual (3):
+>   arm64/cpufeatures: Introduce ESR_ELx_SYS64_ISS_RT()
+>   arm64/cpufeatures: Factorize emulate_mrs()
+>   arm64/cpufeatures: Emulate MRS instructions by parsing ESR_ELx.ISS
 
+Queued for 4.20. Thanks.
 
-The fix for this issue is the following patch:
-https://www.spinics.net/lists/linux-usb/msg172850.html
-
-Best regards,
 -- 
-Romain Izard
+Catalin
