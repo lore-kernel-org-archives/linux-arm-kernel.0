@@ -1,37 +1,40 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 21 Sep 2018 15:51:28 +0530
-Subject: [RFC PATCH 13/40] dt-bindings: PCI: keystone: Add "reg-names" binding
- information
-In-Reply-To: <20180921102155.22839-1-kishon@ti.com>
-References: <20180921102155.22839-1-kishon@ti.com>
-Message-ID: <20180921102155.22839-14-kishon@ti.com>
+From: yogeshnarayan.gaur@nxp.com (Yogesh Gaur)
+Date: Fri, 21 Sep 2018 15:52:03 +0530
+Subject: [PATCH v3 5/5] MAINTAINERS: add maintainers for the NXP FlexSPI driver
+In-Reply-To: <1537525323-20730-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+References: <1537525323-20730-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+Message-ID: <1537525323-20730-6-git-send-email-yogeshnarayan.gaur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add "reg-names" binding information in order for device tree node
-to be populated with the correct register strings.
+Add maintainers for the NXP FlexSPI driver
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
 ---
- Documentation/devicetree/bindings/pci/pci-keystone.txt | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+Changes for v3:
+- None
+Changes for v2:
+- None
 
-diff --git a/Documentation/devicetree/bindings/pci/pci-keystone.txt b/Documentation/devicetree/bindings/pci/pci-keystone.txt
-index 2030ee0dc4f9..3a551687cfa2 100644
---- a/Documentation/devicetree/bindings/pci/pci-keystone.txt
-+++ b/Documentation/devicetree/bindings/pci/pci-keystone.txt
-@@ -12,8 +12,10 @@ described here as well as properties that are not applicable.
- Required Properties:-
+ MAINTAINERS | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 9d5eeff..2696898 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -10228,6 +10228,12 @@ L:	linux-nfc at lists.01.org (moderated for non-subscribers)
+ S:	Supported
+ F:	drivers/nfc/nxp-nci
  
- compatibility: "ti,keystone-pcie"
--reg:	index 1 is the base address and length of DW application registers.
--	index 2 is the base address and length of PCI device ID register.
-+reg: Three register ranges as listed in the reg-names property
-+reg-names: "dbics" for the DesignWare PCIe registers, "app" for the
-+	   TI specific application registers, "config" for the
-+	   configuration space address
- 
- pcie_msi_intc : Interrupt controller device node for MSI IRQ chip
- 	interrupt-cells: should be set to 1
++NXP FSPI DRIVER
++M:	Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
++L:	linux-spi at vger.kernel.org
++S:	Maintained
++F:	drivers/spi/spi-nxp-fspi.c
++
+ OBJTOOL
+ M:	Josh Poimboeuf <jpoimboe@redhat.com>
+ M:	Peter Zijlstra <peterz@infradead.org>
 -- 
-2.17.1
+2.7.4
