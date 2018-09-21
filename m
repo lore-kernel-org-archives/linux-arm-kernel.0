@@ -1,196 +1,92 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri, 21 Sep 2018 23:16:49 +0100
-Subject: [PATCH v6 02/18] ACPI / APEI: Generalise the estatus queue's
- add/remove and notify code
+Date: Fri, 21 Sep 2018 23:16:51 +0100
+Subject: [PATCH v6 04/18] ACPI / APEI: Switch NOTIFY_SEA to use the estatus
+ queue
 In-Reply-To: <20180921221705.6478-1-james.morse@arm.com>
 References: <20180921221705.6478-1-james.morse@arm.com>
-Message-ID: <20180921221705.6478-3-james.morse@arm.com>
+Message-ID: <20180921221705.6478-5-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Refactor the estatus queue's pool grow/shrink code and notification
-routine from NOTIFY_NMI's handlers. This will allow another notification
-method to use the estatus queue without duplicating this code.
+Now that the estatus queue can be used by more than one notification
+method, we can move notifications that have NMI-like behaviour over to
+it, and start abstracting GHES's single in_nmi() path.
 
-This patch adds rcu_read_lock()/rcu_read_unlock() around the list
-list_for_each_entry_rcu() walker. These aren't strictly necessary as
-the whole nmi_enter/nmi_exit() window is a spooky RCU read-side
-critical section.
-
-The existing ghes_estatus_pool_shrink() is folded into the new
-ghes_estatus_queue_shrink_pool() as only the queue uses it.
-
-_in_nmi_notify_one() is separate from the rcu-list walker for a later
-caller that doesn't need to walk a list.
+Switch NOTIFY_SEA over to use the estatus queue. This makes it behave
+in the same way as x86's NOTIFY_NMI.
 
 Signed-off-by: James Morse <james.morse@arm.com>
 Reviewed-by: Punit Agrawal <punit.agrawal@arm.com>
 Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
-
 ---
-Changes since v3:
- * Removed dupicate or redundant paragraphs in commit message.
- * Fixed the style of a zero check
-Changes since v1:
- * Tidied up _in_nmi_notify_one().
----
- drivers/acpi/apei/ghes.c | 100 +++++++++++++++++++++++++--------------
- 1 file changed, 65 insertions(+), 35 deletions(-)
+ drivers/acpi/apei/ghes.c | 23 +++++++++++------------
+ 1 file changed, 11 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index f5732e6b5be8..29d863ff2f87 100644
+index d7c46236b353..150fb184c7cb 100644
 --- a/drivers/acpi/apei/ghes.c
 +++ b/drivers/acpi/apei/ghes.c
-@@ -747,6 +747,51 @@ static void __process_error(struct ghes *ghes)
- #endif
- }
+@@ -58,6 +58,10 @@
  
-+static int _in_nmi_notify_one(struct ghes *ghes)
-+{
-+	int sev;
-+
-+	if (ghes_read_estatus(ghes, 1)) {
-+		ghes_clear_estatus(ghes);
-+		return -ENOENT;
-+	}
-+
-+	sev = ghes_severity(ghes->estatus->error_severity);
-+	if (sev >= GHES_SEV_PANIC) {
-+#ifdef CONFIG_X86
-+		oops_begin();
+ #define GHES_PFX	"GHES: "
+ 
++#if defined(CONFIG_HAVE_ACPI_APEI_NMI) || defined(CONFIG_ACPI_APEI_SEA)
++#define WANT_NMI_ESTATUS_QUEUE	1
 +#endif
-+		ghes_print_queued_estatus();
-+		__ghes_panic(ghes);
-+	}
 +
-+	if (!(ghes->flags & GHES_TO_CLEAR))
-+		return 0;
-+
-+	__process_error(ghes);
-+	ghes_clear_estatus(ghes);
-+
-+	return 0;
-+}
-+
-+static int ghes_estatus_queue_notified(struct list_head *rcu_list)
-+{
-+	int ret = -ENOENT;
-+	struct ghes *ghes;
-+
-+	rcu_read_lock();
-+	list_for_each_entry_rcu(ghes, rcu_list, list) {
-+		if (!_in_nmi_notify_one(ghes))
-+			ret = 0;
-+	}
-+	rcu_read_unlock();
-+
-+	if (IS_ENABLED(CONFIG_ARCH_HAVE_NMI_SAFE_CMPXCHG) && !ret)
-+		irq_work_queue(&ghes_proc_irq_work);
-+
-+	return ret;
-+}
-+
- static unsigned long ghes_esource_prealloc_size(
- 	const struct acpi_hest_generic *generic)
- {
-@@ -762,11 +807,24 @@ static unsigned long ghes_esource_prealloc_size(
- 	return prealloc_size;
+ #define GHES_ESTATUS_MAX_SIZE		65536
+ #define GHES_ESOURCE_PREALLOC_MAX_SIZE	65536
+ 
+@@ -681,7 +685,7 @@ static void ghes_estatus_cache_add(
+ 	rcu_read_unlock();
  }
  
--static void ghes_estatus_pool_shrink(unsigned long len)
-+/* After removing a queue user, we can shrink the pool */
-+static void ghes_estatus_queue_shrink_pool(struct ghes *ghes)
- {
-+	unsigned long len;
-+
-+	len = ghes_esource_prealloc_size(ghes->generic);
- 	ghes_estatus_pool_size_request -= PAGE_ALIGN(len);
- }
+-#ifdef CONFIG_HAVE_ACPI_APEI_NMI
++#ifdef WANT_NMI_ESTATUS_QUEUE
+ /*
+  * Handlers for CPER records may not be NMI safe. For example,
+  * memory_failure_queue() takes spinlocks and calls schedule_work_on().
+@@ -861,7 +865,7 @@ static void ghes_nmi_init_cxt(void)
  
-+/* Before adding a queue user, grow the pool */
-+static void ghes_estatus_queue_grow_pool(struct ghes *ghes)
-+{
-+	unsigned long len;
-+
-+	len = ghes_esource_prealloc_size(ghes->generic);
-+	ghes_estatus_pool_expand(len);
-+}
-+
- static void ghes_proc_in_irq(struct irq_work *irq_work)
- {
- 	struct llist_node *llnode, *next;
-@@ -965,48 +1023,22 @@ static LIST_HEAD(ghes_nmi);
+ #else
+ static inline void ghes_nmi_init_cxt(void) { }
+-#endif /* CONFIG_HAVE_ACPI_APEI_NMI */
++#endif /* WANT_NMI_ESTATUS_QUEUE */
  
- static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
+ static int ghes_ack_error(struct acpi_hest_generic_v2 *gv2)
+ {
+@@ -977,20 +981,13 @@ static LIST_HEAD(ghes_sea);
+  */
+ int ghes_notify_sea(void)
  {
 -	struct ghes *ghes;
--	int sev, ret = NMI_DONE;
-+	int ret = NMI_DONE;
- 
- 	if (!atomic_add_unless(&ghes_in_nmi, 1, 1))
- 		return ret;
- 
--	list_for_each_entry_rcu(ghes, &ghes_nmi, list) {
--		if (ghes_read_estatus(ghes, 1)) {
--			ghes_clear_estatus(ghes);
--			continue;
--		} else {
--			ret = NMI_HANDLED;
--		}
+-	int ret = -ENOENT;
 -
--		sev = ghes_severity(ghes->estatus->error_severity);
--		if (sev >= GHES_SEV_PANIC) {
--			oops_begin();
--			ghes_print_queued_estatus();
--			__ghes_panic(ghes);
--		}
-+	if (!ghes_estatus_queue_notified(&ghes_nmi))
-+		ret = NMI_HANDLED;
- 
--		if (!(ghes->flags & GHES_TO_CLEAR))
--			continue;
--
--		__process_error(ghes);
--		ghes_clear_estatus(ghes);
+-	rcu_read_lock();
+-	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
+-		if (!ghes_proc(ghes))
+-			ret = 0;
 -	}
--
--#ifdef CONFIG_ARCH_HAVE_NMI_SAFE_CMPXCHG
--	if (ret == NMI_HANDLED)
--		irq_work_queue(&ghes_proc_irq_work);
--#endif
- 	atomic_dec(&ghes_in_nmi);
- 	return ret;
+-	rcu_read_unlock();
+-	return ret;
++	return ghes_estatus_queue_notified(&ghes_sea);
  }
  
- static void ghes_nmi_add(struct ghes *ghes)
+ static void ghes_sea_add(struct ghes *ghes)
  {
--	unsigned long len;
 +	ghes_estatus_queue_grow_pool(ghes);
- 
--	len = ghes_esource_prealloc_size(ghes->generic);
--	ghes_estatus_pool_expand(len);
++
  	mutex_lock(&ghes_list_mutex);
- 	if (list_empty(&ghes_nmi))
- 		register_nmi_handler(NMI_LOCAL, ghes_notify_nmi, 0, "ghes");
-@@ -1016,8 +1048,6 @@ static void ghes_nmi_add(struct ghes *ghes)
- 
- static void ghes_nmi_remove(struct ghes *ghes)
- {
--	unsigned long len;
--
- 	mutex_lock(&ghes_list_mutex);
+ 	list_add_rcu(&ghes->list, &ghes_sea);
+ 	mutex_unlock(&ghes_list_mutex);
+@@ -1002,6 +999,8 @@ static void ghes_sea_remove(struct ghes *ghes)
  	list_del_rcu(&ghes->list);
- 	if (list_empty(&ghes_nmi))
-@@ -1028,8 +1058,8 @@ static void ghes_nmi_remove(struct ghes *ghes)
- 	 * freed after NMI handler finishes.
- 	 */
+ 	mutex_unlock(&ghes_list_mutex);
  	synchronize_rcu();
--	len = ghes_esource_prealloc_size(ghes->generic);
--	ghes_estatus_pool_shrink(len);
 +
 +	ghes_estatus_queue_shrink_pool(ghes);
  }
- 
- #else /* CONFIG_HAVE_ACPI_APEI_NMI */
+ #else /* CONFIG_ACPI_APEI_SEA */
+ static inline void ghes_sea_add(struct ghes *ghes) { }
 -- 
 2.19.0
