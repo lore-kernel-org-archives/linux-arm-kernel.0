@@ -1,29 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 21 Sep 2018 12:13:25 +0100
-Subject: [PATCH] arm64: Kconfig: Remove ARCH_HAS_HOLES_MEMORYMODEL
-In-Reply-To: <20180831151943.9281-1-james.morse@arm.com>
-References: <20180831151943.9281-1-james.morse@arm.com>
-Message-ID: <20180921111324.GB238853@arrakis.emea.arm.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 21 Sep 2018 15:51:52 +0530
+Subject: [RFC PATCH 37/40] arm64: dts: k3-am6: Add Main System Control Module
+ node
+In-Reply-To: <20180921102155.22839-1-kishon@ti.com>
+References: <20180921102155.22839-1-kishon@ti.com>
+Message-ID: <20180921102155.22839-38-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2018 at 04:19:43PM +0100, James Morse wrote:
-> include/linux/mmzone.h describes ARCH_HAS_HOLES_MEMORYMODEL as
-> relevant when parts the memmap have been free()d. This would
-> happen on systems where memory is smaller than a sparsemem-section,
-> and the extra struct pages are expensive. pfn_valid() on these
-> systems returns true for the whole sparsemem-section, so an extra
-> memmap_valid_within() check is needed.
-> 
-> On arm64 we have nomap memory, so always provide pfn_valid() to test
-> for nomap pages. This means ARCH_HAS_HOLES_MEMORYMODEL's extra checks
-> are already rolled up into pfn_valid().
-> 
-> Remove it.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
+From: Benoit Parrot <bparrot@ti.com>
 
-Queued for 4.20. Thanks.
+Main System control module support is added to the device tree to allow
+driver to access to their control module registers.
 
+Signed-off-by: Benoit Parrot <bparrot@ti.com>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm64/boot/dts/ti/k3-am65-main.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/ti/k3-am65-main.dtsi b/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
+index 2df4acb198bd..957c9125a453 100644
+--- a/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
++++ b/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
+@@ -6,6 +6,11 @@
+  */
+ 
+ &cbass_main {
++	scm_conf: scm_conf at 100000 {
++		compatible = "syscon";
++		reg = <0 0x00100000 0 0x1c000>;
++	};
++
+ 	gic500: interrupt-controller at 1800000 {
+ 		compatible = "arm,gic-v3";
+ 		#address-cells = <2>;
 -- 
-Catalin
+2.17.1
