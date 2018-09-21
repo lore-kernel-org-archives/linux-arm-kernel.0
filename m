@@ -1,13 +1,16 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 21 Sep 2018 19:45:19 +0200
-Subject: [GIT PULL 2/2] ARM: dts: exynos: DT for v4.20 (or 5.0)
-Message-ID: <20180921174520.9126-1-krzk@kernel.org>
+Date: Fri, 21 Sep 2018 19:45:20 +0200
+Subject: [GIT PULL 1/2] ARM: exynos: mach/soc for v4.20 (or 5.0)
+In-Reply-To: <20180921174520.9126-1-krzk@kernel.org>
+References: <20180921174520.9126-1-krzk@kernel.org>
+Message-ID: <20180921174520.9126-2-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
 Nothing special, description in tag.
+
 
 Best regards,
 Krzysztof
@@ -19,83 +22,35 @@ The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 
 are available in the Git repository at:
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-4.20
+  https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-soc-4.20
 
-for you to fetch changes up to 7c92b9a8e0fc5eae460a33b7420af5cf60bd7b21:
+for you to fetch changes up to f30858439e7db9ce9847eaedf440635fc6349c6e:
 
-  ARM: dts: exynos: Correct audio subsystem parent clock on Peach Chromebooks (2018-09-17 18:03:10 +0200)
-
-----------------------------------------------------------------
-Samsung DTS ARM changes for v4.20
-
-1. Bring up DSI and HDMI on Exynos5250 Arndale.
-2. Use the new way of setting external wakeup interrupts on S5Pv210.
-3. Use proper cpufreq suspend OPP to fix suspend/wakeup from RAM on Snow
-   Chromebook (Exynos5250).
-4. Fully describe regualtors on Odroid XU3-family boards.
-5. Fix sound in Snow-rev5 Chromebook.
-6. Fix regulators configuration on Peach Pi/Pit Chromebooks (Exynos5420)
-   which should be always on.
-7. Fix pull control on PMIC interrupt lines on multiple boards which
-   essentially fixes waking up by RTC.
-8. Add PMIC interrupts on Exynos4210 UniversalC210 board.
-9. Add external SD card support for Trats board (Exynos4210).
-10. Correct audio subsystem parent clock on Peach Chromebooks.
-11. Minor cleanups.
-12. Explicitly mark Samsung Exynos SoC as unstable. When introduced, the
-    DT bindings were minimal and incomplete. Since then some significant
-    (not fully compatible) changes have been already merged and
-    workarounds have been added while working on drivers. Marking certain
-    bindings as unstable will point users attention to always use DTB
-    compiled from current kernel sources - which anyway happens now. In
-    case of fear of incompatible ABI changes, any out of tree Device
-    Tree sources should either be upstreamed or should be changed in the
-    same way as in-kernel DTS are modified.
+  ARM: s3c24xx: Restore proper usage of pr_info/pr_cont (2018-09-19 19:11:17 +0200)
 
 ----------------------------------------------------------------
-Andrzej Hajda (4):
-      ARM: dts: exynos: Add DSI node on Exynos5250
-      ARM: dts: exynos: Add DSI and panel nodes on Arndale
-      ARM: dts: exynos: Use i2c-gpio for HDMI-DDC on Arndale
-      ARM: dts: exynos: Fix HDMI-HPD line handling on Arndale
+Samsung mach/soc changes for v4.20
 
-Krzysztof Kozlowski (7):
-      ARM: dts: s5pv210: Switch to S5Pv210 specific pinctrl wakeup compatible
-      ARM: dts: exynos: Add missing used PMIC regulators on Exynos5422 Odroid boards
-      ARM: dts: exynos: Add unused PMIC regulators on Exynos5422 Odroid boards
-      ARM: dts: exynos: Disable unused PMIC regulators on Exynos5422 Odroid boards
-      ARM: dts: exynos: Add LDO28 regulator on Exynos5422 Odroid boards
-      ARM: dts: exynos: Remove double SD card detect pin inversion
-      dt-bindings: arm: Explicitly mark Samsung Exynos SoC as unstable
+1. Fix imprecise abort during Odroid XU3-family suspend to RAM (but it
+   is not end of work needed for suspend).
+2. Cleanup and fix of SD card write protect on MINI2440.
 
-Marek Szyprowski (10):
-      ARM: dts: exynos: Convert exynos5250.dtsi to opp-v2 bindings
-      ARM: dts: exynos: Mark 1 GHz CPU OPP as suspend OPP on Exynos5250
-      ARM: dts: exynos: Fix sound in Snow-rev5 Chromebook
-      ARM: dts: exynos: Fix regulators configuration on Peach Pi/Pit Chromebooks
-      ARM: dts: exynos: Disable pull control for MAX8997 interrupts on Origen
-      ARM: dts: exynos: Add missing PMIC interrupts on UniversalC210 board
-      ARM: dts: exynos: Disable pull control for S5M8767 PMIC
-      ARM: dts: exynos: Disable pull control for PMIC IRQ line on Artik5 board
-      ARM: dts: exynos: Add external SD card support for Trats board
-      ARM: dts: exynos: Correct audio subsystem parent clock on Peach Chromebooks
+----------------------------------------------------------------
+Cedric Roux (3):
+      ARM: s3c24xx: formatting cleanup in mach-mini2440.c
+      ARM: s3c24xx: Correct SD card write protect detection on Mini2440
+      ARM: s3c24xx: Restore proper usage of pr_info/pr_cont
 
- .../devicetree/bindings/arm/samsung/exynos.txt     |  26 ++++
- arch/arm/boot/dts/exynos3250-artik5.dtsi           |   7 +
- arch/arm/boot/dts/exynos4210-origen.dts            |   9 ++
- arch/arm/boot/dts/exynos4210-trats.dts             |  15 ++
- arch/arm/boot/dts/exynos4210-universal_c210.dts    |  11 +-
- arch/arm/boot/dts/exynos4412-midas.dtsi            |   3 +-
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi    |   3 +-
- arch/arm/boot/dts/exynos5250-arndale.dts           | 102 +++++++++++--
- arch/arm/boot/dts/exynos5250-pinctrl.dtsi          |  11 ++
- arch/arm/boot/dts/exynos5250-snow-rev5.dts         |  11 ++
- arch/arm/boot/dts/exynos5250.dtsi                  | 152 ++++++++++++++------
- arch/arm/boot/dts/exynos5420-peach-pit.dts         |   5 +-
- arch/arm/boot/dts/exynos5422-odroid-core.dtsi      | 157 +++++++++++++++++++--
- arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |   6 +
- arch/arm/boot/dts/exynos5422-odroidxu3.dts         |   6 +
- arch/arm/boot/dts/exynos5800-peach-pi.dts          |   5 +-
- arch/arm/boot/dts/s5pv210.dtsi                     |   2 +-
- 17 files changed, 459 insertions(+), 72 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/samsung/exynos.txt
+Krzysztof Kozlowski (4):
+      ARM: exynos: Store Exynos5420 register state in one variable
+      ARM: exynos: Fix imprecise abort during Exynos5422 suspend to RAM
+      ARM: s3c24xx: Remove empty gta02_pmu children probe
+      ARM: s3c24xx: Consistently use tab for indenting member assignments
+
+ Documentation/arm/Samsung/Bootloader-interface.txt |   1 +
+ arch/arm/mach-exynos/common.h                      |   1 +
+ arch/arm/mach-exynos/firmware.c                    |  14 ++-
+ arch/arm/mach-exynos/suspend.c                     |  34 +++++--
+ arch/arm/mach-s3c24xx/mach-gta02.c                 |  42 --------
+ arch/arm/mach-s3c24xx/mach-mini2440.c              | 113 +++++++++++----------
+ 6 files changed, 97 insertions(+), 108 deletions(-)
