@@ -1,128 +1,100 @@
-From: dvyukov@google.com (Dmitry Vyukov)
-Date: Fri, 21 Sep 2018 13:25:22 +0200
-Subject: [PATCH v8 09/20] kasan: preassign tags to objects with ctors or
- SLAB_TYPESAFE_BY_RCU
-In-Reply-To: <d74e710797323db0e43f047ea698fbc85060fc57.1537383101.git.andreyknvl@google.com>
-References: <cover.1537383101.git.andreyknvl@google.com>
- <d74e710797323db0e43f047ea698fbc85060fc57.1537383101.git.andreyknvl@google.com>
-Message-ID: <CACT4Y+aoFSySFTd9FzA0xzRYQXSbs-wzX7B67hD3jTGAQEXBOA@mail.gmail.com>
+From: willy.mh.wolff.ml@gmail.com (Willy Wolff)
+Date: Fri, 21 Sep 2018 13:25:54 +0100
+Subject: [PATCH] ARM: dts: exynos: ordering wrong order tmu_cpu on
+ Odroid-XU3/4 thermal-zones definition
+In-Reply-To: <CAJKOXPdDFm=7wNLt5Nzf-y8TS4u6gmo51Y70bFv_pKdFK42VDQ@mail.gmail.com>
+References: <20180921113329.tha5tfrsvdf7dtws@inc028000032.lancs.ac.uk>
+ <CAJKOXPdDFm=7wNLt5Nzf-y8TS4u6gmo51Y70bFv_pKdFK42VDQ@mail.gmail.com>
+Message-ID: <CACfOrNdkG=MTy=+TF1x8y++goDAyfnjfReno6=vwpRMy4r-dWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 19, 2018 at 8:54 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
-> An object constructor can initialize pointers within this objects based on
-> the address of the object. Since the object address might be tagged, we
-> need to assign a tag before calling constructor.
+On Fri, 21 Sep 2018 at 12:46, Krzysztof Kozlowski <krzk@kernel.org> wrote:
 >
-> The implemented approach is to assign tags to objects with constructors
-> when a slab is allocated and call constructors once as usual. The
-> downside is that such object would always have the same tag when it is
-> reallocated, so we won't catch use-after-frees on it.
+> On Fri, 21 Sep 2018 at 13:33, Willy Wolff <willy.mh.wolff.ml@gmail.com> wrote:
+> >
+> > This patch is to open a discussion about wrong order of tmu_cpu.
+> >
+> > It seems that tmu_cpu1 correspond to cpu3, and tmu_cpu3 match cpu1.
+> > Note, cpu{0|3} in dtsi correspond to cpu{3|7} in linux and are the big
+> > cores.
 >
-> Also pressign tags for objects from SLAB_TYPESAFE_BY_RCU caches, since
-> they can be validy accessed after having been freed.
+> Hi,
 >
-> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
-> ---
->  mm/slab.c |  2 +-
->  mm/slub.c | 24 ++++++++++++++----------
->  2 files changed, 15 insertions(+), 11 deletions(-)
->
-> diff --git a/mm/slab.c b/mm/slab.c
-> index 6fdca9ec2ea4..fe0ddf08aa2c 100644
-> --- a/mm/slab.c
-> +++ b/mm/slab.c
-> @@ -2574,7 +2574,7 @@ static void cache_init_objs(struct kmem_cache *cachep,
->
->         for (i = 0; i < cachep->num; i++) {
->                 objp = index_to_obj(cachep, page, i);
-> -               kasan_init_slab_obj(cachep, objp);
-> +               objp = kasan_init_slab_obj(cachep, objp);
->
->                 /* constructor could break poison info */
->                 if (DEBUG == 0 && cachep->ctor) {
-> diff --git a/mm/slub.c b/mm/slub.c
-> index c4d5f4442ff1..75fc76e42a1e 100644
-> --- a/mm/slub.c
-> +++ b/mm/slub.c
-> @@ -1413,16 +1413,17 @@ static inline bool slab_free_freelist_hook(struct kmem_cache *s,
->  #endif
->  }
->
-> -static void setup_object(struct kmem_cache *s, struct page *page,
-> +static void *setup_object(struct kmem_cache *s, struct page *page,
->                                 void *object)
->  {
->         setup_object_debug(s, page, object);
-> -       kasan_init_slab_obj(s, object);
-> +       object = kasan_init_slab_obj(s, object);
->         if (unlikely(s->ctor)) {
->                 kasan_unpoison_object_data(s, object);
->                 s->ctor(object);
->                 kasan_poison_object_data(s, object);
->         }
-> +       return object;
->  }
->
->  /*
-> @@ -1530,16 +1531,16 @@ static bool shuffle_freelist(struct kmem_cache *s, struct page *page)
->         /* First entry is used as the base of the freelist */
->         cur = next_freelist_entry(s, page, &pos, start, page_limit,
->                                 freelist_count);
-> +       cur = setup_object(s, page, cur);
->         page->freelist = cur;
->
->         for (idx = 1; idx < page->objects; idx++) {
-> -               setup_object(s, page, cur);
->                 next = next_freelist_entry(s, page, &pos, start, page_limit,
->                         freelist_count);
-> +               next = setup_object(s, page, next);
->                 set_freepointer(s, cur, next);
->                 cur = next;
->         }
-> -       setup_object(s, page, cur);
->         set_freepointer(s, cur, NULL);
->
->         return true;
-> @@ -1561,7 +1562,7 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
->         struct page *page;
->         struct kmem_cache_order_objects oo = s->oo;
->         gfp_t alloc_gfp;
-> -       void *start, *p;
-> +       void *start, *p, *next;
->         int idx, order;
->         bool shuffle;
->
-> @@ -1613,13 +1614,16 @@ static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
->
->         if (!shuffle) {
->                 for_each_object_idx(p, idx, s, start, page->objects) {
-> -                       setup_object(s, page, p);
-> -                       if (likely(idx < page->objects))
-> -                               set_freepointer(s, p, p + s->size);
-> -                       else
-> +                       if (likely(idx < page->objects)) {
-> +                               next = p + s->size;
-> +                               next = setup_object(s, page, next);
-> +                               set_freepointer(s, p, next);
-> +                       } else
->                                 set_freepointer(s, p, NULL);
->                 }
-> -               page->freelist = fixup_red_left(s, start);
-> +               start = fixup_red_left(s, start);
-> +               start = setup_object(s, page, start);
-> +               page->freelist = start;
->         }
+> I do not understand this sentence. In DTSI, the CPU0-3 are the A7,
+> little cores. Defined by exynos5422-cpus.dtsi. What did you mean here?
 
-Just want to double-check that this is correct.
-We now do an additional setup_object call after the loop, but we do 1
-less in the loop. So total number of calls should be the same, right?
-However, after the loop we call setup_object for the first object (?),
-but inside of the loop we skip the call for the last object (?). Am I
-missing something, or we call ctor twice for the last object and don't
-call it for the first one?
+Leave it, you clarify that is just indices.
 
+> > By dependencis from exynos5422-odroidxu3-common.dtsi to
+> > exynos5800.dtsi -> exynos5420.dtsi, I guess definitions of tmu_cpuX are
+> > incorrect. However, changing the address, reg interrupts or clocks
+> > would breack other boards depending on it. As I can't test other boards,
+> > I've just overload the reference in the thermal-zones node.
+>
+> There are 8 CPUs (4 little and 4 big) but only 4 thermal zones for
+> CPUs. The mapping of names of CPU nodes and TMU nodes in DTS is not
+> direct. These are just indices ...
 
->         page->inuse = page->objects;
-> --
-> 2.19.0.397.gdd90340f6a-goog
+Maybe we could rename these nodes to support the real name while running?
+But it's just a detail I guess.
+
+>
+> although more important is to map
+> the cooling devices to proper TMU. This should be mentioned in DTS as
+> this the real problem here.
+
+The cooling devices mapping is correct, it's the reporting in
+/sys/devices/virtual/thermal/thermal_zone$i/temp that are wrong.
+Currently, there is no bad effect for cooling, as the attached cooling device
+adapts the FAN and both frequencies of little and big cluster. Frequencies
+of little cores and big cores are shared inside a cluster.
+This patch is for coherency only.
+
+>
+> >
+> > To reproduce the problem, I provide two scripts:
+> > == script_stress:
+> >
+> > for i in 0 10 20 40 80; do
+> >     echo $i
+> >     taskset $i stress -t 10 -c 1
+> > done;
+> >
+> > == script_read_temp:
+> >
+> > while true; do
+> >     for i in 0 1 2 3 4; do
+> >         echo $i
+> >         cat /sys/devices/virtual/thermal/thermal_zone$i/temp
+> >     done;
+> >     sleep 1
+> >     clear
+> > done;
+> >
+> > Signed-off-by: Willy Wolff <willy.mh.wolff@gmail.com>
+> > ---
+> >  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 6 ++++--
+> >  1 file changed, 4 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> > index 96e281c0a118..4512ffad2785 100644
+> > --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> > +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> > @@ -135,7 +135,8 @@
+> >                         };
+> >                 };
+> >                 cpu1_thermal: cpu1-thermal {
+> > -                       thermal-sensors = <&tmu_cpu1 0>;
+> > +                       // thermal-sensors = <&tmu_cpu1 0>;
+>
+> Do not leave commented lines, there are not needed.
+>
+> Also your email does not match signed-off-by. You must have something
+> wrong with either git setup or mailer (git commit --si will use the
+> same address for From and SoB so I guess the mailer...).
+
+Ok, my bad.
+
+> Best regards,
+> Krzysztof
