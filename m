@@ -1,77 +1,62 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 21 Sep 2018 14:29:22 +0800
-Subject: [PATCH v2 2/7] mfd: Add ST Multi-Function eXpander (STMFX) core
- driver
-In-Reply-To: <1537363669-25991-3-git-send-email-amelie.delaunay@st.com>
-References: <1537363669-25991-3-git-send-email-amelie.delaunay@st.com>
-Message-ID: <201809211450.iSGhRxSU%fengguang.wu@intel.com>
+From: daniel@makrotopia.org (Daniel Golle)
+Date: Fri, 21 Sep 2018 08:31:09 +0200
+Subject: [PATCH 1/2] libata: add ledtrig support
+In-Reply-To: <20180920220449.GC27468@xo-6d-61-c0.localdomain>
+References: <1537328730-9156-1-git-send-email-aditya@kobol.io>
+ <1537328730-9156-2-git-send-email-aditya@kobol.io>
+ <20180920072354.GA20392@amd>
+ <20180920082425.GB20006@makrotopia.org>
+ <20180920220449.GC27468@xo-6d-61-c0.localdomain>
+Message-ID: <20180921063103.GD20006@makrotopia.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Amelie,
+Hi Pavel,
 
-Thank you for the patch! Perhaps something to improve:
+On Fri, Sep 21, 2018 at 12:04:49AM +0200, Pavel Machek wrote:
+> Hi!
+> 
+> > > > +#ifdef CONFIG_ATA_LEDS
+> > > > +	/* register LED triggers for all ports */
+> > > > +	for (i = 0; i < host->n_ports; i++) {
+> > > > +		if (unlikely(!host->ports[i]->ledtrig))
+> > > > +			continue;
+> > > > +
+> > > > +		snprintf(host->ports[i]->ledtrig_name,
+> > > > +			sizeof(host->ports[i]->ledtrig_name), "ata%u",
+> > > > +			host->ports[i]->print_id);
+> > > 
+> > > > +		host->ports[i]->ledtrig->name = host->ports[i]->ledtrig_name;
+> > > > +
+> > > > +		if (led_trigger_register(host->ports[i]->ledtrig)) {
+> > > > +			kfree(host->ports[i]->ledtrig);
+> > > > +			host->ports[i]->ledtrig = NULL;
+> > > > +		}
+> > > > +	}
+> > > > +#endif
+> > > 
+> > > No, we don't want you to register multiple triggers. We want one
+> > > trigger, than has parameter "which port to watch". (Number of triggers
+> > > is limited as by sysfs limitations).
+> > 
+> > Back then I implemented it that way to be able to define the
+> > default trigger for each LED in device tree and "trigger-sources"
+> > didn't exist yet (it was introduced for USB ports and isn't yet used
+> > for anything other than that)
+> 
+> I see why you did it... BUt I believe we still want single trigger solution...
+> 
+> > However, the problem till today is also that ATA ports are often not
+> > individual device-tree objects we can refer to, see for example
+> > marvell,armada-370-sata which appears as one opaque controller. Ie.
+> > all SATA drivers have to be converted to expose individual ports on
+> > device-tree before the trigger-sources approach can be applied...
+> 
+> Yep, well... something to do in SATA then.
+> 
+> Perhaps this should also have an option for single LED for _any_ SATA activity,
+> and 90% devices will be happy with that?
 
-[auto build test WARNING on ljones-mfd/for-mfd-next]
-[also build test WARNING on v4.19-rc4 next-20180920]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Amelie-Delaunay/dt-bindings-mfd-Add-ST-Multi-Function-eXpander-STMFX-core-bindings/20180920-185854
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git for-mfd-next
-config: i386-allmodconfig (attached as .config)
-compiler: gcc-7 (Debian 7.3.0-1) 7.3.0
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
-
-Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
-http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
-
-All warnings (new ones prefixed by >>):
-
-   drivers/mfd/stmfx.c: In function 'stmfx_function_enable':
->> drivers/mfd/stmfx.c:103:8: warning: 'mask' may be used uninitialized in this function [-Wmaybe-uninitialized]
-      mask |= STMFX_REG_SYS_CTRL_GPIO_EN;
-   drivers/mfd/stmfx.c:100:5: note: 'mask' was declared here
-     u8 mask;
-        ^~~~
-   drivers/mfd/stmfx.c: In function 'stmfx_function_disable':
->> drivers/mfd/stmfx.c:103:8: warning: 'mask' may be used uninitialized in this function [-Wmaybe-uninitialized]
-      mask |= STMFX_REG_SYS_CTRL_GPIO_EN;
-   drivers/mfd/stmfx.c:100:5: note: 'mask' was declared here
-     u8 mask;
-        ^~~~
-
-vim +/mask +103 drivers/mfd/stmfx.c
-
-    97	
-    98	static u8 stmfx_func_to_mask(u32 func)
-    99	{
-   100		u8 mask;
-   101	
-   102		if (func & STMFX_FUNC_GPIO)
- > 103			mask |= STMFX_REG_SYS_CTRL_GPIO_EN;
-   104	
-   105		if ((func & STMFX_FUNC_ALTGPIO_LOW) || (func & STMFX_FUNC_ALTGPIO_HIGH))
-   106			mask |= STMFX_REG_SYS_CTRL_ALTGPIO_EN;
-   107	
-   108		if (func & STMFX_FUNC_TS)
-   109			mask |= STMFX_REG_SYS_CTRL_TS_EN;
-   110	
-   111		if (func & STMFX_FUNC_IDD)
-   112			mask |= STMFX_REG_SYS_CTRL_IDD_EN;
-   113	
-   114		return mask;
-   115	}
-   116	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 65161 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180921/0317e9ad/attachment-0001.gz>
+The whole reason for not using one of the existing disk-activity
+triggers was to address individual SATA ports to individual LEDs of NAS
+devices (in my case Shuttle KD20)...
