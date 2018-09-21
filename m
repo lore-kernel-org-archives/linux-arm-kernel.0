@@ -1,110 +1,98 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Fri, 21 Sep 2018 15:39:52 +0800
-Subject: [PATCH v3 02/12] drm/mediatek: move hardware register to node data
-In-Reply-To: <20180921032822.30771-3-bibby.hsieh@mediatek.com>
-References: <20180921032822.30771-1-bibby.hsieh@mediatek.com>
- <20180921032822.30771-3-bibby.hsieh@mediatek.com>
-Message-ID: <1537515592.20660.1.camel@mtksdaap41>
+From: manasi.d.navare@intel.com (Manasi Navare)
+Date: Fri, 21 Sep 2018 00:59:30 -0700
+Subject: [PATCH v4 2/5] drm/dp: fix link probing for devices supporting
+ DP 1.4+
+In-Reply-To: <1537455288-20223-3-git-send-email-dkos@cadence.com>
+References: <1537455288-20223-1-git-send-email-dkos@cadence.com>
+ <1537455288-20223-3-git-send-email-dkos@cadence.com>
+Message-ID: <20180921075929.GA28323@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Bibby:
+Thanks for the patch. Verified with the DP 1.4 spec and looks good to me.
+Also look at the related patch that makes use of the correct extended capabilities:
 
-On Fri, 2018-09-21 at 11:28 +0800, Bibby Hsieh wrote:
-> From: chunhui dai <chunhui.dai@mediatek.com>
+https://patchwork.freedesktop.org/patch/249400/
+
+Reviewed-by: Manasi Navare <manasi.d.navare@intel.com>
+
+Manasi
+
+
+On Thu, Sep 20, 2018 at 03:54:37PM +0100, Damian Kos wrote:
+> From: Quentin Schulz <quentin.schulz@free-electrons.com>
 > 
-> The address of register DPI_H_FRE_CON is different in different IC.
-> Using of_node data to find this address.
+> DP 1.4 introduced a DP_EXTENDED_RECEIVER_CAP_FIELD_PRESENT bit in
+> DP_TRAINING_AUX_RD_INTERVAL register. If set, DPCD registers from
+> DP_DPCD_REV to DP_ADAPTER_CAP should be retrieved starting from
+> DP_DPCD_REV_EXTENDED. All registers are copied except DP_DPCD_REV,
+> DP_MAX_LINK_RATE and DP_DOWNSTREAMPORT_PRESENT which represent the
+> "true capabilities" of DPRX device.
 > 
-
-Reviewed-by: CK Hu <ck.hu@mediatek.com>
-
-> Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
+> Original DP_DPCD_REV, DP_MAX_LINK_RATE and DP_DOWNSTREAMPORT_PRESENT
+> might falsely return lower capabilities to "avoid interoperability
+> issues with some of the existing DP Source devices that malfunction
+> when they discover the higher capabilities within those three
+> registers.".
+> 
+> Before DP 1.4, DP_EXTENDED_RECEIVER_CAP_FIELD_PRESENT bit was reserved
+> and read 0 so it's safe to check against it even if DP revision is
+> <1.4
+> 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> Signed-off-by: Damian Kos <dkos@cadence.com>
 > ---
->  drivers/gpu/drm/mediatek/mtk_dpi.c      | 19 ++++++++++++++++---
->  drivers/gpu/drm/mediatek/mtk_dpi_regs.h |  1 -
->  2 files changed, 16 insertions(+), 4 deletions(-)
+>  drivers/gpu/drm/drm_dp_helper.c | 30 +++++++++++++++++++++++++++++-
+>  1 file changed, 29 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
-> index d9373e67d328..74a32833bde1 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_dpi.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
-> @@ -18,6 +18,7 @@
->  #include <linux/component.h>
->  #include <linux/platform_device.h>
->  #include <linux/of.h>
-> +#include <linux/of_device.h>
->  #include <linux/of_graph.h>
->  #include <linux/interrupt.h>
->  #include <linux/types.h>
-> @@ -72,6 +73,7 @@ struct mtk_dpi {
->  	struct clk *tvd_clk;
->  	int irq;
->  	struct drm_display_mode mode;
-> +	const struct mtk_dpi_conf *conf;
->  	enum mtk_dpi_out_color_format color_format;
->  	enum mtk_dpi_out_yc_map yc_map;
->  	enum mtk_dpi_out_bit_num bit_num;
-> @@ -117,6 +119,10 @@ struct mtk_dpi_yc_limit {
->  	u16 c_bottom;
->  };
+> diff --git a/drivers/gpu/drm/drm_dp_helper.c b/drivers/gpu/drm/drm_dp_helper.c
+> index 8c6b9fd89f8a..735ebde5c2f0 100644
+> --- a/drivers/gpu/drm/drm_dp_helper.c
+> +++ b/drivers/gpu/drm/drm_dp_helper.c
+> @@ -370,10 +370,38 @@ int drm_dp_link_probe(struct drm_dp_aux *aux, struct drm_dp_link *link)
+>  {
+>  	u8 values[3];
+>  	int err;
+> +	unsigned int addr;
 >  
-> +struct mtk_dpi_conf {
-> +	u32 reg_h_fre_con;
-> +};
+>  	memset(link, 0, sizeof(*link));
+>  
+> -	err = drm_dp_dpcd_read(aux, DP_DPCD_REV, values, sizeof(values));
+> +	/*
+> +	 * DP 1.4 introduced a DP_EXTENDED_RECEIVER_CAP_FIELD_PRESENT bit in
+> +	 * DP_TRAINING_AUX_RD_INTERVAL register. If set, DPCD registers from
+> +	 * DP_DPCD_REV to DP_ADAPTER_CAP should be retrieved starting from
+> +	 * DP_DPCD_REV_EXTENDED. All registers are copied except DP_DPCD_REV,
+> +	 * DP_MAX_LINK_RATE and DP_DOWNSTREAMPORT_PRESENT which represent the
+> +	 * "true capabilities" of DPRX device.
+> +	 *
+> +	 * Original DP_DPCD_REV, DP_MAX_LINK_RATE and DP_DOWNSTREAMPORT_PRESENT
+> +	 * might falsely return lower capabilities to "avoid interoperability
+> +	 * issues with some of the existing DP Source devices that malfunction
+> +	 * when they discover the higher capabilities within those three
+> +	 * registers.".
+> +	 *
+> +	 * Before DP 1.4, DP_EXTENDED_RECEIVER_CAP_FIELD_PRESENT bit was reserved
+> +	 * and read 0 so it's safe to check against it even if DP revision is
+> +	 * <1.4
+> +	 */
+> +	err = drm_dp_dpcd_readb(aux, DP_TRAINING_AUX_RD_INTERVAL, values);
+> +	if (err < 0)
+> +		return err;
 > +
->  static void mtk_dpi_mask(struct mtk_dpi *dpi, u32 offset, u32 val, u32 mask)
->  {
->  	u32 tmp = readl(dpi->regs + offset) & ~mask;
-> @@ -342,7 +348,7 @@ static void mtk_dpi_config_swap_input(struct mtk_dpi *dpi, bool enable)
->  
->  static void mtk_dpi_config_2n_h_fre(struct mtk_dpi *dpi)
->  {
-> -	mtk_dpi_mask(dpi, DPI_H_FRE_CON, H_FRE_2N, H_FRE_2N);
-> +	mtk_dpi_mask(dpi, dpi->conf->reg_h_fre_con, H_FRE_2N, H_FRE_2N);
->  }
->  
->  static void mtk_dpi_config_color_format(struct mtk_dpi *dpi,
-> @@ -668,6 +674,10 @@ static const struct component_ops mtk_dpi_component_ops = {
->  	.unbind = mtk_dpi_unbind,
->  };
->  
-> +static const struct mtk_dpi_conf mt8173_conf = {
-> +	.reg_h_fre_con = 0xe0,
-> +};
+> +	if (values[0] & DP_EXTENDED_RECEIVER_CAP_FIELD_PRESENT)
+> +		addr = DP_DP13_DPCD_REV;
+> +	else
+> +		addr = DP_DPCD_REV;
 > +
->  static int mtk_dpi_probe(struct platform_device *pdev)
->  {
->  	struct device *dev = &pdev->dev;
-> @@ -682,6 +692,7 @@ static int mtk_dpi_probe(struct platform_device *pdev)
->  		return -ENOMEM;
+> +	err = drm_dp_dpcd_read(aux, addr, values, sizeof(values));
+>  	if (err < 0)
+>  		return err;
 >  
->  	dpi->dev = dev;
-> +	dpi->conf = (struct mtk_dpi_conf *)of_device_get_match_data(dev);
->  
->  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	dpi->regs = devm_ioremap_resource(dev, mem);
-> @@ -761,8 +772,10 @@ static int mtk_dpi_remove(struct platform_device *pdev)
->  }
->  
->  static const struct of_device_id mtk_dpi_of_ids[] = {
-> -	{ .compatible = "mediatek,mt8173-dpi", },
-> -	{}
-> +	{ .compatible = "mediatek,mt8173-dpi",
-> +	  .data = &mt8173_conf,
-> +	},
-> +	{ },
->  };
->  
->  struct platform_driver mtk_dpi_driver = {
-> diff --git a/drivers/gpu/drm/mediatek/mtk_dpi_regs.h b/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
-> index 4b6ad4751a31..040444d7718d 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
-> +++ b/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
-> @@ -223,6 +223,5 @@
->  #define ESAV_CODE2			(0xFFF << 0)
->  #define ESAV_CODE3_MSB			BIT(16)
->  
-> -#define DPI_H_FRE_CON		0xE0
->  #define H_FRE_2N			BIT(25)
->  #endif /* __MTK_DPI_REGS_H */
+> -- 
+> 2.17.1
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
