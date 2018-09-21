@@ -1,40 +1,34 @@
 From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Fri, 21 Sep 2018 19:08:27 +0100
-Subject: [PATCH 1/5] dt-bindings: display: renesas: du: Document the r8a77470
- bindings
+Date: Fri, 21 Sep 2018 19:08:30 +0100
+Subject: [PATCH 4/5] drm: rcar-du: Add R8A7744 support
 In-Reply-To: <1537553311-8831-1-git-send-email-fabrizio.castro@bp.renesas.com>
 References: <1537553311-8831-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <1537553311-8831-2-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <1537553311-8831-5-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the RZ/G1C (r8a77470) SoC in R-Car DU bindings.
+From: Biju Das <biju.das@bp.renesas.com>
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+Add support for the R8A7744 DU (which is very similar to the R8A7743 DU);
+it has 1 DPAD (RGB) output and 1 LVDS output.
+
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 ---
- Documentation/devicetree/bindings/display/renesas,du.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/gpu/drm/rcar-du/rcar_du_drv.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/display/renesas,du.txt b/Documentation/devicetree/bindings/display/renesas,du.txt
-index ec9d34be..2b28ae2 100644
---- a/Documentation/devicetree/bindings/display/renesas,du.txt
-+++ b/Documentation/devicetree/bindings/display/renesas,du.txt
-@@ -5,6 +5,7 @@ Required Properties:
-   - compatible: must be one of the following.
-     - "renesas,du-r8a7743" for R8A7743 (RZ/G1M) compatible DU
-     - "renesas,du-r8a7745" for R8A7745 (RZ/G1E) compatible DU
-+    - "renesas,du-r8a77470" for R8A77470 (RZ/G1C) compatible DU
-     - "renesas,du-r8a7779" for R8A7779 (R-Car H1) compatible DU
-     - "renesas,du-r8a7790" for R8A7790 (R-Car H2) compatible DU
-     - "renesas,du-r8a7791" for R8A7791 (R-Car M2-W) compatible DU
-@@ -51,6 +52,7 @@ corresponding to each DU output.
- -----------------------------------------------------------------------------
-  R8A7743 (RZ/G1M)       DPAD 0         LVDS 0         -              -
-  R8A7745 (RZ/G1E)       DPAD 0         DPAD 1         -              -
-+ R8A77470 (RZ/G1C)      DPAD 0         DPAD 1         LVDS 0         -
-  R8A7779 (R-Car H1)     DPAD 0         DPAD 1         -              -
-  R8A7790 (R-Car H2)     DPAD 0         LVDS 0         LVDS 1         -
-  R8A7791 (R-Car M2-W)   DPAD 0         LVDS 0         -              -
+diff --git a/drivers/gpu/drm/rcar-du/rcar_du_drv.c b/drivers/gpu/drm/rcar-du/rcar_du_drv.c
+index c07d3f1..2c3d0e5 100644
+--- a/drivers/gpu/drm/rcar-du/rcar_du_drv.c
++++ b/drivers/gpu/drm/rcar-du/rcar_du_drv.c
+@@ -321,6 +321,7 @@ static const struct rcar_du_device_info rcar_du_r8a77970_info = {
+ 
+ static const struct of_device_id rcar_du_of_table[] = {
+ 	{ .compatible = "renesas,du-r8a7743", .data = &rzg1_du_r8a7743_info },
++	{ .compatible = "renesas,du-r8a7744", .data = &rzg1_du_r8a7743_info },
+ 	{ .compatible = "renesas,du-r8a7745", .data = &rzg1_du_r8a7745_info },
+ 	{ .compatible = "renesas,du-r8a77470", .data = &rzg1_du_r8a77470_info },
+ 	{ .compatible = "renesas,du-r8a7779", .data = &rcar_du_r8a7779_info },
 -- 
 2.7.4
