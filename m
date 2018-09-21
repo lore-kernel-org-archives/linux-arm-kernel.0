@@ -1,206 +1,59 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 21 Sep 2018 17:46:12 +0100
-Subject: [PATCH v4 2/4] PCI: mediatek: enable msi after clock enabled
-In-Reply-To: <1536573023-6720-3-git-send-email-honghui.zhang@mediatek.com>
-References: <1536573023-6720-1-git-send-email-honghui.zhang@mediatek.com>
- <1536573023-6720-3-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <20180921164612.GA27651@e107981-ln.cambridge.arm.com>
+From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
+Date: Fri, 21 Sep 2018 16:58:29 +0000
+Subject: [RESEND PATCH 1/6] ARM: config: multi_v5: enable dynamic debug
+In-Reply-To: <f20387e3-4cce-78eb-886c-03ab8c39ae42@gmail.com>
+References: <20180814140612.12554-1-marcel@ziswiler.com>
+ <9461e62248cc7c1b5585004ff8cf7268b823e29c.camel@perches.com>
+ <f20387e3-4cce-78eb-886c-03ab8c39ae42@gmail.com>
+Message-ID: <1537549106.6513.1.camel@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 10, 2018 at 05:50:21PM +0800, honghui.zhang at mediatek.com wrote:
-> From: Honghui Zhang <honghui.zhang@mediatek.com>
+On Wed, 2018-08-15 at 18:29 -0700, Florian Fainelli wrote:
 > 
-> The clocks was not enabled when enable MSI. This patch fix this
-> issue by calling mtk_pcie_enable_msi in mtk_pcie_startup_port_v2
-> since the clock was all enabled at that time.
+> On 08/14/2018 07:16 AM, Joe Perches wrote:
+> > On Tue, 2018-08-14 at 16:06 +0200, Marcel Ziswiler wrote:
+> > > From: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> > > 
+> > > Dynamic debug is really helpful.
+> > 
+> > It's useful, but perhaps not appropriate.
+> > 
+> > Most arm configs are for small resource constrained systems.
 > 
-> The function of mtk_pcie_startup_port_v2's define location is
-> re-arranged to avoid mtk_pcie_enable_msi's forward declaration.
-> 
-> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-> Reviewed-by: Ryder Lee <ryder.lee@mediatek.com>
-> ---
->  drivers/pci/controller/pcie-mediatek.c | 143 +++++++++++++++++----------------
->  1 file changed, 72 insertions(+), 71 deletions(-)
+> Yes, but multi_v*_defconfig, by definition are not, so this really
+> seems
+> acceptable to me here.
 
-Can you read:
+What is the conclusion now? Is anybody gona pull this patchset in? Or
+are any changes needed?
 
-https://marc.info/?l=linux-pci&m=150905742808166&w=2
-
-follow it and adapt this patch and the others accordingly please ?
-
-Thanks,
-Lorenzo
-
-> diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
-> index 20b9088..5aba43a 100644
-> --- a/drivers/pci/controller/pcie-mediatek.c
-> +++ b/drivers/pci/controller/pcie-mediatek.c
-> @@ -398,75 +398,6 @@ static struct pci_ops mtk_pcie_ops_v2 = {
->  	.write = mtk_pcie_config_write,
->  };
->  
-> -static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
-> -{
-> -	struct mtk_pcie *pcie = port->pcie;
-> -	struct resource *mem = &pcie->mem;
-> -	const struct mtk_pcie_soc *soc = port->pcie->soc;
-> -	u32 val;
-> -	size_t size;
-> -	int err;
-> -
-> -	/* MT7622 platforms need to enable LTSSM and ASPM from PCIe subsys */
-> -	if (pcie->base) {
-> -		val = readl(pcie->base + PCIE_SYS_CFG_V2);
-> -		val |= PCIE_CSR_LTSSM_EN(port->slot) |
-> -		       PCIE_CSR_ASPM_L1_EN(port->slot);
-> -		writel(val, pcie->base + PCIE_SYS_CFG_V2);
-> -	}
-> -
-> -	/* Assert all reset signals */
-> -	writel(0, port->base + PCIE_RST_CTRL);
-> -
-> -	/*
-> -	 * Enable PCIe link down reset, if link status changed from link up to
-> -	 * link down, this will reset MAC control registers and configuration
-> -	 * space.
-> -	 */
-> -	writel(PCIE_LINKDOWN_RST_EN, port->base + PCIE_RST_CTRL);
-> -
-> -	/* De-assert PHY, PE, PIPE, MAC and configuration reset	*/
-> -	val = readl(port->base + PCIE_RST_CTRL);
-> -	val |= PCIE_PHY_RSTB | PCIE_PERSTB | PCIE_PIPE_SRSTB |
-> -	       PCIE_MAC_SRSTB | PCIE_CRSTB;
-> -	writel(val, port->base + PCIE_RST_CTRL);
-> -
-> -	/* Set up vendor ID and class code */
-> -	if (soc->need_fix_class_id) {
-> -		val = PCI_VENDOR_ID_MEDIATEK;
-> -		writew(val, port->base + PCIE_CONF_VEND_ID);
-> -
-> -		val = PCI_CLASS_BRIDGE_HOST;
-> -		writew(val, port->base + PCIE_CONF_CLASS_ID);
-> -	}
-> -
-> -	/* 100ms timeout value should be enough for Gen1/2 training */
-> -	err = readl_poll_timeout(port->base + PCIE_LINK_STATUS_V2, val,
-> -				 !!(val & PCIE_PORT_LINKUP_V2), 20,
-> -				 100 * USEC_PER_MSEC);
-> -	if (err)
-> -		return -ETIMEDOUT;
-> -
-> -	/* Set INTx mask */
-> -	val = readl(port->base + PCIE_INT_MASK);
-> -	val &= ~INTX_MASK;
-> -	writel(val, port->base + PCIE_INT_MASK);
-> -
-> -	/* Set AHB to PCIe translation windows */
-> -	size = mem->end - mem->start;
-> -	val = lower_32_bits(mem->start) | AHB2PCIE_SIZE(fls(size));
-> -	writel(val, port->base + PCIE_AHB_TRANS_BASE0_L);
-> -
-> -	val = upper_32_bits(mem->start);
-> -	writel(val, port->base + PCIE_AHB_TRANS_BASE0_H);
-> -
-> -	/* Set PCIe to AXI translation memory space.*/
-> -	val = fls(0xffffffff) | WIN_ENABLE;
-> -	writel(val, port->base + PCIE_AXI_WINDOW0);
-> -
-> -	return 0;
-> -}
-> -
->  static void mtk_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
->  {
->  	struct mtk_pcie_port *port = irq_data_get_irq_chip_data(data);
-> @@ -643,8 +574,6 @@ static int mtk_pcie_init_irq_domain(struct mtk_pcie_port *port,
->  		ret = mtk_pcie_allocate_msi_domains(port);
->  		if (ret)
->  			return ret;
-> -
-> -		mtk_pcie_enable_msi(port);
->  	}
->  
->  	return 0;
-> @@ -711,6 +640,78 @@ static int mtk_pcie_setup_irq(struct mtk_pcie_port *port,
->  	return 0;
->  }
->  
-> +static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
-> +{
-> +	struct mtk_pcie *pcie = port->pcie;
-> +	struct resource *mem = &pcie->mem;
-> +	const struct mtk_pcie_soc *soc = port->pcie->soc;
-> +	u32 val;
-> +	size_t size;
-> +	int err;
-> +
-> +	/* MT7622 platforms need to enable LTSSM and ASPM from PCIe subsys */
-> +	if (pcie->base) {
-> +		val = readl(pcie->base + PCIE_SYS_CFG_V2);
-> +		val |= PCIE_CSR_LTSSM_EN(port->slot) |
-> +		       PCIE_CSR_ASPM_L1_EN(port->slot);
-> +		writel(val, pcie->base + PCIE_SYS_CFG_V2);
-> +	}
-> +
-> +	/* Assert all reset signals */
-> +	writel(0, port->base + PCIE_RST_CTRL);
-> +
-> +	/*
-> +	 * Enable PCIe link down reset, if link status changed from link up to
-> +	 * link down, this will reset MAC control registers and configuration
-> +	 * space.
-> +	 */
-> +	writel(PCIE_LINKDOWN_RST_EN, port->base + PCIE_RST_CTRL);
-> +
-> +	/* De-assert PHY, PE, PIPE, MAC and configuration reset	*/
-> +	val = readl(port->base + PCIE_RST_CTRL);
-> +	val |= PCIE_PHY_RSTB | PCIE_PERSTB | PCIE_PIPE_SRSTB |
-> +	       PCIE_MAC_SRSTB | PCIE_CRSTB;
-> +	writel(val, port->base + PCIE_RST_CTRL);
-> +
-> +	/* Set up vendor ID and class code */
-> +	if (soc->need_fix_class_id) {
-> +		val = PCI_VENDOR_ID_MEDIATEK;
-> +		writew(val, port->base + PCIE_CONF_VEND_ID);
-> +
-> +		val = PCI_CLASS_BRIDGE_HOST;
-> +		writew(val, port->base + PCIE_CONF_CLASS_ID);
-> +	}
-> +
-> +	/* 100ms timeout value should be enough for Gen1/2 training */
-> +	err = readl_poll_timeout(port->base + PCIE_LINK_STATUS_V2, val,
-> +				 !!(val & PCIE_PORT_LINKUP_V2), 20,
-> +				 100 * USEC_PER_MSEC);
-> +	if (err)
-> +		return -ETIMEDOUT;
-> +
-> +	/* Set INTx mask */
-> +	val = readl(port->base + PCIE_INT_MASK);
-> +	val &= ~INTX_MASK;
-> +	writel(val, port->base + PCIE_INT_MASK);
-> +
-> +	if (IS_ENABLED(CONFIG_PCI_MSI))
-> +		mtk_pcie_enable_msi(port);
-> +
-> +	/* Set AHB to PCIe translation windows */
-> +	size = mem->end - mem->start;
-> +	val = lower_32_bits(mem->start) | AHB2PCIE_SIZE(fls(size));
-> +	writel(val, port->base + PCIE_AHB_TRANS_BASE0_L);
-> +
-> +	val = upper_32_bits(mem->start);
-> +	writel(val, port->base + PCIE_AHB_TRANS_BASE0_H);
-> +
-> +	/* Set PCIe to AXI translation memory space.*/
-> +	val = fls(0xffffffff) | WIN_ENABLE;
-> +	writel(val, port->base + PCIE_AXI_WINDOW0);
-> +
-> +	return 0;
-> +}
-> +
->  static void __iomem *mtk_pcie_map_bus(struct pci_bus *bus,
->  				      unsigned int devfn, int where)
->  {
-> -- 
-> 2.6.4
-> 
+> > dynamic_debug adds a lot of additional text and a fair amount of
+> > data.
+> > 
+> > 
+> > > Signed-off-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> > > 
+> > > ---
+> > > 
+> > >  arch/arm/configs/multi_v5_defconfig | 1 +
+> > >  1 file changed, 1 insertion(+)
+> > > 
+> > > diff --git a/arch/arm/configs/multi_v5_defconfig
+> > > b/arch/arm/configs/multi_v5_defconfig
+> > > index 318b76fa26d1..b302ac68d587 100644
+> > > --- a/arch/arm/configs/multi_v5_defconfig
+> > > +++ b/arch/arm/configs/multi_v5_defconfig
+> > > @@ -275,6 +275,7 @@ CONFIG_NLS_CODEPAGE_850=y
+> > >  CONFIG_NLS_ISO8859_1=y
+> > >  CONFIG_NLS_ISO8859_2=y
+> > >  CONFIG_NLS_UTF8=y
+> > > +CONFIG_DYNAMIC_DEBUG=y
+> > >  CONFIG_DEBUG_INFO=y
+> > >  CONFIG_DEBUG_FS=y
+> > >  CONFIG_MAGIC_SYSRQ=y
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
