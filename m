@@ -1,74 +1,62 @@
 From: yuehaibing@huawei.com (YueHaibing)
-Date: Fri, 21 Sep 2018 09:35:13 +0800
+Date: Fri, 21 Sep 2018 09:37:50 +0800
 Subject: [PATCH net-next 17/22] hv_netvsc: fix return type of
  ndo_start_xmit function
-In-Reply-To: <BN6PR21MB016180C794F26A279345A17FCA130@BN6PR21MB0161.namprd21.prod.outlook.com>
+In-Reply-To: <20180920074341.3acef75c@xeon-e3>
 References: <20180920123306.14772-1-yuehaibing@huawei.com>
  <20180920123306.14772-18-yuehaibing@huawei.com>
  <20180920074341.3acef75c@xeon-e3>
- <BN6PR21MB016180C794F26A279345A17FCA130@BN6PR21MB0161.namprd21.prod.outlook.com>
-Message-ID: <1dfae517-640a-fa56-34e8-52964c29a15f@huawei.com>
+Message-ID: <b9b170c4-caba-928e-4c6f-eb51cb5e4707@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018/9/20 22:50, Haiyang Zhang wrote:
+On 2018/9/20 22:43, Stephen Hemminger wrote:
+> On Thu, 20 Sep 2018 20:33:01 +0800
+> YueHaibing <yuehaibing@huawei.com> wrote:
 > 
-> 
->> -----Original Message-----
->> From: Stephen Hemminger <stephen@networkplumber.org>
->> Sent: Thursday, September 20, 2018 10:44 AM
->> To: YueHaibing <yuehaibing@huawei.com>
->> Cc: davem at davemloft.net; dmitry.tarnyagin at lockless.no;
->> wg at grandegger.com; mkl at pengutronix.de; michal.simek at xilinx.com;
->> hsweeten at visionengravers.com; madalin.bucur at nxp.com;
->> pantelis.antoniou at gmail.com; claudiu.manoil at nxp.com; leoyang.li at nxp.com;
->> linux at armlinux.org.uk; sammy at sammy.net; ralf at linux-mips.org;
->> nico at fluxnic.net; steve.glendinning at shawell.net; f.fainelli at gmail.com;
->> grygorii.strashko at ti.com; w-kwok2 at ti.com; m-karicheri2 at ti.com;
->> t.sailer at alumni.ethz.ch; jreuter at yaina.de; KY Srinivasan <kys@microsoft.com>;
->> Haiyang Zhang <haiyangz@microsoft.com>; wei.liu2 at citrix.com;
->> paul.durrant at citrix.com; arvid.brodin at alten.se; pshelar at ovn.org;
->> dev at openvswitch.org; linux-mips at linux-mips.org; xen-
->> devel at lists.xenproject.org; netdev at vger.kernel.org; linux-usb at vger.kernel.org;
->> linux-kernel at vger.kernel.org; linux-can at vger.kernel.org;
->> devel at linuxdriverproject.org; linux-hams at vger.kernel.org; linux-
->> omap at vger.kernel.org; linuxppc-dev at lists.ozlabs.org; linux-arm-
->> kernel at lists.infradead.org
->> Subject: Re: [PATCH net-next 17/22] hv_netvsc: fix return type of
->> ndo_start_xmit function
+>> The method ndo_start_xmit() is defined as returning an 'netdev_tx_t',
+>> which is a typedef for an enum type, so make sure the implementation in
+>> this driver has returns 'netdev_tx_t' value, and change the function
+>> return type to netdev_tx_t.
 >>
->> On Thu, 20 Sep 2018 20:33:01 +0800
->> YueHaibing <yuehaibing@huawei.com> wrote:
->>> int netvsc_start_xmit(struct sk_buff *skb, struct net_device *net)
->>>  	 */
->>>  	vf_netdev = rcu_dereference_bh(net_device_ctx->vf_netdev);
->>>  	if (vf_netdev && netif_running(vf_netdev) &&
->>> -	    !netpoll_tx_running(net))
->>> -		return netvsc_vf_xmit(net, vf_netdev, skb);
->>> +	    !netpoll_tx_running(net)) {
->>> +		ret = netvsc_vf_xmit(net, vf_netdev, skb);
->>> +		if (ret)
->>> +			return NETDEV_TX_BUSY;
->>> +	}
+>> Found by coccinelle.
 >>
->> Sorry, the new code is wrong. It will fall through if ret == 0 (NETDEV_TX_OK)
->> Please review and test your patches.
+>> Signed-off-by: YueHaibing <yuehaibing@huawei.com>
+>> ---
+>>  drivers/net/hyperv/netvsc_drv.c | 10 +++++++---
+>>  1 file changed, 7 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/net/hyperv/netvsc_drv.c b/drivers/net/hyperv/netvsc_drv.c
+>> index 3af6d8d..056c472 100644
+>> --- a/drivers/net/hyperv/netvsc_drv.c
+>> +++ b/drivers/net/hyperv/netvsc_drv.c
+>> @@ -511,7 +511,8 @@ static int netvsc_vf_xmit(struct net_device *net, struct net_device *vf_netdev,
+>>  	return rc;
+>>  }
+>>  
+>> -static int netvsc_start_xmit(struct sk_buff *skb, struct net_device *net)
+>> +static netdev_tx_t
+>> +netvsc_start_xmit(struct sk_buff *skb, struct net_device *net)
+>>  {
+>>  	struct net_device_context *net_device_ctx = netdev_priv(net);
+>>  	struct hv_netvsc_packet *packet = NULL;
+>> @@ -528,8 +529,11 @@ static int netvsc_start_xmit(struct sk_buff *skb, struct net_device *net)
+>>  	 */
+>>  	vf_netdev = rcu_dereference_bh(net_device_ctx->vf_netdev);
+>>  	if (vf_netdev && netif_running(vf_netdev) &&
+>> -	    !netpoll_tx_running(net))
+>> -		return netvsc_vf_xmit(net, vf_netdev, skb);
+>> +	    !netpoll_tx_running(net)) {
+>> +		ret = netvsc_vf_xmit(net, vf_netdev, skb);
+>> +		if (ret)
+>> +			return NETDEV_TX_BUSY;
+>> +	}
 > 
-> Plus consideration of -- For error case, please just return NETDEV_TX_OK. We 
-> are not sure if the error can go away after retrying, returning NETDEV_TX_BUSY 
-> may cause infinite retry from the upper layer.
-> 
-> So, let's just always return NETDEV_TX_OK like this:
-> 		netvsc_vf_xmit(net, vf_netdev, skb);
-> 		return NETDEV_TX_OK;
+> Sorry, the new code is wrong. It will fall through if ret == 0 (NETDEV_TX_OK)
+> Please review and test your patches.
 
-Thank you for review.
+I'm sorry for this, will correct it as Haiyang's suggestion.
 
-Will do that in v2.
-
-> 
-> Thanks,
-> - Haiyang
 > 
 > .
 > 
