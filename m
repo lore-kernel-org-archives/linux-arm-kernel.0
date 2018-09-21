@@ -1,36 +1,47 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Fri, 21 Sep 2018 12:07:36 +0800
-Subject: [PATCH 2/4] pinctrl: mediatek: add no eint function for pin define
+Date: Fri, 21 Sep 2018 12:07:38 +0800
+Subject: [PATCH 4/4] pinctrl: mediatek: add eint support to MT6765 pinctrl
+ driver
 In-Reply-To: <ab85fbee4d8286cbedbcc7317f89dc0d2dd83965.1537502494.git.sean.wang@mediatek.com>
 References: <ab85fbee4d8286cbedbcc7317f89dc0d2dd83965.1537502494.git.sean.wang@mediatek.com>
-Message-ID: <554196e837f622eea62d11602b7c88721d6a776d.1537502494.git.sean.wang@mediatek.com>
+Message-ID: <82d47055aec8e40422eb72568e96bfbaf199d9d2.1537502494.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mars Cheng <mars.cheng@mediatek.com>
 
-Add NO_EINT_SUPPORT back to pinctrl-mtk-common-v2.h as the alias of
-EINT_NA to indicate that some pin not capable of being controlled as eint
-and that is required by pinctrl-paris based driver as old
-pinctrl-mtk-common.h already had.
+Just add eint support to MT6765 pinctrl driver as usual as
+happens on the other SoCs.
 
 Signed-off-by: Mars Cheng <mars.cheng@mediatek.com>
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 ---
- drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/pinctrl/mediatek/pinctrl-mt6765.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h
-index b618042..991c1c5 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h
-+++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h
-@@ -19,6 +19,7 @@
- #define MTK_PULLUP     1
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mt6765.c b/drivers/pinctrl/mediatek/pinctrl-mt6765.c
+index 1cae634..32451e8 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mt6765.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mt6765.c
+@@ -1056,11 +1056,19 @@ static const char * const mt6765_pinctrl_register_base_names[] = {
+ 	"iocfg6", "iocfg7",
+ };
  
- #define EINT_NA	U16_MAX
-+#define NO_EINT_SUPPORT	EINT_NA
- 
- #define PIN_FIELD_CALC(_s_pin, _e_pin, _i_base, _s_addr, _x_addrs,      \
- 		       _s_bit, _x_bits, _sz_reg, _fixed) {		\
++static const struct mtk_eint_hw mt6765_eint_hw = {
++	.port_mask = 7,
++	.ports     = 6,
++	.ap_num    = 160,
++	.db_cnt    = 13,
++};
++
+ static const struct mtk_pin_soc mt6765_data = {
+ 	.reg_cal = mt6765_reg_cals,
+ 	.pins = mtk_pins_mt6765,
+ 	.npins = ARRAY_SIZE(mtk_pins_mt6765),
+ 	.ngrps = ARRAY_SIZE(mtk_pins_mt6765),
++	.eint_hw = &mt6765_eint_hw,
+ 	.gpio_m = 0,
+ 	.ies_present = true,
+ 	.base_names = mt6765_pinctrl_register_base_names,
 -- 
 2.7.4
