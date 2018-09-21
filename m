@@ -1,77 +1,62 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Fri, 21 Sep 2018 17:03:49 +0800
-Subject: [PATCH v3 04/12] drm/mediatek: add clock factor for different IC
-In-Reply-To: <20180921032822.30771-5-bibby.hsieh@mediatek.com>
-References: <20180921032822.30771-1-bibby.hsieh@mediatek.com>
- <20180921032822.30771-5-bibby.hsieh@mediatek.com>
-Message-ID: <1537520629.20660.3.camel@mtksdaap41>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 21 Sep 2018 11:07:21 +0200
+Subject: [PATCH v7 2/7] edac: synps: Add platform specific structures for
+ ddrc controller
+In-Reply-To: <DM6PR02MB52279753E7FD04587393DC08C11C0@DM6PR02MB5227.namprd02.prod.outlook.com>
+References: <1537194305-9243-1-git-send-email-manish.narani@xilinx.com>
+ <1537194305-9243-3-git-send-email-manish.narani@xilinx.com>
+ <20180918075522.GC22202@nazgul.tnic>
+ <DM6PR02MB5227F5B1B329C903BA64A27CC11C0@DM6PR02MB5227.namprd02.prod.outlook.com>
+ <20180919111553.GA9140@nazgul.tnic>
+ <DM6PR02MB52279753E7FD04587393DC08C11C0@DM6PR02MB5227.namprd02.prod.outlook.com>
+Message-ID: <20180921090721.GB30439@nazgul.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Bibby:
+On Wed, Sep 19, 2018 at 01:33:58PM +0000, Manish Narani wrote:
+> Apart from this one, I have covered all the comments from the previous review.
 
-On Fri, 2018-09-21 at 11:28 +0800, Bibby Hsieh wrote:
-> From: chunhui dai <chunhui.dai@mediatek.com>
-> 
-> different IC has different clock designed in HDMI, the factor for
-> calculate clock should be different. Usinng the data in of_node
-> to find this factor.
-> 
+Are you sure?
 
-Reviewed-by: CK Hu <ck.hu@mediatek.com>
+Let's see. I said:
 
-> Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
-> ---
->  drivers/gpu/drm/mediatek/mtk_dpi.c | 24 +++++++++++++++---------
->  1 file changed, 15 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
-> index 1e7369e0d91c..022ccec49cea 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_dpi.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
-> @@ -120,6 +120,7 @@ struct mtk_dpi_yc_limit {
->  };
->  
->  struct mtk_dpi_conf {
-> +	unsigned int (*cal_factor)(int clock);
->  	u32 reg_h_fre_con;
->  	bool edge_sel_en;
->  };
-> @@ -460,15 +461,7 @@ static int mtk_dpi_set_display_mode(struct mtk_dpi *dpi,
->  	unsigned int factor;
->  
->  	/* let pll_rate can fix the valid range of tvdpll (1G~2GHz) */
-> -
-> -	if (mode->clock <= 27000)
-> -		factor = 3 << 4;
-> -	else if (mode->clock <= 84000)
-> -		factor = 3 << 3;
-> -	else if (mode->clock <= 167000)
-> -		factor = 3 << 2;
-> -	else
-> -		factor = 3 << 1;
-> +	factor = dpi->conf->cal_factor(mode->clock);
->  	drm_display_mode_to_videomode(mode, &vm);
->  	pll_rate = vm.pixelclock * factor;
->  
-> @@ -682,7 +675,20 @@ static const struct component_ops mtk_dpi_component_ops = {
->  	.unbind = mtk_dpi_unbind,
->  };
->  
-> +static unsigned int mt8173_calculate_factor(int clock)
-> +{
-> +	if (clock <= 27000)
-> +		return 3 << 4;
-> +	else if (clock <= 84000)
-> +		return 3 << 3;
-> +	else if (clock <= 167000)
-> +		return 3 << 2;
-> +	else
-> +		return 3 << 1;
-> +}
-> +
->  static const struct mtk_dpi_conf mt8173_conf = {
-> +	.cal_factor = mt8173_calculate_factor,
->  	.reg_h_fre_con = 0xe0,
->  };
->  
+| Kill all that "function pointer" fluff. Here's how I've changed it:
+| 
+| /**
+|  * struct synps_platform_data -  synps platform data structure
+|  * @edac_geterror_info: edac error info
+|  * @edac_get_mtype:     get mtype
+|  * @edac_get_dtype:     get dtype
+|  * @edac_get_eccstate:  get ECC state
+			  ^^^^^^^^^^^^^
+
+This is supposed to denote that this function returns whether ECC
+checking is enabled on the controller or not.
+
+Your patch has:
+
++ * struct synps_platform_data -  synps platform data structure.
++ * @geterror_info:     Get error info.
++ * @get_mtype:         Get mtype.
++ * @get_dtype:         Get dtype.
++ * @get_eccstate:      Get eccstate.
+
+So what is "eccstate"? Is it a struct or a variable or ...?
+
+Do you see my point?
+
+I know, it is a small thing but documenting our code properly is
+something which people would be thanking us for. Even you will be
+thanking yourself when you look at this months from now after having
+forgotten it all.
+
+Please check the rest of your additions for similar discrepancies.
+
+Thanks.
+
+-- 
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
+--
