@@ -1,401 +1,50 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 21 Sep 2018 15:06:34 +0100
-Subject: [PATCH v2 03/11] arm64: dts: hi6220: Update coresight bindings
- for hardware ports
-In-Reply-To: <20180912135352.19722-4-suzuki.poulose@arm.com>
-References: <20180912135352.19722-1-suzuki.poulose@arm.com>
- <20180912135352.19722-4-suzuki.poulose@arm.com>
-Message-ID: <5BA4FAEA.3010502@hisilicon.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Fri, 21 Sep 2018 16:02:47 +0200
+Subject: [RESEND PATCH] Revert "pwm: Set class for exported channels in sysfs"
+Message-ID: <1537538567-5377-1-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
+This reverts commit 7e5d1fd75c3dde9fc10c4472b9368089d1b81d00 as it causes
+regression with multiple pwm chip. It creates a new entry in
+'/sys/class/pwm' every time a 'pwmX' is exported with 'echo X > export':
+- 1st time export will create an entry in /sys/class/pwm/pwmX
+- when another export happens on another pwmchip, it can't be created
+(e.g. -EEXIST)
 
-On 2018/9/12 14:53, Suzuki K Poulose wrote:
-> Switch to updated coresight bindings for hw ports.
-> 
-> Cc: xuwei5 at hisilicon.com
-> Cc: lipengcheng8 at huawei.com
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Tested-by: Leo Yan <leo.yan@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+This also changes existing ABI (Documentation/ABI/testing/sysfs-class-pwm):
+- pmwX should be there: /sys/class/pwm/pwmchipN/pwmX
 
-Thanks!
-Applied to the hisilicon dt tree.
+Example on stm32 (stm32429i-eval) platform:
+$ ls /sys/class/pwm
+pwmchip0 pwmchip4
 
-Best Regards,
-Wei
+$ cd /sys/class/pwm/pwmchip0/
+$ echo 0 > export
+$ ls /sys/class/pwm
+pwm0 pwmchip0 pwmchip4
 
-> ---
->  .../boot/dts/hisilicon/hi6220-coresight.dtsi  | 181 +++++++++---------
->  1 file changed, 86 insertions(+), 95 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-coresight.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220-coresight.dtsi
-> index 7afee5d5087b..68c52f1149be 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi6220-coresight.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hi6220-coresight.dtsi
-> @@ -20,22 +20,18 @@
->  			clocks = <&acpu_sctrl HI6220_ACPU_SFT_AT_S>;
->  			clock-names = "apb_pclk";
->  
-> -			ports {
-> -				#address-cells = <1>;
-> -				#size-cells = <0>;
-> -
-> -				port at 0 {
-> -					reg = <0>;
-> +			out-ports {
-> +				port {
->  					soc_funnel_out: endpoint {
->  						remote-endpoint =
->  							<&etf_in>;
->  					};
->  				};
-> +			};
->  
-> -				port at 1 {
-> -					reg = <0>;
-> +			in-ports {
-> +				port {
->  					soc_funnel_in: endpoint {
-> -						slave-mode;
->  						remote-endpoint =
->  							<&acpu_funnel_out>;
->  					};
-> @@ -49,21 +45,17 @@
->  			clocks = <&acpu_sctrl HI6220_ACPU_SFT_AT_S>;
->  			clock-names = "apb_pclk";
->  
-> -			ports {
-> -				#address-cells = <1>;
-> -				#size-cells = <0>;
-> -
-> -				port at 0 {
-> -					reg = <0>;
-> +			in-ports {
-> +				port {
->  					etf_in: endpoint {
-> -						slave-mode;
->  						remote-endpoint =
->  							<&soc_funnel_out>;
->  					};
->  				};
-> +			};
->  
-> -				port at 1 {
-> -					reg = <0>;
-> +			out-ports {
-> +				port {
->  					etf_out: endpoint {
->  						remote-endpoint =
->  							<&replicator_in>;
-> @@ -77,20 +69,20 @@
->  			clocks = <&acpu_sctrl HI6220_ACPU_SFT_AT_S>;
->  			clock-names = "apb_pclk";
->  
-> -			ports {
-> -				#address-cells = <1>;
-> -				#size-cells = <0>;
-> -
-> -				port at 0 {
-> -					reg = <0>;
-> +			in-ports {
-> +				port {
->  					replicator_in: endpoint {
-> -						slave-mode;
->  						remote-endpoint =
->  							<&etf_out>;
->  					};
->  				};
-> +			};
->  
-> -				port at 1 {
-> +			out-ports {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				port at 0 {
->  					reg = <0>;
->  					replicator_out0: endpoint {
->  						remote-endpoint =
-> @@ -98,7 +90,7 @@
->  					};
->  				};
->  
-> -				port at 2 {
-> +				port at 1 {
->  					reg = <1>;
->  					replicator_out1: endpoint {
->  						remote-endpoint =
-> @@ -114,14 +106,9 @@
->  			clocks = <&acpu_sctrl HI6220_ACPU_SFT_AT_S>;
->  			clock-names = "apb_pclk";
->  
-> -			ports {
-> -				#address-cells = <1>;
-> -				#size-cells = <0>;
-> -
-> -				port at 0 {
-> -					reg = <0>;
-> +			in-ports {
-> +				port {
->  					etr_in: endpoint {
-> -						slave-mode;
->  						remote-endpoint =
->  							<&replicator_out0>;
->  					};
-> @@ -135,14 +122,9 @@
->  			clocks = <&acpu_sctrl HI6220_ACPU_SFT_AT_S>;
->  			clock-names = "apb_pclk";
->  
-> -			ports {
-> -				#address-cells = <1>;
-> -				#size-cells = <0>;
-> -
-> -				port at 0 {
-> -					reg = <0>;
-> +			in-ports {
-> +				port {
->  					tpiu_in: endpoint {
-> -						slave-mode;
->  						remote-endpoint =
->  							<&replicator_out1>;
->  					};
-> @@ -156,85 +138,78 @@
->  			clocks = <&acpu_sctrl HI6220_ACPU_SFT_AT_S>;
->  			clock-names = "apb_pclk";
->  
-> -			ports {
-> -				#address-cells = <1>;
-> -				#size-cells = <0>;
-> -
-> -				port at 0 {
-> -					reg = <0>;
-> +			out-ports {
-> +				port {
->  					acpu_funnel_out: endpoint {
->  						remote-endpoint =
->  							<&soc_funnel_in>;
->  					};
->  				};
-> +			};
->  
-> -				port at 1 {
-> +			in-ports {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				port at 0 {
->  					reg = <0>;
->  					acpu_funnel_in0: endpoint {
-> -						slave-mode;
->  						remote-endpoint =
->  							<&etm0_out>;
->  					};
->  				};
->  
-> -				port at 2 {
-> +				port at 1 {
->  					reg = <1>;
->  					acpu_funnel_in1: endpoint {
-> -						slave-mode;
->  						remote-endpoint =
->  							<&etm1_out>;
->  					};
->  				};
->  
-> -				port at 3 {
-> +				port at 2 {
->  					reg = <2>;
->  					acpu_funnel_in2: endpoint {
-> -						slave-mode;
->  						remote-endpoint =
->  							<&etm2_out>;
->  					};
->  				};
->  
-> -				port at 4 {
-> +				port at 3 {
->  					reg = <3>;
->  					acpu_funnel_in3: endpoint {
-> -						slave-mode;
->  						remote-endpoint =
->  							<&etm3_out>;
->  					};
->  				};
->  
-> -				port at 5 {
-> +				port at 4 {
->  					reg = <4>;
->  					acpu_funnel_in4: endpoint {
-> -						slave-mode;
->  						remote-endpoint =
->  							<&etm4_out>;
->  					};
->  				};
->  
-> -				port at 6 {
-> +				port at 5 {
->  					reg = <5>;
->  					acpu_funnel_in5: endpoint {
-> -						slave-mode;
->  						remote-endpoint =
->  							<&etm5_out>;
->  					};
->  				};
->  
-> -				port at 7 {
-> +				port at 6 {
->  					reg = <6>;
->  					acpu_funnel_in6: endpoint {
-> -						slave-mode;
->  						remote-endpoint =
->  							<&etm6_out>;
->  					};
->  				};
->  
-> -				port at 8 {
-> +				port at 7 {
->  					reg = <7>;
->  					acpu_funnel_in7: endpoint {
-> -						slave-mode;
->  						remote-endpoint =
->  							<&etm7_out>;
->  					};
-> @@ -251,10 +226,12 @@
->  
->  			cpu = <&cpu0>;
->  
-> -			port {
-> -				etm0_out: endpoint {
-> -					remote-endpoint =
-> -						<&acpu_funnel_in0>;
-> +			out-ports {
-> +				port {
-> +					etm0_out: endpoint {
-> +						remote-endpoint =
-> +							<&acpu_funnel_in0>;
-> +					};
->  				};
->  			};
->  		};
-> @@ -268,10 +245,12 @@
->  
->  			cpu = <&cpu1>;
->  
-> -			port {
-> -				etm1_out: endpoint {
-> -					remote-endpoint =
-> -						<&acpu_funnel_in1>;
-> +			out-ports {
-> +				port {
-> +					etm1_out: endpoint {
-> +						remote-endpoint =
-> +							<&acpu_funnel_in1>;
-> +					};
->  				};
->  			};
->  		};
-> @@ -285,10 +264,12 @@
->  
->  			cpu = <&cpu2>;
->  
-> -			port {
-> -				etm2_out: endpoint {
-> -					remote-endpoint =
-> -						<&acpu_funnel_in2>;
-> +			out-ports {
-> +				port {
-> +					etm2_out: endpoint {
-> +						remote-endpoint =
-> +							<&acpu_funnel_in2>;
-> +					};
->  				};
->  			};
->  		};
-> @@ -302,10 +283,12 @@
->  
->  			cpu = <&cpu3>;
->  
-> -			port {
-> -				etm3_out: endpoint {
-> -					remote-endpoint =
-> -						<&acpu_funnel_in3>;
-> +			out-ports {
-> +				port {
-> +					etm3_out: endpoint {
-> +						remote-endpoint =
-> +							<&acpu_funnel_in3>;
-> +					};
->  				};
->  			};
->  		};
-> @@ -319,10 +302,12 @@
->  
->  			cpu = <&cpu4>;
->  
-> -			port {
-> -				etm4_out: endpoint {
-> -					remote-endpoint =
-> -						<&acpu_funnel_in4>;
-> +			out-ports {
-> +				port {
-> +					etm4_out: endpoint {
-> +						remote-endpoint =
-> +							<&acpu_funnel_in4>;
-> +					};
->  				};
->  			};
->  		};
-> @@ -336,10 +321,12 @@
->  
->  			cpu = <&cpu5>;
->  
-> -			port {
-> -				etm5_out: endpoint {
-> -					remote-endpoint =
-> -						<&acpu_funnel_in5>;
-> +			out-ports {
-> +				port {
-> +					etm5_out: endpoint {
-> +						remote-endpoint =
-> +							<&acpu_funnel_in5>;
-> +					};
->  				};
->  			};
->  		};
-> @@ -353,10 +340,12 @@
->  
->  			cpu = <&cpu6>;
->  
-> -			port {
-> -				etm6_out: endpoint {
-> -					remote-endpoint =
-> -						<&acpu_funnel_in6>;
-> +			out-ports {
-> +				port {
-> +					etm6_out: endpoint {
-> +						remote-endpoint =
-> +							<&acpu_funnel_in6>;
-> +					};
->  				};
->  			};
->  		};
-> @@ -370,10 +359,12 @@
->  
->  			cpu = <&cpu7>;
->  
-> -			port {
-> -				etm7_out: endpoint {
-> -					remote-endpoint =
-> -						<&acpu_funnel_in7>;
-> +			out-ports {
-> +				port {
-> +					etm7_out: endpoint {
-> +						remote-endpoint =
-> +							<&acpu_funnel_in7>;
-> +					};
->  				};
->  			};
->  		};
-> 
+$ cd /sys/class/pwm/pwmchip4/
+$ echo 0 > export
+sysfs: cannot create duplicate filename '/class/pwm/pwm0'
+...Exception stack follows...
+
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+ drivers/pwm/sysfs.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/drivers/pwm/sysfs.c b/drivers/pwm/sysfs.c
+index 7c71cdb..4726d43 100644
+--- a/drivers/pwm/sysfs.c
++++ b/drivers/pwm/sysfs.c
+@@ -263,7 +263,6 @@ static int pwm_export_child(struct device *parent, struct pwm_device *pwm)
+ 	export->pwm = pwm;
+ 	mutex_init(&export->lock);
+ 
+-	export->child.class = parent->class;
+ 	export->child.release = pwm_export_release;
+ 	export->child.parent = parent;
+ 	export->child.devt = MKDEV(0, 0);
+-- 
+1.9.1
