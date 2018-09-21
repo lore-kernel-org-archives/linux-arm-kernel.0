@@ -1,79 +1,128 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 21 Sep 2018 10:41:59 +0200
-Subject: [PATCH v4 5/5] drm: bridge: add support for Cadence MHDP DPI/DP
- bridge
-In-Reply-To: <1537455288-20223-6-git-send-email-dkos@cadence.com>
-References: <1537455288-20223-1-git-send-email-dkos@cadence.com>
- <1537455288-20223-6-git-send-email-dkos@cadence.com>
-Message-ID: <1903708.pJTgKoWLiI@phil>
+From: pankaj.bansal@nxp.com (Pankaj Bansal)
+Date: Fri, 21 Sep 2018 19:47:20 +0530
+Subject: [PATCH] arm64: dts: add LX2160AQDS board support
+Message-ID: <20180921141720.19159-1-pankaj.bansal@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Damian,
+The LX2160A QorIQ Development System (QDS) is a test, evaluation, and
+development platform, supporting QorIQ LX2160A processor.
 
-Am Donnerstag, 20. September 2018, 16:54:40 CEST schrieb Damian Kos:
-> From: Quentin Schulz <quentin.schulz@free-electrons.com>
-> 
-> This adds basic support for Cadence MHDP DPI to DP bridge.
-> 
-> Basically, it takes a DPI stream as input and output it encoded in DP
-> format. It's missing proper HPD, HDCP and currently supports only
-> SST mode.
-> 
-> Changes made in the low level driver (cdn-dp-reg.*):
-> - moved it to from drivers/gpu/drm/rockchip to
->   drivers/gpu/drm/bridge/cdns-mhdp-common.*
-> - functions for sending/receiving commands are now public
-> - added functions for reading registers and link training
->   adjustment
-> 
-> Changes made in RK's driver (cdn-dp-core.*):
-> - Moved audio_info and audio_pdev fields from cdn_dp_device to
->   cdns_mhdp_device structure.
-> 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> Signed-off-by: Damian Kos <dkos@cadence.com>
+Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
+Signed-off-by: Pankaj Bansal <pankaj.bansal@nxp.com>
+---
 
-[...]
+Notes:
+    This patch is dependent on [1] and [2]
+     [1] https://lore.kernel.org/patchwork/patch/985935/
+     [2] https://lore.kernel.org/patchwork/patch/985938/
 
-> diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
-> index 0ccc76217ee4..129b0529f3e1 100644
-> --- a/drivers/gpu/drm/rockchip/Kconfig
-> +++ b/drivers/gpu/drm/rockchip/Kconfig
-> @@ -27,7 +27,9 @@ config ROCKCHIP_ANALOGIX_DP
->  
->  config ROCKCHIP_CDN_DP
->          bool "Rockchip cdn DP"
-> -	depends on EXTCON=y || (EXTCON=m && DRM_ROCKCHIP=m)
-> +	depends on DRM_ROCKCHIP=m
+ arch/arm64/boot/dts/freescale/Makefile       |  1 +
+ .../boot/dts/freescale/fsl-lx2160a-qds.dts   | 88 ++++++++++++++++++
+ 2 files changed, 89 insertions(+)
 
-Sorry, I wasn't fast enough in my reply to you mail to catch that before
-your v4, but I don't think this is necessary.
-Instead I do guess, the select below should do the right thing by
-making EXTCON=y if DRM_ROCKCHIP=y.
-
-Somewhat clumsily verified by making EXTCON=m in my defconfig
-and seeing get changed to y upon build, which I guess comes from
-a different "select" in the config.
-
-
-> +	select EXTCON
-> +	select DRM_CDNS_MHDP
->          help
->  	  This selects support for Rockchip SoC specific extensions
->  	  for the cdn DP driver. If you want to enable Dp on
-> diff --git a/drivers/gpu/drm/rockchip/Makefile b/drivers/gpu/drm/rockchip/Makefile
-> index a314e2109e76..16ba61ffca39 100644
-> --- a/drivers/gpu/drm/rockchip/Makefile
-> +++ b/drivers/gpu/drm/rockchip/Makefile
-> @@ -3,13 +3,15 @@
->  # Makefile for the drm device driver.  This driver provides support for the
->  # Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
->  
-> +ccflags-y += -I$(src)/../bridge
-
-hmm, instead of adding an include path, the shared header should probably
-just live in /include/drm/bridge/... in the kernel source?
-
-
-Heiko
+diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
+index 445b72bd5a36..ae80fc5c45f7 100644
+--- a/arch/arm64/boot/dts/freescale/Makefile
++++ b/arch/arm64/boot/dts/freescale/Makefile
+@@ -14,3 +14,4 @@ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-qds.dtb
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-rdb.dtb
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-lx2160a-rdb.dtb
++dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-lx2160a-qds.dtb
+diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
+new file mode 100644
+index 000000000000..5cf2fe279f73
+--- /dev/null
++++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
+@@ -0,0 +1,88 @@
++// SPDX-License-Identifier: (GPL-2.0 OR MIT)
++//
++// Device Tree file for LX2160AQDS
++//
++// Copyright 2018 NXP
++
++/dts-v1/;
++
++#include "fsl-lx2160a.dtsi"
++
++/ {
++	model = "NXP Layerscape LX2160AQDS";
++	compatible = "fsl,lx2160a-qds", "fsl,lx2160a";
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
++
++&uart1 {
++	status = "okay";
++};
++
++&i2c0 {
++	status = "okay";
++	i2c-mux at 77 {
++		compatible = "nxp,pca9547";
++		reg = <0x77>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		i2c at 2 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x2>;
++
++			power-monitor at 40 {
++				compatible = "ti,ina220";
++				reg = <0x40>;
++				shunt-resistor = <500>;
++			};
++
++			power-monitor at 41 {
++				compatible = "ti,ina220";
++				reg = <0x41>;
++				shunt-resistor = <1000>;
++			};
++		};
++
++		i2c at 3 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x3>;
++
++			temperature-sensor at 4c {
++				compatible = "nxp,sa56004";
++				reg = <0x4c>;
++			};
++
++			temperature-sensor at 4d {
++				compatible = "nxp,sa56004";
++				reg = <0x4d>;
++			};
++
++			rtc at 51 {
++				compatible = "nxp,pcf2129";
++				reg = <0x51>;
++			};
++		};
++	};
++};
++
++&usb0 {
++	status = "okay";
++};
++
++&usb1 {
++	status = "okay";
++};
++
++&crypto {
++	status = "okay";
++};
++
+-- 
+2.17.1
