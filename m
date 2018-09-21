@@ -1,46 +1,83 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 21 Sep 2018 12:03:52 +0100
-Subject: [PATCH v8 0/7] Add non-strict mode support for iommu-dma
-In-Reply-To: <50330f32-b051-bdf6-af26-3e24ed133480@arm.com>
-References: <cover.1537458163.git.robin.murphy@arm.com>
- <fdfc05a4-283f-3ae2-7928-59e625c8f3b8@huawei.com>
- <50330f32-b051-bdf6-af26-3e24ed133480@arm.com>
-Message-ID: <61fb0f8f-a353-8ab6-f03d-b261da435c94@arm.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Fri, 21 Sep 2018 13:05:04 +0200
+Subject: [PATCH v2] arm64: dts: add support for SolidRun Clearfog GT 8K
+In-Reply-To: <87tvn24q2b.fsf@tkos.co.il> (Baruch Siach's message of "Thu, 06
+ Sep 2018 18:13:16 +0300")
+References: <a8f5114101ac62622a8b8152ba5415f39e52f05b.1536232787.git.baruch@tkos.co.il>
+ <20180906125300.GA22121@lunn.ch> <87tvn24q2b.fsf@tkos.co.il>
+Message-ID: <87h8iji00v.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/09/18 10:29, Robin Murphy wrote:
-> Hi John,
-> 
-> On 2018-09-21 10:20 AM, John Garry wrote:
->> On 20/09/2018 17:10, Robin Murphy wrote:
->>> Hi all,
+Hi Baruch,
+ 
+ On jeu., sept. 06 2018, Baruch Siach <baruch@tkos.co.il> wrote:
+
+> Hi Andrew,
+>
+> Andrew Lunn writes:
+>>> v2:
+>>>   * Add SATA node
 >>>
->>> Hopefully this is the last spin of the series - I've now dropped my 
->>> light
->>> touch and fixed up all the various prose text, plus implemented the 
->>> proper
->>> quirk support for short-descriptor because it's actually just a trivial
->>> cut-and-paste job.
+>>>   * Set front button code to KEY_WPS_BUTTON
 >>>
->>> Robin.
->>>
+>>>   * Use LEDs labels more aligned to conversion
 >>
->> Hi Robin,
+>> Hi Baruch
 >>
->> JFYI, I'm trying to test this patchset to get some figures and provide 
->> a tested-by tag, but 4/8 seems to rely on "iommu/io-pgtable-arm: Fix 
->> race handling in split_blk_unmap()" - more specifically, it seems to 
->> rely on the version which Will rewrote in your patch review, and I am 
->> not sure on what branch it exists on, if any.
-> 
-> Sorry, I should have said this is based on Will's iommu/devel branch:
-> 
-> https://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git/log/?h=iommu/devel 
+>> It would be good to say why you did not make it fully aligned to
+>> convention. What is wrong with "clearfog-gt-8k:green:led0"
+>
+> I wasn't sure what the 'devicename' field translates to for on-board
+> LEDs. The leds-class.txt document recommends to leave blank
+> non-applicable fields. Existing DTs already have have labels like
+> "beaglebone:green:usr0", and "am3517evm:green:user_led_1". So I'm fine
+> with your suggestion.
 
-FWIW I've now pushed out a complete branch here:
+If you send a new version with this change than I will apply it on the
+mvebu trees.
 
-   git://linux-arm.org/linux-rm iommu/non-strict
+Thanks,
 
+Gregory
 
-Robin.
+>
+>>> +		mdio {
+>>> +			#address-cells = <1>;
+>>> +			#size-cells = <0>;
+>>> +			switch0phy0: switch0phy0 at 11 {
+>>> +				reg = <0x11>;
+>>> +			};
+>>> +			switch0phy1: switch0phy1 at 12 {
+>>> +				reg = <0x12>;
+>>> +			};
+>>> +			switch0phy2: switch0phy2 at 13 {
+>>> +				reg = <0x13>;
+>>> +			};
+>>> +			switch0phy3: switch0phy3 at 14 {
+>>> +				reg = <0x14>;
+>>> +			};
+>>> +		};
+>>
+>> It would be nice to add a black line after each child node.
+>>
+>> Otherwise, this looks good.
+>
+> Thanks for reviewing.
+>
+> baruch
+>
+> --
+>      http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+> =}------------------------------------------------ooO--U--Ooo------------{=
+>    - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Gregory Clement, Bootlin
+Embedded Linux and Kernel engineering
+http://bootlin.com
