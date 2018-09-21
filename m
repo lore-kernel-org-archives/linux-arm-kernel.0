@@ -1,62 +1,115 @@
-From: yogeshnarayan.gaur@nxp.com (Yogesh Gaur)
-Date: Fri, 21 Sep 2018 15:51:58 +0530
-Subject: [PATCH v3 0/5] spi: spi-mem: Add driver for NXP FlexSPI controller
-Message-ID: <1537525323-20730-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Fri, 21 Sep 2018 12:52:07 +0200
+Subject: [PATCH] ARM: dts: marvell: Fix SPI and I2C bus warnings
+In-Reply-To: <20180913181245.25484-7-robh@kernel.org> (Rob Herring's message
+ of "Thu, 13 Sep 2018 13:12:31 -0500")
+References: <20180913181245.25484-7-robh@kernel.org>
+Message-ID: <87lg7vi0mg.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- Add driver for NXP FlexSPI host controller
+Hi Rob,
+ 
+ On jeu., sept. 13 2018, Rob Herring <robh@kernel.org> wrote:
 
- FlexSPI is a flexsible SPI host controller [1], Chapter 30 page 1475,
- which supports two SPI channels and up to 4 external devices.
- Each channel supports Single/Dual/Quad/Octal mode data transfer (1/2/4/8 bidirectional data lines)
- i.e. FlexSPI acts as an interface to external devices, maximum 4, each with up to 8
- bidirectional data lines.
+> dtc has new checks for I2C and SPI buses. Fix the warnings in node names
+> and unit-addresses.
+>
+> arch/arm/boot/dts/dove-cubox.dtb: Warning (i2c_bus_reg): /i2c-mux/i2c at 0/clock-generator: I2C bus unit address format error, expected "60"
+> arch/arm/boot/dts/dove-cubox-es.dtb: Warning (i2c_bus_reg): /i2c-mux/i2c at 0/clock-generator: I2C bus unit address format error, expected "60"
+> arch/arm/boot/dts/dove-cubox.dtb: Warning (spi_bus_bridge): /mbus/internal-regs/spi-ctrl at 10600: node name for SPI buses should be 'spi'
+> arch/arm/boot/dts/dove-cubox-es.dtb: Warning (spi_bus_bridge): /mbus/internal-regs/spi-ctrl at 10600: node name for SPI buses should be 'spi'
+> arch/arm/boot/dts/dove-dove-db.dtb: Warning (spi_bus_bridge): /mbus/internal-regs/spi-ctrl at 10600: node name for SPI buses should be 'spi'
+> arch/arm/boot/dts/dove-sbc-a510.dtb: Warning (spi_bus_bridge): /mbus/internal-regs/spi-ctrl at 10600: node name for SPI buses should be 'spi'
+> arch/arm/boot/dts/dove-sbc-a510.dtb: Warning (spi_bus_bridge): /mbus/internal-regs/spi-ctrl at 14600: node name for SPI buses should be 'spi'
+> arch/arm/boot/dts/orion5x-kuroboxpro.dtb: Warning (i2c_bus_reg): /soc/internal-regs/i2c at 11000/rtc: I2C bus unit address format error, expected "32"
+> arch/arm/boot/dts/orion5x-linkstation-lschl.dtb: Warning (i2c_bus_reg): /soc/internal-regs/i2c at 11000/rtc: I2C bus unit address format error, expected "32"
+> arch/arm/boot/dts/orion5x-linkstation-lsgl.dtb: Warning (i2c_bus_reg): /soc/internal-regs/i2c at 11000/rtc: I2C bus unit address format error, expected "32"
+> arch/arm/boot/dts/orion5x-linkstation-lswtgl.dtb: Warning (i2c_bus_reg): /soc/internal-regs/i2c at 11000/rtc: I2C bus unit address format error, expected "32"
+>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Cc: Gregory Clement <gregory.clement@bootlin.com>
+> Signed-off-by: Rob Herring <robh@kernel.org>
 
-- Tested this driver with mtd_debug(Erase/Write/Read) utility and JFFS2
- filesystem mounting and booting on NXP LX2160ARDB[2] and LX2160AQDS targets.
- LX2160ARDB is having two NOR slave device connected on single bus A
- i.e. A0 and A1 (CS0 and CS1).
- LX2160AQDS is having two NOR slave device connected on separate buses
- one flash on A0 and second on B1 i.e. (CS0 and CS3).
- Verified this driver on following SPI NOR flashes:
-   Micron, mt35xu512aba[3], [Read - 1 bit mode]
-   Cypress, s25fl512s, [Read - 1/2/4 bit mode]
+Applied on mvebu/dt
 
- Support for octal flash commands and other Octal data transfer related framework
- changes work is in progress.
+Thanks,
 
-[1] https://www.nxp.com/docs/en/reference-manual/IMXRT1050RM.pdf
-[2] https://patchwork.kernel.org/project/linux-arm-kernel/list/?series=9721
-[3] https://patchwork.ozlabs.org/project/linux-mtd/list/?series=63445
+Gregory
 
-Yogesh Gaur (5):
-  spi: spi-mem: Add driver for NXP FlexSPI controller
-  dt-bindings: spi: add binding file for NXP FlexSPI controller
-  arm64: dts: lx2160a: add FlexSPI node property
-  arm64: defconfig: enable NXP FlexSPI driver
-  MAINTAINERS: add maintainers for the NXP FlexSPI driver
-
-Changes for v3:
-- Incorporated review comments for
-  patch 'spi: spi-mem: Add driver for NXP FlexSPI controller'.
-Changes for v2:
-- Incorporated Boris review comments and drop below patches as per the comments.
- - Patch 'spi: add slave device size in spi_device struct'
- - Patch 'spi: add flags for octal I/O data transfer'
-- Incorporated DTS and Binding file review comments of Shawn Guo and Rob Herring.
-
- .../devicetree/bindings/spi/spi-nxp-fspi.txt       |   42 +
- MAINTAINERS                                        |    6 +
- arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts  |   22 +
- arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi     |   12 +
- arch/arm64/configs/defconfig                       |    1 +
- drivers/spi/Kconfig                                |   10 +
- drivers/spi/Makefile                               |    1 +
- drivers/spi/spi-nxp-fspi.c                         | 1231 ++++++++++++++++++++
- 8 files changed, 1324 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
- create mode 100644 drivers/spi/spi-nxp-fspi.c
+> ---
+> Please apply to the sub-arch tree. The dtc changes haven't landed, but 
+> will for 4.20.
+>
+>  arch/arm/boot/dts/dove-cubox.dts           | 2 +-
+>  arch/arm/boot/dts/dove.dtsi                | 6 +++---
+>  arch/arm/boot/dts/orion5x-linkstation.dtsi | 2 +-
+>  3 files changed, 5 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
+> index 580e3cbcfbf7..3e1584e787ae 100644
+> --- a/arch/arm/boot/dts/dove-cubox.dts
+> +++ b/arch/arm/boot/dts/dove-cubox.dts
+> @@ -87,7 +87,7 @@
+>  	status = "okay";
+>  	clock-frequency = <100000>;
+>  
+> -	si5351: clock-generator {
+> +	si5351: clock-generator at 60 {
+>  		compatible = "silabs,si5351a-msop";
+>  		reg = <0x60>;
+>  		#address-cells = <1>;
+> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+> index 4a0a5115b298..250ad0535e8c 100644
+> --- a/arch/arm/boot/dts/dove.dtsi
+> +++ b/arch/arm/boot/dts/dove.dtsi
+> @@ -155,7 +155,7 @@
+>  				  0xffffe000 MBUS_ID(0x03, 0x01) 0 0x0000800   /* CESA SRAM  2k */
+>  				  0xfffff000 MBUS_ID(0x0d, 0x00) 0 0x0000800>; /* PMU  SRAM  2k */
+>  
+> -			spi0: spi-ctrl at 10600 {
+> +			spi0: spi at 10600 {
+>  				compatible = "marvell,orion-spi";
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+> @@ -168,7 +168,7 @@
+>  				status = "disabled";
+>  			};
+>  
+> -			i2c: i2c-ctrl at 11000 {
+> +			i2c: i2c at 11000 {
+>  				compatible = "marvell,mv64xxx-i2c";
+>  				reg = <0x11000 0x20>;
+>  				#address-cells = <1>;
+> @@ -218,7 +218,7 @@
+>  				status = "disabled";
+>  			};
+>  
+> -			spi1: spi-ctrl at 14600 {
+> +			spi1: spi at 14600 {
+>  				compatible = "marvell,orion-spi";
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+> diff --git a/arch/arm/boot/dts/orion5x-linkstation.dtsi b/arch/arm/boot/dts/orion5x-linkstation.dtsi
+> index ebd93df5d07a..b6c9b85951ea 100644
+> --- a/arch/arm/boot/dts/orion5x-linkstation.dtsi
+> +++ b/arch/arm/boot/dts/orion5x-linkstation.dtsi
+> @@ -156,7 +156,7 @@
+>  &i2c {
+>  	status = "okay";
+>  
+> -	rtc {
+> +	rtc at 32 {
+>  		compatible = "ricoh,rs5c372a";
+>  		reg = <0x32>;
+>  	};
+> -- 
+> 2.17.1
+>
 
 -- 
-2.7.4
+Gregory Clement, Bootlin
+Embedded Linux and Kernel engineering
+http://bootlin.com
