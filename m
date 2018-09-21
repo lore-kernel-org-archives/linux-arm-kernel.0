@@ -1,68 +1,153 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 21 Sep 2018 10:29:42 +0100
-Subject: [PATCH v8 0/7] Add non-strict mode support for iommu-dma
-In-Reply-To: <fdfc05a4-283f-3ae2-7928-59e625c8f3b8@huawei.com>
-References: <cover.1537458163.git.robin.murphy@arm.com>
- <fdfc05a4-283f-3ae2-7928-59e625c8f3b8@huawei.com>
-Message-ID: <50330f32-b051-bdf6-af26-3e24ed133480@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 21 Sep 2018 10:29:30 +0100
+Subject: [PATCH] PCI: remove unnecessary check of device_type == pci
+In-Reply-To: <20180829183440.13601-1-robh@kernel.org>
+References: <20180829183440.13601-1-robh@kernel.org>
+Message-ID: <20180921092930.GA20641@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi John,
-
-On 2018-09-21 10:20 AM, John Garry wrote:
-> On 20/09/2018 17:10, Robin Murphy wrote:
->> Hi all,
->>
->> Hopefully this is the last spin of the series - I've now dropped my light
->> touch and fixed up all the various prose text, plus implemented the 
->> proper
->> quirk support for short-descriptor because it's actually just a trivial
->> cut-and-paste job.
->>
->> Robin.
->>
+On Wed, Aug 29, 2018 at 01:34:40PM -0500, Rob Herring wrote:
+> PCI host drivers have already matched on compatible strings, so checking
+> device_type is redundant. Also, device_type is considered deprecated for
+> FDT though we've still been requiring it for PCI hosts as it is useful
+> for finding PCI buses.
 > 
-> Hi Robin,
-> 
-> JFYI, I'm trying to test this patchset to get some figures and provide a 
-> tested-by tag, but 4/8 seems to rely on "iommu/io-pgtable-arm: Fix race 
-> handling in split_blk_unmap()" - more specifically, it seems to rely on 
-> the version which Will rewrote in your patch review, and I am not sure 
-> on what branch it exists on, if any.
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Alan Douglas <adouglas@cadence.com>
+> Cc: Subrahmanya Lingappa <l.subrahmanya@mobiveil.co.in>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: linux-pci at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> ---
+>  drivers/pci/controller/pci-host-common.c   | 8 --------
+>  drivers/pci/controller/pcie-cadence-host.c | 7 -------
+>  drivers/pci/controller/pcie-mobiveil.c     | 7 -------
+>  drivers/pci/controller/pcie-xilinx-nwl.c   | 9 ---------
+>  drivers/pci/controller/pcie-xilinx.c       | 7 -------
+>  5 files changed, 38 deletions(-)
 
-Sorry, I should have said this is based on Will's iommu/devel branch:
+Hi Michal,
 
-https://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git/log/?h=iommu/devel
+are you OK with these changes ?
 
-Robin.
+Thanks,
+Lorenzo
 
-> 
-> Thanks,
-> John
-> 
->>
->> Robin Murphy (2):
->> ? iommu/io-pgtable-arm-v7s: Add support for non-strict mode
->> ? iommu/arm-smmu: Support non-strict mode
->>
->> Zhen Lei (5):
->> ? iommu/arm-smmu-v3: Implement flush_iotlb_all hook
->> ? iommu/dma: Add support for non-strict mode
->> ? iommu: Add "iommu.strict" command line option
->> ? iommu/io-pgtable-arm: Add support for non-strict mode
->> ? iommu/arm-smmu-v3: Add support for non-strict mode
->>
->> ?.../admin-guide/kernel-parameters.txt???????? | 12 +++
->> ?drivers/iommu/arm-smmu-v3.c?????????????????? | 89 +++++++++++++-----
->> ?drivers/iommu/arm-smmu.c????????????????????? | 93 +++++++++++++------
->> ?drivers/iommu/dma-iommu.c???????????????????? | 32 ++++++-
->> ?drivers/iommu/io-pgtable-arm-v7s.c??????????? | 11 ++-
->> ?drivers/iommu/io-pgtable-arm.c??????????????? | 14 ++-
->> ?drivers/iommu/io-pgtable.h??????????????????? |? 5 +
->> ?drivers/iommu/iommu.c???????????????????????? | 23 +++++
->> ?include/linux/iommu.h???????????????????????? |? 1 +
->> ?9 files changed, 225 insertions(+), 55 deletions(-)
->>
-> 
+> diff --git a/drivers/pci/controller/pci-host-common.c b/drivers/pci/controller/pci-host-common.c
+> index d8f10451f273..c742881b5061 100644
+> --- a/drivers/pci/controller/pci-host-common.c
+> +++ b/drivers/pci/controller/pci-host-common.c
+> @@ -58,9 +58,7 @@ static struct pci_config_window *gen_pci_init(struct device *dev,
+>  int pci_host_common_probe(struct platform_device *pdev,
+>  			  struct pci_ecam_ops *ops)
+>  {
+> -	const char *type;
+>  	struct device *dev = &pdev->dev;
+> -	struct device_node *np = dev->of_node;
+>  	struct pci_host_bridge *bridge;
+>  	struct pci_config_window *cfg;
+>  	struct list_head resources;
+> @@ -70,12 +68,6 @@ int pci_host_common_probe(struct platform_device *pdev,
+>  	if (!bridge)
+>  		return -ENOMEM;
+>  
+> -	type = of_get_property(np, "device_type", NULL);
+> -	if (!type || strcmp(type, "pci")) {
+> -		dev_err(dev, "invalid \"device_type\" %s\n", type);
+> -		return -EINVAL;
+> -	}
+> -
+>  	of_pci_check_probe_only();
+>  
+>  	/* Parse and map our Configuration Space windows */
+> diff --git a/drivers/pci/controller/pcie-cadence-host.c b/drivers/pci/controller/pcie-cadence-host.c
+> index ec394f6a19c8..97e251090b4f 100644
+> --- a/drivers/pci/controller/pcie-cadence-host.c
+> +++ b/drivers/pci/controller/pcie-cadence-host.c
+> @@ -235,7 +235,6 @@ static int cdns_pcie_host_init(struct device *dev,
+>  
+>  static int cdns_pcie_host_probe(struct platform_device *pdev)
+>  {
+> -	const char *type;
+>  	struct device *dev = &pdev->dev;
+>  	struct device_node *np = dev->of_node;
+>  	struct pci_host_bridge *bridge;
+> @@ -268,12 +267,6 @@ static int cdns_pcie_host_probe(struct platform_device *pdev)
+>  	rc->device_id = 0xffff;
+>  	of_property_read_u16(np, "device-id", &rc->device_id);
+>  
+> -	type = of_get_property(np, "device_type", NULL);
+> -	if (!type || strcmp(type, "pci")) {
+> -		dev_err(dev, "invalid \"device_type\" %s\n", type);
+> -		return -EINVAL;
+> -	}
+> -
+>  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "reg");
+>  	pcie->reg_base = devm_ioremap_resource(dev, res);
+>  	if (IS_ERR(pcie->reg_base)) {
+> diff --git a/drivers/pci/controller/pcie-mobiveil.c b/drivers/pci/controller/pcie-mobiveil.c
+> index a939e8d31735..77052a0712d0 100644
+> --- a/drivers/pci/controller/pcie-mobiveil.c
+> +++ b/drivers/pci/controller/pcie-mobiveil.c
+> @@ -301,13 +301,6 @@ static int mobiveil_pcie_parse_dt(struct mobiveil_pcie *pcie)
+>  	struct platform_device *pdev = pcie->pdev;
+>  	struct device_node *node = dev->of_node;
+>  	struct resource *res;
+> -	const char *type;
+> -
+> -	type = of_get_property(node, "device_type", NULL);
+> -	if (!type || strcmp(type, "pci")) {
+> -		dev_err(dev, "invalid \"device_type\" %s\n", type);
+> -		return -EINVAL;
+> -	}
+>  
+>  	/* map config resource */
+>  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+> diff --git a/drivers/pci/controller/pcie-xilinx-nwl.c b/drivers/pci/controller/pcie-xilinx-nwl.c
+> index fb32840ce8e6..81538d77f790 100644
+> --- a/drivers/pci/controller/pcie-xilinx-nwl.c
+> +++ b/drivers/pci/controller/pcie-xilinx-nwl.c
+> @@ -777,16 +777,7 @@ static int nwl_pcie_parse_dt(struct nwl_pcie *pcie,
+>  			     struct platform_device *pdev)
+>  {
+>  	struct device *dev = pcie->dev;
+> -	struct device_node *node = dev->of_node;
+>  	struct resource *res;
+> -	const char *type;
+> -
+> -	/* Check for device type */
+> -	type = of_get_property(node, "device_type", NULL);
+> -	if (!type || strcmp(type, "pci")) {
+> -		dev_err(dev, "invalid \"device_type\" %s\n", type);
+> -		return -EINVAL;
+> -	}
+>  
+>  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "breg");
+>  	pcie->breg_base = devm_ioremap_resource(dev, res);
+> diff --git a/drivers/pci/controller/pcie-xilinx.c b/drivers/pci/controller/pcie-xilinx.c
+> index 7b1389d8e2a5..9bd1a35cd5d8 100644
+> --- a/drivers/pci/controller/pcie-xilinx.c
+> +++ b/drivers/pci/controller/pcie-xilinx.c
+> @@ -574,15 +574,8 @@ static int xilinx_pcie_parse_dt(struct xilinx_pcie_port *port)
+>  	struct device *dev = port->dev;
+>  	struct device_node *node = dev->of_node;
+>  	struct resource regs;
+> -	const char *type;
+>  	int err;
+>  
+> -	type = of_get_property(node, "device_type", NULL);
+> -	if (!type || strcmp(type, "pci")) {
+> -		dev_err(dev, "invalid \"device_type\" %s\n", type);
+> -		return -EINVAL;
+> -	}
+> -
+>  	err = of_address_to_resource(node, 0, &regs);
+>  	if (err) {
+>  		dev_err(dev, "missing \"reg\" property\n");
+> -- 
+> 2.17.1
 > 
