@@ -1,106 +1,61 @@
 From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Fri, 21 Sep 2018 11:28:11 +0800
-Subject: [PATCH v3 01/12] drm/mediatek: add refcount for DPI power on/off
+Date: Fri, 21 Sep 2018 11:28:20 +0800
+Subject: [PATCH v3 10/12] drm/mediatek: implement connection from BLS to DPI0
 In-Reply-To: <20180921032822.30771-1-bibby.hsieh@mediatek.com>
 References: <20180921032822.30771-1-bibby.hsieh@mediatek.com>
-Message-ID: <20180921032822.30771-2-bibby.hsieh@mediatek.com>
+Message-ID: <20180921032822.30771-11-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: chunhui dai <chunhui.dai@mediatek.com>
-
-After the kernel 4.4, the DRM disable flow was changed, if DPI was
-disableed before CRTC, it will cause warning message as following:
-
-------------[ cut here ]------------
-WARNING: CPU: 0 PID: 1339 at ../../linux/linux-4.4.24-mtk/drivers/gpu/drm/drm_irq.c:1326 drm_wait_one_vblank+0x188/0x18c()
-vblank wait timed out on crtc 0
-Modules linked in: bridge mt8521p_ir_shim(O) i2c_eeprom(O) mtk_m4(O) fuse_ctrl(O) virtual_block(O) caamkeys(PO) chk(PO) amperctl(O) ledctl(O) apple_auth(PO) micctl(O) sensors(PO) lla(O) sdd(PO) ice40_fpga(O) psmon(O) event_queue(PO) utils(O) blackbox(O)
-CPU: 0 PID: 1339 Comm: kworker/0:1 Tainted: P        W  O    4.4.24 #1
-Hardware name: Mediatek Cortex-A7 (Device Tree)
-Workqueue: events drm_mode_rmfb_work_fn
-[<c001a710>] (unwind_backtrace) from [<c00151e4>] (show_stack+0x20/0x24)
-[<c00151e4>] (show_stack) from [<c027961c>] (dump_stack+0x98/0xac)
-[<c027961c>] (dump_stack) from [<c002ac54>] (warn_slowpath_common+0x94/0xc4)
-[<c002ac54>] (warn_slowpath_common) from [<c002acc4>] (warn_slowpath_fmt+0x40/0x48)
-[<c002acc4>] (warn_slowpath_fmt) from [<c03307ac>] (drm_wait_one_vblank+0x188/0x18c)
-[<c03307ac>] (drm_wait_one_vblank) from [<c03307d8>] (drm_crtc_wait_one_vblank+0x28/0x2c)
-[<c03307d8>] (drm_crtc_wait_one_vblank) from [<c034f48c>] (mtk_drm_crtc_disable+0x78/0x240)
-[<c034f48c>] (mtk_drm_crtc_disable) from [<c03240d4>] (drm_atomic_helper_commit_modeset_disables+0x128/0x3b8)
-[<c03240d4>] (drm_atomic_helper_commit_modeset_disables) from [<c0350a7c>] (mtk_atomic_complete+0x74/0xb4)
-[<c0350a7c>] (mtk_atomic_complete) from [<c0350b24>] (mtk_atomic_commit+0x68/0x98)
-[<c0350b24>] (mtk_atomic_commit) from [<c034ab48>] (drm_atomic_commit+0x54/0x74)
-[<c034ab48>] (drm_atomic_commit) from [<c0325c4c>] (drm_atomic_helper_set_config+0x7c/0xa0)
-[<c0325c4c>] (drm_atomic_helper_set_config) from [<c0338594>] (drm_mode_set_config_internal+0x68/0xe4)
-[<c0338594>] (drm_mode_set_config_internal) from [<c033967c>] (drm_framebuffer_remove+0xe4/0x120)
-[<c033967c>] (drm_framebuffer_remove) from [<c0339700>] (drm_mode_rmfb_work_fn+0x48/0x58)
-[<c0339700>] (drm_mode_rmfb_work_fn) from [<c0043a38>] (process_one_work+0x154/0x50c)
-[<c0043a38>] (process_one_work) from [<c0044074>] (worker_thread+0x284/0x568)
-[<c0044074>] (worker_thread) from [<c0049dc4>] (kthread+0xec/0x104)
-[<c0049dc4>] (kthread) from [<c0010678>] (ret_from_fork+0x14/0x3c)
----[ end trace 12ae5358e992abd5 ]---
-
-so, we add refcount for DPI power on/off to protect the flow.
+Modify display driver to support connection from BLS to DPI.
 
 Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
-Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
+Reviewed-by: CK Hu <ck.hu@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_dpi.c | 16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
-index 6c0ea39d5739..d9373e67d328 100644
---- a/drivers/gpu/drm/mediatek/mtk_dpi.c
-+++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
-@@ -77,6 +77,7 @@ struct mtk_dpi {
- 	enum mtk_dpi_out_bit_num bit_num;
- 	enum mtk_dpi_out_channel_swap channel_swap;
- 	bool power_sta;
-+	int refcount;
- 	u8 power_ctl;
- };
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+index 87e4191c250e..f3068c62ed48 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+@@ -39,6 +39,7 @@
+ #define DISP_REG_CONFIG_DISP_OVL_MOUT_EN	0x030
+ #define DISP_REG_CONFIG_OUT_SEL			0x04c
+ #define DISP_REG_CONFIG_DSI_SEL			0x050
++#define DISP_REG_CONFIG_DPI_SEL			0x064
  
-@@ -369,6 +370,12 @@ static void mtk_dpi_config_color_format(struct mtk_dpi *dpi,
+ #define DISP_REG_MUTEX_EN(n)	(0x20 + 0x20 * (n))
+ #define DISP_REG_MUTEX(n)	(0x24 + 0x20 * (n))
+@@ -132,7 +133,10 @@
  
- static void mtk_dpi_power_off(struct mtk_dpi *dpi, enum mtk_dpi_power_ctl pctl)
+ #define OVL_MOUT_EN_RDMA		0x1
+ #define BLS_TO_DSI_RDMA1_TO_DPI1	0x8
++#define BLS_TO_DPI_RDMA1_TO_DSI		0x2
+ #define DSI_SEL_IN_BLS			0x0
++#define DPI_SEL_IN_BLS			0x0
++#define DSI_SEL_IN_RDMA			0x1
+ 
+ struct mtk_disp_mutex {
+ 	int id;
+@@ -323,9 +327,17 @@ static void mtk_ddp_sout_sel(void __iomem *config_regs,
+ 			     enum mtk_ddp_comp_id cur,
+ 			     enum mtk_ddp_comp_id next)
  {
-+	if (WARN_ON(dpi->refcount == 0))
-+		return;
-+
-+	if (--dpi->refcount != 0)
-+		return;
-+
- 	dpi->power_ctl &= ~pctl;
- 
- 	if ((dpi->power_ctl & DPI_POWER_START) ||
-@@ -388,14 +395,17 @@ static int mtk_dpi_power_on(struct mtk_dpi *dpi, enum mtk_dpi_power_ctl pctl)
- {
- 	int ret;
- 
-+	if (++dpi->refcount != 1)
-+		return 0;
-+
- 	dpi->power_ctl |= pctl;
- 
- 	if (!(dpi->power_ctl & DPI_POWER_START) &&
- 	    !(dpi->power_ctl & DPI_POWER_ENABLE))
--		return 0;
-+		goto err_refcount;
- 
- 	if (dpi->power_sta)
--		return 0;
-+		goto err_refcount;
- 
- 	ret = clk_prepare_enable(dpi->engine_clk);
- 	if (ret) {
-@@ -417,6 +427,8 @@ static int mtk_dpi_power_on(struct mtk_dpi *dpi, enum mtk_dpi_power_ctl pctl)
- 	clk_disable_unprepare(dpi->engine_clk);
- err_eng:
- 	dpi->power_ctl &= ~pctl;
-+err_refcount:
-+	dpi->refcount--;
- 	return ret;
+-	if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0)
++	if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0) {
+ 		writel_relaxed(BLS_TO_DSI_RDMA1_TO_DPI1,
+ 			       config_regs + DISP_REG_CONFIG_OUT_SEL);
++	} else if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DPI0) {
++		writel_relaxed(BLS_TO_DPI_RDMA1_TO_DSI,
++			       config_regs + DISP_REG_CONFIG_OUT_SEL);
++		writel_relaxed(DSI_SEL_IN_RDMA,
++			       config_regs + DISP_REG_CONFIG_DSI_SEL);
++		writel_relaxed(DPI_SEL_IN_BLS,
++			       config_regs + DISP_REG_CONFIG_DPI_SEL);
++	}
  }
  
+ void mtk_ddp_add_comp_to_path(void __iomem *config_regs,
 -- 
 2.12.5.2.gbdf23ab
