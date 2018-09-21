@@ -1,85 +1,96 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Fri, 21 Sep 2018 17:47:34 +0800
-Subject: [PATCH v3 05/12] drm/mediatek: convert dpi driver to use
- drm_of_find_panel_or_bridge
-In-Reply-To: <20180921032822.30771-6-bibby.hsieh@mediatek.com>
-References: <20180921032822.30771-1-bibby.hsieh@mediatek.com>
- <20180921032822.30771-6-bibby.hsieh@mediatek.com>
-Message-ID: <1537523254.20660.9.camel@mtksdaap41>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 21 Sep 2018 17:47:50 +0800
+Subject: [PATCH] arm64: dts: allwinner: a64: Re-add "syscon" compatible
+In-Reply-To: <20180917152857.162662-1-andre.przywara@arm.com>
+References: <20180917152857.162662-1-andre.przywara@arm.com>
+Message-ID: <CAGb2v643=V_3DbLeEyXEavSQJsW2KdknpZZLfw4QwCjhfdmVsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Bibby:
-
-On Fri, 2018-09-21 at 11:28 +0800, Bibby Hsieh wrote:
-> From: chunhui dai <chunhui.dai@mediatek.com>
-> 
-> Convert dpi driver to use drm_of_find_panel_or_bridge.
-> This changes some error messages to debug messages (in the graph core).
-> Graph connections are often "no connects" depending on the particular
-> board, so we want to avoid spurious messages. Plus the kernel is not a
-> DT validator.
-> related links:
-> [1] https://lkml.org/lkml/2017/2/3/716
-> [2] https://lkml.org/lkml/2017/2/3/719
-> 
-> Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
+On Mon, Sep 17, 2018 at 11:29 PM Andre Przywara <andre.przywara@arm.com> wrote:
+>
+> Commit 1f1f5183981d ("arm64: dts: allwinner: a64: add SRAM controller
+> device tree node") changed the (so far unused) compatible name of the
+> sytem controller node, to match a specific SRAM controller driver
+> instead of relying on the generic syscon driver. The Ethernet driver
+> needs a register in there, so it got amended to use the new driver instead
+> of the generic syscon approach. Consequently the "syscon" compatible has
+> been dropped, as it's not needed anymore and would compete with the
+> new SRAM driver.
+>
+> However this breaks existing DT consumers like older kernels, which
+> expect the node pointed to by the syscon property to contain the string
+> "syscon" somewhere in the compatible list. When such a DT is given to an
+> older kernel (<4.19, for instance one on a distro installer image),
+> the Ethernet will not probe successfully:
+> ----------
+> dwmac-sun8i 1c30000.ethernet: PTP uses main clock
+> dwmac-sun8i 1c30000.ethernet: Linked as a consumer to regulator.6
+> dwmac-sun8i 1c30000.ethernet: Unable to map syscon: -22
+> dwmac-sun8i 1c30000.ethernet: Dropping the link to regulator.6
+> dwmac-sun8i: probe of 1c30000.ethernet failed with error -22
+> ----------
+>
+> To avoid this problem, (re-)add the "syscon" string to the compatible
+> list of the sytem controller. This should make both older and newer
+> kernels happy:
+> - A newer kernel will try to find an existing *device* offering the regmap
+>   first. The "syscon" string itself will not trigger a driver probe on
+>   its own, the node must be explicitly referenced by another driver, wanting
+>   to use the regmap. Newer kernels won't do it this way and will use the
+>   regmap offered by the SRAM driver.
+> - An older kernel will try the syscon way, and the system controller /
+>   SRAM driver DT node is still fully syscon compatible.
+>
+> So by adding "syscon" we make everyone happy: Newer kernels will ignore
+> it (knowing a better way), and older kernels will still work.
+>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 > ---
->  drivers/gpu/drm/mediatek/mtk_dpi.c | 18 ++++++++----------
->  1 file changed, 8 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
-> index 022ccec49cea..7a4868a0afec 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_dpi.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
-> @@ -14,6 +14,7 @@
->  #include <drm/drmP.h>
->  #include <drm/drm_crtc.h>
->  #include <drm/drm_crtc_helper.h>
-> +#include <drm/drm_of.h>
->  #include <linux/kernel.h>
->  #include <linux/component.h>
->  #include <linux/platform_device.h>
-> @@ -697,7 +698,6 @@ static int mtk_dpi_probe(struct platform_device *pdev)
->  	struct device *dev = &pdev->dev;
->  	struct mtk_dpi *dpi;
->  	struct resource *mem;
-> -	struct device_node *bridge_node;
->  	int comp_id;
->  	int ret;
->  
-> @@ -743,16 +743,14 @@ static int mtk_dpi_probe(struct platform_device *pdev)
->  		return -EINVAL;
->  	}
->  
-> -	bridge_node = of_graph_get_remote_node(dev->of_node, 0, 0);
-> -	if (!bridge_node)
-> -		return -ENODEV;
-> -
-> -	dev_info(dev, "Found bridge node: %pOF\n", bridge_node);
-> -
-> -	dpi->bridge = of_drm_find_bridge(bridge_node);
-> -	of_node_put(bridge_node);
-> -	if (!dpi->bridge)
-> +	ret = drm_of_find_panel_or_bridge(dev->of_node, 0, 0,
-> +					  NULL, &dpi->bridge);
-> +	if (ret) {
-> +		dev_err(dev, "Failed to find panel or bridge: %d\n", ret);
->  		return -EPROBE_DEFER;
+> Hi,
+>
+> I think we need to amend the Ethernet driver now to not too easily use
+> syscon as a fallback, in case dwmac-sun8i probed earlier than the SRAM driver.
+> Will try this later tonight, but just wanted to start the discussion.
 
-I've traced into drm_of_find_panel_or_bridge(), it may return -ENODEV
-when device tree has error, why do you treat this error to
--EPROBE_DEFER? I think you may modify this as
+There is a good reason for removing the syscon compatible. It signals
+that the block is a "generic" collection of random registers, which in
+this case is not. This is the main reason. A supplimental one follows.
 
-if (ret)
-	return ret;
+Implementations follow this "generic" concept and offer unrestricted,
+concurrent access to the syscon region. Linux and one of the BSDs AFAIK
+are the same in that syscon is just an API and not a full-blown device.
+Thus the other sram controller driver that we bind to it has no way of
+knowing about other accesses happening under its nose. U-boot, IIRC,
+makes syscon an actual device driver, so you can't even have both drivers
+bind to the same node.
 
-Regards,
-CK
+Yes these are implementation issues, but other drivers might depend on it.
+The syscon driver is simple and nice to use, until it isn't.
 
-> +	}
-> +
-> +	dev_info(dev, "Found bridge node: %pOF\n", dpi->bridge->of_node);
->  
->  	comp_id = mtk_ddp_comp_get_id(dev->of_node, MTK_DPI);
->  	if (comp_id < 0) {
+Regards
+ChenYu
+
+> Thanks,
+> Andre.
+>
+>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> index d3daf90a8715..8f2dad7e5d06 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> @@ -197,7 +197,8 @@
+>                 };
+>
+>                 syscon: syscon at 1c00000 {
+> -                       compatible = "allwinner,sun50i-a64-system-control";
+> +                       compatible = "allwinner,sun50i-a64-system-control",
+> +                                    "syscon";
+>                         reg = <0x01c00000 0x1000>;
+>                         #address-cells = <1>;
+>                         #size-cells = <1>;
+> --
+> 2.17.1
+>
