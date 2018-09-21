@@ -1,67 +1,71 @@
-From: rafal@milecki.pl (=?UTF-8?Q?Rafa=C5=82_Mi=C5=82ecki?=)
-Date: Fri, 21 Sep 2018 16:36:51 +0200
-Subject: [PATCH] ARM: add serial.h and set BASE_BAUD to 0
-In-Reply-To: <20180921135913.GM30658@n2100.armlinux.org.uk>
-References: <20180920201357.16426-1-zajec5@gmail.com>
- <20180921135913.GM30658@n2100.armlinux.org.uk>
-Message-ID: <45c1302d81faf4e77555c3710b793d36@milecki.pl>
+From: dave.anglin@bell.net (John David Anglin)
+Date: Fri, 21 Sep 2018 10:39:53 -0400
+Subject: armada-37xx CPU rates are incorrectly set at 1 and 1.2 GHz
+In-Reply-To: <87y3bvi1tt.fsf@bootlin.com>
+References: <668ea8e4-7a77-54e3-d9e8-07d21ee31366@bell.net>
+ <87y3bvi1tt.fsf@bootlin.com>
+Message-ID: <5c642e9c-18c5-5c01-03c4-1d3851ba1358@bell.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018-09-21 15:59, Russell King - ARM Linux wrote:
-> On Thu, Sep 20, 2018 at 10:13:57PM +0200, Rafa? Mi?ecki wrote:
->> From: Rafa? Mi?ecki <rafal@milecki.pl>
->> 
->> For years arm has been using serial.h from asm-generic which sets
->> BASE_BAUD value to the (1843200 / 16). This is incorrect as:
->> 1) This value obviously isn't correct for all devices
->> 2) There are no device specific serial.h with 
->> CONFIG_ARCH_MULTIPLATFORM
-> 
-> This goes back a long way.  The BASE_BAUD definition is the base baud
-> for 8250 compatible UARTs _only_, no others.
-> 
-> However, as of 182ead3e418a ("earlycon: Remove hardcoded port->uartclk
-> initialization in of_setup_earlycon"), port->uartclk is no longer
-> initialised using BASE_BAUD.  As acknowledged in 814453adea7d
-> ("earlycon: Initialize port->uartclk based on clock-frequency 
-> property")
-> the initialisation using BASE_BAUD was bogus, and there is now the
-> clock-frequency DT property which should be present to set this up.
+On 2018-09-21 6:26 AM, Gregory CLEMENT wrote:
+>> See benchmark the testing reported here:
+>> https://forum.armbian.com/topic/4089-espressobin-support-development-efforts/?page=22&tab=comments#comment-60349
+> I had a look on the forum and the issue is not really clear for me.
+I have two espressobin cards which we are using to evaluate the Marvell 
+CPU and switch for a design.
 
-Thanks a lot for looking at that. I was not aware of the commit
-182ead3e418a ("earlycon: Remove hardcoded port->uartclk initialization
-in of_setup_earlycon"), too bad it wasn't marked for stable.
+When CPU frequency scaling is enabled (CONFIG_ARM_ARMADA_37XX_CPUFREQ) 
+and the
+board boots at 1 GHz or 1.2 GHz, the effective CPU speed shown by the 
+sbc-bench benchmark
+is just under 800 MHz.? The bench performance at 1.2 GHz is actually 
+slightly worse than at 1 GHz.
 
-I simply assumed that
-port->uartclk = BASE_BAUD * 16;
-is correct and that has poisoned all my further reasoning.
+If one turns off CONFIG_ARM_ARMADA_37XX_CPUFREQ, the effective CPU speed 
+agrees
+with the speed set by u-boot.? I only checked this at 1 GHz as I don't 
+have a 1.2 GHz board.
 
-I've just confirmed that backporting 182ead3e418a to the 4.14 fixes the
-problem for me (it results in the same 8250_early.c behavior as setting
-BASE_BAUD to 0).
+There is also a problem with the divider settings at 600 MHz:
+-?????? {.cpu_freq_max = 600*1000*1000,? .divider = {2, 4, 5, 6} },
++?????? {.cpu_freq_max = 600*1000*1000,? .divider = {1, 1, 1, 1} },
+The maximum speed is currently 300 MHz.? I changed it to 600 MHz for all 
+settings.? The CPU didn't
+want to shift down from 600 to 300 or 200.
 
-I'm planning to backport both:
-182ead3e418a ("earlycon: Remove hardcoded port->uartclk initialization 
-in of_setup_earlycon")
-814453adea7d ("earlycon: Initialize port->uartclk based on 
-clock-frequency property")
-to 4.14+ as they fix regression triggered (not to say "caused") by the
-commit 31cb9a8575ca0 ("earlycon: initialise baud field of earlycon
-device structure").
+There are some other things that might be clock related.? When running 
+at 1 GHz for a period
+of time, ntp loses lock on one board and can't sync.? The other doesn't 
+lose lock but it develops
+a large jitter (~ 30 ms).? When cold, the jitter is under 1 ms.? I put a 
+heat sink on the CPU and
+reduced the processor speed to 600 MHz.? This fixed the ntp jitter 
+problem.? This might be a
+thermal issue.? Maybe the oscillator or phase lock loop in the CPU 
+develops a lot of jitter?
 
-Please DROP my serial.h patch and thanks again.
+ptp4l is losing lock between the two cards.? It's also losing time stamps.
 
+With some SD cards, board may hang after it finishes shutting down and 
+not boot.
+If it does reboot, the SD card may get a data CRC error in u-boot. 
+Strangely, these errors
+never occur when Linux is running.? Reports indicate that this problem 
+is present for
+several brands of SD cards.
 
-> Now, setting BASE_BAUD to zero as per your patch will break the
-> 8250 serial driver - this relies on BASE_BAUD being set to the
-> current value, and yes, ARM hardware that uses this will break.  So
-> this is not a solution.
-> 
-> The only solution is that BASE_BAUD must not be abused - it must not
-> be used by non-8250 hardware, and thankfully there are already
-> solutions in the kernel (such as clock-frequency) to allow the clock
-> rate to be specified.
+>
+> Could you first confirm that you use a mainline kernel?
+Yes.
+> Also which version do you use?
+debian at espressobin:~$ uname -a
+Linux espressobin 4.19.0-rc3+ #1 SMP PREEMPT Wed Sep 12 14:34:49 EDT 
+2018 aarch64 GNU/Linux
 
-Somehow my serial console kept working with BASE_BAUD set to 0. I'm not
-sure why.
+The config file was derived from that used by Armbian stretch.
+
+Dave
+
+-- 
+John David Anglin  dave.anglin at bell.net
