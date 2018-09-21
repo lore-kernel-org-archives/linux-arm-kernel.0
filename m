@@ -1,114 +1,115 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Fri, 21 Sep 2018 11:45:55 +0200
-Subject: [PATCH V2 01/27] mmc: mmci: internalize dma map/unmap into mmci dma
- functions
+Date: Fri, 21 Sep 2018 11:45:57 +0200
+Subject: [PATCH V2 03/27] mmc: mmci: convert dma_setup callback to return an
+ int
 In-Reply-To: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
 References: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1537523181-14578-2-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1537523181-14578-4-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Barre <ludovic.barre@st.com>
 
-This patch internalizes the management of dma map/unmap into
-mmci dma interfaces. This allows to simplify and prepare the next dma
-callbacks for mmci host ops.
-mmci_dma_unmap was called in mmci_data_irq & mmci_cmd_irq functions
-and can be integrated in mmci_dma_data_error.
+This patch converts dma_setup callback to return an integer
+This patch is needed to prepare sdmmc variant with internal dma
 
 Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 ---
- drivers/mmc/host/mmci.c | 40 +++++++++++++++++-----------------------
- 1 file changed, 17 insertions(+), 23 deletions(-)
+ drivers/mmc/host/mmci.c          | 14 ++++++++++----
+ drivers/mmc/host/mmci.h          |  2 +-
+ drivers/mmc/host/mmci_qcom_dml.c |  6 ++++--
+ 3 files changed, 15 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 1841d250..bf0bb07 100644
+index cbd67bc..2f845f3 100644
 --- a/drivers/mmc/host/mmci.c
 +++ b/drivers/mmc/host/mmci.c
-@@ -482,16 +482,6 @@ static inline void mmci_dma_release(struct mmci_host *host)
- 	host->dma_rx_channel = host->dma_tx_channel = NULL;
+@@ -415,7 +415,7 @@ static void mmci_init_sg(struct mmci_host *host, struct mmc_data *data)
+  * no custom DMA interfaces are supported.
+  */
+ #ifdef CONFIG_DMA_ENGINE
+-static void mmci_dma_setup(struct mmci_host *host)
++static int mmci_dma_setup(struct mmci_host *host)
+ {
+ 	const char *rxname, *txname;
+ 
+@@ -466,7 +466,9 @@ static void mmci_dma_setup(struct mmci_host *host)
+ 	}
+ 
+ 	if (host->ops && host->ops->dma_setup)
+-		host->ops->dma_setup(host);
++		return host->ops->dma_setup(host);
++
++	return 0;
  }
  
--static void mmci_dma_data_error(struct mmci_host *host)
--{
--	dev_err(mmc_dev(host->mmc), "error during DMA transfer!\n");
--	dmaengine_terminate_all(host->dma_current);
--	host->dma_in_progress = false;
--	host->dma_current = NULL;
--	host->dma_desc_current = NULL;
--	host->data->host_cookie = 0;
--}
--
- static void mmci_dma_unmap(struct mmci_host *host, struct mmc_data *data)
- {
- 	struct dma_chan *chan;
-@@ -505,6 +495,18 @@ static void mmci_dma_unmap(struct mmci_host *host, struct mmc_data *data)
- 		     mmc_get_dma_dir(data));
- }
- 
-+static void mmci_dma_data_error(struct mmci_host *host)
-+{
-+	dev_err(mmc_dev(host->mmc), "error during DMA transfer!\n");
-+	dmaengine_terminate_all(host->dma_current);
-+	host->dma_in_progress = false;
-+	host->dma_current = NULL;
-+	host->dma_desc_current = NULL;
-+	host->data->host_cookie = 0;
-+
-+	mmci_dma_unmap(host, host->data);
-+}
-+
- static void mmci_dma_finalize(struct mmci_host *host, struct mmc_data *data)
- {
- 	u32 status;
-@@ -528,10 +530,9 @@ static void mmci_dma_finalize(struct mmci_host *host, struct mmc_data *data)
- 		mmci_dma_data_error(host);
- 		if (!data->error)
- 			data->error = -EIO;
--	}
--
--	if (!data->host_cookie)
-+	} else if (!data->host_cookie) {
- 		mmci_dma_unmap(host, data);
-+	}
- 
- 	/*
- 	 * Use of DMA with scatter-gather is impossible.
-@@ -742,10 +743,6 @@ static inline void mmci_dma_release(struct mmci_host *host)
+ /*
+@@ -741,8 +743,10 @@ static void mmci_post_request(struct mmc_host *mmc, struct mmc_request *mrq,
+ static void mmci_get_next_data(struct mmci_host *host, struct mmc_data *data)
  {
  }
- 
--static inline void mmci_dma_unmap(struct mmci_host *host, struct mmc_data *data)
--{
--}
--
- static inline void mmci_dma_finalize(struct mmci_host *host,
- 				     struct mmc_data *data)
- {
-@@ -906,10 +903,8 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
- 		u32 remain, success;
- 
- 		/* Terminate the DMA transfer */
--		if (dma_inprogress(host)) {
-+		if (dma_inprogress(host))
- 			mmci_dma_data_error(host);
--			mmci_dma_unmap(host, data);
--		}
- 
- 		/*
- 		 * Calculate how far we are into the transfer.  Note that
-@@ -1055,10 +1050,9 @@ mmci_cmd_irq(struct mmci_host *host, struct mmc_command *cmd,
- 	if ((!sbc && !cmd->data) || cmd->error) {
- 		if (host->data) {
- 			/* Terminate the DMA transfer */
--			if (dma_inprogress(host)) {
-+			if (dma_inprogress(host))
- 				mmci_dma_data_error(host);
--				mmci_dma_unmap(host, host->data);
--			}
+-static inline void mmci_dma_setup(struct mmci_host *host)
 +
- 			mmci_stop_data(host);
- 		}
- 		mmci_request_end(host, host->mrq);
++static inline int mmci_dma_setup(struct mmci_host *host)
+ {
++	return 0;
+ }
+ 
+ static inline void mmci_dma_release(struct mmci_host *host)
+@@ -1796,7 +1800,9 @@ static int mmci_probe(struct amba_device *dev,
+ 		 amba_rev(dev), (unsigned long long)dev->res.start,
+ 		 dev->irq[0], dev->irq[1]);
+ 
+-	mmci_dma_setup(host);
++	ret = mmci_dma_setup(host);
++	if (ret)
++		goto clk_disable;
+ 
+ 	pm_runtime_set_autosuspend_delay(&dev->dev, 50);
+ 	pm_runtime_use_autosuspend(&dev->dev);
+diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+index 21aaf9a..06299ac 100644
+--- a/drivers/mmc/host/mmci.h
++++ b/drivers/mmc/host/mmci.h
+@@ -273,7 +273,7 @@ struct variant_data {
+ 
+ /* mmci variant callbacks */
+ struct mmci_host_ops {
+-	void (*dma_setup)(struct mmci_host *host);
++	int (*dma_setup)(struct mmci_host *host);
+ };
+ 
+ struct mmci_host_next {
+diff --git a/drivers/mmc/host/mmci_qcom_dml.c b/drivers/mmc/host/mmci_qcom_dml.c
+index be3fab5..1bb59cf 100644
+--- a/drivers/mmc/host/mmci_qcom_dml.c
++++ b/drivers/mmc/host/mmci_qcom_dml.c
+@@ -119,7 +119,7 @@ static int of_get_dml_pipe_index(struct device_node *np, const char *name)
+ }
+ 
+ /* Initialize the dml hardware connected to SD Card controller */
+-static void qcom_dma_setup(struct mmci_host *host)
++static int qcom_dma_setup(struct mmci_host *host)
+ {
+ 	u32 config;
+ 	void __iomem *base;
+@@ -131,7 +131,7 @@ static void qcom_dma_setup(struct mmci_host *host)
+ 
+ 	if (producer_id < 0 || consumer_id < 0) {
+ 		host->variant->qcom_dml = false;
+-		return;
++		return -EINVAL;
+ 	}
+ 
+ 	base = host->base + DML_OFFSET;
+@@ -175,6 +175,8 @@ static void qcom_dma_setup(struct mmci_host *host)
+ 
+ 	/* Make sure dml initialization is finished */
+ 	mb();
++
++	return 0;
+ }
+ 
+ static struct mmci_host_ops qcom_variant_ops = {
 -- 
 2.7.4
