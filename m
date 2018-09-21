@@ -1,50 +1,146 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Fri, 21 Sep 2018 16:02:47 +0200
-Subject: [RESEND PATCH] Revert "pwm: Set class for exported channels in sysfs"
-Message-ID: <1537538567-5377-1-git-send-email-fabrice.gasnier@st.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 21 Sep 2018 16:18:05 +0200
+Subject: [PATCH 02/10] phy: Add configuration interface
+In-Reply-To: <20180919121436.ztjnxofe66quddeq@flea>
+References: <cover.ee6158898d563fcc01d45c9652501180bccff0f0.1536138624.git-series.maxime.ripard@bootlin.com>
+ <a739a2d623c3e60373a73e1ec206c2aa35c4a742.1536138624.git-series.maxime.ripard@bootlin.com>
+ <1ed01c1f-76d5-fa96-572b-9bfd269ad11b@ti.com>
+ <20180906145622.kwxvkcuerbeqsj6b@flea>
+ <1a169fad-72b7-fac0-1254-cac5d8304740@ti.com>
+ <20180912084242.skxbwbgluakakyg6@flea>
+ <e0d7db11-7ec1-cb98-4e62-12d78d1ba65b@ti.com>
+ <20180919121436.ztjnxofe66quddeq@flea>
+Message-ID: <20180921141805.s4u224xzmtii66dg@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 7e5d1fd75c3dde9fc10c4472b9368089d1b81d00 as it causes
-regression with multiple pwm chip. It creates a new entry in
-'/sys/class/pwm' every time a 'pwmX' is exported with 'echo X > export':
-- 1st time export will create an entry in /sys/class/pwm/pwmX
-- when another export happens on another pwmchip, it can't be created
-(e.g. -EEXIST)
+On Wed, Sep 19, 2018 at 02:14:36PM +0200, Maxime Ripard wrote:
+> > I'm sorry but I'm not convinced a consumer driver should have all the details
+> > that are added in phy_configure_opts_mipi_dphy.
+> 
+> If it can convince you, here is the parameters that are needed by all
+> the MIPI-DSI drivers currently in Linux to configure their PHY:
+> 
+>   - cdns-dsi (drivers/gpu/drm/bridge/cdns-dsi.c)
+>     - hs_clk_rate
+>     - lanes
+>     - videomode
+> 
+>   - kirin (drivers/gpu/drm/hisilicon/kirin/dw_drm_dsi.c)
+>     - hs_exit
+>     - hs_prepare
+>     - hs_trail
+>     - hs_zero
+>     - lpx
+>     - ta_get
+>     - ta_go
+>     - wakeup
+> 
+>   - msm (drivers/gpu/drm/msm/dsi/*)
+>     - clk_post
+>     - clk_pre
+>     - clk_prepare
+>     - clk_trail
+>     - clk_zero
+>     - hs_clk_rate
+>     - hs_exit
+>     - hs_prepare
+>     - hs_trail
+>     - hs_zero
+>     - lp_clk_rate
+>     - ta_get
+>     - ta_go
+>     - ta_sure
+> 
+>   - mtk (drivers/gpu/drm/mediatek/mtk_dsi.c)
+>     - hs_clk_rate
+>     - hs_exit
+>     - hs_prepare
+>     - hs_trail
+>     - hs_zero
+>     - lpx
+> 
+>   - sun4i (drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c)
+>     - clk_post
+>     - clk_pre
+>     - clk_prepare
+>     - clk_zero
+>     - hs_prepare
+>     - hs_trail
+>     - lanes
+>     - lp_clk_rate
+> 
+>   - tegra (drivers/gpu/drm/tegra/dsi.c)
+>     - clk_post
+>     - clk_pre
+>     - clk_prepare
+>     - clk_trail
+>     - clk_zero
+>     - hs_exit
+>     - hs_prepare
+>     - hs_trail
+>     - hs_zero
+>     - lpx
+>     - ta_get
+>     - ta_go
+>     - ta_sure
+> 
+>   - vc4 (drivers/gpu/drm/vc4/vc4_dsi.c)
+>     - hs_clk_rate
+>     - lanes
+> 
+> Now, for MIPI-CSI receivers:
+> 
+>   - marvell-ccic (drivers/media/platform/marvell-ccic/mcam-core.c)
+>     - clk_term_en
+>     - clk_settle
+>     - d_term_en
+>     - hs_settle
+>     - lp_clk_rate
+> 
+>   - omap4iss (drivers/staging/media/omap4iss/iss_csiphy.c)
+>     - clk_miss
+>     - clk_settle
+>     - clk_term
+>     - hs_settle
+>     - hs_term
+>     - lanes
+> 
+>   - rcar-vin (drivers/media/platform/rcar-vin/rcar-csi2.c)
+>     - hs_clk_rate
+>     - lanes
+> 
+>   - ti-vpe (drivers/media/platform/ti-vpe/cal.c)
+>     - clk_term_en
+>     - d_term_en
+>     - hs_settle
+>     - hs_term
+> 
+> So the timings expressed in the structure are the set of all the ones
+> currently used in the tree by DSI and CSI drivers. I would consider
+> that a good proof that it would be useful.
+> 
+> Note that at least cdns-dsi, exynos4-is
+> (drivers/media/platform/exynos4-is/mipi-csis.c), kirin, sun4i, msm,
+> mtk, omap4iss, plus the v4l2 drivers cdns-csi2tx and cdns-csi2rx I
+> want to convert, have already either a driver for their DPHY using the
+> phy framework plus a configuration function, or a design very similar
+> that could be migrated to such an API.
 
-This also changes existing ABI (Documentation/ABI/testing/sysfs-class-pwm):
-- pmwX should be there: /sys/class/pwm/pwmchipN/pwmX
+There's also a patch set currently being submitted that uses a phy
+driver + custom functions:
+https://lore.kernel.org/patchwork/cover/988959/
 
-Example on stm32 (stm32429i-eval) platform:
-$ ls /sys/class/pwm
-pwmchip0 pwmchip4
+Maxime
 
-$ cd /sys/class/pwm/pwmchip0/
-$ echo 0 > export
-$ ls /sys/class/pwm
-pwm0 pwmchip0 pwmchip4
-
-$ cd /sys/class/pwm/pwmchip4/
-$ echo 0 > export
-sysfs: cannot create duplicate filename '/class/pwm/pwm0'
-...Exception stack follows...
-
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
- drivers/pwm/sysfs.c | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/drivers/pwm/sysfs.c b/drivers/pwm/sysfs.c
-index 7c71cdb..4726d43 100644
---- a/drivers/pwm/sysfs.c
-+++ b/drivers/pwm/sysfs.c
-@@ -263,7 +263,6 @@ static int pwm_export_child(struct device *parent, struct pwm_device *pwm)
- 	export->pwm = pwm;
- 	mutex_init(&export->lock);
- 
--	export->child.class = parent->class;
- 	export->child.release = pwm_export_release;
- 	export->child.parent = parent;
- 	export->child.devt = MKDEV(0, 0);
 -- 
-1.9.1
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180921/7d79ac8e/attachment.sig>
