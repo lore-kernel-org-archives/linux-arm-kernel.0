@@ -1,65 +1,48 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 20 Sep 2018 19:58:00 -0500
-Subject: [PATCH 2/3] gpio: omap: Remove custom PM calls and use cpu_pm
- instead
-In-Reply-To: <20180920234756.GC5662@atomide.com>
-References: <20180920193532.7714-1-tony@atomide.com>
- <20180920193532.7714-3-tony@atomide.com>
- <35a1dccf-2b15-2d61-9210-7f3893c27795@ti.com>
- <20180920234756.GC5662@atomide.com>
-Message-ID: <9fa04a22-0908-b35f-1819-dce4058df155@ti.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 20 Sep 2018 18:12:12 -0700
+Subject: [PATCH v4 15/22] nvmem: add support for cell lookups from machine
+ code
+In-Reply-To: <20180914144011.27614-16-brgl@bgdev.pl>
+References: <20180914144011.27614-1-brgl@bgdev.pl>
+ <20180914144011.27614-16-brgl@bgdev.pl>
+Message-ID: <822f2631-43e3-b4e8-91f6-8c8e94be3dde@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 09/20/2018 06:47 PM, Tony Lindgren wrote:
-> * Grygorii Strashko <grygorii.strashko@ti.com> [180920 23:05]:
->> On 09/20/2018 02:35 PM, Tony Lindgren wrote:
->>> +static int __maybe_unused omap_gpio_runtime_suspend(struct device *dev)
->>> +{
->>> +	struct platform_device *pdev = to_platform_device(dev);
->>> +	struct gpio_bank *bank = platform_get_drvdata(pdev);
->>> +	unsigned long flags;
->>> +	int error = 0;
->>> +
->>> +	raw_spin_lock_irqsave(&bank->lock, flags);
->>> +	/* Must be idled only by CPU_CLUSTER_PM_ENTER? */
->>> +	if (bank->irq_usage) {
->>> +		error = -EBUSY;
->>
->> Sry, I didn't get how will it work with suspend to ram?
->> omap_device will call this handler and, seems, abort suspend always
->> if gpio bank has gpios requested as IRQ. Am I missing smth?
+On 14/09/18 07:40, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > 
-> Heh yeah we have _od_suspend_noirq() call pm_generic_suspend_noirq()
-> which will succeed. But note how after that omap_device_idle() gets
-> called only if pm_generic_runtime_suspend() == 0 and we still allow
-> supend with no error.
-
-Ah, sry, You are right - ret not updated in this case
-
+> Add a way for machine code users to associate devices with nvmem cells.
 > 
-> So for gpio interrupts there's nothing that needs to be done at that
-> point and the cpu_pm notifier will take care of things just before
-> suspend.
-
-So, just to summarize:
-- gpio requested (incl irq) - is_suspended = true: no actions
-
-- no gpio irqs requested - is_suspended = false: idle->omap_gpio_idle/unidle
-  suspend->omap_gpio_runtime_suspend/resume
-
-- gpio irqs requested - is_suspended = false: idle->omap_gpio_idle/unidle
-  suspend->omap_gpio_idle/unidle
-   
-
+> This restores the support for non-DT systems but following a different
+> approach. Cells must now be associated with devices using provided
+> routines and data structures before they can be retrieved using
+> nvmem_cell_get().
 > 
-> Do you have any better ideas?
+> It's still possible to define cells statically in nvmem_config but
+> cells created this way still need to be associated with consumers using
+> lookup entries.
+> 
+> Note that nvmem_find() must be moves higher in the source file as we
+> want to call it from __nvmem_device_get() for devices that don't have
+> a device node.
+> 
+> The signature of __nvmem_device_get() is also changed as it's no longer
+> used to retrieve cells.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>   drivers/nvmem/core.c           | 129 ++++++++++++++++++++++++++-------
+>   include/linux/nvmem-consumer.h |  28 +++++++
+>   2 files changed, 131 insertions(+), 26 deletions(-)
 
-No. It's looks good - thanks, but i'd like to try it, so will get back.
+This patch and other follow on patches for core.c does not apply on top 
+of 
+https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/char-misc.git/log/?h=char-misc-next
 
+Please rebase and send!
 
--- 
-regards,
--grygorii
+thanks,
+srini
