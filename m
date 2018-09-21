@@ -1,100 +1,43 @@
-From: willy.mh.wolff.ml@gmail.com (Willy Wolff)
-Date: Fri, 21 Sep 2018 13:25:54 +0100
-Subject: [PATCH] ARM: dts: exynos: ordering wrong order tmu_cpu on
- Odroid-XU3/4 thermal-zones definition
-In-Reply-To: <CAJKOXPdDFm=7wNLt5Nzf-y8TS4u6gmo51Y70bFv_pKdFK42VDQ@mail.gmail.com>
-References: <20180921113329.tha5tfrsvdf7dtws@inc028000032.lancs.ac.uk>
- <CAJKOXPdDFm=7wNLt5Nzf-y8TS4u6gmo51Y70bFv_pKdFK42VDQ@mail.gmail.com>
-Message-ID: <CACfOrNdkG=MTy=+TF1x8y++goDAyfnjfReno6=vwpRMy4r-dWA@mail.gmail.com>
+From: c.manszewski@samsung.com (Christoph Manszewski)
+Date: Fri, 21 Sep 2018 14:24:36 +0200
+Subject: [PATCH 1/3] drm/exynos: drm_plane: Correct exynos_drm_plane_reset
+In-Reply-To: <1537532678-4276-1-git-send-email-c.manszewski@samsung.com>
+References: <1537532678-4276-1-git-send-email-c.manszewski@samsung.com>
+ <CGME20180921122612eucas1p2f3e0b6cf2e15553bd4d7114722c2a217@eucas1p2.samsung.com>
+Message-ID: <20180921122612eucas1p2f3e0b6cf2e15553bd4d7114722c2a217~WaeklfEj21399713997eucas1p2a@eucas1p2.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 21 Sep 2018 at 12:46, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->
-> On Fri, 21 Sep 2018 at 13:33, Willy Wolff <willy.mh.wolff.ml@gmail.com> wrote:
-> >
-> > This patch is to open a discussion about wrong order of tmu_cpu.
-> >
-> > It seems that tmu_cpu1 correspond to cpu3, and tmu_cpu3 match cpu1.
-> > Note, cpu{0|3} in dtsi correspond to cpu{3|7} in linux and are the big
-> > cores.
->
-> Hi,
->
-> I do not understand this sentence. In DTSI, the CPU0-3 are the A7,
-> little cores. Defined by exynos5422-cpus.dtsi. What did you mean here?
+Make use of helper functions in exynos_drm_plane_reset in order to set
+all default values. Currently alpha isn't set during reset.
 
-Leave it, you clarify that is just indices.
+Signed-off-by: Christoph Manszewski <c.manszewski@samsung.com>
+---
+ drivers/gpu/drm/exynos/exynos_drm_plane.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-> > By dependencis from exynos5422-odroidxu3-common.dtsi to
-> > exynos5800.dtsi -> exynos5420.dtsi, I guess definitions of tmu_cpuX are
-> > incorrect. However, changing the address, reg interrupts or clocks
-> > would breack other boards depending on it. As I can't test other boards,
-> > I've just overload the reference in the thermal-zones node.
->
-> There are 8 CPUs (4 little and 4 big) but only 4 thermal zones for
-> CPUs. The mapping of names of CPU nodes and TMU nodes in DTS is not
-> direct. These are just indices ...
-
-Maybe we could rename these nodes to support the real name while running?
-But it's just a detail I guess.
-
->
-> although more important is to map
-> the cooling devices to proper TMU. This should be mentioned in DTS as
-> this the real problem here.
-
-The cooling devices mapping is correct, it's the reporting in
-/sys/devices/virtual/thermal/thermal_zone$i/temp that are wrong.
-Currently, there is no bad effect for cooling, as the attached cooling device
-adapts the FAN and both frequencies of little and big cluster. Frequencies
-of little cores and big cores are shared inside a cluster.
-This patch is for coherency only.
-
->
-> >
-> > To reproduce the problem, I provide two scripts:
-> > == script_stress:
-> >
-> > for i in 0 10 20 40 80; do
-> >     echo $i
-> >     taskset $i stress -t 10 -c 1
-> > done;
-> >
-> > == script_read_temp:
-> >
-> > while true; do
-> >     for i in 0 1 2 3 4; do
-> >         echo $i
-> >         cat /sys/devices/virtual/thermal/thermal_zone$i/temp
-> >     done;
-> >     sleep 1
-> >     clear
-> > done;
-> >
-> > Signed-off-by: Willy Wolff <willy.mh.wolff@gmail.com>
-> > ---
-> >  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 6 ++++--
-> >  1 file changed, 4 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> > index 96e281c0a118..4512ffad2785 100644
-> > --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> > +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> > @@ -135,7 +135,8 @@
-> >                         };
-> >                 };
-> >                 cpu1_thermal: cpu1-thermal {
-> > -                       thermal-sensors = <&tmu_cpu1 0>;
-> > +                       // thermal-sensors = <&tmu_cpu1 0>;
->
-> Do not leave commented lines, there are not needed.
->
-> Also your email does not match signed-off-by. You must have something
-> wrong with either git setup or mailer (git commit --si will use the
-> same address for From and SoB so I guess the mailer...).
-
-Ok, my bad.
-
-> Best regards,
-> Krzysztof
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_plane.c b/drivers/gpu/drm/exynos/exynos_drm_plane.c
+index dba29aec59b4..755ca0e9ead2 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_plane.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_plane.c
+@@ -131,16 +131,14 @@ static void exynos_drm_plane_reset(struct drm_plane *plane)
+ 
+ 	if (plane->state) {
+ 		exynos_state = to_exynos_plane_state(plane->state);
+-		if (exynos_state->base.fb)
+-			drm_framebuffer_put(exynos_state->base.fb);
++		__drm_atomic_helper_plane_destroy_state(plane->state);
+ 		kfree(exynos_state);
+ 		plane->state = NULL;
+ 	}
+ 
+ 	exynos_state = kzalloc(sizeof(*exynos_state), GFP_KERNEL);
+ 	if (exynos_state) {
+-		plane->state = &exynos_state->base;
+-		plane->state->plane = plane;
++		__drm_atomic_helper_plane_reset(plane, &exynos_state->base);
+ 		plane->state->zpos = exynos_plane->config->zpos;
+ 	}
+ }
+-- 
+2.7.4
