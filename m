@@ -1,29 +1,36 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 21 Sep 2018 09:18:22 -0700
-Subject: [PATCH -next] pinctrl: sunxi: fix 'pctrl->functions' allocation
- in sunxi_pinctrl_build_state
-In-Reply-To: <20180921015941.28468-1-yuehaibing@huawei.com>
-References: <20180921015941.28468-1-yuehaibing@huawei.com>
-Message-ID: <CACRpkdbHALf7m2uQ091dBmD9aTctzN2ym5=vZ1wFbE_ayJ-8Fw@mail.gmail.com>
+Date: Fri, 21 Sep 2018 09:11:38 -0700
+Subject: [PATCH 1/4] pinctrl: mediatek: fix static checker warning caused
+ by EINT_NA
+In-Reply-To: <ab85fbee4d8286cbedbcc7317f89dc0d2dd83965.1537502494.git.sean.wang@mediatek.com>
+References: <ab85fbee4d8286cbedbcc7317f89dc0d2dd83965.1537502494.git.sean.wang@mediatek.com>
+Message-ID: <CACRpkdavhUsJkd262rgjk=2RdHVrdmAi+8JHGBMHEDv_w=gnVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 20, 2018 at 7:00 PM YueHaibing <yuehaibing@huawei.com> wrote:
+On Thu, Sep 20, 2018 at 9:07 PM <sean.wang@mediatek.com> wrote:
 
-> fixes following Smatch static check warning:
+> From: Sean Wang <sean.wang@mediatek.com>
 >
->  ./drivers/pinctrl/sunxi/pinctrl-sunxi.c:1112 sunxi_pinctrl_build_state()
->  warn: passing devm_ allocated variable to kfree. 'pctrl->functions'
+> EINT_NA is an u16 number, so it should be U16_MAX instead of -1
+> to fix up drivers/pinctrl/mediatek/pinctrl-paris.c:732 mtk_gpio_to_irq()
+> warn: impossible condition (desc->eint.eint_n == -1) => (0-u16max == (-1))
 >
-> As we will be calling krealloc() on pointer 'pctrl->functions', which means
-> kfree() will be called in there, devm_kzalloc() shouldn't be used with
-> the allocation in the first place.  Fix the warning by calling kcalloc()
-> and managing the free procedure in error path on our own.
+> Also happens in
+> drivers/pinctrl/mediatek/pinctrl-paris.c:749 mtk_gpio_set_config()
+> warn: impossible condition (desc->eint.eint_n == -1) => (0-u16max == (-1))
 >
-> Fixes: 0e37f88d9ad8 ("ARM: sunxi: Add pinctrl driver for Allwinner SoCs")
-> Signed-off-by: YueHaibing <yuehaibing@huawei.com>
+> drivers/pinctrl/mediatek/pinctrl-moore.c:479 mtk_gpio_to_irq()
+> warn: impossible condition (desc->eint.eint_n == -1) => (0-u16max == (-1))
+>
+> drivers/pinctrl/mediatek/pinctrl-moore.c:496 mtk_gpio_set_config()
+> warn: impossible condition '(desc->eint.eint_n == -1) => (0-u16max == (-1))
+>
+> Fixes: 6561859b067f ("pinctrl: mediatek: add eint support to MT8183 pinctrl driver")
+> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 
-Patch applied with Maxime's ACK.
+Patch applied.
 
 Yours,
 Linus Walleij
