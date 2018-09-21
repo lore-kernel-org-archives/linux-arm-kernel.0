@@ -1,38 +1,86 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Fri, 21 Sep 2018 11:39:38 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: enable STM32 MIPI DSI
-In-Reply-To: <1534776782-4941-1-git-send-email-yannick.fertre@st.com>
-References: <1534776782-4941-1-git-send-email-yannick.fertre@st.com>
-Message-ID: <b596862f-3321-d4f6-a01c-e1360c84db4c@st.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Fri, 21 Sep 2018 17:50:04 +0800
+Subject: [PATCH v3 06/12] drm/mediatek: add dpi driver for mt2701 and
+ mt7623
+In-Reply-To: <20180921032822.30771-7-bibby.hsieh@mediatek.com>
+References: <20180921032822.30771-1-bibby.hsieh@mediatek.com>
+ <20180921032822.30771-7-bibby.hsieh@mediatek.com>
+Message-ID: <1537523404.20660.10.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi yannick
+Hi, Bibby:
 
-On 08/20/2018 04:53 PM, Yannick Fertr? wrote:
-> Enable STMicroelectronics specific extensions for Synopsis MIPI DSI
-> as loadable module.
+On Fri, 2018-09-21 at 11:28 +0800, Bibby Hsieh wrote:
+> From: chunhui dai <chunhui.dai@mediatek.com>
 > 
-> Signed-off-by: Yannick Fertr? <yannick.fertre@st.com>
+> This patch adds dpi dirver suppot for both mt2701 and mt7623.
+> And also support other (existing or future) chips that use
+> the same binding and driver.
+> 
+
+Reviewed-by: CK Hu <ck.hu@mediatek.com>
+
+> Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
 > ---
->   arch/arm/configs/multi_v7_defconfig | 1 +
->   1 file changed, 1 insertion(+)
+>  drivers/gpu/drm/mediatek/mtk_dpi.c     | 21 +++++++++++++++++++++
+>  drivers/gpu/drm/mediatek/mtk_drm_drv.c |  2 ++
+>  2 files changed, 23 insertions(+)
 > 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 7e1c543..4c88cba 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -645,6 +645,7 @@ CONFIG_DRM_RCAR_LVDS=y
->   CONFIG_DRM_SUN4I=m
->   CONFIG_DRM_FSL_DCU=m
->   CONFIG_DRM_TEGRA=y
-> +CONFIG_DRM_STM_DSI=m
->   CONFIG_DRM_PANEL_SAMSUNG_LD9040=m
->   CONFIG_DRM_PANEL_SAMSUNG_S6E63J0X03=m
->   CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=m
-> 
-
-Applied on stm32-next.
-
-Thanks.
-Alex
+> diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
+> index 7a4868a0afec..a9d8231a0a9e 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_dpi.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
+> @@ -688,11 +688,29 @@ static unsigned int mt8173_calculate_factor(int clock)
+>  		return 3 << 1;
+>  }
+>  
+> +static unsigned int mt2701_calculate_factor(int clock)
+> +{
+> +	if (clock <= 64000)
+> +		return 16;
+> +	else if (clock <= 128000)
+> +		return 8;
+> +	else if (clock <= 256000)
+> +		return 4;
+> +	else
+> +		return 2;
+> +}
+> +
+>  static const struct mtk_dpi_conf mt8173_conf = {
+>  	.cal_factor = mt8173_calculate_factor,
+>  	.reg_h_fre_con = 0xe0,
+>  };
+>  
+> +static const struct mtk_dpi_conf mt2701_conf = {
+> +	.cal_factor = mt2701_calculate_factor,
+> +	.reg_h_fre_con = 0xb0,
+> +	.edge_sel_en = true,
+> +};
+> +
+>  static int mtk_dpi_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+> @@ -784,6 +802,9 @@ static int mtk_dpi_remove(struct platform_device *pdev)
+>  }
+>  
+>  static const struct of_device_id mtk_dpi_of_ids[] = {
+> +	{ .compatible = "mediatek,mt2701-dpi",
+> +	  .data = &mt2701_conf,
+> +	},
+>  	{ .compatible = "mediatek,mt8173-dpi",
+>  	  .data = &mt8173_conf,
+>  	},
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> index 39721119713b..d961112fa2f5 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> @@ -424,6 +424,8 @@ static const struct of_device_id mtk_ddp_comp_dt_ids[] = {
+>  	  .data = (void *)MTK_DSI },
+>  	{ .compatible = "mediatek,mt8173-dsi",
+>  	  .data = (void *)MTK_DSI },
+> +	{ .compatible = "mediatek,mt2701-dpi",
+> +	  .data = (void *)MTK_DPI },
+>  	{ .compatible = "mediatek,mt8173-dpi",
+>  	  .data = (void *)MTK_DPI },
+>  	{ .compatible = "mediatek,mt2701-disp-mutex",
