@@ -1,7 +1,7 @@
 From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 21 Sep 2018 16:00:41 +0100
-Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.20
-Message-ID: <5BA50799.3060905@hisilicon.com>
+Date: Fri, 21 Sep 2018 16:04:35 +0100
+Subject: [GIT PULL] arm: dts: hisilicon dts updates for v4.20
+Message-ID: <5BA50883.4040708@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,38 +21,20 @@ The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 
 are available in the Git repository at:
 
-  git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.20
+  git://github.com/hisilicon/linux-hisi.git tags/hisi-arm32-dt-for-4.20
 
-for you to fetch changes up to 5510ee99c0deb0c0235acee6498a6745c8317df1:
+for you to fetch changes up to 6523a0e155c8eeafcb290596aad86388e7577316:
 
-  arm64: dts: Add devicetree support for HiKey970 board (2018-09-19 16:15:25 +0100)
-
-----------------------------------------------------------------
-ARM64: DT: Hisilicon SoC DT updates for 4.20
-
-- Add missing clocks for Hi6220
-- Switch to updated coresight bindings for Hi6220
-- Add DT bindings and support for Hi3670 SoC and HiKey970 board
+  arm: dts: hip04: Update coresight bindings for hardware ports (2018-09-19 16:28:51 +0100)
 
 ----------------------------------------------------------------
-Manivannan Sadhasivam (4):
-      dt-bindings: arm: hisilicon: Add binding for Hi3670 SoC
-      arm64: dts: Add devicetree for Hisilicon Hi3670 SoC
-      dt-bindings: arm: hisilicon: Add binding for HiKey970 board
-      arm64: dts: Add devicetree support for HiKey970 board
+ARM: DT: Hisilicon ARM32 SoCs updates for 4.20
 
+- Switch to updated coresight bindings for hip04 SoC
+
+----------------------------------------------------------------
 Suzuki K Poulose (1):
-      arm64: dts: hi6220: Update coresight bindings for hardware ports
+      arm: dts: hip04: Update coresight bindings for hardware ports
 
-Viresh Kumar (1):
-      arm64: dts: hisilicon: Add missing clocks property for CPUs
-
- .../bindings/arm/hisilicon/hisilicon.txt           |   8 +
- arch/arm64/boot/dts/hisilicon/Makefile             |   1 +
- arch/arm64/boot/dts/hisilicon/hi3670-hikey970.dts  |  35 ++++
- arch/arm64/boot/dts/hisilicon/hi3670.dtsi          | 162 ++++++++++++++++++
- .../arm64/boot/dts/hisilicon/hi6220-coresight.dtsi | 181 ++++++++++-----------
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |   7 +
- 6 files changed, 299 insertions(+), 95 deletions(-)
- create mode 100644 arch/arm64/boot/dts/hisilicon/hi3670-hikey970.dts
- create mode 100644 arch/arm64/boot/dts/hisilicon/hi3670.dtsi
+ arch/arm/boot/dts/hip04.dtsi | 346 ++++++++++++++++++++++---------------------
+ 1 file changed, 176 insertions(+), 170 deletions(-)
