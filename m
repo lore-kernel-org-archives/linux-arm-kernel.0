@@ -1,46 +1,77 @@
-From: hanjie.lin@amlogic.com (Hanjie Lin)
-Date: Fri, 21 Sep 2018 14:03:38 +0800
-Subject: [RESEND PATCH v3 0/2] add the Amlogic Meson PCIe controller driver
-Message-ID: <1537509820-52040-1-git-send-email-hanjie.lin@amlogic.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 21 Sep 2018 14:29:22 +0800
+Subject: [PATCH v2 2/7] mfd: Add ST Multi-Function eXpander (STMFX) core
+ driver
+In-Reply-To: <1537363669-25991-3-git-send-email-amelie.delaunay@st.com>
+References: <1537363669-25991-3-git-send-email-amelie.delaunay@st.com>
+Message-ID: <201809211450.iSGhRxSU%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is v3 post RESEND: [2] 
- - add Rob's Reviewed-by to patch 1/2
- - add more to&cc list suggested by get_maintainer.pl
+Hi Amelie,
 
-The Amlogic Meson PCIe host controller is based on the Synopsys DesignWare
-PCI core. This patchset add the driver and dt-bindings of the controller.
+Thank you for the patch! Perhaps something to improve:
 
-Till patch v2, we have a dedicated phy driver which only process reset job.
-It's too overkill so we integrate phy driver into the controller.
+[auto build test WARNING on ljones-mfd/for-mfd-next]
+[also build test WARNING on v4.19-rc4 next-20180920]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Changes since v2: [1]
- - abandon phy driver, move reset to the controller
- - use devm_add_action_or_reset() to use clock res
- - format correcting
+url:    https://github.com/0day-ci/linux/commits/Amelie-Delaunay/dt-bindings-mfd-Add-ST-Multi-Function-eXpander-STMFX-core-bindings/20180920-185854
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git for-mfd-next
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-1) 7.3.0
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-Changes since v1: [0]
- - use gpio lib instead open code 
- - move 'apb' and 'port' reset from phy driver
- - format correcting
+Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
+http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
 
-[0] : https://lkml.kernel.org/r/1534227522-186798-1-git-send-email-hanjie.lin at amlogic.com
-[1] : https://lkml.kernel.org/r/1535096165-45827-1-git-send-email-hanjie.lin at amlogic.com 
-[2] : https://lkml.kernel.org/r/1535616829-167936-1-git-send-email-hanjie.lin at amlogic.com 
+All warnings (new ones prefixed by >>):
 
-Yue Wang (2):
-  dt-bindings: PCI: meson: add DT bindings for Amlogic Meson PCIe
-    controller
-  PCI: meson: add the Amlogic Meson PCIe controller driver
+   drivers/mfd/stmfx.c: In function 'stmfx_function_enable':
+>> drivers/mfd/stmfx.c:103:8: warning: 'mask' may be used uninitialized in this function [-Wmaybe-uninitialized]
+      mask |= STMFX_REG_SYS_CTRL_GPIO_EN;
+   drivers/mfd/stmfx.c:100:5: note: 'mask' was declared here
+     u8 mask;
+        ^~~~
+   drivers/mfd/stmfx.c: In function 'stmfx_function_disable':
+>> drivers/mfd/stmfx.c:103:8: warning: 'mask' may be used uninitialized in this function [-Wmaybe-uninitialized]
+      mask |= STMFX_REG_SYS_CTRL_GPIO_EN;
+   drivers/mfd/stmfx.c:100:5: note: 'mask' was declared here
+     u8 mask;
+        ^~~~
 
- .../devicetree/bindings/pci/amlogic,meson-pcie.txt |  70 +++
- drivers/pci/controller/dwc/Kconfig                 |  12 +
- drivers/pci/controller/dwc/Makefile                |   1 +
- drivers/pci/controller/dwc/pci-meson.c             | 617 +++++++++++++++++++++
- 4 files changed, 700 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
- create mode 100644 drivers/pci/controller/dwc/pci-meson.c
+vim +/mask +103 drivers/mfd/stmfx.c
 
--- 
-2.7.4
+    97	
+    98	static u8 stmfx_func_to_mask(u32 func)
+    99	{
+   100		u8 mask;
+   101	
+   102		if (func & STMFX_FUNC_GPIO)
+ > 103			mask |= STMFX_REG_SYS_CTRL_GPIO_EN;
+   104	
+   105		if ((func & STMFX_FUNC_ALTGPIO_LOW) || (func & STMFX_FUNC_ALTGPIO_HIGH))
+   106			mask |= STMFX_REG_SYS_CTRL_ALTGPIO_EN;
+   107	
+   108		if (func & STMFX_FUNC_TS)
+   109			mask |= STMFX_REG_SYS_CTRL_TS_EN;
+   110	
+   111		if (func & STMFX_FUNC_IDD)
+   112			mask |= STMFX_REG_SYS_CTRL_IDD_EN;
+   113	
+   114		return mask;
+   115	}
+   116	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 65161 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180921/0317e9ad/attachment-0001.gz>
