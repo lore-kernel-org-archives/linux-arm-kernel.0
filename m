@@ -1,68 +1,102 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Fri, 21 Sep 2018 11:45:54 +0200
-Subject: [PATCH V2 00/27] mmc: mmci: add sdmmc variant for stm32
-Message-ID: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
+Date: Fri, 21 Sep 2018 11:46:02 +0200
+Subject: [PATCH V2 08/27] mmc: mmci: add get_next_data callback
+In-Reply-To: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
+References: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1537523181-14578-9-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Barre <ludovic.barre@st.com>
 
-The goal of this serie is to add support of sdmmc for stm32.
-Be to able to add this new variant it is needed to do some changes in
-mmci core:
--Internalize specific needs of legacy dmaengine.
--Create and setup dma_priv pointer
--Create generic callbacks which share some features (like cookie...)
- and call specific needs
+This patch adds get_next_data callback to mmci_host_ops.
+Generic mmci_get_next_data factorizes next_cookie check and
+the host ops call.
 
-change v3:
--remove __dma_inprogress rename
--remove bad space at end of "st,use-ckin"
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+---
+ drivers/mmc/host/mmci.c          | 16 ++++++++++------
+ drivers/mmc/host/mmci.h          |  3 +++
+ drivers/mmc/host/mmci_qcom_dml.c |  1 +
+ 3 files changed, 14 insertions(+), 6 deletions(-)
 
-change v2:
--rename to mmci_prep/unprep_data
--rename specific dma engine structure to mmci_dmae_next/priv
--follow "_" recommandation
--remove dma prefixe of mmci_dmae_priv fields
-
-Ludovic Barre (27):
-  mmc: mmci: internalize dma map/unmap into mmci dma functions
-  mmc: mmci: internalize dma_inprogress into mmci dma functions
-  mmc: mmci: convert dma_setup callback to return an int
-  mmc: mmci: introduce dma_priv pointer to mmci_host
-  mmc: mmci: move mmci next cookie to mci host
-  mmc: mmci: merge prepare data functions
-  mmc: mmci: add prepare/unprepare_data callbacks
-  mmc: mmci: add get_next_data callback
-  mmc: mmci: modify dma_setup callback
-  mmc: mmci: add dma_release callback
-  mmc: mmci: add dma_start callback
-  mmc: mmci: add dma_finalize callback
-  mmc: mmci: add dma_error callback
-  mmc: mmci: add validate_data callback
-  mmc: mmci: add set_clk/pwrreg callbacks
-  mmc: mmci: add datactrl block size variant property
-  mmc: mmci: expand startbiterr to irqmask and error check
-  mmc: mmci: add variant properties to define cpsm & cmdresp bits
-  mmc: mmci: add variant property to define dpsm bit
-  mmc: mmci: add variant property to define irq pio mask
-  mmc: mmci: add variant property to write datactrl before command
-  mmc: mmci: add variant property to not read datacnt
-  mmc: mmci: add variant property to request a reset
-  mmc: mmci: add clock divider for stm32 sdmmc
-  mmc: mmci: add stm32 sdmmc registers
-  mmc: mmci: add DT bindings for STM32 sdmmc
-  mmc: mmci: add stm32 sdmmc variant
-
- Documentation/devicetree/bindings/mmc/mmci.txt |  11 +
- drivers/mmc/host/Kconfig                       |  10 +
- drivers/mmc/host/Makefile                      |   1 +
- drivers/mmc/host/mmci.c                        | 646 +++++++++++++++++--------
- drivers/mmc/host/mmci.h                        | 147 +++++-
- drivers/mmc/host/mmci_qcom_dml.c               |  15 +-
- drivers/mmc/host/mmci_stm32_sdmmc.c            | 282 +++++++++++
- 7 files changed, 880 insertions(+), 232 deletions(-)
- create mode 100644 drivers/mmc/host/mmci_stm32_sdmmc.c
-
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 5734c05..55c4222 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -390,6 +390,14 @@ void mmci_unprep_data(struct mmci_host *host, struct mmc_data *data,
+ 	data->host_cookie = 0;
+ }
+ 
++void mmci_get_next_data(struct mmci_host *host, struct mmc_data *data)
++{
++	WARN_ON(data->host_cookie && data->host_cookie != host->next_cookie);
++
++	if (host->ops && host->ops->get_next_data)
++		host->ops->get_next_data(host, data);
++}
++
+ static void
+ mmci_request_end(struct mmci_host *host, struct mmc_request *mrq)
+ {
+@@ -738,12 +746,11 @@ static int mmci_dma_start_data(struct mmci_host *host, unsigned int datactrl)
+ 	return 0;
+ }
+ 
+-static void mmci_get_next_data(struct mmci_host *host, struct mmc_data *data)
++void mmci_dmae_get_next_data(struct mmci_host *host, struct mmc_data *data)
+ {
+ 	struct mmci_dmae_priv *dmae = host->dma_priv;
+ 	struct mmci_dmae_next *next = &dmae->next_data;
+ 
+-	WARN_ON(data->host_cookie && data->host_cookie != host->next_cookie);
+ 	WARN_ON(!data->host_cookie && (next->desc || next->chan));
+ 
+ 	dmae->desc_current = next->desc;
+@@ -785,13 +792,10 @@ void mmci_dmae_unprep_data(struct mmci_host *host,
+ static struct mmci_host_ops mmci_variant_ops = {
+ 	.prep_data = mmci_dmae_prep_data,
+ 	.unprep_data = mmci_dmae_unprep_data,
++	.get_next_data = mmci_dmae_get_next_data,
+ };
+ #else
+ /* Blank functions if the DMA engine is not available */
+-static void mmci_get_next_data(struct mmci_host *host, struct mmc_data *data)
+-{
+-}
+-
+ static inline int mmci_dma_setup(struct mmci_host *host)
+ {
+ 	return 0;
+diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+index 0f2f82f..4f73070 100644
+--- a/drivers/mmc/host/mmci.h
++++ b/drivers/mmc/host/mmci.h
+@@ -277,6 +277,7 @@ struct mmci_host_ops {
+ 			 bool next);
+ 	void (*unprep_data)(struct mmci_host *host, struct mmc_data *data,
+ 			    int err);
++	void (*get_next_data)(struct mmci_host *host, struct mmc_data *data);
+ 	int (*dma_setup)(struct mmci_host *host);
+ };
+ 
+@@ -332,3 +333,5 @@ int mmci_dmae_prep_data(struct mmci_host *host, struct mmc_data *data,
+ 			bool next);
+ void mmci_dmae_unprep_data(struct mmci_host *host, struct mmc_data *data,
+ 			   int err);
++void mmci_dmae_get_next_data(struct mmci_host *host, struct mmc_data *data);
++
+diff --git a/drivers/mmc/host/mmci_qcom_dml.c b/drivers/mmc/host/mmci_qcom_dml.c
+index e3cbdda..432a823 100644
+--- a/drivers/mmc/host/mmci_qcom_dml.c
++++ b/drivers/mmc/host/mmci_qcom_dml.c
+@@ -182,6 +182,7 @@ static int qcom_dma_setup(struct mmci_host *host)
+ static struct mmci_host_ops qcom_variant_ops = {
+ 	.prep_data = mmci_dmae_prep_data,
+ 	.unprep_data = mmci_dmae_unprep_data,
++	.get_next_data = mmci_dmae_get_next_data,
+ 	.dma_setup = qcom_dma_setup,
+ };
+ 
 -- 
 2.7.4
