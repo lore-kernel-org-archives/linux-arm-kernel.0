@@ -1,152 +1,104 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 21 Sep 2018 17:05:27 +0100
-Subject: [PATCH v5 03/27] arm64: alternative: Apply alternatives early in
- boot process
-In-Reply-To: <78781d82-e5c4-c590-6c0c-e7d2db456bf9@arm.com>
-References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
- <1535471497-38854-4-git-send-email-julien.thierry@arm.com>
- <3becf020-b230-beb8-b304-d8097377f234@arm.com>
- <78781d82-e5c4-c590-6c0c-e7d2db456bf9@arm.com>
-Message-ID: <86fty2x2d4.wl-marc.zyngier@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 21 Sep 2018 17:07:45 +0100
+Subject: [PATCH v4 1/4] PCI: mediatek: fixup mtk_pcie_find_port logical
+In-Reply-To: <1536573023-6720-2-git-send-email-honghui.zhang@mediatek.com>
+References: <1536573023-6720-1-git-send-email-honghui.zhang@mediatek.com>
+ <1536573023-6720-2-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <20180921160745.GB21644@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Sep 2018 17:49:09 +0100,
-Julien Thierry <julien.thierry@arm.com> wrote:
+On Mon, Sep 10, 2018 at 05:50:20PM +0800, honghui.zhang at mediatek.com wrote:
+> From: Honghui Zhang <honghui.zhang@mediatek.com>
 > 
-> Hi James,
+> The Mediatek's host controller has two slots, each with it's own control
+> registers. The host driver need to identify which slot was connected
+> in order to access the device's configuration space. There's problem
+> for current host driver to find out which slot was connected to for
+> a given EP device.
 > 
-> On 12/09/18 11:29, James Morse wrote:
-> > Hi Julien,
-> > 
-> > On 28/08/18 16:51, Julien Thierry wrote:
-> >> From: Daniel Thompson <daniel.thompson@linaro.org>
-> >> 
-> >> Currently alternatives are applied very late in the boot process (and
-> >> a long time after we enable scheduling). Some alternative sequences,
-> >> such as those that alter the way CPU context is stored, must be applied
-> >> much earlier in the boot sequence.
-> >> 
-> >> Introduce apply_boot_alternatives() to allow some alternatives to be
-> >> applied immediately after we detect the CPU features of the boot CPU.
-> > 
-> > 
-> >> diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
-> >> index b5d6039..70c2604 100644
-> >> --- a/arch/arm64/kernel/alternative.c
-> >> +++ b/arch/arm64/kernel/alternative.c
-> >> @@ -145,7 +145,8 @@ static void clean_dcache_range_nopatch(u64 start, u64 end)
-> >>   	} while (cur += d_size, cur < end);
-> >>   }
-> >>   -static void __apply_alternatives(void *alt_region, bool
-> >> is_module)
-> >> +static void __apply_alternatives(void *alt_region,  bool is_module,
-> >> +				 unsigned long feature_mask)
-> > 
-> > Shouldn't feature_mask be a DECLARE_BITMAP() maybe-array like cpu_hwcaps?
-> > This means it keeps working when NR_CAPS grows over 64, which might happen
-> > sooner than we think for backported errata...
-> > 
-> > 
-> >> @@ -155,6 +156,9 @@ static void __apply_alternatives(void *alt_region, bool is_module)
-> >>   	for (alt = region->begin; alt < region->end; alt++) {
-> >>   		int nr_inst;
-> >>   +		if ((BIT(alt->cpufeature) & feature_mask) == 0)
-> >> +			continue;
-> >> +
-> >>   		/* Use ARM64_CB_PATCH as an unconditional patch */
-> >>   		if (alt->cpufeature < ARM64_CB_PATCH &&
-> >>   		    !cpus_have_cap(alt->cpufeature))
-> >> @@ -213,7 +217,7 @@ static int __apply_alternatives_multi_stop(void *unused)
-> >>   		isb();
-> >>   	} else {
-> >>   		BUG_ON(alternatives_applied);
-> >> -		__apply_alternatives(&region, false);
-> >> +		__apply_alternatives(&region, false, ~boot_capabilities);
-> > 
-> > Ah, this is tricky. There is a bitmap_complement() for the DECLARE_BITMAP()
-> > stuff, but we'd need a second array...
-> > 
-> > We could pass the scope around, but then __apply_alternatives() would need to
-> > lookup the struct arm64_cpu_capabilities up every time. This is only a problem
-> > as we have one cap-number-space for errata/features, but separate sparse lists.
-> > 
+> Assuming each slot have connect with one EP device as below:
 > 
-> Since for each alternative we know the cpufeature associated with it,
-> the "lookup" is really just accessing an array with the given index,
-> so that could be an option.
+>                 host bridge
+>   bus 0 --> __________|_______
+>            |                  |
+>            |                  |
+>          slot 0             slot 1
+>   bus 1 -->|        bus 2 --> |
+>            |                  |
+>          EP 0               EP 1
 > 
-> > (I think applying the alternatives one cap at a time is a bad idea as we would
-> > need to walk the alternative region NR_CAPS times)
-> > 
-> > 
-> >> @@ -227,6 +231,24 @@ void __init apply_alternatives_all(void)
-> >>   	stop_machine(__apply_alternatives_multi_stop, NULL, cpu_online_mask);
-> >>   }
-> >>   +/*
-> >> + * This is called very early in the boot process (directly after we run
-> >> + * a feature detect on the boot CPU). No need to worry about other CPUs
-> >> + * here.
-> >> + */
-> >> +void __init apply_boot_alternatives(void)
-> >> +{
-> >> +	struct alt_region region = {
-> >> +		.begin	= (struct alt_instr *)__alt_instructions,
-> >> +		.end	= (struct alt_instr *)__alt_instructions_end,
-> >> +	};
-> >> +
-> >> +	/* If called on non-boot cpu things could go wrong */
-> >> +	WARN_ON(smp_processor_id() != 0);
-> > 
-> > Isn't the problem if there are multiple CPUs online?
-> > 
+> During PCI enumeration, system software will scan all the PCI device
+> starting from devfn 0. So it will get the proper port for slot0 and
+> slot1 device when using PCI_SLOT(devfn) for match. But it will get
+> the wrong slot for EP1: The devfn will be start from 0 when scanning
+> EP1 behind slot1, it will get port0 since the PCI_SLOT(EP1) is match
+> for port0's slot value. So the host driver should not using EP's devfn
+> but the slot's devfn(the slot which EP was connected to) for match.
 > 
-> Yes, that makes more sense. I'll change this.
+> This patch fix the mtk_pcie_find_port's logical by using the slot's
+> devfn for match.
 > 
-> > 
-> >> +	__apply_alternatives(&region, false, boot_capabilities);
-> >> +}
-> >> +
-> >>   #ifdef CONFIG_MODULES
-> >>   void apply_alternatives_module(void *start, size_t length)
-> >>   {
-> > 
-> >> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> >> index 3bc1c8b..0d1e41e 100644
-> >> --- a/arch/arm64/kernel/cpufeature.c
-> >> +++ b/arch/arm64/kernel/cpufeature.c
-> >> @@ -52,6 +52,8 @@
-> >>   DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
-> >>   EXPORT_SYMBOL(cpu_hwcaps);
-> >>   +unsigned long boot_capabilities;
-> >> +
-> >>   /*
-> >>    * Flag to indicate if we have computed the system wide
-> >>    * capabilities based on the boot time active CPUs. This
-> >> @@ -1375,6 +1377,9 @@ static void __update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
-> >>   		if (!cpus_have_cap(caps->capability) && caps->desc)
-> >>   			pr_info("%s %s\n", info, caps->desc);
-> >>   		cpus_set_cap(caps->capability);
-> > 
-> > Hmm, the bitmap behind cpus_set_cap() is what cpus_have_cap() in
-> > __apply_alternatives() looks at. If you had a call to __apply_alternatives after
-> > update_cpu_capabilities(SCOPE_BOOT_CPU), but before any others, it would only
-> > apply those alternatives...
-> > 
-> > (I don't think there is a problem re-applying the same alternative, but I
-> > haven't checked).
-> > 
+> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> Acked-by: Ryder Lee <ryder.lee@mediatek.com>
+> ---
+>  drivers/pci/controller/pcie-mediatek.c | 19 +++++++++++++++++--
+>  1 file changed, 17 insertions(+), 2 deletions(-)
 > 
-> Interesting idea. If someone can confirm that patching alternatives
-> twice is safe, I think it would make things simpler.
+> diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
+> index 861dda6..20b9088 100644
+> --- a/drivers/pci/controller/pcie-mediatek.c
+> +++ b/drivers/pci/controller/pcie-mediatek.c
+> @@ -337,11 +337,26 @@ static struct mtk_pcie_port *mtk_pcie_find_port(struct pci_bus *bus,
+>  {
+>  	struct mtk_pcie *pcie = bus->sysdata;
+>  	struct mtk_pcie_port *port;
+> +	struct pci_dev *dev;
+> +	struct pci_bus *pbus;
+>  
+> -	list_for_each_entry(port, &pcie->ports, list)
+> -		if (port->slot == PCI_SLOT(devfn))
+> +	list_for_each_entry(port, &pcie->ports, list) {
+> +		if (!bus->number && port->slot == PCI_SLOT(devfn))
+>  			return port;
+>  
+> +		if (bus->number) {
+> +			pbus = bus;
+> +
+> +			while (pbus->number) {
+> +				dev = pbus->self;
+> +				pbus = dev->bus;
+> +			}
+> +
+> +			if (port->slot == PCI_SLOT(dev->devfn))
+> +				return port;
+> +		}
+> +	}
 
-It may not be safe for dynamic alternatives, where the patch code is
-generated at runtime and may rely on the original text (to extract a
-register number, for example -- see kvm_update_va_mask).
+	/*
+	 * Walk the bus hierarchy to get the devfn value
+	 * of the port in the root bus.
+	 */
+	while (bus && bus->number) {
+		devfn = bus->self->devfn;
+		bus = bus->parent;
+	}
 
-Thanks,
+	list_for_each_entry(port, &pcie->ports, list) {
+		if (port->slot == PCI_SLOT(devfn))
+			return port;
 
-	M.
+	return NULL;
 
--- 
-Jazz is not dead, it just smell funny.
+Would it work ? Maybe it is a little easier to parse.
+
+I think this can even be made easier by using struct device_node* as
+comparison (and store it in port->slot instead of the port number), I
+think that the pci_dev representing the port should have the right
+of_node associated with it by core code, so it is just a matter of
+finding the first pci_dev parent with an of_node set and compare it
+against port->slot (that should be converted to a struct device_node*).
+
+This ought to be tested and written but I think that's doable.
+
+Lorenzo
