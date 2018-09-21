@@ -1,159 +1,175 @@
-From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Fri, 21 Sep 2018 11:02:02 +0800
-Subject: [PATCH v2 13/13] drm/mediatek: config component output by
- device node port
-In-Reply-To: <1536213802.4618.41.camel@mtksdaap41>
-References: <20180905083146.14727-1-bibby.hsieh@mediatek.com>
- <20180905083146.14727-14-bibby.hsieh@mediatek.com>
- <1536213802.4618.41.camel@mtksdaap41>
-Message-ID: <1537498922.17379.3.camel@mtksdaap41>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Fri, 21 Sep 2018 12:14:22 +0900
+Subject: [PATCH v4] gpu/drm/exynos: Convert
+ drm_atomic_helper_suspend/resume()
+In-Reply-To: <CAFqt6zbp+yFq-59o-J5dtB8Gfc3Ggd6Ff6tCy5vt0OTTSr41vQ@mail.gmail.com>
+References: <20180802154517.GA10593@jordon-HP-15-Notebook-PC>
+ <CAFqt6zZDRaVp53RnEri+P4b8+GByE-UQwerJmuLBe6E=GK0kDQ@mail.gmail.com>
+ <CGME20180918060240epcas1p1aff628245281e98554044ef3db5c684a@epcas1p1.samsung.com>
+ <CAFqt6zbp+yFq-59o-J5dtB8Gfc3Ggd6Ff6tCy5vt0OTTSr41vQ@mail.gmail.com>
+Message-ID: <20180921031422epcas1p440984367cd375f84efd72b1eb8c8b9d7~WS8wTX1AN1223212232epcas1p4L@epcas1p4.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, CK,
+Hi Joarder,
 
-Thanks for the review comment.
-I will add the description in the binding document in v4.
-
-I want to send the other changes in v3 first.
-
-Thanks.
-
-Bibby
-
-
-On Thu, 2018-09-06 at 14:03 +0800, CK Hu wrote:
-> Hi, Bibby:
+On 2018? 09? 18? 15:02, Souptick Joarder wrote:
+> Hi Inki,
+> On Tue, Sep 11, 2018 at 2:06 PM Souptick Joarder <jrdr.linux@gmail.com> wrote:
+>>
+>> On Thu, Aug 2, 2018 at 9:12 PM Souptick Joarder <jrdr.linux@gmail.com> wrote:
+>>>
+>>> convert drm_atomic_helper_suspend/resume() to use
+>>> drm_mode_config_helper_suspend/resume().
+>>>
+>>> exynos_drm_fbdev_suspend/resume can be removed
+>>> as drm_mode_config_helper_suspend/resume has
+>>> implement the same in generic way.
+>>>
+>>> Remove suspend_state from exynos_drm_private
+>>> struct as it is no more useful.
+>>>
+>>> Signed-off-by: Ajit Negi <ajitn.linux@gmail.com>
+>>> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+>>> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>>
+>> Can we get this patch in queue for 4.20 ? Not yet available in linux-next.
 > 
-> On Wed, 2018-09-05 at 16:31 +0800, Bibby Hsieh wrote:
-> > We can select output component by decive node port.
-> > Main path default output component is DSI.
-> > External path default output component is DPI.
-> > 
-> > Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
-> > ---
-> >  drivers/gpu/drm/mediatek/mtk_drm_drv.c | 37 ++++++++++++++++++++++++++++++----
-> >  drivers/gpu/drm/mediatek/mtk_drm_drv.h |  4 ++--
-> >  2 files changed, 35 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> > index d961112fa2f5..a477fb878c06 100644
-> > --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> > @@ -21,7 +21,9 @@
-> >  #include <drm/drm_of.h>
-> >  #include <linux/component.h>
-> >  #include <linux/iommu.h>
-> > +#include <linux/of.h>
-> >  #include <linux/of_address.h>
-> > +#include <linux/of_graph.h>
-> >  #include <linux/of_platform.h>
-> >  #include <linux/pm_runtime.h>
-> >  
-> > @@ -133,7 +135,7 @@ static const struct drm_mode_config_funcs mtk_drm_mode_config_funcs = {
-> >  	.atomic_commit = mtk_atomic_commit,
-> >  };
-> >  
-> > -static const enum mtk_ddp_comp_id mt2701_mtk_ddp_main[] = {
-> > +static enum mtk_ddp_comp_id mt2701_mtk_ddp_main[] = {
-> >  	DDP_COMPONENT_OVL0,
-> >  	DDP_COMPONENT_RDMA0,
-> >  	DDP_COMPONENT_COLOR0,
-> > @@ -141,7 +143,7 @@ static const enum mtk_ddp_comp_id mt2701_mtk_ddp_main[] = {
-> >  	DDP_COMPONENT_DSI0,
-> >  };
-> >  
-> > -static const enum mtk_ddp_comp_id mt2701_mtk_ddp_ext[] = {
-> > +static enum mtk_ddp_comp_id mt2701_mtk_ddp_ext[] = {
-> >  	DDP_COMPONENT_RDMA1,
-> >  	DDP_COMPONENT_DPI0,
-> >  };
-> > @@ -172,7 +174,7 @@ static const enum mtk_ddp_comp_id mt2712_mtk_ddp_third[] = {
-> >  	DDP_COMPONENT_PWM2,
-> >  };
-> >  
-> > -static const enum mtk_ddp_comp_id mt8173_mtk_ddp_main[] = {
-> > +static enum mtk_ddp_comp_id mt8173_mtk_ddp_main[] = {
-> >  	DDP_COMPONENT_OVL0,
-> >  	DDP_COMPONENT_COLOR0,
-> >  	DDP_COMPONENT_AAL0,
-> > @@ -183,7 +185,7 @@ static const enum mtk_ddp_comp_id mt8173_mtk_ddp_main[] = {
-> >  	DDP_COMPONENT_PWM0,
-> >  };
-> >  
-> > -static const enum mtk_ddp_comp_id mt8173_mtk_ddp_ext[] = {
-> > +static enum mtk_ddp_comp_id mt8173_mtk_ddp_ext[] = {
-> >  	DDP_COMPONENT_OVL1,
-> >  	DDP_COMPONENT_COLOR1,
-> >  	DDP_COMPONENT_GAMMA,
-> > @@ -472,6 +474,7 @@ static int mtk_drm_probe(struct platform_device *pdev)
-> >  
-> >  	/* Iterate over sibling DISP function blocks */
-> >  	for_each_child_of_node(dev->of_node->parent, node) {
-> > +		struct device_node *port, *ep, *remote;
-> >  		const struct of_device_id *of_id;
-> >  		enum mtk_ddp_comp_type comp_type;
-> >  		int comp_id;
-> > @@ -531,6 +534,32 @@ static int mtk_drm_probe(struct platform_device *pdev)
-> >  
-> >  			private->ddp_comp[comp_id] = comp;
-> >  		}
-> > +
-> > +		if (comp_type != MTK_DSI && comp_type != MTK_DPI) {
-> > +			port = of_graph_get_port_by_id(node, 0);
-> > +			if (!port)
-> > +				continue;
-> > +			ep = of_get_child_by_name(port, "endpoint");
-> > +			of_node_put(port);
-> > +			if (!ep)
-> > +				continue;
-> > +			remote = of_graph_get_remote_port_parent(ep);
-> > +			of_node_put(ep);
-> > +			if (!remote)
-> > +				continue;
-> > +			of_id = of_match_node(mtk_ddp_comp_dt_ids, remote);
-> > +			if (!of_id)
-> > +				continue;
-> > +			comp_type = (enum mtk_ddp_comp_type)of_id->data;
-> > +			for (i = 0; i < private->data->main_len - 1; i++)
-> > +				if (private->data->main_path[i] == comp_id)
-> > +					private->data->main_path[i + 1] =
-> > +					mtk_ddp_comp_get_id(node, comp_type);
-> > +			for (i = 0; i < private->data->ext_len - 1; i++)
-> > +				if (private->data->ext_path[i] == comp_id)
-> > +					private->data->ext_path[i + 1] =
-> > +					mtk_ddp_comp_get_id(node, comp_type);
-> > +		}
-> 
-> I think you should add description in binding document
-> (Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt)
-> for this. After the binding document is fully reviewed, we could start
-> to review this patch.
-> 
-> Regards,
-> CK
-> 
-> >  	}
-> >  
-> >  	if (!private->mutex_node) {
-> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> > index ecc00ca3221d..256a3ff2e66e 100644
-> > --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> > @@ -29,9 +29,9 @@ struct drm_property;
-> >  struct regmap;
-> >  
-> >  struct mtk_mmsys_driver_data {
-> > -	const enum mtk_ddp_comp_id *main_path;
-> > +	enum mtk_ddp_comp_id *main_path;
-> >  	unsigned int main_len;
-> > -	const enum mtk_ddp_comp_id *ext_path;
-> > +	enum mtk_ddp_comp_id *ext_path;
-> >  	unsigned int ext_len;
-> >  	const enum mtk_ddp_comp_id *third_path;
-> >  	unsigned int third_len;
-> 
-> 
+> Is this patch queued for 4.20 ?
 
--- 
-Bibby
+Queued already to exynos-drm-next below so please wait. I will have pull-request soon.
+https://git.kernel.org/pub/scm/linux/kernel/git/daeinki/drm-exynos.git/log/?h=exynos-drm-next
+
+Thanks,
+Inki Dae
+
+> 
+>>> ---
+>>> v2: Address Inki Dae's comment. Remove ret variable
+>>>     from both suspend/resume function.
+>>>
+>>> v3: Tested by Marek. Updated the change log.
+>>>
+>>> v4: removing the return as exynos_drm_resume()
+>>>     now returns void.
+>>>
+>>>  drivers/gpu/drm/exynos/exynos_drm_drv.c   | 26 ++------------------------
+>>>  drivers/gpu/drm/exynos/exynos_drm_drv.h   |  1 -
+>>>  drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 17 -----------------
+>>>  drivers/gpu/drm/exynos/exynos_drm_fbdev.h | 10 ----------
+>>>  4 files changed, 2 insertions(+), 52 deletions(-)
+>>>
+>>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.c b/drivers/gpu/drm/exynos/exynos_drm_drv.c
+>>> index b599f74..6f76baf 100644
+>>> --- a/drivers/gpu/drm/exynos/exynos_drm_drv.c
+>>> +++ b/drivers/gpu/drm/exynos/exynos_drm_drv.c
+>>> @@ -149,37 +149,15 @@ static void exynos_drm_postclose(struct drm_device *dev, struct drm_file *file)
+>>>  static int exynos_drm_suspend(struct device *dev)
+>>>  {
+>>>         struct drm_device *drm_dev = dev_get_drvdata(dev);
+>>> -       struct exynos_drm_private *private;
+>>> -
+>>> -       if (!drm_dev)
+>>> -               return 0;
+>>> -
+>>> -       private = drm_dev->dev_private;
+>>> -
+>>> -       drm_kms_helper_poll_disable(drm_dev);
+>>> -       exynos_drm_fbdev_suspend(drm_dev);
+>>> -       private->suspend_state = drm_atomic_helper_suspend(drm_dev);
+>>> -       if (IS_ERR(private->suspend_state)) {
+>>> -               exynos_drm_fbdev_resume(drm_dev);
+>>> -               drm_kms_helper_poll_enable(drm_dev);
+>>> -               return PTR_ERR(private->suspend_state);
+>>> -       }
+>>>
+>>> -       return 0;
+>>> +       return  drm_mode_config_helper_suspend(drm_dev);
+>>>  }
+>>>
+>>>  static void exynos_drm_resume(struct device *dev)
+>>>  {
+>>>         struct drm_device *drm_dev = dev_get_drvdata(dev);
+>>> -       struct exynos_drm_private *private;
+>>> -
+>>> -       if (!drm_dev)
+>>> -               return;
+>>>
+>>> -       private = drm_dev->dev_private;
+>>> -       drm_atomic_helper_resume(drm_dev, private->suspend_state);
+>>> -       exynos_drm_fbdev_resume(drm_dev);
+>>> -       drm_kms_helper_poll_enable(drm_dev);
+>>> +       drm_mode_config_helper_resume(drm_dev);
+>>>  }
+>>>
+>>>  static const struct dev_pm_ops exynos_drm_pm_ops = {
+>>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.h b/drivers/gpu/drm/exynos/exynos_drm_drv.h
+>>> index c737c4b..7349e7c 100644
+>>> --- a/drivers/gpu/drm/exynos/exynos_drm_drv.h
+>>> +++ b/drivers/gpu/drm/exynos/exynos_drm_drv.h
+>>> @@ -195,7 +195,6 @@ struct drm_exynos_file_private {
+>>>   */
+>>>  struct exynos_drm_private {
+>>>         struct drm_fb_helper *fb_helper;
+>>> -       struct drm_atomic_state *suspend_state;
+>>>
+>>>         struct device *g2d_dev;
+>>>         struct device *dma_dev;
+>>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+>>> index 132dd52..918dd2c 100644
+>>> --- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+>>> +++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
+>>> @@ -270,20 +270,3 @@ void exynos_drm_fbdev_fini(struct drm_device *dev)
+>>>         private->fb_helper = NULL;
+>>>  }
+>>>
+>>> -void exynos_drm_fbdev_suspend(struct drm_device *dev)
+>>> -{
+>>> -       struct exynos_drm_private *private = dev->dev_private;
+>>> -
+>>> -       console_lock();
+>>> -       drm_fb_helper_set_suspend(private->fb_helper, 1);
+>>> -       console_unlock();
+>>> -}
+>>> -
+>>> -void exynos_drm_fbdev_resume(struct drm_device *dev)
+>>> -{
+>>> -       struct exynos_drm_private *private = dev->dev_private;
+>>> -
+>>> -       console_lock();
+>>> -       drm_fb_helper_set_suspend(private->fb_helper, 0);
+>>> -       console_unlock();
+>>> -}
+>>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.h b/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
+>>> index b338472..6840b6a 100644
+>>> --- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
+>>> +++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
+>>> @@ -19,8 +19,6 @@
+>>>
+>>>  int exynos_drm_fbdev_init(struct drm_device *dev);
+>>>  void exynos_drm_fbdev_fini(struct drm_device *dev);
+>>> -void exynos_drm_fbdev_suspend(struct drm_device *drm);
+>>> -void exynos_drm_fbdev_resume(struct drm_device *drm);
+>>>
+>>>  #else
+>>>
+>>> @@ -39,14 +37,6 @@ static inline void exynos_drm_fbdev_restore_mode(struct drm_device *dev)
+>>>
+>>>  #define exynos_drm_output_poll_changed (NULL)
+>>>
+>>> -static inline void exynos_drm_fbdev_suspend(struct drm_device *drm)
+>>> -{
+>>> -}
+>>> -
+>>> -static inline void exynos_drm_fbdev_resume(struct drm_device *drm)
+>>> -{
+>>> -}
+>>> -
+>>>  #endif
+>>>
+>>>  #endif
+>>> --
+>>> 1.9.1
+>>>
+> 
+> 
