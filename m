@@ -1,71 +1,83 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Fri, 21 Sep 2018 16:15:33 +0200
-Subject: [GIT PULL] STM32 DT changes for v4.20 #1
-Message-ID: <fd4ee9a6-8195-084c-c60e-6c6e11649a4a@st.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Fri, 21 Sep 2018 16:15:42 +0200
+Subject: [RESEND PATCH 4/4] arm64: dts: marvell: add thermal-zone node in
+ cp110 DTSI file
+In-Reply-To: <20180830081501.11569-4-miquel.raynal@bootlin.com> (Miquel
+ Raynal's message of "Thu, 30 Aug 2018 10:15:01 +0200")
+References: <20180830081501.11569-1-miquel.raynal@bootlin.com>
+ <20180830081501.11569-4-miquel.raynal@bootlin.com>
+Message-ID: <87bm8rgcmp.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof and Kevin,
+Hi Miquel,
+ 
+ On jeu., ao?t 30 2018, Miquel Raynal <miquel.raynal@bootlin.com> wrote:
 
-Please consider this first round of STM32 DT updates for v4.20.
+> Add a thermal-zone node and fill in all the sensors available in a
+> cp110 (only one in the thermal IP).
+>
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 
-Thanks.
-Alex
+Applied on mvebu/dt64
 
-The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+Thanks,
 
-   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+Gregory
 
-are available in the git repository at:
+> ---
+>  arch/arm64/boot/dts/marvell/armada-cp110.dtsi | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+> index 62842fae2571..d9b50ad0bc6c 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+> @@ -6,6 +6,7 @@
+>   */
+>  
+>  #include <dt-bindings/interrupt-controller/mvebu-icu.h>
+> +#include <dt-bindings/thermal/thermal.h>
+>  
+>  #include "armada-common.dtsi"
+>  
+> @@ -19,6 +20,23 @@
+>  	 * save one indentation level
+>  	 */
+>  	CP110_NAME: CP110_NAME { };
+> +
+> +	/*
+> +	 * CPs only have one sensor in the thermal IC.
+> +	 *
+> +	 * The cooling maps are empty as there are no cooling devices.
+> +	 */
+> +	thermal-zones {
+> +		CP110_LABEL(thermal_ic): CP110_NODE_NAME(thermal-ic) {
+> +			polling-delay-passive = <1000>;
+> +			polling-delay = <1000>;
+> +
+> +			thermal-sensors = <&CP110_LABEL(thermal) 0>;
+> +
+> +			trips {	};
+> +			cooling-maps { };
+> +		};
+> +	};
+>  };
+>  
+>  &CP110_NAME {
+> @@ -226,6 +244,7 @@
+>  			CP110_LABEL(thermal): thermal-sensor at 70 {
+>  				compatible = "marvell,armada-cp110-thermal";
+>  				reg = <0x70 0x10>;
+> +				#thermal-sensor-cells = <1>;
+>  			};
+>  		};
+>  
+> -- 
+> 2.17.1
+>
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git 
-stm32-dt-for-v4.20-1
-
-for you to fetch changes up to 1ba23b1df0bb6eec430408614c3a11280941e112:
-
-   ARM: dts: stm32: Fix SPI controller node names (2018-09-21 16:09:52 
-+0200)
-
-----------------------------------------------------------------
-STM32 DT updates for v4.20, round 1
-
-Highlights:
-----------
-
--MCU platforms update:
-  -Add missing clock node's lobel on stm32f429
-  -Remove cd-inverted property for sdio nodes for
-   all mcus
-  -Fix stm32h7 rtc binding
-
--MPU STM32MP157 platform update:
-  -Enable display: CEC and DSI
-  -Fix SPI node name to match with the new DTC
-
-----------------------------------------------------------------
-Amelie Delaunay (1):
-       ARM: dts: stm32: update rtc st,syscfg property on stm32h743
-
-Patrice Chotard (5):
-       ARM: dts: stm32: Add clk-lse node's label on stm32f429
-       ARM: dts: stm32: Remove cd-inverted property for stm32429i-eval
-       ARM: dts: stm32: Remove cd-inverted property for stm32f469-disco
-       ARM: dts: stm32: Remove cd-inverted property for stm32f769-disco
-       ARM: dts: stm32: Remove cd-inverted property for stm32f746-disco
-
-Rob Herring (1):
-       ARM: dts: stm32: Fix SPI controller node names
-
-Yannick Fertr? (1):
-       ARM: dts: stm32: enable display on stm32mp157c-ev1 board
-
-  arch/arm/boot/dts/stm32429i-eval.dts  |  3 +-
-  arch/arm/boot/dts/stm32f429.dtsi      |  2 +-
-  arch/arm/boot/dts/stm32f469-disco.dts |  3 +-
-  arch/arm/boot/dts/stm32f746-disco.dts |  3 +-
-  arch/arm/boot/dts/stm32f769-disco.dts |  3 +-
-  arch/arm/boot/dts/stm32h743.dtsi      |  2 +-
-  arch/arm/boot/dts/stm32mp157c-ev1.dts | 73 
-++++++++++++++++++++++++++++++++---
-  arch/arm/boot/dts/stm32mp157c.dtsi    |  2 +-
-  8 files changed, 74 insertions(+), 17 deletions(-)
+-- 
+Gregory Clement, Bootlin
+Embedded Linux and Kernel engineering
+http://bootlin.com
