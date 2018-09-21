@@ -1,21 +1,27 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 21 Sep 2018 12:12:53 +0100
-Subject: [PATCH] arm64: Remove unused VGA console support
-In-Reply-To: <1536839800-14918-1-git-send-email-andrew.murray@arm.com>
-References: <1536839800-14918-1-git-send-email-andrew.murray@arm.com>
-Message-ID: <20180921111252.GA238853@arrakis.emea.arm.com>
+Date: Fri, 21 Sep 2018 12:13:25 +0100
+Subject: [PATCH] arm64: Kconfig: Remove ARCH_HAS_HOLES_MEMORYMODEL
+In-Reply-To: <20180831151943.9281-1-james.morse@arm.com>
+References: <20180831151943.9281-1-james.morse@arm.com>
+Message-ID: <20180921111324.GB238853@arrakis.emea.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2018 at 12:56:40PM +0100, Andrew Murray wrote:
-> Support for VGA_CONSOLE is not allowable due to commit ee23794b8668
-> ("video: vgacon: Don't build on arm64"), thus remove the associated
-> unused code.
+On Fri, Aug 31, 2018 at 04:19:43PM +0100, James Morse wrote:
+> include/linux/mmzone.h describes ARCH_HAS_HOLES_MEMORYMODEL as
+> relevant when parts the memmap have been free()d. This would
+> happen on systems where memory is smaller than a sparsemem-section,
+> and the extra struct pages are expensive. pfn_valid() on these
+> systems returns true for the whole sparsemem-section, so an extra
+> memmap_valid_within() check is needed.
 > 
-> Whilst PCI on arm64 would support VGA a valid screen_info structure
-> is missing.
+> On arm64 we have nomap memory, so always provide pfn_valid() to test
+> for nomap pages. This means ARCH_HAS_HOLES_MEMORYMODEL's extra checks
+> are already rolled up into pfn_valid().
 > 
-> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> Remove it.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
 
 Queued for 4.20. Thanks.
 
