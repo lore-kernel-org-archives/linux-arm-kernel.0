@@ -1,62 +1,541 @@
-From: steve.capper@arm.com (Steve Capper)
-Date: Fri, 21 Sep 2018 16:34:04 +0100
-Subject: [PATCH V2 1/2] arm64: hugetlb: Fix handling of young ptes
-In-Reply-To: <20180921153405.10090-1-steve.capper@arm.com>
-References: <20180921153405.10090-1-steve.capper@arm.com>
-Message-ID: <20180921153405.10090-2-steve.capper@arm.com>
+From: lukma@denx.de (Lukasz Majewski)
+Date: Fri, 21 Sep 2018 17:27:26 +0200
+Subject: [PATCH] ARM: dts: Add support for Liebherr's BK4 device (vf610 based)
+Message-ID: <20180921152726.31742-1-lukma@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the contiguous bit hugetlb break-before-make code we assume that all
-hugetlb pages are young.
+This commit adds DTS support for BK4 device from Liebherr. It
+uses vf610 SoC from NXP.
 
-In fact, remove_migration_pte is able to place an old hugetlb pte so
-this assumption is not valid.
-
-This patch fixes the contiguous hugetlb scanning code to preserve young
-ptes.
-
-Fixes: d8bdcff28764 ("arm64: hugetlb: Add break-before-make logic for contiguous entries")
-Signed-off-by: Steve Capper <steve.capper@arm.com>
+Signed-off-by: Lukasz Majewski <lukma@denx.de>
 ---
- arch/arm64/mm/hugetlbpage.c | 12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/Makefile      |   1 +
+ arch/arm/boot/dts/vf610-bk4.dts | 504 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 505 insertions(+)
+ create mode 100644 arch/arm/boot/dts/vf610-bk4.dts
 
-diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index 192b3ba07075..f85be2f8b140 100644
---- a/arch/arm64/mm/hugetlbpage.c
-+++ b/arch/arm64/mm/hugetlbpage.c
-@@ -117,11 +117,14 @@ static pte_t get_clear_flush(struct mm_struct *mm,
- 
- 		/*
- 		 * If HW_AFDBM is enabled, then the HW could turn on
--		 * the dirty bit for any page in the set, so check
--		 * them all.  All hugetlb entries are already young.
-+		 * the dirty or accessed bit for any page in the set,
-+		 * so check them all.
- 		 */
- 		if (pte_dirty(pte))
- 			orig_pte = pte_mkdirty(orig_pte);
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index b5bd3de87c33..e6f159895fa9 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -577,6 +577,7 @@ dtb-$(CONFIG_SOC_LS1021A) += \
+ 	ls1021a-twr.dtb
+ dtb-$(CONFIG_SOC_VF610) += \
+ 	vf500-colibri-eval-v3.dtb \
++	vf610-bk4.dtb \
+ 	vf610-colibri-eval-v3.dtb \
+ 	vf610m4-colibri.dtb \
+ 	vf610-cosmic.dtb \
+diff --git a/arch/arm/boot/dts/vf610-bk4.dts b/arch/arm/boot/dts/vf610-bk4.dts
+new file mode 100644
+index 000000000000..4ad7e739a0ad
+--- /dev/null
++++ b/arch/arm/boot/dts/vf610-bk4.dts
+@@ -0,0 +1,504 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Copyright 2018
++ * Lukasz Majewski, DENX Software Engineering, lukma at denx.de
++ */
 +
-+		if (pte_young(pte))
-+			orig_pte = pte_mkyoung(orig_pte);
- 	}
- 
- 	if (valid) {
-@@ -340,10 +343,13 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
- 	if (!pte_same(orig_pte, pte))
- 		changed = 1;
- 
--	/* Make sure we don't lose the dirty state */
-+	/* Make sure we don't lose the dirty or young state */
- 	if (pte_dirty(orig_pte))
- 		pte = pte_mkdirty(pte);
- 
-+	if (pte_young(orig_pte))
-+		pte = pte_mkyoung(pte);
++/dts-v1/;
++#include "vf610.dtsi"
 +
- 	hugeprot = pte_pgprot(pte);
- 	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn)
- 		set_pte_at(vma->vm_mm, addr, ptep, pfn_pte(pfn, hugeprot));
++/ {
++	model = "Liebherr BK4 controller";
++	compatible = "lwn,bk4", "fsl,vf610";
++
++	chosen {
++		bootargs = "console=ttyLP1,115200";
++	};
++
++	memory at 80000000 {
++		reg = <0x80000000 0x8000000>;
++	};
++
++	audio_ext: mclk_osc {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <24576000>;
++	};
++
++	enet_ext: eth_osc {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <50000000>;
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_gpio_leds>;
++
++		/* LED D5 */
++		led0: heartbeat {
++			label = "heartbeat";
++			gpios = <&gpio3 21 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
++			linux,default-trigger = "heartbeat";
++		};
++	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		reg_3p3v: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++			regulator-name = "3P3V";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++		};
++
++		reg_vcc_3v3_mcu: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "vcc_3v3_mcu";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++		};
++	};
++};
++
++&adc0 {
++	vref-supply = <&reg_vcc_3v3_mcu>;
++	status = "okay";
++};
++
++&adc1 {
++	vref-supply = <&reg_vcc_3v3_mcu>;
++	status = "okay";
++};
++
++&can0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_can0>;
++	status = "okay";
++};
++
++&can1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_can1>;
++	status = "okay";
++};
++
++&clks {
++	clocks = <&sxosc>, <&fxosc>, <&enet_ext>, <&audio_ext>;
++	clock-names = "sxosc", "fxosc", "enet_ext", "audio_ext";
++};
++
++&dspi0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_dspi0>;
++	bus-num = <0>;
++	status = "okay";
++
++	spidev0 at 0 {
++		compatible = "fsl,vf610-dspi";
++		spi-max-frequency = <30000000>;
++		reg = <0>;
++		fsl,spi-cs-sck-delay = <200>;
++		fsl,spi-sck-cs-delay = <400>;
++	};
++};
++
++&dspi3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_dspi3>;
++	bus-num = <3>;
++	status = "okay";
++
++	spidev3 at 0 {
++		compatible = "fsl,vf610-dspi";
++		spi-max-frequency = <30000000>;
++		reg = <0>;
++		fsl,spi-slave-mode;
++	};
++};
++
++&edma0 {
++	status = "okay";
++};
++
++&edma1 {
++	status = "okay";
++};
++
++&esdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_esdhc1>;
++	bus-width = <4>;
++	cd-gpios = <&gpio3 2 GPIO_ACTIVE_LOW>;
++	status = "okay";
++};
++
++&fec0 {
++	phy-mode = "rmii";
++	phy-handle = <&ethphy0>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_fec0>;
++	status = "okay";
++
++	mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		ethphy0: ethernet-phy at 1 {
++			reg = <1>;
++			clocks = <&clks VF610_CLK_ENET_50M>;
++			clock-names = "rmii-ref";
++		};
++	};
++};
++
++&fec1 {
++	phy-mode = "rmii";
++	phy-handle = <&ethphy1>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_fec1>;
++	status = "okay";
++
++	mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		ethphy1: ethernet-phy at 1 {
++			reg = <1>;
++			clocks = <&clks VF610_CLK_ENET_50M>;
++			clock-names = "rmii-ref";
++		};
++	};
++};
++
++&i2c2 {
++	clock-frequency = <400000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
++
++	eeprom: eeprom at 50 {
++		compatible = "at24,24c256";
++		reg = <0x50>;
++	};
++
++	rtc: rtc at 68 {
++		compatible = "stm,rv4162";
++		reg = <0x68>;
++	};
++};
++
++&iomuxc {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_bk4_common>;
++
++	pinctrl_bk4_common: commongrp {
++		fsl,pins = <
++			/* One_Wire_PSU_EN */
++			VF610_PAD_PTC29__GPIO_102		0x1183
++			/* SPI */
++			VF610_PAD_PTB26__GPIO_96		0x1183
++			VF610_PAD_PTE14__GPIO_119		0x1183
++			VF610_PAD_PTE4__GPIO_109		0x1181
++			/* Feedback_Lines */
++			VF610_PAD_PTC31__GPIO_104		0x1181
++			VF610_PAD_PTA7__GPIO_134		0x1181
++			VF610_PAD_PTD9__GPIO_88		0x1181
++			VF610_PAD_PTE1__GPIO_106		0x1183
++			VF610_PAD_PTB2__GPIO_24		0x1181
++			VF610_PAD_PTB3__GPIO_25		0x1181
++			VF610_PAD_PTB1__GPIO_23		0x1181
++			/* SDHC */
++			VF610_PAD_PTE19__GPIO_124		0x1183
++			VF610_PAD_PTB23__GPIO_93		0x1181
++			/* GPI */
++			VF610_PAD_PTE2__GPIO_107		0x1181
++			VF610_PAD_PTE3__GPIO_108		0x1181
++			VF610_PAD_PTE5__GPIO_110		0x1181
++			VF610_PAD_PTE6__GPIO_111		0x1181
++			/* GPO */
++			VF610_PAD_PTE0__GPIO_105		0x1183
++			VF610_PAD_PTE7__GPIO_112		0x1183
++			/* RS485 */
++			VF610_PAD_PTB8__GPIO_30		0x1183
++			VF610_PAD_PTB9__GPIO_31		0x1183
++			VF610_PAD_PTE8__GPIO_113		0x1183
++			/* MPBUS MPB_EN */
++			VF610_PAD_PTE28__GPIO_133		0x1183
++			/* LEDS */
++			VF610_PAD_PTE15__GPIO_120		0x1183
++			VF610_PAD_PTA12__GPIO_5		0x1183
++			VF610_PAD_PTA16__GPIO_6		0x1183
++			VF610_PAD_PTE9__GPIO_114		0x1183
++			VF610_PAD_PTE20__GPIO_125		0x1183
++			VF610_PAD_PTE23__GPIO_128		0x1183
++			VF610_PAD_PTE16__GPIO_121		0x1183
++			/* MISC */
++			VF610_PAD_PTE10__GPIO_115		0x1183
++			VF610_PAD_PTE11__GPIO_116		0x1183
++			VF610_PAD_PTE17__GPIO_122		0x1183
++			VF610_PAD_PTC30__GPIO_103		0x1183
++			VF610_PAD_PTB0__GPIO_22		0x1181
++			/* RESETINFO */
++			VF610_PAD_PTE26__GPIO_131		0x1183
++			VF610_PAD_PTD6__GPIO_85		0x1181
++			VF610_PAD_PTE27__GPIO_132		0x1181
++			VF610_PAD_PTE13__GPIO_118		0x1181
++			VF610_PAD_PTE21__GPIO_126		0x1181
++			VF610_PAD_PTE22__GPIO_127		0x1181
++			/* EE_5V_EN */
++			VF610_PAD_PTE18__GPIO_123		0x1183
++			/* EE_5V_OC_N */
++			VF610_PAD_PTE25__GPIO_130		0x1181
++		>;
++	};
++
++	pinctrl_can0: can0grp {
++		fsl,pins = <
++			VF610_PAD_PTB14__CAN0_RX		0x1181
++			VF610_PAD_PTB15__CAN0_TX		0x1182
++		>;
++	};
++
++	pinctrl_can1: can1grp {
++		fsl,pins = <
++			VF610_PAD_PTB16__CAN1_RX		0x1181
++			VF610_PAD_PTB17__CAN1_TX		0x1182
++		>;
++	};
++
++	pinctrl_dspi0: dspi0grp {
++		fsl,pins = <
++			VF610_PAD_PTB18__DSPI0_CS1		0x1182
++			VF610_PAD_PTB19__DSPI0_CS0		0x1182
++			VF610_PAD_PTB20__DSPI0_SIN		0x1181
++			VF610_PAD_PTB21__DSPI0_SOUT		0x1182
++			VF610_PAD_PTB22__DSPI0_SCK		0x1182
++		>;
++	};
++
++	pinctrl_dspi3: dspi3grp {
++		fsl,pins = <
++			VF610_PAD_PTD10__DSPI3_CS0		0x1181
++			VF610_PAD_PTD11__DSPI3_SIN		0x1181
++			VF610_PAD_PTD12__DSPI3_SOUT		0x1182
++			VF610_PAD_PTD13__DSPI3_SCK		0x1181
++		>;
++	};
++
++	pinctrl_esdhc1: esdhc1grp {
++		fsl,pins = <
++			VF610_PAD_PTA24__ESDHC1_CLK		0x31ef
++			VF610_PAD_PTA25__ESDHC1_CMD		0x31ef
++			VF610_PAD_PTA26__ESDHC1_DAT0		0x31ef
++			VF610_PAD_PTA27__ESDHC1_DAT1		0x31ef
++			VF610_PAD_PTA28__ESDHC1_DATA2		0x31ef
++			VF610_PAD_PTA29__ESDHC1_DAT3		0x31ef
++			VF610_PAD_PTB28__GPIO_98		0x219d
++		>;
++	};
++
++	pinctrl_fec0: fec0grp {
++		fsl,pins = <
++			VF610_PAD_PTA6__RMII_CLKIN		0x30dd
++			VF610_PAD_PTC0__ENET_RMII0_MDC		0x30de
++			VF610_PAD_PTC1__ENET_RMII0_MDIO	0x30df
++			VF610_PAD_PTC2__ENET_RMII0_CRS		0x30dd
++			VF610_PAD_PTC3__ENET_RMII0_RXD1	0x30dd
++			VF610_PAD_PTC4__ENET_RMII0_RXD0	0x30dd
++			VF610_PAD_PTC5__ENET_RMII0_RXER	0x30dd
++			VF610_PAD_PTC6__ENET_RMII0_TXD1	0x30de
++			VF610_PAD_PTC7__ENET_RMII0_TXD0	0x30de
++			VF610_PAD_PTC8__ENET_RMII0_TXEN	0x30de
++		>;
++	};
++
++	pinctrl_fec1: fec1grp {
++		fsl,pins = <
++			VF610_PAD_PTC9__ENET_RMII1_MDC		0x30de
++			VF610_PAD_PTC10__ENET_RMII1_MDIO	0x30df
++			VF610_PAD_PTC11__ENET_RMII1_CRS	0x30dd
++			VF610_PAD_PTC12__ENET_RMII1_RXD1	0x30dd
++			VF610_PAD_PTC13__ENET_RMII1_RXD0	0x30dd
++			VF610_PAD_PTC14__ENET_RMII1_RXER	0x30dd
++			VF610_PAD_PTC15__ENET_RMII1_TXD1	0x30de
++			VF610_PAD_PTC16__ENET_RMII1_TXD0	0x30de
++			VF610_PAD_PTC17__ENET_RMII1_TXEN	0x30de
++		>;
++	};
++
++	pinctrl_gpio_leds: gpio_leds {
++		fsl,pins = <
++			VF610_PAD_PTE12__GPIO_117	0x1183
++		>;
++	};
++
++	pinctrl_i2c2: i2c2grp {
++		fsl,pins = <
++			VF610_PAD_PTA22__I2C2_SCL               0x34df
++			VF610_PAD_PTA23__I2C2_SDA               0x34df
++		>;
++	};
++
++	pinctrl_nfc: nfcgrp {
++		fsl,pins = <
++			VF610_PAD_PTD23__NF_IO7		0x28df
++			VF610_PAD_PTD22__NF_IO6		0x28df
++			VF610_PAD_PTD21__NF_IO5		0x28df
++			VF610_PAD_PTD20__NF_IO4		0x28df
++			VF610_PAD_PTD19__NF_IO3		0x28df
++			VF610_PAD_PTD18__NF_IO2		0x28df
++			VF610_PAD_PTD17__NF_IO1		0x28df
++			VF610_PAD_PTD16__NF_IO0		0x28df
++			VF610_PAD_PTB24__NF_WE_B		0x28c2
++			VF610_PAD_PTB25__NF_CE0_B		0x28c2
++			VF610_PAD_PTB27__NF_RE_B		0x28c2
++			VF610_PAD_PTC26__NF_RB_B		0x283d
++			VF610_PAD_PTC27__NF_ALE		0x28c2
++			VF610_PAD_PTC28__NF_CLE		0x28c2
++		>;
++	};
++
++	pinctrl_uart0: uart0grp {
++		fsl,pins = <
++			VF610_PAD_PTB10__UART0_TX		0x21a2
++			VF610_PAD_PTB11__UART0_RX		0x21a1
++		>;
++	};
++
++	pinctrl_uart1: uart1grp {
++		fsl,pins = <
++			VF610_PAD_PTB4__UART1_TX		0x21a2
++			VF610_PAD_PTB5__UART1_RX		0x21a1
++		>;
++	};
++
++	pinctrl_uart2: uart2grp {
++		fsl,pins = <
++			VF610_PAD_PTB6__UART2_TX		0x21a2
++			VF610_PAD_PTB7__UART2_RX		0x21a1
++		>;
++	};
++
++	pinctrl_uart3: uart3grp {
++		fsl,pins = <
++			VF610_PAD_PTA20__UART3_TX		0x21a2
++			VF610_PAD_PTA21__UART3_RX		0x21a1
++		>;
++	};
++
++	pinctrl_qspi0: qspi0grp {
++		fsl,pins = <
++			VF610_PAD_PTD0__QSPI0_A_QSCK	0x397f
++			VF610_PAD_PTD1__QSPI0_A_CS0	0x397f
++			VF610_PAD_PTD2__QSPI0_A_DATA3	0x397f
++			VF610_PAD_PTD3__QSPI0_A_DATA2	0x397f
++			VF610_PAD_PTD4__QSPI0_A_DATA1	0x397f
++			VF610_PAD_PTD5__QSPI0_A_DATA0	0x397f
++			VF610_PAD_PTD7__QSPI0_B_QSCK	0x397f
++			VF610_PAD_PTD8__QSPI0_B_CS0	0x397f
++			VF610_PAD_PTD11__QSPI0_B_DATA1	0x397f
++			VF610_PAD_PTD12__QSPI0_B_DATA0	0x397f
++		>;
++	};
++};
++
++&nfc {
++	assigned-clocks = <&clks VF610_CLK_NFC>;
++	assigned-clock-rates = <33000000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_nfc>;
++	status = "okay";
++
++	nand at 0 {
++		compatible = "fsl,vf610-nfc-nandcs";
++		reg = <0>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		nand-bus-width = <16>;
++		nand-ecc-mode = "hw";
++		nand-ecc-strength = <24>;
++		nand-ecc-step-size = <2048>;
++		nand-on-flash-bbt;
++	};
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart0>;
++	status = "okay";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1>;
++	status = "okay";
++};
++
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart2>;
++	status = "okay";
++};
++
++&uart3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart3>;
++	status = "okay";
++};
++
++&usbdev0 {
++	disable-over-current;
++	status = "okay";
++};
++
++&usbh1 {
++	disable-over-current;
++	status = "okay";
++};
++
++&usbmisc0 {
++	status = "okay";
++};
++
++&usbmisc1 {
++	status = "okay";
++};
++
++&usbphy0 {
++	status = "okay";
++};
++
++&usbphy1 {
++	status = "okay";
++};
++
++&qspi0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_qspi0>;
++	status = "okay";
++
++	flash0: n25q128a13 at 0 {
++		compatible = "n25q128a13", "jedec,spi-nor";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		spi-max-frequency = <66000000>;
++		spi-rx-bus-width = <4>;
++		reg = <0>;
++	};
++
++	flash1: n25q128a13 at 1 {
++		compatible = "n25q128a13", "jedec,spi-nor";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		spi-max-frequency = <66000000>;
++		spi-rx-bus-width = <2>;
++		reg = <1>;
++	};
++};
 -- 
 2.11.0
