@@ -1,110 +1,74 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri, 21 Sep 2018 23:16:52 +0100
-Subject: [PATCH v6 05/18] ACPI / APEI: Make estatus queue a Kconfig symbol
+Date: Fri, 21 Sep 2018 23:17:03 +0100
+Subject: [PATCH v6 16/18] ACPI / APEI: Split fixmap pages for arm64 NMI-like
+ notifications
 In-Reply-To: <20180921221705.6478-1-james.morse@arm.com>
 References: <20180921221705.6478-1-james.morse@arm.com>
-Message-ID: <20180921221705.6478-6-james.morse@arm.com>
+Message-ID: <20180921221705.6478-17-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that there are two users of the estatus queue, and likely to be more,
-make it a Kconfig symbol selected by the appropriate notification. We
-can move the ARCH_HAVE_NMI_SAFE_CMPXCHG checks in here too.
+Now that ghes notification helpers provide the fixmap slots and
+take the lock themselves we can support multiple NMI-like
+notifications on arm64.
+
+These should be named after their notification method. x86's
+NOTIFY_NMI already is, move it to live with the ghes_nmi list.
+Change the SEA fixmap entry to be called FIX_APEI_GHES_SEA.
+
+Future patches can add support for FIX_APEI_GHES_SEI and
+FIX_APEI_GHES_SDEI_{NORMAL,CRITICAL}.
 
 Signed-off-by: James Morse <james.morse@arm.com>
----
- drivers/acpi/apei/Kconfig |  6 ++++++
- drivers/acpi/apei/ghes.c  | 12 +++---------
- 2 files changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
-index 52ae5438edeb..2b191e09b647 100644
---- a/drivers/acpi/apei/Kconfig
-+++ b/drivers/acpi/apei/Kconfig
-@@ -4,6 +4,7 @@ config HAVE_ACPI_APEI
+---
+Changes since v3:
+ * idx/lock are now in a separate struct.
+ * Add to the comment above ghes_fixmap_lock_irq so that it makes more
+   sense in isolation.
+---
+ arch/arm64/include/asm/fixmap.h | 4 +++-
+ drivers/acpi/apei/ghes.c        | 6 +++---
+ 2 files changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
+index ec1e6d6fa14c..c3974517c2cb 100644
+--- a/arch/arm64/include/asm/fixmap.h
++++ b/arch/arm64/include/asm/fixmap.h
+@@ -55,7 +55,9 @@ enum fixed_addresses {
+ #ifdef CONFIG_ACPI_APEI_GHES
+ 	/* Used for GHES mapping from assorted contexts */
+ 	FIX_APEI_GHES_IRQ,
+-	FIX_APEI_GHES_NMI,
++#ifdef CONFIG_ACPI_APEI_SEA
++	FIX_APEI_GHES_SEA,
++#endif
+ #endif /* CONFIG_ACPI_APEI_GHES */
  
- config HAVE_ACPI_APEI_NMI
- 	bool
-+	select ACPI_APEI_GHES_ESTATUS_QUEUE
- 
- config ACPI_APEI
- 	bool "ACPI Platform Error Interface (APEI)"
-@@ -33,6 +34,10 @@ config ACPI_APEI_GHES
- 	  by firmware to produce more valuable hardware error
- 	  information for Linux.
- 
-+config ACPI_APEI_GHES_ESTATUS_QUEUE
-+	bool
-+	depends on ACPI_APEI_GHES && ARCH_HAVE_NMI_SAFE_CMPXCHG
-+
- config ACPI_APEI_PCIEAER
- 	bool "APEI PCIe AER logging/recovering support"
- 	depends on ACPI_APEI && PCIEAER
-@@ -43,6 +48,7 @@ config ACPI_APEI_PCIEAER
- config ACPI_APEI_SEA
- 	bool "APEI Synchronous External Abort logging/recovering support"
- 	depends on ARM64 && ACPI_APEI_GHES
-+	select ACPI_APEI_GHES_ESTATUS_QUEUE
- 	default y
- 	help
- 	  This option should be enabled if the system supports
+ #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
 diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 150fb184c7cb..2880547e13b8 100644
+index a0c10b60ad44..463c8e6d1bb5 100644
 --- a/drivers/acpi/apei/ghes.c
 +++ b/drivers/acpi/apei/ghes.c
-@@ -58,10 +58,6 @@
+@@ -994,7 +994,7 @@ int ghes_notify_sea(void)
+ 	int rv;
  
- #define GHES_PFX	"GHES: "
+ 	raw_spin_lock(&ghes_notify_lock_sea);
+-	rv = ghes_estatus_queue_notified(&ghes_sea, FIX_APEI_GHES_NMI);
++	rv = ghes_estatus_queue_notified(&ghes_sea, FIX_APEI_GHES_SEA);
+ 	raw_spin_unlock(&ghes_notify_lock_sea);
  
--#if defined(CONFIG_HAVE_ACPI_APEI_NMI) || defined(CONFIG_ACPI_APEI_SEA)
--#define WANT_NMI_ESTATUS_QUEUE	1
--#endif
--
- #define GHES_ESTATUS_MAX_SIZE		65536
- #define GHES_ESOURCE_PREALLOC_MAX_SIZE	65536
+ 	return rv;
+@@ -1025,8 +1025,8 @@ static inline void ghes_sea_remove(struct ghes *ghes) { }
  
-@@ -685,7 +681,7 @@ static void ghes_estatus_cache_add(
- 	rcu_read_unlock();
- }
- 
--#ifdef WANT_NMI_ESTATUS_QUEUE
-+#ifdef CONFIG_ACPI_APEI_GHES_ESTATUS_QUEUE
+ #ifdef CONFIG_HAVE_ACPI_APEI_NMI
  /*
-  * Handlers for CPER records may not be NMI safe. For example,
-  * memory_failure_queue() takes spinlocks and calls schedule_work_on().
-@@ -727,7 +723,6 @@ static void ghes_print_queued_estatus(void)
- /* Save estatus for further processing in IRQ context */
- static void __process_error(struct ghes *ghes)
- {
--#ifdef CONFIG_ARCH_HAVE_NMI_SAFE_CMPXCHG
- 	u32 len, node_len;
- 	struct ghes_estatus_node *estatus_node;
- 	struct acpi_hest_generic_status *estatus;
-@@ -747,7 +742,6 @@ static void __process_error(struct ghes *ghes)
- 	estatus = GHES_ESTATUS_FROM_NODE(estatus_node);
- 	memcpy(estatus, ghes->estatus, len);
- 	llist_add(&estatus_node->llnode, &ghes_estatus_llist);
--#endif
- }
+- * NMI may be triggered on any CPU, so ghes_in_nmi is used for
+- * having only one concurrent reader.
++ * NOTIFY_NMI may be triggered on any CPU, so ghes_in_nmi is
++ * used for having only one concurrent reader.
+  */
+ static atomic_t ghes_in_nmi = ATOMIC_INIT(0);
  
- static int _in_nmi_notify_one(struct ghes *ghes)
-@@ -786,7 +780,7 @@ static int ghes_estatus_queue_notified(struct list_head *rcu_list)
- 	}
- 	rcu_read_unlock();
- 
--	if (IS_ENABLED(CONFIG_ARCH_HAVE_NMI_SAFE_CMPXCHG) && !ret)
-+	if (!ret)
- 		irq_work_queue(&ghes_proc_irq_work);
- 
- 	return ret;
-@@ -865,7 +859,7 @@ static void ghes_nmi_init_cxt(void)
- 
- #else
- static inline void ghes_nmi_init_cxt(void) { }
--#endif /* WANT_NMI_ESTATUS_QUEUE */
-+#endif /* CONFIG_ACPI_APEI_GHES_ESTATUS_QUEUE */
- 
- static int ghes_ack_error(struct acpi_hest_generic_v2 *gv2)
- {
 -- 
 2.19.0
