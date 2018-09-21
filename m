@@ -1,101 +1,95 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Fri, 21 Sep 2018 11:46:02 +0200
-Subject: [PATCH V2 08/27] mmc: mmci: add get_next_data callback
+Date: Fri, 21 Sep 2018 11:45:56 +0200
+Subject: [PATCH V2 02/27] mmc: mmci: internalize dma_inprogress into mmci dma
+ functions
 In-Reply-To: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
 References: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1537523181-14578-9-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1537523181-14578-3-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Barre <ludovic.barre@st.com>
 
-This patch adds get_next_data callback to mmci_host_ops.
-Generic mmci_get_next_data factorizes next_cookie check and
-the host ops call.
+This patch internalizes the dma_inprogress into mmci dma interfaces.
+This allows to simplify and prepare the next dma callbacks
+for mmci host ops. dma_inprogress is called in mmci_dma_data_error
+and mmci_dma_finalize.
 
 Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 ---
- drivers/mmc/host/mmci.c          | 16 ++++++++++------
- drivers/mmc/host/mmci.h          |  3 +++
- drivers/mmc/host/mmci_qcom_dml.c |  1 +
- 3 files changed, 14 insertions(+), 6 deletions(-)
+change v3:
+-remove __dma_inprogress rename
+
+ drivers/mmc/host/mmci.c | 16 ++++++++++------
+ drivers/mmc/host/mmci.h |  2 --
+ 2 files changed, 10 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 5734c05..55c4222 100644
+index bf0bb07..cbd67bc 100644
 --- a/drivers/mmc/host/mmci.c
 +++ b/drivers/mmc/host/mmci.c
-@@ -390,6 +390,14 @@ void mmci_unprep_data(struct mmci_host *host, struct mmc_data *data,
- 	data->host_cookie = 0;
- }
+@@ -497,6 +497,9 @@ static void mmci_dma_unmap(struct mmci_host *host, struct mmc_data *data)
  
-+void mmci_get_next_data(struct mmci_host *host, struct mmc_data *data)
-+{
-+	WARN_ON(data->host_cookie && data->host_cookie != host->next_cookie);
+ static void mmci_dma_data_error(struct mmci_host *host)
+ {
++	if (!dma_inprogress(host))
++		return;
 +
-+	if (host->ops && host->ops->get_next_data)
-+		host->ops->get_next_data(host, data);
-+}
+ 	dev_err(mmc_dev(host->mmc), "error during DMA transfer!\n");
+ 	dmaengine_terminate_all(host->dma_current);
+ 	host->dma_in_progress = false;
+@@ -512,6 +515,9 @@ static void mmci_dma_finalize(struct mmci_host *host, struct mmc_data *data)
+ 	u32 status;
+ 	int i;
+ 
++	if (!dma_inprogress(host))
++		return;
 +
- static void
- mmci_request_end(struct mmci_host *host, struct mmc_request *mrq)
- {
-@@ -738,12 +746,11 @@ static int mmci_dma_start_data(struct mmci_host *host, unsigned int datactrl)
- 	return 0;
- }
+ 	/* Wait up to 1ms for the DMA to complete */
+ 	for (i = 0; ; i++) {
+ 		status = readl(host->base + MMCISTATUS);
+@@ -903,8 +909,7 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
+ 		u32 remain, success;
  
--static void mmci_get_next_data(struct mmci_host *host, struct mmc_data *data)
-+void mmci_dmae_get_next_data(struct mmci_host *host, struct mmc_data *data)
- {
- 	struct mmci_dmae_priv *dmae = host->dma_priv;
- 	struct mmci_dmae_next *next = &dmae->next_data;
+ 		/* Terminate the DMA transfer */
+-		if (dma_inprogress(host))
+-			mmci_dma_data_error(host);
++		mmci_dma_data_error(host);
  
--	WARN_ON(data->host_cookie && data->host_cookie != host->next_cookie);
- 	WARN_ON(!data->host_cookie && (next->desc || next->chan));
+ 		/*
+ 		 * Calculate how far we are into the transfer.  Note that
+@@ -942,8 +947,8 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
+ 		dev_err(mmc_dev(host->mmc), "stray MCI_DATABLOCKEND interrupt\n");
  
- 	dmae->desc_current = next->desc;
-@@ -785,13 +792,10 @@ void mmci_dmae_unprep_data(struct mmci_host *host,
- static struct mmci_host_ops mmci_variant_ops = {
- 	.prep_data = mmci_dmae_prep_data,
- 	.unprep_data = mmci_dmae_unprep_data,
-+	.get_next_data = mmci_dmae_get_next_data,
- };
- #else
- /* Blank functions if the DMA engine is not available */
--static void mmci_get_next_data(struct mmci_host *host, struct mmc_data *data)
--{
--}
--
- static inline int mmci_dma_setup(struct mmci_host *host)
- {
- 	return 0;
+ 	if (status & MCI_DATAEND || data->error) {
+-		if (dma_inprogress(host))
+-			mmci_dma_finalize(host, data);
++		mmci_dma_finalize(host, data);
++
+ 		mmci_stop_data(host);
+ 
+ 		if (!data->error)
+@@ -1050,8 +1055,7 @@ mmci_cmd_irq(struct mmci_host *host, struct mmc_command *cmd,
+ 	if ((!sbc && !cmd->data) || cmd->error) {
+ 		if (host->data) {
+ 			/* Terminate the DMA transfer */
+-			if (dma_inprogress(host))
+-				mmci_dma_data_error(host);
++			mmci_dma_data_error(host);
+ 
+ 			mmci_stop_data(host);
+ 		}
 diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index 0f2f82f..4f73070 100644
+index 517591d..21aaf9a 100644
 --- a/drivers/mmc/host/mmci.h
 +++ b/drivers/mmc/host/mmci.h
-@@ -277,6 +277,7 @@ struct mmci_host_ops {
- 			 bool next);
- 	void (*unprep_data)(struct mmci_host *host, struct mmc_data *data,
- 			    int err);
-+	void (*get_next_data)(struct mmci_host *host, struct mmc_data *data);
- 	int (*dma_setup)(struct mmci_host *host);
- };
+@@ -333,8 +333,6 @@ struct mmci_host {
+ 	bool			dma_in_progress;
  
-@@ -332,3 +333,5 @@ int mmci_dmae_prep_data(struct mmci_host *host, struct mmc_data *data,
- 			bool next);
- void mmci_dmae_unprep_data(struct mmci_host *host, struct mmc_data *data,
- 			   int err);
-+void mmci_dmae_get_next_data(struct mmci_host *host, struct mmc_data *data);
-+
-diff --git a/drivers/mmc/host/mmci_qcom_dml.c b/drivers/mmc/host/mmci_qcom_dml.c
-index e3cbdda..432a823 100644
---- a/drivers/mmc/host/mmci_qcom_dml.c
-+++ b/drivers/mmc/host/mmci_qcom_dml.c
-@@ -182,6 +182,7 @@ static int qcom_dma_setup(struct mmci_host *host)
- static struct mmci_host_ops qcom_variant_ops = {
- 	.prep_data = mmci_dmae_prep_data,
- 	.unprep_data = mmci_dmae_unprep_data,
-+	.get_next_data = mmci_dmae_get_next_data,
- 	.dma_setup = qcom_dma_setup,
+ #define dma_inprogress(host)	((host)->dma_in_progress)
+-#else
+-#define dma_inprogress(host)	(0)
+ #endif
  };
  
 -- 
