@@ -1,63 +1,154 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 21 Sep 2018 09:29:15 +0200
-Subject: [PATCH v5 16/22] Documentation: nvmem: document cell tables and
- lookup entries
+Date: Fri, 21 Sep 2018 09:29:11 +0200
+Subject: [PATCH v5 12/22] nvmem: remove the global cell list
 In-Reply-To: <20180921072921.19387-1-brgl@bgdev.pl>
 References: <20180921072921.19387-1-brgl@bgdev.pl>
-Message-ID: <20180921072921.19387-17-brgl@bgdev.pl>
+Message-ID: <20180921072921.19387-13-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Document the new nvmem kernel APIs.
+Nvmem subsystem keeps a global list of cells that, for non-DT systems,
+can only be referenced by cell name, which makes it impossible to have
+more than one nvmem device with cells named the same.
+
+This patch makes every nvmem device the owner of the list of its cells.
+This effectively removes the support for non-DT systems, but it will
+be reintroduced following a different approach in subsequent patches.
+
+This isn't a problem as support for board files in nvmem is currently
+broken anyway: any user that would try to get an nvmem cell from the
+global cell list would remove the cell after the calling
+nvmem_cell_put(). This can cause anything from a subsequent user not
+being able to get the cell to double free errors if more users hold
+reference to the same cell at the same time.
+
+Fortunately there are no such users which allows us to rework this part.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- Documentation/nvmem/nvmem.txt | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ drivers/nvmem/core.c | 64 +++++++++++---------------------------------
+ 1 file changed, 15 insertions(+), 49 deletions(-)
 
-diff --git a/Documentation/nvmem/nvmem.txt b/Documentation/nvmem/nvmem.txt
-index 8d8d8f58f96f..fc2fe4b18655 100644
---- a/Documentation/nvmem/nvmem.txt
-+++ b/Documentation/nvmem/nvmem.txt
-@@ -58,6 +58,37 @@ static int qfprom_probe(struct platform_device *pdev)
- It is mandatory that the NVMEM provider has a regmap associated with its
- struct device. Failure to do would return error code from nvmem_register().
+diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+index bd14d04782cd..ee794613024c 100644
+--- a/drivers/nvmem/core.c
++++ b/drivers/nvmem/core.c
+@@ -38,6 +38,7 @@ struct nvmem_device {
+ 	int			flags;
+ 	struct bin_attribute	eeprom;
+ 	struct device		*base_dev;
++	struct list_head	cells;
+ 	nvmem_reg_read_t	reg_read;
+ 	nvmem_reg_write_t	reg_write;
+ 	void *priv;
+@@ -58,9 +59,6 @@ struct nvmem_cell {
+ static DEFINE_MUTEX(nvmem_mutex);
+ static DEFINE_IDA(nvmem_ida);
  
-+Users of board files can define and register nvmem cells using the
-+nvmem_cell_table struct:
-+
-+static struct nvmem_cell_info foo_nvmem_cells[] = {
-+	{
-+		.name		= "macaddr",
-+		.offset		= 0x7f00,
-+		.bytes		= ETH_ALEN,
-+	}
-+};
-+
-+static struct nvmem_cell_table foo_nvmem_cell_table = {
-+	.nvmem_name		= "i2c-eeprom",
-+	.cells			= foo_nvmem_cells,
-+	.ncells			= ARRAY_SIZE(foo_nvmem_cells),
-+};
-+
-+nvmem_add_cell_table(&foo_nvmem_cell_table);
-+
-+Additionally it is possible to create nvmem cell lookup entries and register
-+them with the nvmem framework from machine code as shown in the example below:
-+
-+static struct nvmem_cell_lookup foo_nvmem_lookup = {
-+	.nvmem_name		= "i2c-eeprom",
-+	.cell_name		= "macaddr",
-+	.dev_id			= "foo_mac.0",
-+	.con_id			= "mac-address",
-+};
-+
-+nvmem_add_cell_lookups(&foo_nvmem_lookup, 1);
-+
- NVMEM Consumers
- +++++++++++++++
+-static LIST_HEAD(nvmem_cells);
+-static DEFINE_MUTEX(nvmem_cells_mutex);
+-
+ #ifdef CONFIG_DEBUG_LOCK_ALLOC
+ static struct lock_class_key eeprom_lock_key;
+ #endif
+@@ -282,28 +280,11 @@ static struct nvmem_device *of_nvmem_find(struct device_node *nvmem_np)
+ 	return to_nvmem_device(d);
+ }
  
+-static struct nvmem_cell *nvmem_find_cell(const char *cell_id)
+-{
+-	struct nvmem_cell *p;
+-
+-	mutex_lock(&nvmem_cells_mutex);
+-
+-	list_for_each_entry(p, &nvmem_cells, node)
+-		if (!strcmp(p->name, cell_id)) {
+-			mutex_unlock(&nvmem_cells_mutex);
+-			return p;
+-		}
+-
+-	mutex_unlock(&nvmem_cells_mutex);
+-
+-	return NULL;
+-}
+-
+ static void nvmem_cell_drop(struct nvmem_cell *cell)
+ {
+-	mutex_lock(&nvmem_cells_mutex);
++	mutex_lock(&nvmem_mutex);
+ 	list_del(&cell->node);
+-	mutex_unlock(&nvmem_cells_mutex);
++	mutex_unlock(&nvmem_mutex);
+ 	kfree(cell);
+ }
+ 
+@@ -311,16 +292,15 @@ static void nvmem_device_remove_all_cells(const struct nvmem_device *nvmem)
+ {
+ 	struct nvmem_cell *cell, *p;
+ 
+-	list_for_each_entry_safe(cell, p, &nvmem_cells, node)
+-		if (cell->nvmem == nvmem)
+-			nvmem_cell_drop(cell);
++	list_for_each_entry_safe(cell, p, &nvmem->cells, node)
++		nvmem_cell_drop(cell);
+ }
+ 
+ static void nvmem_cell_add(struct nvmem_cell *cell)
+ {
+-	mutex_lock(&nvmem_cells_mutex);
+-	list_add_tail(&cell->node, &nvmem_cells);
+-	mutex_unlock(&nvmem_cells_mutex);
++	mutex_lock(&nvmem_mutex);
++	list_add_tail(&cell->node, &cell->nvmem->cells);
++	mutex_unlock(&nvmem_mutex);
+ }
+ 
+ static int nvmem_cell_info_to_nvmem_cell(struct nvmem_device *nvmem,
+@@ -465,6 +445,7 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
+ 	}
+ 
+ 	kref_init(&nvmem->refcnt);
++	INIT_LIST_HEAD(&nvmem->cells);
+ 
+ 	nvmem->id = rval;
+ 	nvmem->owner = config->owner;
+@@ -626,29 +607,14 @@ static struct nvmem_device *__nvmem_device_get(struct device_node *np,
+ {
+ 	struct nvmem_device *nvmem = NULL;
+ 
+-	mutex_lock(&nvmem_mutex);
+-
+-	if (np) {
+-		nvmem = of_nvmem_find(np);
+-		if (!nvmem) {
+-			mutex_unlock(&nvmem_mutex);
+-			return ERR_PTR(-EPROBE_DEFER);
+-		}
+-	} else {
+-		struct nvmem_cell *cell = nvmem_find_cell(cell_id);
+-
+-		if (cell) {
+-			nvmem = cell->nvmem;
+-			*cellp = cell;
+-		}
+-
+-		if (!nvmem) {
+-			mutex_unlock(&nvmem_mutex);
+-			return ERR_PTR(-ENOENT);
+-		}
+-	}
++	if (!np)
++		return ERR_PTR(-ENOENT);
+ 
++	mutex_lock(&nvmem_mutex);
++	nvmem = of_nvmem_find(np);
+ 	mutex_unlock(&nvmem_mutex);
++	if (!nvmem)
++		return ERR_PTR(-EPROBE_DEFER);
+ 
+ 	if (!try_module_get(nvmem->owner)) {
+ 		dev_err(&nvmem->dev,
 -- 
 2.18.0
