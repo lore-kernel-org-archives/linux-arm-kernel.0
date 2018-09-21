@@ -1,114 +1,62 @@
 From: steve.capper@arm.com (Steve Capper)
-Date: Fri, 21 Sep 2018 16:34:05 +0100
-Subject: [PATCH V2 2/2] arm64: hugetlb: Avoid unnecessary clearing in
- huge_ptep_set_access_flags
+Date: Fri, 21 Sep 2018 16:34:04 +0100
+Subject: [PATCH V2 1/2] arm64: hugetlb: Fix handling of young ptes
 In-Reply-To: <20180921153405.10090-1-steve.capper@arm.com>
 References: <20180921153405.10090-1-steve.capper@arm.com>
-Message-ID: <20180921153405.10090-3-steve.capper@arm.com>
+Message-ID: <20180921153405.10090-2-steve.capper@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For contiguous hugetlb, huge_ptep_set_access_flags performs a
-get_clear_flush (which then flushes the TLBs) even when no change of ptes
-is necessary.
+In the contiguous bit hugetlb break-before-make code we assume that all
+hugetlb pages are young.
 
-Unfortunately, this behaviour can lead to back-to-back page faults being
-generated when running with multiple threads that access the same
-contiguous huge page.
+In fact, remove_migration_pte is able to place an old hugetlb pte so
+this assumption is not valid.
 
-Thread 1                     |  Thread 2
------------------------------+------------------------------
-hugetlb_fault                |
-huge_ptep_set_access_flags   |
-  -> invalidate pte range    | hugetlb_fault
-continue processing          | wait for hugetlb_fault_mutex
-release mutex and return     | huge_ptep_set_access_flags
-                             |   -> invalidate pte range
-hugetlb_fault
-...
-
-This patch changes huge_ptep_set_access_flags s.t. we first read the
-contiguous range of ptes (whilst preserving dirty information); the pte
-range is only then invalidated where necessary and this prevents further
-spurious page faults.
+This patch fixes the contiguous hugetlb scanning code to preserve young
+ptes.
 
 Fixes: d8bdcff28764 ("arm64: hugetlb: Add break-before-make logic for contiguous entries")
-Reported-by: Lei Zhang <zhang.lei@jp.fujitsu.com>
 Signed-off-by: Steve Capper <steve.capper@arm.com>
 ---
-Changed in v2: we just check dirty, young for the contiguous range and
-writable for the first pte in the range.
----
- arch/arm64/mm/hugetlbpage.c | 38 ++++++++++++++++++++++++++++++++++----
- 1 file changed, 34 insertions(+), 4 deletions(-)
+ arch/arm64/mm/hugetlbpage.c | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index f85be2f8b140..f58ea503ad01 100644
+index 192b3ba07075..f85be2f8b140 100644
 --- a/arch/arm64/mm/hugetlbpage.c
 +++ b/arch/arm64/mm/hugetlbpage.c
-@@ -323,11 +323,40 @@ pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
- 	return get_clear_flush(mm, addr, ptep, pgsize, ncontig);
- }
+@@ -117,11 +117,14 @@ static pte_t get_clear_flush(struct mm_struct *mm,
  
-+/*
-+ * huge_ptep_set_access_flags will update access flags (dirty, accesssed)
-+ * and write permission.
-+ *
-+ * For a contiguous huge pte range we need to check whether or not write
-+ * permission has to change only on the first pte in the set. Then for
-+ * all the contiguous ptes we need to check whether or not there is a
-+ * discrepancy between dirty or young.
-+ */
-+static int __cont_access_flags_changed(pte_t *ptep, pte_t pte, int ncontig)
-+{
-+	int i;
+ 		/*
+ 		 * If HW_AFDBM is enabled, then the HW could turn on
+-		 * the dirty bit for any page in the set, so check
+-		 * them all.  All hugetlb entries are already young.
++		 * the dirty or accessed bit for any page in the set,
++		 * so check them all.
+ 		 */
+ 		if (pte_dirty(pte))
+ 			orig_pte = pte_mkdirty(orig_pte);
 +
-+	if (pte_write(pte) != pte_write(huge_ptep_get(ptep)))
-+		return 1;
-+
-+	for (i = 0; i < ncontig; i++) {
-+		pte_t orig_pte = huge_ptep_get(ptep + i);
-+
-+		if (pte_dirty(pte) != pte_dirty(orig_pte))
-+			return 1;
-+
-+		if (pte_young(pte) != pte_young(orig_pte))
-+			return 1;
-+	}
-+
-+	return 0;
-+}
-+
- int huge_ptep_set_access_flags(struct vm_area_struct *vma,
- 			       unsigned long addr, pte_t *ptep,
- 			       pte_t pte, int dirty)
- {
--	int ncontig, i, changed = 0;
-+	int ncontig, i;
- 	size_t pgsize = 0;
- 	unsigned long pfn = pte_pfn(pte), dpfn;
- 	pgprot_t hugeprot;
-@@ -339,9 +368,10 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
- 	ncontig = find_num_contig(vma->vm_mm, addr, ptep, &pgsize);
- 	dpfn = pgsize >> PAGE_SHIFT;
++		if (pte_young(pte))
++			orig_pte = pte_mkyoung(orig_pte);
+ 	}
  
-+	if (!__cont_access_flags_changed(ptep, pte, ncontig))
-+		return 0;
-+
- 	orig_pte = get_clear_flush(vma->vm_mm, addr, ptep, pgsize, ncontig);
--	if (!pte_same(orig_pte, pte))
--		changed = 1;
+ 	if (valid) {
+@@ -340,10 +343,13 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
+ 	if (!pte_same(orig_pte, pte))
+ 		changed = 1;
  
- 	/* Make sure we don't lose the dirty or young state */
+-	/* Make sure we don't lose the dirty state */
++	/* Make sure we don't lose the dirty or young state */
  	if (pte_dirty(orig_pte))
-@@ -354,7 +384,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
+ 		pte = pte_mkdirty(pte);
+ 
++	if (pte_young(orig_pte))
++		pte = pte_mkyoung(pte);
++
+ 	hugeprot = pte_pgprot(pte);
  	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn)
  		set_pte_at(vma->vm_mm, addr, ptep, pfn_pte(pfn, hugeprot));
- 
--	return changed;
-+	return 1;
- }
- 
- void huge_ptep_set_wrprotect(struct mm_struct *mm,
 -- 
 2.11.0
