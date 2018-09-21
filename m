@@ -1,178 +1,88 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Fri, 21 Sep 2018 11:46:12 +0200
-Subject: [PATCH V2 18/27] mmc: mmci: add variant properties to define cpsm &
- cmdresp bits
+Date: Fri, 21 Sep 2018 11:46:09 +0200
+Subject: [PATCH V2 15/27] mmc: mmci: add set_clk/pwrreg callbacks
 In-Reply-To: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
 References: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1537523181-14578-19-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1537523181-14578-16-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Barre <ludovic.barre@st.com>
 
-This patch adds command variant properties to define
-cpsm enable bit and responses.
-Needed to support the STM32 variant (shift of cpsm bit,
-specific definition of commands response).
+This patch adds set_clkreg and set_pwrreg callbacks
+at mmci_host_ops to allow to call specific variant.
+extends visibility of mmci_write_clk/pwrreg functions
+to be used into specific file variant.
 
 Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 ---
- drivers/mmc/host/mmci.c | 47 +++++++++++++++++++++++++++++++++++++++++++----
- drivers/mmc/host/mmci.h |  8 ++++++++
- 2 files changed, 51 insertions(+), 4 deletions(-)
+ drivers/mmc/host/mmci.c | 16 ++++++++++++----
+ drivers/mmc/host/mmci.h |  5 +++++
+ 2 files changed, 17 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 53f613f..0b4425f 100644
+index 1593942..9d93fe7 100644
 --- a/drivers/mmc/host/mmci.c
 +++ b/drivers/mmc/host/mmci.c
-@@ -51,6 +51,10 @@ static unsigned int fmax = 515633;
- static struct variant_data variant_arm = {
- 	.fifosize		= 16 * 4,
- 	.fifohalfsize		= 8 * 4,
-+	.cmdreg_cpsm_enable	= MCI_CPSM_ENABLE,
-+	.cmdreg_lrsp_crc	= MCI_CPSM_RESPONSE | MCI_CPSM_LONGRSP,
-+	.cmdreg_srsp_crc	= MCI_CPSM_RESPONSE,
-+	.cmdreg_srsp		= MCI_CPSM_RESPONSE,
- 	.datalength_bits	= 16,
- 	.datactrl_blocksz	= 11,
- 	.pwrreg_powerup		= MCI_PWR_UP,
-@@ -65,6 +69,10 @@ static struct variant_data variant_arm = {
- static struct variant_data variant_arm_extended_fifo = {
- 	.fifosize		= 128 * 4,
- 	.fifohalfsize		= 64 * 4,
-+	.cmdreg_cpsm_enable	= MCI_CPSM_ENABLE,
-+	.cmdreg_lrsp_crc	= MCI_CPSM_RESPONSE | MCI_CPSM_LONGRSP,
-+	.cmdreg_srsp_crc	= MCI_CPSM_RESPONSE,
-+	.cmdreg_srsp		= MCI_CPSM_RESPONSE,
- 	.datalength_bits	= 16,
- 	.datactrl_blocksz	= 11,
- 	.pwrreg_powerup		= MCI_PWR_UP,
-@@ -79,6 +87,10 @@ static struct variant_data variant_arm_extended_fifo_hwfc = {
- 	.fifosize		= 128 * 4,
- 	.fifohalfsize		= 64 * 4,
- 	.clkreg_enable		= MCI_ARM_HWFCEN,
-+	.cmdreg_cpsm_enable	= MCI_CPSM_ENABLE,
-+	.cmdreg_lrsp_crc	= MCI_CPSM_RESPONSE | MCI_CPSM_LONGRSP,
-+	.cmdreg_srsp_crc	= MCI_CPSM_RESPONSE,
-+	.cmdreg_srsp		= MCI_CPSM_RESPONSE,
- 	.datalength_bits	= 16,
- 	.datactrl_blocksz	= 11,
- 	.pwrreg_powerup		= MCI_PWR_UP,
-@@ -94,6 +106,10 @@ static struct variant_data variant_u300 = {
- 	.fifohalfsize		= 8 * 4,
- 	.clkreg_enable		= MCI_ST_U300_HWFCEN,
- 	.clkreg_8bit_bus_enable = MCI_ST_8BIT_BUS,
-+	.cmdreg_cpsm_enable	= MCI_CPSM_ENABLE,
-+	.cmdreg_lrsp_crc	= MCI_CPSM_RESPONSE | MCI_CPSM_LONGRSP,
-+	.cmdreg_srsp_crc	= MCI_CPSM_RESPONSE,
-+	.cmdreg_srsp		= MCI_CPSM_RESPONSE,
- 	.datalength_bits	= 16,
- 	.datactrl_blocksz	= 11,
- 	.datactrl_mask_sdio	= MCI_DPSM_ST_SDIOEN,
-@@ -114,6 +130,10 @@ static struct variant_data variant_nomadik = {
- 	.fifohalfsize		= 8 * 4,
- 	.clkreg			= MCI_CLK_ENABLE,
- 	.clkreg_8bit_bus_enable = MCI_ST_8BIT_BUS,
-+	.cmdreg_cpsm_enable	= MCI_CPSM_ENABLE,
-+	.cmdreg_lrsp_crc	= MCI_CPSM_RESPONSE | MCI_CPSM_LONGRSP,
-+	.cmdreg_srsp_crc	= MCI_CPSM_RESPONSE,
-+	.cmdreg_srsp		= MCI_CPSM_RESPONSE,
- 	.datalength_bits	= 24,
- 	.datactrl_blocksz	= 11,
- 	.datactrl_mask_sdio	= MCI_DPSM_ST_SDIOEN,
-@@ -137,6 +157,10 @@ static struct variant_data variant_ux500 = {
- 	.clkreg_enable		= MCI_ST_UX500_HWFCEN,
- 	.clkreg_8bit_bus_enable = MCI_ST_8BIT_BUS,
- 	.clkreg_neg_edge_enable	= MCI_ST_UX500_NEG_EDGE,
-+	.cmdreg_cpsm_enable	= MCI_CPSM_ENABLE,
-+	.cmdreg_lrsp_crc	= MCI_CPSM_RESPONSE | MCI_CPSM_LONGRSP,
-+	.cmdreg_srsp_crc	= MCI_CPSM_RESPONSE,
-+	.cmdreg_srsp		= MCI_CPSM_RESPONSE,
- 	.datalength_bits	= 24,
- 	.datactrl_blocksz	= 11,
- 	.datactrl_mask_sdio	= MCI_DPSM_ST_SDIOEN,
-@@ -164,6 +188,10 @@ static struct variant_data variant_ux500v2 = {
- 	.clkreg_enable		= MCI_ST_UX500_HWFCEN,
- 	.clkreg_8bit_bus_enable = MCI_ST_8BIT_BUS,
- 	.clkreg_neg_edge_enable	= MCI_ST_UX500_NEG_EDGE,
-+	.cmdreg_cpsm_enable	= MCI_CPSM_ENABLE,
-+	.cmdreg_lrsp_crc	= MCI_CPSM_RESPONSE | MCI_CPSM_LONGRSP,
-+	.cmdreg_srsp_crc	= MCI_CPSM_RESPONSE,
-+	.cmdreg_srsp		= MCI_CPSM_RESPONSE,
- 	.datactrl_mask_ddrmode	= MCI_DPSM_ST_DDRMODE,
- 	.datalength_bits	= 24,
- 	.datactrl_blocksz	= 11,
-@@ -193,6 +221,10 @@ static struct variant_data variant_stm32 = {
- 	.clkreg_enable		= MCI_ST_UX500_HWFCEN,
- 	.clkreg_8bit_bus_enable = MCI_ST_8BIT_BUS,
- 	.clkreg_neg_edge_enable	= MCI_ST_UX500_NEG_EDGE,
-+	.cmdreg_cpsm_enable	= MCI_CPSM_ENABLE,
-+	.cmdreg_lrsp_crc	= MCI_CPSM_RESPONSE | MCI_CPSM_LONGRSP,
-+	.cmdreg_srsp_crc	= MCI_CPSM_RESPONSE,
-+	.cmdreg_srsp		= MCI_CPSM_RESPONSE,
- 	.datalength_bits	= 24,
- 	.datactrl_blocksz	= 11,
- 	.datactrl_mask_sdio	= MCI_DPSM_ST_SDIOEN,
-@@ -213,6 +245,10 @@ static struct variant_data variant_qcom = {
- 				  MCI_QCOM_CLK_SELECT_IN_FBCLK,
- 	.clkreg_8bit_bus_enable = MCI_QCOM_CLK_WIDEBUS_8,
- 	.datactrl_mask_ddrmode	= MCI_QCOM_CLK_SELECT_IN_DDR_MODE,
-+	.cmdreg_cpsm_enable	= MCI_CPSM_ENABLE,
-+	.cmdreg_lrsp_crc	= MCI_CPSM_RESPONSE | MCI_CPSM_LONGRSP,
-+	.cmdreg_srsp_crc	= MCI_CPSM_RESPONSE,
-+	.cmdreg_srsp		= MCI_CPSM_RESPONSE,
- 	.data_cmd_enable	= MCI_CPSM_QCOM_DATCMD,
- 	.blksz_datactrl4	= true,
- 	.datalength_bits	= 24,
-@@ -987,16 +1023,19 @@ mmci_start_command(struct mmci_host *host, struct mmc_command *cmd, u32 c)
- 	dev_dbg(mmc_dev(host->mmc), "op %02x arg %08x flags %08x\n",
- 	    cmd->opcode, cmd->arg, cmd->flags);
+@@ -252,7 +252,7 @@ static void mmci_reg_delay(struct mmci_host *host)
+ /*
+  * This must be called with host->lock held
+  */
+-static void mmci_write_clkreg(struct mmci_host *host, u32 clk)
++void mmci_write_clkreg(struct mmci_host *host, u32 clk)
+ {
+ 	if (host->clk_reg != clk) {
+ 		host->clk_reg = clk;
+@@ -263,7 +263,7 @@ static void mmci_write_clkreg(struct mmci_host *host, u32 clk)
+ /*
+  * This must be called with host->lock held
+  */
+-static void mmci_write_pwrreg(struct mmci_host *host, u32 pwr)
++void mmci_write_pwrreg(struct mmci_host *host, u32 pwr)
+ {
+ 	if (host->pwr_reg != pwr) {
+ 		host->pwr_reg = pwr;
+@@ -1543,8 +1543,16 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
  
--	if (readl(base + MMCICOMMAND) & MCI_CPSM_ENABLE) {
-+	if (readl(base + MMCICOMMAND) & host->variant->cmdreg_cpsm_enable) {
- 		writel(0, base + MMCICOMMAND);
- 		mmci_reg_delay(host);
- 	}
+ 	spin_lock_irqsave(&host->lock, flags);
  
--	c |= cmd->opcode | MCI_CPSM_ENABLE;
-+	c |= cmd->opcode | host->variant->cmdreg_cpsm_enable;
- 	if (cmd->flags & MMC_RSP_PRESENT) {
- 		if (cmd->flags & MMC_RSP_136)
--			c |= MCI_CPSM_LONGRSP;
--		c |= MCI_CPSM_RESPONSE;
-+			c |= host->variant->cmdreg_lrsp_crc;
-+		else if (cmd->flags & MMC_RSP_CRC)
-+			c |= host->variant->cmdreg_srsp_crc;
-+		else
-+			c |= host->variant->cmdreg_srsp;
- 	}
- 	if (/*interrupt*/0)
- 		c |= MCI_CPSM_INTERRUPT;
+-	mmci_set_clkreg(host, ios->clock);
+-	mmci_write_pwrreg(host, pwr);
++	if (host->ops && host->ops->set_clkreg)
++		host->ops->set_clkreg(host, ios->clock);
++	else
++		mmci_set_clkreg(host, ios->clock);
++
++	if (host->ops && host->ops->set_pwrreg)
++		host->ops->set_pwrreg(host, pwr);
++	else
++		mmci_write_pwrreg(host, pwr);
++
+ 	mmci_reg_delay(host);
+ 
+ 	spin_unlock_irqrestore(&host->lock, flags);
 diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index fcb332d..6e71ee77 100644
+index cf48377..44e06bb 100644
 --- a/drivers/mmc/host/mmci.h
 +++ b/drivers/mmc/host/mmci.h
-@@ -204,6 +204,10 @@ struct mmci_host;
-  * @clkreg_enable: enable value for MMCICLOCK register
-  * @clkreg_8bit_bus_enable: enable value for 8 bit bus
-  * @clkreg_neg_edge_enable: enable value for inverted data/cmd output
-+ * @cmdreg_cpsm_enable: enable value for CPSM
-+ * @cmdreg_lrsp_crc: enable value for long response with crc
-+ * @cmdreg_srsp_crc: enable value for short response with crc
-+ * @cmdreg_srsp: enable value for short response without crc
-  * @datalength_bits: number of bits in the MMCIDATALENGTH register
-  * @fifosize: number of bytes that can be written when MMCI_TXFIFOEMPTY
-  *	      is asserted (likewise for RX)
-@@ -243,6 +247,10 @@ struct variant_data {
- 	unsigned int		clkreg_enable;
- 	unsigned int		clkreg_8bit_bus_enable;
- 	unsigned int		clkreg_neg_edge_enable;
-+	unsigned int		cmdreg_cpsm_enable;
-+	unsigned int		cmdreg_lrsp_crc;
-+	unsigned int		cmdreg_srsp_crc;
-+	unsigned int		cmdreg_srsp;
- 	unsigned int		datalength_bits;
- 	unsigned int		fifosize;
- 	unsigned int		fifohalfsize;
+@@ -284,6 +284,8 @@ struct mmci_host_ops {
+ 	int (*dma_start)(struct mmci_host *host, unsigned int *datactrl);
+ 	void (*dma_finalize)(struct mmci_host *host, struct mmc_data *data);
+ 	void (*dma_error)(struct mmci_host *host);
++	void (*set_clkreg)(struct mmci_host *host, unsigned int desired);
++	void (*set_pwrreg)(struct mmci_host *host, unsigned int pwr);
+ };
+ 
+ struct mmci_host {
+@@ -332,6 +334,9 @@ struct mmci_host {
+ 	s32			next_cookie;
+ };
+ 
++void mmci_write_clkreg(struct mmci_host *host, u32 clk);
++void mmci_write_pwrreg(struct mmci_host *host, u32 pwr);
++
+ void mmci_variant_init(struct mmci_host *host);
+ 
+ int mmci_dmae_prep_data(struct mmci_host *host, struct mmc_data *data,
 -- 
 2.7.4
