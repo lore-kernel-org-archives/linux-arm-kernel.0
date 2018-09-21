@@ -1,61 +1,79 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 21 Sep 2018 10:38:04 +0200
-Subject: [PATCH v5 0/2] arm64: dts: meson-g12a: Introduce new DT files for
- Meson-G12A SoC
-In-Reply-To: <1537518881-53137-1-git-send-email-jianxin.pan@amlogic.com>
-References: <1537518881-53137-1-git-send-email-jianxin.pan@amlogic.com>
-Message-ID: <33ef5ede-63f4-c58f-4057-0841f0d2aca5@baylibre.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 21 Sep 2018 10:41:59 +0200
+Subject: [PATCH v4 5/5] drm: bridge: add support for Cadence MHDP DPI/DP
+ bridge
+In-Reply-To: <1537455288-20223-6-git-send-email-dkos@cadence.com>
+References: <1537455288-20223-1-git-send-email-dkos@cadence.com>
+ <1537455288-20223-6-git-send-email-dkos@cadence.com>
+Message-ID: <1903708.pJTgKoWLiI@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jianxin,
+Hi Damian,
 
-On 21/09/2018 10:34, Jianxin Pan wrote:
-> This attempt will try to add new DT files to support Meson-G12A SoC.
+Am Donnerstag, 20. September 2018, 16:54:40 CEST schrieb Damian Kos:
+> From: Quentin Schulz <quentin.schulz@free-electrons.com>
 > 
-> 1) first, Please notice that, in this patch series, the DT node about 16M reserved
-> memory for hwrom is removed, since it's not needed by G12A SoC.
-> 2) second, the pclk for uart_AO need to be fixed once G12A clock_ao driver is
-> merged. In this version, it rely on bootloader to enable the pclk gate which 
-> belong to AO clock domain. Please add clk_ignore_unused to bootargs.
+> This adds basic support for Cadence MHDP DPI to DP bridge.
 > 
-> Changes since v4 [3]:
->  - add chosen and memory node
+> Basically, it takes a DPI stream as input and output it encoded in DP
+> format. It's missing proper HPD, HDCP and currently supports only
+> SST mode.
 > 
-> Changes since v3 [2]:
->  - collect Rob's Reviewed-by
->  - test on latest v4.20/integ
+> Changes made in the low level driver (cdn-dp-reg.*):
+> - moved it to from drivers/gpu/drm/rockchip to
+>   drivers/gpu/drm/bridge/cdns-mhdp-common.*
+> - functions for sending/receiving commands are now public
+> - added functions for reading registers and link training
+>   adjustment
 > 
-> Changes since v2 [1]:
->  - reorder subnodes
->  - collect Rob's Reviewed-by
+> Changes made in RK's driver (cdn-dp-core.*):
+> - Moved audio_info and audio_pdev fields from cdn_dp_device to
+>   cdns_mhdp_device structure.
 > 
-> Changes since v1 [0]:
->  - fix signoff typo
->  - order subnodes by addresses when there is one and alphabetically when there is none
-> 
-> 
-> [0] https://lore.kernel.org/lkml/1533802951-49919-2-git-send-email-jianxin.pan at amlogic.com
-> [1] https://lore.kernel.org/lkml/1534160901-22889-1-git-send-email-jianxin.pan at amlogic.com
-> [2] https://lore.kernel.org/lkml/1534243121-33589-1-git-send-email-jianxin.pan at amlogic.com
-> [3] https://lore.kernel.org/lkml/1537427368-11104-1-git-send-email-jianxin.pan at amlogic.com
-> 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> Signed-off-by: Damian Kos <dkos@cadence.com>
 
-For the whole serie :
-Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+[...]
 
-Thanks,
-Neil
+> diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
+> index 0ccc76217ee4..129b0529f3e1 100644
+> --- a/drivers/gpu/drm/rockchip/Kconfig
+> +++ b/drivers/gpu/drm/rockchip/Kconfig
+> @@ -27,7 +27,9 @@ config ROCKCHIP_ANALOGIX_DP
+>  
+>  config ROCKCHIP_CDN_DP
+>          bool "Rockchip cdn DP"
+> -	depends on EXTCON=y || (EXTCON=m && DRM_ROCKCHIP=m)
+> +	depends on DRM_ROCKCHIP=m
 
-> Jianxin Pan (2):
->   dt-bindings: arm: amlogic: Add Meson G12A binding
->   arm64: dts: meson-g12a: add initial g12a s905d2 SoC DT support
-> 
->  Documentation/devicetree/bindings/arm/amlogic.txt |   6 +
->  arch/arm64/boot/dts/amlogic/Makefile              |   1 +
->  arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts   |  29 ++++
->  arch/arm64/boot/dts/amlogic/meson-g12a.dtsi       | 172 ++++++++++++++++++++++
->  4 files changed, 208 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts
->  create mode 100644 arch/arm64/boot/dts/amlogic/meson-g12a.dtsi
-> 
+Sorry, I wasn't fast enough in my reply to you mail to catch that before
+your v4, but I don't think this is necessary.
+Instead I do guess, the select below should do the right thing by
+making EXTCON=y if DRM_ROCKCHIP=y.
+
+Somewhat clumsily verified by making EXTCON=m in my defconfig
+and seeing get changed to y upon build, which I guess comes from
+a different "select" in the config.
+
+
+> +	select EXTCON
+> +	select DRM_CDNS_MHDP
+>          help
+>  	  This selects support for Rockchip SoC specific extensions
+>  	  for the cdn DP driver. If you want to enable Dp on
+> diff --git a/drivers/gpu/drm/rockchip/Makefile b/drivers/gpu/drm/rockchip/Makefile
+> index a314e2109e76..16ba61ffca39 100644
+> --- a/drivers/gpu/drm/rockchip/Makefile
+> +++ b/drivers/gpu/drm/rockchip/Makefile
+> @@ -3,13 +3,15 @@
+>  # Makefile for the drm device driver.  This driver provides support for the
+>  # Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
+>  
+> +ccflags-y += -I$(src)/../bridge
+
+hmm, instead of adding an include path, the shared header should probably
+just live in /include/drm/bridge/... in the kernel source?
+
+
+Heiko
