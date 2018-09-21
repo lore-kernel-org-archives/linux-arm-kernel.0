@@ -1,128 +1,77 @@
-From: pankaj.bansal@nxp.com (Pankaj Bansal)
-Date: Fri, 21 Sep 2018 19:47:20 +0530
-Subject: [PATCH] arm64: dts: add LX2160AQDS board support
-Message-ID: <20180921141720.19159-1-pankaj.bansal@nxp.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Fri, 21 Sep 2018 17:03:49 +0800
+Subject: [PATCH v3 04/12] drm/mediatek: add clock factor for different IC
+In-Reply-To: <20180921032822.30771-5-bibby.hsieh@mediatek.com>
+References: <20180921032822.30771-1-bibby.hsieh@mediatek.com>
+ <20180921032822.30771-5-bibby.hsieh@mediatek.com>
+Message-ID: <1537520629.20660.3.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LX2160A QorIQ Development System (QDS) is a test, evaluation, and
-development platform, supporting QorIQ LX2160A processor.
+Hi, Bibby:
 
-Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
-Signed-off-by: Pankaj Bansal <pankaj.bansal@nxp.com>
----
+On Fri, 2018-09-21 at 11:28 +0800, Bibby Hsieh wrote:
+> From: chunhui dai <chunhui.dai@mediatek.com>
+> 
+> different IC has different clock designed in HDMI, the factor for
+> calculate clock should be different. Usinng the data in of_node
+> to find this factor.
+> 
 
-Notes:
-    This patch is dependent on [1] and [2]
-     [1] https://lore.kernel.org/patchwork/patch/985935/
-     [2] https://lore.kernel.org/patchwork/patch/985938/
+Reviewed-by: CK Hu <ck.hu@mediatek.com>
 
- arch/arm64/boot/dts/freescale/Makefile       |  1 +
- .../boot/dts/freescale/fsl-lx2160a-qds.dts   | 88 ++++++++++++++++++
- 2 files changed, 89 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
-index 445b72bd5a36..ae80fc5c45f7 100644
---- a/arch/arm64/boot/dts/freescale/Makefile
-+++ b/arch/arm64/boot/dts/freescale/Makefile
-@@ -14,3 +14,4 @@ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-rdb.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-lx2160a-rdb.dtb
-+dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-lx2160a-qds.dtb
-diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
-new file mode 100644
-index 000000000000..5cf2fe279f73
---- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
-@@ -0,0 +1,88 @@
-+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
-+//
-+// Device Tree file for LX2160AQDS
-+//
-+// Copyright 2018 NXP
-+
-+/dts-v1/;
-+
-+#include "fsl-lx2160a.dtsi"
-+
-+/ {
-+	model = "NXP Layerscape LX2160AQDS";
-+	compatible = "fsl,lx2160a-qds", "fsl,lx2160a";
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+	i2c-mux at 77 {
-+		compatible = "nxp,pca9547";
-+		reg = <0x77>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		i2c at 2 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x2>;
-+
-+			power-monitor at 40 {
-+				compatible = "ti,ina220";
-+				reg = <0x40>;
-+				shunt-resistor = <500>;
-+			};
-+
-+			power-monitor at 41 {
-+				compatible = "ti,ina220";
-+				reg = <0x41>;
-+				shunt-resistor = <1000>;
-+			};
-+		};
-+
-+		i2c at 3 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x3>;
-+
-+			temperature-sensor at 4c {
-+				compatible = "nxp,sa56004";
-+				reg = <0x4c>;
-+			};
-+
-+			temperature-sensor at 4d {
-+				compatible = "nxp,sa56004";
-+				reg = <0x4d>;
-+			};
-+
-+			rtc at 51 {
-+				compatible = "nxp,pcf2129";
-+				reg = <0x51>;
-+			};
-+		};
-+	};
-+};
-+
-+&usb0 {
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	status = "okay";
-+};
-+
-+&crypto {
-+	status = "okay";
-+};
-+
--- 
-2.17.1
+> Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
+> ---
+>  drivers/gpu/drm/mediatek/mtk_dpi.c | 24 +++++++++++++++---------
+>  1 file changed, 15 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
+> index 1e7369e0d91c..022ccec49cea 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_dpi.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
+> @@ -120,6 +120,7 @@ struct mtk_dpi_yc_limit {
+>  };
+>  
+>  struct mtk_dpi_conf {
+> +	unsigned int (*cal_factor)(int clock);
+>  	u32 reg_h_fre_con;
+>  	bool edge_sel_en;
+>  };
+> @@ -460,15 +461,7 @@ static int mtk_dpi_set_display_mode(struct mtk_dpi *dpi,
+>  	unsigned int factor;
+>  
+>  	/* let pll_rate can fix the valid range of tvdpll (1G~2GHz) */
+> -
+> -	if (mode->clock <= 27000)
+> -		factor = 3 << 4;
+> -	else if (mode->clock <= 84000)
+> -		factor = 3 << 3;
+> -	else if (mode->clock <= 167000)
+> -		factor = 3 << 2;
+> -	else
+> -		factor = 3 << 1;
+> +	factor = dpi->conf->cal_factor(mode->clock);
+>  	drm_display_mode_to_videomode(mode, &vm);
+>  	pll_rate = vm.pixelclock * factor;
+>  
+> @@ -682,7 +675,20 @@ static const struct component_ops mtk_dpi_component_ops = {
+>  	.unbind = mtk_dpi_unbind,
+>  };
+>  
+> +static unsigned int mt8173_calculate_factor(int clock)
+> +{
+> +	if (clock <= 27000)
+> +		return 3 << 4;
+> +	else if (clock <= 84000)
+> +		return 3 << 3;
+> +	else if (clock <= 167000)
+> +		return 3 << 2;
+> +	else
+> +		return 3 << 1;
+> +}
+> +
+>  static const struct mtk_dpi_conf mt8173_conf = {
+> +	.cal_factor = mt8173_calculate_factor,
+>  	.reg_h_fre_con = 0xe0,
+>  };
+>  
