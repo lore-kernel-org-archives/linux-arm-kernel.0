@@ -1,118 +1,51 @@
-From: ludovic.barre@st.com (Ludovic BARRE)
-Date: Fri, 21 Sep 2018 09:42:24 +0200
-Subject: [PATCH V2 02/27] mmc: mmci: internalize dma_inprogress into mmci
- dma functions
-In-Reply-To: <CAPDyKFrwiQv-EFfSrY7TwxXN-AnOsbbPop88GPo8_32hcjBzsg@mail.gmail.com>
-References: <1537268144-21152-1-git-send-email-ludovic.Barre@st.com>
- <1537268144-21152-3-git-send-email-ludovic.Barre@st.com>
- <CAPDyKFrwiQv-EFfSrY7TwxXN-AnOsbbPop88GPo8_32hcjBzsg@mail.gmail.com>
-Message-ID: <4a1ab21e-0c0c-8d93-fd9d-1662a2fa642c@st.com>
+From: jianxin.pan@amlogic.com (Jianxin Pan)
+Date: Fri, 21 Sep 2018 16:34:39 +0800
+Subject: [PATCH v5 0/2] arm64: dts: meson-g12a: Introduce new DT files for
+ Meson-G12A SoC
+Message-ID: <1537518881-53137-1-git-send-email-jianxin.pan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This attempt will try to add new DT files to support Meson-G12A SoC.
+
+1) first, Please notice that, in this patch series, the DT node about 16M reserved
+memory for hwrom is removed, since it's not needed by G12A SoC.
+2) second, the pclk for uart_AO need to be fixed once G12A clock_ao driver is
+merged. In this version, it rely on bootloader to enable the pclk gate which 
+belong to AO clock domain. Please add clk_ignore_unused to bootargs.
+
+Changes since v4 [3]:
+ - add chosen and memory node
+
+Changes since v3 [2]:
+ - collect Rob's Reviewed-by
+ - test on latest v4.20/integ
+
+Changes since v2 [1]:
+ - reorder subnodes
+ - collect Rob's Reviewed-by
+
+Changes since v1 [0]:
+ - fix signoff typo
+ - order subnodes by addresses when there is one and alphabetically when there is none
 
 
-On 09/20/2018 07:56 PM, Ulf Hansson wrote:
-> On 18 September 2018 at 12:55, Ludovic Barre <ludovic.Barre@st.com> wrote:
->> From: Ludovic Barre <ludovic.barre@st.com>
->>
->> This patch internalizes the dma_inprogress into mmci dma interfaces.
->> This allows to simplify and prepare the next dma callbacks
->> for mmci host ops. __dma_inprogress is called in mmci_dma_data_error
->> and mmci_dma_finalize.
->>
->> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
->> ---
->>   drivers/mmc/host/mmci.c | 16 ++++++++++------
->>   drivers/mmc/host/mmci.h |  4 +---
->>   2 files changed, 11 insertions(+), 9 deletions(-)
->>
->> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
->> index bf0bb07..7d22cb9 100644
->> --- a/drivers/mmc/host/mmci.c
->> +++ b/drivers/mmc/host/mmci.c
->> @@ -497,6 +497,9 @@ static void mmci_dma_unmap(struct mmci_host *host, struct mmc_data *data)
->>
->>   static void mmci_dma_data_error(struct mmci_host *host)
->>   {
->> +       if (!__dma_inprogress(host))
->> +               return;
->> +
->>          dev_err(mmc_dev(host->mmc), "error during DMA transfer!\n");
->>          dmaengine_terminate_all(host->dma_current);
->>          host->dma_in_progress = false;
->> @@ -512,6 +515,9 @@ static void mmci_dma_finalize(struct mmci_host *host, struct mmc_data *data)
->>          u32 status;
->>          int i;
->>
->> +       if (!__dma_inprogress(dmae))
->> +               return;
->> +
->>          /* Wait up to 1ms for the DMA to complete */
->>          for (i = 0; ; i++) {
->>                  status = readl(host->base + MMCISTATUS);
->> @@ -903,8 +909,7 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
->>                  u32 remain, success;
->>
->>                  /* Terminate the DMA transfer */
->> -               if (dma_inprogress(host))
->> -                       mmci_dma_data_error(host);
->> +               mmci_dma_data_error(host);
->>
->>                  /*
->>                   * Calculate how far we are into the transfer.  Note that
->> @@ -942,8 +947,8 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
->>                  dev_err(mmc_dev(host->mmc), "stray MCI_DATABLOCKEND interrupt\n");
->>
->>          if (status & MCI_DATAEND || data->error) {
->> -               if (dma_inprogress(host))
->> -                       mmci_dma_finalize(host, data);
->> +               mmci_dma_finalize(host, data);
->> +
->>                  mmci_stop_data(host);
->>
->>                  if (!data->error)
->> @@ -1050,8 +1055,7 @@ mmci_cmd_irq(struct mmci_host *host, struct mmc_command *cmd,
->>          if ((!sbc && !cmd->data) || cmd->error) {
->>                  if (host->data) {
->>                          /* Terminate the DMA transfer */
->> -                       if (dma_inprogress(host))
->> -                               mmci_dma_data_error(host);
->> +                       mmci_dma_data_error(host);
->>
->>                          mmci_stop_data(host);
->>                  }
->> diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
->> index 696a066..f1ec066 100644
->> --- a/drivers/mmc/host/mmci.h
->> +++ b/drivers/mmc/host/mmci.h
->> @@ -332,9 +332,7 @@ struct mmci_host {
->>          struct mmci_host_next   next_data;
->>          bool                    dma_in_progress;
->>
->> -#define dma_inprogress(host)   ((host)->dma_in_progress)
->> -#else
->> -#define dma_inprogress(host)   (0)
->> +#define __dma_inprogress(host) ((host)->dma_in_progress)
-> 
-> Overall the change makes good sense to me, however I don't get why you
-> want to rename the macro-function. Please don't.
+[0] https://lore.kernel.org/lkml/1533802951-49919-2-git-send-email-jianxin.pan at amlogic.com
+[1] https://lore.kernel.org/lkml/1534160901-22889-1-git-send-email-jianxin.pan at amlogic.com
+[2] https://lore.kernel.org/lkml/1534243121-33589-1-git-send-email-jianxin.pan at amlogic.com
+[3] https://lore.kernel.org/lkml/1537427368-11104-1-git-send-email-jianxin.pan at amlogic.com
 
-Oops it's a mistake, I forgot this patch (I remove this)  .
-I wait the end of review and will resend.
+Jianxin Pan (2):
+  dt-bindings: arm: amlogic: Add Meson G12A binding
+  arm64: dts: meson-g12a: add initial g12a s905d2 SoC DT support
 
-like you proposed in previous review this macros is renamed with
-mmci_dmae_inprogress (in patch 04/14) to has common prefix with 
-structure mmci_dmae_priv, mmci_dmae_next...
+ Documentation/devicetree/bindings/arm/amlogic.txt |   6 +
+ arch/arm64/boot/dts/amlogic/Makefile              |   1 +
+ arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts   |  29 ++++
+ arch/arm64/boot/dts/amlogic/meson-g12a.dtsi       | 172 ++++++++++++++++++++++
+ 4 files changed, 208 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-g12a-u200.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-g12a.dtsi
 
-> 
->>   #endif
->>   };
->>
->> --
->> 2.7.4
->>
-> 
-> Kind regards
-> Uffe
-> 
+-- 
+1.9.1
