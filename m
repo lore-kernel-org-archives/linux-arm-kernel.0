@@ -1,172 +1,106 @@
 From: shameerali.kolothum.thodi@huawei.com (Shameer Kolothum)
-Date: Fri, 21 Sep 2018 16:08:01 +0100
-Subject: [PATCH v3 1/3] acpi: arm64: add iort support for PMCG
+Date: Fri, 21 Sep 2018 16:08:03 +0100
+Subject: [PATCH v3 3/3] perf/smmuv3: Add MSI irq support
 In-Reply-To: <20180921150803.25444-1-shameerali.kolothum.thodi@huawei.com>
 References: <20180921150803.25444-1-shameerali.kolothum.thodi@huawei.com>
-Message-ID: <20180921150803.25444-2-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <20180921150803.25444-4-shameerali.kolothum.thodi@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Neil Leeder <nleeder@codeaurora.org>
+This adds support for MSI-based counter overflow interrupt.
 
-Add support for the SMMU Performance Monitor Counter Group
-information from ACPI. This is in preparation for its use
-in the SMMUv3 PMU driver.
-
-Signed-off-by: Neil Leeder <nleeder@codeaurora.org>
-Signed-off-by: Hanjun Guo <guohanjun@huawei.com>
 Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
 ---
- drivers/acpi/arm64/iort.c | 78 +++++++++++++++++++++++++++++++++++++++--------
- 1 file changed, 66 insertions(+), 12 deletions(-)
+ drivers/perf/arm_smmuv3_pmu.c | 58 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 58 insertions(+)
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 08f26db..b979c86 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -356,7 +356,8 @@ static struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
- 	if (map->flags & ACPI_IORT_ID_SINGLE_MAPPING) {
- 		if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT ||
- 		    node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX ||
--		    node->type == ACPI_IORT_NODE_SMMU_V3) {
-+		    node->type == ACPI_IORT_NODE_SMMU_V3 ||
-+		    node->type == ACPI_IORT_NODE_PMCG) {
- 			*id_out = map->output_base;
- 			return parent;
- 		}
-@@ -394,6 +395,8 @@ static int iort_get_id_mapping_index(struct acpi_iort_node *node)
- 		}
+diff --git a/drivers/perf/arm_smmuv3_pmu.c b/drivers/perf/arm_smmuv3_pmu.c
+index 2fa6c96..84f7907 100644
+--- a/drivers/perf/arm_smmuv3_pmu.c
++++ b/drivers/perf/arm_smmuv3_pmu.c
+@@ -57,6 +57,7 @@
+ #define SMMU_PMCG_OVSSET0               0xCC0
+ #define SMMU_PMCG_CFGR                  0xE00
+ #define SMMU_PMCG_CFGR_RELOC_CTRS       BIT(20)
++#define SMMU_PMCG_CFGR_MSI              BIT(21)
+ #define SMMU_PMCG_CFGR_SIZE_MASK        GENMASK(13, 8)
+ #define SMMU_PMCG_CFGR_NCTR_MASK        GENMASK(5, 0)
+ #define SMMU_PMCG_CR                    0xE04
+@@ -66,6 +67,12 @@
+ #define SMMU_PMCG_IRQ_CTRL              0xE50
+ #define SMMU_PMCG_IRQ_CTRL_IRQEN        BIT(0)
+ #define SMMU_PMCG_IRQ_CFG0              0xE58
++#define SMMU_PMCG_IRQ_CFG1              0xE60
++#define SMMU_PMCG_IRQ_CFG2              0xE64
++
++/* MSI config fields */
++#define MSI_CFG0_ADDR_MASK              GENMASK_ULL(51, 2)
++#define MSI_CFG2_MEMATTR_DEVICE_nGnRE   0x1
  
- 		return smmu->id_mapping_index;
-+	case ACPI_IORT_NODE_PMCG:
-+		return 0;
- 	default:
- 		return -EINVAL;
- 	}
-@@ -1309,6 +1312,50 @@ static bool __init arm_smmu_is_coherent(struct acpi_iort_node *node)
- 	return smmu->flags & ACPI_IORT_SMMU_COHERENT_WALK;
+ #define SMMU_DEFAULT_FILTER_SPAN        1
+ #define SMMU_DEFAULT_FILTER_STREAM_ID   GENMASK(31, 0)
+@@ -548,11 +555,62 @@ static irqreturn_t smmu_pmu_handle_irq(int irq_num, void *data)
+ 	return IRQ_HANDLED;
  }
  
-+static void __init arm_smmu_common_dma_configure(struct device *dev,
-+						enum dev_dma_attr attr)
++static void smmu_pmu_free_msis(void *data)
 +{
-+	/* We expect the dma masks to be equivalent for all SMMUs set-ups */
-+	dev->dma_mask = &dev->coherent_dma_mask;
++	struct device *dev = data;
 +
-+	/* Configure DMA for the page table walker */
-+	acpi_dma_configure(dev, attr);
++	platform_msi_domain_free_irqs(dev);
 +}
 +
-+static int __init arm_smmu_v3_pmcg_count_resources(struct acpi_iort_node *node)
++static void smmu_pmu_write_msi_msg(struct msi_desc *desc, struct msi_msg *msg)
 +{
-+	struct acpi_iort_pmcg *pmcg;
++	phys_addr_t doorbell;
++	struct device *dev = msi_desc_to_dev(desc);
++	struct smmu_pmu *pmu = dev_get_drvdata(dev);
 +
-+	/* Retrieve PMCG specific data */
-+	pmcg = (struct acpi_iort_pmcg *)node->node_data;
++	doorbell = (((u64)msg->address_hi) << 32) | msg->address_lo;
++	doorbell &= MSI_CFG0_ADDR_MASK;
 +
-+	/*
-+	 * There are always 2 memory resources.
-+	 * If the overflow_gsiv is present then add that for a total of 3.
-+	 */
-+	return pmcg->overflow_gsiv ? 3 : 2;
++	writeq_relaxed(doorbell, pmu->reg_base + SMMU_PMCG_IRQ_CFG0);
++	writel_relaxed(msg->data, pmu->reg_base + SMMU_PMCG_IRQ_CFG1);
++	writel_relaxed(MSI_CFG2_MEMATTR_DEVICE_nGnRE,
++		       pmu->reg_base + SMMU_PMCG_IRQ_CFG2);
 +}
 +
-+static void __init arm_smmu_v3_pmcg_init_resources(struct resource *res,
-+					       struct acpi_iort_node *node)
++static void smmu_pmu_setup_msi(struct smmu_pmu *pmu)
 +{
-+	struct acpi_iort_pmcg *pmcg;
++	struct msi_desc *desc;
++	struct device *dev = pmu->dev;
++	int ret;
 +
-+	/* Retrieve PMCG specific data */
-+	pmcg = (struct acpi_iort_pmcg *)node->node_data;
++	/* Clear MSI address reg */
++	writeq_relaxed(0, pmu->reg_base + SMMU_PMCG_IRQ_CFG0);
 +
-+	res[0].start = pmcg->page0_base_address;
-+	res[0].end = pmcg->page0_base_address + SZ_4K - 1;
-+	res[0].flags = IORESOURCE_MEM;
-+	res[1].start = pmcg->page1_base_address;
-+	res[1].end = pmcg->page1_base_address + SZ_4K - 1;
-+	res[1].flags = IORESOURCE_MEM;
++	/* MSI supported or not */
++	if (!(readl(pmu->reg_base + SMMU_PMCG_CFGR) & SMMU_PMCG_CFGR_MSI))
++		return;
 +
-+	if (pmcg->overflow_gsiv)
-+		acpi_iort_register_irq(pmcg->overflow_gsiv, "overflow",
-+				       ACPI_EDGE_SENSITIVE, &res[2]);
-+}
-+
- struct iort_dev_config {
- 	const char *name;
- 	int (*dev_init)(struct acpi_iort_node *node);
-@@ -1318,6 +1365,8 @@ struct iort_dev_config {
- 				     struct acpi_iort_node *node);
- 	void (*dev_set_proximity)(struct device *dev,
- 				    struct acpi_iort_node *node);
-+	void (*dev_dma_configure)(struct device *dev,
-+					enum dev_dma_attr attr);
- };
- 
- static const struct iort_dev_config iort_arm_smmu_v3_cfg __initconst = {
-@@ -1326,23 +1375,34 @@ static const struct iort_dev_config iort_arm_smmu_v3_cfg __initconst = {
- 	.dev_count_resources = arm_smmu_v3_count_resources,
- 	.dev_init_resources = arm_smmu_v3_init_resources,
- 	.dev_set_proximity = arm_smmu_v3_set_proximity,
-+	.dev_dma_configure = arm_smmu_common_dma_configure,
- };
- 
- static const struct iort_dev_config iort_arm_smmu_cfg __initconst = {
- 	.name = "arm-smmu",
- 	.dev_is_coherent = arm_smmu_is_coherent,
- 	.dev_count_resources = arm_smmu_count_resources,
--	.dev_init_resources = arm_smmu_init_resources
-+	.dev_init_resources = arm_smmu_init_resources,
-+	.dev_dma_configure = arm_smmu_common_dma_configure,
-+};
-+
-+static const struct iort_dev_config iort_arm_smmu_v3_pmcg_cfg __initconst = {
-+	.name = "arm-smmu-v3-pmu",
-+	.dev_count_resources = arm_smmu_v3_pmcg_count_resources,
-+	.dev_init_resources = arm_smmu_v3_pmcg_init_resources,
- };
- 
- static __init const struct iort_dev_config *iort_get_dev_cfg(
- 			struct acpi_iort_node *node)
- {
-+
- 	switch (node->type) {
- 	case ACPI_IORT_NODE_SMMU_V3:
- 		return &iort_arm_smmu_v3_cfg;
- 	case ACPI_IORT_NODE_SMMU:
- 		return &iort_arm_smmu_cfg;
-+	case ACPI_IORT_NODE_PMCG:
-+		return &iort_arm_smmu_v3_pmcg_cfg;
- 	default:
- 		return NULL;
- 	}
-@@ -1398,12 +1458,6 @@ static int __init iort_add_platform_device(struct acpi_iort_node *node,
- 	if (ret)
- 		goto dev_put;
- 
--	/*
--	 * We expect the dma masks to be equivalent for
--	 * all SMMUs set-ups
--	 */
--	pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
--
- 	fwnode = iort_get_fwnode(node);
- 
- 	if (!fwnode) {
-@@ -1413,11 +1467,11 @@ static int __init iort_add_platform_device(struct acpi_iort_node *node,
- 
- 	pdev->dev.fwnode = fwnode;
- 
--	attr = ops->dev_is_coherent && ops->dev_is_coherent(node) ?
-+	if (ops->dev_dma_configure) {
-+		attr = ops->dev_is_coherent && ops->dev_is_coherent(node) ?
- 			DEV_DMA_COHERENT : DEV_DMA_NON_COHERENT;
--
--	/* Configure DMA for the page table walker */
--	acpi_dma_configure(&pdev->dev, attr);
-+		ops->dev_dma_configure(&pdev->dev, attr);
++	ret = platform_msi_domain_alloc_irqs(dev, 1, smmu_pmu_write_msi_msg);
++	if (ret) {
++		dev_warn(dev, "failed to allocate MSIs\n");
++		return;
 +	}
++
++	desc = first_msi_entry(dev);
++	if (desc)
++		pmu->irq = desc->irq;
++
++	/* Add callback to free MSIs on teardown */
++	devm_add_action(dev, smmu_pmu_free_msis, dev);
++}
++
+ static int smmu_pmu_setup_irq(struct smmu_pmu *pmu)
+ {
+ 	unsigned long flags = IRQF_NOBALANCING | IRQF_SHARED | IRQF_NO_THREAD;
+ 	int irq, ret = -ENXIO;
  
- 	iort_set_device_domain(&pdev->dev, node);
- 
++	smmu_pmu_setup_msi(pmu);
++
+ 	irq = pmu->irq;
+ 	if (irq)
+ 		ret = devm_request_irq(pmu->dev, irq, smmu_pmu_handle_irq,
 -- 
 2.7.4
