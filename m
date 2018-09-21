@@ -1,82 +1,96 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 21 Sep 2018 15:51:41 +0530
-Subject: [RFC PATCH 26/40] PCI: keystone: Explicitly set the PCIe mode
+Date: Fri, 21 Sep 2018 15:51:36 +0530
+Subject: [RFC PATCH 21/40] PCI: keystone: Add debug error message for all
+ errors
 In-Reply-To: <20180921102155.22839-1-kishon@ti.com>
 References: <20180921102155.22839-1-kishon@ti.com>
-Message-ID: <20180921102155.22839-27-kishon@ti.com>
+Message-ID: <20180921102155.22839-22-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Explicitly set the PCIe mode to BOOTCFG_DEVCFG instead of always
-relying on the default values. This is required when EP mode has to
-be explicitly written to BOOTCFG_DEVCFG register.
+commit 025dd3daeda77f61a280da87ae701 ("PCI: keystone: Add error IRQ
+handler") added dev_err() message only for ERR_AXI and ERR_FATAL. Add
+debug error message for ERR_SYS, ERR_NONFATAL, ERR_CORR and ERR_AER here.
+
+While at that avoid using ERR_IRQ_STATUS_RAW and use ERR_IRQ_STATUS
+instead.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/pci/controller/dwc/pci-keystone.c | 37 +++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+ drivers/pci/controller/dwc/pci-keystone.c | 45 +++++++++++++----------
+ 1 file changed, 25 insertions(+), 20 deletions(-)
 
 diff --git a/drivers/pci/controller/dwc/pci-keystone.c b/drivers/pci/controller/dwc/pci-keystone.c
-index 13e865f82f96..e8328039a017 100644
+index 240c39c58b0f..a3dec74da70c 100644
 --- a/drivers/pci/controller/dwc/pci-keystone.c
 +++ b/drivers/pci/controller/dwc/pci-keystone.c
-@@ -80,6 +80,15 @@
- #define PCIE_RC_K2L			0xb00a
- #define PCIE_RC_K2G			0xb00b
- 
-+#define KS_PCIE_DEV_TYPE_MASK		(0x3 << 1)
-+#define KS_PCIE_DEV_TYPE(mode)		((mode) << 1)
-+
-+#define EP				0x0
-+#define LEG_EP				0x1
-+#define RC				0x2
-+
-+#define KS_PCIE_SYSCLOCKOUTEN		BIT(0)
-+
- #define to_keystone_pcie(x)		dev_get_drvdata((x)->dev)
- 
- static int ks_pcie_start_link(struct dw_pcie *pci);
-@@ -749,6 +758,30 @@ static int ks_pcie_enable_phy(struct keystone_pcie *ks_pcie)
- 	return ret;
+@@ -74,8 +74,6 @@
+ #define ERR_SYS		BIT(0)	/* System (fatal, non-fatal, or correctable) */
+ #define ERR_IRQ_ALL	(ERR_AER | ERR_AXI | ERR_CORR | \
+ 			 ERR_NONFATAL | ERR_FATAL | ERR_SYS)
+-#define ERR_FATAL_IRQ	(ERR_FATAL | ERR_AXI)
+-#define ERR_IRQ_STATUS_RAW		0x1c0
+ #define ERR_IRQ_STATUS			0x1c4
+ #define ERR_IRQ_ENABLE_SET		0x1c8
+ #define ERR_IRQ_ENABLE_CLR		0x1cc
+@@ -180,23 +178,6 @@ static void ks_pcie_enable_error_irq(struct keystone_pcie *ks_pcie)
+ 	ks_pcie_app_writel(ks_pcie, ERR_IRQ_ENABLE_SET, ERR_IRQ_ALL);
  }
  
-+static int ks_pcie_set_mode(struct device *dev)
-+{
-+	struct device_node *np = dev->of_node;
-+	struct regmap *syscon;
-+	u32 val;
-+	u32 mask;
-+	int ret = 0;
-+
-+	syscon = syscon_regmap_lookup_by_phandle(np, "ti,syscon-pcie-mode");
-+	if (IS_ERR(syscon))
-+		return 0;
-+
-+	mask = KS_PCIE_DEV_TYPE_MASK | KS_PCIE_SYSCLOCKOUTEN;
-+	val = KS_PCIE_DEV_TYPE(RC) | KS_PCIE_SYSCLOCKOUTEN;
-+
-+	ret = regmap_update_bits(syscon, 0, mask, val);
-+	if (ret) {
-+		dev_err(dev, "failed to set pcie mode\n");
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
- static int __init ks_pcie_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-@@ -865,6 +898,10 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
- 		goto err_get_sync;
- 	}
+-static irqreturn_t ks_pcie_handle_error_irq(struct keystone_pcie *ks_pcie)
+-{
+-	u32 status;
+-
+-	status = ks_pcie_app_readl(ks_pcie, ERR_IRQ_STATUS_RAW) & ERR_IRQ_ALL;
+-	if (!status)
+-		return IRQ_NONE;
+-
+-	if (status & ERR_FATAL_IRQ)
+-		dev_err(ks_pcie->pci->dev, "fatal error (status %#010x)\n",
+-			status);
+-
+-	/* Ack the IRQ; status bits are RW1C */
+-	ks_pcie_app_writel(ks_pcie, ERR_IRQ_STATUS, status);
+-	return IRQ_HANDLED;
+-}
+-
+ /**
+  * ks_pcie_set_dbi_mode() - Set DBI mode to access overlaid BAR mask
+  * registers
+@@ -636,9 +617,33 @@ static const struct dw_pcie_host_ops ks_pcie_host_ops = {
  
-+	ret = ks_pcie_set_mode(dev);
-+	if (ret < 0)
-+		goto err_get_sync;
+ static irqreturn_t ks_pcie_err_irq_handler(int irq, void *priv)
+ {
++	u32 reg;
+ 	struct keystone_pcie *ks_pcie = priv;
++	struct device *dev = ks_pcie->pci->dev;
+ 
+-	return ks_pcie_handle_error_irq(ks_pcie);
++	reg = ks_pcie_app_readl(ks_pcie, ERR_IRQ_STATUS);
 +
- 	ret = ks_pcie_add_pcie_port(ks_pcie, pdev);
- 	if (ret < 0)
- 		goto err_get_sync;
++	if (reg & ERR_SYS)
++		dev_err(dev, "System Error\n");
++
++	if (reg & ERR_FATAL)
++		dev_err(dev, "Fatal Error\n");
++
++	if (reg & ERR_NONFATAL)
++		dev_dbg(dev, "Non Fatal Error\n");
++
++	if (reg & ERR_CORR)
++		dev_dbg(dev, "Correctable Error\n");
++
++	if (reg & ERR_AXI)
++		dev_err(dev, "AXI tag lookup fatal Error\n");
++
++	if (reg & ERR_AER)
++		dev_err(dev, "ECRC Error\n");
++
++	ks_pcie_app_writel(ks_pcie, ERR_IRQ_STATUS, reg);
++
++	return IRQ_HANDLED;
+ }
+ 
+ static int __init ks_pcie_add_pcie_port(struct keystone_pcie *ks_pcie,
 -- 
 2.17.1
