@@ -1,47 +1,46 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Fri, 21 Sep 2018 12:07:38 +0800
-Subject: [PATCH 4/4] pinctrl: mediatek: add eint support to MT6765 pinctrl
- driver
-In-Reply-To: <ab85fbee4d8286cbedbcc7317f89dc0d2dd83965.1537502494.git.sean.wang@mediatek.com>
-References: <ab85fbee4d8286cbedbcc7317f89dc0d2dd83965.1537502494.git.sean.wang@mediatek.com>
-Message-ID: <82d47055aec8e40422eb72568e96bfbaf199d9d2.1537502494.git.sean.wang@mediatek.com>
+Date: Fri, 21 Sep 2018 12:07:35 +0800
+Subject: [PATCH 1/4] pinctrl: mediatek: fix static checker warning caused by
+ EINT_NA
+Message-ID: <ab85fbee4d8286cbedbcc7317f89dc0d2dd83965.1537502494.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mars Cheng <mars.cheng@mediatek.com>
+From: Sean Wang <sean.wang@mediatek.com>
 
-Just add eint support to MT6765 pinctrl driver as usual as
-happens on the other SoCs.
+EINT_NA is an u16 number, so it should be U16_MAX instead of -1
+to fix up drivers/pinctrl/mediatek/pinctrl-paris.c:732 mtk_gpio_to_irq()
+warn: impossible condition (desc->eint.eint_n == -1) => (0-u16max == (-1))
 
-Signed-off-by: Mars Cheng <mars.cheng@mediatek.com>
+Also happens in
+drivers/pinctrl/mediatek/pinctrl-paris.c:749 mtk_gpio_set_config()
+warn: impossible condition (desc->eint.eint_n == -1) => (0-u16max == (-1))
+
+drivers/pinctrl/mediatek/pinctrl-moore.c:479 mtk_gpio_to_irq()
+warn: impossible condition (desc->eint.eint_n == -1) => (0-u16max == (-1))
+
+drivers/pinctrl/mediatek/pinctrl-moore.c:496 mtk_gpio_set_config()
+warn: impossible condition '(desc->eint.eint_n == -1) => (0-u16max == (-1))
+
+Fixes: 6561859b067f ("pinctrl: mediatek: add eint support to MT8183 pinctrl driver")
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 ---
- drivers/pinctrl/mediatek/pinctrl-mt6765.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mt6765.c b/drivers/pinctrl/mediatek/pinctrl-mt6765.c
-index 1cae634..32451e8 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mt6765.c
-+++ b/drivers/pinctrl/mediatek/pinctrl-mt6765.c
-@@ -1056,11 +1056,19 @@ static const char * const mt6765_pinctrl_register_base_names[] = {
- 	"iocfg6", "iocfg7",
- };
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h
+index 10d33ec..b618042 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h
++++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.h
+@@ -18,7 +18,7 @@
+ #define MTK_PULLDOWN   0
+ #define MTK_PULLUP     1
  
-+static const struct mtk_eint_hw mt6765_eint_hw = {
-+	.port_mask = 7,
-+	.ports     = 6,
-+	.ap_num    = 160,
-+	.db_cnt    = 13,
-+};
-+
- static const struct mtk_pin_soc mt6765_data = {
- 	.reg_cal = mt6765_reg_cals,
- 	.pins = mtk_pins_mt6765,
- 	.npins = ARRAY_SIZE(mtk_pins_mt6765),
- 	.ngrps = ARRAY_SIZE(mtk_pins_mt6765),
-+	.eint_hw = &mt6765_eint_hw,
- 	.gpio_m = 0,
- 	.ies_present = true,
- 	.base_names = mt6765_pinctrl_register_base_names,
+-#define EINT_NA	-1
++#define EINT_NA	U16_MAX
+ 
+ #define PIN_FIELD_CALC(_s_pin, _e_pin, _i_base, _s_addr, _x_addrs,      \
+ 		       _s_bit, _x_bits, _sz_reg, _fixed) {		\
 -- 
 2.7.4
