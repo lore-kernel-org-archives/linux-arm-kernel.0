@@ -1,175 +1,67 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Fri, 21 Sep 2018 12:14:22 +0900
-Subject: [PATCH v4] gpu/drm/exynos: Convert
- drm_atomic_helper_suspend/resume()
-In-Reply-To: <CAFqt6zbp+yFq-59o-J5dtB8Gfc3Ggd6Ff6tCy5vt0OTTSr41vQ@mail.gmail.com>
-References: <20180802154517.GA10593@jordon-HP-15-Notebook-PC>
- <CAFqt6zZDRaVp53RnEri+P4b8+GByE-UQwerJmuLBe6E=GK0kDQ@mail.gmail.com>
- <CGME20180918060240epcas1p1aff628245281e98554044ef3db5c684a@epcas1p1.samsung.com>
- <CAFqt6zbp+yFq-59o-J5dtB8Gfc3Ggd6Ff6tCy5vt0OTTSr41vQ@mail.gmail.com>
-Message-ID: <20180921031422epcas1p440984367cd375f84efd72b1eb8c8b9d7~WS8wTX1AN1223212232epcas1p4L@epcas1p4.samsung.com>
+From: bibby.hsieh@mediatek.com (Bibby Hsieh)
+Date: Fri, 21 Sep 2018 11:28:13 +0800
+Subject: [PATCH v3 03/12] drm/mediatek: adjust EDGE to match clock and data
+In-Reply-To: <20180921032822.30771-1-bibby.hsieh@mediatek.com>
+References: <20180921032822.30771-1-bibby.hsieh@mediatek.com>
+Message-ID: <20180921032822.30771-4-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joarder,
+From: chunhui dai <chunhui.dai@mediatek.com>
 
-On 2018? 09? 18? 15:02, Souptick Joarder wrote:
-> Hi Inki,
-> On Tue, Sep 11, 2018 at 2:06 PM Souptick Joarder <jrdr.linux@gmail.com> wrote:
->>
->> On Thu, Aug 2, 2018 at 9:12 PM Souptick Joarder <jrdr.linux@gmail.com> wrote:
->>>
->>> convert drm_atomic_helper_suspend/resume() to use
->>> drm_mode_config_helper_suspend/resume().
->>>
->>> exynos_drm_fbdev_suspend/resume can be removed
->>> as drm_mode_config_helper_suspend/resume has
->>> implement the same in generic way.
->>>
->>> Remove suspend_state from exynos_drm_private
->>> struct as it is no more useful.
->>>
->>> Signed-off-by: Ajit Negi <ajitn.linux@gmail.com>
->>> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
->>> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
->>
->> Can we get this patch in queue for 4.20 ? Not yet available in linux-next.
-> 
-> Is this patch queued for 4.20 ?
+The default timing of DPI data and clock is not match.
+We could adjust this bit to make them match.
 
-Queued already to exynos-drm-next below so please wait. I will have pull-request soon.
-https://git.kernel.org/pub/scm/linux/kernel/git/daeinki/drm-exynos.git/log/?h=exynos-drm-next
+Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
+Reviewed-by: CK Hu <ck.hu@mediatek.com>
+---
+ drivers/gpu/drm/mediatek/mtk_dpi.c      | 8 ++++++++
+ drivers/gpu/drm/mediatek/mtk_dpi_regs.h | 1 +
+ 2 files changed, 9 insertions(+)
 
-Thanks,
-Inki Dae
-
-> 
->>> ---
->>> v2: Address Inki Dae's comment. Remove ret variable
->>>     from both suspend/resume function.
->>>
->>> v3: Tested by Marek. Updated the change log.
->>>
->>> v4: removing the return as exynos_drm_resume()
->>>     now returns void.
->>>
->>>  drivers/gpu/drm/exynos/exynos_drm_drv.c   | 26 ++------------------------
->>>  drivers/gpu/drm/exynos/exynos_drm_drv.h   |  1 -
->>>  drivers/gpu/drm/exynos/exynos_drm_fbdev.c | 17 -----------------
->>>  drivers/gpu/drm/exynos/exynos_drm_fbdev.h | 10 ----------
->>>  4 files changed, 2 insertions(+), 52 deletions(-)
->>>
->>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.c b/drivers/gpu/drm/exynos/exynos_drm_drv.c
->>> index b599f74..6f76baf 100644
->>> --- a/drivers/gpu/drm/exynos/exynos_drm_drv.c
->>> +++ b/drivers/gpu/drm/exynos/exynos_drm_drv.c
->>> @@ -149,37 +149,15 @@ static void exynos_drm_postclose(struct drm_device *dev, struct drm_file *file)
->>>  static int exynos_drm_suspend(struct device *dev)
->>>  {
->>>         struct drm_device *drm_dev = dev_get_drvdata(dev);
->>> -       struct exynos_drm_private *private;
->>> -
->>> -       if (!drm_dev)
->>> -               return 0;
->>> -
->>> -       private = drm_dev->dev_private;
->>> -
->>> -       drm_kms_helper_poll_disable(drm_dev);
->>> -       exynos_drm_fbdev_suspend(drm_dev);
->>> -       private->suspend_state = drm_atomic_helper_suspend(drm_dev);
->>> -       if (IS_ERR(private->suspend_state)) {
->>> -               exynos_drm_fbdev_resume(drm_dev);
->>> -               drm_kms_helper_poll_enable(drm_dev);
->>> -               return PTR_ERR(private->suspend_state);
->>> -       }
->>>
->>> -       return 0;
->>> +       return  drm_mode_config_helper_suspend(drm_dev);
->>>  }
->>>
->>>  static void exynos_drm_resume(struct device *dev)
->>>  {
->>>         struct drm_device *drm_dev = dev_get_drvdata(dev);
->>> -       struct exynos_drm_private *private;
->>> -
->>> -       if (!drm_dev)
->>> -               return;
->>>
->>> -       private = drm_dev->dev_private;
->>> -       drm_atomic_helper_resume(drm_dev, private->suspend_state);
->>> -       exynos_drm_fbdev_resume(drm_dev);
->>> -       drm_kms_helper_poll_enable(drm_dev);
->>> +       drm_mode_config_helper_resume(drm_dev);
->>>  }
->>>
->>>  static const struct dev_pm_ops exynos_drm_pm_ops = {
->>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_drv.h b/drivers/gpu/drm/exynos/exynos_drm_drv.h
->>> index c737c4b..7349e7c 100644
->>> --- a/drivers/gpu/drm/exynos/exynos_drm_drv.h
->>> +++ b/drivers/gpu/drm/exynos/exynos_drm_drv.h
->>> @@ -195,7 +195,6 @@ struct drm_exynos_file_private {
->>>   */
->>>  struct exynos_drm_private {
->>>         struct drm_fb_helper *fb_helper;
->>> -       struct drm_atomic_state *suspend_state;
->>>
->>>         struct device *g2d_dev;
->>>         struct device *dma_dev;
->>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
->>> index 132dd52..918dd2c 100644
->>> --- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
->>> +++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.c
->>> @@ -270,20 +270,3 @@ void exynos_drm_fbdev_fini(struct drm_device *dev)
->>>         private->fb_helper = NULL;
->>>  }
->>>
->>> -void exynos_drm_fbdev_suspend(struct drm_device *dev)
->>> -{
->>> -       struct exynos_drm_private *private = dev->dev_private;
->>> -
->>> -       console_lock();
->>> -       drm_fb_helper_set_suspend(private->fb_helper, 1);
->>> -       console_unlock();
->>> -}
->>> -
->>> -void exynos_drm_fbdev_resume(struct drm_device *dev)
->>> -{
->>> -       struct exynos_drm_private *private = dev->dev_private;
->>> -
->>> -       console_lock();
->>> -       drm_fb_helper_set_suspend(private->fb_helper, 0);
->>> -       console_unlock();
->>> -}
->>> diff --git a/drivers/gpu/drm/exynos/exynos_drm_fbdev.h b/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
->>> index b338472..6840b6a 100644
->>> --- a/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
->>> +++ b/drivers/gpu/drm/exynos/exynos_drm_fbdev.h
->>> @@ -19,8 +19,6 @@
->>>
->>>  int exynos_drm_fbdev_init(struct drm_device *dev);
->>>  void exynos_drm_fbdev_fini(struct drm_device *dev);
->>> -void exynos_drm_fbdev_suspend(struct drm_device *drm);
->>> -void exynos_drm_fbdev_resume(struct drm_device *drm);
->>>
->>>  #else
->>>
->>> @@ -39,14 +37,6 @@ static inline void exynos_drm_fbdev_restore_mode(struct drm_device *dev)
->>>
->>>  #define exynos_drm_output_poll_changed (NULL)
->>>
->>> -static inline void exynos_drm_fbdev_suspend(struct drm_device *drm)
->>> -{
->>> -}
->>> -
->>> -static inline void exynos_drm_fbdev_resume(struct drm_device *drm)
->>> -{
->>> -}
->>> -
->>>  #endif
->>>
->>>  #endif
->>> --
->>> 1.9.1
->>>
-> 
-> 
+diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
+index 74a32833bde1..1e7369e0d91c 100644
+--- a/drivers/gpu/drm/mediatek/mtk_dpi.c
++++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
+@@ -121,6 +121,7 @@ struct mtk_dpi_yc_limit {
+ 
+ struct mtk_dpi_conf {
+ 	u32 reg_h_fre_con;
++	bool edge_sel_en;
+ };
+ 
+ static void mtk_dpi_mask(struct mtk_dpi *dpi, u32 offset, u32 val, u32 mask)
+@@ -351,6 +352,12 @@ static void mtk_dpi_config_2n_h_fre(struct mtk_dpi *dpi)
+ 	mtk_dpi_mask(dpi, dpi->conf->reg_h_fre_con, H_FRE_2N, H_FRE_2N);
+ }
+ 
++static void mtk_dpi_config_disable_edge(struct mtk_dpi *dpi)
++{
++	if (dpi->conf->edge_sel_en)
++		mtk_dpi_mask(dpi, dpi->conf->reg_h_fre_con, 0, EDGE_SEL_EN);
++}
++
+ static void mtk_dpi_config_color_format(struct mtk_dpi *dpi,
+ 					enum mtk_dpi_out_color_format format)
+ {
+@@ -536,6 +543,7 @@ static int mtk_dpi_set_display_mode(struct mtk_dpi *dpi,
+ 	mtk_dpi_config_yc_map(dpi, dpi->yc_map);
+ 	mtk_dpi_config_color_format(dpi, dpi->color_format);
+ 	mtk_dpi_config_2n_h_fre(dpi);
++	mtk_dpi_config_disable_edge(dpi);
+ 	mtk_dpi_sw_reset(dpi, false);
+ 
+ 	return 0;
+diff --git a/drivers/gpu/drm/mediatek/mtk_dpi_regs.h b/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
+index 040444d7718d..d9db8c4cacd7 100644
+--- a/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
++++ b/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
+@@ -223,5 +223,6 @@
+ #define ESAV_CODE2			(0xFFF << 0)
+ #define ESAV_CODE3_MSB			BIT(16)
+ 
++#define EDGE_SEL_EN			BIT(5)
+ #define H_FRE_2N			BIT(25)
+ #endif /* __MTK_DPI_REGS_H */
+-- 
+2.12.5.2.gbdf23ab
