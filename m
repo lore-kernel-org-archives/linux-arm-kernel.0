@@ -1,19 +1,16 @@
 From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 21 Sep 2018 15:03:14 +0100
-Subject: [PATCH] arm64: defconfig: Enable PCIEPORTBUS
-In-Reply-To: <1535632172-127690-1-git-send-email-liudongdong3@huawei.com>
-References: <1535632172-127690-1-git-send-email-liudongdong3@huawei.com>
-Message-ID: <5BA4FA22.7000602@hisilicon.com>
+Date: Fri, 21 Sep 2018 15:05:04 +0100
+Subject: [PATCH] arm64: defconfig: enable HiSilicon HNS3 driver
+In-Reply-To: <1536836203-173901-1-git-send-email-wangzhou1@hisilicon.com>
+References: <1536836203-173901-1-git-send-email-wangzhou1@hisilicon.com>
+Message-ID: <5BA4FA90.1060607@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dongdong,
+Hi Zhou,
 
-On 2018/8/30 13:29, Dongdong Liu wrote:
-> PCIe features like AER, Hotplug, PME, DPC depend on PCIEPORTBUS,
-> so enable PCIEPORTBUS as default.
-> 
-> Signed-off-by: Dongdong Liu <liudongdong3@huawei.com>
+On 2018/9/13 11:56, Zhou Wang wrote:
+> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
 
 Thanks!
 Applied to the hisilicon defconfig tree.
@@ -22,19 +19,21 @@ Best Regards,
 Wei
 
 > ---
->  arch/arm64/configs/defconfig | 1 +
->  1 file changed, 1 insertion(+)
+>  arch/arm64/configs/defconfig | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
 > diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index f67e8d5..e5652e9 100644
+> index db8d364..101ad54 100644
 > --- a/arch/arm64/configs/defconfig
 > +++ b/arch/arm64/configs/defconfig
-> @@ -67,6 +67,7 @@ CONFIG_ARCH_XGENE=y
->  CONFIG_ARCH_ZX=y
->  CONFIG_ARCH_ZYNQMP=y
->  CONFIG_PCI=y
-> +CONFIG_PCIEPORTBUS=y
->  CONFIG_PCI_IOV=y
->  CONFIG_HOTPLUG_PCI=y
->  CONFIG_HOTPLUG_PCI_ACPI=y
+> @@ -222,6 +222,9 @@ CONFIG_THUNDER_NIC_PF=y
+>  CONFIG_HIX5HD2_GMAC=y
+>  CONFIG_HNS_DSAF=y
+>  CONFIG_HNS_ENET=y
+> +CONFIG_HNS3=y
+> +CONFIG_HNS3_HCLGE=y
+> +CONFIG_HNS3_ENET=y
+>  CONFIG_E1000E=y
+>  CONFIG_IGB=y
+>  CONFIG_IGBVF=y
 > 
