@@ -1,124 +1,108 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri, 21 Sep 2018 23:17:01 +0100
-Subject: [PATCH v6 14/18] ACPI / APEI: Split ghes_read_estatus() to read CPER
- length
+Date: Fri, 21 Sep 2018 23:17:05 +0100
+Subject: [PATCH v6 18/18] arm64: acpi: Make apei_claim_sea() synchronise with
+ APEI's irq work
 In-Reply-To: <20180921221705.6478-1-james.morse@arm.com>
 References: <20180921221705.6478-1-james.morse@arm.com>
-Message-ID: <20180921221705.6478-15-james.morse@arm.com>
+Message-ID: <20180921221705.6478-19-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ghes_read_estatus() reads the record address, then the record's
-header, then performs some sanity checks before reading the
-records into the provided estatus buffer.
+APEI is unable to do all of its error handling work in nmi-context, so
+it defers non-fatal work onto the irq_work queue. arch_irq_work_raise()
+sends an IPI to the calling cpu, but we can't guarantee this will be
+taken before we return.
 
-We either need to know the size of the records before we call
-ghes_read_estatus(), or always provide a worst-case sized buffer,
-as happens today.
+Unless we interrupted a context with irqs-masked, we can call
+irq_work_run() to do the work now. Otherwise return -EINPROGRESS to
+indicate ghes_notify_sea() found some work to do, but it hasn't
+finished yet.
 
-Add a function to peek at the record's header to find the size. This
-will let the NMI path allocate the right amount of memory before reading
-the records, instead of using the worst-case size, and having to copy
-the records.
-
-Split ghes_read_estatus() to create ghes_peek_estatus() which
-returns the address and size of the CPER records.
+With this we can take apei_claim_sea() returning '0' to mean this
+external-abort was also notification of a firmware-first RAS error,
+and that APEI has processed the CPER records.
 
 Signed-off-by: James Morse <james.morse@arm.com>
+Reviewed-by: Punit Agrawal <punit.agrawal@arm.com>
+Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
+CC: Xie XiuQi <xiexiuqi@huawei.com>
+CC: gengdongjiu <gengdongjiu@huawei.com>
 ---
- drivers/acpi/apei/ghes.c | 55 ++++++++++++++++++++++++++++++----------
- 1 file changed, 41 insertions(+), 14 deletions(-)
+Changes since v2:
+ * Removed IS_ENABLED() check, done by the caller unless we have a dummy
+   definition.
+---
+ arch/arm64/kernel/acpi.c | 19 +++++++++++++++++++
+ arch/arm64/mm/fault.c    |  9 ++++-----
+ 2 files changed, 23 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 3028487d43a3..055176ed68ac 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -298,11 +298,12 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
- 	}
- }
- 
--static int ghes_read_estatus(struct ghes *ghes,
--			     struct acpi_hest_generic_status *estatus,
--			     u64 *buf_paddr, int fixmap_idx)
-+/* read the CPER block returning its address and size */
-+static int ghes_peek_estatus(struct ghes *ghes, int fixmap_idx,
-+			     u64 *buf_paddr, u32 *buf_len)
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index a9b8bba014b5..09744e2d15a0 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -23,6 +23,7 @@
+ #include <linux/init.h>
+ #include <linux/irq.h>
+ #include <linux/irqdomain.h>
++#include <linux/irq_work.h>
+ #include <linux/memblock.h>
+ #include <linux/of_fdt.h>
+ #include <linux/smp.h>
+@@ -270,10 +271,14 @@ int apei_claim_sea(struct pt_regs *regs)
  {
- 	struct acpi_hest_generic *g = ghes->generic;
-+	struct acpi_hest_generic_status estatus;
- 	u32 len;
- 	int rc;
+ 	int err = -ENOENT;
+ 	unsigned long current_flags = arch_local_save_flags();
++	unsigned long interrupted_flags = current_flags;
  
-@@ -317,26 +318,23 @@ static int ghes_read_estatus(struct ghes *ghes,
- 	if (!*buf_paddr)
- 		return -ENOENT;
+ 	if (!IS_ENABLED(CONFIG_ACPI_APEI_SEA))
+ 		return err;
  
--	ghes_copy_tofrom_phys(estatus, *buf_paddr,
--			      sizeof(*estatus), 1, fixmap_idx);
--	if (!estatus->block_status) {
-+	ghes_copy_tofrom_phys(&estatus, *buf_paddr,
-+			      sizeof(estatus), 1, fixmap_idx);
-+	if (!estatus.block_status) {
- 		*buf_paddr = 0;
- 		return -ENOENT;
- 	}
- 
- 	rc = -EIO;
--	len = cper_estatus_len(estatus);
--	if (len < sizeof(*estatus))
-+	len = cper_estatus_len(&estatus);
-+	if (len < sizeof(estatus))
- 		goto err_read_block;
- 	if (len > ghes->generic->error_block_length)
- 		goto err_read_block;
--	if (cper_estatus_check_header(estatus))
--		goto err_read_block;
--	ghes_copy_tofrom_phys(estatus + 1,
--			      *buf_paddr + sizeof(*estatus),
--			      len - sizeof(*estatus), 1, fixmap_idx);
--	if (cper_estatus_check(estatus))
-+	if (cper_estatus_check_header(&estatus))
- 		goto err_read_block;
-+	*buf_len = len;
++	if (regs)
++		interrupted_flags = regs->pstate;
 +
- 	rc = 0;
- 
- err_read_block:
-@@ -346,6 +344,35 @@ static int ghes_read_estatus(struct ghes *ghes,
- 	return rc;
- }
- 
-+static int __ghes_read_estatus(struct acpi_hest_generic_status *estatus,
-+			       u64 buf_paddr, size_t buf_len,
-+			       int fixmap_idx)
-+{
-+	ghes_copy_tofrom_phys(estatus, buf_paddr, buf_len, 1, fixmap_idx);
-+	if (cper_estatus_check(estatus)) {
-+		if (printk_ratelimit())
-+			pr_warning(FW_WARN GHES_PFX
-+				   "Failed to read error status block!\n");
-+		return -EIO;
+ 	/*
+ 	 * SEA can interrupt SError, mask it and describe this as an NMI so
+ 	 * that APEI defers the handling.
+@@ -282,6 +287,20 @@ int apei_claim_sea(struct pt_regs *regs)
+ 	nmi_enter();
+ 	err = ghes_notify_sea();
+ 	nmi_exit();
++
++	/*
++	 * APEI NMI-like notifications are deferred to irq_work. Unless
++	 * we interrupted irqs-masked code, we can do that now.
++	 */
++	if (!err) {
++		if (!arch_irqs_disabled_flags(interrupted_flags)) {
++			local_daif_restore(DAIF_PROCCTX_NOIRQ);
++			irq_work_run();
++		} else {
++			err = -EINPROGRESS;
++		}
 +	}
 +
-+	return 0;
-+}
-+
-+static int ghes_read_estatus(struct ghes *ghes,
-+			     struct acpi_hest_generic_status *estatus,
-+			     u64 *buf_paddr, int fixmap_idx)
-+{
-+	int rc;
-+	u32 buf_len;
-+
-+	rc = ghes_peek_estatus(ghes, fixmap_idx, buf_paddr, &buf_len);
-+	if (rc)
-+		return rc;
-+
-+	return __ghes_read_estatus(estatus, *buf_paddr, buf_len, fixmap_idx);
-+}
-+
- static void ghes_clear_estatus(struct acpi_hest_generic_status *estatus,
- 			       u64 buf_paddr, int fixmap_idx)
- {
+ 	local_daif_restore(current_flags);
+ 
+ 	return err;
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 2c38776bb71f..97036e01522a 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -630,11 +630,10 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+ 
+ 	inf = esr_to_fault_info(esr);
+ 
+-	/*
+-	 * Return value ignored as we rely on signal merging.
+-	 * Future patches will make this more robust.
+-	 */
+-	apei_claim_sea(regs);
++	if (apei_claim_sea(regs) == 0) {
++		/* APEI claimed this as a firmware-first notification */
++		return 0;
++	}
+ 
+ 	clear_siginfo(&info);
+ 	info.si_signo = inf->sig;
 -- 
 2.19.0
