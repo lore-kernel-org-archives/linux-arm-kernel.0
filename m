@@ -1,43 +1,35 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Fri, 21 Sep 2018 16:29:03 +0200
-Subject: [PATCH] MAINTAINERS: Update stm32 entry
-Message-ID: <1537540143-8177-1-git-send-email-alexandre.torgue@st.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 21 Sep 2018 16:29:41 +0200
+Subject: [PATCH 2/2] arm64: dts: allwinner: Olimex A64-OLinuXino: fix
+ ethernet
+In-Reply-To: <20180919141938.18791-1-rodrigo@tjader.xyz>
+References: <20180919141938.18791-1-rodrigo@tjader.xyz>
+Message-ID: <20180921142941.5ymp7ksphgboxrwz@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+On Wed, Sep 19, 2018 at 11:19:36AM -0300, Rodrigo Exterck?tter Tj?der wrote:
+> Without "allwinner,tx-delay-ps = <600>;" on the DTP it can receive packets
+> but not send.
+> 
+> Signed-off-by: Rodrigo Exterck?tter Tj?der <rodrigo@tjader.xyz>
 
-Add mailing list for stm32 architecture.
-Add "stm" pattern to not miss some drivers/directories when asking for maintainers.
+Again, that commit log would be nice if it was a bit more
+explicit. What is a DTP? How did you come up with that value? What is
+the value used by Allwinner/Olimex, and why did you use another one if
+you did?
 
-Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
+Thanks!
+Maxime
 
----
-
-Hi Arnd, Olof and Kevin,
-
-Can you please merge this patch for v4.20?
-
-Thanks in advance
-Alex
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index a5b256b..2106e08 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2085,10 +2085,12 @@ F:	include/linux/remoteproc/st_slim_rproc.h
- ARM/STM32 ARCHITECTURE
- M:	Maxime Coquelin <mcoquelin.stm32@gmail.com>
- M:	Alexandre Torgue <alexandre.torgue@st.com>
-+L:	linux-stm32 at st-md-mailman.stormreply.com (moderated for non-subscribers)
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git stm32-next
- N:	stm32
-+N:	stm
- F:	arch/arm/boot/dts/stm32*
- F:	arch/arm/mach-stm32/
- F:	drivers/clocksource/armv7m_systick.c
 -- 
-2.7.4
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180921/402f138c/attachment.sig>
