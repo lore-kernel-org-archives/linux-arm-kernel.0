@@ -1,23 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 21 Sep 2018 09:08:59 -0700
-Subject: [PATCH -next] pinctrl: mediatek: moore: fix return value check in
- mtk_moore_pinctrl_probe()
-In-Reply-To: <1537424510-23623-1-git-send-email-weiyongjun1@huawei.com>
-References: <1537424510-23623-1-git-send-email-weiyongjun1@huawei.com>
-Message-ID: <CACRpkdbyHU6cNNd96UMuH-ck5Z0i1vFjXXm6ECtUwUDw6R8=_w@mail.gmail.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Fri, 21 Sep 2018 18:09:14 +0200
+Subject: [PATCH 0/2] Add CPU Idle support on Armada 8K
+Message-ID: <20180921160916.12393-1-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 19, 2018 at 11:12 PM Wei Yongjun <weiyongjun1@huawei.com> wrote:
+Hello,
 
-> In case of error, the function devm_kmalloc_array() returns NULL pointer
-> not ERR_PTR(). The IS_ERR() test in the return value check should be
-> replaced with NULL test.
->
-> Fixes: b7d7f9eeca55 ("pinctrl: mediatek: extend struct mtk_pin_desc which per-pin driver depends on")
-> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+These two patches allow to enable the Idle support for Armada 8K
+boards.
 
-Patch applied with Sean's ACK.
+Gregory
 
-Yours,
-Linus Walleij
+Gregory CLEMENT (1):
+  arm64: dts: marvell: Add node labels for the cpus
+
+orenbh (1):
+  arm64: dts: marvell: add CPU Idle power state support on Armada 7K/8K
+
+ arch/arm64/boot/dts/marvell/armada-372x.dtsi  |  2 +-
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi  |  2 +-
+ .../boot/dts/marvell/armada-ap806-dual.dtsi   |  4 +--
+ .../boot/dts/marvell/armada-ap806-quad.dtsi   | 12 ++++++---
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 27 +++++++++++++++++++
+ .../marvell/armada-ap810-ap0-octa-core.dtsi   | 16 +++++------
+ 6 files changed, 47 insertions(+), 16 deletions(-)
+
+-- 
+2.19.0
