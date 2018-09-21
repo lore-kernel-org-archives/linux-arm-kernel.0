@@ -1,79 +1,271 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 21 Sep 2018 13:46:09 +0200
-Subject: [PATCH] ARM: dts: exynos: ordering wrong order tmu_cpu on
- Odroid-XU3/4 thermal-zones definition
-In-Reply-To: <20180921113329.tha5tfrsvdf7dtws@inc028000032.lancs.ac.uk>
-References: <20180921113329.tha5tfrsvdf7dtws@inc028000032.lancs.ac.uk>
-Message-ID: <CAJKOXPdDFm=7wNLt5Nzf-y8TS4u6gmo51Y70bFv_pKdFK42VDQ@mail.gmail.com>
+From: abel.vesa@nxp.com (Abel Vesa)
+Date: Fri, 21 Sep 2018 15:11:31 +0300
+Subject: [PATCH v8 2/5] clk: imx: add fractional PLL output clock
+In-Reply-To: <1537531894-18499-1-git-send-email-abel.vesa@nxp.com>
+References: <1537531894-18499-1-git-send-email-abel.vesa@nxp.com>
+Message-ID: <1537531894-18499-3-git-send-email-abel.vesa@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 21 Sep 2018 at 13:33, Willy Wolff <willy.mh.wolff.ml@gmail.com> wrote:
->
-> This patch is to open a discussion about wrong order of tmu_cpu.
->
-> It seems that tmu_cpu1 correspond to cpu3, and tmu_cpu3 match cpu1.
-> Note, cpu{0|3} in dtsi correspond to cpu{3|7} in linux and are the big
-> cores.
+From: Lucas Stach <l.stach@pengutronix.de>
 
-Hi,
+This is a new clock type introduced on i.MX8.
 
-I do not understand this sentence. In DTSI, the CPU0-3 are the A7,
-little cores. Defined by exynos5422-cpus.dtsi. What did you mean here?
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
+---
+ drivers/clk/imx/Makefile       |   1 +
+ drivers/clk/imx/clk-frac-pll.c | 215 +++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/imx/clk.h          |   3 +
+ 3 files changed, 219 insertions(+)
+ create mode 100644 drivers/clk/imx/clk-frac-pll.c
 
-> By dependencis from exynos5422-odroidxu3-common.dtsi to
-> exynos5800.dtsi -> exynos5420.dtsi, I guess definitions of tmu_cpuX are
-> incorrect. However, changing the address, reg interrupts or clocks
-> would breack other boards depending on it. As I can't test other boards,
-> I've just overload the reference in the thermal-zones node.
-
-There are 8 CPUs (4 little and 4 big) but only 4 thermal zones for
-CPUs. The mapping of names of CPU nodes and TMU nodes in DTS is not
-direct. These are just indices ... although more important is to map
-the cooling devices to proper TMU. This should be mentioned in DTS as
-this the real problem here.
-
->
-> To reproduce the problem, I provide two scripts:
-> == script_stress:
->
-> for i in 0 10 20 40 80; do
->     echo $i
->     taskset $i stress -t 10 -c 1
-> done;
->
-> == script_read_temp:
->
-> while true; do
->     for i in 0 1 2 3 4; do
->         echo $i
->         cat /sys/devices/virtual/thermal/thermal_zone$i/temp
->     done;
->     sleep 1
->     clear
-> done;
->
-> Signed-off-by: Willy Wolff <willy.mh.wolff@gmail.com>
-> ---
->  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> index 96e281c0a118..4512ffad2785 100644
-> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> @@ -135,7 +135,8 @@
->                         };
->                 };
->                 cpu1_thermal: cpu1-thermal {
-> -                       thermal-sensors = <&tmu_cpu1 0>;
-> +                       // thermal-sensors = <&tmu_cpu1 0>;
-
-Do not leave commented lines, there are not needed.
-
-Also your email does not match signed-off-by. You must have something
-wrong with either git setup or mailer (git commit --si will use the
-same address for From and SoB so I guess the mailer...).
-
-Best regards,
-Krzysztof
+diff --git a/drivers/clk/imx/Makefile b/drivers/clk/imx/Makefile
+index 8c3baa7..4893c1f 100644
+--- a/drivers/clk/imx/Makefile
++++ b/drivers/clk/imx/Makefile
+@@ -6,6 +6,7 @@ obj-y += \
+ 	clk-cpu.o \
+ 	clk-fixup-div.o \
+ 	clk-fixup-mux.o \
++	clk-frac-pll.o \
+ 	clk-gate-exclusive.o \
+ 	clk-gate2.o \
+ 	clk-pllv1.o \
+diff --git a/drivers/clk/imx/clk-frac-pll.c b/drivers/clk/imx/clk-frac-pll.c
+new file mode 100644
+index 0000000..030df76
+--- /dev/null
++++ b/drivers/clk/imx/clk-frac-pll.c
+@@ -0,0 +1,215 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright 2018 NXP.
++ */
++
++#include <linux/clk-provider.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/iopoll.h>
++#include <linux/jiffies.h>
++#include <linux/slab.h>
++#include <linux/bitfield.h>
++
++#include "clk.h"
++
++#define PLL_CFG0		0x0
++#define PLL_CFG1		0x4
++
++#define PLL_LOCK_STATUS		BIT(31)
++#define PLL_PD_MASK		BIT(19)
++#define PLL_BYPASS_MASK		BIT(14)
++#define PLL_NEWDIV_VAL		BIT(12)
++#define PLL_NEWDIV_ACK		BIT(11)
++#define PLL_FRAC_DIV_MASK	GENMASK(30, 7)
++#define PLL_INT_DIV_MASK	GENMASK(6, 0)
++#define PLL_OUTPUT_DIV_MASK	GENMASK(4, 0)
++#define PLL_FRAC_DENOM		0x1000000
++
++#define PLL_FRAC_LOCK_TIMEOUT	10000
++#define PLL_FRAC_ACK_TIMEOUT	500000
++
++struct clk_frac_pll {
++	struct clk_hw	hw;
++	void __iomem	*base;
++};
++
++#define to_clk_frac_pll(_hw) container_of(_hw, struct clk_frac_pll, hw)
++
++static int clk_wait_lock(struct clk_frac_pll *pll)
++{
++	u32 val;
++
++	return readl_poll_timeout(pll->base, val, val & PLL_LOCK_STATUS, 0,
++					PLL_FRAC_LOCK_TIMEOUT);
++}
++
++static int clk_wait_ack(struct clk_frac_pll *pll)
++{
++	u32 val;
++
++	/* return directly if the pll is in powerdown or in bypass */
++	if (readl_relaxed(pll->base) & (PLL_PD_MASK | PLL_BYPASS_MASK))
++		return 0;
++
++	/* Wait for the pll's divfi and divff to be reloaded */
++	return readl_poll_timeout(pll->base, val, val & PLL_NEWDIV_ACK, 0,
++					PLL_FRAC_ACK_TIMEOUT);
++}
++
++static int clk_pll_prepare(struct clk_hw *hw)
++{
++	struct clk_frac_pll *pll = to_clk_frac_pll(hw);
++	u32 val;
++
++	val = readl_relaxed(pll->base + PLL_CFG0);
++	val &= ~PLL_PD_MASK;
++	writel_relaxed(val, pll->base + PLL_CFG0);
++
++	return clk_wait_lock(pll);
++}
++
++static void clk_pll_unprepare(struct clk_hw *hw)
++{
++	struct clk_frac_pll *pll = to_clk_frac_pll(hw);
++	u32 val;
++
++	val = readl_relaxed(pll->base + PLL_CFG0);
++	val |= PLL_PD_MASK;
++	writel_relaxed(val, pll->base + PLL_CFG0);
++}
++
++static int clk_pll_is_prepared(struct clk_hw *hw)
++{
++	struct clk_frac_pll *pll = to_clk_frac_pll(hw);
++	u32 val;
++
++	val = readl_relaxed(pll->base + PLL_CFG0);
++	return (val & PLL_PD_MASK) ? 0 : 1;
++}
++
++static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
++					 unsigned long parent_rate)
++{
++	struct clk_frac_pll *pll = to_clk_frac_pll(hw);
++	u32 val, divff, divfi, divq;
++	u64 temp64;
++
++	val = readl_relaxed(pll->base + PLL_CFG0);
++	divq = ((val & PLL_OUTPUT_DIV_MASK) + 1) * 2;
++	val = readl_relaxed(pll->base + PLL_CFG1);
++	divff = FIELD_GET(PLL_FRAC_DIV_MASK, val);
++	divfi = (val & PLL_INT_DIV_MASK);
++
++	temp64 = (u64)parent_rate * 8;
++	temp64 *= divff;
++	do_div(temp64, PLL_FRAC_DENOM);
++	temp64 /= divq;
++
++	return parent_rate * 8 * (divfi + 1) / divq + (unsigned long)temp64;
++}
++
++static long clk_pll_round_rate(struct clk_hw *hw, unsigned long rate,
++			       unsigned long *prate)
++{
++	unsigned long parent_rate = *prate;
++	u32 divff, divfi;
++	u64 temp64;
++
++	parent_rate *= 8;
++	rate *= 2;
++	divfi = rate / parent_rate;
++	temp64 = (u64)(rate - divfi * parent_rate);
++	temp64 *= PLL_FRAC_DENOM;
++	do_div(temp64, parent_rate);
++	divff = temp64;
++
++	temp64 = (u64)parent_rate;
++	temp64 *= divff;
++	do_div(temp64, PLL_FRAC_DENOM);
++
++	return (parent_rate * divfi + (unsigned long)temp64) / 2;
++}
++
++/*
++ * To simplify the clock calculation, we can keep the 'PLL_OUTPUT_VAL' at zero
++ * (means the PLL output will be divided by 2). So the PLL output can use
++ * the below formula:
++ * pllout = parent_rate * 8 / 2 * DIVF_VAL;
++ * where DIVF_VAL = 1 + DIVFI + DIVFF / 2^24.
++ */
++static int clk_pll_set_rate(struct clk_hw *hw, unsigned long rate,
++			    unsigned long parent_rate)
++{
++	struct clk_frac_pll *pll = to_clk_frac_pll(hw);
++	u32 val, divfi, divff;
++	u64 temp64;
++	int ret;
++
++	parent_rate *= 8;
++	rate *= 2;
++	divfi = rate / parent_rate;
++	temp64 = (u64) (rate - divfi * parent_rate);
++	temp64 *= PLL_FRAC_DENOM;
++	do_div(temp64, parent_rate);
++	divff = temp64;
++
++	val = readl_relaxed(pll->base + PLL_CFG1);
++	val &= ~(PLL_FRAC_DIV_MASK | PLL_INT_DIV_MASK);
++	val |= ((divff << 7) | (divfi - 1));
++	writel_relaxed(val, pll->base + PLL_CFG1);
++
++	val = readl_relaxed(pll->base + PLL_CFG0);
++	val &= ~0x1f;
++	writel_relaxed(val, pll->base + PLL_CFG0);
++
++	/* Set the NEV_DIV_VAL to reload the DIVFI and DIVFF */
++	val = readl_relaxed(pll->base + PLL_CFG0);
++	val |= PLL_NEWDIV_VAL;
++	writel_relaxed(val, pll->base + PLL_CFG0);
++
++	ret = clk_wait_ack(pll);
++
++	/* clear the NEV_DIV_VAL */
++	val = readl_relaxed(pll->base + PLL_CFG0);
++	val &= ~PLL_NEWDIV_VAL;
++	writel_relaxed(val, pll->base + PLL_CFG0);
++
++	return ret;
++}
++
++static const struct clk_ops clk_frac_pll_ops = {
++	.prepare	= clk_pll_prepare,
++	.unprepare	= clk_pll_unprepare,
++	.is_prepared	= clk_pll_is_prepared,
++	.recalc_rate	= clk_pll_recalc_rate,
++	.round_rate	= clk_pll_round_rate,
++	.set_rate	= clk_pll_set_rate,
++};
++
++struct clk *imx_clk_frac_pll(const char *name, const char *parent_name,
++			     void __iomem *base)
++{
++	struct clk_init_data init;
++	struct clk_frac_pll *pll;
++	struct clk *clk;
++
++	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
++	if (!pll)
++		return ERR_PTR(-ENOMEM);
++
++	pll->base = base;
++	init.name = name;
++	init.ops = &clk_frac_pll_ops;
++	init.flags = 0;
++	init.parent_names = &parent_name;
++	init.num_parents = 1;
++
++	pll->hw.init = &init;
++
++	clk = clk_register(NULL, &pll->hw);
++	if (IS_ERR(clk))
++		kfree(pll);
++
++	return clk;
++}
+diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
+index 8076ec0..13daf1c 100644
+--- a/drivers/clk/imx/clk.h
++++ b/drivers/clk/imx/clk.h
+@@ -27,6 +27,9 @@ struct clk *imx_clk_pllv1(enum imx_pllv1_type type, const char *name,
+ struct clk *imx_clk_pllv2(const char *name, const char *parent,
+ 		void __iomem *base);
+ 
++struct clk *imx_clk_frac_pll(const char *name, const char *parent_name,
++			     void __iomem *base);
++
+ enum imx_pllv3_type {
+ 	IMX_PLLV3_GENERIC,
+ 	IMX_PLLV3_SYS,
+-- 
+2.7.4
