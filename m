@@ -1,167 +1,110 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 21 Sep 2018 09:29:19 +0200
-Subject: [PATCH v5 20/22] nvmem: use EOPNOTSUPP instead of ENOSYS
-In-Reply-To: <20180921072921.19387-1-brgl@bgdev.pl>
-References: <20180921072921.19387-1-brgl@bgdev.pl>
-Message-ID: <20180921072921.19387-21-brgl@bgdev.pl>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Fri, 21 Sep 2018 15:39:52 +0800
+Subject: [PATCH v3 02/12] drm/mediatek: move hardware register to node data
+In-Reply-To: <20180921032822.30771-3-bibby.hsieh@mediatek.com>
+References: <20180921032822.30771-1-bibby.hsieh@mediatek.com>
+ <20180921032822.30771-3-bibby.hsieh@mediatek.com>
+Message-ID: <1537515592.20660.1.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Hi, Bibby:
 
-Checkpatch emits warnings when using ENOSYS. Some of the frameworks
-started using EOPNOTSUPP as return values for API functions when given
-subsystem is disabled in Kconfig.
+On Fri, 2018-09-21 at 11:28 +0800, Bibby Hsieh wrote:
+> From: chunhui dai <chunhui.dai@mediatek.com>
+> 
+> The address of register DPI_H_FRE_CON is different in different IC.
+> Using of_node data to find this address.
+> 
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- include/linux/nvmem-consumer.h | 30 +++++++++++++++---------------
- include/linux/nvmem-provider.h |  5 ++---
- 2 files changed, 17 insertions(+), 18 deletions(-)
+Reviewed-by: CK Hu <ck.hu@mediatek.com>
 
-diff --git a/include/linux/nvmem-consumer.h b/include/linux/nvmem-consumer.h
-index e17617fa034f..312bfa5efd80 100644
---- a/include/linux/nvmem-consumer.h
-+++ b/include/linux/nvmem-consumer.h
-@@ -93,13 +93,13 @@ int nvmem_unregister_notifier(struct notifier_block *nb);
- static inline struct nvmem_cell *nvmem_cell_get(struct device *dev,
- 						const char *id)
- {
--	return ERR_PTR(-ENOSYS);
-+	return ERR_PTR(-EOPNOTSUPP);
- }
- 
- static inline struct nvmem_cell *devm_nvmem_cell_get(struct device *dev,
- 						     const char *id)
- {
--	return ERR_PTR(-ENOSYS);
-+	return ERR_PTR(-EOPNOTSUPP);
- }
- 
- static inline void devm_nvmem_cell_put(struct device *dev,
-@@ -113,31 +113,31 @@ static inline void nvmem_cell_put(struct nvmem_cell *cell)
- 
- static inline void *nvmem_cell_read(struct nvmem_cell *cell, size_t *len)
- {
--	return ERR_PTR(-ENOSYS);
-+	return ERR_PTR(-EOPNOTSUPP);
- }
- 
- static inline int nvmem_cell_write(struct nvmem_cell *cell,
- 				    const char *buf, size_t len)
- {
--	return -ENOSYS;
-+	return -EOPNOTSUPP;
- }
- 
- static inline int nvmem_cell_read_u32(struct device *dev,
- 				      const char *cell_id, u32 *val)
- {
--	return -ENOSYS;
-+	return -EOPNOTSUPP;
- }
- 
- static inline struct nvmem_device *nvmem_device_get(struct device *dev,
- 						    const char *name)
- {
--	return ERR_PTR(-ENOSYS);
-+	return ERR_PTR(-EOPNOTSUPP);
- }
- 
- static inline struct nvmem_device *devm_nvmem_device_get(struct device *dev,
- 							 const char *name)
- {
--	return ERR_PTR(-ENOSYS);
-+	return ERR_PTR(-EOPNOTSUPP);
- }
- 
- static inline void nvmem_device_put(struct nvmem_device *nvmem)
-@@ -153,28 +153,28 @@ static inline ssize_t nvmem_device_cell_read(struct nvmem_device *nvmem,
- 					 struct nvmem_cell_info *info,
- 					 void *buf)
- {
--	return -ENOSYS;
-+	return -EOPNOTSUPP;
- }
- 
- static inline int nvmem_device_cell_write(struct nvmem_device *nvmem,
- 					  struct nvmem_cell_info *info,
- 					  void *buf)
- {
--	return -ENOSYS;
-+	return -EOPNOTSUPP;
- }
- 
- static inline int nvmem_device_read(struct nvmem_device *nvmem,
- 				    unsigned int offset, size_t bytes,
- 				    void *buf)
- {
--	return -ENOSYS;
-+	return -EOPNOTSUPP;
- }
- 
- static inline int nvmem_device_write(struct nvmem_device *nvmem,
- 				     unsigned int offset, size_t bytes,
- 				     void *buf)
- {
--	return -ENOSYS;
-+	return -EOPNOTSUPP;
- }
- 
- static inline const char *nvmem_dev_name(struct nvmem_device *nvmem)
-@@ -189,12 +189,12 @@ nvmem_del_cell_lookups(struct nvmem_cell_lookup *entries, size_t nentries) {}
- 
- static inline int nvmem_register_notifier(struct notifier_block *nb)
- {
--	return -ENOSYS;
-+	return -EOPNOTSUPP;
- }
- 
- static inline int nvmem_unregister_notifier(struct notifier_block *nb)
- {
--	return -ENOSYS;
-+	return -EOPNOTSUPP;
- }
- 
- #endif /* CONFIG_NVMEM */
-@@ -208,13 +208,13 @@ struct nvmem_device *of_nvmem_device_get(struct device_node *np,
- static inline struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
- 						   const char *id)
- {
--	return ERR_PTR(-ENOSYS);
-+	return ERR_PTR(-EOPNOTSUPP);
- }
- 
- static inline struct nvmem_device *of_nvmem_device_get(struct device_node *np,
- 						       const char *name)
- {
--	return ERR_PTR(-ENOSYS);
-+	return ERR_PTR(-EOPNOTSUPP);
- }
- #endif /* CONFIG_NVMEM && CONFIG_OF */
- 
-diff --git a/include/linux/nvmem-provider.h b/include/linux/nvmem-provider.h
-index 8ae012f6545a..1e3283c2af77 100644
---- a/include/linux/nvmem-provider.h
-+++ b/include/linux/nvmem-provider.h
-@@ -100,7 +100,7 @@ void nvmem_del_cell_table(struct nvmem_cell_table *table);
- 
- static inline struct nvmem_device *nvmem_register(const struct nvmem_config *c)
- {
--	return ERR_PTR(-ENOSYS);
-+	return ERR_PTR(-EOPNOTSUPP);
- }
- 
- static inline void nvmem_unregister(struct nvmem_device *nvmem) {}
-@@ -114,8 +114,7 @@ devm_nvmem_register(struct device *dev, const struct nvmem_config *c)
- static inline int
- devm_nvmem_unregister(struct device *dev, struct nvmem_device *nvmem)
- {
--	return -ENOSYS;
--
-+	return -EOPNOTSUPP;
- }
- 
- static inline void nvmem_add_cell_table(struct nvmem_cell_table *table) {}
--- 
-2.18.0
+> Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
+> ---
+>  drivers/gpu/drm/mediatek/mtk_dpi.c      | 19 ++++++++++++++++---
+>  drivers/gpu/drm/mediatek/mtk_dpi_regs.h |  1 -
+>  2 files changed, 16 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
+> index d9373e67d328..74a32833bde1 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_dpi.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/component.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/of.h>
+> +#include <linux/of_device.h>
+>  #include <linux/of_graph.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/types.h>
+> @@ -72,6 +73,7 @@ struct mtk_dpi {
+>  	struct clk *tvd_clk;
+>  	int irq;
+>  	struct drm_display_mode mode;
+> +	const struct mtk_dpi_conf *conf;
+>  	enum mtk_dpi_out_color_format color_format;
+>  	enum mtk_dpi_out_yc_map yc_map;
+>  	enum mtk_dpi_out_bit_num bit_num;
+> @@ -117,6 +119,10 @@ struct mtk_dpi_yc_limit {
+>  	u16 c_bottom;
+>  };
+>  
+> +struct mtk_dpi_conf {
+> +	u32 reg_h_fre_con;
+> +};
+> +
+>  static void mtk_dpi_mask(struct mtk_dpi *dpi, u32 offset, u32 val, u32 mask)
+>  {
+>  	u32 tmp = readl(dpi->regs + offset) & ~mask;
+> @@ -342,7 +348,7 @@ static void mtk_dpi_config_swap_input(struct mtk_dpi *dpi, bool enable)
+>  
+>  static void mtk_dpi_config_2n_h_fre(struct mtk_dpi *dpi)
+>  {
+> -	mtk_dpi_mask(dpi, DPI_H_FRE_CON, H_FRE_2N, H_FRE_2N);
+> +	mtk_dpi_mask(dpi, dpi->conf->reg_h_fre_con, H_FRE_2N, H_FRE_2N);
+>  }
+>  
+>  static void mtk_dpi_config_color_format(struct mtk_dpi *dpi,
+> @@ -668,6 +674,10 @@ static const struct component_ops mtk_dpi_component_ops = {
+>  	.unbind = mtk_dpi_unbind,
+>  };
+>  
+> +static const struct mtk_dpi_conf mt8173_conf = {
+> +	.reg_h_fre_con = 0xe0,
+> +};
+> +
+>  static int mtk_dpi_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+> @@ -682,6 +692,7 @@ static int mtk_dpi_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
+>  
+>  	dpi->dev = dev;
+> +	dpi->conf = (struct mtk_dpi_conf *)of_device_get_match_data(dev);
+>  
+>  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	dpi->regs = devm_ioremap_resource(dev, mem);
+> @@ -761,8 +772,10 @@ static int mtk_dpi_remove(struct platform_device *pdev)
+>  }
+>  
+>  static const struct of_device_id mtk_dpi_of_ids[] = {
+> -	{ .compatible = "mediatek,mt8173-dpi", },
+> -	{}
+> +	{ .compatible = "mediatek,mt8173-dpi",
+> +	  .data = &mt8173_conf,
+> +	},
+> +	{ },
+>  };
+>  
+>  struct platform_driver mtk_dpi_driver = {
+> diff --git a/drivers/gpu/drm/mediatek/mtk_dpi_regs.h b/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
+> index 4b6ad4751a31..040444d7718d 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
+> +++ b/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
+> @@ -223,6 +223,5 @@
+>  #define ESAV_CODE2			(0xFFF << 0)
+>  #define ESAV_CODE3_MSB			BIT(16)
+>  
+> -#define DPI_H_FRE_CON		0xE0
+>  #define H_FRE_2N			BIT(25)
+>  #endif /* __MTK_DPI_REGS_H */
