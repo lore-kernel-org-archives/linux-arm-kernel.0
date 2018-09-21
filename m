@@ -1,63 +1,85 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 21 Sep 2018 10:56:07 +0100
-Subject: [PATCH v13 3/3] arm64: Implement page table free interfaces
-In-Reply-To: <20180920172527.GB18934@arrakis.emea.arm.com>
-References: <1528268481-19299-1-git-send-email-cpandya@codeaurora.org>
- <1528268481-19299-4-git-send-email-cpandya@codeaurora.org>
- <20180920172527.GB18934@arrakis.emea.arm.com>
-Message-ID: <20180921095607.GA166997@arrakis.emea.arm.com>
+From: ludovic.Barre@st.com (Ludovic Barre)
+Date: Fri, 21 Sep 2018 11:46:20 +0200
+Subject: [PATCH V2 26/27] mmc: mmci: add DT bindings for STM32 sdmmc
+In-Reply-To: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
+References: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1537523181-14578-27-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 20, 2018 at 06:25:29PM +0100, Catalin Marinas wrote:
-> On Wed, Jun 06, 2018 at 12:31:21PM +0530, Chintan Pandya wrote:
-> > diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> > index 8ae5d7a..65f8627 100644
-> > --- a/arch/arm64/mm/mmu.c
-> > +++ b/arch/arm64/mm/mmu.c
-> > @@ -45,6 +45,7 @@
-> >  #include <asm/memblock.h>
-> >  #include <asm/mmu_context.h>
-> >  #include <asm/ptdump.h>
-> > +#include <asm/tlbflush.h>
-> >  
-> >  #define NO_BLOCK_MAPPINGS	BIT(0)
-> >  #define NO_CONT_MAPPINGS	BIT(1)
-> > @@ -977,12 +978,51 @@ int pmd_clear_huge(pmd_t *pmdp)
-> >  	return 1;
-> >  }
-> >  
-> > -int pud_free_pmd_page(pud_t *pud, unsigned long addr)
-> > +int pmd_free_pte_page(pmd_t *pmdp, unsigned long addr)
-> >  {
-> > -	return pud_none(*pud);
-> > +	pte_t *table;
-> > +	pmd_t pmd;
-> > +
-> > +	pmd = READ_ONCE(*pmdp);
-> > +
-> > +	/* No-op for empty entry and WARN_ON for valid entry */
-> > +	if (!pmd_present(pmd) || !pmd_table(pmd)) {
-> > +		VM_WARN_ON(!pmd_table(pmd));
-> > +		return 1;
-> > +	}
-> 
-> What's this VM_WARN_ON supposed to do here? If the pmd is 0, we trigger
-> it all the time. Did you actually mean something like:
-> 
-> 		VM_WARN_ON(!pmd_none(pmd));
-> 
-> or pmd_present(pmd)?
-> 
-> Since the comment mentions empty entry, I'd rather make it explicit:
-> 
-> 	if (pmd_none(pmd) || !pmd_table(pmd))
-> 		VM_WARN_ON(!pmd_none(pmd));
-> 		return 1;
-> 	}
+From: Ludovic Barre <ludovic.barre@st.com>
 
-Ignore this, fixed in -rc4 (fac880c7d074 "arm64: fix erroneous warnings
-in page freeing functions").
+STM32 sdmmc variant has support to:
+-Indicate signal directions (only one property
+for d0dir, d123dir, cmd_dir)
+-Select command and data phase relation.
+-Select "clock in" from an external driver.
 
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+---
+change v3:
+-remove space at end of "st,use-ckin "
+
+ Documentation/devicetree/bindings/mmc/mmci.txt | 9 +++++++++
+ drivers/mmc/host/mmci.c                        | 6 ++++++
+ drivers/mmc/host/mmci.h                        | 1 +
+ 3 files changed, 16 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/mmc/mmci.txt b/Documentation/devicetree/bindings/mmc/mmci.txt
+index e952707..d678933 100644
+--- a/Documentation/devicetree/bindings/mmc/mmci.txt
++++ b/Documentation/devicetree/bindings/mmc/mmci.txt
+@@ -19,6 +19,7 @@ Optional properties:
+                            the ID provided by the HW
+ - vqmmc-supply           : phandle to the regulator device tree node, mentioned
+                            as the VCCQ/VDD_IO supply in the eMMC/SD specs.
++specific for ux500 variant:
+ - st,sig-dir-dat0        : bus signal direction pin used for DAT[0].
+ - st,sig-dir-dat2        : bus signal direction pin used for DAT[2].
+ - st,sig-dir-dat31       : bus signal direction pin used for DAT[3] and DAT[1].
+@@ -26,6 +27,14 @@ Optional properties:
+ - st,sig-dir-cmd         : cmd signal direction pin used for CMD.
+ - st,sig-pin-fbclk       : feedback clock signal pin used.
+ 
++specific for sdmmc variant:
++- st,sig-dir             : signal direction polarity used for cmd, dat0 dat123.
++- st,neg-edge            : data & command phase relation, generated on
++                           sd clock falling edge.
++- st,use-ckin            : use ckin pin from an external driver to sample
++                           the receive data (example: with voltage
++			   switch transceiver).
++
+ Deprecated properties:
+ - mmc-cap-mmc-highspeed  : indicates whether MMC is high speed capable.
+ - mmc-cap-sd-highspeed   : indicates whether SD is high speed capable.
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index d622fbb..4057456 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -1708,6 +1708,12 @@ static int mmci_of_parse(struct device_node *np, struct mmc_host *mmc)
+ 		host->pwr_reg_add |= MCI_ST_CMDDIREN;
+ 	if (of_get_property(np, "st,sig-pin-fbclk", NULL))
+ 		host->pwr_reg_add |= MCI_ST_FBCLKEN;
++	if (of_get_property(np, "st,sig-dir", NULL))
++		host->pwr_reg_add |= MCI_STM32_DIRPOL;
++	if (of_get_property(np, "st,neg-edge", NULL))
++		host->clk_reg_add |= MCI_STM32_CLK_NEGEDGE;
++	if (of_get_property(np, "st,use-ckin", NULL))
++		host->clk_reg_add |= MCI_STM32_CLK_SELCKIN;
+ 
+ 	if (of_get_property(np, "mmc-cap-mmc-highspeed", NULL))
+ 		mmc->caps |= MMC_CAP_MMC_HIGHSPEED;
+diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+index 75b9c5c..017d9b8 100644
+--- a/drivers/mmc/host/mmci.h
++++ b/drivers/mmc/host/mmci.h
+@@ -389,6 +389,7 @@ struct mmci_host {
+ 	u32			pwr_reg;
+ 	u32			pwr_reg_add;
+ 	u32			clk_reg;
++	u32			clk_reg_add;
+ 	u32			datactrl_reg;
+ 	u32			busy_status;
+ 	u32			mask1_reg;
 -- 
-Catalin
+2.7.4
