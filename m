@@ -1,51 +1,48 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 21 Sep 2018 17:16:25 +0200
-Subject: [PATCH] arm64: dts: allwinner: a64: Re-add "syscon" compatible
-In-Reply-To: <20180921153522.0413c280@donnerap.Emea.Arm.com>
-References: <20180917152857.162662-1-andre.przywara@arm.com>
- <CAGb2v643=V_3DbLeEyXEavSQJsW2KdknpZZLfw4QwCjhfdmVsA@mail.gmail.com>
- <20180921153522.0413c280@donnerap.Emea.Arm.com>
-Message-ID: <20180921151625.wkaypyueyi2pguur@flea>
+From: rodrigo@tjader.xyz (=?UTF-8?Q?Rodrigo_Exterck=C3=B6tter_Tj=C3=A4der?=)
+Date: Fri, 21 Sep 2018 12:25:53 -0300
+Subject: [PATCH 2/2] arm64: dts: allwinner: Olimex A64-OLinuXino: fix
+ ethernet
+In-Reply-To: <20180921142941.5ymp7ksphgboxrwz@flea>
+References: <20180919141938.18791-1-rodrigo@tjader.xyz>
+ <20180921142941.5ymp7ksphgboxrwz@flea>
+Message-ID: <CAG7TQgFOuHHmkm-6CDDYJ6KuDqfjNvFjnt8_9BPYfdP=oV57VQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2018 at 03:35:22PM +0100, Andre Przywara wrote:
-> The problem is: we broke compatibility with older kernels.
+On Fri, Sep 21, 2018 at 11:30 AM Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+> On Wed, Sep 19, 2018 at 11:19:36AM -0300, Rodrigo Exterck?tter Tj?der wrote:
+> > Without "allwinner,tx-delay-ps = <600>;" on the DTP it can receive packets
+> > but not send.
+> >
+> > Signed-off-by: Rodrigo Exterck?tter Tj?der <rodrigo@tjader.xyz>
+>
+> Again, that commit log would be nice if it was a bit more
+> explicit. What is a DTP? How did you come up with that value? What is
+> the value used by Allwinner/Olimex, and why did you use another one if
+> you did?
 
-The problem is that we never said we wouldn't.
+Thanks for the feedback.
 
-We've had this discussion a number of times. You forced the backward
-compatibility onto us without any warning, and now we have to support
-it. And it's already a pain. Maybe ARM can fix that problem by just
-assigning more engineers to that, but that's not something we can do.
+DTP is a typo, it should have been DT for "device tree".
 
-The fundamental difference is that we're mostly just a bunch of spare
-time programmers working on this platform, with a partial
-documentation for the controllers, at best.
+Olimex's provided device tree uses a different driver for ethernet,
+but it has a property named "tx-delay" with value 6 and the range of
+the property is 0-7. On dwmac-sun8i's bindings documentation it says
+allwinner,tx-delay-ps has a range of 0-700 and must be a multiple of
+100, so I tried 600 and it works.
 
-You forced me to ask these developpers to work on their weekends and
-evenings on some crazy corner cases to maintain the backward
-compatibility. And honestly, both from a technical and human
-standpoint, I definitely understand if some of them are just leaving
-and don't want to work on it anymore. I would probably do the same in
-their position.
+I'm not sure how much of that I should include in the commit log,
+perhaps something like this:
 
-And having to ask that for companies like ARM or SUSE just makes it
-more frustrating to be honest. So there's simply no way you have
-forward compatibility while I'm there. Or you manage to convince all
-the ARM maintainers and enforce that compatibility for all the
-platforms.
+---
+arm64: dts: allwinner: OLinuXino: PHY TX clock delay
 
-Maxime
+The PHY requres a delay on the TX clock, otherwise it is not able to send
+any packets on the interface.
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180921/c6954b27/attachment.sig>
+Olimex's device tree uses 6 in a range of 0-7, dwmac-sun8i requires a
+multiple of 100 in the range 0-700.
+
+
+Signed-off-by: Rodrigo Exterck?tter Tj?der <rodrigo@tjader.xyz>
