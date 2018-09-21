@@ -1,10 +1,10 @@
 From: sean.wang@mediatek.com (Sean Wang)
-Date: Fri, 21 Sep 2018 10:01:40 +0800
+Date: Fri, 21 Sep 2018 10:18:01 +0800
 Subject: [PATCH -next] pinctrl: mediatek: moore: fix return value check
  in mtk_moore_pinctrl_probe()
 In-Reply-To: <1537424510-23623-1-git-send-email-weiyongjun1@huawei.com>
 References: <1537424510-23623-1-git-send-email-weiyongjun1@huawei.com>
-Message-ID: <1537495300.9654.2.camel@mtkswgap22>
+Message-ID: <1537496281.9654.8.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
