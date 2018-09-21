@@ -1,92 +1,100 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Fri, 21 Sep 2018 11:46:08 +0200
-Subject: [PATCH V2 14/27] mmc: mmci: add validate_data callback
+Date: Fri, 21 Sep 2018 11:46:06 +0200
+Subject: [PATCH V2 12/27] mmc: mmci: add dma_finalize callback
 In-Reply-To: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
 References: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1537523181-14578-15-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1537523181-14578-13-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Barre <ludovic.barre@st.com>
 
-This patch adds validate_data callback at mmci_host_ops
-to check specific constraints of variant.
-Move mmci_validate_data function to regroup mmci_host_ops interfaces.
+This patch adds dma_finalize callback at mmci_host_ops
+to allow to call specific variant.
+
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+
+# Conflicts:
+#	drivers/mmc/host/mmci.h
 
 Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 ---
- drivers/mmc/host/mmci.c | 39 +++++++++++++++++++++------------------
- drivers/mmc/host/mmci.h |  1 +
- 2 files changed, 22 insertions(+), 18 deletions(-)
+ drivers/mmc/host/mmci.c          | 14 ++++++++------
+ drivers/mmc/host/mmci.h          |  3 ++-
+ drivers/mmc/host/mmci_qcom_dml.c |  1 +
+ 3 files changed, 11 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 5a8b09c..1593942 100644
+index 10c7adc..1158d5c 100644
 --- a/drivers/mmc/host/mmci.c
 +++ b/drivers/mmc/host/mmci.c
-@@ -234,24 +234,6 @@ static int mmci_card_busy(struct mmc_host *mmc)
- 	return busy;
+@@ -447,6 +447,12 @@ int mmci_dma_start(struct mmci_host *host, unsigned int datactrl)
+ 	return 0;
  }
  
--/*
-- * Validate mmc prerequisites
-- */
--static int mmci_validate_data(struct mmci_host *host,
--			      struct mmc_data *data)
--{
--	if (!data)
--		return 0;
--
--	if (!is_power_of_2(data->blksz)) {
--		dev_err(mmc_dev(host->mmc),
--			"unsupported block size (%d bytes)\n", data->blksz);
--		return -EINVAL;
--	}
--
--	return 0;
--}
--
- static void mmci_reg_delay(struct mmci_host *host)
- {
- 	/*
-@@ -365,6 +347,27 @@ static void mmci_set_clkreg(struct mmci_host *host, unsigned int desired)
- 	mmci_write_clkreg(host, clk);
- }
- 
-+/*
-+ * Validate mmc prerequisites
-+ */
-+static int mmci_validate_data(struct mmci_host *host,
-+			      struct mmc_data *data)
++void mmci_dma_finalize(struct mmci_host *host, struct mmc_data *data)
 +{
-+	if (!data)
-+		return 0;
-+
-+	if (!is_power_of_2(data->blksz)) {
-+		dev_err(mmc_dev(host->mmc),
-+			"unsupported block size (%d bytes)\n", data->blksz);
-+		return -EINVAL;
-+	}
-+
-+	if (host->ops && host->ops->validate_data)
-+		return host->ops->validate_data(host, data);
-+
-+	return 0;
++	if (host->ops && host->ops->dma_finalize)
++		host->ops->dma_finalize(host, data);
 +}
 +
- int mmci_prep_data(struct mmci_host *host, struct mmc_data *data, bool next)
+ static void
+ mmci_request_end(struct mmci_host *host, struct mmc_request *mrq)
  {
- 	int err;
+@@ -626,7 +632,7 @@ static void mmci_dma_data_error(struct mmci_host *host)
+ 	mmci_dma_unmap(host, host->data);
+ }
+ 
+-static void mmci_dma_finalize(struct mmci_host *host, struct mmc_data *data)
++void mmci_dmae_finalize(struct mmci_host *host, struct mmc_data *data)
+ {
+ 	struct mmci_dmae_priv *dmae = host->dma_priv;
+ 	u32 status;
+@@ -820,14 +826,10 @@ static struct mmci_host_ops mmci_variant_ops = {
+ 	.dma_setup = mmci_dmae_setup,
+ 	.dma_release = mmci_dmae_release,
+ 	.dma_start = mmci_dmae_start,
++	.dma_finalize = mmci_dmae_finalize,
+ };
+ #else
+ /* Blank functions if the DMA engine is not available */
+-static inline void mmci_dma_finalize(struct mmci_host *host,
+-				     struct mmc_data *data)
+-{
+-}
+-
+ static inline void mmci_dma_data_error(struct mmci_host *host)
+ {
+ }
 diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index 320f122..cf48377 100644
+index df1826b..b793cfb 100644
 --- a/drivers/mmc/host/mmci.h
 +++ b/drivers/mmc/host/mmci.h
-@@ -273,6 +273,7 @@ struct variant_data {
+@@ -281,6 +281,7 @@ struct mmci_host_ops {
+ 	int (*dma_setup)(struct mmci_host *host);
+ 	void (*dma_release)(struct mmci_host *host);
+ 	int (*dma_start)(struct mmci_host *host, unsigned int *datactrl);
++	void (*dma_finalize)(struct mmci_host *host, struct mmc_data *data);
+ };
  
- /* mmci variant callbacks */
- struct mmci_host_ops {
-+	int (*validate_data)(struct mmci_host *host, struct mmc_data *data);
- 	int (*prep_data)(struct mmci_host *host, struct mmc_data *data,
- 			 bool next);
- 	void (*unprep_data)(struct mmci_host *host, struct mmc_data *data,
+ struct mmci_host {
+@@ -339,4 +340,4 @@ void mmci_dmae_get_next_data(struct mmci_host *host, struct mmc_data *data);
+ int mmci_dmae_setup(struct mmci_host *host);
+ void mmci_dmae_release(struct mmci_host *host);
+ int mmci_dmae_start(struct mmci_host *host, unsigned int *datactrl);
+-
++void mmci_dmae_finalize(struct mmci_host *host, struct mmc_data *data);
+diff --git a/drivers/mmc/host/mmci_qcom_dml.c b/drivers/mmc/host/mmci_qcom_dml.c
+index e2e756c..f1fd48a 100644
+--- a/drivers/mmc/host/mmci_qcom_dml.c
++++ b/drivers/mmc/host/mmci_qcom_dml.c
+@@ -188,6 +188,7 @@ static struct mmci_host_ops qcom_variant_ops = {
+ 	.dma_setup = qcom_dma_setup,
+ 	.dma_release = mmci_dmae_release,
+ 	.dma_start = mmci_dmae_start,
++	.dma_finalize = mmci_dmae_finalize,
+ };
+ 
+ void qcom_variant_init(struct mmci_host *host)
 -- 
 2.7.4
