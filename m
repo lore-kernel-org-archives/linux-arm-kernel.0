@@ -1,33 +1,35 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Fri, 21 Sep 2018 13:46:31 +0800
-Subject: [PATCH 1/2] cpufeature: avoid warning when compiling with clang
-In-Reply-To: <20180916043825.23247-1-stefan@agner.ch>
-References: <20180916043825.23247-1-stefan@agner.ch>
-Message-ID: <20180921054631.m573qaxoqhql3juj@gondor.apana.org.au>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Thu, 20 Sep 2018 23:00:59 -0700
+Subject: [PATCH 0/4] Add clock support for Hi3670 SoC
+Message-ID: <20180921060103.21370-1-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 15, 2018 at 09:38:24PM -0700, Stefan Agner wrote:
-> The table id (second) argument to MODULE_DEVICE_TABLE is often
-> referenced otherwise. This is not the case for CPU features. This
-> leads to warnings when building the kernel with Clang:
->   arch/arm/crypto/aes-ce-glue.c:450:1: warning: variable
->     'cpu_feature_match_AES' is not needed and will not be emitted
->     [-Wunneeded-internal-declaration]
->   module_cpu_feature_match(AES, aes_init);
->   ^
-> 
-> Avoid warnings by using __maybe_unused, similar to commit 1f318a8bafcf
-> ("modules: mark __inittest/__exittest as __maybe_unused").
-> 
-> Fixes: 67bad2fdb754 ("cpu: add generic support for CPU feature based module autoloading")
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  include/linux/cpufeature.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+This patchset adds clock support for Hi3670 SoC from HiSilicon utilizing
+the HiSi common clock code. While adding clock support, let's remove the
+fixed clock for UART and source SoC clock on HiKey970 board.
 
-All applied.  Thanks.
+This patchset has been verified on HiKey970 board.
+
+Thanks,
+Mani
+
+Manivannan Sadhasivam (4):
+  dt-bindings: clk: hisilicon: Add bindings for Hi3670 clk
+  arm64: dts: hisilicon: Add clock nodes for Hi3670 SoC
+  arm64: dts: hisilicon: Source SoC clock for UART6
+  clk: hisilicon: Add clock driver for Hi3670 SoC
+
+ .../bindings/clock/hi3670-clock.txt           |   43 +
+ arch/arm64/boot/dts/hisilicon/hi3670.dtsi     |   48 +-
+ drivers/clk/hisilicon/Kconfig                 |    7 +
+ drivers/clk/hisilicon/Makefile                |    1 +
+ drivers/clk/hisilicon/clk-hi3670.c            | 1016 +++++++++++++++++
+ include/dt-bindings/clock/hi3670-clock.h      |  348 ++++++
+ 6 files changed, 1458 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/hi3670-clock.txt
+ create mode 100644 drivers/clk/hisilicon/clk-hi3670.c
+ create mode 100644 include/dt-bindings/clock/hi3670-clock.h
+
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+2.17.1
