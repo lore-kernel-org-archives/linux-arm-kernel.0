@@ -1,54 +1,59 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Fri, 21 Sep 2018 18:00:18 +0530
-Subject: [PATCHv3 0/7] Add support for UHS-I on Exynos5422 odroid boards
-In-Reply-To: <CAJKOXPdsAK1_9JRzq7_pVfDwBK6WGkFbYUsbcsujCh31Fzsz6g@mail.gmail.com>
-References: <20180920175826.1284-1-linux.amoon@gmail.com>
- <CAJKOXPdsAK1_9JRzq7_pVfDwBK6WGkFbYUsbcsujCh31Fzsz6g@mail.gmail.com>
-Message-ID: <CANAwSgT-1pz-NQMb68F7m0rAFNkpCOyFqFPf7-HbZe+92+sPPQ@mail.gmail.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Fri, 21 Sep 2018 15:42:09 +0200
+Subject: [PATCH] ARM: dts: clearfog: fix sdhci supply property name
+In-Reply-To: <606cef37c2776bdc7dfa3ef578a18c40004e17af.1534878753.git.baruch@tkos.co.il>
+ (Baruch Siach's message of "Tue, 21 Aug 2018 22:12:33 +0300")
+References: <606cef37c2776bdc7dfa3ef578a18c40004e17af.1534878753.git.baruch@tkos.co.il>
+Message-ID: <871s9nhsr2.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+Hi Baruch,
+ 
+ On mar., ao?t 21 2018, Baruch Siach <baruch@tkos.co.il> wrote:
 
-On Fri, 21 Sep 2018 at 16:26, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> The vmmc phandle, like all power supply property names, must have the
+> '-supply' suffix.
 >
-> On Thu, 20 Sep 2018 at 19:58, Anand Moon <linux.amoon@gmail.com> wrote:
-> >
-> > This is series v3 since my previous patches we incomplete with driver
-> > changes missing.
-> >
-> > These changes add UHS-I tuning for dw_mmc-exynos driver.
-> > Some new patches are added to enhance the performace.
->
-> Patches look like based on some older version of kernel tree (or
-> current mainline) and probably they will not apply on my tree. The
-> easiest is to base on top of linux-next or, for DTS patches, on my
-> next/dt branch.
->
-> Best regards,
-> Krzysztof
->
-Yes this patch is based on current mainline.
-I will try to re-base on your next/dt branch and resend them.
 
-Best Regards
--Anand
-> >
-> > Anand Moon (7):
-> >   ARM: dts: exynos5422: Added UHS-I bus speed support
-> >   ARM: dts: exynos5422: fix regulator min values of LDO13 for Odroid
-> >     XU3/XU4
-> >   ARM: dts: exynos5422: update maximum frequency for sdcard to 200MHz
-> >   ARM: dts: exynos5422: use cd-gpio method to detect sd-card
-> >   ARM: dts: exynos5422: use wp-gpio method to detect sd-card
-> >   ARM: dts: exynos5422: update maximum frequency for emmc to 200MHz
-> >   mmc: dw_mmc-exynos: Add tuning for sdr and ddr timing for USH-I mode
-> >
-> >  arch/arm/boot/dts/exynos5422-odroid-core.dtsi      |  8 +++++++-
-> >  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  1 +
-> >  drivers/mmc/host/dw_mmc-exynos.c                   | 11 +++++++++++
-> >  3 files changed, 19 insertions(+), 1 deletion(-)
-> >
-> > --
-> > 2.17.1
-> >
+I also noticed it a few months ago and then I forgot. However, does it
+add any value to have this regulator?
+
+Now that I found my note, I considered to just remove this line as well
+as the regulator node.
+
+What do you think ?
+
+Gregory
+
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> ---
+>  arch/arm/boot/dts/armada-388-clearfog.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/armada-388-clearfog.dtsi b/arch/arm/boot/dts/armada-388-clearfog.dtsi
+> index 7c6ad2afb094..1b0d0680c8b6 100644
+> --- a/arch/arm/boot/dts/armada-388-clearfog.dtsi
+> +++ b/arch/arm/boot/dts/armada-388-clearfog.dtsi
+> @@ -48,7 +48,7 @@
+>  					     &clearfog_sdhci_cd_pins>;
+>  				pinctrl-names = "default";
+>  				status = "okay";
+> -				vmmc = <&reg_3p3v>;
+> +				vmmc-supply = <&reg_3p3v>;
+>  				wp-inverted;
+>  			};
+>  
+> -- 
+> 2.18.0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Gregory Clement, Bootlin
+Embedded Linux and Kernel engineering
+http://bootlin.com
