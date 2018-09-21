@@ -1,52 +1,45 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Fri, 21 Sep 2018 12:22:41 +0800
-Subject: [PATCH v2 00/22] Unify MediaTek pinctrl in preparation for
- MT8183 and MT6765
-In-Reply-To: <20180919043722.GA14181@Mani-XPS-13-9360>
-References: <cover.1536404280.git.sean.wang@mediatek.com>
- <CACRpkdZtVBjYGs5C7-HWEyX7f7pnCqvnRYBH=fFmLKhN4FGymA@mail.gmail.com>
- <1537325650.572.9.camel@mtkswgap22>
- <20180919043722.GA14181@Mani-XPS-13-9360>
-Message-ID: <1537503761.9654.17.camel@mtkswgap22>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Fri, 21 Sep 2018 13:44:09 +0800
+Subject: [PATCH 0/4] crypto: arm64/aes-blk - cleanups and optimizations
+ for XTS/CTS-CBC
+In-Reply-To: <20180910144115.25727-1-ard.biesheuvel@linaro.org>
+References: <20180910144115.25727-1-ard.biesheuvel@linaro.org>
+Message-ID: <20180921054409.pbf7bjyw27j4rj7h@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-09-18 at 21:37 -0700, Manivannan Sadhasivam wrote:
-> On Wed, Sep 19, 2018 at 10:54:10AM +0800, Sean Wang wrote:
-> > On Tue, 2018-09-18 at 15:07 -0700, Linus Walleij wrote:
-> > > On Sat, Sep 8, 2018 at 4:07 AM <sean.wang@mediatek.com> wrote:
-> > > 
-> > > > v2 and changes since v1:
-> > > 
-> > > I had trouble applying the last patches in the series so I applied
-> > > all on an immutable branch (ib-mtk) then merged that into devel
-> > > and added a patch on top to fix up some GPIO includes (just sent).
-> > > 
-> > > Please check the result!
-> > > 
-> > 
-> > Sure, I'll take a look and and test on the devel branch.
-> > 
-> > On the top, I'll add a fix for the issue recently reported by kbuild
-> > test robot about implicit declaration and a new MT6765 driver based
-> > on the series.
-> >
+On Mon, Sep 10, 2018 at 04:41:11PM +0200, Ard Biesheuvel wrote:
+> Some cleanups and optimizations for the arm64  AES skcipher routines.
 > 
-> Hi Sean,
+> Patch #1 fixes the peculiar use of u8 arrays to refer to AES round keys,
+> which are natively arrays of u32.
 > 
-> Do you have any plans to add support for MT6797?
+> Patch #2 partially reverts the use of NEON yield calls, which is not
+> needed for skciphers.
 > 
+> Patch #3 adds support for cts(cbc(aes)) in the NEON chaining mode handling.
+> 
+> Patch #4 tweaks the XTS handling to remove a literal load from the inner
+> loop.
+> 
+> Cc: Eric Biggers <ebiggers@google.com>
+> Cc: Theodore Ts'o <tytso@mit.edu>
+> Cc: Steve Capper <steve.capper@arm.com>
+> 
+> Ard Biesheuvel (4):
+>   crypto: arm64/aes-blk - remove pointless (u8 *) casts
+>   crypto: arm64/aes-blk - revert NEON yield for skciphers
+>   crypto: arm64/aes-blk - add support for CTS-CBC mode
+>   crypto: aes/arm64-blk - improve XTS mask handling
+> 
+>  arch/arm64/crypto/aes-ce.S    |   5 +
+>  arch/arm64/crypto/aes-glue.c  | 212 +++++++++--
+>  arch/arm64/crypto/aes-modes.S | 400 ++++++++++----------
+>  arch/arm64/crypto/aes-neon.S  |   6 +
+>  4 files changed, 406 insertions(+), 217 deletions(-)
 
-I personally have no the plan to add support to MT6797 because I have no
-the device, but as I knew some of people in mediatek have interest to
-add them by volunteers and thus there is no clear schedule. Eventually,
-if they're really done, they would be still based on vendor binding not
-by generic binding.
-
-> Thanks,
-> Mani
-> 
-> > > Yours,
-> > > Linus Walleij
-> > 
-> > 
+All applied.  Thanks.
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
