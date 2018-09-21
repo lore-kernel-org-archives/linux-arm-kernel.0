@@ -1,56 +1,71 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Fri, 21 Sep 2018 16:15:27 +0200
-Subject: [RESEND PATCH 3/4] arm64: dts: marvell: add macro to make
- distinction between node names
-In-Reply-To: <20180830081501.11569-3-miquel.raynal@bootlin.com> (Miquel
- Raynal's message of "Thu, 30 Aug 2018 10:15:00 +0200")
-References: <20180830081501.11569-1-miquel.raynal@bootlin.com>
- <20180830081501.11569-3-miquel.raynal@bootlin.com>
-Message-ID: <87fty3gcn4.fsf@bootlin.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Fri, 21 Sep 2018 16:15:33 +0200
+Subject: [GIT PULL] STM32 DT changes for v4.20 #1
+Message-ID: <fd4ee9a6-8195-084c-c60e-6c6e11649a4a@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Miquel,
- 
- On jeu., ao?t 30 2018, Miquel Raynal <miquel.raynal@bootlin.com> wrote:
+Hi Arnd, Olof and Kevin,
 
-> Because the label is different between CPs, the full path of a node is
-> unique. However, when referring to the end of the path only (the node
-> name), this name is not unique anymore.
->
-> The *thermal_zone_of_sensor_register() functions of the thermal core
-> present this limitation and prevent having a thermal-zone per CP.
->
-> Add a macro to make the distinction between node names to solve this
-> situation.
->
-> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+Please consider this first round of STM32 DT updates for v4.20.
 
-Applied on mvebu/dt64
+Thanks.
+Alex
 
-Thanks,
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 
-Gregory
+   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
 
-> ---
->  arch/arm64/boot/dts/marvell/armada-common.dtsi | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-common.dtsi b/arch/arm64/boot/dts/marvell/armada-common.dtsi
-> index d5e8aedec188..b29c6405d214 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-common.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-common.dtsi
-> @@ -7,4 +7,5 @@
->  #define PASTER(x, y) x ## y
->  #define EVALUATOR(x, y) PASTER(x, y)
->  #define CP110_LABEL(name) EVALUATOR(CP110_NAME, EVALUATOR(_, name))
-> +#define CP110_NODE_NAME(name) EVALUATOR(CP110_NAME, EVALUATOR(-, name))
->  #define ADDRESSIFY(addr) EVALUATOR(0x, addr)
-> -- 
-> 2.17.1
->
+are available in the git repository at:
 
--- 
-Gregory Clement, Bootlin
-Embedded Linux and Kernel engineering
-http://bootlin.com
+   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git 
+stm32-dt-for-v4.20-1
+
+for you to fetch changes up to 1ba23b1df0bb6eec430408614c3a11280941e112:
+
+   ARM: dts: stm32: Fix SPI controller node names (2018-09-21 16:09:52 
++0200)
+
+----------------------------------------------------------------
+STM32 DT updates for v4.20, round 1
+
+Highlights:
+----------
+
+-MCU platforms update:
+  -Add missing clock node's lobel on stm32f429
+  -Remove cd-inverted property for sdio nodes for
+   all mcus
+  -Fix stm32h7 rtc binding
+
+-MPU STM32MP157 platform update:
+  -Enable display: CEC and DSI
+  -Fix SPI node name to match with the new DTC
+
+----------------------------------------------------------------
+Amelie Delaunay (1):
+       ARM: dts: stm32: update rtc st,syscfg property on stm32h743
+
+Patrice Chotard (5):
+       ARM: dts: stm32: Add clk-lse node's label on stm32f429
+       ARM: dts: stm32: Remove cd-inverted property for stm32429i-eval
+       ARM: dts: stm32: Remove cd-inverted property for stm32f469-disco
+       ARM: dts: stm32: Remove cd-inverted property for stm32f769-disco
+       ARM: dts: stm32: Remove cd-inverted property for stm32f746-disco
+
+Rob Herring (1):
+       ARM: dts: stm32: Fix SPI controller node names
+
+Yannick Fertr? (1):
+       ARM: dts: stm32: enable display on stm32mp157c-ev1 board
+
+  arch/arm/boot/dts/stm32429i-eval.dts  |  3 +-
+  arch/arm/boot/dts/stm32f429.dtsi      |  2 +-
+  arch/arm/boot/dts/stm32f469-disco.dts |  3 +-
+  arch/arm/boot/dts/stm32f746-disco.dts |  3 +-
+  arch/arm/boot/dts/stm32f769-disco.dts |  3 +-
+  arch/arm/boot/dts/stm32h743.dtsi      |  2 +-
+  arch/arm/boot/dts/stm32mp157c-ev1.dts | 73 
+++++++++++++++++++++++++++++++++---
+  arch/arm/boot/dts/stm32mp157c.dtsi    |  2 +-
+  8 files changed, 74 insertions(+), 17 deletions(-)
