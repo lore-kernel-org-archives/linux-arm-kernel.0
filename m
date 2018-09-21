@@ -1,75 +1,43 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 21 Sep 2018 09:29:00 +0200
-Subject: [PATCH v5 01/22] nvmem: provide nvmem_dev_name()
+Date: Fri, 21 Sep 2018 09:29:02 +0200
+Subject: [PATCH v5 03/22] nvmem: use list_for_each_entry_safe in
+ nvmem_device_remove_all_cells()
 In-Reply-To: <20180921072921.19387-1-brgl@bgdev.pl>
 References: <20180921072921.19387-1-brgl@bgdev.pl>
-Message-ID: <20180921072921.19387-2-brgl@bgdev.pl>
+Message-ID: <20180921072921.19387-4-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Kernel users don't have any means of checking the names of nvmem
-devices. Add a routine that returns the name of the nvmem provider.
-
-This will be useful for future nvmem notifier subscribers - otherwise
-they can't check what device is being added/removed.
+Use the provided helper for iterating over list entries without having
+to use the list_entry() macro.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/nvmem/core.c           | 13 +++++++++++++
- include/linux/nvmem-consumer.h |  8 ++++++++
- 2 files changed, 21 insertions(+)
+ drivers/nvmem/core.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index 6f064002f439..11afa3b6d551 100644
+index 72313a1d215f..0e963d83a099 100644
 --- a/drivers/nvmem/core.c
 +++ b/drivers/nvmem/core.c
-@@ -1343,6 +1343,19 @@ int nvmem_device_write(struct nvmem_device *nvmem,
- }
- EXPORT_SYMBOL_GPL(nvmem_device_write);
+@@ -308,14 +308,11 @@ static void nvmem_cell_drop(struct nvmem_cell *cell)
  
-+/**
-+ * nvmem_dev_name() - Get the name of a given nvmem device.
-+ *
-+ * @nvmem: nvmem device.
-+ *
-+ * Return: name of the nvmem device.
-+ */
-+const char *nvmem_dev_name(struct nvmem_device *nvmem)
-+{
-+	return dev_name(&nvmem->dev);
-+}
-+EXPORT_SYMBOL_GPL(nvmem_dev_name);
-+
- static int __init nvmem_init(void)
+ static void nvmem_device_remove_all_cells(const struct nvmem_device *nvmem)
  {
- 	return bus_register(&nvmem_bus_type);
-diff --git a/include/linux/nvmem-consumer.h b/include/linux/nvmem-consumer.h
-index 4e85447f7860..0389fe00b177 100644
---- a/include/linux/nvmem-consumer.h
-+++ b/include/linux/nvmem-consumer.h
-@@ -55,6 +55,8 @@ ssize_t nvmem_device_cell_read(struct nvmem_device *nvmem,
- int nvmem_device_cell_write(struct nvmem_device *nvmem,
- 			    struct nvmem_cell_info *info, void *buf);
+-	struct nvmem_cell *cell;
+-	struct list_head *p, *n;
++	struct nvmem_cell *cell, *p;
  
-+const char *nvmem_dev_name(struct nvmem_device *nvmem);
-+
- #else
- 
- static inline struct nvmem_cell *nvmem_cell_get(struct device *dev,
-@@ -143,6 +145,12 @@ static inline int nvmem_device_write(struct nvmem_device *nvmem,
- {
- 	return -ENOSYS;
+-	list_for_each_safe(p, n, &nvmem_cells) {
+-		cell = list_entry(p, struct nvmem_cell, node);
++	list_for_each_entry_safe(cell, p, &nvmem_cells, node)
+ 		if (cell->nvmem == nvmem)
+ 			nvmem_cell_drop(cell);
+-	}
  }
-+
-+static inline const char *nvmem_dev_name(struct nvmem_device *nvmem)
-+{
-+	return NULL;
-+}
-+
- #endif /* CONFIG_NVMEM */
  
- #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
+ static void nvmem_cell_add(struct nvmem_cell *cell)
 -- 
 2.18.0
