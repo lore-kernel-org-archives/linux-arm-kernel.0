@@ -1,12 +1,12 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Fri, 21 Sep 2018 16:15:12 +0200
-Subject: [RESEND PATCH 2/4] arm64: dts: marvell: add thermal-zone node in
- ap806 DTSI file
-In-Reply-To: <20180830081501.11569-2-miquel.raynal@bootlin.com> (Miquel
- Raynal's message of "Thu, 30 Aug 2018 10:14:59 +0200")
+Date: Fri, 21 Sep 2018 16:15:27 +0200
+Subject: [RESEND PATCH 3/4] arm64: dts: marvell: add macro to make
+ distinction between node names
+In-Reply-To: <20180830081501.11569-3-miquel.raynal@bootlin.com> (Miquel
+ Raynal's message of "Thu, 30 Aug 2018 10:15:00 +0200")
 References: <20180830081501.11569-1-miquel.raynal@bootlin.com>
- <20180830081501.11569-2-miquel.raynal@bootlin.com>
-Message-ID: <87k1nfgcnj.fsf@bootlin.com>
+ <20180830081501.11569-3-miquel.raynal@bootlin.com>
+Message-ID: <87fty3gcn4.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,8 +14,15 @@ Hi Miquel,
  
  On jeu., ao?t 30 2018, Miquel Raynal <miquel.raynal@bootlin.com> wrote:
 
-> Add a thermal-zone node and fill in all the sensors available in an
-> ap806 (one in the IC plus one per CPU).
+> Because the label is different between CPs, the full path of a node is
+> unique. However, when referring to the end of the path only (the node
+> name), this name is not unique anymore.
+>
+> The *thermal_zone_of_sensor_register() functions of the thermal core
+> present this limitation and prevent having a thermal-zone per CP.
+>
+> Add a macro to make the distinction between node names to solve this
+> situation.
 >
 > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 
@@ -26,89 +33,19 @@ Thanks,
 Gregory
 
 > ---
->  arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 60 +++++++++++++++++++
->  1 file changed, 60 insertions(+)
+>  arch/arm64/boot/dts/marvell/armada-common.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
 >
-> diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> index 3da3a13f7ee1..7d94c1fa592a 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> @@ -6,6 +6,7 @@
->   */
->  
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
-> +#include <dt-bindings/thermal/thermal.h>
->  
->  /dts-v1/;
->  
-> @@ -265,8 +266,67 @@
->  				ap_thermal: thermal-sensor at 80 {
->  					compatible = "marvell,armada-ap806-thermal";
->  					reg = <0x80 0x10>;
-> +					#thermal-sensor-cells = <1>;
->  				};
->  			};
->  		};
->  	};
-> +
-> +	/*
-> +	 * The thermal IP features one internal sensor plus, if applicable, one
-> +	 * remote channel wired to one sensor per CPU.
-> +	 *
-> +	 * The cooling maps are always empty as there are no cooling devices.
-> +	 */
-> +	thermal-zones {
-> +		ap_thermal_ic: ap-thermal-ic {
-> +			polling-delay-passive = <1000>;
-> +			polling-delay = <1000>;
-> +
-> +			thermal-sensors = <&ap_thermal 0>;
-> +
-> +			trips {	};
-> +			cooling-maps { };
-> +		};
-> +
-> +		ap_thermal_cpu1: ap-thermal-cpu1 {
-> +			polling-delay-passive = <1000>;
-> +			polling-delay = <1000>;
-> +
-> +			thermal-sensors = <&ap_thermal 1>;
-> +
-> +			trips { };
-> +			cooling-maps { };
-> +		};
-> +
-> +		ap_thermal_cpu2: ap-thermal-cpu2 {
-> +			polling-delay-passive = <1000>;
-> +			polling-delay = <1000>;
-> +
-> +			thermal-sensors = <&ap_thermal 2>;
-> +
-> +			trips { };
-> +			cooling-maps { };
-> +		};
-> +
-> +		ap_thermal_cpu3: ap-thermal-cpu3 {
-> +			polling-delay-passive = <1000>;
-> +			polling-delay = <1000>;
-> +
-> +			thermal-sensors = <&ap_thermal 3>;
-> +
-> +			trips { };
-> +			cooling-maps { };
-> +		};
-> +
-> +		ap_thermal_cpu4: ap-thermal-cpu4 {
-> +			polling-delay-passive = <1000>;
-> +			polling-delay = <1000>;
-> +
-> +			thermal-sensors = <&ap_thermal 4>;
-> +
-> +			trips { };
-> +			cooling-maps { };
-> +		};
-> +	};
->  };
+> diff --git a/arch/arm64/boot/dts/marvell/armada-common.dtsi b/arch/arm64/boot/dts/marvell/armada-common.dtsi
+> index d5e8aedec188..b29c6405d214 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-common.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-common.dtsi
+> @@ -7,4 +7,5 @@
+>  #define PASTER(x, y) x ## y
+>  #define EVALUATOR(x, y) PASTER(x, y)
+>  #define CP110_LABEL(name) EVALUATOR(CP110_NAME, EVALUATOR(_, name))
+> +#define CP110_NODE_NAME(name) EVALUATOR(CP110_NAME, EVALUATOR(-, name))
+>  #define ADDRESSIFY(addr) EVALUATOR(0x, addr)
 > -- 
 > 2.17.1
 >
