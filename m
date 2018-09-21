@@ -1,93 +1,38 @@
-From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Fri, 21 Sep 2018 11:46:17 +0200
-Subject: [PATCH V2 23/27] mmc: mmci: add variant property to request a reset
-In-Reply-To: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
-References: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1537523181-14578-24-git-send-email-ludovic.Barre@st.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Fri, 21 Sep 2018 11:39:38 +0200
+Subject: [PATCH] ARM: multi_v7_defconfig: enable STM32 MIPI DSI
+In-Reply-To: <1534776782-4941-1-git-send-email-yannick.fertre@st.com>
+References: <1534776782-4941-1-git-send-email-yannick.fertre@st.com>
+Message-ID: <b596862f-3321-d4f6-a01c-e1360c84db4c@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Barre <ludovic.barre@st.com>
+Hi yannick
 
-Some variants could require a reset.
-STM32 sdmmc variant needs to reset hardware block
-during the power cycle procedure (for re-initialization)
+On 08/20/2018 04:53 PM, Yannick Fertr? wrote:
+> Enable STMicroelectronics specific extensions for Synopsis MIPI DSI
+> as loadable module.
+> 
+> Signed-off-by: Yannick Fertr? <yannick.fertre@st.com>
+> ---
+>   arch/arm/configs/multi_v7_defconfig | 1 +
+>   1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 7e1c543..4c88cba 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -645,6 +645,7 @@ CONFIG_DRM_RCAR_LVDS=y
+>   CONFIG_DRM_SUN4I=m
+>   CONFIG_DRM_FSL_DCU=m
+>   CONFIG_DRM_TEGRA=y
+> +CONFIG_DRM_STM_DSI=m
+>   CONFIG_DRM_PANEL_SAMSUNG_LD9040=m
+>   CONFIG_DRM_PANEL_SAMSUNG_S6E63J0X03=m
+>   CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=m
+> 
 
-Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
----
- Documentation/devicetree/bindings/mmc/mmci.txt | 2 ++
- drivers/mmc/host/mmci.c                        | 9 +++++++++
- drivers/mmc/host/mmci.h                        | 4 ++++
- 3 files changed, 15 insertions(+)
+Applied on stm32-next.
 
-diff --git a/Documentation/devicetree/bindings/mmc/mmci.txt b/Documentation/devicetree/bindings/mmc/mmci.txt
-index 03796cf..e952707 100644
---- a/Documentation/devicetree/bindings/mmc/mmci.txt
-+++ b/Documentation/devicetree/bindings/mmc/mmci.txt
-@@ -11,6 +11,8 @@ Required properties:
- - compatible             : contains "arm,pl18x", "arm,primecell".
- - vmmc-supply            : phandle to the regulator device tree node, mentioned
-                            as the VCC/VDD supply in the eMMC/SD specs.
-+depend of variant:
-+- resets                 : phandle to internal reset line.
- 
- Optional properties:
- - arm,primecell-periphid : contains the PrimeCell Peripheral ID, it overrides
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index b1d5bc5..6b3c33f 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -37,6 +37,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/types.h>
- #include <linux/pinctrl/consumer.h>
-+#include <linux/reset.h>
- 
- #include <asm/div64.h>
- #include <asm/io.h>
-@@ -1854,6 +1855,14 @@ static int mmci_probe(struct amba_device *dev,
- 
- 	dev_dbg(mmc_dev(mmc), "clocking block at %u Hz\n", mmc->f_max);
- 
-+	if (variant->reset) {
-+		host->rst = devm_reset_control_get_exclusive(&dev->dev, NULL);
-+		if (IS_ERR(host->rst)) {
-+			ret = PTR_ERR(host->rst);
-+			goto clk_disable;
-+		}
-+	}
-+
- 	/* Get regulators and the supported OCR mask */
- 	ret = mmc_regulator_get_supply(mmc);
- 	if (ret)
-diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index e130689..f0fa185 100644
---- a/drivers/mmc/host/mmci.h
-+++ b/drivers/mmc/host/mmci.h
-@@ -247,6 +247,7 @@ struct mmci_host;
-  * @start_err: bitmask identifying the STARTBITERR bit inside MMCISTATUS
-  *	       register.
-  * @opendrain: bitmask identifying the OPENDRAIN bit inside MMCIPOWER register
-+ * @reset: true if variant has need reset signal.
-  */
- struct variant_data {
- 	unsigned int		clkreg;
-@@ -285,6 +286,7 @@ struct variant_data {
- 	bool			qcom_dml;
- 	bool			reversed_irq_handling;
- 	bool			mmcimask1;
-+	bool			reset;
- 	unsigned int		irq_pio_mask;
- 	u32			start_err;
- 	u32			opendrain;
-@@ -318,6 +320,8 @@ struct mmci_host {
- 	struct clk		*clk;
- 	bool			singleirq;
- 
-+	struct reset_control	*rst;
-+
- 	spinlock_t		lock;
- 
- 	unsigned int		mclk;
--- 
-2.7.4
+Thanks.
+Alex
