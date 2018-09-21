@@ -1,48 +1,33 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 20 Sep 2018 18:12:12 -0700
-Subject: [PATCH v4 15/22] nvmem: add support for cell lookups from machine
- code
-In-Reply-To: <20180914144011.27614-16-brgl@bgdev.pl>
-References: <20180914144011.27614-1-brgl@bgdev.pl>
- <20180914144011.27614-16-brgl@bgdev.pl>
-Message-ID: <822f2631-43e3-b4e8-91f6-8c8e94be3dde@linaro.org>
+From: yuehaibing@huawei.com (YueHaibing)
+Date: Fri, 21 Sep 2018 09:33:24 +0800
+Subject: [PATCH net-next 00/22] net: fix return type of ndo_start_xmit
+ function
+In-Reply-To: <20180920.085055.1188796939437872993.davem@davemloft.net>
+References: <20180920123306.14772-1-yuehaibing@huawei.com>
+ <20180920.085055.1188796939437872993.davem@davemloft.net>
+Message-ID: <83d29681-b008-9b1f-5961-e23f0174d5f4@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2018/9/20 23:50, David Miller wrote:
+> From: YueHaibing <yuehaibing@huawei.com>
+> Date: Thu, 20 Sep 2018 20:32:44 +0800
+> 
+>> The method ndo_start_xmit() is defined as returning an 'netdev_tx_t',
+>> which is a typedef for an enum type, so make sure the implementation in
+>> this driver has returns 'netdev_tx_t' value, and change the function
+>> return type to netdev_tx_t.
+> 
+> I would advise you not to send so many of these changes as a group.
+> 
+> If one of the patches needs feedback addressed, which is already the
+> case, you will have to resubmit the entire series all over again with
+> the fixes.
+> 
 
+Yes, I will send it separately after test and review again.
 
-On 14/09/18 07:40, Bartosz Golaszewski wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> 
-> Add a way for machine code users to associate devices with nvmem cells.
-> 
-> This restores the support for non-DT systems but following a different
-> approach. Cells must now be associated with devices using provided
-> routines and data structures before they can be retrieved using
-> nvmem_cell_get().
-> 
-> It's still possible to define cells statically in nvmem_config but
-> cells created this way still need to be associated with consumers using
-> lookup entries.
-> 
-> Note that nvmem_find() must be moves higher in the source file as we
-> want to call it from __nvmem_device_get() for devices that don't have
-> a device node.
-> 
-> The signature of __nvmem_device_get() is also changed as it's no longer
-> used to retrieve cells.
-> 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
->   drivers/nvmem/core.c           | 129 ++++++++++++++++++++++++++-------
->   include/linux/nvmem-consumer.h |  28 +++++++
->   2 files changed, 131 insertions(+), 26 deletions(-)
+Thank you for your advice.
 
-This patch and other follow on patches for core.c does not apply on top 
-of 
-https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/char-misc.git/log/?h=char-misc-next
-
-Please rebase and send!
-
-thanks,
-srini
+> .
+> 
