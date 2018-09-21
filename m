@@ -1,44 +1,46 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 21 Sep 2018 12:55:54 +0200
-Subject: [PATCHv3 0/7] Add support for UHS-I on Exynos5422 odroid boards
-In-Reply-To: <20180920175826.1284-1-linux.amoon@gmail.com>
-References: <20180920175826.1284-1-linux.amoon@gmail.com>
-Message-ID: <CAJKOXPdsAK1_9JRzq7_pVfDwBK6WGkFbYUsbcsujCh31Fzsz6g@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 21 Sep 2018 12:03:52 +0100
+Subject: [PATCH v8 0/7] Add non-strict mode support for iommu-dma
+In-Reply-To: <50330f32-b051-bdf6-af26-3e24ed133480@arm.com>
+References: <cover.1537458163.git.robin.murphy@arm.com>
+ <fdfc05a4-283f-3ae2-7928-59e625c8f3b8@huawei.com>
+ <50330f32-b051-bdf6-af26-3e24ed133480@arm.com>
+Message-ID: <61fb0f8f-a353-8ab6-f03d-b261da435c94@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Sep 2018 at 19:58, Anand Moon <linux.amoon@gmail.com> wrote:
->
-> This is series v3 since my previous patches we incomplete with driver
-> changes missing.
->
-> These changes add UHS-I tuning for dw_mmc-exynos driver.
-> Some new patches are added to enhance the performace.
+On 21/09/18 10:29, Robin Murphy wrote:
+> Hi John,
+> 
+> On 2018-09-21 10:20 AM, John Garry wrote:
+>> On 20/09/2018 17:10, Robin Murphy wrote:
+>>> Hi all,
+>>>
+>>> Hopefully this is the last spin of the series - I've now dropped my 
+>>> light
+>>> touch and fixed up all the various prose text, plus implemented the 
+>>> proper
+>>> quirk support for short-descriptor because it's actually just a trivial
+>>> cut-and-paste job.
+>>>
+>>> Robin.
+>>>
+>>
+>> Hi Robin,
+>>
+>> JFYI, I'm trying to test this patchset to get some figures and provide 
+>> a tested-by tag, but 4/8 seems to rely on "iommu/io-pgtable-arm: Fix 
+>> race handling in split_blk_unmap()" - more specifically, it seems to 
+>> rely on the version which Will rewrote in your patch review, and I am 
+>> not sure on what branch it exists on, if any.
+> 
+> Sorry, I should have said this is based on Will's iommu/devel branch:
+> 
+> https://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git/log/?h=iommu/devel 
 
-Patches look like based on some older version of kernel tree (or
-current mainline) and probably they will not apply on my tree. The
-easiest is to base on top of linux-next or, for DTS patches, on my
-next/dt branch.
+FWIW I've now pushed out a complete branch here:
 
-Best regards,
-Krzysztof
+   git://linux-arm.org/linux-rm iommu/non-strict
 
->
-> Anand Moon (7):
->   ARM: dts: exynos5422: Added UHS-I bus speed support
->   ARM: dts: exynos5422: fix regulator min values of LDO13 for Odroid
->     XU3/XU4
->   ARM: dts: exynos5422: update maximum frequency for sdcard to 200MHz
->   ARM: dts: exynos5422: use cd-gpio method to detect sd-card
->   ARM: dts: exynos5422: use wp-gpio method to detect sd-card
->   ARM: dts: exynos5422: update maximum frequency for emmc to 200MHz
->   mmc: dw_mmc-exynos: Add tuning for sdr and ddr timing for USH-I mode
->
->  arch/arm/boot/dts/exynos5422-odroid-core.dtsi      |  8 +++++++-
->  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  1 +
->  drivers/mmc/host/dw_mmc-exynos.c                   | 11 +++++++++++
->  3 files changed, 19 insertions(+), 1 deletion(-)
->
-> --
-> 2.17.1
->
+
+Robin.
