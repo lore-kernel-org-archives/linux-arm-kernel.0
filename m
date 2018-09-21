@@ -1,58 +1,56 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 21 Sep 2018 20:59:46 +0100
-Subject: [PATCH 02/10] irqchip/gic-v3-its: Consolidate LPI_PENDBASE_SZ usage
-In-Reply-To: <20180921195954.21574-1-marc.zyngier@arm.com>
-References: <20180921195954.21574-1-marc.zyngier@arm.com>
-Message-ID: <20180921195954.21574-3-marc.zyngier@arm.com>
+Date: Fri, 21 Sep 2018 20:59:44 +0100
+Subject: [PATCH 00/10] GICv3 support for kexec/kdump on EFI systems
+Message-ID: <20180921195954.21574-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LPI_PENDING_SZ is always used in conjunction with a max(). Let's
-factor this in the definition of the macro, and simplify the rest
-of the code.
+The GICv3 architecture has the remarkable feature that once LPI tables
+have been assigned to redistributors and that LPI delivery is enabled,
+there is no guarantee that LPIs can be turned off (and most
+implementations do not allow it), nor can it be reprogrammed to use
+other tables.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/irqchip/irq-gic-v3-its.c | 12 ++++--------
- 1 file changed, 4 insertions(+), 8 deletions(-)
+This is a bit of a problem for kexec, where the secondary kernel
+completely looses track of the previous allocations. If the secondary
+kernel doesn't allocate the tables exactly the same way, no LPIs will
+be delivered by the GIC (which continues to use the old tables), and
+memory previously allocated for the pending tables will be slowly
+corrupted, one bit at a time.
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index c2df341ff6fa..ed6aab11e019 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -62,7 +62,7 @@ static u32 lpi_id_bits;
-  */
- #define LPI_NRBITS		lpi_id_bits
- #define LPI_PROPBASE_SZ		ALIGN(BIT(LPI_NRBITS), SZ_64K)
--#define LPI_PENDBASE_SZ		ALIGN(BIT(LPI_NRBITS) / 8, SZ_64K)
-+#define LPI_PENDBASE_SZ		max_t(u32, SZ_64K, ALIGN(BIT(LPI_NRBITS) / 8, SZ_64K))
- 
- #define LPI_PROP_DEFAULT_PRIO	0xa0
- 
-@@ -1924,12 +1924,9 @@ static int its_alloc_collections(struct its_node *its)
- static struct page *its_allocate_pending_table(gfp_t gfp_flags)
- {
- 	struct page *pend_page;
--	/*
--	 * The pending pages have to be at least 64kB aligned,
--	 * hence the 'max(LPI_PENDBASE_SZ, SZ_64K)' below.
--	 */
-+
- 	pend_page = alloc_pages(gfp_flags | __GFP_ZERO,
--				get_order(max_t(u32, LPI_PENDBASE_SZ, SZ_64K)));
-+				get_order(LPI_PENDBASE_SZ));
- 	if (!pend_page)
- 		return NULL;
- 
-@@ -1941,8 +1938,7 @@ static struct page *its_allocate_pending_table(gfp_t gfp_flags)
- 
- static void its_free_pending_table(struct page *pt)
- {
--	free_pages((unsigned long)page_address(pt),
--		   get_order(max_t(u32, LPI_PENDBASE_SZ, SZ_64K)));
-+	free_pages((unsigned long)page_address(pt), get_order(LPI_PENDBASE_SZ));
- }
- 
- static void its_cpu_init_lpis(void)
+The workaround for this is based on a series[1] by Ard Biesheuvel,
+which adds the required infrastructure for memory reservations to be
+passed from one kernel to another using an EFI table.
+
+This infrastructure is then used to register the allocation of GIC
+tables with EFI, and allow the GIC driver to safely reuse the existing
+programming if it detects that the tables have been correctly
+registered. On non-EFI systems, there is not much we can do.
+
+This has been tested on a TX2 system both as a host and a guest. I'd
+welcome additional testing of different HW. For convenience, I've
+stashed a branch containing the whole thing at [2].
+
+[1] https://marc.info/?l=linux-efi&m=153754757208163&w=2
+[2] https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/log/?h=irq/gicv3-kdump
+
+Marc Zyngier (10):
+  irqchip/gic-v3-its: Change initialization ordering for LPIs
+  irqchip/gic-v3-its: Consolidate LPI_PENDBASE_SZ usage
+  irqchip/gic-v3-its: Split property table clearing from allocation
+  irqchip/gic-v3-its: Move pending table allocation to init time
+  irqchip/gic-v3-its: Keep track of property table's PA and VA
+  irqchip/gic-v3-its: Allow use of pre-programmed LPI tables
+  irqchip/gic-v3-its: Use pre-programmed redistributor tables with kdump
+    kernels
+  irqchip/gic-v3-its: Check that all RDs have the same property table
+  irqchip/gic-v3-its: Register LPI tables with EFI config table
+  irqchip/gic-v3-its: Allow use of LPI tables in reserved memory
+
+ drivers/irqchip/irq-gic-v3-its.c   | 249 ++++++++++++++++++++++-------
+ drivers/irqchip/irq-gic-v3.c       |  20 ++-
+ include/linux/irqchip/arm-gic-v3.h |   4 +-
+ 3 files changed, 208 insertions(+), 65 deletions(-)
+
 -- 
 2.18.0
