@@ -1,53 +1,43 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 21 Sep 2018 16:56:47 +0100
-Subject: [PATCH v5 01/27] arm64: cpufeature: Set SYSREG_GIC_CPUIF as a
- boot system feature
-In-Reply-To: <1535471497-38854-2-git-send-email-julien.thierry@arm.com>
-References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
- <1535471497-38854-2-git-send-email-julien.thierry@arm.com>
-Message-ID: <86h8iix2rk.wl-marc.zyngier@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 21 Sep 2018 16:58:29 +0100
+Subject: [RFC] arm64: lse: remove -fcall-used-x0 flag
+In-Reply-To: <20180919192750.200491-1-trong@android.com>
+References: <20180919192750.200491-1-trong@android.com>
+Message-ID: <20180921155829.GD1451@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 28 Aug 2018 16:51:11 +0100,
-Julien Thierry <julien.thierry@arm.com> wrote:
+On Wed, Sep 19, 2018 at 12:27:50PM -0700, Tri Vo wrote:
+> x0 is not callee-saved in the PCS. So there is no need to specify
+> -fcall-used-x0.
 > 
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Clang doesn't currently support -fcall-used flags. This patch will help
+> building the kernel with clang.
+> 
+> Signed-off-by: Tri Vo <trong@android.com>
 > ---
->  arch/arm64/kernel/cpufeature.c | 2 +-
+>  arch/arm64/lib/Makefile | 2 +-
 >  1 file changed, 1 insertion(+), 1 deletion(-)
+
+If this is useful to you, then:
+
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
+
+> diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
+> index c86b7909ef31..2f7c60c8e588 100644
+> --- a/arch/arm64/lib/Makefile
+> +++ b/arch/arm64/lib/Makefile
+> @@ -11,7 +11,7 @@ lib-y		:= bitops.o clear_user.o delay.o copy_from_user.o	\
+>  # when supported by the CPU. Result and argument registers are handled
+>  # correctly, based on the function prototype.
+>  lib-$(CONFIG_ARM64_LSE_ATOMICS) += atomic_ll_sc.o
+> -CFLAGS_atomic_ll_sc.o	:= -fcall-used-x0 -ffixed-x1 -ffixed-x2		\
+> +CFLAGS_atomic_ll_sc.o	:= -ffixed-x1 -ffixed-x2        		\
+>  		   -ffixed-x3 -ffixed-x4 -ffixed-x5 -ffixed-x6		\
+>  		   -ffixed-x7 -fcall-saved-x8 -fcall-saved-x9		\
+>  		   -fcall-saved-x10 -fcall-saved-x11 -fcall-saved-x12	\
+> --
+> 2.19.0.397.gdd90340f6a-goog
 > 
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index e238b79..1e433ac 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -1039,7 +1039,7 @@ static void cpu_has_fwb(const struct arm64_cpu_capabilities *__unused)
->  	{
->  		.desc = "GIC system register CPU interface",
->  		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
-> -		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
-> +		.type = ARM64_CPUCAP_STRICT_BOOT_CPU_FEATURE,
->  		.matches = has_useable_gicv3_cpuif,
->  		.sys_reg = SYS_ID_AA64PFR0_EL1,
->  		.field_pos = ID_AA64PFR0_GIC_SHIFT,
-> -- 
-> 1.9.1
-> 
-
-This definitely deserves a commit message, such as:
-
-"We do not support systems where some CPUs have an operational GICv3
- CPU interface, and some don't. Let's make this requirement obvious by
- flagging the GICv3 capability as being strict."
-
-Thanks,
-
-	M.
-
--- 
-Jazz is not dead, it just smell funny.
