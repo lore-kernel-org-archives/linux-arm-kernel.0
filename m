@@ -1,111 +1,119 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri, 21 Sep 2018 23:17:02 +0100
-Subject: [PATCH v6 15/18] ACPI / APEI: Only use queued estatus entry during
- _in_nmi_notify_one()
+Date: Fri, 21 Sep 2018 23:17:00 +0100
+Subject: [PATCH v6 13/18] ACPI / APEI: Don't update struct ghes' flags in
+ read/clear estatus
 In-Reply-To: <20180921221705.6478-1-james.morse@arm.com>
 References: <20180921221705.6478-1-james.morse@arm.com>
-Message-ID: <20180921221705.6478-16-james.morse@arm.com>
+Message-ID: <20180921221705.6478-14-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Each struct ghes has an worst-case sized buffer for storing the
-estatus. If an error is being processed by ghes_proc() in process
-context this buffer will be in use. If the error source then triggers
-an NMI-like notification, the same buffer will be used by
-_in_nmi_notify_one() to stage the estatus data, before
-__process_error() copys it into a queued estatus entry.
+ghes_read_estatus() sets a flag in struct ghes if the buffer of
+CPER records needs to be cleared once the records have been
+processed. This global flags value is a problem if a struct ghes
+can be processed concurrently, as happens at probe time if an
+NMI arrives for the same error source.
 
-Merge __process_error()s work into _in_nmi_notify_one() so that
-the queued estatus entry is used from the beginning. Use the
-ghes_peek_estatus() so we know how much memory to allocate from
-the ghes_estatus_pool before we read the records.
+The GHES_TO_CLEAR flags was only set at the same time as
+buffer_paddr, which is now owned by the caller and passed to
+ghes_clear_estatus(). Use this as the flag.
 
-Reported-by: Borislav Petkov <bp@suse.de>
+A non-zero buf_paddr returned by ghes_read_estatus() means
+ghes_clear_estatus() will clear this address. ghes_read_estatus()
+already checks for a read of error_status_address being zero,
+so we can never get CPER records written at zero.
+
+After this ghes_clear_estatus() no longer needs the struct ghes.
+
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
- drivers/acpi/apei/ghes.c | 45 ++++++++++++++++++++--------------------
- 1 file changed, 22 insertions(+), 23 deletions(-)
+ drivers/acpi/apei/ghes.c | 26 ++++++++++++--------------
+ include/acpi/ghes.h      |  1 -
+ 2 files changed, 12 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 055176ed68ac..a0c10b60ad44 100644
+index c58f9b330ed3..3028487d43a3 100644
 --- a/drivers/acpi/apei/ghes.c
 +++ b/drivers/acpi/apei/ghes.c
-@@ -722,40 +722,32 @@ static void ghes_print_queued_estatus(void)
- 	}
+@@ -319,10 +319,10 @@ static int ghes_read_estatus(struct ghes *ghes,
+ 
+ 	ghes_copy_tofrom_phys(estatus, *buf_paddr,
+ 			      sizeof(*estatus), 1, fixmap_idx);
+-	if (!estatus->block_status)
++	if (!estatus->block_status) {
++		*buf_paddr = 0;
+ 		return -ENOENT;
+-
+-	ghes->flags |= GHES_TO_CLEAR;
++	}
+ 
+ 	rc = -EIO;
+ 	len = cper_estatus_len(estatus);
+@@ -346,16 +346,14 @@ static int ghes_read_estatus(struct ghes *ghes,
+ 	return rc;
  }
  
--/* Save estatus for further processing in IRQ context */
--static void __process_error(struct ghes *ghes,
--			    struct acpi_hest_generic_status *ghes_estatus)
-+static int _in_nmi_notify_one(struct ghes *ghes, int fixmap_idx)
+-static void ghes_clear_estatus(struct ghes *ghes,
+-			       struct acpi_hest_generic_status *estatus,
++static void ghes_clear_estatus(struct acpi_hest_generic_status *estatus,
+ 			       u64 buf_paddr, int fixmap_idx)
  {
-+	u64 buf_paddr;
-+	int sev, rc = 0;
- 	u32 len, node_len;
- 	struct ghes_estatus_node *estatus_node;
- 	struct acpi_hest_generic_status *estatus;
- 
--	if (ghes_estatus_cached(ghes_estatus))
+ 	estatus->block_status = 0;
+-	if (!(ghes->flags & GHES_TO_CLEAR))
 -		return;
-+	rc = ghes_peek_estatus(ghes, fixmap_idx, &buf_paddr, &len);
-+	if (rc)
-+		return rc;
+-	ghes_copy_tofrom_phys(estatus, buf_paddr,
+-			      sizeof(estatus->block_status), 0, fixmap_idx);
+-	ghes->flags &= ~GHES_TO_CLEAR;
++	if (buf_paddr)
++		ghes_copy_tofrom_phys(estatus, buf_paddr,
++				      sizeof(estatus->block_status), 0,
++				      fixmap_idx);
+ }
  
--	len = cper_estatus_len(ghes_estatus);
- 	node_len = GHES_ESTATUS_NODE_LEN(len);
+ static void ghes_handle_memory_failure(struct acpi_hest_generic_data *gdata, int sev)
+@@ -729,7 +727,7 @@ static int _in_nmi_notify_one(struct ghes *ghes, int fixmap_idx)
+ 	struct acpi_hest_generic_status *estatus = ghes->estatus;
  
- 	estatus_node = (void *)gen_pool_alloc(ghes_estatus_pool, node_len);
- 	if (!estatus_node)
--		return;
-+		return -ENOMEM;
- 
- 	estatus_node->ghes = ghes;
- 	estatus_node->generic = ghes->generic;
- 	estatus = GHES_ESTATUS_FROM_NODE(estatus_node);
--	memcpy(estatus, ghes_estatus, len);
--	llist_add(&estatus_node->llnode, &ghes_estatus_llist);
--}
--
--static int _in_nmi_notify_one(struct ghes *ghes, int fixmap_idx)
--{
--	int sev;
--	u64 buf_paddr;
--	struct acpi_hest_generic_status *estatus = ghes->estatus;
- 
--	if (ghes_read_estatus(ghes, estatus, &buf_paddr, fixmap_idx)) {
-+	if (__ghes_read_estatus(estatus, buf_paddr, len, fixmap_idx)) {
- 		ghes_clear_estatus(estatus, buf_paddr, fixmap_idx);
--		return -ENOENT;
-+		rc = -ENOENT;
-+		goto no_work;
+ 	if (ghes_read_estatus(ghes, estatus, &buf_paddr, fixmap_idx)) {
+-		ghes_clear_estatus(ghes, estatus, buf_paddr, fixmap_idx);
++		ghes_clear_estatus(estatus, buf_paddr, fixmap_idx);
+ 		return -ENOENT;
  	}
  
- 	sev = ghes_severity(estatus->error_severity);
-@@ -764,13 +756,20 @@ static int _in_nmi_notify_one(struct ghes *ghes, int fixmap_idx)
+@@ -739,11 +737,11 @@ static int _in_nmi_notify_one(struct ghes *ghes, int fixmap_idx)
  		__ghes_panic(ghes, estatus);
  	}
  
--	if (!buf_paddr)
--		return 0;
--
--	__process_error(ghes, estatus);
- 	ghes_clear_estatus(estatus, buf_paddr, fixmap_idx);
+-	if (!(ghes->flags & GHES_TO_CLEAR))
++	if (!buf_paddr)
+ 		return 0;
  
--	return 0;
-+	if (!buf_paddr || ghes_estatus_cached(estatus))
-+		goto no_work;
-+
-+	llist_add(&estatus_node->llnode, &ghes_estatus_llist);
-+
-+	return rc;
-+
-+no_work:
-+	gen_pool_free(ghes_estatus_pool, (unsigned long)estatus_node,
-+			      node_len);
-+
-+	return rc;
+ 	__process_error(ghes, estatus);
+-	ghes_clear_estatus(ghes, estatus, buf_paddr, fixmap_idx);
++	ghes_clear_estatus(estatus, buf_paddr, fixmap_idx);
+ 
+ 	return 0;
  }
+@@ -877,7 +875,7 @@ static int ghes_proc(struct ghes *ghes)
+ 	ghes_do_proc(ghes, estatus);
  
- static int ghes_estatus_queue_notified(struct list_head *rcu_list,
+ out:
+-	ghes_clear_estatus(ghes, estatus, buf_paddr, FIX_APEI_GHES_IRQ);
++	ghes_clear_estatus(estatus, buf_paddr, FIX_APEI_GHES_IRQ);
+ 
+ 	if (rc == -ENOENT)
+ 		return rc;
+diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
+index 6dc021e9cdad..536f90dd1e34 100644
+--- a/include/acpi/ghes.h
++++ b/include/acpi/ghes.h
+@@ -13,7 +13,6 @@
+  * estatus: memory buffer for error status block, allocated during
+  * HEST parsing.
+  */
+-#define GHES_TO_CLEAR		0x0001
+ #define GHES_EXITING		0x0002
+ 
+ struct ghes {
 -- 
 2.19.0
