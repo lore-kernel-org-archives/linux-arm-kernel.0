@@ -1,61 +1,37 @@
 From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Fri, 21 Sep 2018 11:28:20 +0800
-Subject: [PATCH v3 10/12] drm/mediatek: implement connection from BLS to DPI0
+Date: Fri, 21 Sep 2018 11:28:18 +0800
+Subject: [PATCH v3 08/12] drm/mediatek: add support for SPDIF audio in HDMI
 In-Reply-To: <20180921032822.30771-1-bibby.hsieh@mediatek.com>
 References: <20180921032822.30771-1-bibby.hsieh@mediatek.com>
-Message-ID: <20180921032822.30771-11-bibby.hsieh@mediatek.com>
+Message-ID: <20180921032822.30771-9-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modify display driver to support connection from BLS to DPI.
+From: chunhui dai <chunhui.dai@mediatek.com>
 
-Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+add support for SPDIF audio  in HDMI
+
+Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
 Reviewed-by: CK Hu <ck.hu@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/mediatek/mtk_hdmi.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-index 87e4191c250e..f3068c62ed48 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-@@ -39,6 +39,7 @@
- #define DISP_REG_CONFIG_DISP_OVL_MOUT_EN	0x030
- #define DISP_REG_CONFIG_OUT_SEL			0x04c
- #define DISP_REG_CONFIG_DSI_SEL			0x050
-+#define DISP_REG_CONFIG_DPI_SEL			0x064
- 
- #define DISP_REG_MUTEX_EN(n)	(0x20 + 0x20 * (n))
- #define DISP_REG_MUTEX(n)	(0x24 + 0x20 * (n))
-@@ -132,7 +133,10 @@
- 
- #define OVL_MOUT_EN_RDMA		0x1
- #define BLS_TO_DSI_RDMA1_TO_DPI1	0x8
-+#define BLS_TO_DPI_RDMA1_TO_DSI		0x2
- #define DSI_SEL_IN_BLS			0x0
-+#define DPI_SEL_IN_BLS			0x0
-+#define DSI_SEL_IN_RDMA			0x1
- 
- struct mtk_disp_mutex {
- 	int id;
-@@ -323,9 +327,17 @@ static void mtk_ddp_sout_sel(void __iomem *config_regs,
- 			     enum mtk_ddp_comp_id cur,
- 			     enum mtk_ddp_comp_id next)
- {
--	if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0)
-+	if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0) {
- 		writel_relaxed(BLS_TO_DSI_RDMA1_TO_DPI1,
- 			       config_regs + DISP_REG_CONFIG_OUT_SEL);
-+	} else if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DPI0) {
-+		writel_relaxed(BLS_TO_DPI_RDMA1_TO_DSI,
-+			       config_regs + DISP_REG_CONFIG_OUT_SEL);
-+		writel_relaxed(DSI_SEL_IN_RDMA,
-+			       config_regs + DISP_REG_CONFIG_DSI_SEL);
-+		writel_relaxed(DPI_SEL_IN_BLS,
-+			       config_regs + DISP_REG_CONFIG_DPI_SEL);
-+	}
- }
- 
- void mtk_ddp_add_comp_to_path(void __iomem *config_regs,
+diff --git a/drivers/gpu/drm/mediatek/mtk_hdmi.c b/drivers/gpu/drm/mediatek/mtk_hdmi.c
+index 2ca9f6a64dab..d62e685cec73 100644
+--- a/drivers/gpu/drm/mediatek/mtk_hdmi.c
++++ b/drivers/gpu/drm/mediatek/mtk_hdmi.c
+@@ -1576,6 +1576,11 @@ static int mtk_hdmi_audio_hw_params(struct device *dev, void *data,
+ 		hdmi_params.aud_i2s_fmt = HDMI_I2S_MODE_I2S_24BIT;
+ 		hdmi_params.aud_mclk = HDMI_AUD_MCLK_128FS;
+ 		break;
++	case HDMI_SPDIF:
++		hdmi_params.aud_codec = HDMI_AUDIO_CODING_TYPE_PCM;
++		hdmi_params.aud_sampe_size = HDMI_AUDIO_SAMPLE_SIZE_16;
++		hdmi_params.aud_input_type = HDMI_AUD_INPUT_SPDIF;
++		break;
+ 	default:
+ 		dev_err(hdmi->dev, "%s: Invalid DAI format %d\n", __func__,
+ 			daifmt->fmt);
 -- 
 2.12.5.2.gbdf23ab
