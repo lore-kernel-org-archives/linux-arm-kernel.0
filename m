@@ -1,37 +1,105 @@
 From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Fri, 21 Sep 2018 11:28:18 +0800
-Subject: [PATCH v3 08/12] drm/mediatek: add support for SPDIF audio in HDMI
+Date: Fri, 21 Sep 2018 11:28:12 +0800
+Subject: [PATCH v3 02/12] drm/mediatek: move hardware register to node data
 In-Reply-To: <20180921032822.30771-1-bibby.hsieh@mediatek.com>
 References: <20180921032822.30771-1-bibby.hsieh@mediatek.com>
-Message-ID: <20180921032822.30771-9-bibby.hsieh@mediatek.com>
+Message-ID: <20180921032822.30771-3-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: chunhui dai <chunhui.dai@mediatek.com>
 
-add support for SPDIF audio  in HDMI
+The address of register DPI_H_FRE_CON is different in different IC.
+Using of_node data to find this address.
 
 Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
-Reviewed-by: CK Hu <ck.hu@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_hdmi.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/gpu/drm/mediatek/mtk_dpi.c      | 19 ++++++++++++++++---
+ drivers/gpu/drm/mediatek/mtk_dpi_regs.h |  1 -
+ 2 files changed, 16 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_hdmi.c b/drivers/gpu/drm/mediatek/mtk_hdmi.c
-index 2ca9f6a64dab..d62e685cec73 100644
---- a/drivers/gpu/drm/mediatek/mtk_hdmi.c
-+++ b/drivers/gpu/drm/mediatek/mtk_hdmi.c
-@@ -1576,6 +1576,11 @@ static int mtk_hdmi_audio_hw_params(struct device *dev, void *data,
- 		hdmi_params.aud_i2s_fmt = HDMI_I2S_MODE_I2S_24BIT;
- 		hdmi_params.aud_mclk = HDMI_AUD_MCLK_128FS;
- 		break;
-+	case HDMI_SPDIF:
-+		hdmi_params.aud_codec = HDMI_AUDIO_CODING_TYPE_PCM;
-+		hdmi_params.aud_sampe_size = HDMI_AUDIO_SAMPLE_SIZE_16;
-+		hdmi_params.aud_input_type = HDMI_AUD_INPUT_SPDIF;
-+		break;
- 	default:
- 		dev_err(hdmi->dev, "%s: Invalid DAI format %d\n", __func__,
- 			daifmt->fmt);
+diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
+index d9373e67d328..74a32833bde1 100644
+--- a/drivers/gpu/drm/mediatek/mtk_dpi.c
++++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
+@@ -18,6 +18,7 @@
+ #include <linux/component.h>
+ #include <linux/platform_device.h>
+ #include <linux/of.h>
++#include <linux/of_device.h>
+ #include <linux/of_graph.h>
+ #include <linux/interrupt.h>
+ #include <linux/types.h>
+@@ -72,6 +73,7 @@ struct mtk_dpi {
+ 	struct clk *tvd_clk;
+ 	int irq;
+ 	struct drm_display_mode mode;
++	const struct mtk_dpi_conf *conf;
+ 	enum mtk_dpi_out_color_format color_format;
+ 	enum mtk_dpi_out_yc_map yc_map;
+ 	enum mtk_dpi_out_bit_num bit_num;
+@@ -117,6 +119,10 @@ struct mtk_dpi_yc_limit {
+ 	u16 c_bottom;
+ };
+ 
++struct mtk_dpi_conf {
++	u32 reg_h_fre_con;
++};
++
+ static void mtk_dpi_mask(struct mtk_dpi *dpi, u32 offset, u32 val, u32 mask)
+ {
+ 	u32 tmp = readl(dpi->regs + offset) & ~mask;
+@@ -342,7 +348,7 @@ static void mtk_dpi_config_swap_input(struct mtk_dpi *dpi, bool enable)
+ 
+ static void mtk_dpi_config_2n_h_fre(struct mtk_dpi *dpi)
+ {
+-	mtk_dpi_mask(dpi, DPI_H_FRE_CON, H_FRE_2N, H_FRE_2N);
++	mtk_dpi_mask(dpi, dpi->conf->reg_h_fre_con, H_FRE_2N, H_FRE_2N);
+ }
+ 
+ static void mtk_dpi_config_color_format(struct mtk_dpi *dpi,
+@@ -668,6 +674,10 @@ static const struct component_ops mtk_dpi_component_ops = {
+ 	.unbind = mtk_dpi_unbind,
+ };
+ 
++static const struct mtk_dpi_conf mt8173_conf = {
++	.reg_h_fre_con = 0xe0,
++};
++
+ static int mtk_dpi_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -682,6 +692,7 @@ static int mtk_dpi_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 
+ 	dpi->dev = dev;
++	dpi->conf = (struct mtk_dpi_conf *)of_device_get_match_data(dev);
+ 
+ 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	dpi->regs = devm_ioremap_resource(dev, mem);
+@@ -761,8 +772,10 @@ static int mtk_dpi_remove(struct platform_device *pdev)
+ }
+ 
+ static const struct of_device_id mtk_dpi_of_ids[] = {
+-	{ .compatible = "mediatek,mt8173-dpi", },
+-	{}
++	{ .compatible = "mediatek,mt8173-dpi",
++	  .data = &mt8173_conf,
++	},
++	{ },
+ };
+ 
+ struct platform_driver mtk_dpi_driver = {
+diff --git a/drivers/gpu/drm/mediatek/mtk_dpi_regs.h b/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
+index 4b6ad4751a31..040444d7718d 100644
+--- a/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
++++ b/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
+@@ -223,6 +223,5 @@
+ #define ESAV_CODE2			(0xFFF << 0)
+ #define ESAV_CODE3_MSB			BIT(16)
+ 
+-#define DPI_H_FRE_CON		0xE0
+ #define H_FRE_2N			BIT(25)
+ #endif /* __MTK_DPI_REGS_H */
 -- 
 2.12.5.2.gbdf23ab
