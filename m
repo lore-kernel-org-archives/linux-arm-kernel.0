@@ -1,154 +1,161 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Fri, 21 Sep 2018 09:29:11 +0200
-Subject: [PATCH v5 12/22] nvmem: remove the global cell list
+Date: Fri, 21 Sep 2018 09:29:16 +0200
+Subject: [PATCH v5 17/22] nvmem: add a notifier chain
 In-Reply-To: <20180921072921.19387-1-brgl@bgdev.pl>
 References: <20180921072921.19387-1-brgl@bgdev.pl>
-Message-ID: <20180921072921.19387-13-brgl@bgdev.pl>
+Message-ID: <20180921072921.19387-18-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Nvmem subsystem keeps a global list of cells that, for non-DT systems,
-can only be referenced by cell name, which makes it impossible to have
-more than one nvmem device with cells named the same.
+Add a blocking notifier chain with four events (add and remove for
+both devices and cells) so that users can get notified about the
+addition of nvmem resources they're waiting for.
 
-This patch makes every nvmem device the owner of the list of its cells.
-This effectively removes the support for non-DT systems, but it will
-be reintroduced following a different approach in subsequent patches.
-
-This isn't a problem as support for board files in nvmem is currently
-broken anyway: any user that would try to get an nvmem cell from the
-global cell list would remove the cell after the calling
-nvmem_cell_put(). This can cause anything from a subsequent user not
-being able to get the cell to double free errors if more users hold
-reference to the same cell at the same time.
-
-Fortunately there are no such users which allows us to rework this part.
+We'll use this instead of the at24 setup callback in the mityomapl138
+board file.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/nvmem/core.c | 64 +++++++++++---------------------------------
- 1 file changed, 15 insertions(+), 49 deletions(-)
+ drivers/nvmem/core.c           | 36 ++++++++++++++++++++++++++++++++++
+ include/linux/nvmem-consumer.h | 21 ++++++++++++++++++++
+ 2 files changed, 57 insertions(+)
 
 diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index bd14d04782cd..ee794613024c 100644
+index 9cc86d131e1e..da441019b609 100644
 --- a/drivers/nvmem/core.c
 +++ b/drivers/nvmem/core.c
-@@ -38,6 +38,7 @@ struct nvmem_device {
- 	int			flags;
- 	struct bin_attribute	eeprom;
- 	struct device		*base_dev;
-+	struct list_head	cells;
- 	nvmem_reg_read_t	reg_read;
- 	nvmem_reg_write_t	reg_write;
- 	void *priv;
-@@ -58,9 +59,6 @@ struct nvmem_cell {
- static DEFINE_MUTEX(nvmem_mutex);
- static DEFINE_IDA(nvmem_ida);
+@@ -65,6 +65,8 @@ static LIST_HEAD(nvmem_cell_tables);
+ static DEFINE_MUTEX(nvmem_lookup_mutex);
+ static LIST_HEAD(nvmem_lookup_list);
  
--static LIST_HEAD(nvmem_cells);
--static DEFINE_MUTEX(nvmem_cells_mutex);
--
++static BLOCKING_NOTIFIER_HEAD(nvmem_notifier);
++
  #ifdef CONFIG_DEBUG_LOCK_ALLOC
  static struct lock_class_key eeprom_lock_key;
  #endif
-@@ -282,28 +280,11 @@ static struct nvmem_device *of_nvmem_find(struct device_node *nvmem_np)
- 	return to_nvmem_device(d);
- }
+@@ -300,6 +302,7 @@ static struct nvmem_device *nvmem_find(const char *name)
  
--static struct nvmem_cell *nvmem_find_cell(const char *cell_id)
--{
--	struct nvmem_cell *p;
--
--	mutex_lock(&nvmem_cells_mutex);
--
--	list_for_each_entry(p, &nvmem_cells, node)
--		if (!strcmp(p->name, cell_id)) {
--			mutex_unlock(&nvmem_cells_mutex);
--			return p;
--		}
--
--	mutex_unlock(&nvmem_cells_mutex);
--
--	return NULL;
--}
--
  static void nvmem_cell_drop(struct nvmem_cell *cell)
  {
--	mutex_lock(&nvmem_cells_mutex);
-+	mutex_lock(&nvmem_mutex);
++	blocking_notifier_call_chain(&nvmem_notifier, NVMEM_CELL_REMOVE, cell);
+ 	mutex_lock(&nvmem_mutex);
  	list_del(&cell->node);
--	mutex_unlock(&nvmem_cells_mutex);
-+	mutex_unlock(&nvmem_mutex);
- 	kfree(cell);
- }
- 
-@@ -311,16 +292,15 @@ static void nvmem_device_remove_all_cells(const struct nvmem_device *nvmem)
- {
- 	struct nvmem_cell *cell, *p;
- 
--	list_for_each_entry_safe(cell, p, &nvmem_cells, node)
--		if (cell->nvmem == nvmem)
--			nvmem_cell_drop(cell);
-+	list_for_each_entry_safe(cell, p, &nvmem->cells, node)
-+		nvmem_cell_drop(cell);
- }
- 
- static void nvmem_cell_add(struct nvmem_cell *cell)
- {
--	mutex_lock(&nvmem_cells_mutex);
--	list_add_tail(&cell->node, &nvmem_cells);
--	mutex_unlock(&nvmem_cells_mutex);
-+	mutex_lock(&nvmem_mutex);
-+	list_add_tail(&cell->node, &cell->nvmem->cells);
-+	mutex_unlock(&nvmem_mutex);
+ 	mutex_unlock(&nvmem_mutex);
+@@ -319,6 +322,7 @@ static void nvmem_cell_add(struct nvmem_cell *cell)
+ 	mutex_lock(&nvmem_mutex);
+ 	list_add_tail(&cell->node, &cell->nvmem->cells);
+ 	mutex_unlock(&nvmem_mutex);
++	blocking_notifier_call_chain(&nvmem_notifier, NVMEM_CELL_ADD, cell);
  }
  
  static int nvmem_cell_info_to_nvmem_cell(struct nvmem_device *nvmem,
-@@ -465,6 +445,7 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
- 	}
+@@ -434,6 +438,32 @@ static int nvmem_setup_compat(struct nvmem_device *nvmem,
+ 	return 0;
+ }
  
- 	kref_init(&nvmem->refcnt);
-+	INIT_LIST_HEAD(&nvmem->cells);
- 
- 	nvmem->id = rval;
- 	nvmem->owner = config->owner;
-@@ -626,29 +607,14 @@ static struct nvmem_device *__nvmem_device_get(struct device_node *np,
++/**
++ * nvmem_register_notifier() - Register a notifier block for nvmem events.
++ *
++ * @nb: notifier block to be called on nvmem events.
++ *
++ * Return: 0 on success, negative error number on failure.
++ */
++int nvmem_register_notifier(struct notifier_block *nb)
++{
++	return blocking_notifier_chain_register(&nvmem_notifier, nb);
++}
++EXPORT_SYMBOL_GPL(nvmem_register_notifier);
++
++/**
++ * nvmem_unregister_notifier() - Unregister a notifier block for nvmem events.
++ *
++ * @nb: notifier block to be unregistered.
++ *
++ * Return: 0 on success, negative error number on failure.
++ */
++int nvmem_unregister_notifier(struct notifier_block *nb)
++{
++	return blocking_notifier_chain_unregister(&nvmem_notifier, nb);
++}
++EXPORT_SYMBOL_GPL(nvmem_unregister_notifier);
++
+ static int nvmem_add_cells_from_table(struct nvmem_device *nvmem)
  {
- 	struct nvmem_device *nvmem = NULL;
+ 	const struct nvmem_cell_info *info;
+@@ -647,6 +677,10 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
+ 	if (rval)
+ 		goto err_remove_cells;
  
--	mutex_lock(&nvmem_mutex);
--
--	if (np) {
--		nvmem = of_nvmem_find(np);
--		if (!nvmem) {
--			mutex_unlock(&nvmem_mutex);
--			return ERR_PTR(-EPROBE_DEFER);
--		}
--	} else {
--		struct nvmem_cell *cell = nvmem_find_cell(cell_id);
--
--		if (cell) {
--			nvmem = cell->nvmem;
--			*cellp = cell;
--		}
--
--		if (!nvmem) {
--			mutex_unlock(&nvmem_mutex);
--			return ERR_PTR(-ENOENT);
--		}
--	}
-+	if (!np)
-+		return ERR_PTR(-ENOENT);
++	rval = blocking_notifier_call_chain(&nvmem_notifier, NVMEM_ADD, nvmem);
++	if (rval)
++		goto err_remove_cells;
++
+ 	return nvmem;
  
-+	mutex_lock(&nvmem_mutex);
-+	nvmem = of_nvmem_find(np);
- 	mutex_unlock(&nvmem_mutex);
-+	if (!nvmem)
-+		return ERR_PTR(-EPROBE_DEFER);
+ err_remove_cells:
+@@ -669,6 +703,8 @@ static void nvmem_device_release(struct kref *kref)
  
- 	if (!try_module_get(nvmem->owner)) {
- 		dev_err(&nvmem->dev,
+ 	nvmem = container_of(kref, struct nvmem_device, refcnt);
+ 
++	blocking_notifier_call_chain(&nvmem_notifier, NVMEM_REMOVE, nvmem);
++
+ 	if (nvmem->flags & FLAG_COMPAT)
+ 		device_remove_bin_file(nvmem->base_dev, &nvmem->eeprom);
+ 
+diff --git a/include/linux/nvmem-consumer.h b/include/linux/nvmem-consumer.h
+index 27eee3945405..0326b52e906b 100644
+--- a/include/linux/nvmem-consumer.h
++++ b/include/linux/nvmem-consumer.h
+@@ -14,6 +14,7 @@
+ 
+ #include <linux/err.h>
+ #include <linux/errno.h>
++#include <linux/notifier.h>
+ 
+ struct device;
+ struct device_node;
+@@ -47,6 +48,13 @@ struct nvmem_cell_lookup {
+ 	struct list_head	node;
+ };
+ 
++enum {
++	NVMEM_ADD = 1,
++	NVMEM_REMOVE,
++	NVMEM_CELL_ADD,
++	NVMEM_CELL_REMOVE,
++};
++
+ #if IS_ENABLED(CONFIG_NVMEM)
+ 
+ /* Cell based interface */
+@@ -80,6 +88,9 @@ void nvmem_add_cell_lookups(struct nvmem_cell_lookup *entries,
+ void nvmem_del_cell_lookups(struct nvmem_cell_lookup *entries,
+ 			    size_t nentries);
+ 
++int nvmem_register_notifier(struct notifier_block *nb);
++int nvmem_unregister_notifier(struct notifier_block *nb);
++
+ #else
+ 
+ static inline struct nvmem_cell *nvmem_cell_get(struct device *dev,
+@@ -179,6 +190,16 @@ nvmem_add_cell_lookups(struct nvmem_cell_lookup *entries, size_t nentries) {}
+ static inline void
+ nvmem_del_cell_lookups(struct nvmem_cell_lookup *entries, size_t nentries) {}
+ 
++static inline int nvmem_register_notifier(struct notifier_block *nb)
++{
++	return -ENOSYS;
++}
++
++static inline int nvmem_unregister_notifier(struct notifier_block *nb)
++{
++	return -ENOSYS;
++}
++
+ #endif /* CONFIG_NVMEM */
+ 
+ #if IS_ENABLED(CONFIG_NVMEM) && IS_ENABLED(CONFIG_OF)
 -- 
 2.18.0
