@@ -1,374 +1,126 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 21 Sep 2018 18:55:02 +0100
-Subject: [PATCH v5 15/27] arm64: irqflags: Use ICC_PMR_EL1 for interrupt
- masking
-In-Reply-To: <1675f220-e4c3-b1e2-7842-901bec8eee19@arm.com>
-References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
- <1535471497-38854-16-git-send-email-julien.thierry@arm.com>
- <1675f220-e4c3-b1e2-7842-901bec8eee19@arm.com>
-Message-ID: <a436a59d-4ec9-fcb3-8037-d807368d4823@arm.com>
+From: jim2101024@gmail.com (Jim Quinlan)
+Date: Fri, 21 Sep 2018 14:00:39 -0400
+Subject: [PATCH v5 02/12] dt-bindings: pci: add DT docs for Brcmstb PCIe
+ device
+In-Reply-To: <CAOiHx=mEKoHz6t=PbnG801e2u8GG=ct7ypMTKZ=EALKJhBZf=g@mail.gmail.com>
+References: <1537367527-20773-1-git-send-email-jim2101024@gmail.com>
+ <1537367527-20773-3-git-send-email-jim2101024@gmail.com>
+ <CAOiHx=mEKoHz6t=PbnG801e2u8GG=ct7ypMTKZ=EALKJhBZf=g@mail.gmail.com>
+Message-ID: <CANCKTBs1VqJCFFJAseJ8Kk8_d7PnniD55dc20-NwAKj8f6jFmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Sep 20, 2018 at 5:06 AM Jonas Gorski <jonas.gorski@gmail.com> wrote:
+>
+> On 19 September 2018 at 16:31, Jim Quinlan <jim2101024@gmail.com> wrote:
+> > The DT bindings description of the Brcmstb PCIe device is described.
+> > This node can be used by almost all Broadcom settop box chips, using
+> > ARM, ARM64, or MIPS CPU architectures.
+>
+> Oh, hey, *one* email made it finally through :P
 
+Sigh, I'm still having email issues, my apologies.
 
-On 21/09/18 18:39, Julien Thierry wrote:
-> Hi,
-> 
-> On 28/08/18 16:51, Julien Thierry wrote:
->> Instead disabling interrupts by setting the PSR.I bit, use a priority
->> higher than the one used for interrupts to mask them via PMR.
->>
->> The value chosen for PMR to enable/disable interrupts encodes the status
->> of interrupts on a single bit. This information is stored in the irqflags
->> values used when saving/restoring IRQ status.
->>
->> Tested-by: Daniel Thompson <daniel.thompson@linaro.org>
->> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
->> Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> Cc: Oleg Nesterov <oleg@redhat.com>
->> ---
->> ? arch/arm64/include/asm/assembler.h | 17 ++++++-
->> ? arch/arm64/include/asm/efi.h?????? |? 3 +-
->> ? arch/arm64/include/asm/irqflags.h? | 97 
->> ++++++++++++++++++++++++++++++--------
->> ? arch/arm64/include/asm/ptrace.h??? | 10 ++--
->> ? arch/arm64/kernel/entry.S????????? |? 2 +-
->> ? 5 files changed, 102 insertions(+), 27 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/assembler.h 
->> b/arch/arm64/include/asm/assembler.h
->> index 0bcc98d..0b2dcfd 100644
->> --- a/arch/arm64/include/asm/assembler.h
->> +++ b/arch/arm64/include/asm/assembler.h
->> @@ -23,6 +23,7 @@
->> ? #ifndef __ASM_ASSEMBLER_H
->> ? #define __ASM_ASSEMBLER_H
->>
->> +#include <asm/alternative.h>
->> ? #include <asm/asm-offsets.h>
->> ? #include <asm/cpufeature.h>
->> ? #include <asm/debug-monitors.h>
->> @@ -62,12 +63,24 @@
->> ? /*
->> ?? * Enable and disable interrupts.
->> ?? */
->> -??? .macro??? disable_irq
->> +??? .macro??? disable_irq, tmp
->> +??? mov??? \tmp, #ICC_PMR_EL1_MASKED
->> +alternative_if_not ARM64_HAS_IRQ_PRIO_MASKING
->> ????? msr??? daifset, #2
->> +alternative_else
->> +??? msr_s??? SYS_ICC_PMR_EL1, \tmp
->> +alternative_endif
->> ????? .endm
->>
->> -??? .macro??? enable_irq
->> +??? .macro??? enable_irq, tmp
->> +??? mov???? \tmp, #ICC_PMR_EL1_UNMASKED
->> +alternative_if_not ARM64_HAS_IRQ_PRIO_MASKING
->> ????? msr??? daifclr, #2
->> +??? nop
->> +alternative_else
->> +??? msr_s??? SYS_ICC_PMR_EL1, \tmp
->> +??? dsb??? sy
->> +alternative_endif
->> ????? .endm
->>
->> ????? .macro??? save_and_disable_irq, flags
->> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
->> index 7ed3208..3e06891 100644
->> --- a/arch/arm64/include/asm/efi.h
->> +++ b/arch/arm64/include/asm/efi.h
->> @@ -42,7 +42,8 @@
->>
->> ? efi_status_t __efi_rt_asm_wrapper(void *, const char *, ...);
->>
->> -#define ARCH_EFI_IRQ_FLAGS_MASK (PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | 
->> PSR_F_BIT)
->> +#define ARCH_EFI_IRQ_FLAGS_MASK \
->> +??? (PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT | ARCH_FLAG_PMR_EN)
->>
->> ? /* arch specific definitions used by the stub code */
->>
->> diff --git a/arch/arm64/include/asm/irqflags.h 
->> b/arch/arm64/include/asm/irqflags.h
->> index 24692ed..193cfd0 100644
->> --- a/arch/arm64/include/asm/irqflags.h
->> +++ b/arch/arm64/include/asm/irqflags.h
->> @@ -18,7 +18,27 @@
->>
->> ? #ifdef __KERNEL__
->>
->> +#include <asm/alternative.h>
->> +#include <asm/cpufeature.h>
->> ? #include <asm/ptrace.h>
->> +#include <asm/sysreg.h>
->> +
->> +
->> +/*
->> + * When ICC_PMR_EL1 is used for interrupt masking, only the bit 
->> indicating
->> + * whether the normal interrupts are masked is kept along with the daif
->> + * flags.
->> + */
->> +#define ARCH_FLAG_PMR_EN 0x1
->> +
->> +#define MAKE_ARCH_FLAGS(daif, pmr)??????????????????? \
->> +??? ((daif) | (((pmr) >> ICC_PMR_EL1_EN_SHIFT) & ARCH_FLAG_PMR_EN))
->> +
->> +#define ARCH_FLAGS_GET_PMR(flags)??????????????? \
->> +??? ((((flags) & ARCH_FLAG_PMR_EN) << ICC_PMR_EL1_EN_SHIFT) \
->> +??????? | ICC_PMR_EL1_MASKED)
->> +
->> +#define ARCH_FLAGS_GET_DAIF(flags) ((flags) & ~ARCH_FLAG_PMR_EN)
->>
->> ? /*
->> ?? * Aarch64 has flags for masking: Debug, Asynchronous (serror), 
->> Interrupts and
->> @@ -38,31 +58,50 @@
->> ?? */
->> ? static inline unsigned long arch_local_irq_save(void)
->> ? {
->> -??? unsigned long flags;
->> -??? asm volatile(
->> +??? unsigned long flags, masked = ICC_PMR_EL1_MASKED;
->> +??? unsigned long pmr = 0;
->> +
->> +??? asm volatile(ALTERNATIVE(
->> ????????? "mrs??? %0, daif??????? // arch_local_irq_save\n"
->> -??????? "msr??? daifset, #2"
->> -??????? : "=r" (flags)
->> -??????? :
->> +??????? "msr??? daifset, #2\n"
->> +??????? "mov??? %1, #" __stringify(ICC_PMR_EL1_UNMASKED),
->> +??????? /* --- */
->> +??????? "mrs??? %0, daif\n"
->> +??????? "mrs_s? %1, " __stringify(SYS_ICC_PMR_EL1) "\n"
->> +??????? "msr_s??? " __stringify(SYS_ICC_PMR_EL1) ", %2",
->> +??????? ARM64_HAS_IRQ_PRIO_MASKING)
->> +??????? : "=&r" (flags), "=&r" (pmr)
->> +??????? : "r" (masked)
->> ????????? : "memory");
->> -??? return flags;
->> +
->> +??? return MAKE_ARCH_FLAGS(flags, pmr);
->> ? }
->>
->> ? static inline void arch_local_irq_enable(void)
->> ? {
->> -??? asm volatile(
->> -??????? "msr??? daifclr, #2??????? // arch_local_irq_enable"
->> -??????? :
->> +??? unsigned long unmasked = ICC_PMR_EL1_UNMASKED;
->> +
->> +??? asm volatile(ALTERNATIVE(
->> +??????? "msr??? daifclr, #2??????? // arch_local_irq_enable\n"
->> +??????? "nop",
->> +??????? "msr_s? " __stringify(SYS_ICC_PMR_EL1) ",%0\n"
->> +??????? "dsb??? sy",
->> +??????? ARM64_HAS_IRQ_PRIO_MASKING)
->> ????????? :
->> +??????? : "r" (unmasked)
->> ????????? : "memory");
->> ? }
->>
->> ? static inline void arch_local_irq_disable(void)
->> ? {
->> -??? asm volatile(
->> -??????? "msr??? daifset, #2??????? // arch_local_irq_disable"
->> -??????? :
->> +??? unsigned long masked = ICC_PMR_EL1_MASKED;
->> +
->> +??? asm volatile(ALTERNATIVE(
->> +??????? "msr??? daifset, #2??????? // arch_local_irq_disable",
->> +??????? "msr_s? " __stringify(SYS_ICC_PMR_EL1) ",%0",
->> +??????? ARM64_HAS_IRQ_PRIO_MASKING)
->> ????????? :
->> +??????? : "r" (masked)
->> ????????? : "memory");
->> ? }
->>
->> @@ -72,12 +111,19 @@ static inline void arch_local_irq_disable(void)
->> ? static inline unsigned long arch_local_save_flags(void)
->> ? {
->> ????? unsigned long flags;
->> -??? asm volatile(
->> -??????? "mrs??? %0, daif??????? // arch_local_save_flags"
->> -??????? : "=r" (flags)
->> +??? unsigned long pmr = 0;
->> +
->> +??? asm volatile(ALTERNATIVE(
->> +??????? "mrs??? %0, daif??????? // arch_local_save_flags\n"
->> +??????? "mov??? %1, #" __stringify(ICC_PMR_EL1_UNMASKED),
->> +??????? "mrs??? %0, daif\n"
->> +??????? "mrs_s? %1, " __stringify(SYS_ICC_PMR_EL1),
->> +??????? ARM64_HAS_IRQ_PRIO_MASKING)
->> +??????? : "=r" (flags), "=r" (pmr)
->> ????????? :
->> ????????? : "memory");
->> -??? return flags;
->> +
->> +??? return MAKE_ARCH_FLAGS(flags, pmr);
->> ? }
->>
->> ? /*
->> @@ -85,16 +131,27 @@ static inline unsigned long 
->> arch_local_save_flags(void)
->> ?? */
->> ? static inline void arch_local_irq_restore(unsigned long flags)
->> ? {
->> -??? asm volatile(
->> -??????? "msr??? daif, %0??????? // arch_local_irq_restore"
->> +??? unsigned long pmr = ARCH_FLAGS_GET_PMR(flags);
->> +
->> +??? flags = ARCH_FLAGS_GET_DAIF(flags);
->> +
->> +??? asm volatile(ALTERNATIVE(
->> +??????? "msr??? daif, %0??????? // arch_local_irq_restore\n"
->> +??????? "nop\n"
->> +??????? "nop",
->> +??????? "msr??? daif, %0\n"
->> +??????? "msr_s? " __stringify(SYS_ICC_PMR_EL1) ",%1\n"
->> +??????? "dsb??? sy",
-> 
-> I've come to realize there is an issue with that sequence. If the CPU 
-> has { PSR.I = 1, PMR = unmasked }, attempting attempting to restore 
-> flags { PSR.I = 0, PMR = masked }, there will be that ever so small 
-> window between the two instructions where interrupts get re-enabled 
-> while both contexts (the current one and the one being restored) have 
-> interrupts disabled...
-> 
-> Does that ever happen? Yes, when coming from a kernel entry or coming 
-> back from a VHE guest and doing "local_daif_retore(DAIF_PROCCTX_NOIRQ)".
-> 
-> An obvious, always working solution would be to do:
->  ????msr daifset, #2
->  ????msr ICC_PMR_EL1, %1
->  ????msr daif, %0
->  ????dsb sy
-> 
-> This however has some heavy performance hit on hackbench (~4-5%).
-> 
-> So I'd suggest:
->  ????msr ICC_PMR_EL1, %1
->  ????msr daif, %0
->  ????dsb sy
-> 
-> So, this only reverses the issue to the case where we restore { PSR.I = 
-> 1, PMR = unmasked } while CPU has { PSR.I = 0, PMR = masked }?
-> Yes, *but* there is no reason this should happen:
-> 
-> - There is no pre-defined flags values that provide { PSR.I = 1, PMR = 
-> unmasked } (and there is no reason to be one once we start using 
-> priorities)
-> 
-> - If flags { PMR = unmasked, PSR.I = 1 } where obtained through 
-> local_irq_save() or local_irq_save_flags(), from that point one would 
-> need to mask PMR *and* explicitly modify PSR.I since local_enable_irq() 
-> no longer touches PSR.
-> The only code that has a reason to do this explicit change is PMR setup 
-> code at CPU startup and when coming from exception entry. And code doing 
-> such action has no reason to be between local_irq_save/restore() calls 
-> since that would simply undo its action...
-> 
-> So my take is that restoring the PMR register first is fine without 
-> masking PSR.I with the following comment:
-> 
-> /*
->  ?* Code switching from PSR.I interrupt disabling to PMR masking
->  ?* should not lie between consecutive calls to local_irq_save()
->  ?* and local_irq_restore() in the same context.
->  ?*/
-> 
-> Does this approach seem sound? (If my explanation was not to confusing)
-> Am I missing some corner case?
+>
+> >
+> > Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
+> > Acked-by: Rob Herring <robh@kernel.org>
+> > ---
+> >  .../devicetree/bindings/pci/brcmstb-pcie.txt       | 59 ++++++++++++++++++++++
+> >  1 file changed, 59 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/pci/brcmstb-pcie.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/pci/brcmstb-pcie.txt b/Documentation/devicetree/bindings/pci/brcmstb-pcie.txt
+> > new file mode 100644
+> > index 0000000..a1a9ad5
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/pci/brcmstb-pcie.txt
+> > @@ -0,0 +1,59 @@
+> > +Brcmstb PCIe Host Controller Device Tree Bindings
+> > +
+> > +Required Properties:
+> > +- compatible
+> > +  "brcm,bcm7425-pcie" -- for 7425 family MIPS-based SOCs.
+> > +  "brcm,bcm7435-pcie" -- for 7435 family MIPS-based SOCs.
+> > +  "brcm,bcm7445-pcie" -- for 7445 and later ARM based SOCs (not including
+> > +      the 7278).
+> > +  "brcm,bcm7278-pcie"  -- for 7278 family ARM-based SOCs.
+> > +
+> > +- reg -- the register start address and length for the PCIe reg block.
+> > +- interrupts -- two interrupts are specified; the first interrupt is for
+> > +     the PCI host controller and the second is for MSI if the built-in
+> > +     MSI controller is to be used.
+> > +- interrupt-names -- names of the interrupts (above): "pcie" and "msi".
+> > +- #address-cells -- set to <3>.
+> > +- #size-cells -- set to <2>.
+> > +- #interrupt-cells: set to <1>.
+> > +- interrupt-map-mask and interrupt-map, standard PCI properties to define the
+> > +     mapping of the PCIe interface to interrupt numbers.
+> > +- ranges: ranges for the PCI memory and I/O regions.
+> > +- linux,pci-domain -- should be unique per host controller.
+> > +
+> > +Optional Properties:
+> > +- clocks -- phandle of pcie clock.
+> > +- clock-names -- set to "sw_pcie" if clocks is used.
+> > +- dma-ranges -- Specifies the inbound memory mapping regions when
+> > +     an "identity map" is not possible.
+> > +- msi-controller -- this property is typically specified to have the
+> > +     PCIe controller use its internal MSI controller.
+> > +- msi-parent -- set to use an external MSI interrupt controller.
+> > +- brcm,enable-ssc -- (boolean) indicates usage of spread-spectrum clocking.
+> > +- max-link-speed --  (integer) indicates desired generation of link:
+> > +     1 => 2.5 Gbps (gen1), 2 => 5.0 Gbps (gen2), 3 => 8.0 Gbps (gen3).
+> > +
+> > +Example Node:
+> > +
+> > +pcie0: pcie at f0460000 {
+> > +               reg = <0x0 0xf0460000 0x0 0x9310>;
+> > +               interrupts = <0x0 0x0 0x4>;
+>
+> Your binding says two interrupts, your example has three - what's the
+> third interrupt for?
 
-One sequence that would cause trouble this is:
-- { PSR.I = 1, PMR = unmasked }
-- flags = local_irq_save()
-- local_daif_unmask()
-- // do stuff
-- local_irq_disable()
-- // do stuff
-- local_irq_restore(flags)
+Actually that's a single interrupt with three cells.  I need to add
+another interrupt.  Note that we have #interrupt-cells set to 1
+because that is for the legacy interrupts given in the interrupt-map.
 
-However, local_daif_unmask() is not called anywhere currently. So I am 
-tempted to remove it as the function become a bit of a casualty waiting 
-to happen once we start having PMR.
+> Also you define the same for MSI and PCIe (I assume) - is that expected?
+No, these will be updated to two different interrupts.
 
-> Any suggestions for better approach? Or better wording?
-> 
-> Thanks,
-> 
->> +??????? ARM64_HAS_IRQ_PRIO_MASKING)
->> ????? :
->> -??? : "r" (flags)
->> +??? : "r" (flags), "r" (pmr)
->> ????? : "memory");
->> ? }
->>
->> ? static inline int arch_irqs_disabled_flags(unsigned long flags)
->> ? {
->> -??? return flags & PSR_I_BIT;
->> +??? return (ARCH_FLAGS_GET_DAIF(flags) & (PSR_I_BIT)) |
->> +??????? !(ARCH_FLAGS_GET_PMR(flags) & ICC_PMR_EL1_EN_BIT);
->> ? }
->> ? #endif
->> ? #endif
->> diff --git a/arch/arm64/include/asm/ptrace.h 
->> b/arch/arm64/include/asm/ptrace.h
->> index 29ec217..67df46e 100644
->> --- a/arch/arm64/include/asm/ptrace.h
->> +++ b/arch/arm64/include/asm/ptrace.h
->> @@ -25,8 +25,11 @@
->> ? #define CurrentEL_EL1??????? (1 << 2)
->> ? #define CurrentEL_EL2??????? (2 << 2)
->>
->> -/* PMR value use to unmask interrupts */
->> +/* PMR values used to mask/unmask interrupts */
->> ? #define ICC_PMR_EL1_UNMASKED??? 0xf0
->> +#define ICC_PMR_EL1_EN_SHIFT??? 6
->> +#define ICC_PMR_EL1_EN_BIT??? (1 << ICC_PMR_EL1_EN_SHIFT) // PMR IRQ 
->> enable
->> +#define ICC_PMR_EL1_MASKED????? (ICC_PMR_EL1_UNMASKED ^ 
->> ICC_PMR_EL1_EN_BIT)
->>
->> ? /* AArch32-specific ptrace requests */
->> ? #define COMPAT_PTRACE_GETREGS??????? 12
->> @@ -201,8 +204,9 @@ static inline void forget_syscall(struct pt_regs 
->> *regs)
->> ? #define processor_mode(regs) \
->> ????? ((regs)->pstate & PSR_MODE_MASK)
->>
->> -#define interrupts_enabled(regs) \
->> -??? (!((regs)->pstate & PSR_I_BIT))
->> +#define interrupts_enabled(regs)??????????? \
->> +??? ((!((regs)->pstate & PSR_I_BIT)) &&??????? \
->> +???? ((regs)->pmr_save & ICC_PMR_EL1_EN_BIT))
->>
->> ? #define fast_interrupts_enabled(regs) \
->> ????? (!((regs)->pstate & PSR_F_BIT))
->> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
->> index 79b06af..91e1e3d 100644
->> --- a/arch/arm64/kernel/entry.S
->> +++ b/arch/arm64/kernel/entry.S
->> @@ -912,7 +912,7 @@ work_pending:
->> ?? * "slow" syscall return path.
->> ?? */
->> ? ret_to_user:
->> -??? disable_irq??????????????? // disable interrupts
->> +??? disable_irq x21??????????????? // disable interrupts
->> ????? ldr??? x1, [tsk, #TSK_TI_FLAGS]
->> ????? and??? x2, x1, #_TIF_WORK_MASK
->> ????? cbnz??? x2, work_pending
->> -- 
->> 1.9.1
->>
-> 
+Are there systems where they are
+> different? I would expect the msi interrupt to be optional for the
+> case where its the same as the pcie one, and only required if it is
+> different.
+>
+> Also your binding requires an interrupt-names propery, but it's
+> missing from the example.
+Will fix.
 
--- 
-Julien Thierry
+Thanks,
+Jim
+>
+> > +               compatible = "brcm,bcm7445-pcie";
+> > +               #address-cells = <3>;
+> > +               #size-cells = <2>;
+> > +               ranges = <0x02000000 0x00000000 0x00000000 0x00000000 0xc0000000 0x00000000 0x08000000
+> > +                         0x02000000 0x00000000 0x08000000 0x00000000 0xc8000000 0x00000000 0x08000000>;
+> > +               #interrupt-cells = <1>;
+> > +               interrupt-map-mask = <0 0 0 7>;
+> > +               interrupt-map = <0 0 0 1 &intc 0 47 3
+> > +                                0 0 0 2 &intc 0 48 3
+> > +                                0 0 0 3 &intc 0 49 3
+> > +                                0 0 0 4 &intc 0 50 3>;
+> > +               clocks = <&sw_pcie0>;
+> > +               clock-names = "sw_pcie";
+> > +               msi-parent = <&pcie0>;  /* use PCIe's internal MSI controller */
+> > +               msi-controller;         /* use PCIe's internal MSI controller */
+> > +               brcm,ssc;
+> > +               max-link-speed = <1>;
+> > +               linux,pci-domain = <0>;
+> > +       };
+> > --
+> > 1.9.0.138.g2de3478
+> >
+>
+> Regards
+> Jonas
