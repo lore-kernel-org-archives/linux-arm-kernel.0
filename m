@@ -1,50 +1,63 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 21 Sep 2018 21:49:19 +0100
-Subject: [PATCH] arm64: KVM: Guests can skip __install_bp_hardening_cb()s HYP
- work
-Message-ID: <20180921204919.5790-1-james.morse@arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 21 Sep 2018 23:03:21 +0200
+Subject: [PATCH] ARM: dts: exynos: Add CD and WP pins to Odroid XU SD card
+Message-ID: <20180921210321.12404-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-enable_smccc_arch_workaround_1() passes NULL as the hyp_vecs start and
-end if the HVC conduit is in use, and ARM_SMCCC_ARCH_WORKAROUND_1 is
-detected.
+Defining card-detect and write-protect GPIO pins in Odroid XU SD Card
+does not change anything from functional point of view - dw-mmc driver
+was reading the state from registers.  Adding cd-gpios and wp-gpios
+properties changes only internal driver behavior to access the pins
+directly.
 
-If the guest kernel happened to be built with KVM_INDIRECT_VECTORS,
-we go on to allocate a slot, memcpy() the empty workaround in and
-do the appropriate cache maintenance.
+Add them to DTS only to comprehensively describe the hardware.  Minor
+benefit is that write-protect pin configuration makes sure that it will
+be properly pulled up to indicate write access.
 
-This works as we always tell memcpy() the range is 0, so it never
-accesses the NULL src pointer, but we still do the cache maintenance.
+This also removes debug messages:
+    dwmmc_exynos 12220000.mmc: No GPIO consumer cd found
+    dwmmc_exynos 12220000.mmc: No GPIO consumer wp found
 
-If hyp_vecs_start is NULL we know we're a guest, just update the fn
-like the !KVM_INDIRECT_VECTORS version.
-
-Signed-off-by: James Morse <james.morse@arm.com>
-Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- arch/arm64/kernel/cpu_errata.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/exynos5410-odroidxu.dts | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index dec10898d688..25305f8a8670 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -116,6 +116,15 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
- 	static DEFINE_SPINLOCK(bp_lock);
- 	int cpu, slot = -1;
+diff --git a/arch/arm/boot/dts/exynos5410-odroidxu.dts b/arch/arm/boot/dts/exynos5410-odroidxu.dts
+index a2046f5f998c..dae360f29a47 100644
+--- a/arch/arm/boot/dts/exynos5410-odroidxu.dts
++++ b/arch/arm/boot/dts/exynos5410-odroidxu.dts
+@@ -525,12 +525,14 @@
  
-+	/*
-+	 * enable_smccc_arch_workaround_1() passes NULL for the hyp_vecs
-+	 * start/end if we're a guest. Skip the hyp-vectors work.
-+	 */
-+	if (!hyp_vecs_start) {
-+		__this_cpu_write(bp_hardening_data.fn, fn);
-+		return;
-+	}
+ &mmc_2 {
+ 	status = "okay";
++	wp-gpios = <&gpm5 0 GPIO_ACTIVE_LOW>;
++	cd-gpios = <&gpc2 2 GPIO_ACTIVE_LOW>;
+ 	card-detect-delay = <200>;
+ 	samsung,dw-mshc-ciu-div = <3>;
+ 	samsung,dw-mshc-sdr-timing = <0 4>;
+ 	samsung,dw-mshc-ddr-timing = <0 2>;
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4>;
++	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4 &sd2_wp>;
+ 	bus-width = <4>;
+ 	cap-sd-highspeed;
+ 	vmmc-supply = <&ldo21_reg>;
+@@ -573,6 +575,14 @@
+ 		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+ 		samsung,pin-drv = <EXYNOS5420_PIN_DRV_LV1>;
+ 	};
 +
- 	spin_lock(&bp_lock);
- 	for_each_possible_cpu(cpu) {
- 		if (per_cpu(bp_hardening_data.fn, cpu) == fn) {
++	sd2_wp: sd2-wp {
++		samsung,pins = "gpm5-0";
++		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
++		/* Pin is floating so pull it up to disable write-protect */
++		samsung,pin-pud = <EXYNOS_PIN_PULL_UP>;
++		samsung,pin-drv = <EXYNOS5420_PIN_DRV_LV4>;
++	};
+ };
+ 
+ &pwm {
 -- 
-2.18.0
+2.17.1
