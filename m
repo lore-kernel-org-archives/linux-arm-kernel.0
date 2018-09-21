@@ -1,39 +1,29 @@
-From: zhongjiang@huawei.com (zhong jiang)
-Date: Fri, 21 Sep 2018 22:49:08 +0800
-Subject: [PATCH] drm: sun4i: Fix a uninitialized variable warning.
-In-Reply-To: <20180921142654.ahuhswypvscjsuyj@flea>
-References: <1537255520-41614-1-git-send-email-zhongjiang@huawei.com>
- <20180919084719.6ymf6h4eftomfab3@flea> <5BA2106C.2080007@huawei.com>
- <20180921142654.ahuhswypvscjsuyj@flea>
-Message-ID: <5BA504E4.90607@huawei.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 21 Sep 2018 09:18:22 -0700
+Subject: [PATCH -next] pinctrl: sunxi: fix 'pctrl->functions' allocation
+ in sunxi_pinctrl_build_state
+In-Reply-To: <20180921015941.28468-1-yuehaibing@huawei.com>
+References: <20180921015941.28468-1-yuehaibing@huawei.com>
+Message-ID: <CACRpkdbHALf7m2uQ091dBmD9aTctzN2ym5=vZ1wFbE_ayJ-8Fw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018/9/21 22:26, Maxime Ripard wrote:
-> On Wed, Sep 19, 2018 at 05:01:32PM +0800, zhong jiang wrote:
->> On 2018/9/19 16:47, Maxime Ripard wrote:
->>> On Tue, Sep 18, 2018 at 03:25:20PM +0800, zhong jiang wrote:
->>>> Fix the following compile warning:
->>>>
->>>> drivers/gpu/drm/sun4i/sun4i_tcon.c:1088: warning: 'has_lvds_alt' may be used uninitialized in this function [-Wmaybe-uninitialized]
->>>> bool has_lvds_rst, has_lvds_alt, can_lvds;
->>>>
->>>> Signed-off-by: zhong jiang <zhongjiang@huawei.com>
->>> I can't see any code path that would lead to an uninitialized usage of
->>> that variable.
->>>
->>> Which compiler produced that warning? I tried building it today with
->>> gcc 8.1.1, and I don't see that warning either.
->> I indeed  hit the issue.  the gcc version is
->> gcc (Ubuntu 5.4.0-6ubuntu1~16.04.9) 5.4.0 20160609
-> I've tested with 4.* gcc, and it didn't report any error. It seems to
-> be a false positive for this particular version, so there's no need to
-> merge that patch. If more people are affected, we'll obviously do
-> something about it though.
-Yep,  it rarely occur.  I just happen once.  Thank you for reply.
+On Thu, Sep 20, 2018 at 7:00 PM YueHaibing <yuehaibing@huawei.com> wrote:
 
-Sincerely,
-zhong jiang
-> Thanks!
-> Maxime
+> fixes following Smatch static check warning:
 >
+>  ./drivers/pinctrl/sunxi/pinctrl-sunxi.c:1112 sunxi_pinctrl_build_state()
+>  warn: passing devm_ allocated variable to kfree. 'pctrl->functions'
+>
+> As we will be calling krealloc() on pointer 'pctrl->functions', which means
+> kfree() will be called in there, devm_kzalloc() shouldn't be used with
+> the allocation in the first place.  Fix the warning by calling kcalloc()
+> and managing the free procedure in error path on our own.
+>
+> Fixes: 0e37f88d9ad8 ("ARM: sunxi: Add pinctrl driver for Allwinner SoCs")
+> Signed-off-by: YueHaibing <yuehaibing@huawei.com>
+
+Patch applied with Maxime's ACK.
+
+Yours,
+Linus Walleij
