@@ -1,74 +1,75 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri, 21 Sep 2018 23:17:03 +0100
-Subject: [PATCH v6 16/18] ACPI / APEI: Split fixmap pages for arm64 NMI-like
- notifications
+Date: Fri, 21 Sep 2018 23:16:58 +0100
+Subject: [PATCH v6 11/18] ACPI / APEI: Remove silent flag from
+ ghes_read_estatus()
 In-Reply-To: <20180921221705.6478-1-james.morse@arm.com>
 References: <20180921221705.6478-1-james.morse@arm.com>
-Message-ID: <20180921221705.6478-17-james.morse@arm.com>
+Message-ID: <20180921221705.6478-12-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that ghes notification helpers provide the fixmap slots and
-take the lock themselves we can support multiple NMI-like
-notifications on arm64.
+Subsequent patches will split up ghes_read_estatus(), at which
+point passing around the 'silent' flag gets annoying. This is to
+suppress prink() messages, which prior to 42a0bb3f7138 ("printk/nmi:
+generic solution for safe printk in NMI"), were unsafe in NMI context.
 
-These should be named after their notification method. x86's
-NOTIFY_NMI already is, move it to live with the ghes_nmi list.
-Change the SEA fixmap entry to be called FIX_APEI_GHES_SEA.
-
-Future patches can add support for FIX_APEI_GHES_SEI and
-FIX_APEI_GHES_SDEI_{NORMAL,CRITICAL}.
+We don't need to do this anymore, remove the flag. printk() messages
+are batched in a per-cpu buffer and printed via irq-work, or a call
+back from panic().
 
 Signed-off-by: James Morse <james.morse@arm.com>
-
 ---
-Changes since v3:
- * idx/lock are now in a separate struct.
- * Add to the comment above ghes_fixmap_lock_irq so that it makes more
-   sense in isolation.
----
- arch/arm64/include/asm/fixmap.h | 4 +++-
- drivers/acpi/apei/ghes.c        | 6 +++---
- 2 files changed, 6 insertions(+), 4 deletions(-)
+ drivers/acpi/apei/ghes.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
-index ec1e6d6fa14c..c3974517c2cb 100644
---- a/arch/arm64/include/asm/fixmap.h
-+++ b/arch/arm64/include/asm/fixmap.h
-@@ -55,7 +55,9 @@ enum fixed_addresses {
- #ifdef CONFIG_ACPI_APEI_GHES
- 	/* Used for GHES mapping from assorted contexts */
- 	FIX_APEI_GHES_IRQ,
--	FIX_APEI_GHES_NMI,
-+#ifdef CONFIG_ACPI_APEI_SEA
-+	FIX_APEI_GHES_SEA,
-+#endif
- #endif /* CONFIG_ACPI_APEI_GHES */
- 
- #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
 diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index a0c10b60ad44..463c8e6d1bb5 100644
+index 586689cbc0fd..ba5344d26a39 100644
 --- a/drivers/acpi/apei/ghes.c
 +++ b/drivers/acpi/apei/ghes.c
-@@ -994,7 +994,7 @@ int ghes_notify_sea(void)
- 	int rv;
+@@ -300,7 +300,7 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
  
- 	raw_spin_lock(&ghes_notify_lock_sea);
--	rv = ghes_estatus_queue_notified(&ghes_sea, FIX_APEI_GHES_NMI);
-+	rv = ghes_estatus_queue_notified(&ghes_sea, FIX_APEI_GHES_SEA);
- 	raw_spin_unlock(&ghes_notify_lock_sea);
+ static int ghes_read_estatus(struct ghes *ghes,
+ 			     struct acpi_hest_generic_status *estatus,
+-			     int silent, int fixmap_idx)
++			     int fixmap_idx)
+ {
+ 	struct acpi_hest_generic *g = ghes->generic;
+ 	u64 buf_paddr;
+@@ -309,7 +309,7 @@ static int ghes_read_estatus(struct ghes *ghes,
  
- 	return rv;
-@@ -1025,8 +1025,8 @@ static inline void ghes_sea_remove(struct ghes *ghes) { }
+ 	rc = apei_read(&buf_paddr, &g->error_status_address);
+ 	if (rc) {
+-		if (!silent && printk_ratelimit())
++		if (printk_ratelimit())
+ 			pr_warning(FW_WARN GHES_PFX
+ "Failed to read error status block address for hardware error source: %d.\n",
+ 				   g->header.source_id);
+@@ -342,7 +342,7 @@ static int ghes_read_estatus(struct ghes *ghes,
+ 	rc = 0;
  
- #ifdef CONFIG_HAVE_ACPI_APEI_NMI
- /*
-- * NMI may be triggered on any CPU, so ghes_in_nmi is used for
-- * having only one concurrent reader.
-+ * NOTIFY_NMI may be triggered on any CPU, so ghes_in_nmi is
-+ * used for having only one concurrent reader.
-  */
- static atomic_t ghes_in_nmi = ATOMIC_INIT(0);
+ err_read_block:
+-	if (rc && !silent && printk_ratelimit())
++	if (rc && printk_ratelimit())
+ 		pr_warning(FW_WARN GHES_PFX
+ 			   "Failed to read error status block!\n");
+ 	return rc;
+@@ -729,7 +729,7 @@ static int _in_nmi_notify_one(struct ghes *ghes, int fixmap_idx)
+ 	int sev;
+ 	struct acpi_hest_generic_status *estatus = ghes->estatus;
+ 
+-	if (ghes_read_estatus(ghes, estatus, 1, fixmap_idx)) {
++	if (ghes_read_estatus(ghes, estatus, fixmap_idx)) {
+ 		ghes_clear_estatus(ghes, estatus, fixmap_idx);
+ 		return -ENOENT;
+ 	}
+@@ -863,7 +863,7 @@ static int ghes_proc(struct ghes *ghes)
+ 	int rc;
+ 	struct acpi_hest_generic_status *estatus = ghes->estatus;
+ 
+-	rc = ghes_read_estatus(ghes, estatus, 0, FIX_APEI_GHES_IRQ);
++	rc = ghes_read_estatus(ghes, estatus, FIX_APEI_GHES_IRQ);
+ 	if (rc)
+ 		goto out;
  
 -- 
 2.19.0
