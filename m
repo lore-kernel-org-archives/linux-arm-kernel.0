@@ -1,62 +1,103 @@
-From: yuehaibing@huawei.com (YueHaibing)
-Date: Fri, 21 Sep 2018 09:37:50 +0800
-Subject: [PATCH net-next 17/22] hv_netvsc: fix return type of
- ndo_start_xmit function
-In-Reply-To: <20180920074341.3acef75c@xeon-e3>
-References: <20180920123306.14772-1-yuehaibing@huawei.com>
- <20180920123306.14772-18-yuehaibing@huawei.com>
- <20180920074341.3acef75c@xeon-e3>
-Message-ID: <b9b170c4-caba-928e-4c6f-eb51cb5e4707@huawei.com>
+From: minchan.kernel@gmail.com (Minchan Kim)
+Date: Fri, 21 Sep 2018 10:43:32 +0900
+Subject: [PATCH v1 1/3] arm: mm: reordering memory type table
+In-Reply-To: <20180917004451.174527-2-minchan@kernel.org>
+References: <20180917004451.174527-1-minchan@kernel.org>
+ <20180917004451.174527-2-minchan@kernel.org>
+Message-ID: <20180921014332.GA112825@rodete-desktop-imager.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018/9/20 22:43, Stephen Hemminger wrote:
-> On Thu, 20 Sep 2018 20:33:01 +0800
-> YueHaibing <yuehaibing@huawei.com> wrote:
-> 
->> The method ndo_start_xmit() is defined as returning an 'netdev_tx_t',
->> which is a typedef for an enum type, so make sure the implementation in
->> this driver has returns 'netdev_tx_t' value, and change the function
->> return type to netdev_tx_t.
->>
->> Found by coccinelle.
->>
->> Signed-off-by: YueHaibing <yuehaibing@huawei.com>
->> ---
->>  drivers/net/hyperv/netvsc_drv.c | 10 +++++++---
->>  1 file changed, 7 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/net/hyperv/netvsc_drv.c b/drivers/net/hyperv/netvsc_drv.c
->> index 3af6d8d..056c472 100644
->> --- a/drivers/net/hyperv/netvsc_drv.c
->> +++ b/drivers/net/hyperv/netvsc_drv.c
->> @@ -511,7 +511,8 @@ static int netvsc_vf_xmit(struct net_device *net, struct net_device *vf_netdev,
->>  	return rc;
->>  }
->>  
->> -static int netvsc_start_xmit(struct sk_buff *skb, struct net_device *net)
->> +static netdev_tx_t
->> +netvsc_start_xmit(struct sk_buff *skb, struct net_device *net)
->>  {
->>  	struct net_device_context *net_device_ctx = netdev_priv(net);
->>  	struct hv_netvsc_packet *packet = NULL;
->> @@ -528,8 +529,11 @@ static int netvsc_start_xmit(struct sk_buff *skb, struct net_device *net)
->>  	 */
->>  	vf_netdev = rcu_dereference_bh(net_device_ctx->vf_netdev);
->>  	if (vf_netdev && netif_running(vf_netdev) &&
->> -	    !netpoll_tx_running(net))
->> -		return netvsc_vf_xmit(net, vf_netdev, skb);
->> +	    !netpoll_tx_running(net)) {
->> +		ret = netvsc_vf_xmit(net, vf_netdev, skb);
->> +		if (ret)
->> +			return NETDEV_TX_BUSY;
->> +	}
-> 
-> Sorry, the new code is wrong. It will fall through if ret == 0 (NETDEV_TX_OK)
-> Please review and test your patches.
+Hi Guys,
 
-I'm sorry for this, will correct it as Haiyang's suggestion.
+Could you have a chance to review this patchset?
 
+Thanks!
+
+On Mon, Sep 17, 2018 at 09:44:49AM +0900, Minchan Kim wrote:
+> To use bit 5 in page table as L_PTE_SPECIAL, we need a room for that.
+> It seems we don't need 4 bits for the memory type with ARMv6+.
+> If it's true, let's reorder bits to make bit 5 free.
 > 
-> .
+> We will use the bit for L_PTE_SPECIAL in next patch.
+> 
+> A note from Catalin
+> "
+> > Anyway, on ARMv7 or ARMv6+LPAE, the non-shared device gets mapped to
+> > shared device in hardware. Looking through the arm32 code, it seems that
+> > MT_DEVICE_NONSHARED is used by arch/arm/mach-shmobile/setup-r8a7779.c
+> > and IIUC that's a v7 platform (R-Car H1, Cortex-A9). I think the above
+> > should be defined to L_PTE_MT_DEV_SHARED, unless I miss any place where
+> > DEV_NONSHARED is relevant on ARMv6 (adding Simon to confirm on shmbile).
+> "
+> 
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Steve Capper <steve.capper@linaro.org>
+> Cc: Simon Horman <horms@verge.net.au>
+> Signed-off-by: Minchan Kim <minchan@kernel.org>
+> ---
+>  arch/arm/include/asm/pgtable-2level.h | 19 +++++++++++++++----
+>  arch/arm/mm/proc-macros.S             |  4 ++--
+>  2 files changed, 17 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
+> index 92fd2c8a9af0..514b13c27b43 100644
+> --- a/arch/arm/include/asm/pgtable-2level.h
+> +++ b/arch/arm/include/asm/pgtable-2level.h
+> @@ -164,14 +164,25 @@
+>  #define L_PTE_MT_BUFFERABLE	(_AT(pteval_t, 0x01) << 2)	/* 0001 */
+>  #define L_PTE_MT_WRITETHROUGH	(_AT(pteval_t, 0x02) << 2)	/* 0010 */
+>  #define L_PTE_MT_WRITEBACK	(_AT(pteval_t, 0x03) << 2)	/* 0011 */
+> +#define L_PTE_MT_DEV_SHARED	(_AT(pteval_t, 0x04) << 2)	/* 0100 */
+> +#define L_PTE_MT_VECTORS	(_AT(pteval_t, 0x05) << 2)	/* 0101 */
+>  #define L_PTE_MT_MINICACHE	(_AT(pteval_t, 0x06) << 2)	/* 0110 (sa1100, xscale) */
+>  #define L_PTE_MT_WRITEALLOC	(_AT(pteval_t, 0x07) << 2)	/* 0111 */
+> -#define L_PTE_MT_DEV_SHARED	(_AT(pteval_t, 0x04) << 2)	/* 0100 */
+> -#define L_PTE_MT_DEV_NONSHARED	(_AT(pteval_t, 0x0c) << 2)	/* 1100 */
+> +#if defined(CONFIG_CPU_V7) || defined (CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K)
+> +/*
+> + * On ARMv7 or ARMv6+LPAE, the non-shared device gets mapped to
+> + * shared device in hardware.
+> + */
+> +#define L_PTE_MT_DEV_NONSHARED	L_PTE_MT_DEV_SHARED
+> +#define L_PTE_MT_DEV_WC		L_PTE_MT_BUFFERABLE
+> +#define L_PTE_MT_DEV_CACHED	L_PTE_MT_WRITEBACK
+> +#define L_PTE_MT_MASK		(_AT(pteval_t, 0x07) << 2)
+> +#else
+>  #define L_PTE_MT_DEV_WC		(_AT(pteval_t, 0x09) << 2)	/* 1001 */
+>  #define L_PTE_MT_DEV_CACHED	(_AT(pteval_t, 0x0b) << 2)	/* 1011 */
+> -#define L_PTE_MT_VECTORS	(_AT(pteval_t, 0x0f) << 2)	/* 1111 */
+> -#define L_PTE_MT_MASK		(_AT(pteval_t, 0x0f) << 2)
+> +#define L_PTE_MT_DEV_NONSHARED	(_AT(pteval_t, 0x0c) << 2)	/* 1100 */
+> +#define L_PTE_MT_MASK           (_AT(pteval_t, 0x0f) << 2)
+> +#endif
+>  
+>  #ifndef __ASSEMBLY__
+>  
+> diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+> index 81d0efb055c6..367a89d5aeca 100644
+> --- a/arch/arm/mm/proc-macros.S
+> +++ b/arch/arm/mm/proc-macros.S
+> @@ -138,7 +138,7 @@
+>  	.long	PTE_CACHEABLE					@ L_PTE_MT_WRITETHROUGH
+>  	.long	PTE_CACHEABLE | PTE_BUFFERABLE			@ L_PTE_MT_WRITEBACK
+>  	.long	PTE_BUFFERABLE					@ L_PTE_MT_DEV_SHARED
+> -	.long	0x00						@ unused
+> +	.long	PTE_CACHEABLE | PTE_BUFFERABLE | PTE_EXT_APX	@ L_PTE_MT_VECTORS
+>  	.long	0x00						@ L_PTE_MT_MINICACHE (not present)
+>  	.long	PTE_EXT_TEX(1) | PTE_CACHEABLE | PTE_BUFFERABLE	@ L_PTE_MT_WRITEALLOC
+>  	.long	0x00						@ unused
+> @@ -148,7 +148,7 @@
+>  	.long	PTE_EXT_TEX(2)					@ L_PTE_MT_DEV_NONSHARED
+>  	.long	0x00						@ unused
+>  	.long	0x00						@ unused
+> -	.long	PTE_CACHEABLE | PTE_BUFFERABLE | PTE_EXT_APX	@ L_PTE_MT_VECTORS
+> +	.long	0x00						@ unused
+>  	.endm
+>  
+>  	.macro	armv6_set_pte_ext pfx
+> -- 
+> 2.19.0.397.gdd90340f6a-goog
 > 
