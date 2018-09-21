@@ -1,74 +1,30 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Fri, 21 Sep 2018 18:01:07 +0530
-Subject: [PATCHv3 5/7] ARM: dts: exynos5422: use wp-gpio method to detect
- sd-card
-In-Reply-To: <CAJKOXPdUVjG1xR-q-K98RQpqsWzw-emEv2_3x3CoS+XK8cye2Q@mail.gmail.com>
-References: <20180920175826.1284-1-linux.amoon@gmail.com>
- <20180920175826.1284-6-linux.amoon@gmail.com>
- <CAJKOXPdUVjG1xR-q-K98RQpqsWzw-emEv2_3x3CoS+XK8cye2Q@mail.gmail.com>
-Message-ID: <CANAwSgQQgObh-N0CbBM9iNxOGUd2uwoKNFVDBymEALzMtHxOhA@mail.gmail.com>
+From: zhongjiang@huawei.com (zhong jiang)
+Date: Fri, 21 Sep 2018 20:20:09 +0800
+Subject: [PATCH] drivers/firmware: Should be a struct size instead of a
+ pointer.
+Message-ID: <1537532409-43532-1-git-send-email-zhongjiang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+kcalloc should be sizeof(*cpu_groups) instead of sizeof(cpu_groups).
 
-On Fri, 21 Sep 2018 at 16:42, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->
-> On Thu, 20 Sep 2018 at 19:59, Anand Moon <linux.amoon@gmail.com> wrote:
-> >
-> > add the Write Protect GPIO property for sdcard, to fix
-> > the warning message during boot time.
-> > of_get_named_gpiod_flags: can't parse 'wp-gpios' property of node '/soc/mmc at 12220000[0]'
-> >
-> > Signed-off-by: Anand Moon <linux.amoon@gmail.com>
-> > ---
-> > New patch to this series.
-> > If we keep the wp-gpio GPIO_ACTIVE_LOW sdcard boot into RO mode.
-> > ---
-> >  arch/arm/boot/dts/exynos5422-odroid-core.dtsi | 1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> > diff --git a/arch/arm/boot/dts/exynos5422-odroid-core.dtsi b/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
-> > index 03fe02ceae66..475c38bbc99e 100644
-> > --- a/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
-> > +++ b/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
-> > @@ -370,6 +370,7 @@
-> >         cap-sd-highspeed;
-> >         max-frequency = <200000000>;
-> >         cd-gpios = <&gpc2 2 GPIO_ACTIVE_LOW>;
-> > +       wp-gpios = <&gpc4 0 GPIO_ACTIVE_HIGH>;
->
-> Two issues here:
-> 1. You need also proper pinctrl setting.
+Signed-off-by: zhong jiang <zhongjiang@huawei.com>
+---
+ drivers/firmware/psci_checker.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks for pointing out. Yes proper pinctrl is needed to support this setting.
-probably pinctrl sd2_wp is needed to support this feature.
-
-> 2. On schematics the WP is not connected... so how do you know that it
->From XU4_MAIN_REV0.1 schematics page 7 "Micro Socket" their is no
-connection to WP pin.
-but below schematics page "EXYNOS 5422 MMC UFS" it's shows
-XMMC2WP/GPC4_0/EXT_INT13_0.
-
-> is active high? How did you test it? How do you want to test it on
-> microSD?
-
-I just tested this with the DTS change to GPIO_ACTIVE_LOW which
-resulted the microSD card booted into RO mode.
-So I set this to GPIO_ACTIVE_HIGH just to avoid warning.
-
-I will study the changes requires and then post proper separate patch
-to support this feature.
-
-Best Regards
--Anand
->
-> Best regards,
-> Krzysztof
->
-> >         vmmc-supply = <&ldo19_reg>;
-> >         vqmmc-supply = <&ldo13_reg>;
-> >         sd-uhs-sdr50;
-> > --
-> > 2.17.1
-> >
+diff --git a/drivers/firmware/psci_checker.c b/drivers/firmware/psci_checker.c
+index 3469436..26afabc 100644
+--- a/drivers/firmware/psci_checker.c
++++ b/drivers/firmware/psci_checker.c
+@@ -162,7 +162,7 @@ static int alloc_init_cpu_groups(cpumask_var_t **pcpu_groups)
+ 	if (!alloc_cpumask_var(&tmp, GFP_KERNEL))
+ 		return -ENOMEM;
+ 
+-	cpu_groups = kcalloc(nb_available_cpus, sizeof(cpu_groups),
++	cpu_groups = kcalloc(nb_available_cpus, sizeof(*cpu_groups),
+ 			     GFP_KERNEL);
+ 	if (!cpu_groups)
+ 		return -ENOMEM;
+-- 
+1.7.12.4
