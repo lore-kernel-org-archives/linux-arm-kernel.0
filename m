@@ -1,106 +1,101 @@
-From: jim2101024@gmail.com (Jim Quinlan)
-Date: Fri, 21 Sep 2018 13:40:58 -0400
-Subject: [PATCH v5 04/12] PCI: brcmstb: add dma-range mapping for inbound
- traffic
-In-Reply-To: <fa285694-c3e1-adf8-032a-202e7598de41@gmail.com>
-References: <1537367527-20773-1-git-send-email-jim2101024@gmail.com>
- <1537367527-20773-5-git-send-email-jim2101024@gmail.com>
- <CAKv+Gu_d-r0ubyqZcDzERYd5FVTSpjBk++iACHqVgtHrOK0F7A@mail.gmail.com>
- <7fa897cf-4d58-c63f-afdd-a3ec5a6a56bf@gmail.com>
- <CAKv+Gu8aJRV4nqq1e-5HRLvbrANQsYuMf-pwWB53BhxLgX7iWg@mail.gmail.com>
- <b74d3c16-a512-73dc-c94a-ef6adde5f757@gmail.com>
- <CAKv+Gu8ZbN3BDRyuFzt4o--SSUmhuOh+jnpq8ZR-Ay13DJrAqg@mail.gmail.com>
- <fa285694-c3e1-adf8-032a-202e7598de41@gmail.com>
-Message-ID: <CANCKTBsypcVS_iC1+sbW5fMKfj+tTsxbQv9CvDwcO8GV3a8_Yg@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 21 Sep 2018 19:45:19 +0200
+Subject: [GIT PULL 2/2] ARM: dts: exynos: DT for v4.20 (or 5.0)
+Message-ID: <20180921174520.9126-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 20, 2018 at 5:39 PM Florian Fainelli <f.fainelli@gmail.com> wrote:
->
-> On 09/20/2018 02:33 PM, Ard Biesheuvel wrote:
-> > On 20 September 2018 at 14:31, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> >> On 09/20/2018 02:04 PM, Ard Biesheuvel wrote:
-> >>> On 20 September 2018 at 13:55, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> >>>> On 09/19/2018 07:19 PM, Ard Biesheuvel wrote:
-> >>>>> On 19 September 2018 at 07:31, Jim Quinlan <jim2101024@gmail.com> wrote:
-> >>>>>> The Broadcom STB PCIe host controller is intimately related to the
-> >>>>>> memory subsystem.  This close relationship adds complexity to how cpu
-> >>>>>> system memory is mapped to PCIe memory.  Ideally, this mapping is an
-> >>>>>> identity mapping, or an identity mapping off by a constant.  Not so in
-> >>>>>> this case.
-> >>>>>>
-> >>>>>> Consider the Broadcom reference board BCM97445LCC_4X8 which has 6 GB
-> >>>>>> of system memory.  Here is how the PCIe controller maps the
-> >>>>>> system memory to PCIe memory:
-> >>>>>>
-> >>>>>>   memc0-a@[        0....3fffffff] <=> pci@[        0....3fffffff]
-> >>>>>>   memc0-b@[100000000...13fffffff] <=> pci@[ 40000000....7fffffff]
-> >>>>>>   memc1-a@[ 40000000....7fffffff] <=> pci@[ 80000000....bfffffff]
-> >>>>>>   memc1-b@[300000000...33fffffff] <=> pci@[ c0000000....ffffffff]
-> >>>>>>   memc2-a@[ 80000000....bfffffff] <=> pci@[100000000...13fffffff]
-> >>>>>>   memc2-b@[c00000000...c3fffffff] <=> pci@[140000000...17fffffff]
-> >>>>>>
-> >>>>>
-> >>>>> So is describing this as
-> >>>>>
-> >>>>> dma-ranges = <0x0 0x0 0x0 0x0 0x0 0x40000000>,
-> >>>>>              <0x0 0x40000000 0x1 0x0 0x0 0x40000000>,
-> >>>>>              <0x0 0x80000000 0x0 0x40000000 0x0 0x40000000>,
-> >>>>>              <0x0 0xc0000000 0x3 0x0 0x0 0x40000000>,
-> >>>>>              <0x1 0x0 0x0 0x80000000 0x0 0x40000000>,
-> >>>>>              <0x1 0x40000000 0x0 0xc0000000 0x0 0x40000000>;
-> >>>>>
-> >>>>> not working for you? I haven't tried this myself, but since DT permits
-> >>>>> describing the inbound mappings this way, we should fix the code if it
-> >>>>> doesn't work at the moment.
-> >>>>
-> >>>> You mean encoding the memory controller index in the first cell? If that
-> >>>> works, that's indeed a much cleaner solution, though is it standard
-> >>>> compliant in any form?
-> >>>
-> >>> No those are just memory addresses (although I may have screwed up the
-> >>> order). From Documentation/devicetree/booting-without-of.txt:
-> >>>
-> >>> """
-> >>> Optional property:
-> >>> - dma-ranges: <prop-encoded-array> encoded as arbitrary number of triplets of
-> >>>         (child-bus-address, parent-bus-address, length). Each triplet specified
-> >>>         describes a contiguous DMA address range.
-> >>> """
-> >>>
-> >>
-> >> Then I am confused by your comment, that's what this patch does, it adds
-> >> support for reading "dma-ranges" from Device Tree and setting up inbound
-> >> windows using that. The only caveat is that because the PCIe root
-> >> complex has some ties with the memory bus architecture it is connected
-> >> to (SCB in our case) there is still a requirement to know the
-> >> translation between a given physical address and its backing memory
-> >> controller/aperture.
-> >>
-> >
-> > Ah ok, apologies for the noise then.
-> >
-> > I was hoping that having working support for dma-ranges would remove
-> > the need for the special phys<->dma conversion routines.
->
-> What you describe definitively works with platform devices, but I am not
-> sure this is working for PCIe devices, although, conceptually it should,
-> yes.
-Sorry for my delay in responding.  One problem is that
-of_dma_configure() only looks at the first dma-range given and then
-converts it to dev->dma_pfn_offset which is respected by the DMA API.
-However, we often have multiple dma-ranges, not just one.  This is the
-big issue.
+Hi,
 
-There is another issue with of_dma_configure() being invoked by the EP
-driver on "bridge->parent->of_node", which is our RC device,
-Of_dma_configure() calls of_dma_range() on the of_get_next_parent() of
-our RC's device node and this misses the dma-ranges property which is
-contained within the RC.  I think I could workaround this but there is
-no getting around the first problem.
+Nothing special, description in tag.
 
-Thanks,
-Jim
+Best regards,
+Krzysztof
 
-> --
-> Florian
+
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+
+  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+
+are available in the Git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-4.20
+
+for you to fetch changes up to 7c92b9a8e0fc5eae460a33b7420af5cf60bd7b21:
+
+  ARM: dts: exynos: Correct audio subsystem parent clock on Peach Chromebooks (2018-09-17 18:03:10 +0200)
+
+----------------------------------------------------------------
+Samsung DTS ARM changes for v4.20
+
+1. Bring up DSI and HDMI on Exynos5250 Arndale.
+2. Use the new way of setting external wakeup interrupts on S5Pv210.
+3. Use proper cpufreq suspend OPP to fix suspend/wakeup from RAM on Snow
+   Chromebook (Exynos5250).
+4. Fully describe regualtors on Odroid XU3-family boards.
+5. Fix sound in Snow-rev5 Chromebook.
+6. Fix regulators configuration on Peach Pi/Pit Chromebooks (Exynos5420)
+   which should be always on.
+7. Fix pull control on PMIC interrupt lines on multiple boards which
+   essentially fixes waking up by RTC.
+8. Add PMIC interrupts on Exynos4210 UniversalC210 board.
+9. Add external SD card support for Trats board (Exynos4210).
+10. Correct audio subsystem parent clock on Peach Chromebooks.
+11. Minor cleanups.
+12. Explicitly mark Samsung Exynos SoC as unstable. When introduced, the
+    DT bindings were minimal and incomplete. Since then some significant
+    (not fully compatible) changes have been already merged and
+    workarounds have been added while working on drivers. Marking certain
+    bindings as unstable will point users attention to always use DTB
+    compiled from current kernel sources - which anyway happens now. In
+    case of fear of incompatible ABI changes, any out of tree Device
+    Tree sources should either be upstreamed or should be changed in the
+    same way as in-kernel DTS are modified.
+
+----------------------------------------------------------------
+Andrzej Hajda (4):
+      ARM: dts: exynos: Add DSI node on Exynos5250
+      ARM: dts: exynos: Add DSI and panel nodes on Arndale
+      ARM: dts: exynos: Use i2c-gpio for HDMI-DDC on Arndale
+      ARM: dts: exynos: Fix HDMI-HPD line handling on Arndale
+
+Krzysztof Kozlowski (7):
+      ARM: dts: s5pv210: Switch to S5Pv210 specific pinctrl wakeup compatible
+      ARM: dts: exynos: Add missing used PMIC regulators on Exynos5422 Odroid boards
+      ARM: dts: exynos: Add unused PMIC regulators on Exynos5422 Odroid boards
+      ARM: dts: exynos: Disable unused PMIC regulators on Exynos5422 Odroid boards
+      ARM: dts: exynos: Add LDO28 regulator on Exynos5422 Odroid boards
+      ARM: dts: exynos: Remove double SD card detect pin inversion
+      dt-bindings: arm: Explicitly mark Samsung Exynos SoC as unstable
+
+Marek Szyprowski (10):
+      ARM: dts: exynos: Convert exynos5250.dtsi to opp-v2 bindings
+      ARM: dts: exynos: Mark 1 GHz CPU OPP as suspend OPP on Exynos5250
+      ARM: dts: exynos: Fix sound in Snow-rev5 Chromebook
+      ARM: dts: exynos: Fix regulators configuration on Peach Pi/Pit Chromebooks
+      ARM: dts: exynos: Disable pull control for MAX8997 interrupts on Origen
+      ARM: dts: exynos: Add missing PMIC interrupts on UniversalC210 board
+      ARM: dts: exynos: Disable pull control for S5M8767 PMIC
+      ARM: dts: exynos: Disable pull control for PMIC IRQ line on Artik5 board
+      ARM: dts: exynos: Add external SD card support for Trats board
+      ARM: dts: exynos: Correct audio subsystem parent clock on Peach Chromebooks
+
+ .../devicetree/bindings/arm/samsung/exynos.txt     |  26 ++++
+ arch/arm/boot/dts/exynos3250-artik5.dtsi           |   7 +
+ arch/arm/boot/dts/exynos4210-origen.dts            |   9 ++
+ arch/arm/boot/dts/exynos4210-trats.dts             |  15 ++
+ arch/arm/boot/dts/exynos4210-universal_c210.dts    |  11 +-
+ arch/arm/boot/dts/exynos4412-midas.dtsi            |   3 +-
+ arch/arm/boot/dts/exynos4412-odroid-common.dtsi    |   3 +-
+ arch/arm/boot/dts/exynos5250-arndale.dts           | 102 +++++++++++--
+ arch/arm/boot/dts/exynos5250-pinctrl.dtsi          |  11 ++
+ arch/arm/boot/dts/exynos5250-snow-rev5.dts         |  11 ++
+ arch/arm/boot/dts/exynos5250.dtsi                  | 152 ++++++++++++++------
+ arch/arm/boot/dts/exynos5420-peach-pit.dts         |   5 +-
+ arch/arm/boot/dts/exynos5422-odroid-core.dtsi      | 157 +++++++++++++++++++--
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |   6 +
+ arch/arm/boot/dts/exynos5422-odroidxu3.dts         |   6 +
+ arch/arm/boot/dts/exynos5800-peach-pi.dts          |   5 +-
+ arch/arm/boot/dts/s5pv210.dtsi                     |   2 +-
+ 17 files changed, 459 insertions(+), 72 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/samsung/exynos.txt
