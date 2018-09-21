@@ -1,343 +1,198 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 21 Sep 2018 18:39:58 +0100
-Subject: [PATCH v5 15/27] arm64: irqflags: Use ICC_PMR_EL1 for interrupt
- masking
-In-Reply-To: <1535471497-38854-16-git-send-email-julien.thierry@arm.com>
-References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
- <1535471497-38854-16-git-send-email-julien.thierry@arm.com>
-Message-ID: <1675f220-e4c3-b1e2-7842-901bec8eee19@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 21 Sep 2018 18:40:31 +0100
+Subject: [PATCH 2/5] arm64: mm: introduce 52-bit userspace support
+In-Reply-To: <20180829124543.25314-3-steve.capper@arm.com>
+References: <20180829124543.25314-1-steve.capper@arm.com>
+ <20180829124543.25314-3-steve.capper@arm.com>
+Message-ID: <20180921174031.GD238853@arrakis.emea.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Aug 29, 2018 at 01:45:40PM +0100, Steve Capper wrote:
+> On arm64 there is optional support for a 52-bit virtual address space.
+> To exploit this one has to be running with a 64KB page size and be
+> running on hardware that supports this.
+> 
+> For an arm64 kernel supporting a 48 bit VA with a 64KB page size,
+> a few changes are needed to support a 52-bit userspace:
+>  * TCR_EL1.T0SZ needs to be 12 instead of 16,
+>  * pgd_offset needs to work with a different PTRS_PER_PGD,
+>  * PGD_SIZE needs to be increased,
+>  * TASK_SIZE needs to reflect the new size.
 
-On 28/08/18 16:51, Julien Thierry wrote:
-> Instead disabling interrupts by setting the PSR.I bit, use a priority
-> higher than the one used for interrupts to mask them via PMR.
-> 
-> The value chosen for PMR to enable/disable interrupts encodes the status
-> of interrupts on a single bit. This information is stored in the irqflags
-> values used when saving/restoring IRQ status.
-> 
-> Tested-by: Daniel Thompson <daniel.thompson@linaro.org>
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Oleg Nesterov <oleg@redhat.com>
-> ---
->   arch/arm64/include/asm/assembler.h | 17 ++++++-
->   arch/arm64/include/asm/efi.h       |  3 +-
->   arch/arm64/include/asm/irqflags.h  | 97 ++++++++++++++++++++++++++++++--------
->   arch/arm64/include/asm/ptrace.h    | 10 ++--
->   arch/arm64/kernel/entry.S          |  2 +-
->   5 files changed, 102 insertions(+), 27 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-> index 0bcc98d..0b2dcfd 100644
-> --- a/arch/arm64/include/asm/assembler.h
-> +++ b/arch/arm64/include/asm/assembler.h
-> @@ -23,6 +23,7 @@
->   #ifndef __ASM_ASSEMBLER_H
->   #define __ASM_ASSEMBLER_H
-> 
-> +#include <asm/alternative.h>
->   #include <asm/asm-offsets.h>
->   #include <asm/cpufeature.h>
->   #include <asm/debug-monitors.h>
-> @@ -62,12 +63,24 @@
->   /*
->    * Enable and disable interrupts.
->    */
-> -	.macro	disable_irq
-> +	.macro	disable_irq, tmp
-> +	mov	\tmp, #ICC_PMR_EL1_MASKED
-> +alternative_if_not ARM64_HAS_IRQ_PRIO_MASKING
->   	msr	daifset, #2
-> +alternative_else
-> +	msr_s	SYS_ICC_PMR_EL1, \tmp
-> +alternative_endif
->   	.endm
-> 
-> -	.macro	enable_irq
-> +	.macro	enable_irq, tmp
-> +	mov     \tmp, #ICC_PMR_EL1_UNMASKED
-> +alternative_if_not ARM64_HAS_IRQ_PRIO_MASKING
->   	msr	daifclr, #2
-> +	nop
-> +alternative_else
-> +	msr_s	SYS_ICC_PMR_EL1, \tmp
-> +	dsb	sy
-> +alternative_endif
->   	.endm
-> 
->   	.macro	save_and_disable_irq, flags
-> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-> index 7ed3208..3e06891 100644
-> --- a/arch/arm64/include/asm/efi.h
-> +++ b/arch/arm64/include/asm/efi.h
-> @@ -42,7 +42,8 @@
-> 
->   efi_status_t __efi_rt_asm_wrapper(void *, const char *, ...);
-> 
-> -#define ARCH_EFI_IRQ_FLAGS_MASK (PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT)
-> +#define ARCH_EFI_IRQ_FLAGS_MASK \
-> +	(PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT | ARCH_FLAG_PMR_EN)
-> 
->   /* arch specific definitions used by the stub code */
-> 
-> diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
-> index 24692ed..193cfd0 100644
-> --- a/arch/arm64/include/asm/irqflags.h
-> +++ b/arch/arm64/include/asm/irqflags.h
-> @@ -18,7 +18,27 @@
-> 
->   #ifdef __KERNEL__
-> 
-> +#include <asm/alternative.h>
-> +#include <asm/cpufeature.h>
->   #include <asm/ptrace.h>
-> +#include <asm/sysreg.h>
+I will comment on the general approach here. We indeed need TASK_SIZE
+and T0SZ to be variable based on the supported feature. However, I think
+PGD_SIZE can be fixed to cover 52-bit VA all the time, we just need to
+ensure that we allocate a bigger pgd when this option is enabled.
+
+When the 52-bit VA is not present, everything still works as normal as
+the pgd entries for a 48-bit VA are written at the beginning of the pgd.
+There is no need to change pgd_offset/index etc.
+
+> A future patch enables CONFIG_ARM64_TRY_52BIT_VA (which essentially
+> activates this patch) as we need to also change the mmap logic to maintain
+> compatibility with a userspace that expects at most 48-bits of VA.
+
+And I would just drop the "TRY" part in the above config (but mention it
+in the help text that it is used only if available).
+
+> diff --git a/arch/arm64/include/asm/pgalloc.h b/arch/arm64/include/asm/pgalloc.h
+> index 2e05bcd944c8..7f50804a677e 100644
+> --- a/arch/arm64/include/asm/pgalloc.h
+> +++ b/arch/arm64/include/asm/pgalloc.h
+> @@ -27,7 +27,11 @@
+>  #define check_pgt_cache()		do { } while (0)
+>  
+>  #define PGALLOC_GFP	(GFP_KERNEL | __GFP_ZERO)
+> +#ifdef CONFIG_ARM64_TRY_52BIT_VA
+> +#define PGD_SIZE	((1 << (52 - PGDIR_SHIFT)) * sizeof(pgd_t))
+> +#else
+>  #define PGD_SIZE	(PTRS_PER_PGD * sizeof(pgd_t))
+> +#endif
+
+OK, so you've already made the PGD_SIZE static here (unless changed in
+subsequent patches). 
+
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> index 1bdeca8918a6..8449e266cd46 100644
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
+> @@ -577,11 +577,21 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
+>  #define pgd_ERROR(pgd)		__pgd_error(__FILE__, __LINE__, pgd_val(pgd))
+>  
+>  /* to find an entry in a page-table-directory */
+> -#define pgd_index(addr)		(((addr) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
+> +#define pgd_index(addr, ptrs)		(((addr) >> PGDIR_SHIFT) & ((ptrs) - 1))
+> +#define _pgd_offset_raw(pgd, addr, ptrs) ((pgd) + pgd_index(addr, ptrs))
+> +#define pgd_offset_raw(pgd, addr)	(_pgd_offset_raw(pgd, addr, PTRS_PER_PGD))
+>  
+> -#define pgd_offset_raw(pgd, addr)	((pgd) + pgd_index(addr))
+> +static inline pgd_t *pgd_offset(const struct mm_struct *mm, unsigned long addr)
+> +{
+> +	pgd_t *ret;
 > +
-> +
-> +/*
-> + * When ICC_PMR_EL1 is used for interrupt masking, only the bit indicating
-> + * whether the normal interrupts are masked is kept along with the daif
-> + * flags.
-> + */
-> +#define ARCH_FLAG_PMR_EN 0x1
-> +
-> +#define MAKE_ARCH_FLAGS(daif, pmr)					\
-> +	((daif) | (((pmr) >> ICC_PMR_EL1_EN_SHIFT) & ARCH_FLAG_PMR_EN))
-> +
-> +#define ARCH_FLAGS_GET_PMR(flags)				\
-> +	((((flags) & ARCH_FLAG_PMR_EN) << ICC_PMR_EL1_EN_SHIFT) \
-> +		| ICC_PMR_EL1_MASKED)
-> +
-> +#define ARCH_FLAGS_GET_DAIF(flags) ((flags) & ~ARCH_FLAG_PMR_EN)
-> 
->   /*
->    * Aarch64 has flags for masking: Debug, Asynchronous (serror), Interrupts and
-> @@ -38,31 +58,50 @@
->    */
->   static inline unsigned long arch_local_irq_save(void)
->   {
-> -	unsigned long flags;
-> -	asm volatile(
-> +	unsigned long flags, masked = ICC_PMR_EL1_MASKED;
-> +	unsigned long pmr = 0;
-> +
-> +	asm volatile(ALTERNATIVE(
->   		"mrs	%0, daif		// arch_local_irq_save\n"
-> -		"msr	daifset, #2"
-> -		: "=r" (flags)
-> -		:
-> +		"msr	daifset, #2\n"
-> +		"mov	%1, #" __stringify(ICC_PMR_EL1_UNMASKED),
-> +		/* --- */
-> +		"mrs	%0, daif\n"
-> +		"mrs_s  %1, " __stringify(SYS_ICC_PMR_EL1) "\n"
-> +		"msr_s	" __stringify(SYS_ICC_PMR_EL1) ", %2",
-> +		ARM64_HAS_IRQ_PRIO_MASKING)
-> +		: "=&r" (flags), "=&r" (pmr)
-> +		: "r" (masked)
->   		: "memory");
-> -	return flags;
-> +
-> +	return MAKE_ARCH_FLAGS(flags, pmr);
->   }
-> 
->   static inline void arch_local_irq_enable(void)
->   {
-> -	asm volatile(
-> -		"msr	daifclr, #2		// arch_local_irq_enable"
-> -		:
-> +	unsigned long unmasked = ICC_PMR_EL1_UNMASKED;
-> +
-> +	asm volatile(ALTERNATIVE(
-> +		"msr	daifclr, #2		// arch_local_irq_enable\n"
-> +		"nop",
-> +		"msr_s  " __stringify(SYS_ICC_PMR_EL1) ",%0\n"
-> +		"dsb	sy",
-> +		ARM64_HAS_IRQ_PRIO_MASKING)
->   		:
-> +		: "r" (unmasked)
->   		: "memory");
->   }
-> 
->   static inline void arch_local_irq_disable(void)
->   {
-> -	asm volatile(
-> -		"msr	daifset, #2		// arch_local_irq_disable"
-> -		:
-> +	unsigned long masked = ICC_PMR_EL1_MASKED;
-> +
-> +	asm volatile(ALTERNATIVE(
-> +		"msr	daifset, #2		// arch_local_irq_disable",
-> +		"msr_s  " __stringify(SYS_ICC_PMR_EL1) ",%0",
-> +		ARM64_HAS_IRQ_PRIO_MASKING)
->   		:
-> +		: "r" (masked)
->   		: "memory");
->   }
-> 
-> @@ -72,12 +111,19 @@ static inline void arch_local_irq_disable(void)
->   static inline unsigned long arch_local_save_flags(void)
->   {
->   	unsigned long flags;
-> -	asm volatile(
-> -		"mrs	%0, daif		// arch_local_save_flags"
-> -		: "=r" (flags)
-> +	unsigned long pmr = 0;
-> +
-> +	asm volatile(ALTERNATIVE(
-> +		"mrs	%0, daif		// arch_local_save_flags\n"
-> +		"mov	%1, #" __stringify(ICC_PMR_EL1_UNMASKED),
-> +		"mrs	%0, daif\n"
-> +		"mrs_s  %1, " __stringify(SYS_ICC_PMR_EL1),
-> +		ARM64_HAS_IRQ_PRIO_MASKING)
-> +		: "=r" (flags), "=r" (pmr)
->   		:
->   		: "memory");
-> -	return flags;
-> +
-> +	return MAKE_ARCH_FLAGS(flags, pmr);
->   }
-> 
->   /*
-> @@ -85,16 +131,27 @@ static inline unsigned long arch_local_save_flags(void)
->    */
->   static inline void arch_local_irq_restore(unsigned long flags)
->   {
-> -	asm volatile(
-> -		"msr	daif, %0		// arch_local_irq_restore"
-> +	unsigned long pmr = ARCH_FLAGS_GET_PMR(flags);
-> +
-> +	flags = ARCH_FLAGS_GET_DAIF(flags);
-> +
-> +	asm volatile(ALTERNATIVE(
-> +		"msr	daif, %0		// arch_local_irq_restore\n"
-> +		"nop\n"
-> +		"nop",
-> +		"msr	daif, %0\n"
-> +		"msr_s  " __stringify(SYS_ICC_PMR_EL1) ",%1\n"
-> +		"dsb	sy",
+> +	if (IS_ENABLED(CONFIG_ARM64_TRY_52BIT_VA) && (addr < TASK_SIZE))
+> +		ret = _pgd_offset_raw(mm->pgd, addr, 1ULL << (vabits_user - PGDIR_SHIFT));
+> +	else
+> +		ret = pgd_offset_raw(mm->pgd, addr);
+>  
+> -#define pgd_offset(mm, addr)	(pgd_offset_raw((mm)->pgd, (addr)))
+> +	return ret;
+> +}
+>  
+>  /* to find an entry in a kernel page-table-directory */
+>  #define pgd_offset_k(addr)	pgd_offset(&init_mm, addr)
 
-I've come to realize there is an issue with that sequence. If the CPU 
-has { PSR.I = 1, PMR = unmasked }, attempting attempting to restore 
-flags { PSR.I = 0, PMR = masked }, there will be that ever so small 
-window between the two instructions where interrupts get re-enabled 
-while both contexts (the current one and the one being restored) have 
-interrupts disabled...
+We can decouple pgd_offset_k() from pgd_offset() and there wouldn't be a
+need to check the addr < TASK_SIZE. Do we have any case where
+pgd_offset() is used on a kernel address?
 
-Does that ever happen? Yes, when coming from a kernel entry or coming 
-back from a VHE guest and doing "local_daif_retore(DAIF_PROCCTX_NOIRQ)".
+> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+> index 46c9d9ff028c..ba63b8a8dac1 100644
+> --- a/arch/arm64/include/asm/processor.h
+> +++ b/arch/arm64/include/asm/processor.h
+> @@ -19,13 +19,13 @@
+>  #ifndef __ASM_PROCESSOR_H
+>  #define __ASM_PROCESSOR_H
+>  
+> -#define TASK_SIZE_64		(UL(1) << VA_BITS)
+> -
+> -#define KERNEL_DS	UL(-1)
+> -#define USER_DS		(TASK_SIZE_64 - 1)
+> -
+> +#define KERNEL_DS		UL(-1)
+> +#define _USER_DS(vabits)	((UL(1) << (vabits)) - 1)
+>  #ifndef __ASSEMBLY__
+>  
+> +extern u64 vabits_user;
+> +#define TASK_SIZE_64		(UL(1) << vabits_user)
+> +#define USER_DS			_USER_DS(vabits_user)
+>  #define DEFAULT_MAP_WINDOW_64	(UL(1) << VA_BITS)
 
-An obvious, always working solution would be to do:
-	msr daifset, #2
-	msr ICC_PMR_EL1, %1
-	msr daif, %0
-	dsb sy
+Can we keep USER_DS to TASK_SIZE_64 (static)? I don't see what we gain
+by making it dynamic, all we want is that it doesn't overlap with the
+KERNEL_DS (similarly we don't have a different USER_DS for 32-bit tasks
+here).
 
-This however has some heavy performance hit on hackbench (~4-5%).
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index e238b7932096..4807fee515b6 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -1006,6 +1006,14 @@ static bool has_hw_dbm(const struct arm64_cpu_capabilities *cap,
+>  
+>  #endif
+>  
+> +#ifdef CONFIG_ARM64_TRY_52BIT_VA
+> +extern u64 vabits_user;
+> +static bool has_52bit_vas(const struct arm64_cpu_capabilities *entry, int __unused)
 
-So I'd suggest:
-	msr ICC_PMR_EL1, %1
-	msr daif, %0
-	dsb sy
+Nitpick: just s/vas/va/ to match the config option naming.
 
-So, this only reverses the issue to the case where we restore { PSR.I = 
-1, PMR = unmasked } while CPU has { PSR.I = 0, PMR = masked }?
-Yes, *but* there is no reason this should happen:
-
-- There is no pre-defined flags values that provide { PSR.I = 1, PMR = 
-unmasked } (and there is no reason to be one once we start using priorities)
-
-- If flags { PMR = unmasked, PSR.I = 1 } where obtained through 
-local_irq_save() or local_irq_save_flags(), from that point one would 
-need to mask PMR *and* explicitly modify PSR.I since local_enable_irq() 
-no longer touches PSR.
-The only code that has a reason to do this explicit change is PMR setup 
-code at CPU startup and when coming from exception entry. And code doing 
-such action has no reason to be between local_irq_save/restore() calls 
-since that would simply undo its action...
-
-So my take is that restoring the PMR register first is fine without 
-masking PSR.I with the following comment:
-
-/*
-  * Code switching from PSR.I interrupt disabling to PMR masking
-  * should not lie between consecutive calls to local_irq_save()
-  * and local_irq_restore() in the same context.
-  */
-
-Does this approach seem sound? (If my explanation was not to confusing)
-Am I missing some corner case?
-Any suggestions for better approach? Or better wording?
-
-Thanks,
-
-> +		ARM64_HAS_IRQ_PRIO_MASKING)
->   	:
-> -	: "r" (flags)
-> +	: "r" (flags), "r" (pmr)
->   	: "memory");
->   }
-> 
->   static inline int arch_irqs_disabled_flags(unsigned long flags)
->   {
-> -	return flags & PSR_I_BIT;
-> +	return (ARCH_FLAGS_GET_DAIF(flags) & (PSR_I_BIT)) |
-> +		!(ARCH_FLAGS_GET_PMR(flags) & ICC_PMR_EL1_EN_BIT);
->   }
->   #endif
->   #endif
-> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-> index 29ec217..67df46e 100644
-> --- a/arch/arm64/include/asm/ptrace.h
-> +++ b/arch/arm64/include/asm/ptrace.h
-> @@ -25,8 +25,11 @@
->   #define CurrentEL_EL1		(1 << 2)
->   #define CurrentEL_EL2		(2 << 2)
-> 
-> -/* PMR value use to unmask interrupts */
-> +/* PMR values used to mask/unmask interrupts */
->   #define ICC_PMR_EL1_UNMASKED    0xf0
-> +#define ICC_PMR_EL1_EN_SHIFT	6
-> +#define ICC_PMR_EL1_EN_BIT	(1 << ICC_PMR_EL1_EN_SHIFT) // PMR IRQ enable
-> +#define ICC_PMR_EL1_MASKED      (ICC_PMR_EL1_UNMASKED ^ ICC_PMR_EL1_EN_BIT)
-> 
->   /* AArch32-specific ptrace requests */
->   #define COMPAT_PTRACE_GETREGS		12
-> @@ -201,8 +204,9 @@ static inline void forget_syscall(struct pt_regs *regs)
->   #define processor_mode(regs) \
->   	((regs)->pstate & PSR_MODE_MASK)
-> 
-> -#define interrupts_enabled(regs) \
-> -	(!((regs)->pstate & PSR_I_BIT))
-> +#define interrupts_enabled(regs)			\
-> +	((!((regs)->pstate & PSR_I_BIT)) &&		\
-> +	 ((regs)->pmr_save & ICC_PMR_EL1_EN_BIT))
-> 
->   #define fast_interrupts_enabled(regs) \
->   	(!((regs)->pstate & PSR_F_BIT))
 > diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 79b06af..91e1e3d 100644
+> index 09dbea221a27..72b4b0b069b9 100644
 > --- a/arch/arm64/kernel/entry.S
 > +++ b/arch/arm64/kernel/entry.S
-> @@ -912,7 +912,7 @@ work_pending:
->    * "slow" syscall return path.
->    */
->   ret_to_user:
-> -	disable_irq				// disable interrupts
-> +	disable_irq x21				// disable interrupts
->   	ldr	x1, [tsk, #TSK_TI_FLAGS]
->   	and	x2, x1, #_TIF_WORK_MASK
->   	cbnz	x2, work_pending
-> --
-> 1.9.1
-> 
+> @@ -189,7 +189,11 @@ alternative_cb_end
+>  	/* Save the task's original addr_limit and set USER_DS */
+>  	ldr	x20, [tsk, #TSK_TI_ADDR_LIMIT]
+>  	str	x20, [sp, #S_ORIG_ADDR_LIMIT]
+> -	mov	x20, #USER_DS
+> +alternative_if	ARM64_HAS_52BIT_VA
+> +	mov	x20, #_USER_DS(52)
+> +alternative_else
+> +	mov	x20, #_USER_DS(VA_BITS)
+> +alternative_endif
+
+Why is this needed? Can't we just use 52 all the time?
+
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index b0853069702f..6b7d32990b25 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -316,6 +316,19 @@ __create_page_tables:
+>  	adrp	x0, idmap_pg_dir
+>  	adrp	x3, __idmap_text_start		// __pa(__idmap_text_start)
+>  
+> +#ifdef CONFIG_ARM64_TRY_52BIT_VA
+> +	mrs_s	x6, SYS_ID_AA64MMFR2_EL1
+> +	and	x6, x6, #(0xf << ID_AA64MMFR2_LVA_SHIFT)
+> +	mov	x5, #52
+> +	cbnz	x6, 1f
+> +#endif
+> +	mov	x5, #VA_BITS
+> +1:
+> +	adr_l	x6, vabits_user
+> +	str	x5, [x6]
+> +	dmb	sy
+> +	dc	ivac, x6		// Invalidate potentially stale cache line
+
+I wonder whether we could get away with not setting vabits_user until
+has_52bit_va(), especially since it's meant for user space. For idmap,
+this matches the PA and while we support 52-bit PA, we've never
+supported a 52-bit idmap. Even if we do, I don't think setting
+vabits_user early is necessary.
+
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> index 03646e6a2ef4..4834bd434143 100644
+> --- a/arch/arm64/mm/proc.S
+> +++ b/arch/arm64/mm/proc.S
+> @@ -441,7 +441,15 @@ ENTRY(__cpu_setup)
+>  	ldr	x10, =TCR_TxSZ(VA_BITS) | TCR_CACHE_FLAGS | TCR_SMP_FLAGS | \
+>  			TCR_TG_FLAGS | TCR_KASLR_FLAGS | TCR_ASID16 | \
+>  			TCR_TBI0 | TCR_A1
+> -	tcr_set_idmap_t0sz	x10, x9
+> +
+> +#ifdef CONFIG_ARM64_TRY_52BIT_VA
+> +	ldr_l 		x9, vabits_user
+> +	sub		x9, xzr, x9
+> +	add		x9, x9, #64
+> +#else
+> +	ldr_l		x9, idmap_t0sz
+> +#endif
+> +	tcr_set_t0sz	x10, x9
+
+This is probably sufficient for 52-bit idmap, together with a statically
+allocated idmap_pg_dir (which we do anyway, using a full page IIUC).
 
 -- 
-Julien Thierry
+Catalin
