@@ -1,51 +1,59 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Fri, 21 Sep 2018 10:18:01 +0800
-Subject: [PATCH -next] pinctrl: mediatek: moore: fix return value check
- in mtk_moore_pinctrl_probe()
-In-Reply-To: <1537424510-23623-1-git-send-email-weiyongjun1@huawei.com>
-References: <1537424510-23623-1-git-send-email-weiyongjun1@huawei.com>
-Message-ID: <1537496281.9654.8.camel@mtkswgap22>
+From: yuehaibing@huawei.com (YueHaibing)
+Date: Fri, 21 Sep 2018 10:53:47 +0800
+Subject: [PATCH net-next] net: seeq: fix return type of ndo_start_xmit function
+Message-ID: <20180921025347.9208-1-yuehaibing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-09-20 at 06:21 +0000, Wei Yongjun wrote:
-> In case of error, the function devm_kmalloc_array() returns NULL pointer
-> not ERR_PTR(). The IS_ERR() test in the return value check should be
-> replaced with NULL test.
-> 
-> Fixes: b7d7f9eeca55 ("pinctrl: mediatek: extend struct mtk_pin_desc which per-pin driver depends on")
-> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+The method ndo_start_xmit() is defined as returning an 'netdev_tx_t',
+which is a typedef for an enum type, so make sure the implementation in
+this driver has returns 'netdev_tx_t' value, and change the function
+return type to netdev_tx_t.
 
-Acked-by: Sean Wang <sean.wang@mediatek.com>
+Found by coccinelle.
 
-> ---
->  drivers/pinctrl/mediatek/pinctrl-moore.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-moore.c b/drivers/pinctrl/mediatek/pinctrl-moore.c
-> index c27597c..3bf5dd5 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-moore.c
-> +++ b/drivers/pinctrl/mediatek/pinctrl-moore.c
-> @@ -608,8 +608,8 @@ int mtk_moore_pinctrl_probe(struct platform_device *pdev,
->  
->  	hw->base = devm_kmalloc_array(&pdev->dev, hw->soc->nbase_names,
->  				      sizeof(*hw->base), GFP_KERNEL);
-> -	if (IS_ERR(hw->base))
-> -		return PTR_ERR(hw->base);
-> +	if (!hw->base)
-> +		return -ENOMEM;
->  
->  	for (i = 0; i < hw->soc->nbase_names; i++) {
->  		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-> @@ -629,8 +629,8 @@ int mtk_moore_pinctrl_probe(struct platform_device *pdev,
->  	/* Copy from internal struct mtk_pin_desc to register to the core */
->  	pins = devm_kmalloc_array(&pdev->dev, hw->soc->npins, sizeof(*pins),
->  				  GFP_KERNEL);
-> -	if (IS_ERR(pins))
-> -		return PTR_ERR(pins);
-> +	if (!pins)
-> +		return -ENOMEM;
->  
->  	for (i = 0; i < hw->soc->npins; i++) {
->  		pins[i].number = hw->soc->pins[i].number;
-> 
+Signed-off-by: YueHaibing <yuehaibing@huawei.com>
+---
+ drivers/net/ethernet/seeq/ether3.c  | 5 +++--
+ drivers/net/ethernet/seeq/sgiseeq.c | 3 ++-
+ 2 files changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/net/ethernet/seeq/ether3.c b/drivers/net/ethernet/seeq/ether3.c
+index c5bc124..d1bb73b 100644
+--- a/drivers/net/ethernet/seeq/ether3.c
++++ b/drivers/net/ethernet/seeq/ether3.c
+@@ -77,7 +77,8 @@
+ static int	ether3_rx(struct net_device *dev, unsigned int maxcnt);
+ static void	ether3_tx(struct net_device *dev);
+ static int	ether3_open (struct net_device *dev);
+-static int	ether3_sendpacket (struct sk_buff *skb, struct net_device *dev);
++static netdev_tx_t	ether3_sendpacket(struct sk_buff *skb,
++					  struct net_device *dev);
+ static irqreturn_t ether3_interrupt (int irq, void *dev_id);
+ static int	ether3_close (struct net_device *dev);
+ static void	ether3_setmulticastlist (struct net_device *dev);
+@@ -481,7 +482,7 @@ static void ether3_timeout(struct net_device *dev)
+ /*
+  * Transmit a packet
+  */
+-static int
++static netdev_tx_t
+ ether3_sendpacket(struct sk_buff *skb, struct net_device *dev)
+ {
+ 	unsigned long flags;
+diff --git a/drivers/net/ethernet/seeq/sgiseeq.c b/drivers/net/ethernet/seeq/sgiseeq.c
+index 573691b..70cce63 100644
+--- a/drivers/net/ethernet/seeq/sgiseeq.c
++++ b/drivers/net/ethernet/seeq/sgiseeq.c
+@@ -578,7 +578,8 @@ static inline int sgiseeq_reset(struct net_device *dev)
+ 	return 0;
+ }
+ 
+-static int sgiseeq_start_xmit(struct sk_buff *skb, struct net_device *dev)
++static netdev_tx_t
++sgiseeq_start_xmit(struct sk_buff *skb, struct net_device *dev)
+ {
+ 	struct sgiseeq_private *sp = netdev_priv(dev);
+ 	struct hpc3_ethregs *hregs = sp->hregs;
+-- 
+1.8.3.1
