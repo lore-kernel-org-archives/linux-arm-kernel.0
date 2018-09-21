@@ -1,32 +1,34 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 21 Sep 2018 15:51:24 +0530
-Subject: [RFC PATCH 09/40] PCI: keystone: Remove redundant platform_set_drvdata
+Date: Fri, 21 Sep 2018 15:51:26 +0530
+Subject: [RFC PATCH 11/40] dt-bindings: PCI: keystone: Add bindings to get
+ device control module
 In-Reply-To: <20180921102155.22839-1-kishon@ti.com>
 References: <20180921102155.22839-1-kishon@ti.com>
-Message-ID: <20180921102155.22839-10-kishon@ti.com>
+Message-ID: <20180921102155.22839-12-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No functional change. Remove redundant platform_set_drvdata invocation
-in ks_pcie_probe().
+Add bindings to get device control module which has the device id and
+vendor id to be configured in the keystone PCIe controller.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/pci/controller/dwc/pci-keystone.c | 2 --
- 1 file changed, 2 deletions(-)
+ Documentation/devicetree/bindings/pci/pci-keystone.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/pci/controller/dwc/pci-keystone.c b/drivers/pci/controller/dwc/pci-keystone.c
-index 4554fdc6cce1..c54d18ea263a 100644
---- a/drivers/pci/controller/dwc/pci-keystone.c
-+++ b/drivers/pci/controller/dwc/pci-keystone.c
-@@ -829,8 +829,6 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
+diff --git a/Documentation/devicetree/bindings/pci/pci-keystone.txt b/Documentation/devicetree/bindings/pci/pci-keystone.txt
+index 4dd17de549a7..2030ee0dc4f9 100644
+--- a/Documentation/devicetree/bindings/pci/pci-keystone.txt
++++ b/Documentation/devicetree/bindings/pci/pci-keystone.txt
+@@ -19,6 +19,9 @@ pcie_msi_intc : Interrupt controller device node for MSI IRQ chip
+ 	interrupt-cells: should be set to 1
+ 	interrupts: GIC interrupt lines connected to PCI MSI interrupt lines
  
--	platform_set_drvdata(pdev, ks_pcie);
--
- 	ret = ks_add_pcie_port(ks_pcie, pdev);
- 	if (ret < 0)
- 		goto fail_clk;
++ti,syscon-pcie-id : phandle to the device control module required to set device
++		    id and vendor id.
++
+  Example:
+ 	pcie_msi_intc: msi-interrupt-controller {
+ 			interrupt-controller;
 -- 
 2.17.1
