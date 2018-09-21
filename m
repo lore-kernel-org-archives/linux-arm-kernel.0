@@ -1,37 +1,84 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Fri, 21 Sep 2018 11:39:21 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: enable STM32 DRM support
-In-Reply-To: <1534776651-4617-1-git-send-email-yannick.fertre@st.com>
-References: <1534776651-4617-1-git-send-email-yannick.fertre@st.com>
-Message-ID: <f06b81ec-1ac6-0be5-de82-d4552e0c0d88@st.com>
+From: ludovic.Barre@st.com (Ludovic Barre)
+Date: Fri, 21 Sep 2018 11:45:59 +0200
+Subject: [PATCH V2 05/27] mmc: mmci: move mmci next cookie to mci host
+In-Reply-To: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
+References: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1537523181-14578-6-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yannick
+From: Ludovic Barre <ludovic.barre@st.com>
 
-On 08/20/2018 04:50 PM, Yannick Fertr? wrote:
-> Enable DRM support for STMicroelectronics as loadable module.
-> 
-> Signed-off-by: Yannick Fertr? <yannick.fertre@st.com>
-> ---
->   arch/arm/configs/multi_v7_defconfig | 1 +
->   1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 7e1c543..d1a2fbf 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -645,6 +645,7 @@ CONFIG_DRM_RCAR_LVDS=y
->   CONFIG_DRM_SUN4I=m
->   CONFIG_DRM_FSL_DCU=m
->   CONFIG_DRM_TEGRA=y
-> +CONFIG_DRM_STM=m
->   CONFIG_DRM_PANEL_SAMSUNG_LD9040=m
->   CONFIG_DRM_PANEL_SAMSUNG_S6E63J0X03=m
->   CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=m
-> 
+This patch moves next cookie to mmci host structure to
+share same cookie management between all variants.
 
-Applied on stm32-next.
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+---
+ drivers/mmc/host/mmci.c | 10 ++++------
+ drivers/mmc/host/mmci.h |  2 ++
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-Thanks.
-Alex
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 6de7c8d..43f2a1a 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -418,7 +418,6 @@ static void mmci_init_sg(struct mmci_host *host, struct mmc_data *data)
+ struct mmci_dmae_next {
+ 	struct dma_async_tx_descriptor *desc;
+ 	struct dma_chan	*chan;
+-	s32 cookie;
+ };
+ 
+ struct mmci_dmae_priv {
+@@ -449,7 +448,7 @@ static int mmci_dma_setup(struct mmci_host *host)
+ 						     "tx");
+ 
+ 	/* initialize pre request cookie */
+-	dmae->next_data.cookie = 1;
++	host->next_cookie = 1;
+ 
+ 	/*
+ 	 * If only an RX channel is specified, the driver will
+@@ -716,7 +715,7 @@ static void mmci_get_next_data(struct mmci_host *host, struct mmc_data *data)
+ 	struct mmci_dmae_priv *dmae = host->dma_priv;
+ 	struct mmci_dmae_next *next = &dmae->next_data;
+ 
+-	WARN_ON(data->host_cookie && data->host_cookie != next->cookie);
++	WARN_ON(data->host_cookie && data->host_cookie != host->next_cookie);
+ 	WARN_ON(!data->host_cookie && (next->desc || next->chan));
+ 
+ 	dmae->desc_current = next->desc;
+@@ -728,9 +727,7 @@ static void mmci_get_next_data(struct mmci_host *host, struct mmc_data *data)
+ static void mmci_pre_request(struct mmc_host *mmc, struct mmc_request *mrq)
+ {
+ 	struct mmci_host *host = mmc_priv(mmc);
+-	struct mmci_dmae_priv *dmae = host->dma_priv;
+ 	struct mmc_data *data = mrq->data;
+-	struct mmci_dmae_next *nd = &dmae->next_data;
+ 
+ 	if (!data)
+ 		return;
+@@ -741,7 +738,8 @@ static void mmci_pre_request(struct mmc_host *mmc, struct mmc_request *mrq)
+ 		return;
+ 
+ 	if (!mmci_dma_prep_next(host, data))
+-		data->host_cookie = ++nd->cookie < 0 ? 1 : nd->cookie;
++		data->host_cookie = ++host->next_cookie < 0 ?
++			1 : host->next_cookie;
+ }
+ 
+ static void mmci_post_request(struct mmc_host *mmc, struct mmc_request *mrq,
+diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+index 1e9a45b..5bb1ce2 100644
+--- a/drivers/mmc/host/mmci.h
++++ b/drivers/mmc/host/mmci.h
+@@ -318,5 +318,7 @@ struct mmci_host {
+ 	int (*get_rx_fifocnt)(struct mmci_host *h, u32 status, int remain);
+ 
+ 	void			*dma_priv;
++
++	s32			next_cookie;
+ };
+ 
+-- 
+2.7.4
