@@ -1,103 +1,68 @@
-From: minchan.kernel@gmail.com (Minchan Kim)
-Date: Fri, 21 Sep 2018 10:43:32 +0900
-Subject: [PATCH v1 1/3] arm: mm: reordering memory type table
-In-Reply-To: <20180917004451.174527-2-minchan@kernel.org>
-References: <20180917004451.174527-1-minchan@kernel.org>
- <20180917004451.174527-2-minchan@kernel.org>
-Message-ID: <20180921014332.GA112825@rodete-desktop-imager.corp.google.com>
+From: yuehaibing@huawei.com (YueHaibing)
+Date: Fri, 21 Sep 2018 09:59:41 +0800
+Subject: [PATCH -next] pinctrl: sunxi: fix 'pctrl->functions' allocation in
+ sunxi_pinctrl_build_state
+Message-ID: <20180921015941.28468-1-yuehaibing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guys,
+fixes following Smatch static check warning:
 
-Could you have a chance to review this patchset?
+ ./drivers/pinctrl/sunxi/pinctrl-sunxi.c:1112 sunxi_pinctrl_build_state()
+ warn: passing devm_ allocated variable to kfree. 'pctrl->functions'
 
-Thanks!
+As we will be calling krealloc() on pointer 'pctrl->functions', which means
+kfree() will be called in there, devm_kzalloc() shouldn't be used with
+the allocation in the first place.  Fix the warning by calling kcalloc()
+and managing the free procedure in error path on our own.
 
-On Mon, Sep 17, 2018 at 09:44:49AM +0900, Minchan Kim wrote:
-> To use bit 5 in page table as L_PTE_SPECIAL, we need a room for that.
-> It seems we don't need 4 bits for the memory type with ARMv6+.
-> If it's true, let's reorder bits to make bit 5 free.
-> 
-> We will use the bit for L_PTE_SPECIAL in next patch.
-> 
-> A note from Catalin
-> "
-> > Anyway, on ARMv7 or ARMv6+LPAE, the non-shared device gets mapped to
-> > shared device in hardware. Looking through the arm32 code, it seems that
-> > MT_DEVICE_NONSHARED is used by arch/arm/mach-shmobile/setup-r8a7779.c
-> > and IIUC that's a v7 platform (R-Car H1, Cortex-A9). I think the above
-> > should be defined to L_PTE_MT_DEV_SHARED, unless I miss any place where
-> > DEV_NONSHARED is relevant on ARMv6 (adding Simon to confirm on shmbile).
-> "
-> 
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Steve Capper <steve.capper@linaro.org>
-> Cc: Simon Horman <horms@verge.net.au>
-> Signed-off-by: Minchan Kim <minchan@kernel.org>
-> ---
->  arch/arm/include/asm/pgtable-2level.h | 19 +++++++++++++++----
->  arch/arm/mm/proc-macros.S             |  4 ++--
->  2 files changed, 17 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
-> index 92fd2c8a9af0..514b13c27b43 100644
-> --- a/arch/arm/include/asm/pgtable-2level.h
-> +++ b/arch/arm/include/asm/pgtable-2level.h
-> @@ -164,14 +164,25 @@
->  #define L_PTE_MT_BUFFERABLE	(_AT(pteval_t, 0x01) << 2)	/* 0001 */
->  #define L_PTE_MT_WRITETHROUGH	(_AT(pteval_t, 0x02) << 2)	/* 0010 */
->  #define L_PTE_MT_WRITEBACK	(_AT(pteval_t, 0x03) << 2)	/* 0011 */
-> +#define L_PTE_MT_DEV_SHARED	(_AT(pteval_t, 0x04) << 2)	/* 0100 */
-> +#define L_PTE_MT_VECTORS	(_AT(pteval_t, 0x05) << 2)	/* 0101 */
->  #define L_PTE_MT_MINICACHE	(_AT(pteval_t, 0x06) << 2)	/* 0110 (sa1100, xscale) */
->  #define L_PTE_MT_WRITEALLOC	(_AT(pteval_t, 0x07) << 2)	/* 0111 */
-> -#define L_PTE_MT_DEV_SHARED	(_AT(pteval_t, 0x04) << 2)	/* 0100 */
-> -#define L_PTE_MT_DEV_NONSHARED	(_AT(pteval_t, 0x0c) << 2)	/* 1100 */
-> +#if defined(CONFIG_CPU_V7) || defined (CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K)
-> +/*
-> + * On ARMv7 or ARMv6+LPAE, the non-shared device gets mapped to
-> + * shared device in hardware.
-> + */
-> +#define L_PTE_MT_DEV_NONSHARED	L_PTE_MT_DEV_SHARED
-> +#define L_PTE_MT_DEV_WC		L_PTE_MT_BUFFERABLE
-> +#define L_PTE_MT_DEV_CACHED	L_PTE_MT_WRITEBACK
-> +#define L_PTE_MT_MASK		(_AT(pteval_t, 0x07) << 2)
-> +#else
->  #define L_PTE_MT_DEV_WC		(_AT(pteval_t, 0x09) << 2)	/* 1001 */
->  #define L_PTE_MT_DEV_CACHED	(_AT(pteval_t, 0x0b) << 2)	/* 1011 */
-> -#define L_PTE_MT_VECTORS	(_AT(pteval_t, 0x0f) << 2)	/* 1111 */
-> -#define L_PTE_MT_MASK		(_AT(pteval_t, 0x0f) << 2)
-> +#define L_PTE_MT_DEV_NONSHARED	(_AT(pteval_t, 0x0c) << 2)	/* 1100 */
-> +#define L_PTE_MT_MASK           (_AT(pteval_t, 0x0f) << 2)
-> +#endif
->  
->  #ifndef __ASSEMBLY__
->  
-> diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
-> index 81d0efb055c6..367a89d5aeca 100644
-> --- a/arch/arm/mm/proc-macros.S
-> +++ b/arch/arm/mm/proc-macros.S
-> @@ -138,7 +138,7 @@
->  	.long	PTE_CACHEABLE					@ L_PTE_MT_WRITETHROUGH
->  	.long	PTE_CACHEABLE | PTE_BUFFERABLE			@ L_PTE_MT_WRITEBACK
->  	.long	PTE_BUFFERABLE					@ L_PTE_MT_DEV_SHARED
-> -	.long	0x00						@ unused
-> +	.long	PTE_CACHEABLE | PTE_BUFFERABLE | PTE_EXT_APX	@ L_PTE_MT_VECTORS
->  	.long	0x00						@ L_PTE_MT_MINICACHE (not present)
->  	.long	PTE_EXT_TEX(1) | PTE_CACHEABLE | PTE_BUFFERABLE	@ L_PTE_MT_WRITEALLOC
->  	.long	0x00						@ unused
-> @@ -148,7 +148,7 @@
->  	.long	PTE_EXT_TEX(2)					@ L_PTE_MT_DEV_NONSHARED
->  	.long	0x00						@ unused
->  	.long	0x00						@ unused
-> -	.long	PTE_CACHEABLE | PTE_BUFFERABLE | PTE_EXT_APX	@ L_PTE_MT_VECTORS
-> +	.long	0x00						@ unused
->  	.endm
->  
->  	.macro	armv6_set_pte_ext pfx
-> -- 
-> 2.19.0.397.gdd90340f6a-goog
-> 
+Fixes: 0e37f88d9ad8 ("ARM: sunxi: Add pinctrl driver for Allwinner SoCs")
+Signed-off-by: YueHaibing <yuehaibing@huawei.com>
+---
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+index 3ccbe22..213a5d5 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+@@ -1079,10 +1079,9 @@ static int sunxi_pinctrl_build_state(struct platform_device *pdev)
+ 	 * We suppose that we won't have any more functions than pins,
+ 	 * we'll reallocate that later anyway
+ 	 */
+-	pctl->functions = devm_kcalloc(&pdev->dev,
+-				       pctl->ngroups,
+-				       sizeof(*pctl->functions),
+-				       GFP_KERNEL);
++	pctl->functions = kcalloc(pctl->ngroups,
++				  sizeof(*pctl->functions),
++				  GFP_KERNEL);
+ 	if (!pctl->functions)
+ 		return -ENOMEM;
+ 
+@@ -1133,8 +1132,10 @@ static int sunxi_pinctrl_build_state(struct platform_device *pdev)
+ 
+ 			func_item = sunxi_pinctrl_find_function_by_name(pctl,
+ 									func->name);
+-			if (!func_item)
++			if (!func_item) {
++				kfree(pctl->functions);
+ 				return -EINVAL;
++			}
+ 
+ 			if (!func_item->groups) {
+ 				func_item->groups =
+@@ -1142,8 +1143,10 @@ static int sunxi_pinctrl_build_state(struct platform_device *pdev)
+ 						     func_item->ngroups,
+ 						     sizeof(*func_item->groups),
+ 						     GFP_KERNEL);
+-				if (!func_item->groups)
++				if (!func_item->groups) {
++					kfree(pctl->functions);
+ 					return -ENOMEM;
++				}
+ 			}
+ 
+ 			func_grp = func_item->groups;
+-- 
+2.7.0
