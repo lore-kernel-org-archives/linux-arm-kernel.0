@@ -1,423 +1,100 @@
-From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Fri, 21 Sep 2018 11:46:21 +0200
-Subject: [PATCH V2 27/27] mmc: mmci: add stm32 sdmmc variant
-In-Reply-To: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
-References: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1537523181-14578-28-git-send-email-ludovic.Barre@st.com>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Fri, 21 Sep 2018 12:05:48 +0200
+Subject: [PATCH v5] ARM: mvebu: use dt_fixup to provide fallback for
+ enable-method
+In-Reply-To: <20180726034856.20743-1-chris.packham@alliedtelesis.co.nz> (Chris
+ Packham's message of "Thu, 26 Jul 2018 15:48:56 +1200")
+References: <20180726034856.20743-1-chris.packham@alliedtelesis.co.nz>
+Message-ID: <8736u3jhc3.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Barre <ludovic.barre@st.com>
+Hi Chris,
+ 
+ On jeu., juil. 26 2018, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
 
-This patch adds a stm32 sdmmc variant, rev 1.1.
-Introduces a new Manufacturer id "0x53, ascii 'S' to define
-new stm32 sdmmc family with clean range of amba
-revision/configurations bits (corresponding to sdmmc_ver
-register with major/minor fields).
+> We need to maintain backwards compatibility with device trees that don't
+> define an enable method. At the same time we want the device tree to be
+> able to specify an enable-method and have it stick.
+>
+> Previously by having smp assigned in the DT_MACHINE definition this
+> would be picked up by setup_arch() and override whatever
+> arm_dt_init_cpu_maps() had configured. Now we move the initial
+> assignment of default smp_ops to a dt_fixup and let
+> arm_dt_init_cpu_maps() override that if the device tree defines an
+> enable-method.
+>
+> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
 
-Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
----
- drivers/mmc/host/Kconfig            |  10 ++
- drivers/mmc/host/Makefile           |   1 +
- drivers/mmc/host/mmci.c             |  25 ++++
- drivers/mmc/host/mmci.h             |   5 +
- drivers/mmc/host/mmci_stm32_sdmmc.c | 282 ++++++++++++++++++++++++++++++++++++
- 5 files changed, 323 insertions(+)
- create mode 100644 drivers/mmc/host/mmci_stm32_sdmmc.c
+I made several tests on an Armada XP based board: OpenBlock AX3: I
+modify the enable-method in the decvice tree, and I confirm that without
+your patch it is not taken into account whereas with this patch the
+enable-method is applied form the device tree. I also didn't see any
+regression with the original dtb.
 
-diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-index 5ab2eb0..e59671a 100644
---- a/drivers/mmc/host/Kconfig
-+++ b/drivers/mmc/host/Kconfig
-@@ -34,6 +34,16 @@ config MMC_QCOM_DML
- 
- 	  if unsure, say N.
- 
-+config MMC_STM32_SDMMC
-+	bool "STMicroelectronics STM32 SDMMC Controller"
-+	depends on MMC_ARMMMCI
-+	default y
-+	help
-+	  This selects the STMicroelectronics STM32 SDMMC host controller.
-+	  If you have a STM32 sdmmc host with internal dma say Y or M here.
-+
-+	  If unsure, say N.
-+
- config MMC_PXA
- 	tristate "Intel PXA25x/26x/27x Multimedia Card Interface support"
- 	depends on ARCH_PXA
-diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
-index ce8398e..f14410f 100644
---- a/drivers/mmc/host/Makefile
-+++ b/drivers/mmc/host/Makefile
-@@ -6,6 +6,7 @@
- obj-$(CONFIG_MMC_ARMMMCI) += armmmci.o
- armmmci-y := mmci.o
- armmmci-$(CONFIG_MMC_QCOM_DML) += mmci_qcom_dml.o
-+armmmci-$(CONFIG_MMC_STM32_SDMMC) += mmci_stm32_sdmmc.o
- obj-$(CONFIG_MMC_PXA)		+= pxamci.o
- obj-$(CONFIG_MMC_MXC)		+= mxcmmc.o
- obj-$(CONFIG_MMC_MXS)		+= mxs-mmc.o
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 4057456..ca2e483 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -254,6 +254,26 @@ static struct variant_data variant_stm32 = {
- 	.init			= mmci_variant_init,
- };
- 
-+static struct variant_data variant_stm32_sdmmc = {
-+	.fifosize		= 16 * 4,
-+	.fifohalfsize		= 8 * 4,
-+	.f_max			= 208000000,
-+	.stm32_clkdiv		= true,
-+	.reset			= true,
-+	.cmdreg_cpsm_enable	= MCI_CPSM_STM32_ENABLE,
-+	.cmdreg_lrsp_crc	= MCI_CPSM_STM32_LRSP_CRC,
-+	.cmdreg_srsp_crc	= MCI_CPSM_STM32_SRSP_CRC,
-+	.cmdreg_srsp		= MCI_CPSM_STM32_SRSP,
-+	.data_cmd_enable	= MCI_CPSM_STM32_CMDTRANS,
-+	.irq_pio_mask		= MCI_IRQ_PIO_STM32_MASK,
-+	.datactrl_first		= true,
-+	.datacnt_useless	= true,
-+	.datalength_bits	= 25,
-+	.datactrl_blocksz	= 14,
-+	.stm32_idmabsize_mask	= GENMASK(12, 5),
-+	.init			= sdmmc_variant_init,
-+};
-+
- static struct variant_data variant_qcom = {
- 	.fifosize		= 16 * 4,
- 	.fifohalfsize		= 8 * 4,
-@@ -2180,6 +2200,11 @@ static const struct amba_id mmci_ids[] = {
- 		.mask   = 0x00ffffff,
- 		.data	= &variant_stm32,
- 	},
-+	{
-+		.id     = 0x10153180,
-+		.mask	= 0xf0ffffff,
-+		.data	= &variant_stm32_sdmmc,
-+	},
- 	/* Qualcomm variants */
- 	{
- 		.id     = 0x00051180,
-diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index 017d9b8..581b9b1 100644
---- a/drivers/mmc/host/mmci.h
-+++ b/drivers/mmc/host/mmci.h
-@@ -305,6 +305,8 @@ struct mmci_host;
-  *	       register.
-  * @opendrain: bitmask identifying the OPENDRAIN bit inside MMCIPOWER register
-  * @reset: true if variant has need reset signal.
-+ * @dma_lli: true if variant has dma link list feature.
-+ * @stm32_idmabsize_mask: stm32 sdmmc idma buffer size.
-  */
- struct variant_data {
- 	unsigned int		clkreg;
-@@ -348,6 +350,8 @@ struct variant_data {
- 	unsigned int		irq_pio_mask;
- 	u32			start_err;
- 	u32			opendrain;
-+	bool			dma_lli;
-+	u32			stm32_idmabsize_mask;
- 	void (*init)(struct mmci_host *host);
- };
- 
-@@ -421,6 +425,7 @@ void mmci_write_clkreg(struct mmci_host *host, u32 clk);
- void mmci_write_pwrreg(struct mmci_host *host, u32 pwr);
- 
- void mmci_variant_init(struct mmci_host *host);
-+void sdmmc_variant_init(struct mmci_host *host);
- 
- int mmci_dmae_prep_data(struct mmci_host *host, struct mmc_data *data,
- 			bool next);
-diff --git a/drivers/mmc/host/mmci_stm32_sdmmc.c b/drivers/mmc/host/mmci_stm32_sdmmc.c
-new file mode 100644
-index 0000000..cfbfc6f
---- /dev/null
-+++ b/drivers/mmc/host/mmci_stm32_sdmmc.c
-@@ -0,0 +1,282 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright (C) STMicroelectronics 2018 - All Rights Reserved
-+ * Author: Ludovic.barre at st.com for STMicroelectronics.
-+ */
-+#include <linux/delay.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/mmc/host.h>
-+#include <linux/mmc/card.h>
-+#include <linux/reset.h>
-+#include <linux/scatterlist.h>
-+#include "mmci.h"
-+
-+#define SDMMC_LLI_BUF_LEN	PAGE_SIZE
-+#define SDMMC_IDMA_BURST	BIT(MMCI_STM32_IDMABNDT_SHIFT)
-+
-+struct sdmmc_lli_desc {
-+	u32 idmalar;
-+	u32 idmabase;
-+	u32 idmasize;
-+};
-+
-+struct sdmmc_priv {
-+	dma_addr_t sg_dma;
-+	void *sg_cpu;
-+};
-+
-+int sdmmc_idma_validate_data(struct mmci_host *host,
-+			     struct mmc_data *data)
-+{
-+	struct scatterlist *sg;
-+	int i;
-+
-+	/*
-+	 * idma has constraints on idmabase & idmasize for each element
-+	 * excepted the last element which has no constraint on idmasize
-+	 */
-+	for_each_sg(data->sg, sg, data->sg_len - 1, i) {
-+		if (!IS_ALIGNED(sg_dma_address(data->sg), sizeof(u32)) ||
-+		    !IS_ALIGNED(sg_dma_len(data->sg), SDMMC_IDMA_BURST)) {
-+			dev_err(mmc_dev(host->mmc),
-+				"unaligned scatterlist: ofst:%x length:%d\n",
-+				data->sg->offset, data->sg->length);
-+			return -EINVAL;
-+		}
-+	}
-+
-+	if (!IS_ALIGNED(sg_dma_address(data->sg), sizeof(u32))) {
-+		dev_err(mmc_dev(host->mmc),
-+			"unaligned last scatterlist: ofst:%x length:%d\n",
-+			data->sg->offset, data->sg->length);
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static int _sdmmc_idma_prep_data(struct mmci_host *host,
-+				 struct mmc_data *data)
-+{
-+	int n_elem;
-+
-+	n_elem = dma_map_sg(mmc_dev(host->mmc),
-+			    data->sg,
-+			    data->sg_len,
-+			    mmc_get_dma_dir(data));
-+
-+	if (!n_elem) {
-+		dev_err(mmc_dev(host->mmc), "dma_map_sg failed\n");
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
-+static int sdmmc_idma_prep_data(struct mmci_host *host,
-+				struct mmc_data *data, bool next)
-+{
-+	/* Check if job is already prepared. */
-+	if (!next && data->host_cookie == host->next_cookie)
-+		return 0;
-+
-+	return _sdmmc_idma_prep_data(host, data);
-+}
-+
-+static void sdmmc_idma_unprep_data(struct mmci_host *host,
-+				   struct mmc_data *data, int err)
-+{
-+	dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
-+		     mmc_get_dma_dir(data));
-+}
-+
-+static int sdmmc_idma_setup(struct mmci_host *host)
-+{
-+	struct sdmmc_priv *idma;
-+
-+	idma = devm_kzalloc(mmc_dev(host->mmc), sizeof(*idma), GFP_KERNEL);
-+	if (!idma)
-+		return -ENOMEM;
-+
-+	host->dma_priv = idma;
-+
-+	if (host->variant->dma_lli) {
-+		idma->sg_cpu = dmam_alloc_coherent(mmc_dev(host->mmc),
-+						   SDMMC_LLI_BUF_LEN,
-+						   &idma->sg_dma, GFP_KERNEL);
-+		if (!idma->sg_cpu) {
-+			dev_err(mmc_dev(host->mmc),
-+				"Failed to alloc IDMA descriptor\n");
-+			return -ENOMEM;
-+		}
-+		host->mmc->max_segs = SDMMC_LLI_BUF_LEN /
-+			sizeof(struct sdmmc_lli_desc);
-+		host->mmc->max_seg_size = host->variant->stm32_idmabsize_mask;
-+	} else {
-+		host->mmc->max_segs = 1;
-+		host->mmc->max_seg_size = host->mmc->max_req_size;
-+	}
-+
-+	return 0;
-+}
-+
-+static int sdmmc_idma_start(struct mmci_host *host, unsigned int *datactrl)
-+
-+{
-+	struct sdmmc_priv *idma = host->dma_priv;
-+	struct sdmmc_lli_desc *desc = (struct sdmmc_lli_desc *)idma->sg_cpu;
-+	struct mmc_data *data = host->data;
-+	struct scatterlist *sg;
-+	int i;
-+
-+	if (!host->variant->dma_lli || data->sg_len == 1) {
-+		writel_relaxed(sg_dma_address(data->sg),
-+			       host->base + MMCI_STM32_IDMABASE0R);
-+		writel_relaxed(MMCI_STM32_IDMAEN,
-+			       host->base + MMCI_STM32_IDMACTRLR);
-+		return 0;
-+	}
-+
-+	for_each_sg(data->sg, sg, data->sg_len, i) {
-+		desc[i].idmalar = (i + 1) * sizeof(struct sdmmc_lli_desc);
-+		desc[i].idmalar |= MMCI_STM32_ULA | MMCI_STM32_ULS
-+			| MMCI_STM32_ABR;
-+		desc[i].idmabase = sg_dma_address(sg);
-+		desc[i].idmasize = sg_dma_len(sg);
-+	}
-+
-+	/* notice the end of link list */
-+	desc[data->sg_len - 1].idmalar &= ~MMCI_STM32_ULA;
-+
-+	dma_wmb();
-+	writel_relaxed(idma->sg_dma, host->base + MMCI_STM32_IDMABAR);
-+	writel_relaxed(desc[0].idmalar, host->base + MMCI_STM32_IDMALAR);
-+	writel_relaxed(desc[0].idmabase, host->base + MMCI_STM32_IDMABASE0R);
-+	writel_relaxed(desc[0].idmasize, host->base + MMCI_STM32_IDMABSIZER);
-+	writel_relaxed(MMCI_STM32_IDMAEN | MMCI_STM32_IDMALLIEN,
-+		       host->base + MMCI_STM32_IDMACTRLR);
-+
-+	return 0;
-+}
-+
-+static void sdmmc_idma_finalize(struct mmci_host *host, struct mmc_data *data)
-+{
-+	writel_relaxed(0, host->base + MMCI_STM32_IDMACTRLR);
-+}
-+
-+static void mmci_sdmmc_set_clkreg(struct mmci_host *host, unsigned int desired)
-+{
-+	unsigned int clk = 0, ddr = 0;
-+
-+	if (host->mmc->ios.timing == MMC_TIMING_MMC_DDR52 ||
-+	    host->mmc->ios.timing == MMC_TIMING_UHS_DDR50)
-+		ddr = MCI_STM32_CLK_DDR;
-+
-+	/*
-+	 * cclk = mclk / (2 * clkdiv)
-+	 * clkdiv 0 => bypass
-+	 * in ddr mode bypass is not possible
-+	 */
-+	if (desired) {
-+		if (desired >= host->mclk && !ddr) {
-+			host->cclk = host->mclk;
-+		} else {
-+			clk = DIV_ROUND_UP(host->mclk, 2 * desired);
-+			if (clk > MCI_STM32_CLK_CLKDIV_MSK)
-+				clk = MCI_STM32_CLK_CLKDIV_MSK;
-+			host->cclk = host->mclk / (2 * clk);
-+		}
-+	} else {
-+		/*
-+		 * while power-on phase the clock can't be define to 0,
-+		 * Only power-off and power-cyc deactivate the clock.
-+		 * if desired clock is 0, set max divider
-+		 */
-+		clk = MCI_STM32_CLK_CLKDIV_MSK;
-+		host->cclk = host->mclk / (2 * clk);
-+	}
-+
-+	/* Set actual clock for debug */
-+	if (host->mmc->ios.power_mode == MMC_POWER_ON)
-+		host->mmc->actual_clock = host->cclk;
-+	else
-+		host->mmc->actual_clock = 0;
-+
-+	if (host->mmc->ios.bus_width == MMC_BUS_WIDTH_4)
-+		clk |= MCI_STM32_CLK_WIDEBUS_4;
-+	if (host->mmc->ios.bus_width == MMC_BUS_WIDTH_8)
-+		clk |= MCI_STM32_CLK_WIDEBUS_8;
-+
-+	clk |= MCI_STM32_CLK_HWFCEN;
-+	clk |= host->clk_reg_add;
-+	clk |= ddr;
-+
-+	/*
-+	 * SDMMC_FBCK is selected when an external Delay Block is needed
-+	 * with SDR104.
-+	 */
-+	if (host->mmc->ios.timing >= MMC_TIMING_UHS_SDR50) {
-+		clk |= MCI_STM32_CLK_BUSSPEED;
-+		if (host->mmc->ios.timing == MMC_TIMING_UHS_SDR104) {
-+			clk &= ~MCI_STM32_CLK_SEL_MSK;
-+			clk |= MCI_STM32_CLK_SELFBCK;
-+		}
-+	}
-+
-+	mmci_write_clkreg(host, clk);
-+}
-+
-+static void mmci_sdmmc_set_pwrreg(struct mmci_host *host, unsigned int pwr)
-+{
-+	struct mmc_ios ios = host->mmc->ios;
-+
-+	pwr = host->pwr_reg_add;
-+
-+	if (ios.power_mode == MMC_POWER_OFF) {
-+		/* Only a reset could power-off sdmmc */
-+		reset_control_assert(host->rst);
-+		udelay(2);
-+		reset_control_deassert(host->rst);
-+
-+		/*
-+		 * Set the SDMMC in Power-cycle state.
-+		 * This will make that the SDMMC_D[7:0], SDMMC_CMD and SDMMC_CK
-+		 * are driven low, to prevent the Card from being supplied
-+		 * through the signal lines.
-+		 */
-+		mmci_write_pwrreg(host, MCI_STM32_PWR_CYC | pwr);
-+	} else if (ios.power_mode == MMC_POWER_ON) {
-+		/*
-+		 * After power-off (reset): the irq mask defined in probe
-+		 * functionis lost
-+		 * ault irq mask (probe) must be activated
-+		 */
-+		writel(MCI_IRQENABLE | host->variant->start_err,
-+		       host->base + MMCIMASK0);
-+
-+		/*
-+		 * After a power-cycle state, we must set the SDMMC in
-+		 * Power-off. The SDMMC_D[7:0], SDMMC_CMD and SDMMC_CK are
-+		 * driven high. Then we can set the SDMMC to Power-on state
-+		 */
-+		mmci_write_pwrreg(host, MCI_PWR_OFF | pwr);
-+		mdelay(1);
-+		mmci_write_pwrreg(host, MCI_PWR_ON | pwr);
-+	}
-+}
-+
-+static struct mmci_host_ops sdmmc_variant_ops = {
-+	.validate_data = sdmmc_idma_validate_data,
-+	.prep_data = sdmmc_idma_prep_data,
-+	.unprep_data = sdmmc_idma_unprep_data,
-+	.dma_setup = sdmmc_idma_setup,
-+	.dma_start = sdmmc_idma_start,
-+	.dma_finalize = sdmmc_idma_finalize,
-+	.set_clkreg = mmci_sdmmc_set_clkreg,
-+	.set_pwrreg = mmci_sdmmc_set_pwrreg,
-+};
-+
-+void sdmmc_variant_init(struct mmci_host *host)
-+{
-+	host->ops = &sdmmc_variant_ops;
-+}
+So I added my:
+Tested-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+
+and applied on mvebu/soc
+
+Thanks,
+
+Gregory
+
+> ---
+> Pervious versions
+>
+> v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/300182.html
+> v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/300480.html
+> v3: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/302945.html
+> v4: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/303899.html
+>
+> Changes since v4:
+> - drop "RFC"
+>
+>  arch/arm/mach-mvebu/board-v7.c | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+> index ccca95173e17..5bbde5e5258e 100644
+> --- a/arch/arm/mach-mvebu/board-v7.c
+> +++ b/arch/arm/mach-mvebu/board-v7.c
+> @@ -145,6 +145,11 @@ static void __init mvebu_dt_init(void)
+>  		i2c_quirk();
+>  }
+>  
+> +static void __init armada_370_xp_dt_fixup(void)
+> +{
+> +	smp_set_ops(smp_ops(armada_xp_smp_ops));
+> +}
+> +
+>  static const char * const armada_370_xp_dt_compat[] __initconst = {
+>  	"marvell,armada-370-xp",
+>  	NULL,
+> @@ -153,17 +158,12 @@ static const char * const armada_370_xp_dt_compat[] __initconst = {
+>  DT_MACHINE_START(ARMADA_370_XP_DT, "Marvell Armada 370/XP (Device Tree)")
+>  	.l2c_aux_val	= 0,
+>  	.l2c_aux_mask	= ~0,
+> -/*
+> - * The following field (.smp) is still needed to ensure backward
+> - * compatibility with old Device Trees that were not specifying the
+> - * cpus enable-method property.
+> - */
+> -	.smp		= smp_ops(armada_xp_smp_ops),
+>  	.init_machine	= mvebu_dt_init,
+>  	.init_irq       = mvebu_init_irq,
+>  	.restart	= mvebu_restart,
+>  	.reserve        = mvebu_memblock_reserve,
+>  	.dt_compat	= armada_370_xp_dt_compat,
+> +	.dt_fixup	= armada_370_xp_dt_fixup,
+>  MACHINE_END
+>  
+>  static const char * const armada_375_dt_compat[] __initconst = {
+> -- 
+> 2.18.0
+>
+
 -- 
-2.7.4
+Gregory Clement, Bootlin
+Embedded Linux and Kernel engineering
+http://bootlin.com
