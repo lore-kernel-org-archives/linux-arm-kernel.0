@@ -1,94 +1,87 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 21 Sep 2018 15:51:50 +0530
-Subject: [RFC PATCH 35/40] ARM: dts: keystone-k2e: Use the updated binding to
- describe PCIe in k2e
+Date: Fri, 21 Sep 2018 15:51:54 +0530
+Subject: [RFC PATCH 39/40] arm64: dts: k3-am6: Add SERDES DT node
 In-Reply-To: <20180921102155.22839-1-kishon@ti.com>
 References: <20180921102155.22839-1-kishon@ti.com>
-Message-ID: <20180921102155.22839-36-kishon@ti.com>
+Message-ID: <20180921102155.22839-40-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the updated binding to describe PCIe in k2e. (The older binding has
-never worked in upstream kernel since serdes driver was never upstreamed).
+Add DT node for SERDES0 and SERDES1.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 ---
- arch/arm/boot/dts/keystone-k2e.dtsi | 15 ++++++++-------
- arch/arm/boot/dts/keystone.dtsi     | 18 ++++++++++++++----
- 2 files changed, 22 insertions(+), 11 deletions(-)
+ arch/arm64/boot/dts/ti/k3-am65-main.dtsi | 46 ++++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
 
-diff --git a/arch/arm/boot/dts/keystone-k2e.dtsi b/arch/arm/boot/dts/keystone-k2e.dtsi
-index 085e7326ea8e..d9945d600c95 100644
---- a/arch/arm/boot/dts/keystone-k2e.dtsi
-+++ b/arch/arm/boot/dts/keystone-k2e.dtsi
-@@ -136,20 +136,21 @@
- 		};
+diff --git a/arch/arm64/boot/dts/ti/k3-am65-main.dtsi b/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
+index 4379c370f6f8..b08d15fa110e 100644
+--- a/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
++++ b/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
+@@ -4,11 +4,25 @@
+  *
+  * Copyright (C) 2016-2018 Texas Instruments Incorporated - http://www.ti.com/
+  */
++#include <dt-bindings/phy/phy-am654-serdes.h>
  
- 		pcie1: pcie at 21020000 {
--			compatible = "ti,keystone-pcie","snps,dw-pcie";
-+			compatible = "ti,keystone-pcie", "snps,dw-pcie";
-+			reg =  <0x21020000 0x1000>, <0x21021000 0x1000>, <0x21022000 0x1000>;
-+			reg-names = "app", "dbics", "config";
- 			clocks = <&clkpcie1>;
--			clock-names = "pcie";
-+			clock-names = "fck";
- 			#address-cells = <3>;
- 			#size-cells = <2>;
--			reg =  <0x21021000 0x2000>, <0x21020000 0x1000>, <0x02620128 4>;
--			ranges = <0x82000000 0 0x60000000 0x60000000
--				  0 0x10000000>;
--
-+			ranges = <0x82000000 0 0x60000000 0x60000000 0 0x10000000>;
-+			ti,syscon-pcie-id = <&pcie_devid>;
-+			ti,syscon-pcie-mode = <&pcie_mode>;
- 			status = "disabled";
- 			device_type = "pci";
- 			num-lanes = <2>;
-+			num-viewport = <32>;
- 			bus-range = <0x00 0xff>;
--
- 			/* error interrupt */
- 			interrupts = <GIC_SPI 385 IRQ_TYPE_EDGE_RISING>;
- 			#interrupt-cells = <1>;
-diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
-index c298675a29a5..0245fe854367 100644
---- a/arch/arm/boot/dts/keystone.dtsi
-+++ b/arch/arm/boot/dts/keystone.dtsi
-@@ -93,6 +93,16 @@
- 			#size-cells = <1>;
- 			ranges = <0x0 0x02620000 0x1000>;
- 
-+			pcie_devid: pcie-devid at 128 {
-+				compatible = "syscon";
-+				reg = <0x00000128 0x4>;
-+			};
+ &cbass_main {
+ 	scm_conf: scm_conf at 100000 {
+ 		compatible = "syscon", "simple-mfd";
+ 		reg = <0 0x00100000 0 0x1c000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0x0 0x0 0x00100000 0x1c000>;
 +
-+			pcie_mode: pcie-mode at 14c {
-+				compatible = "syscon";
-+				reg = <0x0000014c 0x4>;
-+			};
++		serdes0_clk: serdes_clk at 4080 {
++			compatible = "syscon";
++			reg = <0x00004080 0x4>;
++		};
 +
- 			kirq0: keystone_irq at 2a0 {
- 				compatible = "ti,keystone-irq";
- 				reg = <0x2a0 0x4>;
-@@ -297,13 +307,13 @@
++		serdes1_clk: serdes_clk at 4090 {
++			compatible = "syscon";
++			reg = <0x00004090 0x4>;
++		};
  
- 		pcie0: pcie at 21800000 {
- 			compatible = "ti,keystone-pcie", "snps,dw-pcie";
-+			reg =  <0x21800000 0x1000>, <0x21801000 0x1000>, <0x21802000 0x1000>;
-+			reg-names = "app", "dbics", "config";
- 			clocks = <&clkpcie>;
--			clock-names = "pcie";
-+			clock-names = "fck";
- 			#address-cells = <3>;
- 			#size-cells = <2>;
--			reg =  <0x21801000 0x2000>, <0x21800000 0x1000>, <0x02620128 4>;
--			ranges = <0x82000000 0 0x50000000 0x50000000
--				  0 0x10000000>;
-+			ranges = <0x82000000 0 0x50000000 0x50000000 0 0x10000000>;
+ 		serdes_mux: mux-controller {
+ 			compatible = "mmio-mux";
+@@ -53,6 +67,38 @@
+ 		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+ 	};
  
- 			status = "disabled";
- 			device_type = "pci";
++	serdes0: serdes at 900000 {
++		compatible = "ti,phy-am654-serdes";
++		reg = <0x0 0x900000 0x0 0x2000>;
++		reg-names = "serdes";
++		#phy-cells = <2>;
++		power-domains = <&k3_pds 153>;
++		clocks = <&k3_clks 153 4>, <&k3_clks 153 1>, <&serdes1 AM654_SERDES_LO_REFCLK>;
++		clock-output-names = "serdes0_cmu_refclk", "serdes0_lo_refclk", "serdes0_ro_refclk";
++		assigned-clocks = <&k3_clks 153 4>, <&serdes0 AM654_SERDES_CMU_REFCLK>;
++		assigned-clock-parents = <&k3_clks 153 8>, <&k3_clks 153 4>;
++		ti,serdes-clk = <&serdes0_clk>;
++		#clock-cells = <1>;
++		mux-controls = <&serdes_mux 0>;
++		status = "disabled";
++	};
++
++	serdes1: serdes at 910000 {
++		compatible = "ti,phy-am654-serdes";
++		reg = <0x0 0x910000 0x0 0x2000>;
++		reg-names = "serdes";
++		#phy-cells = <2>;
++		power-domains = <&k3_pds 154>;
++		clocks = <&serdes0 AM654_SERDES_RO_REFCLK>, <&k3_clks 154 1>, <&k3_clks 154 5>;
++		clock-output-names = "serdes1_cmu_refclk", "serdes1_lo_refclk", "serdes1_ro_refclk";
++		assigned-clocks = <&k3_clks 154 5>, <&serdes1 AM654_SERDES_CMU_REFCLK>;
++		assigned-clock-parents = <&k3_clks 154 9>, <&k3_clks 154 5>;
++		ti,serdes-clk = <&serdes1_clk>;
++		#clock-cells = <1>;
++		mux-controls = <&serdes_mux 1>;
++		status = "disabled";
++	};
++
+ 	main_uart0: serial at 2800000 {
+ 		compatible = "ti,am654-uart";
+ 		reg = <0x00 0x02800000 0x00 0x100>;
 -- 
 2.17.1
