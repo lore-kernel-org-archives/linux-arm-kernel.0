@@ -1,33 +1,46 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 21 Sep 2018 20:30:14 +0200
-Subject: [RFT] arm64: ARM: dts: exynos: Remove double SD card detect pin
- inversion on TM2
-Message-ID: <20180921183014.20236-1-krzk@kernel.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 21 Sep 2018 14:42:38 -0500
+Subject: [RFC PATCH 36/40] arm64: dts: k3-am6: Add
+ "socionext,synquacer-pre-its" property to gic_its
+In-Reply-To: <20180921102155.22839-37-kishon@ti.com>
+References: <20180921102155.22839-1-kishon@ti.com>
+ <20180921102155.22839-37-kishon@ti.com>
+Message-ID: <20180921194238.mhckqlsztk2eduwp@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SDHCI standard, MMC host controller bindings and MMC core defines
-card detect pin as active low.  Therefore there is no point to invert it
-twice.
+On 10:21-20180921, Kishon Vijay Abraham I wrote:
+> GIC_ITS used in AM65x platform has the same configuration as that of
+> GIC_ITS used in Socionext SoCs. Add "socionext,synquacer-pre-its"
+> property to get PCI MSI working.
+> 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  arch/arm64/boot/dts/ti/k3-am65-main.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm64/boot/dts/ti/k3-am65-main.dtsi b/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
+> index adcd6341e40c..2df4acb198bd 100644
+> --- a/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
+> +++ b/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
+> @@ -24,6 +24,7 @@
+>  		gic_its: gic-its at 18200000 {
+>  			compatible = "arm,gic-v3-its";
+>  			reg = <0x00 0x01820000 0x00 0x10000>;
+> +			socionext,synquacer-pre-its = <0x1000000 0x400000>;
+>  			msi-controller;
+>  			#msi-cells = <1>;
+>  		};
+> -- 
+> 2.17.1
+> 
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
-index a1e3194b7483..86d8ddc3288a 100644
---- a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
-+++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
-@@ -939,8 +939,7 @@
- 	status = "okay";
- 	cap-sd-highspeed;
- 	disable-wp;
--	cd-gpios = <&gpa2 4 GPIO_ACTIVE_HIGH>;
--	cd-inverted;
-+	cd-gpios = <&gpa2 4 GPIO_ACTIVE_LOW>;
- 	card-detect-delay = <200>;
- 	samsung,dw-mshc-ciu-div = <3>;
- 	samsung,dw-mshc-sdr-timing = <0 4>;
+Please post the DTS series separately. This specific patch is a GIC ITS
+patch, and does'nt need to depend on rest of the PCI series. Also looks
+like you missed the v4.20-rc1 bandwagon.
+
+ 
 -- 
-2.17.1
+Regards,
+Nishanth Menon
