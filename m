@@ -1,77 +1,129 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 21 Sep 2018 15:26:03 +0800
-Subject: [PATCH 2/2] iio: adc: at91: fix wrong channel number in
- triggered buffer mode
-In-Reply-To: <1537447238-18674-2-git-send-email-eugen.hristev@microchip.com>
-References: <1537447238-18674-2-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <201809211544.zop1vk8B%fengguang.wu@intel.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Fri, 21 Sep 2018 09:29:05 +0200
+Subject: [PATCH v5 06/22] nvmem: use kref
+In-Reply-To: <20180921072921.19387-1-brgl@bgdev.pl>
+References: <20180921072921.19387-1-brgl@bgdev.pl>
+Message-ID: <20180921072921.19387-7-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eugen,
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-I love your patch! Perhaps something to improve:
+Use kref for reference counting. Use an approach similar to the one
+seen in the common clock subsystem: don't actually destroy the nvmem
+device until the last user puts it. This way we can get rid of the
+users check from nvmem_unregister().
 
-[auto build test WARNING on iio/togreg]
-[also build test WARNING on v4.19-rc4 next-20180919]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Eugen-Hristev/iio-adc-at91-fix-acking-DRDY-irq-on-simple-conversions/20180920-215908
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/jic23/iio.git togreg
-config: arm-allmodconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=arm 
-
-All warnings (new ones prefixed by >>):
-
-   drivers/iio/adc/at91_adc.c: In function 'at91_adc_trigger_handler':
->> drivers/iio/adc/at91_adc.c:257:8: warning: assignment discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
-      chan = idev->channels + i;
-           ^
-
-vim +/const +257 drivers/iio/adc/at91_adc.c
-
-   245	
-   246	static irqreturn_t at91_adc_trigger_handler(int irq, void *p)
-   247	{
-   248		struct iio_poll_func *pf = p;
-   249		struct iio_dev *idev = pf->indio_dev;
-   250		struct at91_adc_state *st = iio_priv(idev);
-   251		struct iio_chan_spec *chan;
-   252		int i, j = 0;
-   253	
-   254		for (i = 0; i < idev->masklength; i++) {
-   255			if (!test_bit(i, idev->active_scan_mask))
-   256				continue;
- > 257			chan = idev->channels + i;
-   258			st->buffer[j] = at91_adc_readl(st, AT91_ADC_CHAN(st, chan->channel));
-   259			j++;
-   260		}
-   261	
-   262		iio_push_to_buffers_with_timestamp(idev, st->buffer, pf->timestamp);
-   263	
-   264		iio_trigger_notify_done(idev->trig);
-   265	
-   266		/* Needed to ACK the DRDY interruption */
-   267		at91_adc_readl(st, AT91_ADC_LCDR);
-   268	
-   269		enable_irq(st->irq);
-   270	
-   271		return IRQ_HANDLED;
-   272	}
-   273	
-
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 67150 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180921/5d130cc6/attachment-0001.gz>
+ drivers/nvmem/core.c | 44 ++++++++++++++++++++++----------------------
+ 1 file changed, 22 insertions(+), 22 deletions(-)
+
+diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+index 0ef84441ebe5..920b56e500cc 100644
+--- a/drivers/nvmem/core.c
++++ b/drivers/nvmem/core.c
+@@ -19,6 +19,7 @@
+ #include <linux/fs.h>
+ #include <linux/idr.h>
+ #include <linux/init.h>
++#include <linux/kref.h>
+ #include <linux/module.h>
+ #include <linux/nvmem-consumer.h>
+ #include <linux/nvmem-provider.h>
+@@ -31,7 +32,7 @@ struct nvmem_device {
+ 	int			stride;
+ 	int			word_size;
+ 	int			id;
+-	int			users;
++	struct kref		refcnt;
+ 	size_t			size;
+ 	bool			read_only;
+ 	int			flags;
+@@ -463,6 +464,8 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
+ 		return ERR_PTR(rval);
+ 	}
+ 
++	kref_init(&nvmem->refcnt);
++
+ 	nvmem->id = rval;
+ 	nvmem->owner = config->owner;
+ 	if (!nvmem->owner && config->dev->driver)
+@@ -532,6 +535,20 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
+ }
+ EXPORT_SYMBOL_GPL(nvmem_register);
+ 
++static void nvmem_device_release(struct kref *kref)
++{
++	struct nvmem_device *nvmem;
++
++	nvmem = container_of(kref, struct nvmem_device, refcnt);
++
++	if (nvmem->flags & FLAG_COMPAT)
++		device_remove_bin_file(nvmem->base_dev, &nvmem->eeprom);
++
++	nvmem_device_remove_all_cells(nvmem);
++	device_del(&nvmem->dev);
++	put_device(&nvmem->dev);
++}
++
+ /**
+  * nvmem_unregister() - Unregister previously registered nvmem device
+  *
+@@ -541,19 +558,7 @@ EXPORT_SYMBOL_GPL(nvmem_register);
+  */
+ int nvmem_unregister(struct nvmem_device *nvmem)
+ {
+-	mutex_lock(&nvmem_mutex);
+-	if (nvmem->users) {
+-		mutex_unlock(&nvmem_mutex);
+-		return -EBUSY;
+-	}
+-	mutex_unlock(&nvmem_mutex);
+-
+-	if (nvmem->flags & FLAG_COMPAT)
+-		device_remove_bin_file(nvmem->base_dev, &nvmem->eeprom);
+-
+-	nvmem_device_remove_all_cells(nvmem);
+-	device_del(&nvmem->dev);
+-	put_device(&nvmem->dev);
++	kref_put(&nvmem->refcnt, nvmem_device_release);
+ 
+ 	return 0;
+ }
+@@ -647,7 +652,6 @@ static struct nvmem_device *__nvmem_device_get(struct device_node *np,
+ 		}
+ 	}
+ 
+-	nvmem->users++;
+ 	mutex_unlock(&nvmem_mutex);
+ 
+ 	if (!try_module_get(nvmem->owner)) {
+@@ -655,22 +659,18 @@ static struct nvmem_device *__nvmem_device_get(struct device_node *np,
+ 			"could not increase module refcount for cell %s\n",
+ 			nvmem_dev_name(nvmem));
+ 
+-		mutex_lock(&nvmem_mutex);
+-		nvmem->users--;
+-		mutex_unlock(&nvmem_mutex);
+-
+ 		return ERR_PTR(-EINVAL);
+ 	}
+ 
++	kref_get(&nvmem->refcnt);
++
+ 	return nvmem;
+ }
+ 
+ static void __nvmem_device_put(struct nvmem_device *nvmem)
+ {
+ 	module_put(nvmem->owner);
+-	mutex_lock(&nvmem_mutex);
+-	nvmem->users--;
+-	mutex_unlock(&nvmem_mutex);
++	kref_put(&nvmem->refcnt, nvmem_device_release);
+ }
+ 
+ static struct nvmem_device *nvmem_find(const char *name)
+-- 
+2.18.0
