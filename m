@@ -1,63 +1,76 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 21 Sep 2018 23:03:21 +0200
-Subject: [PATCH] ARM: dts: exynos: Add CD and WP pins to Odroid XU SD card
-Message-ID: <20180921210321.12404-1-krzk@kernel.org>
+Date: Fri, 21 Sep 2018 23:09:00 +0200
+Subject: [PATCHv3 5/7] ARM: dts: exynos5422: use wp-gpio method to detect
+ sd-card
+In-Reply-To: <CANAwSgQQgObh-N0CbBM9iNxOGUd2uwoKNFVDBymEALzMtHxOhA@mail.gmail.com>
+References: <20180920175826.1284-1-linux.amoon@gmail.com>
+ <20180920175826.1284-6-linux.amoon@gmail.com>
+ <CAJKOXPdUVjG1xR-q-K98RQpqsWzw-emEv2_3x3CoS+XK8cye2Q@mail.gmail.com>
+ <CANAwSgQQgObh-N0CbBM9iNxOGUd2uwoKNFVDBymEALzMtHxOhA@mail.gmail.com>
+Message-ID: <20180921210900.GA12384@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Defining card-detect and write-protect GPIO pins in Odroid XU SD Card
-does not change anything from functional point of view - dw-mmc driver
-was reading the state from registers.  Adding cd-gpios and wp-gpios
-properties changes only internal driver behavior to access the pins
-directly.
+On Fri, Sep 21, 2018 at 06:01:07PM +0530, Anand Moon wrote:
+> Hi Krzysztof,
+> 
+> On Fri, 21 Sep 2018 at 16:42, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> >
+> > On Thu, 20 Sep 2018 at 19:59, Anand Moon <linux.amoon@gmail.com> wrote:
+> > >
+> > > add the Write Protect GPIO property for sdcard, to fix
+> > > the warning message during boot time.
+> > > of_get_named_gpiod_flags: can't parse 'wp-gpios' property of node '/soc/mmc at 12220000[0]'
+> > >
+> > > Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+> > > ---
+> > > New patch to this series.
+> > > If we keep the wp-gpio GPIO_ACTIVE_LOW sdcard boot into RO mode.
+> > > ---
+> > >  arch/arm/boot/dts/exynos5422-odroid-core.dtsi | 1 +
+> > >  1 file changed, 1 insertion(+)
+> > >
+> > > diff --git a/arch/arm/boot/dts/exynos5422-odroid-core.dtsi b/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
+> > > index 03fe02ceae66..475c38bbc99e 100644
+> > > --- a/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
+> > > +++ b/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
+> > > @@ -370,6 +370,7 @@
+> > >         cap-sd-highspeed;
+> > >         max-frequency = <200000000>;
+> > >         cd-gpios = <&gpc2 2 GPIO_ACTIVE_LOW>;
+> > > +       wp-gpios = <&gpc4 0 GPIO_ACTIVE_HIGH>;
+> >
+> > Two issues here:
+> > 1. You need also proper pinctrl setting.
+> 
+> Thanks for pointing out. Yes proper pinctrl is needed to support this setting.
+> probably pinctrl sd2_wp is needed to support this feature.
+> 
+> > 2. On schematics the WP is not connected... so how do you know that it
+> From XU4_MAIN_REV0.1 schematics page 7 "Micro Socket" their is no
+> connection to WP pin.
+> but below schematics page "EXYNOS 5422 MMC UFS" it's shows
+> XMMC2WP/GPC4_0/EXT_INT13_0.
+> 
+> > is active high? How did you test it? How do you want to test it on
+> > microSD?
+> 
+> I just tested this with the DTS change to GPIO_ACTIVE_LOW which
+> resulted the microSD card booted into RO mode.
+> So I set this to GPIO_ACTIVE_HIGH just to avoid warning.
+> 
+> I will study the changes requires and then post proper separate patch
+> to support this feature.
 
-Add them to DTS only to comprehensively describe the hardware.  Minor
-benefit is that write-protect pin configuration makes sure that it will
-be properly pulled up to indicate write access.
+Please squash it with cd-gpios change and send it only for the purpose
+of describing the hardware. They do not have any meaningful change from
+functional point of view (maybe except slower code as now it goes
+through gpio subsystem instead of just reading dw-mmc registers).
 
-This also removes debug messages:
-    dwmmc_exynos 12220000.mmc: No GPIO consumer cd found
-    dwmmc_exynos 12220000.mmc: No GPIO consumer wp found
+Please use full sentences in commit msg (so start with capital letter)
+and remove reference for warning because there is no warning.
+You can follow up on my change for XU:
+https://patchwork.kernel.org/patch/10610985/
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- arch/arm/boot/dts/exynos5410-odroidxu.dts | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/exynos5410-odroidxu.dts b/arch/arm/boot/dts/exynos5410-odroidxu.dts
-index a2046f5f998c..dae360f29a47 100644
---- a/arch/arm/boot/dts/exynos5410-odroidxu.dts
-+++ b/arch/arm/boot/dts/exynos5410-odroidxu.dts
-@@ -525,12 +525,14 @@
- 
- &mmc_2 {
- 	status = "okay";
-+	wp-gpios = <&gpm5 0 GPIO_ACTIVE_LOW>;
-+	cd-gpios = <&gpc2 2 GPIO_ACTIVE_LOW>;
- 	card-detect-delay = <200>;
- 	samsung,dw-mshc-ciu-div = <3>;
- 	samsung,dw-mshc-sdr-timing = <0 4>;
- 	samsung,dw-mshc-ddr-timing = <0 2>;
- 	pinctrl-names = "default";
--	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4>;
-+	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4 &sd2_wp>;
- 	bus-width = <4>;
- 	cap-sd-highspeed;
- 	vmmc-supply = <&ldo21_reg>;
-@@ -573,6 +575,14 @@
- 		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
- 		samsung,pin-drv = <EXYNOS5420_PIN_DRV_LV1>;
- 	};
-+
-+	sd2_wp: sd2-wp {
-+		samsung,pins = "gpm5-0";
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
-+		/* Pin is floating so pull it up to disable write-protect */
-+		samsung,pin-pud = <EXYNOS_PIN_PULL_UP>;
-+		samsung,pin-drv = <EXYNOS5420_PIN_DRV_LV4>;
-+	};
- };
- 
- &pwm {
--- 
-2.17.1
+Best regards,
+Krzysztof
