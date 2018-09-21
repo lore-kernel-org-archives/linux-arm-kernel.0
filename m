@@ -1,127 +1,64 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 21 Sep 2018 15:51:32 +0530
-Subject: [RFC PATCH 17/40] PCI: keystone: Cleanup configuration space access
-In-Reply-To: <20180921102155.22839-1-kishon@ti.com>
-References: <20180921102155.22839-1-kishon@ti.com>
-Message-ID: <20180921102155.22839-18-kishon@ti.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 21 Sep 2018 12:08:56 +0200
+Subject: [PATCH] firmware: tegra: bpmp: Implement suspend/resume support
+Message-ID: <20180921100856.11396-1-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cleanup configuration space access by removing ks_pcie_cfg_setup
-which has an unncessary check of "if (bus == 0)" which will never be the
-case of *_other_conf() and adding macros for configuring the CFG_SETUP
-register required for accessing the configuration space of the device.
+From: Thierry Reding <treding@nvidia.com>
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+When returning from a system sleep state, the BPMP driver needs to
+reinitialize the IVC channels used to communicate with the BPMP to
+restore proper functionality.
+
+Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- drivers/pci/controller/dwc/pci-keystone.c | 70 +++++++----------------
- 1 file changed, 20 insertions(+), 50 deletions(-)
+ drivers/firmware/tegra/bpmp.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/drivers/pci/controller/dwc/pci-keystone.c b/drivers/pci/controller/dwc/pci-keystone.c
-index f230344e1f4e..3ead1162235f 100644
---- a/drivers/pci/controller/dwc/pci-keystone.c
-+++ b/drivers/pci/controller/dwc/pci-keystone.c
-@@ -45,7 +45,13 @@
+diff --git a/drivers/firmware/tegra/bpmp.c b/drivers/firmware/tegra/bpmp.c
+index 14a456afa379..41448ba78be9 100644
+--- a/drivers/firmware/tegra/bpmp.c
++++ b/drivers/firmware/tegra/bpmp.c
+@@ -18,6 +18,7 @@
+ #include <linux/of_address.h>
+ #include <linux/of_device.h>
+ #include <linux/platform_device.h>
++#include <linux/pm.h>
+ #include <linux/semaphore.h>
+ #include <linux/sched/clock.h>
  
- /* Application registers */
- #define CMD_STATUS			0x004
+@@ -843,6 +844,23 @@ static int tegra_bpmp_probe(struct platform_device *pdev)
+ 	return err;
+ }
+ 
++static int tegra_bpmp_resume(struct device *dev)
++{
++	struct tegra_bpmp *bpmp = dev_get_drvdata(dev);
++	unsigned int i;
 +
- #define CFG_SETUP			0x008
-+#define CFG_BUS(x)			(((x) & 0xff) << 16)
-+#define CFG_DEVICE(x)			(((x) & 0x1f) << 8)
-+#define CFG_FUNC(x)			((x) & 0x7)
-+#define CFG_TYPE1			BIT(24)
++	/* reset message channels */
++	tegra_bpmp_channel_reset(bpmp->tx_channel);
++	tegra_bpmp_channel_reset(bpmp->rx_channel);
 +
- #define OB_SIZE				0x030
- #define CFG_PCIM_WIN_SZ_IDX		3
- #define CFG_PCIM_WIN_CNT		32
-@@ -261,60 +267,21 @@ static void ks_pcie_setup_rc_app_regs(struct keystone_pcie *ks_pcie)
- 	ks_pcie_app_writel(ks_pcie, CMD_STATUS, OB_XLAT_EN_VAL | val);
- }
- 
--/**
-- * ks_pcie_cfg_setup() - Set up configuration space address for a device
-- *
-- * @ks_pcie: ptr to keystone_pcie structure
-- * @bus: Bus number the device is residing on
-- * @devfn: device, function number info
-- *
-- * Forms and returns the address of configuration space mapped in PCIESS
-- * address space 0.  Also configures CFG_SETUP for remote configuration space
-- * access.
-- *
-- * The address space has two regions to access configuration - local and remote.
-- * We access local region for bus 0 (as RC is attached on bus 0) and remote
-- * region for others with TYPE 1 access when bus > 1.  As for device on bus = 1,
-- * we will do TYPE 0 access as it will be on our secondary bus (logical).
-- * CFG_SETUP is needed only for remote configuration access.
-- */
--static void __iomem *ks_pcie_cfg_setup(struct keystone_pcie *ks_pcie, u8 bus,
--				       unsigned int devfn)
--{
--	u8 device = PCI_SLOT(devfn), function = PCI_FUNC(devfn);
--	struct dw_pcie *pci = ks_pcie->pci;
--	struct pcie_port *pp = &pci->pp;
--	u32 regval;
--
--	if (bus == 0)
--		return pci->dbi_base;
--
--	regval = (bus << 16) | (device << 8) | function;
--
--	/*
--	 * Since Bus#1 will be a virtual bus, we need to have TYPE0
--	 * access only.
--	 * TYPE 1
--	 */
--	if (bus != 1)
--		regval |= BIT(24);
--
--	ks_pcie_app_writel(ks_pcie, CFG_SETUP, regval);
--	return pp->va_cfg0_base;
--}
--
- static int ks_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
- 				 unsigned int devfn, int where, int size,
- 				 u32 *val)
- {
- 	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
- 	struct keystone_pcie *ks_pcie = to_keystone_pcie(pci);
--	u8 bus_num = bus->number;
--	void __iomem *addr;
-+	u32 reg;
- 
--	addr = ks_pcie_cfg_setup(ks_pcie, bus_num, devfn);
-+	reg = CFG_BUS(bus->number) | CFG_DEVICE(PCI_SLOT(devfn)) |
-+		CFG_FUNC(PCI_FUNC(devfn));
-+	if (bus->parent->number != pp->root_bus_nr)
-+		reg |= CFG_TYPE1;
-+	ks_pcie_app_writel(ks_pcie, CFG_SETUP, reg);
- 
--	return dw_pcie_read(addr + where, size, val);
-+	return dw_pcie_read(pp->va_cfg0_base + where, size, val);
- }
- 
- static int ks_pcie_wr_other_conf(struct pcie_port *pp, struct pci_bus *bus,
-@@ -323,12 +290,15 @@ static int ks_pcie_wr_other_conf(struct pcie_port *pp, struct pci_bus *bus,
- {
- 	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
- 	struct keystone_pcie *ks_pcie = to_keystone_pcie(pci);
--	u8 bus_num = bus->number;
--	void __iomem *addr;
-+	u32 reg;
- 
--	addr = ks_pcie_cfg_setup(ks_pcie, bus_num, devfn);
-+	reg = CFG_BUS(bus->number) | CFG_DEVICE(PCI_SLOT(devfn)) |
-+		CFG_FUNC(PCI_FUNC(devfn));
-+	if (bus->parent->number != pp->root_bus_nr)
-+		reg |= CFG_TYPE1;
-+	ks_pcie_app_writel(ks_pcie, CFG_SETUP, reg);
- 
--	return dw_pcie_write(addr + where, size, val);
-+	return dw_pcie_write(pp->va_cfg0_base + where, size, val);
- }
- 
- /**
++	for (i = 0; i < bpmp->threaded.count; i++)
++		tegra_bpmp_channel_reset(&bpmp->threaded_channels[i]);
++
++	return 0;
++}
++
++static SIMPLE_DEV_PM_OPS(tegra_bpmp_pm_ops, NULL, tegra_bpmp_resume);
++
+ static const struct tegra_bpmp_soc tegra186_soc = {
+ 	.channels = {
+ 		.cpu_tx = {
+@@ -871,6 +889,7 @@ static struct platform_driver tegra_bpmp_driver = {
+ 	.driver = {
+ 		.name = "tegra-bpmp",
+ 		.of_match_table = tegra_bpmp_match,
++		.pm = &tegra_bpmp_pm_ops,
+ 	},
+ 	.probe = tegra_bpmp_probe,
+ };
 -- 
-2.17.1
+2.19.0
