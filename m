@@ -1,162 +1,193 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sat, 22 Sep 2018 15:06:02 +0300
-Subject: [PATCH v2 1/8] drm/bridge: use bus flags in bridge timings
-In-Reply-To: <bf38f469923e1c2a16252c6d1d2bcb2b@agner.ch>
-References: <20180912183222.25414-1-stefan@agner.ch>
- <6714863.eJMplaj6yU@avalon> <bf38f469923e1c2a16252c6d1d2bcb2b@agner.ch>
-Message-ID: <3905999.JCVWYgpCCG@avalon>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Sat, 22 Sep 2018 14:28:38 +0200
+Subject: [PATCH 2/2] cpufreq: ap806: add cpufreq driver for Armada 8K
+In-Reply-To: <20180921154326.10776-2-gregory.clement@bootlin.com>
+References: <20180921154326.10776-1-gregory.clement@bootlin.com>
+ <20180921154326.10776-2-gregory.clement@bootlin.com>
+Message-ID: <20180922142838.6bde6b9c@windsurf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+Hello,
 
-On Tuesday, 18 September 2018 21:14:22 EEST Stefan Agner wrote:
-> On 14.09.2018 02:23, Laurent Pinchart wrote:
-> > On Wednesday, 12 September 2018 21:32:15 EEST Stefan Agner wrote:
-> >> The DRM bus flags conveys additional information on pixel data on
-> >> the bus. All currently available bus flags might be of interest for
-> >> a bridge. In the case at hand a dumb VGA bridge needs a specific
-> >> data enable polarity (DRM_BUS_FLAG_DE_LOW).
-> >> 
-> >> Replace the sampling_edge field with input_bus_flags and allow all
-> >> currently documented bus flags.
-> >> 
-> >> This changes the perspective from sampling side to the driving
-> >> side for the currently supported flags. We assume that the sampling
-> >> edge is always the opposite of the driving edge (hence we need to
-> >> invert the DRM_BUS_FLAG_PIXDATA_[POS|NEG]EDGE flags). This is an
-> >> assumption we already make for displays. For all we know it is a
-> >> safe assumption for bridges too.
-> > 
-> > Please don't, that will get confusing very quickly. Flag names such as
-> > DRM_BUS_FLAG_PIXDATA_NEGEDGE don't mention sampling or driving. There's
-> > only a small comment next to their definition, which will easily be
-> > overlooked. I'd rather update the definition to cover both sampling and
-> > driving, and document the input_bus_flags field to explain that all flags
-> > refer to sampling.
-> 
-> There is history to that, and I'd really rather prefer to keep that similar
-> across the kernel. There is already precedence in the kernel, the display
-> timings (which is a consumer) defines it from the driving perspective too
-> (see DISPLAY_FLAGS_PIXDATA_POSEDGE).
-> 
-> That is why I introduced the bus flags using the same perspective.
-> 
-> If we _really_ want it from sampling side, we should create new defines
-> which are explicit about that, e.g.: DRM_BUS_FLAG_PIXDATA_SAMPLE_NEGEDGE.
+This is not a full review, just a few things I noticed.
 
-I'm not opposed to that.
+On Fri, 21 Sep 2018 17:43:26 +0200, Gregory CLEMENT wrote:
+> Add cpufreq driver for Marvell AP-806 found on Aramda 8K.
 
-> But again, since even the display flags use the driving perspective, I'd
-> rather prefer to have it that way also for bridges too.
+Armada, not Aramda.
 
-But look at the following diff:
+> +config ARM_ARMADA_8K_CPUFREQ
+> +       tristate "Armada 8K CPUFreq driver"
+> +       depends on ARCH_MVEBU && CPUFREQ_DT
+> +       help
 
--	.sampling_edge = DRM_BUS_FLAG_PIXDATA_POSEDGE,
-+	.input_bus_flags = DRM_BUS_FLAG_PIXDATA_NEGEDGE,
+Indentation of those items should use one tab, not spaces.
 
-The first line makes it very explicit that the data signals are sampled on the 
-rising edge. The second line reads to me as sampling on the negative edge, as 
-it reports input information from a bridge perspective. I'll have to read the 
-documentation to get it right, and I'm sure I and other will overlook it from 
-time to time.
+> +         This enables the CPUFreq driver support for Marvell
+> +	 Armada8k SOCs.
+> +	 Armada8K device has the AP806 which supports scaling
+> +	 to any full integer divider.
 
-The following would be much more explicit:
+And for the help text, it should be one tab + two spaces.
 
-	.input_bus_flags = DRM_BUS_FLAG_PIXDATA_SAMPLING_POSEDGE,
 
-and we could define macros as follows:
+> +/*
+> + * Setup the opps list with the divider for the max frequency, that
+> + * will be filled at runtime, 0 meaning 100Mhz
+> + */
+> +static int opps_div[] __initdata = {1, 2, 3, 0};
 
-/*
- * Don't use those two flags directly, use the DRM_BUS_FLAG_PIXDATA_DRIVE_*
- * and DRM_BUS_FLAG_PIXDATA_SAMPLE_* variants to qualify the flags explicitly.
- * The DRM_BUS_FLAG_PIXDATA_SAMPLE_* flags are defined as the opposite of the
- * DRM_BUS_FLAG_PIXDATA_DRIVE_* flags to make code simpler, as signals are
- * usually to be sampled on the opposite edge of the driving edge.
- */
-#define DRM_BUS_FLAG_PIXDATA_POSEDGE    (1<<2)
-#define DRM_BUS_FLAG_PIXDATA_NEGEDGE    (1<<3)
+const ?
 
-/* Drive data on rising edge */
-#define DRM_BUS_FLAG_PIXDATA_DRIVE_POSEDGE    DRM_BUS_FLAG_PIXDATA_POSEDGE
-/* Drive data on falling edge */
-#define DRM_BUS_FLAG_PIXDATA_DRIVE_NEGEDGE    DRM_BUS_FLAG_PIXDATA_NEGEDGE
-/* Sample data on rising edge */
-#define DRM_BUS_FLAG_PIXDATA_SAMPLE_POSEDGE   DRM_BUS_FLAG_PIXDATA_NEGEDGE
-/* Sample data on falling edge */
-#define DRM_BUS_FLAG_PIXDATA_SAMPLE_NEGEDGE   DRM_BUS_FLAG_PIXDATA_POSEDGE
+> +
+> +struct opps_array {
+> +	struct device *cpu_dev;
+> +	unsigned int freq[ARRAY_SIZE(opps_div)];
+> +};
+> +
+> +/* If the CPUs share the same clock, then they are in the same cluster */
+> +static void __init aramda_8k_get_sharing_cpus(struct clk *cur_clk,
 
-I'll submit a patch series.
+Typo in function name, it should use armada, not aramda.
 
-> >> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> >> ---
-> >> 
-> >>  drivers/gpu/drm/bridge/dumb-vga-dac.c |  6 +++---
-> >>  include/drm/drm_bridge.h              | 11 +++++------
-> >>  2 files changed, 8 insertions(+), 9 deletions(-)
-> >> 
-> >> diff --git a/drivers/gpu/drm/bridge/dumb-vga-dac.c
-> >> b/drivers/gpu/drm/bridge/dumb-vga-dac.c index 9b706789a341..d5aa0f931ef2
-> >> 100644
-> >> --- a/drivers/gpu/drm/bridge/dumb-vga-dac.c
-> >> +++ b/drivers/gpu/drm/bridge/dumb-vga-dac.c
-> >> @@ -234,7 +234,7 @@ static int dumb_vga_remove(struct platform_device
-> >> *pdev)
-> >>  */
-> >>  static const struct drm_bridge_timings default_dac_timings = {
-> >>  	/* Timing specifications, datasheet page 7 */
-> >> -	.sampling_edge = DRM_BUS_FLAG_PIXDATA_POSEDGE,
-> >> +	.input_bus_flags = DRM_BUS_FLAG_PIXDATA_NEGEDGE,
-> >>  	.setup_time_ps = 500,
-> >>  	.hold_time_ps = 1500,
-> >>  };
-> >> @@ -245,7 +245,7 @@ static const struct drm_bridge_timings
-> >> default_dac_timings = {
-> >>  */
-> >>  static const struct drm_bridge_timings ti_ths8134_dac_timings = {
-> >>  	/* From timing diagram, datasheet page 9 */
-> >> -	.sampling_edge = DRM_BUS_FLAG_PIXDATA_POSEDGE,
-> >> +	.input_bus_flags = DRM_BUS_FLAG_PIXDATA_NEGEDGE,
-> >>  	/* From datasheet, page 12 */
-> >>  	.setup_time_ps = 3000,
-> >>  	/* I guess this means latched input */
-> >> @@ -258,7 +258,7 @@ static const struct drm_bridge_timings
-> >> ti_ths8134_dac_timings = {
-> >>  */
-> >>  static const struct drm_bridge_timings ti_ths8135_dac_timings = {
-> >>  	/* From timing diagram, datasheet page 14 */
-> >> -	.sampling_edge = DRM_BUS_FLAG_PIXDATA_POSEDGE,
-> >> +	.input_bus_flags = DRM_BUS_FLAG_PIXDATA_NEGEDGE,
-> >>  	/* From datasheet, page 16 */
-> >>  	.setup_time_ps = 2000,
-> >>  	.hold_time_ps = 500,
-> >> diff --git a/include/drm/drm_bridge.h b/include/drm/drm_bridge.h
-> >> index bd850747ce54..45e90f4b46c3 100644
-> >> --- a/include/drm/drm_bridge.h
-> >> +++ b/include/drm/drm_bridge.h
-> >> @@ -244,14 +244,13 @@ struct drm_bridge_funcs {
-> >>   */
-> >>  struct drm_bridge_timings {
-> >>  	/**
-> >> -	 * @sampling_edge:
-> >> +	 * @input_bus_flags:
-> >>  	 *
-> >> -	 * Tells whether the bridge samples the digital input signal
-> >> -	 * from the display engine on the positive or negative edge of the
-> >> -	 * clock, this should reuse the DRM_BUS_FLAG_PIXDATA_[POS|NEG]EDGE
-> >> -	 * bitwise flags from the DRM connector (bit 2 and 3 valid).
-> >> +	 * Additional settings this bridge requires for the pixel data on
-> >> +	 * the input bus (e.g. pixel signal polarity). See also
-> >> +	 * &drm_display_info->bus_flags.
-> >>  	 */
-> >> -	u32 sampling_edge;
-> >> +	u32 input_bus_flags;
-> >> 
-> >>  	/**
-> >>  	 * @setup_time_ps:
-> >>  	 *
+> +				       struct cpumask *cpumask)
+> +{
+> +	int cpu;
+> +
+> +	for_each_possible_cpu(cpu) {
+> +		struct device *cpu_dev = get_cpu_device(cpu);
+> +		struct clk *clk = clk_get(cpu_dev, 0);
+> +
+> +		if (IS_ERR(clk))
+> +			dev_warn(cpu_dev, "Cannot get clock for CPU %d\n", cpu);
+> +
+> +		if (clk_is_match(clk, cur_clk))
 
+Is it OK to call clk_is_match() is clk being an error ?
+
+> +			cpumask_set_cpu(cpu, cpumask);
+> +	}
+> +
+> +}
+> +
+> +static int __init armada_8k_cpufreq_init(void)
+> +{
+> +	struct opps_array *opps_arrays;
+> +	struct platform_device *pdev;
+> +	int ret, cpu, opps_index = 0;
+> +	unsigned int cur_frequency;
+> +	struct device_node *node;
+> +
+> +	node = of_find_compatible_node(NULL, NULL, "marvell,ap806-cpu-clock");
+> +	if (!node || !of_device_is_available(node))
+> +		return -ENODEV;
+> +
+> +	opps_arrays = kcalloc(num_possible_cpus(), sizeof(*opps_arrays),
+> +			      GFP_KERNEL);
+> +	/*
+> +	 * For each CPU, this loop registers the operating points
+> +	 * supported (which are the nominal CPU frequency and full integer
+> +	 * divisions of it).
+> +	 */
+> +	for_each_possible_cpu(cpu) {
+> +		struct device *cpu_dev;
+> +		struct cpumask cpus;
+> +		unsigned int freq;
+> +		struct clk *clk;
+> +		int i;
+> +
+> +		cpu_dev = get_cpu_device(cpu);
+> +		if (!cpu_dev) {
+> +			dev_err(cpu_dev, "Cannot get CPU %d\n", cpu);
+> +			continue;
+> +		}
+> +
+> +		clk = clk_get(cpu_dev, 0);
+> +		if (IS_ERR(clk)) {
+> +			dev_err(cpu_dev, "Cannot get clock for CPU %d\n", cpu);
+> +			return PTR_ERR(clk);
+
+So here you're leaking the memory allocation of opps_array[] and
+everything that was done during all previous iterations of the loop.
+
+> +		}
+> +
+> +		/* Get nominal (current) CPU frequency */
+> +		cur_frequency = clk_get_rate(clk);
+> +		if (!cur_frequency) {
+> +			dev_err(cpu_dev,
+> +				"Failed to get clock rate for CPU %d\n", cpu);
+> +			return -EINVAL;
+
+Ditto.
+
+> +		}
+> +
+> +		opps_arrays[opps_index].cpu_dev = cpu_dev;
+> +		for (i = 0; i < ARRAY_SIZE(opps_div); i++) {
+> +			if (opps_div[i])
+> +				freq = cur_frequency / opps_div[i];
+> +			else
+> +				freq = MIN_FREQ;
+> +
+> +			ret = dev_pm_opp_add(cpu_dev, freq, 0);
+> +
+
+Remove this blank line, to have the if (ret) just below the function
+call.
+
+> +			if (ret)
+> +				goto remove_opp;
+
+And add a blank line here instead.
+
+> +			opps_arrays[opps_index].freq[i] = freq;
+> +		}
+> +
+> +		cpumask_clear(&cpus);
+> +		aramda_8k_get_sharing_cpus(clk, &cpus);
+> +		dev_pm_opp_set_sharing_cpus(cpu_dev, &cpus);
+> +	}
+> +
+> +	pdev = platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
+> +	ret = PTR_ERR_OR_ZERO(pdev);
+> +	if (ret)
+> +		goto remove_opp;
+> +	kfree(opps_arrays);
+> +	return 0;
+> +remove_opp:
+> +
+
+Please exchange those two lines: one blank line between the return and
+the goto label, and no blank line between the goto label and the core
+of the code.
+
+> +	for (; opps_index >= 0; opps_index--) {
+> +		int i = 0;
+> +
+> +		while (opps_arrays[opps_index].freq[i]) {
+> +			dev_pm_opp_remove(opps_arrays[opps_index].cpu_dev,
+> +					  opps_arrays[opps_index].freq[i]);
+> +			i++;
+> +		}
+> +	}
+> +	kfree(opps_arrays);
+> +	return ret;
+> +}
+> +module_init(armada_8k_cpufreq_init);
+> +
+> +MODULE_AUTHOR("Gregory Clement <gregory.clement@bootlin.com>");
+> +MODULE_DESCRIPTION("Armada 8K cpufreq driver");
+> +MODULE_LICENSE("GPL");
+
+Once again, this is not a full review, I haven't reviewed the logic of
+the driver itself, just a few obvious things I noticed.
+
+Best regards,
+
+Thomas Petazzoni
 -- 
-Regards,
-
-Laurent Pinchart
+Thomas Petazzoni, CTO, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
