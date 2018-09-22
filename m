@@ -1,48 +1,53 @@
-From: trong@android.com (Tri Vo)
-Date: Fri, 21 Sep 2018 16:47:40 -0700
-Subject: [RFC] arm64: lse: remove -fcall-used-x0 flag
-In-Reply-To: <20180921155829.GD1451@arm.com>
-References: <20180919192750.200491-1-trong@android.com>
- <20180921155829.GD1451@arm.com>
-Message-ID: <CANA+-vDoOj5N7Y4BOyJADpDXa1-vAnY8oNjcSMxkRfy=MSv6Fw@mail.gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 21 Sep 2018 22:12:52 -0500
+Subject: [PATCHv2 0/3] omap gpio add level idle, cpu_pm and drop
+ runtime_irq_safe
+In-Reply-To: <20180920193532.7714-1-tony@atomide.com>
+References: <20180920193532.7714-1-tony@atomide.com>
+Message-ID: <e3dbeb73-c14e-282b-f2bb-449131d6ed33@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2018 at 8:58 AM Will Deacon <will.deacon@arm.com> wrote:
->
-> On Wed, Sep 19, 2018 at 12:27:50PM -0700, Tri Vo wrote:
-> > x0 is not callee-saved in the PCS. So there is no need to specify
-> > -fcall-used-x0.
-> >
-> > Clang doesn't currently support -fcall-used flags. This patch will help
-> > building the kernel with clang.
-> >
-> > Signed-off-by: Tri Vo <trong@android.com>
-> > ---
-> >  arch/arm64/lib/Makefile | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> If this is useful to you, then:
->
-> Acked-by: Will Deacon <will.deacon@arm.com>
 
-Thank you!
->
-> Will
->
-> > diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
-> > index c86b7909ef31..2f7c60c8e588 100644
-> > --- a/arch/arm64/lib/Makefile
-> > +++ b/arch/arm64/lib/Makefile
-> > @@ -11,7 +11,7 @@ lib-y               := bitops.o clear_user.o delay.o copy_from_user.o       \
-> >  # when supported by the CPU. Result and argument registers are handled
-> >  # correctly, based on the function prototype.
-> >  lib-$(CONFIG_ARM64_LSE_ATOMICS) += atomic_ll_sc.o
-> > -CFLAGS_atomic_ll_sc.o        := -fcall-used-x0 -ffixed-x1 -ffixed-x2         \
-> > +CFLAGS_atomic_ll_sc.o        := -ffixed-x1 -ffixed-x2                        \
-> >                  -ffixed-x3 -ffixed-x4 -ffixed-x5 -ffixed-x6          \
-> >                  -ffixed-x7 -fcall-saved-x8 -fcall-saved-x9           \
-> >                  -fcall-saved-x10 -fcall-saved-x11 -fcall-saved-x12   \
-> > --
-> > 2.19.0.397.gdd90340f6a-goog
-> >
+
+On 09/20/2018 02:35 PM, Tony Lindgren wrote:
+> Hi,
+> 
+> Here's v2 of the patches to add support for omap4 and later level interrupt
+> idle support, get rid of the custom pm calls, and finally after these we can
+> drop pm_runtime_irq_safe().
+> 
+> Linus, assuming people are happy with these, I'd appreciate an immutable branch
+> with these in case we run into merge conflicts for arch/arm/mach-omap2 changes.
+> 
+> Regards,
+> 
+> Tony
+> 
+> 
+> Changes since v1:
+> - Fix issue noted in v1 set and update comments accordingly
+> 
+> - Don't call pm_runtime from cpu_pm to avoid further dependencies to
+>    pm_runtime_irq_safe() as discussed offline with Grygorii
+> 
+> - Add a patch to drop pm_runtime_irq_safe() as it's no longer needed
+> 
+> Tony Lindgren (3):
+>    gpio: omap: Add level wakeup handling for omap4 based SoCs
+>    gpio: omap: Remove custom PM calls and use cpu_pm instead
+>    gpio: omap: Get rid of pm_runtime_irq_safe()
+> 
+>   arch/arm/mach-omap2/pm24xx.c            |   7 +-
+>   arch/arm/mach-omap2/pm34xx.c            |  14 +-
+>   drivers/gpio/gpio-omap.c                | 331 ++++++++++++++++--------
+>   include/linux/platform_data/gpio-omap.h |  15 +-
+>   4 files changed, 237 insertions(+), 130 deletions(-)
+> 
+
+Thank you
+Acked-by: Grygorii Strashko <grygorii.strashko@ti.com>
+
+-- 
+regards,
+-grygorii
