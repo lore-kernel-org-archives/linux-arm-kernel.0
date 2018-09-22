@@ -1,21 +1,30 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 22 Sep 2018 21:30:52 +0800
-Subject: [PATCH 17/27] drm/sun4i: dw-hdmi: Add quirk for setting TMDS clock
-In-Reply-To: <20180902072643.4917-18-jernej.skrabec@siol.net>
+Date: Sat, 22 Sep 2018 21:32:13 +0800
+Subject: [PATCH 09/27] dt-bindings: display: sun4i-drm: Add H6 display
+ engine compatibles
+In-Reply-To: <5b9f3f4d.1c69fb81.c776b.ee42@mx.google.com>
 References: <20180902072643.4917-1-jernej.skrabec@siol.net>
- <20180902072643.4917-18-jernej.skrabec@siol.net>
-Message-ID: <CAGb2v66oMoXxYCrnZpWMk_wtZMfqGonWM+fdc1BG-3NghcE7bQ@mail.gmail.com>
+ <20180902072643.4917-10-jernej.skrabec@siol.net>
+ <5b9f3f4d.1c69fb81.c776b.ee42@mx.google.com>
+Message-ID: <CAGb2v67yHpV042LW=iwBBNV7krauwCGX8CFh23nTNFsHkHXQqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 2, 2018 at 3:27 PM Jernej Skrabec <jernej.skrabec@siol.net> wrote:
+On Mon, Sep 17, 2018 at 1:44 PM Rob Herring <robh@kernel.org> wrote:
 >
-> It turns out that H6 HDMI BSP kernel driver doesn't change TMDS rate at
-> all. At this point it is not clear whether it is just not necessary or
-> it would cause some kind of issues.
+> On Sun,  2 Sep 2018 09:26:25 +0200, Jernej Skrabec wrote:
+> > This commit adds compatibles used in H6 display pipeline, namely for
+> > display engine, mixer and TV TCON.
+> >
+> > H6 display engine is somewhat similar to R40, just less TCONs and
+> > mixer support more features.
+> >
+> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> > ---
+> >  .../devicetree/bindings/display/sunxi/sun4i-drm.txt          | 5 ++++-
+> >  1 file changed, 4 insertions(+), 1 deletion(-)
+> >
 >
-> Add a quirk for it.
->
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> Reviewed-by: Rob Herring <robh@kernel.org>
 
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
