@@ -1,415 +1,78 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 22 Sep 2018 23:55:35 +0800
-Subject: [PATCH 21/27] drm/sun4i: Add support for H6 HDMI PHY
-In-Reply-To: <20180902072643.4917-22-jernej.skrabec@siol.net>
-References: <20180902072643.4917-1-jernej.skrabec@siol.net>
- <20180902072643.4917-22-jernej.skrabec@siol.net>
-Message-ID: <CAGb2v66RqR3pGh+1_rnvMQ4LJaSkKmky9D36tdxQS7cyJb6GYA@mail.gmail.com>
+From: saiprakash.ranjan@codeaurora.org (Sai Prakash Ranjan)
+Date: Sat, 22 Sep 2018 22:07:00 +0530
+Subject: [PATCH 2/6] pstore: Add event tracing support
+In-Reply-To: <CAEXW_YRXQwKvnahv5X1F_Bu_98vMg=w1xpo8PZ+aNT02vBrwwg@mail.gmail.com>
+References: <cover.1536430404.git.saiprakash.ranjan@codeaurora.org>
+ <b9b60ff2864a17fb05481aa33f90114ab051d6ce.1536430404.git.saiprakash.ranjan@codeaurora.org>
+ <CAEXW_YRXQwKvnahv5X1F_Bu_98vMg=w1xpo8PZ+aNT02vBrwwg@mail.gmail.com>
+Message-ID: <e8fdef37-afcd-24b3-1005-e707b73f20b1@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 2, 2018 at 3:28 PM Jernej Skrabec <jernej.skrabec@siol.net> wrote:
->
-> H6 has Synopsys DWC HDMI 2.0 TX PHY.
->
-> mpll settings were calculated from specifications of similar Synopsys
-> HDMI PHY found in i.MX6. Other PHY settings were derived from BSP PHY
-> driver code.
->
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> ---
->  drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c | 137 +++++++++++++++++++++++++
->  1 file changed, 137 insertions(+)
->
-> diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-> index ee2bf61cd4d2..2f5499bd35ec 100644
-> --- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-> +++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-> @@ -14,6 +14,122 @@
->   */
->  #define I2C_ADDR       0x69
->
-> +static const struct dw_hdmi_mpll_config sun50i_h6_mpll_cfg[] = {
+On 9/22/2018 2:35 PM, Joel Fernandes wrote:
+> On Sat, Sep 8, 2018 at 4:28 PM Sai Prakash Ranjan
+> <saiprakash.ranjan@codeaurora.org> wrote:
+>>
+> Could you just split the pstore space into a per-cpu event buffer like
+> we are doing for ftrace-on-pstore? Then you don't need to lock. I fear
+> the lock contention will be apparent. The pstore code already has
+> plumbing to split the store buffer per CPU.
+> 
 
-How did you choose the pixel clock points for this table? The values
-sort of match up with the BSP.
+Hi Joel,
 
-> +       {
-> +               30666000, {
-> +                       { 0x00b3, 0x0000 },
-> +                       { 0x2153, 0x0000 },
-> +                       { 0x40f3, 0x0000 },
-> +               },
-> +       },  {
-> +               36800000, {
-> +                       { 0x00b3, 0x0000 },
-> +                       { 0x2153, 0x0000 },
-> +                       { 0x40a2, 0x0001 },
-> +               },
-> +       },  {
-> +               46000000, {
-> +                       { 0x00b3, 0x0000 },
-> +                       { 0x2142, 0x0001 },
-> +                       { 0x40a2, 0x0001 },
-> +               },
-> +       },  {
-> +               61333000, {
-> +                       { 0x0072, 0x0001 },
-> +                       { 0x2142, 0x0001 },
-> +                       { 0x40a2, 0x0001 },
-> +               },
-> +       },  {
-> +               73600000, {
-> +                       { 0x0072, 0x0001 },
-> +                       { 0x2142, 0x0001 },
-> +                       { 0x4061, 0x0002 },
-> +               },
-> +       },  {
-> +               92000000, {
-> +                       { 0x0072, 0x0001 },
-> +                       { 0x2145, 0x0002 },
-> +                       { 0x4061, 0x0002 },
-> +               },
-> +       },  {
-> +               122666000, {
-> +                       { 0x0051, 0x0002 },
-> +                       { 0x2145, 0x0002 },
-> +                       { 0x4061, 0x0002 },
-> +               },
-> +       },  {
-> +               147200000, {
-> +                       { 0x0051, 0x0002 },
-> +                       { 0x2145, 0x0002 },
-> +                       { 0x4064, 0x0003 },
-> +               },
-> +       },  {
-> +               184000000, {
-> +                       { 0x0051, 0x0002 },
-> +                       { 0x214c, 0x0003 },
-> +                       { 0x4064, 0x0003 },
-> +               },
-> +       },  {
-> +               226666000, {
-> +                       { 0x0040, 0x0003 },
-> +                       { 0x214c, 0x0003 },
-> +                       { 0x4064, 0x0003 },
-> +               },
-> +       },  {
-> +               272000000, {
-> +                       { 0x0040, 0x0003 },
-> +                       { 0x214c, 0x0003 },
-> +                       { 0x5a64, 0x0003 },
-> +               },
-> +       },  {
-> +               340000000, {
-> +                       { 0x0040, 0x0003 },
-> +                       { 0x3b4c, 0x0003 },
-> +                       { 0x5a64, 0x0003 },
-> +               },
-> +       },  {
-> +               600000000, {
+Thanks a lot for reviewing.
 
-594000000 is the proper clock rate.
+I just looked at per-cpu buffer for ftrace and itseems the pstore percpu 
+records will need to be merged into one record if we add this support 
+for events. Merging of ftrace logs is based on timestamp, but for events 
+we do not have timestamp field (for this specific reason I have added 
+timestamp field for IO event tracing so that atleast we can know the cpu 
+number in pstore output). For example, the sched event pstore output 
+below has no timestamp field, so how do we merge per-cpu logs?
 
-> +                       { 0x1a40, 0x0003 },
-> +                       { 0x3b4c, 0x0003 },
-> +                       { 0x5a64, 0x0003 },
-> +               },
-> +       }, {
-> +               ~0UL, {
-> +                       { 0x0000, 0x0000 },
-> +                       { 0x0000, 0x0000 },
-> +                       { 0x0000, 0x0000 },
-> +               },
-> +       }
-> +};
-> +
-> +static const struct dw_hdmi_curr_ctrl sun50i_h6_cur_ctr[] = {
+# tail /sys/fs/pstore/event-ramoops-0
+sched_waking: comm=rcu_sched pid=11 prio=120 target_cpu=002
+sched_wakeup: comm=rcu_sched pid=11 prio=120 target_cpu=002
 
-The BSP sometimes uses different settings depending on the pixel repetition.
-Any ideas about this? I assume it's because the TMDS clock changes as a
-result of pixel repetition, as is the same with different bit depths.
+Also Pstore ftrace log format is fixed i.e.,(CPU:%d ts:%llu %08lx  %08lx 
+  %pf <- %pF\n"), but different events will have different formats and 
+we will not be able to add timestamp field like how pstore ftrace does 
+using  pstore_ftrace_write_timestamp() and pstore_ftrace_read_timestamp().
 
-> +       /* pixelclk    bpp8    bpp10   bpp12 */
-> +       { 25175000,  { 0x0000, 0x0000, 0x0000 }, },
-> +       { 27000000,  { 0x0012, 0x0000, 0x0000 }, },
-> +       { 59400000,  { 0x0008, 0x0008, 0x0008 }, },
-> +       { 72000000,  { 0x0008, 0x0008, 0x001b }, },
-> +       { 74250000,  { 0x0013, 0x0013, 0x0013 }, },
-> +       { 90000000,  { 0x0008, 0x001a, 0x001b }, },
-> +       { 118800000, { 0x001b, 0x001a, 0x001b }, },
-> +       { 144000000, { 0x001b, 0x001a, 0x0034 }, },
-> +       { 180000000, { 0x001b, 0x0033, 0x0034 }, },
-> +       { 216000000, { 0x0036, 0x0033, 0x0034 }, },
-> +       { 237600000, { 0x0036, 0x0033, 0x001b }, },
-> +       { 288000000, { 0x0036, 0x001b, 0x001b }, },
-> +       { 297000000, { 0x0019, 0x001b, 0x0019 }, },
-> +       { 330000000, { 0x0036, 0x001b, 0x001b }, },
-> +       { 600000000, { 0x003f, 0x001b, 0x001b }, },
-> +       { ~0UL,      { 0x0000, 0x0000, 0x0000 }, }
-> +};
-> +
-> +static const struct dw_hdmi_phy_config sun50i_h6_phy_config[] = {
-> +       /*pixelclk   symbol   term   vlev*/
+Sorry if I am confusing you, I can explain better I guess.
 
-I see a slightly different setting for 27000000, and this frequency
-below 74250000
-only, and even different for all three bit depths (not listed here). So:
+> Also I think this spinlock can be moved further down.
+> 
 
-    { 25175000,  0x8009, 0x0004, 0x0232 },
-    { 27000000,  0x8009, 0x0007, 0x02b0 },
+OK. Something like this would suffice?
 
-And,
+{{{
+spin_lock_irqsave(&psinfo->buf_lock, flags);
 
-> +       { 74250000,  0x8009, 0x0004, 0x0232},
-> +       { 148500000, 0x8029, 0x0004, 0x0273},
+record.buf = (char *)(seq->buffer);
+record.size = seq->len;
+psinfo->write(&record);
 
-These two don't match what I see in the BSP. BTW, which table did you use?
-phy301 or phy303? The code seems to indicate that model 301 is the one.
+spin_unlock_irqrestore(&psinfo->buf_lock, flags);
+}}}
 
-> +       { 600000000, 0x8039, 0x0004, 0x014a},
+>> +
+>> +       trace_seq_init(&iter->seq);
+>> +       iter->ent = fbuffer->entry;
+>> +       event_call->event.funcs->trace(iter, 0, event);
+>> +       trace_seq_putc(&iter->seq, 0);
+> 
+> Would it be possible to store the binary trace record in the pstore
+> buffer instead of outputting text? I suspect that will both be faster
+> and less space.
+> 
 
-594000000 is the proper pixel clock you're after.
+I will try this and come back.
 
-> +       { ~0UL,      0x0000, 0x0000, 0x0000}
-> +};
-> +
->  static int sun8i_hdmi_phy_config_a83t(struct dw_hdmi *hdmi,
->                                       struct sun8i_hdmi_phy *phy,
->                                       unsigned int clk_rate)
-> @@ -290,6 +406,16 @@ static void sun8i_hdmi_phy_unlock(struct sun8i_hdmi_phy *phy)
->                      SUN8I_HDMI_PHY_UNSCRAMBLE_MAGIC);
->  }
->
-> +static void sun50i_hdmi_phy_init_h6(struct sun8i_hdmi_phy *phy)
-> +{
-> +       regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_REXT_CTRL_REG,
-> +                          SUN8I_HDMI_PHY_REXT_CTRL_REXT_EN,
-> +                          SUN8I_HDMI_PHY_REXT_CTRL_REXT_EN);
-> +
-> +       regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_REXT_CTRL_REG,
-> +                          0xffff0000, 0x80c00000);
-> +}
-> +
->  static void sun8i_hdmi_phy_init_a83t(struct sun8i_hdmi_phy *phy)
->  {
->         sun8i_hdmi_phy_unlock(phy);
-> @@ -423,6 +549,13 @@ static const struct sun8i_hdmi_phy_variant sun50i_a64_hdmi_phy = {
->         .phy_config = &sun8i_hdmi_phy_config_h3,
->  };
->
-> +static const struct sun8i_hdmi_phy_variant sun50i_h6_hdmi_phy = {
-> +       .cur_ctr  = sun50i_h6_cur_ctr,
-> +       .mpll_cfg = sun50i_h6_mpll_cfg,
-> +       .phy_cfg  = sun50i_h6_phy_config,
-> +       .phy_init = &sun50i_hdmi_phy_init_h6,
-> +};
-> +
->  static const struct sun8i_hdmi_phy_variant sun8i_a83t_hdmi_phy = {
->         .is_custom_phy = true,
->         .phy_init = &sun8i_hdmi_phy_init_a83t,
-> @@ -443,6 +576,10 @@ static const struct of_device_id sun8i_hdmi_phy_of_table[] = {
->                 .compatible = "allwinner,sun50i-a64-hdmi-phy",
->                 .data = &sun50i_a64_hdmi_phy,
->         },
-> +       {
-> +               .compatible = "allwinner,sun50i-h6-hdmi-phy",
-> +               .data = &sun50i_h6_hdmi_phy,
-> +       },
+Thanks,
+Sai
 
-Version sort please.
-
-Regards
-ChenYu
-
->         {
->                 .compatible = "allwinner,sun8i-a83t-hdmi-phy",
->                 .data = &sun8i_a83t_hdmi_phy,
-> --
-> 2.18.0
->
-On Sun, Sep 2, 2018 at 3:28 PM Jernej Skrabec <jernej.skrabec@siol.net> wrote:
->
-> H6 has Synopsys DWC HDMI 2.0 TX PHY.
->
-> mpll settings were calculated from specifications of similar Synopsys
-> HDMI PHY found in i.MX6. Other PHY settings were derived from BSP PHY
-> driver code.
->
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> ---
->  drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c | 137 +++++++++++++++++++++++++
->  1 file changed, 137 insertions(+)
->
-> diff --git a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-> index ee2bf61cd4d2..2f5499bd35ec 100644
-> --- a/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-> +++ b/drivers/gpu/drm/sun4i/sun8i_hdmi_phy.c
-> @@ -14,6 +14,122 @@
->   */
->  #define I2C_ADDR       0x69
->
-> +static const struct dw_hdmi_mpll_config sun50i_h6_mpll_cfg[] = {
-> +       {
-> +               30666000, {
-> +                       { 0x00b3, 0x0000 },
-> +                       { 0x2153, 0x0000 },
-> +                       { 0x40f3, 0x0000 },
-> +               },
-> +       },  {
-> +               36800000, {
-> +                       { 0x00b3, 0x0000 },
-> +                       { 0x2153, 0x0000 },
-> +                       { 0x40a2, 0x0001 },
-> +               },
-> +       },  {
-> +               46000000, {
-> +                       { 0x00b3, 0x0000 },
-> +                       { 0x2142, 0x0001 },
-> +                       { 0x40a2, 0x0001 },
-> +               },
-> +       },  {
-> +               61333000, {
-> +                       { 0x0072, 0x0001 },
-> +                       { 0x2142, 0x0001 },
-> +                       { 0x40a2, 0x0001 },
-> +               },
-> +       },  {
-> +               73600000, {
-> +                       { 0x0072, 0x0001 },
-> +                       { 0x2142, 0x0001 },
-> +                       { 0x4061, 0x0002 },
-> +               },
-> +       },  {
-> +               92000000, {
-> +                       { 0x0072, 0x0001 },
-> +                       { 0x2145, 0x0002 },
-> +                       { 0x4061, 0x0002 },
-> +               },
-> +       },  {
-> +               122666000, {
-> +                       { 0x0051, 0x0002 },
-> +                       { 0x2145, 0x0002 },
-> +                       { 0x4061, 0x0002 },
-> +               },
-> +       },  {
-> +               147200000, {
-> +                       { 0x0051, 0x0002 },
-> +                       { 0x2145, 0x0002 },
-> +                       { 0x4064, 0x0003 },
-> +               },
-> +       },  {
-> +               184000000, {
-> +                       { 0x0051, 0x0002 },
-> +                       { 0x214c, 0x0003 },
-> +                       { 0x4064, 0x0003 },
-> +               },
-> +       },  {
-> +               226666000, {
-> +                       { 0x0040, 0x0003 },
-> +                       { 0x214c, 0x0003 },
-> +                       { 0x4064, 0x0003 },
-> +               },
-> +       },  {
-> +               272000000, {
-> +                       { 0x0040, 0x0003 },
-> +                       { 0x214c, 0x0003 },
-> +                       { 0x5a64, 0x0003 },
-> +               },
-> +       },  {
-> +               340000000, {
-> +                       { 0x0040, 0x0003 },
-> +                       { 0x3b4c, 0x0003 },
-> +                       { 0x5a64, 0x0003 },
-> +               },
-> +       },  {
-> +               600000000, {
-> +                       { 0x1a40, 0x0003 },
-> +                       { 0x3b4c, 0x0003 },
-> +                       { 0x5a64, 0x0003 },
-> +               },
-> +       }, {
-> +               ~0UL, {
-> +                       { 0x0000, 0x0000 },
-> +                       { 0x0000, 0x0000 },
-> +                       { 0x0000, 0x0000 },
-> +               },
-> +       }
-> +};
-> +
-> +static const struct dw_hdmi_curr_ctrl sun50i_h6_cur_ctr[] = {
-> +       /* pixelclk    bpp8    bpp10   bpp12 */
-> +       { 25175000,  { 0x0000, 0x0000, 0x0000 }, },
-> +       { 27000000,  { 0x0012, 0x0000, 0x0000 }, },
-> +       { 59400000,  { 0x0008, 0x0008, 0x0008 }, },
-> +       { 72000000,  { 0x0008, 0x0008, 0x001b }, },
-> +       { 74250000,  { 0x0013, 0x0013, 0x0013 }, },
-> +       { 90000000,  { 0x0008, 0x001a, 0x001b }, },
-> +       { 118800000, { 0x001b, 0x001a, 0x001b }, },
-> +       { 144000000, { 0x001b, 0x001a, 0x0034 }, },
-> +       { 180000000, { 0x001b, 0x0033, 0x0034 }, },
-> +       { 216000000, { 0x0036, 0x0033, 0x0034 }, },
-> +       { 237600000, { 0x0036, 0x0033, 0x001b }, },
-> +       { 288000000, { 0x0036, 0x001b, 0x001b }, },
-> +       { 297000000, { 0x0019, 0x001b, 0x0019 }, },
-> +       { 330000000, { 0x0036, 0x001b, 0x001b }, },
-> +       { 600000000, { 0x003f, 0x001b, 0x001b }, },
-> +       { ~0UL,      { 0x0000, 0x0000, 0x0000 }, }
-> +};
-> +
-> +static const struct dw_hdmi_phy_config sun50i_h6_phy_config[] = {
-> +       /*pixelclk   symbol   term   vlev*/
-> +       { 74250000,  0x8009, 0x0004, 0x0232},
-> +       { 148500000, 0x8029, 0x0004, 0x0273},
-> +       { 600000000, 0x8039, 0x0004, 0x014a},
-> +       { ~0UL,      0x0000, 0x0000, 0x0000}
-> +};
-> +
->  static int sun8i_hdmi_phy_config_a83t(struct dw_hdmi *hdmi,
->                                       struct sun8i_hdmi_phy *phy,
->                                       unsigned int clk_rate)
-> @@ -290,6 +406,16 @@ static void sun8i_hdmi_phy_unlock(struct sun8i_hdmi_phy *phy)
->                      SUN8I_HDMI_PHY_UNSCRAMBLE_MAGIC);
->  }
->
-> +static void sun50i_hdmi_phy_init_h6(struct sun8i_hdmi_phy *phy)
-> +{
-> +       regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_REXT_CTRL_REG,
-> +                          SUN8I_HDMI_PHY_REXT_CTRL_REXT_EN,
-> +                          SUN8I_HDMI_PHY_REXT_CTRL_REXT_EN);
-> +
-> +       regmap_update_bits(phy->regs, SUN8I_HDMI_PHY_REXT_CTRL_REG,
-> +                          0xffff0000, 0x80c00000);
-> +}
-> +
->  static void sun8i_hdmi_phy_init_a83t(struct sun8i_hdmi_phy *phy)
->  {
->         sun8i_hdmi_phy_unlock(phy);
-> @@ -423,6 +549,13 @@ static const struct sun8i_hdmi_phy_variant sun50i_a64_hdmi_phy = {
->         .phy_config = &sun8i_hdmi_phy_config_h3,
->  };
->
-> +static const struct sun8i_hdmi_phy_variant sun50i_h6_hdmi_phy = {
-> +       .cur_ctr  = sun50i_h6_cur_ctr,
-> +       .mpll_cfg = sun50i_h6_mpll_cfg,
-> +       .phy_cfg  = sun50i_h6_phy_config,
-> +       .phy_init = &sun50i_hdmi_phy_init_h6,
-> +};
-> +
->  static const struct sun8i_hdmi_phy_variant sun8i_a83t_hdmi_phy = {
->         .is_custom_phy = true,
->         .phy_init = &sun8i_hdmi_phy_init_a83t,
-> @@ -443,6 +576,10 @@ static const struct of_device_id sun8i_hdmi_phy_of_table[] = {
->                 .compatible = "allwinner,sun50i-a64-hdmi-phy",
->                 .data = &sun50i_a64_hdmi_phy,
->         },
-> +       {
-> +               .compatible = "allwinner,sun50i-h6-hdmi-phy",
-> +               .data = &sun50i_h6_hdmi_phy,
-> +       },
->         {
->                 .compatible = "allwinner,sun8i-a83t-hdmi-phy",
->                 .data = &sun8i_a83t_hdmi_phy,
-> --
-> 2.18.0
->
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
