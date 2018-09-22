@@ -1,35 +1,39 @@
 From: linux.amoon@gmail.com (Anand Moon)
-Date: Sat, 22 Sep 2018 07:52:31 +0000
-Subject: [PATCHv4 0/6] Add support for UHS-I on Exynos5422 odroid boards
-Message-ID: <20180922075238.884-1-linux.amoon@gmail.com>
+Date: Sat, 22 Sep 2018 07:52:34 +0000
+Subject: [PATCHv4 2/6] ARM: dts: exynos: fix regulator min values of LDO13 for
+ Odroid XU3/XU4
+In-Reply-To: <20180922075238.884-1-linux.amoon@gmail.com>
+References: <20180922075238.884-1-linux.amoon@gmail.com>
+Message-ID: <20180922075238.884-4-linux.amoon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is series v4 since my previous patches were incomplete with driver
-changes missing.
+Looking at the schematic sd_2 min/max range from 1.8V/2.8V so fix the
+regulator min value to 1.8V. Without these changes sdcard will failed
+to detect on booting when UHS-I tuning is enabled.
 
-v4 changes.
-squash cd-gpios and wp-gpio changes into single patch.
-change the subject prefix to "ARM: dts: exynos:"
+Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+---
+[0] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/376262.html
+Fixed the commit message.
+drop the ramp-delay changes.
+drop the vmmc-supply/vqmmc-supply changes.
+---
+ arch/arm/boot/dts/exynos5422-odroid-core.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-These changes add UHS-I tuning for dw_mmc-exynos driver.
-
-Rebased on Krzysztof branch next/dt
-[0] git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git 
-
-Anand Moon (6):
-  ARM: dts: exynos: Added UHS-I bus speed support
-  ARM: dts: exynos: fix regulator min values of LDO13 for Odroid XU3/XU4
-  ARM: dts: exynos: update maximum frequency for sdcard to 200MHz
-  ARM: dts: exynos: Add CD and WP pins to Odroid XU3/XU4 SD card
-  ARM: dts: exynos: update maximum frequency for emmc to 200MHz
-  mmc: dw_mmc-exynos: Add tuning for sdr and ddr timing for USH-I mode
-
- arch/arm/boot/dts/exynos5420-pinctrl.dtsi          |  8 ++++++++
- arch/arm/boot/dts/exynos5422-odroid-core.dtsi      | 10 ++++++++--
- arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  1 +
- drivers/mmc/host/dw_mmc-exynos.c                   | 11 +++++++++++
- 4 files changed, 28 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm/boot/dts/exynos5422-odroid-core.dtsi b/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
+index 0508e6891f41..15ab380e5fcf 100644
+--- a/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
++++ b/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
+@@ -231,7 +231,7 @@
+ 
+ 			ldo13_reg: LDO13 {
+ 				regulator-name = "vddq_mmc2";
+-				regulator-min-microvolt = <2800000>;
++				regulator-min-microvolt = <1800000>;
+ 				regulator-max-microvolt = <2800000>;
+ 			};
+ 
 -- 
 2.17.1
