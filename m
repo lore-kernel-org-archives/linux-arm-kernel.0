@@ -1,46 +1,33 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sat, 22 Sep 2018 17:10:02 +0200
-Subject: [PATCH v2 4/5] ARM: dts: meson8b: add the RMII pins
+Date: Sat, 22 Sep 2018 17:10:00 +0200
+Subject: [PATCH v2 2/5] dt-bindings: arm: amlogic: Add the Endless Mobile
+ Endless Mini (EC-100)
 In-Reply-To: <20180922151003.4736-1-martin.blumenstingl@googlemail.com>
 References: <20180922151003.4736-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20180922151003.4736-5-martin.blumenstingl@googlemail.com>
+Message-ID: <20180922151003.4736-3-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some boards use an RMII Ethernet PHY which requires fewer pins than the
-RGMII PHYs. Add a separate eth_rmii_pins node which does not include the
-pins which are only required for RGMII (but not for RMII) PHYs.
+Add bindings documentation for the Endless Mini (EC-100) from Endless
+Mobile.
 
 Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm/boot/dts/meson8b.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ Documentation/devicetree/bindings/arm/amlogic.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
-index 4bbbbc6bea83..cd1ca9dda126 100644
---- a/arch/arm/boot/dts/meson8b.dtsi
-+++ b/arch/arm/boot/dts/meson8b.dtsi
-@@ -223,6 +223,21 @@
- 			};
- 		};
+diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
+index b5c2b5c35766..2c2eee206736 100644
+--- a/Documentation/devicetree/bindings/arm/amlogic.txt
++++ b/Documentation/devicetree/bindings/arm/amlogic.txt
+@@ -63,6 +63,7 @@ Board compatible values (alphabetically, grouped by SoC):
  
-+		eth_rmii_pins: eth-rmii {
-+			mux {
-+				groups = "eth_tx_en",
-+					 "eth_txd1_0",
-+					 "eth_txd0_0",
-+					 "eth_rx_clk",
-+					 "eth_rx_dv",
-+					 "eth_rxd1",
-+					 "eth_rxd0",
-+					 "eth_mdio_en",
-+					 "eth_mdc";
-+				function = "ethernet";
-+			};
-+		};
-+
- 		i2c_a_pins: i2c-a {
- 			mux {
- 				groups = "i2c_sda_a", "i2c_sck_a";
+   - "minix,neo-x8" (Meson8)
+ 
++  - "endless,ec100" (Meson8b)
+   - "hardkernel,odroid-c1" (Meson8b)
+   - "tronfy,mxq" (Meson8b)
+ 
 -- 
 2.19.0
