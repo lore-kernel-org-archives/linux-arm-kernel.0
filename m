@@ -1,129 +1,66 @@
-From: beagleboard@davidjohnsummers.uk (David Summers)
-Date: Sat, 22 Sep 2018 18:02:36 +0100
-Subject: [PATCH 3/3] This patch adds wifi to asus tinker board S
-In-Reply-To: <20180922170236.8690-1-beagleboard@davidjohnsummers.uk>
-References: <20180922170236.8690-1-beagleboard@davidjohnsummers.uk>
-Message-ID: <20180922170236.8690-4-beagleboard@davidjohnsummers.uk>
+From: saiprakash.ranjan@codeaurora.org (Sai Prakash Ranjan)
+Date: Sat, 22 Sep 2018 23:02:37 +0530
+Subject: [PATCH 2/6] pstore: Add event tracing support
+In-Reply-To: <e8fdef37-afcd-24b3-1005-e707b73f20b1@codeaurora.org>
+References: <cover.1536430404.git.saiprakash.ranjan@codeaurora.org>
+ <b9b60ff2864a17fb05481aa33f90114ab051d6ce.1536430404.git.saiprakash.ranjan@codeaurora.org>
+ <CAEXW_YRXQwKvnahv5X1F_Bu_98vMg=w1xpo8PZ+aNT02vBrwwg@mail.gmail.com>
+ <e8fdef37-afcd-24b3-1005-e707b73f20b1@codeaurora.org>
+Message-ID: <ab7c17a6-c853-d763-1f12-1c169ff7a579@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now as fair as I understand. the asus tinker board contains a wifi
-So should this patch be added to the tinker board dtsi ?
+On 9/22/2018 10:07 PM, Sai Prakash Ranjan wrote:
+> On 9/22/2018 2:35 PM, Joel Fernandes wrote:
+>> On Sat, Sep 8, 2018 at 4:28 PM Sai Prakash Ranjan
+>> <saiprakash.ranjan@codeaurora.org> wrote:
+>>>
+>> Could you just split the pstore space into a per-cpu event buffer like
+>> we are doing for ftrace-on-pstore? Then you don't need to lock. I fear
+>> the lock contention will be apparent. The pstore code already has
+>> plumbing to split the store buffer per CPU.
+>>
+> 
+> Hi Joel,
+> 
+> Thanks a lot for reviewing.
+> 
+> I just looked at per-cpu buffer for ftrace and itseems the pstore percpu 
+> records will need to be merged into one record if we add this support 
+> for events. Merging of ftrace logs is based on timestamp, but for events 
+> we do not have timestamp field (for this specific reason I have added 
+> timestamp field for IO event tracing so that atleast we can know the cpu 
+> number in pstore output). For example, the sched event pstore output 
+> below has no timestamp field, so how do we merge per-cpu logs?
+> 
+> # tail /sys/fs/pstore/event-ramoops-0
+> sched_waking: comm=rcu_sched pid=11 prio=120 target_cpu=002
+> sched_wakeup: comm=rcu_sched pid=11 prio=120 target_cpu=002
+> 
+> Also Pstore ftrace log format is fixed i.e.,(CPU:%d ts:%llu %08lx? %08lx 
+>  ?%pf <- %pF\n"), but different events will have different formats and 
+> we will not be able to add timestamp field like how pstore ftrace does 
+> using? pstore_ftrace_write_timestamp() and pstore_ftrace_read_timestamp().
+> 
+> Sorry if I am confusing you, I can explain better I guess.
+> 
 
-It also far move complex - it adds far more things, so consider
+To add to this on db410c board with the current patch I just measured 
+average throughput of dd over 60 seconds with sched event tracing 
+enabled (trace_event=sched tp_pstore) : 190 MB/s
 
-Signed-off-by: David Summers <beagleboard@davidjohnsummers.uk>
----
- arch/arm/boot/dts/rk3288-tinker-s.dts | 93 +++++++++++++++++++++++++++
- 1 file changed, 93 insertions(+)
+# dd if=/dev/zero of=/dev/null status=progress
+11402907648 bytes (11 GB, 11 GiB) copied, 60 s, 190 MB/s^C
+22430312+0 records in
+22430312+0 records out
+11484319744 bytes (11 GB, 11 GiB) copied, 60.4277 s, 190 MB/s
 
-diff --git a/arch/arm/boot/dts/rk3288-tinker-s.dts b/arch/arm/boot/dts/rk3288-tinker-s.dts
-index bc691e3f9c07..3d91924fd8db 100644
---- a/arch/arm/boot/dts/rk3288-tinker-s.dts
-+++ b/arch/arm/boot/dts/rk3288-tinker-s.dts
-@@ -10,6 +10,95 @@
- / {
- 	model = "Rockchip RK3288 Asus Tinker Board S";
- 	compatible = "asus,rk3288-tinker-s", "rockchip,rk3288";
-+
-+	wireless-bluetooth {
-+		compatible = "bluetooth-platdata";
-+		uart_rts_gpios = <&gpio4 19 GPIO_ACTIVE_LOW>;
-+		pinctrl-names = "default","rts_gpio";
-+		pinctrl-0 = <&uart0_rts>;
-+		pinctrl-1 = <&uart0_gpios>;
-+		BT,reset_gpio    = <&gpio4 29 GPIO_ACTIVE_HIGH>;
-+		BT,wake_gpio     = <&gpio4 26 GPIO_ACTIVE_HIGH>;
-+		BT,wake_host_irq = <&gpio4 31 GPIO_ACTIVE_HIGH>;
-+		status = "okay";
-+	};
-+
-+	wireless-wlan {
-+		compatible = "wlan-platdata";
-+		rockchip,grf = <&grf>;
-+		wifi_chip_type = "ap6212";
-+		sdio_vref = <1800>;
-+		WIFI,host_wake_irq = <&gpio4 30 GPIO_ACTIVE_HIGH>;
-+		status = "okay";
-+	};
-+
-+	io-domains {
-+		compatible = "rockchip,rk3288-io-voltage-domain";
-+		rockchip,grf = <&grf>;
-+		flash0-supply = <&vcc_flash>;
-+		gpio30-supply = <&vcc_io>;
-+		wifi-supply = <&vcc_18>;
-+		sdcard-supply = <&vccio_sd>;
-+	};
-+
-+	sdio_pwrseq: sdio-pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		clocks = <&rk808 1>;
-+		clock-names = "ext_clock";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&chip_enable_h>, <&wifi_enable_h>;
-+
-+		/*
-+		 * On the module itself this is one of these (depending
-+		 * on the actual card populated):
-+		 * - SDIO_RESET_L_WL_REG_ON
-+		 * - PDN (power down when low)
-+		 */
-+		reset-gpios = <&gpio4 28 GPIO_ACTIVE_LOW>, <&gpio4 27 GPIO_ACTIVE_LOW>;
-+	};
-+
-+	vcc_flash: flash-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_flash";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		vin-supply = <&vcc_io>;
-+	};
-+};
-+
-+&pinctrl {
-+	sdio-pwrseq {
-+		wifi_enable_h: wifi-enable-h {
-+			rockchip,pins = <4 28 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+		chip_enable_h: chip-enable-h {
-+			rockchip,pins = <4 27 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+
-+	wireless-bluetooth {
-+		uart0_gpios: uart0-gpios {
-+			rockchip,pins = <4 19 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+};
-+
-+&sdio0 {
-+	status = "okay";
-+	clock-frequency = <50000000>;
-+	clock-freq-min-max = <200000 50000000>;
-+	bus-width = <4>;
-+	cap-sd-highspeed;
-+	cap-sdio-irq;
-+	disable-wp;
-+	keep-power-in-suspend;
-+	mmc-pwrseq = <&sdio_pwrseq>;
-+	non-removable;
-+	num-slots = <1>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sdio0_bus4 &sdio0_cmd &sdio0_clk>;
-+	sd-uhs-sdr104;
-+	supports-sdio;
- };
- 
- &emmc {
-@@ -25,3 +114,7 @@
- 	mmc-ddr-1_8v;
- 	status = "okay";
- };
-+
-+&uart0 {
-+	pinctrl-0 = <&uart0_xfer>, <&uart0_cts>;
-+};
+It seems fine or maybe I am testing it wrongly? Anyways let me know if I 
+can test any additional things in some different ways.
+
+Thanks,
+Sai
+
 -- 
-David Summers <beagleboard@davididjohnsummers.uk>
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
