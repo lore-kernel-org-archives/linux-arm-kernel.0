@@ -1,31 +1,72 @@
 From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Sat, 22 Sep 2018 20:17:08 +0200
-Subject: [PATCH 5/6] arm64: marvell: enable the  Armada 7K/8K CPU clk driver
+Date: Sat, 22 Sep 2018 20:17:09 +0200
+Subject: [PATCH 6/6] arm64: dts: marvell: Add cpu clock node on Armada 7K/8K
 In-Reply-To: <20180922181709.13007-1-gregory.clement@bootlin.com>
 References: <20180922181709.13007-1-gregory.clement@bootlin.com>
-Message-ID: <20180922181709.13007-6-gregory.clement@bootlin.com>
+Message-ID: <20180922181709.13007-7-gregory.clement@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit makes sure the driver for the Armada 7K/8K CPU clock is
-enabled.
+Add cpu clock node on AP
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 ---
- arch/arm64/Kconfig.platforms | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi | 4 ++++
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi      | 6 ++++++
+ 2 files changed, 10 insertions(+)
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 393d2b524284..cf6888ecd9f4 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -119,6 +119,7 @@ config ARCH_MESON
+diff --git a/arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi
+index 64632c873888..f2fd777d1944 100644
+--- a/arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi
+@@ -21,6 +21,7 @@
+ 			reg = <0x000>;
+ 			enable-method = "psci";
+ 			cpu-idle-states = <&CPU_SLEEP_0>;
++			clocks = <&cpu_clk 0>;
+ 		};
+ 		cpu1: cpu at 1 {
+ 			device_type = "cpu";
+@@ -28,6 +29,7 @@
+ 			reg = <0x001>;
+ 			enable-method = "psci";
+ 			cpu-idle-states = <&CPU_SLEEP_0>;
++			clocks = <&cpu_clk 0>;
+ 		};
+ 		cpu2: cpu at 100 {
+ 			device_type = "cpu";
+@@ -35,6 +37,7 @@
+ 			reg = <0x100>;
+ 			enable-method = "psci";
+ 			cpu-idle-states = <&CPU_SLEEP_0>;
++			clocks = <&cpu_clk 1>;
+ 		};
+ 		cpu3: cpu at 101 {
+ 			device_type = "cpu";
+@@ -42,6 +45,7 @@
+ 			reg = <0x101>;
+ 			enable-method = "psci";
+ 			cpu-idle-states = <&CPU_SLEEP_0>;
++			clocks = <&cpu_clk 1>;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+index 4a65e4e830aa..27c840e91abe 100644
+--- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+@@ -280,6 +280,12 @@
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
  
- config ARCH_MVEBU
- 	bool "Marvell EBU SoC Family"
-+	select ARMADA_AP_CPU_CLK
- 	select ARMADA_AP806_SYSCON
- 	select ARMADA_CP110_SYSCON
- 	select ARMADA_37XX_CLK
++				cpu_clk: clock-cpu {
++					compatible = "marvell,ap806-cpu-clock";
++					clocks = <&ap_clk 0>, <&ap_clk 1>;
++					#clock-cells = <1>;
++				};
++
+ 				ap_thermal: thermal-sensor at 80 {
+ 					compatible = "marvell,armada-ap806-thermal";
+ 					reg = <0x80 0x10>;
 -- 
 2.19.0
