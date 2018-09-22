@@ -1,61 +1,84 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 22 Sep 2018 11:31:23 +0100
-Subject: [PATCH 1/2] iio: adc: at91: fix acking DRDY irq on simple
- conversions
-In-Reply-To: <1537447238-18674-1-git-send-email-eugen.hristev@microchip.com>
-References: <1537447238-18674-1-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <20180922113123.2c8da044@archlinux>
+Date: Sat, 22 Sep 2018 11:36:16 +0100
+Subject: [PATCH 2/2] iio: adc: at91: fix wrong channel number in
+ triggered buffer mode
+In-Reply-To: <201809211544.zop1vk8B%fengguang.wu@intel.com>
+References: <1537447238-18674-2-git-send-email-eugen.hristev@microchip.com>
+ <201809211544.zop1vk8B%fengguang.wu@intel.com>
+Message-ID: <20180922113616.2d849fb0@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Sep 2018 15:40:37 +0300
-Eugen Hristev <eugen.hristev@microchip.com> wrote:
+On Fri, 21 Sep 2018 15:26:03 +0800
+kbuild test robot <lkp@intel.com> wrote:
 
-> When doing simple conversions, the driver did not acknowledge the DRDY irq.
-> If this irq is not acked, it will be left pending, and as soon as a trigger
-> is enabled, the irq handler will be called, it doesn't know why this irq
-> has occurred because no channel is pending, and then we will have irq loop
-> and board will hang.
-> 
-> Fixes 0e589d5fb ("ARM: AT91: IIO: Add AT91 ADC driver.")
-> Cc: Maxime Ripard <maxime.ripard@bootlin.com>
-> Cc: <stable@vger.kernel.org>
-> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
-> ---
->  drivers/iio/adc/at91_adc.c | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-> index 44b5168..e85f859 100644
-> --- a/drivers/iio/adc/at91_adc.c
-> +++ b/drivers/iio/adc/at91_adc.c
-> @@ -712,6 +712,11 @@ static int at91_adc_read_raw(struct iio_dev *idev,
->  		at91_adc_writel(st, AT91_ADC_CHDR,
->  				AT91_ADC_CH(chan->channel));
->  		at91_adc_writel(st, AT91_ADC_IDR, BIT(chan->channel));
-> +		/*
-> +		 * we need to ack the DRDY irq, otherwise it will be
-> +		 * left pending and irq handler will be confused
-> +		 */
-> +		at91_adc_readl(st, AT91_ADC_LCDR);
+> Hi Eugen,
+This one is leaving me stumped...
 
-I'm curious as to how things were working before.  Does this only occur
-if we do a raw_read whilst the buffer is enabled?
+Anyone care to point out what I'm missing that is wrong here?
 
-I would have assumed when it's not enabled, the irq would be masked and
-never generated in the first place...
-
-It may be that what we actually need to do is to prevent read_raw accesses
-when the buffer is enabled (like lots of other drivers do precisely to
-avoid this sort of condition). The problem there comes if we have
-existing applications doing this combination as we are then breaking
-userspace. If that's the case we'll need to be a bit more clever.
-
-Hammering down an irq state in a non irq handling path isn't a good
-solution.
+Also Eugen, please don't cc stable on a patch directly.  It is fine to send
+a backport request once a patch has hit mainline, but before that it's just
+adding noise to a list as they won't take it directly anyway.
 
 Jonathan
 
->  
->  		st->last_value = 0;
->  		st->done = false;
+> 
+> I love your patch! Perhaps something to improve:
+> 
+> [auto build test WARNING on iio/togreg]
+> [also build test WARNING on v4.19-rc4 next-20180919]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> 
+> url:    https://github.com/0day-ci/linux/commits/Eugen-Hristev/iio-adc-at91-fix-acking-DRDY-irq-on-simple-conversions/20180920-215908
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/jic23/iio.git togreg
+> config: arm-allmodconfig (attached as .config)
+> compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+> reproduce:
+>         wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         GCC_VERSION=7.2.0 make.cross ARCH=arm 
+> 
+> All warnings (new ones prefixed by >>):
+> 
+>    drivers/iio/adc/at91_adc.c: In function 'at91_adc_trigger_handler':
+> >> drivers/iio/adc/at91_adc.c:257:8: warning: assignment discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]  
+>       chan = idev->channels + i;
+>            ^
+> 
+> vim +/const +257 drivers/iio/adc/at91_adc.c
+> 
+>    245	
+>    246	static irqreturn_t at91_adc_trigger_handler(int irq, void *p)
+>    247	{
+>    248		struct iio_poll_func *pf = p;
+>    249		struct iio_dev *idev = pf->indio_dev;
+>    250		struct at91_adc_state *st = iio_priv(idev);
+>    251		struct iio_chan_spec *chan;
+>    252		int i, j = 0;
+>    253	
+>    254		for (i = 0; i < idev->masklength; i++) {
+>    255			if (!test_bit(i, idev->active_scan_mask))
+>    256				continue;
+>  > 257			chan = idev->channels + i;  
+>    258			st->buffer[j] = at91_adc_readl(st, AT91_ADC_CHAN(st, chan->channel));
+>    259			j++;
+>    260		}
+>    261	
+>    262		iio_push_to_buffers_with_timestamp(idev, st->buffer, pf->timestamp);
+>    263	
+>    264		iio_trigger_notify_done(idev->trig);
+>    265	
+>    266		/* Needed to ACK the DRDY interruption */
+>    267		at91_adc_readl(st, AT91_ADC_LCDR);
+>    268	
+>    269		enable_irq(st->irq);
+>    270	
+>    271		return IRQ_HANDLED;
+>    272	}
+>    273	
+> 
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
