@@ -1,32 +1,20 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sat, 22 Sep 2018 22:11:41 +0200
-Subject: [PATCH] soc: actions: Update SPS help text for S700
-In-Reply-To: <20180624140108.13505-1-afaerber@suse.de>
-References: <62ef1835-8db9-f1e8-53b9-4cd74b5d416d@suse.de>
- <20180624140108.13505-1-afaerber@suse.de>
-Message-ID: <0a574d0f-a2c3-b714-61d5-c26b12beae51@suse.de>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sat, 22 Sep 2018 22:52:01 +0200
+Subject: [PATCH v2] arm64: dts: rockchip: add spdif sound node for rock64
+In-Reply-To: <20180917122633.31401-1-katsuhiro@katsuster.net>
+References: <20180917122633.31401-1-katsuhiro@katsuster.net>
+Message-ID: <1969493.RLLmHdtvR4@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 24.06.18 um 16:01 schrieb Andreas F?rber:
-> Commit 3ad85b08f7789d51e6aad0f535296d1c31e319b9 (soc: actions: sps: Add S700)
-> added S700 support to the SPS driver but forget to update Kconfig help.
+Am Montag, 17. September 2018, 14:26:33 CEST schrieb Katsuhiro Suzuki:
+> This patch adds sound card node for rock64. Currently we can support
+> S/PDIF only. It seems the lack of codec driver of rk3328 to enable
+> analog audio out.
 > 
-> Add missing S700 mention, in preparation for further SoCs.
-> 
-> Fixes: 3ad85b08f778 ("soc: actions: sps: Add S700")
-> Reported-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  drivers/soc/actions/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> Signed-off-by: Katsuhiro Suzuki <katsuhiro@katsuster.net>
 
-Applied to v4.20/drivers branch.
+applied for 4.20
 
-Regards,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Thanks
+Heiko
