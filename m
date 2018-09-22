@@ -1,59 +1,27 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Fri, 21 Sep 2018 15:42:09 +0200
-Subject: [PATCH] ARM: dts: clearfog: fix sdhci supply property name
-In-Reply-To: <606cef37c2776bdc7dfa3ef578a18c40004e17af.1534878753.git.baruch@tkos.co.il>
- (Baruch Siach's message of "Tue, 21 Aug 2018 22:12:33 +0300")
-References: <606cef37c2776bdc7dfa3ef578a18c40004e17af.1534878753.git.baruch@tkos.co.il>
-Message-ID: <871s9nhsr2.fsf@bootlin.com>
+From: nava.manne@xilinx.com (Nava kishore Manne)
+Date: Sat, 22 Sep 2018 19:11:46 +0530
+Subject: [RFC PATCH v3 0/3] Add nvmem driver support for ZynqMP
+Message-ID: <20180922134149.5693-1-nava.manne@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
- 
- On mar., ao?t 21 2018, Baruch Siach <baruch@tkos.co.il> wrote:
+This series of patches are created On top of the
+below series of patches.
+https://lkml.org/lkml/2018/8/3/687 
 
-> The vmmc phandle, like all power supply property names, must have the
-> '-supply' suffix.
->
+Nava kishore Manne (3):
+  firmware: xilinx: Add zynqmp_pm_get_chipid() API
+  dt-bindings: fpga: Add bindings for ZynqMP nvmem driver
+  nvmem: zynqmp: Added zynqmp nvmem firmware driver
 
-I also noticed it a few months ago and then I forgot. However, does it
-add any value to have this regulator?
-
-Now that I found my note, I considered to just remove this line as well
-as the regulator node.
-
-What do you think ?
-
-Gregory
-
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> ---
->  arch/arm/boot/dts/armada-388-clearfog.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/armada-388-clearfog.dtsi b/arch/arm/boot/dts/armada-388-clearfog.dtsi
-> index 7c6ad2afb094..1b0d0680c8b6 100644
-> --- a/arch/arm/boot/dts/armada-388-clearfog.dtsi
-> +++ b/arch/arm/boot/dts/armada-388-clearfog.dtsi
-> @@ -48,7 +48,7 @@
->  					     &clearfog_sdhci_cd_pins>;
->  				pinctrl-names = "default";
->  				status = "okay";
-> -				vmmc = <&reg_3p3v>;
-> +				vmmc-supply = <&reg_3p3v>;
->  				wp-inverted;
->  			};
->  
-> -- 
-> 2.18.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ .../firmware/xilinx/xlnx,zynqmp-firmware.txt  | 35 ++++++++
+ drivers/firmware/xilinx/zynqmp.c              | 24 ++++++
+ drivers/nvmem/Kconfig                         | 10 +++
+ drivers/nvmem/Makefile                        |  2 +
+ drivers/nvmem/zynqmp_nvmem.c                  | 86 +++++++++++++++++++
+ include/linux/firmware/xlnx-zynqmp.h          |  2 +
+ 6 files changed, 159 insertions(+)
+ create mode 100644 drivers/nvmem/zynqmp_nvmem.c
 
 -- 
-Gregory Clement, Bootlin
-Embedded Linux and Kernel engineering
-http://bootlin.com
+2.18.0
