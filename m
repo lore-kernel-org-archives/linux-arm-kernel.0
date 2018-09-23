@@ -1,46 +1,44 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 23 Sep 2018 17:23:51 +0200
-Subject: [PATCH v2 2/7] dt-bindings: add power-domain header for RK3066 SoCs
+Date: Sun, 23 Sep 2018 17:23:52 +0200
+Subject: [PATCH v2 3/7] dt-bindings: add compatibles for rk3066/rk3188 power
+ controllers
 In-Reply-To: <20180923152356.30154-1-heiko@sntech.de>
 References: <20180923152356.30154-1-heiko@sntech.de>
-Message-ID: <20180923152356.30154-3-heiko@sntech.de>
+Message-ID: <20180923152356.30154-4-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add rk3066 power-domains as described by the TRM.
+Add the compatible values for the power-domain controllers found on
+rk3066 and rk3188.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- include/dt-bindings/power/rk3066-power.h | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
- create mode 100644 include/dt-bindings/power/rk3066-power.h
+ .../devicetree/bindings/soc/rockchip/power_domain.txt         | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/include/dt-bindings/power/rk3066-power.h b/include/dt-bindings/power/rk3066-power.h
-new file mode 100644
-index 000000000000..dd9bbd35c274
---- /dev/null
-+++ b/include/dt-bindings/power/rk3066-power.h
-@@ -0,0 +1,21 @@
-+#ifndef __DT_BINDINGS_POWER_RK3066_POWER_H__
-+#define __DT_BINDINGS_POWER_RK3066_POWER_H__
-+
-+/* VD_CORE */
-+#define RK3066_PD_A9_0		0
-+#define RK3066_PD_A9_1		1
-+#define RK3066_PD_DBG		4
-+#define RK3066_PD_SCU		5
-+
-+/* VD_LOGIC */
-+#define RK3066_PD_VIDEO		6
-+#define RK3066_PD_VIO		7
-+#define RK3066_PD_GPU		8
-+#define RK3066_PD_PERI		9
-+#define RK3066_PD_CPU		10
-+#define RK3066_PD_ALIVE		11
-+
-+/* VD_PMU */
-+#define RK3066_PD_RTC		12
-+
-+#endif
+diff --git a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+index 5d49d0a2ff29..8304eceb62e4 100644
+--- a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
++++ b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+@@ -7,7 +7,9 @@ Required properties for power domain controller:
+ - compatible: Should be one of the following.
+ 	"rockchip,px30-power-controller" - for PX30 SoCs.
+ 	"rockchip,rk3036-power-controller" - for RK3036 SoCs.
++	"rockchip,rk3066-power-controller" - for RK3066 SoCs.
+ 	"rockchip,rk3128-power-controller" - for RK3128 SoCs.
++	"rockchip,rk3188-power-controller" - for RK3188 SoCs.
+ 	"rockchip,rk3228-power-controller" - for RK3228 SoCs.
+ 	"rockchip,rk3288-power-controller" - for RK3288 SoCs.
+ 	"rockchip,rk3328-power-controller" - for RK3328 SoCs.
+@@ -23,7 +25,9 @@ Required properties for power domain sub nodes:
+ - reg: index of the power domain, should use macros in:
+ 	"include/dt-bindings/power/px30-power.h" - for PX30 type power domain.
+ 	"include/dt-bindings/power/rk3036-power.h" - for RK3036 type power domain.
++	"include/dt-bindings/power/rk3066-power.h" - for RK3066 type power domain.
+ 	"include/dt-bindings/power/rk3128-power.h" - for RK3128 type power domain.
++	"include/dt-bindings/power/rk3188-power.h" - for RK3188 type power domain.
+ 	"include/dt-bindings/power/rk3228-power.h" - for RK3228 type power domain.
+ 	"include/dt-bindings/power/rk3288-power.h" - for RK3288 type power domain.
+ 	"include/dt-bindings/power/rk3328-power.h" - for RK3328 type power domain.
 -- 
 2.18.0
