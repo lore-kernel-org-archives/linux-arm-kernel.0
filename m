@@ -1,41 +1,35 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 23 Sep 2018 06:29:16 -0700
-Subject: [GIT PULL] arm64: dts: juno: updates for v4.20
-In-Reply-To: <20180918111752.GB23868@e107155-lin>
-References: <20180918111752.GB23868@e107155-lin>
-Message-ID: <20180923132916.npk2nwd3yh6tbh2a@localhost>
+Date: Sun, 23 Sep 2018 06:28:34 -0700
+Subject: [GIT PULL 3/3] Broadcom devicetree-arm64 changes for 4.20
+In-Reply-To: <20180914235928.20551-3-f.fainelli@gmail.com>
+References: <20180914235928.20551-1-f.fainelli@gmail.com>
+ <20180914235928.20551-3-f.fainelli@gmail.com>
+Message-ID: <20180923132834.py7mhe2ikjwjnoje@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2018 at 12:17:53PM +0100, Sudeep Holla wrote:
-> Hi ARM-SoC team,
-> 
-> Please pull !
-> 
-> Regards,
-> Sudeep
-> 
-> --
-> 
+On Fri, Sep 14, 2018 at 04:59:28PM -0700, Florian Fainelli wrote:
 > The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 > 
 >   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
 > 
-> are available in the git repository at:
+> are available in the Git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/juno-updates-4.20
+>   https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.20/devicetree-arm64
 > 
-> for you to fetch changes up to 79daf2a4089f6a817e5e0202362cdc764b535561:
+> for you to fetch changes up to 7cdbe45da1a189e744e6801aebb462ee47235580:
 > 
->   arm64: dts: juno: Enable coresight tmc scatter gather in ETR (2018-09-11 11:41:28 +0100)
+>   arm64: dts: broadcom: Fix I2C and SPI bus warnings (2018-09-13 15:05:47 -0700)
 > 
 > ----------------------------------------------------------------
-> ARMv8 Juno/Vexpress updates for v4.20
+> This pull request contains Broadcom ARM64-based SoCs Device Tree changes
+> for 4.20, please pull the following:
 > 
-> 1. Enablement of scatter gather mode for CoreSight TMC-ETR routing
+> - Stefan provides a reference to the Compute Module IO Board V3 such
+>   that we can reference the arm counterpart and still build it for arm64
 > 
-> 2. Usage of updated coresight graph bindings that eliminates loads of
->    dtc warnings
+> - Rob fixes I2C and SPI bus warnings which are going to show up with his
+>   update to DTC scheduled for 4.20
 
 Merged, thanks!
 
