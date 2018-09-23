@@ -1,28 +1,44 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 23 Sep 2018 06:54:31 -0700
-Subject: [PATCH] MAINTAINERS: Update stm32 entry
-In-Reply-To: <1537540143-8177-1-git-send-email-alexandre.torgue@st.com>
-References: <1537540143-8177-1-git-send-email-alexandre.torgue@st.com>
-Message-ID: <20180923135431.arpr4tsi6g2244qj@localhost>
+From: qader.aymen@gmail.com (Aymen Qader)
+Date: Sun, 23 Sep 2018 15:06:18 +0100
+Subject: [PATCH v2 3/5] staging: vc04_services: Add spaces after commas
+In-Reply-To: <20180923140620.14583-1-qader.aymen@gmail.com>
+References: <20180923140620.14583-1-qader.aymen@gmail.com>
+Message-ID: <20180923140620.14583-4-qader.aymen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2018 at 04:29:03PM +0200, Alexandre Torgue wrote:
-> From: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-> 
-> Add mailing list for stm32 architecture.
-> Add "stm" pattern to not miss some drivers/directories when asking for maintainers.
-> 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
-> 
-> ---
-> 
-> Hi Arnd, Olof and Kevin,
-> 
-> Can you please merge this patch for v4.20?
+This patch fixes the checkpatch.pl error:
 
-Applied, thanks!
+ERROR: space required after that ','
 
+in the interface/vchi directory
 
--Olof
+Signed-off-by: Aymen Qader <qader.aymen@gmail.com>
+---
+ drivers/staging/vc04_services/interface/vchi/vchi.h | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/staging/vc04_services/interface/vchi/vchi.h b/drivers/staging/vc04_services/interface/vchi/vchi.h
+index cb2582a4eb6a..d8e660240a44 100644
+--- a/drivers/staging/vc04_services/interface/vchi/vchi.h
++++ b/drivers/staging/vc04_services/interface/vchi/vchi.h
+@@ -92,14 +92,14 @@ typedef struct vchi_msg_vector_ex {
+ } VCHI_MSG_VECTOR_EX_T;
+ 
+ // Construct an entry in a msg vector for a pointer (p) of length (l)
+-#define VCHI_VEC_POINTER(p,l)  VCHI_VEC_POINTER, { { (VCHI_MEM_HANDLE_T)(p), (l) } }
++#define VCHI_VEC_POINTER(p, l)  VCHI_VEC_POINTER, { { (VCHI_MEM_HANDLE_T)(p), (l) } }
+ 
+ // Construct an entry in a msg vector for a message handle (h), starting at offset (o) of length (l)
+-#define VCHI_VEC_HANDLE(h,o,l) VCHI_VEC_HANDLE,  { { (h), (o), (l) } }
++#define VCHI_VEC_HANDLE(h, o, l) VCHI_VEC_HANDLE,  { { (h), (o), (l) } }
+ 
+ // Macros to manipulate 'FOURCC' values
+ #define MAKE_FOURCC(x) ((int32_t)((x[0] << 24) | (x[1] << 16) | (x[2] << 8) | x[3]))
+-#define FOURCC_TO_CHAR(x) (x >> 24) & 0xFF,(x >> 16) & 0xFF,(x >> 8) & 0xFF, x & 0xFF
++#define FOURCC_TO_CHAR(x) (x >> 24) & 0xFF, (x >> 16) & 0xFF, (x >> 8) & 0xFF, x & 0xFF
+ 
+ // Opaque service information
+ struct opaque_vchi_service_t;
+-- 
+2.17.1
