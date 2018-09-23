@@ -1,28 +1,43 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 23 Sep 2018 05:34:38 -0700
-Subject: [PATCH 0/2] STM32: Fixes for 4.19 cycle
-In-Reply-To: <1537461257-2940-1-git-send-email-alexandre.torgue@st.com>
-References: <1537461257-2940-1-git-send-email-alexandre.torgue@st.com>
-Message-ID: <20180923123438.kyvxpeqq6q6xo6cs@localhost>
+Date: Sun, 23 Sep 2018 06:06:32 -0700
+Subject: [GIT PULL] soc/fsl drivers updates for next(v4.20)
+In-Reply-To: <20180920170634.32046-1-leoyang.li@nxp.com>
+References: <20180920170634.32046-1-leoyang.li@nxp.com>
+Message-ID: <20180923130632.uhcjl347goqxeutd@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
-
-On Thu, Sep 20, 2018 at 06:34:15PM +0200, Alexandre Torgue wrote:
-> Hi Arnd, olof and Kevin
+On Thu, Sep 20, 2018 at 12:06:34PM -0500, Li Yang wrote:
+> Hi arm-soc maintainers,
 > 
-> Those 2 patches fixe the same issue on 4.19-rc: a bad usage of the mdma
-> binding inside stm32mp157c.dts file. Can you please add them as fixe for 4.19 ?
+> Please merge the following updates for soc/fsl drivers.
+> 
+> Regards,
+> Leo
+> 
+> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+> 
+>   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+> 
+> are available in the Git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/leo/linux.git tags/soc-fsl-for-next-4.20
+> 
+> for you to fetch changes up to afa86d264a7ce62ba214bc7c6012e2129141421e:
+> 
+>   soc: fsl: dpio: remove redundant pointer 'priv' (2018-08-30 12:19:02 -0500)
+> 
+> ----------------------------------------------------------------
+> soc/fsl for next
 
-The patches only mention removing unused property contents, not what the bug is
-that it fixes (or if it's even causing any problems). Care you clarify?
+Hi,
 
-If it's just fixing inaccurate DT that isn't used, then it's not something we
-urgently need to fix in 4.19 and it can wait for 4.20.
+My feedback here is the same as for the fixes pull request; please provide
+another level of detail of what is in the pull request.
 
+(Not merged, please respin with new tag description).
 
-Thanks,
+Thanks!
 
 
 -Olof
