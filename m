@@ -1,46 +1,49 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 23 Sep 2018 06:33:12 -0700
-Subject: [GIT PULL] ARM: aspeed: dts changes for 4.20
-In-Reply-To: <CACPK8XfwK85_os-Kjqvkwp-V8YqV3JDPZEepdgXNA+6ievOLSQ@mail.gmail.com>
-References: <CACPK8XfwK85_os-Kjqvkwp-V8YqV3JDPZEepdgXNA+6ievOLSQ@mail.gmail.com>
-Message-ID: <20180923133312.jdxydkcmyxa5h3tf@localhost>
+Date: Sun, 23 Sep 2018 06:32:08 -0700
+Subject: [GIT PULL] arm64: dts: TI AM65x changes for 4.20
+In-Reply-To: <404ebcc1-7e8c-c505-a6ac-10a94f6bd608@ti.com>
+References: <404ebcc1-7e8c-c505-a6ac-10a94f6bd608@ti.com>
+Message-ID: <20180923133208.zwuxw5jpjq24afm3@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Sep 19, 2018 at 09:54:08PM +0300, Tero Kristo wrote:
+> Hi ARM-SoC team,
+> 
+> Here are the TI AM65x DTS changes towards 4.20 merge window. Applied on top
+> of 4.19-rc2 basically just because of some testing considerations, please
+> let me know if that is not fine.
 
-On Thu, Sep 20, 2018 at 06:18:09PM +0930, Joel Stanley wrote:
-> Hello ARM Maintainers,
+No worries - next/dt is already on -rc2 in this case. If in doubt, see what our
+for-next has as a base at the time. In general rc1-3 are fair game. Beyond
+that, it's on a case by case basis and ask if you're uncertain.
+
 > 
-> Here's the ASPEED device tree changes for 4.20. Please pull if they
-> look good. Thanks!
+> The following changes since commit 57361846b52bc686112da6ca5368d11210796804:
 > 
-> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+>   Linux 4.19-rc2 (2018-09-02 14:37:30 -0700)
 > 
->   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+> are available in the git repository at:
 > 
-> are available in the Git repository at:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kristo/linux
+> tags/am654-for-v4.20
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/joel/aspeed.git \
->     tags/aspeed-4.20-devicetree
+> for you to fetch changes up to 42e54f6467ecc25f464d74c0fcea0c9fab1c2e3b:
 > 
-> for you to fetch changes up to 3368e06e2a91a65cff59e520acc51b9adf4900bf:
-> 
->   ARM: dts: aspeed: Adding Facebook TiogaPass BMC (2018-09-20 17:25:48 +0930)
+>   arm64: dts: ti: k3-am6: Add Device Management Security Controller support
+> (2018-09-18 18:25:06 +0300)
 > 
 > ----------------------------------------------------------------
-> ASPEED device tree updates for 4.20
+> TI AM654 support for v4.20 merge window.
 > 
->  - Two new ast2500-based machines:
-> 
->    * Facebook TiogaPass (x86 server)
-
-\o/ :-)
-
->    * HXT StarDragon 4800 Reference Evaluation Platform 2 (arm64 server)
-> 
->  - Updates for the Quanta q71l system
-> 
->  - i2c device tree cleanups
+> This branch adds changes for the Texas Instruments AM654 SoC. Included
+> changes are:
+> - Add uart nodes
+> - Change address cells and size-cells of interconnect tfrom 1 to 2
+> - Add secure proxy instance for main domain
+> - Add DMSC support
 
 Merged, thanks!
+
+
+-Olof
