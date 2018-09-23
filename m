@@ -1,74 +1,187 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 23 Sep 2018 17:23:54 +0200
-Subject: [PATCH v2 5/7] soc: rockchip: power-domain: add rk3066 powerdomains
+Date: Sun, 23 Sep 2018 17:23:56 +0200
+Subject: [PATCH v2 7/7] ARM: dts: rockchip: add rk3066/rk3188 power-domains
 In-Reply-To: <20180923152356.30154-1-heiko@sntech.de>
 References: <20180923152356.30154-1-heiko@sntech.de>
-Message-ID: <20180923152356.30154-6-heiko@sntech.de>
+Message-ID: <20180923152356.30154-8-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add power-domains found on rk3066 socs.
+Add the power-domain nodes to both rk3066 and rk3188 including
+their clocks and qos connections.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/soc/rockchip/pm_domains.c | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ arch/arm/boot/dts/rk3066a.dtsi | 52 ++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/rk3188.dtsi  | 51 +++++++++++++++++++++++++++++++++
+ 2 files changed, 103 insertions(+)
 
-diff --git a/drivers/soc/rockchip/pm_domains.c b/drivers/soc/rockchip/pm_domains.c
-index 58bd39cd3369..4587b27eeb9f 100644
---- a/drivers/soc/rockchip/pm_domains.c
-+++ b/drivers/soc/rockchip/pm_domains.c
-@@ -21,6 +21,7 @@
- #include <linux/mfd/syscon.h>
- #include <dt-bindings/power/px30-power.h>
- #include <dt-bindings/power/rk3036-power.h>
+diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
+index 2ab3c4b32003..112d2bf8e998 100644
+--- a/arch/arm/boot/dts/rk3066a.dtsi
++++ b/arch/arm/boot/dts/rk3066a.dtsi
+@@ -7,6 +7,7 @@
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/pinctrl/rockchip.h>
+ #include <dt-bindings/clock/rk3066a-cru.h>
 +#include <dt-bindings/power/rk3066-power.h>
- #include <dt-bindings/power/rk3128-power.h>
- #include <dt-bindings/power/rk3188-power.h>
- #include <dt-bindings/power/rk3228-power.h>
-@@ -738,6 +739,14 @@ static const struct rockchip_domain_info rk3036_pm_domains[] = {
- 	[RK3036_PD_SYS]		= DOMAIN_RK3036(8, 22, 29, false),
+ #include "rk3xxx.dtsi"
+ 
+ / {
+@@ -595,6 +596,7 @@
+ 			  "ppmmu2",
+ 			  "pp3",
+ 			  "ppmmu3";
++	power-domains = <&power RK3066_PD_GPU>;
  };
  
-+static const struct rockchip_domain_info rk3066_pm_domains[] = {
-+	[RK3066_PD_GPU]		= DOMAIN(9, 9, 3, 24, 29, false),
-+	[RK3066_PD_VIDEO]	= DOMAIN(8, 8, 4, 23, 28, false),
-+	[RK3066_PD_VIO]		= DOMAIN(7, 7, 5, 22, 27, false),
-+	[RK3066_PD_PERI]	= DOMAIN(6, 6, 2, 25, 30, false),
-+	[RK3066_PD_CPU]		= DOMAIN(-1, 5, 1, 26, 31, false),
-+};
-+
- static const struct rockchip_domain_info rk3128_pm_domains[] = {
- 	[RK3128_PD_CORE]	= DOMAIN_RK3288(0, 0, 4, false),
- 	[RK3128_PD_MSCH]	= DOMAIN_RK3288(-1, -1, 6, true),
-@@ -855,6 +864,17 @@ static const struct rockchip_pmu_info rk3036_pmu = {
- 	.domain_info = rk3036_pm_domains,
+ &i2c0 {
+@@ -643,6 +645,56 @@
+ 	dma-names = "rx-tx";
  };
  
-+static const struct rockchip_pmu_info rk3066_pmu = {
-+	.pwr_offset = 0x08,
-+	.status_offset = 0x0c,
-+	.req_offset = 0x38, /* PMU_MISC_CON1 */
-+	.idle_offset = 0x0c,
-+	.ack_offset = 0x0c,
++&pmu {
++	power: power-controller {
++		compatible = "rockchip,rk3066-power-controller";
++		#power-domain-cells = <1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+	.num_domains = ARRAY_SIZE(rk3066_pm_domains),
-+	.domain_info = rk3066_pm_domains,
++		pd_vio at RK3066_PD_VIO {
++			reg = <RK3066_PD_VIO>;
++			clocks = <&cru ACLK_LCDC0>,
++				 <&cru ACLK_LCDC1>,
++				 <&cru DCLK_LCDC0>,
++				 <&cru DCLK_LCDC1>,
++				 <&cru HCLK_LCDC0>,
++				 <&cru HCLK_LCDC1>,
++				 <&cru SCLK_CIF1>,
++				 <&cru ACLK_CIF1>,
++				 <&cru HCLK_CIF1>,
++				 <&cru SCLK_CIF0>,
++				 <&cru ACLK_CIF0>,
++				 <&cru HCLK_CIF0>,
++				 <&cru ACLK_IPP>,
++				 <&cru HCLK_IPP>,
++				 <&cru ACLK_RGA>,
++				 <&cru HCLK_RGA>;
++			pm_qos = <&qos_lcdc0>,
++				 <&qos_lcdc1>,
++				 <&qos_cif0>,
++				 <&qos_cif1>,
++				 <&qos_ipp>,
++				 <&qos_rga>;
++		};
++
++		pd_video at RK3066_PD_VIDEO {
++			reg = <RK3066_PD_VIDEO>;
++			clocks = <&cru ACLK_VDPU>,
++				 <&cru ACLK_VEPU>,
++				 <&cru HCLK_VDPU>,
++				 <&cru HCLK_VEPU>;
++			pm_qos = <&qos_vpu>;
++		};
++
++		pd_gpu at RK3066_PD_GPU {
++			reg = <RK3066_PD_GPU>;
++			clocks = <&cru ACLK_GPU>;
++			pm_qos = <&qos_gpu>;
++		};
++	};
 +};
 +
- static const struct rockchip_pmu_info rk3128_pmu = {
- 	.pwr_offset = 0x04,
- 	.status_offset = 0x08,
-@@ -968,6 +988,10 @@ static const struct of_device_id rockchip_pm_domain_dt_match[] = {
- 		.compatible = "rockchip,rk3036-power-controller",
- 		.data = (void *)&rk3036_pmu,
- 	},
-+	{
-+		.compatible = "rockchip,rk3066-power-controller",
-+		.data = (void *)&rk3066_pmu,
-+	},
- 	{
- 		.compatible = "rockchip,rk3128-power-controller",
- 		.data = (void *)&rk3128_pmu,
+ &pwm0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pwm0_out>;
+diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
+index b6f790973736..7e0dc52630d9 100644
+--- a/arch/arm/boot/dts/rk3188.dtsi
++++ b/arch/arm/boot/dts/rk3188.dtsi
+@@ -7,6 +7,7 @@
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/pinctrl/rockchip.h>
+ #include <dt-bindings/clock/rk3188-cru.h>
++#include <dt-bindings/power/rk3188-power.h>
+ #include "rk3xxx.dtsi"
+ 
+ / {
+@@ -80,6 +81,7 @@
+ 		interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&cru ACLK_LCDC0>, <&cru DCLK_LCDC0>, <&cru HCLK_LCDC0>;
+ 		clock-names = "aclk_vop", "dclk_vop", "hclk_vop";
++		power-domains = <&power RK3188_PD_VIO>;
+ 		resets = <&cru SRST_LCDC0_AXI>, <&cru SRST_LCDC0_AHB>, <&cru SRST_LCDC0_DCLK>;
+ 		reset-names = "axi", "ahb", "dclk";
+ 		status = "disabled";
+@@ -96,6 +98,7 @@
+ 		interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&cru ACLK_LCDC1>, <&cru DCLK_LCDC1>, <&cru HCLK_LCDC1>;
+ 		clock-names = "aclk_vop", "dclk_vop", "hclk_vop";
++		power-domains = <&power RK3188_PD_VIO>;
+ 		resets = <&cru SRST_LCDC1_AXI>, <&cru SRST_LCDC1_AHB>, <&cru SRST_LCDC1_DCLK>;
+ 		reset-names = "axi", "ahb", "dclk";
+ 		status = "disabled";
+@@ -620,6 +623,7 @@
+ 			  "ppmmu2",
+ 			  "pp3",
+ 			  "ppmmu3";
++	power-domains = <&power RK3188_PD_GPU>;
+ };
+ 
+ &i2c0 {
+@@ -652,6 +656,53 @@
+ 	pinctrl-0 = <&i2c4_xfer>;
+ };
+ 
++&pmu {
++	power: power-controller {
++		compatible = "rockchip,rk3188-power-controller";
++		#power-domain-cells = <1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		pd_vio at RK3188_PD_VIO {
++			reg = <RK3188_PD_VIO>;
++			clocks = <&cru ACLK_LCDC0>,
++				 <&cru ACLK_LCDC1>,
++				 <&cru DCLK_LCDC0>,
++				 <&cru DCLK_LCDC1>,
++				 <&cru HCLK_LCDC0>,
++				 <&cru HCLK_LCDC1>,
++				 <&cru SCLK_CIF0>,
++				 <&cru ACLK_CIF0>,
++				 <&cru HCLK_CIF0>,
++				 <&cru ACLK_IPP>,
++				 <&cru HCLK_IPP>,
++				 <&cru ACLK_RGA>,
++				 <&cru HCLK_RGA>;
++			pm_qos = <&qos_lcdc0>,
++				 <&qos_lcdc1>,
++				 <&qos_cif0>,
++				 <&qos_cif1>,
++				 <&qos_ipp>,
++				 <&qos_rga>;
++		};
++
++		pd_video at RK3188_PD_VIDEO {
++			reg = <RK3188_PD_VIDEO>;
++			clocks = <&cru ACLK_VDPU>,
++				 <&cru ACLK_VEPU>,
++				 <&cru HCLK_VDPU>,
++				 <&cru HCLK_VEPU>;
++			pm_qos = <&qos_vpu>;
++		};
++
++		pd_gpu at RK3188_PD_GPU {
++			reg = <RK3188_PD_GPU>;
++			clocks = <&cru ACLK_GPU>;
++			pm_qos = <&qos_gpu>;
++		};
++	};
++};
++
+ &pwm0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pwm0_out>;
 -- 
 2.18.0
