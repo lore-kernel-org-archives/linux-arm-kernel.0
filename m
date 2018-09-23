@@ -1,24 +1,71 @@
-From: contact@stefanchrist.eu (Stefan Lengfeld)
-Date: Sun, 23 Sep 2018 22:20:34 +0200
-Subject: [RFC PATCH 0/4] i2c: core: introduce master_xfer_irqless
-In-Reply-To: <20180920161423.13990-1-wsa+renesas@sang-engineering.com>
-References: <20180920161423.13990-1-wsa+renesas@sang-engineering.com>
-Message-ID: <20180923202034.qugs4fxucj7h4vri@porty>
+From: colin.king@canonical.com (Colin King)
+Date: Sun, 23 Sep 2018 23:14:36 +0100
+Subject: [PATCH] soc: ti: fix spelling mistake "instace" -> "instance"
+Message-ID: <20180923221436.7701-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+From: Colin Ian King <colin.king@canonical.com>
 
-On Thu, Sep 20, 2018 at 06:14:19PM +0200, Wolfram Sang wrote:
-> To keep the discussion about master_xfer_irqless going, I post here a
-> draft how I envision the changes to the I2C core. They are only build
-> tested. I am unsure if I can test them on hardware before next week, so
-> I'll send them around as RFC already, so people can get an idea and
-> comment. Maybe Stefan has some bandwidth to test his imx driver
-> implementation on top of this?
+Trivial fix to spelling mistake in dev_err messages and comments
 
-No problem. I have some spare time in the next days and will post my
-results to the mailinglist.
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ drivers/soc/ti/knav_dma.c  | 4 ++--
+ drivers/soc/ti/knav_qmss.h | 6 +++---
+ 2 files changed, 5 insertions(+), 5 deletions(-)
 
-Kind Regards,
-Stefan Lengfeld
+diff --git a/drivers/soc/ti/knav_dma.c b/drivers/soc/ti/knav_dma.c
+index 224d7ddeeb76..23f09dce23e0 100644
+--- a/drivers/soc/ti/knav_dma.c
++++ b/drivers/soc/ti/knav_dma.c
+@@ -438,7 +438,7 @@ void *knav_dma_open_channel(struct device *dev, const char *name,
+ 
+ 	chan_num = of_channel_match_helper(dev->of_node, name, &instance);
+ 	if (chan_num < 0) {
+-		dev_err(kdev->dev, "No DMA instace with name %s\n", name);
++		dev_err(kdev->dev, "No DMA instance with name %s\n", name);
+ 		return (void *)-EINVAL;
+ 	}
+ 
+@@ -461,7 +461,7 @@ void *knav_dma_open_channel(struct device *dev, const char *name,
+ 		}
+ 	}
+ 	if (!found) {
+-		dev_err(kdev->dev, "No DMA instace with name %s\n", instance);
++		dev_err(kdev->dev, "No DMA instance with name %s\n", instance);
+ 		return (void *)-EINVAL;
+ 	}
+ 
+diff --git a/drivers/soc/ti/knav_qmss.h b/drivers/soc/ti/knav_qmss.h
+index 3efc47e82973..7c128132799e 100644
+--- a/drivers/soc/ti/knav_qmss.h
++++ b/drivers/soc/ti/knav_qmss.h
+@@ -240,14 +240,14 @@ struct knav_pool {
+ };
+ 
+ /**
+- * struct knav_queue_inst:		qmss queue instace properties
++ * struct knav_queue_inst:		qmss queue instance properties
+  * @descs:				descriptor pointer
+  * @desc_head, desc_tail, desc_count:	descriptor counters
+  * @acc:				accumulator channel pointer
+  * @kdev:				qmss device pointer
+  * @range:				range info
+  * @qmgr:				queue manager info
+- * @id:					queue instace id
++ * @id:					queue instance id
+  * @irq_num:				irq line number
+  * @notify_needed:			notifier needed based on queue type
+  * @num_notifiers:			total notifiers
+@@ -274,7 +274,7 @@ struct knav_queue_inst {
+ /**
+  * struct knav_queue:			qmss queue properties
+  * @reg_push, reg_pop, reg_peek:	push, pop queue registers
+- * @inst:				qmss queue instace properties
++ * @inst:				qmss queue instance properties
+  * @notifier_fn:			notifier function
+  * @notifier_fn_arg:			notifier function argument
+  * @notifier_enabled:			notier enabled for a give queue
+-- 
+2.17.1
