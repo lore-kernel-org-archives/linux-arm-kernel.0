@@ -1,36 +1,44 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 23 Sep 2018 14:10:59 +0100
-Subject: [PATCH v11 03/11] firmware: xilinx: Add zynqmp IOCTL API for
- device control
-In-Reply-To: <CY1PR02MB2138254CC5B1C2B2D41AB725B8040@CY1PR02MB2138.namprd02.prod.outlook.com>
-References: <1533318808-10781-1-git-send-email-jollys@xilinx.com>
- <1533318808-10781-4-git-send-email-jollys@xilinx.com>
- <CAOesGMi7Q9L4oZkUubKtV-m8XD67MQ05ZFhPA_0Hwky_qVUxfg@mail.gmail.com>
- <CY1PR02MB2138BF2252E1CE2C1747A78AB8050@CY1PR02MB2138.namprd02.prod.outlook.com>
- <CAOesGMhViv_D6GKYf3x02LGqthwEsfkUFWBdG7pCQqD2MGsEew@mail.gmail.com>
- <CY1PR02MB2138254CC5B1C2B2D41AB725B8040@CY1PR02MB2138.namprd02.prod.outlook.com>
-Message-ID: <CAOesGMgqjGEXzRPXFxUcSyTof_wgjErPhZ7wokdGEDY9SnCvdw@mail.gmail.com>
+From: qader.aymen@gmail.com (Aymen Qader)
+Date: Sun, 23 Sep 2018 14:07:29 +0100
+Subject: [PATCH 3/5] staging: vc04_services: Add spaces after commas
+In-Reply-To: <20180923130733.4128-1-qader.aymen@gmail.com>
+References: <20180923130733.4128-1-qader.aymen@gmail.com>
+Message-ID: <20180923130733.4128-3-qader.aymen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch fixes the checkpatch.pl error:
 
-Apologies for the slow responses here, I meant to follow up on this sooner.
+ERROR: space required after that ','
 
-On Tue, Sep 11, 2018 at 8:20 PM, Jolly Shah <JOLLYS@xilinx.com> wrote:
-> Hi Sudeep and Olof,
->
-> Clock driver from same patch set uses ioctl API along with other clock eemi APIs. As clock patches' final review is pending by Stephen, Michal only created pull request for rest of the patches and that doesn't require ioctl api. I will remove it and submit new patch set.
->
-> For future patches which requires ioctl api, would like to understand your suggestion so I can make required changes. For zynqmp, EEMI interface allows clock, reset, power etc management through firmware but apart from those there are some operations which needs secure access through firmware. Examples are accessing some storage registers for inter agent communication, configuring another agent(RPU) mode, setting PLL parameters, boot device configuration etc. Those operations are covered as ioctls as they are very platform specific. Do you suggest to handle them with individual EEMI APIs instead of ioctl API?
+in the interface/vchi directory
 
-I'm personally less worried about whether the calls are through an
-ioctl API or an EEMI one, but if it is through ioctl, I'd prefer if it
-wasn't wide-open pass-through. I.e. that the ioctls you actually use
-are documented, and only those who are whitelisted are passed through
-(and not in general exported to userspace).
+Signed-off-by: Aymen Qader <qader.aymen@gmail.com>
+---
+ drivers/staging/vc04_services/interface/vchi/vchi.h | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Does that make sense?
-
-
--Olof
+diff --git a/drivers/staging/vc04_services/interface/vchi/vchi.h b/drivers/staging/vc04_services/interface/vchi/vchi.h
+index cb2582a4eb6a..d8e660240a44 100644
+--- a/drivers/staging/vc04_services/interface/vchi/vchi.h
++++ b/drivers/staging/vc04_services/interface/vchi/vchi.h
+@@ -92,14 +92,14 @@ typedef struct vchi_msg_vector_ex {
+ } VCHI_MSG_VECTOR_EX_T;
+ 
+ // Construct an entry in a msg vector for a pointer (p) of length (l)
+-#define VCHI_VEC_POINTER(p,l)  VCHI_VEC_POINTER, { { (VCHI_MEM_HANDLE_T)(p), (l) } }
++#define VCHI_VEC_POINTER(p, l)  VCHI_VEC_POINTER, { { (VCHI_MEM_HANDLE_T)(p), (l) } }
+ 
+ // Construct an entry in a msg vector for a message handle (h), starting at offset (o) of length (l)
+-#define VCHI_VEC_HANDLE(h,o,l) VCHI_VEC_HANDLE,  { { (h), (o), (l) } }
++#define VCHI_VEC_HANDLE(h, o, l) VCHI_VEC_HANDLE,  { { (h), (o), (l) } }
+ 
+ // Macros to manipulate 'FOURCC' values
+ #define MAKE_FOURCC(x) ((int32_t)((x[0] << 24) | (x[1] << 16) | (x[2] << 8) | x[3]))
+-#define FOURCC_TO_CHAR(x) (x >> 24) & 0xFF,(x >> 16) & 0xFF,(x >> 8) & 0xFF, x & 0xFF
++#define FOURCC_TO_CHAR(x) (x >> 24) & 0xFF, (x >> 16) & 0xFF, (x >> 8) & 0xFF, x & 0xFF
+ 
+ // Opaque service information
+ struct opaque_vchi_service_t;
+-- 
+2.17.1
