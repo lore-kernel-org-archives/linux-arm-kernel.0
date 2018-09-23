@@ -1,31 +1,45 @@
-From: qader.aymen@gmail.com (Aymen Qader)
-Date: Sun, 23 Sep 2018 15:06:15 +0100
-Subject: [PATCH v2 0/5] staging: vc04_services: Fix checkpatch.pl errors
-Message-ID: <20180923140620.14583-1-qader.aymen@gmail.com>
+From: hanetzer@startmail.com (Marty E. Plummer)
+Date: Sun, 23 Sep 2018 09:20:05 -0500
+Subject: [PATCH] drm/rockchip: typo: selet->select
+Message-ID: <20180923142005.23915-1-hanetzer@startmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset fixes the following checkpatch.pl errors in the
-interface/vchi directory:
+Signed-off-by: Marty E. Plummer <hanetzer@startmail.com>
+---
+ drivers/gpu/drm/rockchip/Kconfig | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-ERROR: space prohibited after/before that open/closed parenthesis
-ERROR: code indent should use tabs where possible
-ERROR: space required after that ','
-ERROR: Macros with complex values should be enclosed in parentheses
-ERROR: "foo * bar" should be "foo* bar"
-
-Aymen Qader (5):
-  staging: vc04_services: Fix "space prohibited"
-  staging: vc04_services: Use tabs instead of spaces
-  staging: vc04_services: Add spaces after commas
-  staging: vc04_services: Surround complex macros
-  staging: vc04_services: Remove spaces after '*'
-
-v2: Added cover letter correctly
-
- .../vc04_services/interface/vchi/vchi.h       | 200 +++++++++---------
- .../vc04_services/interface/vchi/vchi_cfg.h   |   2 +-
- 2 files changed, 101 insertions(+), 101 deletions(-)
-
+diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
+index 0ccc76217ee4..7d1ccc9efc76 100644
+--- a/drivers/gpu/drm/rockchip/Kconfig
++++ b/drivers/gpu/drm/rockchip/Kconfig
+@@ -23,7 +23,7 @@ config ROCKCHIP_ANALOGIX_DP
+ 	help
+ 	  This selects support for Rockchip SoC specific extensions
+ 	  for the Analogix Core DP driver. If you want to enable DP
+-	  on RK3288 based SoC, you should selet this option.
++	  on RK3288 based SoC, you should select this option.
+ 
+ config ROCKCHIP_CDN_DP
+         bool "Rockchip cdn DP"
+@@ -39,7 +39,7 @@ config ROCKCHIP_DW_HDMI
+         help
+ 	  This selects support for Rockchip SoC specific extensions
+ 	  for the Synopsys DesignWare HDMI driver. If you want to
+-	  enable HDMI on RK3288 based SoC, you should selet this
++	  enable HDMI on RK3288 based SoC, you should select this
+ 	  option.
+ 
+ config ROCKCHIP_DW_MIPI_DSI
+@@ -47,7 +47,7 @@ config ROCKCHIP_DW_MIPI_DSI
+ 	help
+ 	 This selects support for Rockchip SoC specific extensions
+ 	 for the Synopsys DesignWare HDMI driver. If you want to
+-	 enable MIPI DSI on RK3288 based SoC, you should selet this
++	 enable MIPI DSI on RK3288 based SoC, you should select this
+ 	 option.
+ 
+ config ROCKCHIP_INNO_HDMI
 -- 
-2.17.1
+2.19.0
