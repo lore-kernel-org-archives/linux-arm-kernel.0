@@ -1,222 +1,163 @@
-From: aford173@gmail.com (Adam Ford)
-Date: Sun, 23 Sep 2018 10:37:18 -0500
-Subject: [PATCH 3/3] ARM: OMAP2PLUS: Remove references to AM3517-EVM since
- it's in DT
-In-Reply-To: <20180923153718.15095-1-aford173@gmail.com>
-References: <20180923153718.15095-1-aford173@gmail.com>
-Message-ID: <20180923153718.15095-3-aford173@gmail.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Sun, 23 Sep 2018 18:06:03 +0200
+Subject: [RFC 2/3 net] lorawan: Add macro and definition for LoRaWAN class
+ modlue
+In-Reply-To: <f7ea222671a2bc6fe0a060c4bdb1ebae162d0d91.1535039998.git.starnight@g.ncu.edu.tw>
+References: <cover.1535039998.git.starnight@g.ncu.edu.tw>
+ <f7ea222671a2bc6fe0a060c4bdb1ebae162d0d91.1535039998.git.starnight@g.ncu.edu.tw>
+Message-ID: <f74c033a-fadc-fb8c-9469-6e6a32339cd8@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the audio codecs used on the AM3517-EVM are now available
-in device tree, and the audio driver wasn't really being used
-anyway, this patch removes the remaining AM3517 legacy board
-options and sound soc drivers.
+Hi Jian-Hong,
 
-Signed-off-by: Adam Ford <aford173@gmail.com>
+Many thanks and sorry for the delay. This patch mostly looks good and
+should go in before its first uses, so I would like to queue it soon for
+my hardware-MAC module drivers - but some questions below. Also a typo
+in the subject, and we should probably prepend "net: " and I would
+personally not mention the module here as it's a userspace API.
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 9f27b486a536..7473a88c3201 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -196,11 +196,6 @@ config MACH_OMAP2_TUSB6010
- 	depends on ARCH_OMAP2 && SOC_OMAP2420
- 	default y if MACH_NOKIA_N8X0
- 
--config MACH_OMAP3517EVM
--	bool "OMAP3517/ AM3517 EVM board"
--	depends on ARCH_OMAP3
--	default y
--
- config MACH_OMAP3_PANDORA
- 	bool "OMAP3 Pandora"
- 	depends on ARCH_OMAP3
-diff --git a/sound/soc/omap/Kconfig b/sound/soc/omap/Kconfig
-index 6dccea6fdaeb..3d418482d242 100644
---- a/sound/soc/omap/Kconfig
-+++ b/sound/soc/omap/Kconfig
-@@ -78,15 +78,6 @@ config SND_OMAP_SOC_OSK5912
- 	help
- 	  Say Y if you want to add support for SoC audio on osk5912.
- 
--config SND_OMAP_SOC_AM3517EVM
--	tristate "SoC Audio support for OMAP3517 / AM3517 EVM"
--	depends on SND_SDMA_SOC && MACH_OMAP3517EVM && I2C
--	select SND_OMAP_SOC_MCBSP
--	select SND_SOC_TLV320AIC23_I2C
--	help
--	  Say Y if you want to add support for SoC audio on the OMAP3517 / AM3517
--	  EVM.
--
- config SND_OMAP_SOC_OMAP_TWL4030
- 	tristate "SoC Audio support for TI SoC based boards with twl4030 codec"
- 	depends on TWL4030_CORE && SND_SDMA_SOC
-diff --git a/sound/soc/omap/Makefile b/sound/soc/omap/Makefile
-index 53eba3413485..af50cdd6eea9 100644
---- a/sound/soc/omap/Makefile
-+++ b/sound/soc/omap/Makefile
-@@ -17,7 +17,6 @@ snd-soc-n810-objs := n810.o
- snd-soc-rx51-objs := rx51.o
- snd-soc-ams-delta-objs := ams-delta.o
- snd-soc-osk5912-objs := osk5912.o
--snd-soc-am3517evm-objs := am3517evm.o
- snd-soc-omap-abe-twl6040-objs := omap-abe-twl6040.o
- snd-soc-omap-twl4030-objs := omap-twl4030.o
- snd-soc-omap3pandora-objs := omap3pandora.o
-@@ -26,7 +25,6 @@ obj-$(CONFIG_SND_OMAP_SOC_N810) += snd-soc-n810.o
- obj-$(CONFIG_SND_OMAP_SOC_RX51) += snd-soc-rx51.o
- obj-$(CONFIG_SND_OMAP_SOC_AMS_DELTA) += snd-soc-ams-delta.o
- obj-$(CONFIG_SND_OMAP_SOC_OSK5912) += snd-soc-osk5912.o
--obj-$(CONFIG_SND_OMAP_SOC_AM3517EVM) += snd-soc-am3517evm.o
- obj-$(CONFIG_SND_OMAP_SOC_OMAP_ABE_TWL6040) += snd-soc-omap-abe-twl6040.o
- obj-$(CONFIG_SND_OMAP_SOC_OMAP_TWL4030) += snd-soc-omap-twl4030.o
- obj-$(CONFIG_SND_OMAP_SOC_OMAP3_PANDORA) += snd-soc-omap3pandora.o
-diff --git a/sound/soc/omap/am3517evm.c b/sound/soc/omap/am3517evm.c
-deleted file mode 100644
-index d5651026ec10..000000000000
---- a/sound/soc/omap/am3517evm.c
-+++ /dev/null
-@@ -1,141 +0,0 @@
--/*
-- * am3517evm.c  -- ALSA SoC support for OMAP3517 / AM3517 EVM
-- *
-- * Author: Anuj Aggarwal <anuj.aggarwal@ti.com>
-- *
-- * Based on sound/soc/omap/beagle.c by Steve Sakoman
-- *
-- * Copyright (C) 2009 Texas Instruments Incorporated
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License as published by the
-- * Free Software Foundation version 2.
-- *
-- * This program is distributed "as is" WITHOUT ANY WARRANTY of any kind,
-- * whether express or implied; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-- * General Public License for more details.
-- */
--
--#include <linux/clk.h>
--#include <linux/platform_device.h>
--#include <linux/module.h>
--#include <sound/core.h>
--#include <sound/pcm.h>
--#include <sound/soc.h>
--
--#include <asm/mach-types.h>
--#include <linux/platform_data/asoc-ti-mcbsp.h>
--
--#include "omap-mcbsp.h"
--
--#include "../codecs/tlv320aic23.h"
--
--#define CODEC_CLOCK 	12000000
--
--static int am3517evm_hw_params(struct snd_pcm_substream *substream,
--	struct snd_pcm_hw_params *params)
--{
--	struct snd_soc_pcm_runtime *rtd = substream->private_data;
--	struct snd_soc_dai *codec_dai = rtd->codec_dai;
--	int ret;
--
--	/* Set the codec system clock for DAC and ADC */
--	ret = snd_soc_dai_set_sysclk(codec_dai, 0,
--			CODEC_CLOCK, SND_SOC_CLOCK_IN);
--	if (ret < 0)
--		printk(KERN_ERR "can't set codec system clock\n");
--
--	return ret;
--}
--
--static const struct snd_soc_ops am3517evm_ops = {
--	.hw_params = am3517evm_hw_params,
--};
--
--/* am3517evm machine dapm widgets */
--static const struct snd_soc_dapm_widget tlv320aic23_dapm_widgets[] = {
--	SND_SOC_DAPM_HP("Line Out", NULL),
--	SND_SOC_DAPM_LINE("Line In", NULL),
--	SND_SOC_DAPM_MIC("Mic In", NULL),
--};
--
--static const struct snd_soc_dapm_route audio_map[] = {
--	/* Line Out connected to LLOUT, RLOUT */
--	{"Line Out", NULL, "LOUT"},
--	{"Line Out", NULL, "ROUT"},
--
--	{"LLINEIN", NULL, "Line In"},
--	{"RLINEIN", NULL, "Line In"},
--
--	{"MICIN", NULL, "Mic In"},
--};
--
--/* Digital audio interface glue - connects codec <--> CPU */
--static struct snd_soc_dai_link am3517evm_dai = {
--	.name = "TLV320AIC23",
--	.stream_name = "AIC23",
--	.cpu_dai_name = "omap-mcbsp.1",
--	.codec_dai_name = "tlv320aic23-hifi",
--	.platform_name = "omap-mcbsp.1",
--	.codec_name = "tlv320aic23-codec.2-001a",
--	.dai_fmt = SND_SOC_DAIFMT_DSP_B | SND_SOC_DAIFMT_NB_NF |
--		   SND_SOC_DAIFMT_CBM_CFM,
--	.ops = &am3517evm_ops,
--};
--
--/* Audio machine driver */
--static struct snd_soc_card snd_soc_am3517evm = {
--	.name = "am3517evm",
--	.owner = THIS_MODULE,
--	.dai_link = &am3517evm_dai,
--	.num_links = 1,
--
--	.dapm_widgets = tlv320aic23_dapm_widgets,
--	.num_dapm_widgets = ARRAY_SIZE(tlv320aic23_dapm_widgets),
--	.dapm_routes = audio_map,
--	.num_dapm_routes = ARRAY_SIZE(audio_map),
--};
--
--static struct platform_device *am3517evm_snd_device;
--
--static int __init am3517evm_soc_init(void)
--{
--	int ret;
--
--	if (!machine_is_omap3517evm())
--		return -ENODEV;
--	pr_info("OMAP3517 / AM3517 EVM SoC init\n");
--
--	am3517evm_snd_device = platform_device_alloc("soc-audio", -1);
--	if (!am3517evm_snd_device) {
--		printk(KERN_ERR "Platform device allocation failed\n");
--		return -ENOMEM;
--	}
--
--	platform_set_drvdata(am3517evm_snd_device, &snd_soc_am3517evm);
--
--	ret = platform_device_add(am3517evm_snd_device);
--	if (ret)
--		goto err1;
--
--	return 0;
--
--err1:
--	printk(KERN_ERR "Unable to add platform device\n");
--	platform_device_put(am3517evm_snd_device);
--
--	return ret;
--}
--
--static void __exit am3517evm_soc_exit(void)
--{
--	platform_device_unregister(am3517evm_snd_device);
--}
--
--module_init(am3517evm_soc_init);
--module_exit(am3517evm_soc_exit);
--
--MODULE_AUTHOR("Anuj Aggarwal <anuj.aggarwal@ti.com>");
--MODULE_DESCRIPTION("ALSA SoC OMAP3517 / AM3517 EVM");
--MODULE_LICENSE("GPL v2");
+Am 23.08.18 um 19:15 schrieb Jian-Hong Pan:
+> This patch add the macro and definition for the implementation of
+> LoRaWAN protocol.
+
+I would fix up the grammar nits in my tree then.
+
+> 
+> Signed-off-by: Jian-Hong Pan <starnight@g.ncu.edu.tw>
+> ---
+>  include/linux/socket.h              | 5 ++++-
+>  include/uapi/linux/if_arp.h         | 1 +
+>  include/uapi/linux/if_ether.h       | 1 +
+>  net/core/dev.c                      | 4 ++--
+>  security/selinux/hooks.c            | 4 +++-
+>  security/selinux/include/classmap.h | 4 +++-
+>  6 files changed, 14 insertions(+), 5 deletions(-)
+> 
+> diff --git a/include/linux/socket.h b/include/linux/socket.h
+> index aa1e288b1659..e5c8381fd1aa 100644
+> --- a/include/linux/socket.h
+> +++ b/include/linux/socket.h
+> @@ -209,8 +209,9 @@ struct ucred {
+>  				 */
+>  #define AF_XDP		44	/* XDP sockets			*/
+>  #define AF_LORA		45	/* LoRa sockets			*/
+> +#define AF_LORAWAN	46	/* LoRaWAN sockets			*/
+>  
+> -#define AF_MAX		46	/* For now.. */
+> +#define AF_MAX		47	/* For now.. */
+>  
+>  /* Protocol families, same as address families. */
+>  #define PF_UNSPEC	AF_UNSPEC
+> @@ -261,6 +262,7 @@ struct ucred {
+>  #define PF_SMC		AF_SMC
+>  #define PF_XDP		AF_XDP
+>  #define PF_LORA		AF_LORA
+> +#define PF_LORAWAN	AF_LORAWAN
+>  #define PF_MAX		AF_MAX
+>  
+>  /* Maximum queue length specifiable by listen.  */
+> @@ -343,6 +345,7 @@ struct ucred {
+>  #define SOL_KCM		281
+>  #define SOL_TLS		282
+>  #define SOL_XDP		283
+> +#define SOL_LORAWAN	284
+>  
+>  /* IPX options */
+>  #define IPX_TYPE	1
+> diff --git a/include/uapi/linux/if_arp.h b/include/uapi/linux/if_arp.h
+> index 1ed7cb3f2129..2376f7839355 100644
+> --- a/include/uapi/linux/if_arp.h
+> +++ b/include/uapi/linux/if_arp.h
+> @@ -99,6 +99,7 @@
+>  #define ARPHRD_6LOWPAN	825		/* IPv6 over LoWPAN             */
+>  #define ARPHRD_VSOCKMON	826		/* Vsock monitor header		*/
+>  #define ARPHRD_LORA	827		/* LoRa				*/
+> +#define ARPHRD_LORAWAN	828		/* LoRaWAN			*/
+>  
+>  #define ARPHRD_VOID	  0xFFFF	/* Void type, nothing is known */
+>  #define ARPHRD_NONE	  0xFFFE	/* zero header length */
+> diff --git a/include/uapi/linux/if_ether.h b/include/uapi/linux/if_ether.h
+> index 45644dcf5b39..b1ac70d4a377 100644
+> --- a/include/uapi/linux/if_ether.h
+> +++ b/include/uapi/linux/if_ether.h
+> @@ -148,6 +148,7 @@
+>  					 * aggregation protocol
+>  					 */
+>  #define ETH_P_LORA	0x00FA		/* LoRa				*/
+> +#define ETH_P_LORAWAN	0x00FB		/* LoRaWAN			*/
+>  
+>  /*
+>   *	This is an Ethernet frame header.
+> diff --git a/net/core/dev.c b/net/core/dev.c
+> index f68122f0ab02..b95ce79ec5a8 100644
+> --- a/net/core/dev.c
+> +++ b/net/core/dev.c
+> @@ -297,7 +297,7 @@ static const unsigned short netdev_lock_type[] = {
+>  	 ARPHRD_IRDA, ARPHRD_FCPP, ARPHRD_FCAL, ARPHRD_FCPL,
+>  	 ARPHRD_FCFABRIC, ARPHRD_IEEE80211, ARPHRD_IEEE80211_PRISM,
+>  	 ARPHRD_IEEE80211_RADIOTAP, ARPHRD_PHONET, ARPHRD_PHONET_PIPE,
+> -	 ARPHRD_IEEE802154, ARPHRD_VOID, ARPHRD_NONE};
+> +	 ARPHRD_IEEE802154, ARPHRD_LORAWAN, ARPHRD_VOID, ARPHRD_NONE};
+>  
+>  static const char *const netdev_lock_name[] = {
+>  	"_xmit_NETROM", "_xmit_ETHER", "_xmit_EETHER", "_xmit_AX25",
+> @@ -314,7 +314,7 @@ static const char *const netdev_lock_name[] = {
+>  	"_xmit_IRDA", "_xmit_FCPP", "_xmit_FCAL", "_xmit_FCPL",
+>  	"_xmit_FCFABRIC", "_xmit_IEEE80211", "_xmit_IEEE80211_PRISM",
+>  	"_xmit_IEEE80211_RADIOTAP", "_xmit_PHONET", "_xmit_PHONET_PIPE",
+> -	"_xmit_IEEE802154", "_xmit_VOID", "_xmit_NONE"};
+> +	"_xmit_IEEE802154", "_xmit_LORAWAN", "_xmit_VOID", "_xmit_NONE"};
+>  
+>  static struct lock_class_key netdev_xmit_lock_key[ARRAY_SIZE(netdev_lock_type)];
+>  static struct lock_class_key netdev_addr_lock_key[ARRAY_SIZE(netdev_lock_type)];
+
+All your new constants except SOL_LORAWAN are always next to a LoRa one,
+but not in these two arrays. I don't have such changes in my original
+LoRa patch - am I missing such an array extension for ARPHRD_LORA then,
+or what is the criteria for when to add this?
+
+Other changes look fine to me.
+
+Regards,
+Andreas
+
+> diff --git a/security/selinux/hooks.c b/security/selinux/hooks.c
+> index aaf520a689d8..0da3a1d69cb8 100644
+> --- a/security/selinux/hooks.c
+> +++ b/security/selinux/hooks.c
+> @@ -1477,7 +1477,9 @@ static inline u16 socket_type_to_security_class(int family, int type, int protoc
+>  			return SECCLASS_XDP_SOCKET;
+>  		case PF_LORA:
+>  			return SECCLASS_LORA_SOCKET;
+> -#if PF_MAX > 46
+> +		case PF_LORAWAN:
+> +			return SECCLASS_LORAWAN_SOCKET;
+> +#if PF_MAX > 47
+>  #error New address family defined, please update this function.
+>  #endif
+>  		}
+> diff --git a/security/selinux/include/classmap.h b/security/selinux/include/classmap.h
+> index 060d4bf8385e..fa0151fe6f32 100644
+> --- a/security/selinux/include/classmap.h
+> +++ b/security/selinux/include/classmap.h
+> @@ -244,9 +244,11 @@ struct security_class_mapping secclass_map[] = {
+>  	  { COMMON_SOCK_PERMS, NULL } },
+>  	{ "lora_socket",
+>  	  { COMMON_SOCK_PERMS, NULL } },
+> +	{ "lorawan_socket",
+> +	  { COMMON_SOCK_PERMS, NULL } },
+>  	{ NULL }
+>    };
+>  
+> -#if PF_MAX > 46
+> +#if PF_MAX > 47
+>  #error New address family defined, please update secclass_map.
+>  #endif
+> 
+
+
 -- 
-2.17.1
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
