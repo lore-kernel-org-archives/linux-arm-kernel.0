@@ -1,67 +1,54 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 23 Sep 2018 06:18:17 -0700
-Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.20
-In-Reply-To: <cover.1536824376.git.horms+renesas@verge.net.au>
-References: <cover.1536824376.git.horms+renesas@verge.net.au>
-Message-ID: <20180923131817.t2lj6d2sb7bp6lqi@localhost>
+Date: Sun, 23 Sep 2018 06:20:55 -0700
+Subject: [GIT PULL] Rockchip ARM64 devicetree updates for 4.20
+In-Reply-To: <2349272.dkc8ODN2Us@phil>
+References: <2349272.dkc8ODN2Us@phil>
+Message-ID: <20180923132055.5hgyj4qphxxiecaz@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-On Thu, Sep 13, 2018 at 11:08:18AM +0200, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Thu, Sep 13, 2018 at 03:55:15PM +0200, Heiko Stuebner wrote:
+> Hi Arnd, Kevin, Olof,
 > 
-> Please consider these Renesas ARM based SoC DT updates for v4.20.
+> please find below the first set of arm64 dt updates for 4.20
+> (or however it will be named).
 > 
-> I am sending out this pull-request at this time as there are a number
-> of patches queued up in my arm (32) DT branch and I hope that this
-> will ease the burden later on in the development cycle. I expect to
-> send a follow-up pull-request for this branch at the usual pre-rc6 timing.
+> It's really only 64 bit changes so far [I have one 32bit patch queued up,
+> but that isn't really useful on its own, so I'll keep it a bit longer,
+> to not send needless 1-patch pull requests ;-) ]
 
-This is a good amount of patches, feel free to flush your queue around the time
-it builds up to about this amount -- no need to hold on to them longer.
+No worries, send it if you want (or just send the patch without a PR, that
+works too).
 
+> The tag describes the included changes, so if ok please pull
+> 
+> Thanks
+> Heiko
+> 
+> 
 > The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 > 
 >   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
 > 
-> are available in the git repository at:
+> are available in the Git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm-dt-for-v4.20
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.20-rockchip-dts64-1
 > 
-> for you to fetch changes up to 1926bd6bf20fe306797fbf366902674d2d6c20cc:
+> for you to fetch changes up to 78f26da3ffbce0ea3692a89fe3f5487cb8dda068:
 > 
->   ARM: dts: r9a06g032: Use r9a06g032-sysctrl binding definitions (2018-09-06 11:31:35 +0200)
-
-Merged, thanks!
-
-
+>   arm64: dts: rockchip: Add type-c port supply on rk3399-sapphire board (2018-09-10 19:16:26 +0200)
 > 
 > ----------------------------------------------------------------
-> Renesas ARM Based SoC DT Updates for v4.20
-> 
-> * R-Car Gen1 SoCs: Include product name in DTSI files for ease of maintenance
-> * R-Car Gen2 SoCs:
->   - Convert to new DU DT bindings
->   - Correct SATA device sizes to 2 MiB
-> * R-Car H2 (r8a7790) based Porter board: Add DA9063 OnKey PMIC node
-> * R-Car E2 (r8a7794) based Silk board: Add DA9063 PMIC, RTC and OnKey nodes
-> * R-Car M2-N (r8a7793) based Gose board: Add DA9210 node for CPU DVFS
-> * RZ/G1C (R8A77470) SoC:
->   - Add GPIO nodes
->   - Add PFC support
->   - Use r8a77470-sysc binding definitions
-> * RZ/G1C (r8a77470) iW-RainboW-G23S dev platform:
->   - Specify EtherAVB PHY IRQ
->   - Add pinctl support for scif1
-> * RZ/N1D (r9a06g032) SoC: Use r9a06g032-sysctrl binding definitions
+> New soc support for the px30 quad-core Cortex-A35.
+> New boards are the px30 eval board and roc-rk3399-pc.
+> The rk3328 got support for the one gpio controlled via the general
+> register files and the rk3399 finally got its idle-states defined.
+> And finally fixes and improvements for firefly-rk3399 (wifi),
+> roc-rk3328-cc (sdmmc-uhs, io-domains), rk3328-rock64 (gpio-regulator
+> pin fix) and rk3399-sapphire (gpio-regulator pin fix, pmic pin fix
+> and type-c port supply).
 
-I like this format! It's nice, terse and to the point, and it makes
-it a bit easier to see commonalities across the large number of similar
-(and different) product and platform names.
-
-Thanks a lot for being flexible and trying different things here!
+Merged, thanks!
 
 
 -Olof
