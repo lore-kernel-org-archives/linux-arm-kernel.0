@@ -1,86 +1,63 @@
-From: beagleboard@davidjohnsummers.uk (David Summers)
-Date: Sun, 23 Sep 2018 17:44:33 +0100
-Subject: [PATCH v4 0/2] Reworked rk3288-tinker-s devicetree
-In-Reply-To: <20180923113807.11558-1-heiko@sntech.de>
-References: <20180923113807.11558-1-heiko@sntech.de>
-Message-ID: <1f9a2dc0-0eac-8aa2-41a4-5d6117c72aea@davidjohnsummers.uk>
+From: liviu@dudau.co.uk (Liviu Dudau)
+Date: Sun, 23 Sep 2018 18:39:40 +0100
+Subject: [PATCH V2 3/3] arm64: dts: broadcom: Add reference to Compute
+ Module IO Board V3
+In-Reply-To: <1535393148-24163-4-git-send-email-stefan.wahren@i2se.com>
+References: <1535393148-24163-1-git-send-email-stefan.wahren@i2se.com>
+ <1535393148-24163-4-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <20180923173940.GE9849@bart.dudau.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Heiko,
+On Mon, Aug 27, 2018 at 08:05:48PM +0200, Stefan Wahren wrote:
+> This adds a reference to the dts of the Compute Module IO Board V3 in arm,
+> so we don't need to maintain the content in arm64.
+> 
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> ---
+>  arch/arm64/boot/dts/broadcom/Makefile                | 3 ++-
+>  arch/arm64/boot/dts/broadcom/bcm2837-rpi-cm3-io3.dts | 2 ++
+>  2 files changed, 4 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm64/boot/dts/broadcom/bcm2837-rpi-cm3-io3.dts
+> 
+> diff --git a/arch/arm64/boot/dts/broadcom/Makefile b/arch/arm64/boot/dts/broadcom/Makefile
+> index 1193a9e..3d98f5f 100644
+> --- a/arch/arm64/boot/dts/broadcom/Makefile
+> +++ b/arch/arm64/boot/dts/broadcom/Makefile
+> @@ -1,6 +1,7 @@
+>  # SPDX-License-Identifier: GPL-2.0
+>  dtb-$(CONFIG_ARCH_BCM2835) += bcm2837-rpi-3-b.dtb \
+> -			      bcm2837-rpi-3-b-plus.dtb
+> +			      bcm2837-rpi-3-b-plus.dtb \
+> +			      bcm2837-rpi-cm3-io3.dts
 
-Yes I like the refactoring. Patch 1 effectively making no changes, but 
-rearranging files so the tinker board device tree can be used as a 
-template for others. Patch 2 then adding the Tinker Board S, with the 
-only major change being adding the eMMC - and that change is relatively 
-simple.
+This should be the .dtb file, not the .dts. At compile time make is not going
+to complain, because it finds the file, but make dtbs_install will fail.
 
-These two patches by themselves are enough to get the Tinker Board S 
-functional, and that they should be uncontroversial hopefully means they 
-will go through.
+I'm not sure if you want a patch or if you can fix it in your public tree.
 
-The WiFi change, I also had my doubts over - hence why it was a separate 
-patch. For what it is worth, it was what was needed to get the WiFi up 
-on: https://paste.pound-python.org/show/SFdoQHC3z2hvoufdAmxs/ - hence 
-why submitted.
 
-My own problems with it:
-1) I believe that the tinker board has wi-fi in which case it should be 
-common - but know of no one with a plain tinker board - hence why to 
-post, so if someone can test. Then if so apply to the tinker-board.dtsi
-2) Parts of the patch are clear (e.g. enabling sdio0 - as that is how 
-the wifi data is wired up); but other parts (e.g. uart0 pinctrl, and the 
-sdio_pwrseq) and although these seem needed - the connection is vague to 
-the WiFi. What can I say, but these were in the original ASUS patch.
+Found out while trying to install the dtbs from linux-next 20180920
 
-So on WiFi I can understand if discussion is needed.
+Best regards,
+Liviu
 
-Regards,
-
-David.
-
-P.S. and thanks for the git commands - first time I've used git in 
-anger, e.g. hadn't realised the importance of the "git commit" message 
-for how it is used in "git format-patch". I'll get better at this with 
-time ....
-
-On 23/09/2018 12:38, Heiko Stuebner wrote:
-> Hi David,
->
-> I've adpated your patches 1+2 like so and would like to add them this way
-> later on. Biggest change is of course making patch 1 solely about moving
-> the shared parts to the dtsi and adding the tinker-s.dts including the
-> emmc in the second patch.
->
-> Apart from that you can also see some previously missing style-related
-> fixes. For example patch subject lines are somewhat specific, to allow
-> people browsing the git history to realize the core patch contents just
-> from the "headline" and also use the "correct" prefixes which vary
-> depending on the subsystem your changing.
->
-> For future patches you can just do a "git log --oneline arch/arm/boot/dts"
-> (change directory depending on location of the change of course), to
-> see that arm32 dts use "ARM: dts: $soc-vendor: foo".
->
->
-> Also providing a commit message describing the individual change
-> in a bit more detail is important.
->
-> The wifi patch is a different issue, so I'll reply there.
->
->
-> Heiko
->
-> David Summers (2):
->    ARM: dts: rockchip: move shared tinker-board nodes to a common dtsi
->    ARM: dts: rockchip: add rk3288-based Tinker board S
->
->   .../devicetree/bindings/arm/rockchip.txt      |   4 +
->   arch/arm/boot/dts/Makefile                    |   1 +
->   arch/arm/boot/dts/rk3288-tinker-s.dts         |  26 +
->   arch/arm/boot/dts/rk3288-tinker.dts           | 498 +----------------
->   arch/arm/boot/dts/rk3288-tinker.dtsi          | 504 ++++++++++++++++++
->   5 files changed, 537 insertions(+), 496 deletions(-)
->   create mode 100644 arch/arm/boot/dts/rk3288-tinker-s.dts
->   create mode 100644 arch/arm/boot/dts/rk3288-tinker.dtsi
->
+>  
+>  subdir-y	+= northstar2
+>  subdir-y	+= stingray
+> diff --git a/arch/arm64/boot/dts/broadcom/bcm2837-rpi-cm3-io3.dts b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-cm3-io3.dts
+> new file mode 100644
+> index 0000000..b1c4ab2
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-cm3-io3.dts
+> @@ -0,0 +1,2 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +#include "arm/bcm2837-rpi-cm3-io3.dts"
+> -- 
+> 2.7.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
