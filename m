@@ -1,77 +1,86 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sun, 23 Sep 2018 18:40:25 +0200
-Subject: [RFC 1/3 net] lorawan: Add LoRaWAN class module
-In-Reply-To: <fc737f3940bbe91341fb15d85ac11931eb56d1fc.1535039998.git.starnight@g.ncu.edu.tw>
-References: <cover.1535039998.git.starnight@g.ncu.edu.tw>
- <fc737f3940bbe91341fb15d85ac11931eb56d1fc.1535039998.git.starnight@g.ncu.edu.tw>
-Message-ID: <cebcea44-9db3-5564-574c-038d9af79995@suse.de>
+From: beagleboard@davidjohnsummers.uk (David Summers)
+Date: Sun, 23 Sep 2018 17:44:33 +0100
+Subject: [PATCH v4 0/2] Reworked rk3288-tinker-s devicetree
+In-Reply-To: <20180923113807.11558-1-heiko@sntech.de>
+References: <20180923113807.11558-1-heiko@sntech.de>
+Message-ID: <1f9a2dc0-0eac-8aa2-41a4-5d6117c72aea@davidjohnsummers.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jian-Hong,
+Thanks Heiko,
 
-[+ Afonso]
+Yes I like the refactoring. Patch 1 effectively making no changes, but 
+rearranging files so the tinker board device tree can be used as a 
+template for others. Patch 2 then adding the Tinker Board S, with the 
+only major change being adding the eMMC - and that change is relatively 
+simple.
 
-Am 23.08.18 um 19:15 schrieb Jian-Hong Pan:
-> LoRaWAN defined by LoRa Alliance(TM) is the MAC layer over LoRa devices.
-> 
-> This patch implements part of Class A end-devices features defined in
-> LoRaWAN(TM) Specification Ver. 1.0.2:
-> 1. End-device receive slot timing
-> 2. Only single channel and single data rate for now
-> 3. Unconfirmed data up/down message types
-> 4. Encryption/decryption for up/down link data messages
-> 
-> It also implements the the functions and maps to Datagram socket for
-> LoRaWAN unconfirmed data messages.
-> 
-> On the other side, it defines the basic interface and operation
-> functions for compatible LoRa device drivers.
-> 
-> Signed-off-by: Jian-Hong Pan <starnight@g.ncu.edu.tw>
-> ---
->  include/linux/maclorawan/lora.h | 239 +++++++++++
->  net/maclorawan/Kconfig          |  14 +
->  net/maclorawan/Makefile         |   2 +
->  net/maclorawan/lorawan.h        | 219 ++++++++++
->  net/maclorawan/lrwsec.c         | 237 +++++++++++
->  net/maclorawan/lrwsec.h         |  57 +++
->  net/maclorawan/mac.c            | 552 +++++++++++++++++++++++++
->  net/maclorawan/main.c           | 665 ++++++++++++++++++++++++++++++
->  net/maclorawan/socket.c         | 700 ++++++++++++++++++++++++++++++++
->  9 files changed, 2685 insertions(+)
->  create mode 100644 include/linux/maclorawan/lora.h
+These two patches by themselves are enough to get the Tinker Board S 
+functional, and that they should be uncontroversial hopefully means they 
+will go through.
 
-Can we use include/linux/lora/lorawan.h for simplicity?
+The WiFi change, I also had my doubts over - hence why it was a separate 
+patch. For what it is worth, it was what was needed to get the WiFi up 
+on: https://paste.pound-python.org/show/SFdoQHC3z2hvoufdAmxs/ - hence 
+why submitted.
 
->  create mode 100644 net/maclorawan/Kconfig
->  create mode 100644 net/maclorawan/Makefile
->  create mode 100644 net/maclorawan/lorawan.h
->  create mode 100644 net/maclorawan/lrwsec.c
->  create mode 100644 net/maclorawan/lrwsec.h
->  create mode 100644 net/maclorawan/mac.c
->  create mode 100644 net/maclorawan/main.c
->  create mode 100644 net/maclorawan/socket.c
+My own problems with it:
+1) I believe that the tinker board has wi-fi in which case it should be 
+common - but know of no one with a plain tinker board - hence why to 
+post, so if someone can test. Then if so apply to the tinker-board.dtsi
+2) Parts of the patch are clear (e.g. enabling sdio0 - as that is how 
+the wifi data is wired up); but other parts (e.g. uart0 pinctrl, and the 
+sdio_pwrseq) and although these seem needed - the connection is vague to 
+the WiFi. What can I say, but these were in the original ASUS patch.
 
-This patch is much too large for me to review...
+So on WiFi I can understand if discussion is needed.
 
-It also doesn't seem to follow the structure I suggested: 802.15.4 has
-two separate directories, net/ieee802154/ and net/mac802154/. Therefore
-I had suggested net/maclorawan/ only for code that translates from
-ETH_P_LORAWAN to ETH_P_LORA socket buffers, i.e. your soft MAC. Generic
-socket code that applies also to hard MAC drivers I expected to go
-either to net/lora/lorawan/ or better net/lorawan/ or some other clearly
-separate location, with its own Kconfig symbol - any reason not to?
-Consider which parts can be enabled/used independently of each other,
-then you can put them into two (or more?) different patches.
+Regards,
 
-Also please use SPDX license identifiers in your headers.
-And please don't put the whole world in To, use CC.
+David.
 
-Thanks,
-Andreas
+P.S. and thanks for the git commands - first time I've used git in 
+anger, e.g. hadn't realised the importance of the "git commit" message 
+for how it is used in "git format-patch". I'll get better at this with 
+time ....
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+On 23/09/2018 12:38, Heiko Stuebner wrote:
+> Hi David,
+>
+> I've adpated your patches 1+2 like so and would like to add them this way
+> later on. Biggest change is of course making patch 1 solely about moving
+> the shared parts to the dtsi and adding the tinker-s.dts including the
+> emmc in the second patch.
+>
+> Apart from that you can also see some previously missing style-related
+> fixes. For example patch subject lines are somewhat specific, to allow
+> people browsing the git history to realize the core patch contents just
+> from the "headline" and also use the "correct" prefixes which vary
+> depending on the subsystem your changing.
+>
+> For future patches you can just do a "git log --oneline arch/arm/boot/dts"
+> (change directory depending on location of the change of course), to
+> see that arm32 dts use "ARM: dts: $soc-vendor: foo".
+>
+>
+> Also providing a commit message describing the individual change
+> in a bit more detail is important.
+>
+> The wifi patch is a different issue, so I'll reply there.
+>
+>
+> Heiko
+>
+> David Summers (2):
+>    ARM: dts: rockchip: move shared tinker-board nodes to a common dtsi
+>    ARM: dts: rockchip: add rk3288-based Tinker board S
+>
+>   .../devicetree/bindings/arm/rockchip.txt      |   4 +
+>   arch/arm/boot/dts/Makefile                    |   1 +
+>   arch/arm/boot/dts/rk3288-tinker-s.dts         |  26 +
+>   arch/arm/boot/dts/rk3288-tinker.dts           | 498 +----------------
+>   arch/arm/boot/dts/rk3288-tinker.dtsi          | 504 ++++++++++++++++++
+>   5 files changed, 537 insertions(+), 496 deletions(-)
+>   create mode 100644 arch/arm/boot/dts/rk3288-tinker-s.dts
+>   create mode 100644 arch/arm/boot/dts/rk3288-tinker.dtsi
+>
