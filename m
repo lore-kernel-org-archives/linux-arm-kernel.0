@@ -1,31 +1,44 @@
 From: qader.aymen@gmail.com (Aymen Qader)
-Date: Sun, 23 Sep 2018 14:16:56 +0100
-Subject: [PATCH 0/5] staging: vc04_services: Fix checkpatch.pl errors
-Message-ID: <20180923131656.9062-1-qader.aymen@gmail.com>
+Date: Sun, 23 Sep 2018 14:07:30 +0100
+Subject: [PATCH 4/5] staging: vc04_services: Surround complex macros
+In-Reply-To: <20180923130733.4128-1-qader.aymen@gmail.com>
+References: <20180923130733.4128-1-qader.aymen@gmail.com>
+Message-ID: <20180923130733.4128-4-qader.aymen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset fixes the following checkpatch.pl errors in the
-interface/vchi directory:
+This patch fixes the checkpatch.pl error:
 
-ERROR: space prohibited after/before that open/closed parenthesis
-ERROR: code indent should use tabs where possible
-ERROR: space required after that ','
 ERROR: Macros with complex values should be enclosed in parentheses
-ERROR: Macros with complex values should be enclosed in parenthese
 
+in the interface/vchi directory
 
+Signed-off-by: Aymen Qader <qader.aymen@gmail.com>
+---
+ drivers/staging/vc04_services/interface/vchi/vchi.h | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Aymen Qader (5):
-  staging: vc04_services: Fix "space prohibited"
-  staging: vc04_services: Use tabs instead of spaces
-  staging: vc04_services: Add spaces after commas
-  staging: vc04_services: Surround complex macros
-  staging: vc04_services: Remove spaces after '*'
-
- .../vc04_services/interface/vchi/vchi.h       | 200 +++++++++---------
- .../vc04_services/interface/vchi/vchi_cfg.h   |   2 +-
- 2 files changed, 101 insertions(+), 101 deletions(-)
-
+diff --git a/drivers/staging/vc04_services/interface/vchi/vchi.h b/drivers/staging/vc04_services/interface/vchi/vchi.h
+index d8e660240a44..f818cf2e27e1 100644
+--- a/drivers/staging/vc04_services/interface/vchi/vchi.h
++++ b/drivers/staging/vc04_services/interface/vchi/vchi.h
+@@ -92,14 +92,14 @@ typedef struct vchi_msg_vector_ex {
+ } VCHI_MSG_VECTOR_EX_T;
+ 
+ // Construct an entry in a msg vector for a pointer (p) of length (l)
+-#define VCHI_VEC_POINTER(p, l)  VCHI_VEC_POINTER, { { (VCHI_MEM_HANDLE_T)(p), (l) } }
++#define VCHI_VEC_POINTER(p, l)  (VCHI_VEC_POINTER, { { (VCHI_MEM_HANDLE_T)(p), (l) } })
+ 
+ // Construct an entry in a msg vector for a message handle (h), starting at offset (o) of length (l)
+-#define VCHI_VEC_HANDLE(h, o, l) VCHI_VEC_HANDLE,  { { (h), (o), (l) } }
++#define VCHI_VEC_HANDLE(h, o, l) (VCHI_VEC_HANDLE,  { { (h), (o), (l) } })
+ 
+ // Macros to manipulate 'FOURCC' values
+ #define MAKE_FOURCC(x) ((int32_t)((x[0] << 24) | (x[1] << 16) | (x[2] << 8) | x[3]))
+-#define FOURCC_TO_CHAR(x) (x >> 24) & 0xFF, (x >> 16) & 0xFF, (x >> 8) & 0xFF, x & 0xFF
++#define FOURCC_TO_CHAR(x) ((x >> 24) & 0xFF, (x >> 16) & 0xFF, (x >> 8) & 0xFF, x & 0xFF)
+ 
+ // Opaque service information
+ struct opaque_vchi_service_t;
 -- 
 2.17.1
