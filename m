@@ -1,26 +1,256 @@
 From: aford173@gmail.com (Adam Ford)
-Date: Sun, 23 Sep 2018 10:37:16 -0500
-Subject: [PATCH 1/3] ARM: configs: omap2plus: Add tlv320aic23 as module
-Message-ID: <20180923153718.15095-1-aford173@gmail.com>
+Date: Sun, 23 Sep 2018 10:37:17 -0500
+Subject: [PATCH 2/3] ARM: DTS: AM3517-EVM: Add support for UI board and Audio
+In-Reply-To: <20180923153718.15095-1-aford173@gmail.com>
+References: <20180923153718.15095-1-aford173@gmail.com>
+Message-ID: <20180923153718.15095-2-aford173@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AM3517 EVM has an expander board which has two tlv320aic23
-codecs.  This enables the driver for these codecs as a module.
+The full AM3517-EVM shipped with an add-on board which contained
+two Audio codecs, a GPIO expander with a variety of buttons, and
+some other features.  This patch enables these portions of the UI
+board because they don't directly conflict with existing features.
 
 Signed-off-by: Adam Ford <aford173@gmail.com>
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index 6491419b1dad..21cabb7ad970 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -389,6 +389,7 @@ CONFIG_SND_OMAP_SOC_OMAP_TWL4030=m
- CONFIG_SND_OMAP_SOC_OMAP_ABE_TWL6040=m
- CONFIG_SND_OMAP_SOC_OMAP3_PANDORA=m
- CONFIG_SND_SOC_CPCAP=m
-+CONFIG_SND_SOC_TLV320AIC23_I2C=m
- CONFIG_SND_SIMPLE_CARD=m
- CONFIG_SND_AUDIO_GRAPH_CARD=m
- CONFIG_HID_GENERIC=m
+diff --git a/arch/arm/boot/dts/am3517-evm-ui.dtsi b/arch/arm/boot/dts/am3517-evm-ui.dtsi
+new file mode 100644
+index 000000000000..e841918c1c26
+--- /dev/null
++++ b/arch/arm/boot/dts/am3517-evm-ui.dtsi
+@@ -0,0 +1,220 @@
++/*
++ * Copyright (C) 2018 Logic PD, Inc - http://www.logicpd.com/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <dt-bindings/input/input.h>
++
++/ {
++	codec1 {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "tlv320aic23-hifi";
++
++		simple-audio-card,widgets =
++			"Microphone", "Mic In",
++			"Line", "Line In",
++			"Line", "Line Out";
++
++		simple-audio-card,routing =
++			"Line Out", "LOUT",
++			"Line Out", "ROUT",
++			"LLINEIN", "Line In",
++			"RLINEIN", "Line In",
++			"MICIN", "Mic In";
++
++		simple-audio-card,format = "i2s";
++		simple-audio-card,bitclock-master = <&sound_master>;
++		simple-audio-card,frame-master = <&sound_master>;
++
++		simple-audio-card,cpu {
++			sound-dai = <&mcbsp1>;
++		};
++
++		sound_master: simple-audio-card,codec {
++			sound-dai = <&tlv320aic23_1>;
++			system-clock-frequency = <12000000>;
++		};
++	};
++
++	codec2 {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "tlv320aic23-hifi";
++
++		simple-audio-card,widgets =
++			"Microphone", "Mic In",
++			"Line", "Line In",
++			"Line", "Line Out";
++
++		simple-audio-card,routing =
++			"Line Out", "LOUT",
++			"Line Out", "ROUT",
++			"LLINEIN", "Line In",
++			"RLINEIN", "Line In",
++			"MICIN", "Mic In";
++
++		simple-audio-card,format = "i2s";
++		simple-audio-card,bitclock-master = <&sound_master2>;
++		simple-audio-card,frame-master = <&sound_master2>;
++
++		simple-audio-card,cpu {
++			sound-dai = <&mcbsp2>;
++		};
++
++		sound_master2: simple-audio-card,codec {
++			sound-dai = <&tlv320aic23_2>;
++			system-clock-frequency = <12000000>;
++		};
++	};
++
++	expander-keys {
++		compatible = "gpio-keys-polled";
++		poll-interval = <100>;
++
++		record {
++			label = "Record";
++			/* linux,code = <BTN_0>; */
++			gpios = <&tca6416_2 15 GPIO_ACTIVE_LOW>;
++		};
++
++		play {
++			label = "Play";
++			linux,code = <KEY_PLAY>;
++			gpios = <&tca6416_2 14 GPIO_ACTIVE_LOW>;
++		};
++
++		Stop {
++			label = "Stop";
++			linux,code = <KEY_STOP>;
++			gpios = <&tca6416_2 13 GPIO_ACTIVE_LOW>;
++		};
++
++		fwd {
++			label = "FWD";
++			linux,code = <KEY_FASTFORWARD>;
++			gpios = <&tca6416_2 12 GPIO_ACTIVE_LOW>;
++		};
++
++		rwd {
++			label = "RWD";
++			linux,code = <KEY_REWIND>;
++			gpios = <&tca6416_2 11 GPIO_ACTIVE_LOW>;
++		};
++
++		shift {
++			label = "Shift";
++			linux,code = <KEY_LEFTSHIFT>;
++			gpios = <&tca6416_2 10 GPIO_ACTIVE_LOW>;
++		};
++
++		Mode {
++			label = "Mode";
++			linux,code = <BTN_MODE>;
++			gpios = <&tca6416_2 9 GPIO_ACTIVE_LOW>;
++		};
++
++		Menu {
++			label = "Menu";
++			linux,code = <KEY_MENU>;
++			gpios = <&tca6416_2 8 GPIO_ACTIVE_LOW>;
++		};
++
++		Up {
++			label = "Up";
++			linux,code = <KEY_UP>;
++			gpios = <&tca6416_2 7 GPIO_ACTIVE_LOW>;
++		};
++
++		Down {
++			label = "Down";
++			linux,code = <KEY_DOWN>;
++			gpios = <&tca6416_2 6 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
++
++&i2c2 {
++	/* Audio codecs */
++	tlv320aic23_1: codec at 1a {
++		compatible = "ti,tlv320aic23";
++		reg = <0x1a>;
++		#sound-dai-cells= <0>;
++		status = "okay";
++	};
++
++	tlv320aic23_2: codec at 1b {
++		compatible = "ti,tlv320aic23";
++		reg = <0x1b>;
++		#sound-dai-cells= <0>;
++		status = "okay";
++	};
++};
++
++&i2c3 {
++	/* Audio codecs */
++	tlv320aic23_3: codec at 1a {
++		compatible = "ti,tlv320aic23";
++		reg = <0x1a>;
++		#sound-dai-cells= <0>;
++		status = "okay";
++	};
++
++	/* GPIO Expanders */
++	tca6416_2: gpio at 20 {
++		compatible = "ti,tca6416";
++		reg = <0x20>;
++		gpio-controller;
++		#gpio-cells = <2>;
++		vcc-supply = <&vdd_io_reg>;
++	};
++
++	tca6416_3: gpio at 21 {
++		compatible = "ti,tca6416";
++		reg = <0x21>;
++		gpio-controller;
++		#gpio-cells = <2>;
++		vcc-supply = <&vdd_io_reg>;
++	};
++
++	/* TVP5146 Analog Video decoder input */
++	tvp5146 at 5c {
++		compatible = "ti,tvp5146m2";
++		reg = <0x5c>;
++	};
++};
++
++&mcbsp1 {
++	status = "ok";
++	#sound-dai-cells = <0>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&mcbsp1_pins>;
++};
++
++&mcbsp2 {
++	status = "ok";
++	#sound-dai-cells = <0>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&mcbsp2_pins>;
++};
++
++&omap3_pmx_core {
++	mcbsp1_pins: pinmux_mcbsp1_pins {
++		pinctrl-single,pins = <
++			OMAP3_CORE1_IOPAD(0x2190, PIN_OUTPUT | MUX_MODE0)	/* mcbsp1_dx.mcbsp1_dx */
++			OMAP3_CORE1_IOPAD(0x2192, PIN_INPUT | MUX_MODE0)	/* mcbsp1_dx.mcbsp1_dr */
++			OMAP3_CORE1_IOPAD(0x2196, PIN_INPUT | MUX_MODE0)	/* mcbsp_clks.mcbsp1_fsx */
++			OMAP3_CORE1_IOPAD(0x2198, PIN_INPUT | MUX_MODE0)	/* mcbsp1_clkx.mcbsp1_clkx */
++		>;
++	};
++
++	mcbsp2_pins: pinmux_mcbsp2_pins {
++		pinctrl-single,pins = <
++			OMAP3_CORE1_IOPAD(0x213c, PIN_INPUT | MUX_MODE0)	/* mcbsp2_fsx.mcbsp2_fsx */
++			OMAP3_CORE1_IOPAD(0x213e, PIN_INPUT | MUX_MODE0)	/* mcbsp2_clkx.mcbsp2_clkx */
++			OMAP3_CORE1_IOPAD(0x2140, PIN_INPUT | MUX_MODE0)	/* mcbsp2_dr.mcbsp2.dr */
++			OMAP3_CORE1_IOPAD(0x2142, PIN_OUTPUT | MUX_MODE0)	/* mcbsp2_dx.mcbsp2_dx */
++		>;
++	};
++};
+diff --git a/arch/arm/boot/dts/am3517-evm.dts b/arch/arm/boot/dts/am3517-evm.dts
+index 1d158cfda15f..d4d33cd7adad 100644
+--- a/arch/arm/boot/dts/am3517-evm.dts
++++ b/arch/arm/boot/dts/am3517-evm.dts
+@@ -9,6 +9,7 @@
+ 
+ #include "am3517.dtsi"
+ #include "am3517-som.dtsi"
++#include "am3517-evm-ui.dtsi"
+ #include <dt-bindings/input/input.h>
+ 
+ / {
 -- 
 2.17.1
