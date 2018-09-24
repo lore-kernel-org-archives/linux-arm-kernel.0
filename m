@@ -1,331 +1,111 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Mon, 24 Sep 2018 11:26:32 +0200
-Subject: [PATCH V2 2/2] pinctrl: bcm: add Northstar driver
-In-Reply-To: <20180924092632.3788-1-zajec5@gmail.com>
-References: <20180924092632.3788-1-zajec5@gmail.com>
-Message-ID: <20180924092632.3788-2-zajec5@gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 24 Sep 2018 11:40:08 +0200
+Subject: [PATCH 1/2] arm64: freescale: Use "spi" as name for SPI controllers
+Message-ID: <20180924094009.19344-1-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rafa? Mi?ecki <rafal@milecki.pl>
+From: Thierry Reding <treding@nvidia.com>
 
-This driver provides support for Northstar mux controller. It differs
-from Northstar Plus one so a new binding and driver were needed.
+Recent versions of DTC contain additional checks for SPI busses and warn
+about certain common mistakes, such as when an SPI controller has a name
+other than "spi".
 
-Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
-V2: Define more pins, groups, functions
-    Simplify ns_pinctrl_set_mux() as Northstar uses 1:1 mapping
----
- drivers/pinctrl/bcm/Kconfig      |  13 ++
- drivers/pinctrl/bcm/Makefile     |   1 +
- drivers/pinctrl/bcm/pinctrl-ns.c | 262 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 276 insertions(+)
- create mode 100644 drivers/pinctrl/bcm/pinctrl-ns.c
+ arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi | 2 +-
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 6 +++---
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 4 ++--
+ arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi | 4 ++--
+ 4 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/pinctrl/bcm/Kconfig b/drivers/pinctrl/bcm/Kconfig
-index 0f38d51f47c6..c8575399d6f7 100644
---- a/drivers/pinctrl/bcm/Kconfig
-+++ b/drivers/pinctrl/bcm/Kconfig
-@@ -73,6 +73,19 @@ config PINCTRL_CYGNUS_MUX
- 	  configuration, with the exception that certain individual pins
- 	  can be overridden to GPIO function
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
+index 68ac78c4564d..5da732f82fa0 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi
+@@ -337,7 +337,7 @@
+ 			status = "disabled";
+ 		};
  
-+config PINCTRL_NS
-+	bool "Broadcom Northstar pins driver"
-+	depends on OF && (ARCH_BCM_5301X || COMPILE_TEST)
-+	select PINMUX
-+	select GENERIC_PINCONF
-+	default ARCH_BCM_5301X
-+	help
-+	  Say yes here to enable the Broadcom NS SoC pins driver.
-+
-+	  The Broadcom Northstar pins driver supports muxing multi-purpose pins
-+	  that can be used for various functions (e.g. SPI, I2C, UART) as well
-+	  as GPIOs.
-+
- config PINCTRL_NSP_GPIO
- 	bool "Broadcom NSP GPIO (with PINCONF) driver"
- 	depends on OF_GPIO && (ARCH_BCM_NSP || COMPILE_TEST)
-diff --git a/drivers/pinctrl/bcm/Makefile b/drivers/pinctrl/bcm/Makefile
-index 80ceb9dae944..79d5e49fdd9a 100644
---- a/drivers/pinctrl/bcm/Makefile
-+++ b/drivers/pinctrl/bcm/Makefile
-@@ -5,6 +5,7 @@ obj-$(CONFIG_PINCTRL_BCM281XX)		+= pinctrl-bcm281xx.o
- obj-$(CONFIG_PINCTRL_BCM2835)		+= pinctrl-bcm2835.o
- obj-$(CONFIG_PINCTRL_IPROC_GPIO)	+= pinctrl-iproc-gpio.o
- obj-$(CONFIG_PINCTRL_CYGNUS_MUX)	+= pinctrl-cygnus-mux.o
-+obj-$(CONFIG_PINCTRL_NS)		+= pinctrl-ns.o
- obj-$(CONFIG_PINCTRL_NSP_GPIO)		+= pinctrl-nsp-gpio.o
- obj-$(CONFIG_PINCTRL_NS2_MUX)		+= pinctrl-ns2-mux.o
- obj-$(CONFIG_PINCTRL_NSP_MUX)		+= pinctrl-nsp-mux.o
-diff --git a/drivers/pinctrl/bcm/pinctrl-ns.c b/drivers/pinctrl/bcm/pinctrl-ns.c
-new file mode 100644
-index 000000000000..5bd9f581850e
---- /dev/null
-+++ b/drivers/pinctrl/bcm/pinctrl-ns.c
-@@ -0,0 +1,262 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright (C) 2018 Rafa? Mi?ecki <rafal@milecki.pl>
-+ */
-+
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/pinctrl/pinconf-generic.h>
-+#include <linux/pinctrl/pinctrl.h>
-+#include <linux/pinctrl/pinmux.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+
-+struct ns_pinctrl {
-+	struct pinctrl_dev *pctldev;
-+	struct device *dev;
-+	void __iomem *base;
-+};
-+
-+/*
-+ * Pins
-+ */
-+
-+static const struct pinctrl_pin_desc ns_pinctrl_pins[] = {
-+	{ 0, "spi_clk" },
-+	{ 1, "spi_ss" },
-+	{ 2, "spi_mosi" },
-+	{ 3, "spi_miso" },
-+	{ 4, "i2c_scl" },
-+	{ 5, "i2c_sda" },
-+	{ 6, "mdc" },
-+	{ 7, "mdio" },
-+	{ 8, "pwm0" },
-+	{ 9, "pwm1" },
-+	{ 10, "pwm2" },
-+	{ 11, "pwm3" },
-+	{ 12, "uart1_rx" },
-+	{ 13, "uart1_tx" },
-+	{ 14, "uart1_cts" },
-+	{ 15, "uart1_rts" },
-+};
-+
-+/*
-+ * Groups
-+ */
-+
-+struct ns_pinctrl_group {
-+	const char *name;
-+	const unsigned int *pins;
-+	const unsigned int num_pins;
-+};
-+
-+static const unsigned int spi_pins[] = { 0, 1, 2, 3 };
-+static const unsigned int i2c_pins[] = { 4, 5 };
-+static const unsigned int mdio_pins[] = { 6, 7 };
-+static const unsigned int pwm0_pins[] = { 8 };
-+static const unsigned int pwm1_pins[] = { 9 };
-+static const unsigned int pwm2_pins[] = { 10 };
-+static const unsigned int pwm3_pins[] = { 11 };
-+static const unsigned int uart1_pins[] = { 12, 13, 14, 15 };
-+
-+#define NS_GROUP(_name, _pins)			\
-+{						\
-+	.name = _name,				\
-+	.pins = _pins,				\
-+	.num_pins = ARRAY_SIZE(_pins),		\
-+}
-+
-+static const struct ns_pinctrl_group ns_pinctrl_groups[] = {
-+	NS_GROUP("spi_grp", spi_pins),
-+	NS_GROUP("i2c_grp", i2c_pins),
-+	NS_GROUP("mdio_grp", mdio_pins),
-+	NS_GROUP("pwm0_grp", pwm0_pins),
-+	NS_GROUP("pwm1_grp", pwm1_pins),
-+	NS_GROUP("pwm2_grp", pwm2_pins),
-+	NS_GROUP("pwm3_grp", pwm3_pins),
-+	NS_GROUP("uart1_grp", uart1_pins),
-+};
-+
-+/*
-+ * Functions
-+ */
-+
-+struct ns_pinctrl_function {
-+	const char *name;
-+	const char * const *groups;
-+	const unsigned int num_groups;
-+};
-+
-+static const char * const spi_groups[] = { "spi_grp" };
-+static const char * const i2c_groups[] = { "i2c_grp" };
-+static const char * const mdio_groups[] = { "mdio_grp" };
-+static const char * const pwm_groups[] = { "pwm0_grp", "pwm1_grp", "pwm2_grp",
-+					   "pwm3_grp" };
-+static const char * const uart1_groups[] = { "uart1_grp" };
-+
-+#define NS_FUNCTION(_name, _groups)		\
-+{						\
-+	.name = _name,				\
-+	.groups = _groups,			\
-+	.num_groups = ARRAY_SIZE(_groups),	\
-+}
-+
-+static const struct ns_pinctrl_function ns_pinctrl_functions[] = {
-+	NS_FUNCTION("spi", spi_groups),
-+	NS_FUNCTION("i2c", i2c_groups),
-+	NS_FUNCTION("mdio", mdio_groups),
-+	NS_FUNCTION("pwm", pwm_groups),
-+	NS_FUNCTION("uart1", uart1_groups),
-+};
-+
-+/*
-+ * Groups code
-+ */
-+
-+static int ns_pinctrl_get_groups_count(struct pinctrl_dev *pctrl_dev)
-+{
-+	return ARRAY_SIZE(ns_pinctrl_groups);
-+}
-+
-+static const char *ns_pinctrl_get_group_name(struct pinctrl_dev *pctrl_dev,
-+					     unsigned int selector)
-+{
-+	return ns_pinctrl_groups[selector].name;
-+}
-+
-+static int ns_pinctrl_get_group_pins(struct pinctrl_dev *pctrl_dev,
-+				     unsigned int selector,
-+				     const unsigned int **pins,
-+				     unsigned int *num_pins)
-+{
-+	*pins = ns_pinctrl_groups[selector].pins;
-+	*num_pins = ns_pinctrl_groups[selector].num_pins;
-+
-+	return 0;
-+}
-+
-+static const struct pinctrl_ops ns_pinctrl_ops = {
-+	.get_groups_count = ns_pinctrl_get_groups_count,
-+	.get_group_name = ns_pinctrl_get_group_name,
-+	.get_group_pins = ns_pinctrl_get_group_pins,
-+	.dt_node_to_map = pinconf_generic_dt_node_to_map_group,
-+	.dt_free_map = pinconf_generic_dt_free_map,
-+};
-+
-+/*
-+ * Functions code
-+ */
-+
-+static int ns_pinctrl_get_functions_count(struct pinctrl_dev *pctrl_dev)
-+{
-+	return ARRAY_SIZE(ns_pinctrl_functions);
-+}
-+
-+static const char *ns_pinctrl_get_function_name(struct pinctrl_dev *pctrl_dev,
-+						unsigned int selector)
-+{
-+	return ns_pinctrl_functions[selector].name;
-+}
-+
-+static int ns_pinctrl_get_function_groups(struct pinctrl_dev *pctrl_dev,
-+					  unsigned int selector,
-+					  const char * const **groups,
-+					  unsigned * const num_groups)
-+{
-+	*groups = ns_pinctrl_functions[selector].groups;
-+	*num_groups = ns_pinctrl_functions[selector].num_groups;
-+
-+	return 0;
-+}
-+
-+static int ns_pinctrl_set_mux(struct pinctrl_dev *pctrl_dev,
-+			      unsigned int func_select,
-+			      unsigned int grp_select)
-+{
-+	struct ns_pinctrl *ns_pinctrl = pinctrl_dev_get_drvdata(pctrl_dev);
-+	u32 unset = 0;
-+	u32 tmp;
-+	int i;
-+
-+	for (i = 0; i < ns_pinctrl_groups[grp_select].num_pins; i++) {
-+		int pin_number = ns_pinctrl_groups[grp_select].pins[i];
-+
-+		unset |= BIT(pin_number);
-+	}
-+
-+	tmp = readl(ns_pinctrl->base);
-+	tmp &= ~unset;
-+	writel(tmp, ns_pinctrl->base);
-+
-+	return 0;
-+}
-+
-+static const struct pinmux_ops ns_pinctrl_pmxops = {
-+	.get_functions_count = ns_pinctrl_get_functions_count,
-+	.get_function_name = ns_pinctrl_get_function_name,
-+	.get_function_groups = ns_pinctrl_get_function_groups,
-+	.set_mux = ns_pinctrl_set_mux,
-+};
-+
-+/*
-+ * Controller code
-+ */
-+
-+static struct pinctrl_desc ns_pinctrl_desc = {
-+	.name = "pinctrl-ns",
-+	.pins = ns_pinctrl_pins,
-+	.npins = ARRAY_SIZE(ns_pinctrl_pins),
-+	.pctlops = &ns_pinctrl_ops,
-+	.pmxops = &ns_pinctrl_pmxops,
-+};
-+
-+static int ns_pinctrl_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct ns_pinctrl *ns_pinctrl;
-+	struct resource *res;
-+
-+	ns_pinctrl = devm_kzalloc(dev, sizeof(*ns_pinctrl), GFP_KERNEL);
-+	if (!ns_pinctrl)
-+		return -ENOMEM;
-+	ns_pinctrl->dev = dev;
-+
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-+					   "cru_gpio_control");
-+	ns_pinctrl->base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(ns_pinctrl->base)) {
-+		dev_err(dev, "Failed to map pinctrl regs\n");
-+		return PTR_ERR(ns_pinctrl->base);
-+	}
-+
-+	platform_set_drvdata(pdev, ns_pinctrl);
-+
-+	ns_pinctrl->pctldev = devm_pinctrl_register(dev, &ns_pinctrl_desc,
-+						    ns_pinctrl);
-+	if (IS_ERR(ns_pinctrl->pctldev)) {
-+		dev_err(dev, "Failed to register pinctrl\n");
-+		return PTR_ERR(ns_pinctrl->pctldev);
-+	}
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id ns_pinctrl_of_match_table[] = {
-+	{ .compatible = "brcm,ns-pinmux" },
-+	{ }
-+};
-+
-+static struct platform_driver ns_pinctrl_driver = {
-+	.probe = ns_pinctrl_probe,
-+	.driver = {
-+		.name = "ns-pinmux",
-+		.of_match_table = ns_pinctrl_of_match_table,
-+	},
-+};
-+
-+module_platform_driver(ns_pinctrl_driver);
-+
-+MODULE_AUTHOR("Rafa? Mi?ecki");
-+MODULE_LICENSE("GPL v2");
+-		dspi: dspi at 2100000 {
++		dspi: spi at 2100000 {
+ 			compatible = "fsl,ls1012a-dspi", "fsl,ls1021a-v1.0-dspi";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+index 6cc4c87614b6..3fed504b5381 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+@@ -284,7 +284,7 @@
+ 			interrupts = <0 43 0x4>;
+ 		};
+ 
+-		qspi: quadspi at 1550000 {
++		qspi: spi at 1550000 {
+ 			compatible = "fsl,ls1043a-qspi", "fsl,ls1021a-qspi";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -382,7 +382,7 @@
+ 			ranges = <0x0 0x5 0x00000000 0x8000000>;
+ 		};
+ 
+-		dspi0: dspi at 2100000 {
++		dspi0: spi at 2100000 {
+ 			compatible = "fsl,ls1043a-dspi", "fsl,ls1021a-v1.0-dspi";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -395,7 +395,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		dspi1: dspi at 2110000 {
++		dspi1: spi at 2110000 {
+ 			compatible = "fsl,ls1043a-dspi", "fsl,ls1021a-v1.0-dspi";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+index 3a2a14a8e187..51cbd50012d6 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+@@ -202,7 +202,7 @@
+ 			interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
+ 		};
+ 
+-		qspi: quadspi at 1550000 {
++		qspi: spi at 1550000 {
+ 			compatible = "fsl,ls1021a-qspi";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -361,7 +361,7 @@
+ 			#thermal-sensor-cells = <1>;
+ 		};
+ 
+-		dspi: dspi at 2100000 {
++		dspi: spi at 2100000 {
+ 			compatible = "fsl,ls1021a-v1.0-dspi";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+index 547a86ec7cd2..e45607419692 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+@@ -485,7 +485,7 @@
+ 			mmu-masters = <&fsl_mc 0x300 0>;
+ 		};
+ 
+-		dspi: dspi at 2100000 {
++		dspi: spi at 2100000 {
+ 			status = "disabled";
+ 			compatible = "fsl,ls2080a-dspi", "fsl,ls2085a-dspi";
+ 			#address-cells = <1>;
+@@ -611,7 +611,7 @@
+ 				  3 0 0x5 0x20000000 0x00010000>;
+ 		};
+ 
+-		qspi: quadspi at 20c0000 {
++		qspi: spi at 20c0000 {
+ 			status = "disabled";
+ 			compatible = "fsl,ls2080a-qspi", "fsl,ls1021a-qspi";
+ 			#address-cells = <1>;
 -- 
-2.13.7
+2.19.0
