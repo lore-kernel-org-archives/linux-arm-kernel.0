@@ -1,57 +1,90 @@
-From: leoyang.li@nxp.com (Leo Li)
-Date: Mon, 24 Sep 2018 16:58:40 +0000
-Subject: [GIT PULL] fixes for soc/fsl drivers for v4.19
-In-Reply-To: <20180923123704.r47aywqfhor3ma74@localhost>
-References: <20180920165656.31902-1-leoyang.li@nxp.com>
- <20180923123704.r47aywqfhor3ma74@localhost>
-Message-ID: <AMSPR04MB503FA6EEF013F8F10D6629F8F170@AMSPR04MB503.eurprd04.prod.outlook.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 24 Sep 2018 19:16:45 +0200
+Subject: [PATCH v3] dt-bindings: arm: Explicitly mark Samsung Exynos SoC
+ as unstable
+In-Reply-To: <CAOesGMgE6QaasvHi7E55Z4U1Pp0+8QYW2eRLMsExebZ999_UHA@mail.gmail.com>
+References: <20180830180205.18121-1-krzk@kernel.org>
+ <CAOesGMgE6QaasvHi7E55Z4U1Pp0+8QYW2eRLMsExebZ999_UHA@mail.gmail.com>
+Message-ID: <20180924171645.GA10910@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Sep 23, 2018 at 02:46:20PM +0100, Olof Johansson wrote:
+> On Thu, Aug 30, 2018 at 7:02 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> > Samsung Exynos SoCs and boards related bindings evolved since the initial
+> > introduction, but initially the bindings were minimal and a bit incomplete
+> > (they never described all the hardware modules available in the SoCs).
+> > Since then some significant (not fully compatible) changes have been
+> > already committed a few times (like gpio replaced by pinctrl, display ddc,
+> > mfc reserved memory, some core clocks added to various hardware modules,
+> > added more required nodes).
+> >
+> > On the other side there are no boards which have device tree embedded in
+> > the bootloader. Device tree blob is always compiled from the kernel tree
+> > and updated together with the kernel image.
+> >
+> > Thus to avoid further adding a bunch of workarounds for old/missing
+> > bindings, make development of new platforms easier and allow to make
+> > cleanup of the existing code and device tree files, lets mark some
+> > Samsung Exynos SoC platform bindings as unstable. This means that
+> > bindings can may change at any time and users should use the dtb file
+> > compiled from the same kernel source tree as the kernel image.
+> 
+> I have to admit that I don't really like this approach, and I missed
+> the patch when originally posted (I did notice it in the pull request
+> it came in with though).
+> 
+> The main concern for me is that with a blanket "everything is always
+> unstable" we discard the notion that we should strive for bindings to
+> be stable and backwards compatible.
+
+The original idea from Marek was to mark everything unstable. After
+comments from Rob I made it weaker already by changing to specific group
+of compatibles. Accepting their instability does not mean that we will
+be doing this on whenever possible. It just opens the possibility of
+finding some balance in cleanups and development. Sometimes things have
+to be seriously changed (fixed) and implementing workarounds for
+existing ABI might be huge work by itself.
+
+IOW, we want stability but not with the costs of huge development
+efforts... because no one else except us cares about the stability.
+
+> 
+> Questions that come to mind are:
+> 
+>  - When do they stop being unstable?
+
+They became unstable in a subjective way so I assume that reverse is the
+same, based on consensus and discussions.
+
+I am not sure if a hard time limit is good. There is no timeline for the
+Exynos development, no public roadmaps but rather community and
+partially volountary effort.  Therefore whatever number we set, it might
+be totally not matching reality.
+
+>  - Is there a way to note in the binding itself that it's still
+> unstable with an anticipation of when it will be settled in?
+
+Hmm, I see that some existing bindings are being added with "Unstable"
+warning:
+
+	git grep -i unstable Documentation/devicetree/
+
+so there should be no problem for putting there a timeframe.
+
+>  - Is there a better way to version the bindings to avoid complete
+> backwards compatibility?
+
+Some architectures are using overlays for handling backward
+compatibility. Anyway it might put additional effort on driver
+development.
+
+> Pointing out a couple of cases where it has been painful to stay
+> backwards compatible could also be useful for understanding (even
+> though you run the risk of each case being explained away with
+> suggestions of how it can be handled).
+> 
 
 
-> -----Original Message-----
-> From: Olof Johansson <olof@lixom.net>
-> Sent: Sunday, September 23, 2018 7:37 AM
-> To: Leo Li <leoyang.li@nxp.com>
-> Cc: arm at kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; shawnguo at kernel.org
-> Subject: Re: [GIT PULL] fixes for soc/fsl drivers for v4.19
-> 
-> Hi Li,
-> 
-> On Thu, Sep 20, 2018 at 11:56:56AM -0500, Li Yang wrote:
-> > Hi arm-soc maintainers,
-> >
-> > Please merge the following fixes for soc/fsl drivers.
-> >
-> > Regards,
-> > Leo
-> >
-> > The following changes since commit
-> 5b394b2ddf0347bef56e50c69a58773c94343ff3:
-> >
-> >   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
-> >
-> > are available in the Git repository at:
-> >
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/leo/linux.git
-> > tags/soc-fsl-fixes-for-4.19
-> >
-> > for you to fetch changes up to
-> 3cb31b634052ed458922e0c8e2b4b093d7fb60b9:
-> >
-> >   soc: fsl: qe: Fix copy/paste bug in ucc_get_tdm_sync_shift()
-> > (2018-09-17 16:01:46 -0500)
-> >
-> > ----------------------------------------------------------------
-> > soc/fsl fixes for 4.19
-> 
-> Please spend a bit of effort on writing up the tag for all pull requests, even
-> fixes. For fixes in particular, just as with the patch descriptions we want the
-> pull request to contain some brief information to what the bug is and why
-> the fix is needed.
-> 
-> Care to give this another go with a new tag description, please?
-
-Sure.  Will send a new version right away.
+Best regards,
+Krzysztof
