@@ -1,52 +1,86 @@
 From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Mon, 24 Sep 2018 21:30:00 +0800
-Subject: [PATCH 2/2] arm/arm64: KVM: share the check for vcpu events capability
+Date: Mon, 24 Sep 2018 21:29:59 +0800
+Subject: [PATCH 1/2] arm/arm64: KVM: rename function
+ kvm_arch_dev_ioctl_check_extension()
 In-Reply-To: <20180924133000.10244-1-gengdongjiu@huawei.com>
 References: <20180924133000.10244-1-gengdongjiu@huawei.com>
-Message-ID: <20180924133000.10244-3-gengdongjiu@huawei.com>
+Message-ID: <20180924133000.10244-2-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit 539aee0edb9f ("KVM: arm64: Share the parts of
-get/set events useful to 32bit") shares the get/set events
-helper for arm64 and arm32, it is better also share the check
-for vcpu events capability.
+Rename kvm_arch_dev_ioctl_check_extension() to
+kvm_arch_vm_ioctl_check_extension(), because it does
+not have any relationship with device.
 
-User space will check whether KVM supports vcpu events through
-KVM_CAP_VCPU_EVENTS IOCTL.
-
+Cc: James Morse <james.morse@arm.com> 
 Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
 ---
-For the 32 bit guest migration, it needs to enable the vcpu events
+I remeber James also mentioned that rename this function.
 
 ---
- arch/arm64/kvm/reset.c | 1 -
- virt/kvm/arm/arm.c     | 1 +
- 2 files changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/include/asm/kvm_host.h   | 2 +-
+ arch/arm64/include/asm/kvm_host.h | 2 +-
+ arch/arm64/kvm/reset.c            | 4 ++--
+ virt/kvm/arm/arm.c                | 2 +-
+ 4 files changed, 5 insertions(+), 5 deletions(-)
 
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 3ad482d..3ee29db 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -273,7 +273,7 @@ static inline void __cpu_init_stage2(void)
+ 	kvm_call_hyp(__init_stage2_translation);
+ }
+ 
+-static inline int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
++static inline int kvm_arch_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+ {
+ 	return 0;
+ }
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 3d6d733..c20537f 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -53,7 +53,7 @@
+ 
+ int __attribute_const__ kvm_target_cpu(void);
+ int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
+-int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext);
++int kvm_arch_vm_ioctl_check_extension(struct kvm *kvm, long ext);
+ void __extended_idmap_trampoline(phys_addr_t boot_pgd, phys_addr_t idmap_start);
+ 
+ struct kvm_arch {
 diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index fd37c53..e50245e 100644
+index e37c78b..fd37c53 100644
 --- a/arch/arm64/kvm/reset.c
 +++ b/arch/arm64/kvm/reset.c
-@@ -82,7 +82,6 @@ int kvm_arch_vm_ioctl_check_extension(struct kvm *kvm, long ext)
- 		break;
- 	case KVM_CAP_SET_GUEST_DEBUG:
- 	case KVM_CAP_VCPU_ATTRIBUTES:
--	case KVM_CAP_VCPU_EVENTS:
+@@ -55,12 +55,12 @@ static bool cpu_has_32bit_el1(void)
+ }
+ 
+ /**
+- * kvm_arch_dev_ioctl_check_extension
++ * kvm_arch_vm_ioctl_check_extension
+  *
+  * We currently assume that the number of HW registers is uniform
+  * across all CPUs (see cpuinfo_sanity_check).
+  */
+-int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
++int kvm_arch_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+ {
+ 	int r;
+ 
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index c92053b..40e79ea 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -240,7 +240,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
  		r = 1;
  		break;
  	default:
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 40e79ea..64e5d97 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -212,6 +212,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
- 	case KVM_CAP_READONLY_MEM:
- 	case KVM_CAP_MP_STATE:
- 	case KVM_CAP_IMMEDIATE_EXIT:
-+	case KVM_CAP_VCPU_EVENTS:
- 		r = 1;
+-		r = kvm_arch_dev_ioctl_check_extension(kvm, ext);
++		r = kvm_arch_vm_ioctl_check_extension(kvm, ext);
  		break;
- 	case KVM_CAP_ARM_SET_DEVICE_ADDR:
+ 	}
+ 	return r;
 -- 
 1.9.1
