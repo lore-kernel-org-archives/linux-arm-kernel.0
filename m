@@ -1,32 +1,61 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 24 Sep 2018 15:44:41 -0700
-Subject: [PATCH 0/4] TI sysc driver updates for am335x and am437x
-Message-ID: <20180924224445.97239-1-tony@atomide.com>
+Date: Mon, 24 Sep 2018 15:44:45 -0700
+Subject: [PATCH 4/4] bus: ti-sysc: Detect devices on am335x when DEBUG is
+ enabled
+In-Reply-To: <20180924224445.97239-1-tony@atomide.com>
+References: <20180924224445.97239-1-tony@atomide.com>
+Message-ID: <20180924224445.97239-5-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+When debug is enabled, we want to see what devices we're detecting
+to make things a bit easier for us.
 
-Here are few updates for ti-sysc driver for am335x and am437x. I'll be
-posting the related dts changes separately.
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ drivers/bus/ti-sysc.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-Based on testing with various devices, we can now also get rid of the
-quirk flag for SYSC_QUIRK_RESOURCE_PROVIDER and make module names limited
-to debug only except for few devices still using pm_runtime_irq_safe().
-
-Regards,
-
-Tony
-
-Tony Lindgren (4):
-  bus: ti-sysc: Defer suspend as needed
-  bus: ti-sysc: Update revision masks to support am437x
-  bus: ti-sysc: Detect more devices on am473x for debugging
-  bus: ti-sysc: Detect devices on am335x when DEBUG is enabled
-
- drivers/bus/ti-sysc.c                 | 143 +++++++++++++++-----------
- include/linux/platform_data/ti-sysc.h |   1 -
- 2 files changed, 85 insertions(+), 59 deletions(-)
-
+diff --git a/drivers/bus/ti-sysc.c b/drivers/bus/ti-sysc.c
+--- a/drivers/bus/ti-sysc.c
++++ b/drivers/bus/ti-sysc.c
+@@ -899,7 +899,8 @@ static const struct sysc_revision_quirk sysc_revision_quirks[] = {
+ 	SYSC_QUIRK("aess", 0, 0, 0x10, -1, 0x40000000, 0xffffffff, 0),
+ 	SYSC_QUIRK("control", 0, 0, 0x10, -1, 0x40000900, 0xffffffff, 0),
+ 	SYSC_QUIRK("cpgmac", 0, 0x1200, 0x1208, 0x1204, 0x4edb1902,
+-		   0xffffffff, 0),
++		   0xffff00f0, 0),
++	SYSC_QUIRK("dcan", 0, 0, -1, -1, 0xffffffff, 0xffffffff, 0),
+ 	SYSC_QUIRK("dcan", 0, 0, -1, -1, 0x00001401, 0xffffffff, 0),
+ 	SYSC_QUIRK("dwc3", 0, 0, 0x10, -1, 0x500a0200, 0xffffffff, 0),
+ 	SYSC_QUIRK("epwmss", 0, 0, 0x4, -1, 0x47400001, 0xffffffff, 0),
+@@ -909,6 +910,7 @@ static const struct sysc_revision_quirk sysc_revision_quirks[] = {
+ 	SYSC_QUIRK("hsi", 0, 0, 0x10, 0x14, 0x50043101, 0xffffffff, 0),
+ 	SYSC_QUIRK("iss", 0, 0, 0x10, -1, 0x40000101, 0xffffffff, 0),
+ 	SYSC_QUIRK("i2c", 0, 0, 0x10, 0x90, 0x5040000a, 0xfffffff0, 0),
++	SYSC_QUIRK("lcdc", 0, 0, 0x54, -1, 0x4f201000, 0xffffffff, 0),
+ 	SYSC_QUIRK("mcasp", 0, 0, 0x4, -1, 0x44306302, 0xffffffff, 0),
+ 	SYSC_QUIRK("mcasp", 0, 0, 0x4, -1, 0x44307b02, 0xffffffff, 0),
+ 	SYSC_QUIRK("mcbsp", 0, -1, 0x8c, -1, 0, 0, 0),
+@@ -920,8 +922,10 @@ static const struct sysc_revision_quirk sysc_revision_quirks[] = {
+ 	SYSC_QUIRK("ocp2scp", 0, 0, -1, -1, 0x50060007, 0xffffffff, 0),
+ 	SYSC_QUIRK("padconf", 0, 0, 0x10, -1, 0x4fff0800, 0xffffffff, 0),
+ 	SYSC_QUIRK("prcm", 0, 0, -1, -1, 0x40000100, 0xffffffff, 0),
++	SYSC_QUIRK("prcm", 0, 0, -1, -1, 0x00004102, 0xffffffff, 0),
+ 	SYSC_QUIRK("prcm", 0, 0, -1, -1, 0x40000400, 0xffffffff, 0),
+ 	SYSC_QUIRK("scm", 0, 0, 0x10, -1, 0x40000900, 0xffffffff, 0),
++	SYSC_QUIRK("scm", 0, 0, -1, -1, 0x4e8b0100, 0xffffffff, 0),
+ 	SYSC_QUIRK("scm", 0, 0, -1, -1, 0x4f000100, 0xffffffff, 0),
+ 	SYSC_QUIRK("scrm", 0, 0, -1, -1, 0x00000010, 0xffffffff, 0),
+ 	SYSC_QUIRK("sdio", 0, 0, 0x10, -1, 0x40202301, 0xffffffff, 0),
+@@ -931,7 +935,7 @@ static const struct sysc_revision_quirk sysc_revision_quirks[] = {
+ 	SYSC_QUIRK("slimbus", 0, 0, 0x10, -1, 0x40002903, 0xffffffff, 0),
+ 	SYSC_QUIRK("spinlock", 0, 0, 0x10, -1, 0x50020000, 0xffffffff, 0),
+ 	SYSC_QUIRK("rng", 0, 0x1fe0, 0x1fe4, -1, 0x00000020, 0xffffffff, 0),
+-	SYSC_QUIRK("rtc", 0, 0x74, 0x78, -1, 0x4eb01908, 0xffffffff, 0),
++	SYSC_QUIRK("rtc", 0, 0x74, 0x78, -1, 0x4eb01908, 0xfffff0f0, 0),
+ 	SYSC_QUIRK("timer32k", 0, 0, 0x4, -1, 0x00000060, 0xffffffff, 0),
+ 	SYSC_QUIRK("usbhstll", 0, 0, 0x10, 0x14, 0x00000004, 0xffffffff, 0),
+ 	SYSC_QUIRK("usb_host_hs", 0, 0, 0x10, 0x14, 0x50700100, 0xffffffff, 0),
 -- 
 2.19.0
