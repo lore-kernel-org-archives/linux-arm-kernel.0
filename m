@@ -1,32 +1,50 @@
-From: qader.aymen@gmail.com (Aymen Qader)
-Date: Mon, 24 Sep 2018 18:35:43 +0100
-Subject: [PATCH v4 0/4] staging: vc04_services: Fix checkpatch.pl errors
-Message-ID: <20180924173547.23393-1-qader.aymen@gmail.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Mon, 24 Sep 2018 18:45:44 +0100
+Subject: [PATCH v7 1/9] KVM: arm/arm64: Ensure only THP is candidate for
+ adjustment
+In-Reply-To: <20180924174552.8387-1-punit.agrawal@arm.com>
+References: <20180924174552.8387-1-punit.agrawal@arm.com>
+Message-ID: <20180924174552.8387-2-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset fixes the following checkpatch.pl errors in the
-interface/vchi directory:
+PageTransCompoundMap() returns true for hugetlbfs and THP
+hugepages. This behaviour incorrectly leads to stage 2 faults for
+unsupported hugepage sizes (e.g., 64K hugepage with 4K pages) to be
+treated as THP faults.
 
-ERROR: space prohibited after/before that open/closed parenthesis
-ERROR: code indent should use tabs where possible
-ERROR: space required after that ','
-ERROR: Macros with complex values should be enclosed in parentheses
-ERROR: "foo * bar" should be "foo* bar"
+Tighten the check to filter out hugetlbfs pages. This also leads to
+consistently mapping all unsupported hugepage sizes as PTE level
+entries at stage 2.
 
-Aymen Qader (4):
-  staging: vc04_services: Fix "space prohibited"
-  staging: vc04_services: Use tabs instead of spaces
-  staging: vc04_services: Remove unused macros
-  staging: vc04_services: Remove spaces after '*'
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Cc: Christoffer Dall <christoffer.dall@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Suzuki Poulose <suzuki.poulose@arm.com>
+Cc: stable at vger.kernel.org # v4.13+
+---
+ virt/kvm/arm/mmu.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-v2: Added cover letter correctly
-v3: Remove unused macros
-v4: Added patch changelog to cover letter
-
- .../vc04_services/interface/vchi/vchi.h       | 208 +++++++-----------
- .../vc04_services/interface/vchi/vchi_cfg.h   |   2 +-
- 2 files changed, 86 insertions(+), 124 deletions(-)
-
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 7e477b3cae5b..c23a1b323aad 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1231,8 +1231,14 @@ static bool transparent_hugepage_adjust(kvm_pfn_t *pfnp, phys_addr_t *ipap)
+ {
+ 	kvm_pfn_t pfn = *pfnp;
+ 	gfn_t gfn = *ipap >> PAGE_SHIFT;
++	struct page *page = pfn_to_page(pfn);
+ 
+-	if (PageTransCompoundMap(pfn_to_page(pfn))) {
++	/*
++	 * PageTransCompoungMap() returns true for THP and
++	 * hugetlbfs. Make sure the adjustment is done only for THP
++	 * pages.
++	 */
++	if (!PageHuge(page) && PageTransCompoundMap(page)) {
+ 		unsigned long mask;
+ 		/*
+ 		 * The address we faulted on is backed by a transparent huge
 -- 
-2.17.1
+2.18.0
