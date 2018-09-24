@@ -1,73 +1,39 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Mon, 24 Sep 2018 15:59:03 +0200
-Subject: [RESEND PATCH] Revert "pwm: Set class for exported channels in
- sysfs"
-In-Reply-To: <20180924115301.GV21032@ulmo>
-References: <1537538567-5377-1-git-send-email-fabrice.gasnier@st.com>
- <20180924115301.GV21032@ulmo>
-Message-ID: <fc02ced1-01ba-dde4-95da-285d9351338b@st.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 24 Sep 2018 15:03:38 +0100
+Subject: [PATCH v5 1/6] arm64/mm: Introduce the init_pg_dir.
+In-Reply-To: <20180924130137.re3nftpsi2dx2da2@lakrids.cambridge.arm.com>
+References: <20180917044333.30051-1-yaojun8558363@gmail.com>
+ <20180917044333.30051-2-yaojun8558363@gmail.com>
+ <20180924130137.re3nftpsi2dx2da2@lakrids.cambridge.arm.com>
+Message-ID: <20180924140338.nu7jn3hfcwwoztnt@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/24/2018 01:53 PM, Thierry Reding wrote:
-> On Fri, Sep 21, 2018 at 04:02:47PM +0200, Fabrice Gasnier wrote:
->> This reverts commit 7e5d1fd75c3dde9fc10c4472b9368089d1b81d00 as it causes
->> regression with multiple pwm chip. It creates a new entry in
->> '/sys/class/pwm' every time a 'pwmX' is exported with 'echo X > export':
->> - 1st time export will create an entry in /sys/class/pwm/pwmX
->> - when another export happens on another pwmchip, it can't be created
->> (e.g. -EEXIST)
->>
->> This also changes existing ABI (Documentation/ABI/testing/sysfs-class-pwm):
->> - pmwX should be there: /sys/class/pwm/pwmchipN/pwmX
->>
->> Example on stm32 (stm32429i-eval) platform:
->> $ ls /sys/class/pwm
->> pwmchip0 pwmchip4
->>
->> $ cd /sys/class/pwm/pwmchip0/
->> $ echo 0 > export
->> $ ls /sys/class/pwm
->> pwm0 pwmchip0 pwmchip4
->>
->> $ cd /sys/class/pwm/pwmchip4/
->> $ echo 0 > export
->> sysfs: cannot create duplicate filename '/class/pwm/pwm0'
->> ...Exception stack follows...
->>
->> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->> ---
->>  drivers/pwm/sysfs.c | 1 -
->>  1 file changed, 1 deletion(-)
+On Mon, Sep 24, 2018 at 02:01:37PM +0100, Mark Rutland wrote:
+> On Mon, Sep 17, 2018 at 12:43:28PM +0800, Jun Yao wrote:
+> > To make the swapper_pg_dir read only, we will move it to the rodata
+> > section. And force the kernel to set up the initial page table in
+> > the init_pg_dir. After generating all levels page table, we copy
+> > only the top level into the swapper_pg_dir during paging_init().
+
+> > +#define INIT_PG_TABLES					\
+> > +	. = ALIGN(PAGE_SIZE);				\
+> > +	init_pg_dir = .;				\
+> > +	. += SWAPPER_DIR_SIZE;				\
+> > +	init_pg_end = .;
 > 
-> Can we come up with an alternative that allows us to have both? We want
-> uevent and proper sysfs creation, or is that not possible?
-
-Hi Thierry, all,
-
-With current approach:
-- "export->child.class = parent->class"
-- ABI (e.g. "pwm%d") device name isn't unique with multiple pwm chip.
-I think this is not possible.
-
-Trying to think of an alternative... I just did a quick test, by
-changing device name, to take pwmchip into account:
-+       export->child.class = parent->class;
-        export->child.release = pwm_export_release;
-        export->child.parent = parent;
-        export->child.devt = MKDEV(0, 0);
-        export->child.groups = pwm_groups;
--       dev_set_name(&export->child, "pwm%u", pwm->hwpwm);
-+       dev_set_name(&export->child, "pwmchip%d-pwm%u", chip->base,
-pwm->hwpwm);
-
-But this also impacts existing ABI :-(
-Would you have suggestions to send an uevent, without modifying ABI ?
-
-Please advise,
-Best regards,
-Fabrice
-
+> This will allocate a full set of PGD + PUD + PMD (+ PTE) levels, but the
+> commit message says we only copy the top level table.
 > 
-> Thierry
+> The memory for otjher levels of table can be re-allocated once the
+> kernel init phase is over, so that seems a bit worrying.
 > 
+> Do we switch over to new copies of those levels, or do we continue using
+> the entries from INIT_PG_TABLES?
+
+I now see that we already allocate copies of those levels of table (and
+free the originals in paging_init), so this is not a problem.
+
+Sorry for the noise!
+
+Mark.
