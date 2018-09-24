@@ -1,31 +1,52 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 24 Sep 2018 11:12:15 -0700
-Subject: [GIT PULL 1/1] Broadcom devicetree fixes for 4.19
-Message-ID: <20180924181215.7573-1-f.fainelli@gmail.com>
+From: JOLLYS@xilinx.com (Jolly Shah)
+Date: Mon, 24 Sep 2018 18:21:55 +0000
+Subject: [PATCH v12 0/6] drivers: Introduce firmware driver for ZynqMP core
+In-Reply-To: <CAOesGMgUaQMcTQsbLR_qN95QPfOE1gCJuM9=6AiFLg+_t98qaw@mail.gmail.com>
+References: <1536781120-22794-1-git-send-email-jollys@xilinx.com>
+ <CY1PR02MB21385F71D8BC4498654CD0BFB8130@CY1PR02MB2138.namprd02.prod.outlook.com>
+ <CAOesGMgUaQMcTQsbLR_qN95QPfOE1gCJuM9=6AiFLg+_t98qaw@mail.gmail.com>
+Message-ID: <CY1PR02MB21380A6ED51FD3C8C75EB309B8170@CY1PR02MB2138.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+Hi Olof,
 
-  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+> -----Original Message-----
+> From: Olof Johansson [mailto:olof at lixom.net]
+> Sent: Sunday, September 23, 2018 6:13 AM
+> To: Jolly Shah <JOLLYS@xilinx.com>
+> Cc: Michal Simek <michals@xilinx.com>; arm at kernel.org; Rajan Vaja
+> <RAJANV@xilinx.com>; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org
+> Subject: Re: [PATCH v12 0/6] drivers: Introduce firmware driver for ZynqMP core
+> 
+> On Thu, Sep 20, 2018 at 5:46 PM, Jolly Shah <JOLLYS@xilinx.com> wrote:
+> > Hi Olof,
+> >
+> > As suggested, this patchset is generated without ioctl interface. Please review.
+> If you are ok, Michal can create a pull request for merge.
+> 
+> Hi,
+> 
+> I replied on the other thread as well; it sounds like you will need something
+> _like_ the ioctl interface for some of the dependent drivers. For those, would it
+> be possible to only expose some of the ioctls through the interface, and not just
+> pass through any call? I think that'd probably take care of my concern.
+> 
 
-are available in the Git repository at:
+Sounds good. I will make required changes and submit as incremental patches along with clock driver.
 
-  https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.19/devicetree-fixes
+> But yeah, go ahead and stage these in a pull request for now, that way we can
+> take care of these and merge them as the rest are getting ready. I don't want to
+> hold you up more than needed; the patch set is already up to a very high version
+> number and it's not fair to make you rework it completely yet again.
+> 
+> 
 
-for you to fetch changes up to 3ab97942d0213b6583a5408630a8cbbfbf54730f:
+Thanks. Michal will create pull request for same.
 
-  ARM: dts: BCM63xx: Fix incorrect interrupt specifiers (2018-09-24 11:04:04 -0700)
+Thanks,
+Jolly Shah
 
-----------------------------------------------------------------
-This pull request contains Broadcom ARM-based SoCs Device Tree changes
-intended for 4.19, please pull the following:
-
-- Florian fixes the PPI and SPI interrupts in the BCM63138 (DSL) SoC DTS
-
-----------------------------------------------------------------
-Florian Fainelli (1):
-      ARM: dts: BCM63xx: Fix incorrect interrupt specifiers
-
- arch/arm/boot/dts/bcm63138.dtsi | 14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
+> 
+> -Olof
