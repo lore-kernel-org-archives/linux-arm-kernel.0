@@ -1,92 +1,48 @@
 From: ebiederm@xmission.com (Eric W. Biederman)
-Date: Mon, 24 Sep 2018 14:11:26 +0200
-Subject: [REVIEW][PATCH 2/4] signal/arm: Use force_sig_fault where appropriate
+Date: Mon, 24 Sep 2018 14:11:28 +0200
+Subject: [REVIEW][PATCH 4/4] signal/arm/kvm: Use send_sig_mceerr
 In-Reply-To: <87pnx32j2p.fsf@xmission.com>
 References: <87pnx32j2p.fsf@xmission.com>
-Message-ID: <20180924121128.5983-2-ebiederm@xmission.com>
+Message-ID: <20180924121128.5983-4-ebiederm@xmission.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This simplifies the code making it clearer what is going on, and
+making the siginfo generation easier to maintain.
+
 Signed-off-by: "Eric W. Biederman" <ebiederm@xmission.com>
 ---
- arch/arm/kernel/ptrace.c | 11 ++---------
- arch/arm/mm/alignment.c  | 10 +---------
- arch/arm/mm/fault.c      | 10 +---------
- 3 files changed, 4 insertions(+), 27 deletions(-)
+ virt/kvm/arm/mmu.c | 14 ++++----------
+ 1 file changed, 4 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-index 36718a424358..6fa5b6387556 100644
---- a/arch/arm/kernel/ptrace.c
-+++ b/arch/arm/kernel/ptrace.c
-@@ -203,15 +203,8 @@ void ptrace_disable(struct task_struct *child)
-  */
- void ptrace_break(struct task_struct *tsk, struct pt_regs *regs)
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 91aaf73b00df..39c0405f2021 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1450,20 +1450,14 @@ static void invalidate_icache_guest_page(kvm_pfn_t pfn, unsigned long size)
+ static void kvm_send_hwpoison_signal(unsigned long address,
+ 				     struct vm_area_struct *vma)
  {
 -	siginfo_t info;
 -
 -	clear_siginfo(&info);
--	info.si_signo = SIGTRAP;
--	info.si_errno = 0;
--	info.si_code  = TRAP_BRKPT;
--	info.si_addr  = (void __user *)instruction_pointer(regs);
--
--	force_sig_info(SIGTRAP, &info, tsk);
-+	force_sig_fault(SIGTRAP, TRAP_BRKPT,
-+			(void __user *)instruction_pointer(regs), tsk);
+-	info.si_signo   = SIGBUS;
+-	info.si_errno   = 0;
+-	info.si_code    = BUS_MCEERR_AR;
+-	info.si_addr    = (void __user *)address;
++	short lsb;
+ 
+ 	if (is_vm_hugetlb_page(vma))
+-		info.si_addr_lsb = huge_page_shift(hstate_vma(vma));
++		lsb = huge_page_shift(hstate_vma(vma));
+ 	else
+-		info.si_addr_lsb = PAGE_SHIFT;
++		lsb = PAGE_SHIFT;
+ 
+-	send_sig_info(SIGBUS, &info, current);
++	send_sig_mceerr(BUS_MCEERR_AR, (void __user *)address, lsb, current);
  }
  
- static int break_trap(struct pt_regs *regs, unsigned int instr)
-diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-index bd2c739d8083..b54f8f8def36 100644
---- a/arch/arm/mm/alignment.c
-+++ b/arch/arm/mm/alignment.c
-@@ -948,15 +948,7 @@ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
- 		goto fixup;
- 
- 	if (ai_usermode & UM_SIGNAL) {
--		siginfo_t si;
--
--		clear_siginfo(&si);
--		si.si_signo = SIGBUS;
--		si.si_errno = 0;
--		si.si_code = BUS_ADRALN;
--		si.si_addr = (void __user *)addr;
--
--		force_sig_info(si.si_signo, &si, current);
-+		force_sig_fault(SIGBUS, BUS_ADRALN, (void __user *)addr, current);
- 	} else {
- 		/*
- 		 * We're about to disable the alignment trap and return to
-diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-index 544d2c8c2775..f4ea4c62c613 100644
---- a/arch/arm/mm/fault.c
-+++ b/arch/arm/mm/fault.c
-@@ -161,13 +161,9 @@ __do_user_fault(struct task_struct *tsk, unsigned long addr,
- 		unsigned int fsr, unsigned int sig, int code,
- 		struct pt_regs *regs)
- {
--	struct siginfo si;
--
- 	if (addr > TASK_SIZE)
- 		harden_branch_predictor();
- 
--	clear_siginfo(&si);
--
- #ifdef CONFIG_DEBUG_USER
- 	if (((user_debug & UDBG_SEGV) && (sig == SIGSEGV)) ||
- 	    ((user_debug & UDBG_BUS)  && (sig == SIGBUS))) {
-@@ -181,11 +177,7 @@ __do_user_fault(struct task_struct *tsk, unsigned long addr,
- 	tsk->thread.address = addr;
- 	tsk->thread.error_code = fsr;
- 	tsk->thread.trap_no = 14;
--	si.si_signo = sig;
--	si.si_errno = 0;
--	si.si_code = code;
--	si.si_addr = (void __user *)addr;
--	force_sig_info(sig, &si, tsk);
-+	force_sig_fault(sig, code, (void __user *)addr, tsk);
- }
- 
- void do_bad_area(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 -- 
 2.17.1
