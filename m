@@ -1,79 +1,210 @@
 From: hch@lst.de (Christoph Hellwig)
-Date: Mon, 24 Sep 2018 09:43:49 +0200
-Subject: [PATCH 04/10] block: move req_gap_back_merge to blk.h
+Date: Mon, 24 Sep 2018 09:43:50 +0200
+Subject: [PATCH 05/10] block: simplify BIOVEC_PHYS_MERGEABLE
 In-Reply-To: <20180924074355.2802-1-hch@lst.de>
 References: <20180924074355.2802-1-hch@lst.de>
-Message-ID: <20180924074355.2802-5-hch@lst.de>
+Message-ID: <20180924074355.2802-6-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No need to expose these helpers outside the block layer.
+Turn the macro into an inline, move it to blk.h and simplify the
+arch hooks a bit.
+
+Also rename the function to biovec_phys_mergeable as there is no need
+to shout.
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- block/blk.h            | 19 +++++++++++++++++++
- include/linux/blkdev.h | 19 -------------------
- 2 files changed, 19 insertions(+), 19 deletions(-)
+ arch/arm/include/asm/io.h   |  5 ++---
+ arch/arm64/include/asm/io.h |  5 ++---
+ arch/x86/include/asm/io.h   |  5 ++---
+ block/bio.c                 |  2 +-
+ block/blk-integrity.c       |  4 ++--
+ block/blk-merge.c           | 10 +++++-----
+ block/blk.h                 | 14 ++++++++++++++
+ include/linux/bio.h         | 13 -------------
+ 8 files changed, 28 insertions(+), 30 deletions(-)
 
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index 6774553dc214..e58ca25eddb7 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -462,9 +462,8 @@ extern void pci_iounmap(struct pci_dev *dev, void __iomem *addr);
+ struct bio_vec;
+ extern bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
+ 				      const struct bio_vec *vec2);
+-#define BIOVEC_PHYS_MERGEABLE(vec1, vec2)				\
+-	(__BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&				\
+-	 (!xen_domain() || xen_biovec_phys_mergeable(vec1, vec2)))
++#define ARCH_BIOVEC_PHYS_MERGEABLE(vec1, vec2)				\
++	 (!xen_domain() || xen_biovec_phys_mergeable(vec1, vec2))
+ 
+ #ifdef CONFIG_MMU
+ #define ARCH_HAS_VALID_PHYS_ADDR_RANGE
+diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+index 35b2e50f17fb..774e03ea1bb0 100644
+--- a/arch/arm64/include/asm/io.h
++++ b/arch/arm64/include/asm/io.h
+@@ -208,9 +208,8 @@ extern int devmem_is_allowed(unsigned long pfn);
+ struct bio_vec;
+ extern bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
+ 				      const struct bio_vec *vec2);
+-#define BIOVEC_PHYS_MERGEABLE(vec1, vec2)				\
+-	(__BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&				\
+-	 (!xen_domain() || xen_biovec_phys_mergeable(vec1, vec2)))
++#define ARCH_BIOVEC_PHYS_MERGEABLE(vec1, vec2)				\
++	 (!xen_domain() || xen_biovec_phys_mergeable(vec1, vec2))
+ 
+ #endif	/* __KERNEL__ */
+ #endif	/* __ASM_IO_H */
+diff --git a/arch/x86/include/asm/io.h b/arch/x86/include/asm/io.h
+index 6de64840dd22..7c6106216d9c 100644
+--- a/arch/x86/include/asm/io.h
++++ b/arch/x86/include/asm/io.h
+@@ -376,9 +376,8 @@ struct bio_vec;
+ extern bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
+ 				      const struct bio_vec *vec2);
+ 
+-#define BIOVEC_PHYS_MERGEABLE(vec1, vec2)				\
+-	(__BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&				\
+-	 (!xen_domain() || xen_biovec_phys_mergeable(vec1, vec2)))
++#define ARCH_BIOVEC_PHYS_MERGEABLE(vec1, vec2)				\
++	 (!xen_domain() || xen_biovec_phys_mergeable(vec1, vec2))
+ #endif	/* CONFIG_XEN */
+ 
+ #define IO_SPACE_LIMIT 0xffff
+diff --git a/block/bio.c b/block/bio.c
+index 1cd47f218200..81d90b839e05 100644
+--- a/block/bio.c
++++ b/block/bio.c
+@@ -731,7 +731,7 @@ int bio_add_pc_page(struct request_queue *q, struct bio *bio, struct page
+ 	}
+ 
+ 	/* If we may be able to merge these biovecs, force a recount */
+-	if (bio->bi_vcnt > 1 && (BIOVEC_PHYS_MERGEABLE(bvec-1, bvec)))
++	if (bio->bi_vcnt > 1 && biovec_phys_mergeable(bvec-1, bvec))
+ 		bio_clear_flag(bio, BIO_SEG_VALID);
+ 
+  done:
+diff --git a/block/blk-integrity.c b/block/blk-integrity.c
+index 6121611e1316..0f7267916509 100644
+--- a/block/blk-integrity.c
++++ b/block/blk-integrity.c
+@@ -49,7 +49,7 @@ int blk_rq_count_integrity_sg(struct request_queue *q, struct bio *bio)
+ 	bio_for_each_integrity_vec(iv, bio, iter) {
+ 
+ 		if (prev) {
+-			if (!BIOVEC_PHYS_MERGEABLE(&ivprv, &iv))
++			if (!biovec_phys_mergeable(&ivprv, &iv))
+ 				goto new_segment;
+ 
+ 			if (!BIOVEC_SEG_BOUNDARY(q, &ivprv, &iv))
+@@ -95,7 +95,7 @@ int blk_rq_map_integrity_sg(struct request_queue *q, struct bio *bio,
+ 	bio_for_each_integrity_vec(iv, bio, iter) {
+ 
+ 		if (prev) {
+-			if (!BIOVEC_PHYS_MERGEABLE(&ivprv, &iv))
++			if (!biovec_phys_mergeable(&ivprv, &iv))
+ 				goto new_segment;
+ 
+ 			if (!BIOVEC_SEG_BOUNDARY(q, &ivprv, &iv))
+diff --git a/block/blk-merge.c b/block/blk-merge.c
+index ad8a226347a6..5e63e8259f92 100644
+--- a/block/blk-merge.c
++++ b/block/blk-merge.c
+@@ -21,7 +21,7 @@ static inline bool bios_segs_mergeable(struct request_queue *q,
+ 		struct bio *prev, struct bio_vec *prev_last_bv,
+ 		struct bio_vec *next_first_bv)
+ {
+-	if (!BIOVEC_PHYS_MERGEABLE(prev_last_bv, next_first_bv))
++	if (!biovec_phys_mergeable(prev_last_bv, next_first_bv))
+ 		return false;
+ 	if (!BIOVEC_SEG_BOUNDARY(q, prev_last_bv, next_first_bv))
+ 		return false;
+@@ -199,7 +199,7 @@ static struct bio *blk_bio_segment_split(struct request_queue *q,
+ 		if (bvprvp && blk_queue_cluster(q)) {
+ 			if (seg_size + bv.bv_len > queue_max_segment_size(q))
+ 				goto new_segment;
+-			if (!BIOVEC_PHYS_MERGEABLE(bvprvp, &bv))
++			if (!biovec_phys_mergeable(bvprvp, &bv))
+ 				goto new_segment;
+ 			if (!BIOVEC_SEG_BOUNDARY(q, bvprvp, &bv))
+ 				goto new_segment;
+@@ -332,7 +332,7 @@ static unsigned int __blk_recalc_rq_segments(struct request_queue *q,
+ 				if (seg_size + bv.bv_len
+ 				    > queue_max_segment_size(q))
+ 					goto new_segment;
+-				if (!BIOVEC_PHYS_MERGEABLE(&bvprv, &bv))
++				if (!biovec_phys_mergeable(&bvprv, &bv))
+ 					goto new_segment;
+ 				if (!BIOVEC_SEG_BOUNDARY(q, &bvprv, &bv))
+ 					goto new_segment;
+@@ -414,7 +414,7 @@ static int blk_phys_contig_segment(struct request_queue *q, struct bio *bio,
+ 	bio_get_last_bvec(bio, &end_bv);
+ 	bio_get_first_bvec(nxt, &nxt_bv);
+ 
+-	if (!BIOVEC_PHYS_MERGEABLE(&end_bv, &nxt_bv))
++	if (!biovec_phys_mergeable(&end_bv, &nxt_bv))
+ 		return 0;
+ 
+ 	/*
+@@ -439,7 +439,7 @@ __blk_segment_map_sg(struct request_queue *q, struct bio_vec *bvec,
+ 		if ((*sg)->length + nbytes > queue_max_segment_size(q))
+ 			goto new_segment;
+ 
+-		if (!BIOVEC_PHYS_MERGEABLE(bvprv, bvec))
++		if (!biovec_phys_mergeable(bvprv, bvec))
+ 			goto new_segment;
+ 		if (!BIOVEC_SEG_BOUNDARY(q, bvprv, bvec))
+ 			goto new_segment;
 diff --git a/block/blk.h b/block/blk.h
-index 441c2de1d4b9..63035c95689c 100644
+index 63035c95689c..aed99cbc1bca 100644
 --- a/block/blk.h
 +++ b/block/blk.h
-@@ -149,6 +149,25 @@ static inline void blk_queue_enter_live(struct request_queue *q)
+@@ -149,6 +149,20 @@ static inline void blk_queue_enter_live(struct request_queue *q)
  	percpu_ref_get(&q->q_usage_counter);
  }
  
-+static inline bool __bvec_gap_to_prev(struct request_queue *q,
-+		struct bio_vec *bprv, unsigned int offset)
-+{
-+	return offset ||
-+		((bprv->bv_offset + bprv->bv_len) & queue_virt_boundary(q));
-+}
++#ifndef ARCH_BIOVEC_PHYS_MERGEABLE
++#define ARCH_BIOVEC_PHYS_MERGEABLE(vec1, vec2) true
++#endif
 +
-+/*
-+ * Check if adding a bio_vec after bprv with offset would create a gap in
-+ * the SG list. Most drivers don't care about this, but some do.
-+ */
-+static inline bool bvec_gap_to_prev(struct request_queue *q,
-+		struct bio_vec *bprv, unsigned int offset)
++static inline bool biovec_phys_mergeable(const struct bio_vec *vec1,
++		const struct bio_vec *vec2)
 +{
-+	if (!queue_virt_boundary(q))
++	if (bvec_to_phys(vec1) + vec1->bv_len != bvec_to_phys(vec2))
 +		return false;
-+	return __bvec_gap_to_prev(q, bprv, offset);
++	if (!ARCH_BIOVEC_PHYS_MERGEABLE(vec1, vec2))
++		return false;
++	return true;
 +}
 +
- #ifdef CONFIG_BLK_DEV_INTEGRITY
- void blk_flush_integrity(void);
- bool __bio_integrity_endio(struct bio *);
-diff --git a/include/linux/blkdev.h b/include/linux/blkdev.h
-index b7e676bb01bc..1d5e14139795 100644
---- a/include/linux/blkdev.h
-+++ b/include/linux/blkdev.h
-@@ -1676,25 +1676,6 @@ static inline void put_dev_sector(Sector p)
- 	put_page(p.v);
- }
- 
--static inline bool __bvec_gap_to_prev(struct request_queue *q,
--				struct bio_vec *bprv, unsigned int offset)
--{
--	return offset ||
--		((bprv->bv_offset + bprv->bv_len) & queue_virt_boundary(q));
--}
+ static inline bool __bvec_gap_to_prev(struct request_queue *q,
+ 		struct bio_vec *bprv, unsigned int offset)
+ {
+diff --git a/include/linux/bio.h b/include/linux/bio.h
+index e973876625a8..e2adb96346f0 100644
+--- a/include/linux/bio.h
++++ b/include/linux/bio.h
+@@ -140,19 +140,6 @@ static inline bool bio_full(struct bio *bio)
+ /*
+  * merge helpers etc
+  */
+-
+-/* Default implementation of BIOVEC_PHYS_MERGEABLE */
+-#define __BIOVEC_PHYS_MERGEABLE(vec1, vec2)	\
+-	((bvec_to_phys((vec1)) + (vec1)->bv_len) == bvec_to_phys((vec2)))
 -
 -/*
-- * Check if adding a bio_vec after bprv with offset would create a gap in
-- * the SG list. Most drivers don't care about this, but some do.
+- * allow arch override, for eg virtualized architectures (put in asm/io.h)
 - */
--static inline bool bvec_gap_to_prev(struct request_queue *q,
--				struct bio_vec *bprv, unsigned int offset)
--{
--	if (!queue_virt_boundary(q))
--		return false;
--	return __bvec_gap_to_prev(q, bprv, offset);
--}
+-#ifndef BIOVEC_PHYS_MERGEABLE
+-#define BIOVEC_PHYS_MERGEABLE(vec1, vec2)	\
+-	__BIOVEC_PHYS_MERGEABLE(vec1, vec2)
+-#endif
 -
- int kblockd_schedule_work(struct work_struct *work);
- int kblockd_schedule_work_on(int cpu, struct work_struct *work);
- int kblockd_mod_delayed_work_on(int cpu, struct delayed_work *dwork, unsigned long delay);
+ #define __BIO_SEG_BOUNDARY(addr1, addr2, mask) \
+ 	(((addr1) | (mask)) == (((addr2) - 1) | (mask)))
+ #define BIOVEC_SEG_BOUNDARY(q, b1, b2) \
 -- 
 2.19.0
