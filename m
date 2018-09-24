@@ -1,72 +1,48 @@
 From: ebiederm@xmission.com (Eric W. Biederman)
-Date: Mon, 24 Sep 2018 11:10:06 +0200
-Subject: [REVIEW][PATCH 06/15] signal/arm64: For clarity separate the 3 signal
- sending cases in do_page_fault
+Date: Mon, 24 Sep 2018 11:10:12 +0200
+Subject: [REVIEW][PATCH 12/15] signal/arm64: Remove arm64_force_sig_info
 In-Reply-To: <871s9j462u.fsf@xmission.com>
 References: <871s9j462u.fsf@xmission.com>
-Message-ID: <20180924091015.4458-6-ebiederm@xmission.com>
+Message-ID: <20180924091015.4458-12-ebiederm@xmission.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It gets easy to confuse what is going on when some code is shared and some not
-so stop sharing the trivial bits of signal generation to make future updates
-easier to understand.
+The function has no more callers so remove it.
 
 Signed-off-by: "Eric W. Biederman" <ebiederm@xmission.com>
 ---
- arch/arm64/mm/fault.c | 13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/traps.h | 1 -
+ arch/arm64/kernel/traps.c      | 6 ------
+ 2 files changed, 7 deletions(-)
 
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 0ddc8c6ba53b..14d6ff895139 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -567,16 +567,16 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
- 		return 0;
- 	}
+diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
+index 193f0b0e8ee3..d32b8bd440af 100644
+--- a/arch/arm64/include/asm/traps.h
++++ b/arch/arm64/include/asm/traps.h
+@@ -39,7 +39,6 @@ void force_signal_inject(int signal, int code, unsigned long address);
+ void arm64_notify_segfault(unsigned long addr);
+ void arm64_force_sig_fault(int signo, int code, void __user *addr, const char *str);
+ void arm64_force_sig_mceerr(int code, void __user *addr, short lsb, const char *str);
+-void arm64_force_sig_info(struct siginfo *info, const char *str);
  
--	clear_siginfo(&si);
--	si.si_addr = (void __user *)addr;
+ /*
+  * Move regs->pc to next instruction and do necessary setup before it
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index baa96dfffeec..de67818258cd 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -262,12 +262,6 @@ void arm64_force_sig_mceerr(int code, void __user *addr, short lsb,
+ 	force_sig_mceerr(code, addr, lsb, current);
+ }
+ 
+-void arm64_force_sig_info(struct siginfo *info, const char *str)
+-{
+-	arm64_show_signal(info->si_signo, str);
+-	force_sig_info(info->si_signo, info, current);
+-}
 -
- 	if (fault & VM_FAULT_SIGBUS) {
- 		/*
- 		 * We had some memory, but were unable to successfully fix up
- 		 * this page fault.
- 		 */
-+		clear_siginfo(&si);
- 		si.si_signo	= SIGBUS;
- 		si.si_code	= BUS_ADRERR;
-+		si.si_addr = (void __user *)addr;
-+		__do_user_fault(&si, esr);
- 	} else if (fault & (VM_FAULT_HWPOISON_LARGE | VM_FAULT_HWPOISON)) {
- 		unsigned int lsb;
- 
-@@ -584,20 +584,25 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
- 		if (fault & VM_FAULT_HWPOISON_LARGE)
- 			lsb = hstate_index_to_shift(VM_FAULT_GET_HINDEX(fault));
- 
-+		clear_siginfo(&si);
- 		si.si_signo	= SIGBUS;
- 		si.si_code	= BUS_MCEERR_AR;
-+		si.si_addr = (void __user *)addr;
- 		si.si_addr_lsb	= lsb;
-+		__do_user_fault(&si, esr);
- 	} else {
- 		/*
- 		 * Something tried to access memory that isn't in our memory
- 		 * map.
- 		 */
-+		clear_siginfo(&si);
- 		si.si_signo	= SIGSEGV;
- 		si.si_code	= fault == VM_FAULT_BADACCESS ?
- 				  SEGV_ACCERR : SEGV_MAPERR;
-+		si.si_addr = (void __user *)addr;
-+		__do_user_fault(&si, esr);
- 	}
- 
--	__do_user_fault(&si, esr);
- 	return 0;
- 
- no_context:
+ void arm64_notify_die(const char *str, struct pt_regs *regs,
+ 		      int signo, int sicode, void __user *addr,
+ 		      int err)
 -- 
 2.17.1
