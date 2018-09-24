@@ -1,146 +1,40 @@
-From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Mon, 24 Sep 2018 15:10:40 +0200
-Subject: [BISECTED] Regression: Solidrun Clearfog Base won't boot since
- "PCI: mvebu: Only remap I/O space if configured"
-In-Reply-To: <20180924124620.GA10322@e107981-ln.cambridge.arm.com>
-References: <61fdfd69-2bb6-478c-b0d5-69d8744adae3@cesnet.cz>
- <87zhwm4kl6.fsf@tkos.co.il>
- <20180912231050.GX30658@n2100.armlinux.org.uk>
- <20180913094515.351967bb@windsurf>
- <5ad46fec-a71a-477a-b23f-d20aacfb481d@cesnet.cz>
- <20180913104241.65db8243@windsurf>
- <20180924101213.GO30658@n2100.armlinux.org.uk>
- <20180924122614.70738b5c@windsurf>
- <20180924111341.GP30658@n2100.armlinux.org.uk>
- <20180924141203.3df9707a@windsurf>
- <20180924124620.GA10322@e107981-ln.cambridge.arm.com>
-Message-ID: <20180924151040.5e57462b@windsurf>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 24 Sep 2018 15:26:05 +0200
+Subject: [PATCH] arm64: amd: seattle: Use "spi" as name for SPI controllers
+In-Reply-To: <b0721afb-ff52-f348-a481-bc4e8ee0f4a7@amd.com>
+References: <20180924094648.20797-1-thierry.reding@gmail.com>
+ <b0721afb-ff52-f348-a481-bc4e8ee0f4a7@amd.com>
+Message-ID: <20180924132605.GB23547@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Mon, 24 Sep 2018 13:46:29 +0100, Lorenzo Pieralisi wrote:
-
-> What I think you can do short term, given that AFAICS MVEBU is not
-> removable, instead of using pci_host_probe() you move part of its code
-> into the driver and make sure that you remap IO as last operation before
-> probe completion (ie after scanning the host bridge) so that you do not
-> need to unmap it on failure; write a commit log summarising/linking this
-> thread please and when v4.20 lands we will give this a more thorough
-> look as Russell requested.
+On Mon, Sep 24, 2018 at 01:09:16PM +0000, Lendacky, Thomas wrote:
+> On 09/24/2018 04:46 AM, Thierry Reding wrote:
+> > From: Thierry Reding <treding@nvidia.com>
+> > 
+> > Recent versions of DTC contain additional checks for SPI busses and warn
+> > about certain common mistakes, such as when an SPI controller has a name
+> > other than "spi".
+> > 
+> > Signed-off-by: Thierry Reding <treding@nvidia.com>
 > 
-> How does that sound ?
+> Looks like the same patch was already submitted:
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2018-September/601706.html
 
-The only thing that can fail in pci_host_probe() is:
+Indeed. I had done a quick search and not seen these submitted in recent
+days and since the DTC change that causes these had only landed in -next
+on Friday I had assumed that they must not have been fixed yet.
 
-	ret = pci_scan_root_bus_bridge(bridge);
-	if (ret < 0) {
-		dev_err(bridge->dev.parent, "Scanning root bridge
-	failed"); return ret;
-	}
+I wouldn't have thought that Rob had preemptively sent out the fixes.
+But it being Rob, maybe I should have. =)
 
-In the pci-mvebu driver prior to the conversion to pci_host_probe(),
-the code flow at the end of ->probe() was:
-
-  mvebu_pcie_enable()
-    pci_common_init_dev()
-      pcibios_init_hw()
-
-and pcibios_init_hw() calls pci_scan_root_bus_bridge(), without doing
-much about the return value other than issuing a warning:
-
-                                ret = pci_scan_root_bus_bridge(bridge);
-                        }
-
-                        if (WARN(ret < 0, "PCI: unable to scan bus!")) {
-                                pci_free_host_bridge(bridge);
-                                break;
-                        }
-
-I.e, even before the conversion to pci_host_probe(), in case of
-failure in pci_scan_root_bus_bridge(), we would have the I/O mapping in
-place, but the PCI controller not registered.
-
-We could keep the same (not great) behavior by doing:
-
-diff --git a/drivers/pci/controller/pci-mvebu.c b/drivers/pci/controller/pci-mvebu.c
-index 50eb0729385b..487492f0c5f7 100644
---- a/drivers/pci/controller/pci-mvebu.c
-+++ b/drivers/pci/controller/pci-mvebu.c
-@@ -1179,9 +1179,6 @@ static int mvebu_pcie_parse_request_resources(struct mvebu_pcie *pcie)
-                                         resource_size(&pcie->io) - 1);
-                pcie->realio.name = "PCI I/O";
- 
--               for (i = 0; i < resource_size(&pcie->realio); i += SZ_64K)
--                       pci_ioremap_io(i, pcie->io.start + i);
--
-                pci_add_resource(&pcie->resources, &pcie->realio);
-        }
- 
-@@ -1197,7 +1194,7 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
-        struct device_node *child;
-        int num, i, ret;
- 
--       bridge = devm_pci_alloc_host_bridge(dev, sizeof(struct mvebu_pcie));
-+       bridge = pci_alloc_host_bridge(sizeof(struct mvebu_pcie));
-        if (!bridge)
-                return -ENOMEM;
- 
-@@ -1212,8 +1209,10 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
-        num = of_get_available_child_count(np);
- 
-        pcie->ports = devm_kcalloc(dev, num, sizeof(*pcie->ports), GFP_KERNEL);
--       if (!pcie->ports)
--               return -ENOMEM;
-+       if (!pcie->ports) {
-+               ret = -ENOMEM;
-+               goto free_host_bridge;
-+       }
- 
-        i = 0;
-        for_each_available_child_of_node(np, child) {
-@@ -1222,7 +1221,7 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
-                ret = mvebu_pcie_parse_port(pcie, port, child);
-                if (ret < 0) {
-                        of_node_put(child);
--                       return ret;
-+                       goto free_host_bridge;
-                } else if (ret == 0) {
-                        continue;
-                }
-@@ -1268,7 +1267,21 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
-        bridge->align_resource = mvebu_pcie_align_resource;
-        bridge->msi = pcie->msi;
- 
--       return pci_host_probe(bridge);
-+       if (resource_size(&pcie->io) != 0) {
-+               for (i = 0; i < resource_size(&pcie->realio); i += SZ_64K)
-+                       pci_ioremap_io(i, pcie->io.start + i);
-+       }
-+
-+       ret = pci_host_probe(bridge);
-+       if (ret)
-+               pci_free_host_bridge(bridge);
-+
-+       /* Yes, when pci_host_probe() returns a failure, we don't care */
-+       return 0;
-+
-+free_host_bridge:
-+       pci_free_host_bridge(bridge);
-+       return ret;
- }
- 
- static const struct of_device_id mvebu_pcie_of_match_table[] = {
-
-I.e, we simply ignore the failure of pci_host_probe().
-
-To be honest, I really prefer the option of introducing pci_unmap_io().
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Sorry for the noise,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180924/1ef69125/attachment.sig>
