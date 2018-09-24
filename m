@@ -1,180 +1,125 @@
-From: ludovic.barre@st.com (Ludovic BARRE)
-Date: Mon, 24 Sep 2018 18:12:44 +0200
-Subject: [PATCH V2 03/27] mmc: mmci: convert dma_setup callback to return
- an int
-In-Reply-To: <CAPDyKFqnN0gg9WsbNPQcodqUXJmFEzMM+ST36s6oEZ2OPoONug@mail.gmail.com>
-References: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
- <1537523181-14578-4-git-send-email-ludovic.Barre@st.com>
- <CAPDyKFqnN0gg9WsbNPQcodqUXJmFEzMM+ST36s6oEZ2OPoONug@mail.gmail.com>
-Message-ID: <15c31e3b-646a-f5db-b45a-3e2f556d9fd5@st.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 24 Sep 2018 17:22:03 +0100
+Subject: [PATCH v1 1/3] arm: mm: reordering memory type table
+In-Reply-To: <20180917004451.174527-2-minchan@kernel.org>
+References: <20180917004451.174527-1-minchan@kernel.org>
+ <20180917004451.174527-2-minchan@kernel.org>
+Message-ID: <20180924162202.GD52978@arrakis.emea.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Ulf
-
-On 09/24/2018 04:28 PM, Ulf Hansson wrote:
-> On 21 September 2018 at 11:45, Ludovic Barre <ludovic.Barre@st.com> wrote:
->> From: Ludovic Barre <ludovic.barre@st.com>
->>
->> This patch converts dma_setup callback to return an integer
->> This patch is needed to prepare sdmmc variant with internal dma
->>
->> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
->> ---
->>   drivers/mmc/host/mmci.c          | 14 ++++++++++----
->>   drivers/mmc/host/mmci.h          |  2 +-
->>   drivers/mmc/host/mmci_qcom_dml.c |  6 ++++--
->>   3 files changed, 15 insertions(+), 7 deletions(-)
->>
->> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
->> index cbd67bc..2f845f3 100644
->> --- a/drivers/mmc/host/mmci.c
->> +++ b/drivers/mmc/host/mmci.c
->> @@ -415,7 +415,7 @@ static void mmci_init_sg(struct mmci_host *host, struct mmc_data *data)
->>    * no custom DMA interfaces are supported.
->>    */
->>   #ifdef CONFIG_DMA_ENGINE
->> -static void mmci_dma_setup(struct mmci_host *host)
->> +static int mmci_dma_setup(struct mmci_host *host)
->>   {
->>          const char *rxname, *txname;
->>
->> @@ -466,7 +466,9 @@ static void mmci_dma_setup(struct mmci_host *host)
->>          }
->>
->>          if (host->ops && host->ops->dma_setup)
->> -               host->ops->dma_setup(host);
->> +               return host->ops->dma_setup(host);
->> +
+On Mon, Sep 17, 2018 at 09:44:49AM +0900, Minchan Kim wrote:
+> To use bit 5 in page table as L_PTE_SPECIAL, we need a room for that.
+> It seems we don't need 4 bits for the memory type with ARMv6+.
+> If it's true, let's reorder bits to make bit 5 free.
 > 
-> Looks like you need to implement a error handling, instead of just
-> returning the error code.
-
-yes, today if a dma_setup is defined, we can't fallback to pio mode.
-A use_dma variable (defined in mmci_host) could be setted follow the 
-return code of ops->dma_setup
-
-example:
-
-void mmci_dma_setup(struct mmci_host *host)
-{
-	int err;
-
-	if (!host->ops || !host->ops->dma_setup)
-		return;
-
-	err = host->ops->dma_setup(host);
-	if (err)
-		return;
-	
-	host->use_dma = true;
-	
-	/* initialize pre request cookie */
-	host->next_cookie = 1;
-}
-
-use_dma variable could be check by mmci_host_ops variant functions.
-
-are you agree with this proposal?
-
+> We will use the bit for L_PTE_SPECIAL in next patch.
 > 
->> +       return 0;
->>   }
->>
->>   /*
->> @@ -741,8 +743,10 @@ static void mmci_post_request(struct mmc_host *mmc, struct mmc_request *mrq,
->>   static void mmci_get_next_data(struct mmci_host *host, struct mmc_data *data)
->>   {
->>   }
->> -static inline void mmci_dma_setup(struct mmci_host *host)
->> +
->> +static inline int mmci_dma_setup(struct mmci_host *host)
->>   {
->> +       return 0;
->>   }
->>
->>   static inline void mmci_dma_release(struct mmci_host *host)
->> @@ -1796,7 +1800,9 @@ static int mmci_probe(struct amba_device *dev,
->>                   amba_rev(dev), (unsigned long long)dev->res.start,
->>                   dev->irq[0], dev->irq[1]);
->>
->> -       mmci_dma_setup(host);
->> +       ret = mmci_dma_setup(host);
->> +       if (ret)
->> +               goto clk_disable;
->>
->>          pm_runtime_set_autosuspend_delay(&dev->dev, 50);
->>          pm_runtime_use_autosuspend(&dev->dev);
->> diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
->> index 21aaf9a..06299ac 100644
->> --- a/drivers/mmc/host/mmci.h
->> +++ b/drivers/mmc/host/mmci.h
->> @@ -273,7 +273,7 @@ struct variant_data {
->>
->>   /* mmci variant callbacks */
->>   struct mmci_host_ops {
->> -       void (*dma_setup)(struct mmci_host *host);
->> +       int (*dma_setup)(struct mmci_host *host);
->>   };
->>
->>   struct mmci_host_next {
->> diff --git a/drivers/mmc/host/mmci_qcom_dml.c b/drivers/mmc/host/mmci_qcom_dml.c
->> index be3fab5..1bb59cf 100644
->> --- a/drivers/mmc/host/mmci_qcom_dml.c
->> +++ b/drivers/mmc/host/mmci_qcom_dml.c
->> @@ -119,7 +119,7 @@ static int of_get_dml_pipe_index(struct device_node *np, const char *name)
->>   }
->>
->>   /* Initialize the dml hardware connected to SD Card controller */
->> -static void qcom_dma_setup(struct mmci_host *host)
->> +static int qcom_dma_setup(struct mmci_host *host)
->>   {
->>          u32 config;
->>          void __iomem *base;
->> @@ -131,7 +131,7 @@ static void qcom_dma_setup(struct mmci_host *host)
->>
->>          if (producer_id < 0 || consumer_id < 0) {
->>                  host->variant->qcom_dml = false;
-> 
-> It seems like the existing code is an attempt to fallback to use pio
-> mode. However, I doubt it works as is.
+> A note from Catalin
+> "
+> > Anyway, on ARMv7 or ARMv6+LPAE, the non-shared device gets mapped to
 
-oops, I seen that like a variant identification issue, so if it's a
-fallback to pio mode it doesn't work.
+I meant 'ARMv7+LPAE' since ARMv6 never had the LPAE feature (please
+correct the code comment below as well).
 
-> 
->> -               return;
->> +               return -EINVAL;
-> 
-> My point is, if you return an error code here, it means that the error
-> code becomes propagated and ->probe() will fail.
-> 
-> Ideally, we should be able fall back to pio mode when dma doesn't
-> work. I have looped in Srinivas who implemented the qcom dml support,
-> let's see if he can explains the intent with the code.
-> 
-> I also volunteer to help out running some tests on the 410c platform,
-> however allow me a day or two to do that.
+I was wrong with the classic ARMv7, only ARMv7+LPAE makes all device
+memory shareable in hardware (even if not enabled). With classic ARMv7
+(that is pre-Cortex-A7/A15), the shareable bit in combination with PRRR
+allows the Device Non-shareable configuration.
 
-yes, I would be more reassured
+Anyway, it doesn't matter here since the L_PTE_SHARED bit is set
+separately in the mem_types[] array, the L_PTE_MT_* definitions are just
+for the actual memory type ignoring shareability. We just need to make
+sure the comments are correct.
 
-> 
->>          }
->>
->>          base = host->base + DML_OFFSET;
->> @@ -175,6 +175,8 @@ static void qcom_dma_setup(struct mmci_host *host)
->>
->>          /* Make sure dml initialization is finished */
->>          mb();
->> +
->> +       return 0;
->>   }
->>
->>   static struct mmci_host_ops qcom_variant_ops = {
->> --
->> 2.7.4
->>
-> 
-> Kind regards
-> Uffe
-> 
+> > shared device in hardware. Looking through the arm32 code, it seems that
+> > MT_DEVICE_NONSHARED is used by arch/arm/mach-shmobile/setup-r8a7779.c
+> > and IIUC that's a v7 platform (R-Car H1, Cortex-A9). I think the above
+> > should be defined to L_PTE_MT_DEV_SHARED, unless I miss any place where
+> > DEV_NONSHARED is relevant on ARMv6 (adding Simon to confirm on shmbile).
+
+It would be good to figure out the DEV_NONSHARED on ARMv6 relevance. I
+don't think we break R-Car H1 since the shareability bit wouldn't be set
+for DEV_NONSHARED.
+
+> diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
+> index 92fd2c8a9af0..514b13c27b43 100644
+> --- a/arch/arm/include/asm/pgtable-2level.h
+> +++ b/arch/arm/include/asm/pgtable-2level.h
+> @@ -164,14 +164,25 @@
+>  #define L_PTE_MT_BUFFERABLE	(_AT(pteval_t, 0x01) << 2)	/* 0001 */
+>  #define L_PTE_MT_WRITETHROUGH	(_AT(pteval_t, 0x02) << 2)	/* 0010 */
+>  #define L_PTE_MT_WRITEBACK	(_AT(pteval_t, 0x03) << 2)	/* 0011 */
+> +#define L_PTE_MT_DEV_SHARED	(_AT(pteval_t, 0x04) << 2)	/* 0100 */
+> +#define L_PTE_MT_VECTORS	(_AT(pteval_t, 0x05) << 2)	/* 0101 */
+>  #define L_PTE_MT_MINICACHE	(_AT(pteval_t, 0x06) << 2)	/* 0110 (sa1100, xscale) */
+>  #define L_PTE_MT_WRITEALLOC	(_AT(pteval_t, 0x07) << 2)	/* 0111 */
+> -#define L_PTE_MT_DEV_SHARED	(_AT(pteval_t, 0x04) << 2)	/* 0100 */
+> -#define L_PTE_MT_DEV_NONSHARED	(_AT(pteval_t, 0x0c) << 2)	/* 1100 */
+> +#if defined(CONFIG_CPU_V7) || defined (CONFIG_CPU_V6) || defined(CONFIG_CPU_V6K)
+> +/*
+> + * On ARMv7 or ARMv6+LPAE, the non-shared device gets mapped to
+> + * shared device in hardware.
+> + */
+
+I would change this to something like:
+
+/*
+ * On ARMv7 or ARMv7+LPAE, the non-shared and shared device types get
+ * mapped to the same TEX remapping index. On classic ARMv7, the
+ * shareability is controlled by the PRRR[17:16] field, indexed by
+ * L_PTE_SHARED. On ARMv7+LPAE the device mapping is always shareable.
+ */
+
+> +#define L_PTE_MT_DEV_NONSHARED	L_PTE_MT_DEV_SHARED
+> +#define L_PTE_MT_DEV_WC		L_PTE_MT_BUFFERABLE
+> +#define L_PTE_MT_DEV_CACHED	L_PTE_MT_WRITEBACK
+> +#define L_PTE_MT_MASK		(_AT(pteval_t, 0x07) << 2)
+> +#else
+>  #define L_PTE_MT_DEV_WC		(_AT(pteval_t, 0x09) << 2)	/* 1001 */
+>  #define L_PTE_MT_DEV_CACHED	(_AT(pteval_t, 0x0b) << 2)	/* 1011 */
+> -#define L_PTE_MT_VECTORS	(_AT(pteval_t, 0x0f) << 2)	/* 1111 */
+> -#define L_PTE_MT_MASK		(_AT(pteval_t, 0x0f) << 2)
+> +#define L_PTE_MT_DEV_NONSHARED	(_AT(pteval_t, 0x0c) << 2)	/* 1100 */
+> +#define L_PTE_MT_MASK           (_AT(pteval_t, 0x0f) << 2)
+> +#endif
+>  
+>  #ifndef __ASSEMBLY__
+>  
+> diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+> index 81d0efb055c6..367a89d5aeca 100644
+> --- a/arch/arm/mm/proc-macros.S
+> +++ b/arch/arm/mm/proc-macros.S
+> @@ -138,7 +138,7 @@
+>  	.long	PTE_CACHEABLE					@ L_PTE_MT_WRITETHROUGH
+>  	.long	PTE_CACHEABLE | PTE_BUFFERABLE			@ L_PTE_MT_WRITEBACK
+>  	.long	PTE_BUFFERABLE					@ L_PTE_MT_DEV_SHARED
+> -	.long	0x00						@ unused
+> +	.long	PTE_CACHEABLE | PTE_BUFFERABLE | PTE_EXT_APX	@ L_PTE_MT_VECTORS
+>  	.long	0x00						@ L_PTE_MT_MINICACHE (not present)
+>  	.long	PTE_EXT_TEX(1) | PTE_CACHEABLE | PTE_BUFFERABLE	@ L_PTE_MT_WRITEALLOC
+>  	.long	0x00						@ unused
+> @@ -148,7 +148,7 @@
+>  	.long	PTE_EXT_TEX(2)					@ L_PTE_MT_DEV_NONSHARED
+>  	.long	0x00						@ unused
+>  	.long	0x00						@ unused
+> -	.long	PTE_CACHEABLE | PTE_BUFFERABLE | PTE_EXT_APX	@ L_PTE_MT_VECTORS
+> +	.long	0x00						@ unused
+>  	.endm
+
+Looking at the L_PTE_MT_VECTORS uses, I don't think this gives you what
+you intended. vecs_pgprot in build_mem_type_table() actually combines
+the cache policy bits with L_PTE_MT_VECTORS and this might have been the
+reason why it was on the last position (all bits 1). So the default
+cachepolicy of L_PTE_MT_WRITEBACK or'ed with the new L_PTE_MT_VECTORS
+gives you 0b0111 which is position 7 instead of 5. This would map onto
+L_PTE_MT_WRITEALLOC (which is not that bad) but misses the APX bit which
+marks the vectors page r/w for kernel and ro for user.
+
+I don't think this matters since the kernel no longer writes to the
+vectors page at run-time but it needs cleaning up a bit (and testing in
+case I missed something). IOW, do we still need a dedicated mapping type
+for the vectors or we can simply use the read-only user page attributes?
+
+-- 
+Catalin
