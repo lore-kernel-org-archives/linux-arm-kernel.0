@@ -1,122 +1,176 @@
 From: hch@lst.de (Christoph Hellwig)
-Date: Mon, 24 Sep 2018 09:43:47 +0200
-Subject: [PATCH 02/10] block: move integrity_req_gap_{back,
- front}_merge to blk.h
+Date: Mon, 24 Sep 2018 09:43:48 +0200
+Subject: [PATCH 03/10] block: move req_gap_{back,front}_merge to blk-merge.c
 In-Reply-To: <20180924074355.2802-1-hch@lst.de>
 References: <20180924074355.2802-1-hch@lst.de>
-Message-ID: <20180924074355.2802-3-hch@lst.de>
+Message-ID: <20180924074355.2802-4-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No need to expose these to drivers.
+Keep it close to the actual users instead of exposing the function to all
+drivers.
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- block/blk.h            | 35 +++++++++++++++++++++++++++++++++--
- include/linux/blkdev.h | 31 -------------------------------
- 2 files changed, 33 insertions(+), 33 deletions(-)
+ block/blk-merge.c      | 65 +++++++++++++++++++++++++++++++++++++++
+ include/linux/blkdev.h | 69 ------------------------------------------
+ 2 files changed, 65 insertions(+), 69 deletions(-)
 
-diff --git a/block/blk.h b/block/blk.h
-index 9db4e389582c..441c2de1d4b9 100644
---- a/block/blk.h
-+++ b/block/blk.h
-@@ -158,7 +158,38 @@ static inline bool bio_integrity_endio(struct bio *bio)
- 		return __bio_integrity_endio(bio);
- 	return true;
- }
--#else
-+
-+static inline bool integrity_req_gap_back_merge(struct request *req,
-+		struct bio *next)
-+{
-+	struct bio_integrity_payload *bip = bio_integrity(req->bio);
-+	struct bio_integrity_payload *bip_next = bio_integrity(next);
-+
-+	return bvec_gap_to_prev(req->q, &bip->bip_vec[bip->bip_vcnt - 1],
-+				bip_next->bip_vec[0].bv_offset);
-+}
-+
-+static inline bool integrity_req_gap_front_merge(struct request *req,
-+		struct bio *bio)
-+{
-+	struct bio_integrity_payload *bip = bio_integrity(bio);
-+	struct bio_integrity_payload *bip_next = bio_integrity(req->bio);
-+
-+	return bvec_gap_to_prev(req->q, &bip->bip_vec[bip->bip_vcnt - 1],
-+				bip_next->bip_vec[0].bv_offset);
-+}
-+#else /* CONFIG_BLK_DEV_INTEGRITY */
-+static inline bool integrity_req_gap_back_merge(struct request *req,
-+		struct bio *next)
-+{
-+	return false;
-+}
-+static inline bool integrity_req_gap_front_merge(struct request *req,
-+		struct bio *bio)
-+{
-+	return false;
-+}
-+
- static inline void blk_flush_integrity(void)
- {
- }
-@@ -166,7 +197,7 @@ static inline bool bio_integrity_endio(struct bio *bio)
- {
- 	return true;
- }
--#endif
-+#endif /* CONFIG_BLK_DEV_INTEGRITY */
+diff --git a/block/blk-merge.c b/block/blk-merge.c
+index aaec38cc37b8..ad8a226347a6 100644
+--- a/block/blk-merge.c
++++ b/block/blk-merge.c
+@@ -12,6 +12,71 @@
  
- void blk_timeout_work(struct work_struct *work);
- unsigned long blk_rq_timeout(unsigned long timeout);
+ #include "blk.h"
+ 
++/*
++ * Check if the two bvecs from two bios can be merged to one segment.  If yes,
++ * no need to check gap between the two bios since the 1st bio and the 1st bvec
++ * in the 2nd bio can be handled in one segment.
++ */
++static inline bool bios_segs_mergeable(struct request_queue *q,
++		struct bio *prev, struct bio_vec *prev_last_bv,
++		struct bio_vec *next_first_bv)
++{
++	if (!BIOVEC_PHYS_MERGEABLE(prev_last_bv, next_first_bv))
++		return false;
++	if (!BIOVEC_SEG_BOUNDARY(q, prev_last_bv, next_first_bv))
++		return false;
++	if (prev->bi_seg_back_size + next_first_bv->bv_len >
++			queue_max_segment_size(q))
++		return false;
++	return true;
++}
++
++static inline bool bio_will_gap(struct request_queue *q,
++		struct request *prev_rq, struct bio *prev, struct bio *next)
++{
++	struct bio_vec pb, nb;
++
++	if (!bio_has_data(prev) || !queue_virt_boundary(q))
++		return false;
++
++	/*
++	 * Don't merge if the 1st bio starts with non-zero offset, otherwise it
++	 * is quite difficult to respect the sg gap limit.  We work hard to
++	 * merge a huge number of small single bios in case of mkfs.
++	 */
++	if (prev_rq)
++		bio_get_first_bvec(prev_rq->bio, &pb);
++	else
++		bio_get_first_bvec(prev, &pb);
++	if (pb.bv_offset)
++		return true;
++
++	/*
++	 * We don't need to worry about the situation that the merged segment
++	 * ends in unaligned virt boundary:
++	 *
++	 * - if 'pb' ends aligned, the merged segment ends aligned
++	 * - if 'pb' ends unaligned, the next bio must include
++	 *   one single bvec of 'nb', otherwise the 'nb' can't
++	 *   merge with 'pb'
++	 */
++	bio_get_last_bvec(prev, &pb);
++	bio_get_first_bvec(next, &nb);
++	if (bios_segs_mergeable(q, prev, &pb, &nb))
++		return false;
++	return __bvec_gap_to_prev(q, &pb, nb.bv_offset);
++}
++
++static inline bool req_gap_back_merge(struct request *req, struct bio *bio)
++{
++	return bio_will_gap(req->q, req, req->biotail, bio);
++}
++
++static inline bool req_gap_front_merge(struct request *req, struct bio *bio)
++{
++	return bio_will_gap(req->q, NULL, bio, req->bio);
++}
++
+ static struct bio *blk_bio_discard_split(struct request_queue *q,
+ 					 struct bio *bio,
+ 					 struct bio_set *bs,
 diff --git a/include/linux/blkdev.h b/include/linux/blkdev.h
-index d6869e0e2b64..bc534c857344 100644
+index bc534c857344..b7e676bb01bc 100644
 --- a/include/linux/blkdev.h
 +++ b/include/linux/blkdev.h
-@@ -1843,26 +1843,6 @@ queue_max_integrity_segments(struct request_queue *q)
- 	return q->limits.max_integrity_segments;
+@@ -1695,75 +1695,6 @@ static inline bool bvec_gap_to_prev(struct request_queue *q,
+ 	return __bvec_gap_to_prev(q, bprv, offset);
  }
  
--static inline bool integrity_req_gap_back_merge(struct request *req,
--						struct bio *next)
+-/*
+- * Check if the two bvecs from two bios can be merged to one segment.
+- * If yes, no need to check gap between the two bios since the 1st bio
+- * and the 1st bvec in the 2nd bio can be handled in one segment.
+- */
+-static inline bool bios_segs_mergeable(struct request_queue *q,
+-		struct bio *prev, struct bio_vec *prev_last_bv,
+-		struct bio_vec *next_first_bv)
 -{
--	struct bio_integrity_payload *bip = bio_integrity(req->bio);
--	struct bio_integrity_payload *bip_next = bio_integrity(next);
--
--	return bvec_gap_to_prev(req->q, &bip->bip_vec[bip->bip_vcnt - 1],
--				bip_next->bip_vec[0].bv_offset);
+-	if (!BIOVEC_PHYS_MERGEABLE(prev_last_bv, next_first_bv))
+-		return false;
+-	if (!BIOVEC_SEG_BOUNDARY(q, prev_last_bv, next_first_bv))
+-		return false;
+-	if (prev->bi_seg_back_size + next_first_bv->bv_len >
+-			queue_max_segment_size(q))
+-		return false;
+-	return true;
 -}
 -
--static inline bool integrity_req_gap_front_merge(struct request *req,
--						 struct bio *bio)
+-static inline bool bio_will_gap(struct request_queue *q,
+-				struct request *prev_rq,
+-				struct bio *prev,
+-				struct bio *next)
 -{
--	struct bio_integrity_payload *bip = bio_integrity(bio);
--	struct bio_integrity_payload *bip_next = bio_integrity(req->bio);
+-	if (bio_has_data(prev) && queue_virt_boundary(q)) {
+-		struct bio_vec pb, nb;
 -
--	return bvec_gap_to_prev(req->q, &bip->bip_vec[bip->bip_vcnt - 1],
--				bip_next->bip_vec[0].bv_offset);
--}
+-		/*
+-		 * don't merge if the 1st bio starts with non-zero
+-		 * offset, otherwise it is quite difficult to respect
+-		 * sg gap limit. We work hard to merge a huge number of small
+-		 * single bios in case of mkfs.
+-		 */
+-		if (prev_rq)
+-			bio_get_first_bvec(prev_rq->bio, &pb);
+-		else
+-			bio_get_first_bvec(prev, &pb);
+-		if (pb.bv_offset)
+-			return true;
 -
- /**
-  * bio_integrity_intervals - Return number of integrity intervals for a bio
-  * @bi:		blk_integrity profile for device
-@@ -1947,17 +1927,6 @@ static inline bool blk_integrity_merge_bio(struct request_queue *rq,
- 	return true;
- }
- 
--static inline bool integrity_req_gap_back_merge(struct request *req,
--						struct bio *next)
--{
+-		/*
+-		 * We don't need to worry about the situation that the
+-		 * merged segment ends in unaligned virt boundary:
+-		 *
+-		 * - if 'pb' ends aligned, the merged segment ends aligned
+-		 * - if 'pb' ends unaligned, the next bio must include
+-		 *   one single bvec of 'nb', otherwise the 'nb' can't
+-		 *   merge with 'pb'
+-		 */
+-		bio_get_last_bvec(prev, &pb);
+-		bio_get_first_bvec(next, &nb);
+-
+-		if (!bios_segs_mergeable(q, prev, &pb, &nb))
+-			return __bvec_gap_to_prev(q, &pb, nb.bv_offset);
+-	}
+-
 -	return false;
 -}
--static inline bool integrity_req_gap_front_merge(struct request *req,
--						 struct bio *bio)
+-
+-static inline bool req_gap_back_merge(struct request *req, struct bio *bio)
 -{
--	return false;
+-	return bio_will_gap(req->q, req, req->biotail, bio);
 -}
 -
- static inline unsigned int bio_integrity_intervals(struct blk_integrity *bi,
- 						   unsigned int sectors)
- {
+-static inline bool req_gap_front_merge(struct request *req, struct bio *bio)
+-{
+-	return bio_will_gap(req->q, NULL, bio, req->bio);
+-}
+-
+ int kblockd_schedule_work(struct work_struct *work);
+ int kblockd_schedule_work_on(int cpu, struct work_struct *work);
+ int kblockd_mod_delayed_work_on(int cpu, struct delayed_work *dwork, unsigned long delay);
 -- 
 2.19.0
