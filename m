@@ -1,90 +1,57 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 24 Sep 2018 19:16:45 +0200
-Subject: [PATCH v3] dt-bindings: arm: Explicitly mark Samsung Exynos SoC
- as unstable
-In-Reply-To: <CAOesGMgE6QaasvHi7E55Z4U1Pp0+8QYW2eRLMsExebZ999_UHA@mail.gmail.com>
-References: <20180830180205.18121-1-krzk@kernel.org>
- <CAOesGMgE6QaasvHi7E55Z4U1Pp0+8QYW2eRLMsExebZ999_UHA@mail.gmail.com>
-Message-ID: <20180924171645.GA10910@kozik-lap>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 24 Sep 2018 18:19:36 +0100
+Subject: [PATCH v5 0/6] Move swapper_pg_dir to rodata section.
+In-Reply-To: <20180917044333.30051-1-yaojun8558363@gmail.com>
+References: <20180917044333.30051-1-yaojun8558363@gmail.com>
+Message-ID: <20180924171936.q5bfvczzllmm5lpe@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 23, 2018 at 02:46:20PM +0100, Olof Johansson wrote:
-> On Thu, Aug 30, 2018 at 7:02 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> > Samsung Exynos SoCs and boards related bindings evolved since the initial
-> > introduction, but initially the bindings were minimal and a bit incomplete
-> > (they never described all the hardware modules available in the SoCs).
-> > Since then some significant (not fully compatible) changes have been
-> > already committed a few times (like gpio replaced by pinctrl, display ddc,
-> > mfc reserved memory, some core clocks added to various hardware modules,
-> > added more required nodes).
-> >
-> > On the other side there are no boards which have device tree embedded in
-> > the bootloader. Device tree blob is always compiled from the kernel tree
-> > and updated together with the kernel image.
-> >
-> > Thus to avoid further adding a bunch of workarounds for old/missing
-> > bindings, make development of new platforms easier and allow to make
-> > cleanup of the existing code and device tree files, lets mark some
-> > Samsung Exynos SoC platform bindings as unstable. This means that
-> > bindings can may change at any time and users should use the dtb file
-> > compiled from the same kernel source tree as the kernel image.
+Hi,
+
+On Mon, Sep 17, 2018 at 12:43:27PM +0800, Jun Yao wrote:
+> Version 5 changes:
+> 	1. Correct spelling and indentation errors[1].
+> 	2. Update init_mm.pgd by assembly[2].
+> 	3. Simplify set_p?d() by introducing set_swapper_pgd()[3].
+> 	4. Reduce unnecessary tlbi for every write to swapper_pg_dir
+> 	   during paging_init()[3].
 > 
-> I have to admit that I don't really like this approach, and I missed
-> the patch when originally posted (I did notice it in the pull request
-> it came in with though).
+> v4: https://www.spinics.net/lists/arm-kernel/msg672195.html
+> v3: https://www.spinics.net/lists/arm-kernel/msg662537.html
+> v2: https://patchwork.kernel.org/patch/10485641/
+> v1: https://patchwork.kernel.org/patch/10476595/
 > 
-> The main concern for me is that with a blanket "everything is always
-> unstable" we discard the notion that we should strive for bindings to
-> be stable and backwards compatible.
-
-The original idea from Marek was to mark everything unstable. After
-comments from Rob I made it weaker already by changing to specific group
-of compatibles. Accepting their instability does not mean that we will
-be doing this on whenever possible. It just opens the possibility of
-finding some balance in cleanups and development. Sometimes things have
-to be seriously changed (fixed) and implementing workarounds for
-existing ABI might be huge work by itself.
-
-IOW, we want stability but not with the costs of huge development
-efforts... because no one else except us cares about the stability.
-
+> [1] https://www.spinics.net/lists/arm-kernel/msg675189.html
+> [2] https://www.spinics.net/lists/arm-kernel/msg675193.html
+> [3] https://www.spinics.net/lists/arm-kernel/msg675196.html
 > 
-> Questions that come to mind are:
+> Jun Yao (6):
+>   arm64/mm: Introduce the init_pg_dir.
+>   arm64/mm: Pass ttbr1 as a parameter to __enable_mmu().
+>   arm64/mm: Create the initial page table in the init_pg_dir.
+>   arm64/mm: Create the final page table directly in swapper_pg_dir.
+>   arm64/mm: Populate the swapper_pg_dir by fixmap.
+>   arm64/mm: Move {idmap_pg_dir .. swapper_pg_dir} to rodata section.
 > 
->  - When do they stop being unstable?
+>  arch/arm64/include/asm/assembler.h | 29 ++++++++++++++++++
+>  arch/arm64/include/asm/pgtable.h   | 36 ++++++++++++++++++----
+>  arch/arm64/kernel/asm-offsets.c    |  1 +
+>  arch/arm64/kernel/head.S           | 48 ++++++++++++++++++++----------
+>  arch/arm64/kernel/sleep.S          |  1 +
+>  arch/arm64/kernel/vmlinux.lds.S    | 47 +++++++++++++++++++----------
+>  arch/arm64/mm/mmu.c                | 45 +++++++++++++---------------
+>  7 files changed, 147 insertions(+), 60 deletions(-)
 
-They became unstable in a subjective way so I assume that reverse is the
-same, based on consensus and discussions.
+I've pushed a branch with the cleanups I requested [1] folded in.
 
-I am not sure if a hard time limit is good. There is no timeline for the
-Exynos development, no public roadmaps but rather community and
-partially volountary effort.  Therefore whatever number we set, it might
-be totally not matching reality.
+I'm still a bit worried about the pgd lock, but otherwise I think this
+is sound. I intend to throw some testing at it, just in case.
 
->  - Is there a way to note in the binding itself that it's still
-> unstable with an anticipation of when it will be settled in?
+If you're happy with that branch, I'll ask Will and Catalin to consider
+picking it up.
 
-Hmm, I see that some existing bindings are being added with "Unstable"
-warning:
+Thanks,
+Mark.
 
-	git grep -i unstable Documentation/devicetree/
-
-so there should be no problem for putting there a timeframe.
-
->  - Is there a better way to version the bindings to avoid complete
-> backwards compatibility?
-
-Some architectures are using overlays for handling backward
-compatibility. Anyway it might put additional effort on driver
-development.
-
-> Pointing out a couple of cases where it has been painful to stay
-> backwards compatible could also be useful for understanding (even
-> though you run the risk of each case being explained away with
-> suggestions of how it can be handled).
-> 
-
-
-Best regards,
-Krzysztof
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm64/ro-swapper
