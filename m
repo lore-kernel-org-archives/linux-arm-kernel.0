@@ -1,85 +1,57 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 24 Sep 2018 17:54:21 +0100
-Subject: [PATCH v5 5/6] arm64/mm: Populate the swapper_pg_dir by fixmap.
-In-Reply-To: <20180917044333.30051-6-yaojun8558363@gmail.com>
-References: <20180917044333.30051-1-yaojun8558363@gmail.com>
- <20180917044333.30051-6-yaojun8558363@gmail.com>
-Message-ID: <20180924165421.77bjq5m32h5w7ffh@lakrids.cambridge.arm.com>
+From: leoyang.li@nxp.com (Leo Li)
+Date: Mon, 24 Sep 2018 16:58:40 +0000
+Subject: [GIT PULL] fixes for soc/fsl drivers for v4.19
+In-Reply-To: <20180923123704.r47aywqfhor3ma74@localhost>
+References: <20180920165656.31902-1-leoyang.li@nxp.com>
+ <20180923123704.r47aywqfhor3ma74@localhost>
+Message-ID: <AMSPR04MB503FA6EEF013F8F10D6629F8F170@AMSPR04MB503.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 17, 2018 at 12:43:32PM +0800, Jun Yao wrote:
-> Since we will move the swapper_pg_dir to rodata section, we need a
-> way to update it. The fixmap can handle it. When the swapper_pg_dir
-> needs to be updated, we map it dynamically. The map will be
-> canceled after the update is complete. In this way, we can defend
-> against KSMA(Kernel Space Mirror Attack).
+
+
+> -----Original Message-----
+> From: Olof Johansson <olof@lixom.net>
+> Sent: Sunday, September 23, 2018 7:37 AM
+> To: Leo Li <leoyang.li@nxp.com>
+> Cc: arm at kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; shawnguo at kernel.org
+> Subject: Re: [GIT PULL] fixes for soc/fsl drivers for v4.19
 > 
-> Signed-off-by: Jun Yao <yaojun8558363@gmail.com>
-> ---
->  arch/arm64/include/asm/pgtable.h | 38 ++++++++++++++++++++++++++------
->  arch/arm64/mm/mmu.c              | 25 +++++++++++++++++++--
->  2 files changed, 54 insertions(+), 9 deletions(-)
+> Hi Li,
 > 
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index b11d6fc62a62..9e643fc2453d 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -429,8 +429,29 @@ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
->  				 PUD_TYPE_TABLE)
->  #endif
->  
-> +extern pgd_t init_pg_dir[PTRS_PER_PGD];
-> +extern pgd_t init_pg_end[];
-> +extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
-> +extern pgd_t swapper_pg_end[];
-> +extern pgd_t idmap_pg_dir[PTRS_PER_PGD];
-> +extern pgd_t tramp_pg_dir[PTRS_PER_PGD];
-> +
-> +extern void set_swapper_pgd(pgd_t *pgdp, pgd_t pgd);
-> +
-> +static inline bool in_swapper_pgdir(void *addr)
-> +{
-> +	return ((unsigned long)addr & PAGE_MASK) ==
-> +		((unsigned long)swapper_pg_dir & PAGE_MASK);
-> +}
-> +
->  static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
->  {
-> +#ifdef __PAGETABLE_PMD_FOLDED
-> +	if (in_swapper_pgdir(pmdp)) {
-> +		set_swapper_pgd((pgd_t *)pmdp, __pgd(pmd_val(pmd)));
-> +		return;
-> +	}
-> +#endif
+> On Thu, Sep 20, 2018 at 11:56:56AM -0500, Li Yang wrote:
+> > Hi arm-soc maintainers,
+> >
+> > Please merge the following fixes for soc/fsl drivers.
+> >
+> > Regards,
+> > Leo
+> >
+> > The following changes since commit
+> 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+> >
+> >   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+> >
+> > are available in the Git repository at:
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/leo/linux.git
+> > tags/soc-fsl-fixes-for-4.19
+> >
+> > for you to fetch changes up to
+> 3cb31b634052ed458922e0c8e2b4b093d7fb60b9:
+> >
+> >   soc: fsl: qe: Fix copy/paste bug in ucc_get_tdm_sync_shift()
+> > (2018-09-17 16:01:46 -0500)
+> >
+> > ----------------------------------------------------------------
+> > soc/fsl fixes for 4.19
+> 
+> Please spend a bit of effort on writing up the tag for all pull requests, even
+> fixes. For fixes in particular, just as with the patch descriptions we want the
+> pull request to contain some brief information to what the bug is and why
+> the fix is needed.
+> 
+> Care to give this another go with a new tag description, please?
 
-So that we can get consistent build coverage, could we make this:
-
-	if (__is_defined(__PAGETABLE_PMD_FOLDED) && in_swapper_pgdir(pmdp)) {
-		set_swapper_pgd((pgd_t *)pmdp, __pgd(pmd_val(pmd)));
-		return;
-	}
-
->  	WRITE_ONCE(*pmdp, pmd);
->  
->  	if (pmd_valid(pmd))
-> @@ -484,6 +505,12 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
->  
->  static inline void set_pud(pud_t *pudp, pud_t pud)
->  {
-> +#ifdef __PAGETABLE_PUD_FOLDED
-> +	if (in_swapper_pgdir(pudp)) {
-> +		set_swapper_pgd((pgd_t *)pudp, __pgd(pud_val(pud)));
-> +		return;
-> +	}
-> +#endif
-
-... and likewise:
-
-	if (__is_enabled(__PAGETABLE_PUD_FOLDED) && in_swapper_pgdir(pudp)) {
-		set_swapper_pgd((pgd_t *)pudp, __pgd(pud_val(pud)));
-		return;
-	}
-
-Thanks,
-Mark.
+Sure.  Will send a new version right away.
