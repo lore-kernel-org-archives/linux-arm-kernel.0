@@ -1,44 +1,105 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 24 Sep 2018 14:26:25 +0200
-Subject: [PATCH/RFT] arm64: dts: renesas: r8a77965: Add Sound and Audio
- DMAC device nodes
-In-Reply-To: <1532551190-14797-1-git-send-email-ykaneko0929@gmail.com>
-References: <1532551190-14797-1-git-send-email-ykaneko0929@gmail.com>
-Message-ID: <20180924122624.gnrhlwfeik5ki2zf@verge.net.au>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 24 Sep 2018 14:28:07 +0200
+Subject: [PATCH v4 5/5] drm: bridge: add support for Cadence MHDP DPI/DP
+ bridge
+In-Reply-To: <CO2PR07MB2551EC0A7DEB61C54A4D6A5FCD170@CO2PR07MB2551.namprd07.prod.outlook.com>
+References: <1537455288-20223-1-git-send-email-dkos@cadence.com>
+ <1903708.pJTgKoWLiI@phil>
+ <CO2PR07MB2551EC0A7DEB61C54A4D6A5FCD170@CO2PR07MB2551.namprd07.prod.outlook.com>
+Message-ID: <6154358.J9crsCiUTz@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 26, 2018 at 05:39:50AM +0900, Yoshihiro Kaneko wrote:
-> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> 
-> Based on a similar patch of the R8A7796 device tree
-> by Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>.
-> 
-> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
-> ---
-> 
-> The following patches were squashed into this patch:
-> 
->   arm64: dts: r8a77965: Add Audio-DMAC device nodes
->   arm64: dts: r8a77965: Add Sound device node and SSI support
->   arm64: dts: r8a77965: Add Sound SRC support
->   arm64: dts: r8a77965: Add Sound DVC device nodes
->   arm64: dts: r8a77965: Add Sound CTU support
->   arm64: dts: r8a77965: Add Sound MIX support
-> 
-> This patch is based on the devel branch of Simon Horman's renesas tree.
-> 
->  arch/arm64/boot/dts/renesas/r8a77965.dtsi | 245 ++++++++++++++++++++++++++++--
->  1 file changed, 234 insertions(+), 11 deletions(-)
+Hi Damian,
 
-I have tested playback and record using a loopback cable and this patce
-appears to work well on top of a merge of:
+Am Montag, 24. September 2018, 13:40:03 CEST schrieb Damian Kos:
+> > Am Donnerstag, 20. September 2018, 16:54:40 CEST schrieb Damian Kos:
+> > > From: Quentin Schulz <quentin.schulz@free-electrons.com>
+> > > 
+> > > This adds basic support for Cadence MHDP DPI to DP bridge.
+> > > 
+> > > Basically, it takes a DPI stream as input and output it encoded in DP 
+> > > format. It's missing proper HPD, HDCP and currently supports only SST 
+> > > mode.
+> > > 
+> > > Changes made in the low level driver (cdn-dp-reg.*):
+> > > - moved it to from drivers/gpu/drm/rockchip to
+> > >   drivers/gpu/drm/bridge/cdns-mhdp-common.*
+> > > - functions for sending/receiving commands are now public
+> > > - added functions for reading registers and link training
+> > >   adjustment
+> > > 
+> > > Changes made in RK's driver (cdn-dp-core.*):
+> > > - Moved audio_info and audio_pdev fields from cdn_dp_device to
+> > >   cdns_mhdp_device structure.
+> > > 
+> > > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> > > Signed-off-by: Damian Kos <dkos@cadence.com>
+> > 
+> > [...]
+> > 
+> > > diff --git a/drivers/gpu/drm/rockchip/Kconfig 
+> > > b/drivers/gpu/drm/rockchip/Kconfig
+> > > index 0ccc76217ee4..129b0529f3e1 100644
+> > > --- a/drivers/gpu/drm/rockchip/Kconfig
+> > > +++ b/drivers/gpu/drm/rockchip/Kconfig
+> > > @@ -27,7 +27,9 @@ config ROCKCHIP_ANALOGIX_DP
+> > >  
+> > >  config ROCKCHIP_CDN_DP
+> > >          bool "Rockchip cdn DP"
+> > > -	depends on EXTCON=y || (EXTCON=m && DRM_ROCKCHIP=m)
+> > > +	depends on DRM_ROCKCHIP=m
+> > 
+> > Sorry, I wasn't fast enough in my reply to you mail to catch that before your v4, but I don't think this is necessary.
+> > Instead I do guess, the select below should do the right thing by making EXTCON=y if DRM_ROCKCHIP=y.
+> > 
+> > Somewhat clumsily verified by making EXTCON=m in my defconfig and seeing get changed to y upon build, which I guess comes from a different "select" in the config.
+> > 
+> 
+> I've changed it to:
+> 
+> config ROCKCHIP_CDN_DP
+>         bool "Rockchip cdn DP"
+>         depends on DRM_ROCKCHIP
+>         select EXTCON if DRM_ROCKCHIP=y
+>         select DRM_CDNS_MHDP
+>         help...
+> 
+> and it seems that there are no issues. At least for me.
+> 
+> Please let me know if that's OK.
 
-* renesas-devel-20180919-v4.19-rc4
-* renesas-drivers-2018-09-11-v4.19-rc3
+nope, just do "select EXTCON" . It works nicely and the above would
+not select EXTCON at all if the the rockchip-drm driver gets built into
+the kernel.
 
-I plan to accept this patch for v4.20 in the coming days if there are no
-objections.
+To be sure I just did a little experiment and added:
 
-Tested-by: Simon Horman <horms+renesas@verge.net.au>
+diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
+index 4ad85c046dcd..64e2b096afd8 100644
+--- a/drivers/gpu/drm/bridge/Kconfig
++++ b/drivers/gpu/drm/bridge/Kconfig
+@@ -154,4 +154,11 @@ source "drivers/gpu/drm/bridge/ite/Kconfig"
+ 
+ source "drivers/gpu/drm/bridge/synopsys/Kconfig"
+ 
++config DRM_TMP1
++       tristate "option to select"
++
++config DRM_TMP2
++       tristate "option doing the selecting"
++       select DRM_TMP1
++
+
+If I select DRM_TMP2=m as module I end up with
+CONFIG_DRM_TMP1=m
+CONFIG_DRM_TMP2=m
+in the defconfig and wit DRM_TMP2=y it changes to
+CONFIG_DRM_TMP1=y
+CONFIG_DRM_TMP2=y
+
+so all is well with just doing "select EXTCON" above and will
+select the correct "m" or "y" stance as needed.
+
+
+Heiko
