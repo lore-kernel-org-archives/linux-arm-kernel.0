@@ -1,34 +1,122 @@
 From: hch@lst.de (Christoph Hellwig)
-Date: Mon, 24 Sep 2018 09:43:46 +0200
-Subject: [PATCH 01/10] arm: remove the unused BIOVEC_MERGEABLE define
+Date: Mon, 24 Sep 2018 09:43:47 +0200
+Subject: [PATCH 02/10] block: move integrity_req_gap_{back,
+ front}_merge to blk.h
 In-Reply-To: <20180924074355.2802-1-hch@lst.de>
 References: <20180924074355.2802-1-hch@lst.de>
-Message-ID: <20180924074355.2802-2-hch@lst.de>
+Message-ID: <20180924074355.2802-3-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+No need to expose these to drivers.
+
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- arch/arm/include/asm/io.h | 7 -------
- 1 file changed, 7 deletions(-)
+ block/blk.h            | 35 +++++++++++++++++++++++++++++++++--
+ include/linux/blkdev.h | 31 -------------------------------
+ 2 files changed, 33 insertions(+), 33 deletions(-)
 
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index 2cfbc531f63b..6774553dc214 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -459,13 +459,6 @@ extern void pci_iounmap(struct pci_dev *dev, void __iomem *addr);
+diff --git a/block/blk.h b/block/blk.h
+index 9db4e389582c..441c2de1d4b9 100644
+--- a/block/blk.h
++++ b/block/blk.h
+@@ -158,7 +158,38 @@ static inline bool bio_integrity_endio(struct bio *bio)
+ 		return __bio_integrity_endio(bio);
+ 	return true;
+ }
+-#else
++
++static inline bool integrity_req_gap_back_merge(struct request *req,
++		struct bio *next)
++{
++	struct bio_integrity_payload *bip = bio_integrity(req->bio);
++	struct bio_integrity_payload *bip_next = bio_integrity(next);
++
++	return bvec_gap_to_prev(req->q, &bip->bip_vec[bip->bip_vcnt - 1],
++				bip_next->bip_vec[0].bv_offset);
++}
++
++static inline bool integrity_req_gap_front_merge(struct request *req,
++		struct bio *bio)
++{
++	struct bio_integrity_payload *bip = bio_integrity(bio);
++	struct bio_integrity_payload *bip_next = bio_integrity(req->bio);
++
++	return bvec_gap_to_prev(req->q, &bip->bip_vec[bip->bip_vcnt - 1],
++				bip_next->bip_vec[0].bv_offset);
++}
++#else /* CONFIG_BLK_DEV_INTEGRITY */
++static inline bool integrity_req_gap_back_merge(struct request *req,
++		struct bio *next)
++{
++	return false;
++}
++static inline bool integrity_req_gap_front_merge(struct request *req,
++		struct bio *bio)
++{
++	return false;
++}
++
+ static inline void blk_flush_integrity(void)
+ {
+ }
+@@ -166,7 +197,7 @@ static inline bool bio_integrity_endio(struct bio *bio)
+ {
+ 	return true;
+ }
+-#endif
++#endif /* CONFIG_BLK_DEV_INTEGRITY */
  
- #include <asm-generic/io.h>
+ void blk_timeout_work(struct work_struct *work);
+ unsigned long blk_rq_timeout(unsigned long timeout);
+diff --git a/include/linux/blkdev.h b/include/linux/blkdev.h
+index d6869e0e2b64..bc534c857344 100644
+--- a/include/linux/blkdev.h
++++ b/include/linux/blkdev.h
+@@ -1843,26 +1843,6 @@ queue_max_integrity_segments(struct request_queue *q)
+ 	return q->limits.max_integrity_segments;
+ }
  
--/*
-- * can the hardware map this into one segment or not, given no other
-- * constraints.
-- */
--#define BIOVEC_MERGEABLE(vec1, vec2)	\
--	((bvec_to_phys((vec1)) + (vec1)->bv_len) == bvec_to_phys((vec2)))
+-static inline bool integrity_req_gap_back_merge(struct request *req,
+-						struct bio *next)
+-{
+-	struct bio_integrity_payload *bip = bio_integrity(req->bio);
+-	struct bio_integrity_payload *bip_next = bio_integrity(next);
 -
- struct bio_vec;
- extern bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
- 				      const struct bio_vec *vec2);
+-	return bvec_gap_to_prev(req->q, &bip->bip_vec[bip->bip_vcnt - 1],
+-				bip_next->bip_vec[0].bv_offset);
+-}
+-
+-static inline bool integrity_req_gap_front_merge(struct request *req,
+-						 struct bio *bio)
+-{
+-	struct bio_integrity_payload *bip = bio_integrity(bio);
+-	struct bio_integrity_payload *bip_next = bio_integrity(req->bio);
+-
+-	return bvec_gap_to_prev(req->q, &bip->bip_vec[bip->bip_vcnt - 1],
+-				bip_next->bip_vec[0].bv_offset);
+-}
+-
+ /**
+  * bio_integrity_intervals - Return number of integrity intervals for a bio
+  * @bi:		blk_integrity profile for device
+@@ -1947,17 +1927,6 @@ static inline bool blk_integrity_merge_bio(struct request_queue *rq,
+ 	return true;
+ }
+ 
+-static inline bool integrity_req_gap_back_merge(struct request *req,
+-						struct bio *next)
+-{
+-	return false;
+-}
+-static inline bool integrity_req_gap_front_merge(struct request *req,
+-						 struct bio *bio)
+-{
+-	return false;
+-}
+-
+ static inline unsigned int bio_integrity_intervals(struct blk_integrity *bi,
+ 						   unsigned int sectors)
+ {
 -- 
 2.19.0
