@@ -1,39 +1,68 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Mon, 24 Sep 2018 22:09:41 +0200
-Subject: [GIT PULL] ARM: at91: fixes for 4.19
-Message-ID: <20180924200941.GA11498@piout.net>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Mon, 24 Sep 2018 21:23:33 +0100
+Subject: [PATCH v2 1/2] iio: adc: at91: fix acking DRDY irq on simple
+ conversions
+In-Reply-To: <1537775504-7981-1-git-send-email-eugen.hristev@microchip.com>
+References: <1537775504-7981-1-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <20180924212333.797439dd@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On Mon, 24 Sep 2018 10:51:43 +0300
+Eugen Hristev <eugen.hristev@microchip.com> wrote:
 
-Here is a small fix for an issue seen on the sama5d2 PTC EK.
+> When doing simple conversions, the driver did not acknowledge the DRDY irq.
+> If this irq status is not acked, it will be left pending, and as soon as a
+> trigger is enabled, the irq handler will be called, it doesn't know why
+> this status has occurred because no channel is pending, and then it will go
+> int a irq loop and board will hang.
+> To avoid this situation, read the LCDR after a raw conversion is done.
+> 
+> Fixes 0e589d5fb ("ARM: AT91: IIO: Add AT91 ADC driver.")
+> Cc: Maxime Ripard <maxime.ripard@bootlin.com>
+> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+> ---
+> Hello Jonathan,
+> 
+> I moved this LCDR read/acknowledge into the IRQ handler after the conversion
+> value is being read.
+Ah.. This all makes more sense now. I'd misunderstood originally and thought
+we were looking at a read raw that wasn't using the interrupt at all.
 
-The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+Sorry about that.
 
-  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+However, mostly by coincidence (given I misread the code) I think
+this is a neater way to do this than the previous option as it
+puts it near the actual read.
 
-are available in the Git repository at:
+Given Maxime is the author of this one though I'd like to leave it
+on the list a little longer before applying.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/at91/linux tags/at91-4.19-fixes
+At this stage in the cycle I'll probably just queue it up for the
+next merge window anyway (marked for stable). It's not exactly a new bug
+after all.
 
-for you to fetch changes up to 379e36d3f591cb62e781907edafea17d75e8c1fa:
+Thanks,
 
-  ARM: dts: at91: sama5d2_ptc_ek: fix nand pinctrl (2018-09-12 12:38:04 +0200)
-
-----------------------------------------------------------------
-AT91 fixes for 4.19:
-
- - fix a NAND issue on sama5d2_ptc_ek
-
-----------------------------------------------------------------
-Ludovic Desroches (1):
-      ARM: dts: at91: sama5d2_ptc_ek: fix nand pinctrl
-
- arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts | 2 ++
- 1 file changed, 2 insertions(+)
-
--- 
-Alexandre Belloni, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Jonathan
+> Sorry about the noise to stable at vger, removed from message.
+> 
+> Thanks,
+> Eugen
+> 
+>  drivers/iio/adc/at91_adc.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
+> index 44b5168..e3be88e 100644
+> --- a/drivers/iio/adc/at91_adc.c
+> +++ b/drivers/iio/adc/at91_adc.c
+> @@ -279,6 +279,8 @@ static void handle_adc_eoc_trigger(int irq, struct iio_dev *idev)
+>  		iio_trigger_poll(idev->trig);
+>  	} else {
+>  		st->last_value = at91_adc_readl(st, AT91_ADC_CHAN(st, st->chnb));
+> +		/* Needed to ACK the DRDY interruption */
+> +		at91_adc_readl(st, AT91_ADC_LCDR);
+>  		st->done = true;
+>  		wake_up_interruptible(&st->wq_data_avail);
+>  	}
