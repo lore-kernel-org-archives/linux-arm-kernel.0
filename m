@@ -1,49 +1,51 @@
-From: ebiederm@xmission.com (Eric W. Biederman)
-Date: Mon, 24 Sep 2018 11:10:05 +0200
-Subject: [REVIEW][PATCH 05/15] signal/arm64: Consolidate the two hwpoison
- cases in do_page_fault
-In-Reply-To: <871s9j462u.fsf@xmission.com>
-References: <871s9j462u.fsf@xmission.com>
-Message-ID: <20180924091015.4458-5-ebiederm@xmission.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 24 Sep 2018 11:08:51 +0200
+Subject: [PATCH 5/5] ARM: shmobile: defconfig: Enable SII902X
+In-Reply-To: <1537553311-8831-6-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1537553311-8831-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <1537553311-8831-6-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <20180924090850.krd2cjzf6cyfdfh6@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These two cases are practically the same and use siginfo differently
-from the other signals sent from do_page_fault.  So consolidate them
-to make future changes easier.
+On Fri, Sep 21, 2018 at 07:08:31PM +0100, Fabrizio Castro wrote:
+> The iwg23s board comes with the SiI9022ACNU HDMI transmitter,
+> this patch makes sure the corresponding driver gets built.
+> 
+> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+> ---
+> 
+> Hello Simon,
+> 
+> a patch for the multi_v7_defconfig will be sent at a later stage.
 
-Signed-off-by: "Eric W. Biederman" <ebiederm@xmission.com>
----
- arch/arm64/mm/fault.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+Thanks Fabrizio,
 
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 654a861c4bd0..0ddc8c6ba53b 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -577,16 +577,16 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
- 		 */
- 		si.si_signo	= SIGBUS;
- 		si.si_code	= BUS_ADRERR;
--	} else if (fault & VM_FAULT_HWPOISON_LARGE) {
--		unsigned int hindex = VM_FAULT_GET_HINDEX(fault);
-+	} else if (fault & (VM_FAULT_HWPOISON_LARGE | VM_FAULT_HWPOISON)) {
-+		unsigned int lsb;
-+
-+		lsb = PAGE_SHIFT;
-+		if (fault & VM_FAULT_HWPOISON_LARGE)
-+			lsb = hstate_index_to_shift(VM_FAULT_GET_HINDEX(fault));
- 
- 		si.si_signo	= SIGBUS;
- 		si.si_code	= BUS_MCEERR_AR;
--		si.si_addr_lsb	= hstate_index_to_shift(hindex);
--	} else if (fault & VM_FAULT_HWPOISON) {
--		si.si_signo	= SIGBUS;
--		si.si_code	= BUS_MCEERR_AR;
--		si.si_addr_lsb	= PAGE_SHIFT;
-+		si.si_addr_lsb	= lsb;
- 	} else {
- 		/*
- 		 * Something tried to access memory that isn't in our memory
--- 
-2.17.1
+This looks fine to me but I will wait to see if there are other reviews
+before applying.
+
+Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+
+> 
+> Thanks,
+> Fab
+> 
+>  arch/arm/configs/shmobile_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+> index d090022..9e5a5ad 100644
+> --- a/arch/arm/configs/shmobile_defconfig
+> +++ b/arch/arm/configs/shmobile_defconfig
+> @@ -142,6 +142,7 @@ CONFIG_DRM=y
+>  CONFIG_DRM_RCAR_DU=y
+>  CONFIG_DRM_RCAR_LVDS=y
+>  CONFIG_DRM_DUMB_VGA_DAC=y
+> +CONFIG_DRM_SII902X=y
+>  CONFIG_DRM_I2C_ADV7511=y
+>  CONFIG_DRM_I2C_ADV7511_AUDIO=y
+>  CONFIG_FB_SH_MOBILE_LCDC=y
+> -- 
+> 2.7.4
+> 
