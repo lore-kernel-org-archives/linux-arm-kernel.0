@@ -1,42 +1,16 @@
-From: leoyang.li@nxp.com (Li Yang)
-Date: Mon, 24 Sep 2018 17:20:17 -0500
-Subject: [GIT PULL] updates for soc/fsl drivers for v4.20
-Message-ID: <20180924222017.30522-1-leoyang.li@nxp.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 24 Sep 2018 15:22:17 -0700
+Subject: [PATCH 1/3] ARM: configs: omap2plus: Add tlv320aic23 as module
+In-Reply-To: <20180923153718.15095-1-aford173@gmail.com>
+References: <20180923153718.15095-1-aford173@gmail.com>
+Message-ID: <20180924222217.GL5662@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi arm-soc maintainers,
+* Adam Ford <aford173@gmail.com> [180923 08:41]:
+> The AM3517 EVM has an expander board which has two tlv320aic23
+> codecs.  This enables the driver for these codecs as a module.
 
-Please pull soc/fsl drivers updates for v4.20.
+Applying into omap-for-v4.20/defconfig thanks.
 
-Regards,
-Leo
-
-The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
-
-  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
-
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/leo/linux.git soc-fsl-next-v4.20
-
-for you to fetch changes up to afa86d264a7ce62ba214bc7c6012e2129141421e:
-
-  soc: fsl: dpio: remove redundant pointer 'priv' (2018-08-30 12:19:02 -0500)
-
-----------------------------------------------------------------
-NXP/FSL SoC driver updates for v4.20
-
-- Use of_get_child_by_name helper for QE driver
-- Remove redundant pointer 'priv' for dpio driver
-
-----------------------------------------------------------------
-Colin Ian King (1):
-      soc: fsl: dpio: remove redundant pointer 'priv'
-
-Rob Herring (1):
-      soc: fsl/qe: Use of_get_child_by_name helper
-
- drivers/soc/fsl/dpio/dpio-driver.c | 3 ---
- drivers/soc/fsl/qe/qe.c            | 6 +-----
- 2 files changed, 1 insertion(+), 8 deletions(-)
+Tony
