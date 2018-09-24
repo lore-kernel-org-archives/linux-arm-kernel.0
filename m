@@ -1,148 +1,118 @@
 From: clabbe@baylibre.com (Corentin Labbe)
-Date: Mon, 24 Sep 2018 19:04:14 +0000
-Subject: [PATCH v2 5/7] net: ethernet: stmmac: dwmac-sun8i: use xxxsetbits32
+Date: Mon, 24 Sep 2018 19:04:13 +0000
+Subject: [PATCH v2 4/7] ata: ahci_sunxi: use xxxsetbits32 functions
 In-Reply-To: <1537815856-31728-1-git-send-email-clabbe@baylibre.com>
 References: <1537815856-31728-1-git-send-email-clabbe@baylibre.com>
-Message-ID: <1537815856-31728-6-git-send-email-clabbe@baylibre.com>
+Message-ID: <1537815856-31728-5-git-send-email-clabbe@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch convert dwmac-sun8i driver to use all xxxsetbits32 functions.
+This patch converts ahci_sunxi to use xxxsetbits32 functions
 
 Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
 ---
- drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 62 ++++++-----------------
- 1 file changed, 16 insertions(+), 46 deletions(-)
+ drivers/ata/ahci_sunxi.c | 51 ++++++++++++------------------------------------
+ 1 file changed, 12 insertions(+), 39 deletions(-)
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-index f9a61f90cfbc..74067a59af50 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-@@ -28,6 +28,7 @@
+diff --git a/drivers/ata/ahci_sunxi.c b/drivers/ata/ahci_sunxi.c
+index 911710643305..5b285a6dff60 100644
+--- a/drivers/ata/ahci_sunxi.c
++++ b/drivers/ata/ahci_sunxi.c
+@@ -25,6 +25,7 @@
+ #include <linux/of_device.h>
+ #include <linux/platform_device.h>
  #include <linux/regulator/consumer.h>
- #include <linux/regmap.h>
- #include <linux/stmmac.h>
 +#include <linux/setbits.h>
+ #include "ahci.h"
  
- #include "stmmac.h"
- #include "stmmac_platform.h"
-@@ -342,50 +343,30 @@ static void sun8i_dwmac_disable_dma_irq(void __iomem *ioaddr, u32 chan)
+ #define DRV_NAME "ahci-sunxi"
+@@ -58,34 +59,6 @@ MODULE_PARM_DESC(enable_pmp,
+ #define AHCI_P0PHYCR	0x0178
+ #define AHCI_P0PHYSR	0x017c
  
- static void sun8i_dwmac_dma_start_tx(void __iomem *ioaddr, u32 chan)
- {
--	u32 v;
+-static void sunxi_clrbits(void __iomem *reg, u32 clr_val)
+-{
+-	u32 reg_val;
 -
--	v = readl(ioaddr + EMAC_TX_CTL1);
--	v |= EMAC_TX_DMA_START;
--	v |= EMAC_TX_DMA_EN;
--	writel(v, ioaddr + EMAC_TX_CTL1);
-+	setbits_le32(ioaddr + EMAC_TX_CTL1,
-+		     EMAC_TX_DMA_START | EMAC_TX_DMA_EN);
- }
- 
- static void sun8i_dwmac_enable_dma_transmission(void __iomem *ioaddr)
- {
--	u32 v;
+-	reg_val = readl(reg);
+-	reg_val &= ~(clr_val);
+-	writel(reg_val, reg);
+-}
 -
--	v = readl(ioaddr + EMAC_TX_CTL1);
--	v |= EMAC_TX_DMA_START;
--	v |= EMAC_TX_DMA_EN;
--	writel(v, ioaddr + EMAC_TX_CTL1);
-+	setbits_le32(ioaddr + EMAC_TX_CTL1,
-+		     EMAC_TX_DMA_START | EMAC_TX_DMA_EN);
- }
- 
- static void sun8i_dwmac_dma_stop_tx(void __iomem *ioaddr, u32 chan)
- {
--	u32 v;
+-static void sunxi_setbits(void __iomem *reg, u32 set_val)
+-{
+-	u32 reg_val;
 -
--	v = readl(ioaddr + EMAC_TX_CTL1);
--	v &= ~EMAC_TX_DMA_EN;
--	writel(v, ioaddr + EMAC_TX_CTL1);
-+	clrbits_le32(ioaddr + EMAC_TX_CTL1, EMAC_TX_DMA_EN);
- }
- 
- static void sun8i_dwmac_dma_start_rx(void __iomem *ioaddr, u32 chan)
- {
--	u32 v;
+-	reg_val = readl(reg);
+-	reg_val |= set_val;
+-	writel(reg_val, reg);
+-}
 -
--	v = readl(ioaddr + EMAC_RX_CTL1);
--	v |= EMAC_RX_DMA_START;
--	v |= EMAC_RX_DMA_EN;
--	writel(v, ioaddr + EMAC_RX_CTL1);
-+	setbits_le32(ioaddr + EMAC_RX_CTL1,
-+		     EMAC_RX_DMA_START | EMAC_RX_DMA_EN);
- }
- 
- static void sun8i_dwmac_dma_stop_rx(void __iomem *ioaddr, u32 chan)
- {
--	u32 v;
+-static void sunxi_clrsetbits(void __iomem *reg, u32 clr_val, u32 set_val)
+-{
+-	u32 reg_val;
 -
--	v = readl(ioaddr + EMAC_RX_CTL1);
--	v &= ~EMAC_RX_DMA_EN;
--	writel(v, ioaddr + EMAC_RX_CTL1);
-+	clrbits_le32(ioaddr + EMAC_RX_CTL1, EMAC_RX_DMA_EN);
- }
- 
- static int sun8i_dwmac_dma_interrupt(void __iomem *ioaddr,
-@@ -578,7 +559,6 @@ static void sun8i_dwmac_set_umac_addr(struct mac_device_info *hw,
- 				      unsigned int reg_n)
- {
- 	void __iomem *ioaddr = hw->pcsr;
--	u32 v;
- 
- 	if (!addr) {
- 		writel(0, ioaddr + EMAC_MACADDR_HI(reg_n));
-@@ -588,9 +568,8 @@ static void sun8i_dwmac_set_umac_addr(struct mac_device_info *hw,
- 	stmmac_set_mac_addr(ioaddr, addr, EMAC_MACADDR_HI(reg_n),
- 			    EMAC_MACADDR_LO(reg_n));
- 	if (reg_n > 0) {
--		v = readl(ioaddr + EMAC_MACADDR_HI(reg_n));
--		v |= MAC_ADDR_TYPE_DST;
--		writel(v, ioaddr + EMAC_MACADDR_HI(reg_n));
-+		setbits_le32(ioaddr + EMAC_MACADDR_HI(reg_n),
-+			     MAC_ADDR_TYPE_DST);
- 	}
- }
- 
-@@ -608,11 +587,8 @@ static void sun8i_dwmac_get_umac_addr(struct mac_device_info *hw,
- static int sun8i_dwmac_rx_ipc_enable(struct mac_device_info *hw)
- {
- 	void __iomem *ioaddr = hw->pcsr;
--	u32 v;
- 
--	v = readl(ioaddr + EMAC_RX_CTL0);
--	v |= EMAC_RX_DO_CRC;
--	writel(v, ioaddr + EMAC_RX_CTL0);
-+	setbits_le32(ioaddr + EMAC_RX_CTL0, EMAC_RX_DO_CRC);
- 
- 	return 1;
- }
-@@ -662,21 +638,15 @@ static void sun8i_dwmac_flow_ctrl(struct mac_device_info *hw,
- 				  unsigned int pause_time, u32 tx_cnt)
- {
- 	void __iomem *ioaddr = hw->pcsr;
--	u32 v;
- 
--	v = readl(ioaddr + EMAC_RX_CTL0);
- 	if (fc == FLOW_AUTO)
--		v |= EMAC_RX_FLOW_CTL_EN;
-+		setbits_le32(ioaddr + EMAC_RX_CTL0, EMAC_RX_FLOW_CTL_EN);
- 	else
--		v &= ~EMAC_RX_FLOW_CTL_EN;
--	writel(v, ioaddr + EMAC_RX_CTL0);
+-	reg_val = readl(reg);
+-	reg_val &= ~(clr_val);
+-	reg_val |= set_val;
+-	writel(reg_val, reg);
+-}
 -
--	v = readl(ioaddr + EMAC_TX_FLOW_CTL);
-+		clrbits_le32(ioaddr + EMAC_RX_CTL0, EMAC_RX_FLOW_CTL_EN);
- 	if (fc == FLOW_AUTO)
--		v |= EMAC_TX_FLOW_CTL_EN;
-+		setbits_le32(ioaddr + EMAC_TX_FLOW_CTL, EMAC_TX_FLOW_CTL_EN);
- 	else
--		v &= ~EMAC_TX_FLOW_CTL_EN;
--	writel(v, ioaddr + EMAC_TX_FLOW_CTL);
-+		clrbits_le32(ioaddr + EMAC_TX_FLOW_CTL, EMAC_TX_FLOW_CTL_EN);
+ static u32 sunxi_getbits(void __iomem *reg, u8 mask, u8 shift)
+ {
+ 	return (readl(reg) >> shift) & mask;
+@@ -100,22 +73,22 @@ static int ahci_sunxi_phy_init(struct device *dev, void __iomem *reg_base)
+ 	writel(0, reg_base + AHCI_RWCR);
+ 	msleep(5);
+ 
+-	sunxi_setbits(reg_base + AHCI_PHYCS1R, BIT(19));
+-	sunxi_clrsetbits(reg_base + AHCI_PHYCS0R,
++	setbits_le32(reg_base + AHCI_PHYCS1R, BIT(19));
++	clrsetbits_le32(reg_base + AHCI_PHYCS0R,
+ 			 (0x7 << 24),
+ 			 (0x5 << 24) | BIT(23) | BIT(18));
+-	sunxi_clrsetbits(reg_base + AHCI_PHYCS1R,
++	clrsetbits_le32(reg_base + AHCI_PHYCS1R,
+ 			 (0x3 << 16) | (0x1f << 8) | (0x3 << 6),
+ 			 (0x2 << 16) | (0x6 << 8) | (0x2 << 6));
+-	sunxi_setbits(reg_base + AHCI_PHYCS1R, BIT(28) | BIT(15));
+-	sunxi_clrbits(reg_base + AHCI_PHYCS1R, BIT(19));
+-	sunxi_clrsetbits(reg_base + AHCI_PHYCS0R,
++	setbits_le32(reg_base + AHCI_PHYCS1R, BIT(28) | BIT(15));
++	clrbits_le32(reg_base + AHCI_PHYCS1R, BIT(19));
++	clrsetbits_le32(reg_base + AHCI_PHYCS0R,
+ 			 (0x7 << 20), (0x3 << 20));
+-	sunxi_clrsetbits(reg_base + AHCI_PHYCS2R,
++	clrsetbits_le32(reg_base + AHCI_PHYCS2R,
+ 			 (0x1f << 5), (0x19 << 5));
+ 	msleep(5);
+ 
+-	sunxi_setbits(reg_base + AHCI_PHYCS0R, (0x1 << 19));
++	setbits_le32(reg_base + AHCI_PHYCS0R, (0x1 << 19));
+ 
+ 	timeout = 250; /* Power up takes aprox 50 us */
+ 	do {
+@@ -130,7 +103,7 @@ static int ahci_sunxi_phy_init(struct device *dev, void __iomem *reg_base)
+ 		udelay(1);
+ 	} while (1);
+ 
+-	sunxi_setbits(reg_base + AHCI_PHYCS2R, (0x1 << 24));
++	setbits_le32(reg_base + AHCI_PHYCS2R, (0x1 << 24));
+ 
+ 	timeout = 100; /* Calibration takes aprox 10 us */
+ 	do {
+@@ -158,10 +131,10 @@ static void ahci_sunxi_start_engine(struct ata_port *ap)
+ 	struct ahci_host_priv *hpriv = ap->host->private_data;
+ 
+ 	/* Setup DMA before DMA start */
+-	sunxi_clrsetbits(hpriv->mmio + AHCI_P0DMACR, 0x0000ff00, 0x00004400);
++	clrsetbits_le32(hpriv->mmio + AHCI_P0DMACR, 0x0000ff00, 0x00004400);
+ 
+ 	/* Start DMA */
+-	sunxi_setbits(port_mmio + PORT_CMD, PORT_CMD_START);
++	setbits_le32(port_mmio + PORT_CMD, PORT_CMD_START);
  }
  
- static int sun8i_dwmac_reset(struct stmmac_priv *priv)
+ static const struct ata_port_info ahci_sunxi_port_info = {
 -- 
 2.16.4
