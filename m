@@ -1,55 +1,100 @@
 From: yong.wu@mediatek.com (Yong Wu)
-Date: Mon, 24 Sep 2018 16:58:51 +0800
-Subject: [PATCH v2 11/14] iommu/mediatek: Add VLD_PA_RANGE register backup
- when suspend
+Date: Mon, 24 Sep 2018 16:58:53 +0800
+Subject: [PATCH v2 13/14] memory: mtk-smi: Get rid of need_larbid
 In-Reply-To: <1537779534-23575-1-git-send-email-yong.wu@mediatek.com>
 References: <1537779534-23575-1-git-send-email-yong.wu@mediatek.com>
-Message-ID: <1537779534-23575-12-git-send-email-yong.wu@mediatek.com>
+Message-ID: <1537779534-23575-14-git-send-email-yong.wu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The register VLD_PA_RNG(0x118) was forgot to backup while adding 4GB
-mode support for mt2712. this patch add it.
+The "mediatek,larb-id" has already been parsed in MTK IOMMU driver.
+It's no need to parse it again in SMI driver. Only clean some codes.
+This patch is fit for all the current mt2701, mt2712, mt8173 and
+mt8183.
 
-Fixes: 30e2fccf9512 ("iommu/mediatek: Enlarge the validate PA range
-for 4GB mode")
 Signed-off-by: Yong Wu <yong.wu@mediatek.com>
 ---
- drivers/iommu/mtk_iommu.c | 2 ++
- drivers/iommu/mtk_iommu.h | 1 +
- 2 files changed, 3 insertions(+)
+ drivers/memory/mtk-smi.c | 27 ++-------------------------
+ 1 file changed, 2 insertions(+), 25 deletions(-)
 
-diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
-index 03178b0..18b130b 100644
---- a/drivers/iommu/mtk_iommu.c
-+++ b/drivers/iommu/mtk_iommu.c
-@@ -723,6 +723,7 @@ static int __maybe_unused mtk_iommu_suspend(struct device *dev)
- 	reg->int_control0 = readl_relaxed(base + REG_MMU_INT_CONTROL0);
- 	reg->int_main_control = readl_relaxed(base + REG_MMU_INT_MAIN_CONTROL);
- 	reg->ivrp_paddr = readl_relaxed(base + REG_MMU_IVRP_PADDR);
-+	reg->vld_pa_range = readl_relaxed(base + REG_MMU_VLD_PA_RNG);
- 	clk_disable_unprepare(data->bclk);
- 	return 0;
- }
-@@ -747,6 +748,7 @@ static int __maybe_unused mtk_iommu_resume(struct device *dev)
- 	writel_relaxed(reg->int_control0, base + REG_MMU_INT_CONTROL0);
- 	writel_relaxed(reg->int_main_control, base + REG_MMU_INT_MAIN_CONTROL);
- 	writel_relaxed(reg->ivrp_paddr, base + REG_MMU_IVRP_PADDR);
-+	writel_relaxed(reg->vld_pa_range, base + REG_MMU_VLD_PA_RNG);
- 	if (m4u_dom)
- 		writel(m4u_dom->cfg.arm_v7s_cfg.ttbr[0] & MMU_PT_ADDR_MASK,
- 		       base + REG_MMU_PT_BASE_ADDR);
-diff --git a/drivers/iommu/mtk_iommu.h b/drivers/iommu/mtk_iommu.h
-index e5fd8ee..dfe9a07 100644
---- a/drivers/iommu/mtk_iommu.h
-+++ b/drivers/iommu/mtk_iommu.h
-@@ -33,6 +33,7 @@ struct mtk_iommu_suspend_reg {
- 	u32				int_control0;
- 	u32				int_main_control;
- 	u32				ivrp_paddr;
-+	u32				vld_pa_range;
+diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
+index e4daabb..e0265fe 100644
+--- a/drivers/memory/mtk-smi.c
++++ b/drivers/memory/mtk-smi.c
+@@ -67,7 +67,6 @@ struct mtk_smi_common_plat {
  };
  
- enum mtk_iommu_plat {
+ struct mtk_smi_larb_gen {
+-	bool need_larbid;
+ 	int port_in_larb[MTK_LARB_NR_MAX + 1];
+ 	void (*config_port)(struct device *);
+ 	unsigned int larb_special_mask; /* The special larbs mask. */
+@@ -152,18 +151,9 @@ void mtk_smi_larb_put(struct device *larbdev)
+ 	struct mtk_smi_iommu *smi_iommu = data;
+ 	unsigned int         i;
+ 
+-	if (larb->larb_gen->need_larbid) {
+-		larb->mmu = &smi_iommu->larb_imu[larb->larbid].mmu;
+-		return 0;
+-	}
+-
+-	/*
+-	 * If there is no larbid property, Loop to find the corresponding
+-	 * iommu information.
+-	 */
+-	for (i = 0; i < smi_iommu->larb_nr; i++) {
++	for (i = 0; i < MTK_LARB_NR_MAX; i++) {
+ 		if (dev == smi_iommu->larb_imu[i].dev) {
+-			/* The 'mmu' may be updated in iommu-attach/detach. */
++			larb->larbid = i;
+ 			larb->mmu = &smi_iommu->larb_imu[i].mmu;
+ 			return 0;
+ 		}
+@@ -242,7 +232,6 @@ static void mtk_smi_larb_config_port_gen1(struct device *dev)
+ };
+ 
+ static const struct mtk_smi_larb_gen mtk_smi_larb_mt2701 = {
+-	.need_larbid = true,
+ 	.port_in_larb = {
+ 		LARB0_PORT_OFFSET, LARB1_PORT_OFFSET,
+ 		LARB2_PORT_OFFSET, LARB3_PORT_OFFSET
+@@ -251,13 +240,11 @@ static void mtk_smi_larb_config_port_gen1(struct device *dev)
+ };
+ 
+ static const struct mtk_smi_larb_gen mtk_smi_larb_mt2712 = {
+-	.need_larbid = true,
+ 	.config_port = mtk_smi_larb_config_port_gen2_general,
+ 	.larb_special_mask = BIT(8) | BIT(9), /* bdpsys */
+ };
+ 
+ static const struct mtk_smi_larb_gen mtk_smi_larb_mt8183 = {
+-	.need_larbid = true,
+ 	.config_port = mtk_smi_larb_config_port_gen2_general,
+ 	.larb_special_mask = BIT(2) | BIT(3) | BIT(7), /* IPU0 | IPU1 | CCU */
+ };
+@@ -289,7 +276,6 @@ static int mtk_smi_larb_probe(struct platform_device *pdev)
+ 	struct device *dev = &pdev->dev;
+ 	struct device_node *smi_node;
+ 	struct platform_device *smi_pdev;
+-	int err;
+ 
+ 	larb = devm_kzalloc(dev, sizeof(*larb), GFP_KERNEL);
+ 	if (!larb)
+@@ -316,15 +302,6 @@ static int mtk_smi_larb_probe(struct platform_device *pdev)
+ 		return PTR_ERR(larb->smi.clk_gals0);
+ 	larb->smi.dev = dev;
+ 
+-	if (larb->larb_gen->need_larbid) {
+-		err = of_property_read_u32(dev->of_node, "mediatek,larb-id",
+-					   &larb->larbid);
+-		if (err) {
+-			dev_err(dev, "missing larbid property\n");
+-			return err;
+-		}
+-	}
+-
+ 	smi_node = of_parse_phandle(dev->of_node, "mediatek,smi", 0);
+ 	if (!smi_node)
+ 		return -EINVAL;
 -- 
 1.9.1
