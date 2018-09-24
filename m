@@ -1,69 +1,201 @@
-From: vabhav.sharma@nxp.com (Vabhav Sharma)
-Date: Mon, 24 Sep 2018 11:56:08 +0000
-Subject: [PATCH v2 3/5] drivers: clk-qoriq: Add clockgen support for
- lx2160a
-In-Reply-To: <4fa10f679ad4b1b619daa521a8641c145cf8537e.camel@buserror.net>
-References: <1536871075-3732-1-git-send-email-vabhav.sharma@nxp.com>
- <1536871075-3732-4-git-send-email-vabhav.sharma@nxp.com>
- <4fa10f679ad4b1b619daa521a8641c145cf8537e.camel@buserror.net>
-Message-ID: <VI1PR04MB4800CA1AFEB6EB7B56680CBBF3170@VI1PR04MB4800.eurprd04.prod.outlook.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Mon, 24 Sep 2018 12:58:09 +0100
+Subject: [PATCH 04/10] irqchip/gic-v3-its: Move pending table allocation
+ to init time
+In-Reply-To: <20180921195954.21574-5-marc.zyngier@arm.com>
+References: <20180921195954.21574-1-marc.zyngier@arm.com>
+ <20180921195954.21574-5-marc.zyngier@arm.com>
+Message-ID: <7cdac0d7-a256-5e75-5a19-8eb0fb1cf6a5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Marc,
 
+On 21/09/18 20:59, Marc Zyngier wrote:
+> Pending tables for the redistributors are currently allocated
+> one at a time as each CPU boots. This is causing some grief
+> for Linux/RT (allocation from within a CPU hotplug notifier is
+> frown upon).
+> 
+> Let's more this allocation to take place at init time, when we
+> only have a single CPU. It means we're allocating memory for CPUs
+> that are not online yet, but most system will boot all of their
+> CPUs anyway, so that's not completely wasted.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>   drivers/irqchip/irq-gic-v3-its.c   | 80 +++++++++++++++++++-----------
+>   include/linux/irqchip/arm-gic-v3.h |  1 +
+>   2 files changed, 53 insertions(+), 28 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 7ef6baea2d78..462bba422189 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -173,6 +173,7 @@ static DEFINE_RAW_SPINLOCK(vmovp_lock);
+>   static DEFINE_IDA(its_vpeid_ida);
+>   
+>   #define gic_data_rdist()		(raw_cpu_ptr(gic_rdists->rdist))
+> +#define gic_data_rdist_cpu(cpu)		(per_cpu_ptr(gic_rdists->rdist, cpu))
+>   #define gic_data_rdist_rd_base()	(gic_data_rdist()->rd_base)
+>   #define gic_data_rdist_vlpi_base()	(gic_data_rdist_rd_base() + SZ_128K)
+>   
+> @@ -1625,7 +1626,7 @@ static void its_free_prop_table(struct page *prop_page)
+>   		   get_order(LPI_PROPBASE_SZ));
+>   }
+>   
+> -static int __init its_alloc_lpi_tables(void)
+> +static int __init its_alloc_lpi_prop_table(void)
 
-> -----Original Message-----
-> From: Scott Wood <oss@buserror.net>
-> Sent: Sunday, September 16, 2018 12:54 AM
-> To: Vabhav Sharma <vabhav.sharma@nxp.com>; sudeep.holla at arm.com; linux-
-> kernel at vger.kernel.org; devicetree at vger.kernel.org; robh+dt at kernel.org;
-> mark.rutland at arm.com; linuxppc-dev at lists.ozlabs.org; linux-arm-
-> kernel at lists.infradead.org; mturquette at baylibre.com; sboyd at kernel.org;
-> rjw at rjwysocki.net; viresh.kumar at linaro.org; linux-clk at vger.kernel.org; linux-
-> pm at vger.kernel.org; linux-kernel-owner at vger.kernel.org;
-> catalin.marinas at arm.com; will.deacon at arm.com;
-> gregkh at linuxfoundation.org; arnd at arndb.de; kstewart at linuxfoundation.org;
-> yamada.masahiro at socionext.com
-> Cc: linux at armlinux.org.uk; Varun Sethi <V.Sethi@nxp.com>; Udit Kumar
-> <udit.kumar@nxp.com>; Yogesh Narayan Gaur
-> <yogeshnarayan.gaur@nxp.com>; Andy Tang <andy.tang@nxp.com>
-> Subject: Re: [PATCH v2 3/5] drivers: clk-qoriq: Add clockgen support for lx2160a
+A bit of a nit, but there is already a function called 
+"its_allocate_prop_table" which I find very easy to confuse with this one.
+
+And patch 3 factored the initialization out of its_allocate_prop_table. 
+So I was wondering whether it would not actually be better to open-code 
+it here and get rid of that function. Otherwise I'd suggest having more 
+distinct names.
+
+Otherwise the patch looks good.
+
+Thanks,
+
+>   {
+>   	phys_addr_t paddr;
+>   
+> @@ -1944,30 +1945,47 @@ static void its_free_pending_table(struct page *pt)
+>   	free_pages((unsigned long)page_address(pt), get_order(LPI_PENDBASE_SZ));
+>   }
+>   
+> -static void its_cpu_init_lpis(void)
+> +static int __init allocate_lpi_tables(void)
+>   {
+> -	void __iomem *rbase = gic_data_rdist_rd_base();
+> -	struct page *pend_page;
+> -	u64 val, tmp;
+> +	int err, cpu;
+>   
+> -	/* If we didn't allocate the pending table yet, do it now */
+> -	pend_page = gic_data_rdist()->pend_page;
+> -	if (!pend_page) {
+> -		phys_addr_t paddr;
+> +	err = its_alloc_lpi_prop_table();
+> +	if (err)
+> +		return err;
+> +
+> +	/*
+> +	 * We allocate all the pending tables anyway, as we may have a
+> +	 * mix of RDs that have had LPIs enabled, and some that
+> +	 * don't. We'll free the unused ones as each CPU comes online.
+> +	 */
+> +	for_each_possible_cpu(cpu) {
+> +		struct page *pend_page;
+>   
+>   		pend_page = its_allocate_pending_table(GFP_NOWAIT);
+>   		if (!pend_page) {
+> -			pr_err("Failed to allocate PENDBASE for CPU%d\n",
+> -			       smp_processor_id());
+> -			return;
+> +			pr_err("Failed to allocate PENDBASE for CPU%d\n", cpu);
+> +			return -ENOMEM;
+>   		}
+>   
+> -		paddr = page_to_phys(pend_page);
+> -		pr_info("CPU%d: using LPI pending table @%pa\n",
+> -			smp_processor_id(), &paddr);
+> -		gic_data_rdist()->pend_page = pend_page;
+> +		gic_data_rdist_cpu(cpu)->pend_page = pend_page;
+>   	}
+>   
+> +	return 0;
+> +}
+> +
+> +static void its_cpu_init_lpis(void)
+> +{
+> +	void __iomem *rbase = gic_data_rdist_rd_base();
+> +	struct page *pend_page;
+> +	phys_addr_t paddr;
+> +	u64 val, tmp;
+> +
+> +	if (gic_data_rdist()->lpi_enabled)
+> +		return;
+> +
+> +	pend_page = gic_data_rdist()->pend_page;
+> +	paddr = page_to_phys(pend_page);
+> +
+>   	/* set PROPBASE */
+>   	val = (page_to_phys(gic_rdists->prop_page) |
+>   	       GICR_PROPBASER_InnerShareable |
+> @@ -2019,6 +2037,10 @@ static void its_cpu_init_lpis(void)
+>   
+>   	/* Make sure the GIC has seen the above */
+>   	dsb(sy);
+> +	gic_data_rdist()->lpi_enabled = true;
+> +	pr_info("GICv3: CPU%d: using LPI pending table @%pa\n",
+> +		smp_processor_id(),
+> +		&paddr);
+>   }
+>   
+>   static void its_cpu_init_collection(struct its_node *its)
+> @@ -3497,16 +3519,6 @@ static int redist_disable_lpis(void)
+>   	u64 timeout = USEC_PER_SEC;
+>   	u64 val;
+>   
+> -	/*
+> -	 * If coming via a CPU hotplug event, we don't need to disable
+> -	 * LPIs before trying to re-enable them. They are already
+> -	 * configured and all is well in the world. Detect this case
+> -	 * by checking the allocation of the pending table for the
+> -	 * current CPU.
+> -	 */
+> -	if (gic_data_rdist()->pend_page)
+> -		return 0;
+> -
+>   	if (!gic_rdists_supports_plpis()) {
+>   		pr_info("CPU%d: LPIs not supported\n", smp_processor_id());
+>   		return -ENXIO;
+> @@ -3516,7 +3528,18 @@ static int redist_disable_lpis(void)
+>   	if (!(val & GICR_CTLR_ENABLE_LPIS))
+>   		return 0;
+>   
+> -	pr_warn("CPU%d: Booted with LPIs enabled, memory probably corrupted\n",
+> +	/*
+> +	 * If coming via a CPU hotplug event, we don't need to disable
+> +	 * LPIs before trying to re-enable them. They are already
+> +	 * configured and all is well in the world.
+> +	 */
+> +	if (gic_data_rdist()->lpi_enabled)
+> +		return 0;
+> +
+> +	/*
+> +	 * From that point on, we only try to do some damage control.
+> +	 */
+> +	pr_warn("GICv3: CPU%d: Booted with LPIs enabled, memory probably corrupted\n",
+>   		smp_processor_id());
+>   	add_taint(TAINT_CRAP, LOCKDEP_STILL_OK);
+>   
+> @@ -3772,7 +3795,8 @@ int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
+>   	}
+>   
+>   	gic_rdists = rdists;
+> -	err = its_alloc_lpi_tables();
+> +
+> +	err = allocate_lpi_tables();
+>   	if (err)
+>   		return err;
+>   
+> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+> index 8bdbb5f29494..266093e845bb 100644
+> --- a/include/linux/irqchip/arm-gic-v3.h
+> +++ b/include/linux/irqchip/arm-gic-v3.h
+> @@ -585,6 +585,7 @@ struct rdists {
+>   		void __iomem	*rd_base;
+>   		struct page	*pend_page;
+>   		phys_addr_t	phys_base;
+> +		bool		lpi_enabled;
+>   	} __percpu		*rdist;
+>   	struct page		*prop_page;
+>   	u64			flags;
 > 
-> On Fri, 2018-09-14 at 02:07 +0530, Vabhav Sharma wrote:
-> > From: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
-> >
-> > Add clockgen support for lx2160a.
-> > Added entry for compat 'fsl,lx2160a-clockgen'.
-> >
-> > Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
-> > Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
-> > Signed-off-by: Vabhav Sharma <vabhav.sharma@nxp.com>
-> > Acked-by: Stephen Boyd <sboyd@kernel.org>
-> > ---
-> >  drivers/clk/clk-qoriq.c         | 14 +++++++++++++-
-> >  drivers/cpufreq/qoriq-cpufreq.c |  1 +
-> >  2 files changed, 14 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/clk/clk-qoriq.c b/drivers/clk/clk-qoriq.c index
-> > 3a1812f..e9ae70b 100644
-> > --- a/drivers/clk/clk-qoriq.c
-> > +++ b/drivers/clk/clk-qoriq.c
-> > @@ -79,7 +79,7 @@ struct clockgen_chipinfo {
-> >  	const struct clockgen_muxinfo *cmux_groups[2];
-> >  	const struct clockgen_muxinfo *hwaccel[NUM_HWACCEL];
-> >  	void (*init_periph)(struct clockgen *cg);
-> > -	int cmux_to_group[NUM_CMUX]; /* -1 terminates if fewer than
-> > NUM_CMUX */
-> > +	int cmux_to_group[NUM_CMUX+1]; /* -1 terminate if fewer to
-> > NUM_CMUX+1 */
-> 
-> You need to add the -1 terminator to p4080, and remove the "if fewer"
-> comment since the whole point of this is that every array gets -1 terminated.
-Ok, Updated
-> 
-> Why did you change "terminates" to "terminate" and "than" to "to"?
-> 
-> This +1 change should be a separate patch from lx2160a support.
-Sure, Sending as separate patch
-> 
-> -Scott
+
+-- 
+Julien Thierry
