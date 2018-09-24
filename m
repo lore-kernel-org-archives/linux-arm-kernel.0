@@ -1,51 +1,248 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 24 Sep 2018 13:53:01 +0200
-Subject: [RESEND PATCH] Revert "pwm: Set class for exported channels in
- sysfs"
-In-Reply-To: <1537538567-5377-1-git-send-email-fabrice.gasnier@st.com>
-References: <1537538567-5377-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20180924115301.GV21032@ulmo>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 24 Sep 2018 17:25:26 +0530
+Subject: [PATCH 02/10] phy: Add configuration interface
+In-Reply-To: <20180924095435.77hh7lrpq7wkss2o@flea>
+References: <cover.ee6158898d563fcc01d45c9652501180bccff0f0.1536138624.git-series.maxime.ripard@bootlin.com>
+ <a739a2d623c3e60373a73e1ec206c2aa35c4a742.1536138624.git-series.maxime.ripard@bootlin.com>
+ <1ed01c1f-76d5-fa96-572b-9bfd269ad11b@ti.com>
+ <20180906145622.kwxvkcuerbeqsj6b@flea>
+ <1a169fad-72b7-fac0-1254-cac5d8304740@ti.com>
+ <20180912084242.skxbwbgluakakyg6@flea>
+ <e0d7db11-7ec1-cb98-4e62-12d78d1ba65b@ti.com>
+ <20180919121436.ztjnxofe66quddeq@flea>
+ <93088385-126b-6bfb-70e4-16f7b949d299@ti.com>
+ <20180924095435.77hh7lrpq7wkss2o@flea>
+Message-ID: <b5ebd9a5-f43b-728b-1d7f-0f7b08021f39@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2018 at 04:02:47PM +0200, Fabrice Gasnier wrote:
-> This reverts commit 7e5d1fd75c3dde9fc10c4472b9368089d1b81d00 as it causes
-> regression with multiple pwm chip. It creates a new entry in
-> '/sys/class/pwm' every time a 'pwmX' is exported with 'echo X > export':
-> - 1st time export will create an entry in /sys/class/pwm/pwmX
-> - when another export happens on another pwmchip, it can't be created
-> (e.g. -EEXIST)
-> 
-> This also changes existing ABI (Documentation/ABI/testing/sysfs-class-pwm):
-> - pmwX should be there: /sys/class/pwm/pwmchipN/pwmX
-> 
-> Example on stm32 (stm32429i-eval) platform:
-> $ ls /sys/class/pwm
-> pwmchip0 pwmchip4
-> 
-> $ cd /sys/class/pwm/pwmchip0/
-> $ echo 0 > export
-> $ ls /sys/class/pwm
-> pwm0 pwmchip0 pwmchip4
-> 
-> $ cd /sys/class/pwm/pwmchip4/
-> $ echo 0 > export
-> sysfs: cannot create duplicate filename '/class/pwm/pwm0'
-> ...Exception stack follows...
-> 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> ---
->  drivers/pwm/sysfs.c | 1 -
->  1 file changed, 1 deletion(-)
+Hi Maxime,
 
-Can we come up with an alternative that allows us to have both? We want
-uevent and proper sysfs creation, or is that not possible?
+On Monday 24 September 2018 03:24 PM, Maxime Ripard wrote:
+> Hi,
+> 
+> On Mon, Sep 24, 2018 at 02:18:35PM +0530, Kishon Vijay Abraham I wrote:
+>> On Wednesday 19 September 2018 05:44 PM, Maxime Ripard wrote:
+>>> Hi,
+>>>
+>>> On Fri, Sep 14, 2018 at 02:18:37PM +0530, Kishon Vijay Abraham I wrote:
+>>>>>>>>> +/**
+>>>>>>>>> + * phy_validate() - Checks the phy parameters
+>>>>>>>>> + * @phy: the phy returned by phy_get()
+>>>>>>>>> + * @mode: phy_mode the configuration is applicable to.
+>>>>>>>>> + * @opts: Configuration to check
+>>>>>>>>> + *
+>>>>>>>>> + * Used to check that the current set of parameters can be handled by
+>>>>>>>>> + * the phy. Implementations are free to tune the parameters passed as
+>>>>>>>>> + * arguments if needed by some implementation detail or
+>>>>>>>>> + * constraints. It will not change any actual configuration of the
+>>>>>>>>> + * PHY, so calling it as many times as deemed fit will have no side
+>>>>>>>>> + * effect.
+>>>>>>>>> + *
+>>>>>>>>> + * Returns: 0 if successful, an negative error code otherwise
+>>>>>>>>> + */
+>>>>>>>>> +int phy_validate(struct phy *phy, enum phy_mode mode,
+>>>>>>>>> +		  union phy_configure_opts *opts)
+>>>>>>>>
+>>>>>>>> IIUC the consumer driver will pass configuration options (or PHY parameters)
+>>>>>>>> which will be validated by the PHY driver and in some cases the PHY driver can
+>>>>>>>> modify the configuration options? And these modified configuration options will
+>>>>>>>> again be given to phy_configure?
+>>>>>>>>
+>>>>>>>> Looks like it's a round about way of doing the same thing.
+>>>>>>>
+>>>>>>> Not really. The validate callback allows to check whether a particular
+>>>>>>> configuration would work, and try to negotiate a set of configurations
+>>>>>>> that both the consumer and the PHY could work with.
+>>>>>>
+>>>>>> Maybe the PHY should provide the list of supported features to the consumer
+>>>>>> driver and the consumer should select a supported feature?
+>>>>>
+>>>>> It's not really about the features it supports, but the boundaries it
+>>>>> might have on those features. For example, the same phy integrated in
+>>>>> two different SoCs will probably have some limit on the clock rate it
+>>>>> can output because of the phy design itself, but also because of the
+>>>>> clock that is fed into that phy, and that will be different from one
+>>>>> SoC to the other.
+>>>>>
+>>>>> This integration will prevent us to use some clock rates on the first
+>>>>> SoC, while the second one would be totally fine with it.
+>>>>
+>>>> If there's a clock that is fed to the PHY from the consumer, then the consumer
+>>>> driver should model a clock provider and the PHY can get a reference to it
+>>>> using clk_get(). Rockchip and Arasan eMMC PHYs has already used something like
+>>>> that.
+>>>
+>>> That would be doable, but no current driver has had this in their
+>>> binding. So that would prevent any further rework, and make that whole
+>>> series moot. And while I could live without the Allwinner part, the
+>>> Cadence one is really needed.
+>>
+>> We could add a binding and modify the driver to to register a clock provider.
+>> That could be included in this series itself.
+> 
+> That wouldn't work for device whose bindings need to remain backward
+> compatible. And the Allwinner part at least is in that case.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180924/fadb97fa/attachment.sig>
+Er..
+> 
+> I think we should aim at making it a norm for newer bindings, but we
+> still have to support the old ones that cannot be changed.
+
+There are drivers which support both the old and new bindings. Allwinner could
+be in that category.
+> 
+>>>> Assuming the PHY can get a reference to the clock provided by the consumer,
+>>>> what are the parameters we'll be able to get rid of in struct
+>>>> phy_configure_opts_mipi_dphy?
+>>>
+>>> hs_clock_rate and lp_clock_rate. All the other ones are needed.
+>>
+>> For a start we could use that and get rid of hs_clock_rate and lp_clock_rate in
+>> phy_configure_opts_mipi_dphy.
+> 
+> As I was saying above, I'm not sure we can do that.
+> 
+>> We could also use phy_set_bus_width() for lanes.
+> 
+> I overlooked this function somehow, it indeed looks like we can remove
+> the lanes part in favor of this function.
+> 
+>>>
+>>>> I'm sorry but I'm not convinced a consumer driver should have all the details
+>>>> that are added in phy_configure_opts_mipi_dphy.
+>>>
+>>> If it can convince you, here is the parameters that are needed by all
+>>> the MIPI-DSI drivers currently in Linux to configure their PHY:
+>>>
+>>>   - cdns-dsi (drivers/gpu/drm/bridge/cdns-dsi.c)
+>>>     - hs_clk_rate
+>>>     - lanes
+>>>     - videomode
+>>>
+>>>   - kirin (drivers/gpu/drm/hisilicon/kirin/dw_drm_dsi.c)
+>>>     - hs_exit
+>>>     - hs_prepare
+>>>     - hs_trail
+>>>     - hs_zero
+>>>     - lpx
+>>>     - ta_get
+>>>     - ta_go
+>>>     - wakeup
+>>>
+>>>   - msm (drivers/gpu/drm/msm/dsi/*)
+>>>     - clk_post
+>>>     - clk_pre
+>>>     - clk_prepare
+>>>     - clk_trail
+>>>     - clk_zero
+>>>     - hs_clk_rate
+>>>     - hs_exit
+>>>     - hs_prepare
+>>>     - hs_trail
+>>>     - hs_zero
+>>>     - lp_clk_rate
+>>>     - ta_get
+>>>     - ta_go
+>>>     - ta_sure
+>>>
+>>>   - mtk (drivers/gpu/drm/mediatek/mtk_dsi.c)
+>>>     - hs_clk_rate
+>>>     - hs_exit
+>>>     - hs_prepare
+>>>     - hs_trail
+>>>     - hs_zero
+>>>     - lpx
+>>>
+>>>   - sun4i (drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c)
+>>>     - clk_post
+>>>     - clk_pre
+>>>     - clk_prepare
+>>>     - clk_zero
+>>>     - hs_prepare
+>>>     - hs_trail
+>>>     - lanes
+>>>     - lp_clk_rate
+>>>
+>>>   - tegra (drivers/gpu/drm/tegra/dsi.c)
+>>>     - clk_post
+>>>     - clk_pre
+>>>     - clk_prepare
+>>>     - clk_trail
+>>>     - clk_zero
+>>>     - hs_exit
+>>>     - hs_prepare
+>>>     - hs_trail
+>>>     - hs_zero
+>>>     - lpx
+>>>     - ta_get
+>>>     - ta_go
+>>>     - ta_sure
+>>>
+>>>   - vc4 (drivers/gpu/drm/vc4/vc4_dsi.c)
+>>>     - hs_clk_rate
+>>>     - lanes
+>>>
+>>> Now, for MIPI-CSI receivers:
+>>>
+>>>   - marvell-ccic (drivers/media/platform/marvell-ccic/mcam-core.c)
+>>>     - clk_term_en
+>>>     - clk_settle
+>>>     - d_term_en
+>>>     - hs_settle
+>>>     - lp_clk_rate
+>>>
+>>>   - omap4iss (drivers/staging/media/omap4iss/iss_csiphy.c)
+>>>     - clk_miss
+>>>     - clk_settle
+>>>     - clk_term
+>>>     - hs_settle
+>>>     - hs_term
+>>>     - lanes
+>>>
+>>>   - rcar-vin (drivers/media/platform/rcar-vin/rcar-csi2.c)
+>>>     - hs_clk_rate
+>>>     - lanes
+>>>
+>>>   - ti-vpe (drivers/media/platform/ti-vpe/cal.c)
+>>>     - clk_term_en
+>>>     - d_term_en
+>>>     - hs_settle
+>>>     - hs_term
+>>
+>> Thank you for providing the exhaustive list.
+>>
+>>> So the timings expressed in the structure are the set of all the ones
+>>> currently used in the tree by DSI and CSI drivers. I would consider
+>>> that a good proof that it would be useful.
+>>
+>> The problem I see here is each platform (PHY) will have it's own set of
+>> parameters and we have to keep adding members to phy_configure_opts which is
+>> not scalable. We should try to find a correlation between generic PHY modes and
+>> these parameters (at-least for a subset).
+> 
+> I definitely understand you skepticism towards someone coming in and
+> dropping such a big list of obscure parameters :)
+
+That's part of my concern. The other concern is consumer driver having to know
+so much internal details of the PHY. None of the other consumers (PCIe, USB,
+etc) had to know so much internals of the PHY.
+> 
+> However, those values are actually the whole list of parameters
+> defined by the MIPI-DPHY standard, so I really don't expect drivers to
+> need more than that. As you can see, most drivers allow less
+> parameters to be configured, but all of them are defined within those
+> parameters. So I'm not sure we need to worry about an ever-expanding
+> list of parameters: we have a limited set of parameters defined, and
+> from an authoritative source, so we can also push back if someone
+> wants to add a parameter that is implementation specific.
+
+Your commit log mentioned there are a few parameters in addition to what is
+specified in the MIPI D-PHY spec :-/
+
+"The parameters added here are the one defined in the MIPI D-PHY spec, plus
+some parameters that were used by a number of PHY drivers currently found
+in the linux kernel."
+
+Thanks
+Kishon
