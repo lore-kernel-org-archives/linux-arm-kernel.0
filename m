@@ -1,71 +1,55 @@
-From: colin.king@canonical.com (Colin King)
-Date: Sun, 23 Sep 2018 23:14:36 +0100
-Subject: [PATCH] soc: ti: fix spelling mistake "instace" -> "instance"
-Message-ID: <20180923221436.7701-1-colin.king@canonical.com>
+From: david@lechnology.com (David Lechner)
+Date: Sun, 23 Sep 2018 20:31:46 -0500
+Subject: [PATCH] ARM: dts: da850-lego-ev3: slow down A/DC as much as possible
+Message-ID: <20180924013146.18121-1-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+Due to the electrical design of the A/DC circuits on LEGO MINDSTORMS EV3,
+if we are reading analog values as fast as possible (i.e. using DMA to
+service the SPI) the A/DC chip will read incorrect values - as much as
+0.1V off when the SPI is running at 10MHz. (This has to do with the
+capacitor charge time when channels are muxed in the A/DC.)
 
-Trivial fix to spelling mistake in dev_err messages and comments
+This patch slows down the SPI as much as possible (if CPU is at 456MHz,
+SPI runs at 1/2 of that, so 228MHz and has a max prescalar of 256, so
+we could get ~891kHz, but we're just rounding it to 1MHz). We also use
+the max allowable value for WDELAY to slow things down even more.
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
+These changes reduce the error of the analog values to about 5mV, which
+is tolerable.
+
+Commits a3762b13a596 ("spi: spi-davinci: Add support for SPI_CS_WORD")
+and e2540da86ef8 ("iio: adc: ti-ads7950: use SPI_CS_WORD to reduce
+CPU usage") introduce changes that allow DMA transfers to be used, so
+this slow down is needed now.
+
+Signed-off-by: David Lechner <david@lechnology.com>
 ---
- drivers/soc/ti/knav_dma.c  | 4 ++--
- drivers/soc/ti/knav_qmss.h | 6 +++---
- 2 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/soc/ti/knav_dma.c b/drivers/soc/ti/knav_dma.c
-index 224d7ddeeb76..23f09dce23e0 100644
---- a/drivers/soc/ti/knav_dma.c
-+++ b/drivers/soc/ti/knav_dma.c
-@@ -438,7 +438,7 @@ void *knav_dma_open_channel(struct device *dev, const char *name,
- 
- 	chan_num = of_channel_match_helper(dev->of_node, name, &instance);
- 	if (chan_num < 0) {
--		dev_err(kdev->dev, "No DMA instace with name %s\n", name);
-+		dev_err(kdev->dev, "No DMA instance with name %s\n", name);
- 		return (void *)-EINVAL;
- 	}
- 
-@@ -461,7 +461,7 @@ void *knav_dma_open_channel(struct device *dev, const char *name,
- 		}
- 	}
- 	if (!found) {
--		dev_err(kdev->dev, "No DMA instace with name %s\n", instance);
-+		dev_err(kdev->dev, "No DMA instance with name %s\n", instance);
- 		return (void *)-EINVAL;
- 	}
- 
-diff --git a/drivers/soc/ti/knav_qmss.h b/drivers/soc/ti/knav_qmss.h
-index 3efc47e82973..7c128132799e 100644
---- a/drivers/soc/ti/knav_qmss.h
-+++ b/drivers/soc/ti/knav_qmss.h
-@@ -240,14 +240,14 @@ struct knav_pool {
+FYI, this patch doesn't strictly depend on the other two mentioned. In fact, it
+would better if it got merged before them, but the consequences are minimal, so
+it doesn't seem worth it to me to try coordinating merges here.
+
+Both of these patches mentioned have been picked up in the respective
+subsystems.
+
+ arch/arm/boot/dts/da850-lego-ev3.dts | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/da850-lego-ev3.dts b/arch/arm/boot/dts/da850-lego-ev3.dts
+index c4729d0e6c19..66fcadf0ba91 100644
+--- a/arch/arm/boot/dts/da850-lego-ev3.dts
++++ b/arch/arm/boot/dts/da850-lego-ev3.dts
+@@ -352,7 +352,8 @@
+ 		compatible = "ti,ads7957";
+ 		reg = <3>;
+ 		#io-channel-cells = <1>;
+-		spi-max-frequency = <10000000>;
++		spi-max-frequency = <1000000>;
++		ti,spi-wdelay = <63>;
+ 		vref-supply = <&adc_ref>;
+ 	};
  };
- 
- /**
-- * struct knav_queue_inst:		qmss queue instace properties
-+ * struct knav_queue_inst:		qmss queue instance properties
-  * @descs:				descriptor pointer
-  * @desc_head, desc_tail, desc_count:	descriptor counters
-  * @acc:				accumulator channel pointer
-  * @kdev:				qmss device pointer
-  * @range:				range info
-  * @qmgr:				queue manager info
-- * @id:					queue instace id
-+ * @id:					queue instance id
-  * @irq_num:				irq line number
-  * @notify_needed:			notifier needed based on queue type
-  * @num_notifiers:			total notifiers
-@@ -274,7 +274,7 @@ struct knav_queue_inst {
- /**
-  * struct knav_queue:			qmss queue properties
-  * @reg_push, reg_pop, reg_peek:	push, pop queue registers
-- * @inst:				qmss queue instace properties
-+ * @inst:				qmss queue instance properties
-  * @notifier_fn:			notifier function
-  * @notifier_fn_arg:			notifier function argument
-  * @notifier_enabled:			notier enabled for a give queue
 -- 
 2.17.1
