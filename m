@@ -1,172 +1,75 @@
 From: hch@lst.de (Christoph Hellwig)
-Date: Mon, 24 Sep 2018 09:43:48 +0200
-Subject: [PATCH 03/10] block: move req_gap_{back,front}_merge to blk-merge.c
+Date: Mon, 24 Sep 2018 09:43:49 +0200
+Subject: [PATCH 04/10] block: move req_gap_back_merge to blk.h
 In-Reply-To: <20180924074355.2802-1-hch@lst.de>
 References: <20180924074355.2802-1-hch@lst.de>
-Message-ID: <20180924074355.2802-4-hch@lst.de>
+Message-ID: <20180924074355.2802-5-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Keep it close to the actual users instead of exposing the function to all
-drivers.
+No need to expose these helpers outside the block layer.
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- block/blk-merge.c      | 65 +++++++++++++++++++++++++++++++++++++++
- include/linux/blkdev.h | 69 ------------------------------------------
- 2 files changed, 65 insertions(+), 69 deletions(-)
+ block/blk.h            | 19 +++++++++++++++++++
+ include/linux/blkdev.h | 19 -------------------
+ 2 files changed, 19 insertions(+), 19 deletions(-)
 
-diff --git a/block/blk-merge.c b/block/blk-merge.c
-index aaec38cc37b8..ad8a226347a6 100644
---- a/block/blk-merge.c
-+++ b/block/blk-merge.c
-@@ -12,6 +12,71 @@
- 
- #include "blk.h"
- 
-+/*
-+ * Check if the two bvecs from two bios can be merged to one segment.  If yes,
-+ * no need to check gap between the two bios since the 1st bio and the 1st bvec
-+ * in the 2nd bio can be handled in one segment.
-+ */
-+static inline bool bios_segs_mergeable(struct request_queue *q,
-+		struct bio *prev, struct bio_vec *prev_last_bv,
-+		struct bio_vec *next_first_bv)
-+{
-+	if (!BIOVEC_PHYS_MERGEABLE(prev_last_bv, next_first_bv))
-+		return false;
-+	if (!BIOVEC_SEG_BOUNDARY(q, prev_last_bv, next_first_bv))
-+		return false;
-+	if (prev->bi_seg_back_size + next_first_bv->bv_len >
-+			queue_max_segment_size(q))
-+		return false;
-+	return true;
-+}
-+
-+static inline bool bio_will_gap(struct request_queue *q,
-+		struct request *prev_rq, struct bio *prev, struct bio *next)
-+{
-+	struct bio_vec pb, nb;
-+
-+	if (!bio_has_data(prev) || !queue_virt_boundary(q))
-+		return false;
-+
-+	/*
-+	 * Don't merge if the 1st bio starts with non-zero offset, otherwise it
-+	 * is quite difficult to respect the sg gap limit.  We work hard to
-+	 * merge a huge number of small single bios in case of mkfs.
-+	 */
-+	if (prev_rq)
-+		bio_get_first_bvec(prev_rq->bio, &pb);
-+	else
-+		bio_get_first_bvec(prev, &pb);
-+	if (pb.bv_offset)
-+		return true;
-+
-+	/*
-+	 * We don't need to worry about the situation that the merged segment
-+	 * ends in unaligned virt boundary:
-+	 *
-+	 * - if 'pb' ends aligned, the merged segment ends aligned
-+	 * - if 'pb' ends unaligned, the next bio must include
-+	 *   one single bvec of 'nb', otherwise the 'nb' can't
-+	 *   merge with 'pb'
-+	 */
-+	bio_get_last_bvec(prev, &pb);
-+	bio_get_first_bvec(next, &nb);
-+	if (bios_segs_mergeable(q, prev, &pb, &nb))
-+		return false;
-+	return __bvec_gap_to_prev(q, &pb, nb.bv_offset);
-+}
-+
-+static inline bool req_gap_back_merge(struct request *req, struct bio *bio)
-+{
-+	return bio_will_gap(req->q, req, req->biotail, bio);
-+}
-+
-+static inline bool req_gap_front_merge(struct request *req, struct bio *bio)
-+{
-+	return bio_will_gap(req->q, NULL, bio, req->bio);
-+}
-+
- static struct bio *blk_bio_discard_split(struct request_queue *q,
- 					 struct bio *bio,
- 					 struct bio_set *bs,
-diff --git a/include/linux/blkdev.h b/include/linux/blkdev.h
-index bc534c857344..b7e676bb01bc 100644
---- a/include/linux/blkdev.h
-+++ b/include/linux/blkdev.h
-@@ -1695,75 +1695,6 @@ static inline bool bvec_gap_to_prev(struct request_queue *q,
- 	return __bvec_gap_to_prev(q, bprv, offset);
+diff --git a/block/blk.h b/block/blk.h
+index 441c2de1d4b9..63035c95689c 100644
+--- a/block/blk.h
++++ b/block/blk.h
+@@ -149,6 +149,25 @@ static inline void blk_queue_enter_live(struct request_queue *q)
+ 	percpu_ref_get(&q->q_usage_counter);
  }
  
++static inline bool __bvec_gap_to_prev(struct request_queue *q,
++		struct bio_vec *bprv, unsigned int offset)
++{
++	return offset ||
++		((bprv->bv_offset + bprv->bv_len) & queue_virt_boundary(q));
++}
++
++/*
++ * Check if adding a bio_vec after bprv with offset would create a gap in
++ * the SG list. Most drivers don't care about this, but some do.
++ */
++static inline bool bvec_gap_to_prev(struct request_queue *q,
++		struct bio_vec *bprv, unsigned int offset)
++{
++	if (!queue_virt_boundary(q))
++		return false;
++	return __bvec_gap_to_prev(q, bprv, offset);
++}
++
+ #ifdef CONFIG_BLK_DEV_INTEGRITY
+ void blk_flush_integrity(void);
+ bool __bio_integrity_endio(struct bio *);
+diff --git a/include/linux/blkdev.h b/include/linux/blkdev.h
+index b7e676bb01bc..1d5e14139795 100644
+--- a/include/linux/blkdev.h
++++ b/include/linux/blkdev.h
+@@ -1676,25 +1676,6 @@ static inline void put_dev_sector(Sector p)
+ 	put_page(p.v);
+ }
+ 
+-static inline bool __bvec_gap_to_prev(struct request_queue *q,
+-				struct bio_vec *bprv, unsigned int offset)
+-{
+-	return offset ||
+-		((bprv->bv_offset + bprv->bv_len) & queue_virt_boundary(q));
+-}
+-
 -/*
-- * Check if the two bvecs from two bios can be merged to one segment.
-- * If yes, no need to check gap between the two bios since the 1st bio
-- * and the 1st bvec in the 2nd bio can be handled in one segment.
+- * Check if adding a bio_vec after bprv with offset would create a gap in
+- * the SG list. Most drivers don't care about this, but some do.
 - */
--static inline bool bios_segs_mergeable(struct request_queue *q,
--		struct bio *prev, struct bio_vec *prev_last_bv,
--		struct bio_vec *next_first_bv)
+-static inline bool bvec_gap_to_prev(struct request_queue *q,
+-				struct bio_vec *bprv, unsigned int offset)
 -{
--	if (!BIOVEC_PHYS_MERGEABLE(prev_last_bv, next_first_bv))
+-	if (!queue_virt_boundary(q))
 -		return false;
--	if (!BIOVEC_SEG_BOUNDARY(q, prev_last_bv, next_first_bv))
--		return false;
--	if (prev->bi_seg_back_size + next_first_bv->bv_len >
--			queue_max_segment_size(q))
--		return false;
--	return true;
--}
--
--static inline bool bio_will_gap(struct request_queue *q,
--				struct request *prev_rq,
--				struct bio *prev,
--				struct bio *next)
--{
--	if (bio_has_data(prev) && queue_virt_boundary(q)) {
--		struct bio_vec pb, nb;
--
--		/*
--		 * don't merge if the 1st bio starts with non-zero
--		 * offset, otherwise it is quite difficult to respect
--		 * sg gap limit. We work hard to merge a huge number of small
--		 * single bios in case of mkfs.
--		 */
--		if (prev_rq)
--			bio_get_first_bvec(prev_rq->bio, &pb);
--		else
--			bio_get_first_bvec(prev, &pb);
--		if (pb.bv_offset)
--			return true;
--
--		/*
--		 * We don't need to worry about the situation that the
--		 * merged segment ends in unaligned virt boundary:
--		 *
--		 * - if 'pb' ends aligned, the merged segment ends aligned
--		 * - if 'pb' ends unaligned, the next bio must include
--		 *   one single bvec of 'nb', otherwise the 'nb' can't
--		 *   merge with 'pb'
--		 */
--		bio_get_last_bvec(prev, &pb);
--		bio_get_first_bvec(next, &nb);
--
--		if (!bios_segs_mergeable(q, prev, &pb, &nb))
--			return __bvec_gap_to_prev(q, &pb, nb.bv_offset);
--	}
--
--	return false;
--}
--
--static inline bool req_gap_back_merge(struct request *req, struct bio *bio)
--{
--	return bio_will_gap(req->q, req, req->biotail, bio);
--}
--
--static inline bool req_gap_front_merge(struct request *req, struct bio *bio)
--{
--	return bio_will_gap(req->q, NULL, bio, req->bio);
+-	return __bvec_gap_to_prev(q, bprv, offset);
 -}
 -
  int kblockd_schedule_work(struct work_struct *work);
