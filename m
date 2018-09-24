@@ -1,73 +1,96 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 24 Sep 2018 17:38:04 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.20
-In-Reply-To: <20180923131817.t2lj6d2sb7bp6lqi@localhost>
-References: <cover.1536824376.git.horms+renesas@verge.net.au>
- <20180923131817.t2lj6d2sb7bp6lqi@localhost>
-Message-ID: <20180924153803.qfy2cu64cjpimi37@verge.net.au>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Mon, 24 Sep 2018 17:50:48 +0200
+Subject: [RESEND PATCH] Revert "pwm: Set class for exported channels in
+ sysfs"
+In-Reply-To: <20180924142318.GG23547@ulmo>
+References: <1537538567-5377-1-git-send-email-fabrice.gasnier@st.com>
+ <20180924115301.GV21032@ulmo> <fc02ced1-01ba-dde4-95da-285d9351338b@st.com>
+ <20180924142318.GG23547@ulmo>
+Message-ID: <c4866533-1c7e-2675-5d80-3b824e32ae9b@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 23, 2018 at 06:18:17AM -0700, Olof Johansson wrote:
-> Hi Simon,
+On 09/24/2018 04:23 PM, Thierry Reding wrote:
+> On Mon, Sep 24, 2018 at 03:59:03PM +0200, Fabrice Gasnier wrote:
+>> On 09/24/2018 01:53 PM, Thierry Reding wrote:
+>>> On Fri, Sep 21, 2018 at 04:02:47PM +0200, Fabrice Gasnier wrote:
+>>>> This reverts commit 7e5d1fd75c3dde9fc10c4472b9368089d1b81d00 as it causes
+>>>> regression with multiple pwm chip. It creates a new entry in
+>>>> '/sys/class/pwm' every time a 'pwmX' is exported with 'echo X > export':
+>>>> - 1st time export will create an entry in /sys/class/pwm/pwmX
+>>>> - when another export happens on another pwmchip, it can't be created
+>>>> (e.g. -EEXIST)
+>>>>
+>>>> This also changes existing ABI (Documentation/ABI/testing/sysfs-class-pwm):
+>>>> - pmwX should be there: /sys/class/pwm/pwmchipN/pwmX
+>>>>
+>>>> Example on stm32 (stm32429i-eval) platform:
+>>>> $ ls /sys/class/pwm
+>>>> pwmchip0 pwmchip4
+>>>>
+>>>> $ cd /sys/class/pwm/pwmchip0/
+>>>> $ echo 0 > export
+>>>> $ ls /sys/class/pwm
+>>>> pwm0 pwmchip0 pwmchip4
+>>>>
+>>>> $ cd /sys/class/pwm/pwmchip4/
+>>>> $ echo 0 > export
+>>>> sysfs: cannot create duplicate filename '/class/pwm/pwm0'
+>>>> ...Exception stack follows...
+>>>>
+>>>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>>>> ---
+>>>>  drivers/pwm/sysfs.c | 1 -
+>>>>  1 file changed, 1 deletion(-)
+>>>
+>>> Can we come up with an alternative that allows us to have both? We want
+>>> uevent and proper sysfs creation, or is that not possible?
+>>
+>> Hi Thierry, all,
+>>
+>> With current approach:
+>> - "export->child.class = parent->class"
+>> - ABI (e.g. "pwm%d") device name isn't unique with multiple pwm chip.
+>> I think this is not possible.
+>>
+>> Trying to think of an alternative... I just did a quick test, by
+>> changing device name, to take pwmchip into account:
+>> +       export->child.class = parent->class;
+>>         export->child.release = pwm_export_release;
+>>         export->child.parent = parent;
+>>         export->child.devt = MKDEV(0, 0);
+>>         export->child.groups = pwm_groups;
+>> -       dev_set_name(&export->child, "pwm%u", pwm->hwpwm);
+>> +       dev_set_name(&export->child, "pwmchip%d-pwm%u", chip->base,
+>> pwm->hwpwm);
+>>
+>> But this also impacts existing ABI :-(
+>> Would you have suggestions to send an uevent, without modifying ABI ?
 > 
-> On Thu, Sep 13, 2018 at 11:08:18AM +0200, Simon Horman wrote:
-> > Hi Olof, Hi Kevin, Hi Arnd,
-> > 
-> > Please consider these Renesas ARM based SoC DT updates for v4.20.
-> > 
-> > I am sending out this pull-request at this time as there are a number
-> > of patches queued up in my arm (32) DT branch and I hope that this
-> > will ease the burden later on in the development cycle. I expect to
-> > send a follow-up pull-request for this branch at the usual pre-rc6 timing.
-> 
-> This is a good amount of patches, feel free to flush your queue around the time
-> it builds up to about this amount -- no need to hold on to them longer.
+> I don't quite understand why, in the example you show in the commit
+> message, the pwmX nodes appear in the top-level /sys/class/pwm
+> directory. According to Documentation/ABI/testing/sysfs-class-pwm they
+> should appear as /sys/class/pwm/pwmchipN/pwmX. I can only imagine that
+> setting the class may have changed that.
 
-Will do. Often the DT branches accumulate quite a lot of patches
-in the course of an entire development cycle. I'll plan to flush
-them out to you when that happens.
+Yes, adding the class makes the link to be created under /sys/class/pwm:
+device_register() -> device_add() -> device_add_class_symlinks()
+In device_add_class_symlinks():
+...
+	if (!dev->class)
+		return 0;
+...
+	/* link in the class directory pointing to the device */
+	error = sysfs_create_link(&dev->class->p->subsys.kobj,
+				  &dev->kobj, dev_name(dev));
+...
+
+> If so, perhaps we can
+> workaround that by creating a new class that is not parent->class?
+
+And this link is added using dev_name(). So I doubt adding a new class
+will change the current behavior.
 
 > 
-> > The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
-> > 
-> >   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm-dt-for-v4.20
-> > 
-> > for you to fetch changes up to 1926bd6bf20fe306797fbf366902674d2d6c20cc:
-> > 
-> >   ARM: dts: r9a06g032: Use r9a06g032-sysctrl binding definitions (2018-09-06 11:31:35 +0200)
+> Thierry
 > 
-> Merged, thanks!
-> 
-> 
-> > 
-> > ----------------------------------------------------------------
-> > Renesas ARM Based SoC DT Updates for v4.20
-> > 
-> > * R-Car Gen1 SoCs: Include product name in DTSI files for ease of maintenance
-> > * R-Car Gen2 SoCs:
-> >   - Convert to new DU DT bindings
-> >   - Correct SATA device sizes to 2 MiB
-> > * R-Car H2 (r8a7790) based Porter board: Add DA9063 OnKey PMIC node
-> > * R-Car E2 (r8a7794) based Silk board: Add DA9063 PMIC, RTC and OnKey nodes
-> > * R-Car M2-N (r8a7793) based Gose board: Add DA9210 node for CPU DVFS
-> > * RZ/G1C (R8A77470) SoC:
-> >   - Add GPIO nodes
-> >   - Add PFC support
-> >   - Use r8a77470-sysc binding definitions
-> > * RZ/G1C (r8a77470) iW-RainboW-G23S dev platform:
-> >   - Specify EtherAVB PHY IRQ
-> >   - Add pinctl support for scif1
-> > * RZ/N1D (r9a06g032) SoC: Use r9a06g032-sysctrl binding definitions
-> 
-> I like this format! It's nice, terse and to the point, and it makes
-> it a bit easier to see commonalities across the large number of similar
-> (and different) product and platform names.
-> 
-> Thanks a lot for being flexible and trying different things here!
-
-Thanks for your patience, I'm glad the new format works for you.
