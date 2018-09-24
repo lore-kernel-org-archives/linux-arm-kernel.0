@@ -1,26 +1,69 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 24 Sep 2018 16:05:49 +0200
-Subject: [PATCH] ARM: dts: rockchip: explicitly set vcc_sd0 pin to gpio on
- rk3188-radxarock
-In-Reply-To: <20180921081341.23258-1-heiko@sntech.de>
-References: <20180921081341.23258-1-heiko@sntech.de>
-Message-ID: <1680177.p9B9Bbjx8F@phil>
+Date: Mon, 24 Sep 2018 16:11:31 +0200
+Subject: [PATCH 2/3] dt-bindings: firmware: coreboot: document board
+ variant properties
+In-Reply-To: <20180831121836.GA23441@bogus>
+References: <20180822120214.11848-1-heiko@sntech.de>
+ <20180822120214.11848-2-heiko@sntech.de> <20180831121836.GA23441@bogus>
+Message-ID: <1660300.IG1gbB27SJ@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 21. September 2018, 10:13:41 CEST schrieb Heiko Stuebner:
-> It is good practice to make the setting of gpio-pinctrls explicitly in the
-> devicetree, and in this case even necessary.
-> Rockchip boards start with iomux settings set to gpio for most pins and
-> while the linux pinctrl driver also implicitly sets the gpio function if
-> a pin is requested as gpio that is not necessarily true for other drivers.
-> 
-> The issue in question stems from uboot, where the sdmmc_pwr pin is set
-> to function 1 (sdmmc-power) by the bootrom when reading the 1st-stage
-> loader. The regulator controlled by the pin is active-low though, so
-> when the dwmmc hw-block sets its enabled bit, it actually disables the
-> regulator. By changing the pin back to gpio we fix that behaviour.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Hi Rob,
 
-applied for 4.20
+Am Freitag, 31. August 2018, 14:18:36 CEST schrieb Rob Herring:
+> On Wed, Aug 22, 2018 at 02:02:13PM +0200, Heiko Stuebner wrote:
+> > Since at least 2014 coreboot exports board specific variant ids for
+> > board-revision, used ram-modules and component variants on the same board
+> > into the loaded devicetree.
+> > 
+> > These are set on all devicetree-based Chromebooks since then, so at
+> > least we can make the effort to document these long-used properties.
+> 
+> Long used, but never reviewed, so that doesn't really matter.
+> 
+> > 
+> > A case where these are used is for example to determine the touchscreen
+> > type that is only identifyable via the sku-id when updating its firmware
+> > on the Scarlet tablet from the Gru ChromeOS family.
+> > 
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> >  Documentation/devicetree/bindings/firmware/coreboot.txt | 6 ++++++
+> >  1 file changed, 6 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/firmware/coreboot.txt b/Documentation/devicetree/bindings/firmware/coreboot.txt
+> > index 4c955703cea8..cfc7623e2577 100644
+> > --- a/Documentation/devicetree/bindings/firmware/coreboot.txt
+> > +++ b/Documentation/devicetree/bindings/firmware/coreboot.txt
+> > @@ -21,6 +21,12 @@ Required properties:
+> >  	0xc0389481 that resides in the topmost 8 bytes of the area.
+> >  	See coreboot's src/include/imd.h for details.
+> >  
+> > +Board variant properties determined via strapping measures (like gpios):
+> > + - board-id: board-specific id indicating the board-revision
+> > + - ram-code: board-specific id identifying the used ram-module
+> > + - sku-id: board-specific id indicating a variant (using different
+> > +           display panels for example)
+> 
+> The appear to be consumed by coreboot, but the purpose of the /firmware 
+> nodes has describing firmware interfaces provided by the platform. 
+> 
+> Not saying we can't put things to configure the firmware there, but it 
+> would be a departure and something we should consider. These properties 
+> aren't really coreboot specific and probably belong at the root node. 
+> Though I think we already discussed a 'board-id' property for QCom (and 
+> ended up with a compatible string approach instead.
+
+These are not for configuring the firmware. Coreboot is reading the values
+from hardware-strappings, like special gpios and inserts the properties into
+the devicetree for the kernel or userspace to read back if needed.
+
+So coreboot loads a devicetree without them from the boot-partition and
+amends that devicetree we these properties.
+
+As indicated above, devices since 2014 do that, so I thought it might make
+sense to document that behaviour.
+
+
+Heiko
