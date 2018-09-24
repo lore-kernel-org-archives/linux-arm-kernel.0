@@ -1,27 +1,73 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 24 Sep 2018 15:47:12 +0200
-Subject: [PATCH 0/3] add dwc2 support for px30
-In-Reply-To: <20180802130133.4898-1-heiko@sntech.de>
-References: <20180802130133.4898-1-heiko@sntech.de>
-Message-ID: <102522978.rGKrA9VWk8@phil>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Mon, 24 Sep 2018 15:59:03 +0200
+Subject: [RESEND PATCH] Revert "pwm: Set class for exported channels in
+ sysfs"
+In-Reply-To: <20180924115301.GV21032@ulmo>
+References: <1537538567-5377-1-git-send-email-fabrice.gasnier@st.com>
+ <20180924115301.GV21032@ulmo>
+Message-ID: <fc02ced1-01ba-dde4-95da-285d9351338b@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 2. August 2018, 15:01:30 CEST schrieb Heiko Stuebner:
-> This is split out from the series adding the px30 support, due to
-> the dwc2 binding change not having landed yet in a maintainer tree.
+On 09/24/2018 01:53 PM, Thierry Reding wrote:
+> On Fri, Sep 21, 2018 at 04:02:47PM +0200, Fabrice Gasnier wrote:
+>> This reverts commit 7e5d1fd75c3dde9fc10c4472b9368089d1b81d00 as it causes
+>> regression with multiple pwm chip. It creates a new entry in
+>> '/sys/class/pwm' every time a 'pwmX' is exported with 'echo X > export':
+>> - 1st time export will create an entry in /sys/class/pwm/pwmX
+>> - when another export happens on another pwmchip, it can't be created
+>> (e.g. -EEXIST)
+>>
+>> This also changes existing ABI (Documentation/ABI/testing/sysfs-class-pwm):
+>> - pmwX should be there: /sys/class/pwm/pwmchipN/pwmX
+>>
+>> Example on stm32 (stm32429i-eval) platform:
+>> $ ls /sys/class/pwm
+>> pwmchip0 pwmchip4
+>>
+>> $ cd /sys/class/pwm/pwmchip0/
+>> $ echo 0 > export
+>> $ ls /sys/class/pwm
+>> pwm0 pwmchip0 pwmchip4
+>>
+>> $ cd /sys/class/pwm/pwmchip4/
+>> $ echo 0 > export
+>> sysfs: cannot create duplicate filename '/class/pwm/pwm0'
+>> ...Exception stack follows...
+>>
+>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>> ---
+>>  drivers/pwm/sysfs.c | 1 -
+>>  1 file changed, 1 deletion(-)
 > 
-> The Acked binding change should go through some usb tree, while
-> I'll pick up the dts changes once that has happened.
-> 
-> The binding itself is unchanged.
-> 
-> 
-> Heiko Stuebner (2):
->   arm64: dts: rockchip: add dwc2 otg controller on px30
->   arm64: dts: rockchip: enable dwc2-based otg controller on px30-evb
-> 
-> Liang Chen (1):
->   dt-bindings: usb: dwc2: add description for px30
+> Can we come up with an alternative that allows us to have both? We want
+> uevent and proper sysfs creation, or is that not possible?
 
-applied all 3 patches for 4.20 now.
+Hi Thierry, all,
+
+With current approach:
+- "export->child.class = parent->class"
+- ABI (e.g. "pwm%d") device name isn't unique with multiple pwm chip.
+I think this is not possible.
+
+Trying to think of an alternative... I just did a quick test, by
+changing device name, to take pwmchip into account:
++       export->child.class = parent->class;
+        export->child.release = pwm_export_release;
+        export->child.parent = parent;
+        export->child.devt = MKDEV(0, 0);
+        export->child.groups = pwm_groups;
+-       dev_set_name(&export->child, "pwm%u", pwm->hwpwm);
++       dev_set_name(&export->child, "pwmchip%d-pwm%u", chip->base,
+pwm->hwpwm);
+
+But this also impacts existing ABI :-(
+Would you have suggestions to send an uevent, without modifying ABI ?
+
+Please advise,
+Best regards,
+Fabrice
+
+> 
+> Thierry
+> 
