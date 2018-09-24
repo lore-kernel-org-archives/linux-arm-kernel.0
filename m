@@ -1,39 +1,26 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 24 Sep 2018 15:03:38 +0100
-Subject: [PATCH v5 1/6] arm64/mm: Introduce the init_pg_dir.
-In-Reply-To: <20180924130137.re3nftpsi2dx2da2@lakrids.cambridge.arm.com>
-References: <20180917044333.30051-1-yaojun8558363@gmail.com>
- <20180917044333.30051-2-yaojun8558363@gmail.com>
- <20180924130137.re3nftpsi2dx2da2@lakrids.cambridge.arm.com>
-Message-ID: <20180924140338.nu7jn3hfcwwoztnt@lakrids.cambridge.arm.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 24 Sep 2018 16:05:49 +0200
+Subject: [PATCH] ARM: dts: rockchip: explicitly set vcc_sd0 pin to gpio on
+ rk3188-radxarock
+In-Reply-To: <20180921081341.23258-1-heiko@sntech.de>
+References: <20180921081341.23258-1-heiko@sntech.de>
+Message-ID: <1680177.p9B9Bbjx8F@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 24, 2018 at 02:01:37PM +0100, Mark Rutland wrote:
-> On Mon, Sep 17, 2018 at 12:43:28PM +0800, Jun Yao wrote:
-> > To make the swapper_pg_dir read only, we will move it to the rodata
-> > section. And force the kernel to set up the initial page table in
-> > the init_pg_dir. After generating all levels page table, we copy
-> > only the top level into the swapper_pg_dir during paging_init().
-
-> > +#define INIT_PG_TABLES					\
-> > +	. = ALIGN(PAGE_SIZE);				\
-> > +	init_pg_dir = .;				\
-> > +	. += SWAPPER_DIR_SIZE;				\
-> > +	init_pg_end = .;
+Am Freitag, 21. September 2018, 10:13:41 CEST schrieb Heiko Stuebner:
+> It is good practice to make the setting of gpio-pinctrls explicitly in the
+> devicetree, and in this case even necessary.
+> Rockchip boards start with iomux settings set to gpio for most pins and
+> while the linux pinctrl driver also implicitly sets the gpio function if
+> a pin is requested as gpio that is not necessarily true for other drivers.
 > 
-> This will allocate a full set of PGD + PUD + PMD (+ PTE) levels, but the
-> commit message says we only copy the top level table.
+> The issue in question stems from uboot, where the sdmmc_pwr pin is set
+> to function 1 (sdmmc-power) by the bootrom when reading the 1st-stage
+> loader. The regulator controlled by the pin is active-low though, so
+> when the dwmmc hw-block sets its enabled bit, it actually disables the
+> regulator. By changing the pin back to gpio we fix that behaviour.
 > 
-> The memory for otjher levels of table can be re-allocated once the
-> kernel init phase is over, so that seems a bit worrying.
-> 
-> Do we switch over to new copies of those levels, or do we continue using
-> the entries from INIT_PG_TABLES?
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-I now see that we already allocate copies of those levels of table (and
-free the originals in paging_init), so this is not a problem.
-
-Sorry for the noise!
-
-Mark.
+applied for 4.20
