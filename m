@@ -1,61 +1,70 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 24 Sep 2018 08:31:26 +0200
-Subject: [PATCH 1/2] clocksource/drivers: Unify the names to timer-* format
-In-Reply-To: <20180924062828.4yh3aumcuiihojgu@pengutronix.de>
-References: <1537762569-18657-1-git-send-email-daniel.lezcano@linaro.org>
- <20180924062828.4yh3aumcuiihojgu@pengutronix.de>
-Message-ID: <7451938d-c600-f070-d1c7-1c77f79518b0@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 24 Sep 2018 08:47:03 +0200
+Subject: [PATCH v8 4/5] clk: imx: add imx composite clock
+In-Reply-To: <1537531894-18499-5-git-send-email-abel.vesa@nxp.com>
+References: <1537531894-18499-1-git-send-email-abel.vesa@nxp.com>
+ <1537531894-18499-5-git-send-email-abel.vesa@nxp.com>
+Message-ID: <20180924064703.GY4097@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/09/2018 08:28, Uwe Kleine-K?nig wrote:
-> On Mon, Sep 24, 2018 at 06:15:17AM +0200, Daniel Lezcano wrote:
->> In order to make some housekeeping in the directory, this patch renames
->> drivers to the timer-* format in order to unify their names.
->>
->> There is no functional changes.
->>
->> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->> ---
->>  MAINTAINERS                               |  10 +-
->>  drivers/clocksource/Makefile              |  26 +-
->>  drivers/clocksource/cadence_ttc_timer.c   | 543 ------------------------------
->>  drivers/clocksource/fsl_ftm_timer.c       | 376 ---------------------
->>  drivers/clocksource/owl-timer.c           | 173 ----------
->>  drivers/clocksource/qcom-timer.c          | 258 --------------
->>  drivers/clocksource/time-armada-370-xp.c  | 416 -----------------------
->>  drivers/clocksource/time-efm32.c          | 287 ----------------
->>  drivers/clocksource/time-lpc32xx.c        | 314 -----------------
->>  drivers/clocksource/time-orion.c          | 192 -----------
->>  drivers/clocksource/time-pistachio.c      | 218 ------------
->>  drivers/clocksource/timer-armada-370-xp.c | 416 +++++++++++++++++++++++
->>  drivers/clocksource/timer-cadence-ttc.c   | 543 ++++++++++++++++++++++++++++++
->>  drivers/clocksource/timer-efm32.c         | 287 ++++++++++++++++
->>  drivers/clocksource/timer-fsl-ftm.c       | 376 +++++++++++++++++++++
->>  drivers/clocksource/timer-lpc32xx.c       | 314 +++++++++++++++++
->>  drivers/clocksource/timer-orion.c         | 192 +++++++++++
->>  drivers/clocksource/timer-owl.c           | 173 ++++++++++
->>  drivers/clocksource/timer-pistachio.c     | 218 ++++++++++++
->>  drivers/clocksource/timer-qcom.c          | 258 ++++++++++++++
->>  drivers/clocksource/timer-versatile.c     |  44 +++
->>  drivers/clocksource/timer-vf-pit.c        | 204 +++++++++++
->>  drivers/clocksource/timer-vt8500.c        | 168 +++++++++
->>  drivers/clocksource/timer-zevio.c         | 218 ++++++++++++
->>  drivers/clocksource/versatile.c           |  44 ---
->>  drivers/clocksource/vf_pit_timer.c        | 204 -----------
->>  drivers/clocksource/vt8500_timer.c        | 168 ---------
->>  drivers/clocksource/zevio-timer.c         | 218 ------------
->>  28 files changed, 3429 insertions(+), 3429 deletions(-)
+Hi Abel,
+
+On Fri, Sep 21, 2018 at 03:11:33PM +0300, Abel Vesa wrote:
+> Since a lot of clocks on imx8 are formed by a mux, gate, predivider and
+> divider, the idea here is to combine all of those into one composite clock,
+> but we need to deal with both predivider and divider at the same time and
+> therefore we add the imx_clk_composite_divider_ops and register the composite
+> clock with those.
 > 
-> Wow, with git format-patch -M this should look much smaller and so
-> easier to review.
+> Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
+> Suggested-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  drivers/clk/imx/Makefile        |   1 +
+>  drivers/clk/imx/clk-composite.c | 156 ++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/imx/clk.h           |  14 ++++
+>  3 files changed, 171 insertions(+)
+>  create mode 100644 drivers/clk/imx/clk-composite.c
+> 
+> +static int imx_clk_composite_divider_set_rate(struct clk_hw *hw,
+> +					unsigned long rate,
+> +					unsigned long parent_rate)
+> +{
+> +	struct clk_divider *divider = to_clk_divider(hw);
+> +	unsigned long prediv_rate;
+> +	unsigned long flags = 0;
+> +	int prediv_value;
+> +	int div_value;
+> +	u32 val;
+> +
+> +	prediv_value = divider_get_val(rate, parent_rate, NULL,
+> +				PCG_PREDIV_WIDTH, CLK_DIVIDER_ROUND_CLOSEST);
+> +	if (prediv_value < 0)
+> +		return prediv_value;
+> +
+> +	prediv_rate = DIV_ROUND_UP_ULL((u64)parent_rate, prediv_value + 1);
+> +
+> +	div_value = divider_get_val(rate, prediv_rate, NULL,
+> +				PCG_DIV_WIDTH, CLK_DIVIDER_ROUND_CLOSEST);
+> +	if (div_value < 0)
+> +		return div_value;
 
-Yes, I forgot the option :/
+Does this work with expected accuracy? Consider the best divider you are
+looking for is 9. With the above you'll end up with a predivider of 8
+and a postdivider of 1 instead of the optimum divider values of 3 and 3.
 
+I think you have to iterate over all possible divider combinations and
+then use the best one found. The original divider code does this, albeit
+a little obfuscated.
+
+You have to do the same in round_rate aswell.
+
+Sorry, I missed that when I last looked at it in v6.
+
+Sascha
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
