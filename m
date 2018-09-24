@@ -1,57 +1,71 @@
-From: MNARANI@xilinx.com (Manish Narani)
-Date: Mon, 24 Sep 2018 10:29:44 +0000
-Subject: [PATCH v7 4/7] edac: synopsys: Add macro defines for ZynqMP DDRC
-In-Reply-To: <20180924092226.GA20187@zn.tnic>
-References: <1537194305-9243-1-git-send-email-manish.narani@xilinx.com>
- <1537194305-9243-5-git-send-email-manish.narani@xilinx.com>
- <20180924092226.GA20187@zn.tnic>
-Message-ID: <DM6PR02MB5227D961C992C3BB6A4421B7C1170@DM6PR02MB5227.namprd02.prod.outlook.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 24 Sep 2018 11:33:51 +0100
+Subject: [PATCH 02/10] irqchip/gic-v3-its: Consolidate LPI_PENDBASE_SZ
+ usage
+In-Reply-To: <20180921195954.21574-3-marc.zyngier@arm.com>
+References: <20180921195954.21574-1-marc.zyngier@arm.com>
+ <20180921195954.21574-3-marc.zyngier@arm.com>
+Message-ID: <e267123d-af92-0871-455c-cb74a2bc4103@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+Hi Marc,
 
-Thanks for the review.
+On 21/09/18 20:59, Marc Zyngier wrote:
+> LPI_PENDING_SZ is always used in conjunction with a max(). Let's
+> factor this in the definition of the macro, and simplify the rest
+> of the code.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>   drivers/irqchip/irq-gic-v3-its.c | 12 ++++--------
+>   1 file changed, 4 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index c2df341ff6fa..ed6aab11e019 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -62,7 +62,7 @@ static u32 lpi_id_bits;
+>    */
+>   #define LPI_NRBITS		lpi_id_bits
+>   #define LPI_PROPBASE_SZ		ALIGN(BIT(LPI_NRBITS), SZ_64K)
+> -#define LPI_PENDBASE_SZ		ALIGN(BIT(LPI_NRBITS) / 8, SZ_64K)
+> +#define LPI_PENDBASE_SZ		max_t(u32, SZ_64K, ALIGN(BIT(LPI_NRBITS) / 8, SZ_64K))
 
-> -----Original Message-----
-> From: Borislav Petkov [mailto:bp at alien8.de]
-> Sent: Monday, September 24, 2018 2:52 PM
-> To: Manish Narani <MNARANI@xilinx.com>
-> Cc: robh+dt at kernel.org; mark.rutland at arm.com; mchehab at kernel.org;
-> Michal Simek <michals@xilinx.com>; leoyang.li at nxp.com;
-> sudeep.holla at arm.com; amit.kucheria at linaro.org;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
-> edac at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v7 4/7] edac: synopsys: Add macro defines for ZynqMP
-> DDRC
-> 
-> On Mon, Sep 17, 2018 at 07:55:02PM +0530, Manish Narani wrote:
-> > Add macro defines for ZynqMP DDR controller. These macros will be used
-> > for ZyqnMP ECC operations.
-> >
-> > Signed-off-by: Manish Narani <manish.narani@xilinx.com>
-> > ---
-> >  drivers/edac/synopsys_edac.c | 168
-> > +++++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 168 insertions(+)
-> >
-> > diff --git a/drivers/edac/synopsys_edac.c
-> > b/drivers/edac/synopsys_edac.c index eb458e5..6bf7959 100644
-> > --- a/drivers/edac/synopsys_edac.c
-> > +++ b/drivers/edac/synopsys_edac.c
-> > @@ -97,6 +97,174 @@
-> >  #define SCRUB_MODE_MASK		0x7
-> >  #define SCRUB_MODE_SECDED	0x4
-> >
-> > +/* DDR ECC Quirks */
-> > +#define DDR_ECC_INTR_SUPPORT		BIT(0)
-> > +#define DDR_ECC_DATA_POISON_SUPPORT	BIT(1)
-> 
-> All those new additions are one column further to the left than the old ones.
-> Why?
-> 
-> Is there some significance here or can they all be vertically aligned?
-Should I increase the alignment of the existing macros in the 'code formatting' patches? New macros will need an increased indentation.
+minor nit: The ALIGN() already aligns the given value up to the required
+alignment. So, if the LPI_NRBITS is guaranteed to be non-zero,
+we could simply drop the max_t().
 
-Thanks,
-Manish
+Rest looks good to me.
+
+Suzuki
+
+>   
+>   #define LPI_PROP_DEFAULT_PRIO	0xa0
+>   
+> @@ -1924,12 +1924,9 @@ static int its_alloc_collections(struct its_node *its)
+>   static struct page *its_allocate_pending_table(gfp_t gfp_flags)
+>   {
+>   	struct page *pend_page;
+> -	/*
+> -	 * The pending pages have to be at least 64kB aligned,
+> -	 * hence the 'max(LPI_PENDBASE_SZ, SZ_64K)' below.
+> -	 */
+> +
+>   	pend_page = alloc_pages(gfp_flags | __GFP_ZERO,
+> -				get_order(max_t(u32, LPI_PENDBASE_SZ, SZ_64K)));
+> +				get_order(LPI_PENDBASE_SZ));
+>   	if (!pend_page)
+>   		return NULL;
+>   
+> @@ -1941,8 +1938,7 @@ static struct page *its_allocate_pending_table(gfp_t gfp_flags)
+>   
+>   static void its_free_pending_table(struct page *pt)
+>   {
+> -	free_pages((unsigned long)page_address(pt),
+> -		   get_order(max_t(u32, LPI_PENDBASE_SZ, SZ_64K)));
+> +	free_pages((unsigned long)page_address(pt), get_order(LPI_PENDBASE_SZ));
+>   }
+>   
+>   static void its_cpu_init_lpis(void)
+> 
