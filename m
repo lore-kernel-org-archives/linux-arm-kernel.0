@@ -1,81 +1,83 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 24 Sep 2018 12:04:52 +0200
-Subject: [PATCH] ARM: dts: exynos: Add CD and WP pins to Odroid XU SD card
-In-Reply-To: <20180921210321.12404-1-krzk@kernel.org>
-References: <CGME20180921210332epcas3p423aaeeb84ec3d8a44c5a898949f992e8@epcas3p4.samsung.com>
- <20180921210321.12404-1-krzk@kernel.org>
-Message-ID: <20180924100453eucas1p2cc67bf2cae5c0d0a031c7ce8d1117529~XTfCSQ2rd1041310413eucas1p2S@eucas1p2.samsung.com>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Mon, 24 Sep 2018 10:06:09 +0000
+Subject: [PATCH v5] ARM: mvebu: use dt_fixup to provide fallback for
+ enable-method
+References: <20180726034856.20743-1-chris.packham@alliedtelesis.co.nz>
+ <8736u3jhc3.fsf@bootlin.com> <20180924095332.lrfobc5dhxahm6g5@localhost>
+Message-ID: <63e0f13b8081419a813fba4c4d6faa8b@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
-
-On 2018-09-21 23:03, Krzysztof Kozlowski wrote:
-> Defining card-detect and write-protect GPIO pins in Odroid XU SD Card
-> does not change anything from functional point of view - dw-mmc driver
-> was reading the state from registers.  Adding cd-gpios and wp-gpios
-> properties changes only internal driver behavior to access the pins
-> directly.
->
-> Add them to DTS only to comprehensively describe the hardware.  Minor
-> benefit is that write-protect pin configuration makes sure that it will
-> be properly pulled up to indicate write access.
->
-> This also removes debug messages:
->      dwmmc_exynos 12220000.mmc: No GPIO consumer cd found
->      dwmmc_exynos 12220000.mmc: No GPIO consumer wp found
->
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+On 24/09/18 21:54, Olof Johansson wrote:
+> On Fri, Sep 21, 2018 at 12:05:48PM +0200, Gregory CLEMENT wrote:
+>> Hi Chris,
+>>   
+>>   On jeu., juil. 26 2018, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
+>>
+>>> We need to maintain backwards compatibility with device trees that don't
+>>> define an enable method. At the same time we want the device tree to be
+>>> able to specify an enable-method and have it stick.
+>>>
+>>> Previously by having smp assigned in the DT_MACHINE definition this
+>>> would be picked up by setup_arch() and override whatever
+>>> arm_dt_init_cpu_maps() had configured. Now we move the initial
+>>> assignment of default smp_ops to a dt_fixup and let
+>>> arm_dt_init_cpu_maps() override that if the device tree defines an
+>>> enable-method.
+>>>
+>>> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+>>
+>> I made several tests on an Armada XP based board: OpenBlock AX3: I
+>> modify the enable-method in the decvice tree, and I confirm that without
+>> your patch it is not taken into account whereas with this patch the
+>> enable-method is applied form the device tree. I also didn't see any
+>> regression with the original dtb.
+>>
+>> So I added my:
+>> Tested-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+>>
+>> and applied on mvebu/soc
+> 
+> Hi,
+> 
+> Looks like this broke non-SMP. Not a huge deal, but please apply this as
+> closely as possible on top of the previous patch (or squash it in).
+> 
+> 
+> - 8< - 8< - 8< - 8< - 8< - 8< - 8< - 8< - 8< - 8< - 8< - 8< - 8< - 8< -
+> 
+> 
+> 
+>  From 3190d9502607995c7aecce79beec36714574d494 Mon Sep 17 00:00:00 2001
+> From: Olof Johansson <olof@lixom.net>
+> Date: Mon, 24 Sep 2018 02:37:31 -0700
+> Subject: [PATCH] ARM: mvebu: fix !SMP build
+> 
+> Wrap set_smp_ops() in CONFIG_SMP.
+> 
+> Fixes: d6ec59de9a0a8 ("ARM: mvebu: use dt_fixup to provide fallback for enable-method")
+> Cc: Chris Packham <chris.packham@alliedtelesis.co.nz>
+> Signed-off-by: Olof Johansson <olof@lixom.net>
 > ---
->   arch/arm/boot/dts/exynos5410-odroidxu.dts | 12 +++++++++++-
->   1 file changed, 11 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/exynos5410-odroidxu.dts b/arch/arm/boot/dts/exynos5410-odroidxu.dts
-> index a2046f5f998c..dae360f29a47 100644
-> --- a/arch/arm/boot/dts/exynos5410-odroidxu.dts
-> +++ b/arch/arm/boot/dts/exynos5410-odroidxu.dts
-> @@ -525,12 +525,14 @@
+>   arch/arm/mach-mvebu/board-v7.c | 2 ++
+>   1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+> index 5bbde5e..0b10acd 100644
+> --- a/arch/arm/mach-mvebu/board-v7.c
+> +++ b/arch/arm/mach-mvebu/board-v7.c
+> @@ -147,7 +147,9 @@ static void __init mvebu_dt_init(void)
 >   
->   &mmc_2 {
->   	status = "okay";
-> +	wp-gpios = <&gpm5 0 GPIO_ACTIVE_LOW>;
-> +	cd-gpios = <&gpc2 2 GPIO_ACTIVE_LOW>;
->   	card-detect-delay = <200>;
->   	samsung,dw-mshc-ciu-div = <3>;
->   	samsung,dw-mshc-sdr-timing = <0 4>;
->   	samsung,dw-mshc-ddr-timing = <0 2>;
->   	pinctrl-names = "default";
-> -	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4>;
-> +	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4 &sd2_wp>;
-
-IMHO there is no point adding cd-gpios property if CD line is already 
-assigned to this device via respective pin ctrl entry (as special function).
-
-Handling of WP line is even more controversial imho. Ideally the drivers 
-or mmc core should check somehow if WP line is available or not and act 
-respectively. WP line is not available on uSD card connector so there is 
-no point describing it.
-
->   	bus-width = <4>;
->   	cap-sd-highspeed;
->   	vmmc-supply = <&ldo21_reg>;
-> @@ -573,6 +575,14 @@
->   		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
->   		samsung,pin-drv = <EXYNOS5420_PIN_DRV_LV1>;
->   	};
-> +
-> +	sd2_wp: sd2-wp {
-> +		samsung,pins = "gpm5-0";
-> +		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
-> +		/* Pin is floating so pull it up to disable write-protect */
-> +		samsung,pin-pud = <EXYNOS_PIN_PULL_UP>;
-> +		samsung,pin-drv = <EXYNOS5420_PIN_DRV_LV4>;
-> +	};
->   };
+>   static void __init armada_370_xp_dt_fixup(void)
+>   {
+> +#ifdef CONFIG_SMP
+>   	smp_set_ops(smp_ops(armada_xp_smp_ops));
+> +#endif
+>   }
 >   
->   &pwm {
+>   static const char * const armada_370_xp_dt_compat[] __initconst = {
+> 
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Makes sense to me.
+
+Gregory, do you want me to send a v6 or are you able to squash this in?
