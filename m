@@ -1,124 +1,85 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 24 Sep 2018 17:42:58 +0100
-Subject: [BISECTED] Regression: Solidrun Clearfog Base won't boot since
- "PCI: mvebu: Only remap I/O space if configured"
-In-Reply-To: <20180924165218.26c7c418@windsurf>
-References: <5ad46fec-a71a-477a-b23f-d20aacfb481d@cesnet.cz>
- <20180913104241.65db8243@windsurf>
- <20180924101213.GO30658@n2100.armlinux.org.uk>
- <20180924122614.70738b5c@windsurf>
- <20180924111341.GP30658@n2100.armlinux.org.uk>
- <20180924141203.3df9707a@windsurf>
- <20180924124620.GA10322@e107981-ln.cambridge.arm.com>
- <20180924151040.5e57462b@windsurf>
- <20180924141512.GA11875@e107981-ln.cambridge.arm.com>
- <20180924165218.26c7c418@windsurf>
-Message-ID: <20180924164258.GA19513@red-moon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 24 Sep 2018 17:54:21 +0100
+Subject: [PATCH v5 5/6] arm64/mm: Populate the swapper_pg_dir by fixmap.
+In-Reply-To: <20180917044333.30051-6-yaojun8558363@gmail.com>
+References: <20180917044333.30051-1-yaojun8558363@gmail.com>
+ <20180917044333.30051-6-yaojun8558363@gmail.com>
+Message-ID: <20180924165421.77bjq5m32h5w7ffh@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 24, 2018 at 04:52:18PM +0200, Thomas Petazzoni wrote:
-> Hello,
+On Mon, Sep 17, 2018 at 12:43:32PM +0800, Jun Yao wrote:
+> Since we will move the swapper_pg_dir to rodata section, we need a
+> way to update it. The fixmap can handle it. When the swapper_pg_dir
+> needs to be updated, we map it dynamically. The map will be
+> canceled after the update is complete. In this way, we can defend
+> against KSMA(Kernel Space Mirror Attack).
 > 
-> On Mon, 24 Sep 2018 15:15:12 +0100, Lorenzo Pieralisi wrote:
+> Signed-off-by: Jun Yao <yaojun8558363@gmail.com>
+> ---
+>  arch/arm64/include/asm/pgtable.h | 38 ++++++++++++++++++++++++++------
+>  arch/arm64/mm/mmu.c              | 25 +++++++++++++++++++--
+>  2 files changed, 54 insertions(+), 9 deletions(-)
 > 
-> > I understand that, I wanted to make sure we come up with a fix asap
-> > and what I put forward would cover everything discussed in this thread,
-> > at least temporarily, giving us time to check ISA related issues while
-> > unmapping IO space.
-> 
-> Something like this should implemented what you suggest I guess:
-> 
-> diff --git a/drivers/pci/controller/pci-mvebu.c b/drivers/pci/controller/pci-mvebu.c
-> index 50eb0729385b..a41d79b8d46a 100644
-> --- a/drivers/pci/controller/pci-mvebu.c
-> +++ b/drivers/pci/controller/pci-mvebu.c
-> @@ -1145,7 +1145,6 @@ static int mvebu_pcie_parse_request_resources(struct mvebu_pcie *pcie)
->  {
->         struct device *dev = &pcie->pdev->dev;
->         struct device_node *np = dev->of_node;
-> -       unsigned int i;
->         int ret;
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> index b11d6fc62a62..9e643fc2453d 100644
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
+> @@ -429,8 +429,29 @@ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+>  				 PUD_TYPE_TABLE)
+>  #endif
 >  
->         INIT_LIST_HEAD(&pcie->resources);
-> @@ -1179,13 +1178,58 @@ static int mvebu_pcie_parse_request_resources(struct mvebu_pcie *pcie)
->                                          resource_size(&pcie->io) - 1);
->                 pcie->realio.name = "PCI I/O";
->  
-> +               pci_add_resource(&pcie->resources, &pcie->realio);
-> +       }
+> +extern pgd_t init_pg_dir[PTRS_PER_PGD];
+> +extern pgd_t init_pg_end[];
+> +extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
+> +extern pgd_t swapper_pg_end[];
+> +extern pgd_t idmap_pg_dir[PTRS_PER_PGD];
+> +extern pgd_t tramp_pg_dir[PTRS_PER_PGD];
 > +
-> +       return devm_request_pci_bus_resources(dev, &pcie->resources);
+> +extern void set_swapper_pgd(pgd_t *pgdp, pgd_t pgd);
+> +
+> +static inline bool in_swapper_pgdir(void *addr)
+> +{
+> +	return ((unsigned long)addr & PAGE_MASK) ==
+> +		((unsigned long)swapper_pg_dir & PAGE_MASK);
 > +}
 > +
-> +/*
-> + * This is a copy of pci_host_probe(), except that it does the I/O
-> + * remap as the last step, once we are sure we won't fail.
-> + *
-> + * It should be removed once the I/O remap error handling issue has
-> + * been sorted out.
-> + */
-> +static int mvebu_pci_host_probe(struct pci_host_bridge *bridge)
-> +{
-> +       struct mvebu_pcie *pcie;
-> +       struct pci_bus *bus, *child;
-> +       int ret;
-> +
-> +       ret = pci_scan_root_bus_bridge(bridge);
-> +       if (ret < 0) {
-> +               dev_err(bridge->dev.parent, "Scanning root bridge failed");
-> +               return ret;
-> +       }
-> +
-> +       pcie = pci_host_bridge_priv(bridge);
-> +       if (resource_size(&pcie->io) != 0) {
-> +               unsigned int i;
-> +
->                 for (i = 0; i < resource_size(&pcie->realio); i += SZ_64K)
->                         pci_ioremap_io(i, pcie->io.start + i);
-> +       }
->  
-> -               pci_add_resource(&pcie->resources, &pcie->realio);
-> +       bus = bridge->bus;
-> +
-> +       /*
-> +        * We insert PCI resources into the iomem_resource and
-> +        * ioport_resource trees in either pci_bus_claim_resources()
-> +        * or pci_bus_assign_resources().
-> +        */
-> +       if (pci_has_flag(PCI_PROBE_ONLY)) {
-> +               pci_bus_claim_resources(bus);
-> +       } else {
-> +               pci_bus_size_bridges(bus);
-> +               pci_bus_assign_resources(bus);
-> +
-> +               list_for_each_entry(child, &bus->children, node)
-> +                       pcie_bus_configure_settings(child);
->         }
->  
-> -       return devm_request_pci_bus_resources(dev, &pcie->resources);
-> +       pci_bus_add_devices(bus);
-> +       return 0;
->  }
->  
->  static int mvebu_pcie_probe(struct platform_device *pdev)
-> @@ -1268,7 +1312,7 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
->         bridge->align_resource = mvebu_pcie_align_resource;
->         bridge->msi = pcie->msi;
->  
-> -       return pci_host_probe(bridge);
-> +       return mvebu_pci_host_probe(bridge);
->  }
->  
->  static const struct of_device_id mvebu_pcie_of_match_table[] = {
-> 
-> If that's what you meant, I'll go ahead and test on actual hardware and
-> submit as a proper patch.
+>  static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
+>  {
+> +#ifdef __PAGETABLE_PMD_FOLDED
+> +	if (in_swapper_pgdir(pmdp)) {
+> +		set_swapper_pgd((pgd_t *)pmdp, __pgd(pmd_val(pmd)));
+> +		return;
+> +	}
+> +#endif
 
-Yes, that's what I meant, I hope that you will have some bandwidth to
-discuss a way forward for v4.21, when this fix is merged (I think that
-v4.20 is a tall order but we can try if you will have time to post the
-patches - I suspect your fix will go in -rc6 if Bjorn can pull it this
-week).
+So that we can get consistent build coverage, could we make this:
 
-Lorenzo
+	if (__is_defined(__PAGETABLE_PMD_FOLDED) && in_swapper_pgdir(pmdp)) {
+		set_swapper_pgd((pgd_t *)pmdp, __pgd(pmd_val(pmd)));
+		return;
+	}
+
+>  	WRITE_ONCE(*pmdp, pmd);
+>  
+>  	if (pmd_valid(pmd))
+> @@ -484,6 +505,12 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
+>  
+>  static inline void set_pud(pud_t *pudp, pud_t pud)
+>  {
+> +#ifdef __PAGETABLE_PUD_FOLDED
+> +	if (in_swapper_pgdir(pudp)) {
+> +		set_swapper_pgd((pgd_t *)pudp, __pgd(pud_val(pud)));
+> +		return;
+> +	}
+> +#endif
+
+... and likewise:
+
+	if (__is_enabled(__PAGETABLE_PUD_FOLDED) && in_swapper_pgdir(pudp)) {
+		set_swapper_pgd((pgd_t *)pudp, __pgd(pud_val(pud)));
+		return;
+	}
+
+Thanks,
+Mark.
