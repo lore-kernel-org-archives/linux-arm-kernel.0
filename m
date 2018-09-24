@@ -1,26 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 24 Sep 2018 15:06:30 -0700
-Subject: [PATCH 3/3] ARM: OMAP2PLUS: Remove references to AM3517-EVM
- since it's in DT
-In-Reply-To: <20180923153718.15095-3-aford173@gmail.com>
-References: <20180923153718.15095-1-aford173@gmail.com>
- <20180923153718.15095-3-aford173@gmail.com>
-Message-ID: <20180924220630.GI5662@atomide.com>
+From: thor.thayer@linux.intel.com (thor.thayer at linux.intel.com)
+Date: Mon, 24 Sep 2018 17:09:04 -0500
+Subject: [PATCH 2/4] ARM: socfpga_defconfig: Enable CONFIG_MTD_ALTERA_SYSMGR
+In-Reply-To: <1537826946-18942-1-git-send-email-thor.thayer@linux.intel.com>
+References: <1537826946-18942-1-git-send-email-thor.thayer@linux.intel.com>
+Message-ID: <1537826946-18942-3-git-send-email-thor.thayer@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Adam Ford <aford173@gmail.com> [180923 08:41]:
-> Since the audio codecs used on the AM3517-EVM are now available
-> in device tree, and the audio driver wasn't really being used
-> anyway, this patch removes the remaining AM3517 legacy board
-> options and sound soc drivers.
+From: Thor Thayer <thor.thayer@linux.intel.com>
 
-Mark do you want to pick this one? If so:
+Add System Manager driver by default for SOCFPGA ARM32 platforms.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+---
+ arch/arm/configs/socfpga_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Maybe update the subject line according too.
-
-Regards,
-
-Tony
+diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
+index 371fca4e1ab7..c510a32f9f0d 100644
+--- a/arch/arm/configs/socfpga_defconfig
++++ b/arch/arm/configs/socfpga_defconfig
+@@ -109,6 +109,7 @@ CONFIG_SENSORS_LTC2978_REGULATOR=y
+ CONFIG_WATCHDOG=y
+ CONFIG_DW_WATCHDOG=y
+ CONFIG_MFD_ALTERA_A10SR=y
++CONFIG_MFD_ALTERA_SYSMGR=y
+ CONFIG_MFD_STMPE=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+-- 
+2.7.4
