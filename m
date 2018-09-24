@@ -1,109 +1,155 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 24 Sep 2018 18:45:48 +0100
-Subject: [PATCH v7 5/9] KVM: arm64: Support dirty page tracking for PUD
+Date: Mon, 24 Sep 2018 18:45:50 +0100
+Subject: [PATCH v7 7/9] KVM: arm64: Support handling access faults for PUD
  hugepages
 In-Reply-To: <20180924174552.8387-1-punit.agrawal@arm.com>
 References: <20180924174552.8387-1-punit.agrawal@arm.com>
-Message-ID: <20180924174552.8387-6-punit.agrawal@arm.com>
+Message-ID: <20180924174552.8387-8-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for creating PUD hugepages at stage 2, add support for
-write protecting PUD hugepages when they are encountered. Write
-protecting guest tables is used to track dirty pages when migrating
-VMs.
+In preparation for creating larger hugepages at Stage 2, extend the
+access fault handling at Stage 2 to support PUD hugepages when
+encountered.
 
-Also, provide trivial implementations of required kvm_s2pud_* helpers
-to allow sharing of code with arm32.
+Provide trivial helpers for arm32 to allow sharing of code.
 
 Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
 Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Cc: Christoffer Dall <christoffer.dall@arm.com>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Russell King <linux@armlinux.org.uk>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/kvm_mmu.h   | 15 +++++++++++++++
- arch/arm64/include/asm/kvm_mmu.h | 10 ++++++++++
- virt/kvm/arm/mmu.c               | 11 +++++++----
- 3 files changed, 32 insertions(+), 4 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h   |  9 +++++++++
+ arch/arm64/include/asm/kvm_mmu.h |  7 +++++++
+ arch/arm64/include/asm/pgtable.h |  6 ++++++
+ virt/kvm/arm/mmu.c               | 22 +++++++++++-----------
+ 4 files changed, 33 insertions(+), 11 deletions(-)
 
 diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index e77212e53e77..9ec09f4cc284 100644
+index 26a2ab05b3f6..95b34aad0dc8 100644
 --- a/arch/arm/include/asm/kvm_mmu.h
 +++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -87,6 +87,21 @@ void kvm_clear_hyp_idmap(void);
+@@ -85,6 +85,9 @@ void kvm_clear_hyp_idmap(void);
+ #define kvm_pfn_pte(pfn, prot)	pfn_pte(pfn, prot)
+ #define kvm_pfn_pmd(pfn, prot)	pfn_pmd(pfn, prot)
  
++#define kvm_pud_pfn(pud)	({ BUG(); 0; })
++
++
  #define kvm_pmd_mkhuge(pmd)	pmd_mkhuge(pmd)
  
-+/*
-+ * The following kvm_*pud*() functions are provided strictly to allow
-+ * sharing code with arm64. They should never be called in practice.
-+ */
-+static inline void kvm_set_s2pud_readonly(pud_t *pud)
+ /*
+@@ -108,6 +111,12 @@ static inline bool kvm_s2pud_exec(pud_t *pud)
+ 	return false;
+ }
+ 
++static inline pud_t kvm_s2pud_mkyoung(pud_t pud)
 +{
 +	BUG();
-+}
-+
-+static inline bool kvm_s2pud_readonly(pud_t *pud)
-+{
-+	BUG();
-+	return false;
++	return pud;
 +}
 +
  static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
  {
  	pte_val(pte) |= L_PTE_S2_RDWR;
 diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index baabea0cbb66..3cc342177474 100644
+index c06ef3be8ca9..b93e5167728f 100644
 --- a/arch/arm64/include/asm/kvm_mmu.h
 +++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -251,6 +251,16 @@ static inline bool kvm_s2pmd_exec(pmd_t *pmdp)
- 	return !(READ_ONCE(pmd_val(*pmdp)) & PMD_S2_XN);
+@@ -187,6 +187,8 @@ void kvm_clear_hyp_idmap(void);
+ #define kvm_pfn_pte(pfn, prot)		pfn_pte(pfn, prot)
+ #define kvm_pfn_pmd(pfn, prot)		pfn_pmd(pfn, prot)
+ 
++#define kvm_pud_pfn(pud)		pud_pfn(pud)
++
+ #define kvm_pmd_mkhuge(pmd)		pmd_mkhuge(pmd)
+ 
+ static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
+@@ -266,6 +268,11 @@ static inline bool kvm_s2pud_exec(pud_t *pudp)
+ 	return !(READ_ONCE(pud_val(*pudp)) & PUD_S2_XN);
  }
  
-+static inline void kvm_set_s2pud_readonly(pud_t *pudp)
++static inline pud_t kvm_s2pud_mkyoung(pud_t pud)
 +{
-+	kvm_set_s2pte_readonly((pte_t *)pudp);
-+}
-+
-+static inline bool kvm_s2pud_readonly(pud_t *pudp)
-+{
-+	return kvm_s2pte_readonly((pte_t *)pudp);
++	return pud_mkyoung(pud);
 +}
 +
  #define hyp_pte_table_empty(ptep) kvm_page_empty(ptep)
  
  #ifdef __PAGETABLE_PMD_FOLDED
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 1bdeca8918a6..a64a5c35beb1 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -314,6 +314,11 @@ static inline pte_t pud_pte(pud_t pud)
+ 	return __pte(pud_val(pud));
+ }
+ 
++static inline pud_t pte_pud(pte_t pte)
++{
++	return __pud(pte_val(pte));
++}
++
+ static inline pmd_t pud_pmd(pud_t pud)
+ {
+ 	return __pmd(pud_val(pud));
+@@ -380,6 +385,7 @@ static inline int pmd_protnone(pmd_t pmd)
+ #define pfn_pmd(pfn,prot)	__pmd(__phys_to_pmd_val((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot))
+ #define mk_pmd(page,prot)	pfn_pmd(page_to_pfn(page),prot)
+ 
++#define pud_mkyoung(pud)	pte_pud(pte_mkyoung(pud_pte(pud)))
+ #define pud_write(pud)		pte_write(pud_pte(pud))
+ 
+ #define __pud_to_phys(pud)	__pte_to_phys(pud_pte(pud))
 diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 21079eb5bc15..9c48f2ca6583 100644
+index 5fd1eae7d964..e2487e5fff37 100644
 --- a/virt/kvm/arm/mmu.c
 +++ b/virt/kvm/arm/mmu.c
-@@ -1347,9 +1347,12 @@ static void  stage2_wp_puds(struct kvm *kvm, pgd_t *pgd,
- 	do {
- 		next = stage2_pud_addr_end(kvm, addr, end);
- 		if (!stage2_pud_none(kvm, *pud)) {
--			/* TODO:PUD not supported, revisit later if supported */
--			BUG_ON(stage2_pud_huge(kvm, *pud));
--			stage2_wp_pmds(kvm, pud, addr, next);
-+			if (stage2_pud_huge(kvm, *pud)) {
-+				if (!kvm_s2pud_readonly(pud))
-+					kvm_set_s2pud_readonly(pud);
-+			} else {
-+				stage2_wp_pmds(kvm, pud, addr, next);
-+			}
- 		}
- 	} while (pud++, addr = next, addr != end);
- }
-@@ -1392,7 +1395,7 @@ static void stage2_wp_range(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
-  *
-  * Called to start logging dirty pages after memory region
-  * KVM_MEM_LOG_DIRTY_PAGES operation is called. After this function returns
-- * all present PMD and PTEs are write protected in the memory region.
-+ * all present PUD, PMD and PTEs are write protected in the memory region.
-  * Afterwards read of dirty page log can be called.
-  *
-  * Acquires kvm_mmu_lock. Called with kvm->slots_lock mutex acquired,
+@@ -1706,6 +1706,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+  */
+ static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
+ {
++	pud_t *pud;
+ 	pmd_t *pmd;
+ 	pte_t *pte;
+ 	kvm_pfn_t pfn;
+@@ -1715,24 +1716,23 @@ static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
+ 
+ 	spin_lock(&vcpu->kvm->mmu_lock);
+ 
+-	pmd = stage2_get_pmd(vcpu->kvm, NULL, fault_ipa);
+-	if (!pmd || pmd_none(*pmd))	/* Nothing there */
++	if (!stage2_get_leaf_entry(vcpu->kvm, fault_ipa, &pud, &pmd, &pte))
+ 		goto out;
+ 
+-	if (pmd_thp_or_huge(*pmd)) {	/* THP, HugeTLB */
++	if (pud) {		/* HugeTLB */
++		*pud = kvm_s2pud_mkyoung(*pud);
++		pfn = kvm_pud_pfn(*pud);
++		pfn_valid = true;
++	} else 	if (pmd) {	/* THP, HugeTLB */
+ 		*pmd = pmd_mkyoung(*pmd);
+ 		pfn = pmd_pfn(*pmd);
+ 		pfn_valid = true;
+-		goto out;
++	} else {
++		*pte = pte_mkyoung(*pte);	/* Just a page... */
++		pfn = pte_pfn(*pte);
++		pfn_valid = true;
+ 	}
+ 
+-	pte = pte_offset_kernel(pmd, fault_ipa);
+-	if (pte_none(*pte))		/* Nothing there either */
+-		goto out;
+-
+-	*pte = pte_mkyoung(*pte);	/* Just a page... */
+-	pfn = pte_pfn(*pte);
+-	pfn_valid = true;
+ out:
+ 	spin_unlock(&vcpu->kvm->mmu_lock);
+ 	if (pfn_valid)
 -- 
 2.18.0
