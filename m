@@ -1,16 +1,12 @@
 From: MNARANI@xilinx.com (Manish Narani)
-Date: Mon, 24 Sep 2018 10:16:26 +0000
-Subject: [PATCH v7 2/7] edac: synps: Add platform specific structures for
- ddrc controller
-In-Reply-To: <20180921091532.GC30439@nazgul.tnic>
+Date: Mon, 24 Sep 2018 10:20:41 +0000
+Subject: [PATCH v7 5/7] edac: synopsys: Add EDAC ECC support for ZynqMP
+ DDRC
+In-Reply-To: <20180921125527.GE30439@nazgul.tnic>
 References: <1537194305-9243-1-git-send-email-manish.narani@xilinx.com>
- <1537194305-9243-3-git-send-email-manish.narani@xilinx.com>
- <20180918075522.GC22202@nazgul.tnic>
- <DM6PR02MB5227F5B1B329C903BA64A27CC11C0@DM6PR02MB5227.namprd02.prod.outlook.com>
- <20180919111553.GA9140@nazgul.tnic>
- <DM6PR02MB52279753E7FD04587393DC08C11C0@DM6PR02MB5227.namprd02.prod.outlook.com>
- <20180921090721.GB30439@nazgul.tnic> <20180921091532.GC30439@nazgul.tnic>
-Message-ID: <DM6PR02MB5227592B66080409835C6CBDC1170@DM6PR02MB5227.namprd02.prod.outlook.com>
+ <1537194305-9243-6-git-send-email-manish.narani@xilinx.com>
+ <20180921125527.GE30439@nazgul.tnic>
+Message-ID: <DM6PR02MB522717E2B74148A7069FA57EC1170@DM6PR02MB5227.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,35 +14,95 @@ Hi Boris,
 
 Thanks for the review.
 
-> -----Original Message-----
+
 > From: Borislav Petkov [mailto:bp at alien8.de]
-> Sent: Friday, September 21, 2018 2:46 PM
-> To: Manish Narani <MNARANI@xilinx.com>
-> Cc: robh+dt at kernel.org; mark.rutland at arm.com; mchehab at kernel.org;
-> Michal Simek <michals@xilinx.com>; leoyang.li at nxp.com;
-> sudeep.holla at arm.com; amit.kucheria at linaro.org;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
-> edac at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v7 2/7] edac: synps: Add platform specific structures for
-> ddrc controller
+> Sent: Friday, September 21, 2018 6:26 PM
+> On Mon, Sep 17, 2018 at 07:55:03PM +0530, Manish Narani wrote:
+> > Add EDAC ECC support for ZynqMP DDRC IP. The IP supports interrupts
+> > for corrected and uncorrected errors. Add interrupt handlers for the same.
+> >
+> > Signed-off-by: Manish Narani <manish.narani@xilinx.com>
+> > ---
+> >  drivers/edac/Kconfig         |   2 +-
+> >  drivers/edac/synopsys_edac.c | 304
+> > ++++++++++++++++++++++++++++++++++++++++---
+> >  2 files changed, 287 insertions(+), 19 deletions(-)
 > 
-> There's more:
+> ...
+> > +	if (priv->p_data->quirks & DDR_ECC_INTR_SUPPORT) {
 > 
-> I said:
+> This whole chunk together with the if, looks like it could be a separate function
+> called maybe request_irq() or so.
+May be I can keep it like edac_setup_irq() ?
+
 > 
-> > > @@ -370,12 +398,12 @@ static int synps_edac_init_csrows(struct
-> > > mem_ctl_info *mci)
+> > +		irq = platform_get_irq(pdev, 0);
+> > +		if (irq < 0) {
+> > +			edac_printk(KERN_ERR, EDAC_MC,
+> > +					"No irq %d in DT\n", irq);
 > 
-> > That function returns 0 unconditionally. Make it a void in a prepatch.
+> Align arguments on opening brace.
+Okay
+
 > 
-> But you've lumped this change together with a bunch more. Maybe my request
-> wasn't clear so let me rephrase it:
+> Then, here it is "irq"...
 > 
-> That function returns 0 unconditionally. Make it a void in a *separate*
-> prepatch.
+> > +			rc = irq;
+> > +			goto free_edac_mc;
+> > +		}
+> > +
+> > +		rc = devm_request_irq(&pdev->dev, irq,
+> > +			synps_edac_intr_handler,
+> > +			0, dev_name(&pdev->dev), mci);
 > 
-> Ok?
-Yes, okay. ? I will keep it in a separate prepatch in v8. 
+> Also align on opening brace.
+> 
+> > +		if (rc < 0) {
+> > +			edac_printk(KERN_ERR, EDAC_MC, "Failed to request
+> Irq\n");
+> 
+> ... here it is "Irq".
+> 
+> I'd say it should be "IRQ" everywhere.
+Okay
+
+> 
+> > +			goto free_edac_mc;
+> > +		}
+> > +
+> > +		/* Enable UE/CE Interrupts */
+> > +		writel((DDR_QOSUE_MASK | DDR_QOSCE_MASK),
+> > +			priv->baseaddr + DDR_QOS_IRQ_EN_OFST);
+> > +	}
+> > +
+> >  	rc = edac_mc_add_mc(mci);
+> >  	if (rc) {
+> >  		edac_printk(KERN_ERR, EDAC_MC,
+> > @@ -684,7 +945,8 @@ static int synps_edac_mc_probe(struct
+> platform_device *pdev)
+> >  	 * Start capturing the correctable and uncorrectable errors. A write of
+> >  	 * 0 starts the counters.
+> >  	 */
+> > -	writel(0x0, baseaddr + ECC_CTRL_OFST);
+> > +	if (!(priv->p_data->quirks & DDR_ECC_INTR_SUPPORT))
+> > +		writel(0x0, baseaddr + ECC_CTRL_OFST);
+> >  	return rc;
+> >
+> >  free_edac_mc:
+> > @@ -702,7 +964,13 @@ static int synps_edac_mc_probe(struct
+> > platform_device *pdev)  static int synps_edac_mc_remove(struct
+> > platform_device *pdev)  {
+> >  	struct mem_ctl_info *mci = platform_get_drvdata(pdev);
+> > +	struct synps_edac_priv *priv;
+> >
+> > +	priv = mci->pvt_info;
+> > +	if (priv->p_data->quirks & DDR_ECC_INTR_SUPPORT)
+> > +		/* Disable UE/CE Interrupts */
+> > +		writel((DDR_QOSUE_MASK | DDR_QOSCE_MASK),
+> > +			priv->baseaddr + DDR_QOS_IRQ_DB_OFST);
+> 
+> This could be a disable_irq() function. Makes the code easier to follow.
+Okay. Will update this in v8.
 
 Thanks,
 Manish
