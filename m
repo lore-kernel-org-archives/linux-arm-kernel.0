@@ -1,83 +1,42 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 24 Sep 2018 16:23:18 +0200
-Subject: [RESEND PATCH] Revert "pwm: Set class for exported channels in
- sysfs"
-In-Reply-To: <fc02ced1-01ba-dde4-95da-285d9351338b@st.com>
-References: <1537538567-5377-1-git-send-email-fabrice.gasnier@st.com>
- <20180924115301.GV21032@ulmo>
- <fc02ced1-01ba-dde4-95da-285d9351338b@st.com>
-Message-ID: <20180924142318.GG23547@ulmo>
+From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
+Date: Mon, 24 Sep 2018 10:25:45 -0400
+Subject: [Xen-devel] clean up physical merging helpers
+In-Reply-To: <6e7fa8d3-4839-726d-572c-1678f5450880@kernel.dk>
+References: <20180904191431.20102-1-hch@lst.de> <20180915070300.GA10555@lst.de>
+ <b8f3621a-f789-d737-649f-7b3645912888@kernel.dk>
+ <20180920062946.GA12893@lst.de>
+ <6e7fa8d3-4839-726d-572c-1678f5450880@kernel.dk>
+Message-ID: <5fc63f64-4e81-0e10-bc3e-bde6f279c973@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 24, 2018 at 03:59:03PM +0200, Fabrice Gasnier wrote:
-> On 09/24/2018 01:53 PM, Thierry Reding wrote:
-> > On Fri, Sep 21, 2018 at 04:02:47PM +0200, Fabrice Gasnier wrote:
-> >> This reverts commit 7e5d1fd75c3dde9fc10c4472b9368089d1b81d00 as it causes
-> >> regression with multiple pwm chip. It creates a new entry in
-> >> '/sys/class/pwm' every time a 'pwmX' is exported with 'echo X > export':
-> >> - 1st time export will create an entry in /sys/class/pwm/pwmX
-> >> - when another export happens on another pwmchip, it can't be created
-> >> (e.g. -EEXIST)
-> >>
-> >> This also changes existing ABI (Documentation/ABI/testing/sysfs-class-pwm):
-> >> - pmwX should be there: /sys/class/pwm/pwmchipN/pwmX
-> >>
-> >> Example on stm32 (stm32429i-eval) platform:
-> >> $ ls /sys/class/pwm
-> >> pwmchip0 pwmchip4
-> >>
-> >> $ cd /sys/class/pwm/pwmchip0/
-> >> $ echo 0 > export
-> >> $ ls /sys/class/pwm
-> >> pwm0 pwmchip0 pwmchip4
-> >>
-> >> $ cd /sys/class/pwm/pwmchip4/
-> >> $ echo 0 > export
-> >> sysfs: cannot create duplicate filename '/class/pwm/pwm0'
-> >> ...Exception stack follows...
-> >>
-> >> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> >> ---
-> >>  drivers/pwm/sysfs.c | 1 -
-> >>  1 file changed, 1 deletion(-)
-> > 
-> > Can we come up with an alternative that allows us to have both? We want
-> > uevent and proper sysfs creation, or is that not possible?
-> 
-> Hi Thierry, all,
-> 
-> With current approach:
-> - "export->child.class = parent->class"
-> - ABI (e.g. "pwm%d") device name isn't unique with multiple pwm chip.
-> I think this is not possible.
-> 
-> Trying to think of an alternative... I just did a quick test, by
-> changing device name, to take pwmchip into account:
-> +       export->child.class = parent->class;
->         export->child.release = pwm_export_release;
->         export->child.parent = parent;
->         export->child.devt = MKDEV(0, 0);
->         export->child.groups = pwm_groups;
-> -       dev_set_name(&export->child, "pwm%u", pwm->hwpwm);
-> +       dev_set_name(&export->child, "pwmchip%d-pwm%u", chip->base,
-> pwm->hwpwm);
-> 
-> But this also impacts existing ABI :-(
-> Would you have suggestions to send an uevent, without modifying ABI ?
+On 9/20/18 10:39 AM, Jens Axboe wrote:
+> On 9/20/18 12:29 AM, Christoph Hellwig wrote:
+>> On Sat, Sep 15, 2018 at 08:47:13AM -0600, Jens Axboe wrote:
+>>>>> this series moves various helpers related to merging based on physical
+>>>>> addresses from the public headers into block/, moves the Xen special
+>>>>> case from arch hooks into common code, cleans up the code a bit, and
+>>>>> removes not nessecary includes from the block headers.
+>>>> ---end quoted text---
+>>>>
+>>> It's a good cleanup, I like it. Would prefer if the arm/xen folks could
+>>> ack the first bits,
+>> Konread, can you look at the series (or delegate).
 
-I don't quite understand why, in the example you show in the commit
-message, the pwmX nodes appear in the top-level /sys/class/pwm
-directory. According to Documentation/ABI/testing/sysfs-class-pwm they
-should appear as /sys/class/pwm/pwmchipN/pwmX. I can only imagine that
-setting the class may have changed that. If so, perhaps we can
-workaround that by creating a new class that is not parent->class?
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180924/f256adeb/attachment.sig>
+Konrad is out this (and last) week, this looks good to me. Including
+patch 13, although it's hard to say whether it may break some builds.
+
+-boris
+
+
+
+>>
+>>> and 13/13 should probably just to in differently.
+>> I can't parse this setence.
+> The irony is thick :-)
+>
+> Anyway, s/to/go for that sentence. I don't mind carrying it if Konrad
+> is happy with it, but it could go in separately after this series is
+> merged.
+>
