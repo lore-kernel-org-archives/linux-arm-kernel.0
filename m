@@ -1,43 +1,48 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 24 Sep 2018 09:37:08 +0200
-Subject: [RESEND PATCH v3 2/2] serial: uartps: Change uart ID port
- allocation
-In-Reply-To: <39e840d1f727fe6338ea14b882ca9bf831f53e32.1537443710.git.michal.simek@xilinx.com>
-References: <b1772d99d4e8b788448cde0fc5c7dccb1f63b507.1537443710.git.michal.simek@xilinx.com>
- <39e840d1f727fe6338ea14b882ca9bf831f53e32.1537443710.git.michal.simek@xilinx.com>
-Message-ID: <CAMuHMdWQcc+ZD238e13fBcVW77304u2nqq2K9A9-wsDVAPEa4A@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 24 Sep 2018 09:41:01 +0200
+Subject: [RFT] arm64: ARM: dts: exynos: Remove double SD card detect pin
+ inversion on TM2
+In-Reply-To: <20180921183014.20236-1-krzk@kernel.org>
+References: <CGME20180921183024epcas2p3bef08b81273524ec9d7afef4875bb746@epcas2p3.samsung.com>
+ <20180921183014.20236-1-krzk@kernel.org>
+Message-ID: <20180924074103eucas1p1eccd62abcdeca57a95ad406869884a97~XRhczWE3m1304413044eucas1p1F@eucas1p1.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+Hi Krzysztof,
 
-On Thu, Sep 20, 2018 at 1:42 PM Michal Simek <michal.simek@xilinx.com> wrote:
-> For IPs which have alias algorightm all the time using that alias and
-> minor number. It means serial20 alias ends up as ttyPS20.
+On 2018-09-21 20:30, Krzysztof Kozlowski wrote:
+> The SDHCI standard, MMC host controller bindings and MMC core defines
+> card detect pin as active low.  Therefore there is no point to invert it
+> twice.
 >
-> If alias is not setup for probed IP instance the first unused position is
-> used but that needs to be checked if it is really empty because another
-> instance doesn't need to be probed at that time. of_alias_get_alias_list()
-> fills alias bitmap which exactly shows which ID is free.
-> If alias pointing to different not compatible IP, it is free to use.
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+
+Works fine on TM2 and TM2e. However I'm not sure if it makes sense to
+refer to the SDHCI standard, as Exynos5433 has only DWMMC host controllers.
+
+Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+
+> ---
+>   arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi | 3 +--
+>   1 file changed, 1 insertion(+), 2 deletions(-)
 >
-> cdns_get_id() call is placed below structure allocation to simplify
-> error path.
->
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+> index a1e3194b7483..86d8ddc3288a 100644
+> --- a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+> +++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+> @@ -939,8 +939,7 @@
+>   	status = "okay";
+>   	cap-sd-highspeed;
+>   	disable-wp;
+> -	cd-gpios = <&gpa2 4 GPIO_ACTIVE_HIGH>;
+> -	cd-inverted;
+> +	cd-gpios = <&gpa2 4 GPIO_ACTIVE_LOW>;
+>   	card-detect-delay = <200>;
+>   	samsung,dw-mshc-ciu-div = <3>;
+>   	samsung,dw-mshc-sdr-timing = <0 4>;
 
-JFTR, for sh-sci, I used a different approach, as all ports in the static DTB
-can have an alias (if aliases are needed at all), and only DT overlays cannot
-have them. Cfr. commit 7678f4c20fa7670f ("serial: sh-sci: Add support for
-dynamic instances").
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
+Best regards
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
