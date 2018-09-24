@@ -1,100 +1,58 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Mon, 24 Sep 2018 16:58:53 +0800
-Subject: [PATCH v2 13/14] memory: mtk-smi: Get rid of need_larbid
-In-Reply-To: <1537779534-23575-1-git-send-email-yong.wu@mediatek.com>
-References: <1537779534-23575-1-git-send-email-yong.wu@mediatek.com>
-Message-ID: <1537779534-23575-14-git-send-email-yong.wu@mediatek.com>
+From: antoine.tenart@bootlin.com (Antoine Tenart)
+Date: Mon, 24 Sep 2018 11:00:01 +0200
+Subject: [PATCH 1/2] arm64: dts: marvell: armada-cp110: change the PPv2 IRQ
+ names
+Message-ID: <20180924090002.27939-1-antoine.tenart@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "mediatek,larb-id" has already been parsed in MTK IOMMU driver.
-It's no need to parse it again in SMI driver. Only clean some codes.
-This patch is fit for all the current mt2701, mt2712, mt8173 and
-mt8183.
+This patch changes the PPv2 IRQ names in the CP110 device tree to match
+a corresponding change in the Marvell PPv2 driver. The reason this was
+updated is the IRQ where names after Tx/Rx interrupts, but this is not
+true and can be configured. A following patch will add more of them and
+the names wouldn't make sense.
 
-Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+Signed-off-by: Antoine Tenart <antoine.tenart@bootlin.com>
 ---
- drivers/memory/mtk-smi.c | 27 ++-------------------------
- 1 file changed, 2 insertions(+), 25 deletions(-)
+ arch/arm64/boot/dts/marvell/armada-cp110.dtsi | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
-index e4daabb..e0265fe 100644
---- a/drivers/memory/mtk-smi.c
-+++ b/drivers/memory/mtk-smi.c
-@@ -67,7 +67,6 @@ struct mtk_smi_common_plat {
- };
- 
- struct mtk_smi_larb_gen {
--	bool need_larbid;
- 	int port_in_larb[MTK_LARB_NR_MAX + 1];
- 	void (*config_port)(struct device *);
- 	unsigned int larb_special_mask; /* The special larbs mask. */
-@@ -152,18 +151,9 @@ void mtk_smi_larb_put(struct device *larbdev)
- 	struct mtk_smi_iommu *smi_iommu = data;
- 	unsigned int         i;
- 
--	if (larb->larb_gen->need_larbid) {
--		larb->mmu = &smi_iommu->larb_imu[larb->larbid].mmu;
--		return 0;
--	}
--
--	/*
--	 * If there is no larbid property, Loop to find the corresponding
--	 * iommu information.
--	 */
--	for (i = 0; i < smi_iommu->larb_nr; i++) {
-+	for (i = 0; i < MTK_LARB_NR_MAX; i++) {
- 		if (dev == smi_iommu->larb_imu[i].dev) {
--			/* The 'mmu' may be updated in iommu-attach/detach. */
-+			larb->larbid = i;
- 			larb->mmu = &smi_iommu->larb_imu[i].mmu;
- 			return 0;
- 		}
-@@ -242,7 +232,6 @@ static void mtk_smi_larb_config_port_gen1(struct device *dev)
- };
- 
- static const struct mtk_smi_larb_gen mtk_smi_larb_mt2701 = {
--	.need_larbid = true,
- 	.port_in_larb = {
- 		LARB0_PORT_OFFSET, LARB1_PORT_OFFSET,
- 		LARB2_PORT_OFFSET, LARB3_PORT_OFFSET
-@@ -251,13 +240,11 @@ static void mtk_smi_larb_config_port_gen1(struct device *dev)
- };
- 
- static const struct mtk_smi_larb_gen mtk_smi_larb_mt2712 = {
--	.need_larbid = true,
- 	.config_port = mtk_smi_larb_config_port_gen2_general,
- 	.larb_special_mask = BIT(8) | BIT(9), /* bdpsys */
- };
- 
- static const struct mtk_smi_larb_gen mtk_smi_larb_mt8183 = {
--	.need_larbid = true,
- 	.config_port = mtk_smi_larb_config_port_gen2_general,
- 	.larb_special_mask = BIT(2) | BIT(3) | BIT(7), /* IPU0 | IPU1 | CCU */
- };
-@@ -289,7 +276,6 @@ static int mtk_smi_larb_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct device_node *smi_node;
- 	struct platform_device *smi_pdev;
--	int err;
- 
- 	larb = devm_kzalloc(dev, sizeof(*larb), GFP_KERNEL);
- 	if (!larb)
-@@ -316,15 +302,6 @@ static int mtk_smi_larb_probe(struct platform_device *pdev)
- 		return PTR_ERR(larb->smi.clk_gals0);
- 	larb->smi.dev = dev;
- 
--	if (larb->larb_gen->need_larbid) {
--		err = of_property_read_u32(dev->of_node, "mediatek,larb-id",
--					   &larb->larbid);
--		if (err) {
--			dev_err(dev, "missing larbid property\n");
--			return err;
--		}
--	}
--
- 	smi_node = of_parse_phandle(dev->of_node, "mediatek,smi", 0);
- 	if (!smi_node)
- 		return -EINVAL;
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+index 840c8454d03e..6a13690cf1e4 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+@@ -53,8 +53,8 @@
+ 					<ICU_GRP_NSR 51 IRQ_TYPE_LEVEL_HIGH>,
+ 					<ICU_GRP_NSR 55 IRQ_TYPE_LEVEL_HIGH>,
+ 					<ICU_GRP_NSR 129 IRQ_TYPE_LEVEL_HIGH>;
+-				interrupt-names = "tx-cpu0", "tx-cpu1", "tx-cpu2",
+-					"tx-cpu3", "rx-shared", "link";
++				interrupt-names = "hif0", "hif1", "hif2",
++					"hif3", "hif4", "link";
+ 				port-id = <0>;
+ 				gop-port-id = <0>;
+ 				status = "disabled";
+@@ -67,8 +67,8 @@
+ 					<ICU_GRP_NSR 52 IRQ_TYPE_LEVEL_HIGH>,
+ 					<ICU_GRP_NSR 56 IRQ_TYPE_LEVEL_HIGH>,
+ 					<ICU_GRP_NSR 128 IRQ_TYPE_LEVEL_HIGH>;
+-				interrupt-names = "tx-cpu0", "tx-cpu1", "tx-cpu2",
+-					"tx-cpu3", "rx-shared", "link";
++				interrupt-names = "hif0", "hif1", "hif2",
++					"hif3", "hif4", "link";
+ 				port-id = <1>;
+ 				gop-port-id = <2>;
+ 				status = "disabled";
+@@ -81,8 +81,8 @@
+ 					<ICU_GRP_NSR 53 IRQ_TYPE_LEVEL_HIGH>,
+ 					<ICU_GRP_NSR 57 IRQ_TYPE_LEVEL_HIGH>,
+ 					<ICU_GRP_NSR 127 IRQ_TYPE_LEVEL_HIGH>;
+-				interrupt-names = "tx-cpu0", "tx-cpu1", "tx-cpu2",
+-					"tx-cpu3", "rx-shared", "link";
++				interrupt-names = "hif0", "hif1", "hif2",
++					"hif3", "hif4", "link";
+ 				port-id = <2>;
+ 				gop-port-id = <3>;
+ 				status = "disabled";
 -- 
-1.9.1
+2.17.1
