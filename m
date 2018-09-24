@@ -1,41 +1,59 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Mon, 24 Sep 2018 11:22:26 +0200
-Subject: [PATCH v7 4/7] edac: synopsys: Add macro defines for ZynqMP DDRC
-In-Reply-To: <1537194305-9243-5-git-send-email-manish.narani@xilinx.com>
-References: <1537194305-9243-1-git-send-email-manish.narani@xilinx.com>
- <1537194305-9243-5-git-send-email-manish.narani@xilinx.com>
-Message-ID: <20180924092226.GA20187@zn.tnic>
+From: ebiederm@xmission.com (Eric W. Biederman)
+Date: Mon, 24 Sep 2018 11:07:05 +0200
+Subject: [REVIEW][PATCH 00/15] signal/arm64: siginfo cleanups
+Message-ID: <871s9j462u.fsf@xmission.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 17, 2018 at 07:55:02PM +0530, Manish Narani wrote:
-> Add macro defines for ZynqMP DDR controller. These macros will be used
-> for ZyqnMP ECC operations.
-> 
-> Signed-off-by: Manish Narani <manish.narani@xilinx.com>
-> ---
->  drivers/edac/synopsys_edac.c | 168 +++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 168 insertions(+)
-> 
-> diff --git a/drivers/edac/synopsys_edac.c b/drivers/edac/synopsys_edac.c
-> index eb458e5..6bf7959 100644
-> --- a/drivers/edac/synopsys_edac.c
-> +++ b/drivers/edac/synopsys_edac.c
-> @@ -97,6 +97,174 @@
->  #define SCRUB_MODE_MASK		0x7
->  #define SCRUB_MODE_SECDED	0x4
->  
-> +/* DDR ECC Quirks */
-> +#define DDR_ECC_INTR_SUPPORT		BIT(0)
-> +#define DDR_ECC_DATA_POISON_SUPPORT	BIT(1)
 
-All those new additions are one column further to the left than the old
-ones. Why?
+This is the continuation of my work to sort out signaling of exceptions
+with siginfo.  The old signal sending functions by taking a siginfo
+argument resulted in their callers having to deal with the fiddly nature
+of siginfo directly.  In small numbers of callers this is not a problem
+but in the number of callers in the kernel this resulted in cases
+where fields were not initialized or improperly initialized before
+being passed to userspace.
 
-Is there some significance here or can they all be vertically aligned?
+To avoid having to worry about those issues I have added new signal
+sending functions that each deal wit a different siginfo case.  When
+using these functions there is no room for the fiddly nature of siginfo
+to cause mistakes.
 
--- 
-Regards/Gruss,
-    Boris.
+This is my set of changes to update arm64 to use those functions.
+Along with some refactoring so those functions can be cleanly used.
 
-Good mailing practices for 400: avoid top-posting and trim the reply.
+Folks please review and double check me.  I think I have kept these
+changes simple and obviously correct but I am human and mess up
+sometimes.
+
+After these patches have had a chance to be reviewed I plan to merge
+them by my siginfo tree.  If you would rather take them in the arm64
+tree let me know.   All of the prerequisites should have been merged
+through Linus's tree several releases ago.
+
+Eric W. Biederman (15):
+      signal/arm64: Push siginfo generation into arm64_notify_die
+      signal/arm64: Remove unneeded tsk parameter from arm64_force_sig_info
+      signal/arm64: Factor out arm64_show_signal from arm64_force_sig_info
+      signal/arm64: Factor set_thread_esr out of __do_user_fault
+      signal/arm64: Consolidate the two hwpoison cases in do_page_fault
+      signal/arm64: For clarity separate the 3 signal sending cases in do_page_fault
+      signal/arm64: Expand __do_user_fault and remove it
+      signal/arm64: Only perform one esr_to_fault_info call in do_page_fault
+      signal/arm64: Only call set_thread_esr once in do_page_fault
+      signal/arm64: Add and use arm64_force_sig_fault where appropriate
+      signal/arm64: Add and use arm64_force_sig_mceerr as appropriate
+      signal/arm64: Remove arm64_force_sig_info
+      signal/arm64: In ptrace_hbptriggered name the signal description string
+      signal/arm64: Add and use arm64_force_sig_ptrace_errno_trap
+      signal/arm64: Use send_sig_fault where appropriate
+
+ arch/arm64/include/asm/system_misc.h |  3 +-
+ arch/arm64/include/asm/traps.h       |  5 +-
+ arch/arm64/kernel/debug-monitors.c   | 11 ++---
+ arch/arm64/kernel/fpsimd.c           | 10 ++--
+ arch/arm64/kernel/ptrace.c           | 16 +++---
+ arch/arm64/kernel/sys_compat.c       | 13 ++---
+ arch/arm64/kernel/traps.c            | 67 ++++++++++++-------------
+ arch/arm64/mm/fault.c                | 94 +++++++++++++-----------------------
+ 8 files changed, 90 insertions(+), 129 deletions(-)
