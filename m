@@ -1,70 +1,112 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 24 Sep 2018 13:46:29 +0100
-Subject: [BISECTED] Regression: Solidrun Clearfog Base won't boot since
- "PCI: mvebu: Only remap I/O space if configured"
-In-Reply-To: <20180924141203.3df9707a@windsurf>
-References: <61fdfd69-2bb6-478c-b0d5-69d8744adae3@cesnet.cz>
- <87zhwm4kl6.fsf@tkos.co.il>
- <20180912231050.GX30658@n2100.armlinux.org.uk>
- <20180913094515.351967bb@windsurf>
- <5ad46fec-a71a-477a-b23f-d20aacfb481d@cesnet.cz>
- <20180913104241.65db8243@windsurf>
- <20180924101213.GO30658@n2100.armlinux.org.uk>
- <20180924122614.70738b5c@windsurf>
- <20180924111341.GP30658@n2100.armlinux.org.uk>
- <20180924141203.3df9707a@windsurf>
-Message-ID: <20180924124620.GA10322@e107981-ln.cambridge.arm.com>
+From: dkos@cadence.com (Damian Kos)
+Date: Mon, 24 Sep 2018 12:47:39 +0000
+Subject: [PATCH v4 5/5] drm: bridge: add support for Cadence MHDP DPI/DP
+ bridge
+In-Reply-To: <6154358.J9crsCiUTz@phil>
+References: <1537455288-20223-1-git-send-email-dkos@cadence.com>
+ <1903708.pJTgKoWLiI@phil>
+ <CO2PR07MB2551EC0A7DEB61C54A4D6A5FCD170@CO2PR07MB2551.namprd07.prod.outlook.com>
+ <6154358.J9crsCiUTz@phil>
+Message-ID: <CO2PR07MB2551CD9AD02B57D818B7FD23CD170@CO2PR07MB2551.namprd07.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 24, 2018 at 02:12:03PM +0200, Thomas Petazzoni wrote:
+Heiko,
 
-[...]
-
-> > Trying to address a regression with further development means that
-> > _that_ development needs thought and review, which is a slower
-> > process.
+> Hi Damian,
+> 
+> Am Montag, 24. September 2018, 13:40:03 CEST schrieb Damian Kos:
+> > > Am Donnerstag, 20. September 2018, 16:54:40 CEST schrieb Damian Kos:
+> > > > From: Quentin Schulz <quentin.schulz@free-electrons.com>
+> > > > 
+> > > > This adds basic support for Cadence MHDP DPI to DP bridge.
+> > > > 
+> > > > Basically, it takes a DPI stream as input and output it encoded in 
+> > > > DP format. It's missing proper HPD, HDCP and currently supports 
+> > > > only SST mode.
+> > > > 
+> > > > Changes made in the low level driver (cdn-dp-reg.*):
+> > > > - moved it to from drivers/gpu/drm/rockchip to
+> > > >   drivers/gpu/drm/bridge/cdns-mhdp-common.*
+> > > > - functions for sending/receiving commands are now public
+> > > > - added functions for reading registers and link training
+> > > >   adjustment
+> > > > 
+> > > > Changes made in RK's driver (cdn-dp-core.*):
+> > > > - Moved audio_info and audio_pdev fields from cdn_dp_device to
+> > > >   cdns_mhdp_device structure.
+> > > > 
+> > > > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> > > > Signed-off-by: Damian Kos <dkos@cadence.com>
+> > > 
+> > > [...]
+> > > 
+> > > > diff --git a/drivers/gpu/drm/rockchip/Kconfig
+> > > > b/drivers/gpu/drm/rockchip/Kconfig
+> > > > index 0ccc76217ee4..129b0529f3e1 100644
+> > > > --- a/drivers/gpu/drm/rockchip/Kconfig
+> > > > +++ b/drivers/gpu/drm/rockchip/Kconfig
+> > > > @@ -27,7 +27,9 @@ config ROCKCHIP_ANALOGIX_DP
+> > > >  
+> > > >  config ROCKCHIP_CDN_DP
+> > > >          bool "Rockchip cdn DP"
+> > > > -	depends on EXTCON=y || (EXTCON=m && DRM_ROCKCHIP=m)
+> > > > +	depends on DRM_ROCKCHIP=m
+> > > 
+> > > Sorry, I wasn't fast enough in my reply to you mail to catch that before your v4, but I don't think this is necessary.
+> > > Instead I do guess, the select below should do the right thing by making EXTCON=y if DRM_ROCKCHIP=y.
+> > > 
+> > > Somewhat clumsily verified by making EXTCON=m in my defconfig and seeing get changed to y upon build, which I guess comes from a different "select" in the config.
+> > > 
 > > 
-> > I do understand the desire to keep moving forward and never take a
-> > step backwards, but sometimes backwards steps are the best way to
-> > resolve a regression.  But I also do appreciate that a simple revert
-> > in this case is not possible.
+> > I've changed it to:
+> > 
+> > config ROCKCHIP_CDN_DP
+> >         bool "Rockchip cdn DP"
+> >         depends on DRM_ROCKCHIP
+> >         select EXTCON if DRM_ROCKCHIP=y
+> >         select DRM_CDNS_MHDP
+> >         help...
+> > 
+> > and it seems that there are no issues. At least for me.
+> > 
+> > Please let me know if that's OK.
 > 
-> Well, I can revert:
-> 
-> 42342073e38b50113354944cd51dcfed28d857a1 PCI: mvebu: Convert to use
-> pci_host_bridge directly ee1604381a371b3ea6aec7d5e43b6e3f5e153854 PCI:
-> mvebu: Only remap I/O space if configured
-> 
-> so it's not a big deal either. I can revert those, and then resubmit a
-> more complete series later on that moves pci-mvebu to use
-> pci_remap_iospace().
-> 
-> > I'll accept your patch on the condition that the ARM private
-> > pci_ioremap_io() will go away in the very near future (please _try_
-> > to get agreement on that before this patch is merged.)
-> 
-> Bjorn, Lorenzo, what do you prefer ? 
-> 
-> If we want to get rid of pci_ioremap_io(), then we need a way to tell
-> pci_remap_iospace() the memory attributes that should be used for the
-> mapping, because on Armada 38x, we need to map the I/O space mapped
-> MT_UNCACHED instead of MT_DEVICE. I'm not sure how to achieve this yet.
-> Should pgprot_device() be changed to return MT_UNCACHED on a
-> platform-specific basis ? Any other idea ?
+> nope, just do "select EXTCON" . It works nicely and the above would not select EXTCON at all if the the rockchip-drm driver gets built into the kernel.
 
-I think we should address Russell's concern, he has more insights into
-code that predates the PCI host developments.
+That's weird. I'm pretty sure that I've tried that and got circular dependency error, but now it's working fine. Anyway:
 
-What I think you can do short term, given that AFAICS MVEBU is not
-removable, instead of using pci_host_probe() you move part of its code
-into the driver and make sure that you remap IO as last operation before
-probe completion (ie after scanning the host bridge) so that you do not
-need to unmap it on failure; write a commit log summarising/linking this
-thread please and when v4.20 lands we will give this a more thorough
-look as Russell requested.
+config ROCKCHIP_CDN_DP
+        bool "Rockchip cdn DP"
+        depends on DRM_ROCKCHIP
+        select EXTCON
+        select DRM_CDNS_MHDP
+        help...
 
-How does that sound ?
+> 
+> To be sure I just did a little experiment and added:
+> 
+> diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig index 4ad85c046dcd..64e2b096afd8 100644
+> --- a/drivers/gpu/drm/bridge/Kconfig
+> +++ b/drivers/gpu/drm/bridge/Kconfig
+> @@ -154,4 +154,11 @@ source "drivers/gpu/drm/bridge/ite/Kconfig"
+>  
+>  source "drivers/gpu/drm/bridge/synopsys/Kconfig"
+>  
+> +config DRM_TMP1
+> +       tristate "option to select"
+> +
+> +config DRM_TMP2
+> +       tristate "option doing the selecting"
+> +       select DRM_TMP1
+> +
+> 
+> If I select DRM_TMP2=m as module I end up with CONFIG_DRM_TMP1=m CONFIG_DRM_TMP2=m in the defconfig and wit DRM_TMP2=y it changes to CONFIG_DRM_TMP1=y CONFIG_DRM_TMP2=y
+> 
+> so all is well with just doing "select EXTCON" above and will select the correct "m" or "y" stance as needed.
+> 
+> 
+> Heiko
 
-Thanks,
-Lorenzo
+--
+Damian
