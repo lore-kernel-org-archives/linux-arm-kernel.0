@@ -1,51 +1,56 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 24 Sep 2018 10:19:31 +0100
-Subject: [PATCH 0/2] STM32: Fixes for 4.19 cycle
-In-Reply-To: <d952b14a-644e-a067-9615-f0d35f370893@st.com>
-References: <1537461257-2940-1-git-send-email-alexandre.torgue@st.com>
- <20180923123438.kyvxpeqq6q6xo6cs@localhost>
- <d952b14a-644e-a067-9615-f0d35f370893@st.com>
-Message-ID: <CAOesGMjEHaubwAdZCo9ZgJEDJwaCTB1MgFfeqzwnScwPn2aELg@mail.gmail.com>
+From: dvyukov@google.com (Dmitry Vyukov)
+Date: Mon, 24 Sep 2018 11:19:17 +0200
+Subject: [PATCH v8 09/20] kasan: preassign tags to objects with ctors or
+ SLAB_TYPESAFE_BY_RCU
+In-Reply-To: <CAAeHK+zBh0BiYq65QDxD-nxkHHF0QL6UQx8fs40K39R6XJJfzA@mail.gmail.com>
+References: <cover.1537383101.git.andreyknvl@google.com>
+ <d74e710797323db0e43f047ea698fbc85060fc57.1537383101.git.andreyknvl@google.com>
+ <CACT4Y+aoFSySFTd9FzA0xzRYQXSbs-wzX7B67hD3jTGAQEXBOA@mail.gmail.com>
+ <CAAeHK+zBh0BiYq65QDxD-nxkHHF0QL6UQx8fs40K39R6XJJfzA@mail.gmail.com>
+Message-ID: <CACT4Y+b6qe1S_4dAhYGPm0r1nFWW4Fn1rCNbSZW-7w7jMpcTtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-
-On Mon, Sep 24, 2018 at 7:55 AM, Alexandre Torgue
-<alexandre.torgue@st.com> wrote:
-> Hi Olof
+On Fri, Sep 21, 2018 at 2:24 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
+> On Fri, Sep 21, 2018 at 1:25 PM, Dmitry Vyukov <dvyukov@google.com> wrote:
+>> On Wed, Sep 19, 2018 at 8:54 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
 >
-> On 09/23/2018 02:34 PM, Olof Johansson wrote:
+>>>         if (!shuffle) {
+>>>                 for_each_object_idx(p, idx, s, start, page->objects) {
+>>> -                       setup_object(s, page, p);
+>>> -                       if (likely(idx < page->objects))
+>>> -                               set_freepointer(s, p, p + s->size);
+>>> -                       else
+>>> +                       if (likely(idx < page->objects)) {
+>>> +                               next = p + s->size;
+>>> +                               next = setup_object(s, page, next);
+>>> +                               set_freepointer(s, p, next);
+>>> +                       } else
+>>>                                 set_freepointer(s, p, NULL);
+>>>                 }
+>>> -               page->freelist = fixup_red_left(s, start);
+>>> +               start = fixup_red_left(s, start);
+>>> +               start = setup_object(s, page, start);
+>>> +               page->freelist = start;
+>>>         }
 >>
->> Hi Alexandre,
->>
->> On Thu, Sep 20, 2018 at 06:34:15PM +0200, Alexandre Torgue wrote:
->>>
->>> Hi Arnd, olof and Kevin
->>>
->>> Those 2 patches fixe the same issue on 4.19-rc: a bad usage of the mdma
->>> binding inside stm32mp157c.dts file. Can you please add them as fixe for
->>> 4.19 ?
->>
->>
->> The patches only mention removing unused property contents, not what the
->> bug is
->> that it fixes (or if it's even causing any problems). Care you clarify?
+>> Just want to double-check that this is correct.
+>> We now do an additional setup_object call after the loop, but we do 1
+>> less in the loop. So total number of calls should be the same, right?
+>> However, after the loop we call setup_object for the first object (?),
+>> but inside of the loop we skip the call for the last object (?). Am I
+>> missing something, or we call ctor twice for the last object and don't
+>> call it for the first one?
 >
+> Inside the loop we call setup_object for the "next" object. So we
+> start iterating on the first one, but call setup_object for the
+> second. Then the loop moves on to the second one and calls
+> setup_object for the third. And so on. So the loop calls setup_object
+> for every object (including the last one) except for the first one.
 >
-> Sure.
-> Concerning SPI patch: without this patch, DMA request will fail but there
-> will be no crash because SPI will switch in interrupt mode.
-> Concerning HASH one, it's just to align DT with dt-bindings documentation.
-> Regarding the minor issue that they fix I could understand that you postpone
-> the merge of those two patches for 4.20.
+> The idea is that we want the freelist pointer that is stored in the
+> current object to have a tagged pointer to the next one, so we need to
+> assign a tag to the next object before storing the pointer in the
+> current one.
 
-The former sounds like an appropriate fix, but the latter is probably
-4.20 material, indeed.
-
-Should I just cherry-pick the two patches, or do you want to re-stage
-new branches?
-
-
--Olof
+Ah, OK, then false alarm.
