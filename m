@@ -1,182 +1,64 @@
 From: hch@lst.de (Christoph Hellwig)
-Date: Mon, 24 Sep 2018 09:43:52 +0200
-Subject: [PATCH 07/10] block: merge BIOVEC_SEG_BOUNDARY into
- biovec_phys_mergeable
+Date: Mon, 24 Sep 2018 09:43:53 +0200
+Subject: [PATCH 08/10] block: remove bvec_to_phys
 In-Reply-To: <20180924074355.2802-1-hch@lst.de>
 References: <20180924074355.2802-1-hch@lst.de>
-Message-ID: <20180924074355.2802-8-hch@lst.de>
+Message-ID: <20180924074355.2802-9-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These two checks should always be performed together, so merge them into
-a single helper.
+We only use it in biovec_phys_mergeable and a m68k paravirt driver,
+so just opencode it there.  Also remove the pointless unsigned long cast
+for the offset in the opencoded instances.
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
+Reviewed-by: Geert Uytterhoeven <geert@linux-m68k.org>
 ---
- block/bio.c           |  4 +---
- block/blk-integrity.c | 12 ++----------
- block/blk-merge.c     | 29 +++++------------------------
- block/blk.h           | 12 +++++++++---
- include/linux/bio.h   |  8 --------
- 5 files changed, 17 insertions(+), 48 deletions(-)
+ arch/m68k/emu/nfblock.c | 2 +-
+ block/blk.h             | 4 ++--
+ include/linux/bio.h     | 5 -----
+ 3 files changed, 3 insertions(+), 8 deletions(-)
 
-diff --git a/block/bio.c b/block/bio.c
-index c254e5aa331f..e9f92b50724d 100644
---- a/block/bio.c
-+++ b/block/bio.c
-@@ -731,9 +731,7 @@ int bio_add_pc_page(struct request_queue *q, struct bio *bio, struct page
+diff --git a/arch/m68k/emu/nfblock.c b/arch/m68k/emu/nfblock.c
+index e9110b9b8bcd..38049357d6d3 100644
+--- a/arch/m68k/emu/nfblock.c
++++ b/arch/m68k/emu/nfblock.c
+@@ -73,7 +73,7 @@ static blk_qc_t nfhd_make_request(struct request_queue *queue, struct bio *bio)
+ 		len = bvec.bv_len;
+ 		len >>= 9;
+ 		nfhd_read_write(dev->id, 0, dir, sec >> shift, len >> shift,
+-				bvec_to_phys(&bvec));
++				page_to_phys(bvec.bv_page) + bvec.bv_offset);
+ 		sec += len;
  	}
- 
- 	/* If we may be able to merge these biovecs, force a recount */
--	if (bio->bi_vcnt > 1 &&
--	    biovec_phys_mergeable(bvec - 1, bvec) &&
--	    BIOVEC_SEG_BOUNDARY(q, bvec - 1, bvec))
-+	if (bio->bi_vcnt > 1 && biovec_phys_mergeable(q, bvec - 1, bvec))
- 		bio_clear_flag(bio, BIO_SEG_VALID);
- 
-  done:
-diff --git a/block/blk-integrity.c b/block/blk-integrity.c
-index 0f7267916509..d1ab089e0919 100644
---- a/block/blk-integrity.c
-+++ b/block/blk-integrity.c
-@@ -49,12 +49,8 @@ int blk_rq_count_integrity_sg(struct request_queue *q, struct bio *bio)
- 	bio_for_each_integrity_vec(iv, bio, iter) {
- 
- 		if (prev) {
--			if (!biovec_phys_mergeable(&ivprv, &iv))
-+			if (!biovec_phys_mergeable(q, &ivprv, &iv))
- 				goto new_segment;
--
--			if (!BIOVEC_SEG_BOUNDARY(q, &ivprv, &iv))
--				goto new_segment;
--
- 			if (seg_size + iv.bv_len > queue_max_segment_size(q))
- 				goto new_segment;
- 
-@@ -95,12 +91,8 @@ int blk_rq_map_integrity_sg(struct request_queue *q, struct bio *bio,
- 	bio_for_each_integrity_vec(iv, bio, iter) {
- 
- 		if (prev) {
--			if (!biovec_phys_mergeable(&ivprv, &iv))
-+			if (!biovec_phys_mergeable(q, &ivprv, &iv))
- 				goto new_segment;
--
--			if (!BIOVEC_SEG_BOUNDARY(q, &ivprv, &iv))
--				goto new_segment;
--
- 			if (sg->length + iv.bv_len > queue_max_segment_size(q))
- 				goto new_segment;
- 
-diff --git a/block/blk-merge.c b/block/blk-merge.c
-index 5e63e8259f92..42a46744c11b 100644
---- a/block/blk-merge.c
-+++ b/block/blk-merge.c
-@@ -21,9 +21,7 @@ static inline bool bios_segs_mergeable(struct request_queue *q,
- 		struct bio *prev, struct bio_vec *prev_last_bv,
- 		struct bio_vec *next_first_bv)
- {
--	if (!biovec_phys_mergeable(prev_last_bv, next_first_bv))
--		return false;
--	if (!BIOVEC_SEG_BOUNDARY(q, prev_last_bv, next_first_bv))
-+	if (!biovec_phys_mergeable(q, prev_last_bv, next_first_bv))
- 		return false;
- 	if (prev->bi_seg_back_size + next_first_bv->bv_len >
- 			queue_max_segment_size(q))
-@@ -199,9 +197,7 @@ static struct bio *blk_bio_segment_split(struct request_queue *q,
- 		if (bvprvp && blk_queue_cluster(q)) {
- 			if (seg_size + bv.bv_len > queue_max_segment_size(q))
- 				goto new_segment;
--			if (!biovec_phys_mergeable(bvprvp, &bv))
--				goto new_segment;
--			if (!BIOVEC_SEG_BOUNDARY(q, bvprvp, &bv))
-+			if (!biovec_phys_mergeable(q, bvprvp, &bv))
- 				goto new_segment;
- 
- 			seg_size += bv.bv_len;
-@@ -332,9 +328,7 @@ static unsigned int __blk_recalc_rq_segments(struct request_queue *q,
- 				if (seg_size + bv.bv_len
- 				    > queue_max_segment_size(q))
- 					goto new_segment;
--				if (!biovec_phys_mergeable(&bvprv, &bv))
--					goto new_segment;
--				if (!BIOVEC_SEG_BOUNDARY(q, &bvprv, &bv))
-+				if (!biovec_phys_mergeable(q, &bvprv, &bv))
- 					goto new_segment;
- 
- 				seg_size += bv.bv_len;
-@@ -414,17 +408,7 @@ static int blk_phys_contig_segment(struct request_queue *q, struct bio *bio,
- 	bio_get_last_bvec(bio, &end_bv);
- 	bio_get_first_bvec(nxt, &nxt_bv);
- 
--	if (!biovec_phys_mergeable(&end_bv, &nxt_bv))
--		return 0;
--
--	/*
--	 * bio and nxt are contiguous in memory; check if the queue allows
--	 * these two to be merged into one
--	 */
--	if (BIOVEC_SEG_BOUNDARY(q, &end_bv, &nxt_bv))
--		return 1;
--
--	return 0;
-+	return biovec_phys_mergeable(q, &end_bv, &nxt_bv);
- }
- 
- static inline void
-@@ -438,10 +422,7 @@ __blk_segment_map_sg(struct request_queue *q, struct bio_vec *bvec,
- 	if (*sg && *cluster) {
- 		if ((*sg)->length + nbytes > queue_max_segment_size(q))
- 			goto new_segment;
--
--		if (!biovec_phys_mergeable(bvprv, bvec))
--			goto new_segment;
--		if (!BIOVEC_SEG_BOUNDARY(q, bvprv, bvec))
-+		if (!biovec_phys_mergeable(q, bvprv, bvec))
- 			goto new_segment;
- 
- 		(*sg)->length += nbytes;
+ 	bio_endio(bio);
 diff --git a/block/blk.h b/block/blk.h
-index aed99cbc1bca..8f7229b6f63e 100644
+index 8f7229b6f63e..50f74ce60453 100644
 --- a/block/blk.h
 +++ b/block/blk.h
-@@ -153,13 +153,19 @@ static inline void blk_queue_enter_live(struct request_queue *q)
- #define ARCH_BIOVEC_PHYS_MERGEABLE(vec1, vec2) true
- #endif
- 
--static inline bool biovec_phys_mergeable(const struct bio_vec *vec1,
--		const struct bio_vec *vec2)
-+static inline bool biovec_phys_mergeable(struct request_queue *q,
-+		struct bio_vec *vec1, struct bio_vec *vec2)
+@@ -157,8 +157,8 @@ static inline bool biovec_phys_mergeable(struct request_queue *q,
+ 		struct bio_vec *vec1, struct bio_vec *vec2)
  {
--	if (bvec_to_phys(vec1) + vec1->bv_len != bvec_to_phys(vec2))
-+	unsigned long mask = queue_segment_boundary(q);
-+	phys_addr_t addr1 = bvec_to_phys(vec1);
-+	phys_addr_t addr2 = bvec_to_phys(vec2);
-+
-+	if (addr1 + vec1->bv_len != addr2)
- 		return false;
- 	if (!ARCH_BIOVEC_PHYS_MERGEABLE(vec1, vec2))
- 		return false;
-+	if ((addr1 | mask) != ((addr2 + vec2->bv_len - 1) | mask))
-+		return false;
- 	return true;
- }
+ 	unsigned long mask = queue_segment_boundary(q);
+-	phys_addr_t addr1 = bvec_to_phys(vec1);
+-	phys_addr_t addr2 = bvec_to_phys(vec2);
++	phys_addr_t addr1 = page_to_phys(vec1->bv_page) + vec1->bv_offset;
++	phys_addr_t addr2 = page_to_phys(vec2->bv_page) + vec2->bv_offset;
  
+ 	if (addr1 + vec1->bv_len != addr2)
+ 		return false;
 diff --git a/include/linux/bio.h b/include/linux/bio.h
-index e2adb96346f0..9b580e1cb2e8 100644
+index 9b580e1cb2e8..9ad4b0a487a4 100644
 --- a/include/linux/bio.h
 +++ b/include/linux/bio.h
-@@ -137,14 +137,6 @@ static inline bool bio_full(struct bio *bio)
-  */
- #define bvec_to_phys(bv)	(page_to_phys((bv)->bv_page) + (unsigned long) (bv)->bv_offset)
+@@ -132,11 +132,6 @@ static inline bool bio_full(struct bio *bio)
+ 	return bio->bi_vcnt >= bio->bi_max_vecs;
+ }
  
 -/*
-- * merge helpers etc
+- * will die
 - */
--#define __BIO_SEG_BOUNDARY(addr1, addr2, mask) \
--	(((addr1) | (mask)) == (((addr2) - 1) | (mask)))
--#define BIOVEC_SEG_BOUNDARY(q, b1, b2) \
--	__BIO_SEG_BOUNDARY(bvec_to_phys((b1)), bvec_to_phys((b2)) + (b2)->bv_len, queue_segment_boundary((q)))
+-#define bvec_to_phys(bv)	(page_to_phys((bv)->bv_page) + (unsigned long) (bv)->bv_offset)
 -
  /*
   * drivers should _never_ use the all version - the bio may have been split
