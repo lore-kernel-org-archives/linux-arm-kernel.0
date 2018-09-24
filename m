@@ -1,82 +1,57 @@
-From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Mon, 24 Sep 2018 12:26:14 +0200
-Subject: [BISECTED] Regression: Solidrun Clearfog Base won't boot since
- "PCI: mvebu: Only remap I/O space if configured"
-In-Reply-To: <20180924101213.GO30658@n2100.armlinux.org.uk>
-References: <61fdfd69-2bb6-478c-b0d5-69d8744adae3@cesnet.cz>
- <87zhwm4kl6.fsf@tkos.co.il>
- <20180912231050.GX30658@n2100.armlinux.org.uk>
- <20180913094515.351967bb@windsurf>
- <5ad46fec-a71a-477a-b23f-d20aacfb481d@cesnet.cz>
- <20180913104241.65db8243@windsurf>
- <20180924101213.GO30658@n2100.armlinux.org.uk>
-Message-ID: <20180924122614.70738b5c@windsurf>
+From: MNARANI@xilinx.com (Manish Narani)
+Date: Mon, 24 Sep 2018 10:29:44 +0000
+Subject: [PATCH v7 4/7] edac: synopsys: Add macro defines for ZynqMP DDRC
+In-Reply-To: <20180924092226.GA20187@zn.tnic>
+References: <1537194305-9243-1-git-send-email-manish.narani@xilinx.com>
+ <1537194305-9243-5-git-send-email-manish.narani@xilinx.com>
+ <20180924092226.GA20187@zn.tnic>
+Message-ID: <DM6PR02MB5227D961C992C3BB6A4421B7C1170@DM6PR02MB5227.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Boris,
 
-On Mon, 24 Sep 2018 11:12:13 +0100, Russell King - ARM Linux wrote:
+Thanks for the review.
 
-> > Thanks for the testing. I'll wait for Russell to say if he is happy
-> > (or not) with the addition of pci_unmap_io() in the ARM code, if that's
-> > the case, I'll send a proper patch to fix the issue.  
+> -----Original Message-----
+> From: Borislav Petkov [mailto:bp at alien8.de]
+> Sent: Monday, September 24, 2018 2:52 PM
+> To: Manish Narani <MNARANI@xilinx.com>
+> Cc: robh+dt at kernel.org; mark.rutland at arm.com; mchehab at kernel.org;
+> Michal Simek <michals@xilinx.com>; leoyang.li at nxp.com;
+> sudeep.holla at arm.com; amit.kucheria at linaro.org;
+> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
+> edac at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v7 4/7] edac: synopsys: Add macro defines for ZynqMP
+> DDRC
 > 
-> I'd prefer not to provide an unmapping API, because it gives the
-> impression that it's okay to unmap the IO space mapping, and we'll
-> end up with drivers that decide to call it in their cleanup path.
-> IO space isn't expected to ever go away - eg, on a PC, it's always
-> present.
-
-But being able to unmap it would also be needed to be able to remove
-PCI host controller drivers, and therefore compile them as module, and
-make them more like any other drivers.
-
-I'm not sure why we need to guarantee that the I/O space is always
-mapped:
-
- - It isn't mapped before the PCI controller driver does the mapping.
-
- - There is no reason for it to be accessed when the PCI controller
-   driver is not initialized: PCI devices can only be probed and
-   initialized when the PCI controller driver is probed/initialized.
-
-Also, in general, pci_ioremap_io() is ARM specific, and is now only
-used by very few drivers:
-
- - Dove (Marvell platform)
- - IOP13xx
- - MV78xx0 (Marvell platform, should be moved to use pci-mvebu)
- - Orion5x (Marvell platform, should be moved to use pci-mvebu)
- - pci-mvebu
- - at91_cf
-
-All other drivers, including on ARM, use pci_remap_iospace(), which
-does provide the pci_unmap_iospace() counter part.
-
-The only reason I have not changed pci-mvebu to use
-pci_{remap,unmap}_iospace() is because it doesn't allow to change the
-memory attributes.
-
-But to me, the general direction is that the ARM-specific
-pci_remap_io() API is fading away, and its replacement already provides
-an unmapping capability. So why not add the same unmapping capability
-to pci_remap_io() ?
-
-> I've been toying with the idea of making pci_map_io() ignore
-> subsequent attempts to overwrite the mapping with an identical
-> mapping, and WARN() if there is an attempt to overwrite an existing
-> mapping with other physical address, but I'm not entirely happy
-> with that either (which is why I haven't responded sooner.)
+> On Mon, Sep 17, 2018 at 07:55:02PM +0530, Manish Narani wrote:
+> > Add macro defines for ZynqMP DDR controller. These macros will be used
+> > for ZyqnMP ECC operations.
+> >
+> > Signed-off-by: Manish Narani <manish.narani@xilinx.com>
+> > ---
+> >  drivers/edac/synopsys_edac.c | 168
+> > +++++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 168 insertions(+)
+> >
+> > diff --git a/drivers/edac/synopsys_edac.c
+> > b/drivers/edac/synopsys_edac.c index eb458e5..6bf7959 100644
+> > --- a/drivers/edac/synopsys_edac.c
+> > +++ b/drivers/edac/synopsys_edac.c
+> > @@ -97,6 +97,174 @@
+> >  #define SCRUB_MODE_MASK		0x7
+> >  #define SCRUB_MODE_SECDED	0x4
+> >
+> > +/* DDR ECC Quirks */
+> > +#define DDR_ECC_INTR_SUPPORT		BIT(0)
+> > +#define DDR_ECC_DATA_POISON_SUPPORT	BIT(1)
 > 
-> At the moment, I don't have a way forward that I'm happy with for
-> this.
+> All those new additions are one column further to the left than the old ones.
+> Why?
+> 
+> Is there some significance here or can they all be vertically aligned?
+Should I increase the alignment of the existing macros in the 'code formatting' patches? New macros will need an increased indentation.
 
-But we have a regression and we need to fix it. Do you suggest to not
-use the new pci_host_probe() API ?
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Thanks,
+Manish
