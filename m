@@ -1,33 +1,31 @@
-From: hugues.fruchet@st.com (Hugues Fruchet)
-Date: Mon, 24 Sep 2018 14:54:59 +0200
-Subject: [PATCH] media: stm32-dcmi: only enable IT frame on JPEG capture
-Message-ID: <1537793699-2555-1-git-send-email-hugues.fruchet@st.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 24 Sep 2018 14:58:15 +0200
+Subject: [PATCH] arm64: dts: rockchip: update pinmux setting in rk3399.dtsi
+In-Reply-To: <1537368317-22170-1-git-send-email-Akash_Gajjar@mentor.com>
+References: <Akash_Gajjar@mentor.com>
+ <1537368317-22170-1-git-send-email-Akash_Gajjar@mentor.com>
+Message-ID: <1621920.B7a7Pky3iO@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Only enable IT frame on JPEG capture, this saves some CPU
-interruptions and processing on all the other cases.
+Hi Akash,
 
-Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
----
- drivers/media/platform/stm32/stm32-dcmi.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+Am Mittwoch, 19. September 2018, 16:45:15 CEST schrieb Akash Gajjar:
+> replace pin numbers with equivalent pin macro in rk3399.dtsi
+> 
+> Signed-off-by: Akash Gajjar <Akash_Gajjar@mentor.com>
 
-diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
-index ba3e2ee..d6b00eda 100644
---- a/drivers/media/platform/stm32/stm32-dcmi.c
-+++ b/drivers/media/platform/stm32/stm32-dcmi.c
-@@ -659,7 +659,10 @@ static int dcmi_start_streaming(struct vb2_queue *vq, unsigned int count)
- 	}
- 
- 	/* Enable interruptions */
--	reg_set(dcmi->regs, DCMI_IER, IT_FRAME | IT_OVR | IT_ERR);
-+	if (dcmi->sd_format->fourcc == V4L2_PIX_FMT_JPEG)
-+		reg_set(dcmi->regs, DCMI_IER, IT_FRAME | IT_OVR | IT_ERR);
-+	else
-+		reg_set(dcmi->regs, DCMI_IER, IT_OVR | IT_ERR);
- 
- 	return 0;
- 
--- 
-2.7.4
+so far my "policy" has been to have new stuff use the constants
+but not mass-converting the old entries, due to me being anxious
+about accidentially breaking some seldom used settings.
+
+With the newly added linebreaks your change looks pretty much hand-
+generated, so I guess there is a bit of probability for typos creeping in
+and it of course also only adapts one of the Rockchip socs.
+
+So while I _may_ be persuaded of a scripted conversion [including seeing
+the script] doing all Rockchip socs (per architecture) at once, I currently
+somehow prefer keeping the status quo ;-)
+
+
+Heiko
