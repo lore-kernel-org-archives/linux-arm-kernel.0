@@ -1,68 +1,43 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 24 Sep 2018 09:28:07 +0200
-Subject: [PATCH 1/2] clocksource/drivers: Unify the names to timer-* format
-In-Reply-To: <7451938d-c600-f070-d1c7-1c77f79518b0@linaro.org>
-References: <1537762569-18657-1-git-send-email-daniel.lezcano@linaro.org>
- <20180924062828.4yh3aumcuiihojgu@pengutronix.de>
- <7451938d-c600-f070-d1c7-1c77f79518b0@linaro.org>
-Message-ID: <20180924072807.xjxdrvtjeoa3wsch@pengutronix.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 24 Sep 2018 09:37:08 +0200
+Subject: [RESEND PATCH v3 2/2] serial: uartps: Change uart ID port
+ allocation
+In-Reply-To: <39e840d1f727fe6338ea14b882ca9bf831f53e32.1537443710.git.michal.simek@xilinx.com>
+References: <b1772d99d4e8b788448cde0fc5c7dccb1f63b507.1537443710.git.michal.simek@xilinx.com>
+ <39e840d1f727fe6338ea14b882ca9bf831f53e32.1537443710.git.michal.simek@xilinx.com>
+Message-ID: <CAMuHMdWQcc+ZD238e13fBcVW77304u2nqq2K9A9-wsDVAPEa4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 24, 2018 at 08:31:26AM +0200, Daniel Lezcano wrote:
-> On 24/09/2018 08:28, Uwe Kleine-K?nig wrote:
-> > On Mon, Sep 24, 2018 at 06:15:17AM +0200, Daniel Lezcano wrote:
-> >> In order to make some housekeeping in the directory, this patch renames
-> >> drivers to the timer-* format in order to unify their names.
-> >>
-> >> There is no functional changes.
-> >>
-> >> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> >> ---
-> >>  MAINTAINERS                               |  10 +-
-> >>  drivers/clocksource/Makefile              |  26 +-
-> >>  drivers/clocksource/cadence_ttc_timer.c   | 543 ------------------------------
-> >>  drivers/clocksource/fsl_ftm_timer.c       | 376 ---------------------
-> >>  drivers/clocksource/owl-timer.c           | 173 ----------
-> >>  drivers/clocksource/qcom-timer.c          | 258 --------------
-> >>  drivers/clocksource/time-armada-370-xp.c  | 416 -----------------------
-> >>  drivers/clocksource/time-efm32.c          | 287 ----------------
-> >>  drivers/clocksource/time-lpc32xx.c        | 314 -----------------
-> >>  drivers/clocksource/time-orion.c          | 192 -----------
-> >>  drivers/clocksource/time-pistachio.c      | 218 ------------
-> >>  drivers/clocksource/timer-armada-370-xp.c | 416 +++++++++++++++++++++++
-> >>  drivers/clocksource/timer-cadence-ttc.c   | 543 ++++++++++++++++++++++++++++++
-> >>  drivers/clocksource/timer-efm32.c         | 287 ++++++++++++++++
-> >>  drivers/clocksource/timer-fsl-ftm.c       | 376 +++++++++++++++++++++
-> >>  drivers/clocksource/timer-lpc32xx.c       | 314 +++++++++++++++++
-> >>  drivers/clocksource/timer-orion.c         | 192 +++++++++++
-> >>  drivers/clocksource/timer-owl.c           | 173 ++++++++++
-> >>  drivers/clocksource/timer-pistachio.c     | 218 ++++++++++++
-> >>  drivers/clocksource/timer-qcom.c          | 258 ++++++++++++++
-> >>  drivers/clocksource/timer-versatile.c     |  44 +++
-> >>  drivers/clocksource/timer-vf-pit.c        | 204 +++++++++++
-> >>  drivers/clocksource/timer-vt8500.c        | 168 +++++++++
-> >>  drivers/clocksource/timer-zevio.c         | 218 ++++++++++++
-> >>  drivers/clocksource/versatile.c           |  44 ---
-> >>  drivers/clocksource/vf_pit_timer.c        | 204 -----------
-> >>  drivers/clocksource/vt8500_timer.c        | 168 ---------
-> >>  drivers/clocksource/zevio-timer.c         | 218 ------------
-> >>  28 files changed, 3429 insertions(+), 3429 deletions(-)
-> > 
-> > Wow, with git format-patch -M this should look much smaller and so
-> > easier to review.
-> 
-> Yes, I forgot the option :/
+Hi Michal,
 
-I think you want:
+On Thu, Sep 20, 2018 at 1:42 PM Michal Simek <michal.simek@xilinx.com> wrote:
+> For IPs which have alias algorightm all the time using that alias and
+> minor number. It means serial20 alias ends up as ttyPS20.
+>
+> If alias is not setup for probed IP instance the first unused position is
+> used but that needs to be checked if it is really empty because another
+> instance doesn't need to be probed at that time. of_alias_get_alias_list()
+> fills alias bitmap which exactly shows which ID is free.
+> If alias pointing to different not compatible IP, it is free to use.
+>
+> cdns_get_id() call is placed below structure allocation to simplify
+> error path.
+>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 
-	git config diff.renames true
+JFTR, for sh-sci, I used a different approach, as all ports in the static DTB
+can have an alias (if aliases are needed at all), and only DT overlays cannot
+have them. Cfr. commit 7678f4c20fa7670f ("serial: sh-sci: Add support for
+dynamic instances").
 
-or a newer git (>= 2.9, which enabled that by default).
+Gr{oetje,eeting}s,
 
-Best regards
-Uwe
+                        Geert
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
