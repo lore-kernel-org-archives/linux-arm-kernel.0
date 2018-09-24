@@ -1,94 +1,50 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 24 Sep 2018 20:46:30 +0200
-Subject: [PATCH V2 05/27] mmc: mmci: move mmci next cookie to mci host
-In-Reply-To: <1537523181-14578-6-git-send-email-ludovic.Barre@st.com>
-References: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
- <1537523181-14578-6-git-send-email-ludovic.Barre@st.com>
-Message-ID: <CAPDyKFqhyVrRGRraGQzx9kwRxLtr56Gwc_NKqNqwLvZuM=jM1A@mail.gmail.com>
+From: john.stultz@linaro.org (John Stultz)
+Date: Mon, 24 Sep 2018 11:52:54 -0700
+Subject: [RFC/PATCH] arm64: Fix /proc/iomem for reserved but not memory
+ regions
+In-Reply-To: <20180910141636.21813-1-james.morse@arm.com>
+References: <20180910141636.21813-1-james.morse@arm.com>
+Message-ID: <CALAqxLX6oadOT80qCyj-P0ZBMJvTt1XZ-viM1uw34BrofHmOVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 September 2018 at 11:45, Ludovic Barre <ludovic.Barre@st.com> wrote:
-> From: Ludovic Barre <ludovic.barre@st.com>
+On Mon, Sep 10, 2018 at 7:16 AM, James Morse <james.morse@arm.com> wrote:
+> commit 50d7ba36b916 ("arm64: export memblock_reserve()d regions via
+> /proc/iomem") wrongly assumed that memblock_reserve() would not be used to
+> reserve regions that aren't memory. It turns out, this is exactly what
+> early_init_dt_reserve_memory_arch() will do if it finds a reservation
+> that was also carved out of the memory node.
 >
-> This patch moves next cookie to mmci host structure to
-> share same cookie management between all variants.
-
-I would suggest you to squash this with patch4, as I think it makes
-more sense to keep these changes together.
-
+> reserve_memblock_reserved_regions() now needs to cope with reserved regions
+> that aren't memory, which means we must walk two lists at once.
 >
-> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+> We can't use walk_system_ram_res() and reserve_region_with_split()
+> together, as the former hands its callback a copied resource on
+> the stack, where as the latter expects the in-tree resource to be
+> provided.
+>
+> Allocate an array of struct resources during request_standard_resources()
+> so that we have all the 'System RAM' regions on hand.
+>
+> Increasing the mem_idx cursor is optional as multiple memblock_reserved()
+> regions may exist in one System RAM region.
+> Because adjacent memblock_reserved() regions will be merged, we also need
+> to consider multiple System RAM regions for one span of memblock_reserved()
+> address space.
+>
+> Fixes: 50d7ba36b916 ("arm64: export memblock_reserve()d regions via /proc/iomem")
+> Reported-by: John Stultz <john.stultz@linaro.org>
+> CC: Akashi Takahiro <takahiro.akashi@linaro.org>
+> CC: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: James Morse <james.morse@arm.com>
 > ---
->  drivers/mmc/host/mmci.c | 10 ++++------
->  drivers/mmc/host/mmci.h |  2 ++
->  2 files changed, 6 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-> index 6de7c8d..43f2a1a 100644
-> --- a/drivers/mmc/host/mmci.c
-> +++ b/drivers/mmc/host/mmci.c
-> @@ -418,7 +418,6 @@ static void mmci_init_sg(struct mmci_host *host, struct mmc_data *data)
->  struct mmci_dmae_next {
->         struct dma_async_tx_descriptor *desc;
->         struct dma_chan *chan;
-> -       s32 cookie;
->  };
->
->  struct mmci_dmae_priv {
-> @@ -449,7 +448,7 @@ static int mmci_dma_setup(struct mmci_host *host)
->                                                      "tx");
->
->         /* initialize pre request cookie */
-> -       dmae->next_data.cookie = 1;
-> +       host->next_cookie = 1;
->
->         /*
->          * If only an RX channel is specified, the driver will
-> @@ -716,7 +715,7 @@ static void mmci_get_next_data(struct mmci_host *host, struct mmc_data *data)
->         struct mmci_dmae_priv *dmae = host->dma_priv;
->         struct mmci_dmae_next *next = &dmae->next_data;
->
-> -       WARN_ON(data->host_cookie && data->host_cookie != next->cookie);
-> +       WARN_ON(data->host_cookie && data->host_cookie != host->next_cookie);
->         WARN_ON(!data->host_cookie && (next->desc || next->chan));
->
->         dmae->desc_current = next->desc;
-> @@ -728,9 +727,7 @@ static void mmci_get_next_data(struct mmci_host *host, struct mmc_data *data)
->  static void mmci_pre_request(struct mmc_host *mmc, struct mmc_request *mrq)
->  {
->         struct mmci_host *host = mmc_priv(mmc);
-> -       struct mmci_dmae_priv *dmae = host->dma_priv;
->         struct mmc_data *data = mrq->data;
-> -       struct mmci_dmae_next *nd = &dmae->next_data;
->
->         if (!data)
->                 return;
-> @@ -741,7 +738,8 @@ static void mmci_pre_request(struct mmc_host *mmc, struct mmc_request *mrq)
->                 return;
->
->         if (!mmci_dma_prep_next(host, data))
-> -               data->host_cookie = ++nd->cookie < 0 ? 1 : nd->cookie;
-> +               data->host_cookie = ++host->next_cookie < 0 ?
-> +                       1 : host->next_cookie;
->  }
->
->  static void mmci_post_request(struct mmc_host *mmc, struct mmc_request *mrq,
-> diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-> index 1e9a45b..5bb1ce2 100644
-> --- a/drivers/mmc/host/mmci.h
-> +++ b/drivers/mmc/host/mmci.h
-> @@ -318,5 +318,7 @@ struct mmci_host {
->         int (*get_rx_fifocnt)(struct mmci_host *h, u32 status, int remain);
->
->         void                    *dma_priv;
-> +
-> +       s32                     next_cookie;
->  };
->
-> --
-> 2.7.4
->
+> John, any chance you could give this a test on the platform that the warning
+> fires on? Thanks!
 
-Kind regards
-Uffe
+
+Seems to fix it.
+
+Tested-by: John Stultz <john.stultz@linaro.org>
+
+thanks
+-john
