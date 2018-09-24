@@ -1,75 +1,99 @@
-From: MNARANI@xilinx.com (Manish Narani)
-Date: Mon, 24 Sep 2018 10:07:33 +0000
-Subject: [PATCH v7 2/7] edac: synps: Add platform specific structures for
- ddrc controller
-In-Reply-To: <20180921090721.GB30439@nazgul.tnic>
-References: <1537194305-9243-1-git-send-email-manish.narani@xilinx.com>
- <1537194305-9243-3-git-send-email-manish.narani@xilinx.com>
- <20180918075522.GC22202@nazgul.tnic>
- <DM6PR02MB5227F5B1B329C903BA64A27CC11C0@DM6PR02MB5227.namprd02.prod.outlook.com>
- <20180919111553.GA9140@nazgul.tnic>
- <DM6PR02MB52279753E7FD04587393DC08C11C0@DM6PR02MB5227.namprd02.prod.outlook.com>
- <20180921090721.GB30439@nazgul.tnic>
-Message-ID: <DM6PR02MB5227B76AD2D71C4EABCA48DCC1170@DM6PR02MB5227.namprd02.prod.outlook.com>
+From: dkos@cadence.com (Damian Kos)
+Date: Mon, 24 Sep 2018 11:40:03 +0000
+Subject: [PATCH v4 5/5] drm: bridge: add support for Cadence MHDP DPI/DP
+ bridge
+In-Reply-To: <1903708.pJTgKoWLiI@phil>
+References: <1537455288-20223-1-git-send-email-dkos@cadence.com>
+ <1537455288-20223-6-git-send-email-dkos@cadence.com>
+ <1903708.pJTgKoWLiI@phil>
+Message-ID: <CO2PR07MB2551EC0A7DEB61C54A4D6A5FCD170@CO2PR07MB2551.namprd07.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+Hi Heiko,
 
-Thanks for the review.
+> Hi Damian,
+> 
+> Am Donnerstag, 20. September 2018, 16:54:40 CEST schrieb Damian Kos:
+> > From: Quentin Schulz <quentin.schulz@free-electrons.com>
+> > 
+> > This adds basic support for Cadence MHDP DPI to DP bridge.
+> > 
+> > Basically, it takes a DPI stream as input and output it encoded in DP 
+> > format. It's missing proper HPD, HDCP and currently supports only SST 
+> > mode.
+> > 
+> > Changes made in the low level driver (cdn-dp-reg.*):
+> > - moved it to from drivers/gpu/drm/rockchip to
+> >   drivers/gpu/drm/bridge/cdns-mhdp-common.*
+> > - functions for sending/receiving commands are now public
+> > - added functions for reading registers and link training
+> >   adjustment
+> > 
+> > Changes made in RK's driver (cdn-dp-core.*):
+> > - Moved audio_info and audio_pdev fields from cdn_dp_device to
+> >   cdns_mhdp_device structure.
+> > 
+> > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> > Signed-off-by: Damian Kos <dkos@cadence.com>
+> 
+> [...]
+> 
+> > diff --git a/drivers/gpu/drm/rockchip/Kconfig 
+> > b/drivers/gpu/drm/rockchip/Kconfig
+> > index 0ccc76217ee4..129b0529f3e1 100644
+> > --- a/drivers/gpu/drm/rockchip/Kconfig
+> > +++ b/drivers/gpu/drm/rockchip/Kconfig
+> > @@ -27,7 +27,9 @@ config ROCKCHIP_ANALOGIX_DP
+> >  
+> >  config ROCKCHIP_CDN_DP
+> >          bool "Rockchip cdn DP"
+> > -	depends on EXTCON=y || (EXTCON=m && DRM_ROCKCHIP=m)
+> > +	depends on DRM_ROCKCHIP=m
+> 
+> Sorry, I wasn't fast enough in my reply to you mail to catch that before your v4, but I don't think this is necessary.
+> Instead I do guess, the select below should do the right thing by making EXTCON=y if DRM_ROCKCHIP=y.
+> 
+> Somewhat clumsily verified by making EXTCON=m in my defconfig and seeing get changed to y upon build, which I guess comes from a different "select" in the config.
+> 
 
+I've changed it to:
 
-> -----Original Message-----
-> From: Borislav Petkov [mailto:bp at alien8.de]
-> Sent: Friday, September 21, 2018 2:37 PM
-> To: Manish Narani <MNARANI@xilinx.com>
-> Cc: robh+dt at kernel.org; mark.rutland at arm.com; mchehab at kernel.org;
-> Michal Simek <michals@xilinx.com>; leoyang.li at nxp.com;
-> sudeep.holla at arm.com; amit.kucheria at linaro.org;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
-> edac at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v7 2/7] edac: synps: Add platform specific structures for
-> ddrc controller
-> 
-> On Wed, Sep 19, 2018 at 01:33:58PM +0000, Manish Narani wrote:
-> > Apart from this one, I have covered all the comments from the previous
-> review.
-> 
-> Are you sure?
-> 
-> Let's see. I said:
-> 
-> | Kill all that "function pointer" fluff. Here's how I've changed it:
-> |
-> | /**
-> |  * struct synps_platform_data -  synps platform data structure
-> |  * @edac_geterror_info: edac error info
-> |  * @edac_get_mtype:     get mtype
-> |  * @edac_get_dtype:     get dtype
-> |  * @edac_get_eccstate:  get ECC state
-> 			  ^^^^^^^^^^^^^
-> 
-> This is supposed to denote that this function returns whether ECC checking is
-> enabled on the controller or not.
-> 
-> Your patch has:
-> 
-> + * struct synps_platform_data -  synps platform data structure.
-> + * @geterror_info:     Get error info.
-> + * @get_mtype:         Get mtype.
-> + * @get_dtype:         Get dtype.
-> + * @get_eccstate:      Get eccstate.
-> 
-> So what is "eccstate"? Is it a struct or a variable or ...?
-> 
-> Do you see my point?
-> 
-> I know, it is a small thing but documenting our code properly is something
-> which people would be thanking us for. Even you will be thanking yourself when
-> you look at this months from now after having forgotten it all.
-> 
-> Please check the rest of your additions for similar discrepancies.
-Okay sure. Will be rectified in v8.
+config ROCKCHIP_CDN_DP
+        bool "Rockchip cdn DP"
+        depends on DRM_ROCKCHIP
+        select EXTCON if DRM_ROCKCHIP=y
+        select DRM_CDNS_MHDP
+        help...
 
-Thanks,
-Manish
+and it seems that there are no issues. At least for me.
+
+Please let me know if that's OK.
+
+> 
+> > +	select EXTCON
+> > +	select DRM_CDNS_MHDP
+> >          help
+> >  	  This selects support for Rockchip SoC specific extensions
+> >  	  for the cdn DP driver. If you want to enable Dp on diff --git 
+> > a/drivers/gpu/drm/rockchip/Makefile 
+> > b/drivers/gpu/drm/rockchip/Makefile
+> > index a314e2109e76..16ba61ffca39 100644
+> > --- a/drivers/gpu/drm/rockchip/Makefile
+> > +++ b/drivers/gpu/drm/rockchip/Makefile
+> > @@ -3,13 +3,15 @@
+> >  # Makefile for the drm device driver.  This driver provides support 
+> > for the  # Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
+> >  
+> > +ccflags-y += -I$(src)/../bridge
+> 
+> hmm, instead of adding an include path, the shared header should probably just live in /include/drm/bridge/... in the kernel source?
+> 
+
+I'll move the common header to include/drm/bridge/ in v5.
+
+> 
+> Heiko
+
+--
+Damian
