@@ -1,57 +1,89 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 24 Sep 2018 18:19:36 +0100
-Subject: [PATCH v5 0/6] Move swapper_pg_dir to rodata section.
-In-Reply-To: <20180917044333.30051-1-yaojun8558363@gmail.com>
-References: <20180917044333.30051-1-yaojun8558363@gmail.com>
-Message-ID: <20180924171936.q5bfvczzllmm5lpe@lakrids.cambridge.arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 24 Sep 2018 19:21:33 +0200
+Subject: [GIT PULL] ARM: dts: exynos: DT for v4.20 (or 5.0) (revised)
+Message-ID: <20180924172133.11786-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Mon, Sep 17, 2018 at 12:43:27PM +0800, Jun Yao wrote:
-> Version 5 changes:
-> 	1. Correct spelling and indentation errors[1].
-> 	2. Update init_mm.pgd by assembly[2].
-> 	3. Simplify set_p?d() by introducing set_swapper_pgd()[3].
-> 	4. Reduce unnecessary tlbi for every write to swapper_pg_dir
-> 	   during paging_init()[3].
-> 
-> v4: https://www.spinics.net/lists/arm-kernel/msg672195.html
-> v3: https://www.spinics.net/lists/arm-kernel/msg662537.html
-> v2: https://patchwork.kernel.org/patch/10485641/
-> v1: https://patchwork.kernel.org/patch/10476595/
-> 
-> [1] https://www.spinics.net/lists/arm-kernel/msg675189.html
-> [2] https://www.spinics.net/lists/arm-kernel/msg675193.html
-> [3] https://www.spinics.net/lists/arm-kernel/msg675196.html
-> 
-> Jun Yao (6):
->   arm64/mm: Introduce the init_pg_dir.
->   arm64/mm: Pass ttbr1 as a parameter to __enable_mmu().
->   arm64/mm: Create the initial page table in the init_pg_dir.
->   arm64/mm: Create the final page table directly in swapper_pg_dir.
->   arm64/mm: Populate the swapper_pg_dir by fixmap.
->   arm64/mm: Move {idmap_pg_dir .. swapper_pg_dir} to rodata section.
-> 
->  arch/arm64/include/asm/assembler.h | 29 ++++++++++++++++++
->  arch/arm64/include/asm/pgtable.h   | 36 ++++++++++++++++++----
->  arch/arm64/kernel/asm-offsets.c    |  1 +
->  arch/arm64/kernel/head.S           | 48 ++++++++++++++++++++----------
->  arch/arm64/kernel/sleep.S          |  1 +
->  arch/arm64/kernel/vmlinux.lds.S    | 47 +++++++++++++++++++----------
->  arch/arm64/mm/mmu.c                | 45 +++++++++++++---------------
->  7 files changed, 147 insertions(+), 60 deletions(-)
+Pull request without ABI-stability patch.
 
-I've pushed a branch with the cleanups I requested [1] folded in.
+Best regards,
+Krzysztof
 
-I'm still a bit worried about the pgd lock, but otherwise I think this
-is sound. I intend to throw some testing at it, just in case.
 
-If you're happy with that branch, I'll ask Will and Catalin to consider
-picking it up.
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 
-Thanks,
-Mark.
+  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
 
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm64/ro-swapper
+are available in the Git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-4.20-2
+
+for you to fetch changes up to ff1e37c6809daab75f7b2dea1efe69330e8eb65b:
+
+  ARM: dts: exynos: Correct audio subsystem parent clock on Peach Chromebooks (2018-09-24 18:55:16 +0200)
+
+----------------------------------------------------------------
+Samsung DTS ARM changes for v4.20
+
+1. Bring up DSI and HDMI on Exynos5250 Arndale.
+2. Use the new way of setting external wakeup interrupts on S5Pv210.
+3. Use proper cpufreq suspend OPP to fix suspend/wakeup from RAM on Snow
+   Chromebook (Exynos5250).
+4. Fully describe regualtors on Odroid XU3-family boards.
+5. Fix sound in Snow-rev5 Chromebook.
+6. Fix regulators configuration on Peach Pi/Pit Chromebooks (Exynos5420)
+   which should be always on.
+7. Fix pull control on PMIC interrupt lines on multiple boards which
+   essentially fixes waking up by RTC.
+8. Add PMIC interrupts on Exynos4210 UniversalC210 board.
+9. Add external SD card support for Trats board (Exynos4210).
+10. Correct audio subsystem parent clock on Peach Chromebooks.
+11. Minor cleanups.
+
+----------------------------------------------------------------
+Andrzej Hajda (4):
+      ARM: dts: exynos: Add DSI node on Exynos5250
+      ARM: dts: exynos: Add DSI and panel nodes on Arndale
+      ARM: dts: exynos: Use i2c-gpio for HDMI-DDC on Arndale
+      ARM: dts: exynos: Fix HDMI-HPD line handling on Arndale
+
+Krzysztof Kozlowski (6):
+      ARM: dts: s5pv210: Switch to S5Pv210 specific pinctrl wakeup compatible
+      ARM: dts: exynos: Add missing used PMIC regulators on Exynos5422 Odroid boards
+      ARM: dts: exynos: Add unused PMIC regulators on Exynos5422 Odroid boards
+      ARM: dts: exynos: Disable unused PMIC regulators on Exynos5422 Odroid boards
+      ARM: dts: exynos: Add LDO28 regulator on Exynos5422 Odroid boards
+      ARM: dts: exynos: Remove double SD card detect pin inversion
+
+Marek Szyprowski (10):
+      ARM: dts: exynos: Convert exynos5250.dtsi to opp-v2 bindings
+      ARM: dts: exynos: Mark 1 GHz CPU OPP as suspend OPP on Exynos5250
+      ARM: dts: exynos: Fix sound in Snow-rev5 Chromebook
+      ARM: dts: exynos: Fix regulators configuration on Peach Pi/Pit Chromebooks
+      ARM: dts: exynos: Disable pull control for MAX8997 interrupts on Origen
+      ARM: dts: exynos: Add missing PMIC interrupts on UniversalC210 board
+      ARM: dts: exynos: Disable pull control for S5M8767 PMIC
+      ARM: dts: exynos: Disable pull control for PMIC IRQ line on Artik5 board
+      ARM: dts: exynos: Add external SD card support for Trats board
+      ARM: dts: exynos: Correct audio subsystem parent clock on Peach Chromebooks
+
+ arch/arm/boot/dts/exynos3250-artik5.dtsi           |   7 +
+ arch/arm/boot/dts/exynos4210-origen.dts            |   9 ++
+ arch/arm/boot/dts/exynos4210-trats.dts             |  15 ++
+ arch/arm/boot/dts/exynos4210-universal_c210.dts    |  11 +-
+ arch/arm/boot/dts/exynos4412-midas.dtsi            |   3 +-
+ arch/arm/boot/dts/exynos4412-odroid-common.dtsi    |   3 +-
+ arch/arm/boot/dts/exynos5250-arndale.dts           | 102 +++++++++++--
+ arch/arm/boot/dts/exynos5250-pinctrl.dtsi          |  11 ++
+ arch/arm/boot/dts/exynos5250-snow-rev5.dts         |  11 ++
+ arch/arm/boot/dts/exynos5250.dtsi                  | 152 ++++++++++++++------
+ arch/arm/boot/dts/exynos5420-peach-pit.dts         |   5 +-
+ arch/arm/boot/dts/exynos5422-odroid-core.dtsi      | 157 +++++++++++++++++++--
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |   6 +
+ arch/arm/boot/dts/exynos5422-odroidxu3.dts         |   6 +
+ arch/arm/boot/dts/exynos5800-peach-pi.dts          |   5 +-
+ arch/arm/boot/dts/s5pv210.dtsi                     |   2 +-
+ 16 files changed, 433 insertions(+), 72 deletions(-)
