@@ -1,140 +1,72 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 24 Sep 2018 16:28:07 +0200
-Subject: [PATCH V2 03/27] mmc: mmci: convert dma_setup callback to return
- an int
-In-Reply-To: <1537523181-14578-4-git-send-email-ludovic.Barre@st.com>
-References: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
- <1537523181-14578-4-git-send-email-ludovic.Barre@st.com>
-Message-ID: <CAPDyKFqnN0gg9WsbNPQcodqUXJmFEzMM+ST36s6oEZ2OPoONug@mail.gmail.com>
+From: john.garry@huawei.com (John Garry)
+Date: Mon, 24 Sep 2018 15:35:20 +0100
+Subject: [PATCH v8 0/7] Add non-strict mode support for iommu-dma
+In-Reply-To: <61fb0f8f-a353-8ab6-f03d-b261da435c94@arm.com>
+References: <cover.1537458163.git.robin.murphy@arm.com>
+ <fdfc05a4-283f-3ae2-7928-59e625c8f3b8@huawei.com>
+ <50330f32-b051-bdf6-af26-3e24ed133480@arm.com>
+ <61fb0f8f-a353-8ab6-f03d-b261da435c94@arm.com>
+Message-ID: <796e20eb-a0bd-f559-6cf2-f97fddf0114e@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 September 2018 at 11:45, Ludovic Barre <ludovic.Barre@st.com> wrote:
-> From: Ludovic Barre <ludovic.barre@st.com>
+On 21/09/2018 12:03, Robin Murphy wrote:
+> On 21/09/18 10:29, Robin Murphy wrote:
+>> Hi John,
+>>
+>> On 2018-09-21 10:20 AM, John Garry wrote:
+>>> On 20/09/2018 17:10, Robin Murphy wrote:
+>>>> Hi all,
+>>>>
+>>>> Hopefully this is the last spin of the series - I've now dropped my
+>>>> light
+>>>> touch and fixed up all the various prose text, plus implemented the
+>>>> proper
+>>>> quirk support for short-descriptor because it's actually just a trivial
+>>>> cut-and-paste job.
+>>>>
+>>>> Robin.
+>>>>
+>>>
+>>> Hi Robin,
+>>>
+>>> JFYI, I'm trying to test this patchset to get some figures and
+>>> provide a tested-by tag, but 4/8 seems to rely on
+>>> "iommu/io-pgtable-arm: Fix race handling in split_blk_unmap()" - more
+>>> specifically, it seems to rely on the version which Will rewrote in
+>>> your patch review, and I am not sure on what branch it exists on, if
+>>> any.
+>>
+>> Sorry, I should have said this is based on Will's iommu/devel branch:
+>>
+>> https://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git/log/?h=iommu/devel
 >
-> This patch converts dma_setup callback to return an integer
-> This patch is needed to prepare sdmmc variant with internal dma
 >
-> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-> ---
->  drivers/mmc/host/mmci.c          | 14 ++++++++++----
->  drivers/mmc/host/mmci.h          |  2 +-
->  drivers/mmc/host/mmci_qcom_dml.c |  6 ++++--
->  3 files changed, 15 insertions(+), 7 deletions(-)
+> FWIW I've now pushed out a complete branch here:
 >
-> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-> index cbd67bc..2f845f3 100644
-> --- a/drivers/mmc/host/mmci.c
-> +++ b/drivers/mmc/host/mmci.c
-> @@ -415,7 +415,7 @@ static void mmci_init_sg(struct mmci_host *host, struct mmc_data *data)
->   * no custom DMA interfaces are supported.
->   */
->  #ifdef CONFIG_DMA_ENGINE
-> -static void mmci_dma_setup(struct mmci_host *host)
-> +static int mmci_dma_setup(struct mmci_host *host)
->  {
->         const char *rxname, *txname;
->
-> @@ -466,7 +466,9 @@ static void mmci_dma_setup(struct mmci_host *host)
->         }
->
->         if (host->ops && host->ops->dma_setup)
-> -               host->ops->dma_setup(host);
-> +               return host->ops->dma_setup(host);
-> +
-
-Looks like you need to implement a error handling, instead of just
-returning the error code.
-
-> +       return 0;
->  }
->
->  /*
-> @@ -741,8 +743,10 @@ static void mmci_post_request(struct mmc_host *mmc, struct mmc_request *mrq,
->  static void mmci_get_next_data(struct mmci_host *host, struct mmc_data *data)
->  {
->  }
-> -static inline void mmci_dma_setup(struct mmci_host *host)
-> +
-> +static inline int mmci_dma_setup(struct mmci_host *host)
->  {
-> +       return 0;
->  }
->
->  static inline void mmci_dma_release(struct mmci_host *host)
-> @@ -1796,7 +1800,9 @@ static int mmci_probe(struct amba_device *dev,
->                  amba_rev(dev), (unsigned long long)dev->res.start,
->                  dev->irq[0], dev->irq[1]);
->
-> -       mmci_dma_setup(host);
-> +       ret = mmci_dma_setup(host);
-> +       if (ret)
-> +               goto clk_disable;
->
->         pm_runtime_set_autosuspend_delay(&dev->dev, 50);
->         pm_runtime_use_autosuspend(&dev->dev);
-> diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-> index 21aaf9a..06299ac 100644
-> --- a/drivers/mmc/host/mmci.h
-> +++ b/drivers/mmc/host/mmci.h
-> @@ -273,7 +273,7 @@ struct variant_data {
->
->  /* mmci variant callbacks */
->  struct mmci_host_ops {
-> -       void (*dma_setup)(struct mmci_host *host);
-> +       int (*dma_setup)(struct mmci_host *host);
->  };
->
->  struct mmci_host_next {
-> diff --git a/drivers/mmc/host/mmci_qcom_dml.c b/drivers/mmc/host/mmci_qcom_dml.c
-> index be3fab5..1bb59cf 100644
-> --- a/drivers/mmc/host/mmci_qcom_dml.c
-> +++ b/drivers/mmc/host/mmci_qcom_dml.c
-> @@ -119,7 +119,7 @@ static int of_get_dml_pipe_index(struct device_node *np, const char *name)
->  }
->
->  /* Initialize the dml hardware connected to SD Card controller */
-> -static void qcom_dma_setup(struct mmci_host *host)
-> +static int qcom_dma_setup(struct mmci_host *host)
->  {
->         u32 config;
->         void __iomem *base;
-> @@ -131,7 +131,7 @@ static void qcom_dma_setup(struct mmci_host *host)
->
->         if (producer_id < 0 || consumer_id < 0) {
->                 host->variant->qcom_dml = false;
-
-It seems like the existing code is an attempt to fallback to use pio
-mode. However, I doubt it works as is.
-
-> -               return;
-> +               return -EINVAL;
-
-My point is, if you return an error code here, it means that the error
-code becomes propagated and ->probe() will fail.
-
-Ideally, we should be able fall back to pio mode when dma doesn't
-work. I have looped in Srinivas who implemented the qcom dml support,
-let's see if he can explains the intent with the code.
-
-I also volunteer to help out running some tests on the 410c platform,
-however allow me a day or two to do that.
-
->         }
->
->         base = host->base + DML_OFFSET;
-> @@ -175,6 +175,8 @@ static void qcom_dma_setup(struct mmci_host *host)
->
->         /* Make sure dml initialization is finished */
->         mb();
-> +
-> +       return 0;
->  }
->
->  static struct mmci_host_ops qcom_variant_ops = {
-> --
-> 2.7.4
+>   git://linux-arm.org/linux-rm iommu/non-strict
 >
 
-Kind regards
-Uffe
+Cheers
+
+So for my network test scenario I was getting a boost @ 250K vs 160K 
+packet(s)/second with strict off/on
+
+For NVMe single disk performance, I was getting a boost @ 582K vs 370K 
+IOPS with strict off/on.
+
+I wasn't seeing such a boost for other storage controller scenario 
+(that's with 6 SSDs), with 776K vs 740K IOPS for strict off/on, but SMMU 
+off was ~800K IOPS.
+
+FWIW:
+Tested-by: John Garry <john.garry@huawei.com>
+
+Thanks,
+John
+
+>
+> Robin.
+>
+> .
+>
