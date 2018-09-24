@@ -1,86 +1,25 @@
 From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Mon, 24 Sep 2018 21:29:59 +0800
-Subject: [PATCH 1/2] arm/arm64: KVM: rename function
- kvm_arch_dev_ioctl_check_extension()
-In-Reply-To: <20180924133000.10244-1-gengdongjiu@huawei.com>
-References: <20180924133000.10244-1-gengdongjiu@huawei.com>
-Message-ID: <20180924133000.10244-2-gengdongjiu@huawei.com>
+Date: Mon, 24 Sep 2018 21:29:58 +0800
+Subject: [PATCH 0/2] rename function name and enable 32bit vcpu events
+Message-ID: <20180924133000.10244-1-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename kvm_arch_dev_ioctl_check_extension() to
-kvm_arch_vm_ioctl_check_extension(), because it does
-not have any relationship with device.
+Rename the kvm_arch_dev_ioctl_check_extension() to 
+kvm_arch_vm_ioctl_check_extension, because the name
+is not reasonable; 
 
-Cc: James Morse <james.morse@arm.com> 
-Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
----
-I remeber James also mentioned that rename this function.
+Enable the 32 bit vcpu events support.
 
----
+Dongjiu Geng (2):
+  arm/arm64: KVM: rename function kvm_arch_dev_ioctl_check_extension()
+  arm/arm64: KVM: share the check for vcpu events capability
+
  arch/arm/include/asm/kvm_host.h   | 2 +-
  arch/arm64/include/asm/kvm_host.h | 2 +-
- arch/arm64/kvm/reset.c            | 4 ++--
- virt/kvm/arm/arm.c                | 2 +-
- 4 files changed, 5 insertions(+), 5 deletions(-)
+ arch/arm64/kvm/reset.c            | 5 ++---
+ virt/kvm/arm/arm.c                | 3 ++-
+ 4 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 3ad482d..3ee29db 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -273,7 +273,7 @@ static inline void __cpu_init_stage2(void)
- 	kvm_call_hyp(__init_stage2_translation);
- }
- 
--static inline int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
-+static inline int kvm_arch_vm_ioctl_check_extension(struct kvm *kvm, long ext)
- {
- 	return 0;
- }
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 3d6d733..c20537f 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -53,7 +53,7 @@
- 
- int __attribute_const__ kvm_target_cpu(void);
- int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
--int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext);
-+int kvm_arch_vm_ioctl_check_extension(struct kvm *kvm, long ext);
- void __extended_idmap_trampoline(phys_addr_t boot_pgd, phys_addr_t idmap_start);
- 
- struct kvm_arch {
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index e37c78b..fd37c53 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -55,12 +55,12 @@ static bool cpu_has_32bit_el1(void)
- }
- 
- /**
-- * kvm_arch_dev_ioctl_check_extension
-+ * kvm_arch_vm_ioctl_check_extension
-  *
-  * We currently assume that the number of HW registers is uniform
-  * across all CPUs (see cpuinfo_sanity_check).
-  */
--int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
-+int kvm_arch_vm_ioctl_check_extension(struct kvm *kvm, long ext)
- {
- 	int r;
- 
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index c92053b..40e79ea 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -240,7 +240,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
- 		r = 1;
- 		break;
- 	default:
--		r = kvm_arch_dev_ioctl_check_extension(kvm, ext);
-+		r = kvm_arch_vm_ioctl_check_extension(kvm, ext);
- 		break;
- 	}
- 	return r;
 -- 
 1.9.1
