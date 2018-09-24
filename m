@@ -1,39 +1,43 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 25 Sep 2018 04:24:39 -0700
-Subject: [PATCH] arm64: dts: rockchip: add initial dts support for
- Rockpro64 board
-In-Reply-To: <1537368206-22058-1-git-send-email-Akash_Gajjar@mentor.com>
-References: <Akash_Gajjar@mentor.com>
- <1537368206-22058-1-git-send-email-Akash_Gajjar@mentor.com>
-Message-ID: <5baa1af8.1c69fb81.b6252.4425@mx.google.com>
+Date: Mon, 24 Sep 2018 16:00:33 -0700
+Subject: [RFC PATCH 13/40] dt-bindings: PCI: keystone: Add "reg-names"
+ binding information
+In-Reply-To: <20180921102155.22839-14-kishon@ti.com>
+References: <20180921102155.22839-1-kishon@ti.com>
+ <20180921102155.22839-14-kishon@ti.com>
+Message-ID: <5baa1b0e.1c69fb81.4f57b.32f7@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Sep 2018 20:13:18 +0530, Akash Gajjar wrote:
-> This patch basic node support for Rockpro64 board and make it able to bring up.
+On Fri, Sep 21, 2018 at 03:51:28PM +0530, Kishon Vijay Abraham I wrote:
+> Add "reg-names" binding information in order for device tree node
+> to be populated with the correct register strings.
 > 
-> Peripheral Works
-> - SDIO, Sdcard
-> - USB 2.0, 3.0
-> - Leds
-> 
-> Not working:
-> - USB Type-C
-> 
-> Signed-off-by: Akash Gajjar <Akash_Gajjar@mentor.com>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 > ---
+>  Documentation/devicetree/bindings/pci/pci-keystone.txt | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
 > 
-> Changes in v2:
-> - add support for usb 2.0, 3.0
-> - add fusb302 node and its regulator support
-> - cleanup pinctrl node
-> - remove backlight, pcie, sound codec node inherited from firefly-rk3399 dts
-> 
->  Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
->  arch/arm64/boot/dts/rockchip/Makefile              |   1 +
->  arch/arm64/boot/dts/rockchip/rk3399-rockpro64.dts  | 692 +++++++++++++++++++++
->  3 files changed, 697 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-rockpro64.dts
-> 
+> diff --git a/Documentation/devicetree/bindings/pci/pci-keystone.txt b/Documentation/devicetree/bindings/pci/pci-keystone.txt
+> index 2030ee0dc4f9..3a551687cfa2 100644
+> --- a/Documentation/devicetree/bindings/pci/pci-keystone.txt
+> +++ b/Documentation/devicetree/bindings/pci/pci-keystone.txt
+> @@ -12,8 +12,10 @@ described here as well as properties that are not applicable.
+>  Required Properties:-
+>  
+>  compatibility: "ti,keystone-pcie"
+> -reg:	index 1 is the base address and length of DW application registers.
+> -	index 2 is the base address and length of PCI device ID register.
+> +reg: Three register ranges as listed in the reg-names property
+> +reg-names: "dbics" for the DesignWare PCIe registers, "app" for the
+> +	   TI specific application registers, "config" for the
+> +	   configuration space address
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+This doesn't doesn't look like a compatible change.
+
+>  
+>  pcie_msi_intc : Interrupt controller device node for MSI IRQ chip
+>  	interrupt-cells: should be set to 1
+> -- 
+> 2.17.1
+> 
