@@ -1,226 +1,145 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 24 Sep 2018 16:13:23 +0200
-Subject: [PATCH] phy: rockchip-usb: add usb-uart setup for rk3188
-In-Reply-To: <20180828085610.28904-1-heiko@sntech.de>
-References: <20180828085610.28904-1-heiko@sntech.de>
-Message-ID: <2960494.bBbcRnOUuH@phil>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 24 Sep 2018 15:15:12 +0100
+Subject: [BISECTED] Regression: Solidrun Clearfog Base won't boot since
+ "PCI: mvebu: Only remap I/O space if configured"
+In-Reply-To: <20180924151040.5e57462b@windsurf>
+References: <20180912231050.GX30658@n2100.armlinux.org.uk>
+ <20180913094515.351967bb@windsurf>
+ <5ad46fec-a71a-477a-b23f-d20aacfb481d@cesnet.cz>
+ <20180913104241.65db8243@windsurf>
+ <20180924101213.GO30658@n2100.armlinux.org.uk>
+ <20180924122614.70738b5c@windsurf>
+ <20180924111341.GP30658@n2100.armlinux.org.uk>
+ <20180924141203.3df9707a@windsurf>
+ <20180924124620.GA10322@e107981-ln.cambridge.arm.com>
+ <20180924151040.5e57462b@windsurf>
+Message-ID: <20180924141512.GA11875@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
-
-Am Dienstag, 28. August 2018, 10:56:10 CEST schrieb Heiko Stuebner:
-> The rk3188 also supports bringing the uart2 out through
-> the usb dm+dp pins, so add the necessary setup for it.
+On Mon, Sep 24, 2018 at 03:10:40PM +0200, Thomas Petazzoni wrote:
+> Hello,
 > 
-> rk3066 does not seem to support usb-uart functionality and this
-> particular phy was only used on older Rockchip socs, so this leaves
-> room for a bit of cleanup as well, as there most likely won't be new
-> additions in the driver.
+> On Mon, 24 Sep 2018 13:46:29 +0100, Lorenzo Pieralisi wrote:
 > 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-
-could you take a look at this change if you find the time please?
-
-
-Thanks
-Heiko
-
-> ---
->  drivers/phy/rockchip/phy-rockchip-usb.c | 141 ++++++++++++++++--------
->  1 file changed, 95 insertions(+), 46 deletions(-)
+> > What I think you can do short term, given that AFAICS MVEBU is not
+> > removable, instead of using pci_host_probe() you move part of its code
+> > into the driver and make sure that you remap IO as last operation before
+> > probe completion (ie after scanning the host bridge) so that you do not
+> > need to unmap it on failure; write a commit log summarising/linking this
+> > thread please and when v4.20 lands we will give this a more thorough
+> > look as Russell requested.
+> > 
+> > How does that sound ?
 > 
-> diff --git a/drivers/phy/rockchip/phy-rockchip-usb.c b/drivers/phy/rockchip/phy-rockchip-usb.c
-> index 3378eeb7a562..456fa703e4f0 100644
-> --- a/drivers/phy/rockchip/phy-rockchip-usb.c
-> +++ b/drivers/phy/rockchip/phy-rockchip-usb.c
-> @@ -36,7 +36,22 @@ static int enable_usb_uart;
->  #define HIWORD_UPDATE(val, mask) \
->  		((val) | (mask) << 16)
->  
-> -#define UOC_CON0_SIDDQ BIT(13)
-> +#define UOC_CON0					0x00
-> +#define UOC_CON0_SIDDQ					BIT(13)
-> +#define UOC_CON0_DISABLE				BIT(4)
-> +#define UOC_CON0_COMMON_ON_N				BIT(0)
-> +
-> +#define UOC_CON2					0x08
-> +#define UOC_CON2_SOFT_CON_SEL				BIT(2)
-> +
-> +#define UOC_CON3					0x0c
-> +/* bits present on rk3188 and rk3288 phys */
-> +#define UOC_CON3_UTMI_TERMSEL_FULLSPEED			BIT(5)
-> +#define UOC_CON3_UTMI_XCVRSEELCT_FSTRANSC		(1 << 3)
-> +#define UOC_CON3_UTMI_XCVRSEELCT_MASK			(3 << 3)
-> +#define UOC_CON3_UTMI_OPMODE_NODRIVING			(1 << 1)
-> +#define UOC_CON3_UTMI_OPMODE_MASK			(3 << 1)
-> +#define UOC_CON3_UTMI_SUSPENDN				BIT(0)
->  
->  struct rockchip_usb_phys {
->  	int reg;
-> @@ -46,7 +61,8 @@ struct rockchip_usb_phys {
->  struct rockchip_usb_phy_base;
->  struct rockchip_usb_phy_pdata {
->  	struct rockchip_usb_phys *phys;
-> -	int (*init_usb_uart)(struct regmap *grf);
-> +	int (*init_usb_uart)(struct regmap *grf,
-> +			     const struct rockchip_usb_phy_pdata *pdata);
->  	int usb_uart_phy;
->  };
->  
-> @@ -313,28 +329,88 @@ static const struct rockchip_usb_phy_pdata rk3066a_pdata = {
->  	},
->  };
->  
-> +static int __init rockchip_init_usb_uart_common(struct regmap *grf,
-> +				const struct rockchip_usb_phy_pdata *pdata)
-> +{
-> +	int regoffs = pdata->phys[pdata->usb_uart_phy].reg;
-> +	int ret;
-> +	u32 val;
-> +
-> +	/*
-> +	 * COMMON_ON and DISABLE settings are described in the TRM,
-> +	 * but were not present in the original code.
-> +	 * Also disable the analog phy components to save power.
-> +	 */
-> +	val = HIWORD_UPDATE(UOC_CON0_COMMON_ON_N
-> +				| UOC_CON0_DISABLE
-> +				| UOC_CON0_SIDDQ,
-> +			    UOC_CON0_COMMON_ON_N
-> +				| UOC_CON0_DISABLE
-> +				| UOC_CON0_SIDDQ);
-> +	ret = regmap_write(grf, regoffs + UOC_CON0, val);
-> +	if (ret)
-> +		return ret;
-> +
-> +	val = HIWORD_UPDATE(UOC_CON2_SOFT_CON_SEL,
-> +			    UOC_CON2_SOFT_CON_SEL);
-> +	ret = regmap_write(grf, regoffs + UOC_CON2, val);
-> +	if (ret)
-> +		return ret;
-> +
-> +	val = HIWORD_UPDATE(UOC_CON3_UTMI_OPMODE_NODRIVING
-> +				| UOC_CON3_UTMI_XCVRSEELCT_FSTRANSC
-> +				| UOC_CON3_UTMI_TERMSEL_FULLSPEED,
-> +			    UOC_CON3_UTMI_SUSPENDN
-> +				| UOC_CON3_UTMI_OPMODE_MASK
-> +				| UOC_CON3_UTMI_XCVRSEELCT_MASK
-> +				| UOC_CON3_UTMI_TERMSEL_FULLSPEED);
-> +	ret = regmap_write(grf, UOC_CON3, val);
-> +	if (ret)
-> +		return ret;
-> +
-> +	return 0;
-> +}
-> +
-> +#define RK3188_UOC0_CON0				0x10c
-> +#define RK3188_UOC0_CON0_BYPASSSEL			BIT(9)
-> +#define RK3188_UOC0_CON0_BYPASSDMEN			BIT(8)
-> +
-> +/*
-> + * Enable the bypass of uart2 data through the otg usb phy.
-> + * See description of rk3288-variant for details.
-> + */
-> +static int __init rk3188_init_usb_uart(struct regmap *grf,
-> +				const struct rockchip_usb_phy_pdata *pdata)
-> +{
-> +	u32 val;
-> +	int ret;
-> +
-> +	ret = rockchip_init_usb_uart_common(grf, pdata);
-> +	if (ret)
-> +		return ret;
-> +
-> +	val = HIWORD_UPDATE(RK3188_UOC0_CON0_BYPASSSEL
-> +				| RK3188_UOC0_CON0_BYPASSDMEN,
-> +			    RK3188_UOC0_CON0_BYPASSSEL
-> +				| RK3188_UOC0_CON0_BYPASSDMEN);
-> +	ret = regmap_write(grf, RK3188_UOC0_CON0, val);
-> +	if (ret)
-> +		return ret;
-> +
-> +	return 0;
-> +}
-> +
->  static const struct rockchip_usb_phy_pdata rk3188_pdata = {
->  	.phys = (struct rockchip_usb_phys[]){
->  		{ .reg = 0x10c, .pll_name = "sclk_otgphy0_480m" },
->  		{ .reg = 0x11c, .pll_name = "sclk_otgphy1_480m" },
->  		{ /* sentinel */ }
->  	},
-> +	.init_usb_uart = rk3188_init_usb_uart,
-> +	.usb_uart_phy = 0,
->  };
->  
-> -#define RK3288_UOC0_CON0				0x320
-> -#define RK3288_UOC0_CON0_COMMON_ON_N			BIT(0)
-> -#define RK3288_UOC0_CON0_DISABLE			BIT(4)
-> -
-> -#define RK3288_UOC0_CON2				0x328
-> -#define RK3288_UOC0_CON2_SOFT_CON_SEL			BIT(2)
-> -
->  #define RK3288_UOC0_CON3				0x32c
-> -#define RK3288_UOC0_CON3_UTMI_SUSPENDN			BIT(0)
-> -#define RK3288_UOC0_CON3_UTMI_OPMODE_NODRIVING		(1 << 1)
-> -#define RK3288_UOC0_CON3_UTMI_OPMODE_MASK		(3 << 1)
-> -#define RK3288_UOC0_CON3_UTMI_XCVRSEELCT_FSTRANSC	(1 << 3)
-> -#define RK3288_UOC0_CON3_UTMI_XCVRSEELCT_MASK		(3 << 3)
-> -#define RK3288_UOC0_CON3_UTMI_TERMSEL_FULLSPEED		BIT(5)
->  #define RK3288_UOC0_CON3_BYPASSDMEN			BIT(6)
->  #define RK3288_UOC0_CON3_BYPASSSEL			BIT(7)
->  
-> @@ -353,40 +429,13 @@ static const struct rockchip_usb_phy_pdata rk3188_pdata = {
->   *
->   * The actual code in the vendor kernel does some things differently.
->   */
-> -static int __init rk3288_init_usb_uart(struct regmap *grf)
-> +static int __init rk3288_init_usb_uart(struct regmap *grf,
-> +				const struct rockchip_usb_phy_pdata *pdata)
->  {
->  	u32 val;
->  	int ret;
->  
-> -	/*
-> -	 * COMMON_ON and DISABLE settings are described in the TRM,
-> -	 * but were not present in the original code.
-> -	 * Also disable the analog phy components to save power.
-> -	 */
-> -	val = HIWORD_UPDATE(RK3288_UOC0_CON0_COMMON_ON_N
-> -				| RK3288_UOC0_CON0_DISABLE
-> -				| UOC_CON0_SIDDQ,
-> -			    RK3288_UOC0_CON0_COMMON_ON_N
-> -				| RK3288_UOC0_CON0_DISABLE
-> -				| UOC_CON0_SIDDQ);
-> -	ret = regmap_write(grf, RK3288_UOC0_CON0, val);
-> -	if (ret)
-> -		return ret;
-> -
-> -	val = HIWORD_UPDATE(RK3288_UOC0_CON2_SOFT_CON_SEL,
-> -			    RK3288_UOC0_CON2_SOFT_CON_SEL);
-> -	ret = regmap_write(grf, RK3288_UOC0_CON2, val);
-> -	if (ret)
-> -		return ret;
-> -
-> -	val = HIWORD_UPDATE(RK3288_UOC0_CON3_UTMI_OPMODE_NODRIVING
-> -				| RK3288_UOC0_CON3_UTMI_XCVRSEELCT_FSTRANSC
-> -				| RK3288_UOC0_CON3_UTMI_TERMSEL_FULLSPEED,
-> -			    RK3288_UOC0_CON3_UTMI_SUSPENDN
-> -				| RK3288_UOC0_CON3_UTMI_OPMODE_MASK
-> -				| RK3288_UOC0_CON3_UTMI_XCVRSEELCT_MASK
-> -				| RK3288_UOC0_CON3_UTMI_TERMSEL_FULLSPEED);
-> -	ret = regmap_write(grf, RK3288_UOC0_CON3, val);
-> +	ret = rockchip_init_usb_uart_common(grf, pdata);
->  	if (ret)
->  		return ret;
->  
-> @@ -516,7 +565,7 @@ static int __init rockchip_init_usb_uart(void)
->  		return PTR_ERR(grf);
->  	}
->  
-> -	ret = data->init_usb_uart(grf);
-> +	ret = data->init_usb_uart(grf, data);
->  	if (ret) {
->  		pr_err("%s: could not init usb_uart, %d\n", __func__, ret);
->  		enable_usb_uart = 0;
+> The only thing that can fail in pci_host_probe() is:
 > 
+> 	ret = pci_scan_root_bus_bridge(bridge);
+> 	if (ret < 0) {
+> 		dev_err(bridge->dev.parent, "Scanning root bridge
+> 	failed"); return ret;
+> 	}
+> 
+> In the pci-mvebu driver prior to the conversion to pci_host_probe(),
+> the code flow at the end of ->probe() was:
+> 
+>   mvebu_pcie_enable()
+>     pci_common_init_dev()
+>       pcibios_init_hw()
+> 
+> and pcibios_init_hw() calls pci_scan_root_bus_bridge(), without doing
+> much about the return value other than issuing a warning:
+> 
+>                                 ret = pci_scan_root_bus_bridge(bridge);
+>                         }
+> 
+>                         if (WARN(ret < 0, "PCI: unable to scan bus!")) {
+>                                 pci_free_host_bridge(bridge);
+>                                 break;
+>                         }
+> 
+> I.e, even before the conversion to pci_host_probe(), in case of
+> failure in pci_scan_root_bus_bridge(), we would have the I/O mapping in
+> place, but the PCI controller not registered.
+> 
+> We could keep the same (not great) behavior by doing:
+> 
+> diff --git a/drivers/pci/controller/pci-mvebu.c b/drivers/pci/controller/pci-mvebu.c
+> index 50eb0729385b..487492f0c5f7 100644
+> --- a/drivers/pci/controller/pci-mvebu.c
+> +++ b/drivers/pci/controller/pci-mvebu.c
+> @@ -1179,9 +1179,6 @@ static int mvebu_pcie_parse_request_resources(struct mvebu_pcie *pcie)
+>                                          resource_size(&pcie->io) - 1);
+>                 pcie->realio.name = "PCI I/O";
+>  
+> -               for (i = 0; i < resource_size(&pcie->realio); i += SZ_64K)
+> -                       pci_ioremap_io(i, pcie->io.start + i);
+> -
+>                 pci_add_resource(&pcie->resources, &pcie->realio);
+>         }
+>  
+> @@ -1197,7 +1194,7 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+>         struct device_node *child;
+>         int num, i, ret;
+>  
+> -       bridge = devm_pci_alloc_host_bridge(dev, sizeof(struct mvebu_pcie));
+> +       bridge = pci_alloc_host_bridge(sizeof(struct mvebu_pcie));
+>         if (!bridge)
+>                 return -ENOMEM;
+>  
+> @@ -1212,8 +1209,10 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+>         num = of_get_available_child_count(np);
+>  
+>         pcie->ports = devm_kcalloc(dev, num, sizeof(*pcie->ports), GFP_KERNEL);
+> -       if (!pcie->ports)
+> -               return -ENOMEM;
+> +       if (!pcie->ports) {
+> +               ret = -ENOMEM;
+> +               goto free_host_bridge;
+> +       }
+>  
+>         i = 0;
+>         for_each_available_child_of_node(np, child) {
+> @@ -1222,7 +1221,7 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+>                 ret = mvebu_pcie_parse_port(pcie, port, child);
+>                 if (ret < 0) {
+>                         of_node_put(child);
+> -                       return ret;
+> +                       goto free_host_bridge;
+>                 } else if (ret == 0) {
+>                         continue;
+>                 }
+> @@ -1268,7 +1267,21 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+>         bridge->align_resource = mvebu_pcie_align_resource;
+>         bridge->msi = pcie->msi;
+>  
+> -       return pci_host_probe(bridge);
+> +       if (resource_size(&pcie->io) != 0) {
+> +               for (i = 0; i < resource_size(&pcie->realio); i += SZ_64K)
+> +                       pci_ioremap_io(i, pcie->io.start + i);
+> +       }
+> +
+> +       ret = pci_host_probe(bridge);
+> +       if (ret)
+> +               pci_free_host_bridge(bridge);
+> +
+> +       /* Yes, when pci_host_probe() returns a failure, we don't care */
+> +       return 0;
+> +
+> +free_host_bridge:
+> +       pci_free_host_bridge(bridge);
+> +       return ret;
+>  }
+>  
+>  static const struct of_device_id mvebu_pcie_of_match_table[] = {
+> 
+> I.e, we simply ignore the failure of pci_host_probe().
+> 
+> To be honest, I really prefer the option of introducing pci_unmap_io().
+
+I understand that, I wanted to make sure we come up with a fix asap
+and what I put forward would cover everything discussed in this thread,
+at least temporarily, giving us time to check ISA related issues while
+unmapping IO space.
+
+Lorenzo
