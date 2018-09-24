@@ -1,42 +1,140 @@
-From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
-Date: Mon, 24 Sep 2018 10:25:45 -0400
-Subject: [Xen-devel] clean up physical merging helpers
-In-Reply-To: <6e7fa8d3-4839-726d-572c-1678f5450880@kernel.dk>
-References: <20180904191431.20102-1-hch@lst.de> <20180915070300.GA10555@lst.de>
- <b8f3621a-f789-d737-649f-7b3645912888@kernel.dk>
- <20180920062946.GA12893@lst.de>
- <6e7fa8d3-4839-726d-572c-1678f5450880@kernel.dk>
-Message-ID: <5fc63f64-4e81-0e10-bc3e-bde6f279c973@oracle.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 24 Sep 2018 16:28:07 +0200
+Subject: [PATCH V2 03/27] mmc: mmci: convert dma_setup callback to return
+ an int
+In-Reply-To: <1537523181-14578-4-git-send-email-ludovic.Barre@st.com>
+References: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
+ <1537523181-14578-4-git-send-email-ludovic.Barre@st.com>
+Message-ID: <CAPDyKFqnN0gg9WsbNPQcodqUXJmFEzMM+ST36s6oEZ2OPoONug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/20/18 10:39 AM, Jens Axboe wrote:
-> On 9/20/18 12:29 AM, Christoph Hellwig wrote:
->> On Sat, Sep 15, 2018 at 08:47:13AM -0600, Jens Axboe wrote:
->>>>> this series moves various helpers related to merging based on physical
->>>>> addresses from the public headers into block/, moves the Xen special
->>>>> case from arch hooks into common code, cleans up the code a bit, and
->>>>> removes not nessecary includes from the block headers.
->>>> ---end quoted text---
->>>>
->>> It's a good cleanup, I like it. Would prefer if the arm/xen folks could
->>> ack the first bits,
->> Konread, can you look at the series (or delegate).
-
-
-Konrad is out this (and last) week, this looks good to me. Including
-patch 13, although it's hard to say whether it may break some builds.
-
--boris
-
-
-
->>
->>> and 13/13 should probably just to in differently.
->> I can't parse this setence.
-> The irony is thick :-)
+On 21 September 2018 at 11:45, Ludovic Barre <ludovic.Barre@st.com> wrote:
+> From: Ludovic Barre <ludovic.barre@st.com>
 >
-> Anyway, s/to/go for that sentence. I don't mind carrying it if Konrad
-> is happy with it, but it could go in separately after this series is
-> merged.
+> This patch converts dma_setup callback to return an integer
+> This patch is needed to prepare sdmmc variant with internal dma
 >
+> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+> ---
+>  drivers/mmc/host/mmci.c          | 14 ++++++++++----
+>  drivers/mmc/host/mmci.h          |  2 +-
+>  drivers/mmc/host/mmci_qcom_dml.c |  6 ++++--
+>  3 files changed, 15 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+> index cbd67bc..2f845f3 100644
+> --- a/drivers/mmc/host/mmci.c
+> +++ b/drivers/mmc/host/mmci.c
+> @@ -415,7 +415,7 @@ static void mmci_init_sg(struct mmci_host *host, struct mmc_data *data)
+>   * no custom DMA interfaces are supported.
+>   */
+>  #ifdef CONFIG_DMA_ENGINE
+> -static void mmci_dma_setup(struct mmci_host *host)
+> +static int mmci_dma_setup(struct mmci_host *host)
+>  {
+>         const char *rxname, *txname;
+>
+> @@ -466,7 +466,9 @@ static void mmci_dma_setup(struct mmci_host *host)
+>         }
+>
+>         if (host->ops && host->ops->dma_setup)
+> -               host->ops->dma_setup(host);
+> +               return host->ops->dma_setup(host);
+> +
+
+Looks like you need to implement a error handling, instead of just
+returning the error code.
+
+> +       return 0;
+>  }
+>
+>  /*
+> @@ -741,8 +743,10 @@ static void mmci_post_request(struct mmc_host *mmc, struct mmc_request *mrq,
+>  static void mmci_get_next_data(struct mmci_host *host, struct mmc_data *data)
+>  {
+>  }
+> -static inline void mmci_dma_setup(struct mmci_host *host)
+> +
+> +static inline int mmci_dma_setup(struct mmci_host *host)
+>  {
+> +       return 0;
+>  }
+>
+>  static inline void mmci_dma_release(struct mmci_host *host)
+> @@ -1796,7 +1800,9 @@ static int mmci_probe(struct amba_device *dev,
+>                  amba_rev(dev), (unsigned long long)dev->res.start,
+>                  dev->irq[0], dev->irq[1]);
+>
+> -       mmci_dma_setup(host);
+> +       ret = mmci_dma_setup(host);
+> +       if (ret)
+> +               goto clk_disable;
+>
+>         pm_runtime_set_autosuspend_delay(&dev->dev, 50);
+>         pm_runtime_use_autosuspend(&dev->dev);
+> diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+> index 21aaf9a..06299ac 100644
+> --- a/drivers/mmc/host/mmci.h
+> +++ b/drivers/mmc/host/mmci.h
+> @@ -273,7 +273,7 @@ struct variant_data {
+>
+>  /* mmci variant callbacks */
+>  struct mmci_host_ops {
+> -       void (*dma_setup)(struct mmci_host *host);
+> +       int (*dma_setup)(struct mmci_host *host);
+>  };
+>
+>  struct mmci_host_next {
+> diff --git a/drivers/mmc/host/mmci_qcom_dml.c b/drivers/mmc/host/mmci_qcom_dml.c
+> index be3fab5..1bb59cf 100644
+> --- a/drivers/mmc/host/mmci_qcom_dml.c
+> +++ b/drivers/mmc/host/mmci_qcom_dml.c
+> @@ -119,7 +119,7 @@ static int of_get_dml_pipe_index(struct device_node *np, const char *name)
+>  }
+>
+>  /* Initialize the dml hardware connected to SD Card controller */
+> -static void qcom_dma_setup(struct mmci_host *host)
+> +static int qcom_dma_setup(struct mmci_host *host)
+>  {
+>         u32 config;
+>         void __iomem *base;
+> @@ -131,7 +131,7 @@ static void qcom_dma_setup(struct mmci_host *host)
+>
+>         if (producer_id < 0 || consumer_id < 0) {
+>                 host->variant->qcom_dml = false;
+
+It seems like the existing code is an attempt to fallback to use pio
+mode. However, I doubt it works as is.
+
+> -               return;
+> +               return -EINVAL;
+
+My point is, if you return an error code here, it means that the error
+code becomes propagated and ->probe() will fail.
+
+Ideally, we should be able fall back to pio mode when dma doesn't
+work. I have looped in Srinivas who implemented the qcom dml support,
+let's see if he can explains the intent with the code.
+
+I also volunteer to help out running some tests on the 410c platform,
+however allow me a day or two to do that.
+
+>         }
+>
+>         base = host->base + DML_OFFSET;
+> @@ -175,6 +175,8 @@ static void qcom_dma_setup(struct mmci_host *host)
+>
+>         /* Make sure dml initialization is finished */
+>         mb();
+> +
+> +       return 0;
+>  }
+>
+>  static struct mmci_host_ops qcom_variant_ops = {
+> --
+> 2.7.4
+>
+
+Kind regards
+Uffe
