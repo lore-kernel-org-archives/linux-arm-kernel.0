@@ -1,30 +1,52 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Mon, 24 Sep 2018 09:43:55 +0200
-Subject: [PATCH 10/10] block: don't include bug.h from bio.h
-In-Reply-To: <20180924074355.2802-1-hch@lst.de>
-References: <20180924074355.2802-1-hch@lst.de>
-Message-ID: <20180924074355.2802-11-hch@lst.de>
+From: eugen.hristev@microchip.com (Eugen Hristev)
+Date: Mon, 24 Sep 2018 10:51:44 +0300
+Subject: [PATCH v2 2/2] iio: adc: at91: fix wrong channel number in triggered
+ buffer mode
+In-Reply-To: <1537775504-7981-1-git-send-email-eugen.hristev@microchip.com>
+References: <1537775504-7981-1-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <1537775504-7981-2-git-send-email-eugen.hristev@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No need to pull in the BUG() defintion.
+When channels are registered, the hardware channel number is not the
+actual iio channel number.
+This is because the driver is probed with a certain number of accessible
+channels. Some pins are routed and some not, depending on the description of
+the board in the DT.
+Because of that, channels 0,1,2,3 can correspond to hardware channels
+2,3,4,5 for example.
+In the buffered triggered case, we need to do the translation accordingly.
+Fixed the channel number to stop reading the wrong channel.
 
-Signed-off-by: Christoph Hellwig <hch@lst.de>
+Fixes 0e589d5fb "ARM: AT91: IIO: Add AT91 ADC driver."
+Cc: Maxime Ripard <maxime.ripard@bootlin.com>
+Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
 ---
- include/linux/bio.h | 1 -
- 1 file changed, 1 deletion(-)
+Changes in v2:
+- Added 'const' spec to the declaration to avoid build warning
 
-diff --git a/include/linux/bio.h b/include/linux/bio.h
-index b3d47862b1b4..f447b0ebb288 100644
---- a/include/linux/bio.h
-+++ b/include/linux/bio.h
-@@ -21,7 +21,6 @@
- #include <linux/highmem.h>
- #include <linux/mempool.h>
- #include <linux/ioprio.h>
--#include <linux/bug.h>
+ drivers/iio/adc/at91_adc.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
+index e3be88e..75d2f73 100644
+--- a/drivers/iio/adc/at91_adc.c
++++ b/drivers/iio/adc/at91_adc.c
+@@ -248,12 +248,14 @@ static irqreturn_t at91_adc_trigger_handler(int irq, void *p)
+ 	struct iio_poll_func *pf = p;
+ 	struct iio_dev *idev = pf->indio_dev;
+ 	struct at91_adc_state *st = iio_priv(idev);
++	struct iio_chan_spec const *chan;
+ 	int i, j = 0;
  
- #ifdef CONFIG_BLOCK
- /* struct bio, bio_vec and BIO_* flags are defined in blk_types.h */
+ 	for (i = 0; i < idev->masklength; i++) {
+ 		if (!test_bit(i, idev->active_scan_mask))
+ 			continue;
+-		st->buffer[j] = at91_adc_readl(st, AT91_ADC_CHAN(st, i));
++		chan = idev->channels + i;
++		st->buffer[j] = at91_adc_readl(st, AT91_ADC_CHAN(st, chan->channel));
+ 		j++;
+ 	}
+ 
 -- 
-2.19.0
+2.7.4
