@@ -1,96 +1,125 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Mon, 24 Sep 2018 14:16:51 -0700
-Subject: [PATCH] arm64: dts: sdm630 SoC and Sony Pioneer (Xperia XA2)
- support
-In-Reply-To: <18147804-E195-4A4F-B215-77E8E4FF7C88@gmail.com>
-References: <20180811162549.12312-1-ctatlor97@gmail.com>
- <20180924191929.GQ1367@tuxbook-pro>
- <18147804-E195-4A4F-B215-77E8E4FF7C88@gmail.com>
-Message-ID: <20180924211650.GH2523@minitux>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 24 Sep 2018 22:21:43 +0100
+Subject: [PATCH v7 9/9] KVM: arm64: Add support for creating PUD hugepages
+ at stage 2
+In-Reply-To: <20180924174552.8387-10-punit.agrawal@arm.com>
+References: <20180924174552.8387-1-punit.agrawal@arm.com>
+ <20180924174552.8387-10-punit.agrawal@arm.com>
+Message-ID: <4df146fc-f9b0-882e-becb-056111a444d4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 24 Sep 13:42 PDT 2018, Craig wrote:
-> On 24 September 2018 20:19:29 BST, Bjorn Andersson <bjorn.andersson@linaro.org> wrote:
-> >On Sat 11 Aug 09:25 PDT 2018, Craig Tatlor wrote:
-> >
-> >> Initial device tree support for Qualcomm SDM630 SoC and
-> >> Sony Pioneer (Xperia XA2).
-> >> 
-> >> SDM630 is based off of the SDM660 soc and all SDM660 specific drivers
-> >are
-> >> compatible with it. SDM660 is also based off of MSM8998 so it uses
-> >some
-> >> of its drivers aswell.
-> >
-> >Consider adding both sdm630 and sdm660 compatibles to the bindings and
-> >drivers and use the right one in the dts, in case we find details that
-> >differs in the future.
+Hi Punit,
+
+
+On 09/24/2018 06:45 PM, Punit Agrawal wrote:
+> KVM only supports PMD hugepages at stage 2. Now that the various page
+> handling routines are updated, extend the stage 2 fault handling to
+> map in PUD hugepages.
 > 
-> This includes pinctrl and GCC?
+> Addition of PUD hugepage support enables additional page sizes (e.g.,
+> 1G with 4K granule) which can be useful on cores that support mapping
+> larger block sizes in the TLB entries.
+> 
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
 
-Yes
 
-> >
-> >> 
-> >> The device tree is based on the CAF 4.4 kernel tree.
-> >> 
-> >> The device can be booted into the initrd with a shell over UART.
-> >> 
-> >> Signed-off-by: Craig Tatlor <ctatlor97@gmail.com>
-> >[..]
-> >> diff --git a/arch/arm64/boot/dts/qcom/sdm630-pins.dtsi
-> >b/arch/arm64/boot/dts/qcom/sdm630-pins.dtsi
-> >> new file mode 100644
-> >> index 000000000000..78b79c1076f1
-> >> --- /dev/null
-> >> +++ b/arch/arm64/boot/dts/qcom/sdm630-pins.dtsi
-> >> @@ -0,0 +1,17 @@
-> >> +// SPDX-License-Identifier: GPL-2.0
-> >> +/* Copyright (c) 2018, Craig Tatlor. */
-> >> +
-> >> +&tlmm {
-> >> +	blsp1_uart1_default: blsp1_uart1_default {
-> >> +		pinmux {
-> >> +			pins = "gpio0", "gpio1", "gpio2", "gpio3";
-> >> +			function = "gpio";
-> >
-> >Please put these in the sdm630.dtsi directly, rather than spreading the
-> >pins out in a separate file.
-> >
-> Okay, just followed what 8996 did
+> 
+> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> index a42b9505c9a7..a8e86b926ee0 100644
+> --- a/arch/arm/include/asm/kvm_mmu.h
+> +++ b/arch/arm/include/asm/kvm_mmu.h
+> @@ -84,11 +84,14 @@ void kvm_clear_hyp_idmap(void);
+>   
+>   #define kvm_pfn_pte(pfn, prot)	pfn_pte(pfn, prot)
+>   #define kvm_pfn_pmd(pfn, prot)	pfn_pmd(pfn, prot)
+> +#define kvm_pfn_pud(pfn, prot)	(__pud(0))
+>   
+>   #define kvm_pud_pfn(pud)	({ BUG(); 0; })
+>   
+>   
+>   #define kvm_pmd_mkhuge(pmd)	pmd_mkhuge(pmd)
+> +/* No support for pud hugepages */
+> +#define kvm_pud_mkhuge(pud)	(pud)
+>   
 
-I have started to rework that based on the last year's discussions, but
-haven't posted any patches yet.
+shouldn't this be BUG() like other PUD huge helpers for arm32 ?
 
-> >> +		};
-> >> +
-> >> +		pinconf {
-> >> +			pins = "gpio0", "gpio1", "gpio2", "gpio3";
-> >> +			drive-strength = <2>;
-> >> +			bias-disable;
-> >
-> >Please extend &blsp1_uart1_default in the pioneer dtsi with these
-> >"electrical properties".
-> Are you meaning to put this in the pioneer DTS or just drive strength and bias?
+>   /*
+>    * The following kvm_*pud*() functions are provided strictly to allow
+> @@ -105,6 +108,23 @@ static inline bool kvm_s2pud_readonly(pud_t *pud)
+>   	return false;
+>   }
+>   
+> +static inline void kvm_set_pud(pud_t *pud, pud_t new_pud)
+> +{
+> +	BUG();
+> +}
+> +
+> +static inline pud_t kvm_s2pud_mkwrite(pud_t pud)
+> +{
+> +	BUG();
+> +	return pud;
+> +}
+> +
+> +static inline pud_t kvm_s2pud_mkexec(pud_t pud)
+> +{
+> +	BUG();
+> +	return pud;
+> +}
+> +
 
-The drive-strength and bias are board-specific properties, so we want to
-keep those in the board file, so I mean push the pinconf part into the
-board dtsi.
 
-[..]
-> >> +		gcc: clock-controller at 100000 {
-> >> +			compatible = "qcom,gcc-sdm660";
-> >> +			#clock-cells = <1>;
-> >> +			#reset-cells = <1>;
-> >> +			#power-domain-cells = <1>;
-> >> +			reg = <0x100000 0x94000>;
-> >
-> >Please 0-pad addresses in "reg", makes it easier to sort them as well
-> >(but keep the @address after the node name unpadded)
-> Sure, how much should I pad up to?
+> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+> index 3ff7ebb262d2..5b8163537bc2 100644
+> --- a/virt/kvm/arm/mmu.c
+> +++ b/virt/kvm/arm/mmu.c
 
-reg = <0x00100000 0xb0000>;
+...
 
-Regards,
-Bjorn
+
+> @@ -1669,7 +1746,28 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>   	needs_exec = exec_fault ||
+>   		(fault_status == FSC_PERM && stage2_is_exec(kvm, fault_ipa));
+>   
+> -	if (hugetlb && vma_pagesize == PMD_SIZE) {
+> +	if (hugetlb && vma_pagesize == PUD_SIZE) {
+> +		/*
+> +		 * Assuming that PUD level always exists at Stage 2 -
+> +		 * this is true for 4k pages with 40 bits IPA
+> +		 * currently supported.
+> +		 *
+> +		 * When using 64k pages, 40bits of IPA results in
+> +		 * using only 2-levels at Stage 2. Overlooking this
+> +		 * problem for now as a PUD hugepage with 64k pages is
+> +		 * too big (4TB) to be practical.
+> +		 */
+> +		pud_t new_pud = kvm_pfn_pud(pfn, mem_type);
+
+Is this based on the Dynamic IPA series ? The cover letter seems
+to suggest that it is. But I don't see the check to make sure we have
+stage2 PUD level here before we go ahead and try PUD huge page at
+stage2. Also the comment above seems outdated in that case.
+
+> +
+> +		new_pud = kvm_pud_mkhuge(new_pud);
+> +		if (writable)
+> +			new_pud = kvm_s2pud_mkwrite(new_pud);
+> +
+> +		if (needs_exec)
+> +			new_pud = kvm_s2pud_mkexec(new_pud);
+> +
+> +		ret = stage2_set_pud_huge(kvm, memcache, fault_ipa, &new_pud);
+> +	} else if (hugetlb && vma_pagesize == PMD_SIZE) {
+>   		pmd_t new_pmd = kvm_pfn_pmd(pfn, mem_type);
+>   
+>   		new_pmd = kvm_pmd_mkhuge(new_pmd);
+> 
+
+
+Suzuki
