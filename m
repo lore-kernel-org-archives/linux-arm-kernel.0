@@ -1,44 +1,68 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 24 Sep 2018 08:55:29 +0200
-Subject: [PATCH 0/2] STM32: Fixes for 4.19 cycle
-In-Reply-To: <20180923123438.kyvxpeqq6q6xo6cs@localhost>
-References: <1537461257-2940-1-git-send-email-alexandre.torgue@st.com>
- <20180923123438.kyvxpeqq6q6xo6cs@localhost>
-Message-ID: <d952b14a-644e-a067-9615-f0d35f370893@st.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 24 Sep 2018 09:28:07 +0200
+Subject: [PATCH 1/2] clocksource/drivers: Unify the names to timer-* format
+In-Reply-To: <7451938d-c600-f070-d1c7-1c77f79518b0@linaro.org>
+References: <1537762569-18657-1-git-send-email-daniel.lezcano@linaro.org>
+ <20180924062828.4yh3aumcuiihojgu@pengutronix.de>
+ <7451938d-c600-f070-d1c7-1c77f79518b0@linaro.org>
+Message-ID: <20180924072807.xjxdrvtjeoa3wsch@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof
+On Mon, Sep 24, 2018 at 08:31:26AM +0200, Daniel Lezcano wrote:
+> On 24/09/2018 08:28, Uwe Kleine-K?nig wrote:
+> > On Mon, Sep 24, 2018 at 06:15:17AM +0200, Daniel Lezcano wrote:
+> >> In order to make some housekeeping in the directory, this patch renames
+> >> drivers to the timer-* format in order to unify their names.
+> >>
+> >> There is no functional changes.
+> >>
+> >> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> >> ---
+> >>  MAINTAINERS                               |  10 +-
+> >>  drivers/clocksource/Makefile              |  26 +-
+> >>  drivers/clocksource/cadence_ttc_timer.c   | 543 ------------------------------
+> >>  drivers/clocksource/fsl_ftm_timer.c       | 376 ---------------------
+> >>  drivers/clocksource/owl-timer.c           | 173 ----------
+> >>  drivers/clocksource/qcom-timer.c          | 258 --------------
+> >>  drivers/clocksource/time-armada-370-xp.c  | 416 -----------------------
+> >>  drivers/clocksource/time-efm32.c          | 287 ----------------
+> >>  drivers/clocksource/time-lpc32xx.c        | 314 -----------------
+> >>  drivers/clocksource/time-orion.c          | 192 -----------
+> >>  drivers/clocksource/time-pistachio.c      | 218 ------------
+> >>  drivers/clocksource/timer-armada-370-xp.c | 416 +++++++++++++++++++++++
+> >>  drivers/clocksource/timer-cadence-ttc.c   | 543 ++++++++++++++++++++++++++++++
+> >>  drivers/clocksource/timer-efm32.c         | 287 ++++++++++++++++
+> >>  drivers/clocksource/timer-fsl-ftm.c       | 376 +++++++++++++++++++++
+> >>  drivers/clocksource/timer-lpc32xx.c       | 314 +++++++++++++++++
+> >>  drivers/clocksource/timer-orion.c         | 192 +++++++++++
+> >>  drivers/clocksource/timer-owl.c           | 173 ++++++++++
+> >>  drivers/clocksource/timer-pistachio.c     | 218 ++++++++++++
+> >>  drivers/clocksource/timer-qcom.c          | 258 ++++++++++++++
+> >>  drivers/clocksource/timer-versatile.c     |  44 +++
+> >>  drivers/clocksource/timer-vf-pit.c        | 204 +++++++++++
+> >>  drivers/clocksource/timer-vt8500.c        | 168 +++++++++
+> >>  drivers/clocksource/timer-zevio.c         | 218 ++++++++++++
+> >>  drivers/clocksource/versatile.c           |  44 ---
+> >>  drivers/clocksource/vf_pit_timer.c        | 204 -----------
+> >>  drivers/clocksource/vt8500_timer.c        | 168 ---------
+> >>  drivers/clocksource/zevio-timer.c         | 218 ------------
+> >>  28 files changed, 3429 insertions(+), 3429 deletions(-)
+> > 
+> > Wow, with git format-patch -M this should look much smaller and so
+> > easier to review.
+> 
+> Yes, I forgot the option :/
 
-On 09/23/2018 02:34 PM, Olof Johansson wrote:
-> Hi Alexandre,
-> 
-> On Thu, Sep 20, 2018 at 06:34:15PM +0200, Alexandre Torgue wrote:
->> Hi Arnd, olof and Kevin
->>
->> Those 2 patches fixe the same issue on 4.19-rc: a bad usage of the mdma
->> binding inside stm32mp157c.dts file. Can you please add them as fixe for 4.19 ?
-> 
-> The patches only mention removing unused property contents, not what the bug is
-> that it fixes (or if it's even causing any problems). Care you clarify?
+I think you want:
 
-Sure.
-Concerning SPI patch: without this patch, DMA request will fail but 
-there will be no crash because SPI will switch in interrupt mode.
-Concerning HASH one, it's just to align DT with dt-bindings documentation.
-Regarding the minor issue that they fix I could understand that you 
-postpone the merge of those two patches for 4.20.
+	git config diff.renames true
 
-Regards
-Alex
+or a newer git (>= 2.9, which enabled that by default).
 
-> 
-> If it's just fixing inaccurate DT that isn't used, then it's not something we
-> urgently need to fix in 4.19 and it can wait for 4.20.
-> 
-> 
-> Thanks,
-> 
-> 
-> -Olof
-> 
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
