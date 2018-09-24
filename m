@@ -1,63 +1,319 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Mon, 24 Sep 2018 09:27:25 +0100
-Subject: [GIT PULL] arm: dts: hisilicon dts updates for v4.20
-In-Reply-To: <20180923133851.hrggqnbi6mzesgjj@localhost>
-References: <5BA50883.4040708@hisilicon.com>
- <20180923133851.hrggqnbi6mzesgjj@localhost>
-Message-ID: <5BA89FED.2070903@hisilicon.com>
+From: lukma@denx.de (Lukasz Majewski)
+Date: Mon, 24 Sep 2018 10:30:45 +0200
+Subject: [PATCH] ARM: dts: Add support for Liebherr's BK4 device (vf610
+ based)
+In-Reply-To: <CAOMZO5DPnWNJ_UVdE9Lvh05R84seP8VPP=35eEUaor4-pppXGQ@mail.gmail.com>
+References: <20180921152726.31742-1-lukma@denx.de>
+ <CAOMZO5DPnWNJ_UVdE9Lvh05R84seP8VPP=35eEUaor4-pppXGQ@mail.gmail.com>
+Message-ID: <20180924103045.524c6855@jawa>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Hi Fabio,
 
-On 2018/9/23 14:38, Olof Johansson wrote:
-> On Fri, Sep 21, 2018 at 04:04:35PM +0100, Wei Xu wrote:
->> Hi ARM-SoC team,
->>
->> Please consider to pull the following changes.
->> Thanks!
->>
->> Best Regards,
->> Wei
->>
->> ---
->>
->> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
->>
->>   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
->>
->> are available in the Git repository at:
->>
->>   git://github.com/hisilicon/linux-hisi.git tags/hisi-arm32-dt-for-4.20
->>
->> for you to fetch changes up to 6523a0e155c8eeafcb290596aad86388e7577316:
->>
->>   arm: dts: hip04: Update coresight bindings for hardware ports (2018-09-19 16:28:51 +0100)
->>
->> ----------------------------------------------------------------
->> ARM: DT: Hisilicon ARM32 SoCs updates for 4.20
->>
->> - Switch to updated coresight bindings for hip04 SoC
->>
->> ----------------------------------------------------------------
->> Suzuki K Poulose (1):
->>       arm: dts: hip04: Update coresight bindings for hardware ports
-> 
-> Nit: we try to keep ARM patches with ARM: as previx, arm64 has arm64:.
-> 
-> 
-> Merged, thanks!
+Thanks for your review.
 
-Thanks for pointing it out.
-I will follow that pattern in the future.
-Thanks!
+> On Fri, Sep 21, 2018 at 12:27 PM, Lukasz Majewski <lukma@denx.de>
+> wrote:
+> > This commit adds DTS support for BK4 device from Liebherr. It
+> > uses vf610 SoC from NXP.
+> >
+> > Signed-off-by: Lukasz Majewski <lukma@denx.de>
+> > ---
+> >  arch/arm/boot/dts/Makefile      |   1 +
+> >  arch/arm/boot/dts/vf610-bk4.dts | 504
+> > ++++++++++++++++++++++++++++++++++++++++ 2 files changed, 505
+> > insertions(+) create mode 100644 arch/arm/boot/dts/vf610-bk4.dts
+> >
+> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> > index b5bd3de87c33..e6f159895fa9 100644
+> > --- a/arch/arm/boot/dts/Makefile
+> > +++ b/arch/arm/boot/dts/Makefile
+> > @@ -577,6 +577,7 @@ dtb-$(CONFIG_SOC_LS1021A) += \
+> >         ls1021a-twr.dtb
+> >  dtb-$(CONFIG_SOC_VF610) += \
+> >         vf500-colibri-eval-v3.dtb \
+> > +       vf610-bk4.dtb \
+> >         vf610-colibri-eval-v3.dtb \
+> >         vf610m4-colibri.dtb \
+> >         vf610-cosmic.dtb \
+> > diff --git a/arch/arm/boot/dts/vf610-bk4.dts
+> > b/arch/arm/boot/dts/vf610-bk4.dts new file mode 100644
+> > index 000000000000..4ad7e739a0ad
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/vf610-bk4.dts
+> > @@ -0,0 +1,504 @@
+> > +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+> > +/*
+> > + * Copyright 2018
+> > + * Lukasz Majewski, DENX Software Engineering, lukma at denx.de
+> > + */
+> > +
+> > +/dts-v1/;
+> > +#include "vf610.dtsi"
+> > +
+> > +/ {
+> > +       model = "Liebherr BK4 controller";
+> > +       compatible = "lwn,bk4", "fsl,vf610";
+> > +
+> > +       chosen {
+> > +               bootargs = "console=ttyLP1,115200";  
+> 
+> You could pass stdout-path instead.
 
-Best Regards,
-Wei
+Ok.
+
+> 
+> > +       };
+> > +
+> > +       memory at 80000000 {
+> > +               reg = <0x80000000 0x8000000>;
+> > +       };
+> > +
+> > +       audio_ext: mclk_osc {
+> > +               compatible = "fixed-clock";
+> > +               #clock-cells = <0>;
+> > +               clock-frequency = <24576000>;
+> > +       };  
+> 
+> This seems to be unused.
+
+The audio_ext label is used (referenced) in the "clks".
+
+> 
+> > +
+> > +       enet_ext: eth_osc {
+> > +               compatible = "fixed-clock";
+> > +               #clock-cells = <0>;
+> > +               clock-frequency = <50000000>;
+> > +       };
+> > +
+> > +       leds {
+> > +               compatible = "gpio-leds";
+> > +               pinctrl-names = "default";
+> > +               pinctrl-0 = <&pinctrl_gpio_leds>;
+> > +
+> > +               /* LED D5 */
+> > +               led0: heartbeat {
+> > +                       label = "heartbeat";
+> > +                       gpios = <&gpio3 21 GPIO_ACTIVE_HIGH>;
+> > +                       default-state = "on";
+> > +                       linux,default-trigger = "heartbeat";
+> > +               };
+> > +       };
+> > +
+> > +       regulators {
+> > +               compatible = "simple-bus";
+> > +               #address-cells = <1>;
+> > +               #size-cells = <0>;
+> > +
+> > +               reg_3p3v: regulator at 0 {  
+> 
+> Please move all regulators outside of the simple-bus container and use
+> this naming convention:
+> 
+> reg_3p3v: regulator-3p3v {
+
+Ok.
+
+> 
+> > +&dspi3 {
+> > +       pinctrl-names = "default";
+> > +       pinctrl-0 = <&pinctrl_dspi3>;
+> > +       bus-num = <3>;
+> > +       status = "okay";
+> > +
+> > +       spidev3 at 0 {
+> > +               compatible = "fsl,vf610-dspi";
+> > +               spi-max-frequency = <30000000>;
+> > +               reg = <0>;
+> > +               fsl,spi-slave-mode;  
+> 
+> Such property does not exist.
+
+It has been added in the other patch sent to ML:
+https://lkml.org/lkml/2018/9/18/792
+
+But till now no comments/reply.
+
+> 
+> I also thought that spidev nodes in dt were not recommended.
+
+This is a bit "unusual" on BK4, as the spidev driver is the only "user"
+of the SPI subsystem on this board. In other words - the /dev/spidevX.Y
+provided by spidev is solely used for communication.
+
+Hence, I would prefer to make it explicit in the DTS.
+
+> 
+> > +&iomuxc {  
+> 
+> Like Stefan mentioned it is common practice on imx dts files to place
+> the iomuxc node as the last one.
+
+Ok.
 
 > 
 > 
-> -Olof
+> > +       pinctrl-names = "default";
+> > +       pinctrl-0 = <&pinctrl_bk4_common>;  
 > 
-> .
+> This seems to be not called from any driver.
+
+Yes. This is "base" setup for the board. Those configured pins are
+thereafter used by several user space programs.
+
 > 
+> We usually use a hog group for such purpose.
+
+I wanted to name it explicit that we do use it for this controller.
+However, no problem to rename it to hog.
+
+> 
+> > +
+> > +       pinctrl_bk4_common: commongrp {
+> > +               fsl,pins = <
+> > +                       /* One_Wire_PSU_EN */
+> > +                       VF610_PAD_PTC29__GPIO_102
+> > 0x1183
+> > +                       /* SPI */
+> > +                       VF610_PAD_PTB26__GPIO_96
+> > 0x1183
+> > +                       VF610_PAD_PTE14__GPIO_119
+> > 0x1183
+> > +                       VF610_PAD_PTE4__GPIO_109
+> > 0x1181
+> > +                       /* Feedback_Lines */
+> > +                       VF610_PAD_PTC31__GPIO_104
+> > 0x1181
+> > +                       VF610_PAD_PTA7__GPIO_134
+> > 0x1181
+> > +                       VF610_PAD_PTD9__GPIO_88         0x1181
+> > +                       VF610_PAD_PTE1__GPIO_106
+> > 0x1183
+> > +                       VF610_PAD_PTB2__GPIO_24         0x1181
+> > +                       VF610_PAD_PTB3__GPIO_25         0x1181
+> > +                       VF610_PAD_PTB1__GPIO_23         0x1181
+> > +                       /* SDHC */
+> > +                       VF610_PAD_PTE19__GPIO_124
+> > 0x1183
+> > +                       VF610_PAD_PTB23__GPIO_93
+> > 0x1181  
+> 
+> If they are related to SDHC they should be better placed under the
+> sdhc nodes.
+> 
+
+I will double check this.
+
+> 
+> > +                       /* GPI */
+> > +                       VF610_PAD_PTE2__GPIO_107
+> > 0x1181
+> > +                       VF610_PAD_PTE3__GPIO_108
+> > 0x1181
+> > +                       VF610_PAD_PTE5__GPIO_110
+> > 0x1181
+> > +                       VF610_PAD_PTE6__GPIO_111
+> > 0x1181
+> > +                       /* GPO */
+> > +                       VF610_PAD_PTE0__GPIO_105
+> > 0x1183
+> > +                       VF610_PAD_PTE7__GPIO_112
+> > 0x1183
+> > +                       /* RS485 */
+> > +                       VF610_PAD_PTB8__GPIO_30         0x1183
+> > +                       VF610_PAD_PTB9__GPIO_31         0x1183
+> > +                       VF610_PAD_PTE8__GPIO_113
+> > 0x1183
+> > +                       /* MPBUS MPB_EN */
+> > +                       VF610_PAD_PTE28__GPIO_133
+> > 0x1183
+> > +                       /* LEDS */
+> > +                       VF610_PAD_PTE15__GPIO_120
+> > 0x1183
+> > +                       VF610_PAD_PTA12__GPIO_5         0x1183
+> > +                       VF610_PAD_PTA16__GPIO_6         0x1183
+> > +                       VF610_PAD_PTE9__GPIO_114
+> > 0x1183
+> > +                       VF610_PAD_PTE20__GPIO_125
+> > 0x1183
+> > +                       VF610_PAD_PTE23__GPIO_128
+> > 0x1183
+> > +                       VF610_PAD_PTE16__GPIO_121
+> > 0x1183
+> > +                       /* MISC */
+> > +                       VF610_PAD_PTE10__GPIO_115
+> > 0x1183
+> > +                       VF610_PAD_PTE11__GPIO_116
+> > 0x1183
+> > +                       VF610_PAD_PTE17__GPIO_122
+> > 0x1183
+> > +                       VF610_PAD_PTC30__GPIO_103
+> > 0x1183
+> > +                       VF610_PAD_PTB0__GPIO_22         0x1181
+> > +                       /* RESETINFO */
+> > +                       VF610_PAD_PTE26__GPIO_131
+> > 0x1183
+> > +                       VF610_PAD_PTD6__GPIO_85         0x1181
+> > +                       VF610_PAD_PTE27__GPIO_132
+> > 0x1181
+> > +                       VF610_PAD_PTE13__GPIO_118
+> > 0x1181
+> > +                       VF610_PAD_PTE21__GPIO_126
+> > 0x1181
+> > +                       VF610_PAD_PTE22__GPIO_127
+> > 0x1181
+> > +                       /* EE_5V_EN */
+> > +                       VF610_PAD_PTE18__GPIO_123
+> > 0x1183
+> > +                       /* EE_5V_OC_N */
+> > +                       VF610_PAD_PTE25__GPIO_130
+> > 0x1181  
+> 
+> Seems like a long list of pins without any driver associated.
+
+Not kernel driver associated. The user space code uses those pins
+directly.
+
+> 
+> Please review such list carefully and assign to nodes that have a
+> driver associated, such as rs485,LEDS, etc.
+
+For example - the user space is not using in-kernel rs485 driver.
+
+But as said above - I will double check this.
+
+> 
+> > +
+> > +&usbphy0 {
+> > +       status = "okay";
+> > +};
+> > +
+> > +&usbphy1 {
+> > +       status = "okay";
+> > +};
+> > +
+> > +&qspi0 {  
+> 
+> This is not placed in alphabetical order.
+
+Ok. 
+
+
+Best regards,
+
+Lukasz Majewski
+
+--
+
+DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180924/d5d13f8e/attachment.sig>
