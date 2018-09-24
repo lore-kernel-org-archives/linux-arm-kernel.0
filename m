@@ -1,63 +1,42 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 24 Sep 2018 11:28:17 +0200
-Subject: [PATCH 0/2] STM32: Fixes for 4.19 cycle
-In-Reply-To: <CAOesGMjEHaubwAdZCo9ZgJEDJwaCTB1MgFfeqzwnScwPn2aELg@mail.gmail.com>
-References: <1537461257-2940-1-git-send-email-alexandre.torgue@st.com>
- <20180923123438.kyvxpeqq6q6xo6cs@localhost>
- <d952b14a-644e-a067-9615-f0d35f370893@st.com>
- <CAOesGMjEHaubwAdZCo9ZgJEDJwaCTB1MgFfeqzwnScwPn2aELg@mail.gmail.com>
-Message-ID: <0f424a8e-67e0-cdc2-0276-660e455e3df6@st.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 24 Sep 2018 11:46:48 +0200
+Subject: [PATCH] arm64: amd: seattle: Use "spi" as name for SPI controllers
+Message-ID: <20180924094648.20797-1-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof
+From: Thierry Reding <treding@nvidia.com>
 
-On 09/24/2018 11:19 AM, Olof Johansson wrote:
-> Hi,
-> 
-> 
-> On Mon, Sep 24, 2018 at 7:55 AM, Alexandre Torgue
-> <alexandre.torgue@st.com> wrote:
->> Hi Olof
->>
->> On 09/23/2018 02:34 PM, Olof Johansson wrote:
->>>
->>> Hi Alexandre,
->>>
->>> On Thu, Sep 20, 2018 at 06:34:15PM +0200, Alexandre Torgue wrote:
->>>>
->>>> Hi Arnd, olof and Kevin
->>>>
->>>> Those 2 patches fixe the same issue on 4.19-rc: a bad usage of the mdma
->>>> binding inside stm32mp157c.dts file. Can you please add them as fixe for
->>>> 4.19 ?
->>>
->>>
->>> The patches only mention removing unused property contents, not what the
->>> bug is
->>> that it fixes (or if it's even causing any problems). Care you clarify?
->>
->>
->> Sure.
->> Concerning SPI patch: without this patch, DMA request will fail but there
->> will be no crash because SPI will switch in interrupt mode.
->> Concerning HASH one, it's just to align DT with dt-bindings documentation.
->> Regarding the minor issue that they fix I could understand that you postpone
->> the merge of those two patches for 4.20.
-> 
-> The former sounds like an appropriate fix, but the latter is probably
-> 4.20 material, indeed.
-> 
-> Should I just cherry-pick the two patches, or do you want to re-stage
-> new branches?
+Recent versions of DTC contain additional checks for SPI busses and warn
+about certain common mistakes, such as when an SPI controller has a name
+other than "spi".
 
-I have nothing else to send for v4.20 so if you can directly take those 
-two patches for v4.20, I agree.
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+ arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-thanks
-alex
-
-> 
-> 
-> -Olof
-> 
+diff --git a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
+index 125f4deb52fe..b664e7af74eb 100644
+--- a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
++++ b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
+@@ -107,7 +107,7 @@
+ 			clock-names = "uartclk", "apb_pclk";
+ 		};
+ 
+-		spi0: ssp at e1020000 {
++		spi0: spi at e1020000 {
+ 			status = "disabled";
+ 			compatible = "arm,pl022", "arm,primecell";
+ 			reg = <0 0xe1020000 0 0x1000>;
+@@ -117,7 +117,7 @@
+ 			clock-names = "apb_pclk";
+ 		};
+ 
+-		spi1: ssp at e1030000 {
++		spi1: spi at e1030000 {
+ 			status = "disabled";
+ 			compatible = "arm,pl022", "arm,primecell";
+ 			reg = <0 0xe1030000 0 0x1000>;
+-- 
+2.19.0
