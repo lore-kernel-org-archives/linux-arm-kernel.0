@@ -1,135 +1,124 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Mon, 24 Sep 2018 16:49:01 +0200
-Subject: [PATCH 2/3] rtc: ab8500: let the core handle range
-In-Reply-To: <20180924144902.607-1-alexandre.belloni@bootlin.com>
-References: <20180924144902.607-1-alexandre.belloni@bootlin.com>
-Message-ID: <20180924144902.607-2-alexandre.belloni@bootlin.com>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Mon, 24 Sep 2018 16:52:18 +0200
+Subject: [BISECTED] Regression: Solidrun Clearfog Base won't boot since
+ "PCI: mvebu: Only remap I/O space if configured"
+In-Reply-To: <20180924141512.GA11875@e107981-ln.cambridge.arm.com>
+References: <20180912231050.GX30658@n2100.armlinux.org.uk>
+ <20180913094515.351967bb@windsurf>
+ <5ad46fec-a71a-477a-b23f-d20aacfb481d@cesnet.cz>
+ <20180913104241.65db8243@windsurf>
+ <20180924101213.GO30658@n2100.armlinux.org.uk>
+ <20180924122614.70738b5c@windsurf>
+ <20180924111341.GP30658@n2100.armlinux.org.uk>
+ <20180924141203.3df9707a@windsurf>
+ <20180924124620.GA10322@e107981-ln.cambridge.arm.com>
+ <20180924151040.5e57462b@windsurf>
+ <20180924141512.GA11875@e107981-ln.cambridge.arm.com>
+Message-ID: <20180924165218.26c7c418@windsurf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let the core handle offsetting and windowing the RTC range.
-The RTC has a 24 bit counter for minutes plus a seconds counter.
-Keep the epoch at the beginning of 2000.
+Hello,
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
----
- drivers/rtc/rtc-ab8500.c | 53 +++-------------------------------------
- 1 file changed, 4 insertions(+), 49 deletions(-)
+On Mon, 24 Sep 2018 15:15:12 +0100, Lorenzo Pieralisi wrote:
 
-diff --git a/drivers/rtc/rtc-ab8500.c b/drivers/rtc/rtc-ab8500.c
-index e97015e5c63e..2e2671b84ab0 100644
---- a/drivers/rtc/rtc-ab8500.c
-+++ b/drivers/rtc/rtc-ab8500.c
-@@ -46,7 +46,6 @@
- #define RTC_STATUS_DATA			0x01
- 
- #define COUNTS_PER_SEC			(0xF000 / 60)
--#define AB8500_RTC_EPOCH		2000
- 
- static const u8 ab8500_rtc_time_regs[] = {
- 	AB8500_RTC_WATCH_TMIN_HI_REG, AB8500_RTC_WATCH_TMIN_MID_REG,
-@@ -59,23 +58,6 @@ static const u8 ab8500_rtc_alarm_regs[] = {
- 	AB8500_RTC_ALRM_MIN_LOW_REG
- };
- 
--/* Calculate the seconds from 1970 to 01-01-2000 00:00:00 */
--static unsigned long get_elapsed_seconds(int year)
--{
--	unsigned long secs;
--	struct rtc_time tm = {
--		.tm_year = year - 1900,
--		.tm_mday = 1,
--	};
--
--	/*
--	 * This function calculates secs from 1970 and not from
--	 * 1900, even if we supply the offset from year 1900.
--	 */
--	rtc_tm_to_time(&tm, &secs);
--	return secs;
--}
--
- static int ab8500_rtc_read_time(struct device *dev, struct rtc_time *tm)
+> I understand that, I wanted to make sure we come up with a fix asap
+> and what I put forward would cover everything discussed in this thread,
+> at least temporarily, giving us time to check ISA related issues while
+> unmapping IO space.
+
+Something like this should implemented what you suggest I guess:
+
+diff --git a/drivers/pci/controller/pci-mvebu.c b/drivers/pci/controller/pci-mvebu.c
+index 50eb0729385b..a41d79b8d46a 100644
+--- a/drivers/pci/controller/pci-mvebu.c
++++ b/drivers/pci/controller/pci-mvebu.c
+@@ -1145,7 +1145,6 @@ static int mvebu_pcie_parse_request_resources(struct mvebu_pcie *pcie)
  {
- 	unsigned long timeout = jiffies + HZ;
-@@ -118,9 +100,6 @@ static int ab8500_rtc_read_time(struct device *dev, struct rtc_time *tm)
- 	secs =	secs / COUNTS_PER_SEC;
- 	secs =	secs + (mins * 60);
+        struct device *dev = &pcie->pdev->dev;
+        struct device_node *np = dev->of_node;
+-       unsigned int i;
+        int ret;
  
--	/* Add back the initially subtracted number of seconds */
--	secs += get_elapsed_seconds(AB8500_RTC_EPOCH);
--
- 	rtc_time_to_tm(secs, tm);
- 	return 0;
- }
-@@ -131,21 +110,8 @@ static int ab8500_rtc_set_time(struct device *dev, struct rtc_time *tm)
- 	unsigned char buf[ARRAY_SIZE(ab8500_rtc_time_regs)];
- 	unsigned long no_secs, no_mins, secs = 0;
+        INIT_LIST_HEAD(&pcie->resources);
+@@ -1179,13 +1178,58 @@ static int mvebu_pcie_parse_request_resources(struct mvebu_pcie *pcie)
+                                         resource_size(&pcie->io) - 1);
+                pcie->realio.name = "PCI I/O";
  
--	if (tm->tm_year < (AB8500_RTC_EPOCH - 1900)) {
--		dev_dbg(dev, "year should be equal to or greater than %d\n",
--				AB8500_RTC_EPOCH);
--		return -EINVAL;
--	}
--
--	/* Get the number of seconds since 1970 */
- 	rtc_tm_to_time(tm, &secs);
- 
--	/*
--	 * Convert it to the number of seconds since 01-01-2000 00:00:00, since
--	 * we only have a small counter in the RTC.
--	 */
--	secs -= get_elapsed_seconds(AB8500_RTC_EPOCH);
--
- 	no_mins = secs / 60;
- 
- 	no_secs = secs % 60;
-@@ -202,9 +168,6 @@ static int ab8500_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alarm)
- 	mins = (buf[0] << 16) | (buf[1] << 8) | (buf[2]);
- 	secs = mins * 60;
- 
--	/* Add back the initially subtracted number of seconds */
--	secs += get_elapsed_seconds(AB8500_RTC_EPOCH);
--
- 	rtc_time_to_tm(secs, &alarm->time);
- 
- 	return rtc_valid_tm(&alarm->time);
-@@ -224,12 +187,6 @@ static int ab8500_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alarm)
- 	unsigned long mins, secs = 0, cursec = 0;
- 	struct rtc_time curtm;
- 
--	if (alarm->time.tm_year < (AB8500_RTC_EPOCH - 1900)) {
--		dev_dbg(dev, "year should be equal to or greater than %d\n",
--				AB8500_RTC_EPOCH);
--		return -EINVAL;
--	}
--
- 	/* Get the number of seconds since 1970 */
- 	rtc_tm_to_time(&alarm->time, &secs);
- 
-@@ -245,12 +202,6 @@ static int ab8500_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alarm)
- 		return -EINVAL;
- 	}
- 
--	/*
--	 * Convert it to the number of seconds since 01-01-2000 00:00:00, since
--	 * we only have a small counter in the RTC.
--	 */
--	secs -= get_elapsed_seconds(AB8500_RTC_EPOCH);
--
- 	mins = secs / 60;
- 
- 	buf[2] = mins & 0xFF;
-@@ -445,6 +396,10 @@ static int ab8500_rtc_probe(struct platform_device *pdev)
- 
- 	rtc->uie_unsupported = 1;
- 
-+	rtc->range_max = (1ULL << 24) * 60 - 1; // 24-bit minutes + 59 secs
-+	rtc->start_secs = RTC_TIMESTAMP_BEGIN_2000;
-+	rtc->set_start_time = true;
++               pci_add_resource(&pcie->resources, &pcie->realio);
++       }
 +
- 	err = rtc_add_group(rtc, &ab8500_rtc_sysfs_files);
- 	if (err)
- 		return err;
++       return devm_request_pci_bus_resources(dev, &pcie->resources);
++}
++
++/*
++ * This is a copy of pci_host_probe(), except that it does the I/O
++ * remap as the last step, once we are sure we won't fail.
++ *
++ * It should be removed once the I/O remap error handling issue has
++ * been sorted out.
++ */
++static int mvebu_pci_host_probe(struct pci_host_bridge *bridge)
++{
++       struct mvebu_pcie *pcie;
++       struct pci_bus *bus, *child;
++       int ret;
++
++       ret = pci_scan_root_bus_bridge(bridge);
++       if (ret < 0) {
++               dev_err(bridge->dev.parent, "Scanning root bridge failed");
++               return ret;
++       }
++
++       pcie = pci_host_bridge_priv(bridge);
++       if (resource_size(&pcie->io) != 0) {
++               unsigned int i;
++
+                for (i = 0; i < resource_size(&pcie->realio); i += SZ_64K)
+                        pci_ioremap_io(i, pcie->io.start + i);
++       }
+ 
+-               pci_add_resource(&pcie->resources, &pcie->realio);
++       bus = bridge->bus;
++
++       /*
++        * We insert PCI resources into the iomem_resource and
++        * ioport_resource trees in either pci_bus_claim_resources()
++        * or pci_bus_assign_resources().
++        */
++       if (pci_has_flag(PCI_PROBE_ONLY)) {
++               pci_bus_claim_resources(bus);
++       } else {
++               pci_bus_size_bridges(bus);
++               pci_bus_assign_resources(bus);
++
++               list_for_each_entry(child, &bus->children, node)
++                       pcie_bus_configure_settings(child);
+        }
+ 
+-       return devm_request_pci_bus_resources(dev, &pcie->resources);
++       pci_bus_add_devices(bus);
++       return 0;
+ }
+ 
+ static int mvebu_pcie_probe(struct platform_device *pdev)
+@@ -1268,7 +1312,7 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+        bridge->align_resource = mvebu_pcie_align_resource;
+        bridge->msi = pcie->msi;
+ 
+-       return pci_host_probe(bridge);
++       return mvebu_pci_host_probe(bridge);
+ }
+ 
+ static const struct of_device_id mvebu_pcie_of_match_table[] = {
+
+If that's what you meant, I'll go ahead and test on actual hardware and
+submit as a proper patch.
+
+Thanks!
+
+Thomas
 -- 
-2.19.0
+Thomas Petazzoni, CTO, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
