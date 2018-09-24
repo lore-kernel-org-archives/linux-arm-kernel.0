@@ -1,74 +1,175 @@
-From: antoine.tenart@bootlin.com (Antoine Tenart)
-Date: Mon, 24 Sep 2018 11:00:02 +0200
-Subject: [PATCH 2/2] arm64: dts: marvell: armada-cp110: describe more PPv2
- interrupts
-In-Reply-To: <20180924090002.27939-1-antoine.tenart@bootlin.com>
-References: <20180924090002.27939-1-antoine.tenart@bootlin.com>
-Message-ID: <20180924090002.27939-2-antoine.tenart@bootlin.com>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Mon, 24 Sep 2018 16:58:54 +0800
+Subject: [PATCH v2 14/14] iommu/mediatek: Switch to SPDX license identifier
+In-Reply-To: <1537779534-23575-1-git-send-email-yong.wu@mediatek.com>
+References: <1537779534-23575-1-git-send-email-yong.wu@mediatek.com>
+Message-ID: <1537779534-23575-15-git-send-email-yong.wu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch describes 3 additional interrupts per PPv2 port. Those
-interrupts will be used later in future versions of the Marvell PPv2
-driver, and now the device tree description matches the hardware
-capabilities.
+Switch to SPDX license identifier for MediaTek iommu/smi and their
+header files.
 
-Signed-off-by: Antoine Tenart <antoine.tenart@bootlin.com>
+Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm64/boot/dts/marvell/armada-cp110.dtsi | 21 ++++++++++++++++---
- 1 file changed, 18 insertions(+), 3 deletions(-)
+ drivers/iommu/mtk_iommu.c                     | 10 +---------
+ drivers/iommu/mtk_iommu.h                     | 10 +---------
+ drivers/iommu/mtk_iommu_v1.c                  | 10 +---------
+ drivers/memory/mtk-smi.c                      | 10 +---------
+ include/dt-bindings/memory/mt2701-larb-port.h | 10 +---------
+ include/dt-bindings/memory/mt8173-larb-port.h | 10 +---------
+ include/soc/mediatek/smi.h                    | 10 +---------
+ 7 files changed, 7 insertions(+), 63 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-index 6a13690cf1e4..26d6e602d1ec 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-@@ -52,9 +52,14 @@
- 					<ICU_GRP_NSR 47 IRQ_TYPE_LEVEL_HIGH>,
- 					<ICU_GRP_NSR 51 IRQ_TYPE_LEVEL_HIGH>,
- 					<ICU_GRP_NSR 55 IRQ_TYPE_LEVEL_HIGH>,
-+					<ICU_GRP_NSR 59 IRQ_TYPE_LEVEL_HIGH>,
-+					<ICU_GRP_NSR 63 IRQ_TYPE_LEVEL_HIGH>,
-+					<ICU_GRP_NSR 67 IRQ_TYPE_LEVEL_HIGH>,
-+					<ICU_GRP_NSR 71 IRQ_TYPE_LEVEL_HIGH>,
- 					<ICU_GRP_NSR 129 IRQ_TYPE_LEVEL_HIGH>;
- 				interrupt-names = "hif0", "hif1", "hif2",
--					"hif3", "hif4", "link";
-+					"hif3", "hif4", "hif5", "hif6", "hif7",
-+					"hif8", "link";
- 				port-id = <0>;
- 				gop-port-id = <0>;
- 				status = "disabled";
-@@ -66,9 +71,14 @@
- 					<ICU_GRP_NSR 48 IRQ_TYPE_LEVEL_HIGH>,
- 					<ICU_GRP_NSR 52 IRQ_TYPE_LEVEL_HIGH>,
- 					<ICU_GRP_NSR 56 IRQ_TYPE_LEVEL_HIGH>,
-+					<ICU_GRP_NSR 60 IRQ_TYPE_LEVEL_HIGH>,
-+					<ICU_GRP_NSR 64 IRQ_TYPE_LEVEL_HIGH>,
-+					<ICU_GRP_NSR 68 IRQ_TYPE_LEVEL_HIGH>,
-+					<ICU_GRP_NSR 72 IRQ_TYPE_LEVEL_HIGH>,
- 					<ICU_GRP_NSR 128 IRQ_TYPE_LEVEL_HIGH>;
- 				interrupt-names = "hif0", "hif1", "hif2",
--					"hif3", "hif4", "link";
-+					"hif3", "hif4", "hif5", "hif6", "hif7",
-+					"hif8", "link";
- 				port-id = <1>;
- 				gop-port-id = <2>;
- 				status = "disabled";
-@@ -80,9 +90,14 @@
- 					<ICU_GRP_NSR 49 IRQ_TYPE_LEVEL_HIGH>,
- 					<ICU_GRP_NSR 53 IRQ_TYPE_LEVEL_HIGH>,
- 					<ICU_GRP_NSR 57 IRQ_TYPE_LEVEL_HIGH>,
-+					<ICU_GRP_NSR 61 IRQ_TYPE_LEVEL_HIGH>,
-+					<ICU_GRP_NSR 65 IRQ_TYPE_LEVEL_HIGH>,
-+					<ICU_GRP_NSR 69 IRQ_TYPE_LEVEL_HIGH>,
-+					<ICU_GRP_NSR 73 IRQ_TYPE_LEVEL_HIGH>,
- 					<ICU_GRP_NSR 127 IRQ_TYPE_LEVEL_HIGH>;
- 				interrupt-names = "hif0", "hif1", "hif2",
--					"hif3", "hif4", "link";
-+					"hif3", "hif4", "hif5", "hif6", "hif7",
-+					"hif8", "link";
- 				port-id = <2>;
- 				gop-port-id = <3>;
- 				status = "disabled";
+diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
+index fb8aefc..ab42b60 100644
+--- a/drivers/iommu/mtk_iommu.c
++++ b/drivers/iommu/mtk_iommu.c
+@@ -1,15 +1,7 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright (c) 2015-2016 MediaTek Inc.
+  * Author: Yong Wu <yong.wu@mediatek.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
+ #include <linux/bootmem.h>
+ #include <linux/bug.h>
+diff --git a/drivers/iommu/mtk_iommu.h b/drivers/iommu/mtk_iommu.h
+index dfe9a07..d8bfba5 100644
+--- a/drivers/iommu/mtk_iommu.h
++++ b/drivers/iommu/mtk_iommu.h
+@@ -1,15 +1,7 @@
++/* SPDX-License-Identifier: GPL-2.0 */
+ /*
+  * Copyright (c) 2015-2016 MediaTek Inc.
+  * Author: Honghui Zhang <honghui.zhang@mediatek.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
+ 
+ #ifndef _MTK_IOMMU_H_
+diff --git a/drivers/iommu/mtk_iommu_v1.c b/drivers/iommu/mtk_iommu_v1.c
+index 676c029..f477300 100644
+--- a/drivers/iommu/mtk_iommu_v1.c
++++ b/drivers/iommu/mtk_iommu_v1.c
+@@ -1,17 +1,9 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright (c) 2015-2016 MediaTek Inc.
+  * Author: Honghui Zhang <honghui.zhang@mediatek.com>
+  *
+  * Based on driver/iommu/mtk_iommu.c
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
+ #include <linux/bootmem.h>
+ #include <linux/bug.h>
+diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
+index e0265fe..30a3e00 100644
+--- a/drivers/memory/mtk-smi.c
++++ b/drivers/memory/mtk-smi.c
+@@ -1,15 +1,7 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright (c) 2015-2016 MediaTek Inc.
+  * Author: Yong Wu <yong.wu@mediatek.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
+ #include <linux/clk.h>
+ #include <linux/component.h>
+diff --git a/include/dt-bindings/memory/mt2701-larb-port.h b/include/dt-bindings/memory/mt2701-larb-port.h
+index 6764d74..c511f0f 100644
+--- a/include/dt-bindings/memory/mt2701-larb-port.h
++++ b/include/dt-bindings/memory/mt2701-larb-port.h
+@@ -1,15 +1,7 @@
++/* SPDX-License-Identifier: GPL-2.0 */
+ /*
+  * Copyright (c) 2015 MediaTek Inc.
+  * Author: Honghui Zhang <honghui.zhang@mediatek.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
+ 
+ #ifndef _MT2701_LARB_PORT_H_
+diff --git a/include/dt-bindings/memory/mt8173-larb-port.h b/include/dt-bindings/memory/mt8173-larb-port.h
+index 111b4b0..a62bfeb 100644
+--- a/include/dt-bindings/memory/mt8173-larb-port.h
++++ b/include/dt-bindings/memory/mt8173-larb-port.h
+@@ -1,15 +1,7 @@
++/* SPDX-License-Identifier: GPL-2.0 */
+ /*
+  * Copyright (c) 2015-2016 MediaTek Inc.
+  * Author: Yong Wu <yong.wu@mediatek.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
+ #ifndef __DTS_IOMMU_PORT_MT8173_H
+ #define __DTS_IOMMU_PORT_MT8173_H
+diff --git a/include/soc/mediatek/smi.h b/include/soc/mediatek/smi.h
+index 5201e90..2b410d2 100644
+--- a/include/soc/mediatek/smi.h
++++ b/include/soc/mediatek/smi.h
+@@ -1,15 +1,7 @@
++/* SPDX-License-Identifier: GPL-2.0 */
+ /*
+  * Copyright (c) 2015-2016 MediaTek Inc.
+  * Author: Yong Wu <yong.wu@mediatek.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
+ #ifndef MTK_IOMMU_SMI_H
+ #define MTK_IOMMU_SMI_H
 -- 
-2.17.1
+1.9.1
