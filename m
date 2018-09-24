@@ -1,203 +1,206 @@
 From: yong.wu@mediatek.com (Yong Wu)
-Date: Mon, 24 Sep 2018 16:58:45 +0800
-Subject: [PATCH v2 05/14] iommu/io-pgtable-arm-v7s: Extend MediaTek 4GB Mode
+Date: Mon, 24 Sep 2018 16:58:48 +0800
+Subject: [PATCH v2 08/14] memory: mtk-smi: Invoke pm runtime_callback to
+ enable clocks
 In-Reply-To: <1537779534-23575-1-git-send-email-yong.wu@mediatek.com>
 References: <1537779534-23575-1-git-send-email-yong.wu@mediatek.com>
-Message-ID: <1537779534-23575-6-git-send-email-yong.wu@mediatek.com>
+Message-ID: <1537779534-23575-9-git-send-email-yong.wu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MediaTek extend the arm v7s descriptor to support the dram over 4GB.
+This patch only move the clk_prepare_enable and config_port into the
+runtime suspend/resume callback. It doesn't change the code content
+and sequence.
 
-In the mt2712 and mt8173, it's called "4GB mode", the physical address
-is from 0x4000_0000 to 0x1_3fff_ffff, but from EMI point of view, it
-is remapped to high address from 0x1_0000_0000 to 0x1_ffff_ffff, the
-bit32 is always enabled. thus, in the M4U, we always enable the bit9
-for all PTEs which means to enable bit32 of physical address.
-
-but in mt8183, M4U support the dram from 0x4000_0000 to 0x3_ffff_ffff
-which isn't remaped. We extend the PTEs: the bit9 represent bit32 of
-PA and the bit4 represent bit33 of PA. Meanwhile the iova still is
-32bits.
-
-In order to unify code, in the "4GB mode", we add the bit32 for the
-physical address manually in our driver.
-
-Correspondingly, Adding bit32 and bit33 for the PA in the iova_to_phys
-has to been moved into v7s.
+This is a prepare patch for adjusting SMI_BUS_SEL for mt8183.
+(SMI_BUS_SEL need to be restored after smi-common resume every time.)
+Also it gives a chance to get rid of mtk_smi_larb_get/put which could
+be a next topic.
 
 Signed-off-by: Yong Wu <yong.wu@mediatek.com>
 ---
- drivers/iommu/io-pgtable-arm-v7s.c | 34 +++++++++++++++++++++++++++-------
- drivers/iommu/io-pgtable.h         |  7 +++----
- drivers/iommu/mtk_iommu.c          | 16 ++++++++++------
- drivers/iommu/mtk_iommu.h          |  1 +
- 4 files changed, 41 insertions(+), 17 deletions(-)
+ drivers/memory/mtk-smi.c | 113 ++++++++++++++++++++++++++++++-----------------
+ 1 file changed, 72 insertions(+), 41 deletions(-)
 
-diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
-index fa3b9ec..3679a5f 100644
---- a/drivers/iommu/io-pgtable-arm-v7s.c
-+++ b/drivers/iommu/io-pgtable-arm-v7s.c
-@@ -124,7 +124,9 @@
- #define ARM_V7S_TEX_MASK		0x7
- #define ARM_V7S_ATTR_TEX(val)		(((val) & ARM_V7S_TEX_MASK) << ARM_V7S_TEX_SHIFT)
+diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
+index 979153b..7cf4573 100644
+--- a/drivers/memory/mtk-smi.c
++++ b/drivers/memory/mtk-smi.c
+@@ -78,17 +78,13 @@ enum mtk_smi_gen {
+ 	MTK_SMI_GEN2
+ };
  
--#define ARM_V7S_ATTR_MTK_4GB		BIT(9) /* MTK extend it for 4GB mode */
-+/* MediaTek extend the two bits below for over 4GB mode */
-+#define ARM_V7S_ATTR_MTK_PA_BIT32	BIT(9)
-+#define ARM_V7S_ATTR_MTK_PA_BIT33	BIT(4)
- 
- /* *well, except for TEX on level 2 large pages, of course :( */
- #define ARM_V7S_CONT_PAGE_TEX_SHIFT	6
-@@ -183,13 +185,24 @@ static dma_addr_t __arm_v7s_dma_addr(void *pages)
- static arm_v7s_iopte paddr_to_iopte(phys_addr_t paddr, int lvl,
- 				    struct arm_v7s_io_pgtable *data)
+-static int mtk_smi_enable(const struct mtk_smi *smi)
++static int mtk_smi_clk_enable(const struct mtk_smi *smi)
  {
--	return paddr & ARM_V7S_LVL_MASK(lvl);
-+	arm_v7s_iopte pte = paddr & ARM_V7S_LVL_MASK(lvl);
-+	struct io_pgtable_cfg *cfg = &data->iop.cfg;
-+
-+	if (cfg->quirks & IO_PGTABLE_QUIRK_ARM_MTK_4GB) {
-+		if (paddr & BIT_ULL(32))
-+			pte |= ARM_V7S_ATTR_MTK_PA_BIT32;
-+		if (paddr & BIT_ULL(33))
-+			pte |= ARM_V7S_ATTR_MTK_PA_BIT33;
-+	}
-+	return pte;
- }
- 
- static phys_addr_t iopte_to_paddr(arm_v7s_iopte pte, int lvl,
- 				  struct arm_v7s_io_pgtable *data)
- {
-+	struct io_pgtable_cfg *cfg = &data->iop.cfg;
- 	arm_v7s_iopte mask;
-+	phys_addr_t paddr;
- 
- 	if (ARM_V7S_PTE_IS_TABLE(pte, lvl))
- 		mask = ARM_V7S_TABLE_MASK;
-@@ -198,7 +211,15 @@ static phys_addr_t iopte_to_paddr(arm_v7s_iopte pte, int lvl,
- 	else
- 		mask = ARM_V7S_LVL_MASK(lvl);
- 
--	return pte & mask;
-+	paddr = pte & mask;
-+	if (IS_ENABLED(CONFIG_PHYS_ADDR_T_64BIT) &&
-+	    cfg->quirks & IO_PGTABLE_QUIRK_ARM_MTK_4GB) {
-+		if (pte & ARM_V7S_ATTR_MTK_PA_BIT32)
-+			paddr |= BIT_ULL(32);
-+		if (pte & ARM_V7S_ATTR_MTK_PA_BIT33)
-+			paddr |= BIT_ULL(33);
-+	}
-+	return paddr;
- }
- 
- static arm_v7s_iopte *iopte_deref(arm_v7s_iopte pte, int lvl,
-@@ -315,9 +336,6 @@ static arm_v7s_iopte arm_v7s_prot_to_pte(int prot, int lvl,
- 	if (lvl == 1 && (cfg->quirks & IO_PGTABLE_QUIRK_ARM_NS))
- 		pte |= ARM_V7S_ATTR_NS_SECTION;
- 
--	if (cfg->quirks & IO_PGTABLE_QUIRK_ARM_MTK_4GB)
--		pte |= ARM_V7S_ATTR_MTK_4GB;
--
- 	return pte;
- }
- 
-@@ -504,7 +522,9 @@ static int arm_v7s_map(struct io_pgtable_ops *ops, unsigned long iova,
- 	if (!(prot & (IOMMU_READ | IOMMU_WRITE)))
- 		return 0;
- 
--	if (WARN_ON(upper_32_bits(iova) || upper_32_bits(paddr)))
-+	if (WARN_ON(upper_32_bits(iova)) ||
-+	    WARN_ON(upper_32_bits(paddr) &&
-+		    !(iop->cfg.quirks & IO_PGTABLE_QUIRK_ARM_MTK_4GB)))
- 		return -ERANGE;
- 
- 	ret = __arm_v7s_map(data, iova, paddr, size, prot, 1, data->pgd);
-diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
-index 2df7909..ee7beb5 100644
---- a/drivers/iommu/io-pgtable.h
-+++ b/drivers/iommu/io-pgtable.h
-@@ -62,10 +62,9 @@ struct io_pgtable_cfg {
- 	 *	(unmapped) entries but the hardware might do so anyway, perform
- 	 *	TLB maintenance when mapping as well as when unmapping.
- 	 *
--	 * IO_PGTABLE_QUIRK_ARM_MTK_4GB: (ARM v7s format) Set bit 9 in all
--	 *	PTEs, for Mediatek IOMMUs which treat it as a 33rd address bit
--	 *	when the SoC is in "4GB mode" and they can only access the high
--	 *	remap of DRAM (0x1_00000000 to 0x1_ffffffff).
-+	 * IO_PGTABLE_QUIRK_ARM_MTK_4GB: (ARM v7s format) MediaTek IOMMUs extend
-+	 *	to support up to 34 bits PA where the bit32 and bit33 are
-+	 *	encoded in the bit9 and bit4 of the PTE respectively.
- 	 *
- 	 * IO_PGTABLE_QUIRK_NO_DMA: Guarantees that the tables will only ever
- 	 *	be accessed by a fully cache-coherent IOMMU or CPU (e.g. for a
-diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
-index c0e2da5..84a12ed 100644
---- a/drivers/iommu/mtk_iommu.c
-+++ b/drivers/iommu/mtk_iommu.c
-@@ -367,12 +367,18 @@ static int mtk_iommu_map(struct iommu_domain *domain, unsigned long iova,
- 			 phys_addr_t paddr, size_t size, int prot)
- {
- 	struct mtk_iommu_domain *dom = to_mtk_domain(domain);
-+	struct mtk_iommu_data *data = mtk_iommu_get_m4u_data();
- 	unsigned long flags;
  	int ret;
  
-+	/* The "4GB mode" M4U physically can not use the lower remap of Dram. */
-+	if (IS_ENABLED(CONFIG_PHYS_ADDR_T_64BIT) &&
-+	    data->plat_data->has_4gb_mode &&
-+	    data->enable_4GB)
-+		paddr |= BIT_ULL(32);
-+
- 	spin_lock_irqsave(&dom->pgtlock, flags);
--	ret = dom->iop->map(dom->iop, iova, paddr & DMA_BIT_MASK(32),
--			    size, prot);
-+	ret = dom->iop->map(dom->iop, iova, paddr, size, prot);
- 	spin_unlock_irqrestore(&dom->pgtlock, flags);
- 
- 	return ret;
-@@ -401,7 +407,6 @@ static phys_addr_t mtk_iommu_iova_to_phys(struct iommu_domain *domain,
- 					  dma_addr_t iova)
- {
- 	struct mtk_iommu_domain *dom = to_mtk_domain(domain);
--	struct mtk_iommu_data *data = mtk_iommu_get_m4u_data();
- 	unsigned long flags;
- 	phys_addr_t pa;
- 
-@@ -409,9 +414,6 @@ static phys_addr_t mtk_iommu_iova_to_phys(struct iommu_domain *domain,
- 	pa = dom->iop->iova_to_phys(dom->iop, iova);
- 	spin_unlock_irqrestore(&dom->pgtlock, flags);
- 
--	if (data->enable_4GB)
--		pa |= BIT_ULL(32);
+-	ret = pm_runtime_get_sync(smi->dev);
+-	if (ret < 0)
+-		return ret;
 -
- 	return pa;
+ 	ret = clk_prepare_enable(smi->clk_apb);
+ 	if (ret)
+-		goto err_put_pm;
++		return ret;
+ 
+ 	ret = clk_prepare_enable(smi->clk_smi);
+ 	if (ret)
+@@ -110,59 +106,28 @@ static int mtk_smi_enable(const struct mtk_smi *smi)
+ 	clk_disable_unprepare(smi->clk_smi);
+ err_disable_apb:
+ 	clk_disable_unprepare(smi->clk_apb);
+-err_put_pm:
+-	pm_runtime_put_sync(smi->dev);
+ 	return ret;
  }
  
-@@ -735,10 +737,12 @@ static int __maybe_unused mtk_iommu_resume(struct device *dev)
+-static void mtk_smi_disable(const struct mtk_smi *smi)
++static void mtk_smi_clk_disable(const struct mtk_smi *smi)
+ {
+ 	clk_disable_unprepare(smi->clk_gals1);
+ 	clk_disable_unprepare(smi->clk_gals0);
+ 	clk_disable_unprepare(smi->clk_smi);
+ 	clk_disable_unprepare(smi->clk_apb);
+-	pm_runtime_put_sync(smi->dev);
+ }
  
- static const struct mtk_iommu_plat_data mt2712_data = {
- 	.m4u_plat = M4U_MT2712,
-+	.has_4gb_mode = true,
+ int mtk_smi_larb_get(struct device *larbdev)
+ {
+-	struct mtk_smi_larb *larb = dev_get_drvdata(larbdev);
+-	const struct mtk_smi_larb_gen *larb_gen = larb->larb_gen;
+-	struct mtk_smi *common = dev_get_drvdata(larb->smi_common_dev);
+-	int ret;
++	int ret = pm_runtime_get_sync(larbdev);
+ 
+-	/* Enable the smi-common's power and clocks */
+-	ret = mtk_smi_enable(common);
+-	if (ret)
+-		return ret;
+-
+-	/* Enable the larb's power and clocks */
+-	ret = mtk_smi_enable(&larb->smi);
+-	if (ret) {
+-		mtk_smi_disable(common);
+-		return ret;
+-	}
+-
+-	/* Configure the iommu info for this larb */
+-	larb_gen->config_port(larbdev);
+-
+-	return 0;
++	return (ret < 0) ? ret : 0;
+ }
+ EXPORT_SYMBOL_GPL(mtk_smi_larb_get);
+ 
+ void mtk_smi_larb_put(struct device *larbdev)
+ {
+-	struct mtk_smi_larb *larb = dev_get_drvdata(larbdev);
+-	struct mtk_smi *common = dev_get_drvdata(larb->smi_common_dev);
+-
+-	/*
+-	 * Don't de-configure the iommu info for this larb since there may be
+-	 * several modules in this larb.
+-	 * The iommu info will be reset after power off.
+-	 */
+-
+-	mtk_smi_disable(&larb->smi);
+-	mtk_smi_disable(common);
++	pm_runtime_put_sync(larbdev);
+ }
+ EXPORT_SYMBOL_GPL(mtk_smi_larb_put);
+ 
+@@ -373,12 +338,52 @@ static int mtk_smi_larb_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static int __maybe_unused mtk_smi_larb_resume(struct device *dev)
++{
++	struct mtk_smi_larb *larb = dev_get_drvdata(dev);
++	const struct mtk_smi_larb_gen *larb_gen = larb->larb_gen;
++	int ret;
++
++	/* Power on smi-common. */
++	ret = pm_runtime_get_sync(larb->smi_common_dev);
++	if (ret < 0) {
++		dev_err(dev, "Failed to pm get for smi-common(%d).\n", ret);
++		return ret;
++	}
++
++	ret = mtk_smi_clk_enable(&larb->smi);
++	if (ret < 0) {
++		dev_err(dev, "Failed to enable clock(%d).\n", ret);
++		pm_runtime_put_sync(larb->smi_common_dev);
++		return ret;
++	}
++
++	/* Configure the basic setting for this larb */
++	larb_gen->config_port(dev);
++
++	return 0;
++}
++
++static int __maybe_unused mtk_smi_larb_suspend(struct device *dev)
++{
++	struct mtk_smi_larb *larb = dev_get_drvdata(dev);
++
++	mtk_smi_clk_disable(&larb->smi);
++	pm_runtime_put_sync(larb->smi_common_dev);
++	return 0;
++}
++
++static const struct dev_pm_ops smi_larb_pm_ops = {
++	SET_RUNTIME_PM_OPS(mtk_smi_larb_suspend, mtk_smi_larb_resume, NULL)
++};
++
+ static struct platform_driver mtk_smi_larb_driver = {
+ 	.probe	= mtk_smi_larb_probe,
+ 	.remove	= mtk_smi_larb_remove,
+ 	.driver	= {
+ 		.name = "mtk-smi-larb",
+ 		.of_match_table = mtk_smi_larb_of_ids,
++		.pm             = &smi_larb_pm_ops,
+ 	}
  };
  
- static const struct mtk_iommu_plat_data mt8173_data = {
- 	.m4u_plat = M4U_MT8173,
-+	.has_4gb_mode = true,
+@@ -467,12 +472,38 @@ static int mtk_smi_common_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static int __maybe_unused mtk_smi_common_resume(struct device *dev)
++{
++	struct mtk_smi *common = dev_get_drvdata(dev);
++	int ret;
++
++	ret = mtk_smi_clk_enable(common);
++	if (ret) {
++		dev_err(common->dev, "Failed to enable clock(%d).\n", ret);
++		return ret;
++	}
++	return 0;
++}
++
++static int __maybe_unused mtk_smi_common_suspend(struct device *dev)
++{
++	struct mtk_smi *common = dev_get_drvdata(dev);
++
++	mtk_smi_clk_disable(common);
++	return 0;
++}
++
++static const struct dev_pm_ops smi_common_pm_ops = {
++	SET_RUNTIME_PM_OPS(mtk_smi_common_suspend, mtk_smi_common_resume, NULL)
++};
++
+ static struct platform_driver mtk_smi_common_driver = {
+ 	.probe	= mtk_smi_common_probe,
+ 	.remove = mtk_smi_common_remove,
+ 	.driver	= {
+ 		.name = "mtk-smi-common",
+ 		.of_match_table = mtk_smi_common_of_ids,
++		.pm             = &smi_common_pm_ops,
+ 	}
  };
  
- static const struct of_device_id mtk_iommu_of_ids[] = {
-diff --git a/drivers/iommu/mtk_iommu.h b/drivers/iommu/mtk_iommu.h
-index 333a0ef..a243047 100644
---- a/drivers/iommu/mtk_iommu.h
-+++ b/drivers/iommu/mtk_iommu.h
-@@ -43,6 +43,7 @@ enum mtk_iommu_plat {
- 
- struct mtk_iommu_plat_data {
- 	enum mtk_iommu_plat m4u_plat;
-+	bool has_4gb_mode;
- };
- 
- struct mtk_iommu_domain;
 -- 
 1.9.1
