@@ -1,41 +1,53 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Mon, 24 Sep 2018 16:04:41 -0700
-Subject: [PATCH i2c-next v2 1/2] dt-bindings: i2c: aspeed: Add
- 'idle-wait-timeout-ms' property
-In-Reply-To: <20180924230442.7732-1-jae.hyun.yoo@linux.intel.com>
-References: <20180924230442.7732-1-jae.hyun.yoo@linux.intel.com>
-Message-ID: <20180924230442.7732-2-jae.hyun.yoo@linux.intel.com>
+From: qader.aymen@gmail.com (Aymen Qader)
+Date: Tue, 25 Sep 2018 00:34:26 +0100
+Subject: [PATCH v2] staging: vc04_services: Update TODO re: arm64
+In-Reply-To: <20180924224835.32539-1-qader.aymen@gmail.com>
+References: <20180924224835.32539-1-qader.aymen@gmail.com>
+Message-ID: <20180924233426.32609-1-qader.aymen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds 'idle-wait-timeout-ms' property which can be used
-for bus idle waiting logic in multi-master environment.
+Remove the TODO item to remove manual cache flushing from bulk_receive.
+This was previously done in this commit:
 
-Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+(7e8dbdea) staging: bcm2835-camera: Remove explicit cache flush
+operations
+
+Also remove the unnecessary asm/cacheflush.h header.
+
+Signed-off-by: Aymen Qader <qader.aymen@gmail.com>
 ---
- Documentation/devicetree/bindings/i2c/i2c-aspeed.txt | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+v2: Make commit message clearer
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-aspeed.txt b/Documentation/devicetree/bindings/i2c/i2c-aspeed.txt
-index 8fbd8633a387..42ecaaf67172 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-aspeed.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-aspeed.txt
-@@ -13,9 +13,13 @@ Required Properties:
- - interrupts		: interrupt number
+ drivers/staging/vc04_services/bcm2835-camera/TODO         | 6 ------
+ drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c | 1 -
+ 2 files changed, 7 deletions(-)
+
+diff --git a/drivers/staging/vc04_services/bcm2835-camera/TODO b/drivers/staging/vc04_services/bcm2835-camera/TODO
+index cefce72d814f..6c2b4ffe4996 100644
+--- a/drivers/staging/vc04_services/bcm2835-camera/TODO
++++ b/drivers/staging/vc04_services/bcm2835-camera/TODO
+@@ -15,9 +15,3 @@ padding in the V4L2 spec, but that padding doesn't match what the
+ hardware can do.  If we exposed the native padding requirements
+ through the V4L2 "multiplanar" formats, the firmware would have one
+ less copy it needed to do.
+-
+-3) Port to ARM64
+-
+-The bulk_receive() does some manual cache flushing that are 32-bit ARM
+-only, which we should convert to proper cross-platform APIs.
+-
+diff --git a/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
+index 51e5b04ff0f5..6e5c1d4ee122 100644
+--- a/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
++++ b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
+@@ -21,7 +21,6 @@
+ #include <linux/slab.h>
+ #include <linux/completion.h>
+ #include <linux/vmalloc.h>
+-#include <asm/cacheflush.h>
+ #include <media/videobuf2-vmalloc.h>
  
- Optional Properties:
--- bus-frequency	: frequency of the bus clock in Hz defaults to 100 kHz when not
--		  specified
--- multi-master	: states that there is another master active on this bus.
-+- bus-frequency		: frequency of the bus clock in Hz defaults to 100 kHz
-+			  when not specified
-+- multi-master		: states that there is another master active on this
-+			  bus.
-+- idle-wait-timeout-ms	: bus idle waiting timeout in milliseconds when
-+			  multi-master is set, defaults to 100 ms when not
-+			  specified.
- 
- Example:
- 
+ #include "mmal-common.h"
 -- 
-2.18.0
+2.17.1
