@@ -1,40 +1,63 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 24 Sep 2018 11:40:09 +0200
-Subject: [PATCH 2/2] arm64: freescale: Fix EEPROM unit addresses
-In-Reply-To: <20180924094009.19344-1-thierry.reding@gmail.com>
-References: <20180924094009.19344-1-thierry.reding@gmail.com>
-Message-ID: <20180924094009.19344-2-thierry.reding@gmail.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Mon, 24 Sep 2018 11:28:17 +0200
+Subject: [PATCH 0/2] STM32: Fixes for 4.19 cycle
+In-Reply-To: <CAOesGMjEHaubwAdZCo9ZgJEDJwaCTB1MgFfeqzwnScwPn2aELg@mail.gmail.com>
+References: <1537461257-2940-1-git-send-email-alexandre.torgue@st.com>
+ <20180923123438.kyvxpeqq6q6xo6cs@localhost>
+ <d952b14a-644e-a067-9615-f0d35f370893@st.com>
+ <CAOesGMjEHaubwAdZCo9ZgJEDJwaCTB1MgFfeqzwnScwPn2aELg@mail.gmail.com>
+Message-ID: <0f424a8e-67e0-cdc2-0276-660e455e3df6@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+Olof
 
-These unit addresses have always been wrong, but DTC only recently
-started complaining about it.
+On 09/24/2018 11:19 AM, Olof Johansson wrote:
+> Hi,
+> 
+> 
+> On Mon, Sep 24, 2018 at 7:55 AM, Alexandre Torgue
+> <alexandre.torgue@st.com> wrote:
+>> Hi Olof
+>>
+>> On 09/23/2018 02:34 PM, Olof Johansson wrote:
+>>>
+>>> Hi Alexandre,
+>>>
+>>> On Thu, Sep 20, 2018 at 06:34:15PM +0200, Alexandre Torgue wrote:
+>>>>
+>>>> Hi Arnd, olof and Kevin
+>>>>
+>>>> Those 2 patches fixe the same issue on 4.19-rc: a bad usage of the mdma
+>>>> binding inside stm32mp157c.dts file. Can you please add them as fixe for
+>>>> 4.19 ?
+>>>
+>>>
+>>> The patches only mention removing unused property contents, not what the
+>>> bug is
+>>> that it fixes (or if it's even causing any problems). Care you clarify?
+>>
+>>
+>> Sure.
+>> Concerning SPI patch: without this patch, DMA request will fail but there
+>> will be no crash because SPI will switch in interrupt mode.
+>> Concerning HASH one, it's just to align DT with dt-bindings documentation.
+>> Regarding the minor issue that they fix I could understand that you postpone
+>> the merge of those two patches for 4.20.
+> 
+> The former sounds like an appropriate fix, but the latter is probably
+> 4.20 material, indeed.
+> 
+> Should I just cherry-pick the two patches, or do you want to re-stage
+> new branches?
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+I have nothing else to send for v4.20 so if you can directly take those 
+two patches for v4.20, I agree.
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
-index 440e111651d5..a59b48203688 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts
-@@ -57,12 +57,12 @@
- 		reg = <0x4c>;
- 	};
- 
--	eeprom at 56 {
-+	eeprom at 52 {
- 		compatible = "atmel,24c512";
- 		reg = <0x52>;
- 	};
- 
--	eeprom at 57 {
-+	eeprom at 53 {
- 		compatible = "atmel,24c512";
- 		reg = <0x53>;
- 	};
--- 
-2.19.0
+thanks
+alex
+
+> 
+> 
+> -Olof
+> 
