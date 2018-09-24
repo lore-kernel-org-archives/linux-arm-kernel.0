@@ -1,104 +1,41 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Mon, 24 Sep 2018 17:18:30 +0200
-Subject: [PATCH v5] ARM: mvebu: use dt_fixup to provide fallback for
- enable-method
-In-Reply-To: <63e0f13b8081419a813fba4c4d6faa8b@svr-chch-ex1.atlnz.lc> (Chris
- Packham's message of "Mon, 24 Sep 2018 10:06:09 +0000")
-References: <20180726034856.20743-1-chris.packham@alliedtelesis.co.nz>
- <8736u3jhc3.fsf@bootlin.com>
- <20180924095332.lrfobc5dhxahm6g5@localhost>
- <63e0f13b8081419a813fba4c4d6faa8b@svr-chch-ex1.atlnz.lc>
-Message-ID: <878t3qgbzt.fsf@bootlin.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Mon, 24 Sep 2018 10:23:46 -0500
+Subject: [GIT PULL] SoCFPGA DTS updates for v4.20, part 2
+Message-ID: <1537802626-10990-1-git-send-email-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris and Olof
- 
- On lun., sept. 24 2018, Chris Packham <Chris.Packham@alliedtelesis.co.nz> wrote:
+Hi Arnd, Kevin, and Olof:
 
-> On 24/09/18 21:54, Olof Johansson wrote:
->> On Fri, Sep 21, 2018 at 12:05:48PM +0200, Gregory CLEMENT wrote:
->>> Hi Chris,
->>>   
->>>   On jeu., juil. 26 2018, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
->>>
->>>> We need to maintain backwards compatibility with device trees that don't
->>>> define an enable method. At the same time we want the device tree to be
->>>> able to specify an enable-method and have it stick.
->>>>
->>>> Previously by having smp assigned in the DT_MACHINE definition this
->>>> would be picked up by setup_arch() and override whatever
->>>> arm_dt_init_cpu_maps() had configured. Now we move the initial
->>>> assignment of default smp_ops to a dt_fixup and let
->>>> arm_dt_init_cpu_maps() override that if the device tree defines an
->>>> enable-method.
->>>>
->>>> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
->>>
->>> I made several tests on an Armada XP based board: OpenBlock AX3: I
->>> modify the enable-method in the decvice tree, and I confirm that without
->>> your patch it is not taken into account whereas with this patch the
->>> enable-method is applied form the device tree. I also didn't see any
->>> regression with the original dtb.
->>>
->>> So I added my:
->>> Tested-by: Gregory CLEMENT <gregory.clement@bootlin.com>
->>>
->>> and applied on mvebu/soc
->> 
->> Hi,
->> 
->> Looks like this broke non-SMP. Not a huge deal, but please apply this as
->> closely as possible on top of the previous patch (or squash it in).
->> 
->> 
->> - 8< - 8< - 8< - 8< - 8< - 8< - 8< - 8< - 8< - 8< - 8< - 8< - 8< - 8< -
->> 
->> 
->> 
->>  From 3190d9502607995c7aecce79beec36714574d494 Mon Sep 17 00:00:00 2001
->> From: Olof Johansson <olof@lixom.net>
->> Date: Mon, 24 Sep 2018 02:37:31 -0700
->> Subject: [PATCH] ARM: mvebu: fix !SMP build
->> 
->> Wrap set_smp_ops() in CONFIG_SMP.
->> 
->> Fixes: d6ec59de9a0a8 ("ARM: mvebu: use dt_fixup to provide fallback for enable-method")
->> Cc: Chris Packham <chris.packham@alliedtelesis.co.nz>
->> Signed-off-by: Olof Johansson <olof@lixom.net>
->> ---
->>   arch/arm/mach-mvebu/board-v7.c | 2 ++
->>   1 file changed, 2 insertions(+)
->> 
->> diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
->> index 5bbde5e..0b10acd 100644
->> --- a/arch/arm/mach-mvebu/board-v7.c
->> +++ b/arch/arm/mach-mvebu/board-v7.c
->> @@ -147,7 +147,9 @@ static void __init mvebu_dt_init(void)
->>   
->>   static void __init armada_370_xp_dt_fixup(void)
->>   {
->> +#ifdef CONFIG_SMP
->>   	smp_set_ops(smp_ops(armada_xp_smp_ops));
->> +#endif
->>   }
->>   
->>   static const char * const armada_370_xp_dt_compat[] __initconst = {
->> 
->
-> Makes sense to me.
->
-> Gregory, do you want me to send a v6 or are you able to squash this
-> in?
-
-I squashed Olof fix in the commit of the mvebu/soc .
+Please pull in these additional patches for v4.20.
 
 Thanks,
+Dinh
 
-Gregory
 
+The following changes since commit 202eb5481421040e115526b75317b5ca72584806:
 
--- 
-Gregory Clement, Bootlin
-Embedded Linux and Kernel engineering
-http://bootlin.com
+  ARM: dts: socfpga: Rename socfpga_cyclone5_de0_{sockit,nano_soc} (2018-08-30 08:38:26 -0500)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_updates_for_v4.20_part2
+
+for you to fetch changes up to 20373e0cb8f7d540ae082a8026f5ae7c27cc6cb3:
+
+  ARM: dts: socfpga: add timer resets for SoCFPGA platform (2018-09-17 10:11:28 -0500)
+
+----------------------------------------------------------------
+SoCFPGA DTS updates for v4.20, part 2
+- Fix I2C bus unit-address warning with new DTC checks
+- Add reset properties for timers
+
+----------------------------------------------------------------
+Dinh Nguyen (2):
+      ARM: dts: socfpga: Fix I2C bus unit-address error
+      ARM: dts: socfpga: add timer resets for SoCFPGA platform
+
+ arch/arm/boot/dts/socfpga.dtsi                      | 8 ++++++++
+ arch/arm/boot/dts/socfpga_arria10.dtsi              | 8 ++++++++
+ arch/arm/boot/dts/socfpga_cyclone5_de0_nano_soc.dts | 2 +-
+ 3 files changed, 17 insertions(+), 1 deletion(-)
