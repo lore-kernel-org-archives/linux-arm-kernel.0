@@ -1,46 +1,32 @@
-From: eugen.hristev@microchip.com (Eugen Hristev)
-Date: Mon, 24 Sep 2018 10:51:43 +0300
-Subject: [PATCH v2 1/2] iio: adc: at91: fix acking DRDY irq on simple
- conversions
-Message-ID: <1537775504-7981-1-git-send-email-eugen.hristev@microchip.com>
+From: ykaukab@suse.de (Mian Yousaf Kaukab)
+Date: Mon, 24 Sep 2018 12:06:20 +0200
+Subject: [PATCH RESEND 0/6] arm64: add support for generic cpu
+ vulnerabilities
+In-Reply-To: <20180917133508.GE23040@arm.com>
+References: <20180827143310.641-1-ykaukab@suse.de>
+ <20180905092533.GB17376@suse.de> <20180917133508.GE23040@arm.com>
+Message-ID: <20180924100620.GA19083@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When doing simple conversions, the driver did not acknowledge the DRDY irq.
-If this irq status is not acked, it will be left pending, and as soon as a
-trigger is enabled, the irq handler will be called, it doesn't know why
-this status has occurred because no channel is pending, and then it will go
-int a irq loop and board will hang.
-To avoid this situation, read the LCDR after a raw conversion is done.
+On Mon, Sep 17, 2018 at 02:35:08PM +0100, Will Deacon wrote:
+> On Wed, Sep 05, 2018 at 11:25:33AM +0200, Mian Yousaf Kaukab wrote:
+> > On Mon, Aug 27, 2018 at 04:33:04PM +0200, Mian Yousaf Kaukab wrote:
+> > > GENERIC_CPU_VULNERABILITIES provide a common way to figure out if a
+> > > system is affected by vulnerabilities like meltdown and other variants
+> > > of spectre. This small series adds support for it in arm64.
+> > 
+> > Marc, Will, Can you please review this series?
+> 
+> Sorry it took so long to get to this, it's just consistently failed to
+> get to the top of my review queue. I had a quick look just now and there
+> are a few things to address before we can take the series.
+Thank you for the review. I will get back to you after fixing the comments as soon as possible.
 
-Fixes 0e589d5fb ("ARM: AT91: IIO: Add AT91 ADC driver.")
-Cc: Maxime Ripard <maxime.ripard@bootlin.com>
-Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
----
-Hello Jonathan,
-
-I moved this LCDR read/acknowledge into the IRQ handler after the conversion
-value is being read.
-Sorry about the noise to stable at vger, removed from message.
+> 
+> Cheers,
+> 
+> Will
 
 Thanks,
-Eugen
-
- drivers/iio/adc/at91_adc.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-index 44b5168..e3be88e 100644
---- a/drivers/iio/adc/at91_adc.c
-+++ b/drivers/iio/adc/at91_adc.c
-@@ -279,6 +279,8 @@ static void handle_adc_eoc_trigger(int irq, struct iio_dev *idev)
- 		iio_trigger_poll(idev->trig);
- 	} else {
- 		st->last_value = at91_adc_readl(st, AT91_ADC_CHAN(st, st->chnb));
-+		/* Needed to ACK the DRDY interruption */
-+		at91_adc_readl(st, AT91_ADC_LCDR);
- 		st->done = true;
- 		wake_up_interruptible(&st->wq_data_avail);
- 	}
--- 
-2.7.4
+Yousaf
