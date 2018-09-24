@@ -1,68 +1,64 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 24 Sep 2018 14:31:43 -0700
-Subject: [RFC PATCH 2/4] dt-bindings: mmc: arasan: Document
- 'xlnx,zynqmp-8.9a' controller
-In-Reply-To: <1537278339-9257-3-git-send-email-manish.narani@xilinx.com>
-References: <1537278339-9257-1-git-send-email-manish.narani@xilinx.com>
- <1537278339-9257-3-git-send-email-manish.narani@xilinx.com>
-Message-ID: <5baa1aef.1c69fb81.e8e5f.3dbb@mx.google.com>
+Date: Mon, 24 Sep 2018 15:19:46 -0700
+Subject: [PATCH 1/4] dt-bindings: dma: uart: add uart dma bindings
+In-Reply-To: <1537425673-18807-2-git-send-email-long.cheng@mediatek.com>
+References: <1537425673-18807-1-git-send-email-long.cheng@mediatek.com>
+ <1537425673-18807-2-git-send-email-long.cheng@mediatek.com>
+Message-ID: <5baa1b00.1c69fb81.efde0.46e6@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2018 at 07:15:37PM +0530, Manish Narani wrote:
-> Add documentation for 'xlnx,zynqmp-8.9a' SDHCI controller and required
-> properties followed by example.
+On Thu, Sep 20, 2018 at 02:41:10PM +0800, Long Cheng wrote:
+> add uart dma bindings
 > 
-> Signed-off-by: Manish Narani <manish.narani@xilinx.com>
+> Signed-off-by: Long Cheng <long.cheng@mediatek.com>
 > ---
->  Documentation/devicetree/bindings/mmc/arasan,sdhci.txt | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
+>  .../devicetree/bindings/dma/8250_mtk_dma.txt       |   32 ++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/dma/8250_mtk_dma.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> index f6ddba3..72769e0 100644
-> --- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> +++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
-> @@ -15,6 +15,7 @@ Required Properties:
->      - "arasan,sdhci-5.1": generic Arasan SDHCI 5.1 PHY
->      - "rockchip,rk3399-sdhci-5.1", "arasan,sdhci-5.1": rk3399 eMMC PHY
->        For this device it is strongly suggested to include arasan,soc-ctl-syscon.
-> +    - "xlnx,zynqmp-8.9a", "arasan,sdhci-8.9a": Xilinx ZynqMP Arasan SDHCI 8.9a PHY
-
-xlnx,zynqmp-sdhci. The version number is for Arasan.
-
->    - reg: From mmc bindings: Register location and length.
->    - clocks: From clock bindings: Handles to clock inputs.
->    - clock-names: From clock bindings: Tuple including "clk_xin" and "clk_ahb"
-> @@ -24,6 +25,9 @@ Required Properties for "arasan,sdhci-5.1":
->    - phys: From PHY bindings: Phandle for the Generic PHY for arasan.
->    - phy-names:  MUST be "phy_arasan".
->  
-> +Required Properties for "xlnx,zynqmp-8.9a":
-> +  - xlnx,device_id: SD controller device ID. Must be either <0> or <1>.
+> diff --git a/Documentation/devicetree/bindings/dma/8250_mtk_dma.txt b/Documentation/devicetree/bindings/dma/8250_mtk_dma.txt
+> new file mode 100644
+> index 0000000..b140cf4
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/8250_mtk_dma.txt
+> @@ -0,0 +1,32 @@
+> +* Mediatek UART APDMA Controller
 > +
-
-What's this for?
-
->  Optional Properties:
->    - arasan,soc-ctl-syscon: A phandle to a syscon device (see ../mfd/syscon.txt)
->      used to access core corecfg registers.  Offsets of registers in this
-> @@ -75,3 +79,13 @@ Example:
->  		phy-names = "phy_arasan";
->  		#clock-cells = <0>;
->  	};
+> +Required properties:
+> +- compatible should contain:
+> +  * "mediatek,mt2712-uart-dma" for MT2712 compatible APDMA
+> +  * "mediatek,mt6577-uart-dma" for MT6577 and all of the above
 > +
-> +	sdhci: sdhci at ff160000 {
-
-mmc at ...
-
-> +		compatible = "xlnx,zynqmp-8.9a", "arasan,sdhci-8.9a";
-> +		reg = <0x0 0xff160000 0x0 0x1000>;
-> +		interrupt-parent = <&gic>;
-> +		interrupts = <0 48 4>;
-> +		clock-names = "clk_xin", "clk_ahb";
-> +		clocks = <&clk 54>, <&clk 31>;
-> +		xlnx,device_id = <0>;
+> +- reg: The base address of the APDMA register bank.
+> +
+> +- interrupts: A single interrupt specifier.
+> +
+> +- clocks : Must contain an entry for each entry in clock-names.
+> +  See ../clocks/clock-bindings.txt for details.
+> +- clock-names: The APDMA clock for register accesses
+> +
+> +Examples:
+> +
+> +	apdma: dma-controller at 11000380 {
+> +		compatible = "mediatek,mt2712-uart-dma";
+> +		reg = <0 0x11000380 0 0x400>;
+> +		interrupts = <GIC_SPI 63 IRQ_TYPE_LEVEL_LOW>,
+> +			     <GIC_SPI 64 IRQ_TYPE_LEVEL_LOW>,
+> +			     <GIC_SPI 65 IRQ_TYPE_LEVEL_LOW>,
+> +			     <GIC_SPI 66 IRQ_TYPE_LEVEL_LOW>,
+> +			     <GIC_SPI 67 IRQ_TYPE_LEVEL_LOW>,
+> +			     <GIC_SPI 68 IRQ_TYPE_LEVEL_LOW>,
+> +			     <GIC_SPI 69 IRQ_TYPE_LEVEL_LOW>,
+> +			     <GIC_SPI 70 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&pericfg CLK_PERI_AP_DMA>;
+> +		clock-names = "apdma";
+> +		#dma-cells = <1>;
 > +	};
-> -- 
-> 2.1.1
-> 
+> \ No newline at end of file
+
+Please fix this.
+
+Otherwise,
+
+Reviewed-by: Rob Herring <robh@kernel.org>
