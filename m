@@ -1,45 +1,40 @@
 From: ebiederm@xmission.com (Eric W. Biederman)
-Date: Mon, 24 Sep 2018 11:10:15 +0200
-Subject: [REVIEW][PATCH 15/15] signal/arm64: Use send_sig_fault where
- appropriate
+Date: Mon, 24 Sep 2018 11:10:13 +0200
+Subject: [REVIEW][PATCH 13/15] signal/arm64: In ptrace_hbptriggered name the
+ signal description string
 In-Reply-To: <871s9j462u.fsf@xmission.com>
 References: <871s9j462u.fsf@xmission.com>
-Message-ID: <20180924091015.4458-15-ebiederm@xmission.com>
+Message-ID: <20180924091015.4458-13-ebiederm@xmission.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This will let the description be reused shortly.
+
 Signed-off-by: "Eric W. Biederman" <ebiederm@xmission.com>
 ---
- arch/arm64/kernel/fpsimd.c | 10 +++-------
- 1 file changed, 3 insertions(+), 7 deletions(-)
+ arch/arm64/kernel/ptrace.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 58c53bc96928..5ebe73b69961 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -842,7 +842,6 @@ asmlinkage void do_fpsimd_acc(unsigned int esr, struct pt_regs *regs)
-  */
- asmlinkage void do_fpsimd_exc(unsigned int esr, struct pt_regs *regs)
+diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+index 7ab75e78aa08..921267f59d0d 100644
+--- a/arch/arm64/kernel/ptrace.c
++++ b/arch/arm64/kernel/ptrace.c
+@@ -182,6 +182,7 @@ static void ptrace_hbptriggered(struct perf_event *bp,
+ 				struct pt_regs *regs)
  {
--	siginfo_t info;
- 	unsigned int si_code = FPE_FLTUNK;
+ 	struct arch_hw_breakpoint *bkpt = counter_arch_bp(bp);
++	const char *desc = "Hardware breakpoint trap (ptrace)";
  
- 	if (esr & ESR_ELx_FP_EXC_TFV) {
-@@ -858,12 +857,9 @@ asmlinkage void do_fpsimd_exc(unsigned int esr, struct pt_regs *regs)
- 			si_code = FPE_FLTRES;
- 	}
- 
--	clear_siginfo(&info);
--	info.si_signo = SIGFPE;
--	info.si_code = si_code;
--	info.si_addr = (void __user *)instruction_pointer(regs);
--
--	send_sig_info(SIGFPE, &info, current);
-+	send_sig_fault(SIGFPE, si_code,
-+		       (void __user *)instruction_pointer(regs),
-+		       current);
+ #ifdef CONFIG_COMPAT
+ 	if (is_compat_task()) {
+@@ -206,7 +207,7 @@ static void ptrace_hbptriggered(struct perf_event *bp,
+ #endif
+ 	arm64_force_sig_fault(SIGTRAP, TRAP_HWBKPT,
+ 			      (void __user *)(bkpt->trigger),
+-			      "Hardware breakpoint trap (ptrace)");
++			      desc);
  }
  
- void fpsimd_thread_switch(struct task_struct *next)
+ /*
 -- 
 2.17.1
