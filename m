@@ -1,67 +1,58 @@
 From: vabhav.sharma@nxp.com (Vabhav Sharma)
-Date: Mon, 24 Sep 2018 05:38:59 +0530
-Subject: [PATCH v3 4/6] drivers: clk-qoriq: Add clockgen support for lx2160a
-In-Reply-To: <1537747741-6245-1-git-send-email-vabhav.sharma@nxp.com>
-References: <1537747741-6245-1-git-send-email-vabhav.sharma@nxp.com>
-Message-ID: <1537747741-6245-5-git-send-email-vabhav.sharma@nxp.com>
+Date: Mon, 24 Sep 2018 05:38:55 +0530
+Subject: [PATCH v3 0/6]  arm64: dts: NXP: add basic dts file for LX2160A SoC
+Message-ID: <1537747741-6245-1-git-send-email-vabhav.sharma@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
+Changes for v3:
+-Split clockgen support patch into below two patches:
+- a)Updated array size of cmux_to_group[] with NUM_CMUX+1 to include -1
+ terminator and p4080 cmux_to_group[] array with -1 terminator
+- b)Add clockgen support for lx2160a
 
-Add clockgen support for lx2160a.
-Added entry for compat 'fsl,lx2160a-clockgen'.
+Changes for v2:
+- Modified cmux_to_group array to include -1 terminator
+- Revert NUM_CMUX to original value 8 from 16
+- Remove ?As LX2160A is 16 core, so modified value for NUM_CMUX?
+  in patch "[PATCH 3/5] drivers: clk-qoriq: Add clockgen support for
+  lx2160a" description
+- Populated cache properties for L1 and L2 cache in lx2160a device-tree.
+- Removed reboot node from lx2160a device-tree as PSCI is implemented.
+- Removed incorrect comment for timer node interrupt property in
+  lx2160a device-tree.
+- Modified pmu node compatible property from "arm,armv8-pmuv3" to
+  "arm,cortex-a72-pmu" in lx2160a device-tree
+- Non-standard aliases removed in lx2160a rdb board device-tree
+- Updated i2c child nodes to generic name in lx2160a rdb device-tree.
 
-Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
-Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
-Signed-off-by: Vabhav Sharma <vabhav.sharma@nxp.com>
-Acked-by: Stephen Boyd <sboyd@kernel.org>
----
- drivers/clk/clk-qoriq.c         | 12 ++++++++++++
- drivers/cpufreq/qoriq-cpufreq.c |  1 +
- 2 files changed, 13 insertions(+)
+Changes for v1:
+- Add compatible string for LX2160A clockgen support
+- Add compatible string to initialize LX2160A guts driver
+- Add compatible string for LX2160A support in dt-bindings
+- Add dts file to enable support for LX2160A SoC and LX2160A RDB
+  (Reference design board)
 
-diff --git a/drivers/clk/clk-qoriq.c b/drivers/clk/clk-qoriq.c
-index e152bfb..99675de 100644
---- a/drivers/clk/clk-qoriq.c
-+++ b/drivers/clk/clk-qoriq.c
-@@ -570,6 +570,17 @@ static const struct clockgen_chipinfo chipinfo[] = {
- 		.flags = CG_VER3 | CG_LITTLE_ENDIAN,
- 	},
- 	{
-+		.compat = "fsl,lx2160a-clockgen",
-+		.cmux_groups = {
-+			&clockgen2_cmux_cga12, &clockgen2_cmux_cgb
-+		},
-+		.cmux_to_group = {
-+			0, 0, 0, 0, 1, 1, 1, 1, -1
-+		},
-+		.pll_mask = 0x37,
-+		.flags = CG_VER3 | CG_LITTLE_ENDIAN,
-+	},
-+	{
- 		.compat = "fsl,p2041-clockgen",
- 		.guts_compat = "fsl,qoriq-device-config-1.0",
- 		.init_periph = p2041_init_periph,
-@@ -1424,6 +1435,7 @@ CLK_OF_DECLARE(qoriq_clockgen_ls1043a, "fsl,ls1043a-clockgen", clockgen_init);
- CLK_OF_DECLARE(qoriq_clockgen_ls1046a, "fsl,ls1046a-clockgen", clockgen_init);
- CLK_OF_DECLARE(qoriq_clockgen_ls1088a, "fsl,ls1088a-clockgen", clockgen_init);
- CLK_OF_DECLARE(qoriq_clockgen_ls2080a, "fsl,ls2080a-clockgen", clockgen_init);
-+CLK_OF_DECLARE(qoriq_clockgen_lx2160a, "fsl,lx2160a-clockgen", clockgen_init);
- 
- /* Legacy nodes */
- CLK_OF_DECLARE(qoriq_sysclk_1, "fsl,qoriq-sysclk-1.0", sysclk_init);
-diff --git a/drivers/cpufreq/qoriq-cpufreq.c b/drivers/cpufreq/qoriq-cpufreq.c
-index 3d773f6..83921b7 100644
---- a/drivers/cpufreq/qoriq-cpufreq.c
-+++ b/drivers/cpufreq/qoriq-cpufreq.c
-@@ -295,6 +295,7 @@ static const struct of_device_id node_matches[] __initconst = {
- 	{ .compatible = "fsl,ls1046a-clockgen", },
- 	{ .compatible = "fsl,ls1088a-clockgen", },
- 	{ .compatible = "fsl,ls2080a-clockgen", },
-+	{ .compatible = "fsl,lx2160a-clockgen", },
- 	{ .compatible = "fsl,p4080-clockgen", },
- 	{ .compatible = "fsl,qoriq-clockgen-1.0", },
- 	{ .compatible = "fsl,qoriq-clockgen-2.0", },
+Vabhav Sharma (4):
+  dt-bindings: arm64: add compatible for LX2160A
+  soc/fsl/guts: Add compatible string for LX2160A
+  arm64: dts: add QorIQ LX2160A SoC support
+  arm64: dts: add LX2160ARDB board support
+
+Yogesh Gaur (2):
+  drivers: clk-qoriq: increase array size of cmux_to_group
+  drivers: clk-qoriq: Add clockgen support for lx2160a
+
+ Documentation/devicetree/bindings/arm/fsl.txt     |  12 +
+ arch/arm64/boot/dts/freescale/Makefile            |   1 +
+ arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts |  88 +++
+ arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi    | 693 ++++++++++++++++++++++
+ drivers/clk/clk-qoriq.c                           |  16 +-
+ drivers/cpufreq/qoriq-cpufreq.c                   |   1 +
+ drivers/soc/fsl/guts.c                            |   1 +
+ 7 files changed, 810 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+
 -- 
 2.7.4
