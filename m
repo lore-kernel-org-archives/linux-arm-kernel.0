@@ -1,145 +1,83 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 24 Sep 2018 15:15:12 +0100
-Subject: [BISECTED] Regression: Solidrun Clearfog Base won't boot since
- "PCI: mvebu: Only remap I/O space if configured"
-In-Reply-To: <20180924151040.5e57462b@windsurf>
-References: <20180912231050.GX30658@n2100.armlinux.org.uk>
- <20180913094515.351967bb@windsurf>
- <5ad46fec-a71a-477a-b23f-d20aacfb481d@cesnet.cz>
- <20180913104241.65db8243@windsurf>
- <20180924101213.GO30658@n2100.armlinux.org.uk>
- <20180924122614.70738b5c@windsurf>
- <20180924111341.GP30658@n2100.armlinux.org.uk>
- <20180924141203.3df9707a@windsurf>
- <20180924124620.GA10322@e107981-ln.cambridge.arm.com>
- <20180924151040.5e57462b@windsurf>
-Message-ID: <20180924141512.GA11875@e107981-ln.cambridge.arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 24 Sep 2018 16:23:18 +0200
+Subject: [RESEND PATCH] Revert "pwm: Set class for exported channels in
+ sysfs"
+In-Reply-To: <fc02ced1-01ba-dde4-95da-285d9351338b@st.com>
+References: <1537538567-5377-1-git-send-email-fabrice.gasnier@st.com>
+ <20180924115301.GV21032@ulmo>
+ <fc02ced1-01ba-dde4-95da-285d9351338b@st.com>
+Message-ID: <20180924142318.GG23547@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 24, 2018 at 03:10:40PM +0200, Thomas Petazzoni wrote:
-> Hello,
-> 
-> On Mon, 24 Sep 2018 13:46:29 +0100, Lorenzo Pieralisi wrote:
-> 
-> > What I think you can do short term, given that AFAICS MVEBU is not
-> > removable, instead of using pci_host_probe() you move part of its code
-> > into the driver and make sure that you remap IO as last operation before
-> > probe completion (ie after scanning the host bridge) so that you do not
-> > need to unmap it on failure; write a commit log summarising/linking this
-> > thread please and when v4.20 lands we will give this a more thorough
-> > look as Russell requested.
+On Mon, Sep 24, 2018 at 03:59:03PM +0200, Fabrice Gasnier wrote:
+> On 09/24/2018 01:53 PM, Thierry Reding wrote:
+> > On Fri, Sep 21, 2018 at 04:02:47PM +0200, Fabrice Gasnier wrote:
+> >> This reverts commit 7e5d1fd75c3dde9fc10c4472b9368089d1b81d00 as it causes
+> >> regression with multiple pwm chip. It creates a new entry in
+> >> '/sys/class/pwm' every time a 'pwmX' is exported with 'echo X > export':
+> >> - 1st time export will create an entry in /sys/class/pwm/pwmX
+> >> - when another export happens on another pwmchip, it can't be created
+> >> (e.g. -EEXIST)
+> >>
+> >> This also changes existing ABI (Documentation/ABI/testing/sysfs-class-pwm):
+> >> - pmwX should be there: /sys/class/pwm/pwmchipN/pwmX
+> >>
+> >> Example on stm32 (stm32429i-eval) platform:
+> >> $ ls /sys/class/pwm
+> >> pwmchip0 pwmchip4
+> >>
+> >> $ cd /sys/class/pwm/pwmchip0/
+> >> $ echo 0 > export
+> >> $ ls /sys/class/pwm
+> >> pwm0 pwmchip0 pwmchip4
+> >>
+> >> $ cd /sys/class/pwm/pwmchip4/
+> >> $ echo 0 > export
+> >> sysfs: cannot create duplicate filename '/class/pwm/pwm0'
+> >> ...Exception stack follows...
+> >>
+> >> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> >> ---
+> >>  drivers/pwm/sysfs.c | 1 -
+> >>  1 file changed, 1 deletion(-)
 > > 
-> > How does that sound ?
+> > Can we come up with an alternative that allows us to have both? We want
+> > uevent and proper sysfs creation, or is that not possible?
 > 
-> The only thing that can fail in pci_host_probe() is:
+> Hi Thierry, all,
 > 
-> 	ret = pci_scan_root_bus_bridge(bridge);
-> 	if (ret < 0) {
-> 		dev_err(bridge->dev.parent, "Scanning root bridge
-> 	failed"); return ret;
-> 	}
+> With current approach:
+> - "export->child.class = parent->class"
+> - ABI (e.g. "pwm%d") device name isn't unique with multiple pwm chip.
+> I think this is not possible.
 > 
-> In the pci-mvebu driver prior to the conversion to pci_host_probe(),
-> the code flow at the end of ->probe() was:
+> Trying to think of an alternative... I just did a quick test, by
+> changing device name, to take pwmchip into account:
+> +       export->child.class = parent->class;
+>         export->child.release = pwm_export_release;
+>         export->child.parent = parent;
+>         export->child.devt = MKDEV(0, 0);
+>         export->child.groups = pwm_groups;
+> -       dev_set_name(&export->child, "pwm%u", pwm->hwpwm);
+> +       dev_set_name(&export->child, "pwmchip%d-pwm%u", chip->base,
+> pwm->hwpwm);
 > 
->   mvebu_pcie_enable()
->     pci_common_init_dev()
->       pcibios_init_hw()
-> 
-> and pcibios_init_hw() calls pci_scan_root_bus_bridge(), without doing
-> much about the return value other than issuing a warning:
-> 
->                                 ret = pci_scan_root_bus_bridge(bridge);
->                         }
-> 
->                         if (WARN(ret < 0, "PCI: unable to scan bus!")) {
->                                 pci_free_host_bridge(bridge);
->                                 break;
->                         }
-> 
-> I.e, even before the conversion to pci_host_probe(), in case of
-> failure in pci_scan_root_bus_bridge(), we would have the I/O mapping in
-> place, but the PCI controller not registered.
-> 
-> We could keep the same (not great) behavior by doing:
-> 
-> diff --git a/drivers/pci/controller/pci-mvebu.c b/drivers/pci/controller/pci-mvebu.c
-> index 50eb0729385b..487492f0c5f7 100644
-> --- a/drivers/pci/controller/pci-mvebu.c
-> +++ b/drivers/pci/controller/pci-mvebu.c
-> @@ -1179,9 +1179,6 @@ static int mvebu_pcie_parse_request_resources(struct mvebu_pcie *pcie)
->                                          resource_size(&pcie->io) - 1);
->                 pcie->realio.name = "PCI I/O";
->  
-> -               for (i = 0; i < resource_size(&pcie->realio); i += SZ_64K)
-> -                       pci_ioremap_io(i, pcie->io.start + i);
-> -
->                 pci_add_resource(&pcie->resources, &pcie->realio);
->         }
->  
-> @@ -1197,7 +1194,7 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
->         struct device_node *child;
->         int num, i, ret;
->  
-> -       bridge = devm_pci_alloc_host_bridge(dev, sizeof(struct mvebu_pcie));
-> +       bridge = pci_alloc_host_bridge(sizeof(struct mvebu_pcie));
->         if (!bridge)
->                 return -ENOMEM;
->  
-> @@ -1212,8 +1209,10 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
->         num = of_get_available_child_count(np);
->  
->         pcie->ports = devm_kcalloc(dev, num, sizeof(*pcie->ports), GFP_KERNEL);
-> -       if (!pcie->ports)
-> -               return -ENOMEM;
-> +       if (!pcie->ports) {
-> +               ret = -ENOMEM;
-> +               goto free_host_bridge;
-> +       }
->  
->         i = 0;
->         for_each_available_child_of_node(np, child) {
-> @@ -1222,7 +1221,7 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
->                 ret = mvebu_pcie_parse_port(pcie, port, child);
->                 if (ret < 0) {
->                         of_node_put(child);
-> -                       return ret;
-> +                       goto free_host_bridge;
->                 } else if (ret == 0) {
->                         continue;
->                 }
-> @@ -1268,7 +1267,21 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
->         bridge->align_resource = mvebu_pcie_align_resource;
->         bridge->msi = pcie->msi;
->  
-> -       return pci_host_probe(bridge);
-> +       if (resource_size(&pcie->io) != 0) {
-> +               for (i = 0; i < resource_size(&pcie->realio); i += SZ_64K)
-> +                       pci_ioremap_io(i, pcie->io.start + i);
-> +       }
-> +
-> +       ret = pci_host_probe(bridge);
-> +       if (ret)
-> +               pci_free_host_bridge(bridge);
-> +
-> +       /* Yes, when pci_host_probe() returns a failure, we don't care */
-> +       return 0;
-> +
-> +free_host_bridge:
-> +       pci_free_host_bridge(bridge);
-> +       return ret;
->  }
->  
->  static const struct of_device_id mvebu_pcie_of_match_table[] = {
-> 
-> I.e, we simply ignore the failure of pci_host_probe().
-> 
-> To be honest, I really prefer the option of introducing pci_unmap_io().
+> But this also impacts existing ABI :-(
+> Would you have suggestions to send an uevent, without modifying ABI ?
 
-I understand that, I wanted to make sure we come up with a fix asap
-and what I put forward would cover everything discussed in this thread,
-at least temporarily, giving us time to check ISA related issues while
-unmapping IO space.
+I don't quite understand why, in the example you show in the commit
+message, the pwmX nodes appear in the top-level /sys/class/pwm
+directory. According to Documentation/ABI/testing/sysfs-class-pwm they
+should appear as /sys/class/pwm/pwmchipN/pwmX. I can only imagine that
+setting the class may have changed that. If so, perhaps we can
+workaround that by creating a new class that is not parent->class?
 
-Lorenzo
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180924/f256adeb/attachment.sig>
