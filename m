@@ -1,51 +1,51 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 24 Sep 2018 11:08:51 +0200
-Subject: [PATCH 5/5] ARM: shmobile: defconfig: Enable SII902X
-In-Reply-To: <1537553311-8831-6-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1537553311-8831-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1537553311-8831-6-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <20180924090850.krd2cjzf6cyfdfh6@verge.net.au>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 24 Sep 2018 10:19:31 +0100
+Subject: [PATCH 0/2] STM32: Fixes for 4.19 cycle
+In-Reply-To: <d952b14a-644e-a067-9615-f0d35f370893@st.com>
+References: <1537461257-2940-1-git-send-email-alexandre.torgue@st.com>
+ <20180923123438.kyvxpeqq6q6xo6cs@localhost>
+ <d952b14a-644e-a067-9615-f0d35f370893@st.com>
+Message-ID: <CAOesGMjEHaubwAdZCo9ZgJEDJwaCTB1MgFfeqzwnScwPn2aELg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2018 at 07:08:31PM +0100, Fabrizio Castro wrote:
-> The iwg23s board comes with the SiI9022ACNU HDMI transmitter,
-> this patch makes sure the corresponding driver gets built.
-> 
-> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> Reviewed-by: Biju Das <biju.das@bp.renesas.com>
-> ---
-> 
-> Hello Simon,
-> 
-> a patch for the multi_v7_defconfig will be sent at a later stage.
+Hi,
 
-Thanks Fabrizio,
 
-This looks fine to me but I will wait to see if there are other reviews
-before applying.
+On Mon, Sep 24, 2018 at 7:55 AM, Alexandre Torgue
+<alexandre.torgue@st.com> wrote:
+> Hi Olof
+>
+> On 09/23/2018 02:34 PM, Olof Johansson wrote:
+>>
+>> Hi Alexandre,
+>>
+>> On Thu, Sep 20, 2018 at 06:34:15PM +0200, Alexandre Torgue wrote:
+>>>
+>>> Hi Arnd, olof and Kevin
+>>>
+>>> Those 2 patches fixe the same issue on 4.19-rc: a bad usage of the mdma
+>>> binding inside stm32mp157c.dts file. Can you please add them as fixe for
+>>> 4.19 ?
+>>
+>>
+>> The patches only mention removing unused property contents, not what the
+>> bug is
+>> that it fixes (or if it's even causing any problems). Care you clarify?
+>
+>
+> Sure.
+> Concerning SPI patch: without this patch, DMA request will fail but there
+> will be no crash because SPI will switch in interrupt mode.
+> Concerning HASH one, it's just to align DT with dt-bindings documentation.
+> Regarding the minor issue that they fix I could understand that you postpone
+> the merge of those two patches for 4.20.
 
-Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+The former sounds like an appropriate fix, but the latter is probably
+4.20 material, indeed.
 
-> 
-> Thanks,
-> Fab
-> 
->  arch/arm/configs/shmobile_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-> index d090022..9e5a5ad 100644
-> --- a/arch/arm/configs/shmobile_defconfig
-> +++ b/arch/arm/configs/shmobile_defconfig
-> @@ -142,6 +142,7 @@ CONFIG_DRM=y
->  CONFIG_DRM_RCAR_DU=y
->  CONFIG_DRM_RCAR_LVDS=y
->  CONFIG_DRM_DUMB_VGA_DAC=y
-> +CONFIG_DRM_SII902X=y
->  CONFIG_DRM_I2C_ADV7511=y
->  CONFIG_DRM_I2C_ADV7511_AUDIO=y
->  CONFIG_FB_SH_MOBILE_LCDC=y
-> -- 
-> 2.7.4
-> 
+Should I just cherry-pick the two patches, or do you want to re-stage
+new branches?
+
+
+-Olof
