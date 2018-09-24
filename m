@@ -1,319 +1,692 @@
-From: lukma@denx.de (Lukasz Majewski)
-Date: Mon, 24 Sep 2018 10:30:45 +0200
-Subject: [PATCH] ARM: dts: Add support for Liebherr's BK4 device (vf610
- based)
-In-Reply-To: <CAOMZO5DPnWNJ_UVdE9Lvh05R84seP8VPP=35eEUaor4-pppXGQ@mail.gmail.com>
-References: <20180921152726.31742-1-lukma@denx.de>
- <CAOMZO5DPnWNJ_UVdE9Lvh05R84seP8VPP=35eEUaor4-pppXGQ@mail.gmail.com>
-Message-ID: <20180924103045.524c6855@jawa>
+From: gustavo.pimentel@synopsys.com (Gustavo Pimentel)
+Date: Mon, 24 Sep 2018 09:34:46 +0100
+Subject: [RESEND PATCH v3 2/2] PCI: meson: add the Amlogic Meson PCIe
+ controller driver
+In-Reply-To: <1537509820-52040-3-git-send-email-hanjie.lin@amlogic.com>
+References: <1537509820-52040-1-git-send-email-hanjie.lin@amlogic.com>
+ <1537509820-52040-3-git-send-email-hanjie.lin@amlogic.com>
+Message-ID: <cd234d38-b162-c8c2-edb8-9f1b96d53253@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Hi Hanjie,
 
-Thanks for your review.
-
-> On Fri, Sep 21, 2018 at 12:27 PM, Lukasz Majewski <lukma@denx.de>
-> wrote:
-> > This commit adds DTS support for BK4 device from Liebherr. It
-> > uses vf610 SoC from NXP.
-> >
-> > Signed-off-by: Lukasz Majewski <lukma@denx.de>
-> > ---
-> >  arch/arm/boot/dts/Makefile      |   1 +
-> >  arch/arm/boot/dts/vf610-bk4.dts | 504
-> > ++++++++++++++++++++++++++++++++++++++++ 2 files changed, 505
-> > insertions(+) create mode 100644 arch/arm/boot/dts/vf610-bk4.dts
-> >
-> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> > index b5bd3de87c33..e6f159895fa9 100644
-> > --- a/arch/arm/boot/dts/Makefile
-> > +++ b/arch/arm/boot/dts/Makefile
-> > @@ -577,6 +577,7 @@ dtb-$(CONFIG_SOC_LS1021A) += \
-> >         ls1021a-twr.dtb
-> >  dtb-$(CONFIG_SOC_VF610) += \
-> >         vf500-colibri-eval-v3.dtb \
-> > +       vf610-bk4.dtb \
-> >         vf610-colibri-eval-v3.dtb \
-> >         vf610m4-colibri.dtb \
-> >         vf610-cosmic.dtb \
-> > diff --git a/arch/arm/boot/dts/vf610-bk4.dts
-> > b/arch/arm/boot/dts/vf610-bk4.dts new file mode 100644
-> > index 000000000000..4ad7e739a0ad
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/vf610-bk4.dts
-> > @@ -0,0 +1,504 @@
-> > +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-> > +/*
-> > + * Copyright 2018
-> > + * Lukasz Majewski, DENX Software Engineering, lukma at denx.de
-> > + */
-> > +
-> > +/dts-v1/;
-> > +#include "vf610.dtsi"
-> > +
-> > +/ {
-> > +       model = "Liebherr BK4 controller";
-> > +       compatible = "lwn,bk4", "fsl,vf610";
-> > +
-> > +       chosen {
-> > +               bootargs = "console=ttyLP1,115200";  
+On 21/09/2018 07:03, Hanjie Lin wrote:
+> From: Yue Wang <yue.wang@amlogic.com>
 > 
-> You could pass stdout-path instead.
-
-Ok.
-
+> The Amlogic Meson PCIe host controller is based on the Synopsys DesignWare
+> PCI core. This patch adds the driver support for Meson PCIe controller.
 > 
-> > +       };
-> > +
-> > +       memory at 80000000 {
-> > +               reg = <0x80000000 0x8000000>;
-> > +       };
-> > +
-> > +       audio_ext: mclk_osc {
-> > +               compatible = "fixed-clock";
-> > +               #clock-cells = <0>;
-> > +               clock-frequency = <24576000>;
-> > +       };  
+> Signed-off-by: Yue Wang <yue.wang@amlogic.com>
+> Signed-off-by: Hanjie Lin <hanjie.lin@amlogic.com>
+> ---
+>  drivers/pci/controller/dwc/Kconfig     |  12 +
+>  drivers/pci/controller/dwc/Makefile    |   1 +
+>  drivers/pci/controller/dwc/pci-meson.c | 617 +++++++++++++++++++++++++++++++++
+>  3 files changed, 630 insertions(+)
+>  create mode 100644 drivers/pci/controller/dwc/pci-meson.c
 > 
-> This seems to be unused.
+> diff --git a/drivers/pci/controller/dwc/Kconfig b/drivers/pci/controller/dwc/Kconfig
+> index 91b0194..6cb36f6 100644
+> --- a/drivers/pci/controller/dwc/Kconfig
+> +++ b/drivers/pci/controller/dwc/Kconfig
+> @@ -193,4 +193,16 @@ config PCIE_HISI_STB
+>  	help
+>            Say Y here if you want PCIe controller support on HiSilicon STB SoCs
+>  
+> +config PCI_MESON
+> +	bool "MESON PCIe controller"
+> +	depends on PCI
+> +	depends on PCI_MSI_IRQ_DOMAIN
 
-The audio_ext label is used (referenced) in the "clks".
+I would suggest to compress the previous 2 line into in just one, like:
+depends on PCI && PCI_MSI_IRQ_DOMAIN
 
+Regards,
+Gustavo
+
+> +	select PCIEPORTBUS
+> +	select PCIE_DW_HOST
+> +	help
+> +	  Say Y here if you want to enable PCI controller support on Amlogic
+> +	  SoCs. The PCI controller on Amlogic is based on DesignWare hardware
+> +	  and therefore the driver re-uses the DesignWare core functions to
+> +	  implement the driver.
+> +
+>  endmenu
+> diff --git a/drivers/pci/controller/dwc/Makefile b/drivers/pci/controller/dwc/Makefile
+> index 5d2ce72..cf676bd 100644
+> --- a/drivers/pci/controller/dwc/Makefile
+> +++ b/drivers/pci/controller/dwc/Makefile
+> @@ -14,6 +14,7 @@ obj-$(CONFIG_PCIE_ARMADA_8K) += pcie-armada8k.o
+>  obj-$(CONFIG_PCIE_ARTPEC6) += pcie-artpec6.o
+>  obj-$(CONFIG_PCIE_KIRIN) += pcie-kirin.o
+>  obj-$(CONFIG_PCIE_HISI_STB) += pcie-histb.o
+> +obj-$(CONFIG_PCI_MESON) += pci-meson.o
+>  
+>  # The following drivers are for devices that use the generic ACPI
+>  # pci_root.c driver but don't support standard ECAM config access.
+> diff --git a/drivers/pci/controller/dwc/pci-meson.c b/drivers/pci/controller/dwc/pci-meson.c
+> new file mode 100644
+> index 0000000..9c92a89
+> --- /dev/null
+> +++ b/drivers/pci/controller/dwc/pci-meson.c
+> @@ -0,0 +1,617 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * PCIe host controller driver for Amlogic MESON SoCs
+> + *
+> + * Copyright (c) 2018 Amlogic, inc.
+> + * Author: Yue Wang <yue.wang@amlogic.com>
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/of_device.h>
+> +#include <linux/of_gpio.h>
+> +#include <linux/pci.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/resource.h>
+> +#include <linux/types.h>
+> +#include <linux/reset.h>
+> +
+> +#include "pcie-designware.h"
+> +
+> +#define to_meson_pcie(x) dev_get_drvdata((x)->dev)
+> +
+> +/* External local bus interface registers */
+> +#define PLR_OFFSET			0x700
+> +#define PCIE_PORT_LINK_CTRL_OFF		(PLR_OFFSET + 0x10)
+> +#define FAST_LINK_MODE			BIT(7)
+> +#define LINK_CAPABLE_MASK		GENMASK(21, 16)
+> +#define LINK_CAPABLE_X1			BIT(16)
+> +
+> +#define PCIE_GEN2_CTRL_OFF		(PLR_OFFSET + 0x10c)
+> +#define NUM_OF_LANES_MASK		GENMASK(12, 8)
+> +#define NUM_OF_LANES_X1			BIT(8)
+> +#define DIRECT_SPEED_CHANGE		BIT(17)
+> +
+> +#define TYPE1_HDR_OFFSET		0x0
+> +#define PCIE_STATUS_COMMAND		(TYPE1_HDR_OFFSET + 0x04)
+> +#define PCI_IO_EN			BIT(0)
+> +#define PCI_MEM_SPACE_EN		BIT(1)
+> +#define PCI_BUS_MASTER_EN		BIT(2)
+> +
+> +#define PCIE_BASE_ADDR0			(TYPE1_HDR_OFFSET + 0x10)
+> +#define PCIE_BASE_ADDR1			(TYPE1_HDR_OFFSET + 0x14)
+> +
+> +#define PCIE_CAP_OFFSET			0x70
+> +#define PCIE_DEV_CTRL_DEV_STUS		(PCIE_CAP_OFFSET + 0x08)
+> +#define PCIE_CAP_MAX_PAYLOAD_MASK	GENMASK(7, 5)
+> +#define PCIE_CAP_MAX_PAYLOAD_SIZE(x)	((x) << 5)
+> +#define PCIE_CAP_MAX_READ_REQ_MASK	GENMASK(14, 12)
+> +#define PCIE_CAP_MAX_READ_REQ_SIZE(x)	((x) << 12)
+> +
+> +#define PCI_CLASS_REVISION_MASK		GENMASK(7, 0)
+> +
+> +/* PCIe specific config registers */
+> +#define PCIE_CFG0			0x0
+> +#define APP_LTSSM_ENABLE		BIT(7)
+> +
+> +#define PCIE_CFG_STATUS12		0x30
+> +#define IS_SMLH_LINK_UP(x)		((x) & (1 << 6))
+> +#define IS_RDLH_LINK_UP(x)		((x) & (1 << 16))
+> +#define IS_LTSSM_UP(x)			((((x) >> 10) & 0x1f) == 0x11)
+> +
+> +#define PCIE_CFG_STATUS17		0x44
+> +#define PM_CURRENT_STATE(x)		(((x) >> 7) & 0x1)
+> +
+> +#define WAIT_LINKUP_TIMEOUT		2000
+> +#define PORT_CLK_RATE			100000000UL
+> +#define MAX_PAYLOAD_SIZE		256
+> +#define MAX_READ_REQ_SIZE		256
+> +#define MESON_PCIE_PHY_POWERUP		0x1c
+> +#define PCIE_RESET_DELAY		500
+> +#define PCIE_SHARED_RESET		1
+> +#define PCIE_NORMAL_RESET		0
+> +
+> +enum pcie_data_rate {
+> +	PCIE_GEN1,
+> +	PCIE_GEN2,
+> +	PCIE_GEN3,
+> +	PCIE_GEN4
+> +};
+> +
+> +struct meson_pcie_mem_res {
+> +	void __iomem *elbi_base; /* DT 0th resource */
+> +	void __iomem *cfg_base; /* DT 1nd resource */
+> +	void __iomem *phy_base; /* DT 2nd resource */
+> +};
+> +
+> +struct meson_pcie_clk_res {
+> +	struct clk *clk;
+> +	struct clk *mipi_gate;
+> +	struct clk *port_clk;
+> +	struct clk *general_clk;
+> +};
+> +
+> +struct meson_pcie_rc_reset {
+> +	struct reset_control *phy;
+> +	struct reset_control *port;
+> +	struct reset_control *apb;
+> +};
+> +
+> +struct meson_pcie {
+> +	struct dw_pcie pci;
+> +	struct meson_pcie_mem_res mem_res;
+> +	struct meson_pcie_clk_res clk_res;
+> +	struct meson_pcie_rc_reset mrst;
+> +	struct gpio_desc *reset_gpio;
+> +
+> +	enum of_gpio_flags gpio_flag;
+> +	int pcie_num;
+> +	u32 port_num;
+> +	u32 device_attch;
+> +};
+> +
+> +static struct reset_control *meson_pcie_get_reset(struct meson_pcie *mp,
+> +						  const char *id,
+> +						  u32 reset_type)
+> +{
+> +	struct device *dev = mp->pci.dev;
+> +	struct reset_control *reset;
+> +
+> +	if (reset_type == PCIE_SHARED_RESET)
+> +		reset = devm_reset_control_get_shared(dev, id);
+> +	else
+> +		reset = devm_reset_control_get(dev, id);
+> +
+> +	return reset;
+> +}
+> +
+> +static int meson_pcie_get_resets(struct meson_pcie *mp)
+> +{
+> +	struct meson_pcie_rc_reset *mrst = &mp->mrst;
+> +
+> +	mrst->phy = meson_pcie_get_reset(mp, "phy", PCIE_SHARED_RESET);
+> +	if (IS_ERR(mrst->phy))
+> +		return PTR_ERR(mrst->phy);
+> +	reset_control_deassert(mrst->phy);
+> +
+> +	mrst->port = meson_pcie_get_reset(mp, "port", PCIE_NORMAL_RESET);
+> +	if (IS_ERR(mrst->port))
+> +		return PTR_ERR(mrst->port);
+> +	reset_control_deassert(mrst->port);
+> +
+> +	mrst->apb = meson_pcie_get_reset(mp, "apb", PCIE_SHARED_RESET);
+> +	if (IS_ERR(mrst->apb))
+> +		return PTR_ERR(mrst->apb);
+> +	reset_control_deassert(mrst->apb);
+> +
+> +	return 0;
+> +}
+> +
+> +static void __iomem *meson_pcie_get_mem_shared(struct platform_device *pdev,
+> +					       struct meson_pcie *mp,
+> +					       const char *id)
+> +{
+> +	struct resource *res;
+> +
+> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, id);
+> +
+> +	return ioremap(res->start, resource_size(res));
+> +}
+> +
+> +static void __iomem *meson_pcie_get_mem(struct platform_device *pdev,
+> +					struct meson_pcie *mp,
+> +					const char *id)
+> +{
+> +	struct device *dev = mp->pci.dev;
+> +	struct resource *res;
+> +
+> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, id);
+> +
+> +	return devm_ioremap_resource(dev, res);
+> +}
+> +
+> +static int meson_pcie_get_mems(struct platform_device *pdev,
+> +			       struct meson_pcie *mp)
+> +{
+> +	mp->mem_res.elbi_base = meson_pcie_get_mem(pdev, mp, "elbi");
+> +	if (IS_ERR(mp->mem_res.elbi_base))
+> +		return PTR_ERR(mp->mem_res.elbi_base);
+> +
+> +	mp->mem_res.cfg_base = meson_pcie_get_mem(pdev, mp, "cfg");
+> +	if (IS_ERR(mp->mem_res.cfg_base))
+> +		return PTR_ERR(mp->mem_res.cfg_base);
+> +
+> +	mp->mem_res.phy_base = meson_pcie_get_mem_shared(pdev, mp, "phy");
+> +	if (IS_ERR(mp->mem_res.phy_base))
+> +		return PTR_ERR(mp->mem_res.phy_base);
+> +
+> +	return 0;
+> +}
+> +
+> +static void meson_pcie_power_on(struct meson_pcie *mp)
+> +{
+> +	writel(MESON_PCIE_PHY_POWERUP, mp->mem_res.phy_base);
+> +}
+> +
+> +static void meson_pcie_reset(struct meson_pcie *mp)
+> +{
+> +	struct meson_pcie_rc_reset *mrst = &mp->mrst;
+> +
+> +	reset_control_assert(mrst->phy);
+> +	udelay(PCIE_RESET_DELAY);
+> +	reset_control_deassert(mrst->phy);
+> +	udelay(PCIE_RESET_DELAY);
+> +
+> +	reset_control_assert(mrst->port);
+> +	reset_control_assert(mrst->apb);
+> +	udelay(PCIE_RESET_DELAY);
+> +	reset_control_deassert(mrst->port);
+> +	reset_control_deassert(mrst->apb);
+> +	udelay(PCIE_RESET_DELAY);
+> +}
+> +
+> +static inline struct clk *meson_pcie_probe_clock(struct device *dev,
+> +						 const char *id, u64 rate)
+> +{
+> +	struct clk *clk = NULL;
+> +	int ret;
+> +
+> +	clk = devm_clk_get(dev, id);
+> +	if (IS_ERR(clk))
+> +		return clk;
+> +
+> +	if (rate) {
+> +		ret = clk_set_rate(clk, rate);
+> +		if (ret) {
+> +			dev_err(dev, "set clk rate failed, ret = %d\n", ret);
+> +			return ERR_PTR(ret);
+> +		}
+> +	}
+> +
+> +	ret = clk_prepare_enable(clk);
+> +	if (ret) {
+> +		dev_err(dev, "couldn't enable clk\n");
+> +		return ERR_PTR(ret);
+> +	}
+> +
+> +	devm_add_action_or_reset(dev,
+> +				 (void (*) (void *))clk_disable_unprepare,
+> +				 clk);
+> +
+> +	return clk;
+> +}
+> +
+> +static int meson_pcie_probe_clocks(struct meson_pcie *mp)
+> +{
+> +	struct device *dev = mp->pci.dev;
+> +	struct meson_pcie_clk_res *res = &mp->clk_res;
+> +
+> +	res->port_clk = meson_pcie_probe_clock(dev, "port", PORT_CLK_RATE);
+> +	if (IS_ERR(res->port_clk))
+> +		return PTR_ERR(res->port_clk);
+> +
+> +	res->mipi_gate = meson_pcie_probe_clock(dev, "pcie_mipi_en", 0);
+> +	if (IS_ERR(res->mipi_gate))
+> +		return PTR_ERR(res->mipi_gate);
+> +
+> +	res->general_clk = meson_pcie_probe_clock(dev, "pcie_general", 0);
+> +	if (IS_ERR(res->general_clk))
+> +		return PTR_ERR(res->general_clk);
+> +
+> +	res->clk = meson_pcie_probe_clock(dev, "pcie", 0);
+> +	if (IS_ERR(res->clk))
+> +		return PTR_ERR(res->clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static inline void meson_elb_writel(struct meson_pcie *mp, u32 val, u32 reg)
+> +{
+> +	writel(val, mp->mem_res.elbi_base + reg);
+> +}
+> +
+> +static inline u32 meson_elb_readl(struct meson_pcie *mp, u32 reg)
+> +{
+> +	return readl(mp->mem_res.elbi_base + reg);
+> +}
+> +
+> +static inline u32 meson_cfg_readl(struct meson_pcie *mp, u32 reg)
+> +{
+> +	return readl(mp->mem_res.cfg_base + reg);
+> +}
+> +
+> +static inline void meson_cfg_writel(struct meson_pcie *mp, u32 val, u32 reg)
+> +{
+> +	writel(val, mp->mem_res.cfg_base + reg);
+> +}
+> +
+> +static void meson_pcie_assert_reset(struct meson_pcie *mp)
+> +{
+> +	gpiod_set_value_cansleep(mp->reset_gpio, 0);
+> +	udelay(500);
+> +	gpiod_set_value_cansleep(mp->reset_gpio, 1);
+> +}
+> +
+> +static void meson_pcie_init_dw(struct meson_pcie *mp)
+> +{
+> +	u32 val = 0;
+> +
+> +	val = meson_cfg_readl(mp, PCIE_CFG0);
+> +	val |= APP_LTSSM_ENABLE;
+> +	meson_cfg_writel(mp, val, PCIE_CFG0);
+> +
+> +	val = meson_elb_readl(mp, PCIE_PORT_LINK_CTRL_OFF);
+> +	val &= ~LINK_CAPABLE_MASK;
+> +	meson_elb_writel(mp, val, PCIE_PORT_LINK_CTRL_OFF);
+> +
+> +	val = meson_elb_readl(mp, PCIE_PORT_LINK_CTRL_OFF);
+> +	val |= LINK_CAPABLE_X1 | FAST_LINK_MODE;
+> +	meson_elb_writel(mp, val, PCIE_PORT_LINK_CTRL_OFF);
+> +
+> +	val = meson_elb_readl(mp, PCIE_GEN2_CTRL_OFF);
+> +	val &= ~NUM_OF_LANES_MASK;
+> +	meson_elb_writel(mp, val, PCIE_GEN2_CTRL_OFF);
+> +
+> +	val = meson_elb_readl(mp, PCIE_GEN2_CTRL_OFF);
+> +	val |= NUM_OF_LANES_X1 | DIRECT_SPEED_CHANGE;
+> +	meson_elb_writel(mp, val, PCIE_GEN2_CTRL_OFF);
+> +
+> +	meson_elb_writel(mp, 0x0, PCIE_BASE_ADDR0);
+> +	meson_elb_writel(mp, 0x0, PCIE_BASE_ADDR1);
+> +}
+> +
+> +static int meson_size_to_payload(int size)
+> +{
+> +	if (size & (size - 1) || size < 128 || size > 4096)
+> +		return 1;
+> +
+> +	return fls(size) - 8;
+> +}
+> +
+> +static void meson_set_max_payload(struct meson_pcie *mp, int size)
+> +{
+> +	u32 val = 0;
+> +	int max_payload_size = meson_size_to_payload(size);
+> +
+> +	val = meson_elb_readl(mp, PCIE_DEV_CTRL_DEV_STUS);
+> +	val &= ~PCIE_CAP_MAX_PAYLOAD_MASK;
+> +	meson_elb_writel(mp, val, PCIE_DEV_CTRL_DEV_STUS);
+> +
+> +	val = meson_elb_readl(mp, PCIE_DEV_CTRL_DEV_STUS);
+> +	val |= PCIE_CAP_MAX_PAYLOAD_SIZE(max_payload_size);
+> +	meson_elb_writel(mp, val, PCIE_DEV_CTRL_DEV_STUS);
+> +}
+> +
+> +static void meson_set_max_rd_req_size(struct meson_pcie *mp, int size)
+> +{
+> +	u32 val = 0;
+> +	int max_rd_req_size = meson_size_to_payload(size);
+> +
+> +	val = meson_elb_readl(mp, PCIE_DEV_CTRL_DEV_STUS);
+> +	val &= ~PCIE_CAP_MAX_READ_REQ_MASK;
+> +	meson_elb_writel(mp, val, PCIE_DEV_CTRL_DEV_STUS);
+> +
+> +	val = meson_elb_readl(mp, PCIE_DEV_CTRL_DEV_STUS);
+> +	val |= PCIE_CAP_MAX_READ_REQ_SIZE(max_rd_req_size);
+> +	meson_elb_writel(mp, val, PCIE_DEV_CTRL_DEV_STUS);
+> +}
+> +
+> +static inline void meson_enable_memory_space(struct meson_pcie *mp)
+> +{
+> +	/* Set the RC Bus Master, Memory Space and I/O Space enables */
+> +	meson_elb_writel(mp, PCI_IO_EN | PCI_MEM_SPACE_EN | PCI_BUS_MASTER_EN,
+> +			 PCIE_STATUS_COMMAND);
+> +}
+> +
+> +static int meson_pcie_establish_link(struct meson_pcie *mp)
+> +{
+> +	struct dw_pcie *pci = &mp->pci;
+> +	struct pcie_port *pp = &pci->pp;
+> +
+> +	meson_pcie_init_dw(mp);
+> +	meson_set_max_payload(mp, MAX_PAYLOAD_SIZE);
+> +	meson_set_max_rd_req_size(mp, MAX_READ_REQ_SIZE);
+> +
+> +	dw_pcie_setup_rc(pp);
+> +	meson_enable_memory_space(mp);
+> +
+> +	meson_pcie_assert_reset(mp);
+> +
+> +	/* check if the link is up or not */
+> +	if (!dw_pcie_wait_for_link(pci))
+> +		return 0;
+> +
+> +	return -ETIMEDOUT;
+> +}
+> +
+> +static void meson_pcie_msi_init(struct meson_pcie *mp)
+> +{
+> +	struct pcie_port *pp = &mp->pci.pp;
+> +
+> +	dw_pcie_msi_init(pp);
+> +}
+> +
+> +static void meson_pcie_enable_interrupts(struct meson_pcie *mp)
+> +{
+> +	if (IS_ENABLED(CONFIG_PCI_MSI))
+> +		meson_pcie_msi_init(mp);
+> +}
+> +
+> +static u32 meson_pcie_read_dbi(struct dw_pcie *pci, void __iomem *base,
+> +			       u32 reg, size_t size)
+> +{
+> +	u32 val;
+> +
+> +	dw_pcie_read(base + reg, size, &val);
+> +
+> +	return val;
+> +}
+> +
+> +static void meson_pcie_write_dbi(struct dw_pcie *pci, void __iomem *base,
+> +				 u32 reg, size_t size, u32 val)
+> +{
+> +	dw_pcie_write(base + reg, size, val);
+> +}
+> +
+> +static int meson_pcie_rd_own_conf(struct pcie_port *pp, int where, int size,
+> +				  u32 *val)
+> +{
+> +	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+> +	struct meson_pcie *mp = to_meson_pcie(pci);
+> +
+> +	if (!mp->device_attch)
+> +		return 0;
+> +
+> +	/* the device class is not reported correctly from the register */
+> +	if (where == PCI_CLASS_REVISION) {
+> +		*val = readl(pci->dbi_base + PCI_CLASS_REVISION);
+> +		/* keep revision id */
+> +		*val &= PCI_CLASS_REVISION_MASK;
+> +		*val |= PCI_CLASS_BRIDGE_PCI << 16;
+> +		return PCIBIOS_SUCCESSFUL;
+> +	}
+> +
+> +	return dw_pcie_read(pci->dbi_base + where, size, val);
+> +}
+> +
+> +static int meson_pcie_wr_own_conf(struct pcie_port *pp, int where,
+> +				  int size, u32 val)
+> +{
+> +	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+> +	struct meson_pcie *mp = to_meson_pcie(pci);
+> +
+> +	if (!mp->device_attch)
+> +		return 0;
+> +
+> +	return dw_pcie_write(pci->dbi_base + where, size, val);
+> +}
+> +
+> +static int meson_pcie_link_up(struct dw_pcie *pci)
+> +{
+> +	struct meson_pcie *mp = to_meson_pcie(pci);
+> +	struct device *dev = pci->dev;
+> +	u32 smlh_up = 0;
+> +	u32 ltssm_up = 0;
+> +	u32 rdlh_up = 0;
+> +	u32 speed_okay = 0;
+> +	u32 cnt = 0;
+> +	u32 state12, state17;
+> +
+> +	while (smlh_up == 0 || rdlh_up == 0 || ltssm_up == 0 ||
+> +	       speed_okay == 0) {
+> +		udelay(20);
+> +
+> +		state12 = meson_cfg_readl(mp, PCIE_CFG_STATUS12);
+> +		state17 = meson_cfg_readl(mp, PCIE_CFG_STATUS17);
+> +		smlh_up = IS_SMLH_LINK_UP(state12);
+> +		rdlh_up = IS_RDLH_LINK_UP(state12);
+> +		ltssm_up = IS_LTSSM_UP(state12);
+> +
+> +		if (PM_CURRENT_STATE(state17) < PCIE_GEN3)
+> +			speed_okay = 1;
+> +
+> +		if (smlh_up)
+> +			dev_dbg(dev, "smlh_link_up is on\n");
+> +		if (rdlh_up)
+> +			dev_dbg(dev, "rdlh_link_up is on\n");
+> +		if (ltssm_up)
+> +			dev_dbg(dev, "ltssm_up is on\n");
+> +		if (speed_okay)
+> +			dev_dbg(dev, "speed_okay\n");
+> +
+> +		cnt++;
+> +
+> +		if (cnt >= WAIT_LINKUP_TIMEOUT) {
+> +			dev_err(dev, "Error: Wait linkup timeout.\n");
+> +			return 0;
+> +		}
+> +	}
+> +
+> +	return 1;
+> +}
+> +
+> +static int meson_pcie_host_init(struct pcie_port *pp)
+> +{
+> +	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+> +	struct meson_pcie *mp = to_meson_pcie(pci);
+> +	int ret;
+> +
+> +	ret = meson_pcie_establish_link(mp);
+> +
+> +	if (ret)
+> +		return ret;
+> +
+> +	mp->device_attch = 1;
+> +	meson_pcie_enable_interrupts(mp);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct dw_pcie_host_ops meson_pcie_host_ops = {
+> +	.rd_own_conf = meson_pcie_rd_own_conf,
+> +	.wr_own_conf = meson_pcie_wr_own_conf,
+> +	.host_init = meson_pcie_host_init,
+> +};
+> +
+> +static int meson_add_pcie_port(struct meson_pcie *mp,
+> +			       struct platform_device *pdev)
+> +{
+> +	struct dw_pcie *pci = &mp->pci;
+> +	struct pcie_port *pp = &pci->pp;
+> +	struct device *dev = &pdev->dev;
+> +	int ret;
+> +
+> +	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+> +		pp->msi_irq = platform_get_irq(pdev, 0);
+> +		if (pp->msi_irq < 0) {
+> +			dev_err(dev, "failed to get msi irq\n");
+> +			return pp->msi_irq;
+> +		}
+> +	}
+> +
+> +	pp->root_bus_nr = -1;
+> +	pp->ops = &meson_pcie_host_ops;
+> +	pci->dbi_base = mp->mem_res.elbi_base;
+> +
+> +	ret = dw_pcie_host_init(pp);
+> +	if (ret) {
+> +		dev_err(dev, "failed to initialize host\n");
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct dw_pcie_ops dw_pcie_ops = {
+> +	.read_dbi = meson_pcie_read_dbi,
+> +	.write_dbi = meson_pcie_write_dbi,
+> +	.link_up = meson_pcie_link_up,
+> +};
+> +
+> +static int meson_pcie_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct dw_pcie *pci;
+> +	struct meson_pcie *mp;
+> +	int ret;
+> +
+> +	mp = devm_kzalloc(dev, sizeof(*mp), GFP_KERNEL);
+> +	if (!mp)
+> +		return -ENOMEM;
+> +
+> +	pci = &mp->pci;
+> +	pci->dev = dev;
+> +	pci->ops = &dw_pcie_ops;
+> +
+> +	mp->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_LOW);
+> +	if (IS_ERR(mp->reset_gpio)) {
+> +		dev_err(dev, "Get reset gpio failed\n");
+> +		return PTR_ERR(mp->reset_gpio);
+> +	}
+> +
+> +	ret = meson_pcie_get_resets(mp);
+> +	if (ret) {
+> +		dev_err(dev, "Get reset resource failed, %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	ret = meson_pcie_get_mems(pdev, mp);
+> +	if (ret) {
+> +		dev_err(dev, "Get memory resource failed, %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	meson_pcie_power_on(mp);
+> +	meson_pcie_reset(mp);
+> +
+> +	ret = meson_pcie_probe_clocks(mp);
+> +	if (ret) {
+> +		dev_err(dev, "Init clock resources failed, %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, mp);
+> +
+> +	ret = meson_add_pcie_port(mp, pdev);
+> +	if (ret < 0)
+> +		dev_err(dev, "Add PCIE port failed, %d\n", ret);
+> +
+> +	return ret;
+> +}
+> +
+> +static const struct of_device_id meson_pcie_of_match[] = {
+> +	{
+> +		.compatible = "amlogic,axg-pcie",
+> +	},
+> +	{},
+> +};
+> +
+> +static struct platform_driver meson_pcie_driver = {
+> +	.probe = meson_pcie_probe,
+> +	.driver = {
+> +		.name = "meson-pcie",
+> +		.of_match_table = meson_pcie_of_match,
+> +	},
+> +};
+> +
+> +builtin_platform_driver(meson_pcie_driver);
 > 
-> > +
-> > +       enet_ext: eth_osc {
-> > +               compatible = "fixed-clock";
-> > +               #clock-cells = <0>;
-> > +               clock-frequency = <50000000>;
-> > +       };
-> > +
-> > +       leds {
-> > +               compatible = "gpio-leds";
-> > +               pinctrl-names = "default";
-> > +               pinctrl-0 = <&pinctrl_gpio_leds>;
-> > +
-> > +               /* LED D5 */
-> > +               led0: heartbeat {
-> > +                       label = "heartbeat";
-> > +                       gpios = <&gpio3 21 GPIO_ACTIVE_HIGH>;
-> > +                       default-state = "on";
-> > +                       linux,default-trigger = "heartbeat";
-> > +               };
-> > +       };
-> > +
-> > +       regulators {
-> > +               compatible = "simple-bus";
-> > +               #address-cells = <1>;
-> > +               #size-cells = <0>;
-> > +
-> > +               reg_3p3v: regulator at 0 {  
-> 
-> Please move all regulators outside of the simple-bus container and use
-> this naming convention:
-> 
-> reg_3p3v: regulator-3p3v {
-
-Ok.
-
-> 
-> > +&dspi3 {
-> > +       pinctrl-names = "default";
-> > +       pinctrl-0 = <&pinctrl_dspi3>;
-> > +       bus-num = <3>;
-> > +       status = "okay";
-> > +
-> > +       spidev3 at 0 {
-> > +               compatible = "fsl,vf610-dspi";
-> > +               spi-max-frequency = <30000000>;
-> > +               reg = <0>;
-> > +               fsl,spi-slave-mode;  
-> 
-> Such property does not exist.
-
-It has been added in the other patch sent to ML:
-https://lkml.org/lkml/2018/9/18/792
-
-But till now no comments/reply.
-
-> 
-> I also thought that spidev nodes in dt were not recommended.
-
-This is a bit "unusual" on BK4, as the spidev driver is the only "user"
-of the SPI subsystem on this board. In other words - the /dev/spidevX.Y
-provided by spidev is solely used for communication.
-
-Hence, I would prefer to make it explicit in the DTS.
-
-> 
-> > +&iomuxc {  
-> 
-> Like Stefan mentioned it is common practice on imx dts files to place
-> the iomuxc node as the last one.
-
-Ok.
-
-> 
-> 
-> > +       pinctrl-names = "default";
-> > +       pinctrl-0 = <&pinctrl_bk4_common>;  
-> 
-> This seems to be not called from any driver.
-
-Yes. This is "base" setup for the board. Those configured pins are
-thereafter used by several user space programs.
-
-> 
-> We usually use a hog group for such purpose.
-
-I wanted to name it explicit that we do use it for this controller.
-However, no problem to rename it to hog.
-
-> 
-> > +
-> > +       pinctrl_bk4_common: commongrp {
-> > +               fsl,pins = <
-> > +                       /* One_Wire_PSU_EN */
-> > +                       VF610_PAD_PTC29__GPIO_102
-> > 0x1183
-> > +                       /* SPI */
-> > +                       VF610_PAD_PTB26__GPIO_96
-> > 0x1183
-> > +                       VF610_PAD_PTE14__GPIO_119
-> > 0x1183
-> > +                       VF610_PAD_PTE4__GPIO_109
-> > 0x1181
-> > +                       /* Feedback_Lines */
-> > +                       VF610_PAD_PTC31__GPIO_104
-> > 0x1181
-> > +                       VF610_PAD_PTA7__GPIO_134
-> > 0x1181
-> > +                       VF610_PAD_PTD9__GPIO_88         0x1181
-> > +                       VF610_PAD_PTE1__GPIO_106
-> > 0x1183
-> > +                       VF610_PAD_PTB2__GPIO_24         0x1181
-> > +                       VF610_PAD_PTB3__GPIO_25         0x1181
-> > +                       VF610_PAD_PTB1__GPIO_23         0x1181
-> > +                       /* SDHC */
-> > +                       VF610_PAD_PTE19__GPIO_124
-> > 0x1183
-> > +                       VF610_PAD_PTB23__GPIO_93
-> > 0x1181  
-> 
-> If they are related to SDHC they should be better placed under the
-> sdhc nodes.
-> 
-
-I will double check this.
-
-> 
-> > +                       /* GPI */
-> > +                       VF610_PAD_PTE2__GPIO_107
-> > 0x1181
-> > +                       VF610_PAD_PTE3__GPIO_108
-> > 0x1181
-> > +                       VF610_PAD_PTE5__GPIO_110
-> > 0x1181
-> > +                       VF610_PAD_PTE6__GPIO_111
-> > 0x1181
-> > +                       /* GPO */
-> > +                       VF610_PAD_PTE0__GPIO_105
-> > 0x1183
-> > +                       VF610_PAD_PTE7__GPIO_112
-> > 0x1183
-> > +                       /* RS485 */
-> > +                       VF610_PAD_PTB8__GPIO_30         0x1183
-> > +                       VF610_PAD_PTB9__GPIO_31         0x1183
-> > +                       VF610_PAD_PTE8__GPIO_113
-> > 0x1183
-> > +                       /* MPBUS MPB_EN */
-> > +                       VF610_PAD_PTE28__GPIO_133
-> > 0x1183
-> > +                       /* LEDS */
-> > +                       VF610_PAD_PTE15__GPIO_120
-> > 0x1183
-> > +                       VF610_PAD_PTA12__GPIO_5         0x1183
-> > +                       VF610_PAD_PTA16__GPIO_6         0x1183
-> > +                       VF610_PAD_PTE9__GPIO_114
-> > 0x1183
-> > +                       VF610_PAD_PTE20__GPIO_125
-> > 0x1183
-> > +                       VF610_PAD_PTE23__GPIO_128
-> > 0x1183
-> > +                       VF610_PAD_PTE16__GPIO_121
-> > 0x1183
-> > +                       /* MISC */
-> > +                       VF610_PAD_PTE10__GPIO_115
-> > 0x1183
-> > +                       VF610_PAD_PTE11__GPIO_116
-> > 0x1183
-> > +                       VF610_PAD_PTE17__GPIO_122
-> > 0x1183
-> > +                       VF610_PAD_PTC30__GPIO_103
-> > 0x1183
-> > +                       VF610_PAD_PTB0__GPIO_22         0x1181
-> > +                       /* RESETINFO */
-> > +                       VF610_PAD_PTE26__GPIO_131
-> > 0x1183
-> > +                       VF610_PAD_PTD6__GPIO_85         0x1181
-> > +                       VF610_PAD_PTE27__GPIO_132
-> > 0x1181
-> > +                       VF610_PAD_PTE13__GPIO_118
-> > 0x1181
-> > +                       VF610_PAD_PTE21__GPIO_126
-> > 0x1181
-> > +                       VF610_PAD_PTE22__GPIO_127
-> > 0x1181
-> > +                       /* EE_5V_EN */
-> > +                       VF610_PAD_PTE18__GPIO_123
-> > 0x1183
-> > +                       /* EE_5V_OC_N */
-> > +                       VF610_PAD_PTE25__GPIO_130
-> > 0x1181  
-> 
-> Seems like a long list of pins without any driver associated.
-
-Not kernel driver associated. The user space code uses those pins
-directly.
-
-> 
-> Please review such list carefully and assign to nodes that have a
-> driver associated, such as rs485,LEDS, etc.
-
-For example - the user space is not using in-kernel rs485 driver.
-
-But as said above - I will double check this.
-
-> 
-> > +
-> > +&usbphy0 {
-> > +       status = "okay";
-> > +};
-> > +
-> > +&usbphy1 {
-> > +       status = "okay";
-> > +};
-> > +
-> > +&qspi0 {  
-> 
-> This is not placed in alphabetical order.
-
-Ok. 
-
-
-Best regards,
-
-Lukasz Majewski
-
---
-
-DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180924/d5d13f8e/attachment.sig>
