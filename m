@@ -1,150 +1,176 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 25 Sep 2018 10:11:50 +0100
-Subject: [PATCH] PCI: remove unnecessary check of device_type == pci
-In-Reply-To: <20180829183440.13601-1-robh@kernel.org>
-References: <20180829183440.13601-1-robh@kernel.org>
-Message-ID: <20180925091150.GA28596@red-moon>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Tue, 25 Sep 2018 09:11:13 +0000
+Subject: [PATCH V4 0/9] clk: add imx7ulp clk support
+In-Reply-To: <AM0PR04MB421176CFEF18F815CE0EC1A980010@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1531921023-18497-1-git-send-email-aisheng.dong@nxp.com>
+ <AM0PR04MB421169829CFE1A6A32DCC209802B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <AM0PR04MB421153E1441FBE356E1B859E800B0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <AM0PR04MB421176CFEF18F815CE0EC1A980010@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <AM0PR04MB4211732CC6C078017C8B849680160@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 29, 2018 at 01:34:40PM -0500, Rob Herring wrote:
-> PCI host drivers have already matched on compatible strings, so checking
-> device_type is redundant. Also, device_type is considered deprecated for
-> FDT though we've still been requiring it for PCI hosts as it is useful
-> for finding PCI buses.
+It's been a few months without comments.
+
+Shawn & Stephen,
+Would you provide some suggestions on how to handle this?
+
+Regards
+Dong Aisheng
+
+> -----Original Message-----
+> From: A.s. Dong
+> Sent: Thursday, September 6, 2018 11:25 AM
+> To: linux-clk at vger.kernel.org; sboyd at kernel.org; shawnguo at kernel.org
+> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> mturquette at baylibre.com; Anson Huang <anson.huang@nxp.com>; Jacky Bai
+> <ping.bai@nxp.com>; dl-linux-imx <linux-imx@nxp.com>
+> Subject: RE: [PATCH V4 0/9] clk: add imx7ulp clk support
 > 
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Alan Douglas <adouglas@cadence.com>
-> Cc: Subrahmanya Lingappa <l.subrahmanya@mobiveil.co.in>
-> Cc: Michal Simek <michal.simek@xilinx.com>
-> Cc: linux-pci at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
->  drivers/pci/controller/pci-host-common.c   | 8 --------
->  drivers/pci/controller/pcie-cadence-host.c | 7 -------
->  drivers/pci/controller/pcie-mobiveil.c     | 7 -------
->  drivers/pci/controller/pcie-xilinx-nwl.c   | 9 ---------
->  drivers/pci/controller/pcie-xilinx.c       | 7 -------
->  5 files changed, 38 deletions(-)
-
-Applied to pci/controller-misc for v4.20, thanks.
-
-Lorenzo
-
-> diff --git a/drivers/pci/controller/pci-host-common.c b/drivers/pci/controller/pci-host-common.c
-> index d8f10451f273..c742881b5061 100644
-> --- a/drivers/pci/controller/pci-host-common.c
-> +++ b/drivers/pci/controller/pci-host-common.c
-> @@ -58,9 +58,7 @@ static struct pci_config_window *gen_pci_init(struct device *dev,
->  int pci_host_common_probe(struct platform_device *pdev,
->  			  struct pci_ecam_ops *ops)
->  {
-> -	const char *type;
->  	struct device *dev = &pdev->dev;
-> -	struct device_node *np = dev->of_node;
->  	struct pci_host_bridge *bridge;
->  	struct pci_config_window *cfg;
->  	struct list_head resources;
-> @@ -70,12 +68,6 @@ int pci_host_common_probe(struct platform_device *pdev,
->  	if (!bridge)
->  		return -ENOMEM;
->  
-> -	type = of_get_property(np, "device_type", NULL);
-> -	if (!type || strcmp(type, "pci")) {
-> -		dev_err(dev, "invalid \"device_type\" %s\n", type);
-> -		return -EINVAL;
-> -	}
-> -
->  	of_pci_check_probe_only();
->  
->  	/* Parse and map our Configuration Space windows */
-> diff --git a/drivers/pci/controller/pcie-cadence-host.c b/drivers/pci/controller/pcie-cadence-host.c
-> index ec394f6a19c8..97e251090b4f 100644
-> --- a/drivers/pci/controller/pcie-cadence-host.c
-> +++ b/drivers/pci/controller/pcie-cadence-host.c
-> @@ -235,7 +235,6 @@ static int cdns_pcie_host_init(struct device *dev,
->  
->  static int cdns_pcie_host_probe(struct platform_device *pdev)
->  {
-> -	const char *type;
->  	struct device *dev = &pdev->dev;
->  	struct device_node *np = dev->of_node;
->  	struct pci_host_bridge *bridge;
-> @@ -268,12 +267,6 @@ static int cdns_pcie_host_probe(struct platform_device *pdev)
->  	rc->device_id = 0xffff;
->  	of_property_read_u16(np, "device-id", &rc->device_id);
->  
-> -	type = of_get_property(np, "device_type", NULL);
-> -	if (!type || strcmp(type, "pci")) {
-> -		dev_err(dev, "invalid \"device_type\" %s\n", type);
-> -		return -EINVAL;
-> -	}
-> -
->  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "reg");
->  	pcie->reg_base = devm_ioremap_resource(dev, res);
->  	if (IS_ERR(pcie->reg_base)) {
-> diff --git a/drivers/pci/controller/pcie-mobiveil.c b/drivers/pci/controller/pcie-mobiveil.c
-> index a939e8d31735..77052a0712d0 100644
-> --- a/drivers/pci/controller/pcie-mobiveil.c
-> +++ b/drivers/pci/controller/pcie-mobiveil.c
-> @@ -301,13 +301,6 @@ static int mobiveil_pcie_parse_dt(struct mobiveil_pcie *pcie)
->  	struct platform_device *pdev = pcie->pdev;
->  	struct device_node *node = dev->of_node;
->  	struct resource *res;
-> -	const char *type;
-> -
-> -	type = of_get_property(node, "device_type", NULL);
-> -	if (!type || strcmp(type, "pci")) {
-> -		dev_err(dev, "invalid \"device_type\" %s\n", type);
-> -		return -EINVAL;
-> -	}
->  
->  	/* map config resource */
->  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-> diff --git a/drivers/pci/controller/pcie-xilinx-nwl.c b/drivers/pci/controller/pcie-xilinx-nwl.c
-> index fb32840ce8e6..81538d77f790 100644
-> --- a/drivers/pci/controller/pcie-xilinx-nwl.c
-> +++ b/drivers/pci/controller/pcie-xilinx-nwl.c
-> @@ -777,16 +777,7 @@ static int nwl_pcie_parse_dt(struct nwl_pcie *pcie,
->  			     struct platform_device *pdev)
->  {
->  	struct device *dev = pcie->dev;
-> -	struct device_node *node = dev->of_node;
->  	struct resource *res;
-> -	const char *type;
-> -
-> -	/* Check for device type */
-> -	type = of_get_property(node, "device_type", NULL);
-> -	if (!type || strcmp(type, "pci")) {
-> -		dev_err(dev, "invalid \"device_type\" %s\n", type);
-> -		return -EINVAL;
-> -	}
->  
->  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "breg");
->  	pcie->breg_base = devm_ioremap_resource(dev, res);
-> diff --git a/drivers/pci/controller/pcie-xilinx.c b/drivers/pci/controller/pcie-xilinx.c
-> index 7b1389d8e2a5..9bd1a35cd5d8 100644
-> --- a/drivers/pci/controller/pcie-xilinx.c
-> +++ b/drivers/pci/controller/pcie-xilinx.c
-> @@ -574,15 +574,8 @@ static int xilinx_pcie_parse_dt(struct xilinx_pcie_port *port)
->  	struct device *dev = port->dev;
->  	struct device_node *node = dev->of_node;
->  	struct resource regs;
-> -	const char *type;
->  	int err;
->  
-> -	type = of_get_property(node, "device_type", NULL);
-> -	if (!type || strcmp(type, "pci")) {
-> -		dev_err(dev, "invalid \"device_type\" %s\n", type);
-> -		return -EINVAL;
-> -	}
-> -
->  	err = of_address_to_resource(node, 0, &regs);
->  	if (err) {
->  		dev_err(dev, "missing \"reg\" property\n");
-> -- 
-> 2.17.1
+> Hi Stephen,
 > 
+> Would you shine some lights on how to proceed?
+> 
+> Regards
+> Dong Aisheng
+> 
+> > -----Original Message-----
+> > From: A.s. Dong
+> > Sent: Monday, August 27, 2018 11:46 AM
+> > To: linux-clk at vger.kernel.org; sboyd at kernel.org; shawnguo at kernel.org
+> > Cc: linux-kernel at vger.kernel.org;
+> > linux-arm-kernel at lists.infradead.org;
+> > mturquette at baylibre.com; Anson Huang <anson.huang@nxp.com>; Jacky
+> Bai
+> > <ping.bai@nxp.com>; dl-linux-imx <linux-imx@nxp.com>
+> > Subject: RE: [PATCH V4 0/9] clk: add imx7ulp clk support
+> >
+> > Kindly ping again...  This is really pending too long...
+> >
+> > Stephen & Shawn,
+> > Any suggestion on how to proceed this patch set?
+> >
+> > Regards
+> > Dong Aisheng
+> >
+> > > -----Original Message-----
+> > > From: A.s. Dong
+> > > Sent: Thursday, July 26, 2018 9:51 AM
+> > > To: linux-clk at vger.kernel.org; sboyd at kernel.org
+> > > Cc: linux-kernel at vger.kernel.org;
+> > > linux-arm-kernel at lists.infradead.org;
+> > > mturquette at baylibre.com; shawnguo at kernel.org; Anson Huang
+> > > <anson.huang@nxp.com>; Jacky Bai <ping.bai@nxp.com>; dl-linux-imx
+> > > <linux-imx@nxp.com>
+> > > Subject: RE: [PATCH V4 0/9] clk: add imx7ulp clk support
+> > >
+> > > Hi Stephen,
+> > >
+> > > Do you have a chance to look at it?
+> > > This patch series has been pending for quite a long time without
+> > > much comments.
+> > >
+> > > Regards
+> > > Dong Aisheng
+> > >
+> > > > -----Original Message-----
+> > > > From: A.s. Dong
+> > > > Sent: Wednesday, July 18, 2018 9:37 PM
+> > > > To: linux-clk at vger.kernel.org
+> > > > Cc: linux-kernel at vger.kernel.org;
+> > > > linux-arm-kernel at lists.infradead.org;
+> > > > sboyd at kernel.org; mturquette at baylibre.com; shawnguo at kernel.org;
+> > > Anson
+> > > > Huang <anson.huang@nxp.com>; Jacky Bai <ping.bai@nxp.com>; dl-
+> > > > linux-imx <linux-imx@nxp.com>; A.s. Dong <aisheng.dong@nxp.com>
+> > > > Subject: [PATCH V4 0/9] clk: add imx7ulp clk support
+> > > >
+> > > > This is a rebased version of below patch series against latest clk tree.
+> > > > [PATCH RESEND V3 0/9] clk: add imx7ulp clk support
+> > > > https://lkml.org/lkml/2018/3/16/310
+> > > >
+> > > > This patch series intends to add imx7ulp clk support.
+> > > >
+> > > > i.MX7ULP Clock functions are under joint control of the System
+> > > > Clock Generation (SCG) modules, Peripheral Clock Control (PCC)
+> > > > modules, and Core Mode Controller (CMC)1 blocks
+> > > >
+> > > > The clocking scheme provides clear separation between M4 domain
+> > > > and
+> > > > A7 domain. Except for a few clock sources shared between two
+> > > > domains, such as the System Oscillator clock, the Slow IRC (SIRC),
+> > > > and and the Fast IRC clock (FIRCLK), clock sources and clock
+> > > > management are separated and contained within each domain.
+> > > >
+> > > > M4 clock management consists of SCG0, PCC0, PCC1, and CMC0
+> modules.
+> > > > A7 clock management consists of SCG1, PCC2, PCC3, and CMC1 modules.
+> > > >
+> > > > Note: this series only adds A7 clock domain support as M4 clock
+> > > > domain will be handled by M4 seperately.
+> > > >
+> > > > Change Log:
+> > > > v3->v4:
+> > > >  * rebased to latest kernel
+> > > >  * make scg and pcc separate nodes according to Rob's suggestion
+> > > >
+> > > > v2->v3:
+> > > >  * Patch 1 changed on: 1) split normal and gate ops 2) fix the possible
+> racy
+> > > >    Others no changes.
+> > > >
+> > > > v1->v2:
+> > > >  * add enable/disable for the type of CLK_DIVIDER_ZERO_GATE
+> > > > dividers
+> > > >  * use clk_hw apis to register clocks
+> > > >  * use of_clk_add_hw_provider
+> > > >  * split the clocks register process into two parts: early part for possible
+> > > >    timers clocks registered by CLK_OF_DECLARE_DRIVER and the later
+> > > > part
+> > > for
+> > > >    the left normal peripheral clocks registered by a platform driver.
+> > > >
+> > > > Dong Aisheng (9):
+> > > >   clk: clk-divider: add CLK_DIVIDER_ZERO_GATE clk support
+> > > >   clk: fractional-divider: add CLK_FRAC_DIVIDER_ZERO_BASED flag
+> > support
+> > > >   clk: imx: add pllv4 support
+> > > >   clk: imx: add pfdv2 support
+> > > >   clk: imx: add composite clk support
+> > > >   dt-bindings: clock: add imx7ulp clock binding doc
+> > > >   clk: imx: make mux parent strings const
+> > > >   clk: imx: implement new clk_hw based APIs
+> > > >   clk: imx: add imx7ulp clk driver
+> > > >
+> > > >  .../devicetree/bindings/clock/imx7ulp-clock.txt    |  87 +++++++++
+> > > >  drivers/clk/clk-divider.c                          | 152
+> > > +++++++++++++++
+> > > >  drivers/clk/clk-fractional-divider.c               |  10 +
+> > > >  drivers/clk/imx/Makefile                           |   6 +-
+> > > >  drivers/clk/imx/clk-busy.c                         |   2 +-
+> > > >  drivers/clk/imx/clk-composite.c                    |  85
+> +++++++++
+> > > >  drivers/clk/imx/clk-fixup-mux.c                    |   2 +-
+> > > >  drivers/clk/imx/clk-imx7ulp.c                      | 209
+> > > +++++++++++++++++++++
+> > > >  drivers/clk/imx/clk-pfdv2.c                        | 201
+> > > ++++++++++++++++++++
+> > > >  drivers/clk/imx/clk-pllv4.c                        | 182
+> > > ++++++++++++++++++
+> > > >  drivers/clk/imx/clk.c                              |  22 +++
+> > > >  drivers/clk/imx/clk.h                              |  92
+> ++++++++-
+> > > >  include/dt-bindings/clock/imx7ulp-clock.h          | 109
+> > +++++++++++
+> > > >  include/linux/clk-provider.h                       |  17 ++
+> > > >  14 files changed, 1166 insertions(+), 10 deletions(-)  create
+> > > > mode
+> > > > 100644 Documentation/devicetree/bindings/clock/imx7ulp-clock.txt
+> > > >  create mode 100644 drivers/clk/imx/clk-composite.c  create mode
+> > > > 100644 drivers/clk/imx/clk-imx7ulp.c  create mode 100644
+> > > > drivers/clk/imx/clk- pfdv2.c  create mode 100644
+> > > > drivers/clk/imx/clk-pllv4.c  create mode 100644
+> > > > include/dt-bindings/clock/imx7ulp-clock.h
+> > > >
+> > > > --
+> > > > 2.7.4
