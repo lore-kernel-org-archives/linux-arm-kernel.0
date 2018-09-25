@@ -1,44 +1,34 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 25 Sep 2018 13:40:14 -0700
-Subject: [GIT PULL] ARM: at91: DT for 4.20
-In-Reply-To: <20180925104226.GA32034@piout.net>
-References: <20180925104226.GA32034@piout.net>
-Message-ID: <20180925204014.ys7gpxssghmrq3wx@localhost>
+Date: Tue, 25 Sep 2018 13:48:53 -0700
+Subject: [GIT PULL] SoCFPGA DTS updates for v4.20, part 2
+In-Reply-To: <1537802626-10990-1-git-send-email-dinguyen@kernel.org>
+References: <1537802626-10990-1-git-send-email-dinguyen@kernel.org>
+Message-ID: <20180925204853.ihufhcevw5mm7xsu@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2018 at 12:42:26PM +0200, Alexandre Belloni wrote:
-> Arnd, Olof,
+On Mon, Sep 24, 2018 at 10:23:46AM -0500, Dinh Nguyen wrote:
+> Hi Arnd, Kevin, and Olof:
 > 
-> Here are the DT changes for 4.20. Mostly cleanups and small additions.
+> Please pull in these additional patches for v4.20.
 > 
-> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+> Thanks,
+> Dinh
 > 
->   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
 > 
-> are available in the Git repository at:
+> The following changes since commit 202eb5481421040e115526b75317b5ca72584806:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/at91/linux tags/at91-4.20-dt
+>   ARM: dts: socfpga: Rename socfpga_cyclone5_de0_{sockit,nano_soc} (2018-08-30 08:38:26 -0500)
 > 
-> for you to fetch changes up to 97181516b0785dd032700ae4899842389c6bea78:
+> are available in the git repository at:
 > 
->   arm: dts: sama5d2: Update coresight bindings for hardware ports (2018-09-19 19:12:25 +0200)
+>   git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_updates_for_v4.20_part2
 > 
-> ----------------------------------------------------------------
-> AT91 DT for 4.20
+> for you to fetch changes up to 20373e0cb8f7d540ae082a8026f5ae7c27cc6cb3:
 > 
->  - warning fiwes from Rob
->  - many updates for the axentia boards
->  - ADC, I2S and touch screen support for sama5d2
+>   ARM: dts: socfpga: add timer resets for SoCFPGA platform (2018-09-17 10:11:28 -0500)
 
 Merged, thanks!
-
-Tiny nit:
-
-> Suzuki K Poulose (1):
->       arm: dts: sama5d2: Update coresight bindings for hardware ports
-
-s/arm/ARM/
 
 
 -Olof
