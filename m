@@ -1,36 +1,30 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Tue, 25 Sep 2018 16:21:26 +0000
-Subject: [GIT PULL] STi DT update for v4.20 round 1
-Message-ID: <7250e85d-374a-76e7-fa8a-4911ef7a12ae@st.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 25 Sep 2018 13:24:08 -0300
+Subject: [PATCH] ARM: dts: imx53-ppd: Remove 'num-chipselects' property
+Message-ID: <1537892648-30414-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof
+The 'num-chipselects' property is not a valid property according
+to Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt, so
+let's remove it.
 
-PLease consider this first round of STi dts update for v4.20
+Signed-off-by: Fabio Estevam <festevam@gmail.com>
+---
+ arch/arm/boot/dts/imx53-ppd.dts | 1 -
+ 1 file changed, 1 deletion(-)
 
-The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
-
-  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git
-tags/sti-dt-for-v4.20-round1
-
-for you to fetch changes up to b5b4c8dd5c44edc112a362f87a8d8953336571bd:
-
-  ARM: dts: stih410: change syntax of multiple DAI (2018-09-25 17:41:51
-+0200)
-
-----------------------------------------------------------------
-STi DT update:
- _ Change syntax of multiple DAI links
-
-----------------------------------------------------------------
-Christophe Priouzeau (1):
-      ARM: dts: stih410: change syntax of multiple DAI
-
- arch/arm/boot/dts/stih410-b2260.dts  |  5 ++++-
- arch/arm/boot/dts/stihxxx-b2120.dtsi | 11 ++++++++---
- 2 files changed, 12 insertions(+), 4 deletions(-)
+diff --git a/arch/arm/boot/dts/imx53-ppd.dts b/arch/arm/boot/dts/imx53-ppd.dts
+index cdb90be..b560ff8 100644
+--- a/arch/arm/boot/dts/imx53-ppd.dts
++++ b/arch/arm/boot/dts/imx53-ppd.dts
+@@ -319,7 +319,6 @@
+ &ecspi2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_ecspi2>;
+-	num-chipselects = <1>;
+ 	cs-gpios = <&gpio2 26 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ 
+-- 
+2.7.4
