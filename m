@@ -1,25 +1,39 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 25 Sep 2018 04:24:35 -0700
-Subject: [PATCH 3/3] serial: 8250_uniphier: add auto-flow-control support
-In-Reply-To: <1537334893-26079-4-git-send-email-yamada.masahiro@socionext.com>
-References: <1537334893-26079-1-git-send-email-yamada.masahiro@socionext.com>
- <1537334893-26079-4-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <5baa1af4.1c69fb81.52980.4bc3@mx.google.com>
+Date: Tue, 25 Sep 2018 04:24:39 -0700
+Subject: [PATCH] arm64: dts: rockchip: add initial dts support for
+ Rockpro64 board
+In-Reply-To: <1537368206-22058-1-git-send-email-Akash_Gajjar@mentor.com>
+References: <Akash_Gajjar@mentor.com>
+ <1537368206-22058-1-git-send-email-Akash_Gajjar@mentor.com>
+Message-ID: <5baa1af8.1c69fb81.b6252.4425@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Sep 2018 14:28:13 +0900, Masahiro Yamada wrote:
-> From: Dai Okamura <okamura.dai@socionext.com>
+On Wed, 19 Sep 2018 20:13:18 +0530, Akash Gajjar wrote:
+> This patch basic node support for Rockpro64 board and make it able to bring up.
 > 
-> Add selective auto-flow-control support for UniPhier serial driver.
+> Peripheral Works
+> - SDIO, Sdcard
+> - USB 2.0, 3.0
+> - Leds
 > 
-> Signed-off-by: Dai Okamura <okamura.dai@socionext.com>
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Not working:
+> - USB Type-C
+> 
+> Signed-off-by: Akash Gajjar <Akash_Gajjar@mentor.com>
 > ---
 > 
->  Documentation/devicetree/bindings/serial/uniphier-uart.txt | 3 +++
->  drivers/tty/serial/8250/8250_uniphier.c                    | 3 +++
->  2 files changed, 6 insertions(+)
+> Changes in v2:
+> - add support for usb 2.0, 3.0
+> - add fusb302 node and its regulator support
+> - cleanup pinctrl node
+> - remove backlight, pcie, sound codec node inherited from firefly-rk3399 dts
+> 
+>  Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
+>  arch/arm64/boot/dts/rockchip/Makefile              |   1 +
+>  arch/arm64/boot/dts/rockchip/rk3399-rockpro64.dts  | 692 +++++++++++++++++++++
+>  3 files changed, 697 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-rockpro64.dts
 > 
 
 Reviewed-by: Rob Herring <robh@kernel.org>
