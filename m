@@ -1,28 +1,25 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 25 Sep 2018 15:17:20 -0500
-Subject: [RFC PATCH v2 2/3] dt-bindings: fpga: Add bindings for ZynqMP
- fpga driver
-In-Reply-To: <20180905072448.12488-3-nava.manne@xilinx.com>
-References: <20180905072448.12488-1-nava.manne@xilinx.com>
- <20180905072448.12488-3-nava.manne@xilinx.com>
-Message-ID: <20180925201720.GA32354@bogus>
+From: axboe@kernel.dk (Jens Axboe)
+Date: Tue, 25 Sep 2018 14:25:28 -0600
+Subject: clean up physical merging helpers V2
+In-Reply-To: <20180925200958.GA8413@lst.de>
+References: <20180924074355.2802-1-hch@lst.de>
+ <dae7788b-9b0f-bb51-820e-ab626d157e23@kernel.dk>
+ <20180925200958.GA8413@lst.de>
+Message-ID: <88a1a096-b35d-dce1-3e19-0601a4c312eb@kernel.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 05, 2018 at 12:54:47PM +0530, Nava kishore Manne wrote:
-> Add documentation to describe Xilinx ZynqMP fpga driver
-> bindings.
+On 9/25/18 2:09 PM, Christoph Hellwig wrote:
+> On Mon, Sep 24, 2018 at 12:35:08PM -0600, Jens Axboe wrote:
+>> Looks good to me - #1 should just go to the arm guys separately, there's
+>> no point in me carrying this arch patch.
 > 
-> Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
-> ---
-> Changes for v2:
->                 -Moved pcap node as a child to firwmare
->                  node as suggested by Rob.
+> It would require a respin of all the Xen patches and is rather related.
+> But if you absolutely don't want it I can drop it from the resend of
+> those.
 
-Sorry, but I wasn't thinking that you already have a node defined under 
-/firmware. There's no reason to have this pcap node as a child of it. 
-The existing node can instantiate multiple providers including this and 
-reset provider.
+I don't feel that strongly about it, and it's dead block code. If it makes
+your life easier, I can add it.
 
->  .../firmware/xilinx/xlnx,zynqmp-firmware.txt        | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
+-- 
+Jens Axboe
