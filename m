@@ -1,42 +1,45 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 25 Sep 2018 15:38:20 +0100
-Subject: [PATCH v5 0/6] Move swapper_pg_dir to rodata section.
-In-Reply-To: <20180925140624.7wovo2xtpyihyt3j@lakrids.cambridge.arm.com>
-References: <20180917044333.30051-1-yaojun8558363@gmail.com>
- <20180924171936.q5bfvczzllmm5lpe@lakrids.cambridge.arm.com>
- <20180925095316.GA27420@toy>
- <20180925140624.7wovo2xtpyihyt3j@lakrids.cambridge.arm.com>
-Message-ID: <20180925143820.GA11064@arrakis.emea.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 25 Sep 2018 07:40:21 -0700
+Subject: [PATCH 0/4] Update am437x and am335x dts to probe with ti-sysc
+In-Reply-To: <e9afe736-c2f0-6182-afd0-08279e09a35e@ti.com>
+References: <20180925000545.22931-1-tony@atomide.com>
+ <e9afe736-c2f0-6182-afd0-08279e09a35e@ti.com>
+Message-ID: <20180925144021.GN5662@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2018 at 03:06:25PM +0100, Mark Rutland wrote:
-> On Tue, Sep 25, 2018 at 05:53:16PM +0800, Jun Yao wrote:
-> > On Mon, Sep 24, 2018 at 06:19:36PM +0100, Mark Rutland wrote:
-> > > I've pushed a branch with the cleanups I requested [1] folded in.
-> > > 
-> > > I'm still a bit worried about the pgd lock, but otherwise I think this
-> > > is sound. I intend to throw some testing at it, just in case.
-> > > 
-> > > If you're happy with that branch, I'll ask Will and Catalin to consider
-> > > picking it up.
-> > 
-> > This branch looks great. Thank you for improving my patch.
+* Keerthy <j-keerthy@ti.com> [180925 05:18]:
+> I tried Branch [1] above. AM335x-boneblack is doing all good with ds0.
+> AM437x-gp the following is happening:
 > 
-> Thanks for your patches!
+> https://pastebin.ubuntu.com/p/fmZNYgJ9Sp/
 > 
-> > Is there anything I need to do? This is my first time to submit a patch,
-> > so I am a bit overwhelmed. I think I should wait for other people to
-> > review my patch. If there is a problem, I need to fix it.
+> There seems to be a timeout due to which resume is not immediate i see
+> 1-2s delay and i see i2c timeout.
 > 
-> Hopefully Catalin is happy to pick this up from my branch, and neither
-> of us have to do anything. :)
+> [  402.247271] omap_i2c 4802a000.i2c: controller timed out
+> [  402.247441] pixcir_ts 1-005c: pixcir_int_enable: can't read reg 0x34
+> : -110
+> [  402.247486] pixcir_ts 1-005c: Failed to disable interrupt generation:
+> -110
+> [  402.247522] pixcir_ts 1-005c: Failed to stop
+> [  402.247607] dpm_run_callback(): pixcir_i2c_ts_resume+0x0/0x98
+> [pixcir_i2c_ts] returns -110
 > 
-> Catalin, are you happy to pick the patches from:
+> so pixcir_i2c_ts_resume is retuning -110 which is timeout error code.
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm64/ro-swapper
+> I did some touch screen testing after DS0 resume seems to be working.
+> Everything is in pastebin link provided above.
 
-I queued them for 4.20. Thanks.
+Thanks for testing. Hmm no idea what might be going on with
+the pixcir. I have edt-ft5x06 on the am437x-sk-evm and that
+behaves just fine for suspend and resume. Both are on i2c1,
+pixcir calls pixcir_start/stop from suspend and resume while
+edt-ft5x06 does not reconfigure anything.
 
--- 
-Catalin
+I'll try read some edt-ft5x06 register values on suspend
+and resume, let's see if that makes it reproducable here.
+
+Regards,
+
+Tony
