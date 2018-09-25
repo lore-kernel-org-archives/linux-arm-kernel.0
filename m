@@ -1,21 +1,164 @@
-From: rodrigo@tjader.xyz (=?UTF-8?Q?Rodrigo_Exterck=C3=B6tter_Tj=C3=A4der?=)
-Date: Tue, 25 Sep 2018 14:47:59 -0300
-Subject: [PATCH 1/2] arm64: dts: allwinner: Olimex A64-OLinuXino: enable
- eMMC.
-In-Reply-To: <20180925090139.qbu6tqav5oth7zkw@flea>
-References: <20180919141815.18737-1-rodrigo@tjader.xyz>
- <20180921142811.h5jraemk565alh3i@flea>
- <CAG7TQgE_KU_cK_4E+NG8Qcw-QB2=C6YoqBYR2svmWxywFyySCw@mail.gmail.com>
- <20180925090139.qbu6tqav5oth7zkw@flea>
-Message-ID: <CAG7TQgFTsR4pf4jAcWMFoOmiP7AXYqjts60RP2kuJGU44AcQJQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 25 Sep 2018 10:55:37 -0700
+Subject: [PATCH 0/4] Update am437x and am335x dts to probe with ti-sysc
+In-Reply-To: <20180925144021.GN5662@atomide.com>
+References: <20180925000545.22931-1-tony@atomide.com>
+ <e9afe736-c2f0-6182-afd0-08279e09a35e@ti.com>
+ <20180925144021.GN5662@atomide.com>
+Message-ID: <20180925175537.GQ5662@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2018 at 6:01 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> We can't really do that, unfortunately. If the device tree name was to
-> change for a given board, we'd break all the build systems, boot
-> scripts and distros out there.
+* Tony Lindgren <tony@atomide.com> [180925 14:44]:
+> * Keerthy <j-keerthy@ti.com> [180925 05:18]:
+> > I tried Branch [1] above. AM335x-boneblack is doing all good with ds0.
+> > AM437x-gp the following is happening:
+> > 
+> > https://pastebin.ubuntu.com/p/fmZNYgJ9Sp/
+> > 
+> > There seems to be a timeout due to which resume is not immediate i see
+> > 1-2s delay and i see i2c timeout.
+> > 
+> > [  402.247271] omap_i2c 4802a000.i2c: controller timed out
+> > [  402.247441] pixcir_ts 1-005c: pixcir_int_enable: can't read reg 0x34
+> > : -110
+> > [  402.247486] pixcir_ts 1-005c: Failed to disable interrupt generation:
+> > -110
+> > [  402.247522] pixcir_ts 1-005c: Failed to stop
+> > [  402.247607] dpm_run_callback(): pixcir_i2c_ts_resume+0x0/0x98
+> > [pixcir_i2c_ts] returns -110
+> > 
+> > so pixcir_i2c_ts_resume is retuning -110 which is timeout error code.
+> > 
+> > I did some touch screen testing after DS0 resume seems to be working.
+> > Everything is in pastebin link provided above.
+> 
+> Thanks for testing. Hmm no idea what might be going on with
+> the pixcir. I have edt-ft5x06 on the am437x-sk-evm and that
+> behaves just fine for suspend and resume. Both are on i2c1,
+> pixcir calls pixcir_start/stop from suspend and resume while
+> edt-ft5x06 does not reconfigure anything.
+> 
+> I'll try read some edt-ft5x06 register values on suspend
+> and resume, let's see if that makes it reproducable here.
 
-What if we keep the device tree for the version without WiFi and eMMC
-with the current name and create new device trees for the other two
-versions?
+So after adding a call to edt_ft5x06_ts_readwrite to
+edt_ft5x06_ts_resume I see -110 errors too. Looks like we
+have i2c-omap not idled for suspend because of autoidle if
+an i2c client reconfigures it's registers for suspend.
+
+Care to test with the following patch applied? If that works
+for you, I'll send a proper patch for that.
+
+Regards,
+
+Tony
+
+8< -------------------
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -208,6 +208,8 @@ struct omap_i2c_dev {
+ 						 * if set, should be trsh+1
+ 						 */
+ 	u32			rev;
++	unsigned int		is_suspended:1;
++	unsigned int		needs_resume:1;
+ 	unsigned		b_hw:1;		/* bad h/w fixes */
+ 	unsigned		bb_valid:1;	/* true when BB-bit reflects
+ 						 * the I2C bus state
+@@ -1498,8 +1500,7 @@ static int omap_i2c_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_PM
+-static int omap_i2c_runtime_suspend(struct device *dev)
++static int __maybe_unused omap_i2c_runtime_suspend(struct device *dev)
+ {
+ 	struct omap_i2c_dev *omap = dev_get_drvdata(dev);
+ 
+@@ -1521,11 +1522,12 @@ static int omap_i2c_runtime_suspend(struct device *dev)
+ 	}
+ 
+ 	pinctrl_pm_select_sleep_state(dev);
++	omap->is_suspended = true;
+ 
+ 	return 0;
+ }
+ 
+-static int omap_i2c_runtime_resume(struct device *dev)
++static int __maybe_unused omap_i2c_runtime_resume(struct device *dev)
+ {
+ 	struct omap_i2c_dev *omap = dev_get_drvdata(dev);
+ 
+@@ -1535,6 +1537,47 @@ static int omap_i2c_runtime_resume(struct device *dev)
+ 		return 0;
+ 
+ 	__omap_i2c_init(omap);
++	omap->is_suspended = false;
++
++	return 0;
++}
++
++static int __maybe_unused omap_i2c_suspend(struct device *dev)
++{
++	struct omap_i2c_dev *ddata = dev_get_drvdata(dev);
++	int error;
++
++	/* Is device still enabled because of autosuspend? */
++	if (!ddata->is_suspended) {
++		error = pm_runtime_put_sync_suspend(dev);
++		if (error < 0) {
++			dev_err(dev, "%s failed: %i\n", __func__, error);
++
++			return error;
++		}
++		ddata->needs_resume = true;
++	}
++
++	return 0;
++}
++
++static int __maybe_unused omap_i2c_resume(struct device *dev)
++{
++	struct omap_i2c_dev *ddata = dev_get_drvdata(dev);
++	int error;
++
++	if (ddata->needs_resume) {
++		error = pm_runtime_get_sync(dev);
++		if (error < 0) {
++			dev_err(dev, "%s failed: %i\n", __func__, error);
++			pm_runtime_put_noidle(dev);
++
++			return error;
++		}
++		pm_runtime_mark_last_busy(dev);
++		pm_runtime_put_autosuspend(dev);
++		ddata->needs_resume = false;
++	}
+ 
+ 	return 0;
+ }
+@@ -1542,18 +1585,15 @@ static int omap_i2c_runtime_resume(struct device *dev)
+ static const struct dev_pm_ops omap_i2c_pm_ops = {
+ 	SET_RUNTIME_PM_OPS(omap_i2c_runtime_suspend,
+ 			   omap_i2c_runtime_resume, NULL)
++	SET_SYSTEM_SLEEP_PM_OPS(omap_i2c_suspend, omap_i2c_resume)
+ };
+-#define OMAP_I2C_PM_OPS (&omap_i2c_pm_ops)
+-#else
+-#define OMAP_I2C_PM_OPS NULL
+-#endif /* CONFIG_PM */
+ 
+ static struct platform_driver omap_i2c_driver = {
+ 	.probe		= omap_i2c_probe,
+ 	.remove		= omap_i2c_remove,
+ 	.driver		= {
+ 		.name	= "omap_i2c",
+-		.pm	= OMAP_I2C_PM_OPS,
++		.pm	= &omap_i2c_pm_ops,
+ 		.of_match_table = of_match_ptr(omap_i2c_of_match),
+ 	},
+ };
+-- 
+2.19.0
