@@ -1,58 +1,130 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 25 Sep 2018 11:03:08 +0200
-Subject: [PATCH 10/14] ARM64: dts: hisilicon: Add interrupt names for the
- tsensors
+Date: Tue, 25 Sep 2018 11:03:11 +0200
+Subject: [PATCH 13/14] ARM64: dts: hisilicon: Add dual clusters thermal zones
+ for hi3660
 In-Reply-To: <1537866192-12320-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1537866192-12320-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1537866192-12320-11-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1537866192-12320-14-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the missing interrupts for the temperature sensors as well as
-their names.
+Add a thermal zone for the little cluster, so we can handle two
+sensors managing each a cluster on the SoC.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt | 8 ++++++--
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi                       | 8 ++++++--
- 2 files changed, 12 insertions(+), 4 deletions(-)
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 97 ++++++++++++++++++++-----------
+ 1 file changed, 63 insertions(+), 34 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt b/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt
-index 3edfae3..4cb8add 100644
---- a/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt
-+++ b/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt
-@@ -29,7 +29,11 @@ for Hi3660:
- 	tsensor: tsensor at fff30000 {
- 		compatible = "hisilicon,hi3660-tsensor";
- 		reg = <0x0 0xfff30000 0x0 0x1000>;
--		interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
--		interrupt-names = "tsensor_a73";
-+		interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "tsensor_a73", "tsensor_a53",
-+				  "tsensor_g3d", "tsensor_modem";
- 		#thermal-sensor-cells = <1>;
- 	};
 diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-index bf8a479..dd398cb 100644
+index dd398cb..6df7d9f 100644
 --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
 +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -1080,8 +1080,12 @@
- 		tsensor: tsensor at fff30000 {
- 			compatible = "hisilicon,hi3660-tsensor";
- 			reg = <0x0 0xfff30000 0x0 0x1000>;
--			interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
--			interrupt-names = "tsensor_a73";
-+			interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>,
-+			             <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>,
-+			             <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>,
-+			             <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "tsensor_a73", "tsensor_a53",
-+			                  "tsensor_g3d", "tsensor_modem";
- 			#thermal-sensor-cells = <1>;
+@@ -1090,42 +1090,71 @@
  		};
  
+                 thermal-zones {
++			tz_a53: tz_a53 {
++				polling-delay = <1000>;
++				polling-delay-passive = <100>;
++				sustainable-power = <4500>;
++
++				/* sensor ID */
++				thermal-sensors = <&tsensor 0>;
++
++				trips {
++					a53_temp_threshold: trip-point at 0 {
++						temperature = <65000>;
++						hysteresis = <1000>;
++						type = "passive";
++					};
++
++					a53_temp_target: trip-point at 1 {
++						temperature = <75000>;
++						hysteresis = <1000>;
++						type = "passive";
++					};
++				};
+ 
+-                        cls0: cls0 {
+-                                polling-delay = <1000>;
+-                                polling-delay-passive = <100>;
+-                                sustainable-power = <4500>;
+-
+-                                /* sensor ID */
+-                                thermal-sensors = <&tsensor 1>;
+-
+-                                trips {
+-                                        threshold: trip-point at 0 {
+-                                                temperature = <65000>;
+-                                                hysteresis = <1000>;
+-                                                type = "passive";
+-                                        };
+-
+-                                        target: trip-point at 1 {
+-                                                temperature = <75000>;
+-                                                hysteresis = <1000>;
+-                                                type = "passive";
+-                                        };
+-                                };
+-
+-                                cooling-maps {
++				cooling-maps {
+ 					map0 {
+-                                                trip = <&target>;
+-                                                contribution = <1024>;
+-                                                cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+-                                        };
+-					map1 {
+-                                                trip = <&target>;
+-                                                contribution = <512>;
+-                                                cooling-device = <&cpu4 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+-                                        };
+-                                };
+-                        };
++						trip = <&a53_temp_target>;
++						contribution = <512>;
++						cooling-device = <&cpu0
++							THERMAL_NO_LIMIT
++							THERMAL_NO_LIMIT>;
++					};
++				};
++			};
++
++			tz_a73: tz_a73 {
++				polling-delay = <1000>;
++				polling-delay-passive = <100>;
++				sustainable-power = <4500>;
++
++				/* sensor ID */
++				thermal-sensors = <&tsensor 1>;
++
++				trips {
++					a73_temp_threshold: trip-point at 0 {
++						temperature = <65000>;
++						hysteresis = <1000>;
++						type = "passive";
++					};
++
++					a73_temp_target: trip-point at 1 {
++						temperature = <75000>;
++						hysteresis = <1000>;
++						type = "passive";
++					};
++				};
++
++				cooling-maps {
++					map0 {
++						trip = <&a73_temp_target>;
++						contribution = <1024>;
++						cooling-device = <&cpu4
++							THERMAL_NO_LIMIT
++							THERMAL_NO_LIMIT>;
++					};
++				};
++			};
+                 };
+ 	};
+ };
 -- 
 2.7.4
