@@ -1,33 +1,18 @@
-From: thor.thayer@linux.intel.com (thor.thayer at linux.intel.com)
-Date: Tue, 25 Sep 2018 10:31:52 -0500
-Subject: [PATCH] arm64: dts: stratix10: Correct System Manager register size
-Message-ID: <1537889512-586-1-git-send-email-thor.thayer@linux.intel.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 25 Sep 2018 23:33:48 +0800
+Subject: [PATCH] ARM: dts: imx6ull: update vdd_soc voltage for 900MHz
+ operating point
+In-Reply-To: <1536740009-32735-1-git-send-email-Anson.Huang@nxp.com>
+References: <1536740009-32735-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20180925153345.GA22238@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thor Thayer <thor.thayer@linux.intel.com>
+On Wed, Sep 12, 2018 at 04:13:29PM +0800, Anson Huang wrote:
+> Update VDD_SOC voltage to 1.25V for 900MHz operating point
+> according to datasheet Rev. 1.3, 08/2018, 25mV is added to
+> the minimum allowed values to cover power supply ripple.
+> 
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 
-Correct the register size of the System Manager node.
-
-Cc: stable at vger.kernel.org
-Fixes: 78cd6a9d8e154 ("arm64: dts: Add base stratix 10 dtsi")
-Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
----
- arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-index 67dac595dc72..3989876ab699 100644
---- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-+++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
-@@ -327,7 +327,7 @@
- 
- 		sysmgr: sysmgr at ffd12000 {
- 			compatible = "altr,sys-mgr", "syscon";
--			reg = <0xffd12000 0x1000>;
-+			reg = <0xffd12000 0x228>;
- 		};
- 
- 		/* Local timer */
--- 
-2.7.4
+Applied, thanks.
