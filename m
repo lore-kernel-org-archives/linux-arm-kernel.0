@@ -1,35 +1,44 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 25 Sep 2018 12:31:12 -0700
-Subject: [GIT PULL] ARM: at91: fixes for 4.19
-In-Reply-To: <20180924200941.GA11498@piout.net>
-References: <20180924200941.GA11498@piout.net>
-Message-ID: <20180925193112.uu2lncxsbmzenxl4@localhost>
+Date: Tue, 25 Sep 2018 11:51:33 -0700
+Subject: [PATCH] arm64: dts: broadcom: Use the .dtb name in the rule,
+ rather than .dts
+In-Reply-To: <1c0db58a-5bc2-8de3-f70d-725a29376513@gmail.com>
+References: <b42d2e57-8bcd-0d6a-7a4d-aeefedcdd5f3@i2se.com>
+ <20180924102228.19656-1-liviu@dudau.co.uk>
+ <539eb374-9122-6c09-4c64-80bfa6b7bf89@i2se.com>
+ <1c0db58a-5bc2-8de3-f70d-725a29376513@gmail.com>
+Message-ID: <20180925185133.jdom5tvs6zklntr7@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 24, 2018 at 10:09:41PM +0200, Alexandre Belloni wrote:
-> Arnd, Olof,
+On Tue, Sep 25, 2018 at 11:17:52AM -0700, Florian Fainelli wrote:
+> On 09/24/2018 04:03 AM, Stefan Wahren wrote:
+> > Am 24.09.2018 um 12:22 schrieb Liviu Dudau:
+> >> Commit a7eb26392b893 ("arm64: dts: broadcom: Add reference to Compute
+> >> Module IO Board V3") adds the bcm2837-rpi-cm3-io3.dts file as a target
+> >> in the Makefile, rather than the .dtb name. This will skip the
+> >> generation of the .dtb file at compile time and will fail the dtbs_install
+> >> target.
+> >>
+> >> Fixes: a7eb26392b893 ("arm64: dts: broadcom: Add reference to Compute
+> >> Module IO Board V3")
+> >>
+> >> Signed-off-by: Liviu Dudau <liviu@dudau.co.uk>
+> > 
+> > Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+> > 
+> > Thanks, i will add a dtbs_install step to my test jobs.
 > 
-> Here is a small fix for an issue seen on the sama5d2 PTC EK.
-> 
-> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
-> 
->   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
-> 
-> are available in the Git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/at91/linux tags/at91-4.19-fixes
-> 
-> for you to fetch changes up to 379e36d3f591cb62e781907edafea17d75e8c1fa:
-> 
->   ARM: dts: at91: sama5d2_ptc_ek: fix nand pinctrl (2018-09-12 12:38:04 +0200)
-> 
-> ----------------------------------------------------------------
-> AT91 fixes for 4.19:
-> 
->  - fix a NAND issue on sama5d2_ptc_ek
+> Same here.
 
-Merged, thanks (with slight elaboration on merge description from tag).
+I do but I don't seem to catch any errors from it. :-/
+
+> > @Arnd @Olof Should this fix for 4.20 go via pull request or can you
+> > apply it directly to your tree?
+> 
+> That would be my preference here as well.
+
+Applied to next/dt now. Thanks!
 
 
 -Olof
