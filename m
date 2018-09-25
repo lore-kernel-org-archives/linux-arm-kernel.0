@@ -1,102 +1,25 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 25 Sep 2018 13:02:15 -0500
-Subject: [PATCH v9 2/8] dt-bindings: Introduce interconnect binding
-In-Reply-To: <20180831140151.13972-3-georgi.djakov@linaro.org>
+Date: Tue, 25 Sep 2018 13:17:35 -0500
+Subject: [PATCH v9 5/8] interconnect: qcom: Add RPM communication
+In-Reply-To: <20180831140151.13972-6-georgi.djakov@linaro.org>
 References: <20180831140151.13972-1-georgi.djakov@linaro.org>
- <20180831140151.13972-3-georgi.djakov@linaro.org>
-Message-ID: <20180925180215.GA12435@bogus>
+ <20180831140151.13972-6-georgi.djakov@linaro.org>
+Message-ID: <20180925181735.GA28385@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2018 at 05:01:45PM +0300, Georgi Djakov wrote:
-> This binding is intended to represent the relations between the interconnect
-> controllers (providers) and consumer device nodes. It will allow creating links
-> between consumers and interconnect paths (exposed by interconnect providers).
+On Fri, Aug 31, 2018 at 05:01:48PM +0300, Georgi Djakov wrote:
+> On some Qualcomm SoCs, there is a remote processor, which controls some of
+> the Network-On-Chip interconnect resources. Other CPUs express their needs
+> by communicating with this processor. Add a driver to handle communication
+> with this remote processor.
 
-As I mentioned in person, I want to see other SoC families using this 
-before accepting. They don't have to be ready for upstream, but WIP 
-patches or even just a "yes, this works for us and we're going to use 
-this binding on X".
+I don't think you should have a binding nor a separate driver for this. 
+It's not actually an interconnect provider, so it doesn't belong in 
+bindings/interconnect. And it just looks like abuse of DT to instantiate 
+some driver.
 
-Also, I think the QCom GPU use of this should be fully sorted out. Or 
-more generically how this fits into OPP binding which seems to be never 
-ending extended...
+All the driver amounts to is a 1 function wrapper for RPM_KEY_BW 
+messages. Can't this be part of the parent?
 
-> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
-> ---
->  .../bindings/interconnect/interconnect.txt    | 60 +++++++++++++++++++
->  1 file changed, 60 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interconnect/interconnect.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/interconnect/interconnect.txt b/Documentation/devicetree/bindings/interconnect/interconnect.txt
-> new file mode 100644
-> index 000000000000..5cb7d3c8d44d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/interconnect/interconnect.txt
-> @@ -0,0 +1,60 @@
-> +Interconnect Provider Device Tree Bindings
-> +=========================================
-> +
-> +The purpose of this document is to define a common set of generic interconnect
-> +providers/consumers properties.
-> +
-> +
-> += interconnect providers =
-> +
-> +The interconnect provider binding is intended to represent the interconnect
-> +controllers in the system. Each provider registers a set of interconnect
-> +nodes, which expose the interconnect related capabilities of the interconnect
-> +to consumer drivers. These capabilities can be throughput, latency, priority
-> +etc. The consumer drivers set constraints on interconnect path (or endpoints)
-> +depending on the use case. Interconnect providers can also be interconnect
-> +consumers, such as in the case where two network-on-chip fabrics interface
-> +directly
-
-missing '.'
-
-> +
-> +Required properties:
-> +- compatible : contains the interconnect provider compatible string
-> +- #interconnect-cells : number of cells in a interconnect specifier needed to
-> +			encode the interconnect node id
-> +
-> +Example:
-> +
-> +		snoc: snoc at 580000 {
-> +			compatible = "qcom,msm8916-snoc";
-> +			#interconnect-cells = <1>;
-> +			reg = <0x580000 0x14000>;
-> +			clock-names = "bus_clk", "bus_a_clk";
-> +			clocks = <&rpmcc RPM_SMD_SNOC_CLK>,
-> +				 <&rpmcc RPM_SMD_SNOC_A_CLK>;
-> +		};
-> +
-> +
-> += interconnect consumers =
-> +
-> +The interconnect consumers are device nodes which dynamically express their
-> +bandwidth requirements along interconnect paths they are connected to. There
-> +can be multiple interconnect providers on a SoC and the consumer may consume
-> +multiple paths from different providers depending on use case and the
-> +components it has to interact with.
-> +
-> +Required properties:
-> +interconnects : Pairs of phandles and interconnect provider specifier to denote
-> +	        the edge source and destination ports of the interconnect path.
-> +
-> +Optional properties:
-> +interconnect-names : List of interconnect path name strings sorted in the same
-> +		     order as the interconnects property. Consumers drivers will use
-> +		     interconnect-names to match interconnect paths with interconnect
-> +		     specifiers.
-
-specifier pairs.
-
-> +
-> +Example:
-> +
-> +	sdhci at 7864000 {
-> +		...
-> +		interconnects = <&pnoc MASTER_SDCC_1 &bimc SLAVE_EBI_CH0>;
-> +		interconnect-names = "ddr";
-> +	};
+Rob
