@@ -1,30 +1,47 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Tue, 25 Sep 2018 08:14:46 -0700
-Subject: [PATCH 4/6] ARM: dts: imx51-zii-scu2-mezz: Disable the internal
- watchdog
-In-Reply-To: <20180925151208.GF21282@dragon>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 25 Sep 2018 23:18:22 +0800
+Subject: [PATCH 5/6] ARM: dts: vf610-zii-cfu1: Pass the 'no-sdio' property
+In-Reply-To: <1536696647-8228-5-git-send-email-festevam@gmail.com>
 References: <1536696647-8228-1-git-send-email-festevam@gmail.com>
- <1536696647-8228-4-git-send-email-festevam@gmail.com>
- <20180925151208.GF21282@dragon>
-Message-ID: <CAHQ1cqH5Yh9XKTghH9wC+tMb3-49SdFnm6ra3XKS0hH_WBQpXw@mail.gmail.com>
+ <1536696647-8228-5-git-send-email-festevam@gmail.com>
+Message-ID: <20180925151821.GG21282@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2018 at 8:12 AM Shawn Guo <shawnguo@kernel.org> wrote:
->
-> On Tue, Sep 11, 2018 at 05:10:45PM -0300, Fabio Estevam wrote:
-> > imx51-zii-scu2-mezz has an external watchdog in the environment
-> > microcontroller, so disable the internal one.
-> >
-> > Signed-off-by: Fabio Estevam <festevam@gmail.com>
->
-> @Andrey, are you okay with this one?
->
+On Tue, Sep 11, 2018 at 05:10:46PM -0300, Fabio Estevam wrote:
+> No SDIO devices are connected to these ports, so pass the 'no-sdio'
+> property.
+> 
+> Signed-off-by: Fabio Estevam <festevam@gmail.com>
 
-Yep, that's one of the boards that have RAVE SP MCU that implements
-watchdog functionality there.
+@Andrey, are you okay?
 
-Acked-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+Shawn
 
-Thanks,
-Andrey Smirnov
+> ---
+>  arch/arm/boot/dts/vf610-zii-cfu1.dts | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/vf610-zii-cfu1.dts b/arch/arm/boot/dts/vf610-zii-cfu1.dts
+> index de3ed03..aba4cec 100644
+> --- a/arch/arm/boot/dts/vf610-zii-cfu1.dts
+> +++ b/arch/arm/boot/dts/vf610-zii-cfu1.dts
+> @@ -122,6 +122,7 @@
+>  	non-removable;
+>  	no-1-8-v;
+>  	keep-power-in-suspend;
+> +	no-sdio;
+>  	status = "okay";
+>  };
+>  
+> @@ -129,6 +130,7 @@
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_esdhc1>;
+>  	bus-width = <4>;
+> +	no-sdio;
+>  	status = "okay";
+>  };
+>  
+> -- 
+> 2.7.4
+> 
