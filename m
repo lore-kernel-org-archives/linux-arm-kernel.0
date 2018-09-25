@@ -1,177 +1,79 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 25 Sep 2018 18:33:20 +0200
-Subject: [PATCH 1/2] ARM: dts: vf: Switch to SPDX identifier
-In-Reply-To: <1537891682-29858-1-git-send-email-festevam@gmail.com>
-References: <1537891682-29858-1-git-send-email-festevam@gmail.com>
-Message-ID: <1f28d0337a5e58610385c6724551d6be@agner.ch>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 25 Sep 2018 11:39:27 -0500
+Subject: [PATCH 2/3] dt-bindings: firmware: coreboot: document board
+ variant properties
+In-Reply-To: <1660300.IG1gbB27SJ@phil>
+References: <20180822120214.11848-1-heiko@sntech.de>
+ <20180822120214.11848-2-heiko@sntech.de>
+ <20180831121836.GA23441@bogus> <1660300.IG1gbB27SJ@phil>
+Message-ID: <20180925163927.GA23163@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25.09.2018 18:08, Fabio Estevam wrote:
-> Adopt the SPDX license identifier headers to ease license compliance
-> management.
+On Mon, Sep 24, 2018 at 04:11:31PM +0200, Heiko Stuebner wrote:
+> Hi Rob,
 > 
-> Signed-off-by: Fabio Estevam <festevam@gmail.com>
-
-Acked-by: Stefan Agner <stefan@agner.ch>
-
-> ---
->  arch/arm/boot/dts/vf500.dtsi | 43 +++----------------------------------------
->  arch/arm/boot/dts/vf610.dtsi | 44 ++++----------------------------------------
->  arch/arm/boot/dts/vfxxx.dtsi | 43 +++----------------------------------------
->  3 files changed, 10 insertions(+), 120 deletions(-)
+> Am Freitag, 31. August 2018, 14:18:36 CEST schrieb Rob Herring:
+> > On Wed, Aug 22, 2018 at 02:02:13PM +0200, Heiko Stuebner wrote:
+> > > Since at least 2014 coreboot exports board specific variant ids for
+> > > board-revision, used ram-modules and component variants on the same board
+> > > into the loaded devicetree.
+> > > 
+> > > These are set on all devicetree-based Chromebooks since then, so at
+> > > least we can make the effort to document these long-used properties.
+> > 
+> > Long used, but never reviewed, so that doesn't really matter.
+> > 
+> > > 
+> > > A case where these are used is for example to determine the touchscreen
+> > > type that is only identifyable via the sku-id when updating its firmware
+> > > on the Scarlet tablet from the Gru ChromeOS family.
+> > > 
+> > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > > ---
+> > >  Documentation/devicetree/bindings/firmware/coreboot.txt | 6 ++++++
+> > >  1 file changed, 6 insertions(+)
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/firmware/coreboot.txt b/Documentation/devicetree/bindings/firmware/coreboot.txt
+> > > index 4c955703cea8..cfc7623e2577 100644
+> > > --- a/Documentation/devicetree/bindings/firmware/coreboot.txt
+> > > +++ b/Documentation/devicetree/bindings/firmware/coreboot.txt
+> > > @@ -21,6 +21,12 @@ Required properties:
+> > >  	0xc0389481 that resides in the topmost 8 bytes of the area.
+> > >  	See coreboot's src/include/imd.h for details.
+> > >  
+> > > +Board variant properties determined via strapping measures (like gpios):
+> > > + - board-id: board-specific id indicating the board-revision
+> > > + - ram-code: board-specific id identifying the used ram-module
+> > > + - sku-id: board-specific id indicating a variant (using different
+> > > +           display panels for example)
+> > 
+> > The appear to be consumed by coreboot, but the purpose of the /firmware 
+> > nodes has describing firmware interfaces provided by the platform. 
+> > 
+> > Not saying we can't put things to configure the firmware there, but it 
+> > would be a departure and something we should consider. These properties 
+> > aren't really coreboot specific and probably belong at the root node. 
+> > Though I think we already discussed a 'board-id' property for QCom (and 
+> > ended up with a compatible string approach instead.
 > 
-> diff --git a/arch/arm/boot/dts/vf500.dtsi b/arch/arm/boot/dts/vf500.dtsi
-> index bbff011..76a0949 100644
-> --- a/arch/arm/boot/dts/vf500.dtsi
-> +++ b/arch/arm/boot/dts/vf500.dtsi
-> @@ -1,43 +1,6 @@
-> -/*
-> - * Copyright 2013 Freescale Semiconductor, Inc.
-> - *
-> - * This file is dual-licensed: you can use it either under the terms
-> - * of the GPL or the X11 license, at your option. Note that this dual
-> - * licensing only applies to this file, and not this project as a
-> - * whole.
-> - *
-> - *  a) This file is free software; you can redistribute it and/or
-> - *     modify it under the terms of the GNU General Public License
-> - *     version 2 as published by the Free Software Foundation.
-> - *
-> - *     This file is distributed in the hope that it will be useful,
-> - *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> - *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> - *     GNU General Public License for more details.
-> - *
-> - * Or, alternatively,
-> - *
-> - *  b) Permission is hereby granted, free of charge, to any person
-> - *     obtaining a copy of this software and associated documentation
-> - *     files (the "Software"), to deal in the Software without
-> - *     restriction, including without limitation the rights to use,
-> - *     copy, modify, merge, publish, distribute, sublicense, and/or
-> - *     sell copies of the Software, and to permit persons to whom the
-> - *     Software is furnished to do so, subject to the following
-> - *     conditions:
-> - *
-> - *     The above copyright notice and this permission notice shall be
-> - *     included in all copies or substantial portions of the Software.
-> - *
-> - *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> - *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> - *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> - *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> - *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> - *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> - *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> - *     OTHER DEALINGS IN THE SOFTWARE.
-> - */
-> +// SPDX-License-Identifier: (GPL-2.0 OR MIT)
-> +//
-> +// Copyright 2013 Freescale Semiconductor, Inc.
->  
->  #include "vfxxx.dtsi"
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
-> diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-> index 80fef18..7fd3981 100644
-> --- a/arch/arm/boot/dts/vf610.dtsi
-> +++ b/arch/arm/boot/dts/vf610.dtsi
-> @@ -1,43 +1,7 @@
-> -/*
-> - * Copyright 2013 Freescale Semiconductor, Inc.
-> - *
-> - * This file is dual-licensed: you can use it either under the terms
-> - * of the GPL or the X11 license, at your option. Note that this dual
-> - * licensing only applies to this file, and not this project as a
-> - * whole.
-> - *
-> - *  a) This file is free software; you can redistribute it and/or
-> - *     modify it under the terms of the GNU General Public License
-> - *     version 2 as published by the Free Software Foundation.
-> - *
-> - *     This file is distributed in the hope that it will be useful,
-> - *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> - *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> - *     GNU General Public License for more details.
-> - *
-> - * Or, alternatively,
-> - *
-> - *  b) Permission is hereby granted, free of charge, to any person
-> - *     obtaining a copy of this software and associated documentation
-> - *     files (the "Software"), to deal in the Software without
-> - *     restriction, including without limitation the rights to use,
-> - *     copy, modify, merge, publish, distribute, sublicense, and/or
-> - *     sell copies of the Software, and to permit persons to whom the
-> - *     Software is furnished to do so, subject to the following
-> - *     conditions:
-> - *
-> - *     The above copyright notice and this permission notice shall be
-> - *     included in all copies or substantial portions of the Software.
-> - *
-> - *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> - *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> - *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> - *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> - *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> - *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> - *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> - *     OTHER DEALINGS IN THE SOFTWARE.
-> - */
-> +// SPDX-License-Identifier: (GPL-2.0 OR MIT)
-> +//
-> +// Copyright 2013 Freescale Semiconductor, Inc.
-> +
->  
->  #include "vf500.dtsi"
->  
-> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
-> index d392794..0df852d 100644
-> --- a/arch/arm/boot/dts/vfxxx.dtsi
-> +++ b/arch/arm/boot/dts/vfxxx.dtsi
-> @@ -1,43 +1,6 @@
-> -/*
-> - * Copyright 2013 Freescale Semiconductor, Inc.
-> - *
-> - * This file is dual-licensed: you can use it either under the terms
-> - * of the GPL or the X11 license, at your option. Note that this dual
-> - * licensing only applies to this file, and not this project as a
-> - * whole.
-> - *
-> - *  a) This file is free software; you can redistribute it and/or
-> - *     modify it under the terms of the GNU General Public License
-> - *     version 2 as published by the Free Software Foundation.
-> - *
-> - *     This file is distributed in the hope that it will be useful,
-> - *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> - *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> - *     GNU General Public License for more details.
-> - *
-> - * Or, alternatively,
-> - *
-> - *  b) Permission is hereby granted, free of charge, to any person
-> - *     obtaining a copy of this software and associated documentation
-> - *     files (the "Software"), to deal in the Software without
-> - *     restriction, including without limitation the rights to use,
-> - *     copy, modify, merge, publish, distribute, sublicense, and/or
-> - *     sell copies of the Software, and to permit persons to whom the
-> - *     Software is furnished to do so, subject to the following
-> - *     conditions:
-> - *
-> - *     The above copyright notice and this permission notice shall be
-> - *     included in all copies or substantial portions of the Software.
-> - *
-> - *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> - *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> - *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> - *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> - *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> - *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> - *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> - *     OTHER DEALINGS IN THE SOFTWARE.
-> - */
-> +// SPDX-License-Identifier: (GPL-2.0 OR MIT)
-> +//
-> +// Copyright 2013 Freescale Semiconductor, Inc.
->  
->  #include "vf610-pinfunc.h"
->  #include <dt-bindings/clock/vf610-clock.h>
+> These are not for configuring the firmware. Coreboot is reading the values
+> from hardware-strappings, like special gpios and inserts the properties into
+> the devicetree for the kernel or userspace to read back if needed.
+> 
+> So coreboot loads a devicetree without them from the boot-partition and
+> amends that devicetree we these properties.
+> 
+> As indicated above, devices since 2014 do that, so I thought it might make
+> sense to document that behaviour.
+
+Reading strapping values and putting into DT seems like a perfectly 
+reasonable thing to do (I'm assuming the pins get initialized to their 
+function and reading them later is not possible), but that has nothing 
+to do coreboot really. We don't put things u-boot touches under a u-boot 
+node. These should go at the top-level IMO.
+
+And maybe it is compelling to just take them having been in use for some 
+time on widely deploying devices, but that's not really good precedence.
+
+Rob
