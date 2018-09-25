@@ -1,57 +1,32 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 25 Sep 2018 12:48:09 +0200
-Subject: [PATCH v2 00/22] Unify MediaTek pinctrl in preparation for MT8183
- and MT6765
-In-Reply-To: <1537503761.9654.17.camel@mtkswgap22>
-References: <cover.1536404280.git.sean.wang@mediatek.com>
- <CACRpkdZtVBjYGs5C7-HWEyX7f7pnCqvnRYBH=fFmLKhN4FGymA@mail.gmail.com>
- <1537325650.572.9.camel@mtkswgap22> <20180919043722.GA14181@Mani-XPS-13-9360>
- <1537503761.9654.17.camel@mtkswgap22>
-Message-ID: <9f0a8868-a06e-d378-1008-df758b898fbe@gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 25 Sep 2018 11:48:17 +0100
+Subject: [PATCH] iommu/io-pgtable-arm: Fix race handling in
+ split_blk_unmap()
+In-Reply-To: <20180925090138.h6tqvrvxy43ycp6g@8bytes.org>
+References: <f6700817286f60597f2a93835bf658f3ef3585ef.1535026499.git.robin.murphy@arm.com>
+ <20180925090138.h6tqvrvxy43ycp6g@8bytes.org>
+Message-ID: <e86cd69f-4355-5078-890a-338756e325ba@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Joerg,
 
-
-On 21/09/2018 06:22, Sean Wang wrote:
-> On Tue, 2018-09-18 at 21:37 -0700, Manivannan Sadhasivam wrote:
->> On Wed, Sep 19, 2018 at 10:54:10AM +0800, Sean Wang wrote:
->>> On Tue, 2018-09-18 at 15:07 -0700, Linus Walleij wrote:
->>>> On Sat, Sep 8, 2018 at 4:07 AM <sean.wang@mediatek.com> wrote:
->>>>
->>>>> v2 and changes since v1:
->>>>
->>>> I had trouble applying the last patches in the series so I applied
->>>> all on an immutable branch (ib-mtk) then merged that into devel
->>>> and added a patch on top to fix up some GPIO includes (just sent).
->>>>
->>>> Please check the result!
->>>>
->>>
->>> Sure, I'll take a look and and test on the devel branch.
->>>
->>> On the top, I'll add a fix for the issue recently reported by kbuild
->>> test robot about implicit declaration and a new MT6765 driver based
->>> on the series.
->>>
->>
->> Hi Sean,
->>
->> Do you have any plans to add support for MT6797?
->>
+On 25/09/18 10:01, Joerg Roedel wrote:
+> Hey Robin,
 > 
-> I personally have no the plan to add support to MT6797 because I have no
-> the device, but as I knew some of people in mediatek have interest to
-> add them by volunteers and thus there is no clear schedule. Eventually,
-> if they're really done, they would be still based on vendor binding not
-> by generic binding.
+> On Thu, Aug 23, 2018 at 01:14:59PM +0100, Robin Murphy wrote:
+>> Fixes: 2c3d273eabe8 ("iommu/io-pgtable-arm: Support lockless operation")
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 > 
+> I can't find a newer version of this in my inbox, do you plan to send
+> one or has it been addressed differently?
 
-CCing Saber as he is working on the pinctrl for this device. Actually he as some
-questions regarding the register layout.
+Will has the cleaned-up version in his tree along with a couple of other 
+SMMU fixes, which I assume he's planning to send you a pull for (he's 
+off at yet another conference just now so I can't confirm offline). We 
+were planning for the non-strict stuff to come in as SMMU updates on top 
+of that (p.s. please shout if you have any objections on that series so 
+I can get on them ASAP!)
 
-Sean maybe you can bring him in contact with someone inside Mediatek who could
-help him :)
-
-Regards.
-Matthias
+Thanks,
+Robin.
