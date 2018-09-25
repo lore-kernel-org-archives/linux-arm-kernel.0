@@ -1,41 +1,66 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 25 Sep 2018 17:45:57 +0800
-Subject: [PATCH] arm64: dts: Add support for NXP LS1028A SoC
-In-Reply-To: <AM6PR04MB4407A9A699D60F0243FD7FB98C1E0@AM6PR04MB4407.eurprd04.prod.outlook.com>
-References: <1535555668-7763-1-git-send-email-sudhanshu.gupta@nxp.com>
- <20180903015709.GC3850@dragon>
- <AM6PR04MB4407A9A699D60F0243FD7FB98C1E0@AM6PR04MB4407.eurprd04.prod.outlook.com>
-Message-ID: <20180925094556.GB21282@dragon>
+From: yaojun8558363@gmail.com (Jun Yao)
+Date: Tue, 25 Sep 2018 17:53:16 +0800
+Subject: [PATCH v5 0/6] Move swapper_pg_dir to rodata section.
+In-Reply-To: <20180924171936.q5bfvczzllmm5lpe@lakrids.cambridge.arm.com>
+References: <20180917044333.30051-1-yaojun8558363@gmail.com>
+ <20180924171936.q5bfvczzllmm5lpe@lakrids.cambridge.arm.com>
+Message-ID: <20180925095316.GA27420@toy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 17, 2018 at 05:43:47AM +0000, Bhaskar Upadhaya wrote:
+Hi Mark,
+
+On Mon, Sep 24, 2018 at 06:19:36PM +0100, Mark Rutland wrote:
+> Hi,
 > 
-> >-----Original Message-----
-> >From: Shawn Guo <shawnguo@kernel.org>
-> >Sent: Monday, September 3, 2018 7:27 AM
-> >To: Sudhanshu Gupta <sudhanshu.gupta@nxp.com>
-> >Cc: devicetree at vger.kernel.org; Harninder Rai <harninder.rai@nxp.com>;
-> >Bhaskar Upadhaya <bhaskar.upadhaya@nxp.com>; stuart.yoder at nxp.com;
-> >Leo Li <leoyang.li@nxp.com>; oss at buserror.net; linux-arm-
-> >kernel at lists.infradead.org
-> >Subject: Re: [PATCH] arm64: dts: Add support for NXP LS1028A SoC
-> >
-> >On Wed, Aug 29, 2018 at 08:44:28PM +0530, Sudhanshu Gupta wrote:
-> >> From: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
-> >>
-> >> LS1028A contains two ARM v8 CortexA72 processor cores with 32 KB L1-D
-> >> cache and 48 KB L1-I cache
-> >> +&i2c0 {
-> >> +	status = "okay";
-> >> +
-> >> +	pca9847 at 77 {
-> >
-> >Please have generic node name for the device.
-> is i2c-mux at 77 ok ?
+> On Mon, Sep 17, 2018 at 12:43:27PM +0800, Jun Yao wrote:
+> > Version 5 changes:
+> > 	1. Correct spelling and indentation errors[1].
+> > 	2. Update init_mm.pgd by assembly[2].
+> > 	3. Simplify set_p?d() by introducing set_swapper_pgd()[3].
+> > 	4. Reduce unnecessary tlbi for every write to swapper_pg_dir
+> > 	   during paging_init()[3].
+> > 
+> > v4: https://www.spinics.net/lists/arm-kernel/msg672195.html
+> > v3: https://www.spinics.net/lists/arm-kernel/msg662537.html
+> > v2: https://patchwork.kernel.org/patch/10485641/
+> > v1: https://patchwork.kernel.org/patch/10476595/
+> > 
+> > [1] https://www.spinics.net/lists/arm-kernel/msg675189.html
+> > [2] https://www.spinics.net/lists/arm-kernel/msg675193.html
+> > [3] https://www.spinics.net/lists/arm-kernel/msg675196.html
+> > 
+> > Jun Yao (6):
+> >   arm64/mm: Introduce the init_pg_dir.
+> >   arm64/mm: Pass ttbr1 as a parameter to __enable_mmu().
+> >   arm64/mm: Create the initial page table in the init_pg_dir.
+> >   arm64/mm: Create the final page table directly in swapper_pg_dir.
+> >   arm64/mm: Populate the swapper_pg_dir by fixmap.
+> >   arm64/mm: Move {idmap_pg_dir .. swapper_pg_dir} to rodata section.
+> > 
+> >  arch/arm64/include/asm/assembler.h | 29 ++++++++++++++++++
+> >  arch/arm64/include/asm/pgtable.h   | 36 ++++++++++++++++++----
+> >  arch/arm64/kernel/asm-offsets.c    |  1 +
+> >  arch/arm64/kernel/head.S           | 48 ++++++++++++++++++++----------
+> >  arch/arm64/kernel/sleep.S          |  1 +
+> >  arch/arm64/kernel/vmlinux.lds.S    | 47 +++++++++++++++++++----------
+> >  arch/arm64/mm/mmu.c                | 45 +++++++++++++---------------
+> >  7 files changed, 147 insertions(+), 60 deletions(-)
+> 
+> I've pushed a branch with the cleanups I requested [1] folded in.
+> 
+> I'm still a bit worried about the pgd lock, but otherwise I think this
+> is sound. I intend to throw some testing at it, just in case.
+> 
+> If you're happy with that branch, I'll ask Will and Catalin to consider
+> picking it up.
 
-There are some name suggestions in DeviceTree Specification [1].
+This branch looks great. Thank you for improving my patch.
 
-Shawn
+Is there anything I need to do? This is my first time to submit a patch,
+so I am a bit overwhelmed. I think I should wait for other people to
+review my patch. If there is a problem, I need to fix it.
 
-[1] https://www.devicetree.org/
+Thanks,
+
+Jun
