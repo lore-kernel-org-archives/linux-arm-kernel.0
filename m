@@ -1,47 +1,63 @@
-From: dennis@kernel.org (Dennis Zhou)
-Date: Tue, 25 Sep 2018 16:35:27 -0400
-Subject: [PATCH] arm64: percpu: Initialize ret in the default case
-In-Reply-To: <CAKwvOdnzN0E0HD--3GmC9b=20fx3AE-8-x0iZ04-LEXnxh=YoQ@mail.gmail.com>
-References: <20180925194459.13088-1-natechancellor@gmail.com>
- <CAKwvOdnzN0E0HD--3GmC9b=20fx3AE-8-x0iZ04-LEXnxh=YoQ@mail.gmail.com>
-Message-ID: <20180925203527.GB61443@dennisz-mbp.dhcp.thefacebook.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 25 Sep 2018 22:36:33 +0200
+Subject: [PATCH] arm64: dts: broadcom: Use the .dtb name in the rule,
+ rather than .dts
+In-Reply-To: <1480797531.286958.1537907616382@email.1und1.de>
+References: <b42d2e57-8bcd-0d6a-7a4d-aeefedcdd5f3@i2se.com>
+ <20180924102228.19656-1-liviu@dudau.co.uk>
+ <539eb374-9122-6c09-4c64-80bfa6b7bf89@i2se.com>
+ <1c0db58a-5bc2-8de3-f70d-725a29376513@gmail.com>
+ <20180925185133.jdom5tvs6zklntr7@localhost>
+ <1480797531.286958.1537907616382@email.1und1.de>
+Message-ID: <CAOesGMj2-1o1O0MpKbk8_8e1cyvGSYb2JFvF-M2Nf7CBa-Ujxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nick,
+On Tue, Sep 25, 2018 at 10:33 PM Stefan Wahren <stefan.wahren@i2se.com> wrote:
+>
+>
+> > Olof Johansson <olof@lixom.net> hat am 25. September 2018 um 20:51 geschrieben:
+> >
+> >
+> > On Tue, Sep 25, 2018 at 11:17:52AM -0700, Florian Fainelli wrote:
+> > > On 09/24/2018 04:03 AM, Stefan Wahren wrote:
+> > > > Am 24.09.2018 um 12:22 schrieb Liviu Dudau:
+> > > >> Commit a7eb26392b893 ("arm64: dts: broadcom: Add reference to Compute
+> > > >> Module IO Board V3") adds the bcm2837-rpi-cm3-io3.dts file as a target
+> > > >> in the Makefile, rather than the .dtb name. This will skip the
+> > > >> generation of the .dtb file at compile time and will fail the dtbs_install
+> > > >> target.
+> > > >>
+> > > >> Fixes: a7eb26392b893 ("arm64: dts: broadcom: Add reference to Compute
+> > > >> Module IO Board V3")
+> > > >>
+> > > >> Signed-off-by: Liviu Dudau <liviu@dudau.co.uk>
+> > > >
+> > > > Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+> > > >
+> > > > Thanks, i will add a dtbs_install step to my test jobs.
+> > >
+> > > Same here.
+> >
+> > I do but I don't seem to catch any errors from it. :-/
+>
+> Strange, i'm get getting this:
+>
+> scripts/Makefile.dtbinst:31: Target ?bcm2837-rpi-cm3-io3.dts? passt nicht zum Ziel-Muster
+>   INSTALL arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b-plus.dtb
+>   INSTALL arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dtb
+>   INSTALL
+> cp: Fehlender Zieldatei?Operand hinter '/tmp/broadcom'
+> ?cp --help? liefert weitere Informationen.
+> scripts/Makefile.dtbinst:32: die Regel f?r Ziel ?bcm2837-rpi-cm3-io3.dts? scheiterte
+> make[2]: *** [bcm2837-rpi-cm3-io3.dts] Fehler 1
+> scripts/Makefile.dtbinst:35: die Regel f?r Ziel ?broadcom? scheiterte
+> make[1]: *** [broadcom] Fehler 2
+> arch/arm64/Makefile:139: die Regel f?r Ziel ?dtbs_install? scheiterte
+> make: *** [dtbs_install] Fehler 2
 
-On Tue, Sep 25, 2018 at 01:24:06PM -0700, Nick Desaulniers wrote:
-> On Tue, Sep 25, 2018 at 12:45 PM Nathan Chancellor
-> <natechancellor@gmail.com> wrote:
-> >
-> > Clang warns that if the default case is taken, ret will be
-> > uninitialized.
-> >
-> > ./arch/arm64/include/asm/percpu.h:196:2: warning: variable 'ret' is used
-> > uninitialized whenever switch default is taken
-> > [-Wsometimes-uninitialized]
-> >         default:
-> >         ^~~~~~~
-> > ./arch/arm64/include/asm/percpu.h:200:9: note: uninitialized use occurs
-> > here
-> >         return ret;
-> >                ^~~
-> > ./arch/arm64/include/asm/percpu.h:157:19: note: initialize the variable
-> > 'ret' to silence this warning
-> >         unsigned long ret, loop;
-> >                          ^
-> >                           = 0
-> >
-> > This warning appears several times while building the erofs filesystem.
-> > While it's not strictly wrong, the BUILD_BUG will prevent this from
-> > becoming a true problem. Initialize ret to 0 in the default case right
-> > before the BUILD_BUG to silence all of these warnings.
-> 
-> Clang does semantic analysis BEFORE inlining/optimizations, so I can't
-> determine that default is never reachable.  Nathan, thanks for this
-> patch.
-> Reviewed-by: Nick Desaulniers <ndesaulniers@google.com>
-> 
+Oh, it fails but my reporting scripts don't notice it since I usually
+don't capture errors from the install phase.
 
-Thanks for the explanation!
-Dennis
+
+-Olof
