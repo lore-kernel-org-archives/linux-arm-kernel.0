@@ -1,26 +1,22 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 25 Sep 2018 13:29:30 +0200
-Subject: [PATCH] iommu: rockchip: Drop verbose prints in the interrupt
- handler
-In-Reply-To: <20180830222832.16766-1-ezequiel@collabora.com>
-References: <20180830222832.16766-1-ezequiel@collabora.com>
-Message-ID: <20180925112930.u5kftmo3vhmdxji4@8bytes.org>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 25 Sep 2018 04:25:00 -0700
+Subject: [RFC PATCH 11/40] dt-bindings: PCI: keystone: Add bindings to get
+ device control module
+In-Reply-To: <20180921102155.22839-12-kishon@ti.com>
+References: <20180921102155.22839-1-kishon@ti.com>
+ <20180921102155.22839-12-kishon@ti.com>
+Message-ID: <5baa1b0c.1c69fb81.efde0.46e9@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 30, 2018 at 07:28:32PM -0300, Ezequiel Garcia wrote:
-> Printing verbosely via WARN macros and friends in interrupt handlers
-> is strongly discouraged. Drop them and use proper ratelimited
-> prints.
+On Fri, 21 Sep 2018 15:51:26 +0530, Kishon Vijay Abraham I wrote:
+> Add bindings to get device control module which has the device id and
+> vendor id to be configured in the keystone PCIe controller.
 > 
-> Signed-off-by: Ezequiel Garcia <ezequiel@collabora.com>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 > ---
->  drivers/iommu/rockchip-iommu.c | 10 ++++++----
->  1 file changed, 6 insertions(+), 4 deletions(-)
+>  Documentation/devicetree/bindings/pci/pci-keystone.txt | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
 
-This doesn't apply cleanly to v4.19-rc5, can you please base the patch
-on that tag, add the Reviewed-by and re-send?
-
-Thanks,
-
-	Joerg
+Reviewed-by: Rob Herring <robh@kernel.org>
