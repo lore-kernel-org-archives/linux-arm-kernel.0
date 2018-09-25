@@ -1,37 +1,236 @@
-From: qader.aymen@gmail.com (Aymen Qader)
-Date: Tue, 25 Sep 2018 09:33:56 +0100
-Subject: [PATCH v3 1/2] staging: bcm2835-camera: Update TODO
-In-Reply-To: <20180925083401.22533-1-qader.aymen@gmail.com>
-References: <20180924233426.32609-1-qader.aymen@gmail.com>
- <20180925083401.22533-1-qader.aymen@gmail.com>
-Message-ID: <20180925083401.22533-2-qader.aymen@gmail.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Tue, 25 Sep 2018 14:19:39 +0530
+Subject: [PATCH v5 1/2] arm64: dts: allwinner: a64: Add display pipeline
+Message-ID: <20180925084940.27903-1-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the TODO item to remove manual cache flushing from bulk_receive.
-This was previously done in this commit:
+Allwinner A64 have a display pipeline with 2 mixers/TCONs, the first
+TCON is connected to LCD and the second is to HDMI.
 
-commit 7e8dbea41032 ("staging: bcm2835-camera: Remove explicit cache
-flush operations")
+The HDMI controller/PHY pair is similar to the one on H3/H5.
 
-Signed-off-by: Aymen Qader <qader.aymen@gmail.com>
+Add all required device tree nodes of the display pipeline, including
+the TCON0 LCD one and the TCON1 HDMI one.
+
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+[Icenowy: refactor commit message and add 1st pipeline]
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- drivers/staging/vc04_services/bcm2835-camera/TODO | 6 ------
- 1 file changed, 6 deletions(-)
+Changes for v5:
+- Use hdmi_phy compatible for A64
+Changes for v4:
+- Misc fixes
+- Dropped second PLL from HDMI PHY clock
+Changes for v3.1:
+- Refactor commit message to make it more clear.
+- Added first pipeline (mixer0 -> tcon0)
+Changes for v3:
+- Squash all pipeline components in one patch
+- Add status for mixer1 and tcon1
+Changes for v2:
+- Change compatibles and other based on previous patch changes
 
-diff --git a/drivers/staging/vc04_services/bcm2835-camera/TODO b/drivers/staging/vc04_services/bcm2835-camera/TODO
-index cefce72d814f..6c2b4ffe4996 100644
---- a/drivers/staging/vc04_services/bcm2835-camera/TODO
-+++ b/drivers/staging/vc04_services/bcm2835-camera/TODO
-@@ -15,9 +15,3 @@ padding in the V4L2 spec, but that padding doesn't match what the
- hardware can do.  If we exposed the native padding requirements
- through the V4L2 "multiplanar" formats, the firmware would have one
- less copy it needed to do.
--
--3) Port to ARM64
--
--The bulk_receive() does some manual cache flushing that are 32-bit ARM
--only, which we should convert to proper cross-platform APIs.
--
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 166 ++++++++++++++++++
+ 1 file changed, 166 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index e4cfa8778623..f3a66f888205 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -121,6 +121,13 @@
+ 		};
+ 	};
+ 
++	de: display-engine {
++		compatible = "allwinner,sun50i-a64-display-engine";
++		allwinner,pipelines = <&mixer0>,
++				      <&mixer1>;
++		status = "disabled";
++	};
++
+ 	osc24M: osc24M_clk {
+ 		#clock-cells = <0>;
+ 		compatible = "fixed-clock";
+@@ -203,6 +210,52 @@
+ 				#clock-cells = <1>;
+ 				#reset-cells = <1>;
+ 			};
++
++			mixer0: mixer at 100000 {
++				compatible = "allwinner,sun50i-a64-de2-mixer-0";
++				reg = <0x100000 0x100000>;
++				clocks = <&display_clocks CLK_BUS_MIXER0>,
++					 <&display_clocks CLK_MIXER0>;
++				clock-names = "bus",
++					      "mod";
++				resets = <&display_clocks RST_MIXER0>;
++
++				ports {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					mixer0_out: port at 1 {
++						reg = <1>;
++
++						mixer0_out_tcon0: endpoint {
++							remote-endpoint = <&tcon0_in_mixer0>;
++						};
++					};
++				};
++			};
++
++			mixer1: mixer at 200000 {
++				compatible = "allwinner,sun50i-a64-de2-mixer-1";
++				reg = <0x200000 0x100000>;
++				clocks = <&display_clocks CLK_BUS_MIXER1>,
++					 <&display_clocks CLK_MIXER1>;
++				clock-names = "bus",
++					      "mod";
++				resets = <&display_clocks RST_MIXER1>;
++
++				ports {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					mixer1_out: port at 1 {
++						reg = <1>;
++
++						mixer1_out_tcon1: endpoint {
++							remote-endpoint = <&tcon1_in_mixer1>;
++						};
++					};
++				};
++			};
+ 		};
+ 
+ 		syscon: syscon at 1c00000 {
+@@ -237,6 +290,75 @@
+ 			#dma-cells = <1>;
+ 		};
+ 
++		tcon0: lcd-controller at 1c0c000 {
++			compatible = "allwinner,sun50i-a64-tcon-lcd",
++				     "allwinner,sun8i-a83t-tcon-lcd";
++			reg = <0x01c0c000 0x1000>;
++			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_TCON0>, <&ccu CLK_TCON0>;
++			clock-names = "ahb", "tcon-ch0";
++			clock-output-names = "tcon-pixel-clock";
++			resets = <&ccu RST_BUS_TCON0>, <&ccu RST_BUS_LVDS>;
++			reset-names = "lcd", "lvds";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				tcon0_in: port at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++
++					tcon0_in_mixer0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&mixer0_out_tcon0>;
++					};
++				};
++
++				tcon0_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++				};
++			};
++		};
++
++		tcon1: lcd-controller at 1c0d000 {
++			compatible = "allwinner,sun50i-a64-tcon-tv",
++				     "allwinner,sun8i-a83t-tcon-tv";
++			reg = <0x01c0d000 0x1000>;
++			interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_TCON1>, <&ccu CLK_TCON1>;
++			clock-names = "ahb", "tcon-ch1";
++			resets = <&ccu RST_BUS_TCON1>;
++			reset-names = "lcd";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				tcon1_in: port at 0 {
++					reg = <0>;
++
++					tcon1_in_mixer1: endpoint {
++						remote-endpoint = <&mixer1_out_tcon1>;
++					};
++				};
++
++				tcon1_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++
++					tcon1_out_hdmi: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&hdmi_in_tcon1>;
++					};
++				};
++			};
++		};
++
+ 		mmc0: mmc at 1c0f000 {
+ 			compatible = "allwinner,sun50i-a64-mmc";
+ 			reg = <0x01c0f000 0x1000>;
+@@ -707,6 +829,50 @@
+ 			status = "disabled";
+ 		};
+ 
++		hdmi: hdmi at 1ee0000 {
++			compatible = "allwinner,sun50i-a64-dw-hdmi",
++				     "allwinner,sun8i-a83t-dw-hdmi";
++			reg = <0x01ee0000 0x10000>;
++			reg-io-width = <1>;
++			interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI_DDC>,
++				 <&ccu CLK_HDMI>;
++			clock-names = "iahb", "isfr", "tmds";
++			resets = <&ccu RST_BUS_HDMI1>;
++			reset-names = "ctrl";
++			phys = <&hdmi_phy>;
++			phy-names = "hdmi-phy";
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				hdmi_in: port at 0 {
++					reg = <0>;
++
++					hdmi_in_tcon1: endpoint {
++						remote-endpoint = <&tcon1_out_hdmi>;
++					};
++				};
++
++				hdmi_out: port at 1 {
++					reg = <1>;
++				};
++			};
++		};
++
++		hdmi_phy: hdmi-phy at 1ef0000 {
++			compatible = "allwinner,sun50i-a64-hdmi-phy";
++			reg = <0x01ef0000 0x10000>;
++			clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI_DDC>,
++				 <&ccu 7>;
++			clock-names = "bus", "mod", "pll-0";
++			resets = <&ccu RST_BUS_HDMI0>;
++			reset-names = "phy";
++			#phy-cells = <0>;
++		};
++
+ 		rtc: rtc at 1f00000 {
+ 			compatible = "allwinner,sun6i-a31-rtc";
+ 			reg = <0x01f00000 0x54>;
 -- 
-2.17.1
+2.18.0.321.gffc6fa0e3
