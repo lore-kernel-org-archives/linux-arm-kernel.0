@@ -1,25 +1,38 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 25 Sep 2018 13:17:35 -0500
-Subject: [PATCH v9 5/8] interconnect: qcom: Add RPM communication
-In-Reply-To: <20180831140151.13972-6-georgi.djakov@linaro.org>
-References: <20180831140151.13972-1-georgi.djakov@linaro.org>
- <20180831140151.13972-6-georgi.djakov@linaro.org>
-Message-ID: <20180925181735.GA28385@bogus>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 25 Sep 2018 11:17:52 -0700
+Subject: [PATCH] arm64: dts: broadcom: Use the .dtb name in the rule,
+ rather than .dts
+In-Reply-To: <539eb374-9122-6c09-4c64-80bfa6b7bf89@i2se.com>
+References: <b42d2e57-8bcd-0d6a-7a4d-aeefedcdd5f3@i2se.com>
+ <20180924102228.19656-1-liviu@dudau.co.uk>
+ <539eb374-9122-6c09-4c64-80bfa6b7bf89@i2se.com>
+Message-ID: <1c0db58a-5bc2-8de3-f70d-725a29376513@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 31, 2018 at 05:01:48PM +0300, Georgi Djakov wrote:
-> On some Qualcomm SoCs, there is a remote processor, which controls some of
-> the Network-On-Chip interconnect resources. Other CPUs express their needs
-> by communicating with this processor. Add a driver to handle communication
-> with this remote processor.
+On 09/24/2018 04:03 AM, Stefan Wahren wrote:
+> Am 24.09.2018 um 12:22 schrieb Liviu Dudau:
+>> Commit a7eb26392b893 ("arm64: dts: broadcom: Add reference to Compute
+>> Module IO Board V3") adds the bcm2837-rpi-cm3-io3.dts file as a target
+>> in the Makefile, rather than the .dtb name. This will skip the
+>> generation of the .dtb file at compile time and will fail the dtbs_install
+>> target.
+>>
+>> Fixes: a7eb26392b893 ("arm64: dts: broadcom: Add reference to Compute
+>> Module IO Board V3")
+>>
+>> Signed-off-by: Liviu Dudau <liviu@dudau.co.uk>
+> 
+> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+> 
+> Thanks, i will add a dtbs_install step to my test jobs.
 
-I don't think you should have a binding nor a separate driver for this. 
-It's not actually an interconnect provider, so it doesn't belong in 
-bindings/interconnect. And it just looks like abuse of DT to instantiate 
-some driver.
+Same here.
 
-All the driver amounts to is a 1 function wrapper for RPM_KEY_BW 
-messages. Can't this be part of the parent?
+> 
+> @Arnd @Olof Should this fix for 4.20 go via pull request or can you
+> apply it directly to your tree?
 
-Rob
+That would be my preference here as well.
+-- 
+Florian
