@@ -1,102 +1,74 @@
-From: ludovic.barre@st.com (Ludovic BARRE)
-Date: Tue, 25 Sep 2018 09:08:11 +0200
-Subject: [PATCH V2 05/27] mmc: mmci: move mmci next cookie to mci host
-In-Reply-To: <CAPDyKFqhyVrRGRraGQzx9kwRxLtr56Gwc_NKqNqwLvZuM=jM1A@mail.gmail.com>
-References: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
- <1537523181-14578-6-git-send-email-ludovic.Barre@st.com>
- <CAPDyKFqhyVrRGRraGQzx9kwRxLtr56Gwc_NKqNqwLvZuM=jM1A@mail.gmail.com>
-Message-ID: <87fd1322-a8bc-15cc-8f91-3cf19043a2ca@st.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 25 Sep 2018 09:12:25 +0200
+Subject: [PATCH v2] staging: vc04_services: Update TODO re: arm64
+In-Reply-To: <20180924233426.32609-1-qader.aymen@gmail.com>
+References: <20180924224835.32539-1-qader.aymen@gmail.com>
+ <20180924233426.32609-1-qader.aymen@gmail.com>
+Message-ID: <34086ca9-758f-5228-2acb-04915c2e148d@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+Hi Aymen,
 
-On 09/24/2018 08:46 PM, Ulf Hansson wrote:
-> On 21 September 2018 at 11:45, Ludovic Barre <ludovic.Barre@st.com> wrote:
->> From: Ludovic Barre <ludovic.barre@st.com>
->>
->> This patch moves next cookie to mmci host structure to
->> share same cookie management between all variants.
-> 
-> I would suggest you to squash this with patch4, as I think it makes
-> more sense to keep these changes together.
+there are more than one TODO file in vc04_services (contains 3 drivers),
+so here is my suggestion for the subject:
 
-ok
+staging: bcm2835-camera: Update TODO
 
-> 
->>
->> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
->> ---
->>   drivers/mmc/host/mmci.c | 10 ++++------
->>   drivers/mmc/host/mmci.h |  2 ++
->>   2 files changed, 6 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
->> index 6de7c8d..43f2a1a 100644
->> --- a/drivers/mmc/host/mmci.c
->> +++ b/drivers/mmc/host/mmci.c
->> @@ -418,7 +418,6 @@ static void mmci_init_sg(struct mmci_host *host, struct mmc_data *data)
->>   struct mmci_dmae_next {
->>          struct dma_async_tx_descriptor *desc;
->>          struct dma_chan *chan;
->> -       s32 cookie;
->>   };
->>
->>   struct mmci_dmae_priv {
->> @@ -449,7 +448,7 @@ static int mmci_dma_setup(struct mmci_host *host)
->>                                                       "tx");
->>
->>          /* initialize pre request cookie */
->> -       dmae->next_data.cookie = 1;
->> +       host->next_cookie = 1;
->>
->>          /*
->>           * If only an RX channel is specified, the driver will
->> @@ -716,7 +715,7 @@ static void mmci_get_next_data(struct mmci_host *host, struct mmc_data *data)
->>          struct mmci_dmae_priv *dmae = host->dma_priv;
->>          struct mmci_dmae_next *next = &dmae->next_data;
->>
->> -       WARN_ON(data->host_cookie && data->host_cookie != next->cookie);
->> +       WARN_ON(data->host_cookie && data->host_cookie != host->next_cookie);
->>          WARN_ON(!data->host_cookie && (next->desc || next->chan));
->>
->>          dmae->desc_current = next->desc;
->> @@ -728,9 +727,7 @@ static void mmci_get_next_data(struct mmci_host *host, struct mmc_data *data)
->>   static void mmci_pre_request(struct mmc_host *mmc, struct mmc_request *mrq)
->>   {
->>          struct mmci_host *host = mmc_priv(mmc);
->> -       struct mmci_dmae_priv *dmae = host->dma_priv;
->>          struct mmc_data *data = mrq->data;
->> -       struct mmci_dmae_next *nd = &dmae->next_data;
->>
->>          if (!data)
->>                  return;
->> @@ -741,7 +738,8 @@ static void mmci_pre_request(struct mmc_host *mmc, struct mmc_request *mrq)
->>                  return;
->>
->>          if (!mmci_dma_prep_next(host, data))
->> -               data->host_cookie = ++nd->cookie < 0 ? 1 : nd->cookie;
->> +               data->host_cookie = ++host->next_cookie < 0 ?
->> +                       1 : host->next_cookie;
->>   }
->>
->>   static void mmci_post_request(struct mmc_host *mmc, struct mmc_request *mrq,
->> diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
->> index 1e9a45b..5bb1ce2 100644
->> --- a/drivers/mmc/host/mmci.h
->> +++ b/drivers/mmc/host/mmci.h
->> @@ -318,5 +318,7 @@ struct mmci_host {
->>          int (*get_rx_fifocnt)(struct mmci_host *h, u32 status, int remain);
->>
->>          void                    *dma_priv;
->> +
->> +       s32                     next_cookie;
->>   };
->>
->> --
->> 2.7.4
->>
-> 
-> Kind regards
-> Uffe
-> 
+Am 25.09.2018 um 01:34 schrieb Aymen Qader:
+> Remove the TODO item to remove manual cache flushing from bulk_receive.
+> This was previously done in this commit:
+>
+> (7e8dbdea) staging: bcm2835-camera: Remove explicit cache flush
+> operations
+
+please use this format, which should also make scripts/checkpatch.pl happy:
+
+commit 7e8dbea41032 ("staging: bcm2835-camera: Remove explicit cache
+flush operations ")
+
+>
+> Also remove the unnecessary asm/cacheflush.h header.
+
+This doesn't match to the subject. Maybe a separate patch would be
+better here.
+
+Thanks
+Stefan
+
+>
+> Signed-off-by: Aymen Qader <qader.aymen@gmail.com>
+> ---
+> v2: Make commit message clearer
+>
+>  drivers/staging/vc04_services/bcm2835-camera/TODO         | 6 ------
+>  drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c | 1 -
+>  2 files changed, 7 deletions(-)
+>
+> diff --git a/drivers/staging/vc04_services/bcm2835-camera/TODO b/drivers/staging/vc04_services/bcm2835-camera/TODO
+> index cefce72d814f..6c2b4ffe4996 100644
+> --- a/drivers/staging/vc04_services/bcm2835-camera/TODO
+> +++ b/drivers/staging/vc04_services/bcm2835-camera/TODO
+> @@ -15,9 +15,3 @@ padding in the V4L2 spec, but that padding doesn't match what the
+>  hardware can do.  If we exposed the native padding requirements
+>  through the V4L2 "multiplanar" formats, the firmware would have one
+>  less copy it needed to do.
+> -
+> -3) Port to ARM64
+> -
+> -The bulk_receive() does some manual cache flushing that are 32-bit ARM
+> -only, which we should convert to proper cross-platform APIs.
+> -
+> diff --git a/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
+> index 51e5b04ff0f5..6e5c1d4ee122 100644
+> --- a/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
+> +++ b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
+> @@ -21,7 +21,6 @@
+>  #include <linux/slab.h>
+>  #include <linux/completion.h>
+>  #include <linux/vmalloc.h>
+> -#include <asm/cacheflush.h>
+>  #include <media/videobuf2-vmalloc.h>
+>  
+>  #include "mmal-common.h"
