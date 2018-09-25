@@ -1,412 +1,415 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 25 Sep 2018 10:53:49 +0530
-Subject: [PATCH 01/14] phy: phy-pxa-usb: add a new driver
-In-Reply-To: <20180822204307.13251-2-lkundrak@v3.sk>
-References: <20180822204307.13251-1-lkundrak@v3.sk>
- <20180822204307.13251-2-lkundrak@v3.sk>
-Message-ID: <f36abb62-e8a4-e69f-4732-95a0db466034@ti.com>
+Date: Tue, 25 Sep 2018 10:59:24 +0530
+Subject: [PATCH 1/2] phy: zynqmp: Add phy driver for xilinx zynqmp phy core
+In-Reply-To: <1535551648-29534-2-git-send-email-anurag.kumar.vulisha@xilinx.com>
+References: <1535551648-29534-1-git-send-email-anurag.kumar.vulisha@xilinx.com>
+ <1535551648-29534-2-git-send-email-anurag.kumar.vulisha@xilinx.com>
+Message-ID: <9bd46b50-03a9-8a47-7751-dad19bac3643@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
-On Thursday 23 August 2018 02:12 AM, Lubomir Rintel wrote:
-> Turned from arch/arm/mach-mmp/devices.c into a proper PHY driver, so
-> that in can be instantiated from a DT.
+On Wednesday 29 August 2018 07:37 PM, Anurag Kumar Vulisha wrote:
+> ZynqMP SoC has a Gigabit Transceiver with four lanes. All the high speed
+> peripherals such as USB, SATA, PCIE, Display Port and Ethernet SGMII can
+> rely on any of the four GT lanes for PHY layer. This patch adds driver
+> for that ZynqMP GT core.
 > 
-> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-
-Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
-
-If this has to be merged via linux-phy tree, please let me know.
-
-Thanks
-Kishon
-
+> Signed-off-by: Anurag Kumar Vulisha <anurag.kumar.vulisha@xilinx.com>
 > ---
->  drivers/phy/marvell/Kconfig       |  11 +
->  drivers/phy/marvell/Makefile      |   1 +
->  drivers/phy/marvell/phy-pxa-usb.c | 345 ++++++++++++++++++++++++++++++
->  3 files changed, 357 insertions(+)
->  create mode 100644 drivers/phy/marvell/phy-pxa-usb.c
+>  drivers/phy/Kconfig            |    8 +
+>  drivers/phy/Makefile           |    1 +
+>  drivers/phy/phy-zynqmp.c       | 1579 ++++++++++++++++++++++++++++++++++++++++
+>  include/dt-bindings/phy/phy.h  |    2 +
+>  include/linux/phy/phy-zynqmp.h |   52 ++
+>  5 files changed, 1642 insertions(+)
+>  create mode 100644 drivers/phy/phy-zynqmp.c
+>  create mode 100644 include/linux/phy/phy-zynqmp.h
 > 
-> diff --git a/drivers/phy/marvell/Kconfig b/drivers/phy/marvell/Kconfig
-> index 68e321225400..6fb4b56e4c14 100644
-> --- a/drivers/phy/marvell/Kconfig
-> +++ b/drivers/phy/marvell/Kconfig
-> @@ -59,3 +59,14 @@ config PHY_PXA_28NM_USB2
->  	  The PHY driver will be used by Marvell udc/ehci/otg driver.
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index 5c8d452..14cf3330 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -40,6 +40,14 @@ config PHY_XGENE
+>  	help
+>  	  This option enables support for APM X-Gene SoC multi-purpose PHY.
 >  
->  	  To compile this driver as a module, choose M here.
-> +
-> +config PHY_PXA_USB
-> +	tristate "Marvell PXA USB PHY Driver"
-> +	depends on ARCH_PXA || ARCH_MMP
+> +config PHY_XILINX_ZYNQMP
+> +	tristate "Xilinx ZynqMP PHY driver"
+> +	depends on ARCH_ZYNQMP
 > +	select GENERIC_PHY
 > +	help
-> +	  Enable this to support Marvell PXA USB PHY driver for Marvell
-> +	  SoC. This driver will do the PHY initialization and shutdown.
-> +	  The PHY driver will be used by Marvell udc/ehci/otg driver.
+> +	  Enable this to support ZynqMP High Speed Gigabit Transceiver
+> +	  that is part of ZynqMP SoC.
 > +
-> +	  To compile this driver as a module, choose M here.
-> diff --git a/drivers/phy/marvell/Makefile b/drivers/phy/marvell/Makefile
-> index 5c3ec5d10e0d..3975b144f8ec 100644
-> --- a/drivers/phy/marvell/Makefile
-> +++ b/drivers/phy/marvell/Makefile
-> @@ -6,3 +6,4 @@ obj-$(CONFIG_PHY_MVEBU_CP110_COMPHY)	+= phy-mvebu-cp110-comphy.o
->  obj-$(CONFIG_PHY_MVEBU_SATA)		+= phy-mvebu-sata.o
->  obj-$(CONFIG_PHY_PXA_28NM_HSIC)		+= phy-pxa-28nm-hsic.o
->  obj-$(CONFIG_PHY_PXA_28NM_USB2)		+= phy-pxa-28nm-usb2.o
-> +obj-$(CONFIG_PHY_PXA_USB)		+= phy-pxa-usb.o
-> diff --git a/drivers/phy/marvell/phy-pxa-usb.c b/drivers/phy/marvell/phy-pxa-usb.c
+>  source "drivers/phy/allwinner/Kconfig"
+>  source "drivers/phy/amlogic/Kconfig"
+>  source "drivers/phy/broadcom/Kconfig"
+> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+> index 84e3bd9..f2a8d27 100644
+> --- a/drivers/phy/Makefile
+> +++ b/drivers/phy/Makefile
+> @@ -7,6 +7,7 @@ obj-$(CONFIG_GENERIC_PHY)		+= phy-core.o
+>  obj-$(CONFIG_PHY_LPC18XX_USB_OTG)	+= phy-lpc18xx-usb-otg.o
+>  obj-$(CONFIG_PHY_XGENE)			+= phy-xgene.o
+>  obj-$(CONFIG_PHY_PISTACHIO_USB)		+= phy-pistachio-usb.o
+> +obj-$(CONFIG_PHY_XILINX_ZYNQMP)		+= phy-zynqmp.o
+>  obj-$(CONFIG_ARCH_SUNXI)		+= allwinner/
+>  obj-$(CONFIG_ARCH_MESON)		+= amlogic/
+>  obj-$(CONFIG_LANTIQ)			+= lantiq/
+> diff --git a/drivers/phy/phy-zynqmp.c b/drivers/phy/phy-zynqmp.c
 > new file mode 100644
-> index 000000000000..87ff7550b912
+> index 0000000..306cedd
 > --- /dev/null
-> +++ b/drivers/phy/marvell/phy-pxa-usb.c
-> @@ -0,0 +1,345 @@
+> +++ b/drivers/phy/phy-zynqmp.c
+> @@ -0,0 +1,1579 @@
 > +// SPDX-License-Identifier: GPL-2.0
 > +/*
-> + * Copyright (C) 2011 Marvell International Ltd. All rights reserved.
-> + * Copyright (C) 2018 Lubomir Rintel <lkundrak@v3.sk>
+> + * phy-zynqmp.c - PHY driver for Xilinx ZynqMP GT.
+> + *
+> + * Copyright (C) 2018 Xilinx Inc.
+> + *
+> + * Author: Anurag Kumar Vulisha <anuragku@xilinx.com>
+> + *
+> + * This driver is tested for USB, SATA and Display Port currently.
+> + * Other controllers PCIe and SGMII should also work but that is
+> + * experimental as of now.
 > + */
 > +
-> +#include <dt-bindings/phy/phy.h>
 > +#include <linux/clk.h>
 > +#include <linux/delay.h>
 > +#include <linux/io.h>
+> +#include <linux/kernel.h>
 > +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_platform.h>
 > +#include <linux/of_address.h>
 > +#include <linux/phy/phy.h>
+> +#include <linux/phy/phy-zynqmp.h>
 > +#include <linux/platform_device.h>
+> +#include <linux/delay.h>
+> +#include <dt-bindings/phy/phy.h>
+> +#include <linux/reset.h>
+> +#include <linux/list.h>
+> +#include <linux/slab.h>
 > +
-> +/* phy regs */
-> +#define UTMI_REVISION		0x0
-> +#define UTMI_CTRL		0x4
-> +#define UTMI_PLL		0x8
-> +#define UTMI_TX			0xc
-> +#define UTMI_RX			0x10
-> +#define UTMI_IVREF		0x14
-> +#define UTMI_T0			0x18
-> +#define UTMI_T1			0x1c
-> +#define UTMI_T2			0x20
-> +#define UTMI_T3			0x24
-> +#define UTMI_T4			0x28
-> +#define UTMI_T5			0x2c
-> +#define UTMI_RESERVE		0x30
-> +#define UTMI_USB_INT		0x34
-> +#define UTMI_DBG_CTL		0x38
-> +#define UTMI_OTG_ADDON		0x3c
+> +/* Inter Connect Matrix parameters */
+> +#define ICM_CFG0			0x10010
+> +#define ICM_CFG1			0x10014
+> +#define ICM_CFG0_L0_MASK		0x07
+> +#define ICM_CFG0_L1_MASK		0x70
+> +#define ICM_CFG1_L2_MASK		0x07
+> +#define ICM_CFG2_L3_MASK		0x70
+> +#define ICM_CFG_SHIFT			4
 > +
-> +/* For UTMICTRL Register */
-> +#define UTMI_CTRL_USB_CLK_EN                    (1 << 31)
-> +/* pxa168 */
-> +#define UTMI_CTRL_SUSPEND_SET1                  (1 << 30)
-> +#define UTMI_CTRL_SUSPEND_SET2                  (1 << 29)
-> +#define UTMI_CTRL_RXBUF_PDWN                    (1 << 24)
-> +#define UTMI_CTRL_TXBUF_PDWN                    (1 << 11)
+> +/* Inter Connect Matrix allowed protocols */
+> +#define ICM_PROTOCOL_PD			0x0
+> +#define ICM_PROTOCOL_PCIE		0x1
+> +#define ICM_PROTOCOL_SATA		0x2
+> +#define ICM_PROTOCOL_USB		0x3
+> +#define ICM_PROTOCOL_DP			0x4
+> +#define ICM_PROTOCOL_SGMII		0x5
 > +
-> +#define UTMI_CTRL_INPKT_DELAY_SHIFT             30
-> +#define UTMI_CTRL_INPKT_DELAY_SOF_SHIFT		28
-> +#define UTMI_CTRL_PU_REF_SHIFT			20
-> +#define UTMI_CTRL_ARC_PULLDN_SHIFT              12
-> +#define UTMI_CTRL_PLL_PWR_UP_SHIFT              1
-> +#define UTMI_CTRL_PWR_UP_SHIFT                  0
+> +/* Test Mode common reset control  parameters */
+> +#define TM_CMN_RST			0x10018
+> +#define TM_CMN_RST_EN			0x1
+> +#define TM_CMN_RST_SET			0x2
+> +#define TM_CMN_RST_MASK			0x3
 > +
-> +/* For UTMI_PLL Register */
-> +#define UTMI_PLL_PLLCALI12_SHIFT		29
-> +#define UTMI_PLL_PLLCALI12_MASK			(0x3 << 29)
+> +/* Refclk selection parameters */
+> +#define PLL_REF_SEL0			0x10000
+> +#define PLL_REF_OFFSET			0x4
+> +#define PLL_FREQ_MASK			0x1F
+> +#define PLL_STATUS_READ_OFFSET		0x4000
+> +#define PLL_STATUS_LOCKED		0x10
 > +
-> +#define UTMI_PLL_PLLVDD18_SHIFT			27
-> +#define UTMI_PLL_PLLVDD18_MASK			(0x3 << 27)
+> +/* PLL SSC step size offsets */
+> +#define L0_L0_REF_CLK_SEL		0x2860
+> +#define L0_PLL_SS_STEPS_0_LSB		0x2368
+> +#define L0_PLL_SS_STEPS_1_MSB		0x236C
+> +#define L0_PLL_SS_STEP_SIZE_0_LSB	0x2370
+> +#define L0_PLL_SS_STEP_SIZE_1		0x2374
+> +#define L0_PLL_SS_STEP_SIZE_2		0x2378
+> +#define L0_PLL_SS_STEP_SIZE_3_MSB	0x237C
+> +#define L0_PLL_STATUS_READ_1		0x23E4
 > +
-> +#define UTMI_PLL_PLLVDD12_SHIFT			25
-> +#define UTMI_PLL_PLLVDD12_MASK			(0x3 << 25)
+> +/* SSC step size parameters */
+> +#define STEP_SIZE_OFFSET		0x4000
+> +#define STEP_SIZE_0_MASK		0xFF
+> +#define STEP_SIZE_1_MASK		0xFF
+> +#define STEP_SIZE_2_MASK		0xFF
+> +#define STEP_SIZE_3_MASK		0x3
+> +#define STEP_SIZE_SHIFT			8
+> +#define FORCE_STEP_SIZE			0x10
+> +#define FORCE_STEPS			0x20
+> +#define STEPS_OFFSET			0x4000
+> +#define STEPS_0_MASK			0xFF
+> +#define STEPS_1_MASK			0x07
 > +
-> +#define UTMI_PLL_CLK_BLK_EN_SHIFT               24
-> +#define CLK_BLK_EN                              (0x1 << 24)
-> +#define PLL_READY                               (0x1 << 23)
-> +#define KVCO_EXT                                (0x1 << 22)
-> +#define VCOCAL_START                            (0x1 << 21)
+> +/* BG calibration parameters */
+> +#define BGCAL_REF_SEL			0x10028
+> +#define BGCAL_REF_VALUE			0x0C
 > +
-> +#define UTMI_PLL_KVCO_SHIFT			15
-> +#define UTMI_PLL_KVCO_MASK                      (0x7 << 15)
+> +/* Calibration digital logic parameters */
+> +#define L3_TM_CALIB_DIG19		0xEC4C
+> +#define L3_CALIB_DONE_STATUS		0xEF14
+> +#define L3_TM_CALIB_DIG18		0xEC48
+> +#define L3_TM_CALIB_DIG19_NSW		0x07
+> +#define L3_TM_CALIB_DIG18_NSW		0xE0
+> +#define L3_TM_OVERRIDE_NSW_CODE         0x20
+> +#define L3_CALIB_DONE			0x02
+> +#define L3_NSW_SHIFT			5
+> +#define L3_NSW_PIPE_SHIFT		4
+> +#define L3_NSW_CALIB_SHIFT		3
 > +
-> +#define UTMI_PLL_ICP_SHIFT			12
-> +#define UTMI_PLL_ICP_MASK                       (0x7 << 12)
+> +/* DN Resistor calibration code parameters */
+> +#define L0_TXPMA_ST_3			0x0B0C
+> +#define L0_DN_CALIB_CODE		0x3F
 > +
-> +#define UTMI_PLL_FBDIV_SHIFT                    4
-> +#define UTMI_PLL_FBDIV_MASK                     (0xFF << 4)
+> +/* PLL Test Mode register parameters */
+> +#define L0_TM_PLL_DIG_37		0x2094
+> +#define L0_TM_PLL_DIG_37_OFFSET		0x4000
+> +#define L0_TM_COARSE_CODE_LIMIT		0x10
 > +
-> +#define UTMI_PLL_REFDIV_SHIFT                   0
-> +#define UTMI_PLL_REFDIV_MASK                    (0xF << 0)
+> +/* PCS control parameters */
+> +#define L0_TM_DIG_6			0x106C
+> +#define L0_TX_DIG_61			0x00F4
+> +#define L0_TM_DIG_6_OFFSET		0x4000
+> +#define L0_TX_DIG_61_OFFSET		0x4000
+> +#define L0_TM_DIS_DESCRAMBLE_DECODER	0x0F
+> +#define L0_TM_DISABLE_SCRAMBLE_ENCODER	0x0F
 > +
-> +/* For UTMI_TX Register */
-> +#define UTMI_TX_REG_EXT_FS_RCAL_SHIFT		27
-> +#define UTMI_TX_REG_EXT_FS_RCAL_MASK		(0xf << 27)
+> +/* TX De-emphasis parameters */
+> +#define L0_TX_ANA_TM_18			0x0048
+> +#define L0_TX_ANA_TM_118		0x01D8
+> +#define L0_TX_ANA_TM_18_OFFSET		0x4000
+> +#define L0_TX_ANA_TM_118_OFFSET		0x4000
+> +#define L0_TX_ANA_TM_118_FORCE_17_0	BIT(0)
 > +
-> +#define UTMI_TX_REG_EXT_FS_RCAL_EN_SHIFT	26
-> +#define UTMI_TX_REG_EXT_FS_RCAL_EN_MASK		(0x1 << 26)
+> +/* PMA control parameters */
+> +#define L0_TXPMD_TM_45			0x0CB4
+> +#define L0_TXPMD_TM_48			0x0CC0
+> +#define L0_TXPMD_TM_45_OFFSET		0x4000
+> +#define L0_TXPMD_TM_48_OFFSET		0x4000
+> +#define L0_TXPMD_TM_45_OVER_DP_MAIN	BIT(0)
+> +#define L0_TXPMD_TM_45_ENABLE_DP_MAIN	BIT(1)
+> +#define L0_TXPMD_TM_45_OVER_DP_POST1	BIT(2)
+> +#define L0_TXPMD_TM_45_ENABLE_DP_POST1	BIT(3)
+> +#define L0_TXPMD_TM_45_OVER_DP_POST2	BIT(4)
+> +#define L0_TXPMD_TM_45_ENABLE_DP_POST2	BIT(5)
 > +
-> +#define UTMI_TX_TXVDD12_SHIFT                   22
-> +#define UTMI_TX_TXVDD12_MASK                    (0x3 << 22)
+> +/* Bus width parameters */
+> +#define TX_PROT_BUS_WIDTH		0x10040
+> +#define RX_PROT_BUS_WIDTH		0x10044
+> +#define PROT_BUS_WIDTH_10		0x0
+> +#define PROT_BUS_WIDTH_20		0x1
+> +#define PROT_BUS_WIDTH_40		0x2
+> +#define PROT_BUS_WIDTH_SHIFT		2
 > +
-> +#define UTMI_TX_CK60_PHSEL_SHIFT                17
-> +#define UTMI_TX_CK60_PHSEL_MASK                 (0xf << 17)
+> +/* Max number of GT lanes */
+> +#define MAX_LANES			4
 > +
-> +#define UTMI_TX_IMPCAL_VTH_SHIFT                14
-> +#define UTMI_TX_IMPCAL_VTH_MASK                 (0x7 << 14)
+> +/* Max Allowed refclk frequencies */
+> +#define MAX_REFCLK			13
 > +
-> +#define REG_RCAL_START                          (0x1 << 12)
+> +/* Lane CLK sharing mask */
+> +#define LANE_CLK_SHARE_MASK		0x8F
 > +
-> +#define UTMI_TX_LOW_VDD_EN_SHIFT                11
+> +/* SIOU SATA control register */
+> +#define SATA_CONTROL_OFFSET		0x0100
 > +
-> +#define UTMI_TX_AMP_SHIFT			0
-> +#define UTMI_TX_AMP_MASK			(0x7 << 0)
+> +/* Total number of controllers */
+> +#define CONTROLLERS_PER_LANE		5
 > +
-> +/* For UTMI_RX Register */
-> +#define UTMI_REG_SQ_LENGTH_SHIFT                15
-> +#define UTMI_REG_SQ_LENGTH_MASK                 (0x3 << 15)
+> +/* USB pipe control parameters */
+> +#define PIPE_CLK_OFFSET			0x7c
+> +#define PIPE_POWER_OFFSET		0x80
+> +#define PIPE_CLK_ON			1
+> +#define PIPE_CLK_OFF			0
+> +#define PIPE_POWER_ON			1
+> +#define PIPE_POWER_OFF			0
 > +
-> +#define UTMI_RX_SQ_THRESH_SHIFT                 4
-> +#define UTMI_RX_SQ_THRESH_MASK                  (0xf << 4)
+> +/* Protocol Type Pparameters */
+> +#define XPSGTR_TYPE_USB0		0  /* USB controller 0 */
+> +#define XPSGTR_TYPE_USB1		1  /* USB controller 1 */
+> +#define XPSGTR_TYPE_SATA_0		2  /* SATA controller lane 0 */
+> +#define XPSGTR_TYPE_SATA_1		3  /* SATA controller lane 1 */
+> +#define XPSGTR_TYPE_PCIE_0		4  /* PCIe controller lane 0 */
+> +#define XPSGTR_TYPE_PCIE_1		5  /* PCIe controller lane 1 */
+> +#define XPSGTR_TYPE_PCIE_2		6  /* PCIe controller lane 2 */
+> +#define XPSGTR_TYPE_PCIE_3		7  /* PCIe controller lane 3 */
+> +#define XPSGTR_TYPE_DP_0		8  /* Display Port controller lane 0 */
+> +#define XPSGTR_TYPE_DP_1		9  /* Display Port controller lane 1 */
+> +#define XPSGTR_TYPE_SGMII0		10 /* Ethernet SGMII controller 0 */
+> +#define XPSGTR_TYPE_SGMII1		11 /* Ethernet SGMII controller 1 */
+> +#define XPSGTR_TYPE_SGMII2		12 /* Ethernet SGMII controller 2 */
+> +#define XPSGTR_TYPE_SGMII3		13 /* Ethernet SGMII controller 3 */
 > +
-> +#define UTMI_OTG_ADDON_OTG_ON			(1 << 0)
+> +/* Timeout values */
+> +#define RST_TIMEOUT_MS			1000
+> +#define TIMEOUT_US			1000
 > +
-> +enum pxa_usb_phy_version {
-> +	PXA_USB_PHY_MMP2,
-> +	PXA_USB_PHY_PXA910,
-> +	PXA_USB_PHY_PXA168,
+> +/*
+> + * This table holds the valid combinations of controllers and
+> + * lanes(Interconnect Matrix).
+> + */
+> +static unsigned int icm_matrix[MAX_LANES][CONTROLLERS_PER_LANE] = {
+> +	{ XPSGTR_TYPE_PCIE_0, XPSGTR_TYPE_SATA_0, XPSGTR_TYPE_USB0,
+> +		XPSGTR_TYPE_DP_1, XPSGTR_TYPE_SGMII0 },
+> +	{ XPSGTR_TYPE_PCIE_1, XPSGTR_TYPE_SATA_1, XPSGTR_TYPE_USB0,
+> +		XPSGTR_TYPE_DP_0, XPSGTR_TYPE_SGMII1 },
+> +	{ XPSGTR_TYPE_PCIE_2, XPSGTR_TYPE_SATA_0, XPSGTR_TYPE_USB0,
+> +		XPSGTR_TYPE_DP_1, XPSGTR_TYPE_SGMII2 },
+> +	{ XPSGTR_TYPE_PCIE_3, XPSGTR_TYPE_SATA_1, XPSGTR_TYPE_USB1,
+> +		XPSGTR_TYPE_DP_0, XPSGTR_TYPE_SGMII3 }
 > +};
 > +
-> +struct pxa_usb_phy {
+> +/* Allowed PLL reference clock frequencies */
+> +enum pll_frequencies {
+> +	REF_19_2M = 0,
+> +	REF_20M,
+> +	REF_24M,
+> +	REF_26M,
+> +	REF_27M,
+> +	REF_38_4M,
+> +	REF_40M,
+> +	REF_52M,
+> +	REF_100M,
+> +	REF_108M,
+> +	REF_125M,
+> +	REF_135M,
+> +	REF_150M,
+> +};
+> +
+> +/**
+> + * struct xpsgtr_phy - representation of a lane
+> + * @phy: pointer to the kernel PHY device
+> + * @type: controller which uses this lane
+> + * @lane: lane number
+> + * @protocol: protocol in which the lane operates
+> + * @ref_clk: enum of allowed ref clock rates for this lane PLL
+> + * @pll_lock: PLL status
+> + * @skip_phy_init: skip phy_init() if true
+> + * @data: pointer to hold private data
+> + * @refclk_rate: PLL reference clock frequency
+> + * @share_laneclk: lane number of the clock to be shared
+> + */
+> +struct xpsgtr_phy {
 > +	struct phy *phy;
-> +	void __iomem *base;
-> +	enum pxa_usb_phy_version version;
+> +	u8 type;
+> +	u8 lane;
+> +	u8 protocol;
+> +	enum pll_frequencies ref_clk;
+> +	bool pll_lock;
+> +	bool skip_phy_init;
+> +	void *data;
+> +	u32 refclk_rate;
+> +	u32 share_laneclk;
 > +};
 > +
-> +/*****************************************************************************
-> + * The registers read/write routines
-> + *****************************************************************************/
-> +
-> +static unsigned int u2o_get(void __iomem *base, unsigned int offset)
-> +{
-> +	return readl_relaxed(base + offset);
-> +}
-> +
-> +static void u2o_set(void __iomem *base, unsigned int offset,
-> +		unsigned int value)
-> +{
-> +	u32 reg;
-> +
-> +	reg = readl_relaxed(base + offset);
-> +	reg |= value;
-> +	writel_relaxed(reg, base + offset);
-> +	readl_relaxed(base + offset);
-> +}
-> +
-> +static void u2o_clear(void __iomem *base, unsigned int offset,
-> +		unsigned int value)
-> +{
-> +	u32 reg;
-> +
-> +	reg = readl_relaxed(base + offset);
-> +	reg &= ~value;
-> +	writel_relaxed(reg, base + offset);
-> +	readl_relaxed(base + offset);
-> +}
-> +
-> +static void u2o_write(void __iomem *base, unsigned int offset,
-> +		unsigned int value)
-> +{
-> +	writel_relaxed(value, base + offset);
-> +	readl_relaxed(base + offset);
-> +}
-> +
-> +static int pxa_usb_phy_init(struct phy *phy)
-> +{
-> +	struct pxa_usb_phy *pxa_usb_phy = phy_get_drvdata(phy);
-> +	void __iomem *base = pxa_usb_phy->base;
-> +	int loops;
-> +
-> +	dev_info(&phy->dev, "initializing Marvell PXA USB PHY");
-> +
-> +	/* Initialize the USB PHY power */
-> +	if (pxa_usb_phy->version == PXA_USB_PHY_PXA910) {
-> +		u2o_set(base, UTMI_CTRL, (1<<UTMI_CTRL_INPKT_DELAY_SOF_SHIFT)
-> +			| (1<<UTMI_CTRL_PU_REF_SHIFT));
-> +	}
-> +
-> +	u2o_set(base, UTMI_CTRL, 1<<UTMI_CTRL_PLL_PWR_UP_SHIFT);
-> +	u2o_set(base, UTMI_CTRL, 1<<UTMI_CTRL_PWR_UP_SHIFT);
-> +
-> +	/* UTMI_PLL settings */
-> +	u2o_clear(base, UTMI_PLL, UTMI_PLL_PLLVDD18_MASK
-> +		| UTMI_PLL_PLLVDD12_MASK | UTMI_PLL_PLLCALI12_MASK
-> +		| UTMI_PLL_FBDIV_MASK | UTMI_PLL_REFDIV_MASK
-> +		| UTMI_PLL_ICP_MASK | UTMI_PLL_KVCO_MASK);
-> +
-> +	u2o_set(base, UTMI_PLL, 0xee<<UTMI_PLL_FBDIV_SHIFT
-> +		| 0xb<<UTMI_PLL_REFDIV_SHIFT | 3<<UTMI_PLL_PLLVDD18_SHIFT
-> +		| 3<<UTMI_PLL_PLLVDD12_SHIFT | 3<<UTMI_PLL_PLLCALI12_SHIFT
-> +		| 1<<UTMI_PLL_ICP_SHIFT | 3<<UTMI_PLL_KVCO_SHIFT);
-> +
-> +	/* UTMI_TX */
-> +	u2o_clear(base, UTMI_TX, UTMI_TX_REG_EXT_FS_RCAL_EN_MASK
-> +		| UTMI_TX_TXVDD12_MASK | UTMI_TX_CK60_PHSEL_MASK
-> +		| UTMI_TX_IMPCAL_VTH_MASK | UTMI_TX_REG_EXT_FS_RCAL_MASK
-> +		| UTMI_TX_AMP_MASK);
-> +	u2o_set(base, UTMI_TX, 3<<UTMI_TX_TXVDD12_SHIFT
-> +		| 4<<UTMI_TX_CK60_PHSEL_SHIFT | 4<<UTMI_TX_IMPCAL_VTH_SHIFT
-> +		| 8<<UTMI_TX_REG_EXT_FS_RCAL_SHIFT | 3<<UTMI_TX_AMP_SHIFT);
-> +
-> +	/* UTMI_RX */
-> +	u2o_clear(base, UTMI_RX, UTMI_RX_SQ_THRESH_MASK
-> +		| UTMI_REG_SQ_LENGTH_MASK);
-> +	u2o_set(base, UTMI_RX, 7<<UTMI_RX_SQ_THRESH_SHIFT
-> +		| 2<<UTMI_REG_SQ_LENGTH_SHIFT);
-> +
-> +	/* UTMI_IVREF */
-> +	if (pxa_usb_phy->version == PXA_USB_PHY_PXA168) {
-> +		/*
-> +		 * fixing Microsoft Altair board interface with NEC hub issue -
-> +		 * Set UTMI_IVREF from 0x4a3 to 0x4bf
-> +		 */
-> +		u2o_write(base, UTMI_IVREF, 0x4bf);
-> +	}
-> +
-> +	/* toggle VCOCAL_START bit of UTMI_PLL */
-> +	udelay(200);
-> +	u2o_set(base, UTMI_PLL, VCOCAL_START);
-> +	udelay(40);
-> +	u2o_clear(base, UTMI_PLL, VCOCAL_START);
-> +
-> +	/* toggle REG_RCAL_START bit of UTMI_TX */
-> +	udelay(400);
-> +	u2o_set(base, UTMI_TX, REG_RCAL_START);
-> +	udelay(40);
-> +	u2o_clear(base, UTMI_TX, REG_RCAL_START);
-> +	udelay(400);
-> +
-> +	/* Make sure PHY PLL is ready */
-> +	loops = 0;
-> +	while ((u2o_get(base, UTMI_PLL) & PLL_READY) == 0) {
-> +		mdelay(1);
-> +		loops++;
-> +		if (loops > 100) {
-> +			dev_warn(&phy->dev, "calibrate timeout, UTMI_PLL %x\n",
-> +						u2o_get(base, UTMI_PLL));
-> +			break;
-> +		}
-> +	}
-> +
-> +	if (pxa_usb_phy->version == PXA_USB_PHY_PXA168) {
-> +		u2o_set(base, UTMI_RESERVE, 1 << 5);
-> +		/* Turn on UTMI PHY OTG extension */
-> +		u2o_write(base, UTMI_OTG_ADDON, 1);
-> +	}
-> +
-> +	return 0;
-> +
-> +}
-> +
-> +static int pxa_usb_phy_exit(struct phy *phy)
-> +{
-> +	struct pxa_usb_phy *pxa_usb_phy = phy_get_drvdata(phy);
-> +	void __iomem *base = pxa_usb_phy->base;
-> +
-> +	dev_info(&phy->dev, "deinitializing Marvell PXA USB PHY");
-> +
-> +	if (pxa_usb_phy->version == PXA_USB_PHY_PXA168)
-> +		u2o_clear(base, UTMI_OTG_ADDON, UTMI_OTG_ADDON_OTG_ON);
-> +
-> +	u2o_clear(base, UTMI_CTRL, UTMI_CTRL_RXBUF_PDWN);
-> +	u2o_clear(base, UTMI_CTRL, UTMI_CTRL_TXBUF_PDWN);
-> +	u2o_clear(base, UTMI_CTRL, UTMI_CTRL_USB_CLK_EN);
-> +	u2o_clear(base, UTMI_CTRL, 1<<UTMI_CTRL_PWR_UP_SHIFT);
-> +	u2o_clear(base, UTMI_CTRL, 1<<UTMI_CTRL_PLL_PWR_UP_SHIFT);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct phy_ops pxa_usb_phy_ops = {
-> +	.init	= pxa_usb_phy_init,
-> +	.exit	= pxa_usb_phy_exit,
-> +	.owner	= THIS_MODULE,
+> +/**
+> + * struct xpsgtr_ssc - structure to hold SSC settings for a lane
+> + * @refclk_rate: PLL reference clock frequency
+> + * @pll_ref_clk: value to be written to register for corresponding ref clk rate
+> + * @steps: number of steps of SSC (Spread Spectrum Clock)
+> + * @step_size: step size of each step
+> + */
+> +struct xpsgtr_ssc {
+> +	u32 refclk_rate;
+> +	u8  pll_ref_clk;
+> +	u32 steps;
+> +	u32 step_size;
 > +};
 > +
-> +static const struct of_device_id pxa_usb_phy_of_match[] = {
-> +	{
-> +		.compatible = "marvell,mmp2-usb-phy",
-> +		.data = (void *)PXA_USB_PHY_MMP2,
-> +	}, {
-> +		.compatible = "marvell,pxa910-usb-phy",
-> +		.data = (void *)PXA_USB_PHY_PXA910,
-> +	}, {
-> +		.compatible = "marvell,pxa168-usb-phy",
-> +		.data = (void *)PXA_USB_PHY_PXA168,
-> +	},
-> +	{ },
+> +/* lookup table to hold all settings needed for a ref clock frequency */
+> +static struct xpsgtr_ssc ssc_lookup[MAX_REFCLK] = {
+> +	{19200000, 0x05, 608, 264020},
+> +	{20000000, 0x06, 634, 243454},
+> +	{24000000, 0x07, 760, 168973},
+> +	{26000000, 0x08, 824, 143860},
+> +	{27000000, 0x09, 856, 86551},
+> +	{38400000, 0x0A, 1218, 65896},
+> +	{40000000, 0x0B, 634, 243454},
+> +	{52000000, 0x0C, 824, 143860},
+> +	{100000000, 0x0D, 1058, 87533},
+> +	{108000000, 0x0E, 856, 86551},
+> +	{125000000, 0x0F, 992, 119497},
+> +	{135000000, 0x10, 1070, 55393},
+> +	{150000000, 0x11, 792, 187091}
 > +};
-> +MODULE_DEVICE_TABLE(of, pxa_usb_phy_of_match);
 > +
-> +static int pxa_usb_phy_probe(struct platform_device *pdev)
+> +/**
+> + * struct xpsgtr_dev - representation of a ZynMP GT device
+> + * @dev: pointer to device
+> + * @serdes: serdes base address
+> + * @siou: siou base address
+> + * @gtr_mutex: mutex for locking
+> + * @phys: pointer to all the lanes
+> + * @tx_term_fix: fix for GT issue
+> + * @saved_icm_cfg0: stored value of ICM CFG0 register
+> + * @saved_icm_cfg1: stored value of ICM CFG1 register
+> + * @sata_rst: a reset control for SATA
+> + * @dp_rst: a reset control for DP
+> + * @usb0_crst: a reset control for usb0 core
+> + * @usb1_crst: a reset control for usb1 core
+> + * @usb0_hibrst: a reset control for usb0 hibernation module
+> + * @usb1_hibrst: a reset control for usb1 hibernation module
+> + * @usb0_apbrst: a reset control for usb0 apb bus
+> + * @usb1_apbrst: a reset control for usb1 apb bus
+> + * @gem0_rst: a reset control for gem0
+> + * @gem1_rst: a reset control for gem1
+> + * @gem2_rst: a reset control for gem2
+> + * @gem3_rst: a reset control for gem3
+> + */
+> +struct xpsgtr_dev {
+> +	struct device *dev;
+> +	void __iomem *serdes;
+> +	void __iomem *siou;
+> +	struct mutex gtr_mutex; /* mutex for locking */
+> +	struct xpsgtr_phy **phys;
+> +	bool tx_term_fix;
+> +	unsigned int saved_icm_cfg0;
+> +	unsigned int saved_icm_cfg1;
+> +	struct reset_control *sata_rst;
+> +	struct reset_control *dp_rst;
+> +	struct reset_control *usb0_crst;
+> +	struct reset_control *usb1_crst;
+> +	struct reset_control *usb0_hibrst;
+> +	struct reset_control *usb1_hibrst;
+> +	struct reset_control *usb0_apbrst;
+> +	struct reset_control *usb1_apbrst;
+> +	struct reset_control *gem0_rst;
+> +	struct reset_control *gem1_rst;
+> +	struct reset_control *gem2_rst;
+> +	struct reset_control *gem3_rst;
+> +};
+> +
+> +/**
+> + * xpsgtr_override_deemph - override PIPE TX de-emphasis
+> + * @phy: pointer to phy
+> + * @plvl: pre-emphasis level
+> + * @vlvl: voltage swing level
+> + *
+> + * Return: None
+> + */
+> +void xpsgtr_override_deemph(struct phy *phy, u8 plvl, u8 vlvl)
 > +{
-> +	struct device *dev = &pdev->dev;
-> +	struct resource *resource;
-> +	struct pxa_usb_phy *pxa_usb_phy;
-> +	struct phy_provider *provider;
-> +	const struct of_device_id *of_id;
+> +	struct xpsgtr_phy *gtr_phy = phy_get_drvdata(phy);
+> +	struct xpsgtr_dev *gtr_dev = gtr_phy->data;
+> +	static u8 pe[4][4] = { { 0x2, 0x2, 0x2, 0x2 },
+> +			       { 0x1, 0x1, 0x1, 0xFF },
+> +			       { 0x0, 0x0, 0xFF, 0xFF },
+> +			       { 0xFF, 0xFF, 0xFF, 0xFF } };
 > +
-> +	pxa_usb_phy = devm_kzalloc(dev, sizeof(struct pxa_usb_phy), GFP_KERNEL);
-> +	if (!pxa_usb_phy)
-> +		return -ENOMEM;
-> +
-> +	of_id = of_match_node(pxa_usb_phy_of_match, dev->of_node);
-> +	if (of_id)
-> +		pxa_usb_phy->version = (enum pxa_usb_phy_version)of_id->data;
-> +	else
-> +		pxa_usb_phy->version = PXA_USB_PHY_MMP2;
-> +
-> +	resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	pxa_usb_phy->base = devm_ioremap_resource(dev, resource);
-> +	if (IS_ERR(pxa_usb_phy->base)) {
-> +		dev_err(dev, "failed to remap PHY regs\n");
-> +		return PTR_ERR(pxa_usb_phy->base);
-> +	}
-> +
-> +	pxa_usb_phy->phy = devm_phy_create(dev, NULL, &pxa_usb_phy_ops);
-> +	if (IS_ERR(pxa_usb_phy->phy)) {
-> +		dev_err(dev, "failed to create PHY\n");
-> +		return PTR_ERR(pxa_usb_phy->phy);
-> +	}
-> +
-> +	phy_set_drvdata(pxa_usb_phy->phy, pxa_usb_phy);
-> +	provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
-> +	if (IS_ERR(provider)) {
-> +		dev_err(dev, "failed to register PHY provider\n");
-> +		return PTR_ERR(provider);
-> +	}
-> +
-> +	if (!dev->of_node) {
-> +		phy_create_lookup(pxa_usb_phy->phy, "usb", "mv-udc");
-> +		phy_create_lookup(pxa_usb_phy->phy, "usb", "pxa-u2oehci");
-> +		phy_create_lookup(pxa_usb_phy->phy, "usb", "mv-otg");
-> +	}
-> +
-> +	dev_info(dev, "Marvell PXA USB PHY");
-> +	return 0;
+> +	writel(pe[plvl][vlvl],
+> +	       gtr_dev->serdes + gtr_phy->lane * L0_TX_ANA_TM_18_OFFSET +
+> +	       L0_TX_ANA_TM_18);
 > +}
-> +
-> +static struct platform_driver pxa_usb_phy_driver = {
-> +	.probe		= pxa_usb_phy_probe,
-> +	.driver		= {
-> +		.name	= "pxa-usb-phy",
-> +		.of_match_table = pxa_usb_phy_of_match,
-> +	},
-> +};
-> +module_platform_driver(pxa_usb_phy_driver);
-> +
-> +MODULE_AUTHOR("Lubomir Rintel <lkundrak@v3.sk>");
-> +MODULE_DESCRIPTION("Marvell PXA USB PHY Driver");
-> +MODULE_LICENSE("GPL v2");
-> 
+> +EXPORT_SYMBOL_GPL(xpsgtr_override_deemph);
+
+Why can't these be included in one of the phy_ops? Why do you need export
+symbols here and below?
+
+Thanks
+Kishon
