@@ -1,38 +1,66 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 25 Sep 2018 14:10:47 -0500
-Subject: [PATCH v2 01/03] dt-bindings: clock: Add Clock Management Unit
- for Actions Semi S500 SoC
-In-Reply-To: <CADHB5bBkyE90LVrWjt0ziU+oe=4sc8G_513VGECc++6xQ2ACdA@mail.gmail.com>
-References: <CADHB5bBkyE90LVrWjt0ziU+oe=4sc8G_513VGECc++6xQ2ACdA@mail.gmail.com>
-Message-ID: <20180925191047.GA14410@bogus>
+From: natechancellor@gmail.com (Nathan Chancellor)
+Date: Tue, 25 Sep 2018 12:44:59 -0700
+Subject: [PATCH] arm64: percpu: Initialize ret in the default case
+Message-ID: <20180925194459.13088-1-natechancellor@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 04, 2018 at 12:36:36PM -0300, Edgar Bernardi Righi wrote:
-> Add Clock Management Unit for Actions Semi S500 SoC. Dt-Bindings
-> constants added.
-> Tested on a Lemaker Guitar board.
-> 
-> Signed-off-by: Edgar Bernardi Righi <edgar.righi@lsitec.org.br>
-> 
-> diff --git a/include/dt-bindings/clock/actions,s500-cmu.h
-> b/include/dt-bindings/clock/actions,s500-cmu.h
-> new file mode 100644
-> index 000000000000..34e5849ffcf1
-> --- /dev/null
-> +++ b/include/dt-bindings/clock/actions,s500-cmu.h
-> @@ -0,0 +1,78 @@
-> +// SPDX-License-Identifier: GPL-2.0+
+Clang warns that if the default case is taken, ret will be
+uninitialized.
 
-Headers should be /* */ style comments.
+./arch/arm64/include/asm/percpu.h:196:2: warning: variable 'ret' is used
+uninitialized whenever switch default is taken
+[-Wsometimes-uninitialized]
+        default:
+        ^~~~~~~
+./arch/arm64/include/asm/percpu.h:200:9: note: uninitialized use occurs
+here
+        return ret;
+               ^~~
+./arch/arm64/include/asm/percpu.h:157:19: note: initialize the variable
+'ret' to silence this warning
+        unsigned long ret, loop;
+                         ^
+                          = 0
 
-Otherwise,
+This warning appears several times while building the erofs filesystem.
+While it's not strictly wrong, the BUILD_BUG will prevent this from
+becoming a true problem. Initialize ret to 0 in the default case right
+before the BUILD_BUG to silence all of these warnings.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Reported-by: Prasad Sodagudi <psodagud@codeaurora.org>
+Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
+---
+ arch/arm64/include/asm/percpu.h | 3 +++
+ 1 file changed, 3 insertions(+)
 
-> +//
-> +// Device Tree binding constants for Actions Semi S500 Clock Management Unit
-> +//
-> +// Copyright (c) 2014 Actions Semi Inc.
-> +// Copyright (c) 2018 Linaro Ltd.
-> +// Copyright (c) 2018 LSI-TEC - Caninos Loucos
+diff --git a/arch/arm64/include/asm/percpu.h b/arch/arm64/include/asm/percpu.h
+index 9234013e759e..21a81b59a0cc 100644
+--- a/arch/arm64/include/asm/percpu.h
++++ b/arch/arm64/include/asm/percpu.h
+@@ -96,6 +96,7 @@ static inline unsigned long __percpu_##op(void *ptr,			\
+ 		: [val] "Ir" (val));					\
+ 		break;							\
+ 	default:							\
++		ret = 0;						\
+ 		BUILD_BUG();						\
+ 	}								\
+ 									\
+@@ -125,6 +126,7 @@ static inline unsigned long __percpu_read(void *ptr, int size)
+ 		ret = READ_ONCE(*(u64 *)ptr);
+ 		break;
+ 	default:
++		ret = 0;
+ 		BUILD_BUG();
+ 	}
+ 
+@@ -194,6 +196,7 @@ static inline unsigned long __percpu_xchg(void *ptr, unsigned long val,
+ 		: [val] "r" (val));
+ 		break;
+ 	default:
++		ret = 0;
+ 		BUILD_BUG();
+ 	}
+ 
+-- 
+2.19.0
