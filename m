@@ -1,66 +1,162 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 25 Sep 2018 09:13:01 +0100
-Subject: [PATCH v5 01/27] arm64: cpufeature: Set SYSREG_GIC_CPUIF as a
- boot system feature
-In-Reply-To: <MWHPR0601MB3707D7CF3B55BF40EEEA0D52C4160@MWHPR0601MB3707.namprd06.prod.outlook.com>
-References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
- <1535471497-38854-2-git-send-email-julien.thierry@arm.com>
- <86h8iix2rk.wl-marc.zyngier@arm.com>
- <MWHPR0601MB3707D7CF3B55BF40EEEA0D52C4160@MWHPR0601MB3707.namprd06.prod.outlook.com>
-Message-ID: <33e98d70-a689-e1d9-ab73-a6650a34213f@arm.com>
+From: andrew.murray@arm.com (Andrew Murray)
+Date: Tue, 25 Sep 2018 09:18:02 +0100
+Subject: [BISECTED] Regression: Solidrun Clearfog Base won't boot since
+ "PCI: mvebu: Only remap I/O space if configured"
+In-Reply-To: <20180924141203.3df9707a@windsurf>
+References: <61fdfd69-2bb6-478c-b0d5-69d8744adae3@cesnet.cz>
+ <87zhwm4kl6.fsf@tkos.co.il>
+ <20180912231050.GX30658@n2100.armlinux.org.uk>
+ <20180913094515.351967bb@windsurf>
+ <5ad46fec-a71a-477a-b23f-d20aacfb481d@cesnet.cz>
+ <20180913104241.65db8243@windsurf>
+ <20180924101213.GO30658@n2100.armlinux.org.uk>
+ <20180924122614.70738b5c@windsurf>
+ <20180924111341.GP30658@n2100.armlinux.org.uk>
+ <20180924141203.3df9707a@windsurf>
+Message-ID: <20180925081801.GA54965@e119886-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/09/18 04:10, Yao Lihua wrote:
-> Hi Marc, Julien?
-> 
-> 
-> On 09/21/2018 11:56 PM, Marc Zyngier wrote:
->> On Tue, 28 Aug 2018 16:51:11 +0100,
->> Julien Thierry <julien.thierry@arm.com> wrote:
->>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
->>> Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
->>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>> Cc: Will Deacon <will.deacon@arm.com>
->>> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
->>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>> ---
->>>   arch/arm64/kernel/cpufeature.c | 2 +-
->>>   1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
->>> index e238b79..1e433ac 100644
->>> --- a/arch/arm64/kernel/cpufeature.c
->>> +++ b/arch/arm64/kernel/cpufeature.c
->>> @@ -1039,7 +1039,7 @@ static void cpu_has_fwb(const struct arm64_cpu_capabilities *__unused)
->>>   	{
->>>   		.desc = "GIC system register CPU interface",
->>>   		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
->>> -		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
->>> +		.type = ARM64_CPUCAP_STRICT_BOOT_CPU_FEATURE,
->>>   		.matches = has_useable_gicv3_cpuif,
->>>   		.sys_reg = SYS_ID_AA64PFR0_EL1,
->>>   		.field_pos = ID_AA64PFR0_GIC_SHIFT,
->>> -- 
->>> 1.9.1
->>>
->> This definitely deserves a commit message, such as:
->>
->> "We do not support systems where some CPUs have an operational GICv3
->>   CPU interface, and some don't. Let's make this requirement obvious by
->>   flagging the GICv3 capability as being strict."
-> May I ask if it is possible to implement psedue-NMI on a arm64 SoC with GIC-400?
+Hi Thomas,
 
-In theory, yes. In practice, this is likely to be both hard to implement 
-(you need to discover the GIC CPU interface address very early so that 
-you can patch the the PMR flipping code at the right time), and pretty 
-bad from a performance point of view (MMIO accesses are likely to be slow).
+On Mon, Sep 24, 2018 at 02:12:03PM +0200, Thomas Petazzoni wrote:
+> Hello,
+> 
+> On Mon, 24 Sep 2018 12:13:41 +0100, Russell King - ARM Linux wrote:
+> 
+> > > But being able to unmap it would also be needed to be able to remove
+> > > PCI host controller drivers, and therefore compile them as module, and
+> > > make them more like any other drivers.
+> > > 
+> > > I'm not sure why we need to guarantee that the I/O space is always
+> > > mapped:
+> > > 
+> > >  - It isn't mapped before the PCI controller driver does the mapping.
+> > > 
+> > >  - There is no reason for it to be accessed when the PCI controller
+> > >    driver is not initialized: PCI devices can only be probed and
+> > >    initialized when the PCI controller driver is probed/initialized.  
+> > 
+> > There are historic reasons.  PCI provides ISA IO space, and when you
+> > have a machine with ISA peripherals present, the PCI IO space must
+> > never be unmapped - if it is, ISA drivers will oops the kernel.  There
+> > is no way for a vanishing PCI controller to cause ISA drivers to be
+> > unbound.
+> > 
+> > If you have a host controller that does unmap PCI IO space and you have
+> > ISA peripherals with drivers present, unbinding the PCI host controller
+> > will remove the IO space mapping, and next time an ISA peripheral
+> > touches IO space, the kernel will oops.
+> 
+> Thanks for sharing some additional technical context on this, very
+> useful.
+> 
+> I have another question though: shouldn't those ISA devices be child
+> devices of the PCI controller, if they use some resources of the PCI
+> controller ? Could you give an example of such an ISA device driver ?
 
-Given the above, the incentive to support such a configuration is close 
-to zero.
+Legacy VGA also falls into this category - for example
+drivers/video/console/vgacon.c will happily use outb/inb macros to hard
+coded addresses which are hoped to be present on some PCI/ISA bus.
+
+With regards to ISA drivers - take a look for anything that registers with
+isa_register_driver - for example:
+
+drivers/input/touchscreen/htcpen.c
+drivers/net/ethernet/3com/3c509.c
+drivers/watchdog/ebc-c384_wdt.c
+
+None of these drivers do any kind of mapping before attempting to access
+these addresses.
 
 Thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Andrew Murray
+
+> This is just to understand better the issue, because there seems to be
+> a kind of hidden dependency between those ISA drivers and the setup of
+> the PCI controller.
+> 
+> > > All other drivers, including on ARM, use pci_remap_iospace(), which
+> > > does provide the pci_unmap_iospace() counter part.  
+> > 
+> > ... which has been created in PCI land just to deal with PCI without
+> > regard for the above issue.
+> > 
+> > However, there's another issue I missed - if you _do_ have ISA
+> > peripherals, you likely want the IO space setup from very early on,
+> > and you won't be using the new fangled PCI host driver support anyway.
+> > That uses pci_map_io_early() rather than pci_ioremap_io() or
+> > pci_remap_io().
+> 
+> OK. There's today a single platform (Footbridge) that uses
+> pci_map_io_early(), and it is indeed called through the ->map_io()
+> hook, which is very early in the boot process.
+> 
+> BTW, look at drivers/pcmcia/at91_cf.c. It has ->probe() and ->remove(),
+> and does a pci_ioremap_io() in its ->probe(), and nothing in its
+> ->remove(). I don't think this driver, compiled as a module, will work
+> well after a insmod/rmmod/insmod cycle.
+> 
+> > > But to me, the general direction is that the ARM-specific
+> > > pci_remap_io() API is fading away, and its replacement already provides
+> > > an unmapping capability. So why not add the same unmapping capability
+> > > to pci_remap_io() ?  
+> > 
+> > Yes, that would be a good longer term plan - we don't need three
+> > different ways to map PCI IO space, but it is development.
+> 
+> Absolutely. Glad to hear that you agree on the longer term plan.
+> 
+> > > But we have a regression and we need to fix it. Do you suggest to not
+> > > use the new pci_host_probe() API ?  
+> > 
+> > Well, arguably, the patch that caused the regression is the buggy patch,
+> > _not_ the lack of unmapping API for pci_ioremap_io().
+> 
+> Totally true.
+> 
+> > Trying to address a regression with further development means that
+> > _that_ development needs thought and review, which is a slower
+> > process.
+> > 
+> > I do understand the desire to keep moving forward and never take a
+> > step backwards, but sometimes backwards steps are the best way to
+> > resolve a regression.  But I also do appreciate that a simple revert
+> > in this case is not possible.
+> 
+> Well, I can revert:
+> 
+> 42342073e38b50113354944cd51dcfed28d857a1 PCI: mvebu: Convert to use
+> pci_host_bridge directly ee1604381a371b3ea6aec7d5e43b6e3f5e153854 PCI:
+> mvebu: Only remap I/O space if configured
+> 
+> so it's not a big deal either. I can revert those, and then resubmit a
+> more complete series later on that moves pci-mvebu to use
+> pci_remap_iospace().
+> 
+> > I'll accept your patch on the condition that the ARM private
+> > pci_ioremap_io() will go away in the very near future (please _try_
+> > to get agreement on that before this patch is merged.)
+> 
+> Bjorn, Lorenzo, what do you prefer ? 
+> 
+> If we want to get rid of pci_ioremap_io(), then we need a way to tell
+> pci_remap_iospace() the memory attributes that should be used for the
+> mapping, because on Armada 38x, we need to map the I/O space mapped
+> MT_UNCACHED instead of MT_DEVICE. I'm not sure how to achieve this yet.
+> Should pgprot_device() be changed to return MT_UNCACHED on a
+> platform-specific basis ? Any other idea ?
+> 
+> Best regards,
+> 
+> Thomas
+> -- 
+> Thomas Petazzoni, CTO, Bootlin
+> Embedded Linux and Kernel engineering
+> https://bootlin.com
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
