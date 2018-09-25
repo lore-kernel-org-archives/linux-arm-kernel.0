@@ -1,39 +1,58 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Tue, 25 Sep 2018 12:23:58 +0200
-Subject: [GIT PULL] ARM: at91: drivers for 4.20
-Message-ID: <20180925102358.GA30243@piout.net>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 25 Sep 2018 11:25:35 +0100
+Subject: [PATCH v5 17/18] kvm: arm64: Limit the minimum number of page
+ table levels
+In-Reply-To: <59231541-311f-e04b-3e6b-e073a8392316@redhat.com>
+References: <20180917104144.19188-1-suzuki.poulose@arm.com>
+ <20180917104144.19188-18-suzuki.poulose@arm.com>
+ <59231541-311f-e04b-3e6b-e073a8392316@redhat.com>
+Message-ID: <1486a576-dc71-9b88-688f-317fb662ff69@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 09/25/2018 11:00 AM, Auger Eric wrote:
+> Hi Suzuki,
+> 
+> On 9/17/18 12:41 PM, Suzuki K Poulose wrote:
+>> Since we are about to remove the lower limit on the IPA size,
+>> make sure that we do not go to 1 level page table (e.g, with
+>> 32bit IPA on 64K host with concatenation) to avoid splitting
+>> the host PMD huge pages at stage2.
+>>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Christoffer Dall <cdall@kernel.org>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>>   arch/arm64/include/asm/stage2_pgtable.h |  8 +++++++-
+>>   arch/arm64/kvm/reset.c                  | 12 +++++++++++-
+>>   2 files changed, 18 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
+>> index 352ec4158fdf..6a56fdff0823 100644
+>> --- a/arch/arm64/include/asm/stage2_pgtable.h
+>> +++ b/arch/arm64/include/asm/stage2_pgtable.h
+>> @@ -72,8 +72,14 @@
+>>   /*
+>>    * The number of PTRS across all concatenated stage2 tables given by the
+>>    * number of bits resolved at the initial level.
+>> + * If we force more number of levels than necessary, we may have
+> more levels?
 
-A single trivial patch for at91 drivers.
 
-The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+>> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+>> index 76972b19bdd7..0393bb974b23 100644
+>> --- a/arch/arm64/kvm/reset.c
+>> +++ b/arch/arm64/kvm/reset.c
 
-  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+>> @@ -210,7 +219,8 @@ int kvm_arm_config_vm(struct kvm *kvm, unsigned long type)
+>>   	vtcr |= (kvm_get_vmid_bits() == 16) ?
+>>   		VTCR_EL2_VS_16BIT :
+>>   		VTCR_EL2_VS_8BIT;
+>> -	vtcr |= VTCR_EL2_LVLS_TO_SL0(stage2_pgtable_levels(KVM_PHYS_SHIFT));
+>> +
+> nit: new line not requested
+> 
 
-are available in the Git repository at:
+Fixed all the above
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/at91/linux tags/at91-4.20-drivers
-
-for you to fetch changes up to f62df676d7f16580fa5085a8f51a1cbe27f7dd10:
-
-  memory: atmel-ebi: Use struct_size() in devm_kzalloc() (2018-08-27 23:10:31 +0200)
-
-----------------------------------------------------------------
-AT91 drivers for 4.20
-
- - use struct_size in atmel-ebi
-
-----------------------------------------------------------------
-Gustavo A. R. Silva (1):
-      memory: atmel-ebi: Use struct_size() in devm_kzalloc()
-
- drivers/memory/atmel-ebi.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
--- 
-Alexandre Belloni, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Suzuki
