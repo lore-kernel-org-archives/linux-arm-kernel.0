@@ -1,57 +1,43 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Tue, 25 Sep 2018 15:17:57 +0200
-Subject: [PATCH v2 2/2] iio: adc: at91: fix wrong channel number in
- triggered buffer mode
-In-Reply-To: <1537775504-7981-2-git-send-email-eugen.hristev@microchip.com>
-References: <1537775504-7981-1-git-send-email-eugen.hristev@microchip.com>
- <1537775504-7981-2-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <20180925131757.gjk2t277twhji5ns@M43218.corp.atmel.com>
+From: colin.king@canonical.com (Colin King)
+Date: Tue, 25 Sep 2018 14:21:30 +0100
+Subject: [PATCH] pinctrl: paris: fix check on EINT_NA comparison
+Message-ID: <20180925132130.27044-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 24, 2018 at 10:51:44AM +0300, Eugen Hristev wrote:
-> When channels are registered, the hardware channel number is not the
-> actual iio channel number.
-> This is because the driver is probed with a certain number of accessible
-> channels. Some pins are routed and some not, depending on the description of
-> the board in the DT.
-> Because of that, channels 0,1,2,3 can correspond to hardware channels
-> 2,3,4,5 for example.
-> In the buffered triggered case, we need to do the translation accordingly.
-> Fixed the channel number to stop reading the wrong channel.
-> 
-> Fixes 0e589d5fb "ARM: AT91: IIO: Add AT91 ADC driver."
-> Cc: Maxime Ripard <maxime.ripard@bootlin.com>
-> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
-Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+From: Colin Ian King <colin.king@canonical.com>
 
-> ---
-> Changes in v2:
-> - Added 'const' spec to the declaration to avoid build warning
-> 
->  drivers/iio/adc/at91_adc.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-> index e3be88e..75d2f73 100644
-> --- a/drivers/iio/adc/at91_adc.c
-> +++ b/drivers/iio/adc/at91_adc.c
-> @@ -248,12 +248,14 @@ static irqreturn_t at91_adc_trigger_handler(int irq, void *p)
->  	struct iio_poll_func *pf = p;
->  	struct iio_dev *idev = pf->indio_dev;
->  	struct at91_adc_state *st = iio_priv(idev);
-> +	struct iio_chan_spec const *chan;
->  	int i, j = 0;
->  
->  	for (i = 0; i < idev->masklength; i++) {
->  		if (!test_bit(i, idev->active_scan_mask))
->  			continue;
-> -		st->buffer[j] = at91_adc_readl(st, AT91_ADC_CHAN(st, i));
-> +		chan = idev->channels + i;
-> +		st->buffer[j] = at91_adc_readl(st, AT91_ADC_CHAN(st, chan->channel));
->  		j++;
->  	}
->  
-> -- 
-> 2.7.4
-> 
+Currently, the check on desc->eint.eint_n == EINT_NA is always false
+because this is comparing a u16 to -1 which can never be true.  Fix
+this by casting EINT_NA to u16.
+
+Fixes: fb5fa8dc151b ("pinctrl: mediatek: extend struct mtk_pin_desc to pinctrl-mtk-common-v2.c")
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ drivers/pinctrl/mediatek/pinctrl-paris.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/pinctrl/mediatek/pinctrl-paris.c b/drivers/pinctrl/mediatek/pinctrl-paris.c
+index 4cf0fea30b7d..77d380145dfd 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-paris.c
++++ b/drivers/pinctrl/mediatek/pinctrl-paris.c
+@@ -729,7 +729,7 @@ static int mtk_gpio_to_irq(struct gpio_chip *chip, unsigned int offset)
+ 
+ 	desc = (const struct mtk_pin_desc *)&hw->soc->pins[offset];
+ 
+-	if (desc->eint.eint_n == EINT_NA)
++	if (desc->eint.eint_n == (u16)EINT_NA)
+ 		return -ENOTSUPP;
+ 
+ 	return mtk_eint_find_irq(hw->eint, desc->eint.eint_n);
+@@ -746,7 +746,7 @@ static int mtk_gpio_set_config(struct gpio_chip *chip, unsigned int offset,
+ 
+ 	if (!hw->eint ||
+ 	    pinconf_to_config_param(config) != PIN_CONFIG_INPUT_DEBOUNCE ||
+-	    desc->eint.eint_n == EINT_NA)
++	    desc->eint.eint_n == (u16)EINT_NA)
+ 		return -ENOTSUPP;
+ 
+ 	debounce = pinconf_to_config_argument(config);
+-- 
+2.17.1
