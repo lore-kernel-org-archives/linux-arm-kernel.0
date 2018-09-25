@@ -1,62 +1,66 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 25 Sep 2018 09:53:22 +0200
-Subject: [PATCH v2 7/7] net: stmmac: dwmac-meson8b: use xxxsetbits32
-In-Reply-To: <a8d06d0a-b13b-384c-ade6-b0a3b0ee61f6@gmail.com>
-References: <1537815856-31728-1-git-send-email-clabbe@baylibre.com>
- <1537815856-31728-8-git-send-email-clabbe@baylibre.com>
- <a8d06d0a-b13b-384c-ade6-b0a3b0ee61f6@gmail.com>
-Message-ID: <6af26377-e2b8-3a1c-ca17-4932f636e01d@baylibre.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 25 Sep 2018 09:13:01 +0100
+Subject: [PATCH v5 01/27] arm64: cpufeature: Set SYSREG_GIC_CPUIF as a
+ boot system feature
+In-Reply-To: <MWHPR0601MB3707D7CF3B55BF40EEEA0D52C4160@MWHPR0601MB3707.namprd06.prod.outlook.com>
+References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
+ <1535471497-38854-2-git-send-email-julien.thierry@arm.com>
+ <86h8iix2rk.wl-marc.zyngier@arm.com>
+ <MWHPR0601MB3707D7CF3B55BF40EEEA0D52C4160@MWHPR0601MB3707.namprd06.prod.outlook.com>
+Message-ID: <33e98d70-a689-e1d9-ab73-a6650a34213f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
-
-On 24/09/2018 21:17, Florian Fainelli wrote:
-> On 09/24/2018 12:04 PM, Corentin Labbe wrote:
->> This patch convert meson stmmac glue driver to use all xxxsetbits32 functions.
->>
->> Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
->> ---
->>  .../net/ethernet/stmicro/stmmac/dwmac-meson8b.c    | 56 +++++++++-------------
->>  1 file changed, 22 insertions(+), 34 deletions(-)
->>
->> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
->> index c5979569fd60..abcf65588576 100644
->> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
->> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.c
->> @@ -23,6 +23,7 @@
->>  #include <linux/mfd/syscon.h>
->>  #include <linux/platform_device.h>
->>  #include <linux/stmmac.h>
->> +#include <linux/setbits.h>
->>  
->>  #include "stmmac_platform.h"
->>  
->> @@ -75,18 +76,6 @@ struct meson8b_dwmac_clk_configs {
->>  	struct clk_gate		rgmii_tx_en;
->>  };
->>  
->> -static void meson8b_dwmac_mask_bits(struct meson8b_dwmac *dwmac, u32 reg,
->> -				    u32 mask, u32 value)
->> -{
->> -	u32 data;
->> -
->> -	data = readl(dwmac->regs + reg);
->> -	data &= ~mask;
->> -	data |= (value & mask);
->> -
->> -	writel(data, dwmac->regs + reg);
->> -}
+On 25/09/18 04:10, Yao Lihua wrote:
+> Hi Marc, Julien?
 > 
-> Why not make mseon8b_dwmac_mask_bits() a wrapper around
-> clrsetbits_le32() whose purpose is only to dereference dwmac->regs and
-> pass it to clrsetbits_le32()? That would be far less changes to review
-> and audit for correctness, same goes with every other patch in this
-> series touching the meson drivers.
 > 
+> On 09/21/2018 11:56 PM, Marc Zyngier wrote:
+>> On Tue, 28 Aug 2018 16:51:11 +0100,
+>> Julien Thierry <julien.thierry@arm.com> wrote:
+>>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+>>> Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
+>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>>> Cc: Will Deacon <will.deacon@arm.com>
+>>> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>> ---
+>>>   arch/arm64/kernel/cpufeature.c | 2 +-
+>>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+>>> index e238b79..1e433ac 100644
+>>> --- a/arch/arm64/kernel/cpufeature.c
+>>> +++ b/arch/arm64/kernel/cpufeature.c
+>>> @@ -1039,7 +1039,7 @@ static void cpu_has_fwb(const struct arm64_cpu_capabilities *__unused)
+>>>   	{
+>>>   		.desc = "GIC system register CPU interface",
+>>>   		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
+>>> -		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
+>>> +		.type = ARM64_CPUCAP_STRICT_BOOT_CPU_FEATURE,
+>>>   		.matches = has_useable_gicv3_cpuif,
+>>>   		.sys_reg = SYS_ID_AA64PFR0_EL1,
+>>>   		.field_pos = ID_AA64PFR0_GIC_SHIFT,
+>>> -- 
+>>> 1.9.1
+>>>
+>> This definitely deserves a commit message, such as:
+>>
+>> "We do not support systems where some CPUs have an operational GICv3
+>>   CPU interface, and some don't. Let's make this requirement obvious by
+>>   flagging the GICv3 capability as being strict."
+> May I ask if it is possible to implement psedue-NMI on a arm64 SoC with GIC-400?
 
-Personally, I'll prefer dropping my custom writel_bits_relaxed() with something
-more future proof (I also use it in spi-meson-spicc and ao-cec),
-and I think the same for dwmac-meson8b.c
+In theory, yes. In practice, this is likely to be both hard to implement 
+(you need to discover the GIC CPU interface address very early so that 
+you can patch the the PMR flipping code at the right time), and pretty 
+bad from a performance point of view (MMIO accesses are likely to be slow).
 
-Neil
+Given the above, the incentive to support such a configuration is close 
+to zero.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
