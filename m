@@ -1,32 +1,35 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 25 Sep 2018 12:29:47 -0700
-Subject: [GIT_PULL] SOC: driver updates for v4.20
-In-Reply-To: <1537818662-6307-1-git-send-email-santosh.shilimkar@oracle.com>
-References: <1537818662-6307-1-git-send-email-santosh.shilimkar@oracle.com>
-Message-ID: <20180925192947.735kcmaywe5umjab@localhost>
+Date: Tue, 25 Sep 2018 12:31:12 -0700
+Subject: [GIT PULL] ARM: at91: fixes for 4.19
+In-Reply-To: <20180924200941.GA11498@piout.net>
+References: <20180924200941.GA11498@piout.net>
+Message-ID: <20180925193112.uu2lncxsbmzenxl4@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 24, 2018 at 12:51:02PM -0700, Santosh Shilimkar wrote:
+On Mon, Sep 24, 2018 at 10:09:41PM +0200, Alexandre Belloni wrote:
+> Arnd, Olof,
+> 
+> Here is a small fix for an issue seen on the sama5d2 PTC EK.
+> 
 > The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 > 
 >   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
 > 
-> are available in the git repository at:
+> are available in the Git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/drivers_soc_for_4.20
+>   git://git.kernel.org/pub/scm/linux/kernel/git/at91/linux tags/at91-4.19-fixes
 > 
-> for you to fetch changes up to 7bcfe20d0d8b647879629798fa57e39905d6cded:
+> for you to fetch changes up to 379e36d3f591cb62e781907edafea17d75e8c1fa:
 > 
->   soc: ti: fix spelling mistake "instace" -> "instance" (2018-09-24 12:43:21 -0700)
+>   ARM: dts: at91: sama5d2_ptc_ek: fix nand pinctrl (2018-09-12 12:38:04 +0200)
 > 
 > ----------------------------------------------------------------
-> soc: driver soc update for v4.20
+> AT91 fixes for 4.19:
 > 
->   - Enable host-id as an optional dt property
->   - Fix minor typo in knav driver
+>  - fix a NAND issue on sama5d2_ptc_ek
 
-Merged, thanks!
+Merged, thanks (with slight elaboration on merge description from tag).
 
 
 -Olof
