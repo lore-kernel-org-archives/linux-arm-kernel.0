@@ -1,68 +1,84 @@
-From: ylhuajnu@outlook.com (Yao Lihua)
-Date: Tue, 25 Sep 2018 10:39:23 +0000
-Subject: [PATCH v5 01/27] arm64: cpufeature: Set SYSREG_GIC_CPUIF as a
- boot system feature
-In-Reply-To: <33e98d70-a689-e1d9-ab73-a6650a34213f@arm.com>
-References: <1535471497-38854-1-git-send-email-julien.thierry@arm.com>
- <1535471497-38854-2-git-send-email-julien.thierry@arm.com>
- <86h8iix2rk.wl-marc.zyngier@arm.com>
- <MWHPR0601MB3707D7CF3B55BF40EEEA0D52C4160@MWHPR0601MB3707.namprd06.prod.outlook.com>
- <33e98d70-a689-e1d9-ab73-a6650a34213f@arm.com>
-Message-ID: <MWHPR0601MB370784C3E509CD8E61B00E3EC4160@MWHPR0601MB3707.namprd06.prod.outlook.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Tue, 25 Sep 2018 12:42:26 +0200
+Subject: [GIT PULL] ARM: at91: DT for 4.20
+Message-ID: <20180925104226.GA32034@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/25/2018 04:13 PM, Marc Zyngier wrote:
+Arnd, Olof,
 
-> On 25/09/18 04:10, Yao Lihua wrote:
->> Hi Marc, Julien?
->>
->>
->> On 09/21/2018 11:56 PM, Marc Zyngier wrote:
->>> On Tue, 28 Aug 2018 16:51:11 +0100,
->>> Julien Thierry <julien.thierry@arm.com> wrote:
->>>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
->>>> Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
->>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>>> Cc: Will Deacon <will.deacon@arm.com>
->>>> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
->>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>>> ---
->>>> ? arch/arm64/kernel/cpufeature.c | 2 +-
->>>> ? 1 file changed, 1 insertion(+), 1 deletion(-)
->>>>
->>>> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
->>>> index e238b79..1e433ac 100644
->>>> --- a/arch/arm64/kernel/cpufeature.c
->>>> +++ b/arch/arm64/kernel/cpufeature.c
->>>> @@ -1039,7 +1039,7 @@ static void cpu_has_fwb(const struct arm64_cpu_capabilities *__unused)
->>>> ????? {
->>>> ????????? .desc = "GIC system register CPU interface",
->>>> ????????? .capability = ARM64_HAS_SYSREG_GIC_CPUIF,
->>>> -??????? .type = ARM64_CPUCAP_SYSTEM_FEATURE,
->>>> +??????? .type = ARM64_CPUCAP_STRICT_BOOT_CPU_FEATURE,
->>>> ????????? .matches = has_useable_gicv3_cpuif,
->>>> ????????? .sys_reg = SYS_ID_AA64PFR0_EL1,
->>>> ????????? .field_pos = ID_AA64PFR0_GIC_SHIFT,
->>>> --?
->>>> 1.9.1
->>>>
->>> This definitely deserves a commit message, such as:
->>>
->>> "We do not support systems where some CPUs have an operational GICv3
->>> ? CPU interface, and some don't. Let's make this requirement obvious by
->>> ? flagging the GICv3 capability as being strict."
->> May I ask if it is possible to implement psedue-NMI on a arm64 SoC with GIC-400?
->
-> In theory, yes. In practice, this is likely to be both hard to implement (you need to discover the GIC CPU interface address very early so that you can patch the the PMR flipping code at the right time), and pretty bad from a performance point of view (MMIO accesses are likely to be slow).
->
-> Given the above, the incentive to support such a configuration is close to zero.
->
-Hi Marc,
+Here are the DT changes for 4.20. Mostly cleanups and small additions.
 
-Thank you for the answer!
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 
-I intended to utilize hard lockup detector and on-demand CPU backtrace to debug a nasty BUG. But it seem a hardware debugger would be much easier.:-)
+  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
 
-Best Regards,
-Lihua
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/at91/linux tags/at91-4.20-dt
+
+for you to fetch changes up to 97181516b0785dd032700ae4899842389c6bea78:
+
+  arm: dts: sama5d2: Update coresight bindings for hardware ports (2018-09-19 19:12:25 +0200)
+
+----------------------------------------------------------------
+AT91 DT for 4.20
+
+ - warning fiwes from Rob
+ - many updates for the axentia boards
+ - ADC, I2S and touch screen support for sama5d2
+
+----------------------------------------------------------------
+Codrin Ciubotariu (1):
+      ARM: dts: at91: sama5d2: add I2S clock muxing nodes
+
+Cyrille Pitchen (2):
+      ARM: dts: at91: sama5d2: add nodes for I2S controllers
+      ARM: dts: at91: sama5d2 Xplained: add pin muxing for I2S
+
+Eugen Hristev (4):
+      ARM: dts: at91: sama5d2: add channel cells for ADC device
+      ARM: dts: at91: sama5d2: Add resistive touch device
+      ARM: dts: at91: sama5d4: add labels to soc dtsi for derivative boards
+      ARM: dts: at91: sama5d27_som1_ek: add adc regulators
+
+Jay Foster (1):
+      ARM: dts: at91/trivial: Fix USART1 definition for at91sam9g45
+
+Nicolas Ferre (1):
+      ARM: dts: at91/trivial: remove old NAND bindings leftover in sama5d2
+
+Peter Rosin (7):
+      ARM: dts: at91: nattis: set the PRLUD and HIPOW signals low
+      ARM: dts: at91: nattis: make the SD-card slot work
+      ARM: dts: at91: nattis: state the actual lvds-encoder chip
+      ARM: dts: at91: nattis: move pinctrls for the lvds chip to the lvds node
+      ARM: dts: at91: nattis: describe the lvds panel
+      ARM: dts: at91: nattis: drop three indentation levels
+      ARM: dts: at91: tse850: drop three indentation levels
+
+Rob Herring (1):
+      ARM: dts: atmel: Fix I2C and SPI bus warnings
+
+Suzuki K Poulose (1):
+      arm: dts: sama5d2: Update coresight bindings for hardware ports
+
+ arch/arm/boot/dts/at91-dvk_su60_somc.dtsi     |   4 +-
+ arch/arm/boot/dts/at91-dvk_su60_somc_lcm.dtsi |   4 +-
+ arch/arm/boot/dts/at91-nattis-2-natte-2.dts   | 103 +++++++++++----------
+ arch/arm/boot/dts/at91-sama5d27_som1_ek.dts   |  42 +++++++++
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts   |  30 +++++++
+ arch/arm/boot/dts/at91-tse850-3.dts           |  32 +++----
+ arch/arm/boot/dts/at91-vinco.dts              |   2 +-
+ arch/arm/boot/dts/at91sam9260ek.dts           |   2 +-
+ arch/arm/boot/dts/at91sam9261ek.dts           |   2 +-
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi   |   2 +-
+ arch/arm/boot/dts/at91sam9g45.dtsi            |   2 +-
+ arch/arm/boot/dts/sama5d2.dtsi                | 123 ++++++++++++++++----------
+ arch/arm/boot/dts/sama5d4.dtsi                |   8 +-
+ 13 files changed, 233 insertions(+), 123 deletions(-)
+
+-- 
+Alexandre Belloni, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
