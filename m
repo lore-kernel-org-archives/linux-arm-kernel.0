@@ -1,179 +1,128 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 25 Sep 2018 16:16:57 -0500
-Subject: [PATCH 0/4] Update am437x and am335x dts to probe with ti-sysc
-In-Reply-To: <20180925175537.GQ5662@atomide.com>
-References: <20180925000545.22931-1-tony@atomide.com>
- <e9afe736-c2f0-6182-afd0-08279e09a35e@ti.com>
- <20180925144021.GN5662@atomide.com> <20180925175537.GQ5662@atomide.com>
-Message-ID: <cbe5a1ad-dab3-1838-eabb-4165168ccb38@ti.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 25 Sep 2018 23:20:18 +0200
+Subject: [PATCH v2] ARM: use choice for kernel unwinders
+Message-ID: <20180925212018.27132-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+While in theory multiple unwinders could be compiled in, it does
+not make sense in practise. Use a choice to make the unwinder
+selection mutually exclusive and mandatory.
 
+Already before this commit it has not been possible to deselect
+FRAME_POINTER. Remove the obsolete comment.
 
-On 09/25/2018 12:55 PM, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [180925 14:44]:
->> * Keerthy <j-keerthy@ti.com> [180925 05:18]:
->>> I tried Branch [1] above. AM335x-boneblack is doing all good with ds0.
->>> AM437x-gp the following is happening:
->>>
->>> https://pastebin.ubuntu.com/p/fmZNYgJ9Sp/
->>>
->>> There seems to be a timeout due to which resume is not immediate i see
->>> 1-2s delay and i see i2c timeout.
->>>
->>> [  402.247271] omap_i2c 4802a000.i2c: controller timed out
->>> [  402.247441] pixcir_ts 1-005c: pixcir_int_enable: can't read reg 0x34
->>> : -110
->>> [  402.247486] pixcir_ts 1-005c: Failed to disable interrupt generation:
->>> -110
->>> [  402.247522] pixcir_ts 1-005c: Failed to stop
->>> [  402.247607] dpm_run_callback(): pixcir_i2c_ts_resume+0x0/0x98
->>> [pixcir_i2c_ts] returns -110
->>>
->>> so pixcir_i2c_ts_resume is retuning -110 which is timeout error code.
->>>
->>> I did some touch screen testing after DS0 resume seems to be working.
->>> Everything is in pastebin link provided above.
+Furthermore, to produce a meaningful backtrace with FRAME_POINTER
+enabled the kernel needs a specific function prologue:
+    mov    ip, sp
+    stmfd    sp!, {fp, ip, lr, pc}
+    sub    fp, ip, #4
 
-You might want to try it with "echo 1 > /sys/power/pm_print_times"
+To get to the required prologue gcc uses apcs and no-sched-prolog.
+This compiler options are not available on clang, and clang is not
+able to generate the required prologue. Make the FRAME_POINTER
+config symbol depending on !clang.
 
-and add some dbg print in _od_resume_noirq()/_od_suspend_noirq()
+Suggested-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ arch/arm/Kconfig.debug | 44 +++++++++++++++++++++++++++---------------
+ lib/Kconfig.debug      |  6 +++---
+ 2 files changed, 31 insertions(+), 19 deletions(-)
 
->>
->> Thanks for testing. Hmm no idea what might be going on with
->> the pixcir. I have edt-ft5x06 on the am437x-sk-evm and that
->> behaves just fine for suspend and resume. Both are on i2c1,
->> pixcir calls pixcir_start/stop from suspend and resume while
->> edt-ft5x06 does not reconfigure anything.
->>
->> I'll try read some edt-ft5x06 register values on suspend
->> and resume, let's see if that makes it reproducable here.
-> 
-> So after adding a call to edt_ft5x06_ts_readwrite to
-> edt_ft5x06_ts_resume I see -110 errors too. Looks like we
-> have i2c-omap not idled for suspend because of autoidle if
-> an i2c client reconfigures it's registers for suspend.
-> 
-> Care to test with the following patch applied? If that works
-> for you, I'll send a proper patch for that.
-> 
-> Regards,
-> 
-> Tony
-> 
-> 8< -------------------
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -208,6 +208,8 @@ struct omap_i2c_dev {
->   						 * if set, should be trsh+1
->   						 */
->   	u32			rev;
-> +	unsigned int		is_suspended:1;
-> +	unsigned int		needs_resume:1;
->   	unsigned		b_hw:1;		/* bad h/w fixes */
->   	unsigned		bb_valid:1;	/* true when BB-bit reflects
->   						 * the I2C bus state
-> @@ -1498,8 +1500,7 @@ static int omap_i2c_remove(struct platform_device *pdev)
->   	return 0;
->   }
->   
-> -#ifdef CONFIG_PM
-> -static int omap_i2c_runtime_suspend(struct device *dev)
-> +static int __maybe_unused omap_i2c_runtime_suspend(struct device *dev)
->   {
->   	struct omap_i2c_dev *omap = dev_get_drvdata(dev);
->   
-> @@ -1521,11 +1522,12 @@ static int omap_i2c_runtime_suspend(struct device *dev)
->   	}
->   
->   	pinctrl_pm_select_sleep_state(dev);
-> +	omap->is_suspended = true;
->   
->   	return 0;
->   }
->   
-> -static int omap_i2c_runtime_resume(struct device *dev)
-> +static int __maybe_unused omap_i2c_runtime_resume(struct device *dev)
->   {
->   	struct omap_i2c_dev *omap = dev_get_drvdata(dev);
->   
-> @@ -1535,6 +1537,47 @@ static int omap_i2c_runtime_resume(struct device *dev)
->   		return 0;
->   
->   	__omap_i2c_init(omap);
-> +	omap->is_suspended = false;
-> +
-> +	return 0;
-> +}
-> +
-> +static int __maybe_unused omap_i2c_suspend(struct device *dev)
-> +{
-> +	struct omap_i2c_dev *ddata = dev_get_drvdata(dev);
-> +	int error;
-> +
-> +	/* Is device still enabled because of autosuspend? */
-> +	if (!ddata->is_suspended) {
-> +		error = pm_runtime_put_sync_suspend(dev);
-
-sry, this make no sense - put is nop, because of
-pm_runtime_get_noresume() in device_prepare()
-
-> +		if (error < 0) {
-> +			dev_err(dev, "%s failed: %i\n", __func__, error);
-> +
-> +			return error;
-> +		}
-> +		ddata->needs_resume = true;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int __maybe_unused omap_i2c_resume(struct device *dev)
-> +{
-> +	struct omap_i2c_dev *ddata = dev_get_drvdata(dev);
-> +	int error;
-> +
-> +	if (ddata->needs_resume) {
-> +		error = pm_runtime_get_sync(dev);
-> +		if (error < 0) {
-> +			dev_err(dev, "%s failed: %i\n", __func__, error);
-> +			pm_runtime_put_noidle(dev);
-> +
-> +			return error;
-> +		}
-> +		pm_runtime_mark_last_busy(dev);
-> +		pm_runtime_put_autosuspend(dev);
-> +		ddata->needs_resume = false;
-> +	}
->   
->   	return 0;
->   }
-> @@ -1542,18 +1585,15 @@ static int omap_i2c_runtime_resume(struct device *dev)
->   static const struct dev_pm_ops omap_i2c_pm_ops = {
->   	SET_RUNTIME_PM_OPS(omap_i2c_runtime_suspend,
->   			   omap_i2c_runtime_resume, NULL)
-> +	SET_SYSTEM_SLEEP_PM_OPS(omap_i2c_suspend, omap_i2c_resume)
->   };
-> -#define OMAP_I2C_PM_OPS (&omap_i2c_pm_ops)
-> -#else
-> -#define OMAP_I2C_PM_OPS NULL
-> -#endif /* CONFIG_PM */
->   
->   static struct platform_driver omap_i2c_driver = {
->   	.probe		= omap_i2c_probe,
->   	.remove		= omap_i2c_remove,
->   	.driver		= {
->   		.name	= "omap_i2c",
-> -		.pm	= OMAP_I2C_PM_OPS,
-> +		.pm	= &omap_i2c_pm_ops,
->   		.of_match_table = of_match_ptr(omap_i2c_of_match),
->   	},
->   };
-> 
-
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index f6fcb8a79889..3408f1ad394c 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -45,30 +45,42 @@ config DEBUG_WX
+ 
+ 		If in doubt, say "Y".
+ 
+-# RMK wants arm kernels compiled with frame pointers or stack unwinding.
+-# If you know what you are doing and are willing to live without stack
+-# traces, you can get a slightly smaller kernel by setting this option to
+-# n, but then RMK will have to kill you ;).
+-config FRAME_POINTER
+-	bool
+-	depends on !THUMB2_KERNEL
+-	default y if !ARM_UNWIND || FUNCTION_GRAPH_TRACER
++choice
++	prompt "Choose kernel unwinder"
++	default UNWINDER_ARM if AEABI && !FUNCTION_GRAPH_TRACER
++	default UNWINDER_FRAME_POINTER if !AEABI || FUNCTION_GRAPH_TRACER
++	help
++	  This determines which method will be used for unwinding kernel stack
++	  traces for panics, oopses, bugs, warnings, perf, /proc/<pid>/stack,
++	  livepatch, lockdep, and more.
++
++config UNWINDER_FRAME_POINTER
++	bool "Frame pointer unwinder"
++	depends on !THUMB2_KERNEL && !CC_IS_CLANG
++	select ARCH_WANT_FRAME_POINTERS
++	select FRAME_POINTER
+ 	help
+-	  If you say N here, the resulting kernel will be slightly smaller and
+-	  faster. However, if neither FRAME_POINTER nor ARM_UNWIND are enabled,
+-	  when a problem occurs with the kernel, the information that is
+-	  reported is severely limited.
++	  This option enables the frame pointer unwinder for unwinding
++	  kernel stack traces.
+ 
+-config ARM_UNWIND
+-	bool "Enable stack unwinding support (EXPERIMENTAL)"
++config UNWINDER_ARM
++	bool "ARM EABI stack unwinder"
+ 	depends on AEABI
+-	default y
++	select ARM_UNWIND
+ 	help
+ 	  This option enables stack unwinding support in the kernel
+ 	  using the information automatically generated by the
+ 	  compiler. The resulting kernel image is slightly bigger but
+ 	  the performance is not affected. Currently, this feature
+-	  only works with EABI compilers. If unsure say Y.
++	  only works with EABI compilers.
++
++endchoice
++
++config ARM_UNWIND
++	bool
++
++config FRAME_POINTER
++	bool
+ 
+ config OLD_MCOUNT
+ 	bool
+diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
+index 4966c4fbe7f7..8d24f4ed66fd 100644
+--- a/lib/Kconfig.debug
++++ b/lib/Kconfig.debug
+@@ -1179,7 +1179,7 @@ config LOCKDEP
+ 	bool
+ 	depends on DEBUG_KERNEL && LOCK_DEBUGGING_SUPPORT
+ 	select STACKTRACE
+-	select FRAME_POINTER if !MIPS && !PPC && !ARM_UNWIND && !S390 && !MICROBLAZE && !ARC && !X86
++	select FRAME_POINTER if !MIPS && !PPC && !ARM && !S390 && !MICROBLAZE && !ARC && !X86
+ 	select KALLSYMS
+ 	select KALLSYMS_ALL
+ 
+@@ -1590,7 +1590,7 @@ config FAULT_INJECTION_STACKTRACE_FILTER
+ 	depends on FAULT_INJECTION_DEBUG_FS && STACKTRACE_SUPPORT
+ 	depends on !X86_64
+ 	select STACKTRACE
+-	select FRAME_POINTER if !MIPS && !PPC && !S390 && !MICROBLAZE && !ARM_UNWIND && !ARC && !X86
++	select FRAME_POINTER if !MIPS && !PPC && !S390 && !MICROBLAZE && !ARM && !ARC && !X86
+ 	help
+ 	  Provide stacktrace filter for fault-injection capabilities
+ 
+@@ -1599,7 +1599,7 @@ config LATENCYTOP
+ 	depends on DEBUG_KERNEL
+ 	depends on STACKTRACE_SUPPORT
+ 	depends on PROC_FS
+-	select FRAME_POINTER if !MIPS && !PPC && !S390 && !MICROBLAZE && !ARM_UNWIND && !ARC && !X86
++	select FRAME_POINTER if !MIPS && !PPC && !S390 && !MICROBLAZE && !ARM && !ARC && !X86
+ 	select KALLSYMS
+ 	select KALLSYMS_ALL
+ 	select STACKTRACE
 -- 
-regards,
--grygorii
+2.19.0
