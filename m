@@ -1,84 +1,57 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Tue, 25 Sep 2018 12:42:26 +0200
-Subject: [GIT PULL] ARM: at91: DT for 4.20
-Message-ID: <20180925104226.GA32034@piout.net>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 25 Sep 2018 12:48:09 +0200
+Subject: [PATCH v2 00/22] Unify MediaTek pinctrl in preparation for MT8183
+ and MT6765
+In-Reply-To: <1537503761.9654.17.camel@mtkswgap22>
+References: <cover.1536404280.git.sean.wang@mediatek.com>
+ <CACRpkdZtVBjYGs5C7-HWEyX7f7pnCqvnRYBH=fFmLKhN4FGymA@mail.gmail.com>
+ <1537325650.572.9.camel@mtkswgap22> <20180919043722.GA14181@Mani-XPS-13-9360>
+ <1537503761.9654.17.camel@mtkswgap22>
+Message-ID: <9f0a8868-a06e-d378-1008-df758b898fbe@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
 
-Here are the DT changes for 4.20. Mostly cleanups and small additions.
 
-The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+On 21/09/2018 06:22, Sean Wang wrote:
+> On Tue, 2018-09-18 at 21:37 -0700, Manivannan Sadhasivam wrote:
+>> On Wed, Sep 19, 2018 at 10:54:10AM +0800, Sean Wang wrote:
+>>> On Tue, 2018-09-18 at 15:07 -0700, Linus Walleij wrote:
+>>>> On Sat, Sep 8, 2018 at 4:07 AM <sean.wang@mediatek.com> wrote:
+>>>>
+>>>>> v2 and changes since v1:
+>>>>
+>>>> I had trouble applying the last patches in the series so I applied
+>>>> all on an immutable branch (ib-mtk) then merged that into devel
+>>>> and added a patch on top to fix up some GPIO includes (just sent).
+>>>>
+>>>> Please check the result!
+>>>>
+>>>
+>>> Sure, I'll take a look and and test on the devel branch.
+>>>
+>>> On the top, I'll add a fix for the issue recently reported by kbuild
+>>> test robot about implicit declaration and a new MT6765 driver based
+>>> on the series.
+>>>
+>>
+>> Hi Sean,
+>>
+>> Do you have any plans to add support for MT6797?
+>>
+> 
+> I personally have no the plan to add support to MT6797 because I have no
+> the device, but as I knew some of people in mediatek have interest to
+> add them by volunteers and thus there is no clear schedule. Eventually,
+> if they're really done, they would be still based on vendor binding not
+> by generic binding.
+> 
 
-  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+CCing Saber as he is working on the pinctrl for this device. Actually he as some
+questions regarding the register layout.
 
-are available in the Git repository at:
+Sean maybe you can bring him in contact with someone inside Mediatek who could
+help him :)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/at91/linux tags/at91-4.20-dt
-
-for you to fetch changes up to 97181516b0785dd032700ae4899842389c6bea78:
-
-  arm: dts: sama5d2: Update coresight bindings for hardware ports (2018-09-19 19:12:25 +0200)
-
-----------------------------------------------------------------
-AT91 DT for 4.20
-
- - warning fiwes from Rob
- - many updates for the axentia boards
- - ADC, I2S and touch screen support for sama5d2
-
-----------------------------------------------------------------
-Codrin Ciubotariu (1):
-      ARM: dts: at91: sama5d2: add I2S clock muxing nodes
-
-Cyrille Pitchen (2):
-      ARM: dts: at91: sama5d2: add nodes for I2S controllers
-      ARM: dts: at91: sama5d2 Xplained: add pin muxing for I2S
-
-Eugen Hristev (4):
-      ARM: dts: at91: sama5d2: add channel cells for ADC device
-      ARM: dts: at91: sama5d2: Add resistive touch device
-      ARM: dts: at91: sama5d4: add labels to soc dtsi for derivative boards
-      ARM: dts: at91: sama5d27_som1_ek: add adc regulators
-
-Jay Foster (1):
-      ARM: dts: at91/trivial: Fix USART1 definition for at91sam9g45
-
-Nicolas Ferre (1):
-      ARM: dts: at91/trivial: remove old NAND bindings leftover in sama5d2
-
-Peter Rosin (7):
-      ARM: dts: at91: nattis: set the PRLUD and HIPOW signals low
-      ARM: dts: at91: nattis: make the SD-card slot work
-      ARM: dts: at91: nattis: state the actual lvds-encoder chip
-      ARM: dts: at91: nattis: move pinctrls for the lvds chip to the lvds node
-      ARM: dts: at91: nattis: describe the lvds panel
-      ARM: dts: at91: nattis: drop three indentation levels
-      ARM: dts: at91: tse850: drop three indentation levels
-
-Rob Herring (1):
-      ARM: dts: atmel: Fix I2C and SPI bus warnings
-
-Suzuki K Poulose (1):
-      arm: dts: sama5d2: Update coresight bindings for hardware ports
-
- arch/arm/boot/dts/at91-dvk_su60_somc.dtsi     |   4 +-
- arch/arm/boot/dts/at91-dvk_su60_somc_lcm.dtsi |   4 +-
- arch/arm/boot/dts/at91-nattis-2-natte-2.dts   | 103 +++++++++++----------
- arch/arm/boot/dts/at91-sama5d27_som1_ek.dts   |  42 +++++++++
- arch/arm/boot/dts/at91-sama5d2_xplained.dts   |  30 +++++++
- arch/arm/boot/dts/at91-tse850-3.dts           |  32 +++----
- arch/arm/boot/dts/at91-vinco.dts              |   2 +-
- arch/arm/boot/dts/at91sam9260ek.dts           |   2 +-
- arch/arm/boot/dts/at91sam9261ek.dts           |   2 +-
- arch/arm/boot/dts/at91sam9g20ek_common.dtsi   |   2 +-
- arch/arm/boot/dts/at91sam9g45.dtsi            |   2 +-
- arch/arm/boot/dts/sama5d2.dtsi                | 123 ++++++++++++++++----------
- arch/arm/boot/dts/sama5d4.dtsi                |   8 +-
- 13 files changed, 233 insertions(+), 123 deletions(-)
-
--- 
-Alexandre Belloni, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Regards.
+Matthias
