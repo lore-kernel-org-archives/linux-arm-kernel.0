@@ -1,44 +1,33 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 25 Sep 2018 15:06:25 +0100
-Subject: [PATCH v5 0/6] Move swapper_pg_dir to rodata section.
-In-Reply-To: <20180925095316.GA27420@toy>
-References: <20180917044333.30051-1-yaojun8558363@gmail.com>
- <20180924171936.q5bfvczzllmm5lpe@lakrids.cambridge.arm.com>
- <20180925095316.GA27420@toy>
-Message-ID: <20180925140624.7wovo2xtpyihyt3j@lakrids.cambridge.arm.com>
+From: weiyongjun1@huawei.com (Wei Yongjun)
+Date: Tue, 25 Sep 2018 14:23:21 +0000
+Subject: [PATCH -next] serial: uartps: Fix missing unlock on error in
+ cdns_get_id()
+Message-ID: <1537885401-18605-1-git-send-email-weiyongjun1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2018 at 05:53:16PM +0800, Jun Yao wrote:
-> On Mon, Sep 24, 2018 at 06:19:36PM +0100, Mark Rutland wrote:
-> > I've pushed a branch with the cleanups I requested [1] folded in.
-> > 
-> > I'm still a bit worried about the pgd lock, but otherwise I think this
-> > is sound. I intend to throw some testing at it, just in case.
-> > 
-> > If you're happy with that branch, I'll ask Will and Catalin to consider
-> > picking it up.
-> 
-> This branch looks great. Thank you for improving my patch.
+Add the missing unlock before return from function cdns_get_id()
+in the error handling case.
 
-Thanks for your patches!
+Fixes: ae1cca3fa347 ("serial: uartps: Change uart ID port allocation")
+Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+---
+ drivers/tty/serial/xilinx_uartps.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-> Is there anything I need to do? This is my first time to submit a patch,
-> so I am a bit overwhelmed. I think I should wait for other people to
-> review my patch. If there is a problem, I need to fix it.
-
-Hopefully Catalin is happy to pick this up from my branch, and neither
-of us have to do anything. :)
-
-Catalin, are you happy to pick the patches from:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm64/ro-swapper
-
-... that should be based on the arm64 for-next/core branch, and has
-James's R-B prior to my commit fixup notes.
-
-I've given this some basic testing with defconfig, 48-bit/4k and
-42-bit/64k (with lockdep on in both cases), and things seem fine.
-
-Thanks,
-Mark.
+diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+index f77200a..0e3dae4 100644
+--- a/drivers/tty/serial/xilinx_uartps.c
++++ b/drivers/tty/serial/xilinx_uartps.c
+@@ -1394,8 +1394,10 @@ static int cdns_get_id(struct platform_device *pdev)
+ 	if (!alias_bitmap_initialized) {
+ 		ret = of_alias_get_alias_list(cdns_uart_of_match, "serial",
+ 					      alias_bitmap, MAX_UART_INSTANCES);
+-		if (ret)
++		if (ret) {
++			mutex_unlock(&bitmap_lock);
+ 			return ret;
++		}
+ 
+ 		alias_bitmap_initialized++;
+ 	}
