@@ -1,56 +1,74 @@
-From: joelaf@google.com (Joel Fernandes)
-Date: Tue, 25 Sep 2018 13:37:14 -0700
-Subject: [PATCH 2/6] pstore: Add event tracing support
-In-Reply-To: <eb686156-95d2-2468-21be-13bfd97d5a58@codeaurora.org>
-References: <cover.1536430404.git.saiprakash.ranjan@codeaurora.org>
- <b9b60ff2864a17fb05481aa33f90114ab051d6ce.1536430404.git.saiprakash.ranjan@codeaurora.org>
- <CAEXW_YRXQwKvnahv5X1F_Bu_98vMg=w1xpo8PZ+aNT02vBrwwg@mail.gmail.com>
- <e8fdef37-afcd-24b3-1005-e707b73f20b1@codeaurora.org>
- <eb686156-95d2-2468-21be-13bfd97d5a58@codeaurora.org>
-Message-ID: <CAJWu+ooTi+9Hp6xWpje-zoFOdRpZPLMvTzTDEk8Vf-y4TicvUw@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 25 Sep 2018 22:33:36 +0200 (CEST)
+Subject: [PATCH] arm64: dts: broadcom: Use the .dtb name in the rule,
+ rather than .dts
+In-Reply-To: <20180925185133.jdom5tvs6zklntr7@localhost>
+References: <b42d2e57-8bcd-0d6a-7a4d-aeefedcdd5f3@i2se.com>
+ <20180924102228.19656-1-liviu@dudau.co.uk>
+ <539eb374-9122-6c09-4c64-80bfa6b7bf89@i2se.com>
+ <1c0db58a-5bc2-8de3-f70d-725a29376513@gmail.com>
+ <20180925185133.jdom5tvs6zklntr7@localhost>
+Message-ID: <1480797531.286958.1537907616382@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 23, 2018 at 8:33 AM, Sai Prakash Ranjan
-<saiprakash.ranjan@codeaurora.org> wrote:
-> On 9/22/2018 10:07 PM, Sai Prakash Ranjan wrote:
->>
->> On 9/22/2018 2:35 PM, Joel Fernandes wrote:
->>>
->>> On Sat, Sep 8, 2018 at 4:28 PM Sai Prakash Ranjan
->>> <saiprakash.ranjan@codeaurora.org> wrote:
->>>>
->>>>
->>>> +
->>>> +       trace_seq_init(&iter->seq);
->>>> +       iter->ent = fbuffer->entry;
->>>> +       event_call->event.funcs->trace(iter, 0, event);
->>>> +       trace_seq_putc(&iter->seq, 0);
->>>
->>>
->>> Would it be possible to store the binary trace record in the pstore
->>> buffer instead of outputting text? I suspect that will both be faster
->>> and less space.
->>>
->>
->> I will try this and come back.
->>
->
-> Hi Joel,
->
-> I removed trace_seq_putc and there is some improvement seen: 203 MB/s
->
-> # dd if=/dev/zero of=/dev/null status=progress
-> 12207371264 bytes (12 GB, 11 GiB) copied, 60 s, 203 MB/s^C
-> 24171926+0 records in
-> 24171926+0 records out
-> 12376026112 bytes (12 GB, 12 GiB) copied, 60.8282 s, 203 MB/s
->
-> This seems good when compared to 190 MB/s seen previously.
-> If this is Ok, then I will spin v2 with changes suggested.
 
-Sorry for slow reply, yes that sounds good and a worthwhile perf improvement.
+> Olof Johansson <olof@lixom.net> hat am 25. September 2018 um 20:51 geschrieben:
+> 
+> 
+> On Tue, Sep 25, 2018 at 11:17:52AM -0700, Florian Fainelli wrote:
+> > On 09/24/2018 04:03 AM, Stefan Wahren wrote:
+> > > Am 24.09.2018 um 12:22 schrieb Liviu Dudau:
+> > >> Commit a7eb26392b893 ("arm64: dts: broadcom: Add reference to Compute
+> > >> Module IO Board V3") adds the bcm2837-rpi-cm3-io3.dts file as a target
+> > >> in the Makefile, rather than the .dtb name. This will skip the
+> > >> generation of the .dtb file at compile time and will fail the dtbs_install
+> > >> target.
+> > >>
+> > >> Fixes: a7eb26392b893 ("arm64: dts: broadcom: Add reference to Compute
+> > >> Module IO Board V3")
+> > >>
+> > >> Signed-off-by: Liviu Dudau <liviu@dudau.co.uk>
+> > > 
+> > > Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+> > > 
+> > > Thanks, i will add a dtbs_install step to my test jobs.
+> > 
+> > Same here.
+> 
+> I do but I don't seem to catch any errors from it. :-/
 
-thanks,
+Strange, i'm get getting this:
 
- - Joel
+scripts/Makefile.dtbinst:31: Target ?bcm2837-rpi-cm3-io3.dts? passt nicht zum Ziel-Muster
+  INSTALL arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b-plus.dtb
+  INSTALL arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dtb
+  INSTALL 
+cp: Fehlender Zieldatei?Operand hinter '/tmp/broadcom'
+?cp --help? liefert weitere Informationen.
+scripts/Makefile.dtbinst:32: die Regel f?r Ziel ?bcm2837-rpi-cm3-io3.dts? scheiterte
+make[2]: *** [bcm2837-rpi-cm3-io3.dts] Fehler 1
+scripts/Makefile.dtbinst:35: die Regel f?r Ziel ?broadcom? scheiterte
+make[1]: *** [broadcom] Fehler 2
+arch/arm64/Makefile:139: die Regel f?r Ziel ?dtbs_install? scheiterte
+make: *** [dtbs_install] Fehler 2
+
+> 
+> > > @Arnd @Olof Should this fix for 4.20 go via pull request or can you
+> > > apply it directly to your tree?
+> > 
+> > That would be my preference here as well.
+> 
+> Applied to next/dt now. Thanks!
+
+Thanks
+
+> 
+> 
+> -Olof
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
