@@ -1,69 +1,109 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 25 Sep 2018 15:53:30 +0200
-Subject: [PATCH] arm64: amlogic: Rename spi pinmux group
-In-Reply-To: <20180924094523.20573-1-thierry.reding@gmail.com>
-References: <20180924094523.20573-1-thierry.reding@gmail.com>
-Message-ID: <cf080df1-ee10-cfa8-9bc1-d5b77415990e@baylibre.com>
+From: maxime.chevallier@bootlin.com (Maxime Chevallier)
+Date: Tue, 25 Sep 2018 15:59:39 +0200
+Subject: [PATCH net-next] net: mvneta: Add support for 2500Mbps SGMII
+Message-ID: <20180925135939.4816-1-maxime.chevallier@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The mvneta controller can handle speeds up to 2500Mbps on the SGMII
+interface. This relies on serdes configuration, the lane must be
+configured at 3.125Gbps and we can't use in-band autoneg at that speed.
 
-On 24/09/2018 11:45, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
-> 
-> The name "spi" is reserved for nodes representing an SPI controller.
-> Rename the "spi" pinmux group to "spi-miso" to avoid the issue and for
-> consistency with other pinmux groups.
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
-> Rob,
-> 
-> do you think perhaps DTC is being a little too strict here? Seems to me
-> like the check could be limited to nodes that have a name and a unit
-> address, the assumption being that an SPI controller would always have
-> some sort of register space that requires a reg property and therefore
-> also a unit address.
-> 
-> Thierry
-> 
->  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 2 +-
->  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
+The main issue when supporting that speed on this particular controller
+is that the link partner can send ethernet frames with a shortened
+preamble, which if not explicitly enabled in the controller will cause
+unexpected behaviours.
 
-Rob has already submitted similar fix and was merged by kevin.
+This was tested on Armada 385, with the comphy configuration done in
+bootloader.
 
-Neil
+Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
+---
+ drivers/net/ethernet/marvell/mvneta.c | 27 +++++++++++++++++++++++----
+ 1 file changed, 23 insertions(+), 4 deletions(-)
 
-> 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> index 98cbba6809ca..3cd4475ca027 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> @@ -390,7 +390,7 @@
->  			};
->  		};
->  
-> -		spi_pins: spi {
-> +		spi_pins: spi-miso {
-
-The name "spi-miso" is wrong since it also has spi-mosi...
-
->  			mux {
->  				groups = "spi_miso",
->  					"spi_mosi",
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-> index c87a80e9bcc6..911fd3412788 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-> @@ -337,7 +337,7 @@
->  			};
->  		};
->  
-> -		spi_pins: spi {
-> +		spi_pins: spi-miso {
->  			mux {
->  				groups = "spi_miso",
->  					"spi_mosi",
-> 
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index 59ed63102e14..650303577090 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -221,6 +221,8 @@
+ #define      MVNETA_GMAC_AN_FLOW_CTRL_EN         BIT(11)
+ #define      MVNETA_GMAC_CONFIG_FULL_DUPLEX      BIT(12)
+ #define      MVNETA_GMAC_AN_DUPLEX_EN            BIT(13)
++#define MVNETA_GMAC_CTRL_4                       0x2c90
++#define      MVNETA_GMAC4_SHORT_PREAMBLE_ENABLE  BIT(1)
+ #define MVNETA_MIB_COUNTERS_BASE                 0x3000
+ #define      MVNETA_MIB_LATE_COLLISION           0x7c
+ #define MVNETA_DA_FILT_SPEC_MCAST                0x3400
+@@ -3342,6 +3344,7 @@ static void mvneta_validate(struct net_device *ndev, unsigned long *supported,
+ 	if (state->interface != PHY_INTERFACE_MODE_NA &&
+ 	    state->interface != PHY_INTERFACE_MODE_QSGMII &&
+ 	    state->interface != PHY_INTERFACE_MODE_SGMII &&
++	    state->interface != PHY_INTERFACE_MODE_2500BASEX &&
+ 	    !phy_interface_mode_is_8023z(state->interface) &&
+ 	    !phy_interface_mode_is_rgmii(state->interface)) {
+ 		bitmap_zero(supported, __ETHTOOL_LINK_MODE_MASK_NBITS);
+@@ -3354,9 +3357,15 @@ static void mvneta_validate(struct net_device *ndev, unsigned long *supported,
+ 
+ 	/* Asymmetric pause is unsupported */
+ 	phylink_set(mask, Pause);
+-	/* Half-duplex at speeds higher than 100Mbit is unsupported */
+-	phylink_set(mask, 1000baseT_Full);
+-	phylink_set(mask, 1000baseX_Full);
++
++	/* We cannot use 1Gbps when using the 2.5G interface. */
++	if (state->interface == PHY_INTERFACE_MODE_2500BASEX) {
++		phylink_set(mask, 2500baseT_Full);
++		phylink_set(mask, 2500baseX_Full);
++	} else {
++		phylink_set(mask, 1000baseT_Full);
++		phylink_set(mask, 1000baseX_Full);
++	}
+ 
+ 	if (!phy_interface_mode_is_8023z(state->interface)) {
+ 		/* 10M and 100M are only supported in non-802.3z mode */
+@@ -3417,12 +3426,14 @@ static void mvneta_mac_config(struct net_device *ndev, unsigned int mode,
+ 	struct mvneta_port *pp = netdev_priv(ndev);
+ 	u32 new_ctrl0, gmac_ctrl0 = mvreg_read(pp, MVNETA_GMAC_CTRL_0);
+ 	u32 new_ctrl2, gmac_ctrl2 = mvreg_read(pp, MVNETA_GMAC_CTRL_2);
++	u32 new_ctrl4, gmac_ctrl4 = mvreg_read(pp, MVNETA_GMAC_CTRL_4);
+ 	u32 new_clk, gmac_clk = mvreg_read(pp, MVNETA_GMAC_CLOCK_DIVIDER);
+ 	u32 new_an, gmac_an = mvreg_read(pp, MVNETA_GMAC_AUTONEG_CONFIG);
+ 
+ 	new_ctrl0 = gmac_ctrl0 & ~MVNETA_GMAC0_PORT_1000BASE_X;
+ 	new_ctrl2 = gmac_ctrl2 & ~(MVNETA_GMAC2_INBAND_AN_ENABLE |
+ 				   MVNETA_GMAC2_PORT_RESET);
++	new_ctrl4 = gmac_ctrl4 & ~(MVNETA_GMAC4_SHORT_PREAMBLE_ENABLE);
+ 	new_clk = gmac_clk & ~MVNETA_GMAC_1MS_CLOCK_ENABLE;
+ 	new_an = gmac_an & ~(MVNETA_GMAC_INBAND_AN_ENABLE |
+ 			     MVNETA_GMAC_INBAND_RESTART_AN |
+@@ -3455,7 +3466,7 @@ static void mvneta_mac_config(struct net_device *ndev, unsigned int mode,
+ 		if (state->duplex)
+ 			new_an |= MVNETA_GMAC_CONFIG_FULL_DUPLEX;
+ 
+-		if (state->speed == SPEED_1000)
++		if (state->speed == SPEED_1000 || state->speed == SPEED_2500)
+ 			new_an |= MVNETA_GMAC_CONFIG_GMII_SPEED;
+ 		else if (state->speed == SPEED_100)
+ 			new_an |= MVNETA_GMAC_CONFIG_MII_SPEED;
+@@ -3494,10 +3505,18 @@ static void mvneta_mac_config(struct net_device *ndev, unsigned int mode,
+ 			    MVNETA_GMAC_FORCE_LINK_DOWN);
+ 	}
+ 
++	/* When at 2.5G, the link partner can send frames with shortened
++	 * preambles.
++	 */
++	if (state->speed == SPEED_2500)
++		new_ctrl4 |= MVNETA_GMAC4_SHORT_PREAMBLE_ENABLE;
++
+ 	if (new_ctrl0 != gmac_ctrl0)
+ 		mvreg_write(pp, MVNETA_GMAC_CTRL_0, new_ctrl0);
+ 	if (new_ctrl2 != gmac_ctrl2)
+ 		mvreg_write(pp, MVNETA_GMAC_CTRL_2, new_ctrl2);
++	if (new_ctrl4 != gmac_ctrl4)
++		mvreg_write(pp, MVNETA_GMAC_CTRL_4, new_ctrl4);
+ 	if (new_clk != gmac_clk)
+ 		mvreg_write(pp, MVNETA_GMAC_CLOCK_DIVIDER, new_clk);
+ 	if (new_an != gmac_an)
+-- 
+2.11.0
