@@ -1,35 +1,38 @@
-From: thor.thayer@linux.intel.com (Thor Thayer)
-Date: Tue, 25 Sep 2018 13:53:56 -0500
-Subject: [PATCH] arm64: dts: stratix10: Enable QSPI on SOCFPGA DevKit
-In-Reply-To: <1537894165-3524-1-git-send-email-thor.thayer@linux.intel.com>
-References: <1537894165-3524-1-git-send-email-thor.thayer@linux.intel.com>
-Message-ID: <7f6f2174-aa2f-2d44-7359-fc827d83c784@linux.intel.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 25 Sep 2018 14:10:47 -0500
+Subject: [PATCH v2 01/03] dt-bindings: clock: Add Clock Management Unit
+ for Actions Semi S500 SoC
+In-Reply-To: <CADHB5bBkyE90LVrWjt0ziU+oe=4sc8G_513VGECc++6xQ2ACdA@mail.gmail.com>
+References: <CADHB5bBkyE90LVrWjt0ziU+oe=4sc8G_513VGECc++6xQ2ACdA@mail.gmail.com>
+Message-ID: <20180925191047.GA14410@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please disregard this patch because it isn't needed.
+On Tue, Sep 04, 2018 at 12:36:36PM -0300, Edgar Bernardi Righi wrote:
+> Add Clock Management Unit for Actions Semi S500 SoC. Dt-Bindings
+> constants added.
+> Tested on a Lemaker Guitar board.
+> 
+> Signed-off-by: Edgar Bernardi Righi <edgar.righi@lsitec.org.br>
+> 
+> diff --git a/include/dt-bindings/clock/actions,s500-cmu.h
+> b/include/dt-bindings/clock/actions,s500-cmu.h
+> new file mode 100644
+> index 000000000000..34e5849ffcf1
+> --- /dev/null
+> +++ b/include/dt-bindings/clock/actions,s500-cmu.h
+> @@ -0,0 +1,78 @@
+> +// SPDX-License-Identifier: GPL-2.0+
 
-On 09/25/2018 11:49 AM, thor.thayer at linux.intel.com wrote:
-> From: Thor Thayer <thor.thayer@linux.intel.com>
-> 
-> Always enable QSPI the SOCFPGA DevKit since both QSPI and
-> SDMMC are available on that platform.
-> 
-> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
-> ---
->   arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts | 1 +
->   1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-> index 53cf195c2ada..93354c5558df 100644
-> --- a/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-> +++ b/arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dts
-> @@ -151,6 +151,7 @@
->   };
->   
->   &qspi {
-> +	status = "okay";
->   	flash at 0 {
->   		#address-cells = <1>;
->   		#size-cells = <1>;
-> 
+Headers should be /* */ style comments.
+
+Otherwise,
+
+Reviewed-by: Rob Herring <robh@kernel.org>
+
+> +//
+> +// Device Tree binding constants for Actions Semi S500 Clock Management Unit
+> +//
+> +// Copyright (c) 2014 Actions Semi Inc.
+> +// Copyright (c) 2018 Linaro Ltd.
+> +// Copyright (c) 2018 LSI-TEC - Caninos Loucos
