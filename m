@@ -1,129 +1,169 @@
-From: eugen.hristev@microchip.com (Eugen Hristev)
-Date: Tue, 25 Sep 2018 09:50:24 +0300
-Subject: [PATCH 1/2] iio: adc: at91: fix acking DRDY irq on simple
- conversions
-In-Reply-To: <20180924212701.400e21f7@archlinux>
-References: <1537447238-18674-1-git-send-email-eugen.hristev@microchip.com>
- <20180922113123.2c8da044@archlinux>
- <9846e106-8baf-b491-29ca-8306be9527ee@microchip.com>
- <20180924210056.2cae9439@archlinux> <20180924212701.400e21f7@archlinux>
-Message-ID: <5ee8253a-5b07-94ce-a86d-b453911fce0a@microchip.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 25 Sep 2018 08:59:25 +0200
+Subject: [PATCH] sdhci: arasan: Add runtime PM support
+In-Reply-To: <1537283046-13985-1-git-send-email-manish.narani@xilinx.com>
+References: <1537283046-13985-1-git-send-email-manish.narani@xilinx.com>
+Message-ID: <CAPDyKFqmyCg_BL6bAEB7x48KtvYmS45VR9KC4jyQ9=9Pt3QMjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 18 September 2018 at 17:04, Manish Narani <manish.narani@xilinx.com> wrote:
+> Add runtime PM support in Arasan SDHCI driver.
 
+According to the patch you seem to deploy support for it, but since
+you call pm_runtime_forbid() in ->probe(), this means in practice that
+the code becomes unused, at least until user-space decides to change
+it.
 
-On 24.09.2018 23:27, Jonathan Cameron wrote:
-> On Mon, 24 Sep 2018 21:00:56 +0100
-> Jonathan Cameron <jic23@kernel.org> wrote:
-> 
->> On Mon, 24 Sep 2018 09:19:43 +0300
->> Eugen Hristev <eugen.hristev@microchip.com> wrote:
->>
->>> On 22.09.2018 13:31, Jonathan Cameron wrote:
->>>> On Thu, 20 Sep 2018 15:40:37 +0300
->>>> Eugen Hristev <eugen.hristev@microchip.com> wrote:
->>>>      
->>>>> When doing simple conversions, the driver did not acknowledge the DRDY irq.
->>>>> If this irq is not acked, it will be left pending, and as soon as a trigger
->>>>> is enabled, the irq handler will be called, it doesn't know why this irq
->>>>> has occurred because no channel is pending, and then we will have irq loop
->>>>> and board will hang.
->>>>>
->>>>> Fixes 0e589d5fb ("ARM: AT91: IIO: Add AT91 ADC driver.")
->>>>> Cc: Maxime Ripard <maxime.ripard@bootlin.com>
->>>>> Cc: <stable@vger.kernel.org>
->>>>> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
->>>>> ---
->>>>>    drivers/iio/adc/at91_adc.c | 5 +++++
->>>>>    1 file changed, 5 insertions(+)
->>>>>
->>>>> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
->>>>> index 44b5168..e85f859 100644
->>>>> --- a/drivers/iio/adc/at91_adc.c
->>>>> +++ b/drivers/iio/adc/at91_adc.c
->>>>> @@ -712,6 +712,11 @@ static int at91_adc_read_raw(struct iio_dev *idev,
->>>>>    		at91_adc_writel(st, AT91_ADC_CHDR,
->>>>>    				AT91_ADC_CH(chan->channel));
->>>>>    		at91_adc_writel(st, AT91_ADC_IDR, BIT(chan->channel));
->>>>> +		/*
->>>>> +		 * we need to ack the DRDY irq, otherwise it will be
->>>>> +		 * left pending and irq handler will be confused
->>>>> +		 */
->>>>> +		at91_adc_readl(st, AT91_ADC_LCDR);
->>>>
->>>> I'm curious as to how things were working before.  Does this only occur
->>>> if we do a raw_read whilst the buffer is enabled?
->>>
->>> No. The situation is that the read raw does not properly cleans itself
->>> up after it's done.
->>> The DRDY bit is cleared only when LCDR (last converted data ) is being read.
->>> Even if we read the per channel conversion data, the LCDR still needs to
->>> be read to clear this irq status.
->>> The driver does not use the DRDY irq but this irq status is still being
->>> set in the status register.
->>
->> Hmm. That is somewhat nasty if it results in false interrupts when you
->> then enable them.
-> 
-> I'm talking rubbish here.  Please ignore!
-> 
->>
->>>    
->>>>
->>>> I would have assumed when it's not enabled, the irq would be masked and
->>>> never generated in the first place...
->>>>
->>>> It may be that what we actually need to do is to prevent read_raw accesses
->>>> when the buffer is enabled (like lots of other drivers do precisely to
->>>> avoid this sort of condition). The problem there comes if we have
->>>> existing applications doing this combination as we are then breaking
->>>> userspace. If that's the case we'll need to be a bit more clever.
->>>>
->>>> Hammering down an irq state in a non irq handling path isn't a good
->>>> solution.
->>>
->>> Ok, I will move the clearing of the DRDY (LCDR read) in the irq path
->>> then, and send a v2.
->>
->> If that can be done cleanly, let us go with that approach. If not
->> what you have here with the addition of a comments saying that the
->> interrupt status is not masked, merely the interrupt and as a result needs
->> clearing for when you later enabled the interrupt, is fine.
->>
->> This definitely sounds like one of those bits of hardware that
->> you can write software to use safely but they certainly didn't make
->> it easy to do so!
+Does it mean that you haven't tested the code or that there are some problems?
 
-For what it's worth a small explanation:
+In either case, it would be good to know so please add this
+information to the changelog.
 
-The status in the ISR (interrupt status) is updated regardless of 
-whether the IRQ is enabled in the IER (interrupt enable) or not. 
-Actually "enabling DRDY" makes the hardware start raising the interrupt 
-line on DRDY event if it's the case. but DRDY bit is still being 
-asserted in the ISR. It works like this because someone might want to 
-write some simple driver without IRQ, just poll the ISR for the status.
+>
+> Signed-off-by: Manish Narani <manish.narani@xilinx.com>
+> ---
+>  drivers/mmc/host/sdhci-of-arasan.c | 80 +++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 78 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+> index a40bcc2..370ada5 100644
+> --- a/drivers/mmc/host/sdhci-of-arasan.c
+> +++ b/drivers/mmc/host/sdhci-of-arasan.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/mfd/syscon.h>
+>  #include <linux/module.h>
+>  #include <linux/of_device.h>
+> +#include <linux/pm_runtime.h>
+>  #include <linux/phy/phy.h>
+>  #include <linux/regmap.h>
+>  #include <linux/of.h>
+> @@ -30,6 +31,7 @@
+>  #include "cqhci.h"
+>  #include "sdhci-pltfm.h"
+>
+> +#define SDHCI_ARASAN_AUTOSUSPEND_DELAY 2000 /* ms */
+>  #define SDHCI_ARASAN_VENDOR_REGISTER   0x78
+>  #define SDHCI_ARASAN_CQE_BASE_ADDR     0x200
+>  #define VENDOR_ENHANCED_STROBE         BIT(0)
+> @@ -363,6 +365,70 @@ static const struct sdhci_pltfm_data sdhci_arasan_cqe_pdata = {
+>                         SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN,
+>  };
+>
+> +#ifdef CONFIG_PM
+> +static int sdhci_arasan_runtime_suspend(struct device *dev)
+> +{
+> +       struct platform_device *pdev = to_platform_device(dev);
+> +       struct sdhci_host *host = platform_get_drvdata(pdev);
+> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +       struct sdhci_arasan_data *sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
+> +       int ret;
+> +
+> +       if (sdhci_arasan->has_cqe) {
+> +               ret = cqhci_suspend(host->mmc);
+> +               if (ret)
+> +                       return ret;
+> +       }
+> +
+> +       ret = sdhci_runtime_suspend_host(host);
+> +       if (ret)
+> +               return ret;
+> +
+> +       if (host->tuning_mode != SDHCI_TUNING_MODE_3)
+> +               mmc_retune_needed(host->mmc);
+> +
+> +       clk_disable(pltfm_host->clk);
+> +       clk_disable(sdhci_arasan->clk_ahb);
+> +
+> +       return 0;
+> +}
+> +
+> +static int sdhci_arasan_runtime_resume(struct device *dev)
+> +{
+> +       struct platform_device *pdev = to_platform_device(dev);
+> +       struct sdhci_host *host = platform_get_drvdata(pdev);
+> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +       struct sdhci_arasan_data *sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
+> +       int ret;
+> +
+> +       ret = clk_enable(sdhci_arasan->clk_ahb);
+> +       if (ret) {
+> +               dev_err(dev, "Cannot enable AHB clock.\n");
+> +               return ret;
+> +       }
+> +
+> +       ret = clk_enable(pltfm_host->clk);
+> +       if (ret) {
+> +               dev_err(dev, "Cannot enable SD clock.\n");
+> +               return ret;
+> +       }
+> +
+> +       ret = sdhci_runtime_resume_host(host);
+> +       if (ret)
+> +               goto out;
+> +
+> +       if (sdhci_arasan->has_cqe)
+> +               return cqhci_resume(host->mmc);
+> +
+> +       return 0;
+> +out:
+> +       clk_disable(pltfm_host->clk);
+> +       clk_disable(sdhci_arasan->clk_ahb);
+> +
+> +       return ret;
+> +}
+> +#endif /* ! CONFIG_PM */
+> +
+>  #ifdef CONFIG_PM_SLEEP
+>  /**
+>   * sdhci_arasan_suspend - Suspend method for the driver
+> @@ -455,8 +521,10 @@ static int sdhci_arasan_resume(struct device *dev)
+>  }
+>  #endif /* ! CONFIG_PM_SLEEP */
+>
+> -static SIMPLE_DEV_PM_OPS(sdhci_arasan_dev_pm_ops, sdhci_arasan_suspend,
+> -                        sdhci_arasan_resume);
+> +static const struct dev_pm_ops sdhci_arasan_dev_pm_ops = {
+> +       SET_SYSTEM_SLEEP_PM_OPS(sdhci_arasan_suspend, sdhci_arasan_resume)
+> +       SET_RUNTIME_PM_OPS(sdhci_arasan_runtime_suspend,
+> +                          sdhci_arasan_runtime_resume, NULL) };
+>
+>  static const struct of_device_id sdhci_arasan_of_match[] = {
+>         /* SoC-specific compatible strings w/ soc_ctl_map */
+> @@ -821,6 +889,14 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+>         if (ret)
+>                 goto err_add_host;
+>
+> +       pm_runtime_set_active(&pdev->dev);
+> +       pm_runtime_enable(&pdev->dev);
+> +       pm_runtime_set_autosuspend_delay(&pdev->dev,
+> +                                        SDHCI_ARASAN_AUTOSUSPEND_DELAY);
+> +       pm_runtime_mark_last_busy(&pdev->dev);
+> +       pm_runtime_use_autosuspend(&pdev->dev);
+> +       pm_runtime_forbid(&pdev->dev);
 
-One other thing, in my driver, at91-sama5d2_adc, I had the same issue, 
-and I am reading the DRDY in the EOC part after waking up from the wait. 
-This makes the IRQ handler shorter by a few hundred cycles : read LCDR 
-in the userspace-called read_raw.
-Do you want me to have a patch at some point to move the LCDR read in 
-the IRQ handler for at91-sama5d2_adc as well ?
+When sdhci_arasan_suspend|resume() gets called, which calls into
+sdhci_suspend|resume_host(), we requires that the host is already
+runtime resumed. I am guessing that's why you are calling
+pm_runtime_forbid() here?
 
-Eugen
+To me, it looks like you may want to look into using
+pm_runtime_force_suspend|resume() from the system suspend/resume
+callbacks. The tricky part seems to be to manage the phy correctly, as
+there seems to be some constraints while changing the clock in regards
+to the state of the phy - and of course make sure to deal with wakeups
+correctly.
 
->>
->> Jonathan
->>>
->>>    
->>>>
->>>> Jonathan
->>>>      
->>>>>    
->>>>>    		st->last_value = 0;
->>>>>    		st->done = false;
->>>>      
->>
-> 
-> 
+I suggest you to have a look at how sdhci-of-at91 has implemented PM
+support, that might give you an idea of how it could be done.
+
+> +
+>         return 0;
+>
+>  err_add_host:
+> --
+> 2.1.1
+>
+
+Kind regards
+Uffe
