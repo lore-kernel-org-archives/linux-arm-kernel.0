@@ -1,70 +1,71 @@
-From: leoyang.li@nxp.com (Leo Li)
-Date: Tue, 25 Sep 2018 20:19:29 +0000
-Subject: [GIT PULL] fixes for soc/fsl drivers for v4.19
-In-Reply-To: <20180925194757.pp3jiltu36ih2wfo@localhost>
-References: <20180924221954.30473-1-leoyang.li@nxp.com>
- <20180925194757.pp3jiltu36ih2wfo@localhost>
-Message-ID: <AMSPR04MB503EAF5EF985E25D87190AA8F160@AMSPR04MB503.eurprd04.prod.outlook.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 25 Sep 2018 15:55:02 -0500
+Subject: [PATCH v2 1/2] dt-bindings: PCI: add UniPhier PCIe host
+ controller description
+In-Reply-To: <1536226832-5089-2-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1536226832-5089-1-git-send-email-hayashi.kunihiko@socionext.com>
+ <1536226832-5089-2-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <20180925205502.GA12949@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Sep 06, 2018 at 06:40:31PM +0900, Kunihiko Hayashi wrote:
+> Add DT bindings for PCIe controller implemented in UniPhier SoCs when
+> configured in Root Complex (host) mode. This controller is based on
+> the DesignWare PCIe core.
+> 
+> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> ---
+>  .../devicetree/bindings/pci/uniphier-pcie.txt      | 78 ++++++++++++++++++++++
+>  1 file changed, 78 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/uniphier-pcie.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/uniphier-pcie.txt b/Documentation/devicetree/bindings/pci/uniphier-pcie.txt
+> new file mode 100644
+> index 0000000..a34e167
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/uniphier-pcie.txt
+> @@ -0,0 +1,78 @@
+> +Socionext UniPhier PCIe host controller bindings
+> +
+> +This describes the devicetree bindings for PCIe host controller implemented
+> +on Socionext UniPhier SoCs.
+> +
+> +UniPhier PCIe host controller is based on the Synopsys DesignWare PCI core.
+> +It shares common functions with the PCIe DesignWare core driver and inherits
+> +common properties defined in
+> +Documentation/devicetree/bindings/pci/designware-pcie.txt.
+> +
+> +Required properties:
+> +- compatible: Should be "socionext,uniphier-pcie".
+> +- reg: Specifies offset and length of the register set for the device.
+> +	According to the reg-names, appropriate register sets are required.
+> +- reg-names: Must include the following entries:
+> +    "dbi"    - controller configuration registers
+> +    "link"   - SoC-specific glue layer registers
+> +    "config" - PCIe configuration space
+> +- clocks: A phandle to the clock gate for PCIe glue layer including
+> +	the host controller.
+> +- resets: A phandle to the reset line for PCIe glue layer including
+> +	the host controller.
+> +- interrupts: A list of interrupt specifiers. According to the
+> +	interrupt-names, appropriate interrupts are required.
+> +- interrupt-names: Must include the following entries:
+> +    "dma"    - DMA interrupt
+> +    "msi"    - MSI interrupt
+> +    "intx"   - Legacy INTA/B/C/D interrupt
+> +
+> +Optional properties:
+> +- phys: A phandle to generic PCIe PHY. According to the phy-names, appropriate
+> +	phys are required.
+> +- phy-names: Must be "pcie-phy".
+> +
+> +Required sub-node:
+> +- interrupt-controller: Specifies interrupt controller for legacy PCI
+> +	interrupts. The node name isn't important.
 
+No, it is important.
 
-> -----Original Message-----
-> From: Olof Johansson <olof@lixom.net>
-> Sent: Tuesday, September 25, 2018 2:48 PM
-> To: Leo Li <leoyang.li@nxp.com>
-> Cc: arm at kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; shawnguo at kernel.org
-> Subject: Re: [GIT PULL] fixes for soc/fsl drivers for v4.19
-> 
-> Hi,
-> 
-> On Mon, Sep 24, 2018 at 05:19:54PM -0500, Li Yang wrote:
-> > Hi arm-soc maintainers,
-> >
-> > Please pull soc/fsl drivers fixes for v4.19.
-> >
-> > Regards,
-> > Leo
-> >
-> >
-> > The following changes since commit
-> 5b394b2ddf0347bef56e50c69a58773c94343ff3:
-> >
-> >   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
-> >
-> > are available in the Git repository at:
-> >
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/leo/linux.git
-> > tags/soc-fsl-fix-v4.19
-> >
-> > for you to fetch changes up to
-> 3cb31b634052ed458922e0c8e2b4b093d7fb60b9:
-> >
-> >   soc: fsl: qe: Fix copy/paste bug in ucc_get_tdm_sync_shift()
-> > (2018-09-17 16:01:46 -0500)
-> >
-> > ----------------------------------------------------------------
-> > NXP/FSL SoC driver fixes for v4.19
-> >
-> > - Fix crash of qman_portal by deferring its probe if qman is not
-> > probed
-> > - Fix NULL pointer dereference by adding more checks in qman_portal
-> > - Fix copy/paste bug in ucc_get_tdm_sync_shift()
-> 
-> Good summary, thanks!
-> 
-> However:
-> 
-> > Alexandre Belloni (2):
-> >       soc: fsl: qbman: qman_portal: defer probing when qman is not
-> > available
-> 
-> I think this fix has issues, I replied on the patch. Let me know if you want me to
-> cherry-pick the other two fixes for now.
+With that sentence removed,
 
-Thanks for the review.  Please help to cherry-pick the other two.  I will work with the patch author for an update for the first one.
-
-Regards,
-Leo
+Reviewed-by: Rob Herring <robh@kernel.org>
