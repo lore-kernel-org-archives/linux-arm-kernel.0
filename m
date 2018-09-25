@@ -1,53 +1,54 @@
-From: qader.aymen@gmail.com (Aymen Qader)
-Date: Tue, 25 Sep 2018 00:34:26 +0100
-Subject: [PATCH v2] staging: vc04_services: Update TODO re: arm64
-In-Reply-To: <20180924224835.32539-1-qader.aymen@gmail.com>
-References: <20180924224835.32539-1-qader.aymen@gmail.com>
-Message-ID: <20180924233426.32609-1-qader.aymen@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 24 Sep 2018 17:05:41 -0700
+Subject: [PATCH 0/4] Update am437x and am335x dts to probe with ti-sysc
+Message-ID: <20180925000545.22931-1-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the TODO item to remove manual cache flushing from bulk_receive.
-This was previously done in this commit:
+Hi all,
 
-(7e8dbdea) staging: bcm2835-camera: Remove explicit cache flush
-operations
+Here are four patches to make am437x and am335x l4 devices to probe with
+ti-sysc driver similar to what we've already done for omap4. The related
+legacy hwmod platform data will be removed few merge cycles later.
 
-Also remove the unnecessary asm/cacheflush.h header.
+There are still dependencies to Tero's clkctrl changes and for ti-sysc
+drivers changes. So these patches are based on on v4.19-rc3 merged with
+my omap-for-v4.20/dt branch plus the following additional series of
+patches:
 
-Signed-off-by: Aymen Qader <qader.aymen@gmail.com>
----
-v2: Make commit message clearer
+[PATCH 00/11] clk: ti: clkctrl data split based on clkdm boundaries
+[PATCH 0/3] ARM: dts: am3/am4/dra7 clkctrl data conversion
+[PATCH 0/4] TI sysc driver updates for am335x and am437x
 
- drivers/staging/vc04_services/bcm2835-camera/TODO         | 6 ------
- drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c | 1 -
- 2 files changed, 7 deletions(-)
+v4.19-rc3 is needed for commit 18eb8aea7fb2 ("net: ethernet:
+cpsw-phy-sel: prefer phandle for phy sel") and omap-for-v4.20/dt
+is needed to avoid conflicts with clean-up.
 
-diff --git a/drivers/staging/vc04_services/bcm2835-camera/TODO b/drivers/staging/vc04_services/bcm2835-camera/TODO
-index cefce72d814f..6c2b4ffe4996 100644
---- a/drivers/staging/vc04_services/bcm2835-camera/TODO
-+++ b/drivers/staging/vc04_services/bcm2835-camera/TODO
-@@ -15,9 +15,3 @@ padding in the V4L2 spec, but that padding doesn't match what the
- hardware can do.  If we exposed the native padding requirements
- through the V4L2 "multiplanar" formats, the firmware would have one
- less copy it needed to do.
--
--3) Port to ARM64
--
--The bulk_receive() does some manual cache flushing that are 32-bit ARM
--only, which we should convert to proper cross-platform APIs.
--
-diff --git a/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
-index 51e5b04ff0f5..6e5c1d4ee122 100644
---- a/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
-+++ b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
-@@ -21,7 +21,6 @@
- #include <linux/slab.h>
- #include <linux/completion.h>
- #include <linux/vmalloc.h>
--#include <asm/cacheflush.h>
- #include <media/videobuf2-vmalloc.h>
- 
- #include "mmal-common.h"
+I've also pushed out a temporary testing branch for people to test
+as omap-for-v4.20/dt-ti-sysc-tmp-testing [0][1].
+
+Regards,
+
+Tony
+
+[0] git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git omap-for-v4.20/dt-ti-sysc-tmp-testing
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git/log/?h=omap-for-v4.20/dt-ti-sysc-tmp-testing
+
+
+Tony Lindgren (4):
+  ARM: dts: am437x: Add l4 interconnect hierarchy and ti-sysc data
+  ARM: dts: am437x: Move l4 child devices to probe them with ti-sysc
+  ARM: dts: am335x: Add l4 interconnect hierarchy and ti-sysc data
+  ARM: dts: am335x: Move l4 child devices to probe them with ti-sysc
+
+ arch/arm/boot/dts/am335x-shc.dts |    2 +-
+ arch/arm/boot/dts/am33xx-l4.dtsi | 2132 +++++++++++++++++++++++++
+ arch/arm/boot/dts/am33xx.dtsi    |  623 +-------
+ arch/arm/boot/dts/am4372.dtsi    |  876 +----------
+ arch/arm/boot/dts/am437x-l4.dtsi | 2499 ++++++++++++++++++++++++++++++
+ 5 files changed, 4651 insertions(+), 1481 deletions(-)
+ create mode 100644 arch/arm/boot/dts/am33xx-l4.dtsi
+ create mode 100644 arch/arm/boot/dts/am437x-l4.dtsi
+
 -- 
-2.17.1
+2.19.0
