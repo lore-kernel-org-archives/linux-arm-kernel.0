@@ -1,128 +1,83 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 25 Sep 2018 23:20:18 +0200
-Subject: [PATCH v2] ARM: use choice for kernel unwinders
-Message-ID: <20180925212018.27132-1-stefan@agner.ch>
+From: ndesaulniers@google.com (Nick Desaulniers)
+Date: Tue, 25 Sep 2018 13:24:06 -0700
+Subject: [PATCH] arm64: percpu: Initialize ret in the default case
+In-Reply-To: <20180925194459.13088-1-natechancellor@gmail.com>
+References: <20180925194459.13088-1-natechancellor@gmail.com>
+Message-ID: <CAKwvOdnzN0E0HD--3GmC9b=20fx3AE-8-x0iZ04-LEXnxh=YoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While in theory multiple unwinders could be compiled in, it does
-not make sense in practise. Use a choice to make the unwinder
-selection mutually exclusive and mandatory.
+On Tue, Sep 25, 2018 at 12:45 PM Nathan Chancellor
+<natechancellor@gmail.com> wrote:
+>
+> Clang warns that if the default case is taken, ret will be
+> uninitialized.
+>
+> ./arch/arm64/include/asm/percpu.h:196:2: warning: variable 'ret' is used
+> uninitialized whenever switch default is taken
+> [-Wsometimes-uninitialized]
+>         default:
+>         ^~~~~~~
+> ./arch/arm64/include/asm/percpu.h:200:9: note: uninitialized use occurs
+> here
+>         return ret;
+>                ^~~
+> ./arch/arm64/include/asm/percpu.h:157:19: note: initialize the variable
+> 'ret' to silence this warning
+>         unsigned long ret, loop;
+>                          ^
+>                           = 0
+>
+> This warning appears several times while building the erofs filesystem.
+> While it's not strictly wrong, the BUILD_BUG will prevent this from
+> becoming a true problem. Initialize ret to 0 in the default case right
+> before the BUILD_BUG to silence all of these warnings.
 
-Already before this commit it has not been possible to deselect
-FRAME_POINTER. Remove the obsolete comment.
+Clang does semantic analysis BEFORE inlining/optimizations, so I can't
+determine that default is never reachable.  Nathan, thanks for this
+patch.
+Reviewed-by: Nick Desaulniers <ndesaulniers@google.com>
 
-Furthermore, to produce a meaningful backtrace with FRAME_POINTER
-enabled the kernel needs a specific function prologue:
-    mov    ip, sp
-    stmfd    sp!, {fp, ip, lr, pc}
-    sub    fp, ip, #4
+>
+> Reported-by: Prasad Sodagudi <psodagud@codeaurora.org>
+> Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
+> ---
+>  arch/arm64/include/asm/percpu.h | 3 +++
+>  1 file changed, 3 insertions(+)
+>
+> diff --git a/arch/arm64/include/asm/percpu.h b/arch/arm64/include/asm/percpu.h
+> index 9234013e759e..21a81b59a0cc 100644
+> --- a/arch/arm64/include/asm/percpu.h
+> +++ b/arch/arm64/include/asm/percpu.h
+> @@ -96,6 +96,7 @@ static inline unsigned long __percpu_##op(void *ptr,                  \
+>                 : [val] "Ir" (val));                                    \
+>                 break;                                                  \
+>         default:                                                        \
+> +               ret = 0;                                                \
+>                 BUILD_BUG();                                            \
+>         }                                                               \
+>                                                                         \
+> @@ -125,6 +126,7 @@ static inline unsigned long __percpu_read(void *ptr, int size)
+>                 ret = READ_ONCE(*(u64 *)ptr);
+>                 break;
+>         default:
+> +               ret = 0;
+>                 BUILD_BUG();
+>         }
+>
+> @@ -194,6 +196,7 @@ static inline unsigned long __percpu_xchg(void *ptr, unsigned long val,
+>                 : [val] "r" (val));
+>                 break;
+>         default:
+> +               ret = 0;
+>                 BUILD_BUG();
+>         }
+>
+> --
+> 2.19.0
+>
 
-To get to the required prologue gcc uses apcs and no-sched-prolog.
-This compiler options are not available on clang, and clang is not
-able to generate the required prologue. Make the FRAME_POINTER
-config symbol depending on !clang.
 
-Suggested-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- arch/arm/Kconfig.debug | 44 +++++++++++++++++++++++++++---------------
- lib/Kconfig.debug      |  6 +++---
- 2 files changed, 31 insertions(+), 19 deletions(-)
-
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index f6fcb8a79889..3408f1ad394c 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -45,30 +45,42 @@ config DEBUG_WX
- 
- 		If in doubt, say "Y".
- 
--# RMK wants arm kernels compiled with frame pointers or stack unwinding.
--# If you know what you are doing and are willing to live without stack
--# traces, you can get a slightly smaller kernel by setting this option to
--# n, but then RMK will have to kill you ;).
--config FRAME_POINTER
--	bool
--	depends on !THUMB2_KERNEL
--	default y if !ARM_UNWIND || FUNCTION_GRAPH_TRACER
-+choice
-+	prompt "Choose kernel unwinder"
-+	default UNWINDER_ARM if AEABI && !FUNCTION_GRAPH_TRACER
-+	default UNWINDER_FRAME_POINTER if !AEABI || FUNCTION_GRAPH_TRACER
-+	help
-+	  This determines which method will be used for unwinding kernel stack
-+	  traces for panics, oopses, bugs, warnings, perf, /proc/<pid>/stack,
-+	  livepatch, lockdep, and more.
-+
-+config UNWINDER_FRAME_POINTER
-+	bool "Frame pointer unwinder"
-+	depends on !THUMB2_KERNEL && !CC_IS_CLANG
-+	select ARCH_WANT_FRAME_POINTERS
-+	select FRAME_POINTER
- 	help
--	  If you say N here, the resulting kernel will be slightly smaller and
--	  faster. However, if neither FRAME_POINTER nor ARM_UNWIND are enabled,
--	  when a problem occurs with the kernel, the information that is
--	  reported is severely limited.
-+	  This option enables the frame pointer unwinder for unwinding
-+	  kernel stack traces.
- 
--config ARM_UNWIND
--	bool "Enable stack unwinding support (EXPERIMENTAL)"
-+config UNWINDER_ARM
-+	bool "ARM EABI stack unwinder"
- 	depends on AEABI
--	default y
-+	select ARM_UNWIND
- 	help
- 	  This option enables stack unwinding support in the kernel
- 	  using the information automatically generated by the
- 	  compiler. The resulting kernel image is slightly bigger but
- 	  the performance is not affected. Currently, this feature
--	  only works with EABI compilers. If unsure say Y.
-+	  only works with EABI compilers.
-+
-+endchoice
-+
-+config ARM_UNWIND
-+	bool
-+
-+config FRAME_POINTER
-+	bool
- 
- config OLD_MCOUNT
- 	bool
-diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
-index 4966c4fbe7f7..8d24f4ed66fd 100644
---- a/lib/Kconfig.debug
-+++ b/lib/Kconfig.debug
-@@ -1179,7 +1179,7 @@ config LOCKDEP
- 	bool
- 	depends on DEBUG_KERNEL && LOCK_DEBUGGING_SUPPORT
- 	select STACKTRACE
--	select FRAME_POINTER if !MIPS && !PPC && !ARM_UNWIND && !S390 && !MICROBLAZE && !ARC && !X86
-+	select FRAME_POINTER if !MIPS && !PPC && !ARM && !S390 && !MICROBLAZE && !ARC && !X86
- 	select KALLSYMS
- 	select KALLSYMS_ALL
- 
-@@ -1590,7 +1590,7 @@ config FAULT_INJECTION_STACKTRACE_FILTER
- 	depends on FAULT_INJECTION_DEBUG_FS && STACKTRACE_SUPPORT
- 	depends on !X86_64
- 	select STACKTRACE
--	select FRAME_POINTER if !MIPS && !PPC && !S390 && !MICROBLAZE && !ARM_UNWIND && !ARC && !X86
-+	select FRAME_POINTER if !MIPS && !PPC && !S390 && !MICROBLAZE && !ARM && !ARC && !X86
- 	help
- 	  Provide stacktrace filter for fault-injection capabilities
- 
-@@ -1599,7 +1599,7 @@ config LATENCYTOP
- 	depends on DEBUG_KERNEL
- 	depends on STACKTRACE_SUPPORT
- 	depends on PROC_FS
--	select FRAME_POINTER if !MIPS && !PPC && !S390 && !MICROBLAZE && !ARM_UNWIND && !ARC && !X86
-+	select FRAME_POINTER if !MIPS && !PPC && !S390 && !MICROBLAZE && !ARM && !ARC && !X86
- 	select KALLSYMS
- 	select KALLSYMS_ALL
- 	select STACKTRACE
 -- 
-2.19.0
+Thanks,
+~Nick Desaulniers
