@@ -1,100 +1,51 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 25 Sep 2018 11:15:00 -0500
-Subject: [PATCH v2 1/3] dt-bindings: power: Add ZynqMP power domain
- bindings
-In-Reply-To: <CY1PR02MB2138C05E97C1EFAEA921CB5CB81A0@CY1PR02MB2138.namprd02.prod.outlook.com>
-References: <1534447304-12919-1-git-send-email-jollys@xilinx.com>
- <1534447304-12919-2-git-send-email-jollys@xilinx.com>
- <20180820194628.GA26783@bogus>
- <CY1PR02MB2138C05E97C1EFAEA921CB5CB81A0@CY1PR02MB2138.namprd02.prod.outlook.com>
-Message-ID: <CAL_JsqJOz_z9dHcG5dfx=UTXQMaLTQKBPu+vTrTOt=sdAabqSw@mail.gmail.com>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Tue, 25 Sep 2018 09:20:02 -0700
+Subject: [RFC PATCH i2c-next 1/2] dt-bindings: i2c: aspeed: Add
+ 'idle-wait-timeout-ms' setting
+In-Reply-To: <20180925082717.GB2270@kunai>
+References: <20180910214519.14126-1-jae.hyun.yoo@linux.intel.com>
+ <20180910214519.14126-2-jae.hyun.yoo@linux.intel.com>
+ <a81a6092-a9d0-78d5-3596-cddc5d6a0713@linux.intel.com>
+ <20180924215850.GD18592@kunai>
+ <2c8563fd-0641-5237-0026-f559c480ad91@linux.intel.com>
+ <20180925082717.GB2270@kunai>
+Message-ID: <7b4e5715-3a87-8f77-8d0d-4647f02c87a8@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 13, 2018 at 12:51 PM Jolly Shah <JOLLYS@xilinx.com> wrote:
->
-> Hi Rob,
->
-> > -----Original Message-----
-> > From: Rob Herring [mailto:robh at kernel.org]
-> > Sent: Monday, August 20, 2018 12:46 PM
-> > To: Jolly Shah <JOLLYS@xilinx.com>
-> > Cc: matthias.bgg at gmail.com; andy.gross at linaro.org; shawnguo at kernel.org;
-> > geert+renesas at glider.be; bjorn.andersson at linaro.org;
-> > sean.wang at mediatek.com; m.szyprowski at samsung.com; Michal Simek
-> > <michals@xilinx.com>; mark.rutland at arm.com; Rajan Vaja
-> > <RAJANV@xilinx.com>; devicetree at vger.kernel.org; linux-arm-
-> > kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Rajan Vaja
-> > <RAJANV@xilinx.com>; Jolly Shah <JOLLYS@xilinx.com>
-> > Subject: Re: [PATCH v2 1/3] dt-bindings: power: Add ZynqMP power domain
-> > bindings
-> >
-> > On Thu, Aug 16, 2018 at 12:21:42PM -0700, Jolly Shah wrote:
-> > > From: Rajan Vaja <rajan.vaja@xilinx.com>
-> > >
-> > > Add documentation to describe ZynqMP power domain bindings.
-> > >
-> > > Signed-off-by: Rajan Vaja <rajan.vaja@xilinx.com>
-> > > Signed-off-by: Jolly Shah <jollys@xilinx.com>
-> > > ---
-> > >  .../firmware/xilinx/xlnx,zynqmp-firmware.txt       | 47
-> > ++++++++++++++++++++++
-> >
-> > This should be with all the other power domain bindings.
-> >
-> > >  1 file changed, 47 insertions(+)
-> > >
-> > > diff --git
-> > > a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmwa
-> > > re.txt
-> > > b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmwa
-> > > re.txt
-> > > index d215d15..5fa10a0 100644
-> > > ---
-> > > a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmwa
-> > > re.txt
-> > > +++ b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-fi
-> > > +++ rmware.txt
-> > > @@ -64,6 +64,29 @@ Output clocks are registered based on clock
-> > > information received  from firmware. Output clocks indexes are
-> > > mentioned in  include/dt-bindings/clock/xlnx,zynqmp-clk.h.
-> > >
-> > > +-----------------------------------------------------------
-> > > +Device Tree Bindings for the Xilinx Zynq MPSoC PM domains
-> > > +-----------------------------------------------------------
-> > > +The binding for zynqmp-power-controller follow the common generic PM
-> > > +domain binding[1].
-> > > +
-> > > +[1] Documentation/devicetree/bindings/power/power_domain.txt
-> > > +
-> > > +== Zynq MPSoC Generic PM Domain Node ==
-> > > +
-> > > +Required properties:
-> > > + - compatible:     Must be: "xlnx,zynqmp-power-controller"
-> > > +
-> > > +This node contains a number of subnodes, each representing a single
-> > > +PM domain that PM domain consumer devices reference.
-> > > +
-> > > +== PM Domain Nodes ==
-> > > +
-> > > +Required properties:
-> > > + - #power-domain-cells:    Number of cells in a PM domain specifier. Must
-> > be 0.
-> > > + - pd-id:          Domain identifier as defined by platform firmware.
-> > > +                   This identifier is passed to the PM firmware.
-> >
-> > Make this a cell for the power domain consumer.
-> [Jolly] We have more than one Ids for GPU device. Also they don't have parent child relationship and hence are defined as flat hierarchy. (shown in example below)
+On 9/25/2018 1:27 AM, Wolfram Sang wrote:
+> On Mon, Sep 24, 2018 at 03:15:46PM -0700, Jae Hyun Yoo wrote:
+>> Hi Wolfram,
+>>
+>> On 9/24/2018 2:58 PM, Wolfram Sang wrote:
+>>> On Tue, Sep 18, 2018 at 11:02:54AM -0700, Jae Hyun Yoo wrote:
+>>>> On 9/10/2018 2:45 PM, Jae Hyun Yoo wrote:
+>>>>> +- idle-wait-timeout-ms	: bus idle waiting timeout in milliseconds when
+>>>>> +			  multi-master is set, defaults to 100 ms when not
+>>>>> +			  specified.
+>>>>
+>>>> Will change it to 'aspeed,idle-wait-timeout-ms' as it's a non standard
+>>>> property.
+>>>
+>>> No need. This binding is not a HW description, so not a DT property in
+>>> my book. I still don't understand: Your IP core in master mode does not
+>>> have a BUSY bit or similar which detects when a START was detected and
+>>> clears after a STOP?
+>>>
+>>
+>> Okay, I'll keep this property as it is then.
+> 
+> Sorry for the misunderstanding. I don't think this a property, at all.
+> It doesn't describe the hardware, it is more of a configuration thing,
+> or?
+> 
 
-Then the gpu node should have:
+You are right. It doesn't describe the hardware but it needs to be
+configurable because it very depends on the peer master's behavior.
+If peer master sends a long packet usually, it should have a long
+timeout value since a slave receiving operation takes long time,
+and it should be adjusted with an optimal value with taking some
+experiments to make it not too long. Any suggestion?
 
-power-domains = <&pd 58 &pd 20 &pd 21>;
-
-Also, for this and the firmware reset binding, there is no reason that
-I see to make these all subnodes. A single firmware node can be a
-provider of multiple functions. You only need child nodes if the
-sub-functions have their own resources (clks, irqs, etc.). IOW, don't
-create nodes just because you want to instantiate drivers that way. DT
-is not the only way to instantiate devices for drivers.
-
-Rob
+Thanks,
+Jae
