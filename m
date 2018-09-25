@@ -1,34 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 25 Sep 2018 17:39:30 +0100
-Subject: [PATCH v2 0/4] Qcom smmu-500 TLB invalidation errata for sdm845
-In-Reply-To: <20180925120933.54xd72sv65d63tkl@8bytes.org>
-References: <20180910062551.28175-1-vivek.gautam@codeaurora.org>
- <20180925120933.54xd72sv65d63tkl@8bytes.org>
-Message-ID: <20180925163928.GA1839@brain-police>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 25 Sep 2018 13:42:12 -0300
+Subject: [PATCH v9 4/5] clk: imx: add imx composite clock
+In-Reply-To: <1537785597-26499-5-git-send-email-abel.vesa@nxp.com>
+References: <1537785597-26499-1-git-send-email-abel.vesa@nxp.com>
+ <1537785597-26499-5-git-send-email-abel.vesa@nxp.com>
+Message-ID: <CAOMZO5D7yLUzriOub4RWsq1K8_fTj6c0LFOnSZwHyjqMPYu=0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2018 at 02:09:34PM +0200, Joerg Roedel wrote:
-> On Mon, Sep 10, 2018 at 11:55:47AM +0530, Vivek Gautam wrote:
-> > Vivek Gautam (4):
-> >   firmware: qcom_scm-64: Add atomic version of qcom_scm_call
-> >   firmware/qcom_scm: Add atomic version of io read/write APIs
-> >   firmware/qcom_scm: Add scm call to handle smmu errata
-> >   iommu/arm-smmu: Add support to handle Qcom's TLBI serialization errata
-> > 
-> >  drivers/firmware/qcom_scm-32.c |  17 ++++
-> >  drivers/firmware/qcom_scm-64.c | 181 +++++++++++++++++++++++++++++++----------
-> >  drivers/firmware/qcom_scm.c    |  18 ++++
-> >  drivers/firmware/qcom_scm.h    |   9 ++
-> >  drivers/iommu/arm-smmu-regs.h  |   2 +
-> >  drivers/iommu/arm-smmu.c       | 133 +++++++++++++++++++++++++++++-
-> >  include/linux/qcom_scm.h       |   6 ++
-> >  7 files changed, 320 insertions(+), 46 deletions(-)
-> 
-> Should this go through the iommu-tree? In that case I need Acked-by's
-> for the firmware code changes.
+Hi Abel,
 
-Yup, and I'd also like Robin's ack on the arm-smmu*.c changes (I see he has
-some comments on the code as it stands).
+On Mon, Sep 24, 2018 at 7:39 AM, Abel Vesa <abel.vesa@nxp.com> wrote:
 
-Will
+> +static long imx_clk_composite_divider_round_rate(struct clk_hw *hw,
+> +                                               unsigned long rate,
+> +                                               unsigned long *prate)
+> +{
+> +       int prediv_value;
+> +       int div_value;
+> +
+> +       imx_clk_composite_compute_dividers(rate, *prate,
+> +                                               &prediv_value, &div_value);
+> +
+> +       rate = DIV_ROUND_UP_ULL((u64)*prate, prediv_value);
+
+You assing a value to 'rate' here.
+
+> +       rate = DIV_ROUND_UP_ULL((u64)rate, div_value);
+
+And then overwrite it immediately after.
+
+Is this really the intended behavior?
