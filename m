@@ -1,33 +1,50 @@
-From: yaojun8558363@gmail.com (Jun Yao)
-Date: Tue, 25 Sep 2018 16:56:18 +0800
-Subject: [PATCH v5 0/6] Move swapper_pg_dir to rodata section.
-In-Reply-To: <2f97b06e-ba36-4f6f-e29d-a9747ad9ec75@arm.com>
-References: <20180917044333.30051-1-yaojun8558363@gmail.com>
- <2f97b06e-ba36-4f6f-e29d-a9747ad9ec75@arm.com>
-Message-ID: <20180925085618.GA26696@toy>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 25 Sep 2018 11:01:39 +0200
+Subject: [PATCH 1/2] arm64: dts: allwinner: Olimex A64-OLinuXino: enable
+ eMMC.
+In-Reply-To: <CAG7TQgE_KU_cK_4E+NG8Qcw-QB2=C6YoqBYR2svmWxywFyySCw@mail.gmail.com>
+References: <20180919141815.18737-1-rodrigo@tjader.xyz>
+ <20180921142811.h5jraemk565alh3i@flea>
+ <CAG7TQgE_KU_cK_4E+NG8Qcw-QB2=C6YoqBYR2svmWxywFyySCw@mail.gmail.com>
+Message-ID: <20180925090139.qbu6tqav5oth7zkw@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
-
-On Fri, Sep 21, 2018 at 11:26:39PM +0100, James Morse wrote:
-> Hi Jun,
+On Fri, Sep 21, 2018 at 11:54:07AM -0300, Rodrigo Exterck?tter Tj?der wrote:
+> On Fri, Sep 21, 2018 at 11:28 AM Maxime Ripard
+> <maxime.ripard@bootlin.com> wrote:
+> > Expanding a bit more that commit log would be helpful. What is the
+> > eMMC connected to that board? Do all versions have it? Which modes are
+> > supposed to be supported, and which one have been tested?
 > 
-> On 09/17/2018 05:43 AM, Jun Yao wrote:
-> > Version 5 changes:
-> > 	1. Correct spelling and indentation errors[1].
-> > 	2. Update init_mm.pgd by assembly[2].
-> > 	3. Simplify set_p?d() by introducing set_swapper_pgd()[3].
-> > 	4. Reduce unnecessary tlbi for every write to swapper_pg_dir
-> > 	   during paging_init()[3].
+> The terseness of the commit message was already pointed out to me on
+> #linux-sunxi. I was waiting for more comments before sending a v2.
 > 
-> 
-> For the series:
-> Reviewed-by: James Morse <james.morse@arm.com>
+> But you do touch on something I also realized: there are actually
+> three versions of the A64-OLinuXino. In fact only one of them has the
+> WiFi board, which is already enabled in the current device tree.
 
-Thank you very much for helping me improve the patch and tolerate the
-mistakes I made.
+Sigh, ok..
 
-Thanks,
+> Wouldn't it be better to split it into three separate device trees? I
+> have made a patch that does that[1], if you think that is a good
+> approach I can submit that as a patch and then later submit a patch on
+> top of that to enable the eMMC only on the two boards that have it.
 
-Jun
+We can't really do that, unfortunately. If the device tree name was to
+change for a given board, we'd break all the build systems, boot
+scripts and distros out there.
+
+Maxime
+
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180925/e6d44c9b/attachment.sig>
