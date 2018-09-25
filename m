@@ -1,66 +1,45 @@
-From: yaojun8558363@gmail.com (Jun Yao)
-Date: Tue, 25 Sep 2018 17:53:16 +0800
-Subject: [PATCH v5 0/6] Move swapper_pg_dir to rodata section.
-In-Reply-To: <20180924171936.q5bfvczzllmm5lpe@lakrids.cambridge.arm.com>
-References: <20180917044333.30051-1-yaojun8558363@gmail.com>
- <20180924171936.q5bfvczzllmm5lpe@lakrids.cambridge.arm.com>
-Message-ID: <20180925095316.GA27420@toy>
+From: colin.king@canonical.com (Colin King)
+Date: Tue, 25 Sep 2018 10:55:56 +0100
+Subject: [PATCH] pinctrl: mediatek: fix check on EINT_NA comparison
+Message-ID: <20180925095556.19779-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+From: Colin Ian King <colin.king@canonical.com>
 
-On Mon, Sep 24, 2018 at 06:19:36PM +0100, Mark Rutland wrote:
-> Hi,
-> 
-> On Mon, Sep 17, 2018 at 12:43:27PM +0800, Jun Yao wrote:
-> > Version 5 changes:
-> > 	1. Correct spelling and indentation errors[1].
-> > 	2. Update init_mm.pgd by assembly[2].
-> > 	3. Simplify set_p?d() by introducing set_swapper_pgd()[3].
-> > 	4. Reduce unnecessary tlbi for every write to swapper_pg_dir
-> > 	   during paging_init()[3].
-> > 
-> > v4: https://www.spinics.net/lists/arm-kernel/msg672195.html
-> > v3: https://www.spinics.net/lists/arm-kernel/msg662537.html
-> > v2: https://patchwork.kernel.org/patch/10485641/
-> > v1: https://patchwork.kernel.org/patch/10476595/
-> > 
-> > [1] https://www.spinics.net/lists/arm-kernel/msg675189.html
-> > [2] https://www.spinics.net/lists/arm-kernel/msg675193.html
-> > [3] https://www.spinics.net/lists/arm-kernel/msg675196.html
-> > 
-> > Jun Yao (6):
-> >   arm64/mm: Introduce the init_pg_dir.
-> >   arm64/mm: Pass ttbr1 as a parameter to __enable_mmu().
-> >   arm64/mm: Create the initial page table in the init_pg_dir.
-> >   arm64/mm: Create the final page table directly in swapper_pg_dir.
-> >   arm64/mm: Populate the swapper_pg_dir by fixmap.
-> >   arm64/mm: Move {idmap_pg_dir .. swapper_pg_dir} to rodata section.
-> > 
-> >  arch/arm64/include/asm/assembler.h | 29 ++++++++++++++++++
-> >  arch/arm64/include/asm/pgtable.h   | 36 ++++++++++++++++++----
-> >  arch/arm64/kernel/asm-offsets.c    |  1 +
-> >  arch/arm64/kernel/head.S           | 48 ++++++++++++++++++++----------
-> >  arch/arm64/kernel/sleep.S          |  1 +
-> >  arch/arm64/kernel/vmlinux.lds.S    | 47 +++++++++++++++++++----------
-> >  arch/arm64/mm/mmu.c                | 45 +++++++++++++---------------
-> >  7 files changed, 147 insertions(+), 60 deletions(-)
-> 
-> I've pushed a branch with the cleanups I requested [1] folded in.
-> 
-> I'm still a bit worried about the pgd lock, but otherwise I think this
-> is sound. I intend to throw some testing at it, just in case.
-> 
-> If you're happy with that branch, I'll ask Will and Catalin to consider
-> picking it up.
+Currently, the check on desc->eint.eint_n == EINT_NA is always false
+because this is comparing a u16 to -1 which can never be true.  Fix
+this by casting EINT_NA to u16.
 
-This branch looks great. Thank you for improving my patch.
+Detected by CoverityScan, CID#1473610 ("Operands don't affect result")
 
-Is there anything I need to do? This is my first time to submit a patch,
-so I am a bit overwhelmed. I think I should wait for other people to
-review my patch. If there is a problem, I need to fix it.
+Fixes: fb5fa8dc151b ("pinctrl: mediatek: extend struct mtk_pin_desc to pinctrl-mtk-common-v2.c")
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ drivers/pinctrl/mediatek/pinctrl-moore.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Thanks,
-
-Jun
+diff --git a/drivers/pinctrl/mediatek/pinctrl-moore.c b/drivers/pinctrl/mediatek/pinctrl-moore.c
+index c27597cd3931..4aa6def1f785 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-moore.c
++++ b/drivers/pinctrl/mediatek/pinctrl-moore.c
+@@ -476,7 +476,7 @@ static int mtk_gpio_to_irq(struct gpio_chip *chip, unsigned int offset)
+ 
+ 	desc = (const struct mtk_pin_desc *)&hw->soc->pins[offset];
+ 
+-	if (desc->eint.eint_n == EINT_NA)
++	if (desc->eint.eint_n == (u16)EINT_NA)
+ 		return -ENOTSUPP;
+ 
+ 	return mtk_eint_find_irq(hw->eint, desc->eint.eint_n);
+@@ -493,7 +493,7 @@ static int mtk_gpio_set_config(struct gpio_chip *chip, unsigned int offset,
+ 
+ 	if (!hw->eint ||
+ 	    pinconf_to_config_param(config) != PIN_CONFIG_INPUT_DEBOUNCE ||
+-	    desc->eint.eint_n == EINT_NA)
++	    desc->eint.eint_n == (u16)EINT_NA)
+ 		return -ENOTSUPP;
+ 
+ 	debounce = pinconf_to_config_argument(config);
+-- 
+2.17.1
