@@ -1,109 +1,142 @@
 From: hch@lst.de (Christoph Hellwig)
-Date: Tue, 25 Sep 2018 13:30:08 -0700
-Subject: [PATCH 4/5] block: remove ARCH_BIOVEC_PHYS_MERGEABLE
+Date: Tue, 25 Sep 2018 13:30:09 -0700
+Subject: [PATCH 5/5] xen: don't include <xen/xen.h> from <asm/io.h> and
+ <asm/dma-mapping.h>
 In-Reply-To: <20180925203009.1838-1-hch@lst.de>
 References: <20180925203009.1838-1-hch@lst.de>
-Message-ID: <20180925203009.1838-5-hch@lst.de>
+Message-ID: <20180925203009.1838-6-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Take the Xen check into the core code instead of delegating it to
-the architectures.
+Nothing Xen specific in these headers, which get included from a lot
+of code in the kernel.  So prune the includes and move them to the
+Xen-specific files that actually use them instead.
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- arch/arm/include/asm/io.h   | 3 ---
- arch/arm64/include/asm/io.h | 3 ---
- arch/x86/include/asm/io.h   | 3 ---
- block/blk.h                 | 7 ++-----
- drivers/xen/biomerge.c      | 2 +-
- 5 files changed, 3 insertions(+), 15 deletions(-)
+ arch/arm/include/asm/io.h          | 1 -
+ arch/arm64/include/asm/io.h        | 2 --
+ arch/x86/include/asm/io.h          | 4 ----
+ arch/x86/include/asm/xen/events.h  | 2 ++
+ arch/x86/xen/enlighten.c           | 1 +
+ arch/x86/xen/enlighten_pvh.c       | 1 +
+ arch/x86/xen/platform-pci-unplug.c | 1 +
+ arch/x86/xen/pmu.c                 | 1 +
+ drivers/xen/xen-acpi-pad.c         | 1 +
+ 9 files changed, 7 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index cf5cd88e7289..6ae7674da0d6 100644
+index 6ae7674da0d6..6b51826ab3d1 100644
 --- a/arch/arm/include/asm/io.h
 +++ b/arch/arm/include/asm/io.h
-@@ -459,9 +459,6 @@ extern void pci_iounmap(struct pci_dev *dev, void __iomem *addr);
+@@ -28,7 +28,6 @@
+ #include <asm/byteorder.h>
+ #include <asm/memory.h>
+ #include <asm-generic/pci_iomap.h>
+-#include <xen/xen.h>
  
- #include <asm-generic/io.h>
- 
--#define ARCH_BIOVEC_PHYS_MERGEABLE(vec1, vec2)				\
--	 (!xen_domain() || xen_biovec_phys_mergeable(vec1, vec2))
--
- #ifdef CONFIG_MMU
- #define ARCH_HAS_VALID_PHYS_ADDR_RANGE
- extern int valid_phys_addr_range(phys_addr_t addr, size_t size);
+ /*
+  * ISA I/O bus memory addresses are 1:1 with the physical address.
 diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-index 06119ee511cd..18f6ae6a43f1 100644
+index 18f6ae6a43f1..9f8b915af3a7 100644
 --- a/arch/arm64/include/asm/io.h
 +++ b/arch/arm64/include/asm/io.h
-@@ -205,8 +205,5 @@ extern int valid_mmap_phys_addr_range(unsigned long pfn, size_t size);
+@@ -31,8 +31,6 @@
+ #include <asm/alternative.h>
+ #include <asm/cpufeature.h>
  
- extern int devmem_is_allowed(unsigned long pfn);
- 
--#define ARCH_BIOVEC_PHYS_MERGEABLE(vec1, vec2)				\
--	 (!xen_domain() || xen_biovec_phys_mergeable(vec1, vec2))
+-#include <xen/xen.h>
 -
- #endif	/* __KERNEL__ */
- #endif	/* __ASM_IO_H */
+ /*
+  * Generic IO read/write.  These perform native-endian accesses.
+  */
 diff --git a/arch/x86/include/asm/io.h b/arch/x86/include/asm/io.h
-index abdb501a551d..232d8e9ee8a0 100644
+index 232d8e9ee8a0..9a92a3ac2ac5 100644
 --- a/arch/x86/include/asm/io.h
 +++ b/arch/x86/include/asm/io.h
-@@ -371,9 +371,6 @@ extern bool is_early_ioremap_ptep(pte_t *ptep);
+@@ -369,10 +369,6 @@ extern void __iomem *ioremap_wt(resource_size_t offset, unsigned long size);
  
- #ifdef CONFIG_XEN
- #include <xen/xen.h>
+ extern bool is_early_ioremap_ptep(pte_t *ptep);
+ 
+-#ifdef CONFIG_XEN
+-#include <xen/xen.h>
+-#endif	/* CONFIG_XEN */
 -
--#define ARCH_BIOVEC_PHYS_MERGEABLE(vec1, vec2)				\
--	 (!xen_domain() || xen_biovec_phys_mergeable(vec1, vec2))
- #endif	/* CONFIG_XEN */
- 
  #define IO_SPACE_LIMIT 0xffff
-diff --git a/block/blk.h b/block/blk.h
-index 50f74ce60453..58c030f727e9 100644
---- a/block/blk.h
-+++ b/block/blk.h
-@@ -4,6 +4,7 @@
  
- #include <linux/idr.h>
- #include <linux/blk-mq.h>
+ #include <asm-generic/io.h>
+diff --git a/arch/x86/include/asm/xen/events.h b/arch/x86/include/asm/xen/events.h
+index d383140e1dc8..068d9b067c83 100644
+--- a/arch/x86/include/asm/xen/events.h
++++ b/arch/x86/include/asm/xen/events.h
+@@ -2,6 +2,8 @@
+ #ifndef _ASM_X86_XEN_EVENTS_H
+ #define _ASM_X86_XEN_EVENTS_H
+ 
 +#include <xen/xen.h>
- #include "blk-mq.h"
++
+ enum ipi_vector {
+ 	XEN_RESCHEDULE_VECTOR,
+ 	XEN_CALL_FUNCTION_VECTOR,
+diff --git a/arch/x86/xen/enlighten.c b/arch/x86/xen/enlighten.c
+index 2eeddd814653..0ca46e03b830 100644
+--- a/arch/x86/xen/enlighten.c
++++ b/arch/x86/xen/enlighten.c
+@@ -5,6 +5,7 @@
+ #include <linux/kexec.h>
+ #include <linux/slab.h>
  
- /* Amount of time in which a process may batch requests */
-@@ -149,10 +150,6 @@ static inline void blk_queue_enter_live(struct request_queue *q)
- 	percpu_ref_get(&q->q_usage_counter);
- }
++#include <xen/xen.h>
+ #include <xen/features.h>
+ #include <xen/page.h>
+ #include <xen/interface/memory.h>
+diff --git a/arch/x86/xen/enlighten_pvh.c b/arch/x86/xen/enlighten_pvh.c
+index c85d1a88f476..2a9025343534 100644
+--- a/arch/x86/xen/enlighten_pvh.c
++++ b/arch/x86/xen/enlighten_pvh.c
+@@ -11,6 +11,7 @@
+ #include <asm/xen/interface.h>
+ #include <asm/xen/hypercall.h>
  
--#ifndef ARCH_BIOVEC_PHYS_MERGEABLE
--#define ARCH_BIOVEC_PHYS_MERGEABLE(vec1, vec2) true
--#endif
--
- static inline bool biovec_phys_mergeable(struct request_queue *q,
- 		struct bio_vec *vec1, struct bio_vec *vec2)
- {
-@@ -162,7 +159,7 @@ static inline bool biovec_phys_mergeable(struct request_queue *q,
++#include <xen/xen.h>
+ #include <xen/interface/memory.h>
+ #include <xen/interface/hvm/start_info.h>
  
- 	if (addr1 + vec1->bv_len != addr2)
- 		return false;
--	if (!ARCH_BIOVEC_PHYS_MERGEABLE(vec1, vec2))
-+	if (xen_domain() && !xen_biovec_phys_mergeable(vec1, vec2))
- 		return false;
- 	if ((addr1 | mask) != ((addr2 + vec2->bv_len - 1) | mask))
- 		return false;
-diff --git a/drivers/xen/biomerge.c b/drivers/xen/biomerge.c
-index 399c4e30f723..f3fbb700f569 100644
---- a/drivers/xen/biomerge.c
-+++ b/drivers/xen/biomerge.c
-@@ -1,7 +1,7 @@
- // SPDX-License-Identifier: GPL-2.0
- #include <linux/bio.h>
--#include <linux/io.h>
+diff --git a/arch/x86/xen/platform-pci-unplug.c b/arch/x86/xen/platform-pci-unplug.c
+index 33a783c77d96..b99585034dd2 100644
+--- a/arch/x86/xen/platform-pci-unplug.c
++++ b/arch/x86/xen/platform-pci-unplug.c
+@@ -23,6 +23,7 @@
+ #include <linux/io.h>
  #include <linux/export.h>
+ 
++#include <xen/xen.h>
+ #include <xen/platform_pci.h>
+ #include "xen-ops.h"
+ 
+diff --git a/arch/x86/xen/pmu.c b/arch/x86/xen/pmu.c
+index 7d00d4ad44d4..5f7d530fc679 100644
+--- a/arch/x86/xen/pmu.c
++++ b/arch/x86/xen/pmu.c
+@@ -3,6 +3,7 @@
+ #include <linux/interrupt.h>
+ 
+ #include <asm/xen/hypercall.h>
 +#include <xen/xen.h>
  #include <xen/page.h>
- 
- bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
+ #include <xen/interface/xen.h>
+ #include <xen/interface/vcpu.h>
+diff --git a/drivers/xen/xen-acpi-pad.c b/drivers/xen/xen-acpi-pad.c
+index 23d1808fe027..e25ab76b9c99 100644
+--- a/drivers/xen/xen-acpi-pad.c
++++ b/drivers/xen/xen-acpi-pad.c
+@@ -19,6 +19,7 @@
+ #include <linux/kernel.h>
+ #include <linux/types.h>
+ #include <linux/acpi.h>
++#include <xen/xen.h>
+ #include <xen/interface/version.h>
+ #include <xen/xen-ops.h>
+ #include <asm/xen/hypercall.h>
 -- 
 2.19.0
