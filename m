@@ -1,127 +1,59 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Wed, 26 Sep 2018 00:36:30 +0800
-Subject: [PATCH V2 1/2] firmware: imx: add pm svc headfile
-In-Reply-To: <1537893391-31084-1-git-send-email-aisheng.dong@nxp.com>
-References: <1537893391-31084-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1537893391-31084-2-git-send-email-aisheng.dong@nxp.com>
+Date: Wed, 26 Sep 2018 00:43:46 +0800
+Subject: [PATCH V2 00/11] clk: imx: add imx8qxp clock support
+Message-ID: <1537893837-31172-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SCU PM SVC related protocol definitions which will be used by a number
-of PM functions like Power Domain, Clock, Reset and etc. The detailed
-implementation of each function will put in the individual function drivers.
+This patch series adds i.MX8QXP clock support which is based
+on the clock service provided by SCU firmware.
+It depends on SCU driver.
 
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
-v6->v7: new introduced
----
- include/soc/imx/scu/sci.h    |  1 +
- include/soc/imx/scu/svc/pm.h | 85 ++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 86 insertions(+)
- create mode 100644 include/soc/imx/scu/svc/pm.h
+Dong Aisheng (11):
+  clk: imx: add configuration option for mmio clks
+  clk: imx: scu: add scu clock common part
+  clk: imx: scu: add scu clock divider
+  clk: imx: scu: add scu clock gpr divider
+  clk: imx: scu: add scu clock gate
+  clk: imx: scu: add scu clock gpr gate
+  clk: imx: scu: add scu clock mux
+  clk: imx: scu: add scu clock gpr mux
+  clk: imx: add common imx_clk_hw_fixed functions
+  clk: imx: add imx_check_clk_hws helper function
+  clk: imx: add imx8qxp clk driver
 
-diff --git a/include/soc/imx/scu/sci.h b/include/soc/imx/scu/sci.h
-index 4a60d70..b600f7e 100644
---- a/include/soc/imx/scu/sci.h
-+++ b/include/soc/imx/scu/sci.h
-@@ -14,4 +14,5 @@
- #include <soc/imx/scu/types.h>
- 
- #include <soc/imx/scu/svc/misc.h>
-+#include <soc/imx/scu/svc/pm.h>
- #endif /* _SC_SCI_H */
-diff --git a/include/soc/imx/scu/svc/pm.h b/include/soc/imx/scu/svc/pm.h
-new file mode 100644
-index 0000000..f247fce
---- /dev/null
-+++ b/include/soc/imx/scu/svc/pm.h
-@@ -0,0 +1,85 @@
-+/* SPDX-License-Identifier: GPL-2.0+ */
-+/*
-+ * Copyright (C) 2016 Freescale Semiconductor, Inc.
-+ * Copyright 2017~2018 NXP
-+ *
-+ * Header file containing the public API for the System Controller (SC)
-+ * Power Management (PM) function. This includes functions for power state
-+ * control, clock control, reset control, and wake-up event control.
-+ *
-+ * PM_SVC (SVC) Power Management Service
-+ *
-+ * Module for the Power Management (PM) service.
-+ */
-+
-+#ifndef _SC_PM_API_H
-+#define _SC_PM_API_H
-+
-+#include <soc/imx/scu/sci.h>
-+
-+/*
-+ * This type is used to indicate RPC PM function calls.
-+ */
-+enum pm_func_e {
-+	PM_FUNC_UNKNOWN = 0,
-+	PM_FUNC_SET_SYS_POWER_MODE = 19,
-+	PM_FUNC_SET_PARTITION_POWER_MODE = 1,
-+	PM_FUNC_GET_SYS_POWER_MODE = 2,
-+	PM_FUNC_SET_RESOURCE_POWER_MODE = 3,
-+	PM_FUNC_GET_RESOURCE_POWER_MODE = 4,
-+	PM_FUNC_REQ_LOW_POWER_MODE = 16,
-+	PM_FUNC_SET_CPU_RESUME_ADDR = 17,
-+	PM_FUNC_REQ_SYS_IF_POWER_MODE = 18,
-+	PM_FUNC_SET_CLOCK_RATE = 5,
-+	PM_FUNC_GET_CLOCK_RATE = 6,
-+	PM_FUNC_CLOCK_ENABLE = 7,
-+	PM_FUNC_SET_CLOCK_PARENT = 14,
-+	PM_FUNC_GET_CLOCK_PARENT = 15,
-+	PM_FUNC_RESET = 13,
-+	PM_FUNC_RESET_REASON = 10,
-+	PM_FUNC_BOOT = 8,
-+	PM_FUNC_REBOOT = 9,
-+	PM_FUNC_REBOOT_PARTITION = 12,
-+	PM_FUNC_CPU_START = 11,
-+};
-+
-+/*
-+ * Defines for ALL parameters
-+ */
-+#define SC_PM_CLK_ALL		UINT8_MAX	/* All clocks */
-+
-+/*
-+ * Defines for SC PM Power Mode
-+ */
-+#define SC_PM_PW_MODE_OFF	0	/* Power off */
-+#define SC_PM_PW_MODE_STBY	1	/* Power in standby */
-+#define SC_PM_PW_MODE_LP	2	/* Power in low-power */
-+#define SC_PM_PW_MODE_ON	3	/* Power on */
-+
-+/*
-+ * Defines for SC PM CLK
-+ */
-+#define SC_PM_CLK_SLV_BUS	0	/* Slave bus clock */
-+#define SC_PM_CLK_MST_BUS	1	/* Master bus clock */
-+#define SC_PM_CLK_PER		2	/* Peripheral clock */
-+#define SC_PM_CLK_PHY		3	/* Phy clock */
-+#define SC_PM_CLK_MISC		4	/* Misc clock */
-+#define SC_PM_CLK_MISC0		0	/* Misc 0 clock */
-+#define SC_PM_CLK_MISC1		1	/* Misc 1 clock */
-+#define SC_PM_CLK_MISC2		2	/* Misc 2 clock */
-+#define SC_PM_CLK_MISC3		3	/* Misc 3 clock */
-+#define SC_PM_CLK_MISC4		4	/* Misc 4 clock */
-+#define SC_PM_CLK_CPU		2	/* CPU clock */
-+#define SC_PM_CLK_PLL		4	/* PLL */
-+#define SC_PM_CLK_BYPASS	4	/* Bypass clock */
-+
-+/*
-+ * Defines for SC PM CLK Parent
-+ */
-+#define SC_PM_PARENT_XTAL	0	/* Parent is XTAL. */
-+#define SC_PM_PARENT_PLL0	1	/* Parent is PLL0 */
-+#define SC_PM_PARENT_PLL1	2	/* Parent is PLL1 or PLL0/2 */
-+#define SC_PM_PARENT_PLL2	3	/* Parent in PLL2 or PLL0/4 */
-+#define SC_PM_PARENT_BYPS	4	/* Parent is a bypass clock. */
-+
-+#endif /* _SC_PM_API_H */
+ arch/arm/mach-imx/Kconfig                 |  11 +
+ drivers/clk/Kconfig                       |   1 +
+ drivers/clk/imx/Kconfig                   |   7 +
+ drivers/clk/imx/Makefile                  |   4 +-
+ drivers/clk/imx/clk-common.h              |  27 ++
+ drivers/clk/imx/scu/Kconfig               |   5 +
+ drivers/clk/imx/scu/Makefile              |  12 +
+ drivers/clk/imx/scu/clk-divider-gpr-scu.c | 131 +++++++++
+ drivers/clk/imx/scu/clk-divider-scu.c     | 190 +++++++++++++
+ drivers/clk/imx/scu/clk-gate-gpr-scu.c    |  84 ++++++
+ drivers/clk/imx/scu/clk-gate-scu.c        | 230 ++++++++++++++++
+ drivers/clk/imx/scu/clk-imx8qxp.c         | 426 ++++++++++++++++++++++++++++++
+ drivers/clk/imx/scu/clk-mux-gpr-scu.c     |  90 +++++++
+ drivers/clk/imx/scu/clk-mux-scu.c         | 142 ++++++++++
+ drivers/clk/imx/scu/clk-scu.c             |  17 ++
+ drivers/clk/imx/scu/clk-scu.h             |  97 +++++++
+ include/soc/imx/imx8qxp/lpcg.h            | 186 +++++++++++++
+ 17 files changed, 1659 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/imx/Kconfig
+ create mode 100644 drivers/clk/imx/clk-common.h
+ create mode 100644 drivers/clk/imx/scu/Kconfig
+ create mode 100644 drivers/clk/imx/scu/Makefile
+ create mode 100644 drivers/clk/imx/scu/clk-divider-gpr-scu.c
+ create mode 100644 drivers/clk/imx/scu/clk-divider-scu.c
+ create mode 100644 drivers/clk/imx/scu/clk-gate-gpr-scu.c
+ create mode 100644 drivers/clk/imx/scu/clk-gate-scu.c
+ create mode 100644 drivers/clk/imx/scu/clk-imx8qxp.c
+ create mode 100644 drivers/clk/imx/scu/clk-mux-gpr-scu.c
+ create mode 100644 drivers/clk/imx/scu/clk-mux-scu.c
+ create mode 100644 drivers/clk/imx/scu/clk-scu.c
+ create mode 100644 drivers/clk/imx/scu/clk-scu.h
+ create mode 100644 include/soc/imx/imx8qxp/lpcg.h
+
 -- 
 2.7.4
