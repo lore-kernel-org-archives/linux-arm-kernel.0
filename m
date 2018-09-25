@@ -1,40 +1,44 @@
 From: leilk.liu@mediatek.com (Leilk Liu)
-Date: Tue, 25 Sep 2018 10:20:43 +0800
-Subject: [PATCH v4 3/3] arm64: dts: Add spi slave dts
-In-Reply-To: <1537842043-15255-1-git-send-email-leilk.liu@mediatek.com>
-References: <1537842043-15255-1-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <1537842043-15255-4-git-send-email-leilk.liu@mediatek.com>
+Date: Tue, 25 Sep 2018 10:20:40 +0800
+Subject: [PATCH v4 0/3] Add Mediatek SPI slave driver
+Message-ID: <1537842043-15255-1-git-send-email-leilk.liu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds MT2712 spi slave into device tree.
+>From 7f2423debd91771a1d3a5ca02cd3990f1417bcb8 Mon Sep 17 00:00:00 2001
+From: Leilk Liu <leilk.liu@mediatek.com>
+Date: Tue, 25 Sep 2018 10:11:44 +0800
+Subject: Subject: [PATCH v4 0/3] Add Mediatek SPI slave driver
 
-Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/mt2712e.dtsi |   11 +++++++++++
- 1 file changed, 11 insertions(+)
+v4:
+1. Fix Mark Brown review comment about kconfig & driver.
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-index 75cc0f7..ee627a7 100644
---- a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-@@ -301,6 +301,17 @@
- 		status = "disabled";
- 	};
- 
-+	spis1: spi at 10013000 {
-+		compatible = "mediatek,mt2712-spi-slave";
-+		reg = <0 0x10013000 0 0x100>;
-+		interrupts = <GIC_SPI 283 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&infracfg CLK_INFRA_AO_SPI1>;
-+		clock-names = "spi";
-+		assigned-clocks = <&topckgen CLK_TOP_SPISLV_SEL>;
-+		assigned-clock-parents = <&topckgen CLK_TOP_UNIVPLL1_D2>;
-+		status = "disabled";
-+	};
-+
- 	apmixedsys: syscon at 10209000 {
- 		compatible = "mediatek,mt2712-apmixedsys", "syscon";
- 		reg = <0 0x10209000 0 0x1000>;
+v3:
+1. Fix Rob Herring review comment about bindings.
+2. remove unused variables in driver.
+
+v2:
+1. Fix Sean Wang review comment.
+2. remove unused register and offset define.
+3. update bindings file with assigned-clocks and assigned-clocks-parents.
+
+v1:
+This series are based on 4.19-rc1 and provide three patches to add mediatek spi slave driver.
+
+
+Leilk Liu (3):
+  spi: mediatek: add bindings for Mediatek MT2712 soc platform
+  spi: mediatek: add spi slave for Mediatek MT2712
+  arm64: dts: Add spi slave dts
+
+ .../devicetree/bindings/spi/spi-slave-mt27xx.txt   |  32 ++
+ arch/arm64/boot/dts/mediatek/mt2712e.dtsi          |  11 +
+ drivers/spi/Kconfig                                |  10 +
+ drivers/spi/Makefile                               |   1 +
+ drivers/spi/spi-slave-mt27xx.c                     | 554 +++++++++++++++++++++
+ 5 files changed, 608 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/spi/spi-slave-mt27xx.txt
+ create mode 100644 drivers/spi/spi-slave-mt27xx.c
+
 -- 
-1.7.9.5
+1.9.1
