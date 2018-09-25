@@ -1,84 +1,153 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Tue, 25 Sep 2018 10:44:11 +0530
-Subject: [PATCH 0/4] Update am437x and am335x dts to probe with ti-sysc
-In-Reply-To: <20180925000545.22931-1-tony@atomide.com>
-References: <20180925000545.22931-1-tony@atomide.com>
-Message-ID: <e9afe736-c2f0-6182-afd0-08279e09a35e@ti.com>
+From: MNARANI@xilinx.com (Manish Narani)
+Date: Tue, 25 Sep 2018 05:18:03 +0000
+Subject: [PATCH] sdhci: arasan: Add runtime PM support
+In-Reply-To: <1537283046-13985-1-git-send-email-manish.narani@xilinx.com>
+References: <1537283046-13985-1-git-send-email-manish.narani@xilinx.com>
+Message-ID: <DM6PR02MB52271FEA75D6AF49A345FC9BC1160@DM6PR02MB5227.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Ping!
 
-
-On Tuesday 25 September 2018 05:35 AM, Tony Lindgren wrote:
-> Hi all,
+> -----Original Message-----
+> From: Manish Narani [mailto:manish.narani at xilinx.com]
+> Sent: Tuesday, September 18, 2018 8:34 PM
+> To: adrian.hunter at intel.com; Michal Simek <michals@xilinx.com>;
+> ulf.hansson at linaro.org
+> Cc: linux-mmc at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; Manish Narani <MNARANI@xilinx.com>
+> Subject: [PATCH] sdhci: arasan: Add runtime PM support
 > 
-> Here are four patches to make am437x and am335x l4 devices to probe with
-> ti-sysc driver similar to what we've already done for omap4. The related
-> legacy hwmod platform data will be removed few merge cycles later.
+> Add runtime PM support in Arasan SDHCI driver.
 > 
-> There are still dependencies to Tero's clkctrl changes and for ti-sysc
-> drivers changes. So these patches are based on on v4.19-rc3 merged with
-> my omap-for-v4.20/dt branch plus the following additional series of
-> patches:
+> Signed-off-by: Manish Narani <manish.narani@xilinx.com>
+> ---
+>  drivers/mmc/host/sdhci-of-arasan.c | 80
+> +++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 78 insertions(+), 2 deletions(-)
 > 
-> [PATCH 00/11] clk: ti: clkctrl data split based on clkdm boundaries
-> [PATCH 0/3] ARM: dts: am3/am4/dra7 clkctrl data conversion
-> [PATCH 0/4] TI sysc driver updates for am335x and am437x
+> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-
+> arasan.c
+> index a40bcc2..370ada5 100644
+> --- a/drivers/mmc/host/sdhci-of-arasan.c
+> +++ b/drivers/mmc/host/sdhci-of-arasan.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/mfd/syscon.h>
+>  #include <linux/module.h>
+>  #include <linux/of_device.h>
+> +#include <linux/pm_runtime.h>
+>  #include <linux/phy/phy.h>
+>  #include <linux/regmap.h>
+>  #include <linux/of.h>
+> @@ -30,6 +31,7 @@
+>  #include "cqhci.h"
+>  #include "sdhci-pltfm.h"
 > 
-> v4.19-rc3 is needed for commit 18eb8aea7fb2 ("net: ethernet:
-> cpsw-phy-sel: prefer phandle for phy sel") and omap-for-v4.20/dt
-> is needed to avoid conflicts with clean-up.
+> +#define SDHCI_ARASAN_AUTOSUSPEND_DELAY	2000 /* ms */
+>  #define SDHCI_ARASAN_VENDOR_REGISTER	0x78
+>  #define SDHCI_ARASAN_CQE_BASE_ADDR	0x200
+>  #define VENDOR_ENHANCED_STROBE		BIT(0)
+> @@ -363,6 +365,70 @@ static const struct sdhci_pltfm_data
+> sdhci_arasan_cqe_pdata = {
+>  			SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN,
+>  };
 > 
-> I've also pushed out a temporary testing branch for people to test
-> as omap-for-v4.20/dt-ti-sysc-tmp-testing [0][1].
+> +#ifdef CONFIG_PM
+> +static int sdhci_arasan_runtime_suspend(struct device *dev) {
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct sdhci_host *host = platform_get_drvdata(pdev);
+> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +	struct sdhci_arasan_data *sdhci_arasan =
+> sdhci_pltfm_priv(pltfm_host);
+> +	int ret;
+> +
+> +	if (sdhci_arasan->has_cqe) {
+> +		ret = cqhci_suspend(host->mmc);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+> +	ret = sdhci_runtime_suspend_host(host);
+> +	if (ret)
+> +		return ret;
+> +
+> +	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
+> +		mmc_retune_needed(host->mmc);
+> +
+> +	clk_disable(pltfm_host->clk);
+> +	clk_disable(sdhci_arasan->clk_ahb);
+> +
+> +	return 0;
+> +}
+> +
+> +static int sdhci_arasan_runtime_resume(struct device *dev) {
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct sdhci_host *host = platform_get_drvdata(pdev);
+> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +	struct sdhci_arasan_data *sdhci_arasan =
+> sdhci_pltfm_priv(pltfm_host);
+> +	int ret;
+> +
+> +	ret = clk_enable(sdhci_arasan->clk_ahb);
+> +	if (ret) {
+> +		dev_err(dev, "Cannot enable AHB clock.\n");
+> +		return ret;
+> +	}
+> +
+> +	ret = clk_enable(pltfm_host->clk);
+> +	if (ret) {
+> +		dev_err(dev, "Cannot enable SD clock.\n");
+> +		return ret;
+> +	}
+> +
+> +	ret = sdhci_runtime_resume_host(host);
+> +	if (ret)
+> +		goto out;
+> +
+> +	if (sdhci_arasan->has_cqe)
+> +		return cqhci_resume(host->mmc);
+> +
+> +	return 0;
+> +out:
+> +	clk_disable(pltfm_host->clk);
+> +	clk_disable(sdhci_arasan->clk_ahb);
+> +
+> +	return ret;
+> +}
+> +#endif /* ! CONFIG_PM */
+> +
+>  #ifdef CONFIG_PM_SLEEP
+>  /**
+>   * sdhci_arasan_suspend - Suspend method for the driver @@ -455,8 +521,10
+> @@ static int sdhci_arasan_resume(struct device *dev)  }  #endif /* !
+> CONFIG_PM_SLEEP */
 > 
-> Regards,
+> -static SIMPLE_DEV_PM_OPS(sdhci_arasan_dev_pm_ops,
+> sdhci_arasan_suspend,
+> -			 sdhci_arasan_resume);
+> +static const struct dev_pm_ops sdhci_arasan_dev_pm_ops = {
+> +	SET_SYSTEM_SLEEP_PM_OPS(sdhci_arasan_suspend,
+> sdhci_arasan_resume)
+> +	SET_RUNTIME_PM_OPS(sdhci_arasan_runtime_suspend,
+> +			   sdhci_arasan_runtime_resume, NULL) };
 > 
-> Tony
+>  static const struct of_device_id sdhci_arasan_of_match[] = {
+>  	/* SoC-specific compatible strings w/ soc_ctl_map */ @@ -821,6
+> +889,14 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+>  	if (ret)
+>  		goto err_add_host;
 > 
-> [0] git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git omap-for-v4.20/dt-ti-sysc-tmp-testing
-> [1] https://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git/log/?h=omap-for-v4.20/dt-ti-sysc-tmp-testing
-
-Hi Tony,
-
-I tried Branch [1] above. AM335x-boneblack is doing all good with ds0.
-AM437x-gp the following is happening:
-
-https://pastebin.ubuntu.com/p/fmZNYgJ9Sp/
-
-There seems to be a timeout due to which resume is not immediate i see
-1-2s delay and i see i2c timeout.
-
-[  402.247271] omap_i2c 4802a000.i2c: controller timed out
-[  402.247441] pixcir_ts 1-005c: pixcir_int_enable: can't read reg 0x34
-: -110
-[  402.247486] pixcir_ts 1-005c: Failed to disable interrupt generation:
--110
-[  402.247522] pixcir_ts 1-005c: Failed to stop
-[  402.247607] dpm_run_callback(): pixcir_i2c_ts_resume+0x0/0x98
-[pixcir_i2c_ts] returns -110
-
-so pixcir_i2c_ts_resume is retuning -110 which is timeout error code.
-
-I did some touch screen testing after DS0 resume seems to be working.
-Everything is in pastebin link provided above.
-
-Regards,
-Keerthy
+> +	pm_runtime_set_active(&pdev->dev);
+> +	pm_runtime_enable(&pdev->dev);
+> +	pm_runtime_set_autosuspend_delay(&pdev->dev,
+> +
+> SDHCI_ARASAN_AUTOSUSPEND_DELAY);
+> +	pm_runtime_mark_last_busy(&pdev->dev);
+> +	pm_runtime_use_autosuspend(&pdev->dev);
+> +	pm_runtime_forbid(&pdev->dev);
+> +
+>  	return 0;
 > 
-> 
-> Tony Lindgren (4):
->   ARM: dts: am437x: Add l4 interconnect hierarchy and ti-sysc data
->   ARM: dts: am437x: Move l4 child devices to probe them with ti-sysc
->   ARM: dts: am335x: Add l4 interconnect hierarchy and ti-sysc data
->   ARM: dts: am335x: Move l4 child devices to probe them with ti-sysc
-> 
->  arch/arm/boot/dts/am335x-shc.dts |    2 +-
->  arch/arm/boot/dts/am33xx-l4.dtsi | 2132 +++++++++++++++++++++++++
->  arch/arm/boot/dts/am33xx.dtsi    |  623 +-------
->  arch/arm/boot/dts/am4372.dtsi    |  876 +----------
->  arch/arm/boot/dts/am437x-l4.dtsi | 2499 ++++++++++++++++++++++++++++++
->  5 files changed, 4651 insertions(+), 1481 deletions(-)
->  create mode 100644 arch/arm/boot/dts/am33xx-l4.dtsi
->  create mode 100644 arch/arm/boot/dts/am437x-l4.dtsi
-> 
+>  err_add_host:
+> --
+> 2.1.1
