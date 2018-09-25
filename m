@@ -1,32 +1,80 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 25 Sep 2018 11:48:17 +0100
-Subject: [PATCH] iommu/io-pgtable-arm: Fix race handling in
- split_blk_unmap()
-In-Reply-To: <20180925090138.h6tqvrvxy43ycp6g@8bytes.org>
-References: <f6700817286f60597f2a93835bf658f3ef3585ef.1535026499.git.robin.murphy@arm.com>
- <20180925090138.h6tqvrvxy43ycp6g@8bytes.org>
-Message-ID: <e86cd69f-4355-5078-890a-338756e325ba@arm.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 25 Sep 2018 11:49:19 +0100
+Subject: [PATCH v5 14/18] vgic: Add support for 52bit guest physical
+ address
+In-Reply-To: <e308a66d-c426-81c0-0c79-ce97773fa090@redhat.com>
+References: <20180917104144.19188-1-suzuki.poulose@arm.com>
+ <20180917104144.19188-15-suzuki.poulose@arm.com>
+ <e308a66d-c426-81c0-0c79-ce97773fa090@redhat.com>
+Message-ID: <79adfcd4-cab0-cc29-5c12-ffcad325be70@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+Hi Eric
 
-On 25/09/18 10:01, Joerg Roedel wrote:
-> Hey Robin,
+On 09/21/2018 03:57 PM, Auger Eric wrote:
+> Hi Suzuki,
 > 
-> On Thu, Aug 23, 2018 at 01:14:59PM +0100, Robin Murphy wrote:
->> Fixes: 2c3d273eabe8 ("iommu/io-pgtable-arm: Support lockless operation")
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> 
-> I can't find a newer version of this in my inbox, do you plan to send
-> one or has it been addressed differently?
+> On 9/17/18 12:41 PM, Suzuki K Poulose wrote:
+>> From: Kristina Martsenko <kristina.martsenko@arm.com>
+>>
+>> Add support for handling 52bit guest physical address to the
+>> VGIC layer. So far we have limited the guest physical address
+>> to 48bits, by explicitly masking the upper bits. This patch
+>> removes the restriction. We do not have to check if the host
+>> supports 52bit as the gpa is always validated during an access.
+>> (e.g, kvm_{read/write}_guest, kvm_is_visible_gfn()).
+>> Also, the ITS table save-restore is also not affected with
+>> the enhancement. The DTE entries already store the bits[51:8]
+>> of the ITT_addr (with a 256byte alignment).
+>>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Christoffer Dall <cdall@kernel.org>
+>> Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
+>> [ Macro clean ups, fix PROPBASER and PENDBASER accesses ]
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>>   include/linux/irqchip/arm-gic-v3.h |  5 +++++
+>>   virt/kvm/arm/vgic/vgic-its.c       | 36 +++++++++---------------------
+>>   virt/kvm/arm/vgic/vgic-mmio-v3.c   |  2 --
+>>   3 files changed, 15 insertions(+), 28 deletions(-)
+>>
+>> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+>> index 8bdbb5f29494..e961f40992d7 100644
+>> --- a/include/linux/irqchip/arm-gic-v3.h
+>> +++ b/include/linux/irqchip/arm-gic-v3.h
+>> @@ -357,6 +357,8 @@
+>>   #define GITS_CBASER_RaWaWt	GIC_BASER_CACHEABILITY(GITS_CBASER, INNER, RaWaWt)
+>>   #define GITS_CBASER_RaWaWb	GIC_BASER_CACHEABILITY(GITS_CBASER, INNER, RaWaWb)
+>>   
+>> +#define GITS_CBASER_ADDRESS(cbaser)	((cbaser) & GENMASK_ULL(52, 12))
+> nit GENMASK_ULL(51, 12), bit 52 is RES0
 
-Will has the cleaned-up version in his tree along with a couple of other 
-SMMU fixes, which I assume he's planning to send you a pull for (he's 
-off at yet another conference just now so I can't confirm offline). We 
-were planning for the non-strict stuff to come in as SMMU updates on top 
-of that (p.s. please shout if you have any objections on that series so 
-I can get on them ASAP!)
+I will fix this.
 
-Thanks,
-Robin.
+>> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>> index a2a175b08b17..b3d1f0985117 100644
+>> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>> @@ -364,7 +364,6 @@ static u64 vgic_sanitise_pendbaser(u64 reg)
+>>   				  vgic_sanitise_outer_an);
+>>   
+>>   	reg &= ~PENDBASER_RES0_MASK;
+>> -	reg &= ~GENMASK_ULL(51, 48);
+>>   
+>>   	return reg;
+>>   }
+>> @@ -382,7 +381,6 @@ static u64 vgic_sanitise_propbaser(u64 reg)
+>>   				  vgic_sanitise_outer_cacheability);
+>>   
+>>   	reg &= ~PROPBASER_RES0_MASK;
+>> -	reg &= ~GENMASK_ULL(51, 48);
+>>   	return reg;
+>>   }
+>>   
+>>
+> Besides looks good to me.
+> Reviewed-by: Eric Auger <eric.auger@redhat.com>
+
+Thanks
+Suzuki
