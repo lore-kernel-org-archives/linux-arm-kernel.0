@@ -1,24 +1,60 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 25 Sep 2018 18:29:48 +0800
-Subject: [PATCH v5 1/2] arm64: dts: allwinner: a64: Add display pipeline
-In-Reply-To: <20180925084940.27903-1-jagan@amarulasolutions.com>
-References: <20180925084940.27903-1-jagan@amarulasolutions.com>
-Message-ID: <CAGb2v64vzD5y5PMRscfWkdh+7b=KUJFf0chvOpsrw6XTg+_YYg@mail.gmail.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Tue, 25 Sep 2018 12:37:35 +0200
+Subject: [GIT PULL] ARM: at91: SoC for 4.20
+Message-ID: <20180925103735.GA31525@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2018 at 4:49 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
->
-> Allwinner A64 have a display pipeline with 2 mixers/TCONs, the first
-> TCON is connected to LCD and the second is to HDMI.
->
-> The HDMI controller/PHY pair is similar to the one on H3/H5.
->
-> Add all required device tree nodes of the display pipeline, including
-> the TCON0 LCD one and the TCON1 HDMI one.
->
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> [Icenowy: refactor commit message and add 1st pipeline]
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Arnd, Olof,
 
-Merged both patches for 4.20. Thanks.
+Most changes are shuffling around the maintainers entries. There are
+also two PM non urgent fixes.
+
+This one as a trivial conflict with the staging tree solved in linux-next.
+
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+
+  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/at91/linux tags/at91-4.20-soc
+
+for you to fetch changes up to 34d2a7db77ad837cfb88bd01b33fd1f3855ce9c0:
+
+  MAINTAINERS: sdhci: move the Microchip entry to proper location (2018-09-25 12:26:31 +0200)
+
+----------------------------------------------------------------
+AT91 SoC for 4.20
+
+ - rename MAINTAINERS entries and change maintainers
+ - two pm cleanups
+
+----------------------------------------------------------------
+Claudiu Beznea (1):
+      ARM: at91: pm: remove pm_bu initialization in at91_pm_backup_init()
+
+Nicolas Ferre (11):
+      MAINTAINERS: ARM: at91: add co-maintainer for ARM/Microchip
+      MAINTAINERS: update entry for Microchip NAND driver support
+      MAINTAINERS: media: change Microchip ISI, ISC maintainers
+      MAINTAINERS: ASoC: change maintainer for Microchip ALSA drivers
+      MAINTAINERS: USB: change maintainer for Microchip USBA gadget driver
+      MAINTAINERS: dmaengine: add files to Microchip dma entry
+      MAINTAINERS: pwm: add entry for Microchip pwm driver
+      MAINTAINERS: iio: add co-maintainer to SAMA5D2-compatible ADC driver
+      MAINTAINERS: remove the / ATMEL string from MICROCHIP entries
+      MAINTAINERS: move former ATMEL entries to proper MICROCHIP location
+      MAINTAINERS: sdhci: move the Microchip entry to proper location
+
+zhong jiang (1):
+      ARM: at91: pm: call put_device instead of of_node_put in at91_pm_config_ws
+
+ MAINTAINERS             | 196 ++++++++++++++++++++++++++----------------------
+ arch/arm/mach-at91/pm.c |   9 +--
+ 2 files changed, 108 insertions(+), 97 deletions(-)
+
+-- 
+Alexandre Belloni, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
