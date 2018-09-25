@@ -1,49 +1,131 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 25 Sep 2018 17:20:20 +0800
-Subject: [PATCH v4 5/6] ARM: dts: imx7d: Add turnoff reset
-In-Reply-To: <c305d4da96ead7d570bf755fde9f0e0cc68f88e0.1534264292.git.leonard.crestez@nxp.com>
-References: <cover.1534264292.git.leonard.crestez@nxp.com>
- <c305d4da96ead7d570bf755fde9f0e0cc68f88e0.1534264292.git.leonard.crestez@nxp.com>
-Message-ID: <20180925092018.GA21282@dragon>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Tue, 25 Sep 2018 10:21:17 +0100
+Subject: [PATCH v7 9/9] KVM: arm64: Add support for creating PUD hugepages
+ at stage 2
+In-Reply-To: <4df146fc-f9b0-882e-becb-056111a444d4@arm.com> (Suzuki
+ K. Poulose's message of "Mon, 24 Sep 2018 22:21:43 +0100")
+References: <20180924174552.8387-1-punit.agrawal@arm.com>
+ <20180924174552.8387-10-punit.agrawal@arm.com>
+ <4df146fc-f9b0-882e-becb-056111a444d4@arm.com>
+Message-ID: <875zyurkz6.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 14, 2018 at 07:50:19PM +0300, Leonard Crestez wrote:
-> This is required for the imx pci driver to send the PME_Turn_Off TLP.
-> 
-> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+Suzuki K Poulose <suzuki.poulose@arm.com> writes:
 
-Acked-by: Shawn Guo <shawnguo@kernel.org>
+> Hi Punit,
+>
+>
+> On 09/24/2018 06:45 PM, Punit Agrawal wrote:
+>> KVM only supports PMD hugepages at stage 2. Now that the various page
+>> handling routines are updated, extend the stage 2 fault handling to
+>> map in PUD hugepages.
+>>
+>> Addition of PUD hugepage support enables additional page sizes (e.g.,
+>> 1G with 4K granule) which can be useful on cores that support mapping
+>> larger block sizes in the TLB entries.
+>>
+>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>> Cc: Christoffer Dall <christoffer.dall@arm.com>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Russell King <linux@armlinux.org.uk>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>
+>
+>>
+>> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+>> index a42b9505c9a7..a8e86b926ee0 100644
+>> --- a/arch/arm/include/asm/kvm_mmu.h
+>> +++ b/arch/arm/include/asm/kvm_mmu.h
+>> @@ -84,11 +84,14 @@ void kvm_clear_hyp_idmap(void);
+>>     #define kvm_pfn_pte(pfn, prot)	pfn_pte(pfn, prot)
+>>   #define kvm_pfn_pmd(pfn, prot)	pfn_pmd(pfn, prot)
+>> +#define kvm_pfn_pud(pfn, prot)	(__pud(0))
+>>     #define kvm_pud_pfn(pud)	({ BUG(); 0; })
+>>       #define kvm_pmd_mkhuge(pmd)	pmd_mkhuge(pmd)
+>> +/* No support for pud hugepages */
+>> +#define kvm_pud_mkhuge(pud)	(pud)
+>>   
+>
+> shouldn't this be BUG() like other PUD huge helpers for arm32 ?
+>
+>>   /*
+>>    * The following kvm_*pud*() functions are provided strictly to allow
+>> @@ -105,6 +108,23 @@ static inline bool kvm_s2pud_readonly(pud_t *pud)
+>>   	return false;
+>>   }
+>>   +static inline void kvm_set_pud(pud_t *pud, pud_t new_pud)
+>> +{
+>> +	BUG();
+>> +}
+>> +
+>> +static inline pud_t kvm_s2pud_mkwrite(pud_t pud)
+>> +{
+>> +	BUG();
+>> +	return pud;
+>> +}
+>> +
+>> +static inline pud_t kvm_s2pud_mkexec(pud_t pud)
+>> +{
+>> +	BUG();
+>> +	return pud;
+>> +}
+>> +
+>
+>
+>> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+>> index 3ff7ebb262d2..5b8163537bc2 100644
+>> --- a/virt/kvm/arm/mmu.c
+>> +++ b/virt/kvm/arm/mmu.c
+>
+> ...
+>
+>
+>> @@ -1669,7 +1746,28 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>   	needs_exec = exec_fault ||
+>>   		(fault_status == FSC_PERM && stage2_is_exec(kvm, fault_ipa));
+>>   -	if (hugetlb && vma_pagesize == PMD_SIZE) {
+>> +	if (hugetlb && vma_pagesize == PUD_SIZE) {
+>> +		/*
+>> +		 * Assuming that PUD level always exists at Stage 2 -
+>> +		 * this is true for 4k pages with 40 bits IPA
+>> +		 * currently supported.
+>> +		 *
+>> +		 * When using 64k pages, 40bits of IPA results in
+>> +		 * using only 2-levels at Stage 2. Overlooking this
+>> +		 * problem for now as a PUD hugepage with 64k pages is
+>> +		 * too big (4TB) to be practical.
+>> +		 */
+>> +		pud_t new_pud = kvm_pfn_pud(pfn, mem_type);
+>
+> Is this based on the Dynamic IPA series ? The cover letter seems
+> to suggest that it is. But I don't see the check to make sure we have
+> stage2 PUD level here before we go ahead and try PUD huge page at
+> stage2. Also the comment above seems outdated in that case.
 
-> ---
->  arch/arm/boot/dts/imx7d.dtsi | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-> index 7234e8330a57..efbdeaaa8dcd 100644
-> --- a/arch/arm/boot/dts/imx7d.dtsi
-> +++ b/arch/arm/boot/dts/imx7d.dtsi
-> @@ -144,12 +144,13 @@
->  					 <&clks IMX7D_PLL_ENET_MAIN_100M_CLK>;
->  
->  		fsl,max-link-speed = <2>;
->  		power-domains = <&pgc_pcie_phy>;
->  		resets = <&src IMX7_RESET_PCIEPHY>,
-> -			 <&src IMX7_RESET_PCIE_CTRL_APPS_EN>;
-> -		reset-names = "pciephy", "apps";
-> +			 <&src IMX7_RESET_PCIE_CTRL_APPS_EN>,
-> +			 <&src IMX7_RESET_PCIE_CTRL_APPS_TURNOFF>;
-> +		reset-names = "pciephy", "apps", "turnoff";
->  		status = "disabled";
->  	};
->  };
->  
->  &ca_funnel_ports {
-> -- 
-> 2.17.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+It is indeed based on the Dynamic IPA series but I seem to have lost the
+actual changes introducing the checks for PUD level. Let me fix that up
+and post an update.
+
+Sorry for the noise.
+
+Punit
+
+>
+>> +
+>> +		new_pud = kvm_pud_mkhuge(new_pud);
+>> +		if (writable)
+>> +			new_pud = kvm_s2pud_mkwrite(new_pud);
+>> +
+>> +		if (needs_exec)
+>> +			new_pud = kvm_s2pud_mkexec(new_pud);
+>> +
+>> +		ret = stage2_set_pud_huge(kvm, memcache, fault_ipa, &new_pud);
+>> +	} else if (hugetlb && vma_pagesize == PMD_SIZE) {
+>>   		pmd_t new_pmd = kvm_pfn_pmd(pfn, mem_type);
+>>     		new_pmd = kvm_pmd_mkhuge(new_pmd);
+>>
+>
+>
+> Suzuki
