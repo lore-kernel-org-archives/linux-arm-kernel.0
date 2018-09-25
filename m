@@ -1,66 +1,51 @@
-From: natechancellor@gmail.com (Nathan Chancellor)
-Date: Tue, 25 Sep 2018 12:44:59 -0700
-Subject: [PATCH] arm64: percpu: Initialize ret in the default case
-Message-ID: <20180925194459.13088-1-natechancellor@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 25 Sep 2018 21:45:56 +0200
+Subject: [PATCH 1/2] soc: fsl: qbman: qman_portal: defer probing when qman
+ is not available
+In-Reply-To: <20180823213600.23426-1-alexandre.belloni@bootlin.com>
+References: <20180823213600.23426-1-alexandre.belloni@bootlin.com>
+Message-ID: <CAOesGMjDKKSNVccu4D579SiwL9zEU7ha7HQCHncvh2r4kpO6fQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clang warns that if the default case is taken, ret will be
-uninitialized.
+Hi,
 
-./arch/arm64/include/asm/percpu.h:196:2: warning: variable 'ret' is used
-uninitialized whenever switch default is taken
-[-Wsometimes-uninitialized]
-        default:
-        ^~~~~~~
-./arch/arm64/include/asm/percpu.h:200:9: note: uninitialized use occurs
-here
-        return ret;
-               ^~~
-./arch/arm64/include/asm/percpu.h:157:19: note: initialize the variable
-'ret' to silence this warning
-        unsigned long ret, loop;
-                         ^
-                          = 0
 
-This warning appears several times while building the erofs filesystem.
-While it's not strictly wrong, the BUILD_BUG will prevent this from
-becoming a true problem. Initialize ret to 0 in the default case right
-before the BUILD_BUG to silence all of these warnings.
+On Thu, Aug 23, 2018 at 11:36 PM Alexandre Belloni
+<alexandre.belloni@bootlin.com> wrote:
+>
+> If the qman driver (qman_ccsr) doesn't probe or fail to probe before
+> qman_portal, qm_ccsr_start will be either NULL or a stale pointer to an
+> unmapped page.
+>
+> This leads to a crash when probing  qman_portal as the init_pcfg function
+> calls qman_liodn_fixup that tries to read qman registers.
+>
+> Assume that qman didn't probe when the pool mask is 0.
+>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+> ---
+>  drivers/soc/fsl/qbman/qman_portal.c | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/drivers/soc/fsl/qbman/qman_portal.c b/drivers/soc/fsl/qbman/qman_portal.c
+> index a120002b630e..4fc80d2c8feb 100644
+> --- a/drivers/soc/fsl/qbman/qman_portal.c
+> +++ b/drivers/soc/fsl/qbman/qman_portal.c
+> @@ -277,6 +277,8 @@ static int qman_portal_probe(struct platform_device *pdev)
+>         }
+>
+>         pcfg->pools = qm_get_pools_sdqcr();
+> +       if (pcfg->pools == 0)
+> +               return -EPROBE_DEFER;
 
-Reported-by: Prasad Sodagudi <psodagud@codeaurora.org>
-Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
----
- arch/arm64/include/asm/percpu.h | 3 +++
- 1 file changed, 3 insertions(+)
+This is quite late in the probe, after a bunch of resources have been claimed.
 
-diff --git a/arch/arm64/include/asm/percpu.h b/arch/arm64/include/asm/percpu.h
-index 9234013e759e..21a81b59a0cc 100644
---- a/arch/arm64/include/asm/percpu.h
-+++ b/arch/arm64/include/asm/percpu.h
-@@ -96,6 +96,7 @@ static inline unsigned long __percpu_##op(void *ptr,			\
- 		: [val] "Ir" (val));					\
- 		break;							\
- 	default:							\
-+		ret = 0;						\
- 		BUILD_BUG();						\
- 	}								\
- 									\
-@@ -125,6 +126,7 @@ static inline unsigned long __percpu_read(void *ptr, int size)
- 		ret = READ_ONCE(*(u64 *)ptr);
- 		break;
- 	default:
-+		ret = 0;
- 		BUILD_BUG();
- 	}
- 
-@@ -194,6 +196,7 @@ static inline unsigned long __percpu_xchg(void *ptr, unsigned long val,
- 		: [val] "r" (val));
- 		break;
- 	default:
-+		ret = 0;
- 		BUILD_BUG();
- 	}
- 
--- 
-2.19.0
+Note that the ioremaps above this are doing unwinds, and you'll end up
+doing duplicate ioremaps if you come in and probe again.
+
+You should probably unwind those allocations, or move them to devm_*
+or do this check earlier in the function.
+
+
+-Olof
