@@ -1,71 +1,32 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 25 Sep 2018 15:55:02 -0500
-Subject: [PATCH v2 1/2] dt-bindings: PCI: add UniPhier PCIe host
- controller description
-In-Reply-To: <1536226832-5089-2-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1536226832-5089-1-git-send-email-hayashi.kunihiko@socionext.com>
- <1536226832-5089-2-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <20180925205502.GA12949@bogus>
+Date: Tue, 25 Sep 2018 16:13:09 -0500
+Subject: [PATCH v2 4/6] drm/panel: simple: Add support for Banana Pi 7"
+ S070WV20-CT16 panel
+In-Reply-To: <20180907041948.19913-5-wens@csie.org>
+References: <20180907041948.19913-1-wens@csie.org>
+ <20180907041948.19913-5-wens@csie.org>
+Message-ID: <20180925211309.GA12535@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 06, 2018 at 06:40:31PM +0900, Kunihiko Hayashi wrote:
-> Add DT bindings for PCIe controller implemented in UniPhier SoCs when
-> configured in Root Complex (host) mode. This controller is based on
-> the DesignWare PCIe core.
+On Fri,  7 Sep 2018 12:19:46 +0800, Chen-Yu Tsai wrote:
+> This panel is marketed as Banana Pi 7" LCD display. On the back is
+> a sticker denoting the model name S070WV20-CT16.
 > 
-> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> This is a 7" 800x480 panel connected through a 24-bit RGB interface.
+> However the panel only does 262k colors.
+> 
+> Depending on the variant, the PCB attached to the panel module either
+> supports DSI, or DSI + 24-bit RGB. DSI is converted to 24-bit RGB via
+> an onboard ICN6211 MIPI DSI - RGB bridge chip, then fed to the panel
+> itself.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
->  .../devicetree/bindings/pci/uniphier-pcie.txt      | 78 ++++++++++++++++++++++
->  1 file changed, 78 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/uniphier-pcie.txt
+>  .../display/panel/bananapi,s070wv20-ct16.txt  | 12 +++++++++
+>  drivers/gpu/drm/panel/panel-simple.c          | 25 +++++++++++++++++++
+>  2 files changed, 37 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/pci/uniphier-pcie.txt b/Documentation/devicetree/bindings/pci/uniphier-pcie.txt
-> new file mode 100644
-> index 0000000..a34e167
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/uniphier-pcie.txt
-> @@ -0,0 +1,78 @@
-> +Socionext UniPhier PCIe host controller bindings
-> +
-> +This describes the devicetree bindings for PCIe host controller implemented
-> +on Socionext UniPhier SoCs.
-> +
-> +UniPhier PCIe host controller is based on the Synopsys DesignWare PCI core.
-> +It shares common functions with the PCIe DesignWare core driver and inherits
-> +common properties defined in
-> +Documentation/devicetree/bindings/pci/designware-pcie.txt.
-> +
-> +Required properties:
-> +- compatible: Should be "socionext,uniphier-pcie".
-> +- reg: Specifies offset and length of the register set for the device.
-> +	According to the reg-names, appropriate register sets are required.
-> +- reg-names: Must include the following entries:
-> +    "dbi"    - controller configuration registers
-> +    "link"   - SoC-specific glue layer registers
-> +    "config" - PCIe configuration space
-> +- clocks: A phandle to the clock gate for PCIe glue layer including
-> +	the host controller.
-> +- resets: A phandle to the reset line for PCIe glue layer including
-> +	the host controller.
-> +- interrupts: A list of interrupt specifiers. According to the
-> +	interrupt-names, appropriate interrupts are required.
-> +- interrupt-names: Must include the following entries:
-> +    "dma"    - DMA interrupt
-> +    "msi"    - MSI interrupt
-> +    "intx"   - Legacy INTA/B/C/D interrupt
-> +
-> +Optional properties:
-> +- phys: A phandle to generic PCIe PHY. According to the phy-names, appropriate
-> +	phys are required.
-> +- phy-names: Must be "pcie-phy".
-> +
-> +Required sub-node:
-> +- interrupt-controller: Specifies interrupt controller for legacy PCI
-> +	interrupts. The node name isn't important.
-
-No, it is important.
-
-With that sentence removed,
 
 Reviewed-by: Rob Herring <robh@kernel.org>
