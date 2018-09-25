@@ -1,36 +1,32 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 25 Sep 2018 13:48:02 -0700
-Subject: [GIT PULL] STi DT update for v4.20 round 1
-In-Reply-To: <7250e85d-374a-76e7-fa8a-4911ef7a12ae@st.com>
-References: <7250e85d-374a-76e7-fa8a-4911ef7a12ae@st.com>
-Message-ID: <20180925204802.slqzlekvjm5j3fiv@localhost>
+Date: Tue, 25 Sep 2018 13:52:17 -0700
+Subject: [GIT PULL 1/1] Broadcom devicetree fixes for 4.19
+In-Reply-To: <20180924181215.7573-1-f.fainelli@gmail.com>
+References: <20180924181215.7573-1-f.fainelli@gmail.com>
+Message-ID: <20180925205217.xpdno7rjilsarcn7@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2018 at 04:21:26PM +0000, Patrice CHOTARD wrote:
-> Hi Arnd, Kevin, Olof
-> 
-> PLease consider this first round of STi dts update for v4.20
-> 
+On Mon, Sep 24, 2018 at 11:12:15AM -0700, Florian Fainelli wrote:
 > The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 > 
 >   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
 > 
-> are available in the git repository at:
+> are available in the Git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git
-> tags/sti-dt-for-v4.20-round1
+>   https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.19/devicetree-fixes
 > 
-> for you to fetch changes up to b5b4c8dd5c44edc112a362f87a8d8953336571bd:
+> for you to fetch changes up to 3ab97942d0213b6583a5408630a8cbbfbf54730f:
 > 
->   ARM: dts: stih410: change syntax of multiple DAI (2018-09-25 17:41:51
-> +0200)
+>   ARM: dts: BCM63xx: Fix incorrect interrupt specifiers (2018-09-24 11:04:04 -0700)
 > 
 > ----------------------------------------------------------------
-> STi DT update:
->  _ Change syntax of multiple DAI links
+> This pull request contains Broadcom ARM-based SoCs Device Tree changes
+> intended for 4.19, please pull the following:
+> 
+> - Florian fixes the PPI and SPI interrupts in the BCM63138 (DSL) SoC DTS
 
-Merged, thanks.
+Merged, thanks!
 
 
 -Olof
