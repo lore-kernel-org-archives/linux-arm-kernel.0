@@ -1,116 +1,80 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Wed, 26 Sep 2018 14:56:24 +0100
-Subject: [PATCH 7/7] arm64: kvm: Align stack for exception coming from EL2
-In-Reply-To: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
-References: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1537970184-44348-8-git-send-email-julien.thierry@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 26 Sep 2018 16:02:22 +0200
+Subject: [PATCH net-next v6 07/23] zinc: ChaCha20 ARM and ARM64
+ implementations
+In-Reply-To: <CAHmME9r9KppoFwwNVpzpYbU+9dCPzb7Pit+4iRa4MY_ouJBWrA@mail.gmail.com>
+References: <20180925145622.29959-1-Jason@zx2c4.com>
+ <20180925145622.29959-8-Jason@zx2c4.com>
+ <CAKv+Gu9mVAfdBvOMCFqRJj+wBiWu3JVOgPZdkcdjzqSdQQ5Jrw@mail.gmail.com>
+ <CAHmME9r9KppoFwwNVpzpYbU+9dCPzb7Pit+4iRa4MY_ouJBWrA@mail.gmail.com>
+Message-ID: <CAKv+Gu8ih-TsASRGqK+ST_5+EQ0=Zo-zhGCadOdGyPjucMFTCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SP needs to be 16-bytes aligned before accessing memory through it. When
-handling exceptions from EL2, there is no guarantee that SP is already
-aligned.
+(+ Herbert, Thomas)
 
-Ensure SP is aligned upon entries from EL2.
+On Wed, 26 Sep 2018 at 15:33, Jason A. Donenfeld <Jason@zx2c4.com> wrote:
+>
+> Hi Ard,
+>
+> On Wed, Sep 26, 2018 at 10:59 AM Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+> > > +static inline bool chacha20_arch(struct chacha20_ctx *state, u8 *dst,
+> > > +                                const u8 *src, size_t len,
+> > > +                                simd_context_t *simd_context)
+> > > +{
+> > > +#if defined(CONFIG_KERNEL_MODE_NEON)
+> > > +       if (chacha20_use_neon && len >= CHACHA20_BLOCK_SIZE * 3 &&
+> > > +           simd_use(simd_context))
+> > > +               chacha20_neon(dst, src, len, state->key, state->counter);
+> > > +       else
+> > > +#endif
+> >
+> > Better to use IS_ENABLED() here:
+> >
+> > > +       if (IS_ENABLED(CONFIG_KERNEL_MODE_NEON)) &&
+> > > +           chacha20_use_neon && len >= CHACHA20_BLOCK_SIZE * 3 &&
+> > > +           simd_use(simd_context))
+>
+> Good idea. I'll fix that up.
+>
+> >
+> > Also, this still has unbounded worst case scheduling latency, given
+> > that the outer library function passes its entire input straight into
+> > the NEON routine.
+>
+> The vast majority of crypto routines in arch/*/crypto/ follow this
+> same exact pattern, actually. I realize a few don't -- probably the
+> ones you had a hand in :) -- but I think this is up to the caller to
+> handle.
 
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: kvmarm at lists.cs.columbia.edu
----
- arch/arm64/kvm/hyp/hyp-entry.S | 63 ++++++++++++++++++++++++++++++++++--------
- 1 file changed, 52 insertions(+), 11 deletions(-)
+Anything that uses the scatterwalk API (AEADs and skciphers) will
+handle at most a page at a time. Hashes are different, which is why
+some of them have to handle it explicitly.
 
-diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-index da31386..f611072 100644
---- a/arch/arm64/kvm/hyp/hyp-entry.S
-+++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -184,6 +184,10 @@ el2_error:
- 	ccmp	x0, x1, #4, ne
- 	b.ne	__hyp_panic
- 	mov	x0, #(1 << ARM_EXIT_WITH_SERROR_BIT)
-+
-+	/* Restore the stack */
-+	ldr	x1, [sp]
-+	mov	sp, x1
- 	eret
+> I made a change so that in chacha20poly1305.c, it calls
+> simd_relax after handling each scatter-gather element, so a
+> "construction" will handle this gracefully. But I believe it's up to
+> the caller to decide on what sizes of information it wants to pass to
+> primitives. Put differently, this also hasn't ever been an issue
+> before -- the existing state of the tree indicates this -- and so I
+> don't anticipate this will be a real issue now.
 
- ENTRY(__hyp_do_panic)
-@@ -221,29 +225,66 @@ ENDPROC(\label)
+The state of the tree does not capture all relevant context or
+history. The scheduling latency issue was brought up very recently by
+the -rt folks on the mailing lists.
 
- 	.align 11
+> And if it becomes one,
+> this is something we can address *later*, but certainly there's no use
+> of adding additional complexity to the initial patchset to do this
+> now.
+>
 
--.macro valid_vect target
-+/*
-+ * Aligns the stack and stores the old sp value. This is what the stack
-+ * looks like after this code:
-+ *
-+ *  +--------+
-+ *  |        |
-+ *  |--------|--> old_sp (upon entry)
-+ *  |   x1   |--> (only used for local save/restore)
-+ *  |--------|--> old_sp - 8
-+ *  |        |--> padding
-+ *  |--------|--> aligned_sp + 8
-+ *  | old_sp |
-+ *  |--------|--> sp = aligned_sp
-+ *  |        |
-+ *  +--------+
-+ */
-+.macro align_sp_el2
-+	xchg_sp	x0
-+	str	x1, [x0, #-8]	// save x1
-+	mov	x1, x0		// x1 = old_sp
-+	sub	x0, x0, #0x10	// save space for x1 + old_sp
-+	bic	x0, x0, #0xf	// align down to 16-bytes
-+	xchg_sp	x0
-+	str	x1, [sp]	// save old_sp
-+	ldr	x1, [x1, #-8]
-+.endm
-+
-+.macro valid_vect target, el=1
- 	.align 7
-+	.if \el == 2
-+	align_sp_el2
-+	.endif
-+
- 	stp	x0, x1, [sp, #-16]!
- 	b	\target
- .endm
+You are introducing a very useful SIMD abstraction, but it lets code
+run with preemption disabled for unbounded amounts of time, and so now
+is the time to ensure we get it right.
 
--.macro invalid_vect target
-+.macro invalid_vect target, el=1
- 	.align 7
-+	.if \el == 2
-+	align_sp_el2
-+	.endif
-+
- 	b	\target
-+	.if \el == 1
- 	ldp	x0, x1, [sp], #16
- 	b	\target
-+	.endif
- .endm
-
- ENTRY(__kvm_hyp_vector)
--	invalid_vect	el2t_sync_invalid	// Synchronous EL2t
--	invalid_vect	el2t_irq_invalid	// IRQ EL2t
--	invalid_vect	el2t_fiq_invalid	// FIQ EL2t
--	invalid_vect	el2t_error_invalid	// Error EL2t
--
--	invalid_vect	el2h_sync_invalid	// Synchronous EL2h
--	invalid_vect	el2h_irq_invalid	// IRQ EL2h
--	invalid_vect	el2h_fiq_invalid	// FIQ EL2h
--	valid_vect	el2_error		// Error EL2h
-+	invalid_vect	el2t_sync_invalid, 2	// Synchronous EL2t
-+	invalid_vect	el2t_irq_invalid, 2	// IRQ EL2t
-+	invalid_vect	el2t_fiq_invalid, 2	// FIQ EL2t
-+	invalid_vect	el2t_error_invalid, 2	// Error EL2t
-+
-+	invalid_vect	el2h_sync_invalid, 2	// Synchronous EL2h
-+	invalid_vect	el2h_irq_invalid, 2	// IRQ EL2h
-+	invalid_vect	el2h_fiq_invalid, 2	// FIQ EL2h
-+	valid_vect	el2_error, 2		// Error EL2h
-
- 	valid_vect	el1_sync		// Synchronous 64-bit EL1
- 	valid_vect	el1_irq			// IRQ 64-bit EL1
---
-1.9.1
+Part of the [justified] criticism on the current state of the crypto
+API is on its complexity, and so I don't think it makes sense to keep
+it simple now and add the complexity later (and the same concern
+applies to async support btw).
