@@ -1,22 +1,21 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 26 Sep 2018 16:01:00 -0500
-Subject: [PATCH v2 5/8] dt-bindings: display: add data-enable polarity
- property
-In-Reply-To: <20180912183222.25414-6-stefan@agner.ch>
-References: <20180912183222.25414-1-stefan@agner.ch>
- <20180912183222.25414-6-stefan@agner.ch>
-Message-ID: <20180926210100.GA31471@bogus>
+Date: Wed, 26 Sep 2018 16:06:03 -0500
+Subject: [PATCH v3 2/4] dt-bindings: arm: rockchip: Add binding for
+ Rock960 board
+In-Reply-To: <20180913180545.29756-3-manivannan.sadhasivam@linaro.org>
+References: <20180913180545.29756-1-manivannan.sadhasivam@linaro.org>
+ <20180913180545.29756-3-manivannan.sadhasivam@linaro.org>
+Message-ID: <20180926210603.GA6297@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Sep 2018 11:32:19 -0700, Stefan Agner wrote:
-> Allow to specify the data-enable polarity required by a dumb VGA
-> DAC converting parallel RGB to VGA.
+On Thu, 13 Sep 2018 23:35:43 +0530, Manivannan Sadhasivam wrote:
+> Add devicetree binding for Rock960 board from Vamrs Limited.
 > 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 > ---
->  .../devicetree/bindings/display/bridge/dumb-vga-dac.txt         | 2 ++
->  1 file changed, 2 insertions(+)
+>  Documentation/devicetree/bindings/arm/rockchip.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
 
 Reviewed-by: Rob Herring <robh@kernel.org>
