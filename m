@@ -1,55 +1,51 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Wed, 26 Sep 2018 15:32:45 +0200
-Subject: [PATCH net-next v6 07/23] zinc: ChaCha20 ARM and ARM64
- implementations
-In-Reply-To: <CAKv+Gu9mVAfdBvOMCFqRJj+wBiWu3JVOgPZdkcdjzqSdQQ5Jrw@mail.gmail.com>
-References: <20180925145622.29959-1-Jason@zx2c4.com>
- <20180925145622.29959-8-Jason@zx2c4.com>
- <CAKv+Gu9mVAfdBvOMCFqRJj+wBiWu3JVOgPZdkcdjzqSdQQ5Jrw@mail.gmail.com>
-Message-ID: <CAHmME9r9KppoFwwNVpzpYbU+9dCPzb7Pit+4iRa4MY_ouJBWrA@mail.gmail.com>
+From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
+Date: Wed, 26 Sep 2018 16:22:43 +0300
+Subject: [PATCH v2 18/22] arm64: dts: ls104xa: set mask to drop TBU ID from
+ StreamID
+In-Reply-To: <20180926132247.10971-1-laurentiu.tudor@nxp.com>
+References: <20180926132247.10971-1-laurentiu.tudor@nxp.com>
+Message-ID: <20180926132247.10971-19-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-On Wed, Sep 26, 2018 at 10:59 AM Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> > +static inline bool chacha20_arch(struct chacha20_ctx *state, u8 *dst,
-> > +                                const u8 *src, size_t len,
-> > +                                simd_context_t *simd_context)
-> > +{
-> > +#if defined(CONFIG_KERNEL_MODE_NEON)
-> > +       if (chacha20_use_neon && len >= CHACHA20_BLOCK_SIZE * 3 &&
-> > +           simd_use(simd_context))
-> > +               chacha20_neon(dst, src, len, state->key, state->counter);
-> > +       else
-> > +#endif
->
-> Better to use IS_ENABLED() here:
->
-> > +       if (IS_ENABLED(CONFIG_KERNEL_MODE_NEON)) &&
-> > +           chacha20_use_neon && len >= CHACHA20_BLOCK_SIZE * 3 &&
-> > +           simd_use(simd_context))
+The StreamID entering the SMMU is actually a concatenation of the
+SMMU TBU ID and the ICID configured in software.
+Since the TBU ID is internal to the SoC and since we want that the
+actual the ICID configured in software to enter the SMMU witout any
+additional set bits, mask out the TBU ID bits and leave only the
+relevant ICID bits to enter SMMU.
 
-Good idea. I'll fix that up.
+Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+---
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 1 +
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 1 +
+ 2 files changed, 2 insertions(+)
 
->
-> Also, this still has unbounded worst case scheduling latency, given
-> that the outer library function passes its entire input straight into
-> the NEON routine.
-
-The vast majority of crypto routines in arch/*/crypto/ follow this
-same exact pattern, actually. I realize a few don't -- probably the
-ones you had a hand in :) -- but I think this is up to the caller to
-handle. I made a change so that in chacha20poly1305.c, it calls
-simd_relax after handling each scatter-gather element, so a
-"construction" will handle this gracefully. But I believe it's up to
-the caller to decide on what sizes of information it wants to pass to
-primitives. Put differently, this also hasn't ever been an issue
-before -- the existing state of the tree indicates this -- and so I
-don't anticipate this will be a real issue now. And if it becomes one,
-this is something we can address *later*, but certainly there's no use
-of adding additional complexity to the initial patchset to do this
-now.
-
-Jason
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+index 7eea2bace171..1f9b385007a8 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+@@ -226,6 +226,7 @@
+ 			compatible = "arm,mmu-500";
+ 			reg = <0 0x9000000 0 0x400000>;
+ 			dma-coherent;
++			stream-match-mask = <0x7f00>;
+ 			#global-interrupts = <2>;
+ 			#iommu-cells = <1>;
+ 			interrupts = <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+index 07a853a0aeaa..22bf3975492a 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+@@ -232,6 +232,7 @@
+ 			compatible = "arm,mmu-500";
+ 			reg = <0 0x9000000 0 0x400000>;
+ 			dma-coherent;
++			stream-match-mask = <0x7f00>;
+ 			#global-interrupts = <2>;
+ 			#iommu-cells = <1>;
+ 			interrupts = <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
+-- 
+2.17.1
