@@ -1,32 +1,25 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 26 Sep 2018 08:59:11 -0700
-Subject: [PATCH 0/4] Update am437x and am335x dts to probe with ti-sysc
-In-Reply-To: <d98aa7c1-5131-34c5-51e5-c7ef57cbc31e@ti.com>
-References: <20180925000545.22931-1-tony@atomide.com>
- <e9afe736-c2f0-6182-afd0-08279e09a35e@ti.com>
- <20180925144021.GN5662@atomide.com>
- <20180925175537.GQ5662@atomide.com>
- <d98aa7c1-5131-34c5-51e5-c7ef57cbc31e@ti.com>
-Message-ID: <20180926155911.GT5662@atomide.com>
+From: Jason@zx2c4.com (Jason A. Donenfeld)
+Date: Wed, 26 Sep 2018 17:58:53 +0200
+Subject: [PATCH net-next v6 07/23] zinc: ChaCha20 ARM and ARM64
+ implementations
+In-Reply-To: <CAKv+Gu-WDt8f9qVjLDRPHL7THS0BjtKHThw2RMfHbWBT8Hs8aQ@mail.gmail.com>
+References: <20180925145622.29959-1-Jason@zx2c4.com>
+ <20180925145622.29959-8-Jason@zx2c4.com>
+ <CAKv+Gu9mVAfdBvOMCFqRJj+wBiWu3JVOgPZdkcdjzqSdQQ5Jrw@mail.gmail.com>
+ <CAHmME9r9KppoFwwNVpzpYbU+9dCPzb7Pit+4iRa4MY_ouJBWrA@mail.gmail.com>
+ <CAKv+Gu8ih-TsASRGqK+ST_5+EQ0=Zo-zhGCadOdGyPjucMFTCg@mail.gmail.com>
+ <CAKv+Gu8w74dUSEAGxxh=C6To6F=bSm8DjiExUPmh_LUyhoDLhg@mail.gmail.com>
+ <CAHmME9pbRabkGjNh-65S9qBNNS1GLJSwZ_tTM507S_Ezr1=QLg@mail.gmail.com>
+ <CAHmME9ru=kJO8QiW+uNNgt5NgFVZzRsQ4tNSgo+f+KfHs3fAKQ@mail.gmail.com>
+ <CAKv+Gu-WDt8f9qVjLDRPHL7THS0BjtKHThw2RMfHbWBT8Hs8aQ@mail.gmail.com>
+Message-ID: <CAHmME9q9QcCEZfTykJdS5Qcvv97Ve4PEFhFKYWKFyQXgn8+m9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Keerthy <j-keerthy@ti.com> [180926 04:12]:
-> So the below patch is solving the problem only for the first iteration
-> but i see the problem recurring from second iteration of suspend.
-> 
-> I tried the above cycle multiple times on am437x-gp-evm. I believe
-> we are one step closer still not completely fixed.
+On Wed, Sep 26, 2018 at 5:52 PM Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> Nice one :-)
+>
+> This works for me (but perhaps add a comment as well)
 
-OK thanks, that's interesting, I'll take a look. Good to hear
-that is the reason for pixcir issues though :)
-
-FYI, Grygorii also pointed out that am335x gpio debounce bit
-needs to be 18 not 8 for all gpio instances in am33xx-l4.dtsi.
-Otherwise am335x-evm won't boot.
-
-So I'll be posting at least one more updated test branch.
-
-Regards,
-
-Tony
+Sure. Just a prototype; it'll be clean for v7.
