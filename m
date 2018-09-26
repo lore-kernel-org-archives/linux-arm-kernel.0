@@ -1,44 +1,44 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 26 Sep 2018 12:40:53 +0200
-Subject: [PATCH v11 1/2] dt-bindings: media: Add Allwinner V3s Camera
- Sensor Interface (CSI)
-In-Reply-To: <1568838.d8CnAYTeDB@avalon>
-References: <1537951204-24672-1-git-send-email-yong.deng@magewell.com>
- <7197338.mhOH8fQaEM@avalon> <20180926103547.5ubb6xjkl7xngmfg@flea>
- <1568838.d8CnAYTeDB@avalon>
-Message-ID: <20180926104053.ijhmvvsbju36j4d3@flea>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 26 Sep 2018 12:43:05 +0200
+Subject: [RESEND PATCH v3 2/2] serial: uartps: Change uart ID port
+ allocation
+In-Reply-To: <CAMuHMdWQcc+ZD238e13fBcVW77304u2nqq2K9A9-wsDVAPEa4A@mail.gmail.com>
+References: <b1772d99d4e8b788448cde0fc5c7dccb1f63b507.1537443710.git.michal.simek@xilinx.com>
+ <39e840d1f727fe6338ea14b882ca9bf831f53e32.1537443710.git.michal.simek@xilinx.com>
+ <CAMuHMdWQcc+ZD238e13fBcVW77304u2nqq2K9A9-wsDVAPEa4A@mail.gmail.com>
+Message-ID: <c92386bf-ccdc-5c38-faed-75ff5e9718a6@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 26, 2018 at 01:38:08PM +0300, Laurent Pinchart wrote:
-> Hi Maxime,
-> 
-> On Wednesday, 26 September 2018 13:35:47 EEST maxime.ripard at bootlin.com wrote:
-> > On Wed, Sep 26, 2018 at 01:19:34PM +0300, Laurent Pinchart wrote:
-> > > > +Endpoint node properties for CSI1
-> > > > +---------------------------------
-> > > 
-> > > Should you list the CSI0 properties as well ? As the driver in patch 2/2
-> > > doesn't support the CSI-2 interface I assume you have left out CSI0 for
-> > > now, but it should still be listed in the bindings. I'm fine with fixing
-> > > this as a follow-up patch to avoid missing the v4.20 merge window, but if
-> > > you end up resubmitting the series, could you please address the problem
-> > > ?
-> > 
-> > That driver is not available, and the documentation isn't either, so
-> > there's no easy way to tell which properties are going to be needed
-> > before doing the actual work of reverse engineering it and writing a
-> > driver for it. Unfortunately...
-> 
-> While DT bindings should be independent from driver implementations, I agree 
-> it's difficult to develop good bindings without hardware documentation and 
-> without at least one working driver implementation.
-> 
-> How about just explicitly stating that these bindings don't support CSI0 yet ?
+Hi Geert,
 
-Yep, that would work
+On 24.9.2018 09:37, Geert Uytterhoeven wrote:
+> Hi Michal,
+> 
+> On Thu, Sep 20, 2018 at 1:42 PM Michal Simek <michal.simek@xilinx.com> wrote:
+>> For IPs which have alias algorightm all the time using that alias and
+>> minor number. It means serial20 alias ends up as ttyPS20.
+>>
+>> If alias is not setup for probed IP instance the first unused position is
+>> used but that needs to be checked if it is really empty because another
+>> instance doesn't need to be probed at that time. of_alias_get_alias_list()
+>> fills alias bitmap which exactly shows which ID is free.
+>> If alias pointing to different not compatible IP, it is free to use.
+>>
+>> cdns_get_id() call is placed below structure allocation to simplify
+>> error path.
+>>
+>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> 
+> JFTR, for sh-sci, I used a different approach, as all ports in the static DTB
+> can have an alias (if aliases are needed at all), and only DT overlays cannot
+> have them. Cfr. commit 7678f4c20fa7670f ("serial: sh-sci: Add support for
+> dynamic instances").
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+if you look at all patches I have done for uartps you can find out that
+I am creating uart_driver for every instance separately.
+It means that there is still a limit for number of consoles exactly as
+yours CONFIG_SERIAL_SH_SCI_NR_UARTS but every instance is separated.
+
+Thanks,
+Michal
