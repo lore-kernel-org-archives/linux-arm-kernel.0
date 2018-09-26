@@ -1,97 +1,41 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Wed, 26 Sep 2018 14:30:09 +0200
-Subject: [PATCH 2/2] arm64: dts: marvell: armada-cp110: describe more PPv2
- interrupts
-In-Reply-To: <20180924090002.27939-2-antoine.tenart@bootlin.com> (Antoine
- Tenart's message of "Mon, 24 Sep 2018 11:00:02 +0200")
-References: <20180924090002.27939-1-antoine.tenart@bootlin.com>
- <20180924090002.27939-2-antoine.tenart@bootlin.com>
-Message-ID: <87bm8ke90u.fsf@bootlin.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 26 Sep 2018 14:32:10 +0200
+Subject: [PATCH v4 0/2] Reworked rk3288-tinker-s devicetree
+In-Reply-To: <20180923113807.11558-1-heiko@sntech.de>
+References: <20180923113807.11558-1-heiko@sntech.de>
+Message-ID: <5476375.mdEj9W728V@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Antoine,
- 
- On lun., sept. 24 2018, Antoine Tenart <antoine.tenart@bootlin.com> wrote:
+Am Sonntag, 23. September 2018, 13:38:05 CEST schrieb Heiko Stuebner:
+> Hi David,
+> 
+> I've adpated your patches 1+2 like so and would like to add them this way
+> later on. Biggest change is of course making patch 1 solely about moving
+> the shared parts to the dtsi and adding the tinker-s.dts including the
+> emmc in the second patch.
+> 
+> Apart from that you can also see some previously missing style-related
+> fixes. For example patch subject lines are somewhat specific, to allow
+> people browsing the git history to realize the core patch contents just
+> from the "headline" and also use the "correct" prefixes which vary
+> depending on the subsystem your changing.
+> 
+> For future patches you can just do a "git log --oneline arch/arm/boot/dts"
+> (change directory depending on location of the change of course), to
+> see that arm32 dts use "ARM: dts: $soc-vendor: foo".
+> 
+> 
+> Also providing a commit message describing the individual change
+> in a bit more detail is important.
+> 
+> The wifi patch is a different issue, so I'll reply there.
+> 
+> 
+> Heiko
+> 
+> David Summers (2):
+>   ARM: dts: rockchip: move shared tinker-board nodes to a common dtsi
+>   ARM: dts: rockchip: add rk3288-based Tinker board S
 
-> This patch describes 3 additional interrupts per PPv2 port. Those
-> interrupts will be used later in future versions of the Marvell PPv2
-> driver, and now the device tree description matches the hardware
-> capabilities.
->
-> Signed-off-by: Antoine Tenart <antoine.tenart@bootlin.com>
-
-Applied on mvebu/dt64
-
-Thanks,
-
-Gregory
-> ---
->  arch/arm64/boot/dts/marvell/armada-cp110.dtsi | 21 ++++++++++++++++---
->  1 file changed, 18 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-> index 6a13690cf1e4..26d6e602d1ec 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-> @@ -52,9 +52,14 @@
->  					<ICU_GRP_NSR 47 IRQ_TYPE_LEVEL_HIGH>,
->  					<ICU_GRP_NSR 51 IRQ_TYPE_LEVEL_HIGH>,
->  					<ICU_GRP_NSR 55 IRQ_TYPE_LEVEL_HIGH>,
-> +					<ICU_GRP_NSR 59 IRQ_TYPE_LEVEL_HIGH>,
-> +					<ICU_GRP_NSR 63 IRQ_TYPE_LEVEL_HIGH>,
-> +					<ICU_GRP_NSR 67 IRQ_TYPE_LEVEL_HIGH>,
-> +					<ICU_GRP_NSR 71 IRQ_TYPE_LEVEL_HIGH>,
->  					<ICU_GRP_NSR 129 IRQ_TYPE_LEVEL_HIGH>;
->  				interrupt-names = "hif0", "hif1", "hif2",
-> -					"hif3", "hif4", "link";
-> +					"hif3", "hif4", "hif5", "hif6", "hif7",
-> +					"hif8", "link";
->  				port-id = <0>;
->  				gop-port-id = <0>;
->  				status = "disabled";
-> @@ -66,9 +71,14 @@
->  					<ICU_GRP_NSR 48 IRQ_TYPE_LEVEL_HIGH>,
->  					<ICU_GRP_NSR 52 IRQ_TYPE_LEVEL_HIGH>,
->  					<ICU_GRP_NSR 56 IRQ_TYPE_LEVEL_HIGH>,
-> +					<ICU_GRP_NSR 60 IRQ_TYPE_LEVEL_HIGH>,
-> +					<ICU_GRP_NSR 64 IRQ_TYPE_LEVEL_HIGH>,
-> +					<ICU_GRP_NSR 68 IRQ_TYPE_LEVEL_HIGH>,
-> +					<ICU_GRP_NSR 72 IRQ_TYPE_LEVEL_HIGH>,
->  					<ICU_GRP_NSR 128 IRQ_TYPE_LEVEL_HIGH>;
->  				interrupt-names = "hif0", "hif1", "hif2",
-> -					"hif3", "hif4", "link";
-> +					"hif3", "hif4", "hif5", "hif6", "hif7",
-> +					"hif8", "link";
->  				port-id = <1>;
->  				gop-port-id = <2>;
->  				status = "disabled";
-> @@ -80,9 +90,14 @@
->  					<ICU_GRP_NSR 49 IRQ_TYPE_LEVEL_HIGH>,
->  					<ICU_GRP_NSR 53 IRQ_TYPE_LEVEL_HIGH>,
->  					<ICU_GRP_NSR 57 IRQ_TYPE_LEVEL_HIGH>,
-> +					<ICU_GRP_NSR 61 IRQ_TYPE_LEVEL_HIGH>,
-> +					<ICU_GRP_NSR 65 IRQ_TYPE_LEVEL_HIGH>,
-> +					<ICU_GRP_NSR 69 IRQ_TYPE_LEVEL_HIGH>,
-> +					<ICU_GRP_NSR 73 IRQ_TYPE_LEVEL_HIGH>,
->  					<ICU_GRP_NSR 127 IRQ_TYPE_LEVEL_HIGH>;
->  				interrupt-names = "hif0", "hif1", "hif2",
-> -					"hif3", "hif4", "link";
-> +					"hif3", "hif4", "hif5", "hif6", "hif7",
-> +					"hif8", "link";
->  				port-id = <2>;
->  				gop-port-id = <3>;
->  				status = "disabled";
-> -- 
-> 2.17.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Gregory Clement, Bootlin
-Embedded Linux and Kernel engineering
-http://bootlin.com
+applied for 4.20
