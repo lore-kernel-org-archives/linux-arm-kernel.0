@@ -1,207 +1,36 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 26 Sep 2018 10:50:13 +0200
-Subject: [Resend PATCH 5/5] arm: dts: mt7623: add display subsystem
- related device nodes
-In-Reply-To: <1537939280.20005.19.camel@mtksdaap41>
-References: <84011aa94dd7be9239b7a2f944dd30fc70568fbb.1536155449.git.ryder.lee@mediatek.com>
- <7105c341de3525761ad4067ca57c641c7097f773.1536155449.git.ryder.lee@mediatek.com>
- <1537925879.20118.3.camel@mtksdaap41> <1537929498.32631.16.camel@mtkswgap22>
- <1537939280.20005.19.camel@mtksdaap41>
-Message-ID: <67eb0b9c-f2a3-a9c4-202f-d3c64b6a2b3e@gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 26 Sep 2018 10:50:55 +0200
+Subject: [PATCH v2 0/5] Meson8b: add support for the Endless Mini EC-100
+In-Reply-To: <20180922151003.4736-1-martin.blumenstingl@googlemail.com>
+ (Martin Blumenstingl's message of "Sat, 22 Sep 2018 17:09:58 +0200")
+References: <20180922151003.4736-1-martin.blumenstingl@googlemail.com>
+Message-ID: <7hd0t063rk.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
 
+> This series adds support for the "Endless Mini" grapefruit-sized mini PC
+> from Endless Mobile, Inc. The internal name of this device is EC-100
+> (this can be found for example in the GPL kernel tree which is based on
+> Amlogic's 3.10 kernel: [0]).
+>
+> The board is using a Meson8b (S805) SoC with various peripherals.
+> The biggest difference compared to boards which are based on Amlogic's
+> reference designs is that this board comes with an embedded micro-
+> controller called "EC" which makes the system LED pulse during boot
+> and allows powering off the board. It also comes with a 10/100 Mbit/s
+> Ethernet port and one USB host port.
+> There are two variants:
+> - 2GB RAM, 32GB storage, 802.11bgn and Bluetooth 4.0
+> - 1GB RAM, 24GB storage, neither wifi nor Bluetooth
+>
+> This series contains support for the new board as well as supporting
+> patches for the new vendor prefix and the pin definitions in
+> meson8b.dtsi so various peripherals can be enabled.
 
-On 26/09/2018 07:21, CK Hu wrote:
-> Hi, Ryder:
-> 
-> On Wed, 2018-09-26 at 10:38 +0800, Ryder Lee wrote:
->> On Wed, 2018-09-26 at 09:37 +0800, CK Hu wrote:
->>> Hi, Ryder:
->>>
->>> On Wed, 2018-09-05 at 22:09 +0800, Ryder Lee wrote:
->>>> Add display subsystem related device nodes for MT7623.
->>>>
->>>> Cc: CK Hu <ck.hu@mediatek.com>
->>>> Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
->>>> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
->>>> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
->>>> ---
->>>> I forgot to sort nodes in my previous mail. Sorry for the inconvenience.
->>>>
->>>> This patch depends on the series: https://lkml.org/lkml/2018/9/5/223
->>>>
->>>> @Matthias,
->>>> I know you're working on broken MMSYS - just want to ask whether it's possible
->>>> to let the patch to go to your tree (if others are okay with it), and send a
->>>> fixup one for MT7623 MMSYS later?
->>>> ---
->>>>  arch/arm/boot/dts/mt7623.dtsi                 | 177 ++++++++++++++++++++++++++
->>>>  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts |  83 ++++++++++++
->>>>  arch/arm/boot/dts/mt7623n-rfb-emmc.dts        |  83 ++++++++++++
->>>>  3 files changed, 343 insertions(+)
->>>>
->>>> diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
->>>> index d01bdee..fdf9078 100644
->>>> --- a/arch/arm/boot/dts/mt7623.dtsi
->>>> +++ b/arch/arm/boot/dts/mt7623.dtsi
->>>> @@ -23,6 +23,11 @@
->>>>  	#address-cells = <2>;
->>>>  	#size-cells = <2>;
->>>>  
->>>> +	aliases {
->>>> +		rdma0 = &rdma0;
->>>> +		rdma1 = &rdma1;
->>>> +	};
->>>> +
->>>>  	cpu_opp_table: opp-table {
->>>>  		compatible = "operating-points-v2";
->>>>  		opp-shared;
->>>> @@ -311,6 +316,25 @@
->>>>  		clock-names = "spi", "wrap";
->>>>  	};
->>>>  
->>>> +	mipi_tx0: mipi-dphy at 10010000 {
->>>> +		compatible = "mediatek,mt7623-mipi-tx",
->>>> +			     "mediatek,mt2701-mipi-tx";
->>>> +		reg = <0 0x10010000 0 0x90>;
->>>> +		clocks = <&clk26m>;
->>>> +		clock-output-names = "mipi_tx0_pll";
->>>> +		#clock-cells = <0>;
->>>> +		#phy-cells = <0>;
->>>> +	};
->>>> +
->>>> +	cec: cec at 10012000 {
->>>> +		compatible = "mediatek,mt7623-cec",
->>>> +			     "mediatek,mt8173-cec";
->>>> +		reg = <0 0x10012000 0 0xbc>;
->>>> +		interrupts = <GIC_SPI 182 IRQ_TYPE_LEVEL_LOW>;
->>>> +		clocks = <&infracfg CLK_INFRA_CEC>;
->>>> +		status = "disabled";
->>>> +	};
->>>> +
->>>>  	cir: cir at 10013000 {
->>>>  		compatible = "mediatek,mt7623-cir";
->>>>  		reg = <0 0x10013000 0 0x1000>;
->>>> @@ -359,6 +383,18 @@
->>>>  		#clock-cells = <1>;
->>>>  	};
->>>>  
->>>> +	hdmi_phy: phy at 10209100 {
->>>> +		compatible = "mediatek,mt7623-hdmi-phy",
->>>> +			     "mediatek,mt2701-hdmi-phy";
->>>> +		reg = <0 0x10209100 0 0x24>;
->>>> +		clocks = <&apmixedsys CLK_APMIXED_HDMI_REF>;
->>>> +		clock-names = "pll_ref";
->>>> +		clock-output-names = "hdmitx_dig_cts";
->>>> +		#clock-cells = <0>;
->>>> +		#phy-cells = <0>;
->>>> +		status = "disabled";
->>>> +	};
->>>> +
->>>>  	rng: rng at 1020f000 {
->>>>  		compatible = "mediatek,mt7623-rng";
->>>>  		reg = <0 0x1020f000 0 0x1000>;
->>>> @@ -558,6 +594,16 @@
->>>>  		status = "disabled";
->>>>  	};
->>>>  
->>>> +	hdmiddc0: i2c at 11013000 {
->>>> +		compatible = "mediatek,mt7623-hdmi-ddc",
->>>> +			     "mediatek,mt8173-hdmi-ddc";
->>>> +		interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_LOW>;
->>>> +		reg = <0 0x11013000 0 0x1C>;
->>>> +		clocks = <&pericfg CLK_PERI_I2C3>;
->>>> +		clock-names = "ddc-i2c";
->>>> +		status = "disabled";
->>>> +	};
->>>> +
->>>>  	nor_flash: spi at 11014000 {
->>>>  		compatible = "mediatek,mt7623-nor",
->>>>  			     "mediatek,mt8173-nor";
->>>> @@ -732,6 +778,84 @@
->>>>  		#clock-cells = <1>;
->>>>  	};
->>>>  
->>>> +	display_components: dispsys at 14000000 {
->>>> +		compatible = "mediatek,mt7623-mmsys",
->>>
->>> Checkpatch warning:
->>>
->>> WARNING: DT compatible string "mediatek,mt7623-mmsys" appears
->>> un-documented -- check ./Documentation/devicetree/bindings/
->>> #101: FILE: arch/arm/boot/dts/mt7623.dtsi:782:
->>> +               compatible = "mediatek,mt7623-mmsys",
->>>
->>>
->>>> +			     "mediatek,mt2701-mmsys";
->>>> +		reg = <0 0x14000000 0 0x1000>;
->>>> +		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
->>>> +	};
->>>> +
->>>> +	ovl at 14007000 {
->>>> +		compatible = "mediatek,mt7623-disp-ovl",
->>>
->>> I think this is also un-documented, but I don't know why checkpatch does
->>> not show any warning.
->>>
->>> Regards,
->>> CK
->>>> +			     "mediatek,mt2701-disp-ovl";
->>>> +		reg = <0 0x14007000 0 0x1000>;
->>>> +		interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_LOW>;
->>>> +		clocks = <&mmsys CLK_MM_DISP_OVL>;
->>>> +		iommus = <&iommu MT2701_M4U_PORT_DISP_OVL_0>;
->>>> +		mediatek,larb = <&larb0>;
->>>> +	};
->>>> +
->>
->> I fallback to use the MT2701's compatible string here and there, but I
->> could add a new one for MT7623.
->>
->> BTW, I've had this question for a long time - should I add a new
->> compatible for the very same IPs, or could we just use the old one in
->> DTS?
->>
->> Ryder
->>
-> 
-> From [1], there is a description for the multiple compatible string
-> scheme:
-> 
-> ====
-> The reasoning behind this scheme is the observation that in the majority
-> of cases, a single machine_desc can support a large number of boards
-> if they all use the same SoC, or same family of SoCs.  However,
-> invariably there will be some exceptions where a specific board will
-> require special setup code that is not useful in the generic case.
-> Special cases could be handled by explicitly checking for the
-> troublesome board(s) in generic setup code, but doing so very quickly
-> becomes ugly and/or unmaintainable if it is more than just a couple of
-> cases.
-> 
-> Instead, the compatible list allows a generic machine_desc to provide
-> support for a wide common set of boards by specifying "less
-> compatible" values in the dt_compat list.  In the example above,
-> generic board support can claim compatibility with "ti,omap3" or
-> "ti,omap3450".  If a bug was discovered on the original beagleboard
-> that required special workaround code during early boot, then a new
-> machine_desc could be added which implements the workarounds and only
-> matches on "ti,omap3-beagleboard".
-> ====
-> 
-> I don't know would there be a problem happened only in MT7623 even
-> though this hardware is identical in both MT2701 and MT7623. Maybe the
-> system-wide configuration would influence this driver. So the easy way
-> is to add the compatible string for MT7623. If you could prove that 
-> this driver would never be influenced by system-wide configuration,
-> using only MT2701 compatible string is acceptable for me.
-> 
-> This is my opinion, but the most important is maintainer's opinion.
-> 
+Applied to v4.20/dt,
 
-The compatible string looks good. But you should update the binding documentation :)
+Thanks,
 
-Regards,
-Matthias
+Kevin
