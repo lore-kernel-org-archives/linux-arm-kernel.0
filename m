@@ -1,79 +1,62 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Wed, 26 Sep 2018 16:22:45 +0300
-Subject: [PATCH v2 20/22] arm64: dts: ls104x: add iommu-map to pci controllers
+Date: Wed, 26 Sep 2018 16:22:28 +0300
+Subject: [PATCH v2 03/22] soc/fsl/qman: map FQD and PFDR areas in the iommu
 In-Reply-To: <20180926132247.10971-1-laurentiu.tudor@nxp.com>
 References: <20180926132247.10971-1-laurentiu.tudor@nxp.com>
-Message-ID: <20180926132247.10971-21-laurentiu.tudor@nxp.com>
+Message-ID: <20180926132247.10971-4-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-The pci controllers are also behind the smmu so add the iommu-map
-property to reflect this. The bootloader needs to patch the stream id
-ranges to some sane values.
+Add a one-to-one iommu mapping for qman private data memory areas
+(FQD and PFDR). This is required for QMAN to work without faults
+behind an iommu.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 3 +++
- arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 3 +++
- 2 files changed, 6 insertions(+)
+ drivers/soc/fsl/qbman/qman_ccsr.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-index 0e8fc8f29997..ccadc40a36f4 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-@@ -716,6 +716,7 @@
- 			#size-cells = <2>;
- 			device_type = "pci";
- 			dma-coherent;
-+			iommu-map = <0 &mmu 0 1>;
- 			num-lanes = <4>;
- 			bus-range = <0x0 0xff>;
- 			ranges = <0x81000000 0x0 0x00000000 0x40 0x00010000 0x0 0x00010000   /* downstream I/O */
-@@ -741,6 +742,7 @@
- 			#size-cells = <2>;
- 			device_type = "pci";
- 			dma-coherent;
-+			iommu-map = <0 &mmu 0 1>;
- 			num-lanes = <2>;
- 			bus-range = <0x0 0xff>;
- 			ranges = <0x81000000 0x0 0x00000000 0x48 0x00010000 0x0 0x00010000   /* downstream I/O */
-@@ -766,6 +768,7 @@
- 			#size-cells = <2>;
- 			device_type = "pci";
- 			dma-coherent;
-+			iommu-map = <0 &mmu 0 1>;
- 			num-lanes = <2>;
- 			bus-range = <0x0 0xff>;
- 			ranges = <0x81000000 0x0 0x00000000 0x50 0x00010000 0x0 0x00010000   /* downstream I/O */
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-index 29b07bdd4207..a12d33362554 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-@@ -685,6 +685,7 @@
- 			#size-cells = <2>;
- 			device_type = "pci";
- 			dma-coherent;
-+			iommu-map = <0 &mmu 0 1>;
- 			num-lanes = <4>;
- 			bus-range = <0x0 0xff>;
- 			ranges = <0x81000000 0x0 0x00000000 0x40 0x00010000 0x0 0x00010000   /* downstream I/O */
-@@ -710,6 +711,7 @@
- 			#size-cells = <2>;
- 			device_type = "pci";
- 			dma-coherent;
-+			iommu-map = <0 &mmu 0 1>;
- 			num-lanes = <2>;
- 			bus-range = <0x0 0xff>;
- 			ranges = <0x81000000 0x0 0x00000000 0x48 0x00010000 0x0 0x00010000   /* downstream I/O */
-@@ -735,6 +737,7 @@
- 			#size-cells = <2>;
- 			device_type = "pci";
- 			dma-coherent;
-+			iommu-map = <0 &mmu 0 1>;
- 			num-lanes = <2>;
- 			bus-range = <0x0 0xff>;
- 			ranges = <0x81000000 0x0 0x00000000 0x50 0x00010000 0x0 0x00010000   /* downstream I/O */
+diff --git a/drivers/soc/fsl/qbman/qman_ccsr.c b/drivers/soc/fsl/qbman/qman_ccsr.c
+index 619e22030460..0cfe79f85a66 100644
+--- a/drivers/soc/fsl/qbman/qman_ccsr.c
++++ b/drivers/soc/fsl/qbman/qman_ccsr.c
+@@ -29,6 +29,7 @@
+  */
+ 
+ #include "qman_priv.h"
++#include <linux/iommu.h>
+ 
+ u16 qman_ip_rev;
+ EXPORT_SYMBOL(qman_ip_rev);
+@@ -692,6 +693,7 @@ static int fsl_qman_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+ 	struct device_node *node = dev->of_node;
++	struct iommu_domain *domain;
+ 	struct resource *res;
+ 	int ret, err_irq;
+ 	u16 id;
+@@ -769,6 +771,19 @@ static int fsl_qman_probe(struct platform_device *pdev)
+ 	}
+ 	dev_dbg(dev, "Allocated PFDR 0x%llx 0x%zx\n", pfdr_a, pfdr_sz);
+ 
++	/* Create an 1-to-1 iommu mapping for fqd and pfdr areas */
++	domain = iommu_get_domain_for_dev(dev);
++	if (domain) {
++		ret = iommu_map(domain, fqd_a, fqd_a, fqd_sz,
++				IOMMU_READ | IOMMU_WRITE | IOMMU_CACHE);
++		if (ret)
++			dev_warn(dev, "iommu_map(fqd) failed %d\n", ret);
++		ret = iommu_map(domain, pfdr_a, pfdr_a, pfdr_sz,
++				IOMMU_READ | IOMMU_WRITE | IOMMU_CACHE);
++		if (ret)
++			dev_warn(dev, "iommu_map(pfdr) failed %d\n", ret);
++	}
++
+ 	ret = qman_init_ccsr(dev);
+ 	if (ret) {
+ 		dev_err(dev, "CCSR setup failed\n");
 -- 
 2.17.1
