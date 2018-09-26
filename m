@@ -1,32 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 26 Sep 2018 15:04:38 +0200
-Subject: [PATCH 1/2] ARM: omap1: add nand_chip declaration
-Message-ID: <20180926130458.2406549-1-arnd@arndb.de>
+From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
+Date: Wed, 26 Sep 2018 16:22:35 +0300
+Subject: [PATCH v2 10/22] fsl/fman: add API to get the device behind a fman
+ port
+In-Reply-To: <20180926132247.10971-1-laurentiu.tudor@nxp.com>
+References: <20180926132247.10971-1-laurentiu.tudor@nxp.com>
+Message-ID: <20180926132247.10971-11-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recent MTD changes caused a minor build regression on OMAP1:
+From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-In file included from arch/arm/mach-omap1/devices.c:31:
-arch/arm/mach-omap1/common.h:85:39: error: 'struct nand_chip' declared inside parameter list will not be visible outside of this definition or declaration [-Werror]
+Add an API that retrieves the 'struct device' that the specified fman
+port probed against. The new API will be used in a subsequent iommu
+enablement related patch.
 
-Fixes: 1002aed789bc ("mtd: rawnand: plat_nand: Pass a nand_chip object to all platform_nand_ctrl hooks")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
- arch/arm/mach-omap1/common.h | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/net/ethernet/freescale/fman/fman_port.c | 14 ++++++++++++++
+ drivers/net/ethernet/freescale/fman/fman_port.h |  2 ++
+ 2 files changed, 16 insertions(+)
 
-diff --git a/arch/arm/mach-omap1/common.h b/arch/arm/mach-omap1/common.h
-index 11b87a4c84d4..82f2c065040a 100644
---- a/arch/arm/mach-omap1/common.h
-+++ b/arch/arm/mach-omap1/common.h
-@@ -82,6 +82,7 @@ void omap1_restart(enum reboot_mode, const char *);
+diff --git a/drivers/net/ethernet/freescale/fman/fman_port.c b/drivers/net/ethernet/freescale/fman/fman_port.c
+index ee82ee1384eb..bd76c9730692 100644
+--- a/drivers/net/ethernet/freescale/fman/fman_port.c
++++ b/drivers/net/ethernet/freescale/fman/fman_port.c
+@@ -1728,6 +1728,20 @@ u32 fman_port_get_qman_channel_id(struct fman_port *port)
+ }
+ EXPORT_SYMBOL(fman_port_get_qman_channel_id);
  
- extern void __init omap_check_revision(void);
++/**
++ * fman_port_get_device
++ * port:	Pointer to the FMan port device
++ *
++ * Get the 'struct device' associated to the specified FMan port device
++ *
++ * Return: pointer to associated 'struct device'
++ */
++struct device *fman_port_get_device(struct fman_port *port)
++{
++	return port->dev;
++}
++EXPORT_SYMBOL(fman_port_get_device);
++
+ int fman_port_get_hash_result_offset(struct fman_port *port, u32 *offset)
+ {
+ 	if (port->buffer_offsets.hash_result_offset == ILLEGAL_BASE)
+diff --git a/drivers/net/ethernet/freescale/fman/fman_port.h b/drivers/net/ethernet/freescale/fman/fman_port.h
+index 9dbb69f40121..82f12661a46d 100644
+--- a/drivers/net/ethernet/freescale/fman/fman_port.h
++++ b/drivers/net/ethernet/freescale/fman/fman_port.h
+@@ -157,4 +157,6 @@ int fman_port_get_tstamp(struct fman_port *port, const void *data, u64 *tstamp);
  
-+struct nand_chip;
- extern void omap1_nand_cmd_ctl(struct nand_chip *this, int cmd,
- 			       unsigned int ctrl);
+ struct fman_port *fman_port_bind(struct device *dev);
  
++struct device *fman_port_get_device(struct fman_port *port);
++
+ #endif /* __FMAN_PORT_H */
 -- 
-2.18.0
+2.17.1
