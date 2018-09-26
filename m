@@ -1,29 +1,47 @@
-From: ezequiel@collabora.com (Ezequiel Garcia)
-Date: Wed, 26 Sep 2018 19:31:22 +0200
-Subject: [PATCH] iommu: rockchip: Drop verbose prints in the interrupt
- handler
-In-Reply-To: <20180925112930.u5kftmo3vhmdxji4@8bytes.org>
-References: <20180830222832.16766-1-ezequiel@collabora.com>
- <20180925112930.u5kftmo3vhmdxji4@8bytes.org>
-Message-ID: <ea4d539ecbaf229bef8c0810c6a11cf824339b4b.camel@collabora.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 26 Sep 2018 21:07:30 +0200
+Subject: [PATCHv4 0/6] Add support for UHS-I on Exynos5422 odroid boards
+In-Reply-To: <20180922075238.884-2-linux.amoon@gmail.com>
+References: <20180922075238.884-1-linux.amoon@gmail.com>
+ <20180922075238.884-2-linux.amoon@gmail.com>
+Message-ID: <20180926190730.GB6461@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-09-25 at 13:29 +0200, Joerg Roedel wrote:
-> On Thu, Aug 30, 2018 at 07:28:32PM -0300, Ezequiel Garcia wrote:
-> > Printing verbosely via WARN macros and friends in interrupt handlers
-> > is strongly discouraged. Drop them and use proper ratelimited
-> > prints.
-> > 
-> > Signed-off-by: Ezequiel Garcia <ezequiel@collabora.com>
-> > ---
-> >  drivers/iommu/rockchip-iommu.c | 10 ++++++----
-> >  1 file changed, 6 insertions(+), 4 deletions(-)
+On Sat, Sep 22, 2018 at 07:52:32AM +0000, Anand Moon wrote:
+> This is series v4 since my previous patches were incomplete with driver
+> changes missing.
 > 
-> This doesn't apply cleanly to v4.19-rc5, can you please base the patch
-> on that tag, add the Reviewed-by and re-send?
+> v4 changes.
+> squash cd-gpios and wp-gpio changes into single patch.
+> change the subject prefix to "ARM: dts: exynos:"
+> 
+> These changes add UHS-I tuning for dw_mmc-exynos driver.
+> 
+> Rebased on Krzysztof branch next/dt
+> [0] git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git 
 > 
 
-Well, after looking at the latest code, now I'm wondering why Marc
-changed the WARN_ON with a WARN_ON_ONCE, instead of a less verbose
-ratelimited print.
+Except the one about CD and WP pins (where I replied), they look ok. It
+would be nice if you get tested-by tags for them.
+
+Best regards,
+Krzysztof
+
+> Anand Moon (6):
+>   ARM: dts: exynos: Added UHS-I bus speed support
+>   ARM: dts: exynos: fix regulator min values of LDO13 for Odroid XU3/XU4
+>   ARM: dts: exynos: update maximum frequency for sdcard to 200MHz
+>   ARM: dts: exynos: Add CD and WP pins to Odroid XU3/XU4 SD card
+>   ARM: dts: exynos: update maximum frequency for emmc to 200MHz
+>   mmc: dw_mmc-exynos: Add tuning for sdr and ddr timing for USH-I mode
+> 
+>  arch/arm/boot/dts/exynos5420-pinctrl.dtsi          |  8 ++++++++
+>  arch/arm/boot/dts/exynos5422-odroid-core.dtsi      | 10 ++++++++--
+>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  1 +
+>  drivers/mmc/host/dw_mmc-exynos.c                   | 11 +++++++++++
+>  4 files changed, 28 insertions(+), 2 deletions(-)
+> 
+> -- 
+> 2.17.1
+> 
