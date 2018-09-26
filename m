@@ -1,57 +1,54 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Wed, 26 Sep 2018 18:03:16 +0300
-Subject: [PATCH v9 2/8] dt-bindings: Introduce interconnect binding
-In-Reply-To: <20180926144830.GB25838@e107155-lin>
-References: <20180831140151.13972-1-georgi.djakov@linaro.org>
- <20180831140151.13972-3-georgi.djakov@linaro.org>
- <20180925180215.GA12435@bogus>
- <b67253fb-d86d-2ddd-6c30-0833d6ed62ad@linaro.org>
- <20180926144830.GB25838@e107155-lin>
-Message-ID: <0fd425c0-733b-825e-69ad-96294e5c911a@linaro.org>
+From: koomi@moshbit.net (Lukas Braun)
+Date: Wed, 26 Sep 2018 17:11:35 +0200
+Subject: [PATCH v2] KVM: arm/arm64: Check memslot bounds before mapping
+ hugepages
+Message-ID: <20180926151135.16083-1-koomi@moshbit.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
+Userspace can create a memslot with memory backed by (transparent)
+hugepages, but with bounds that do not align with hugepages.
+In that case, we cannot map the entire region in the guest as hugepages
+without exposing additional host memory to the guest and potentially
+interfering with other memslots.
+Consequently, this patch adds a bounds check when populating guest page
+tables and forces the creation of regular PTEs if mapping an entire
+hugepage would violate the memslots bounds.
 
-On 09/26/2018 05:48 PM, Sudeep Holla wrote:
-> On Wed, Sep 26, 2018 at 05:42:15PM +0300, Georgi Djakov wrote:
->> Hi Rob,
->>
->> Thanks for the comments!
->>
->> On 09/25/2018 09:02 PM, Rob Herring wrote:
->>> On Fri, Aug 31, 2018 at 05:01:45PM +0300, Georgi Djakov wrote:
->>>> This binding is intended to represent the relations between the interconnect
->>>> controllers (providers) and consumer device nodes. It will allow creating links
->>>> between consumers and interconnect paths (exposed by interconnect providers).
->>>
->>> As I mentioned in person, I want to see other SoC families using this 
->>> before accepting. They don't have to be ready for upstream, but WIP 
->>> patches or even just a "yes, this works for us and we're going to use 
->>> this binding on X".
->>
->> Other than the 3 Qualcomm SoCs (msm8916, msm8996, sdm845) that are
->> currently using this binding, there is ongoing work from at least two
->> other vendors that would be using this same binding. I will check on
->> what is their progress so far.
->>
->>> Also, I think the QCom GPU use of this should be fully sorted out. Or 
->>> more generically how this fits into OPP binding which seems to be never 
->>> ending extended...
->>
->> I see this as a further step. It could be OPP binding which include
->> bandwidth values or some separate DT property. Jordan has already
->> proposed something, do you have any initial comments on that?
-> 
-> I am curious as how this fits into new systems which have firmware driven
-> CPUFreq and other DVFS. I would like to avoid using this in such systems
-> and leave it upto the firmware to scale the bus/interconnect based on the
-> other components that are connected to it and active.
+Signed-off-by: Lukas Braun <koomi@moshbit.net>
+---
 
-This can be used with firmware driven systems too. In this case the
-interconnect platform driver will not manage the interconnects directly,
-but will collect data and provide hints to the firmware. Then the
-firmware can take into account these hints and do the scaling.
+Hi everyone,
 
-Thanks,
-Georgi
+for v2, in addition to writing the condition the way Marc suggested, I
+moved the whole check so it also catches the problem when the hugepage
+was allocated explicitly, not only for THPs. The second line is quite
+long, but splitting it up would make things rather ugly IMO, so I left
+it as it is.
+
+Regards,
+Lukas
+
+
+ virt/kvm/arm/mmu.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index ed162a6c57c5..ba77339e23ec 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1500,7 +1500,11 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		return -EFAULT;
+ 	}
+ 
+-	if (vma_kernel_pagesize(vma) == PMD_SIZE && !logging_active) {
++	if ((fault_ipa & S2_PMD_MASK) < (memslot->base_gfn << PAGE_SHIFT) ||
++	    ALIGN(fault_ipa, S2_PMD_SIZE) >= ((memslot->base_gfn + memslot->npages) << PAGE_SHIFT)) {
++		/* PMD entry would map something outside of the memslot */
++		force_pte = true;
++	} else if (vma_kernel_pagesize(vma) == PMD_SIZE && !logging_active) {
+ 		hugetlb = true;
+ 		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
+ 	} else {
+-- 
+2.11.0
