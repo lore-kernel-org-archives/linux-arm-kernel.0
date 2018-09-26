@@ -1,46 +1,56 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Wed, 26 Sep 2018 09:16:17 +0200
-Subject: [GIT PULL] ARM: at91: SoC for 4.20
-In-Reply-To: <20180925203812.z7jo32d5aebwh7e2@localhost>
-References: <20180925103735.GA31525@piout.net>
- <20180925203812.z7jo32d5aebwh7e2@localhost>
-Message-ID: <20180926071617.5vend45tfxtxbsiv@M43218.corp.atmel.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 26 Sep 2018 09:24:17 +0200
+Subject: [GIT PULL] ARM: dts: zynq: Xilinx DT changes for v4.20
+Message-ID: <70e3d4cf-7f50-310e-57d4-b9598de84c7d@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2018 at 01:38:12PM -0700, Olof Johansson wrote:
-> On Tue, Sep 25, 2018 at 12:37:35PM +0200, Alexandre Belloni wrote:
-> > Arnd, Olof,
-> > 
-> > Most changes are shuffling around the maintainers entries. There are
-> > also two PM non urgent fixes.
-> > 
-> > This one as a trivial conflict with the staging tree solved in linux-next.
-> > 
-> > The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
-> > 
-> >   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
-> > 
-> > are available in the Git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/at91/linux tags/at91-4.20-soc
-> > 
-> > for you to fetch changes up to 34d2a7db77ad837cfb88bd01b33fd1f3855ce9c0:
-> > 
-> >   MAINTAINERS: sdhci: move the Microchip entry to proper location (2018-09-25 12:26:31 +0200)
-> > 
-> > ----------------------------------------------------------------
-> > AT91 SoC for 4.20
-> > 
-> >  - rename MAINTAINERS entries and change maintainers
-> >  - two pm cleanups
-> 
-> Merged, thanks.  Welcome aboard as maintainer, Ludovic!
+Hi,
 
-Thanks!
+please pull this one patch to your tree. It can supposed to be a fix but
+the dtc changes, which expose these warnings, will be merged in v4.20.
 
-Ludovic
+Thanks,
+Michal
 
-> 
-> 
-> -Olof
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+
+  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+
+are available in the git repository at:
+
+  https://github.com/Xilinx/linux-xlnx.git tags/zynq-dt-for-v4.20
+
+for you to fetch changes up to f5054ceed420b1f38d37920a4c65446fcc5d6b90:
+
+  ARM: dts: xilinx: Fix I2C and SPI bus warnings (2018-09-18 12:49:39 +0200)
+
+----------------------------------------------------------------
+ARM: dts: zynq: DT changes for v4.20
+
+- Fix DTS spi/i2c warnings for zc702/zc770 boards
+
+----------------------------------------------------------------
+Rob Herring (1):
+      ARM: dts: xilinx: Fix I2C and SPI bus warnings
+
+ arch/arm/boot/dts/zynq-zc702.dts       | 12 ++++++------
+ arch/arm/boot/dts/zynq-zc770-xm010.dts |  2 +-
+ arch/arm/boot/dts/zynq-zc770-xm013.dts |  2 +-
+ 3 files changed, 8 insertions(+), 8 deletions(-)
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Xilinx Microblaze
+Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
+U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180926/7ebd4070/attachment.sig>
