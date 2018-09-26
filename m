@@ -1,41 +1,158 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 27 Sep 2018 01:47:44 +0200
-Subject: [PATCH] mmc: core: Fix debounce time to use microseconds
-In-Reply-To: <20180918231656.21778-1-tony@atomide.com>
-References: <20180918231656.21778-1-tony@atomide.com>
-Message-ID: <CAPDyKFqOYNAC5GHPsWbganZ7BjHD67OSqrxxCwu1nXzrLRhFMw@mail.gmail.com>
+Date: Thu, 27 Sep 2018 01:48:10 +0200
+Subject: [PATCH] mmc: mmci: Drop support for pdata GPIO numbers
+In-Reply-To: <20180920230110.19927-1-linus.walleij@linaro.org>
+References: <20180920230110.19927-1-linus.walleij@linaro.org>
+Message-ID: <CAPDyKFpSbyspzcGrAp3McwtG04=o6UfymEnrjLCZ=+JY-YWfHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 September 2018 at 01:16, Tony Lindgren <tony@atomide.com> wrote:
-> The debounce value in device tree is in milliseconds but needs to be in
-> microseconds for mmc_gpiod_request_cd().
+On 21 September 2018 at 01:01, Linus Walleij <linus.walleij@linaro.org> wrote:
+> All the machines using the MMCI are passing GPIOs for the
+> card detect and write protect using the device tree or
+> descriptor table (one single case, Integrator/AP IM-PD1).
 >
-> Fixes: bfd694d5e21c ("mmc: core: Add tunable delay before detecting card
-> after card is inserted")
-> Cc: Shawn Lin <shawn.lin@rock-chips.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> Drop support for passing global GPIO numbers through
+> platform data, noone is using it.
+>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Applied for fixes, thanks!
+Applied for next, thanks!
 
 Kind regards
 Uffe
 
 > ---
->  drivers/mmc/core/host.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm/mach-integrator/integrator_cp.c |  2 --
+>  arch/arm/mach-versatile/versatile_dt.c   |  4 ---
+>  drivers/mmc/host/mmci.c                  | 34 +++++-------------------
+>  include/linux/amba/mmci.h                | 11 ++------
+>  4 files changed, 8 insertions(+), 43 deletions(-)
 >
-> diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
-> --- a/drivers/mmc/core/host.c
-> +++ b/drivers/mmc/core/host.c
-> @@ -235,7 +235,7 @@ int mmc_of_parse(struct mmc_host *host)
->                         host->caps |= MMC_CAP_NEEDS_POLL;
+> diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
+> index 772a7cf2010e..976ded5c5916 100644
+> --- a/arch/arm/mach-integrator/integrator_cp.c
+> +++ b/arch/arm/mach-integrator/integrator_cp.c
+> @@ -80,8 +80,6 @@ static unsigned int mmc_status(struct device *dev)
+>  static struct mmci_platform_data mmc_data = {
+>         .ocr_mask       = MMC_VDD_32_33|MMC_VDD_33_34,
+>         .status         = mmc_status,
+> -       .gpio_wp        = -1,
+> -       .gpio_cd        = -1,
+>  };
 >
->                 ret = mmc_gpiod_request_cd(host, "cd", 0, true,
-> -                                          cd_debounce_delay_ms,
-> +                                          cd_debounce_delay_ms * 1000,
->                                            &cd_gpio_invert);
->                 if (!ret)
->                         dev_info(host->parent, "Got CD GPIO\n");
+>  static u64 notrace intcp_read_sched_clock(void)
+> diff --git a/arch/arm/mach-versatile/versatile_dt.c b/arch/arm/mach-versatile/versatile_dt.c
+> index 3c8d39c12909..e9d60687e416 100644
+> --- a/arch/arm/mach-versatile/versatile_dt.c
+> +++ b/arch/arm/mach-versatile/versatile_dt.c
+> @@ -89,15 +89,11 @@ unsigned int mmc_status(struct device *dev)
+>  static struct mmci_platform_data mmc0_plat_data = {
+>         .ocr_mask       = MMC_VDD_32_33|MMC_VDD_33_34,
+>         .status         = mmc_status,
+> -       .gpio_wp        = -1,
+> -       .gpio_cd        = -1,
+>  };
+>
+>  static struct mmci_platform_data mmc1_plat_data = {
+>         .ocr_mask       = MMC_VDD_32_33|MMC_VDD_33_34,
+>         .status         = mmc_status,
+> -       .gpio_wp        = -1,
+> -       .gpio_cd        = -1,
+>  };
+>
+>  /*
+> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+> index 1841d250e9e2..4b843712dc01 100644
+> --- a/drivers/mmc/host/mmci.c
+> +++ b/drivers/mmc/host/mmci.c
+> @@ -28,8 +28,7 @@
+>  #include <linux/amba/bus.h>
+>  #include <linux/clk.h>
+>  #include <linux/scatterlist.h>
+> -#include <linux/gpio.h>
+> -#include <linux/of_gpio.h>
+> +#include <linux/of.h>
+>  #include <linux/regulator/consumer.h>
+>  #include <linux/dmaengine.h>
+>  #include <linux/dma-mapping.h>
+> @@ -1675,13 +1674,6 @@ static int mmci_probe(struct amba_device *dev,
+>         else if (plat->ocr_mask)
+>                 dev_warn(mmc_dev(mmc), "Platform OCR mask is ignored\n");
+>
+> -       /* DT takes precedence over platform data. */
+> -       if (!np) {
+> -               if (!plat->cd_invert)
+> -                       mmc->caps2 |= MMC_CAP2_CD_ACTIVE_HIGH;
+> -               mmc->caps2 |= MMC_CAP2_RO_ACTIVE_HIGH;
+> -       }
+> -
+>         /* We support these capabilities. */
+>         mmc->caps |= MMC_CAP_CMD23;
+>
+> @@ -1749,30 +1741,16 @@ static int mmci_probe(struct amba_device *dev,
+>          * - not using DT but using a descriptor table, or
+>          * - using a table of descriptors ALONGSIDE DT, or
+>          * look up these descriptors named "cd" and "wp" right here, fail
+> -        * silently of these do not exist and proceed to try platform data
+> +        * silently of these do not exist
+>          */
+>         if (!np) {
+>                 ret = mmc_gpiod_request_cd(mmc, "cd", 0, false, 0, NULL);
+> -               if (ret < 0) {
+> -                       if (ret == -EPROBE_DEFER)
+> -                               goto clk_disable;
+> -                       else if (gpio_is_valid(plat->gpio_cd)) {
+> -                               ret = mmc_gpio_request_cd(mmc, plat->gpio_cd, 0);
+> -                               if (ret)
+> -                                       goto clk_disable;
+> -                       }
+> -               }
+> +               if (ret == -EPROBE_DEFER)
+> +                       goto clk_disable;
+>
+>                 ret = mmc_gpiod_request_ro(mmc, "wp", 0, false, 0, NULL);
+> -               if (ret < 0) {
+> -                       if (ret == -EPROBE_DEFER)
+> -                               goto clk_disable;
+> -                       else if (gpio_is_valid(plat->gpio_wp)) {
+> -                               ret = mmc_gpio_request_ro(mmc, plat->gpio_wp);
+> -                               if (ret)
+> -                                       goto clk_disable;
+> -                       }
+> -               }
+> +               if (ret == -EPROBE_DEFER)
+> +                       goto clk_disable;
+>         }
+>
+>         ret = devm_request_irq(&dev->dev, dev->irq[0], mmci_irq, IRQF_SHARED,
+> diff --git a/include/linux/amba/mmci.h b/include/linux/amba/mmci.h
+> index da8357ba11bc..c92ebc39fc1f 100644
+> --- a/include/linux/amba/mmci.h
+> +++ b/include/linux/amba/mmci.h
+> @@ -18,20 +18,13 @@
+>   * mask into a value to be binary (or set some other custom bits
+>   * in MMCIPWR) or:ed and written into the MMCIPWR register of the
+>   * block.  May also control external power based on the power_mode.
+> - * @status: if no GPIO read function was given to the block in
+> - * gpio_wp (below) this function will be called to determine
+> - * whether a card is present in the MMC slot or not
+> - * @gpio_wp: read this GPIO pin to see if the card is write protected
+> - * @gpio_cd: read this GPIO pin to detect card insertion
+> - * @cd_invert: true if the gpio_cd pin value is active low
+> + * @status: if no GPIO line was given to the block in this function will
+> + * be called to determine whether a card is present in the MMC slot or not
+>   */
+>  struct mmci_platform_data {
+>         unsigned int ocr_mask;
+>         int (*ios_handler)(struct device *, struct mmc_ios *);
+>         unsigned int (*status)(struct device *);
+> -       int     gpio_wp;
+> -       int     gpio_cd;
+> -       bool    cd_invert;
+>  };
+>
+>  #endif
 > --
-> 2.19.0
+> 2.17.1
+>
