@@ -1,20 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 26 Sep 2018 17:27:06 +0200
-Subject: [GIT PULL] arm64: zynqmp: Xilinx SoC changes for v4.20 v2
-In-Reply-To: <e6a23ed7-0573-24a3-c13d-c188fb10f131@monstr.eu>
-References: <e6a23ed7-0573-24a3-c13d-c188fb10f131@monstr.eu>
-Message-ID: <CAK8P3a2ExVYLr4FO_uGesBxmCLUjrCjaTywwUGttJJpyoejwFQ@mail.gmail.com>
+Date: Wed, 26 Sep 2018 17:30:21 +0200
+Subject: [PATCH] [v2] ARM: omap1: add nand_chip declaration
+In-Reply-To: <20180926165240.77a78fc4@xps13>
+References: <20180926142029.619397-1-arnd@arndb.de>
+ <20180926165240.77a78fc4@xps13>
+Message-ID: <CAK8P3a29=N9AoBAfKzNR-8fKQgoLGyPJJrqXn0eMwas+nKWN=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 26, 2018 at 9:14 AM Michal Simek <monstr@monstr.eu> wrote:
+On Wed, Sep 26, 2018 at 4:52 PM Miquel Raynal <miquel.raynal@bootlin.com> wrote:
+> Arnd Bergmann <arnd@arndb.de> wrote on Wed, 26 Sep 2018 16:20:16 +0200:
+> > @@ -82,6 +81,7 @@ void omap1_restart(enum reboot_mode, const char *);
+> >
+> >  extern void __init omap_check_revision(void);
+> >
+> > +struct nand_chip;
+> >  extern void omap1_nand_cmd_ctl(struct nand_chip *this, int cmd,
+> >                              unsigned int ctrl);
+> >
 >
-> Hi,
->
-> Based on discussion with Olof I am sending this pull request
-> You can find out more information about content in a tag below.
+> Boris pointed me that the commit introducing the regression is still
+> in nand/next, so do you mind if I squash both patches with it?
 
-Looks good. Olof confirmed to me that his comments are addressed, so
-I pulled it into next/drivers. Thanks!
+No worries, please do that if it makes it easier for you.
 
-     Arnd
+      Arnd
