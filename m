@@ -1,68 +1,94 @@
 From: m.slodczyk2@partner.samsung.com (Maciej Slodczyk)
-Date: Wed, 26 Sep 2018 14:12:01 +0200
-Subject: [PATCH v2 3/7] arm64: introduce get_swbp_insn() instead of static
- assignment
-In-Reply-To: <1537963925-25313-1-git-send-email-m.slodczyk2@partner.samsung.com>
-References: <1537963925-25313-1-git-send-email-m.slodczyk2@partner.samsung.com>
- <CGME20180926121215eucas1p10437d5bd9db81bedbcc363d24d196ded@eucas1p1.samsung.com>
-Message-ID: <1537963925-25313-4-git-send-email-m.slodczyk2@partner.samsung.com>
+Date: Wed, 26 Sep 2018 14:11:58 +0200
+Subject: [PATCH v2 0/7] arm64: uprobes - ARM32 instruction probing
+References: <CGME20180926121213eucas1p1e85f71d1187eb6b50c320377e5ea907f@eucas1p1.samsung.com>
+Message-ID: <1537963925-25313-1-git-send-email-m.slodczyk2@partner.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In uprobes generic code, an arch specific software breakpoint instruction
-is statically assigned with a #define statement. It does not allow to
-examine the context and set the proper arch on runtime, which is the case
-of uprobing either a 32 or 64 bit app on a 64-bit kernel. Introduce
-get_swbp_insn() with weak attribute that will allow to be redefined in
-ARM64 uprobes code.
+The uprobe feature on ARM64 kernel does not support ARM A32 instruction
+probing, making 32 bit apps running on 64 bit kernel unprobeable.
 
-Signed-off-by: Maciej Slodczyk <m.slodczyk2@partner.samsung.com>
----
- include/linux/uprobes.h |  1 +
- kernel/events/uprobes.c | 12 +++++++++++-
- 2 files changed, 12 insertions(+), 1 deletion(-)
+This patchset utilizes ARM32 uprobe code in ARM64 tree with following
+modifications:
+- moves ARM32 uprobes code form arch/arm to lib/uprobes/arm to be reused
+by ARM64 code
+- makes adjustments in api so that it suits the one used by ARM64 kernel, e.g.
+struct pt_regs, register numbers
+- takes into account differences between 32 and 64 bit ARM architectures.
+A64 instruction handling is left unchanged.
 
-diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
-index bb9d208..8c2fdd9 100644
---- a/include/linux/uprobes.h
-+++ b/include/linux/uprobes.h
-@@ -117,6 +117,7 @@ struct uprobes_state {
- 
- extern int set_swbp(struct arch_uprobe *aup, struct mm_struct *mm, unsigned long vaddr);
- extern int set_orig_insn(struct arch_uprobe *aup, struct mm_struct *mm, unsigned long vaddr);
-+extern uprobe_opcode_t get_swbp_insn(void);
- extern bool is_swbp_insn(uprobe_opcode_t *insn);
- extern bool is_trap_insn(uprobe_opcode_t *insn);
- extern unsigned long uprobe_get_swbp_addr(struct pt_regs *regs);
-diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
-index 3207a4d..a2c3e62 100644
---- a/kernel/events/uprobes.c
-+++ b/kernel/events/uprobes.c
-@@ -216,6 +216,16 @@ static int __replace_page(struct vm_area_struct *vma, unsigned long addr,
- }
- 
- /**
-+ * get_swbp_insn - return breakpoint instruction.
-+ * Default implementation of get_swbp_insn
-+ * Returns architecture-dependent breakpoint instruction opcode
-+ */
-+uprobe_opcode_t __weak get_swbp_insn(void)
-+{
-+	return UPROBE_SWBP_INSN;
-+}
-+
-+/**
-  * is_swbp_insn - check if instruction is breakpoint instruction.
-  * @insn: instruction to be checked.
-  * Default implementation of is_swbp_insn
-@@ -1181,7 +1191,7 @@ static int xol_add_vma(struct mm_struct *mm, struct xol_area *area)
- static struct xol_area *__create_xol_area(unsigned long vaddr)
- {
- 	struct mm_struct *mm = current->mm;
--	uprobe_opcode_t insn = UPROBE_SWBP_INSN;
-+	uprobe_opcode_t insn = get_swbp_insn();
- 	struct xol_area *area;
- 
- 	area = kmalloc(sizeof(*area), GFP_KERNEL);
+Detect what kind of instruction is being probed and depending on the result:
+- if an A64 instruction handle it the old way, using existing A64 instructions
+probing code,
+- if an A32 instruction decode it and handle using the new code, moved from
+32 bit arm kernel tree.
+
+Currently following test cases have been carried out with positive results:
+- simulation-able instructions, like: STM, LDM, BLX, BL
+- xol-able instructions, like: STR, LDR, ADD, CMN, CMP
+- branching
+- uretprobes.
+
+This patchset does not implement T32 (Thumb) instructions probing (which is
+also unsupported on "native" ARM32 arch).
+
+v2:
+- Rebased on 4.19-rc4 and tested against it
+- Fixed build errors reported by kbuild test robot
+
+Maciej Slodczyk (7):
+  arm64: move arm uprobes code to be reused by arm64
+  arm64: uprobes - fix checkpatch issues
+  arm64: introduce get_swbp_insn() instead of static assignment
+  arm64: change arm64 probes handler prototype
+  arm64: make arm uprobes code reusable by arm64
+  arm64: change arm_probe_decode_insn() function name
+  arm64: uprobes - ARM32 instruction probing
+
+ arch/arm/include/asm/probes.h                      |   8 ++
+ arch/arm/include/asm/ptrace.h                      |  32 +++++
+ arch/arm/include/asm/uprobes.h                     |   2 +-
+ arch/arm/probes/Makefile                           |   8 +-
+ arch/arm/probes/kprobes/actions-arm.c              |   2 +-
+ arch/arm/probes/kprobes/checkers-arm.c             |   4 +-
+ arch/arm/probes/kprobes/checkers-common.c          |   4 +-
+ arch/arm/probes/kprobes/checkers-thumb.c           |   2 +-
+ arch/arm/probes/kprobes/checkers.h                 |   2 +-
+ arch/arm/probes/kprobes/core.c                     |   2 +-
+ arch/arm/probes/kprobes/core.h                     |   2 +-
+ arch/arm/probes/kprobes/test-core.c                |   2 +-
+ arch/arm/probes/uprobes/Makefile                   |   2 +-
+ arch/arm/probes/uprobes/core.c                     |  10 +-
+ arch/arm64/include/asm/probes.h                    |  24 +++-
+ arch/arm64/include/asm/ptrace.h                    |  21 +++
+ arch/arm64/include/asm/uprobes.h                   |  21 ++-
+ arch/arm64/kernel/debug-monitors.c                 |   8 ++
+ arch/arm64/kernel/probes/Makefile                  |   2 +
+ arch/arm64/kernel/probes/decode-insn.c             |  30 ++--
+ arch/arm64/kernel/probes/decode-insn.h             |  15 +-
+ arch/arm64/kernel/probes/kprobes.c                 |   4 +-
+ arch/arm64/kernel/probes/simulate-insn.c           |  32 +++--
+ arch/arm64/kernel/probes/simulate-insn.h           |  24 ++--
+ arch/arm64/kernel/probes/uprobes.c                 | 122 ++++++++++++++--
+ include/linux/uprobes.h                            |   1 +
+ kernel/events/uprobes.c                            |  12 +-
+ lib/Makefile                                       |   2 +
+ lib/probes/Makefile                                |   2 +
+ lib/probes/arm/Makefile                            |  11 ++
+ .../uprobes => lib/probes/arm}/actions-arm.c       | 153 ++++++++++++++++++---
+ {arch/arm/probes => lib/probes/arm}/decode-arm.c   |  58 +++++---
+ {arch/arm/probes => lib/probes/arm}/decode-arm.h   |   4 +-
+ {arch/arm/probes => lib/probes/arm}/decode.c       |  18 ++-
+ {arch/arm/probes => lib/probes/arm}/decode.h       |  48 ++++---
+ 35 files changed, 552 insertions(+), 142 deletions(-)
+ create mode 100644 lib/probes/Makefile
+ create mode 100644 lib/probes/arm/Makefile
+ rename {arch/arm/probes/uprobes => lib/probes/arm}/actions-arm.c (61%)
+ rename {arch/arm/probes => lib/probes/arm}/decode-arm.c (95%)
+ rename {arch/arm/probes => lib/probes/arm}/decode-arm.h (94%)
+ rename {arch/arm/probes => lib/probes/arm}/decode.c (98%)
+ rename {arch/arm/probes => lib/probes/arm}/decode.h (94%)
+
 -- 
 2.7.4
