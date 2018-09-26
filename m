@@ -1,23 +1,39 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 26 Sep 2018 13:38:53 +0200
-Subject: [PATCH] arm64: dts: rockchip: Enable SPI NOR flash on Rock64
-In-Reply-To: <20180926045357.20722-1-wens@csie.org>
-References: <20180926045357.20722-1-wens@csie.org>
-Message-ID: <2872521.VFYVRVU0oA@phil>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 26 Sep 2018 13:39:39 +0200
+Subject: [PATCH] arm64: dts: Use mmc@ instead sdhci@
+Message-ID: <59fd089c075740303d81e4a3475598dfd48e5026.1537961975.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 26. September 2018, 06:53:57 CEST schrieb Chen-Yu Tsai:
-> The Pine64 Rock64 board comes with a GigaDevice GD25Q128CSIG
-> or GD25Q127CSIG chip, which is a 128 Mbit SPI NOR flash chip
-> that supports the JEDEC read-ID command.
-> 
-> This patch enables the SPI controller and adds a device node
-> for the flash chip using the generic "jedec,spi-nor" comaptible.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+mmc name is recommended based on devicetree specification.
 
-applied for 4.20
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-Thanks
-Heiko
+ arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+index 29ce23422acf..dacabde6ff7e 100644
+--- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
++++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+@@ -484,7 +484,7 @@
+ 			interrupts = <0 133 4>;
+ 		};
+ 
+-		sdhci0: sdhci at ff160000 {
++		sdhci0: mmc at ff160000 {
+ 			compatible = "arasan,sdhci-8.9a";
+ 			status = "disabled";
+ 			interrupt-parent = <&gic>;
+@@ -493,7 +493,7 @@
+ 			clock-names = "clk_xin", "clk_ahb";
+ 		};
+ 
+-		sdhci1: sdhci at ff170000 {
++		sdhci1: mmc at ff170000 {
+ 			compatible = "arasan,sdhci-8.9a";
+ 			status = "disabled";
+ 			interrupt-parent = <&gic>;
+-- 
+1.9.1
