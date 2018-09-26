@@ -1,37 +1,32 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 26 Sep 2018 15:04:39 +0200
-Subject: [PATCH 2/2] ARM: ixp4xx: include linux/mtd/platnand.h
-In-Reply-To: <20180926130458.2406549-1-arnd@arndb.de>
-References: <20180926130458.2406549-1-arnd@arndb.de>
-Message-ID: <20180926130458.2406549-2-arnd@arndb.de>
+Date: Wed, 26 Sep 2018 15:04:38 +0200
+Subject: [PATCH 1/2] ARM: omap1: add nand_chip declaration
+Message-ID: <20180926130458.2406549-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The platform_nand_data structure definition is required for ixdp425
-but has now moved to a new header file:
+Recent MTD changes caused a minor build regression on OMAP1:
 
-arch/arm/mach-ixp4xx/ixdp425-setup.c:98:15: error: variable 'ixdp425_flash_nand_data' has initializer but incomplete type
- static struct platform_nand_data ixdp425_flash_nand_data = {
-               ^~~~~~~~~~~~~~~~~~
-arch/arm/mach-ixp4xx/ixdp425-setup.c:99:3: error: 'struct platform_nand_data' has no member named 'chip'
+In file included from arch/arm/mach-omap1/devices.c:31:
+arch/arm/mach-omap1/common.h:85:39: error: 'struct nand_chip' declared inside parameter list will not be visible outside of this definition or declaration [-Werror]
 
-Fixes: 19cf5dfa3a31 ("mtd: rawnand: Move platform_nand_xxx definitions out of rawnand.h")
+Fixes: 1002aed789bc ("mtd: rawnand: plat_nand: Pass a nand_chip object to all platform_nand_ctrl hooks")
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-ixp4xx/ixdp425-setup.c | 1 +
+ arch/arm/mach-omap1/common.h | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-ixp4xx/ixdp425-setup.c b/arch/arm/mach-ixp4xx/ixdp425-setup.c
-index 797e7edc7124..57d7df79d838 100644
---- a/arch/arm/mach-ixp4xx/ixdp425-setup.c
-+++ b/arch/arm/mach-ixp4xx/ixdp425-setup.c
-@@ -20,6 +20,7 @@
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/rawnand.h>
- #include <linux/mtd/partitions.h>
-+#include <linux/mtd/platnand.h>
- #include <linux/delay.h>
- #include <linux/gpio.h>
- #include <asm/types.h>
+diff --git a/arch/arm/mach-omap1/common.h b/arch/arm/mach-omap1/common.h
+index 11b87a4c84d4..82f2c065040a 100644
+--- a/arch/arm/mach-omap1/common.h
++++ b/arch/arm/mach-omap1/common.h
+@@ -82,6 +82,7 @@ void omap1_restart(enum reboot_mode, const char *);
+ 
+ extern void __init omap_check_revision(void);
+ 
++struct nand_chip;
+ extern void omap1_nand_cmd_ctl(struct nand_chip *this, int cmd,
+ 			       unsigned int ctrl);
+ 
 -- 
 2.18.0
