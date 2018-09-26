@@ -1,72 +1,68 @@
 From: m.slodczyk2@partner.samsung.com (Maciej Slodczyk)
-Date: Wed, 26 Sep 2018 14:12:04 +0200
-Subject: [PATCH v2 6/7] arm64: change arm_probe_decode_insn() function name
+Date: Wed, 26 Sep 2018 14:12:01 +0200
+Subject: [PATCH v2 3/7] arm64: introduce get_swbp_insn() instead of static
+ assignment
 In-Reply-To: <1537963925-25313-1-git-send-email-m.slodczyk2@partner.samsung.com>
 References: <1537963925-25313-1-git-send-email-m.slodczyk2@partner.samsung.com>
- <CGME20180926121217eucas1p198d96ed637d1aa8a98c1b90466dde745@eucas1p1.samsung.com>
-Message-ID: <1537963925-25313-7-git-send-email-m.slodczyk2@partner.samsung.com>
+ <CGME20180926121215eucas1p10437d5bd9db81bedbcc363d24d196ded@eucas1p1.samsung.com>
+Message-ID: <1537963925-25313-4-git-send-email-m.slodczyk2@partner.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM probe decoding function has similar name in arm32 -
-arm_probes_decode_insn(), and arm64 - arm_probe_decode_insn(). Change arm64
-probes decoding function name from arm_probe_decode_insn() to
-arm64_probes_decode_insn() to minimize the risk of confusion.
+In uprobes generic code, an arch specific software breakpoint instruction
+is statically assigned with a #define statement. It does not allow to
+examine the context and set the proper arch on runtime, which is the case
+of uprobing either a 32 or 64 bit app on a 64-bit kernel. Introduce
+get_swbp_insn() with weak attribute that will allow to be redefined in
+ARM64 uprobes code.
 
 Signed-off-by: Maciej Slodczyk <m.slodczyk2@partner.samsung.com>
 ---
- arch/arm64/kernel/probes/decode-insn.c | 4 ++--
- arch/arm64/kernel/probes/decode-insn.h | 2 +-
- arch/arm64/kernel/probes/uprobes.c     | 2 +-
- 3 files changed, 4 insertions(+), 4 deletions(-)
+ include/linux/uprobes.h |  1 +
+ kernel/events/uprobes.c | 12 +++++++++++-
+ 2 files changed, 12 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/probes/decode-insn.c b/arch/arm64/kernel/probes/decode-insn.c
-index a0597a2..37be1a9 100644
---- a/arch/arm64/kernel/probes/decode-insn.c
-+++ b/arch/arm64/kernel/probes/decode-insn.c
-@@ -78,7 +78,7 @@ static bool __kprobes aarch64_insn_is_steppable(u32 insn)
-  *   INSN_GOOD_NO_SLOT If instruction is supported but doesn't use its slot.
-  */
- enum probes_insn __kprobes
--arm_probe_decode_insn(probes_opcode_t insn, struct arch_probes_insn *api)
-+arm64_probes_decode_insn(probes_opcode_t insn, struct arch_probes_insn *api)
+diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
+index bb9d208..8c2fdd9 100644
+--- a/include/linux/uprobes.h
++++ b/include/linux/uprobes.h
+@@ -117,6 +117,7 @@ struct uprobes_state {
+ 
+ extern int set_swbp(struct arch_uprobe *aup, struct mm_struct *mm, unsigned long vaddr);
+ extern int set_orig_insn(struct arch_uprobe *aup, struct mm_struct *mm, unsigned long vaddr);
++extern uprobe_opcode_t get_swbp_insn(void);
+ extern bool is_swbp_insn(uprobe_opcode_t *insn);
+ extern bool is_trap_insn(uprobe_opcode_t *insn);
+ extern unsigned long uprobe_get_swbp_addr(struct pt_regs *regs);
+diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
+index 3207a4d..a2c3e62 100644
+--- a/kernel/events/uprobes.c
++++ b/kernel/events/uprobes.c
+@@ -216,6 +216,16 @@ static int __replace_page(struct vm_area_struct *vma, unsigned long addr,
+ }
+ 
+ /**
++ * get_swbp_insn - return breakpoint instruction.
++ * Default implementation of get_swbp_insn
++ * Returns architecture-dependent breakpoint instruction opcode
++ */
++uprobe_opcode_t __weak get_swbp_insn(void)
++{
++	return UPROBE_SWBP_INSN;
++}
++
++/**
+  * is_swbp_insn - check if instruction is breakpoint instruction.
+  * @insn: instruction to be checked.
+  * Default implementation of is_swbp_insn
+@@ -1181,7 +1191,7 @@ static int xol_add_vma(struct mm_struct *mm, struct xol_area *area)
+ static struct xol_area *__create_xol_area(unsigned long vaddr)
  {
- 	/*
- 	 * Instructions reading or modifying the PC won't work from the XOL
-@@ -162,7 +162,7 @@ arm_kprobe_decode_insn(kprobe_opcode_t *addr, struct arch_specific_insn *asi)
- 		else
- 			scan_end = addr - MAX_ATOMIC_CONTEXT_SIZE;
- 	}
--	decoded = arm_probe_decode_insn(insn, &asi->api);
-+	decoded = arm64_probes_decode_insn(insn, &asi->api);
+ 	struct mm_struct *mm = current->mm;
+-	uprobe_opcode_t insn = UPROBE_SWBP_INSN;
++	uprobe_opcode_t insn = get_swbp_insn();
+ 	struct xol_area *area;
  
- 	if (decoded != INSN_REJECTED && scan_end)
- 		if (is_probed_address_atomic(addr - 1, scan_end))
-diff --git a/arch/arm64/kernel/probes/decode-insn.h b/arch/arm64/kernel/probes/decode-insn.h
-index 93e021f..e6c7b9e 100644
---- a/arch/arm64/kernel/probes/decode-insn.h
-+++ b/arch/arm64/kernel/probes/decode-insn.h
-@@ -32,7 +32,7 @@ enum probes_insn __kprobes
- arm_kprobe_decode_insn(kprobe_opcode_t *addr, struct arch_specific_insn *asi);
- #endif
- enum probes_insn __kprobes
--arm_probe_decode_insn(probes_opcode_t insn, struct arch_probes_insn *asi);
-+arm64_probes_decode_insn(probes_opcode_t insn, struct arch_probes_insn *asi);
- 
- extern const union decode_action uprobes_probes_actions[];
- #endif /* _ARM_KERNEL_KPROBES_ARM64_H */
-diff --git a/arch/arm64/kernel/probes/uprobes.c b/arch/arm64/kernel/probes/uprobes.c
-index f99b50b..e7b8912 100644
---- a/arch/arm64/kernel/probes/uprobes.c
-+++ b/arch/arm64/kernel/probes/uprobes.c
-@@ -47,7 +47,7 @@ int arch_uprobe_analyze_insn(struct arch_uprobe *auprobe, struct mm_struct *mm,
- 
- 	insn = *(probes_opcode_t *)(&auprobe->insn[0]);
- 
--	switch (arm_probe_decode_insn(insn, &auprobe->api)) {
-+	switch (arm64_probes_decode_insn(insn, &auprobe->api)) {
- 	case INSN_REJECTED:
- 		return -EINVAL;
- 
+ 	area = kmalloc(sizeof(*area), GFP_KERNEL);
 -- 
 2.7.4
