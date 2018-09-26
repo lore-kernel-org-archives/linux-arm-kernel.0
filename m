@@ -1,47 +1,116 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Wed, 26 Sep 2018 14:56:22 +0100
-Subject: [PATCH 5/7] arm64: Do not apply BP hardening for hyp entries from EL2
+Date: Wed, 26 Sep 2018 14:56:24 +0100
+Subject: [PATCH 7/7] arm64: kvm: Align stack for exception coming from EL2
 In-Reply-To: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
 References: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1537970184-44348-6-git-send-email-julien.thierry@arm.com>
+Message-ID: <1537970184-44348-8-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When an EL2 entry of __kvm_hyp_vector is taken, it means an entry from a
-lower EL was previously taken to exit the guest. Taking that lower EL entry
-already applied BP hardening if it was needed, so there is no need to do
-it again.
+SP needs to be 16-bytes aligned before accessing memory through it. When
+handling exceptions from EL2, there is no guarantee that SP is already
+aligned.
 
-Only apply BP hardening for exception coming from lower EL.
+Ensure SP is aligned upon entries from EL2.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
 Cc: kvmarm at lists.cs.columbia.edu
 ---
- arch/arm64/kernel/cpu_errata.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+ arch/arm64/kvm/hyp/hyp-entry.S | 63 ++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 52 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index dec1089..9db5ecc 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -103,10 +103,16 @@ static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
- 	void *dst = lm_alias(__bp_harden_hyp_vecs_start + slot * SZ_2K);
- 	int i;
+diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+index da31386..f611072 100644
+--- a/arch/arm64/kvm/hyp/hyp-entry.S
++++ b/arch/arm64/kvm/hyp/hyp-entry.S
+@@ -184,6 +184,10 @@ el2_error:
+ 	ccmp	x0, x1, #4, ne
+ 	b.ne	__hyp_panic
+ 	mov	x0, #(1 << ARM_EXIT_WITH_SERROR_BIT)
++
++	/* Restore the stack */
++	ldr	x1, [sp]
++	mov	sp, x1
+ 	eret
 
--	for (i = 0; i < SZ_2K; i += 0x80)
-+	/*
-+	 * Only overwrite hyp entries for exceptions from lower EL.
-+	 * Exception vection vector is 2K bytes, first 1K bytes concern
-+	 * exception from EL2 (EL2t, EL2h), last 1K concert lower exception
-+	 * levels (ELx-64bits, ELx-32bits).
-+	 */
-+	for (i = SZ_1K; i < SZ_2K; i += 0x80)
- 		memcpy(dst + i, hyp_vecs_start, hyp_vecs_end - hyp_vecs_start);
+ ENTRY(__hyp_do_panic)
+@@ -221,29 +225,66 @@ ENDPROC(\label)
 
--	__flush_icache_range((uintptr_t)dst, (uintptr_t)dst + SZ_2K);
-+	__flush_icache_range((uintptr_t)dst + SZ_1K, (uintptr_t)dst + SZ_2K);
- }
+ 	.align 11
 
- static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+-.macro valid_vect target
++/*
++ * Aligns the stack and stores the old sp value. This is what the stack
++ * looks like after this code:
++ *
++ *  +--------+
++ *  |        |
++ *  |--------|--> old_sp (upon entry)
++ *  |   x1   |--> (only used for local save/restore)
++ *  |--------|--> old_sp - 8
++ *  |        |--> padding
++ *  |--------|--> aligned_sp + 8
++ *  | old_sp |
++ *  |--------|--> sp = aligned_sp
++ *  |        |
++ *  +--------+
++ */
++.macro align_sp_el2
++	xchg_sp	x0
++	str	x1, [x0, #-8]	// save x1
++	mov	x1, x0		// x1 = old_sp
++	sub	x0, x0, #0x10	// save space for x1 + old_sp
++	bic	x0, x0, #0xf	// align down to 16-bytes
++	xchg_sp	x0
++	str	x1, [sp]	// save old_sp
++	ldr	x1, [x1, #-8]
++.endm
++
++.macro valid_vect target, el=1
+ 	.align 7
++	.if \el == 2
++	align_sp_el2
++	.endif
++
+ 	stp	x0, x1, [sp, #-16]!
+ 	b	\target
+ .endm
+
+-.macro invalid_vect target
++.macro invalid_vect target, el=1
+ 	.align 7
++	.if \el == 2
++	align_sp_el2
++	.endif
++
+ 	b	\target
++	.if \el == 1
+ 	ldp	x0, x1, [sp], #16
+ 	b	\target
++	.endif
+ .endm
+
+ ENTRY(__kvm_hyp_vector)
+-	invalid_vect	el2t_sync_invalid	// Synchronous EL2t
+-	invalid_vect	el2t_irq_invalid	// IRQ EL2t
+-	invalid_vect	el2t_fiq_invalid	// FIQ EL2t
+-	invalid_vect	el2t_error_invalid	// Error EL2t
+-
+-	invalid_vect	el2h_sync_invalid	// Synchronous EL2h
+-	invalid_vect	el2h_irq_invalid	// IRQ EL2h
+-	invalid_vect	el2h_fiq_invalid	// FIQ EL2h
+-	valid_vect	el2_error		// Error EL2h
++	invalid_vect	el2t_sync_invalid, 2	// Synchronous EL2t
++	invalid_vect	el2t_irq_invalid, 2	// IRQ EL2t
++	invalid_vect	el2t_fiq_invalid, 2	// FIQ EL2t
++	invalid_vect	el2t_error_invalid, 2	// Error EL2t
++
++	invalid_vect	el2h_sync_invalid, 2	// Synchronous EL2h
++	invalid_vect	el2h_irq_invalid, 2	// IRQ EL2h
++	invalid_vect	el2h_fiq_invalid, 2	// FIQ EL2h
++	valid_vect	el2_error, 2		// Error EL2h
+
+ 	valid_vect	el1_sync		// Synchronous 64-bit EL1
+ 	valid_vect	el1_irq			// IRQ 64-bit EL1
 --
 1.9.1
