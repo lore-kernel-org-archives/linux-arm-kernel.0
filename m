@@ -1,38 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 26 Sep 2018 14:59:40 +0200
-Subject: [PATCH] ASoC: atmel: add SND_SOC_I2C_AND_SPI dependency
-Message-ID: <20180926125957.2256982-1-arnd@arndb.de>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Wed, 26 Sep 2018 14:58:46 +0200
+Subject: [PATCH v5 0/2] add ISO7816 support
+Message-ID: <20180926125848.31032-1-ludovic.desroches@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Selecting SND_SOC_WM8731 is only allowed when all its dependencies
-are already there:
+Hi,
 
-WARNING: unmet direct dependencies detected for SND_SOC_WM8731
-  Depends on [m]: SOUND [=y] && !UML && SND [=y] && SND_SOC [=y] && SND_SOC_I2C_AND_SPI [=m]
-  Selected by [y]:
-  - SND_SOC_MIKROE_PROTO [=y] && SOUND [=y] && !UML && SND [=y] && SND_SOC [=y] && SND_ATMEL_SOC [=y] && OF [=y]
-  Selected by [m]:
-  - SND_AT91_SOC_SAM9X5_WM8731 [=m] && SOUND [=y] && !UML && SND [=y] && SND_SOC [=y] && SND_ATMEL_SOC [=y] && (ARCH_AT91 [=y] || COMPILE_TEST [=y]) && ATMEL_SSC [=y] && SND_SOC_I2C_AND_SPI [=m]
-  - SND_SOC_ALL_CODECS [=m] && SOUND [=y] && !UML && SND [=y] && SND_SOC [=y] && COMPILE_TEST [=y] && SND_SOC_I2C_AND_SPI [=m]
+This patchset adds support for the ISO7816 standard. The USART devices
+in Microchip SoCs have an ISO7816 mode. It allows to let the USART
+managing the CLK and I/O signals of a smart card.
 
-Fixes: a45f8853a5f9 ("ASoC: Add driver for PROTO Audio CODEC (with a WM8731)")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- sound/soc/atmel/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+Changes:
+- v5
+  - rebase on tty-next.
+  - add documentation for the new ioctls (mimic rs485 one).
+  - fix a switch/case identation
+- v4
+  - use the IP version number instead of the compatible string to set
+  min and max values for fidi.
+  - remove a useless macro for fidi.
+- v3
+  - add IOCTLs to parisc arch.
+  - rework atmel_config_iso7816 according to the comments by Richard.
+  - keep max iteration hard coded. Will see later if the user need to
+    set this value. It may also concern the normal/inverse mode.
+  - improve the checking of the value from the user space.
+- v2
+  - uart_get_iso7816_config: check there is an iso7816_config function.
+  - use IOCTL macros to generate the IOCTL number.
+  - check that reserved field is not used.
+  - remove debug logs.
+  - check that the iso7816_config is right before doing any action.
+  - change the error from nack and max iteration status to a debug
+    message.
+  - remove patch 3 as it concerns both rs485 and iso7816 to think more
+    about the need of adding a lock or not.
 
-diff --git a/sound/soc/atmel/Kconfig b/sound/soc/atmel/Kconfig
-index 81a0712d4f14..64f86f0b87e5 100644
---- a/sound/soc/atmel/Kconfig
-+++ b/sound/soc/atmel/Kconfig
-@@ -101,6 +101,7 @@ config SND_ATMEL_SOC_I2S
- config SND_SOC_MIKROE_PROTO
- 	tristate "Support for Mikroe-PROTO board"
- 	depends on OF
-+	depends on SND_SOC_I2C_AND_SPI
- 	select SND_SOC_WM8731
- 	help
- 	  Say Y or M if you want to add support for MikroElektronika PROTO Audio
+Nicolas Ferre (2):
+  tty/serial_core: add ISO7816 infrastructure
+  tty/serial: atmel: add ISO7816 support
+
+ Documentation/serial/serial-iso7816.txt |  83 ++++++++++++++
+ arch/alpha/include/uapi/asm/ioctls.h    |   2 +
+ arch/mips/include/uapi/asm/ioctls.h     |   2 +
+ arch/parisc/include/uapi/asm/ioctls.h   |   2 +
+ arch/powerpc/include/uapi/asm/ioctls.h  |   2 +
+ arch/sh/include/uapi/asm/ioctls.h       |   2 +
+ arch/sparc/include/uapi/asm/ioctls.h    |   2 +
+ arch/xtensa/include/uapi/asm/ioctls.h   |   2 +
+ drivers/tty/serial/atmel_serial.c       | 190 ++++++++++++++++++++++++++++++--
+ drivers/tty/serial/atmel_serial.h       |   3 +-
+ drivers/tty/serial/serial_core.c        |  60 ++++++++++
+ include/linux/serial_core.h             |   3 +
+ include/uapi/asm-generic/ioctls.h       |   2 +
+ include/uapi/linux/serial.h             |  17 +++
+ 14 files changed, 360 insertions(+), 12 deletions(-)
+ create mode 100644 Documentation/serial/serial-iso7816.txt
+
 -- 
-2.18.0
+2.12.2
