@@ -1,47 +1,50 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 26 Sep 2018 11:28:47 +0100
-Subject: [PATCH 02/10] irqchip/gic-v3-its: Consolidate LPI_PENDBASE_SZ
- usage
-In-Reply-To: <e267123d-af92-0871-455c-cb74a2bc4103@arm.com>
-References: <20180921195954.21574-1-marc.zyngier@arm.com>
- <20180921195954.21574-3-marc.zyngier@arm.com>
- <e267123d-af92-0871-455c-cb74a2bc4103@arm.com>
-Message-ID: <1fe9460d-c90a-a6ce-b0ce-754e22d834e1@arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 26 Sep 2018 12:32:05 +0200
+Subject: [PATCH/RFT] arm64: dts: renesas: r8a77965: Add Sound and Audio
+ DMAC device nodes
+In-Reply-To: <20180924122624.gnrhlwfeik5ki2zf@verge.net.au>
+References: <1532551190-14797-1-git-send-email-ykaneko0929@gmail.com>
+ <20180924122624.gnrhlwfeik5ki2zf@verge.net.au>
+Message-ID: <20180926103204.rdzr5mnioo7ijc27@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/09/18 11:33, Suzuki K Poulose wrote:
-> Hi Marc,
+On Mon, Sep 24, 2018 at 02:26:25PM +0200, Simon Horman wrote:
+> On Thu, Jul 26, 2018 at 05:39:50AM +0900, Yoshihiro Kaneko wrote:
+> > From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> > 
+> > Based on a similar patch of the R8A7796 device tree
+> > by Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>.
+> > 
+> > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> > Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+> > ---
+> > 
+> > The following patches were squashed into this patch:
+> > 
+> >   arm64: dts: r8a77965: Add Audio-DMAC device nodes
+> >   arm64: dts: r8a77965: Add Sound device node and SSI support
+> >   arm64: dts: r8a77965: Add Sound SRC support
+> >   arm64: dts: r8a77965: Add Sound DVC device nodes
+> >   arm64: dts: r8a77965: Add Sound CTU support
+> >   arm64: dts: r8a77965: Add Sound MIX support
+> > 
+> > This patch is based on the devel branch of Simon Horman's renesas tree.
+> > 
+> >  arch/arm64/boot/dts/renesas/r8a77965.dtsi | 245 ++++++++++++++++++++++++++++--
+> >  1 file changed, 234 insertions(+), 11 deletions(-)
 > 
-> On 21/09/18 20:59, Marc Zyngier wrote:
->> LPI_PENDING_SZ is always used in conjunction with a max(). Let's
->> factor this in the definition of the macro, and simplify the rest
->> of the code.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>    drivers/irqchip/irq-gic-v3-its.c | 12 ++++--------
->>    1 file changed, 4 insertions(+), 8 deletions(-)
->>
->> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
->> index c2df341ff6fa..ed6aab11e019 100644
->> --- a/drivers/irqchip/irq-gic-v3-its.c
->> +++ b/drivers/irqchip/irq-gic-v3-its.c
->> @@ -62,7 +62,7 @@ static u32 lpi_id_bits;
->>     */
->>    #define LPI_NRBITS		lpi_id_bits
->>    #define LPI_PROPBASE_SZ		ALIGN(BIT(LPI_NRBITS), SZ_64K)
->> -#define LPI_PENDBASE_SZ		ALIGN(BIT(LPI_NRBITS) / 8, SZ_64K)
->> +#define LPI_PENDBASE_SZ		max_t(u32, SZ_64K, ALIGN(BIT(LPI_NRBITS) / 8, SZ_64K))
+> I have tested playback and record using a loopback cable and this patce
+> appears to work well on top of a merge of:
 > 
-> minor nit: The ALIGN() already aligns the given value up to the required
-> alignment. So, if the LPI_NRBITS is guaranteed to be non-zero,
-> we could simply drop the max_t().
+> * renesas-devel-20180919-v4.19-rc4
+> * renesas-drivers-2018-09-11-v4.19-rc3
+> 
+> I plan to accept this patch for v4.20 in the coming days if there are no
+> objections.
 
-Yeah, that's a brain fart on my part. I've fixed up.
+I have now applied this for v4.20.
 
-Thanks,
+> Tested-by: Simon Horman <horms+renesas@verge.net.au>
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Testing was on a Salvator-XS board.
