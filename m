@@ -1,26 +1,120 @@
-From: rodrigo@tjader.xyz (=?UTF-8?Q?Rodrigo_Exterck=C3=B6tter_Tj=C3=A4der?=)
-Date: Wed, 26 Sep 2018 12:14:15 -0300
-Subject: [PATCH 2/2] arm64: dts: allwinner: Olimex A64-OLinuXino: fix
- ethernet
-In-Reply-To: <20180926094525.e4fepvonmy7ykdbb@flea>
-References: <20180919141938.18791-1-rodrigo@tjader.xyz>
- <20180921142941.5ymp7ksphgboxrwz@flea>
- <CAG7TQgFOuHHmkm-6CDDYJ6KuDqfjNvFjnt8_9BPYfdP=oV57VQ@mail.gmail.com>
- <20180926094525.e4fepvonmy7ykdbb@flea>
-Message-ID: <CAG7TQgFEqH6k0GAPA3yqKDQbtA=n9Qiw0-rq-aNNVZ5L6+Unhw@mail.gmail.com>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Wed, 26 Sep 2018 17:42:15 +0300
+Subject: [PATCH v9 2/8] dt-bindings: Introduce interconnect binding
+In-Reply-To: <20180925180215.GA12435@bogus>
+References: <20180831140151.13972-1-georgi.djakov@linaro.org>
+ <20180831140151.13972-3-georgi.djakov@linaro.org>
+ <20180925180215.GA12435@bogus>
+Message-ID: <b67253fb-d86d-2ddd-6c30-0833d6ed62ad@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 26, 2018 at 6:46 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> There's no need to be so specific though :)
->
-> Something like that would work:
->
-> arm64: dts: allwinner: a64-olinuxino: set the PHY TX delay
->
-> The PHY found on the A64-Olinuxino requires a TX delay in order to
-> operate properly. Olimex uses a 600ps second delay in their BSP, and
-> that has been found to work, so let's use that value in the current
-> DT.
+Hi Rob,
 
-Should I go ahead and send a v2 with that commit message then?
+Thanks for the comments!
+
+On 09/25/2018 09:02 PM, Rob Herring wrote:
+> On Fri, Aug 31, 2018 at 05:01:45PM +0300, Georgi Djakov wrote:
+>> This binding is intended to represent the relations between the interconnect
+>> controllers (providers) and consumer device nodes. It will allow creating links
+>> between consumers and interconnect paths (exposed by interconnect providers).
+> 
+> As I mentioned in person, I want to see other SoC families using this 
+> before accepting. They don't have to be ready for upstream, but WIP 
+> patches or even just a "yes, this works for us and we're going to use 
+> this binding on X".
+
+Other than the 3 Qualcomm SoCs (msm8916, msm8996, sdm845) that are
+currently using this binding, there is ongoing work from at least two
+other vendors that would be using this same binding. I will check on
+what is their progress so far.
+
+> Also, I think the QCom GPU use of this should be fully sorted out. Or 
+> more generically how this fits into OPP binding which seems to be never 
+> ending extended...
+
+I see this as a further step. It could be OPP binding which include
+bandwidth values or some separate DT property. Jordan has already
+proposed something, do you have any initial comments on that?
+
+BR,
+Georgi
+
+>> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+>> ---
+>>  .../bindings/interconnect/interconnect.txt    | 60 +++++++++++++++++++
+>>  1 file changed, 60 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/interconnect/interconnect.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/interconnect/interconnect.txt b/Documentation/devicetree/bindings/interconnect/interconnect.txt
+>> new file mode 100644
+>> index 000000000000..5cb7d3c8d44d
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/interconnect/interconnect.txt
+>> @@ -0,0 +1,60 @@
+>> +Interconnect Provider Device Tree Bindings
+>> +=========================================
+>> +
+>> +The purpose of this document is to define a common set of generic interconnect
+>> +providers/consumers properties.
+>> +
+>> +
+>> += interconnect providers =
+>> +
+>> +The interconnect provider binding is intended to represent the interconnect
+>> +controllers in the system. Each provider registers a set of interconnect
+>> +nodes, which expose the interconnect related capabilities of the interconnect
+>> +to consumer drivers. These capabilities can be throughput, latency, priority
+>> +etc. The consumer drivers set constraints on interconnect path (or endpoints)
+>> +depending on the use case. Interconnect providers can also be interconnect
+>> +consumers, such as in the case where two network-on-chip fabrics interface
+>> +directly
+> 
+> missing '.'
+> 
+>> +
+>> +Required properties:
+>> +- compatible : contains the interconnect provider compatible string
+>> +- #interconnect-cells : number of cells in a interconnect specifier needed to
+>> +			encode the interconnect node id
+>> +
+>> +Example:
+>> +
+>> +		snoc: snoc at 580000 {
+>> +			compatible = "qcom,msm8916-snoc";
+>> +			#interconnect-cells = <1>;
+>> +			reg = <0x580000 0x14000>;
+>> +			clock-names = "bus_clk", "bus_a_clk";
+>> +			clocks = <&rpmcc RPM_SMD_SNOC_CLK>,
+>> +				 <&rpmcc RPM_SMD_SNOC_A_CLK>;
+>> +		};
+>> +
+>> +
+>> += interconnect consumers =
+>> +
+>> +The interconnect consumers are device nodes which dynamically express their
+>> +bandwidth requirements along interconnect paths they are connected to. There
+>> +can be multiple interconnect providers on a SoC and the consumer may consume
+>> +multiple paths from different providers depending on use case and the
+>> +components it has to interact with.
+>> +
+>> +Required properties:
+>> +interconnects : Pairs of phandles and interconnect provider specifier to denote
+>> +	        the edge source and destination ports of the interconnect path.
+>> +
+>> +Optional properties:
+>> +interconnect-names : List of interconnect path name strings sorted in the same
+>> +		     order as the interconnects property. Consumers drivers will use
+>> +		     interconnect-names to match interconnect paths with interconnect
+>> +		     specifiers.
+> 
+> specifier pairs.
+> 
+>> +
+>> +Example:
+>> +
+>> +	sdhci at 7864000 {
+>> +		...
+>> +		interconnects = <&pnoc MASTER_SDCC_1 &bimc SLAVE_EBI_CH0>;
+>> +		interconnect-names = "ddr";
+>> +	};
