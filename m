@@ -1,375 +1,181 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 26 Sep 2018 17:32:45 +0100
-Subject: [PATCH v6 09/18] kvm: arm64: Prepare for dynamic stage2 page table
- layout
+Date: Wed, 26 Sep 2018 17:32:52 +0100
+Subject: [PATCH v6 16/18] kvm: arm64: Set a limit on the IPA size
 In-Reply-To: <20180926163258.20218-1-suzuki.poulose@arm.com>
 References: <20180926163258.20218-1-suzuki.poulose@arm.com>
-Message-ID: <20180926163258.20218-10-suzuki.poulose@arm.com>
+Message-ID: <20180926163258.20218-17-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our stage2 page table helpers are statically defined based
-on the fixed IPA of 40bits and the host page size. As we are
-about to add support for configurable IPA size for VMs, we
-need to make the page table checks for each VM. This patch
-prepares the stage2 helpers to make the transition to a VM
-dependent table layout easier. Instead of statically defining
-the table helpers based on the page table levels, we now
-check the page table levels in the helpers to do the right
-thing. In effect, it simply converts the macros to static
-inline functions.
+So far we have restricted the IPA size of the VM to the default
+value (40bits). Now that we can manage the IPA size per VM and
+support dynamic stage2 page tables, we can allow VMs to have
+larger IPA. This patch introduces a the maximum IPA size
+supported on the host. This is decided by the following factors :
 
-Cc: Eric Auger <eric.auger@redhat.com>
+ 1) Maximum PARange supported by the CPUs - This can be inferred
+    from the system wide safe value.
+ 2) Maximum PA size supported by the host kernel (48 vs 52)
+ 3) Number of levels in the host page table (as we base our
+    stage2 tables on the host table helpers).
+
+Since the stage2 page table code is dependent on the stage1
+page table, we always ensure that :
+
+  Number of Levels at Stage1 >= Number of Levels at Stage2
+
+So we limit the IPA to make sure that the above condition
+is satisfied. This will affect the following combinations
+of VA_BITS and IPA for different page sizes.
+
+  Host configuration | Unsupported IPA ranges
+  39bit VA, 4K       | [44, 48]
+  36bit VA, 16K      | [41, 48]
+  42bit VA, 64K      | [47, 52]
+
+Supporting the above combinations need independent stage2
+page table manipulation code, which would need substantial
+changes. We could purse the solution independently and
+switch the page table code once we have it ready.
+
+Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Christoffer Dall <cdall@kernel.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/kvm_mmu.h              |  12 +-
- arch/arm64/include/asm/stage2_pgtable-nopmd.h |  42 -----
- arch/arm64/include/asm/stage2_pgtable-nopud.h |  39 ----
- arch/arm64/include/asm/stage2_pgtable.h       | 173 ++++++++++++++----
- 4 files changed, 139 insertions(+), 127 deletions(-)
- delete mode 100644 arch/arm64/include/asm/stage2_pgtable-nopmd.h
- delete mode 100644 arch/arm64/include/asm/stage2_pgtable-nopud.h
+Changes since v5:
+ - Don't raise the IPA limit to 40bits
+ - Print the KVM IPA limit, WARN if the limit is less than the
+   default size. Drop the per-CPU PARange check
+ - If the limit was reduced due to kernel configuration,
+   report the limiting factor. i.e, kernel virtual vs physical
+   address limit.
+Changes since V2:
+ - Restrict the IPA size to limit the number of page table
+   levels in stage2 to that of stage1 or less.
+---
+ arch/arm/include/asm/kvm_mmu.h    |  2 ++
+ arch/arm64/include/asm/kvm_host.h | 12 +++------
+ arch/arm64/kvm/reset.c            | 43 +++++++++++++++++++++++++++++++
+ virt/kvm/arm/arm.c                |  2 ++
+ 4 files changed, 50 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 3a032066e52c..7342d2c51773 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -147,6 +147,12 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
- #define kvm_phys_mask(kvm)		(kvm_phys_size(kvm) - _AC(1, ULL))
- #define kvm_vttbr_baddr_mask(kvm)	VTTBR_BADDR_MASK
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 12ae5fbbcf01..5ad1a54f98dc 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -358,6 +358,8 @@ static inline int hyp_map_aux_data(void)
  
-+static inline bool kvm_page_empty(void *ptr)
-+{
-+	struct page *ptr_page = virt_to_page(ptr);
-+	return page_count(ptr_page) == 1;
-+}
+ #define kvm_phys_to_vttbr(addr)		(addr)
+ 
++static inline void kvm_set_ipa_limit(void) {}
 +
- #include <asm/stage2_pgtable.h>
+ #endif	/* !__ASSEMBLY__ */
  
- int create_hyp_mappings(void *from, void *to, pgprot_t prot);
-@@ -241,12 +247,6 @@ static inline bool kvm_s2pmd_exec(pmd_t *pmdp)
- 	return !(READ_ONCE(pmd_val(*pmdp)) & PMD_S2_XN);
- }
+ #endif /* __ARM_KVM_MMU_H__ */
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 5ecd457bce7d..f008f8866b2a 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -442,15 +442,7 @@ int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
+ int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
+ 			       struct kvm_device_attr *attr);
  
--static inline bool kvm_page_empty(void *ptr)
+-static inline void __cpu_init_stage2(void)
 -{
--	struct page *ptr_page = virt_to_page(ptr);
--	return page_count(ptr_page) == 1;
+-	u32 ps;
+-
+-	/* Sanity check for minimum IPA size support */
+-	ps = id_aa64mmfr0_parange_to_phys_shift(read_sysreg(id_aa64mmfr0_el1) & 0x7);
+-	WARN_ONCE(ps < 40,
+-		  "PARange is %d bits, unsupported configuration!", ps);
 -}
--
- #define hyp_pte_table_empty(ptep) kvm_page_empty(ptep)
++static inline void __cpu_init_stage2(void) {}
  
- #ifdef __PAGETABLE_PMD_FOLDED
-diff --git a/arch/arm64/include/asm/stage2_pgtable-nopmd.h b/arch/arm64/include/asm/stage2_pgtable-nopmd.h
-deleted file mode 100644
-index 0280dedbf75f..000000000000
---- a/arch/arm64/include/asm/stage2_pgtable-nopmd.h
-+++ /dev/null
-@@ -1,42 +0,0 @@
--/*
-- * Copyright (C) 2016 - ARM Ltd
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-- */
--
--#ifndef __ARM64_S2_PGTABLE_NOPMD_H_
--#define __ARM64_S2_PGTABLE_NOPMD_H_
--
--#include <asm/stage2_pgtable-nopud.h>
--
--#define __S2_PGTABLE_PMD_FOLDED
--
--#define S2_PMD_SHIFT		S2_PUD_SHIFT
--#define S2_PTRS_PER_PMD		1
--#define S2_PMD_SIZE		(1UL << S2_PMD_SHIFT)
--#define S2_PMD_MASK		(~(S2_PMD_SIZE-1))
--
--#define stage2_pud_none(kvm, pud)		(0)
--#define stage2_pud_present(kvm, pud)		(1)
--#define stage2_pud_clear(kvm, pud)		do { } while (0)
--#define stage2_pud_populate(kvm, pud, pmd)	do { } while (0)
--#define stage2_pmd_offset(kvm, pud, address)	((pmd_t *)(pud))
--
--#define stage2_pmd_free(kvm, pmd)		do { } while (0)
--
--#define stage2_pmd_addr_end(kvm, addr, end)	(end)
--
--#define stage2_pud_huge(kvm, pud)		(0)
--#define stage2_pmd_table_empty(kvm, pmdp)	(0)
--
--#endif
-diff --git a/arch/arm64/include/asm/stage2_pgtable-nopud.h b/arch/arm64/include/asm/stage2_pgtable-nopud.h
-deleted file mode 100644
-index cd6304e203be..000000000000
---- a/arch/arm64/include/asm/stage2_pgtable-nopud.h
-+++ /dev/null
-@@ -1,39 +0,0 @@
--/*
-- * Copyright (C) 2016 - ARM Ltd
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-- */
--
--#ifndef __ARM64_S2_PGTABLE_NOPUD_H_
--#define __ARM64_S2_PGTABLE_NOPUD_H_
--
--#define __S2_PGTABLE_PUD_FOLDED
--
--#define S2_PUD_SHIFT		S2_PGDIR_SHIFT
--#define S2_PTRS_PER_PUD		1
--#define S2_PUD_SIZE		(_AC(1, UL) << S2_PUD_SHIFT)
--#define S2_PUD_MASK		(~(S2_PUD_SIZE-1))
--
--#define stage2_pgd_none(kvm, pgd)		(0)
--#define stage2_pgd_present(kvm, pgd)		(1)
--#define stage2_pgd_clear(kvm, pgd)		do { } while (0)
--#define stage2_pgd_populate(kvm, pgd, pud)	do { } while (0)
--
--#define stage2_pud_offset(kvm, pgd, address)	((pud_t *)(pgd))
--
--#define stage2_pud_free(kvm, x)			do { } while (0)
--
--#define stage2_pud_addr_end(kvm, addr, end)	(end)
--#define stage2_pud_table_empty(kvm, pmdp)	(0)
--
--#endif
-diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
-index 11891612be14..384f9e982cba 100644
---- a/arch/arm64/include/asm/stage2_pgtable.h
-+++ b/arch/arm64/include/asm/stage2_pgtable.h
-@@ -19,6 +19,7 @@
- #ifndef __ARM64_S2_PGTABLE_H_
- #define __ARM64_S2_PGTABLE_H_
+ /* Guest/host FPSIMD coordination helpers */
+ int kvm_arch_vcpu_run_map_fp(struct kvm_vcpu *vcpu);
+@@ -513,6 +505,8 @@ static inline int kvm_arm_have_ssbd(void)
+ void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu);
+ void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu);
  
-+#include <linux/hugetlb.h>
- #include <asm/pgtable.h>
++void kvm_set_ipa_limit(void);
++
+ #define __KVM_HAVE_ARCH_VM_ALLOC
+ struct kvm *kvm_arch_alloc_vm(void);
+ void kvm_arch_free_vm(struct kvm *kvm);
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index 2bf41e007390..96b3f50101bc 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -34,6 +34,9 @@
+ #include <asm/kvm_coproc.h>
+ #include <asm/kvm_mmu.h>
  
++/* Maximum phys_shift supported for any VM on this host */
++static u32 kvm_ipa_limit;
++
  /*
-@@ -71,71 +72,163 @@
+  * ARMv8 Reset Values
   */
- #define kvm_mmu_cache_min_pages(kvm)	(STAGE2_PGTABLE_LEVELS - 1)
- 
--
--#if STAGE2_PGTABLE_LEVELS > 3
--
-+/* Stage2 PUD definitions when the level is present */
-+#define STAGE2_PGTABLE_HAS_PUD		(STAGE2_PGTABLE_LEVELS > 3)
- #define S2_PUD_SHIFT			ARM64_HW_PGTABLE_LEVEL_SHIFT(1)
- #define S2_PUD_SIZE			(1UL << S2_PUD_SHIFT)
- #define S2_PUD_MASK			(~(S2_PUD_SIZE - 1))
- 
--#define stage2_pgd_none(kvm, pgd)		pgd_none(pgd)
--#define stage2_pgd_clear(kvm, pgd)		pgd_clear(pgd)
--#define stage2_pgd_present(kvm, pgd)		pgd_present(pgd)
--#define stage2_pgd_populate(kvm, pgd, pud)	pgd_populate(NULL, pgd, pud)
--#define stage2_pud_offset(kvm, pgd, address)	pud_offset(pgd, address)
--#define stage2_pud_free(kvm, pud)		pud_free(NULL, pud)
--
--#define stage2_pud_table_empty(kvm, pudp)	kvm_page_empty(pudp)
-+static inline bool stage2_pgd_none(struct kvm *kvm, pgd_t pgd)
-+{
-+	if (STAGE2_PGTABLE_HAS_PUD)
-+		return pgd_none(pgd);
-+	else
-+		return 0;
-+}
-+
-+static inline void stage2_pgd_clear(struct kvm *kvm, pgd_t *pgdp)
-+{
-+	if (STAGE2_PGTABLE_HAS_PUD)
-+		pgd_clear(pgdp);
-+}
-+
-+static inline bool stage2_pgd_present(struct kvm *kvm, pgd_t pgd)
-+{
-+	if (STAGE2_PGTABLE_HAS_PUD)
-+		return pgd_present(pgd);
-+	else
-+		return 1;
-+}
-+
-+static inline void stage2_pgd_populate(struct kvm *kvm, pgd_t *pgd, pud_t *pud)
-+{
-+	if (STAGE2_PGTABLE_HAS_PUD)
-+		pgd_populate(NULL, pgd, pud);
-+}
-+
-+static inline pud_t *stage2_pud_offset(struct kvm *kvm,
-+				       pgd_t *pgd, unsigned long address)
-+{
-+	if (STAGE2_PGTABLE_HAS_PUD)
-+		return pud_offset(pgd, address);
-+	else
-+		return (pud_t *)pgd;
-+}
-+
-+static inline void stage2_pud_free(struct kvm *kvm, pud_t *pud)
-+{
-+	if (STAGE2_PGTABLE_HAS_PUD)
-+		pud_free(NULL, pud);
-+}
-+
-+static inline bool stage2_pud_table_empty(struct kvm *kvm, pud_t *pudp)
-+{
-+	if (STAGE2_PGTABLE_HAS_PUD)
-+		return kvm_page_empty(pudp);
-+	else
-+		return false;
-+}
- 
- static inline phys_addr_t
- stage2_pud_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
- {
--	phys_addr_t boundary = (addr + S2_PUD_SIZE) & S2_PUD_MASK;
-+	if (STAGE2_PGTABLE_HAS_PUD) {
-+		phys_addr_t boundary = (addr + S2_PUD_SIZE) & S2_PUD_MASK;
- 
--	return (boundary - 1 < end - 1) ? boundary : end;
-+		return (boundary - 1 < end - 1) ? boundary : end;
-+	} else {
-+		return end;
-+	}
+@@ -135,6 +138,46 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ 	return kvm_timer_vcpu_reset(vcpu);
  }
  
--#endif		/* STAGE2_PGTABLE_LEVELS > 3 */
--
--
--#if STAGE2_PGTABLE_LEVELS > 2
--
-+/* Stage2 PMD definitions when the level is present */
-+#define STAGE2_PGTABLE_HAS_PMD		(STAGE2_PGTABLE_LEVELS > 2)
- #define S2_PMD_SHIFT			ARM64_HW_PGTABLE_LEVEL_SHIFT(2)
- #define S2_PMD_SIZE			(1UL << S2_PMD_SHIFT)
- #define S2_PMD_MASK			(~(S2_PMD_SIZE - 1))
++void kvm_set_ipa_limit(void)
++{
++	unsigned int ipa_max, pa_max, va_max, parange;
++
++	parange = read_sanitised_ftr_reg(SYS_ID_AA64MMFR0_EL1) & 0x7;
++	pa_max = id_aa64mmfr0_parange_to_phys_shift(parange);
++
++	/* Clamp the IPA limit to the PA size supported by the kernel */
++	ipa_max = (pa_max > PHYS_MASK_SHIFT) ? PHYS_MASK_SHIFT : pa_max;
++	/*
++	 * Since our stage2 table is dependent on the stage1 page table code,
++	 * we must always honor the following condition:
++	 *
++	 *  Number of levels in Stage1 >= Number of levels in Stage2.
++	 *
++	 * So clamp the ipa limit further down to limit the number of levels.
++	 * Since we can concatenate upto 16 tables at entry level, we could
++	 * go upto 4bits above the maximum VA addressible with the current
++	 * number of levels.
++	 */
++	va_max = PGDIR_SHIFT + PAGE_SHIFT - 3;
++	va_max += 4;
++
++	if (va_max < ipa_max)
++		ipa_max = va_max;
++
++	/*
++	 * If the final limit is lower than the real physical address
++	 * limit of the CPUs, report the reason.
++	 */
++	if (ipa_max < pa_max)
++		pr_info("kvm: Limiting the IPA size due to kernel %s Address limit\n",
++			(va_max < pa_max) ? "Virtual" : "Physical");
++
++	WARN(ipa_max < KVM_PHYS_SHIFT,
++	     "KVM IPA limit (%d bit) is smaller than default size\n", ipa_max);
++	kvm_ipa_limit = ipa_max;
++	kvm_info("IPA Size Limit: %dbits\n", kvm_ipa_limit);
++}
++
+ /*
+  * Configure the VTCR_EL2 for this VM. The VTCR value is common
+  * across all the physical CPUs on the system. We use system wide
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 43e716bc3f08..631f9a3ad99a 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -1413,6 +1413,8 @@ static int init_common_resources(void)
+ 	kvm_vmid_bits = kvm_get_vmid_bits();
+ 	kvm_info("%d-bit VMID\n", kvm_vmid_bits);
  
--#define stage2_pud_none(kvm, pud)		pud_none(pud)
--#define stage2_pud_clear(kvm, pud)		pud_clear(pud)
--#define stage2_pud_present(kvm, pud)		pud_present(pud)
--#define stage2_pud_populate(kvm, pud, pmd)	pud_populate(NULL, pud, pmd)
--#define stage2_pmd_offset(kvm, pud, address)	pmd_offset(pud, address)
--#define stage2_pmd_free(kvm, pmd)		pmd_free(NULL, pmd)
--
--#define stage2_pud_huge(kvm, pud)		pud_huge(pud)
--#define stage2_pmd_table_empty(kvm, pmdp)	kvm_page_empty(pmdp)
-+static inline bool stage2_pud_none(struct kvm *kvm, pud_t pud)
-+{
-+	if (STAGE2_PGTABLE_HAS_PMD)
-+		return pud_none(pud);
-+	else
-+		return 0;
-+}
++	kvm_set_ipa_limit();
 +
-+static inline void stage2_pud_clear(struct kvm *kvm, pud_t *pud)
-+{
-+	if (STAGE2_PGTABLE_HAS_PMD)
-+		pud_clear(pud);
-+}
-+
-+static inline bool stage2_pud_present(struct kvm *kvm, pud_t pud)
-+{
-+	if (STAGE2_PGTABLE_HAS_PMD)
-+		return pud_present(pud);
-+	else
-+		return 1;
-+}
-+
-+static inline void stage2_pud_populate(struct kvm *kvm, pud_t *pud, pmd_t *pmd)
-+{
-+	if (STAGE2_PGTABLE_HAS_PMD)
-+		pud_populate(NULL, pud, pmd);
-+}
-+
-+static inline pmd_t *stage2_pmd_offset(struct kvm *kvm,
-+				       pud_t *pud, unsigned long address)
-+{
-+	if (STAGE2_PGTABLE_HAS_PMD)
-+		return pmd_offset(pud, address);
-+	else
-+		return (pmd_t *)pud;
-+}
-+
-+static inline void stage2_pmd_free(struct kvm *kvm, pmd_t *pmd)
-+{
-+	if (STAGE2_PGTABLE_HAS_PMD)
-+		pmd_free(NULL, pmd);
-+}
-+
-+static inline bool stage2_pud_huge(struct kvm *kvm, pud_t pud)
-+{
-+	if (STAGE2_PGTABLE_HAS_PMD)
-+		return pud_huge(pud);
-+	else
-+		return 0;
-+}
-+
-+static inline bool stage2_pmd_table_empty(struct kvm *kvm, pmd_t *pmdp)
-+{
-+	if (STAGE2_PGTABLE_HAS_PMD)
-+		return kvm_page_empty(pmdp);
-+	else
-+		return 0;
-+}
- 
- static inline phys_addr_t
- stage2_pmd_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
- {
--	phys_addr_t boundary = (addr + S2_PMD_SIZE) & S2_PMD_MASK;
-+	if (STAGE2_PGTABLE_HAS_PMD) {
-+		phys_addr_t boundary = (addr + S2_PMD_SIZE) & S2_PMD_MASK;
- 
--	return (boundary - 1 < end - 1) ? boundary : end;
-+		return (boundary - 1 < end - 1) ? boundary : end;
-+	} else {
-+		return end;
-+	}
+ 	return 0;
  }
  
--#endif		/* STAGE2_PGTABLE_LEVELS > 2 */
--
--#define stage2_pte_table_empty(kvm, ptep)	kvm_page_empty(ptep)
--
--#if STAGE2_PGTABLE_LEVELS == 2
--#include <asm/stage2_pgtable-nopmd.h>
--#elif STAGE2_PGTABLE_LEVELS == 3
--#include <asm/stage2_pgtable-nopud.h>
--#endif
-+static inline bool stage2_pte_table_empty(struct kvm *kvm, pte_t *ptep)
-+{
-+	return kvm_page_empty(ptep);
-+}
- 
- #define stage2_pgd_size(kvm)	(PTRS_PER_S2_PGD * sizeof(pgd_t))
- 
--#define stage2_pgd_index(kvm, addr) \
--	(((addr) >> S2_PGDIR_SHIFT) & (PTRS_PER_S2_PGD - 1))
-+static inline unsigned long stage2_pgd_index(struct kvm *kvm, phys_addr_t addr)
-+{
-+	return (((addr) >> S2_PGDIR_SHIFT) & (PTRS_PER_S2_PGD - 1));
-+}
- 
- static inline phys_addr_t
- stage2_pgd_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
 -- 
 2.19.0
