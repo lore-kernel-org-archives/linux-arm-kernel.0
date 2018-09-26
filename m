@@ -1,176 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 26 Sep 2018 10:40:45 -0700
-Subject: [GIT PULL 3/3] dts changes for omaps for v4.20
-In-Reply-To: <pull-1537983432-167273@atomide.com>
-References: <pull-1537983432-167273@atomide.com>
-Message-ID: <pull-1537983432-167273@atomide.com-3>
+From: Jason@zx2c4.com (Jason A. Donenfeld)
+Date: Wed, 26 Sep 2018 19:46:36 +0200
+Subject: [PATCH net-next v6 07/23] zinc: ChaCha20 ARM and ARM64
+ implementations
+In-Reply-To: <20180926173720.GA248906@gmail.com>
+References: <20180925145622.29959-1-Jason@zx2c4.com>
+ <20180925145622.29959-8-Jason@zx2c4.com>
+ <CAKv+Gu9mVAfdBvOMCFqRJj+wBiWu3JVOgPZdkcdjzqSdQQ5Jrw@mail.gmail.com>
+ <CAHmME9r9KppoFwwNVpzpYbU+9dCPzb7Pit+4iRa4MY_ouJBWrA@mail.gmail.com>
+ <CAKv+Gu8ih-TsASRGqK+ST_5+EQ0=Zo-zhGCadOdGyPjucMFTCg@mail.gmail.com>
+ <CAHmME9p5b=L0FSL72gCszhvut-kr=aD4ZniY9qsJxiBnZk8qNQ@mail.gmail.com>
+ <20180926173720.GA248906@gmail.com>
+Message-ID: <CAHmME9ou-4JvvuRntwUf-BCQpnsHP4d+T0V8_XPSQ8jQ4G2Rpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Tony Lindgren" <tony@atomide.com>
+On Wed, Sep 26, 2018 at 7:37 PM Eric Biggers <ebiggers@kernel.org> wrote:
+> Can you please stop accusing Ard of "filibustering" your patchset?  Spending too
+> long in non-preemptible code is a real problem even on non-RT systems.
+> syzkaller has been reporting bugs where the kernel spins too long without any
+> preemption points, both in crypto-related code and elsewhere in the kernel.  So
+> we've had to add explicit preemption points to address those, as otherwise users
+> can lock up all CPUs for tens of seconds.  The issue being discussed here is
+> basically the same except here preemption is being explicitly disabled via
+> kernel_neon_begin(), so it becomes a problem even on non-CONFIG_PREEMPT kernels.
 
-The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
-
-  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
-
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.20/dt-signed
-
-for you to fetch changes up to e4ab928957a3173d5d8e7fc78df6a3a63be0f60d:
-
-  ARM: dts: omap3-gta04: add pulldown/up settings for twl4030 gpio (2018-09-24 15:17:14 -0700)
-
-----------------------------------------------------------------
-Devicetree changes for omap variants
-
-This branch contains a series of improvments for omap3-gta04 phone,
-and a series of clean-up for am335x to remove the deprecated phy_id
-property.
-
-The rest is to configure am57xx-idk boards for leds, load trigger,
-and smps, am3517-evm audio configuration, beaglebone hdmi cec support,
-coresight binding update, and fixes for i2c and spi warnings.
-
-----------------------------------------------------------------
-Adam Ford (1):
-      ARM: dts: am3517-evm: Add support for UI board and Audio
-
-Andreas Kemnade (2):
-      ARM: dts: gta04: add serial console wakeup irq
-      ARM: dts: omap3-gta04: add pulldown/up settings for twl4030 gpio
-
-Andrew F. Davis (3):
-      ARM: dts: am571x-idk: Add tricolor Industrial LED support
-      ARM: dts: am572x-idk: Add tricolor Industrial LED support
-      ARM: dts: am571x-idk: Add Industrial input load trigger
-
-Grygorii Strashko (27):
-      ARM: dts: am335x-evm: fix number of cpsw
-      ARM: dts: am335x-shc: get rid of phy_id property
-      ARM: dts: am335x-pepper: get rid of phy_id property
-      ARM: dts: am335x-pdu001: get rid of phy_id property
-      ARM: dts: am335x-nano: get rid of phy_id property
-      ARM: dts: am335x-moxa-uc-8100-me-t: get rid of phy_id property
-      ARM: dts: am335x-lxm: get rid of phy_id property
-      ARM: dts: am335x-igep0033: get rid of phy_id property
-      ARM: dts: am335x-evmsk: get rid of phy_id property
-      ARM: dts: am335x-cm-t335: get rid of phy_id property
-      ARM: dts: am335x-chiliboard: get rid of phy_id property
-      ARM: dts: am335x-bone-common: get rid of phy_id property
-      ARM: dts: am43x-epos-evm: get rid of phy_id property
-      ARM: dts: am437x-sk-evm: get rid of phy_id property
-      ARM: dts: am437x-idk-evm: get rid of phy_id property
-      ARM: dts: am437x-gp-evm: get rid of phy_id property
-      ARM: dts: am437x-cm-t43: get rid of phy_id property
-      ARM: dts: dra76-evm: get rid of phy_id property
-      ARM: dts: dra72-evm: get rid of phy_id property
-      ARM: dts: dra72-evm-revc: get rid of phy_id property
-      ARM: dts: dra71-evm: get rid of phy_id property
-      ARM: dts: dra7-evm: get rid of phy_id property
-      ARM: dts: am57xx-idk-common: get rid of phy_id property
-      ARM: dts: am57xx-cl-som-am57x: get rid of phy_id property
-      ARM: dts: dm8148-evm: get rid of phy_id property
-      ARM: dts: dm8148-t410: get rid of phy_id property
-      ARM: dts: dra62x-j5eco-evm: get rid of phy_id property
-
-H. Nikolaus Schaller (32):
-      ARM: dts: omap3-gta04: fix typo in backlight pins node name
-      ARM: dts: omap3-gta04: fix some whitespace and tab style errors
-      ARM: dts: omap3-gta04: give spi_lcd node a label so that we can overwrite in other DTS files
-      ARM: dts: omap3-gta04: fixes for tvout / venc
-      ARM: dts: omap3-gta04: add devconf1 setup for correct tvout pins
-      ARM: dts: omap3-gta04: tvout: enable as display1 alias
-      ARM: dts: omap3-gta04: fix touchscreen tsc2007
-      ARM: dts: omap3-gta04: add pinmux for bmp085 EOC interrupt
-      ARM: dts: omap3-gta04: make NAND partitions compatible with recent U-Boot
-      ARM: dts: omap3-gta04: update gpmc NAND setup
-      ARM: dts: omap3-gta04: keep vpll2 always on
-      ARM: dts: omap3-gta04: add a comment how to reference the tca6507 gpio
-      ARM: dts: omap3-gta04: add warning comment to vaux2 regulator
-      ARM: dts: omap3-gta04: explicitly describe that mmc1 has no CD/WP
-      ARM: dts: omap3-gta04: make use of input event include file and constants
-      ARM: dts: omap3-gta04: map antenna detect GPIO to SW_LINEIN_INSERT key event
-      ARM: dts: omap3-gta04: add camera interface parallel port
-      ARM: dts: omap3-gta04: add camera pinmux
-      ARM: dts: omap3-gta04: add mcbsp (audio subsystem) pinmux
-      ARM: dts: omap3-gta04: add devconf0 setup for mcbsp1 clock pins
-      ARM: dts: omap3-gta04: add mcbsp (audio subsystem) nodes
-      ARM: dts: omap3-gta04a3: fix model name for A3 variant
-      ARM: dts: omap3-gta04a4: fix model name for A4 variant
-      ARM: dts: omap3-gta04a5: fix copyright of A5 variant
-      ARM: dts: omap3-gta04a5: fix model name
-      ARM: dts: omap3-gta04a5: fix whitepsace and tab style
-      ARM: dts: omap3-gta04a5: add support for PPS
-      ARM: dts: omap3-gta04a5: disable IrDA receiver to save power
-      ARM: dts: omap3-gta04a5: add support for ti,wl1837 module
-      ARM: dts: omap3-gta04a5: uses different sensors than gta04a4
-      ARM: dts: omap3-gta04a5: define pinmux for bluetooth enable of ti,wl1837 module
-      ARM: dts: omap3-gta04a5one: define GTA04A5 variant with OneNAND
-
-Hans Verkuil (1):
-      ARM: dts: am335x-boneblack: add cec support
-
-Keerthy (1):
-      ARM: dts: am57xx-idk-common: Hook smps12 regulator as cpu vdd-supply
-
-Rob Herring (1):
-      ARM: dts: ti: Fix SPI and I2C bus warnings
-
-Suzuki K Poulose (1):
-      ARM: dts: omap: Update coresight bindings for hardware ports
-
-Tony Lindgren (1):
-      Merge branch 'am335x-evm-port-fix' into omap-for-v4.20/dt
-
- arch/arm/boot/dts/am335x-bone-common.dtsi      |   6 +-
- arch/arm/boot/dts/am335x-boneblack-common.dtsi |   5 +-
- arch/arm/boot/dts/am335x-chiliboard.dts        |   6 +-
- arch/arm/boot/dts/am335x-cm-t335.dts           |   6 +-
- arch/arm/boot/dts/am335x-evm.dts               |  12 +-
- arch/arm/boot/dts/am335x-evmsk.dts             |  12 +-
- arch/arm/boot/dts/am335x-igep0033.dtsi         |  13 +-
- arch/arm/boot/dts/am335x-lxm.dts               |  12 +-
- arch/arm/boot/dts/am335x-moxa-uc-8100-me-t.dts |  12 +-
- arch/arm/boot/dts/am335x-nano.dts              |  12 +-
- arch/arm/boot/dts/am335x-osd3358-sm-red.dts    |   2 +-
- arch/arm/boot/dts/am335x-pdu001.dts            |  14 +-
- arch/arm/boot/dts/am335x-pepper.dts            |  12 +-
- arch/arm/boot/dts/am335x-shc.dts               |   1 -
- arch/arm/boot/dts/am3517-evm-ui.dtsi           | 220 +++++++++++++++++++++
- arch/arm/boot/dts/am3517-evm.dts               |   1 +
- arch/arm/boot/dts/am4372.dtsi                  |   2 +-
- arch/arm/boot/dts/am437x-cm-t43.dts            |  12 +-
- arch/arm/boot/dts/am437x-gp-evm.dts            |   6 +-
- arch/arm/boot/dts/am437x-idk-evm.dts           |   6 +-
- arch/arm/boot/dts/am437x-sk-evm.dts            |  12 +-
- arch/arm/boot/dts/am43x-epos-evm.dts           |   6 +-
- arch/arm/boot/dts/am571x-idk.dts               |  84 +++++++-
- arch/arm/boot/dts/am572x-idk-common.dtsi       |  76 +++++++
- arch/arm/boot/dts/am572x-idk.dts               |   4 -
- arch/arm/boot/dts/am57xx-cl-som-am57x.dts      |  14 +-
- arch/arm/boot/dts/am57xx-idk-common.dtsi       |  18 +-
- arch/arm/boot/dts/dm8148-evm.dts               |  14 +-
- arch/arm/boot/dts/dm8148-t410.dts              |  14 +-
- arch/arm/boot/dts/dra62x-j5eco-evm.dts         |  14 +-
- arch/arm/boot/dts/dra7-evm.dts                 |  14 +-
- arch/arm/boot/dts/dra7.dtsi                    |   2 +-
- arch/arm/boot/dts/dra71-evm.dts                |   4 +-
- arch/arm/boot/dts/dra72-evm-revc.dts           |   4 +-
- arch/arm/boot/dts/dra72-evm.dts                |   8 +-
- arch/arm/boot/dts/dra76-evm.dts                |   4 +-
- arch/arm/boot/dts/keystone-k2g.dtsi            |   2 +-
- arch/arm/boot/dts/omap2.dtsi                   |   4 +-
- arch/arm/boot/dts/omap2430.dtsi                |   2 +-
- arch/arm/boot/dts/omap3-beagle-xm.dts          |  17 +-
- arch/arm/boot/dts/omap3-beagle.dts             |  17 +-
- arch/arm/boot/dts/omap3-gta04.dtsi             | 262 ++++++++++++++++++++++---
- arch/arm/boot/dts/omap3-gta04a3.dts            |   2 +-
- arch/arm/boot/dts/omap3-gta04a4.dts            |   2 +-
- arch/arm/boot/dts/omap3-gta04a5.dts            | 129 +++++++++++-
- arch/arm/boot/dts/omap3-gta04a5one.dts         | 114 +++++++++++
- arch/arm/boot/dts/omap3-n9.dts                 |   2 +-
- 47 files changed, 1101 insertions(+), 116 deletions(-)
- mode change 100755 => 100644 arch/arm/boot/dts/am335x-osd3358-sm-red.dts
- create mode 100644 arch/arm/boot/dts/am3517-evm-ui.dtsi
- create mode 100644 arch/arm/boot/dts/omap3-gta04a5one.dts
+The async distraction (re:filibustering) and the preempt concern are
+two totally different things. I've already posted some code elsewhere
+in this thread that addresses the preempt issue that looked good to
+Ard. This will be part of v7.
