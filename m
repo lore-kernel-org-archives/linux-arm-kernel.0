@@ -1,46 +1,55 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 26 Sep 2018 14:25:20 +0100
-Subject: [GIT PULL] firmware: scmi: updates for v4.20
-In-Reply-To: <20180925183510.cebyq474rnx5vnxk@localhost>
-References: <20180918111716.GA23868@e107155-lin>
- <20180925183510.cebyq474rnx5vnxk@localhost>
-Message-ID: <20180926132520.GA22657@e107155-lin>
+From: Jason@zx2c4.com (Jason A. Donenfeld)
+Date: Wed, 26 Sep 2018 15:32:45 +0200
+Subject: [PATCH net-next v6 07/23] zinc: ChaCha20 ARM and ARM64
+ implementations
+In-Reply-To: <CAKv+Gu9mVAfdBvOMCFqRJj+wBiWu3JVOgPZdkcdjzqSdQQ5Jrw@mail.gmail.com>
+References: <20180925145622.29959-1-Jason@zx2c4.com>
+ <20180925145622.29959-8-Jason@zx2c4.com>
+ <CAKv+Gu9mVAfdBvOMCFqRJj+wBiWu3JVOgPZdkcdjzqSdQQ5Jrw@mail.gmail.com>
+Message-ID: <CAHmME9r9KppoFwwNVpzpYbU+9dCPzb7Pit+4iRa4MY_ouJBWrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2018 at 11:35:10AM -0700, Olof Johansson wrote:
-> On Tue, Sep 18, 2018 at 12:17:17PM +0100, Sudeep Holla wrote:
-> > Hi ARM-SoC team,
-> > 
-> > I have based this one on v4.19-rc3 in order to avoid conflicts with the
-> > driver fix that went in after -rc2. Please pull !
-> 
-> No worries! This works well, you also have the choice of just using our fixes
-> branch at the time as your base if for some reason you prefer that (or at
-> later -rcs).
+Hi Ard,
+
+On Wed, Sep 26, 2018 at 10:59 AM Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> > +static inline bool chacha20_arch(struct chacha20_ctx *state, u8 *dst,
+> > +                                const u8 *src, size_t len,
+> > +                                simd_context_t *simd_context)
+> > +{
+> > +#if defined(CONFIG_KERNEL_MODE_NEON)
+> > +       if (chacha20_use_neon && len >= CHACHA20_BLOCK_SIZE * 3 &&
+> > +           simd_use(simd_context))
+> > +               chacha20_neon(dst, src, len, state->key, state->counter);
+> > +       else
+> > +#endif
 >
-
-Ah right, I remember doing that in the past, not sure why I didn't think
-about that option this time. I prefer using previous fixes as base as
-it keeps things simply, will follow that in future.
-
-> > The following changes since commit 11da3a7f84f19c26da6f86af878298694ede0804:
-> > 
-> >   Linux 4.19-rc3 (2018-09-09 17:26:43 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/scmi-updates-4.20
-> > 
-> > for you to fetch changes up to 1a63fe9a2b1f47af5b2b7436b41824b14999c17a:
-> > 
-> >   firmware: arm_scmi: add a getter for power of performance states (2018-09-10 17:37:06 +0100)
-> 
-> Merged, thanks!
+> Better to use IS_ENABLED() here:
 >
+> > +       if (IS_ENABLED(CONFIG_KERNEL_MODE_NEON)) &&
+> > +           chacha20_use_neon && len >= CHACHA20_BLOCK_SIZE * 3 &&
+> > +           simd_use(simd_context))
 
-Thanks.
+Good idea. I'll fix that up.
 
---
-Regards,
-Sudeep
+>
+> Also, this still has unbounded worst case scheduling latency, given
+> that the outer library function passes its entire input straight into
+> the NEON routine.
+
+The vast majority of crypto routines in arch/*/crypto/ follow this
+same exact pattern, actually. I realize a few don't -- probably the
+ones you had a hand in :) -- but I think this is up to the caller to
+handle. I made a change so that in chacha20poly1305.c, it calls
+simd_relax after handling each scatter-gather element, so a
+"construction" will handle this gracefully. But I believe it's up to
+the caller to decide on what sizes of information it wants to pass to
+primitives. Put differently, this also hasn't ever been an issue
+before -- the existing state of the tree indicates this -- and so I
+don't anticipate this will be a real issue now. And if it becomes one,
+this is something we can address *later*, but certainly there's no use
+of adding additional complexity to the initial patchset to do this
+now.
+
+Jason
