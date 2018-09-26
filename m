@@ -1,49 +1,87 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 26 Sep 2018 17:32:55 +0100
-Subject: [kvmtool PATCH v6 19/18] kvmtool: Allow backends to run checks on the
- KVM device fd
+Date: Wed, 26 Sep 2018 17:32:58 +0100
+Subject: [kvmtool PATCH v6 22/18] kvmtool: arm: Add support for creating VM
+ with PA size
 In-Reply-To: <20180926163258.20218-1-suzuki.poulose@arm.com>
 References: <20180926163258.20218-1-suzuki.poulose@arm.com>
-Message-ID: <20180926163258.20218-20-suzuki.poulose@arm.com>
+Message-ID: <20180926163258.20218-23-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow architectures to perform initialisation based on the
-KVM device fd ioctls, even before the VM is created.
+Specify the physical size for the VM encoded in the vm type.
 
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- include/kvm/kvm.h | 4 ++++
- kvm.c             | 2 ++
- 2 files changed, 6 insertions(+)
+ arm/include/arm-common/kvm-arch.h |  6 +++++-
+ arm/kvm.c                         | 32 +++++++++++++++++++++++++++++++
+ 2 files changed, 37 insertions(+), 1 deletion(-)
 
-diff --git a/include/kvm/kvm.h b/include/kvm/kvm.h
-index 1edacfd..dc3f0dd 100644
---- a/include/kvm/kvm.h
-+++ b/include/kvm/kvm.h
-@@ -135,6 +135,10 @@ int kvm__get_sock_by_instance(const char *name);
- int kvm__enumerate_instances(int (*callback)(const char *name, int pid));
- void kvm__remove_socket(const char *name);
+diff --git a/arm/include/arm-common/kvm-arch.h b/arm/include/arm-common/kvm-arch.h
+index b29b4b1..d77f3ac 100644
+--- a/arm/include/arm-common/kvm-arch.h
++++ b/arm/include/arm-common/kvm-arch.h
+@@ -44,7 +44,11 @@
  
-+#ifndef kvm__arch_init_hyp
-+static inline void kvm__arch_init_hyp(struct kvm *kvm) {}
+ #define KVM_IRQ_OFFSET		GIC_SPI_IRQ_BASE
+ 
+-#define KVM_VM_TYPE		0
++extern unsigned long		kvm_arm_type;
++extern void kvm__arch_init_hyp(struct kvm *kvm);
++
++#define KVM_VM_TYPE		kvm_arm_type
++#define kvm__arch_init_hyp	kvm__arch_init_hyp
+ 
+ #define VIRTIO_DEFAULT_TRANS(kvm)	\
+ 	((kvm)->cfg.arch.virtio_trans_pci ? VIRTIO_PCI : VIRTIO_MMIO)
+diff --git a/arm/kvm.c b/arm/kvm.c
+index eac2ad2..c8db6b3 100644
+--- a/arm/kvm.c
++++ b/arm/kvm.c
+@@ -11,6 +11,8 @@
+ #include <linux/kvm.h>
+ #include <linux/sizes.h>
+ 
++unsigned long kvm_arm_type;
++
+ struct kvm_ext kvm_req_ext[] = {
+ 	{ DEFINE_KVM_EXT(KVM_CAP_IRQCHIP) },
+ 	{ DEFINE_KVM_EXT(KVM_CAP_ONE_REG) },
+@@ -18,6 +20,36 @@ struct kvm_ext kvm_req_ext[] = {
+ 	{ 0, 0 },
+ };
+ 
++#ifndef KVM_CAP_ARM_VM_IPA_SIZE
++#define KVM_CAP_ARM_VM_IPA_SIZE	159
 +#endif
 +
- void kvm__arch_set_cmdline(char *cmdline, bool video);
- void kvm__arch_init(struct kvm *kvm, const char *hugetlbfs_path, u64 ram_size);
- void kvm__arch_delete_ram(struct kvm *kvm);
-diff --git a/kvm.c b/kvm.c
-index 7de825a..0894778 100644
---- a/kvm.c
-+++ b/kvm.c
-@@ -373,6 +373,8 @@ int kvm__init(struct kvm *kvm)
- 		goto err_sys_fd;
- 	}
- 
-+	kvm__arch_init_hyp(kvm);
++#ifndef KVM_VM_TYPE_ARM_IPA_SIZE
++#define KVM_VM_TYPE_ARM_IPA_SIZE_MASK	0xffULL
++#define KVM_VM_TYPE_ARM_IPA_SIZE(x)	\
++	((x) & KVM_VM_TYPE_ARM_IPA_SIZE_MASK)
++#endif
 +
- 	kvm->vm_fd = ioctl(kvm->sys_fd, KVM_CREATE_VM, KVM_VM_TYPE);
- 	if (kvm->vm_fd < 0) {
- 		pr_err("KVM_CREATE_VM ioctl");
++void kvm__arch_init_hyp(struct kvm *kvm)
++{
++	int max_ipa;
++
++	if (!kvm->cfg.arch.phys_shift)
++		kvm->cfg.arch.phys_shift = 40;
++	if (kvm->cfg.arch.phys_shift == 40)
++		return;
++	max_ipa = ioctl(kvm->sys_fd,
++			KVM_CHECK_EXTENSION, KVM_CAP_ARM_VM_IPA_SIZE);
++	if (!max_ipa)
++		die("Kernel doesn't support IPA size configuration\n");
++	if ((kvm->cfg.arch.phys_shift > max_ipa) ||
++	    (kvm->cfg.arch.phys_shift < 32))
++		die("Requested PA size (%u) is not supported by the host"
++		    " [32 - %u]bit\n",
++		    kvm->cfg.arch.phys_shift, max_ipa);
++	kvm_arm_type = KVM_VM_TYPE_ARM_IPA_SIZE(kvm->cfg.arch.phys_shift);
++}
++
+ bool kvm__arch_cpu_supports_vm(void)
+ {
+ 	/* The KVM capability check is enough. */
 -- 
 2.19.0
