@@ -1,80 +1,73 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Wed, 26 Sep 2018 16:22:46 +0300
-Subject: [PATCH v2 21/22] arm64: dts: ls104x: make dma-coherent global to the
- SoC
+Date: Wed, 26 Sep 2018 16:22:41 +0300
+Subject: [PATCH v2 16/22] arm64: dts: ls1046a: add smmu node
 In-Reply-To: <20180926132247.10971-1-laurentiu.tudor@nxp.com>
 References: <20180926132247.10971-1-laurentiu.tudor@nxp.com>
-Message-ID: <20180926132247.10971-22-laurentiu.tudor@nxp.com>
+Message-ID: <20180926132247.10971-17-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-These SoCs are really completely dma coherent in their entirety so add
-the dma-coherent property at the soc level in the device tree and drop
-the instances where it's specifically added to a few select devices.
+This allows for the SMMU device to be probed by the SMMU kernel driver.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 5 +----
- arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 1 +
- 2 files changed, 2 insertions(+), 4 deletions(-)
+ .../arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 42 +++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-index ccadc40a36f4..9fb3ac0fa87c 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-@@ -215,6 +215,7 @@
- 		#size-cells = <2>;
- 		ranges;
- 		dma-ranges = <0x0 0x0 0x0 0x0 0x10000 0x00000000>;
-+		dma-coherent;
- 
- 		clockgen: clocking at 1ee1000 {
- 			compatible = "fsl,ls1043a-clockgen";
-@@ -680,7 +681,6 @@
- 			reg-names = "ahci", "sata-ecc";
- 			interrupts = <0 69 0x4>;
- 			clocks = <&clockgen 4 0>;
--			dma-coherent;
- 		};
- 
- 		msi1: msi-controller1 at 1571000 {
-@@ -715,7 +715,6 @@
- 			#address-cells = <3>;
- 			#size-cells = <2>;
- 			device_type = "pci";
--			dma-coherent;
- 			iommu-map = <0 &mmu 0 1>;
- 			num-lanes = <4>;
- 			bus-range = <0x0 0xff>;
-@@ -741,7 +740,6 @@
- 			#address-cells = <3>;
- 			#size-cells = <2>;
- 			device_type = "pci";
--			dma-coherent;
- 			iommu-map = <0 &mmu 0 1>;
- 			num-lanes = <2>;
- 			bus-range = <0x0 0xff>;
-@@ -767,7 +765,6 @@
- 			#address-cells = <3>;
- 			#size-cells = <2>;
- 			device_type = "pci";
--			dma-coherent;
- 			iommu-map = <0 &mmu 0 1>;
- 			num-lanes = <2>;
- 			bus-range = <0x0 0xff>;
 diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-index a12d33362554..f19cf6087235 100644
+index ef83786b8b90..07a853a0aeaa 100644
 --- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
 +++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-@@ -188,6 +188,7 @@
- 		#size-cells = <2>;
- 		ranges;
- 		dma-ranges = <0x0 0x0 0x0 0x0 0x10000 0x00000000>;
-+		dma-coherent;
+@@ -228,6 +228,48 @@
+ 			bus-width = <4>;
+ 		};
  
- 		ddr: memory-controller at 1080000 {
- 			compatible = "fsl,qoriq-memory-controller";
++		mmu: iommu at 9000000 {
++			compatible = "arm,mmu-500";
++			reg = <0 0x9000000 0 0x400000>;
++			dma-coherent;
++			#global-interrupts = <2>;
++			#iommu-cells = <1>;
++			interrupts = <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
+ 		scfg: scfg at 1570000 {
+ 			compatible = "fsl,ls1046a-scfg", "syscon";
+ 			reg = <0x0 0x1570000 0x0 0x10000>;
 -- 
 2.17.1
