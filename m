@@ -1,81 +1,303 @@
 From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Wed, 26 Sep 2018 21:33:44 +0900
-Subject: [PATCH v2 1/2] dt-bindings: PCI: add UniPhier PCIe host
- controller description
-In-Reply-To: <20180925205502.GA12949@bogus>
-References: <1536226832-5089-2-git-send-email-hayashi.kunihiko@socionext.com>
- <20180925205502.GA12949@bogus>
-Message-ID: <20180926213343.A4B8.4A936039@socionext.com>
+Date: Wed, 26 Sep 2018 21:31:36 +0900
+Subject: [PATCH v2 2/2] PCI: controller: dwc: add UniPhier PCIe host
+ controller support
+In-Reply-To: <b869b273-e681-0b8c-52f5-6e02f9de5485@synopsys.com>
+References: <20180925161417.GA30943@e107981-ln.cambridge.arm.com>
+ <b869b273-e681-0b8c-52f5-6e02f9de5485@synopsys.com>
+Message-ID: <20180926213135.A4B4.4A936039@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Lorenzo, Gustavo,
 
-On Tue, 25 Sep 2018 15:55:02 -0500 <robh@kernel.org> wrote:
+Thank you for reviewing.
 
-> On Thu, Sep 06, 2018 at 06:40:31PM +0900, Kunihiko Hayashi wrote:
-> > Add DT bindings for PCIe controller implemented in UniPhier SoCs when
-> > configured in Root Complex (host) mode. This controller is based on
-> > the DesignWare PCIe core.
+On Tue, 25 Sep 2018 18:53:01 +0100
+Gustavo Pimentel <gustavo.pimentel@synopsys.com> wrote:
+
+> On 25/09/2018 17:14, Lorenzo Pieralisi wrote:
+> > [+Gustavo, please have a look at INTX/MSI management]
 > > 
-> > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> > ---
-> >  .../devicetree/bindings/pci/uniphier-pcie.txt      | 78 ++++++++++++++++++++++
-> >  1 file changed, 78 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/pci/uniphier-pcie.txt
+> > On Thu, Sep 06, 2018 at 06:40:32PM +0900, Kunihiko Hayashi wrote:
+> >> This introduces specific glue layer for UniPhier platform to support
+> >> PCIe host controller that is based on the DesignWare PCIe core, and
+> >> this driver supports Root Complex (host) mode.
 > > 
-> > diff --git a/Documentation/devicetree/bindings/pci/uniphier-pcie.txt b/Documentation/devicetree/bindings/pci/uniphier-pcie.txt
-> > new file mode 100644
-> > index 0000000..a34e167
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/pci/uniphier-pcie.txt
-> > @@ -0,0 +1,78 @@
-> > +Socionext UniPhier PCIe host controller bindings
-> > +
-> > +This describes the devicetree bindings for PCIe host controller implemented
-> > +on Socionext UniPhier SoCs.
-> > +
-> > +UniPhier PCIe host controller is based on the Synopsys DesignWare PCI core.
-> > +It shares common functions with the PCIe DesignWare core driver and inherits
-> > +common properties defined in
-> > +Documentation/devicetree/bindings/pci/designware-pcie.txt.
-> > +
-> > +Required properties:
-> > +- compatible: Should be "socionext,uniphier-pcie".
-> > +- reg: Specifies offset and length of the register set for the device.
-> > +	According to the reg-names, appropriate register sets are required.
-> > +- reg-names: Must include the following entries:
-> > +    "dbi"    - controller configuration registers
-> > +    "link"   - SoC-specific glue layer registers
-> > +    "config" - PCIe configuration space
-> > +- clocks: A phandle to the clock gate for PCIe glue layer including
-> > +	the host controller.
-> > +- resets: A phandle to the reset line for PCIe glue layer including
-> > +	the host controller.
-> > +- interrupts: A list of interrupt specifiers. According to the
-> > +	interrupt-names, appropriate interrupts are required.
-> > +- interrupt-names: Must include the following entries:
-> > +    "dma"    - DMA interrupt
-> > +    "msi"    - MSI interrupt
-> > +    "intx"   - Legacy INTA/B/C/D interrupt
-> > +
-> > +Optional properties:
-> > +- phys: A phandle to generic PCIe PHY. According to the phy-names, appropriate
-> > +	phys are required.
-> > +- phy-names: Must be "pcie-phy".
-> > +
-> > +Required sub-node:
-> > +- interrupt-controller: Specifies interrupt controller for legacy PCI
-> > +	interrupts. The node name isn't important.
-> 
-> No, it is important.
-> 
-> With that sentence removed,
-> 
-> Reviewed-by: Rob Herring <robh@kernel.org>
+> > Please read this thread and apply it to next versions:
+> > 
+> > https://urldefense.proofpoint.com/v2/url?u=https-3A__marc.info_-3Fl-3Dlinux-2Dpci-26m-3D150905742808166-26w-3D2&d=DwIBAg&c=DPL6_X_6JkXFx7AXWqB0tg&r=bkWxpLoW-f-E3EdiDCCa0_h0PicsViasSlvIpzZvPxs&m=H8UNDDUGQnQnqfWr4CBios689dJcjxu4qeTTRGulLmU&s=CgcXc_2LThyOpW-4bCriJNo9H1lzROEdy_cG9p-Y5hU&e=
 
-I was wrong. the node name is important to express its role.
-I'll remove that sentence in next.
+I also found this thread in previous linux-pci, and I think it's helpful for me.
+I'll check it carefully.
+
+> > 
+> > [...]
+> > 
+> >> +static int uniphier_pcie_link_up(struct dw_pcie *pci)
+> >> +{
+> >> +	struct uniphier_pcie_priv *priv = to_uniphier_pcie(pci);
+> >> +	u32 val, mask;
+> >> +
+> >> +	val = readl(priv->base + PCL_STATUS_LINK);
+> >> +	mask = PCL_RDLH_LINK_UP | PCL_XMLH_LINK_UP;
+> >> +
+> >> +	return (val & mask) == mask;
+> >> +}
+> >> +
+> >> +static int uniphier_pcie_establish_link(struct dw_pcie *pci)
+> >> +{
+> >> +	struct uniphier_pcie_priv *priv = to_uniphier_pcie(pci);
+> >> +	int ret;
+> >> +
+> >> +	if (dw_pcie_link_up(pci))
+> >> +		return 0;
+> >> +
+> >> +	uniphier_pcie_ltssm_enable(priv);
+> >> +
+> >> +	ret = dw_pcie_wait_for_link(pci);
+> >> +	if (ret == -ETIMEDOUT) {
+> >> +		dev_warn(pci->dev, "Link not up\n");
+> >> +		ret = 0;
+> > 
+> > So if the link is not up we warn, return and all is fine ?
+
+Although I was not sure about driver's behavior if the link isn't up,
+since the driver can't do anything after that,
+so it seems suitable to return -ETIMEOUT and fail to probe.
+
+> > 
+> >> +	}
+> >> +
+> >> +	return ret;
+> >> +}
+> >> +
+> >> +static void uniphier_pcie_stop_link(struct dw_pcie *pci)
+> >> +{
+> >> +	struct uniphier_pcie_priv *priv = to_uniphier_pcie(pci);
+> >> +
+> >> +	uniphier_pcie_ltssm_disable(priv);
+> >> +}
+> >> +
+> >> +static int uniphier_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
+> >> +				  irq_hw_number_t hwirq)
+> >> +{
+> >> +	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
+> >> +	irq_set_chip_data(irq, domain->host_data);
+> >> +
+> >> +	return 0;
+> >> +}
+> >> +
+> >> +static const struct irq_domain_ops uniphier_intx_domain_ops = {
+> >> +	.map = uniphier_pcie_intx_map,
+> >> +};
+> > 
+> > I looped in Gustavo since this is not how I expect INTX management
+> > should be done. I do not think there is a DWC INTX generic layer
+> > but I think drivers/pci/controller/dwc/pci-keystone-dw.c is how
+> > it has to be done.
+> > 
+> >> +
+> >> +static int uniphier_pcie_init_irq_domain(struct pcie_port *pp)
+> >> +{
+> >> +	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+> >> +	struct uniphier_pcie_priv *priv = to_uniphier_pcie(pci);
+> >> +	struct device_node *np = pci->dev->of_node;
+> >> +	struct device_node *np_intc = of_get_next_child(np, NULL);
+> >> +
+> >> +	if (!np_intc) {
+> >> +		dev_err(pci->dev, "Failed to get child node\n");
+> >> +		return -ENODEV;
+> >> +	}
+> >> +
+> >> +	priv->irq_domain = irq_domain_add_linear(np_intc, PCI_NUM_INTX,
+> >> +						 &uniphier_intx_domain_ops,
+> >> +						 pp);
+> >> +	if (!priv->irq_domain) {
+> >> +		dev_err(pci->dev, "Failed to get INTx domain\n");
+> >> +		return -ENODEV;
+> >> +	}
+> >> +
+> >> +	return 0;
+> >> +}
+> >> +
+> >> +static void uniphier_pcie_irq_enable(struct uniphier_pcie_priv *priv)
+> >> +{
+> >> +	writel(PCL_RCV_INT_ALL_ENABLE, priv->base + PCL_RCV_INT);
+> >> +	writel(PCL_RCV_INTX_ALL_ENABLE, priv->base + PCL_RCV_INTX);
+> >> +}
+> >> +
+> >> +static void uniphier_pcie_irq_disable(struct uniphier_pcie_priv *priv)
+> >> +{
+> >> +	writel(0, priv->base + PCL_RCV_INT);
+> >> +	writel(0, priv->base + PCL_RCV_INTX);
+> >> +}
+> > 
+> >> +
+> >> +static irqreturn_t uniphier_pcie_irq_handler(int irq, void *arg)
+> > 
+> > This should not be an IRQ handler (and we should not use
+> > devm_request_irq() for the multiplexed IRQ line), it is a chained
+> > interrupt controller configuration and should be managed by an IRQ
+> > chain, again the way keystone does it seems reasonable to me.
+
+I see. I'll try to refer to keystone driver as an example for chained interrupt
+management.
+
+> > 
+> >> +{
+> >> +	struct uniphier_pcie_priv *priv = arg;
+> >> +	struct dw_pcie *pci = &priv->pci;
+> >> +	u32 val;
+> >> +
+> >> +	/* INT for debug */
+> >> +	val = readl(priv->base + PCL_RCV_INT);
+> >> +
+> >> +	if (val & PCL_CFG_BW_MGT_STATUS)
+> >> +		dev_dbg(pci->dev, "Link Bandwidth Management Event\n");
+> >> +	if (val & PCL_CFG_LINK_AUTO_BW_STATUS)
+> >> +		dev_dbg(pci->dev, "Link Autonomous Bandwidth Event\n");
+> >> +	if (val & PCL_CFG_AER_RC_ERR_MSI_STATUS)
+> >> +		dev_dbg(pci->dev, "Root Error\n");
+> >> +	if (val & PCL_CFG_PME_MSI_STATUS)
+> >> +		dev_dbg(pci->dev, "PME Interrupt\n");
+> >> +
+> >> +	writel(val, priv->base + PCL_RCV_INT);
+> >> +
+> >> +	/* INTx */
+> >> +	val = readl(priv->base + PCL_RCV_INTX);
+> >> +
+> >> +	if (val & PCL_RADM_INTA_STATUS)
+> >> +		generic_handle_irq(irq_find_mapping(priv->irq_domain, 0));
+> >> +	if (val & PCL_RADM_INTB_STATUS)
+> >> +		generic_handle_irq(irq_find_mapping(priv->irq_domain, 1));
+> >> +	if (val & PCL_RADM_INTC_STATUS)
+> >> +		generic_handle_irq(irq_find_mapping(priv->irq_domain, 2));
+> >> +	if (val & PCL_RADM_INTD_STATUS)
+> >> +		generic_handle_irq(irq_find_mapping(priv->irq_domain, 3));
+> > 
+> > Nit: Do you really need 4 if statements to handle INTX ?
+
+I found an example to use for_each_set_bit() in pci-dra7xx.c.
+I'll replace it.
+
+> > 
+> >> +
+> >> +	writel(val, priv->base + PCL_RCV_INTX);
+> >> +
+> >> +	return IRQ_HANDLED;
+> >> +}
+> >> +
+> >> +static irqreturn_t uniphier_pcie_msi_irq_handler(int irq, void *arg)
+> >> +{
+> >> +	struct pcie_port *pp = arg;
+> >> +
+> >> +	return dw_handle_msi_irq(pp);
+> >> +}
+> > 
+> > This IRQ handler must be removed, the MSI irq is handled by dwc core.
+
+I see. I'll remove it.
+
+> > 
+> >> +static int uniphier_pcie_host_init(struct pcie_port *pp)
+> >> +{
+> >> +	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+> >> +	int ret;
+> >> +
+> >> +	dw_pcie_setup_rc(pp);
+> >> +	ret = uniphier_pcie_establish_link(pci);
+> >> +	if (ret)
+> >> +		return ret;
+> >> +
+> >> +	if (IS_ENABLED(CONFIG_PCI_MSI))
+> >> +		dw_pcie_msi_init(pp);
+> >> +
+> >> +	return 0;
+> >> +}
+> >> +
+> >> +static const struct dw_pcie_host_ops uniphier_pcie_host_ops = {
+> >> +	.host_init = uniphier_pcie_host_init,
+> >> +};
+> >> +
+> >> +static int uniphier_add_pcie_port(struct uniphier_pcie_priv *priv,
+> >> +				  struct platform_device *pdev)
+> >> +{
+> >> +	struct dw_pcie *pci = &priv->pci;
+> >> +	struct pcie_port *pp = &pci->pp;
+> >> +	struct device *dev = &pdev->dev;
+> >> +	int ret;
+> >> +
+> >> +	pp->root_bus_nr = -1;
+> > 
+> > Useless initialization, remove it.
+> > 
+> > (ie dw_pcie_host_init() initializes root_bus_nr for you).
+
+I found it. This will be removed.
+
+> > 
+> >> +	pp->ops = &uniphier_pcie_host_ops;
+> >> +
+> >> +	pp->irq = platform_get_irq_byname(pdev, "intx");
+> >> +	if (pp->irq < 0) {
+> >> +		dev_err(dev, "Failed to get intx irq\n");
+> >> +		return pp->irq;
+> >> +	}
+> >> +
+> >> +	ret = devm_request_irq(dev, pp->irq, uniphier_pcie_irq_handler,
+> >> +			       IRQF_SHARED, "pcie", priv);
+> > 
+> > This is wrong, you should set-up a chained IRQ for INTX.
+> > 
+> > I *think* that
+> > 
+> > ks_pcie_setup_interrupts()
+> > 
+> > is a good example to start with but I wonder whether it is worth
+> > generalizing the INTX approach to designware as a whole as it was
+> > done for MSIs.
+> > 
+> > Thoughts ?
+> 
+> From what I understood this is for legacy IRQ, right?
+
+Yes. For legacy IRQ.
+
+> Like you (Lorenzo) said there is 2 drivers (pci-keystone-dw.c and pci-dra7xx.c)
+> that uses it and can be use as a template for handling this type of interrupts.
+> 
+> We can try to pass some kind of generic INTX function to the DesignWare host
+> library to handling this, but this will require some help from keystone and
+> dra7xx maintainers, since my setup doesn't have legacy IRQ HW support.
+
+Now I think it's difficult to make a template for INTX function,
+and at first, I'll try to re-write this part with reference to pci-keystone-dw.c.
+
+> 
+> > 
+> >> +	if (ret) {
+> >> +		dev_err(dev, "Failed to request irq %d\n", pp->irq);
+> >> +		return ret;
+> >> +	}
+> >> +
+> >> +	ret = uniphier_pcie_init_irq_domain(pp);
+> >> +	if (ret)
+> >> +		return ret;
+> >> +
+> >> +	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+> >> +		pp->msi_irq = platform_get_irq_byname(pdev, "msi");
+> >> +		if (pp->msi_irq < 0)
+> >> +			return pp->msi_irq;
+> >> +
+> >> +		ret = devm_request_irq(dev, pp->msi_irq,
+> >> +				       uniphier_pcie_msi_irq_handler,
+> >> +				       IRQF_SHARED, "pcie-msi", pp);
+> > 
+> > No. With MSI management in DWC core all you need to do is initializing
+> > pp->msi_irq.
+
+Okay, it isn't necessary to call devm_request_irq() here no longer.
 
 Thank you,
 
