@@ -1,47 +1,47 @@
-From: ebiggers@kernel.org (Eric Biggers)
-Date: Wed, 26 Sep 2018 10:37:21 -0700
-Subject: [PATCH net-next v6 07/23] zinc: ChaCha20 ARM and ARM64
- implementations
-In-Reply-To: <CAHmME9p5b=L0FSL72gCszhvut-kr=aD4ZniY9qsJxiBnZk8qNQ@mail.gmail.com>
-References: <20180925145622.29959-1-Jason@zx2c4.com>
- <20180925145622.29959-8-Jason@zx2c4.com>
- <CAKv+Gu9mVAfdBvOMCFqRJj+wBiWu3JVOgPZdkcdjzqSdQQ5Jrw@mail.gmail.com>
- <CAHmME9r9KppoFwwNVpzpYbU+9dCPzb7Pit+4iRa4MY_ouJBWrA@mail.gmail.com>
- <CAKv+Gu8ih-TsASRGqK+ST_5+EQ0=Zo-zhGCadOdGyPjucMFTCg@mail.gmail.com>
- <CAHmME9p5b=L0FSL72gCszhvut-kr=aD4ZniY9qsJxiBnZk8qNQ@mail.gmail.com>
-Message-ID: <20180926173720.GA248906@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 26 Sep 2018 18:38:42 +0100
+Subject: [REVIEW][PATCH 00/15] signal/arm64: siginfo cleanups
+In-Reply-To: <871s9j462u.fsf@xmission.com>
+References: <871s9j462u.fsf@xmission.com>
+Message-ID: <20180926173841.GD175719@arrakis.emea.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 26, 2018 at 05:41:12PM +0200, Jason A. Donenfeld wrote:
-> On Wed, Sep 26, 2018 at 4:02 PM Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
-> > I don't think it makes sense to keep
-> > it simple now and add the complexity later (and the same concern
-> > applies to async support btw).
+Hi Eric,
+
+On Mon, Sep 24, 2018 at 11:07:05AM +0200, Eric W. Biederman wrote:
+> This is the continuation of my work to sort out signaling of exceptions
+> with siginfo.  The old signal sending functions by taking a siginfo
+> argument resulted in their callers having to deal with the fiddly nature
+> of siginfo directly.  In small numbers of callers this is not a problem
+> but in the number of callers in the kernel this resulted in cases
+> where fields were not initialized or improperly initialized before
+> being passed to userspace.
 > 
-> Ugh, no. I don't want to add needless complexity, period. Zinc is
-> synchronous, not asynchronous. It provides software implementations.
-> That's what it does. While many of your reviews have been useful, many
-> of your comments indicate some desire to change and mold the purpose
-> and focus of Zinc away from Zinc's intents. Stop that. It's not going
-> to become a bloated mess of "things Ard wanted and quipped about on
-> LKML." Things like these only serve to filibuster the patchset
-> indefinitely. But maybe that's what you'd like all along? Hard to
-> tell, honestly. So, no, sorry, Zinc isn't gaining an async interface
-> right now.
+> To avoid having to worry about those issues I have added new signal
+> sending functions that each deal wit a different siginfo case.  When
+> using these functions there is no room for the fiddly nature of siginfo
+> to cause mistakes.
+> 
+> This is my set of changes to update arm64 to use those functions.
+> Along with some refactoring so those functions can be cleanly used.
+> 
+> Folks please review and double check me.  I think I have kept these
+> changes simple and obviously correct but I am human and mess up
+> sometimes.
 
-Can you please stop accusing Ard of "filibustering" your patchset?  Spending too
-long in non-preemptible code is a real problem even on non-RT systems.
-syzkaller has been reporting bugs where the kernel spins too long without any
-preemption points, both in crypto-related code and elsewhere in the kernel.  So
-we've had to add explicit preemption points to address those, as otherwise users
-can lock up all CPUs for tens of seconds.  The issue being discussed here is
-basically the same except here preemption is being explicitly disabled via
-kernel_neon_begin(), so it becomes a problem even on non-CONFIG_PREEMPT kernels.
+Nice clean-up, thanks. I started reviewing the patches, I should finish
+by tomorrow (I also applied them locally to give some testing).
 
-It's much better to address this problem (which is a regression from the current
-skcipher API which only maps a page at a time) up front rather than have to rush
-to patch it after the fact once the syzbot reports start coming in.
+> After these patches have had a chance to be reviewed I plan to merge
+> them by my siginfo tree.  If you would rather take them in the arm64
+> tree let me know.   All of the prerequisites should have been merged
+> through Linus's tree several releases ago.
 
-- Eric
+Either way works for me. There is a trivial conflict in
+force_signal_inject() with the arm64 for-next/core tree so I could as
+well put them on top of this branch and send them during the 4.20
+merging window.
+
+-- 
+Catalin
