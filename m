@@ -1,86 +1,119 @@
-From: yong.deng@magewell.com (Yong Deng)
-Date: Wed, 26 Sep 2018 16:40:04 +0800
-Subject: [PATCH v11 1/2] dt-bindings: media: Add Allwinner V3s Camera Sensor
- Interface (CSI)
-Message-ID: <1537951204-24672-1-git-send-email-yong.deng@magewell.com>
+From: honghui.zhang@mediatek.com (Honghui Zhang)
+Date: Wed, 26 Sep 2018 17:06:57 +0800
+Subject: [PATCH v4 1/4] PCI: mediatek: fixup mtk_pcie_find_port logical
+In-Reply-To: <20180921160745.GB21644@e107981-ln.cambridge.arm.com>
+References: <1536573023-6720-1-git-send-email-honghui.zhang@mediatek.com>
+ <1536573023-6720-2-git-send-email-honghui.zhang@mediatek.com>
+ <20180921160745.GB21644@e107981-ln.cambridge.arm.com>
+Message-ID: <1537952817.14753.4.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add binding documentation for Allwinner V3s CSI.
+On Fri, 2018-09-21 at 17:07 +0100, Lorenzo Pieralisi wrote:
+> On Mon, Sep 10, 2018 at 05:50:20PM +0800, honghui.zhang at mediatek.com wrote:
+> > From: Honghui Zhang <honghui.zhang@mediatek.com>
+> > 
+> > The Mediatek's host controller has two slots, each with it's own control
+> > registers. The host driver need to identify which slot was connected
+> > in order to access the device's configuration space. There's problem
+> > for current host driver to find out which slot was connected to for
+> > a given EP device.
+> > 
+> > Assuming each slot have connect with one EP device as below:
+> > 
+> >                 host bridge
+> >   bus 0 --> __________|_______
+> >            |                  |
+> >            |                  |
+> >          slot 0             slot 1
+> >   bus 1 -->|        bus 2 --> |
+> >            |                  |
+> >          EP 0               EP 1
+> > 
+> > During PCI enumeration, system software will scan all the PCI device
+> > starting from devfn 0. So it will get the proper port for slot0 and
+> > slot1 device when using PCI_SLOT(devfn) for match. But it will get
+> > the wrong slot for EP1: The devfn will be start from 0 when scanning
+> > EP1 behind slot1, it will get port0 since the PCI_SLOT(EP1) is match
+> > for port0's slot value. So the host driver should not using EP's devfn
+> > but the slot's devfn(the slot which EP was connected to) for match.
+> > 
+> > This patch fix the mtk_pcie_find_port's logical by using the slot's
+> > devfn for match.
+> > 
+> > Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> > Acked-by: Ryder Lee <ryder.lee@mediatek.com>
+> > ---
+> >  drivers/pci/controller/pcie-mediatek.c | 19 +++++++++++++++++--
+> >  1 file changed, 17 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
+> > index 861dda6..20b9088 100644
+> > --- a/drivers/pci/controller/pcie-mediatek.c
+> > +++ b/drivers/pci/controller/pcie-mediatek.c
+> > @@ -337,11 +337,26 @@ static struct mtk_pcie_port *mtk_pcie_find_port(struct pci_bus *bus,
+> >  {
+> >  	struct mtk_pcie *pcie = bus->sysdata;
+> >  	struct mtk_pcie_port *port;
+> > +	struct pci_dev *dev;
+> > +	struct pci_bus *pbus;
+> >  
+> > -	list_for_each_entry(port, &pcie->ports, list)
+> > -		if (port->slot == PCI_SLOT(devfn))
+> > +	list_for_each_entry(port, &pcie->ports, list) {
+> > +		if (!bus->number && port->slot == PCI_SLOT(devfn))
+> >  			return port;
+> >  
+> > +		if (bus->number) {
+> > +			pbus = bus;
+> > +
+> > +			while (pbus->number) {
+> > +				dev = pbus->self;
+> > +				pbus = dev->bus;
+> > +			}
+> > +
+> > +			if (port->slot == PCI_SLOT(dev->devfn))
+> > +				return port;
+> > +		}
+> > +	}
+> 
+> 	/*
+> 	 * Walk the bus hierarchy to get the devfn value
+> 	 * of the port in the root bus.
+> 	 */
+> 	while (bus && bus->number) {
+> 		devfn = bus->self->devfn;
+> 		bus = bus->parent;
+> 	}
+> 
+> 	list_for_each_entry(port, &pcie->ports, list) {
+> 		if (port->slot == PCI_SLOT(devfn))
+> 			return port;
+> 
+> 	return NULL;
+> 
+> Would it work ? Maybe it is a little easier to parse.
+> 
 
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Yong Deng <yong.deng@magewell.com>
----
- .../devicetree/bindings/media/sun6i-csi.txt        | 59 ++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
+Thanks, this is much better.
 
-diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-new file mode 100644
-index 000000000000..2ff47a9507a6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-@@ -0,0 +1,59 @@
-+Allwinner V3s Camera Sensor Interface
-+-------------------------------------
-+
-+Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
-+interface and CSI1 is used for parallel interface.
-+
-+Required properties:
-+  - compatible: value must be "allwinner,sun8i-v3s-csi"
-+  - reg: base address and size of the memory-mapped region.
-+  - interrupts: interrupt associated to this IP
-+  - clocks: phandles to the clocks feeding the CSI
-+    * bus: the CSI interface clock
-+    * mod: the CSI module clock
-+    * ram: the CSI DRAM clock
-+  - clock-names: the clock names mentioned above
-+  - resets: phandles to the reset line driving the CSI
-+
-+Each CSI node should contain one 'port' child node with one child 'endpoint'
-+node, according to the bindings defined in
-+Documentation/devicetree/bindings/media/video-interfaces.txt. As mentioned
-+above, the endpoint's bus type should be MIPI CSI-2 for CSI0 and parallel or
-+Bt656 for CSI1.
-+
-+Endpoint node properties for CSI1
-+---------------------------------
-+
-+- remote-endpoint	: (required) a phandle to the bus receiver's endpoint
-+			   node
-+- bus-width:		: (required) must be 8, 10, 12 or 16
-+- pclk-sample		: (optional) (default: sample on falling edge)
-+- hsync-active		: (only required for parallel)
-+- vsync-active		: (only required for parallel)
-+
-+Example:
-+
-+csi1: csi at 1cb4000 {
-+	compatible = "allwinner,sun8i-v3s-csi";
-+	reg = <0x01cb4000 0x1000>;
-+	interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-+	clocks = <&ccu CLK_BUS_CSI>,
-+		 <&ccu CLK_CSI1_SCLK>,
-+		 <&ccu CLK_DRAM_CSI>;
-+	clock-names = "bus", "mod", "ram";
-+	resets = <&ccu RST_BUS_CSI>;
-+
-+	port {
-+		/* Parallel bus endpoint */
-+		csi1_ep: endpoint {
-+			remote-endpoint = <&adv7611_ep>;
-+			bus-width = <16>;
-+
-+			/* If hsync-active/vsync-active are missing,
-+			   embedded BT.656 sync is used */
-+			hsync-active = <0>; /* Active low */
-+			vsync-active = <0>; /* Active low */
-+			pclk-sample = <1>;  /* Rising */
-+		};
-+	};
-+};
--- 
-1.8.3.1
+> I think this can even be made easier by using struct device_node* as
+> comparison (and store it in port->slot instead of the port number), I
+> think that the pci_dev representing the port should have the right
+> of_node associated with it by core code, so it is just a matter of
+> finding the first pci_dev parent with an of_node set and compare it
+> against port->slot (that should be converted to a struct device_node*).
+> 
+> This ought to be tested and written but I think that's doable.
+> 
+
+Thanks, I will do my homework and figure a way out through this
+solution.
+Currently port->slot is used in too much place to be removed, I guess I
+need to added a new parameter in the port struct to store the of_node
+for compare.
+I'm not sure which way is better, anyway, let me try the new solution.
+
+thanks.
+
+> Lorenzo
