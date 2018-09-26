@@ -1,42 +1,38 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Wed, 26 Sep 2018 14:55:28 +0200
-Subject: [PATCH v4 2/2] tty/serial: atmel: add ISO7816 support
-In-Reply-To: <20180918132856.GA14333@kroah.com>
-References: <20180906134214.29031-1-ludovic.desroches@microchip.com>
- <20180906134214.29031-3-ludovic.desroches@microchip.com>
- <20180918132856.GA14333@kroah.com>
-Message-ID: <20180926125528.fmfti62ymod2derb@M43218.corp.atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 26 Sep 2018 14:59:40 +0200
+Subject: [PATCH] ASoC: atmel: add SND_SOC_I2C_AND_SPI dependency
+Message-ID: <20180926125957.2256982-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2018 at 03:28:56PM +0200, Greg KH wrote:
-> On Thu, Sep 06, 2018 at 03:42:14PM +0200, Ludovic Desroches wrote:
-> > From: Nicolas Ferre <nicolas.ferre@microchip.com>
-> > 
-> > When mode is set in atmel_config_iso7816() we backup last RS232 mode
-> > for coming back to this mode if requested.
-> > Also allow setup of T=0 and T=1 parameter and basic support in set_termios
-> > function as well.
-> > 
-> > Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-> > [ludovic.desroches at microchip.com: rebase, add check on fidi ratio, checkpatch fixes]
-> > Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
-> > Acked-by: Richard Genoud <richard.genoud@gmail.com>
-> > ---
-> >  drivers/tty/serial/atmel_serial.c | 190 +++++++++++++++++++++++++++++++++++---
-> >  drivers/tty/serial/atmel_serial.h |   3 +-
-> >  2 files changed, 181 insertions(+), 12 deletions(-)
-> 
-> This doesn't apply to my tree :(
-> 
+Selecting SND_SOC_WM8731 is only allowed when all its dependencies
+are already there:
 
-I am rebasing it on tty-next.
+WARNING: unmet direct dependencies detected for SND_SOC_WM8731
+  Depends on [m]: SOUND [=y] && !UML && SND [=y] && SND_SOC [=y] && SND_SOC_I2C_AND_SPI [=m]
+  Selected by [y]:
+  - SND_SOC_MIKROE_PROTO [=y] && SOUND [=y] && !UML && SND [=y] && SND_SOC [=y] && SND_ATMEL_SOC [=y] && OF [=y]
+  Selected by [m]:
+  - SND_AT91_SOC_SAM9X5_WM8731 [=m] && SOUND [=y] && !UML && SND [=y] && SND_SOC [=y] && SND_ATMEL_SOC [=y] && (ARCH_AT91 [=y] || COMPILE_TEST [=y]) && ATMEL_SSC [=y] && SND_SOC_I2C_AND_SPI [=m]
+  - SND_SOC_ALL_CODECS [=m] && SOUND [=y] && !UML && SND [=y] && SND_SOC [=y] && COMPILE_TEST [=y] && SND_SOC_I2C_AND_SPI [=m]
 
-> Also, shouldn't this new ioctl be documented somewhere?
-> 
+Fixes: a45f8853a5f9 ("ASoC: Add driver for PROTO Audio CODEC (with a WM8731)")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ sound/soc/atmel/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-v5 is coming.
-
-Regards
-
-Ludovic
+diff --git a/sound/soc/atmel/Kconfig b/sound/soc/atmel/Kconfig
+index 81a0712d4f14..64f86f0b87e5 100644
+--- a/sound/soc/atmel/Kconfig
++++ b/sound/soc/atmel/Kconfig
+@@ -101,6 +101,7 @@ config SND_ATMEL_SOC_I2S
+ config SND_SOC_MIKROE_PROTO
+ 	tristate "Support for Mikroe-PROTO board"
+ 	depends on OF
++	depends on SND_SOC_I2C_AND_SPI
+ 	select SND_SOC_WM8731
+ 	help
+ 	  Say Y or M if you want to add support for MikroElektronika PROTO Audio
+-- 
+2.18.0
