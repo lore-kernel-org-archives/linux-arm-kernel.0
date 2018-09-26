@@ -1,35 +1,53 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Wed, 26 Sep 2018 15:51:10 +0200
-Subject: [PATCH] arm: support big-endian for the virt architecture
-Message-ID: <20180926135110.13061-1-Jason@zx2c4.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Wed, 26 Sep 2018 14:56:17 +0100
+Subject: [PATCH 0/7] Ensure stack is aligned for kernel entries
+Message-ID: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This architecture, used for running in QEMU, runs just fine when
-compiled in big-endian mode. So enable it. This is enabled in exactly
-the same way that it is for other platforms (such as vexpress) that also
-support big-endian mode in QEMU successfully.
+Hi,
 
-Signed-off-by: Jason A. Donenfeld <Jason@zx2c4.com>
----
-Personally, I'm using this as part of WireGuard's CI, and patching
-kernels to include this is a bit annoying. Any chance this can get into
-4.19?
+Having SCTLR_ELx.SA enabled requires the SP to be 16-bytes aligned before
+using it to access memory. When taking an exception, it is possible that
+the context during which the exception occured had SP mis-aligned. The
+entry code needs to make sure that the stack is aligned before using it to
+save the context.
 
- arch/arm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+This is only a concern when taking exception from an EL using the same
+SP_ELx as the handler. In other cases it can be assumed that the SP being
+picked up on exception entry is aligned under the condition that SP is
+always aligned when doing eret to an EL using a different SP.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index e8cd55a5b04c..b8c6062ca0c1 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -701,6 +701,7 @@ config ARCH_VIRT
- 	select ARM_GIC_V3_ITS if PCI
- 	select ARM_PSCI
- 	select HAVE_ARM_ARCH_TIMER
-+	select ARCH_SUPPORTS_BIG_ENDIAN
- 
- #
- # This is sorted alphabetically by mach-* pathname.  However, plat-*
--- 
-2.19.0
+On Juno I see a runtime difference <1% for hackbench. If I do not include
+the fast path@EL1 (patch 4) I see a diff of 1-2%.
+
+For EL2 entries, a bit of clean up of stuff getting patched in the vector
+has been needed.
+
+Cheers,
+
+Julien
+
+-->
+
+Julien Thierry (7):
+  arm64: Add static check for pt_regs alignment
+  arm64: sdei: Always use sdei stack for sdei events
+  arm64: Align stack when taking exception from EL1
+  arm64: Add fast-path for stack alignment
+  arm64: Do not apply BP hardening for hyp entries from EL2
+  arm64: Do not apply vector harderning for hyp entries from EL2
+  arm64: kvm: Align stack for exception coming from EL2
+
+ arch/arm64/include/asm/assembler.h |  9 +++++
+ arch/arm64/include/asm/ptrace.h    |  2 +
+ arch/arm64/include/asm/sdei.h      |  2 -
+ arch/arm64/kernel/cpu_errata.c     | 10 ++++-
+ arch/arm64/kernel/entry.S          | 43 +++++++++++++++++++--
+ arch/arm64/kernel/sdei.c           | 23 ++++-------
+ arch/arm64/kvm/hyp/hyp-entry.S     | 78 +++++++++++++++++++++++++++++++-------
+ drivers/firmware/Kconfig           |  1 +
+ 8 files changed, 132 insertions(+), 36 deletions(-)
+
+--
+1.9.1
