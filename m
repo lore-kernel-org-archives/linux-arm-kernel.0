@@ -1,30 +1,49 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 26 Sep 2018 09:02:07 -0300
-Subject: [PATCH v9 4/5] clk: imx: add imx composite clock
-In-Reply-To: <20180926064752.GM4097@pengutronix.de>
-References: <1537785597-26499-1-git-send-email-abel.vesa@nxp.com>
- <1537785597-26499-5-git-send-email-abel.vesa@nxp.com>
- <CAOMZO5D7yLUzriOub4RWsq1K8_fTj6c0LFOnSZwHyjqMPYu=0A@mail.gmail.com>
- <20180926064752.GM4097@pengutronix.de>
-Message-ID: <CAOMZO5D-40WbanPC=-O_Nj98znOk6Aa3dAqpCuwHTv+GuFR6_g@mail.gmail.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Wed, 26 Sep 2018 12:02:25 +0000
+Subject: [PATCh v3 1/4] arm64: add basic Kconfig symbols for i.MX8
+In-Reply-To: <20180921125626.21971-1-l.stach@pengutronix.de>
+References: <20180921125626.21971-1-l.stach@pengutronix.de>
+Message-ID: <AM0PR04MB4211D28203CC397B48FB9D7980150@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+[...]
 
-On Wed, Sep 26, 2018 at 3:47 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+> index 393d2b524284..210a0145117a 100644
+> --- a/arch/arm64/Kconfig.platforms
+> +++ b/arch/arm64/Kconfig.platforms
+> @@ -139,6 +139,20 @@ config ARCH_MVEBU
+>  	   - Armada 7K SoC Family
+>  	   - Armada 8K SoC Family
+> 
+> +config ARCH_MXC
+> +	bool "ARMv8 based NXP i.MX SoC family"
+> +	help
+> +	  This enables support for the ARMv8 based SoCs in the
+> +	  NXP i.MX family.
+> +
 
-> It's:
->         rate = *prate / prediv_value;
->         rate = rate / div_value;
+A bit wondering whether we should depends on other platforms to select
+the ones we need. But I did see similar users in kernel...
 
-Yes, this looks correct. Thanks for the feedback.
+> +config SOC_IMX8MQ
+> +	bool "i.MX8MQ support"
+> +	depends on ARCH_MXC
+> +	select ARM64_ERRATUM_843419
+> +	select ARM64_ERRATUM_845719
+> +	help
+> +	  This enables support for the i.MX8MQ SoC.
+> +
 
-> To me this looks correct. However, For an unsigned long type we have
-> DIV_ROUND_UP() with which we do not need any casting. For 64bit code
-> unsigned long is 64bit anyway which makes the cast a no-op and for 32bit
-> code there's also no point in exanding the initial 32bit value to 64bit.
+Do you think we need select some basic required configurations to make it
+capable of booting? E.g. Pinctrl, Clock, Timer and etc...
 
-That's a good point too.
+Regards
+Dong Aisheng
 
-Thanks
+>  config ARCH_QCOM
+>  	bool "Qualcomm Platforms"
+>  	select GPIOLIB
+> --
+> 2.19.0
