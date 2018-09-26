@@ -1,35 +1,32 @@
-From: yuehaibing@huawei.com (YueHaibing)
-Date: Wed, 26 Sep 2018 18:32:29 +0800
-Subject: [PATCH net-next] can: xilinx: fix return type of ndo_start_xmit
- function
-Message-ID: <20180926103229.13204-1-yuehaibing@huawei.com>
+From: maxime.ripard@bootlin.com (maxime.ripard at bootlin.com)
+Date: Wed, 26 Sep 2018 12:35:47 +0200
+Subject: [PATCH v11 1/2] dt-bindings: media: Add Allwinner V3s Camera
+ Sensor Interface (CSI)
+In-Reply-To: <7197338.mhOH8fQaEM@avalon>
+References: <1537951204-24672-1-git-send-email-yong.deng@magewell.com>
+ <7197338.mhOH8fQaEM@avalon>
+Message-ID: <20180926103547.5ubb6xjkl7xngmfg@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The method ndo_start_xmit() is defined as returning an 'netdev_tx_t',
-which is a typedef for an enum type, so make sure the implementation in
-this driver has returns 'netdev_tx_t' value, and change the function
-return type to netdev_tx_t.
+On Wed, Sep 26, 2018 at 01:19:34PM +0300, Laurent Pinchart wrote:
+> > +Endpoint node properties for CSI1
+> > +---------------------------------
+> 
+> Should you list the CSI0 properties as well ? As the driver in patch 2/2 
+> doesn't support the CSI-2 interface I assume you have left out CSI0 for now, 
+> but it should still be listed in the bindings. I'm fine with fixing this as a 
+> follow-up patch to avoid missing the v4.20 merge window, but if you end up 
+> resubmitting the series, could you please address the problem ?
 
-Found by coccinelle.
+That driver is not available, and the documentation isn't either, so
+there's no easy way to tell which properties are going to be needed
+before doing the actual work of reverse engineering it and writing a
+driver for it. Unfortunately...
 
-Signed-off-by: YueHaibing <yuehaibing@huawei.com>
----
- drivers/net/can/xilinx_can.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Maxime
 
-diff --git a/drivers/net/can/xilinx_can.c b/drivers/net/can/xilinx_can.c
-index 045f084..6de5004 100644
---- a/drivers/net/can/xilinx_can.c
-+++ b/drivers/net/can/xilinx_can.c
-@@ -612,7 +612,7 @@ static int xcan_start_xmit_mailbox(struct sk_buff *skb, struct net_device *ndev)
-  *
-  * Return: NETDEV_TX_OK on success and NETDEV_TX_BUSY when the tx queue is full
-  */
--static int xcan_start_xmit(struct sk_buff *skb, struct net_device *ndev)
-+static netdev_tx_t xcan_start_xmit(struct sk_buff *skb, struct net_device *ndev)
- {
- 	struct xcan_priv *priv = netdev_priv(ndev);
- 	int ret;
 -- 
-1.8.3.1
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
