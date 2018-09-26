@@ -1,58 +1,204 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 26 Sep 2018 12:53:57 +0800
-Subject: [PATCH] arm64: dts: rockchip: Enable SPI NOR flash on Rock64
-Message-ID: <20180926045357.20722-1-wens@csie.org>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Wed, 26 Sep 2018 13:21:20 +0800
+Subject: [Resend PATCH 5/5] arm: dts: mt7623: add display subsystem
+ related device nodes
+In-Reply-To: <1537929498.32631.16.camel@mtkswgap22>
+References: <84011aa94dd7be9239b7a2f944dd30fc70568fbb.1536155449.git.ryder.lee@mediatek.com>
+ <7105c341de3525761ad4067ca57c641c7097f773.1536155449.git.ryder.lee@mediatek.com>
+ <1537925879.20118.3.camel@mtksdaap41>
+ <1537929498.32631.16.camel@mtkswgap22>
+Message-ID: <1537939280.20005.19.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Pine64 Rock64 board comes with a GigaDevice GD25Q128CSIG
-or GD25Q127CSIG chip, which is a 128 Mbit SPI NOR flash chip
-that supports the JEDEC read-ID command.
+Hi, Ryder:
 
-This patch enables the SPI controller and adds a device node
-for the flash chip using the generic "jedec,spi-nor" comaptible.
+On Wed, 2018-09-26 at 10:38 +0800, Ryder Lee wrote:
+> On Wed, 2018-09-26 at 09:37 +0800, CK Hu wrote:
+> > Hi, Ryder:
+> > 
+> > On Wed, 2018-09-05 at 22:09 +0800, Ryder Lee wrote:
+> > > Add display subsystem related device nodes for MT7623.
+> > > 
+> > > Cc: CK Hu <ck.hu@mediatek.com>
+> > > Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
+> > > Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+> > > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> > > ---
+> > > I forgot to sort nodes in my previous mail. Sorry for the inconvenience.
+> > > 
+> > > This patch depends on the series: https://lkml.org/lkml/2018/9/5/223
+> > > 
+> > > @Matthias,
+> > > I know you're working on broken MMSYS - just want to ask whether it's possible
+> > > to let the patch to go to your tree (if others are okay with it), and send a
+> > > fixup one for MT7623 MMSYS later?
+> > > ---
+> > >  arch/arm/boot/dts/mt7623.dtsi                 | 177 ++++++++++++++++++++++++++
+> > >  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts |  83 ++++++++++++
+> > >  arch/arm/boot/dts/mt7623n-rfb-emmc.dts        |  83 ++++++++++++
+> > >  3 files changed, 343 insertions(+)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
+> > > index d01bdee..fdf9078 100644
+> > > --- a/arch/arm/boot/dts/mt7623.dtsi
+> > > +++ b/arch/arm/boot/dts/mt7623.dtsi
+> > > @@ -23,6 +23,11 @@
+> > >  	#address-cells = <2>;
+> > >  	#size-cells = <2>;
+> > >  
+> > > +	aliases {
+> > > +		rdma0 = &rdma0;
+> > > +		rdma1 = &rdma1;
+> > > +	};
+> > > +
+> > >  	cpu_opp_table: opp-table {
+> > >  		compatible = "operating-points-v2";
+> > >  		opp-shared;
+> > > @@ -311,6 +316,25 @@
+> > >  		clock-names = "spi", "wrap";
+> > >  	};
+> > >  
+> > > +	mipi_tx0: mipi-dphy at 10010000 {
+> > > +		compatible = "mediatek,mt7623-mipi-tx",
+> > > +			     "mediatek,mt2701-mipi-tx";
+> > > +		reg = <0 0x10010000 0 0x90>;
+> > > +		clocks = <&clk26m>;
+> > > +		clock-output-names = "mipi_tx0_pll";
+> > > +		#clock-cells = <0>;
+> > > +		#phy-cells = <0>;
+> > > +	};
+> > > +
+> > > +	cec: cec at 10012000 {
+> > > +		compatible = "mediatek,mt7623-cec",
+> > > +			     "mediatek,mt8173-cec";
+> > > +		reg = <0 0x10012000 0 0xbc>;
+> > > +		interrupts = <GIC_SPI 182 IRQ_TYPE_LEVEL_LOW>;
+> > > +		clocks = <&infracfg CLK_INFRA_CEC>;
+> > > +		status = "disabled";
+> > > +	};
+> > > +
+> > >  	cir: cir at 10013000 {
+> > >  		compatible = "mediatek,mt7623-cir";
+> > >  		reg = <0 0x10013000 0 0x1000>;
+> > > @@ -359,6 +383,18 @@
+> > >  		#clock-cells = <1>;
+> > >  	};
+> > >  
+> > > +	hdmi_phy: phy at 10209100 {
+> > > +		compatible = "mediatek,mt7623-hdmi-phy",
+> > > +			     "mediatek,mt2701-hdmi-phy";
+> > > +		reg = <0 0x10209100 0 0x24>;
+> > > +		clocks = <&apmixedsys CLK_APMIXED_HDMI_REF>;
+> > > +		clock-names = "pll_ref";
+> > > +		clock-output-names = "hdmitx_dig_cts";
+> > > +		#clock-cells = <0>;
+> > > +		#phy-cells = <0>;
+> > > +		status = "disabled";
+> > > +	};
+> > > +
+> > >  	rng: rng at 1020f000 {
+> > >  		compatible = "mediatek,mt7623-rng";
+> > >  		reg = <0 0x1020f000 0 0x1000>;
+> > > @@ -558,6 +594,16 @@
+> > >  		status = "disabled";
+> > >  	};
+> > >  
+> > > +	hdmiddc0: i2c at 11013000 {
+> > > +		compatible = "mediatek,mt7623-hdmi-ddc",
+> > > +			     "mediatek,mt8173-hdmi-ddc";
+> > > +		interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_LOW>;
+> > > +		reg = <0 0x11013000 0 0x1C>;
+> > > +		clocks = <&pericfg CLK_PERI_I2C3>;
+> > > +		clock-names = "ddc-i2c";
+> > > +		status = "disabled";
+> > > +	};
+> > > +
+> > >  	nor_flash: spi at 11014000 {
+> > >  		compatible = "mediatek,mt7623-nor",
+> > >  			     "mediatek,mt8173-nor";
+> > > @@ -732,6 +778,84 @@
+> > >  		#clock-cells = <1>;
+> > >  	};
+> > >  
+> > > +	display_components: dispsys at 14000000 {
+> > > +		compatible = "mediatek,mt7623-mmsys",
+> > 
+> > Checkpatch warning:
+> > 
+> > WARNING: DT compatible string "mediatek,mt7623-mmsys" appears
+> > un-documented -- check ./Documentation/devicetree/bindings/
+> > #101: FILE: arch/arm/boot/dts/mt7623.dtsi:782:
+> > +               compatible = "mediatek,mt7623-mmsys",
+> > 
+> > 
+> > > +			     "mediatek,mt2701-mmsys";
+> > > +		reg = <0 0x14000000 0 0x1000>;
+> > > +		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
+> > > +	};
+> > > +
+> > > +	ovl at 14007000 {
+> > > +		compatible = "mediatek,mt7623-disp-ovl",
+> > 
+> > I think this is also un-documented, but I don't know why checkpatch does
+> > not show any warning.
+> > 
+> > Regards,
+> > CK
+> > > +			     "mediatek,mt2701-disp-ovl";
+> > > +		reg = <0 0x14007000 0 0x1000>;
+> > > +		interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_LOW>;
+> > > +		clocks = <&mmsys CLK_MM_DISP_OVL>;
+> > > +		iommus = <&iommu MT2701_M4U_PORT_DISP_OVL_0>;
+> > > +		mediatek,larb = <&larb0>;
+> > > +	};
+> > > +
+> 
+> I fallback to use the MT2701's compatible string here and there, but I
+> could add a new one for MT7623.
+> 
+> BTW, I've had this question for a long time - should I add a new
+> compatible for the very same IPs, or could we just use the old one in
+> DTS?
+> 
+> Ryder
+> 
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
+>From [1], there is a description for the multiple compatible string
+scheme:
 
-This was working on linux-next 20180910, but now fails on linux-next
-20180925, with the following error messages:
+====
+The reasoning behind this scheme is the observation that in the majority
+of cases, a single machine_desc can support a large number of boards
+if they all use the same SoC, or same family of SoCs.  However,
+invariably there will be some exceptions where a specific board will
+require special setup code that is not useful in the generic case.
+Special cases could be handled by explicitly checking for the
+troublesome board(s) in generic setup code, but doing so very quickly
+becomes ugly and/or unmaintainable if it is more than just a couple of
+cases.
 
-    m25p80 spi0.0: error -22 reading 9f
-    m25p80: probe of spi0.0 failed with error -2
+Instead, the compatible list allows a generic machine_desc to provide
+support for a wide common set of boards by specifying "less
+compatible" values in the dt_compat list.  In the example above,
+generic board support can claim compatibility with "ti,omap3" or
+"ti,omap3450".  If a bug was discovered on the original beagleboard
+that required special workaround code during early boot, then a new
+machine_desc could be added which implements the workarounds and only
+matches on "ti,omap3-beagleboard".
+====
 
-Reverting the spi/for-next branch makes it work again:
+I don't know would there be a problem happened only in MT7623 even
+though this hardware is identical in both MT2701 and MT7623. Maybe the
+system-wide configuration would influence this driver. So the easy way
+is to add the compatible string for MT7623. If you could prove that 
+this driver would never be influenced by system-wide configuration,
+using only MT2701 compatible string is acceptable for me.
 
-    m25p80 spi0.0: gd25q128 (16384 Kbytes)
+This is my opinion, but the most important is maintainer's opinion.
 
-Not sure what's up.
+[1]
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/plain/Documentation/devicetree/usage-model.txt?id=HEAD
 
----
- arch/arm64/boot/dts/rockchip/rk3328-rock64.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts b/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
-index 9ee4f57557f3..2170cf63845e 100644
---- a/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
-@@ -290,6 +290,18 @@
- 	};
- };
- 
-+&spi0 {
-+	status = "okay";
-+
-+	spiflash at 0 {
-+		compatible = "jedec,spi-nor";
-+		reg = <0>;
-+
-+		/* maximum speed for Rockchip SPI */
-+		spi-max-frequency = <50000000>;
-+	};
-+};
-+
- &tsadc {
- 	rockchip,hw-tshut-mode = <0>;
- 	rockchip,hw-tshut-polarity = <0>;
--- 
-2.19.0
+Regards,
+CK
