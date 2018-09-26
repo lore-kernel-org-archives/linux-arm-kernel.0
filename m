@@ -1,16 +1,22 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 26 Sep 2018 10:19:45 +0800
-Subject: [PATCH 1/6] ARM: dts: imx51: Add label for VPU node
-In-Reply-To: <1536696647-8228-1-git-send-email-festevam@gmail.com>
-References: <1536696647-8228-1-git-send-email-festevam@gmail.com>
-Message-ID: <20180926021943.GB22238@dragon>
+Date: Wed, 26 Sep 2018 10:24:42 +0800
+Subject: [PATCH v2 07/11] arm: dts: imx7: Update coresight binding for
+ hardware ports
+In-Reply-To: <20180912135352.19722-8-suzuki.poulose@arm.com>
+References: <20180912135352.19722-1-suzuki.poulose@arm.com>
+ <20180912135352.19722-8-suzuki.poulose@arm.com>
+Message-ID: <20180926022440.GC22238@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 11, 2018 at 05:10:42PM -0300, Fabio Estevam wrote:
-> Add label for VPU node so that board dts files can disable VPU
-> if needed.
+On Wed, Sep 12, 2018 at 02:53:48PM +0100, Suzuki K Poulose wrote:
+> Switch to the updated coresight bindings.
 > 
-> Signed-off-by: Fabio Estevam <festevam@gmail.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Pengutronix Kernel Team <kernel@pengutronix.de>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Applied all, thanks.
+Applied, thanks.
