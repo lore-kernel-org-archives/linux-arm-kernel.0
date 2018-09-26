@@ -1,80 +1,114 @@
-From: saiprakash.ranjan@codeaurora.org (Sai Prakash Ranjan)
-Date: Wed, 26 Sep 2018 15:22:59 +0530
-Subject: [PATCH 2/6] pstore: Add event tracing support
-In-Reply-To: <CAJWu+orL63-qfDL7B_Fs_Vx_rUr4fwn+DXK1mosmyM4jhj_BSw@mail.gmail.com>
-References: <cover.1536430404.git.saiprakash.ranjan@codeaurora.org>
- <b9b60ff2864a17fb05481aa33f90114ab051d6ce.1536430404.git.saiprakash.ranjan@codeaurora.org>
- <CAEXW_YRXQwKvnahv5X1F_Bu_98vMg=w1xpo8PZ+aNT02vBrwwg@mail.gmail.com>
- <e8fdef37-afcd-24b3-1005-e707b73f20b1@codeaurora.org>
- <eb686156-95d2-2468-21be-13bfd97d5a58@codeaurora.org>
- <CAJWu+ooTi+9Hp6xWpje-zoFOdRpZPLMvTzTDEk8Vf-y4TicvUw@mail.gmail.com>
- <CAJWu+oorTRschpgLODgVv50S57U6Su9SM57WVrVKiQBSXEVC9w@mail.gmail.com>
- <CAJWu+orL63-qfDL7B_Fs_Vx_rUr4fwn+DXK1mosmyM4jhj_BSw@mail.gmail.com>
-Message-ID: <67f42dd8-31e3-99fa-06b7-bd9f860ccef8@codeaurora.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 26 Sep 2018 13:19:34 +0300
+Subject: [PATCH v11 1/2] dt-bindings: media: Add Allwinner V3s Camera
+ Sensor Interface (CSI)
+In-Reply-To: <1537951204-24672-1-git-send-email-yong.deng@magewell.com>
+References: <1537951204-24672-1-git-send-email-yong.deng@magewell.com>
+Message-ID: <7197338.mhOH8fQaEM@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/26/2018 2:10 AM, Joel Fernandes wrote:
-> On Tue, Sep 25, 2018 at 1:39 PM, Joel Fernandes <joelaf@google.com> wrote:
->> On Tue, Sep 25, 2018 at 1:37 PM, Joel Fernandes <joelaf@google.com> wrote:
->>> On Sun, Sep 23, 2018 at 8:33 AM, Sai Prakash Ranjan
->>> <saiprakash.ranjan@codeaurora.org> wrote:
->>>> On 9/22/2018 10:07 PM, Sai Prakash Ranjan wrote:
->>>>>
->>>>> On 9/22/2018 2:35 PM, Joel Fernandes wrote:
->>>>>>
->>>>>> On Sat, Sep 8, 2018 at 4:28 PM Sai Prakash Ranjan
->>>>>> <saiprakash.ranjan@codeaurora.org> wrote:
->>>>>>>
->>>>>>>
->>>>>>> +
->>>>>>> +       trace_seq_init(&iter->seq);
->>>>>>> +       iter->ent = fbuffer->entry;
->>>>>>> +       event_call->event.funcs->trace(iter, 0, event);
->>>>>>> +       trace_seq_putc(&iter->seq, 0);
->>>>>>
->>>>>>
->>>>>> Would it be possible to store the binary trace record in the pstore
->>>>>> buffer instead of outputting text? I suspect that will both be faster
->>>>>> and less space.
->>>>>>
->>>>>
->>>>> I will try this and come back.
->>>>>
->>>>
->>>> Hi Joel,
->>>>
->>>> I removed trace_seq_putc and there is some improvement seen: 203 MB/s
->>>>
->>>> # dd if=/dev/zero of=/dev/null status=progress
->>>> 12207371264 bytes (12 GB, 11 GiB) copied, 60 s, 203 MB/s^C
->>>> 24171926+0 records in
->>>> 24171926+0 records out
->>>> 12376026112 bytes (12 GB, 12 GiB) copied, 60.8282 s, 203 MB/s
->>>>
->>>> This seems good when compared to 190 MB/s seen previously.
->>>> If this is Ok, then I will spin v2 with changes suggested.
->>>
->>> Sorry for slow reply, yes that sounds good and a worthwhile perf improvement.
->>>
->>
->> Well so I think you should still not use spinlock to synchronize and
->> split the buffer. You could expand pstore_record to have a ts field or
->> introduce a new API like ->write_percpu instead of write, or
->> something. But I strongly feel you should lock. For ftrace function
+Hi Yong,
+
+Thank you for the patch.
+
+On Wednesday, 26 September 2018 11:40:04 EEST Yong Deng wrote:
+> Add binding documentation for Allwinner V3s CSI.
 > 
-> Aargh, I meant you should *not* lock :-)
+> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Yong Deng <yong.deng@magewell.com>
+> ---
+>  .../devicetree/bindings/media/sun6i-csi.txt        | 59 +++++++++++++++++++
+>  1 file changed, 59 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
 > 
+> diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt
+> b/Documentation/devicetree/bindings/media/sun6i-csi.txt new file mode
+> 100644
+> index 000000000000..2ff47a9507a6
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+> @@ -0,0 +1,59 @@
+> +Allwinner V3s Camera Sensor Interface
+> +-------------------------------------
+> +
+> +Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
+> +interface and CSI1 is used for parallel interface.
+> +
+> +Required properties:
+> +  - compatible: value must be "allwinner,sun8i-v3s-csi"
+> +  - reg: base address and size of the memory-mapped region.
+> +  - interrupts: interrupt associated to this IP
+> +  - clocks: phandles to the clocks feeding the CSI
+> +    * bus: the CSI interface clock
+> +    * mod: the CSI module clock
+> +    * ram: the CSI DRAM clock
+> +  - clock-names: the clock names mentioned above
+> +  - resets: phandles to the reset line driving the CSI
+> +
+> +Each CSI node should contain one 'port' child node with one child
+> 'endpoint' +node, according to the bindings defined in
+> +Documentation/devicetree/bindings/media/video-interfaces.txt. As mentioned
+> +above, the endpoint's bus type should be MIPI CSI-2 for CSI0 and parallel
+> or
+> +Bt656 for CSI1.
 
-OK I can try this and will measure some perf difference.
+Nitpicking, BT.656 is parallel as well. We should use BT.601 instead of 
+parallel, to differentiate between embedded sync and external sync. This is a 
+problem in Documentation/devicetree/bindings/media/video-interfaces.txt in the 
+first place, so I won't ask you to modify these bindings. I'll try to submit a 
+patch for video-interfaces.txt.
 
-BTW I guess you missed my previous comment about not able to combine 
-logs based on timestamp? Anyways I think if I add some extra ts field, 
-then should be able to do it.
+> +Endpoint node properties for CSI1
+> +---------------------------------
 
-Thanks,
-Sai
+Should you list the CSI0 properties as well ? As the driver in patch 2/2 
+doesn't support the CSI-2 interface I assume you have left out CSI0 for now, 
+but it should still be listed in the bindings. I'm fine with fixing this as a 
+follow-up patch to avoid missing the v4.20 merge window, but if you end up 
+resubmitting the series, could you please address the problem ?
+
+With this fixed,
+
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+> +- remote-endpoint	: (required) a phandle to the bus receiver's endpoint
+> +			   node
+> +- bus-width:		: (required) must be 8, 10, 12 or 16
+> +- pclk-sample		: (optional) (default: sample on falling edge)
+> +- hsync-active		: (only required for parallel)
+> +- vsync-active		: (only required for parallel)
+>
+> +Example:
+> +
+> +csi1: csi at 1cb4000 {
+> +	compatible = "allwinner,sun8i-v3s-csi";
+> +	reg = <0x01cb4000 0x1000>;
+> +	interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
+> +	clocks = <&ccu CLK_BUS_CSI>,
+> +		 <&ccu CLK_CSI1_SCLK>,
+> +		 <&ccu CLK_DRAM_CSI>;
+> +	clock-names = "bus", "mod", "ram";
+> +	resets = <&ccu RST_BUS_CSI>;
+> +
+> +	port {
+> +		/* Parallel bus endpoint */
+> +		csi1_ep: endpoint {
+> +			remote-endpoint = <&adv7611_ep>;
+> +			bus-width = <16>;
+> +
+> +			/* If hsync-active/vsync-active are missing,
+> +			   embedded BT.656 sync is used */
+> +			hsync-active = <0>; /* Active low */
+> +			vsync-active = <0>; /* Active low */
+> +			pclk-sample = <1>;  /* Rising */
+> +		};
+> +	};
+> +};
 
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+Regards,
+
+Laurent Pinchart
