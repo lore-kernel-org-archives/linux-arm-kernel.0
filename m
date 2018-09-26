@@ -1,45 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 26 Sep 2018 21:38:09 +0200
-Subject: [PATCH] pinctrl: mediatek: mark dummy helpers as 'static inline'
-Message-ID: <20180926193818.2481220-1-arnd@arndb.de>
+From: rodrigo@tjader.xyz (=?UTF-8?q?Rodrigo=20Exterck=C3=B6tter=20Tj=C3=A4der?=)
+Date: Wed, 26 Sep 2018 19:48:24 +0000
+Subject: [PATCH v2] arm64: dts: allwinner: a64-olinuxino: set the PHY TX delay
+In-Reply-To: <20180926170545.ogcmt36ff7jmqxkl@flea>
+References: <20180926170545.ogcmt36ff7jmqxkl@flea>
+Message-ID: <20180926194824.8832-1-rodrigo@tjader.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mtk_eint_set_debounce and mtk_eint_find_irq are defined as stub functions
-in a header file, but without marking them as 'static inline', we get
-a copy for each file that includes the header:
+The PHY found on the A64-OLinuXino requires a TX delay in order to
+operate properly. Olimex uses a 600ps second delay in their BSP, and
+that has been found to work, so let's use that value in the current
+DT.
 
-drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.o: In function `mtk_eint_set_debounce':
-pinctrl-mtk-common-v2.c:(.text+0x134): multiple definition of `mtk_eint_set_debounce'
-drivers/pinctrl/mediatek/pinctrl-moore.o:pinctrl-moore.c:(.text+0x7d0): first defined here
-drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.o: In function `mtk_eint_find_irq':
-pinctrl-mtk-common-v2.c:(.text+0x13c): multiple definition of `mtk_eint_find_irq'
-
-Fixes: e46df235b4e6 ("pinctrl: mediatek: refactor EINT related code for all MediaTek pinctrl can fit")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Rodrigo Exterck?tter Tj?der <rodrigo@tjader.xyz>
 ---
- drivers/pinctrl/mediatek/mtk-eint.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/pinctrl/mediatek/mtk-eint.h b/drivers/pinctrl/mediatek/mtk-eint.h
-index c286a9b940f2..48468d0fae68 100644
---- a/drivers/pinctrl/mediatek/mtk-eint.h
-+++ b/drivers/pinctrl/mediatek/mtk-eint.h
-@@ -92,13 +92,13 @@ static inline int mtk_eint_do_resume(struct mtk_eint *eint)
- 	return -EOPNOTSUPP;
- }
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
+index 6ef3dd4c2389..f7a4bccaa5d4 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
+@@ -105,6 +105,7 @@
+ 	phy-mode = "rgmii";
+ 	phy-handle = <&ext_rgmii_phy>;
+ 	phy-supply = <&reg_dcdc1>;
++	allwinner,tx-delay-ps = <600>;
+ 	status = "okay";
+ };
  
--int mtk_eint_set_debounce(struct mtk_eint *eint, unsigned long eint_n,
-+static inline int mtk_eint_set_debounce(struct mtk_eint *eint, unsigned long eint_n,
- 			  unsigned int debounce)
- {
- 	return -EOPNOTSUPP;
- }
- 
--int mtk_eint_find_irq(struct mtk_eint *eint, unsigned long eint_n)
-+static inline int mtk_eint_find_irq(struct mtk_eint *eint, unsigned long eint_n)
- {
- 	return -EOPNOTSUPP;
- }
 -- 
-2.18.0
+2.11.0
