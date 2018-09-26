@@ -1,114 +1,47 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 26 Sep 2018 13:19:34 +0300
-Subject: [PATCH v11 1/2] dt-bindings: media: Add Allwinner V3s Camera
- Sensor Interface (CSI)
-In-Reply-To: <1537951204-24672-1-git-send-email-yong.deng@magewell.com>
-References: <1537951204-24672-1-git-send-email-yong.deng@magewell.com>
-Message-ID: <7197338.mhOH8fQaEM@avalon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 26 Sep 2018 11:28:47 +0100
+Subject: [PATCH 02/10] irqchip/gic-v3-its: Consolidate LPI_PENDBASE_SZ
+ usage
+In-Reply-To: <e267123d-af92-0871-455c-cb74a2bc4103@arm.com>
+References: <20180921195954.21574-1-marc.zyngier@arm.com>
+ <20180921195954.21574-3-marc.zyngier@arm.com>
+ <e267123d-af92-0871-455c-cb74a2bc4103@arm.com>
+Message-ID: <1fe9460d-c90a-a6ce-b0ce-754e22d834e1@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yong,
-
-Thank you for the patch.
-
-On Wednesday, 26 September 2018 11:40:04 EEST Yong Deng wrote:
-> Add binding documentation for Allwinner V3s CSI.
+On 24/09/18 11:33, Suzuki K Poulose wrote:
+> Hi Marc,
 > 
-> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Yong Deng <yong.deng@magewell.com>
-> ---
->  .../devicetree/bindings/media/sun6i-csi.txt        | 59 +++++++++++++++++++
->  1 file changed, 59 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
+> On 21/09/18 20:59, Marc Zyngier wrote:
+>> LPI_PENDING_SZ is always used in conjunction with a max(). Let's
+>> factor this in the definition of the macro, and simplify the rest
+>> of the code.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>    drivers/irqchip/irq-gic-v3-its.c | 12 ++++--------
+>>    1 file changed, 4 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>> index c2df341ff6fa..ed6aab11e019 100644
+>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>> @@ -62,7 +62,7 @@ static u32 lpi_id_bits;
+>>     */
+>>    #define LPI_NRBITS		lpi_id_bits
+>>    #define LPI_PROPBASE_SZ		ALIGN(BIT(LPI_NRBITS), SZ_64K)
+>> -#define LPI_PENDBASE_SZ		ALIGN(BIT(LPI_NRBITS) / 8, SZ_64K)
+>> +#define LPI_PENDBASE_SZ		max_t(u32, SZ_64K, ALIGN(BIT(LPI_NRBITS) / 8, SZ_64K))
 > 
-> diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt
-> b/Documentation/devicetree/bindings/media/sun6i-csi.txt new file mode
-> 100644
-> index 000000000000..2ff47a9507a6
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-> @@ -0,0 +1,59 @@
-> +Allwinner V3s Camera Sensor Interface
-> +-------------------------------------
-> +
-> +Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
-> +interface and CSI1 is used for parallel interface.
-> +
-> +Required properties:
-> +  - compatible: value must be "allwinner,sun8i-v3s-csi"
-> +  - reg: base address and size of the memory-mapped region.
-> +  - interrupts: interrupt associated to this IP
-> +  - clocks: phandles to the clocks feeding the CSI
-> +    * bus: the CSI interface clock
-> +    * mod: the CSI module clock
-> +    * ram: the CSI DRAM clock
-> +  - clock-names: the clock names mentioned above
-> +  - resets: phandles to the reset line driving the CSI
-> +
-> +Each CSI node should contain one 'port' child node with one child
-> 'endpoint' +node, according to the bindings defined in
-> +Documentation/devicetree/bindings/media/video-interfaces.txt. As mentioned
-> +above, the endpoint's bus type should be MIPI CSI-2 for CSI0 and parallel
-> or
-> +Bt656 for CSI1.
+> minor nit: The ALIGN() already aligns the given value up to the required
+> alignment. So, if the LPI_NRBITS is guaranteed to be non-zero,
+> we could simply drop the max_t().
 
-Nitpicking, BT.656 is parallel as well. We should use BT.601 instead of 
-parallel, to differentiate between embedded sync and external sync. This is a 
-problem in Documentation/devicetree/bindings/media/video-interfaces.txt in the 
-first place, so I won't ask you to modify these bindings. I'll try to submit a 
-patch for video-interfaces.txt.
+Yeah, that's a brain fart on my part. I've fixed up.
 
-> +Endpoint node properties for CSI1
-> +---------------------------------
+Thanks,
 
-Should you list the CSI0 properties as well ? As the driver in patch 2/2 
-doesn't support the CSI-2 interface I assume you have left out CSI0 for now, 
-but it should still be listed in the bindings. I'm fine with fixing this as a 
-follow-up patch to avoid missing the v4.20 merge window, but if you end up 
-resubmitting the series, could you please address the problem ?
-
-With this fixed,
-
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-> +- remote-endpoint	: (required) a phandle to the bus receiver's endpoint
-> +			   node
-> +- bus-width:		: (required) must be 8, 10, 12 or 16
-> +- pclk-sample		: (optional) (default: sample on falling edge)
-> +- hsync-active		: (only required for parallel)
-> +- vsync-active		: (only required for parallel)
->
-> +Example:
-> +
-> +csi1: csi at 1cb4000 {
-> +	compatible = "allwinner,sun8i-v3s-csi";
-> +	reg = <0x01cb4000 0x1000>;
-> +	interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-> +	clocks = <&ccu CLK_BUS_CSI>,
-> +		 <&ccu CLK_CSI1_SCLK>,
-> +		 <&ccu CLK_DRAM_CSI>;
-> +	clock-names = "bus", "mod", "ram";
-> +	resets = <&ccu RST_BUS_CSI>;
-> +
-> +	port {
-> +		/* Parallel bus endpoint */
-> +		csi1_ep: endpoint {
-> +			remote-endpoint = <&adv7611_ep>;
-> +			bus-width = <16>;
-> +
-> +			/* If hsync-active/vsync-active are missing,
-> +			   embedded BT.656 sync is used */
-> +			hsync-active = <0>; /* Active low */
-> +			vsync-active = <0>; /* Active low */
-> +			pclk-sample = <1>;  /* Rising */
-> +		};
-> +	};
-> +};
-
+	M.
 -- 
-Regards,
-
-Laurent Pinchart
+Jazz is not dead. It just smells funny...
