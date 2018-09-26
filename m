@@ -1,82 +1,29 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 26 Sep 2018 21:06:39 +0200
-Subject: [PATCHv4 4/6] ARM: dts: exynos: Add CD and WP pins to Odroid
- XU3/XU4 SD card
-In-Reply-To: <20180922075238.884-6-linux.amoon@gmail.com>
-References: <20180922075238.884-1-linux.amoon@gmail.com>
- <20180922075238.884-6-linux.amoon@gmail.com>
-Message-ID: <20180926190639.GA6461@kozik-lap>
+From: ezequiel@collabora.com (Ezequiel Garcia)
+Date: Wed, 26 Sep 2018 19:31:22 +0200
+Subject: [PATCH] iommu: rockchip: Drop verbose prints in the interrupt
+ handler
+In-Reply-To: <20180925112930.u5kftmo3vhmdxji4@8bytes.org>
+References: <20180830222832.16766-1-ezequiel@collabora.com>
+ <20180925112930.u5kftmo3vhmdxji4@8bytes.org>
+Message-ID: <ea4d539ecbaf229bef8c0810c6a11cf824339b4b.camel@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 22, 2018 at 07:52:36AM +0000, Anand Moon wrote:
-> Add the card-detect and write-protect GPIO pins for OdroidXU3/XU4
-> SD card by adding pinctrl setting for wp-gpio pin and set it to
-> active low.
+On Tue, 2018-09-25 at 13:29 +0200, Joerg Roedel wrote:
+> On Thu, Aug 30, 2018 at 07:28:32PM -0300, Ezequiel Garcia wrote:
+> > Printing verbosely via WARN macros and friends in interrupt handlers
+> > is strongly discouraged. Drop them and use proper ratelimited
+> > prints.
+> > 
+> > Signed-off-by: Ezequiel Garcia <ezequiel@collabora.com>
+> > ---
+> >  drivers/iommu/rockchip-iommu.c | 10 ++++++----
+> >  1 file changed, 6 insertions(+), 4 deletions(-)
 > 
-> This also removes debug messages:
->     dwmmc_exynos 12220000.mmc: No GPIO consumer cd found
->     dwmmc_exynos 12220000.mmc: No GPIO consumer wp found
+> This doesn't apply cleanly to v4.19-rc5, can you please base the patch
+> on that tag, add the Reviewed-by and re-send?
 > 
-> Suggested-by: Krzysztof Kozlowski <krzk@kernel.org>
-> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
-> ---
-> Fix the commit message and squash it with cd-gpios and wp-gpio
-> patches into single patch as suggested by Krzysztof.
 
-As Marek pointed to my Odroid XU patch, there is no point of adding
-cd-gpios and wp-gpios properties.
-
-Adding pin configuration for wp pin is also not needed. Reset values are
-working properly. However there might be meaning of adding it just in
-case - if bootloader decided to touch it...
-
-Best regards,
-Krzysztof
-
-
-> ---
->  arch/arm/boot/dts/exynos5420-pinctrl.dtsi     | 8 ++++++++
->  arch/arm/boot/dts/exynos5422-odroid-core.dtsi | 4 +++-
->  2 files changed, 11 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-> index dda8ca2d2324..9a39a0d8ec86 100644
-> --- a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-> +++ b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-> @@ -289,6 +289,14 @@
->  		samsung,pin-pud = <EXYNOS_PIN_PULL_UP>;
->  		samsung,pin-drv = <EXYNOS5420_PIN_DRV_LV4>;
->  	};
-> +
-> +	sd2_wp: sd2-wp {
-> +		samsung,pins = "gpc4-0";
-> +		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
-> +		/* Pin is floating so pull it up to disable write-protect */
-> +		samsung,pin-pud = <EXYNOS_PIN_PULL_UP>;
-> +		samsung,pin-drv = <EXYNOS5420_PIN_DRV_LV4>;
-> +	};
->  };
->  
->  &pinctrl_2 {
-> diff --git a/arch/arm/boot/dts/exynos5422-odroid-core.dtsi b/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
-> index a80b6c045154..2aacfb669140 100644
-> --- a/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
-> +++ b/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
-> @@ -498,10 +498,12 @@
->  	samsung,dw-mshc-sdr-timing = <0 4>;
->  	samsung,dw-mshc-ddr-timing = <0 2>;
->  	pinctrl-names = "default";
-> -	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4>;
-> +	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_wp &sd2_bus1 &sd2_bus4>;
->  	bus-width = <4>;
->  	cap-sd-highspeed;
->  	max-frequency = <200000000>;
-> +	cd-gpios = <&gpc2 2 GPIO_ACTIVE_LOW>;
-> +	wp-gpios = <&gpc4 0 GPIO_ACTIVE_LOW>;
->  	vmmc-supply = <&ldo19_reg>;
->  	vqmmc-supply = <&ldo13_reg>;
->  	sd-uhs-sdr50;
-> -- 
-> 2.17.1
-> 
+Well, after looking at the latest code, now I'm wondering why Marc
+changed the WARN_ON with a WARN_ON_ONCE, instead of a less verbose
+ratelimited print.
