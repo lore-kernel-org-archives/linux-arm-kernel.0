@@ -1,55 +1,22 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Thu, 27 Sep 2018 06:33:53 +0800
-Subject: [PATCH] pinctrl: mediatek: mark dummy helpers as 'static inline'
-In-Reply-To: <20180926193818.2481220-1-arnd@arndb.de>
-References: <20180926193818.2481220-1-arnd@arndb.de>
-Message-ID: <1538001233.30348.20.camel@mtkswgap22>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 26 Sep 2018 17:36:16 -0500
+Subject: [PATCH v2 2/3] dt-bindings: arm: syna: add support for the AS370
+ SoC
+In-Reply-To: <20180917160211.7b1cd37d@xhacker.debian>
+References: <20180917160015.05a1fc5b@xhacker.debian>
+ <20180917160211.7b1cd37d@xhacker.debian>
+Message-ID: <20180926223616.GA26157@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, 2018-09-26 at 21:38 +0200, Arnd Bergmann wrote:
-> mtk_eint_set_debounce and mtk_eint_find_irq are defined as stub functions
-> in a header file, but without marking them as 'static inline', we get
-> a copy for each file that includes the header:
+On Mon, 17 Sep 2018 16:02:11 +0800, Jisheng Zhang wrote:
+> The AS370 SoC is a new derivative of the berlin family. However, the
+> SoC isn't named as berlin*.
 > 
-> drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.o: In function `mtk_eint_set_debounce':
-> pinctrl-mtk-common-v2.c:(.text+0x134): multiple definition of `mtk_eint_set_debounce'
-> drivers/pinctrl/mediatek/pinctrl-moore.o:pinctrl-moore.c:(.text+0x7d0): first defined here
-> drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.o: In function `mtk_eint_find_irq':
-> pinctrl-mtk-common-v2.c:(.text+0x13c): multiple definition of `mtk_eint_find_irq'
-> 
-> Fixes: e46df235b4e6 ("pinctrl: mediatek: refactor EINT related code for all MediaTek pinctrl can fit")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-
-Thank for the fixes for that I miss to mark the two functions as 'static
-inline'. The other functions in the same header file seem fine.
-
-Acked-by: Sean Wang <sean.wang@mediatek.com>
-
+> Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
 > ---
->  drivers/pinctrl/mediatek/mtk-eint.h | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  Documentation/devicetree/bindings/arm/syna.txt | 11 ++++++++++-
+>  1 file changed, 10 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/pinctrl/mediatek/mtk-eint.h b/drivers/pinctrl/mediatek/mtk-eint.h
-> index c286a9b940f2..48468d0fae68 100644
-> --- a/drivers/pinctrl/mediatek/mtk-eint.h
-> +++ b/drivers/pinctrl/mediatek/mtk-eint.h
-> @@ -92,13 +92,13 @@ static inline int mtk_eint_do_resume(struct mtk_eint *eint)
->  	return -EOPNOTSUPP;
->  }
->  
-> -int mtk_eint_set_debounce(struct mtk_eint *eint, unsigned long eint_n,
-> +static inline int mtk_eint_set_debounce(struct mtk_eint *eint, unsigned long eint_n,
->  			  unsigned int debounce)
->  {
->  	return -EOPNOTSUPP;
->  }
->  
-> -int mtk_eint_find_irq(struct mtk_eint *eint, unsigned long eint_n)
-> +static inline int mtk_eint_find_irq(struct mtk_eint *eint, unsigned long eint_n)
->  {
->  	return -EOPNOTSUPP;
->  }
+
+Reviewed-by: Rob Herring <robh@kernel.org>
