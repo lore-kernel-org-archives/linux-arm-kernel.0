@@ -1,152 +1,274 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 26 Sep 2018 09:59:45 +0200
-Subject: [PATCH v5 04/12] PCI: brcmstb: add dma-range mapping for inbound
- traffic
-In-Reply-To: <7accc1a7-647b-1f92-13f8-2fab315ddc45@gmail.com>
-References: <1537367527-20773-1-git-send-email-jim2101024@gmail.com>
- <1537367527-20773-5-git-send-email-jim2101024@gmail.com>
- <CAKv+Gu_d-r0ubyqZcDzERYd5FVTSpjBk++iACHqVgtHrOK0F7A@mail.gmail.com>
- <7fa897cf-4d58-c63f-afdd-a3ec5a6a56bf@gmail.com>
- <CAKv+Gu8aJRV4nqq1e-5HRLvbrANQsYuMf-pwWB53BhxLgX7iWg@mail.gmail.com>
- <b74d3c16-a512-73dc-c94a-ef6adde5f757@gmail.com>
- <CAKv+Gu8ZbN3BDRyuFzt4o--SSUmhuOh+jnpq8ZR-Ay13DJrAqg@mail.gmail.com>
- <fa285694-c3e1-adf8-032a-202e7598de41@gmail.com>
- <CANCKTBsypcVS_iC1+sbW5fMKfj+tTsxbQv9CvDwcO8GV3a8_Yg@mail.gmail.com>
- <CAKv+Gu-+OjJi8zGLqvnsOJQ9ygMot-O0EbyMKO-yyG-+k-274A@mail.gmail.com>
- <CANCKTBtbwSqfSU0b_d6Yi7TV3R_ijEpPE8a4bpgpkcOxJOa_zQ@mail.gmail.com>
- <7accc1a7-647b-1f92-13f8-2fab315ddc45@gmail.com>
-Message-ID: <CAKv+Gu-h4kjxE-ErthJqWQRh7r1EJhC5Na4n2Ma=foJEtDLdcg@mail.gmail.com>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Wed, 26 Sep 2018 01:10:32 -0700
+Subject: [PATCH v14 06/16] of/fdt: add helper functions for handling
+ properties
+In-Reply-To: <20180926055704.GC27322@linaro.org>
+References: <20180907080040.4967-1-takahiro.akashi@linaro.org>
+ <a535515a-92f1-fc33-bdb9-6f5e0392cb11@gmail.com>
+ <8403dfd5-3188-219b-966c-72b009f94e0f@gmail.com>
+ <16a39f7f-a8cc-72a1-89a7-e9b49a4d6547@gmail.com>
+ <20180926055704.GC27322@linaro.org>
+Message-ID: <8394773d-e614-3868-c725-f6825690a57e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Sep 2018 at 04:59, Florian Fainelli <f.fainelli@gmail.com> wrote:
->
->
->
-> On 9/24/2018 8:01 AM, Jim Quinlan wrote:
-> > On Mon, Sep 24, 2018 at 4:25 AM Ard Biesheuvel
-> > <ard.biesheuvel@linaro.org> wrote:
-> >>
-> >> On Fri, 21 Sep 2018 at 19:41, Jim Quinlan <jim2101024@gmail.com> wrote:
-> >>>
-> >>> On Thu, Sep 20, 2018 at 5:39 PM Florian Fainelli <f.fainelli@gmail.com> wrote:
-> >>>>
-> >>>> On 09/20/2018 02:33 PM, Ard Biesheuvel wrote:
-> >>>>> On 20 September 2018 at 14:31, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> >>>>>> On 09/20/2018 02:04 PM, Ard Biesheuvel wrote:
-> >>>>>>> On 20 September 2018 at 13:55, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> >>>>>>>> On 09/19/2018 07:19 PM, Ard Biesheuvel wrote:
-> >>>>>>>>> On 19 September 2018 at 07:31, Jim Quinlan <jim2101024@gmail.com> wrote:
-> >>>>>>>>>> The Broadcom STB PCIe host controller is intimately related to the
-> >>>>>>>>>> memory subsystem.  This close relationship adds complexity to how cpu
-> >>>>>>>>>> system memory is mapped to PCIe memory.  Ideally, this mapping is an
-> >>>>>>>>>> identity mapping, or an identity mapping off by a constant.  Not so in
-> >>>>>>>>>> this case.
-> >>>>>>>>>>
-> >>>>>>>>>> Consider the Broadcom reference board BCM97445LCC_4X8 which has 6 GB
-> >>>>>>>>>> of system memory.  Here is how the PCIe controller maps the
-> >>>>>>>>>> system memory to PCIe memory:
-> >>>>>>>>>>
-> >>>>>>>>>>    memc0-a@[        0....3fffffff] <=> pci@[        0....3fffffff]
-> >>>>>>>>>>    memc0-b@[100000000...13fffffff] <=> pci@[ 40000000....7fffffff]
-> >>>>>>>>>>    memc1-a@[ 40000000....7fffffff] <=> pci@[ 80000000....bfffffff]
-> >>>>>>>>>>    memc1-b@[300000000...33fffffff] <=> pci@[ c0000000....ffffffff]
-> >>>>>>>>>>    memc2-a@[ 80000000....bfffffff] <=> pci@[100000000...13fffffff]
-> >>>>>>>>>>    memc2-b@[c00000000...c3fffffff] <=> pci@[140000000...17fffffff]
-> >>>>>>>>>>
-> >>>>>>>>>
-> >>>>>>>>> So is describing this as
-> >>>>>>>>>
-> >>>>>>>>> dma-ranges = <0x0 0x0 0x0 0x0 0x0 0x40000000>,
-> >>>>>>>>>               <0x0 0x40000000 0x1 0x0 0x0 0x40000000>,
-> >>>>>>>>>               <0x0 0x80000000 0x0 0x40000000 0x0 0x40000000>,
-> >>>>>>>>>               <0x0 0xc0000000 0x3 0x0 0x0 0x40000000>,
-> >>>>>>>>>               <0x1 0x0 0x0 0x80000000 0x0 0x40000000>,
-> >>>>>>>>>               <0x1 0x40000000 0x0 0xc0000000 0x0 0x40000000>;
-> >>>>>>>>>
-> >>>>>>>>> not working for you? I haven't tried this myself, but since DT permits
-> >>>>>>>>> describing the inbound mappings this way, we should fix the code if it
-> >>>>>>>>> doesn't work at the moment.
-> >>>>>>>>
-> >>>>>>>> You mean encoding the memory controller index in the first cell? If that
-> >>>>>>>> works, that's indeed a much cleaner solution, though is it standard
-> >>>>>>>> compliant in any form?
-> >>>>>>>
-> >>>>>>> No those are just memory addresses (although I may have screwed up the
-> >>>>>>> order). From Documentation/devicetree/booting-without-of.txt:
-> >>>>>>>
-> >>>>>>> """
-> >>>>>>> Optional property:
-> >>>>>>> - dma-ranges: <prop-encoded-array> encoded as arbitrary number of triplets of
-> >>>>>>>          (child-bus-address, parent-bus-address, length). Each triplet specified
-> >>>>>>>          describes a contiguous DMA address range.
-> >>>>>>> """
-> >>>>>>>
-> >>>>>>
-> >>>>>> Then I am confused by your comment, that's what this patch does, it adds
-> >>>>>> support for reading "dma-ranges" from Device Tree and setting up inbound
-> >>>>>> windows using that. The only caveat is that because the PCIe root
-> >>>>>> complex has some ties with the memory bus architecture it is connected
-> >>>>>> to (SCB in our case) there is still a requirement to know the
-> >>>>>> translation between a given physical address and its backing memory
-> >>>>>> controller/aperture.
-> >>>>>>
-> >>>>>
-> >>>>> Ah ok, apologies for the noise then.
-> >>>>>
-> >>>>> I was hoping that having working support for dma-ranges would remove
-> >>>>> the need for the special phys<->dma conversion routines.
-> >>>>
-> >>>> What you describe definitively works with platform devices, but I am not
-> >>>> sure this is working for PCIe devices, although, conceptually it should,
-> >>>> yes.
-> >>> Sorry for my delay in responding.  One problem is that
-> >>> of_dma_configure() only looks at the first dma-range given and then
-> >>> converts it to dev->dma_pfn_offset which is respected by the DMA API.
-> >>> However, we often have multiple dma-ranges, not just one.  This is the
-> >>> big issue.
-> >>>
-> >>
-> >> Given the recent attention to getting these APIs in shape, this may be
-> >> something Robin or Christoph may care to look into?
-> >
-> > It looks like this has been brought up before in the "[RFC PATCH] of:
-> > Fix DMA configuration for non-DT masters" thread aka
-> >
-> > https://lists.linuxfoundation.org/pipermail/iommu/2017-April/021325.html
-> >
-> > In the thread "Oza Oza", a Broadcom coworker probably dealing with the
-> > same exact problem as I,  enumerates three problems.   #1 and #2 are
-> > the exact same ones I've just given: the "dma-ranges" prop of the RC
-> > DT node is "skipped", and of_dma_get_range() only considers the first
-> > entry in any "dma-ranges".
->
-> Robin, is that something that is expected or should the "dma-ranges"
-> somehow propagate from host bridge down the PCIe end-point drivers?
->
-> >
-> > Thanks, Jim
-> >
-> >>
-> >> In any case, the description of dma-ranges should be in sync with the
-> >> way Linux interprets it, so this is either a documentation bug or a
-> >> DMA layer bug.
-> >>
-> >>> There is another issue with of_dma_configure() being invoked by the EP
-> >>> driver on "bridge->parent->of_node", which is our RC device,
-> >>> Of_dma_configure() calls of_dma_range() on the of_get_next_parent() of
-> >>> our RC's device node and this misses the dma-ranges property which is
-> >>> contained within the RC.  I think I could workaround this but there is
-> >>> no getting around the first problem.
-> >>>
-> >>
-> >> IIUC dma-ranges should be added to the parent bus of a device, which I
-> >> guess is slightly ambiguous for a root complex that incorporates a
-> >> host bridge.
->
-> Humm, why is that ambiguous for a host bridge/root complex?
+Hi Rob,
 
-Well, perhaps I am the only one who is slightly confused by this, but
-the fact that the device node describes both the host bridge and the
-root port/bridge (which is arguably a device behind the bus) makes it
-somewhat non-intuitive to me.
+On 09/25/18 22:57, AKASHI Takahiro wrote:
+> Frank,
+> 
+> On Fri, Sep 14, 2018 at 10:19:38AM -0700, Frank Rowand wrote:
+>> On 09/13/18 18:26, Frank Rowand wrote:
+>>> I was re-reading this while answering a later email in the thread.  After reading
+>>> other patches in the series that were not sent to me, I have a better understanding
+>>> of the intent behind this patch, and some changes to my previous reply.
+>>>
+>>> The intent of the helper functions is related to properties whose values are
+>>> tuples of the same format as the "reg" property of the "/memory" nodes.  For
+>>> example, the "linux,usable-memory-range" and "linux,elfcoredhr" properties of
+>>> the "/chosen" node.
+>>>
+>>> The patch header and the function names should be updated to reflect this intent.
+>>> This means most or all of my previous suggested function name changes are no longer
+>>> useful.
+>>>
+>>> Please add devicetree at vger.kernel.org to the next version of this patch and to
+>>> the patches that use the functions in this patch.
+>>>
+>>>
+>>> On 09/07/18 12:53, Frank Rowand wrote:
+>>>> On 09/07/18 01:00, AKASHI Takahiro wrote:
+>>>>> These functions will be used later to handle kexec-specific properties
+>>>>> in arm64's kexec_file implementation.
+>>>>>
+>>>>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>>>>> Cc: Rob Herring <robh+dt@kernel.org>
+>>>>> Cc: Frank Rowand <frowand.list@gmail.com>
+>>>>> ---
+>>>>>  drivers/of/fdt.c       | 62 ++++++++++++++++++++++++++++++++++++++++--
+>>>>>  include/linux/of_fdt.h | 10 +++++--
+>>>>>  2 files changed, 68 insertions(+), 4 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+>>>>> index 800ad252cf9c..dc960cea1355 100644
+>>>>> --- a/drivers/of/fdt.c
+>>>>> +++ b/drivers/of/fdt.c
+>>>>> @@ -25,6 +25,7 @@
+>>>>>  #include <linux/debugfs.h>
+>>>>>  #include <linux/serial_core.h>
+>>>>>  #include <linux/sysfs.h>
+>>>>> +#include <linux/types.h>
+>>>>>  
+>>>>>  #include <asm/setup.h>  /* for COMMAND_LINE_SIZE */
+>>>>>  #include <asm/page.h>
+>>>>> @@ -537,8 +538,8 @@ void *of_fdt_unflatten_tree(const unsigned long *blob,
+>>>>>  EXPORT_SYMBOL_GPL(of_fdt_unflatten_tree);
+>>>>>  
+>>>>>  /* Everything below here references initial_boot_params directly. */
+>>>>> -int __initdata dt_root_addr_cells;
+>>>>> -int __initdata dt_root_size_cells;
+>>>>> +int dt_root_addr_cells;
+>>>>> +int dt_root_size_cells;
+>>>>>  
+>>>>>  void *initial_boot_params;
+>>>>>  
+>>>>> @@ -1323,3 +1324,60 @@ late_initcall(of_fdt_raw_init);
+>>>>>  #endif
+>>>>>  
+>>>>>  #endif /* CONFIG_OF_EARLY_FLATTREE */
+>>>>> +
+>>>
+>>> Global comment: this code should not be using the variables
+>>> dt_root_addr_cells and dt_root_size_cells.  These variables are
+>>> __initdata.
+>>>
+>>> The code that is using these helpers is acting upon a specific FDT
+>>> (copied from initial_boot_params).  This code should be getting the
+>>> values of the root node's "#address-cells" and "#size-cells" from
+>>> the FDT.
+>>
+
+
+Can you confirm whether "[PATCH 3/3] scripts/dtc: ..." (see below) will
+be in the v4.20 pull request?
+
+
+>> There will be new functions available soon to return the values of
+>> a node's "#address-cells" and "#size-cells" from an fdt.  They are
+>> fdt_address_cells() and fdt_size_cells().
+>>
+>> Rob submitted the patch to add them yesterday in "[PATCH 3/3] scripts/dtc:
+>> Update to upstream version v1.4.7-14-gc86da84d30e4" [1]
+> 
+> Will this patch go into mainline in v4.20 merge window?
+> 
+>>   [1] https://lkml.kernel.org/r/<20180913202828.15372-3-robh@kernel.org>
+> 
+> Unfortunately, fdt_addresses.c where fdt_address_cells() and
+> fdt_size_cells() are defined is NOT compiled in the kernel.
+> I will submit a patch.
+> 
+> -Takahiro Akashi
+> 
+> 
+>> -Frank
+
+Thanks,
+
+Frank
+
+
+>>
+>>
+>>>
+>>>
+>>>> Please add comment:
+>>>>
+>>>> /* helper functions for arm64 kexec */
+>>>>
+>>>>
+>>>>> +bool of_fdt_cells_size_fitted(u64 base, u64 size)
+>>>>
+>>>> Please rename as of_fdt_range_valid()
+>>>
+>>> I'm not entirely sure of what the caller in 12/16 is trying to ensure
+>>> with this function.
+>>>
+>>> (1) At the minimum (and what the implementation in of_fdt_cells_size_fitted()
+>>> does) is make sure that an address and size tuple are consistent with
+>>> the root properties "#address-cells" and "#size-cells".
+>>>
+>>> The caller in 12/16 is using this check to validate values for the
+>>> properties  "linux,elfcorehdr" and "linux,usable-memory-range".
+>>>
+>>> (2) A more complete check _might_ be to ensure that the values also
+>>> specify memory that is available to the kernel.  This memory is described
+>>> by the "reg" property of one or more "/memory" nodes.
+>>>
+>>> This second check is probably what is actually desired.
+>>>
+>>> One possible issue to note is that the binding for "linux,usable-memory-range"
+>>> suggests that available memory could be described by an EFI memory map.
+>>> I am not familiar with how or when an EFI memory map might exist instead
+>>> of the "/memory" nodes.
+>>>
+>>>
+>>>>> +{
+>>>>> +	/* if *_cells >= 2, cells can hold 64-bit values anyway */
+>>>>> +	if ((dt_root_addr_cells == 1) && (base > U32_MAX))
+>>>>> +		return false;
+>>>>> +
+>>>>> +	if ((dt_root_size_cells == 1) && (size > U32_MAX))
+>>>>> +		return false;
+>>>>
+>>>> Should also check that base + size does not wrap around.
+>>>>
+>>>>
+>>>>> +
+>>>>> +	return true;
+>>>>> +}
+>>>>> +
+>>>>> +size_t of_fdt_reg_cells_size(void)
+>>>>
+>>>> Please rename as of_fdt_root_range_size()
+>>>
+>>> Even better would be to remove this function and replace the one place
+>>> that it is called from with the one line of code in this function.
+>>>
+>>> -Frank
+>>>
+>>>
+>>>>> +{
+>>>>> +	return (dt_root_addr_cells + dt_root_size_cells) * sizeof(u32);
+>>>>> +}
+>>>>> +
+>>>>> +#define FDT_ALIGN(x, a)	(((x) + (a) - 1) & ~((a) - 1))
+>>>>> +#define FDT_TAGALIGN(x)	(FDT_ALIGN((x), FDT_TAGSIZE))
+>>>>> +
+>>>>> +int fdt_prop_len(const char *prop_name, int len)
+>>>>
+>>>> Please rename as fdt_len_added_prop()
+>>>>
+>>>>
+>>>>> +{
+>>>>> +	return (strlen(prop_name) + 1) +
+>>>>> +		sizeof(struct fdt_property) +
+>>>>> +		FDT_TAGALIGN(len);
+>>>>> +}
+>>>>> +
+>>>>
+>>>> Please add comment, something like:
+>>>>
+>>>> /* cells must be 1 or 2 */
+>>>>
+>>>>
+>>>>> +static void fill_property(void *buf, u64 val64, int cells)
+>>>>
+>>>> Please rename as cpu64_to_fdt_cells()
+>>>>
+>>>> Thanks,
+>>>>
+>>>> Frank
+>>>>
+>>>>> +{
+>>>>> +	__be32 val32;
+>>>>> +
+>>>>> +	while (cells) {
+>>>>> +		val32 = cpu_to_fdt32((val64 >> (32 * (--cells))) & U32_MAX);
+>>>>> +		memcpy(buf, &val32, sizeof(val32));
+>>>>> +		buf += sizeof(val32);
+>>>>> +	}
+>>>>> +}
+>>>>> +
+>>>>> +int fdt_setprop_reg(void *fdt, int nodeoffset, const char *name,
+>>>>> +						u64 addr, u64 size)
+>>>>> +{
+>>>>> +	char buf[sizeof(__be32) * 2 * 2];
+>>>>> +		/* assume dt_root_[addr|size]_cells <= 2 */
+>>>>> +	void *prop;
+>>>>> +	size_t buf_size;
+>>>>> +
+>>>>> +	buf_size = of_fdt_reg_cells_size();
+>>>>> +	prop = buf;
+>>>>> +
+>>>>> +	fill_property(prop, addr, dt_root_addr_cells);
+>>>>> +	prop += dt_root_addr_cells * sizeof(u32);
+>>>>> +
+>>>>> +	fill_property(prop, size, dt_root_size_cells);
+>>>>> +
+>>>>> +	return fdt_setprop(fdt, nodeoffset, name, buf, buf_size);
+>>>>> +}
+>>>>> diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
+>>>>> index b9cd9ebdf9b9..9615d6142578 100644
+>>>>> --- a/include/linux/of_fdt.h
+>>>>> +++ b/include/linux/of_fdt.h
+>>>>> @@ -37,8 +37,8 @@ extern void *of_fdt_unflatten_tree(const unsigned long *blob,
+>>>>>  				   struct device_node **mynodes);
+>>>>>  
+>>>>>  /* TBD: Temporary export of fdt globals - remove when code fully merged */
+>>>>> -extern int __initdata dt_root_addr_cells;
+>>>>> -extern int __initdata dt_root_size_cells;
+>>>>> +extern int dt_root_addr_cells;
+>>>>> +extern int dt_root_size_cells;
+>>>>>  extern void *initial_boot_params;
+>>>>>  
+>>>>>  extern char __dtb_start[];
+>>>>> @@ -108,5 +108,11 @@ static inline void unflatten_device_tree(void) {}
+>>>>>  static inline void unflatten_and_copy_device_tree(void) {}
+>>>>>  #endif /* CONFIG_OF_EARLY_FLATTREE */
+>>>>>  
+>>>>> +bool of_fdt_cells_size_fitted(u64 base, u64 size);
+>>>>> +size_t of_fdt_reg_cells_size(void);
+>>>>> +int fdt_prop_len(const char *prop_name, int len);
+>>>>> +int fdt_setprop_reg(void *fdt, int nodeoffset, const char *name,
+>>>>> +						u64 addr, u64 size);
+>>>>> +
+>>>>>  #endif /* __ASSEMBLY__ */
+>>>>>  #endif /* _LINUX_OF_FDT_H */
+>>>>>
+>>>>
+>>>>
+>>>
+>>>
+>>
+> 
