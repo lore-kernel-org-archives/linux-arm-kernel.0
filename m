@@ -1,22 +1,25 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 26 Sep 2018 17:37:14 -0500
-Subject: [PATCH v3 2/4] dt-bindings: soc: Document "brcm,bcm2836-vchiq"
-In-Reply-To: <1537172544-104852-3-git-send-email-phil@raspberrypi.org>
-References: <1537172544-104852-1-git-send-email-phil@raspberrypi.org>
- <1537172544-104852-3-git-send-email-phil@raspberrypi.org>
-Message-ID: <20180926223714.GA27452@bogus>
+Date: Wed, 26 Sep 2018 17:51:50 -0500
+Subject: [PATCH v2 1/4] dt-bindings: mrvl,mmp-timer: add clock
+In-Reply-To: <20180918205455.25464-2-lkundrak@v3.sk>
+References: <20180918205455.25464-1-lkundrak@v3.sk>
+ <20180918205455.25464-2-lkundrak@v3.sk>
+Message-ID: <20180926225150.GA15157@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 17 Sep 2018 09:22:22 +0100, Phil Elwell wrote:
-> "brcm,bcm2836-vchiq" should be used on BCM2836 and BCM2837 to ensure
-> correct operation.
+On Tue, 18 Sep 2018 22:54:52 +0200, Lubomir Rintel wrote:
+> The timer needs the timer clock to be enabled, otherwise it stops
+> ticking.
 > 
-> Signed-off-by: Phil Elwell <phil@raspberrypi.org>
-> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+> 
 > ---
->  Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-vchiq.txt | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+> Changes since v1:
+> - Made the clock optional, to keep compatibility with DTs without it
+> 
+>  Documentation/devicetree/bindings/timer/mrvl,mmp-timer.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
 
 Reviewed-by: Rob Herring <robh@kernel.org>
