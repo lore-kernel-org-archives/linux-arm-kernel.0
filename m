@@ -1,34 +1,26 @@
 From: hanjie.lin@amlogic.com (Hanjie Lin)
-Date: Wed, 26 Sep 2018 14:44:01 +0800
+Date: Wed, 26 Sep 2018 14:47:18 +0800
 Subject: [RESEND PATCH v3 2/2] PCI: meson: add the Amlogic Meson PCIe
  controller driver
-In-Reply-To: <20180921144740.GA21644@e107981-ln.cambridge.arm.com>
+In-Reply-To: <cd234d38-b162-c8c2-edb8-9f1b96d53253@synopsys.com>
 References: <1537509820-52040-1-git-send-email-hanjie.lin@amlogic.com>
  <1537509820-52040-3-git-send-email-hanjie.lin@amlogic.com>
- <20180921144740.GA21644@e107981-ln.cambridge.arm.com>
-Message-ID: <49059c4c-f395-7d09-16be-eba16dad1555@amlogic.com>
+ <cd234d38-b162-c8c2-edb8-9f1b96d53253@synopsys.com>
+Message-ID: <abd273a9-1164-c3e0-b98f-d95d13f4f01f@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 2018/9/21 22:47, Lorenzo Pieralisi wrote:
-> On Fri, Sep 21, 2018 at 02:03:40PM +0800, Hanjie Lin wrote:
+On 2018/9/24 16:34, Gustavo Pimentel wrote:
+> Hi Hanjie,
+> 
+> On 21/09/2018 07:03, Hanjie Lin wrote:
 >> From: Yue Wang <yue.wang@amlogic.com>
 >>
 >> The Amlogic Meson PCIe host controller is based on the Synopsys DesignWare
 >> PCI core. This patch adds the driver support for Meson PCIe controller.
-> 
-> Please read:
-> 
-> https://marc.info/?l=linux-pci&m=150905742808166&w=2
-> 
-> update the $SUBJECT accordingly, I can do it but you will repost anyway
-> so please do it yourself while at it.
-> 
-
-OK, I will follow the list and check the patch. 
-
+>>
 >> Signed-off-by: Yue Wang <yue.wang@amlogic.com>
 >> Signed-off-by: Hanjie Lin <hanjie.lin@amlogic.com>
 >> ---
@@ -37,12 +29,7 @@ OK, I will follow the list and check the patch.
 >>  drivers/pci/controller/dwc/pci-meson.c | 617 +++++++++++++++++++++++++++++++++
 >>  3 files changed, 630 insertions(+)
 >>  create mode 100644 drivers/pci/controller/dwc/pci-meson.c
-> 
-> I would request a MAINTAINERS update too.
-> 
-
-I will update MAINTAINERS in this patch of next-version.
-
+>>
 >> diff --git a/drivers/pci/controller/dwc/Kconfig b/drivers/pci/controller/dwc/Kconfig
 >> index 91b0194..6cb36f6 100644
 >> --- a/drivers/pci/controller/dwc/Kconfig
@@ -54,21 +41,22 @@ I will update MAINTAINERS in this patch of next-version.
 >> +config PCI_MESON
 >> +	bool "MESON PCIe controller"
 >> +	depends on PCI
-> 
-> This is redundant, remove it.
->
-
-Yes, really redundant I will remove it.
- 
 >> +	depends on PCI_MSI_IRQ_DOMAIN
->> +	select PCIEPORTBUS
 > 
-> There is no real dependency on it, this should be left to kernel
-> configuration, remove it.
->
+> I would suggest to compress the previous 2 line into in just one, like:
+> depends on PCI && PCI_MSI_IRQ_DOMAIN
+> 
+> Regards,
+> Gustavo
+> 
 
-Yes, I will remove it.
- 
+Right, depends on PCI is unnecessary actually.
+I will fix it. 
+
+Thanks,
+Hanjie
+
+>> +	select PCIEPORTBUS
 >> +	select PCIE_DW_HOST
 >> +	help
 >> +	  Say Y here if you want to enable PCI controller support on Amlogic
@@ -116,13 +104,7 @@ Yes, I will remove it.
 >> +#include "pcie-designware.h"
 >> +
 >> +#define to_meson_pcie(x) dev_get_drvdata((x)->dev)
-> 
-> Side note: this macro can be made dwc global since it is the same for all
-> dwc based host bridges.
-> 
-
-Yes, actually this patch refers to the other drivers in dwc directory.
-
+>> +
 >> +/* External local bus interface registers */
 >> +#define PLR_OFFSET			0x700
 >> +#define PCIE_PORT_LINK_CTRL_OFF		(PLR_OFFSET + 0x10)
@@ -211,14 +193,6 @@ Yes, actually this patch refers to the other drivers in dwc directory.
 >> +	int pcie_num;
 >> +	u32 port_num;
 >> +	u32 device_attch;
-> 
-> What's this variable for and is it really needed ?
-> 
-
-It was designed for dw_pcie_host_ops operations protection.
-It seems to be unnecessary when we looking into the code.
-We will continue to confirm and remove it if necessary.
-
 >> +};
 >> +
 >> +static struct reset_control *meson_pcie_get_reset(struct meson_pcie *mp,
@@ -295,18 +269,7 @@ We will continue to confirm and remove it if necessary.
 >> +	mp->mem_res.phy_base = meson_pcie_get_mem_shared(pdev, mp, "phy");
 >> +	if (IS_ERR(mp->mem_res.phy_base))
 >> +		return PTR_ERR(mp->mem_res.phy_base);
-> 
-> I do no understand the logic behind this _shared() extension and how
-> it would work in the failure path.
-> 
-
-Yes, this 'shared' likely to leads to some confusion.
-Because we have two PCI controllers in meson SoC and they share one phy register
-bank to handle power-on thing, so it's just a prompt.
-Currently there is no error-handler and does not check the res before ioremap().
-I think it's better to use devm_ioremap_resource() instead and give a comment for
-'phy' register.
-
+>> +
 >> +	return 0;
 >> +}
 >> +
@@ -336,12 +299,6 @@ I think it's better to use devm_ioremap_resource() instead and give a comment fo
 >> +						 const char *id, u64 rate)
 >> +{
 >> +	struct clk *clk = NULL;
-> 
-> Nit: useless initialization.
-> 
-
-OK, I will remove it.
-
 >> +	int ret;
 >> +
 >> +	clk = devm_clk_get(dev, id);
@@ -423,12 +380,7 @@ OK, I will remove it.
 >> +static void meson_pcie_init_dw(struct meson_pcie *mp)
 >> +{
 >> +	u32 val = 0;
-> 
-> Useless initialization.
-> 
-
-OK, I will remove it.
-
+>> +
 >> +	val = meson_cfg_readl(mp, PCIE_CFG0);
 >> +	val |= APP_LTSSM_ENABLE;
 >> +	meson_cfg_writel(mp, val, PCIE_CFG0);
@@ -457,12 +409,6 @@ OK, I will remove it.
 >> +{
 >> +	if (size & (size - 1) || size < 128 || size > 4096)
 >> +		return 1;
-> 
-> Please expain this statement. It deserves a comment at least.
-> 
-
-Yes, I will add the comment in next-version.
-
 >> +
 >> +	return fls(size) - 8;
 >> +}
@@ -484,12 +430,6 @@ Yes, I will add the comment in next-version.
 >> +static void meson_set_max_rd_req_size(struct meson_pcie *mp, int size)
 >> +{
 >> +	u32 val = 0;
-> 
-> Useless initialization.
-> 
-
-OK, I will remove it.
-
 >> +	int max_rd_req_size = meson_size_to_payload(size);
 >> +
 >> +	val = meson_elb_readl(mp, PCIE_DEV_CTRL_DEV_STUS);
@@ -527,14 +467,6 @@ OK, I will remove it.
 >> +		return 0;
 >> +
 >> +	return -ETIMEDOUT;
-> 
-> 	return dw_pcie_wait_for_link(pci));
-> 
-> ?
-> 
-
-Yes, it's more clear.
-	
 >> +}
 >> +
 >> +static void meson_pcie_msi_init(struct meson_pcie *mp)
@@ -549,16 +481,6 @@ Yes, it's more clear.
 >> +	if (IS_ENABLED(CONFIG_PCI_MSI))
 >> +		meson_pcie_msi_init(mp);
 >> +}
-> 
-> You do not need two functions to do what can be done in one.
-> 
-> All you need is struct pcie_port instead of calling this function
-> with struct meson_pci.
-> 
-
-Yes, these two functions are too redundant.
-I will remove function meson_pcie_msi_init().
-
 >> +
 >> +static u32 meson_pcie_read_dbi(struct dw_pcie *pci, void __iomem *base,
 >> +			       u32 reg, size_t size)
@@ -575,12 +497,6 @@ I will remove function meson_pcie_msi_init().
 >> +{
 >> +	dw_pcie_write(base + reg, size, val);
 >> +}
-> 
-> Nit: there is nothing dbi specific in these two functions.
-> 
-
-We will check this code.
-
 >> +
 >> +static int meson_pcie_rd_own_conf(struct pcie_port *pp, int where, int size,
 >> +				  u32 *val)
@@ -590,12 +506,6 @@ We will check this code.
 >> +
 >> +	if (!mp->device_attch)
 >> +		return 0;
-> 
-> Why do you need this guard ?
-> 
-
-We'll continue to check this guard and remove it if necessary.
-
 >> +
 >> +	/* the device class is not reported correctly from the register */
 >> +	if (where == PCI_CLASS_REVISION) {
@@ -617,9 +527,6 @@ We'll continue to check this guard and remove it if necessary.
 >> +
 >> +	if (!mp->device_attch)
 >> +		return 0;
-> 
-> Same question.
-> 
 >> +
 >> +	return dw_pcie_write(pci->dbi_base + where, size, val);
 >> +}
@@ -676,20 +583,10 @@ We'll continue to check this guard and remove it if necessary.
 >> +
 >> +	ret = meson_pcie_establish_link(mp);
 >> +
-> 
-> Remove this empty line.
-> 
-
-OK.
-
 >> +	if (ret)
 >> +		return ret;
 >> +
 >> +	mp->device_attch = 1;
-> 
-> I want to understand why you need this variable at all (and why it is
-> an u32).
-> 
 >> +	meson_pcie_enable_interrupts(mp);
 >> +
 >> +	return 0;
@@ -718,13 +615,6 @@ OK.
 >> +	}
 >> +
 >> +	pp->root_bus_nr = -1;
-> 
-> This is useless, since it is initialized in dw_pcie_host_init(), remove
-> it.
-> 
-
-Yes, we will remove it.
-
 >> +	pp->ops = &meson_pcie_host_ops;
 >> +	pci->dbi_base = mp->mem_res.elbi_base;
 >> +
@@ -790,18 +680,7 @@ Yes, we will remove it.
 >> +	ret = meson_add_pcie_port(mp, pdev);
 >> +	if (ret < 0)
 >> +		dev_err(dev, "Add PCIE port failed, %d\n", ret);
-> 
-> Isn't this fatal ?
-> 
-> Thanks,
-> Lorenzo
-> 
-
-Yes, it's a fatal error we will fix it.
-
-Thanks,
-Hanjie
-
+>> +
 >> +	return ret;
 >> +}
 >> +
@@ -821,8 +700,6 @@ Hanjie
 >> +};
 >> +
 >> +builtin_platform_driver(meson_pcie_driver);
->> -- 
->> 2.7.4
 >>
 > 
 > .
