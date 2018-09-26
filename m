@@ -1,47 +1,30 @@
-From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Wed, 26 Sep 2018 16:22:44 +0300
-Subject: [PATCH v2 19/22] arm64: dts: ls104x: add missing dma ranges property
-In-Reply-To: <20180926132247.10971-1-laurentiu.tudor@nxp.com>
-References: <20180926132247.10971-1-laurentiu.tudor@nxp.com>
-Message-ID: <20180926132247.10971-20-laurentiu.tudor@nxp.com>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Wed, 26 Sep 2018 15:24:10 +0200
+Subject: [PATCH 2/2] ARM: ixp4xx: include linux/mtd/platnand.h
+In-Reply-To: <20180926130458.2406549-2-arnd@arndb.de>
+References: <20180926130458.2406549-1-arnd@arndb.de>
+ <20180926130458.2406549-2-arnd@arndb.de>
+Message-ID: <20180926152410.454560f0@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+Hi Arnd,
 
-These chips have a 48-bit address size so make sure that the dma-ranges
-reflects this. Otherwise the linux kernel's dma sub-system will set
-the default dma masks to full 64-bit, badly breaking dmas.
+Arnd Bergmann <arnd@arndb.de> wrote on Wed, 26 Sep 2018 15:04:39 +0200:
 
-Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 1 +
- arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 1 +
- 2 files changed, 2 insertions(+)
+> The platform_nand_data structure definition is required for ixdp425
+> but has now moved to a new header file:
+> 
+> arch/arm/mach-ixp4xx/ixdp425-setup.c:98:15: error: variable 'ixdp425_flash_nand_data' has initializer but incomplete type
+>  static struct platform_nand_data ixdp425_flash_nand_data = {
+>                ^~~~~~~~~~~~~~~~~~
+> arch/arm/mach-ixp4xx/ixdp425-setup.c:99:3: error: 'struct platform_nand_data' has no member named 'chip'
+> 
+> Fixes: 19cf5dfa3a31 ("mtd: rawnand: Move platform_nand_xxx definitions out of rawnand.h")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-index 1f9b385007a8..0e8fc8f29997 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-@@ -214,6 +214,7 @@
- 		#address-cells = <2>;
- 		#size-cells = <2>;
- 		ranges;
-+		dma-ranges = <0x0 0x0 0x0 0x0 0x10000 0x00000000>;
- 
- 		clockgen: clocking at 1ee1000 {
- 			compatible = "fsl,ls1043a-clockgen";
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-index 22bf3975492a..29b07bdd4207 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-@@ -187,6 +187,7 @@
- 		#address-cells = <2>;
- 		#size-cells = <2>;
- 		ranges;
-+		dma-ranges = <0x0 0x0 0x0 0x0 0x10000 0x00000000>;
- 
- 		ddr: memory-controller at 1080000 {
- 			compatible = "fsl,qoriq-memory-controller";
--- 
-2.17.1
+Reviewed-by: Miquel Raynal <miquel.raynal@bootlin.com>
+
+Thanks,
+Miqu?l
