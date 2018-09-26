@@ -1,32 +1,120 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 25 Sep 2018 13:53:38 -0700
-Subject: [GIT PULL] ARM: at91: defconfig for 4.20
-In-Reply-To: <20180925105344.GA32532@piout.net>
-References: <20180925105344.GA32532@piout.net>
-Message-ID: <20180925205338.ljchudvxe4jo6chh@localhost>
+Date: Tue, 25 Sep 2018 20:55:22 -0700
+Subject: [PATCH v3] dt-bindings: arm: Explicitly mark Samsung Exynos SoC
+ as unstable
+In-Reply-To: <20180924171645.GA10910@kozik-lap>
+References: <20180830180205.18121-1-krzk@kernel.org>
+ <CAOesGMgE6QaasvHi7E55Z4U1Pp0+8QYW2eRLMsExebZ999_UHA@mail.gmail.com>
+ <20180924171645.GA10910@kozik-lap>
+Message-ID: <20180926035522.v5flr36nl5ftayi4@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2018 at 12:53:44PM +0200, Alexandre Belloni wrote:
-> Arnd, Olof
+On Mon, Sep 24, 2018 at 07:16:45PM +0200, Krzysztof Kozlowski wrote:
+> On Sun, Sep 23, 2018 at 02:46:20PM +0100, Olof Johansson wrote:
+> > On Thu, Aug 30, 2018 at 7:02 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> > > Samsung Exynos SoCs and boards related bindings evolved since the initial
+> > > introduction, but initially the bindings were minimal and a bit incomplete
+> > > (they never described all the hardware modules available in the SoCs).
+> > > Since then some significant (not fully compatible) changes have been
+> > > already committed a few times (like gpio replaced by pinctrl, display ddc,
+> > > mfc reserved memory, some core clocks added to various hardware modules,
+> > > added more required nodes).
+> > >
+> > > On the other side there are no boards which have device tree embedded in
+> > > the bootloader. Device tree blob is always compiled from the kernel tree
+> > > and updated together with the kernel image.
+> > >
+> > > Thus to avoid further adding a bunch of workarounds for old/missing
+> > > bindings, make development of new platforms easier and allow to make
+> > > cleanup of the existing code and device tree files, lets mark some
+> > > Samsung Exynos SoC platform bindings as unstable. This means that
+> > > bindings can may change at any time and users should use the dtb file
+> > > compiled from the same kernel source tree as the kernel image.
+> > 
+> > I have to admit that I don't really like this approach, and I missed
+> > the patch when originally posted (I did notice it in the pull request
+> > it came in with though).
+> > 
+> > The main concern for me is that with a blanket "everything is always
+> > unstable" we discard the notion that we should strive for bindings to
+> > be stable and backwards compatible.
 > 
-> The addition of the generic ADC touchscreen driver can probably benefit
-> other architectures. Also add the sama5 I2S driver.
+> The original idea from Marek was to mark everything unstable. After
+> comments from Rob I made it weaker already by changing to specific group
+> of compatibles. Accepting their instability does not mean that we will
+> be doing this on whenever possible. It just opens the possibility of
+> finding some balance in cleanups and development. Sometimes things have
+> to be seriously changed (fixed) and implementing workarounds for
+> existing ABI might be huge work by itself.
 > 
-> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
-> 
->   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
-> 
-> are available in the Git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/at91/linux tags/at91-4.20-defconfig
-> 
-> for you to fetch changes up to 4eb2534057b1b01014a2b2bb6898d9934d2ba831:
-> 
->   ARM: multi_v7_defconfig: add Atmel I2S driver (2018-08-30 22:19:32 +0200)
-> 
+> IOW, we want stability but not with the costs of huge development
+> efforts... because no one else except us cares about the stability.
 
-Merged, thanks!
+I think it's really problematic to retroactively mark a binding as unstable.
+The best way to do it is probably at the time of introduction if you anticipate
+it needing adjustments down the road (i.e. if it's for a complex IP block).
+
+For major overhauls, it might be worth updating to a new binding instead (by
+appending a suffix to the name or similar, and documenting that).
+
+> > Questions that come to mind are:
+> > 
+> >  - When do they stop being unstable?
+> 
+> They became unstable in a subjective way so I assume that reverse is the
+> same, based on consensus and discussions.
+> 
+> I am not sure if a hard time limit is good. There is no timeline for the
+> Exynos development, no public roadmaps but rather community and
+> partially volountary effort.  Therefore whatever number we set, it might
+> be totally not matching reality.
+
+I think that sets up for a pretty bad experience for some downstream users.
+
+The main problem with unstable bindings is if you have a platform that you
+haven't (yet) upstreamed the devicetrees for. Moving around base kernel
+versions in those cases can be really awkward.
+
+"Just upstream your devicetrees" is one counter-argument, but it's not always
+that easy -- it might be unreleased products or just some experimental
+platforms that might even be tracking fairly close to mainline during whatever
+development is ongoing.
+
+> >  - Is there a way to note in the binding itself that it's still
+> > unstable with an anticipation of when it will be settled in?
+> 
+> Hmm, I see that some existing bindings are being added with "Unstable"
+> warning:
+> 
+> 	git grep -i unstable Documentation/devicetree/
+> 
+> so there should be no problem for putting there a timeframe.
+
+Yeah, adding them with unstable up front is a good way to do it (and then
+remove that warning once things have settled down).
+
+> >  - Is there a better way to version the bindings to avoid complete
+> > backwards compatibility?
+> 
+> Some architectures are using overlays for handling backward
+> compatibility. Anyway it might put additional effort on driver
+> development.
+
+In some cases it's pretty easy to stay backwards compatible by making sure
+that things like missing properties have the same defaults as they used to
+before the properties became mandatory.
+
+For complex subsystems it might be a different story, but that's also where it
+_might_ be worth looking at a new revision of the binding instead, this time
+maybe closer to a permanent one.
+
+> > Pointing out a couple of cases where it has been painful to stay
+> > backwards compatible could also be useful for understanding (even
+> > though you run the risk of each case being explained away with
+> > suggestions of how it can be handled).
+
+Marek, do you have any good examples here? Could still be useful.
 
 
 -Olof
