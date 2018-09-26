@@ -1,71 +1,44 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 26 Sep 2018 11:39:03 +0100
-Subject: [PATCH 04/10] irqchip/gic-v3-its: Move pending table allocation
- to init time
-In-Reply-To: <7cdac0d7-a256-5e75-5a19-8eb0fb1cf6a5@arm.com>
-References: <20180921195954.21574-1-marc.zyngier@arm.com>
- <20180921195954.21574-5-marc.zyngier@arm.com>
- <7cdac0d7-a256-5e75-5a19-8eb0fb1cf6a5@arm.com>
-Message-ID: <637c7af3-cce7-4e0b-e049-366ea4b17e25@arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 26 Sep 2018 12:40:53 +0200
+Subject: [PATCH v11 1/2] dt-bindings: media: Add Allwinner V3s Camera
+ Sensor Interface (CSI)
+In-Reply-To: <1568838.d8CnAYTeDB@avalon>
+References: <1537951204-24672-1-git-send-email-yong.deng@magewell.com>
+ <7197338.mhOH8fQaEM@avalon> <20180926103547.5ubb6xjkl7xngmfg@flea>
+ <1568838.d8CnAYTeDB@avalon>
+Message-ID: <20180926104053.ijhmvvsbju36j4d3@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julien,
-
-On 24/09/18 12:58, Julien Thierry wrote:
-> Hi Marc,
+On Wed, Sep 26, 2018 at 01:38:08PM +0300, Laurent Pinchart wrote:
+> Hi Maxime,
 > 
-> On 21/09/18 20:59, Marc Zyngier wrote:
->> Pending tables for the redistributors are currently allocated
->> one at a time as each CPU boots. This is causing some grief
->> for Linux/RT (allocation from within a CPU hotplug notifier is
->> frown upon).
->>
->> Let's more this allocation to take place at init time, when we
->> only have a single CPU. It means we're allocating memory for CPUs
->> that are not online yet, but most system will boot all of their
->> CPUs anyway, so that's not completely wasted.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>    drivers/irqchip/irq-gic-v3-its.c   | 80 +++++++++++++++++++-----------
->>    include/linux/irqchip/arm-gic-v3.h |  1 +
->>    2 files changed, 53 insertions(+), 28 deletions(-)
->>
->> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
->> index 7ef6baea2d78..462bba422189 100644
->> --- a/drivers/irqchip/irq-gic-v3-its.c
->> +++ b/drivers/irqchip/irq-gic-v3-its.c
->> @@ -173,6 +173,7 @@ static DEFINE_RAW_SPINLOCK(vmovp_lock);
->>    static DEFINE_IDA(its_vpeid_ida);
->>    
->>    #define gic_data_rdist()		(raw_cpu_ptr(gic_rdists->rdist))
->> +#define gic_data_rdist_cpu(cpu)		(per_cpu_ptr(gic_rdists->rdist, cpu))
->>    #define gic_data_rdist_rd_base()	(gic_data_rdist()->rd_base)
->>    #define gic_data_rdist_vlpi_base()	(gic_data_rdist_rd_base() + SZ_128K)
->>    
->> @@ -1625,7 +1626,7 @@ static void its_free_prop_table(struct page *prop_page)
->>    		   get_order(LPI_PROPBASE_SZ));
->>    }
->>    
->> -static int __init its_alloc_lpi_tables(void)
->> +static int __init its_alloc_lpi_prop_table(void)
+> On Wednesday, 26 September 2018 13:35:47 EEST maxime.ripard at bootlin.com wrote:
+> > On Wed, Sep 26, 2018 at 01:19:34PM +0300, Laurent Pinchart wrote:
+> > > > +Endpoint node properties for CSI1
+> > > > +---------------------------------
+> > > 
+> > > Should you list the CSI0 properties as well ? As the driver in patch 2/2
+> > > doesn't support the CSI-2 interface I assume you have left out CSI0 for
+> > > now, but it should still be listed in the bindings. I'm fine with fixing
+> > > this as a follow-up patch to avoid missing the v4.20 merge window, but if
+> > > you end up resubmitting the series, could you please address the problem
+> > > ?
+> > 
+> > That driver is not available, and the documentation isn't either, so
+> > there's no easy way to tell which properties are going to be needed
+> > before doing the actual work of reverse engineering it and writing a
+> > driver for it. Unfortunately...
 > 
-> A bit of a nit, but there is already a function called
-> "its_allocate_prop_table" which I find very easy to confuse with this one.
+> While DT bindings should be independent from driver implementations, I agree 
+> it's difficult to develop good bindings without hardware documentation and 
+> without at least one working driver implementation.
 > 
-> And patch 3 factored the initialization out of its_allocate_prop_table.
-> So I was wondering whether it would not actually be better to open-code
-> it here and get rid of that function. Otherwise I'd suggest having more
-> distinct names.
+> How about just explicitly stating that these bindings don't support CSI0 yet ?
 
-its_allocate_prop_table is also used by the VLPI code to allocate guest 
-property tables, so I'd rather not open-code it.
+Yep, that would work
 
-How about renaming this function to its_setup_lpi_prop_table?
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
