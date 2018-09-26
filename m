@@ -1,47 +1,80 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Wed, 26 Sep 2018 16:22:32 +0300
-Subject: [PATCH v2 07/22] soc/fsl/bman_portals: defer probe after bman's probe
+Date: Wed, 26 Sep 2018 16:22:46 +0300
+Subject: [PATCH v2 21/22] arm64: dts: ls104x: make dma-coherent global to the
+ SoC
 In-Reply-To: <20180926132247.10971-1-laurentiu.tudor@nxp.com>
 References: <20180926132247.10971-1-laurentiu.tudor@nxp.com>
-Message-ID: <20180926132247.10971-8-laurentiu.tudor@nxp.com>
+Message-ID: <20180926132247.10971-22-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-A crash in bman portal probing could not be triggered (as is the case
-with qman portals) but it does make calls [1] into the bman driver so
-lets make sure the bman portal probing happens after bman's.
-
-[1]  bman_p_irqsource_add() (in bman) called by:
-       init_pcfg() called by:
-         bman_portal_probe()
+These SoCs are really completely dma coherent in their entirety so add
+the dma-coherent property at the soc level in the device tree and drop
+the instances where it's specifically added to a few select devices.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
- drivers/soc/fsl/qbman/bman_portal.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 5 +----
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 1 +
+ 2 files changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/soc/fsl/qbman/bman_portal.c b/drivers/soc/fsl/qbman/bman_portal.c
-index 2f71f7df3465..f9edd28894fd 100644
---- a/drivers/soc/fsl/qbman/bman_portal.c
-+++ b/drivers/soc/fsl/qbman/bman_portal.c
-@@ -91,7 +91,15 @@ static int bman_portal_probe(struct platform_device *pdev)
- 	struct device_node *node = dev->of_node;
- 	struct bm_portal_config *pcfg;
- 	struct resource *addr_phys[2];
--	int irq, cpu;
-+	int irq, cpu, err;
-+
-+	err = bman_is_probed();
-+	if (!err)
-+		return -EPROBE_DEFER;
-+	if (err < 0) {
-+		dev_err(&pdev->dev, "failing probe due to bman probe error\n");
-+		return -ENODEV;
-+	}
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+index ccadc40a36f4..9fb3ac0fa87c 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+@@ -215,6 +215,7 @@
+ 		#size-cells = <2>;
+ 		ranges;
+ 		dma-ranges = <0x0 0x0 0x0 0x0 0x10000 0x00000000>;
++		dma-coherent;
  
- 	pcfg = devm_kmalloc(dev, sizeof(*pcfg), GFP_KERNEL);
- 	if (!pcfg)
+ 		clockgen: clocking at 1ee1000 {
+ 			compatible = "fsl,ls1043a-clockgen";
+@@ -680,7 +681,6 @@
+ 			reg-names = "ahci", "sata-ecc";
+ 			interrupts = <0 69 0x4>;
+ 			clocks = <&clockgen 4 0>;
+-			dma-coherent;
+ 		};
+ 
+ 		msi1: msi-controller1 at 1571000 {
+@@ -715,7 +715,6 @@
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+ 			device_type = "pci";
+-			dma-coherent;
+ 			iommu-map = <0 &mmu 0 1>;
+ 			num-lanes = <4>;
+ 			bus-range = <0x0 0xff>;
+@@ -741,7 +740,6 @@
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+ 			device_type = "pci";
+-			dma-coherent;
+ 			iommu-map = <0 &mmu 0 1>;
+ 			num-lanes = <2>;
+ 			bus-range = <0x0 0xff>;
+@@ -767,7 +765,6 @@
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+ 			device_type = "pci";
+-			dma-coherent;
+ 			iommu-map = <0 &mmu 0 1>;
+ 			num-lanes = <2>;
+ 			bus-range = <0x0 0xff>;
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+index a12d33362554..f19cf6087235 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+@@ -188,6 +188,7 @@
+ 		#size-cells = <2>;
+ 		ranges;
+ 		dma-ranges = <0x0 0x0 0x0 0x0 0x10000 0x00000000>;
++		dma-coherent;
+ 
+ 		ddr: memory-controller at 1080000 {
+ 			compatible = "fsl,qoriq-memory-controller";
 -- 
 2.17.1
