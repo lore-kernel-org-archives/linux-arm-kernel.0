@@ -1,50 +1,69 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 26 Sep 2018 08:47:52 +0200
-Subject: [PATCH v9 4/5] clk: imx: add imx composite clock
-In-Reply-To: <CAOMZO5D7yLUzriOub4RWsq1K8_fTj6c0LFOnSZwHyjqMPYu=0A@mail.gmail.com>
-References: <1537785597-26499-1-git-send-email-abel.vesa@nxp.com>
- <1537785597-26499-5-git-send-email-abel.vesa@nxp.com>
- <CAOMZO5D7yLUzriOub4RWsq1K8_fTj6c0LFOnSZwHyjqMPYu=0A@mail.gmail.com>
-Message-ID: <20180926064752.GM4097@pengutronix.de>
+From: frieder.schrempf@exceet.de (Frieder Schrempf)
+Date: Wed, 26 Sep 2018 09:10:17 +0200
+Subject: [PATCH] arm64: dts: rockchip: Enable SPI NOR flash on Rock64
+In-Reply-To: <20180926045357.20722-1-wens@csie.org>
+References: <20180926045357.20722-1-wens@csie.org>
+Message-ID: <7ecb43c3-1693-005b-b547-03ca361bd843@exceet.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2018 at 01:42:12PM -0300, Fabio Estevam wrote:
-> Hi Abel,
+On 26.09.2018 06:53, Chen-Yu Tsai wrote:
+> The Pine64 Rock64 board comes with a GigaDevice GD25Q128CSIG
+> or GD25Q127CSIG chip, which is a 128 Mbit SPI NOR flash chip
+> that supports the JEDEC read-ID command.
 > 
-> On Mon, Sep 24, 2018 at 7:39 AM, Abel Vesa <abel.vesa@nxp.com> wrote:
+> This patch enables the SPI controller and adds a device node
+> for the flash chip using the generic "jedec,spi-nor" comaptible.
 > 
-> > +static long imx_clk_composite_divider_round_rate(struct clk_hw *hw,
-> > +                                               unsigned long rate,
-> > +                                               unsigned long *prate)
-> > +{
-> > +       int prediv_value;
-> > +       int div_value;
-> > +
-> > +       imx_clk_composite_compute_dividers(rate, *prate,
-> > +                                               &prediv_value, &div_value);
-> > +
-> > +       rate = DIV_ROUND_UP_ULL((u64)*prate, prediv_value);
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
 > 
-> You assing a value to 'rate' here.
+> This was working on linux-next 20180910, but now fails on linux-next
+> 20180925, with the following error messages:
 > 
-> > +       rate = DIV_ROUND_UP_ULL((u64)rate, div_value);
+>      m25p80 spi0.0: error -22 reading 9f
+>      m25p80: probe of spi0.0 failed with error -2
 > 
-> And then overwrite it immediately after.
+> Reverting the spi/for-next branch makes it work again:
+> 
+>      m25p80 spi0.0: gd25q128 (16384 Kbytes)
+> 
+> Not sure what's up.
 
-It's:
-	rate = *prate / prediv_value;
-	rate = rate / div_value;
+The reason is probably an issue that was introduced here: [1], and it 
+was fixed here: [2].
 
-To me this looks correct. However, For an unsigned long type we have
-DIV_ROUND_UP() with which we do not need any casting. For 64bit code
-unsigned long is 64bit anyway which makes the cast a no-op and for 32bit
-code there's also no point in exanding the initial 32bit value to 64bit.
+[1] 
+https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/drivers/spi?id=380583227c0c7f52383b0cd5c0e2de93ed31d553
+[2] 
+https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/drivers/spi?id=4c53f98555fdbf1cc291cab8ffa5e1507a4f25d9
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
+> ---
+>   arch/arm64/boot/dts/rockchip/rk3328-rock64.dts | 12 ++++++++++++
+>   1 file changed, 12 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts b/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
+> index 9ee4f57557f3..2170cf63845e 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
+> +++ b/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
+> @@ -290,6 +290,18 @@
+>   	};
+>   };
+>   
+> +&spi0 {
+> +	status = "okay";
+> +
+> +	spiflash at 0 {
+> +		compatible = "jedec,spi-nor";
+> +		reg = <0>;
+> +
+> +		/* maximum speed for Rockchip SPI */
+> +		spi-max-frequency = <50000000>;
+> +	};
+> +};
+> +
+>   &tsadc {
+>   	rockchip,hw-tshut-mode = <0>;
+>   	rockchip,hw-tshut-polarity = <0>;
+> 
