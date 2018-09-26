@@ -1,69 +1,96 @@
-From: frieder.schrempf@exceet.de (Frieder Schrempf)
-Date: Wed, 26 Sep 2018 09:10:17 +0200
-Subject: [PATCH] arm64: dts: rockchip: Enable SPI NOR flash on Rock64
-In-Reply-To: <20180926045357.20722-1-wens@csie.org>
-References: <20180926045357.20722-1-wens@csie.org>
-Message-ID: <7ecb43c3-1693-005b-b547-03ca361bd843@exceet.de>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 26 Sep 2018 09:14:16 +0200
+Subject: [GIT PULL] arm64: zynqmp: Xilinx SoC changes for v4.20 v2
+Message-ID: <e6a23ed7-0573-24a3-c13d-c188fb10f131@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26.09.2018 06:53, Chen-Yu Tsai wrote:
-> The Pine64 Rock64 board comes with a GigaDevice GD25Q128CSIG
-> or GD25Q127CSIG chip, which is a 128 Mbit SPI NOR flash chip
-> that supports the JEDEC read-ID command.
-> 
-> This patch enables the SPI controller and adds a device node
-> for the flash chip using the generic "jedec,spi-nor" comaptible.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> 
-> This was working on linux-next 20180910, but now fails on linux-next
-> 20180925, with the following error messages:
-> 
->      m25p80 spi0.0: error -22 reading 9f
->      m25p80: probe of spi0.0 failed with error -2
-> 
-> Reverting the spi/for-next branch makes it work again:
-> 
->      m25p80 spi0.0: gd25q128 (16384 Kbytes)
-> 
-> Not sure what's up.
+Hi,
 
-The reason is probably an issue that was introduced here: [1], and it 
-was fixed here: [2].
+Based on discussion with Olof I am sending this pull request
+You can find out more information about content in a tag below.
 
-[1] 
-https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/drivers/spi?id=380583227c0c7f52383b0cd5c0e2de93ed31d553
-[2] 
-https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/drivers/spi?id=4c53f98555fdbf1cc291cab8ffa5e1507a4f25d9
+Thanks,
+Michal
 
-> 
-> ---
->   arch/arm64/boot/dts/rockchip/rk3328-rock64.dts | 12 ++++++++++++
->   1 file changed, 12 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts b/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
-> index 9ee4f57557f3..2170cf63845e 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
-> +++ b/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
-> @@ -290,6 +290,18 @@
->   	};
->   };
->   
-> +&spi0 {
-> +	status = "okay";
-> +
-> +	spiflash at 0 {
-> +		compatible = "jedec,spi-nor";
-> +		reg = <0>;
-> +
-> +		/* maximum speed for Rockchip SPI */
-> +		spi-max-frequency = <50000000>;
-> +	};
-> +};
-> +
->   &tsadc {
->   	rockchip,hw-tshut-mode = <0>;
->   	rockchip,hw-tshut-polarity = <0>;
-> 
+
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+
+  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+
+are available in the git repository at:
+
+  https://github.com/Xilinx/linux-xlnx.git tags/zynqmp-soc-for-v4.20-v2
+
+for you to fetch changes up to e60f02ddb4d2e29b0eb30dbe55475822c4bf3818:
+
+  firmware: xilinx: Add debugfs for query data API (2018-09-26 08:47:37
++0200)
+
+----------------------------------------------------------------
+arm64: zynqmp: SoC changes for v4.20
+
+- Adding firmware API for SoC with debugfs interface
+  Firmware driver communicates to Platform Management Unit (PMU) by using
+  SMC instructions routed to Arm Trusted Firmware (ATF). Initial version
+  adds support for base firmware driver with query and clock APIs.
+
+  EEMI spec is available here:
+
+https://www.xilinx.com/support/documentation/user_guides/ug1200-eemi-api.pdf
+
+----------------------------------------------------------------
+Rajan Vaja (6):
+      dt-bindings: firmware: Add bindings for ZynqMP firmware
+      firmware: xilinx: Add Zynqmp firmware driver
+      firmware: xilinx: Add query data API
+      firmware: xilinx: Add clock APIs
+      firmware: xilinx: Add debugfs interface
+      firmware: xilinx: Add debugfs for query data API
+
+ Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt |  29 ++++++++
+ arch/arm64/Kconfig.platforms
+   |   1 +
+ drivers/firmware/Kconfig
+   |   1 +
+ drivers/firmware/Makefile
+   |   1 +
+ drivers/firmware/xilinx/Kconfig
+   |  23 ++++++
+ drivers/firmware/xilinx/Makefile
+   |   5 ++
+ drivers/firmware/xilinx/zynqmp-debug.c
+   | 250 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/firmware/xilinx/zynqmp-debug.h
+   |  24 ++++++
+ drivers/firmware/xilinx/zynqmp.c
+   | 523
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/firmware/xlnx-zynqmp.h
+   | 113 ++++++++++++++++++++++++++++
+ 10 files changed, 970 insertions(+)
+ create mode 100644
+Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
+ create mode 100644 drivers/firmware/xilinx/Kconfig
+ create mode 100644 drivers/firmware/xilinx/Makefile
+ create mode 100644 drivers/firmware/xilinx/zynqmp-debug.c
+ create mode 100644 drivers/firmware/xilinx/zynqmp-debug.h
+ create mode 100644 drivers/firmware/xilinx/zynqmp.c
+ create mode 100644 include/linux/firmware/xlnx-zynqmp.h
+
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Xilinx Microblaze
+Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
+U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180926/2095464d/attachment.sig>
