@@ -1,39 +1,33 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 26 Sep 2018 13:39:39 +0200
-Subject: [PATCH] arm64: dts: Use mmc@ instead sdhci@
-Message-ID: <59fd089c075740303d81e4a3475598dfd48e5026.1537961975.git.michal.simek@xilinx.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Wed, 26 Sep 2018 17:27:50 +0530
+Subject: [PATCH 1/2] dt-bindings: i2c-omap: Add new compatible for AM654 SoCs
+In-Reply-To: <20180926115751.20421-1-vigneshr@ti.com>
+References: <20180926115751.20421-1-vigneshr@ti.com>
+Message-ID: <20180926115751.20421-2-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mmc name is recommended based on devicetree specification.
+AM654 SoCs have similar I2C IP as OMAP SoCs. Add new compatible to
+handle AM654 SoCs.
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+Signed-off-by: Vignesh R <vigneshr@ti.com>
 ---
+ Documentation/devicetree/bindings/i2c/i2c-omap.txt | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
- arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-index 29ce23422acf..dacabde6ff7e 100644
---- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-+++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-@@ -484,7 +484,7 @@
- 			interrupts = <0 133 4>;
- 		};
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-omap.txt b/Documentation/devicetree/bindings/i2c/i2c-omap.txt
+index 7e49839d4124..11ce869d682d 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-omap.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-omap.txt
+@@ -2,7 +2,8 @@ I2C for OMAP platforms
  
--		sdhci0: sdhci at ff160000 {
-+		sdhci0: mmc at ff160000 {
- 			compatible = "arasan,sdhci-8.9a";
- 			status = "disabled";
- 			interrupt-parent = <&gic>;
-@@ -493,7 +493,7 @@
- 			clock-names = "clk_xin", "clk_ahb";
- 		};
- 
--		sdhci1: sdhci at ff170000 {
-+		sdhci1: mmc at ff170000 {
- 			compatible = "arasan,sdhci-8.9a";
- 			status = "disabled";
- 			interrupt-parent = <&gic>;
+ Required properties :
+ - compatible : Must be "ti,omap2420-i2c", "ti,omap2430-i2c", "ti,omap3-i2c"
+-  or "ti,omap4-i2c"
++  or "ti,omap4-i2c" for OMAP2+ SoCs
++- compatible : Must "ti,am654-i2c", "ti,omap4-i2c" for AM654 SoCs
+ - ti,hwmods : Must be "i2c<n>", n being the instance number (1-based)
+ - #address-cells = <1>;
+ - #size-cells = <0>;
 -- 
-1.9.1
+2.19.0
