@@ -1,31 +1,20 @@
 From: vigneshr@ti.com (Vignesh R)
-Date: Wed, 26 Sep 2018 17:27:51 +0530
-Subject: [PATCH 2/2] i2c: busses: Kconfig: Enable I2C_OMAP for ARCH_K3
-In-Reply-To: <20180926115751.20421-1-vigneshr@ti.com>
-References: <20180926115751.20421-1-vigneshr@ti.com>
-Message-ID: <20180926115751.20421-3-vigneshr@ti.com>
+Date: Wed, 26 Sep 2018 17:27:49 +0530
+Subject: [PATCH 0/2] i2c-omap: Enable i2c-omap driver for AM654 SoCs
+Message-ID: <20180926115751.20421-1-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow I2C_OMAP to be built for K3 platforms.
+Couple of patches to enable i2c-omap driver to be used with TI's new
+AM654 platforms.
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
- drivers/i2c/busses/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Vignesh R (2):
+  dt-bindings: i2c-omap: Add new compatible for AM654 SoCs
+  i2c: busses: Kconfig: Enable I2C_OMAP for ARCH_K3
 
-diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-index 451d4ae50e66..ac4b09642f63 100644
---- a/drivers/i2c/busses/Kconfig
-+++ b/drivers/i2c/busses/Kconfig
-@@ -751,7 +751,7 @@ config I2C_OCORES
- 
- config I2C_OMAP
- 	tristate "OMAP I2C adapter"
--	depends on ARCH_OMAP
-+	depends on ARCH_OMAP || ARCH_K3
- 	default y if MACH_OMAP_H3 || MACH_OMAP_OSK
- 	help
- 	  If you say yes to this option, support will be included for the
+ Documentation/devicetree/bindings/i2c/i2c-omap.txt | 1 +
+ drivers/i2c/busses/Kconfig                         | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
 -- 
 2.19.0
