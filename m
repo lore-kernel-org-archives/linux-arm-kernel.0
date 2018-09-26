@@ -1,73 +1,133 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Wed, 26 Sep 2018 16:22:42 +0300
-Subject: [PATCH v2 17/22] arm64: dts: ls1043a: add smmu node
+Date: Wed, 26 Sep 2018 16:22:39 +0300
+Subject: [PATCH v2 14/22] dpaa_eth: fix iova handling for sg frames
 In-Reply-To: <20180926132247.10971-1-laurentiu.tudor@nxp.com>
 References: <20180926132247.10971-1-laurentiu.tudor@nxp.com>
-Message-ID: <20180926132247.10971-18-laurentiu.tudor@nxp.com>
+Message-ID: <20180926132247.10971-15-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-This allows for the SMMU device to be probed by the SMMU kernel driver.
+The driver relies on the no longer valid assumption that dma addresses
+(iovas) are identical to physical addressees and uses phys_to_virt() to
+make iova -> vaddr conversions. Fix this also for scatter-gather frames
+using the iova -> phys conversion function added in the previous patch.
+While at it, clean-up a redundant dpaa_bpid2pool() and pass the bp
+as parameter.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
- .../arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 42 +++++++++++++++++++
- 1 file changed, 42 insertions(+)
+ .../net/ethernet/freescale/dpaa/dpaa_eth.c    | 41 +++++++++++--------
+ 1 file changed, 24 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-index 7881e3d81a9a..7eea2bace171 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-@@ -222,6 +222,48 @@
- 			clocks = <&sysclk>;
- 		};
+diff --git a/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c b/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
+index e9e081c3f8cc..8db861f281a0 100644
+--- a/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
++++ b/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
+@@ -1646,14 +1646,17 @@ static struct sk_buff *dpaa_cleanup_tx_fd(const struct dpaa_priv *priv,
  
-+		mmu: iommu at 9000000 {
-+			compatible = "arm,mmu-500";
-+			reg = <0 0x9000000 0 0x400000>;
-+			dma-coherent;
-+			#global-interrupts = <2>;
-+			#iommu-cells = <1>;
-+			interrupts = <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>;
-+		};
+ 	if (unlikely(qm_fd_get_format(fd) == qm_fd_sg)) {
+ 		nr_frags = skb_shinfo(skb)->nr_frags;
+-		dma_unmap_single(dev, addr,
+-				 qm_fd_get_offset(fd) + DPAA_SGT_SIZE,
+-				 dma_dir);
+ 
+ 		/* The sgt buffer has been allocated with netdev_alloc_frag(),
+ 		 * it's from lowmem.
+ 		 */
+-		sgt = phys_to_virt(addr + qm_fd_get_offset(fd));
++		sgt = phys_to_virt(dpaa_iova_to_phys(dev,
++						     addr +
++						     qm_fd_get_offset(fd)));
 +
- 		scfg: scfg at 1570000 {
- 			compatible = "fsl,ls1043a-scfg", "syscon";
- 			reg = <0x0 0x1570000 0x0 0x10000>;
++		dma_unmap_single(dev, addr,
++				 qm_fd_get_offset(fd) + DPAA_SGT_SIZE,
++				 dma_dir);
+ 
+ 		/* sgt[0] is from lowmem, was dma_map_single()-ed */
+ 		dma_unmap_single(dev, qm_sg_addr(&sgt[0]),
+@@ -1668,7 +1671,7 @@ static struct sk_buff *dpaa_cleanup_tx_fd(const struct dpaa_priv *priv,
+ 		}
+ 
+ 		/* Free the page frag that we allocated on Tx */
+-		skb_free_frag(phys_to_virt(addr));
++		skb_free_frag(skbh);
+ 	} else {
+ 		dma_unmap_single(dev, addr,
+ 				 skb_tail_pointer(skb) - (u8 *)skbh, dma_dir);
+@@ -1729,14 +1732,14 @@ static struct sk_buff *contig_fd_to_skb(const struct dpaa_priv *priv,
+  * The page fragment holding the S/G Table is recycled here.
+  */
+ static struct sk_buff *sg_fd_to_skb(const struct dpaa_priv *priv,
+-				    const struct qm_fd *fd)
++				    const struct qm_fd *fd,
++				    struct dpaa_bp *dpaa_bp,
++				    void *vaddr)
+ {
+ 	ssize_t fd_off = qm_fd_get_offset(fd);
+-	dma_addr_t addr = qm_fd_addr(fd);
+ 	const struct qm_sg_entry *sgt;
+ 	struct page *page, *head_page;
+-	struct dpaa_bp *dpaa_bp;
+-	void *vaddr, *sg_vaddr;
++	void *sg_vaddr;
+ 	int frag_off, frag_len;
+ 	struct sk_buff *skb;
+ 	dma_addr_t sg_addr;
+@@ -1745,7 +1748,6 @@ static struct sk_buff *sg_fd_to_skb(const struct dpaa_priv *priv,
+ 	int *count_ptr;
+ 	int i;
+ 
+-	vaddr = phys_to_virt(addr);
+ 	WARN_ON(!IS_ALIGNED((unsigned long)vaddr, SMP_CACHE_BYTES));
+ 
+ 	/* Iterate through the SGT entries and add data buffers to the skb */
+@@ -1756,14 +1758,18 @@ static struct sk_buff *sg_fd_to_skb(const struct dpaa_priv *priv,
+ 		WARN_ON(qm_sg_entry_is_ext(&sgt[i]));
+ 
+ 		sg_addr = qm_sg_addr(&sgt[i]);
+-		sg_vaddr = phys_to_virt(sg_addr);
+-		WARN_ON(!IS_ALIGNED((unsigned long)sg_vaddr,
+-				    SMP_CACHE_BYTES));
+ 
+ 		/* We may use multiple Rx pools */
+ 		dpaa_bp = dpaa_bpid2pool(sgt[i].bpid);
+-		if (!dpaa_bp)
++		if (!dpaa_bp) {
++			pr_info("%s: fail to get dpaa_bp for sg bpid %d\n",
++				__func__, sgt[i].bpid);
+ 			goto free_buffers;
++		}
++		sg_vaddr = phys_to_virt(dpaa_iova_to_phys(dpaa_bp->dev,
++							  sg_addr));
++		WARN_ON(!IS_ALIGNED((unsigned long)sg_vaddr,
++				    SMP_CACHE_BYTES));
+ 
+ 		count_ptr = this_cpu_ptr(dpaa_bp->percpu_count);
+ 		dma_unmap_single(dpaa_bp->dev, sg_addr, dpaa_bp->size,
+@@ -1835,10 +1841,11 @@ static struct sk_buff *sg_fd_to_skb(const struct dpaa_priv *priv,
+ 	/* free all the SG entries */
+ 	for (i = 0; i < DPAA_SGT_MAX_ENTRIES ; i++) {
+ 		sg_addr = qm_sg_addr(&sgt[i]);
+-		sg_vaddr = phys_to_virt(sg_addr);
+-		skb_free_frag(sg_vaddr);
+ 		dpaa_bp = dpaa_bpid2pool(sgt[i].bpid);
+ 		if (dpaa_bp) {
++			sg_addr = dpaa_iova_to_phys(dpaa_bp->dev, sg_addr);
++			sg_vaddr = phys_to_virt(sg_addr);
++			skb_free_frag(sg_vaddr);
+ 			count_ptr = this_cpu_ptr(dpaa_bp->percpu_count);
+ 			(*count_ptr)--;
+ 		}
+@@ -2324,7 +2331,7 @@ static enum qman_cb_dqrr_result rx_default_dqrr(struct qman_portal *portal,
+ 	if (likely(fd_format == qm_fd_contig))
+ 		skb = contig_fd_to_skb(priv, fd, dpaa_bp, vaddr);
+ 	else
+-		skb = sg_fd_to_skb(priv, fd);
++		skb = sg_fd_to_skb(priv, fd, dpaa_bp, vaddr);
+ 	if (!skb)
+ 		return qman_cb_dqrr_consume;
+ 
 -- 
 2.17.1
