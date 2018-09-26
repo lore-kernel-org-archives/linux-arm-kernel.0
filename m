@@ -1,50 +1,53 @@
-From: JOLLYS@xilinx.com (Jolly Shah)
-Date: Wed, 26 Sep 2018 18:25:14 +0000
-Subject: [PATCH v12 0/6] drivers: Introduce firmware driver for ZynqMP core
-In-Reply-To: <CAOesGMgUaQMcTQsbLR_qN95QPfOE1gCJuM9=6AiFLg+_t98qaw@mail.gmail.com>
-References: <1536781120-22794-1-git-send-email-jollys@xilinx.com>
- <CY1PR02MB21385F71D8BC4498654CD0BFB8130@CY1PR02MB2138.namprd02.prod.outlook.com>
- <CAOesGMgUaQMcTQsbLR_qN95QPfOE1gCJuM9=6AiFLg+_t98qaw@mail.gmail.com>
-Message-ID: <CY1PR02MB21385086CCA9A22504657D38B8150@CY1PR02MB2138.namprd02.prod.outlook.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 26 Sep 2018 21:02:48 +0200
+Subject: [PATCH v2] ARM: dts: exynos: Add pin configuration for SD write
+ protect on Odroid XU
+Message-ID: <20180926190248.6369-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Add SD card write-protect pin configuration to be sure that it will be
+properly pulled down to indicate write access.
 
-> -----Original Message-----
-> From: Olof Johansson [mailto:olof at lixom.net]
-> Sent: Sunday, September 23, 2018 6:13 AM
-> To: Jolly Shah <JOLLYS@xilinx.com>
-> Cc: Michal Simek <michals@xilinx.com>; arm at kernel.org; Rajan Vaja
-> <RAJANV@xilinx.com>; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org
-> Subject: Re: [PATCH v12 0/6] drivers: Introduce firmware driver for ZynqMP core
-> 
-> On Thu, Sep 20, 2018 at 5:46 PM, Jolly Shah <JOLLYS@xilinx.com> wrote:
-> > Hi Olof,
-> >
-> > As suggested, this patchset is generated without ioctl interface. Please review.
-> If you are ok, Michal can create a pull request for merge.
-> 
-> Hi,
-> 
-> I replied on the other thread as well; it sounds like you will need something
-> _like_ the ioctl interface for some of the dependent drivers. For those, would it
-> be possible to only expose some of the ioctls through the interface, and not just
-> pass through any call? I think that'd probably take care of my concern.
-> 
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-I have pushed clock driver patch set including ioctl changes. Please review and let me know if any changes are required.
+---
 
-Thanks,
-Jolly Shah
+Changes since v1:
+1. Remove cd-gpios and wp-gpios leaving only WP pin configuration (after
+   Marek Szyprowski feedback).
+2. Pull pin down.
+---
+ arch/arm/boot/dts/exynos5410-odroidxu.dts | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-
-> But yeah, go ahead and stage these in a pull request for now, that way we can
-> take care of these and merge them as the rest are getting ready. I don't want to
-> hold you up more than needed; the patch set is already up to a very high version
-> number and it's not fair to make you rework it completely yet again.
-> 
-> 
-> 
-> -Olof
+diff --git a/arch/arm/boot/dts/exynos5410-odroidxu.dts b/arch/arm/boot/dts/exynos5410-odroidxu.dts
+index a2046f5f998c..434a7591ff63 100644
+--- a/arch/arm/boot/dts/exynos5410-odroidxu.dts
++++ b/arch/arm/boot/dts/exynos5410-odroidxu.dts
+@@ -530,7 +530,7 @@
+ 	samsung,dw-mshc-sdr-timing = <0 4>;
+ 	samsung,dw-mshc-ddr-timing = <0 2>;
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4>;
++	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4 &sd2_wp>;
+ 	bus-width = <4>;
+ 	cap-sd-highspeed;
+ 	vmmc-supply = <&ldo21_reg>;
+@@ -545,6 +545,14 @@
+ 		samsung,pin-drv = <EXYNOS5420_PIN_DRV_LV1>;
+ 	};
+ 
++	sd2_wp: sd2-wp {
++		samsung,pins = "gpm5-0";
++		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
++		/* Pin is floating so be sure to disable write-protect */
++		samsung,pin-pud = <EXYNOS_PIN_PULL_DOWN>;
++		samsung,pin-drv = <EXYNOS5420_PIN_DRV_LV4>;
++	};
++
+ 	pmic_dvs_3: pmic-dvs-3 {
+ 		samsung,pins = "gpx0-0";
+ 		samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;
+-- 
+2.17.1
