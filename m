@@ -1,121 +1,144 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 26 Sep 2018 17:32:41 +0100
-Subject: [PATCH v6 05/18] kvm: arm64: Clean up VTCR_EL2 initialisation
+Date: Wed, 26 Sep 2018 17:32:48 +0100
+Subject: [PATCH v6 12/18] kvm: arm64: Configure VTCR_EL2.SL0 per VM
 In-Reply-To: <20180926163258.20218-1-suzuki.poulose@arm.com>
 References: <20180926163258.20218-1-suzuki.poulose@arm.com>
-Message-ID: <20180926163258.20218-6-suzuki.poulose@arm.com>
+Message-ID: <20180926163258.20218-13-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the new helper for converting the parange to the physical shift.
-Also, add the missing definitions for the VTCR_EL2 register fields
-and use them instead of hard coding numbers.
+VTCR_EL2 holds the following key stage2 translation table
+parameters:
+  SL0  - Entry level in the page table lookup.
+  T0SZ - Denotes the size of the memory addressed by the table.
+
+We have been using fixed values for the SL0 depending on the
+page size as we have a fixed IPA size. But since we are about
+to make it dynamic, we need to calculate the SL0 at runtime
+per VM. This patch adds a helper to compute the value of SL0
+for a VM based on the IPA size.
 
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Christoffer Dall <cdall@kernel.org>
 Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
-Changs sinec v3
- - Update comment about reserved bits
- - Added Reviewed-by from Eric
+Changes since v5:
+ - Improve commentary.
+Changes since v3:
+ - Update reference to latest ARM ARM.
+ - Update per-vm VTCR value of SL0.
+ - Add helpers to decode levels from SL0.
+ - Didn't pick up Reviewed-by tag from Eric, as there
+   are some new changes in this version
 ---
- arch/arm64/include/asm/kvm_arm.h |  3 +++
- arch/arm64/kvm/hyp/s2-setup.c    | 34 ++++++++------------------------
- 2 files changed, 11 insertions(+), 26 deletions(-)
+ arch/arm64/include/asm/kvm_arm.h | 69 +++++++++++++++++++++++---------
+ arch/arm64/kvm/reset.c           |  1 +
+ 2 files changed, 50 insertions(+), 20 deletions(-)
 
 diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index aa45df752a16..5f807b680a5f 100644
+index b236d90ca056..f913adb44f93 100644
 --- a/arch/arm64/include/asm/kvm_arm.h
 +++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -107,6 +107,7 @@
- #define VTCR_EL2_RES1		(1 << 31)
- #define VTCR_EL2_HD		(1 << 22)
- #define VTCR_EL2_HA		(1 << 21)
-+#define VTCR_EL2_PS_SHIFT	TCR_EL2_PS_SHIFT
- #define VTCR_EL2_PS_MASK	TCR_EL2_PS_MASK
- #define VTCR_EL2_TG0_MASK	TCR_TG0_MASK
- #define VTCR_EL2_TG0_4K		TCR_TG0_4K
-@@ -127,6 +128,8 @@
+@@ -121,7 +121,6 @@
+ #define VTCR_EL2_IRGN0_WBWA	TCR_IRGN0_WBWA
+ #define VTCR_EL2_SL0_SHIFT	6
+ #define VTCR_EL2_SL0_MASK	(3 << VTCR_EL2_SL0_SHIFT)
+-#define VTCR_EL2_SL0_LVL1	(1 << VTCR_EL2_SL0_SHIFT)
+ #define VTCR_EL2_T0SZ_MASK	0x3f
+ #define VTCR_EL2_VS_SHIFT	19
  #define VTCR_EL2_VS_8BIT	(0 << VTCR_EL2_VS_SHIFT)
- #define VTCR_EL2_VS_16BIT	(1 << VTCR_EL2_VS_SHIFT)
+@@ -144,30 +143,60 @@
+ #define VTCR_EL2_COMMON_BITS	(VTCR_EL2_SH0_INNER | VTCR_EL2_ORGN0_WBWA | \
+ 				 VTCR_EL2_IRGN0_WBWA | VTCR_EL2_RES1)
  
-+#define VTCR_EL2_T0SZ(x)	TCR_T0SZ(x)
++/*
++ * VTCR_EL2:SL0 indicates the entry level for Stage2 translation.
++ * Interestingly, it depends on the page size.
++ * See D.10.2.121, VTCR_EL2, in ARM DDI 0487C.a
++ *
++ *	-----------------------------------------
++ *	| Entry level		|  4K  | 16K/64K |
++ *	------------------------------------------
++ *	| Level: 0		|  2   |   -     |
++ *	------------------------------------------
++ *	| Level: 1		|  1   |   2     |
++ *	------------------------------------------
++ *	| Level: 2		|  0   |   1     |
++ *	------------------------------------------
++ *	| Level: 3		|  -   |   0     |
++ *	------------------------------------------
++ *
++ * The table roughly translates to :
++ *
++ *	SL0(PAGE_SIZE, Entry_level) = TGRAN_SL0_BASE - Entry_Level
++ *
++ * Where TGRAN_SL0_BASE is a magic number depending on the page size:
++ * 	TGRAN_SL0_BASE(4K) = 2
++ *	TGRAN_SL0_BASE(16K) = 3
++ *	TGRAN_SL0_BASE(64K) = 3
++ * provided we take care of ruling out the unsupported cases and
++ * Entry_Level = 4 - Number_of_levels.
++ *
++ */
+ #ifdef CONFIG_ARM64_64K_PAGES
+-/*
+- * Stage2 translation configuration:
+- * 64kB pages (TG0 = 1)
+- * 2 level page tables (SL = 1)
+- */
+-#define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SL0_LVL1)
 +
++#define VTCR_EL2_TGRAN			VTCR_EL2_TG0_64K
++#define VTCR_EL2_TGRAN_SL0_BASE		3UL
++
+ #elif defined(CONFIG_ARM64_16K_PAGES)
+-/*
+- * Stage2 translation configuration:
+- * 16kB pages (TG0 = 2)
+- * 2 level page tables (SL = 1)
+- */
+-#define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_16K | VTCR_EL2_SL0_LVL1)
++
++#define VTCR_EL2_TGRAN			VTCR_EL2_TG0_16K
++#define VTCR_EL2_TGRAN_SL0_BASE		3UL
++
+ #else	/* 4K */
+-/*
+- * Stage2 translation configuration:
+- * 4kB pages (TG0 = 0)
+- * 3 level page tables (SL = 1)
+- */
+-#define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SL0_LVL1)
++
++#define VTCR_EL2_TGRAN			VTCR_EL2_TG0_4K
++#define VTCR_EL2_TGRAN_SL0_BASE		2UL
++
+ #endif
+ 
+-#define VTCR_EL2_FLAGS			(VTCR_EL2_COMMON_BITS | VTCR_EL2_TGRAN_FLAGS)
++#define VTCR_EL2_LVLS_TO_SL0(levels)	\
++	((VTCR_EL2_TGRAN_SL0_BASE - (4 - (levels))) << VTCR_EL2_SL0_SHIFT)
++#define VTCR_EL2_SL0_TO_LVLS(sl0)	\
++	((sl0) + 4 - VTCR_EL2_TGRAN_SL0_BASE)
++#define VTCR_EL2_LVLS(vtcr)		\
++	VTCR_EL2_SL0_TO_LVLS(((vtcr) & VTCR_EL2_SL0_MASK) >> VTCR_EL2_SL0_SHIFT)
++
++#define VTCR_EL2_FLAGS			(VTCR_EL2_COMMON_BITS | VTCR_EL2_TGRAN)
  /*
-  * We configure the Stage-2 page tables to always restrict the IPA space to be
-  * 40 bits wide (T0SZ = 24).  Systems with a PARange smaller than 40 bits are
-diff --git a/arch/arm64/kvm/hyp/s2-setup.c b/arch/arm64/kvm/hyp/s2-setup.c
-index 603e1ee83e89..e1ca672e937a 100644
---- a/arch/arm64/kvm/hyp/s2-setup.c
-+++ b/arch/arm64/kvm/hyp/s2-setup.c
-@@ -19,45 +19,27 @@
- #include <asm/kvm_arm.h>
- #include <asm/kvm_asm.h>
- #include <asm/kvm_hyp.h>
-+#include <asm/cpufeature.h>
- 
- u32 __hyp_text __init_stage2_translation(void)
- {
- 	u64 val = VTCR_EL2_FLAGS;
- 	u64 parange;
-+	u32 phys_shift;
- 	u64 tmp;
+  * ARM VMSAv8-64 defines an algorithm for finding the translation table
+  * descriptors in section D4.2.8 in ARM DDI 0487C.a.
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index 616120c4176b..1ced1e37374e 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -160,6 +160,7 @@ int kvm_arm_config_vm(struct kvm *kvm, unsigned long type)
+ 	if (phys_shift > KVM_PHYS_SHIFT)
+ 		phys_shift = KVM_PHYS_SHIFT;
+ 	vtcr |= VTCR_EL2_T0SZ(phys_shift);
++	vtcr |= VTCR_EL2_LVLS_TO_SL0(kvm_stage2_levels(kvm));
  
  	/*
- 	 * Read the PARange bits from ID_AA64MMFR0_EL1 and set the PS
--	 * bits in VTCR_EL2. Amusingly, the PARange is 4 bits, while
--	 * PS is only 3. Fortunately, bit 19 is RES0 in VTCR_EL2...
-+	 * bits in VTCR_EL2. Amusingly, the PARange is 4 bits, but the
-+	 * allocated values are limited to 3bits.
- 	 */
- 	parange = read_sysreg(id_aa64mmfr0_el1) & 7;
- 	if (parange > ID_AA64MMFR0_PARANGE_MAX)
- 		parange = ID_AA64MMFR0_PARANGE_MAX;
--	val |= parange << 16;
-+	val |= parange << VTCR_EL2_PS_SHIFT;
- 
- 	/* Compute the actual PARange... */
--	switch (parange) {
--	case 0:
--		parange = 32;
--		break;
--	case 1:
--		parange = 36;
--		break;
--	case 2:
--		parange = 40;
--		break;
--	case 3:
--		parange = 42;
--		break;
--	case 4:
--		parange = 44;
--		break;
--	case 5:
--	default:
--		parange = 48;
--		break;
--	}
-+	phys_shift = id_aa64mmfr0_parange_to_phys_shift(parange);
- 
- 	/*
- 	 * ... and clamp it to 40 bits, unless we have some braindead
-@@ -65,7 +47,7 @@ u32 __hyp_text __init_stage2_translation(void)
- 	 * return that value for the rest of the kernel to decide what
- 	 * to do.
- 	 */
--	val |= 64 - (parange > 40 ? 40 : parange);
-+	val |= VTCR_EL2_T0SZ(phys_shift > 40 ? 40 : phys_shift);
- 
- 	/*
- 	 * Check the availability of Hardware Access Flag / Dirty Bit
-@@ -86,5 +68,5 @@ u32 __hyp_text __init_stage2_translation(void)
- 
- 	write_sysreg(val, vtcr_el2);
- 
--	return parange;
-+	return phys_shift;
- }
+ 	 * Enable the Hardware Access Flag management, unconditionally
 -- 
 2.19.0
