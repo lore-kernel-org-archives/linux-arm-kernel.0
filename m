@@ -1,87 +1,76 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 26 Sep 2018 17:32:58 +0100
-Subject: [kvmtool PATCH v6 22/18] kvmtool: arm: Add support for creating VM
- with PA size
+Date: Wed, 26 Sep 2018 17:32:53 +0100
+Subject: [PATCH v6 17/18] kvm: arm64: Limit the minimum number of page table
+ levels
 In-Reply-To: <20180926163258.20218-1-suzuki.poulose@arm.com>
 References: <20180926163258.20218-1-suzuki.poulose@arm.com>
-Message-ID: <20180926163258.20218-23-suzuki.poulose@arm.com>
+Message-ID: <20180926163258.20218-18-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Specify the physical size for the VM encoded in the vm type.
+Since we are about to remove the lower limit on the IPA size,
+make sure that we do not go to 1 level page table (e.g, with
+32bit IPA on 64K host with concatenation) to avoid splitting
+the host PMD huge pages at stage2.
 
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Christoffer Dall <cdall@kernel.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arm/include/arm-common/kvm-arch.h |  6 +++++-
- arm/kvm.c                         | 32 +++++++++++++++++++++++++++++++
- 2 files changed, 37 insertions(+), 1 deletion(-)
+Change since v5:
+ - Cosmetic changes to the comment
+ - Remove unnecessary new line
+---
+ arch/arm64/include/asm/stage2_pgtable.h |  7 ++++++-
+ arch/arm64/kvm/reset.c                  | 10 +++++++++-
+ 2 files changed, 15 insertions(+), 2 deletions(-)
 
-diff --git a/arm/include/arm-common/kvm-arch.h b/arm/include/arm-common/kvm-arch.h
-index b29b4b1..d77f3ac 100644
---- a/arm/include/arm-common/kvm-arch.h
-+++ b/arm/include/arm-common/kvm-arch.h
-@@ -44,7 +44,11 @@
+diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
+index c62fe118a898..2cce769ba4c6 100644
+--- a/arch/arm64/include/asm/stage2_pgtable.h
++++ b/arch/arm64/include/asm/stage2_pgtable.h
+@@ -72,8 +72,13 @@
+ /*
+  * The number of PTRS across all concatenated stage2 tables given by the
+  * number of bits resolved at the initial level.
++ * If we force more levels than necessary, we may have (stage2_pgdir_shift > IPA),
++ * in which case, stage2_pgd_ptrs will have one entry.
+  */
+-#define __s2_pgd_ptrs(ipa, lvls)	(1 << ((ipa) - pt_levels_pgdir_shift((lvls))))
++#define pgd_ptrs_shift(ipa, pgdir_shift)	\
++	((ipa) > (pgdir_shift) ? ((ipa) - (pgdir_shift)) : 0)
++#define __s2_pgd_ptrs(ipa, lvls)		\
++	(1 << (pgd_ptrs_shift((ipa), pt_levels_pgdir_shift(lvls))))
+ #define __s2_pgd_size(ipa, lvls)	(__s2_pgd_ptrs((ipa), (lvls)) * sizeof(pgd_t))
  
- #define KVM_IRQ_OFFSET		GIC_SPI_IRQ_BASE
- 
--#define KVM_VM_TYPE		0
-+extern unsigned long		kvm_arm_type;
-+extern void kvm__arch_init_hyp(struct kvm *kvm);
-+
-+#define KVM_VM_TYPE		kvm_arm_type
-+#define kvm__arch_init_hyp	kvm__arch_init_hyp
- 
- #define VIRTIO_DEFAULT_TRANS(kvm)	\
- 	((kvm)->cfg.arch.virtio_trans_pci ? VIRTIO_PCI : VIRTIO_MMIO)
-diff --git a/arm/kvm.c b/arm/kvm.c
-index eac2ad2..c8db6b3 100644
---- a/arm/kvm.c
-+++ b/arm/kvm.c
-@@ -11,6 +11,8 @@
- #include <linux/kvm.h>
- #include <linux/sizes.h>
- 
-+unsigned long kvm_arm_type;
-+
- struct kvm_ext kvm_req_ext[] = {
- 	{ DEFINE_KVM_EXT(KVM_CAP_IRQCHIP) },
- 	{ DEFINE_KVM_EXT(KVM_CAP_ONE_REG) },
-@@ -18,6 +20,36 @@ struct kvm_ext kvm_req_ext[] = {
- 	{ 0, 0 },
- };
- 
-+#ifndef KVM_CAP_ARM_VM_IPA_SIZE
-+#define KVM_CAP_ARM_VM_IPA_SIZE	159
-+#endif
-+
-+#ifndef KVM_VM_TYPE_ARM_IPA_SIZE
-+#define KVM_VM_TYPE_ARM_IPA_SIZE_MASK	0xffULL
-+#define KVM_VM_TYPE_ARM_IPA_SIZE(x)	\
-+	((x) & KVM_VM_TYPE_ARM_IPA_SIZE_MASK)
-+#endif
-+
-+void kvm__arch_init_hyp(struct kvm *kvm)
-+{
-+	int max_ipa;
-+
-+	if (!kvm->cfg.arch.phys_shift)
-+		kvm->cfg.arch.phys_shift = 40;
-+	if (kvm->cfg.arch.phys_shift == 40)
-+		return;
-+	max_ipa = ioctl(kvm->sys_fd,
-+			KVM_CHECK_EXTENSION, KVM_CAP_ARM_VM_IPA_SIZE);
-+	if (!max_ipa)
-+		die("Kernel doesn't support IPA size configuration\n");
-+	if ((kvm->cfg.arch.phys_shift > max_ipa) ||
-+	    (kvm->cfg.arch.phys_shift < 32))
-+		die("Requested PA size (%u) is not supported by the host"
-+		    " [32 - %u]bit\n",
-+		    kvm->cfg.arch.phys_shift, max_ipa);
-+	kvm_arm_type = KVM_VM_TYPE_ARM_IPA_SIZE(kvm->cfg.arch.phys_shift);
-+}
-+
- bool kvm__arch_cpu_supports_vm(void)
+ #define stage2_pgd_ptrs(kvm)		__s2_pgd_ptrs(kvm_phys_shift(kvm), kvm_stage2_levels(kvm))
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index 96b3f50101bc..f156e45760bc 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -190,6 +190,7 @@ int kvm_arm_config_vm(struct kvm *kvm, unsigned long type)
  {
- 	/* The KVM capability check is enough. */
+ 	u64 vtcr = VTCR_EL2_FLAGS;
+ 	u32 parange, phys_shift;
++	u8 lvls;
+ 
+ 	if (type)
+ 		return -EINVAL;
+@@ -203,7 +204,14 @@ int kvm_arm_config_vm(struct kvm *kvm, unsigned long type)
+ 	if (phys_shift > KVM_PHYS_SHIFT)
+ 		phys_shift = KVM_PHYS_SHIFT;
+ 	vtcr |= VTCR_EL2_T0SZ(phys_shift);
+-	vtcr |= VTCR_EL2_LVLS_TO_SL0(stage2_pgtable_levels(phys_shift));
++	/*
++	 * Use a minimum 2 level page table to prevent splitting
++	 * host PMD huge pages at stage2.
++	 */
++	lvls = stage2_pgtable_levels(phys_shift);
++	if (lvls < 2)
++		lvls = 2;
++	vtcr |= VTCR_EL2_LVLS_TO_SL0(lvls);
+ 
+ 	/*
+ 	 * Enable the Hardware Access Flag management, unconditionally
 -- 
 2.19.0
