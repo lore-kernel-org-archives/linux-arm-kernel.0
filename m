@@ -1,120 +1,175 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 25 Sep 2018 20:55:22 -0700
-Subject: [PATCH v3] dt-bindings: arm: Explicitly mark Samsung Exynos SoC
- as unstable
-In-Reply-To: <20180924171645.GA10910@kozik-lap>
-References: <20180830180205.18121-1-krzk@kernel.org>
- <CAOesGMgE6QaasvHi7E55Z4U1Pp0+8QYW2eRLMsExebZ999_UHA@mail.gmail.com>
- <20180924171645.GA10910@kozik-lap>
-Message-ID: <20180926035522.v5flr36nl5ftayi4@localhost>
+From: j-keerthy@ti.com (Keerthy)
+Date: Wed, 26 Sep 2018 09:38:12 +0530
+Subject: [PATCH 0/4] Update am437x and am335x dts to probe with ti-sysc
+In-Reply-To: <20180925175537.GQ5662@atomide.com>
+References: <20180925000545.22931-1-tony@atomide.com>
+ <e9afe736-c2f0-6182-afd0-08279e09a35e@ti.com>
+ <20180925144021.GN5662@atomide.com> <20180925175537.GQ5662@atomide.com>
+Message-ID: <d98aa7c1-5131-34c5-51e5-c7ef57cbc31e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 24, 2018 at 07:16:45PM +0200, Krzysztof Kozlowski wrote:
-> On Sun, Sep 23, 2018 at 02:46:20PM +0100, Olof Johansson wrote:
-> > On Thu, Aug 30, 2018 at 7:02 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> > > Samsung Exynos SoCs and boards related bindings evolved since the initial
-> > > introduction, but initially the bindings were minimal and a bit incomplete
-> > > (they never described all the hardware modules available in the SoCs).
-> > > Since then some significant (not fully compatible) changes have been
-> > > already committed a few times (like gpio replaced by pinctrl, display ddc,
-> > > mfc reserved memory, some core clocks added to various hardware modules,
-> > > added more required nodes).
-> > >
-> > > On the other side there are no boards which have device tree embedded in
-> > > the bootloader. Device tree blob is always compiled from the kernel tree
-> > > and updated together with the kernel image.
-> > >
-> > > Thus to avoid further adding a bunch of workarounds for old/missing
-> > > bindings, make development of new platforms easier and allow to make
-> > > cleanup of the existing code and device tree files, lets mark some
-> > > Samsung Exynos SoC platform bindings as unstable. This means that
-> > > bindings can may change at any time and users should use the dtb file
-> > > compiled from the same kernel source tree as the kernel image.
-> > 
-> > I have to admit that I don't really like this approach, and I missed
-> > the patch when originally posted (I did notice it in the pull request
-> > it came in with though).
-> > 
-> > The main concern for me is that with a blanket "everything is always
-> > unstable" we discard the notion that we should strive for bindings to
-> > be stable and backwards compatible.
+
+
+On Tuesday 25 September 2018 11:25 PM, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [180925 14:44]:
+>> * Keerthy <j-keerthy@ti.com> [180925 05:18]:
+>>> I tried Branch [1] above. AM335x-boneblack is doing all good with ds0.
+>>> AM437x-gp the following is happening:
+>>>
+>>> https://pastebin.ubuntu.com/p/fmZNYgJ9Sp/
+>>>
+>>> There seems to be a timeout due to which resume is not immediate i see
+>>> 1-2s delay and i see i2c timeout.
+>>>
+>>> [  402.247271] omap_i2c 4802a000.i2c: controller timed out
+>>> [  402.247441] pixcir_ts 1-005c: pixcir_int_enable: can't read reg 0x34
+>>> : -110
+>>> [  402.247486] pixcir_ts 1-005c: Failed to disable interrupt generation:
+>>> -110
+>>> [  402.247522] pixcir_ts 1-005c: Failed to stop
+>>> [  402.247607] dpm_run_callback(): pixcir_i2c_ts_resume+0x0/0x98
+>>> [pixcir_i2c_ts] returns -110
+>>>
+>>> so pixcir_i2c_ts_resume is retuning -110 which is timeout error code.
+>>>
+>>> I did some touch screen testing after DS0 resume seems to be working.
+>>> Everything is in pastebin link provided above.
+>>
+>> Thanks for testing. Hmm no idea what might be going on with
+>> the pixcir. I have edt-ft5x06 on the am437x-sk-evm and that
+>> behaves just fine for suspend and resume. Both are on i2c1,
+>> pixcir calls pixcir_start/stop from suspend and resume while
+>> edt-ft5x06 does not reconfigure anything.
+>>
+>> I'll try read some edt-ft5x06 register values on suspend
+>> and resume, let's see if that makes it reproducable here.
 > 
-> The original idea from Marek was to mark everything unstable. After
-> comments from Rob I made it weaker already by changing to specific group
-> of compatibles. Accepting their instability does not mean that we will
-> be doing this on whenever possible. It just opens the possibility of
-> finding some balance in cleanups and development. Sometimes things have
-> to be seriously changed (fixed) and implementing workarounds for
-> existing ABI might be huge work by itself.
+> So after adding a call to edt_ft5x06_ts_readwrite to
+> edt_ft5x06_ts_resume I see -110 errors too. Looks like we
+> have i2c-omap not idled for suspend because of autoidle if
+> an i2c client reconfigures it's registers for suspend.
 > 
-> IOW, we want stability but not with the costs of huge development
-> efforts... because no one else except us cares about the stability.
+> Care to test with the following patch applied? If that works
+> for you, I'll send a proper patch for that.
 
-I think it's really problematic to retroactively mark a binding as unstable.
-The best way to do it is probably at the time of introduction if you anticipate
-it needing adjustments down the road (i.e. if it's for a complex IP block).
+https://pastebin.ubuntu.com/p/KKNDB6sCcD/
 
-For major overhauls, it might be worth updating to a new binding instead (by
-appending a suffix to the name or similar, and documenting that).
+So the below patch is solving the problem only for the first iteration
+but i see the problem recurring from second iteration of suspend.
 
-> > Questions that come to mind are:
-> > 
-> >  - When do they stop being unstable?
+I tried the above cycle multiple times on am437x-gp-evm. I believe
+we are one step closer still not completely fixed.
+
 > 
-> They became unstable in a subjective way so I assume that reverse is the
-> same, based on consensus and discussions.
+> Regards,
 > 
-> I am not sure if a hard time limit is good. There is no timeline for the
-> Exynos development, no public roadmaps but rather community and
-> partially volountary effort.  Therefore whatever number we set, it might
-> be totally not matching reality.
-
-I think that sets up for a pretty bad experience for some downstream users.
-
-The main problem with unstable bindings is if you have a platform that you
-haven't (yet) upstreamed the devicetrees for. Moving around base kernel
-versions in those cases can be really awkward.
-
-"Just upstream your devicetrees" is one counter-argument, but it's not always
-that easy -- it might be unreleased products or just some experimental
-platforms that might even be tracking fairly close to mainline during whatever
-development is ongoing.
-
-> >  - Is there a way to note in the binding itself that it's still
-> > unstable with an anticipation of when it will be settled in?
+> Tony
 > 
-> Hmm, I see that some existing bindings are being added with "Unstable"
-> warning:
+> 8< -------------------
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -208,6 +208,8 @@ struct omap_i2c_dev {
+>  						 * if set, should be trsh+1
+>  						 */
+>  	u32			rev;
+> +	unsigned int		is_suspended:1;
+> +	unsigned int		needs_resume:1;
+>  	unsigned		b_hw:1;		/* bad h/w fixes */
+>  	unsigned		bb_valid:1;	/* true when BB-bit reflects
+>  						 * the I2C bus state
+> @@ -1498,8 +1500,7 @@ static int omap_i2c_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> -#ifdef CONFIG_PM
+> -static int omap_i2c_runtime_suspend(struct device *dev)
+> +static int __maybe_unused omap_i2c_runtime_suspend(struct device *dev)
+>  {
+>  	struct omap_i2c_dev *omap = dev_get_drvdata(dev);
+>  
+> @@ -1521,11 +1522,12 @@ static int omap_i2c_runtime_suspend(struct device *dev)
+>  	}
+>  
+>  	pinctrl_pm_select_sleep_state(dev);
+> +	omap->is_suspended = true;
+>  
+>  	return 0;
+>  }
+>  
+> -static int omap_i2c_runtime_resume(struct device *dev)
+> +static int __maybe_unused omap_i2c_runtime_resume(struct device *dev)
+>  {
+>  	struct omap_i2c_dev *omap = dev_get_drvdata(dev);
+>  
+> @@ -1535,6 +1537,47 @@ static int omap_i2c_runtime_resume(struct device *dev)
+>  		return 0;
+>  
+>  	__omap_i2c_init(omap);
+> +	omap->is_suspended = false;
+> +
+> +	return 0;
+> +}
+> +
+> +static int __maybe_unused omap_i2c_suspend(struct device *dev)
+> +{
+> +	struct omap_i2c_dev *ddata = dev_get_drvdata(dev);
+> +	int error;
+> +
+> +	/* Is device still enabled because of autosuspend? */
+> +	if (!ddata->is_suspended) {
+> +		error = pm_runtime_put_sync_suspend(dev);
+> +		if (error < 0) {
+> +			dev_err(dev, "%s failed: %i\n", __func__, error);
+> +
+> +			return error;
+> +		}
+> +		ddata->needs_resume = true;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int __maybe_unused omap_i2c_resume(struct device *dev)
+> +{
+> +	struct omap_i2c_dev *ddata = dev_get_drvdata(dev);
+> +	int error;
+> +
+> +	if (ddata->needs_resume) {
+> +		error = pm_runtime_get_sync(dev);
+> +		if (error < 0) {
+> +			dev_err(dev, "%s failed: %i\n", __func__, error);
+> +			pm_runtime_put_noidle(dev);
+> +
+> +			return error;
+> +		}
+> +		pm_runtime_mark_last_busy(dev);
+> +		pm_runtime_put_autosuspend(dev);
+> +		ddata->needs_resume = false;
+> +	}
+>  
+>  	return 0;
+>  }
+> @@ -1542,18 +1585,15 @@ static int omap_i2c_runtime_resume(struct device *dev)
+>  static const struct dev_pm_ops omap_i2c_pm_ops = {
+>  	SET_RUNTIME_PM_OPS(omap_i2c_runtime_suspend,
+>  			   omap_i2c_runtime_resume, NULL)
+> +	SET_SYSTEM_SLEEP_PM_OPS(omap_i2c_suspend, omap_i2c_resume)
+>  };
+> -#define OMAP_I2C_PM_OPS (&omap_i2c_pm_ops)
+> -#else
+> -#define OMAP_I2C_PM_OPS NULL
+> -#endif /* CONFIG_PM */
+>  
+>  static struct platform_driver omap_i2c_driver = {
+>  	.probe		= omap_i2c_probe,
+>  	.remove		= omap_i2c_remove,
+>  	.driver		= {
+>  		.name	= "omap_i2c",
+> -		.pm	= OMAP_I2C_PM_OPS,
+> +		.pm	= &omap_i2c_pm_ops,
+>  		.of_match_table = of_match_ptr(omap_i2c_of_match),
+>  	},
+>  };
 > 
-> 	git grep -i unstable Documentation/devicetree/
-> 
-> so there should be no problem for putting there a timeframe.
-
-Yeah, adding them with unstable up front is a good way to do it (and then
-remove that warning once things have settled down).
-
-> >  - Is there a better way to version the bindings to avoid complete
-> > backwards compatibility?
-> 
-> Some architectures are using overlays for handling backward
-> compatibility. Anyway it might put additional effort on driver
-> development.
-
-In some cases it's pretty easy to stay backwards compatible by making sure
-that things like missing properties have the same defaults as they used to
-before the properties became mandatory.
-
-For complex subsystems it might be a different story, but that's also where it
-_might_ be worth looking at a new revision of the binding instead, this time
-maybe closer to a permanent one.
-
-> > Pointing out a couple of cases where it has been painful to stay
-> > backwards compatible could also be useful for understanding (even
-> > though you run the risk of each case being explained away with
-> > suggestions of how it can be handled).
-
-Marek, do you have any good examples here? Could still be useful.
-
-
--Olof
