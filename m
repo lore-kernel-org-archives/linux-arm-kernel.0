@@ -1,71 +1,147 @@
-From: ashok.raj@linux.intel.com (Raj, Ashok)
-Date: Wed, 26 Sep 2018 09:22:35 -0700
-Subject: [PATCH V3] PCI: Enable PASID when End-to-End TLP is supported by
- all bridges
-In-Reply-To: <1530372264-20653-1-git-send-email-okaya@codeaurora.org>
-References: <1530372264-20653-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <20180926162235.GA30177@araj-mobl1.jf.intel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 26 Sep 2018 09:23:03 -0700
+Subject: [PATCH 0/4] Update am437x and am335x dts to probe with ti-sysc
+In-Reply-To: <20180926155911.GT5662@atomide.com>
+References: <20180925000545.22931-1-tony@atomide.com>
+ <e9afe736-c2f0-6182-afd0-08279e09a35e@ti.com>
+ <20180925144021.GN5662@atomide.com>
+ <20180925175537.GQ5662@atomide.com>
+ <d98aa7c1-5131-34c5-51e5-c7ef57cbc31e@ti.com>
+ <20180926155911.GT5662@atomide.com>
+Message-ID: <20180926162303.GU5662@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan
-
-+ IOMMU list.
-
-On Sat, Jun 30, 2018 at 11:24:24AM -0400, Sinan Kaya wrote:
-> A PCIe endpoint carries the process address space identifier (PASID) in
-> the TLP prefix as part of the memory read/write transaction. The address
-> information in the TLP is relevant only for a given PASID context.
+* Tony Lindgren <tony@atomide.com> [180926 16:04]:
+> * Keerthy <j-keerthy@ti.com> [180926 04:12]:
+> > So the below patch is solving the problem only for the first iteration
+> > but i see the problem recurring from second iteration of suspend.
+> > 
+> > I tried the above cycle multiple times on am437x-gp-evm. I believe
+> > we are one step closer still not completely fixed.
 > 
-> An IOMMU takes PASID value and the address information from the
-> TLP to look up the physical address in the system.
-> 
-> PASID is an End-End TLP Prefix (PCIe r4.0, sec 6.20).  Sec 2.2.10.2 says
-> 
->   It is an error to receive a TLP with an End-End TLP Prefix by a
->   Receiver that does not support End-End TLP Prefixes. A TLP in
->   violation of this rule is handled as a Malformed TLP. This is a
->   reported error associated with the Receiving Port (see Section 6.2).
-> 
-> Prevent error condition by proactively requiring End-to-End TLP
-> prefix to be supported on the entire data path between the endpoint and
-> the root port before enabling PASID.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  
-> +static void pci_configure_eetlp_prefix(struct pci_dev *dev)
-> +{
-> +#ifdef CONFIG_PCI_PASID
-> +	struct pci_dev *bridge;
-> +	u32 cap;
-> +
-> +	if (!pci_is_pcie(dev))
-> +		return;
-> +
-> +	pcie_capability_read_dword(dev, PCI_EXP_DEVCAP2, &cap);
-> +	if (!(cap & PCI_EXP_DEVCAP2_E2ETLP))
-> +		return;
+> OK thanks, that's interesting, I'll take a look. Good to hear
+> that is the reason for pixcir issues though :)
 
-Forgot to notice this.. I'm not sure if the same enforcement is 
-required for devices that are RCIEP. The spec isn't clear about calling
-any excemption. Although it should be simple for devices to expose
-e2etlp support, but if they don't that should be ok, since there are
-nothing between itself and the root port.
+Heh ooops the previous i2c-omap patch I posted does unpaired
+runtime_pm calls.. The put must be left out omap_i2c_resume().
 
-We are seeking help from our SIG reps, but thought I'll ask here as well
-if there are other opinions.
+Below is a better patch, seems to work for me multiple times
+now.
 
-> +
-> +	if (pci_pcie_type(dev) == PCI_EXP_TYPE_ROOT_PORT)
-> +		dev->eetlp_prefix_path = 1;
-> +	else {
-> +		bridge = pci_upstream_bridge(dev);
-> +		if (bridge && bridge->eetlp_prefix_path)
-> +			dev->eetlp_prefix_path = 1;
-> +	}
-> +#endif
-> +}
+Regards,
 
-Cheers,
-Ashok
+Tony
+
+8< ---------------------------
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -208,6 +208,8 @@ struct omap_i2c_dev {
+ 						 * if set, should be trsh+1
+ 						 */
+ 	u32			rev;
++	unsigned int		is_suspended:1;
++	unsigned int		needs_resume:1;
+ 	unsigned		b_hw:1;		/* bad h/w fixes */
+ 	unsigned		bb_valid:1;	/* true when BB-bit reflects
+ 						 * the I2C bus state
+@@ -1498,8 +1500,7 @@ static int omap_i2c_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_PM
+-static int omap_i2c_runtime_suspend(struct device *dev)
++static int __maybe_unused omap_i2c_runtime_suspend(struct device *dev)
+ {
+ 	struct omap_i2c_dev *omap = dev_get_drvdata(dev);
+ 
+@@ -1521,11 +1522,12 @@ static int omap_i2c_runtime_suspend(struct device *dev)
+ 	}
+ 
+ 	pinctrl_pm_select_sleep_state(dev);
++	omap->is_suspended = true;
+ 
+ 	return 0;
+ }
+ 
+-static int omap_i2c_runtime_resume(struct device *dev)
++static int __maybe_unused omap_i2c_runtime_resume(struct device *dev)
+ {
+ 	struct omap_i2c_dev *omap = dev_get_drvdata(dev);
+ 
+@@ -1535,6 +1537,51 @@ static int omap_i2c_runtime_resume(struct device *dev)
+ 		return 0;
+ 
+ 	__omap_i2c_init(omap);
++	omap->is_suspended = false;
++
++	return 0;
++}
++
++static int __maybe_unused omap_i2c_suspend(struct device *dev)
++{
++	struct omap_i2c_dev *ddata = dev_get_drvdata(dev);
++	int error;
++
++	/* Is device still enabled because of autosuspend? */
++	if (ddata->is_suspended)
++		return 0;
++
++	/* Paired with call in omap_i2c_resume() */
++	error = pm_runtime_put_sync_suspend(dev);
++	if (error < 0) {
++		dev_err(dev, "%s failed: %i\n", __func__, error);
++
++		return error;
++	}
++
++	ddata->needs_resume = true;
++
++	return 0;
++}
++
++static int __maybe_unused omap_i2c_resume(struct device *dev)
++{
++	struct omap_i2c_dev *ddata = dev_get_drvdata(dev);
++	int error;
++
++	if (!ddata->needs_resume)
++		return 0;
++
++	/* Paired with call in omap_i2c_suspend() */
++	error = pm_runtime_get_sync(dev);
++	if (error < 0) {
++		dev_err(dev, "%s failed: %i\n", __func__, error);
++		pm_runtime_put_noidle(dev);
++
++		return error;
++	}
++
++	ddata->needs_resume = false;
+ 
+ 	return 0;
+ }
+@@ -1542,18 +1589,15 @@ static int omap_i2c_runtime_resume(struct device *dev)
+ static const struct dev_pm_ops omap_i2c_pm_ops = {
+ 	SET_RUNTIME_PM_OPS(omap_i2c_runtime_suspend,
+ 			   omap_i2c_runtime_resume, NULL)
++	SET_SYSTEM_SLEEP_PM_OPS(omap_i2c_suspend, omap_i2c_resume)
+ };
+-#define OMAP_I2C_PM_OPS (&omap_i2c_pm_ops)
+-#else
+-#define OMAP_I2C_PM_OPS NULL
+-#endif /* CONFIG_PM */
+ 
+ static struct platform_driver omap_i2c_driver = {
+ 	.probe		= omap_i2c_probe,
+ 	.remove		= omap_i2c_remove,
+ 	.driver		= {
+ 		.name	= "omap_i2c",
+-		.pm	= OMAP_I2C_PM_OPS,
++		.pm	= &omap_i2c_pm_ops,
+ 		.of_match_table = of_match_ptr(omap_i2c_of_match),
+ 	},
+ };
+-- 
+2.19.0
