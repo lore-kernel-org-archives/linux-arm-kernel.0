@@ -1,85 +1,80 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 26 Sep 2018 17:32:42 +0100
-Subject: [PATCH v6 06/18] kvm: arm/arm64: Allow arch specific configurations
- for VM
+Date: Wed, 26 Sep 2018 17:32:49 +0100
+Subject: [PATCH v6 13/18] kvm: arm64: Switch to per VM IPA limit
 In-Reply-To: <20180926163258.20218-1-suzuki.poulose@arm.com>
 References: <20180926163258.20218-1-suzuki.poulose@arm.com>
-Message-ID: <20180926163258.20218-7-suzuki.poulose@arm.com>
+Message-ID: <20180926163258.20218-14-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow the arch backends to perform VM specific initialisation.
-This will be later used to handle IPA size configuration and per-VM
-VTCR configuration on arm64.
+Now that we can manage the stage2 page table per VM, switch the
+configuration details to per VM instance. The VTCR is updated
+with the values specific to the VM based on the configuration.
+We store the IPA size and the number of stage2 page table levels
+for the guest already in VTCR. Decode it back from the vtcr
+field wherever we need it.
 
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Christoffer Dall <cdall@kernel.org>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm/include/asm/kvm_host.h   | 7 +++++++
- arch/arm64/include/asm/kvm_host.h | 2 ++
- arch/arm64/kvm/reset.c            | 7 +++++++
- virt/kvm/arm/arm.c                | 5 +++--
- 4 files changed, 19 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/kvm_arm.h        | 2 ++
+ arch/arm64/include/asm/kvm_mmu.h        | 2 +-
+ arch/arm64/include/asm/stage2_pgtable.h | 2 +-
+ arch/arm64/kvm/reset.c                  | 2 +-
+ 4 files changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 3ad482d2f1eb..72d46418e1ef 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -354,4 +354,11 @@ static inline void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu) {}
- struct kvm *kvm_arch_alloc_vm(void);
- void kvm_arch_free_vm(struct kvm *kvm);
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index f913adb44f93..e4240568cc18 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -197,6 +197,8 @@
+ 	VTCR_EL2_SL0_TO_LVLS(((vtcr) & VTCR_EL2_SL0_MASK) >> VTCR_EL2_SL0_SHIFT)
  
-+static inline int kvm_arm_config_vm(struct kvm *kvm, unsigned long type)
-+{
-+	if (type)
-+		return -EINVAL;
-+	return 0;
-+}
+ #define VTCR_EL2_FLAGS			(VTCR_EL2_COMMON_BITS | VTCR_EL2_TGRAN)
++#define VTCR_EL2_IPA(vtcr)		(64 - ((vtcr) & VTCR_EL2_T0SZ_MASK))
 +
- #endif /* __ARM_KVM_HOST_H__ */
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 3d6d7336f871..b04280ae1be0 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -513,4 +513,6 @@ void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu);
- struct kvm *kvm_arch_alloc_vm(void);
- void kvm_arch_free_vm(struct kvm *kvm);
+ /*
+  * ARM VMSAv8-64 defines an algorithm for finding the translation table
+  * descriptors in section D4.2.8 in ARM DDI 0487C.a.
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index ac3ca9690bad..77b1af9e64db 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -142,7 +142,7 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
+  */
+ #define KVM_PHYS_SHIFT	(40)
  
-+int kvm_arm_config_vm(struct kvm *kvm, unsigned long type);
-+
- #endif /* __ARM64_KVM_HOST_H__ */
+-#define kvm_phys_shift(kvm)		KVM_PHYS_SHIFT
++#define kvm_phys_shift(kvm)		VTCR_EL2_IPA(kvm->arch.vtcr)
+ #define kvm_phys_size(kvm)		(_AC(1, ULL) << kvm_phys_shift(kvm))
+ #define kvm_phys_mask(kvm)		(kvm_phys_size(kvm) - _AC(1, ULL))
+ 
+diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
+index 36a0a1165003..c62fe118a898 100644
+--- a/arch/arm64/include/asm/stage2_pgtable.h
++++ b/arch/arm64/include/asm/stage2_pgtable.h
+@@ -43,7 +43,7 @@
+  */
+ #define stage2_pgtable_levels(ipa)	ARM64_HW_PGTABLE_LEVELS((ipa) - 4)
+ #define STAGE2_PGTABLE_LEVELS		stage2_pgtable_levels(KVM_PHYS_SHIFT)
+-#define kvm_stage2_levels(kvm)		stage2_pgtable_levels(kvm_phys_shift(kvm))
++#define kvm_stage2_levels(kvm)		VTCR_EL2_LVLS(kvm->arch.vtcr)
+ 
+ /*
+  * With all the supported VA_BITs and 40bit guest IPA, the following condition
 diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index e37c78bbe1ca..b0c07dab5cb3 100644
+index 1ced1e37374e..2bf41e007390 100644
 --- a/arch/arm64/kvm/reset.c
 +++ b/arch/arm64/kvm/reset.c
-@@ -133,3 +133,10 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- 	/* Reset timer */
- 	return kvm_timer_vcpu_reset(vcpu);
- }
-+
-+int kvm_arm_config_vm(struct kvm *kvm, unsigned long type)
-+{
-+	if (type)
-+		return -EINVAL;
-+	return 0;
-+}
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index c92053bc3f96..327d0fd28380 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -120,8 +120,9 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
- {
- 	int ret, cpu;
+@@ -160,7 +160,7 @@ int kvm_arm_config_vm(struct kvm *kvm, unsigned long type)
+ 	if (phys_shift > KVM_PHYS_SHIFT)
+ 		phys_shift = KVM_PHYS_SHIFT;
+ 	vtcr |= VTCR_EL2_T0SZ(phys_shift);
+-	vtcr |= VTCR_EL2_LVLS_TO_SL0(kvm_stage2_levels(kvm));
++	vtcr |= VTCR_EL2_LVLS_TO_SL0(stage2_pgtable_levels(phys_shift));
  
--	if (type)
--		return -EINVAL;
-+	ret = kvm_arm_config_vm(kvm, type);
-+	if (ret)
-+		return ret;
- 
- 	kvm->arch.last_vcpu_ran = alloc_percpu(typeof(*kvm->arch.last_vcpu_ran));
- 	if (!kvm->arch.last_vcpu_ran)
+ 	/*
+ 	 * Enable the Hardware Access Flag management, unconditionally
 -- 
 2.19.0
