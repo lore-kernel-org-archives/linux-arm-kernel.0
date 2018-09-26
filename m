@@ -1,140 +1,54 @@
-From: saiprakash.ranjan@codeaurora.org (Sai Prakash Ranjan)
-Date: Wed, 26 Sep 2018 15:16:05 +0530
-Subject: [PATCH 3/6] tracing: Add tp_pstore cmdline to have tracepoints go
- to pstore
-In-Reply-To: <CAEXW_YRQtJb=3V0RKHSAejfQXKssh5qBp7nmD1OUC-wTyqGDEQ@mail.gmail.com>
-References: <cover.1536430404.git.saiprakash.ranjan@codeaurora.org>
- <f65e9fa6e047b9b14d4f64362f9fe1f89b306050.1536430404.git.saiprakash.ranjan@codeaurora.org>
- <CAEXW_YRQtJb=3V0RKHSAejfQXKssh5qBp7nmD1OUC-wTyqGDEQ@mail.gmail.com>
-Message-ID: <1f546234-bd7b-448a-3666-3f8baa249608@codeaurora.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 26 Sep 2018 11:52:02 +0200
+Subject: [PATCH] arm64: dts: allwinner: a64: Re-add "syscon" compatible
+In-Reply-To: <20180924112230.73e3009b@donnerap.Emea.Arm.com>
+References: <20180917152857.162662-1-andre.przywara@arm.com>
+ <CAGb2v643=V_3DbLeEyXEavSQJsW2KdknpZZLfw4QwCjhfdmVsA@mail.gmail.com>
+ <20180921153522.0413c280@donnerap.Emea.Arm.com>
+ <20180921151625.wkaypyueyi2pguur@flea>
+ <20180924112230.73e3009b@donnerap.Emea.Arm.com>
+Message-ID: <20180926095202.tdibor3x7fsn6afz@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/26/2018 2:55 AM, Joel Fernandes wrote:
-> On Sat, Sep 8, 2018 at 1:28 PM Sai Prakash Ranjan
-> <saiprakash.ranjan@codeaurora.org> wrote:
->>
->> Add the kernel command line tp_pstore option that will have
->> tracepoints go to persistent ram buffer as well as to the
->> trace buffer for further debugging. This is similar to tp_printk
->> cmdline option of ftrace.
->>
->> Pstore support for event tracing is already added and we enable
->> logging to pstore only if cmdline is specified.
->>
->> Passing "tp_pstore" will activate logging to pstore. To turn it
->> off, the sysctl /proc/sys/kernel/tracepoint_pstore can have '0'
->> echoed into it. Note, this only works if the cmdline option is
->> used. Echoing 1 into the sysctl file without the cmdline option
->> will have no affect.
->>
->> Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
->> ---
->>   .../admin-guide/kernel-parameters.txt         | 21 ++++++++
->>   include/linux/ftrace.h                        |  6 ++-
->>   kernel/sysctl.c                               |  7 +++
->>   kernel/trace/Kconfig                          | 22 +++++++-
->>   kernel/trace/trace.c                          | 51 +++++++++++++++++++
->>   kernel/trace/trace.h                          |  7 +++
->>   6 files changed, 112 insertions(+), 2 deletions(-)
->>
-> [...]
->>   config GCOV_PROFILE_FTRACE
->>          bool "Enable GCOV profiling on ftrace subsystem"
->>          depends on GCOV_KERNEL
->> @@ -789,4 +810,3 @@ config GCOV_PROFILE_FTRACE
->>   endif # FTRACE
->>
->>   endif # TRACING_SUPPORT
->> -
->> diff --git a/kernel/trace/trace.c b/kernel/trace/trace.c
->> index bf6f1d70484d..018cbbefb769 100644
->> --- a/kernel/trace/trace.c
->> +++ b/kernel/trace/trace.c
->> @@ -73,6 +73,11 @@ struct trace_iterator *tracepoint_print_iter;
->>   int tracepoint_printk;
->>   static DEFINE_STATIC_KEY_FALSE(tracepoint_printk_key);
->>
->> +/* Pipe tracepoints to pstore */
->> +struct trace_iterator *tracepoint_pstore_iter;
->> +int tracepoint_pstore;
->> +static DEFINE_STATIC_KEY_FALSE(tracepoint_pstore_key);
->> +
->>   /* For tracers that don't implement custom flags */
->>   static struct tracer_opt dummy_tracer_opt[] = {
->>          { }
->> @@ -238,6 +243,14 @@ static int __init set_tracepoint_printk(char *str)
->>   }
->>   __setup("tp_printk", set_tracepoint_printk);
->>
->> +static int __init set_tracepoint_pstore(char *str)
->> +{
->> +       if ((strcmp(str, "=0") != 0 && strcmp(str, "=off") != 0))
->> +               tracepoint_pstore = 1;
->> +       return 1;
->> +}
->> +__setup("tp_pstore", set_tracepoint_pstore);
->> +
->>   unsigned long long ns2usecs(u64 nsec)
->>   {
->>          nsec += 500;
->> @@ -2376,11 +2389,45 @@ int tracepoint_printk_sysctl(struct ctl_table *table, int write,
->>          return ret;
->>   }
->>
->> +static DEFINE_MUTEX(tracepoint_pstore_mutex);
->> +
->> +int tracepoint_pstore_sysctl(struct ctl_table *table, int write,
->> +                            void __user *buffer, size_t *lenp,
->> +                            loff_t *ppos)
->> +{
->> +       int save_tracepoint_pstore;
->> +       int ret;
->> +
->> +       mutex_lock(&tracepoint_pstore_mutex);
->> +       save_tracepoint_pstore = tracepoint_pstore;
->> +
->> +       ret = proc_dointvec(table, write, buffer, lenp, ppos);
->> +
->> +       if (!tracepoint_pstore_iter)
->> +               tracepoint_pstore = 0;
->> +
->> +       if (save_tracepoint_pstore == tracepoint_pstore)
->> +               goto out;
->> +
->> +       if (tracepoint_pstore)
->> +               static_key_enable(&tracepoint_pstore_key.key);
->> +       else
->> +               static_key_disable(&tracepoint_pstore_key.key);
->> +
->> + out:
->> +       mutex_unlock(&tracepoint_pstore_mutex);
->> +
->> +       return ret;
->> +}
->> +
->>   void trace_event_buffer_commit(struct trace_event_buffer *fbuffer)
->>   {
->>          if (static_key_false(&tracepoint_printk_key.key))
->>                  output_printk(fbuffer);
->>
->> +       if (static_key_false(&tracepoint_pstore_key.key))
->> +               pstore_event_call(fbuffer);
+On Mon, Sep 24, 2018 at 11:22:30AM +0100, Andre Przywara wrote:
+> > The fundamental difference is that we're mostly just a bunch of spare
+> > time programmers working on this platform, with a partial
+> > documentation for the controllers, at best.
+> > 
+> > You forced me to ask these developpers to work on their weekends and
+> > evenings on some crazy corner cases to maintain the backward
+> > compatibility. And honestly, both from a technical and human
+> > standpoint, I definitely understand if some of them are just leaving
+> > and don't want to work on it anymore. I would probably do the same in
+> > their position.
+> > 
+> > And having to ask that for companies like ARM or SUSE just makes it
+> > more frustrating to be honest. So there's simply no way you have
+> > forward compatibility while I'm there. Or you manage to convince all
+> > the ARM maintainers and enforce that compatibility for all the
+> > platforms.
 > 
-> Can you not find a way to pass the size of the even record here, to
-> pstore? Then you can directly allocate and store the binary record in
-> pstore itself instead of rendering and storing the text in pstore
-> which will be more space (and I think time) efficient. I also think if
-> you do this, then you will not need to use the spinlock in the pstore
-> (which AIUI is preventing the warning you're seeing in the
-> event_call->event.funcs->trace() call).
-> 
+> I understand that from your point of view there is no way of investing
+> huge efforts in staying forward compatible, but I am not asking for
+> that (and by no way forcing this!). Instead this suggestion is a small
+> tweak to achieve this.
 
-Right, I can check this out.
+We're trying to remain compatible but if there's any technical reason,
+then we won't be. I don't want anyone to assume we will, and to rely
+on the fact that we are actually guaranteeing this.
 
-Thanks,
-Sai
+> So I am sorry if those things frustrate you (which I can understand
+> very well), but I believe fixing the DT in a proper way is
+> much more user friendly in the long term (actually this issue was
+> brought forward by a user[1]).
+
+Given the current state of the industry, I don't really see how the DT
+can allow you to do what you are trying to achieve.
+
+Maxime
 
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
