@@ -1,61 +1,70 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Wed, 26 Sep 2018 11:27:06 +0200
-Subject: [PATCH 1/2] soc: fsl: qbman: qman_portal: defer probing when
- qman is not available
-In-Reply-To: <CAOesGMjDKKSNVccu4D579SiwL9zEU7ha7HQCHncvh2r4kpO6fQ@mail.gmail.com>
-References: <20180823213600.23426-1-alexandre.belloni@bootlin.com>
- <CAOesGMjDKKSNVccu4D579SiwL9zEU7ha7HQCHncvh2r4kpO6fQ@mail.gmail.com>
-Message-ID: <20180926092706.GA16644@piout.net>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 26 Sep 2018 12:30:10 +0300
+Subject: [Intel-gfx] [PATCH 4/5] drm/omapdrm: Substitute format_is_yuv()
+ with format->is_yuv
+In-Reply-To: <20180718101741.GU5565@intel.com>
+References: <1531847626-22248-1-git-send-email-ayan.halder@arm.com>
+ <1531847626-22248-4-git-send-email-ayan.halder@arm.com>
+ <20180718101741.GU5565@intel.com>
+Message-ID: <57ef0cb3-c032-3854-cff5-78fbe2a5ed20@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/09/2018 21:45:56+0200, Olof Johansson wrote:
-> Hi,
-> 
-> 
-> On Thu, Aug 23, 2018 at 11:36 PM Alexandre Belloni
-> <alexandre.belloni@bootlin.com> wrote:
-> >
-> > If the qman driver (qman_ccsr) doesn't probe or fail to probe before
-> > qman_portal, qm_ccsr_start will be either NULL or a stale pointer to an
-> > unmapped page.
-> >
-> > This leads to a crash when probing  qman_portal as the init_pcfg function
-> > calls qman_liodn_fixup that tries to read qman registers.
-> >
-> > Assume that qman didn't probe when the pool mask is 0.
-> >
-> > Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
-> > ---
-> >  drivers/soc/fsl/qbman/qman_portal.c | 2 ++
-> >  1 file changed, 2 insertions(+)
-> >
-> > diff --git a/drivers/soc/fsl/qbman/qman_portal.c b/drivers/soc/fsl/qbman/qman_portal.c
-> > index a120002b630e..4fc80d2c8feb 100644
-> > --- a/drivers/soc/fsl/qbman/qman_portal.c
-> > +++ b/drivers/soc/fsl/qbman/qman_portal.c
-> > @@ -277,6 +277,8 @@ static int qman_portal_probe(struct platform_device *pdev)
-> >         }
-> >
-> >         pcfg->pools = qm_get_pools_sdqcr();
-> > +       if (pcfg->pools == 0)
-> > +               return -EPROBE_DEFER;
-> 
-> This is quite late in the probe, after a bunch of resources have been claimed.
-> 
-> Note that the ioremaps above this are doing unwinds, and you'll end up
-> doing duplicate ioremaps if you come in and probe again.
-> 
-> You should probably unwind those allocations, or move them to devm_*
-> or do this check earlier in the function.
-> 
+Hi,
 
-The actual chance of having that happen is quite small (this was coming
-from a non working DT) and I mainly wanted to avoid a crash so the
-platform could still boot. I would think moving to devm_ would be the
-right thing to do.
+On 18/07/18 13:17, Ville Syrj?l? wrote:
+> On Tue, Jul 17, 2018 at 06:13:45PM +0100, Ayan Kumar Halder wrote:
+>> drm_format_info table has a field 'is_yuv' to denote if the format
+>> is yuv or not. The driver is expected to use this instead of
+>> having a function for the same purpose.
+>>
+>> Signed-off-by: Ayan Kumar halder <ayan.halder@arm.com>
+>> ---
+>>  drivers/gpu/drm/omapdrm/dss/dispc.c | 26 ++++++++++----------------
+>>  1 file changed, 10 insertions(+), 16 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/omapdrm/dss/dispc.c b/drivers/gpu/drm/omapdrm/dss/dispc.c
+>> index 84f274c..8d2d7a4 100644
+>> --- a/drivers/gpu/drm/omapdrm/dss/dispc.c
+>> +++ b/drivers/gpu/drm/omapdrm/dss/dispc.c
+>> @@ -1140,18 +1140,6 @@ static void dispc_ovl_set_color_mode(struct dispc_device *dispc,
+>>  	REG_FLD_MOD(dispc, DISPC_OVL_ATTRIBUTES(plane), m, 4, 1);
+>>  }
+>>  
+>> -static bool format_is_yuv(u32 fourcc)
+>> -{
+>> -	switch (fourcc) {
+>> -	case DRM_FORMAT_YUYV:
+>> -	case DRM_FORMAT_UYVY:
+>> -	case DRM_FORMAT_NV12:
+>> -		return true;
+>> -	default:
+>> -		return false;
+>> -	}
+>> -}
+>> -
+>>  static void dispc_ovl_configure_burst_type(struct dispc_device *dispc,
+>>  					   enum omap_plane_id plane,
+>>  					   enum omap_dss_rotation_type rotation)
+>> @@ -1910,11 +1898,14 @@ static void dispc_ovl_set_scaling_uv(struct dispc_device *dispc,
+>>  	int scale_x = out_width != orig_width;
+>>  	int scale_y = out_height != orig_height;
+>>  	bool chroma_upscale = plane != OMAP_DSS_WB;
+>> +	const struct drm_format_info *info;
+>> +
+>> +	info = drm_format_info(fourcc);
+> 
+> Not sure Tomi wants drm usage (apart from the fourccs) inside the
+> dss code.
+
+Seems like I have missed this. No, I don't have anything against drm
+usage inside dss. That's the way we've been moving after we managed to
+get rid of omapfb links.
+
+I'll pick this up.
+
+ Tomi
 
 -- 
-Alexandre Belloni, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
