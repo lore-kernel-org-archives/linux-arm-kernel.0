@@ -1,20 +1,30 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Wed, 26 Sep 2018 17:27:49 +0530
-Subject: [PATCH 0/2] i2c-omap: Enable i2c-omap driver for AM654 SoCs
-Message-ID: <20180926115751.20421-1-vigneshr@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 26 Sep 2018 09:02:07 -0300
+Subject: [PATCH v9 4/5] clk: imx: add imx composite clock
+In-Reply-To: <20180926064752.GM4097@pengutronix.de>
+References: <1537785597-26499-1-git-send-email-abel.vesa@nxp.com>
+ <1537785597-26499-5-git-send-email-abel.vesa@nxp.com>
+ <CAOMZO5D7yLUzriOub4RWsq1K8_fTj6c0LFOnSZwHyjqMPYu=0A@mail.gmail.com>
+ <20180926064752.GM4097@pengutronix.de>
+Message-ID: <CAOMZO5D-40WbanPC=-O_Nj98znOk6Aa3dAqpCuwHTv+GuFR6_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Couple of patches to enable i2c-omap driver to be used with TI's new
-AM654 platforms.
+Hi Sascha,
 
-Vignesh R (2):
-  dt-bindings: i2c-omap: Add new compatible for AM654 SoCs
-  i2c: busses: Kconfig: Enable I2C_OMAP for ARCH_K3
+On Wed, Sep 26, 2018 at 3:47 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
 
- Documentation/devicetree/bindings/i2c/i2c-omap.txt | 1 +
- drivers/i2c/busses/Kconfig                         | 2 +-
- 2 files changed, 2 insertions(+), 1 deletion(-)
+> It's:
+>         rate = *prate / prediv_value;
+>         rate = rate / div_value;
 
--- 
-2.19.0
+Yes, this looks correct. Thanks for the feedback.
+
+> To me this looks correct. However, For an unsigned long type we have
+> DIV_ROUND_UP() with which we do not need any casting. For 64bit code
+> unsigned long is 64bit anyway which makes the cast a no-op and for 32bit
+> code there's also no point in exanding the initial 32bit value to 64bit.
+
+That's a good point too.
+
+Thanks
