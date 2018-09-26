@@ -1,60 +1,35 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Wed, 26 Sep 2018 16:22:35 +0300
-Subject: [PATCH v2 10/22] fsl/fman: add API to get the device behind a fman
- port
+Date: Wed, 26 Sep 2018 16:22:40 +0300
+Subject: [PATCH v2 15/22] dpaa_eth: fix SG frame cleanup
 In-Reply-To: <20180926132247.10971-1-laurentiu.tudor@nxp.com>
 References: <20180926132247.10971-1-laurentiu.tudor@nxp.com>
-Message-ID: <20180926132247.10971-11-laurentiu.tudor@nxp.com>
+Message-ID: <20180926132247.10971-16-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-Add an API that retrieves the 'struct device' that the specified fman
-port probed against. The new API will be used in a subsequent iommu
-enablement related patch.
+Fix issue with the entry indexing in the sg frame cleanup code being
+off-by-1. This problem showed up when doing some basic iperf tests and
+manifested in traffic coming to a halt.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
- drivers/net/ethernet/freescale/fman/fman_port.c | 14 ++++++++++++++
- drivers/net/ethernet/freescale/fman/fman_port.h |  2 ++
- 2 files changed, 16 insertions(+)
+ drivers/net/ethernet/freescale/dpaa/dpaa_eth.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/net/ethernet/freescale/fman/fman_port.c b/drivers/net/ethernet/freescale/fman/fman_port.c
-index ee82ee1384eb..bd76c9730692 100644
---- a/drivers/net/ethernet/freescale/fman/fman_port.c
-+++ b/drivers/net/ethernet/freescale/fman/fman_port.c
-@@ -1728,6 +1728,20 @@ u32 fman_port_get_qman_channel_id(struct fman_port *port)
- }
- EXPORT_SYMBOL(fman_port_get_qman_channel_id);
+diff --git a/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c b/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
+index 8db861f281a0..605f06f0def8 100644
+--- a/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
++++ b/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
+@@ -1663,7 +1663,7 @@ static struct sk_buff *dpaa_cleanup_tx_fd(const struct dpaa_priv *priv,
+ 				 qm_sg_entry_get_len(&sgt[0]), dma_dir);
  
-+/**
-+ * fman_port_get_device
-+ * port:	Pointer to the FMan port device
-+ *
-+ * Get the 'struct device' associated to the specified FMan port device
-+ *
-+ * Return: pointer to associated 'struct device'
-+ */
-+struct device *fman_port_get_device(struct fman_port *port)
-+{
-+	return port->dev;
-+}
-+EXPORT_SYMBOL(fman_port_get_device);
-+
- int fman_port_get_hash_result_offset(struct fman_port *port, u32 *offset)
- {
- 	if (port->buffer_offsets.hash_result_offset == ILLEGAL_BASE)
-diff --git a/drivers/net/ethernet/freescale/fman/fman_port.h b/drivers/net/ethernet/freescale/fman/fman_port.h
-index 9dbb69f40121..82f12661a46d 100644
---- a/drivers/net/ethernet/freescale/fman/fman_port.h
-+++ b/drivers/net/ethernet/freescale/fman/fman_port.h
-@@ -157,4 +157,6 @@ int fman_port_get_tstamp(struct fman_port *port, const void *data, u64 *tstamp);
+ 		/* remaining pages were mapped with skb_frag_dma_map() */
+-		for (i = 1; i < nr_frags; i++) {
++		for (i = 1; i <= nr_frags; i++) {
+ 			WARN_ON(qm_sg_entry_is_ext(&sgt[i]));
  
- struct fman_port *fman_port_bind(struct device *dev);
- 
-+struct device *fman_port_get_device(struct fman_port *port);
-+
- #endif /* __FMAN_PORT_H */
+ 			dma_unmap_page(dev, qm_sg_addr(&sgt[i]),
 -- 
 2.17.1
