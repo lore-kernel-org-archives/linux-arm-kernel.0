@@ -1,204 +1,257 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Wed, 26 Sep 2018 13:21:20 +0800
-Subject: [Resend PATCH 5/5] arm: dts: mt7623: add display subsystem
- related device nodes
-In-Reply-To: <1537929498.32631.16.camel@mtkswgap22>
-References: <84011aa94dd7be9239b7a2f944dd30fc70568fbb.1536155449.git.ryder.lee@mediatek.com>
- <7105c341de3525761ad4067ca57c641c7097f773.1536155449.git.ryder.lee@mediatek.com>
- <1537925879.20118.3.camel@mtksdaap41>
- <1537929498.32631.16.camel@mtkswgap22>
-Message-ID: <1537939280.20005.19.camel@mtksdaap41>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 26 Sep 2018 14:57:07 +0900
+Subject: [PATCH v14 06/16] of/fdt: add helper functions for handling
+ properties
+In-Reply-To: <16a39f7f-a8cc-72a1-89a7-e9b49a4d6547@gmail.com>
+References: <20180907080040.4967-1-takahiro.akashi@linaro.org>
+ <a535515a-92f1-fc33-bdb9-6f5e0392cb11@gmail.com>
+ <8403dfd5-3188-219b-966c-72b009f94e0f@gmail.com>
+ <16a39f7f-a8cc-72a1-89a7-e9b49a4d6547@gmail.com>
+Message-ID: <20180926055704.GC27322@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Ryder:
+Frank,
 
-On Wed, 2018-09-26 at 10:38 +0800, Ryder Lee wrote:
-> On Wed, 2018-09-26 at 09:37 +0800, CK Hu wrote:
-> > Hi, Ryder:
+On Fri, Sep 14, 2018 at 10:19:38AM -0700, Frank Rowand wrote:
+> On 09/13/18 18:26, Frank Rowand wrote:
+> > I was re-reading this while answering a later email in the thread.  After reading
+> > other patches in the series that were not sent to me, I have a better understanding
+> > of the intent behind this patch, and some changes to my previous reply.
 > > 
-> > On Wed, 2018-09-05 at 22:09 +0800, Ryder Lee wrote:
-> > > Add display subsystem related device nodes for MT7623.
-> > > 
-> > > Cc: CK Hu <ck.hu@mediatek.com>
-> > > Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
-> > > Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
-> > > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> > > ---
-> > > I forgot to sort nodes in my previous mail. Sorry for the inconvenience.
-> > > 
-> > > This patch depends on the series: https://lkml.org/lkml/2018/9/5/223
-> > > 
-> > > @Matthias,
-> > > I know you're working on broken MMSYS - just want to ask whether it's possible
-> > > to let the patch to go to your tree (if others are okay with it), and send a
-> > > fixup one for MT7623 MMSYS later?
-> > > ---
-> > >  arch/arm/boot/dts/mt7623.dtsi                 | 177 ++++++++++++++++++++++++++
-> > >  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts |  83 ++++++++++++
-> > >  arch/arm/boot/dts/mt7623n-rfb-emmc.dts        |  83 ++++++++++++
-> > >  3 files changed, 343 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
-> > > index d01bdee..fdf9078 100644
-> > > --- a/arch/arm/boot/dts/mt7623.dtsi
-> > > +++ b/arch/arm/boot/dts/mt7623.dtsi
-> > > @@ -23,6 +23,11 @@
-> > >  	#address-cells = <2>;
-> > >  	#size-cells = <2>;
-> > >  
-> > > +	aliases {
-> > > +		rdma0 = &rdma0;
-> > > +		rdma1 = &rdma1;
-> > > +	};
-> > > +
-> > >  	cpu_opp_table: opp-table {
-> > >  		compatible = "operating-points-v2";
-> > >  		opp-shared;
-> > > @@ -311,6 +316,25 @@
-> > >  		clock-names = "spi", "wrap";
-> > >  	};
-> > >  
-> > > +	mipi_tx0: mipi-dphy at 10010000 {
-> > > +		compatible = "mediatek,mt7623-mipi-tx",
-> > > +			     "mediatek,mt2701-mipi-tx";
-> > > +		reg = <0 0x10010000 0 0x90>;
-> > > +		clocks = <&clk26m>;
-> > > +		clock-output-names = "mipi_tx0_pll";
-> > > +		#clock-cells = <0>;
-> > > +		#phy-cells = <0>;
-> > > +	};
-> > > +
-> > > +	cec: cec at 10012000 {
-> > > +		compatible = "mediatek,mt7623-cec",
-> > > +			     "mediatek,mt8173-cec";
-> > > +		reg = <0 0x10012000 0 0xbc>;
-> > > +		interrupts = <GIC_SPI 182 IRQ_TYPE_LEVEL_LOW>;
-> > > +		clocks = <&infracfg CLK_INFRA_CEC>;
-> > > +		status = "disabled";
-> > > +	};
-> > > +
-> > >  	cir: cir at 10013000 {
-> > >  		compatible = "mediatek,mt7623-cir";
-> > >  		reg = <0 0x10013000 0 0x1000>;
-> > > @@ -359,6 +383,18 @@
-> > >  		#clock-cells = <1>;
-> > >  	};
-> > >  
-> > > +	hdmi_phy: phy at 10209100 {
-> > > +		compatible = "mediatek,mt7623-hdmi-phy",
-> > > +			     "mediatek,mt2701-hdmi-phy";
-> > > +		reg = <0 0x10209100 0 0x24>;
-> > > +		clocks = <&apmixedsys CLK_APMIXED_HDMI_REF>;
-> > > +		clock-names = "pll_ref";
-> > > +		clock-output-names = "hdmitx_dig_cts";
-> > > +		#clock-cells = <0>;
-> > > +		#phy-cells = <0>;
-> > > +		status = "disabled";
-> > > +	};
-> > > +
-> > >  	rng: rng at 1020f000 {
-> > >  		compatible = "mediatek,mt7623-rng";
-> > >  		reg = <0 0x1020f000 0 0x1000>;
-> > > @@ -558,6 +594,16 @@
-> > >  		status = "disabled";
-> > >  	};
-> > >  
-> > > +	hdmiddc0: i2c at 11013000 {
-> > > +		compatible = "mediatek,mt7623-hdmi-ddc",
-> > > +			     "mediatek,mt8173-hdmi-ddc";
-> > > +		interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_LOW>;
-> > > +		reg = <0 0x11013000 0 0x1C>;
-> > > +		clocks = <&pericfg CLK_PERI_I2C3>;
-> > > +		clock-names = "ddc-i2c";
-> > > +		status = "disabled";
-> > > +	};
-> > > +
-> > >  	nor_flash: spi at 11014000 {
-> > >  		compatible = "mediatek,mt7623-nor",
-> > >  			     "mediatek,mt8173-nor";
-> > > @@ -732,6 +778,84 @@
-> > >  		#clock-cells = <1>;
-> > >  	};
-> > >  
-> > > +	display_components: dispsys at 14000000 {
-> > > +		compatible = "mediatek,mt7623-mmsys",
+> > The intent of the helper functions is related to properties whose values are
+> > tuples of the same format as the "reg" property of the "/memory" nodes.  For
+> > example, the "linux,usable-memory-range" and "linux,elfcoredhr" properties of
+> > the "/chosen" node.
 > > 
-> > Checkpatch warning:
+> > The patch header and the function names should be updated to reflect this intent.
+> > This means most or all of my previous suggested function name changes are no longer
+> > useful.
 > > 
-> > WARNING: DT compatible string "mediatek,mt7623-mmsys" appears
-> > un-documented -- check ./Documentation/devicetree/bindings/
-> > #101: FILE: arch/arm/boot/dts/mt7623.dtsi:782:
-> > +               compatible = "mediatek,mt7623-mmsys",
+> > Please add devicetree at vger.kernel.org to the next version of this patch and to
+> > the patches that use the functions in this patch.
 > > 
 > > 
-> > > +			     "mediatek,mt2701-mmsys";
-> > > +		reg = <0 0x14000000 0 0x1000>;
-> > > +		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
-> > > +	};
-> > > +
-> > > +	ovl at 14007000 {
-> > > +		compatible = "mediatek,mt7623-disp-ovl",
+> > On 09/07/18 12:53, Frank Rowand wrote:
+> >> On 09/07/18 01:00, AKASHI Takahiro wrote:
+> >>> These functions will be used later to handle kexec-specific properties
+> >>> in arm64's kexec_file implementation.
+> >>>
+> >>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> >>> Cc: Rob Herring <robh+dt@kernel.org>
+> >>> Cc: Frank Rowand <frowand.list@gmail.com>
+> >>> ---
+> >>>  drivers/of/fdt.c       | 62 ++++++++++++++++++++++++++++++++++++++++--
+> >>>  include/linux/of_fdt.h | 10 +++++--
+> >>>  2 files changed, 68 insertions(+), 4 deletions(-)
+> >>>
+> >>> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+> >>> index 800ad252cf9c..dc960cea1355 100644
+> >>> --- a/drivers/of/fdt.c
+> >>> +++ b/drivers/of/fdt.c
+> >>> @@ -25,6 +25,7 @@
+> >>>  #include <linux/debugfs.h>
+> >>>  #include <linux/serial_core.h>
+> >>>  #include <linux/sysfs.h>
+> >>> +#include <linux/types.h>
+> >>>  
+> >>>  #include <asm/setup.h>  /* for COMMAND_LINE_SIZE */
+> >>>  #include <asm/page.h>
+> >>> @@ -537,8 +538,8 @@ void *of_fdt_unflatten_tree(const unsigned long *blob,
+> >>>  EXPORT_SYMBOL_GPL(of_fdt_unflatten_tree);
+> >>>  
+> >>>  /* Everything below here references initial_boot_params directly. */
+> >>> -int __initdata dt_root_addr_cells;
+> >>> -int __initdata dt_root_size_cells;
+> >>> +int dt_root_addr_cells;
+> >>> +int dt_root_size_cells;
+> >>>  
+> >>>  void *initial_boot_params;
+> >>>  
+> >>> @@ -1323,3 +1324,60 @@ late_initcall(of_fdt_raw_init);
+> >>>  #endif
+> >>>  
+> >>>  #endif /* CONFIG_OF_EARLY_FLATTREE */
+> >>> +
 > > 
-> > I think this is also un-documented, but I don't know why checkpatch does
-> > not show any warning.
+> > Global comment: this code should not be using the variables
+> > dt_root_addr_cells and dt_root_size_cells.  These variables are
+> > __initdata.
 > > 
-> > Regards,
-> > CK
-> > > +			     "mediatek,mt2701-disp-ovl";
-> > > +		reg = <0 0x14007000 0 0x1000>;
-> > > +		interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_LOW>;
-> > > +		clocks = <&mmsys CLK_MM_DISP_OVL>;
-> > > +		iommus = <&iommu MT2701_M4U_PORT_DISP_OVL_0>;
-> > > +		mediatek,larb = <&larb0>;
-> > > +	};
-> > > +
+> > The code that is using these helpers is acting upon a specific FDT
+> > (copied from initial_boot_params).  This code should be getting the
+> > values of the root node's "#address-cells" and "#size-cells" from
+> > the FDT.
 > 
-> I fallback to use the MT2701's compatible string here and there, but I
-> could add a new one for MT7623.
+> There will be new functions available soon to return the values of
+> a node's "#address-cells" and "#size-cells" from an fdt.  They are
+> fdt_address_cells() and fdt_size_cells().
 > 
-> BTW, I've had this question for a long time - should I add a new
-> compatible for the very same IPs, or could we just use the old one in
-> DTS?
+> Rob submitted the patch to add them yesterday in "[PATCH 3/3] scripts/dtc:
+> Update to upstream version v1.4.7-14-gc86da84d30e4" [1]
+
+Will this patch go into mainline in v4.20 merge window?
+
+>   [1] https://lkml.kernel.org/r/<20180913202828.15372-3-robh@kernel.org>
+
+Unfortunately, fdt_addresses.c where fdt_address_cells() and
+fdt_size_cells() are defined is NOT compiled in the kernel.
+I will submit a patch.
+
+-Takahiro Akashi
+
+
+> -Frank
 > 
-> Ryder
 > 
-
->From [1], there is a description for the multiple compatible string
-scheme:
-
-====
-The reasoning behind this scheme is the observation that in the majority
-of cases, a single machine_desc can support a large number of boards
-if they all use the same SoC, or same family of SoCs.  However,
-invariably there will be some exceptions where a specific board will
-require special setup code that is not useful in the generic case.
-Special cases could be handled by explicitly checking for the
-troublesome board(s) in generic setup code, but doing so very quickly
-becomes ugly and/or unmaintainable if it is more than just a couple of
-cases.
-
-Instead, the compatible list allows a generic machine_desc to provide
-support for a wide common set of boards by specifying "less
-compatible" values in the dt_compat list.  In the example above,
-generic board support can claim compatibility with "ti,omap3" or
-"ti,omap3450".  If a bug was discovered on the original beagleboard
-that required special workaround code during early boot, then a new
-machine_desc could be added which implements the workarounds and only
-matches on "ti,omap3-beagleboard".
-====
-
-I don't know would there be a problem happened only in MT7623 even
-though this hardware is identical in both MT2701 and MT7623. Maybe the
-system-wide configuration would influence this driver. So the easy way
-is to add the compatible string for MT7623. If you could prove that 
-this driver would never be influenced by system-wide configuration,
-using only MT2701 compatible string is acceptable for me.
-
-This is my opinion, but the most important is maintainer's opinion.
-
-[1]
-https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/plain/Documentation/devicetree/usage-model.txt?id=HEAD
-
-Regards,
-CK
+> > 
+> > 
+> >> Please add comment:
+> >>
+> >> /* helper functions for arm64 kexec */
+> >>
+> >>
+> >>> +bool of_fdt_cells_size_fitted(u64 base, u64 size)
+> >>
+> >> Please rename as of_fdt_range_valid()
+> > 
+> > I'm not entirely sure of what the caller in 12/16 is trying to ensure
+> > with this function.
+> > 
+> > (1) At the minimum (and what the implementation in of_fdt_cells_size_fitted()
+> > does) is make sure that an address and size tuple are consistent with
+> > the root properties "#address-cells" and "#size-cells".
+> > 
+> > The caller in 12/16 is using this check to validate values for the
+> > properties  "linux,elfcorehdr" and "linux,usable-memory-range".
+> > 
+> > (2) A more complete check _might_ be to ensure that the values also
+> > specify memory that is available to the kernel.  This memory is described
+> > by the "reg" property of one or more "/memory" nodes.
+> > 
+> > This second check is probably what is actually desired.
+> > 
+> > One possible issue to note is that the binding for "linux,usable-memory-range"
+> > suggests that available memory could be described by an EFI memory map.
+> > I am not familiar with how or when an EFI memory map might exist instead
+> > of the "/memory" nodes.
+> > 
+> > 
+> >>> +{
+> >>> +	/* if *_cells >= 2, cells can hold 64-bit values anyway */
+> >>> +	if ((dt_root_addr_cells == 1) && (base > U32_MAX))
+> >>> +		return false;
+> >>> +
+> >>> +	if ((dt_root_size_cells == 1) && (size > U32_MAX))
+> >>> +		return false;
+> >>
+> >> Should also check that base + size does not wrap around.
+> >>
+> >>
+> >>> +
+> >>> +	return true;
+> >>> +}
+> >>> +
+> >>> +size_t of_fdt_reg_cells_size(void)
+> >>
+> >> Please rename as of_fdt_root_range_size()
+> > 
+> > Even better would be to remove this function and replace the one place
+> > that it is called from with the one line of code in this function.
+> > 
+> > -Frank
+> > 
+> > 
+> >>> +{
+> >>> +	return (dt_root_addr_cells + dt_root_size_cells) * sizeof(u32);
+> >>> +}
+> >>> +
+> >>> +#define FDT_ALIGN(x, a)	(((x) + (a) - 1) & ~((a) - 1))
+> >>> +#define FDT_TAGALIGN(x)	(FDT_ALIGN((x), FDT_TAGSIZE))
+> >>> +
+> >>> +int fdt_prop_len(const char *prop_name, int len)
+> >>
+> >> Please rename as fdt_len_added_prop()
+> >>
+> >>
+> >>> +{
+> >>> +	return (strlen(prop_name) + 1) +
+> >>> +		sizeof(struct fdt_property) +
+> >>> +		FDT_TAGALIGN(len);
+> >>> +}
+> >>> +
+> >>
+> >> Please add comment, something like:
+> >>
+> >> /* cells must be 1 or 2 */
+> >>
+> >>
+> >>> +static void fill_property(void *buf, u64 val64, int cells)
+> >>
+> >> Please rename as cpu64_to_fdt_cells()
+> >>
+> >> Thanks,
+> >>
+> >> Frank
+> >>
+> >>> +{
+> >>> +	__be32 val32;
+> >>> +
+> >>> +	while (cells) {
+> >>> +		val32 = cpu_to_fdt32((val64 >> (32 * (--cells))) & U32_MAX);
+> >>> +		memcpy(buf, &val32, sizeof(val32));
+> >>> +		buf += sizeof(val32);
+> >>> +	}
+> >>> +}
+> >>> +
+> >>> +int fdt_setprop_reg(void *fdt, int nodeoffset, const char *name,
+> >>> +						u64 addr, u64 size)
+> >>> +{
+> >>> +	char buf[sizeof(__be32) * 2 * 2];
+> >>> +		/* assume dt_root_[addr|size]_cells <= 2 */
+> >>> +	void *prop;
+> >>> +	size_t buf_size;
+> >>> +
+> >>> +	buf_size = of_fdt_reg_cells_size();
+> >>> +	prop = buf;
+> >>> +
+> >>> +	fill_property(prop, addr, dt_root_addr_cells);
+> >>> +	prop += dt_root_addr_cells * sizeof(u32);
+> >>> +
+> >>> +	fill_property(prop, size, dt_root_size_cells);
+> >>> +
+> >>> +	return fdt_setprop(fdt, nodeoffset, name, buf, buf_size);
+> >>> +}
+> >>> diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
+> >>> index b9cd9ebdf9b9..9615d6142578 100644
+> >>> --- a/include/linux/of_fdt.h
+> >>> +++ b/include/linux/of_fdt.h
+> >>> @@ -37,8 +37,8 @@ extern void *of_fdt_unflatten_tree(const unsigned long *blob,
+> >>>  				   struct device_node **mynodes);
+> >>>  
+> >>>  /* TBD: Temporary export of fdt globals - remove when code fully merged */
+> >>> -extern int __initdata dt_root_addr_cells;
+> >>> -extern int __initdata dt_root_size_cells;
+> >>> +extern int dt_root_addr_cells;
+> >>> +extern int dt_root_size_cells;
+> >>>  extern void *initial_boot_params;
+> >>>  
+> >>>  extern char __dtb_start[];
+> >>> @@ -108,5 +108,11 @@ static inline void unflatten_device_tree(void) {}
+> >>>  static inline void unflatten_and_copy_device_tree(void) {}
+> >>>  #endif /* CONFIG_OF_EARLY_FLATTREE */
+> >>>  
+> >>> +bool of_fdt_cells_size_fitted(u64 base, u64 size);
+> >>> +size_t of_fdt_reg_cells_size(void);
+> >>> +int fdt_prop_len(const char *prop_name, int len);
+> >>> +int fdt_setprop_reg(void *fdt, int nodeoffset, const char *name,
+> >>> +						u64 addr, u64 size);
+> >>> +
+> >>>  #endif /* __ASSEMBLY__ */
+> >>>  #endif /* _LINUX_OF_FDT_H */
+> >>>
+> >>
+> >>
+> > 
+> > 
+> 
