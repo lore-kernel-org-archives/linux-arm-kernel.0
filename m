@@ -1,57 +1,52 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 26 Sep 2018 14:33:46 +0000
-Subject: [PATCh v3 4/4] MAINTAINERS: add i.MX8 DT path to i.MX architecture
-In-Reply-To: <20180921125626.21971-4-l.stach@pengutronix.de>
-References: <20180921125626.21971-1-l.stach@pengutronix.de>
- <20180921125626.21971-4-l.stach@pengutronix.de>
-Message-ID: <AM0PR04MB42112E5BED8499DE590C232F80150@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 26 Sep 2018 16:36:14 +0200
+Subject: [PATCH net-next v6 07/23] zinc: ChaCha20 ARM and ARM64
+ implementations
+In-Reply-To: <CAHmME9r9KppoFwwNVpzpYbU+9dCPzb7Pit+4iRa4MY_ouJBWrA@mail.gmail.com>
+References: <20180925145622.29959-1-Jason@zx2c4.com>
+ <20180925145622.29959-8-Jason@zx2c4.com>
+ <CAKv+Gu9mVAfdBvOMCFqRJj+wBiWu3JVOgPZdkcdjzqSdQQ5Jrw@mail.gmail.com>
+ <CAHmME9r9KppoFwwNVpzpYbU+9dCPzb7Pit+4iRa4MY_ouJBWrA@mail.gmail.com>
+Message-ID: <20180926143614.GL1676@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Lucas Stach [mailto:l.stach at pengutronix.de]
-> Sent: Friday, September 21, 2018 8:56 PM
-> To: Shawn Guo <shawnguo@kernel.org>; Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>; Catalin Marinas
-> <catalin.marinas@arm.com>; Will Deacon <will.deacon@arm.com>;
-> Pengutronix Kernel Team <kernel@pengutronix.de>; Fabio Estevam
-> <fabio.estevam@nxp.com>; dl-linux-imx <linux-imx@nxp.com>;
-> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> patchwork-lst at pengutronix.de; Abel Vesa <abel.vesa@nxp.com>
-> Subject: [PATCh v3 4/4] MAINTAINERS: add i.MX8 DT path to i.MX architecture
+> > Also, this still has unbounded worst case scheduling latency, given
+> > that the outer library function passes its entire input straight into
+> > the NEON routine.
 > 
-> Shawn agreed to take patches for the i.MX8 parts through his tree.
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> ---
->  MAINTAINERS | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index a5b256b25905..f080df859941 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1461,6 +1461,7 @@ F:	arch/arm/mach-imx/
->  F:	arch/arm/mach-mxs/
->  F:	arch/arm/boot/dts/imx*
->  F:	arch/arm/configs/imx*_defconfig
-> +F:	arch/arm64/boot/dts/freescale/imx*
+> The vast majority of crypto routines in arch/*/crypto/ follow this
+> same exact pattern, actually. I realize a few don't -- probably the
+> ones you had a hand in :) -- but I think this is up to the caller to
+> handle. I made a change so that in chacha20poly1305.c, it calls
+> simd_relax after handling each scatter-gather element, so a
+> "construction" will handle this gracefully. But I believe it's up to
+> the caller to decide on what sizes of information it wants to pass to
+> primitives. Put differently, this also hasn't ever been an issue
+> before -- the existing state of the tree indicates this -- and so I
+> don't anticipate this will be a real issue now. And if it becomes one,
+> this is something we can address *later*, but certainly there's no use
+> of adding additional complexity to the initial patchset to do this
+> now.
 
-This means other mx8 devices also need naming like this.
-e.g. imx8qxp/qm_xxx.dts
-Then we have
-Imx*.dts for IMX series.
-And fsl-*.dts for layerscape series.
+Hi Jason
 
-It's fine to me. I will change qxp patch set as well later.
-So:
-Reviewed-by: Dong Aisheng <aisheng.dong@nxp.com>
+This is not my area of expertise, so you should verify what i'm say
+here...
 
-Regards
-Dong Aisheng
+My guess is, IPSEC will mostly ask the crypto code to work on 1500
+byte full MTU packets and 64 byte TCP ACK packets. Disk encryption i
+guess works on 4K blocks. So these requests are all quite small,
+keeping the latency reasonably bounded.
 
->  F:	drivers/clk/imx/
->  F:	drivers/soc/imx/
->  F:	include/soc/imx/
-> --
-> 2.19.0
+The wireguard interface claims it is GSO capable. This means the
+network stack will pass it big chunks of data and leave it to the
+network interface to perform the segmentation into 1500 byte MTU
+frames on the wire. I've not looked at how wireguard actually handles
+these big chunks. But to get maximum performance, it should try to
+keep them whole, just add a header and/or trailer. Will wireguard pass
+these big chunks of data to the crypto code? Do we now have 64K blocks
+being worked on? Does the latency jump from 4K to 64K? That might be
+new, so the existing state of the tree does not help you here.
+
+   Andrew
