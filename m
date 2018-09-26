@@ -1,107 +1,98 @@
 From: jolly.shah@xilinx.com (Jolly Shah)
-Date: Wed, 26 Sep 2018 11:12:59 -0700
-Subject: [PATCH v3 2/4] firmware: xilinx: Add zynqmp IOCTL API for device
- control
+Date: Wed, 26 Sep 2018 11:12:58 -0700
+Subject: [PATCH v3 1/4] Documentation: xilinx: Add documentation for eemi APIs
 In-Reply-To: <1537985581-32164-1-git-send-email-jollys@xilinx.com>
 References: <1537985581-32164-1-git-send-email-jollys@xilinx.com>
-Message-ID: <1537985581-32164-3-git-send-email-jollys@xilinx.com>
+Message-ID: <1537985581-32164-2-git-send-email-jollys@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rajan Vaja <rajan.vaja@xilinx.com>
 
-Add ZynqMP firmware IOCTL API to control and configure
-devices like PLLs, SD, Gem, etc.
+Add documentation for embedded energy management interface (EEMI)
+APIs. It includes information about eemi ops and how to use them.
+It also includes API information and supported IOCTL IDs which can
+be used for device and control configuration.
 
 Signed-off-by: Rajan Vaja <rajan.vaja@xilinx.com>
 Signed-off-by: Jolly Shah <jollys@xilinx.com>
 ---
- drivers/firmware/xilinx/zynqmp.c     | 43 ++++++++++++++++++++++++++++++++++++
- include/linux/firmware/xlnx-zynqmp.h |  4 +++-
- 2 files changed, 46 insertions(+), 1 deletion(-)
+ Documentation/xilinx/eemi.txt | 67 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 67 insertions(+)
+ create mode 100644 Documentation/xilinx/eemi.txt
 
-diff --git a/drivers/firmware/xilinx/zynqmp.c b/drivers/firmware/xilinx/zynqmp.c
-index 84b3fd2..671a37a 100644
---- a/drivers/firmware/xilinx/zynqmp.c
-+++ b/drivers/firmware/xilinx/zynqmp.c
-@@ -428,6 +428,48 @@ static int zynqmp_pm_clock_getparent(u32 clock_id, u32 *parent_id)
- 	return ret;
- }
- 
-+/**
-+ * zynqmp_is_valid_ioctl() - Check whether IOCTL ID is valid or not
-+ * @ioctl_id:	IOCTL ID
-+ *
-+ * Return: 0 if IOCTL is valid, else -EINVAL
-+ */
-+static inline int zynqmp_is_valid_ioctl(u32 ioctl_id)
-+{
-+	if (ioctl_id == IOCTL_SET_PLL_FRAC_MODE ||
-+	    ioctl_id == IOCTL_GET_PLL_FRAC_MODE ||
-+	    ioctl_id == IOCTL_SET_PLL_FRAC_DATA ||
-+	    ioctl_id == IOCTL_GET_PLL_FRAC_DATA)
-+		return 0;
+diff --git a/Documentation/xilinx/eemi.txt b/Documentation/xilinx/eemi.txt
+new file mode 100644
+index 0000000..0ab686c
+--- /dev/null
++++ b/Documentation/xilinx/eemi.txt
+@@ -0,0 +1,67 @@
++---------------------------------------------------------------------
++Xilinx Zynq MPSoC EEMI Documentation
++---------------------------------------------------------------------
 +
-+	return -EINVAL;
-+}
++Xilinx Zynq MPSoC Firmware Interface
++-------------------------------------
++The zynqmp-firmware node describes the interface to platform firmware.
++ZynqMP has an interface to communicate with secure firmware. Firmware
++driver provides an interface to firmware APIs. Interface APIs can be
++used by any driver to communicate with PMC(Platform Management Controller).
 +
-+/**
-+ * zynqmp_pm_ioctl() - PM IOCTL API for device control and configs
-+ * @node_id:	Node ID of the device
-+ * @ioctl_id:	ID of the requested IOCTL
-+ * @arg1:	Argument 1 to requested IOCTL call
-+ * @arg2:	Argument 2 to requested IOCTL call
-+ * @out:	Returned output value
-+ *
-+ * This function calls IOCTL to firmware for device control and configuration.
-+ *
-+ * Return: Returns status, either success or error+reason
-+ */
-+static int zynqmp_pm_ioctl(u32 node_id, u32 ioctl_id, u32 arg1, u32 arg2,
-+			   u32 *out)
-+{
++Embedded Energy Management Interface (EEMI)
++----------------------------------------------
++The embedded energy management interface is used to allow software
++components running across different processing clusters on a chip or
++device to communicate with a power management controller (PMC) on a
++device to issue or respond to power management requests.
++
++EEMI ops is a structure containing all eemi APIs supported by Zynq MPSoC.
++The zynqmp-firmware driver maintain all EEMI APIs in zynqmp_eemi_ops
++structure. Any driver who want to communicate with PMC using EEMI APIs
++can call zynqmp_pm_get_eemi_ops().
++
++Example of EEMI ops:
++
++	/* zynqmp-firmware driver maintain all EEMI APIs */
++	struct zynqmp_eemi_ops {
++		int (*get_api_version)(u32 *version);
++		int (*query_data)(struct zynqmp_pm_query_data qdata, u32 *out);
++	};
++
++	static const struct zynqmp_eemi_ops eemi_ops = {
++		.get_api_version = zynqmp_pm_get_api_version,
++		.query_data = zynqmp_pm_query_data,
++	};
++
++Example of EEMI ops usage:
++
++	static const struct zynqmp_eemi_ops *eemi_ops;
++	u32 ret_payload[PAYLOAD_ARG_CNT];
 +	int ret;
 +
-+	ret = zynqmp_is_valid_ioctl(ioctl_id);
-+	if (ret)
-+		return ret;
++	eemi_ops = zynqmp_pm_get_eemi_ops();
++	if (!eemi_ops)
++		return -ENXIO;
 +
-+	return zynqmp_pm_invoke_fn(PM_IOCTL, node_id, ioctl_id,
-+				   arg1, arg2, out);
-+}
++	ret = eemi_ops->query_data(qdata, ret_payload);
 +
- static const struct zynqmp_eemi_ops eemi_ops = {
- 	.get_api_version = zynqmp_pm_get_api_version,
- 	.query_data = zynqmp_pm_query_data,
-@@ -440,6 +482,7 @@ static const struct zynqmp_eemi_ops eemi_ops = {
- 	.clock_getrate = zynqmp_pm_clock_getrate,
- 	.clock_setparent = zynqmp_pm_clock_setparent,
- 	.clock_getparent = zynqmp_pm_clock_getparent,
-+	.ioctl = zynqmp_pm_ioctl,
- };
- 
- /**
-diff --git a/include/linux/firmware/xlnx-zynqmp.h b/include/linux/firmware/xlnx-zynqmp.h
-index 015e130..7a9db08 100644
---- a/include/linux/firmware/xlnx-zynqmp.h
-+++ b/include/linux/firmware/xlnx-zynqmp.h
-@@ -34,7 +34,8 @@
- 
- enum pm_api_id {
- 	PM_GET_API_VERSION = 1,
--	PM_QUERY_DATA = 35,
-+	PM_IOCTL = 34,
-+	PM_QUERY_DATA,
- 	PM_CLOCK_ENABLE,
- 	PM_CLOCK_DISABLE,
- 	PM_CLOCK_GETSTATE,
-@@ -99,6 +100,7 @@ struct zynqmp_eemi_ops {
- 	int (*clock_getrate)(u32 clock_id, u64 *rate);
- 	int (*clock_setparent)(u32 clock_id, u32 parent_id);
- 	int (*clock_getparent)(u32 clock_id, u32 *parent_id);
-+	int (*ioctl)(u32 node_id, u32 ioctl_id, u32 arg1, u32 arg2, u32 *out);
- };
- 
- #if IS_REACHABLE(CONFIG_ARCH_ZYNQMP)
++IOCTL
++------
++IOCTL API is for device control and configuration. It is not a system
++IOCTL but it is an EEMI API. This API can be used by master to control
++any device specific configuration. IOCTL definitions can be platform
++specific. This API also manage shared device configuration.
++
++The following IOCTL IDs are valid for device control:
++- IOCTL_SET_PLL_FRAC_MODE	8
++- IOCTL_GET_PLL_FRAC_MODE	9
++- IOCTL_SET_PLL_FRAC_DATA	10
++- IOCTL_GET_PLL_FRAC_DATA	11
++
++Refer EEMI API guide [0] for IOCTL specific parameters and other EEMI APIs.
++
++References
++----------
++[0] Embedded Energy Management Interface (EEMI) API guide:
++    https://www.xilinx.com/support/documentation/user_guides/ug1200-eemi-api.pdf
 -- 
 2.7.4
