@@ -1,95 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 26 Sep 2018 14:46:35 +0200
-Subject: [PATCH] ASoC: pxa: avoid AC97_BUS build warning
-Message-ID: <20180926124645.1841850-1-arnd@arndb.de>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Wed, 26 Sep 2018 14:55:28 +0200
+Subject: [PATCH v4 2/2] tty/serial: atmel: add ISO7816 support
+In-Reply-To: <20180918132856.GA14333@kroah.com>
+References: <20180906134214.29031-1-ludovic.desroches@microchip.com>
+ <20180906134214.29031-3-ludovic.desroches@microchip.com>
+ <20180918132856.GA14333@kroah.com>
+Message-ID: <20180926125528.fmfti62ymod2derb@M43218.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Selecting AC97_BUS_NEW from SND_PXA2XX_SOC_AC97 leads to a Kconfig
-warning if any other driver selects AC97_BUS:
+On Tue, Sep 18, 2018 at 03:28:56PM +0200, Greg KH wrote:
+> On Thu, Sep 06, 2018 at 03:42:14PM +0200, Ludovic Desroches wrote:
+> > From: Nicolas Ferre <nicolas.ferre@microchip.com>
+> > 
+> > When mode is set in atmel_config_iso7816() we backup last RS232 mode
+> > for coming back to this mode if requested.
+> > Also allow setup of T=0 and T=1 parameter and basic support in set_termios
+> > function as well.
+> > 
+> > Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> > [ludovic.desroches at microchip.com: rebase, add check on fidi ratio, checkpatch fixes]
+> > Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+> > Acked-by: Richard Genoud <richard.genoud@gmail.com>
+> > ---
+> >  drivers/tty/serial/atmel_serial.c | 190 +++++++++++++++++++++++++++++++++++---
+> >  drivers/tty/serial/atmel_serial.h |   3 +-
+> >  2 files changed, 181 insertions(+), 12 deletions(-)
+> 
+> This doesn't apply to my tree :(
+> 
 
-WARNING: unmet direct dependencies detected for AC97_BUS_COMPAT
-  Depends on [n]: SOUND [=y] && !UML && SND [=y] && AC97_BUS_NEW [=y] && !AC97_BUS [=y]
-  Selected by [y]:
-  - SND_SOC_WM9713 [=y] && SOUND [=y] && !UML && SND [=y] && SND_SOC [=y] && AC97_BUS_NEW [=y]
+I am rebasing it on tty-next.
 
-I don't know if that combination is supposed to work.
-Assuming it is not, this adds a dependency on all users
-for PXA to avoids the combination.
+> Also, shouldn't this new ioctl be documented somewhere?
+> 
 
-Fixes: 1c8bc7b3de5e ("ASoC: pxa: switch to new ac97 bus support")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- sound/soc/pxa/Kconfig | 8 ++++++++
- 1 file changed, 8 insertions(+)
+v5 is coming.
 
-diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
-index 29f577e6dfc0..943b44de1464 100644
---- a/sound/soc/pxa/Kconfig
-+++ b/sound/soc/pxa/Kconfig
-@@ -79,6 +79,7 @@ config SND_PXA2XX_SOC_TOSA
- 	tristate "SoC AC97 Audio support for Tosa"
- 	depends on SND_PXA2XX_SOC && MACH_TOSA
- 	depends on MFD_TC6393XB
-+	depends on !AC97_BUS
- 	select SND_PXA2XX_SOC_AC97
- 	select SND_SOC_WM9712
- 	help
-@@ -88,6 +89,7 @@ config SND_PXA2XX_SOC_TOSA
- config SND_PXA2XX_SOC_E740
- 	tristate "SoC AC97 Audio support for e740"
- 	depends on SND_PXA2XX_SOC && MACH_E740
-+	depends on !AC97_BUS
- 	select SND_SOC_WM9705
- 	select SND_PXA2XX_SOC_AC97
- 	help
-@@ -97,6 +99,7 @@ config SND_PXA2XX_SOC_E740
- config SND_PXA2XX_SOC_E750
- 	tristate "SoC AC97 Audio support for e750"
- 	depends on SND_PXA2XX_SOC && MACH_E750
-+	depends on !AC97_BUS
- 	select SND_SOC_WM9705
- 	select SND_PXA2XX_SOC_AC97
- 	help
-@@ -106,6 +109,7 @@ config SND_PXA2XX_SOC_E750
- config SND_PXA2XX_SOC_E800
- 	tristate "SoC AC97 Audio support for e800"
- 	depends on SND_PXA2XX_SOC && MACH_E800
-+	depends on !AC97_BUS
- 	select SND_SOC_WM9712
- 	select SND_PXA2XX_SOC_AC97
- 	help
-@@ -116,6 +120,7 @@ config SND_PXA2XX_SOC_EM_X270
- 	tristate "SoC Audio support for CompuLab EM-x270, eXeda and CM-X300"
- 	depends on SND_PXA2XX_SOC && (MACH_EM_X270 || MACH_EXEDA || \
- 			MACH_CM_X300)
-+	depends on !AC97_BUS
- 	select SND_PXA2XX_SOC_AC97
- 	select SND_SOC_WM9712
- 	help
-@@ -126,6 +131,7 @@ config SND_PXA2XX_SOC_PALM27X
- 	bool "SoC Audio support for Palm T|X, T5, E2 and LifeDrive"
- 	depends on SND_PXA2XX_SOC && (MACH_PALMLD || MACH_PALMTX || \
- 			MACH_PALMT5 || MACH_PALMTE2)
-+	depends on !AC97_BUS
- 	select SND_PXA2XX_SOC_AC97
- 	select SND_SOC_WM9712
- 	help
-@@ -155,6 +161,7 @@ config SND_SOC_TTC_DKB
- config SND_SOC_ZYLONITE
- 	tristate "SoC Audio support for Marvell Zylonite"
- 	depends on SND_PXA2XX_SOC && MACH_ZYLONITE
-+	depends on !AC97_BUS
- 	select SND_PXA2XX_SOC_AC97
- 	select SND_PXA_SOC_SSP
- 	select SND_SOC_WM9713
-@@ -194,6 +201,7 @@ config SND_PXA2XX_SOC_MAGICIAN
- config SND_PXA2XX_SOC_MIOA701
-         tristate "SoC Audio support for MIO A701"
-         depends on SND_PXA2XX_SOC && MACH_MIOA701
-+	depends on !AC97_BUS
-         select SND_PXA2XX_SOC_AC97
-         select SND_SOC_WM9713
-         help
--- 
-2.18.0
+Regards
+
+Ludovic
