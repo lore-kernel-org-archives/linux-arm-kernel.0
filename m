@@ -1,30 +1,27 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Wed, 26 Sep 2018 15:24:10 +0200
-Subject: [PATCH 2/2] ARM: ixp4xx: include linux/mtd/platnand.h
-In-Reply-To: <20180926130458.2406549-2-arnd@arndb.de>
-References: <20180926130458.2406549-1-arnd@arndb.de>
- <20180926130458.2406549-2-arnd@arndb.de>
-Message-ID: <20180926152410.454560f0@xps13>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 26 Sep 2018 15:24:27 +0200
+Subject: [PATCH] ARM: u300: regulator: add MODULE_LICENSE()
+Message-ID: <20180926132434.3071168-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+The missing license showed up as a randconfig warning now, no idea
+why we never saw that earlier.
 
-Arnd Bergmann <arnd@arndb.de> wrote on Wed, 26 Sep 2018 15:04:39 +0200:
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mach-u300/regulator.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> The platform_nand_data structure definition is required for ixdp425
-> but has now moved to a new header file:
-> 
-> arch/arm/mach-ixp4xx/ixdp425-setup.c:98:15: error: variable 'ixdp425_flash_nand_data' has initializer but incomplete type
->  static struct platform_nand_data ixdp425_flash_nand_data = {
->                ^~~~~~~~~~~~~~~~~~
-> arch/arm/mach-ixp4xx/ixdp425-setup.c:99:3: error: 'struct platform_nand_data' has no member named 'chip'
-> 
-> Fixes: 19cf5dfa3a31 ("mtd: rawnand: Move platform_nand_xxx definitions out of rawnand.h")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-
-Reviewed-by: Miquel Raynal <miquel.raynal@bootlin.com>
-
-Thanks,
-Miqu?l
+diff --git a/arch/arm/mach-u300/regulator.c b/arch/arm/mach-u300/regulator.c
+index 595b574c2c50..96ec72bd3928 100644
+--- a/arch/arm/mach-u300/regulator.c
++++ b/arch/arm/mach-u300/regulator.c
+@@ -130,3 +130,5 @@ static int __init u300_init_boardpower(void)
+ }
+ 
+ device_initcall(u300_init_boardpower);
++MODULE_LICENSE("GPL v2");
++MODULE_AUTHOR("Linus Walleij");
+-- 
+2.18.0
