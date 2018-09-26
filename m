@@ -1,39 +1,39 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 26 Sep 2018 13:35:15 +0200
-Subject: [PATCH v3] arm64: dts: rockchip: add initial dts support for
- Rockpro64
-In-Reply-To: <1537943105-21247-1-git-send-email-Akash_Gajjar@mentor.com>
-References: <Akash_Gajjar@mentor.com>
- <1537943105-21247-1-git-send-email-Akash_Gajjar@mentor.com>
-Message-ID: <6748636.LqZcXZ9sFQ@phil>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 26 Sep 2018 13:38:07 +0200
+Subject: [PATCH] ARM: dts: Use mmc@ instead sdhci@
+Message-ID: <84c0bf4f601d9bb30d8caeafa7df3c081009c971.1537961882.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 26. September 2018, 08:24:57 CEST schrieb Akash Gajjar:
-> Rockpro64 is a rockchip RK3399 based board from pine64.org.
-> This patch adds basic device node support for Rockpro64 board and make it able
-> to bring up.
-> 
-> Peripheral Works
-> - Sdcard
-> - USB 2.0, 3.0
-> - Leds
-> - Ethernet
-> - Debug console
-> 
-> Not working:
-> - USB Type-C
-> 
-> Signed-off-by: Akash Gajjar <Akash_Gajjar@mentor.com>
+mmc name is recommended based on devicetree specification.
 
-applied for 4.20.
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-For future patches, please keep in mind to transfer received tags from
-one version to the next. v2 received a "Reviewed-by" from Rob, so ideally
-it should have been included below your Signed-off in v3.
+ arch/arm/boot/dts/zynq-7000.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-I've picked that tag myself from v2, so no need to do anything now,
-just for the next time ;-)
-
-Thanks
-Heiko
+diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+index e22507e23303..ca6425ad794c 100644
+--- a/arch/arm/boot/dts/zynq-7000.dtsi
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -219,7 +219,7 @@
+ 			#size-cells = <0>;
+ 		};
+ 
+-		sdhci0: sdhci at e0100000 {
++		sdhci0: mmc at e0100000 {
+ 			compatible = "arasan,sdhci-8.9a";
+ 			status = "disabled";
+ 			clock-names = "clk_xin", "clk_ahb";
+@@ -229,7 +229,7 @@
+ 			reg = <0xe0100000 0x1000>;
+ 		};
+ 
+-		sdhci1: sdhci at e0101000 {
++		sdhci1: mmc at e0101000 {
+ 			compatible = "arasan,sdhci-8.9a";
+ 			status = "disabled";
+ 			clock-names = "clk_xin", "clk_ahb";
+-- 
+1.9.1
