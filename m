@@ -1,35 +1,47 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Wed, 26 Sep 2018 16:22:40 +0300
-Subject: [PATCH v2 15/22] dpaa_eth: fix SG frame cleanup
+Date: Wed, 26 Sep 2018 16:22:32 +0300
+Subject: [PATCH v2 07/22] soc/fsl/bman_portals: defer probe after bman's probe
 In-Reply-To: <20180926132247.10971-1-laurentiu.tudor@nxp.com>
 References: <20180926132247.10971-1-laurentiu.tudor@nxp.com>
-Message-ID: <20180926132247.10971-16-laurentiu.tudor@nxp.com>
+Message-ID: <20180926132247.10971-8-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-Fix issue with the entry indexing in the sg frame cleanup code being
-off-by-1. This problem showed up when doing some basic iperf tests and
-manifested in traffic coming to a halt.
+A crash in bman portal probing could not be triggered (as is the case
+with qman portals) but it does make calls [1] into the bman driver so
+lets make sure the bman portal probing happens after bman's.
+
+[1]  bman_p_irqsource_add() (in bman) called by:
+       init_pcfg() called by:
+         bman_portal_probe()
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
- drivers/net/ethernet/freescale/dpaa/dpaa_eth.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/soc/fsl/qbman/bman_portal.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c b/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
-index 8db861f281a0..605f06f0def8 100644
---- a/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
-+++ b/drivers/net/ethernet/freescale/dpaa/dpaa_eth.c
-@@ -1663,7 +1663,7 @@ static struct sk_buff *dpaa_cleanup_tx_fd(const struct dpaa_priv *priv,
- 				 qm_sg_entry_get_len(&sgt[0]), dma_dir);
+diff --git a/drivers/soc/fsl/qbman/bman_portal.c b/drivers/soc/fsl/qbman/bman_portal.c
+index 2f71f7df3465..f9edd28894fd 100644
+--- a/drivers/soc/fsl/qbman/bman_portal.c
++++ b/drivers/soc/fsl/qbman/bman_portal.c
+@@ -91,7 +91,15 @@ static int bman_portal_probe(struct platform_device *pdev)
+ 	struct device_node *node = dev->of_node;
+ 	struct bm_portal_config *pcfg;
+ 	struct resource *addr_phys[2];
+-	int irq, cpu;
++	int irq, cpu, err;
++
++	err = bman_is_probed();
++	if (!err)
++		return -EPROBE_DEFER;
++	if (err < 0) {
++		dev_err(&pdev->dev, "failing probe due to bman probe error\n");
++		return -ENODEV;
++	}
  
- 		/* remaining pages were mapped with skb_frag_dma_map() */
--		for (i = 1; i < nr_frags; i++) {
-+		for (i = 1; i <= nr_frags; i++) {
- 			WARN_ON(qm_sg_entry_is_ext(&sgt[i]));
- 
- 			dma_unmap_page(dev, qm_sg_addr(&sgt[i]),
+ 	pcfg = devm_kmalloc(dev, sizeof(*pcfg), GFP_KERNEL);
+ 	if (!pcfg)
 -- 
 2.17.1
