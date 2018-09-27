@@ -1,48 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 27 Sep 2018 07:53:32 -0700
-Subject: [PATCH 0/4] Update am437x and am335x dts to probe with ti-sysc
-In-Reply-To: <305bf1c3-915d-dac1-95e4-4d32621247e1@ti.com>
-References: <20180925000545.22931-1-tony@atomide.com>
- <e9afe736-c2f0-6182-afd0-08279e09a35e@ti.com>
- <20180925144021.GN5662@atomide.com>
- <20180925175537.GQ5662@atomide.com>
- <d98aa7c1-5131-34c5-51e5-c7ef57cbc31e@ti.com>
- <20180926155911.GT5662@atomide.com>
- <20180926162303.GU5662@atomide.com>
- <cfc3f1db-9468-ed92-a673-882b51b4dec8@ti.com>
- <20180926233111.GY5662@atomide.com>
- <305bf1c3-915d-dac1-95e4-4d32621247e1@ti.com>
-Message-ID: <20180927145332.GA5662@atomide.com>
+From: rodrigo@tjader.xyz (=?UTF-8?Q?Rodrigo_Exterck=C3=B6tter_Tj=C3=A4der?=)
+Date: Thu, 27 Sep 2018 11:49:20 -0300
+Subject: [PATCH 1/2] arm64: dts: allwinner: Olimex A64-OLinuXino: enable
+ eMMC.
+In-Reply-To: <20180927081711.llmwnvpu73loe5iv@flea>
+References: <20180919141815.18737-1-rodrigo@tjader.xyz>
+ <20180921142811.h5jraemk565alh3i@flea>
+ <CAG7TQgE_KU_cK_4E+NG8Qcw-QB2=C6YoqBYR2svmWxywFyySCw@mail.gmail.com>
+ <20180925090139.qbu6tqav5oth7zkw@flea>
+ <CAG7TQgFTsR4pf4jAcWMFoOmiP7AXYqjts60RP2kuJGU44AcQJQ@mail.gmail.com>
+ <20180927081711.llmwnvpu73loe5iv@flea>
+Message-ID: <CAG7TQgGMkvBnNE_WEth8gscKxN3qN8a44mNMWz3QP-2+JKfOzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Keerthy <j-keerthy@ti.com> [180927 05:00]:
-> On Thursday 27 September 2018 05:01 AM, Tony Lindgren wrote:
-> > The following works for me, does it look OK to you?
-> 
-> This works pretty well with DS0 on am437x-gp-evm. Tested rtc wakeup,
-> wakeup using uart and touch. All of the work well.
-> 
-> https://pastebin.ubuntu.com/p/RJhJJKhJHX/
+On Thu, Sep 27, 2018 at 5:17 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+>
+> On Tue, Sep 25, 2018 at 02:47:59PM -0300, Rodrigo Exterck?tter Tj?der wrote:
+> > On Tue, Sep 25, 2018 at 6:01 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> > > We can't really do that, unfortunately. If the device tree name was to
+> > > change for a given board, we'd break all the build systems, boot
+> > > scripts and distros out there.
+> >
+> > What if we keep the device tree for the version without WiFi and eMMC
+> > with the current name and create new device trees for the other two
+> > versions?
+>
+> Wifi and Bluetooth should be dealt with with overlays in this case,
+> and since the eMMC is already enabled, then there's nothing to do, I
+> guess.
 
-OK good to hear and thanks for testing again.
+It's WiFi that is already enabled, not eMMC. Only one of the three
+variants has WiFi.
 
-> Also tested on beaglebone black DS0 works fine. Although there seems to
-> be an additional warning which was not seen before:
-> 
-> "l4-wkup-clkctrl:0008:0: failed to disable"
-> 
-> log: https://pastebin.ubuntu.com/p/Ns2WRdVkXS/
-> 
-> Also the above warning is present without/with this patch on [0].
-> No such warnings on am4 though.
+We can't even remove a node from a device tree? Removing the WiFi node
+from the current tree would make it correspond to the variant with the
+least features.
 
-OK. For am335x I'll post an updated version of the am335x
-changes to fix the gpio dbck offset.
+About device tree overlays, I read overlay-notes.txt, but I went
+looking for an example with "git grep /plugin/ arch" and it came
+empty. Is this approach not used for other boards?
 
-Regards,
+Does the overlay approach make the device available at boot time? That
+is important for a storage device such as eMMC.
 
-Tony
-
-> [0]
-> https://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git/log/?h=omap-for-v4.20/dt-ti-sysc-tmp-testing
+I went with the separate dts approach because that's what I saw was
+done for other similar cases, like Pine64 and Pine64+, OLinuXino-LIME2
+and its variant with eMMC, among others.
