@@ -1,55 +1,45 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Thu, 27 Sep 2018 17:19:20 +0200
-Subject: [PATCH net-next v6 07/23] zinc: ChaCha20 ARM and ARM64
- implementations
-In-Reply-To: <CAHmME9rN3-7Mj5JQqt2EFPauG9vjkN5pQn3tPiJY4fPiwksaDA@mail.gmail.com>
-References: <20180925145622.29959-1-Jason@zx2c4.com>
- <20180925145622.29959-8-Jason@zx2c4.com>
- <CAKv+Gu9mVAfdBvOMCFqRJj+wBiWu3JVOgPZdkcdjzqSdQQ5Jrw@mail.gmail.com>
- <CAHmME9r9KppoFwwNVpzpYbU+9dCPzb7Pit+4iRa4MY_ouJBWrA@mail.gmail.com>
- <CAKv+Gu8ih-TsASRGqK+ST_5+EQ0=Zo-zhGCadOdGyPjucMFTCg@mail.gmail.com>
- <CAKv+Gu8w74dUSEAGxxh=C6To6F=bSm8DjiExUPmh_LUyhoDLhg@mail.gmail.com>
- <CAHmME9pbRabkGjNh-65S9qBNNS1GLJSwZ_tTM507S_Ezr1=QLg@mail.gmail.com>
- <CAHmME9ru=kJO8QiW+uNNgt5NgFVZzRsQ4tNSgo+f+KfHs3fAKQ@mail.gmail.com>
- <CAKv+Gu-WDt8f9qVjLDRPHL7THS0BjtKHThw2RMfHbWBT8Hs8aQ@mail.gmail.com>
- <CAHmME9qNn5aRgtbV3bAsz3xW1A49a7RMMkOzGruBUPzLVUxVNg@mail.gmail.com>
- <CAHmME9rN3-7Mj5JQqt2EFPauG9vjkN5pQn3tPiJY4fPiwksaDA@mail.gmail.com>
-Message-ID: <CAHmME9pBRu4hC5=Ef62R_nWOi3jTegxvxNrR8qDM+VfO=2t8Tg@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 27 Sep 2018 17:21:26 +0200
+Subject: [PATCH 06/12] drm/sun4i: sun6i_mipi_dsi: Fix VBP size calculation
+In-Reply-To: <20180927114850.24565-7-jagan@amarulasolutions.com>
+References: <20180927114850.24565-1-jagan@amarulasolutions.com>
+ <20180927114850.24565-7-jagan@amarulasolutions.com>
+Message-ID: <20180927152126.vovnvwmqdfpuxgdm@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey again Thomas,
+On Thu, Sep 27, 2018 at 05:18:44PM +0530, Jagan Teki wrote:
+> According to horizontal and vertical timings are defined
+> per the diagram from include/drm/drm_modes.h
+> 
+> Back porch = [hv]total - [hv]sync_end
+>
+> So, update SUN6I_DSI_BASIC_SIZE0_VBP calculation as
+> mode->vtotal - mode->vsync_end
+> 
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> ---
+>  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> index 1c7e42015645..599284971ab6 100644
+> --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> @@ -526,8 +526,8 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
+>  	regmap_write(dsi->regs, SUN6I_DSI_BASIC_SIZE0_REG,
+>  		     SUN6I_DSI_BASIC_SIZE0_VSA(mode->vsync_end -
+>  					       mode->vsync_start) |
+> -		     SUN6I_DSI_BASIC_SIZE0_VBP(mode->vsync_start -
+> -					       mode->vdisplay));
+> +		     SUN6I_DSI_BASIC_SIZE0_VBP(mode->vtotal -
+> +					       mode->vsync_end));
 
-On Thu, Sep 27, 2018 at 3:26 PM Jason A. Donenfeld <Jason@zx2c4.com> wrote:
->
-> Hi Thomas,
->
-> I'm trying to optimize this for crypto performance while still taking
-> into account preemption concerns. I'm having a bit of trouble figuring
-> out a way to determine numerically what the upper bounds for this
-> stuff looks like. I'm sure I could pick a pretty sane number that's
-> arguably okay -- and way under the limit -- but I still am interested
-> in determining what that limit actually is. I was hoping there'd be a
-> debugging option called, "warn if preemption is disabled for too
-> long", or something, but I couldn't find anything like that. I'm also
-> not quite sure what the latency limits are, to just compute this with
-> a formula. Essentially what I'm trying to determine is:
->
-> preempt_disable();
-> asm volatile(".fill N, 1, 0x90;");
-> preempt_enable();
->
-> What is the maximum value of N for which the above is okay? What
-> technique would you generally use in measuring this?
->
-> Thanks,
-> Jason
+Is it purely theoretical, or did you find some source that back that?
 
->From talking to Peter (now CC'd) on IRC, it sounds like what you're
-mostly interested in is clocktime latency on reasonable hardware, with
-a goal of around ~20?s as a maximum upper bound? I don't expect to get
-anywhere near this value at all, but if you can confirm that's a
-decent ballpark, it would make for some interesting calculations.
+Maxime
 
-Regards,
-Jason
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
