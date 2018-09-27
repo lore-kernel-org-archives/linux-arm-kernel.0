@@ -1,50 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 27 Sep 2018 14:43:28 -0700
-Subject: [PATCH 0/4] Update am437x and am335x dts to probe with ti-sysc
-In-Reply-To: <20180927145332.GA5662@atomide.com>
-References: <e9afe736-c2f0-6182-afd0-08279e09a35e@ti.com>
- <20180925144021.GN5662@atomide.com>
- <20180925175537.GQ5662@atomide.com>
- <d98aa7c1-5131-34c5-51e5-c7ef57cbc31e@ti.com>
- <20180926155911.GT5662@atomide.com>
- <20180926162303.GU5662@atomide.com>
- <cfc3f1db-9468-ed92-a673-882b51b4dec8@ti.com>
- <20180926233111.GY5662@atomide.com>
- <305bf1c3-915d-dac1-95e4-4d32621247e1@ti.com>
- <20180927145332.GA5662@atomide.com>
-Message-ID: <20180927214327.GF5662@atomide.com>
+From: briannorris@chromium.org (Brian Norris)
+Date: Thu, 27 Sep 2018 14:48:51 -0700
+Subject: [PATCH 2/3] dt-bindings: firmware: coreboot: document board
+ variant properties
+In-Reply-To: <20180925163927.GA23163@bogus>
+References: <20180822120214.11848-1-heiko@sntech.de>
+ <20180822120214.11848-2-heiko@sntech.de>
+ <20180831121836.GA23441@bogus> <1660300.IG1gbB27SJ@phil>
+ <20180925163927.GA23163@bogus>
+Message-ID: <CA+ASDXMMyz+uva9++kih+t9k2W+hFtA5E-Fmd8b_TwrY2N0LFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [180927 14:58]:
-> * Keerthy <j-keerthy@ti.com> [180927 05:00]:
-> > On Thursday 27 September 2018 05:01 AM, Tony Lindgren wrote:
-> > > The following works for me, does it look OK to you?
-> > 
-> > This works pretty well with DS0 on am437x-gp-evm. Tested rtc wakeup,
-> > wakeup using uart and touch. All of the work well.
-> > 
-> > https://pastebin.ubuntu.com/p/RJhJJKhJHX/
-> 
-> OK good to hear and thanks for testing again.
-> 
-> > Also tested on beaglebone black DS0 works fine. Although there seems to
-> > be an additional warning which was not seen before:
-> > 
-> > "l4-wkup-clkctrl:0008:0: failed to disable"
-> > 
-> > log: https://pastebin.ubuntu.com/p/Ns2WRdVkXS/
-> > 
-> > Also the above warning is present without/with this patch on [0].
-> > No such warnings on am4 though.
-> 
-> OK. For am335x I'll post an updated version of the am335x
-> changes to fix the gpio dbck offset.
+On Tue, Sep 25, 2018 at 9:39 AM Rob Herring <robh@kernel.org> wrote:
+> Reading strapping values and putting into DT seems like a perfectly
+> reasonable thing to do (I'm assuming the pins get initialized to their
+> function and reading them later is not possible), but that has nothing
+> to do coreboot really. We don't put things u-boot touches under a u-boot
+> node. These should go at the top-level IMO.
 
-FYI I have pushed updated patches into a new temporary test
-branch omap-for-v4.20/dt-ti-sysc-tmp-testing-v2 with initial
-dra7 dts changes too.
+Where, exactly? Do you have a suggested property name?
 
-Regards,
+Regarding compatible-based approach (from prior email): we do heavily
+use the top-level 'compatible' property too for a similar purpose, but
+sometimes there's a useful difference between "I booted with DTB
+<foo>, which is compatible with revision X, Y, Z, ..." and "the exact
+revision I booted is N". So the properties are definitely useful.
 
-Tony
+> And maybe it is compelling to just take them having been in use for some
+> time on widely deploying devices, but that's not really good precedence.
+
+Well, we ain't changing the old firmware. Coming up with a new name
+can work, and we can modify new firmware to start doing both. But it'd
+still probably be wise to note what's actively in-use, especially if
+it's not substantively different than what we settle on.
+
+Brian
