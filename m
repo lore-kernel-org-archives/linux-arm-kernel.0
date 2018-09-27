@@ -1,33 +1,36 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 27 Sep 2018 12:27:08 -0700
-Subject: [PATCH 0/3] ARM/PSCI: Fix THUMB2_KERNEL entry points
-Message-ID: <20180927192711.26455-1-f.fainelli@gmail.com>
+Date: Thu, 27 Sep 2018 12:27:11 -0700
+Subject: [PATCH 3/3] soc: bcm: brcmstb: Fix re-entry point with a THUMB2_KERNEL
+In-Reply-To: <20180927192711.26455-1-f.fainelli@gmail.com>
+References: <20180927192711.26455-1-f.fainelli@gmail.com>
+Message-ID: <20180927192711.26455-4-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+When the kernel is built with CONFIG_THUMB2_KERNEL we would set the
+kernel's resume entry point to be a function that is already built as
+Thumb-2 code while the boot agent doing the resume is in ARM mode, so
+this does not work. There is a header label defined: cpu_resume_arm
+which we can use to do the switching for us.
 
-While playing with THUMB2_KERNEL on ARCH_BRCMSTB, several issues came up
-which are addressed by these 3 patches.
+Fixes: 0b741b8234c8 ("soc: bcm: brcmstb: Add support for S2/S3/S5 suspend states (ARM)")
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ drivers/soc/bcm/brcmstb/pm/pm-arm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The THUMB() assembler macro is a no-op unless CONFIG_THUMB2_KERNEL so
-using it unconditionally for CONFIG_ARM should not cause a problem
-AFAICT.
-
-Those patches can all be independently picked up by their respective
-maintainers and don't depent on one another.
-
-Thank you!
-
-Florian Fainelli (3):
-  firmware/psci: Fix cpu_resume entry points with THUMB2_KERNEL
-  ARM: psci: Fix secondary core boot with THUMB2_KERNEL
-  soc: bcm: brcmstb: Fix re-entry point with a THUMB2_KERNEL
-
- arch/arm/kernel/psci_smp.c          |  4 ++--
- drivers/firmware/psci.c             | 18 +++++++++++++++---
- drivers/soc/bcm/brcmstb/pm/pm-arm.c |  2 +-
- 3 files changed, 18 insertions(+), 6 deletions(-)
-
+diff --git a/drivers/soc/bcm/brcmstb/pm/pm-arm.c b/drivers/soc/bcm/brcmstb/pm/pm-arm.c
+index a5577dd5eb08..8ee06347447c 100644
+--- a/drivers/soc/bcm/brcmstb/pm/pm-arm.c
++++ b/drivers/soc/bcm/brcmstb/pm/pm-arm.c
+@@ -404,7 +404,7 @@ noinline int brcmstb_pm_s3_finish(void)
+ {
+ 	struct brcmstb_s3_params *params = ctrl.s3_params;
+ 	dma_addr_t params_pa = ctrl.s3_params_pa;
+-	phys_addr_t reentry = virt_to_phys(&cpu_resume);
++	phys_addr_t reentry = virt_to_phys(&cpu_resume_arm);
+ 	enum bsp_initiate_command cmd;
+ 	u32 flags;
+ 
 -- 
 2.17.1
