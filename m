@@ -1,35 +1,77 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Thu, 27 Sep 2018 09:28:06 -0700
-Subject: [PATCH v8 07/12] dt-bindings: mfd: Add a document for PECI client
- MFD
-In-Reply-To: <20180927151524.GA16798@bogus>
-References: <20180918215124.14003-1-jae.hyun.yoo@linux.intel.com>
- <20180918215124.14003-8-jae.hyun.yoo@linux.intel.com>
- <20180927151524.GA16798@bogus>
-Message-ID: <68edf927-a39a-dc54-9766-507e4fa789a5@linux.intel.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 28 Sep 2018 00:33:39 +0800
+Subject: [linux-sunxi] Re: [PATCH 04/12] drm/sun4i: sun6i_mipi_dsi: Enable
+ missing DSI bus clock
+In-Reply-To: <CAMty3ZAsF=uSJqj2L9ZS8N3CqcSUPzFSdtH8WtZPTg3m-K8COQ@mail.gmail.com>
+References: <20180927114850.24565-1-jagan@amarulasolutions.com>
+ <20180927114850.24565-5-jagan@amarulasolutions.com>
+ <CAGb2v66No3-AODYCCGifBrm9uvPjaNdR2W5MDQdazRAPomT9CQ@mail.gmail.com>
+ <CAMty3ZBUQKVLJsmkU=hjaO_O5bhetDfAh9-7iLkUqOznVc0KyA@mail.gmail.com>
+ <CAGb2v67pKgORe7uo6r6F+xaVi=Q-p6_DKotZJD7P=46Z=4RhEA@mail.gmail.com>
+ <CAMty3ZAsF=uSJqj2L9ZS8N3CqcSUPzFSdtH8WtZPTg3m-K8COQ@mail.gmail.com>
+Message-ID: <CAGb2v66RPYqH2uDF_izW3PdNrvBhmXecs5A6ThW-3xMeQampqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/27/2018 8:15 AM, Rob Herring wrote:
-> On Tue, 18 Sep 2018 14:51:19 -0700, Jae Hyun Yoo wrote:
->> This commit adds a dt-bindings document for PECI client MFD.
->>
->> Cc: Lee Jones <lee.jones@linaro.org>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Andrew Jeffery <andrew@aj.id.au>
->> Cc: James Feist <james.feist@linux.intel.com>
->> Cc: Jason M Biils <jason.m.bills@linux.intel.com>
->> Cc: Joel Stanley <joel@jms.id.au>
->> Cc: Vernon Mauery <vernon.mauery@linux.intel.com>
->> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
->> ---
->>   .../bindings/mfd/intel-peci-client.txt        | 34 +++++++++++++++++++
->>   1 file changed, 34 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/mfd/intel-peci-client.txt
->>
-> 
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> 
+On Fri, Sep 28, 2018 at 12:26 AM Jagan Teki <jagan@amarulasolutions.com> wrote:
+>
+> On Thu, Sep 27, 2018 at 7:47 PM Chen-Yu Tsai <wens@csie.org> wrote:
+> >
+> > On Thu, Sep 27, 2018 at 9:44 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
+> > >
+> > > On Thu, Sep 27, 2018 at 6:13 PM Chen-Yu Tsai <wens@csie.org> wrote:
+> > > >
+> > > > Hi,
+> > > >
+> > > > On Thu, Sep 27, 2018 at 7:49 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
+> > > > >
+> > > > > DSI bus_clk is already available in sun6i_dsi but missed to
+> > > > > get the clk and process for enable/disable.
+> > > > >
+> > > > > This patch add support for it.
+> > > > >
+> > > > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> > > > > ---
+> > > > >  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 8 ++++++++
+> > > > >  1 file changed, 8 insertions(+)
+> > > > >
+> > > > > diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> > > > > index 8e9c76febca2..156b371243c6 100644
+> > > > > --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> > > > > +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> > > > > @@ -1004,6 +1004,12 @@ static int sun6i_dsi_probe(struct platform_device *pdev)
+> > > > >                 return PTR_ERR(dsi->reset);
+> > > > >         }
+> > > > >
+> > > > > +       dsi->bus_clk = devm_clk_get(dev, "bus");
+> > > > > +       if (IS_ERR(dsi->bus_clk)) {
+> > > > > +               dev_err(dev, "Couldn't get the DSI bus clock\n");
+> > > > > +               return PTR_ERR(dsi->bus_clk);
+> > > > > +       }
+> > > > > +
+> > > >
+> > > > The DSI driver uses devm_regmap_init_mmio_clk, which enables the
+> > > > clock behind the scenes when regmap access needs it enabled.
+> > > >
+> > > > Did you have any issues without this patch?
+> > >
+> > > I'm unable to read register values via devmem, I see all 0's for all
+> > > dsi reg space.
+> >
+> > Well that is to be expected given how mmio with clk regmap works.
+> > Did you encounter any other problems besides this?
+>
+> no
+>
+> >
+> > FYI you can dump regmap contents using /sys/kernel/debug/regmap/*/registers
+>
+> Thanks, but ccu not using regmap I believe so can't see bus enabled
+> bit set via devmap
+> # devmem 0x01C20060
+> 0x33800000
 
-Thanks for the review, Rob!
+That is perfectly normal. It is only enabled when there are accesses to the
+DSI regmap.
+
+ChenYu
