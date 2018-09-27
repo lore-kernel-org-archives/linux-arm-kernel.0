@@ -1,94 +1,125 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 27 Sep 2018 12:42:18 +0800
-Subject: [arm-platforms:irq/gicv3-kdump 12/13]
- drivers//irqchip/irq-gic-v3-its.c:1659:11: error: implicit declaration of
- function 'gic_reserve_range'; did you mean 'free_reserved_page'?
-Message-ID: <201809271217.rRFpC7FY%fengguang.wu@intel.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Thu, 27 Sep 2018 10:25:52 +0530
+Subject: [PATCH 0/4] Update am437x and am335x dts to probe with ti-sysc
+In-Reply-To: <20180926233111.GY5662@atomide.com>
+References: <20180925000545.22931-1-tony@atomide.com>
+ <e9afe736-c2f0-6182-afd0-08279e09a35e@ti.com>
+ <20180925144021.GN5662@atomide.com> <20180925175537.GQ5662@atomide.com>
+ <d98aa7c1-5131-34c5-51e5-c7ef57cbc31e@ti.com>
+ <20180926155911.GT5662@atomide.com> <20180926162303.GU5662@atomide.com>
+ <cfc3f1db-9468-ed92-a673-882b51b4dec8@ti.com>
+ <20180926233111.GY5662@atomide.com>
+Message-ID: <305bf1c3-915d-dac1-95e4-4d32621247e1@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/gicv3-kdump
-head:   8bc67dad68a8d35bd9186eb4782df953da664a66
-commit: 8af4c6c076d0f4c8469f3aab34aa93d638306d2b [12/13] irqchip/gic-v3-its: Register LPI tables with EFI config table
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 8af4c6c076d0f4c8469f3aab34aa93d638306d2b
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
 
-Note: the arm-platforms/irq/gicv3-kdump HEAD 8bc67dad68a8d35bd9186eb4782df953da664a66 builds fine.
-      It only hurts bisectibility.
 
-All errors (new ones prefixed by >>):
+On Thursday 27 September 2018 05:01 AM, Tony Lindgren wrote:
+> * Grygorii Strashko <grygorii.strashko@ti.com> [180926 21:41]:
+>> On 09/26/2018 11:23 AM, Tony Lindgren wrote:
+>>> +static int __maybe_unused omap_i2c_suspend(struct device *dev)
+>>> +{
+>>> +	struct omap_i2c_dev *ddata = dev_get_drvdata(dev);
+>>> +	int error;
+>>> +
+>>> +	/* Is device still enabled because of autosuspend? */
+>>> +	if (ddata->is_suspended)
+>>> +		return 0;
+>>
+>> Sry, but you can't do this. There is no sync between suspend and PM runtime.
+>>
+>>
+>>> +
+>>> +	/* Paired with call in omap_i2c_resume() */
+>>> +	error = pm_runtime_put_sync_suspend(dev);
+>>
+>> This is nop!!! More over, in general you can't predict how many times pm_runtime_get was called and
+>> what's the current value of usage_count.
+> 
+> Hmm yeah that's a good point.
+> 
+>> To make things work the pm_runtime_force_xx() have to be used, or
+>> like with omap_device, platform/bus code have to handle device state
+>> at suspend_no_irq stage.
+> 
+> OK. So looks like the other i2c bus drivers have already solved it
+> with simply SET_NOIRQ_SYSTEM_SLEEP_PM_OPS which is along the lines
+> you're suggesting.
+> 
+> The following works for me, does it look OK to you?
 
-   In file included from arch/arm64/include/asm/bug.h:37:0,
-                    from include/linux/bug.h:5,
-                    from include/linux/mmdebug.h:5,
-                    from include/linux/gfp.h:5,
-                    from include/linux/slab.h:15,
-                    from include/linux/resource_ext.h:19,
-                    from include/linux/acpi.h:26,
-                    from drivers//irqchip/irq-gic-v3-its.c:18:
-   drivers//irqchip/irq-gic-v3-its.c: In function 'its_setup_lpi_prop_table':
->> drivers//irqchip/irq-gic-v3-its.c:1659:11: error: implicit declaration of function 'gic_reserve_range'; did you mean 'free_reserved_page'? [-Werror=implicit-function-declaration]
-      WARN_ON(gic_reserve_range(gic_rdists->prop_table_pa,
-              ^
-   include/asm-generic/bug.h:122:25: note: in definition of macro 'WARN_ON'
-     int __ret_warn_on = !!(condition);    \
-                            ^~~~~~~~~
-   cc1: some warnings being treated as errors
+This works pretty well with DS0 on am437x-gp-evm. Tested rtc wakeup,
+wakeup using uart and touch. All of the work well.
 
-vim +1659 drivers//irqchip/irq-gic-v3-its.c
+https://pastebin.ubuntu.com/p/RJhJJKhJHX/
 
-  1631	
-  1632	static int __init its_setup_lpi_prop_table(void)
-  1633	{
-  1634		if (gic_rdists->flags & RDIST_FLAGS_RD_TABLES_PREALLOCATED) {
-  1635			u64 val;
-  1636	
-  1637			val = gicr_read_propbaser(gic_data_rdist_rd_base() + GICR_PROPBASER);
-  1638			lpi_id_bits = (val & GICR_PROPBASER_IDBITS_MASK) + 1;
-  1639	
-  1640			gic_rdists->prop_table_pa = val & GENMASK_ULL(51, 12);
-  1641			gic_rdists->prop_table_va = memremap(gic_rdists->prop_table_pa,
-  1642							     LPI_PROPBASE_SZ,
-  1643							     MEMREMAP_WB);
-  1644			gic_reset_prop_table(gic_rdists->prop_table_va);
-  1645		} else {
-  1646			struct page *page;
-  1647	
-  1648			lpi_id_bits = min_t(u32,
-  1649					    GICD_TYPER_ID_BITS(gic_rdists->gicd_typer),
-  1650					    ITS_MAX_LPI_NRBITS);
-  1651			page = its_allocate_prop_table(GFP_NOWAIT);
-  1652			if (!page) {
-  1653				pr_err("Failed to allocate PROPBASE\n");
-  1654				return -ENOMEM;
-  1655			}
-  1656	
-  1657			gic_rdists->prop_table_pa = page_to_phys(page);
-  1658			gic_rdists->prop_table_va = page_address(page);
-> 1659			WARN_ON(gic_reserve_range(gic_rdists->prop_table_pa,
-  1660						  LPI_PROPBASE_SZ));
-  1661		}
-  1662	
-  1663		pr_info("GICv3: using LPI property table @%pa\n",
-  1664			&gic_rdists->prop_table_pa);
-  1665	
-  1666		return its_lpi_init(lpi_id_bits);
-  1667	}
-  1668	
+Also tested on beaglebone black DS0 works fine. Although there seems to
+be an additional warning which was not seen before:
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 40352 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180927/5dc8de3c/attachment-0001.gz>
+"l4-wkup-clkctrl:0008:0: failed to disable"
+
+log: https://pastebin.ubuntu.com/p/Ns2WRdVkXS/
+
+Also the above warning is present without/with this patch on [0].
+No such warnings on am4 though.
+
+[0]
+https://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git/log/?h=omap-for-v4.20/dt-ti-sysc-tmp-testing
+
+Regards,
+Keerthy
+
+> 
+> Regards,
+> 
+> Tony
+> 
+> 8< ---------------------
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -1498,8 +1498,7 @@ static int omap_i2c_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> -#ifdef CONFIG_PM
+> -static int omap_i2c_runtime_suspend(struct device *dev)
+> +static int __maybe_unused omap_i2c_runtime_suspend(struct device *dev)
+>  {
+>  	struct omap_i2c_dev *omap = dev_get_drvdata(dev);
+>  
+> @@ -1525,7 +1524,7 @@ static int omap_i2c_runtime_suspend(struct device *dev)
+>  	return 0;
+>  }
+>  
+> -static int omap_i2c_runtime_resume(struct device *dev)
+> +static int __maybe_unused omap_i2c_runtime_resume(struct device *dev)
+>  {
+>  	struct omap_i2c_dev *omap = dev_get_drvdata(dev);
+>  
+> @@ -1540,20 +1539,18 @@ static int omap_i2c_runtime_resume(struct device *dev)
+>  }
+>  
+>  static const struct dev_pm_ops omap_i2c_pm_ops = {
+> +	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
+> +				      pm_runtime_force_resume)
+>  	SET_RUNTIME_PM_OPS(omap_i2c_runtime_suspend,
+>  			   omap_i2c_runtime_resume, NULL)
+>  };
+> -#define OMAP_I2C_PM_OPS (&omap_i2c_pm_ops)
+> -#else
+> -#define OMAP_I2C_PM_OPS NULL
+> -#endif /* CONFIG_PM */
+>  
+>  static struct platform_driver omap_i2c_driver = {
+>  	.probe		= omap_i2c_probe,
+>  	.remove		= omap_i2c_remove,
+>  	.driver		= {
+>  		.name	= "omap_i2c",
+> -		.pm	= OMAP_I2C_PM_OPS,
+> +		.pm	= &omap_i2c_pm_ops,
+>  		.of_match_table = of_match_ptr(omap_i2c_of_match),
+>  	},
+>  };
+> 
