@@ -1,39 +1,38 @@
 From: linux.amoon@gmail.com (Anand Moon)
-Date: Thu, 27 Sep 2018 14:07:34 +0000
-Subject: [PATCHv5 2/6] ARM: dts: exynos: fix regulator min values of LDO13 for
- Odroid XU3/XU4
+Date: Thu, 27 Sep 2018 14:07:33 +0000
+Subject: [PATCHv5 1/6] ARM: dts: exynos: Added UHS-I bus speed support
 In-Reply-To: <20180927140738.1006-1-linux.amoon@gmail.com>
 References: <20180927140738.1006-1-linux.amoon@gmail.com>
-Message-ID: <20180927140738.1006-3-linux.amoon@gmail.com>
+Message-ID: <20180927140738.1006-2-linux.amoon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looking at the schematic sd_2 min/max range from 1.8V/2.8V so fix the
-regulator min value to 1.8V. Without these changes sdcard will failed
-to detect on booting when UHS-I tuning is enabled.
+Added support for UHS-I bus speed tuning for SDR50, DDR50 SDR104.
 
 Signed-off-by: Anand Moon <linux.amoon@gmail.com>
 ---
-[0] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/376262.html
-Fixed the commit message.
-drop the ramp-delay changes.
-drop the vmmc-supply/vqmmc-supply changes.
 ---
- arch/arm/boot/dts/exynos5422-odroid-core.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+[0] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/376263.html
+Changes from above.
+Fix the subject and commit message.
+drop sd-uhs-sdr12 and sd-uhs-sdr25 as host driver is not enable as of now.
+---
+ arch/arm/boot/dts/exynos5422-odroid-core.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/arch/arm/boot/dts/exynos5422-odroid-core.dtsi b/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
-index 0508e6891f41..15ab380e5fcf 100644
+index 2fac4baf1eb4..0508e6891f41 100644
 --- a/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
 +++ b/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
-@@ -231,7 +231,7 @@
+@@ -503,6 +503,9 @@
+ 	cap-sd-highspeed;
+ 	vmmc-supply = <&ldo19_reg>;
+ 	vqmmc-supply = <&ldo13_reg>;
++	sd-uhs-sdr50;
++	sd-uhs-sdr104;
++	sd-uhs-ddr50;
+ };
  
- 			ldo13_reg: LDO13 {
- 				regulator-name = "vddq_mmc2";
--				regulator-min-microvolt = <2800000>;
-+				regulator-min-microvolt = <1800000>;
- 				regulator-max-microvolt = <2800000>;
- 			};
- 
+ &nocp_mem0_0 {
 -- 
 2.17.1
