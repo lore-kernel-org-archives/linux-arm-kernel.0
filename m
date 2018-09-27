@@ -1,31 +1,45 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 27 Sep 2018 14:14:50 -0500
-Subject: [PATCh v3 2/4] arm64: add basic DTS for i.MX8MQ
-In-Reply-To: <20180921125626.21971-2-l.stach@pengutronix.de>
-References: <20180921125626.21971-1-l.stach@pengutronix.de>
- <20180921125626.21971-2-l.stach@pengutronix.de>
-Message-ID: <20180927191450.GA32039@bogus>
+Date: Thu, 27 Sep 2018 15:02:51 -0500
+Subject: [PATCH v3] arm64: dts: rockchip: add initial dts support for
+ Rockpro64
+In-Reply-To: <1537943105-21247-1-git-send-email-Akash_Gajjar@mentor.com>
+References: <Akash_Gajjar@mentor.com>
+ <1537943105-21247-1-git-send-email-Akash_Gajjar@mentor.com>
+Message-ID: <20180927200251.GA4060@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2018 at 02:56:24PM +0200, Lucas Stach wrote:
-> This adds the basic DTS for the i.MX8MQ.
-> For now only the following peripherals are supported:
-> - IOMUXC (pin controller)
-> - CCM (clock controller)
-> - GPIO
-> - UART
-> - uSDHC (SD/eMMC controller)
-> - FEC (ethernet controller)
-> - i2c
+On Wed, 26 Sep 2018 11:54:57 +0530, Akash Gajjar wrote:
+> Rockpro64 is a rockchip RK3399 based board from pine64.org.
+> This patch adds basic device node support for Rockpro64 board and make it able
+> to bring up.
 > 
-> +#define MX8MQ_IOMUXC_SD1_DATA0_USDHC1_DATA0                                 0x0A8 0x310 0x000 0x0 0x0
-> +#define MX8MQ_IOMUXC_SD1_DATA0_GPIO2_IO2                                    0x0A8 0x31  0x000 0x5 0x0
+> Peripheral Works
+> - Sdcard
+> - USB 2.0, 3.0
+> - Leds
+> - Ethernet
+> - Debug console
+> 
+> Not working:
+> - USB Type-C
+> 
+> Signed-off-by: Akash Gajjar <Akash_Gajjar@mentor.com>
+> ---
+> changes for v2
+> - Added support for usb 2.0, 3.0
+> - Added fusb302 node and its regulator support
+> - Cleanup pinctrl node
+> - Remove backlight, pcie, sound codec node inherited from firefly-rk3399 dts
+> changes for v3
+> - Added copyright properly
+> - Typo correction in commit message
+> 
+>  Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
+>  arch/arm64/boot/dts/rockchip/Makefile              |   1 +
+>  arch/arm64/boot/dts/rockchip/rk3399-rockpro64.dts  | 692 +++++++++++++++++++++
+>  3 files changed, 697 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-rockpro64.dts
+> 
 
-The 0x31 looks suspicious.
-
-And checkpatch isn't happy about the spaces instead of tabs.
-
-Rob
-
-> +#define MX8MQ_IOMUXC_SD1_DATA1_USDHC1_DATA1                                 0x0AC 0x314 0x000 0x0 0x0
+Reviewed-by: Rob Herring <robh@kernel.org>
