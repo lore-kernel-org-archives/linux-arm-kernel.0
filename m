@@ -1,46 +1,49 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Thu, 27 Sep 2018 17:18:43 +0530
-Subject: [PATCH 05/12] drm/sun4i: sun6i_mipi_dsi: Add DSI Generic short write
- 2 param transfer
+Date: Thu, 27 Sep 2018 17:18:46 +0530
+Subject: [PATCH 08/12] drm/sun4i: sun6i_mipi_dsi: Refactor vertical video
+ start delay
 In-Reply-To: <20180927114850.24565-1-jagan@amarulasolutions.com>
 References: <20180927114850.24565-1-jagan@amarulasolutions.com>
-Message-ID: <20180927114850.24565-6-jagan@amarulasolutions.com>
+Message-ID: <20180927114850.24565-9-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Short transfer write support for DCS and Generic transfer types
-share similar way to process command sequence in DSI block so
-add generic write 2 param transfer type macro so-that the panels
-which are requesting similar transfer type may process properly.
+Accordingly to BPI-M64-bsp DE DSI code Video start delay
+can be computed by subtracting total vertical timing with
+front porch timing and with adding 1 delay line for TCON.
 
-Also added error check for unsupporting transfer types this make
-debugging easy for new transfer types.
+This patch simply add the start_delay logic from BPI-M64-bsp,
+w/o this new computation, the DSI on A64 encounter vblank time out.
+
+[CRTC:36:crtc-0] vblank wait timed out
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-index 156b371243c6..1c7e42015645 100644
+index 9918fdb990ff..217db74c6dc3 100644
 --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
 +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-@@ -869,6 +869,7 @@ static ssize_t sun6i_dsi_transfer(struct mipi_dsi_host *host,
- 		     SUN6I_DSI_CMD_CTL_TX_FLAG);
+@@ -358,7 +358,17 @@ static void sun6i_dsi_inst_init(struct sun6i_dsi *dsi,
+ static u16 sun6i_dsi_get_video_start_delay(struct sun6i_dsi *dsi,
+ 					   struct drm_display_mode *mode)
+ {
+-	return mode->vtotal - (mode->vsync_end - mode->vdisplay) + 1;
++	u32 vfp = mode->vsync_start - mode->vdisplay;
++	u32 start_delay;
++
++	start_delay = mode->vtotal - vfp + 1;
++	if (start_delay > mode->vtotal)
++		start_delay -= mode->vtotal;
++
++	if (!start_delay)
++		start_delay = 1;
++
++	return start_delay;
+ }
  
- 	switch (msg->type) {
-+	case MIPI_DSI_GENERIC_SHORT_WRITE_2_PARAM:
- 	case MIPI_DSI_DCS_SHORT_WRITE:
- 	case MIPI_DSI_DCS_SHORT_WRITE_PARAM:
- 		ret = sun6i_dsi_dcs_write_short(dsi, msg);
-@@ -885,6 +886,8 @@ static ssize_t sun6i_dsi_transfer(struct mipi_dsi_host *host,
- 		}
- 
- 	default:
-+		dev_err(dsi->dev, "unsupported message type 0x%02x\n",
-+			msg->type);
- 		ret = -EINVAL;
- 	}
- 
+ static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
 -- 
 2.18.0.321.gffc6fa0e3
