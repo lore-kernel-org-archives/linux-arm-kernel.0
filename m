@@ -1,103 +1,126 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Thu, 27 Sep 2018 16:44:26 +0900
-Subject: [PATCH v2 2/2] PCI: controller: dwc: add UniPhier PCIe host
- controller support
-In-Reply-To: <20180926213135.A4B4.4A936039@socionext.com>
-References: <b869b273-e681-0b8c-52f5-6e02f9de5485@synopsys.com>
- <20180926213135.A4B4.4A936039@socionext.com>
-Message-ID: <20180927164426.ECD6.4A936039@socionext.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 27 Sep 2018 09:50:48 +0200
+Subject: [PATCH v23 4/4] soc: mediatek: Add Mediatek CMDQ helper
+In-Reply-To: <1538013431.17514.31.camel@mhfsdcap03>
+References: <1532482002-11164-1-git-send-email-houlong.wei@mediatek.com>
+ <1532482002-11164-5-git-send-email-houlong.wei@mediatek.com>
+ <ca12e8ab-e3d1-1cf0-8fe9-756d57bd5a3a@gmail.com>
+ <1538013431.17514.31.camel@mhfsdcap03>
+Message-ID: <3773f620-e135-578d-5307-08483436f4c2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo, Gustavo,
 
-On Wed, 26 Sep 2018 21:31:36 +0900 <hayashi.kunihiko@socionext.com> wrote:
 
-> Hi Lorenzo, Gustavo,
+On 27/09/2018 03:57, houlong wei wrote:
+[...]
+>>> +	}
+>>> +
+>>> +	return client;
+>>> +}
+>>> +EXPORT_SYMBOL(cmdq_mbox_create);
+>>> +
+>>> +void cmdq_mbox_destroy(struct cmdq_client *client)
+>>> +{
+>>> +	if (client->timeout_ms != CMDQ_NO_TIMEOUT) {
+>>> +		spin_lock(&client->lock);
+>>> +		del_timer_sync(&client->timer);
+>>> +		spin_unlock(&client->lock);
+>>> +	}
+>>> +	mbox_free_channel(client->chan);
+>>> +	kfree(client);
+>>> +}
+>>> +EXPORT_SYMBOL(cmdq_mbox_destroy);
+>>> +
+>>> +int cmdq_pkt_create(struct cmdq_client *client, struct cmdq_pkt **pkt_ptr,
+>>> +		    size_t size)
+>>
+>> I suppose you are not returning the allocated cmdq_pkt to avoid checks for
+>> IS_ERR() logic in the consumer of this API. Am I correct?
+>> Do we really need a pointer to a pointer here? Can't we just use a struct
+>> cmdq_pkt *pkt as argument? That would make things easier.
 > 
-> Thank you for reviewing.
+> Do you mean we change the argument 'struct cmdq_pkt **pkt_ptr' to
+> 'struct cmdq_pkt *pkt', and the consumer allocate a struct cmdq_pkt
+> *pkt, then pass pkt as argument of this API?
+> If yes, the consumer still need to check the return value of this API.
+> For the current implementation, the consumer doesn't need check
+> IS_ERR(*pkt_ptr) if the return value equals to 0.
 > 
-> On Tue, 25 Sep 2018 18:53:01 +0100
-> Gustavo Pimentel <gustavo.pimentel@synopsys.com> wrote:
+> Since the consumer has to check the return value of this API once, to
+> make it simpler, I shall change the prototype to 
+> 'struct cmdq_pkt *cmdq_pkt_create(struct cmdq_client *client, size_t
+> size)' and change its implementation.
 > 
-> > On 25/09/2018 17:14, Lorenzo Pieralisi wrote:
-> > > [+Gustavo, please have a look at INTX/MSI management]
-> > > 
-> > > On Thu, Sep 06, 2018 at 06:40:32PM +0900, Kunihiko Hayashi wrote:
-> > >> This introduces specific glue layer for UniPhier platform to support
-> > >> PCIe host controller that is based on the DesignWare PCIe core, and
-> > >> this driver supports Root Complex (host) mode.
-> > > 
-> > > Please read this thread and apply it to next versions:
-> > > 
-> > > https://urldefense.proofpoint.com/v2/url?u=https-3A__marc.info_-3Fl-3Dlinux-2Dpci-26m-3D150905742808166-26w-3D2&d=DwIBAg&c=DPL6_X_6JkXFx7AXWqB0tg&r=bkWxpLoW-f-E3EdiDCCa0_h0PicsViasSlvIpzZvPxs&m=H8UNDDUGQnQnqfWr4CBios689dJcjxu4qeTTRGulLmU&s=CgcXc_2LThyOpW-4bCriJNo9H1lzROEdy_cG9p-Y5hU&e=
+
+Exactly that's what I proposed. Sorry for not explaining myself :)
+
+>>
+>>> +{
+>>> +	struct cmdq_pkt *pkt;
+>>> +	struct device *dev;
+>>> +	dma_addr_t dma_addr;
+>>> +
+>>> +	pkt = kzalloc(sizeof(*pkt), GFP_KERNEL);
+>>> +	if (!pkt)
+>>> +		return -ENOMEM;
+>>> +	pkt->va_base = kzalloc(size, GFP_KERNEL);
+>>> +	if (!pkt->va_base) {
+>>> +		kfree(pkt);
+>>> +		return -ENOMEM;
+>>> +	}
+>>> +	pkt->buf_size = size;
+>>> +	pkt->cl = (void *)client;
+>>> +
+>>> +	dev = client->chan->mbox->dev;
+>>> +	dma_addr = dma_map_single(dev, pkt->va_base, pkt->buf_size,
+>>> +		DMA_TO_DEVICE);
+>>> +	if (dma_mapping_error(dev, dma_addr)) {
+>>> +		dev_err(dev, "dma map failed, size=%u\n", (u32)(u64)size);
+>>> +		kfree(pkt->va_base);
+>>> +		kfree(pkt);
+>>> +		return -ENOMEM;
+>>> +	}
+>>> +
+>>> +	pkt->pa_base = dma_addr;
+>>> +	*pkt_ptr = pkt;
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +EXPORT_SYMBOL(cmdq_pkt_create);
+>>> +
+>>> +void cmdq_pkt_destroy(struct cmdq_pkt *pkt)
+>>> +{
+>>> +	struct cmdq_client *client = (struct cmdq_client *)pkt->cl;
+>>> +
+>>> +	dma_unmap_single(client->chan->mbox->dev, pkt->pa_base, pkt->buf_size,
+>>> +			 DMA_TO_DEVICE);
+>>> +	kfree(pkt->va_base);
+>>> +	kfree(pkt);
+>>> +}
+>>> +EXPORT_SYMBOL(cmdq_pkt_destroy);
+>>> +
+>>> +static int cmdq_pkt_append_command(struct cmdq_pkt *pkt, enum cmdq_code code,
+>>> +				   u32 arg_a, u32 arg_b)
+>>> +{
+>>> +	u64 *cmd_ptr;
+>>> +
+>>> +	if (unlikely(pkt->cmd_buf_size + CMDQ_INST_SIZE > pkt->buf_size)) {
+>>> +		pkt->cmd_buf_size += CMDQ_INST_SIZE;
+>>
+>> Why do we update the cmd_buf_size here?
 > 
-> I also found this thread in previous linux-pci, and I think it's helpful for me.
-> I'll check it carefully.
-
-[snip]
-
-> > >> +	ret = devm_request_irq(dev, pp->irq, uniphier_pcie_irq_handler,
-> > >> +			       IRQF_SHARED, "pcie", priv);
-> > > 
-> > > This is wrong, you should set-up a chained IRQ for INTX.
-> > > 
-> > > I *think* that
-> > > 
-> > > ks_pcie_setup_interrupts()
-> > > 
-> > > is a good example to start with but I wonder whether it is worth
-> > > generalizing the INTX approach to designware as a whole as it was
-> > > done for MSIs.
-> > > 
-> > > Thoughts ?
-> > 
-> > From what I understood this is for legacy IRQ, right?
+> Because in developing phase of consumer driver, the consumer has to know
+> the real command buffer size after adding command failure. Then the
+> consumer will increase the size and run the cmdq flow (cmdq_pkt_create,
+> cmdq_pkt_write/wfe...) again. Finally, the consumer get the real size
+> and fix it.
 > 
-> Yes. For legacy IRQ.
-> 
-> > Like you (Lorenzo) said there is 2 drivers (pci-keystone-dw.c and pci-dra7xx.c)
-> > that uses it and can be use as a template for handling this type of interrupts.
-> > 
-> > We can try to pass some kind of generic INTX function to the DesignWare host
-> > library to handling this, but this will require some help from keystone and
-> > dra7xx maintainers, since my setup doesn't have legacy IRQ HW support.
-> 
-> Now I think it's difficult to make a template for INTX function,
-> and at first, I'll try to re-write this part with reference to pci-keystone-dw.c.
 
-I understand that there are 2 types of interrupt and the drivers.
+But the consumer should know the size it needs for it's buffer and if not it
+should be able to decide on it's own how much space it needs. If he get's a
+-ENOMEM he implicitly knows that he has to increase the buf_size. Now the size
+depends on how many command he has pending and wasn't able to write to the cmdq_pkt.
 
-One like pci-keystone-dw.c is:
-
- - there are 4 interrupts for legacy,
- - invoke handlers for each interrupt, and handle the interrupt,
- - call irq_set_chained_handler_and_data() to make a chain of the interrupts
-  when initializing
-
-The other like pci-dra7xx.c is:
-
- - there is 1 IRQ for legacy as a parent,
- - check an interrupt factor register, and handle the interrupt correspond
-   to the factor,
- - call request_irq() for the parent IRQ and irq_domain_add_linear() for
-   the factor when initializing
-
-The pcie-uniphier.c is the same type as the latter (like pci-dra7xx.c).
-
-However, in pci-dra7xx.c, MSI and legacy IRQ share the same interrupt number,
-so the same handler is called and the handler divides these IRQs.
-(found in dra7xx_pcie_msi_irq_handler())
-
-In pcie-uniphier.c, MSI and legacy IRQ are independent.
-Therefore it's necessary to prepare the handler for the legacy IRQ.
-
-I think that it's difficult to apply the way of pci-keystone-dw.c,
-and uniphier_pcie_irq_handler() and calling devm_request_irq() are still necessary
-to handle legacy IRQ.
-
-Thank you,
-
----
-Best Regards,
-Kunihiko Hayashi
+Regards,
+Matthias
