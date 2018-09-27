@@ -1,67 +1,45 @@
-From: rruigrok@codeaurora.org (Richard Ruigrok)
-Date: Thu, 27 Sep 2018 15:10:50 -0600
-Subject: [PATCH 00/10] GICv3 support for kexec/kdump on EFI systems
-In-Reply-To: <20180921195954.21574-1-marc.zyngier@arm.com>
-References: <20180921195954.21574-1-marc.zyngier@arm.com>
-Message-ID: <44ac1fad-8df4-4738-0f25-8a7a2de8f6df@codeaurora.org>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Thu, 27 Sep 2018 14:35:52 -0700
+Subject: [PATCH i2c-next v3 1/3] dt-bindings: i2c: aspeed: Add 'timeout'
+ property as an optional property
+In-Reply-To: <20180927205610.GA29022@bogus>
+References: <20180926215842.23125-1-jae.hyun.yoo@linux.intel.com>
+ <20180926215842.23125-2-jae.hyun.yoo@linux.intel.com>
+ <20180927205610.GA29022@bogus>
+Message-ID: <c045aceb-80e4-4f9f-7ff2-c30172f04b3e@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc
+Hi Rob,
 
-On 9/21/2018 1:59 PM, Marc Zyngier wrote:
-> The GICv3 architecture has the remarkable feature that once LPI tables
-> have been assigned to redistributors and that LPI delivery is enabled,
-> there is no guarantee that LPIs can be turned off (and most
-> implementations do not allow it), nor can it be reprogrammed to use
-> other tables.
->
-> This is a bit of a problem for kexec, where the secondary kernel
-> completely looses track of the previous allocations. If the secondary
-> kernel doesn't allocate the tables exactly the same way, no LPIs will
-> be delivered by the GIC (which continues to use the old tables), and
-> memory previously allocated for the pending tables will be slowly
-> corrupted, one bit at a time.
->
-> The workaround for this is based on a series[1] by Ard Biesheuvel,
-> which adds the required infrastructure for memory reservations to be
-> passed from one kernel to another using an EFI table.
->
-> This infrastructure is then used to register the allocation of GIC
-> tables with EFI, and allow the GIC driver to safely reuse the existing
-> programming if it detects that the tables have been correctly
-> registered. On non-EFI systems, there is not much we can do.
->
-> This has been tested on a TX2 system both as a host and a guest. I'd
-> welcome additional testing of different HW. For convenience, I've
-> stashed a branch containing the whole thing at [2].
-I tested [2] from the 4.19-rc4 set which included this series and [1].
-Tested kexec on Centriq system with ITS support (46 core).? On-board was a MLX CX5 NIC, verified MSIs are active in /proc/interrupts.
-Prior to this we used a workaround from Shanker to reuse the same tables in the kexec'ed kernel.
-Let me know if further testing is needed, and thanks for adding this support.
-> [1] https://marc.info/?l=linux-efi&m=153754757208163&w=2
-> [2] https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/log/?h=irq/gicv3-kdump
->
-> Marc Zyngier (10):
->   irqchip/gic-v3-its: Change initialization ordering for LPIs
->   irqchip/gic-v3-its: Consolidate LPI_PENDBASE_SZ usage
->   irqchip/gic-v3-its: Split property table clearing from allocation
->   irqchip/gic-v3-its: Move pending table allocation to init time
->   irqchip/gic-v3-its: Keep track of property table's PA and VA
->   irqchip/gic-v3-its: Allow use of pre-programmed LPI tables
->   irqchip/gic-v3-its: Use pre-programmed redistributor tables with kdump
->     kernels
->   irqchip/gic-v3-its: Check that all RDs have the same property table
->   irqchip/gic-v3-its: Register LPI tables with EFI config table
->   irqchip/gic-v3-its: Allow use of LPI tables in reserved memory
->
->  drivers/irqchip/irq-gic-v3-its.c   | 249 ++++++++++++++++++++++-------
->  drivers/irqchip/irq-gic-v3.c       |  20 ++-
->  include/linux/irqchip/arm-gic-v3.h |   4 +-
->  3 files changed, 208 insertions(+), 65 deletions(-)
->
+On 9/27/2018 1:56 PM, Rob Herring wrote:
+> On Wed, Sep 26, 2018 at 02:58:40PM -0700, Jae Hyun Yoo wrote:
+>> This commit adds 'aspeed,timeout' property as an optional property
+>> which can be used for setting 'timeout' value of
+>> 'struct i2c_adapter'. With this patch, the timeout value can be
+>> set through an I2C_TIMEOUT ioctl on cdev, or through this optional
+>> DT property.
+> 
+> Isn't controlling this from userspace or relying on a default
+> sufficient?  I can't see this needing to be highly tuned for each
+> platform.
+> 
 
--- 
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+It can be controlled using an ioctl command on an I2C cdev from
+userspace if CONFIG_I2C_CHARDEV is enabled. A couple of I2C drivers use
+their own specific default value for it but in general the common
+default value (1 second) which is set by i2c core is sufficient.
+But it still needs to be tuned for specific cases based on attached
+devices' characteristic, on packet length, on bus speed and on etc.
+Specifically in Aspeed I2C driver for BMC, it should be tuned
+to support multi-master use cases properly, and it needs a device tree
+property to apply this timeout value from the probing time of the
+module.
+
+> However, if we do have a property, it should be common.
+> 
+
+Okay, I'll change it to 'timeout'.
+
+Thanks a lot,
+Jae
