@@ -1,62 +1,136 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 27 Sep 2018 17:15:33 +0100
-Subject: [PATCH 6/7] arm64: compat: Add CNTFRQ trap handler
+Date: Thu, 27 Sep 2018 17:15:34 +0100
+Subject: [PATCH 7/7] arm64: arch_timer: Add workaround for ARM erratum 1188873
 In-Reply-To: <20180927161534.247926-1-marc.zyngier@arm.com>
 References: <20180927161534.247926-1-marc.zyngier@arm.com>
-Message-ID: <20180927161534.247926-7-marc.zyngier@arm.com>
+Message-ID: <20180927161534.247926-8-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just like CNTVCT, we need to handle userspace trapping into the
-kernel if we're decided that the timer wasn't fit for purpose...
-64bit userspace is already dealt with, but we're missing the
-equivalent compat handling.
+When running on Cortex-A76, a timer access from an AArch32 EL0
+task may end up with a corrupted value or register. The workaround for
+this is to trap these accesses at EL1/EL2 and execute them there.
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+This only affects versions r0p0, r1p0 and r2p0 of the CPU.
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/esr.h |  3 +++
- arch/arm64/kernel/traps.c    | 13 +++++++++++++
- 2 files changed, 16 insertions(+)
+ arch/arm64/Kconfig                   | 12 ++++++++++++
+ arch/arm64/include/asm/cpucaps.h     |  3 ++-
+ arch/arm64/include/asm/cputype.h     |  2 ++
+ arch/arm64/kernel/cpu_errata.c       |  8 ++++++++
+ drivers/clocksource/arm_arch_timer.c | 15 +++++++++++++++
+ 5 files changed, 39 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
-index 67faae88f953..6c764616b2a2 100644
---- a/arch/arm64/include/asm/esr.h
-+++ b/arch/arm64/include/asm/esr.h
-@@ -304,6 +304,9 @@
- #define ESR_ELx_CP15_64_ISS_SYS_CNTVCT	(ESR_ELx_CP15_64_ISS_SYS_VAL(1, 14) | \
- 					 ESR_ELx_CP15_64_ISS_DIR_READ)
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 1b1a0e95c751..28766066f31b 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -479,6 +479,18 @@ config ARM64_ERRATUM_1024718
  
-+#define ESR_ELx_CP15_32_ISS_SYS_CNTFRQ	(ESR_ELx_CP15_32_ISS_SYS_VAL(0, 0, 14, 0) |\
-+					 ESR_ELx_CP15_32_ISS_DIR_READ)
-+
- #ifndef __ASSEMBLY__
- #include <asm/types.h>
+ 	  If unsure, say Y.
  
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index cc0ad028caf3..923468c585a6 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -607,7 +607,20 @@ static void arm64_compat_skip_faulting_instruction(struct pt_regs *regs,
- 	arm64_skip_faulting_instruction(regs, sz);
- }
++config ARM64_ERRATUM_1188873
++	bool "Cortex-A76: MRC read following MRRC read of specific Generic Timer in AArch32 might give incorrect result"
++	default y
++	help
++	  This option adds work arounds for ARM Cortex-A76 erratum 1188873
++
++	  Affected Cortex-A76 cores (r0p0, r1p0, r2p0) could cause
++	  register corruption when accessing the timer registers from
++	  AArch32 userspace.
++
++	  If unsure, say Y.
++
+ config CAVIUM_ERRATUM_22375
+ 	bool "Cavium erratum 22375, 24313"
+ 	default y
+diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+index ae1f70450fb2..3575331dea7b 100644
+--- a/arch/arm64/include/asm/cpucaps.h
++++ b/arch/arm64/include/asm/cpucaps.h
+@@ -51,7 +51,8 @@
+ #define ARM64_SSBD				30
+ #define ARM64_MISMATCHED_CACHE_TYPE		31
+ #define ARM64_HAS_STAGE2_FWB			32
++#define ARM64_WORKAROUND_1188873		33
  
-+static void compat_cntfrq_read_handler(unsigned int esr, struct pt_regs *regs)
-+{
-+	int reg = (esr & ESR_ELx_CP15_32_ISS_RT_MASK) >> ESR_ELx_CP15_32_ISS_RT_SHIFT;
-+
-+	pt_regs_write_reg(regs, reg, arch_timer_get_rate());
-+	arm64_compat_skip_faulting_instruction(regs, 4);
-+}
-+
- static struct sys64_hook cp15_32_hooks[] = {
+-#define ARM64_NCAPS				33
++#define ARM64_NCAPS				34
+ 
+ #endif /* __ASM_CPUCAPS_H */
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index ea690b3562af..12f93e4d2452 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -86,6 +86,7 @@
+ #define ARM_CPU_PART_CORTEX_A75		0xD0A
+ #define ARM_CPU_PART_CORTEX_A35		0xD04
+ #define ARM_CPU_PART_CORTEX_A55		0xD05
++#define ARM_CPU_PART_CORTEX_A76		0xD0B
+ 
+ #define APM_CPU_PART_POTENZA		0x000
+ 
+@@ -110,6 +111,7 @@
+ #define MIDR_CORTEX_A75 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A75)
+ #define MIDR_CORTEX_A35 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A35)
+ #define MIDR_CORTEX_A55 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A55)
++#define MIDR_CORTEX_A76	MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A76)
+ #define MIDR_THUNDERX	MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX)
+ #define MIDR_THUNDERX_81XX MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX_81XX)
+ #define MIDR_THUNDERX_83XX MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX_83XX)
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index dec10898d688..16c102d96e6d 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -679,6 +679,14 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
+ 		.matches = has_ssbd_mitigation,
+ 	},
++#endif
++#ifdef CONFIG_ARM64_ERRATUM_1188873
 +	{
-+		.esr_mask = ESR_ELx_CP15_32_ISS_SYS_MASK,
-+		.esr_val = ESR_ELx_CP15_32_ISS_SYS_CNTFRQ,
-+		.handler = compat_cntfrq_read_handler,
++		/* Cortex-A76 r0p0 to r2p0 */
++		.desc = "ARM erratum 1188873",
++		.capability = ARM64_WORKAROUND_1188873,
++		ERRATA_MIDR_RANGE(MIDR_CORTEX_A76, 0, 0, 2, 0),
 +	},
- 	{},
+ #endif
+ 	{
+ 	}
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index d8c7f5750cdb..9a7d4dc00b6e 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -319,6 +319,13 @@ static u64 notrace arm64_858921_read_cntvct_el0(void)
+ }
+ #endif
+ 
++#ifdef CONFIG_ARM64_ERRATUM_1188873
++static u64 notrace arm64_1188873_read_cntvct_el0(void)
++{
++	return read_sysreg(cntvct_el0);
++}
++#endif
++
+ #ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
+ DEFINE_PER_CPU(const struct arch_timer_erratum_workaround *, timer_unstable_counter_workaround);
+ EXPORT_SYMBOL_GPL(timer_unstable_counter_workaround);
+@@ -408,6 +415,14 @@ static const struct arch_timer_erratum_workaround ool_workarounds[] = {
+ 		.read_cntvct_el0 = arm64_858921_read_cntvct_el0,
+ 	},
+ #endif
++#ifdef CONFIG_ARM64_ERRATUM_1188873
++	{
++		.match_type = ate_match_local_cap_id,
++		.id = (void *)ARM64_WORKAROUND_1188873,
++		.desc = "ARM erratum 1188873",
++		.read_cntvct_el0 = arm64_1188873_read_cntvct_el0,
++	},
++#endif
  };
  
+ typedef bool (*ate_match_fn_t)(const struct arch_timer_erratum_workaround *,
 -- 
 2.19.0
