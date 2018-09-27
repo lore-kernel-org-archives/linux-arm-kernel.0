@@ -1,43 +1,83 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 27 Sep 2018 17:15:27 +0100
-Subject: [PATCH 0/7] arm64: Workaround for Cortex-A76 erratum 1188873
-Message-ID: <20180927161534.247926-1-marc.zyngier@arm.com>
+Date: Thu, 27 Sep 2018 17:15:28 +0100
+Subject: [PATCH 1/7] arm64: Add decoding macros for CP15_32 and CP15_64 traps
+In-Reply-To: <20180927161534.247926-1-marc.zyngier@arm.com>
+References: <20180927161534.247926-1-marc.zyngier@arm.com>
+Message-ID: <20180927161534.247926-2-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Early revisions of Cortex-A76 suffer from erratum 1188873 which reads
-"MRC read following MRRC read of specific Generic Timer in AArch32
-might give incorrect result" (see [1], registration required...).
+So far, we don't have anything to help decoding ESR_ELx when dealing
+with ESR_ELx_EC_CP15_{32,64}. As we're about to handle some of those,
+let's add some useful macros.
 
-The workaround is to trap all EL0 accesses to the virtual timer (as
-well as CNTFRQ_EL0) and emulate it at EL1 (EL2 if running VHE). This
-results in some infrastructure for handling AArch32 CP15 traps at EL1,
-with all the joy of handling conditional instructions and IT
-advance... A lot of that code comes from KVM, and could potentially be
-shared. Most of these patches were posted as part of a different
-series about a year ago[2]
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/esr.h | 52 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
 
-[1] https://silver.arm.com/download/Documentation/BX500-DA-10008-r0p0-00rel0/Arm_Cortex-A76_MP052_Software_Developer_Errata_Notice_v9.pdf
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-July/520426.html
-
-Marc Zyngier (7):
-  arm64: Add decoding macros for CP15_32 and CP15_64 traps
-  arm64: compat: Add separate CP15 trapping hook
-  arm64: compat: Add condition code checks and IT advance
-  arm64: compat: Add cp15_32 and cp15_64 handler arrays
-  arm64: compat: Add CNTVCT trap handler
-  arm64: compat: Add CNTFRQ trap handler
-  arm64: arch_timer: Add workaround for ARM erratum 1188873
-
- arch/arm64/Kconfig                   |  12 +++
- arch/arm64/include/asm/cpucaps.h     |   3 +-
- arch/arm64/include/asm/cputype.h     |   2 +
- arch/arm64/include/asm/esr.h         |  58 ++++++++++
- arch/arm64/kernel/cpu_errata.c       |   8 ++
- arch/arm64/kernel/entry.S            |  15 ++-
- arch/arm64/kernel/traps.c            | 155 +++++++++++++++++++++++++++
- drivers/clocksource/arm_arch_timer.c |  15 +++
- 8 files changed, 265 insertions(+), 3 deletions(-)
-
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index ce70c3ffb993..bfd27753a59d 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -249,6 +249,58 @@
+ 
+ #define ESR_ELx_FP_EXC_TFV	(UL(1) << 23)
+ 
++/*
++ * ISS field definitions for CP15 accesses
++ */
++#define ESR_ELx_CP15_32_ISS_DIR_MASK	0x1
++#define ESR_ELx_CP15_32_ISS_DIR_READ	0x1
++#define ESR_ELx_CP15_32_ISS_DIR_WRITE	0x0
++
++#define ESR_ELx_CP15_32_ISS_RT_SHIFT	5
++#define ESR_ELx_CP15_32_ISS_RT_MASK	(UL(0x1f) << ESR_ELx_CP15_32_ISS_RT_SHIFT)
++#define ESR_ELx_CP15_32_ISS_CRM_SHIFT	1
++#define ESR_ELx_CP15_32_ISS_CRM_MASK	(UL(0xf) << ESR_ELx_CP15_32_ISS_CRM_SHIFT)
++#define ESR_ELx_CP15_32_ISS_CRN_SHIFT	10
++#define ESR_ELx_CP15_32_ISS_CRN_MASK	(UL(0xf) << ESR_ELx_CP15_32_ISS_CRN_SHIFT)
++#define ESR_ELx_CP15_32_ISS_OP1_SHIFT	14
++#define ESR_ELx_CP15_32_ISS_OP1_MASK	(UL(0x7) << ESR_ELx_CP15_32_ISS_OP1_SHIFT)
++#define ESR_ELx_CP15_32_ISS_OP2_SHIFT	17
++#define ESR_ELx_CP15_32_ISS_OP2_MASK	(UL(0x7) << ESR_ELx_CP15_32_ISS_OP2_SHIFT)
++
++#define ESR_ELx_CP15_32_ISS_SYS_MASK	(ESR_ELx_CP15_32_ISS_OP1_MASK | \
++					 ESR_ELx_CP15_32_ISS_OP2_MASK | \
++					 ESR_ELx_CP15_32_ISS_CRN_MASK | \
++					 ESR_ELx_CP15_32_ISS_CRM_MASK | \
++					 ESR_ELx_CP15_32_ISS_DIR_MASK)
++#define ESR_ELx_CP15_32_ISS_SYS_VAL(op1, op2, crn, crm) \
++					(((op1) << ESR_ELx_CP15_32_ISS_OP1_SHIFT) | \
++					 ((op2) << ESR_ELx_CP15_32_ISS_OP2_SHIFT) | \
++					 ((crn) << ESR_ELx_CP15_32_ISS_CRN_SHIFT) | \
++					 ((crm) << ESR_ELx_CP15_32_ISS_CRM_SHIFT))
++
++#define ESR_ELx_CP15_64_ISS_DIR_MASK	0x1
++#define ESR_ELx_CP15_64_ISS_DIR_READ	0x1
++#define ESR_ELx_CP15_64_ISS_DIR_WRITE	0x0
++
++#define ESR_ELx_CP15_64_ISS_RT_SHIFT	5
++#define ESR_ELx_CP15_64_ISS_RT_MASK	(UL(0x1f) << ESR_ELx_CP15_64_ISS_RT_SHIFT)
++
++#define ESR_ELx_CP15_64_ISS_RT2_SHIFT	10
++#define ESR_ELx_CP15_64_ISS_RT2_MASK	(UL(0x1f) << ESR_ELx_CP15_64_ISS_RT2_SHIFT)
++
++#define ESR_ELx_CP15_64_ISS_OP1_SHIFT	16
++#define ESR_ELx_CP15_64_ISS_OP1_MASK	(UL(0xf) << ESR_ELx_CP15_64_ISS_OP1_SHIFT)
++#define ESR_ELx_CP15_64_ISS_CRM_SHIFT	1
++#define ESR_ELx_CP15_64_ISS_CRM_MASK	(UL(0xf) << ESR_ELx_CP15_64_ISS_CRM_SHIFT)
++
++#define ESR_ELx_CP15_64_ISS_SYS_VAL(op1, crm) \
++					(((op1) << ESR_ELx_CP15_64_ISS_OP1_SHIFT) | \
++					 ((crm) << ESR_ELx_CP15_64_ISS_CRM_SHIFT))
++
++#define ESR_ELx_CP15_64_ISS_SYS_MASK	(ESR_ELx_CP15_64_ISS_OP1_MASK |	\
++					 ESR_ELx_CP15_64_ISS_CRM_MASK | \
++					 ESR_ELx_CP15_64_ISS_DIR_MASK)
++
+ #ifndef __ASSEMBLY__
+ #include <asm/types.h>
+ 
 -- 
 2.19.0
