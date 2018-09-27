@@ -1,58 +1,85 @@
-From: ben-linux@fluff.org (Ben Dooks)
-Date: Thu, 27 Sep 2018 19:38:09 +0100
-Subject: [PATCH] ARM: zImage: atags_to_fdt: add serial-number for ATAG_SERIAL
-Message-ID: <20180927183809.23051-1-ben-linux@fluff.org>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 27 Sep 2018 14:10:00 -0500
+Subject: [PATCH v3 2/5] dt-bindings: spi: add binding file for NXP
+ FlexSPI controller
+In-Reply-To: <1537525323-20730-3-git-send-email-yogeshnarayan.gaur@nxp.com>
+References: <1537525323-20730-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+ <1537525323-20730-3-git-send-email-yogeshnarayan.gaur@nxp.com>
+Message-ID: <20180927191000.GA18549@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the system passes an ATAG_SERIAL, convert that into a /serial-number
-node so that the system serial number will be present under the kernel.
+On Fri, Sep 21, 2018 at 03:52:00PM +0530, Yogesh Gaur wrote:
+> Add binding file for NXP FlexSPI controller
+> 
+> Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
+> ---
+> Changes for v3:
+> - None
+> Changes for v2:
+> - Incorporated Rob review comments.
+> 
+>  .../devicetree/bindings/spi/spi-nxp-fspi.txt       | 42 ++++++++++++++++++++++
+>  1 file changed, 42 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt b/Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
+> new file mode 100644
+> index 0000000..94b5203
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/spi/spi-nxp-fspi.txt
+> @@ -0,0 +1,42 @@
+> +* NXP Flex Serial Peripheral Interface (FSPI)
+> +
+> +Required properties:
+> +  - compatible : Should be "nxp,lx2160a-fspi"
+> +  - reg :        First contains the register location and length,
+> +                 Second contains the memory mapping address and length
+> +  - reg-names :  Should contain the resource reg names:
+> +	         - fspi_base: configuration register address space
+> +                 - fspi_mmap: memory mapped address space
+> +  - interrupts : Should contain the interrupt for the device
+> +
+> +Optional properties:
+> +  - big-endian : See common-properties.txt.
+> +
+> +Required SPI slave node properties:
+> +  - reg :        There are two buses (A and B) with two chip selects each.
+> +                 This encodes to which bus and CS the flash is connected:
+> +                 - <0>: Bus A, CS 0
+> +                 - <1>: Bus A, CS 1
+> +                 - <2>: Bus B, CS 0
+> +                 - <3>: Bus B, CS 1
+> +
+> +Example showing the usage of two SPI NOR slave devices on bus A:
+> +
+> +fspi at 0: flexspi at 20c0000 {
 
-Signed-off-by: Ben Dooks <ben-linux@fluff.org>
----
- arch/arm/boot/compressed/atags_to_fdt.c | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+Use standard node names.
 
-diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
-index 41fa7316c52b..330cd3c2eae5 100644
---- a/arch/arm/boot/compressed/atags_to_fdt.c
-+++ b/arch/arm/boot/compressed/atags_to_fdt.c
-@@ -98,6 +98,24 @@ static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
- 	setprop_string(fdt, "/chosen", "bootargs", cmdline);
- }
- 
-+static void hex_str(char *out, uint32_t value)
-+{
-+	uint32_t digit;
-+	int idx;
-+
-+	for (idx = 7; idx >= 0; idx--) {
-+		digit = value >> 28;
-+		value <<= 4;
-+		digit &= 0xf;
-+		if (digit < 10)
-+			digit += '0';
-+		else
-+			digit += 'A'-10;
-+		*out++ = digit;
-+	}
-+	*out = '\0';
-+}
-+
- /*
-  * Convert and fold provided ATAGs into the provided FDT.
-  *
-@@ -180,6 +198,11 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
- 					initrd_start);
- 			setprop_cell(fdt, "/chosen", "linux,initrd-end",
- 					initrd_start + initrd_size);
-+		} else if (atag->hdr.tag == ATAG_SERIAL) {
-+			char serno[16+2];
-+			hex_str(serno, atag->u.serialnr.high);
-+			hex_str(serno+8, atag->u.serialnr.low);
-+			setprop_string(fdt, "/", "serial-number", serno);
- 		}
- 	}
- 
--- 
-2.19.0
+spi at ...
+
+> +	compatible = "nxp,lx2160a-fspi";
+> +	reg = <0x0 0x20c0000 0x0 0x10000>, <0x0 0x20000000 0x0 0x10000000>;
+> +	reg-names = "fspi_base", "fspi_mmap";
+> +	interrupts = <0 25 0x4>; /* Level high type */
+> +	clocks = <&clockgen 4 3>, <&clockgen 4 3>;
+> +	clock-names = "fspi_en", "fspi";
+> +
+> +	flash at 0: mt35xu512aba at 0 {
+
+You've got the label and node name reversed. Drop the '@' in the label. 
+That should be reserved for node names.
+
+> +		reg = <0>;
+> +		....
+> +	};
+> +
+> +	flash at 1: mt35xu512aba at 1 {
+> +		reg = <1>;
+> +		....
+> +	};
+> +};
+> -- 
+> 2.7.4
+> 
