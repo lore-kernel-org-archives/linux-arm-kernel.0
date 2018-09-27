@@ -1,58 +1,56 @@
 From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Thu, 27 Sep 2018 13:39:57 +0200
-Subject: [PATCH v3 0/7] Introduce STMFX I2C Multi-Function eXpander
-Message-ID: <1538048404-9041-1-git-send-email-amelie.delaunay@st.com>
+Date: Thu, 27 Sep 2018 13:39:58 +0200
+Subject: [PATCH v3 1/7] dt-bindings: mfd: Add ST Multi-Function eXpander
+ (STMFX) core bindings
+In-Reply-To: <1538048404-9041-1-git-send-email-amelie.delaunay@st.com>
+References: <1538048404-9041-1-git-send-email-amelie.delaunay@st.com>
+Message-ID: <1538048404-9041-2-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for STMicroelectronics Multi-Function eXpander
-(STMFX), used on some STM32 discovery and evaluation boards.
+This patch adds documentation of device tree bindings for the
+STMicroelectronics Multi-Function eXpander (STMFX) MFD core.
 
-STMFX is an STM32L152 slave controller whose firmware embeds the following
-features:
-- I/O expander (16 GPIOs + 8 extra if the other features are not enabled),
-- resistive touchscreen controller,
-- IDD measurement.
-
-I2C stuff and chip initialization is based on an MFD parent driver, which
-registers a pinctrl MFD child.
-
+Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-Changes in v3:
-- fix MFD interrupt bindings
-- fix drivers/mfd/stmfx.c:103:8: warning: 'mask' may be used uninitialized
-  in this function
-Changes in v2:
-- move to MFD parent driver for i2c stuff and chip initialization
-- improve regmap configuration
-- take advantage of the use of gpio-ranges
-
-
-Amelie Delaunay (7):
-  dt-bindings: mfd: Add ST Multi-Function eXpander (STMFX) core bindings
-  mfd: Add ST Multi-Function eXpander (STMFX) core driver
-  dt-bindings: pinctrl: document the STMFX pinctrl bindings
-  pinctrl: Add STMFX GPIO expander Pinctrl/GPIO driver
-  ARM: dts: stm32: add STMFX support on stm32746g-eval
-  ARM: dts: stm32: add joystick support on stm32746g-eval
-  ARM: dts: stm32: add orange and blue leds on stm32746g-eval
-
- Documentation/devicetree/bindings/mfd/stmfx.txt    |  28 +
- .../devicetree/bindings/pinctrl/pinctrl-stmfx.txt  | 116 +++
- arch/arm/boot/dts/stm32746g-eval.dts               |  66 ++
- drivers/mfd/Kconfig                                |  14 +
- drivers/mfd/Makefile                               |   2 +-
- drivers/mfd/stmfx.c                                | 626 ++++++++++++++++
- drivers/pinctrl/Kconfig                            |  12 +
- drivers/pinctrl/Makefile                           |   1 +
- drivers/pinctrl/pinctrl-stmfx.c                    | 821 +++++++++++++++++++++
- include/linux/mfd/stmfx.h                          |  27 +
- 10 files changed, 1712 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/mfd/stmfx.txt | 28 +++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/mfd/stmfx.txt
- create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-stmfx.txt
- create mode 100644 drivers/mfd/stmfx.c
- create mode 100644 drivers/pinctrl/pinctrl-stmfx.c
- create mode 100644 include/linux/mfd/stmfx.h
 
+diff --git a/Documentation/devicetree/bindings/mfd/stmfx.txt b/Documentation/devicetree/bindings/mfd/stmfx.txt
+new file mode 100644
+index 0000000..f0c2f7f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/stmfx.txt
+@@ -0,0 +1,28 @@
++STMicroelectonics Multi-Function eXpander (STMFX) Core bindings
++
++ST Multi-Function eXpander (STMFX) is a slave controller using I2C for
++communication with the main MCU. Its main features are GPIO expansion, main
++MCU IDD measurement (IDD is the amount of current that flows through VDD) and
++resistive touchscreen controller.
++
++Required properties:
++- compatible: should be "st,stmfx-0300".
++- reg: I2C slave address of the device.
++- interrupts: interrupt specifier triggered by MFX_IRQ_OUT signal.
++  Please refer to ../interrupt-controller/interrupt.txt
++
++Optional properties:
++- drive-open-drain: configure MFX_IRQ_OUT as open drain.
++- vdd-supply: phandle of the regulator supplying STMFX.
++
++Example:
++
++	stmfx: stmfx at 42 {
++		compatible = "st,stmfx-0300";
++		reg = <0x42>;
++		interrupts = <8 IRQ_TYPE_EDGE_RISING>;
++		interrupt-parent = <&gpioi>;
++		vdd-supply = <&v3v3>;
++	};
++
++Please refer to ../pinctrl/pinctrl-stmfx.txt for STMFX GPIO expander function bindings.
 -- 
 2.7.4
