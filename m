@@ -1,44 +1,82 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 27 Sep 2018 09:33:40 +0200
-Subject: [GIT PULL] DTS patch for RealView
-Message-ID: <CACRpkdbuLQakD9vmX-CjGce4h7KtP8s2a8zVMCKmvGSWCDK7ew@mail.gmail.com>
+Date: Thu, 27 Sep 2018 09:37:33 +0200
+Subject: [PATCH] ARM: Assume maintainership of ARM reference designs
+Message-ID: <20180927073733.11580-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+With this I assume maintainership of the Integrator, Versatile
+and RealView ARM reference machines.
 
-here is a realview patch.
+It's no big secret that I've been maintaining them for years,
+but might as well make it official so I get the mails and
+don't miss anything.
 
-Please pull it in! Description in the
-signed tag.
+I have also included some drivers that are closely associated
+with the ARM reference designs and yet orphaned in the
+MAINTAINERS file. I can surely maintain them too, or route
+the question to the right people so it doesn't fall on the
+floor of upward to the subsystem maintainers who have too much
+to do already as it is.
 
-Yours,
-Linus Walleij
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Rob Herring <robh@kernel.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Michael Turquette <mturquette@baylibre.com>
+Cc: Stephen Boyd <sboyd@kernel.org>
+Cc: Wolfram Sang <wsa@the-dreams.de>
+Cc: Mark Brown <broonie@kernel.org>
+Cc: Brian Norris <computersforpeace@gmail.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ARM SoC folks: please apply this directly wherever MAINTAINERS
+patches go.
 
-The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+Submitted a while back, thought it was applied since everyone
+was in on it, but apparently it got lost.
 
-  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+ARM Cambridge sent me all their old reference designs so I am
+well equipped for this.
+---
+ MAINTAINERS | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-tags/realview-dts-v4.20
-
-for you to fetch changes up to 016add12977bcc30f77d7e48fc9a3a024cb46645:
-
-  ARM: dts: realview: Fix SPI controller node names (2018-09-27 09:29:12 +0200)
-
-----------------------------------------------------------------
-Realview DTS update for v4.20:
-- One patch from Rob fixing SPI node names
-
-----------------------------------------------------------------
-Rob Herring (1):
-      ARM: dts: realview: Fix SPI controller node names
-
- arch/arm/boot/dts/arm-realview-eb.dtsi    | 2 +-
- arch/arm/boot/dts/arm-realview-pb1176.dts | 2 +-
- arch/arm/boot/dts/arm-realview-pb11mp.dts | 2 +-
- arch/arm/boot/dts/arm-realview-pbx.dtsi   | 2 +-
- arch/arm/boot/dts/versatile-ab.dts        | 2 +-
- 5 files changed, 5 insertions(+), 5 deletions(-)
+diff --git a/MAINTAINERS b/MAINTAINERS
+index a5b256b25905..a4ed79a5a1c2 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1078,6 +1078,31 @@ F:	arch/arm/include/asm/arch_timer.h
+ F:	arch/arm64/include/asm/arch_timer.h
+ F:	drivers/clocksource/arm_arch_timer.c
+ 
++ARM INTEGRATOR, VERSATILE AND REALVIEW SUPPORT
++M:	Linus Walleij <linus.walleij@linaro.org>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++F:	Documentation/devicetree/bindings/arm/arm-boards
++F:	Documentation/devicetree/bindings/auxdisplay/arm-charlcd.txt
++F:	Documentation/devicetree/bindings/clock/arm-integrator.txt
++F:	Documentation/devicetree/bindings/interrupt-controller/arm,versatile-fpga-irq.txt
++F:	Documentation/devicetree/bindings/mtd/arm-versatile.txt
++F:	arch/arm/mach-integrator/
++F:	arch/arm/mach-realview/
++F:	arch/arm/mach-versatile/
++F:	arch/arm/plat-versatile/
++F:	arch/arm/boot/dts/arm-realview-*
++F:	arch/arm/boot/dts/integrator*
++F:	arch/arm/boot/dts/versatile*
++F:	drivers/clk/versatile/
++F:	drivers/i2c/busses/i2c-versatile.c
++F:	drivers/irqchip/irq-versatile-fpga.c
++F:	drivers/irqchip/irq-vic.c
++F:	drivers/mtd/maps/physmap_of_versatile.c
++F:	drivers/power/reset/arm-versatile-reboot.c
++F:	drivers/soc/versatile/
++F:	drivers/spi/spi-pl022.c
++
+ ARM HDLCD DRM DRIVER
+ M:	Liviu Dudau <liviu.dudau@arm.com>
+ S:	Supported
+-- 
+2.17.1
