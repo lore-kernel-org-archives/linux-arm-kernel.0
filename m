@@ -1,54 +1,38 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 27 Sep 2018 09:55:05 +0100
-Subject: [PATCH V2 03/27] mmc: mmci: convert dma_setup callback to return
- an int
-In-Reply-To: <CAPDyKFqnN0gg9WsbNPQcodqUXJmFEzMM+ST36s6oEZ2OPoONug@mail.gmail.com>
-References: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
- <1537523181-14578-4-git-send-email-ludovic.Barre@st.com>
- <CAPDyKFqnN0gg9WsbNPQcodqUXJmFEzMM+ST36s6oEZ2OPoONug@mail.gmail.com>
-Message-ID: <55622e1c-190f-6903-ab04-16089264f277@linaro.org>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Thu, 27 Sep 2018 10:58:37 +0200
+Subject: [PATCH net-next] can: xilinx: fix return type of ndo_start_xmit
+ function
+In-Reply-To: <20180926103229.13204-1-yuehaibing@huawei.com>
+References: <20180926103229.13204-1-yuehaibing@huawei.com>
+Message-ID: <b364d678-98ea-2822-624d-3d65cccfc386@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for looping me!
-
-On 24/09/18 15:28, Ulf Hansson wrote:
->>   /* Initialize the dml hardware connected to SD Card controller */
->> -static void qcom_dma_setup(struct mmci_host *host)
->> +static int qcom_dma_setup(struct mmci_host *host)
->>   {
->>          u32 config;
->>          void __iomem *base;
->> @@ -131,7 +131,7 @@ static void qcom_dma_setup(struct mmci_host *host)
->>
->>          if (producer_id < 0 || consumer_id < 0) {
->>                  host->variant->qcom_dml = false;
-> It seems like the existing code is an attempt to fallback to use pio
-> mode. However, I doubt it works as is.
-
-If I remember it correctly, Yes, that was the intent. we should still be 
-able to use the pio mode if the dma setup fails.
-
-I believe pio mode should work, Last time when I tried (3-4 years back) 
-it did work!
-
+On 09/26/2018 12:32 PM, YueHaibing wrote:
+> The method ndo_start_xmit() is defined as returning an 'netdev_tx_t',
+> which is a typedef for an enum type, so make sure the implementation in
+> this driver has returns 'netdev_tx_t' value, and change the function
+> return type to netdev_tx_t.
 > 
->> -               return;
->> +               return -EINVAL;
-> My point is, if you return an error code here, it means that the error
-> code becomes propagated and ->probe() will fail.
-That would be very bad!, We should report it and may be just continue 
-with pio mode.
-
+> Found by coccinelle.
 > 
-> Ideally, we should be able fall back to pio mode when dma doesn't
-> work. I have looped in Srinivas who implemented the qcom dml support,
-> let's see if he can explains the intent with the code.
-> 
-> I also volunteer to help out running some tests on the 410c platform,
-I think you meant IFC6410.. DB410c uses sdhci.
+> Signed-off-by: YueHaibing <yuehaibing@huawei.com>
 
+applied to can-next.
 
---srini
-> however allow me a day or two to do that.
-> 
+Tnx,
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180927/cd7ffd1e/attachment.sig>
