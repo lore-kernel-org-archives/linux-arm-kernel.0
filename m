@@ -1,94 +1,942 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 27 Sep 2018 15:07:37 +0200
-Subject: [PATCH] arm64: remove unused asm/compiler.h header file
-Message-ID: <20180927130737.31301-1-ard.biesheuvel@linaro.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 27 Sep 2018 10:16:06 -0300
+Subject: [PATCH] ARM: dts: vf610: Add ZII SCU4 AIB board
+Message-ID: <1538054166-28411-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm64 does not define CONFIG_HAVE_ARCH_COMPILER_H, nor does it keep
-anything useful in its copy of asm/compiler.h, so let's remove it
-before anybody starts using it.
+Add support for the ZII SCU 4 board, which has lots of switches and
+SFF ports.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Based on the work from Andrew Lunn.
+
+Reviewed-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+Signed-off-by: Fabio Estevam <festevam@gmail.com>
 ---
- arch/arm64/include/asm/compiler.h | 30 ------------------------------
- arch/arm64/include/asm/sysreg.h   |  1 -
- arch/arm64/include/asm/uaccess.h  |  1 -
- arch/arm64/kernel/psci.c          |  1 -
- 4 files changed, 33 deletions(-)
- delete mode 100644 arch/arm64/include/asm/compiler.h
+ arch/arm/boot/dts/Makefile               |   1 +
+ arch/arm/boot/dts/vf610-zii-scu4-aib.dts | 902 +++++++++++++++++++++++++++++++
+ 2 files changed, 903 insertions(+)
+ create mode 100644 arch/arm/boot/dts/vf610-zii-scu4-aib.dts
 
-diff --git a/arch/arm64/include/asm/compiler.h b/arch/arm64/include/asm/compiler.h
-deleted file mode 100644
-index ee35fd0f2236..000000000000
---- a/arch/arm64/include/asm/compiler.h
-+++ /dev/null
-@@ -1,30 +0,0 @@
--/*
-- * Based on arch/arm/include/asm/compiler.h
-- *
-- * Copyright (C) 2012 ARM Ltd.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-- */
--#ifndef __ASM_COMPILER_H
--#define __ASM_COMPILER_H
--
--/*
-- * This is used to ensure the compiler did actually allocate the register we
-- * asked it for some inline assembly sequences.  Apparently we can't trust the
-- * compiler from one version to another so a bit of paranoia won't hurt.  This
-- * string is meant to be concatenated with the inline asm string and will
-- * cause compilation to stop on mismatch.  (for details, see gcc PR 15089)
-- */
--#define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
--
--#endif	/* __ASM_COMPILER_H */
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index c1470931b897..6d307212bf7c 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -20,7 +20,6 @@
- #ifndef __ASM_SYSREG_H
- #define __ASM_SYSREG_H
- 
--#include <asm/compiler.h>
- #include <linux/stringify.h>
- 
- /*
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index e66b0fca99c2..07c34087bd5e 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -32,7 +32,6 @@
- #include <asm/cpufeature.h>
- #include <asm/ptrace.h>
- #include <asm/memory.h>
--#include <asm/compiler.h>
- #include <asm/extable.h>
- 
- #define get_ds()	(KERNEL_DS)
-diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-index e8edbf13302a..8cdaf25e99cd 100644
---- a/arch/arm64/kernel/psci.c
-+++ b/arch/arm64/kernel/psci.c
-@@ -24,7 +24,6 @@
- 
- #include <uapi/linux/psci.h>
- 
--#include <asm/compiler.h>
- #include <asm/cpu_ops.h>
- #include <asm/errno.h>
- #include <asm/smp_plat.h>
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 3c0c2fc..2d576c3 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -587,6 +587,7 @@ dtb-$(CONFIG_SOC_VF610) += \
+ 	vf610-zii-cfu1.dtb \
+ 	vf610-zii-dev-rev-b.dtb \
+ 	vf610-zii-dev-rev-c.dtb \
++	vf610-zii-scu4-aib.dtb \
+ 	vf610-zii-ssmb-spu3.dtb
+ dtb-$(CONFIG_ARCH_MXS) += \
+ 	imx23-evk.dtb \
+diff --git a/arch/arm/boot/dts/vf610-zii-scu4-aib.dts b/arch/arm/boot/dts/vf610-zii-scu4-aib.dts
+new file mode 100644
+index 0000000..07dae16
+--- /dev/null
++++ b/arch/arm/boot/dts/vf610-zii-scu4-aib.dts
+@@ -0,0 +1,902 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++//
++// Copyright (C) 2016-2018 Zodiac Inflight Innovations
++
++/dts-v1/;
++#include "vf610.dtsi"
++
++/ {
++	model = "ZII VF610 SCU4 AIB";
++	compatible = "zii,vf610scu4-aib", "zii,vf610dev", "fsl,vf610";
++
++	chosen {
++		stdout-path = &uart0;
++	};
++
++	memory at 80000000 {
++		device_type = "memory";
++		reg = <0x80000000 0x20000000>;
++	};
++
++	gpio-leds {
++		compatible = "gpio-leds";
++		pinctrl-0 = <&pinctrl_leds_debug>;
++		pinctrl-names = "default";
++
++		debug {
++			label = "zii:green:debug1";
++			gpios = <&gpio3 0 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "heartbeat";
++		};
++	};
++
++	mdio-mux {
++		compatible = "mdio-mux-gpio";
++		pinctrl-0 = <&pinctrl_mdio_mux>;
++		pinctrl-names = "default";
++		gpios = <&gpio4 4  GPIO_ACTIVE_HIGH
++			 &gpio4 5  GPIO_ACTIVE_HIGH
++			 &gpio3 30 GPIO_ACTIVE_HIGH
++			 &gpio3 31 GPIO_ACTIVE_HIGH>;
++		mdio-parent-bus = <&mdio1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		mdio_mux_1: mdio at 1 {
++			reg = <1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			switch0: switch0 at 0 {
++				compatible = "marvell,mv88e6190";
++				reg = <0>;
++				dsa,member = <0 0>;
++				eeprom-length = <65536>;
++
++				ports {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					port at 0 {
++						reg = <0>;
++						label = "cpu";
++						ethernet = <&fec1>;
++
++						fixed-link {
++							speed = <100>;
++							full-duplex;
++						};
++					};
++
++					port at 1 {
++						reg = <1>;
++						label = "aib2main_1";
++						phy-handle = <&switch0phy1>;
++					};
++
++					port at 2 {
++						reg = <2>;
++						label = "aib2main_2";
++						phy-handle = <&switch0phy2>;
++					};
++
++					port at 3 {
++						reg = <3>;
++						label = "eth_cu_1000_5";
++						phy-handle = <&switch0phy3>;
++					};
++
++					port at 4 {
++						reg = <4>;
++						label = "eth_cu_1000_6";
++						phy-handle = <&switch0phy4>;
++					};
++
++					port at 5 {
++						reg = <5>;
++						label = "eth_cu_1000_4";
++						phy-handle = <&switch0phy5>;
++					};
++
++					port at 6 {
++						reg = <6>;
++						label = "eth_cu_1000_7";
++						phy-handle = <&switch0phy6>;
++					};
++
++					port at 7 {
++						reg = <7>;
++						label = "modem_pic";
++
++						fixed-link {
++							speed = <100>;
++							full-duplex;
++						};
++					};
++
++					switch0port10: port at 10 {
++						reg = <10>;
++						label = "dsa";
++						phy-mode = "xgmii";
++						link = <&switch1port10
++							&switch3port10
++							&switch2port10>;
++					};
++				};
++
++				mdio {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					switch0phy1: switch0phy at 1 {
++						reg = <1>;
++					};
++
++					switch0phy2: switch0phy at 2 {
++						reg = <2>;
++					};
++
++					switch0phy3: switch0phy at 3 {
++						reg = <3>;
++					};
++
++					switch0phy4: switch0phy at 4 {
++						reg = <4>;
++					};
++
++					switch0phy5: switch0phy at 5 {
++						reg = <5>;
++					};
++
++					switch0phy6: switch0phy at 6 {
++						reg = <6>;
++					};
++				};
++			};
++		};
++
++		mdio_mux_2: mdio at 2 {
++			reg = <2>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			switch1: switch1 at 0 {
++				compatible = "marvell,mv88e6190";
++				reg = <0>;
++				dsa,member = <0 1>;
++				eeprom-length = <65536>;
++
++				ports {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					port at 1 {
++						reg = <1>;
++						label = "eth_cu_1000_3";
++					};
++
++					port at 2 {
++						reg = <2>;
++						label = "eth_cu_100_2";
++					};
++
++					port at 3 {
++						reg = <3>;
++						label = "eth_cu_100_3";
++					};
++
++					switch1port9: port at 9 {
++						reg = <9>;
++						label = "dsa";
++						phy-mode = "xgmii";
++						link = <&switch3port10
++							&switch2port10>;
++					};
++
++					switch1port10: port at 10 {
++						reg = <10>;
++						label = "dsa";
++						phy-mode = "xgmii";
++						link = <&switch0port10>;
++					};
++				};
++			};
++		};
++
++		mdio_mux_4: mdio at 4 {
++			reg = <4>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			switch2: switch2 at 0 {
++				compatible = "marvell,mv88e6190";
++				reg = <0>;
++				dsa,member = <0 2>;
++				eeprom-length = <65536>;
++
++				ports {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					port at 1 {
++						reg = <1>;
++						label = "internal_j9";
++					};
++
++					port at 2 {
++						reg = <2>;
++						label = "eth_fc_1000_2";
++						module-eeprom-type = <8472>;
++						module-eeprom-i2c = <&sff1>;
++
++						fixed-link {
++							speed = <1000>;
++							full-duplex;
++							link-gpios = <&gpio9 1 GPIO_ACTIVE_HIGH>;
++						};
++					};
++
++					port at 3 {
++						reg = <3>;
++						label = "eth_fc_1000_3";
++						module-eeprom-type = <8472>;
++						module-eeprom-i2c = <&sff2>;
++
++						fixed-link {
++							speed = <1000>;
++							full-duplex;
++							link-gpios = <&gpio9 2 GPIO_ACTIVE_HIGH>;
++						};
++					};
++
++					port at 4 {
++						reg = <4>;
++						label = "eth_fc_1000_4";
++						module-eeprom-type = <8472>;
++						module-eeprom-i2c = <&sff3>;
++
++						fixed-link {
++							speed = <1000>;
++							full-duplex;
++							link-gpios = <&gpio9 3 GPIO_ACTIVE_HIGH>;
++						};
++					};
++
++					port at 5 {
++						reg = <5>;
++						label = "eth_fc_1000_5";
++						module-eeprom-type = <8472>;
++						module-eeprom-i2c = <&sff4>;
++
++						fixed-link {
++							speed = <1000>;
++							full-duplex;
++							link-gpios = <&gpio9 4 GPIO_ACTIVE_HIGH>;
++						};
++					};
++
++					port at 6 {
++						reg = <6>;
++						label = "eth_fc_1000_6";
++						module-eeprom-type = <8472>;
++						module-eeprom-i2c = <&sff5>;
++
++						fixed-link {
++							speed = <1000>;
++							full-duplex;
++							link-gpios = <&gpio9 5 GPIO_ACTIVE_HIGH>;
++						};
++					};
++
++					port at 7 {
++						reg = <7>;
++						label = "eth_fc_1000_7";
++						module-eeprom-type = <8472>;
++						module-eeprom-i2c = <&sff6>;
++
++						fixed-link {
++							speed = <1000>;
++							full-duplex;
++							link-gpios = <&gpio9 6 GPIO_ACTIVE_HIGH>;
++						};
++					};
++
++					port at 9 {
++						reg = <9>;
++						label = "eth_fc_1000_1";
++						phy-mode = "1000base-x";
++						module-eeprom-type = <8472>;
++						module-eeprom-i2c = <&sff0>;
++
++						fixed-link {
++							speed = <1000>;
++							full-duplex;
++							link-gpios = <&gpio9 0 GPIO_ACTIVE_HIGH>;
++						};
++					};
++
++					switch2port10: port at 10 {
++						reg = <10>;
++						label = "dsa";
++						phy-mode = "2500base-x";
++						link = <&switch3port9
++							&switch1port9
++							&switch0port10>;
++					};
++				};
++			};
++		};
++
++		mdio_mux_8: mdio at 8 {
++			reg = <8>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			switch3: switch3 at 0 {
++				compatible = "marvell,mv88e6190";
++				reg = <0>;
++				dsa,member = <0 3>;
++				eeprom-length = <65536>;
++
++				ports {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					port at 1 {
++						reg = <1>;
++						label = "internal_j8";
++					};
++
++					port at 2 {
++						reg = <2>;
++						label = "eth_fc_1000_8";
++						module-eeprom-type = <8472>;
++						module-eeprom-i2c = <&sff7>;
++						fixed-link {
++							speed = <1000>;
++							full-duplex;
++							link-gpios = <&gpio9 7 GPIO_ACTIVE_HIGH>;
++						};
++					};
++
++					port at 3 {
++						reg = <3>;
++						label = "eth_fc_1000_9";
++						module-eeprom-type = <8472>;
++						module-eeprom-i2c = <&sff8>;
++
++						fixed-link {
++							speed = <1000>;
++							full-duplex;
++							link-gpios = <&gpio9 8 GPIO_ACTIVE_HIGH>;
++						};
++					};
++
++					port at 4 {
++						reg = <4>;
++						label = "eth_fc_1000_10";
++						module-eeprom-type = <8472>;
++						module-eeprom-i2c = <&sff9>;
++
++						fixed-link {
++							speed = <1000>;
++							full-duplex;
++							link-gpios = <&gpio9 9 GPIO_ACTIVE_HIGH>;
++						};
++					};
++
++					switch3port9: port at 9 {
++						reg = <9>;
++						label = "dsa";
++						phy-mode = "2500base-x";
++						link = <&switch2port10>;
++					};
++
++					switch3port10: port at 10 {
++						reg = <10>;
++						label = "dsa";
++						phy-mode = "xgmii";
++						link = <&switch1port9
++							&switch0port10>;
++					};
++				};
++			};
++		};
++	};
++
++	reg_vcc_3v3_mcu: regulator-vcc-3v3-mcu {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc_3v3_mcu";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++};
++
++&dspi1 {
++	bus-num = <1>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_dspi1>;
++	status = "okay";
++
++	spi-flash at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "jedec,spi-nor";
++		reg = <0>;
++		spi-max-frequency = <50000000>;
++
++		partition at 0 {
++			label = "m25p128-0";
++			reg = <0x0 0x01000000>;
++		};
++	};
++
++	spi-flash at 1 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "jedec,spi-nor";
++		reg = <1>;
++		spi-max-frequency = <50000000>;
++
++		partition at 0 {
++			label = "m25p128-1";
++			reg = <0x0 0x01000000>;
++		};
++	};
++};
++
++&adc0 {
++	vref-supply = <&reg_vcc_3v3_mcu>;
++	status = "okay";
++};
++
++&adc1 {
++	vref-supply = <&reg_vcc_3v3_mcu>;
++	status = "okay";
++};
++
++&edma0 {
++	status = "okay";
++};
++
++&edma1 {
++	status = "okay";
++};
++
++&esdhc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_esdhc0>;
++	bus-width = <8>;
++	non-removable;
++	no-1-8-v;
++	no-sd;
++	no-sdio;
++	keep-power-in-suspend;
++	status = "okay";
++};
++
++&esdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_esdhc1>;
++	bus-width = <4>;
++	no-sdio;
++	status = "okay";
++};
++
++&fec1 {
++	phy-mode = "rmii";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_fec1>;
++	status = "okay";
++
++	fixed-link {
++		   speed = <100>;
++		   full-duplex;
++	};
++
++	mdio1: mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
++};
++
++&i2c0 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c0>;
++	status = "okay";
++
++	gpio5: pca9554 at 20 {
++		compatible = "nxp,pca9554";
++		reg = <0x20>;
++		gpio-controller;
++		#gpio-cells = <2>;
++	};
++
++	gpio6: pca9554 at 22 {
++		compatible = "nxp,pca9554";
++		reg = <0x22>;
++		gpio-controller;
++		#gpio-cells = <2>;
++	};
++
++	lm75 at 48 {
++		compatible = "national,lm75";
++		reg = <0x48>;
++	};
++
++	at24c04 at 50 {
++		compatible = "atmel,24c04";
++		reg = <0x50>;
++	};
++
++	at24c04 at 52 {
++		compatible = "atmel,24c04";
++		reg = <0x52>;
++	};
++
++	ds1682 at 6b {
++		compatible = "dallas,ds1682";
++		reg = <0x6b>;
++	};
++};
++
++&i2c1 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
++
++	adt7411 at 4a {
++		compatible = "adi,adt7411";
++		reg = <0x4a>;
++	};
++};
++
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
++
++	gpio9: sx1503q at 20 {
++		compatible = "semtech,sx1503q";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_sx1503_20>;
++		#gpio-cells = <2>;
++		reg = <0x20>;
++		gpio-controller;
++	};
++
++	lm75 at 4e {
++		compatible = "national,lm75";
++		reg = <0x4e>;
++	};
++
++	lm75 at 4f {
++		compatible = "national,lm75";
++		reg = <0x4f>;
++	};
++
++	pca9555 at 23 {
++		compatible = "nxp,pca9555";
++		gpio-controller;
++		#gpio-cells = <2>;
++		reg = <0x23>;
++	};
++
++	adt7411 at 4a {
++		compatible = "adi,adt7411";
++		reg = <0x4a>;
++	};
++
++	at24c08 at 54 {
++		compatible = "atmel,24c08";
++		reg = <0x54>;
++	};
++
++	tca9548 at 70 {
++		compatible = "nxp,pca9548";
++		pinctrl-names = "default";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0x70>;
++
++		sff0: i2c at 1 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <1>;
++
++			at24c04 at 50 {
++				compatible = "atmel,24c04";
++				reg = <0x50>;
++			};
++		};
++
++		sff1: i2c at 2 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <2>;
++
++			at24c04 at 50 {
++				compatible = "atmel,24c04";
++				reg = <0x50>;
++			};
++		};
++
++		sff2: i2c at 3 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <3>;
++
++			at24c04 at 50 {
++				compatible = "atmel,24c04";
++				reg = <0x50>;
++			};
++		};
++
++		sff3: i2c at 4 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <4>;
++
++			at24c04 at 50 {
++				compatible = "atmel,24c04";
++				reg = <0x50>;
++			};
++		};
++
++		sff4: i2c at 5 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <5>;
++
++			at24c04 at 50 {
++				compatible = "atmel,24c04";
++				reg = <0x50>;
++			};
++		};
++	};
++
++	tca9548 at 71 {
++		compatible = "nxp,pca9548";
++		pinctrl-names = "default";
++		reg = <0x71>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		sff5: i2c at 1 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <1>;
++
++			at24c04 at 50 {
++				compatible = "atmel,24c04";
++				reg = <0x50>;
++			};
++		};
++
++		sff6: i2c at 2 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <2>;
++
++			at24c04 at 50 {
++				compatible = "atmel,24c04";
++				reg = <0x50>;
++			};
++		};
++
++		sff7: i2c at 3 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <3>;
++
++			at24c04 at 50 {
++				compatible = "atmel,24c04";
++				reg = <0x50>;
++			};
++		};
++
++		sff8: i2c at 4 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <4>;
++
++			at24c04 at 50 {
++				compatible = "atmel,24c04";
++				reg = <0x50>;
++			};
++		};
++
++		sff9: i2c at 5 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <5>;
++
++			at24c04 at 50 {
++				compatible = "atmel,24c04";
++				reg = <0x50>;
++			};
++		};
++	};
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart0>;
++	status = "okay";
++};
++
++&uart1 {
++	linux,rs485-enabled-at-boot-time;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1>;
++	rs485-rts-delay = <0 200>;
++	status = "okay";
++};
++
++&uart2 {
++	linux,rs485-enabled-at-boot-time;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart2>;
++	rs485-rts-delay = <0 200>;
++	status = "okay";
++};
++
++&iomuxc {
++	pinctrl_dspi0: dspi0grp {
++		fsl,pins = <
++			VF610_PAD_PTB19__DSPI0_CS0		0x1182
++			VF610_PAD_PTB18__DSPI0_CS1		0x1182
++			VF610_PAD_PTB13__DSPI0_CS4		0x1182
++			VF610_PAD_PTB12__DSPI0_CS5		0x1182
++			VF610_PAD_PTB20__DSPI0_SIN		0x1181
++			VF610_PAD_PTB21__DSPI0_SOUT		0x1182
++			VF610_PAD_PTB22__DSPI0_SCK		0x1182
++		>;
++	};
++
++	pinctrl_dspi1: dspi1grp {
++		fsl,pins = <
++			VF610_PAD_PTD5__DSPI1_CS0		0x1182
++			VF610_PAD_PTD4__DSPI1_CS1		0x1182
++			VF610_PAD_PTC6__DSPI1_SIN		0x1181
++			VF610_PAD_PTC7__DSPI1_SOUT		0x1182
++			VF610_PAD_PTC8__DSPI1_SCK		0x1182
++		>;
++	};
++
++	pinctrl_dspi2: dspi2gpio {
++		fsl,pins = <
++			VF610_PAD_PTD30__GPIO_64		0x33e2
++			VF610_PAD_PTD29__GPIO_65		0x33e1
++			VF610_PAD_PTD28__GPIO_66		0x33e2
++			VF610_PAD_PTD27__GPIO_67		0x33e2
++			VF610_PAD_PTD26__GPIO_68		0x31c2
++		>;
++	};
++
++	pinctrl_esdhc0: esdhc0grp {
++		fsl,pins = <
++			VF610_PAD_PTC0__ESDHC0_CLK		0x31ef
++			VF610_PAD_PTC1__ESDHC0_CMD		0x31ef
++			VF610_PAD_PTC2__ESDHC0_DAT0		0x31ef
++			VF610_PAD_PTC3__ESDHC0_DAT1		0x31ef
++			VF610_PAD_PTC4__ESDHC0_DAT2		0x31ef
++			VF610_PAD_PTC5__ESDHC0_DAT3		0x31ef
++			VF610_PAD_PTD23__ESDHC0_DAT4		0x31ef
++			VF610_PAD_PTD22__ESDHC0_DAT5		0x31ef
++			VF610_PAD_PTD21__ESDHC0_DAT6		0x31ef
++			VF610_PAD_PTD20__ESDHC0_DAT7		0x31ef
++		>;
++	};
++
++	pinctrl_esdhc1: esdhc1grp {
++		fsl,pins = <
++			VF610_PAD_PTA24__ESDHC1_CLK		0x31ef
++			VF610_PAD_PTA25__ESDHC1_CMD		0x31ef
++			VF610_PAD_PTA26__ESDHC1_DAT0		0x31ef
++			VF610_PAD_PTA27__ESDHC1_DAT1		0x31ef
++			VF610_PAD_PTA28__ESDHC1_DATA2		0x31ef
++			VF610_PAD_PTA29__ESDHC1_DAT3		0x31ef
++		>;
++	};
++
++	pinctrl_fec1: fec1grp {
++		fsl,pins = <
++			VF610_PAD_PTA6__RMII_CLKIN		0x30d1
++			VF610_PAD_PTC9__ENET_RMII1_MDC		0x30d2
++			VF610_PAD_PTC10__ENET_RMII1_MDIO	0x30d3
++			VF610_PAD_PTC11__ENET_RMII1_CRS		0x30d1
++			VF610_PAD_PTC12__ENET_RMII1_RXD1	0x30d1
++			VF610_PAD_PTC13__ENET_RMII1_RXD0	0x30d1
++			VF610_PAD_PTC14__ENET_RMII1_RXER	0x30d1
++			VF610_PAD_PTC15__ENET_RMII1_TXD1	0x30d2
++			VF610_PAD_PTC16__ENET_RMII1_TXD0	0x30d2
++			VF610_PAD_PTC17__ENET_RMII1_TXEN	0x30d2
++		>;
++	};
++
++	pinctrl_i2c0: i2c0grp {
++		fsl,pins = <
++			VF610_PAD_PTB14__I2C0_SCL		0x37ff
++			VF610_PAD_PTB15__I2C0_SDA		0x37ff
++		>;
++	};
++		pinctrl_i2c1: i2c1grp {
++		fsl,pins = <
++			VF610_PAD_PTB16__I2C1_SCL		0x37ff
++			VF610_PAD_PTB17__I2C1_SDA		0x37ff
++		>;
++	};
++
++	pinctrl_i2c2: i2c2grp {
++		fsl,pins = <
++			VF610_PAD_PTA22__I2C2_SCL		0x37ff
++			VF610_PAD_PTA23__I2C2_SDA		0x37ff
++		>;
++	};
++
++	pinctrl_i2c3: i2c3grp {
++		fsl,pins = <
++			VF610_PAD_PTA30__I2C3_SCL		0x37ff
++			VF610_PAD_PTA31__I2C3_SDA		0x37ff
++		>;
++	};
++
++	pinctrl_leds_debug: pinctrl-leds-debug {
++		fsl,pins = <
++			 VF610_PAD_PTB26__GPIO_96		0x31c2
++		   >;
++	};
++
++	pinctrl_mdio_mux: pinctrl-mdio-mux {
++		fsl,pins = <
++			VF610_PAD_PTE27__GPIO_132		0x31c2
++			VF610_PAD_PTE28__GPIO_133		0x31c2
++			VF610_PAD_PTE21__GPIO_126		0x31c2
++			VF610_PAD_PTE22__GPIO_127		0x31c2
++		>;
++	};
++
++	pinctrl_qspi0: qspi0grp {
++		fsl,pins = <
++			VF610_PAD_PTD7__QSPI0_B_QSCK		0x31c3
++			VF610_PAD_PTD8__QSPI0_B_CS0		0x31ff
++			VF610_PAD_PTD9__QSPI0_B_DATA3		0x31c3
++			VF610_PAD_PTD10__QSPI0_B_DATA2		0x31c3
++			VF610_PAD_PTD11__QSPI0_B_DATA1		0x31c3
++			VF610_PAD_PTD12__QSPI0_B_DATA0		0x31c3
++		>;
++	};
++
++	pinctrl_sx1503_20: pinctrl-sx1503-20 {
++		fsl,pins = <
++			VF610_PAD_PTD31__GPIO_63		0x219d
++			>;
++	};
++
++	pinctrl_uart0: uart0grp {
++		fsl,pins = <
++			VF610_PAD_PTB10__UART0_TX		0x21a2
++			VF610_PAD_PTB11__UART0_RX		0x21a1
++		>;
++	};
++
++	pinctrl_uart1: uart1grp {
++		fsl,pins = <
++			VF610_PAD_PTB23__UART1_TX		0x21a2
++			VF610_PAD_PTB24__UART1_RX		0x21a1
++			VF610_PAD_PTB25__UART1_RTS		0x21a2	/* Used as DE signal for the RS-485 transceiver */
++		>;
++	};
++
++	pinctrl_uart2: uart2grp {
++		fsl,pins = <
++			VF610_PAD_PTD0__UART2_TX		0x21a2
++			VF610_PAD_PTD1__UART2_RX		0x21a1
++			VF610_PAD_PTD2__UART2_RTS		0x21a2 /* Used as DE signal for the RS-485 transceiver */
++		>;
++	};
++};
 -- 
-2.18.0
+2.7.4
