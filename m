@@ -1,14 +1,14 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 27 Sep 2018 17:22:38 +0200
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 27 Sep 2018 08:46:16 -0700
 Subject: [PATCH v3 0/9] add support for relative references in jump tables
 In-Reply-To: <20180919130803.GH24124@hirez.programming.kicks-ass.net>
 References: <20180919065144.25010-1-ard.biesheuvel@linaro.org>
  <20180919130803.GH24124@hirez.programming.kicks-ass.net>
-Message-ID: <CAKv+Gu9NB8B0GrD0GZfF5mcgg4epokEBLFuSLz-1KQo=yh0d8A@mail.gmail.com>
+Message-ID: <CAGXu5jKZSvJo=E1sKzAVuGaCSdEUspB4dUbhpKQ7+otfsyu2wA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 September 2018 at 15:08, Peter Zijlstra <peterz@infradead.org> wrote:
+On Wed, Sep 19, 2018 at 6:08 AM, Peter Zijlstra <peterz@infradead.org> wrote:
 > On Tue, Sep 18, 2018 at 11:51:35PM -0700, Ard Biesheuvel wrote:
 >
 >> Ard Biesheuvel (8):
@@ -30,8 +30,12 @@ On 19 September 2018 at 15:08, Peter Zijlstra <peterz@infradead.org> wrote:
 >
 > Ingo, could you queue this?
 
-I wouldn't mind if these could go in for the next cycle if there are
-no remaining concerns.
+Seconded. :) (My Reviewed-by tags are already in the patches I've examined.)
 
-Thanks,
-Ard.
+Thanks!
+
+-Kees
+
+-- 
+Kees Cook
+Pixel Security
