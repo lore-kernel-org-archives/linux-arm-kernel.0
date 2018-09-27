@@ -1,61 +1,45 @@
 From: linux.amoon@gmail.com (Anand Moon)
-Date: Thu, 27 Sep 2018 14:07:36 +0000
-Subject: [PATCHv5 4/6] ARM: dts: exynos: Add pin configuration for SD write
- protect on Odroid XU3/XU4
+Date: Thu, 27 Sep 2018 14:07:37 +0000
+Subject: [PATCHv5 5/6] ARM: dts: exynos: update maximum frequency for emmc to
+ 200MHz
 In-Reply-To: <20180927140738.1006-1-linux.amoon@gmail.com>
 References: <20180927140738.1006-1-linux.amoon@gmail.com>
-Message-ID: <20180927140738.1006-5-linux.amoon@gmail.com>
+Message-ID: <20180927140738.1006-6-linux.amoon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SD card write-protect pin configuration to be sure that it will be
-properly pulled down to indicate write access.
+Set the max-frequency to 200MHz for optimal performace of eMMC.
 
-Suggested-by: Krzysztof Kozlowski <krzk@kernel.org>
 Signed-off-by: Anand Moon <linux.amoon@gmail.com>
 ---
-Changes since v4:
-1. Remove cd-gpios and wp-gpios leaving only WP pin configuration (after
-   Marek Szyprowski feedback).
-2. Pull pin down.
-3. change the subject and commit message.
-Sorry Krzysztof if I have copied your commit message to describe the
-changes.
----
- arch/arm/boot/dts/exynos5420-pinctrl.dtsi     | 7 +++++++
- arch/arm/boot/dts/exynos5422-odroid-core.dtsi | 2 +-
- 2 files changed, 8 insertions(+), 1 deletion(-)
+eMMC
 
-diff --git a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-index dda8ca2d2324..b82af7c89654 100644
---- a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-@@ -289,6 +289,13 @@
- 		samsung,pin-pud = <EXYNOS_PIN_PULL_UP>;
- 		samsung,pin-drv = <EXYNOS5420_PIN_DRV_LV4>;
- 	};
-+
-+	sd2_wp: sd2-wp {
-+		samsung,pins = "gpc4-0";
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
-+		samsung,pin-pud = <EXYNOS_PIN_PULL_DOWN>;
-+		samsung,pin-drv = <EXYNOS5420_PIN_DRV_LV4>;
-+	};
+root at odroid:~# sudo cat /sys/kernel/debug/mmc0/ios
+clock:          200000000 Hz
+actual clock:   200000000 Hz
+vdd:            7 (1.65 - 1.95 V)
+bus mode:       2 (push-pull)
+chip select:    0 (don't care)
+power mode:     2 (on)
+bus width:      3 (8 bits)
+timing spec:    10 (mmc HS400)
+signal voltage: 1 (1.80 V)
+driver type:    0 (driver type B)
+---
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+index e522edb2bb82..1f2d3987dde1 100644
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+@@ -392,6 +392,7 @@
+ 	cap-mmc-highspeed;
+ 	mmc-hs200-1_8v;
+ 	mmc-hs400-1_8v;
++	max-frequency = <200000000>;
+ 	vmmc-supply = <&ldo18_reg>;
+ 	vqmmc-supply = <&ldo3_reg>;
  };
- 
- &pinctrl_2 {
-diff --git a/arch/arm/boot/dts/exynos5422-odroid-core.dtsi b/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
-index a80b6c045154..54811960e322 100644
---- a/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
-+++ b/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
-@@ -498,7 +498,7 @@
- 	samsung,dw-mshc-sdr-timing = <0 4>;
- 	samsung,dw-mshc-ddr-timing = <0 2>;
- 	pinctrl-names = "default";
--	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4>;
-+	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_wp &sd2_bus1 &sd2_bus4>;
- 	bus-width = <4>;
- 	cap-sd-highspeed;
- 	max-frequency = <200000000>;
 -- 
 2.17.1
