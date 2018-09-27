@@ -1,47 +1,55 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 27 Sep 2018 15:56:10 -0500
-Subject: [PATCH i2c-next v3 1/3] dt-bindings: i2c: aspeed: Add 'timeout'
- property as an optional property
-In-Reply-To: <20180926215842.23125-2-jae.hyun.yoo@linux.intel.com>
-References: <20180926215842.23125-1-jae.hyun.yoo@linux.intel.com>
- <20180926215842.23125-2-jae.hyun.yoo@linux.intel.com>
-Message-ID: <20180927205610.GA29022@bogus>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 27 Sep 2018 22:59:39 +0200
+Subject: [GIT PULL 2/5] soc/tegra: Changes for v4.20-rc1
+In-Reply-To: <20180927205942.30878-1-thierry.reding@gmail.com>
+References: <20180927205942.30878-1-thierry.reding@gmail.com>
+Message-ID: <20180927205942.30878-2-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 26, 2018 at 02:58:40PM -0700, Jae Hyun Yoo wrote:
-> This commit adds 'aspeed,timeout' property as an optional property
-> which can be used for setting 'timeout' value of
-> 'struct i2c_adapter'. With this patch, the timeout value can be
-> set through an I2C_TIMEOUT ioctl on cdev, or through this optional
-> DT property.
+Hi ARM SoC maintainers,
 
-Isn't controlling this from userspace or relying on a default 
-sufficient?  I can't see this needing to be highly tuned for each 
-platform.
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 
-However, if we do have a property, it should be common.
+  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
 
-> 
-> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
-> ---
->  Documentation/devicetree/bindings/i2c/i2c-aspeed.txt | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-aspeed.txt b/Documentation/devicetree/bindings/i2c/i2c-aspeed.txt
-> index 8fbd8633a387..d6965b360fbc 100644
-> --- a/Documentation/devicetree/bindings/i2c/i2c-aspeed.txt
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-aspeed.txt
-> @@ -17,6 +17,9 @@ Optional Properties:
->  		  specified
->  - multi-master	: states that there is another master active on this bus.
->  
-> +- aspeed,timeout : I2C bus timeout in microseconds defaults to 5 seconds when
-> +		   not specified.
-> +
->  Example:
->  
->  i2c {
-> -- 
-> 2.19.0
-> 
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.20-soc
+
+for you to fetch changes up to 4a37f11c8f57ffd6f7397eaf372109d67edd3769:
+
+  soc/tegra: pmc: Implement pad configuration via pinctrl (2018-08-27 12:25:18 +0200)
+
+Thanks,
+Thierry
+
+----------------------------------------------------------------
+soc/tegra: Changes for v4.20-rc1
+
+This contains a pinctrl implementation for the pad configuration that
+can be controlled from the PMC.
+
+----------------------------------------------------------------
+Aapo Vienamo (7):
+      dt-bindings: Add Tegra PMC pad configuration bindings
+      soc/tegra: pmc: Fix pad voltage configuration for Tegra186
+      soc/tegra: pmc: Factor out DPD register bit calculation
+      soc/tegra: pmc: Implement tegra_io_pad_is_powered()
+      soc/tegra: pmc: Use X macro to generate IO pad tables
+      soc/tegra: pmc: Remove public pad voltage APIs
+      soc/tegra: pmc: Implement pad configuration via pinctrl
+
+Johan Hovold (1):
+      soc/tegra: pmc: Fix child-node lookup
+
+Thierry Reding (1):
+      Merge branch 'for-4.20/dt-bindings' into for-4.20/soc
+
+ .../bindings/arm/tegra/nvidia,tegra186-pmc.txt     |  93 ++++
+ .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      | 103 +++++
+ drivers/soc/tegra/pmc.c                            | 513 +++++++++++++++------
+ include/dt-bindings/pinctrl/pinctrl-tegra-io-pad.h |  18 +
+ include/soc/tegra/pmc.h                            |  20 +-
+ 5 files changed, 599 insertions(+), 148 deletions(-)
+ create mode 100644 include/dt-bindings/pinctrl/pinctrl-tegra-io-pad.h
