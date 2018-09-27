@@ -1,73 +1,94 @@
-From: zhang.lei@jp.fujitsu.com (Zhang, Lei)
-Date: Thu, 27 Sep 2018 13:01:01 +0000
-Subject: [PATCH 00/10] GICv3 support for kexec/kdump on EFI systems
-In-Reply-To: <20180921195954.21574-1-marc.zyngier@arm.com>
-References: <20180921195954.21574-1-marc.zyngier@arm.com>
-Message-ID: <8898674D84E3B24BA3A2D289B872026A6A005F4A@G01JPEXMBKW03>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 27 Sep 2018 15:07:37 +0200
+Subject: [PATCH] arm64: remove unused asm/compiler.h header file
+Message-ID: <20180927130737.31301-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc
+arm64 does not define CONFIG_HAVE_ARCH_COMPILER_H, nor does it keep
+anything useful in its copy of asm/compiler.h, so let's remove it
+before anybody starts using it.
 
-> -----Original Message-----
-> From: linux-arm-kernel
-> [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Marc
-> Zyngier
-> Sent: Saturday, September 22, 2018 5:00 AM
-> To: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Cc: Jeffrey Hugo; Thomas Gleixner; Jason Cooper; Jeremy Linton; Ard
-> Biesheuvel
-> Subject: [PATCH 00/10] GICv3 support for kexec/kdump on EFI systems
-> 
-> The GICv3 architecture has the remarkable feature that once LPI tables
-> have been assigned to redistributors and that LPI delivery is enabled,
-> there is no guarantee that LPIs can be turned off (and most
-> implementations do not allow it), nor can it be reprogrammed to use
-> other tables.
-> 
-> This is a bit of a problem for kexec, where the secondary kernel
-> completely looses track of the previous allocations. If the secondary
-> kernel doesn't allocate the tables exactly the same way, no LPIs will
-> be delivered by the GIC (which continues to use the old tables), and
-> memory previously allocated for the pending tables will be slowly
-> corrupted, one bit at a time.
-> 
-> The workaround for this is based on a series[1] by Ard Biesheuvel,
-> which adds the required infrastructure for memory reservations to be
-> passed from one kernel to another using an EFI table.
-> 
-> This infrastructure is then used to register the allocation of GIC
-> tables with EFI, and allow the GIC driver to safely reuse the existing
-> programming if it detects that the tables have been correctly
-> registered. On non-EFI systems, there is not much we can do.
-> 
-> This has been tested on a TX2 system both as a host and a guest. I'd
-> welcome additional testing of different HW. For convenience, I've
-> stashed a branch containing the whole thing at [2].
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/include/asm/compiler.h | 30 ------------------------------
+ arch/arm64/include/asm/sysreg.h   |  1 -
+ arch/arm64/include/asm/uaccess.h  |  1 -
+ arch/arm64/kernel/psci.c          |  1 -
+ 4 files changed, 33 deletions(-)
+ delete mode 100644 arch/arm64/include/asm/compiler.h
 
-We have done the test on our chip A64FX that When a write changes 
-EnableLPI bit from 0 to 1, this bit becomes RES1. 
-The result is that the kexec operation successfully works on our chip,
- and PCI based on LPI also works after kexec.
-
-For detail:
-We did "kexec -e" command, and the message, "Using preallocated 
-redistributor tables", was shown.
-After kexec, we can use our ssd normally.
-
-Test environment
-CPU: A64FX
-
-Kernel version: v4.19 rc4 base
-https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/log/?h=irq/gicv3-kdump
-8bc67da irqchip/gic-v3-its: Allow use of LPI tables in reserved memory
-
-kexec version:kexec-tools-2.0.14-17.2.el7.aarch64
-
-Tested-by: Lei Zhang <zhang.lei@jp.fujitsu.com>
-
-Thanks a lot.
-
-Best Regards,
-Lei,Zhang
-FUJITSU LIMITED.
+diff --git a/arch/arm64/include/asm/compiler.h b/arch/arm64/include/asm/compiler.h
+deleted file mode 100644
+index ee35fd0f2236..000000000000
+--- a/arch/arm64/include/asm/compiler.h
++++ /dev/null
+@@ -1,30 +0,0 @@
+-/*
+- * Based on arch/arm/include/asm/compiler.h
+- *
+- * Copyright (C) 2012 ARM Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+- */
+-#ifndef __ASM_COMPILER_H
+-#define __ASM_COMPILER_H
+-
+-/*
+- * This is used to ensure the compiler did actually allocate the register we
+- * asked it for some inline assembly sequences.  Apparently we can't trust the
+- * compiler from one version to another so a bit of paranoia won't hurt.  This
+- * string is meant to be concatenated with the inline asm string and will
+- * cause compilation to stop on mismatch.  (for details, see gcc PR 15089)
+- */
+-#define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
+-
+-#endif	/* __ASM_COMPILER_H */
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index c1470931b897..6d307212bf7c 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -20,7 +20,6 @@
+ #ifndef __ASM_SYSREG_H
+ #define __ASM_SYSREG_H
+ 
+-#include <asm/compiler.h>
+ #include <linux/stringify.h>
+ 
+ /*
+diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+index e66b0fca99c2..07c34087bd5e 100644
+--- a/arch/arm64/include/asm/uaccess.h
++++ b/arch/arm64/include/asm/uaccess.h
+@@ -32,7 +32,6 @@
+ #include <asm/cpufeature.h>
+ #include <asm/ptrace.h>
+ #include <asm/memory.h>
+-#include <asm/compiler.h>
+ #include <asm/extable.h>
+ 
+ #define get_ds()	(KERNEL_DS)
+diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+index e8edbf13302a..8cdaf25e99cd 100644
+--- a/arch/arm64/kernel/psci.c
++++ b/arch/arm64/kernel/psci.c
+@@ -24,7 +24,6 @@
+ 
+ #include <uapi/linux/psci.h>
+ 
+-#include <asm/compiler.h>
+ #include <asm/cpu_ops.h>
+ #include <asm/errno.h>
+ #include <asm/smp_plat.h>
+-- 
+2.18.0
