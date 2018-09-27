@@ -1,82 +1,103 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 27 Sep 2018 09:37:33 +0200
-Subject: [PATCH] ARM: Assume maintainership of ARM reference designs
-Message-ID: <20180927073733.11580-1-linus.walleij@linaro.org>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Thu, 27 Sep 2018 16:44:26 +0900
+Subject: [PATCH v2 2/2] PCI: controller: dwc: add UniPhier PCIe host
+ controller support
+In-Reply-To: <20180926213135.A4B4.4A936039@socionext.com>
+References: <b869b273-e681-0b8c-52f5-6e02f9de5485@synopsys.com>
+ <20180926213135.A4B4.4A936039@socionext.com>
+Message-ID: <20180927164426.ECD6.4A936039@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With this I assume maintainership of the Integrator, Versatile
-and RealView ARM reference machines.
+Hi Lorenzo, Gustavo,
 
-It's no big secret that I've been maintaining them for years,
-but might as well make it official so I get the mails and
-don't miss anything.
+On Wed, 26 Sep 2018 21:31:36 +0900 <hayashi.kunihiko@socionext.com> wrote:
 
-I have also included some drivers that are closely associated
-with the ARM reference designs and yet orphaned in the
-MAINTAINERS file. I can surely maintain them too, or route
-the question to the right people so it doesn't fall on the
-floor of upward to the subsystem maintainers who have too much
-to do already as it is.
+> Hi Lorenzo, Gustavo,
+> 
+> Thank you for reviewing.
+> 
+> On Tue, 25 Sep 2018 18:53:01 +0100
+> Gustavo Pimentel <gustavo.pimentel@synopsys.com> wrote:
+> 
+> > On 25/09/2018 17:14, Lorenzo Pieralisi wrote:
+> > > [+Gustavo, please have a look at INTX/MSI management]
+> > > 
+> > > On Thu, Sep 06, 2018 at 06:40:32PM +0900, Kunihiko Hayashi wrote:
+> > >> This introduces specific glue layer for UniPhier platform to support
+> > >> PCIe host controller that is based on the DesignWare PCIe core, and
+> > >> this driver supports Root Complex (host) mode.
+> > > 
+> > > Please read this thread and apply it to next versions:
+> > > 
+> > > https://urldefense.proofpoint.com/v2/url?u=https-3A__marc.info_-3Fl-3Dlinux-2Dpci-26m-3D150905742808166-26w-3D2&d=DwIBAg&c=DPL6_X_6JkXFx7AXWqB0tg&r=bkWxpLoW-f-E3EdiDCCa0_h0PicsViasSlvIpzZvPxs&m=H8UNDDUGQnQnqfWr4CBios689dJcjxu4qeTTRGulLmU&s=CgcXc_2LThyOpW-4bCriJNo9H1lzROEdy_cG9p-Y5hU&e=
+> 
+> I also found this thread in previous linux-pci, and I think it's helpful for me.
+> I'll check it carefully.
 
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Rob Herring <robh@kernel.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Michael Turquette <mturquette@baylibre.com>
-Cc: Stephen Boyd <sboyd@kernel.org>
-Cc: Wolfram Sang <wsa@the-dreams.de>
-Cc: Mark Brown <broonie@kernel.org>
-Cc: Brian Norris <computersforpeace@gmail.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+[snip]
+
+> > >> +	ret = devm_request_irq(dev, pp->irq, uniphier_pcie_irq_handler,
+> > >> +			       IRQF_SHARED, "pcie", priv);
+> > > 
+> > > This is wrong, you should set-up a chained IRQ for INTX.
+> > > 
+> > > I *think* that
+> > > 
+> > > ks_pcie_setup_interrupts()
+> > > 
+> > > is a good example to start with but I wonder whether it is worth
+> > > generalizing the INTX approach to designware as a whole as it was
+> > > done for MSIs.
+> > > 
+> > > Thoughts ?
+> > 
+> > From what I understood this is for legacy IRQ, right?
+> 
+> Yes. For legacy IRQ.
+> 
+> > Like you (Lorenzo) said there is 2 drivers (pci-keystone-dw.c and pci-dra7xx.c)
+> > that uses it and can be use as a template for handling this type of interrupts.
+> > 
+> > We can try to pass some kind of generic INTX function to the DesignWare host
+> > library to handling this, but this will require some help from keystone and
+> > dra7xx maintainers, since my setup doesn't have legacy IRQ HW support.
+> 
+> Now I think it's difficult to make a template for INTX function,
+> and at first, I'll try to re-write this part with reference to pci-keystone-dw.c.
+
+I understand that there are 2 types of interrupt and the drivers.
+
+One like pci-keystone-dw.c is:
+
+ - there are 4 interrupts for legacy,
+ - invoke handlers for each interrupt, and handle the interrupt,
+ - call irq_set_chained_handler_and_data() to make a chain of the interrupts
+  when initializing
+
+The other like pci-dra7xx.c is:
+
+ - there is 1 IRQ for legacy as a parent,
+ - check an interrupt factor register, and handle the interrupt correspond
+   to the factor,
+ - call request_irq() for the parent IRQ and irq_domain_add_linear() for
+   the factor when initializing
+
+The pcie-uniphier.c is the same type as the latter (like pci-dra7xx.c).
+
+However, in pci-dra7xx.c, MSI and legacy IRQ share the same interrupt number,
+so the same handler is called and the handler divides these IRQs.
+(found in dra7xx_pcie_msi_irq_handler())
+
+In pcie-uniphier.c, MSI and legacy IRQ are independent.
+Therefore it's necessary to prepare the handler for the legacy IRQ.
+
+I think that it's difficult to apply the way of pci-keystone-dw.c,
+and uniphier_pcie_irq_handler() and calling devm_request_irq() are still necessary
+to handle legacy IRQ.
+
+Thank you,
+
 ---
-ARM SoC folks: please apply this directly wherever MAINTAINERS
-patches go.
-
-Submitted a while back, thought it was applied since everyone
-was in on it, but apparently it got lost.
-
-ARM Cambridge sent me all their old reference designs so I am
-well equipped for this.
----
- MAINTAINERS | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index a5b256b25905..a4ed79a5a1c2 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1078,6 +1078,31 @@ F:	arch/arm/include/asm/arch_timer.h
- F:	arch/arm64/include/asm/arch_timer.h
- F:	drivers/clocksource/arm_arch_timer.c
- 
-+ARM INTEGRATOR, VERSATILE AND REALVIEW SUPPORT
-+M:	Linus Walleij <linus.walleij@linaro.org>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	Documentation/devicetree/bindings/arm/arm-boards
-+F:	Documentation/devicetree/bindings/auxdisplay/arm-charlcd.txt
-+F:	Documentation/devicetree/bindings/clock/arm-integrator.txt
-+F:	Documentation/devicetree/bindings/interrupt-controller/arm,versatile-fpga-irq.txt
-+F:	Documentation/devicetree/bindings/mtd/arm-versatile.txt
-+F:	arch/arm/mach-integrator/
-+F:	arch/arm/mach-realview/
-+F:	arch/arm/mach-versatile/
-+F:	arch/arm/plat-versatile/
-+F:	arch/arm/boot/dts/arm-realview-*
-+F:	arch/arm/boot/dts/integrator*
-+F:	arch/arm/boot/dts/versatile*
-+F:	drivers/clk/versatile/
-+F:	drivers/i2c/busses/i2c-versatile.c
-+F:	drivers/irqchip/irq-versatile-fpga.c
-+F:	drivers/irqchip/irq-vic.c
-+F:	drivers/mtd/maps/physmap_of_versatile.c
-+F:	drivers/power/reset/arm-versatile-reboot.c
-+F:	drivers/soc/versatile/
-+F:	drivers/spi/spi-pl022.c
-+
- ARM HDLCD DRM DRIVER
- M:	Liviu Dudau <liviu.dudau@arm.com>
- S:	Supported
--- 
-2.17.1
+Best Regards,
+Kunihiko Hayashi
