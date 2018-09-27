@@ -1,76 +1,89 @@
-From: jorik@kippendief.biz (jorik at kippendief.biz)
-Date: Thu, 27 Sep 2018 10:36:36 +0200
-Subject: [PATCH] dts: sun8i-h3: add sy8106a to orange pi plus
-Message-ID: <20180927083636.5415-1-jorik@kippendief.biz>
+From: mjourdan@baylibre.com (Maxime Jourdan)
+Date: Thu, 27 Sep 2018 10:46:49 +0200
+Subject: [PATCH v2 0/3] Add Amlogic video decoder driver
+In-Reply-To: <8b8af340-8bd7-092a-4203-fd01fd0cc5c6@xs4all.nl>
+References: <20180911150938.3844-1-mjourdan@baylibre.com>
+ <9c33c57e-2ce2-8752-b851-f85c03a7d761@xs4all.nl>
+ <CAMO6nay7u4nMZcND6+g-GJAFsFcGrp_GDKBhVjeXVzpjF0ND4Q@mail.gmail.com>
+ <8b8af340-8bd7-092a-4203-fd01fd0cc5c6@xs4all.nl>
+Message-ID: <CAMO6naxf_+HiRf8fEs65NP+c1OLMvPSs71SKxwWg-zZO+mSiyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jorik Jonker <jorik@kippendief.biz>
+Le ven. 21 sept. 2018 ? 12:51, Hans Verkuil <hverkuil@xs4all.nl> a ?crit :
+>
+> On 09/17/18 18:36, Maxime Jourdan wrote:
+> > 2018-09-17 16:51 GMT+02:00 Hans Verkuil <hverkuil@xs4all.nl>:
+> >> On 09/11/2018 05:09 PM, Maxime Jourdan wrote:
+> >>>  - Moved the single instance check (returning -EBUSY) to start/stop streaming
+> >>>  The check was previously in queue_setup but there was no great location to
+> >>>  clear it except for .close().
+> >>
+> >> Actually, you can clear it by called VIDIOC_REQBUFS with count set to 0. That
+> >> freed all buffers and clears this.
+> >>
+> >> Now, the difference between queue_setup and start/stop streaming is that if you
+> >> do this in queue_setup you'll know early on that the device is busy. It is
+> >> reasonable to assume that you only allocate buffers when you also want to start
+> >> streaming, so that it a good place to know this quickly.
+> >>
+> >> Whereas with start_streaming you won't know until you call STREAMON, or even later
+> >> if you start streaming with no buffers queued, since start_streaming won't
+> >> be called until you have at least 'min_buffers_needed' buffers queued (1 for this
+> >> driver). So in that case EBUSY won't be returned until the first VIDIOC_QBUF.
+> >>
+> >> My preference is to check this in queue_setup, but it is up to you to decide.
+> >> Just be aware of the difference between the two options.
+> >>
+> >> Regards,
+> >>
+> >>         Hans
+> >
+> > I could for instance keep track of which queue(s) have been called
+> > with queue_setup, catch calls to VIDIOC_REQBUFS with count set to 0,
+> > and clear the current session once both queues have been reset ?
+>
+> I see your point, this is rather awkward. The real problem here is that
+> we don't have a 'queue_free' callback. If we'd had that this would be
+> a lot easier.
+>
+> In any case, I am dropping my objections to doing this in start/stop_streaming.
 
-The Orange Pi Plus board lacks voltage scaling capabilities in its
-current form. This results in random freezes during boot when cpufreq is
-enabled, probably due to wrong voltages.
+Ack.
 
-This patch (a copy/paste of 06139c) does the following things on this
-board:
-- enable r_i2c
-- add sy8106a to the r_i2c bus
-- have the sy8106a regulate VDD of cpu
+> > You leverage another issue with min_buffers_needed. It's indeed set to
+> > 1 but this value is wrong for the CAPTURE queue. The problem is that
+> > this value changes depending on the codec and the amount of CAPTURE
+> > buffers requested by userspace.
+> > Ultimately I want it set to the total amount of CAPTURE buffers,
+> > because the hardware needs the full buffer list before starting a
+> > decode job.
+> > Am I free to change this queue parameter later, or is m2m_queue_init
+> > the only place to do it ?
+>
+> It has to be set before the VIDIOC_STREAMON. After that you cannot
+> change it anymore.
+>
+> But I don't think this is all that relevant, since this is something
+> that the job_ready() callback should take care of. min_buffers_needed
+> is really for hardware where the DMA engine cannot start unless that
+> many buffers are queued. But in that case the DMA runs continuously
+> capturing video, whereas here these are jobs and the DMA is only
+> started when you can actually execute a job.
 
-I have tested this on two Orange Pi Plus boards, and they run stable
-across a range of voltages (and frequencies).
+After doing some testing, overriding min_buffers_needed in queue_setup
+is what works best for me.
 
-Signed-off-by: Jorik Jonker <jorik@kippendief.biz>
----
- arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 29 ++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+When doing the initialization in start_streaming, the complete buffer
+list needs to be configured in HW. The firmware can then choose any
+buffer from this list during decoding later on.
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-index b403e5d78..fd64b5c94 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-@@ -74,6 +74,10 @@
- 	};
- };
- 
-+&cpu0 {
-+	cpu-supply = <&reg_vdd_cpux>;
-+};
-+
- &ehci3 {
- 	status = "okay";
- };
-@@ -119,6 +123,31 @@
- 	};
- };
- 
-+&r_i2c {
-+	status = "okay";
-+
-+	reg_vdd_cpux: regulator at 65 {
-+		compatible = "silergy,sy8106a";
-+		reg = <0x65>;
-+		regulator-name = "vdd-cpux";
-+		silergy,fixed-microvolt = <1200000>;
-+		/*
-+		 * The datasheet uses 1.1V as the minimum value of VDD-CPUX,
-+		 * however both the Armbian DVFS table and the official one
-+		 * have operating points with voltage under 1.1V, and both
-+		 * DVFS table are known to work properly at the lowest
-+		 * operating point.
-+		 *
-+		 * Use 1.0V as the minimum voltage instead.
-+		 */
-+		regulator-min-microvolt = <1000000>;
-+		regulator-max-microvolt = <1400000>;
-+		regulator-ramp-delay = <200>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+};
-+
- &usbphy {
- 	usb3_vbus-supply = <&reg_usb3_vbus>;
- };
--- 
-2.17.1
+I do this initialization by iterating with v4l2_m2m_for_each_dst_buf,
+which requires all CAPTURE buffers to be queued in.
+
+Cheers,
+Maxime
+
+> Regards,
+>
+>         Hans
