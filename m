@@ -1,86 +1,285 @@
-From: chunyan.zhang@unisoc.com (Chunyan Zhang)
-Date: Thu, 27 Sep 2018 11:41:37 +0800
-Subject: [RESEND PATCH] ARM: prevent tracing IPI_CPU_BACKTRACE
-Message-ID: <1538019697-14673-1-git-send-email-chunyan.zhang@unisoc.com>
+From: clabbe@baylibre.com (LABBE Corentin)
+Date: Thu, 27 Sep 2018 07:30:03 +0200
+Subject: [PATCH v2 1/7] powerpc: rename setbits32/clrbits32 to
+ setbits32_be/clrbits32_be
+In-Reply-To: <eeaeff10-dcc9-ab50-5d54-4d727f12d584@c-s.fr>
+References: <1537815856-31728-1-git-send-email-clabbe@baylibre.com>
+ <1537815856-31728-2-git-send-email-clabbe@baylibre.com>
+ <eeaeff10-dcc9-ab50-5d54-4d727f12d584@c-s.fr>
+Message-ID: <20180927053003.GA27637@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
+On Tue, Sep 25, 2018 at 06:56:23AM +0200, Christophe LEROY wrote:
+> Fix the patch title.
+> 
+> 
+> Le 24/09/2018 ? 21:04, Corentin Labbe a ?crit?:
+> > Since setbits32/clrbits32 work on be32, it's better to remove ambiguity on
+> > the used data type.
+> > 
+> > Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
+> > ---
+> >   arch/powerpc/include/asm/fsl_lbc.h               |  2 +-
+> >   arch/powerpc/include/asm/io.h                    |  5 +-
+> >   arch/powerpc/platforms/44x/canyonlands.c         |  4 +-
+> >   arch/powerpc/platforms/4xx/gpio.c                | 28 ++++-----
+> >   arch/powerpc/platforms/512x/pdm360ng.c           |  6 +-
+> >   arch/powerpc/platforms/52xx/mpc52xx_common.c     |  6 +-
+> >   arch/powerpc/platforms/52xx/mpc52xx_gpt.c        | 10 ++--
+> >   arch/powerpc/platforms/82xx/ep8248e.c            |  2 +-
+> >   arch/powerpc/platforms/82xx/km82xx.c             |  6 +-
+> >   arch/powerpc/platforms/82xx/mpc8272_ads.c        | 10 ++--
+> >   arch/powerpc/platforms/82xx/pq2.c                |  2 +-
+> >   arch/powerpc/platforms/82xx/pq2ads-pci-pic.c     |  4 +-
+> >   arch/powerpc/platforms/82xx/pq2fads.c            | 10 ++--
+> >   arch/powerpc/platforms/83xx/km83xx.c             |  6 +-
+> >   arch/powerpc/platforms/83xx/mpc836x_mds.c        |  2 +-
+> >   arch/powerpc/platforms/85xx/mpc85xx_mds.c        |  2 +-
+> >   arch/powerpc/platforms/85xx/mpc85xx_pm_ops.c     |  4 +-
+> >   arch/powerpc/platforms/85xx/mpc85xx_rdb.c        |  2 +-
+> >   arch/powerpc/platforms/85xx/p1022_ds.c           |  4 +-
+> >   arch/powerpc/platforms/85xx/p1022_rdk.c          |  4 +-
+> >   arch/powerpc/platforms/85xx/t1042rdb_diu.c       |  4 +-
+> >   arch/powerpc/platforms/85xx/twr_p102x.c          |  2 +-
+> >   arch/powerpc/platforms/86xx/mpc8610_hpcd.c       |  4 +-
+> >   arch/powerpc/platforms/8xx/adder875.c            |  2 +-
+> >   arch/powerpc/platforms/8xx/m8xx_setup.c          |  4 +-
+> >   arch/powerpc/platforms/8xx/mpc86xads_setup.c     |  4 +-
+> >   arch/powerpc/platforms/8xx/mpc885ads_setup.c     | 28 ++++-----
+> >   arch/powerpc/platforms/embedded6xx/flipper-pic.c |  6 +-
+> >   arch/powerpc/platforms/embedded6xx/hlwd-pic.c    |  8 +--
+> >   arch/powerpc/platforms/embedded6xx/wii.c         | 10 ++--
+> >   arch/powerpc/sysdev/cpm1.c                       | 26 ++++-----
+> >   arch/powerpc/sysdev/cpm2.c                       | 16 ++---
+> >   arch/powerpc/sysdev/cpm_common.c                 |  4 +-
+> >   arch/powerpc/sysdev/fsl_85xx_l2ctlr.c            |  8 +--
+> >   arch/powerpc/sysdev/fsl_lbc.c                    |  2 +-
+> >   arch/powerpc/sysdev/fsl_pci.c                    |  8 +--
+> >   arch/powerpc/sysdev/fsl_pmc.c                    |  2 +-
+> >   arch/powerpc/sysdev/fsl_rcpm.c                   | 74 ++++++++++++------------
+> >   arch/powerpc/sysdev/fsl_rio.c                    |  4 +-
+> >   arch/powerpc/sysdev/fsl_rmu.c                    |  8 +--
+> >   arch/powerpc/sysdev/mpic_timer.c                 | 12 ++--
+> >   41 files changed, 178 insertions(+), 177 deletions(-)
+> > 
+> > diff --git a/arch/powerpc/include/asm/fsl_lbc.h b/arch/powerpc/include/asm/fsl_lbc.h
+> > index c7240a024b96..4d6a56b48a28 100644
+> > --- a/arch/powerpc/include/asm/fsl_lbc.h
+> > +++ b/arch/powerpc/include/asm/fsl_lbc.h
+> > @@ -276,7 +276,7 @@ static inline void fsl_upm_start_pattern(struct fsl_upm *upm, u8 pat_offset)
+> >    */
+> >   static inline void fsl_upm_end_pattern(struct fsl_upm *upm)
+> >   {
+> > -	clrbits32(upm->mxmr, MxMR_OP_RP);
+> > +	clrbits_be32(upm->mxmr, MxMR_OP_RP);
+> >   
+> >   	while (in_be32(upm->mxmr) & MxMR_OP_RP)
+> >   		cpu_relax();
+> > diff --git a/arch/powerpc/include/asm/io.h b/arch/powerpc/include/asm/io.h
+> > index e0331e754568..57486a1b9992 100644
+> > --- a/arch/powerpc/include/asm/io.h
+> > +++ b/arch/powerpc/include/asm/io.h
+> > @@ -873,8 +873,8 @@ static inline void * bus_to_virt(unsigned long address)
+> >   #endif /* CONFIG_PPC32 */
+> >   
+> >   /* access ports */
+> > -#define setbits32(_addr, _v) out_be32((_addr), in_be32(_addr) |  (_v))
+> > -#define clrbits32(_addr, _v) out_be32((_addr), in_be32(_addr) & ~(_v))
+> > +#define setbits_be32(_addr, _v) out_be32((_addr), in_be32(_addr) |  (_v))
+> > +#define clrbits_be32(_addr, _v) out_be32((_addr), in_be32(_addr) & ~(_v))
+> >   
+> >   #define setbits16(_addr, _v) out_be16((_addr), in_be16(_addr) |  (_v))
+> >   #define clrbits16(_addr, _v) out_be16((_addr), in_be16(_addr) & ~(_v))
+> > @@ -904,6 +904,7 @@ static inline void * bus_to_virt(unsigned long address)
+> >   #define clrsetbits_le16(addr, clear, set) clrsetbits(le16, addr, clear, set)
+> >   
+> >   #define clrsetbits_8(addr, clear, set) clrsetbits(8, addr, clear, set)
+> > +#define clrsetbits_be32(addr, clear, set) clrsetbits(be32, addr, clear, set)
+> 
+> This one already exists a few lines above.
+> 
+> >   
+> >   #endif /* __KERNEL__ */
+> >   
+> > diff --git a/arch/powerpc/platforms/44x/canyonlands.c b/arch/powerpc/platforms/44x/canyonlands.c
+> > index 157f4ce46386..6aeb4ca64d09 100644
+> > --- a/arch/powerpc/platforms/44x/canyonlands.c
+> > +++ b/arch/powerpc/platforms/44x/canyonlands.c
+> > @@ -113,8 +113,8 @@ static int __init ppc460ex_canyonlands_fixup(void)
+> >   	 * USB2HStop and gpio19 will be USB2DStop. For more details refer to
+> >   	 * table 34-7 of PPC460EX user manual.
+> >   	 */
+> > -	setbits32((vaddr + GPIO0_OSRH), 0x42000000);
+> > -	setbits32((vaddr + GPIO0_TSRH), 0x42000000);
+> > +	setbits_be32((vaddr + GPIO0_OSRH), 0x42000000);
+> > +	setbits_be32((vaddr + GPIO0_TSRH), 0x42000000);
+> >   err_gpio:
+> >   	iounmap(vaddr);
+> >   err_bcsr:
+> > diff --git a/arch/powerpc/platforms/4xx/gpio.c b/arch/powerpc/platforms/4xx/gpio.c
+> > index 2238e369cde4..8436da0617fd 100644
+> > --- a/arch/powerpc/platforms/4xx/gpio.c
+> > +++ b/arch/powerpc/platforms/4xx/gpio.c
+> > @@ -82,9 +82,9 @@ __ppc4xx_gpio_set(struct gpio_chip *gc, unsigned int gpio, int val)
+> >   	struct ppc4xx_gpio __iomem *regs = mm_gc->regs;
+> >   
+> >   	if (val)
+> > -		setbits32(&regs->or, GPIO_MASK(gpio));
+> > +		setbits_be32(&regs->or, GPIO_MASK(gpio));
+> >   	else
+> > -		clrbits32(&regs->or, GPIO_MASK(gpio));
+> > +		clrbits_be32(&regs->or, GPIO_MASK(gpio));
+> >   }
+> >   
+> >   static void
+> > @@ -112,18 +112,18 @@ static int ppc4xx_gpio_dir_in(struct gpio_chip *gc, unsigned int gpio)
+> >   	spin_lock_irqsave(&chip->lock, flags);
+> >   
+> >   	/* Disable open-drain function */
+> > -	clrbits32(&regs->odr, GPIO_MASK(gpio));
+> > +	clrbits_be32(&regs->odr, GPIO_MASK(gpio));
+> >   
+> >   	/* Float the pin */
+> > -	clrbits32(&regs->tcr, GPIO_MASK(gpio));
+> > +	clrbits_be32(&regs->tcr, GPIO_MASK(gpio));
+> >   
+> >   	/* Bits 0-15 use TSRL/OSRL, bits 16-31 use TSRH/OSRH */
+> >   	if (gpio < 16) {
+> > -		clrbits32(&regs->osrl, GPIO_MASK2(gpio));
+> > -		clrbits32(&regs->tsrl, GPIO_MASK2(gpio));
+> > +		clrbits_be32(&regs->osrl, GPIO_MASK2(gpio));
+> > +		clrbits_be32(&regs->tsrl, GPIO_MASK2(gpio));
+> >   	} else {
+> > -		clrbits32(&regs->osrh, GPIO_MASK2(gpio));
+> > -		clrbits32(&regs->tsrh, GPIO_MASK2(gpio));
+> > +		clrbits_be32(&regs->osrh, GPIO_MASK2(gpio));
+> > +		clrbits_be32(&regs->tsrh, GPIO_MASK2(gpio));
+> >   	}
+> >   
+> >   	spin_unlock_irqrestore(&chip->lock, flags);
+> > @@ -145,18 +145,18 @@ ppc4xx_gpio_dir_out(struct gpio_chip *gc, unsigned int gpio, int val)
+> >   	__ppc4xx_gpio_set(gc, gpio, val);
+> >   
+> >   	/* Disable open-drain function */
+> > -	clrbits32(&regs->odr, GPIO_MASK(gpio));
+> > +	clrbits_be32(&regs->odr, GPIO_MASK(gpio));
+> >   
+> >   	/* Drive the pin */
+> > -	setbits32(&regs->tcr, GPIO_MASK(gpio));
+> > +	setbits_be32(&regs->tcr, GPIO_MASK(gpio));
+> >   
+> >   	/* Bits 0-15 use TSRL, bits 16-31 use TSRH */
+> >   	if (gpio < 16) {
+> > -		clrbits32(&regs->osrl, GPIO_MASK2(gpio));
+> > -		clrbits32(&regs->tsrl, GPIO_MASK2(gpio));
+> > +		clrbits_be32(&regs->osrl, GPIO_MASK2(gpio));
+> > +		clrbits_be32(&regs->tsrl, GPIO_MASK2(gpio));
+> >   	} else {
+> > -		clrbits32(&regs->osrh, GPIO_MASK2(gpio));
+> > -		clrbits32(&regs->tsrh, GPIO_MASK2(gpio));
+> > +		clrbits_be32(&regs->osrh, GPIO_MASK2(gpio));
+> > +		clrbits_be32(&regs->tsrh, GPIO_MASK2(gpio));
+> >   	}
+> >   
+> >   	spin_unlock_irqrestore(&chip->lock, flags);
+> > diff --git a/arch/powerpc/platforms/512x/pdm360ng.c b/arch/powerpc/platforms/512x/pdm360ng.c
+> > index dc81f05e0bce..06b95795267a 100644
+> > --- a/arch/powerpc/platforms/512x/pdm360ng.c
+> > +++ b/arch/powerpc/platforms/512x/pdm360ng.c
+> > @@ -38,7 +38,7 @@ static int pdm360ng_get_pendown_state(void)
+> >   
+> >   	reg = in_be32(pdm360ng_gpio_base + 0xc);
+> >   	if (reg & 0x40)
+> > -		setbits32(pdm360ng_gpio_base + 0xc, 0x40);
+> > +		setbits_be32(pdm360ng_gpio_base + 0xc, 0x40);
+> >   
+> >   	reg = in_be32(pdm360ng_gpio_base + 0x8);
+> >   
+> > @@ -69,8 +69,8 @@ static int __init pdm360ng_penirq_init(void)
+> >   		return -ENODEV;
+> >   	}
+> >   	out_be32(pdm360ng_gpio_base + 0xc, 0xffffffff);
+> > -	setbits32(pdm360ng_gpio_base + 0x18, 0x2000);
+> > -	setbits32(pdm360ng_gpio_base + 0x10, 0x40);
+> > +	setbits_be32(pdm360ng_gpio_base + 0x18, 0x2000);
+> > +	setbits_be32(pdm360ng_gpio_base + 0x10, 0x40);
+> >   
+> >   	return 0;
+> >   }
+> > diff --git a/arch/powerpc/platforms/52xx/mpc52xx_common.c b/arch/powerpc/platforms/52xx/mpc52xx_common.c
+> > index 565e3a83dc9e..edfe619d67bf 100644
+> > --- a/arch/powerpc/platforms/52xx/mpc52xx_common.c
+> > +++ b/arch/powerpc/platforms/52xx/mpc52xx_common.c
+> > @@ -314,13 +314,13 @@ int mpc5200_psc_ac97_gpio_reset(int psc_number)
+> >   
+> >   	/* enable gpio pins for output */
+> >   	setbits8(&wkup_gpio->wkup_gpioe, reset);
+> > -	setbits32(&simple_gpio->simple_gpioe, sync | out);
+> > +	setbits_be32(&simple_gpio->simple_gpioe, sync | out);
+> >   
+> >   	setbits8(&wkup_gpio->wkup_ddr, reset);
+> > -	setbits32(&simple_gpio->simple_ddr, sync | out);
+> > +	setbits_be32(&simple_gpio->simple_ddr, sync | out);
+> >   
+> >   	/* Assert cold reset */
+> > -	clrbits32(&simple_gpio->simple_dvo, sync | out);
+> > +	clrbits_be32(&simple_gpio->simple_dvo, sync | out);
+> >   	clrbits8(&wkup_gpio->wkup_dvo, reset);
+> >   
+> >   	/* wait for 1 us */
+> > diff --git a/arch/powerpc/platforms/52xx/mpc52xx_gpt.c b/arch/powerpc/platforms/52xx/mpc52xx_gpt.c
+> > index 17cf249b18ee..e9f4dec06077 100644
+> > --- a/arch/powerpc/platforms/52xx/mpc52xx_gpt.c
+> > +++ b/arch/powerpc/platforms/52xx/mpc52xx_gpt.c
+> > @@ -142,7 +142,7 @@ static void mpc52xx_gpt_irq_unmask(struct irq_data *d)
+> >   	unsigned long flags;
+> >   
+> >   	raw_spin_lock_irqsave(&gpt->lock, flags);
+> > -	setbits32(&gpt->regs->mode, MPC52xx_GPT_MODE_IRQ_EN);
+> > +	setbits_be32(&gpt->regs->mode, MPC52xx_GPT_MODE_IRQ_EN);
+> >   	raw_spin_unlock_irqrestore(&gpt->lock, flags);
+> >   }
+> >   
+> > @@ -152,7 +152,7 @@ static void mpc52xx_gpt_irq_mask(struct irq_data *d)
+> >   	unsigned long flags;
+> >   
+> >   	raw_spin_lock_irqsave(&gpt->lock, flags);
+> > -	clrbits32(&gpt->regs->mode, MPC52xx_GPT_MODE_IRQ_EN);
+> > +	clrbits_be32(&gpt->regs->mode, MPC52xx_GPT_MODE_IRQ_EN);
+> >   	raw_spin_unlock_irqrestore(&gpt->lock, flags);
+> >   }
+> >   
+> > @@ -308,7 +308,7 @@ static int mpc52xx_gpt_gpio_dir_in(struct gpio_chip *gc, unsigned int gpio)
+> >   	dev_dbg(gpt->dev, "%s: gpio:%d\n", __func__, gpio);
+> >   
+> >   	raw_spin_lock_irqsave(&gpt->lock, flags);
+> > -	clrbits32(&gpt->regs->mode, MPC52xx_GPT_MODE_GPIO_MASK);
+> > +	clrbits_be32(&gpt->regs->mode, MPC52xx_GPT_MODE_GPIO_MASK);
+> >   	raw_spin_unlock_irqrestore(&gpt->lock, flags);
+> >   
+> >   	return 0;
+> > @@ -482,7 +482,7 @@ int mpc52xx_gpt_stop_timer(struct mpc52xx_gpt_priv *gpt)
+> >   		return -EBUSY;
+> >   	}
+> >   
+> > -	clrbits32(&gpt->regs->mode, MPC52xx_GPT_MODE_COUNTER_ENABLE);
+> > +	clrbits_be32(&gpt->regs->mode, MPC52xx_GPT_MODE_COUNTER_ENABLE);
+> >   	raw_spin_unlock_irqrestore(&gpt->lock, flags);
+> >   	return 0;
+> >   }
+> > @@ -639,7 +639,7 @@ static int mpc52xx_wdt_release(struct inode *inode, struct file *file)
+> >   	unsigned long flags;
+> >   
+> >   	raw_spin_lock_irqsave(&gpt_wdt->lock, flags);
+> > -	clrbits32(&gpt_wdt->regs->mode,
+> > +	clrbits_be32(&gpt_wdt->regs->mode,
+> >   		  MPC52xx_GPT_MODE_COUNTER_ENABLE | MPC52xx_GPT_MODE_WDT_EN);
+> 
+> The alignment needs to be fixed here (and all other places). The second 
+> line should start under the &
+> Eventually use checkpatch to locate all places that need to be fixed. 
+> (checkpatch may even fix it for you)
+> 
 
-When function tracing for IPIs is enabled, we get a warning for an
-overflow of the ipi_types array with the IPI_CPU_BACKTRACE type
-as triggered by raise_nmi():
-
-arch/arm/kernel/smp.c: In function 'raise_nmi':
-arch/arm/kernel/smp.c:489:2: error: array subscript is above array bounds [-Werror=array-bounds]
-	trace_ipi_raise(target, ipi_types[ipinr]);
-
-This is a correct warning as we actually overflow the array here.
-
-This patch raise_nmi() to call __smp_cross_call() instead of
-smp_cross_call(), to avoid calling into ftrace. For clarification,
-I'm also adding a two new code comments describing how this one
-is special.
-
-The warning appears to have shown up after patch e7273ff49acf
-("ARM: 8488/1: Make IPI_CPU_BACKTRACE a "non-secure" SGI"), which
-changed the number assignment from '15' to '8', but as far as I can
-tell has existed since the IPI tracepoints were first introduced.
-If we decide to backport this patch to stable kernels, we probably
-need to backport e7273ff49acf as well.
-
-Resubmiting this patch is because that I found coverity is complaining
-the issue this patch fixed, and also I got the traces like below:
-"ipi_raise: target_mask=00000001 (machine_suspend)" which actually was
-the TPS of suspend_resume[1] rather than ipi_raise.
-
-[1]
-https://elixir.bootlin.com/linux/latest/source/kernel/power/suspend.c#L80
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: e7273ff49acf ("ARM: 8488/1: Make IPI_CPU_BACKTRACE a "non-secure" SGI")
-Fixes: 365ec7b17327 ("ARM: add IPI tracepoints") # v3.17
-Signed-off-by: Chunyan Zhang <chunyan.zhang@unisoc.com>
----
- arch/arm/include/asm/hardirq.h | 1 +
- arch/arm/kernel/smp.c          | 6 +++++-
- 2 files changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/hardirq.h b/arch/arm/include/asm/hardirq.h
-index cba23ea..7a88f16 100644
---- a/arch/arm/include/asm/hardirq.h
-+++ b/arch/arm/include/asm/hardirq.h
-@@ -6,6 +6,7 @@
- #include <linux/threads.h>
- #include <asm/irq.h>
- 
-+/* number of IPIS _not_ including IPI_CPU_BACKTRACE */
- #define NR_IPI	7
- 
- typedef struct {
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 0978282..123be77 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -75,6 +75,10 @@ enum ipi_msg_type {
- 	IPI_CPU_STOP,
- 	IPI_IRQ_WORK,
- 	IPI_COMPLETION,
-+	/*
-+	 * CPU_BACKTRACE is special and not included in NR_IPI
-+	 * or tracable with trace_ipi_*
-+	 */
- 	IPI_CPU_BACKTRACE,
- 	/*
- 	 * SGI8-15 can be reserved by secure firmware, and thus may
-@@ -755,7 +759,7 @@ core_initcall(register_cpufreq_notifier);
- 
- static void raise_nmi(cpumask_t *mask)
- {
--	smp_cross_call(mask, IPI_CPU_BACKTRACE);
-+	_smp_cross_call(mask, IPI_CPU_BACKTRACE);
- }
- 
- void arch_trigger_cpumask_backtrace(const cpumask_t *mask, bool exclude_self)
--- 
-2.7.4
+Thanks, I will fix all reported problem
