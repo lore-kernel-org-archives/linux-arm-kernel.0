@@ -1,125 +1,36 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 27 Sep 2018 10:25:52 +0530
-Subject: [PATCH 0/4] Update am437x and am335x dts to probe with ti-sysc
-In-Reply-To: <20180926233111.GY5662@atomide.com>
-References: <20180925000545.22931-1-tony@atomide.com>
- <e9afe736-c2f0-6182-afd0-08279e09a35e@ti.com>
- <20180925144021.GN5662@atomide.com> <20180925175537.GQ5662@atomide.com>
- <d98aa7c1-5131-34c5-51e5-c7ef57cbc31e@ti.com>
- <20180926155911.GT5662@atomide.com> <20180926162303.GU5662@atomide.com>
- <cfc3f1db-9468-ed92-a673-882b51b4dec8@ti.com>
- <20180926233111.GY5662@atomide.com>
-Message-ID: <305bf1c3-915d-dac1-95e4-4d32621247e1@ti.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Thu, 27 Sep 2018 10:31:46 +0530
+Subject: [PATCH] arm64: dts: k3-am65-wakeup: Fix wakeup_uart reg address
+Message-ID: <20180927050146.17847-1-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+cbass_wakeup interconnect which is the parent of wakeup_uart node
+defines address-cells=1 and size-cells=1, therefore fix up reg property
+of wakeup_uart node accordingly. Otherwise, this UART instance fails to
+probe if enabled.
 
+Fixes: 4201af2544b3 ("arm64: dts: ti: am654: Add uart nodes")
+Signed-off-by: Vignesh R <vigneshr@ti.com>
+---
 
-On Thursday 27 September 2018 05:01 AM, Tony Lindgren wrote:
-> * Grygorii Strashko <grygorii.strashko@ti.com> [180926 21:41]:
->> On 09/26/2018 11:23 AM, Tony Lindgren wrote:
->>> +static int __maybe_unused omap_i2c_suspend(struct device *dev)
->>> +{
->>> +	struct omap_i2c_dev *ddata = dev_get_drvdata(dev);
->>> +	int error;
->>> +
->>> +	/* Is device still enabled because of autosuspend? */
->>> +	if (ddata->is_suspended)
->>> +		return 0;
->>
->> Sry, but you can't do this. There is no sync between suspend and PM runtime.
->>
->>
->>> +
->>> +	/* Paired with call in omap_i2c_resume() */
->>> +	error = pm_runtime_put_sync_suspend(dev);
->>
->> This is nop!!! More over, in general you can't predict how many times pm_runtime_get was called and
->> what's the current value of usage_count.
-> 
-> Hmm yeah that's a good point.
-> 
->> To make things work the pm_runtime_force_xx() have to be used, or
->> like with omap_device, platform/bus code have to handle device state
->> at suspend_no_irq stage.
-> 
-> OK. So looks like the other i2c bus drivers have already solved it
-> with simply SET_NOIRQ_SYSTEM_SLEEP_PM_OPS which is along the lines
-> you're suggesting.
-> 
-> The following works for me, does it look OK to you?
+Based on next-20180926
 
-This works pretty well with DS0 on am437x-gp-evm. Tested rtc wakeup,
-wakeup using uart and touch. All of the work well.
+ arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-https://pastebin.ubuntu.com/p/RJhJJKhJHX/
-
-Also tested on beaglebone black DS0 works fine. Although there seems to
-be an additional warning which was not seen before:
-
-"l4-wkup-clkctrl:0008:0: failed to disable"
-
-log: https://pastebin.ubuntu.com/p/Ns2WRdVkXS/
-
-Also the above warning is present without/with this patch on [0].
-No such warnings on am4 though.
-
-[0]
-https://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git/log/?h=omap-for-v4.20/dt-ti-sysc-tmp-testing
-
-Regards,
-Keerthy
-
-> 
-> Regards,
-> 
-> Tony
-> 
-> 8< ---------------------
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -1498,8 +1498,7 @@ static int omap_i2c_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> -#ifdef CONFIG_PM
-> -static int omap_i2c_runtime_suspend(struct device *dev)
-> +static int __maybe_unused omap_i2c_runtime_suspend(struct device *dev)
->  {
->  	struct omap_i2c_dev *omap = dev_get_drvdata(dev);
->  
-> @@ -1525,7 +1524,7 @@ static int omap_i2c_runtime_suspend(struct device *dev)
->  	return 0;
->  }
->  
-> -static int omap_i2c_runtime_resume(struct device *dev)
-> +static int __maybe_unused omap_i2c_runtime_resume(struct device *dev)
->  {
->  	struct omap_i2c_dev *omap = dev_get_drvdata(dev);
->  
-> @@ -1540,20 +1539,18 @@ static int omap_i2c_runtime_resume(struct device *dev)
->  }
->  
->  static const struct dev_pm_ops omap_i2c_pm_ops = {
-> +	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
-> +				      pm_runtime_force_resume)
->  	SET_RUNTIME_PM_OPS(omap_i2c_runtime_suspend,
->  			   omap_i2c_runtime_resume, NULL)
->  };
-> -#define OMAP_I2C_PM_OPS (&omap_i2c_pm_ops)
-> -#else
-> -#define OMAP_I2C_PM_OPS NULL
-> -#endif /* CONFIG_PM */
->  
->  static struct platform_driver omap_i2c_driver = {
->  	.probe		= omap_i2c_probe,
->  	.remove		= omap_i2c_remove,
->  	.driver		= {
->  		.name	= "omap_i2c",
-> -		.pm	= OMAP_I2C_PM_OPS,
-> +		.pm	= &omap_i2c_pm_ops,
->  		.of_match_table = of_match_ptr(omap_i2c_of_match),
->  	},
->  };
-> 
+diff --git a/arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi b/arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi
+index ee56959f4af8..c617393ea767 100644
+--- a/arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi
++++ b/arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi
+@@ -44,7 +44,7 @@
+ 
+ 	wkup_uart0: serial at 42300000 {
+ 		compatible = "ti,am654-uart";
+-		reg = <0x00 0x42300000 0x00 0x100>;
++		reg = <0x42300000 0x100>;
+ 		reg-shift = <2>;
+ 		reg-io-width = <4>;
+ 		interrupts = <GIC_SPI 697 IRQ_TYPE_LEVEL_HIGH>;
+-- 
+2.19.0
