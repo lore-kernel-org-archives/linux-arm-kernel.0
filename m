@@ -1,41 +1,99 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Thu, 27 Sep 2018 15:26:18 +0200
-Subject: [PATCH net-next v6 07/23] zinc: ChaCha20 ARM and ARM64
- implementations
-In-Reply-To: <CAHmME9qNn5aRgtbV3bAsz3xW1A49a7RMMkOzGruBUPzLVUxVNg@mail.gmail.com>
-References: <20180925145622.29959-1-Jason@zx2c4.com>
- <20180925145622.29959-8-Jason@zx2c4.com>
- <CAKv+Gu9mVAfdBvOMCFqRJj+wBiWu3JVOgPZdkcdjzqSdQQ5Jrw@mail.gmail.com>
- <CAHmME9r9KppoFwwNVpzpYbU+9dCPzb7Pit+4iRa4MY_ouJBWrA@mail.gmail.com>
- <CAKv+Gu8ih-TsASRGqK+ST_5+EQ0=Zo-zhGCadOdGyPjucMFTCg@mail.gmail.com>
- <CAKv+Gu8w74dUSEAGxxh=C6To6F=bSm8DjiExUPmh_LUyhoDLhg@mail.gmail.com>
- <CAHmME9pbRabkGjNh-65S9qBNNS1GLJSwZ_tTM507S_Ezr1=QLg@mail.gmail.com>
- <CAHmME9ru=kJO8QiW+uNNgt5NgFVZzRsQ4tNSgo+f+KfHs3fAKQ@mail.gmail.com>
- <CAKv+Gu-WDt8f9qVjLDRPHL7THS0BjtKHThw2RMfHbWBT8Hs8aQ@mail.gmail.com>
- <CAHmME9qNn5aRgtbV3bAsz3xW1A49a7RMMkOzGruBUPzLVUxVNg@mail.gmail.com>
-Message-ID: <CAHmME9rN3-7Mj5JQqt2EFPauG9vjkN5pQn3tPiJY4fPiwksaDA@mail.gmail.com>
+From: madalin.bucur@nxp.com (Madalin-cristian Bucur)
+Date: Thu, 27 Sep 2018 13:39:33 +0000
+Subject: [PATCH v2 00/22] SMMU enablement for NXP LS1043A and LS1046A
+In-Reply-To: <20180926132247.10971-1-laurentiu.tudor@nxp.com>
+References: <20180926132247.10971-1-laurentiu.tudor@nxp.com>
+Message-ID: <AM6PR04MB400811E9B5AD3DD1646D1B9CEC140@AM6PR04MB4008.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+> -----Original Message-----
+> From: laurentiu.tudor at nxp.com [mailto:laurentiu.tudor at nxp.com]
+> Sent: Wednesday, September 26, 2018 4:22 PM
+> To: devicetree at vger.kernel.org; netdev at vger.kernel.org; linux-
+> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Cc: Roy Pledge <roy.pledge@nxp.com>; Madalin-cristian Bucur
+> <madalin.bucur@nxp.com>; davem at davemloft.net; shawnguo at kernel.org; Leo Li
+> <leoyang.li@nxp.com>; robin.murphy at arm.com; Bharat Bhushan
+> <bharat.bhushan@nxp.com>; Laurentiu Tudor <laurentiu.tudor@nxp.com>
+> Subject: [PATCH v2 00/22] SMMU enablement for NXP LS1043A and LS1046A
+> 
+> From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+> 
+> This patch series adds SMMU support for NXP LS1043A and LS1046A chips
+> and consists mostly in important driver fixes and the required device
+> tree updates. It touches several subsystems and consists of three main
+> parts:
+>  - changes in soc/drivers/fsl/qbman drivers adding iommu mapping of
+>    reserved memory areas, fixes and defered probe support
+>  - changes in drivers/net/ethernet/freescale/dpaa_eth drivers
+>    consisting in misc dma mapping related fixes and probe ordering
+>  - addition of the actual arm smmu device tree node together with
+>    various adjustments to the device trees
+> 
+> Performance impact
+> 
+>     Running iperf benchmarks in a back-to-back setup (both sides
+>     having smmu enabled) on a 10GBps port show an important
+>     networking performance degradation of around 40% (9.48Gbps
+>     linerate vs 5.45Gbps) and around 30%-35% with iommu.strict=1.
+>     If you need performance but without SMMU support you can use
+>     "iommu.passthrough=1" to disable SMMU.
+> 
+> The patch set is based on net-next so, if generally agreed, I'd suggest
+> to get the patches through the netdev tree after getting all the Acks.
+> 
+> Changes in v2:
+>  - dropped confusing comments in smmu interrupt property (Robin)
+>  - add an intermediate simple-bus for usb to fix dma size issue (Robin)
+>  - use defines instead of numbers in smmu interrupt definition
+>  - drop redundant double iommu_get_domain_for_dev() call in few qbman
+>    patches
+> 
+> Laurentiu Tudor (22):
+>   soc/fsl/qman: fixup liodns only on ppc targets
+>   soc/fsl/bman: map FBPR area in the iommu
+>   soc/fsl/qman: map FQD and PFDR areas in the iommu
+>   soc/fsl/qman-portal: map CENA area in the iommu
+>   soc/fsl/qbman: add APIs to retrieve the probing status
+>   soc/fsl/qman_portals: defer probe after qman's probe
+>   soc/fsl/bman_portals: defer probe after bman's probe
+>   soc/fsl/qbman_portals: add APIs to retrieve the probing status
+>   fsl/fman: backup and restore ICID registers
+>   fsl/fman: add API to get the device behind a fman port
+>   dpaa_eth: defer probing after qbman
+>   dpaa_eth: base dma mappings on the fman rx port
+>   dpaa_eth: fix iova handling for contiguous frames
+>   dpaa_eth: fix iova handling for sg frames
+>   dpaa_eth: fix SG frame cleanup
+>   arm64: dts: ls1046a: add smmu node
+>   arm64: dts: ls1043a: add smmu node
+>   arm64: dts: ls104xa: set mask to drop TBU ID from StreamID
+>   arm64: dts: ls104x: add missing dma ranges property
+>   arm64: dts: ls104x: add iommu-map to pci controllers
+>   arm64: dts: ls104x: make dma-coherent global to the SoC
+>   arm64: dts: ls104x: use a pseudo-bus to constrain usb dma size
+> 
+>  .../arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 106 ++++++++++----
+>  .../arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 102 ++++++++++---
+>  .../net/ethernet/freescale/dpaa/dpaa_eth.c    | 136 ++++++++++++------
+>  drivers/net/ethernet/freescale/fman/fman.c    |  35 ++++-
+>  drivers/net/ethernet/freescale/fman/fman.h    |   4 +
+>  .../net/ethernet/freescale/fman/fman_port.c   |  14 ++
+>  .../net/ethernet/freescale/fman/fman_port.h   |   2 +
+>  drivers/soc/fsl/qbman/bman_ccsr.c             |  22 +++
+>  drivers/soc/fsl/qbman/bman_portal.c           |  20 ++-
+>  drivers/soc/fsl/qbman/qman_ccsr.c             |  28 ++++
+>  drivers/soc/fsl/qbman/qman_portal.c           |  35 +++++
+>  include/soc/fsl/bman.h                        |  16 +++
+>  include/soc/fsl/qman.h                        |  17 +++
+>  13 files changed, 438 insertions(+), 99 deletions(-)
+> 
+> --
+> 2.17.1
 
-I'm trying to optimize this for crypto performance while still taking
-into account preemption concerns. I'm having a bit of trouble figuring
-out a way to determine numerically what the upper bounds for this
-stuff looks like. I'm sure I could pick a pretty sane number that's
-arguably okay -- and way under the limit -- but I still am interested
-in determining what that limit actually is. I was hoping there'd be a
-debugging option called, "warn if preemption is disabled for too
-long", or something, but I couldn't find anything like that. I'm also
-not quite sure what the latency limits are, to just compute this with
-a formula. Essentially what I'm trying to determine is:
+For the fsl/fman and dpaa_eth:
 
-preempt_disable();
-asm volatile(".fill N, 1, 0x90;");
-preempt_enable();
+Acked-by: Madalin Bucur <madalin.bucur@nxp.com>
 
-What is the maximum value of N for which the above is okay? What
-technique would you generally use in measuring this?
-
-Thanks,
-Jason
+Thank you
