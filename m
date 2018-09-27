@@ -1,38 +1,49 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Thu, 27 Sep 2018 17:18:45 +0530
-Subject: [PATCH 07/12] drm/sun4i: sun6i_mipi_dsi: Fix TCON DRQ set bits
+Date: Thu, 27 Sep 2018 17:18:47 +0530
+Subject: [PATCH 09/12] dt-bindings: panel: Add Bananapi S070WV20-CT16 MIPI-DSI
+ panel bindings
 In-Reply-To: <20180927114850.24565-1-jagan@amarulasolutions.com>
 References: <20180927114850.24565-1-jagan@amarulasolutions.com>
-Message-ID: <20180927114850.24565-8-jagan@amarulasolutions.com>
+Message-ID: <20180927114850.24565-10-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TCON DRQ set bits for non-burst DSI mode can computed via
-horizontal front porch instead of front porch + sync timings.
-
-Since there no documentation for TCON_DRQ_REG(0x7c) register
-this change is taken as reference from BPI-M64-bsp.
+Bananapi S070WV20-CT16 is 800x480, 4-lane MIPI-DSI panel, the
+same panel PCB comes with parallel RBG which is supported via
+panel-simple with "bananapi,s070wv20-ct16" compatible.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ .../panel/bananapi,s070wv20-ct16-dsi.txt      | 21 +++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16-dsi.txt
 
-diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-index 599284971ab6..9918fdb990ff 100644
---- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-+++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-@@ -367,9 +367,9 @@ static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
- 	struct mipi_dsi_device *device = dsi->device;
- 	u32 val = 0;
- 
--	if ((mode->hsync_end - mode->hdisplay) > 20) {
-+	if ((mode->hsync_start - mode->hdisplay) > 20) {
- 		/* Maaaaaagic */
--		u16 drq = (mode->hsync_end - mode->hdisplay) - 20;
-+		u16 drq = (mode->hsync_start - mode->hdisplay) - 20;
- 
- 		drq *= mipi_dsi_pixel_format_to_bpp(device->format);
- 		drq /= 32;
+diff --git a/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16-dsi.txt b/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16-dsi.txt
+new file mode 100644
+index 000000000000..c477163f7999
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16-dsi.txt
+@@ -0,0 +1,21 @@
++Bananapi S070WV20 CT16 MIPI-DSI panel
++
++Required properties:
++- compatible: must be "bananapi,s070wv20-ct16-dsi"
++- reg: DSI virtual channel used by that screen
++- avdd-supply: analog regulator dc1 switch
++- dvdd-supply: 3v3 digital regulator
++- reset-gpios: a GPIO phandle for the reset pin
++
++Optional properties:
++- backlight: phandle for the backlight control.
++
++Example:
++panel at 0 {
++	compatible = "bananapi,s070wv20-ct16-dsi";
++	reg = <0>;
++	avdd-supply = <&reg_dc1sw>;
++	dvdd-supply = <&reg_dldo1>;
++	reset-gpios = <&pio 3 6 GPIO_ACTIVE_HIGH>; /* PD6 */
++	backlight = <&backlight_dsi>;
++};
 -- 
 2.18.0.321.gffc6fa0e3
