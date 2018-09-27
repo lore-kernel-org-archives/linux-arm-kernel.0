@@ -1,89 +1,627 @@
-From: mjourdan@baylibre.com (Maxime Jourdan)
-Date: Thu, 27 Sep 2018 10:46:49 +0200
-Subject: [PATCH v2 0/3] Add Amlogic video decoder driver
-In-Reply-To: <8b8af340-8bd7-092a-4203-fd01fd0cc5c6@xs4all.nl>
-References: <20180911150938.3844-1-mjourdan@baylibre.com>
- <9c33c57e-2ce2-8752-b851-f85c03a7d761@xs4all.nl>
- <CAMO6nay7u4nMZcND6+g-GJAFsFcGrp_GDKBhVjeXVzpjF0ND4Q@mail.gmail.com>
- <8b8af340-8bd7-092a-4203-fd01fd0cc5c6@xs4all.nl>
-Message-ID: <CAMO6naxf_+HiRf8fEs65NP+c1OLMvPSs71SKxwWg-zZO+mSiyw@mail.gmail.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 27 Sep 2018 09:51:54 +0100
+Subject: [PATCH v2 04/11] arm64: dts: sc9836/sc9860: Update coresight
+ bindings for hardware ports
+In-Reply-To: <20180912135352.19722-5-suzuki.poulose@arm.com>
+References: <20180912135352.19722-1-suzuki.poulose@arm.com>
+ <20180912135352.19722-5-suzuki.poulose@arm.com>
+Message-ID: <ccc61e1b-768c-2a6d-3ff5-95b72bc58a6f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le ven. 21 sept. 2018 ? 12:51, Hans Verkuil <hverkuil@xs4all.nl> a ?crit :
->
-> On 09/17/18 18:36, Maxime Jourdan wrote:
-> > 2018-09-17 16:51 GMT+02:00 Hans Verkuil <hverkuil@xs4all.nl>:
-> >> On 09/11/2018 05:09 PM, Maxime Jourdan wrote:
-> >>>  - Moved the single instance check (returning -EBUSY) to start/stop streaming
-> >>>  The check was previously in queue_setup but there was no great location to
-> >>>  clear it except for .close().
-> >>
-> >> Actually, you can clear it by called VIDIOC_REQBUFS with count set to 0. That
-> >> freed all buffers and clears this.
-> >>
-> >> Now, the difference between queue_setup and start/stop streaming is that if you
-> >> do this in queue_setup you'll know early on that the device is busy. It is
-> >> reasonable to assume that you only allocate buffers when you also want to start
-> >> streaming, so that it a good place to know this quickly.
-> >>
-> >> Whereas with start_streaming you won't know until you call STREAMON, or even later
-> >> if you start streaming with no buffers queued, since start_streaming won't
-> >> be called until you have at least 'min_buffers_needed' buffers queued (1 for this
-> >> driver). So in that case EBUSY won't be returned until the first VIDIOC_QBUF.
-> >>
-> >> My preference is to check this in queue_setup, but it is up to you to decide.
-> >> Just be aware of the difference between the two options.
-> >>
-> >> Regards,
-> >>
-> >>         Hans
-> >
-> > I could for instance keep track of which queue(s) have been called
-> > with queue_setup, catch calls to VIDIOC_REQBUFS with count set to 0,
-> > and clear the current session once both queues have been reset ?
->
-> I see your point, this is rather awkward. The real problem here is that
-> we don't have a 'queue_free' callback. If we'd had that this would be
-> a lot easier.
->
-> In any case, I am dropping my objections to doing this in start/stop_streaming.
++To: Chunyan Zhang
 
-Ack.
+Chunyan Zhang,
 
-> > You leverage another issue with min_buffers_needed. It's indeed set to
-> > 1 but this value is wrong for the CAPTURE queue. The problem is that
-> > this value changes depending on the codec and the amount of CAPTURE
-> > buffers requested by userspace.
-> > Ultimately I want it set to the total amount of CAPTURE buffers,
-> > because the hardware needs the full buffer list before starting a
-> > decode job.
-> > Am I free to change this queue parameter later, or is m2m_queue_init
-> > the only place to do it ?
->
-> It has to be set before the VIDIOC_STREAMON. After that you cannot
-> change it anymore.
->
-> But I don't think this is all that relevant, since this is something
-> that the job_ready() callback should take care of. min_buffers_needed
-> is really for hardware where the DMA engine cannot start unless that
-> many buffers are queued. But in that case the DMA runs continuously
-> capturing video, whereas here these are jobs and the DMA is only
-> started when you can actually execute a job.
+On 09/12/2018 02:53 PM, Suzuki K Poulose wrote:
+> Switch to the new coresight bindings for hw ports
+> 
 
-After doing some testing, overriding min_buffers_needed in queue_setup
-is what works best for me.
+How can we push this patch ? Do you generally send the spreadtrum
+specific changes to ARM soc folks ? Or would you like me to post
+this directly to ARM soc folks ?
 
-When doing the initialization in start_streaming, the complete buffer
-list needs to be configured in HW. The firmware can then choose any
-buffer from this list during decoding later on.
+Suzuki
 
-I do this initialization by iterating with v4l2_m2m_for_each_dst_buf,
-which requires all CAPTURE buffers to be queued in.
-
-Cheers,
-Maxime
-
-> Regards,
->
->         Hans
+> Cc: orsonzhai at gmail.com
+> Cc: zhang.lyra at gmail.com
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>   arch/arm64/boot/dts/sprd/sc9836.dtsi |  82 +++++-----
+>   arch/arm64/boot/dts/sprd/sc9860.dtsi | 215 ++++++++++++++-------------
+>   2 files changed, 153 insertions(+), 144 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/sprd/sc9836.dtsi b/arch/arm64/boot/dts/sprd/sc9836.dtsi
+> index 63894c456969..4bcdbb709c01 100644
+> --- a/arch/arm64/boot/dts/sprd/sc9836.dtsi
+> +++ b/arch/arm64/boot/dts/sprd/sc9836.dtsi
+> @@ -50,10 +50,11 @@
+>   		reg = <0 0x10003000 0 0x1000>;
+>   		clocks = <&clk26mhz>;
+>   		clock-names = "apb_pclk";
+> -		port {
+> -			etf_in: endpoint {
+> -				slave-mode;
+> -				remote-endpoint = <&funnel_out_port0>;
+> +		in-ports {
+> +			port {
+> +				etf_in: endpoint {
+> +					remote-endpoint = <&funnel_out_port0>;
+> +				};
+>   			};
+>   		};
+>   	};
+> @@ -63,55 +64,50 @@
+>   		reg = <0 0x10001000 0 0x1000>;
+>   		clocks = <&clk26mhz>;
+>   		clock-names = "apb_pclk";
+> -		ports {
+> +
+> +		out-ports {
+> +			port {
+> +				funnel_out_port0: endpoint {
+> +					remote-endpoint = <&etf_in>;
+> +				};
+> +			};
+> +		};
+> +
+> +		in-ports {
+>   			#address-cells = <1>;
+>   			#size-cells = <0>;
+>   
+> -			/* funnel output port */
+>   			port at 0 {
+> -				reg = <0>;
+> -				funnel_out_port0: endpoint {
+> -					remote-endpoint = <&etf_in>;
+> -				};
+> -			};
+> -
+> -			/* funnel input port 0-4 */
+> -			port at 1 {
+>   				reg = <0>;
+>   				funnel_in_port0: endpoint {
+> -					slave-mode;
+>   					remote-endpoint = <&etm0_out>;
+>   				};
+>   			};
+>   
+> -			port at 2 {
+> +			port at 1 {
+>   				reg = <1>;
+>   				funnel_in_port1: endpoint {
+> -					slave-mode;
+>   					remote-endpoint = <&etm1_out>;
+>   				};
+>   			};
+>   
+> -			port at 3 {
+> +			port at 2 {
+>   				reg = <2>;
+>   				funnel_in_port2: endpoint {
+> -					slave-mode;
+>   					remote-endpoint = <&etm2_out>;
+>   				};
+>   			};
+>   
+> -			port at 4 {
+> +			port at 3 {
+>   				reg = <3>;
+>   				funnel_in_port3: endpoint {
+> -					slave-mode;
+>   					remote-endpoint = <&etm3_out>;
+>   				};
+>   			};
+>   
+> -			port at 5 {
+> +			port at 4 {
+>   				reg = <4>;
+>   				funnel_in_port4: endpoint {
+> -					slave-mode;
+>   					remote-endpoint = <&stm_out>;
+>   				};
+>   			};
+> @@ -126,9 +122,11 @@
+>   		cpu = <&cpu0>;
+>   		clocks = <&clk26mhz>;
+>   		clock-names = "apb_pclk";
+> -		port {
+> -			etm0_out: endpoint {
+> -				remote-endpoint = <&funnel_in_port0>;
+> +		out-ports {
+> +			port {
+> +				etm0_out: endpoint {
+> +					remote-endpoint = <&funnel_in_port0>;
+> +				};
+>   			};
+>   		};
+>   	};
+> @@ -140,9 +138,11 @@
+>   		cpu = <&cpu1>;
+>   		clocks = <&clk26mhz>;
+>   		clock-names = "apb_pclk";
+> -		port {
+> -			etm1_out: endpoint {
+> -				remote-endpoint = <&funnel_in_port1>;
+> +		out-ports {
+> +			port {
+> +				etm1_out: endpoint {
+> +					remote-endpoint = <&funnel_in_port1>;
+> +				};
+>   			};
+>   		};
+>   	};
+> @@ -154,9 +154,11 @@
+>   		cpu = <&cpu2>;
+>   		clocks = <&clk26mhz>;
+>   		clock-names = "apb_pclk";
+> -		port {
+> -			etm2_out: endpoint {
+> -				remote-endpoint = <&funnel_in_port2>;
+> +		out-ports {
+> +			port {
+> +				etm2_out: endpoint {
+> +					remote-endpoint = <&funnel_in_port2>;
+> +				};
+>   			};
+>   		};
+>   	};
+> @@ -168,9 +170,11 @@
+>   		cpu = <&cpu3>;
+>   		clocks = <&clk26mhz>;
+>   		clock-names = "apb_pclk";
+> -		port {
+> -			etm3_out: endpoint {
+> -				remote-endpoint = <&funnel_in_port3>;
+> +		out-ports {
+> +			port {
+> +				etm3_out: endpoint {
+> +					remote-endpoint = <&funnel_in_port3>;
+> +				};
+>   			};
+>   		};
+>   	};
+> @@ -182,9 +186,11 @@
+>   		reg-names = "stm-base", "stm-stimulus-base";
+>   		clocks = <&clk26mhz>;
+>   		clock-names = "apb_pclk";
+> -		port {
+> -			stm_out: endpoint {
+> -				remote-endpoint = <&funnel_in_port4>;
+> +		out-ports {
+> +			port {
+> +				stm_out: endpoint {
+> +					remote-endpoint = <&funnel_in_port4>;
+> +				};
+>   			};
+>   		};
+>   	};
+> diff --git a/arch/arm64/boot/dts/sprd/sc9860.dtsi b/arch/arm64/boot/dts/sprd/sc9860.dtsi
+> index 48f5928ed45c..5f57bf055cde 100644
+> --- a/arch/arm64/boot/dts/sprd/sc9860.dtsi
+> +++ b/arch/arm64/boot/dts/sprd/sc9860.dtsi
+> @@ -304,30 +304,29 @@
+>   			reg = <0 0x10001000 0 0x1000>;
+>   			clocks = <&ext_26m>;
+>   			clock-names = "apb_pclk";
+> -			ports {
+> -				#address-cells = <1>;
+> -				#size-cells = <0>;
+> -
+> -				port at 0 {
+> -					reg = <0>;
+> +			out-ports {
+> +				port {
+>   					soc_funnel_out_port: endpoint {
+>   						remote-endpoint = <&etb_in>;
+>   					};
+>   				};
+> +			};
+>   
+> -				port at 1 {
+> +			in-ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				port at 0 {
+>   					reg = <0>;
+>   					soc_funnel_in_port0: endpoint {
+> -						slave-mode;
+>   						remote-endpoint =
+>   						<&main_funnel_out_port>;
+>   					};
+>   				};
+>   
+> -				port at 2 {
+> +				port at 4 {
+>   					reg = <4>;
+>   					soc_funnel_in_port1: endpoint {
+> -						slave-mode;
+>   						remote-endpoint =
+>   							<&stm_out_port>;
+>   					};
+> @@ -340,11 +339,12 @@
+>   			reg = <0 0x10003000 0 0x1000>;
+>   			clocks = <&ext_26m>;
+>   			clock-names = "apb_pclk";
+> -			port {
+> -				etb_in: endpoint {
+> -					slave-mode;
+> -					remote-endpoint =
+> -						<&soc_funnel_out_port>;
+> +			out-ports {
+> +				port {
+> +					etb_in: endpoint {
+> +						remote-endpoint =
+> +							<&soc_funnel_out_port>;
+> +					};
+>   				};
+>   			};
+>   		};
+> @@ -356,10 +356,12 @@
+>   			reg-names = "stm-base", "stm-stimulus-base";
+>   			clocks = <&ext_26m>;
+>   			clock-names = "apb_pclk";
+> -			port {
+> -				stm_out_port: endpoint {
+> -					remote-endpoint =
+> -						<&soc_funnel_in_port1>;
+> +			out-ports {
+> +				port {
+> +					stm_out_port: endpoint {
+> +						remote-endpoint =
+> +							<&soc_funnel_in_port1>;
+> +					};
+>   				};
+>   			};
+>   		};
+> @@ -369,38 +371,36 @@
+>   			reg = <0 0x11001000 0 0x1000>;
+>   			clocks = <&ext_26m>;
+>   			clock-names = "apb_pclk";
+> -			ports {
+> -				#address-cells = <1>;
+> -				#size-cells = <0>;
+> -
+> -				port at 0 {
+> -					reg = <0>;
+> +			out-ports {
+> +				port {
+>   					cluster0_funnel_out_port: endpoint {
+>   						remote-endpoint =
+>   							<&cluster0_etf_in>;
+>   					};
+>   				};
+> +			};
+>   
+> -				port at 1 {
+> +			in-ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				port at 0 {
+>   					reg = <0>;
+>   					cluster0_funnel_in_port0: endpoint {
+> -						slave-mode;
+>   						remote-endpoint = <&etm0_out>;
+>   					};
+>   				};
+>   
+> -				port at 2 {
+> +				port at 1 {
+>   					reg = <1>;
+>   					cluster0_funnel_in_port1: endpoint {
+> -						slave-mode;
+>   						remote-endpoint = <&etm1_out>;
+>   					};
+>   				};
+>   
+> -				port at 3 {
+> +				port at 2 {
+>   					reg = <2>;
+>   					cluster0_funnel_in_port2: endpoint {
+> -						slave-mode;
+>   						remote-endpoint = <&etm2_out>;
+>   					};
+>   				};
+> @@ -408,7 +408,6 @@
+>   				port at 4 {
+>   					reg = <4>;
+>   					cluster0_funnel_in_port3: endpoint {
+> -						slave-mode;
+>   						remote-endpoint = <&etm3_out>;
+>   					};
+>   				};
+> @@ -420,46 +419,43 @@
+>   			reg = <0 0x11002000 0 0x1000>;
+>   			clocks = <&ext_26m>;
+>   			clock-names = "apb_pclk";
+> -			ports {
+> -				#address-cells = <1>;
+> -				#size-cells = <0>;
+> -
+> -				port at 0 {
+> -					reg = <0>;
+> +			out-ports {
+> +				port {
+>   					cluster1_funnel_out_port: endpoint {
+>   						remote-endpoint =
+>   							<&cluster1_etf_in>;
+>   					};
+>   				};
+> +			};
+>   
+> -				port at 1 {
+> +			in-ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				port at 0 {
+>   					reg = <0>;
+>   					cluster1_funnel_in_port0: endpoint {
+> -						slave-mode;
+>   						remote-endpoint = <&etm4_out>;
+>   					};
+>   				};
+>   
+> -				port at 2 {
+> +				port at 1 {
+>   					reg = <1>;
+>   					cluster1_funnel_in_port1: endpoint {
+> -						slave-mode;
+>   						remote-endpoint = <&etm5_out>;
+>   					};
+>   				};
+>   
+> -				port at 3 {
+> +				port at 2 {
+>   					reg = <2>;
+>   					cluster1_funnel_in_port2: endpoint {
+> -						slave-mode;
+>   						remote-endpoint = <&etm6_out>;
+>   					};
+>   				};
+>   
+> -				port at 4 {
+> +				port at 3 {
+>   					reg = <3>;
+>   					cluster1_funnel_in_port3: endpoint {
+> -						slave-mode;
+>   						remote-endpoint = <&etm7_out>;
+>   					};
+>   				};
+> @@ -472,22 +468,18 @@
+>   			clocks = <&ext_26m>;
+>   			clock-names = "apb_pclk";
+>   
+> -			ports {
+> -				#address-cells = <1>;
+> -				#size-cells = <0>;
+> -
+> -				port at 0 {
+> -					reg = <0>;
+> +			out-ports {
+> +				port {
+>   					cluster0_etf_out: endpoint {
+>   						remote-endpoint =
+>   						<&main_funnel_in_port0>;
+>   					};
+>   				};
+> +			};
+>   
+> -				port at 1 {
+> -					reg = <0>;
+> +			in-ports {
+> +				port {
+>   					cluster0_etf_in: endpoint {
+> -						slave-mode;
+>   						remote-endpoint =
+>   						<&cluster0_funnel_out_port>;
+>   					};
+> @@ -501,22 +493,18 @@
+>   			clocks = <&ext_26m>;
+>   			clock-names = "apb_pclk";
+>   
+> -			ports {
+> -				#address-cells = <1>;
+> -				#size-cells = <0>;
+> -
+> -				port at 0 {
+> -					reg = <0>;
+> +			out-ports {
+> +				port {
+>   					cluster1_etf_out: endpoint {
+>   						remote-endpoint =
+>   						<&main_funnel_in_port1>;
+>   					};
+>   				};
+> +			};
+>   
+> -				port at 1 {
+> -					reg = <0>;
+> +			in-ports {
+> +				port {
+>   					cluster1_etf_in: endpoint {
+> -						slave-mode;
+>   						remote-endpoint =
+>   						<&cluster1_funnel_out_port>;
+>   					};
+> @@ -530,31 +518,30 @@
+>   			clocks = <&ext_26m>;
+>   			clock-names = "apb_pclk";
+>   
+> -			ports {
+> -				#address-cells = <1>;
+> -				#size-cells = <0>;
+> -
+> -				port at 0 {
+> -					reg = <0>;
+> +			out-ports {
+> +				port {
+>   					main_funnel_out_port: endpoint {
+>   						remote-endpoint =
+>   							<&soc_funnel_in_port0>;
+>   					};
+>   				};
+> +			};
+>   
+> -				port at 1 {
+> +			in-ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				port at 0 {
+>   					reg = <0>;
+>   					main_funnel_in_port0: endpoint {
+> -						slave-mode;
+>   						remote-endpoint =
+>   							<&cluster0_etf_out>;
+>   					};
+>   				};
+>   
+> -				port at 2 {
+> +				port at 1 {
+>   					reg = <1>;
+>   					main_funnel_in_port1: endpoint {
+> -						slave-mode;
+>   						remote-endpoint =
+>   							<&cluster1_etf_out>;
+>   					};
+> @@ -569,10 +556,12 @@
+>   			clocks = <&ext_26m>;
+>   			clock-names = "apb_pclk";
+>   
+> -			port {
+> -				etm0_out: endpoint {
+> -					remote-endpoint =
+> -						<&cluster0_funnel_in_port0>;
+> +			out-ports {
+> +				port {
+> +					etm0_out: endpoint {
+> +						remote-endpoint =
+> +							<&cluster0_funnel_in_port0>;
+> +					};
+>   				};
+>   			};
+>   		};
+> @@ -584,10 +573,12 @@
+>   			clocks = <&ext_26m>;
+>   			clock-names = "apb_pclk";
+>   
+> -			port {
+> -				etm1_out: endpoint {
+> -					remote-endpoint =
+> -						<&cluster0_funnel_in_port1>;
+> +			out-ports {
+> +				port {
+> +					etm1_out: endpoint {
+> +						remote-endpoint =
+> +							<&cluster0_funnel_in_port1>;
+> +					};
+>   				};
+>   			};
+>   		};
+> @@ -599,10 +590,12 @@
+>   			clocks = <&ext_26m>;
+>   			clock-names = "apb_pclk";
+>   
+> -			port {
+> -				etm2_out: endpoint {
+> -					remote-endpoint =
+> -						<&cluster0_funnel_in_port2>;
+> +			out-ports {
+> +				port {
+> +					etm2_out: endpoint {
+> +						remote-endpoint =
+> +							<&cluster0_funnel_in_port2>;
+> +					};
+>   				};
+>   			};
+>   		};
+> @@ -614,10 +607,12 @@
+>   			clocks = <&ext_26m>;
+>   			clock-names = "apb_pclk";
+>   
+> -			port {
+> -				etm3_out: endpoint {
+> -					remote-endpoint =
+> -						<&cluster0_funnel_in_port3>;
+> +			out-ports {
+> +				port {
+> +					etm3_out: endpoint {
+> +						remote-endpoint =
+> +							<&cluster0_funnel_in_port3>;
+> +					};
+>   				};
+>   			};
+>   		};
+> @@ -629,10 +624,12 @@
+>   			clocks = <&ext_26m>;
+>   			clock-names = "apb_pclk";
+>   
+> -			port {
+> -				etm4_out: endpoint {
+> -					remote-endpoint =
+> -						<&cluster1_funnel_in_port0>;
+> +			out-ports {
+> +				port {
+> +					etm4_out: endpoint {
+> +						remote-endpoint =
+> +							<&cluster1_funnel_in_port0>;
+> +					};
+>   				};
+>   			};
+>   		};
+> @@ -644,10 +641,12 @@
+>   			clocks = <&ext_26m>;
+>   			clock-names = "apb_pclk";
+>   
+> -			port {
+> -				etm5_out: endpoint {
+> -					remote-endpoint =
+> -						<&cluster1_funnel_in_port1>;
+> +			out-ports {
+> +				port {
+> +					etm5_out: endpoint {
+> +						remote-endpoint =
+> +							<&cluster1_funnel_in_port1>;
+> +					};
+>   				};
+>   			};
+>   		};
+> @@ -659,10 +658,12 @@
+>   			clocks = <&ext_26m>;
+>   			clock-names = "apb_pclk";
+>   
+> -			port {
+> -				etm6_out: endpoint {
+> -					remote-endpoint =
+> -						<&cluster1_funnel_in_port2>;
+> +			out-ports {
+> +				port {
+> +					etm6_out: endpoint {
+> +						remote-endpoint =
+> +							<&cluster1_funnel_in_port2>;
+> +					};
+>   				};
+>   			};
+>   		};
+> @@ -674,10 +675,12 @@
+>   			clocks = <&ext_26m>;
+>   			clock-names = "apb_pclk";
+>   
+> -			port {
+> -				etm7_out: endpoint {
+> -					remote-endpoint =
+> -						<&cluster1_funnel_in_port3>;
+> +			out-ports {
+> +				port {
+> +					etm7_out: endpoint {
+> +						remote-endpoint =
+> +							<&cluster1_funnel_in_port3>;
+> +					};
+>   				};
+>   			};
+>   		};
+> 
