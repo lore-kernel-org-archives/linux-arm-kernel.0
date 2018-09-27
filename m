@@ -1,46 +1,51 @@
-From: yong.deng@magewell.com (Yong)
-Date: Thu, 27 Sep 2018 08:59:23 +0800
-Subject: [PATCH v11 1/2] dt-bindings: media: Add Allwinner V3s Camera
- Sensor Interface (CSI)
-In-Reply-To: <1568838.d8CnAYTeDB@avalon>
-References: <1537951204-24672-1-git-send-email-yong.deng@magewell.com>
- <7197338.mhOH8fQaEM@avalon> <20180926103547.5ubb6xjkl7xngmfg@flea>
- <1568838.d8CnAYTeDB@avalon>
-Message-ID: <20180927085923.cf24d7e2fba7f38637aff7c4@magewell.com>
+From: leilk.liu@mediatek.com (lei liu)
+Date: Thu, 27 Sep 2018 09:12:12 +0800
+Subject: [PATCH v3 1/3] spis: mediatek: add bindings for Mediatek MT2712
+ soc platform
+In-Reply-To: <20180926223318.GA18703@bogus>
+References: <1537150762-7072-1-git-send-email-leilk.liu@mediatek.com>
+ <1537150762-7072-2-git-send-email-leilk.liu@mediatek.com>
+ <20180926223318.GA18703@bogus>
+Message-ID: <1538010732.27607.25.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, 26 Sep 2018 13:38:08 +0300
-Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote:
-
-> Hi Maxime,
-> 
-> On Wednesday, 26 September 2018 13:35:47 EEST maxime.ripard at bootlin.com wrote:
-> > On Wed, Sep 26, 2018 at 01:19:34PM +0300, Laurent Pinchart wrote:
-> > > > +Endpoint node properties for CSI1
-> > > > +---------------------------------
-> > > 
-> > > Should you list the CSI0 properties as well ? As the driver in patch 2/2
-> > > doesn't support the CSI-2 interface I assume you have left out CSI0 for
-> > > now, but it should still be listed in the bindings. I'm fine with fixing
-> > > this as a follow-up patch to avoid missing the v4.20 merge window, but if
-> > > you end up resubmitting the series, could you please address the problem
-> > > ?
+On Wed, 2018-09-26 at 17:33 -0500, Rob Herring wrote:
+> On Mon, Sep 17, 2018 at 10:19:20AM +0800, Leilk Liu wrote:
+> > This patch adds a DT binding documentation for the MT2712 soc.
 > > 
-> > That driver is not available, and the documentation isn't either, so
-> > there's no easy way to tell which properties are going to be needed
-> > before doing the actual work of reverse engineering it and writing a
-> > driver for it. Unfortunately...
+> > Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/spi/spi-slave-mt27xx.txt   |   32 ++++++++++++++++++++
+> >  1 file changed, 32 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/spi/spi-slave-mt27xx.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/spi/spi-slave-mt27xx.txt b/Documentation/devicetree/bindings/spi/spi-slave-mt27xx.txt
+> > new file mode 100644
+> > index 0000000..09cb2c4
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/spi/spi-slave-mt27xx.txt
+> > @@ -0,0 +1,32 @@
+> > +Binding for MTK SPI Slave controller
+> > +
+> > +Required properties:
+> > +- compatible: should be one of the following.
+> > +    - mediatek,mt2712-spi-slave: for mt2712 platforms
+> > +- reg: Address and length of the register set for the device.
+> > +- interrupts: Should contain spi interrupt.
+> > +- clocks: phandles to input clocks.
+> > +  It's clock gate, and should be <&infracfg CLK_INFRA_AO_SPI1>.
+> > +- clock-names: should be "spi" for the clock gate.
+> > +
+> > +Optional properties:
+> > +- assigned-clocks: it's mux clock, should be <&topckgen CLK_TOP_SPISLV_SEL>.
+> > +- assigned-clock-parents: parent of mux clock.
+> > +  It's PLL, and should be on of the following.
 > 
-> While DT bindings should be independent from driver implementations, I agree 
-> it's difficult to develop good bindings without hardware documentation and 
-> without at least one working driver implementation.
+> s/on/one/
 > 
-> How about just explicitly stating that these bindings don't support CSI0 yet ?
+> With that fixed,
+> 
+> Reviewed-by: Rob Herring <robh@kernel.org>
 
-OK.
-
-Thanks,
-Yong
+Yes, it's a mistake, I'll fix it, thanks
