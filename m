@@ -1,169 +1,58 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 27 Sep 2018 01:49:39 +0200
-Subject: [PATCH V2 03/27] mmc: mmci: convert dma_setup callback to return
- an int
-In-Reply-To: <15c31e3b-646a-f5db-b45a-3e2f556d9fd5@st.com>
-References: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
- <1537523181-14578-4-git-send-email-ludovic.Barre@st.com>
- <CAPDyKFqnN0gg9WsbNPQcodqUXJmFEzMM+ST36s6oEZ2OPoONug@mail.gmail.com>
- <15c31e3b-646a-f5db-b45a-3e2f556d9fd5@st.com>
-Message-ID: <CAPDyKFq2FmggcuRRYmeW-ChL-SiEboCTCu745kZHGeNLi_qQjg@mail.gmail.com>
+From: Jason@zx2c4.com (Jason A. Donenfeld)
+Date: Thu, 27 Sep 2018 02:04:56 +0200
+Subject: [PATCH net-next v6 07/23] zinc: ChaCha20 ARM and ARM64
+ implementations
+In-Reply-To: <CAKv+Gu-WDt8f9qVjLDRPHL7THS0BjtKHThw2RMfHbWBT8Hs8aQ@mail.gmail.com>
+References: <20180925145622.29959-1-Jason@zx2c4.com>
+ <20180925145622.29959-8-Jason@zx2c4.com>
+ <CAKv+Gu9mVAfdBvOMCFqRJj+wBiWu3JVOgPZdkcdjzqSdQQ5Jrw@mail.gmail.com>
+ <CAHmME9r9KppoFwwNVpzpYbU+9dCPzb7Pit+4iRa4MY_ouJBWrA@mail.gmail.com>
+ <CAKv+Gu8ih-TsASRGqK+ST_5+EQ0=Zo-zhGCadOdGyPjucMFTCg@mail.gmail.com>
+ <CAKv+Gu8w74dUSEAGxxh=C6To6F=bSm8DjiExUPmh_LUyhoDLhg@mail.gmail.com>
+ <CAHmME9pbRabkGjNh-65S9qBNNS1GLJSwZ_tTM507S_Ezr1=QLg@mail.gmail.com>
+ <CAHmME9ru=kJO8QiW+uNNgt5NgFVZzRsQ4tNSgo+f+KfHs3fAKQ@mail.gmail.com>
+ <CAKv+Gu-WDt8f9qVjLDRPHL7THS0BjtKHThw2RMfHbWBT8Hs8aQ@mail.gmail.com>
+Message-ID: <CAHmME9qNn5aRgtbV3bAsz3xW1A49a7RMMkOzGruBUPzLVUxVNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 September 2018 at 18:12, Ludovic BARRE <ludovic.barre@st.com> wrote:
-> hi Ulf
+On Wed, Sep 26, 2018 at 5:52 PM Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
 >
+> On Wed, 26 Sep 2018 at 17:50, Jason A. Donenfeld <Jason@zx2c4.com> wrote:
+> >
+> > On Wed, Sep 26, 2018 at 5:45 PM Jason A. Donenfeld <Jason@zx2c4.com> wrote:
+> > > So what you have in mind is something like calling simd_relax() every
+> > > 4096 bytes or so?
+> >
+> > That was actually pretty easy, putting together both of your suggestions:
+> >
+> > static inline bool chacha20_arch(struct chacha20_ctx *state, u8 *dst,
+> >                  u8 *src, size_t len,
+> >                  simd_context_t *simd_context)
+> > {
+> >     while (len > PAGE_SIZE) {
+> >         chacha20_arch(state, dst, src, PAGE_SIZE, simd_context);
+> >         len -= PAGE_SIZE;
+> >         src += PAGE_SIZE;
+> >         dst += PAGE_SIZE;
+> >         simd_relax(simd_context);
+> >     }
+> >     if (IS_ENABLED(CONFIG_KERNEL_MODE_NEON) && chacha20_use_neon &&
+> >         len >= CHACHA20_BLOCK_SIZE * 3 && simd_use(simd_context))
+> >         chacha20_neon(dst, src, len, state->key, state->counter);
+> >     else
+> >         chacha20_arm(dst, src, len, state->key, state->counter);
+> >
+> >     state->counter[0] += (len + 63) / 64;
+> >     return true;
+> > }
 >
-> On 09/24/2018 04:28 PM, Ulf Hansson wrote:
->>
->> On 21 September 2018 at 11:45, Ludovic Barre <ludovic.Barre@st.com> wrote:
->>>
->>> From: Ludovic Barre <ludovic.barre@st.com>
->>>
->>> This patch converts dma_setup callback to return an integer
->>> This patch is needed to prepare sdmmc variant with internal dma
->>>
->>> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
->>> ---
->>>   drivers/mmc/host/mmci.c          | 14 ++++++++++----
->>>   drivers/mmc/host/mmci.h          |  2 +-
->>>   drivers/mmc/host/mmci_qcom_dml.c |  6 ++++--
->>>   3 files changed, 15 insertions(+), 7 deletions(-)
->>>
->>> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
->>> index cbd67bc..2f845f3 100644
->>> --- a/drivers/mmc/host/mmci.c
->>> +++ b/drivers/mmc/host/mmci.c
->>> @@ -415,7 +415,7 @@ static void mmci_init_sg(struct mmci_host *host,
->>> struct mmc_data *data)
->>>    * no custom DMA interfaces are supported.
->>>    */
->>>   #ifdef CONFIG_DMA_ENGINE
->>> -static void mmci_dma_setup(struct mmci_host *host)
->>> +static int mmci_dma_setup(struct mmci_host *host)
->>>   {
->>>          const char *rxname, *txname;
->>>
->>> @@ -466,7 +466,9 @@ static void mmci_dma_setup(struct mmci_host *host)
->>>          }
->>>
->>>          if (host->ops && host->ops->dma_setup)
->>> -               host->ops->dma_setup(host);
->>> +               return host->ops->dma_setup(host);
->>> +
->>
->>
->> Looks like you need to implement a error handling, instead of just
->> returning the error code.
+> Nice one :-)
 >
->
-> yes, today if a dma_setup is defined, we can't fallback to pio mode.
-> A use_dma variable (defined in mmci_host) could be setted follow the return
-> code of ops->dma_setup
->
-> example:
->
-> void mmci_dma_setup(struct mmci_host *host)
-> {
->         int err;
->
->         if (!host->ops || !host->ops->dma_setup)
->                 return;
->
->         err = host->ops->dma_setup(host);
->         if (err)
->                 return;
->
->         host->use_dma = true;
->
->         /* initialize pre request cookie */
->         host->next_cookie = 1;
-> }
->
-> use_dma variable could be check by mmci_host_ops variant functions.
->
-> are you agree with this proposal?
->
+> This works for me (but perhaps add a comment as well)
 
-Yep, makes sense!
-
->
->>
->>> +       return 0;
->>>   }
->>>
->>>   /*
->>> @@ -741,8 +743,10 @@ static void mmci_post_request(struct mmc_host *mmc,
->>> struct mmc_request *mrq,
->>>   static void mmci_get_next_data(struct mmci_host *host, struct mmc_data
->>> *data)
->>>   {
->>>   }
->>> -static inline void mmci_dma_setup(struct mmci_host *host)
->>> +
->>> +static inline int mmci_dma_setup(struct mmci_host *host)
->>>   {
->>> +       return 0;
->>>   }
->>>
->>>   static inline void mmci_dma_release(struct mmci_host *host)
->>> @@ -1796,7 +1800,9 @@ static int mmci_probe(struct amba_device *dev,
->>>                   amba_rev(dev), (unsigned long long)dev->res.start,
->>>                   dev->irq[0], dev->irq[1]);
->>>
->>> -       mmci_dma_setup(host);
->>> +       ret = mmci_dma_setup(host);
->>> +       if (ret)
->>> +               goto clk_disable;
->>>
->>>          pm_runtime_set_autosuspend_delay(&dev->dev, 50);
->>>          pm_runtime_use_autosuspend(&dev->dev);
->>> diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
->>> index 21aaf9a..06299ac 100644
->>> --- a/drivers/mmc/host/mmci.h
->>> +++ b/drivers/mmc/host/mmci.h
->>> @@ -273,7 +273,7 @@ struct variant_data {
->>>
->>>   /* mmci variant callbacks */
->>>   struct mmci_host_ops {
->>> -       void (*dma_setup)(struct mmci_host *host);
->>> +       int (*dma_setup)(struct mmci_host *host);
->>>   };
->>>
->>>   struct mmci_host_next {
->>> diff --git a/drivers/mmc/host/mmci_qcom_dml.c
->>> b/drivers/mmc/host/mmci_qcom_dml.c
->>> index be3fab5..1bb59cf 100644
->>> --- a/drivers/mmc/host/mmci_qcom_dml.c
->>> +++ b/drivers/mmc/host/mmci_qcom_dml.c
->>> @@ -119,7 +119,7 @@ static int of_get_dml_pipe_index(struct device_node
->>> *np, const char *name)
->>>   }
->>>
->>>   /* Initialize the dml hardware connected to SD Card controller */
->>> -static void qcom_dma_setup(struct mmci_host *host)
->>> +static int qcom_dma_setup(struct mmci_host *host)
->>>   {
->>>          u32 config;
->>>          void __iomem *base;
->>> @@ -131,7 +131,7 @@ static void qcom_dma_setup(struct mmci_host *host)
->>>
->>>          if (producer_id < 0 || consumer_id < 0) {
->>>                  host->variant->qcom_dml = false;
->>
->>
->> It seems like the existing code is an attempt to fallback to use pio
->> mode. However, I doubt it works as is.
->
->
-> oops, I seen that like a variant identification issue, so if it's a
-> fallback to pio mode it doesn't work.
-
-Right. Let's see if we can get some input from Srinivas, else I will
-run some test on my 410c board to see the behavior - very soon.
-
-[...]
-
-Kind regards
-Uffe
+As elegant as my quick recursive solution was, gcc produced kind of
+bad code from it, as you might expect. So I've implemented this using
+a boring old loop that works the way it's supposed to. This is marked
+for v7.
