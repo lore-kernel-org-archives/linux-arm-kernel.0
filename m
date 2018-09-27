@@ -1,65 +1,59 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Thu, 27 Sep 2018 23:03:19 +0530
-Subject: [PATCH 08/12] drm/sun4i: sun6i_mipi_dsi: Refactor vertical video
- start delay
-In-Reply-To: <20180927171451.7iqt2nt2log5qojf@flea>
+Date: Thu, 27 Sep 2018 23:06:50 +0530
+Subject: [PATCH 05/12] drm/sun4i: sun6i_mipi_dsi: Add DSI Generic short
+ write 2 param transfer
+In-Reply-To: <20180927171831.2nfybgn2xmc4vrgt@flea>
 References: <20180927114850.24565-1-jagan@amarulasolutions.com>
- <20180927114850.24565-9-jagan@amarulasolutions.com>
- <20180927171451.7iqt2nt2log5qojf@flea>
-Message-ID: <CAMty3ZDxpLwVDsgVMjX+6+uz89sQ1aZaXHHZ+-5aogrA4MHmqw@mail.gmail.com>
+ <20180927114850.24565-6-jagan@amarulasolutions.com>
+ <20180927171831.2nfybgn2xmc4vrgt@flea>
+Message-ID: <CAMty3ZCD4ArjhPJYxv3ztWXdnby8YXQ73QqoVNoHFBc-DAxx_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 27, 2018 at 10:44 PM Maxime Ripard
+On Thu, Sep 27, 2018 at 10:48 PM Maxime Ripard
 <maxime.ripard@bootlin.com> wrote:
 >
-> On Thu, Sep 27, 2018 at 05:18:46PM +0530, Jagan Teki wrote:
-> > Accordingly to BPI-M64-bsp DE DSI code Video start delay
-> > can be computed by subtracting total vertical timing with
-> > front porch timing and with adding 1 delay line for TCON.
->
-> This is what the current code is doing as well.
-
-The current code
-return mode->vtotal - (mode->vsync_end - mode->vdisplay) + 1;
-
-(mode->vsync_end - mode->vdisplay) = front porch + sync
-
-but I'm updating here only front porch.
-
->
-> > This patch simply add the start_delay logic from BPI-M64-bsp,
-> > w/o this new computation, the DSI on A64 encounter vblank time out.
+> On Thu, Sep 27, 2018 at 05:18:43PM +0530, Jagan Teki wrote:
+> > Short transfer write support for DCS and Generic transfer types
+> > share similar way to process command sequence in DSI block so
+> > add generic write 2 param transfer type macro so-that the panels
+> > which are requesting similar transfer type may process properly.
 > >
-> > [CRTC:36:crtc-0] vblank wait timed out
+> > Also added error check for unsupporting transfer types this make
+> > debugging easy for new transfer types.
 > >
 > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 > > ---
-> >  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 12 +++++++++++-
-> >  1 file changed, 11 insertions(+), 1 deletion(-)
+> >  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 3 +++
+> >  1 file changed, 3 insertions(+)
 > >
 > > diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > index 9918fdb990ff..217db74c6dc3 100644
+> > index 156b371243c6..1c7e42015645 100644
 > > --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
 > > +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > @@ -358,7 +358,17 @@ static void sun6i_dsi_inst_init(struct sun6i_dsi *dsi,
-> >  static u16 sun6i_dsi_get_video_start_delay(struct sun6i_dsi *dsi,
-> >                                          struct drm_display_mode *mode)
-> >  {
-> > -     return mode->vtotal - (mode->vsync_end - mode->vdisplay) + 1;
-> > +     u32 vfp = mode->vsync_start - mode->vdisplay;
+> > @@ -869,6 +869,7 @@ static ssize_t sun6i_dsi_transfer(struct mipi_dsi_host *host,
+> >                    SUN6I_DSI_CMD_CTL_TX_FLAG);
+> >
+> >       switch (msg->type) {
+> > +     case MIPI_DSI_GENERIC_SHORT_WRITE_2_PARAM:
+> >       case MIPI_DSI_DCS_SHORT_WRITE:
+> >       case MIPI_DSI_DCS_SHORT_WRITE_PARAM:
+>
+> You should order them by alphabetical order.
 
-let me explain this.
+I just placed it with transfer code, ok will add it alphabetical
 
-Actual code from Allwinner
-u32 vfp = panel->lcd_vt - panel->lcd_y - panel->lcd_vbp;
+>
+> >               ret = sun6i_dsi_dcs_write_short(dsi, msg);
+> > @@ -885,6 +886,8 @@ static ssize_t sun6i_dsi_transfer(struct mipi_dsi_host *host,
+> >               }
+> >
+> >       default:
+> > +             dev_err(dsi->dev, "unsupported message type 0x%02x\n",
+> > +                     msg->type);
+>
+> And this isn't an error check.
 
-So,
-
-=> (panel->lcd_vt - panel->lcd_y) - (panel->lcd_vbp)
-=> (front porch + sync + back porch) - (back porch + sync)
-=> front porch + sync + back porch - back porch - sync
-=> front porch
-=> mode->vsync_start - mode->vdisplay
-
-Hope it clear.
+But unsupported message type by sun6i_dsi should be an error
+eventually isn't it? and we can easily figure out where the error
+trigger.
