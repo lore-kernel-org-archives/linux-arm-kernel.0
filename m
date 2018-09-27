@@ -1,227 +1,35 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 27 Sep 2018 19:03:47 +0200
-Subject: [RESEND] dt-bindings: clock: samsung: Add SPDX license identifiers
-Message-ID: <20180927170347.12909-1-krzk@kernel.org>
+From: Jason@zx2c4.com (Jason A. Donenfeld)
+Date: Thu, 27 Sep 2018 19:06:50 +0200
+Subject: [PATCH net-next v6 07/23] zinc: ChaCha20 ARM and ARM64
+ implementations
+In-Reply-To: <BB2CD8D5-E7FF-4D25-8C83-F64960253248@amacapital.net>
+References: <20180925145622.29959-1-Jason@zx2c4.com>
+ <20180925145622.29959-8-Jason@zx2c4.com>
+ <CAKv+Gu9mVAfdBvOMCFqRJj+wBiWu3JVOgPZdkcdjzqSdQQ5Jrw@mail.gmail.com>
+ <CAHmME9r9KppoFwwNVpzpYbU+9dCPzb7Pit+4iRa4MY_ouJBWrA@mail.gmail.com>
+ <CAKv+Gu8ih-TsASRGqK+ST_5+EQ0=Zo-zhGCadOdGyPjucMFTCg@mail.gmail.com>
+ <CAKv+Gu8w74dUSEAGxxh=C6To6F=bSm8DjiExUPmh_LUyhoDLhg@mail.gmail.com>
+ <CAHmME9pbRabkGjNh-65S9qBNNS1GLJSwZ_tTM507S_Ezr1=QLg@mail.gmail.com>
+ <CAHmME9ru=kJO8QiW+uNNgt5NgFVZzRsQ4tNSgo+f+KfHs3fAKQ@mail.gmail.com>
+ <CAKv+Gu-WDt8f9qVjLDRPHL7THS0BjtKHThw2RMfHbWBT8Hs8aQ@mail.gmail.com>
+ <CAHmME9qNn5aRgtbV3bAsz3xW1A49a7RMMkOzGruBUPzLVUxVNg@mail.gmail.com>
+ <CAHmME9rN3-7Mj5JQqt2EFPauG9vjkN5pQn3tPiJY4fPiwksaDA@mail.gmail.com>
+ <CAHmME9pBRu4hC5=Ef62R_nWOi3jTegxvxNrR8qDM+VfO=2t8Tg@mail.gmail.com>
+ <BB2CD8D5-E7FF-4D25-8C83-F64960253248@amacapital.net>
+Message-ID: <CAHmME9oXBin5NyVTKfV2efSzztW4Snno+sZoWJr-ieDLNVgVGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace GPL license statements with SPDX license identifiers (GPL-2.0).
+On Thu, Sep 27, 2018 at 6:27 PM Andy Lutomirski <luto@amacapital.net> wrote:
+> I would add another consideration: if you can get better latency with negligible overhead (0.1%? 0.05%), then that might make sense too. For example, it seems plausible that checking need_resched() every few blocks adds basically no overhead, and the SIMD helpers could do this themselves or perhaps only ever do a block at a time.
+>
+> need_resched() costs a cacheline access, but it?s usually a hot cacheline, and the actual check is just whether a certain bit in memory is set.
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
----
- include/dt-bindings/clock/exynos3250.h     | 5 +----
- include/dt-bindings/clock/exynos4.h        | 7 ++-----
- include/dt-bindings/clock/exynos5250.h     | 7 ++-----
- include/dt-bindings/clock/exynos5260-clk.h | 7 ++-----
- include/dt-bindings/clock/exynos5410.h     | 7 ++-----
- include/dt-bindings/clock/exynos5420.h     | 7 ++-----
- include/dt-bindings/clock/exynos5433.h     | 5 +----
- include/dt-bindings/clock/exynos7-clk.h    | 7 ++-----
- include/dt-bindings/clock/s3c2410.h        | 5 +----
- include/dt-bindings/clock/s3c2412.h        | 5 +----
- include/dt-bindings/clock/s3c2443.h        | 5 +----
- 11 files changed, 17 insertions(+), 50 deletions(-)
-
-diff --git a/include/dt-bindings/clock/exynos3250.h b/include/dt-bindings/clock/exynos3250.h
-index c796ff02ceeb..fe8214017b46 100644
---- a/include/dt-bindings/clock/exynos3250.h
-+++ b/include/dt-bindings/clock/exynos3250.h
-@@ -1,11 +1,8 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-  * 	Author: Tomasz Figa <t.figa@samsung.com>
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-  * Device Tree binding constants for Samsung Exynos3250 clock controllers.
-  */
- 
-diff --git a/include/dt-bindings/clock/exynos4.h b/include/dt-bindings/clock/exynos4.h
-index f59ea85d77bd..a0439ce8e8d3 100644
---- a/include/dt-bindings/clock/exynos4.h
-+++ b/include/dt-bindings/clock/exynos4.h
-@@ -1,13 +1,10 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-  * Author: Andrzej Hajda <a.hajda@samsung.com>
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-  * Device Tree binding constants for Exynos4 clock controller.
--*/
-+ */
- 
- #ifndef _DT_BINDINGS_CLOCK_EXYNOS_4_H
- #define _DT_BINDINGS_CLOCK_EXYNOS_4_H
-diff --git a/include/dt-bindings/clock/exynos5250.h b/include/dt-bindings/clock/exynos5250.h
-index 15508adcdfde..bc8a3c53a54b 100644
---- a/include/dt-bindings/clock/exynos5250.h
-+++ b/include/dt-bindings/clock/exynos5250.h
-@@ -1,13 +1,10 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-  * Author: Andrzej Hajda <a.hajda@samsung.com>
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-  * Device Tree binding constants for Exynos5250 clock controller.
--*/
-+ */
- 
- #ifndef _DT_BINDINGS_CLOCK_EXYNOS_5250_H
- #define _DT_BINDINGS_CLOCK_EXYNOS_5250_H
-diff --git a/include/dt-bindings/clock/exynos5260-clk.h b/include/dt-bindings/clock/exynos5260-clk.h
-index a4bac9a1764f..98a58cbd81b2 100644
---- a/include/dt-bindings/clock/exynos5260-clk.h
-+++ b/include/dt-bindings/clock/exynos5260-clk.h
-@@ -1,13 +1,10 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-  * Author: Rahul Sharma <rahul.sharma@samsung.com>
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-  * Provides Constants for Exynos5260 clocks.
--*/
-+ */
- 
- #ifndef _DT_BINDINGS_CLK_EXYNOS5260_H
- #define _DT_BINDINGS_CLK_EXYNOS5260_H
-diff --git a/include/dt-bindings/clock/exynos5410.h b/include/dt-bindings/clock/exynos5410.h
-index 6cb4e90f81fc..f179eabbcdb7 100644
---- a/include/dt-bindings/clock/exynos5410.h
-+++ b/include/dt-bindings/clock/exynos5410.h
-@@ -1,13 +1,10 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-  * Copyright (c) 2016 Krzysztof Kozlowski
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-  * Device Tree binding constants for Exynos5421 clock controller.
--*/
-+ */
- 
- #ifndef _DT_BINDINGS_CLOCK_EXYNOS_5410_H
- #define _DT_BINDINGS_CLOCK_EXYNOS_5410_H
-diff --git a/include/dt-bindings/clock/exynos5420.h b/include/dt-bindings/clock/exynos5420.h
-index 2740ae0424a9..355f469943f1 100644
---- a/include/dt-bindings/clock/exynos5420.h
-+++ b/include/dt-bindings/clock/exynos5420.h
-@@ -1,13 +1,10 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-  * Author: Andrzej Hajda <a.hajda@samsung.com>
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-  * Device Tree binding constants for Exynos5420 clock controller.
--*/
-+ */
- 
- #ifndef _DT_BINDINGS_CLOCK_EXYNOS_5420_H
- #define _DT_BINDINGS_CLOCK_EXYNOS_5420_H
-diff --git a/include/dt-bindings/clock/exynos5433.h b/include/dt-bindings/clock/exynos5433.h
-index be39d23e6a32..98bd85ce1e45 100644
---- a/include/dt-bindings/clock/exynos5433.h
-+++ b/include/dt-bindings/clock/exynos5433.h
-@@ -1,10 +1,7 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-  * Author: Chanwoo Choi <cw00.choi@samsung.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-  */
- 
- #ifndef _DT_BINDINGS_CLOCK_EXYNOS5433_H
-diff --git a/include/dt-bindings/clock/exynos7-clk.h b/include/dt-bindings/clock/exynos7-clk.h
-index 10c558611085..fce33c7050c8 100644
---- a/include/dt-bindings/clock/exynos7-clk.h
-+++ b/include/dt-bindings/clock/exynos7-clk.h
-@@ -1,11 +1,8 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Copyright (c) 2014 Samsung Electronics Co., Ltd.
-  * Author: Naveen Krishna Ch <naveenkrishna.ch@gmail.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
-+ */
- 
- #ifndef _DT_BINDINGS_CLOCK_EXYNOS7_H
- #define _DT_BINDINGS_CLOCK_EXYNOS7_H
-diff --git a/include/dt-bindings/clock/s3c2410.h b/include/dt-bindings/clock/s3c2410.h
-index 352a7673fc69..0fb65c3f2f59 100644
---- a/include/dt-bindings/clock/s3c2410.h
-+++ b/include/dt-bindings/clock/s3c2410.h
-@@ -1,10 +1,7 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Copyright (c) 2013 Heiko Stuebner <heiko@sntech.de>
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-  * Device Tree binding constants clock controllers of Samsung S3C2410 and later.
-  */
- 
-diff --git a/include/dt-bindings/clock/s3c2412.h b/include/dt-bindings/clock/s3c2412.h
-index aac1dcfda81c..b4656156cc0f 100644
---- a/include/dt-bindings/clock/s3c2412.h
-+++ b/include/dt-bindings/clock/s3c2412.h
-@@ -1,10 +1,7 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Copyright (c) 2013 Heiko Stuebner <heiko@sntech.de>
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-  * Device Tree binding constants clock controllers of Samsung S3C2412.
-  */
- 
-diff --git a/include/dt-bindings/clock/s3c2443.h b/include/dt-bindings/clock/s3c2443.h
-index f3ba68a25ecb..a9d2f105d536 100644
---- a/include/dt-bindings/clock/s3c2443.h
-+++ b/include/dt-bindings/clock/s3c2443.h
-@@ -1,10 +1,7 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Copyright (c) 2013 Heiko Stuebner <heiko@sntech.de>
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-  * Device Tree binding constants clock controllers of Samsung S3C2443 and later.
-  */
- 
--- 
-2.17.1
+Yes you're right, I do plan to check quite often, rather than seldom,
+for this reason. I've been toying with the idea of instead processing
+65k (maximum size of a UDP packet) at a time before checking
+need_resched(), but armed with the 20?s figure, this isn't remotely
+possible on most hardware. So I'll stick with the original
+conservative plan of checking very often, and not making things
+different from the aspects worked out by the present crypto API in
+this regard.
