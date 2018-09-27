@@ -1,7 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 27 Sep 2018 22:59:38 +0200
-Subject: [GIT PULL 1/5] dt-bindings: Changes for v4.20-rc1
-Message-ID: <20180927205942.30878-1-thierry.reding@gmail.com>
+Date: Thu, 27 Sep 2018 22:59:40 +0200
+Subject: [GIT PULL 3/5] firmware: tegra: Changes for v4.20-rc1
+In-Reply-To: <20180927205942.30878-1-thierry.reding@gmail.com>
+References: <20180927205942.30878-1-thierry.reding@gmail.com>
+Message-ID: <20180927205942.30878-3-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,28 +15,24 @@ The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 
 are available in the Git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.20-dt-bindings
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.20-firmware
 
-for you to fetch changes up to d9be10edf7d6040468f89824df0dfcfcbf3a693b:
+for you to fetch changes up to cd40f6ff124ce4a020d589f5c2727a69dd1ca176:
 
-  dt-bindings: Add Tegra PMC pad configuration bindings (2018-08-27 12:21:43 +0200)
+  firmware: tegra: bpmp: Implement suspend/resume support (2018-09-26 16:02:55 +0200)
 
 Thanks,
 Thierry
 
 ----------------------------------------------------------------
-dt-bindings: Changes for v4.20-rc1
+firmware: tegra: Changes for v4.20-rc1
 
-This contains the PMC pad configuration bindings which are used to
-control the voltage of various pads found on Tegra chips. Among other
-things this is required to enable faster modes on SDHCI.
+This contains a fix for suspend/resume support for the BPMP found on
+Tegra186 and Tegra194.
 
 ----------------------------------------------------------------
-Aapo Vienamo (1):
-      dt-bindings: Add Tegra PMC pad configuration bindings
+Thierry Reding (1):
+      firmware: tegra: bpmp: Implement suspend/resume support
 
- .../bindings/arm/tegra/nvidia,tegra186-pmc.txt     |  93 +++++++++++++++++++
- .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      | 103 +++++++++++++++++++++
- include/dt-bindings/pinctrl/pinctrl-tegra-io-pad.h |  18 ++++
- 3 files changed, 214 insertions(+)
- create mode 100644 include/dt-bindings/pinctrl/pinctrl-tegra-io-pad.h
+ drivers/firmware/tegra/bpmp.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
