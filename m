@@ -1,47 +1,69 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Thu, 27 Sep 2018 21:50:34 +0530
-Subject: [PATCH 06/12] drm/sun4i: sun6i_mipi_dsi: Fix VBP size calculation
-In-Reply-To: <20180927152126.vovnvwmqdfpuxgdm@flea>
+Date: Thu, 27 Sep 2018 21:56:32 +0530
+Subject: [linux-sunxi] Re: [PATCH 04/12] drm/sun4i: sun6i_mipi_dsi: Enable
+ missing DSI bus clock
+In-Reply-To: <CAGb2v67pKgORe7uo6r6F+xaVi=Q-p6_DKotZJD7P=46Z=4RhEA@mail.gmail.com>
 References: <20180927114850.24565-1-jagan@amarulasolutions.com>
- <20180927114850.24565-7-jagan@amarulasolutions.com>
- <20180927152126.vovnvwmqdfpuxgdm@flea>
-Message-ID: <CAMty3ZABx9Fod5W_T7JciZEsn7jGvuM-LsBFATdA=hQ2CVwELw@mail.gmail.com>
+ <20180927114850.24565-5-jagan@amarulasolutions.com>
+ <CAGb2v66No3-AODYCCGifBrm9uvPjaNdR2W5MDQdazRAPomT9CQ@mail.gmail.com>
+ <CAMty3ZBUQKVLJsmkU=hjaO_O5bhetDfAh9-7iLkUqOznVc0KyA@mail.gmail.com>
+ <CAGb2v67pKgORe7uo6r6F+xaVi=Q-p6_DKotZJD7P=46Z=4RhEA@mail.gmail.com>
+Message-ID: <CAMty3ZAsF=uSJqj2L9ZS8N3CqcSUPzFSdtH8WtZPTg3m-K8COQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 27, 2018 at 8:51 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+On Thu, Sep 27, 2018 at 7:47 PM Chen-Yu Tsai <wens@csie.org> wrote:
 >
-> On Thu, Sep 27, 2018 at 05:18:44PM +0530, Jagan Teki wrote:
-> > According to horizontal and vertical timings are defined
-> > per the diagram from include/drm/drm_modes.h
+> On Thu, Sep 27, 2018 at 9:44 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
 > >
-> > Back porch = [hv]total - [hv]sync_end
+> > On Thu, Sep 27, 2018 at 6:13 PM Chen-Yu Tsai <wens@csie.org> wrote:
+> > >
+> > > Hi,
+> > >
+> > > On Thu, Sep 27, 2018 at 7:49 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
+> > > >
+> > > > DSI bus_clk is already available in sun6i_dsi but missed to
+> > > > get the clk and process for enable/disable.
+> > > >
+> > > > This patch add support for it.
+> > > >
+> > > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> > > > ---
+> > > >  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 8 ++++++++
+> > > >  1 file changed, 8 insertions(+)
+> > > >
+> > > > diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> > > > index 8e9c76febca2..156b371243c6 100644
+> > > > --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> > > > +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> > > > @@ -1004,6 +1004,12 @@ static int sun6i_dsi_probe(struct platform_device *pdev)
+> > > >                 return PTR_ERR(dsi->reset);
+> > > >         }
+> > > >
+> > > > +       dsi->bus_clk = devm_clk_get(dev, "bus");
+> > > > +       if (IS_ERR(dsi->bus_clk)) {
+> > > > +               dev_err(dev, "Couldn't get the DSI bus clock\n");
+> > > > +               return PTR_ERR(dsi->bus_clk);
+> > > > +       }
+> > > > +
+> > >
+> > > The DSI driver uses devm_regmap_init_mmio_clk, which enables the
+> > > clock behind the scenes when regmap access needs it enabled.
+> > >
+> > > Did you have any issues without this patch?
 > >
-> > So, update SUN6I_DSI_BASIC_SIZE0_VBP calculation as
-> > mode->vtotal - mode->vsync_end
-> >
-> > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > ---
-> >  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > index 1c7e42015645..599284971ab6 100644
-> > --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > @@ -526,8 +526,8 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
-> >       regmap_write(dsi->regs, SUN6I_DSI_BASIC_SIZE0_REG,
-> >                    SUN6I_DSI_BASIC_SIZE0_VSA(mode->vsync_end -
-> >                                              mode->vsync_start) |
-> > -                  SUN6I_DSI_BASIC_SIZE0_VBP(mode->vsync_start -
-> > -                                            mode->vdisplay));
-> > +                  SUN6I_DSI_BASIC_SIZE0_VBP(mode->vtotal -
-> > +                                            mode->vsync_end));
+> > I'm unable to read register values via devmem, I see all 0's for all
+> > dsi reg space.
 >
-> Is it purely theoretical, or did you find some source that back that?
+> Well that is to be expected given how mmio with clk regmap works.
+> Did you encounter any other problems besides this?
 
-VSA is done as per that, sync_end - sync start would give sync time.
-VBP also done in BPI-M64-bsp[1] which results back porch existing code
-results fron porch.
+no
 
-[1] https://github.com/BPI-SINOVOIP/BPI-M64-bsp/blob/master/linux-sunxi/drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c#L955
+>
+> FYI you can dump regmap contents using /sys/kernel/debug/regmap/*/registers
+
+Thanks, but ccu not using regmap I believe so can't see bus enabled
+bit set via devmap
+# devmem 0x01C20060
+0x33800000
