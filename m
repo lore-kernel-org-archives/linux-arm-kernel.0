@@ -1,69 +1,99 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Thu, 27 Sep 2018 23:15:50 +0530
-Subject: [PATCH 07/12] drm/sun4i: sun6i_mipi_dsi: Fix TCON DRQ set bits
-In-Reply-To: <20180927165853.dpluekbqzat663q7@flea>
-References: <20180927114850.24565-1-jagan@amarulasolutions.com>
- <20180927114850.24565-8-jagan@amarulasolutions.com>
- <20180927165853.dpluekbqzat663q7@flea>
-Message-ID: <CAMty3ZDUxqokipNqnn6c618pebdVBWc8Pfzaz+4+SYqR42Yerg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 27 Sep 2018 13:16:53 -0500
+Subject: [PATCH v4 1/2] dt-bindings: nand: meson: add Amlogic NAND
+ controller driver
+In-Reply-To: <1537433449-65213-2-git-send-email-jianxin.pan@amlogic.com>
+References: <1537433449-65213-1-git-send-email-jianxin.pan@amlogic.com>
+ <1537433449-65213-2-git-send-email-jianxin.pan@amlogic.com>
+Message-ID: <20180927181653.GA22153@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 27, 2018 at 10:28 PM Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
->
-> On Thu, Sep 27, 2018 at 05:18:45PM +0530, Jagan Teki wrote:
-> > TCON DRQ set bits for non-burst DSI mode can computed via
-> > horizontal front porch instead of front porch + sync timings.
-> >
-> > Since there no documentation for TCON_DRQ_REG(0x7c) register
-> > this change is taken as reference from BPI-M64-bsp.
->
-> Detailing more what the issue is would be great.
->
-> > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > ---
-> >  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > index 599284971ab6..9918fdb990ff 100644
-> > --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > @@ -367,9 +367,9 @@ static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
-> >       struct mipi_dsi_device *device = dsi->device;
-> >       u32 val = 0;
->
-> The computation here is in the A64 driver:
->
-> if ((panel->lcd_ht - panel->lcd_x - panel->lcd_hbp) < 21) {
->         dsi_dev[sel]->dsi_tcon_drq.bits.drq_mode = 0;
-> } else {
->         dsi_dev[sel]->dsi_tcon_drq.bits.drq_set =
->                 (panel->lcd_ht-panel->lcd_x-panel->lcd_hbp-20) *
->                 dsi_pixel_bits[panel->lcd_dsi_format]/(8*4);
-> }
->
-> It is testing that the sync + front porch is smaller than 21, and
-> otherwise sets the drq.
->
-> > -     if ((mode->hsync_end - mode->hdisplay) > 20) {
->
-> My code here is testing that the difference between hsync_end and
-> hdisplay is superior to 20, and sets the DRQ if true. The condition is
-> reversed, but otherwise, that difference is the front porch plus the
-> sync length.
+On Thu, Sep 20, 2018 at 04:50:48PM +0800, Jianxin Pan wrote:
+> From: Liang Yang <liang.yang@amlogic.com>
+> 
+> Add Amlogic NAND controller dt-bindings for Meson SoC,
+> Current this driver support GXBB/GXL/AXG platform.
+> 
+> Signed-off-by: Liang Yang <liang.yang@amlogic.com>
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> ---
+>  .../devicetree/bindings/mtd/amlogic,meson-nand.txt | 60 ++++++++++++++++++++++
+>  1 file changed, 60 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt b/Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt
+> new file mode 100644
+> index 0000000..803df2a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt
+> @@ -0,0 +1,60 @@
+> +Amlogic NAND Flash Controller (NFC) for GXBB/GXL/AXG family SoCs
+> +
+> +This file documents the properties in addition to those available in
+> +the MTD NAND bindings.
+> +
+> +Required properties:
+> +- compatible : contains one of:
+> +  - "amlogic,meson-gxl-nfc"
+> +  - "amlogic,meson-axg-nfc"
+> +- clocks     :
+> +	A list of phandle + clock-specifier pairs for the clocks listed
+> +	in clock-names.
+> +
+> +- clock-names: Should contain the following:
+> +	"core" - NFC module gate clock
+> +	"device" - device clock from eMMC sub clock controller
+> +
+> +- amlogic,mmc-syscon	: Required for NAND clocks, it's shared with SD/eMMC
+> +				controller port C
+> +
+> +Optional children nodes:
+> +Children nodes represent the available nand chips.
+> +
+> +Other properties:
+> +see Documentation/devicetree/bindings/mtd/nand.txt for generic bindings.
+> +
+> +Example demonstrate on AXG SoC:
+> +
+> +	sd_emmc_c_clkc: mmc at 7000 {
+> +		compatible = "amlogic,meson-axg-mmc-clkc", "syscon";
+> +		reg = <0x0 0x7000 0x0 0x800>;
+> +		status = "okay";
+> +	};
+> +
+> +	nand: nfc at 7800 {
 
-True, I understand this, but does drq setting here is specific to SoC?
-I thought of finding DRQ in A31 BSP but I couldn't find the code. do
-you have bsp somewhere in github?
+nand-controller at 7800
 
->
-> > +     if ((mode->hsync_start - mode->hdisplay) > 20) {
->
-> However, you are testing for just the front porch, unlike what your
-> commit log is saying, and unlike what allwinner's code is saying. So
-> this deserves some explanation.
+> +		compatible = "amlogic,meson-axg-nfc";
+> +		reg = <0x0 0x7800 0x0 0x100>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		interrupts = <GIC_SPI 34 IRQ_TYPE_EDGE_RISING>;
+> +		status = "disabled";
+> +
+> +		clocks = <&clkc CLKID_SD_EMMC_C>,
+> +			<&sd_emmc_c_clkc CLKID_MMC_DIV>;
+> +		clock-names = "core", "device";
+> +		amlogic,mmc-syscon = <&sd_emmc_c_clkc>;
+> +
+> +		status = "okay";
 
-but A64 is doing this, do you think it's completely A64 specific or
-testing panel with front porch drq?
+Don't show status in examples, plus you have it twice.
+
+> +
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&nand_pins>;
+> +
+> +		nand at 0 {
+> +			reg = <0>;
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +
+> +			nand-on-flash-bbt;
+> +		};
+> +	};
+> -- 
+> 1.9.1
+> 
