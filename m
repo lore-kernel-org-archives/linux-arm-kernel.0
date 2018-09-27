@@ -1,83 +1,121 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 27 Sep 2018 17:15:28 +0100
-Subject: [PATCH 1/7] arm64: Add decoding macros for CP15_32 and CP15_64 traps
+Date: Thu, 27 Sep 2018 17:15:30 +0100
+Subject: [PATCH 3/7] arm64: compat: Add condition code checks and IT advance
 In-Reply-To: <20180927161534.247926-1-marc.zyngier@arm.com>
 References: <20180927161534.247926-1-marc.zyngier@arm.com>
-Message-ID: <20180927161534.247926-2-marc.zyngier@arm.com>
+Message-ID: <20180927161534.247926-4-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, we don't have anything to help decoding ESR_ELx when dealing
-with ESR_ELx_EC_CP15_{32,64}. As we're about to handle some of those,
-let's add some useful macros.
+Here's a /really nice/ part of the architecture: a CP15 access is
+allowed to trap even if it fails its condition check, and SW must
+handle it. This includes decoding the IT state if this happens in
+am IT block. As a consequence, SW must also deal with advancing
+the IT state machine.
 
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/esr.h | 52 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 52 insertions(+)
+ arch/arm64/kernel/traps.c | 85 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 85 insertions(+)
 
-diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
-index ce70c3ffb993..bfd27753a59d 100644
---- a/arch/arm64/include/asm/esr.h
-+++ b/arch/arm64/include/asm/esr.h
-@@ -249,6 +249,58 @@
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 7607283c1ef1..db036a097672 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -531,8 +531,93 @@ static struct sys64_hook sys64_hooks[] = {
  
- #define ESR_ELx_FP_EXC_TFV	(UL(1) << 23)
  
-+/*
-+ * ISS field definitions for CP15 accesses
-+ */
-+#define ESR_ELx_CP15_32_ISS_DIR_MASK	0x1
-+#define ESR_ELx_CP15_32_ISS_DIR_READ	0x1
-+#define ESR_ELx_CP15_32_ISS_DIR_WRITE	0x0
+ #ifdef CONFIG_COMPAT
++#define PSTATE_IT_1_0_SHIFT	25
++#define PSTATE_IT_1_0_MASK	(0x3 << PSTATE_IT_1_0_SHIFT)
++#define PSTATE_IT_7_2_SHIFT	10
++#define PSTATE_IT_7_2_MASK	(0x3f << PSTATE_IT_7_2_SHIFT)
 +
-+#define ESR_ELx_CP15_32_ISS_RT_SHIFT	5
-+#define ESR_ELx_CP15_32_ISS_RT_MASK	(UL(0x1f) << ESR_ELx_CP15_32_ISS_RT_SHIFT)
-+#define ESR_ELx_CP15_32_ISS_CRM_SHIFT	1
-+#define ESR_ELx_CP15_32_ISS_CRM_MASK	(UL(0xf) << ESR_ELx_CP15_32_ISS_CRM_SHIFT)
-+#define ESR_ELx_CP15_32_ISS_CRN_SHIFT	10
-+#define ESR_ELx_CP15_32_ISS_CRN_MASK	(UL(0xf) << ESR_ELx_CP15_32_ISS_CRN_SHIFT)
-+#define ESR_ELx_CP15_32_ISS_OP1_SHIFT	14
-+#define ESR_ELx_CP15_32_ISS_OP1_MASK	(UL(0x7) << ESR_ELx_CP15_32_ISS_OP1_SHIFT)
-+#define ESR_ELx_CP15_32_ISS_OP2_SHIFT	17
-+#define ESR_ELx_CP15_32_ISS_OP2_MASK	(UL(0x7) << ESR_ELx_CP15_32_ISS_OP2_SHIFT)
++static u32 compat_get_it_state(struct pt_regs *regs)
++{
++	u32 it, pstate = regs->pstate;
 +
-+#define ESR_ELx_CP15_32_ISS_SYS_MASK	(ESR_ELx_CP15_32_ISS_OP1_MASK | \
-+					 ESR_ELx_CP15_32_ISS_OP2_MASK | \
-+					 ESR_ELx_CP15_32_ISS_CRN_MASK | \
-+					 ESR_ELx_CP15_32_ISS_CRM_MASK | \
-+					 ESR_ELx_CP15_32_ISS_DIR_MASK)
-+#define ESR_ELx_CP15_32_ISS_SYS_VAL(op1, op2, crn, crm) \
-+					(((op1) << ESR_ELx_CP15_32_ISS_OP1_SHIFT) | \
-+					 ((op2) << ESR_ELx_CP15_32_ISS_OP2_SHIFT) | \
-+					 ((crn) << ESR_ELx_CP15_32_ISS_CRN_SHIFT) | \
-+					 ((crm) << ESR_ELx_CP15_32_ISS_CRM_SHIFT))
++	it  = (pstate & PSTATE_IT_1_0_MASK) >> PSTATE_IT_1_0_SHIFT;
++	it |= ((pstate & PSTATE_IT_7_2_MASK) >> PSTATE_IT_7_2_SHIFT) << 2;
 +
-+#define ESR_ELx_CP15_64_ISS_DIR_MASK	0x1
-+#define ESR_ELx_CP15_64_ISS_DIR_READ	0x1
-+#define ESR_ELx_CP15_64_ISS_DIR_WRITE	0x0
++	return it;
++}
 +
-+#define ESR_ELx_CP15_64_ISS_RT_SHIFT	5
-+#define ESR_ELx_CP15_64_ISS_RT_MASK	(UL(0x1f) << ESR_ELx_CP15_64_ISS_RT_SHIFT)
++static void compat_set_it_state(struct pt_regs *regs, u32 it)
++{
++	u32 pstate_it;
 +
-+#define ESR_ELx_CP15_64_ISS_RT2_SHIFT	10
-+#define ESR_ELx_CP15_64_ISS_RT2_MASK	(UL(0x1f) << ESR_ELx_CP15_64_ISS_RT2_SHIFT)
++	pstate_it  = (it << PSTATE_IT_1_0_SHIFT) & PSTATE_IT_1_0_MASK;
++	pstate_it |= ((it >> 2) << PSTATE_IT_7_2_SHIFT) & PSTATE_IT_7_2_MASK;
 +
-+#define ESR_ELx_CP15_64_ISS_OP1_SHIFT	16
-+#define ESR_ELx_CP15_64_ISS_OP1_MASK	(UL(0xf) << ESR_ELx_CP15_64_ISS_OP1_SHIFT)
-+#define ESR_ELx_CP15_64_ISS_CRM_SHIFT	1
-+#define ESR_ELx_CP15_64_ISS_CRM_MASK	(UL(0xf) << ESR_ELx_CP15_64_ISS_CRM_SHIFT)
++	regs->pstate &= ~PSR_AA32_IT_MASK;
++	regs->pstate |= pstate_it;
++}
 +
-+#define ESR_ELx_CP15_64_ISS_SYS_VAL(op1, crm) \
-+					(((op1) << ESR_ELx_CP15_64_ISS_OP1_SHIFT) | \
-+					 ((crm) << ESR_ELx_CP15_64_ISS_CRM_SHIFT))
++static bool cp15_cond_valid(unsigned int esr, struct pt_regs *regs)
++{
++	int cond;
 +
-+#define ESR_ELx_CP15_64_ISS_SYS_MASK	(ESR_ELx_CP15_64_ISS_OP1_MASK |	\
-+					 ESR_ELx_CP15_64_ISS_CRM_MASK | \
-+					 ESR_ELx_CP15_64_ISS_DIR_MASK)
++	/* Only a T32 instruction can trap without CV being set */
++	if (!(esr & ESR_ELx_CV)) {
++		u32 it;
 +
- #ifndef __ASSEMBLY__
- #include <asm/types.h>
- 
++		it = compat_get_it_state(regs);
++		if (!it)
++			return true;
++
++		cond = it >> 4;
++	} else {
++		cond = (esr & ESR_ELx_COND_MASK) >> ESR_ELx_COND_SHIFT;
++	}
++
++	return aarch32_opcode_cond_checks[cond](regs->pstate);
++}
++
++static void advance_itstate(struct pt_regs *regs)
++{
++	u32 it;
++
++	/* ARM mode */
++	if (!(regs->pstate & PSR_AA32_T_BIT) ||
++	    !(regs->pstate & PSR_AA32_IT_MASK))
++		return;
++
++	it  = compat_get_it_state(regs);
++
++	/*
++	 * If this is the last instruction of the block, wipe the IT
++	 * state. Otherwise advance it.
++	 */
++	if (!(it & 7))
++		it = 0;
++	else
++		it = (it & 0xe0) | ((it << 1) & 0x1f);
++
++	compat_set_it_state(regs, it);
++}
++
++static void arm64_compat_skip_faulting_instruction(struct pt_regs *regs,
++						   unsigned int sz)
++{
++	advance_itstate(regs);
++	arm64_skip_faulting_instruction(regs, sz);
++}
++
+ asmlinkage void __exception do_cp15instr(unsigned int esr, struct pt_regs *regs)
+ {
++	if (!cp15_cond_valid(esr, regs)) {
++		/*
++		 * There is no T16 variant of a CP access, so we
++		 * always advance PC by 4 bytes.
++		 */
++		arm64_compat_skip_faulting_instruction(regs, 4);
++		return;
++	}
++
+ 	/*
+ 	 * New cp15 instructions may previously have been undefined at
+ 	 * EL0. Fall back to our usual undefined instruction handler
 -- 
 2.19.0
