@@ -1,77 +1,64 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 28 Sep 2018 00:33:39 +0800
-Subject: [linux-sunxi] Re: [PATCH 04/12] drm/sun4i: sun6i_mipi_dsi: Enable
- missing DSI bus clock
-In-Reply-To: <CAMty3ZAsF=uSJqj2L9ZS8N3CqcSUPzFSdtH8WtZPTg3m-K8COQ@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 27 Sep 2018 18:58:53 +0200
+Subject: [PATCH 07/12] drm/sun4i: sun6i_mipi_dsi: Fix TCON DRQ set bits
+In-Reply-To: <20180927114850.24565-8-jagan@amarulasolutions.com>
 References: <20180927114850.24565-1-jagan@amarulasolutions.com>
- <20180927114850.24565-5-jagan@amarulasolutions.com>
- <CAGb2v66No3-AODYCCGifBrm9uvPjaNdR2W5MDQdazRAPomT9CQ@mail.gmail.com>
- <CAMty3ZBUQKVLJsmkU=hjaO_O5bhetDfAh9-7iLkUqOznVc0KyA@mail.gmail.com>
- <CAGb2v67pKgORe7uo6r6F+xaVi=Q-p6_DKotZJD7P=46Z=4RhEA@mail.gmail.com>
- <CAMty3ZAsF=uSJqj2L9ZS8N3CqcSUPzFSdtH8WtZPTg3m-K8COQ@mail.gmail.com>
-Message-ID: <CAGb2v66RPYqH2uDF_izW3PdNrvBhmXecs5A6ThW-3xMeQampqA@mail.gmail.com>
+ <20180927114850.24565-8-jagan@amarulasolutions.com>
+Message-ID: <20180927165853.dpluekbqzat663q7@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 28, 2018 at 12:26 AM Jagan Teki <jagan@amarulasolutions.com> wrote:
+On Thu, Sep 27, 2018 at 05:18:45PM +0530, Jagan Teki wrote:
+> TCON DRQ set bits for non-burst DSI mode can computed via
+> horizontal front porch instead of front porch + sync timings.
 >
-> On Thu, Sep 27, 2018 at 7:47 PM Chen-Yu Tsai <wens@csie.org> wrote:
-> >
-> > On Thu, Sep 27, 2018 at 9:44 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
-> > >
-> > > On Thu, Sep 27, 2018 at 6:13 PM Chen-Yu Tsai <wens@csie.org> wrote:
-> > > >
-> > > > Hi,
-> > > >
-> > > > On Thu, Sep 27, 2018 at 7:49 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
-> > > > >
-> > > > > DSI bus_clk is already available in sun6i_dsi but missed to
-> > > > > get the clk and process for enable/disable.
-> > > > >
-> > > > > This patch add support for it.
-> > > > >
-> > > > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > > > > ---
-> > > > >  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 8 ++++++++
-> > > > >  1 file changed, 8 insertions(+)
-> > > > >
-> > > > > diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > > > > index 8e9c76febca2..156b371243c6 100644
-> > > > > --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > > > > +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > > > > @@ -1004,6 +1004,12 @@ static int sun6i_dsi_probe(struct platform_device *pdev)
-> > > > >                 return PTR_ERR(dsi->reset);
-> > > > >         }
-> > > > >
-> > > > > +       dsi->bus_clk = devm_clk_get(dev, "bus");
-> > > > > +       if (IS_ERR(dsi->bus_clk)) {
-> > > > > +               dev_err(dev, "Couldn't get the DSI bus clock\n");
-> > > > > +               return PTR_ERR(dsi->bus_clk);
-> > > > > +       }
-> > > > > +
-> > > >
-> > > > The DSI driver uses devm_regmap_init_mmio_clk, which enables the
-> > > > clock behind the scenes when regmap access needs it enabled.
-> > > >
-> > > > Did you have any issues without this patch?
-> > >
-> > > I'm unable to read register values via devmem, I see all 0's for all
-> > > dsi reg space.
-> >
-> > Well that is to be expected given how mmio with clk regmap works.
-> > Did you encounter any other problems besides this?
->
-> no
->
-> >
-> > FYI you can dump regmap contents using /sys/kernel/debug/regmap/*/registers
->
-> Thanks, but ccu not using regmap I believe so can't see bus enabled
-> bit set via devmap
-> # devmem 0x01C20060
-> 0x33800000
+> Since there no documentation for TCON_DRQ_REG(0x7c) register
+> this change is taken as reference from BPI-M64-bsp.
 
-That is perfectly normal. It is only enabled when there are accesses to the
-DSI regmap.
+Detailing more what the issue is would be great.
 
-ChenYu
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> ---
+>  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> index 599284971ab6..9918fdb990ff 100644
+> --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> @@ -367,9 +367,9 @@ static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
+>  	struct mipi_dsi_device *device = dsi->device;
+>  	u32 val = 0;
+
+The computation here is in the A64 driver:
+
+if ((panel->lcd_ht - panel->lcd_x - panel->lcd_hbp) < 21) {
+	dsi_dev[sel]->dsi_tcon_drq.bits.drq_mode = 0;
+} else {
+	dsi_dev[sel]->dsi_tcon_drq.bits.drq_set	=
+		(panel->lcd_ht-panel->lcd_x-panel->lcd_hbp-20) *
+		dsi_pixel_bits[panel->lcd_dsi_format]/(8*4);
+}
+
+It is testing that the sync + front porch is smaller than 21, and
+otherwise sets the drq.
+
+> -	if ((mode->hsync_end - mode->hdisplay) > 20) {
+
+My code here is testing that the difference between hsync_end and
+hdisplay is superior to 20, and sets the DRQ if true. The condition is
+reversed, but otherwise, that difference is the front porch plus the
+sync length.
+
+> +	if ((mode->hsync_start - mode->hdisplay) > 20) {
+
+However, you are testing for just the front porch, unlike what your
+commit log is saying, and unlike what allwinner's code is saying. So
+this deserves some explanation.
+
+Maxime
+
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
