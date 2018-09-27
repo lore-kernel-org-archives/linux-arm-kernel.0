@@ -1,69 +1,80 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 27 Sep 2018 17:15:31 +0100
-Subject: [PATCH 4/7] arm64: compat: Add cp15_32 and cp15_64 handler arrays
+Date: Thu, 27 Sep 2018 17:15:29 +0100
+Subject: [PATCH 2/7] arm64: compat: Add separate CP15 trapping hook
 In-Reply-To: <20180927161534.247926-1-marc.zyngier@arm.com>
 References: <20180927161534.247926-1-marc.zyngier@arm.com>
-Message-ID: <20180927161534.247926-5-marc.zyngier@arm.com>
+Message-ID: <20180927161534.247926-3-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We're now ready to start handling CP15 access. Let's add (empty)
-arrays for both 32 and 64bit accessors, and the code that deals
-with them.
+Instead of directly generating an UNDEF when trapping a CP15 access,
+let's add a new entry point to that effect (which only generates an
+UNDEF for now).
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kernel/traps.c | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ arch/arm64/kernel/entry.S | 15 +++++++++++++--
+ arch/arm64/kernel/traps.c | 13 +++++++++++++
+ 2 files changed, 26 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 09dbea221a27..53f805cad602 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -697,9 +697,9 @@ el0_sync_compat:
+ 	cmp	x24, #ESR_ELx_EC_UNKNOWN	// unknown exception in EL0
+ 	b.eq	el0_undef
+ 	cmp	x24, #ESR_ELx_EC_CP15_32	// CP15 MRC/MCR trap
+-	b.eq	el0_undef
++	b.eq	el0_cp15
+ 	cmp	x24, #ESR_ELx_EC_CP15_64	// CP15 MRRC/MCRR trap
+-	b.eq	el0_undef
++	b.eq	el0_cp15
+ 	cmp	x24, #ESR_ELx_EC_CP14_MR	// CP14 MRC/MCR trap
+ 	b.eq	el0_undef
+ 	cmp	x24, #ESR_ELx_EC_CP14_LS	// CP14 LDC/STC trap
+@@ -722,6 +722,17 @@ el0_irq_compat:
+ el0_error_compat:
+ 	kernel_entry 0, 32
+ 	b	el0_error_naked
++
++el0_cp15:
++	/*
++	 * Trapped CP15 (MRC, MCR, MRRC, MCRR) instructions
++	 */
++	enable_daif
++	ct_user_exit
++	mov	x0, x25
++	mov	x1, sp
++	bl	do_cp15instr
++	b	ret_to_user
+ #endif
+ 
+ el0_da:
 diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index db036a097672..2920a8f30158 100644
+index 039e9ff379cc..7607283c1ef1 100644
 --- a/arch/arm64/kernel/traps.c
 +++ b/arch/arm64/kernel/traps.c
-@@ -607,8 +607,18 @@ static void arm64_compat_skip_faulting_instruction(struct pt_regs *regs,
- 	arm64_skip_faulting_instruction(regs, sz);
- }
+@@ -529,6 +529,19 @@ static struct sys64_hook sys64_hooks[] = {
+ 	{},
+ };
  
-+static struct sys64_hook cp15_32_hooks[] = {
-+	{},
-+};
 +
-+static struct sys64_hook cp15_64_hooks[] = {
-+	{},
-+};
++#ifdef CONFIG_COMPAT
++asmlinkage void __exception do_cp15instr(unsigned int esr, struct pt_regs *regs)
++{
++	/*
++	 * New cp15 instructions may previously have been undefined at
++	 * EL0. Fall back to our usual undefined instruction handler
++	 * so that we handle these consistently.
++	 */
++	do_undefinstr(regs);
++}
++#endif
 +
- asmlinkage void __exception do_cp15instr(unsigned int esr, struct pt_regs *regs)
+ asmlinkage void __exception do_sysinstr(unsigned int esr, struct pt_regs *regs)
  {
-+	struct sys64_hook *hook, *hook_base;
-+
- 	if (!cp15_cond_valid(esr, regs)) {
- 		/*
- 		 * There is no T16 variant of a CP access, so we
-@@ -618,6 +628,24 @@ asmlinkage void __exception do_cp15instr(unsigned int esr, struct pt_regs *regs)
- 		return;
- 	}
- 
-+	switch (ESR_ELx_EC(esr)) {
-+	case ESR_ELx_EC_CP15_32:
-+		hook_base = cp15_32_hooks;
-+		break;
-+	case ESR_ELx_EC_CP15_64:
-+		hook_base = cp15_64_hooks;
-+		break;
-+	default:
-+		do_undefinstr(regs);
-+		return;
-+	}
-+
-+	for (hook = hook_base; hook->handler; hook++)
-+		if ((hook->esr_mask & esr) == hook->esr_val) {
-+			hook->handler(esr, regs);
-+			return;
-+		}
-+
- 	/*
- 	 * New cp15 instructions may previously have been undefined at
- 	 * EL0. Fall back to our usual undefined instruction handler
+ 	struct sys64_hook *hook;
 -- 
 2.19.0
