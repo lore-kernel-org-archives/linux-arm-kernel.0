@@ -1,74 +1,92 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Thu, 27 Sep 2018 18:46:07 -0400
-Subject: [PATCH] iommu: arm-smmu: Set SCTLR.HUPCF bit
-Message-ID: <20180927224609.19515-1-robdclark@gmail.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Thu, 27 Sep 2018 15:55:44 -0700
+Subject: [PATCH] ARM: Assume maintainership of ARM reference designs
+In-Reply-To: <20180927073733.11580-1-linus.walleij@linaro.org>
+References: <20180927073733.11580-1-linus.walleij@linaro.org>
+Message-ID: <20180927225541.58942.24953@harbor.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We seem to need to set either this or CFCFG (stall), otherwise gpu
-faults trigger problems with other in-flight transactions from the
-GPU causing CP errors, etc.
+Quoting Linus Walleij (2018-09-27 00:37:33)
+> With this I assume maintainership of the Integrator, Versatile
+> and RealView ARM reference machines.
+> 
+> It's no big secret that I've been maintaining them for years,
+> but might as well make it official so I get the mails and
+> don't miss anything.
+> 
+> I have also included some drivers that are closely associated
+> with the ARM reference designs and yet orphaned in the
+> MAINTAINERS file. I can surely maintain them too, or route
+> the question to the right people so it doesn't fall on the
+> floor of upward to the subsystem maintainers who have too much
+> to do already as it is.
+> 
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Michael Turquette <mturquette@baylibre.com>
+> Cc: Stephen Boyd <sboyd@kernel.org>
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> Cc: Mark Brown <broonie@kernel.org>
+> Cc: Brian Norris <computersforpeace@gmail.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-In the ARM SMMU spec, the 'Hit under previous context fault' bit is
-described as:
+Acked-by: Michael Turquette <mturquette@baylibre.com>
 
- '0' - Stall or terminate subsequent transactions in the presence
-       of an outstanding context fault
- '1' - Process all subsequent transactions independently of any
-       outstanding context fault.
+Best regards,
+Mike
 
-Since we don't enable CFCFG (stall) the behavior of terminating
-other transactions makes sense.  And is probably not what we want
-(and definately not what we want for GPU).
-
-Signed-off-by: Rob Clark <robdclark@gmail.com>
----
-So I hit this issue a long time back on 820 (msm8996) and at the
-time I solved it with a patch that enabled CFCFG.  And it resurfaced
-more recently on sdm845.  But at the time CFCFG was rejected, iirc
-because of concern that it would cause problems on other non-qcom
-arm smmu implementations.  And I think I forgot to send this version
-of the solution.
-
-If enabling HUPCF is anticipated to cause problems on other ARM
-SMMU implementations, I think I can come up with a variant of this
-patch which conditionally enables it for snapdragon.
-
-Either way, I'd really like to get some variant of this fix merged
-(and probably it would be a good idea for stable kernel branches
-too), since current behaviour with the GPU means faults turn into
-a fantastic cascade of fail.
-
- drivers/iommu/arm-smmu-regs.h | 1 +
- drivers/iommu/arm-smmu.c      | 2 +-
- 2 files changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/iommu/arm-smmu-regs.h b/drivers/iommu/arm-smmu-regs.h
-index a1226e4ab5f8..2291925eb800 100644
---- a/drivers/iommu/arm-smmu-regs.h
-+++ b/drivers/iommu/arm-smmu-regs.h
-@@ -178,6 +178,7 @@ enum arm_smmu_s2cr_privcfg {
- #define ARM_SMMU_CB_ATSR		0x8f0
- 
- #define SCTLR_S1_ASIDPNE		(1 << 12)
-+#define SCTLR_HUPCF			(1 << 8)
- #define SCTLR_CFCFG			(1 << 7)
- #define SCTLR_CFIE			(1 << 6)
- #define SCTLR_CFRE			(1 << 5)
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index f7a96bcf94a6..47ffc9aade72 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -713,9 +713,9 @@ static void arm_smmu_write_context_bank(struct arm_smmu_device *smmu, int idx)
- 	reg = SCTLR_CFIE | SCTLR_CFRE | SCTLR_AFE | SCTLR_TRE | SCTLR_M;
- 	if (stage1)
- 		reg |= SCTLR_S1_ASIDPNE;
-+	reg |= SCTLR_HUPCF;
- 	if (IS_ENABLED(CONFIG_CPU_BIG_ENDIAN))
- 		reg |= SCTLR_E;
--
- 	writel_relaxed(reg, cb_base + ARM_SMMU_CB_SCTLR);
- }
- 
--- 
-2.17.1
+> ---
+> ARM SoC folks: please apply this directly wherever MAINTAINERS
+> patches go.
+> 
+> Submitted a while back, thought it was applied since everyone
+> was in on it, but apparently it got lost.
+> 
+> ARM Cambridge sent me all their old reference designs so I am
+> well equipped for this.
+> ---
+>  MAINTAINERS | 25 +++++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index a5b256b25905..a4ed79a5a1c2 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1078,6 +1078,31 @@ F:       arch/arm/include/asm/arch_timer.h
+>  F:     arch/arm64/include/asm/arch_timer.h
+>  F:     drivers/clocksource/arm_arch_timer.c
+>  
+> +ARM INTEGRATOR, VERSATILE AND REALVIEW SUPPORT
+> +M:     Linus Walleij <linus.walleij@linaro.org>
+> +L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> +S:     Maintained
+> +F:     Documentation/devicetree/bindings/arm/arm-boards
+> +F:     Documentation/devicetree/bindings/auxdisplay/arm-charlcd.txt
+> +F:     Documentation/devicetree/bindings/clock/arm-integrator.txt
+> +F:     Documentation/devicetree/bindings/interrupt-controller/arm,versatile-fpga-irq.txt
+> +F:     Documentation/devicetree/bindings/mtd/arm-versatile.txt
+> +F:     arch/arm/mach-integrator/
+> +F:     arch/arm/mach-realview/
+> +F:     arch/arm/mach-versatile/
+> +F:     arch/arm/plat-versatile/
+> +F:     arch/arm/boot/dts/arm-realview-*
+> +F:     arch/arm/boot/dts/integrator*
+> +F:     arch/arm/boot/dts/versatile*
+> +F:     drivers/clk/versatile/
+> +F:     drivers/i2c/busses/i2c-versatile.c
+> +F:     drivers/irqchip/irq-versatile-fpga.c
+> +F:     drivers/irqchip/irq-vic.c
+> +F:     drivers/mtd/maps/physmap_of_versatile.c
+> +F:     drivers/power/reset/arm-versatile-reboot.c
+> +F:     drivers/soc/versatile/
+> +F:     drivers/spi/spi-pl022.c
+> +
+>  ARM HDLCD DRM DRIVER
+>  M:     Liviu Dudau <liviu.dudau@arm.com>
+>  S:     Supported
+> -- 
+> 2.17.1
+> 
