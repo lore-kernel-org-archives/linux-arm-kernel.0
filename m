@@ -1,64 +1,46 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 27 Sep 2018 18:58:53 +0200
-Subject: [PATCH 07/12] drm/sun4i: sun6i_mipi_dsi: Fix TCON DRQ set bits
-In-Reply-To: <20180927114850.24565-8-jagan@amarulasolutions.com>
-References: <20180927114850.24565-1-jagan@amarulasolutions.com>
- <20180927114850.24565-8-jagan@amarulasolutions.com>
-Message-ID: <20180927165853.dpluekbqzat663q7@flea>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 27 Sep 2018 18:01:31 +0100
+Subject: [PATCH v2 7/7] arm64: uprobes - ARM32 instruction probing
+In-Reply-To: <1537963925-25313-8-git-send-email-m.slodczyk2@partner.samsung.com>
+References: <1537963925-25313-1-git-send-email-m.slodczyk2@partner.samsung.com>
+ <CGME20180926121218eucas1p1b20a88cfec17c6403a35e4f23de96ade@eucas1p1.samsung.com>
+ <1537963925-25313-8-git-send-email-m.slodczyk2@partner.samsung.com>
+Message-ID: <89110505-da2e-3266-c2aa-6e5128c520a4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 27, 2018 at 05:18:45PM +0530, Jagan Teki wrote:
-> TCON DRQ set bits for non-burst DSI mode can computed via
-> horizontal front porch instead of front porch + sync timings.
->
-> Since there no documentation for TCON_DRQ_REG(0x7c) register
-> this change is taken as reference from BPI-M64-bsp.
+On 26/09/18 13:12, Maciej Slodczyk wrote:
+[...]
+> @@ -38,16 +78,44 @@ int arch_uprobe_analyze_insn(struct arch_uprobe *auprobe, struct mm_struct *mm,
+>   		unsigned long addr)
+>   {
+>   	probes_opcode_t insn;
+> +	enum probes_insn retval;
+> +	unsigned int bpinsn;
+>   
+> -	/* TODO: Currently we do not support AARCH32 instruction probing */
+> -	if (mm->context.flags & MMCF_AARCH32)
+> -		return -ENOTSUPP;
+> -	else if (!IS_ALIGNED(addr, AARCH64_INSN_SIZE))
+> +	insn = *(probes_opcode_t *)(&auprobe->insn[0]);
+> +
+> +	if (!IS_ALIGNED(addr, AARCH64_INSN_SIZE))
+>   		return -EINVAL;
+>   
+> -	insn = *(probes_opcode_t *)(&auprobe->insn[0]);
+> +	/* check if AARCH32 */
+> +	if (is_compat_task()) {
+> +
+> +		/* Thumb is not supported yet */
+> +		if (addr & 0x3)
 
-Detailing more what the issue is would be great.
+I'm only skimming, so forgive me if I'm missing something which should 
+be obvious, but this has a big red flag all over it. If "addr" is the 
+actual instruction address (or even a branch target, for a 
+non-interworking branch), plenty of Thumb instructions will just happen 
+to lie at 4-byte-aligned addresses anyway.
 
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> ---
->  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> index 599284971ab6..9918fdb990ff 100644
-> --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> @@ -367,9 +367,9 @@ static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
->  	struct mipi_dsi_device *device = dsi->device;
->  	u32 val = 0;
+Furthermore, how would this check ever catch anything anyway given 
+!IS_ALIGNED(addr, AARCH64_INSN_SIZE) above?
 
-The computation here is in the A64 driver:
-
-if ((panel->lcd_ht - panel->lcd_x - panel->lcd_hbp) < 21) {
-	dsi_dev[sel]->dsi_tcon_drq.bits.drq_mode = 0;
-} else {
-	dsi_dev[sel]->dsi_tcon_drq.bits.drq_set	=
-		(panel->lcd_ht-panel->lcd_x-panel->lcd_hbp-20) *
-		dsi_pixel_bits[panel->lcd_dsi_format]/(8*4);
-}
-
-It is testing that the sync + front porch is smaller than 21, and
-otherwise sets the drq.
-
-> -	if ((mode->hsync_end - mode->hdisplay) > 20) {
-
-My code here is testing that the difference between hsync_end and
-hdisplay is superior to 20, and sets the DRQ if true. The condition is
-reversed, but otherwise, that difference is the front porch plus the
-sync length.
-
-> +	if ((mode->hsync_start - mode->hdisplay) > 20) {
-
-However, you are testing for just the front porch, unlike what your
-commit log is saying, and unlike what allwinner's code is saying. So
-this deserves some explanation.
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Robin.
