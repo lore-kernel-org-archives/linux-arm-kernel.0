@@ -1,49 +1,399 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Thu, 27 Sep 2018 17:18:47 +0530
-Subject: [PATCH 09/12] dt-bindings: panel: Add Bananapi S070WV20-CT16 MIPI-DSI
- panel bindings
+Date: Thu, 27 Sep 2018 17:18:48 +0530
+Subject: [PATCH 10/12] drm/panel: Add Bananapi S070WV20-CT16 MIPI-DSI panel
+ driver
 In-Reply-To: <20180927114850.24565-1-jagan@amarulasolutions.com>
 References: <20180927114850.24565-1-jagan@amarulasolutions.com>
-Message-ID: <20180927114850.24565-10-jagan@amarulasolutions.com>
+Message-ID: <20180927114850.24565-11-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bananapi S070WV20-CT16 is 800x480, 4-lane MIPI-DSI panel, the
-same panel PCB comes with parallel RBG which is supported via
-panel-simple with "bananapi,s070wv20-ct16" compatible.
+Bananapi S070WV20-CT16 is 800x480, 4-lane MIPI-DSI panel which
+can be used to connect via BPI-M64 board, so add a driver for it.
+
+The same panel PCB comes with parallel RBG which is supported via
+panel-simple driver with "bananapi,s070wv20-ct16" compatible.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- .../panel/bananapi,s070wv20-ct16-dsi.txt      | 21 +++++++++++++++++++
- 1 file changed, 21 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16-dsi.txt
+ drivers/gpu/drm/panel/Kconfig                 |   9 +
+ drivers/gpu/drm/panel/Makefile                |   1 +
+ .../gpu/drm/panel/panel-bananapi-s070wv20.c   | 336 ++++++++++++++++++
+ 3 files changed, 346 insertions(+)
+ create mode 100644 drivers/gpu/drm/panel/panel-bananapi-s070wv20.c
 
-diff --git a/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16-dsi.txt b/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16-dsi.txt
+diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
+index 6020c30a33b3..d25960a63b10 100644
+--- a/drivers/gpu/drm/panel/Kconfig
++++ b/drivers/gpu/drm/panel/Kconfig
+@@ -17,6 +17,15 @@ config DRM_PANEL_ARM_VERSATILE
+ 	  reference designs. The panel is detected using special registers
+ 	  in the Versatile family syscon registers.
+ 
++config DRM_PANEL_BANANAPI_S070WV20
++	tristate "Bananapi S070WV20-CT16 MIPI-DSI panel driver"
++	depends on OF
++	depends on DRM_MIPI_DSI
++	depends on BACKLIGHT_CLASS_DEVICE
++	help
++	  Say Y if you want to enable support for panels based on the
++	  Bananapi S070WV20-CT16 MIPI-DSI controller.
++
+ config DRM_PANEL_LVDS
+ 	tristate "Generic LVDS panel driver"
+ 	depends on OF
+diff --git a/drivers/gpu/drm/panel/Makefile b/drivers/gpu/drm/panel/Makefile
+index 5ccaaa9d13af..345b6475d3a4 100644
+--- a/drivers/gpu/drm/panel/Makefile
++++ b/drivers/gpu/drm/panel/Makefile
+@@ -1,5 +1,6 @@
+ # SPDX-License-Identifier: GPL-2.0
+ obj-$(CONFIG_DRM_PANEL_ARM_VERSATILE) += panel-arm-versatile.o
++obj-$(CONFIG_DRM_PANEL_BANANAPI_S070WV20) += panel-bananapi-s070wv20.o
+ obj-$(CONFIG_DRM_PANEL_LVDS) += panel-lvds.o
+ obj-$(CONFIG_DRM_PANEL_SIMPLE) += panel-simple.o
+ obj-$(CONFIG_DRM_PANEL_ILITEK_IL9322) += panel-ilitek-ili9322.o
+diff --git a/drivers/gpu/drm/panel/panel-bananapi-s070wv20.c b/drivers/gpu/drm/panel/panel-bananapi-s070wv20.c
 new file mode 100644
-index 000000000000..c477163f7999
+index 000000000000..6c9adbec6dd8
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/display/panel/bananapi,s070wv20-ct16-dsi.txt
-@@ -0,0 +1,21 @@
-+Bananapi S070WV20 CT16 MIPI-DSI panel
++++ b/drivers/gpu/drm/panel/panel-bananapi-s070wv20.c
+@@ -0,0 +1,336 @@
++// SPDX-License-Identifier: (GPL-2.0+ or MIT)
++/*
++ * Copyright (C) 2018 Amarula Solutions
++ * Author: Jagan Teki <jagan@amarulasolutions.com>
++ */
 +
-+Required properties:
-+- compatible: must be "bananapi,s070wv20-ct16-dsi"
-+- reg: DSI virtual channel used by that screen
-+- avdd-supply: analog regulator dc1 switch
-+- dvdd-supply: 3v3 digital regulator
-+- reset-gpios: a GPIO phandle for the reset pin
++#include <linux/backlight.h>
++#include <linux/delay.h>
++#include <linux/device.h>
++#include <linux/err.h>
++#include <linux/errno.h>
++#include <linux/fb.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
 +
-+Optional properties:
-+- backlight: phandle for the backlight control.
++#include <linux/gpio/consumer.h>
++#include <linux/regulator/consumer.h>
 +
-+Example:
-+panel at 0 {
-+	compatible = "bananapi,s070wv20-ct16-dsi";
-+	reg = <0>;
-+	avdd-supply = <&reg_dc1sw>;
-+	dvdd-supply = <&reg_dldo1>;
-+	reset-gpios = <&pio 3 6 GPIO_ACTIVE_HIGH>; /* PD6 */
-+	backlight = <&backlight_dsi>;
++#include <drm/drm_mipi_dsi.h>
++#include <drm/drm_modes.h>
++#include <drm/drm_panel.h>
++
++#include <video/mipi_display.h>
++
++struct s070wv20 {
++	struct drm_panel	panel;
++	struct mipi_dsi_device	*dsi;
++
++	struct backlight_device	*backlight;
++	struct regulator	*dvdd;
++	struct regulator	*avdd;
++	struct gpio_desc	*reset;
++
++	bool			is_enabled;
++	bool			is_prepared;
 +};
++
++static inline struct s070wv20 *panel_to_s070wv20(struct drm_panel *panel)
++{
++	return container_of(panel, struct s070wv20, panel);
++}
++
++struct s070wv20_init_cmd {
++	size_t len;
++	const char *data;
++};
++
++#define S070WV20_INIT_CMD(...) { \
++	.len = sizeof((char[]){__VA_ARGS__}), \
++	.data = (char[]){__VA_ARGS__} }
++
++static const struct s070wv20_init_cmd s070wv20_init_cmds[] = {
++	S070WV20_INIT_CMD(0x7A, 0xC1),
++	S070WV20_INIT_CMD(0x20, 0x20),
++	S070WV20_INIT_CMD(0x21, 0xE0),
++	S070WV20_INIT_CMD(0x22, 0x13),
++	S070WV20_INIT_CMD(0x23, 0x28),
++	S070WV20_INIT_CMD(0x24, 0x30),
++	S070WV20_INIT_CMD(0x25, 0x28),
++	S070WV20_INIT_CMD(0x26, 0x00),
++	S070WV20_INIT_CMD(0x27, 0x0D),
++	S070WV20_INIT_CMD(0x28, 0x03),
++	S070WV20_INIT_CMD(0x29, 0x1D),
++	S070WV20_INIT_CMD(0x34, 0x80),
++	S070WV20_INIT_CMD(0x36, 0x28),
++	S070WV20_INIT_CMD(0xB5, 0xA0),
++	S070WV20_INIT_CMD(0x5C, 0xFF),
++	S070WV20_INIT_CMD(0x2A, 0x01),
++	S070WV20_INIT_CMD(0x56, 0x92),
++	S070WV20_INIT_CMD(0x6B, 0x71),
++	S070WV20_INIT_CMD(0x69, 0x2B),
++	S070WV20_INIT_CMD(0x10, 0x40),
++	S070WV20_INIT_CMD(0x11, 0x98),
++	S070WV20_INIT_CMD(0xB6, 0x20),
++	S070WV20_INIT_CMD(0x51, 0x20),
++	S070WV20_INIT_CMD(0x09, 0x10),
++};
++
++static int s070wv20_prepare(struct drm_panel *panel)
++{
++	struct s070wv20 *ctx = panel_to_s070wv20(panel);
++	struct mipi_dsi_device *dsi = ctx->dsi;
++	unsigned int i;
++	int ret;
++
++	if (ctx->is_prepared)
++		return 0;
++
++	msleep(50);
++
++	gpiod_set_value(ctx->reset, 1);
++	msleep(50);
++
++	gpiod_set_value(ctx->reset, 0);
++	msleep(50);
++
++	gpiod_set_value(ctx->reset, 1);
++	msleep(20);
++
++	ret = mipi_dsi_dcs_exit_sleep_mode(dsi);
++	if (ret < 0) {
++		dev_err(panel->dev, "failed to exit sleep mode: %d\n", ret);
++		return ret;
++	}
++
++	msleep(120);
++
++	for (i = 0; i < ARRAY_SIZE(s070wv20_init_cmds); i++) {
++		const struct s070wv20_init_cmd *cmd = &s070wv20_init_cmds[i];
++
++		ret = mipi_dsi_generic_write(dsi, cmd->data, cmd->len);
++		if (ret < 0)
++			return ret;
++
++		msleep(10);
++	}
++
++	ret = mipi_dsi_dcs_set_display_on(dsi);
++	if (ret < 0) {
++		dev_err(panel->dev, "failed to set display on: %d\n", ret);
++		return ret;
++	}
++
++	ctx->is_prepared = true;
++
++	return 0;
++}
++
++static int s070wv20_enable(struct drm_panel *panel)
++{
++	struct s070wv20 *ctx = panel_to_s070wv20(panel);
++
++	if (ctx->is_enabled)
++		return 0;
++
++	msleep(120);
++
++	backlight_enable(ctx->backlight);
++	ctx->is_enabled = true;
++
++	return 0;
++}
++
++static int s070wv20_disable(struct drm_panel *panel)
++{
++	struct s070wv20 *ctx = panel_to_s070wv20(panel);
++
++	if (!ctx->is_enabled)
++		return 0;
++
++	backlight_disable(ctx->backlight);
++	ctx->is_enabled = false;
++
++	return 0;
++}
++
++static int s070wv20_unprepare(struct drm_panel *panel)
++{
++	struct s070wv20 *ctx = panel_to_s070wv20(panel);
++	int ret;
++
++	if (!ctx->is_prepared)
++		return 0;
++
++	ret = mipi_dsi_dcs_set_display_off(ctx->dsi);
++	if (ret < 0)
++		dev_err(panel->dev, "failed to set display off: %d\n", ret);
++
++	ret = mipi_dsi_dcs_enter_sleep_mode(ctx->dsi);
++	if (ret < 0)
++		dev_err(panel->dev, "failed to enter sleep mode: %d\n", ret);
++
++	msleep(100);
++
++	regulator_disable(ctx->avdd);
++
++	regulator_disable(ctx->dvdd);
++
++	gpiod_set_value(ctx->reset, 0);
++
++	gpiod_set_value(ctx->reset, 1);
++
++	gpiod_set_value(ctx->reset, 0);
++
++	ctx->is_prepared = false;
++
++	return 0;
++}
++
++static const struct drm_display_mode s070wv20_default_mode = {
++	.clock = 30000,
++	.vrefresh = 60,
++
++	.hdisplay = 800,
++	.hsync_start = 800 + 40,
++	.hsync_end = 800 + 40 + 48,
++	.htotal = 800 + 40 + 48 + 40,
++
++	.vdisplay = 480,
++	.vsync_start = 480 + 13,
++	.vsync_end = 480 + 13 + 3,
++	.vtotal = 480 + 13 + 3 + 29,
++};
++
++static int s070wv20_get_modes(struct drm_panel *panel)
++{
++	struct drm_connector *connector = panel->connector;
++	struct s070wv20 *ctx = panel_to_s070wv20(panel);
++	struct drm_display_mode *mode;
++
++	mode = drm_mode_duplicate(panel->drm, &s070wv20_default_mode);
++	if (!mode) {
++		dev_err(&ctx->dsi->dev, "failed to add mode %ux%ux@%u\n",
++			s070wv20_default_mode.hdisplay,
++			s070wv20_default_mode.vdisplay,
++			s070wv20_default_mode.vrefresh);
++		return -ENOMEM;
++	}
++
++	drm_mode_set_name(mode);
++
++	mode->type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
++	drm_mode_probed_add(connector, mode);
++
++	panel->connector->display_info.width_mm = 86;
++	panel->connector->display_info.height_mm = 154;
++
++	return 1;
++}
++
++static const struct drm_panel_funcs s070wv20_funcs = {
++	.disable = s070wv20_disable,
++	.unprepare = s070wv20_unprepare,
++	.prepare = s070wv20_prepare,
++	.enable = s070wv20_enable,
++	.get_modes = s070wv20_get_modes,
++};
++
++static int s070wv20_dsi_probe(struct mipi_dsi_device *dsi)
++{
++	struct device_node *np;
++	struct s070wv20 *ctx;
++	int ret;
++
++	ctx = devm_kzalloc(&dsi->dev, sizeof(*ctx), GFP_KERNEL);
++	if (!ctx)
++		return -ENOMEM;
++	mipi_dsi_set_drvdata(dsi, ctx);
++	ctx->dsi = dsi;
++
++	drm_panel_init(&ctx->panel);
++	ctx->panel.dev = &dsi->dev;
++	ctx->panel.funcs = &s070wv20_funcs;
++
++	ctx->dvdd = devm_regulator_get(&dsi->dev, "dvdd");
++	if (IS_ERR(ctx->dvdd)) {
++		dev_err(&dsi->dev, "Couldn't get dvdd regulator\n");
++		return PTR_ERR(ctx->dvdd);
++	}
++
++	ctx->avdd = devm_regulator_get(&dsi->dev, "avdd");
++	if (IS_ERR(ctx->avdd)) {
++		dev_err(&dsi->dev, "Couldn't get avdd regulator\n");
++		return PTR_ERR(ctx->avdd);
++	}
++
++	ret = regulator_enable(ctx->dvdd);
++	if (ret)
++		return ret;
++
++	msleep(5);
++
++	ret = regulator_enable(ctx->avdd);
++	if (ret)
++		return ret;
++
++	msleep(5);
++
++	ctx->reset = devm_gpiod_get(&dsi->dev, "reset", GPIOD_OUT_LOW);
++	if (IS_ERR(ctx->reset)) {
++		dev_err(&dsi->dev, "Couldn't get our reset GPIO\n");
++		return PTR_ERR(ctx->reset);
++	}
++
++	np = of_parse_phandle(dsi->dev.of_node, "backlight", 0);
++	if (np) {
++		ctx->backlight = of_find_backlight_by_node(np);
++		of_node_put(np);
++
++		if (!ctx->backlight)
++			return -EPROBE_DEFER;
++	}
++
++	ret = drm_panel_add(&ctx->panel);
++	if (ret < 0)
++		return ret;
++
++	dsi->mode_flags = MIPI_DSI_MODE_VIDEO_SYNC_PULSE;
++	dsi->format = MIPI_DSI_FMT_RGB888;
++	dsi->lanes = 4;
++
++	return mipi_dsi_attach(dsi);
++}
++
++static int s070wv20_dsi_remove(struct mipi_dsi_device *dsi)
++{
++	struct s070wv20 *ctx = mipi_dsi_get_drvdata(dsi);
++
++	mipi_dsi_detach(dsi);
++	drm_panel_remove(&ctx->panel);
++
++	if (ctx->backlight)
++		put_device(&ctx->backlight->dev);
++
++	return 0;
++}
++
++static const struct of_device_id s070wv20_of_match[] = {
++	{ .compatible = "bananapi,s070wv20-ct16-dsi", },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, s070wv20_of_match);
++
++static struct mipi_dsi_driver s070wv20_driver = {
++	.probe = s070wv20_dsi_probe,
++	.remove = s070wv20_dsi_remove,
++	.driver = {
++		.name = "bananapi-s070wv20-ct16-dsi",
++		.of_match_table = s070wv20_of_match,
++	},
++};
++module_mipi_dsi_driver(s070wv20_driver);
++
++MODULE_AUTHOR("Jagan Teki <jagan@amarulasolutions.com>");
++MODULE_DESCRIPTION("Bananapi S070WV20-CT16 MIPI-DSI");
++MODULE_LICENSE("GPL v2");
 -- 
 2.18.0.321.gffc6fa0e3
