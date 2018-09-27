@@ -1,61 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 27 Sep 2018 12:38:57 -0700
-Subject: [PATCH 0/4] Update am437x and am335x dts to probe with ti-sysc
-In-Reply-To: <033a9b5f-c7cb-f2dd-31b4-3f178d74b79b@ti.com>
-References: <20180925000545.22931-1-tony@atomide.com>
- <e9afe736-c2f0-6182-afd0-08279e09a35e@ti.com>
- <20180925144021.GN5662@atomide.com>
- <20180925175537.GQ5662@atomide.com>
- <d98aa7c1-5131-34c5-51e5-c7ef57cbc31e@ti.com>
- <20180926155911.GT5662@atomide.com>
- <20180926162303.GU5662@atomide.com>
- <cfc3f1db-9468-ed92-a673-882b51b4dec8@ti.com>
- <20180926233111.GY5662@atomide.com>
- <033a9b5f-c7cb-f2dd-31b4-3f178d74b79b@ti.com>
-Message-ID: <20180927193857.GE5662@atomide.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 27 Sep 2018 14:14:50 -0500
+Subject: [PATCh v3 2/4] arm64: add basic DTS for i.MX8MQ
+In-Reply-To: <20180921125626.21971-2-l.stach@pengutronix.de>
+References: <20180921125626.21971-1-l.stach@pengutronix.de>
+ <20180921125626.21971-2-l.stach@pengutronix.de>
+Message-ID: <20180927191450.GA32039@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grygorii Strashko <grygorii.strashko@ti.com> [180927 19:16]:
-> On 09/26/2018 06:31 PM, Tony Lindgren wrote:
-> > 
-> > OK. So looks like the other i2c bus drivers have already solved it
-> > with simply SET_NOIRQ_SYSTEM_SLEEP_PM_OPS which is along the lines
-> > you're suggesting.
-> > 
-> > The following works for me, does it look OK to you?
+On Fri, Sep 21, 2018 at 02:56:24PM +0200, Lucas Stach wrote:
+> This adds the basic DTS for the i.MX8MQ.
+> For now only the following peripherals are supported:
+> - IOMUXC (pin controller)
+> - CCM (clock controller)
+> - GPIO
+> - UART
+> - uSDHC (SD/eMMC controller)
+> - FEC (ethernet controller)
+> - i2c
 > 
-> it looks good, just curious if it will work both ti-sysc legacy/nonlegacy modes.
+> +#define MX8MQ_IOMUXC_SD1_DATA0_USDHC1_DATA0                                 0x0A8 0x310 0x000 0x0 0x0
+> +#define MX8MQ_IOMUXC_SD1_DATA0_GPIO2_IO2                                    0x0A8 0x31  0x000 0x5 0x0
 
-OK, yes it seems to pass my artificial test case without ti-sysc
-dts changes, see below. So I just sent the i2c-omap patch as:
+The 0x31 looks suspicious.
 
-"[PATCH] i2c: omap: Use noirq system sleep pm ops to idle device for suspend"
+And checkpatch isn't happy about the spaces instead of tabs.
 
-Regards,
+Rob
 
-Tony
-
-8< -----------
-[   70.509713] PM: suspend entry (deep)
-[   70.509739] PM: Syncing filesystems ... done.
-[   70.516785] Freezing user space processes ... (elapsed 0.001 seconds) done.
-[   70.518746] OOM killer disabled.
-[   70.518756] Freezing remaining freezable tasks ... (elapsed 0.001 seconds) done.
-[   70.520393] Suspending console(s) (use no_console_suspend to debug)
-[   70.532983] wlan0: deauthenticating from 42:04:7a:03:0b:78 by local choice (Reason: 3=DEAUTH_LEAVING)
-[   70.589742] wlcore: down
-[   70.590435] wlcore: down
-[   70.672208] Disabling non-boot CPUs ...
-[   70.672237] pm33xx pm33xx: PM: Successfully put all powerdomains to target state
-[   70.694047] net eth0: initializing cpsw version 1.15 (0)
-[   70.792216] Micrel KSZ9031 Gigabit PHY 4a101000.mdio:04: attached PHY driver [Micrel KSZ9031 Gigabit PHY] (mii_bus:p)
-[   70.795548] net eth1: initializing cpsw version 1.15 (0)
-[   70.902204] Micrel KSZ9031 Gigabit PHY 4a101000.mdio:05: attached PHY driver [Micrel KSZ9031 Gigabit PHY] (mii_bus:p)
-[   71.007103] usb usb1: root hub lost power or was reset
-[   71.007121] usb usb2: root hub lost power or was reset
-[   71.322414] wlcore: PHY firmware version: Rev 8.2.0.0.236
-[   71.417839] wlcore: firmware booted (Rev 8.9.0.0.69)
-[   71.444787] OOM killer enabled.
-[   71.444799] Restarting tasks ... done.
-[   71.461113] PM: suspend exit
+> +#define MX8MQ_IOMUXC_SD1_DATA1_USDHC1_DATA1                                 0x0AC 0x314 0x000 0x0 0x0
