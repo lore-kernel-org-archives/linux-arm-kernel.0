@@ -1,55 +1,47 @@
-From: leoyang.li@nxp.com (Li Yang)
-Date: Thu, 27 Sep 2018 15:40:02 -0500
-Subject: [PATCH v2 07/22] soc/fsl/bman_portals: defer probe after bman's
- probe
-In-Reply-To: <20180926132247.10971-8-laurentiu.tudor@nxp.com>
-References: <20180926132247.10971-1-laurentiu.tudor@nxp.com>
- <20180926132247.10971-8-laurentiu.tudor@nxp.com>
-Message-ID: <CADRPPNQyp=zC7Bo441gRQL61GMNdL-EMo4BA_NYV+CErOaM6tg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 27 Sep 2018 15:56:10 -0500
+Subject: [PATCH i2c-next v3 1/3] dt-bindings: i2c: aspeed: Add 'timeout'
+ property as an optional property
+In-Reply-To: <20180926215842.23125-2-jae.hyun.yoo@linux.intel.com>
+References: <20180926215842.23125-1-jae.hyun.yoo@linux.intel.com>
+ <20180926215842.23125-2-jae.hyun.yoo@linux.intel.com>
+Message-ID: <20180927205610.GA29022@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 26, 2018 at 8:26 AM <laurentiu.tudor@nxp.com> wrote:
->
-> From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
->
-> A crash in bman portal probing could not be triggered (as is the case
-> with qman portals) but it does make calls [1] into the bman driver so
-> lets make sure the bman portal probing happens after bman's.
->
-> [1]  bman_p_irqsource_add() (in bman) called by:
->        init_pcfg() called by:
->          bman_portal_probe()
->
-> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+On Wed, Sep 26, 2018 at 02:58:40PM -0700, Jae Hyun Yoo wrote:
+> This commit adds 'aspeed,timeout' property as an optional property
+> which can be used for setting 'timeout' value of
+> 'struct i2c_adapter'. With this patch, the timeout value can be
+> set through an I2C_TIMEOUT ioctl on cdev, or through this optional
+> DT property.
 
-As this is part of a bug fix for v4.19, applied on soc/fsl for fix.
+Isn't controlling this from userspace or relying on a default 
+sufficient?  I can't see this needing to be highly tuned for each 
+platform.
 
+However, if we do have a property, it should be common.
+
+> 
+> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
 > ---
->  drivers/soc/fsl/qbman/bman_portal.c | 10 +++++++++-
->  1 file changed, 9 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/soc/fsl/qbman/bman_portal.c b/drivers/soc/fsl/qbman/bman_portal.c
-> index 2f71f7df3465..f9edd28894fd 100644
-> --- a/drivers/soc/fsl/qbman/bman_portal.c
-> +++ b/drivers/soc/fsl/qbman/bman_portal.c
-> @@ -91,7 +91,15 @@ static int bman_portal_probe(struct platform_device *pdev)
->         struct device_node *node = dev->of_node;
->         struct bm_portal_config *pcfg;
->         struct resource *addr_phys[2];
-> -       int irq, cpu;
-> +       int irq, cpu, err;
+>  Documentation/devicetree/bindings/i2c/i2c-aspeed.txt | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-aspeed.txt b/Documentation/devicetree/bindings/i2c/i2c-aspeed.txt
+> index 8fbd8633a387..d6965b360fbc 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-aspeed.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-aspeed.txt
+> @@ -17,6 +17,9 @@ Optional Properties:
+>  		  specified
+>  - multi-master	: states that there is another master active on this bus.
+>  
+> +- aspeed,timeout : I2C bus timeout in microseconds defaults to 5 seconds when
+> +		   not specified.
 > +
-> +       err = bman_is_probed();
-> +       if (!err)
-> +               return -EPROBE_DEFER;
-> +       if (err < 0) {
-> +               dev_err(&pdev->dev, "failing probe due to bman probe error\n");
-> +               return -ENODEV;
-> +       }
->
->         pcfg = devm_kmalloc(dev, sizeof(*pcfg), GFP_KERNEL);
->         if (!pcfg)
-> --
-> 2.17.1
->
+>  Example:
+>  
+>  i2c {
+> -- 
+> 2.19.0
+> 
