@@ -1,45 +1,37 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 27 Sep 2018 17:21:26 +0200
-Subject: [PATCH 06/12] drm/sun4i: sun6i_mipi_dsi: Fix VBP size calculation
-In-Reply-To: <20180927114850.24565-7-jagan@amarulasolutions.com>
-References: <20180927114850.24565-1-jagan@amarulasolutions.com>
- <20180927114850.24565-7-jagan@amarulasolutions.com>
-Message-ID: <20180927152126.vovnvwmqdfpuxgdm@flea>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 27 Sep 2018 17:22:38 +0200
+Subject: [PATCH v3 0/9] add support for relative references in jump tables
+In-Reply-To: <20180919130803.GH24124@hirez.programming.kicks-ass.net>
+References: <20180919065144.25010-1-ard.biesheuvel@linaro.org>
+ <20180919130803.GH24124@hirez.programming.kicks-ass.net>
+Message-ID: <CAKv+Gu9NB8B0GrD0GZfF5mcgg4epokEBLFuSLz-1KQo=yh0d8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 27, 2018 at 05:18:44PM +0530, Jagan Teki wrote:
-> According to horizontal and vertical timings are defined
-> per the diagram from include/drm/drm_modes.h
-> 
-> Back porch = [hv]total - [hv]sync_end
+On 19 September 2018 at 15:08, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Tue, Sep 18, 2018 at 11:51:35PM -0700, Ard Biesheuvel wrote:
 >
-> So, update SUN6I_DSI_BASIC_SIZE0_VBP calculation as
-> mode->vtotal - mode->vsync_end
-> 
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> ---
->  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> index 1c7e42015645..599284971ab6 100644
-> --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> @@ -526,8 +526,8 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
->  	regmap_write(dsi->regs, SUN6I_DSI_BASIC_SIZE0_REG,
->  		     SUN6I_DSI_BASIC_SIZE0_VSA(mode->vsync_end -
->  					       mode->vsync_start) |
-> -		     SUN6I_DSI_BASIC_SIZE0_VBP(mode->vsync_start -
-> -					       mode->vdisplay));
-> +		     SUN6I_DSI_BASIC_SIZE0_VBP(mode->vtotal -
-> +					       mode->vsync_end));
+>> Ard Biesheuvel (8):
+>>   kernel/jump_label: abstract jump_entry member accessors
+>>   kernel/jump_label: implement generic support for relative references
+>>   arm64/kernel: jump_label: switch to relative references
+>>   x86: add support for 64-bit place relative relocations
+>>   x86: jump_label: switch to jump_entry accessors
+>>   x86/kernel: jump_table: use relative references
+>>   jump_label: annotate entries that operate on __init code earlier
+>>   jump_table: move entries into ro_after_init region
+>>
+>> Heiko Carstens (1):
+>>   s390/jump_label: switch to relative references
+>
+> This all looks good to me;
+>
+> Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
+>
+> Ingo, could you queue this?
 
-Is it purely theoretical, or did you find some source that back that?
+I wouldn't mind if these could go in for the next cycle if there are
+no remaining concerns.
 
-Maxime
-
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Thanks,
+Ard.
