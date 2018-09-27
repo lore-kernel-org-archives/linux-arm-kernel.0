@@ -1,97 +1,48 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 27 Sep 2018 16:51:35 +0200
-Subject: [PATCH] clocksource/drivers/timer-atmel-pit: Properly handle error
- cases
-In-Reply-To: <ea561d6f-22f8-b1f7-a063-d559900a9004@linaro.org>
-References: <ea561d6f-22f8-b1f7-a063-d559900a9004@linaro.org>
-Message-ID: <1538059895-10049-1-git-send-email-daniel.lezcano@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 27 Sep 2018 07:53:32 -0700
+Subject: [PATCH 0/4] Update am437x and am335x dts to probe with ti-sysc
+In-Reply-To: <305bf1c3-915d-dac1-95e4-4d32621247e1@ti.com>
+References: <20180925000545.22931-1-tony@atomide.com>
+ <e9afe736-c2f0-6182-afd0-08279e09a35e@ti.com>
+ <20180925144021.GN5662@atomide.com>
+ <20180925175537.GQ5662@atomide.com>
+ <d98aa7c1-5131-34c5-51e5-c7ef57cbc31e@ti.com>
+ <20180926155911.GT5662@atomide.com>
+ <20180926162303.GU5662@atomide.com>
+ <cfc3f1db-9468-ed92-a673-882b51b4dec8@ti.com>
+ <20180926233111.GY5662@atomide.com>
+ <305bf1c3-915d-dac1-95e4-4d32621247e1@ti.com>
+Message-ID: <20180927145332.GA5662@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexandre Belloni <alexandre.belloni@bootlin.com>
+* Keerthy <j-keerthy@ti.com> [180927 05:00]:
+> On Thursday 27 September 2018 05:01 AM, Tony Lindgren wrote:
+> > The following works for me, does it look OK to you?
+> 
+> This works pretty well with DS0 on am437x-gp-evm. Tested rtc wakeup,
+> wakeup using uart and touch. All of the work well.
+> 
+> https://pastebin.ubuntu.com/p/RJhJJKhJHX/
 
-The smatch utility reports a possible leak:
+OK good to hear and thanks for testing again.
 
-smatch warnings:
-drivers/clocksource/timer-atmel-pit.c:183 at91sam926x_pit_dt_init() warn: possible memory leak of 'data'
+> Also tested on beaglebone black DS0 works fine. Although there seems to
+> be an additional warning which was not seen before:
+> 
+> "l4-wkup-clkctrl:0008:0: failed to disable"
+> 
+> log: https://pastebin.ubuntu.com/p/Ns2WRdVkXS/
+> 
+> Also the above warning is present without/with this patch on [0].
+> No such warnings on am4 though.
 
-Ensure data is freed before exiting with an error.
+OK. For am335x I'll post an updated version of the am335x
+changes to fix the gpio dbck offset.
 
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
-Cc: stable at vger.kernel.org
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- drivers/clocksource/timer-atmel-pit.c | 20 ++++++++++++++------
- 1 file changed, 14 insertions(+), 6 deletions(-)
+Regards,
 
-diff --git a/drivers/clocksource/timer-atmel-pit.c b/drivers/clocksource/timer-atmel-pit.c
-index ec8a437..2fab18f 100644
---- a/drivers/clocksource/timer-atmel-pit.c
-+++ b/drivers/clocksource/timer-atmel-pit.c
-@@ -180,26 +180,29 @@ static int __init at91sam926x_pit_dt_init(struct device_node *node)
- 	data->base = of_iomap(node, 0);
- 	if (!data->base) {
- 		pr_err("Could not map PIT address\n");
--		return -ENXIO;
-+		ret = -ENXIO;
-+		goto exit;
- 	}
- 
- 	data->mck = of_clk_get(node, 0);
- 	if (IS_ERR(data->mck)) {
- 		pr_err("Unable to get mck clk\n");
--		return PTR_ERR(data->mck);
-+		ret = PTR_ERR(data->mck);
-+		goto exit;
- 	}
- 
- 	ret = clk_prepare_enable(data->mck);
- 	if (ret) {
- 		pr_err("Unable to enable mck\n");
--		return ret;
-+		goto exit;
- 	}
- 
- 	/* Get the interrupts property */
- 	data->irq = irq_of_parse_and_map(node, 0);
- 	if (!data->irq) {
- 		pr_err("Unable to get IRQ from DT\n");
--		return -EINVAL;
-+		ret = -EINVAL;
-+		goto exit;
- 	}
- 
- 	/*
-@@ -227,7 +230,7 @@ static int __init at91sam926x_pit_dt_init(struct device_node *node)
- 	ret = clocksource_register_hz(&data->clksrc, pit_rate);
- 	if (ret) {
- 		pr_err("Failed to register clocksource\n");
--		return ret;
-+		goto exit;
- 	}
- 
- 	/* Set up irq handler */
-@@ -236,7 +239,8 @@ static int __init at91sam926x_pit_dt_init(struct device_node *node)
- 			  "at91_tick", data);
- 	if (ret) {
- 		pr_err("Unable to setup IRQ\n");
--		return ret;
-+		clocksource_unregister(&data->clksrc);
-+		goto exit;
- 	}
- 
- 	/* Set up and register clockevents */
-@@ -254,6 +258,10 @@ static int __init at91sam926x_pit_dt_init(struct device_node *node)
- 	clockevents_register_device(&data->clkevt);
- 
- 	return 0;
-+
-+exit:
-+	kfree(data);
-+	return ret;
- }
- TIMER_OF_DECLARE(at91sam926x_pit, "atmel,at91sam9260-pit",
- 		       at91sam926x_pit_dt_init);
--- 
-2.7.4
+Tony
+
+> [0]
+> https://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git/log/?h=omap-for-v4.20/dt-ti-sysc-tmp-testing
