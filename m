@@ -1,85 +1,63 @@
-From: leoyang.li@nxp.com (Li Yang)
-Date: Thu, 27 Sep 2018 14:24:48 -0500
-Subject: [PATCH 1/2] soc: fsl: qbman: qman_portal: defer probing when qman
- is not available
-In-Reply-To: <CADRPPNQwWgU6OcE7CjxyrgSXjUjwYe4VY0gQD8jx6D+eT_DWrw@mail.gmail.com>
-References: <20180823213600.23426-1-alexandre.belloni@bootlin.com>
- <CAOesGMjDKKSNVccu4D579SiwL9zEU7ha7HQCHncvh2r4kpO6fQ@mail.gmail.com>
- <20180926092706.GA16644@piout.net>
- <CADRPPNQwWgU6OcE7CjxyrgSXjUjwYe4VY0gQD8jx6D+eT_DWrw@mail.gmail.com>
-Message-ID: <CADRPPNRTWSLapqLHO=y5_Rcbh27CigAjPuorLYPrzqxUGYt-9Q@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 27 Sep 2018 12:27:09 -0700
+Subject: [PATCH 1/3] firmware/psci: Fix cpu_resume entry points with
+ THUMB2_KERNEL
+In-Reply-To: <20180927192711.26455-1-f.fainelli@gmail.com>
+References: <20180927192711.26455-1-f.fainelli@gmail.com>
+Message-ID: <20180927192711.26455-2-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 26, 2018 at 1:15 PM Li Yang <leoyang.li@nxp.com> wrote:
->
-> On Wed, Sep 26, 2018 at 4:28 AM Alexandre Belloni
-> <alexandre.belloni@bootlin.com> wrote:
-> >
-> > On 25/09/2018 21:45:56+0200, Olof Johansson wrote:
-> > > Hi,
-> > >
-> > >
-> > > On Thu, Aug 23, 2018 at 11:36 PM Alexandre Belloni
-> > > <alexandre.belloni@bootlin.com> wrote:
-> > > >
-> > > > If the qman driver (qman_ccsr) doesn't probe or fail to probe before
-> > > > qman_portal, qm_ccsr_start will be either NULL or a stale pointer to an
-> > > > unmapped page.
-> > > >
-> > > > This leads to a crash when probing  qman_portal as the init_pcfg function
-> > > > calls qman_liodn_fixup that tries to read qman registers.
-> > > >
-> > > > Assume that qman didn't probe when the pool mask is 0.
-> > > >
-> > > > Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
-> > > > ---
-> > > >  drivers/soc/fsl/qbman/qman_portal.c | 2 ++
-> > > >  1 file changed, 2 insertions(+)
-> > > >
-> > > > diff --git a/drivers/soc/fsl/qbman/qman_portal.c b/drivers/soc/fsl/qbman/qman_portal.c
-> > > > index a120002b630e..4fc80d2c8feb 100644
-> > > > --- a/drivers/soc/fsl/qbman/qman_portal.c
-> > > > +++ b/drivers/soc/fsl/qbman/qman_portal.c
-> > > > @@ -277,6 +277,8 @@ static int qman_portal_probe(struct platform_device *pdev)
-> > > >         }
-> > > >
-> > > >         pcfg->pools = qm_get_pools_sdqcr();
-> > > > +       if (pcfg->pools == 0)
-> > > > +               return -EPROBE_DEFER;
-> > >
-> > > This is quite late in the probe, after a bunch of resources have been claimed.
-> > >
-> > > Note that the ioremaps above this are doing unwinds, and you'll end up
-> > > doing duplicate ioremaps if you come in and probe again.
-> > >
-> > > You should probably unwind those allocations, or move them to devm_*
-> > > or do this check earlier in the function.
-> > >
-> >
-> > The actual chance of having that happen is quite small (this was coming
-> > from a non working DT) and I mainly wanted to avoid a crash so the
-> > platform could still boot. I would think moving to devm_ would be the
-> > right thing to do.
->
-> Even if it is not failing with the upstreamed device trees, it is
-> still good to harden the driver for possible issues.  Moving to devm_
-> is definitely a right thing to do.  But I also think checking if the
-> qman is already probed should be the first thing to do before starting
-> to allocate resources and etc and rolling back later.  Probably we can
-> move the qm_get_pools_sdqcr() to the begining of the probe to
-> determine if qman is probed as it doesn't seem to depend on any of the
-> setups done right now.
+When THUMB2_KERNEL is enabled, we would be failing to resume from an
+idle or system suspend call where the reentry point is set to
+cpu_resume() because that function is in Thumb2. Utilize
+cpu_resume_arm() for ARM 32-bit kernels which takes care of the mode
+switching for us.
 
-I just find out Laurentiu also included the following patches in his
-SMMU patch series (although not neccessarily related to SMMU) which
-also fix the same problem.  I think they are more straightforward and
-can deal with the case that qman failed to probe.  So we can take
-these to fix this problem instead in 4.19.
+Fixes: 8b6f2499ac45 ("ARM: 8511/1: ARM64: kernel: PSCI: move PSCI idle management code to drivers/firmware")
+Fixes: faf7ec4a92c0 ("drivers: firmware: psci: add system suspend support")
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ drivers/firmware/psci.c | 18 +++++++++++++++---
+ 1 file changed, 15 insertions(+), 3 deletions(-)
 
-https://patchwork.kernel.org/patch/10616021/
-https://patchwork.kernel.org/patch/10616019/
-https://patchwork.kernel.org/patch/10615971/
-
-Regards,
-Leo
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index c80ec1d03274..f8b154384483 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -400,9 +400,14 @@ int psci_cpu_init_idle(unsigned int cpu)
+ static int psci_suspend_finisher(unsigned long index)
+ {
+ 	u32 *state = __this_cpu_read(psci_power_state);
++	unsigned long reentry;
+ 
+-	return psci_ops.cpu_suspend(state[index - 1],
+-				    __pa_symbol(cpu_resume));
++#ifdef CONFIG_ARM
++	reentry = __pa_symbol(cpu_resume_arm);
++#else
++	reentry = __pa_symbol(cpu_resume);
++#endif
++	return psci_ops.cpu_suspend(state[index - 1], reentry);
+ }
+ 
+ int psci_cpu_suspend_enter(unsigned long index)
+@@ -437,8 +442,15 @@ CPUIDLE_METHOD_OF_DECLARE(psci, "psci", &psci_cpuidle_ops);
+ 
+ static int psci_system_suspend(unsigned long unused)
+ {
++	unsigned long reentry;
++
++#ifdef CONFIG_ARM
++	reentry = __pa_symbol(cpu_resume_arm);
++#else
++	reentry = __pa_symbol(cpu_resume);
++#endif
+ 	return invoke_psci_fn(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND),
+-			      __pa_symbol(cpu_resume), 0, 0);
++			      reentry, 0, 0);
+ }
+ 
+ static int psci_system_suspend_enter(suspend_state_t state)
+-- 
+2.17.1
