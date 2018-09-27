@@ -1,51 +1,67 @@
-From: npcomplete13@gmail.com (Vivek Unune)
-Date: Thu, 27 Sep 2018 16:59:51 -0400
-Subject: [PATCH] ARM: dts: BCM5301X: Relicense BCM47094 file to the GPL
- 2.0+ / MIT
-In-Reply-To: <20180920112019.25622-1-zajec5@gmail.com>
-References: <20180920112019.25622-1-zajec5@gmail.com>
-Message-ID: <CAChtp753sZzQY8Jbsie2eW-j0cfM227AehcRf67puYAUCvELZw@mail.gmail.com>
+From: rruigrok@codeaurora.org (Richard Ruigrok)
+Date: Thu, 27 Sep 2018 15:10:50 -0600
+Subject: [PATCH 00/10] GICv3 support for kexec/kdump on EFI systems
+In-Reply-To: <20180921195954.21574-1-marc.zyngier@arm.com>
+References: <20180921195954.21574-1-marc.zyngier@arm.com>
+Message-ID: <44ac1fad-8df4-4738-0f25-8a7a2de8f6df@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by Vivek Unune
+Hi Marc
 
+On 9/21/2018 1:59 PM, Marc Zyngier wrote:
+> The GICv3 architecture has the remarkable feature that once LPI tables
+> have been assigned to redistributors and that LPI delivery is enabled,
+> there is no guarantee that LPIs can be turned off (and most
+> implementations do not allow it), nor can it be reprogrammed to use
+> other tables.
+>
+> This is a bit of a problem for kexec, where the secondary kernel
+> completely looses track of the previous allocations. If the secondary
+> kernel doesn't allocate the tables exactly the same way, no LPIs will
+> be delivered by the GIC (which continues to use the old tables), and
+> memory previously allocated for the pending tables will be slowly
+> corrupted, one bit at a time.
+>
+> The workaround for this is based on a series[1] by Ard Biesheuvel,
+> which adds the required infrastructure for memory reservations to be
+> passed from one kernel to another using an EFI table.
+>
+> This infrastructure is then used to register the allocation of GIC
+> tables with EFI, and allow the GIC driver to safely reuse the existing
+> programming if it detects that the tables have been correctly
+> registered. On non-EFI systems, there is not much we can do.
+>
+> This has been tested on a TX2 system both as a host and a guest. I'd
+> welcome additional testing of different HW. For convenience, I've
+> stashed a branch containing the whole thing at [2].
+I tested [2] from the 4.19-rc4 set which included this series and [1].
+Tested kexec on Centriq system with ITS support (46 core).? On-board was a MLX CX5 NIC, verified MSIs are active in /proc/interrupts.
+Prior to this we used a workaround from Shanker to reuse the same tables in the kexec'ed kernel.
+Let me know if further testing is needed, and thanks for adding this support.
+> [1] https://marc.info/?l=linux-efi&m=153754757208163&w=2
+> [2] https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/log/?h=irq/gicv3-kdump
+>
+> Marc Zyngier (10):
+>   irqchip/gic-v3-its: Change initialization ordering for LPIs
+>   irqchip/gic-v3-its: Consolidate LPI_PENDBASE_SZ usage
+>   irqchip/gic-v3-its: Split property table clearing from allocation
+>   irqchip/gic-v3-its: Move pending table allocation to init time
+>   irqchip/gic-v3-its: Keep track of property table's PA and VA
+>   irqchip/gic-v3-its: Allow use of pre-programmed LPI tables
+>   irqchip/gic-v3-its: Use pre-programmed redistributor tables with kdump
+>     kernels
+>   irqchip/gic-v3-its: Check that all RDs have the same property table
+>   irqchip/gic-v3-its: Register LPI tables with EFI config table
+>   irqchip/gic-v3-its: Allow use of LPI tables in reserved memory
+>
+>  drivers/irqchip/irq-gic-v3-its.c   | 249 ++++++++++++++++++++++-------
+>  drivers/irqchip/irq-gic-v3.c       |  20 ++-
+>  include/linux/irqchip/arm-gic-v3.h |   4 +-
+>  3 files changed, 208 insertions(+), 65 deletions(-)
+>
 
-On Thu, Sep 20, 2018 at 7:20 AM Rafa? Mi?ecki <zajec5@gmail.com> wrote:
->
-> From: Rafa? Mi?ecki <rafal@milecki.pl>
->
-> This matches licensing used by other BCM5301X files and is preferred as:
-> 1) GPL 2.0+ makes it clearly compatible with Linux kernel
-> 2) MIT is also permissive but preferred over ISC
->
-> This file has been developed by me & once modified by Vivek.
->
-> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
-> ---
-> Vivek: you have touched this file in the commit 37f6130ec39f ("ARM: dts:
-> BCM5301X: Make USB 3.0 PHY use MDIO PHY driver").
->
-> If you are OK with this relicensing, can you reply with
-> Acked-by
-> with your name, please?
-> ---
->  arch/arm/boot/dts/bcm47094.dtsi | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/bcm47094.dtsi b/arch/arm/boot/dts/bcm47094.dtsi
-> index f7c3e274b354..cdc5ff593adb 100644
-> --- a/arch/arm/boot/dts/bcm47094.dtsi
-> +++ b/arch/arm/boot/dts/bcm47094.dtsi
-> @@ -1,7 +1,6 @@
-> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
->  /*
->   * Copyright (C) 2016 Rafa? Mi?ecki <rafal@milecki.pl>
-> - *
-> - * Licensed under the ISC license.
->   */
->
->  #include "bcm4708.dtsi"
-> --
-> 2.13.7
->
+-- 
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
