@@ -1,129 +1,74 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 27 Sep 2018 23:39:48 +0100 (BST)
-Subject: Applied "ASoC: pxa: avoid AC97_BUS build warning" to the asoc tree
-In-Reply-To: <20180926124645.1841850-1-arnd@arndb.de>
-Message-ID: <20180927223948.526C8440078@finisterre.ee.mobilebroadband>
+From: robdclark@gmail.com (Rob Clark)
+Date: Thu, 27 Sep 2018 18:46:07 -0400
+Subject: [PATCH] iommu: arm-smmu: Set SCTLR.HUPCF bit
+Message-ID: <20180927224609.19515-1-robdclark@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+We seem to need to set either this or CFCFG (stall), otherwise gpu
+faults trigger problems with other in-flight transactions from the
+GPU causing CP errors, etc.
 
-   ASoC: pxa: avoid AC97_BUS build warning
+In the ARM SMMU spec, the 'Hit under previous context fault' bit is
+described as:
 
-has been applied to the asoc tree at
+ '0' - Stall or terminate subsequent transactions in the presence
+       of an outstanding context fault
+ '1' - Process all subsequent transactions independently of any
+       outstanding context fault.
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+Since we don't enable CFCFG (stall) the behavior of terminating
+other transactions makes sense.  And is probably not what we want
+(and definately not what we want for GPU).
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From bec5ecdf41d404691980c9c82ba867113cc8dee5 Mon Sep 17 00:00:00 2001
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Wed, 26 Sep 2018 14:46:35 +0200
-Subject: [PATCH] ASoC: pxa: avoid AC97_BUS build warning
-
-Selecting AC97_BUS_NEW from SND_PXA2XX_SOC_AC97 leads to a Kconfig
-warning if any other driver selects AC97_BUS:
-
-WARNING: unmet direct dependencies detected for AC97_BUS_COMPAT
-  Depends on [n]: SOUND [=y] && !UML && SND [=y] && AC97_BUS_NEW [=y] && !AC97_BUS [=y]
-  Selected by [y]:
-  - SND_SOC_WM9713 [=y] && SOUND [=y] && !UML && SND [=y] && SND_SOC [=y] && AC97_BUS_NEW [=y]
-
-I don't know if that combination is supposed to work.
-Assuming it is not, this adds a dependency on all users
-for PXA to avoids the combination.
-
-Fixes: 1c8bc7b3de5e ("ASoC: pxa: switch to new ac97 bus support")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Mark Brown <broonie@kernel.org>
+Signed-off-by: Rob Clark <robdclark@gmail.com>
 ---
- sound/soc/pxa/Kconfig | 8 ++++++++
- 1 file changed, 8 insertions(+)
+So I hit this issue a long time back on 820 (msm8996) and at the
+time I solved it with a patch that enabled CFCFG.  And it resurfaced
+more recently on sdm845.  But at the time CFCFG was rejected, iirc
+because of concern that it would cause problems on other non-qcom
+arm smmu implementations.  And I think I forgot to send this version
+of the solution.
 
-diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
-index 29f577e6dfc0..943b44de1464 100644
---- a/sound/soc/pxa/Kconfig
-+++ b/sound/soc/pxa/Kconfig
-@@ -79,6 +79,7 @@ config SND_PXA2XX_SOC_TOSA
- 	tristate "SoC AC97 Audio support for Tosa"
- 	depends on SND_PXA2XX_SOC && MACH_TOSA
- 	depends on MFD_TC6393XB
-+	depends on !AC97_BUS
- 	select SND_PXA2XX_SOC_AC97
- 	select SND_SOC_WM9712
- 	help
-@@ -88,6 +89,7 @@ config SND_PXA2XX_SOC_TOSA
- config SND_PXA2XX_SOC_E740
- 	tristate "SoC AC97 Audio support for e740"
- 	depends on SND_PXA2XX_SOC && MACH_E740
-+	depends on !AC97_BUS
- 	select SND_SOC_WM9705
- 	select SND_PXA2XX_SOC_AC97
- 	help
-@@ -97,6 +99,7 @@ config SND_PXA2XX_SOC_E740
- config SND_PXA2XX_SOC_E750
- 	tristate "SoC AC97 Audio support for e750"
- 	depends on SND_PXA2XX_SOC && MACH_E750
-+	depends on !AC97_BUS
- 	select SND_SOC_WM9705
- 	select SND_PXA2XX_SOC_AC97
- 	help
-@@ -106,6 +109,7 @@ config SND_PXA2XX_SOC_E750
- config SND_PXA2XX_SOC_E800
- 	tristate "SoC AC97 Audio support for e800"
- 	depends on SND_PXA2XX_SOC && MACH_E800
-+	depends on !AC97_BUS
- 	select SND_SOC_WM9712
- 	select SND_PXA2XX_SOC_AC97
- 	help
-@@ -116,6 +120,7 @@ config SND_PXA2XX_SOC_EM_X270
- 	tristate "SoC Audio support for CompuLab EM-x270, eXeda and CM-X300"
- 	depends on SND_PXA2XX_SOC && (MACH_EM_X270 || MACH_EXEDA || \
- 			MACH_CM_X300)
-+	depends on !AC97_BUS
- 	select SND_PXA2XX_SOC_AC97
- 	select SND_SOC_WM9712
- 	help
-@@ -126,6 +131,7 @@ config SND_PXA2XX_SOC_PALM27X
- 	bool "SoC Audio support for Palm T|X, T5, E2 and LifeDrive"
- 	depends on SND_PXA2XX_SOC && (MACH_PALMLD || MACH_PALMTX || \
- 			MACH_PALMT5 || MACH_PALMTE2)
-+	depends on !AC97_BUS
- 	select SND_PXA2XX_SOC_AC97
- 	select SND_SOC_WM9712
- 	help
-@@ -155,6 +161,7 @@ config SND_SOC_TTC_DKB
- config SND_SOC_ZYLONITE
- 	tristate "SoC Audio support for Marvell Zylonite"
- 	depends on SND_PXA2XX_SOC && MACH_ZYLONITE
-+	depends on !AC97_BUS
- 	select SND_PXA2XX_SOC_AC97
- 	select SND_PXA_SOC_SSP
- 	select SND_SOC_WM9713
-@@ -194,6 +201,7 @@ config SND_PXA2XX_SOC_MAGICIAN
- config SND_PXA2XX_SOC_MIOA701
-         tristate "SoC Audio support for MIO A701"
-         depends on SND_PXA2XX_SOC && MACH_MIOA701
-+	depends on !AC97_BUS
-         select SND_PXA2XX_SOC_AC97
-         select SND_SOC_WM9713
-         help
+If enabling HUPCF is anticipated to cause problems on other ARM
+SMMU implementations, I think I can come up with a variant of this
+patch which conditionally enables it for snapdragon.
+
+Either way, I'd really like to get some variant of this fix merged
+(and probably it would be a good idea for stable kernel branches
+too), since current behaviour with the GPU means faults turn into
+a fantastic cascade of fail.
+
+ drivers/iommu/arm-smmu-regs.h | 1 +
+ drivers/iommu/arm-smmu.c      | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/iommu/arm-smmu-regs.h b/drivers/iommu/arm-smmu-regs.h
+index a1226e4ab5f8..2291925eb800 100644
+--- a/drivers/iommu/arm-smmu-regs.h
++++ b/drivers/iommu/arm-smmu-regs.h
+@@ -178,6 +178,7 @@ enum arm_smmu_s2cr_privcfg {
+ #define ARM_SMMU_CB_ATSR		0x8f0
+ 
+ #define SCTLR_S1_ASIDPNE		(1 << 12)
++#define SCTLR_HUPCF			(1 << 8)
+ #define SCTLR_CFCFG			(1 << 7)
+ #define SCTLR_CFIE			(1 << 6)
+ #define SCTLR_CFRE			(1 << 5)
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index f7a96bcf94a6..47ffc9aade72 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -713,9 +713,9 @@ static void arm_smmu_write_context_bank(struct arm_smmu_device *smmu, int idx)
+ 	reg = SCTLR_CFIE | SCTLR_CFRE | SCTLR_AFE | SCTLR_TRE | SCTLR_M;
+ 	if (stage1)
+ 		reg |= SCTLR_S1_ASIDPNE;
++	reg |= SCTLR_HUPCF;
+ 	if (IS_ENABLED(CONFIG_CPU_BIG_ENDIAN))
+ 		reg |= SCTLR_E;
+-
+ 	writel_relaxed(reg, cb_base + ARM_SMMU_CB_SCTLR);
+ }
+ 
 -- 
-2.19.0
+2.17.1
