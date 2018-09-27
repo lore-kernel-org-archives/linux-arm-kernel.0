@@ -1,52 +1,52 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 27 Sep 2018 08:28:22 +0200
-Subject: [PATCHv4 4/6] ARM: dts: exynos: Add CD and WP pins to Odroid
- XU3/XU4 SD card
-In-Reply-To: <CANAwSgSPkKL3jaHHSkEhgocKT_Sq4zg3Z=+7d5889ttpnNPHDA@mail.gmail.com>
-References: <20180922075238.884-1-linux.amoon@gmail.com>
- <20180922075238.884-6-linux.amoon@gmail.com>
- <20180926190639.GA6461@kozik-lap>
- <CANAwSgSPkKL3jaHHSkEhgocKT_Sq4zg3Z=+7d5889ttpnNPHDA@mail.gmail.com>
-Message-ID: <CAJKOXPeRauojpS9kEbQK8k+BQLSGEHEVsAwi406tW3zN2RzPWQ@mail.gmail.com>
+From: houlong.wei@mediatek.com (Houlong Wei)
+Date: Thu, 27 Sep 2018 14:43:37 +0800
+Subject: [PATCH v24 0/2] MediaTek MT8173 CMDQ support
+Message-ID: <1538030619-25829-1-git-send-email-houlong.wei@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Sep 2018 at 05:45, Anand Moon <linux.amoon@gmail.com> wrote:
->
-> Hi Krzysztof,
-> On Thu, 27 Sep 2018 at 00:36, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> >
-> > On Sat, Sep 22, 2018 at 07:52:36AM +0000, Anand Moon wrote:
-> > > Add the card-detect and write-protect GPIO pins for OdroidXU3/XU4
-> > > SD card by adding pinctrl setting for wp-gpio pin and set it to
-> > > active low.
-> > >
-> > > This also removes debug messages:
-> > >     dwmmc_exynos 12220000.mmc: No GPIO consumer cd found
-> > >     dwmmc_exynos 12220000.mmc: No GPIO consumer wp found
-> > >
-> > > Suggested-by: Krzysztof Kozlowski <krzk@kernel.org>
-> > > Signed-off-by: Anand Moon <linux.amoon@gmail.com>
-> > > ---
-> > > Fix the commit message and squash it with cd-gpios and wp-gpio
-> > > patches into single patch as suggested by Krzysztof.
-> >
-> > As Marek pointed to my Odroid XU patch, there is no point of adding
-> > cd-gpios and wp-gpios properties.
-> >
-> > Adding pin configuration for wp pin is also not needed. Reset values are
-> > working properly. However there might be meaning of adding it just in
-> > case - if bootloader decided to touch it...
-> >
-> > Best regards,
-> > Krzysztof
-> >
->
-> Do I need to send the all the patches again or just resend this as per
-> your patch for Odroid XU.
-> with dropping the cd-gpios and wp-gpios changes.
+Hi,
 
-I am fine with both (resend all or only this).
+This is Mediatek MT8173 Command Queue(CMDQ) driver. The CMDQ is used
+to help write registers with critical time limitation, such as
+updating display configuration during the vblank. It controls Global
+Command Engine (GCE) hardware to achieve this requirement.
 
-Best regards,
-Krzysztof
+Changes since v23:
+ -rebase on v4.19-rc1
+ -revise return value of cmdq_mbox_create()
+ -revise cmdq_pkt_create()
+ -add MODULE_LICENSE() for mtk-cmdq-helper.c
+ -adjust functions order in mtk-cmdq.h
+Changes since v22:
+ -remove properties 'timeout' and 'thread-num' from device tree
+ -move timer from CMDQ driver to CMDQ helper
+ -move dma unmap from CMDQ driver to CMDQ helper
+ -config thread number in CMDQ match table
+ -remove reallocate mechanism and let client specify the cmdq buffer size
+ -let client specify the timeout time
+Changes since v21:
+ -rebase on v4.18-rc1
+ -remove subsys code and event id definition from mtk-cmdq-helper.c
+ -add mt8173-gce.h to define the subsys code and envent id
+Changes since v20:
+ -rebase on v4.15-rc1
+ -move dma_map_single outside of spinlock
+Changes since v19:
+ -rebase to v4.10-rc2
+
+Houlong Wei (2):
+  arm64: dts: mt8173: Add GCE node
+  soc: mediatek: Add Mediatek CMDQ helper
+
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi |   10 +
+ drivers/soc/mediatek/Kconfig             |   12 ++
+ drivers/soc/mediatek/Makefile            |    1 +
+ drivers/soc/mediatek/mtk-cmdq-helper.c   |  292 ++++++++++++++++++++++++++++++
+ include/linux/soc/mediatek/mtk-cmdq.h    |  133 ++++++++++++++
+ 5 files changed, 448 insertions(+)
+ create mode 100644 drivers/soc/mediatek/mtk-cmdq-helper.c
+ create mode 100644 include/linux/soc/mediatek/mtk-cmdq.h
+
+-- 
+1.7.9.5
