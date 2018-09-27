@@ -1,36 +1,42 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 27 Sep 2018 12:27:11 -0700
-Subject: [PATCH 3/3] soc: bcm: brcmstb: Fix re-entry point with a THUMB2_KERNEL
+Date: Thu, 27 Sep 2018 12:27:10 -0700
+Subject: [PATCH 2/3] ARM: psci: Fix secondary core boot with THUMB2_KERNEL
 In-Reply-To: <20180927192711.26455-1-f.fainelli@gmail.com>
 References: <20180927192711.26455-1-f.fainelli@gmail.com>
-Message-ID: <20180927192711.26455-4-f.fainelli@gmail.com>
+Message-ID: <20180927192711.26455-3-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the kernel is built with CONFIG_THUMB2_KERNEL we would set the
-kernel's resume entry point to be a function that is already built as
-Thumb-2 code while the boot agent doing the resume is in ARM mode, so
-this does not work. There is a header label defined: cpu_resume_arm
-which we can use to do the switching for us.
+When THUMB2_KERNEL is enabled, we would be setting the secondary core's
+entry point to secondary_startup() which is already Thumb2 code, utilize
+secondary_startup_arm() which takes care of doing the mode switching for
+us.
 
-Fixes: 0b741b8234c8 ("soc: bcm: brcmstb: Add support for S2/S3/S5 suspend states (ARM)")
+Fixes: 05774088391c ("arm: introduce psci_smp_ops")
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- drivers/soc/bcm/brcmstb/pm/pm-arm.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/kernel/psci_smp.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/soc/bcm/brcmstb/pm/pm-arm.c b/drivers/soc/bcm/brcmstb/pm/pm-arm.c
-index a5577dd5eb08..8ee06347447c 100644
---- a/drivers/soc/bcm/brcmstb/pm/pm-arm.c
-+++ b/drivers/soc/bcm/brcmstb/pm/pm-arm.c
-@@ -404,7 +404,7 @@ noinline int brcmstb_pm_s3_finish(void)
+diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
+index cb3fcaeb2233..547a11b065d2 100644
+--- a/arch/arm/kernel/psci_smp.c
++++ b/arch/arm/kernel/psci_smp.c
+@@ -47,13 +47,13 @@
+  *
+  */
+ 
+-extern void secondary_startup(void);
++extern void secondary_startup_arm(void);
+ 
+ static int psci_boot_secondary(unsigned int cpu, struct task_struct *idle)
  {
- 	struct brcmstb_s3_params *params = ctrl.s3_params;
- 	dma_addr_t params_pa = ctrl.s3_params_pa;
--	phys_addr_t reentry = virt_to_phys(&cpu_resume);
-+	phys_addr_t reentry = virt_to_phys(&cpu_resume_arm);
- 	enum bsp_initiate_command cmd;
- 	u32 flags;
+ 	if (psci_ops.cpu_on)
+ 		return psci_ops.cpu_on(cpu_logical_map(cpu),
+-					virt_to_idmap(&secondary_startup));
++					virt_to_idmap(&secondary_startup_arm));
+ 	return -ENODEV;
+ }
  
 -- 
 2.17.1
