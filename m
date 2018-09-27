@@ -1,50 +1,58 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Thu, 27 Sep 2018 19:14:23 +0530
-Subject: [PATCH 04/12] drm/sun4i: sun6i_mipi_dsi: Enable missing DSI bus
- clock
-In-Reply-To: <CAGb2v66No3-AODYCCGifBrm9uvPjaNdR2W5MDQdazRAPomT9CQ@mail.gmail.com>
-References: <20180927114850.24565-1-jagan@amarulasolutions.com>
- <20180927114850.24565-5-jagan@amarulasolutions.com>
- <CAGb2v66No3-AODYCCGifBrm9uvPjaNdR2W5MDQdazRAPomT9CQ@mail.gmail.com>
-Message-ID: <CAMty3ZBUQKVLJsmkU=hjaO_O5bhetDfAh9-7iLkUqOznVc0KyA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 27 Sep 2018 14:50:18 +0100
+Subject: [REVIEW][PATCH 00/15] signal/arm64: siginfo cleanups
+In-Reply-To: <87ftxvs2i0.fsf@xmission.com>
+References: <871s9j462u.fsf@xmission.com>
+ <20180926173841.GD175719@arrakis.emea.arm.com>
+ <87ftxvs2i0.fsf@xmission.com>
+Message-ID: <20180927135017.GC44459@arrakis.emea.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 27, 2018 at 6:13 PM Chen-Yu Tsai <wens@csie.org> wrote:
->
-> Hi,
->
-> On Thu, Sep 27, 2018 at 7:49 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
+On Thu, Sep 27, 2018 at 11:39:35AM +0200, Eric W. Biederman wrote:
+> Catalin Marinas <catalin.marinas@arm.com> writes:
+> > On Mon, Sep 24, 2018 at 11:07:05AM +0200, Eric W. Biederman wrote:
+> >> After these patches have had a chance to be reviewed I plan to merge
+> >> them by my siginfo tree.  If you would rather take them in the arm64
+> >> tree let me know.   All of the prerequisites should have been merged
+> >> through Linus's tree several releases ago.
 > >
-> > DSI bus_clk is already available in sun6i_dsi but missed to
-> > get the clk and process for enable/disable.
-> >
-> > This patch add support for it.
-> >
-> > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > ---
-> >  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 8 ++++++++
-> >  1 file changed, 8 insertions(+)
-> >
-> > diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > index 8e9c76febca2..156b371243c6 100644
-> > --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > @@ -1004,6 +1004,12 @@ static int sun6i_dsi_probe(struct platform_device *pdev)
-> >                 return PTR_ERR(dsi->reset);
-> >         }
-> >
-> > +       dsi->bus_clk = devm_clk_get(dev, "bus");
-> > +       if (IS_ERR(dsi->bus_clk)) {
-> > +               dev_err(dev, "Couldn't get the DSI bus clock\n");
-> > +               return PTR_ERR(dsi->bus_clk);
-> > +       }
-> > +
->
-> The DSI driver uses devm_regmap_init_mmio_clk, which enables the
-> clock behind the scenes when regmap access needs it enabled.
->
-> Did you have any issues without this patch?
+> > Either way works for me. There is a trivial conflict in
+> > force_signal_inject() with the arm64 for-next/core tree so I could as
+> > well put them on top of this branch and send them during the 4.20
+> > merging window.
+> 
+> As long as there is a trivial conflict I would like to keep everything
+> in one tree.
+> 
+> There is a following patchset that manages to reduce the size of struct
+> siginfo in the kernel that I have also posted for review.    With
+> everything in one tree I can make that change now, and just cross it off
+> my list of things to worry about.
 
-I'm unable to read register values via devmem, I see all 0's for all
-dsi reg space.
+Fine by me:
+
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Tested-by: Catalin Marinas <catalin.marinas@arm.com>
+
+The conflict will appear in -next but the resolution is simple:
+
+diff --cc arch/arm64/kernel/traps.c
+index 21689c6a985f,856b32aa03d8..adb0a32c1568
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@@ -353,12 -366,6 +368,9 @@@ void force_signal_inject(int signal, in
+  	const char *desc;
+  	struct pt_regs *regs = current_pt_regs();
+  
+ +	if (WARN_ON(!user_mode(regs)))
+ +		return;
+ +
+- 	clear_siginfo(&info);
+- 
+  	switch (signal) {
+  	case SIGILL:
+  		desc = "undefined instruction";
+
+-- 
+Catalin
