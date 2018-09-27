@@ -1,120 +1,40 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 27 Sep 2018 09:55:00 +0200
-Subject: [PATCH v23 4/4] soc: mediatek: Add Mediatek CMDQ helper
-In-Reply-To: <1534297570.21668.3.camel@mhfsdcap03>
-References: <1532482002-11164-1-git-send-email-houlong.wei@mediatek.com>
- <1532482002-11164-5-git-send-email-houlong.wei@mediatek.com>
- <1534297570.21668.3.camel@mhfsdcap03>
-Message-ID: <23d76d03-c0e9-cd83-f9a8-f5efa0c72938@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 27 Sep 2018 09:10:23 +0100
+Subject: [PATCH] iommu: rockchip: Drop verbose prints in the interrupt
+ handler
+In-Reply-To: <ea4d539ecbaf229bef8c0810c6a11cf824339b4b.camel@collabora.com>
+References: <20180830222832.16766-1-ezequiel@collabora.com>
+ <20180925112930.u5kftmo3vhmdxji4@8bytes.org>
+ <ea4d539ecbaf229bef8c0810c6a11cf824339b4b.camel@collabora.com>
+Message-ID: <03cdadf4-14e7-8643-81f6-cd2e7d2f3e88@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 26/09/18 18:31, Ezequiel Garcia wrote:
+> On Tue, 2018-09-25 at 13:29 +0200, Joerg Roedel wrote:
+>> On Thu, Aug 30, 2018 at 07:28:32PM -0300, Ezequiel Garcia wrote:
+>>> Printing verbosely via WARN macros and friends in interrupt handlers
+>>> is strongly discouraged. Drop them and use proper ratelimited
+>>> prints.
+>>>
+>>> Signed-off-by: Ezequiel Garcia <ezequiel@collabora.com>
+>>> ---
+>>>   drivers/iommu/rockchip-iommu.c | 10 ++++++----
+>>>   1 file changed, 6 insertions(+), 4 deletions(-)
+>>
+>> This doesn't apply cleanly to v4.19-rc5, can you please base the patch
+>> on that tag, add the Reviewed-by and re-send?
+>>
+> 
+> Well, after looking at the latest code, now I'm wondering why Marc
+> changed the WARN_ON with a WARN_ON_ONCE, instead of a less verbose
+> ratelimited print.
 
+WARN_ONCE does it exactly once. A rate-limited printk will still spit as 
+many messages as you want.
 
-On 15/08/2018 03:46, houlong wei wrote:
-[...]
->> +
->> +static int cmdq_pkt_append_command(struct cmdq_pkt *pkt, enum cmdq_code code,
->> +				   u32 arg_a, u32 arg_b)
->> +{
->> +	u64 *cmd_ptr;
->> +
->> +	if (unlikely(pkt->cmd_buf_size + CMDQ_INST_SIZE > pkt->buf_size)) {
->> +		pkt->cmd_buf_size += CMDQ_INST_SIZE;
->> +		return -ENOMEM;
->> +	}
->> +	cmd_ptr = pkt->va_base + pkt->cmd_buf_size;
->> +	(*cmd_ptr) = (u64)((code << CMDQ_OP_CODE_SHIFT) | arg_a) << 32 | arg_b;
->> +	pkt->cmd_buf_size += CMDQ_INST_SIZE;
->> +
->> +	return 0;
->> +}
->> +
->> +int cmdq_pkt_write(struct cmdq_pkt *pkt, u32 value, u32 subsys, u32 offset)
->> +{
->> +	u32 arg_a = (offset & CMDQ_ARG_A_WRITE_MASK) |
->> +		    (subsys << CMDQ_SUBSYS_SHIFT);
->> +
->> +	return cmdq_pkt_append_command(pkt, CMDQ_CODE_WRITE, arg_a, value);
->> +}
->> +EXPORT_SYMBOL(cmdq_pkt_write);
->> +
->> +int cmdq_pkt_write_mask(struct cmdq_pkt *pkt, u32 value,
->> +			u32 subsys, u32 offset, u32 mask)
->> +{
->> +	u32 offset_mask = offset;
->> +	int err;
->> +
->> +	if (mask != 0xffffffff) {
->> +		err = cmdq_pkt_append_command(pkt, CMDQ_CODE_MASK, 0, ~mask);
->> +		WARN_ON(err < 0);
+Thanks,
 
-If we want to write out a warning to the kernel log, then we should but that in
-the if (unlikely(pkt->cmd_buf_size + CMDQ_INST_SIZE > pkt->buf_size)) from
-cmdq_pkt_append_command to make it consistent between cmdq_pkt_write,
-cmdq_pkt_write_mask and cmdq_pkt_finalize
-
-Sorry, just saw this right now.
-
->> +		offset_mask |= CMDQ_WRITE_ENABLE_MASK;
->> +	}
->> +
->> +	return cmdq_pkt_write(pkt, value, subsys, offset_mask);
->> +}
->> +EXPORT_SYMBOL(cmdq_pkt_write_mask);
->> +
->> +int cmdq_pkt_wfe(struct cmdq_pkt *pkt, u32 event)
->> +{
->> +	u32 arg_b;
->> +
->> +	if (event >= CMDQ_MAX_EVENT)
->> +		return -EINVAL;
->> +
->> +	/*
->> +	 * WFE arg_b
->> +	 * bit 0-11: wait value
->> +	 * bit 15: 1 - wait, 0 - no wait
->> +	 * bit 16-27: update value
->> +	 * bit 31: 1 - update, 0 - no update
->> +	 */
->> +	arg_b = CMDQ_WFE_UPDATE | CMDQ_WFE_WAIT | CMDQ_WFE_WAIT_VALUE;
->> +
->> +	return cmdq_pkt_append_command(pkt, CMDQ_CODE_WFE, event, arg_b);
->> +}
->> +EXPORT_SYMBOL(cmdq_pkt_wfe);
->> +
->> +int cmdq_pkt_clear_event(struct cmdq_pkt *pkt, u32 event)
->> +{
->> +	if (event >= CMDQ_MAX_EVENT)
->> +		return -EINVAL;
->> +
->> +	return cmdq_pkt_append_command(pkt, CMDQ_CODE_WFE, event,
->> +				       CMDQ_WFE_UPDATE);
->> +}
->> +EXPORT_SYMBOL(cmdq_pkt_clear_event);
->> +
->> +static int cmdq_pkt_finalize(struct cmdq_pkt *pkt)
->> +{
->> +	int err;
->> +
->> +	/* insert EOC and generate IRQ for each command iteration */
->> +	err = cmdq_pkt_append_command(pkt, CMDQ_CODE_EOC, 0, CMDQ_EOC_IRQ_EN);
->> +	WARN_ON(err < 0);
-
-Should move into cmdq_pkt_append_command
-
->> +
->> +	/* JUMP to end */
->> +	err = cmdq_pkt_append_command(pkt, CMDQ_CODE_JUMP, 0, CMDQ_JUMP_PASS);
->> +	WARN_ON(err < 0);
-
-same here.
-
->> +
->> +	return err;
->> +}
->> +
-[...]
-
-Regards,
-Matthias
+	M.
+-- 
+Jazz is not dead. It just smells funny...
