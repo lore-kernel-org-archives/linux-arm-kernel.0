@@ -1,67 +1,68 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 28 Sep 2018 12:22:14 +0200
-Subject: [PATCH 7/7] ARM: dts: iwg20d-q7-common: Move pciec node out of common
- dtsi
-In-Reply-To: <cover.1538123642.git.horms+renesas@verge.net.au>
-References: <cover.1538123642.git.horms+renesas@verge.net.au>
-Message-ID: <e0a39511dafd7e302a974f5cbdfc9c8afffa98d8.1538123642.git.horms+renesas@verge.net.au>
+Date: Fri, 28 Sep 2018 12:22:47 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC Updates for v4.20
+Message-ID: <cover.1538123953.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Biju Das <biju.das@bp.renesas.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-PCIe is not populated by default on iWave RZ/G1N board. RZ/G1N board
-is almost identical to RZ/G1M. In order to reuse the common dtsi for
-both the boards, it is required to move pcie node from common dtsi
-to board specific dts.
+Please consider these Renesas ARM based SoC updates for v4.20.
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/iwg20d-q7-common.dtsi         | 4 ----
- arch/arm/boot/dts/r8a7743-iwg20d-q7-dbcm-ca.dts | 4 ++++
- arch/arm/boot/dts/r8a7743-iwg20d-q7.dts         | 4 ++++
- 3 files changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/iwg20d-q7-common.dtsi b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
-index 5cae74eb6cdd..ca9154dd8052 100644
---- a/arch/arm/boot/dts/iwg20d-q7-common.dtsi
-+++ b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
-@@ -160,10 +160,6 @@
- 	clock-frequency = <100000000>;
- };
- 
--&pciec {
--	status = "okay";
--};
--
- &pfc {
- 	can0_pins: can0 {
- 		groups = "can0_data_d";
-diff --git a/arch/arm/boot/dts/r8a7743-iwg20d-q7-dbcm-ca.dts b/arch/arm/boot/dts/r8a7743-iwg20d-q7-dbcm-ca.dts
-index 327545119ee3..0d006aea99da 100644
---- a/arch/arm/boot/dts/r8a7743-iwg20d-q7-dbcm-ca.dts
-+++ b/arch/arm/boot/dts/r8a7743-iwg20d-q7-dbcm-ca.dts
-@@ -14,3 +14,7 @@
- 	model = "iW-RainboW-G20D-Q7 RZ/G1M based plus camera daughter board";
- 	compatible = "iwave,g20d", "iwave,g20m", "renesas,r8a7743";
- };
-+
-+&pciec {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-index b683db4da8b1..498e223a5f93 100644
---- a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-+++ b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-@@ -13,3 +13,7 @@
- 	model = "iWave Systems RainboW-G20D-Qseven board based on RZ/G1M";
- 	compatible = "iwave,g20d", "iwave,g20m", "renesas,r8a7743";
- };
-+
-+&pciec {
-+	status = "okay";
-+};
--- 
-2.11.0
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+
+  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm-soc-for-v4.20
+
+for you to fetch changes up to 6d14d4d313d09dabdb06b4a9f4e5fe4305051e9b:
+
+  ARM: shmobile: Rework the PMIC IRQ line quirk (2018-09-19 11:11:46 +0200)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Updates for v4.20
+
+* Rework the PMIC IRQ line quirk to use DT rather than hard coded topology
+* Convert to SPDX identifiers
+* Convert to using %pOFn instead of device_node.name
+* Remove the no longer needed ARCH_SHMOBILE Kconfig symbol
+* RZ/G1N (r8a7744) SoC: Add basic SoC and debug-ll support
+* R-Car H1 (r8a7779) SoC: remove unused includes
+
+----------------------------------------------------------------
+Biju Das (2):
+      ARM: shmobile: r8a7744: Basic SoC support
+      ARM: debug-ll: Add support for r8a7744
+
+Geert Uytterhoeven (2):
+      ARM: shmobile: r8a7779: Remove unused includes
+      ARM: shmobile: Remove the ARCH_SHMOBILE Kconfig symbol
+
+Kuninori Morimoto (1):
+      ARM: shmobile: convert to SPDX identifiers
+
+Marek Vasut (1):
+      ARM: shmobile: Rework the PMIC IRQ line quirk
+
+Rob Herring (1):
+      ARM: shmobile: Convert to using %pOFn instead of device_node.name
+
+ arch/arm/Kconfig.debug                             |   9 +-
+ arch/arm/mach-shmobile/Kconfig                     |  10 +-
+ arch/arm/mach-shmobile/headsmp-scu.S               |  13 +-
+ arch/arm/mach-shmobile/headsmp.S                   |   7 +-
+ arch/arm/mach-shmobile/platsmp-scu.c               |   5 +-
+ arch/arm/mach-shmobile/platsmp.c                   |   5 +-
+ arch/arm/mach-shmobile/pm-rcar-gen2.c              |   5 +-
+ arch/arm/mach-shmobile/pm-rmobile.c                |   7 +-
+ arch/arm/mach-shmobile/pm-rmobile.h                |   7 +-
+ arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c | 139 ++++++++++++++++-----
+ arch/arm/mach-shmobile/setup-r8a7779.c             |   2 -
+ arch/arm/mach-shmobile/setup-rcar-gen2.c           |   2 +
+ arch/arm/mach-shmobile/smp-sh73a0.c                |  10 +-
+ arch/arm/mach-shmobile/suspend.c                   |   5 +-
+ arch/arm/mach-shmobile/timer.c                     |  10 +-
+ 15 files changed, 137 insertions(+), 99 deletions(-)
