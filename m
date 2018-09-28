@@ -1,34 +1,143 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 28 Sep 2018 12:19:03 +0200
-Subject: [PATCH 2/2] arm64: defconfig: enable R8A774C0 SoC
-In-Reply-To: <cover.1538124193.git.horms+renesas@verge.net.au>
-References: <cover.1538124193.git.horms+renesas@verge.net.au>
-Message-ID: <76506880eac66cb1f189a993c39ad0fcba723b99.1538124193.git.horms+renesas@verge.net.au>
+Date: Fri, 28 Sep 2018 12:20:13 +0200
+Subject: [PATCH 02/14] arm64: dts: renesas: ebisu: Add HDMI and CVBS input
+In-Reply-To: <cover.1538125184.git.horms+renesas@verge.net.au>
+References: <cover.1538125184.git.horms+renesas@verge.net.au>
+Message-ID: <a1d354a768d8ba15185bc1fb157db42489a2f462.1538125184.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+From: Jacopo Mondi <jacopo+renesas@jmondi.org>
 
-Enable the Renesas RZ/G2E (R8A774C0) SoC in the ARM64 defconfig.
+Add HDMI and CVBS inputs device nodes to R-Car E3 Ebisu board.
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+Both HDMI and CVBS inputs are connected to an ADV7482 video decoder hooked to
+the SoC CSI-2 receiver port.
+
+Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts | 86 ++++++++++++++++++++++++++
+ 1 file changed, 86 insertions(+)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index cf19fa4c7baf..6838b84c6140 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -50,6 +50,7 @@ CONFIG_ARCH_SEATTLE=y
- CONFIG_ARCH_SYNQUACER=y
- CONFIG_ARCH_RENESAS=y
- CONFIG_ARCH_R8A774A1=y
-+CONFIG_ARCH_R8A774C0=y
- CONFIG_ARCH_R8A7795=y
- CONFIG_ARCH_R8A7796=y
- CONFIG_ARCH_R8A77965=y
+diff --git a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+index 31934a310ac3..fd60079169f6 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
++++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+@@ -28,6 +28,29 @@
+ 		/* first 128MB is reserved for secure area. */
+ 		reg = <0x0 0x48000000 0x0 0x38000000>;
+ 	};
++
++	cvbs-in {
++		compatible = "composite-video-connector";
++		label = "CVBS IN";
++
++		port {
++			cvbs_con: endpoint {
++				remote-endpoint = <&adv7482_ain7>;
++			};
++		};
++	};
++
++	hdmi-in {
++		compatible = "hdmi-connector";
++		label = "HDMI IN";
++		type = "a";
++
++		port {
++			hdmi_in_con: endpoint {
++				remote-endpoint = <&adv7482_hdmi>;
++			};
++		};
++	};
+ };
+ 
+ &avb {
+@@ -47,6 +70,22 @@
+ 	};
+ };
+ 
++&csi40 {
++	status = "okay";
++
++	ports {
++		port at 0 {
++			reg = <0>;
++
++			csi40_in: endpoint {
++				clock-lanes = <0>;
++				data-lanes = <1 2>;
++				remote-endpoint = <&adv7482_txa>;
++			};
++		};
++	};
++};
++
+ &ehci0 {
+ 	status = "okay";
+ };
+@@ -55,6 +94,49 @@
+ 	clock-frequency = <48000000>;
+ };
+ 
++&i2c0 {
++	status = "okay";
++
++	video-receiver at 70 {
++		compatible = "adi,adv7482";
++		reg = <0x70>;
++
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		interrupt-parent = <&gpio0>;
++		interrupt-names = "intrq1", "intrq2";
++		interrupts = <7 IRQ_TYPE_LEVEL_LOW>,
++			     <17 IRQ_TYPE_LEVEL_LOW>;
++
++		port at 7 {
++			reg = <7>;
++
++			adv7482_ain7: endpoint {
++				remote-endpoint = <&cvbs_con>;
++			};
++		};
++
++		port at 8 {
++			reg = <8>;
++
++			adv7482_hdmi: endpoint {
++				remote-endpoint = <&hdmi_in_con>;
++			};
++		};
++
++		port at a {
++			reg = <0xa>;
++
++			adv7482_txa: endpoint {
++				clock-lanes = <0>;
++				data-lanes = <1 2>;
++				remote-endpoint = <&csi40_in>;
++			};
++		};
++	};
++};
++
+ &ohci0 {
+ 	status = "okay";
+ };
+@@ -118,6 +200,10 @@
+ 	status = "okay";
+ };
+ 
++&vin4 {
++	status = "okay";
++};
++
+ &xhci0 {
+ 	pinctrl-0 = <&usb30_pins>;
+ 	pinctrl-names = "default";
 -- 
 2.11.0
