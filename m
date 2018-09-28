@@ -1,25 +1,40 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Fri, 28 Sep 2018 17:57:18 +0200
-Subject: [PATCH net-next v6 05/23] zinc: import Andy Polyakov's ChaCha20
- ARM and ARM64 implementations
-In-Reply-To: <CAKv+Gu8-EwxFhQSUPxjEvTA5ZPz34RieMokM6CUqwURDr74jtg@mail.gmail.com>
-References: <20180925145622.29959-1-Jason@zx2c4.com>
- <20180925145622.29959-6-Jason@zx2c4.com>
- <CAKv+Gu8-EwxFhQSUPxjEvTA5ZPz34RieMokM6CUqwURDr74jtg@mail.gmail.com>
-Message-ID: <CAHmME9r3CuEkkxTEp0mDpPoYUR_CVqa8TVMB8ZTwBxLh9fQSTQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Sep 2018 17:45:20 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC DT Bindings Updates for v4.20
+In-Reply-To: <cover.1538129305.git.horms+renesas@verge.net.au>
+References: <cover.1538129305.git.horms+renesas@verge.net.au>
+Message-ID: <CAK8P3a3fNQj2EQovTLcan58uDTbYc8thbtA3t=ghDhUx1QSYJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On Fri, Sep 28, 2018 at 12:23 PM Simon Horman
+<horms+renesas@verge.net.au> wrote:
+>
+> Hi Olof, Hi Kevin, Hi Arnd,
+>
+> Please consider these Renesas ARM based SoC DT bindings updates for v4.20.
+>
+>
+> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+>
+>   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+>
+> are available in the git repository at:
+>
+>   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-bindings-for-v4.20
+>
+> for you to fetch changes up to 39c0e5a8746cfbfb87e86761337c807e7faea134:
+>
+>   dt-bindings: arm: Document RZ/G2E SoC DT bindings (2018-09-12 10:27:16 +0200)
+>
+> ----------------------------------------------------------------
+> Renesas ARM Based SoC DT Bindings Updates for v4.20
+>
+> * Document bindings for:
+>   - RZ/G2E (r8a774c0), RZ/G2M (r8a774a1) and RZ/A2 (r7s9210) SoCs
+>   - R-Car M3-N (r8a77965) SoC based ULCB board
+>
 
-On Fri, Sep 28, 2018 at 5:49 PM Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> As I mentioned before, I'd prefer this to be based on the original .pl
-> but if I am the only one objecting to this, I guess I can live with
-> it.
+Pulled into next/dt, thanks!
 
-We're working on that, actually. It's not obvious when it'll be ready
-to ship -- perhaps after the initial merge, but perhaps way sooner --
-but that is something we're trying to do for arm/arm64/mips64.
-
-Jason
+     Arnd
