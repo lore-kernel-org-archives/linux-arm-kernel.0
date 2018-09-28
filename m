@@ -1,57 +1,48 @@
-From: leoyang.li@nxp.com (Li Yang)
-Date: Fri, 28 Sep 2018 16:00:52 -0500
-Subject: drivers binding to device node with multiple compatible strings
-In-Reply-To: <CAL_JsqKRH8uEzSx6H6ZSRJF9Ecp4am1cNsxgQqf2OO5_aGR1zw@mail.gmail.com>
-References: <CADRPPNT0QiBkJtJnxjW95Yf-mirL5OzRrvqj8rC-O8fiz17VnA@mail.gmail.com>
- <CAL_JsqKRH8uEzSx6H6ZSRJF9Ecp4am1cNsxgQqf2OO5_aGR1zw@mail.gmail.com>
-Message-ID: <CADRPPNQam-QUfqDMvu42KS+50VaHfGPhCZj-1jRHQ-Od0fbxuQ@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 28 Sep 2018 23:07:32 +0200
+Subject: [PATCH v5 3/3] arm64: dts: Add spi slave dts
+In-Reply-To: <1538131985-9471-4-git-send-email-leilk.liu@mediatek.com>
+References: <1538131985-9471-1-git-send-email-leilk.liu@mediatek.com>
+ <1538131985-9471-4-git-send-email-leilk.liu@mediatek.com>
+Message-ID: <aef8fb56-e774-b9bd-e361-a1ea69e1885d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 28, 2018 at 3:07 PM Rob Herring <robh+dt@kernel.org> wrote:
->
-> On Thu, Sep 27, 2018 at 5:25 PM Li Yang <leoyang.li@nxp.com> wrote:
-> >
-> > Hi Rob and Grant,
-> >
-> > Various device tree specs are recommending to include all the
-> > potential compatible strings in the device node, with the order from
-> > most specific to most general.  But it looks like Linux kernel doesn't
-> > provide a way to bind the device to the most specific driver, however,
-> > the first registered compatible driver will be bound.
-> >
-> > As more and more generic drivers are added to the Linux kernel, they
-> > are competing with the more specific vendor drivers and causes problem
-> > when both are built into the kernel.  I'm wondering if there is a
-> > generic solution (or in plan) to make the most specific driver bound
-> > to the device.   Or we have to disable the more general driver or
-> > remove the more general compatible string from the device tree?
->
-> It's been a known limitation for a long time. However, in practice it
-> doesn't seem to be a common problem. Perhaps folks just remove the
-> less specific compatible from their DT (though that's not ideal). For
-> most modern bindings, there's so many other resources beyond
-> compatible (clocks, resets, pinctrl, etc.) that there are few generic
-> drivers that can work.
->
-> I guess if we want to fix this, we'd need to have weighted matching in
-> the driver core and unbind drivers when we get a better match. Though
-> it could get messy if the better driver probe fails. Then we've got to
-> rebind to the original driver.
 
-Probably we can populate the platform devices from device tree after
-the device_init phase?  So that all built-in drivers are already
-registered when the devices are created and we can try find the best
-match in one go?  For more specific loadable modules we probably need
-to unbind from the old driver and bind to the new one.  But I agree
-with you that it could be messy.
 
->
-> Do you have a specific case where you hit this?
+On 28/09/2018 12:53, Leilk Liu wrote:
+> This patch adds MT2712 spi slave into device tree.
+> 
+> Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+> ---
 
-Maybe not a new issue but "snps,dw-pcie" is competing with various
-"fsl,<chip>-pcie" compatibles.  Also a specific PHY
-"ethernet-phy-idAAAA.BBBB" with generic "ethernet-phy-ieee802.3-c45".
+Pushed to v4.19-next/dts64
 
-Regards,
-Leo
+Thanks!
+
+>  arch/arm64/boot/dts/mediatek/mt2712e.dtsi |   11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+> index 75cc0f7..ee627a7 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+> @@ -301,6 +301,17 @@
+>  		status = "disabled";
+>  	};
+>  
+> +	spis1: spi at 10013000 {
+> +		compatible = "mediatek,mt2712-spi-slave";
+> +		reg = <0 0x10013000 0 0x100>;
+> +		interrupts = <GIC_SPI 283 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&infracfg CLK_INFRA_AO_SPI1>;
+> +		clock-names = "spi";
+> +		assigned-clocks = <&topckgen CLK_TOP_SPISLV_SEL>;
+> +		assigned-clock-parents = <&topckgen CLK_TOP_UNIVPLL1_D2>;
+> +		status = "disabled";
+> +	};
+> +
+>  	apmixedsys: syscon at 10209000 {
+>  		compatible = "mediatek,mt2712-apmixedsys", "syscon";
+>  		reg = <0 0x10209000 0 0x1000>;
+> 
