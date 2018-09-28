@@ -1,54 +1,85 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 28 Sep 2018 11:05:09 +0900
-Subject: [PATCH v2 3/3] serial: 8250_uniphier: add auto-flow-control support
+Date: Fri, 28 Sep 2018 11:05:07 +0900
+Subject: [PATCH v2 1/3] serial: 8250_uniphier: remove unused "fifo-size"
+ property
 In-Reply-To: <1538100309-24323-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1538100309-24323-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1538100309-24323-4-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1538100309-24323-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dai Okamura <okamura.dai@socionext.com>
+The FIFO size of the UART devices is 64 on almost all UniPhier SoCs
+with the exception Pro4TV SoC (MN2WS0235), which used 128 FIFO size.
+However, Pro4TV SoC was never upstreamed, and out of production.
 
-Add selective auto-flow-control support for UniPhier serial driver.
+So, this property has never been used in a useful way.
+Let's remove old unused code.
 
-Signed-off-by: Dai Okamura <okamura.dai@socionext.com>
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 Reviewed-by: Rob Herring <robh@kernel.org>
 ---
 
-Changes in v2: None
+Changes in v2:
+  - Fix the product code in git-log: MN2WS0230 -> MN2WS0235
 
- Documentation/devicetree/bindings/serial/uniphier-uart.txt | 3 +++
- drivers/tty/serial/8250/8250_uniphier.c                    | 3 +++
- 2 files changed, 6 insertions(+)
+ Documentation/devicetree/bindings/serial/uniphier-uart.txt |  4 ----
+ drivers/tty/serial/8250/8250_uniphier.c                    | 10 +---------
+ 2 files changed, 1 insertion(+), 13 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/serial/uniphier-uart.txt b/Documentation/devicetree/bindings/serial/uniphier-uart.txt
-index 811c479..7a1bf02 100644
+index 0b3892a..811c479 100644
 --- a/Documentation/devicetree/bindings/serial/uniphier-uart.txt
 +++ b/Documentation/devicetree/bindings/serial/uniphier-uart.txt
-@@ -6,6 +6,9 @@ Required properties:
+@@ -6,9 +6,6 @@ Required properties:
  - interrupts: a single interrupt specifier.
  - clocks: phandle to the input clock.
  
-+Optional properties:
-+-auto-flow-control: enable automatic flow control support.
-+
+-Optional properties:
+-- fifo-size: the RX/TX FIFO size.  Defaults to 64 if not specified.
+-
  Example:
  	aliases {
  		serial0 = &serial0;
+@@ -19,5 +16,4 @@ Example:
+ 		reg = <0x54006800 0x40>;
+ 		interrupts = <0 33 4>;
+ 		clocks = <&uart_clk>;
+-		fifo-size = <64>;
+ 	};
 diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
-index 1028c02..164ba13 100644
+index 28d88ccf..d292654 100644
 --- a/drivers/tty/serial/8250/8250_uniphier.c
 +++ b/drivers/tty/serial/8250/8250_uniphier.c
-@@ -222,6 +222,9 @@ static int uniphier_uart_probe(struct platform_device *pdev)
+@@ -12,9 +12,6 @@
+ 
+ #include "8250.h"
+ 
+-/* Most (but not all) of UniPhier UART devices have 64-depth FIFO. */
+-#define UNIPHIER_UART_DEFAULT_FIFO_SIZE	64
+-
+ /*
+  * This hardware is similar to 8250, but its register map is a bit different:
+  *   - MMIO32 (regshift = 2)
+@@ -185,12 +182,6 @@ static int uniphier_of_serial_setup(struct device *dev, struct uart_port *port,
+ 
+ 	port->uartclk = clk_get_rate(priv->clk);
+ 
+-	/* Check for fifo size */
+-	if (of_property_read_u32(np, "fifo-size", &prop) == 0)
+-		port->fifosize = prop;
+-	else
+-		port->fifosize = UNIPHIER_UART_DEFAULT_FIFO_SIZE;
+-
+ 	return 0;
+ }
+ 
+@@ -241,6 +232,7 @@ static int uniphier_uart_probe(struct platform_device *pdev)
+ 
+ 	up.port.type = PORT_16550A;
+ 	up.port.iotype = UPIO_MEM32;
++	up.port.fifosize = 64;
+ 	up.port.regshift = UNIPHIER_UART_REGSHIFT;
  	up.port.flags = UPF_FIXED_PORT | UPF_FIXED_TYPE;
  	up.capabilities = UART_CAP_FIFO;
- 
-+	if (of_property_read_bool(dev->of_node, "auto-flow-control"))
-+		up.capabilities |= UART_CAP_AFE;
-+
- 	up.port.serial_in = uniphier_serial_in;
- 	up.port.serial_out = uniphier_serial_out;
- 	up.dl_read = uniphier_serial_dl_read;
 -- 
 2.7.4
