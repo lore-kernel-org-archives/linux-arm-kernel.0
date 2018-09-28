@@ -1,46 +1,26 @@
-From: natechancellor@gmail.com (Nathan Chancellor)
-Date: Thu, 27 Sep 2018 17:50:39 -0700
-Subject: [PATCH] staging: bcm2835-camera: Avoid unneeded internal declaration
- warning
-Message-ID: <20180928005038.1697-1-natechancellor@gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 28 Sep 2018 11:05:06 +0900
+Subject: [PATCH v2 0/3] serial: 8250_uniphier: remove unused code and add
+ auto-flow-control
+Message-ID: <1538100309-24323-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clang warns:
+ - Remove never-used DT property
+ - Refactor code
+ - Add auto-flow-control support
 
-drivers/staging/vc04_services/bcm2835-camera/controls.c:59:18: warning:
-variable 'mains_freq_qmenu' is not needed and will not be emitted
-[-Wunneeded-internal-declaration]
-static const s64 mains_freq_qmenu[] = {
-                 ^
-1 warning generated.
 
-This is because mains_freq_qmenu is currently only used in an ARRAY_SIZE
-macro, which is a compile time evaluation in this case. Avoid this by
-adding mains_freq_qmenu as the imenu member of this structure, which
-matches all other controls that uses the ARRAY_SIZE macro in v4l2_ctrls.
-This turns out to be a no-op because V4L2_CID_MPEG_VIDEO_BITRATE_MODE is
-defined as a MMAL_CONTROL_TYPE_STD_MENU, which does not pass the imenu
-definition along to v4l2_ctrl_new in bm2835_mmal_init_controls.
+Dai Okamura (1):
+  serial: 8250_uniphier: add auto-flow-control support
 
-Link: https://github.com/ClangBuiltLinux/linux/issues/122
-Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
----
- drivers/staging/vc04_services/bcm2835-camera/controls.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Masahiro Yamada (2):
+  serial: 8250_uniphier: remove unused "fifo-size" property
+  serial: 8250_uniphier: flatten probe function
 
-diff --git a/drivers/staging/vc04_services/bcm2835-camera/controls.c b/drivers/staging/vc04_services/bcm2835-camera/controls.c
-index cff7b1e07153..a2c55cb2192a 100644
---- a/drivers/staging/vc04_services/bcm2835-camera/controls.c
-+++ b/drivers/staging/vc04_services/bcm2835-camera/controls.c
-@@ -1106,7 +1106,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
- 	{
- 		V4L2_CID_POWER_LINE_FREQUENCY, MMAL_CONTROL_TYPE_STD_MENU,
- 		0, ARRAY_SIZE(mains_freq_qmenu) - 1,
--		1, 1, NULL,
-+		1, 1, mains_freq_qmenu,
- 		MMAL_PARAMETER_FLICKER_AVOID,
- 		&ctrl_set_flicker_avoidance,
- 		false
+ .../devicetree/bindings/serial/uniphier-uart.txt   |  3 +-
+ drivers/tty/serial/8250/8250_uniphier.c            | 62 ++++++++--------------
+ 2 files changed, 22 insertions(+), 43 deletions(-)
+
 -- 
-2.19.0
+2.7.4
