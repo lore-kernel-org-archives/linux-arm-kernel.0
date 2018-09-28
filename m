@@ -1,31 +1,39 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Fri, 28 Sep 2018 12:43:41 -0700
-Subject: drivers binding to device node with multiple compatible strings
-In-Reply-To: <CADRPPNT0QiBkJtJnxjW95Yf-mirL5OzRrvqj8rC-O8fiz17VnA@mail.gmail.com>
-References: <CADRPPNT0QiBkJtJnxjW95Yf-mirL5OzRrvqj8rC-O8fiz17VnA@mail.gmail.com>
-Message-ID: <ecbf11cd-a140-fe7e-392a-bccbf8224d14@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Sep 2018 21:57:20 +0200
+Subject: [GIT PULL 2/5] soc/tegra: Changes for v4.20-rc1
+In-Reply-To: <20180927205942.30878-2-thierry.reding@gmail.com>
+References: <20180927205942.30878-1-thierry.reding@gmail.com>
+ <20180927205942.30878-2-thierry.reding@gmail.com>
+Message-ID: <CAK8P3a1FgAtVdLixD7nGgg3r52qrT0_TOyFzKc99egmhrExFqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Sep 27, 2018 at 10:59 PM Thierry Reding
+<thierry.reding@gmail.com> wrote:
+>
+> Hi ARM SoC maintainers,
+>
+> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+>
+>   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+>
+> are available in the Git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.20-soc
+>
+> for you to fetch changes up to 4a37f11c8f57ffd6f7397eaf372109d67edd3769:
+>
+>   soc/tegra: pmc: Implement pad configuration via pinctrl (2018-08-27 12:25:18 +0200)
+>
+> Thanks,
+> Thierry
+>
+> ----------------------------------------------------------------
+> soc/tegra: Changes for v4.20-rc1
+>
+> This contains a pinctrl implementation for the pad configuration that
+> can be controlled from the PMC.
 
-+ Frank
+Pulled into next/drivers, thanks!
 
-On 09/27/18 15:25, Li Yang wrote:
-> Hi Rob and Grant,
-> 
-> Various device tree specs are recommending to include all the
-> potential compatible strings in the device node, with the order from
-> most specific to most general.  But it looks like Linux kernel doesn't
-> provide a way to bind the device to the most specific driver, however,
-> the first registered compatible driver will be bound.
-> 
-> As more and more generic drivers are added to the Linux kernel, they
-> are competing with the more specific vendor drivers and causes problem
-> when both are built into the kernel.  I'm wondering if there is a
-> generic solution (or in plan) to make the most specific driver bound
-> to the device.   Or we have to disable the more general driver or
-> remove the more general compatible string from the device tree?
-> 
-> Regards,
-> Leo
-> 
+       Arnd
