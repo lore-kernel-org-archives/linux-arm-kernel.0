@@ -1,34 +1,34 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 28 Sep 2018 12:21:37 +0200
-Subject: [PATCH 4/6] ARM: multi_v7_defconfig: Enable VIDEO_RENESAS_FDP1
+Date: Fri, 28 Sep 2018 12:21:39 +0200
+Subject: [PATCH 6/6] ARM: shmobile: defconfig: Enable r8a7744 SoC
 In-Reply-To: <cover.1538122547.git.horms+renesas@verge.net.au>
 References: <cover.1538122547.git.horms+renesas@verge.net.au>
-Message-ID: <3ff7ee8a972ac7379bd74af4dc203359320e7c75.1538122547.git.horms+renesas@verge.net.au>
+Message-ID: <c26eb6f34c9ea56ed795785ecb7938f008dfed1e.1538122547.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Biju Das <biju.das@bp.renesas.com>
 
-R-Car Gen2 (and RZ/G1) SoCs have a Fine Display Processor, hence enable
-support for it.
+Enable recently added r8a7744 (RZ/G1N) SoC.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/configs/multi_v7_defconfig | 1 +
+ arch/arm/configs/shmobile_defconfig | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index fc33444e94f0..dec755c939bb 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -584,6 +584,7 @@ CONFIG_VIDEO_SAMSUNG_EXYNOS_GSC=m
- CONFIG_VIDEO_STI_BDISP=m
- CONFIG_VIDEO_STI_HVA=m
- CONFIG_VIDEO_STI_DELTA=m
-+CONFIG_VIDEO_RENESAS_FDP1=m
- CONFIG_VIDEO_RENESAS_JPU=m
- CONFIG_VIDEO_RENESAS_VSP1=m
- CONFIG_V4L_TEST_DRIVERS=y
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index f2b40075819f..d090022ca975 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -13,6 +13,7 @@ CONFIG_ARCH_R7S72100=y
+ CONFIG_ARCH_R8A73A4=y
+ CONFIG_ARCH_R8A7740=y
+ CONFIG_ARCH_R8A7743=y
++CONFIG_ARCH_R8A7744=y
+ CONFIG_ARCH_R8A7745=y
+ CONFIG_ARCH_R8A77470=y
+ CONFIG_ARCH_R8A7778=y
 -- 
 2.11.0
