@@ -1,34 +1,42 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 28 Sep 2018 12:21:36 +0200
-Subject: [PATCH 3/6] ARM: shmobile: defconfig: Enable VIDEO_RENESAS_FDP1
-In-Reply-To: <cover.1538122547.git.horms+renesas@verge.net.au>
-References: <cover.1538122547.git.horms+renesas@verge.net.au>
-Message-ID: <59051a25bfb51d98d50b7270d55d38a928b55073.1538122547.git.horms+renesas@verge.net.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Sep 2018 12:45:07 +0200
+Subject: [PATCH v2 04/11] arm64: dts: sc9836/sc9860: Update coresight
+ bindings for hardware ports
+In-Reply-To: <CAAfSe-swWPgCWN6cZbQxLL6fwaJ1qLXnC_X7A0zeYuHDaZ_A1Q@mail.gmail.com>
+References: <20180912135352.19722-1-suzuki.poulose@arm.com>
+ <20180912135352.19722-5-suzuki.poulose@arm.com>
+ <ccc61e1b-768c-2a6d-3ff5-95b72bc58a6f@arm.com>
+ <CAAfSe-swWPgCWN6cZbQxLL6fwaJ1qLXnC_X7A0zeYuHDaZ_A1Q@mail.gmail.com>
+Message-ID: <CAK8P3a2WWFp5W5-7o-X3joOpSGgnK=s_ZyGev7gsVV0SjN0p0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+On Thu, Sep 27, 2018 at 11:19 AM Chunyan Zhang <zhang.lyra@gmail.com> wrote:
+>
+> Hi Suzuki,
+>
+> On 27 September 2018 at 16:51, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+> > +To: Chunyan Zhang
+> >
+> > Chunyan Zhang,
+> >
+> > On 09/12/2018 02:53 PM, Suzuki K Poulose wrote:
+> >>
+> >> Switch to the new coresight bindings for hw ports
+> >>
+> >
+> > How can we push this patch ? Do you generally send the spreadtrum
+> > specific changes to ARM soc folks ? Or would you like me to post
+> > this directly to ARM soc folks ?
+>
+> Yeah, at present sprd dts files generally got merged through arm-soc
+> (I've added arm at kernel.org).
 
-R-Car Gen2 (and RZ/G1) SoCs have a Fine Display Processor, hence enable
-support for it.
+Yes, that's fine. Generally, we prefer if you collect patches for your
+platform first, and then send them as a pull request or short set
+of patches. for inclusion, rather than picking them up from the list.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/shmobile_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+If this is the only DT patch for spreadtrum in 4.20, I can also just
+pick it up with your Ack.
 
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index 7b48ec3e63ec..f2b40075819f 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -130,6 +130,7 @@ CONFIG_VIDEO_V4L2_SUBDEV_API=y
- CONFIG_V4L_PLATFORM_DRIVERS=y
- CONFIG_VIDEO_RCAR_VIN=y
- CONFIG_V4L_MEM2MEM_DRIVERS=y
-+CONFIG_VIDEO_RENESAS_FDP1=y
- CONFIG_VIDEO_RENESAS_JPU=y
- CONFIG_VIDEO_RENESAS_VSP1=y
- # CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
--- 
-2.11.0
+       Arnd
