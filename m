@@ -1,107 +1,99 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 28 Sep 2018 12:23:33 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC Drivers Updates for v4.20
-Message-ID: <cover.1538128711.git.horms+renesas@verge.net.au>
+Date: Fri, 28 Sep 2018 12:23:16 +0200
+Subject: [PATCH 01/21] soc: renesas: Identify RZ/G2M
+In-Reply-To: <cover.1538128711.git.horms+renesas@verge.net.au>
+References: <cover.1538128711.git.horms+renesas@verge.net.au>
+Message-ID: <2a4056a759e26745f3a19431f5428c581fd8f347.1538128711.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Biju Das <biju.das@bp.renesas.com>
 
-Please consider these Renesas ARM based SoC drivers updates for v4.20.
+This patch adds support for identifying the RZ/G2M (r8a774a1) SoC.
+It corrects the original RZ/G SoC family name to RZ/G1 and also
+adds support for the new RZ/G2 SoC family.
 
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ drivers/soc/renesas/renesas-soc.c | 27 ++++++++++++++++++++-------
+ 1 file changed, 20 insertions(+), 7 deletions(-)
 
-The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
-
-  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-drivers-for-v4.20
-
-for you to fetch changes up to fae210bb5bfbd29118e18881f7108c6bd59293b9:
-
-  dt-bindings: apmu: Document r8a7744 support (2018-09-24 17:21:12 +0200)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Drivers Updates for v4.20
-
-* Convert to SPDX identifiers
-* R-Car V3M (r8a77970) and V3H (r8a77980): Document Timer Unit (TMU) bindings
-* RZ/G1N (r8a7744) and RZ/G1C (r8a77470) SoCs:
-  - Document APMU and SMP enable method
-* RZ/G2M (r8a74a1), RZ/G1N (r8a7744) and RZ/G2E (r8a774c0) SoCs:
-  - Add reset support
-  - Add sysc support
-* RZ/G2M (r8a774a1), RZ/G2E (r8a774c0) and RZ/A2M (r7s9210) SoCs:
-  - Add support for identifying SoC
-* RZ/A2M (r7s9210) SoC:
-  - Add basic SoC setup support
-
-----------------------------------------------------------------
-Biju Das (10):
-      soc: renesas: Identify RZ/G2M
-      dt-bindings: power: Add r8a774a1 SYSC power domain definitions
-      soc: renesas: rcar-sysc: Add r8a774a1 support
-      soc: renesas: rcar-rst: Add support for RZ/G2M
-      dt-bindings: power: rcar-sysc: Document r8a7744 SYSC binding
-      dt-bindings: power: rcar-sysc: Add r8a7744 power domain index macros
-      soc: renesas: rcar-sysc: Add r8a7744 support
-      dt-bindings: reset: rcar-rst: Document r8a7744 reset module
-      soc: renesas: rcar-rst: Add support for RZ/G1N
-      dt-bindings: apmu: Document r8a7744 support
-
-Chris Brandt (2):
-      ARM: shmobile: Add basic RZ/A2 SoC support
-      soc: renesas: identify RZ/A2
-
-Fabrizio Castro (7):
-      soc: renesas: Identify RZ/G2E
-      dt-bindings: power: Add r8a774c0 SYSC power domain definitions
-      dt-bindings: power: rcar-sysc: Document r8a774c0 sysc
-      soc: renesas: rcar-sysc: Add r8a774c0 support
-      dt-bindings: reset: rcar-rst: Document r8a774c0 rst
-      soc: renesas: rcar-rst: Add support for RZ/G2E
-      dt-bindings: apmu: Document r8a77470 support
-
-Kuninori Morimoto (1):
-      soc: renesas: convert to SPDX identifiers
-
-Sergei Shtylyov (1):
-      dt-bindings: timer: renesas: tmu: document R8A779{7|8}0 bindings
-
- .../devicetree/bindings/power/renesas,apmu.txt     |   2 +
- .../bindings/power/renesas,rcar-sysc.txt           |   3 +
- .../devicetree/bindings/reset/renesas,rst.txt      |   3 +
- .../devicetree/bindings/timer/renesas,tmu.txt      |   2 +
- arch/arm/mach-shmobile/Kconfig                     |   6 ++
- arch/arm/mach-shmobile/Makefile                    |   1 +
- arch/arm/mach-shmobile/setup-r7s9210.c             |  27 ++++++
- drivers/soc/renesas/Kconfig                        |  19 +++-
- drivers/soc/renesas/Makefile                       |   2 +
- drivers/soc/renesas/r8a7743-sysc.c                 |   5 +-
- drivers/soc/renesas/r8a7745-sysc.c                 |   5 +-
- drivers/soc/renesas/r8a774a1-sysc.c                |  45 ++++++++++
- drivers/soc/renesas/r8a774c0-sysc.c                |  68 ++++++++++++++
- drivers/soc/renesas/r8a7779-sysc.c                 |   5 +-
- drivers/soc/renesas/r8a7790-sysc.c                 |   5 +-
- drivers/soc/renesas/r8a7791-sysc.c                 |   5 +-
- drivers/soc/renesas/r8a7792-sysc.c                 |   5 +-
- drivers/soc/renesas/r8a7794-sysc.c                 |   5 +-
- drivers/soc/renesas/r8a7795-sysc.c                 |   5 +-
- drivers/soc/renesas/r8a7796-sysc.c                 |   5 +-
- drivers/soc/renesas/r8a77970-sysc.c                |   5 +-
- drivers/soc/renesas/r8a77995-sysc.c                |   5 +-
- drivers/soc/renesas/rcar-rst.c                     |  11 +--
- drivers/soc/renesas/rcar-sysc.c                    |  13 ++-
- drivers/soc/renesas/rcar-sysc.h                    |   9 +-
- drivers/soc/renesas/renesas-soc.c                  | 100 ++++++++++++++++-----
- include/dt-bindings/power/r8a7744-sysc.h           |  24 +++++
- include/dt-bindings/power/r8a774a1-sysc.h          |  31 +++++++
- include/dt-bindings/power/r8a774c0-sysc.h          |  25 ++++++
- 29 files changed, 360 insertions(+), 86 deletions(-)
- create mode 100644 arch/arm/mach-shmobile/setup-r7s9210.c
- create mode 100644 drivers/soc/renesas/r8a774a1-sysc.c
- create mode 100644 drivers/soc/renesas/r8a774c0-sysc.c
- create mode 100644 include/dt-bindings/power/r8a7744-sysc.h
- create mode 100644 include/dt-bindings/power/r8a774a1-sysc.h
- create mode 100644 include/dt-bindings/power/r8a774c0-sysc.h
+diff --git a/drivers/soc/renesas/renesas-soc.c b/drivers/soc/renesas/renesas-soc.c
+index d44d0e687ab8..56916183739b 100644
+--- a/drivers/soc/renesas/renesas-soc.c
++++ b/drivers/soc/renesas/renesas-soc.c
+@@ -50,11 +50,16 @@ static const struct renesas_family fam_rza __initconst __maybe_unused = {
+ 	.name	= "RZ/A",
+ };
+ 
+-static const struct renesas_family fam_rzg __initconst __maybe_unused = {
+-	.name	= "RZ/G",
++static const struct renesas_family fam_rzg1 __initconst __maybe_unused = {
++	.name	= "RZ/G1",
+ 	.reg	= 0xff000044,		/* PRR (Product Register) */
+ };
+ 
++static const struct renesas_family fam_rzg2 __initconst __maybe_unused = {
++	.name	= "RZ/G2",
++	.reg	= 0xfff00044,		/* PRR (Product Register) */
++};
++
+ static const struct renesas_family fam_shmobile __initconst __maybe_unused = {
+ 	.name	= "SH-Mobile",
+ 	.reg	= 0xe600101c,		/* CCCR (Common Chip Code Register) */
+@@ -81,30 +86,35 @@ static const struct renesas_soc soc_rmobile_a1 __initconst __maybe_unused = {
+ };
+ 
+ static const struct renesas_soc soc_rz_g1h __initconst __maybe_unused = {
+-	.family	= &fam_rzg,
++	.family	= &fam_rzg1,
+ 	.id	= 0x45,
+ };
+ 
+ static const struct renesas_soc soc_rz_g1m __initconst __maybe_unused = {
+-	.family	= &fam_rzg,
++	.family	= &fam_rzg1,
+ 	.id	= 0x47,
+ };
+ 
+ static const struct renesas_soc soc_rz_g1n __initconst __maybe_unused = {
+-	.family	= &fam_rzg,
++	.family	= &fam_rzg1,
+ 	.id	= 0x4b,
+ };
+ 
+ static const struct renesas_soc soc_rz_g1e __initconst __maybe_unused = {
+-	.family	= &fam_rzg,
++	.family	= &fam_rzg1,
+ 	.id	= 0x4c,
+ };
+ 
+ static const struct renesas_soc soc_rz_g1c __initconst __maybe_unused = {
+-	.family	= &fam_rzg,
++	.family	= &fam_rzg1,
+ 	.id	= 0x53,
+ };
+ 
++static const struct renesas_soc soc_rz_g2m __initconst __maybe_unused = {
++	.family	= &fam_rzg2,
++	.id	= 0x52,
++};
++
+ static const struct renesas_soc soc_rcar_m1a __initconst __maybe_unused = {
+ 	.family	= &fam_rcar_gen1,
+ };
+@@ -205,6 +215,9 @@ static const struct of_device_id renesas_socs[] __initconst = {
+ #ifdef CONFIG_ARCH_R8A77470
+ 	{ .compatible = "renesas,r8a77470",	.data = &soc_rz_g1c },
+ #endif
++#ifdef CONFIG_ARCH_R8A774A1
++	{ .compatible = "renesas,r8a774a1",	.data = &soc_rz_g2m },
++#endif
+ #ifdef CONFIG_ARCH_R8A7778
+ 	{ .compatible = "renesas,r8a7778",	.data = &soc_rcar_m1a },
+ #endif
+-- 
+2.11.0
