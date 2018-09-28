@@ -1,37 +1,46 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 28 Sep 2018 12:23:35 +0200
-Subject: [PATCH 20/21] dt-bindings: timer: renesas: tmu: document R8A779{7|8}0
- bindings
-In-Reply-To: <cover.1538128711.git.horms+renesas@verge.net.au>
-References: <cover.1538128711.git.horms+renesas@verge.net.au>
-Message-ID: <5851fa4d088747af4a141110541594a2a4479b12.1538128711.git.horms+renesas@verge.net.au>
+Date: Fri, 28 Sep 2018 12:23:48 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC DT Bindings Updates for v4.20
+Message-ID: <cover.1538129305.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Document the R-Car V3{M|H} (R8A779{7|8}0) SoC in the Renesas TMU bindings;
-the TMU hardware in those is the Renesas standard 3-channel timer unit.
+Please consider these Renesas ARM based SoC DT bindings updates for v4.20.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- Documentation/devicetree/bindings/timer/renesas,tmu.txt | 2 ++
- 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/timer/renesas,tmu.txt b/Documentation/devicetree/bindings/timer/renesas,tmu.txt
-index cd5f20bf2582..4ddff85837da 100644
---- a/Documentation/devicetree/bindings/timer/renesas,tmu.txt
-+++ b/Documentation/devicetree/bindings/timer/renesas,tmu.txt
-@@ -12,6 +12,8 @@ Required Properties:
-     - "renesas,tmu-r8a7740" for the r8a7740 TMU
-     - "renesas,tmu-r8a7778" for the r8a7778 TMU
-     - "renesas,tmu-r8a7779" for the r8a7779 TMU
-+    - "renesas,tmu-r8a77970" for the r8a77970 TMU
-+    - "renesas,tmu-r8a77980" for the r8a77980 TMU
-     - "renesas,tmu" for any TMU.
-       This is a fallback for the above renesas,tmu-* entries
- 
--- 
-2.11.0
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+
+  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-bindings-for-v4.20
+
+for you to fetch changes up to 39c0e5a8746cfbfb87e86761337c807e7faea134:
+
+  dt-bindings: arm: Document RZ/G2E SoC DT bindings (2018-09-12 10:27:16 +0200)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC DT Bindings Updates for v4.20
+
+* Document bindings for:
+  - RZ/G2E (r8a774c0), RZ/G2M (r8a774a1) and RZ/A2 (r7s9210) SoCs
+  - R-Car M3-N (r8a77965) SoC based ULCB board
+
+----------------------------------------------------------------
+Biju Das (1):
+      dt-bindings: arm: Document RZ/G2M SoC DT bindings
+
+Chris Brandt (1):
+      dt-bindings: arm: Document RZ/A2 SoC DT bindings
+
+Eugeniu Rosca (1):
+      dt-bindings: arm: Document Renesas R-Car M3-N-based ULCB board
+
+Fabrizio Castro (1):
+      dt-bindings: arm: Document RZ/G2E SoC DT bindings
+
+ Documentation/devicetree/bindings/arm/shmobile.txt | 16 ++++++++++++----
+ 1 file changed, 12 insertions(+), 4 deletions(-)
