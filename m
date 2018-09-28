@@ -1,41 +1,62 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Fri, 28 Sep 2018 13:47:59 +0000
-Subject: [PATCH V7 0/3] soc: imx: add scu firmware api support
-In-Reply-To: <20180928061223.dghtovm7kgcjhc4w@pengutronix.de>
-References: <1537892878-30933-1-git-send-email-aisheng.dong@nxp.com>
- <20180928061223.dghtovm7kgcjhc4w@pengutronix.de>
-Message-ID: <AM0PR04MB4211D4549496652DB54AE2C780EC0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 28 Sep 2018 14:39:26 +0100
+Subject: [RFC PATCH v2 22/23] KVM: Documentation: Document arm64 core
+ registers in detail
+In-Reply-To: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
+References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1538141967-15375-23-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+Since the the sizes of members the core arm64 registers vary, the
+list of register encodings that make sense is not a simple linear
+sequence.
 
-[...]
+To clarify which encodings to use, this patch adds a brief list
+to the documentation.
 
-> On Wed, Sep 26, 2018 at 12:27:55AM +0800, Dong Aisheng wrote:
-> > Unlike the former i.MX Architectures, the new generation i.MX8 SoCs
-> > (e.g. MX8QXP and MX8QM) contain a system controller which runs on a
-> > dedicated Cortex-M core to provide power, clock, Pad, and resource
-> > management. Communication between the host processor running an OS
-> and
-> > the system controller happens through a SCU protocol.
-> > This patchset adds the SCU APIs which is implemented based on MU and
-> > will be used by different system components.
-> >
-> > It mainly consists of below parts:
-> > 1) SCU IPC
-> >    Basic IPC mechanism implemention based on mailbox which is used
-> >    for communication between AP and SCU firmware.
-> > 2) SCU IPC Service API
-> 
-> Still some imx_sc_ prefixes missing. Otherwise looks good to me now, so
-> 
-> Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
-> 
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
 
-Appreciate your review work.
-Will add the missing prefixes as well and re-send with you sign-off.
-Thanks.
+Draft only -- encodings not checked yet.
+---
+ Documentation/virtual/kvm/api.txt | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-Regards
-Dong Aisheng
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index 647f941..a58067b 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -2037,6 +2037,30 @@ contains elements ranging from 32 to 128 bits. The index is a 32bit
+ value in the kvm_regs structure seen as a 32bit array.
+   0x60x0 0000 0010 <index into the kvm_regs struct:16>
+ 
++Specifically:
++    Encoding            Register  Bits  kvm_regs member
++----------------------------------------------------------------
++  0x6030 0000 0010 0000 X0          64  regs.regs[0]
++  0x6030 0000 0010 0002 X1          64  regs.regs[1]
++    ...
++  0x6030 0000 0010 003c X30         64  regs.regs[30]
++  0x6030 0000 0010 003e SP          64  regs.sp
++  0x6030 0000 0010 0040 PC          64  regs.pc
++  0x6030 0000 0010 0042 PSTATE      64  regs.pstate
++  0x6030 0000 0010 0044 SP_EL1      64  sp_el1
++  0x6030 0000 0010 0046 ELR_EL1     64  elr_el1
++  0x6030 0000 0010 0048 SPSR_EL1    64  spsr[KVM_SPSR_EL1] (alias SPSR_SVC)
++  0x6030 0000 0010 004a SPSR_ABT    64  spsr[KVM_SPSR_ABT]
++  0x6030 0000 0010 004c SPSR_UND    64  spsr[KVM_SPSR_UND]
++  0x6030 0000 0010 004e SPSR_IRQ    64  spsr[KVM_SPSR_IRQ]
++  0x6060 0000 0010 0050 SPSR_FIQ    64  spsr[KVM_SPSR_FIQ]
++  0x6040 0000 0010 0054 V0         128  fp_regs.vregs[0]
++  0x6040 0000 0010 0058 V1         128  fp_regs.vregs[1]
++    ...
++  0x6040 0000 0010 00d0 V31        128  fp_regs.vregs[31]
++  0x6020 0000 0010 00d4 FPSR        32  fp_regs.fpsr
++  0x6020 0000 0010 00d5 FPCR        32  fp_regs.fpcr
++
+ arm64 CCSIDR registers are demultiplexed by CSSELR value:
+   0x6020 0000 0011 00 <csselr:8>
+ 
+-- 
+2.1.4
