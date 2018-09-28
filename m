@@ -1,8 +1,8 @@
 From: joe@perches.com (Joe Perches)
-Date: Fri, 28 Sep 2018 15:03:53 -0700
+Date: Fri, 28 Sep 2018 15:04:11 -0700
 Subject: Bad MAINTAINERS pattern in section 'SOFTWARE DELEGATED EXCEPTION
  INTERFACE (SDEI)'
-Message-ID: <20180928220353.31413-1-joe@perches.com>
+Message-ID: <20180928220411.31488-1-joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,8 +16,8 @@ linux-next MAINTAINERS section:
 	13612	S:	Maintained
 	13613	F:	Documentation/devicetree/bindings/arm/firmware/sdei.txt
 	13614	F:	drivers/firmware/arm_sdei.c
--->	13615	F:	include/linux/sdei.h
-	13616	F:	include/uapi/linux/sdei.h
+	13615	F:	include/linux/sdei.h
+-->	13616	F:	include/uapi/linux/sdei.h
 
 Commit that introduced this:
 
@@ -52,4 +52,4 @@ commit ad6eb31ef90355993eb55ff77e0e855ae7d91e4c
   include/uapi/linux/arm_sdei.h |  73 +++++
   7 files changed, 797 insertions(+)
 
-No commit with include/linux/sdei.h found
+No commit with include/uapi/linux/sdei.h found
