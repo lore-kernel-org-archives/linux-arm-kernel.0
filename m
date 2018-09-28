@@ -1,50 +1,40 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 28 Sep 2018 12:22:10 +0200
-Subject: [PATCH 3/7] ARM: dts: R-Car Gen1 board comment update
-In-Reply-To: <cover.1538123642.git.horms+renesas@verge.net.au>
-References: <cover.1538123642.git.horms+renesas@verge.net.au>
-Message-ID: <a070e3dc6131da94b0e62b9544851c10ebd879eb.1538123642.git.horms+renesas@verge.net.au>
+From: leilk.liu@mediatek.com (Leilk Liu)
+Date: Fri, 28 Sep 2018 18:53:05 +0800
+Subject: [PATCH v5 3/3] arm64: dts: Add spi slave dts
+In-Reply-To: <1538131985-9471-1-git-send-email-leilk.liu@mediatek.com>
+References: <1538131985-9471-1-git-send-email-leilk.liu@mediatek.com>
+Message-ID: <1538131985-9471-4-git-send-email-leilk.liu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+This patch adds MT2712 spi slave into device tree.
 
-Include R-Car Gen1 product names for Bock-W and Marzen.
-
-The product names are taken from:
-Documentation/devicetree/bindings/arm/shmobile.txt
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
 ---
- arch/arm/boot/dts/r8a7778-bockw.dts  | 2 +-
- arch/arm/boot/dts/r8a7779-marzen.dts | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/mediatek/mt2712e.dtsi |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7778-bockw.dts b/arch/arm/boot/dts/r8a7778-bockw.dts
-index de808d2ea856..cecb22924ec4 100644
---- a/arch/arm/boot/dts/r8a7778-bockw.dts
-+++ b/arch/arm/boot/dts/r8a7778-bockw.dts
-@@ -1,6 +1,6 @@
- // SPDX-License-Identifier: GPL-2.0
- /*
-- * Reference Device Tree Source for the Bock-W board
-+ * Reference Device Tree Source for the R-Car M1A (R8A77781) Bock-W board
-  *
-  * Copyright (C) 2013  Renesas Solutions Corp.
-  * Copyright (C) 2013  Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-diff --git a/arch/arm/boot/dts/r8a7779-marzen.dts b/arch/arm/boot/dts/r8a7779-marzen.dts
-index a4d0038363f0..abc14e7a4c93 100644
---- a/arch/arm/boot/dts/r8a7779-marzen.dts
-+++ b/arch/arm/boot/dts/r8a7779-marzen.dts
-@@ -1,6 +1,6 @@
- // SPDX-License-Identifier: GPL-2.0
- /*
-- * Device Tree Source for the Marzen board
-+ * Device Tree Source for the R-Car H1 (R8A77790) Marzen board
-  *
-  * Copyright (C) 2013 Renesas Solutions Corp.
-  * Copyright (C) 2013 Simon Horman
+diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+index 75cc0f7..ee627a7 100644
+--- a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+@@ -301,6 +301,17 @@
+ 		status = "disabled";
+ 	};
+ 
++	spis1: spi at 10013000 {
++		compatible = "mediatek,mt2712-spi-slave";
++		reg = <0 0x10013000 0 0x100>;
++		interrupts = <GIC_SPI 283 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&infracfg CLK_INFRA_AO_SPI1>;
++		clock-names = "spi";
++		assigned-clocks = <&topckgen CLK_TOP_SPISLV_SEL>;
++		assigned-clock-parents = <&topckgen CLK_TOP_UNIVPLL1_D2>;
++		status = "disabled";
++	};
++
+ 	apmixedsys: syscon at 10209000 {
+ 		compatible = "mediatek,mt2712-apmixedsys", "syscon";
+ 		reg = <0 0x10209000 0 0x1000>;
 -- 
-2.11.0
+1.7.9.5
