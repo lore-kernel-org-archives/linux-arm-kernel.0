@@ -1,210 +1,230 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 28 Sep 2018 12:20:21 +0200
-Subject: [PATCH 10/14] arm64: dts: renesas: r8a77990: Add display output
- support
+Date: Fri, 28 Sep 2018 12:20:23 +0200
+Subject: [PATCH 12/14] arm64: dts: renesas: r8a77990: ebisu: Enable VGA and
+ HDMI outputs
 In-Reply-To: <cover.1538125184.git.horms+renesas@verge.net.au>
 References: <cover.1538125184.git.horms+renesas@verge.net.au>
-Message-ID: <13ee2bfc5444c8950d3c74bd47ff2a7b53c34aa6.1538125184.git.horms+renesas@verge.net.au>
+Message-ID: <74fe39abbf745737754effe64f5f6c574fbb1412.1538125184.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-The R8A77990 (E3) platform has one RGB output and two LVDS outputs
-connected to the DU. Add the DT nodes for the DU, LVDS encoders and
-supporting VSP and FCP.
+Add the LVDS decoder, HDMI encoder, VGA encoder and HDMI and VGA
+connectors, and wire up the display-related nodes with clocks, pinmux
+and regulators.
+
+The LVDS0 and LVDS1 encoders can use the DU_DOTCLKIN0, DU_DOTCLKIN1 and
+EXTAL externals clocks. Two of them are provided to the SoC on the Ebisu
+board, hook them up in DT.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Tested-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77990.dtsi | 167 ++++++++++++++++++++++++++++++
- 1 file changed, 167 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts | 162 +++++++++++++++++++++++++
+ 1 file changed, 162 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77990.dtsi b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-index 0c726ea5d315..9509dc05665f 100644
---- a/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-@@ -843,6 +843,82 @@
- 			resets = <&cpg 408>;
- 		};
- 
-+		vspb0: vsp at fe960000 {
-+			compatible = "renesas,vsp2";
-+			reg = <0 0xfe960000 0 0x8000>;
-+			interrupts = <GIC_SPI 266 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 626>;
-+			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
-+			resets = <&cpg 626>;
-+			renesas,fcp = <&fcpvb0>;
-+		};
-+
-+		fcpvb0: fcp at fe96f000 {
-+			compatible = "renesas,fcpv";
-+			reg = <0 0xfe96f000 0 0x200>;
-+			clocks = <&cpg CPG_MOD 607>;
-+			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
-+			resets = <&cpg 607>;
-+			iommus = <&ipmmu_vp0 5>;
-+		};
-+
-+		vspi0: vsp at fe9a0000 {
-+			compatible = "renesas,vsp2";
-+			reg = <0 0xfe9a0000 0 0x8000>;
-+			interrupts = <GIC_SPI 444 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 631>;
-+			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
-+			resets = <&cpg 631>;
-+			renesas,fcp = <&fcpvi0>;
-+		};
-+
-+		fcpvi0: fcp at fe9af000 {
-+			compatible = "renesas,fcpv";
-+			reg = <0 0xfe9af000 0 0x200>;
-+			clocks = <&cpg CPG_MOD 611>;
-+			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
-+			resets = <&cpg 611>;
-+			iommus = <&ipmmu_vp0 8>;
-+		};
-+
-+		vspd0: vsp at fea20000 {
-+			compatible = "renesas,vsp2";
-+			reg = <0 0xfea20000 0 0x7000>;
-+			interrupts = <GIC_SPI 466 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 623>;
-+			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
-+			resets = <&cpg 623>;
-+			renesas,fcp = <&fcpvd0>;
-+		};
-+
-+		fcpvd0: fcp at fea27000 {
-+			compatible = "renesas,fcpv";
-+			reg = <0 0xfea27000 0 0x200>;
-+			clocks = <&cpg CPG_MOD 603>;
-+			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
-+			resets = <&cpg 603>;
-+			iommus = <&ipmmu_vi0 8>;
-+		};
-+
-+		vspd1: vsp at fea28000 {
-+			compatible = "renesas,vsp2";
-+			reg = <0 0xfea28000 0 0x7000>;
-+			interrupts = <GIC_SPI 467 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 622>;
-+			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
-+			resets = <&cpg 622>;
-+			renesas,fcp = <&fcpvd1>;
-+		};
-+
-+		fcpvd1: fcp at fea2f000 {
-+			compatible = "renesas,fcpv";
-+			reg = <0 0xfea2f000 0 0x200>;
-+			clocks = <&cpg CPG_MOD 602>;
-+			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
-+			resets = <&cpg 602>;
-+			iommus = <&ipmmu_vi0 9>;
-+		};
-+
- 		csi40: csi2 at feaa0000 {
- 			compatible = "renesas,r8a77990-csi2", "renesas,rcar-gen3-csi2";
- 			reg = <0 0xfeaa0000 0 0x10000>;
-@@ -874,6 +950,97 @@
+diff --git a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+index fd60079169f6..f342dd85b152 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
++++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+@@ -51,6 +51,88 @@
  			};
  		};
+ 	};
++
++	hdmi-out {
++		compatible = "hdmi-connector";
++		type = "a";
++
++		port {
++			hdmi_con_out: endpoint {
++				remote-endpoint = <&adv7511_out>;
++			};
++		};
++	};
++
++	lvds-decoder {
++		compatible = "thine,thc63lvd1024";
++		vcc-supply = <&reg_3p3v>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				thc63lvd1024_in: endpoint {
++					remote-endpoint = <&lvds0_out>;
++				};
++			};
++
++			port at 2 {
++				reg = <2>;
++				thc63lvd1024_out: endpoint {
++					remote-endpoint = <&adv7511_in>;
++				};
++			};
++		};
++	};
++
++	vga {
++		compatible = "vga-connector";
++
++		port {
++			vga_in: endpoint {
++				remote-endpoint = <&adv7123_out>;
++			};
++		};
++	};
++
++	vga-encoder {
++		compatible = "adi,adv7123";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				adv7123_in: endpoint {
++					remote-endpoint = <&du_out_rgb>;
++				};
++			};
++			port at 1 {
++				reg = <1>;
++				adv7123_out: endpoint {
++					remote-endpoint = <&vga_in>;
++				};
++			};
++		};
++	};
++
++	reg_3p3v: regulator1 {
++		compatible = "regulator-fixed";
++		regulator-name = "fixed-3.3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
++	x13_clk: x13 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <74250000>;
++	};
+ };
  
-+		du: display at feb00000 {
-+			compatible = "renesas,du-r8a77990";
-+			reg = <0 0xfeb00000 0 0x80000>;
-+			interrupts = <GIC_SPI 256 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 268 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 724>,
-+				 <&cpg CPG_MOD 723>;
-+			clock-names = "du.0", "du.1";
-+			vsps = <&vspd0 0 &vspd1 0>;
-+			status = "disabled";
+ &avb {
+@@ -86,6 +168,25 @@
+ 	};
+ };
+ 
++&du {
++	pinctrl-0 = <&du_pins>;
++	pinctrl-names = "default";
++	status = "okay";
 +
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
++	clocks = <&cpg CPG_MOD 724>,
++		 <&cpg CPG_MOD 723>,
++		 <&x13_clk>;
++	clock-names = "du.0", "du.1", "dclkin.0";
 +
-+				port at 0 {
-+					reg = <0>;
-+					du_out_rgb: endpoint {
-+					};
++	ports {
++		port at 0 {
++			endpoint {
++				remote-endpoint = <&adv7123_in>;
++			};
++		};
++	};
++};
++
+ &ehci0 {
+ 	status = "okay";
+ };
+@@ -97,6 +198,38 @@
+ &i2c0 {
+ 	status = "okay";
+ 
++	hdmi-encoder at 39 {
++		compatible = "adi,adv7511w";
++		reg = <0x39>;
++		interrupt-parent = <&gpio1>;
++		interrupts = <1 IRQ_TYPE_LEVEL_LOW>;
++
++		adi,input-depth = <8>;
++		adi,input-colorspace = "rgb";
++		adi,input-clock = "1x";
++		adi,input-style = <1>;
++		adi,input-justification = "evenly";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				adv7511_in: endpoint {
++					remote-endpoint = <&thc63lvd1024_out>;
 +				};
++			};
 +
-+				port at 1 {
-+					reg = <1>;
-+					du_out_lvds0: endpoint {
-+						remote-endpoint = <&lvds0_in>;
-+					};
-+				};
-+
-+				port at 2 {
-+					reg = <2>;
-+					du_out_lvds1: endpoint {
-+						remote-endpoint = <&lvds1_in>;
-+					};
++			port at 1 {
++				reg = <1>;
++				adv7511_out: endpoint {
++					remote-endpoint = <&hdmi_con_out>;
 +				};
 +			};
 +		};
++	};
 +
-+		lvds0: lvds-encoder at feb90000 {
-+			compatible = "renesas,r8a77990-lvds";
-+			reg = <0 0xfeb90000 0 0x20>;
-+			clocks = <&cpg CPG_MOD 727>;
-+			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
-+			resets = <&cpg 727>;
-+			status = "disabled";
+ 	video-receiver at 70 {
+ 		compatible = "adi,adv7482";
+ 		reg = <0x70>;
+@@ -137,6 +270,30 @@
+ 	};
+ };
+ 
++&lvds0 {
++	status = "okay";
 +
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
++	clocks = <&cpg CPG_MOD 727>,
++		 <&x13_clk>,
++		 <&extal_clk>;
++	clock-names = "fck", "dclkin.0", "extal";
 +
-+				port at 0 {
-+					reg = <0>;
-+					lvds0_in: endpoint {
-+						remote-endpoint = <&du_out_lvds0>;
-+					};
-+				};
-+
-+				port at 1 {
-+					reg = <1>;
-+					lvds0_out: endpoint {
-+					};
-+				};
++	ports {
++		port at 1 {
++			lvds0_out: endpoint {
++				remote-endpoint = <&thc63lvd1024_in>;
 +			};
 +		};
++	};
++};
 +
-+		lvds1: lvds-encoder at feb90100 {
-+			compatible = "renesas,r8a77990-lvds";
-+			reg = <0 0xfeb90100 0 0x20>;
-+			clocks = <&cpg CPG_MOD 727>;
-+			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
-+			resets = <&cpg 726>;
-+			status = "disabled";
++&lvds1 {
++	clocks = <&cpg CPG_MOD 727>,
++		 <&x13_clk>,
++		 <&extal_clk>;
++	clock-names = "fck", "dclkin.0", "extal";
++};
 +
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
+ &ohci0 {
+ 	status = "okay";
+ };
+@@ -149,6 +306,11 @@
+ 		};
+ 	};
+ 
++	du_pins: du {
++		groups = "du_rgb888", "du_sync", "du_disp", "du_clk_out_0";
++		function = "du";
++	};
 +
-+				port at 0 {
-+					reg = <0>;
-+					lvds1_in: endpoint {
-+						remote-endpoint = <&du_out_lvds1>;
-+					};
-+				};
-+
-+				port at 1 {
-+					reg = <1>;
-+					lvds1_out: endpoint {
-+					};
-+				};
-+			};
-+		};
-+
- 		prr: chipid at fff00044 {
- 			compatible = "renesas,prr";
- 			reg = <0 0xfff00044 0 4>;
+ 	pwm3_pins: pwm3 {
+ 		groups = "pwm3_b";
+ 		function = "pwm3";
 -- 
 2.11.0
