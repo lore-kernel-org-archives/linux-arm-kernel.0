@@ -1,49 +1,21 @@
-From: npcomplete13@gmail.com (Vivek Unune)
-Date: Fri, 28 Sep 2018 01:05:21 -0400
-Subject: [PATCH] ARM: dts: BCM5301X: Relicense BCM47094 file to the GPL
- 2.0+ / MIT
-In-Reply-To: <20180920112019.25622-1-zajec5@gmail.com>
-References: <20180920112019.25622-1-zajec5@gmail.com>
-Message-ID: <CAChtp74qNQVto4OwAscM0EwO8RB8bD6KXWUSEL=qc7hTuJNZug@mail.gmail.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Fri, 28 Sep 2018 10:55:55 +0530
+Subject: [PATCH v2 0/2] i2c-omap: Enable i2c-omap driver for AM654 SoCs
+Message-ID: <20180928052557.21663-1-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Vivek Unune <npcomplete13@gmail.com>
-On Thu, Sep 20, 2018 at 7:20 AM Rafa? Mi?ecki <zajec5@gmail.com> wrote:
->
-> From: Rafa? Mi?ecki <rafal@milecki.pl>
->
-> This matches licensing used by other BCM5301X files and is preferred as:
-> 1) GPL 2.0+ makes it clearly compatible with Linux kernel
-> 2) MIT is also permissive but preferred over ISC
->
-> This file has been developed by me & once modified by Vivek.
->
-> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
-> ---
-> Vivek: you have touched this file in the commit 37f6130ec39f ("ARM: dts:
-> BCM5301X: Make USB 3.0 PHY use MDIO PHY driver").
->
-> If you are OK with this relicensing, can you reply with
-> Acked-by
-> with your name, please?
-> ---
->  arch/arm/boot/dts/bcm47094.dtsi | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/bcm47094.dtsi b/arch/arm/boot/dts/bcm47094.dtsi
-> index f7c3e274b354..cdc5ff593adb 100644
-> --- a/arch/arm/boot/dts/bcm47094.dtsi
-> +++ b/arch/arm/boot/dts/bcm47094.dtsi
-> @@ -1,7 +1,6 @@
-> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
->  /*
->   * Copyright (C) 2016 Rafa? Mi?ecki <rafal@milecki.pl>
-> - *
-> - * Licensed under the ISC license.
->   */
->
->  #include "bcm4708.dtsi"
-> --
-> 2.13.7
->
+Couple of patches to enable i2c-omap driver to be used with TI's new
+AM654 platforms.
+
+
+Vignesh R (2):
+  dt-bindings: i2c-omap: Add new compatible for AM654 SoCs
+  i2c: busses: Kconfig: Enable I2C_OMAP for ARCH_K3
+
+ Documentation/devicetree/bindings/i2c/i2c-omap.txt | 8 ++++++--
+ drivers/i2c/busses/Kconfig                         | 2 +-
+ 2 files changed, 7 insertions(+), 3 deletions(-)
+
+-- 
+2.19.0
