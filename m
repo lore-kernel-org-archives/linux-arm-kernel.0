@@ -1,63 +1,102 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 28 Sep 2018 13:26:00 +0100
-Subject: [PATCH v8 5/7] iommu/arm-smmu-v3: Add support for non-strict mode
-In-Reply-To: <20180928121900.GB1577@brain-police>
-References: <cover.1537458163.git.robin.murphy@arm.com>
- <b98f8f695178c9c9ac6e081680090d5ac97e8d7c.1537458163.git.robin.murphy@arm.com>
- <20180928121900.GB1577@brain-police>
-Message-ID: <1d2b57f7-be4e-39c5-4981-7f8e2f601b6a@arm.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 28 Sep 2018 12:20:16 +0200
+Subject: [GIT PULL] Second Round of Renesas ARM64 Based SoC DT Updates for
+ v4.20
+Message-ID: <cover.1538125184.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/09/18 13:19, Will Deacon wrote:
-> On Thu, Sep 20, 2018 at 05:10:25PM +0100, Robin Murphy wrote:
->> From: Zhen Lei <thunder.leizhen@huawei.com>
->>
->> Now that io-pgtable knows how to dodge strict TLB maintenance, all
->> that's left to do is bridge the gap between the IOMMU core requesting
->> DOMAIN_ATTR_DMA_USE_FLUSH_QUEUE for default domains, and showing the
->> appropriate IO_PGTABLE_QUIRK_NON_STRICT flag to alloc_io_pgtable_ops().
->>
->> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
->> [rm: convert to domain attribute, tweak commit message]
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>
->> v8:
->>   - Use nested switches for attrs
->>   - Document barrier semantics
->>
->>   drivers/iommu/arm-smmu-v3.c | 79 ++++++++++++++++++++++++++-----------
->>   1 file changed, 56 insertions(+), 23 deletions(-)
->>
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index f10c852479fc..db402e8b068b 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -612,6 +612,7 @@ struct arm_smmu_domain {
->>   	struct mutex			init_mutex; /* Protects smmu pointer */
->>   
->>   	struct io_pgtable_ops		*pgtbl_ops;
->> +	bool				non_strict;
->>   
->>   	enum arm_smmu_domain_stage	stage;
->>   	union {
->> @@ -1407,6 +1408,12 @@ static void arm_smmu_tlb_inv_context(void *cookie)
->>   		cmd.tlbi.vmid	= smmu_domain->s2_cfg.vmid;
->>   	}
->>   
->> +	/*
->> +	 * NOTE: when io-pgtable is in non-strict mode, we may get here with
->> +	 * PTEs previously cleared by unmaps on the current CPU not yet visible
->> +	 * to the SMMU. We are relying on the DSB implicit in queue_inc_prod()
->> +	 * to guarantee those are observed before the TLBI. Do be careful, 007.
->> +	 */
-> 
-> Good, so you can ignore my comment on the previous patch :)
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Well, I suppose that comment in io-pgtable *could* have explicitly noted 
-that same-CPU order is dealt with elsewhere - feel free to fix it up if 
-you think it would be a helpful reminder for the future.
+Please consider these second round of Renesas ARM64 based SoC DT updates for v4.20.
 
-Cheers,
-Robin.
+This pull request is based on the previous round of
+such requests, tagged as renesas-arm64-dt-for-v4.20,
+which you have already pulled.
+
+
+The following changes since commit 450d6079e8d3c40c7ce67ac8bb4a2da9baf56613:
+
+  arm64: dts: r8a77965: add FDP1 device nodes (2018-09-13 09:48:13 +0200)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt2-for-v4.20
+
+for you to fetch changes up to 158928f38e1c6f3ac4dd83cf2240ae412179005d:
+
+  arm64: dts: renesas: r8a77965: Add Sound and Audio DMAC device nodes (2018-09-26 12:31:04 +0200)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM64 Based SoC DT Updates for v4.20
+
+* Remove unneeded status from thermal nodes
+
+* R-Car Gen 3 SoCs:
+  - Use 400kHz for I2C DVFS bus
+  - Revise USB2.0 properties
+* R-Car Gen 3 SoC based ULCB boards: Add default bootargs
+* R-Car M3-N (r8a77965) SoC based boards: Enable audio with DMA
+
+* R-Car V3M (r8a77970 and V3H (r8a77980) SoCs:
+  - Add compare match timer (CMT) support
+  - Add timer pulse unit (TPU) support
+* R-Car V3H (r8a77980) and E3 (r8a77990) SoCs:
+  - Attach the SYS-DMAC to the IPMMU
+* E3 (r8a77990) SoC: Add display output support
+* R-Car E3 (r8a77990) based Ebisu board:
+  - Enable HDMI and CVBS input, and VGA and HDMI display output
+
+* R-Car D3 (r8a77995) SoC: Add LVDS support
+* R-Car D3 (r8a77995) based Draak board: Enable HDMI display output
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      arm64: dts: renesas: Remove unneeded status from thermal nodes
+
+Jacopo Mondi (1):
+      arm64: dts: renesas: ebisu: Add HDMI and CVBS input
+
+Kieran Bingham (1):
+      arm64: dts: renesas: r8a77995: Add LVDS support
+
+Kuninori Morimoto (1):
+      arm64: dts: renesas: ulcb: add default bootargs
+
+Laurent Pinchart (2):
+      arm64: dts: renesas: r8a77990: Add display output support
+      arm64: dts: renesas: r8a77990: ebisu: Enable VGA and HDMI outputs
+
+Magnus Damm (2):
+      arm64: dts: renesas: r8a77990: Attach the SYS-DMAC to the IPMMU
+      arm64: dts: renesas: r8a77980: Attach the SYS-DMAC to the IPMMU
+
+Sergei Shtylyov (2):
+      arm64: dts: renesas: r8a779{7|8}0: add CMT support
+      arm64: dts: renesas: r8a779{7|8}0: add TPU support
+
+Takeshi Kihara (1):
+      arm64: dts: renesas: r8a77965: Add Sound and Audio DMAC device nodes
+
+Ulrich Hecht (1):
+      arm64: dts: renesas: r8a77995: draak: Enable HDMI display output
+
+Wolfram Sang (1):
+      arm64: dts: renesas: gen3: use 400kHz for I2C DVFS bus
+
+Yoshihiro Shimoda (1):
+      arm64: dts: renesas: revise properties for R-Car Gen3 SoCs' usb 2.0
+
+ arch/arm64/boot/dts/renesas/r8a774a1.dtsi        |   1 -
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi         |  33 ++-
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi         |  17 +-
+ arch/arm64/boot/dts/renesas/r8a77965.dtsi        | 262 +++++++++++++++++++++--
+ arch/arm64/boot/dts/renesas/r8a77970.dtsi        |  80 +++++++
+ arch/arm64/boot/dts/renesas/r8a77980.dtsi        |  97 +++++++++
+ arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts   | 248 +++++++++++++++++++++
+ arch/arm64/boot/dts/renesas/r8a77990.dtsi        | 203 +++++++++++++++++-
+ arch/arm64/boot/dts/renesas/r8a77995-draak.dts   |  98 ++++++++-
+ arch/arm64/boot/dts/renesas/r8a77995.dtsi        |  68 +++++-
+ arch/arm64/boot/dts/renesas/salvator-common.dtsi |   2 +
+ arch/arm64/boot/dts/renesas/ulcb.dtsi            |   3 +
+ 12 files changed, 1052 insertions(+), 60 deletions(-)
