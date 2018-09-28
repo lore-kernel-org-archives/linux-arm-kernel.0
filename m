@@ -1,8 +1,8 @@
 From: joe@perches.com (Joe Perches)
-Date: Fri, 28 Sep 2018 14:51:26 -0700
-Subject: Bad MAINTAINERS pattern in section 'ARM/SAMSUNG S5P SERIES Multi
- Format Codec (MFC) SUPPORT'
-Message-ID: <20180928215127.28790-1-joe@perches.com>
+Date: Fri, 28 Sep 2018 15:03:53 -0700
+Subject: Bad MAINTAINERS pattern in section 'SOFTWARE DELEGATED EXCEPTION
+ INTERFACE (SDEI)'
+Message-ID: <20180928220353.31413-1-joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,57 +10,46 @@ Please fix this defect appropriately.
 
 linux-next MAINTAINERS section:
 
-	2009	ARM/SAMSUNG S5P SERIES Multi Format Codec (MFC) SUPPORT
-	2010	M:	Kyungmin Park <kyungmin.park@samsung.com>
-	2011	M:	Kamil Debski <kamil@wypas.org>
-	2012	M:	Jeongtae Park <jtp.park@samsung.com>
-	2013	M:	Andrzej Hajda <a.hajda@samsung.com>
-	2014	L:	linux-arm-kernel at lists.infradead.org
-	2015	L:	linux-media at vger.kernel.org
-	2016	S:	Maintained
--->	2017	F:	arch/arm/plat-samsung/s5p-dev-mfc.c
-	2018	F:	drivers/media/platform/s5p-mfc/
+	13609	SOFTWARE DELEGATED EXCEPTION INTERFACE (SDEI)
+	13610	M:	James Morse <james.morse@arm.com>
+	13611	L:	linux-arm-kernel at lists.infradead.org
+	13612	S:	Maintained
+	13613	F:	Documentation/devicetree/bindings/arm/firmware/sdei.txt
+	13614	F:	drivers/firmware/arm_sdei.c
+-->	13615	F:	include/linux/sdei.h
+	13616	F:	include/uapi/linux/sdei.h
 
 Commit that introduced this:
 
-commit 7683e9e529258d01ce99216ad3be21f59eff83ec
- Author: Linus Torvalds <torvalds@linux-foundation.org>
- Date:   Sun Jul 23 16:06:21 2017 -0700
+commit ad6eb31ef90355993eb55ff77e0e855ae7d91e4c
+ Author: James Morse <james.morse@arm.com>
+ Date:   Mon Jan 8 15:38:09 2018 +0000
  
-     Properly alphabetize MAINTAINERS file
+     firmware: arm_sdei: Add driver for Software Delegated Exceptions
      
-     This adds a perl script to actually parse the MAINTAINERS file, clean up
-     some whitespace in it, warn about errors in it, and then properly sort
-     the end result.
+     The Software Delegated Exception Interface (SDEI) is an ARM standard
+     for registering callbacks from the platform firmware into the OS.
+     This is typically used to implement firmware notifications (such as
+     firmware-first RAS) or promote an IRQ that has been promoted to a
+     firmware-assisted NMI.
      
-     My perl-fu is atrocious, so the script has basically been created by
-     randomly putting various characters in a pile, mixing them around, and
-     then looking it the end result does anything interesting when used as a
-     perl script.
+     Add the code for detecting the SDEI version and the framework for
+     registering and unregistering events. Subsequent patches will add the
+     arch-specific backend code and the necessary power management hooks.
      
-     Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+     Only shared events are supported, power management, private events and
+     discovery for ACPI systems will be added by later patches.
+     
+     Signed-off-by: James Morse <james.morse@arm.com>
+     Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
  
-  MAINTAINERS                  | 3585 +++++++++++++++++++++---------------------
-  scripts/parse-maintainers.pl |   77 +
-  2 files changed, 1868 insertions(+), 1794 deletions(-)
+  MAINTAINERS                   |   9 +
+  arch/arm64/include/asm/sdei.h |   8 +
+  drivers/firmware/Kconfig      |   8 +
+  drivers/firmware/Makefile     |   1 +
+  drivers/firmware/arm_sdei.c   | 619 ++++++++++++++++++++++++++++++++++++++++++
+  include/linux/arm_sdei.h      |  79 ++++++
+  include/uapi/linux/arm_sdei.h |  73 +++++
+  7 files changed, 797 insertions(+)
 
-Last commit with arch/arm/plat-samsung/s5p-dev-mfc.c
-
-commit b93b315d444faa1505b6a5e001c30f3024849e46
-Author: Kukjin Kim <kgene@kernel.org>
-Date:   Thu Jul 30 01:48:17 2015 +0900
-
-    ARM: SAMSUNG: make local s5p-dev-mfc in mach-exynos
-    
-    This patch moves s5p-dev-mfc from plat-samsung into mach-exynos
-    because it is used for only exynos no other platforms.
-    
-    Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-    Signed-off-by: Kukjin Kim <kgene@kernel.org>
-
- arch/arm/mach-exynos/Kconfig                         | 5 +++++
- arch/arm/mach-exynos/Makefile                        | 2 ++
- arch/arm/{plat-samsung => mach-exynos}/s5p-dev-mfc.c | 0
- arch/arm/plat-samsung/Kconfig                        | 5 -----
- arch/arm/plat-samsung/Makefile                       | 1 -
- 5 files changed, 7 insertions(+), 6 deletions(-)
+No commit with include/linux/sdei.h found
