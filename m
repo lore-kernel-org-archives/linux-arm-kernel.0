@@ -1,48 +1,32 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 28 Sep 2018 23:07:32 +0200
-Subject: [PATCH v5 3/3] arm64: dts: Add spi slave dts
-In-Reply-To: <1538131985-9471-4-git-send-email-leilk.liu@mediatek.com>
-References: <1538131985-9471-1-git-send-email-leilk.liu@mediatek.com>
- <1538131985-9471-4-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <aef8fb56-e774-b9bd-e361-a1ea69e1885d@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 28 Sep 2018 14:12:48 -0700
+Subject: [PATCH v3 2/4] firmware: xilinx: Add zynqmp IOCTL API for device
+ control
+In-Reply-To: <BL2PR02MB21308D0B6AF76A8094E70863B8EC0@BL2PR02MB2130.namprd02.prod.outlook.com>
+References: <1537985581-32164-1-git-send-email-jollys@xilinx.com>
+ <1537985581-32164-3-git-send-email-jollys@xilinx.com>
+ <CAOesGMhEcMB4caAPtCSq-m5zQBDc-8Z4f_xAkomnEwVaHyX2Mw@mail.gmail.com>
+ <BL2PR02MB21308D0B6AF76A8094E70863B8EC0@BL2PR02MB2130.namprd02.prod.outlook.com>
+Message-ID: <CAOesGMiUnVrnW1VDh1CKRKGpkwAC9G8tiHjpb+7bss6LpPWU-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Sep 28, 2018 at 10:15 AM Jolly Shah <JOLLYS@xilinx.com> wrote:
+>
+> Hi Olof,
+>
+> Thanks for the review. Pushed v4 with suggested fixes. Let us know if series looks good and we can create pull request for same.
+>
+> Thanks,
+> Jolly Shah
+
+I'm happy with this one, thanks for revising the patchset with the fixes.
+
+Feel free to add:
+
+Acked-by: Olof Johansson <olof@lixom.net>
+
+to the patches.
 
 
-On 28/09/2018 12:53, Leilk Liu wrote:
-> This patch adds MT2712 spi slave into device tree.
-> 
-> Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
-> ---
-
-Pushed to v4.19-next/dts64
-
-Thanks!
-
->  arch/arm64/boot/dts/mediatek/mt2712e.dtsi |   11 +++++++++++
->  1 file changed, 11 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-> index 75cc0f7..ee627a7 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-> @@ -301,6 +301,17 @@
->  		status = "disabled";
->  	};
->  
-> +	spis1: spi at 10013000 {
-> +		compatible = "mediatek,mt2712-spi-slave";
-> +		reg = <0 0x10013000 0 0x100>;
-> +		interrupts = <GIC_SPI 283 IRQ_TYPE_LEVEL_LOW>;
-> +		clocks = <&infracfg CLK_INFRA_AO_SPI1>;
-> +		clock-names = "spi";
-> +		assigned-clocks = <&topckgen CLK_TOP_SPISLV_SEL>;
-> +		assigned-clock-parents = <&topckgen CLK_TOP_UNIVPLL1_D2>;
-> +		status = "disabled";
-> +	};
-> +
->  	apmixedsys: syscon at 10209000 {
->  		compatible = "mediatek,mt2712-apmixedsys", "syscon";
->  		reg = <0 0x10209000 0 0x1000>;
-> 
+-Olof
