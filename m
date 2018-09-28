@@ -1,32 +1,28 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Sep 2018 12:47:51 +0200
-Subject: [GIT PULL] ARM: dts: Amlogic updates for v4.20
-In-Reply-To: <7ha7o345ta.fsf@baylibre.com>
-References: <7ha7o345ta.fsf@baylibre.com>
-Message-ID: <CAK8P3a3wRy08X4r=7ob-sD9H=ykQJXTk86XFw5+0a9gcKZbPbA@mail.gmail.com>
+Date: Fri, 28 Sep 2018 12:33:06 +0200
+Subject: [PATCH] arm64: dts: amd: Fix SPI bus warnings
+In-Reply-To: <20180913181245.25484-16-robh@kernel.org>
+References: <20180913181245.25484-16-robh@kernel.org>
+Message-ID: <CAK8P3a1QeQ-LW2bcSw7mDhZWN6Bo-G-v1sqDMKucgW2sg-mAXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 27, 2018 at 12:02 PM Kevin Hilman <khilman@baylibre.com> wrote:
+On Thu, Sep 13, 2018 at 8:13 PM Rob Herring <robh@kernel.org> wrote:
 >
-> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+> dtc has new checks for SPI buses. Fix the warnings in node names.
 >
->   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+> arch/arm64/boot/dts/amd/amd-overdrive.dtb: Warning (spi_bus_bridge): /smb/ssp at e1030000: node name for SPI buses should be 'spi'
+> arch/arm64/boot/dts/amd/amd-overdrive-rev-b0.dtb: Warning (spi_bus_bridge): /smb/ssp at e1030000: node name for SPI buses should be 'spi'
+> arch/arm64/boot/dts/amd/amd-overdrive-rev-b1.dtb: Warning (spi_bus_bridge): /smb/ssp at e1030000: node name for SPI buses should be 'spi'
 >
-> are available in the git repository at:
->
->   https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt
->
-> for you to fetch changes up to 54ef8539f5a3c3da0a415c4afa41556547c973fd:
->
->   ARM: dts: meson8b: odroidc1: add stdout-path property (2018-09-26 01:49:49 -0700)
->
-> ----------------------------------------------------------------
-> ARM: dts: Amlogic updates for v4.20
-> - fix clock controller register sizes
-> - new board: Endless Mini (EC-100) by Endless Mobile
-> - add voltage regulators
+> Cc: Brijesh Singh <brijeshkumar.singh@amd.com>
+> Cc: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
+> Cc: Tom Lendacky <thomas.lendacky@amd.com>
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> ---
+> Please apply to the sub-arch tree. The dtc changes haven't landed, but
+> will for 4.20.
 
-Pulled, thanks!
+Applied, thanks!
 
-      Arnd
+       Arnd
