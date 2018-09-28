@@ -1,122 +1,90 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 28 Sep 2018 12:22:08 +0200
-Subject: [PATCH 1/7] ARM: dts: r9a06g032: Correct UART and add all other UARTs
+Date: Fri, 28 Sep 2018 12:22:09 +0200
+Subject: [PATCH 2/7] ARM: dts: Include R-Car Gen2 product name in DTSI files
 In-Reply-To: <cover.1538123642.git.horms+renesas@verge.net.au>
 References: <cover.1538123642.git.horms+renesas@verge.net.au>
-Message-ID: <9aa2126f16daeb8cd3027a70a2629130b0e618d9.1538123642.git.horms+renesas@verge.net.au>
+Message-ID: <89b43b08123f454f697f7ab02187f09b6e4a36b6.1538123642.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Phil Edworthy <phil.edworthy@renesas.com>
+From: Magnus Damm <damm@opensource.se>
 
-- UART0 was missing the bus clock ("apb_pclk").
-- Use recently accepted r9a06g032 and rzn1 compat strings.
-- Add all the other UARTs.
+Improve the user friendliness of the DTS code base by including the
+R-Car product name in each R-Car Gen2 DTSI file.
 
-Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
-[simon: updated changelog]
+The product names are taken from:
+Documentation/devicetree/bindings/arm/shmobile.txt
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r9a06g032.dtsi | 83 ++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 80 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/r8a7790.dtsi | 2 +-
+ arch/arm/boot/dts/r8a7791.dtsi | 2 +-
+ arch/arm/boot/dts/r8a7792.dtsi | 2 +-
+ arch/arm/boot/dts/r8a7793.dtsi | 2 +-
+ arch/arm/boot/dts/r8a7794.dtsi | 2 +-
+ 5 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r9a06g032.dtsi b/arch/arm/boot/dts/r9a06g032.dtsi
-index 3e45375b79aa..eaf94976ed6d 100644
---- a/arch/arm/boot/dts/r9a06g032.dtsi
-+++ b/arch/arm/boot/dts/r9a06g032.dtsi
-@@ -78,13 +78,90 @@
- 		};
- 
- 		uart0: serial at 40060000 {
--			compatible = "snps,dw-apb-uart";
-+			compatible = "renesas,r9a06g032-uart", "renesas,rzn1-uart", "snps,dw-apb-uart";
- 			reg = <0x40060000 0x400>;
- 			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&sysctrl R9A06G032_CLK_UART0>;
--			clock-names = "baudclk";
-+			clocks = <&sysctrl R9A06G032_CLK_UART0>, <&sysctrl R9A06G032_HCLK_UART0>;
-+			clock-names = "baudclk", "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		uart1: serial at 40061000 {
-+			compatible = "renesas,r9a06g032-uart", "renesas,rzn1-uart", "snps,dw-apb-uart";
-+			reg = <0x40061000 0x400>;
-+			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&sysctrl R9A06G032_CLK_UART1>, <&sysctrl R9A06G032_HCLK_UART1>;
-+			clock-names = "baudclk", "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		uart2: serial at 40062000 {
-+			compatible = "renesas,r9a06g032-uart", "renesas,rzn1-uart", "snps,dw-apb-uart";
-+			reg = <0x40062000 0x400>;
-+			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&sysctrl R9A06G032_CLK_UART2>, <&sysctrl R9A06G032_HCLK_UART2>;
-+			clock-names = "baudclk", "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		uart3: serial at 50000000 {
-+			compatible = "renesas,r9a06g032-uart", "renesas,rzn1-uart";
-+			reg = <0x50000000 0x400>;
-+			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&sysctrl R9A06G032_CLK_UART3>, <&sysctrl R9A06G032_HCLK_UART3>;
-+			clock-names = "baudclk", "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		uart4: serial at 50001000 {
-+			compatible = "renesas,r9a06g032-uart", "renesas,rzn1-uart";
-+			reg = <0x50001000 0x400>;
-+			interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&sysctrl R9A06G032_CLK_UART4>, <&sysctrl R9A06G032_HCLK_UART4>;
-+			clock-names = "baudclk", "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		uart5: serial at 50002000 {
-+			compatible = "renesas,r9a06g032-uart", "renesas,rzn1-uart";
-+			reg = <0x50002000 0x400>;
-+			interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&sysctrl R9A06G032_CLK_UART5>, <&sysctrl R9A06G032_HCLK_UART5>;
-+			clock-names = "baudclk", "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		uart6: serial at 50003000 {
-+			compatible = "renesas,r9a06g032-uart", "renesas,rzn1-uart";
-+			reg = <0x50003000 0x400>;
-+			interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&sysctrl R9A06G032_CLK_UART6>, <&sysctrl R9A06G032_HCLK_UART6>;
-+			clock-names = "baudclk", "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		uart7: serial at 50004000 {
-+			compatible = "renesas,r9a06g032-uart", "renesas,rzn1-uart";
-+			reg = <0x50004000 0x400>;
-+			interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&sysctrl R9A06G032_CLK_UART7>, <&sysctrl R9A06G032_HCLK_UART7>;
-+			clock-names = "baudclk", "apb_pclk";
- 			status = "disabled";
- 		};
- 
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 52a757f47bf0..5a2747758f67 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -1,6 +1,6 @@
+ // SPDX-License-Identifier: GPL-2.0
+ /*
+- * Device Tree Source for the r8a7790 SoC
++ * Device Tree Source for the R-Car H2 (R8A77900) SoC
+  *
+  * Copyright (C) 2015 Renesas Electronics Corporation
+  * Copyright (C) 2013-2014 Renesas Solutions Corp.
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 25b6a99dd87a..6f875502453c 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -1,6 +1,6 @@
+ // SPDX-License-Identifier: GPL-2.0
+ /*
+- * Device Tree Source for the r8a7791 SoC
++ * Device Tree Source for the R-Car M2-W (R8A77910) SoC
+  *
+  * Copyright (C) 2013-2015 Renesas Electronics Corporation
+  * Copyright (C) 2013-2014 Renesas Solutions Corp.
+diff --git a/arch/arm/boot/dts/r8a7792.dtsi b/arch/arm/boot/dts/r8a7792.dtsi
+index 52d16a260db0..8e9eb4b704d3 100644
+--- a/arch/arm/boot/dts/r8a7792.dtsi
++++ b/arch/arm/boot/dts/r8a7792.dtsi
+@@ -1,6 +1,6 @@
+ // SPDX-License-Identifier: GPL-2.0
+ /*
+- * Device Tree Source for the r8a7792 SoC
++ * Device Tree Source for the R-Car V2H (R8A77920) SoC
+  *
+  * Copyright (C) 2016 Cogent Embedded Inc.
+  */
+diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+index 620a570307ff..bf05110fac4e 100644
+--- a/arch/arm/boot/dts/r8a7793.dtsi
++++ b/arch/arm/boot/dts/r8a7793.dtsi
+@@ -1,6 +1,6 @@
+ // SPDX-License-Identifier: GPL-2.0
+ /*
+- * Device Tree Source for the r8a7793 SoC
++ * Device Tree Source for the R-Car M2-N (R8A77930) SoC
+  *
+  * Copyright (C) 2014-2015 Renesas Electronics Corporation
+  */
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 886135a273cb..8d797d34816e 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -1,6 +1,6 @@
+ // SPDX-License-Identifier: GPL-2.0
+ /*
+- * Device Tree Source for the r8a7794 SoC
++ * Device Tree Source for the R-Car E2 (R8A77940) SoC
+  *
+  * Copyright (C) 2014 Renesas Electronics Corporation
+  * Copyright (C) 2014 Ulrich Hecht
 -- 
 2.11.0
