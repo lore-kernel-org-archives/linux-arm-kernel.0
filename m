@@ -1,50 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 28 Sep 2018 12:21:37 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v4.20
-Message-ID: <cover.1538122547.git.horms+renesas@verge.net.au>
+Date: Fri, 28 Sep 2018 12:21:34 +0200
+Subject: [PATCH 1/6] ARM: shmobile: defconfig: Remove SOC_CAMERA
+In-Reply-To: <cover.1538122547.git.horms+renesas@verge.net.au>
+References: <cover.1538122547.git.horms+renesas@verge.net.au>
+Message-ID: <f7be103571e8085a363d47b911560a261a440fd4.1538122547.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Jacopo Mondi <jacopo@jmondi.org>
 
-Please consider these Renesas ARM based SoC defconfig updates for v4.20.
+As the soc_camera framework is going to be deprecated soon, remove the
+associated configuration options from shmobile defconfig.
 
+Signed-off-by: Jacopo Mondi <jacopo@jmondi.org>
+Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/configs/shmobile_defconfig | 2 --
+ 1 file changed, 2 deletions(-)
 
-The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
-
-  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm-defconfig-for-v4.20
-
-for you to fetch changes up to c26eb6f34c9ea56ed795785ecb7938f008dfed1e:
-
-  ARM: shmobile: defconfig: Enable r8a7744 SoC (2018-09-19 10:40:47 +0200)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Defconfig Updates for v4.20
-
-* shmobile and multi_v7 defconfigs:
-  - Enable recently upstreamed r8a7744 SoC
-  - Enable FDP1 (Fine Display processor) present on R-Car Gen2 and RZ/G1 SoCs
-* shmobile defconfig (only):
-  - Refresh for v4.19-rc1
-  - Remove soon to be deprecated SOC_CAMERA
-
-----------------------------------------------------------------
-Biju Das (2):
-      ARM: multi_v7_defconfig: Enable r8a7744 SoC
-      ARM: shmobile: defconfig: Enable r8a7744 SoC
-
-Geert Uytterhoeven (3):
-      ARM: shmobile: defconfig: Refresh shmobile_defconfig for v4.19-rc1
-      ARM: shmobile: defconfig: Enable VIDEO_RENESAS_FDP1
-      ARM: multi_v7_defconfig: Enable VIDEO_RENESAS_FDP1
-
-Jacopo Mondi (1):
-      ARM: shmobile: defconfig: Remove SOC_CAMERA
-
- arch/arm/configs/multi_v7_defconfig | 2 ++
- arch/arm/configs/shmobile_defconfig | 8 +++-----
- 2 files changed, 5 insertions(+), 5 deletions(-)
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index f8faf3729464..c8f2cb9fc7f3 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -129,8 +129,6 @@ CONFIG_MEDIA_CAMERA_SUPPORT=y
+ CONFIG_MEDIA_CONTROLLER=y
+ CONFIG_VIDEO_V4L2_SUBDEV_API=y
+ CONFIG_V4L_PLATFORM_DRIVERS=y
+-CONFIG_SOC_CAMERA=y
+-CONFIG_SOC_CAMERA_PLATFORM=y
+ CONFIG_VIDEO_RCAR_VIN=y
+ CONFIG_V4L_MEM2MEM_DRIVERS=y
+ CONFIG_VIDEO_RENESAS_JPU=y
+-- 
+2.11.0
