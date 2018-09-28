@@ -1,88 +1,61 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 28 Sep 2018 15:48:28 +0900
-Subject: [PATCH v15 03/16] s390, kexec_file: drop arch_kexec_mem_walk()
+Date: Fri, 28 Sep 2018 15:48:32 +0900
+Subject: [PATCH v15 07/16] arm64: add image head flag definitions
 In-Reply-To: <20180928064841.14117-1-takahiro.akashi@linaro.org>
 References: <20180928064841.14117-1-takahiro.akashi@linaro.org>
-Message-ID: <20180928064841.14117-4-takahiro.akashi@linaro.org>
+Message-ID: <20180928064841.14117-8-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since s390 already knows where to locate buffers, calling
-arch_kexec_mem_walk() has no sense. So we can just drop it as kbuf->mem
-indicates this while all other architectures sets it to 0 initially.
-
-This change is a preparatory work for the next patch, where all the
-variant memory walks, either on system resource or memblock, will be
-put in one common place so that it will satisfy all the architectures'
-need.
+Those image head's flags will be used later by kexec_file loader.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Reviewed-by: Philipp Rudo <prudo@linux.ibm.com>
-Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
-Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-Cc: Dave Young <dyoung@redhat.com>
-Cc: Vivek Goyal <vgoyal@redhat.com>
-Cc: Baoquan He <bhe@redhat.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Acked-by: James Morse <james.morse@arm.com>
 ---
- arch/s390/kernel/machine_kexec_file.c | 10 ----------
- include/linux/kexec.h                 |  8 ++++++++
- kernel/kexec_file.c                   |  4 ++++
- 3 files changed, 12 insertions(+), 10 deletions(-)
+ arch/arm64/include/asm/boot.h | 15 +++++++++++++++
+ arch/arm64/kernel/head.S      |  2 +-
+ 2 files changed, 16 insertions(+), 1 deletion(-)
 
-diff --git a/arch/s390/kernel/machine_kexec_file.c b/arch/s390/kernel/machine_kexec_file.c
-index f413f57f8d20..32023b4f9dc0 100644
---- a/arch/s390/kernel/machine_kexec_file.c
-+++ b/arch/s390/kernel/machine_kexec_file.c
-@@ -134,16 +134,6 @@ int kexec_file_add_initrd(struct kimage *image, struct s390_load_data *data,
- 	return ret;
- }
+diff --git a/arch/arm64/include/asm/boot.h b/arch/arm64/include/asm/boot.h
+index 355e552a9175..0bab7eed3012 100644
+--- a/arch/arm64/include/asm/boot.h
++++ b/arch/arm64/include/asm/boot.h
+@@ -5,6 +5,21 @@
  
--/*
-- * The kernel is loaded to a fixed location. Turn off kexec_locate_mem_hole
-- * and provide kbuf->mem by hand.
-- */
--int arch_kexec_walk_mem(struct kexec_buf *kbuf,
--			int (*func)(struct resource *, void *))
--{
--	return 1;
--}
--
- int arch_kexec_apply_relocations_add(struct purgatory_info *pi,
- 				     Elf_Shdr *section,
- 				     const Elf_Shdr *relsec,
-diff --git a/include/linux/kexec.h b/include/linux/kexec.h
-index 49ab758f4d91..f378cb786f1b 100644
---- a/include/linux/kexec.h
-+++ b/include/linux/kexec.h
-@@ -145,6 +145,14 @@ int kexec_image_probe_default(struct kimage *image, void *buf,
- 			      unsigned long buf_len);
- int kexec_image_post_load_cleanup_default(struct kimage *image);
+ #include <asm/sizes.h>
  
-+/*
-+ * If kexec_buf.mem is set to this value, kexec_locate_mem_hole()
-+ * will try to allocate free memory. Arch may overwrite it.
-+ */
-+#ifndef KEXEC_BUF_MEM_UNKNOWN
-+#define KEXEC_BUF_MEM_UNKNOWN 0
-+#endif
++#define ARM64_MAGIC		"ARM\x64"
 +
- /**
-  * struct kexec_buf - parameters for finding a place for a buffer in memory
-  * @image:	kexec image in which memory to search.
-diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-index 63c7ce1c0c3e..0fcaa86219d1 100644
---- a/kernel/kexec_file.c
-+++ b/kernel/kexec_file.c
-@@ -534,6 +534,10 @@ int kexec_locate_mem_hole(struct kexec_buf *kbuf)
- {
- 	int ret;
- 
-+	/* Arch knows where to place */
-+	if (kbuf->mem != KEXEC_BUF_MEM_UNKNOWN)
-+		return 0;
++#define HEAD_FLAG_BE_SHIFT		0
++#define HEAD_FLAG_PAGE_SIZE_SHIFT	1
++#define HEAD_FLAG_BE_MASK		0x1
++#define HEAD_FLAG_PAGE_SIZE_MASK	0x3
 +
- 	ret = arch_kexec_walk_mem(kbuf, locate_mem_hole_callback);
++#define HEAD_FLAG_BE			1
++#define HEAD_FLAG_PAGE_SIZE_4K		1
++#define HEAD_FLAG_PAGE_SIZE_16K		2
++#define HEAD_FLAG_PAGE_SIZE_64K		3
++
++#define head_flag_field(flags, field) \
++		(((flags) >> field##_SHIFT) & field##_MASK)
++
+ /*
+  * arm64 requires the DTB to be 8 byte aligned and
+  * not exceed 2MB in size.
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index b0853069702f..8cbac6232ed1 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -91,7 +91,7 @@ _head:
+ 	.quad	0				// reserved
+ 	.quad	0				// reserved
+ 	.quad	0				// reserved
+-	.ascii	"ARM\x64"			// Magic number
++	.ascii	ARM64_MAGIC			// Magic number
+ #ifdef CONFIG_EFI
+ 	.long	pe_header - _head		// Offset to the PE header.
  
- 	return ret == 1 ? 0 : -EADDRNOTAVAIL;
 -- 
 2.19.0
