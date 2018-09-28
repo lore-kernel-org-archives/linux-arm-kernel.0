@@ -1,137 +1,148 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Fri, 28 Sep 2018 08:44:42 -0500
-Subject: [PATCH v15 06/16] of/fdt: add helper functions for handling
- properties
-In-Reply-To: <20180928064841.14117-7-takahiro.akashi@linaro.org>
-References: <20180928064841.14117-1-takahiro.akashi@linaro.org>
- <20180928064841.14117-7-takahiro.akashi@linaro.org>
-Message-ID: <CAL_JsqKwmcdQ+2eK3LGHhcQ2Wb+Yz1-Atz0-3K6WKNZQt_woVw@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 28 Sep 2018 14:52:36 +0100
+Subject: [PATCH v2 2/3] iommu/dma: Use fast DMA domain lookup
+In-Reply-To: <20180928132605eucas1p1d39fedc3be3e4e2c16035c01a40cfab6~Ykz2Rax6e0538205382eucas1p17@eucas1p1.samsung.com>
+References: <cover.1536764440.git.robin.murphy@arm.com>
+ <CGME20180912152438epcas5p175098b44c3f7232302e10b087279bd3c@epcas5p1.samsung.com>
+ <e42771992a73620f23128c0479b2ae91b3e177bf.1536764440.git.robin.murphy@arm.com>
+ <20180928132605eucas1p1d39fedc3be3e4e2c16035c01a40cfab6~Ykz2Rax6e0538205382eucas1p17@eucas1p1.samsung.com>
+Message-ID: <78a5b373-d569-4461-e258-3104286ba322@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+David Gibson
+On 28/09/18 14:26, Marek Szyprowski wrote:
+> Hi All,
+> 
+> On 2018-09-12 17:24, Robin Murphy wrote:
+>> Most parts of iommu-dma already assume they are operating on a default
+>> domain set up by iommu_dma_init_domain(), and can be converted straight
+>> over to avoid the refcounting bottleneck. MSI page mappings may be in
+>> an unmanaged domain with an explicit MSI-only cookie, so retain the
+>> non-specific lookup, but that's OK since they're far from a contended
+>> fast path either way.
+>>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> 
+> This breaks Exynos DRM driver with Exynos IOMMU on ARM64 (Exynos5433).
+> Exynos DRM creates it's own domain, attach all devices which performs
+> DMA access (typically CRTC devices) to it and uses standard DMA-mapping
+> calls to allocate/map buffers. This way it can use the same one DMA
+> address for each buffer regardless of the CRTC/display/processing
+> device.
+> 
+> This no longer works with this patch. The simplest solution to fix this
+> is add API to change default_domain to the one allocated by the Exynos
+> DRM driver.
 
-On Fri, Sep 28, 2018 at 1:48 AM AKASHI Takahiro
-<takahiro.akashi@linaro.org> wrote:
->
-> These functions will be used later to handle kexec-specific properties
-> in arm64's kexec_file implementation.
->
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Frank Rowand <frowand.list@gmail.com>
-> Cc: devicetree at vger.kernel.org
-> ---
->  drivers/of/fdt.c       | 56 ++++++++++++++++++++++++++++++++++++++++++
->  include/linux/of_fdt.h |  4 +++
->  2 files changed, 60 insertions(+)
->
-> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-> index 800ad252cf9c..c65c31562ccb 100644
-> --- a/drivers/of/fdt.c
-> +++ b/drivers/of/fdt.c
-> @@ -25,6 +25,7 @@
->  #include <linux/debugfs.h>
->  #include <linux/serial_core.h>
->  #include <linux/sysfs.h>
-> +#include <linux/types.h>
->
->  #include <asm/setup.h>  /* for COMMAND_LINE_SIZE */
->  #include <asm/page.h>
-> @@ -1323,3 +1324,58 @@ late_initcall(of_fdt_raw_init);
->  #endif
->
->  #endif /* CONFIG_OF_EARLY_FLATTREE */
-> +
-> +#define FDT_ALIGN(x, a)        (((x) + (a) - 1) & ~((a) - 1))
-> +#define FDT_TAGALIGN(x)        (FDT_ALIGN((x), FDT_TAGSIZE))
-> +
-> +int fdt_prop_len(const char *prop_name, int len)
-> +{
-> +       return (strlen(prop_name) + 1) +
-> +               sizeof(struct fdt_property) +
-> +               FDT_TAGALIGN(len);
+Ugh, I hadn't realised there were any drivers trying to fake up their 
+own default domains - that's always going to be fragile. In fact, one of 
+my proposals for un-breaking Tegra and other DRM drivers involves 
+preventing iommu-dma from trying to operate on non-IOMMU_DOMAIN_DMA 
+domains at all, which would stop that from working permanently.
 
-Looks like you are using this to calculate how much space you need to
-allocate in addition to the current DTB for a couple of new or
-replaced properties. I'm not sure that this calculation is completely
-accurate. And it is strange there doesn't seem to be any libfdt
-function for this already. It would be simpler to just add some fixed
-additional amount.
+Can Exynos not put all the DRM components into a single group, or at 
+least just pick one of the real default domains to attach everyone to 
+instead of allocating a fake one?
 
-Maybe David G has comments on this?
+Robin.
 
-> +}
-> +
-
-The rest of this should go in drivers/of/fdt_address.c. Ultimately, it
-should go into libfdt, but I'm fine with having it in the kernel for
-now.
-
-> +static void fill_property(void *buf, u64 val64, int cells)
-> +{
-> +       __be32 val32;
-> +
-> +       while (cells) {
-> +               val32 = cpu_to_fdt32((val64 >> (32 * (--cells))) & U32_MAX);
-> +               memcpy(buf, &val32, sizeof(val32));
-> +               buf += sizeof(val32);
-
-This is kind of hard to read. I would copy u-boot's fdt_pack_reg function.
-
-BTW, for purposes of moving to libfdt, we'll need the authors'
-(Masahiro Yamada and Hans de Goede) permission to dual license.
-
-> +       }
-> +}
-> +
-> +int fdt_setprop_reg(void *fdt, int nodeoffset, const char *name,
-> +                                               u64 addr, u64 size)
-> +{
-> +       int addr_cells, size_cells;
-> +       char buf[sizeof(__be32) * 2 * 2];
-> +               /* assume dt_root_[addr|size]_cells <= 2 */
-> +       void *prop;
-> +       size_t buf_size;
-> +
-> +       addr_cells = fdt_address_cells(fdt, 0);
-> +       if (addr_cells < 0)
-> +               return addr_cells;
-> +       size_cells = fdt_size_cells(fdt, 0);
-> +       if (size_cells < 0)
-> +               return size_cells;
-> +
-> +       /* if *_cells >= 2, cells can hold 64-bit values anyway */
-> +       if ((addr_cells == 1) && (addr > U32_MAX))
-> +               return -FDT_ERR_BADVALUE;
-> +
-> +       if ((size_cells == 1) && (size > U32_MAX))
-> +               return -FDT_ERR_BADVALUE;
-> +
-> +       buf_size = (addr_cells + size_cells) * sizeof(u32);
-> +       prop = buf;
-> +
-> +       fill_property(prop, addr, addr_cells);
-> +       prop += addr_cells * sizeof(u32);
-> +
-> +       fill_property(prop, size, size_cells);
-> +
-> +       return fdt_setprop(fdt, nodeoffset, name, buf, buf_size);
-> +}
-> diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
-> index b9cd9ebdf9b9..842af6ea92ea 100644
-> --- a/include/linux/of_fdt.h
-> +++ b/include/linux/of_fdt.h
-> @@ -108,5 +108,9 @@ static inline void unflatten_device_tree(void) {}
->  static inline void unflatten_and_copy_device_tree(void) {}
->  #endif /* CONFIG_OF_EARLY_FLATTREE */
->
-> +int fdt_prop_len(const char *prop_name, int len);
-> +int fdt_setprop_reg(void *fdt, int nodeoffset, const char *name,
-> +                                               u64 addr, u64 size);
-> +
->  #endif /* __ASSEMBLY__ */
->  #endif /* _LINUX_OF_FDT_H */
-> --
-> 2.19.0
->
+>> ---
+>>    drivers/iommu/dma-iommu.c | 23 ++++++++++++-----------
+>>    1 file changed, 12 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+>> index 511ff9a1d6d9..320f9ea82f3f 100644
+>> --- a/drivers/iommu/dma-iommu.c
+>> +++ b/drivers/iommu/dma-iommu.c
+>> @@ -491,7 +491,7 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count,
+>>    void iommu_dma_free(struct device *dev, struct page **pages, size_t size,
+>>    		dma_addr_t *handle)
+>>    {
+>> -	__iommu_dma_unmap(iommu_get_domain_for_dev(dev), *handle, size);
+>> +	__iommu_dma_unmap(iommu_get_dma_domain(dev), *handle, size);
+>>    	__iommu_dma_free_pages(pages, PAGE_ALIGN(size) >> PAGE_SHIFT);
+>>    	*handle = IOMMU_MAPPING_ERROR;
+>>    }
+>> @@ -518,7 +518,7 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
+>>    		unsigned long attrs, int prot, dma_addr_t *handle,
+>>    		void (*flush_page)(struct device *, const void *, phys_addr_t))
+>>    {
+>> -	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+>> +	struct iommu_domain *domain = iommu_get_dma_domain(dev);
+>>    	struct iommu_dma_cookie *cookie = domain->iova_cookie;
+>>    	struct iova_domain *iovad = &cookie->iovad;
+>>    	struct page **pages;
+>> @@ -606,9 +606,8 @@ int iommu_dma_mmap(struct page **pages, size_t size, struct vm_area_struct *vma)
+>>    }
+>>    
+>>    static dma_addr_t __iommu_dma_map(struct device *dev, phys_addr_t phys,
+>> -		size_t size, int prot)
+>> +		size_t size, int prot, struct iommu_domain *domain)
+>>    {
+>> -	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+>>    	struct iommu_dma_cookie *cookie = domain->iova_cookie;
+>>    	size_t iova_off = 0;
+>>    	dma_addr_t iova;
+>> @@ -632,13 +631,14 @@ static dma_addr_t __iommu_dma_map(struct device *dev, phys_addr_t phys,
+>>    dma_addr_t iommu_dma_map_page(struct device *dev, struct page *page,
+>>    		unsigned long offset, size_t size, int prot)
+>>    {
+>> -	return __iommu_dma_map(dev, page_to_phys(page) + offset, size, prot);
+>> +	return __iommu_dma_map(dev, page_to_phys(page) + offset, size, prot,
+>> +			iommu_get_dma_domain(dev));
+>>    }
+>>    
+>>    void iommu_dma_unmap_page(struct device *dev, dma_addr_t handle, size_t size,
+>>    		enum dma_data_direction dir, unsigned long attrs)
+>>    {
+>> -	__iommu_dma_unmap(iommu_get_domain_for_dev(dev), handle, size);
+>> +	__iommu_dma_unmap(iommu_get_dma_domain(dev), handle, size);
+>>    }
+>>    
+>>    /*
+>> @@ -726,7 +726,7 @@ static void __invalidate_sg(struct scatterlist *sg, int nents)
+>>    int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
+>>    		int nents, int prot)
+>>    {
+>> -	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+>> +	struct iommu_domain *domain = iommu_get_dma_domain(dev);
+>>    	struct iommu_dma_cookie *cookie = domain->iova_cookie;
+>>    	struct iova_domain *iovad = &cookie->iovad;
+>>    	struct scatterlist *s, *prev = NULL;
+>> @@ -811,20 +811,21 @@ void iommu_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
+>>    		sg = tmp;
+>>    	}
+>>    	end = sg_dma_address(sg) + sg_dma_len(sg);
+>> -	__iommu_dma_unmap(iommu_get_domain_for_dev(dev), start, end - start);
+>> +	__iommu_dma_unmap(iommu_get_dma_domain(dev), start, end - start);
+>>    }
+>>    
+>>    dma_addr_t iommu_dma_map_resource(struct device *dev, phys_addr_t phys,
+>>    		size_t size, enum dma_data_direction dir, unsigned long attrs)
+>>    {
+>>    	return __iommu_dma_map(dev, phys, size,
+>> -			dma_info_to_prot(dir, false, attrs) | IOMMU_MMIO);
+>> +			dma_info_to_prot(dir, false, attrs) | IOMMU_MMIO,
+>> +			iommu_get_dma_domain(dev));
+>>    }
+>>    
+>>    void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
+>>    		size_t size, enum dma_data_direction dir, unsigned long attrs)
+>>    {
+>> -	__iommu_dma_unmap(iommu_get_domain_for_dev(dev), handle, size);
+>> +	__iommu_dma_unmap(iommu_get_dma_domain(dev), handle, size);
+>>    }
+>>    
+>>    int iommu_dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
+>> @@ -850,7 +851,7 @@ static struct iommu_dma_msi_page *iommu_dma_get_msi_page(struct device *dev,
+>>    	if (!msi_page)
+>>    		return NULL;
+>>    
+>> -	iova = __iommu_dma_map(dev, msi_addr, size, prot);
+>> +	iova = __iommu_dma_map(dev, msi_addr, size, prot, domain);
+>>    	if (iommu_dma_mapping_error(dev, iova))
+>>    		goto out_free_page;
+>>    
+> 
+> Best regards
+> 
