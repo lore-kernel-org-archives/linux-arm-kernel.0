@@ -1,45 +1,50 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 28 Sep 2018 12:22:48 +0200
-Subject: [PATCH 6/7] ARM: debug-ll: Add support for r8a7744
-In-Reply-To: <cover.1538123953.git.horms+renesas@verge.net.au>
-References: <cover.1538123953.git.horms+renesas@verge.net.au>
-Message-ID: <abf3bf537d298db18ad929ceb71c0353d6794f42.1538123953.git.horms+renesas@verge.net.au>
+From: zhang.lyra@gmail.com (Chunyan Zhang)
+Date: Fri, 28 Sep 2018 19:09:02 +0800
+Subject: [PATCH v2 04/11] arm64: dts: sc9836/sc9860: Update coresight
+ bindings for hardware ports
+In-Reply-To: <CAK8P3a2WWFp5W5-7o-X3joOpSGgnK=s_ZyGev7gsVV0SjN0p0A@mail.gmail.com>
+References: <20180912135352.19722-1-suzuki.poulose@arm.com>
+ <20180912135352.19722-5-suzuki.poulose@arm.com>
+ <ccc61e1b-768c-2a6d-3ff5-95b72bc58a6f@arm.com>
+ <CAAfSe-swWPgCWN6cZbQxLL6fwaJ1qLXnC_X7A0zeYuHDaZ_A1Q@mail.gmail.com>
+ <CAK8P3a2WWFp5W5-7o-X3joOpSGgnK=s_ZyGev7gsVV0SjN0p0A@mail.gmail.com>
+Message-ID: <CAAfSe-sD-Yk2N-7aRuBW8UuX5=111Ofb5GLZRTHQKJ5n+Y=uog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Biju Das <biju.das@bp.renesas.com>
+On 28 September 2018 at 18:45, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thu, Sep 27, 2018 at 11:19 AM Chunyan Zhang <zhang.lyra@gmail.com> wrote:
+>>
+>> Hi Suzuki,
+>>
+>> On 27 September 2018 at 16:51, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+>> > +To: Chunyan Zhang
+>> >
+>> > Chunyan Zhang,
+>> >
+>> > On 09/12/2018 02:53 PM, Suzuki K Poulose wrote:
+>> >>
+>> >> Switch to the new coresight bindings for hw ports
+>> >>
+>> >
+>> > How can we push this patch ? Do you generally send the spreadtrum
+>> > specific changes to ARM soc folks ? Or would you like me to post
+>> > this directly to ARM soc folks ?
+>>
+>> Yeah, at present sprd dts files generally got merged through arm-soc
+>> (I've added arm at kernel.org).
+>
+> Yes, that's fine. Generally, we prefer if you collect patches for your
+> platform first, and then send them as a pull request or short set
+> of patches. for inclusion, rather than picking them up from the list.
+>
 
-Enable low-level debugging support for RZ/G1N (R8A7744). RZ/G1N uses
-SCIF0 for the debug console.
+Ok, I will send you a patchset once merge window open.
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/Kconfig.debug | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+Thanks,
+Chunyan
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index f6fcb8a79889..7c86875c9bae 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -940,12 +940,13 @@ choice
- 
- 	config DEBUG_RCAR_GEN2_SCIF0
- 		bool "Kernel low-level debugging messages via SCIF0 on R-Car Gen2 and RZ/G1"
--		depends on ARCH_R8A7743 || ARCH_R8A7790 || ARCH_R8A7791 || \
--			ARCH_R8A7792 || ARCH_R8A7793
-+		depends on ARCH_R8A7743 || ARCH_R8A7744 || ARCH_R8A7790 || \
-+			ARCH_R8A7791 || ARCH_R8A7792 || ARCH_R8A7793
- 		help
- 		  Say Y here if you want kernel low-level debugging support
--		  via SCIF0 on Renesas RZ/G1M (R8A7743), R-Car H2 (R8A7790),
--		  M2-W (R8A7791), V2H (R8A7792), or M2-N (R8A7793).
-+		  via SCIF0 on Renesas RZ/G1M (R8A7743), RZ/G1N (R8A7744),
-+		  R-Car H2 (R8A7790), M2-W (R8A7791), V2H (R8A7792), or
-+		  M2-N (R8A7793).
- 
- 	config DEBUG_RCAR_GEN2_SCIF1
- 		bool "Kernel low-level debugging messages via SCIF1 on R8A77470"
--- 
-2.11.0
+> If this is the only DT patch for spreadtrum in 4.20, I can also just
+> pick it up with your Ack.
+>
+>        Arnd
