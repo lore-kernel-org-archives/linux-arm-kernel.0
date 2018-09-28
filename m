@@ -1,111 +1,89 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 28 Sep 2018 14:39:13 +0100
-Subject: [RFC PATCH v2 09/23] KVM: arm64: Propagate vcpu into read_id_reg()
+Date: Fri, 28 Sep 2018 14:39:15 +0100
+Subject: [RFC PATCH v2 11/23] KVM: arm64: Support runtime sysreg filtering for
+ KVM_GET_REG_LIST
 In-Reply-To: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
 References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1538141967-15375-10-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1538141967-15375-12-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Architecture features that are conditionally visible to the guest
-will require run-time checks in the ID register accessor functions.
-In particular, read_id_reg() will need to perform checks in order
-to generate the correct emulated value for certain ID register
-fields such as ID_AA64PFR0_EL1.SVE for example.
+KVM_GET_REG_LIST should only enumerate registers that are actually
+accessible, so it is necessary to filter out any register that is
+not exposed to the guest.  For features that are configured at
+runtime, this will require a dynamic check.
 
-This patch propagates vcpu into read_id_reg() so that future
-patches can add run-time checks on the guest configuration here.
+For example, ZCR_EL1 and ID_AA64ZFR0_EL1 would need to be hidden
+if SVE is not enabled for the guest.
 
-For now, there is no functional change.
+Special-casing walk_one_sys_reg() for specific registers will make
+the code unnecessarily messy, so this patch adds a new sysreg
+method check_present() that, if defined, indicates whether the
+sysreg should be enumerated.  If the guest runtime configuration
+may require a particular system register to be hidden,
+check_present should point to a function that returns true or false
+to enable or disable enumeration of that register respectively.
+
+Currently check_present() is not used for any other purpose, but it
+may be a useful foundation for abstracting other parts of the code
+to handle conditionally-present sysregs, if required.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/kvm/sys_regs.c | 23 +++++++++++++----------
- 1 file changed, 13 insertions(+), 10 deletions(-)
+ arch/arm64/kvm/sys_regs.c | 10 +++++++---
+ arch/arm64/kvm/sys_regs.h |  4 ++++
+ 2 files changed, 11 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 22fbbdb..0dfd064 100644
+index 0dfd064..adb6cbd 100644
 --- a/arch/arm64/kvm/sys_regs.c
 +++ b/arch/arm64/kvm/sys_regs.c
-@@ -1029,7 +1029,8 @@ static bool access_cntp_cval(struct kvm_vcpu *vcpu,
- }
- 
- /* Read a sanitised cpufeature ID register by sys_reg_desc */
--static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
-+static u64 read_id_reg(const struct kvm_vcpu *vcpu,
-+		struct sys_reg_desc const *r, bool raz)
- {
- 	u32 id = sys_reg((u32)r->Op0, (u32)r->Op1,
- 			 (u32)r->CRn, (u32)r->CRm, (u32)r->Op2);
-@@ -1060,7 +1061,7 @@ static bool __access_id_reg(struct kvm_vcpu *vcpu,
- 	if (p->is_write)
- 		return write_to_read_only(vcpu, p, r);
- 
--	p->regval = read_id_reg(r, raz);
-+	p->regval = read_id_reg(vcpu, r, raz);
+@@ -2437,7 +2437,8 @@ static bool copy_reg_to_user(const struct sys_reg_desc *reg, u64 __user **uind)
  	return true;
  }
  
-@@ -1089,16 +1090,18 @@ static u64 sys_reg_to_index(const struct sys_reg_desc *reg);
-  * are stored, and for set_id_reg() we don't allow the effective value
-  * to be changed.
-  */
--static int __get_id_reg(const struct sys_reg_desc *rd, void __user *uaddr,
-+static int __get_id_reg(const struct kvm_vcpu *vcpu,
-+			const struct sys_reg_desc *rd, void __user *uaddr,
- 			bool raz)
+-static int walk_one_sys_reg(const struct sys_reg_desc *rd,
++static int walk_one_sys_reg(const struct kvm_vcpu *vcpu,
++			    const struct sys_reg_desc *rd,
+ 			    u64 __user **uind,
+ 			    unsigned int *total)
  {
- 	const u64 id = sys_reg_to_index(rd);
--	const u64 val = read_id_reg(rd, raz);
-+	const u64 val = read_id_reg(vcpu, rd, raz);
+@@ -2448,6 +2449,9 @@ static int walk_one_sys_reg(const struct sys_reg_desc *rd,
+ 	if (!(rd->reg || rd->get_user))
+ 		return 0;
  
- 	return reg_to_user(uaddr, &val, id);
- }
++	if (rd->check_present && !rd->check_present(vcpu, rd))
++		return 0;
++
+ 	if (!copy_reg_to_user(rd, uind))
+ 		return -EFAULT;
  
--static int __set_id_reg(const struct sys_reg_desc *rd, void __user *uaddr,
-+static int __set_id_reg(const struct kvm_vcpu *vcpu,
-+			const struct sys_reg_desc *rd, void __user *uaddr,
- 			bool raz)
- {
- 	const u64 id = sys_reg_to_index(rd);
-@@ -1110,7 +1113,7 @@ static int __set_id_reg(const struct sys_reg_desc *rd, void __user *uaddr,
- 		return err;
+@@ -2476,9 +2480,9 @@ static int walk_sys_regs(struct kvm_vcpu *vcpu, u64 __user *uind)
+ 		int cmp = cmp_sys_reg(i1, i2);
+ 		/* target-specific overrides generic entry. */
+ 		if (cmp <= 0)
+-			err = walk_one_sys_reg(i1, &uind, &total);
++			err = walk_one_sys_reg(vcpu, i1, &uind, &total);
+ 		else
+-			err = walk_one_sys_reg(i2, &uind, &total);
++			err = walk_one_sys_reg(vcpu, i2, &uind, &total);
  
- 	/* This is what we mean by invariant: you can't change it. */
--	if (val != read_id_reg(rd, raz))
-+	if (val != read_id_reg(vcpu, rd, raz))
- 		return -EINVAL;
+ 		if (err)
+ 			return err;
+diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
+index 24bac06..cffb31e 100644
+--- a/arch/arm64/kvm/sys_regs.h
++++ b/arch/arm64/kvm/sys_regs.h
+@@ -61,6 +61,10 @@ struct sys_reg_desc {
+ 			const struct kvm_one_reg *reg, void __user *uaddr);
+ 	int (*set_user)(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
+ 			const struct kvm_one_reg *reg, void __user *uaddr);
++
++	/* Return true iff the register exists; assume present if NULL */
++	bool (*check_present)(const struct kvm_vcpu *vcpu,
++			      const struct sys_reg_desc *rd);
+ };
  
- 	return 0;
-@@ -1119,25 +1122,25 @@ static int __set_id_reg(const struct sys_reg_desc *rd, void __user *uaddr,
- static int get_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
- 		      const struct kvm_one_reg *reg, void __user *uaddr)
- {
--	return __get_id_reg(rd, uaddr, false);
-+	return __get_id_reg(vcpu, rd, uaddr, false);
- }
- 
- static int set_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
- 		      const struct kvm_one_reg *reg, void __user *uaddr)
- {
--	return __set_id_reg(rd, uaddr, false);
-+	return __set_id_reg(vcpu, rd, uaddr, false);
- }
- 
- static int get_raz_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
- 			  const struct kvm_one_reg *reg, void __user *uaddr)
- {
--	return __get_id_reg(rd, uaddr, true);
-+	return __get_id_reg(vcpu, rd, uaddr, true);
- }
- 
- static int set_raz_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
- 			  const struct kvm_one_reg *reg, void __user *uaddr)
- {
--	return __set_id_reg(rd, uaddr, true);
-+	return __set_id_reg(vcpu, rd, uaddr, true);
- }
- 
- /* sys_reg_desc initialiser for known cpufeature ID registers */
+ static inline void print_sys_reg_instr(const struct sys_reg_params *p)
 -- 
 2.1.4
