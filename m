@@ -1,69 +1,47 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 28 Sep 2018 12:20:20 +0200
-Subject: [PATCH 09/14] arm64: dts: renesas: r8a779{7|8}0: add TPU support
-In-Reply-To: <cover.1538125184.git.horms+renesas@verge.net.au>
-References: <cover.1538125184.git.horms+renesas@verge.net.au>
-Message-ID: <dd809b7de27cff710658febdde65304ec1a3ea82.1538125184.git.horms+renesas@verge.net.au>
+From: yuehaibing@huawei.com (YueHaibing)
+Date: Fri, 28 Sep 2018 10:39:40 +0000
+Subject: [PATCH -next] drm/stm: ltdc: remove set but not used variable 'src_h'
+Message-ID: <1538131180-34108-1-git-send-email-yuehaibing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Fixes gcc '-Wunused-but-set-variable' warning:
 
-Describe TPU in the R8A779{7|8}0 device trees.
+drivers/gpu/drm/stm/ltdc.c: In function 'ltdc_plane_atomic_check':
+drivers/gpu/drm/stm/ltdc.c:694:13: warning:
+ variable 'src_y' set but not used [-Wunused-but-set-variable]
+  u32 src_x, src_y, src_w, src_h;
+             ^
+             ^
+drivers/gpu/drm/stm/ltdc.c:694:6: warning:
+ variable 'src_x' set but not used [-Wunused-but-set-variable]
+  u32 src_x, src_y, src_w, src_h;
+      ^
 
-Based on the original (and large) patches by Vladimir Barinov.
-
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: YueHaibing <yuehaibing@huawei.com>
 ---
- arch/arm64/boot/dts/renesas/r8a77970.dtsi | 10 ++++++++++
- arch/arm64/boot/dts/renesas/r8a77980.dtsi | 11 +++++++++++
- 2 files changed, 21 insertions(+)
+ drivers/gpu/drm/stm/ltdc.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77970.dtsi b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-index 934a15f9171f..cba7885cf7c3 100644
---- a/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-@@ -614,6 +614,16 @@
- 			status = "disabled";
- 		};
+diff --git a/drivers/gpu/drm/stm/ltdc.c b/drivers/gpu/drm/stm/ltdc.c
+index 61dd661..a91e041 100644
+--- a/drivers/gpu/drm/stm/ltdc.c
++++ b/drivers/gpu/drm/stm/ltdc.c
+@@ -691,7 +691,7 @@ static int ltdc_plane_atomic_check(struct drm_plane *plane,
+ 				   struct drm_plane_state *state)
+ {
+ 	struct drm_framebuffer *fb = state->fb;
+-	u32 src_x, src_y, src_w, src_h;
++	u32 src_w, src_h;
  
-+		tpu: pwm at e6e80000 {
-+			compatible = "renesas,tpu-r8a77970", "renesas,tpu";
-+			reg = <0 0xe6e80000 0 0x148>;
-+			interrupts = <GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 304>;
-+			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
-+			resets = <&cpg 304>;
-+			#pwm-cells = <3>;
-+			status = "disabled";
-+		};
+ 	DRM_DEBUG_DRIVER("\n");
  
- 		vin0: video at e6ef0000 {
- 			compatible = "renesas,vin-r8a77970";
-diff --git a/arch/arm64/boot/dts/renesas/r8a77980.dtsi b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-index ba1d281deb07..d4952b527d14 100644
---- a/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-@@ -666,6 +666,17 @@
- 			status = "disabled";
- 		};
+@@ -699,8 +699,6 @@ static int ltdc_plane_atomic_check(struct drm_plane *plane,
+ 		return 0;
  
-+		tpu: pwm at e6e80000 {
-+			compatible = "renesas,tpu-r8a77980", "renesas,tpu";
-+			reg = <0 0xe6e80000 0 0x148>;
-+			interrupts = <GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 304>;
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 304>;
-+			#pwm-cells = <3>;
-+			status = "disabled";
-+		};
-+
- 		vin0: video at e6ef0000 {
- 			compatible = "renesas,vin-r8a77980";
- 			reg = <0 0xe6ef0000 0 0x1000>;
--- 
-2.11.0
+ 	/* convert src_ from 16:16 format */
+-	src_x = state->src_x >> 16;
+-	src_y = state->src_y >> 16;
+ 	src_w = state->src_w >> 16;
+ 	src_h = state->src_h >> 16;
+ 
