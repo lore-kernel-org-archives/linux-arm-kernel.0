@@ -1,62 +1,95 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 28 Sep 2018 14:39:26 +0100
-Subject: [RFC PATCH v2 22/23] KVM: Documentation: Document arm64 core
- registers in detail
+Date: Fri, 28 Sep 2018 14:39:22 +0100
+Subject: [RFC PATCH v2 18/23] KVM: arm64: Add arch vcpu ioctl hook
 In-Reply-To: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
 References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1538141967-15375-23-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1538141967-15375-19-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the the sizes of members the core arm64 registers vary, the
-list of register encodings that make sense is not a simple linear
-sequence.
+To enable arm64-specific vcpu ioctls to be added cleanly, this
+patch adds a kvm_arm_arch_vcpu_ioctl() hook so that these don't
+pollute the common code.
 
-To clarify which encodings to use, this patch adds a brief list
-to the documentation.
+No functional change: the -EINVAL return for unknown ioctls is
+retained, though it may or may not be intentional (KVM returns
+-ENXIO in various other similar contexts).
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
+ arch/arm/include/asm/kvm_host.h   | 7 +++++++
+ arch/arm64/include/asm/kvm_host.h | 2 ++
+ arch/arm64/kvm/guest.c            | 6 ++++++
+ virt/kvm/arm/arm.c                | 2 +-
+ 4 files changed, 16 insertions(+), 1 deletion(-)
 
-Draft only -- encodings not checked yet.
----
- Documentation/virtual/kvm/api.txt | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
-
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 647f941..a58067b 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2037,6 +2037,30 @@ contains elements ranging from 32 to 128 bits. The index is a 32bit
- value in the kvm_regs structure seen as a 32bit array.
-   0x60x0 0000 0010 <index into the kvm_regs struct:16>
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index c36760b..df2659d 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -19,6 +19,7 @@
+ #ifndef __ARM_KVM_HOST_H__
+ #define __ARM_KVM_HOST_H__
  
-+Specifically:
-+    Encoding            Register  Bits  kvm_regs member
-+----------------------------------------------------------------
-+  0x6030 0000 0010 0000 X0          64  regs.regs[0]
-+  0x6030 0000 0010 0002 X1          64  regs.regs[1]
-+    ...
-+  0x6030 0000 0010 003c X30         64  regs.regs[30]
-+  0x6030 0000 0010 003e SP          64  regs.sp
-+  0x6030 0000 0010 0040 PC          64  regs.pc
-+  0x6030 0000 0010 0042 PSTATE      64  regs.pstate
-+  0x6030 0000 0010 0044 SP_EL1      64  sp_el1
-+  0x6030 0000 0010 0046 ELR_EL1     64  elr_el1
-+  0x6030 0000 0010 0048 SPSR_EL1    64  spsr[KVM_SPSR_EL1] (alias SPSR_SVC)
-+  0x6030 0000 0010 004a SPSR_ABT    64  spsr[KVM_SPSR_ABT]
-+  0x6030 0000 0010 004c SPSR_UND    64  spsr[KVM_SPSR_UND]
-+  0x6030 0000 0010 004e SPSR_IRQ    64  spsr[KVM_SPSR_IRQ]
-+  0x6060 0000 0010 0050 SPSR_FIQ    64  spsr[KVM_SPSR_FIQ]
-+  0x6040 0000 0010 0054 V0         128  fp_regs.vregs[0]
-+  0x6040 0000 0010 0058 V1         128  fp_regs.vregs[1]
-+    ...
-+  0x6040 0000 0010 00d0 V31        128  fp_regs.vregs[31]
-+  0x6020 0000 0010 00d4 FPSR        32  fp_regs.fpsr
-+  0x6020 0000 0010 00d5 FPCR        32  fp_regs.fpcr
++#include <linux/errno.h>
+ #include <linux/types.h>
+ #include <linux/kvm_types.h>
+ #include <asm/cputype.h>
+@@ -278,6 +279,12 @@ static inline int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+ 	return 0;
+ }
+ 
++static inline int kvm_arm_arch_vcpu_ioctl(struct vcpu *vcpu,
++	unsigned int ioctl, unsigned long arg)
++{
++	return -EINVAL;
++}
 +
- arm64 CCSIDR registers are demultiplexed by CSSELR value:
-   0x6020 0000 0011 00 <csselr:8>
+ int kvm_perf_init(void);
+ int kvm_perf_teardown(void);
  
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 8e9cd43..bbde597 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -55,6 +55,8 @@ DECLARE_STATIC_KEY_FALSE(userspace_irqchip_in_use);
+ int __attribute_const__ kvm_target_cpu(void);
+ int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
+ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext);
++int kvm_arm_arch_vcpu_ioctl(struct kvm_vcpu *vcpu,
++			    unsigned int ioctl, unsigned long arg);
+ void __extended_idmap_trampoline(phys_addr_t boot_pgd, phys_addr_t idmap_start);
+ 
+ struct kvm_arch {
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+index 89eab68..331b85e 100644
+--- a/arch/arm64/kvm/guest.c
++++ b/arch/arm64/kvm/guest.c
+@@ -546,6 +546,12 @@ int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init)
+ 	return 0;
+ }
+ 
++int kvm_arm_arch_vcpu_ioctl(struct kvm_vcpu *vcpu,
++			    unsigned int ioctl, unsigned long arg)
++{
++	return -EINVAL;
++}
++
+ int kvm_arch_vcpu_ioctl_get_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
+ {
+ 	return -EINVAL;
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 1418af9..6e894a8 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -1181,7 +1181,7 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
+ 		return kvm_arm_vcpu_set_events(vcpu, &events);
+ 	}
+ 	default:
+-		r = -EINVAL;
++		r = kvm_arm_arch_vcpu_ioctl(vcpu, ioctl, arg);
+ 	}
+ 
+ 	return r;
 -- 
 2.1.4
