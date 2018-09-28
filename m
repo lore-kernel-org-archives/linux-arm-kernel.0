@@ -1,108 +1,43 @@
-From: liang.yang@amlogic.com (Liang Yang)
-Date: Fri, 28 Sep 2018 16:33:23 +0800
-Subject: [PATCH v4 1/2] dt-bindings: nand: meson: add Amlogic NAND
- controller driver
-In-Reply-To: <20180927181653.GA22153@bogus>
-References: <1537433449-65213-1-git-send-email-jianxin.pan@amlogic.com>
- <1537433449-65213-2-git-send-email-jianxin.pan@amlogic.com>
- <20180927181653.GA22153@bogus>
-Message-ID: <8f194c47-10bb-cb9d-c626-39f9b22887cb@amlogic.com>
+From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
+Date: Fri, 28 Sep 2018 10:36:29 +0200
+Subject: [PATCH v2 2/7] dt-bindings: stm32-dmamux: Add one cell to support
+ DMA/MDMA chain
+In-Reply-To: <1538123794-17085-1-git-send-email-pierre-yves.mordret@st.com>
+References: <1538123794-17085-1-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <1538123794-17085-3-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
 
-On 9/28/2018 2:16 AM, Rob Herring wrote:
-> On Thu, Sep 20, 2018 at 04:50:48PM +0800, Jianxin Pan wrote:
->> From: Liang Yang <liang.yang@amlogic.com>
->>
->> Add Amlogic NAND controller dt-bindings for Meson SoC,
->> Current this driver support GXBB/GXL/AXG platform.
->>
->> Signed-off-by: Liang Yang <liang.yang@amlogic.com>
->> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
->> ---
->>   .../devicetree/bindings/mtd/amlogic,meson-nand.txt | 60 ++++++++++++++++++++++
->>   1 file changed, 60 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt
->>
->> diff --git a/Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt b/Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt
->> new file mode 100644
->> index 0000000..803df2a
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt
->> @@ -0,0 +1,60 @@
->> +Amlogic NAND Flash Controller (NFC) for GXBB/GXL/AXG family SoCs
->> +
->> +This file documents the properties in addition to those available in
->> +the MTD NAND bindings.
->> +
->> +Required properties:
->> +- compatible : contains one of:
->> +  - "amlogic,meson-gxl-nfc"
->> +  - "amlogic,meson-axg-nfc"
->> +- clocks     :
->> +	A list of phandle + clock-specifier pairs for the clocks listed
->> +	in clock-names.
->> +
->> +- clock-names: Should contain the following:
->> +	"core" - NFC module gate clock
->> +	"device" - device clock from eMMC sub clock controller
->> +
->> +- amlogic,mmc-syscon	: Required for NAND clocks, it's shared with SD/eMMC
->> +				controller port C
->> +
->> +Optional children nodes:
->> +Children nodes represent the available nand chips.
->> +
->> +Other properties:
->> +see Documentation/devicetree/bindings/mtd/nand.txt for generic bindings.
->> +
->> +Example demonstrate on AXG SoC:
->> +
->> +	sd_emmc_c_clkc: mmc at 7000 {
->> +		compatible = "amlogic,meson-axg-mmc-clkc", "syscon";
->> +		reg = <0x0 0x7000 0x0 0x800>;
->> +		status = "okay";
->> +	};
->> +
->> +	nand: nfc at 7800 {
-> 
-> nand-controller at 7800
-> 
-ok, i will fix it.
+Add one cell to support DMA/MDMA chaining.
 
->> +		compatible = "amlogic,meson-axg-nfc";
->> +		reg = <0x0 0x7800 0x0 0x100>;
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +		interrupts = <GIC_SPI 34 IRQ_TYPE_EDGE_RISING>;
->> +		status = "disabled";
->> +
->> +		clocks = <&clkc CLKID_SD_EMMC_C>,
->> +			<&sd_emmc_c_clkc CLKID_MMC_DIV>;
->> +		clock-names = "core", "device";
->> +		amlogic,mmc-syscon = <&sd_emmc_c_clkc>;
->> +
->> +		status = "okay";
-> 
-> Don't show status in examples, plus you have it twice.
-> 
-ok, i will fix it.
->> +
->> +		pinctrl-names = "default";
->> +		pinctrl-0 = <&nand_pins>;
->> +
->> +		nand at 0 {
->> +			reg = <0>;
->> +			#address-cells = <1>;
->> +			#size-cells = <1>;
->> +
->> +			nand-on-flash-bbt;
->> +		};
->> +	};
->> -- 
->> 1.9.1
->>
-> 
-> .
-> 
+Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+---
+  Version history:
+    v1:
+       * Initial
+---
+---
+ Documentation/devicetree/bindings/dma/stm32-dmamux.txt | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/dma/stm32-dmamux.txt b/Documentation/devicetree/bindings/dma/stm32-dmamux.txt
+index 1b893b2..5e92b59 100644
+--- a/Documentation/devicetree/bindings/dma/stm32-dmamux.txt
++++ b/Documentation/devicetree/bindings/dma/stm32-dmamux.txt
+@@ -4,9 +4,9 @@ Required properties:
+ - compatible:	"st,stm32h7-dmamux"
+ - reg:		Memory map for accessing module
+ - #dma-cells:	Should be set to <3>.
+-		First parameter is request line number.
+-		Second is DMA channel configuration
+-		Third is Fifo threshold
++-		First parameter is request line number.
++-		Second is DMA channel configuration
++-		Third is a 32bit bitfield
+ 		For more details about the three cells, please see
+ 		stm32-dma.txt documentation binding file
+ - dma-masters:	Phandle pointing to the DMA controllers.
+-- 
+2.7.4
