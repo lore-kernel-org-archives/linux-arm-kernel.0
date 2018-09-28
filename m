@@ -1,8 +1,8 @@
 From: joe@perches.com (Joe Perches)
-Date: Fri, 28 Sep 2018 15:04:11 -0700
-Subject: Bad MAINTAINERS pattern in section 'SOFTWARE DELEGATED EXCEPTION
- INTERFACE (SDEI)'
-Message-ID: <20180928220411.31488-1-joe@perches.com>
+Date: Fri, 28 Sep 2018 15:04:55 -0700
+Subject: Bad MAINTAINERS pattern in section 'Texas Instruments' System Control
+ Interface (TISCI) Protocol Driver'
+Message-ID: <20180928220455.31806-1-joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,46 +10,70 @@ Please fix this defect appropriately.
 
 linux-next MAINTAINERS section:
 
-	13609	SOFTWARE DELEGATED EXCEPTION INTERFACE (SDEI)
-	13610	M:	James Morse <james.morse@arm.com>
-	13611	L:	linux-arm-kernel at lists.infradead.org
-	13612	S:	Maintained
-	13613	F:	Documentation/devicetree/bindings/arm/firmware/sdei.txt
-	13614	F:	drivers/firmware/arm_sdei.c
-	13615	F:	include/linux/sdei.h
--->	13616	F:	include/uapi/linux/sdei.h
+	14531	Texas Instruments' System Control Interface (TISCI) Protocol Driver
+	14532	M:	Nishanth Menon <nm@ti.com>
+	14533	M:	Tero Kristo <t-kristo@ti.com>
+	14534	M:	Santosh Shilimkar <ssantosh@kernel.org>
+	14535	L:	linux-arm-kernel at lists.infradead.org
+	14536	S:	Maintained
+	14537	F:	Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+	14538	F:	drivers/firmware/ti_sci*
+	14539	F:	include/linux/soc/ti/ti_sci_protocol.h
+	14540	F:	Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
+-->	14541	F:	include/dt-bindings/genpd/k2g.h
+	14542	F:	drivers/soc/ti/ti_sci_pm_domains.c
+	14543	F:	Documentation/devicetree/bindings/reset/ti,sci-reset.txt
+	14544	F:	Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+	14545	F:	drivers/clk/keystone/sci-clk.c
+	14546	F:	drivers/reset/reset-ti-sci.c
 
 Commit that introduced this:
 
-commit ad6eb31ef90355993eb55ff77e0e855ae7d91e4c
- Author: James Morse <james.morse@arm.com>
- Date:   Mon Jan 8 15:38:09 2018 +0000
+commit 7cc119f29b197f967161ca94c9d5cb5073b4b52b
+ Author: Dave Gerlach <d-gerlach@ti.com>
+ Date:   Tue Apr 4 08:59:27 2017 -0700
  
-     firmware: arm_sdei: Add driver for Software Delegated Exceptions
+     dt-bindings: Add TI SCI PM Domains
      
-     The Software Delegated Exception Interface (SDEI) is an ARM standard
-     for registering callbacks from the platform firmware into the OS.
-     This is typically used to implement firmware notifications (such as
-     firmware-first RAS) or promote an IRQ that has been promoted to a
-     firmware-assisted NMI.
+     Add a generic power domain implementation, TI SCI PM Domains, that
+     will hook into the genpd framework and allow the TI SCI protocol to
+     control device power states.
      
-     Add the code for detecting the SDEI version and the framework for
-     registering and unregistering events. Subsequent patches will add the
-     arch-specific backend code and the necessary power management hooks.
+     Also, provide macros representing each device index as understood
+     by TI SCI to be used in the device node power-domain references.
+     These are identifiers for the K2G devices managed by the PMMC.
      
-     Only shared events are supported, power management, private events and
-     discovery for ACPI systems will be added by later patches.
-     
-     Signed-off-by: James Morse <james.morse@arm.com>
-     Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+     Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+     Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+     Acked-by: Rob Herring <robh@kernel.org>
+     Signed-off-by: Nishanth Menon <nm@ti.com>
+     Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+     Signed-off-by: Santosh Shilimkar <ssantosh@kernel.org>
  
-  MAINTAINERS                   |   9 +
-  arch/arm64/include/asm/sdei.h |   8 +
-  drivers/firmware/Kconfig      |   8 +
-  drivers/firmware/Makefile     |   1 +
-  drivers/firmware/arm_sdei.c   | 619 ++++++++++++++++++++++++++++++++++++++++++
-  include/linux/arm_sdei.h      |  79 ++++++
-  include/uapi/linux/arm_sdei.h |  73 +++++
-  7 files changed, 797 insertions(+)
+  .../devicetree/bindings/soc/ti/sci-pm-domain.txt   | 57 ++++++++++++++
+  MAINTAINERS                                        |  2 +
+  include/dt-bindings/genpd/k2g.h                    | 90 ++++++++++++++++++++++
+  3 files changed, 149 insertions(+)
 
-No commit with include/uapi/linux/sdei.h found
+Last commit with include/dt-bindings/genpd/k2g.h
+
+commit d16645054d2f55e4011c9725ddf2dbe6177e942a
+Author: Dave Gerlach <d-gerlach@ti.com>
+Date:   Fri Jul 21 09:38:36 2017 -0700
+
+    dt-bindings: Drop k2g genpd device ID macros
+    
+    Commit 7cc119f29b19 ("dt-bindings: Add TI SCI PM Domains") introduced a
+    number of K2G_DEV_x macros to represent each device ID available on the
+    K2G platform for use by the genpd, clock, and reset drivers. Rather than
+    use these macros, which are only used in the device tree for property
+    values and not actually used by the drivers, let's just use the device
+    ID number directly in the device tree to avoid macro bloat.
+    
+    Acked-by: Rob Herring <robh@kernel.org>
+    Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+    Signed-off-by: Santosh Shilimkar <ssantosh@kernel.org>
+
+ .../devicetree/bindings/soc/ti/sci-pm-domain.txt   |  5 +-
+ include/dt-bindings/genpd/k2g.h                    | 90 ----------------------
+ 2 files changed, 3 insertions(+), 92 deletions(-)
