@@ -1,44 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 28 Sep 2018 12:22:44 +0200
-Subject: [PATCH 2/7] ARM: shmobile: Remove the ARCH_SHMOBILE Kconfig symbol
+Date: Fri, 28 Sep 2018 12:22:43 +0200
+Subject: [PATCH 1/7] ARM: shmobile: r8a7779: Remove unused includes
 In-Reply-To: <cover.1538123953.git.horms+renesas@verge.net.au>
 References: <cover.1538123953.git.horms+renesas@verge.net.au>
-Message-ID: <08e735233ea29b17bfec8e4cb302e799d9f920b8.1538123953.git.horms+renesas@verge.net.au>
+Message-ID: <ad73cc2b913273df971cf318d0fe40785376dbcd.1538123953.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-All drivers for Renesas ARM SoCs have gained proper ARCH_RENESAS
-platform dependencies.  Hence finish the conversion from ARCH_SHMOBILE
-to ARCH_RENESAS for Renesas 32-bit ARM SoCs, as started by commit
-9b5ba0df4ea4f940 ("ARM: shmobile: Introduce ARCH_RENESAS").
+Presumable unused since commit c99cd90d98a98aa1 ("ARM: shmobile:
+r8a7779: Remove legacy SoC code").
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Kconfig | 4 ----
- 1 file changed, 4 deletions(-)
+ arch/arm/mach-shmobile/setup-r8a7779.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index aeb2eed08598..82b8908bec13 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -1,6 +1,3 @@
--config ARCH_SHMOBILE
--	bool
--
- config PM_RMOBILE
- 	bool
- 	select PM
-@@ -30,7 +27,6 @@ config ARCH_RMOBILE
- menuconfig ARCH_RENESAS
- 	bool "Renesas ARM SoCs"
- 	depends on ARCH_MULTI_V7 && MMU
--	select ARCH_SHMOBILE
- 	select ARM_GIC
- 	select GPIOLIB
- 	select HAVE_ARM_SCU if SMP
+diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+index d589326099e0..b13ec9088ce5 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7779.c
++++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+@@ -7,9 +7,7 @@
+  * Copyright (C) 2013  Cogent Embedded, Inc.
+  */
+ #include <linux/init.h>
+-#include <linux/irq.h>
+ #include <linux/irqchip.h>
+-#include <linux/irqchip/arm-gic.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
 -- 
 2.11.0
