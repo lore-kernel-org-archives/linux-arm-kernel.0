@@ -1,148 +1,49 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 28 Sep 2018 14:52:36 +0100
-Subject: [PATCH v2 2/3] iommu/dma: Use fast DMA domain lookup
-In-Reply-To: <20180928132605eucas1p1d39fedc3be3e4e2c16035c01a40cfab6~Ykz2Rax6e0538205382eucas1p17@eucas1p1.samsung.com>
-References: <cover.1536764440.git.robin.murphy@arm.com>
- <CGME20180912152438epcas5p175098b44c3f7232302e10b087279bd3c@epcas5p1.samsung.com>
- <e42771992a73620f23128c0479b2ae91b3e177bf.1536764440.git.robin.murphy@arm.com>
- <20180928132605eucas1p1d39fedc3be3e4e2c16035c01a40cfab6~Ykz2Rax6e0538205382eucas1p17@eucas1p1.samsung.com>
-Message-ID: <78a5b373-d569-4461-e258-3104286ba322@arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 28 Sep 2018 15:54:06 +0200
+Subject: [PATCH] ARM: SAMSUNG: limit SAMSUNG_PM_DEBUG config option to
+ non-Exynos platforms
+In-Reply-To: <20180928133713eucas1p16a15a68b61de9aa3310737f7fd77d20d~Yk9kqY_Ga2124121241eucas1p1b@eucas1p1.samsung.com>
+References: <CGME20180928133713eucas1p16a15a68b61de9aa3310737f7fd77d20d@eucas1p1.samsung.com>
+ <20180928133713eucas1p16a15a68b61de9aa3310737f7fd77d20d~Yk9kqY_Ga2124121241eucas1p1b@eucas1p1.samsung.com>
+Message-ID: <CAJKOXPcfvpiO8NpRzDwNgEyJf21+jFt8r9E=OOs_6f7wSjC+Zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/09/18 14:26, Marek Szyprowski wrote:
-> Hi All,
-> 
-> On 2018-09-12 17:24, Robin Murphy wrote:
->> Most parts of iommu-dma already assume they are operating on a default
->> domain set up by iommu_dma_init_domain(), and can be converted straight
->> over to avoid the refcounting bottleneck. MSI page mappings may be in
->> an unmanaged domain with an explicit MSI-only cookie, so retain the
->> non-specific lookup, but that's OK since they're far from a contended
->> fast path either way.
->>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> 
-> This breaks Exynos DRM driver with Exynos IOMMU on ARM64 (Exynos5433).
-> Exynos DRM creates it's own domain, attach all devices which performs
-> DMA access (typically CRTC devices) to it and uses standard DMA-mapping
-> calls to allocate/map buffers. This way it can use the same one DMA
-> address for each buffer regardless of the CRTC/display/processing
-> device.
-> 
-> This no longer works with this patch. The simplest solution to fix this
-> is add API to change default_domain to the one allocated by the Exynos
-> DRM driver.
+On Fri, 28 Sep 2018 at 15:37, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
+>
+> "Samsung PM Suspend debug" feature (controlled by SAMSUNG_PM_DEBUG
+> config option) is not working properly (debug messages are not
+> displayed after resume) on Exynos platforms because GPIOs restore
+> code is not implemented.
 
-Ugh, I hadn't realised there were any drivers trying to fake up their 
-own default domains - that's always going to be fragile. In fact, one of 
-my proposals for un-breaking Tegra and other DRM drivers involves 
-preventing iommu-dma from trying to operate on non-IOMMU_DOMAIN_DMA 
-domains at all, which would stop that from working permanently.
+AFAIR, it worked properly for the suspend part showing more logs.
+Unless it changed, the feature looks still useful.
 
-Can Exynos not put all the DRM components into a single group, or at 
-least just pick one of the real default domains to attach everyone to 
-instead of allocating a fake one?
+Best regards,
+Krzysztof
 
-Robin.
-
->> ---
->>    drivers/iommu/dma-iommu.c | 23 ++++++++++++-----------
->>    1 file changed, 12 insertions(+), 11 deletions(-)
->>
->> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
->> index 511ff9a1d6d9..320f9ea82f3f 100644
->> --- a/drivers/iommu/dma-iommu.c
->> +++ b/drivers/iommu/dma-iommu.c
->> @@ -491,7 +491,7 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count,
->>    void iommu_dma_free(struct device *dev, struct page **pages, size_t size,
->>    		dma_addr_t *handle)
->>    {
->> -	__iommu_dma_unmap(iommu_get_domain_for_dev(dev), *handle, size);
->> +	__iommu_dma_unmap(iommu_get_dma_domain(dev), *handle, size);
->>    	__iommu_dma_free_pages(pages, PAGE_ALIGN(size) >> PAGE_SHIFT);
->>    	*handle = IOMMU_MAPPING_ERROR;
->>    }
->> @@ -518,7 +518,7 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
->>    		unsigned long attrs, int prot, dma_addr_t *handle,
->>    		void (*flush_page)(struct device *, const void *, phys_addr_t))
->>    {
->> -	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
->> +	struct iommu_domain *domain = iommu_get_dma_domain(dev);
->>    	struct iommu_dma_cookie *cookie = domain->iova_cookie;
->>    	struct iova_domain *iovad = &cookie->iovad;
->>    	struct page **pages;
->> @@ -606,9 +606,8 @@ int iommu_dma_mmap(struct page **pages, size_t size, struct vm_area_struct *vma)
->>    }
->>    
->>    static dma_addr_t __iommu_dma_map(struct device *dev, phys_addr_t phys,
->> -		size_t size, int prot)
->> +		size_t size, int prot, struct iommu_domain *domain)
->>    {
->> -	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
->>    	struct iommu_dma_cookie *cookie = domain->iova_cookie;
->>    	size_t iova_off = 0;
->>    	dma_addr_t iova;
->> @@ -632,13 +631,14 @@ static dma_addr_t __iommu_dma_map(struct device *dev, phys_addr_t phys,
->>    dma_addr_t iommu_dma_map_page(struct device *dev, struct page *page,
->>    		unsigned long offset, size_t size, int prot)
->>    {
->> -	return __iommu_dma_map(dev, page_to_phys(page) + offset, size, prot);
->> +	return __iommu_dma_map(dev, page_to_phys(page) + offset, size, prot,
->> +			iommu_get_dma_domain(dev));
->>    }
->>    
->>    void iommu_dma_unmap_page(struct device *dev, dma_addr_t handle, size_t size,
->>    		enum dma_data_direction dir, unsigned long attrs)
->>    {
->> -	__iommu_dma_unmap(iommu_get_domain_for_dev(dev), handle, size);
->> +	__iommu_dma_unmap(iommu_get_dma_domain(dev), handle, size);
->>    }
->>    
->>    /*
->> @@ -726,7 +726,7 @@ static void __invalidate_sg(struct scatterlist *sg, int nents)
->>    int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
->>    		int nents, int prot)
->>    {
->> -	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
->> +	struct iommu_domain *domain = iommu_get_dma_domain(dev);
->>    	struct iommu_dma_cookie *cookie = domain->iova_cookie;
->>    	struct iova_domain *iovad = &cookie->iovad;
->>    	struct scatterlist *s, *prev = NULL;
->> @@ -811,20 +811,21 @@ void iommu_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
->>    		sg = tmp;
->>    	}
->>    	end = sg_dma_address(sg) + sg_dma_len(sg);
->> -	__iommu_dma_unmap(iommu_get_domain_for_dev(dev), start, end - start);
->> +	__iommu_dma_unmap(iommu_get_dma_domain(dev), start, end - start);
->>    }
->>    
->>    dma_addr_t iommu_dma_map_resource(struct device *dev, phys_addr_t phys,
->>    		size_t size, enum dma_data_direction dir, unsigned long attrs)
->>    {
->>    	return __iommu_dma_map(dev, phys, size,
->> -			dma_info_to_prot(dir, false, attrs) | IOMMU_MMIO);
->> +			dma_info_to_prot(dir, false, attrs) | IOMMU_MMIO,
->> +			iommu_get_dma_domain(dev));
->>    }
->>    
->>    void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
->>    		size_t size, enum dma_data_direction dir, unsigned long attrs)
->>    {
->> -	__iommu_dma_unmap(iommu_get_domain_for_dev(dev), handle, size);
->> +	__iommu_dma_unmap(iommu_get_dma_domain(dev), handle, size);
->>    }
->>    
->>    int iommu_dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
->> @@ -850,7 +851,7 @@ static struct iommu_dma_msi_page *iommu_dma_get_msi_page(struct device *dev,
->>    	if (!msi_page)
->>    		return NULL;
->>    
->> -	iova = __iommu_dma_map(dev, msi_addr, size, prot);
->> +	iova = __iommu_dma_map(dev, msi_addr, size, prot, domain);
->>    	if (iommu_dma_mapping_error(dev, iova))
->>    		goto out_free_page;
->>    
-> 
-> Best regards
-> 
+>
+> Add PLAT_S3C24XX, ARCH_S3C64XX and ARCH_S5PV210 dependencies to
+> SAMSUNG_PM_DEBUG config option to hide it on Exynos platforms.
+>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> ---
+>  arch/arm/plat-samsung/Kconfig |    3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> Index: b/arch/arm/plat-samsung/Kconfig
+> ===================================================================
+> --- a/arch/arm/plat-samsung/Kconfig     2018-09-28 15:20:06.041911426 +0200
+> +++ b/arch/arm/plat-samsung/Kconfig     2018-09-28 15:20:06.037911426 +0200
+> @@ -238,7 +238,8 @@ comment "Power management"
+>
+>  config SAMSUNG_PM_DEBUG
+>         bool "Samsung PM Suspend debug"
+> -       depends on PM && DEBUG_KERNEL
+> +       depends on DEBUG_KERNEL
+> +       depends on PM && (PLAT_S3C24XX || ARCH_S3C64XX || ARCH_S5PV210)
+>         depends on DEBUG_EXYNOS_UART || DEBUG_S3C24XX_UART || DEBUG_S3C2410_UART
+>         help
+>           Say Y here if you want verbose debugging from the PM Suspend and
+>
