@@ -1,54 +1,86 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 28 Sep 2018 15:48:30 +0900
-Subject: [PATCH v15 05/16] kexec_file: kexec_walk_memblock() only walks a
- dedicated region at kdump
+Date: Fri, 28 Sep 2018 15:48:33 +0900
+Subject: [PATCH v15 08/16] arm64: cpufeature: add MMFR0 helper functions
 In-Reply-To: <20180928064841.14117-1-takahiro.akashi@linaro.org>
 References: <20180928064841.14117-1-takahiro.akashi@linaro.org>
-Message-ID: <20180928064841.14117-6-takahiro.akashi@linaro.org>
+Message-ID: <20180928064841.14117-9-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In kdump case, there exists only one dedicated memblock region as usable
-memory (crashk_res). With this patch, kexec_walk_memblock() runs a given
-callback function on this region.
-
-Cosmetic change: 0 to MEMBLOCK_NONE at for_each_free_mem_range*()
+Those helper functions for MMFR0 register will be used later by kexec_file
+loader.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Cc: Dave Young <dyoung@redhat.com>
-Cc: Vivek Goyal <vgoyal@redhat.com>
-Cc: Baoquan He <bhe@redhat.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Reviewed-by: James Morse <james.morse@arm.com>
 ---
- kernel/kexec_file.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/cpufeature.h | 48 +++++++++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
 
-diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-index 370d7eab49fe..2f615a7968dd 100644
---- a/kernel/kexec_file.c
-+++ b/kernel/kexec_file.c
-@@ -511,8 +511,11 @@ static int kexec_walk_memblock(struct kexec_buf *kbuf,
- 	phys_addr_t mstart, mend;
- 	struct resource res = { };
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 1717ba1db35d..cd90b5252d6d 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -486,11 +486,59 @@ static inline bool system_supports_32bit_el0(void)
+ 	return cpus_have_const_cap(ARM64_HAS_32BIT_EL0);
+ }
  
-+	if (kbuf->image->type == KEXEC_TYPE_CRASH)
-+		return func(&crashk_res, kbuf);
++static inline bool system_supports_4kb_granule(void)
++{
++	u64 mmfr0;
++	u32 val;
 +
- 	if (kbuf->top_down) {
--		for_each_free_mem_range_reverse(i, NUMA_NO_NODE, 0,
-+		for_each_free_mem_range_reverse(i, NUMA_NO_NODE, MEMBLOCK_NONE,
- 						&mstart, &mend, NULL) {
- 			/*
- 			 * In memblock, end points to the first byte after the
-@@ -526,8 +529,8 @@ static int kexec_walk_memblock(struct kexec_buf *kbuf,
- 				break;
- 		}
- 	} else {
--		for_each_free_mem_range(i, NUMA_NO_NODE, 0, &mstart, &mend,
--					NULL) {
-+		for_each_free_mem_range(i, NUMA_NO_NODE, MEMBLOCK_NONE,
-+					&mstart, &mend, NULL) {
- 			/*
- 			 * In memblock, end points to the first byte after the
- 			 * range while in kexec, end points to the last byte
++	mmfr0 =	read_sanitised_ftr_reg(SYS_ID_AA64MMFR0_EL1);
++	val = cpuid_feature_extract_unsigned_field(mmfr0,
++						ID_AA64MMFR0_TGRAN4_SHIFT);
++
++	return val == ID_AA64MMFR0_TGRAN4_SUPPORTED;
++}
++
++static inline bool system_supports_64kb_granule(void)
++{
++	u64 mmfr0;
++	u32 val;
++
++	mmfr0 =	read_sanitised_ftr_reg(SYS_ID_AA64MMFR0_EL1);
++	val = cpuid_feature_extract_unsigned_field(mmfr0,
++						ID_AA64MMFR0_TGRAN64_SHIFT);
++
++	return val == ID_AA64MMFR0_TGRAN64_SUPPORTED;
++}
++
++static inline bool system_supports_16kb_granule(void)
++{
++	u64 mmfr0;
++	u32 val;
++
++	mmfr0 =	read_sanitised_ftr_reg(SYS_ID_AA64MMFR0_EL1);
++	val = cpuid_feature_extract_unsigned_field(mmfr0,
++						ID_AA64MMFR0_TGRAN16_SHIFT);
++
++	return val == ID_AA64MMFR0_TGRAN16_SUPPORTED;
++}
++
+ static inline bool system_supports_mixed_endian_el0(void)
+ {
+ 	return id_aa64mmfr0_mixed_endian_el0(read_sanitised_ftr_reg(SYS_ID_AA64MMFR0_EL1));
+ }
+ 
++static inline bool system_supports_mixed_endian(void)
++{
++	u64 mmfr0;
++	u32 val;
++
++	mmfr0 =	read_sanitised_ftr_reg(SYS_ID_AA64MMFR0_EL1);
++	val = cpuid_feature_extract_unsigned_field(mmfr0,
++						ID_AA64MMFR0_BIGENDEL_SHIFT);
++
++	return val == 0x1;
++}
++
+ static inline bool system_supports_fpsimd(void)
+ {
+ 	return !cpus_have_const_cap(ARM64_HAS_NO_FPSIMD);
 -- 
 2.19.0
