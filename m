@@ -1,9 +1,10 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Sep 2018 17:32:17 +0200
-Subject: [GIT PULL 1/5] dt-bindings: Changes for v4.20-rc1
-In-Reply-To: <20180927205942.30878-1-thierry.reding@gmail.com>
+Date: Fri, 28 Sep 2018 17:39:36 +0200
+Subject: [GIT PULL 4/5] ARM: tegra: Device tree changes for v4.20-rc1
+In-Reply-To: <20180927205942.30878-4-thierry.reding@gmail.com>
 References: <20180927205942.30878-1-thierry.reding@gmail.com>
-Message-ID: <CAK8P3a1N+kKAA+g+D6TiGDFMG1TdL6oBaY72ppmSrx5GcJ92sQ@mail.gmail.com>
+ <20180927205942.30878-4-thierry.reding@gmail.com>
+Message-ID: <CAK8P3a1h0Z_ekvy9kQQTsjaVL5DqWNUN8jTXkGXEeAD0p_fHkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,23 +19,32 @@ On Thu, Sep 27, 2018 at 10:59 PM Thierry Reding
 >
 > are available in the Git repository at:
 >
->   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.20-dt-bindings
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.20-arm-dt
 >
-> for you to fetch changes up to d9be10edf7d6040468f89824df0dfcfcbf3a693b:
+> for you to fetch changes up to ebea2a43fdafdbce918bd7e200b709d6c33b9f3b:
 >
->   dt-bindings: Add Tegra PMC pad configuration bindings (2018-08-27 12:21:43 +0200)
->
-> Thanks,
-> Thierry
->
+>   ARM: dts: paz00: fix wakeup gpio keycode (2018-09-26 17:29:41 +0200)
 > ----------------------------------------------------------------
-> dt-bindings: Changes for v4.20-rc1
+> ARM: tegra: Device tree changes for v4.20-rc1
 >
-> This contains the PMC pad configuration bindings which are used to
-> control the voltage of various pads found on Tegra chips. Among other
-> things this is required to enable faster modes on SDHCI.
+> This contains a massive amount of changes from Marcel Ziswiler for
+> various boards by Toradex.
 >
 
-Pulled into next/dt, thanks!
+> Marcel Ziswiler (127):
+>       ARM: dts: tegra30: fix xcvr-setup-use-fuses
+>       ARM: dts: tegra20: restore address order
+>       ARM: dts: tegra20/tegra30: add pmu interrupt-affinity
+>       ARM: tegra: apalis_t30: fix mmc1 cmd pull-up
+>       ARM: tegra: apalis_t30: pull-up sd card detect pins
+>       ARM: tegra: apalis_t30: add local-mac-address property
+...
 
-     Arnd
+Pulled into next/dt
+
+I see nothing wrong with the individual changes,  but should note that
+they are overly fine-grained in some cases. There are several
+obvious cleanup that only touch one or two lines, in this case
+I would prefer them to be combined for easier review.
+
+           Arnd
