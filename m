@@ -1,39 +1,31 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 28 Sep 2018 21:38:31 +0200
-Subject: [GIT PULL] pxa for v4.20
-Message-ID: <87y3blza2w.fsf@belgarion.home>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Fri, 28 Sep 2018 12:43:41 -0700
+Subject: drivers binding to device node with multiple compatible strings
+In-Reply-To: <CADRPPNT0QiBkJtJnxjW95Yf-mirL5OzRrvqj8rC-O8fiz17VnA@mail.gmail.com>
+References: <CADRPPNT0QiBkJtJnxjW95Yf-mirL5OzRrvqj8rC-O8fiz17VnA@mail.gmail.com>
+Message-ID: <ecbf11cd-a140-fe7e-392a-bccbf8224d14@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, and Olof,
 
-This is the pxa pull request for 4.20, a simple single patch one.
++ Frank
 
-Can you please consider pulling ?
-
-The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
-
-  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
-
-are available in the git repository at:
-
-  https://github.com/rjarzmik/linux.git tags/pxa-for-4.20
-
-for you to fetch changes up to 13d70a59105581570e939888fc9c023432e14e33:
-
-  dmaengine: pxa: make the filter function internal (2018-08-27 20:52:17 +0200)
-
-----------------------------------------------------------------
-This pxa update brings only a single patch, finishing the
-dmaengine conversion.
-
-----------------------------------------------------------------
-Robert Jarzmik (1):
-      dmaengine: pxa: make the filter function internal
-
- drivers/dma/pxa_dma.c       |  5 ++---
- include/linux/dma/pxa-dma.h | 11 -----------
- 2 files changed, 2 insertions(+), 14 deletions(-)
-
--- 
-Robert
+On 09/27/18 15:25, Li Yang wrote:
+> Hi Rob and Grant,
+> 
+> Various device tree specs are recommending to include all the
+> potential compatible strings in the device node, with the order from
+> most specific to most general.  But it looks like Linux kernel doesn't
+> provide a way to bind the device to the most specific driver, however,
+> the first registered compatible driver will be bound.
+> 
+> As more and more generic drivers are added to the Linux kernel, they
+> are competing with the more specific vendor drivers and causes problem
+> when both are built into the kernel.  I'm wondering if there is a
+> generic solution (or in plan) to make the most specific driver bound
+> to the device.   Or we have to disable the more general driver or
+> remove the more general compatible string from the device tree?
+> 
+> Regards,
+> Leo
+> 
