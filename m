@@ -1,98 +1,69 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 28 Sep 2018 12:20:22 +0200
-Subject: [PATCH 11/14] arm64: dts: renesas: r8a77995: Add LVDS support
+Date: Fri, 28 Sep 2018 12:20:20 +0200
+Subject: [PATCH 09/14] arm64: dts: renesas: r8a779{7|8}0: add TPU support
 In-Reply-To: <cover.1538125184.git.horms+renesas@verge.net.au>
 References: <cover.1538125184.git.horms+renesas@verge.net.au>
-Message-ID: <0dc733988b813b4054e2243539855ef535d3c9dd.1538125184.git.horms+renesas@verge.net.au>
+Message-ID: <dd809b7de27cff710658febdde65304ec1a3ea82.1538125184.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-The r8a77995 D3 platform has 2 LVDS channels connected to the DU.
+Describe TPU in the R8A779{7|8}0 device trees.
 
-Signed-off-by: Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>
-[uli: moved lvds* into the soc node, added PM domains, resets]
-Signed-off-by: Ulrich Hecht <uli+renesas@fpond.eu>
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Tested-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+Based on the original (and large) patches by Vladimir Barinov.
+
+Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77995.dtsi | 56 +++++++++++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77970.dtsi | 10 ++++++++++
+ arch/arm64/boot/dts/renesas/r8a77980.dtsi | 11 +++++++++++
+ 2 files changed, 21 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-index 89a04a4496fd..214f4954b321 100644
---- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-@@ -972,12 +972,68 @@
- 				port at 1 {
- 					reg = <1>;
- 					du_out_lvds0: endpoint {
-+						remote-endpoint = <&lvds0_in>;
- 					};
- 				};
+diff --git a/arch/arm64/boot/dts/renesas/r8a77970.dtsi b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+index 934a15f9171f..cba7885cf7c3 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77970.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+@@ -614,6 +614,16 @@
+ 			status = "disabled";
+ 		};
  
- 				port at 2 {
- 					reg = <2>;
- 					du_out_lvds1: endpoint {
-+						remote-endpoint = <&lvds1_in>;
-+					};
-+				};
-+			};
++		tpu: pwm at e6e80000 {
++			compatible = "renesas,tpu-r8a77970", "renesas,tpu";
++			reg = <0 0xe6e80000 0 0x148>;
++			interrupts = <GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 304>;
++			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
++			resets = <&cpg 304>;
++			#pwm-cells = <3>;
++			status = "disabled";
++		};
+ 
+ 		vin0: video at e6ef0000 {
+ 			compatible = "renesas,vin-r8a77970";
+diff --git a/arch/arm64/boot/dts/renesas/r8a77980.dtsi b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+index ba1d281deb07..d4952b527d14 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77980.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+@@ -666,6 +666,17 @@
+ 			status = "disabled";
+ 		};
+ 
++		tpu: pwm at e6e80000 {
++			compatible = "renesas,tpu-r8a77980", "renesas,tpu";
++			reg = <0 0xe6e80000 0 0x148>;
++			interrupts = <GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 304>;
++			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
++			resets = <&cpg 304>;
++			#pwm-cells = <3>;
++			status = "disabled";
 +		};
 +
-+		lvds0: lvds-encoder at feb90000 {
-+			compatible = "renesas,r8a77995-lvds";
-+			reg = <0 0xfeb90000 0 0x20>;
-+			clocks = <&cpg CPG_MOD 727>;
-+			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
-+			resets = <&cpg 727>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 0 {
-+					reg = <0>;
-+					lvds0_in: endpoint {
-+						remote-endpoint = <&du_out_lvds0>;
-+					};
-+				};
-+
-+				port at 1 {
-+					reg = <1>;
-+					lvds0_out: endpoint {
-+					};
-+				};
-+			};
-+		};
-+
-+		lvds1: lvds-encoder at feb90100 {
-+			compatible = "renesas,r8a77995-lvds";
-+			reg = <0 0xfeb90100 0 0x20>;
-+			clocks = <&cpg CPG_MOD 727>;
-+			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
-+			resets = <&cpg 726>;
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 0 {
-+					reg = <0>;
-+					lvds1_in: endpoint {
-+						remote-endpoint = <&du_out_lvds1>;
-+					};
-+				};
-+
-+				port at 1 {
-+					reg = <1>;
-+					lvds1_out: endpoint {
- 					};
- 				};
- 			};
+ 		vin0: video at e6ef0000 {
+ 			compatible = "renesas,vin-r8a77980";
+ 			reg = <0 0xe6ef0000 0 0x1000>;
 -- 
 2.11.0
