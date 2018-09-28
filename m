@@ -1,28 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 28 Sep 2018 09:27:36 +0200
-Subject: [PATCH] pinctrl: mediatek: mark dummy helpers as 'static inline'
-In-Reply-To: <20180926193818.2481220-1-arnd@arndb.de>
-References: <20180926193818.2481220-1-arnd@arndb.de>
-Message-ID: <CACRpkdY-9VhNJdh2FtzRUiwZTUfKQ+KKM5cFA2LuCwhCC+Ao6Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Sep 2018 09:44:45 +0200
+Subject: [PATCH] ARM: Assume maintainership of ARM reference designs
+In-Reply-To: <20180927220439.GB20825@sirena.org.uk>
+References: <20180927073733.11580-1-linus.walleij@linaro.org>
+ <20180927220439.GB20825@sirena.org.uk>
+Message-ID: <CAK8P3a21dCJuV7mmsVPboWXfxjEpBsiBh37nCk5WGRXWaMUHMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 26, 2018 at 9:38 PM Arnd Bergmann <arnd@arndb.de> wrote:
-
-> mtk_eint_set_debounce and mtk_eint_find_irq are defined as stub functions
-> in a header file, but without marking them as 'static inline', we get
-> a copy for each file that includes the header:
+On Fri, Sep 28, 2018 at 12:04 AM Mark Brown <broonie@kernel.org> wrote:
 >
-> drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.o: In function `mtk_eint_set_debounce':
-> pinctrl-mtk-common-v2.c:(.text+0x134): multiple definition of `mtk_eint_set_debounce'
-> drivers/pinctrl/mediatek/pinctrl-moore.o:pinctrl-moore.c:(.text+0x7d0): first defined here
-> drivers/pinctrl/mediatek/pinctrl-mtk-common-v2.o: In function `mtk_eint_find_irq':
-> pinctrl-mtk-common-v2.c:(.text+0x13c): multiple definition of `mtk_eint_find_irq'
+> On Thu, Sep 27, 2018 at 09:37:33AM +0200, Linus Walleij wrote:
 >
-> Fixes: e46df235b4e6 ("pinctrl: mediatek: refactor EINT related code for all MediaTek pinctrl can fit")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > +F:   drivers/spi/spi-pl022.c
+>
+> The pl022 is actively used by *way* more than just the Arm reference
+> platforms, it's a really popular IP though the driver is fairly feature
+> complete at this point.  I'd like to at least see this split out as a
+> separate thing rather than lumped in so that people don't discount the
+> get_maintainers match as a false positive, though I'm totally fine with
+> you taking it over.
 
-Patch applied with Sean's ACK.
+The same logic probably applies to irq-vic.c, which is used on at least
+five other platforms.
 
-Yours,
-Linus Walleij
+       Arnd
