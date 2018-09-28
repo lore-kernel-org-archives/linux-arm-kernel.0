@@ -1,16 +1,16 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 28 Sep 2018 12:23:30 +0200
-Subject: [PATCH 15/21] dt-bindings: power: rcar-sysc: Add r8a7744 power domain
- index macros
+Date: Fri, 28 Sep 2018 12:23:32 +0200
+Subject: [PATCH 17/21] dt-bindings: reset: rcar-rst: Document r8a7744 reset
+ module
 In-Reply-To: <cover.1538128711.git.horms+renesas@verge.net.au>
 References: <cover.1538128711.git.horms+renesas@verge.net.au>
-Message-ID: <841e37a5cad3976a15b531e512076a05b6045b4b.1538128711.git.horms+renesas@verge.net.au>
+Message-ID: <f1ae799039bfd3fcc046041714eb0ac227505d0f.1538128711.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Biju Das <biju.das@bp.renesas.com>
 
-Add power domain indices for RZ/G1N (R8A7744) SoC.
+Document bindings for the RZ/G1N (R8A7744) reset module.
 
 Signed-off-by: Biju Das <biju.das@bp.renesas.com>
 Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
@@ -18,39 +18,20 @@ Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Reviewed-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- include/dt-bindings/power/r8a7744-sysc.h | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
- create mode 100644 include/dt-bindings/power/r8a7744-sysc.h
+ Documentation/devicetree/bindings/reset/renesas,rst.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/include/dt-bindings/power/r8a7744-sysc.h b/include/dt-bindings/power/r8a7744-sysc.h
-new file mode 100644
-index 000000000000..8b6529778f98
---- /dev/null
-+++ b/include/dt-bindings/power/r8a7744-sysc.h
-@@ -0,0 +1,24 @@
-+/* SPDX-License-Identifier: GPL-2.0
-+ *
-+ * Copyright (C) 2018 Renesas Electronics Corp.
-+ */
-+#ifndef __DT_BINDINGS_POWER_R8A7744_SYSC_H__
-+#define __DT_BINDINGS_POWER_R8A7744_SYSC_H__
-+
-+/*
-+ * These power domain indices match the numbers of the interrupt bits
-+ * representing the power areas in the various Interrupt Registers
-+ * (e.g. SYSCISR, Interrupt Status Register)
-+ *
-+ * Note that RZ/G1N is identical to RZ/G2M w.r.t. power domains.
-+ */
-+
-+#define R8A7744_PD_CA15_CPU0		 0
-+#define R8A7744_PD_CA15_CPU1		 1
-+#define R8A7744_PD_CA15_SCU		12
-+#define R8A7744_PD_SGX			20
-+
-+/* Always-on power area */
-+#define R8A7744_PD_ALWAYS_ON		32
-+
-+#endif /* __DT_BINDINGS_POWER_R8A7744_SYSC_H__ */
+diff --git a/Documentation/devicetree/bindings/reset/renesas,rst.txt b/Documentation/devicetree/bindings/reset/renesas,rst.txt
+index 25e6db546215..b03c48a1150e 100644
+--- a/Documentation/devicetree/bindings/reset/renesas,rst.txt
++++ b/Documentation/devicetree/bindings/reset/renesas,rst.txt
+@@ -16,6 +16,7 @@ Required properties:
+ 		  - "renesas,<soctype>-rst" for R-Car Gen2 and Gen3, and RZ/G
+ 		Examples with soctypes are:
+ 		  - "renesas,r8a7743-rst" (RZ/G1M)
++		  - "renesas,r8a7744-rst" (RZ/G1N)
+ 		  - "renesas,r8a7745-rst" (RZ/G1E)
+ 		  - "renesas,r8a77470-rst" (RZ/G1C)
+ 		  - "renesas,r8a774a1-rst" (RZ/G2M)
 -- 
 2.11.0
