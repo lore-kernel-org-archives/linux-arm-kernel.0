@@ -1,345 +1,57 @@
-From: taoren@fb.com (Tao Ren)
-Date: Fri, 28 Sep 2018 13:55:43 -0700
-Subject: [PATCH 2/2] ARM: dts: aspeed: Add Facebook Backpack-CMM BMC
-Message-ID: <20180928205543.369310-1-taoren@fb.com>
+From: leoyang.li@nxp.com (Li Yang)
+Date: Fri, 28 Sep 2018 16:00:52 -0500
+Subject: drivers binding to device node with multiple compatible strings
+In-Reply-To: <CAL_JsqKRH8uEzSx6H6ZSRJF9Ecp4am1cNsxgQqf2OO5_aGR1zw@mail.gmail.com>
+References: <CADRPPNT0QiBkJtJnxjW95Yf-mirL5OzRrvqj8rC-O8fiz17VnA@mail.gmail.com>
+ <CAL_JsqKRH8uEzSx6H6ZSRJF9Ecp4am1cNsxgQqf2OO5_aGR1zw@mail.gmail.com>
+Message-ID: <CADRPPNQam-QUfqDMvu42KS+50VaHfGPhCZj-1jRHQ-Od0fbxuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial version of device tree file for Facebook Backpack CMM
-(Chasis Management Module) ast2500 BMC.
+On Fri, Sep 28, 2018 at 3:07 PM Rob Herring <robh+dt@kernel.org> wrote:
+>
+> On Thu, Sep 27, 2018 at 5:25 PM Li Yang <leoyang.li@nxp.com> wrote:
+> >
+> > Hi Rob and Grant,
+> >
+> > Various device tree specs are recommending to include all the
+> > potential compatible strings in the device node, with the order from
+> > most specific to most general.  But it looks like Linux kernel doesn't
+> > provide a way to bind the device to the most specific driver, however,
+> > the first registered compatible driver will be bound.
+> >
+> > As more and more generic drivers are added to the Linux kernel, they
+> > are competing with the more specific vendor drivers and causes problem
+> > when both are built into the kernel.  I'm wondering if there is a
+> > generic solution (or in plan) to make the most specific driver bound
+> > to the device.   Or we have to disable the more general driver or
+> > remove the more general compatible string from the device tree?
+>
+> It's been a known limitation for a long time. However, in practice it
+> doesn't seem to be a common problem. Perhaps folks just remove the
+> less specific compatible from their DT (though that's not ideal). For
+> most modern bindings, there's so many other resources beyond
+> compatible (clocks, resets, pinctrl, etc.) that there are few generic
+> drivers that can work.
+>
+> I guess if we want to fix this, we'd need to have weighted matching in
+> the driver core and unbind drivers when we get a better match. Though
+> it could get messy if the better driver probe fails. Then we've got to
+> rebind to the original driver.
 
-Note: I2C devices on Backpack Line Cards and Fabric Cards are not
-listed in the device tree file because Line/Fabric Cards may be
-unplugged.
+Probably we can populate the platform devices from device tree after
+the device_init phase?  So that all built-in drivers are already
+registered when the devices are created and we can try find the best
+match in one go?  For more specific loadable modules we probably need
+to unbind from the old driver and bind to the new one.  But I agree
+with you that it could be messy.
 
-Signed-off-by: Tao Ren <taoren@fb.com>
----
- arch/arm/boot/dts/aspeed-bmc-facebook-cmm.dts | 317 ++++++++++++++++++
- 1 file changed, 317 insertions(+)
- create mode 100644 arch/arm/boot/dts/aspeed-bmc-facebook-cmm.dts
+>
+> Do you have a specific case where you hit this?
 
-diff --git a/arch/arm/boot/dts/aspeed-bmc-facebook-cmm.dts b/arch/arm/boot/dts/aspeed-bmc-facebook-cmm.dts
-new file mode 100644
-index 000000000000..a259d8a2426a
---- /dev/null
-+++ b/arch/arm/boot/dts/aspeed-bmc-facebook-cmm.dts
-@@ -0,0 +1,317 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+// Copyright (c) 2018 Facebook Inc.
-+/dts-v1/;
-+
-+#include "aspeed-g5.dtsi"
-+
-+/ {
-+	model = "Facebook Backpack CMM BMC";
-+	compatible = "facebook,cmm-bmc", "aspeed,ast2500";
-+
-+	aliases {
-+		/*
-+		 * Override the default uart aliases to avoid breaking
-+		 * the legacy applications.
-+		 */
-+		serial0 = &uart5;
-+		serial1 = &uart1;
-+		serial2 = &uart3;
-+		serial3 = &uart4;
-+
-+		/*
-+		 * Hardcode the bus number of i2c switches' channels to
-+		 * avoid breaking the legacy applications.
-+		 */
-+		i2c16 = &imux16;
-+		i2c17 = &imux17;
-+		i2c18 = &imux18;
-+		i2c19 = &imux19;
-+		i2c20 = &imux20;
-+		i2c21 = &imux21;
-+		i2c22 = &imux22;
-+		i2c23 = &imux23;
-+		i2c24 = &imux24;
-+		i2c25 = &imux25;
-+		i2c26 = &imux26;
-+		i2c27 = &imux27;
-+		i2c28 = &imux28;
-+		i2c29 = &imux29;
-+		i2c30 = &imux30;
-+		i2c31 = &imux31;
-+		i2c32 = &imux32;
-+		i2c33 = &imux33;
-+		i2c34 = &imux34;
-+		i2c35 = &imux35;
-+		i2c36 = &imux36;
-+		i2c37 = &imux37;
-+		i2c38 = &imux38;
-+		i2c39 = &imux39;
-+	};
-+
-+	chosen {
-+		stdout-path = &uart1;
-+		bootargs = "console=ttyS1,9600n8 root=/dev/ram rw earlyprintk";
-+	};
-+
-+	memory at 80000000 {
-+		reg = <0x80000000 0x20000000>;
-+	};
-+};
-+
-+/*
-+ * Update reset type to "system" (full chip) to fix warm reboot hang issue
-+ * when reset type is set to default ("soc", gated by reset mask registers).
-+ */
-+&wdt1 {
-+	status = "okay";
-+	aspeed,reset-type = "system";
-+};
-+
-+/*
-+ * wdt2 is not used by Backpack CMM.
-+ */
-+&wdt2 {
-+	status = "disabled";
-+};
-+
-+&fmc {
-+	status = "okay";
-+	flash at 0 {
-+		status = "okay";
-+		m25p,fast-read;
-+		label = "bmc";
-+#include "facebook-bmc-flash-layout.dtsi"
-+	};
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	status = "okay";
-+};
-+
-+&uart4 {
-+	status = "okay";
-+};
-+
-+&uart5 {
-+	status = "okay";
-+};
-+
-+&mac1 {
-+	status = "okay";
-+	no-hw-checksum;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_rgmii2_default &pinctrl_mdio2_default>;
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+
-+	i2c-switch at 77 {
-+		compatible = "nxp,pca9548";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0x77>;
-+
-+		imux16: i2c at 0 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0>;
-+		};
-+
-+		imux17: i2c at 1 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <1>;
-+		};
-+
-+		imux18: i2c at 2 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <2>;
-+		};
-+
-+		imux19: i2c at 3 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <3>;
-+		};
-+
-+		imux20: i2c at 4 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <4>;
-+		};
-+
-+		imux21: i2c at 5 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <5>;
-+		};
-+
-+		imux22: i2c at 6 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <6>;
-+		};
-+
-+		imux23: i2c at 7 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <7>;
-+		};
-+	};
-+};
-+
-+&i2c2 {
-+	status = "okay";
-+
-+	i2c-switch at 71 {
-+		compatible = "nxp,pca9548";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0x71>;
-+
-+		imux24: i2c at 0 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0>;
-+		};
-+
-+		imux25: i2c at 1 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <1>;
-+		};
-+
-+		imux26: i2c at 2 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <2>;
-+		};
-+
-+		imux27: i2c at 3 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <3>;
-+		};
-+
-+		imux28: i2c at 4 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <4>;
-+		};
-+
-+		imux29: i2c at 5 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <5>;
-+		};
-+
-+		imux30: i2c at 6 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <6>;
-+		};
-+
-+		imux31: i2c at 7 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <7>;
-+		};
-+	};
-+};
-+
-+&i2c3 {
-+	status = "okay";
-+};
-+
-+&i2c4 {
-+	status = "okay";
-+};
-+
-+&i2c5 {
-+	status = "okay";
-+};
-+
-+&i2c6 {
-+	status = "okay";
-+};
-+
-+&i2c7 {
-+	status = "okay";
-+};
-+
-+&i2c8 {
-+	status = "okay";
-+
-+	i2c-switch at 77 {
-+		compatible = "nxp,pca9548";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0x77>;
-+
-+		imux32: i2c at 0 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0>;
-+		};
-+
-+		imux33: i2c at 1 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <1>;
-+		};
-+
-+		imux34: i2c at 2 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <2>;
-+		};
-+
-+		imux35: i2c at 3 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <3>;
-+		};
-+
-+		imux36: i2c at 4 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <4>;
-+		};
-+
-+		imux37: i2c at 5 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <5>;
-+		};
-+
-+		imux38: i2c at 6 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <6>;
-+		};
-+
-+		imux39: i2c at 7 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <7>;
-+		};
-+	};
-+};
-+
-+&i2c13 {
-+	status = "okay";
-+};
-+
-+&adc {
-+	status = "okay";
-+};
--- 
-2.17.1
+Maybe not a new issue but "snps,dw-pcie" is competing with various
+"fsl,<chip>-pcie" compatibles.  Also a specific PHY
+"ethernet-phy-idAAAA.BBBB" with generic "ethernet-phy-ieee802.3-c45".
+
+Regards,
+Leo
