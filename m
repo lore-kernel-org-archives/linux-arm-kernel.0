@@ -1,47 +1,54 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Fri, 28 Sep 2018 19:21:45 +0200
-Subject: [PATCH v3 6/9] kbuild: consolidate Devicetree dtb build rules
-In-Reply-To: <CAMuHMdWEnoh97_jiDWMq=ke4PrhSFbToYnx91CPLBuq3mOGzoQ@mail.gmail.com>
-References: <20180910150403.19476-1-robh@kernel.org>
- <20180910150403.19476-7-robh@kernel.org>
- <CAL_Jsq+=VbdcVLiwXbOA5d+R2YY6=2Pw2bQpci-jj-JvereD1A@mail.gmail.com>
- <CAK7LNAQFqhWw+LwDoypGG=OP6tH4qf2tT=LvtchK2GoiNyzDXg@mail.gmail.com>
- <CAMuHMdWEnoh97_jiDWMq=ke4PrhSFbToYnx91CPLBuq3mOGzoQ@mail.gmail.com>
-Message-ID: <75740733-d0d4-4c0c-838c-f01a5e7291d3@suse.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 28 Sep 2018 18:27:37 +0100
+Subject: [PATCH v6 06/18] kvm: arm/arm64: Allow arch specific
+ configurations for VM
+In-Reply-To: <20180926163258.20218-7-suzuki.poulose@arm.com>
+References: <20180926163258.20218-1-suzuki.poulose@arm.com>
+ <20180926163258.20218-7-suzuki.poulose@arm.com>
+Message-ID: <fbca190b-473b-5dee-67be-c724392fd297@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Hi Suzuki,
 
-Am 13.09.18 um 17:51 schrieb Geert Uytterhoeven:
-> On Wed, Sep 12, 2018 at 3:02 AM Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
->> Even x86 can enable OF and OF_UNITTEST.
->>
->> Another solution might be,
->> guard it by 'depends on ARCH_SUPPORTS_OF'.
->>
->> This is actually what ACPI does.
->>
->> menuconfig ACPI
->>         bool "ACPI (Advanced Configuration and Power Interface) Support"
->>         depends on ARCH_SUPPORTS_ACPI
->>          ...
+On 26/09/18 17:32, Suzuki K Poulose wrote:
+> Allow the arch backends to perform VM specific initialisation.
+> This will be later used to handle IPA size configuration and per-VM
+> VTCR configuration on arm64.
 > 
-> ACPI is a real platform feature, as it depends on firmware.
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <cdall@kernel.org>
+> Reviewed-by: Eric Auger <eric.auger@redhat.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>   arch/arm/include/asm/kvm_host.h   | 7 +++++++
+>   arch/arm64/include/asm/kvm_host.h | 2 ++
+>   arch/arm64/kvm/reset.c            | 7 +++++++
+>   virt/kvm/arm/arm.c                | 5 +++--
+>   4 files changed, 19 insertions(+), 2 deletions(-)
 > 
-> CONFIG_OF can be enabled, and DT overlays can be loaded, on any platform,
-> even if it has ACPI ;-)
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 3ad482d2f1eb..72d46418e1ef 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -354,4 +354,11 @@ static inline void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu) {}
+>   struct kvm *kvm_arch_alloc_vm(void);
+>   void kvm_arch_free_vm(struct kvm *kvm);
+>   
+> +static inline int kvm_arm_config_vm(struct kvm *kvm, unsigned long type)
 
-How would loading a DT overlay work on an ACPI platform? I.e., what
-would it overlay against and how to practically load such a file?
+This is a bit of a nit, but VM is a bit of an overloaded term in this 
+context. Given what we do in the following patch (moving the global 
+stage-2 init to be on a per VM -- virtual machine), I'd like to rename 
+this to something less ambiguous.
 
-I wonder whether that could be helpful for USB devices and serdev...
+How about kvm_arm_config_stage2? Or something along those lines?
 
-Cheers,
-Andreas
+No need to respin the series on this account, we can address it in a 
+separate patch. But I think it would help understanding what is done where.
 
+Thanks,
+
+	M.
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Jazz is not dead. It just smells funny...
