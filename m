@@ -1,17 +1,13 @@
 From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Fri, 28 Sep 2018 10:36:30 +0200
-Subject: [PATCH v2 3/7] dt-bindings: stm32-mdma: Add DMA/MDMA chaining support
- bindings
+Date: Fri, 28 Sep 2018 10:36:34 +0200
+Subject: [PATCH v2 7/7] dmaengine: stm32-mdma: enable descriptor_reuse
 In-Reply-To: <1538123794-17085-1-git-send-email-pierre-yves.mordret@st.com>
 References: <1538123794-17085-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <1538123794-17085-4-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <1538123794-17085-8-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-
-This patch adds the description of the 2 properties needed to support M2M
-transfer triggered by STM32 DMA when his transfer is complete.
+enable reuse to spare descriptors creation on critical UC.
 
 Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 ---
@@ -20,52 +16,21 @@ Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
        * Initial
 ---
 ---
- Documentation/devicetree/bindings/dma/stm32-mdma.txt | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+ drivers/dma/stm32-mdma.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/dma/stm32-mdma.txt b/Documentation/devicetree/bindings/dma/stm32-mdma.txt
-index d18772d..27c2812 100644
---- a/Documentation/devicetree/bindings/dma/stm32-mdma.txt
-+++ b/Documentation/devicetree/bindings/dma/stm32-mdma.txt
-@@ -10,7 +10,7 @@ Required properties:
- - interrupts: Should contain the MDMA interrupt.
- - clocks: Should contain the input clock of the DMA instance.
- - resets: Reference to a reset controller asserting the DMA controller.
--- #dma-cells : Must be <5>. See DMA client paragraph for more details.
-+- #dma-cells : Must be <6>. See DMA client paragraph for more details.
- 
- Optional properties:
- - dma-channels: Number of DMA channels supported by the controller.
-@@ -26,7 +26,7 @@ Example:
- 		interrupts = <122>;
- 		clocks = <&timer_clk>;
- 		resets = <&rcc 992>;
--		#dma-cells = <5>;
-+		#dma-cells = <6>;
- 		dma-channels = <16>;
- 		dma-requests = <32>;
- 		st,ahb-addr-masks = <0x20000000>, <0x00000000>;
-@@ -35,8 +35,8 @@ Example:
- * DMA client
- 
- DMA clients connected to the STM32 MDMA controller must use the format
--described in the dma.txt file, using a five-cell specifier for each channel:
--a phandle to the MDMA controller plus the following five integer cells:
-+described in the dma.txt file, using a six-cell specifier for each channel:
-+a phandle to the MDMA controller plus the following six integer cells:
- 
- 1. The request line number
- 2. The priority level
-@@ -76,6 +76,10 @@ a phandle to the MDMA controller plus the following five integer cells:
-    if no HW ack signal is used by the MDMA client
- 5. A 32bit mask specifying the value to be written to acknowledge the request
-    if no HW ack signal is used by the MDMA client
-+6. A bitfield value specifying if the MDMA client wants to generate M2M
-+   transfer with HW trigger (1) or not (0). This bitfield should be only
-+   enabled for M2M transfer triggered by STM32 DMA client. The memory devices
-+   involved in this kind of transfer are SRAM and DDR.
- 
- Example:
- 
+diff --git a/drivers/dma/stm32-mdma.c b/drivers/dma/stm32-mdma.c
+index 6b6e63b..80a17dd 100644
+--- a/drivers/dma/stm32-mdma.c
++++ b/drivers/dma/stm32-mdma.c
+@@ -1715,6 +1715,8 @@ static int stm32_mdma_probe(struct platform_device *pdev)
+ 	dd->device_resume = stm32_mdma_resume;
+ 	dd->device_terminate_all = stm32_mdma_terminate_all;
+ 	dd->device_synchronize = stm32_mdma_synchronize;
++	dd->descriptor_reuse = true;
++
+ 	dd->src_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
+ 		BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
+ 		BIT(DMA_SLAVE_BUSWIDTH_4_BYTES) |
 -- 
 2.7.4
