@@ -1,84 +1,55 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 28 Sep 2018 15:55:16 +0200
-Subject: [PATCH] dts: sun8i-h3: add sy8106a to orange pi plus
-In-Reply-To: <20180927083636.5415-1-jorik@kippendief.biz>
-References: <20180927083636.5415-1-jorik@kippendief.biz>
-Message-ID: <20180928135516.jxhnsgaa3s2nagv7@flea>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 28 Sep 2018 14:55:32 +0100
+Subject: [PATCH v8 5/7] iommu/arm-smmu-v3: Add support for non-strict mode
+In-Reply-To: <20180928124704.GC1577@brain-police>
+References: <cover.1537458163.git.robin.murphy@arm.com>
+ <b98f8f695178c9c9ac6e081680090d5ac97e8d7c.1537458163.git.robin.murphy@arm.com>
+ <20180928121900.GB1577@brain-police>
+ <1d2b57f7-be4e-39c5-4981-7f8e2f601b6a@arm.com>
+ <20180928124704.GC1577@brain-police>
+Message-ID: <20180928135532.GA1581@brain-police>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-On Thu, Sep 27, 2018 at 10:36:36AM +0200, jorik at kippendief.biz wrote:
-> From: Jorik Jonker <jorik@kippendief.biz>
-
-The prefix of your commit title should be "ARM: dts: ..."
-
-> The Orange Pi Plus board lacks voltage scaling capabilities in its
-> current form. This results in random freezes during boot when cpufreq is
-> enabled, probably due to wrong voltages.
+On Fri, Sep 28, 2018 at 01:47:04PM +0100, Will Deacon wrote:
+> On Fri, Sep 28, 2018 at 01:26:00PM +0100, Robin Murphy wrote:
+> > On 28/09/18 13:19, Will Deacon wrote:
+> > > On Thu, Sep 20, 2018 at 05:10:25PM +0100, Robin Murphy wrote:
+> > > > diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> > > > index f10c852479fc..db402e8b068b 100644
+> > > > --- a/drivers/iommu/arm-smmu-v3.c
+> > > > +++ b/drivers/iommu/arm-smmu-v3.c
+> > > > @@ -612,6 +612,7 @@ struct arm_smmu_domain {
+> > > >   	struct mutex			init_mutex; /* Protects smmu pointer */
+> > > >   	struct io_pgtable_ops		*pgtbl_ops;
+> > > > +	bool				non_strict;
+> > > >   	enum arm_smmu_domain_stage	stage;
+> > > >   	union {
+> > > > @@ -1407,6 +1408,12 @@ static void arm_smmu_tlb_inv_context(void *cookie)
+> > > >   		cmd.tlbi.vmid	= smmu_domain->s2_cfg.vmid;
+> > > >   	}
+> > > > +	/*
+> > > > +	 * NOTE: when io-pgtable is in non-strict mode, we may get here with
+> > > > +	 * PTEs previously cleared by unmaps on the current CPU not yet visible
+> > > > +	 * to the SMMU. We are relying on the DSB implicit in queue_inc_prod()
+> > > > +	 * to guarantee those are observed before the TLBI. Do be careful, 007.
+> > > > +	 */
+> > > 
+> > > Good, so you can ignore my comment on the previous patch :)
+> > 
+> > Well, I suppose that comment in io-pgtable *could* have explicitly noted
+> > that same-CPU order is dealt with elsewhere - feel free to fix it up if you
+> > think it would be a helpful reminder for the future.
 > 
-> This patch (a copy/paste of 06139c) does the following things on this
-> board:
-> - enable r_i2c
-> - add sy8106a to the r_i2c bus
-> - have the sy8106a regulate VDD of cpu
-> 
-> I have tested this on two Orange Pi Plus boards, and they run stable
-> across a range of voltages (and frequencies).
+> I think I'll move it into the documentation for the new attribute, so that
+> any driver authors wanting to enable lazy invalidation know that they need
+> to provide this guarantee in their full TLB invalidation callback.
 
-How was this tested?
+Hmm, so I started doing this but then realised we already required this
+behaviour for tlb_add_flush() afaict. That would mean that mainline
+currently has a bug for arm-smmu.c, because we use the _relaxed I/O
+accessors in there and there's no DSB after clearing the PTE on unmap().
 
-> Signed-off-by: Jorik Jonker <jorik@kippendief.biz>
-> ---
->  arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 29 ++++++++++++++++++++
->  1 file changed, 29 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-> index b403e5d78..fd64b5c94 100644
-> --- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-> @@ -74,6 +74,10 @@
->  	};
->  };
->  
-> +&cpu0 {
-> +	cpu-supply = <&reg_vdd_cpux>;
-> +};
-> +
->  &ehci3 {
->  	status = "okay";
->  };
-> @@ -119,6 +123,31 @@
->  	};
->  };
->  
-> +&r_i2c {
-> +	status = "okay";
-> +
-> +	reg_vdd_cpux: regulator at 65 {
-> +		compatible = "silergy,sy8106a";
-> +		reg = <0x65>;
-> +		regulator-name = "vdd-cpux";
-> +		silergy,fixed-microvolt = <1200000>;
-> +		/*
-> +		 * The datasheet uses 1.1V as the minimum value of VDD-CPUX,
-> +		 * however both the Armbian DVFS table and the official one
-> +		 * have operating points with voltage under 1.1V, and both
-> +		 * DVFS table are known to work properly at the lowest
-> +		 * operating point.
-> +		 *
-> +		 * Use 1.0V as the minimum voltage instead.
-> +		 */
+Am I missing something?
 
-There's not much point to that comment, since it's been that way for
-all the other SoCs from Allwinner. However, that would be great to
-have it in the commit log.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Will
