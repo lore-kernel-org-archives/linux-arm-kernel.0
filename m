@@ -1,93 +1,117 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Sep 2018 13:51:31 +0100
-Subject: [PATCH v8 3/7] iommu: Add "iommu.strict" command line option
-In-Reply-To: <799fad801970298385af3abc8ca82620ad62c000.1537458163.git.robin.murphy@arm.com>
-References: <cover.1537458163.git.robin.murphy@arm.com>
- <799fad801970298385af3abc8ca82620ad62c000.1537458163.git.robin.murphy@arm.com>
-Message-ID: <20180928125130.GD1577@brain-police>
+From: sakari.ailus@linux.intel.com (Sakari Ailus)
+Date: Fri, 28 Sep 2018 15:56:01 +0300
+Subject: [PATCH v11 1/2] dt-bindings: media: Add Allwinner V3s Camera
+ Sensor Interface (CSI)
+In-Reply-To: <CAGb2v65YpPRHb5YiGJhC8NX5F5i3+1rW5y6Dq5L+pNN3U_uLdQ@mail.gmail.com>
+References: <1537951204-24672-1-git-send-email-yong.deng@magewell.com>
+ <20180928093833.gwmskm2jvby6x4s6@paasikivi.fi.intel.com>
+ <14114604.4rraf0qJLU@avalon>
+ <20180928102345.r2g342tg5mgcwfw6@paasikivi.fi.intel.com>
+ <CAGb2v65YpPRHb5YiGJhC8NX5F5i3+1rW5y6Dq5L+pNN3U_uLdQ@mail.gmail.com>
+Message-ID: <20180928125601.6ye5tvrmh57amvh5@paasikivi.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 20, 2018 at 05:10:23PM +0100, Robin Murphy wrote:
-> From: Zhen Lei <thunder.leizhen@huawei.com>
-> 
-> Add a generic command line option to enable lazy unmapping via IOVA
-> flush queues, which will initally be suuported by iommu-dma. This echoes
-> the semantics of "intel_iommu=strict" (albeit with the opposite default
-> value), but in the driver-agnostic fashion of "iommu.passthrough".
-> 
-> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> [rm: move handling out of SMMUv3 driver, clean up documentation]
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
-> 
-> v8:
->  - Rename "non-strict" to "strict" to better match existing options
->  - Rewrite doc text/commit message
->  - Downgrade boot-time message from warn/taint to info
-> 
->  .../admin-guide/kernel-parameters.txt         | 12 ++++++++++
->  drivers/iommu/iommu.c                         | 23 +++++++++++++++++++
->  2 files changed, 35 insertions(+)
-> 
-> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-> index 9871e649ffef..92ae12aeabf4 100644
-> --- a/Documentation/admin-guide/kernel-parameters.txt
-> +++ b/Documentation/admin-guide/kernel-parameters.txt
-> @@ -1749,6 +1749,18 @@
->  		nobypass	[PPC/POWERNV]
->  			Disable IOMMU bypass, using IOMMU for PCI devices.
->  
-> +	iommu.strict=	[ARM64] Configure TLB invalidation behaviour
-> +			Format: { "0" | "1" }
-> +			0 - Lazy mode.
-> +			  Request that DMA unmap operations use deferred
-> +			  invalidation of hardware TLBs, for increased
-> +			  throughput at the cost of reduced device isolation.
-> +			  Will fall back to strict mode if not supported by
-> +			  the relevant IOMMU driver.
-> +			1 - Strict mode (default).
-> +			  DMA unmap operations invalidate IOMMU hardware TLBs
-> +			  synchronously.
-> +
->  	iommu.passthrough=
->  			[ARM64] Configure DMA to bypass the IOMMU by default.
->  			Format: { "0" | "1" }
-> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-> index 8c15c5980299..02b6603f0616 100644
-> --- a/drivers/iommu/iommu.c
-> +++ b/drivers/iommu/iommu.c
-> @@ -41,6 +41,7 @@ static unsigned int iommu_def_domain_type = IOMMU_DOMAIN_IDENTITY;
->  #else
->  static unsigned int iommu_def_domain_type = IOMMU_DOMAIN_DMA;
->  #endif
-> +static bool iommu_dma_strict __read_mostly = true;
->  
->  struct iommu_callback_data {
->  	const struct iommu_ops *ops;
-> @@ -131,6 +132,21 @@ static int __init iommu_set_def_domain_type(char *str)
->  }
->  early_param("iommu.passthrough", iommu_set_def_domain_type);
->  
-> +static int __init iommu_dma_setup(char *str)
-> +{
-> +	int ret;
-> +
-> +	ret = kstrtobool(str, &iommu_dma_strict);
-> +	if (ret)
-> +		return ret;
-> +
-> +	if (!iommu_dma_strict)
-> +		pr_info("Enabling deferred TLB invalidation for DMA; protection against malicious/malfunctioning devices may be reduced.\n");
+Hi Chen-Yu,
 
-Printing here isn't quite right, because if somebody boots with something
-like:
+On Fri, Sep 28, 2018 at 07:10:58PM +0800, Chen-Yu Tsai wrote:
+> On Fri, Sep 28, 2018 at 6:23 PM Sakari Ailus
+> <sakari.ailus@linux.intel.com> wrote:
+> >
+> > Hi Laurent,
+> >
+> > On Fri, Sep 28, 2018 at 12:45:12PM +0300, Laurent Pinchart wrote:
+> > > Hi Sakari,
+> > >
+> > > On Friday, 28 September 2018 12:38:33 EEST Sakari Ailus wrote:
+> > > > On Wed, Sep 26, 2018 at 04:40:04PM +0800, Yong Deng wrote:
+> > > > > Add binding documentation for Allwinner V3s CSI.
+> > > > >
+> > > > > Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> > > > > Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+> > > >
+> > > > I know... but I have a few more comments.
+> > > >
+> > > > > Reviewed-by: Rob Herring <robh@kernel.org>
+> > > > > Signed-off-by: Yong Deng <yong.deng@magewell.com>
+> > > > > ---
+> > > > >
+> > > > >  .../devicetree/bindings/media/sun6i-csi.txt        | 59 +++++++++++++++++
+> > > > >  1 file changed, 59 insertions(+)
+> > > > >  create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
+> > > > >
+> > > > > diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt
+> > > > > b/Documentation/devicetree/bindings/media/sun6i-csi.txt new file mode
+> > > > > 100644
+> > > > > index 000000000000..2ff47a9507a6
+> > > > > --- /dev/null
+> > > > > +++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+> > > > > @@ -0,0 +1,59 @@
+> > > > > +Allwinner V3s Camera Sensor Interface
+> > > > > +-------------------------------------
+> > > > > +
+> > > > > +Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
+> > > > > +interface and CSI1 is used for parallel interface.
+> > > > > +
+> > > > > +Required properties:
+> > > > > +  - compatible: value must be "allwinner,sun8i-v3s-csi"
+> > > > > +  - reg: base address and size of the memory-mapped region.
+> > > > > +  - interrupts: interrupt associated to this IP
+> > > > > +  - clocks: phandles to the clocks feeding the CSI
+> > > > > +    * bus: the CSI interface clock
+> > > > > +    * mod: the CSI module clock
+> > > > > +    * ram: the CSI DRAM clock
+> > > > > +  - clock-names: the clock names mentioned above
+> > > > > +  - resets: phandles to the reset line driving the CSI
+> > > > > +
+> > > > > +Each CSI node should contain one 'port' child node with one child
+> > > > > 'endpoint' +node, according to the bindings defined in
+> > > > > +Documentation/devicetree/bindings/media/video-interfaces.txt. As
+> > > > > mentioned
+> > > > > +above, the endpoint's bus type should be MIPI CSI-2 for CSI0 and parallel
+> > > > > or +Bt656 for CSI1.
+> > > >
+> > > > Which port represents CSI0 and which one is CSI1? That needs to be
+> > > > documented.
+> > >
+> > > There are two CSI devices, named CSI0 and CSI1, with one port each. The CSI0
+> > > device supports CSI-2 only, and the CSI1 device parallel (BT.601 or BT.656)
+> > > only.
+> > >
+> > > > > +
+> > > > > +Endpoint node properties for CSI1
+> > > >
+> > > > How about CSI0? I'd expect at least data-lanes, and clock-lanes as well if
+> > > > the hardware supports lane mapping.
+> > >
+> > > I enquired about that too. As far as I understand, CSI0 isn't supported yet in
+> > > the driver due to lack of documentation and lack of open-source vendor-
+> > > provided source code. While DT bindings are not tied to driver
+> > > implementations, it's not the best idea to design DT bindings without at least
+> > > one working implementation to test them. I thus proposed just listing CSI0 as
+> > > being unsupported for now.
+> >
+> > Ack.
+> >
+> > We should still define which receiver corresponds to a given port. Probably
+> > 1 for CSI1 would make sense, in order to avoid changing the order the
+> > hardware already uses. 0 doesn't need to be documented no IMO.
+> >
+> > What do you think?
+> 
+> AFAICT it would be a completely seperate node, since they have different address
+> spaces, clocks and reset controls. So there's no possibility of confusion.
+> 
+> According to Yong, CSI0 is tied internally to some unknown MIPI CSI2-receiver,
+> which is the undocumented part. CSI1 has its parallel data pins exposed to the
+> outside.
 
-	"iommu.strict=1 iommu.strict=0 iommu.strict=0 iommu.strict=1"
+Thanks for clearing up the confusion. If these are truly different kinds of
+devices, then don't they also deserve different compatible strings? And
+possibly also different DT binding documentation in a separate file.
 
-then we'll print the wrong thing twice :)
+-- 
+Regards,
 
-I think we either need to drop the print, or move it to a the DMA domain
-initialisation.
-
-Will
+Sakari Ailus
+sakari.ailus at linux.intel.com
