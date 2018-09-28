@@ -1,85 +1,24 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 28 Sep 2018 14:39:24 +0100
-Subject: [RFC PATCH v2 20/23] KVM: arm64: Add arch vm ioctl hook
-In-Reply-To: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
-References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1538141967-15375-21-git-send-email-Dave.Martin@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 28 Sep 2018 14:42:53 +0100
+Subject: [PATCH v8 0/7] Add non-strict mode support for iommu-dma
+In-Reply-To: <20180928133639.GF1577@brain-police>
+References: <cover.1537458163.git.robin.murphy@arm.com>
+ <20180928133639.GF1577@brain-police>
+Message-ID: <c1bda944-6279-4393-1277-c9df18594ca0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To enable arm64-specific vm ioctls to be added cleanly, this patch
-adds a kvm_arm_arch_vm_ioctl() hook so that these don't pollute the
-common code.
+On 28/09/18 14:36, Will Deacon wrote:
+> On Thu, Sep 20, 2018 at 05:10:20PM +0100, Robin Murphy wrote:
+>> Hopefully this is the last spin of the series - I've now dropped my light
+>> touch and fixed up all the various prose text, plus implemented the proper
+>> quirk support for short-descriptor because it's actually just a trivial
+>> cut-and-paste job.
+> 
+> Did you manage to clarify how the lifetime of the domain/flush queue interacts
+> with the periodic timer after the cookie has been freed?
 
-No functional change.
+Oh, yes - it turned out to be wrapped up in put_iova_domain() already 
+(see free_iova_flush_queue()), so all looks good in that regard.
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
- arch/arm/include/asm/kvm_host.h   | 6 ++++++
- arch/arm64/include/asm/kvm_host.h | 2 ++
- arch/arm64/kvm/guest.c            | 6 ++++++
- virt/kvm/arm/arm.c                | 2 +-
- 4 files changed, 15 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index df2659d..0850fcd 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -285,6 +285,12 @@ static inline int kvm_arm_arch_vcpu_ioctl(struct vcpu *vcpu,
- 	return -EINVAL;
- }
- 
-+static inline int kvm_arm_arch_vm_ioctl(struct kvm *kvm,
-+	unsigned int ioctl, unsigned long arg)
-+{
-+	return -EINVAL;
-+}
-+
- int kvm_perf_init(void);
- int kvm_perf_teardown(void);
- 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 5225485..ae25f14 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -63,6 +63,8 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
- int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext);
- int kvm_arm_arch_vcpu_ioctl(struct kvm_vcpu *vcpu,
- 			    unsigned int ioctl, unsigned long arg);
-+int kvm_arm_arch_vm_ioctl(struct kvm *kvm,
-+			  unsigned int ioctl, unsigned long arg);
- void __extended_idmap_trampoline(phys_addr_t boot_pgd, phys_addr_t idmap_start);
- 
- struct kvm_arch {
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index d96145a..f066b17 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -714,6 +714,12 @@ int kvm_arm_arch_vcpu_ioctl(struct kvm_vcpu *vcpu,
- 	}
- }
- 
-+int kvm_arm_arch_vm_ioctl(struct kvm *kvm,
-+			  unsigned int ioctl, unsigned long arg)
-+{
-+	return -EINVAL;
-+}
-+
- int kvm_arch_vcpu_ioctl_get_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
- {
- 	return -EINVAL;
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 6e894a8..6582a38 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -1279,7 +1279,7 @@ long kvm_arch_vm_ioctl(struct file *filp,
- 		return 0;
- 	}
- 	default:
--		return -EINVAL;
-+		return kvm_arm_arch_vm_ioctl(kvm, ioctl, arg);
- 	}
- }
- 
--- 
-2.1.4
+Robin.
