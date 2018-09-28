@@ -1,234 +1,140 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 28 Sep 2018 14:39:10 +0100
-Subject: [RFC PATCH v2 06/23] arm64/sve: Check SVE virtualisability
+Date: Fri, 28 Sep 2018 14:39:11 +0100
+Subject: [RFC PATCH v2 07/23] arm64/sve: Enable SVE state tracking for
+ non-task contexts
 In-Reply-To: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
 References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1538141967-15375-7-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1538141967-15375-8-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to the way the effective SVE vector length is controlled and
-trapped at different exception levels, certain mismatches in the
-sets of vector lengths supported by different physical CPUs in the
-system may prevent straightforward virtualisation of SVE at parity
-with the host.
+The current FPSIMD/SVE context handling support for non-task (i.e.,
+KVM vcpu) contexts does not take SVE into account.  This means that
+only task contexts can safely use SVE at present.
 
-This patch analyses the extent to which SVE can be virtualised
-safely without interfering with migration of vcpus between physical
-CPUs, and rejects late secondary CPUs that would erode the
-situation further.
+In preparation for enabling KVM guests to use SVE, it is necessary
+to keep track of SVE state for non-task contexts too.
 
-It is left up to KVM to decide what to do with this information.
+This patch adds the necessary support, removing assumptions from
+the context switch code about the location of the SVE context
+storage.
+
+When binding a vcpu context, its vector length is arbitrarily
+specified as sve_max_vl for now.  In any case, because TIF_SVE is
+presently cleared at vcpu context bind time, the specified vector
+length will not be used for anything yet.  In later patches TIF_SVE
+will be set here as appropriate, and the appropriate maximum vector
+length for the vcpu will be passed when binding.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
 ---
-
-Changes since RFCv1:
-
- * The analysis done by this patch is the same as in the previous
-   version, but the commit message the printks etc. have been reworded
-   to avoid the suggestion that KVM is expected to work on a system with
-   mismatched SVE implementations.
----
- arch/arm64/include/asm/fpsimd.h |  1 +
- arch/arm64/kernel/cpufeature.c  |  2 +-
- arch/arm64/kernel/fpsimd.c      | 87 +++++++++++++++++++++++++++++++++++------
- 3 files changed, 76 insertions(+), 14 deletions(-)
+ arch/arm64/include/asm/fpsimd.h |  3 ++-
+ arch/arm64/kernel/fpsimd.c      | 20 +++++++++++++++-----
+ arch/arm64/kvm/fpsimd.c         |  4 +++-
+ 3 files changed, 20 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index dd1ad39..964adc9 100644
+index 964adc9..df7a143 100644
 --- a/arch/arm64/include/asm/fpsimd.h
 +++ b/arch/arm64/include/asm/fpsimd.h
-@@ -87,6 +87,7 @@ extern void sve_kernel_enable(const struct arm64_cpu_capabilities *__unused);
- extern u64 read_zcr_features(void);
+@@ -56,7 +56,8 @@ extern void fpsimd_restore_current_state(void);
+ extern void fpsimd_update_current_state(struct user_fpsimd_state const *state);
  
- extern int __ro_after_init sve_max_vl;
-+extern int __ro_after_init sve_max_virtualisable_vl;
+ extern void fpsimd_bind_task_to_cpu(void);
+-extern void fpsimd_bind_state_to_cpu(struct user_fpsimd_state *state);
++extern void fpsimd_bind_state_to_cpu(struct user_fpsimd_state *state,
++				     void *sve_state, unsigned int sve_vl);
  
- #ifdef CONFIG_ARM64_SVE
- 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index e238b79..aa1a55b 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -1531,7 +1531,7 @@ static void verify_sve_features(void)
- 	unsigned int len = zcr & ZCR_ELx_LEN_MASK;
- 
- 	if (len < safe_len || sve_verify_vq_map()) {
--		pr_crit("CPU%d: SVE: required vector length(s) missing\n",
-+		pr_crit("CPU%d: SVE: vector length support mismatch\n",
- 			smp_processor_id());
- 		cpu_die_early();
- 	}
+ extern void fpsimd_flush_task_state(struct task_struct *target);
+ extern void fpsimd_flush_cpu_state(void);
 diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 42aa154..d28042b 100644
+index d28042b..60c5e28 100644
 --- a/arch/arm64/kernel/fpsimd.c
 +++ b/arch/arm64/kernel/fpsimd.c
-@@ -18,6 +18,7 @@
+@@ -121,6 +121,8 @@
   */
+ struct fpsimd_last_state_struct {
+ 	struct user_fpsimd_state *st;
++	void *sve_state;
++	unsigned int sve_vl;
+ };
  
- #include <linux/bitmap.h>
-+#include <linux/bitops.h>
- #include <linux/bottom_half.h>
- #include <linux/bug.h>
- #include <linux/cache.h>
-@@ -48,6 +49,7 @@
- #include <asm/sigcontext.h>
- #include <asm/sysreg.h>
- #include <asm/traps.h>
-+#include <asm/virt.h>
+ static DEFINE_PER_CPU(struct fpsimd_last_state_struct, fpsimd_last_state);
+@@ -241,14 +243,15 @@ static void task_fpsimd_load(void)
+  */
+ void fpsimd_save(void)
+ {
+-	struct user_fpsimd_state *st = __this_cpu_read(fpsimd_last_state.st);
++	struct fpsimd_last_state_struct const *last =
++		this_cpu_ptr(&fpsimd_last_state);
+ 	/* set by fpsimd_bind_task_to_cpu() or fpsimd_bind_state_to_cpu() */
  
- #define FPEXC_IOF	(1 << 0)
- #define FPEXC_DZF	(1 << 1)
-@@ -130,14 +132,18 @@ static int sve_default_vl = -1;
+ 	WARN_ON(!in_softirq() && !irqs_disabled());
  
- /* Maximum supported vector length across all CPUs (initially poisoned) */
- int __ro_after_init sve_max_vl = SVE_VL_MIN;
-+int __ro_after_init sve_max_virtualisable_vl = SVE_VL_MIN;
- /* Set of available vector lengths, as vq_to_bit(vq): */
- static __ro_after_init DECLARE_BITMAP(sve_vq_map, SVE_VQ_MAX);
-+/* Set of vector lengths present on@least one cpu: */
-+static __ro_after_init DECLARE_BITMAP(sve_vq_partial_map, SVE_VQ_MAX);
- static void __percpu *efi_sve_state;
+ 	if (!test_thread_flag(TIF_FOREIGN_FPSTATE)) {
+ 		if (system_supports_sve() && test_thread_flag(TIF_SVE)) {
+-			if (WARN_ON(sve_get_vl() != current->thread.sve_vl)) {
++			if (WARN_ON(sve_get_vl() != last->sve_vl)) {
+ 				/*
+ 				 * Can't save the user regs, so current would
+ 				 * re-enter user with corrupt state.
+@@ -258,9 +261,11 @@ void fpsimd_save(void)
+ 				return;
+ 			}
  
- #else /* ! CONFIG_ARM64_SVE */
- 
- /* Dummy declaration for code that will be optimised out: */
- extern __ro_after_init DECLARE_BITMAP(sve_vq_map, SVE_VQ_MAX);
-+extern __ro_after_init DECLARE_BITMAP(sve_vq_partial_map, SVE_VQ_MAX);
- extern void __percpu *efi_sve_state;
- 
- #endif /* ! CONFIG_ARM64_SVE */
-@@ -623,11 +629,8 @@ int sve_get_current_vl(void)
- 	return sve_prctl_status(0);
+-			sve_save_state(sve_pffr(&current->thread), &st->fpsr);
++			sve_save_state((char *)last->sve_state +
++						sve_ffr_offset(last->sve_vl),
++				       &last->st->fpsr);
+ 		} else
+-			fpsimd_save_state(st);
++			fpsimd_save_state(last->st);
+ 	}
  }
  
--/*
-- * Bitmap for temporary storage of the per-CPU set of supported vector lengths
-- * during secondary boot.
-- */
--static DECLARE_BITMAP(sve_secondary_vq_map, SVE_VQ_MAX);
-+/* Bitmaps for temporary storage during manipulation of vector length sets */
-+static DECLARE_BITMAP(sve_tmp_vq_map, SVE_VQ_MAX);
+@@ -1035,6 +1040,8 @@ void fpsimd_bind_task_to_cpu(void)
+ 		this_cpu_ptr(&fpsimd_last_state);
  
- static void sve_probe_vqs(DECLARE_BITMAP(map, SVE_VQ_MAX))
+ 	last->st = &current->thread.uw.fpsimd_state;
++	last->sve_state = current->thread.sve_state;
++	last->sve_vl = current->thread.sve_vl;
+ 	current->thread.fpsimd_cpu = smp_processor_id();
+ 
+ 	if (system_supports_sve()) {
+@@ -1048,7 +1055,8 @@ void fpsimd_bind_task_to_cpu(void)
+ 	}
+ }
+ 
+-void fpsimd_bind_state_to_cpu(struct user_fpsimd_state *st)
++void fpsimd_bind_state_to_cpu(struct user_fpsimd_state *st, void *sve_state,
++			      unsigned int sve_vl)
  {
-@@ -650,6 +653,7 @@ static void sve_probe_vqs(DECLARE_BITMAP(map, SVE_VQ_MAX))
- void __init sve_init_vq_map(void)
- {
- 	sve_probe_vqs(sve_vq_map);
-+	bitmap_copy(sve_vq_partial_map, sve_vq_map, SVE_VQ_MAX);
+ 	struct fpsimd_last_state_struct *last =
+ 		this_cpu_ptr(&fpsimd_last_state);
+@@ -1056,6 +1064,8 @@ void fpsimd_bind_state_to_cpu(struct user_fpsimd_state *st)
+ 	WARN_ON(!in_softirq() && !irqs_disabled());
+ 
+ 	last->st = st;
++	last->sve_state = sve_state;
++	last->sve_vl = sve_vl;
  }
  
  /*
-@@ -658,24 +662,60 @@ void __init sve_init_vq_map(void)
-  */
- void sve_update_vq_map(void)
- {
--	sve_probe_vqs(sve_secondary_vq_map);
--	bitmap_and(sve_vq_map, sve_vq_map, sve_secondary_vq_map, SVE_VQ_MAX);
-+	sve_probe_vqs(sve_tmp_vq_map);
-+	bitmap_and(sve_vq_map, sve_vq_map, sve_tmp_vq_map,
-+		   SVE_VQ_MAX);
-+	bitmap_or(sve_vq_partial_map, sve_vq_partial_map, sve_tmp_vq_map,
-+		  SVE_VQ_MAX);
- }
+diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
+index aac7808..55654cb 100644
+--- a/arch/arm64/kvm/fpsimd.c
++++ b/arch/arm64/kvm/fpsimd.c
+@@ -85,7 +85,9 @@ void kvm_arch_vcpu_ctxsync_fp(struct kvm_vcpu *vcpu)
+ 	WARN_ON_ONCE(!irqs_disabled());
  
- /* Check whether the current CPU supports all VQs in the committed set */
- int sve_verify_vq_map(void)
- {
--	int ret = 0;
-+	int ret = -EINVAL;
-+	unsigned long b;
- 
--	sve_probe_vqs(sve_secondary_vq_map);
--	bitmap_andnot(sve_secondary_vq_map, sve_vq_map, sve_secondary_vq_map,
--		      SVE_VQ_MAX);
--	if (!bitmap_empty(sve_secondary_vq_map, SVE_VQ_MAX)) {
-+	sve_probe_vqs(sve_tmp_vq_map);
+ 	if (vcpu->arch.flags & KVM_ARM64_FP_ENABLED) {
+-		fpsimd_bind_state_to_cpu(&vcpu->arch.ctxt.gp_regs.fp_regs);
++		fpsimd_bind_state_to_cpu(&vcpu->arch.ctxt.gp_regs.fp_regs,
++					 NULL, sve_max_vl);
 +
-+	bitmap_complement(sve_tmp_vq_map, sve_tmp_vq_map, SVE_VQ_MAX);
-+	if (bitmap_intersects(sve_tmp_vq_map, sve_vq_map, SVE_VQ_MAX)) {
- 		pr_warn("SVE: cpu%d: Required vector length(s) missing\n",
- 			smp_processor_id());
--		ret = -EINVAL;
-+		goto error;
-+	}
-+
-+	if (!IS_ENABLED(CONFIG_KVM) || !is_hyp_mode_available())
-+		goto ok;
-+
-+	/*
-+	 * For KVM, it is necessary to ensure that this CPU doesn't
-+	 * support any vector length that guests may have probed as
-+	 * unsupported.
-+	 */
-+
-+	/* Recover the set of supported VQs: */
-+	bitmap_complement(sve_tmp_vq_map, sve_tmp_vq_map, SVE_VQ_MAX);
-+	/* Find VQs supported that are not globally supported: */
-+	bitmap_andnot(sve_tmp_vq_map, sve_tmp_vq_map, sve_vq_map, SVE_VQ_MAX);
-+
-+	/* Find the lowest such VQ, if any: */
-+	b = find_last_bit(sve_tmp_vq_map, SVE_VQ_MAX);
-+	if (b >= SVE_VQ_MAX)
-+		goto ok; /* no mismatches */
-+
-+	/*
-+	 * Mismatches above sve_max_virtualisable_vl are fine, since
-+	 * no guest is allowed to configure ZCR_EL2.LEN to exceed this:
-+	 */
-+	if (sve_vl_from_vq(bit_to_vq(b)) <= sve_max_virtualisable_vl) {
-+		pr_warn("SVE: cpu%d: Unsupported vector length(s) present\n",
-+			smp_processor_id());
-+		goto error;
+ 		clear_thread_flag(TIF_FOREIGN_FPSTATE);
+ 		clear_thread_flag(TIF_SVE);
  	}
- 
-+ok:
-+	ret = 0;
-+error:
- 	return ret;
- }
- 
-@@ -743,6 +783,7 @@ u64 read_zcr_features(void)
- void __init sve_setup(void)
- {
- 	u64 zcr;
-+	unsigned long b;
- 
- 	if (!system_supports_sve())
- 		return;
-@@ -771,11 +812,31 @@ void __init sve_setup(void)
- 	 */
- 	sve_default_vl = find_supported_vector_length(64);
- 
-+	bitmap_andnot(sve_tmp_vq_map, sve_vq_partial_map, sve_vq_map,
-+		      SVE_VQ_MAX);
-+
-+	b = find_last_bit(sve_tmp_vq_map, SVE_VQ_MAX);
-+	if (b >= SVE_VQ_MAX)
-+		/* No non-virtualisable VLs found */
-+		sve_max_virtualisable_vl = SVE_VQ_MAX;
-+	else if (WARN_ON(b == SVE_VQ_MAX - 1))
-+		/* No virtualisable VLs?  This is architecturally forbidden. */
-+		sve_max_virtualisable_vl = SVE_VQ_MIN;
-+	else /* b + 1 < SVE_VQ_MAX */
-+		sve_max_virtualisable_vl = sve_vl_from_vq(bit_to_vq(b + 1));
-+
-+	if (sve_max_virtualisable_vl > sve_max_vl)
-+		sve_max_virtualisable_vl = sve_max_vl;
-+
- 	pr_info("SVE: maximum available vector length %u bytes per vector\n",
- 		sve_max_vl);
- 	pr_info("SVE: default vector length %u bytes per vector\n",
- 		sve_default_vl);
- 
-+	/* KVM decides whether to support mismatched systems. Just warn here: */
-+	if (sve_max_virtualisable_vl < sve_max_vl)
-+		pr_info("SVE: unvirtualisable vector lengths present\n");
-+
- 	sve_efi_setup();
- }
- 
 -- 
 2.1.4
