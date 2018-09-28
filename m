@@ -1,102 +1,54 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 28 Sep 2018 12:20:16 +0200
-Subject: [GIT PULL] Second Round of Renesas ARM64 Based SoC DT Updates for
- v4.20
-Message-ID: <cover.1538125184.git.horms+renesas@verge.net.au>
+Date: Fri, 28 Sep 2018 12:23:49 +0200
+Subject: [PATCH 3/4] dt-bindings: arm: Document Renesas R-Car M3-N-based ULCB
+ board
+In-Reply-To: <cover.1538129305.git.horms+renesas@verge.net.au>
+References: <cover.1538129305.git.horms+renesas@verge.net.au>
+Message-ID: <43bcac2396f7874338016d3c6d86d0bdad8e63e8.1538129305.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Eugeniu Rosca <roscaeugeniu@gmail.com>
 
-Please consider these second round of Renesas ARM64 based SoC DT updates for v4.20.
+In harmony with ATF and U-Boot outputs [1] and [2], the new board is
+based on M3-N revision ES1.1 and the amount of memory present on SiP
+is 2GiB, contiguously addressed.
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-arm64-dt-for-v4.20,
-which you have already pulled.
+The amount of RAM is mentioned based on the assumption that it is
+encoded in the board id/string. There is some evidence supporting this
+in form of last-digit-mismatch between two R-Car H3 ES2.0 ULCB board
+ids, one with 4GiB and one with 8GiB of RAM (see [3]).
 
+[1] BL2: R-Car Gen3 Initial Program Loader(CA57) Rev.1.0.21
+    BL2: PRR is R-Car M3N Ver.1.1
 
-The following changes since commit 450d6079e8d3c40c7ce67ac8bb4a2da9baf56613:
+[2] U-Boot 2015.04-00295-*
+    CPU: Renesas Electronics R8A77965 rev 1.1
+    ---8<----
+    DRAM:  1.9 GiB
+    Bank #0: 0x048000000 - 0x0bfffffff, 1.9 GiB
+    ---8<----
 
-  arm64: dts: r8a77965: add FDP1 device nodes (2018-09-13 09:48:13 +0200)
+[3] https://patchwork.kernel.org/patch/10555957/#22169325
 
-are available in the git repository at:
+Signed-off-by: Eugeniu Rosca <erosca@de.adit-jv.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ Documentation/devicetree/bindings/arm/shmobile.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt2-for-v4.20
-
-for you to fetch changes up to 158928f38e1c6f3ac4dd83cf2240ae412179005d:
-
-  arm64: dts: renesas: r8a77965: Add Sound and Audio DMAC device nodes (2018-09-26 12:31:04 +0200)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM64 Based SoC DT Updates for v4.20
-
-* Remove unneeded status from thermal nodes
-
-* R-Car Gen 3 SoCs:
-  - Use 400kHz for I2C DVFS bus
-  - Revise USB2.0 properties
-* R-Car Gen 3 SoC based ULCB boards: Add default bootargs
-* R-Car M3-N (r8a77965) SoC based boards: Enable audio with DMA
-
-* R-Car V3M (r8a77970 and V3H (r8a77980) SoCs:
-  - Add compare match timer (CMT) support
-  - Add timer pulse unit (TPU) support
-* R-Car V3H (r8a77980) and E3 (r8a77990) SoCs:
-  - Attach the SYS-DMAC to the IPMMU
-* E3 (r8a77990) SoC: Add display output support
-* R-Car E3 (r8a77990) based Ebisu board:
-  - Enable HDMI and CVBS input, and VGA and HDMI display output
-
-* R-Car D3 (r8a77995) SoC: Add LVDS support
-* R-Car D3 (r8a77995) based Draak board: Enable HDMI display output
-
-----------------------------------------------------------------
-Geert Uytterhoeven (1):
-      arm64: dts: renesas: Remove unneeded status from thermal nodes
-
-Jacopo Mondi (1):
-      arm64: dts: renesas: ebisu: Add HDMI and CVBS input
-
-Kieran Bingham (1):
-      arm64: dts: renesas: r8a77995: Add LVDS support
-
-Kuninori Morimoto (1):
-      arm64: dts: renesas: ulcb: add default bootargs
-
-Laurent Pinchart (2):
-      arm64: dts: renesas: r8a77990: Add display output support
-      arm64: dts: renesas: r8a77990: ebisu: Enable VGA and HDMI outputs
-
-Magnus Damm (2):
-      arm64: dts: renesas: r8a77990: Attach the SYS-DMAC to the IPMMU
-      arm64: dts: renesas: r8a77980: Attach the SYS-DMAC to the IPMMU
-
-Sergei Shtylyov (2):
-      arm64: dts: renesas: r8a779{7|8}0: add CMT support
-      arm64: dts: renesas: r8a779{7|8}0: add TPU support
-
-Takeshi Kihara (1):
-      arm64: dts: renesas: r8a77965: Add Sound and Audio DMAC device nodes
-
-Ulrich Hecht (1):
-      arm64: dts: renesas: r8a77995: draak: Enable HDMI display output
-
-Wolfram Sang (1):
-      arm64: dts: renesas: gen3: use 400kHz for I2C DVFS bus
-
-Yoshihiro Shimoda (1):
-      arm64: dts: renesas: revise properties for R-Car Gen3 SoCs' usb 2.0
-
- arch/arm64/boot/dts/renesas/r8a774a1.dtsi        |   1 -
- arch/arm64/boot/dts/renesas/r8a7795.dtsi         |  33 ++-
- arch/arm64/boot/dts/renesas/r8a7796.dtsi         |  17 +-
- arch/arm64/boot/dts/renesas/r8a77965.dtsi        | 262 +++++++++++++++++++++--
- arch/arm64/boot/dts/renesas/r8a77970.dtsi        |  80 +++++++
- arch/arm64/boot/dts/renesas/r8a77980.dtsi        |  97 +++++++++
- arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts   | 248 +++++++++++++++++++++
- arch/arm64/boot/dts/renesas/r8a77990.dtsi        | 203 +++++++++++++++++-
- arch/arm64/boot/dts/renesas/r8a77995-draak.dts   |  98 ++++++++-
- arch/arm64/boot/dts/renesas/r8a77995.dtsi        |  68 +++++-
- arch/arm64/boot/dts/renesas/salvator-common.dtsi |   2 +
- arch/arm64/boot/dts/renesas/ulcb.dtsi            |   3 +
- 12 files changed, 1052 insertions(+), 60 deletions(-)
+diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+index c0f0a344dfe0..4a03a6b3397e 100644
+--- a/Documentation/devicetree/bindings/arm/shmobile.txt
++++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -111,6 +111,8 @@ Boards:
+     compatible = "renesas,lager", "renesas,r8a7790"
+   - M3ULCB (R-Car Starter Kit Pro, RTP0RC7796SKBX0010SA09 (M3 ES1.0))
+     compatible = "renesas,m3ulcb", "renesas,r8a7796"
++  - M3NULCB (R-Car Starter Kit Pro, RTP0RC77965SKBX010SA00 (M3-N ES1.1))
++    compatible = "renesas,m3nulcb", "renesas,r8a77965"
+   - Marzen (R0P7779A00010S)
+     compatible = "renesas,marzen", "renesas,r8a7779"
+   - Porter (M2-LCDP)
+-- 
+2.11.0
