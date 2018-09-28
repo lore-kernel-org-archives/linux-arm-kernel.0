@@ -1,89 +1,35 @@
-From: natechancellor@gmail.com (Nathan Chancellor)
-Date: Fri, 28 Sep 2018 07:48:56 -0700
-Subject: [PATCH] staging: bcm2835-camera: Avoid unneeded internal
- declaration warning
-In-Reply-To: <CAAoAYcMMiiDXCcnZ=DP9Y9Xs+xdq-jasj8G_W0jrnQV9so79=A@mail.gmail.com>
-References: <20180928005038.1697-1-natechancellor@gmail.com>
- <CAAoAYcMMiiDXCcnZ=DP9Y9Xs+xdq-jasj8G_W0jrnQV9so79=A@mail.gmail.com>
-Message-ID: <20180928144856.GA22524@flashbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Sep 2018 17:30:56 +0200
+Subject: [GIT PULL] pxa-dt for v4.20
+In-Reply-To: <877ej63d5b.fsf@belgarion.home>
+References: <877ej63d5b.fsf@belgarion.home>
+Message-ID: <CAK8P3a2o17zr7Si72=DWm9LRw2igHv4vXnbJYJAwLs0UJFTBrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 28, 2018 at 10:04:29AM +0100, Dave Stevenson wrote:
-> Hi Nate
-> 
-> Thanks for the patch.
-> 
-> On Fri, 28 Sep 2018 at 01:53, Nathan Chancellor
-> <natechancellor@gmail.com> wrote:
-> >
-> > Clang warns:
-> >
-> > drivers/staging/vc04_services/bcm2835-camera/controls.c:59:18: warning:
-> > variable 'mains_freq_qmenu' is not needed and will not be emitted
-> > [-Wunneeded-internal-declaration]
-> > static const s64 mains_freq_qmenu[] = {
-> >                  ^
-> > 1 warning generated.
-> >
-> > This is because mains_freq_qmenu is currently only used in an ARRAY_SIZE
-> > macro, which is a compile time evaluation in this case. Avoid this by
-> > adding mains_freq_qmenu as the imenu member of this structure, which
-> > matches all other controls that uses the ARRAY_SIZE macro in v4l2_ctrls.
-> > This turns out to be a no-op because V4L2_CID_MPEG_VIDEO_BITRATE_MODE is
-> > defined as a MMAL_CONTROL_TYPE_STD_MENU, which does not pass the imenu
-> > definition along to v4l2_ctrl_new in bm2835_mmal_init_controls.
-> 
-> There's a slight confusion betwen V4L2_CID_MPEG_VIDEO_BITRATE_MODE and
-> V4L2_CID_POWER_LINE_FREQUENCY in your description.
-> 
-> However you're right that MMAL_CONTROL_TYPE_STD_MENU calls
-> v4l2_ctrl_new_std_menu which doesn't need a menu array (it's
-> v4l2_ctrl_new_int_menu that does). That means the correct fix is to
-> define the max value using the relevant enum (in this case
-> V4L2_CID_POWER_LINE_FREQUENCY_AUTO) and remove the array.
-> 
-> The same is true for V4L2_CID_MPEG_VIDEO_BITRATE_MODE - max should be
-> V4L2_MPEG_VIDEO_BITRATE_MODE_CBR, and remove the bitrate_mode_qmenu
-> array.
-> 
-> Thanks,
->   Dave
-> 
+On Thu, Sep 27, 2018 at 10:26 PM Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+>
+> Hi Arnd, Kevin, and Olof,
+>
+> This is a tiny pxa pull request for 4.20 device-tree. Please consider pulling.
+>
+> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+>
+>   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+>
+> are available in the git repository at:
+>
+>   https://github.com/rjarzmik/linux.git tags/pxa-dt-4.20
+>
+> for you to fetch changes up to 9f296fe2718efe558825471b5cdf0ca4d1bdd3c6:
+>
+>   ARM: dts: pxa: add pincontrol helpers (2018-08-31 22:29:29 +0200)
+>
+> ----------------------------------------------------------------
+> This device-tree pxa update brings :
+>  - a couple of changes for future pxa2xx platforms
+>   - 2 fixes in RTC and I2C domain
 
-Hi Dave,
+Pulled into next/dt, thanks!
 
-Thank you for the review, I appreciate it. I had certainly considered
-that solution first butnfigured this was the more conservative change.
-
-I will send a v2 soon with the suggested change.
-
-Nathan
-
-> > Link: https://github.com/ClangBuiltLinux/linux/issues/122
-> > Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
-> > ---
-> >  drivers/staging/vc04_services/bcm2835-camera/controls.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/staging/vc04_services/bcm2835-camera/controls.c b/drivers/staging/vc04_services/bcm2835-camera/controls.c
-> > index cff7b1e07153..a2c55cb2192a 100644
-> > --- a/drivers/staging/vc04_services/bcm2835-camera/controls.c
-> > +++ b/drivers/staging/vc04_services/bcm2835-camera/controls.c
-> > @@ -1106,7 +1106,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
-> >         {
-> >                 V4L2_CID_POWER_LINE_FREQUENCY, MMAL_CONTROL_TYPE_STD_MENU,
-> >                 0, ARRAY_SIZE(mains_freq_qmenu) - 1,
-> > -               1, 1, NULL,
-> > +               1, 1, mains_freq_qmenu,
-> >                 MMAL_PARAMETER_FLICKER_AVOID,
-> >                 &ctrl_set_flicker_avoidance,
-> >                 false
-> > --
-> > 2.19.0
-> >
-> >
-> > _______________________________________________
-> > linux-rpi-kernel mailing list
-> > linux-rpi-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-rpi-kernel
+     Arnd
