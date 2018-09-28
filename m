@@ -1,134 +1,77 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 28 Sep 2018 12:45:12 +0300
-Subject: [PATCH v11 1/2] dt-bindings: media: Add Allwinner V3s Camera
- Sensor Interface (CSI)
-In-Reply-To: <20180928093833.gwmskm2jvby6x4s6@paasikivi.fi.intel.com>
-References: <1537951204-24672-1-git-send-email-yong.deng@magewell.com>
- <20180928093833.gwmskm2jvby6x4s6@paasikivi.fi.intel.com>
-Message-ID: <14114604.4rraf0qJLU@avalon>
+From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
+Date: Fri, 28 Sep 2018 18:04:35 +0800
+Subject: [PATCH v5 4/9] PCI: mediatek: Convert to use pci_host_probe()
+In-Reply-To: <1538129080-8206-1-git-send-email-honghui.zhang@mediatek.com>
+References: <1538129080-8206-1-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <1538129080-8206-5-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sakari,
+From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-On Friday, 28 September 2018 12:38:33 EEST Sakari Ailus wrote:
-> On Wed, Sep 26, 2018 at 04:40:04PM +0800, Yong Deng wrote:
-> > Add binding documentation for Allwinner V3s CSI.
-> > 
-> > Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> > Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
-> 
-> I know... but I have a few more comments.
-> 
-> > Reviewed-by: Rob Herring <robh@kernel.org>
-> > Signed-off-by: Yong Deng <yong.deng@magewell.com>
-> > ---
-> > 
-> >  .../devicetree/bindings/media/sun6i-csi.txt        | 59 +++++++++++++++++
-> >  1 file changed, 59 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt
-> > b/Documentation/devicetree/bindings/media/sun6i-csi.txt new file mode
-> > 100644
-> > index 000000000000..2ff47a9507a6
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-> > @@ -0,0 +1,59 @@
-> > +Allwinner V3s Camera Sensor Interface
-> > +-------------------------------------
-> > +
-> > +Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
-> > +interface and CSI1 is used for parallel interface.
-> > +
-> > +Required properties:
-> > +  - compatible: value must be "allwinner,sun8i-v3s-csi"
-> > +  - reg: base address and size of the memory-mapped region.
-> > +  - interrupts: interrupt associated to this IP
-> > +  - clocks: phandles to the clocks feeding the CSI
-> > +    * bus: the CSI interface clock
-> > +    * mod: the CSI module clock
-> > +    * ram: the CSI DRAM clock
-> > +  - clock-names: the clock names mentioned above
-> > +  - resets: phandles to the reset line driving the CSI
-> > +
-> > +Each CSI node should contain one 'port' child node with one child
-> > 'endpoint' +node, according to the bindings defined in
-> > +Documentation/devicetree/bindings/media/video-interfaces.txt. As
-> > mentioned
-> > +above, the endpoint's bus type should be MIPI CSI-2 for CSI0 and parallel
-> > or +Bt656 for CSI1.
-> 
-> Which port represents CSI0 and which one is CSI1? That needs to be
-> documented.
+Part of mtk_pcie_register_host is an open-coded version of
+pci_host_probe(). So instead of duplicating this code, use
+pci_host_probe() directly and remove mtk_pcie_register_host.
 
-There are two CSI devices, named CSI0 and CSI1, with one port each. The CSI0 
-device supports CSI-2 only, and the CSI1 device parallel (BT.601 or BT.656) 
-only.
+Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+---
+ drivers/pci/controller/pcie-mediatek.c | 37 ++++++++--------------------------
+ 1 file changed, 8 insertions(+), 29 deletions(-)
 
-> > +
-> > +Endpoint node properties for CSI1
-> 
-> How about CSI0? I'd expect at least data-lanes, and clock-lanes as well if
-> the hardware supports lane mapping.
-
-I enquired about that too. As far as I understand, CSI0 isn't supported yet in 
-the driver due to lack of documentation and lack of open-source vendor-
-provided source code. While DT bindings are not tied to driver 
-implementations, it's not the best idea to design DT bindings without at least 
-one working implementation to test them. I thus proposed just listing CSI0 as 
-being unsupported for now.
-
-> > +---------------------------------
-> > +
-> > +- remote-endpoint	: (required) a phandle to the bus receiver's endpoint
-> > +			   node
-> > +- bus-width:		: (required) must be 8, 10, 12 or 16
-> > +- pclk-sample		: (optional) (default: sample on falling edge)
-> 
-> Could you add that video-interfaces.txt contains documentation of these
-> properties as well? There's a reference above but only discusses port and
-> endpoint nodes.
-> 
-> > +- hsync-active		: (only required for parallel)
-> > +- vsync-active		: (only required for parallel)
-> 
-> As you support both Bt656 and parallel (with sync signals), you can detect
-> the interface type from the presence of these properties. I think you
-> should also say that these properties are not allowed on Bt656. So I'd
-> change this to e.g.
-> 
-> 	(required; parallel-only)
-> 
-> > +
-> > +Example:
-> > +
-> > +csi1: csi at 1cb4000 {
-> > +	compatible = "allwinner,sun8i-v3s-csi";
-> > +	reg = <0x01cb4000 0x1000>;
-> > +	interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-> > +	clocks = <&ccu CLK_BUS_CSI>,
-> > +		 <&ccu CLK_CSI1_SCLK>,
-> > +		 <&ccu CLK_DRAM_CSI>;
-> > +	clock-names = "bus", "mod", "ram";
-> > +	resets = <&ccu RST_BUS_CSI>;
-> > +
-> > +	port {
-> > +		/* Parallel bus endpoint */
-> > +		csi1_ep: endpoint {
-> > +			remote-endpoint = <&adv7611_ep>;
-> > +			bus-width = <16>;
-> > +
-> > +			/* If hsync-active/vsync-active are missing,
-> > +			   embedded BT.656 sync is used */
-> > +			hsync-active = <0>; /* Active low */
-> > +			vsync-active = <0>; /* Active low */
-> > +			pclk-sample = <1>;  /* Rising */
-> > +		};
-> > +	};
-> > +};
-
+diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
+index e2c4127..cbf4543 100644
+--- a/drivers/pci/controller/pcie-mediatek.c
++++ b/drivers/pci/controller/pcie-mediatek.c
+@@ -1125,34 +1125,6 @@ static int mtk_pcie_request_resources(struct mtk_pcie *pcie)
+ 	return 0;
+ }
+ 
+-static int mtk_pcie_register_host(struct pci_host_bridge *host)
+-{
+-	struct mtk_pcie *pcie = pci_host_bridge_priv(host);
+-	struct pci_bus *child;
+-	int err;
+-
+-	host->busnr = pcie->busn.start;
+-	host->dev.parent = pcie->dev;
+-	host->ops = pcie->soc->ops;
+-	host->map_irq = of_irq_parse_and_map_pci;
+-	host->swizzle_irq = pci_common_swizzle;
+-	host->sysdata = pcie;
+-
+-	err = pci_scan_root_bus_bridge(host);
+-	if (err < 0)
+-		return err;
+-
+-	pci_bus_size_bridges(host->bus);
+-	pci_bus_assign_resources(host->bus);
+-
+-	list_for_each_entry(child, &host->bus->children, node)
+-		pcie_bus_configure_settings(child);
+-
+-	pci_bus_add_devices(host->bus);
+-
+-	return 0;
+-}
+-
+ static int mtk_pcie_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -1179,7 +1151,14 @@ static int mtk_pcie_probe(struct platform_device *pdev)
+ 	if (err)
+ 		goto put_resources;
+ 
+-	err = mtk_pcie_register_host(host);
++	host->busnr = pcie->busn.start;
++	host->dev.parent = pcie->dev;
++	host->ops = pcie->soc->ops;
++	host->map_irq = of_irq_parse_and_map_pci;
++	host->swizzle_irq = pci_common_swizzle;
++	host->sysdata = pcie;
++
++	err = pci_host_probe(host);
+ 	if (err)
+ 		goto put_resources;
+ 
 -- 
-Regards,
-
-Laurent Pinchart
+2.6.4
