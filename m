@@ -1,54 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 28 Sep 2018 12:23:48 +0200
-Subject: [PATCH 2/4] dt-bindings: arm: Document RZ/A2 SoC DT bindings
-In-Reply-To: <cover.1538129305.git.horms+renesas@verge.net.au>
-References: <cover.1538129305.git.horms+renesas@verge.net.au>
-Message-ID: <d0990cd0930c93e06bdf815ce7c350b621e7fd2f.1538129305.git.horms+renesas@verge.net.au>
+Date: Fri, 28 Sep 2018 12:23:35 +0200
+Subject: [PATCH 20/21] dt-bindings: timer: renesas: tmu: document R8A779{7|8}0
+ bindings
+In-Reply-To: <cover.1538128711.git.horms+renesas@verge.net.au>
+References: <cover.1538128711.git.horms+renesas@verge.net.au>
+Message-ID: <5851fa4d088747af4a141110541594a2a4479b12.1538128711.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Brandt <chris.brandt@renesas.com>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Add device tree bindings documentation for Renesas RZ/A2 (r7s9210) SoC.
-Also document new option for "renesas,bsid"
+Document the R-Car V3{M|H} (R8A779{7|8}0) SoC in the Renesas TMU bindings;
+the TMU hardware in those is the Renesas standard 3-channel timer unit.
 
-Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- Documentation/devicetree/bindings/arm/shmobile.txt | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ Documentation/devicetree/bindings/timer/renesas,tmu.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
-index 8acd3cd819b3..c0f0a344dfe0 100644
---- a/Documentation/devicetree/bindings/arm/shmobile.txt
-+++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-@@ -7,6 +7,8 @@ SoCs:
-     compatible = "renesas,emev2"
-   - RZ/A1H (R7S72100)
-     compatible = "renesas,r7s72100"
-+  - RZ/A2 (R7S9210)
-+    compatible = "renesas,r7s9210"
-   - SH-Mobile AG5 (R8A73A00/SH73A0)
-     compatible = "renesas,sh73a0"
-   - R-Mobile APE6 (R8A73A40)
-@@ -145,12 +147,12 @@ Boards:
-     compatible = "renesas,wheat", "renesas,r8a7792"
- 
- 
--Most Renesas ARM SoCs have a Product Register that allows to retrieve SoC
--product and revision information.  If present, a device node for this register
--should be added.
-+Most Renesas ARM SoCs have a Product Register or Boundary Scan ID Register that
-+allows to retrieve SoC product and revision information.  If present, a device
-+node for this register should be added.
- 
- Required properties:
--  - compatible: Must be "renesas,prr".
-+  - compatible: Must be "renesas,prr" or "renesas,bsid"
-   - reg: Base address and length of the register block.
- 
+diff --git a/Documentation/devicetree/bindings/timer/renesas,tmu.txt b/Documentation/devicetree/bindings/timer/renesas,tmu.txt
+index cd5f20bf2582..4ddff85837da 100644
+--- a/Documentation/devicetree/bindings/timer/renesas,tmu.txt
++++ b/Documentation/devicetree/bindings/timer/renesas,tmu.txt
+@@ -12,6 +12,8 @@ Required Properties:
+     - "renesas,tmu-r8a7740" for the r8a7740 TMU
+     - "renesas,tmu-r8a7778" for the r8a7778 TMU
+     - "renesas,tmu-r8a7779" for the r8a7779 TMU
++    - "renesas,tmu-r8a77970" for the r8a77970 TMU
++    - "renesas,tmu-r8a77980" for the r8a77980 TMU
+     - "renesas,tmu" for any TMU.
+       This is a fallback for the above renesas,tmu-* entries
  
 -- 
 2.11.0
