@@ -1,89 +1,121 @@
 From: andrea.merello@gmail.com (Andrea Merello)
-Date: Fri, 28 Sep 2018 08:53:11 +0200
-Subject: [PATCH v5 4/7] dmaengine: xilinx_dma: program hardware supported
- buffer length
-In-Reply-To: <20180918162508.GD2613@vkoul-mobl>
+Date: Fri, 28 Sep 2018 09:11:19 +0200
+Subject: [PATCH v5 2/7] dmaengine: xilinx_dma: in axidma slave_sg and
+ dma_cyclic mode align split descriptors
+In-Reply-To: <20180918162105.GC2613@vkoul-mobl>
 References: <20180907062502.8241-1-andrea.merello@gmail.com>
- <20180907062502.8241-4-andrea.merello@gmail.com>
- <20180918162508.GD2613@vkoul-mobl>
-Message-ID: <CAN8YU5OySuzAyQ=Buad=Jidhes28koV52Gi-QJ-qOiG5TFBO=Q@mail.gmail.com>
+ <20180907062502.8241-2-andrea.merello@gmail.com>
+ <20180918162105.GC2613@vkoul-mobl>
+Message-ID: <CAN8YU5PWB0sRskcirCcYnY5vG5A_W6pcOMpgyOD3faWfMeu5Rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2018 at 6:25 PM Vinod <vkoul@kernel.org> wrote:
+On Tue, Sep 18, 2018 at 6:21 PM Vinod <vkoul@kernel.org> wrote:
 >
 > On 07-09-18, 08:24, Andrea Merello wrote:
-> > From: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
+> > Whenever a single or cyclic transaction is prepared, the driver
+> > could eventually split it over several SG descriptors in order
+> > to deal with the HW maximum transfer length.
 > >
-> > AXI-DMA IP supports configurable (c_sg_length_width) buffer length
-> > register width, hence read buffer length (xlnx,sg-length-width) DT
-> > property and ensure that driver doesn't program buffer length
-> > exceeding the supported limit. For VDMA and CDMA there is no change.
+> > This could end up in DMA operations starting from a misaligned
+> > address. This seems fatal for the HW if DRE (Data Realignment Engine)
+> > is not enabled.
 > >
-> > Cc: Rob Herring <robh+dt@kernel.org>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: devicetree at vger.kernel.org
-> > Signed-off-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
-> > Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> > Signed-off-by: Andrea Merello <andrea.merello@gmail.com> [rebase, reword]
+> > This patch eventually adjusts the transfer size in order to make sure
+> > all operations start from an aligned address.
+> >
+> > Cc: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
+> > Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
+> > Reviewed-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
 > > ---
 > > Changes in v2:
-> >         - drop original patch and replace with the one in Xilinx tree
+> >         - don't introduce copy_mask field, rather rely on already-esistent
+> >           copy_align field. Suggested by Radhey Shyam Pandey
+> >         - reword title
 > > Changes in v3:
-> >       - cc DT maintainers/ML
+> >       - fix bug introduced in v2: wrong copy size when DRE is enabled
+> >       - use implementation suggested by Radhey Shyam Pandey
 > > Changes in v4:
-> >       - upper bound for the property should be 26, not 23
-> >       - add warn for width > 23 as per xilinx original patch
-> >       - rework due to changes introduced in 1/6
+> >       - rework on the top of 1/6
 > > Changes in v5:
-> >       None
+> >       - fix typo in commit title
+> >       - add hint about "DRE" meaning in commit message
 > > ---
-> >  drivers/dma/xilinx/xilinx_dma.c | 36 +++++++++++++++++++++++++--------
-> >  1 file changed, 28 insertions(+), 8 deletions(-)
+> >  drivers/dma/xilinx/xilinx_dma.c | 22 ++++++++++++++++++----
+> >  1 file changed, 18 insertions(+), 4 deletions(-)
 > >
 > > diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-> > index aaa6de8a70e4..b17f24e4ec35 100644
+> > index a3aaa0e34cc7..aaa6de8a70e4 100644
 > > --- a/drivers/dma/xilinx/xilinx_dma.c
 > > +++ b/drivers/dma/xilinx/xilinx_dma.c
-> > @@ -158,7 +158,9 @@
-> >  #define XILINX_DMA_REG_BTT           0x28
+> > @@ -954,15 +954,28 @@ static int xilinx_dma_alloc_chan_resources(struct dma_chan *dchan)
 > >
-> >  /* AXI DMA Specific Masks/Bit fields */
-> > -#define XILINX_DMA_MAX_TRANS_LEN     GENMASK(22, 0)
-> > +#define XILINX_DMA_MAX_TRANS_LEN_MIN 8
-> > +#define XILINX_DMA_MAX_TRANS_LEN_MAX 23
-> > +#define XILINX_DMA_V2_MAX_TRANS_LEN_MAX      26
-> >  #define XILINX_DMA_CR_COALESCE_MAX   GENMASK(23, 16)
-> >  #define XILINX_DMA_CR_CYCLIC_BD_EN_MASK      BIT(4)
-> >  #define XILINX_DMA_CR_COALESCE_SHIFT 16
-> > @@ -418,6 +420,7 @@ struct xilinx_dma_config {
-> >   * @rxs_clk: DMA s2mm stream clock
-> >   * @nr_channels: Number of channels DMA device supports
-> >   * @chan_id: DMA channel identifier
-> > + * @max_buffer_len: Max buffer length
+> >  /**
+> >   * xilinx_dma_calc_copysize - Calculate the amount of data to copy
+> > + * @chan: Driver specific DMA channel
+> >   * @size: Total data that needs to be copied
+> >   * @done: Amount of data that has been already copied
+> >   *
+> >   * Return: Amount of data that has to be copied
 > >   */
-> >  struct xilinx_dma_device {
-> >       void __iomem *regs;
-> > @@ -437,6 +440,7 @@ struct xilinx_dma_device {
-> >       struct clk *rxs_clk;
-> >       u32 nr_channels;
-> >       u32 chan_id;
-> > +     u32 max_buffer_len;
-> >  };
-> >
-> >  /* Macros */
-> > @@ -964,7 +968,7 @@ static int xilinx_dma_calc_copysize(struct xilinx_dma_chan *chan,
-> >                                   int size, int done)
-> >  {
-> >       size_t copy = min_t(size_t, size - done,
-> > -                  XILINX_DMA_MAX_TRANS_LEN);
-> > +                         chan->xdev->max_buffer_len);
+> > -static int xilinx_dma_calc_copysize(int size, int done)
+> > +static int xilinx_dma_calc_copysize(struct xilinx_dma_chan *chan,
+> > +                                 int size, int done)
 >
-> hmm why not add max_buffer_len in patch 1 again, and then use default
-> len as XILINX_DMA_MAX_TRANS_LEN and add multiple lengths here :)
+> align to preceeding line opening brace please
 
-Sorry, I'm not getting your point. Could you please elaborate the "add
-multiple lengths here" thing ?
+After applying, I'm seeing it already aligned as you requested; 4 tabs
++ 4 spaces so the 2nd line starts right under the "s" near the opened
+brace..
+Patch sent using git, so it should pass through without being ruined;
+don't know why you see it misaligned :(
 
-> -
+> >  {
+> > -     return min_t(size_t, size - done,
+> > +     size_t copy = min_t(size_t, size - done,
+> >                    XILINX_DMA_MAX_TRANS_LEN);
+>
+> so we can do this way in patch 1:
+>
+>         size t copy;
+>
+>         copy =  min_t(size_t, size - done,
+>                       XILINX_DMA_MAX_TRANS_LEN);
+>
+>         return copy;
+>
+> and then add these here, feels like we are redoing change introduced in
+> patch 1..
+
+OK, this sounds good :)
+
+>
+> > +     if ((copy + done < size) &&
+> > +         chan->xdev->common.copy_align) {
+> > +             /*
+> > +              * If this is not the last descriptor, make sure
+> > +              * the next one will be properly aligned
+> > +              */
+> > +             copy = rounddown(copy,
+> > +                              (1 << chan->xdev->common.copy_align));
+> > +     }
+> > +     return copy;
+> >  }
+> >
+> >  /**
+> > @@ -1804,7 +1817,7 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_slave_sg(
+> >                        * Calculate the maximum number of bytes to transfer,
+> >                        * making sure it is less than the hw limit
+> >                        */
+> > -                     copy = xilinx_dma_calc_copysize(sg_dma_len(sg),
+> > +                     copy = xilinx_dma_calc_copysize(chan, sg_dma_len(sg),
+>
+> why not keep chan in patch 1 and add only handling in patch 2, seems
+> less churn to me..
+
+Indeed this was something I was unsure about.. I ended up in feeling
+better not to add introduce a function that takes an unused (yet)
+argument, but I can change this of course :)
+
+> --
 > ~Vinod
