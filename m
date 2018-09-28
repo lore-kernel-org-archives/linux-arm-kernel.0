@@ -1,59 +1,77 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 28 Sep 2018 17:04:09 +0800
-Subject: [PATCH v15 06/16] of/fdt: add helper functions for handling
- properties
-In-Reply-To: <20180928064841.14117-7-takahiro.akashi@linaro.org>
-References: <20180928064841.14117-7-takahiro.akashi@linaro.org>
-Message-ID: <201809281734.qf6xwniP%fengguang.wu@intel.com>
+From: dave.stevenson@raspberrypi.org (Dave Stevenson)
+Date: Fri, 28 Sep 2018 10:04:29 +0100
+Subject: [PATCH] staging: bcm2835-camera: Avoid unneeded internal
+ declaration warning
+In-Reply-To: <20180928005038.1697-1-natechancellor@gmail.com>
+References: <20180928005038.1697-1-natechancellor@gmail.com>
+Message-ID: <CAAoAYcMMiiDXCcnZ=DP9Y9Xs+xdq-jasj8G_W0jrnQV9so79=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi AKASHI,
+Hi Nate
 
-Thank you for the patch! Yet something to improve:
+Thanks for the patch.
 
-[auto build test ERROR on arm64/for-next/core]
-[also build test ERROR on v4.19-rc5 next-20180928]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+On Fri, 28 Sep 2018 at 01:53, Nathan Chancellor
+<natechancellor@gmail.com> wrote:
+>
+> Clang warns:
+>
+> drivers/staging/vc04_services/bcm2835-camera/controls.c:59:18: warning:
+> variable 'mains_freq_qmenu' is not needed and will not be emitted
+> [-Wunneeded-internal-declaration]
+> static const s64 mains_freq_qmenu[] = {
+>                  ^
+> 1 warning generated.
+>
+> This is because mains_freq_qmenu is currently only used in an ARRAY_SIZE
+> macro, which is a compile time evaluation in this case. Avoid this by
+> adding mains_freq_qmenu as the imenu member of this structure, which
+> matches all other controls that uses the ARRAY_SIZE macro in v4l2_ctrls.
+> This turns out to be a no-op because V4L2_CID_MPEG_VIDEO_BITRATE_MODE is
+> defined as a MMAL_CONTROL_TYPE_STD_MENU, which does not pass the imenu
+> definition along to v4l2_ctrl_new in bm2835_mmal_init_controls.
 
-url:    https://github.com/0day-ci/linux/commits/AKASHI-Takahiro/arm64-kexec-add-kexec_file_load-support/20180928-151042
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
-config: i386-randconfig-s0-201838 (attached as .config)
-compiler: gcc-6 (Debian 6.4.0-9) 6.4.0 20171026
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+There's a slight confusion betwen V4L2_CID_MPEG_VIDEO_BITRATE_MODE and
+V4L2_CID_POWER_LINE_FREQUENCY in your description.
 
-All errors (new ones prefixed by >>):
+However you're right that MMAL_CONTROL_TYPE_STD_MENU calls
+v4l2_ctrl_new_std_menu which doesn't need a menu array (it's
+v4l2_ctrl_new_int_menu that does). That means the correct fix is to
+define the max value using the relevant enum (in this case
+V4L2_CID_POWER_LINE_FREQUENCY_AUTO) and remove the array.
 
-   drivers/of/fdt.o: In function `fdt_setprop_reg':
->> drivers/of/fdt.c:1358: undefined reference to `fdt_address_cells'
->> drivers/of/fdt.c:1361: undefined reference to `fdt_size_cells'
+The same is true for V4L2_CID_MPEG_VIDEO_BITRATE_MODE - max should be
+V4L2_MPEG_VIDEO_BITRATE_MODE_CBR, and remove the bitrate_mode_qmenu
+array.
 
-vim +1358 drivers/of/fdt.c
+Thanks,
+  Dave
 
-  1348	
-  1349	int fdt_setprop_reg(void *fdt, int nodeoffset, const char *name,
-  1350							u64 addr, u64 size)
-  1351	{
-  1352		int addr_cells, size_cells;
-  1353		char buf[sizeof(__be32) * 2 * 2];
-  1354			/* assume dt_root_[addr|size]_cells <= 2 */
-  1355		void *prop;
-  1356		size_t buf_size;
-  1357	
-> 1358		addr_cells = fdt_address_cells(fdt, 0);
-  1359		if (addr_cells < 0)
-  1360			return addr_cells;
-> 1361		size_cells = fdt_size_cells(fdt, 0);
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 31880 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180928/10804e57/attachment-0001.gz>
+> Link: https://github.com/ClangBuiltLinux/linux/issues/122
+> Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
+> ---
+>  drivers/staging/vc04_services/bcm2835-camera/controls.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/staging/vc04_services/bcm2835-camera/controls.c b/drivers/staging/vc04_services/bcm2835-camera/controls.c
+> index cff7b1e07153..a2c55cb2192a 100644
+> --- a/drivers/staging/vc04_services/bcm2835-camera/controls.c
+> +++ b/drivers/staging/vc04_services/bcm2835-camera/controls.c
+> @@ -1106,7 +1106,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
+>         {
+>                 V4L2_CID_POWER_LINE_FREQUENCY, MMAL_CONTROL_TYPE_STD_MENU,
+>                 0, ARRAY_SIZE(mains_freq_qmenu) - 1,
+> -               1, 1, NULL,
+> +               1, 1, mains_freq_qmenu,
+>                 MMAL_PARAMETER_FLICKER_AVOID,
+>                 &ctrl_set_flicker_avoidance,
+>                 false
+> --
+> 2.19.0
+>
+>
+> _______________________________________________
+> linux-rpi-kernel mailing list
+> linux-rpi-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rpi-kernel
