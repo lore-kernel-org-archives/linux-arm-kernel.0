@@ -1,98 +1,42 @@
-From: madalin.bucur@nxp.com (Madalin Bucur)
-Date: Fri, 28 Sep 2018 11:43:24 +0300
-Subject: [PATCH v2 5/5] soc/fsl_qbman: export coalesce change API
-In-Reply-To: <1538124204-31406-1-git-send-email-madalin.bucur@nxp.com>
-References: <1538124204-31406-1-git-send-email-madalin.bucur@nxp.com>
-Message-ID: <1538124204-31406-6-git-send-email-madalin.bucur@nxp.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 28 Sep 2018 10:46:30 +0200
+Subject: [PATCH] ARM: Assume maintainership of ARM reference designs
+In-Reply-To: <CAK8P3a21dCJuV7mmsVPboWXfxjEpBsiBh37nCk5WGRXWaMUHMg@mail.gmail.com>
+References: <20180927073733.11580-1-linus.walleij@linaro.org>
+ <20180927220439.GB20825@sirena.org.uk>
+ <CAK8P3a21dCJuV7mmsVPboWXfxjEpBsiBh37nCk5WGRXWaMUHMg@mail.gmail.com>
+Message-ID: <CACRpkdbZNUQ4iRXF_F6A7t-vd1jaZdWCw0eJK8WCJYqp-EqRNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Export the API required to control the QMan portal interrupt coalescing
-settings.
+On Fri, Sep 28, 2018 at 9:45 AM Arnd Bergmann <arnd@arndb.de> wrote:
+> On Fri, Sep 28, 2018 at 12:04 AM Mark Brown <broonie@kernel.org> wrote:
+> > On Thu, Sep 27, 2018 at 09:37:33AM +0200, Linus Walleij wrote:
+> >
+> > > +F:   drivers/spi/spi-pl022.c
+> >
+> > The pl022 is actively used by *way* more than just the Arm reference
+> > platforms, it's a really popular IP though the driver is fairly feature
+> > complete at this point.  I'd like to at least see this split out as a
+> > separate thing rather than lumped in so that people don't discount the
+> > get_maintainers match as a false positive, though I'm totally fine with
+> > you taking it over.
+>
+> The same logic probably applies to irq-vic.c, which is used on at least
+> five other platforms.
 
-Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
----
- drivers/soc/fsl/qbman/qman.c | 31 +++++++++++++++++++++++++++++++
- include/soc/fsl/qman.h       | 27 +++++++++++++++++++++++++++
- 2 files changed, 58 insertions(+)
+I just saw that they were all orphaned so vaccumed them up from
+the floor.
 
-diff --git a/drivers/soc/fsl/qbman/qman.c b/drivers/soc/fsl/qbman/qman.c
-index 99d0f87889b8..8ab75bb44c4d 100644
---- a/drivers/soc/fsl/qbman/qman.c
-+++ b/drivers/soc/fsl/qbman/qman.c
-@@ -1012,6 +1012,37 @@ static inline void put_affine_portal(void)
- 
- static struct workqueue_struct *qm_portal_wq;
- 
-+void qman_dqrr_set_ithresh(struct qman_portal *portal, u8 ithresh)
-+{
-+	if (!portal)
-+		return;
-+
-+	qm_dqrr_set_ithresh(&portal->p, ithresh);
-+	portal->p.dqrr.ithresh = ithresh;
-+}
-+EXPORT_SYMBOL(qman_dqrr_set_ithresh);
-+
-+void qman_dqrr_get_ithresh(struct qman_portal *portal, u8 *ithresh)
-+{
-+	if (portal && ithresh)
-+		*ithresh = portal->p.dqrr.ithresh;
-+}
-+EXPORT_SYMBOL(qman_dqrr_get_ithresh);
-+
-+void qman_portal_get_iperiod(struct qman_portal *portal, u32 *iperiod)
-+{
-+	if (portal && iperiod)
-+		*iperiod = qm_in(&portal->p, QM_REG_ITPR);
-+}
-+EXPORT_SYMBOL(qman_portal_get_iperiod);
-+
-+void qman_portal_set_iperiod(struct qman_portal *portal, u32 iperiod)
-+{
-+	if (portal)
-+		qm_out(&portal->p, QM_REG_ITPR, iperiod);
-+}
-+EXPORT_SYMBOL(qman_portal_set_iperiod);
-+
- int qman_wq_alloc(void)
- {
- 	qm_portal_wq = alloc_workqueue("qman_portal_wq", 0, 1);
-diff --git a/include/soc/fsl/qman.h b/include/soc/fsl/qman.h
-index d4dfefdee6c1..42f50eb51529 100644
---- a/include/soc/fsl/qman.h
-+++ b/include/soc/fsl/qman.h
-@@ -1186,4 +1186,31 @@ int qman_alloc_cgrid_range(u32 *result, u32 count);
-  */
- int qman_release_cgrid(u32 id);
- 
-+/**
-+ * qman_dqrr_get_ithresh - Get coalesce interrupt threshold
-+ * @portal: portal to get the value for
-+ * @ithresh: threshold pointer
-+ */
-+void qman_dqrr_get_ithresh(struct qman_portal *portal, u8 *ithresh);
-+
-+/**
-+ * qman_dqrr_set_ithresh - Set coalesce interrupt threshold
-+ * @portal: portal to set the new value on
-+ * @ithresh: new threshold value
-+ */
-+void qman_dqrr_set_ithresh(struct qman_portal *portal, u8 ithresh);
-+
-+/**
-+ * qman_dqrr_get_iperiod - Get coalesce interrupt period
-+ * @portal: portal to get the value for
-+ * @iperiod: period pointer
-+ */
-+void qman_portal_get_iperiod(struct qman_portal *portal, u32 *iperiod);
-+/*
-+ * qman_dqrr_set_iperiod - Set coalesce interrupt period
-+ * @portal: portal to set the new value on
-+ * @ithresh: new period value
-+ */
-+void qman_portal_set_iperiod(struct qman_portal *portal, u32 iperiod);
-+
- #endif	/* __FSL_QMAN_H */
--- 
-2.1.0
+They are ARM PrimeCells that originate in these reference
+designs: the VHDL code is on the CD that comes with Integrator,
+Versatile etc, that is why this is appearing in more places,
+companies bought the reference designs and took the VHDL
+off the CD and started working on their SoC. So in some esoteric
+sense they are closest associated with the reference designs.
+
+So should I split out the SPI PL022 and VIC PL190 into their
+own MAINTAINERS entries, simply?
+
+Yours,
+Linus Walleij
