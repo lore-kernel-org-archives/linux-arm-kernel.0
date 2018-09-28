@@ -1,129 +1,36 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 28 Sep 2018 15:36:42 +0200
-Subject: [PATCH v11 1/2] dt-bindings: media: Add Allwinner V3s Camera
- Sensor Interface (CSI)
-In-Reply-To: <20180928125601.6ye5tvrmh57amvh5@paasikivi.fi.intel.com>
-References: <1537951204-24672-1-git-send-email-yong.deng@magewell.com>
- <20180928093833.gwmskm2jvby6x4s6@paasikivi.fi.intel.com>
- <14114604.4rraf0qJLU@avalon>
- <20180928102345.r2g342tg5mgcwfw6@paasikivi.fi.intel.com>
- <CAGb2v65YpPRHb5YiGJhC8NX5F5i3+1rW5y6Dq5L+pNN3U_uLdQ@mail.gmail.com>
- <20180928125601.6ye5tvrmh57amvh5@paasikivi.fi.intel.com>
-Message-ID: <20180928133642.3vmjm766cdm2oh6e@flea>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 28 Sep 2018 15:37:12 +0200
+Subject: [PATCH] ARM: SAMSUNG: limit SAMSUNG_PM_DEBUG config option to
+ non-Exynos platforms
+References: <CGME20180928133713eucas1p16a15a68b61de9aa3310737f7fd77d20d@eucas1p1.samsung.com>
+Message-ID: <20180928133713eucas1p16a15a68b61de9aa3310737f7fd77d20d~Yk9kqY_Ga2124121241eucas1p1b@eucas1p1.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sakari,
+"Samsung PM Suspend debug" feature (controlled by SAMSUNG_PM_DEBUG
+config option) is not working properly (debug messages are not
+displayed after resume) on Exynos platforms because GPIOs restore
+code is not implemented.
 
-Thanks for taking the time to review.
+Add PLAT_S3C24XX, ARCH_S3C64XX and ARCH_S5PV210 dependencies to
+SAMSUNG_PM_DEBUG config option to hide it on Exynos platforms.
 
-On Fri, Sep 28, 2018 at 03:56:01PM +0300, Sakari Ailus wrote:
-> Hi Chen-Yu,
-> 
-> On Fri, Sep 28, 2018 at 07:10:58PM +0800, Chen-Yu Tsai wrote:
-> > On Fri, Sep 28, 2018 at 6:23 PM Sakari Ailus
-> > <sakari.ailus@linux.intel.com> wrote:
-> > >
-> > > Hi Laurent,
-> > >
-> > > On Fri, Sep 28, 2018 at 12:45:12PM +0300, Laurent Pinchart wrote:
-> > > > Hi Sakari,
-> > > >
-> > > > On Friday, 28 September 2018 12:38:33 EEST Sakari Ailus wrote:
-> > > > > On Wed, Sep 26, 2018 at 04:40:04PM +0800, Yong Deng wrote:
-> > > > > > Add binding documentation for Allwinner V3s CSI.
-> > > > > >
-> > > > > > Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> > > > > > Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
-> > > > >
-> > > > > I know... but I have a few more comments.
-> > > > >
-> > > > > > Reviewed-by: Rob Herring <robh@kernel.org>
-> > > > > > Signed-off-by: Yong Deng <yong.deng@magewell.com>
-> > > > > > ---
-> > > > > >
-> > > > > >  .../devicetree/bindings/media/sun6i-csi.txt        | 59 +++++++++++++++++
-> > > > > >  1 file changed, 59 insertions(+)
-> > > > > >  create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
-> > > > > >
-> > > > > > diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt
-> > > > > > b/Documentation/devicetree/bindings/media/sun6i-csi.txt new file mode
-> > > > > > 100644
-> > > > > > index 000000000000..2ff47a9507a6
-> > > > > > --- /dev/null
-> > > > > > +++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-> > > > > > @@ -0,0 +1,59 @@
-> > > > > > +Allwinner V3s Camera Sensor Interface
-> > > > > > +-------------------------------------
-> > > > > > +
-> > > > > > +Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
-> > > > > > +interface and CSI1 is used for parallel interface.
-> > > > > > +
-> > > > > > +Required properties:
-> > > > > > +  - compatible: value must be "allwinner,sun8i-v3s-csi"
-> > > > > > +  - reg: base address and size of the memory-mapped region.
-> > > > > > +  - interrupts: interrupt associated to this IP
-> > > > > > +  - clocks: phandles to the clocks feeding the CSI
-> > > > > > +    * bus: the CSI interface clock
-> > > > > > +    * mod: the CSI module clock
-> > > > > > +    * ram: the CSI DRAM clock
-> > > > > > +  - clock-names: the clock names mentioned above
-> > > > > > +  - resets: phandles to the reset line driving the CSI
-> > > > > > +
-> > > > > > +Each CSI node should contain one 'port' child node with one child
-> > > > > > 'endpoint' +node, according to the bindings defined in
-> > > > > > +Documentation/devicetree/bindings/media/video-interfaces.txt. As
-> > > > > > mentioned
-> > > > > > +above, the endpoint's bus type should be MIPI CSI-2 for CSI0 and parallel
-> > > > > > or +Bt656 for CSI1.
-> > > > >
-> > > > > Which port represents CSI0 and which one is CSI1? That needs to be
-> > > > > documented.
-> > > >
-> > > > There are two CSI devices, named CSI0 and CSI1, with one port each. The CSI0
-> > > > device supports CSI-2 only, and the CSI1 device parallel (BT.601 or BT.656)
-> > > > only.
-> > > >
-> > > > > > +
-> > > > > > +Endpoint node properties for CSI1
-> > > > >
-> > > > > How about CSI0? I'd expect at least data-lanes, and clock-lanes as well if
-> > > > > the hardware supports lane mapping.
-> > > >
-> > > > I enquired about that too. As far as I understand, CSI0 isn't supported yet in
-> > > > the driver due to lack of documentation and lack of open-source vendor-
-> > > > provided source code. While DT bindings are not tied to driver
-> > > > implementations, it's not the best idea to design DT bindings without at least
-> > > > one working implementation to test them. I thus proposed just listing CSI0 as
-> > > > being unsupported for now.
-> > >
-> > > Ack.
-> > >
-> > > We should still define which receiver corresponds to a given port. Probably
-> > > 1 for CSI1 would make sense, in order to avoid changing the order the
-> > > hardware already uses. 0 doesn't need to be documented no IMO.
-> > >
-> > > What do you think?
-> > 
-> > AFAICT it would be a completely seperate node, since they have different address
-> > spaces, clocks and reset controls. So there's no possibility of confusion.
-> > 
-> > According to Yong, CSI0 is tied internally to some unknown MIPI CSI2-receiver,
-> > which is the undocumented part. CSI1 has its parallel data pins exposed to the
-> > outside.
-> 
-> Thanks for clearing up the confusion. If these are truly different kinds of
-> devices, then don't they also deserve different compatible strings? And
-> possibly also different DT binding documentation in a separate file.
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+ arch/arm/plat-samsung/Kconfig |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-It can, and will if it's ever supported, but I'm not quite sure what's
-confusing you about those bindings. It never claims to support CSI0,
-and we will only add a new document and compatible and whatever is
-needed when we'll have the need for it?
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Index: b/arch/arm/plat-samsung/Kconfig
+===================================================================
+--- a/arch/arm/plat-samsung/Kconfig	2018-09-28 15:20:06.041911426 +0200
++++ b/arch/arm/plat-samsung/Kconfig	2018-09-28 15:20:06.037911426 +0200
+@@ -238,7 +238,8 @@ comment "Power management"
+ 
+ config SAMSUNG_PM_DEBUG
+ 	bool "Samsung PM Suspend debug"
+-	depends on PM && DEBUG_KERNEL
++	depends on DEBUG_KERNEL
++	depends on PM && (PLAT_S3C24XX || ARCH_S3C64XX || ARCH_S5PV210)
+ 	depends on DEBUG_EXYNOS_UART || DEBUG_S3C24XX_UART || DEBUG_S3C2410_UART
+ 	help
+ 	  Say Y here if you want verbose debugging from the PM Suspend and
