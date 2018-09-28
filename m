@@ -1,86 +1,140 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 28 Sep 2018 14:39:09 +0100
-Subject: [RFC PATCH v2 05/23] KVM: arm: Add arch vcpu uninit hook
+Date: Fri, 28 Sep 2018 14:39:05 +0100
+Subject: [RFC PATCH v2 01/23] arm64: fpsimd: Always set TIF_FOREIGN_FPSTATE on
+ task state flush
 In-Reply-To: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
 References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1538141967-15375-6-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1538141967-15375-2-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for adding support for SVE in guests on arm64, a
-hook is needed for freeing additional per-vcpu memory when a vcpu
-is freed.
+This patch updates fpsimd_flush_task_state() to mirror the new
+semantics of fpsimd_flush_cpu_state(): both functions now
+implicitly set TIF_FOREIGN_FPSTATE to indicate that the task's
+FPSIMD state is not loaded into the cpu.
 
-x86 already uses the kvm_arch_vcpu_uninit() hook for a similar
-purpose, so this patch populates the same hook for arm.  Since SVE
-is specific to arm64, a subsidiary hook kvm_arm_arch_vcpu_uninit()
-is added (with trivial implementations for now) to enable separate
-specialisation for arm and arm64.
+As a side-effect, fpsimd_flush_task_state() now sets
+TIF_FOREIGN_FPSTATE even for non-running tasks.  In the case of
+non-running tasks this is not useful but also harmless, because the
+flag is live only while the corresponding task is running.  This
+function is not called from fast paths, so special-casing this for
+the task == current case is not really worth it.
 
-No functional change.
+Compiler barriers previously present in restore_sve_fpsimd_context()
+are pulled into fpsimd_flush_task_state() so that it can be safely
+called with preemption enabled if necessary.
+
+Explicit calls to set TIF_FOREIGN_FPSTATE that accompany
+fpsimd_flush_task_state() calls and are now redundant are removed
+as appropriate.
+
+fpsimd_flush_task_state() is used to get exclusive access to the
+representation of the task's state via task_struct, for the purpose
+of replacing the state.  Thus, the call to this function should
+happen before manipulating fpsimd_state or sve_state etc. in
+task_struct.  Anomalous cases are reordered appropriately in order
+to make the code more consistent, although there should be no
+functional difference since these cases are protected by
+local_bh_disable() anyway.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
 ---
+ arch/arm64/kernel/fpsimd.c | 25 +++++++++++++++++++------
+ arch/arm64/kernel/signal.c |  5 -----
+ 2 files changed, 19 insertions(+), 11 deletions(-)
 
-Changes since RFCv1:
-
- * The vcpu _init_ hook that was added by the former version of this
-   patch was never used for anything, so it is gone from this version.
----
- arch/arm/include/asm/kvm_host.h   | 3 ++-
- arch/arm64/include/asm/kvm_host.h | 3 ++-
- virt/kvm/arm/arm.c                | 5 +++++
- 3 files changed, 9 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 3ad482d..c36760b 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -288,10 +288,11 @@ struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
- static inline bool kvm_arch_check_sve_has_vhe(void) { return true; }
- static inline void kvm_arch_hardware_unsetup(void) {}
- static inline void kvm_arch_sync_events(struct kvm *kvm) {}
--static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
- static inline void kvm_arch_vcpu_block_finish(struct kvm_vcpu *vcpu) {}
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 58c53bc..42aa154 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -550,7 +550,6 @@ int sve_set_vector_length(struct task_struct *task,
+ 		local_bh_disable();
  
-+static inline void kvm_arm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
-+
- static inline void kvm_arm_init_debug(void) {}
- static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 6316a57..d4b65414 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -425,10 +425,11 @@ static inline bool kvm_arch_check_sve_has_vhe(void)
+ 		fpsimd_save();
+-		set_thread_flag(TIF_FOREIGN_FPSTATE);
+ 	}
  
- static inline void kvm_arch_hardware_unsetup(void) {}
- static inline void kvm_arch_sync_events(struct kvm *kvm) {}
--static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
- static inline void kvm_arch_vcpu_block_finish(struct kvm_vcpu *vcpu) {}
+ 	fpsimd_flush_task_state(task);
+@@ -816,12 +815,11 @@ asmlinkage void do_sve_acc(unsigned int esr, struct pt_regs *regs)
+ 	local_bh_disable();
  
-+static inline void kvm_arm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
-+
- void kvm_arm_init_debug(void);
- void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
- void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index c92053b..1418af9 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -358,6 +358,11 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
- 	return kvm_vgic_vcpu_init(vcpu);
+ 	fpsimd_save();
+-	fpsimd_to_sve(current);
+ 
+ 	/* Force ret_to_user to reload the registers: */
+ 	fpsimd_flush_task_state(current);
+-	set_thread_flag(TIF_FOREIGN_FPSTATE);
+ 
++	fpsimd_to_sve(current);
+ 	if (test_and_set_thread_flag(TIF_SVE))
+ 		WARN_ON(1); /* SVE access shouldn't have trapped */
+ 
+@@ -898,9 +896,9 @@ void fpsimd_flush_thread(void)
+ 
+ 	local_bh_disable();
+ 
++	fpsimd_flush_task_state(current);
+ 	memset(&current->thread.uw.fpsimd_state, 0,
+ 	       sizeof(current->thread.uw.fpsimd_state));
+-	fpsimd_flush_task_state(current);
+ 
+ 	if (system_supports_sve()) {
+ 		clear_thread_flag(TIF_SVE);
+@@ -937,8 +935,6 @@ void fpsimd_flush_thread(void)
+ 			current->thread.sve_vl_onexec = 0;
+ 	}
+ 
+-	set_thread_flag(TIF_FOREIGN_FPSTATE);
+-
+ 	local_bh_enable();
  }
  
-+void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu)
-+{
-+	kvm_arm_arch_vcpu_uninit(vcpu);
-+}
-+
- void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+@@ -1047,12 +1043,29 @@ void fpsimd_update_current_state(struct user_fpsimd_state const *state)
+ 
+ /*
+  * Invalidate live CPU copies of task t's FPSIMD state
++ *
++ * This function may be called with preemption enabled.  The barrier()
++ * ensures that the assignment to fpsimd_cpu is visible to any
++ * preemption/softirq that could race with set_tsk_thread_flag(), so
++ * that TIF_FOREIGN_FPSTATE cannot be spuriously re-cleared.
++ *
++ * The final barrier ensures that TIF_FOREIGN_FPSTATE is seen set by any
++ * subsequent code.
+  */
+ void fpsimd_flush_task_state(struct task_struct *t)
  {
- 	int *last_ran;
+ 	t->thread.fpsimd_cpu = NR_CPUS;
++
++	barrier();
++	set_tsk_thread_flag(t, TIF_FOREIGN_FPSTATE);
++
++	barrier();
+ }
+ 
++/*
++ * Invalidate any task's FPSIMD state that is present on this cpu.
++ * This function must be called with softirqs disabled.
++ */
+ void fpsimd_flush_cpu_state(void)
+ {
+ 	__this_cpu_write(fpsimd_last_state.st, NULL);
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 5dcc942..7dcf0f1 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -296,11 +296,6 @@ static int restore_sve_fpsimd_context(struct user_ctxs *user)
+ 	 */
+ 
+ 	fpsimd_flush_task_state(current);
+-	barrier();
+-	/* From now, fpsimd_thread_switch() won't clear TIF_FOREIGN_FPSTATE */
+-
+-	set_thread_flag(TIF_FOREIGN_FPSTATE);
+-	barrier();
+ 	/* From now, fpsimd_thread_switch() won't touch thread.sve_state */
+ 
+ 	sve_alloc(current);
 -- 
 2.1.4
