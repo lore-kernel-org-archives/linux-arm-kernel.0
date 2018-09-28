@@ -1,92 +1,46 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Thu, 27 Sep 2018 15:55:44 -0700
-Subject: [PATCH] ARM: Assume maintainership of ARM reference designs
-In-Reply-To: <20180927073733.11580-1-linus.walleij@linaro.org>
-References: <20180927073733.11580-1-linus.walleij@linaro.org>
-Message-ID: <20180927225541.58942.24953@harbor.lan>
+From: natechancellor@gmail.com (Nathan Chancellor)
+Date: Thu, 27 Sep 2018 17:50:39 -0700
+Subject: [PATCH] staging: bcm2835-camera: Avoid unneeded internal declaration
+ warning
+Message-ID: <20180928005038.1697-1-natechancellor@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Linus Walleij (2018-09-27 00:37:33)
-> With this I assume maintainership of the Integrator, Versatile
-> and RealView ARM reference machines.
-> 
-> It's no big secret that I've been maintaining them for years,
-> but might as well make it official so I get the mails and
-> don't miss anything.
-> 
-> I have also included some drivers that are closely associated
-> with the ARM reference designs and yet orphaned in the
-> MAINTAINERS file. I can surely maintain them too, or route
-> the question to the right people so it doesn't fall on the
-> floor of upward to the subsystem maintainers who have too much
-> to do already as it is.
-> 
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Rob Herring <robh@kernel.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Michael Turquette <mturquette@baylibre.com>
-> Cc: Stephen Boyd <sboyd@kernel.org>
-> Cc: Wolfram Sang <wsa@the-dreams.de>
-> Cc: Mark Brown <broonie@kernel.org>
-> Cc: Brian Norris <computersforpeace@gmail.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Clang warns:
 
-Acked-by: Michael Turquette <mturquette@baylibre.com>
+drivers/staging/vc04_services/bcm2835-camera/controls.c:59:18: warning:
+variable 'mains_freq_qmenu' is not needed and will not be emitted
+[-Wunneeded-internal-declaration]
+static const s64 mains_freq_qmenu[] = {
+                 ^
+1 warning generated.
 
-Best regards,
-Mike
+This is because mains_freq_qmenu is currently only used in an ARRAY_SIZE
+macro, which is a compile time evaluation in this case. Avoid this by
+adding mains_freq_qmenu as the imenu member of this structure, which
+matches all other controls that uses the ARRAY_SIZE macro in v4l2_ctrls.
+This turns out to be a no-op because V4L2_CID_MPEG_VIDEO_BITRATE_MODE is
+defined as a MMAL_CONTROL_TYPE_STD_MENU, which does not pass the imenu
+definition along to v4l2_ctrl_new in bm2835_mmal_init_controls.
 
-> ---
-> ARM SoC folks: please apply this directly wherever MAINTAINERS
-> patches go.
-> 
-> Submitted a while back, thought it was applied since everyone
-> was in on it, but apparently it got lost.
-> 
-> ARM Cambridge sent me all their old reference designs so I am
-> well equipped for this.
-> ---
->  MAINTAINERS | 25 +++++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index a5b256b25905..a4ed79a5a1c2 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1078,6 +1078,31 @@ F:       arch/arm/include/asm/arch_timer.h
->  F:     arch/arm64/include/asm/arch_timer.h
->  F:     drivers/clocksource/arm_arch_timer.c
->  
-> +ARM INTEGRATOR, VERSATILE AND REALVIEW SUPPORT
-> +M:     Linus Walleij <linus.walleij@linaro.org>
-> +L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> +S:     Maintained
-> +F:     Documentation/devicetree/bindings/arm/arm-boards
-> +F:     Documentation/devicetree/bindings/auxdisplay/arm-charlcd.txt
-> +F:     Documentation/devicetree/bindings/clock/arm-integrator.txt
-> +F:     Documentation/devicetree/bindings/interrupt-controller/arm,versatile-fpga-irq.txt
-> +F:     Documentation/devicetree/bindings/mtd/arm-versatile.txt
-> +F:     arch/arm/mach-integrator/
-> +F:     arch/arm/mach-realview/
-> +F:     arch/arm/mach-versatile/
-> +F:     arch/arm/plat-versatile/
-> +F:     arch/arm/boot/dts/arm-realview-*
-> +F:     arch/arm/boot/dts/integrator*
-> +F:     arch/arm/boot/dts/versatile*
-> +F:     drivers/clk/versatile/
-> +F:     drivers/i2c/busses/i2c-versatile.c
-> +F:     drivers/irqchip/irq-versatile-fpga.c
-> +F:     drivers/irqchip/irq-vic.c
-> +F:     drivers/mtd/maps/physmap_of_versatile.c
-> +F:     drivers/power/reset/arm-versatile-reboot.c
-> +F:     drivers/soc/versatile/
-> +F:     drivers/spi/spi-pl022.c
-> +
->  ARM HDLCD DRM DRIVER
->  M:     Liviu Dudau <liviu.dudau@arm.com>
->  S:     Supported
-> -- 
-> 2.17.1
-> 
+Link: https://github.com/ClangBuiltLinux/linux/issues/122
+Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
+---
+ drivers/staging/vc04_services/bcm2835-camera/controls.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/staging/vc04_services/bcm2835-camera/controls.c b/drivers/staging/vc04_services/bcm2835-camera/controls.c
+index cff7b1e07153..a2c55cb2192a 100644
+--- a/drivers/staging/vc04_services/bcm2835-camera/controls.c
++++ b/drivers/staging/vc04_services/bcm2835-camera/controls.c
+@@ -1106,7 +1106,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
+ 	{
+ 		V4L2_CID_POWER_LINE_FREQUENCY, MMAL_CONTROL_TYPE_STD_MENU,
+ 		0, ARRAY_SIZE(mains_freq_qmenu) - 1,
+-		1, 1, NULL,
++		1, 1, mains_freq_qmenu,
+ 		MMAL_PARAMETER_FLICKER_AVOID,
+ 		&ctrl_set_flicker_avoidance,
+ 		false
+-- 
+2.19.0
