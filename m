@@ -1,39 +1,46 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 28 Sep 2018 12:20:23 +0200
-Subject: [PATCH 12/14] arm64: dts: renesas: r8a77990: ebisu: Enable VGA and
- HDMI outputs
+Date: Fri, 28 Sep 2018 12:20:24 +0200
+Subject: [PATCH 13/14] arm64: dts: renesas: r8a77995: draak: Enable HDMI
+ display output
 In-Reply-To: <cover.1538125184.git.horms+renesas@verge.net.au>
 References: <cover.1538125184.git.horms+renesas@verge.net.au>
-Message-ID: <74fe39abbf745737754effe64f5f6c574fbb1412.1538125184.git.horms+renesas@verge.net.au>
+Message-ID: <bcf3003438ea464594f668a61cf2344a7f82f91c.1538125184.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Ulrich Hecht <uli+renesas@fpond.eu>
 
-Add the LVDS decoder, HDMI encoder, VGA encoder and HDMI and VGA
-connectors, and wire up the display-related nodes with clocks, pinmux
-and regulators.
+Adds LVDS decoder, HDMI encoder and connector for the Draak board.
 
 The LVDS0 and LVDS1 encoders can use the DU_DOTCLKIN0, DU_DOTCLKIN1 and
-EXTAL externals clocks. Two of them are provided to the SoC on the Ebisu
+EXTAL externals clocks. Two of them are provided to the SoC on the Draak
 board, hook them up in DT.
 
+Signed-off-by: Ulrich Hecht <uli+renesas@fpond.eu>
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Tested-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts | 162 +++++++++++++++++++++++++
- 1 file changed, 162 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 98 +++++++++++++++++++++++++-
+ 1 file changed, 97 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-index fd60079169f6..f342dd85b152 100644
---- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-@@ -51,6 +51,88 @@
- 			};
+diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+index e39b73005381..2405eaad0296 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
++++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+@@ -2,7 +2,7 @@
+ /*
+  * Device Tree Source for the Draak board
+  *
+- * Copyright (C) 2016 Renesas Electronics Corp.
++ * Copyright (C) 2016-2018 Renesas Electronics Corp.
+  * Copyright (C) 2017 Glider bvba
+  */
+ 
+@@ -45,6 +45,41 @@
  		};
  	};
-+
+ 
 +	hdmi-out {
 +		compatible = "hdmi-connector";
 +		type = "a";
@@ -69,90 +76,23 @@ index fd60079169f6..f342dd85b152 100644
 +		};
 +	};
 +
-+	vga {
-+		compatible = "vga-connector";
-+
-+		port {
-+			vga_in: endpoint {
-+				remote-endpoint = <&adv7123_out>;
-+			};
-+		};
-+	};
-+
-+	vga-encoder {
-+		compatible = "adi,adv7123";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				adv7123_in: endpoint {
-+					remote-endpoint = <&du_out_rgb>;
-+				};
-+			};
-+			port at 1 {
-+				reg = <1>;
-+				adv7123_out: endpoint {
-+					remote-endpoint = <&vga_in>;
-+				};
-+			};
-+		};
-+	};
-+
-+	reg_3p3v: regulator1 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "fixed-3.3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+
-+	x13_clk: x13 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <74250000>;
-+	};
- };
+ 	memory at 48000000 {
+ 		device_type = "memory";
+ 		/* first 128MB is reserved for secure area. */
+@@ -190,6 +225,43 @@
  
- &avb {
-@@ -86,6 +168,25 @@
  	};
- };
- 
-+&du {
-+	pinctrl-0 = <&du_pins>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+
-+	clocks = <&cpg CPG_MOD 724>,
-+		 <&cpg CPG_MOD 723>,
-+		 <&x13_clk>;
-+	clock-names = "du.0", "du.1", "dclkin.0";
-+
-+	ports {
-+		port at 0 {
-+			endpoint {
-+				remote-endpoint = <&adv7123_in>;
-+			};
-+		};
-+	};
-+};
-+
- &ehci0 {
- 	status = "okay";
- };
-@@ -97,6 +198,38 @@
- &i2c0 {
- 	status = "okay";
  
 +	hdmi-encoder at 39 {
 +		compatible = "adi,adv7511w";
-+		reg = <0x39>;
++		reg = <0x39>, <0x3f>, <0x38>, <0x3c>;
++		reg-names = "main", "edid", "packet", "cec";
 +		interrupt-parent = <&gpio1>;
-+		interrupts = <1 IRQ_TYPE_LEVEL_LOW>;
++		interrupts = <28 IRQ_TYPE_LEVEL_LOW>;
++
++		/* Depends on LVDS */
++		max-clock = <135000000>;
++		min-vrefresh = <50>;
 +
 +		adi,input-depth = <8>;
 +		adi,input-colorspace = "rgb";
@@ -180,18 +120,18 @@ index fd60079169f6..f342dd85b152 100644
 +		};
 +	};
 +
- 	video-receiver at 70 {
- 		compatible = "adi,adv7482";
- 		reg = <0x70>;
-@@ -137,6 +270,30 @@
- 	};
+ 	hdmi-decoder at 4c {
+ 		compatible = "adi,adv7612";
+ 		reg = <0x4c>;
+@@ -240,6 +312,30 @@
+ 	status = "okay";
  };
  
 +&lvds0 {
 +	status = "okay";
 +
 +	clocks = <&cpg CPG_MOD 727>,
-+		 <&x13_clk>,
++		 <&x12_clk>,
 +		 <&extal_clk>;
 +	clock-names = "fck", "dclkin.0", "extal";
 +
@@ -206,7 +146,7 @@ index fd60079169f6..f342dd85b152 100644
 +
 +&lvds1 {
 +	clocks = <&cpg CPG_MOD 727>,
-+		 <&x13_clk>,
++		 <&x12_clk>,
 +		 <&extal_clk>;
 +	clock-names = "fck", "dclkin.0", "extal";
 +};
@@ -214,17 +154,5 @@ index fd60079169f6..f342dd85b152 100644
  &ohci0 {
  	status = "okay";
  };
-@@ -149,6 +306,11 @@
- 		};
- 	};
- 
-+	du_pins: du {
-+		groups = "du_rgb888", "du_sync", "du_disp", "du_clk_out_0";
-+		function = "du";
-+	};
-+
- 	pwm3_pins: pwm3 {
- 		groups = "pwm3_b";
- 		function = "pwm3";
 -- 
 2.11.0
