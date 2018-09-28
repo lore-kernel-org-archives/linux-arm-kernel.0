@@ -1,121 +1,92 @@
-From: andrea.merello@gmail.com (Andrea Merello)
-Date: Fri, 28 Sep 2018 09:11:19 +0200
-Subject: [PATCH v5 2/7] dmaengine: xilinx_dma: in axidma slave_sg and
- dma_cyclic mode align split descriptors
-In-Reply-To: <20180918162105.GC2613@vkoul-mobl>
-References: <20180907062502.8241-1-andrea.merello@gmail.com>
- <20180907062502.8241-2-andrea.merello@gmail.com>
- <20180918162105.GC2613@vkoul-mobl>
-Message-ID: <CAN8YU5PWB0sRskcirCcYnY5vG5A_W6pcOMpgyOD3faWfMeu5Rg@mail.gmail.com>
+From: sean@poorly.run (Sean Paul)
+Date: Fri, 28 Sep 2018 03:21:29 -0400
+Subject: [PATCH v5 3/5] drm/dp: make dp_get_lane_status usable from
+ outside of the core
+In-Reply-To: <1537866837-4408-4-git-send-email-dkos@cadence.com>
+References: <1537866837-4408-1-git-send-email-dkos@cadence.com>
+ <1537866837-4408-4-git-send-email-dkos@cadence.com>
+Message-ID: <20180928072129.GX72545@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 18, 2018 at 6:21 PM Vinod <vkoul@kernel.org> wrote:
->
-> On 07-09-18, 08:24, Andrea Merello wrote:
-> > Whenever a single or cyclic transaction is prepared, the driver
-> > could eventually split it over several SG descriptors in order
-> > to deal with the HW maximum transfer length.
-> >
-> > This could end up in DMA operations starting from a misaligned
-> > address. This seems fatal for the HW if DRE (Data Realignment Engine)
-> > is not enabled.
-> >
-> > This patch eventually adjusts the transfer size in order to make sure
-> > all operations start from an aligned address.
-> >
-> > Cc: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
-> > Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
-> > Reviewed-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
-> > ---
-> > Changes in v2:
-> >         - don't introduce copy_mask field, rather rely on already-esistent
-> >           copy_align field. Suggested by Radhey Shyam Pandey
-> >         - reword title
-> > Changes in v3:
-> >       - fix bug introduced in v2: wrong copy size when DRE is enabled
-> >       - use implementation suggested by Radhey Shyam Pandey
-> > Changes in v4:
-> >       - rework on the top of 1/6
-> > Changes in v5:
-> >       - fix typo in commit title
-> >       - add hint about "DRE" meaning in commit message
-> > ---
-> >  drivers/dma/xilinx/xilinx_dma.c | 22 ++++++++++++++++++----
-> >  1 file changed, 18 insertions(+), 4 deletions(-)
-> >
-> > diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-> > index a3aaa0e34cc7..aaa6de8a70e4 100644
-> > --- a/drivers/dma/xilinx/xilinx_dma.c
-> > +++ b/drivers/dma/xilinx/xilinx_dma.c
-> > @@ -954,15 +954,28 @@ static int xilinx_dma_alloc_chan_resources(struct dma_chan *dchan)
-> >
-> >  /**
-> >   * xilinx_dma_calc_copysize - Calculate the amount of data to copy
-> > + * @chan: Driver specific DMA channel
-> >   * @size: Total data that needs to be copied
-> >   * @done: Amount of data that has been already copied
-> >   *
-> >   * Return: Amount of data that has to be copied
-> >   */
-> > -static int xilinx_dma_calc_copysize(int size, int done)
-> > +static int xilinx_dma_calc_copysize(struct xilinx_dma_chan *chan,
-> > +                                 int size, int done)
->
-> align to preceeding line opening brace please
+On Tue, Sep 25, 2018 at 10:13:33AM +0100, Damian Kos wrote:
+> From: Quentin Schulz <quentin.schulz@free-electrons.com>
+> 
+> dp_get_lane_status is pretty generic and can be used for other means,
+> so let's make it "public".
+> 
+> This adds drm_dp_get_lane_status to the header file and add the appropriate
+> EXPORT_SYMBOL for it so that it can be used by other drivers, be they compiled
+> built-in or as modules.
+> 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> Signed-off-by: Damian Kos <dkos@cadence.com>
 
-After applying, I'm seeing it already aligned as you requested; 4 tabs
-+ 4 spaces so the 2nd line starts right under the "s" near the opened
-brace..
-Patch sent using git, so it should pass through without being ruined;
-don't know why you see it misaligned :(
+Now that you've refactored mhdp_validate_cr(), you no longer need this patch.
 
-> >  {
-> > -     return min_t(size_t, size - done,
-> > +     size_t copy = min_t(size_t, size - done,
-> >                    XILINX_DMA_MAX_TRANS_LEN);
->
-> so we can do this way in patch 1:
->
->         size t copy;
->
->         copy =  min_t(size_t, size - done,
->                       XILINX_DMA_MAX_TRANS_LEN);
->
->         return copy;
->
-> and then add these here, feels like we are redoing change introduced in
-> patch 1..
+Sean
 
-OK, this sounds good :)
+> ---
+>  drivers/gpu/drm/drm_dp_helper.c | 9 +++++----
+>  include/drm/drm_dp_helper.h     | 2 ++
+>  2 files changed, 7 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/drm_dp_helper.c b/drivers/gpu/drm/drm_dp_helper.c
+> index 735ebde5c2f0..169db52f92f5 100644
+> --- a/drivers/gpu/drm/drm_dp_helper.c
+> +++ b/drivers/gpu/drm/drm_dp_helper.c
+> @@ -48,14 +48,15 @@ static u8 dp_link_status(const u8 link_status[DP_LINK_STATUS_SIZE], int r)
+>  	return link_status[r - DP_LANE0_1_STATUS];
+>  }
+>  
+> -static u8 dp_get_lane_status(const u8 link_status[DP_LINK_STATUS_SIZE],
+> -			     int lane)
+> +u8 drm_dp_get_lane_status(const u8 link_status[DP_LINK_STATUS_SIZE],
+> +			  int lane)
+>  {
+>  	int i = DP_LANE0_1_STATUS + (lane >> 1);
+>  	int s = (lane & 1) * 4;
+>  	u8 l = dp_link_status(link_status, i);
+>  	return (l >> s) & 0xf;
+>  }
+> +EXPORT_SYMBOL(drm_dp_get_lane_status);
+>  
+>  bool drm_dp_channel_eq_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
+>  			  int lane_count)
+> @@ -69,7 +70,7 @@ bool drm_dp_channel_eq_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
+>  	if ((lane_align & DP_INTERLANE_ALIGN_DONE) == 0)
+>  		return false;
+>  	for (lane = 0; lane < lane_count; lane++) {
+> -		lane_status = dp_get_lane_status(link_status, lane);
+> +		lane_status = drm_dp_get_lane_status(link_status, lane);
+>  		if ((lane_status & DP_CHANNEL_EQ_BITS) != DP_CHANNEL_EQ_BITS)
+>  			return false;
+>  	}
+> @@ -84,7 +85,7 @@ bool drm_dp_clock_recovery_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
+>  	u8 lane_status;
+>  
+>  	for (lane = 0; lane < lane_count; lane++) {
+> -		lane_status = dp_get_lane_status(link_status, lane);
+> +		lane_status = drm_dp_get_lane_status(link_status, lane);
+>  		if ((lane_status & DP_LANE_CR_DONE) == 0)
+>  			return false;
+>  	}
+> diff --git a/include/drm/drm_dp_helper.h b/include/drm/drm_dp_helper.h
+> index 698082a02b97..973d2fda9654 100644
+> --- a/include/drm/drm_dp_helper.h
+> +++ b/include/drm/drm_dp_helper.h
+> @@ -952,6 +952,8 @@
+>  #define DP_MST_LOGICAL_PORT_0 8
+>  
+>  #define DP_LINK_STATUS_SIZE	   6
+> +
+> +u8 drm_dp_get_lane_status(const u8 link_status[DP_LINK_STATUS_SIZE], int lane);
+>  bool drm_dp_channel_eq_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
+>  			  int lane_count);
+>  bool drm_dp_clock_recovery_ok(const u8 link_status[DP_LINK_STATUS_SIZE],
+> -- 
+> 2.17.1
+> 
 
->
-> > +     if ((copy + done < size) &&
-> > +         chan->xdev->common.copy_align) {
-> > +             /*
-> > +              * If this is not the last descriptor, make sure
-> > +              * the next one will be properly aligned
-> > +              */
-> > +             copy = rounddown(copy,
-> > +                              (1 << chan->xdev->common.copy_align));
-> > +     }
-> > +     return copy;
-> >  }
-> >
-> >  /**
-> > @@ -1804,7 +1817,7 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_slave_sg(
-> >                        * Calculate the maximum number of bytes to transfer,
-> >                        * making sure it is less than the hw limit
-> >                        */
-> > -                     copy = xilinx_dma_calc_copysize(sg_dma_len(sg),
-> > +                     copy = xilinx_dma_calc_copysize(chan, sg_dma_len(sg),
->
-> why not keep chan in patch 1 and add only handling in patch 2, seems
-> less churn to me..
-
-Indeed this was something I was unsure about.. I ended up in feeling
-better not to add introduce a function that takes an unused (yet)
-argument, but I can change this of course :)
-
-> --
-> ~Vinod
+-- 
+Sean Paul, Software Engineer, Google / Chromium OS
