@@ -1,78 +1,45 @@
 From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Fri, 28 Sep 2018 18:04:32 +0800
-Subject: [PATCH v5 1/9] PCI: mediatek: Using slot's devfn for compare to fix
- mtk_pcie_find_port logic
+Date: Fri, 28 Sep 2018 18:04:37 +0800
+Subject: [PATCH v5 6/9] PCI: mediatek: Enable msi after clock enabled
 In-Reply-To: <1538129080-8206-1-git-send-email-honghui.zhang@mediatek.com>
 References: <1538129080-8206-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1538129080-8206-2-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <1538129080-8206-7-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-The Mediatek's host controller has two slots, each with it's own control
-registers. The host driver need to identify which slot was connected
-in order to access the device's configuration space. There's problem
-for current host driver to find out which slot was connected to for
-a given EP device.
-
-Assuming each slot have connect with one EP device as below:
-
-                host bridge
-  bus 0 --> __________|_______
-           |                  |
-           |                  |
-         slot 0             slot 1
-  bus 1 -->|        bus 2 --> |
-           |                  |
-         EP 0               EP 1
-
-During PCI enumeration, system software will scan all the PCI device
-starting from devfn 0. So it will get the proper port for slot0 and
-slot1 device when using PCI_SLOT(devfn) for match. But it will get
-the wrong slot for EP1: The devfn will be start from 0 when scanning
-EP1 behind slot1, it will get port0 since the PCI_SLOT(EP1) is match
-for port0's slot value. So the host driver should not using EP's devfn
-but the slot's devfn(the slot which EP was connected to) for match.
-
-This patch fix the mtk_pcie_find_port's logic by using the slot's
-devfn for match if finding device connected to the subordinate bus.
+The clocks was not enabled when enable MSI. This patch fix this
+issue by calling mtk_pcie_enable_msi in mtk_pcie_startup_port_v2
+since the clock was all enabled at that time.
 
 Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
 ---
- drivers/pci/controller/pcie-mediatek.c | 17 ++++++++++++++++-
- 1 file changed, 16 insertions(+), 1 deletion(-)
+ drivers/pci/controller/pcie-mediatek.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
-index 9999dae..264e03f 100644
+index d150be1..be38b38 100644
 --- a/drivers/pci/controller/pcie-mediatek.c
 +++ b/drivers/pci/controller/pcie-mediatek.c
-@@ -337,10 +337,25 @@ static struct mtk_pcie_port *mtk_pcie_find_port(struct pci_bus *bus,
- {
- 	struct mtk_pcie *pcie = bus->sysdata;
- 	struct mtk_pcie_port *port;
-+	struct pci_dev *dev = NULL;
-+
-+	/*
-+	 * Walk the bus hierarchy to get the devfn value
-+	 * of the port in the root bus.
-+	 */
-+	while (bus && bus->number) {
-+		dev = bus->self;
-+		bus = dev->bus;
-+	}
-+
-+	list_for_each_entry(port, &pcie->ports, list) {
-+		/* Using slot's devfn to compare for subordinary bus. */
-+		if (dev)
-+			devfn = dev->devfn;
+@@ -572,8 +572,6 @@ static int mtk_pcie_init_irq_domain(struct mtk_pcie_port *port,
+ 		ret = mtk_pcie_allocate_msi_domains(port);
+ 		if (ret)
+ 			return ret;
+-
+-		mtk_pcie_enable_msi(port);
+ 	}
  
--	list_for_each_entry(port, &pcie->ports, list)
- 		if (port->slot == PCI_SLOT(devfn))
- 			return port;
-+	}
+ 	return 0;
+@@ -694,6 +692,9 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
+ 	val &= ~INTX_MASK;
+ 	writel(val, port->base + PCIE_INT_MASK);
  
- 	return NULL;
- }
++	if (IS_ENABLED(CONFIG_PCI_MSI))
++		mtk_pcie_enable_msi(port);
++
+ 	/* Set AHB to PCIe translation windows */
+ 	size = mem->end - mem->start;
+ 	val = lower_32_bits(mem->start) | AHB2PCIE_SIZE(fls(size));
 -- 
 2.6.4
