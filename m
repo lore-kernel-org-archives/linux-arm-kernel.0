@@ -1,87 +1,134 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 28 Sep 2018 12:23:17 +0200
-Subject: [PATCH 02/21] ARM: shmobile: Add basic RZ/A2 SoC support
+Date: Fri, 28 Sep 2018 12:23:18 +0200
+Subject: [PATCH 03/21] soc: renesas: identify RZ/A2
 In-Reply-To: <cover.1538128711.git.horms+renesas@verge.net.au>
 References: <cover.1538128711.git.horms+renesas@verge.net.au>
-Message-ID: <332df9828e94d4288825584638b7df6ad4c1ff38.1538128711.git.horms+renesas@verge.net.au>
+Message-ID: <175f435f44b724e389f23c154d94fda45870c1f6.1538128711.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Chris Brandt <chris.brandt@renesas.com>
 
-Add the RZ/A2 SoC to the Renesas SoC collection.
+Add support for identifying the RZ/A2M (R7S9210) SoC.
+Also add support for reading the BSID register which is a different format
+than the PRR.
 
 Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Kconfig         |  6 ++++++
- arch/arm/mach-shmobile/Makefile        |  1 +
- arch/arm/mach-shmobile/setup-r7s9210.c | 27 +++++++++++++++++++++++++++
- 3 files changed, 34 insertions(+)
- create mode 100644 arch/arm/mach-shmobile/setup-r7s9210.c
+ drivers/soc/renesas/renesas-soc.c | 55 +++++++++++++++++++++++++++++++++------
+ 1 file changed, 47 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index aeb2eed08598..94e9431d92b8 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -55,6 +55,12 @@ config ARCH_R7S72100
- 	select SYS_SUPPORTS_SH_MTU2
- 	select RENESAS_OSTM
+diff --git a/drivers/soc/renesas/renesas-soc.c b/drivers/soc/renesas/renesas-soc.c
+index 56916183739b..ce19b2732433 100644
+--- a/drivers/soc/renesas/renesas-soc.c
++++ b/drivers/soc/renesas/renesas-soc.c
+@@ -46,8 +46,12 @@ static const struct renesas_family fam_rmobile __initconst __maybe_unused = {
+ 	.reg	= 0xe600101c,		/* CCCR (Common Chip Code Register) */
+ };
  
-+config ARCH_R7S9210
-+	bool "RZ/A2 (R7S9210)"
-+	select PM
-+	select PM_GENERIC_DOMAINS
-+	select RENESAS_OSTM
-+
- config ARCH_R8A73A4
- 	bool "R-Mobile APE6 (R8A73A40)"
- 	select ARCH_RMOBILE
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index b33dc59d8698..5591646cb9bb 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -14,6 +14,7 @@ obj-$(CONFIG_ARCH_R8A7778)	+= setup-r8a7778.o
- obj-$(CONFIG_ARCH_R8A7779)	+= setup-r8a7779.o
- obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.o
- obj-$(CONFIG_ARCH_R7S72100)	+= setup-r7s72100.o
-+obj-$(CONFIG_ARCH_R7S9210)	+= setup-r7s9210.o
- 
- # CPU reset vector handling objects
- cpu-y				:= platsmp.o headsmp.o
-diff --git a/arch/arm/mach-shmobile/setup-r7s9210.c b/arch/arm/mach-shmobile/setup-r7s9210.c
-new file mode 100644
-index 000000000000..573fb9955e7e
---- /dev/null
-+++ b/arch/arm/mach-shmobile/setup-r7s9210.c
-@@ -0,0 +1,27 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * r7s9210 processor support
-+ *
-+ * Copyright (C) 2018  Renesas Electronics Corporation
-+ * Copyright (C) 2018  Chris Brandt
-+ *
-+ */
-+
-+#include <linux/kernel.h>
-+
-+#include <asm/mach/arch.h>
-+
-+#include "common.h"
-+
-+static const char *const r7s9210_boards_compat_dt[] __initconst = {
-+	"renesas,r7s9210",
-+	NULL,
+-static const struct renesas_family fam_rza __initconst __maybe_unused = {
+-	.name	= "RZ/A",
++static const struct renesas_family fam_rza1 __initconst __maybe_unused = {
++	.name	= "RZ/A1",
 +};
 +
-+DT_MACHINE_START(R7S72100_DT, "Generic R7S9210 (Flattened Device Tree)")
-+	.l2c_aux_val    = 0,
-+	.l2c_aux_mask   = ~0,
-+	.init_early	= shmobile_init_delay,
-+	.init_late	= shmobile_init_late,
-+	.dt_compat	= r7s9210_boards_compat_dt,
-+MACHINE_END
++static const struct renesas_family fam_rza2 __initconst __maybe_unused = {
++	.name	= "RZ/A2",
+ };
+ 
+ static const struct renesas_family fam_rzg1 __initconst __maybe_unused = {
+@@ -72,7 +76,12 @@ struct renesas_soc {
+ };
+ 
+ static const struct renesas_soc soc_rz_a1h __initconst __maybe_unused = {
+-	.family	= &fam_rza,
++	.family	= &fam_rza1,
++};
++
++static const struct renesas_soc soc_rz_a2m __initconst __maybe_unused = {
++	.family	= &fam_rza2,
++	.id	= 0x3b,
+ };
+ 
+ static const struct renesas_soc soc_rmobile_ape6 __initconst __maybe_unused = {
+@@ -194,6 +203,9 @@ static const struct of_device_id renesas_socs[] __initconst = {
+ #ifdef CONFIG_ARCH_R7S72100
+ 	{ .compatible = "renesas,r7s72100",	.data = &soc_rz_a1h },
+ #endif
++#ifdef CONFIG_ARCH_R7S9210
++	{ .compatible = "renesas,r7s9210",	.data = &soc_rz_a2m },
++#endif
+ #ifdef CONFIG_ARCH_R8A73A4
+ 	{ .compatible = "renesas,r8a73a4",	.data = &soc_rmobile_ape6 },
+ #endif
+@@ -275,7 +287,7 @@ static int __init renesas_soc_init(void)
+ 	void __iomem *chipid = NULL;
+ 	struct soc_device *soc_dev;
+ 	struct device_node *np;
+-	unsigned int product;
++	unsigned int product, eshi = 0, eslo;
+ 
+ 	match = of_match_node(renesas_socs, of_root);
+ 	if (!match)
+@@ -284,6 +296,31 @@ static int __init renesas_soc_init(void)
+ 	soc = match->data;
+ 	family = soc->family;
+ 
++	np = of_find_compatible_node(NULL, NULL, "renesas,bsid");
++	if (np) {
++		chipid = of_iomap(np, 0);
++		of_node_put(np);
++
++		if (chipid) {
++			product = readl(chipid);
++			iounmap(chipid);
++
++			if (soc->id && ((product >> 16) & 0xff) != soc->id) {
++				pr_warn("SoC mismatch (product = 0x%x)\n",
++					product);
++				return -ENODEV;
++			}
++		}
++
++		/*
++		 * TODO: Upper 4 bits of BSID are for chip version, but the
++		 * format is not known at this time so we don't know how to
++		 * specify eshi and eslo
++		 */
++
++		goto done;
++	}
++
+ 	/* Try PRR first, then hardcoded fallback */
+ 	np = of_find_compatible_node(NULL, NULL, "renesas,prr");
+ 	if (np) {
+@@ -302,8 +339,11 @@ static int __init renesas_soc_init(void)
+ 			pr_warn("SoC mismatch (product = 0x%x)\n", product);
+ 			return -ENODEV;
+ 		}
++		eshi = ((product >> 4) & 0x0f) + 1;
++		eslo = product & 0xf;
+ 	}
+ 
++done:
+ 	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
+ 	if (!soc_dev_attr)
+ 		return -ENOMEM;
+@@ -315,10 +355,9 @@ static int __init renesas_soc_init(void)
+ 	soc_dev_attr->family = kstrdup_const(family->name, GFP_KERNEL);
+ 	soc_dev_attr->soc_id = kstrdup_const(strchr(match->compatible, ',') + 1,
+ 					     GFP_KERNEL);
+-	if (chipid)
+-		soc_dev_attr->revision = kasprintf(GFP_KERNEL, "ES%u.%u",
+-						   ((product >> 4) & 0x0f) + 1,
+-						   product & 0xf);
++	if (eshi)
++		soc_dev_attr->revision = kasprintf(GFP_KERNEL, "ES%u.%u", eshi,
++						   eslo);
+ 
+ 	pr_info("Detected Renesas %s %s %s\n", soc_dev_attr->family,
+ 		soc_dev_attr->soc_id, soc_dev_attr->revision ?: "");
 -- 
 2.11.0
