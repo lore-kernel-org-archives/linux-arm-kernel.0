@@ -1,47 +1,86 @@
 From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Fri, 28 Sep 2018 10:36:27 +0200
-Subject: [PATCH v2 0/7] Add-DMA-MDMA-chaining-support
-Message-ID: <1538123794-17085-1-git-send-email-pierre-yves.mordret@st.com>
+Date: Fri, 28 Sep 2018 10:36:28 +0200
+Subject: [PATCH v2 1/7] dt-bindings: stm32-dma: Add DMA/MDMA chaining support
+ bindings
+In-Reply-To: <1538123794-17085-1-git-send-email-pierre-yves.mordret@st.com>
+References: <1538123794-17085-1-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <1538123794-17085-2-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This serie adds support for M2M transfer triggered by STM32 DMA in order to
-transfer data from/to SRAM to/from DDR.
+From: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
 
-Normally, this mode should not be needed as transferring data from/to DDR
-is supported by the STM32 DMA.
-However, the STM32 DMA don't have the ability to generate burst transfer
-on the DDR as it only embeds only a 4-word FIFO although the minimal burst
-length on the DDR is 8 words.
-Due to this constraint, the STM32 DMA transfers data from/to DDR in a
-single way and could lead to pollute the DDR.
-To avoid this, we have to use SRAM for all transfers where STM32 DMA is
-involved.
+This patch adds dma bindings to support DMA/MDMA chaining transfer.
+1 bit is to manage both DMA FIFO Threshold
+1 bit is to manage DMA/MDMA Chaining features.
+2 bits are used to specify SDRAM size to use for DMA/MDMA chaining.
+The size in bytes of a certain order is given by the formula:
+    (2 ^ order) * PAGE_SIZE.
+The order is given by those 2 bits.
+For cyclic, whether chaining is chosen, any value above 1 can be set :
+SRAM buffer size will rely on period size and not on this DT value.
 
-An Hw design has been specially put in place to allow this chaining where DMA
-interrupt is connected on GIC and MDMA request line as well. This grants the
-possibility to trigger an MDMA transfer from the completion of DMA.
-At the same time MDMA has the ability to acknowlege DMA. The aim is to have an
-self refreching mechanism to transfer from/to device to/from DDR with minimal
-sw support.
-For instance the DMA is set in cyclic double buffering to feed SRAM and MDMA
-transfer to DDR thanks to LLI.
+Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+---
+  Version history:
+    v1:
+       * Initial
+---
+---
+ .../devicetree/bindings/dma/stm32-dma.txt          | 27 +++++++++++++++++++++-
+ 1 file changed, 26 insertions(+), 1 deletion(-)
 
-M'boumba Cedric Madianga (7):
-  dt-bindings: stm32-dma: Add DMA/MDMA chaining support bindings
-  dt-bindings: stm32-dmamux: Add one cell to support DMA/MDMA chain
-  dt-bindings: stm32-mdma: Add DMA/MDMA chaining support bindings
-  dmaengine: stm32-dma: Add DMA/MDMA chaining support
-  dmaengine: stm32-mdma: Add DMA/MDMA chaining support
-  dmaengine: stm32-dma: enable descriptor_reuse
-  dmaengine: stm32-mdma: enable descriptor_reuse
-
- .../devicetree/bindings/dma/stm32-dma.txt          |  27 +-
- .../devicetree/bindings/dma/stm32-dmamux.txt       |   6 +-
- .../devicetree/bindings/dma/stm32-mdma.txt         |  12 +-
- drivers/dma/stm32-dma.c                            | 903 ++++++++++++++++++---
- drivers/dma/stm32-mdma.c                           | 133 ++-
- 5 files changed, 949 insertions(+), 132 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/dma/stm32-dma.txt b/Documentation/devicetree/bindings/dma/stm32-dma.txt
+index c5f5190..2bac8c7 100644
+--- a/Documentation/devicetree/bindings/dma/stm32-dma.txt
++++ b/Documentation/devicetree/bindings/dma/stm32-dma.txt
+@@ -17,6 +17,12 @@ Optional properties:
+ - resets: Reference to a reset controller asserting the DMA controller
+ - st,mem2mem: boolean; if defined, it indicates that the controller supports
+   memory-to-memory transfer
++- dmas: A list of eight dma specifiers, one for each entry in dma-names.
++  Refer to stm32-mdma.txt for more details.
++- dma-names: should contain "ch0", "ch1", "ch2", "ch3", "ch4", "ch5", "ch6" and
++  "ch7" and represents each STM32 DMA channel connected to a STM32 MDMA one.
++- memory-region : phandle to a node describing memory to be used for
++  M2M intermediate transfer between DMA and MDMA.
+ 
+ Example:
+ 
+@@ -36,6 +42,16 @@ Example:
+ 		st,mem2mem;
+ 		resets = <&rcc 150>;
+ 		dma-requests = <8>;
++		dmas = <&mdma1 8 0x10 0x1200000a 0x40026408 0x00000020 1>,
++		       <&mdma1 9 0x10 0x1200000a 0x40026408 0x00000800 1>,
++		       <&mdma1 10 0x10 0x1200000a 0x40026408 0x00200000 1>,
++		       <&mdma1 11 0x10 0x1200000a 0x40026408 0x08000000 1>,
++		       <&mdma1 12 0x10 0x1200000a 0x4002640C 0x00000020 1>,
++		       <&mdma1 13 0x10 0x1200000a 0x4002640C 0x00000800 1>,
++		       <&mdma1 14 0x10 0x1200000a 0x4002640C 0x00200000 1>,
++		       <&mdma1 15 0x10 0x1200000a 0x4002640C 0x08000000 1>;
++		dma-names = "ch0", "ch1", "ch2", "ch3", "ch4", "ch5", "ch6", "ch7";
++		memory-region = <&sram_dmapool>;
+ 	};
+ 
+ * DMA client
+@@ -68,7 +84,16 @@ channel: a phandle to the DMA controller plus the following four integer cells:
+ 	0x1: 1/2 full FIFO
+ 	0x2: 3/4 full FIFO
+ 	0x3: full FIFO
+-
++ -bit 2: Intermediate M2M transfer from/to DDR to/from SRAM throughout MDMA
++	0: MDMA not used to generate an intermediate M2M transfer
++	1: MDMA used to generate an intermediate M2M transfer.
++ -bit 3-4: indicated SRAM Buffer size in (2^order)*PAGE_SIZE.
++	PAGE_SIZE is given by Linux at 4KiB: include/asm-generic/page.h.
++	Order is given by those 2 bits starting at 0.
++	Valid only whether Intermediate M2M transfer is set.
++	For cyclic, whether Intermediate M2M transfer is chosen, any value can
++	be set: SRAM buffer size will rely on period size and not on this DT
++	value.
+ 
+ Example:
+ 
 -- 
 2.7.4
