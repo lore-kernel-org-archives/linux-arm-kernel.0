@@ -1,7 +1,8 @@
 From: joe@perches.com (Joe Perches)
-Date: Fri, 28 Sep 2018 14:51:32 -0700
-Subject: Bad MAINTAINERS pattern in section 'ARM/Synaptics Berlin SoC support'
-Message-ID: <20180928215132.28867-1-joe@perches.com>
+Date: Fri, 28 Sep 2018 14:51:26 -0700
+Subject: Bad MAINTAINERS pattern in section 'ARM/SAMSUNG S5P SERIES Multi
+ Format Codec (MFC) SUPPORT'
+Message-ID: <20180928215127.28790-1-joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -9,55 +10,57 @@ Please fix this defect appropriately.
 
 linux-next MAINTAINERS section:
 
-	2111	ARM/Synaptics Berlin SoC support
-	2112	M:	Jisheng Zhang <Jisheng.Zhang@synaptics.com>
-	2113	M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-	2114	L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-	2115	S:	Maintained
-	2116	F:	arch/arm/mach-berlin/
-	2117	F:	arch/arm/boot/dts/berlin*
--->	2118	F:	arch/arm64/boot/dts/marvell/berlin*
+	2009	ARM/SAMSUNG S5P SERIES Multi Format Codec (MFC) SUPPORT
+	2010	M:	Kyungmin Park <kyungmin.park@samsung.com>
+	2011	M:	Kamil Debski <kamil@wypas.org>
+	2012	M:	Jeongtae Park <jtp.park@samsung.com>
+	2013	M:	Andrzej Hajda <a.hajda@samsung.com>
+	2014	L:	linux-arm-kernel at lists.infradead.org
+	2015	L:	linux-media at vger.kernel.org
+	2016	S:	Maintained
+-->	2017	F:	arch/arm/plat-samsung/s5p-dev-mfc.c
+	2018	F:	drivers/media/platform/s5p-mfc/
 
 Commit that introduced this:
 
-commit bc52497a595d2246923749177d99e4216703b0f4
- Author: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
- Date:   Fri Mar 30 11:02:11 2018 +0800
+commit 7683e9e529258d01ce99216ad3be21f59eff83ec
+ Author: Linus Torvalds <torvalds@linux-foundation.org>
+ Date:   Sun Jul 23 16:06:21 2017 -0700
  
-     MAINTAINERS: update entry for ARM/berlin
+     Properly alphabetize MAINTAINERS file
      
-     Synaptics has acquired the Multimedia Solutions Business of Marvell[1].
-     So change the berlin entry name and move it to its alphabetical
-     location. We move to ARM/Synaptics instead of ARM/Marvell.
+     This adds a perl script to actually parse the MAINTAINERS file, clean up
+     some whitespace in it, warn about errors in it, and then properly sort
+     the end result.
      
-     This patch also updates my email address from marvell to synaptics.
+     My perl-fu is atrocious, so the script has basically been created by
+     randomly putting various characters in a pile, mixing them around, and
+     then looking it the end result does anything interesting when used as a
+     perl script.
      
-     [1] https://www.synaptics.com/company/news/conexant-marvell
-     
-     Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
-     Reviewed-by: Andrew Lunn <andrew@lunn.ch>
-     Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+     Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
  
-  MAINTAINERS | 18 +++++++++---------
-  1 file changed, 9 insertions(+), 9 deletions(-)
+  MAINTAINERS                  | 3585 +++++++++++++++++++++---------------------
+  scripts/parse-maintainers.pl |   77 +
+  2 files changed, 1868 insertions(+), 1794 deletions(-)
 
-Last commit with arch/arm64/boot/dts/marvell/berlin*
+Last commit with arch/arm/plat-samsung/s5p-dev-mfc.c
 
-commit 031106ce95a201f6dd4c5ebf35abb900cf34e2ba
-Author: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
-Date:   Wed May 16 17:43:28 2018 +0800
+commit b93b315d444faa1505b6a5e001c30f3024849e46
+Author: Kukjin Kim <kgene@kernel.org>
+Date:   Thu Jul 30 01:48:17 2015 +0900
 
-    arm64: dts: move berlin SoC files from marvell dir to synaptics dir
+    ARM: SAMSUNG: make local s5p-dev-mfc in mach-exynos
     
-    Move device tree files as part of transition from Marvell berlin to
-    Synaptics berlin.
+    This patch moves s5p-dev-mfc from plat-samsung into mach-exynos
+    because it is used for only exynos no other platforms.
     
-    Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
+    Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+    Signed-off-by: Kukjin Kim <kgene@kernel.org>
 
- arch/arm64/boot/dts/Makefile                                 | 1 +
- arch/arm64/boot/dts/marvell/Makefile                         | 4 ----
- arch/arm64/boot/dts/synaptics/Makefile                       | 4 ++++
- arch/arm64/boot/dts/{marvell => synaptics}/berlin4ct-dmp.dts | 0
- arch/arm64/boot/dts/{marvell => synaptics}/berlin4ct-stb.dts | 0
- arch/arm64/boot/dts/{marvell => synaptics}/berlin4ct.dtsi    | 0
- 6 files changed, 5 insertions(+), 4 deletions(-)
+ arch/arm/mach-exynos/Kconfig                         | 5 +++++
+ arch/arm/mach-exynos/Makefile                        | 2 ++
+ arch/arm/{plat-samsung => mach-exynos}/s5p-dev-mfc.c | 0
+ arch/arm/plat-samsung/Kconfig                        | 5 -----
+ arch/arm/plat-samsung/Makefile                       | 1 -
+ 5 files changed, 7 insertions(+), 6 deletions(-)
