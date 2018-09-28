@@ -1,77 +1,182 @@
-From: dave.stevenson@raspberrypi.org (Dave Stevenson)
-Date: Fri, 28 Sep 2018 10:04:29 +0100
-Subject: [PATCH] staging: bcm2835-camera: Avoid unneeded internal
- declaration warning
-In-Reply-To: <20180928005038.1697-1-natechancellor@gmail.com>
-References: <20180928005038.1697-1-natechancellor@gmail.com>
-Message-ID: <CAAoAYcMMiiDXCcnZ=DP9Y9Xs+xdq-jasj8G_W0jrnQV9so79=A@mail.gmail.com>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Fri, 28 Sep 2018 09:07:28 +0000
+Subject: [PATCH V2 1/4] ARM: imx: add i.mx6ulz msl support
+In-Reply-To: <20180928084452.GH26692@dragon>
+References: <1537337088-28819-1-git-send-email-Anson.Huang@nxp.com>
+ <1537337088-28819-2-git-send-email-Anson.Huang@nxp.com>
+ <20180928084452.GH26692@dragon>
+Message-ID: <DB3PR0402MB3916515873BCC9673AE9E05AF5EC0@DB3PR0402MB3916.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nate
+Hi, Shawn
 
-Thanks for the patch.
+Anson Huang
+Best Regards!
 
-On Fri, 28 Sep 2018 at 01:53, Nathan Chancellor
-<natechancellor@gmail.com> wrote:
->
-> Clang warns:
->
-> drivers/staging/vc04_services/bcm2835-camera/controls.c:59:18: warning:
-> variable 'mains_freq_qmenu' is not needed and will not be emitted
-> [-Wunneeded-internal-declaration]
-> static const s64 mains_freq_qmenu[] = {
->                  ^
-> 1 warning generated.
->
-> This is because mains_freq_qmenu is currently only used in an ARRAY_SIZE
-> macro, which is a compile time evaluation in this case. Avoid this by
-> adding mains_freq_qmenu as the imenu member of this structure, which
-> matches all other controls that uses the ARRAY_SIZE macro in v4l2_ctrls.
-> This turns out to be a no-op because V4L2_CID_MPEG_VIDEO_BITRATE_MODE is
-> defined as a MMAL_CONTROL_TYPE_STD_MENU, which does not pass the imenu
-> definition along to v4l2_ctrl_new in bm2835_mmal_init_controls.
 
-There's a slight confusion betwen V4L2_CID_MPEG_VIDEO_BITRATE_MODE and
-V4L2_CID_POWER_LINE_FREQUENCY in your description.
+> -----Original Message-----
+> From: Shawn Guo <shawnguo@kernel.org>
+> Sent: Friday, September 28, 2018 4:45 PM
+> To: Anson Huang <anson.huang@nxp.com>
+> Cc: robh+dt at kernel.org; mark.rutland at arm.com; s.hauer at pengutronix.de;
+> kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>;
+> linux at armlinux.org.uk; mturquette at baylibre.com; sboyd at kernel.org; Jacky
+> Bai <ping.bai@nxp.com>; A.s. Dong <aisheng.dong@nxp.com>;
+> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org; linux-clk at vger.kernel.org; dl-linux-imx
+> <linux-imx@nxp.com>
+> Subject: Re: [PATCH V2 1/4] ARM: imx: add i.mx6ulz msl support
+> 
+> On Wed, Sep 19, 2018 at 02:04:45PM +0800, Anson Huang wrote:
+> > The i.MX 6ULZ processor is a high-performance, ultra cost-efficient
+> > consumer Linux processor featuring an advanced implementation of a
+> > single Arm(r) Cortex(r)-A7 core, which operates at speeds up to 900 MHz.
+> >
+> > This patch adds basic MSL support for i.MX6ULZ, the i.MX6ULZ has same
+> > soc_id as i.MX6ULL, and SRC_SBMR2 bit[6] is to differentiate i.MX6ULZ
+> > from i.MX6ULL, 1'b1 means i.MX6ULZ and 1'b0 means i.MX6ULL.
+> >
+> > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> > ---
+> >  arch/arm/mach-imx/anatop.c      | 20 ++++++++++++++++++++
+> >  arch/arm/mach-imx/cpu.c         |  3 +++
+> >  arch/arm/mach-imx/mach-imx6ul.c |  1 +
+> >  arch/arm/mach-imx/mxc.h         |  7 +++++++
+> >  arch/arm/mach-imx/pm-imx6.c     |  4 ++--
+> >  5 files changed, 33 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-imx/anatop.c b/arch/arm/mach-imx/anatop.c
+> > index 61f3d94..45d618a 100644
+> > --- a/arch/arm/mach-imx/anatop.c
+> > +++ b/arch/arm/mach-imx/anatop.c
+> > @@ -31,6 +31,8 @@
+> >  #define ANADIG_DIGPROG_IMX6SL	0x280
+> >  #define ANADIG_DIGPROG_IMX7D	0x800
+> >
+> > +#define SRC_SBMR2		0x1c
+> > +
+> >  #define BM_ANADIG_REG_2P5_ENABLE_WEAK_LINREG	0x40000
+> >  #define BM_ANADIG_REG_2P5_ENABLE_PULLDOWN	0x8
+> >  #define BM_ANADIG_REG_CORE_FET_ODRIVE		0x20000000
+> > @@ -148,6 +150,24 @@ void __init imx_init_revision_from_anatop(void)
+> >  		major_part = (digprog >> 8) & 0xf;
+> >  		minor_part = digprog & 0xf;
+> >  		revision = ((major_part + 1) << 4) | minor_part;
+> > +
+> > +		if ((digprog >> 16) == MXC_CPU_IMX6ULL) {
+> > +			void __iomem *src_base;
+> > +			u32 sbmr2;
+> > +
+> > +			np = of_find_compatible_node(NULL, NULL,
+> > +						     "fsl,imx6ul-src");
+> > +			src_base = of_iomap(np, 0);
+> > +			WARN_ON(!src_base);
+> > +			sbmr2 = readl_relaxed(src_base + SRC_SBMR2);
+> > +			iounmap(src_base);
+> > +
+> > +			/* src_sbmr2 bit 6 is to identify if it is i.MX6ULZ */
+> > +			if (sbmr2 & (1 << 6)) {
+> > +				digprog &= ~(0xff << 16);
+> > +				digprog |= (MXC_CPU_IMX6ULZ << 16);
+> > +			}
+> > +		}
+> >  	}
+> >
+> >  	mxc_set_cpu_type(digprog >> 16 & 0xff); diff --git
+> > a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c index
+> > c6b1bf9..c73593e 100644
+> > --- a/arch/arm/mach-imx/cpu.c
+> > +++ b/arch/arm/mach-imx/cpu.c
+> > @@ -136,6 +136,9 @@ struct device * __init imx_soc_device_init(void)
+> >  	case MXC_CPU_IMX6ULL:
+> >  		soc_id = "i.MX6ULL";
+> >  		break;
+> > +	case MXC_CPU_IMX6ULZ:
+> > +		soc_id = "i.MX6ULZ";
+> > +		break;
+> >  	case MXC_CPU_IMX6SLL:
+> >  		soc_id = "i.MX6SLL";
+> >  		break;
+> > diff --git a/arch/arm/mach-imx/mach-imx6ul.c
+> > b/arch/arm/mach-imx/mach-imx6ul.c index 6cb8a22..4ffe3c8 100644
+> > --- a/arch/arm/mach-imx/mach-imx6ul.c
+> > +++ b/arch/arm/mach-imx/mach-imx6ul.c
+> > @@ -90,6 +90,7 @@ static void __init imx6ul_init_late(void)  static
+> > const char * const imx6ul_dt_compat[] __initconst = {
+> >  	"fsl,imx6ul",
+> >  	"fsl,imx6ull",
+> > +	"fsl,imx6ulz",
+> 
+> Can we have "fsl,imx6ull" on the DT compatible, so that we can save the
+> changes on kernel side, like this and the clock driver update (patch #2)?
+> 
+>   compatible = "fsl,imx6ull", "fsl,imx6ulz";
+> 
+> I'm not sure if there is any problem with this approach.  But you can think
+> about it.
+> 
+> Shawn
+ 
+Using this approach will save the changes in clk-imx6ul.c and mach-imx6ul.c,
+but other changes will be still needed, since it is defined as a new SoC other
+than a i.MX6ULL with different fuse settings. I can do the changes you suggested
+to save those 2 files changes if you prefer this way, but current implementation
+should also make sense if think about it from a new SoC perspective? What do
+you prefer?
 
-However you're right that MMAL_CONTROL_TYPE_STD_MENU calls
-v4l2_ctrl_new_std_menu which doesn't need a menu array (it's
-v4l2_ctrl_new_int_menu that does). That means the correct fix is to
-define the max value using the relevant enum (in this case
-V4L2_CID_POWER_LINE_FREQUENCY_AUTO) and remove the array.
+Thanks.
 
-The same is true for V4L2_CID_MPEG_VIDEO_BITRATE_MODE - max should be
-V4L2_MPEG_VIDEO_BITRATE_MODE_CBR, and remove the bitrate_mode_qmenu
-array.
+Anson.
 
-Thanks,
-  Dave
-
-> Link: https://github.com/ClangBuiltLinux/linux/issues/122
-> Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
-> ---
->  drivers/staging/vc04_services/bcm2835-camera/controls.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/staging/vc04_services/bcm2835-camera/controls.c b/drivers/staging/vc04_services/bcm2835-camera/controls.c
-> index cff7b1e07153..a2c55cb2192a 100644
-> --- a/drivers/staging/vc04_services/bcm2835-camera/controls.c
-> +++ b/drivers/staging/vc04_services/bcm2835-camera/controls.c
-> @@ -1106,7 +1106,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
->         {
->                 V4L2_CID_POWER_LINE_FREQUENCY, MMAL_CONTROL_TYPE_STD_MENU,
->                 0, ARRAY_SIZE(mains_freq_qmenu) - 1,
-> -               1, 1, NULL,
-> +               1, 1, mains_freq_qmenu,
->                 MMAL_PARAMETER_FLICKER_AVOID,
->                 &ctrl_set_flicker_avoidance,
->                 false
-> --
-> 2.19.0
->
->
-> _______________________________________________
-> linux-rpi-kernel mailing list
-> linux-rpi-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rpi-kernel
+> 
+> >  	NULL,
+> >  };
+> >
+> > diff --git a/arch/arm/mach-imx/mxc.h b/arch/arm/mach-imx/mxc.h index
+> > 026e2ca..b130a53 100644
+> > --- a/arch/arm/mach-imx/mxc.h
+> > +++ b/arch/arm/mach-imx/mxc.h
+> > @@ -40,6 +40,8 @@
+> >  #define MXC_CPU_IMX6Q		0x63
+> >  #define MXC_CPU_IMX6UL		0x64
+> >  #define MXC_CPU_IMX6ULL		0x65
+> > +/* virtual cpu id for i.mx6ulz */
+> > +#define MXC_CPU_IMX6ULZ		0x6b
+> >  #define MXC_CPU_IMX6SLL		0x67
+> >  #define MXC_CPU_IMX7D		0x72
+> >
+> > @@ -80,6 +82,11 @@ static inline bool cpu_is_imx6ull(void)
+> >  	return __mxc_cpu_type == MXC_CPU_IMX6ULL;  }
+> >
+> > +static inline bool cpu_is_imx6ulz(void) {
+> > +	return __mxc_cpu_type == MXC_CPU_IMX6ULZ; }
+> > +
+> >  static inline bool cpu_is_imx6sll(void)  {
+> >  	return __mxc_cpu_type == MXC_CPU_IMX6SLL; diff --git
+> > a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c index
+> > 529f4b5..87f45b9 100644
+> > --- a/arch/arm/mach-imx/pm-imx6.c
+> > +++ b/arch/arm/mach-imx/pm-imx6.c
+> > @@ -313,7 +313,7 @@ int imx6_set_lpm(enum mxc_cpu_pwr_mode mode)
+> >  		if (cpu_is_imx6sl())
+> >  			val |= BM_CLPCR_BYPASS_PMIC_READY;
+> >  		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul() ||
+> > -		    cpu_is_imx6ull() || cpu_is_imx6sll())
+> > +		    cpu_is_imx6ull() || cpu_is_imx6sll() || cpu_is_imx6ulz())
+> >  			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
+> >  		else
+> >  			val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS; @@ -331,7
+> +331,7 @@ int
+> > imx6_set_lpm(enum mxc_cpu_pwr_mode mode)
+> >  		if (cpu_is_imx6sl() || cpu_is_imx6sx())
+> >  			val |= BM_CLPCR_BYPASS_PMIC_READY;
+> >  		if (cpu_is_imx6sl() || cpu_is_imx6sx() || cpu_is_imx6ul() ||
+> > -		    cpu_is_imx6ull() || cpu_is_imx6sll())
+> > +		    cpu_is_imx6ull() || cpu_is_imx6sll() || cpu_is_imx6ulz())
+> >  			val |= BM_CLPCR_BYP_MMDC_CH0_LPM_HS;
+> >  		else
+> >  			val |= BM_CLPCR_BYP_MMDC_CH1_LPM_HS;
+> > --
+> > 2.7.4
+> >
