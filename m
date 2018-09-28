@@ -1,106 +1,58 @@
-From: mjourdan@baylibre.com (Maxime Jourdan)
-Date: Fri, 28 Sep 2018 16:32:09 +0200
-Subject: [PATCH v3 1/3] dt-bindings: media: add Amlogic Video Decoder
- Bindings
-In-Reply-To: <20180928142816.4311-2-mjourdan@baylibre.com>
-References: <20180928142816.4311-1-mjourdan@baylibre.com>
- <20180928142816.4311-2-mjourdan@baylibre.com>
-Message-ID: <CAMO6naws6gRXogL8MyGdz8rBivg7ZxLG1ZoPy0zff=rnHfKPQQ@mail.gmail.com>
+From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
+Date: Fri, 28 Sep 2018 16:30:51 +0200
+Subject: [PATCH v2 0/7] Add-DMA-MDMA-chaining-support
+In-Reply-To: <1538123794-17085-1-git-send-email-pierre-yves.mordret@st.com>
+References: <1538123794-17085-1-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <6bc2e022-1a36-f36c-b23b-e2ba7b16f2fc@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Errata: I forgot the following tag:
+Hello all,
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+I've submitted a V3 following a KBuild warning.
+You can thus drop this V2.
 
-(The patch is unchanged from v2)
-Le ven. 28 sept. 2018 ? 16:29, Maxime Jourdan <mjourdan@baylibre.com> a ?crit :
->
-> Add documentation for the meson vdec dts node.
->
-> Signed-off-by: Maxime Jourdan <mjourdan@baylibre.com>
-> ---
->  .../bindings/media/amlogic,vdec.txt           | 71 +++++++++++++++++++
->  1 file changed, 71 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/amlogic,vdec.txt
->
-> diff --git a/Documentation/devicetree/bindings/media/amlogic,vdec.txt b/Documentation/devicetree/bindings/media/amlogic,vdec.txt
-> new file mode 100644
-> index 000000000000..aabdd01bcf32
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/amlogic,vdec.txt
-> @@ -0,0 +1,71 @@
-> +Amlogic Video Decoder
-> +================================
-> +
-> +The video decoding IP lies within the DOS memory region,
-> +except for the hardware bitstream parser that makes use of an undocumented
-> +region.
-> +
-> +It makes use of the following blocks:
-> +
-> +- ESPARSER is a bitstream parser that outputs to a VIFIFO. Further VDEC blocks
-> +then feed from this VIFIFO.
-> +- VDEC_1 can decode MPEG-1, MPEG-2, MPEG-4 part 2, MJPEG, H.263, H.264, VC-1.
-> +- VDEC_HEVC can decode HEVC and VP9.
-> +
-> +Both VDEC_1 and VDEC_HEVC share the "vdec" IRQ and as such cannot run
-> +concurrently.
-> +
-> +Device Tree Bindings:
-> +---------------------
-> +
-> +VDEC: Video Decoder
-> +--------------------------
-> +
-> +Required properties:
-> +- compatible: value should be different for each SoC family as :
-> +       - GXBB (S905) : "amlogic,gxbb-vdec"
-> +       - GXL (S905X, S905D) : "amlogic,gxl-vdec"
-> +       - GXM (S912) : "amlogic,gxm-vdec"
-> +- reg: base address and size of he following memory-mapped regions :
-> +       - dos
-> +       - esparser
-> +- reg-names: should contain the names of the previous memory regions
-> +- interrupts: should contain the following IRQs:
-> +       - vdec
-> +       - esparser
-> +- interrupt-names: should contain the names of the previous interrupts
-> +- amlogic,ao-sysctrl: should point to the AOBUS sysctrl node
-> +- amlogic,canvas: should point to a canvas provider node
-> +- clocks: should contain the following clocks :
-> +       - dos_parser
-> +       - dos
-> +       - vdec_1
-> +       - vdec_hevc
-> +- clock-names: should contain the names of the previous clocks
-> +- resets: should contain the parser reset
-> +- reset-names: should be "esparser"
-> +
-> +Example:
-> +
-> +vdec: video-decoder at c8820000 {
-> +       compatible = "amlogic,gxbb-vdec";
-> +       reg = <0x0 0xc8820000 0x0 0x10000>,
-> +             <0x0 0xc110a580 0x0 0xe4>;
-> +       reg-names = "dos", "esparser";
-> +
-> +       interrupts = <GIC_SPI 44 IRQ_TYPE_EDGE_RISING>,
-> +                    <GIC_SPI 32 IRQ_TYPE_EDGE_RISING>;
-> +       interrupt-names = "vdec", "esparser";
-> +
-> +       amlogic,ao-sysctrl = <&sysctrl_AO>;
-> +       amlogic,canvas = <&canvas>;
-> +
-> +       clocks = <&clkc CLKID_DOS_PARSER>,
-> +                <&clkc CLKID_DOS>,
-> +                <&clkc CLKID_VDEC_1>,
-> +                <&clkc CLKID_VDEC_HEVC>;
-> +       clock-names = "dos_parser", "dos", "vdec_1", "vdec_hevc";
-> +
-> +       resets = <&reset RESET_PARSER>;
-> +       reset-names = "esparser";
-> +};
-> --
-> 2.19.0
->
+Thanks and sorry for the spamming.
+
+Have a nice weekend.
+Regards
+
+On 09/28/2018 10:36 AM, Pierre-Yves MORDRET wrote:
+> This serie adds support for M2M transfer triggered by STM32 DMA in order to
+> transfer data from/to SRAM to/from DDR.
+> 
+> Normally, this mode should not be needed as transferring data from/to DDR
+> is supported by the STM32 DMA.
+> However, the STM32 DMA don't have the ability to generate burst transfer
+> on the DDR as it only embeds only a 4-word FIFO although the minimal burst
+> length on the DDR is 8 words.
+> Due to this constraint, the STM32 DMA transfers data from/to DDR in a
+> single way and could lead to pollute the DDR.
+> To avoid this, we have to use SRAM for all transfers where STM32 DMA is
+> involved.
+> 
+> An Hw design has been specially put in place to allow this chaining where DMA
+> interrupt is connected on GIC and MDMA request line as well. This grants the
+> possibility to trigger an MDMA transfer from the completion of DMA.
+> At the same time MDMA has the ability to acknowlege DMA. The aim is to have an
+> self refreching mechanism to transfer from/to device to/from DDR with minimal
+> sw support.
+> For instance the DMA is set in cyclic double buffering to feed SRAM and MDMA
+> transfer to DDR thanks to LLI.
+> 
+> M'boumba Cedric Madianga (7):
+>   dt-bindings: stm32-dma: Add DMA/MDMA chaining support bindings
+>   dt-bindings: stm32-dmamux: Add one cell to support DMA/MDMA chain
+>   dt-bindings: stm32-mdma: Add DMA/MDMA chaining support bindings
+>   dmaengine: stm32-dma: Add DMA/MDMA chaining support
+>   dmaengine: stm32-mdma: Add DMA/MDMA chaining support
+>   dmaengine: stm32-dma: enable descriptor_reuse
+>   dmaengine: stm32-mdma: enable descriptor_reuse
+> 
+>  .../devicetree/bindings/dma/stm32-dma.txt          |  27 +-
+>  .../devicetree/bindings/dma/stm32-dmamux.txt       |   6 +-
+>  .../devicetree/bindings/dma/stm32-mdma.txt         |  12 +-
+>  drivers/dma/stm32-dma.c                            | 903 ++++++++++++++++++---
+>  drivers/dma/stm32-mdma.c                           | 133 ++-
+>  5 files changed, 949 insertions(+), 132 deletions(-)
+> 
