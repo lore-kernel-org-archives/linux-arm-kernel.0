@@ -1,42 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Sep 2018 12:45:07 +0200
-Subject: [PATCH v2 04/11] arm64: dts: sc9836/sc9860: Update coresight
- bindings for hardware ports
-In-Reply-To: <CAAfSe-swWPgCWN6cZbQxLL6fwaJ1qLXnC_X7A0zeYuHDaZ_A1Q@mail.gmail.com>
-References: <20180912135352.19722-1-suzuki.poulose@arm.com>
- <20180912135352.19722-5-suzuki.poulose@arm.com>
- <ccc61e1b-768c-2a6d-3ff5-95b72bc58a6f@arm.com>
- <CAAfSe-swWPgCWN6cZbQxLL6fwaJ1qLXnC_X7A0zeYuHDaZ_A1Q@mail.gmail.com>
-Message-ID: <CAK8P3a2WWFp5W5-7o-X3joOpSGgnK=s_ZyGev7gsVV0SjN0p0A@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 28 Sep 2018 12:21:37 +0200
+Subject: [PATCH 4/6] ARM: multi_v7_defconfig: Enable VIDEO_RENESAS_FDP1
+In-Reply-To: <cover.1538122547.git.horms+renesas@verge.net.au>
+References: <cover.1538122547.git.horms+renesas@verge.net.au>
+Message-ID: <3ff7ee8a972ac7379bd74af4dc203359320e7c75.1538122547.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 27, 2018 at 11:19 AM Chunyan Zhang <zhang.lyra@gmail.com> wrote:
->
-> Hi Suzuki,
->
-> On 27 September 2018 at 16:51, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
-> > +To: Chunyan Zhang
-> >
-> > Chunyan Zhang,
-> >
-> > On 09/12/2018 02:53 PM, Suzuki K Poulose wrote:
-> >>
-> >> Switch to the new coresight bindings for hw ports
-> >>
-> >
-> > How can we push this patch ? Do you generally send the spreadtrum
-> > specific changes to ARM soc folks ? Or would you like me to post
-> > this directly to ARM soc folks ?
->
-> Yeah, at present sprd dts files generally got merged through arm-soc
-> (I've added arm at kernel.org).
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Yes, that's fine. Generally, we prefer if you collect patches for your
-platform first, and then send them as a pull request or short set
-of patches. for inclusion, rather than picking them up from the list.
+R-Car Gen2 (and RZ/G1) SoCs have a Fine Display Processor, hence enable
+support for it.
 
-If this is the only DT patch for spreadtrum in 4.20, I can also just
-pick it up with your Ack.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-       Arnd
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index fc33444e94f0..dec755c939bb 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -584,6 +584,7 @@ CONFIG_VIDEO_SAMSUNG_EXYNOS_GSC=m
+ CONFIG_VIDEO_STI_BDISP=m
+ CONFIG_VIDEO_STI_HVA=m
+ CONFIG_VIDEO_STI_DELTA=m
++CONFIG_VIDEO_RENESAS_FDP1=m
+ CONFIG_VIDEO_RENESAS_JPU=m
+ CONFIG_VIDEO_RENESAS_VSP1=m
+ CONFIG_V4L_TEST_DRIVERS=y
+-- 
+2.11.0
