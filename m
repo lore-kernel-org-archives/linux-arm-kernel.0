@@ -1,79 +1,62 @@
-From: joe@perches.com (Joe Perches)
-Date: Fri, 28 Sep 2018 15:04:55 -0700
-Subject: Bad MAINTAINERS pattern in section 'Texas Instruments' System Control
- Interface (TISCI) Protocol Driver'
-Message-ID: <20180928220455.31806-1-joe@perches.com>
+From: jolly.shah@xilinx.com (Jolly Shah)
+Date: Fri, 28 Sep 2018 15:17:56 -0700
+Subject: [PATCH v5 0/4] drivers: clk: Add ZynqMP clock driver support
+Message-ID: <1538173080-7597-1-git-send-email-jollys@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please fix this defect appropriately.
+This patchset adds CCF compliant clock driver for ZynqMP.Clock driver queries 
+supported clock information from firmware and regiters pll and output clocks with CCF.
 
-linux-next MAINTAINERS section:
+This patch series is earlier reveiwed as part of FW patchset (https://patchwork.kernel.org/cover/10555405/). 
+FW driver from that patchset is merged. This patchset contains only clock driver and is based on top of 
+xilinx firmware patch set available in below tree:
+https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git/log/?h=next/drivers
 
-	14531	Texas Instruments' System Control Interface (TISCI) Protocol Driver
-	14532	M:	Nishanth Menon <nm@ti.com>
-	14533	M:	Tero Kristo <t-kristo@ti.com>
-	14534	M:	Santosh Shilimkar <ssantosh@kernel.org>
-	14535	L:	linux-arm-kernel at lists.infradead.org
-	14536	S:	Maintained
-	14537	F:	Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-	14538	F:	drivers/firmware/ti_sci*
-	14539	F:	include/linux/soc/ti/ti_sci_protocol.h
-	14540	F:	Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
--->	14541	F:	include/dt-bindings/genpd/k2g.h
-	14542	F:	drivers/soc/ti/ti_sci_pm_domains.c
-	14543	F:	Documentation/devicetree/bindings/reset/ti,sci-reset.txt
-	14544	F:	Documentation/devicetree/bindings/clock/ti,sci-clk.txt
-	14545	F:	drivers/clk/keystone/sci-clk.c
-	14546	F:	drivers/reset/reset-ti-sci.c
-
-Commit that introduced this:
-
-commit 7cc119f29b197f967161ca94c9d5cb5073b4b52b
- Author: Dave Gerlach <d-gerlach@ti.com>
- Date:   Tue Apr 4 08:59:27 2017 -0700
+v5:
+ - Added "Acked-by: Olof Johansson <olof@lixom.net>" for patches
  
-     dt-bindings: Add TI SCI PM Domains
-     
-     Add a generic power domain implementation, TI SCI PM Domains, that
-     will hook into the genpd framework and allow the TI SCI protocol to
-     control device power states.
-     
-     Also, provide macros representing each device index as understood
-     by TI SCI to be used in the device node power-domain references.
-     These are identifiers for the K2G devices managed by the PMMC.
-     
-     Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
-     Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-     Acked-by: Rob Herring <robh@kernel.org>
-     Signed-off-by: Nishanth Menon <nm@ti.com>
-     Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-     Signed-off-by: Santosh Shilimkar <ssantosh@kernel.org>
+v4:
+ - Fixed minor review comments received for v3 patchset
  
-  .../devicetree/bindings/soc/ti/sci-pm-domain.txt   | 57 ++++++++++++++
-  MAINTAINERS                                        |  2 +
-  include/dt-bindings/genpd/k2g.h                    | 90 ++++++++++++++++++++++
-  3 files changed, 149 insertions(+)
+v3:
+ - Added check to pass only valid ioctls for ioctl eemi api
+ - Added eemi documentation including ioctl details
 
-Last commit with include/dt-bindings/genpd/k2g.h
+Jolly Shah (1):
+  drivers: clk: Add ZynqMP clock driver
 
-commit d16645054d2f55e4011c9725ddf2dbe6177e942a
-Author: Dave Gerlach <d-gerlach@ti.com>
-Date:   Fri Jul 21 09:38:36 2017 -0700
+Rajan Vaja (3):
+  Documentation: xilinx: Add documentation for eemi APIs
+  firmware: xilinx: Add zynqmp IOCTL API for device control
+  dt-bindings: clock: Add bindings for ZynqMP clock driver
 
-    dt-bindings: Drop k2g genpd device ID macros
-    
-    Commit 7cc119f29b19 ("dt-bindings: Add TI SCI PM Domains") introduced a
-    number of K2G_DEV_x macros to represent each device ID available on the
-    K2G platform for use by the genpd, clock, and reset drivers. Rather than
-    use these macros, which are only used in the device tree for property
-    values and not actually used by the drivers, let's just use the device
-    ID number directly in the device tree to avoid macro bloat.
-    
-    Acked-by: Rob Herring <robh@kernel.org>
-    Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-    Signed-off-by: Santosh Shilimkar <ssantosh@kernel.org>
+ .../firmware/xilinx/xlnx,zynqmp-firmware.txt       |  53 ++
+ Documentation/xilinx/eemi.txt                      |  67 ++
+ drivers/clk/Kconfig                                |   1 +
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/zynqmp/Kconfig                         |  10 +
+ drivers/clk/zynqmp/Makefile                        |   4 +
+ drivers/clk/zynqmp/clk-gate-zynqmp.c               | 144 +++++
+ drivers/clk/zynqmp/clk-mux-zynqmp.c                | 141 ++++
+ drivers/clk/zynqmp/clk-zynqmp.h                    |  68 ++
+ drivers/clk/zynqmp/clkc.c                          | 716 +++++++++++++++++++++
+ drivers/clk/zynqmp/divider.c                       | 217 +++++++
+ drivers/clk/zynqmp/pll.c                           | 335 ++++++++++
+ drivers/firmware/xilinx/zynqmp.c                   |  42 ++
+ include/dt-bindings/clock/xlnx,zynqmp-clk.h        | 116 ++++
+ include/linux/firmware/xlnx-zynqmp.h               |   5 +-
+ 15 files changed, 1919 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/xilinx/eemi.txt
+ create mode 100644 drivers/clk/zynqmp/Kconfig
+ create mode 100644 drivers/clk/zynqmp/Makefile
+ create mode 100644 drivers/clk/zynqmp/clk-gate-zynqmp.c
+ create mode 100644 drivers/clk/zynqmp/clk-mux-zynqmp.c
+ create mode 100644 drivers/clk/zynqmp/clk-zynqmp.h
+ create mode 100644 drivers/clk/zynqmp/clkc.c
+ create mode 100644 drivers/clk/zynqmp/divider.c
+ create mode 100644 drivers/clk/zynqmp/pll.c
+ create mode 100644 include/dt-bindings/clock/xlnx,zynqmp-clk.h
 
- .../devicetree/bindings/soc/ti/sci-pm-domain.txt   |  5 +-
- include/dt-bindings/genpd/k2g.h                    | 90 ----------------------
- 2 files changed, 3 insertions(+), 92 deletions(-)
+-- 
+2.7.4
