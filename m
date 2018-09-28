@@ -1,50 +1,80 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Sep 2018 17:39:36 +0200
-Subject: [GIT PULL 4/5] ARM: tegra: Device tree changes for v4.20-rc1
-In-Reply-To: <20180927205942.30878-4-thierry.reding@gmail.com>
-References: <20180927205942.30878-1-thierry.reding@gmail.com>
- <20180927205942.30878-4-thierry.reding@gmail.com>
-Message-ID: <CAK8P3a1h0Z_ekvy9kQQTsjaVL5DqWNUN8jTXkGXEeAD0p_fHkg@mail.gmail.com>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Fri, 28 Sep 2018 23:41:17 +0800
+Subject: [PATCH v5 4/9] PCI: mediatek: Convert to use pci_host_probe()
+In-Reply-To: <1538129080-8206-5-git-send-email-honghui.zhang@mediatek.com>
+References: <1538129080-8206-1-git-send-email-honghui.zhang@mediatek.com>
+ <1538129080-8206-5-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <1538149277.23182.7.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 27, 2018 at 10:59 PM Thierry Reding
-<thierry.reding@gmail.com> wrote:
->
-> Hi ARM SoC maintainers,
->
-> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
->
->   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
->
-> are available in the Git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.20-arm-dt
->
-> for you to fetch changes up to ebea2a43fdafdbce918bd7e200b709d6c33b9f3b:
->
->   ARM: dts: paz00: fix wakeup gpio keycode (2018-09-26 17:29:41 +0200)
-> ----------------------------------------------------------------
-> ARM: tegra: Device tree changes for v4.20-rc1
->
-> This contains a massive amount of changes from Marcel Ziswiler for
-> various boards by Toradex.
->
+On Fri, 2018-09-28 at 18:04 +0800, honghui.zhang at mediatek.com wrote:
+> From: Honghui Zhang <honghui.zhang@mediatek.com>
+> 
+> Part of mtk_pcie_register_host is an open-coded version of
+> pci_host_probe(). So instead of duplicating this code, use
+> pci_host_probe() directly and remove mtk_pcie_register_host.
+> 
+> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> ---
+>  drivers/pci/controller/pcie-mediatek.c | 37 ++++++++--------------------------
+>  1 file changed, 8 insertions(+), 29 deletions(-)
+> 
+> diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
+> index e2c4127..cbf4543 100644
+> --- a/drivers/pci/controller/pcie-mediatek.c
+> +++ b/drivers/pci/controller/pcie-mediatek.c
+> @@ -1125,34 +1125,6 @@ static int mtk_pcie_request_resources(struct mtk_pcie *pcie)
+>  	return 0;
+>  }
+>  
+> -static int mtk_pcie_register_host(struct pci_host_bridge *host)
+> -{
+> -	struct mtk_pcie *pcie = pci_host_bridge_priv(host);
+> -	struct pci_bus *child;
+> -	int err;
 
-> Marcel Ziswiler (127):
->       ARM: dts: tegra30: fix xcvr-setup-use-fuses
->       ARM: dts: tegra20: restore address order
->       ARM: dts: tegra20/tegra30: add pmu interrupt-affinity
->       ARM: tegra: apalis_t30: fix mmc1 cmd pull-up
->       ARM: tegra: apalis_t30: pull-up sd card detect pins
->       ARM: tegra: apalis_t30: add local-mac-address property
-...
+To make the patch simple, could we keep these host->*. and return
+pci_host_probe() directly?
 
-Pulled into next/dt
-
-I see nothing wrong with the individual changes,  but should note that
-they are overly fine-grained in some cases. There are several
-obvious cleanup that only touch one or two lines, in this case
-I would prefer them to be combined for easier review.
-
-           Arnd
+> -	host->busnr = pcie->busn.start;
+> -	host->dev.parent = pcie->dev;
+> -	host->ops = pcie->soc->ops;
+> -	host->map_irq = of_irq_parse_and_map_pci;
+> -	host->swizzle_irq = pci_common_swizzle;
+> -	host->sysdata = pcie;
+> -
+> -	err = pci_scan_root_bus_bridge(host);
+> -	if (err < 0)
+> -		return err;
+> -
+> -	pci_bus_size_bridges(host->bus);
+> -	pci_bus_assign_resources(host->bus);
+> -
+> -	list_for_each_entry(child, &host->bus->children, node)
+> -		pcie_bus_configure_settings(child);
+> -
+> -	pci_bus_add_devices(host->bus);
+> -
+> -	return 0;
+> -}
+> -
+>  static int mtk_pcie_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+> @@ -1179,7 +1151,14 @@ static int mtk_pcie_probe(struct platform_device *pdev)
+>  	if (err)
+>  		goto put_resources;
+>  
+> -	err = mtk_pcie_register_host(host);
+> +	host->busnr = pcie->busn.start;
+> +	host->dev.parent = pcie->dev;
+> +	host->ops = pcie->soc->ops;
+> +	host->map_irq = of_irq_parse_and_map_pci;
+> +	host->swizzle_irq = pci_common_swizzle;
+> +	host->sysdata = pcie;
+> +
+> +	err = pci_host_probe(host);
+>  	if (err)
+>  		goto put_resources;
+>  
