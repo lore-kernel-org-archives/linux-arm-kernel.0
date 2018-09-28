@@ -1,55 +1,35 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 28 Sep 2018 12:23:24 +0200
-Subject: [PATCH 09/21] dt-bindings: power: Add r8a774c0 SYSC power domain
- definitions
+Date: Fri, 28 Sep 2018 12:23:36 +0200
+Subject: [PATCH 21/21] dt-bindings: apmu: Document r8a7744 support
 In-Reply-To: <cover.1538128711.git.horms+renesas@verge.net.au>
 References: <cover.1538128711.git.horms+renesas@verge.net.au>
-Message-ID: <cb391265bca42f17c59d90e842a6bc582e3e2211.1538128711.git.horms+renesas@verge.net.au>
+Message-ID: <fae210bb5bfbd29118e18881f7108c6bd59293b9.1538128711.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+From: Biju Das <biju.das@bp.renesas.com>
 
-This patch adds power domain indices for RZ/G2E.
+Document APMU and SMP enable method for RZ/G1N (R8A7744) SoC.
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- include/dt-bindings/power/r8a774c0-sysc.h | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
- create mode 100644 include/dt-bindings/power/r8a774c0-sysc.h
+ Documentation/devicetree/bindings/power/renesas,apmu.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/include/dt-bindings/power/r8a774c0-sysc.h b/include/dt-bindings/power/r8a774c0-sysc.h
-new file mode 100644
-index 000000000000..9922d4c6f87d
---- /dev/null
-+++ b/include/dt-bindings/power/r8a774c0-sysc.h
-@@ -0,0 +1,25 @@
-+/* SPDX-License-Identifier: GPL-2.0
-+ *
-+ * Copyright (C) 2018 Renesas Electronics Corp.
-+ */
-+#ifndef __DT_BINDINGS_POWER_R8A774C0_SYSC_H__
-+#define __DT_BINDINGS_POWER_R8A774C0_SYSC_H__
-+
-+/*
-+ * These power domain indices match the numbers of the interrupt bits
-+ * representing the power areas in the various Interrupt Registers
-+ * (e.g. SYSCISR, Interrupt Status Register)
-+ */
-+
-+#define R8A774C0_PD_CA53_CPU0		5
-+#define R8A774C0_PD_CA53_CPU1		6
-+#define R8A774C0_PD_A3VC		14
-+#define R8A774C0_PD_3DG_A		17
-+#define R8A774C0_PD_3DG_B		18
-+#define R8A774C0_PD_CA53_SCU		21
-+#define R8A774C0_PD_A2VC1		26
-+
-+/* Always-on power area */
-+#define R8A774C0_PD_ALWAYS_ON		32
-+
-+#endif /* __DT_BINDINGS_POWER_R8A774C0_SYSC_H__ */
+diff --git a/Documentation/devicetree/bindings/power/renesas,apmu.txt b/Documentation/devicetree/bindings/power/renesas,apmu.txt
+index e6f47c9b3d0e..5f24586c8cf3 100644
+--- a/Documentation/devicetree/bindings/power/renesas,apmu.txt
++++ b/Documentation/devicetree/bindings/power/renesas,apmu.txt
+@@ -8,6 +8,7 @@ Required properties:
+ - compatible: Should be "renesas,<soctype>-apmu", "renesas,apmu" as fallback.
+ 	      Examples with soctypes are:
+ 		- "renesas,r8a7743-apmu" (RZ/G1M)
++		- "renesas,r8a7744-apmu" (RZ/G1N)
+ 		- "renesas,r8a7745-apmu" (RZ/G1E)
+ 		- "renesas,r8a77470-apmu" (RZ/G1C)
+ 		- "renesas,r8a7790-apmu" (R-Car H2)
 -- 
 2.11.0
