@@ -1,33 +1,41 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Fri, 28 Sep 2018 18:04:39 +0200
-Subject: [PATCH] arm: support big-endian for the virt architecture
-In-Reply-To: <CAK8P3a0+s6DM=QUqS_KrNp+95aDj2QTsWb+w73piwLsQFvq+pg@mail.gmail.com>
-References: <20180926135110.13061-1-Jason@zx2c4.com>
- <CAK8P3a0+s6DM=QUqS_KrNp+95aDj2QTsWb+w73piwLsQFvq+pg@mail.gmail.com>
-Message-ID: <CAHmME9o_6o_wB00kASJdqJyWt2wFH2FqdzXOm8RLA5VeCibDJg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Sep 2018 17:59:44 +0200
+Subject: [GIT PULL 2/3] omap1 gpio clean-up for v4.20
+In-Reply-To: <pull-1537983432-167273@atomide.com-2>
+References: <pull-1537983432-167273@atomide.com>
+ <pull-1537983432-167273@atomide.com-2>
+Message-ID: <CAK8P3a38H1Uov=YYxLD5QKBrnFEjhGvV1GJUY095RU8LuCmr8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Wed, Sep 26, 2018 at 7:40 PM Tony Lindgren <tony@atomide.com> wrote:
+>
+> From: "Tony Lindgren" <tony@atomide.com>
+>
+> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+>
+>   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+>
+> are available in the Git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.20/omap1-signed
+>
+> for you to fetch changes up to 1137ceee76ba8b8c698e11b7150e35524f071bda:
+>
+>   ARM: OMAP1: ams-delta: Don't request unused GPIOs (2018-09-20 14:24:42 -0700)
+>
+> ----------------------------------------------------------------
+> A series of omap1 gpio changes for ams-delta
+>
+> Janusz Krzysztofik has cleaned up ams-delta gpio usage along with
+> generic gpio framework improvments. This series contains the omap1
+> specific clean-up for ams-delta modem and unused gpios.
+>
+> Note that this conflicts with the gpio-omap changes queued into
+> an immutable gpio branch ib-omap for the gpio-omap.h header file.
+> The merge resolution is to drop the IS_BUILTIN(CONFIG_GPIO_OMAP)
+> section and keep the #endif tagged for __ASSEMBLER__.
 
-On Fri, Sep 28, 2018 at 5:59 PM Arnd Bergmann <arnd@arndb.de> wrote:
-> Applied for 4.20 with subject line changed s/arm/ARM/, thanks!
+Pulled into next/soc, thanks!
 
-Thanks.
-
-> I think most people just build a 'defconfig' kernel, which includes
-> multiple platforms that use ARCH_SUPPORTS_BIG_ENDIAN.
-
-Right, that's what it looked like. In my case, I'm doing CI on some
-homebrewed infra, where I'm building lots of kernels for lots of
-architectures and testing them in qemu with various tests _for each
-and every commit_. Not having a server farm as impressive as Intel's
-0-day infra, getting compilation times down is rather important.
-
-> Your patch is certainly fine for 4.20, but since we haven't decided
-> what the proper fix should be, I didn't want to push this for 4.19.
-
-Shucks. It's not like this patch makes the situation worse; it makes
-it better. But I understand and will wait for 4.20/5.0.
-
-Jason
+      Arnd
