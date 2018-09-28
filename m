@@ -1,137 +1,119 @@
-From: fernando.ae2017@gmail.com (Fernando AE)
-Date: Fri, 28 Sep 2018 11:23:24 +0200
-Subject: i.MX6UL external bus access, simple kernel module
-Message-ID: <CAK3Qp=Wp1ibFqeNVoKGgN_FVT63V-nhW9deSbdOWPbTYaAQc=w@mail.gmail.com>
+From: sakari.ailus@linux.intel.com (Sakari Ailus)
+Date: Fri, 28 Sep 2018 12:38:33 +0300
+Subject: [PATCH v11 1/2] dt-bindings: media: Add Allwinner V3s Camera
+ Sensor Interface (CSI)
+In-Reply-To: <1537951204-24672-1-git-send-email-yong.deng@magewell.com>
+References: <1537951204-24672-1-git-send-email-yong.deng@magewell.com>
+Message-ID: <20180928093833.gwmskm2jvby6x4s6@paasikivi.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+Hi Yong,
 
-We are kicking off a new project based on the i.MX6UL processor. For
-testing purposes, we are trying to blink a LED that is mapped to
-0x50005002, going through the External Interface Module (EIM) of the
-processor.
+On Wed, Sep 26, 2018 at 04:40:04PM +0800, Yong Deng wrote:
+> Add binding documentation for Allwinner V3s CSI.
+> 
+> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
 
-We intend for now to let U-Boot set up the EIM, so that external
-accesses in Linux will work without re-configuring the external bus.
+I know... but I have a few more comments.
 
-In U-Boot, simply doing:
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Yong Deng <yong.deng@magewell.com>
+> ---
+>  .../devicetree/bindings/media/sun6i-csi.txt        | 59 ++++++++++++++++++++++
+>  1 file changed, 59 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+> new file mode 100644
+> index 000000000000..2ff47a9507a6
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+> @@ -0,0 +1,59 @@
+> +Allwinner V3s Camera Sensor Interface
+> +-------------------------------------
+> +
+> +Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
+> +interface and CSI1 is used for parallel interface.
+> +
+> +Required properties:
+> +  - compatible: value must be "allwinner,sun8i-v3s-csi"
+> +  - reg: base address and size of the memory-mapped region.
+> +  - interrupts: interrupt associated to this IP
+> +  - clocks: phandles to the clocks feeding the CSI
+> +    * bus: the CSI interface clock
+> +    * mod: the CSI module clock
+> +    * ram: the CSI DRAM clock
+> +  - clock-names: the clock names mentioned above
+> +  - resets: phandles to the reset line driving the CSI
+> +
+> +Each CSI node should contain one 'port' child node with one child 'endpoint'
+> +node, according to the bindings defined in
+> +Documentation/devicetree/bindings/media/video-interfaces.txt. As mentioned
+> +above, the endpoint's bus type should be MIPI CSI-2 for CSI0 and parallel or
+> +Bt656 for CSI1.
 
-mw.b 0x50005002 1
-mw.b 0x50005002 0
+Which port represents CSI0 and which one is CSI1? That needs to be
+documented.
 
-can already blink the LED.
+> +
+> +Endpoint node properties for CSI1
 
-In the Linux side, we are using the following DTB config:
+How about CSI0? I'd expect at least data-lanes, and clock-lanes as well if
+the hardware supports lane mapping.
 
-/ {
-    model = "NXP i.MX6 UltraLite";
-    compatible = "fsl,imx6ul";
+> +---------------------------------
+> +
+> +- remote-endpoint	: (required) a phandle to the bus receiver's endpoint
+> +			   node
+> +- bus-width:		: (required) must be 8, 10, 12 or 16
+> +- pclk-sample		: (optional) (default: sample on falling edge)
 
-    chosen {
-        stdout-path = &uart1; /* Default output is uart 1 */
-    };
+Could you add that video-interfaces.txt contains documentation of these
+properties as well? There's a reference above but only discusses port and
+endpoint nodes.
 
-    memory {
-        reg = <0x80000000 0x10000000>;  /* 2Gb RAM */
-    };
+> +- hsync-active		: (only required for parallel)
+> +- vsync-active		: (only required for parallel)
 
-    reserved-memory {
-        #address-cells = <1>;
-        #size-cells = <1>;
-        ranges;
+As you support both Bt656 and parallel (with sync signals), you can detect
+the interface type from the presence of these properties. I think you
+should also say that these properties are not allowed on Bt656. So I'd
+change this to e.g.
 
-        /* EIM bus access to extension cards, etc */
-        reserved_fpga: buffer at 0 {
-            reg = <0x50000000 0x9000>;
-        };
-    };
+	(required; parallel-only)
 
-    reserved-driver at 0 {
-        compatible = "reserved-memory";
-        memory-region = <&reserved_fpga>;
-    };
-};
+> +
+> +Example:
+> +
+> +csi1: csi at 1cb4000 {
+> +	compatible = "allwinner,sun8i-v3s-csi";
+> +	reg = <0x01cb4000 0x1000>;
+> +	interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
+> +	clocks = <&ccu CLK_BUS_CSI>,
+> +		 <&ccu CLK_CSI1_SCLK>,
+> +		 <&ccu CLK_DRAM_CSI>;
+> +	clock-names = "bus", "mod", "ram";
+> +	resets = <&ccu RST_BUS_CSI>;
+> +
+> +	port {
+> +		/* Parallel bus endpoint */
+> +		csi1_ep: endpoint {
+> +			remote-endpoint = <&adv7611_ep>;
+> +			bus-width = <16>;
+> +
+> +			/* If hsync-active/vsync-active are missing,
+> +			   embedded BT.656 sync is used */
+> +			hsync-active = <0>; /* Active low */
+> +			vsync-active = <0>; /* Active low */
+> +			pclk-sample = <1>;  /* Rising */
+> +		};
+> +	};
+> +};
 
-And a kernel module compiled out of the tree:
-
-int init_module(void)
-{
-    char *name;
-    char *led;
-    int ret;
-    phys_addr_t paddr;
-    struct device_node *device;
-    struct resource r;
-
-    printk(KERN_INFO "Turning on LED USR\n");
-
-    /* Get reserved memory region from Device-tree */
-    name = "reserved-memory";
-    device = of_find_compatible_node(NULL, NULL, name);
-    if (!device) {
-        printk(KERN_INFO "No device %s found\n", name);
-        goto error1;
-    } else {
-        printk(KERN_INFO "Device %s found\n", name);
-    }
-
-    device = of_parse_phandle(device, "memory-region", 0);
-    if (!device) {
-        printk(KERN_INFO "No %s specified\n", "memory-region");
-        goto error1;
-    } else {
-        printk(KERN_INFO "Device memory-region found\n", "memory-region");
-    }
-
-    ret = of_address_to_resource(device, 0, &r);
-    if (ret) {
-        printk(KERN_INFO "No memory address assigned to the region\n");
-        goto error1;
-    } else {
-        printk(KERN_INFO "Memory address assigned to the region found\n");
-    }
-
-    paddr = r.start;
-    led = memremap(r.start, resource_size(&r), MEMREMAP_WB);
-
-    printk(KERN_INFO "Allocated reserved memory, vaddr: 0x%0lX, paddr:
-0x%0lX (paddr.end: 0x%0lX)\n",
-            (long)led, (long)paddr, (long)r.end);
-
-    led += 0x5002;
-
-    printk(KERN_INFO "Writing to virtual address 0x%0lX\n", (long)led);
-
-    *led = 0;
-
-    /*
-     * A non 0 return means init_module failed; module can't be loaded.
-     */
-    return 0;
-error1:
-    return 1;
-}
-
-When I insmod the module I get:
-
-root at machine:~# /sbin/insmod /home/greenbird/simple-leds.ko
-simple_leds: no symbol version for module_layout
-simple_leds: loading out-of-tree module taints kernel.
-Turning on LED USR
-Device reserved-memory found
-Device memory-region found
-Memory address assigned to the region found
-Allocated reserved memory, vaddr: 0xA0B10000, paddr: 0x50000000
-(paddr.end: 0x50008FFF)
-Writing to virtual address 0xA0B15002
-
-Which means that the DTB seems to be correctly configured, the
-physical address is mapped to a logical one, but the processor resets
-after a few seconds, without any further message.
-
-Could someone try to help us?
-
-Thanks in advance.
+-- 
 Kind regards,
-Fernando A. E.
+
+Sakari Ailus
+sakari.ailus at linux.intel.com
