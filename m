@@ -1,110 +1,278 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 28 Sep 2018 14:39:20 +0100
-Subject: [RFC PATCH v2 16/23] KVM: arm64: Enumerate SVE register indices for
- KVM_GET_REG_LIST
+Date: Fri, 28 Sep 2018 14:39:16 +0100
+Subject: [RFC PATCH v2 12/23] KVM: arm64/sve: System register context switch
+ and access support
 In-Reply-To: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
 References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1538141967-15375-17-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1538141967-15375-13-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch includes the SVE register IDs in the list returned by
-KVM_GET_REG_LIST, as appropriate.
+This patch adds the necessary support for context switching ZCR_EL1
+for each vcpu.
 
-On a non-SVE-enabled vcpu, no extra IDs are added.
+ZCR_EL1 is trapped alongside the FPSIMD/SVE registers, so it makes
+sense for it to be handled as part of the guest FPSIMD/SVE context
+for context switch purposes instead of handling it as a general
+system register.  This means that it can be switched in lazily at
+the appropriate time.  No effort is made to track host context for
+this register, since SVE requires VHE: thus the hosts's value for
+this register lives permanently in ZCR_EL2 and does not alias the
+guest's value at any time.
 
-On an SVE-enabled vcpu, the appropriate number of slice IDs are
-enumerated for each SVE register, depending on the maximum vector
-length for the vcpu.
+The Hyp switch and fpsimd context handling code is extended
+appropriately.
+
+Accessors are added in sys_regs.c to expose the SVE system
+registers and ID register fields.  Because these need to be
+conditionally visible based on the guest configuration, they are
+implemented separately for now rather than by use of the generic
+system register helpers.  This may be abstracted better later on
+when/if there are more features requiring this model.
+
+ID_AA64ZFR0_EL1 is RO-RAZ for MRS/MSR when SVE is disabled for the
+guest, but for compatibility with non-SVE aware KVM implementations
+the register should not be enumerated at all for KVM_GET_REG_LIST
+in this case.  For consistency we also reject ioctl access to the
+register.  This ensures that a non-SVE-enabled guest looks the same
+to userspace, irrespective of whether the kernel KVM implementation
+supports SVE.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
 
 Changes since RFCv1:
 
- * Simplify enumerate_sve_regs() based on Andrew Jones' approach.
+ * The conditional visibility logic in sys_regs.c has been
+   simplified.
 
- * Reg copying loops are inverted for brevity, since the order we
-   spit out the regs in doesn't really matter.
+ * The guest's ZCR_EL1 is now treated as part of the FPSIMD/SVE state
+   for switching purposes.  Any access to this register before it is
+   switched in generates an SVE trap, so we have a change to switch it
+   along with the vector registers.
 
-(I tried to keep part of my approach to avoid the duplicate logic
-between num_sve_regs() and copy_sve_reg_indices(), but although
-it works in principle, gcc fails to fully collapse the num_regs()
-case... so I gave up.  The two functions need to be manually kept
-consistent, but hopefully that's fairly straightforward.)
+   Because SVE is only available with VHE there is no need ever to
+   restore the host's version of this register (which instead lives
+   permanently in ZCR_EL2).
 ---
- arch/arm64/kvm/guest.c | 45 +++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
+ arch/arm64/include/asm/kvm_host.h |   1 +
+ arch/arm64/include/asm/sysreg.h   |   3 ++
+ arch/arm64/kvm/fpsimd.c           |   9 +++-
+ arch/arm64/kvm/hyp/switch.c       |   4 ++
+ arch/arm64/kvm/sys_regs.c         | 111 ++++++++++++++++++++++++++++++++++++--
+ 5 files changed, 123 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index 320db0f..89eab68 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -323,6 +323,46 @@ static int get_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	return copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id)) ? -EFAULT : 0;
- }
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 20baf4a..76cbb95e 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -110,6 +110,7 @@ enum vcpu_sysreg {
+ 	SCTLR_EL1,	/* System Control Register */
+ 	ACTLR_EL1,	/* Auxiliary Control Register */
+ 	CPACR_EL1,	/* Coprocessor Access Control */
++	ZCR_EL1,	/* SVE Control */
+ 	TTBR0_EL1,	/* Translation Table Base Register 0 */
+ 	TTBR1_EL1,	/* Translation Table Base Register 1 */
+ 	TCR_EL1,	/* Translation Control Register */
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index c147093..dbac42f 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -418,6 +418,9 @@
+ #define SYS_ICH_LR14_EL2		__SYS__LR8_EL2(6)
+ #define SYS_ICH_LR15_EL2		__SYS__LR8_EL2(7)
  
-+static unsigned long num_sve_regs(const struct kvm_vcpu *vcpu)
++/* VHE encodings for architectural EL0/1 system registers */
++#define SYS_ZCR_EL12			sys_reg(3, 5, 1, 2, 0)
++
+ /* Common SCTLR_ELx flags. */
+ #define SCTLR_ELx_EE    (1 << 25)
+ #define SCTLR_ELx_IESB	(1 << 21)
+diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
+index 55654cb..29e5585 100644
+--- a/arch/arm64/kvm/fpsimd.c
++++ b/arch/arm64/kvm/fpsimd.c
+@@ -102,6 +102,9 @@ void kvm_arch_vcpu_ctxsync_fp(struct kvm_vcpu *vcpu)
+ void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu)
+ {
+ 	unsigned long flags;
++	bool host_has_sve = system_supports_sve();
++	bool guest_has_sve =
++		host_has_sve && (vcpu->arch.flags & KVM_ARM64_FP_ENABLED);
+ 
+ 	local_irq_save(flags);
+ 
+@@ -109,7 +112,11 @@ void kvm_arch_vcpu_put_fp(struct kvm_vcpu *vcpu)
+ 		/* Clean guest FP state to memory and invalidate cpu view */
+ 		fpsimd_save();
+ 		fpsimd_flush_cpu_state();
+-	} else if (system_supports_sve()) {
++
++		if (guest_has_sve)
++			vcpu->arch.ctxt.sys_regs[ZCR_EL1] =
++				read_sysreg_s(SYS_ZCR_EL12);
++	} else if (host_has_sve) {
+ 		/*
+ 		 * The FPSIMD/SVE state in the CPU has not been touched, and we
+ 		 * have SVE (and VHE): CPACR_EL1 (alias CPTR_EL2) has been
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index ca46153..085ed06 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -366,6 +366,10 @@ static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
+ 
+ 	__fpsimd_restore_state(&vcpu->arch.ctxt.gp_regs.fp_regs);
+ 
++	if (system_supports_sve() &&
++	    vcpu->arch.flags & KVM_ARM64_GUEST_HAS_SVE)
++		write_sysreg_s(vcpu->arch.ctxt.sys_regs[ZCR_EL1], SYS_ZCR_EL12);
++
+ 	/* Skip restoring fpexc32 for AArch64 guests */
+ 	if (!(read_sysreg(hcr_el2) & HCR_RW))
+ 		write_sysreg(vcpu->arch.ctxt.sys_regs[FPEXC32_EL2],
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index adb6cbd..6f03211 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -1036,10 +1036,7 @@ static u64 read_id_reg(const struct kvm_vcpu *vcpu,
+ 			 (u32)r->CRn, (u32)r->CRm, (u32)r->Op2);
+ 	u64 val = raz ? 0 : read_sanitised_ftr_reg(id);
+ 
+-	if (id == SYS_ID_AA64PFR0_EL1) {
+-		if (val & (0xfUL << ID_AA64PFR0_SVE_SHIFT))
+-			kvm_debug("SVE unsupported for guests, suppressing\n");
+-
++	if (id == SYS_ID_AA64PFR0_EL1 && !vcpu_has_sve(vcpu)) {
+ 		val &= ~(0xfUL << ID_AA64PFR0_SVE_SHIFT);
+ 	} else if (id == SYS_ID_AA64MMFR1_EL1) {
+ 		if (val & (0xfUL << ID_AA64MMFR1_LOR_SHIFT))
+@@ -1083,6 +1080,105 @@ static int reg_from_user(u64 *val, const void __user *uaddr, u64 id);
+ static int reg_to_user(void __user *uaddr, const u64 *val, u64 id);
+ static u64 sys_reg_to_index(const struct sys_reg_desc *reg);
+ 
++#ifdef CONFIG_ARM64_SVE
++static bool sve_check_present(const struct kvm_vcpu *vcpu,
++			      const struct sys_reg_desc *rd)
 +{
-+	const unsigned int slices = DIV_ROUND_UP(
-+		vcpu->arch.sve_max_vl,
-+		KVM_REG_SIZE(KVM_REG_ARM64_SVE_ZREG(0, 0)));
-+
-+	if (!vcpu_has_sve(vcpu))
-+		return 0;
-+
-+	return slices * (SVE_NUM_PREGS + SVE_NUM_ZREGS + 1 /* FFR */);
++	return vcpu_has_sve(vcpu);
 +}
 +
-+static int copy_sve_reg_indices(const struct kvm_vcpu *vcpu, u64 __user **uind)
++static bool access_zcr_el1(struct kvm_vcpu *vcpu,
++			   struct sys_reg_params *p,
++			   const struct sys_reg_desc *rd)
 +{
-+	const unsigned int slices = DIV_ROUND_UP(
-+		vcpu->arch.sve_max_vl,
-+		KVM_REG_SIZE(KVM_REG_ARM64_SVE_ZREG(0, 0)));
-+	unsigned int i, n;
++	/*
++	 * ZCR_EL1 access is handled directly in Hyp as part of the FPSIMD/SVE
++	 * context, so we should only arrive here for non-SVE guests:
++	 */
++	WARN_ON(vcpu_has_sve(vcpu));
 +
++	kvm_inject_undefined(vcpu);
++	return false;
++}
++
++static int get_zcr_el1(struct kvm_vcpu *vcpu,
++		       const struct sys_reg_desc *rd,
++		       const struct kvm_one_reg *reg, void __user *uaddr)
++{
++	if (!vcpu_has_sve(vcpu))
++		return -ENOENT;
++
++	return reg_to_user(uaddr, &vcpu->arch.ctxt.sys_regs[ZCR_EL1],
++			   reg->id);
++}
++
++static int set_zcr_el1(struct kvm_vcpu *vcpu,
++		       const struct sys_reg_desc *rd,
++		       const struct kvm_one_reg *reg, void __user *uaddr)
++{
++	if (!vcpu_has_sve(vcpu))
++		return -ENOENT;
++
++	return reg_from_user(&vcpu->arch.ctxt.sys_regs[ZCR_EL1], uaddr,
++			     reg->id);
++}
++
++/* Generate the emulated ID_AA64ZFR0_EL1 value exposed to the guest */
++static u64 guest_id_aa64zfr0_el1(const struct kvm_vcpu *vcpu)
++{
 +	if (!vcpu_has_sve(vcpu))
 +		return 0;
 +
-+	for (i = 0; i < slices; i++) {
-+		for (n = 0; n < SVE_NUM_ZREGS; n++) {
-+			if (put_user(KVM_REG_ARM64_SVE_ZREG(n, i), (*uind)++))
-+				return -EFAULT;
-+		}
++	return read_sanitised_ftr_reg(SYS_ID_AA64ZFR0_EL1);
++}
 +
-+		for (n = 0; n < SVE_NUM_PREGS; n++) {
-+			if (put_user(KVM_REG_ARM64_SVE_PREG(n, i), (*uind)++))
-+				return -EFAULT;
-+		}
++static bool access_id_aa64zfr0_el1(struct kvm_vcpu *vcpu,
++				   struct sys_reg_params *p,
++				   const struct sys_reg_desc *rd)
++{
++	if (p->is_write)
++		return write_to_read_only(vcpu, p, rd);
 +
-+		if (put_user(KVM_REG_ARM64_SVE_FFR(i), (*uind)++))
-+			return -EFAULT;
-+	}
++	p->regval = guest_id_aa64zfr0_el1(vcpu);
++	return true;
++}
++
++static int get_id_aa64zfr0_el1(struct kvm_vcpu *vcpu,
++		const struct sys_reg_desc *rd,
++		const struct kvm_one_reg *reg, void __user *uaddr)
++{
++	u64 val;
++
++	if (!vcpu_has_sve(vcpu))
++		return -ENOENT;
++
++	val = guest_id_aa64zfr0_el1(vcpu);
++	return reg_to_user(uaddr, &val, reg->id);
++}
++
++static int set_id_aa64zfr0_el1(struct kvm_vcpu *vcpu,
++		const struct sys_reg_desc *rd,
++		const struct kvm_one_reg *reg, void __user *uaddr)
++{
++	const u64 id = sys_reg_to_index(rd);
++	int err;
++	u64 val;
++
++	if (!vcpu_has_sve(vcpu))
++		return -ENOENT;
++
++	err = reg_from_user(&val, uaddr, id);
++	if (err)
++		return err;
++
++	/* This is what we mean by invariant: you can't change it. */
++	if (val != guest_id_aa64zfr0_el1(vcpu))
++		return -EINVAL;
 +
 +	return 0;
 +}
++#endif /* CONFIG_ARM64_SVE */
 +
- /**
-  * kvm_arm_num_regs - how many registers do we present via KVM_GET_ONE_REG
+ /*
+  * cpufeature ID register user accessors
   *
-@@ -333,6 +373,7 @@ unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
- 	unsigned long res = 0;
+@@ -1270,7 +1366,11 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	ID_SANITISED(ID_AA64PFR1_EL1),
+ 	ID_UNALLOCATED(4,2),
+ 	ID_UNALLOCATED(4,3),
++#ifdef CONFIG_ARM64_SVE
++	{ SYS_DESC(SYS_ID_AA64ZFR0_EL1), access_id_aa64zfr0_el1, .get_user = get_id_aa64zfr0_el1, .set_user = set_id_aa64zfr0_el1, .check_present = sve_check_present },
++#else
+ 	ID_UNALLOCATED(4,4),
++#endif
+ 	ID_UNALLOCATED(4,5),
+ 	ID_UNALLOCATED(4,6),
+ 	ID_UNALLOCATED(4,7),
+@@ -1307,6 +1407,9 @@ static const struct sys_reg_desc sys_reg_descs[] = {
  
- 	res += num_core_regs();
-+	res += num_sve_regs(vcpu);
- 	res += kvm_arm_num_sys_reg_descs(vcpu);
- 	res += kvm_arm_get_fw_num_regs(vcpu);
- 	res += NUM_TIMER_REGS;
-@@ -357,6 +398,10 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
- 		uindices++;
- 	}
- 
-+	ret = copy_sve_reg_indices(vcpu, &uindices);
-+	if (ret)
-+		return ret;
-+
- 	ret = kvm_arm_copy_fw_reg_indices(vcpu, uindices);
- 	if (ret)
- 		return ret;
+ 	{ SYS_DESC(SYS_SCTLR_EL1), access_vm_reg, reset_val, SCTLR_EL1, 0x00C50078 },
+ 	{ SYS_DESC(SYS_CPACR_EL1), NULL, reset_val, CPACR_EL1, 0 },
++#ifdef CONFIG_ARM64_SVE
++	{ SYS_DESC(SYS_ZCR_EL1), access_zcr_el1, reset_unknown, ZCR_EL1, ~0xfUL, .get_user = get_zcr_el1, .set_user = set_zcr_el1, .check_present = sve_check_present },
++#endif
+ 	{ SYS_DESC(SYS_TTBR0_EL1), access_vm_reg, reset_unknown, TTBR0_EL1 },
+ 	{ SYS_DESC(SYS_TTBR1_EL1), access_vm_reg, reset_unknown, TTBR1_EL1 },
+ 	{ SYS_DESC(SYS_TCR_EL1), access_vm_reg, reset_val, TCR_EL1, 0 },
 -- 
 2.1.4
