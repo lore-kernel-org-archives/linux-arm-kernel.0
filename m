@@ -1,61 +1,60 @@
 From: yang.zheng@rock-chips.com (Zheng Yang)
-Date: Fri, 28 Sep 2018 15:52:08 +0800
-Subject: Fwd: [PATCH v5 2/6] drm/rockchip: dw_hdmi: Allow outputs that
- don't need output switching
-In-Reply-To: <6d4ee8b5-a1fa-23b7-88db-32b2c02833cb@rock-chips.com>
-References: <20180912124740.20343-3-heiko@sntech.de>
- <6d4ee8b5-a1fa-23b7-88db-32b2c02833cb@rock-chips.com>
-Message-ID: <2f56c551-bf56-87c2-34de-540da9c62148@rock-chips.com>
+Date: Fri, 28 Sep 2018 15:52:38 +0800
+Subject: Fwd: [PATCH v5 4/6] drm/rockchip: dw_hdmi: allow including
+ external phys
+In-Reply-To: <4187b1f6-9682-6c3e-741e-0374e3e9165b@rock-chips.com>
+References: <20180912124740.20343-5-heiko@sntech.de>
+ <4187b1f6-9682-6c3e-741e-0374e3e9165b@rock-chips.com>
+Message-ID: <e9f9b542-9865-5832-3829-086ec6a59e3a@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi, Heiko:
 
-Hi, Heiko:
-
-Hi, Heiko:
-
 Reviewed-by: zhengyang <zhengyang@rock-chips.com>
 
->
-> So far we always encountered socs with 2 output crtcs needing the driver
-> to tell the hdmi block which output to connect to. But there also exist
-> socs with only one crtc like the rk3228, rk3328 and rk3368.
->
-> So adapt the register field to simply carry a negative value to signal
-> that no output-switching is necessary.
+> Some variants of the dw-hdmi on Rockchip socs use a separate phy block
+> accessed via the generic phy framework, so allow them to be included
+> if such a phy reference is found.
 >
 > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 > Tested-by: Robin Murphy <robin.murphy@arm.com>
->
-> changes in v3:
-> - fixed wording issue found by Robin Murphy
 > ---
-> ?drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 5 ++++-
-> ?1 file changed, 4 insertions(+), 1 deletion(-)
+> ?drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 10 ++++++++++
+> ?1 file changed, 10 insertions(+)
 >
 > diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c 
 > b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-> index 11309a2a4e43..b09c3531305b 100644
+> index b09c3531305b..57e76dfd5f6d 100644
 > --- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
 > +++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-> @@ -36,7 +36,7 @@
-> ? * @lcdsel_lit: reg value of selecting vop little for HDMI
-> ? */
-> ?struct rockchip_hdmi_chip_data {
-> -??? u32??? lcdsel_grf_reg;
-> +??? int??? lcdsel_grf_reg;
-> ???? u32??? lcdsel_big;
-> ???? u32??? lcdsel_lit;
+> @@ -11,6 +11,7 @@
+> ?#include <linux/mfd/syscon.h>
+> ?#include <linux/module.h>
+> ?#include <linux/platform_device.h>
+> +#include <linux/phy/phy.h>
+> ?#include <linux/regmap.h>
+> ? #include <drm/drm_of.h>
+> @@ -49,6 +50,7 @@ struct rockchip_hdmi {
+> ???? struct clk *vpll_clk;
+> ???? struct clk *grf_clk;
+> ???? struct dw_hdmi *hdmi;
+> +??? struct phy *phy;
 > ?};
-> @@ -245,6 +245,9 @@ static void dw_hdmi_rockchip_encoder_enable(struct 
-> drm_encoder *encoder)
-> ???? u32 val;
-> ???? int ret;
-> ?+??? if (hdmi->chip_data->lcdsel_grf_reg < 0)
-> +??????? return;
+> ? #define to_rockchip_hdmi(x)??? container_of(x, struct rockchip_hdmi, x)
+> @@ -376,6 +378,14 @@ static int dw_hdmi_rockchip_bind(struct device 
+> *dev, struct device *master,
+> ???????? return ret;
+> ???? }
+> ?+??? hdmi->phy = devm_phy_optional_get(dev, "hdmi");
+> +??? if (IS_ERR(hdmi->phy)) {
+> +??????? ret = PTR_ERR(hdmi->phy);
+> +??????? if (ret != -EPROBE_DEFER)
+> +??????????? DRM_DEV_ERROR(hdmi->dev, "failed to get phy\n");
+> +??????? return ret;
+> +??? }
 > +
-> ???? ret = drm_of_encoder_active_endpoint_id(hdmi->dev->of_node, 
-> encoder);
-> ???? if (ret)
-> ???????? val = hdmi->chip_data->lcdsel_lit;
+> ???? drm_encoder_helper_add(encoder, 
+> &dw_hdmi_rockchip_encoder_helper_funcs);
+> ???? drm_encoder_init(drm, encoder, &dw_hdmi_rockchip_encoder_funcs,
+> ????????????? DRM_MODE_ENCODER_TMDS, NULL);
