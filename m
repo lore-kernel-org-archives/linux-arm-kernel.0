@@ -1,49 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 28 Sep 2018 12:23:23 +0200
-Subject: [PATCH 08/21] soc: renesas: Identify RZ/G2E
+Date: Fri, 28 Sep 2018 12:23:27 +0200
+Subject: [PATCH 12/21] dt-bindings: reset: rcar-rst: Document r8a774c0 rst
 In-Reply-To: <cover.1538128711.git.horms+renesas@verge.net.au>
 References: <cover.1538128711.git.horms+renesas@verge.net.au>
-Message-ID: <2bab3d8012ebc463b899ee2c9292bd9282d75257.1538128711.git.horms+renesas@verge.net.au>
+Message-ID: <fe46b8229f287e912b8c8d28bf8dde4cd704c17e.1538128711.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-Add support for identifying the RZ/G2E (r8a774c0) SoC.
+Document bindings for the RZ/G2E (a.k.a. R8A774C0) reset
+module.
 
 Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Reviewed-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+Reviewed-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/soc/renesas/renesas-soc.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ Documentation/devicetree/bindings/reset/renesas,rst.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/soc/renesas/renesas-soc.c b/drivers/soc/renesas/renesas-soc.c
-index 9e244206d2dd..4af96e668a2f 100644
---- a/drivers/soc/renesas/renesas-soc.c
-+++ b/drivers/soc/renesas/renesas-soc.c
-@@ -116,6 +116,11 @@ static const struct renesas_soc soc_rz_g2m __initconst __maybe_unused = {
- 	.id	= 0x52,
- };
- 
-+static const struct renesas_soc soc_rz_g2e __initconst __maybe_unused = {
-+	.family	= &fam_rzg2,
-+	.id	= 0x57,
-+};
-+
- static const struct renesas_soc soc_rcar_m1a __initconst __maybe_unused = {
- 	.family	= &fam_rcar_gen1,
- };
-@@ -222,6 +227,9 @@ static const struct of_device_id renesas_socs[] __initconst = {
- #ifdef CONFIG_ARCH_R8A774A1
- 	{ .compatible = "renesas,r8a774a1",	.data = &soc_rz_g2m },
- #endif
-+#ifdef CONFIG_ARCH_R8A774C0
-+	{ .compatible = "renesas,r8a774c0",	.data = &soc_rz_g2e },
-+#endif
- #ifdef CONFIG_ARCH_R8A7778
- 	{ .compatible = "renesas,r8a7778",	.data = &soc_rcar_m1a },
- #endif
+diff --git a/Documentation/devicetree/bindings/reset/renesas,rst.txt b/Documentation/devicetree/bindings/reset/renesas,rst.txt
+index e4fe0ab294bf..25e6db546215 100644
+--- a/Documentation/devicetree/bindings/reset/renesas,rst.txt
++++ b/Documentation/devicetree/bindings/reset/renesas,rst.txt
+@@ -19,6 +19,7 @@ Required properties:
+ 		  - "renesas,r8a7745-rst" (RZ/G1E)
+ 		  - "renesas,r8a77470-rst" (RZ/G1C)
+ 		  - "renesas,r8a774a1-rst" (RZ/G2M)
++		  - "renesas,r8a774c0-rst" (RZ/G2E)
+ 		  - "renesas,r8a7778-reset-wdt" (R-Car M1A)
+ 		  - "renesas,r8a7779-reset-wdt" (R-Car H1)
+ 		  - "renesas,r8a7790-rst" (R-Car H2)
 -- 
 2.11.0
