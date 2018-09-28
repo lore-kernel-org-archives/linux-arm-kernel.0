@@ -1,35 +1,47 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Sep 2018 17:58:21 +0200
-Subject: [GIT PULL 1/3] soc changes for omaps for v4.20
-In-Reply-To: <pull-1537983432-167273@atomide.com>
-References: <pull-1537983432-167273@atomide.com>
-Message-ID: <CAK8P3a09JadeSoSR+dt0=cKBcx9nmp+EYZ8AYA+02wyMiuyM-Q@mail.gmail.com>
+Date: Fri, 28 Sep 2018 18:00:47 +0200
+Subject: [PATCH v2] ARM: Assume maintainership of ARM reference designs
+In-Reply-To: <20180928114250.7858-1-linus.walleij@linaro.org>
+References: <20180928114250.7858-1-linus.walleij@linaro.org>
+Message-ID: <CAK8P3a2vdYfo6=h0nmA86Kb4m+KVtP3hQ_k8_DZd67182Qh0pA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 26, 2018 at 7:40 PM Tony Lindgren <tony@atomide.com> wrote:
+On Fri, Sep 28, 2018 at 1:43 PM Linus Walleij <linus.walleij@linaro.org> wrote:
 >
-> From: "Tony Lindgren" <tony@atomide.com>
+> With this I assume maintainership of the Integrator, Versatile
+> and RealView ARM reference machines.
 >
-> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+> It's no big secret that I've been maintaining them for years,
+> but might as well make it official so I get the mails and
+> don't miss anything.
 >
->   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+> I have also included some drivers that are closely associated
+> with the ARM reference designs and yet orphaned in the
+> MAINTAINERS file. I can surely maintain them too, or route
+> the question to the right people so it doesn't fall on the
+> floor of upward to the subsystem maintainers who have too much
+> to do already as it is.
 >
-> are available in the Git repository at:
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Stephen Boyd <sboyd@kernel.org>
+> Cc: Mark Brown <broonie@kernel.org>
+> Cc: Brian Norris <computersforpeace@gmail.com>
+> Acked-by: Wolfram Sang <wsa@the-dreams.de>
+> Acked-by: Olof Johansson <olof@lixom.net>
+> Acked-by: Michael Turquette <mturquette@baylibre.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v1->v2:
+> - Split out PL022 and PL190/PL192 drivers to their own
+>   MAINTAINERS entries.
 >
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.20/soc-signed
->
-> for you to fetch changes up to 6e77137927639fad66e17c06b50fd319d6b59833:
->
->   ARM: OMAP2+: Convert to using %pOFn instead of device_node.name (2018-09-07 10:50:03 -0700)
->
-> ----------------------------------------------------------------
-> SoC changes for omap variants
->
-> These changes improve support for clkctrl clocks to deal with
-> split memory ranges for clkctrl providers. And to use %pOFn
-> instead of device_node.name.
+> ARM SoC folks: please apply this directly wherever MAINTAINERS
+> patches go.
 
-Pulled into next/soc, thanks!
+Applied, thanks!
 
       Arnd
