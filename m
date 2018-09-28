@@ -1,139 +1,89 @@
-From: sakari.ailus@linux.intel.com (Sakari Ailus)
-Date: Fri, 28 Sep 2018 17:47:11 +0300
-Subject: [PATCH v11 1/2] dt-bindings: media: Add Allwinner V3s Camera
- Sensor Interface (CSI)
-In-Reply-To: <CAGb2v67v0No0=JSt4HQCWeKKTz4gSHUfdyv16T-=4dxGB=JCow@mail.gmail.com>
-References: <1537951204-24672-1-git-send-email-yong.deng@magewell.com>
- <20180928093833.gwmskm2jvby6x4s6@paasikivi.fi.intel.com>
- <14114604.4rraf0qJLU@avalon>
- <20180928102345.r2g342tg5mgcwfw6@paasikivi.fi.intel.com>
- <CAGb2v65YpPRHb5YiGJhC8NX5F5i3+1rW5y6Dq5L+pNN3U_uLdQ@mail.gmail.com>
- <20180928125601.6ye5tvrmh57amvh5@paasikivi.fi.intel.com>
- <CAGb2v67v0No0=JSt4HQCWeKKTz4gSHUfdyv16T-=4dxGB=JCow@mail.gmail.com>
-Message-ID: <20180928144710.55rroseaqteklp3o@paasikivi.fi.intel.com>
+From: natechancellor@gmail.com (Nathan Chancellor)
+Date: Fri, 28 Sep 2018 07:48:56 -0700
+Subject: [PATCH] staging: bcm2835-camera: Avoid unneeded internal
+ declaration warning
+In-Reply-To: <CAAoAYcMMiiDXCcnZ=DP9Y9Xs+xdq-jasj8G_W0jrnQV9so79=A@mail.gmail.com>
+References: <20180928005038.1697-1-natechancellor@gmail.com>
+ <CAAoAYcMMiiDXCcnZ=DP9Y9Xs+xdq-jasj8G_W0jrnQV9so79=A@mail.gmail.com>
+Message-ID: <20180928144856.GA22524@flashbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 28, 2018 at 09:42:50PM +0800, Chen-Yu Tsai wrote:
-> Hi,
+On Fri, Sep 28, 2018 at 10:04:29AM +0100, Dave Stevenson wrote:
+> Hi Nate
 > 
-> On Fri, Sep 28, 2018 at 8:56 PM Sakari Ailus
-> <sakari.ailus@linux.intel.com> wrote:
-> >
-> > Hi Chen-Yu,
-> >
-> > On Fri, Sep 28, 2018 at 07:10:58PM +0800, Chen-Yu Tsai wrote:
-> > > On Fri, Sep 28, 2018 at 6:23 PM Sakari Ailus
-> > > <sakari.ailus@linux.intel.com> wrote:
-> > > >
-> > > > Hi Laurent,
-> > > >
-> > > > On Fri, Sep 28, 2018 at 12:45:12PM +0300, Laurent Pinchart wrote:
-> > > > > Hi Sakari,
-> > > > >
-> > > > > On Friday, 28 September 2018 12:38:33 EEST Sakari Ailus wrote:
-> > > > > > On Wed, Sep 26, 2018 at 04:40:04PM +0800, Yong Deng wrote:
-> > > > > > > Add binding documentation for Allwinner V3s CSI.
-> > > > > > >
-> > > > > > > Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> > > > > > > Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
-> > > > > >
-> > > > > > I know... but I have a few more comments.
-> > > > > >
-> > > > > > > Reviewed-by: Rob Herring <robh@kernel.org>
-> > > > > > > Signed-off-by: Yong Deng <yong.deng@magewell.com>
-> > > > > > > ---
-> > > > > > >
-> > > > > > >  .../devicetree/bindings/media/sun6i-csi.txt        | 59 +++++++++++++++++
-> > > > > > >  1 file changed, 59 insertions(+)
-> > > > > > >  create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
-> > > > > > >
-> > > > > > > diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt
-> > > > > > > b/Documentation/devicetree/bindings/media/sun6i-csi.txt new file mode
-> > > > > > > 100644
-> > > > > > > index 000000000000..2ff47a9507a6
-> > > > > > > --- /dev/null
-> > > > > > > +++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-> > > > > > > @@ -0,0 +1,59 @@
-> > > > > > > +Allwinner V3s Camera Sensor Interface
-> > > > > > > +-------------------------------------
-> > > > > > > +
-> > > > > > > +Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
-> > > > > > > +interface and CSI1 is used for parallel interface.
-> > > > > > > +
-> > > > > > > +Required properties:
-> > > > > > > +  - compatible: value must be "allwinner,sun8i-v3s-csi"
-> > > > > > > +  - reg: base address and size of the memory-mapped region.
-> > > > > > > +  - interrupts: interrupt associated to this IP
-> > > > > > > +  - clocks: phandles to the clocks feeding the CSI
-> > > > > > > +    * bus: the CSI interface clock
-> > > > > > > +    * mod: the CSI module clock
-> > > > > > > +    * ram: the CSI DRAM clock
-> > > > > > > +  - clock-names: the clock names mentioned above
-> > > > > > > +  - resets: phandles to the reset line driving the CSI
-> > > > > > > +
-> > > > > > > +Each CSI node should contain one 'port' child node with one child
-> > > > > > > 'endpoint' +node, according to the bindings defined in
-> > > > > > > +Documentation/devicetree/bindings/media/video-interfaces.txt. As
-> > > > > > > mentioned
-> > > > > > > +above, the endpoint's bus type should be MIPI CSI-2 for CSI0 and parallel
-> > > > > > > or +Bt656 for CSI1.
-> > > > > >
-> > > > > > Which port represents CSI0 and which one is CSI1? That needs to be
-> > > > > > documented.
-> > > > >
-> > > > > There are two CSI devices, named CSI0 and CSI1, with one port each. The CSI0
-> > > > > device supports CSI-2 only, and the CSI1 device parallel (BT.601 or BT.656)
-> > > > > only.
-> > > > >
-> > > > > > > +
-> > > > > > > +Endpoint node properties for CSI1
-> > > > > >
-> > > > > > How about CSI0? I'd expect at least data-lanes, and clock-lanes as well if
-> > > > > > the hardware supports lane mapping.
-> > > > >
-> > > > > I enquired about that too. As far as I understand, CSI0 isn't supported yet in
-> > > > > the driver due to lack of documentation and lack of open-source vendor-
-> > > > > provided source code. While DT bindings are not tied to driver
-> > > > > implementations, it's not the best idea to design DT bindings without at least
-> > > > > one working implementation to test them. I thus proposed just listing CSI0 as
-> > > > > being unsupported for now.
-> > > >
-> > > > Ack.
-> > > >
-> > > > We should still define which receiver corresponds to a given port. Probably
-> > > > 1 for CSI1 would make sense, in order to avoid changing the order the
-> > > > hardware already uses. 0 doesn't need to be documented no IMO.
-> > > >
-> > > > What do you think?
-> > >
-> > > AFAICT it would be a completely seperate node, since they have different address
-> > > spaces, clocks and reset controls. So there's no possibility of confusion.
-> > >
-> > > According to Yong, CSI0 is tied internally to some unknown MIPI CSI2-receiver,
-> > > which is the undocumented part. CSI1 has its parallel data pins exposed to the
-> > > outside.
-> >
-> > Thanks for clearing up the confusion. If these are truly different kinds of
-> > devices, then don't they also deserve different compatible strings? And
-> > possibly also different DT binding documentation in a separate file.
+> Thanks for the patch.
 > 
-> Allwinner's documents aren't particularly clear about this. AFAICT it does not
-> say anything about them being different. The CSI section gives a register table
-> with two base addresses. The V3S SDK listed on linux-sunxi wiki also doesn't
-> differentiate between the two. What's more is there's actually code and register
-> addresses for the MIPI stuff [1], though the license is questionable,
-> as with most
-> BSPs. It indeed seems like a CSI controller, which basically just takes whatever
-> input it is configured for and sends it to either a downstream ISP or DRAM.
-> There are MIPI-CSI receiver and DPHY blocks in addresses following CSI0, but we
-> can treat them as separate hardware blocks.
+> On Fri, 28 Sep 2018 at 01:53, Nathan Chancellor
+> <natechancellor@gmail.com> wrote:
+> >
+> > Clang warns:
+> >
+> > drivers/staging/vc04_services/bcm2835-camera/controls.c:59:18: warning:
+> > variable 'mains_freq_qmenu' is not needed and will not be emitted
+> > [-Wunneeded-internal-declaration]
+> > static const s64 mains_freq_qmenu[] = {
+> >                  ^
+> > 1 warning generated.
+> >
+> > This is because mains_freq_qmenu is currently only used in an ARRAY_SIZE
+> > macro, which is a compile time evaluation in this case. Avoid this by
+> > adding mains_freq_qmenu as the imenu member of this structure, which
+> > matches all other controls that uses the ARRAY_SIZE macro in v4l2_ctrls.
+> > This turns out to be a no-op because V4L2_CID_MPEG_VIDEO_BITRATE_MODE is
+> > defined as a MMAL_CONTROL_TYPE_STD_MENU, which does not pass the imenu
+> > definition along to v4l2_ctrl_new in bm2835_mmal_init_controls.
+> 
+> There's a slight confusion betwen V4L2_CID_MPEG_VIDEO_BITRATE_MODE and
+> V4L2_CID_POWER_LINE_FREQUENCY in your description.
+> 
+> However you're right that MMAL_CONTROL_TYPE_STD_MENU calls
+> v4l2_ctrl_new_std_menu which doesn't need a menu array (it's
+> v4l2_ctrl_new_int_menu that does). That means the correct fix is to
+> define the max value using the relevant enum (in this case
+> V4L2_CID_POWER_LINE_FREQUENCY_AUTO) and remove the array.
+> 
+> The same is true for V4L2_CID_MPEG_VIDEO_BITRATE_MODE - max should be
+> V4L2_MPEG_VIDEO_BITRATE_MODE_CBR, and remove the bitrate_mode_qmenu
+> array.
+> 
+> Thanks,
+>   Dave
+> 
 
-What you could still do is to change the DT binding documentation to only
-apply to the parallel receiver, not the CSI-2 receiver. That'd give you
-more freedom going forward in case you'd later implement support for the
-CSI-2 receiver, too. Up to you.
+Hi Dave,
 
--- 
-Sakari Ailus
-sakari.ailus at linux.intel.com
+Thank you for the review, I appreciate it. I had certainly considered
+that solution first butnfigured this was the more conservative change.
+
+I will send a v2 soon with the suggested change.
+
+Nathan
+
+> > Link: https://github.com/ClangBuiltLinux/linux/issues/122
+> > Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
+> > ---
+> >  drivers/staging/vc04_services/bcm2835-camera/controls.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/staging/vc04_services/bcm2835-camera/controls.c b/drivers/staging/vc04_services/bcm2835-camera/controls.c
+> > index cff7b1e07153..a2c55cb2192a 100644
+> > --- a/drivers/staging/vc04_services/bcm2835-camera/controls.c
+> > +++ b/drivers/staging/vc04_services/bcm2835-camera/controls.c
+> > @@ -1106,7 +1106,7 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
+> >         {
+> >                 V4L2_CID_POWER_LINE_FREQUENCY, MMAL_CONTROL_TYPE_STD_MENU,
+> >                 0, ARRAY_SIZE(mains_freq_qmenu) - 1,
+> > -               1, 1, NULL,
+> > +               1, 1, mains_freq_qmenu,
+> >                 MMAL_PARAMETER_FLICKER_AVOID,
+> >                 &ctrl_set_flicker_avoidance,
+> >                 false
+> > --
+> > 2.19.0
+> >
+> >
+> > _______________________________________________
+> > linux-rpi-kernel mailing list
+> > linux-rpi-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-rpi-kernel
