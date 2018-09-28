@@ -1,99 +1,87 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 28 Sep 2018 12:23:16 +0200
-Subject: [PATCH 01/21] soc: renesas: Identify RZ/G2M
+Date: Fri, 28 Sep 2018 12:23:17 +0200
+Subject: [PATCH 02/21] ARM: shmobile: Add basic RZ/A2 SoC support
 In-Reply-To: <cover.1538128711.git.horms+renesas@verge.net.au>
 References: <cover.1538128711.git.horms+renesas@verge.net.au>
-Message-ID: <2a4056a759e26745f3a19431f5428c581fd8f347.1538128711.git.horms+renesas@verge.net.au>
+Message-ID: <332df9828e94d4288825584638b7df6ad4c1ff38.1538128711.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Biju Das <biju.das@bp.renesas.com>
+From: Chris Brandt <chris.brandt@renesas.com>
 
-This patch adds support for identifying the RZ/G2M (r8a774a1) SoC.
-It corrects the original RZ/G SoC family name to RZ/G1 and also
-adds support for the new RZ/G2 SoC family.
+Add the RZ/A2 SoC to the Renesas SoC collection.
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/soc/renesas/renesas-soc.c | 27 ++++++++++++++++++++-------
- 1 file changed, 20 insertions(+), 7 deletions(-)
+ arch/arm/mach-shmobile/Kconfig         |  6 ++++++
+ arch/arm/mach-shmobile/Makefile        |  1 +
+ arch/arm/mach-shmobile/setup-r7s9210.c | 27 +++++++++++++++++++++++++++
+ 3 files changed, 34 insertions(+)
+ create mode 100644 arch/arm/mach-shmobile/setup-r7s9210.c
 
-diff --git a/drivers/soc/renesas/renesas-soc.c b/drivers/soc/renesas/renesas-soc.c
-index d44d0e687ab8..56916183739b 100644
---- a/drivers/soc/renesas/renesas-soc.c
-+++ b/drivers/soc/renesas/renesas-soc.c
-@@ -50,11 +50,16 @@ static const struct renesas_family fam_rza __initconst __maybe_unused = {
- 	.name	= "RZ/A",
- };
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index aeb2eed08598..94e9431d92b8 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -55,6 +55,12 @@ config ARCH_R7S72100
+ 	select SYS_SUPPORTS_SH_MTU2
+ 	select RENESAS_OSTM
  
--static const struct renesas_family fam_rzg __initconst __maybe_unused = {
--	.name	= "RZ/G",
-+static const struct renesas_family fam_rzg1 __initconst __maybe_unused = {
-+	.name	= "RZ/G1",
- 	.reg	= 0xff000044,		/* PRR (Product Register) */
- };
++config ARCH_R7S9210
++	bool "RZ/A2 (R7S9210)"
++	select PM
++	select PM_GENERIC_DOMAINS
++	select RENESAS_OSTM
++
+ config ARCH_R8A73A4
+ 	bool "R-Mobile APE6 (R8A73A40)"
+ 	select ARCH_RMOBILE
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index b33dc59d8698..5591646cb9bb 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -14,6 +14,7 @@ obj-$(CONFIG_ARCH_R8A7778)	+= setup-r8a7778.o
+ obj-$(CONFIG_ARCH_R8A7779)	+= setup-r8a7779.o
+ obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.o
+ obj-$(CONFIG_ARCH_R7S72100)	+= setup-r7s72100.o
++obj-$(CONFIG_ARCH_R7S9210)	+= setup-r7s9210.o
  
-+static const struct renesas_family fam_rzg2 __initconst __maybe_unused = {
-+	.name	= "RZ/G2",
-+	.reg	= 0xfff00044,		/* PRR (Product Register) */
+ # CPU reset vector handling objects
+ cpu-y				:= platsmp.o headsmp.o
+diff --git a/arch/arm/mach-shmobile/setup-r7s9210.c b/arch/arm/mach-shmobile/setup-r7s9210.c
+new file mode 100644
+index 000000000000..573fb9955e7e
+--- /dev/null
++++ b/arch/arm/mach-shmobile/setup-r7s9210.c
+@@ -0,0 +1,27 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * r7s9210 processor support
++ *
++ * Copyright (C) 2018  Renesas Electronics Corporation
++ * Copyright (C) 2018  Chris Brandt
++ *
++ */
++
++#include <linux/kernel.h>
++
++#include <asm/mach/arch.h>
++
++#include "common.h"
++
++static const char *const r7s9210_boards_compat_dt[] __initconst = {
++	"renesas,r7s9210",
++	NULL,
 +};
 +
- static const struct renesas_family fam_shmobile __initconst __maybe_unused = {
- 	.name	= "SH-Mobile",
- 	.reg	= 0xe600101c,		/* CCCR (Common Chip Code Register) */
-@@ -81,30 +86,35 @@ static const struct renesas_soc soc_rmobile_a1 __initconst __maybe_unused = {
- };
- 
- static const struct renesas_soc soc_rz_g1h __initconst __maybe_unused = {
--	.family	= &fam_rzg,
-+	.family	= &fam_rzg1,
- 	.id	= 0x45,
- };
- 
- static const struct renesas_soc soc_rz_g1m __initconst __maybe_unused = {
--	.family	= &fam_rzg,
-+	.family	= &fam_rzg1,
- 	.id	= 0x47,
- };
- 
- static const struct renesas_soc soc_rz_g1n __initconst __maybe_unused = {
--	.family	= &fam_rzg,
-+	.family	= &fam_rzg1,
- 	.id	= 0x4b,
- };
- 
- static const struct renesas_soc soc_rz_g1e __initconst __maybe_unused = {
--	.family	= &fam_rzg,
-+	.family	= &fam_rzg1,
- 	.id	= 0x4c,
- };
- 
- static const struct renesas_soc soc_rz_g1c __initconst __maybe_unused = {
--	.family	= &fam_rzg,
-+	.family	= &fam_rzg1,
- 	.id	= 0x53,
- };
- 
-+static const struct renesas_soc soc_rz_g2m __initconst __maybe_unused = {
-+	.family	= &fam_rzg2,
-+	.id	= 0x52,
-+};
-+
- static const struct renesas_soc soc_rcar_m1a __initconst __maybe_unused = {
- 	.family	= &fam_rcar_gen1,
- };
-@@ -205,6 +215,9 @@ static const struct of_device_id renesas_socs[] __initconst = {
- #ifdef CONFIG_ARCH_R8A77470
- 	{ .compatible = "renesas,r8a77470",	.data = &soc_rz_g1c },
- #endif
-+#ifdef CONFIG_ARCH_R8A774A1
-+	{ .compatible = "renesas,r8a774a1",	.data = &soc_rz_g2m },
-+#endif
- #ifdef CONFIG_ARCH_R8A7778
- 	{ .compatible = "renesas,r8a7778",	.data = &soc_rcar_m1a },
- #endif
++DT_MACHINE_START(R7S72100_DT, "Generic R7S9210 (Flattened Device Tree)")
++	.l2c_aux_val    = 0,
++	.l2c_aux_mask   = ~0,
++	.init_early	= shmobile_init_delay,
++	.init_late	= shmobile_init_late,
++	.dt_compat	= r7s9210_boards_compat_dt,
++MACHINE_END
 -- 
 2.11.0
