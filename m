@@ -1,40 +1,160 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Sep 2018 21:19:12 +0200
-Subject: [PATCH] arm: support big-endian for the virt architecture
-In-Reply-To: <CAHmME9o_6o_wB00kASJdqJyWt2wFH2FqdzXOm8RLA5VeCibDJg@mail.gmail.com>
-References: <20180926135110.13061-1-Jason@zx2c4.com>
- <CAK8P3a0+s6DM=QUqS_KrNp+95aDj2QTsWb+w73piwLsQFvq+pg@mail.gmail.com>
- <CAHmME9o_6o_wB00kASJdqJyWt2wFH2FqdzXOm8RLA5VeCibDJg@mail.gmail.com>
-Message-ID: <CAK8P3a3riqD9kzGZHLxhYug7zO34e2icOaWddzH2JezbZKVNPg@mail.gmail.com>
+From: leoyang.li@nxp.com (Li Yang)
+Date: Fri, 28 Sep 2018 14:20:58 -0500
+Subject: [PATCH] arm64: dts: add LX2160AQDS board support
+In-Reply-To: <20180928090030.GI26692@dragon>
+References: <20180921141720.19159-1-pankaj.bansal@nxp.com>
+ <20180928090030.GI26692@dragon>
+Message-ID: <CADRPPNQ2HU5JgoSjwXEG-7n9=hAOQJO5FS2BJSWa5YWb2AGriw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 28, 2018 at 6:04 PM Jason A. Donenfeld <Jason@zx2c4.com> wrote:
+On Fri, Sep 28, 2018 at 4:01 AM Shawn Guo <shawnguo@kernel.org> wrote:
 >
-> Hi Arnd,
+> On Fri, Sep 21, 2018 at 07:47:20PM +0530, Pankaj Bansal wrote:
+> > The LX2160A QorIQ Development System (QDS) is a test, evaluation, and
+> > development platform, supporting QorIQ LX2160A processor.
+> >
+> > Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
+> > Signed-off-by: Pankaj Bansal <pankaj.bansal@nxp.com>
+> > ---
+> >
+> > Notes:
+> >     This patch is dependent on [1] and [2]
+> >      [1] https://lore.kernel.org/patchwork/patch/985935/
+> >      [2] https://lore.kernel.org/patchwork/patch/985938/
 >
-> On Fri, Sep 28, 2018 at 5:59 PM Arnd Bergmann <arnd@arndb.de> wrote:
-> > Applied for 4.20 with subject line changed s/arm/ARM/, thanks!
->
-> Thanks.
->
-> > I think most people just build a 'defconfig' kernel, which includes
-> > multiple platforms that use ARCH_SUPPORTS_BIG_ENDIAN.
->
-> Right, that's what it looked like. In my case, I'm doing CI on some
-> homebrewed infra, where I'm building lots of kernels for lots of
-> architectures and testing them in qemu with various tests _for each
-> and every commit_. Not having a server farm as impressive as Intel's
-> 0-day infra, getting compilation times down is rather important.
+> I did not receive these.
 
-You can probably work around it by enabling ARCH_HIGHBANK,
-which is a minimal platform with no other requirements, so it
-should only add a few milliseconds to the build.
+Please add the Shawn Guo and me in "to" recipients when you send next
+version of these patches.  And, btw, I find there is a v3 now, but
+your link is still pointing to the v2.
 
-Another option would be to do the testing on top of linux-next,
-which should have your fix starting on Monday. Testing on
-linux-next carries a higher risk of running into unrelated
-regressions, but also lets you find out about conflicts with
-other patches early on.
-
-       Arnd
+>
+> >
+> >  arch/arm64/boot/dts/freescale/Makefile       |  1 +
+> >  .../boot/dts/freescale/fsl-lx2160a-qds.dts   | 88 ++++++++++++++++++
+> >  2 files changed, 89 insertions(+)
+> >
+> > diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
+> > index 445b72bd5a36..ae80fc5c45f7 100644
+> > --- a/arch/arm64/boot/dts/freescale/Makefile
+> > +++ b/arch/arm64/boot/dts/freescale/Makefile
+> > @@ -14,3 +14,4 @@ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
+> >  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-qds.dtb
+> >  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-rdb.dtb
+> >  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-lx2160a-rdb.dtb
+> > +dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-lx2160a-qds.dtb
+>
+> Please keep them in alphabetic order.
+>
+> > diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
+> > new file mode 100644
+> > index 000000000000..5cf2fe279f73
+> > --- /dev/null
+> > +++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
+> > @@ -0,0 +1,88 @@
+> > +// SPDX-License-Identifier: (GPL-2.0 OR MIT)
+> > +//
+> > +// Device Tree file for LX2160AQDS
+> > +//
+> > +// Copyright 2018 NXP
+> > +
+> > +/dts-v1/;
+> > +
+> > +#include "fsl-lx2160a.dtsi"
+> > +
+> > +/ {
+> > +     model = "NXP Layerscape LX2160AQDS";
+> > +     compatible = "fsl,lx2160a-qds", "fsl,lx2160a";
+> > +
+> > +     chosen {
+> > +             stdout-path = "serial0:115200n8";
+> > +     };
+> > +};
+> > +
+> > +&uart0 {
+> > +     status = "okay";
+> > +};
+> > +
+> > +&uart1 {
+> > +     status = "okay";
+> > +};
+> > +
+> > +&i2c0 {
+>
+> Sort these labeled nodes alphabetically, so that new additions can find
+> their place easier.
+>
+> > +     status = "okay";
+>
+> Have a newline between property list and child node.
+>
+> Shawn
+>
+> > +     i2c-mux at 77 {
+> > +             compatible = "nxp,pca9547";
+> > +             reg = <0x77>;
+> > +             #address-cells = <1>;
+> > +             #size-cells = <0>;
+> > +
+> > +             i2c at 2 {
+> > +                     #address-cells = <1>;
+> > +                     #size-cells = <0>;
+> > +                     reg = <0x2>;
+> > +
+> > +                     power-monitor at 40 {
+> > +                             compatible = "ti,ina220";
+> > +                             reg = <0x40>;
+> > +                             shunt-resistor = <500>;
+> > +                     };
+> > +
+> > +                     power-monitor at 41 {
+> > +                             compatible = "ti,ina220";
+> > +                             reg = <0x41>;
+> > +                             shunt-resistor = <1000>;
+> > +                     };
+> > +             };
+> > +
+> > +             i2c at 3 {
+> > +                     #address-cells = <1>;
+> > +                     #size-cells = <0>;
+> > +                     reg = <0x3>;
+> > +
+> > +                     temperature-sensor at 4c {
+> > +                             compatible = "nxp,sa56004";
+> > +                             reg = <0x4c>;
+> > +                     };
+> > +
+> > +                     temperature-sensor at 4d {
+> > +                             compatible = "nxp,sa56004";
+> > +                             reg = <0x4d>;
+> > +                     };
+> > +
+> > +                     rtc at 51 {
+> > +                             compatible = "nxp,pcf2129";
+> > +                             reg = <0x51>;
+> > +                     };
+> > +             };
+> > +     };
+> > +};
+> > +
+> > +&usb0 {
+> > +     status = "okay";
+> > +};
+> > +
+> > +&usb1 {
+> > +     status = "okay";
+> > +};
+> > +
+> > +&crypto {
+> > +     status = "okay";
+> > +};
+> > +
+> > --
+> > 2.17.1
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
