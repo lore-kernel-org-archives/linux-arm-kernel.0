@@ -1,13 +1,14 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Sat, 29 Sep 2018 16:52:16 +0200
-Subject: [GIT PULL] Allwinner DT changes for 4.20
-Message-ID: <20180929145216.bq52nv6bkjn265xc@flea>
+Date: Sat, 29 Sep 2018 16:56:59 +0200
+Subject: [GIT PULL] Allwinner arm64 DT changes for 4.20
+Message-ID: <20180929145659.73sto3j7235jg6b6@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd, Olof,
 
-Here is our usual set of changes for the next merge window.
+Here are our usual set of DT changes for the arm64 SoCs for the next
+merge window.
 
 Thanks!
 Maxime
@@ -18,57 +19,83 @@ The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 
 are available in the Git repository at:
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-dt-for-4.20
+  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-dt64-for-4.20
 
-for you to fetch changes up to 57a83c5222c1b5e7b3acc72c6e60fce00a38991a:
+for you to fetch changes up to 679294497be31596e1c9c61507746d72b6b05f26:
 
-  ARM: dts: sun9i: Fix I2C bus warnings (2018-09-14 16:59:24 +0800)
-
-----------------------------------------------------------------
-Allwinner DT changes for 4.20
-
-Our usual bunch of DT patches for the Allwinner arm32 SoCs.
-
-The most notable changes are:
-  - Support for the video decoding / encoding engine on the
-    A10s/A13/A20/A33
-  - IR support for the A83t
-  - SATA support for the R40
+  arm64: dts: allwinner: a64: a64-olinuxino: set the PHY TX delay (2018-09-27 18:20:35 +0800)
 
 ----------------------------------------------------------------
-Corentin Labbe (2):
-      ARM: dts: sun8i: r40: add sata node
-      ARM: dts: sun8i: sun8i-r40-bananapi-m2-ultra: enable AHCI
+Allwinner arm64 DT changes for 4.20
 
-Paul Kocialkowski (3):
-      ARM: dts: sun5i: Add Video Engine and reserved memory nodes
-      ARM: dts: sun7i-a20: Add Video Engine and reserved memory nodes
-      ARM: dts: sun8i-a33: Add Video Engine and reserved memory nodes
+Our usual set of DT changes for the arm64 Allwinner SoCs.
 
-Philipp Rossak (3):
-      ARM: dts: sun8i: a83t: Add the cir pin for the A83T
-      ARM: dts: sun8i: a83t: Add support for the cir interface
-      ARM: dts: sun8i: a83t: bananapi-m3: Enable IR controller
+The most notable things are:
+  - HDMI support on the A64
+  - New boards: OrangePi One Plus
 
-Rob Herring (2):
-      ARM: dts: sunxi: Fix I2C bus warnings
-      ARM: dts: sun9i: Fix I2C bus warnings
+----------------------------------------------------------------
+Andre Przywara (9):
+      arm64: dts: allwinner: a64: Add L2 cache nodes
+      arm64: dts: allwinner: a64: Add Pine64-LTS device tree file
+      arm64: dts: allwinner: a64: Olinuxino: fix DRAM voltage
+      arm64: dts: allwinner: a64: Olinuxino: add Ethernet nodes
+      arm64: dts: allwinner: a64: Olinuxino: enable USB
+      arm64: dts: allwinner: a64: NanoPi-A64: Fix DCDC1 voltage
+      arm64: dts: allwinner: a64: NanoPi-A64: Add Ethernet
+      arm64: dts: allwinner: a64: NanoPi-A64: Add Wifi chip
+      arm64: dts: allwinner: a64: NanoPi-A64: Add blue status LED
+
+Chen-Yu Tsai (3):
+      arm64: dts: allwinner: a64: Split out data strobe pin from mmc2 pinmux
+      arm64: dts: allwinner: a64: Rename uart0_pins_a label to uart0_pb_pins
+      arm64: dts: allwinner: a64: Rename r_i2c_pins_a label to r_i2c_pl89_pins
+
+Emmanuel Vadot (1):
+      arm64: dts: allwinner: a64: Add SID node
+
+Icenowy Zheng (1):
+      arm64: dts: allwinner: h6: add system controller device tree node
+
+Jagan Teki (3):
+      arm64: dts: allwinner: h6: Add OrangePi One Plus initial support
+      arm64: dts: allwinner: a64: Add display pipeline
+      arm64: dts: allwinner: a64: Enable HDMI output on A64 boards w/ HDMI
+
+Rodrigo Exterck?tter Tj?der (1):
+      arm64: dts: allwinner: a64: a64-olinuxino: set the PHY TX delay
+
+Samuel Holland (9):
+      arm64: dts: allwinner: a64: Orange Pi Win: Fix SD card node
+      arm64: dts: allwinner: a64: Orange Pi Win: Enable USB hub regulator
+      arm64: dts: allwinner: a64: Orange Pi Win: Enable USB OTG socket
+      arm64: dts: allwinner: a64: Orange Pi Win: Add Ethernet node
+      arm64: dts: allwinner: a64: Orange Pi Win: Add UARTs
+      arm64: dts: allwinner: a64: Orange Pi Win: Add LED node
+      arm64: dts: allwinner: a64: Orange Pi Win: Add SDIO node
+      arm64: dts: allwinner: a64: Orange Pi Win: Add SPI flash node
+      arm64: dts: allwinner: a64: Orange Pi Win: Adjust CSI power rails
 
 Tuomas Tynkkynen (1):
-      ARM: dts: sunxi: Don't use cd-inverted in sun8i-r40-bananapi-m2-ultra
+      arm64: dts: allwinner: Don't use cd-inverted in sun50i-a64-pinebook
 
- .../boot/dts/sun5i-reference-design-tablet.dtsi    |  3 ++-
- arch/arm/boot/dts/sun5i.dtsi                       | 26 ++++++++++++++++++++++
- arch/arm/boot/dts/sun7i-a20.dtsi                   | 26 ++++++++++++++++++++++
- arch/arm/boot/dts/sun8i-a33.dtsi                   | 26 ++++++++++++++++++++++
- arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts       |  5 +++++
- arch/arm/boot/dts/sun8i-a83t.dtsi                  | 18 +++++++++++++++
- arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts  | 21 +++++++++++++++--
- arch/arm/boot/dts/sun8i-r40.dtsi                   | 13 +++++++++++
- .../boot/dts/sun8i-reference-design-tablet.dtsi    |  3 ++-
- arch/arm/boot/dts/sun8i-v40-bananapi-m2-berry.dts  |  2 +-
- arch/arm/boot/dts/sun9i-a80.dtsi                   |  2 +-
- 11 files changed, 139 insertions(+), 6 deletions(-)
+ arch/arm64/boot/dts/allwinner/Makefile             |   2 +
+ .../dts/allwinner/sun50i-a64-amarula-relic.dts     |   2 +-
+ .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts |  30 +++-
+ .../boot/dts/allwinner/sun50i-a64-nanopi-a64.dts   |  85 ++++++++-
+ .../boot/dts/allwinner/sun50i-a64-olinuxino.dts    |  99 ++++++++++-
+ .../boot/dts/allwinner/sun50i-a64-orangepi-win.dts | 175 ++++++++++++++++++-
+ .../boot/dts/allwinner/sun50i-a64-pine64-lts.dts   |  13 ++
+ .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts |  28 ++-
+ .../boot/dts/allwinner/sun50i-a64-pinebook.dts     |   9 +-
+ .../dts/allwinner/sun50i-a64-sopine-baseboard.dts  |  28 ++-
+ .../boot/dts/allwinner/sun50i-a64-teres-i.dts      |   2 +-
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      | 193 ++++++++++++++++++++-
+ .../dts/allwinner/sun50i-h6-orangepi-one-plus.dts  | 150 ++++++++++++++++
+ arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi       |  23 +++
+ 14 files changed, 812 insertions(+), 27 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-lts.dts
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi-one-plus.dts
 
 -- 
 Maxime Ripard, Bootlin
@@ -80,4 +107,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180929/7dcfe6d8/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180929/59956104/attachment.sig>
