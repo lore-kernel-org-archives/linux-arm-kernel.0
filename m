@@ -1,46 +1,44 @@
-From: colin.king@canonical.com (Colin King)
-Date: Sat, 29 Sep 2018 12:43:13 +0100
-Subject: [PATCH] usb: gadget: fix spelling mistakeis "[En]queing" ->
- "[En]queuing"
-Message-ID: <20180929114313.10557-1-colin.king@canonical.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Sat, 29 Sep 2018 14:50:35 +0200
+Subject: [PATCH v25 2/2] soc: mediatek: Add Mediatek CMDQ helper
+In-Reply-To: <1538212903-14331-3-git-send-email-houlong.wei@mediatek.com>
+References: <1538212903-14331-1-git-send-email-houlong.wei@mediatek.com>
+ <1538212903-14331-3-git-send-email-houlong.wei@mediatek.com>
+Message-ID: <7040427b-f580-ec33-8afa-35dcf5735abb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
 
-Trivial fix to spelling mistakes in debug warning messages
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- drivers/usb/gadget/udc/aspeed-vhub/epn.c | 2 +-
- drivers/usb/gadget/udc/udc-xilinx.c      | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+On 29/09/2018 11:21, Houlong Wei wrote:
+[...]
 
-diff --git a/drivers/usb/gadget/udc/aspeed-vhub/epn.c b/drivers/usb/gadget/udc/aspeed-vhub/epn.c
-index 5939eb1e97f2..e9ee2b72af19 100644
---- a/drivers/usb/gadget/udc/aspeed-vhub/epn.c
-+++ b/drivers/usb/gadget/udc/aspeed-vhub/epn.c
-@@ -353,7 +353,7 @@ static int ast_vhub_epn_queue(struct usb_ep* u_ep, struct usb_request *u_req,
- 	/* Endpoint enabled ? */
- 	if (!ep->epn.enabled || !u_ep->desc || !ep->dev || !ep->d_idx ||
- 	    !ep->dev->enabled || ep->dev->suspended) {
--		EPDBG(ep,"Enqueing request on wrong or disabled EP\n");
-+		EPDBG(ep, "Enqueuing request on wrong or disabled EP\n");
- 		return -ESHUTDOWN;
- 	}
- 
-diff --git a/drivers/usb/gadget/udc/udc-xilinx.c b/drivers/usb/gadget/udc/udc-xilinx.c
-index 6407e433bc78..b1f4104d1283 100644
---- a/drivers/usb/gadget/udc/udc-xilinx.c
-+++ b/drivers/usb/gadget/udc/udc-xilinx.c
-@@ -1078,7 +1078,7 @@ static int xudc_ep_queue(struct usb_ep *_ep, struct usb_request *_req,
- 	unsigned long flags;
- 
- 	if (!ep->desc) {
--		dev_dbg(udc->dev, "%s:queing request to disabled %s\n",
-+		dev_dbg(udc->dev, "%s: queuing request to disabled %s\n",
- 			__func__, ep->name);
- 		return -ESHUTDOWN;
- 	}
--- 
-2.17.1
+> +static int cmdq_pkt_append_command(struct cmdq_pkt *pkt, enum cmdq_code code,
+> +				   u32 arg_a, u32 arg_b)
+> +{
+> +	u64 *cmd_ptr;
+> +
+> +	if (unlikely(pkt->cmd_buf_size + CMDQ_INST_SIZE > pkt->buf_size)) {
+> +		pkt->cmd_buf_size += CMDQ_INST_SIZE;
+
+Can you plesae provide some example code of a driver that will use this API, I
+still don't understand why you need to update the cmd_buf_size here.
+
+> +		WARN_ON(1);
+
+can we add some debug information:
+WARN_ON(1, "%s: buffer size too small for the amount of commands", __func__);
+
+Would it make sense to use WARN_ONCE()?
+
+> +		return -ENOMEM;
+> +	}
+> +	cmd_ptr = pkt->va_base + pkt->cmd_buf_size;
+> +	(*cmd_ptr) = (u64)((code << CMDQ_OP_CODE_SHIFT) | arg_a) << 32 | arg_b;
+> +	pkt->cmd_buf_size += CMDQ_INST_SIZE;
+> +
+> +	return 0;
+> +}
+
+Thanks,
+Matthias
