@@ -1,106 +1,153 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 29 Sep 2018 11:30:45 +0100
-Subject: [BUG] sleep in atomic in 8250 runtime PM code path
-In-Reply-To: <20180929132036.0323e24b@xhacker.debian>
-References: <20180929132036.0323e24b@xhacker.debian>
-Message-ID: <20180929103045.GQ30658@n2100.armlinux.org.uk>
+From: jic23@jic23.retrosnub.co.uk (Jonathan Cameron)
+Date: Sat, 29 Sep 2018 12:20:53 +0100
+Subject: [PATCH 1/2] iio: adc: at91: fix acking DRDY irq on simple
+ conversions
+In-Reply-To: <5ee8253a-5b07-94ce-a86d-b453911fce0a@microchip.com>
+References: <1537447238-18674-1-git-send-email-eugen.hristev@microchip.com>
+ <20180922113123.2c8da044@archlinux>
+ <9846e106-8baf-b491-29ca-8306be9527ee@microchip.com>
+ <20180924210056.2cae9439@archlinux>
+ <20180924212701.400e21f7@archlinux>
+ <5ee8253a-5b07-94ce-a86d-b453911fce0a@microchip.com>
+Message-ID: <20180929122053.44aef855@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 29, 2018 at 01:20:36PM +0800, Jisheng Zhang wrote:
-> Hi,
+On Tue, 25 Sep 2018 09:50:24 +0300
+Eugen Hristev <eugen.hristev@microchip.com> wrote:
+
+> On 24.09.2018 23:27, Jonathan Cameron wrote:
+> > On Mon, 24 Sep 2018 21:00:56 +0100
+> > Jonathan Cameron <jic23@kernel.org> wrote:
+> >   
+> >> On Mon, 24 Sep 2018 09:19:43 +0300
+> >> Eugen Hristev <eugen.hristev@microchip.com> wrote:
+> >>  
+> >>> On 22.09.2018 13:31, Jonathan Cameron wrote:  
+> >>>> On Thu, 20 Sep 2018 15:40:37 +0300
+> >>>> Eugen Hristev <eugen.hristev@microchip.com> wrote:
+> >>>>        
+> >>>>> When doing simple conversions, the driver did not acknowledge the DRDY irq.
+> >>>>> If this irq is not acked, it will be left pending, and as soon as a trigger
+> >>>>> is enabled, the irq handler will be called, it doesn't know why this irq
+> >>>>> has occurred because no channel is pending, and then we will have irq loop
+> >>>>> and board will hang.
+> >>>>>
+> >>>>> Fixes 0e589d5fb ("ARM: AT91: IIO: Add AT91 ADC driver.")
+> >>>>> Cc: Maxime Ripard <maxime.ripard@bootlin.com>
+> >>>>> Cc: <stable@vger.kernel.org>
+> >>>>> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+> >>>>> ---
+> >>>>>    drivers/iio/adc/at91_adc.c | 5 +++++
+> >>>>>    1 file changed, 5 insertions(+)
+> >>>>>
+> >>>>> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
+> >>>>> index 44b5168..e85f859 100644
+> >>>>> --- a/drivers/iio/adc/at91_adc.c
+> >>>>> +++ b/drivers/iio/adc/at91_adc.c
+> >>>>> @@ -712,6 +712,11 @@ static int at91_adc_read_raw(struct iio_dev *idev,
+> >>>>>    		at91_adc_writel(st, AT91_ADC_CHDR,
+> >>>>>    				AT91_ADC_CH(chan->channel));
+> >>>>>    		at91_adc_writel(st, AT91_ADC_IDR, BIT(chan->channel));
+> >>>>> +		/*
+> >>>>> +		 * we need to ack the DRDY irq, otherwise it will be
+> >>>>> +		 * left pending and irq handler will be confused
+> >>>>> +		 */
+> >>>>> +		at91_adc_readl(st, AT91_ADC_LCDR);  
+> >>>>
+> >>>> I'm curious as to how things were working before.  Does this only occur
+> >>>> if we do a raw_read whilst the buffer is enabled?  
+> >>>
+> >>> No. The situation is that the read raw does not properly cleans itself
+> >>> up after it's done.
+> >>> The DRDY bit is cleared only when LCDR (last converted data ) is being read.
+> >>> Even if we read the per channel conversion data, the LCDR still needs to
+> >>> be read to clear this irq status.
+> >>> The driver does not use the DRDY irq but this irq status is still being
+> >>> set in the status register.  
+> >>
+> >> Hmm. That is somewhat nasty if it results in false interrupts when you
+> >> then enable them.  
+> > 
+> > I'm talking rubbish here.  Please ignore!
+> >   
+> >>  
+> >>>      
+> >>>>
+> >>>> I would have assumed when it's not enabled, the irq would be masked and
+> >>>> never generated in the first place...
+> >>>>
+> >>>> It may be that what we actually need to do is to prevent read_raw accesses
+> >>>> when the buffer is enabled (like lots of other drivers do precisely to
+> >>>> avoid this sort of condition). The problem there comes if we have
+> >>>> existing applications doing this combination as we are then breaking
+> >>>> userspace. If that's the case we'll need to be a bit more clever.
+> >>>>
+> >>>> Hammering down an irq state in a non irq handling path isn't a good
+> >>>> solution.  
+> >>>
+> >>> Ok, I will move the clearing of the DRDY (LCDR read) in the irq path
+> >>> then, and send a v2.  
+> >>
+> >> If that can be done cleanly, let us go with that approach. If not
+> >> what you have here with the addition of a comments saying that the
+> >> interrupt status is not masked, merely the interrupt and as a result needs
+> >> clearing for when you later enabled the interrupt, is fine.
+> >>
+> >> This definitely sounds like one of those bits of hardware that
+> >> you can write software to use safely but they certainly didn't make
+> >> it easy to do so!  
 > 
-> Recently I found I could trigger sleep in atomic bug on berlin after commit
-> d76c74387e1c ("serial: 8250_dw: Fix runtime PM handling"). The path looks like:
+> For what it's worth a small explanation:
 > 
-> dw8250_probe => serial850_register_8250_port => uart_add_one_port=>
-> register_console => console_unlock => univ8250_console_write =>
-> serial8250_console_write => serial8250_rpm_get => pm_runtime_get_sync
+> The status in the ISR (interrupt status) is updated regardless of 
+> whether the IRQ is enabled in the IER (interrupt enable) or not. 
+> Actually "enabling DRDY" makes the hardware start raising the interrupt 
+> line on DRDY event if it's the case. but DRDY bit is still being 
+> asserted in the ISR. It works like this because someone might want to 
+> write some simple driver without IRQ, just poll the ISR for the status.
+Hmm.  I think the odd blend here that makes this a little unusual is that
+devices normally fall into one of two categories.
+1) Auto reset upon complete reading of output registers. This one works
+   in either interrupt or polled mode.
+2) Interrupt that needs an explicit reset.
+
+Not sure why but it's unusual to need an explicit reset for a status
+register. Not sure why but that's now it is ;)
+
 > 
-> The irq is disabled by printk_safe_enter_irqsave() in console_unlock, but
-> pm_runtime_get_sync can't be called in atomic context...
+> One other thing, in my driver, at91-sama5d2_adc, I had the same issue, 
+> and I am reading the DRDY in the EOC part after waking up from the wait. 
+> This makes the IRQ handler shorter by a few hundred cycles : read LCDR 
+> in the userspace-called read_raw.
+> Do you want me to have a patch at some point to move the LCDR read in 
+> the IRQ handler for at91-sama5d2_adc as well ?
+
+I don't know why I convinced myself before that it was semantically odd
+to do it in this location.
+
+I suppose I felt that it should be handled the same in the triggered
+case (where it is in the interrupt handler - be it very indirectly) and
+in the polled case.  If it's well commented I don't think it matters
+either way.  In some senses you are just making passing out of the interrupt
+into a threaded handler in both paths.
+
+Jonathan
+
 > 
-> I guess the reason why we didn't notice it is due to the fact that
-> only OMAP and DW sets UART_CAP_RPM currently, and DW set the flag in
-> May 2018.
+> Eugen
 > 
-> Per my understanding, the bug sits in the 8250 core driver rather than
-> 8250_dw.c.
-
-(Adding Tony and Sebastian, presumably CAP_RPM comes from OMAP since
-that is the only other user, and this same bug is present there too.)
-
-Correct.  printk() can be called from atomic contexts (consider what
-happens when an oops or similar occurs - we can be in any context,
-holding any locks etc.)  Plain printk() can also be used from within
-spinlocked irqs-off regions.
-
-This means the console's write function may be called in these contexts.
-Since pm_runtime_get_sync() is may sleep, it means that its use in the
-console path is _fundamentally_ wrong, and will lead to exactly this
-problem.
-
-I don't see a way around that other than to avoid RPM on consoles.
-(which makes the presence of the RPM code in serial8250_console_write()
-completely unnecessary.)
-
-When I rewrote the serial drivers and created serial_core & 8250, this
-is something that I realised, and I arranged the PM support at the time
-to always maintain the console in active state (this is prior to RPM).
-
-While I'm looking at commit d74d5d1b7288 ("tty: serial: 8250_core: add
-run time pm"):
-
-+static void serial8250_rpm_get_tx(struct uart_8250_port *p)
-+{
-+       unsigned char rpm_active;
-+
-+       if (!(p->capabilities & UART_CAP_RPM))
-+               return;
-+
-+       rpm_active = xchg(&p->rpm_tx_active, 1);
-+       if (rpm_active)
-+               return;
-+       pm_runtime_get_sync(p->port.dev);
-+}
-
-is particularly "interesting" - if this is called from sections of
-code that allow it to be called concurrently from different contexts,
-then we could have:
-
-rpm_tx_active	thread 0			thread 1
-0
-		xchg(, 1)
-1
-						xchg(, 1)
-						... goes on to use port ...
-		pm_runtime_get_sync()
-
-In other words, the port can be used _before_ pm_runtime_get_sync() is
-called.
-
-If, on the other hand, this can't race, then considering the
-serial8250_rpm_put_tx() path as well, what stops this race from
-happening:
-
-rpm_tx_active	thread 0			thread 1
-1
-		serial8250_rpm_get_tx()
-						serial8250_rpm_put_tx()
-		xchg(, 1)
-1
-						xchg(, 0)
-0
-						pm_runtime_put_autosuspend()
-
-Now to the real point about the above - if _neither_ race is possible,
-then what is the point of the more expensive xchg() here rather than
-simple test-and-assignment of rpm_tx_active?  Either these paths can't
-race with each other and xchg() is unnecessary, or they can and they
-_could_ fail as shown above.  My suspicion is that xchg() is an attempt
-to reduce the likelyhood of one of these races being hit.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 14.8Mbps down 650kbps up
-According to speedtest.net: 13Mbps down 490kbps up
+> >>
+> >> Jonathan  
+> >>>
+> >>>      
+> >>>>
+> >>>> Jonathan
+> >>>>        
+> >>>>>    
+> >>>>>    		st->last_value = 0;
+> >>>>>    		st->done = false;  
+> >>>>        
+> >>  
+> > 
+> >   
