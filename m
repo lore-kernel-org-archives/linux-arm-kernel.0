@@ -1,86 +1,29 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Sat, 29 Sep 2018 04:20:24 +0200
-Subject: [PATCH net-next v6 07/23] zinc: ChaCha20 ARM and ARM64
- implementations
-In-Reply-To: <CAKv+Gu8knzzmK4_KouFQWKzMdHFgEsk-CtBrcuAvk0bYkDFO=w@mail.gmail.com>
-References: <20180925145622.29959-1-Jason@zx2c4.com>
- <20180925145622.29959-8-Jason@zx2c4.com>
- <CAKv+Gu8knzzmK4_KouFQWKzMdHFgEsk-CtBrcuAvk0bYkDFO=w@mail.gmail.com>
-Message-ID: <CAHmME9qtN8kiKnMHTa76r9a_5Ou_s3WhAMT_HnH7-1FeoHUOZg@mail.gmail.com>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Sat, 29 Sep 2018 10:29:54 +0800
+Subject: [PATCH v1 1/2] mmc: dt-bindings: add "bus-clk" for MT2712
+Message-ID: <1538188195-3608-1-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On MT2712 MSDC0/3, HCLK/bus-clk need gate/ungate together,
+or will hang when access MSDC register.
 
-On Fri, Sep 28, 2018 at 6:02 PM Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> Please put comments like this below the ---
+Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+---
+ Documentation/devicetree/bindings/mmc/mtk-sd.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-git-notes is nice for this indeed.
-
-> Are these CONFIG_ symbols defined anywhere at this point?
-
-Yes, they're introduced in the first zinc commit. There's no git-blame
-on git.kernel.org, presumably because it's expensive to compute, but
-there is on my personal instance, so this might help:
-https://git.zx2c4.com/linux-dev/blame/lib/zinc/Kconfig?h=jd/wireguard
-
-> In any case, I don't think these is a reason for these, at least not
-> on ARM/arm64. The 64-bitness is implied in both cases
-
-You mean to say that since these nobs are def_bool y and are
-essentially "depends on ARM", then I should just straight up use
-CONFIG_ARM? I had thought about this, but figured this would make it
-easier to later make these optional or have other options block them
-need be, or even if the dependencies and requirements for having them
-changes (for example, with UML on x86). I think doing it this way
-gives us some flexibility later on. So if that's a compelling enough
-reason, I'd like to keep those.
-
-> and the
-> dependency on !CPU_32v3 you introduce (looking at the version of
-> Kconfig at the end of the series) seems spurious to me. Was that added
-> because of some kbuild robot report? (we don't support ARMv3 in the
-> kernel but ARCH_RPC is built in v3 mode because of historical reasons
-> while the actual core is a v4)
-
-I added the !CPU_32v3 in my development tree after posting v6, so good
-to hear you're just looking straight at the updated tree. If you see
-things jump out in there prior to me posting v7, don't hesitate to let
-me know.
-
-The reason it was added was indeed because of:
-https://lists.01.org/pipermail/kbuild-all/2018-September/053114.html
--- exactly what you suspected, ARCH_RPC. Have a better suggestion than
-!CPU_32v3? It seems to me like so long as the kernel has CPU_32v3 as a
-thing in any form, I should mark Zinc as not supporting it, since
-we'll certainly be at least v4 and up. (Do you guys have any old Acorn
-ARM610 boxes sitting around for old time's sake at LinaroHQ? ;-)
-
-> > +#endif
-> > +
->
-> No need to make asmlinkage declarations conditional
-
-Yep, addressed in the IS_ENABLED cleanup.
-
->
-> if (IS_ENABLED())
-
-Sorted.
-
->
-> """
-> if (!IS_ENABLED(CONFIG_ARM))
->    return false;
->
-> hchacha20_arm(x, derived_key);
-> return true;
-> """
->
-> and drop the #ifdefs
-
-Also sorted.
-
-Regards,
-Jason
+diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+index f33467a..f2208f4 100644
+--- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
++++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+@@ -22,6 +22,7 @@ Required properties:
+ 	"source" - source clock (required)
+ 	"hclk" - HCLK which used for host (required)
+ 	"source_cg" - independent source clock gate (required for MT2712)
++	"bus_clk" - bus clock used for internal register access (required for MT2712 MSDC0/3)
+ - pinctrl-names: should be "default", "state_uhs"
+ - pinctrl-0: should contain default/high speed pin ctrl
+ - pinctrl-1: should contain uhs mode pin ctrl
+-- 
+1.8.1.1.dirty
