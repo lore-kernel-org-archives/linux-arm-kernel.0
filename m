@@ -1,79 +1,107 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Sat, 29 Sep 2018 13:58:03 +0800
-Subject: [PATCH v5 0/9] PCI: mediatek: fixup find_port, enable_msi and
- add pm, module support
-In-Reply-To: <1538129080-8206-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1538129080-8206-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1538200683.25778.6.camel@mtkswgap22>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 29 Sep 2018 08:16:25 +0200
+Subject: [PATCH net-next v6 07/23] zinc: ChaCha20 ARM and ARM64
+ implementations
+In-Reply-To: <CAHmME9qtN8kiKnMHTa76r9a_5Ou_s3WhAMT_HnH7-1FeoHUOZg@mail.gmail.com>
+References: <20180925145622.29959-1-Jason@zx2c4.com>
+ <20180925145622.29959-8-Jason@zx2c4.com>
+ <CAKv+Gu8knzzmK4_KouFQWKzMdHFgEsk-CtBrcuAvk0bYkDFO=w@mail.gmail.com>
+ <CAHmME9qtN8kiKnMHTa76r9a_5Ou_s3WhAMT_HnH7-1FeoHUOZg@mail.gmail.com>
+Message-ID: <CAKv+Gu9FoFQymp2-=rUeh14CkUKON389OCE7stYCOFwKZpaCrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-09-28 at 18:04 +0800, honghui.zhang at mediatek.com wrote:
-> From: Honghui Zhang <honghui.zhang@mediatek.com>
-> 
-> This patchset includes misc patchs:
-> 
-> The patch 1 fixup the mtk_pcie_find_port logic which will cause system
-> could not touch the EP's configuration space that connected to PCIe slot 1.
-> 
-> The patch 2 fixup the class type for MT7622.
-> The patch 6 fixup the enable msi logic, the operation to enable msi
-> should be after system clock is enabled. Call mtk_pcie_enable_msi in
-> mtk_pcie_startup_port_v2 since the clock was all enabled at that time.
-> 
-> The patch 7 was rebased and refactor of the v4 patch[1], changes are:
->  -Add PM support for MT7622.
->  -Using mtk_pcie_enable_port to re-establish the link when resumed.
->  -Rebased on this patchset.
-> 
-> The patch 9 add loadable kernel module support.
-> 
-> [1] https://patchwork.kernel.org/patch/10479079
-> 
-> Change since v4:
->  - Add patch 2 to fixup class type for MT7622.
->  - Add patch 3 to remove the redundant dev->pm_domain check
->  - Add patch 4 to covert to use pci_host_probe
->  - Add patch 5 to re-arrange the function define, this is a prepare patch for
->    fixup the enable_msi logic, no functional changed have been made by this one.
->  - Add patch 8 to save the GIC IRQ in mtk_pcie_port as a prepare patch for tear
->    down the irq when remove the kernel module.
->  - Re-arrange the find_port flow suggest by Lorenzo to make the code parse easier
->    for the patch 1.
->  - Remove the .pm_support in mtk_pcie_soc in patch 7 since if system pm was not
->    supported, then those pm callbacks will never be executed for MT7622. So the
->    .pm_support is not needed.
-> 
-> Change since v3:
->  - Remove pm_runtime_XXX ops in suspend and resume callbacks in the third patch.
->  - Rebase to 4.19-rc1.
-> 
-> Change since v2:
->  - Fix the list_for_each_entry_safe parameter error.
->  - Add Ryder's Acked-by flag.
-> 
-> Change since v1:
->  - A bit of code refact of the first patch suggested by Andy Shevchenko, and
->    commit message updated.
->  - Using __maybe_unused.
->  - Remove the redundant list_empty check of the fourth patch.
-> 
-> Honghui Zhang (9):
->   PCI: mediatek: Using slot's devfn for compare to fix
->     mtk_pcie_find_port logic
->   PCI: mediatek: Fixup class ID for MT7622 as PCI_CLASS_BRIDGE_PCI
->   PCI: mediatek: Remove the redundant dev->pm_domain check
->   PCI: mediatek: Convert to use pci_host_probe()
->   PCI: mediatek: Move the mtk_pcie_startup_port_v2 function's define
->     after mtk_pcie_setup_irq
->   PCI: mediatek: Enable msi after clock enabled
->   PCI: mediatek: Add system pm support for MT2712 and MT7622
->   PCI: mediatek: Save the GIC IRQ in mtk_pcie_port
->   PCI: mediatek: Add loadable kernel module support
-> 
->  drivers/pci/controller/Kconfig         |   2 +-
->  drivers/pci/controller/pcie-mediatek.c | 326 +++++++++++++++++++++------------
->  2 files changed, 210 insertions(+), 118 deletions(-)
-> 
+On 29 September 2018 at 04:20, Jason A. Donenfeld <Jason@zx2c4.com> wrote:
+> Hi Ard,
+>
+> On Fri, Sep 28, 2018 at 6:02 PM Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+>> Please put comments like this below the ---
+>
+> git-notes is nice for this indeed.
+>
+>> Are these CONFIG_ symbols defined anywhere at this point?
+>
+> Yes, they're introduced in the first zinc commit. There's no git-blame
+> on git.kernel.org, presumably because it's expensive to compute, but
+> there is on my personal instance, so this might help:
+> https://git.zx2c4.com/linux-dev/blame/lib/zinc/Kconfig?h=jd/wireguard
+>
+>> In any case, I don't think these is a reason for these, at least not
+>> on ARM/arm64. The 64-bitness is implied in both cases
+>
+> You mean to say that since these nobs are def_bool y and are
+> essentially "depends on ARM", then I should just straight up use
+> CONFIG_ARM? I had thought about this, but figured this would make it
+> easier to later make these optional or have other options block them
+> need be, or even if the dependencies and requirements for having them
+> changes (for example, with UML on x86). I think doing it this way
+> gives us some flexibility later on. So if that's a compelling enough
+> reason, I'd like to keep those.
+>
 
-Acked-by: Ryder Lee <ryder.lee@mediatek.com> for the whole series.
+Sure. But probably better to be consistent then, and stop using
+CONFIG_ARM directly in your code.
+
+>> and the
+>> dependency on !CPU_32v3 you introduce (looking at the version of
+>> Kconfig at the end of the series) seems spurious to me. Was that added
+>> because of some kbuild robot report? (we don't support ARMv3 in the
+>> kernel but ARCH_RPC is built in v3 mode because of historical reasons
+>> while the actual core is a v4)
+>
+> I added the !CPU_32v3 in my development tree after posting v6, so good
+> to hear you're just looking straight at the updated tree. If you see
+> things jump out in there prior to me posting v7, don't hesitate to let
+> me know.
+>
+> The reason it was added was indeed because of:
+> https://lists.01.org/pipermail/kbuild-all/2018-September/053114.html
+> -- exactly what you suspected, ARCH_RPC. Have a better suggestion than
+> !CPU_32v3?
+
+Yes, you could just add
+
+asflags-$(CONFIG_CPU_32v3) += -march=armv4
+
+with a comment stating that we don't actually support ARMv3 but only
+use it as a code generation target for reasons unrelated to the ISA
+
+> It seems to me like so long as the kernel has CPU_32v3 as a
+> thing in any form, I should mark Zinc as not supporting it, since
+> we'll certainly be at least v4 and up. (Do you guys have any old Acorn
+> ARM610 boxes sitting around for old time's sake at LinaroHQ? ;-)
+>
+
+AFAIK we only support the StrongARM flavor of RiscPC which is ARMv4.
+But yes, some people do care deeply about these antiquated platforms,
+including Russell, and there is no particular to leave this one
+behind.
+
+>> > +#endif
+>> > +
+>>
+>> No need to make asmlinkage declarations conditional
+>
+> Yep, addressed in the IS_ENABLED cleanup.
+>
+>>
+>> if (IS_ENABLED())
+>
+> Sorted.
+>
+>>
+>> """
+>> if (!IS_ENABLED(CONFIG_ARM))
+>>    return false;
+>>
+>> hchacha20_arm(x, derived_key);
+>> return true;
+>> """
+>>
+>> and drop the #ifdefs
+>
+> Also sorted.
+>
+> Regards,
+> Jason
