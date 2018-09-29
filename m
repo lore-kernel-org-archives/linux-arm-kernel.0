@@ -1,65 +1,46 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Sat, 29 Sep 2018 14:56:13 +0200
-Subject: [PATCH v1 2/2] mmc: mediatek: add bus_clk control
-In-Reply-To: <1538188195-3608-2-git-send-email-chaotian.jing@mediatek.com>
-References: <1538188195-3608-1-git-send-email-chaotian.jing@mediatek.com>
- <1538188195-3608-2-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <b9a6e56c-0762-e8d7-08df-7633a8e28ec0@gmail.com>
+From: jorik@kippendief.biz (Jorik Jonker)
+Date: Sat, 29 Sep 2018 15:16:17 +0200
+Subject: [PATCH] dts: sun8i-h3: add sy8106a to orange pi plus
+In-Reply-To: <20180928135516.jxhnsgaa3s2nagv7@flea>
+References: <20180927083636.5415-1-jorik@kippendief.biz>
+ <20180928135516.jxhnsgaa3s2nagv7@flea>
+Message-ID: <20180929131617.GA7940@carbon.kippendief.biz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On Fri, Sep 28, 2018 at 03:55:16PM +0200, Maxime Ripard wrote:
+>The prefix of your commit title should be "ARM: dts: ..."
 
-On 29/09/2018 04:29, Chaotian Jing wrote:
-> when gate MSDC0_HCLK, access register will hang, even the MSDC driver
-> will never accessing register after HCLK was gated, but for safety, need
-> gate the bus_clk(which used to access register) too.
-> 
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> ---
->  drivers/mmc/host/mtk-sd.c | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-> index 0484138..1c1c967 100644
-> --- a/drivers/mmc/host/mtk-sd.c
-> +++ b/drivers/mmc/host/mtk-sd.c
-> @@ -387,6 +387,7 @@ struct msdc_host {
->  
->  	struct clk *src_clk;	/* msdc source clock */
->  	struct clk *h_clk;      /* msdc h_clk */
-> +	struct clk *bus_clk;	/* bus clock which used to access register */
->  	struct clk *src_clk_cg; /* msdc source clock control gate */
->  	u32 mclk;		/* mmc subsystem clock frequency */
->  	u32 src_clk_freq;	/* source clock frequency */
-> @@ -660,12 +661,14 @@ static void msdc_gate_clock(struct msdc_host *host)
->  {
->  	clk_disable_unprepare(host->src_clk_cg);
->  	clk_disable_unprepare(host->src_clk);
-> +	clk_disable_unprepare(host->bus_clk);
->  	clk_disable_unprepare(host->h_clk);
->  }
->  
->  static void msdc_ungate_clock(struct msdc_host *host)
->  {
->  	clk_prepare_enable(host->h_clk);
-> +	clk_prepare_enable(host->bus_clk);
->  	clk_prepare_enable(host->src_clk);
->  	clk_prepare_enable(host->src_clk_cg);
->  	while (!(readl(host->base + MSDC_CFG) & MSDC_CFG_CKSTB))
-> @@ -1900,6 +1903,9 @@ static int msdc_drv_probe(struct platform_device *pdev)
->  		goto host_free;
->  	}
->  
-> +	host->bus_clk = devm_clk_get(&pdev->dev, "bus_clk");
-> +	if (IS_ERR(host->bus_clk))
-> +		host->bus_clk = NULL;
+Sure, will fix it in v2.
 
-That means the bus_clk is not requiered, even for mt2712, although the binding
-says so. Not sure if this is good enough or if we want to enforce the driver to
-actually error out, when the clock is not present in a mt2712 DTS.
+>> I have tested this on two Orange Pi Plus boards, and they run stable
+>> across a range of voltages (and frequencies).
+>
+>How was this tested?
 
-I suppose that's up to the maintainer :)
+Basically using intermittent cpuburn runs and monitor freq/voltage/temp.  
+I've included a description of my test in the v2 commit log.
 
-Regards,
-Matthias
+>> +		/*
+>> +		 * The datasheet uses 1.1V as the minimum value of VDD-CPUX,
+>> +		 * however both the Armbian DVFS table and the official one
+>> +		 * have operating points with voltage under 1.1V, and both
+>> +		 * DVFS table are known to work properly at the lowest
+>> +		 * operating point.
+>> +		 *
+>> +		 * Use 1.0V as the minimum voltage instead.
+>> +		 */
+>
+>There's not much point to that comment, since it's been that way for
+>all the other SoCs from Allwinner. However, that would be great to
+>have it in the commit log.
+
+Totally agree, but I thought: there must be a good reason this text is 
+in the PC dts, so let's put it in the Plus dts as well. I've moved it 
+from the patch to the log in the v2 patch, which I will send right away.
+
+Thanks for reviewing!
+
+Jorik
