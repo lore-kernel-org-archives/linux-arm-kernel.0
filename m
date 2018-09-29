@@ -1,44 +1,27 @@
 From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
-Date: Sat, 29 Sep 2018 13:00:03 +0800
-Subject: [PATCH] MAINTAINERS: fix pattern in ARM/Synaptics berlin SoC section
-Message-ID: <20180929130003.5dc79bed@xhacker.debian>
+Date: Sat, 29 Sep 2018 13:20:36 +0800
+Subject: [BUG] sleep in atomic in 8250 runtime PM code path
+Message-ID: <20180929132036.0323e24b@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Berlin SoC files has been moved from marvell dir to synaptics dir, but
-commit bc52497a595d ("MAINTAINERS: update entry for ARM/berlin") didn't
-update the dir accordingly. This patch fixes it.
+Hi,
 
->From another side, new derivative SoCs from Synaptics may not be named
-as berlin*, so let's update the entries accordingly.
+Recently I found I could trigger sleep in atomic bug on berlin after commit
+d76c74387e1c ("serial: 8250_dw: Fix runtime PM handling"). The path looks like:
 
-Fixes: bc52497a595d ("MAINTAINERS: update entry for ARM/berlin")
-Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
-Reported-by: Joe Perches <joe@perches.com>
----
- MAINTAINERS | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+dw8250_probe => serial850_register_8250_port => uart_add_one_port=>
+register_console => console_unlock => univ8250_console_write =>
+serial8250_console_write => serial8250_rpm_get => pm_runtime_get_sync
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index a255240d1452..2be912b67905 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2093,14 +2093,14 @@ F:	arch/arm/boot/dts/stm32*
- F:	arch/arm/mach-stm32/
- F:	drivers/clocksource/armv7m_systick.c
- 
--ARM/Synaptics Berlin SoC support
-+ARM/Synaptics SoC support
- M:	Jisheng Zhang <Jisheng.Zhang@synaptics.com>
- M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/mach-berlin/
- F:	arch/arm/boot/dts/berlin*
--F:	arch/arm64/boot/dts/marvell/berlin*
-+F:	arch/arm64/boot/dts/synaptics/
- 
- ARM/TANGO ARCHITECTURE
- M:	Marc Gonzalez <marc.w.gonzalez@free.fr>
--- 
-2.19.0
+The irq is disabled by printk_safe_enter_irqsave() in console_unlock, but
+pm_runtime_get_sync can't be called in atomic context...
+
+I guess the reason why we didn't notice it is due to the fact that
+only OMAP and DW sets UART_CAP_RPM currently, and DW set the flag in
+May 2018.
+
+Per my understanding, the bug sits in the 8250 core driver rather than
+8250_dw.c.
+
+Thanks
