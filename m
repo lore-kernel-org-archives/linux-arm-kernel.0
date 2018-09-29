@@ -1,40 +1,48 @@
-From: digetx@gmail.com (Dmitry Osipenko)
-Date: Sat, 29 Sep 2018 03:44:07 +0300
-Subject: [PATCH] regulator: core: Pass max_uV value to
- regulator_set_voltage_rdev
-In-Reply-To: <20180929002753.GT5662@atomide.com>
-References: <20180615112916.GK112168@atomide.com>
- <CGME20180618140856eucas1p281619f9bf003655a3c2eac356216ab25@eucas1p2.samsung.com>
- <1529330913-11152-1-git-send-email-m.purski@samsung.com>
- <20180702080505.GN112168@atomide.com>
- <95655644-ef41-f5bd-7e8e-a257d48cd020@gmail.com>
- <20180928202251.GM5662@atomide.com>
- <2c0132ff-ea0f-f19e-ebfb-a0d077565d2c@gmail.com>
- <20180928224109.GS5662@atomide.com>
- <ea0a59ef-e201-986a-9499-a0638359b1b9@gmail.com>
- <d14cc796-8644-41a3-5135-299bd8820204@gmail.com>
- <20180929002753.GT5662@atomide.com>
-Message-ID: <dbaa721a-9a47-2c6a-46d5-92a7ca13c5aa@gmail.com>
+From: Jisheng.Zhang@synaptics.com (Jisheng Zhang)
+Date: Sat, 29 Sep 2018 09:33:26 +0800
+Subject: [GIT PULL] berlin dt64 changes for v4.20
+In-Reply-To: <CAK8P3a3T=P1SS9DRSNEniBrOkKJhd__FoMGZZ_Kt6Xjd32NXGA@mail.gmail.com>
+References: <20180927162106.7a7e48f7@xhacker.debian>
+ <CAK8P3a3T=P1SS9DRSNEniBrOkKJhd__FoMGZZ_Kt6Xjd32NXGA@mail.gmail.com>
+Message-ID: <20180929093309.08c32dca@xhacker.debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/29/18 3:27 AM, Tony Lindgren wrote:
-> * Dmitry Osipenko <digetx@gmail.com> [180928 23:55]:
->> On 9/29/18 2:17 AM, Dmitry Osipenko wrote:
->>> On 9/29/18 1:41 AM, Tony Lindgren wrote:
->>>> I'm still getting these errors after init:
->>>
->>> Thank you very much again, seems I got what's wrong with your case. The ti-abb-regulator driver sets the "abb->current_info_idx = -EINVAL" on probe and that value is getting updated only after the first voltage change, hence _regulator_get_voltage() returns -22.
-> 
-> OK that's starting to make some sense now thanks.
-> 
->>> Please try this patch:
->>
->> I've revised the patch and here is the current final version.
-> 
-> Hey cool this one works now :) I suggest you rework the whole series
-> with these fixes. I recall the series had a problem with git bisect
-> too between the patches. It will make life easier for other people
-> who may need to git bisect these patches.
+On Fri, 28 Sep 2018 12:40:43 +0200 Arnd Bergmann wrote:
 
-Awesome! There are few other things in this patchset that also need fixing. I've asked Maciej if he's going to continue working on the patches, waiting for the answer. I can pick up the patches and try to finish the work if necessary.
+> On Thu, Sep 27, 2018 at 10:24 AM Jisheng Zhang
+> <Jisheng.Zhang@synaptics.com> wrote:
+> >
+> >
+> > The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+> >
+> >   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+> >
+> > are available in the Git repository at:
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/jszhang/linux-berlin.git tags/berlin64-dt-for-v4.20
+> >
+> > for you to fetch changes up to 087682f5a75bec349cdcb34c29384a051587aa99:
+> >
+> >   arm64: dts: synaptics: add dtsi file for Synaptics AS370 SoC (2018-09-27 14:48:43 +0800)
+> >
+> > ----------------------------------------------------------------
+> > Berlin64 DT changes for v4.20
+> >
+> >  - move berlin binding documentation to syna.txt
+> >  - add binding for the AS370 SoC
+> >  - add dtsi file for Synaptics AS370 SoC  
+> 
+> Pulled into next/dt, but I noticed that the tag description was different on
+> the signed tag compared to the one in the email. I left it with the
+> one-line version, since the bullet list you have here does not add
+> any information that is not already part of the one-line patch
+> descriptions below it.
+> 
+> It would be nice to get a real description of the series as a whole
+> in the signed tag instead, to explain what overall theme is. In
+> this case, a good text would explain what the 'AS370 SoC' is,
+> including its main features and when this is expected to hit the
+> market.
+
+Got it. Thanks for the detailed information.
