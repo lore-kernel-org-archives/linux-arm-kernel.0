@@ -1,68 +1,32 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Sat, 29 Sep 2018 10:39:42 +0800
-Subject: [PATCH 2/2] mmc: mediatek: add bus_clk control
-In-Reply-To: <1538155736.30348.85.camel@mtkswgap22>
-References: <1538134855-11198-1-git-send-email-chaotian.jing@mediatek.com>
- <1538134855-11198-3-git-send-email-chaotian.jing@mediatek.com>
- <1538155736.30348.85.camel@mtkswgap22>
-Message-ID: <1538188782.3674.3.camel@mhfsdcap03>
+From: Jason@zx2c4.com (Jason A. Donenfeld)
+Date: Sat, 29 Sep 2018 04:52:30 +0200
+Subject: [PATCH] arm: support big-endian for the virt architecture
+In-Reply-To: <CAK8P3a3riqD9kzGZHLxhYug7zO34e2icOaWddzH2JezbZKVNPg@mail.gmail.com>
+References: <20180926135110.13061-1-Jason@zx2c4.com>
+ <CAK8P3a0+s6DM=QUqS_KrNp+95aDj2QTsWb+w73piwLsQFvq+pg@mail.gmail.com>
+ <CAHmME9o_6o_wB00kASJdqJyWt2wFH2FqdzXOm8RLA5VeCibDJg@mail.gmail.com>
+ <CAK8P3a3riqD9kzGZHLxhYug7zO34e2icOaWddzH2JezbZKVNPg@mail.gmail.com>
+Message-ID: <CAHmME9rGgnNTd84-ywcNZfRx0a3dnqUaCMoSkKHYSUPN1jZiew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2018-09-29 at 01:28 +0800, Sean Wang wrote:
-> Hi,
-> 
-> On Fri, 2018-09-28 at 19:40 +0800, Chaotian Jing wrote:
-> > when gate MSDC0_HCLK, access register will hang, even the MSDC driver
-> > will never accessing register after HCLK was gated, but for safety, need
-> > gate the bus_clk(which used to access register) too.
-> > 
-> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> > ---
-> >  drivers/mmc/host/mtk-sd.c | 6 ++++++
-> >  1 file changed, 6 insertions(+)
-> > 
-> > diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-> > index 0484138..1c1c967 100644
-> > --- a/drivers/mmc/host/mtk-sd.c
-> > +++ b/drivers/mmc/host/mtk-sd.c
-> > @@ -387,6 +387,7 @@ struct msdc_host {
-> >  
-> >  	struct clk *src_clk;	/* msdc source clock */
-> >  	struct clk *h_clk;      /* msdc h_clk */
-> > +	struct clk *bus_clk;	/* bus clock which used to access register */
-> >  	struct clk *src_clk_cg; /* msdc source clock control gate */
-> >  	u32 mclk;		/* mmc subsystem clock frequency */
-> >  	u32 src_clk_freq;	/* source clock frequency */
-> > @@ -660,12 +661,14 @@ static void msdc_gate_clock(struct msdc_host *host)
-> >  {
-> >  	clk_disable_unprepare(host->src_clk_cg);
-> >  	clk_disable_unprepare(host->src_clk);
-> > +	clk_disable_unprepare(host->bus_clk);
-> >  	clk_disable_unprepare(host->h_clk);
-> >  }
-> >  
-> >  static void msdc_ungate_clock(struct msdc_host *host)
-> >  {
-> >  	clk_prepare_enable(host->h_clk);
-> > +	clk_prepare_enable(host->bus_clk);
-> >  	clk_prepare_enable(host->src_clk);
-> >  	clk_prepare_enable(host->src_clk_cg);
-> >  	while (!(readl(host->base + MSDC_CFG) & MSDC_CFG_CKSTB))
-> > @@ -1900,6 +1903,9 @@ static int msdc_drv_probe(struct platform_device *pdev)
-> >  		goto host_free;
-> >  	}
-> >  
-> > +	host->bus_clk = devm_clk_get(&pdev->dev, "bus_clk");
-> > +	if (IS_ERR(host->bus_clk))
-> > +		host->bus_clk = NULL;
-> 
-> The implementation would cause all SoCs to treat the bus_clk as the optional.
-> It seems you should add a flag to see what SoC requires the bus_clk to successfully access the related registers.
+Hey Arnd,
 
->  Yes, but is no harm to other SoCs, just like the handle of "source_cg"
-> >  	/*source clock control gate is optional clock*/
-> >  	host->src_clk_cg = devm_clk_get(&pdev->dev, "source_cg");
-> >  	if (IS_ERR(host->src_clk_cg))
-> 
-> 
+On Fri, Sep 28, 2018 at 9:19 PM Arnd Bergmann <arnd@arndb.de> wrote:
+> You can probably work around it by enabling ARCH_HIGHBANK,
+> which is a minimal platform with no other requirements, so it
+> should only add a few milliseconds to the build.
+
+Nice hack, thanks for the suggestion. Committed here:
+https://git.kernel.org/pub/scm/linux/kernel/git/zx2c4/WireGuard.git/commit/?id=56ff2eb9480e6c691a5b8d8ff1fa01090df61e1d
+
+> Another option would be to do the testing on top of linux-next,
+> which should have your fix starting on Monday. Testing on
+> linux-next carries a higher risk of running into unrelated
+> regressions, but also lets you find out about conflicts with
+> other patches early on.
+
+I do actually test on linux-next (and tons of other kernels too), but
+I like to have things working for at least the latest mainline.
+
+Jason
