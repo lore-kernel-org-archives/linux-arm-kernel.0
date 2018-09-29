@@ -1,69 +1,46 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 29 Sep 2018 12:31:51 +0100
-Subject: [PATCH v2 2/2] iio: adc: at91: fix wrong channel number in
- triggered buffer mode
-In-Reply-To: <20180925131757.gjk2t277twhji5ns@M43218.corp.atmel.com>
-References: <1537775504-7981-1-git-send-email-eugen.hristev@microchip.com>
- <1537775504-7981-2-git-send-email-eugen.hristev@microchip.com>
- <20180925131757.gjk2t277twhji5ns@M43218.corp.atmel.com>
-Message-ID: <20180929123151.1fd0f9ec@archlinux>
+From: colin.king@canonical.com (Colin King)
+Date: Sat, 29 Sep 2018 12:43:13 +0100
+Subject: [PATCH] usb: gadget: fix spelling mistakeis "[En]queing" ->
+ "[En]queuing"
+Message-ID: <20180929114313.10557-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Sep 2018 15:17:57 +0200
-Ludovic Desroches <ludovic.desroches@microchip.com> wrote:
+From: Colin Ian King <colin.king@canonical.com>
 
-> On Mon, Sep 24, 2018 at 10:51:44AM +0300, Eugen Hristev wrote:
-> > When channels are registered, the hardware channel number is not the
-> > actual iio channel number.
-> > This is because the driver is probed with a certain number of accessible
-> > channels. Some pins are routed and some not, depending on the description of
-> > the board in the DT.
-> > Because of that, channels 0,1,2,3 can correspond to hardware channels
-> > 2,3,4,5 for example.
-> > In the buffered triggered case, we need to do the translation accordingly.
-> > Fixed the channel number to stop reading the wrong channel.
-> > 
-> > Fixes 0e589d5fb "ARM: AT91: IIO: Add AT91 ADC driver."
-> > Cc: Maxime Ripard <maxime.ripard@bootlin.com>
-> > Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>  
-> Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+Trivial fix to spelling mistakes in debug warning messages
 
-Applied to the togreg branch of iio.git and pushed out as testing for the
-autobuilders to play with it.
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ drivers/usb/gadget/udc/aspeed-vhub/epn.c | 2 +-
+ drivers/usb/gadget/udc/udc-xilinx.c      | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-Thanks,
-
-Jonathan
-
-> 
-> > ---
-> > Changes in v2:
-> > - Added 'const' spec to the declaration to avoid build warning
-> > 
-> >  drivers/iio/adc/at91_adc.c | 4 +++-
-> >  1 file changed, 3 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-> > index e3be88e..75d2f73 100644
-> > --- a/drivers/iio/adc/at91_adc.c
-> > +++ b/drivers/iio/adc/at91_adc.c
-> > @@ -248,12 +248,14 @@ static irqreturn_t at91_adc_trigger_handler(int irq, void *p)
-> >  	struct iio_poll_func *pf = p;
-> >  	struct iio_dev *idev = pf->indio_dev;
-> >  	struct at91_adc_state *st = iio_priv(idev);
-> > +	struct iio_chan_spec const *chan;
-> >  	int i, j = 0;
-> >  
-> >  	for (i = 0; i < idev->masklength; i++) {
-> >  		if (!test_bit(i, idev->active_scan_mask))
-> >  			continue;
-> > -		st->buffer[j] = at91_adc_readl(st, AT91_ADC_CHAN(st, i));
-> > +		chan = idev->channels + i;
-> > +		st->buffer[j] = at91_adc_readl(st, AT91_ADC_CHAN(st, chan->channel));
-> >  		j++;
-> >  	}
-> >  
-> > -- 
-> > 2.7.4
-> >   
+diff --git a/drivers/usb/gadget/udc/aspeed-vhub/epn.c b/drivers/usb/gadget/udc/aspeed-vhub/epn.c
+index 5939eb1e97f2..e9ee2b72af19 100644
+--- a/drivers/usb/gadget/udc/aspeed-vhub/epn.c
++++ b/drivers/usb/gadget/udc/aspeed-vhub/epn.c
+@@ -353,7 +353,7 @@ static int ast_vhub_epn_queue(struct usb_ep* u_ep, struct usb_request *u_req,
+ 	/* Endpoint enabled ? */
+ 	if (!ep->epn.enabled || !u_ep->desc || !ep->dev || !ep->d_idx ||
+ 	    !ep->dev->enabled || ep->dev->suspended) {
+-		EPDBG(ep,"Enqueing request on wrong or disabled EP\n");
++		EPDBG(ep, "Enqueuing request on wrong or disabled EP\n");
+ 		return -ESHUTDOWN;
+ 	}
+ 
+diff --git a/drivers/usb/gadget/udc/udc-xilinx.c b/drivers/usb/gadget/udc/udc-xilinx.c
+index 6407e433bc78..b1f4104d1283 100644
+--- a/drivers/usb/gadget/udc/udc-xilinx.c
++++ b/drivers/usb/gadget/udc/udc-xilinx.c
+@@ -1078,7 +1078,7 @@ static int xudc_ep_queue(struct usb_ep *_ep, struct usb_request *_req,
+ 	unsigned long flags;
+ 
+ 	if (!ep->desc) {
+-		dev_dbg(udc->dev, "%s:queing request to disabled %s\n",
++		dev_dbg(udc->dev, "%s: queuing request to disabled %s\n",
+ 			__func__, ep->name);
+ 		return -ESHUTDOWN;
+ 	}
+-- 
+2.17.1
