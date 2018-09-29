@@ -1,27 +1,20 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Sat, 29 Sep 2018 10:37:18 +0100
-Subject: [PATCH v2 1/7] arm64: move arm uprobes code to be reused by arm64
-In-Reply-To: <1537963925-25313-2-git-send-email-m.slodczyk2@partner.samsung.com>
+Date: Sat, 29 Sep 2018 10:39:36 +0100
+Subject: [PATCH v2 2/7] arm64: uprobes - fix checkpatch issues
+In-Reply-To: <1537963925-25313-3-git-send-email-m.slodczyk2@partner.samsung.com>
 References: <1537963925-25313-1-git-send-email-m.slodczyk2@partner.samsung.com>
- <CGME20180926121214eucas1p2b262936ddd96980b7b4369f16b52c6ce@eucas1p2.samsung.com>
- <1537963925-25313-2-git-send-email-m.slodczyk2@partner.samsung.com>
-Message-ID: <0d10bc6d-5fb1-fac3-3d68-352b0cfd4af2@arm.com>
+ <CGME20180926121214eucas1p1660542d20425551038da8d3feaf7e1b7@eucas1p1.samsung.com>
+ <1537963925-25313-3-git-send-email-m.slodczyk2@partner.samsung.com>
+Message-ID: <765f38fe-6563-b32e-624b-6e071f424dbd@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/26/2018 01:11 PM, Maciej Slodczyk wrote:
-> Move ARM32 uprobes code from arch/arm/probes/ to a more common location -
-> lib/probes/arm/. This code will be used by ARM64 code when uprobing 32-bit
-> applications.
+On 09/26/2018 01:12 PM, Maciej Slodczyk wrote:
+> Fix checkpatch issues in moved arm uprobes code.
+> 
 
-The patch looks OK to me, with the following nit:
+Again the patch doesn't have anything to do with arm64, so wrong tag.
 
-The subject tag looks incorrect. Since this patch moves the ARM
-code around and has nothing to do with arm64 (yet). So, the subject
-could be :
-
-ARM: move uprobes code to be reused by arm64
-
-which could allow the concerned arm people to check this patch.
+Otherwise looks fine.
 
 Suzuki
