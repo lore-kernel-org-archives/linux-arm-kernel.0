@@ -1,14 +1,13 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Sat, 29 Sep 2018 17:20:22 +0200
-Subject: [GIT PULL] ARM: arm64 dts updates for v4.20
-Message-ID: <5b05e2ed-a909-dbb5-2b95-f1cab0ecc5c8@gmail.com>
+Date: Sat, 29 Sep 2018 17:22:34 +0200
+Subject: [GIT PULL] ARM: soc driver updates for v4.20
+Message-ID: <fa4576fd-e8a5-8cfb-381f-e2343bb97786@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-Hi Olof,
+Hi Olof and Arnd,
 
-Please take the following commit into accout for v4.20
+Please have a look on the following soc driver commits.
 
 Thanks a lot,
 Matthias
@@ -22,38 +21,38 @@ The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 are available in the Git repository at:
 
   https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git/
-tags/v4.19-next-dts64
+tags/v4.19-next-soc
 
-for you to fetch changes up to 3c2ac5b3ebcd387f5399c7888fae7279a65c606a:
+for you to fetch changes up to 3013b410a8f50cf251e09da00b8241fd43bb41fa:
 
-  arm64: dts: Add spi slave dts (2018-09-28 23:05:26 +0200)
-
-----------------------------------------------------------------
-mt2712 - add spi slave node
-
-mt7622:
-- add timer node
-- add CCI node
-- add PMU node
-- add bluetooth node
-- add SPI slave node
-- fix reference board (rfb1) memory and sort node alphabetically
-- add support for Bananapi-R64
+  soc: mediatek: pwrap: add mt6357 driver for mt6765 SoCs (2018-09-25 17:36:38
++0200)
 
 ----------------------------------------------------------------
-Leilk Liu (1):
-      arm64: dts: Add spi slave dts
+PMIC wrapper:
+- sort SoCs and PMICs ascending
+- add capabilities
+- add support for mt8183 SoC + mt6358 PMIC
+- return false instead of 0
+- add support for mt6765 SoC + mt6357 PMIC
 
-Ryder Lee (4):
-      arm64: dts: mt7622: add timer, CCI-400 and PMU nodes
-      arm64: dts: mt7622: add a bluetooth 5 device node
-      arm64: dts: mt7622: fix ram size for rfb1
-      arm64: dts: mt7622: add bananapi BPI-R64 board
+----------------------------------------------------------------
+Argus Lin (3):
+      dt-bindings: pwrap: mediatek: add pwrap support for MT6765
+      soc: mediatek: pwrap: add pwrap driver for mt6765 SoCs
+      soc: mediatek: pwrap: add mt6357 driver for mt6765 SoCs
 
- arch/arm64/boot/dts/mediatek/Makefile              |   1 +
- arch/arm64/boot/dts/mediatek/mt2712e.dtsi          |  11 +
- .../boot/dts/mediatek/mt7622-bananapi-bpi-r64.dts  | 530 +++++++++++++++++++++
- arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts       | 196 ++++----
- arch/arm64/boot/dts/mediatek/mt7622.dtsi           |  62 +++
- 5 files changed, 702 insertions(+), 98 deletions(-)
- create mode 100644 arch/arm64/boot/dts/mediatek/mt7622-bananapi-bpi-r64.dts
+Gustavo A. R. Silva (1):
+      soc: mediatek: pwrap: use true and false for boolean values
+
+Hsin-Hsiung Wang (3):
+      dt-bindings: mediatek: add compatible for mt8183 pwrap
+      soc: mediatek: pwrap: use group of bits for pwrap capability
+      soc: mediatek: add mt8183 pwrap support
+
+Matthias Brugger (1):
+      soc: mediatek: pwrap: order SoCs and PMICs ascending
+
+ .../devicetree/bindings/soc/mediatek/pwrap.txt     |   2 +
+ drivers/soc/mediatek/mtk-pmic-wrap.c               | 519 ++++++++++++++++-----
+ 2 files changed, 399 insertions(+), 122 deletions(-)
