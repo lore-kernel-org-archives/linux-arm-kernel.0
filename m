@@ -1,50 +1,38 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Sat, 29 Sep 2018 17:05:06 +0200
-Subject: [GIT PULL] Allwinner clock fixes for 4.19
-Message-ID: <20180929150506.vch5wuujblgkngfp@flea>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Sat, 29 Sep 2018 17:16:15 +0200
+Subject: [GIT PULL] ARM: defconfig update for v4.20
+Message-ID: <8bb0af1d-8323-9833-ee1c-bbbb9d65a686@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike, Stephen,
+Hi Olof and Arnd,
 
-Here is one fix for 4.19.
+Please have a look on the following pull request.
 
-Thanks!
-Maxime
+Thanks,
+Matthias
 
+---
 The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 
   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
 
 are available in the Git repository at:
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-fixes-for-4.19
+  https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git/
+tags/v4.19-next-defconfig
 
-for you to fetch changes up to 80a6ec7d5e1653208eb53f6738620dab98f6f50e:
+for you to fetch changes up to f718739d1c219decf2e4e4f0121753439850e5ab:
 
-  clk: sunxi-ng: sun4i: Set VCO and PLL bias current to lowest setting (2018-09-07 10:20:50 +0200)
-
-----------------------------------------------------------------
-Allwinner clk fixes for 4.19
-
-One fix for the Audio PLL that were not properly set and generating noise
-on the A10 SoCs.
+  ARM: defconfig: add mediatek_v7_defconfig (2018-09-25 16:18:15 +0200)
 
 ----------------------------------------------------------------
-Chen-Yu Tsai (1):
-      clk: sunxi-ng: sun4i: Set VCO and PLL bias current to lowest setting
+- add arm32 defconfig for mediatek SoCs.
 
- drivers/clk/sunxi-ng/ccu-sun4i-a10.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+----------------------------------------------------------------
+Sean Wang (1):
+      ARM: defconfig: add mediatek_v7_defconfig
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180929/435fb983/attachment.sig>
+ arch/arm/configs/mediatek_v7_defconfig | 319 +++++++++++++++++++++++++++++++++
+ 1 file changed, 319 insertions(+)
+ create mode 100644 arch/arm/configs/mediatek_v7_defconfig
