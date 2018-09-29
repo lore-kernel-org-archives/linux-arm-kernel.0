@@ -1,68 +1,54 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Sat, 29 Sep 2018 09:30:41 +0100
-Subject: [PATCH v6 06/18] kvm: arm/arm64: Allow arch specific
- configurations for VM
-In-Reply-To: <fbca190b-473b-5dee-67be-c724392fd297@arm.com>
-References: <20180926163258.20218-1-suzuki.poulose@arm.com>
- <20180926163258.20218-7-suzuki.poulose@arm.com>
- <fbca190b-473b-5dee-67be-c724392fd297@arm.com>
-Message-ID: <95c89f16-df03-a57b-e373-42cf65769912@arm.com>
+From: houlong.wei@mediatek.com (Houlong Wei)
+Date: Sat, 29 Sep 2018 17:21:41 +0800
+Subject: MediaTek MT8173 CMDQ support
+Message-ID: <1538212903-14331-1-git-send-email-houlong.wei@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi,
 
-On 09/28/2018 06:27 PM, Marc Zyngier wrote:
-> Hi Suzuki,
-> 
-> On 26/09/18 17:32, Suzuki K Poulose wrote:
->> Allow the arch backends to perform VM specific initialisation.
->> This will be later used to handle IPA size configuration and per-VM
->> VTCR configuration on arm64.
->>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Christoffer Dall <cdall@kernel.org>
->> Reviewed-by: Eric Auger <eric.auger@redhat.com>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->> ? arch/arm/include/asm/kvm_host.h?? | 7 +++++++
->> ? arch/arm64/include/asm/kvm_host.h | 2 ++
->> ? arch/arm64/kvm/reset.c??????????? | 7 +++++++
->> ? virt/kvm/arm/arm.c??????????????? | 5 +++--
->> ? 4 files changed, 19 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/kvm_host.h 
->> b/arch/arm/include/asm/kvm_host.h
->> index 3ad482d2f1eb..72d46418e1ef 100644
->> --- a/arch/arm/include/asm/kvm_host.h
->> +++ b/arch/arm/include/asm/kvm_host.h
->> @@ -354,4 +354,11 @@ static inline void kvm_vcpu_put_sysregs(struct 
->> kvm_vcpu *vcpu) {}
->> ? struct kvm *kvm_arch_alloc_vm(void);
->> ? void kvm_arch_free_vm(struct kvm *kvm);
->> +static inline int kvm_arm_config_vm(struct kvm *kvm, unsigned long type)
-> 
-> This is a bit of a nit, but VM is a bit of an overloaded term in this 
-> context. Given what we do in the following patch (moving the global 
-> stage-2 init to be on a per VM -- virtual machine), I'd like to rename 
-> this to something less ambiguous.
-> 
-> How about kvm_arm_config_stage2? Or something along those lines?
+This is Mediatek MT8173 Command Queue(CMDQ) driver. The CMDQ is used
+to help write registers with critical time limitation, such as
+updating display configuration during the vblank. It controls Global
+Command Engine (GCE) hardware to achieve this requirement.
 
-I had something similar in the earlier versions, where we supported
-the "IPA" size for both arm and arm64. But since we restricted this
-feature to arm64, I changed the name to make it more generic to
-let the archs parse the "vm_type" parameter which could potentially have
-more bits defined, not just the IPA size. Hence the change. On arm64, we
-only use it for stage2 configuration and on arm32 we make sure the type
-is empty.
+Changes since v24:
+ -move WARN_ON() into cmdq_pkt_append_command() from outside
+Changes since v23:
+ -rebase on v4.19-rc1
+ -revise return value of cmdq_mbox_create()
+ -revise cmdq_pkt_create()
+ -add MODULE_LICENSE() for mtk-cmdq-helper.c
+ -adjust functions order in mtk-cmdq.h
+Changes since v22:
+ -remove properties 'timeout' and 'thread-num' from device tree
+ -move timer from CMDQ driver to CMDQ helper
+ -move dma unmap from CMDQ driver to CMDQ helper
+ -config thread number in CMDQ match table
+ -remove reallocate mechanism and let client specify the cmdq buffer size
+ -let client specify the timeout time
+Changes since v21:
+ -rebase on v4.18-rc1
+ -remove subsys code and event id definition from mtk-cmdq-helper.c
+ -add mt8173-gce.h to define the subsys code and envent id
+Changes since v20:
+ -rebase on v4.15-rc1
+ -move dma_map_single outside of spinlock
+Changes since v19:
+ -rebase to v4.10-rc2
 
-> 
-> No need to respin the series on this account, we can address it in a 
-> separate patch. But I think it would help understanding what is done where.
-> 
+Houlong Wei (2):
+  arm64: dts: mt8173: Add GCE node
+  soc: mediatek: Add Mediatek CMDQ helper
 
-As such I am fine with suggestion.
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi |   10 +
+ drivers/soc/mediatek/Kconfig             |   12 ++
+ drivers/soc/mediatek/Makefile            |    1 +
+ drivers/soc/mediatek/mtk-cmdq-helper.c   |  291 ++++++++++++++++++++++++++++++
+ include/linux/soc/mediatek/mtk-cmdq.h    |  133 ++++++++++++++
+ 5 files changed, 447 insertions(+)
+ create mode 100644 drivers/soc/mediatek/mtk-cmdq-helper.c
+ create mode 100644 include/linux/soc/mediatek/mtk-cmdq.h
 
-Cheers
-Suzuki
+-- 
+1.7.9.5
