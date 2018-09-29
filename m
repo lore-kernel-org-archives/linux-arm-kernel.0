@@ -1,33 +1,36 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 29 Sep 2018 12:31:07 +0100
-Subject: [PATCH v2 1/2] iio: adc: at91: fix acking DRDY irq on simple
- conversions
-In-Reply-To: <20180925131739.2nuoelhqmkszamqo@M43218.corp.atmel.com>
+Date: Sat, 29 Sep 2018 12:31:51 +0100
+Subject: [PATCH v2 2/2] iio: adc: at91: fix wrong channel number in
+ triggered buffer mode
+In-Reply-To: <20180925131757.gjk2t277twhji5ns@M43218.corp.atmel.com>
 References: <1537775504-7981-1-git-send-email-eugen.hristev@microchip.com>
- <20180925131739.2nuoelhqmkszamqo@M43218.corp.atmel.com>
-Message-ID: <20180929123107.0d0053e3@archlinux>
+ <1537775504-7981-2-git-send-email-eugen.hristev@microchip.com>
+ <20180925131757.gjk2t277twhji5ns@M43218.corp.atmel.com>
+Message-ID: <20180929123151.1fd0f9ec@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Sep 2018 15:17:39 +0200
+On Tue, 25 Sep 2018 15:17:57 +0200
 Ludovic Desroches <ludovic.desroches@microchip.com> wrote:
 
-> On Mon, Sep 24, 2018 at 10:51:43AM +0300, Eugen Hristev wrote:
-> > When doing simple conversions, the driver did not acknowledge the DRDY irq.
-> > If this irq status is not acked, it will be left pending, and as soon as a
-> > trigger is enabled, the irq handler will be called, it doesn't know why
-> > this status has occurred because no channel is pending, and then it will go
-> > int a irq loop and board will hang.
-> > To avoid this situation, read the LCDR after a raw conversion is done.
+> On Mon, Sep 24, 2018 at 10:51:44AM +0300, Eugen Hristev wrote:
+> > When channels are registered, the hardware channel number is not the
+> > actual iio channel number.
+> > This is because the driver is probed with a certain number of accessible
+> > channels. Some pins are routed and some not, depending on the description of
+> > the board in the DT.
+> > Because of that, channels 0,1,2,3 can correspond to hardware channels
+> > 2,3,4,5 for example.
+> > In the buffered triggered case, we need to do the translation accordingly.
+> > Fixed the channel number to stop reading the wrong channel.
 > > 
-> > Fixes 0e589d5fb ("ARM: AT91: IIO: Add AT91 ADC driver.")
+> > Fixes 0e589d5fb "ARM: AT91: IIO: Add AT91 ADC driver."
 > > Cc: Maxime Ripard <maxime.ripard@bootlin.com>
 > > Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>  
-> Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com> 
-Applied to the togreg branch of iio.git and marked for stable.
+> Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
 
-It's been broken long enough that I think it can wait for the merge window
-coming in a few weeks time.
+Applied to the togreg branch of iio.git and pushed out as testing for the
+autobuilders to play with it.
 
 Thanks,
 
@@ -35,31 +38,32 @@ Jonathan
 
 > 
 > > ---
-> > Hello Jonathan,
+> > Changes in v2:
+> > - Added 'const' spec to the declaration to avoid build warning
 > > 
-> > I moved this LCDR read/acknowledge into the IRQ handler after the conversion
-> > value is being read.
-> > Sorry about the noise to stable at vger, removed from message.
-> > 
-> > Thanks,
-> > Eugen
-> > 
-> >  drivers/iio/adc/at91_adc.c | 2 ++
-> >  1 file changed, 2 insertions(+)
+> >  drivers/iio/adc/at91_adc.c | 4 +++-
+> >  1 file changed, 3 insertions(+), 1 deletion(-)
 > > 
 > > diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-> > index 44b5168..e3be88e 100644
+> > index e3be88e..75d2f73 100644
 > > --- a/drivers/iio/adc/at91_adc.c
 > > +++ b/drivers/iio/adc/at91_adc.c
-> > @@ -279,6 +279,8 @@ static void handle_adc_eoc_trigger(int irq, struct iio_dev *idev)
-> >  		iio_trigger_poll(idev->trig);
-> >  	} else {
-> >  		st->last_value = at91_adc_readl(st, AT91_ADC_CHAN(st, st->chnb));
-> > +		/* Needed to ACK the DRDY interruption */
-> > +		at91_adc_readl(st, AT91_ADC_LCDR);
-> >  		st->done = true;
-> >  		wake_up_interruptible(&st->wq_data_avail);
+> > @@ -248,12 +248,14 @@ static irqreturn_t at91_adc_trigger_handler(int irq, void *p)
+> >  	struct iio_poll_func *pf = p;
+> >  	struct iio_dev *idev = pf->indio_dev;
+> >  	struct at91_adc_state *st = iio_priv(idev);
+> > +	struct iio_chan_spec const *chan;
+> >  	int i, j = 0;
+> >  
+> >  	for (i = 0; i < idev->masklength; i++) {
+> >  		if (!test_bit(i, idev->active_scan_mask))
+> >  			continue;
+> > -		st->buffer[j] = at91_adc_readl(st, AT91_ADC_CHAN(st, i));
+> > +		chan = idev->channels + i;
+> > +		st->buffer[j] = at91_adc_readl(st, AT91_ADC_CHAN(st, chan->channel));
+> >  		j++;
 > >  	}
+> >  
 > > -- 
 > > 2.7.4
 > >   
