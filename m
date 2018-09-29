@@ -1,82 +1,46 @@
-From: jorik@kippendief.biz (jorik at kippendief.biz)
-Date: Sat, 29 Sep 2018 15:18:30 +0200
-Subject: [PATCH v2] ARM: dts: sun8i-h3: add sy8106a to orange pi plus
-Message-ID: <20180929131830.13924-1-jorik@kippendief.biz>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Sat, 29 Sep 2018 15:47:04 +0200
+Subject: [PATCH 05/12] drm/sun4i: sun6i_mipi_dsi: Add DSI Generic short
+ write 2 param transfer
+In-Reply-To: <CAMty3ZCD4ArjhPJYxv3ztWXdnby8YXQ73QqoVNoHFBc-DAxx_w@mail.gmail.com>
+References: <20180927114850.24565-1-jagan@amarulasolutions.com>
+ <20180927114850.24565-6-jagan@amarulasolutions.com>
+ <20180927171831.2nfybgn2xmc4vrgt@flea>
+ <CAMty3ZCD4ArjhPJYxv3ztWXdnby8YXQ73QqoVNoHFBc-DAxx_w@mail.gmail.com>
+Message-ID: <20180929134704.ylcg32xtk5m2pyoj@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jorik Jonker <jorik@kippendief.biz>
+On Thu, Sep 27, 2018 at 11:06:50PM +0530, Jagan Teki wrote:
+> >
+> > >               ret = sun6i_dsi_dcs_write_short(dsi, msg);
+> > > @@ -885,6 +886,8 @@ static ssize_t sun6i_dsi_transfer(struct mipi_dsi_host *host,
+> > >               }
+> > >
+> > >       default:
+> > > +             dev_err(dsi->dev, "unsupported message type 0x%02x\n",
+> > > +                     msg->type);
+> >
+> > And this isn't an error check.
+> 
+> But unsupported message type by sun6i_dsi should be an error
+> eventually isn't it?
 
-The Orange Pi Plus board lacks voltage scaling capabilities in its
-current form. This results in random freezes during boot when cpufreq is
-enabled, probably due to wrong voltages.
+It's already an error condition. What you're adding, and unlike what
+your commit log says, is not an error check...
 
-This patch (more or less copy/paste from 06139c) does the following
-things on this board:
-- enable r_i2c
-- add sy8106a to the r_i2c bus
-- have the sy8106a regulate VDD of cpu
+> and we can easily figure out where the error trigger.
 
-Since the Orange Pi Plus has the same PMU setup as the Orange Pi PC, I
-simply took min/max/fixed/ramp from the latter DTS. In that file the
-origin of the values are described by the following comment:
+... but instead an error message.
 
-  "The datasheet uses 1.1V as the minimum value of VDD-CPUX,
-  however both the Armbian DVFS table and the official one
-  have operating points with voltage under 1.1V, and both
-  DVFS table are known to work properly at the lowest
-  operating point.
-  Use 1.0V as the minimum voltage instead."
+That's definitely not the same thing, and I'm not sure we actually
+need it. If a driver requests multiple transfers that are unsupported,
+we'll end up spaming the kernel logs, especially when it can and
+should be checked in the driver doing those transfers.
 
-I have tested this on patch two Orange Pi Plus boards, by running a
-kernel with this patch and do intermettent runs of cpuburn while
-monitoring voltage, frequency and temperature. The board runs stable
-across its operatiing points while showing a reasonable (< 40C)
-temperature. My Orange Pi PC, when put to the same test, yields similar
-stable results.
+Maxime
 
-Signed-off-by: Jorik Jonker <jorik@kippendief.biz>
----
- arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-index b403e5d78..ac8438c2c 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-@@ -74,6 +74,10 @@
- 	};
- };
- 
-+&cpu0 {
-+	cpu-supply = <&reg_vdd_cpux>;
-+};
-+
- &ehci3 {
- 	status = "okay";
- };
-@@ -119,6 +123,22 @@
- 	};
- };
- 
-+&r_i2c {
-+	status = "okay";
-+
-+	reg_vdd_cpux: regulator at 65 {
-+		compatible = "silergy,sy8106a";
-+		reg = <0x65>;
-+		regulator-name = "vdd-cpux";
-+		silergy,fixed-microvolt = <1200000>;
-+		regulator-min-microvolt = <1000000>;
-+		regulator-max-microvolt = <1400000>;
-+		regulator-ramp-delay = <200>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+};
-+
- &usbphy {
- 	usb3_vbus-supply = <&reg_usb3_vbus>;
- };
 -- 
-2.17.1
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
