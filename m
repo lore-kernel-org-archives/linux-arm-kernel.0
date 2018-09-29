@@ -1,86 +1,40 @@
-From: rodrigo@tjader.xyz (=?UTF-8?Q?Rodrigo_Exterck=C3=B6tter_Tj=C3=A4der?=)
-Date: Sat, 29 Sep 2018 13:51:02 -0300
-Subject: [PATCH 1/2] arm64: dts: allwinner: Olimex A64-OLinuXino: enable
- eMMC.
-In-Reply-To: <20180929154754.abz3byvrufvnf4dq@flea>
-References: <20180919141815.18737-1-rodrigo@tjader.xyz>
- <20180921142811.h5jraemk565alh3i@flea>
- <CAG7TQgE_KU_cK_4E+NG8Qcw-QB2=C6YoqBYR2svmWxywFyySCw@mail.gmail.com>
- <20180925090139.qbu6tqav5oth7zkw@flea>
- <CAG7TQgFTsR4pf4jAcWMFoOmiP7AXYqjts60RP2kuJGU44AcQJQ@mail.gmail.com>
- <20180927081711.llmwnvpu73loe5iv@flea>
- <CAG7TQgGMkvBnNE_WEth8gscKxN3qN8a44mNMWz3QP-2+JKfOzg@mail.gmail.com>
- <20180929154754.abz3byvrufvnf4dq@flea>
-Message-ID: <CAG7TQgGS7DkLpNVYqfCD-9vMZkeY6r+L-5oXKWef3x-OVbqjtw@mail.gmail.com>
+From: radhey.shyam.pandey@xilinx.com (Radhey Shyam Pandey)
+Date: Sat, 29 Sep 2018 11:17:58 -0600
+Subject: [PATCH v2 2/4] dmaengine: xilinx_dma: Refactor axidma channel
+ validation
+In-Reply-To: <1538241480-13844-1-git-send-email-radhey.shyam.pandey@xilinx.com>
+References: <1538241480-13844-1-git-send-email-radhey.shyam.pandey@xilinx.com>
+Message-ID: <1538241480-13844-3-git-send-email-radhey.shyam.pandey@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 29, 2018 at 12:47 PM Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
->
-> On Thu, Sep 27, 2018 at 11:49:20AM -0300, Rodrigo Exterck?tter Tj?der wrote:
-> > On Thu, Sep 27, 2018 at 5:17 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > >
-> > > On Tue, Sep 25, 2018 at 02:47:59PM -0300, Rodrigo Exterck?tter Tj?der wrote:
-> > > > On Tue, Sep 25, 2018 at 6:01 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > > > > We can't really do that, unfortunately. If the device tree name was to
-> > > > > change for a given board, we'd break all the build systems, boot
-> > > > > scripts and distros out there.
-> > > >
-> > > > What if we keep the device tree for the version without WiFi and eMMC
-> > > > with the current name and create new device trees for the other two
-> > > > versions?
-> > >
-> > > Wifi and Bluetooth should be dealt with with overlays in this case,
-> > > and since the eMMC is already enabled, then there's nothing to do, I
-> > > guess.
-> >
-> > It's WiFi that is already enabled, not eMMC. Only one of the three
-> > variants has WiFi.
->
-> Ah, right, sorry. In the board that doesn't have an emmc, are the pins
-> usable for something else?
+In axidma start_transfer, prefer checking channel states before
+other params i.e pending_list. No functional change.
 
-I don't have the variant without eMMC nor could I find pictures of it.
-The schematics do mention that the A64 pins could be used to control
-NAND flash, but you'd have to solder that yourself.
+Signed-off-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
+---
+Changes for v2:
+Modified the commit message to mark it as non-functional change.
+---
+ drivers/dma/xilinx/xilinx_dma.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-> > We can't even remove a node from a device tree? Removing the WiFi node
-> > from the current tree would make it correspond to the variant with the
-> > least features.
->
-> Not really. How pissed would you be if you were a user, had wifi
-> running on your board, you upgrade your kernel, and then it's just
-> gone? :)
-
-That would suck, but what about someone who has the board with no wifi
-and problems start happening because the wifi is enabled on the device
-tree?
-
-> > About device tree overlays, I read overlay-notes.txt, but I went
-> > looking for an example with "git grep /plugin/ arch" and it came
-> > empty. Is this approach not used for other boards?
->
-> It is, it's simply not stored in the kernel, but through other third
-> party repos.
-
-So that would mean that it's up to every distro to support the boards
-instead of relying on mainline support?
-
-> > Does the overlay approach make the device available at boot time? That
-> > is important for a storage device such as eMMC.
-> >
-> > I went with the separate dts approach because that's what I saw was
-> > done for other similar cases, like Pine64 and Pine64+, OLinuXino-LIME2
-> > and its variant with eMMC, among others.
->
-> Yeah, but in all these cases, it was done from day one, not after the
-> facts.
-
-For the LIME2 the dts for the emmc variant was commited two years
-after the base LIME2 dts.
-
-
-What if instead of keeping the current dt for the least featureful
-model we keep it for the most featureful model and create new dts for
-the two less featureful models?
+diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
+index 06d1632..a37871e 100644
+--- a/drivers/dma/xilinx/xilinx_dma.c
++++ b/drivers/dma/xilinx/xilinx_dma.c
+@@ -1271,10 +1271,10 @@ static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
+ 	if (chan->err)
+ 		return;
+ 
+-	if (list_empty(&chan->pending_list))
++	if (!chan->idle)
+ 		return;
+ 
+-	if (!chan->idle)
++	if (list_empty(&chan->pending_list))
+ 		return;
+ 
+ 	head_desc = list_first_entry(&chan->pending_list,
+-- 
+1.7.1
