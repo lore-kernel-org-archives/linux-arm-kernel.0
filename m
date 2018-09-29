@@ -1,26 +1,37 @@
 From: radhey.shyam.pandey@xilinx.com (Radhey Shyam Pandey)
-Date: Sat, 29 Sep 2018 11:17:56 -0600
-Subject: [PATCH v2 0/4] dmaengine: xilinx_dma: Minor fix and refactoring
-Message-ID: <1538241480-13844-1-git-send-email-radhey.shyam.pandey@xilinx.com>
+Date: Sat, 29 Sep 2018 11:17:59 -0600
+Subject: [PATCH v2 3/4] dmaengine: xilinx_dma: Introduce helper macro for
+ preparing dma address
+In-Reply-To: <1538241480-13844-1-git-send-email-radhey.shyam.pandey@xilinx.com>
+References: <1538241480-13844-1-git-send-email-radhey.shyam.pandey@xilinx.com>
+Message-ID: <1538241480-13844-4-git-send-email-radhey.shyam.pandey@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset fixes 64-bit simple CDMA transfer.
-It also does some trivial code refactoring.
+This patch introduces the xilinx_prep_dma_addr_t macro which prepares
+dma_addr_t from hardware buffer descriptor LSB and MSB fields. It will
+be used in simple dma 64-bit programming sequence.
 
+Signed-off-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
+---
 Changes for v2:
-- Introduce helper macro for creating dma_addr_t from hardware buffer
-descriptor LSB and MSB fields. Use it to fix 64-bit simple CDMA transfer.
-- Modified commit description in 2/4 patch.
+New patch- Preparatory change for 4/4 fix.
+---
+ drivers/dma/xilinx/xilinx_dma.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-
-
-Radhey Shyam Pandey (4):
-  dmaengine: xilinx_dma: Refactor axidma channel allocation
-  dmaengine: xilinx_dma: Refactor axidma channel validation
-  dmaengine: xilinx_dma: Introduce helper macro for preparing dma
-    address
-  dmaengine: xilinx_dma: Fix 64-bit simple CDMA transfer
-
- drivers/dma/xilinx/xilinx_dma.c |   48 +++++++++++++++++++++-----------------
- 1 files changed, 26 insertions(+), 22 deletions(-)
+diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
+index a37871e..c27ab64 100644
+--- a/drivers/dma/xilinx/xilinx_dma.c
++++ b/drivers/dma/xilinx/xilinx_dma.c
+@@ -190,6 +190,8 @@
+ /* AXI CDMA Specific Masks */
+ #define XILINX_CDMA_CR_SGMODE          BIT(3)
+ 
++#define xilinx_prep_dma_addr_t(addr)	\
++	((dma_addr_t)((u64)addr##_##msb << 32 | (addr)))
+ /**
+  * struct xilinx_vdma_desc_hw - Hardware Descriptor
+  * @next_desc: Next Descriptor Pointer @0x00
+-- 
+1.7.1
