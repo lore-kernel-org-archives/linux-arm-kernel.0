@@ -1,37 +1,40 @@
-From: gottfried.haider@gmail.com (Gottfried Haider)
-Date: Fri, 28 Sep 2018 17:19:18 -0700
-Subject: [RESEND PATCH] Revert "pwm: Set class for exported channels in
- sysfs"
-In-Reply-To: <20180925152022.GB27695@ulmo>
-References: <1537538567-5377-1-git-send-email-fabrice.gasnier@st.com>
- <20180924115301.GV21032@ulmo> <fc02ced1-01ba-dde4-95da-285d9351338b@st.com>
- <20180924142318.GG23547@ulmo> <c4866533-1c7e-2675-5d80-3b824e32ae9b@st.com>
- <4278fef9-ec60-239a-dd0a-29a89d742fa4@st.com> <20180925152022.GB27695@ulmo>
-Message-ID: <CAPoCmY+mNYSV8gq7VCcSJHDpmoq-i7SDJ6uQ5VbLpMZB=b0waQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 28 Sep 2018 17:27:53 -0700
+Subject: [PATCH] regulator: core: Pass max_uV value to
+ regulator_set_voltage_rdev
+In-Reply-To: <d14cc796-8644-41a3-5135-299bd8820204@gmail.com>
+References: <20180615112916.GK112168@atomide.com>
+ <CGME20180618140856eucas1p281619f9bf003655a3c2eac356216ab25@eucas1p2.samsung.com>
+ <1529330913-11152-1-git-send-email-m.purski@samsung.com>
+ <20180702080505.GN112168@atomide.com>
+ <95655644-ef41-f5bd-7e8e-a257d48cd020@gmail.com>
+ <20180928202251.GM5662@atomide.com>
+ <2c0132ff-ea0f-f19e-ebfb-a0d077565d2c@gmail.com>
+ <20180928224109.GS5662@atomide.com>
+ <ea0a59ef-e201-986a-9499-a0638359b1b9@gmail.com>
+ <d14cc796-8644-41a3-5135-299bd8820204@gmail.com>
+Message-ID: <20180929002753.GT5662@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Thierry & Fabrice,
+* Dmitry Osipenko <digetx@gmail.com> [180928 23:55]:
+> On 9/29/18 2:17 AM, Dmitry Osipenko wrote:
+> > On 9/29/18 1:41 AM, Tony Lindgren wrote:
+> >> I'm still getting these errors after init:
+> > 
+> > Thank you very much again, seems I got what's wrong with your case. The ti-abb-regulator driver sets the "abb->current_info_idx = -EINVAL" on probe and that value is getting updated only after the first voltage change, hence _regulator_get_voltage() returns -22.
 
->> Still, it is possible to send uevent (KOBJ_CHANGE) on pwmchipN device,
->> to notify of a change, e.g. pwmX channel being exported/unexported.
+OK that's starting to make some sense now thanks.
 
-I tested this patch, and I am happy to report that it works with the
-udev rule that Raspbian (Raspberry Pi's Debian derivative) has in
-place:
+> > Please try this patch:
+> 
+> I've revised the patch and here is the current final version.
 
-SUBSYSTEM=="pwm*", PROGRAM="/bin/sh -c '\
-        chown -R root:gpio /sys/class/pwm && chmod -R 770 /sys/class/pwm;\
-        chown -R root:gpio
-/sys/devices/platform/soc/*.pwm/pwm/pwmchip* && chmod -R 770
-/sys/devices/platform/soc/*.pwm/pwm/pwmchip*\
-'"
+Hey cool this one works now :) I suggest you rework the whole series
+with these fixes. I recall the series had a problem with git bisect
+too between the patches. It will make life easier for other people
+who may need to git bisect these patches.
 
+Thanks,
 
-So while I can't comment on the uevent semantics, it would solve what
-the original patch attempted to enable (non-root use of pwm).
-
-Tested-by: Gottfried Haider <gottfried.haider@gmail.com>
-
-Best,
-Gottfried
+Tony
