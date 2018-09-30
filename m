@@ -1,68 +1,49 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Sun, 30 Sep 2018 18:10:01 +0800
-Subject: [PATCH v15 05/16] kexec_file: kexec_walk_memblock() only walks a
- dedicated region at kdump
-In-Reply-To: <20180928064841.14117-6-takahiro.akashi@linaro.org>
-References: <20180928064841.14117-1-takahiro.akashi@linaro.org>
- <20180928064841.14117-6-takahiro.akashi@linaro.org>
-Message-ID: <20180930101001.GE6950@dhcp-128-65.nay.redhat.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sun, 30 Sep 2018 14:38:28 +0200
+Subject: [PATCH] ARM: SAMSUNG: limit SAMSUNG_PM_DEBUG config option to
+ non-Exynos platforms
+In-Reply-To: <20180928163457eucas1p10a18e67b832104c32e6148dcb1a67c52~YnYwPaOho0754307543eucas1p1L@eucas1p1.samsung.com>
+References: <CGME20180928133713eucas1p16a15a68b61de9aa3310737f7fd77d20d@eucas1p1.samsung.com>
+ <20180928133713eucas1p16a15a68b61de9aa3310737f7fd77d20d~Yk9kqY_Ga2124121241eucas1p1b@eucas1p1.samsung.com>
+ <CAJKOXPcfvpiO8NpRzDwNgEyJf21+jFt8r9E=OOs_6f7wSjC+Zw@mail.gmail.com>
+ <20180928163457eucas1p10a18e67b832104c32e6148dcb1a67c52~YnYwPaOho0754307543eucas1p1L@eucas1p1.samsung.com>
+Message-ID: <20180930123828.GA10619@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/28/18 at 03:48pm, AKASHI Takahiro wrote:
-> In kdump case, there exists only one dedicated memblock region as usable
-> memory (crashk_res). With this patch, kexec_walk_memblock() runs a given
-> callback function on this region.
+On Fri, Sep 28, 2018 at 06:34:55PM +0200, Bartlomiej Zolnierkiewicz wrote:
 > 
-> Cosmetic change: 0 to MEMBLOCK_NONE at for_each_free_mem_range*()
 > 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Cc: Dave Young <dyoung@redhat.com>
-> Cc: Vivek Goyal <vgoyal@redhat.com>
-> Cc: Baoquan He <bhe@redhat.com>
+> On 09/28/2018 03:54 PM, Krzysztof Kozlowski wrote:
+> > On Fri, 28 Sep 2018 at 15:37, Bartlomiej Zolnierkiewicz
+> > <b.zolnierkie@samsung.com> wrote:
+> >>
+> >> "Samsung PM Suspend debug" feature (controlled by SAMSUNG_PM_DEBUG
+> >> config option) is not working properly (debug messages are not
+> >> displayed after resume) on Exynos platforms because GPIOs restore
+> >> code is not implemented.
+> > 
+> > AFAIR, it worked properly for the suspend part showing more logs.
+> > Unless it changed, the feature looks still useful.
+> 
+> Yes, it shows few additional messages from mach/plat specific suspend
+> code but it breaks the assumption that features (even debug ones)
+> work correctly and make you invest time in debugging known broken
+> code.
 
-Acked-by: Dave Young <dyoung@redhat.com>
+OK, let's remove it. However in such case this change leaves useless
+S3C_PMDBG and other s3c_pm_* in Exynos code. They should go away along
+with SAMSUNG_PM_DEBUG.
 
-> ---
->  kernel/kexec_file.c | 9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
-> 
-> diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-> index 370d7eab49fe..2f615a7968dd 100644
-> --- a/kernel/kexec_file.c
-> +++ b/kernel/kexec_file.c
-> @@ -511,8 +511,11 @@ static int kexec_walk_memblock(struct kexec_buf *kbuf,
->  	phys_addr_t mstart, mend;
->  	struct resource res = { };
->  
-> +	if (kbuf->image->type == KEXEC_TYPE_CRASH)
-> +		return func(&crashk_res, kbuf);
-> +
->  	if (kbuf->top_down) {
-> -		for_each_free_mem_range_reverse(i, NUMA_NO_NODE, 0,
-> +		for_each_free_mem_range_reverse(i, NUMA_NO_NODE, MEMBLOCK_NONE,
->  						&mstart, &mend, NULL) {
->  			/*
->  			 * In memblock, end points to the first byte after the
-> @@ -526,8 +529,8 @@ static int kexec_walk_memblock(struct kexec_buf *kbuf,
->  				break;
->  		}
->  	} else {
-> -		for_each_free_mem_range(i, NUMA_NO_NODE, 0, &mstart, &mend,
-> -					NULL) {
-> +		for_each_free_mem_range(i, NUMA_NO_NODE, MEMBLOCK_NONE,
-> +					&mstart, &mend, NULL) {
->  			/*
->  			 * In memblock, end points to the first byte after the
->  			 * range while in kexec, end points to the last byte
-> -- 
-> 2.19.0
-> 
-> 
-> _______________________________________________
-> kexec mailing list
-> kexec at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/kexec
+Best regards,
+Krzysztof
 
-Thanks
-Dave
+> 
+> In case it is needed/useful (which should be rather rare situation)
+> one can always easily revert the commit locally.
+> 
+> Best regards,
+> --
+> Bartlomiej Zolnierkiewicz
+> Samsung R&D Institute Poland
+> Samsung Electronics
