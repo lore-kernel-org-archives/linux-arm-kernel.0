@@ -1,69 +1,49 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sun, 30 Sep 2018 20:07:12 +0200
-Subject: [GIT PULL] arm: actions: dt64 for v4.20 #1
+Date: Sun, 30 Sep 2018 20:07:15 +0200
+Subject: [GIT PULL] arm: actions: drivers for v4.20 #2
 In-Reply-To: <20180930180715.25829-1-afaerber@suse.de>
 References: <20180930180715.25829-1-afaerber@suse.de>
-Message-ID: <20180930180715.25829-2-afaerber@suse.de>
+Message-ID: <20180930180715.25829-5-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Olof and Arnd,
 
-Here's my dt64 pull for Actions Semi.
-It includes a topic branch for S900 SPS.
+Here's another drivers pull for Actions Semi.
+It merges a topic branch with S900 SPS bindings.
 
 Regards,
 Andreas
 
-The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+The following changes since commit 067517513ae437c2845bc593dbf99a142bdc9250:
 
-  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+  soc: actions: Update SPS help text for S700 (2018-09-22 22:09:47 +0200)
 
 are available in the Git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git tags/actions-arm64-dt-for-4.20
+  git://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git actions-drivers+s900-sps-for-4.20
 
-for you to fetch changes up to 01463ac63b53e24e4e315aa9c5f091e9e0342ad4:
+for you to fetch changes up to da8c37e13d1dec58c795ca6ed81c3da064a3cbb4:
 
-  arm64: dts: actions: s700: Set UART clock references from CMU (2018-09-30 18:57:23 +0200)
-
-----------------------------------------------------------------
-Actions Semi arm64 based SoC DT for v4.20
-
-This updates SPDX headers for remaining files.
-
-For S900 it adds clock, pinctrl, i2c and dma nodes.
-S900 SPS is added via topic branch (shared with driver).
-
-For S700 it adds clock nodes.
+  soc: actions: sps: Add S900 power domains (2018-09-30 16:48:10 +0200)
 
 ----------------------------------------------------------------
-Andreas F?rber (2):
-      arm64: dts: actions: Convert to new-style SPDX license identifiers
-      Merge branch 'v4.20/s900-sps-bindings' into v4.20/dt64
+Actions Semi SoC drivers for v4.20 #2
 
-Manivannan Sadhasivam (10):
+The SPS power domain driver is extended for S900 SoC.
+This required merging a topic branch for the new bindings header.
+
+----------------------------------------------------------------
+Andreas F?rber (1):
+      Merge branch 'v4.20/s900-sps-bindings' into v4.20/drivers+s900-sps
+
+Manivannan Sadhasivam (2):
       dt-bindings: power: Add Actions Semi S900 SPS
-      arm64: dts: actions: s900: Add Clock Management Unit nodes
-      arm64: dts: actions: s900: Source CMU clock for UARTs
-      arm64: dts: actions: s900: Add SPS node
-      arm64: dts: actions: s900: Add pinctrl node
-      arm64: dts: actions: s900: Add gpio properties to pinctrl node
-      arm64: dts: actions: s900-bubblegum-96: Add gpio line names
-      arm64: dts: actions: s900: Add I2C controller nodes
-      arm64: dts: actions: s900-bubblegum-96: Enable I2C1 and I2C2
-      arm64: dts: actions: s900: Add DMA Controller
+      soc: actions: sps: Add S900 power domains
 
-Saravanan Sekar (2):
-      arm64: dts: actions: s700: Add Clock Management Unit
-      arm64: dts: actions: s700: Set UART clock references from CMU
-
- .../devicetree/bindings/power/actions,owl-sps.txt  |   2 +
- arch/arm64/boot/dts/actions/Makefile               |   2 +
- arch/arm64/boot/dts/actions/s700-cubieboard7.dts   |   7 -
- arch/arm64/boot/dts/actions/s700.dtsi              |  21 ++
- arch/arm64/boot/dts/actions/s900-bubblegum-96.dts  | 224 ++++++++++++++++++++-
- arch/arm64/boot/dts/actions/s900.dtsi              | 118 ++++++++++-
- include/dt-bindings/power/owl-s900-powergate.h     |  23 +++
- 7 files changed, 381 insertions(+), 16 deletions(-)
+ .../devicetree/bindings/power/actions,owl-sps.txt  |  2 +
+ drivers/soc/actions/Kconfig                        |  2 +-
+ drivers/soc/actions/owl-sps.c                      | 58 ++++++++++++++++++++++
+ include/dt-bindings/power/owl-s900-powergate.h     | 23 +++++++++
+ 4 files changed, 84 insertions(+), 1 deletion(-)
  create mode 100644 include/dt-bindings/power/owl-s900-powergate.h
