@@ -1,157 +1,41 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Sun, 30 Sep 2018 08:56:21 +0800
-Subject: [PATCH V3 06/11] clk: imx: scu: add scu clock gpr gate
-In-Reply-To: <1538268986-24890-1-git-send-email-aisheng.dong@nxp.com>
-References: <1538268986-24890-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1538268986-24890-7-git-send-email-aisheng.dong@nxp.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 30 Sep 2018 10:04:18 +0800
+Subject: [PATCH v2 1/3] arm64: dts: actions: s900: Enable Tx DMA for UART5
+In-Reply-To: <20180929074637.9766-2-manivannan.sadhasivam@linaro.org>
+References: <20180929074637.9766-2-manivannan.sadhasivam@linaro.org>
+Message-ID: <201809301043.z0Y7bpfe%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add scu based clock gpr gate. Unlike the normal scu gate, such
-gates are controlled by GPR bits through SCU sc_misc_set_control
-API.
+Hi Manivannan,
 
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Stephen Boyd <sboyd@kernel.org>
-Cc: Michael Turquette <mturquette@baylibre.com>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
-ChangeLog:
-v2->v3:
- * structure name and api usage update
-v1->v2:
- * no changes except update headfile name
----
- drivers/clk/imx/scu/Makefile           |  3 +-
- drivers/clk/imx/scu/clk-gate-gpr-scu.c | 88 ++++++++++++++++++++++++++++++++++
- drivers/clk/imx/scu/clk-scu.h          |  9 ++++
- 3 files changed, 99 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/imx/scu/clk-gate-gpr-scu.c
+Thank you for the patch! Yet something to improve:
 
-diff --git a/drivers/clk/imx/scu/Makefile b/drivers/clk/imx/scu/Makefile
-index 2abed17..25d3511 100644
---- a/drivers/clk/imx/scu/Makefile
-+++ b/drivers/clk/imx/scu/Makefile
-@@ -4,4 +4,5 @@ obj-$(CONFIG_MXC_CLK_SCU) += \
- 	clk-scu.o \
- 	clk-divider-scu.o \
- 	clk-divider-gpr-scu.o \
--	clk-gate-scu.o
-+	clk-gate-scu.o \
-+	clk-gate-gpr-scu.o
-diff --git a/drivers/clk/imx/scu/clk-gate-gpr-scu.c b/drivers/clk/imx/scu/clk-gate-gpr-scu.c
-new file mode 100644
-index 0000000..7b8bf3d
---- /dev/null
-+++ b/drivers/clk/imx/scu/clk-gate-gpr-scu.c
-@@ -0,0 +1,88 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * Copyright (C) 2016 Freescale Semiconductor, Inc.
-+ * Copyright 2017~2018 NXP
-+ *	Dong Aisheng <aisheng.dong@nxp.com>
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/slab.h>
-+#include <soc/imx/scu/sci.h>
-+
-+#include "clk-scu.h"
-+
-+struct clk_gate_gpr_scu {
-+	struct clk_hw hw;
-+	u32	rsrc_id;
-+	u8	gpr_id;
-+
-+	/* default: enable 1 disable 0 */
-+	bool	invert;
-+};
-+
-+#define to_clk_gate_gpr_scu(_hw) container_of(_hw, struct clk_gate_gpr_scu, hw)
-+
-+static int clk_gate_gpr_scu_enable(struct clk_hw *hw)
-+{
-+	struct clk_gate_gpr_scu *gate = to_clk_gate_gpr_scu(hw);
-+	int ret;
-+
-+	ret = imx_sc_misc_set_control(ccm_ipc_handle, gate->rsrc_id,
-+				      gate->gpr_id, !gate->invert);
-+	if (ret)
-+		pr_err("%s: clk enable failed %d\n", clk_hw_get_name(hw), ret);
-+
-+	return ret;
-+}
-+
-+static void clk_gate_gpr_scu_disable(struct clk_hw *hw)
-+{
-+	struct clk_gate_gpr_scu *gate = to_clk_gate_gpr_scu(hw);
-+	int ret;
-+
-+	ret  = imx_sc_misc_set_control(ccm_ipc_handle, gate->rsrc_id,
-+				       gate->gpr_id, gate->invert);
-+	if (ret)
-+		pr_err("%s: clk disable failed %d\n", clk_hw_get_name(hw), ret);
-+}
-+
-+static const struct clk_ops clk_gate_gpr_scu_ops = {
-+	.enable = clk_gate_gpr_scu_enable,
-+	.disable = clk_gate_gpr_scu_disable,
-+};
-+
-+struct clk_hw *clk_register_gate_gpr_scu(const char *name, const char *parent_name,
-+					 u32 rsrc_id, u8 gpr_id,
-+					 bool invert_flag)
-+{
-+	struct clk_gate_gpr_scu *gate;
-+	struct clk_init_data init;
-+	struct clk_hw *hw;
-+	int ret;
-+
-+	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
-+	if (!gate)
-+		return ERR_PTR(-ENOMEM);
-+
-+	gate->rsrc_id = rsrc_id;
-+	gate->gpr_id = gpr_id;
-+	gate->invert = invert_flag;
-+
-+	init.name = name;
-+	init.ops = &clk_gate_gpr_scu_ops;
-+	init.parent_names = parent_name ? &parent_name : NULL;
-+	init.num_parents = parent_name ? 1 : 0;
-+
-+	gate->hw.init = &init;
-+
-+	hw = &gate->hw;
-+	ret = clk_hw_register(NULL, hw);
-+	if (ret) {
-+		kfree(gate);
-+		hw = ERR_PTR(ret);
-+	}
-+
-+	return hw;
-+}
-diff --git a/drivers/clk/imx/scu/clk-scu.h b/drivers/clk/imx/scu/clk-scu.h
-index 57de592..d92b3b3 100644
---- a/drivers/clk/imx/scu/clk-scu.h
-+++ b/drivers/clk/imx/scu/clk-scu.h
-@@ -59,4 +59,13 @@ static inline struct clk_hw *imx_clk_gate2_scu(const char *name, const char *par
- 	return clk_register_gate2_scu(name, parent, 0, reg, bit_idx, hw_gate);
- }
- 
-+struct clk_hw *clk_register_gate_gpr_scu(const char *name, const char *parent_name,
-+				u32 rsrc_id, u8 gpr_id, bool invert_flag);
-+
-+static inline struct clk_hw *imx_clk_gate_gpr_scu(const char *name, const char *parent,
-+				u32 rsrc_id, u8 gpr_id, bool invert_flag)
-+{
-+	return clk_register_gate_gpr_scu(name, parent, rsrc_id, gpr_id, invert_flag);
-+}
-+
- #endif
--- 
-2.7.4
+[auto build test ERROR on tty/tty-testing]
+[also build test ERROR on v4.19-rc5 next-20180928]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Manivannan-Sadhasivam/Add-slave-DMA-support-for-Actions-Semi-S900-SoC/20180929-155016
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git tty-testing
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
+
+All errors (new ones prefixed by >>):
+
+>> ERROR: Input tree has errors, aborting (use -f to force output)
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 40255 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20180930/a569519f/attachment-0001.gz>
