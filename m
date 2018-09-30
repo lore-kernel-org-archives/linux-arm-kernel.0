@@ -1,52 +1,58 @@
 From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Sun, 30 Sep 2018 04:33:20 +0200
-Subject: [PATCH net-next v6 07/23] zinc: ChaCha20 ARM and ARM64
- implementations
-In-Reply-To: <CAKv+Gu9FoFQymp2-=rUeh14CkUKON389OCE7stYCOFwKZpaCrg@mail.gmail.com>
-References: <20180925145622.29959-1-Jason@zx2c4.com>
- <20180925145622.29959-8-Jason@zx2c4.com>
- <CAKv+Gu8knzzmK4_KouFQWKzMdHFgEsk-CtBrcuAvk0bYkDFO=w@mail.gmail.com>
- <CAHmME9qtN8kiKnMHTa76r9a_5Ou_s3WhAMT_HnH7-1FeoHUOZg@mail.gmail.com>
- <CAKv+Gu9FoFQymp2-=rUeh14CkUKON389OCE7stYCOFwKZpaCrg@mail.gmail.com>
-Message-ID: <CAHmME9rw=khsP=8PzbWUtwjVh55stzgr1qHcQUi8h7-a--Sr7w@mail.gmail.com>
+Date: Sun, 30 Sep 2018 04:49:04 +0200
+Subject: [PATCH] ARM: makefile: pass -march=armv4 to assembler even on CPU32v3
+Message-ID: <20180930024904.14240-1-Jason@zx2c4.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+Per the discussion about half-way down in [1], the kernel doesn't
+actually support the ARMv3 ISA, but selects it for some ARMv4 ISA
+hardware that benefits from ARMv3 code generation. Such a consideration,
+then, only applies to the compiler but not to the assembler. This commit
+passes -march=armv4 to the assembler in those cases, so that code
+written for ARMv4 will continue to compile and run fine, without needing
+module-specific asflags-y overrides.
 
-On Sat, Sep 29, 2018 at 8:16 AM Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> > You mean to say that since these nobs are def_bool y and are
-> > essentially "depends on ARM", then I should just straight up use
-> > CONFIG_ARM? I had thought about this, but figured this would make it
-> > easier to later make these optional or have other options block them
-> > need be, or even if the dependencies and requirements for having them
-> > changes (for example, with UML on x86). I think doing it this way
-> > gives us some flexibility later on. So if that's a compelling enough
-> > reason, I'd like to keep those.
->
-> Sure. But probably better to be consistent then, and stop using
-> CONFIG_ARM directly in your code.
+[1] https://lore.kernel.org/lkml/CAKv+Gu9FoFQymp2-=rUeh14CkUKON389OCE7stYCOFwKZpaCrg at mail.gmail.com/
 
-Ack.
+Signed-off-by: Jason A. Donenfeld <Jason@zx2c4.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+I don't have too much familiarity with hardware this old, nor access to
+testing systems, so please do carefully evaluate the assertions above
+before merging this, since I'm not sure I have a full understanding of
+the Linux ARMv3 situation.
 
-> > The reason it was added was indeed because of:
-> > https://lists.01.org/pipermail/kbuild-all/2018-September/053114.html
-> > -- exactly what you suspected, ARCH_RPC. Have a better suggestion than
-> > !CPU_32v3?
->
-> Yes, you could just add
->
-> asflags-$(CONFIG_CPU_32v3) += -march=armv4
->
-> with a comment stating that we don't actually support ARMv3 but only
-> use it as a code generation target for reasons unrelated to the ISA
+ arch/arm/Makefile | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-Alright, I'll do exactly that. Though, if the rationale for this has
-to do only with codegen -- with what the C compiler does -- then
-shouldn't this be set globally for CONFIG_CPU_32v3? I couldn't find
-any macros that test against __LINUX_ARM_ARCH__ being 3 in the
-assembly, so this shouldn't be a problem I don't think. Maybe I'll
-send a patch.
-
-Jason
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index d1516f85f25d..7a264cacb482 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -76,8 +76,14 @@ arch-$(CONFIG_CPU_32v4T)	=-D__LINUX_ARM_ARCH__=4 -march=armv4t
+ arch-$(CONFIG_CPU_32v4)		=-D__LINUX_ARM_ARCH__=4 -march=armv4
+ arch-$(CONFIG_CPU_32v3)		=-D__LINUX_ARM_ARCH__=3 -march=armv3
+ 
++# We do not actually support the ARMv3 ISA and prefer it above only for
++# code generation purposes, which does not apply to assembly. So we pass
++# v4 to the assembler, so that we can still assemble all instructions.
++arch-asflags-$(CONFIG_CPU_32v3)	=-march=armv4
++
+ # Evaluate arch cc-option calls now
+ arch-y := $(arch-y)
++arch-asflags-y := $(arch-asflags-y)
+ 
+ # This selects how we optimise for the processor.
+ tune-$(CONFIG_CPU_ARM7TDMI)	=-mtune=arm7tdmi
+@@ -130,7 +136,7 @@ endif
+ 
+ # Need -Uarm for gcc < 3.x
+ KBUILD_CFLAGS	+=$(CFLAGS_ABI) $(CFLAGS_ISA) $(arch-y) $(tune-y) $(call cc-option,-mshort-load-bytes,$(call cc-option,-malignment-traps,)) -msoft-float -Uarm
+-KBUILD_AFLAGS	+=$(CFLAGS_ABI) $(AFLAGS_ISA) $(arch-y) $(tune-y) -include asm/unified.h -msoft-float
++KBUILD_AFLAGS	+=$(CFLAGS_ABI) $(AFLAGS_ISA) $(arch-y) $(tune-y) $(arch-asflags-y) -include asm/unified.h -msoft-float
+ 
+ CHECKFLAGS	+= -D__arm__
+ 
+-- 
+2.19.0
