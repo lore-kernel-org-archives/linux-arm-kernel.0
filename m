@@ -1,157 +1,100 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sun, 30 Sep 2018 15:39:30 +0100
-Subject: [PATCH v5 07/14] irqchip/irq-mvebu-sei: add new driver for
- Marvell SEI
-In-Reply-To: <20180928183806.176ca084@xps13>
-References: <20180830073535.10710-1-miquel.raynal@bootlin.com>
- <20180830073535.10710-8-miquel.raynal@bootlin.com>
- <86pnx7x5pz.wl-marc.zyngier@arm.com>
- <20180924180133.2ea93762@xps13>
- <9a0de5ac-8cef-0950-e218-0368167ecff8@arm.com>
- <20180928183806.176ca084@xps13>
-Message-ID: <20180930153930.4970d2ab@why.wild-wind.fr.eu.org>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 30 Sep 2018 17:09:27 +0200
+Subject: [PATCH] ARM: dts: sun7i: Disable OOB IRQ for brcm wifi on Cubietruck
+ and Banana Pro
+Message-ID: <20180930150927.12076-1-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 Sep 2018 18:38:06 +0200
-Miquel Raynal <miquel.raynal@bootlin.com> wrote:
+While doing some brcmfmac driver work I needed to test this also on some
+devicetree based boards. So I fired up the good old Cubietruck and when
+that would not work a Banana Pro.
 
-> Hi Marc,
-> 
-> Marc Zyngier <marc.zyngier@arm.com> wrote on Fri, 28 Sep 2018 11:25:32
-> +0100:
-> 
-> > On 24/09/18 17:01, Miquel Raynal wrote:
-> > 
-> > Hi Miquel,
-> > 
-> > [...]
-> >   
-> > > The difference is that at this stage, the irq_data->chip pointer of the
-> > > SEI controller _parent_ (ie. the GIC's chip pointer) is not valid. I
-> > > digged a lot in this direction during your vacations to find out what I
-> > > missed, and I ended up calling back irq_alloc_irqs_parent().
-> > > 
-> > > If you have an idea of how to handle this properly, I am all ears!    
-> > 
-> > The most glaring problem is that you create a hierarchy that encompasses
-> > the GIC, which is just wrong. The hierarchy cannot point to the GIC,
-> > because it end-up as a multiplexer.
-> > 
-> > This code sequence in the probe function is the root of all evil:
-> > 
-> > 	/* Get a reference to the parent domain */
-> > 	parent = of_irq_find_parent(node);
-> > 	if (!parent) {
-> > 		dev_err(sei->dev, "Failed to find parent IRQ node\n");
-> > 		ret = -ENODEV;
-> > 		goto dispose_irq;
-> > 	}
-> > 
-> > This is a GIC interrupt, which is the output line for the SEI block.
-> > 
-> > 	parent_domain = irq_find_host(parent);
-> > 	if (!parent_domain) {
-> > 		dev_err(sei->dev, "Failed to find parent IRQ domain\n");
-> > 		ret = -ENODEV;
-> > 		goto dispose_irq;
-> > 	}
-> > 
-> > That's the GIC domain.
-> > 
-> > 	/* Create the 'wired' domain */
-> > 	sei->ap_domain = irq_domain_create_hierarchy(parent_domain, 0,
-> > 						     sei->caps->ap_range.size,
-> > 						     of_node_to_fwnode(node),
-> > 						     &mvebu_sei_ap_domain_ops,
-> > 						     sei);
-> > 	if (!sei->ap_domain) {
-> > 		dev_err(sei->dev, "Failed to create AP IRQ domain\n");
-> > 		ret = -ENOMEM;
-> > 		goto dispose_irq;
-> > 	}
-> > 
-> > And here, you're saying "each and every AP SEI interrupt is directly
-> > linked to a unique GIC interrupt". Nothing could be further from the
-> > truth, since all SEI interrupts are funnelled through a *single*
-> > GIC interrupt. So you cannot create it as a hierarchy parented at
-> > the GIC.
-> > 
-> > 	/* Create the 'MSI' domain */
-> > 	sei->cp_domain = irq_domain_create_hierarchy(parent_domain, 0,
-> > 						     sei->caps->cp_range.size,
-> > 						     of_node_to_fwnode(node),
-> > 						     &mvebu_sei_cp_domain_ops,
-> > 						     sei);
-> > 
-> > 
-> > Same thing here.
-> > 
-> > The issue here is that you're using the GIC domain as the way to root
-> > the two distinct SEI domains, while they should be rooted at an internal,
-> > SEI-specific domain. I'd suggest a topology like this:
-> > 
-> >                   AP-SEI ---> S
-> >                               E
-> >     Plat-MSI ---> CP-SEI ---> I
-> > 
-> > CP-SEI and AP-SEI use SEI as a parent. SEI does not have a parent, but is
-> > a chained irqchip.  
-> 
-> Thanks you very much for this detailed explanation. The above is what I
-> intended to do, but maybe what I achieved is more something like:
-> 
->                    AP-SEI ---> G
->                                I
->      Plat-MSI ---> CP-SEI ---> C
-> 
-> And now I understand better what is bothering you since the beginning.
-> 
-> > 
-> > I'm happy to help you reworking this piece of code if you tell me how to
-> > plug a driver that can use it on an mcbin system.  
-> 
-> Next week I'll have another look at the driver, but it could be great
-> if you could show me the big lines of how you imagine the rework. I
-> prepared a branch based on 4.19-rc1 with:
-> * The ICU/SEI series
-> * The series adding support for thermal interrupts in the
->   armada_thermal.c driver (it triggers a wired SEI when the AP is too
->   hot or an MSI SEI when it is a CP).
-> * The needed DT changes.
-> 
-> https://github.com/miquelraynal/linux/tree/marvell/4.19-rc1/icu-sei 
+With an unmodified 4.17 kernel both boards intermittently would come up
+with non working wifi with the following errors:
 
-I've played with this a bit too much, and have basically rewritten the
-whole SEI driver (see [1] for the resulting patch, which doesn't leave
-much unchanged).
+ brcmfmac: brcmf_sdio_bus_rxctl: resumed on timeout
+ brcmfmac: brcmf_bus_started: failed: -110
+ brcmfmac: brcmf_attach: dongle is not responding: err=-110
+ brcmfmac: brcmf_sdio_firmware_callback: brcmf_attach failed
 
-It also requires some changes[2] to the ICU driver, which assumes that
-the SEI and GICP have similar interrupt flows (news flash, they don't).
-I still hate the way this driver is written (no clear separation
-between what is essentially two different drivers bolted together), but
-that's a different story.
+They would come up this way more often then with actual working wifi,
+once this problem happens it seems to require a power-cycle to fix.
+Once things work one can safely reboot without hitting the issue.
 
-I'm also very worried that ICU-SEI interrupts are handled as edge,
-while they are level. The HW doesn't seem to offer any facility to
-resample the level, so this looks broken by design. Maybe the Marvell
-people on Cc could shed some light on how they expect this to work?
+I've found that disabling OOB interrupts fixes this. This really is more
+of a workaround then a proper fix, but it makes the wifi reliable again
+and it does not have much of a downside.
 
-As for the thermal stuff, the DT is wrong (see [3]).
+Using an OOB IRQ instead of the sdio-IRQ mechanism is mostly important to
+allow the MMC controller to go into runtime-suspend which is not really an
+issue on these boards since they are (usually) not battery powered.
 
-I've tested it by letting the machine overheat, and take thermal
-interrupts on both AP and CP. The box shutdowns cleanly in both cases,
-so I guess it somehow works.
+I've looked at recent brcmfmac and mmc-core changes which may explain this
+and I've not found anything. So the most likely culprit is the A20 external
+interrupt handling e.g. perhaps it is set to edge instead of level? Either
+way I do not have time to further investigate this.
 
-Thanks,
+BugLink: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=908438
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/sun7i-a20-bananapro.dts  | 16 +++++++++++++---
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 16 +++++++++++++---
+ 2 files changed, 26 insertions(+), 6 deletions(-)
 
-	M.
-
-[1] https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/commit/?h=marvell/4.19-rc1/icu-sei&id=63afff77f73c6cc637fceef247e6860b12b07304
-
-[2] https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/commit/?h=marvell/4.19-rc1/icu-sei&id=e2a54f7716fb096b06d9780065ff37b671659c2e
-
-[3] https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/commit/?h=marvell/4.19-rc1/icu-sei&id=927d5d4d03cc0149c15d55b2a5cdccf6922c554a
-
+diff --git a/arch/arm/boot/dts/sun7i-a20-bananapro.dts b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
+index 0898eb6162f5..0e1ddd998b20 100644
+--- a/arch/arm/boot/dts/sun7i-a20-bananapro.dts
++++ b/arch/arm/boot/dts/sun7i-a20-bananapro.dts
+@@ -174,9 +174,19 @@
+ 	brcmf: wifi at 1 {
+ 		reg = <1>;
+ 		compatible = "brcm,bcm4329-fmac";
+-		interrupt-parent = <&pio>;
+-		interrupts = <7 15 IRQ_TYPE_LEVEL_LOW>;
+-		interrupt-names = "host-wake";
++		/*
++		 * OOB interrupt support is broken ATM, often the first irq
++		 * does not get seen resulting in the drv probe failing with:
++		 *
++		 * brcmfmac: brcmf_sdio_bus_rxctl: resumed on timeout
++		 * brcmfmac: brcmf_bus_started: failed: -110
++		 * brcmfmac: brcmf_attach: dongle is not responding: err=-110
++		 * brcmfmac: brcmf_sdio_firmware_callback: brcmf_attach failed
++		 *
++		 * interrupt-parent = <&pio>;
++		 * interrupts = <7 15 IRQ_TYPE_LEVEL_LOW>;
++		 * interrupt-names = "host-wake";
++		 */
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+index 5649161de1d7..a837516db6f9 100644
+--- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+@@ -222,9 +222,19 @@
+ 	brcmf: wifi at 1 {
+ 		reg = <1>;
+ 		compatible = "brcm,bcm4329-fmac";
+-		interrupt-parent = <&pio>;
+-		interrupts = <7 10 IRQ_TYPE_LEVEL_LOW>; /* PH10 / EINT10 */
+-		interrupt-names = "host-wake";
++		/*
++		 * OOB interrupt support is broken ATM, often the first irq
++		 * does not get seen resulting in the drv probe failing with:
++		 *
++		 * brcmfmac: brcmf_sdio_bus_rxctl: resumed on timeout
++		 * brcmfmac: brcmf_bus_started: failed: -110
++		 * brcmfmac: brcmf_attach: dongle is not responding: err=-110
++		 * brcmfmac: brcmf_sdio_firmware_callback: brcmf_attach failed
++		 *
++		 * interrupt-parent = <&pio>;
++		 * interrupts = <7 10 IRQ_TYPE_LEVEL_LOW>; /* PH10 / EINT10 */
++		 * interrupt-names = "host-wake";
++		 */
+ 	};
+ };
+ 
 -- 
-Without deviation from the norm, progress is not possible.
+2.19.0
