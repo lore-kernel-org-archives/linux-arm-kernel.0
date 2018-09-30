@@ -1,44 +1,67 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sun, 30 Sep 2018 20:07:14 +0200
-Subject: [GIT PULL] arm: actions: drivers for v4.20 #1
-In-Reply-To: <20180930180715.25829-1-afaerber@suse.de>
-References: <20180930180715.25829-1-afaerber@suse.de>
-Message-ID: <20180930180715.25829-4-afaerber@suse.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 30 Sep 2018 12:23:43 -0700
+Subject: [GIT PULL] ARM: SoC fixes
+Message-ID: <20180930192343.erige7yfbrnvil2m@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof and Arnd,
+Hi Linus, Greg,
 
-Here's my drivers pull for Actions Semi.
+The following changes since commit a132bb90414bfad4f8ee23cb45fe6946a89b167d:
 
-Regards,
-Andreas
+  Merge tag 'sunxi-fixes-for-4.19' of https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux into fixes (2018-09-08 10:04:37 -0700)
 
-The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+are available in the git repository at:
 
-  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-fixes
 
-are available in the Git repository at:
+for you to fetch changes up to 082dc55e3c5e559b0e6855c0de23ebd674bcc91e:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git tags/actions-drivers-for-4.20
-
-for you to fetch changes up to 067517513ae437c2845bc593dbf99a142bdc9250:
-
-  soc: actions: Update SPS help text for S700 (2018-09-22 22:09:47 +0200)
+  ARM: dts: stm32: update SPI6 dmas property on stm32mp157c (2018-09-25 20:39:06 -0700)
 
 ----------------------------------------------------------------
-Actions Semi SoC drivers for v4.20 #1
+ARM: SoC fixes
 
-This adopts SPDX license identifiers.
-It also updates Kconfig help text.
+A handful of fixes that have been coming in the last couple of weeks:
+
+ - Freescale fixes for on-chip accellerators
+ - A DT fix for stm32 to avoid fallback to non-DMA SPI mode
+ - Fixes for badly specified interrupts on BCM63xx SoCs
+ - Allwinner A64 HDMI was incorrectly specified as fully compatble with R40
+ - Drive strength fix for SAMA5D2 NAND pins on one board
 
 ----------------------------------------------------------------
-Andreas F?rber (2):
-      soc: actions: Convert to SPDX license identifiers
-      soc: actions: Update SPS help text for S700
+Alexandre Belloni (1):
+      soc: fsl: qbman: qman: avoid allocating from non existing gen_pool
 
- drivers/soc/actions/Kconfig          | 2 +-
- drivers/soc/actions/Makefile         | 2 ++
- drivers/soc/actions/owl-sps-helper.c | 6 +-----
- drivers/soc/actions/owl-sps.c        | 6 +-----
- 4 files changed, 5 insertions(+), 11 deletions(-)
+Amelie Delaunay (1):
+      ARM: dts: stm32: update SPI6 dmas property on stm32mp157c
+
+Antoine Tenart (1):
+      MAINTAINERS: update the Annapurna Labs maintainer email
+
+Florian Fainelli (1):
+      ARM: dts: BCM63xx: Fix incorrect interrupt specifiers
+
+Icenowy Zheng (1):
+      ARM: dts: sun8i: drop A64 HDMI PHY fallback compatible from R40 DT
+
+Ludovic Desroches (1):
+      ARM: dts: at91: sama5d2_ptc_ek: fix nand pinctrl
+
+Olof Johansson (3):
+      Merge tag 'sunxi-fixes-for-4.19-2' of https://git.kernel.org/.../sunxi/linux into fixes
+      Merge tag 'at91-4.19-fixes' of git://git.kernel.org/.../at91/linux into fixes
+      Merge tag 'arm-soc/for-4.19/devicetree-fixes' of https://github.com/Broadcom/stblinux into fixes
+
+Zhao Qiang (1):
+      soc: fsl: qe: Fix copy/paste bug in ucc_get_tdm_sync_shift()
+
+ MAINTAINERS                               |  2 +-
+ arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts |  2 ++
+ arch/arm/boot/dts/bcm63138.dtsi           | 14 ++++++++------
+ arch/arm/boot/dts/stm32mp157c.dtsi        |  4 ++--
+ arch/arm/boot/dts/sun8i-r40.dtsi          |  3 +--
+ drivers/soc/fsl/qbman/qman.c              |  3 +++
+ drivers/soc/fsl/qe/ucc.c                  |  2 +-
+ 7 files changed, 18 insertions(+), 12 deletions(-)
