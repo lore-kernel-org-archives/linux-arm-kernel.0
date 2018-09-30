@@ -1,31 +1,32 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sun, 30 Sep 2018 17:46:18 +0200
-Subject: [PATCH 3/4] soc: actions: sps: Add S900 power domains
-In-Reply-To: <5e267c76-1c71-2381-ee66-50a5bef1cfc2@suse.de>
-References: <20180411164036.8046-1-manivannan.sadhasivam@linaro.org>
- <20180411164036.8046-4-manivannan.sadhasivam@linaro.org>
- <5e267c76-1c71-2381-ee66-50a5bef1cfc2@suse.de>
-Message-ID: <a8630149-d1b9-ce23-e5a5-4282cbd8bbca@suse.de>
+From: aford173@gmail.com (Adam Ford)
+Date: Sun, 30 Sep 2018 11:01:18 -0500
+Subject: [PATCH] ARM: dts: da850-evm: Enable tca6416 on baseboard
+Message-ID: <20180930160118.7210-1-aford173@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 24.06.18 um 15:07 schrieb Andreas F?rber:
-> Am 11.04.2018 um 18:40 schrieb Manivannan Sadhasivam:
->> Add power domains for Actions Semi S900 SoC.
->>
->> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
->> ---
->>  drivers/soc/actions/owl-sps.c | 58 +++++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 58 insertions(+)
-> 
-> Reviewed-by: Andreas F?rber <afaerber@suse.de>
+There is a GPIO expander on both the UI board as well as the
+baseboard.  This patch enables the second tca6416 and identifies
+it as being on the baseboard using _bb as the suffix.
 
-Series merged now via topic branch.
+Signed-off-by: Adam Ford <aford173@gmail.com>
 
-Thanks,
-Andreas
-
+diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+index f9b757905845..a3c9b346721d 100644
+--- a/arch/arm/boot/dts/da850-evm.dts
++++ b/arch/arm/boot/dts/da850-evm.dts
+@@ -221,6 +221,12 @@
+ 		gpio-controller;
+ 		#gpio-cells = <2>;
+ 	};
++	tca6416_bb: gpio at 21 {
++		compatible = "ti,tca6416";
++		reg = <0x21>;
++		gpio-controller;
++		#gpio-cells = <2>;
++	};
+ };
+ 
+ &wdt {
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+2.17.1
