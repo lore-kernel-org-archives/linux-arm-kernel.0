@@ -1,13 +1,15 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Sun, 30 Sep 2018 08:56:22 +0800
-Subject: [PATCH V3 07/11] clk: imx: scu: add scu clock mux
+Date: Sun, 30 Sep 2018 08:56:21 +0800
+Subject: [PATCH V3 06/11] clk: imx: scu: add scu clock gpr gate
 In-Reply-To: <1538268986-24890-1-git-send-email-aisheng.dong@nxp.com>
 References: <1538268986-24890-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1538268986-24890-8-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1538268986-24890-7-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add scu based clock mux.
+Add scu based clock gpr gate. Unlike the normal scu gate, such
+gates are controlled by GPR bits through SCU sc_misc_set_control
+API.
 
 Cc: Shawn Guo <shawnguo@kernel.org>
 Cc: Sascha Hauer <kernel@pengutronix.de>
@@ -20,31 +22,31 @@ ChangeLog:
 v2->v3:
  * structure name and api usage update
 v1->v2:
- * move SCU clock API implementation into driver
+ * no changes except update headfile name
 ---
- drivers/clk/imx/scu/Makefile      |   3 +-
- drivers/clk/imx/scu/clk-mux-scu.c | 131 ++++++++++++++++++++++++++++++++++++++
- drivers/clk/imx/scu/clk-scu.h     |  13 ++++
- 3 files changed, 146 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/imx/scu/clk-mux-scu.c
+ drivers/clk/imx/scu/Makefile           |  3 +-
+ drivers/clk/imx/scu/clk-gate-gpr-scu.c | 88 ++++++++++++++++++++++++++++++++++
+ drivers/clk/imx/scu/clk-scu.h          |  9 ++++
+ 3 files changed, 99 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/imx/scu/clk-gate-gpr-scu.c
 
 diff --git a/drivers/clk/imx/scu/Makefile b/drivers/clk/imx/scu/Makefile
-index 25d3511..aee56bf 100644
+index 2abed17..25d3511 100644
 --- a/drivers/clk/imx/scu/Makefile
 +++ b/drivers/clk/imx/scu/Makefile
-@@ -5,4 +5,5 @@ obj-$(CONFIG_MXC_CLK_SCU) += \
+@@ -4,4 +4,5 @@ obj-$(CONFIG_MXC_CLK_SCU) += \
+ 	clk-scu.o \
  	clk-divider-scu.o \
  	clk-divider-gpr-scu.o \
- 	clk-gate-scu.o \
--	clk-gate-gpr-scu.o
-+	clk-gate-gpr-scu.o \
-+	clk-mux-scu.o
-diff --git a/drivers/clk/imx/scu/clk-mux-scu.c b/drivers/clk/imx/scu/clk-mux-scu.c
+-	clk-gate-scu.o
++	clk-gate-scu.o \
++	clk-gate-gpr-scu.o
+diff --git a/drivers/clk/imx/scu/clk-gate-gpr-scu.c b/drivers/clk/imx/scu/clk-gate-gpr-scu.c
 new file mode 100644
-index 0000000..b5f5b18
+index 0000000..7b8bf3d
 --- /dev/null
-+++ b/drivers/clk/imx/scu/clk-mux-scu.c
-@@ -0,0 +1,131 @@
++++ b/drivers/clk/imx/scu/clk-gate-gpr-scu.c
+@@ -0,0 +1,88 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
 + * Copyright (C) 2016 Freescale Semiconductor, Inc.
@@ -60,141 +62,94 @@ index 0000000..b5f5b18
 +
 +#include "clk-scu.h"
 +
-+struct clk_mux_scu {
++struct clk_gate_gpr_scu {
 +	struct clk_hw hw;
-+	u32 rsrc_id;
-+	u8 clk_type;
++	u32	rsrc_id;
++	u8	gpr_id;
++
++	/* default: enable 1 disable 0 */
++	bool	invert;
 +};
 +
-+#define to_clk_mux_scu(_hw) container_of(_hw, struct clk_mux_scu, hw)
++#define to_clk_gate_gpr_scu(_hw) container_of(_hw, struct clk_gate_gpr_scu, hw)
 +
-+
-+/* SCU Clock Protocol definitions */
-+struct imx_sc_msg_req_set_clock_parent {
-+	struct imx_sc_rpc_msg hdr;
-+	u16 resource;
-+	u8 clk;
-+	u8 parent;
-+} __packed;
-+
-+struct imx_sc_msg_req_get_clock_parent {
-+	struct imx_sc_rpc_msg hdr;
-+	u16 resource;
-+	u8 clk;
-+} __packed;
-+
-+struct imx_sc_msg_resp_get_clock_parent {
-+	struct imx_sc_rpc_msg hdr;
-+	u8 parent;
-+} __packed;
-+
-+static u8 clk_mux_scu_get_parent(struct clk_hw *hw)
++static int clk_gate_gpr_scu_enable(struct clk_hw *hw)
 +{
-+	struct clk_mux_scu *mux = to_clk_mux_scu(hw);
-+	struct imx_sc_msg_req_get_clock_parent msg;
-+	struct imx_sc_msg_resp_get_clock_parent *resp;
-+	struct imx_sc_rpc_msg *hdr = &msg.hdr;
++	struct clk_gate_gpr_scu *gate = to_clk_gate_gpr_scu(hw);
 +	int ret;
 +
-+	hdr->ver = IMX_SC_RPC_VERSION;
-+	hdr->svc = (uint8_t)IMX_SC_RPC_SVC_PM;
-+	hdr->func = (uint8_t)IMX_SC_PM_FUNC_GET_CLOCK_PARENT;
-+	hdr->size = 2;
-+
-+	msg.resource = mux->rsrc_id;
-+	msg.clk = mux->clk_type;
-+
-+	ret = imx_scu_call_rpc(ccm_ipc_handle, &msg, true);
-+	if (ret) {
-+		pr_err("%s: failed to get clock parent %d\n",
-+			clk_hw_get_name(hw), ret);
-+		return ret;
-+	}
-+
-+	resp = (struct imx_sc_msg_resp_get_clock_parent *)&msg;
-+
-+	return resp->parent;
-+}
-+
-+static int clk_mux_scu_set_parent(struct clk_hw *hw, u8 index)
-+{
-+	struct clk_mux_scu *mux = to_clk_mux_scu(hw);
-+	struct imx_sc_msg_req_set_clock_parent msg;
-+	struct imx_sc_rpc_msg *hdr = &msg.hdr;
-+	int ret;
-+
-+	hdr->ver = IMX_SC_RPC_VERSION;
-+	hdr->svc = (uint8_t)IMX_SC_RPC_SVC_PM;
-+	hdr->func = (uint8_t)IMX_SC_PM_FUNC_SET_CLOCK_PARENT;
-+	hdr->size = 2;
-+
-+	msg.resource = mux->rsrc_id;
-+	msg.clk = mux->clk_type;
-+	msg.parent = index;
-+
-+	ret = imx_scu_call_rpc(ccm_ipc_handle, &msg, true);
++	ret = imx_sc_misc_set_control(ccm_ipc_handle, gate->rsrc_id,
++				      gate->gpr_id, !gate->invert);
 +	if (ret)
-+		pr_err("%s: failed to set clock parent %d : ret %d\n",
-+			clk_hw_get_name(hw), index, ret);
++		pr_err("%s: clk enable failed %d\n", clk_hw_get_name(hw), ret);
 +
-+	return 0;
++	return ret;
 +}
 +
-+static const struct clk_ops clk_mux_scu_ops = {
-+	.get_parent = clk_mux_scu_get_parent,
-+	.set_parent = clk_mux_scu_set_parent,
++static void clk_gate_gpr_scu_disable(struct clk_hw *hw)
++{
++	struct clk_gate_gpr_scu *gate = to_clk_gate_gpr_scu(hw);
++	int ret;
++
++	ret  = imx_sc_misc_set_control(ccm_ipc_handle, gate->rsrc_id,
++				       gate->gpr_id, gate->invert);
++	if (ret)
++		pr_err("%s: clk disable failed %d\n", clk_hw_get_name(hw), ret);
++}
++
++static const struct clk_ops clk_gate_gpr_scu_ops = {
++	.enable = clk_gate_gpr_scu_enable,
++	.disable = clk_gate_gpr_scu_disable,
 +};
 +
-+struct clk_hw *clk_register_mux_scu(const char *name, const char * const *parents,
-+				    int num_parents, unsigned long flags,
-+				    u32 rsrc_id, u8 clk_type)
++struct clk_hw *clk_register_gate_gpr_scu(const char *name, const char *parent_name,
++					 u32 rsrc_id, u8 gpr_id,
++					 bool invert_flag)
 +{
++	struct clk_gate_gpr_scu *gate;
 +	struct clk_init_data init;
-+	struct clk_mux_scu *mux;
 +	struct clk_hw *hw;
 +	int ret;
 +
-+	mux = kzalloc(sizeof(*mux), GFP_KERNEL);
-+	if (!mux)
++	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
++	if (!gate)
 +		return ERR_PTR(-ENOMEM);
 +
++	gate->rsrc_id = rsrc_id;
++	gate->gpr_id = gpr_id;
++	gate->invert = invert_flag;
++
 +	init.name = name;
-+	init.ops = &clk_mux_scu_ops;
-+	init.parent_names = parents;
-+	init.num_parents = num_parents;
++	init.ops = &clk_gate_gpr_scu_ops;
++	init.parent_names = parent_name ? &parent_name : NULL;
++	init.num_parents = parent_name ? 1 : 0;
 +
-+	mux->hw.init = &init;
-+	mux->rsrc_id = rsrc_id;
-+	mux->clk_type = clk_type;
++	gate->hw.init = &init;
 +
-+	hw = &mux->hw;
++	hw = &gate->hw;
 +	ret = clk_hw_register(NULL, hw);
 +	if (ret) {
-+		kfree(mux);
++		kfree(gate);
 +		hw = ERR_PTR(ret);
 +	}
 +
 +	return hw;
 +}
 diff --git a/drivers/clk/imx/scu/clk-scu.h b/drivers/clk/imx/scu/clk-scu.h
-index d92b3b3..fdf58bd 100644
+index 57de592..d92b3b3 100644
 --- a/drivers/clk/imx/scu/clk-scu.h
 +++ b/drivers/clk/imx/scu/clk-scu.h
-@@ -68,4 +68,17 @@ static inline struct clk_hw *imx_clk_gate_gpr_scu(const char *name, const char *
- 	return clk_register_gate_gpr_scu(name, parent, rsrc_id, gpr_id, invert_flag);
+@@ -59,4 +59,13 @@ static inline struct clk_hw *imx_clk_gate2_scu(const char *name, const char *par
+ 	return clk_register_gate2_scu(name, parent, 0, reg, bit_idx, hw_gate);
  }
  
-+struct clk_hw *clk_register_mux_scu(const char *name, const char * const *parents,
-+			int num_parents, unsigned long flags,
-+			u32 rsrc_id, u8 clk_type);
++struct clk_hw *clk_register_gate_gpr_scu(const char *name, const char *parent_name,
++				u32 rsrc_id, u8 gpr_id, bool invert_flag);
 +
-+static inline struct clk_hw *imx_clk_mux_scu(const char *name,
-+			const char * const *parents, int num_parents,
-+			u32 rsrc_id, u8 clk_type)
++static inline struct clk_hw *imx_clk_gate_gpr_scu(const char *name, const char *parent,
++				u32 rsrc_id, u8 gpr_id, bool invert_flag)
 +{
-+	return clk_register_mux_scu(name, parents, num_parents,
-+			CLK_SET_RATE_NO_REPARENT, rsrc_id,
-+			clk_type);
++	return clk_register_gate_gpr_scu(name, parent, rsrc_id, gpr_id, invert_flag);
 +}
 +
  #endif
