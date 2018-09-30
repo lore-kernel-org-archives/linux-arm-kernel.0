@@ -1,67 +1,43 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 30 Sep 2018 12:23:43 -0700
-Subject: [GIT PULL] ARM: SoC fixes
-Message-ID: <20180930192343.erige7yfbrnvil2m@localhost>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 30 Sep 2018 23:16:07 +0200
+Subject: [PATCH 2/3] clocksource/driver/ep93xx: Fix up includes
+In-Reply-To: <20180930211608.5516-1-linus.walleij@linaro.org>
+References: <20180930211608.5516-1-linus.walleij@linaro.org>
+Message-ID: <20180930211608.5516-2-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus, Greg,
+Include the right interfaces for use with this driver.
 
-The following changes since commit a132bb90414bfad4f8ee23cb45fe6946a89b167d:
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+Clocksource: please ACK this if OK so I can merge this
+patch through the ARM SoC tree.
+---
+ drivers/clocksource/timer-ep93xx.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-  Merge tag 'sunxi-fixes-for-4.19' of https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux into fixes (2018-09-08 10:04:37 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-fixes
-
-for you to fetch changes up to 082dc55e3c5e559b0e6855c0de23ebd674bcc91e:
-
-  ARM: dts: stm32: update SPI6 dmas property on stm32mp157c (2018-09-25 20:39:06 -0700)
-
-----------------------------------------------------------------
-ARM: SoC fixes
-
-A handful of fixes that have been coming in the last couple of weeks:
-
- - Freescale fixes for on-chip accellerators
- - A DT fix for stm32 to avoid fallback to non-DMA SPI mode
- - Fixes for badly specified interrupts on BCM63xx SoCs
- - Allwinner A64 HDMI was incorrectly specified as fully compatble with R40
- - Drive strength fix for SAMA5D2 NAND pins on one board
-
-----------------------------------------------------------------
-Alexandre Belloni (1):
-      soc: fsl: qbman: qman: avoid allocating from non existing gen_pool
-
-Amelie Delaunay (1):
-      ARM: dts: stm32: update SPI6 dmas property on stm32mp157c
-
-Antoine Tenart (1):
-      MAINTAINERS: update the Annapurna Labs maintainer email
-
-Florian Fainelli (1):
-      ARM: dts: BCM63xx: Fix incorrect interrupt specifiers
-
-Icenowy Zheng (1):
-      ARM: dts: sun8i: drop A64 HDMI PHY fallback compatible from R40 DT
-
-Ludovic Desroches (1):
-      ARM: dts: at91: sama5d2_ptc_ek: fix nand pinctrl
-
-Olof Johansson (3):
-      Merge tag 'sunxi-fixes-for-4.19-2' of https://git.kernel.org/.../sunxi/linux into fixes
-      Merge tag 'at91-4.19-fixes' of git://git.kernel.org/.../at91/linux into fixes
-      Merge tag 'arm-soc/for-4.19/devicetree-fixes' of https://github.com/Broadcom/stblinux into fixes
-
-Zhao Qiang (1):
-      soc: fsl: qe: Fix copy/paste bug in ucc_get_tdm_sync_shift()
-
- MAINTAINERS                               |  2 +-
- arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts |  2 ++
- arch/arm/boot/dts/bcm63138.dtsi           | 14 ++++++++------
- arch/arm/boot/dts/stm32mp157c.dtsi        |  4 ++--
- arch/arm/boot/dts/sun8i-r40.dtsi          |  3 +--
- drivers/soc/fsl/qbman/qman.c              |  3 +++
- drivers/soc/fsl/qe/ucc.c                  |  2 +-
- 7 files changed, 18 insertions(+), 12 deletions(-)
+diff --git a/drivers/clocksource/timer-ep93xx.c b/drivers/clocksource/timer-ep93xx.c
+index 9b5e98446d77..3dcc58de65ef 100644
+--- a/drivers/clocksource/timer-ep93xx.c
++++ b/drivers/clocksource/timer-ep93xx.c
+@@ -1,14 +1,12 @@
+ // SPDX-License-Identifier: GPL-2.0
+ #include <linux/kernel.h>
+-#include <linux/init.h>
+ #include <linux/clocksource.h>
+ #include <linux/clockchips.h>
+ #include <linux/sched_clock.h>
+ #include <linux/interrupt.h>
+-#include <linux/irq.h>
+ #include <linux/io.h>
+ #include <linux/platform_data/timer-ep93xx.h>
+-#include <asm/mach/time.h>
++#include <linux/slab.h>
+ 
+ static void __iomem *ep93xx_base;
+ 
+-- 
+2.17.1
