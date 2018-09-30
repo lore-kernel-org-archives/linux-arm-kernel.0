@@ -1,21 +1,17 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 30 Sep 2018 11:14:47 +0800
-Subject: [PATCH 1/2] ARM: dts: vf: Switch to SPDX identifier
-In-Reply-To: <1537891682-29858-1-git-send-email-festevam@gmail.com>
-References: <1537891682-29858-1-git-send-email-festevam@gmail.com>
-Message-ID: <20180930031444.GK26692@dragon>
+Date: Sun, 30 Sep 2018 11:16:33 +0800
+Subject: [PATCH] ARM: dts: imx53-ppd: Remove 'num-chipselects' property
+In-Reply-To: <1537892648-30414-1-git-send-email-festevam@gmail.com>
+References: <1537892648-30414-1-git-send-email-festevam@gmail.com>
+Message-ID: <20180930031631.GL26692@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 25, 2018 at 01:08:01PM -0300, Fabio Estevam wrote:
-> Adopt the SPDX license identifier headers to ease license compliance
-> management.
+On Tue, Sep 25, 2018 at 01:24:08PM -0300, Fabio Estevam wrote:
+> The 'num-chipselects' property is not a valid property according
+> to Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt, so
+> let's remove it.
 > 
 > Signed-off-by: Fabio Estevam <festevam@gmail.com>
 
-Applied both.
-
-For future VF (Vybrid) changes, please always copy Stefan Agner
-<stefan@agner.ch>, thanks.
-
-Shawn
+Applied, thanks.
