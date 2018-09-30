@@ -1,125 +1,87 @@
-From: Anson.Huang@nxp.com (Anson Huang)
-Date: Sun, 30 Sep 2018 11:32:28 +0800
-Subject: [PATCH V3 3/3] ARM: dts: imx: add i.mx6ulz and i.mx6ulz 14x14 evk
- support
-In-Reply-To: <1538278348-7716-1-git-send-email-Anson.Huang@nxp.com>
-References: <1538278348-7716-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1538278348-7716-4-git-send-email-Anson.Huang@nxp.com>
+From: zhongmiao@hisilicon.com (Zhongmiao)
+Date: Sun, 30 Sep 2018 12:06:10 +0800
+Subject: question about update mmu table entry when mmu and smmu use one
+ page
+In-Reply-To: <8CD08B4737CACA4ABE0228F45E441A9163861B9B@dggemm501-mbs.china.huawei.com>
+References: <8CD08B4737CACA4ABE0228F45E441A916381ADEE@DGGEMM501-MBX.china.huawei.com>
+ <5f0e7544-5464-7a74-9c6b-3f8b6a0e147a@hisilicon.com>
+ <318cbf9d-8216-55f2-b6a6-fb96a9d1fb05@arm.com>
+ <8CD08B4737CACA4ABE0228F45E441A9163861B9B@dggemm501-mbs.china.huawei.com>
+Message-ID: <b26dd21d-fa2c-1499-b727-ed8ddd43e805@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6ULZ is new SoC of i.MX6 family, compared to i.MX6ULL,
-it removes below modules:
 
-- UART5/UART6/UART7/UART8;
-- PWM5/PWM6/PWM7/PWM8;
-- eCSPI3/eCSPI4;
-- CAN1/CAN2;
-- FEC1/FEC2;
-- I2C3/I2C4;
-- EPIT2;
-- LCDIF;
-- GPT2;
-- ADC1;
-- TSC;
 
-This patch adds support for i.MX6ULZ and i.MX6ULZ 14x14 EVK
-board.
+On 2018/9/30 11:50, Zhongmiao wrote:
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
-changes since V2:
-	Add "fsl,imx6ull" to DT compatible.
- arch/arm/boot/dts/Makefile              |  3 ++-
- arch/arm/boot/dts/imx6ulz-14x14-evk.dts | 20 +++++++++++++++++
- arch/arm/boot/dts/imx6ulz.dtsi          | 38 +++++++++++++++++++++++++++++++++
- 3 files changed, 60 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/imx6ulz-14x14-evk.dts
- create mode 100644 arch/arm/boot/dts/imx6ulz.dtsi
+Hi Jean:
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b3ec70d..d7268ae 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -560,7 +560,8 @@ dtb-$(CONFIG_SOC_IMX6UL) += \
- 	imx6ul-tx6ul-mainboard.dtb \
- 	imx6ull-14x14-evk.dtb \
- 	imx6ull-colibri-eval-v3.dtb \
--	imx6ull-colibri-wifi-eval-v3.dtb
-+	imx6ull-colibri-wifi-eval-v3.dtb \
-+	imx6ulz-14x14-evk.dtb
- dtb-$(CONFIG_SOC_IMX7D) += \
- 	imx7d-cl-som-imx7.dtb \
- 	imx7d-colibri-emmc-eval-v3.dtb \
-diff --git a/arch/arm/boot/dts/imx6ulz-14x14-evk.dts b/arch/arm/boot/dts/imx6ulz-14x14-evk.dts
-new file mode 100644
-index 0000000..6f1af24
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6ulz-14x14-evk.dts
-@@ -0,0 +1,20 @@
-+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
-+//
-+// Copyright 2018 NXP.
-+
-+/dts-v1/;
-+
-+#include "imx6ulz.dtsi"
-+#include "imx6ul-14x14-evk.dtsi"
-+
-+/delete-node/ &fec1;
-+/delete-node/ &fec2;
-+/delete-node/ &lcdif;
-+/delete-node/ &tsc;
-+
-+/ {
-+	model = "Freescale i.MX6 ULZ 14x14 EVK Board";
-+	compatible = "fsl,imx6ulz-14x14-evk", "fsl,imx6ull", "fsl,imx6ulz";
-+
-+	/delete-node/ panel;
-+};
-diff --git a/arch/arm/boot/dts/imx6ulz.dtsi b/arch/arm/boot/dts/imx6ulz.dtsi
-new file mode 100644
-index 0000000..ae6d7e5
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6ulz.dtsi
-@@ -0,0 +1,38 @@
-+// SPDX-License-Identifier: (GPL-2.0 OR MIT)
-+//
-+// Copyright 2018 NXP.
-+
-+#include "imx6ull.dtsi"
-+
-+/ {
-+	aliases {
-+		/delete-property/ ethernet0;
-+		/delete-property/ ethernet1;
-+		/delete-property/ i2c2;
-+		/delete-property/ i2c3;
-+		/delete-property/ serial4;
-+		/delete-property/ serial5;
-+		/delete-property/ serial6;
-+		/delete-property/ serial7;
-+		/delete-property/ spi2;
-+		/delete-property/ spi3;
-+	};
-+};
-+
-+/delete-node/ &adc1;
-+/delete-node/ &can1;
-+/delete-node/ &can2;
-+/delete-node/ &ecspi3;
-+/delete-node/ &ecspi4;
-+/delete-node/ &epit2;
-+/delete-node/ &gpt2;
-+/delete-node/ &i2c3;
-+/delete-node/ &i2c4;
-+/delete-node/ &pwm5;
-+/delete-node/ &pwm6;
-+/delete-node/ &pwm7;
-+/delete-node/ &pwm8;
-+/delete-node/ &uart5;
-+/delete-node/ &uart6;
-+/delete-node/ &uart7;
-+/delete-node/ &uart8;
--- 
-2.7.4
+    i got it, you are right .  i have another question  about  atc inv cmd .
+
+    For Example :
+       application  malloc two VA  the length is 1MB.
+                   VA_0 = 0x22e1f010
+                   VA_1 = 0x22f1f020
+
+       when free VA_0 and VA_1 , i see the driver build two CMD_INV_ATC :
+
+             1.  cmd_0:0x10000001840,cmd_1:0x2200000d (size = 32MB)
+             2.  cmd_0:0x10000001840,cmd_1:0x23000000 (size = 4KB)
+
+    i think cmd "2" is redundant. How did you think about that?
+
+>
+> Hi,
+>
+> On 28/09/2018 03:50, Zhongmiao wrote:
+>>
+>> Hi Jean:
+>>
+>>      i'm testing mmu and smmu use one page by vfio drvier (use your
+>> patch) ;
+>>
+>>      the test module:
+>>             PCIE(RC) <--> PCIE(EP)
+>>
+>>
+>>      the program module :
+>>
+>>                 1. bind device to vfio
+>>
+>>                 2. alloc pasid
+>>
+>>                 3. malloc VA
+>>
+>>                 4. PCIE EP device write / read by this VA
+>>
+>>                 5. free VA (when "4" done)
+>>
+>> Question:
+>>
+>>     when application update mmu table entry, and software must make
+>> sure send "CMD_TLBI_NH_VA" and inv atc ,and so on.
+>>
+>>     but i do not see CMD_TLBI_NH_VA when application alloc/free . only
+>> atc inv and cmd sync when "free".
+>
+> Excellent, that's expected :) We don't need to issue a CMD_TLBI_NH_VA because the SMMU participates in broadcast TLB invalidation. When unmapping the VA from the program's page tables, the CPU issues a TLB invalidation to the inner-shareable domain (in your case, probably a TLBI VAE1IS instruction). This invalidation is also received by the SMMU, which removes the TLB entry associated for this (ASID, VA) pair.
+>
+> Currently we only support SVA when the SMMU has broadcast invalidation:
+> * We require that SMMU_IDR0.BTM = 1
+> * Then we set SMMU_CR2.PTM = 0
+> * In the context descriptor, we write the ASID of the process
+>   and set ASET = 0. Any TLB entry created for this context can now be
+>   invalidated by the CPU.
+>
+> Unfortunately the ATC doesn't participate in broadcast TLBI, so we need to send the ATC invalidation explicitly.
+>
+> You can check if the broadcast invalidation succeeded by repeating step
+> 4 after the free. It should cause the device to send a PRI Page Request, and the I/O page fault code to return IOMMU_PAGE_RESP_INVALID, resulting in an "Invalid Request" PRG Response (which can be seen with tracepoint event iommu:dev_page_response).
+>
+> Depending on the libc, free doesn't necessarily unmap the underlying page, so when testing SVA I prefer calling mmap(MAP_ANONYMOUS) and
+> munmap() directly.
+>
+> Thanks,
+> Jean
+>
