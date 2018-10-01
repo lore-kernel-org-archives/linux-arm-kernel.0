@@ -1,93 +1,41 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 1 Oct 2018 15:36:41 +0100
-Subject: [PATCH v5 1/9] PCI: mediatek: Using slot's devfn for compare to
- fix mtk_pcie_find_port logic
-In-Reply-To: <1538129080-8206-2-git-send-email-honghui.zhang@mediatek.com>
-References: <1538129080-8206-1-git-send-email-honghui.zhang@mediatek.com>
- <1538129080-8206-2-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <20181001143641.GB13049@red-moon>
+From: jan.kundrat@cesnet.cz (=?iso-8859-1?Q?Jan_Kundr=E1t?=)
+Date: Mon, 01 Oct 2018 16:44:44 +0200
+Subject: [PATCH] PCI: mvebu: Fix PCI I/O mapping creation sequence
+In-Reply-To: <20181001124934.7222-1-thomas.petazzoni@bootlin.com>
+References: <20181001124934.7222-1-thomas.petazzoni@bootlin.com>
+Message-ID: <afee5e1a-4b5a-47f6-91a9-dfe5d041a388@cesnet.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 28, 2018 at 06:04:32PM +0800, honghui.zhang at mediatek.com wrote:
-> From: Honghui Zhang <honghui.zhang@mediatek.com>
-> 
-> The Mediatek's host controller has two slots, each with it's own control
-> registers. The host driver need to identify which slot was connected
-> in order to access the device's configuration space. There's problem
-> for current host driver to find out which slot was connected to for
-> a given EP device.
-> 
-> Assuming each slot have connect with one EP device as below:
-> 
->                 host bridge
->   bus 0 --> __________|_______
->            |                  |
->            |                  |
->          slot 0             slot 1
->   bus 1 -->|        bus 2 --> |
->            |                  |
->          EP 0               EP 1
-> 
-> During PCI enumeration, system software will scan all the PCI device
-> starting from devfn 0. So it will get the proper port for slot0 and
-> slot1 device when using PCI_SLOT(devfn) for match. But it will get
-> the wrong slot for EP1: The devfn will be start from 0 when scanning
-> EP1 behind slot1, it will get port0 since the PCI_SLOT(EP1) is match
-> for port0's slot value. So the host driver should not using EP's devfn
-> but the slot's devfn(the slot which EP was connected to) for match.
-> 
-> This patch fix the mtk_pcie_find_port's logic by using the slot's
-> devfn for match if finding device connected to the subordinate bus.
-> 
-> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-> ---
->  drivers/pci/controller/pcie-mediatek.c | 17 ++++++++++++++++-
->  1 file changed, 16 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
-> index 9999dae..264e03f 100644
-> --- a/drivers/pci/controller/pcie-mediatek.c
-> +++ b/drivers/pci/controller/pcie-mediatek.c
-> @@ -337,10 +337,25 @@ static struct mtk_pcie_port *mtk_pcie_find_port(struct pci_bus *bus,
->  {
->  	struct mtk_pcie *pcie = bus->sysdata;
->  	struct mtk_pcie_port *port;
-> +	struct pci_dev *dev = NULL;
-> +
-> +	/*
-> +	 * Walk the bus hierarchy to get the devfn value
-> +	 * of the port in the root bus.
-> +	 */
-> +	while (bus && bus->number) {
-> +		dev = bus->self;
-> +		bus = dev->bus;
+On pond?l? 1. ??jna 2018 14:49:34 CEST, Thomas Petazzoni wrote:
+> Commit ee1604381a371 ("PCI: mvebu: Only remap I/O space if
+> configured") had the side effect that the PCI I/O mapping was created
+> much earlier than before, at a point where the probe() of the driver
+> could still fail. This is for example a problem if one gets an
+> -EPROBE_DEFER at some point during probe(), after pci_ioremap_io() has
+> been called.
+>
+> Indeed, there is currently no function to undo what pci_ioremap_io()
+> did, and switching to pci_remap_iospace() is not an option in
+> pci-mvebu due to the need for special memory attributes on Armada 38x.
+>
+> Reverting ee1604381a371 ("PCI: mvebu: Only remap I/O space if
+> configured") would be a possibility, but it would require also
+> reverting 42342073e38b5 ("PCI: mvebu: Convert to use pci_host_bridge
+> directly"). So instead, we use an open-coded version of
+> pci_host_probe() that creates the PCI I/O mapping at a point where we
+> are guaranteed not to fail anymore.
+>
+> Reported-by: Jan Kundr?t <jan.kundrat@cesnet.cz>
+> Fixes: ee1604381a371 ("PCI: mvebu: Only remap I/O space if configured")
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
 
-If you add:
+Tested-by: Jan Kundr?t <jan.kundrat@cesnet.cz>
 
-devfn = dev->devfn;
+Just a rebuild-and-boot test. We don't use any PCIe devices yet, but I'll 
+grab an ugly eBay converter and try this patch with a normal PCIe card 
+later.
 
-here
+Thanks!
 
-> +	}
-> +
-> +	list_for_each_entry(port, &pcie->ports, list) {
-> +		/* Using slot's devfn to compare for subordinary bus. */
-> +		if (dev)
-> +			devfn = dev->devfn;
-
-You can remove this ugly hunk altogether (and dev initialization
-to NULL).
-
-Lorenzo
-
-> -	list_for_each_entry(port, &pcie->ports, list)
->  		if (port->slot == PCI_SLOT(devfn))
->  			return port;
-> +	}
->  
->  	return NULL;
->  }
-> -- 
-> 2.6.4
-> 
+Jan
