@@ -1,53 +1,80 @@
-From: salyzyn@android.com (Mark Salyzyn)
-Date: Mon, 1 Oct 2018 13:52:32 -0700
-Subject: RESEND [PATCH v6 11/12] lib: vdso: Add support for CLOCK_BOOTTIME
-In-Reply-To: <alpine.DEB.2.21.1810012009010.32062@nanos.tec.linutronix.de>
-References: <20181001175845.168430-1-salyzyn@android.com>
- <20181001175845.168430-12-salyzyn@android.com>
- <alpine.DEB.2.21.1810012009010.32062@nanos.tec.linutronix.de>
-Message-ID: <a602b661-dde5-399d-6245-cf48a0e43f54@android.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Mon, 1 Oct 2018 13:56:32 -0700
+Subject: [PATCH v9 2/8] dt-bindings: Introduce interconnect binding
+In-Reply-To: <20180926143432.GH10761@jcrouse-lnx.qualcomm.com>
+References: <20180831140151.13972-1-georgi.djakov@linaro.org>
+ <20180831140151.13972-3-georgi.djakov@linaro.org>
+ <20180925180215.GA12435@bogus>
+ <20180926143432.GH10761@jcrouse-lnx.qualcomm.com>
+Message-ID: <1ae0a36a-1178-4db5-1ae9-8f19e561a18b@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/2018 11:15 AM, Thomas Gleixner wrote:
-> On Mon, 1 Oct 2018, Mark Salyzyn wrote:
->>   
->> +static notrace int do_boottime(const struct vdso_data *vd, struct timespec *ts)
->> +{
->> +	u32 seq, mult, shift;
->> +	u64 nsec, cycle_last;
->> +	vdso_wtm_clock_nsec_t wtm_nsec;
->> +
->> +	/* open coding timespec_add_ns to save a ts->tv_nsec = 0 */
->> +	ts->tv_sec = sec + __iter_div_u64_rem(nsec, NSEC_PER_SEC, &nsec);
->> +	ts->tv_nsec = nsec;
->> +
->> +	return 0;
->> +}
->> +
-> Instead of adding yet another copy of the same code you might want to look
-> at the rework I did for the x86 vdso in order to support CLOCK_TAI w/o
-> running into the issue of the clock switch case being compiled into a jump
-> table and then the compile asking for retpoline.
+
+
+On 09/26/2018 07:34 AM, Jordan Crouse wrote:
+> On Tue, Sep 25, 2018 at 01:02:15PM -0500, Rob Herring wrote:
+>> On Fri, Aug 31, 2018 at 05:01:45PM +0300, Georgi Djakov wrote:
+>>> This binding is intended to represent the relations between the interconnect
+>>> controllers (providers) and consumer device nodes. It will allow creating links
+>>> between consumers and interconnect paths (exposed by interconnect providers).
+>> As I mentioned in person, I want to see other SoC families using this
+>> before accepting. They don't have to be ready for upstream, but WIP
+>> patches or even just a "yes, this works for us and we're going to use
+>> this binding on X".
+>>
+>> Also, I think the QCom GPU use of this should be fully sorted out. Or
+>> more generically how this fits into OPP binding which seems to be never
+>> ending extended...
+> This is a discussion I wouldn't mind having now.  To jog memories, this is what
+> I posted a few weeks ago:
 >
->    http://lkml.kernel.org/r/20180917124533.329334911 at linutronix.de
+> https://patchwork.freedesktop.org/patch/246117/
 >
-> Thanks,
+> This seems like the easiest way to me to tie the frequency and the bandwidth
+> quota together for GPU devfreq scaling but I'm not married to the format and
+> I'll happily go a few rounds on the bikeshed if we can get something we can
+> be happy with.
 >
-> 	tglx
+> Jordan
 
-Great idea. Thanks!
+Been meaning to send this out for a while, but caught up with other stuff.
 
-The point of the first 12 patches is to _align_ the arm code to match 
-the assembler for arm64 exactly 1:1. Then switch arm64 assembler to use 
-the _same_ code in 'C' as a library. No performance degradation.
+That GPU BW patch is very specific to device to device mapping and 
+doesn't work well for different use cases (Eg: those that? can calculate 
+based on use case, etc).
 
-Next extend the vdso framework on arm64 to _also_ use that library for 
-vDSO32 (arm32 compat on 64-bit). At this point we achieve a 0.4% power 
-reduction on Android.
+Interconnect paths have different BW (bandwidth) operating points that 
+they can support. For example: 1 GB/s, 1.7 GB/s, 5GB/s, etc. Having a 
+mapping from GPU or CPU to those are fine/necessary, but we still need a 
+separate BW OPP table for interconnect paths to list what they can 
+actually support.
 
-At that point, we would be ready for a rework that fixes all three (ARM 
-vDSO, ARM64 vDSO and ARM64 vDSO32) to get the compiler to handle the 
-switch statement better. One step at a time.
+Two different ways we could represent BW OPP tables for interconnect paths:
+1.? Represent interconnect paths (CPU to DDR, GPU to DDR, etc) as 
+devices and have OPPs for those devices.
 
--- Mark
+2. We can have a "interconnect-opp-tables" DT binding similar to 
+"interconnects" and "interconnect-names". So if a device GPU or Video 
+decoder or I2C device needs to vote on an interconnect path, they can 
+also list the OPP tables that those paths can support.
+
+I know Rob doesn't like (1). But I'm hoping at least (2) is acceptable. 
+I'm open to other suggestions too.
+
+Both (1) and (2) need BW OPP tables similar to frequency OPP tables. 
+That should be easy to add and Viresh is open to that. I'm open to other 
+options too, but the fundamental missing part is how to tie a list of BW 
+OPPs to interconnect paths in DT.
+
+Once we have one of the above two options, we can use the required-opps 
+field (already present in kernel) for the mapping between GPU to a 
+particular BW need (suggested by Viresh during an in person conversation).
+
+Thanks,
+Saravana
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
