@@ -1,92 +1,16 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Mon, 1 Oct 2018 14:51:18 -0700
-Subject: [PATCH v9 2/8] dt-bindings: Introduce interconnect binding
-In-Reply-To: <20181001212608.GF31641@jcrouse-lnx.qualcomm.com>
-References: <20180831140151.13972-1-georgi.djakov@linaro.org>
- <20180831140151.13972-3-georgi.djakov@linaro.org>
- <20180925180215.GA12435@bogus>
- <20180926143432.GH10761@jcrouse-lnx.qualcomm.com>
- <1ae0a36a-1178-4db5-1ae9-8f19e561a18b@codeaurora.org>
- <20181001212608.GF31641@jcrouse-lnx.qualcomm.com>
-Message-ID: <d9f3d732-0a70-f823-d8e0-2d1b10d82e00@codeaurora.org>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Mon, 01 Oct 2018 15:00:13 -0700
+Subject: [GIT PULL] Allwinner clock changes for 4.20
+In-Reply-To: <20180929150127.aky3bijls3ncyunt@flea>
+References: <20180929150127.aky3bijls3ncyunt@flea>
+Message-ID: <153843121361.119890.4708850852378442505@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Quoting Maxime Ripard (2018-09-29 08:01:27)
+> Hi Mike, Stephen,
+> 
+> Here are our usual set of changes for the next merge window.
+> 
 
-
-On 10/01/2018 02:26 PM, Jordan Crouse wrote:
-> On Mon, Oct 01, 2018 at 01:56:32PM -0700, Saravana Kannan wrote:
->>
->> On 09/26/2018 07:34 AM, Jordan Crouse wrote:
->>> On Tue, Sep 25, 2018 at 01:02:15PM -0500, Rob Herring wrote:
->>>> On Fri, Aug 31, 2018 at 05:01:45PM +0300, Georgi Djakov wrote:
->>>>> This binding is intended to represent the relations between the interconnect
->>>>> controllers (providers) and consumer device nodes. It will allow creating links
->>>>> between consumers and interconnect paths (exposed by interconnect providers).
->>>> As I mentioned in person, I want to see other SoC families using this
->>>> before accepting. They don't have to be ready for upstream, but WIP
->>>> patches or even just a "yes, this works for us and we're going to use
->>>> this binding on X".
->>>>
->>>> Also, I think the QCom GPU use of this should be fully sorted out. Or
->>>> more generically how this fits into OPP binding which seems to be never
->>>> ending extended...
->>> This is a discussion I wouldn't mind having now.  To jog memories, this is what
->>> I posted a few weeks ago:
->>>
->>> https://patchwork.freedesktop.org/patch/246117/
->>>
->>> This seems like the easiest way to me to tie the frequency and the bandwidth
->>> quota together for GPU devfreq scaling but I'm not married to the format and
->>> I'll happily go a few rounds on the bikeshed if we can get something we can
->>> be happy with.
->>>
->>> Jordan
->> Been meaning to send this out for a while, but caught up with other stuff.
->>
->> That GPU BW patch is very specific to device to device mapping and
->> doesn't work well for different use cases (Eg: those that? can
->> calculate based on use case, etc).
->>
->> Interconnect paths have different BW (bandwidth) operating points
->> that they can support. For example: 1 GB/s, 1.7 GB/s, 5GB/s, etc.
->> Having a mapping from GPU or CPU to those are fine/necessary, but we
->> still need a separate BW OPP table for interconnect paths to list
->> what they can actually support.
->>
->> Two different ways we could represent BW OPP tables for interconnect paths:
->> 1.? Represent interconnect paths (CPU to DDR, GPU to DDR, etc) as
->> devices and have OPPs for those devices.
->>
->> 2. We can have a "interconnect-opp-tables" DT binding similar to
->> "interconnects" and "interconnect-names". So if a device GPU or
->> Video decoder or I2C device needs to vote on an interconnect path,
->> they can also list the OPP tables that those paths can support.
->>
->> I know Rob doesn't like (1). But I'm hoping at least (2) is
->> acceptable. I'm open to other suggestions too.
->>
->> Both (1) and (2) need BW OPP tables similar to frequency OPP tables.
->> That should be easy to add and Viresh is open to that. I'm open to
->> other options too, but the fundamental missing part is how to tie a
->> list of BW OPPs to interconnect paths in DT.
->>
->> Once we have one of the above two options, we can use the
->> required-opps field (already present in kernel) for the mapping
->> between GPU to a particular BW need (suggested by Viresh during an
->> in person conversation).
-> Assuming we are willing to maintain the bandwidth OPP tables and the
-> names / phandles needed to describe a 1:1 GPU -> bandwidth mapping
-> I'm okay with required-opps but for the sake of argument how would
-> required-opps work for a device that needs to vote multiple paths
-> for a given OPP?
-
-You can list multiple required-opps per device OPP. It's an array of 
-phandles to OPP entries in other tables.
-
--Saravana
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Thanks. Pulled into clk-next.
