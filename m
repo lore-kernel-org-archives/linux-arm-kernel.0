@@ -1,124 +1,57 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 1 Oct 2018 15:44:01 -0500
-Subject: [PATCH] PCI: mvebu: Fix PCI I/O mapping creation sequence
-In-Reply-To: <20181001124934.7222-1-thomas.petazzoni@bootlin.com>
-References: <20181001124934.7222-1-thomas.petazzoni@bootlin.com>
-Message-ID: <20181001204401.GE142872@bhelgaas-glaptop.roam.corp.google.com>
+From: salyzyn@android.com (Mark Salyzyn)
+Date: Mon, 1 Oct 2018 13:44:52 -0700
+Subject: RESEND and REBASE arm+arm64+aarch32 vdso rewrite
+In-Reply-To: <CALAqxLWCbw0bmYeB9Vfi5wXJcnLRnE0TYxy1h5WkHLehHv8KFg@mail.gmail.com>
+References: <20181001175845.168430-1-salyzyn@android.com>
+ <CALAqxLWCbw0bmYeB9Vfi5wXJcnLRnE0TYxy1h5WkHLehHv8KFg@mail.gmail.com>
+Message-ID: <8c09a380-7bc8-a353-aeb7-6591e6c57f68@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 01, 2018 at 02:49:34PM +0200, Thomas Petazzoni wrote:
-> Commit ee1604381a371 ("PCI: mvebu: Only remap I/O space if
-> configured") had the side effect that the PCI I/O mapping was created
-> much earlier than before, at a point where the probe() of the driver
-> could still fail. This is for example a problem if one gets an
-> -EPROBE_DEFER at some point during probe(), after pci_ioremap_io() has
-> been called.
-> 
-> Indeed, there is currently no function to undo what pci_ioremap_io()
-> did, and switching to pci_remap_iospace() is not an option in
-> pci-mvebu due to the need for special memory attributes on Armada 38x.
-> 
-> Reverting ee1604381a371 ("PCI: mvebu: Only remap I/O space if
-> configured") would be a possibility, but it would require also
-> reverting 42342073e38b5 ("PCI: mvebu: Convert to use pci_host_bridge
-> directly"). So instead, we use an open-coded version of
-> pci_host_probe() that creates the PCI I/O mapping at a point where we
-> are guaranteed not to fail anymore.
-> 
-> Reported-by: Jan Kundr?t <jan.kundrat@cesnet.cz>
-> Fixes: ee1604381a371 ("PCI: mvebu: Only remap I/O space if configured")
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+On 10/01/2018 11:49 AM, John Stultz wrote:
+> On Mon, Oct 1, 2018 at 10:58 AM, Mark Salyzyn <salyzyn@android.com> wrote:
+>> Last sent 23 Nov 2016.
+>>
+>> The following 23 patches are rebased and resent, and represent a
+>> rewrite of the arm and arm64 vDSO into C, adding support for arch32
+>> (32-bit user space hosted 64-bit kernels) and into a common library
+>> that other (arm, or non-arm) architectures may utilize.
+> So I feel like this has gone around a few times w/o much comment from
+> the arm/arm64 maintainers. I'm not sure if there's a reason?
+I am "forming an opinion"(tm) that ARM is not interested in any work on 
+32 bit arm architectures. They have no manpower that they are willing to 
+devote to this.
 
-Applied with Lorenzo's ack and Jan's tested-by to for-linux for v4.19,
-thanks!
+Despite the gain of 0.4% for screen-on battery life, where Android has a 
+mix of 64 and 32 bit applications, thus still relevant _today_ on 64 bit 
+architectures (providing vDSO32 for 32-bit applications).
+> I worry part of the issue is the scope of this patch set is a little
+> unwieldy (covering two architectures + generic code) might leave
+> maintainers thinking/hoping someone else should review it.
+Original was submitted by ARM author as a complete patch series. Failed, 
+so I took it over and have broken them up into 5 logical groups of 
+adjustments to divide and conquer.
 
-> ---
->  drivers/pci/controller/pci-mvebu.c | 52 +++++++++++++++++++++++++++++++++++---
->  1 file changed, 48 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/pci/controller/pci-mvebu.c b/drivers/pci/controller/pci-mvebu.c
-> index 50eb0729385b..a41d79b8d46a 100644
-> --- a/drivers/pci/controller/pci-mvebu.c
-> +++ b/drivers/pci/controller/pci-mvebu.c
-> @@ -1145,7 +1145,6 @@ static int mvebu_pcie_parse_request_resources(struct mvebu_pcie *pcie)
->  {
->  	struct device *dev = &pcie->pdev->dev;
->  	struct device_node *np = dev->of_node;
-> -	unsigned int i;
->  	int ret;
->  
->  	INIT_LIST_HEAD(&pcie->resources);
-> @@ -1179,13 +1178,58 @@ static int mvebu_pcie_parse_request_resources(struct mvebu_pcie *pcie)
->  					 resource_size(&pcie->io) - 1);
->  		pcie->realio.name = "PCI I/O";
->  
-> +		pci_add_resource(&pcie->resources, &pcie->realio);
-> +	}
-> +
-> +	return devm_request_pci_bus_resources(dev, &pcie->resources);
-> +}
-> +
-> +/*
-> + * This is a copy of pci_host_probe(), except that it does the I/O
-> + * remap as the last step, once we are sure we won't fail.
-> + *
-> + * It should be removed once the I/O remap error handling issue has
-> + * been sorted out.
-> + */
-> +static int mvebu_pci_host_probe(struct pci_host_bridge *bridge)
-> +{
-> +	struct mvebu_pcie *pcie;
-> +	struct pci_bus *bus, *child;
-> +	int ret;
-> +
-> +	ret = pci_scan_root_bus_bridge(bridge);
-> +	if (ret < 0) {
-> +		dev_err(bridge->dev.parent, "Scanning root bridge failed");
-> +		return ret;
-> +	}
-> +
-> +	pcie = pci_host_bridge_priv(bridge);
-> +	if (resource_size(&pcie->io) != 0) {
-> +		unsigned int i;
-> +
->  		for (i = 0; i < resource_size(&pcie->realio); i += SZ_64K)
->  			pci_ioremap_io(i, pcie->io.start + i);
-> +	}
->  
-> -		pci_add_resource(&pcie->resources, &pcie->realio);
-> +	bus = bridge->bus;
-> +
-> +	/*
-> +	 * We insert PCI resources into the iomem_resource and
-> +	 * ioport_resource trees in either pci_bus_claim_resources()
-> +	 * or pci_bus_assign_resources().
-> +	 */
-> +	if (pci_has_flag(PCI_PROBE_ONLY)) {
-> +		pci_bus_claim_resources(bus);
-> +	} else {
-> +		pci_bus_size_bridges(bus);
-> +		pci_bus_assign_resources(bus);
-> +
-> +		list_for_each_entry(child, &bus->children, node)
-> +			pcie_bus_configure_settings(child);
->  	}
->  
-> -	return devm_request_pci_bus_resources(dev, &pcie->resources);
-> +	pci_bus_add_devices(bus);
-> +	return 0;
->  }
->  
->  static int mvebu_pcie_probe(struct platform_device *pdev)
-> @@ -1268,7 +1312,7 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
->  	bridge->align_resource = mvebu_pcie_align_resource;
->  	bridge->msi = pcie->msi;
->  
-> -	return pci_host_probe(bridge);
-> +	return mvebu_pci_host_probe(bridge);
->  }
->  
->  static const struct of_device_id mvebu_pcie_of_match_table[] = {
-> -- 
-> 2.14.4
-> 
+Was submitted one group at a time, out of eventually 5, with more than a 
+month between them with no up-streaming action. They were reworked based 
+on comments and split into smaller pieces (the first 12 were a much 
+smaller set for example). Over the years (yes, it has been years) I have 
+settled on resending the 23 patches, still has 5 groups, and each 
+individual patch is tested one at a time, so they can be taken 
+individually from each set.
+
+ARM has complained that they want them all at one time because 
+individually they represent more work. So the whole set is here ready to go.
+>
+> It seems the patchset is already somewhat broken up into separate
+> sets, so I might recommend picking just one area and focus on
+> upstreaming that first. Maybe the in-arch cleanups for arm and then
+> arm64 and then maybe do the move to lib?
+
+They are in set-order, The first 12 can be taken one at a time to 
+modernize arm so that it is up-to-date with the assembler code for 
+arm64. More or less the order you just outlined.
+
+TahDah :-)
+
+-- Mark
