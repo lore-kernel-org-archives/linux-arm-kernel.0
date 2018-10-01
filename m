@@ -1,25 +1,56 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon,  1 Oct 2018 11:17:16 -0700
-Subject: [PATCH 3/3] soc: bcm: brcmstb: Fix re-entry point with a
- THUMB2_KERNEL
-In-Reply-To: <20180927192711.26455-4-f.fainelli@gmail.com>
-References: <20180927192711.26455-1-f.fainelli@gmail.com>
- <20180927192711.26455-4-f.fainelli@gmail.com>
-Message-ID: <20181001181716.31870-1-f.fainelli@gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Mon, 1 Oct 2018 17:45:45 +0200
+Subject: [PATCH v2] ARM: dts: sun8i-h3: add sy8106a to orange pi plus
+In-Reply-To: <20180929131830.13924-1-jorik@kippendief.biz>
+References: <20180929131830.13924-1-jorik@kippendief.biz>
+Message-ID: <20181001154545.iwxjgw5exg4psfy4@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Sep 2018 12:27:11 -0700, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> When the kernel is built with CONFIG_THUMB2_KERNEL we would set the
-> kernel's resume entry point to be a function that is already built as
-> Thumb-2 code while the boot agent doing the resume is in ARM mode, so
-> this does not work. There is a header label defined: cpu_resume_arm
-> which we can use to do the switching for us.
+On Sat, Sep 29, 2018 at 03:18:30PM +0200, jorik at kippendief.biz wrote:
+> From: Jorik Jonker <jorik@kippendief.biz>
 > 
-> Fixes: 0b741b8234c8 ("soc: bcm: brcmstb: Add support for S2/S3/S5 suspend states (ARM)")
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
+> The Orange Pi Plus board lacks voltage scaling capabilities in its
+> current form. This results in random freezes during boot when cpufreq is
+> enabled, probably due to wrong voltages.
+> 
+> This patch (more or less copy/paste from 06139c) does the following
+> things on this board:
+> - enable r_i2c
+> - add sy8106a to the r_i2c bus
+> - have the sy8106a regulate VDD of cpu
+> 
+> Since the Orange Pi Plus has the same PMU setup as the Orange Pi PC, I
+> simply took min/max/fixed/ramp from the latter DTS. In that file the
+> origin of the values are described by the following comment:
+> 
+>   "The datasheet uses 1.1V as the minimum value of VDD-CPUX,
+>   however both the Armbian DVFS table and the official one
+>   have operating points with voltage under 1.1V, and both
+>   DVFS table are known to work properly at the lowest
+>   operating point.
+>   Use 1.0V as the minimum voltage instead."
+> 
+> I have tested this on patch two Orange Pi Plus boards, by running a
+> kernel with this patch and do intermettent runs of cpuburn while
+> monitoring voltage, frequency and temperature. The board runs stable
+> across its operatiing points while showing a reasonable (< 40C)
+> temperature. My Orange Pi PC, when put to the same test, yields similar
+> stable results.
+> 
+> Signed-off-by: Jorik Jonker <jorik@kippendief.biz>
 
-Applied to drivers/next, thanks!
---
-Florian
+Queued for 4.21, thanks!
+Maxime
+
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181001/9ce8cc3e/attachment.sig>
