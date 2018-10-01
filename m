@@ -1,25 +1,36 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon,  1 Oct 2018 11:00:43 -0700
-Subject: [PATCH] ARM: dts: BCM5301X: Relicense BCM47094 file to the GPL
- 2.0+ / MIT
-In-Reply-To: <20180920112019.25622-1-zajec5@gmail.com>
-References: <20180920112019.25622-1-zajec5@gmail.com>
-Message-ID: <20181001180043.31157-1-f.fainelli@gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 1 Oct 2018 20:15:28 +0200 (CEST)
+Subject: RESEND [PATCH v6 11/12] lib: vdso: Add support for CLOCK_BOOTTIME
+In-Reply-To: <20181001175845.168430-12-salyzyn@android.com>
+References: <20181001175845.168430-1-salyzyn@android.com>
+ <20181001175845.168430-12-salyzyn@android.com>
+Message-ID: <alpine.DEB.2.21.1810012009010.32062@nanos.tec.linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Sep 2018 13:20:19 +0200, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
-> From: Rafa? Mi?ecki <rafal@milecki.pl>
-> 
-> This matches licensing used by other BCM5301X files and is preferred as:
-> 1) GPL 2.0+ makes it clearly compatible with Linux kernel
-> 2) MIT is also permissive but preferred over ISC
-> 
-> This file has been developed by me & once modified by Vivek.
-> 
-> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
-> ---
+On Mon, 1 Oct 2018, Mark Salyzyn wrote:
+>  
+> +static notrace int do_boottime(const struct vdso_data *vd, struct timespec *ts)
+> +{
+> +	u32 seq, mult, shift;
+> +	u64 nsec, cycle_last;
+> +	vdso_wtm_clock_nsec_t wtm_nsec;
+> +
+> +	/* open coding timespec_add_ns to save a ts->tv_nsec = 0 */
+> +	ts->tv_sec = sec + __iter_div_u64_rem(nsec, NSEC_PER_SEC, &nsec);
+> +	ts->tv_nsec = nsec;
+> +
+> +	return 0;
+> +}
+> +
 
-Applied to devicetree/next, thanks!
---
-Florian
+Instead of adding yet another copy of the same code you might want to look
+at the rework I did for the x86 vdso in order to support CLOCK_TAI w/o
+running into the issue of the clock switch case being compiled into a jump
+table and then the compile asking for retpoline.
+
+  http://lkml.kernel.org/r/20180917124533.329334911 at linutronix.de
+
+Thanks,
+
+	tglx
