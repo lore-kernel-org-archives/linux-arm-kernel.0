@@ -1,22 +1,34 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 1 Oct 2018 16:45:19 +0100
-Subject: [PATCH 1/2] KVM: arm/arm64: Rename kvm_arm_config_vm to
- kvm_arm_setup_stage2
-In-Reply-To: <20181001130656.36999-2-marc.zyngier@arm.com>
-References: <20181001130656.36999-1-marc.zyngier@arm.com>
- <20181001130656.36999-2-marc.zyngier@arm.com>
-Message-ID: <9f463e06-ae91-216c-10cd-6b3d023c59d0@arm.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Mon, 1 Oct 2018 17:32:07 +0200
+Subject: [GIT PULL] iommu/arm-smmu: Updates for 4.20
+In-Reply-To: <20181001142706.GB9716@arm.com>
+References: <20181001142706.GB9716@arm.com>
+Message-ID: <20181001153207.GA27372@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/2018 02:06 PM, Marc Zyngier wrote:
-> VM tends to be a very overloaded term in KVM, so let's keep it
-> to describe the virtual machine. For the virtual memory setup,
-> let's use the "stage2" suffix.
+Hi Will,
+
+On Mon, Oct 01, 2018 at 03:27:06PM +0100, Will Deacon wrote:
+> Please pull these Arm SMMU updates for 4.20. The big thing here is the
+> long-awaited "lazy" invalidation mode, using the generic timer-based
+> infrastructure for moving TLB invalidation out of the fast-path. Thanks
+> to Zhen Lei for the initial work here, and to Robin for getting it into
+> shape for upstream.
+
+I am glad to see this used on ARM now too :)
+
+> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/updates
 
-The intention was that the function would serve as the backend check
-for the vm_type argument. That said, I am fine with the changes, FWIW:
+Pulled, thanks.
 
-Reviewed-by : Suzuki K Poulose <suzuki.poulose@arm.com>
+
+Regards,
+
+	Joerg
