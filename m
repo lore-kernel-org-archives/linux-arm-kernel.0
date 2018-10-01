@@ -1,42 +1,46 @@
-From: leoyang.li@nxp.com (Li Yang)
-Date: Mon,  1 Oct 2018 17:58:27 -0500
-Subject: [GIT PULL] fixes for soc/fsl drivers for v4.19 take 2
-Message-ID: <20181001225827.21946-1-leoyang.li@nxp.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 1 Oct 2018 16:29:52 -0700
+Subject: [PATCH] input: xilinx_ps2: Convert to using %pOFn instead of
+ device_node.name
+In-Reply-To: <20181001214351.13230-2-robh@kernel.org>
+References: <20181001214351.13230-1-robh@kernel.org>
+ <20181001214351.13230-2-robh@kernel.org>
+Message-ID: <20181001232952.GB194397@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi arm-soc maintainers,
+On Mon, Oct 01, 2018 at 04:43:49PM -0500, Rob Herring wrote:
+> In preparation to remove the node name pointer from struct device_node,
+> convert printf users to use the %pOFn format specifier.
+> 
+> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: linux-input at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Rob Herring <robh@kernel.org>
 
-Please merge the updated fix for the following issue.
+Applied, thank you.
 
-Regards,
-Leo
+> ---
+>  drivers/input/serio/xilinx_ps2.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/input/serio/xilinx_ps2.c b/drivers/input/serio/xilinx_ps2.c
+> index 07de1b49293c..6615c02a08fd 100644
+> --- a/drivers/input/serio/xilinx_ps2.c
+> +++ b/drivers/input/serio/xilinx_ps2.c
+> @@ -245,7 +245,7 @@ static int xps2_of_probe(struct platform_device *ofdev)
+>  	unsigned int irq;
+>  	int error;
+>  
+> -	dev_info(dev, "Device Tree Probing \'%s\'\n", dev->of_node->name);
+> +	dev_info(dev, "Device Tree Probing \'%pOFn\'\n", dev->of_node);
+>  
+>  	/* Get iospace for the device */
+>  	error = of_address_to_resource(dev->of_node, 0, &r_mem);
+> -- 
+> 2.17.1
+> 
 
-The following changes since commit 96fc74333f84cfdf8d434c6c07254e215e2aad00:
-
-  soc: fsl: qe: Fix copy/paste bug in ucc_get_tdm_sync_shift() (2018-09-25 13:57:26 -0700)
-
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/leo/linux.git soc-fsl-fix-v4.19-2
-
-for you to fetch changes up to 5a1eb8b9542884592a018829bb1ff20c9695d925:
-
-  soc: fsl: qman_portals: defer probe after qman's probe (2018-10-01 17:47:43 -0500)
-
-----------------------------------------------------------------
-NXP/FSL SoC driver fixes for v4.19 round 2
-
-- Fix crash of qman_portal by deferring its probe if qman is not probed
-
-----------------------------------------------------------------
-Laurentiu Tudor (2):
-      soc: fsl: qbman: add APIs to retrieve the probing status
-      soc: fsl: qman_portals: defer probe after qman's probe
-
- drivers/soc/fsl/qbman/bman_ccsr.c   | 11 +++++++++++
- drivers/soc/fsl/qbman/qman_ccsr.c   | 11 +++++++++++
- drivers/soc/fsl/qbman/qman_portal.c |  8 ++++++++
- include/soc/fsl/bman.h              |  8 ++++++++
- include/soc/fsl/qman.h              |  8 ++++++++
- 5 files changed, 46 insertions(+)
+-- 
+Dmitry
