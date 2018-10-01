@@ -1,9 +1,9 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon,  1 Oct 2018 15:20:00 +0800
-Subject: [GIT PULL 2/5] i.MX SoC changes for 4.20
+Date: Mon,  1 Oct 2018 15:20:02 +0800
+Subject: [GIT PULL 4/5] Freescale arm64 device tree updates for 4.20
 In-Reply-To: <20181001072003.16238-1-shawnguo@kernel.org>
 References: <20181001072003.16238-1-shawnguo@kernel.org>
-Message-ID: <20181001072003.16238-2-shawnguo@kernel.org>
+Message-ID: <20181001072003.16238-4-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,32 +13,37 @@ The following changes since commit 57361846b52bc686112da6ca5368d11210796804:
 
 are available in the Git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-soc-4.20
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-dt64-4.20
 
-for you to fetch changes up to c90dec00cc84942614bc41f75dc24a87b6d5763b:
+for you to fetch changes up to b739c177e1aeab532f355493439a1901b85be38c:
 
-  ARM: imx: add i.mx6ulz msl support (2018-09-30 15:31:40 +0800)
-
-----------------------------------------------------------------
-i.MX SoC update for 4.20:
- - Add ipg clock support in MMDC driver for registers access, so that
-   we will be safe even if the clock is not turned on by firmware.
- - Register pm_power_off handler to provide power off support for iMX6
-   based boards with external PMIC.
- - Add platform code support for i.MX 6ULZ SoC which is a derivative of
-   i.MX6ULL with some modules removed.
+  arm64: dts: fsl: Fix I2C and SPI bus warnings (2018-09-26 17:01:53 +0800)
 
 ----------------------------------------------------------------
-Anson Huang (2):
-      ARM: imx: add mmdc ipg clock operation for mmdc
-      ARM: imx: add i.mx6ulz msl support
+Freescale arm64 device tree update for 4.20:
+ - Add the second Dual UART device for LS208xA SoCs.
+ - Add necessary big-endian property for NOR device on LS104xA based
+   boards, remove unneeded big-endian property from IFC controller.
+ - DTC has new checks for I2C and SPI buses to land into 4.20.  A patch
+   from Rob to fix the bus node names and warnings in unit-addresses.
 
-Oleksij Rempel (1):
-      ARM: imx6: register pm_power_off handler if "fsl,pmic-stby-poweroff" is set
+----------------------------------------------------------------
+Kurt Kanzenbach (1):
+      arm64: dts: ls208xa: add second duart
 
- arch/arm/mach-imx/anatop.c  | 20 ++++++++++++++++++++
- arch/arm/mach-imx/cpu.c     |  3 +++
- arch/arm/mach-imx/mmdc.c    | 14 ++++++++++++++
- arch/arm/mach-imx/mxc.h     |  7 +++++++
- arch/arm/mach-imx/pm-imx6.c | 29 +++++++++++++++++++++++++++--
- 5 files changed, 71 insertions(+), 2 deletions(-)
+Prabhakar Kushwaha (2):
+      arm64: dts: Add big-endian in nor node for ls104xa
+      arm64: dts: fsl: remove big-endian field from IFC controller
+
+Rob Herring (1):
+      arm64: dts: fsl: Fix I2C and SPI bus warnings
+
+ arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi    |  2 +-
+ arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts |  2 ++
+ arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts |  2 ++
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi    |  8 ++++----
+ arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts |  2 ++
+ arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts |  4 ++--
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi    |  6 +++---
+ arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi    | 20 ++++++++++++++++++--
+ 8 files changed, 34 insertions(+), 12 deletions(-)
