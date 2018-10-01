@@ -1,74 +1,89 @@
 From: jagan@openedev.com (Jagan Teki)
-Date: Mon, 1 Oct 2018 13:25:59 +0530
-Subject: [linux-sunxi] Re: [PATCH 08/12] drm/sun4i: sun6i_mipi_dsi:
- Refactor vertical video start delay
-In-Reply-To: <20180929152758.g3goxwjud2ym5rft@flea>
+Date: Mon, 1 Oct 2018 13:39:17 +0530
+Subject: [linux-sunxi] Re: [PATCH 06/12] drm/sun4i: sun6i_mipi_dsi: Fix
+ VBP size calculation
+In-Reply-To: <20180929135302.ymdzapz5npvapti2@flea>
 References: <20180927114850.24565-1-jagan@amarulasolutions.com>
- <20180927114850.24565-9-jagan@amarulasolutions.com>
- <20180927171451.7iqt2nt2log5qojf@flea>
- <CAMty3ZDxpLwVDsgVMjX+6+uz89sQ1aZaXHHZ+-5aogrA4MHmqw@mail.gmail.com>
- <20180929152758.g3goxwjud2ym5rft@flea>
-Message-ID: <c6933daf-c445-ade4-a31b-f311ddae7256@openedev.com>
+ <20180927114850.24565-7-jagan@amarulasolutions.com>
+ <20180927152126.vovnvwmqdfpuxgdm@flea>
+ <CAMty3ZABx9Fod5W_T7JciZEsn7jGvuM-LsBFATdA=hQ2CVwELw@mail.gmail.com>
+ <20180929135302.ymdzapz5npvapti2@flea>
+Message-ID: <63b40c20-670b-1c53-bf5e-62f64e6e02f0@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 29 September 2018 08:57 PM, Maxime Ripard wrote:
-> On Thu, Sep 27, 2018 at 11:03:19PM +0530, Jagan Teki wrote:
->> On Thu, Sep 27, 2018 at 10:44 PM Maxime Ripard
->> <maxime.ripard@bootlin.com> wrote:
+On Saturday 29 September 2018 07:23 PM, Maxime Ripard wrote:
+> On Thu, Sep 27, 2018 at 09:50:34PM +0530, Jagan Teki wrote:
+>> On Thu, Sep 27, 2018 at 8:51 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
 >>>
->>> On Thu, Sep 27, 2018 at 05:18:46PM +0530, Jagan Teki wrote:
->>>> Accordingly to BPI-M64-bsp DE DSI code Video start delay
->>>> can be computed by subtracting total vertical timing with
->>>> front porch timing and with adding 1 delay line for TCON.
->>>
->>> This is what the current code is doing as well.
->>
->> The current code
->> return mode->vtotal - (mode->vsync_end - mode->vdisplay) + 1;
->>
->> (mode->vsync_end - mode->vdisplay) = front porch + sync
->>
->> but I'm updating here only front porch.
->>
->>>
->>>> This patch simply add the start_delay logic from BPI-M64-bsp,
->>>> w/o this new computation, the DSI on A64 encounter vblank time out.
+>>> On Thu, Sep 27, 2018 at 05:18:44PM +0530, Jagan Teki wrote:
+>>>> According to horizontal and vertical timings are defined
+>>>> per the diagram from include/drm/drm_modes.h
 >>>>
->>>> [CRTC:36:crtc-0] vblank wait timed out
+>>>> Back porch = [hv]total - [hv]sync_end
+>>>>
+>>>> So, update SUN6I_DSI_BASIC_SIZE0_VBP calculation as
+>>>> mode->vtotal - mode->vsync_end
 >>>>
 >>>> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 >>>> ---
->>>>   drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 12 +++++++++++-
->>>>   1 file changed, 11 insertions(+), 1 deletion(-)
+>>>>   drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 4 ++--
+>>>>   1 file changed, 2 insertions(+), 2 deletions(-)
 >>>>
 >>>> diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
->>>> index 9918fdb990ff..217db74c6dc3 100644
+>>>> index 1c7e42015645..599284971ab6 100644
 >>>> --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
 >>>> +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
->>>> @@ -358,7 +358,17 @@ static void sun6i_dsi_inst_init(struct sun6i_dsi *dsi,
->>>>   static u16 sun6i_dsi_get_video_start_delay(struct sun6i_dsi *dsi,
->>>>                                           struct drm_display_mode *mode)
->>>>   {
->>>> -     return mode->vtotal - (mode->vsync_end - mode->vdisplay) + 1;
->>>> +     u32 vfp = mode->vsync_start - mode->vdisplay;
+>>>> @@ -526,8 +526,8 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
+>>>>        regmap_write(dsi->regs, SUN6I_DSI_BASIC_SIZE0_REG,
+>>>>                     SUN6I_DSI_BASIC_SIZE0_VSA(mode->vsync_end -
+>>>>                                               mode->vsync_start) |
+>>>> -                  SUN6I_DSI_BASIC_SIZE0_VBP(mode->vsync_start -
+>>>> -                                            mode->vdisplay));
+>>>> +                  SUN6I_DSI_BASIC_SIZE0_VBP(mode->vtotal -
+>>>> +                                            mode->vsync_end));
+>>>
+>>> Is it purely theoretical, or did you find some source that back that?
 >>
->> let me explain this.
->>
->> Actual code from Allwinner
->> u32 vfp = panel->lcd_vt - panel->lcd_y - panel->lcd_vbp;
->>
->> So,
->>
->> => (panel->lcd_vt - panel->lcd_y) - (panel->lcd_vbp)
->> => (front porch + sync + back porch) - (back porch + sync)
+>> VSA is done as per that, sync_end - sync start would give sync time.
 > 
-> Unless Allwinner is doing something fishy, in which case that should
-> be mentionned, the back porch doesn't contain the sync pulse.
+> That's a different register though.
+> 
+>> VBP also done in BPI-M64-bsp[1] which results back porch existing code
+>> results fron porch.
+>>
+>> [1] https://github.com/BPI-SINOVOIP/BPI-M64-bsp/blob/master/linux-sunxi/drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c#L955
+> 
+> That code does back porch - sync length. Such a calculation doesn't
+> make much sense as is, but you're saying that it results in the front
+> porch. Again, what makes you say that?
 
-As per as I understand panel->lcd_vbp is not back porch timings value 
-which i used by drm. It is BSP DTS property value and actual back porch 
-is calculated as "panel->lcd_vbp - panel->sync"
+No what code shows is not a real back porch value used for drm it's 
+panel back porch value which is a DTS property in BSP.
+(I made wrong comment on previous mail as front porch, sorry)
 
+here is the real code
+
+from drivers/video/sunxi/disp2/disp/de/disp_lcd.c
 timmings->ver_sync_time= panel_info->lcd_vspw;
 timmings->ver_back_porch= panel_info->lcd_vbp-panel_info->lcd_vspw;
+
+
+u32 vbp = panel->lcd_vbp;
+u32 vspw = panel->lcd_vspw;
+dsi_dev[sel]->dsi_basic_size0.bits.vbp = vbp-vspw;
+
+So,
+
+dsi_dev[sel]->dsi_basic_size0.bits.vbp = panel->lcd_vbp - panel->lcd_vspw;
+
+=>  timmings->ver_back_porch + panel_info->lcd_vspw - panel_info->lcd_vspw
+=>  timmings->ver_back_porch
+=>  mode->vtotal - mode->end
+
+VSA, which a proper value.
+
+dsi_dev[sel]->dsi_basic_size0.bits.vsa = vspw;
+=> panel_info->lcd_vspw;
+=> timmings->ver_sync_time
+=> mode->vsync_end - mode->vsync_start
