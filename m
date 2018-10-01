@@ -1,39 +1,87 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 1 Oct 2018 10:39:25 +0800
-Subject: [GIT PULL] i.MX fixes for 4.19, round 2
-Message-ID: <20181001023923.GQ26692@dragon>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 1 Oct 2018 14:49:06 +0900
+Subject: [PATCH v3 6/9] kbuild: consolidate Devicetree dtb build rules
+In-Reply-To: <20180928154150.GA25013@bogus>
+References: <20180910150403.19476-1-robh@kernel.org>
+ <20180910150403.19476-7-robh@kernel.org>
+ <CAL_Jsq+=VbdcVLiwXbOA5d+R2YY6=2Pw2bQpci-jj-JvereD1A@mail.gmail.com>
+ <CAK7LNAQFqhWw+LwDoypGG=OP6tH4qf2tT=LvtchK2GoiNyzDXg@mail.gmail.com>
+ <CAMuHMdWEnoh97_jiDWMq=ke4PrhSFbToYnx91CPLBuq3mOGzoQ@mail.gmail.com>
+ <CAK7LNATkkOiYPj2RLubcgZ_z59Bhz4GkgWqPMbnaHBk7EisXLg@mail.gmail.com>
+ <20180928154150.GA25013@bogus>
+Message-ID: <CAK7LNATiSbwVfCRNsDOyksfq5wcv0pnNQYnMXdo2yRyE7fcn-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 57361846b52bc686112da6ca5368d11210796804:
+Hi Rob,
 
-  Linux 4.19-rc2 (2018-09-02 14:37:30 -0700)
 
-are available in the git repository at:
+2018?9?29?(?) 0:43 Rob Herring <robh@kernel.org>:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.19-2
+> +#
+> ---------------------------------------------------------------------------
+> +# Devicetree files
+> +
+> +ifneq ($(wildcard $(srctree)/arch/$(SRCARCH)/boot/dts/),)
+> +dtstree := arch/$(SRCARCH)/boot/dts
+> +endif
+> +
+> +ifneq ($(dtstree),)
+> +
+> +%.dtb : scripts_dtc
 
-for you to fetch changes up to 4d8d4712e47c028306149bda04b79f70325aefb0:
+%.dtb: prepare3 prepare
 
-  soc: imx: gpc: set DMA mask for PD platform devices (2018-09-26 10:38:38 +0800)
 
-----------------------------------------------------------------
-i.MX fixes for 4.19, round 2:
- - There appears an uninitialized DMA mask warning on i.MX GPC driver
-   with 4.19-rc kernel.  Set the DMA mask for powerdomain platform
-   device to fix the warning given by device core.
- - i.MX53 QSB board stops working when cpufreq driver is enabled,
-   because the default OPP table has the maximum CPU frequency at
-   1.2GHz, while the board is only capable of running 1GHz.  Fix up
-   the OPP table for the board to get it work with cpufreq driver.
+because we need to make sure KERNELRELEASE
+is correctly defined before dtbs_install happens.
 
-----------------------------------------------------------------
-Lucas Stach (1):
-      soc: imx: gpc: set DMA mask for PD platform devices
 
-Sascha Hauer (1):
-      ARM: dts: imx53-qsb: disable 1.2GHz OPP
+> +       $(Q)$(MAKE) $(build)=$(dtstree) $(dtstree)/$@
+> +
+> +PHONY += dtbs dtbs_install
+> +dtbs: scripts_dtc
 
- arch/arm/boot/dts/imx53-qsb-common.dtsi | 11 +++++++++++
- drivers/soc/imx/gpc.c                   |  1 +
- 2 files changed, 12 insertions(+)
+
+dtbs: prepare3 scripts_dtc
+
+
+
+> +       $(Q)$(MAKE) $(build)=$(dtstree)
+> +
+> +dtbs_install: dtbs
+
+
+Please do not have dtbs_install to depend on dtbs.
+
+No install targets should ever trigger building anything
+in the source tree.
+
+
+For the background, see the commit log of
+19514fc665ffbce624785f76ee7ad0ea6378a527
+
+
+
+
+> +       $(Q)$(MAKE) $(dtbinst)=$(dtstree)
+> +
+> +ifdef CONFIG_OF_EARLY_FLATTREE
+> +all: dtbs
+> +endif
+> +
+> +endif
+> +
+> +PHONY += scripts_dtc
+> +scripts_dtc: scripts_basic
+> +       $(Q)$(MAKE) $(build)=scripts/dtc
+> +
+>  #
+> ---------------------------------------------------------------------------
+>  # Modules
+>
+
+
+-- 
+Best Regards
+Masahiro Yamada
