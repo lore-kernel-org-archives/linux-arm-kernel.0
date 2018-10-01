@@ -1,54 +1,49 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 1 Oct 2018 18:46:01 +0100
-Subject: [GIT PULL] Late arm64 fixes for 4.19
-Message-ID: <20181001174600.GB14755@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 1 Oct 2018 18:56:22 +0100
+Subject: [PATCH] ARM: makefile: pass -march=armv4 to assembler even on
+ CPU32v3
+In-Reply-To: <20180930024904.14240-1-Jason@zx2c4.com>
+References: <20180930024904.14240-1-Jason@zx2c4.com>
+Message-ID: <20181001175622.GT30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+On Sun, Sep 30, 2018 at 04:49:04AM +0200, Jason A. Donenfeld wrote:
+> Per the discussion about half-way down in [1], the kernel doesn't
+> actually support the ARMv3 ISA, but selects it for some ARMv4 ISA
+> hardware that benefits from ARMv3 code generation.
 
-Please pull these late arm64 fixes for 4.19. Details in the tag, but we've
-fixed a hugetlb livelock issue that was reported by Fujitsu as well as
-removing some useless flexibility in our KVM SET_ONE_REG ioctl().
+The issue is to do with the half-word stores in the ARMv4 ISA, which
+need to be avoided on StrongARM RiscPC - the bus from the processor
+card (which was designed for ARM610 and ARM710) does not support
+anything except 8-bit and 32-bit accesses, so the 16-bit load/store
+instructions don't work correctly.
 
-Cheers,
+Obviously, the reason for having the compiler use ARMv3 is to avoid
+those instructions which we have no other way to prevent - however,
+the use of ARMv3 with the assembler ensures that ldrh/strh are not
+accidentally used.
 
-Will
+We could argue that the ARMv3 assembly files are now stable, so the
+chances of ldrh/strh being introduced is low, which would make this
+change tolerable, but the commit message needs to spell out that
+we lose this protection.
 
---->8
+> Such a consideration,
+> then, only applies to the compiler but not to the assembler. This commit
+> passes -march=armv4 to the assembler in those cases, so that code
+> written for ARMv4 will continue to compile and run fine, without needing
+> module-specific asflags-y overrides.
 
-The following changes since commit 6bf4ca7fbc85d80446ac01c0d1d77db4d91a6d84:
+Note that "code written for ARMv4" will not be usable on this platform
+if it makes use of ldrh/strh, so depending on which instructions the
+assembler is complaining about, it could very well be a real "you're
+doing something wrong" case.
 
-  Linux 4.19-rc5 (2018-09-23 19:15:18 +0200)
+The side effect of this patch is that such cases will now be hidden
+rather than evaluated on a case-by-case basis.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
-
-for you to fetch changes up to 2a3f93459d689d990b3ecfbe782fec89b97d3279:
-
-  arm64: KVM: Sanitize PSTATE.M when being set from userspace (2018-10-01 14:38:26 +0100)
-
-----------------------------------------------------------------
-Late arm64 fixes
-
-- Fix handling of young contiguous ptes for hugetlb mappings
-
-- Fix livelock when taking access faults on contiguous hugetlb mappings
-
-- Tighten up register accesses via KVM SET_ONE_REG ioctl()s
-
-----------------------------------------------------------------
-Dave Martin (1):
-      arm64: KVM: Tighten guest core register access from userspace
-
-Marc Zyngier (1):
-      arm64: KVM: Sanitize PSTATE.M when being set from userspace
-
-Steve Capper (2):
-      arm64: hugetlb: Fix handling of young ptes
-      arm64: hugetlb: Avoid unnecessary clearing in huge_ptep_set_access_flags
-
- arch/arm64/kvm/guest.c      | 55 ++++++++++++++++++++++++++++++++++++++++++++-
- arch/arm64/mm/hugetlbpage.c | 50 +++++++++++++++++++++++++++++++++++------
- 2 files changed, 97 insertions(+), 8 deletions(-)
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 14.8Mbps down 650kbps up
+According to speedtest.net: 13Mbps down 490kbps up
