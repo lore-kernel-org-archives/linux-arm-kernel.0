@@ -1,117 +1,155 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon,  1 Oct 2018 16:54:38 +0100
-Subject: [PATCH v8 4/9] KVM: arm/arm64: Introduce helpers to manipulate page
- table entries
+Date: Mon,  1 Oct 2018 16:54:41 +0100
+Subject: [PATCH v8 7/9] KVM: arm64: Support handling access faults for PUD
+ hugepages
 In-Reply-To: <20181001155443.23032-1-punit.agrawal@arm.com>
 References: <20181001155443.23032-1-punit.agrawal@arm.com>
-Message-ID: <20181001155443.23032-5-punit.agrawal@arm.com>
+Message-ID: <20181001155443.23032-8-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce helpers to abstract architectural handling of the conversion
-of pfn to page table entries and marking a PMD page table entry as a
-block entry.
+In preparation for creating larger hugepages at Stage 2, extend the
+access fault handling at Stage 2 to support PUD hugepages when
+encountered.
 
-The helpers are introduced in preparation for supporting PUD hugepages
-at stage 2 - which are supported on arm64 but do not exist on arm.
+Provide trivial helpers for arm32 to allow sharing of code.
 
 Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
 Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+Cc: Christoffer Dall <christoffer.dall@arm.com>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Russell King <linux@armlinux.org.uk>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/kvm_mmu.h   |  5 +++++
- arch/arm64/include/asm/kvm_mmu.h |  5 +++++
- virt/kvm/arm/mmu.c               | 14 ++++++++------
- 3 files changed, 18 insertions(+), 6 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h   |  9 +++++++++
+ arch/arm64/include/asm/kvm_mmu.h |  7 +++++++
+ arch/arm64/include/asm/pgtable.h |  6 ++++++
+ virt/kvm/arm/mmu.c               | 22 +++++++++++-----------
+ 4 files changed, 33 insertions(+), 11 deletions(-)
 
 diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 5ad1a54f98dc..e77212e53e77 100644
+index 26a2ab05b3f6..95b34aad0dc8 100644
 --- a/arch/arm/include/asm/kvm_mmu.h
 +++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -82,6 +82,11 @@ void kvm_clear_hyp_idmap(void);
- #define kvm_mk_pud(pmdp)	__pud(__pa(pmdp) | PMD_TYPE_TABLE)
- #define kvm_mk_pgd(pudp)	({ BUILD_BUG(); 0; })
+@@ -85,6 +85,9 @@ void kvm_clear_hyp_idmap(void);
+ #define kvm_pfn_pte(pfn, prot)	pfn_pte(pfn, prot)
+ #define kvm_pfn_pmd(pfn, prot)	pfn_pmd(pfn, prot)
  
-+#define kvm_pfn_pte(pfn, prot)	pfn_pte(pfn, prot)
-+#define kvm_pfn_pmd(pfn, prot)	pfn_pmd(pfn, prot)
++#define kvm_pud_pfn(pud)	({ BUG(); 0; })
 +
-+#define kvm_pmd_mkhuge(pmd)	pmd_mkhuge(pmd)
++
+ #define kvm_pmd_mkhuge(pmd)	pmd_mkhuge(pmd)
+ 
+ /*
+@@ -108,6 +111,12 @@ static inline bool kvm_s2pud_exec(pud_t *pud)
+ 	return false;
+ }
+ 
++static inline pud_t kvm_s2pud_mkyoung(pud_t pud)
++{
++	BUG();
++	return pud;
++}
 +
  static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
  {
  	pte_val(pte) |= L_PTE_S2_RDWR;
 diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 77b1af9e64db..baabea0cbb66 100644
+index c06ef3be8ca9..b93e5167728f 100644
 --- a/arch/arm64/include/asm/kvm_mmu.h
 +++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -184,6 +184,11 @@ void kvm_clear_hyp_idmap(void);
- #define kvm_mk_pgd(pudp)					\
- 	__pgd(__phys_to_pgd_val(__pa(pudp)) | PUD_TYPE_TABLE)
+@@ -187,6 +187,8 @@ void kvm_clear_hyp_idmap(void);
+ #define kvm_pfn_pte(pfn, prot)		pfn_pte(pfn, prot)
+ #define kvm_pfn_pmd(pfn, prot)		pfn_pmd(pfn, prot)
  
-+#define kvm_pfn_pte(pfn, prot)		pfn_pte(pfn, prot)
-+#define kvm_pfn_pmd(pfn, prot)		pfn_pmd(pfn, prot)
++#define kvm_pud_pfn(pud)		pud_pfn(pud)
 +
-+#define kvm_pmd_mkhuge(pmd)		pmd_mkhuge(pmd)
-+
+ #define kvm_pmd_mkhuge(pmd)		pmd_mkhuge(pmd)
+ 
  static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
- {
- 	pte_val(pte) |= PTE_S2_RDWR;
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index ec64d21c6571..21079eb5bc15 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -607,7 +607,7 @@ static void create_hyp_pte_mappings(pmd_t *pmd, unsigned long start,
- 	addr = start;
- 	do {
- 		pte = pte_offset_kernel(pmd, addr);
--		kvm_set_pte(pte, pfn_pte(pfn, prot));
-+		kvm_set_pte(pte, kvm_pfn_pte(pfn, prot));
- 		get_page(virt_to_page(pte));
- 		pfn++;
- 	} while (addr += PAGE_SIZE, addr != end);
-@@ -1202,7 +1202,7 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
- 	pfn = __phys_to_pfn(pa);
- 
- 	for (addr = guest_ipa; addr < end; addr += PAGE_SIZE) {
--		pte_t pte = pfn_pte(pfn, PAGE_S2_DEVICE);
-+		pte_t pte = kvm_pfn_pte(pfn, PAGE_S2_DEVICE);
- 
- 		if (writable)
- 			pte = kvm_s2pte_mkwrite(pte);
-@@ -1619,8 +1619,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 		(fault_status == FSC_PERM && stage2_is_exec(kvm, fault_ipa));
- 
- 	if (hugetlb && vma_pagesize == PMD_SIZE) {
--		pmd_t new_pmd = pfn_pmd(pfn, mem_type);
--		new_pmd = pmd_mkhuge(new_pmd);
-+		pmd_t new_pmd = kvm_pfn_pmd(pfn, mem_type);
-+
-+		new_pmd = kvm_pmd_mkhuge(new_pmd);
-+
- 		if (writable)
- 			new_pmd = kvm_s2pmd_mkwrite(new_pmd);
- 
-@@ -1629,7 +1631,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 
- 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
- 	} else {
--		pte_t new_pte = pfn_pte(pfn, mem_type);
-+		pte_t new_pte = kvm_pfn_pte(pfn, mem_type);
- 
- 		if (writable) {
- 			new_pte = kvm_s2pte_mkwrite(new_pte);
-@@ -1886,7 +1888,7 @@ void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte)
- 	 * just like a translation fault and clean the cache to the PoC.
- 	 */
- 	clean_dcache_guest_page(pfn, PAGE_SIZE);
--	stage2_pte = pfn_pte(pfn, PAGE_S2);
-+	stage2_pte = kvm_pfn_pte(pfn, PAGE_S2);
- 	handle_hva_to_gpa(kvm, hva, end, &kvm_set_spte_handler, &stage2_pte);
+@@ -266,6 +268,11 @@ static inline bool kvm_s2pud_exec(pud_t *pudp)
+ 	return !(READ_ONCE(pud_val(*pudp)) & PUD_S2_XN);
  }
  
++static inline pud_t kvm_s2pud_mkyoung(pud_t pud)
++{
++	return pud_mkyoung(pud);
++}
++
+ #define hyp_pte_table_empty(ptep) kvm_page_empty(ptep)
+ 
+ #ifdef __PAGETABLE_PMD_FOLDED
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 1bdeca8918a6..a64a5c35beb1 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -314,6 +314,11 @@ static inline pte_t pud_pte(pud_t pud)
+ 	return __pte(pud_val(pud));
+ }
+ 
++static inline pud_t pte_pud(pte_t pte)
++{
++	return __pud(pte_val(pte));
++}
++
+ static inline pmd_t pud_pmd(pud_t pud)
+ {
+ 	return __pmd(pud_val(pud));
+@@ -380,6 +385,7 @@ static inline int pmd_protnone(pmd_t pmd)
+ #define pfn_pmd(pfn,prot)	__pmd(__phys_to_pmd_val((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot))
+ #define mk_pmd(page,prot)	pfn_pmd(page_to_pfn(page),prot)
+ 
++#define pud_mkyoung(pud)	pte_pud(pte_mkyoung(pud_pte(pud)))
+ #define pud_write(pud)		pte_write(pud_pte(pud))
+ 
+ #define __pud_to_phys(pud)	__pte_to_phys(pud_pte(pud))
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 5fd1eae7d964..1401dc015a22 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1706,6 +1706,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+  */
+ static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
+ {
++	pud_t *pud;
+ 	pmd_t *pmd;
+ 	pte_t *pte;
+ 	kvm_pfn_t pfn;
+@@ -1715,24 +1716,23 @@ static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
+ 
+ 	spin_lock(&vcpu->kvm->mmu_lock);
+ 
+-	pmd = stage2_get_pmd(vcpu->kvm, NULL, fault_ipa);
+-	if (!pmd || pmd_none(*pmd))	/* Nothing there */
++	if (!stage2_get_leaf_entry(vcpu->kvm, fault_ipa, &pud, &pmd, &pte))
+ 		goto out;
+ 
+-	if (pmd_thp_or_huge(*pmd)) {	/* THP, HugeTLB */
++	if (pud) {		/* HugeTLB */
++		*pud = kvm_s2pud_mkyoung(*pud);
++		pfn = kvm_pud_pfn(*pud);
++		pfn_valid = true;
++	} else	if (pmd) {	/* THP, HugeTLB */
+ 		*pmd = pmd_mkyoung(*pmd);
+ 		pfn = pmd_pfn(*pmd);
+ 		pfn_valid = true;
+-		goto out;
++	} else {
++		*pte = pte_mkyoung(*pte);	/* Just a page... */
++		pfn = pte_pfn(*pte);
++		pfn_valid = true;
+ 	}
+ 
+-	pte = pte_offset_kernel(pmd, fault_ipa);
+-	if (pte_none(*pte))		/* Nothing there either */
+-		goto out;
+-
+-	*pte = pte_mkyoung(*pte);	/* Just a page... */
+-	pfn = pte_pfn(*pte);
+-	pfn_valid = true;
+ out:
+ 	spin_unlock(&vcpu->kvm->mmu_lock);
+ 	if (pfn_valid)
 -- 
 2.18.0
