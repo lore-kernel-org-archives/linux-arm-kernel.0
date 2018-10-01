@@ -1,320 +1,144 @@
-From: salyzyn@android.com (Mark Salyzyn)
-Date: Mon,  1 Oct 2018 10:58:23 -0700
-Subject: RESEND [PATCH v5 03/12] arm: vdso: inline assembler operations to
- compiler.h
-In-Reply-To: <20181001175845.168430-1-salyzyn@android.com>
-References: <20181001175845.168430-1-salyzyn@android.com>
-Message-ID: <20181001175845.168430-4-salyzyn@android.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 01 Oct 2018 21:48:10 +0200
+Subject: [PATCH] ARM: disable ARMv6 for Clang older than 8.0
+In-Reply-To: <20181001165342.GR30658@n2100.armlinux.org.uk>
+References: <20180930222230.24167-1-stefan@agner.ch>
+ <aa1fbf64fc1190674abb9ecae3ffe1a39e1e60c0.camel@perches.com>
+ <20181001165342.GR30658@n2100.armlinux.org.uk>
+Message-ID: <ec3341f756c642908996348c9daceb19@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Take an effort to recode the arm64 vdso code from assembler to C
-previously submitted by Andrew Pinski <apinski@cavium.com>, rework
-it for use in both arm and arm64, overlapping any optimizations
-for each architecture. But instead of landing it in arm64, land the
-result into lib/vdso and unify both implementations to simplify
-future maintenance.
+On 01.10.2018 18:53, Russell King - ARM Linux wrote:
+> On Sun, Sep 30, 2018 at 04:48:20PM -0700, Joe Perches wrote:
+>> On Mon, 2018-10-01 at 00:22 +0200, Stefan Agner wrote:
+>> > The kernel passes the ArmV6K architecture to the compiler when
+>> > using the multi platform selection and enabling ARMv6. Clang
+>> > older than version 8.0 emit assembly with an non-existing CPU,
+>> > which then makes the assembler fail. Prevent the user from
+>> > selecting ARMv6 when using Clang before 8.0.
+>> >
+>> > Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> > Link: https://github.com/ClangBuiltLinux/linux/issues/55
+>> > ---
+>> >  arch/arm/Kconfig | 1 +
+>> >  1 file changed, 1 insertion(+)
+>> >
+>> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> > index e8cd55a5b04c..8da160757381 100644
+>> > --- a/arch/arm/Kconfig
+>> > +++ b/arch/arm/Kconfig
+>> > @@ -671,6 +671,7 @@ config ARCH_MULTI_V4_V5
+>> >
+>> >  config ARCH_MULTI_V6
+>> >  	bool "ARMv6 based platforms (ARM11)"
+>> > +	depends on !CC_IS_CLANG || CLANG_VERSION>=80000
+>> >  	select ARCH_MULTI_V6_V7
+>> >  	select CPU_V6K
+>> >
+>>
+>> Perhaps it'd be better to avoid this in selection
+>> criteria in Kconfig and instead add this to
+>> include/linux/compiler_clang.h
+>> ---
+>>  include/linux/compiler-clang.h | 4 ++++
+>>  1 file changed, 4 insertions(+)
+>>
+>> diff --git a/include/linux/compiler-clang.h b/include/linux/compiler-clang.h
+>> index b1ce500fe8b3..90fd16c85359 100644
+>> --- a/include/linux/compiler-clang.h
+>> +++ b/include/linux/compiler-clang.h
+>> @@ -3,6 +3,10 @@
+>>  #error "Please don't include <linux/compiler-clang.h> directly, include <linux/compiler.h> instead."
+>>  #endif
+>>
+>> +#if defined(CONFIG_ARCH_MULTI_V6) && CLANG_VERSION < 80000
+>> +# error Sorry, your compiler is too old - please upgrade it.
+>> +#endif
+> 
+> (a) does it makes sense to have arch CONFIG_* in linux/*.h?  It could
+>     instead go in arch/arm/kernel/asm-offsets.c, where we have the other
+>     tests similar to this for GCC.
+> 
+> (b) do we get far enough that the #error will be generated before the
+>     reported assembler error happens?  IOW, would the assembler error
+>     mask this #error?
+> 
+> I think it needs confirmation that a #error for this problem results
+> in the desired behaviour.
 
-Move compiler-specific code to a local compiler.h file:
+Adding the above #error errors out before the assembler error happen in
+both cases.
 
-- CONFIG_AEABI dependency check.
-- System call fallback functions standardized into a
-  DEFINE_FALLBACK macro.
-- Replace arch_counter_get_cntvct() with arch_vdso_read_counter.
-- Deal with architecture specific unresolved references emitted
-  by GCC.
-- Optimize handling of fallback calls in callers.
-- For time functions that always return success, do not waste time
-  checking return value for switch to fallback.
-- Optimize unlikely nullptr checking in __vdso_gettimeofday,
-  if tv null no need to proceed to fallback, as vdso is still
-  capable of filling in the tv values.
+However, adding it to include/linux/compiler-clang.h leads to a bunch of
+warnings too:
 
-Signed-off-by: Mark Salyzyn <salyzyn@android.com>
-Tested-by: Mark Salyzyn <salyzyn@android.com>
-Cc: James Morse <james.morse@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Andy Lutomirski <luto@amacapital.net>
-Cc: Dmitry Safonov <dsafonov@virtuozzo.com>
-Cc: John Stultz <john.stultz@linaro.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Laura Abbott <labbott@redhat.com>
-Cc: Kees Cook <keescook@chromium.org>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Andy Gross <andy.gross@linaro.org>
-Cc: Kevin Brodsky <kevin.brodsky@arm.com>
-Cc: Andrew Pinski <apinski@cavium.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Jeremy Linton <Jeremy.Linton@arm.com>
-Cc: android-kernel at android.com
+...
+  CC      kernel/bounds.s
+In file included from <built-in>:2:
+In file included from ././include/linux/compiler_types.h:59:
+./include/linux/compiler-clang.h:7:2: error: "Sorry, your compiler is
+too old - please upgrade it."
+#error "Sorry, your compiler is too old - please upgrade it."
+ ^
+In file included from kernel/bounds.c:10:
+In file included from ./include/linux/page-flags.h:10:
+In file included from ./include/linux/bug.h:5:
+In file included from ./arch/arm/include/asm/bug.h:60:
+In file included from ./include/asm-generic/bug.h:18:
+In file included from ./include/linux/kernel.h:11:
+./include/linux/bitops.h:53:41: warning: shift count >= width of type
+[-Wshift-count-overflow]
+        return sizeof(w) == 4 ? hweight32(w) : hweight64(w);
+                                               ^~~~~~~~~~~~
+./include/asm-generic/bitops/const_hweight.h:29:49: note: expanded from
+macro 'hweight64'
+#define hweight64(w) (__builtin_constant_p(w) ? __const_hweight64(w) :
+__arch_hweight64(w))
+                                                ^~~~~~~~~~~~~~~~~~~~
+./include/asm-generic/bitops/const_hweight.h:21:76: note: expanded from
+macro '__const_hweight64'
+#define __const_hweight64(w) (__const_hweight32(w) +
+__const_hweight32((w) >> 32))
+                                                                        
+  ^  ~~
+./include/asm-generic/bitops/const_hweight.h:20:49: note: expanded from
+macro '__const_hweight32'
+#define __const_hweight32(w) (__const_hweight16(w) +
+__const_hweight16((w) >> 16))
+                                                ^
+./include/asm-generic/bitops/const_hweight.h:19:48: note: expanded from
+macro '__const_hweight16'
+#define __const_hweight16(w) (__const_hweight8(w)  +
+__const_hweight8((w)  >> 8 ))
+                                               ^
+./include/asm-generic/bitops/const_hweight.h:10:9: note: expanded from
+macro '__const_hweight8'
+         ((!!((w) & (1ULL << 0))) +     \
+               ^
 
-v2:
-- split first CL into 3 of 7 pieces
 
-v4:
-- switch to arch_vdso_read_counter as common API
-- update commit message to reflect overall reasoning
+Including it to arch/arm/kernel/asm-offsets.c does not lead to those
+warnings:
 
-v5:
-- comment about asm/arch_timer.h and asm/processor.h regarding why
-  they have been added in compiler.h for porting clarity.
-- add linux/compiler.h in vgettimeofday.c because of notrace.
-- remove unnecessary dependency on linux/hrtimer.h
----
- arch/arm/vdso/compiler.h      |  69 +++++++++++++++++++++
- arch/arm/vdso/vgettimeofday.c | 109 +++++++++-------------------------
- 2 files changed, 96 insertions(+), 82 deletions(-)
- create mode 100644 arch/arm/vdso/compiler.h
+...
+  CC      kernel/bounds.s                                               
+                                                                   
+  UPD     include/generated/bounds.h                                    
+                                                                   
+  CC      arch/arm/kernel/asm-offsets.s                                 
+                                                                   
+arch/arm/kernel/asm-offsets.c:51:2: error: "Sorry, your compiler is too
+old - please upgrade it."                                           
+#error "Sorry, your compiler is too old - please upgrade it."           
+                                                                   
+ ^                                                                      
+                                                                   
+1 error generated.                                                      
+                                                                   
+make[1]: *** [Kbuild:56: arch/arm/kernel/asm-offsets.s] Error 1         
+                                                                   
+make: *** [Makefile:1100: prepare0] Error 2
 
-diff --git a/arch/arm/vdso/compiler.h b/arch/arm/vdso/compiler.h
-new file mode 100644
-index 000000000000..af24502797e8
---- /dev/null
-+++ b/arch/arm/vdso/compiler.h
-@@ -0,0 +1,69 @@
-+/*
-+ * Userspace implementations of fallback calls
-+ *
-+ * Copyright (C) 2017 Cavium, Inc.
-+ * Copyright (C) 2012 ARM Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ * Author: Will Deacon <will.deacon@arm.com>
-+ * Rewriten into C by: Andrew Pinski <apinski@cavium.com>
-+ */
-+
-+#ifndef __VDSO_COMPILER_H
-+#define __VDSO_COMPILER_H
-+
-+#include <asm/arch_timer.h>	/* for arch_counter_get_cntvct()	*/
-+#include <asm/processor.h>	/* for cpu_relax()			*/
-+#include <asm/unistd.h>
-+#include <linux/compiler.h>
-+
-+#ifndef CONFIG_AEABI
-+#error This code depends on AEABI system call conventions
-+#endif
-+
-+#define DEFINE_FALLBACK(name, type_arg1, name_arg1, type_arg2, name_arg2) \
-+static notrace long name##_fallback(type_arg1 _##name_arg1,		  \
-+				    type_arg2 _##name_arg2)		  \
-+{									  \
-+	register type_arg1 name_arg1 asm("r0") = _##name_arg1;		  \
-+	register type_arg2 name_arg2 asm("r1") = _##name_arg2;		  \
-+	register long ret asm ("r0");					  \
-+	register long nr asm("r7") = __NR_##name;			  \
-+									  \
-+	asm volatile(							  \
-+	"	swi #0\n"						  \
-+	: "=r" (ret)							  \
-+	: "r" (name_arg1), "r" (name_arg2), "r" (nr)			  \
-+	: "memory");							  \
-+									  \
-+	return ret;							  \
-+}
-+
-+#define arch_vdso_read_counter() arch_counter_get_cntvct()
-+
-+/* Avoid unresolved references emitted by GCC */
-+
-+void __aeabi_unwind_cpp_pr0(void)
-+{
-+}
-+
-+void __aeabi_unwind_cpp_pr1(void)
-+{
-+}
-+
-+void __aeabi_unwind_cpp_pr2(void)
-+{
-+}
-+
-+#endif /* __VDSO_COMPILER_H */
-diff --git a/arch/arm/vdso/vgettimeofday.c b/arch/arm/vdso/vgettimeofday.c
-index 2474c17dc356..522094b147a2 100644
---- a/arch/arm/vdso/vgettimeofday.c
-+++ b/arch/arm/vdso/vgettimeofday.c
-@@ -22,21 +22,16 @@
-  * Reworked and rebased over arm version by: Mark Salyzyn <salyzyn@android.com>
-  */
- 
--#include <linux/compiler.h>
--#include <linux/hrtimer.h>
--#include <linux/time.h>
--#include <asm/arch_timer.h>
- #include <asm/barrier.h>
--#include <asm/bug.h>
--#include <asm/page.h>
--#include <asm/unistd.h>
--
--#ifndef CONFIG_AEABI
--#error This code depends on AEABI system call conventions
--#endif
-+#include <linux/compiler.h>	/* for notrace				*/
-+#include <linux/time.h>
- 
-+#include "compiler.h"
- #include "datapage.h"
- 
-+DEFINE_FALLBACK(gettimeofday, struct timeval *, tv, struct timezone *, tz)
-+DEFINE_FALLBACK(clock_gettime, clockid_t, clock, struct timespec *, ts)
-+
- static notrace u32 vdso_read_begin(const struct vdso_data *vd)
- {
- 	u32 seq;
-@@ -63,23 +58,6 @@ static notrace int vdso_read_retry(const struct vdso_data *vd, u32 start)
- 	return seq != start;
- }
- 
--static notrace long clock_gettime_fallback(clockid_t _clkid,
--					   struct timespec *_ts)
--{
--	register struct timespec *ts asm("r1") = _ts;
--	register clockid_t clkid asm("r0") = _clkid;
--	register long ret asm ("r0");
--	register long nr asm("r7") = __NR_clock_gettime;
--
--	asm volatile(
--	"	swi #0\n"
--	: "=r" (ret)
--	: "r" (clkid), "r" (ts), "r" (nr)
--	: "memory");
--
--	return ret;
--}
--
- static notrace int do_realtime_coarse(const struct vdso_data *vd,
- 				      struct timespec *ts)
- {
-@@ -127,7 +105,7 @@ static notrace u64 get_ns(const struct vdso_data *vd)
- 	u64 cycle_now;
- 	u64 nsec;
- 
--	cycle_now = arch_counter_get_cntvct();
-+	cycle_now = arch_vdso_read_counter();
- 
- 	cycle_delta = (cycle_now - vd->cs_cycle_last) & vd->cs_mask;
- 
-@@ -200,85 +178,52 @@ static notrace int do_monotonic(const struct vdso_data *vd, struct timespec *ts)
- 
- #endif /* CONFIG_ARM_ARCH_TIMER */
- 
--notrace int __vdso_clock_gettime(clockid_t clkid, struct timespec *ts)
-+notrace int __vdso_clock_gettime(clockid_t clock, struct timespec *ts)
- {
--	int ret = -1;
--
- 	const struct vdso_data *vd = __get_datapage();
- 
--	switch (clkid) {
-+	switch (clock) {
- 	case CLOCK_REALTIME_COARSE:
--		ret = do_realtime_coarse(vd, ts);
-+		do_realtime_coarse(vd, ts);
- 		break;
- 	case CLOCK_MONOTONIC_COARSE:
--		ret = do_monotonic_coarse(vd, ts);
-+		do_monotonic_coarse(vd, ts);
- 		break;
- 	case CLOCK_REALTIME:
--		ret = do_realtime(vd, ts);
-+		if (do_realtime(vd, ts))
-+			goto fallback;
- 		break;
- 	case CLOCK_MONOTONIC:
--		ret = do_monotonic(vd, ts);
-+		if (do_monotonic(vd, ts))
-+			goto fallback;
- 		break;
- 	default:
--		break;
-+		goto fallback;
- 	}
- 
--	if (ret)
--		ret = clock_gettime_fallback(clkid, ts);
--
--	return ret;
--}
--
--static notrace long gettimeofday_fallback(struct timeval *_tv,
--					  struct timezone *_tz)
--{
--	register struct timezone *tz asm("r1") = _tz;
--	register struct timeval *tv asm("r0") = _tv;
--	register long ret asm ("r0");
--	register long nr asm("r7") = __NR_gettimeofday;
--
--	asm volatile(
--	"	swi #0\n"
--	: "=r" (ret)
--	: "r" (tv), "r" (tz), "r" (nr)
--	: "memory");
--
--	return ret;
-+	return 0;
-+fallback:
-+	return clock_gettime_fallback(clock, ts);
- }
- 
- notrace int __vdso_gettimeofday(struct timeval *tv, struct timezone *tz)
- {
--	struct timespec ts;
--	int ret;
--
- 	const struct vdso_data *vd = __get_datapage();
- 
--	ret = do_realtime(vd, &ts);
--	if (ret)
--		return gettimeofday_fallback(tv, tz);
-+	if (likely(tv != NULL)) {
-+		struct timespec ts;
-+
-+		if (do_realtime(vd, &ts))
-+			return gettimeofday_fallback(tv, tz);
- 
--	if (tv) {
- 		tv->tv_sec = ts.tv_sec;
- 		tv->tv_usec = ts.tv_nsec / 1000;
- 	}
--	if (tz) {
-+
-+	if (unlikely(tz != NULL)) {
- 		tz->tz_minuteswest = vd->tz_minuteswest;
- 		tz->tz_dsttime = vd->tz_dsttime;
- 	}
- 
--	return ret;
--}
--
--/* Avoid unresolved references emitted by GCC */
--
--void __aeabi_unwind_cpp_pr0(void)
--{
--}
--
--void __aeabi_unwind_cpp_pr1(void)
--{
--}
--
--void __aeabi_unwind_cpp_pr2(void)
--{
-+	return 0;
- }
--- 
-2.19.0.605.g01d371f741-goog
+--
+Stefan
