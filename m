@@ -1,46 +1,29 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 1 Oct 2018 16:01:47 -0500
-Subject: [BISECTED] Regression: Solidrun Clearfog Base won't boot since
- "PCI: mvebu: Only remap I/O space if configured"
-In-Reply-To: <20181001145148.158c6207@windsurf>
-References: <20180924101213.GO30658@n2100.armlinux.org.uk>
- <20180924122614.70738b5c@windsurf>
- <20180924111341.GP30658@n2100.armlinux.org.uk>
- <20180924141203.3df9707a@windsurf>
- <20180924124620.GA10322@e107981-ln.cambridge.arm.com>
- <20180924151040.5e57462b@windsurf>
- <20180924141512.GA11875@e107981-ln.cambridge.arm.com>
- <20180924165218.26c7c418@windsurf>
- <0f80dc88-dffe-4ca6-bb85-c4e5c967e0e1@cesnet.cz>
- <20181001145148.158c6207@windsurf>
-Message-ID: <20181001210147.GF142872@bhelgaas-glaptop.roam.corp.google.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 1 Oct 2018 16:09:18 -0500
+Subject: [PATCH] samples/rpmsg: Introduce a module parameter for message
+ count
+In-Reply-To: <2d904881-ec72-dd68-48ff-b8307642bc63@codeaurora.org>
+References: <20180911174643.26199-1-s-anna@ti.com>
+ <2d904881-ec72-dd68-48ff-b8307642bc63@codeaurora.org>
+Message-ID: <2134784b-8645-cbf3-41af-7c9cc800a146@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 01, 2018 at 02:51:48PM +0200, Thomas Petazzoni wrote:
-> Hello,
-> 
-> On Mon, 01 Oct 2018 12:56:37 +0200, Jan Kundr?t wrote:
-> 
-> > Thomas, Russell, Lorenzo,
-> > did you have time to convert this into a patch which can hit 4.19? I don't 
-> > see anything related in 4.19-rc6, but perhaps I missed something. Is there 
-> > something that I should test or otherwise help?
-> 
-> Sorry, I suddenly got busy (my second son arrived a few days earlier
-> than expected).
+Hi Trilok,
 
-Congratulations!
-
-> I just sent a proper patch with the proposal I made last week, after
-> testing on ClearFog and Armada XP GP. Note that on ClearFog, I only
-> tested that it fixes the panic at boot, since I didn't had any
-> mini-PCIe devices at hand. On Armada XP GP, I verified that an E1000E
-> NIC was still working as expected. Therefore, it would be useful if
-> you could test on your ClearFog platform with PCI devices connected.
+On 09/11/2018 01:17 PM, Trilok Soni wrote:
+> Bjorn,
 > 
-> Thanks a lot and sorry for the delay.
+>> ? ? #define MSG??????? "hello world!"
+>> -#define MSG_LIMIT??? 100
+>> +
+>> +static int count = 100;
+>> +module_param(count, int, 0644);
+> 
+> I thought Greg KH doesn't want any new code to have module_param call,
+> right? Are we Ok here or I am missing something here.
 
-And thanks for the patch!  No need to apologize for having a life :)
+Can you point me to the thread where this was discussed/decided?
 
-Bjorn
+regards
+Suman
