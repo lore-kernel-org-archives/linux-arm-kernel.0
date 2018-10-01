@@ -1,85 +1,42 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon,  1 Oct 2018 14:38:38 +0200
-Subject: [PATCH v6 0/8] drm/rockchip: migrate to common dw-mipi-dsi bridge and
- dual-dsi
-Message-ID: <20181001123845.11818-1-heiko@sntech.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon,  1 Oct 2018 14:06:56 +0100
+Subject: [PATCH 2/2] KVM: arm64: Drop __cpu_init_stage2 on the VHE path
+In-Reply-To: <20181001130656.36999-1-marc.zyngier@arm.com>
+References: <20181001130656.36999-1-marc.zyngier@arm.com>
+Message-ID: <20181001130656.36999-3-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Rockchip DSI driver was separate till now, not using the common
-bridge driver that was introduced a bit later. So this series migrates
-over to use that common bridge driver and then also adds support for
-dual-dsi to both the bridge and Rockchip glue code.
+__cpu_init_stage2 doesn't do anything anymore on arm64, and is
+totally non-sensical if running VHE (as VHE is 64bit only).
 
-The bridge-migration itself is based on Nickeys earlier v8
-work, but adapted to current kernels and with a new split between probe
-and bind, so that we do not create and drop the dsi-host on each deferred
-bind attempt.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/arm.c | 10 ++--------
+ 1 file changed, 2 insertions(+), 8 deletions(-)
 
-changes in v2:
-- rebase against newer drm code (dsi-bridge+rockchip changes)
-- add SPDX header to new glue driver
-- expect regular interface lanes from panel (like 4) not the double number
-  Similar to tegra
-- keep links to both master and slave
-changes in v3:
-- don't defer in bridge_attach, instead add ability to check for finalized
-  panel attachement, for example in bind
-- address bridge-conversion comments from Andrzej:
-  - include ordering
-  - moved hwaccess from mode_set to enable callback
-  - move pllref_clk enablement to bind (needed by bridge mode_set->lane_mbps)
-- limited slave settings to dw_mipi_dsi_set_slave
-- address dual-dsi comments from Philippe:
-  - remove unneeded separate variables
-  - remove unneeded second slave settings
-  - disable slave before master
-  - lane-sum calculation comments
-changes in v4:
-- rebase against some legacy rockchip-dsi changes
-- add dsi-component only after panel has attached to dsi host
-  This solves quite some concurrency problems that happen when trying
-  to determine dsi-panel availability 
-changes in v5:
-- use driver-internal method to find second host
-- drop of-graph based dsi method for it
-changes in v6:
-- patch7 don't add component on empty local dsi-bus, as some
-  dsi bridges might live on an i2c bus or so and attach from there.
-  Instead check for a slave in dsi-attach and add the slave-component
-  from there if needed
-- Go back to reading dsi-slave from dt, to prevent possible driver-
-  probe races
-
-Heiko Stuebner (4):
-  drm/bridge/synopsys: dsi: move mipi_dsi_host_unregister to
-    __dw_mipi_dsi_remove
-  drm/bridge/synopsys: dsi: don't call __dw_mipi_dsi_probe from
-    dw_mipi_dsi_bind
-  drm/bridge/synopsys: dsi: add ability to have glue-specific attach and
-    detach
-  drm/rockchip: dsi: add dual mipi support
-
-Nickey Yang (3):
-  dt-bindings: display: rockchip: update DSI controller
-  drm/rockchip: dsi: migrate to use dw-mipi-dsi bridge driver
-  drm/bridge/synopsys: dsi: add dual-dsi support
-
- .../display/rockchip/dw_mipi_dsi_rockchip.txt |   23 +-
- drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c |  114 +-
- drivers/gpu/drm/rockchip/Kconfig              |    2 +-
- drivers/gpu/drm/rockchip/Makefile             |    2 +-
- .../gpu/drm/rockchip/dw-mipi-dsi-rockchip.c   | 1075 +++++++++++++
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c        | 1349 -----------------
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c   |    2 +-
- drivers/gpu/drm/rockchip/rockchip_drm_drv.h   |    3 +-
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c   |    3 +
- drivers/gpu/drm/rockchip/rockchip_drm_vop.h   |    4 +
- drivers/gpu/drm/rockchip/rockchip_vop_reg.c   |    1 +
- include/drm/bridge/dw_mipi_dsi.h              |   14 +-
- 12 files changed, 1213 insertions(+), 1379 deletions(-)
- create mode 100644 drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c
- delete mode 100644 drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 91c464c9cd21..4ce99bb223bc 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -1310,16 +1310,10 @@ static void cpu_hyp_reinit(void)
+ {
+ 	cpu_hyp_reset();
+ 
+-	if (is_kernel_in_hyp_mode()) {
+-		/*
+-		 * __cpu_init_stage2() is safe to call even if the PM
+-		 * event was cancelled before the CPU was reset.
+-		 */
+-		__cpu_init_stage2();
++	if (is_kernel_in_hyp_mode())
+ 		kvm_timer_init_vhe();
+-	} else {
++	else
+ 		cpu_init_hyp_mode(NULL);
+-	}
+ 
+ 	if (vgic_present)
+ 		kvm_vgic_init_cpu_hardware();
 -- 
-2.18.0
+2.19.0
