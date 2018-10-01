@@ -1,70 +1,100 @@
-From: duwe@lst.de (Torsten Duwe)
-Date: Mon,  1 Oct 2018 16:09:10 +0200 (CEST)
-Subject: [PATCH v3 0/4] arm64 live patching
-Message-ID: <20181001140910.086E768BC7@newverein.lst.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 1 Oct 2018 15:13:15 +0100
+Subject: [kvmtool PATCH v6 22/18] kvmtool: arm: Add support for creating
+ VM with PA size
+In-Reply-To: <20180926163258.20218-23-suzuki.poulose@arm.com>
+References: <20180926163258.20218-1-suzuki.poulose@arm.com>
+ <20180926163258.20218-23-suzuki.poulose@arm.com>
+Message-ID: <0efe3696-e6fd-531d-c473-9dedf6b9d057@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all!
+On 26/09/18 17:32, Suzuki K Poulose wrote:
+> Specify the physical size for the VM encoded in the vm type.
+> 
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>   arm/include/arm-common/kvm-arch.h |  6 +++++-
+>   arm/kvm.c                         | 32 +++++++++++++++++++++++++++++++
+>   2 files changed, 37 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arm/include/arm-common/kvm-arch.h b/arm/include/arm-common/kvm-arch.h
+> index b29b4b1..d77f3ac 100644
+> --- a/arm/include/arm-common/kvm-arch.h
+> +++ b/arm/include/arm-common/kvm-arch.h
+> @@ -44,7 +44,11 @@
+>   
+>   #define KVM_IRQ_OFFSET		GIC_SPI_IRQ_BASE
+>   
+> -#define KVM_VM_TYPE		0
+> +extern unsigned long		kvm_arm_type;
+> +extern void kvm__arch_init_hyp(struct kvm *kvm);
+> +
+> +#define KVM_VM_TYPE		kvm_arm_type
+> +#define kvm__arch_init_hyp	kvm__arch_init_hyp
+>   
+>   #define VIRTIO_DEFAULT_TRANS(kvm)	\
+>   	((kvm)->cfg.arch.virtio_trans_pci ? VIRTIO_PCI : VIRTIO_MMIO)
+> diff --git a/arm/kvm.c b/arm/kvm.c
+> index eac2ad2..c8db6b3 100644
+> --- a/arm/kvm.c
+> +++ b/arm/kvm.c
+> @@ -11,6 +11,8 @@
+>   #include <linux/kvm.h>
+>   #include <linux/sizes.h>
+>   
+> +unsigned long kvm_arm_type;
+> +
+>   struct kvm_ext kvm_req_ext[] = {
+>   	{ DEFINE_KVM_EXT(KVM_CAP_IRQCHIP) },
+>   	{ DEFINE_KVM_EXT(KVM_CAP_ONE_REG) },
+> @@ -18,6 +20,36 @@ struct kvm_ext kvm_req_ext[] = {
+>   	{ 0, 0 },
+>   };
+>   
+> +#ifndef KVM_CAP_ARM_VM_IPA_SIZE
+> +#define KVM_CAP_ARM_VM_IPA_SIZE	159
+> +#endif
 
-Some substantial changes were requested, so I had to shuffle a few
-things around. All the bigger changes are in now.
+Note that when merged on top of 4.19-rc5, this is already 160. I assume 
+this will be even different once this lands in mainline.
 
-[Changes from v2]:
+Thanks,
 
-* ifeq($(CONFIG_DYNAMIC_FTRACE_WITH_REGS),y) instead of ifdef
+	M.
 
-* "fix" commit 06aeaaeabf69da4. (new patch 1)
-  Made DYNAMIC_FTRACE_WITH_REGS a real choice. The current situation
-  would be that a linux-4.20 kernel on arm64 should be built with
-  gcc >= 8; as in this case, as well as all other archs, the "default y"
-  works. Only kernels >= 4.20, arm64, gcc < 8, must change this to "n"
-  in order to not be stopped by the Makefile $(error) from patch 2/4.
-  You'll then fall back to the DYNAMIC_FTRACE, if selected, like before.
+> +
+> +#ifndef KVM_VM_TYPE_ARM_IPA_SIZE
+> +#define KVM_VM_TYPE_ARM_IPA_SIZE_MASK	0xffULL
+> +#define KVM_VM_TYPE_ARM_IPA_SIZE(x)	\
+> +	((x) & KVM_VM_TYPE_ARM_IPA_SIZE_MASK)
+> +#endif
+> +
+> +void kvm__arch_init_hyp(struct kvm *kvm)
+> +{
+> +	int max_ipa;
+> +
+> +	if (!kvm->cfg.arch.phys_shift)
+> +		kvm->cfg.arch.phys_shift = 40;
+> +	if (kvm->cfg.arch.phys_shift == 40)
+> +		return;
+> +	max_ipa = ioctl(kvm->sys_fd,
+> +			KVM_CHECK_EXTENSION, KVM_CAP_ARM_VM_IPA_SIZE);
+> +	if (!max_ipa)
+> +		die("Kernel doesn't support IPA size configuration\n");
+> +	if ((kvm->cfg.arch.phys_shift > max_ipa) ||
+> +	    (kvm->cfg.arch.phys_shift < 32))
+> +		die("Requested PA size (%u) is not supported by the host"
+> +		    " [32 - %u]bit\n",
+> +		    kvm->cfg.arch.phys_shift, max_ipa);
+> +	kvm_arm_type = KVM_VM_TYPE_ARM_IPA_SIZE(kvm->cfg.arch.phys_shift);
+> +}
+> +
+>   bool kvm__arch_cpu_supports_vm(void)
+>   {
+>   	/* The KVM capability check is enough. */
+> 
 
-* use some S_X* constants to refer to offsets into pt_regs in assembly.
 
-* have the compiler/assembler generate the mov x9,x30 instruction that
-  saves LR at compile time, rather than generate it repeatedly@runtime.
-
-* flip the ftrace_regs_caller stack frame so that it is no longer
-  upside down, as Ard remarked. This change broke the graph caller somehow.
-
-* extend handling of the module arch-dependent ftrace trampoline with
-  a companion "regs" version.
-  
-* clear the _TIF_PATCH_PENDING on do_notify_resume()
-
-* took care of arch/arm64/kernel/time.c when changing stack unwinder
-  semantics
-
-[TODO]
-
-* use more S_X* constants
-
-* run the full livepatch test suite, especially test apply_relocate_add()
-  functionality late after module load.
-
-[Changes from v1]:
-
-* Missing compiler support is now a Makefile error, instead
-  of a warning. This will keep the compile log shorter and
-  it will thus be easier to spot the problem.
-
-* A separate ftrace_regs_caller. Only that one will write out
-  a complete pt_regs, for efficiency.
-
-* Replace the use of X19 with X28 to remember the old PC during
-  live patch detection, as only that is saved&restored now for
-  non-regs ftrace.
-
-* CONFIG_DYNAMIC_FTRACE_WITH_REGS and CC_USING_PATCHABLE_FUNCTION_ENTRY
-  are currently synonymous on arm64, but differentiate better for
-  the future when this is no longer the case.
-
-* Clean up "old"/"new" insn value setting vs. #ifdefs.
-
-* #define a INSN_MOV_X9_X30 with suggested aarch64_insn_gen call
-  and use that instead of an immediate hex value.
-
-	Torsten
+-- 
+Jazz is not dead. It just smells funny...
