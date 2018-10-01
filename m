@@ -1,68 +1,52 @@
-From: michal.vokac@ysoft.com (=?UTF-8?B?TWljaGFsIFZva8OhxI0=?=)
-Date: Mon, 1 Oct 2018 18:27:16 +0200
-Subject: [PATCH v2 1/2] Revert "pwm: Set class for exported channels in
- sysfs"
-In-Reply-To: <1538400237-28766-2-git-send-email-fabrice.gasnier@st.com>
-References: <1538400237-28766-1-git-send-email-fabrice.gasnier@st.com>
- <1538400237-28766-2-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <156b0b28-a23a-b8f9-c8ef-67dfe31815ad@ysoft.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 1 Oct 2018 10:26:59 -0700
+Subject: [PATCH v3 2/4] firmware: xilinx: Add zynqmp IOCTL API for device
+ control
+In-Reply-To: <2350f5c3-b59e-b37b-c679-5b0a36f9a79c@xilinx.com>
+References: <1537985581-32164-1-git-send-email-jollys@xilinx.com>
+ <1537985581-32164-3-git-send-email-jollys@xilinx.com>
+ <CAOesGMhEcMB4caAPtCSq-m5zQBDc-8Z4f_xAkomnEwVaHyX2Mw@mail.gmail.com>
+ <BL2PR02MB21308D0B6AF76A8094E70863B8EC0@BL2PR02MB2130.namprd02.prod.outlook.com>
+ <CAOesGMiUnVrnW1VDh1CKRKGpkwAC9G8tiHjpb+7bss6LpPWU-A@mail.gmail.com>
+ <2350f5c3-b59e-b37b-c679-5b0a36f9a79c@xilinx.com>
+Message-ID: <CAOesGMixcQS605kmpW+n-yWBGWu4Dz5SXH396mrWCUfQjfcWcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1.10.2018 15:23, Fabrice Gasnier wrote:
-> This reverts commit 7e5d1fd75c3dde9fc10c4472b9368089d1b81d00 ("pwm: Set
-> class for exported channels in sysfs") as it causes regression with
-> multiple pwm chip[1], when exporting a pwm channel (echo X > export):
-> 
-> - ABI (Documentation/ABI/testing/sysfs-class-pwm) states pwmX should be
->    created in /sys/class/pwm/pwmchipN/pwmX
-> - Reverted patch causes new entry to be also created directly in
->    /sys/class/pwm/pwmX
-> - 1st time, exporting pwmX will create an entry in /sys/class/pwm/pwmX
-> - class attributes are added under pwmX folder, such as export, unexport
->    npwm, symlinks. This is wrong as it belongs to pwmchipN. It may cause
->    bad behavior and report wrong values.
-> - when another export happens on another pwmchip, it can't be created
->    (e.g. -EEXIST). This is causing the issue with multiple pwmchip.
-> 
-> Example on stm32 (stm32429i-eval) platform:
-> $ ls /sys/class/pwm
-> pwmchip0 pwmchip4
-> 
-> $ cd /sys/class/pwm/pwmchip0/
-> $ echo 0 > export
-> $ ls /sys/class/pwm
-> pwm0 pwmchip0 pwmchip4
-> 
-> $ cd /sys/class/pwm/pwmchip4/
-> $ echo 0 > export
-> sysfs: cannot create duplicate filename '/class/pwm/pwm0'
-> ...Exception stack follows...
-> 
-> This is also seen on other platform [2]
-> 
-> [1] https://lkml.org/lkml/2018/9/25/713
-> [2] https://lkml.org/lkml/2018/9/25/447
-> 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> Tested-by: Gottfried Haider <gottfried.haider@gmail.com>
+On Mon, Oct 1, 2018 at 6:17 AM Michal Simek <michal.simek@xilinx.com> wrote:
+>
+> Hi,
+>
+> On 28.9.2018 23:12, Olof Johansson wrote:
+> > On Fri, Sep 28, 2018 at 10:15 AM Jolly Shah <JOLLYS@xilinx.com> wrote:
+> >>
+> >> Hi Olof,
+> >>
+> >> Thanks for the review. Pushed v4 with suggested fixes. Let us know if series looks good and we can create pull request for same.
+> >>
+> >> Thanks,
+> >> Jolly Shah
+> >
+> > I'm happy with this one, thanks for revising the patchset with the fixes.
+> >
+> > Feel free to add:
+> >
+> > Acked-by: Olof Johansson <olof@lixom.net>
+> >
+> > to the patches.
+>
+> Just for clarification. I have checked driver/clk and patches should
+> still go via Michael or Stephen.
+> Firmware code is already in arm-soc tree that's why I would expect
+> Michael/Stephen should review it and then it shouldn't be a problem to
+> take this via arm-soc tree.
+>
+> Olof: Please correct me if I am wrong and you are happy to take it via
+> arm-soc directly.
 
-Tested-by: Michal Vok?? <michal.vokac@ysoft.com>
+Honestly it might be easiest for you to prepare one branch and send to
+all parties in case you have contents you expect to go on top, but
+besides that I'd be fine with merging through either tree.
 
-> ---
->   drivers/pwm/sysfs.c | 1 -
->   1 file changed, 1 deletion(-)
-> 
-> diff --git a/drivers/pwm/sysfs.c b/drivers/pwm/sysfs.c
-> index 7c71cdb..4726d43 100644
-> --- a/drivers/pwm/sysfs.c
-> +++ b/drivers/pwm/sysfs.c
-> @@ -263,7 +263,6 @@ static int pwm_export_child(struct device *parent, struct pwm_device *pwm)
->   	export->pwm = pwm;
->   	mutex_init(&export->lock);
->   
-> -	export->child.class = parent->class;
->   	export->child.release = pwm_export_release;
->   	export->child.parent = parent;
->   	export->child.devt = MKDEV(0, 0);
-> 
+
+-Olof
