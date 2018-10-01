@@ -1,50 +1,77 @@
-From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Mon, 1 Oct 2018 14:51:48 +0200
-Subject: [BISECTED] Regression: Solidrun Clearfog Base won't boot since
- "PCI: mvebu: Only remap I/O space if configured"
-In-Reply-To: <0f80dc88-dffe-4ca6-bb85-c4e5c967e0e1@cesnet.cz>
-References: <20180912231050.GX30658@n2100.armlinux.org.uk>
- <20180913094515.351967bb@windsurf>
- <5ad46fec-a71a-477a-b23f-d20aacfb481d@cesnet.cz>
- <20180913104241.65db8243@windsurf>
- <20180924101213.GO30658@n2100.armlinux.org.uk>
- <20180924122614.70738b5c@windsurf>
- <20180924111341.GP30658@n2100.armlinux.org.uk>
- <20180924141203.3df9707a@windsurf>
- <20180924124620.GA10322@e107981-ln.cambridge.arm.com>
- <20180924151040.5e57462b@windsurf>
- <20180924141512.GA11875@e107981-ln.cambridge.arm.com>
- <20180924165218.26c7c418@windsurf>
- <0f80dc88-dffe-4ca6-bb85-c4e5c967e0e1@cesnet.cz>
-Message-ID: <20181001145148.158c6207@windsurf>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 1 Oct 2018 13:52:26 +0100
+Subject: [PATCH v15 07/16] arm64: add image head flag definitions
+In-Reply-To: <20180928064841.14117-8-takahiro.akashi@linaro.org>
+References: <20180928064841.14117-1-takahiro.akashi@linaro.org>
+ <20180928064841.14117-8-takahiro.akashi@linaro.org>
+Message-ID: <20181001125225.7tlfzt5n25sckhyy@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, Sep 28, 2018 at 03:48:32PM +0900, AKASHI Takahiro wrote:
+> Those image head's flags will be used later by kexec_file loader.
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Acked-by: James Morse <james.morse@arm.com>
+> ---
+>  arch/arm64/include/asm/boot.h | 15 +++++++++++++++
+>  arch/arm64/kernel/head.S      |  2 +-
+>  2 files changed, 16 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/boot.h b/arch/arm64/include/asm/boot.h
+> index 355e552a9175..0bab7eed3012 100644
+> --- a/arch/arm64/include/asm/boot.h
+> +++ b/arch/arm64/include/asm/boot.h
+> @@ -5,6 +5,21 @@
+>  
+>  #include <asm/sizes.h>
+>  
+> +#define ARM64_MAGIC		"ARM\x64"
+> +
+> +#define HEAD_FLAG_BE_SHIFT		0
+> +#define HEAD_FLAG_PAGE_SIZE_SHIFT	1
+> +#define HEAD_FLAG_BE_MASK		0x1
+> +#define HEAD_FLAG_PAGE_SIZE_MASK	0x3
+> +
+> +#define HEAD_FLAG_BE			1
 
-On Mon, 01 Oct 2018 12:56:37 +0200, Jan Kundr?t wrote:
+These already exist in some form in arch/arm64/kernel/image.h; can we
+please factor those out rather than duplicating them?
 
-> Thomas, Russell, Lorenzo,
-> did you have time to convert this into a patch which can hit 4.19? I don't 
-> see anything related in 4.19-rc6, but perhaps I missed something. Is there 
-> something that I should test or otherwise help?
+I'd be happy if you'd update image.h to use the new HEAD_FLAG_* names,
+and removed the old definitions.
 
-Sorry, I suddenly got busy (my second son arrived a few days earlier
-than expected).
+> +#define HEAD_FLAG_PAGE_SIZE_4K		1
+> +#define HEAD_FLAG_PAGE_SIZE_16K		2
+> +#define HEAD_FLAG_PAGE_SIZE_64K		3
 
-I just sent a proper patch with the proposal I made last week, after
-testing on ClearFog and Armada XP GP. Note that on ClearFog, I only
-tested that it fixes the panic at boot, since I didn't had any
-mini-PCIe devices at hand. On Armada XP GP, I verified that an E1000E
-NIC was still working as expected. Therefore, it would be useful if
-you could test on your ClearFog platform with PCI devices connected.
+I appreciate these are new, since we didn't previously need definitions.
 
-Thanks a lot and sorry for the delay.
+Thanks,
+Mark.
 
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+> +
+> +#define head_flag_field(flags, field) \
+> +		(((flags) >> field##_SHIFT) & field##_MASK)
+> +
+>  /*
+>   * arm64 requires the DTB to be 8 byte aligned and
+>   * not exceed 2MB in size.
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index b0853069702f..8cbac6232ed1 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -91,7 +91,7 @@ _head:
+>  	.quad	0				// reserved
+>  	.quad	0				// reserved
+>  	.quad	0				// reserved
+> -	.ascii	"ARM\x64"			// Magic number
+> +	.ascii	ARM64_MAGIC			// Magic number
+>  #ifdef CONFIG_EFI
+>  	.long	pe_header - _head		// Offset to the PE header.
+>  
+> -- 
+> 2.19.0
+> 
