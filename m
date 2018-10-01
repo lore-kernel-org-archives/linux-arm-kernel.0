@@ -1,31 +1,18 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Mon, 1 Oct 2018 11:49:27 -0700
-Subject: RESEND and REBASE arm+arm64+aarch32 vdso rewrite
-In-Reply-To: <20181001175845.168430-1-salyzyn@android.com>
-References: <20181001175845.168430-1-salyzyn@android.com>
-Message-ID: <CALAqxLWCbw0bmYeB9Vfi5wXJcnLRnE0TYxy1h5WkHLehHv8KFg@mail.gmail.com>
+From: jan.kundrat@cesnet.cz (=?iso-8859-1?Q?Jan_Kundr=E1t?=)
+Date: Mon, 01 Oct 2018 21:25:21 +0200
+Subject: [PATCH] PCI: mvebu: Fix PCI I/O mapping creation sequence
+In-Reply-To: <afee5e1a-4b5a-47f6-91a9-dfe5d041a388@cesnet.cz>
+References: <20181001124934.7222-1-thomas.petazzoni@bootlin.com>
+ <afee5e1a-4b5a-47f6-91a9-dfe5d041a388@cesnet.cz>
+Message-ID: <3ced4629-5fed-4399-9ac4-2e570033e6af@cesnet.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 1, 2018 at 10:58 AM, Mark Salyzyn <salyzyn@android.com> wrote:
-> Last sent 23 Nov 2016.
->
-> The following 23 patches are rebased and resent, and represent a
-> rewrite of the arm and arm64 vDSO into C, adding support for arch32
-> (32-bit user space hosted 64-bit kernels) and into a common library
-> that other (arm, or non-arm) architectures may utilize.
+> Just a rebuild-and-boot test. We don't use any PCIe devices 
+> yet, but I'll grab an ugly eBay converter and try this patch 
+> with a normal PCIe card later.
 
-So I feel like this has gone around a few times w/o much comment from
-the arm/arm64 maintainers. I'm not sure if there's a reason?
+The patch works. I can access an i210 over a miniPCIe -> PCIe adapter.
 
-I worry part of the issue is the scope of this patch set is a little
-unwieldy (covering two architectures + generic code) might leave
-maintainers thinking/hoping someone else should review it.
-
-It seems the patchset is already somewhat broken up into separate
-sets, so I might recommend picking just one area and focus on
-upstreaming that first. Maybe the in-arch cleanups for arm and then
-arm64 and then maybe do the move to lib?
-
-thanks
--john
+With kind regards,
+Jan
