@@ -1,33 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 1 Oct 2018 16:03:56 +0200
-Subject: [GIT PULL] ARM: mvebu: soc for v4.20 (#1)
-In-Reply-To: <87r2hangkn.fsf@bootlin.com>
-References: <87r2hangkn.fsf@bootlin.com>
-Message-ID: <CAK8P3a3DJSk5xMZQg6mPsbLRPo-N+HQK_J=8ka2wq4AtoLno_Q@mail.gmail.com>
+Date: Mon, 1 Oct 2018 16:02:23 +0200
+Subject: [GIT PULL 2/5] i.MX SoC changes for 4.20
+In-Reply-To: <20181001072003.16238-2-shawnguo@kernel.org>
+References: <20181001072003.16238-1-shawnguo@kernel.org>
+ <20181001072003.16238-2-shawnguo@kernel.org>
+Message-ID: <CAK8P3a2JsOS_m21mUSxjXM8K0DssbzD1Tqk0ER-UUDx0QBH-Lw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 1, 2018 at 11:48 AM Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+On Mon, Oct 1, 2018 at 9:20 AM Shawn Guo <shawnguo@kernel.org> wrote:
 >
->   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+> The following changes since commit 57361846b52bc686112da6ca5368d11210796804:
+>
+>   Linux 4.19-rc2 (2018-09-02 14:37:30 -0700)
 >
 > are available in the Git repository at:
 >
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-4.20-1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-soc-4.20
 >
-> for you to fetch changes up to 40ad192f9e88d1376320399e49b9d978b56a9477:
+> for you to fetch changes up to c90dec00cc84942614bc41f75dc24a87b6d5763b:
 >
->   dt-bindings: marvell,prestera: Add common compatible string (2018-09-24 17:16:54 +0200)
+>   ARM: imx: add i.mx6ulz msl support (2018-09-30 15:31:40 +0800)
 >
 > ----------------------------------------------------------------
-> mvebu soc for 4.20 (part 1)
->
->  - use dt_fixup to provide fallback for enable-method for Armada XP
->  - document the marvell,prestera compatible string
->  - update Thomas Petazzoni email in MAINTAINERS file
+> i.MX SoC update for 4.20:
+>  - Add ipg clock support in MMDC driver for registers access, so that
+>    we will be safe even if the clock is not turned on by firmware.
+>  - Register pm_power_off handler to provide power off support for iMX6
+>    based boards with external PMIC.
+>  - Add platform code support for i.MX 6ULZ SoC which is a derivative of
+>    i.MX6ULL with some modules removed.
 
 Pulled into next/soc, thanks!
 
-       Arnd
+      Arnd
