@@ -1,128 +1,249 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 1 Oct 2018 11:04:08 -0700
-Subject: [BUG] sleep in atomic in 8250 runtime PM code path
-In-Reply-To: <20180929103045.GQ30658@n2100.armlinux.org.uk>
-References: <20180929132036.0323e24b@xhacker.debian>
- <20180929103045.GQ30658@n2100.armlinux.org.uk>
-Message-ID: <20181001180408.GY5662@atomide.com>
+From: salyzyn@android.com (Mark Salyzyn)
+Date: Mon,  1 Oct 2018 10:58:34 -0700
+Subject: RESEND [PATCH v3 1/3] arm64: compat: Split the sigreturn trampolines
+ and kuser helpers (C sources)
+In-Reply-To: <20181001175845.168430-1-salyzyn@android.com>
+References: <20181001175845.168430-1-salyzyn@android.com>
+Message-ID: <20181001175845.168430-15-salyzyn@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@armlinux.org.uk> [180929 10:35]:
-> On Sat, Sep 29, 2018 at 01:20:36PM +0800, Jisheng Zhang wrote:
-> > Hi,
-> > 
-> > Recently I found I could trigger sleep in atomic bug on berlin after commit
-> > d76c74387e1c ("serial: 8250_dw: Fix runtime PM handling"). The path looks like:
-> > 
-> > dw8250_probe => serial850_register_8250_port => uart_add_one_port=>
-> > register_console => console_unlock => univ8250_console_write =>
-> > serial8250_console_write => serial8250_rpm_get => pm_runtime_get_sync
-> > 
-> > The irq is disabled by printk_safe_enter_irqsave() in console_unlock, but
-> > pm_runtime_get_sync can't be called in atomic context...
-> > 
-> > I guess the reason why we didn't notice it is due to the fact that
-> > only OMAP and DW sets UART_CAP_RPM currently, and DW set the flag in
-> > May 2018.
-> > 
-> > Per my understanding, the bug sits in the 8250 core driver rather than
-> > 8250_dw.c.
-> 
-> (Adding Tony and Sebastian, presumably CAP_RPM comes from OMAP since
-> that is the only other user, and this same bug is present there too.)
+From: Kevin Brodsky <kevin.brodsky@arm.com>
 
-That only works because of pm_runtime_irq_safe() :( And we should not
-use pm_runtime_irq_safe() at all IMO, it takes a permanent RPM usecount
-on the parent device.
+AArch32 processes are currently installed a special [vectors] page that
+contains the sigreturn trampolines and the kuser helpers, at the fixed
+address mandated by the kuser helpers ABI.
 
-Adding also Andy to Cc as he's been working on related fixes.
+Having both functionalities in the same page has become problematic,
+because:
 
-> Correct.  printk() can be called from atomic contexts (consider what
-> happens when an oops or similar occurs - we can be in any context,
-> holding any locks etc.)  Plain printk() can also be used from within
-> spinlocked irqs-off regions.
-> 
-> This means the console's write function may be called in these contexts.
-> Since pm_runtime_get_sync() is may sleep, it means that its use in the
-> console path is _fundamentally_ wrong, and will lead to exactly this
-> problem.
-> 
-> I don't see a way around that other than to avoid RPM on consoles.
-> (which makes the presence of the RPM code in serial8250_console_write()
-> completely unnecessary.)
+* It makes it impossible to disable the kuser helpers (the sigreturn
+  trampolines cannot be removed), which is possible on arm.
 
-Yup the way to go is to have some way to attach/detach kernel serial
-console via /sys, and have the serial layer take a usecount on the
-serial driver RPM when kernel serial console is attached. Then the
-user can detach serial console via /sys as needed and have RPM
-working.
+* A future 32-bit vDSO would provide the sigreturn trampolines itself,
+  making those in [vectors] redundant.
 
-> When I rewrote the serial drivers and created serial_core & 8250, this
-> is something that I realised, and I arranged the PM support at the time
-> to always maintain the console in active state (this is prior to RPM).
-> 
-> While I'm looking at commit d74d5d1b7288 ("tty: serial: 8250_core: add
-> run time pm"):
-> 
-> +static void serial8250_rpm_get_tx(struct uart_8250_port *p)
-> +{
-> +       unsigned char rpm_active;
-> +
-> +       if (!(p->capabilities & UART_CAP_RPM))
-> +               return;
-> +
-> +       rpm_active = xchg(&p->rpm_tx_active, 1);
-> +       if (rpm_active)
-> +               return;
-> +       pm_runtime_get_sync(p->port.dev);
-> +}
-> 
-> is particularly "interesting" - if this is called from sections of
-> code that allow it to be called concurrently from different contexts,
-> then we could have:
-> 
-> rpm_tx_active	thread 0			thread 1
-> 0
-> 		xchg(, 1)
-> 1
-> 						xchg(, 1)
-> 						... goes on to use port ...
-> 		pm_runtime_get_sync()
-> 
-> In other words, the port can be used _before_ pm_runtime_get_sync() is
-> called.
-> 
-> If, on the other hand, this can't race, then considering the
-> serial8250_rpm_put_tx() path as well, what stops this race from
-> happening:
-> 
-> rpm_tx_active	thread 0			thread 1
-> 1
-> 		serial8250_rpm_get_tx()
-> 						serial8250_rpm_put_tx()
-> 		xchg(, 1)
-> 1
-> 						xchg(, 0)
-> 0
-> 						pm_runtime_put_autosuspend()
-> 
-> Now to the real point about the above - if _neither_ race is possible,
-> then what is the point of the more expensive xchg() here rather than
-> simple test-and-assignment of rpm_tx_active?  Either these paths can't
-> race with each other and xchg() is unnecessary, or they can and they
-> _could_ fail as shown above.  My suspicion is that xchg() is an attempt
-> to reduce the likelyhood of one of these races being hit.
+This patch addresses the problem by moving the sigreturn trampolines to
+a separate [sigpage] page, mirroring [sigpage] on arm.
 
-Yeah the driver would need to maintain a is_suspended flag to prevent
-that. See also the is_suspended related parts for runtime PM docs at
-Documentation/power/runtime_pm.txt.
+Even though [vectors] has always been a misnomer on arm64/compat, as
+there is no AArch32 vector there (and now only the kuser helpers),
+its name has been left unchanged, for compatibility with arm (there
+are reports of software relying on [vectors] being there as the last
+mapping in /proc/maps).
 
-But let's just make the serial layer take RPM usecount on the
-serial driver when console is in use and have some way for users
-to attach and detach the kernel serial console via /sys to prevent
-PM regressions.
+mm->context.vdso used to point to the [vectors] page, which is
+unnecessary (as its address is fixed). It now points to the [sigpage]
+page (whose address is randomized like a vDSO).
 
-Regards,
+Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
+Signed-off-by: Mark Salyzyn <salyzyn@android.com>
+Tested-by: Mark Salyzyn <salyzyn@android.com>
+Cc: James Morse <james.morse@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Andy Lutomirski <luto@amacapital.net>
+Cc: Dmitry Safonov <dsafonov@virtuozzo.com>
+Cc: John Stultz <john.stultz@linaro.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Laura Abbott <labbott@redhat.com>
+Cc: Kees Cook <keescook@chromium.org>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Andy Gross <andy.gross@linaro.org>
+Cc: Andrew Pinski <apinski@cavium.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Jeremy Linton <Jeremy.Linton@arm.com>
+Cc: android-kernel at android.com
 
-Tony
+v2:
+- reduce churniness (and defer later to vDSO patches)
+- vectors_page and compat_vdso_spec as array of 2
+- free sigpage if vectors allocation failed
+
+v3:
+- rebase
+---
+ arch/arm64/include/asm/processor.h |  4 +-
+ arch/arm64/include/asm/signal32.h  |  2 -
+ arch/arm64/kernel/signal32.c       |  5 +-
+ arch/arm64/kernel/vdso.c           | 82 ++++++++++++++++++++----------
+ 4 files changed, 60 insertions(+), 33 deletions(-)
+
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index 79657ad91397..bc6bb256ea4c 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -66,9 +66,9 @@
+ 
+ #define STACK_TOP_MAX		TASK_SIZE_64
+ #ifdef CONFIG_COMPAT
+-#define AARCH32_VECTORS_BASE	0xffff0000
++#define AARCH32_KUSER_HELPERS_BASE 0xffff0000
+ #define STACK_TOP		(test_thread_flag(TIF_32BIT) ? \
+-				AARCH32_VECTORS_BASE : STACK_TOP_MAX)
++				AARCH32_KUSER_HELPERS_BASE : STACK_TOP_MAX)
+ #else
+ #define STACK_TOP		STACK_TOP_MAX
+ #endif /* CONFIG_COMPAT */
+diff --git a/arch/arm64/include/asm/signal32.h b/arch/arm64/include/asm/signal32.h
+index 81abea0b7650..58e288aaf0ba 100644
+--- a/arch/arm64/include/asm/signal32.h
++++ b/arch/arm64/include/asm/signal32.h
+@@ -20,8 +20,6 @@
+ #ifdef CONFIG_COMPAT
+ #include <linux/compat.h>
+ 
+-#define AARCH32_KERN_SIGRET_CODE_OFFSET	0x500
+-
+ int compat_setup_frame(int usig, struct ksignal *ksig, sigset_t *set,
+ 		       struct pt_regs *regs);
+ int compat_setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
+diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+index 24b09003f821..52f0d44417c8 100644
+--- a/arch/arm64/kernel/signal32.c
++++ b/arch/arm64/kernel/signal32.c
+@@ -398,14 +398,13 @@ static void compat_setup_return(struct pt_regs *regs, struct k_sigaction *ka,
+ 		retcode = ptr_to_compat(ka->sa.sa_restorer);
+ 	} else {
+ 		/* Set up sigreturn pointer */
++		void *sigreturn_base = current->mm->context.vdso;
+ 		unsigned int idx = thumb << 1;
+ 
+ 		if (ka->sa.sa_flags & SA_SIGINFO)
+ 			idx += 3;
+ 
+-		retcode = AARCH32_VECTORS_BASE +
+-			  AARCH32_KERN_SIGRET_CODE_OFFSET +
+-			  (idx << 2) + thumb;
++		retcode = ptr_to_compat(sigreturn_base) + (idx << 2) + thumb;
+ 	}
+ 
+ 	regs->regs[0]	= usig;
+diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
+index 8dd2ad220a0f..5398f6454ce1 100644
+--- a/arch/arm64/kernel/vdso.c
++++ b/arch/arm64/kernel/vdso.c
+@@ -1,5 +1,7 @@
+ /*
+- * VDSO implementation for AArch64 and vector page setup for AArch32.
++ * Additional userspace pages setup for AArch64 and AArch32.
++ *  - AArch64: vDSO pages setup, vDSO data page update.
++ *  - AArch32: sigreturn and kuser helpers pages setup.
+  *
+  * Copyright (C) 2012 ARM Limited
+  *
+@@ -53,32 +55,51 @@ struct vdso_data *vdso_data = &vdso_data_store.data;
+ /*
+  * Create and map the vectors page for AArch32 tasks.
+  */
+-static struct page *vectors_page[1] __ro_after_init;
++static struct page *vectors_page[] __ro_after_init;
++static const struct vm_special_mapping compat_vdso_spec[] = {
++	{
++		/* Must be named [sigpage] for compatibility with arm. */
++		.name	= "[sigpage]",
++		.pages	= &vectors_page[0],
++	},
++	{
++		.name	= "[kuserhelpers]",
++		.pages	= &vectors_page[1],
++	},
++};
++static struct page *vectors_page[ARRAY_SIZE(compat_vdso_spec)] __ro_after_init;
+ 
+ static int __init alloc_vectors_page(void)
+ {
+ 	extern char __kuser_helper_start[], __kuser_helper_end[];
+-	extern char __aarch32_sigret_code_start[], __aarch32_sigret_code_end[];
++	size_t kuser_sz = __kuser_helper_end - __kuser_helper_start;
++	unsigned long kuser_vpage;
+ 
+-	int kuser_sz = __kuser_helper_end - __kuser_helper_start;
+-	int sigret_sz = __aarch32_sigret_code_end - __aarch32_sigret_code_start;
+-	unsigned long vpage;
+-
+-	vpage = get_zeroed_page(GFP_ATOMIC);
++	extern char __aarch32_sigret_code_start[], __aarch32_sigret_code_end[];
++	size_t sigret_sz =
++		__aarch32_sigret_code_end - __aarch32_sigret_code_start;
++	unsigned long sigret_vpage;
+ 
+-	if (!vpage)
++	sigret_vpage = get_zeroed_page(GFP_ATOMIC);
++	if (!sigret_vpage)
+ 		return -ENOMEM;
+ 
+-	/* kuser helpers */
+-	memcpy((void *)vpage + 0x1000 - kuser_sz, __kuser_helper_start,
+-		kuser_sz);
++	kuser_vpage = get_zeroed_page(GFP_ATOMIC);
++	if (!kuser_vpage) {
++		free_page(sigret_vpage);
++		return -ENOMEM;
++	}
+ 
+ 	/* sigreturn code */
+-	memcpy((void *)vpage + AARCH32_KERN_SIGRET_CODE_OFFSET,
+-               __aarch32_sigret_code_start, sigret_sz);
++	memcpy((void *)sigret_vpage, __aarch32_sigret_code_start, sigret_sz);
++	flush_icache_range(sigret_vpage, sigret_vpage + PAGE_SIZE);
++	vectors_page[0] = virt_to_page(sigret_vpage);
+ 
+-	flush_icache_range(vpage, vpage + PAGE_SIZE);
+-	vectors_page[0] = virt_to_page(vpage);
++	/* kuser helpers */
++	memcpy((void *)kuser_vpage + 0x1000 - kuser_sz, __kuser_helper_start,
++		kuser_sz);
++	flush_icache_range(kuser_vpage, kuser_vpage + PAGE_SIZE);
++	vectors_page[1] = virt_to_page(kuser_vpage);
+ 
+ 	return 0;
+ }
+@@ -87,23 +108,32 @@ arch_initcall(alloc_vectors_page);
+ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
+ {
+ 	struct mm_struct *mm = current->mm;
+-	unsigned long addr = AARCH32_VECTORS_BASE;
+-	static const struct vm_special_mapping spec = {
+-		.name	= "[vectors]",
+-		.pages	= vectors_page,
+-
+-	};
++	unsigned long addr;
+ 	void *ret;
+ 
+ 	if (down_write_killable(&mm->mmap_sem))
+ 		return -EINTR;
+-	current->mm->context.vdso = (void *)addr;
++	addr = get_unmapped_area(NULL, 0, PAGE_SIZE, 0, 0);
++	if (IS_ERR_VALUE(addr)) {
++		ret = ERR_PTR(addr);
++		goto out;
++	}
+ 
+-	/* Map vectors page at the high address. */
+ 	ret = _install_special_mapping(mm, addr, PAGE_SIZE,
+-				       VM_READ|VM_EXEC|VM_MAYREAD|VM_MAYEXEC,
+-				       &spec);
++				       VM_READ|VM_EXEC|
++				       VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
++				       &compat_vdso_spec[0]);
++	if (IS_ERR(ret))
++		goto out;
+ 
++	current->mm->context.vdso = (void *)addr;
++
++	/* Map the kuser helpers at the ABI-defined high address. */
++	ret = _install_special_mapping(mm, AARCH32_KUSER_HELPERS_BASE,
++				       PAGE_SIZE,
++				       VM_READ|VM_EXEC|VM_MAYREAD|VM_MAYEXEC,
++				       &compat_vdso_spec[1]);
++out:
+ 	up_write(&mm->mmap_sem);
+ 
+ 	return PTR_ERR_OR_ZERO(ret);
+-- 
+2.19.0.605.g01d371f741-goog
