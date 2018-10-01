@@ -1,49 +1,62 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 1 Oct 2018 18:56:22 +0100
-Subject: [PATCH] ARM: makefile: pass -march=armv4 to assembler even on
- CPU32v3
-In-Reply-To: <20180930024904.14240-1-Jason@zx2c4.com>
-References: <20180930024904.14240-1-Jason@zx2c4.com>
-Message-ID: <20181001175622.GT30658@n2100.armlinux.org.uk>
+From: salyzyn@android.com (Mark Salyzyn)
+Date: Mon,  1 Oct 2018 10:58:20 -0700
+Subject: RESEND and REBASE arm+arm64+aarch32 vdso rewrite
+Message-ID: <20181001175845.168430-1-salyzyn@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 30, 2018 at 04:49:04AM +0200, Jason A. Donenfeld wrote:
-> Per the discussion about half-way down in [1], the kernel doesn't
-> actually support the ARMv3 ISA, but selects it for some ARMv4 ISA
-> hardware that benefits from ARMv3 code generation.
+Last sent 23 Nov 2016.
 
-The issue is to do with the half-word stores in the ARMv4 ISA, which
-need to be avoided on StrongARM RiscPC - the bus from the processor
-card (which was designed for ARM610 and ARM710) does not support
-anything except 8-bit and 32-bit accesses, so the 16-bit load/store
-instructions don't work correctly.
+The following 23 patches are rebased and resent, and represent a
+rewrite of the arm and arm64 vDSO into C, adding support for arch32
+(32-bit user space hosted 64-bit kernels) and into a common library
+that other (arm, or non-arm) architectures may utilize.
 
-Obviously, the reason for having the compiler use ARMv3 is to avoid
-those instructions which we have no other way to prevent - however,
-the use of ARMv3 with the assembler ensures that ldrh/strh are not
-accidentally used.
+[PATCH v5 01/12] arm: vdso: rename vdso_datapage variables
+[PATCH v5 02/12] arm: vdso: add include file defining __get_datapage()
+[PATCH v5 03/12] arm: vdso: inline assembler operations to compiler.h
+[PATCH v5 04/12] arm: vdso: do calculations outside reader loops
+[PATCH v6 05/12] arm: vdso: Add support for CLOCK_MONOTONIC_RAW
+[PATCH v5 06/12] arm: vdso: add support for clock_getres
+[PATCH v5 07/12] arm: vdso: disable profiling
+[PATCH v5 08/12] arm: vdso: Add ARCH_CLOCK_FIXED_MASK
+[PATCH v5 09/12] arm: vdso: move vgettimeofday.c to lib/vdso/
+[PATCH v5 10/12] arm64: vdso: replace gettimeofday.S with global vgettimeofday.C
+[PATCH v6 11/12] lib: vdso: Add support for CLOCK_BOOTTIME
+[PATCH v5 12/12] lib: vdso: do not expose gettimeofday, if no arch supported timer
+[PATCH] lib: vdso: add support for time
+[PATCH v2 1/3] arm64: compat: Split the sigreturn trampolines and kuser helpers (C sources)
+[PATCH v2 2/3] arm64: compat: Split the sigreturn trampolines and kuser helpers (assembler sources)
+[PATCH v2 3/3] arm64: compat: Add CONFIG_KUSER_HELPERS
+[PATCH] arm64: compat: Expose offset to registers in sigframes
+[PATCH 1/6] arm64: compat: Use vDSO sigreturn trampolines if available
+[PATCH 2/6] arm64: elf: Set AT_SYSINFO_EHDR in compat processes
+[PATCH 3/6] arm64: Refactor vDSO init/setup
+[PATCH v2 4/6] arm64: compat: Add a 32-bit vDSO
+[PATCH 5/6] arm64: compat: 32-bit vDSO setup
+[PATCH 6/6] arm64: Wire up and expose the new compat vDSO
 
-We could argue that the ARMv3 assembly files are now stable, so the
-chances of ldrh/strh being introduced is low, which would make this
-change tolerable, but the commit message needs to spell out that
-we lose this protection.
+This patch series' above has been applied to the latest Pixel phones
+and resulted in a 0.4% battery improvement.
 
-> Such a consideration,
-> then, only applies to the compiler but not to the assembler. This commit
-> passes -march=armv4 to the assembler in those cases, so that code
-> written for ARMv4 will continue to compile and run fine, without needing
-> module-specific asflags-y overrides.
-
-Note that "code written for ARMv4" will not be usable on this platform
-if it makes use of ldrh/strh, so depending on which instructions the
-assembler is complaining about, it could very well be a real "you're
-doing something wrong" case.
-
-The side effect of this patch is that such cases will now be hidden
-rather than evaluated on a case-by-case basis.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 14.8Mbps down 650kbps up
-According to speedtest.net: 13Mbps down 490kbps up
+Signed-off-by: Mark Salyzyn <salyzyn@android.com>
+Tested-by: Mark Salyzyn <salyzyn@android.com>
+Cc: James Morse <james.morse@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Andy Lutomirski <luto@amacapital.net>
+Cc: Dmitry Safonov <dsafonov@virtuozzo.com>
+Cc: John Stultz <john.stultz@linaro.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Laura Abbott <labbott@redhat.com>
+Cc: Kees Cook <keescook@chromium.org>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Andy Gross <andy.gross@linaro.org>
+Cc: Kevin Brodsky <kevin.brodsky@arm.com>
+Cc: Andrew Pinski <apinski@cavium.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Jeremy Linton <Jeremy.Linton@arm.com>
+Cc: android-kernel at android.com
