@@ -1,30 +1,31 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  1 Oct 2018 14:06:54 +0100
-Subject: [PATCH 0/2] KVM: arm64: Dynamic IPA cosmetic fixups
-Message-ID: <20181001130656.36999-1-marc.zyngier@arm.com>
+From: m.slodczyk2@partner.samsung.com (Maciej Slodczyk)
+Date: Mon, 1 Oct 2018 15:12:51 +0200
+Subject: [PATCH v2 1/7] arm64: move arm uprobes code to be reused by arm64
+In-Reply-To: <0d10bc6d-5fb1-fac3-3d68-352b0cfd4af2@arm.com>
+References: <1537963925-25313-1-git-send-email-m.slodczyk2@partner.samsung.com>
+ <CGME20180926121214eucas1p2b262936ddd96980b7b4369f16b52c6ce@eucas1p2.samsung.com>
+ <1537963925-25313-2-git-send-email-m.slodczyk2@partner.samsung.com>
+ <0d10bc6d-5fb1-fac3-3d68-352b0cfd4af2@arm.com>
+Message-ID: <20181001131254eucas1p2ae0390483d52f18e37b9550a59da52aa~ZfkMUwYnn1170611706eucas1p2k@eucas1p2.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here's a couple of tiny cleanups I'd like to queue on top of Suzuki's
-series. They are purely cosmetic, and just aim at making the code
-slightly more readable.
 
-If nobody shouts, I'll stack them on top.
 
-Thanks,
+On 29.09.2018 11:37, Suzuki K Poulose wrote:
+> following nit:
+> 
+> The subject tag looks incorrect. Since this patch moves the ARM
+> code around and has nothing to do with arm64 (yet). So, the subject
+> could be :
+> 
+> ARM: move uprobes code to be reused by arm64
+> 
+> which could allow the concerned arm people to check this patch.
 
-	M.
+Hi,
 
-Marc Zyngier (2):
-  KVM: arm/arm64: Rename kvm_arm_config_vm to kvm_arm_setup_stage2
-  KVM: arm64: Drop __cpu_init_stage2 on the VHE path
+Thank you for the review. I'll adjust subject tags in v3.
 
- arch/arm/include/asm/kvm_host.h   |  6 +++++-
- arch/arm64/include/asm/kvm_arm.h  |  2 +-
- arch/arm64/include/asm/kvm_host.h |  2 +-
- arch/arm64/kvm/reset.c            |  2 +-
- virt/kvm/arm/arm.c                | 12 +++---------
- 5 files changed, 11 insertions(+), 13 deletions(-)
-
--- 
-2.19.0
+Thank you,
+Maciej
