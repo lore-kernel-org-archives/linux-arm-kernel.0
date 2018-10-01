@@ -1,71 +1,130 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 01 Oct 2018 15:00:38 +0100
-Subject: [PATCH v7.1 9/9] KVM: arm64: Add support for creating PUD
- hugepages at stage 2
-In-Reply-To: <20180925143731.27475-1-punit.agrawal@arm.com> (Punit Agrawal's
- message of "Tue, 25 Sep 2018 15:37:31 +0100")
-References: <20180924174552.8387-10-punit.agrawal@arm.com>
- <20180925143731.27475-1-punit.agrawal@arm.com>
-Message-ID: <87bm8dn4vt.fsf@e105922-lin.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 1 Oct 2018 15:01:46 +0100
+Subject: [PATCH] PCI: mvebu: Fix PCI I/O mapping creation sequence
+In-Reply-To: <20181001124934.7222-1-thomas.petazzoni@bootlin.com>
+References: <20181001124934.7222-1-thomas.petazzoni@bootlin.com>
+Message-ID: <20181001140137.GA13049@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Punit Agrawal <punit.agrawal@arm.com> writes:
-
-> KVM only supports PMD hugepages at stage 2. Now that the various page
-> handling routines are updated, extend the stage 2 fault handling to
-> map in PUD hugepages.
->
-> Addition of PUD hugepage support enables additional page sizes (e.g.,
-> 1G with 4K granule) which can be useful on cores that support mapping
-> larger block sizes in the TLB entries.
->
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+On Mon, Oct 01, 2018 at 02:49:34PM +0200, Thomas Petazzoni wrote:
+> Commit ee1604381a371 ("PCI: mvebu: Only remap I/O space if
+> configured") had the side effect that the PCI I/O mapping was created
+> much earlier than before, at a point where the probe() of the driver
+> could still fail. This is for example a problem if one gets an
+> -EPROBE_DEFER at some point during probe(), after pci_ioremap_io() has
+> been called.
+> 
+> Indeed, there is currently no function to undo what pci_ioremap_io()
+> did, and switching to pci_remap_iospace() is not an option in
+> pci-mvebu due to the need for special memory attributes on Armada 38x.
+> 
+> Reverting ee1604381a371 ("PCI: mvebu: Only remap I/O space if
+> configured") would be a possibility, but it would require also
+> reverting 42342073e38b5 ("PCI: mvebu: Convert to use pci_host_bridge
+> directly"). So instead, we use an open-coded version of
+> pci_host_probe() that creates the PCI I/O mapping at a point where we
+> are guaranteed not to fail anymore.
+> 
+> Reported-by: Jan Kundr?t <jan.kundrat@cesnet.cz>
+> Fixes: ee1604381a371 ("PCI: mvebu: Only remap I/O space if configured")
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
 > ---
->
-> v7 -> v7.1
->
-> * Added arm helper kvm_stage2_has_pud()
-> * Added check for PUD level present at stage 2
-> * Dropped redundant comment
-> * Fixed up kvm_pud_mkhuge() to complain on arm
->
->  arch/arm/include/asm/kvm_mmu.h         |  20 +++++
->  arch/arm/include/asm/stage2_pgtable.h  |   5 ++
->  arch/arm64/include/asm/kvm_mmu.h       |  16 ++++
->  arch/arm64/include/asm/pgtable-hwdef.h |   2 +
->  arch/arm64/include/asm/pgtable.h       |   2 +
->  virt/kvm/arm/mmu.c                     | 106 +++++++++++++++++++++++--
->  6 files changed, 145 insertions(+), 6 deletions(-)
->
+>  drivers/pci/controller/pci-mvebu.c | 52 +++++++++++++++++++++++++++++++++++---
+>  1 file changed, 48 insertions(+), 4 deletions(-)
 
-[...]
+Thank you Thomas.
 
-> diff --git a/arch/arm/include/asm/stage2_pgtable.h b/arch/arm/include/asm/stage2_pgtable.h
-> index f6a7ea805232..ec1567d9eb4b 100644
-> --- a/arch/arm/include/asm/stage2_pgtable.h
-> +++ b/arch/arm/include/asm/stage2_pgtable.h
-> @@ -68,4 +68,9 @@ stage2_pmd_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
->  #define stage2_pmd_table_empty(kvm, pmdp)	kvm_page_empty(pmdp)
->  #define stage2_pud_table_empty(kvm, pudp)	false
->  
-> +static inline bool kvm_stage2_has_pud(struct kvm *kvm)
-> +{
-> +	return KVM_VTCR_SL0 == VTCR_SL_L1;
-> +}
-> +
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-Turns out this isn't quite the right check. On arm32, the maximum number
-of supported levels is 3 with LPAE - effectively the helper should
-always return false.
-
-I've updated the check locally to key off of CONFIG_PGTABLE_LEVELS. I'll
-post these patches later today.
+Bjorn, is it possible please to send this patch for -rc7 ? It is
+a regression we introduced in the last cycle.
 
 Thanks,
-Punit
+Lorenzo
+
+> diff --git a/drivers/pci/controller/pci-mvebu.c b/drivers/pci/controller/pci-mvebu.c
+> index 50eb0729385b..a41d79b8d46a 100644
+> --- a/drivers/pci/controller/pci-mvebu.c
+> +++ b/drivers/pci/controller/pci-mvebu.c
+> @@ -1145,7 +1145,6 @@ static int mvebu_pcie_parse_request_resources(struct mvebu_pcie *pcie)
+>  {
+>  	struct device *dev = &pcie->pdev->dev;
+>  	struct device_node *np = dev->of_node;
+> -	unsigned int i;
+>  	int ret;
+>  
+>  	INIT_LIST_HEAD(&pcie->resources);
+> @@ -1179,13 +1178,58 @@ static int mvebu_pcie_parse_request_resources(struct mvebu_pcie *pcie)
+>  					 resource_size(&pcie->io) - 1);
+>  		pcie->realio.name = "PCI I/O";
+>  
+> +		pci_add_resource(&pcie->resources, &pcie->realio);
+> +	}
+> +
+> +	return devm_request_pci_bus_resources(dev, &pcie->resources);
+> +}
+> +
+> +/*
+> + * This is a copy of pci_host_probe(), except that it does the I/O
+> + * remap as the last step, once we are sure we won't fail.
+> + *
+> + * It should be removed once the I/O remap error handling issue has
+> + * been sorted out.
+> + */
+> +static int mvebu_pci_host_probe(struct pci_host_bridge *bridge)
+> +{
+> +	struct mvebu_pcie *pcie;
+> +	struct pci_bus *bus, *child;
+> +	int ret;
+> +
+> +	ret = pci_scan_root_bus_bridge(bridge);
+> +	if (ret < 0) {
+> +		dev_err(bridge->dev.parent, "Scanning root bridge failed");
+> +		return ret;
+> +	}
+> +
+> +	pcie = pci_host_bridge_priv(bridge);
+> +	if (resource_size(&pcie->io) != 0) {
+> +		unsigned int i;
+> +
+>  		for (i = 0; i < resource_size(&pcie->realio); i += SZ_64K)
+>  			pci_ioremap_io(i, pcie->io.start + i);
+> +	}
+>  
+> -		pci_add_resource(&pcie->resources, &pcie->realio);
+> +	bus = bridge->bus;
+> +
+> +	/*
+> +	 * We insert PCI resources into the iomem_resource and
+> +	 * ioport_resource trees in either pci_bus_claim_resources()
+> +	 * or pci_bus_assign_resources().
+> +	 */
+> +	if (pci_has_flag(PCI_PROBE_ONLY)) {
+> +		pci_bus_claim_resources(bus);
+> +	} else {
+> +		pci_bus_size_bridges(bus);
+> +		pci_bus_assign_resources(bus);
+> +
+> +		list_for_each_entry(child, &bus->children, node)
+> +			pcie_bus_configure_settings(child);
+>  	}
+>  
+> -	return devm_request_pci_bus_resources(dev, &pcie->resources);
+> +	pci_bus_add_devices(bus);
+> +	return 0;
+>  }
+>  
+>  static int mvebu_pcie_probe(struct platform_device *pdev)
+> @@ -1268,7 +1312,7 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+>  	bridge->align_resource = mvebu_pcie_align_resource;
+>  	bridge->msi = pcie->msi;
+>  
+> -	return pci_host_probe(bridge);
+> +	return mvebu_pci_host_probe(bridge);
+>  }
+>  
+>  static const struct of_device_id mvebu_pcie_of_match_table[] = {
+> -- 
+> 2.14.4
+> 
