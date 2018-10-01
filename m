@@ -1,41 +1,87 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 1 Oct 2018 15:17:44 +0200
-Subject: [PATCH] MAINTAINERS: Drop dt-bindings/genpd/k2g.h
-In-Reply-To: <19176740-b38f-8ae9-a9a2-85d6f7a9c590@oracle.com>
-References: <20180928224615.19862-1-nm@ti.com>
- <19176740-b38f-8ae9-a9a2-85d6f7a9c590@oracle.com>
-Message-ID: <CAK8P3a0CqDFbNOcLH-mEGfxb2HyzDNiuUWf5zAo1ndehQs9S2g@mail.gmail.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Mon, 1 Oct 2018 15:23:57 +0200
+Subject: [PATCH v2 2/2] pwm: send a uevent on the pwmchip device upon channel
+ sysfs (un)export
+In-Reply-To: <1538400237-28766-1-git-send-email-fabrice.gasnier@st.com>
+References: <1538400237-28766-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1538400237-28766-3-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Sep 29, 2018 at 2:07 AM Santosh Shilimkar
-<santosh.shilimkar@oracle.com> wrote:
-> On 9/28/2018 3:46 PM, Nishanth Menon wrote:
-> > Drop include/dt-bindings/genpd/k2g.h which disappeared from kernel tree
-> > some time back, however MAINTAINERS file was missed to be updated.
-> >
-> > Fixes: d16645054d2f ("dt-bindings: Drop k2g genpd device ID macros")
-> > Cc: Rob Herring <robh@kernel.org>
-> > Cc: Dave Gerlach <d-gerlach@ti.com>
-> > Cc: Santosh Shilimkar <ssantosh@kernel.org>
-> > Cc: Tero Kristo <t-kristo@ti.com>
-> > Reported-by: Joe Perches <joe@perches.com>
-> > Signed-off-by: Nishanth Menon <nm@ti.com>
-> > ---
-> >
-> > A big oops.. Sorry about that. will do better next time. I tried to relook and
-> > I think we have'nt missed any other files.
-> >
-> > Based off next-20180928 tag.
-> >
-> > Santosh, any chance you could pick this up -> Thread:
-> > https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1776470.html
-> >
-> Could you please apply this to arm-soc tree if its not too
-> late ?
->
-> Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+This patch sends a uevent (KOBJ_CHANGE) on the pwmchipN device, everytime
+a pwmX channel has been exported/unexported via sysfs.
+This allows udev to implement rules on such events, like:
 
-Applied to next/soc, thanks!
+SUBSYSTEM=="pwm*", PROGRAM="/bin/sh -c '\
+        chown -R root:gpio /sys/class/pwm && chmod -R 770 /sys/class/pwm;\
+        chown -R root:gpio
+/sys/devices/platform/soc/*.pwm/pwm/pwmchip* && chmod -R 770
+/sys/devices/platform/soc/*.pwm/pwm/pwmchip*\
+'"
 
-      Arnd
+This is a replacement patch for commit 7e5d1fd75c3d ("pwm: Set class for
+exported channels in sysfs"), see [1].
+
+basic testing:
+$ udevadm monitor --environment &
+$ echo 0 > /sys/class/pwm/pwmchip0/export
+KERNEL[197.321736] change   /devices/.../pwm/pwmchip0 (pwm)
+ACTION=change
+DEVPATH=/devices/.../pwm/pwmchip0
+EXPORT=pwm0
+SEQNUM=2045
+SUBSYSTEM=pwm
+
+[1] https://lkml.org/lkml/2018/9/25/713
+
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Tested-by: Gottfried Haider <gottfried.haider@gmail.com>
+---
+ drivers/pwm/sysfs.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/drivers/pwm/sysfs.c b/drivers/pwm/sysfs.c
+index 4726d43..ceb233d 100644
+--- a/drivers/pwm/sysfs.c
++++ b/drivers/pwm/sysfs.c
+@@ -249,6 +249,7 @@ static void pwm_export_release(struct device *child)
+ static int pwm_export_child(struct device *parent, struct pwm_device *pwm)
+ {
+ 	struct pwm_export *export;
++	char *pwm_prop[2];
+ 	int ret;
+ 
+ 	if (test_and_set_bit(PWMF_EXPORTED, &pwm->flags))
+@@ -276,6 +277,10 @@ static int pwm_export_child(struct device *parent, struct pwm_device *pwm)
+ 		export = NULL;
+ 		return ret;
+ 	}
++	pwm_prop[0] = kasprintf(GFP_KERNEL, "EXPORT=pwm%u", pwm->hwpwm);
++	pwm_prop[1] = NULL;
++	kobject_uevent_env(&parent->kobj, KOBJ_CHANGE, pwm_prop);
++	kfree(pwm_prop[0]);
+ 
+ 	return 0;
+ }
+@@ -288,6 +293,7 @@ static int pwm_unexport_match(struct device *child, void *data)
+ static int pwm_unexport_child(struct device *parent, struct pwm_device *pwm)
+ {
+ 	struct device *child;
++	char *pwm_prop[2];
+ 
+ 	if (!test_and_clear_bit(PWMF_EXPORTED, &pwm->flags))
+ 		return -ENODEV;
+@@ -296,6 +302,11 @@ static int pwm_unexport_child(struct device *parent, struct pwm_device *pwm)
+ 	if (!child)
+ 		return -ENODEV;
+ 
++	pwm_prop[0] = kasprintf(GFP_KERNEL, "UNEXPORT=pwm%u", pwm->hwpwm);
++	pwm_prop[1] = NULL;
++	kobject_uevent_env(&parent->kobj, KOBJ_CHANGE, pwm_prop);
++	kfree(pwm_prop[0]);
++
+ 	/* for device_find_child() */
+ 	put_device(child);
+ 	device_unregister(child);
+-- 
+1.9.1
