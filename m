@@ -1,37 +1,31 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 1 Oct 2018 15:29:15 +0100
-Subject: [PATCH] arm_pmu: Delete incorrect cache event mapping for some
- armv8_pmuv3 events.
-In-Reply-To: <20181001100707.16840-1-ganapatrao.kulkarni@cavium.com>
-References: <20181001100707.16840-1-ganapatrao.kulkarni@cavium.com>
-Message-ID: <20181001142914.GD9716@arm.com>
+Date: Mon,  1 Oct 2018 15:24:48 +0100
+Subject: [PATCH 2/2] arm64: docs: Document SSBS HWCAP
+In-Reply-To: <1538403888-13277-1-git-send-email-will.deacon@arm.com>
+References: <1538403888-13277-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1538403888-13277-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ganapat,
+We advertise the MRS/MSR instructions for toggling SSBS at EL0 using an
+HWCAP, so document it along with the others.
 
-On Mon, Oct 01, 2018 at 10:07:43AM +0000, Kulkarni, Ganapatrao wrote:
-> Perf events L1-dcache-load-misses, L1-dcache-store-misses are mapped to
-> armv8_pmuv3 (both DT and ACPI) event L1D_CACHE_REFILL. This is incorrect,
-> since L1D_CACHE_REFILL counts both load and store misses.
-> Similarly the events L1-dcache-loads, L1-dcache-stores, dTLB-load-misses
-> and dTLB-loads are wrongly mapped. Hence Deleting all these cache events
-> from armv8_pmuv3 cache mapping.
-> 
-> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> ---
->  arch/arm64/kernel/perf_event.c | 8 --------
->  1 file changed, 8 deletions(-)
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ Documentation/arm64/elf_hwcaps.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-The "generic" events are really implemented on a best-effort basis, as
-they rarely tend to map exactly to what the hardware supports. I think
-they originally stemmed from the x86 CPU PMU, but that doesn't really
-help us.
-
-I had a discussion with Ingo back when we originally implemented perf
-because I actually preferred not to implement the generic events at all.
-However, he was strongly of the opinion that a best-effort approach was
-sufficient to get casual users going with the tool, so that's what we went
-with.
-
-Will
+diff --git a/Documentation/arm64/elf_hwcaps.txt b/Documentation/arm64/elf_hwcaps.txt
+index 51ccfab408cc..ea819ae024dd 100644
+--- a/Documentation/arm64/elf_hwcaps.txt
++++ b/Documentation/arm64/elf_hwcaps.txt
+@@ -178,3 +178,7 @@ HWCAP_ILRCPC
+ HWCAP_FLAGM
+ 
+     Functionality implied by ID_AA64ISAR0_EL1.TS == 0b0001.
++
++HWCAP_SSBS
++
++    Functionality implied by ID_AA64PFR1_EL1.SSBS == 0b0010.
+-- 
+2.1.4
