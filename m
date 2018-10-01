@@ -1,52 +1,26 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 1 Oct 2018 10:26:59 -0700
-Subject: [PATCH v3 2/4] firmware: xilinx: Add zynqmp IOCTL API for device
- control
-In-Reply-To: <2350f5c3-b59e-b37b-c679-5b0a36f9a79c@xilinx.com>
-References: <1537985581-32164-1-git-send-email-jollys@xilinx.com>
- <1537985581-32164-3-git-send-email-jollys@xilinx.com>
- <CAOesGMhEcMB4caAPtCSq-m5zQBDc-8Z4f_xAkomnEwVaHyX2Mw@mail.gmail.com>
- <BL2PR02MB21308D0B6AF76A8094E70863B8EC0@BL2PR02MB2130.namprd02.prod.outlook.com>
- <CAOesGMiUnVrnW1VDh1CKRKGpkwAC9G8tiHjpb+7bss6LpPWU-A@mail.gmail.com>
- <2350f5c3-b59e-b37b-c679-5b0a36f9a79c@xilinx.com>
-Message-ID: <CAOesGMixcQS605kmpW+n-yWBGWu4Dz5SXH396mrWCUfQjfcWcQ@mail.gmail.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 1 Oct 2018 18:44:14 +0100
+Subject: [PATCH v8 2/9] KVM: arm/arm64: Share common code in
+ user_mem_abort()
+In-Reply-To: <20181001155443.23032-3-punit.agrawal@arm.com>
+References: <20181001155443.23032-1-punit.agrawal@arm.com>
+ <20181001155443.23032-3-punit.agrawal@arm.com>
+Message-ID: <e7b9cc5a-594c-42c8-a36b-931370a0e817@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 1, 2018 at 6:17 AM Michal Simek <michal.simek@xilinx.com> wrote:
->
-> Hi,
->
-> On 28.9.2018 23:12, Olof Johansson wrote:
-> > On Fri, Sep 28, 2018 at 10:15 AM Jolly Shah <JOLLYS@xilinx.com> wrote:
-> >>
-> >> Hi Olof,
-> >>
-> >> Thanks for the review. Pushed v4 with suggested fixes. Let us know if series looks good and we can create pull request for same.
-> >>
-> >> Thanks,
-> >> Jolly Shah
-> >
-> > I'm happy with this one, thanks for revising the patchset with the fixes.
-> >
-> > Feel free to add:
-> >
-> > Acked-by: Olof Johansson <olof@lixom.net>
-> >
-> > to the patches.
->
-> Just for clarification. I have checked driver/clk and patches should
-> still go via Michael or Stephen.
-> Firmware code is already in arm-soc tree that's why I would expect
-> Michael/Stephen should review it and then it shouldn't be a problem to
-> take this via arm-soc tree.
->
-> Olof: Please correct me if I am wrong and you are happy to take it via
-> arm-soc directly.
+On 10/01/2018 04:54 PM, Punit Agrawal wrote:
+> The code for operations such as marking the pfn as dirty, and
+> dcache/icache maintenance during stage 2 fault handling is duplicated
+> between normal pages and PMD hugepages.
+> 
+> Instead of creating another copy of the operations when we introduce
+> PUD hugepages, let's share them across the different pagesizes.
+> 
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> ---
 
-Honestly it might be easiest for you to prepare one branch and send to
-all parties in case you have contents you expect to go on top, but
-besides that I'd be fine with merging through either tree.
-
-
--Olof
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
