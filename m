@@ -1,80 +1,46 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Mon, 1 Oct 2018 13:56:32 -0700
-Subject: [PATCH v9 2/8] dt-bindings: Introduce interconnect binding
-In-Reply-To: <20180926143432.GH10761@jcrouse-lnx.qualcomm.com>
-References: <20180831140151.13972-1-georgi.djakov@linaro.org>
- <20180831140151.13972-3-georgi.djakov@linaro.org>
- <20180925180215.GA12435@bogus>
- <20180926143432.GH10761@jcrouse-lnx.qualcomm.com>
-Message-ID: <1ae0a36a-1178-4db5-1ae9-8f19e561a18b@codeaurora.org>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 1 Oct 2018 16:01:47 -0500
+Subject: [BISECTED] Regression: Solidrun Clearfog Base won't boot since
+ "PCI: mvebu: Only remap I/O space if configured"
+In-Reply-To: <20181001145148.158c6207@windsurf>
+References: <20180924101213.GO30658@n2100.armlinux.org.uk>
+ <20180924122614.70738b5c@windsurf>
+ <20180924111341.GP30658@n2100.armlinux.org.uk>
+ <20180924141203.3df9707a@windsurf>
+ <20180924124620.GA10322@e107981-ln.cambridge.arm.com>
+ <20180924151040.5e57462b@windsurf>
+ <20180924141512.GA11875@e107981-ln.cambridge.arm.com>
+ <20180924165218.26c7c418@windsurf>
+ <0f80dc88-dffe-4ca6-bb85-c4e5c967e0e1@cesnet.cz>
+ <20181001145148.158c6207@windsurf>
+Message-ID: <20181001210147.GF142872@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Oct 01, 2018 at 02:51:48PM +0200, Thomas Petazzoni wrote:
+> Hello,
+> 
+> On Mon, 01 Oct 2018 12:56:37 +0200, Jan Kundr?t wrote:
+> 
+> > Thomas, Russell, Lorenzo,
+> > did you have time to convert this into a patch which can hit 4.19? I don't 
+> > see anything related in 4.19-rc6, but perhaps I missed something. Is there 
+> > something that I should test or otherwise help?
+> 
+> Sorry, I suddenly got busy (my second son arrived a few days earlier
+> than expected).
 
+Congratulations!
 
-On 09/26/2018 07:34 AM, Jordan Crouse wrote:
-> On Tue, Sep 25, 2018 at 01:02:15PM -0500, Rob Herring wrote:
->> On Fri, Aug 31, 2018 at 05:01:45PM +0300, Georgi Djakov wrote:
->>> This binding is intended to represent the relations between the interconnect
->>> controllers (providers) and consumer device nodes. It will allow creating links
->>> between consumers and interconnect paths (exposed by interconnect providers).
->> As I mentioned in person, I want to see other SoC families using this
->> before accepting. They don't have to be ready for upstream, but WIP
->> patches or even just a "yes, this works for us and we're going to use
->> this binding on X".
->>
->> Also, I think the QCom GPU use of this should be fully sorted out. Or
->> more generically how this fits into OPP binding which seems to be never
->> ending extended...
-> This is a discussion I wouldn't mind having now.  To jog memories, this is what
-> I posted a few weeks ago:
->
-> https://patchwork.freedesktop.org/patch/246117/
->
-> This seems like the easiest way to me to tie the frequency and the bandwidth
-> quota together for GPU devfreq scaling but I'm not married to the format and
-> I'll happily go a few rounds on the bikeshed if we can get something we can
-> be happy with.
->
-> Jordan
+> I just sent a proper patch with the proposal I made last week, after
+> testing on ClearFog and Armada XP GP. Note that on ClearFog, I only
+> tested that it fixes the panic at boot, since I didn't had any
+> mini-PCIe devices at hand. On Armada XP GP, I verified that an E1000E
+> NIC was still working as expected. Therefore, it would be useful if
+> you could test on your ClearFog platform with PCI devices connected.
+> 
+> Thanks a lot and sorry for the delay.
 
-Been meaning to send this out for a while, but caught up with other stuff.
+And thanks for the patch!  No need to apologize for having a life :)
 
-That GPU BW patch is very specific to device to device mapping and 
-doesn't work well for different use cases (Eg: those that? can calculate 
-based on use case, etc).
-
-Interconnect paths have different BW (bandwidth) operating points that 
-they can support. For example: 1 GB/s, 1.7 GB/s, 5GB/s, etc. Having a 
-mapping from GPU or CPU to those are fine/necessary, but we still need a 
-separate BW OPP table for interconnect paths to list what they can 
-actually support.
-
-Two different ways we could represent BW OPP tables for interconnect paths:
-1.? Represent interconnect paths (CPU to DDR, GPU to DDR, etc) as 
-devices and have OPPs for those devices.
-
-2. We can have a "interconnect-opp-tables" DT binding similar to 
-"interconnects" and "interconnect-names". So if a device GPU or Video 
-decoder or I2C device needs to vote on an interconnect path, they can 
-also list the OPP tables that those paths can support.
-
-I know Rob doesn't like (1). But I'm hoping at least (2) is acceptable. 
-I'm open to other suggestions too.
-
-Both (1) and (2) need BW OPP tables similar to frequency OPP tables. 
-That should be easy to add and Viresh is open to that. I'm open to other 
-options too, but the fundamental missing part is how to tie a list of BW 
-OPPs to interconnect paths in DT.
-
-Once we have one of the above two options, we can use the required-opps 
-field (already present in kernel) for the mapping between GPU to a 
-particular BW need (suggested by Viresh during an in person conversation).
-
-Thanks,
-Saravana
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Bjorn
