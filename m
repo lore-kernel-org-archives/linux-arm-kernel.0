@@ -1,34 +1,30 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Mon, 01 Oct 2018 13:46:13 +0200
-Subject: [PATCH 2/2] ARM: ixp4xx: include linux/mtd/platnand.h
-In-Reply-To: <20180926130458.2406549-2-arnd@arndb.de> (Arnd Bergmann's message
- of "Wed, 26 Sep 2018 15:04:39 +0200")
-References: <20180926130458.2406549-1-arnd@arndb.de>
- <20180926130458.2406549-2-arnd@arndb.de>
-Message-ID: <m3in2ldh4q.fsf@t19.piap.pl>
+From: nbd@nbd.name (Felix Fietkau)
+Date: Mon, 1 Oct 2018 13:57:22 +0200
+Subject: [PATCH] mt76: fix header guard macro define names
+In-Reply-To: <20180930225715.18491-1-colin.king@canonical.com>
+References: <20180930225715.18491-1-colin.king@canonical.com>
+Message-ID: <ae443a0d-9272-d538-ee85-6d5bf1231db8@nbd.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On 2018-10-01 00:57, Colin King wrote:
+> From: Colin Ian King <colin.king@canonical.com>
+> 
+> The header guards that are #defined are different from those being
+> checked.  Fix this by #defining them to the correct name.
+> 
+> Fixes clang warnings:
+> drivers/net/wireless/mediatek/mt76/mt76x02_mcu.h:17:9:
+> warning: '__MT76x02_MCU_H' is used as a header guard here, followed
+> by #define of a different macro [-Wheader-guard]
+> 
+> drivers/net/wireless/mediatek/mt76/mt76x02_usb.h:17:9:
+> warning: '__MT76x02_USB_H' is used as a header guard here, followed
+> by #define of a different macro [-Wheader-guard]
+> 
+> Fixes: 905db7470199 ("mt76: usb: move mt76x02 mcu code in mt76x02-usb module")
+> Fixes: edaa580bc830 ("mt76: move shared mcu_calibrate routine in mt76x02-lib module")
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+Merged, thanks.
 
-> The platform_nand_data structure definition is required for ixdp425
-> but has now moved to a new header file:
->
-> arch/arm/mach-ixp4xx/ixdp425-setup.c:98:15: error: variable 'ixdp425_flash_nand_data' has initializer but incomplete type
->  static struct platform_nand_data ixdp425_flash_nand_data = {
->                ^~~~~~~~~~~~~~~~~~
-> arch/arm/mach-ixp4xx/ixdp425-setup.c:99:3: error: 'struct platform_nand_data' has no member named 'chip'
->
-> Fixes: 19cf5dfa3a31 ("mtd: rawnand: Move platform_nand_xxx definitions out of rawnand.h")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/arm/mach-ixp4xx/ixdp425-setup.c | 1 +
-
-Right.
-Acked-by: Krzysztof Halasa <khalasa@piap.pl>
-
--- 
-Krzysztof Halasa
-
-Industrial Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+- Felix
