@@ -1,118 +1,148 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Mon,  1 Oct 2018 16:13:49 +0200
-Subject: [PATCH v6 05/14] irqchip/irq-mvebu-icu: disociate ICU and NSR
+Date: Mon,  1 Oct 2018 16:13:54 +0200
+Subject: [PATCH v6 10/14] dt-bindings/interrupt-controller: update Marvell ICU
+ bindings
 In-Reply-To: <20181001141358.31508-1-miquel.raynal@bootlin.com>
 References: <20181001141358.31508-1-miquel.raynal@bootlin.com>
-Message-ID: <20181001141358.31508-6-miquel.raynal@bootlin.com>
+Message-ID: <20181001141358.31508-11-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NSR (non-secure interrupts) are handled in the ICU driver like if there
-was only this type of interrupt in the ICU. Change this behavior to
-prepare the introduction of SEI (System Error Interrupts) support by
-moving the NSR code in a separate function. This is done under the form
-of a 'probe' function to ease future migration to NSR/SEI being platform
-devices part of the ICU. The 'icu' structure is passed as driver data
-and not as a parameter for the same reason.
+Change the documentation to reflect the new bindings used for Marvell
+ICU. This involves describing each interrupt group as a subnode of the
+ICU node. Each of them having their own compatible.
+
+The DT binding documentation still documents the legacy binding, where
+there was a single node with no subnode.
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-Reviewed-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- drivers/irqchip/irq-mvebu-icu.c | 57 ++++++++++++++++++---------------
- 1 file changed, 32 insertions(+), 25 deletions(-)
+ .../interrupt-controller/marvell,icu.txt      | 85 ++++++++++++++++---
+ 1 file changed, 73 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/irqchip/irq-mvebu-icu.c b/drivers/irqchip/irq-mvebu-icu.c
-index 0f2655d7f19e..d09f220a2701 100644
---- a/drivers/irqchip/irq-mvebu-icu.c
-+++ b/drivers/irqchip/irq-mvebu-icu.c
-@@ -39,7 +39,6 @@
- struct mvebu_icu {
- 	struct irq_chip irq_chip;
- 	void __iomem *base;
--	struct irq_domain *domain;
- 	struct device *dev;
- 	atomic_t initialized;
- };
-@@ -204,11 +203,39 @@ static const struct irq_domain_ops mvebu_icu_domain_ops = {
- 	.free      = mvebu_icu_irq_domain_free,
- };
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
+index 649b7ec9d9b1..1c94a57a661e 100644
+--- a/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
++++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,icu.txt
+@@ -5,6 +5,8 @@ The Marvell ICU (Interrupt Consolidation Unit) controller is
+ responsible for collecting all wired-interrupt sources in the CP and
+ communicating them to the GIC in the AP, the unit translates interrupt
+ requests on input wires to MSG memory mapped transactions to the GIC.
++These messages will access a different GIC memory area depending on
++their type (NSR, SR, SEI, REI, etc).
  
-+static int mvebu_icu_subset_probe(struct platform_device *pdev)
-+{
-+	struct device_node *msi_parent_dn;
-+	struct device *dev = &pdev->dev;
-+	struct irq_domain *irq_domain;
-+	struct mvebu_icu *icu;
-+
-+	icu = dev_get_drvdata(dev);
-+
-+	dev->msi_domain = of_msi_get_domain(dev, dev->of_node,
-+					    DOMAIN_BUS_PLATFORM_MSI);
-+	if (!dev->msi_domain)
-+		return -EPROBE_DEFER;
-+
-+	msi_parent_dn = irq_domain_get_of_node(dev->msi_domain);
-+	if (!msi_parent_dn)
-+		return -ENODEV;
-+
-+	irq_domain = platform_msi_create_device_tree_domain(dev, ICU_MAX_IRQS,
-+							    mvebu_icu_write_msg,
-+							    &mvebu_icu_domain_ops,
-+							    icu);
-+	if (!irq_domain) {
-+		dev_err(dev, "Failed to create ICU MSI domain\n");
-+		return -ENOMEM;
-+	}
-+
-+	return 0;
-+}
-+
- static int mvebu_icu_probe(struct platform_device *pdev)
- {
- 	struct mvebu_icu *icu;
--	struct device_node *node = pdev->dev.of_node;
--	struct device_node *gicp_dn;
- 	struct resource *res;
- 	int i;
+ Required properties:
  
-@@ -240,19 +267,6 @@ static int mvebu_icu_probe(struct platform_device *pdev)
- 	icu->irq_chip.irq_set_affinity = irq_chip_set_affinity_parent;
- #endif
+@@ -12,20 +14,23 @@ Required properties:
  
--	/*
--	 * We're probed after MSI domains have been resolved, so force
--	 * resolution here.
--	 */
--	pdev->dev.msi_domain = of_msi_get_domain(&pdev->dev, node,
--						 DOMAIN_BUS_PLATFORM_MSI);
--	if (!pdev->dev.msi_domain)
--		return -EPROBE_DEFER;
+ - reg: Should contain ICU registers location and length.
+ 
++Subnodes: Each group of interrupt is declared as a subnode of the ICU,
++with their own compatible.
++
++Required properties for the icu_nsr/icu_sei subnodes:
++
++- compatible: Should be one of:
++              * "marvell,cp110-icu-nsr"
++	      * "marvell,cp110-icu-sr"
++	      * "marvell,cp110-icu-sei"
++	      * "marvell,cp110-icu-rei"
++
+ - #interrupt-cells: Specifies the number of cells needed to encode an
+-  interrupt source. The value shall be 3.
++  interrupt source. The value shall be 2.
+ 
+-  The 1st cell is the group type of the ICU interrupt. Possible group
+-  types are:
++  The 1st cell is the index of the interrupt in the ICU unit.
+ 
+-   ICU_GRP_NSR (0x0) : Shared peripheral interrupt, non-secure
+-   ICU_GRP_SR  (0x1) : Shared peripheral interrupt, secure
+-   ICU_GRP_SEI (0x4) : System error interrupt
+-   ICU_GRP_REI (0x5) : RAM error interrupt
 -
--	gicp_dn = irq_domain_get_of_node(pdev->dev.msi_domain);
--	if (!gicp_dn)
--		return -ENODEV;
+-  The 2nd cell is the index of the interrupt in the ICU unit.
 -
- 	/*
- 	 * Clean all ICU interrupts with type SPI_NSR, required to
- 	 * avoid unpredictable SPI assignments done by firmware.
-@@ -267,16 +281,9 @@ static int mvebu_icu_probe(struct platform_device *pdev)
- 			writel_relaxed(0x0, icu->base + ICU_INT_CFG(i));
- 	}
+-  The 3rd cell is the type of the interrupt. See arm,gic.txt for
++  The 2nd cell is the type of the interrupt. See arm,gic.txt for
+   details.
  
--	icu->domain =
--		platform_msi_create_device_domain(&pdev->dev, ICU_MAX_IRQS,
--						  mvebu_icu_write_msg,
--						  &mvebu_icu_domain_ops, icu);
--	if (!icu->domain) {
--		dev_err(&pdev->dev, "Failed to create ICU domain\n");
--		return -ENOMEM;
--	}
-+	platform_set_drvdata(pdev, icu);
+ - interrupt-controller: Identifies the node as an interrupt
+@@ -35,17 +40,73 @@ Required properties:
+   that allows to trigger interrupts using MSG memory mapped
+   transactions.
  
--	return 0;
-+	return mvebu_icu_subset_probe(pdev);
- }
++Note: each 'interrupts' property referring to any 'icu_xxx' node shall
++      have a different number within [0:206].
++
+ Example:
  
- static const struct of_device_id mvebu_icu_of_match[] = {
+ icu: interrupt-controller at 1e0000 {
+ 	compatible = "marvell,cp110-icu";
+ 	reg = <0x1e0000 0x440>;
++
++	CP110_LABEL(icu_nsr): interrupt-controller at 10 {
++		compatible = "marvell,cp110-icu-nsr";
++		reg = <0x10 0x20>;
++		#interrupt-cells = <2>;
++		interrupt-controller;
++		msi-parent = <&gicp>;
++	};
++
++	CP110_LABEL(icu_sei): interrupt-controller at 50 {
++		compatible = "marvell,cp110-icu-sei";
++		reg = <0x50 0x10>;
++		#interrupt-cells = <2>;
++		interrupt-controller;
++		msi-parent = <&sei>;
++	};
++};
++
++node1 {
++	interrupt-parent = <&icu_nsr>;
++	interrupts = <106 IRQ_TYPE_LEVEL_HIGH>;
++};
++
++node2 {
++	interrupt-parent = <&icu_sei>;
++	interrupts = <107 IRQ_TYPE_LEVEL_HIGH>;
++};
++
++/* Would not work with the above nodes */
++node3 {
++	interrupt-parent = <&icu_nsr>;
++	interrupts = <107 IRQ_TYPE_LEVEL_HIGH>;
++};
++
++The legacy bindings were different in this way:
++
++- #interrupt-cells: The value was 3.
++	The 1st cell was the group type of the ICU interrupt. Possible
++	group types were:
++	ICU_GRP_NSR (0x0) : Shared peripheral interrupt, non-secure
++	ICU_GRP_SR  (0x1) : Shared peripheral interrupt, secure
++	ICU_GRP_SEI (0x4) : System error interrupt
++	ICU_GRP_REI (0x5) : RAM error interrupt
++	The 2nd cell was the index of the interrupt in the ICU unit.
++	The 3rd cell was the type of the interrupt. See arm,gic.txt for
++	details.
++
++Example:
++
++icu: interrupt-controller at 1e0000 {
++	compatible = "marvell,cp110-icu";
++	reg = <0x1e0000 0x440>;
++
+ 	#interrupt-cells = <3>;
+ 	interrupt-controller;
+ 	msi-parent = <&gicp>;
+ };
+ 
+-usb3h0: usb3 at 500000 {
++node1 {
+ 	interrupt-parent = <&icu>;
+ 	interrupts = <ICU_GRP_NSR 106 IRQ_TYPE_LEVEL_HIGH>;
+ };
 -- 
 2.17.1
