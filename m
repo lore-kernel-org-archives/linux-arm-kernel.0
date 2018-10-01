@@ -1,204 +1,145 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 1 Oct 2018 11:13:12 -0700
-Subject: [PATCH v5 04/12] PCI: brcmstb: add dma-range mapping for inbound
- traffic
-In-Reply-To: <7b25b09e-6f99-8a9b-d548-03becd9de8b5@arm.com>
-References: <1537367527-20773-1-git-send-email-jim2101024@gmail.com>
- <1537367527-20773-5-git-send-email-jim2101024@gmail.com>
- <CAKv+Gu_d-r0ubyqZcDzERYd5FVTSpjBk++iACHqVgtHrOK0F7A@mail.gmail.com>
- <7fa897cf-4d58-c63f-afdd-a3ec5a6a56bf@gmail.com>
- <CAKv+Gu8aJRV4nqq1e-5HRLvbrANQsYuMf-pwWB53BhxLgX7iWg@mail.gmail.com>
- <b74d3c16-a512-73dc-c94a-ef6adde5f757@gmail.com>
- <CAKv+Gu8ZbN3BDRyuFzt4o--SSUmhuOh+jnpq8ZR-Ay13DJrAqg@mail.gmail.com>
- <fa285694-c3e1-adf8-032a-202e7598de41@gmail.com>
- <CANCKTBsypcVS_iC1+sbW5fMKfj+tTsxbQv9CvDwcO8GV3a8_Yg@mail.gmail.com>
- <CAKv+Gu-+OjJi8zGLqvnsOJQ9ygMot-O0EbyMKO-yyG-+k-274A@mail.gmail.com>
- <CANCKTBtbwSqfSU0b_d6Yi7TV3R_ijEpPE8a4bpgpkcOxJOa_zQ@mail.gmail.com>
- <7accc1a7-647b-1f92-13f8-2fab315ddc45@gmail.com>
- <7b25b09e-6f99-8a9b-d548-03becd9de8b5@arm.com>
-Message-ID: <332b42e3-67c6-9471-e18f-4d54954e3be3@gmail.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Mon, 1 Oct 2018 21:21:55 +0300
+Subject: [BUG] sleep in atomic in 8250 runtime PM code path
+In-Reply-To: <20181001180408.GY5662@atomide.com>
+References: <20180929132036.0323e24b@xhacker.debian>
+ <20180929103045.GQ30658@n2100.armlinux.org.uk>
+ <20181001180408.GY5662@atomide.com>
+Message-ID: <20181001182155.GB15943@smile.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/26/2018 03:56 AM, Robin Murphy wrote:
-> On 26/09/18 03:59, Florian Fainelli wrote:
->>
->>
->> On 9/24/2018 8:01 AM, Jim Quinlan wrote:
->>> On Mon, Sep 24, 2018 at 4:25 AM Ard Biesheuvel
->>> <ard.biesheuvel@linaro.org> wrote:
->>>>
->>>> On Fri, 21 Sep 2018 at 19:41, Jim Quinlan <jim2101024@gmail.com> wrote:
->>>>>
->>>>> On Thu, Sep 20, 2018 at 5:39 PM Florian Fainelli
->>>>> <f.fainelli@gmail.com> wrote:
->>>>>>
->>>>>> On 09/20/2018 02:33 PM, Ard Biesheuvel wrote:
->>>>>>> On 20 September 2018 at 14:31, Florian Fainelli
->>>>>>> <f.fainelli@gmail.com> wrote:
->>>>>>>> On 09/20/2018 02:04 PM, Ard Biesheuvel wrote:
->>>>>>>>> On 20 September 2018 at 13:55, Florian Fainelli
->>>>>>>>> <f.fainelli@gmail.com> wrote:
->>>>>>>>>> On 09/19/2018 07:19 PM, Ard Biesheuvel wrote:
->>>>>>>>>>> On 19 September 2018 at 07:31, Jim Quinlan
->>>>>>>>>>> <jim2101024@gmail.com> wrote:
->>>>>>>>>>>> The Broadcom STB PCIe host controller is intimately related
->>>>>>>>>>>> to the
->>>>>>>>>>>> memory subsystem.? This close relationship adds complexity
->>>>>>>>>>>> to how cpu
->>>>>>>>>>>> system memory is mapped to PCIe memory.? Ideally, this
->>>>>>>>>>>> mapping is an
->>>>>>>>>>>> identity mapping, or an identity mapping off by a constant.?
->>>>>>>>>>>> Not so in
->>>>>>>>>>>> this case.
->>>>>>>>>>>>
->>>>>>>>>>>> Consider the Broadcom reference board BCM97445LCC_4X8 which
->>>>>>>>>>>> has 6 GB
->>>>>>>>>>>> of system memory.? Here is how the PCIe controller maps the
->>>>>>>>>>>> system memory to PCIe memory:
->>>>>>>>>>>>
->>>>>>>>>>>> ?? memc0-a@[??????? 0....3fffffff] <=> pci@[???????
->>>>>>>>>>>> 0....3fffffff]
->>>>>>>>>>>> ?? memc0-b@[100000000...13fffffff] <=> pci@[
->>>>>>>>>>>> 40000000....7fffffff]
->>>>>>>>>>>> ?? memc1-a@[ 40000000....7fffffff] <=> pci@[
->>>>>>>>>>>> 80000000....bfffffff]
->>>>>>>>>>>> ?? memc1-b@[300000000...33fffffff] <=> pci@[
->>>>>>>>>>>> c0000000....ffffffff]
->>>>>>>>>>>> ?? memc2-a@[ 80000000....bfffffff] <=>
->>>>>>>>>>>> pci@[100000000...13fffffff]
->>>>>>>>>>>> ?? memc2-b@[c00000000...c3fffffff] <=>
->>>>>>>>>>>> pci@[140000000...17fffffff]
->>>>>>>>>>>>
->>>>>>>>>>>
->>>>>>>>>>> So is describing this as
->>>>>>>>>>>
->>>>>>>>>>> dma-ranges = <0x0 0x0 0x0 0x0 0x0 0x40000000>,
->>>>>>>>>>> ????????????? <0x0 0x40000000 0x1 0x0 0x0 0x40000000>,
->>>>>>>>>>> ????????????? <0x0 0x80000000 0x0 0x40000000 0x0 0x40000000>,
->>>>>>>>>>> ????????????? <0x0 0xc0000000 0x3 0x0 0x0 0x40000000>,
->>>>>>>>>>> ????????????? <0x1 0x0 0x0 0x80000000 0x0 0x40000000>,
->>>>>>>>>>> ????????????? <0x1 0x40000000 0x0 0xc0000000 0x0 0x40000000>;
->>>>>>>>>>>
->>>>>>>>>>> not working for you? I haven't tried this myself, but since
->>>>>>>>>>> DT permits
->>>>>>>>>>> describing the inbound mappings this way, we should fix the
->>>>>>>>>>> code if it
->>>>>>>>>>> doesn't work at the moment.
->>>>>>>>>>
->>>>>>>>>> You mean encoding the memory controller index in the first
->>>>>>>>>> cell? If that
->>>>>>>>>> works, that's indeed a much cleaner solution, though is it
->>>>>>>>>> standard
->>>>>>>>>> compliant in any form?
->>>>>>>>>
->>>>>>>>> No those are just memory addresses (although I may have screwed
->>>>>>>>> up the
->>>>>>>>> order). From Documentation/devicetree/booting-without-of.txt:
->>>>>>>>>
->>>>>>>>> """
->>>>>>>>> Optional property:
->>>>>>>>> - dma-ranges: <prop-encoded-array> encoded as arbitrary number
->>>>>>>>> of triplets of
->>>>>>>>> ???????? (child-bus-address, parent-bus-address, length). Each
->>>>>>>>> triplet specified
->>>>>>>>> ???????? describes a contiguous DMA address range.
->>>>>>>>> """
->>>>>>>>>
->>>>>>>>
->>>>>>>> Then I am confused by your comment, that's what this patch does,
->>>>>>>> it adds
->>>>>>>> support for reading "dma-ranges" from Device Tree and setting up
->>>>>>>> inbound
->>>>>>>> windows using that. The only caveat is that because the PCIe root
->>>>>>>> complex has some ties with the memory bus architecture it is
->>>>>>>> connected
->>>>>>>> to (SCB in our case) there is still a requirement to know the
->>>>>>>> translation between a given physical address and its backing memory
->>>>>>>> controller/aperture.
->>>>>>>>
->>>>>>>
->>>>>>> Ah ok, apologies for the noise then.
->>>>>>>
->>>>>>> I was hoping that having working support for dma-ranges would remove
->>>>>>> the need for the special phys<->dma conversion routines.
->>>>>>
->>>>>> What you describe definitively works with platform devices, but I
->>>>>> am not
->>>>>> sure this is working for PCIe devices, although, conceptually it
->>>>>> should,
->>>>>> yes.
->>>>> Sorry for my delay in responding.? One problem is that
->>>>> of_dma_configure() only looks at the first dma-range given and then
->>>>> converts it to dev->dma_pfn_offset which is respected by the DMA API.
->>>>> However, we often have multiple dma-ranges, not just one.? This is the
->>>>> big issue.
->>>>>
->>>>
->>>> Given the recent attention to getting these APIs in shape, this may be
->>>> something Robin or Christoph may care to look into?
->>>
->>> It looks like this has been brought up before in the "[RFC PATCH] of:
->>> Fix DMA configuration for non-DT masters" thread aka
->>>
->>> https://lists.linuxfoundation.org/pipermail/iommu/2017-April/021325.html
->>>
->>> In the thread "Oza Oza", a Broadcom coworker probably dealing with the
->>> same exact problem as I,? enumerates three problems.?? #1 and #2 are
->>> the exact same ones I've just given: the "dma-ranges" prop of the RC
->>> DT node is "skipped", and of_dma_get_range() only considers the first
->>> entry in any "dma-ranges".
->>
->> Robin, is that something that is expected or should the "dma-ranges"
->> somehow propagate from host bridge down the PCIe end-point drivers?
+On Mon, Oct 01, 2018 at 11:04:08AM -0700, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@armlinux.org.uk> [180929 10:35]:
+> > On Sat, Sep 29, 2018 at 01:20:36PM +0800, Jisheng Zhang wrote:
+> > > Hi,
+> > > 
+> > > Recently I found I could trigger sleep in atomic bug on berlin after commit
+> > > d76c74387e1c ("serial: 8250_dw: Fix runtime PM handling"). The path looks like:
+> > > 
+> > > dw8250_probe => serial850_register_8250_port => uart_add_one_port=>
+> > > register_console => console_unlock => univ8250_console_write =>
+> > > serial8250_console_write => serial8250_rpm_get => pm_runtime_get_sync
+> > > 
+> > > The irq is disabled by printk_safe_enter_irqsave() in console_unlock, but
+> > > pm_runtime_get_sync can't be called in atomic context...
+> > > 
+> > > I guess the reason why we didn't notice it is due to the fact that
+> > > only OMAP and DW sets UART_CAP_RPM currently, and DW set the flag in
+> > > May 2018.
+> > > 
+> > > Per my understanding, the bug sits in the 8250 core driver rather than
+> > > 8250_dw.c.
+
+Precisely!
+It seats there from the day 1 of introducing PM runtime callbacks.
+
+> > 
+> > (Adding Tony and Sebastian, presumably CAP_RPM comes from OMAP since
+> > that is the only other user, and this same bug is present there too.)
 > 
-> Nope, the code is most definitely incomplete - it's sufficient to
-> support the system it was originally needed for (i.e. platform devices
-> with a single range), but can by no means even pretend to support the
-> binding fully. Furthermore, the way that PCI support was later grafted
-> into of_dma_configure() was *only* in support of dma-coherent without
-> consideration for dma-ranges. Hence the current mess.
-
-Is this the way we should go? If the PCIe root complex has a
-"dma-ranges" property, we need to make sure that all child devices
-behind it get that translation applied as well? Right now we tried to
-follow Christoph's recommendations from the v1 through v4 submissions,
-but that does not really seem to be working well.
-
-I am really not a fan of having to go audit every architecture, and
-possibly insert the right translation in there, while introducing a
-possible layering problem too...
-
+> That only works because of pm_runtime_irq_safe() :( And we should not
+> use pm_runtime_irq_safe() at all IMO, it takes a permanent RPM usecount
+> on the parent device.
 > 
->>>
->>> Thanks, Jim
->>>
->>>>
->>>> In any case, the description of dma-ranges should be in sync with the
->>>> way Linux interprets it, so this is either a documentation bug or a
->>>> DMA layer bug.
->>>>
->>>>> There is another issue with of_dma_configure() being invoked by the EP
->>>>> driver on "bridge->parent->of_node", which is our RC device,
->>>>> Of_dma_configure() calls of_dma_range() on the of_get_next_parent() of
->>>>> our RC's device node and this misses the dma-ranges property which is
->>>>> contained within the RC.? I think I could workaround this but there is
->>>>> no getting around the first problem.
->>>>>
->>>>
->>>> IIUC dma-ranges should be added to the parent bus of a device, which I
->>>> guess is slightly ambiguous for a root complex that incorporates a
->>>> host bridge.
->>
->> Humm, why is that ambiguous for a host bridge/root complex?
-> 
-> The real problem is that FDT machines don't describe the PCI hierarchy
-> in DT as proper OF does, so we have this awkward crossing between the DT
-> model and the Linux device model where the devices have no DT
-> representation and the "parent bus" is a DT leaf node, which cocks up
-> the way the current code is expecting to work.
+> Adding also Andy to Cc as he's been working on related fixes.
 
-OK, I see what you mean, we still have to work with what we have here,
-which is FDT...
+Thanks, Tony.
+Unfortunately, I'm busy with some more important stuff, but I will return to this ASAP.
+
+> > Correct.  printk() can be called from atomic contexts (consider what
+> > happens when an oops or similar occurs - we can be in any context,
+> > holding any locks etc.)  Plain printk() can also be used from within
+> > spinlocked irqs-off regions.
+> > 
+> > This means the console's write function may be called in these contexts.
+> > Since pm_runtime_get_sync() is may sleep, it means that its use in the
+> > console path is _fundamentally_ wrong, and will lead to exactly this
+> > problem.
+> > 
+> > I don't see a way around that other than to avoid RPM on consoles.
+> > (which makes the presence of the RPM code in serial8250_console_write()
+> > completely unnecessary.)
+> 
+> Yup the way to go is to have some way to attach/detach kernel serial
+> console via /sys, and have the serial layer take a usecount on the
+> serial driver RPM when kernel serial console is attached. Then the
+> user can detach serial console via /sys as needed and have RPM
+> working.
+
+Or disable runtime PM on kernel console completely, though it's not
+the best solution, rather work around.
+
+> > When I rewrote the serial drivers and created serial_core & 8250, this
+> > is something that I realised, and I arranged the PM support at the time
+> > to always maintain the console in active state (this is prior to RPM).
+
+Have you had chance to see my series against this all mess?
+
+> > While I'm looking at commit d74d5d1b7288 ("tty: serial: 8250_core: add
+> > run time pm"):
+> > 
+> > +static void serial8250_rpm_get_tx(struct uart_8250_port *p)
+> > +{
+> > +       unsigned char rpm_active;
+> > +
+> > +       if (!(p->capabilities & UART_CAP_RPM))
+> > +               return;
+> > +
+> > +       rpm_active = xchg(&p->rpm_tx_active, 1);
+> > +       if (rpm_active)
+> > +               return;
+> > +       pm_runtime_get_sync(p->port.dev);
+> > +}
+> > 
+> > is particularly "interesting" - if this is called from sections of
+> > code that allow it to be called concurrently from different contexts,
+> > then we could have:
+> > 
+> > rpm_tx_active	thread 0			thread 1
+> > 0
+> > 		xchg(, 1)
+> > 1
+> > 						xchg(, 1)
+> > 						... goes on to use port ...
+> > 		pm_runtime_get_sync()
+> > 
+> > In other words, the port can be used _before_ pm_runtime_get_sync() is
+> > called.
+> > 
+> > If, on the other hand, this can't race, then considering the
+> > serial8250_rpm_put_tx() path as well, what stops this race from
+> > happening:
+> > 
+> > rpm_tx_active	thread 0			thread 1
+> > 1
+> > 		serial8250_rpm_get_tx()
+> > 						serial8250_rpm_put_tx()
+> > 		xchg(, 1)
+> > 1
+> > 						xchg(, 0)
+> > 0
+> > 						pm_runtime_put_autosuspend()
+> > 
+> > Now to the real point about the above - if _neither_ race is possible,
+> > then what is the point of the more expensive xchg() here rather than
+> > simple test-and-assignment of rpm_tx_active?  Either these paths can't
+> > race with each other and xchg() is unnecessary, or they can and they
+> > _could_ fail as shown above.  My suspicion is that xchg() is an attempt
+> > to reduce the likelyhood of one of these races being hit.
+> 
+> Yeah the driver would need to maintain a is_suspended flag to prevent
+> that. See also the is_suspended related parts for runtime PM docs at
+> Documentation/power/runtime_pm.txt.
+> 
+> But let's just make the serial layer take RPM usecount on the
+> serial driver when console is in use and have some way for users
+> to attach and detach the kernel serial console via /sys to prevent
+> PM regressions.
+
+Yes, it would be best solution that can cover old users and new comers.
+
+
 -- 
-Florian
+With Best Regards,
+Andy Shevchenko
