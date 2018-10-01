@@ -1,40 +1,50 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 1 Oct 2018 14:44:43 +0200
-Subject: [PATCH v2 3/3] arm64: dts: renesas: r8a774a1: Add CAN nodes
-In-Reply-To: <TY1PR01MB1770B42824076BF5C57F12DDC0140@TY1PR01MB1770.jpnprd01.prod.outlook.com>
-References: <1536576195-11520-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1536576195-11520-4-git-send-email-fabrizio.castro@bp.renesas.com>
- <20180911133220.3kjx5dqp65drx3qs@verge.net.au>
- <TY1PR01MB1770B42824076BF5C57F12DDC0140@TY1PR01MB1770.jpnprd01.prod.outlook.com>
-Message-ID: <20181001124443.g55dwzqpguhglspv@verge.net.au>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Mon, 1 Oct 2018 14:51:48 +0200
+Subject: [BISECTED] Regression: Solidrun Clearfog Base won't boot since
+ "PCI: mvebu: Only remap I/O space if configured"
+In-Reply-To: <0f80dc88-dffe-4ca6-bb85-c4e5c967e0e1@cesnet.cz>
+References: <20180912231050.GX30658@n2100.armlinux.org.uk>
+ <20180913094515.351967bb@windsurf>
+ <5ad46fec-a71a-477a-b23f-d20aacfb481d@cesnet.cz>
+ <20180913104241.65db8243@windsurf>
+ <20180924101213.GO30658@n2100.armlinux.org.uk>
+ <20180924122614.70738b5c@windsurf>
+ <20180924111341.GP30658@n2100.armlinux.org.uk>
+ <20180924141203.3df9707a@windsurf>
+ <20180924124620.GA10322@e107981-ln.cambridge.arm.com>
+ <20180924151040.5e57462b@windsurf>
+ <20180924141512.GA11875@e107981-ln.cambridge.arm.com>
+ <20180924165218.26c7c418@windsurf>
+ <0f80dc88-dffe-4ca6-bb85-c4e5c967e0e1@cesnet.cz>
+Message-ID: <20181001145148.158c6207@windsurf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 27, 2018 at 10:53:41AM +0000, Fabrizio Castro wrote:
-> Hello Simon,
-> 
-> > Subject: Re: [PATCH v2 3/3] arm64: dts: renesas: r8a774a1: Add CAN nodes
-> >
-> > On Mon, Sep 10, 2018 at 11:43:15AM +0100, Fabrizio Castro wrote:
-> > > From: Chris Paterson <chris.paterson2@renesas.com>
-> > >
-> > > Add the device nodes for both RZ/G2M CAN channels.
-> > >
-> > > Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
-> > > Reviewed-by: Biju Das <biju.das@bp.renesas.com>
-> > > ---
-> > >
-> > > v1->v2:
-> > > * replaced "renesas,rzg-gen2-can" with "renesas,rcar-gen3-can" as per
-> > >   Geert's comment.
-> > >
-> > > This patch applies on top of renesas-devel-20180906-v4.19-rc2.
-> >
-> > Thanks Fabrizio,
-> >
-> > I would like to waif for the bindings to be accepted before accepting this
-> > patch.
-> 
-> Marc has taken the bindings, I guess we can unblock this patch now?
+Hello,
 
-Thanks, applied for v4.21.
+On Mon, 01 Oct 2018 12:56:37 +0200, Jan Kundr?t wrote:
+
+> Thomas, Russell, Lorenzo,
+> did you have time to convert this into a patch which can hit 4.19? I don't 
+> see anything related in 4.19-rc6, but perhaps I missed something. Is there 
+> something that I should test or otherwise help?
+
+Sorry, I suddenly got busy (my second son arrived a few days earlier
+than expected).
+
+I just sent a proper patch with the proposal I made last week, after
+testing on ClearFog and Armada XP GP. Note that on ClearFog, I only
+tested that it fixes the panic at boot, since I didn't had any
+mini-PCIe devices at hand. On Armada XP GP, I verified that an E1000E
+NIC was still working as expected. Therefore, it would be useful if
+you could test on your ClearFog platform with PCI devices connected.
+
+Thanks a lot and sorry for the delay.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
