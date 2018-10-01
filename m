@@ -1,77 +1,39 @@
-From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
-Date: Mon, 1 Oct 2018 01:55:19 +0100
-Subject: [PATCH] arm64: dts: allwinner: a64: Re-add "syscon" compatible
-In-Reply-To: <20180926095202.tdibor3x7fsn6afz@flea>
-References: <20180917152857.162662-1-andre.przywara@arm.com>
- <CAGb2v643=V_3DbLeEyXEavSQJsW2KdknpZZLfw4QwCjhfdmVsA@mail.gmail.com>
- <20180921153522.0413c280@donnerap.Emea.Arm.com>
- <20180921151625.wkaypyueyi2pguur@flea>
- <20180924112230.73e3009b@donnerap.Emea.Arm.com>
- <20180926095202.tdibor3x7fsn6afz@flea>
-Message-ID: <22014c5e-fee0-d4c6-bc6c-cd30c8545292@arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 1 Oct 2018 10:39:25 +0800
+Subject: [GIT PULL] i.MX fixes for 4.19, round 2
+Message-ID: <20181001023923.GQ26692@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/26/18 10:52 AM, Maxime Ripard wrote:
+The following changes since commit 57361846b52bc686112da6ca5368d11210796804:
 
-Hi Maxime,
+  Linux 4.19-rc2 (2018-09-02 14:37:30 -0700)
 
-> On Mon, Sep 24, 2018 at 11:22:30AM +0100, Andre Przywara wrote:
->>> The fundamental difference is that we're mostly just a bunch of spare
->>> time programmers working on this platform, with a partial
->>> documentation for the controllers, at best.
->>>
->>> You forced me to ask these developpers to work on their weekends and
->>> evenings on some crazy corner cases to maintain the backward
->>> compatibility. And honestly, both from a technical and human
->>> standpoint, I definitely understand if some of them are just leaving
->>> and don't want to work on it anymore. I would probably do the same in
->>> their position.
->>>
->>> And having to ask that for companies like ARM or SUSE just makes it
->>> more frustrating to be honest. So there's simply no way you have
->>> forward compatibility while I'm there. Or you manage to convince all
->>> the ARM maintainers and enforce that compatibility for all the
->>> platforms.
->>
->> I understand that from your point of view there is no way of investing
->> huge efforts in staying forward compatible, but I am not asking for
->> that (and by no way forcing this!). Instead this suggestion is a small
->> tweak to achieve this.
-> 
-> We're trying to remain compatible but if there's any technical reason,
-> then we won't be. I don't want anyone to assume we will, and to rely
-> on the fact that we are actually guaranteeing this.
+are available in the git repository at:
 
-I understand that this is not the forum to discuss this, so have to
-accept your position here. But I don't think this means we can't try to
-solve those issues on case-by-case base? Just because we don't guarantee
-this doesn't mean we shouldn't even try.
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.19-2
 
->> So I am sorry if those things frustrate you (which I can understand
->> very well), but I believe fixing the DT in a proper way is
->> much more user friendly in the long term (actually this issue was
->> brought forward by a user[1]).
-> 
-> Given the current state of the industry, I don't really see how the DT
-> can allow you to do what you are trying to achieve.
+for you to fetch changes up to 4d8d4712e47c028306149bda04b79f70325aefb0:
 
-I am not sure I do understand what you mean with "industry"? If you are
-thinking about the SoC vendor or board vendors to push this endeavor and
-create stable bindings and DTs from the beginning: I see that this won't
-work with the prevalent attitude across many vendors today.
+  soc: imx: gpc: set DMA mask for PD platform devices (2018-09-26 10:38:38 +0800)
 
-But in our case we (as the community) drive the DTs and the bindings
-anyway, and we decided to mostly ignore Allwinner's DT effort - for good
-reasons. So we can - given consensus on the goals and approach - make
-this possible and don't need to rely on any company or "industry".
+----------------------------------------------------------------
+i.MX fixes for 4.19, round 2:
+ - There appears an uninitialized DMA mask warning on i.MX GPC driver
+   with 4.19-rc kernel.  Set the DMA mask for powerdomain platform
+   device to fix the warning given by device core.
+ - i.MX53 QSB board stops working when cpufreq driver is enabled,
+   because the default OPP table has the maximum CPU frequency at
+   1.2GHz, while the board is only capable of running 1GHz.  Fix up
+   the OPP table for the board to get it work with cpufreq driver.
 
-I find it a bit pity that we are stuck with this embedded approach,
-where each board(!) vendor AND community members produce gazillions of
-questionable images with all kind of distribution flavors.
-At the moment (mainline U-Boot with EFI support and shipping with decent
-DTs) we are very close to let people install distros with off-the-shelf
-installers. I think this is a goal worthwhile fighting for.
+----------------------------------------------------------------
+Lucas Stach (1):
+      soc: imx: gpc: set DMA mask for PD platform devices
 
-Cheers,
-Andre.
+Sascha Hauer (1):
+      ARM: dts: imx53-qsb: disable 1.2GHz OPP
+
+ arch/arm/boot/dts/imx53-qsb-common.dtsi | 11 +++++++++++
+ drivers/soc/imx/gpc.c                   |  1 +
+ 2 files changed, 12 insertions(+)
