@@ -1,19 +1,31 @@
 From: salyzyn@android.com (Mark Salyzyn)
-Date: Mon,  1 Oct 2018 10:58:36 -0700
-Subject: RESEND [PATCH v3 3/3] arm64: compat: Add CONFIG_KUSER_HELPERS
+Date: Mon,  1 Oct 2018 10:58:35 -0700
+Subject: RESEND [PATCH v3 2/3] arm64: compat: Split the sigreturn trampolines
+ and kuser helpers (assembler sources)
 In-Reply-To: <20181001175845.168430-1-salyzyn@android.com>
 References: <20181001175845.168430-1-salyzyn@android.com>
-Message-ID: <20181001175845.168430-17-salyzyn@android.com>
+Message-ID: <20181001175845.168430-16-salyzyn@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kevin Brodsky <kevin.brodsky@arm.com>
 
-Make it possible to disable the kuser helpers by adding a KUSER_HELPERS
-config option (enabled by default). When disabled, all kuser
-helpers-related code is removed from the kernel and no mapping is done
-at the fixed high address (0xffff0000); any attempt to use a kuser
-helper from a 32-bit process will result in a segfault.
+AArch32 processes are currently installed a special [vectors] page that
+contains the sigreturn trampolines and the kuser helpers, at the fixed
+address mandated by the kuser helpers ABI.
+
+Having both functionalities in the same page has become problematic,
+because:
+
+* It makes it impossible to disable the kuser helpers (the sigreturn
+  trampolines cannot be removed), which is possible on arm.
+
+* A future 32-bit vDSO would provide the sigreturn trampolines itself,
+  making those in [vectors] redundant.
+
+This patch addresses the problem by moving the sigreturn trampolines
+sources to its own file.  Wrapped the comments to reduce the wrath of
+checkpatch.pl.
 
 Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
 Signed-off-by: Mark Salyzyn <salyzyn@android.com>
@@ -38,144 +50,173 @@ Cc: Jeremy Linton <Jeremy.Linton@arm.com>
 Cc: android-kernel at android.com
 
 v2:
-- split off assembler changes to a new previous patch in series to reduce churn
-- modify slightly the feature documentation to reduce its reach
-- modify slightly the feature documentation to rationalize the yes default.
-- There are more ifdefs as a result of the rebase.
+- split off from previous v1 'arm64: compat: Add CONFIG_KUSER_HELPERS'
+- adjust makefile so one line for each of the assembler source modules
 
 v3:
 - rebase
 ---
- arch/arm64/Kconfig         | 30 ++++++++++++++++++++++++++++++
- arch/arm64/kernel/Makefile |  4 ++--
- arch/arm64/kernel/vdso.c   | 10 ++++++++++
- 3 files changed, 42 insertions(+), 2 deletions(-)
+ arch/arm64/kernel/Makefile      |  4 +-
+ arch/arm64/kernel/kuser32.S     | 48 ++---------------------
+ arch/arm64/kernel/sigreturn32.S | 67 +++++++++++++++++++++++++++++++++
+ 3 files changed, 73 insertions(+), 46 deletions(-)
+ create mode 100644 arch/arm64/kernel/sigreturn32.S
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 1b1a0e95c751..6e61f01108cb 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -1301,6 +1301,36 @@ config COMPAT
- 
- 	  If you want to execute 32-bit userspace applications, say Y.
- 
-+config KUSER_HELPERS
-+	bool "Enable the kuser helpers page in 32-bit processes"
-+	depends on COMPAT
-+	default y
-+	help
-+	  Warning: disabling this option may break 32-bit applications.
-+
-+	  Provide kuser helpers in a special purpose fixed-address page. The
-+	  kernel provides helper code to userspace in read-only form at a fixed
-+	  location to allow userspace to be independent of the CPU type fitted
-+	  to the system. This permits 32-bit binaries to be run on ARMv6 through
-+	  to ARMv8 without modification.
-+
-+	  See Documentation/arm/kernel_user_helpers.txt for details.
-+
-+	  However, the fixed-address nature of these helpers can be used by ROP
-+	  (return-orientated programming) authors when creating exploits.
-+
-+	  If all of the 32-bit binaries and libraries that run on your platform
-+	  are built specifically for your platform, and make no use of these
-+	  helpers, then you can turn this option off to hinder such exploits.
-+	  However, in that case, if a binary or library relying on those helpers
-+	  is run, it will receive a SIGSEGV signal, which will terminate the
-+	  program. Typically, binaries compiled for ARMv7 or later do not use
-+	  the kuser helpers.
-+
-+	  Say N here only if you are absolutely certain that you do not need
-+	  these helpers; otherwise, the safe option is to say Y (the default
-+	  for now)
-+
- config SYSVIPC_COMPAT
- 	def_bool y
- 	depends on COMPAT && SYSVIPC
 diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index b89a79424912..1c2bd2210f58 100644
+index 4c8b13bede80..b89a79424912 100644
 --- a/arch/arm64/kernel/Makefile
 +++ b/arch/arm64/kernel/Makefile
-@@ -27,10 +27,10 @@ OBJCOPYFLAGS := --prefix-symbols=__efistub_
+@@ -27,8 +27,10 @@ OBJCOPYFLAGS := --prefix-symbols=__efistub_
  $(obj)/%.stub.o: $(obj)/%.o FORCE
  	$(call if_changed,objcopy)
  
--arm64-obj-$(CONFIG_COMPAT)		+= sys32.o signal32.o 	\
-+arm64-obj-$(CONFIG_COMPAT)		+= sys32.o signal32.o	\
+-arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
++arm64-obj-$(CONFIG_COMPAT)		+= sys32.o signal32.o 	\
  					   sys_compat.o
- arm64-obj-$(CONFIG_COMPAT)		+= sigreturn32.o
--arm64-obj-$(CONFIG_COMPAT)		+= kuser32.o
-+arm64-obj-$(CONFIG_KUSER_HELPERS)	+= kuser32.o
++arm64-obj-$(CONFIG_COMPAT)		+= sigreturn32.o
++arm64-obj-$(CONFIG_COMPAT)		+= kuser32.o
  arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
  arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
  arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
-diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-index 5398f6454ce1..76a94bed4bd5 100644
---- a/arch/arm64/kernel/vdso.c
-+++ b/arch/arm64/kernel/vdso.c
-@@ -62,18 +62,22 @@ static const struct vm_special_mapping compat_vdso_spec[] = {
- 		.name	= "[sigpage]",
- 		.pages	= &vectors_page[0],
- 	},
-+#ifdef CONFIG_KUSER_HELPERS
- 	{
- 		.name	= "[kuserhelpers]",
- 		.pages	= &vectors_page[1],
- 	},
-+#endif
- };
- static struct page *vectors_page[ARRAY_SIZE(compat_vdso_spec)] __ro_after_init;
+diff --git a/arch/arm64/kernel/kuser32.S b/arch/arm64/kernel/kuser32.S
+index 997e6b27ff6a..d15b5c2935b3 100644
+--- a/arch/arm64/kernel/kuser32.S
++++ b/arch/arm64/kernel/kuser32.S
+@@ -20,16 +20,13 @@
+  *
+  * AArch32 user helpers.
+  *
+- * Each segment is 32-byte aligned and will be moved to the top of the high
+- * vector page.  New segments (if ever needed) must be added in front of
+- * existing ones.  This mechanism should be used only for things that are
+- * really small and justified, and not be abused freely.
++ * These helpers are provided for compatibility with AArch32 binaries that
++ * still need them. They are installed at a fixed address by
++ * aarch32_setup_additional_pages().
+  *
+  * See Documentation/arm/kernel_user_helpers.txt for formal definitions.
+  */
  
- static int __init alloc_vectors_page(void)
- {
-+#ifdef CONFIG_KUSER_HELPERS
- 	extern char __kuser_helper_start[], __kuser_helper_end[];
- 	size_t kuser_sz = __kuser_helper_end - __kuser_helper_start;
- 	unsigned long kuser_vpage;
-+#endif
- 
- 	extern char __aarch32_sigret_code_start[], __aarch32_sigret_code_end[];
- 	size_t sigret_sz =
-@@ -84,22 +88,26 @@ static int __init alloc_vectors_page(void)
- 	if (!sigret_vpage)
- 		return -ENOMEM;
- 
-+#ifdef CONFIG_KUSER_HELPERS
- 	kuser_vpage = get_zeroed_page(GFP_ATOMIC);
- 	if (!kuser_vpage) {
- 		free_page(sigret_vpage);
- 		return -ENOMEM;
- 	}
-+#endif
- 
- 	/* sigreturn code */
- 	memcpy((void *)sigret_vpage, __aarch32_sigret_code_start, sigret_sz);
- 	flush_icache_range(sigret_vpage, sigret_vpage + PAGE_SIZE);
- 	vectors_page[0] = virt_to_page(sigret_vpage);
- 
-+#ifdef CONFIG_KUSER_HELPERS
- 	/* kuser helpers */
- 	memcpy((void *)kuser_vpage + 0x1000 - kuser_sz, __kuser_helper_start,
- 		kuser_sz);
- 	flush_icache_range(kuser_vpage, kuser_vpage + PAGE_SIZE);
- 	vectors_page[1] = virt_to_page(kuser_vpage);
-+#endif
- 
- 	return 0;
- }
-@@ -128,11 +136,13 @@ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
- 
- 	current->mm->context.vdso = (void *)addr;
- 
-+#ifdef CONFIG_KUSER_HELPERS
- 	/* Map the kuser helpers at the ABI-defined high address. */
- 	ret = _install_special_mapping(mm, AARCH32_KUSER_HELPERS_BASE,
- 				       PAGE_SIZE,
- 				       VM_READ|VM_EXEC|VM_MAYREAD|VM_MAYEXEC,
- 				       &compat_vdso_spec[1]);
-+#endif
- out:
- 	up_write(&mm->mmap_sem);
- 
+-#include <asm/unistd.h>
+-
+ 	.align	5
+ 	.globl	__kuser_helper_start
+ __kuser_helper_start:
+@@ -77,42 +74,3 @@ __kuser_helper_version:			// 0xffff0ffc
+ 	.word	((__kuser_helper_end - __kuser_helper_start) >> 5)
+ 	.globl	__kuser_helper_end
+ __kuser_helper_end:
+-
+-/*
+- * AArch32 sigreturn code
+- *
+- * For ARM syscalls, the syscall number has to be loaded into r7.
+- * We do not support an OABI userspace.
+- *
+- * For Thumb syscalls, we also pass the syscall number via r7. We therefore
+- * need two 16-bit instructions.
+- */
+-	.globl __aarch32_sigret_code_start
+-__aarch32_sigret_code_start:
+-
+-	/*
+-	 * ARM Code
+-	 */
+-	.byte	__NR_compat_sigreturn, 0x70, 0xa0, 0xe3	// mov	r7, #__NR_compat_sigreturn
+-	.byte	__NR_compat_sigreturn, 0x00, 0x00, 0xef	// svc	#__NR_compat_sigreturn
+-
+-	/*
+-	 * Thumb code
+-	 */
+-	.byte	__NR_compat_sigreturn, 0x27			// svc	#__NR_compat_sigreturn
+-	.byte	__NR_compat_sigreturn, 0xdf			// mov	r7, #__NR_compat_sigreturn
+-
+-	/*
+-	 * ARM code
+-	 */
+-	.byte	__NR_compat_rt_sigreturn, 0x70, 0xa0, 0xe3	// mov	r7, #__NR_compat_rt_sigreturn
+-	.byte	__NR_compat_rt_sigreturn, 0x00, 0x00, 0xef	// svc	#__NR_compat_rt_sigreturn
+-
+-	/*
+-	 * Thumb code
+-	 */
+-	.byte	__NR_compat_rt_sigreturn, 0x27			// svc	#__NR_compat_rt_sigreturn
+-	.byte	__NR_compat_rt_sigreturn, 0xdf			// mov	r7, #__NR_compat_rt_sigreturn
+-
+-        .globl __aarch32_sigret_code_end
+-__aarch32_sigret_code_end:
+diff --git a/arch/arm64/kernel/sigreturn32.S b/arch/arm64/kernel/sigreturn32.S
+new file mode 100644
+index 000000000000..6ecda4d84cd5
+--- /dev/null
++++ b/arch/arm64/kernel/sigreturn32.S
+@@ -0,0 +1,67 @@
++/*
++ * sigreturn trampolines for AArch32.
++ *
++ * Copyright (C) 2005-2011 Nicolas Pitre <nico@fluxnic.net>
++ * Copyright (C) 2012 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ *
++ * AArch32 sigreturn code
++ *
++ * For ARM syscalls, the syscall number has to be loaded into r7.
++ * We do not support an OABI userspace.
++ *
++ * For Thumb syscalls, we also pass the syscall number via r7. We therefore
++ * need two 16-bit instructions.
++ */
++
++#include <asm/unistd.h>
++
++	.globl __aarch32_sigret_code_start
++__aarch32_sigret_code_start:
++
++	/*
++	 * ARM Code
++	 */
++	// mov	r7, #__NR_compat_sigreturn
++	.byte	__NR_compat_sigreturn, 0x70, 0xa0, 0xe3
++	// svc	#__NR_compat_sigreturn
++	.byte	__NR_compat_sigreturn, 0x00, 0x00, 0xef
++
++	/*
++	 * Thumb code
++	 */
++	// svc	#__NR_compat_sigreturn
++	.byte	__NR_compat_sigreturn, 0x27
++	// mov	r7, #__NR_compat_sigreturn
++	.byte	__NR_compat_sigreturn, 0xdf
++
++	/*
++	 * ARM code
++	 */
++	// mov	r7, #__NR_compat_rt_sigreturn
++	.byte	__NR_compat_rt_sigreturn, 0x70, 0xa0, 0xe3
++	// svc	#__NR_compat_rt_sigreturn
++	.byte	__NR_compat_rt_sigreturn, 0x00, 0x00, 0xef
++
++	/*
++	 * Thumb code
++	 */
++	// svc	#__NR_compat_rt_sigreturn
++	.byte	__NR_compat_rt_sigreturn, 0x27
++	// mov	r7, #__NR_compat_rt_sigreturn
++	.byte	__NR_compat_rt_sigreturn, 0xdf
++
++        .globl __aarch32_sigret_code_end
++__aarch32_sigret_code_end:
 -- 
 2.19.0.605.g01d371f741-goog
