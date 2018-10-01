@@ -1,87 +1,25 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 1 Oct 2018 14:49:06 +0900
-Subject: [PATCH v3 6/9] kbuild: consolidate Devicetree dtb build rules
-In-Reply-To: <20180928154150.GA25013@bogus>
-References: <20180910150403.19476-1-robh@kernel.org>
- <20180910150403.19476-7-robh@kernel.org>
- <CAL_Jsq+=VbdcVLiwXbOA5d+R2YY6=2Pw2bQpci-jj-JvereD1A@mail.gmail.com>
- <CAK7LNAQFqhWw+LwDoypGG=OP6tH4qf2tT=LvtchK2GoiNyzDXg@mail.gmail.com>
- <CAMuHMdWEnoh97_jiDWMq=ke4PrhSFbToYnx91CPLBuq3mOGzoQ@mail.gmail.com>
- <CAK7LNATkkOiYPj2RLubcgZ_z59Bhz4GkgWqPMbnaHBk7EisXLg@mail.gmail.com>
- <20180928154150.GA25013@bogus>
-Message-ID: <CAK7LNATiSbwVfCRNsDOyksfq5wcv0pnNQYnMXdo2yRyE7fcn-Q@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 1 Oct 2018 11:24:26 +0530
+Subject: [PATCH 2/2] cpufreq: imx6q: read OCOTP through nvmem for
+ imx6ul/imx6ull
+In-Reply-To: <1536893962-11200-2-git-send-email-Anson.Huang@nxp.com>
+References: <1536893962-11200-1-git-send-email-Anson.Huang@nxp.com>
+ <1536893962-11200-2-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20181001055426.w5rp4nfleh4tog3k@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On 14-09-18, 10:59, Anson Huang wrote:
+> On i.MX6UL/i.MX6ULL, accessing OCOTP directly is wrong because
+> the ocotp clock needs to be enabled first. Add support for reading
+> OCOTP through the nvmem API instead.
+> 
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> ---
+>  drivers/cpufreq/imx6q-cpufreq.c | 39 +++++++++++++++++++--------------------
+>  1 file changed, 19 insertions(+), 20 deletions(-)
 
-
-2018?9?29?(?) 0:43 Rob Herring <robh@kernel.org>:
-
-> +#
-> ---------------------------------------------------------------------------
-> +# Devicetree files
-> +
-> +ifneq ($(wildcard $(srctree)/arch/$(SRCARCH)/boot/dts/),)
-> +dtstree := arch/$(SRCARCH)/boot/dts
-> +endif
-> +
-> +ifneq ($(dtstree),)
-> +
-> +%.dtb : scripts_dtc
-
-%.dtb: prepare3 prepare
-
-
-because we need to make sure KERNELRELEASE
-is correctly defined before dtbs_install happens.
-
-
-> +       $(Q)$(MAKE) $(build)=$(dtstree) $(dtstree)/$@
-> +
-> +PHONY += dtbs dtbs_install
-> +dtbs: scripts_dtc
-
-
-dtbs: prepare3 scripts_dtc
-
-
-
-> +       $(Q)$(MAKE) $(build)=$(dtstree)
-> +
-> +dtbs_install: dtbs
-
-
-Please do not have dtbs_install to depend on dtbs.
-
-No install targets should ever trigger building anything
-in the source tree.
-
-
-For the background, see the commit log of
-19514fc665ffbce624785f76ee7ad0ea6378a527
-
-
-
-
-> +       $(Q)$(MAKE) $(dtbinst)=$(dtstree)
-> +
-> +ifdef CONFIG_OF_EARLY_FLATTREE
-> +all: dtbs
-> +endif
-> +
-> +endif
-> +
-> +PHONY += scripts_dtc
-> +scripts_dtc: scripts_basic
-> +       $(Q)$(MAKE) $(build)=scripts/dtc
-> +
->  #
-> ---------------------------------------------------------------------------
->  # Modules
->
-
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
 -- 
-Best Regards
-Masahiro Yamada
+viresh
