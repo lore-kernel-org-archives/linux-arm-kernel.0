@@ -1,50 +1,66 @@
-From: m.purski@samsung.com (Maciej Purski)
-Date: Mon, 1 Oct 2018 09:25:08 +0200
-Subject: [PATCH] regulator: core: Pass max_uV value to
- regulator_set_voltage_rdev
-In-Reply-To: <dbaa721a-9a47-2c6a-46d5-92a7ca13c5aa@gmail.com>
-References: <20180615112916.GK112168@atomide.com>
- <CGME20180618140856eucas1p281619f9bf003655a3c2eac356216ab25@eucas1p2.samsung.com>
- <1529330913-11152-1-git-send-email-m.purski@samsung.com>
- <20180702080505.GN112168@atomide.com>
- <95655644-ef41-f5bd-7e8e-a257d48cd020@gmail.com>
- <20180928202251.GM5662@atomide.com>
- <2c0132ff-ea0f-f19e-ebfb-a0d077565d2c@gmail.com>
- <20180928224109.GS5662@atomide.com>
- <ea0a59ef-e201-986a-9499-a0638359b1b9@gmail.com>
- <d14cc796-8644-41a3-5135-299bd8820204@gmail.com>
- <20180929002753.GT5662@atomide.com>
- <dbaa721a-9a47-2c6a-46d5-92a7ca13c5aa@gmail.com>
-Message-ID: <20181001072510eucas1p29a6e504d642d2cac67ed7c3b43f9d53c~Za0l11ceE1868218682eucas1p2w@eucas1p2.samsung.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 1 Oct 2018 09:53:15 +0200
+Subject: [PATCH v3 6/9] kbuild: consolidate Devicetree dtb build rules
+In-Reply-To: <CAL_JsqKLOohxGx0Je9niMQ5H3o0Y=EcMQTB6YkbV0sfUOZHu8g@mail.gmail.com>
+References: <20180910150403.19476-1-robh@kernel.org>
+ <20180910150403.19476-7-robh@kernel.org>
+ <CAL_Jsq+=VbdcVLiwXbOA5d+R2YY6=2Pw2bQpci-jj-JvereD1A@mail.gmail.com>
+ <CAK7LNAQFqhWw+LwDoypGG=OP6tH4qf2tT=LvtchK2GoiNyzDXg@mail.gmail.com>
+ <CAMuHMdWEnoh97_jiDWMq=ke4PrhSFbToYnx91CPLBuq3mOGzoQ@mail.gmail.com>
+ <75740733-d0d4-4c0c-838c-f01a5e7291d3@suse.de>
+ <CAL_JsqKLOohxGx0Je9niMQ5H3o0Y=EcMQTB6YkbV0sfUOZHu8g@mail.gmail.com>
+Message-ID: <CAMuHMdW_+PNZrh5JXo8MxVwg3YSZL7bszMcUJjCqMFfBz8HDPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-unfortunately, I don't work at kernel anymore. That would be great, if you could take over those patches and finish the 
-work.
-Best regards,
-Maciej
+On Fri, Sep 28, 2018 at 8:42 PM Rob Herring <robh@kernel.org> wrote:
+> On Fri, Sep 28, 2018 at 12:21 PM Andreas F?rber <afaerber@suse.de> wrote:
+> > Am 13.09.18 um 17:51 schrieb Geert Uytterhoeven:
+> > > On Wed, Sep 12, 2018 at 3:02 AM Masahiro Yamada
+> > > <yamada.masahiro@socionext.com> wrote:
+> > >> Even x86 can enable OF and OF_UNITTEST.
+> > >>
+> > >> Another solution might be,
+> > >> guard it by 'depends on ARCH_SUPPORTS_OF'.
+> > >>
+> > >> This is actually what ACPI does.
+> > >>
+> > >> menuconfig ACPI
+> > >>         bool "ACPI (Advanced Configuration and Power Interface) Support"
+> > >>         depends on ARCH_SUPPORTS_ACPI
+> > >>          ...
+> > >
+> > > ACPI is a real platform feature, as it depends on firmware.
+> > >
+> > > CONFIG_OF can be enabled, and DT overlays can be loaded, on any platform,
+> > > even if it has ACPI ;-)
+> >
+> > How would loading a DT overlay work on an ACPI platform? I.e., what
+> > would it overlay against and how to practically load such a file?
+>
+> The DT unittests do just that. I run them on x86 and UM builds. In
+> this case, the loading source is built-in.
+>
+> > I wonder whether that could be helpful for USB devices and serdev...
+>
+> How to load the overlays is pretty orthogonal to the issues to be
+> solved here. It would certainly be possible to move forward with
+> prototyping this and just have the overlay built-in. It may not even
+> need to be an overlay if we can support multiple root nodes.
 
-On 09/29/2018 02:44 AM, Dmitry Osipenko wrote:
-> On 9/29/18 3:27 AM, Tony Lindgren wrote:
->> * Dmitry Osipenko <digetx@gmail.com> [180928 23:55]:
->>> On 9/29/18 2:17 AM, Dmitry Osipenko wrote:
->>>> On 9/29/18 1:41 AM, Tony Lindgren wrote:
->>>>> I'm still getting these errors after init:
->>>>
->>>> Thank you very much again, seems I got what's wrong with your case. The ti-abb-regulator driver sets the "abb->current_info_idx = -EINVAL" on probe and that value is getting updated only after the first voltage change, hence _regulator_get_voltage() returns -22.
->>
->> OK that's starting to make some sense now thanks.
->>
->>>> Please try this patch:
->>>
->>> I've revised the patch and here is the current final version.
->>
->> Hey cool this one works now :) I suggest you rework the whole series
->> with these fixes. I recall the series had a problem with git bisect
->> too between the patches. It will make life easier for other people
->> who may need to git bisect these patches.
-> 
-> Awesome! There are few other things in this patchset that also need fixing. I've asked Maciej if he's going to continue working on the patches, waiting for the answer. I can pick up the patches and try to finish the work if necessary.
-> 
-> 
+You indeed need to refer to some anchors for most use cases, although a
+simple MMIO device could just be anchored to the root node.
+
+Topologies hanging off a USB device would be my first use case, too,
+for serdev, or for e.g. the mcp2210 USB-SPI bridge.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
