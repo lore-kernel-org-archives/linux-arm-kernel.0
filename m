@@ -1,114 +1,33 @@
-From: ludovic.barre@st.com (Ludovic BARRE)
-Date: Mon, 1 Oct 2018 15:53:21 +0200
-Subject: [PATCH V2 27/27] mmc: mmci: add stm32 sdmmc variant
-In-Reply-To: <CAPDyKFr45FF-wbhT7C=+G5ptbCMRiKie304UM9P2vRypKd=PvQ@mail.gmail.com>
-References: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
- <1537523181-14578-28-git-send-email-ludovic.Barre@st.com>
- <CAPDyKFqGY2o7TcUVW9bCZM9-4xtyJJ4PaCtWWQvV3VMd+cK99A@mail.gmail.com>
- <50222b8d-3b53-acea-7935-092fa149d54c@st.com>
- <CAPDyKFr45FF-wbhT7C=+G5ptbCMRiKie304UM9P2vRypKd=PvQ@mail.gmail.com>
-Message-ID: <9e64085d-c137-6117-644d-78f796210277@st.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 1 Oct 2018 16:00:27 +0200
+Subject: [GIT PULL] arm: actions: arm64 for v4.20 #1
+In-Reply-To: <20180930180715.25829-3-afaerber@suse.de>
+References: <20180930180715.25829-1-afaerber@suse.de>
+ <20180930180715.25829-3-afaerber@suse.de>
+Message-ID: <CAK8P3a3CkTwvT0qHyQ_-8hsBebKn0ngTWHLf0kLbFskTZ3c3Yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Sep 30, 2018 at 8:07 PM Andreas F?rber <afaerber@suse.de> wrote:
+>
+> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+>
+>   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+>
+> are available in the Git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git tags/actions-arm64-soc-for-4.20
+>
+> for you to fetch changes up to e0c27a1066a935671a00b1764385bc8118d8022c:
+>
+>   arm64: actions: Enable PINCTRL in platforms Kconfig (2018-09-30 19:11:33 +0200)
+>
+> ----------------------------------------------------------------
+> Actions Semi arm64 SoC for v4.20
+>
+> This updates and extends the MAINTAINERS entry, adding Mani.
+> It also selects PINCTRL in Kconfig.
 
+Pulled into next/soc; thanks, and welcome Manivannan as a reviewer!
 
-On 10/01/2018 03:39 PM, Ulf Hansson wrote:
-> [...]
-> 
->>>>    struct variant_data {
->>>>           unsigned int            clkreg;
->>>> @@ -348,6 +350,8 @@ struct variant_data {
->>>>           unsigned int            irq_pio_mask;
->>>>           u32                     start_err;
->>>>           u32                     opendrain;
->>>> +       bool                    dma_lli;
->>>> +       u32                     stm32_idmabsize_mask;
->>>
->>>
->>> What are these?
->>
->>
->> This property is specific for sdmmc variants:
->> sdmmc has a Internal DMA and the number bytes per buffer
->> could be different between sdmmc variants
->> (depend of SDMMC_IDMABSIZER register).
-> 
-> Okay. Thanks for clarifying.
-> 
-> Could you please add some information about this in the changelog as well?
-
-OK
-
-> 
-> [...]
-> 
->>>> +
->>>> +static int _sdmmc_idma_prep_data(struct mmci_host *host,
->>>> +                                struct mmc_data *data)
->>>> +{
->>>> +       int n_elem;
->>>> +
->>>> +       n_elem = dma_map_sg(mmc_dev(host->mmc),
->>>> +                           data->sg,
->>>> +                           data->sg_len,
->>>> +                           mmc_get_dma_dir(data));
->>>> +
->>>> +       if (!n_elem) {
->>>> +               dev_err(mmc_dev(host->mmc), "dma_map_sg failed\n");
->>>> +               return -EINVAL;
->>>> +       }
->>>> +
->>>> +       return 0;
->>>> +}
->>>> +
->>>> +static int sdmmc_idma_prep_data(struct mmci_host *host,
->>>> +                               struct mmc_data *data, bool next)
->>>> +{
->>>> +       /* Check if job is already prepared. */
->>>> +       if (!next && data->host_cookie == host->next_cookie)
->>>> +               return 0;
->>>> +
->>>> +       return _sdmmc_idma_prep_data(host, data);
->>>> +}
->>>> +
->>>> +static void sdmmc_idma_unprep_data(struct mmci_host *host,
->>>> +                                  struct mmc_data *data, int err)
->>>> +{
->>>> +       dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
->>>> +                    mmc_get_dma_dir(data));
->>>> +}
->>>
->>>
->>> The sdmmc_idma_prep_data() and sdmmc_idma_unprep_data(), seems very
->>> similar to what the mmci core driver needs to do in this regards.
->>>
->>> Can we perhaps avoid adding these callbacks altogether, but rather
->>> rely on common code in the mmci core driver?
->>
->>
->> Actually, these callbacks allow to manage prepare/unprepare of
->> dmaengine interface for mmci variant, (not needed for sdmmc which uses an
->> internal dma).
->>
->> For Sdmmc, today there are no special case, just dma_map/unmap.
->> But in the future, I hope manage the lli list in these callback.
->>
->> Only dma_map/unmap could be common, but the error management may
->> be complicated (in mmci variant).
->>
->> Personally, I prefer keep prep_data/unprep_data mmci_host_ops
->> interfaces.
->> What do you suggest ?
-> 
-> Okay, let's keep them for now. We can always change things on top, in
-> case we see later that those callbacks can be removed.
-
-Okay, that make sense.
-
-> 
-> [...]
-> 
-> Kind regards
-> Uffe
-> 
+      Arnd
