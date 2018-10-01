@@ -1,45 +1,41 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 1 Oct 2018 15:17:28 +0200
-Subject: [PATCH v3 2/4] firmware: xilinx: Add zynqmp IOCTL API for device
- control
-In-Reply-To: <CAOesGMiUnVrnW1VDh1CKRKGpkwAC9G8tiHjpb+7bss6LpPWU-A@mail.gmail.com>
-References: <1537985581-32164-1-git-send-email-jollys@xilinx.com>
- <1537985581-32164-3-git-send-email-jollys@xilinx.com>
- <CAOesGMhEcMB4caAPtCSq-m5zQBDc-8Z4f_xAkomnEwVaHyX2Mw@mail.gmail.com>
- <BL2PR02MB21308D0B6AF76A8094E70863B8EC0@BL2PR02MB2130.namprd02.prod.outlook.com>
- <CAOesGMiUnVrnW1VDh1CKRKGpkwAC9G8tiHjpb+7bss6LpPWU-A@mail.gmail.com>
-Message-ID: <2350f5c3-b59e-b37b-c679-5b0a36f9a79c@xilinx.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 1 Oct 2018 15:17:44 +0200
+Subject: [PATCH] MAINTAINERS: Drop dt-bindings/genpd/k2g.h
+In-Reply-To: <19176740-b38f-8ae9-a9a2-85d6f7a9c590@oracle.com>
+References: <20180928224615.19862-1-nm@ti.com>
+ <19176740-b38f-8ae9-a9a2-85d6f7a9c590@oracle.com>
+Message-ID: <CAK8P3a0CqDFbNOcLH-mEGfxb2HyzDNiuUWf5zAo1ndehQs9S2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, Sep 29, 2018 at 2:07 AM Santosh Shilimkar
+<santosh.shilimkar@oracle.com> wrote:
+> On 9/28/2018 3:46 PM, Nishanth Menon wrote:
+> > Drop include/dt-bindings/genpd/k2g.h which disappeared from kernel tree
+> > some time back, however MAINTAINERS file was missed to be updated.
+> >
+> > Fixes: d16645054d2f ("dt-bindings: Drop k2g genpd device ID macros")
+> > Cc: Rob Herring <robh@kernel.org>
+> > Cc: Dave Gerlach <d-gerlach@ti.com>
+> > Cc: Santosh Shilimkar <ssantosh@kernel.org>
+> > Cc: Tero Kristo <t-kristo@ti.com>
+> > Reported-by: Joe Perches <joe@perches.com>
+> > Signed-off-by: Nishanth Menon <nm@ti.com>
+> > ---
+> >
+> > A big oops.. Sorry about that. will do better next time. I tried to relook and
+> > I think we have'nt missed any other files.
+> >
+> > Based off next-20180928 tag.
+> >
+> > Santosh, any chance you could pick this up -> Thread:
+> > https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1776470.html
+> >
+> Could you please apply this to arm-soc tree if its not too
+> late ?
+>
+> Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
 
-On 28.9.2018 23:12, Olof Johansson wrote:
-> On Fri, Sep 28, 2018 at 10:15 AM Jolly Shah <JOLLYS@xilinx.com> wrote:
->>
->> Hi Olof,
->>
->> Thanks for the review. Pushed v4 with suggested fixes. Let us know if series looks good and we can create pull request for same.
->>
->> Thanks,
->> Jolly Shah
-> 
-> I'm happy with this one, thanks for revising the patchset with the fixes.
-> 
-> Feel free to add:
-> 
-> Acked-by: Olof Johansson <olof@lixom.net>
-> 
-> to the patches.
+Applied to next/soc, thanks!
 
-Just for clarification. I have checked driver/clk and patches should
-still go via Michael or Stephen.
-Firmware code is already in arm-soc tree that's why I would expect
-Michael/Stephen should review it and then it shouldn't be a problem to
-take this via arm-soc tree.
-
-Olof: Please correct me if I am wrong and you are happy to take it via
-arm-soc directly.
-
-Thanks,
-Michal
+      Arnd
