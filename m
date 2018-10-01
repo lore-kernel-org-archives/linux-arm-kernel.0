@@ -1,12 +1,17 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Mon, 01 Oct 2018 15:04:00 -0700
-Subject: [PATCH v3 3/6] drivers: clk-qoriq: increase array size of
- cmux_to_group
-In-Reply-To: <1537747741-6245-4-git-send-email-vabhav.sharma@nxp.com>
+Date: Mon, 01 Oct 2018 15:04:24 -0700
+Subject: [PATCH v3 4/6] drivers: clk-qoriq: Add clockgen support for
+ lx2160a
+In-Reply-To: <1537747741-6245-5-git-send-email-vabhav.sharma@nxp.com>
 References: <1537747741-6245-1-git-send-email-vabhav.sharma@nxp.com>
- <1537747741-6245-4-git-send-email-vabhav.sharma@nxp.com>
-Message-ID: <153843144041.119890.5558230475983572666@swboyd.mtv.corp.google.com>
+ <1537747741-6245-5-git-send-email-vabhav.sharma@nxp.com>
+Message-ID: <153843146463.119890.6551025813220021124@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Subject should be "clk: qoriq: increase array size ..."
+Same subject comment.
+
+Quoting Vabhav Sharma (2018-09-23 17:08:59)
+> From: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
+> 
+> Add clockgen support for lx2160a.
