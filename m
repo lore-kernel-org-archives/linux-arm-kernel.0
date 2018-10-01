@@ -1,44 +1,26 @@
-From: ludovic.barre@st.com (Ludovic BARRE)
-Date: Mon, 1 Oct 2018 11:43:12 +0200
-Subject: [PATCH V2 09/27] mmc: mmci: modify dma_setup callback
-In-Reply-To: <CAPDyKFq-KUNuftT1F7TXMU-Jceqi9GYTWC4Jb7qn3UdpXHR+9Q@mail.gmail.com>
-References: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
- <1537523181-14578-10-git-send-email-ludovic.Barre@st.com>
- <CAPDyKFq-KUNuftT1F7TXMU-Jceqi9GYTWC4Jb7qn3UdpXHR+9Q@mail.gmail.com>
-Message-ID: <f47e4e0e-2e6a-2de0-ecb6-488d00fb1115@st.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 1 Oct 2018 10:48:15 +0100
+Subject: [PATCH] arm64: remove unused asm/compiler.h header file
+In-Reply-To: <20180927130737.31301-1-ard.biesheuvel@linaro.org>
+References: <20180927130737.31301-1-ard.biesheuvel@linaro.org>
+Message-ID: <20181001094814.GA30342@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Ulf
-
-On 10/01/2018 11:30 AM, Ulf Hansson wrote:
-> On 21 September 2018 at 11:46, Ludovic Barre <ludovic.Barre@st.com> wrote:
->> From: Ludovic Barre <ludovic.barre@st.com>
->>
->> This patch creates a generic mmci_dma_setup which calls
->> dma_setup callback and manages common next_cookie.
->> This patch is needed for sdmmc variant which has a different
->> dma settings.
->>
->> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
->>
->> # Conflicts:
->> #       drivers/mmc/host/mmci.h
->>
+On Thu, Sep 27, 2018 at 03:07:37PM +0200, Ard Biesheuvel wrote:
+> arm64 does not define CONFIG_HAVE_ARCH_COMPILER_H, nor does it keep
+> anything useful in its copy of asm/compiler.h, so let's remove it
+> before anybody starts using it.
 > 
-> Please remove this. Looks like some of the other patches in the series
-> have this in their changelogs as well, please have a look and fix them
-> all.
-> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/include/asm/compiler.h | 30 ------------------------------
+>  arch/arm64/include/asm/sysreg.h   |  1 -
+>  arch/arm64/include/asm/uaccess.h  |  1 -
+>  arch/arm64/kernel/psci.c          |  1 -
+>  4 files changed, 33 deletions(-)
+>  delete mode 100644 arch/arm64/include/asm/compiler.h
 
-yes, it's a mistake due to rush work (like Version of cover letter).
-sorry
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-BR
-Ludo
-
-> [...]
-> 
-> Kind regards
-> Uffe
-> 
+Will
