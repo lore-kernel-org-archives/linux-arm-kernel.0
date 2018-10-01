@@ -1,139 +1,30 @@
-From: m.slodczyk2@partner.samsung.com (Maciej Slodczyk)
-Date: Mon, 1 Oct 2018 15:28:51 +0200
-Subject: [PATCH v2 5/7] arm64: make arm uprobes code reusable by arm64
-In-Reply-To: <9abe9091-f305-a446-c93f-6418d35a7dee@arm.com>
-References: <1537963925-25313-1-git-send-email-m.slodczyk2@partner.samsung.com>
- <CGME20180926121216eucas1p2b896ce19f49214d497721db9d6e59bfb@eucas1p2.samsung.com>
- <1537963925-25313-6-git-send-email-m.slodczyk2@partner.samsung.com>
- <9abe9091-f305-a446-c93f-6418d35a7dee@arm.com>
-Message-ID: <20181001132852eucas1p25ab2ddf39296e2c78b188234d168f814~ZfyJK4W4N0481804818eucas1p2j@eucas1p2.samsung.com>
+From: digetx@gmail.com (Dmitry Osipenko)
+Date: Mon, 1 Oct 2018 16:34:13 +0300
+Subject: [PATCH] regulator: core: Pass max_uV value to
+ regulator_set_voltage_rdev
+In-Reply-To: <20181001072510eucas1p29a6e504d642d2cac67ed7c3b43f9d53c~Za0l11ceE1868218682eucas1p2w@eucas1p2.samsung.com>
+References: <20180615112916.GK112168@atomide.com>
+ <CGME20180618140856eucas1p281619f9bf003655a3c2eac356216ab25@eucas1p2.samsung.com>
+ <1529330913-11152-1-git-send-email-m.purski@samsung.com>
+ <20180702080505.GN112168@atomide.com>
+ <95655644-ef41-f5bd-7e8e-a257d48cd020@gmail.com>
+ <20180928202251.GM5662@atomide.com>
+ <2c0132ff-ea0f-f19e-ebfb-a0d077565d2c@gmail.com>
+ <20180928224109.GS5662@atomide.com>
+ <ea0a59ef-e201-986a-9499-a0638359b1b9@gmail.com>
+ <d14cc796-8644-41a3-5135-299bd8820204@gmail.com>
+ <20180929002753.GT5662@atomide.com>
+ <dbaa721a-9a47-2c6a-46d5-92a7ca13c5aa@gmail.com>
+ <20181001072510eucas1p29a6e504d642d2cac67ed7c3b43f9d53c~Za0l11ceE1868218682eucas1p2w@eucas1p2.samsung.com>
+Message-ID: <0c279196-1609-89ce-206e-412ae1774fd7@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 10/1/18 10:25 AM, Maciej Purski wrote:
+> Hi all,
+> unfortunately, I don't work at kernel anymore. That would be great, if you could take over those patches and finish the 
+> work.
 
-Thank you for the review.
+Hello Maciej,
 
-> I think that it would be good to move the renaming changes out of this 
-> patch.
-> 
-
-So, as I understand, you suggest separating renaming from moving and 
-putting it in separate patches, right?
-
->> ? })
->> +#define ARM_COMPAT_LR_OFFSET??? 0
-> 
-> Not sure this should be defined here. What's the meaning of compat for 
-> arch/arm ?
-> 
-
-Sure, I agree that the name is not very fortunate. I'll change it to 
-something like ARM_UPROBES_BRANCH_LR_OFFSET.
-
->> @@ -39,7 +39,7 @@ struct arch_uprobe {
->> ????? void (*posthandler)(struct arch_uprobe *auprobe,
->> ????????????????? struct arch_uprobe_task *autask,
->> ????????????????? struct pt_regs *regs);
->> -??? struct arch_probes_insn asi;
->> +??? struct arch_probes_insn api;
-> 
-> It would be easier to follow thing by making this change in its own 
-> patch. (Probably before you move arm32 code to lib/probes)
-> 
-
-Yup.
-
-
->> +enum probes_insn {
->> +??? INSN_REJECTED,
->> +??? INSN_GOOD_NO_SLOT,
->> +??? INSN_GOOD,
->> +};
-> 
-> Why have two definitions of this enum rather than a common one in 
-> lib/probes?
-> 
-
-Will fix in v3.
-
->> -typedef void (probes_handler_t) (u32 opcode,
->> -?????????????? struct arch_probe_insn *api,
->> +typedef void (probes_insn_handler_t) (u32 opcode,
->> +?????????????? struct arch_probes_insn *api,
-> 
-> In the previous patch you were already aligning this handler the ARM32's 
-> equivalent. Why not fix the name (for the handler and struct 
-> arch_probes_insn) in the previous patch?
-> 
-
-OK.
-
->> +
->> +#define link_register(regs)??????????? ((regs)->compat_lr)
->> +
->> +static inline void link_register_set(struct pt_regs *regs,
->> +?????????????????????? unsigned long val)
->> +{
->> +??? link_register(regs) = val;
->> +}
-> 
-> pstate.h isn't really related to compat mode and whichever compat 
-> definition it contains the relations are made explicit through their names.
-> 
-> I don't think a macro "link_register" defined in arch/arm64 and visible 
-> to any file including ptrace.h (which is a lot) should return 
-> "compat_lr" instead of the actual link register.
-> 
-> I'd say have the link_register macro check whether "regs" refers to a 
-> compat mode context or not and provide the adequate link register.
-> 
-> Otherwise maybe you can get away with naming the macro 
-> "arm_link_register" and the macro "arm_link_register_set". But I would 
-> prefer the previous approach.
-> 
-
-OK.
-
->> +#ifdef CONFIG_ARM64
->> +#include <../../../arm/include/asm/opcodes.h>
-> 
-> Hmmm not sure this is something that is accepted.
-> 
-
-OK, I'll fix it.
-
->> +/*
->> + * based on arm kprobes implementation
->> + */
->> +static void __kprobes simulate_ldm1stm1(probes_opcode_t insn,
->> +??????? struct arch_probes_insn *asi,
-> 
-> The whole asi/api mix become a bit confusing IMO.
-> Should we have api when the argument is of type "arch_probes_insn" and 
-> asi when the type is "arch_specific_insn"?
-> Should we have more coherent definitions of those structures between arm 
-> and arm64 if we are going to share functions between them?
-> 
-
-OK, I'll try to figure something out that's less confusing.
-
-> 
-> #ifdef CONFIG_ARM64
-> 
->> +enum probes_insn
->> +uprobe_decode_ldmstm_aarch64(probes_opcode_t insn,
->> +???????? struct arch_probes_insn *asi,
->> +???????? const struct decode_header *d)
-> 
-> Should be static.
-> 
-
-OK.
-
-Thanks again for the review. I'll rework the whole patchset to include 
-your remarks.
-
-
-Thank you,
-Maciej
+I'll take care of the patches and try to push them forward, thank you.
