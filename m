@@ -1,50 +1,139 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Mon, 1 Oct 2018 15:28:37 +0200
-Subject: [RESEND PATCH] Revert "pwm: Set class for exported channels in
- sysfs"
-In-Reply-To: <CAPoCmY+mNYSV8gq7VCcSJHDpmoq-i7SDJ6uQ5VbLpMZB=b0waQ@mail.gmail.com>
-References: <1537538567-5377-1-git-send-email-fabrice.gasnier@st.com>
- <20180924115301.GV21032@ulmo> <fc02ced1-01ba-dde4-95da-285d9351338b@st.com>
- <20180924142318.GG23547@ulmo> <c4866533-1c7e-2675-5d80-3b824e32ae9b@st.com>
- <4278fef9-ec60-239a-dd0a-29a89d742fa4@st.com> <20180925152022.GB27695@ulmo>
- <CAPoCmY+mNYSV8gq7VCcSJHDpmoq-i7SDJ6uQ5VbLpMZB=b0waQ@mail.gmail.com>
-Message-ID: <a6589b2d-c9b3-88a3-f764-e8519db09dbc@st.com>
+From: m.slodczyk2@partner.samsung.com (Maciej Slodczyk)
+Date: Mon, 1 Oct 2018 15:28:51 +0200
+Subject: [PATCH v2 5/7] arm64: make arm uprobes code reusable by arm64
+In-Reply-To: <9abe9091-f305-a446-c93f-6418d35a7dee@arm.com>
+References: <1537963925-25313-1-git-send-email-m.slodczyk2@partner.samsung.com>
+ <CGME20180926121216eucas1p2b896ce19f49214d497721db9d6e59bfb@eucas1p2.samsung.com>
+ <1537963925-25313-6-git-send-email-m.slodczyk2@partner.samsung.com>
+ <9abe9091-f305-a446-c93f-6418d35a7dee@arm.com>
+Message-ID: <20181001132852eucas1p25ab2ddf39296e2c78b188234d168f814~ZfyJK4W4N0481804818eucas1p2j@eucas1p2.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/29/2018 02:19 AM, Gottfried Haider wrote:
-> Hello Thierry & Fabrice,
-> 
->>> Still, it is possible to send uevent (KOBJ_CHANGE) on pwmchipN device,
->>> to notify of a change, e.g. pwmX channel being exported/unexported.
-> 
-> I tested this patch, and I am happy to report that it works with the
-> udev rule that Raspbian (Raspberry Pi's Debian derivative) has in
-> place:
-> 
-> SUBSYSTEM=="pwm*", PROGRAM="/bin/sh -c '\
->         chown -R root:gpio /sys/class/pwm && chmod -R 770 /sys/class/pwm;\
->         chown -R root:gpio
-> /sys/devices/platform/soc/*.pwm/pwm/pwmchip* && chmod -R 770
-> /sys/devices/platform/soc/*.pwm/pwm/pwmchip*\
-> '"
-> 
-> 
-> So while I can't comment on the uevent semantics, it would solve what
-> the original patch attempted to enable (non-root use of pwm).
-> 
-> Tested-by: Gottfried Haider <gottfried.haider@gmail.com>
+Hi,
 
-Hi Gottfried, Thierry,
+Thank you for the review.
 
-Thanks for testing. I just sent a new series with:
-- revert patch
-- additional patch with proposed uevent notification (change) on pwmchip.
+> I think that it would be good to move the renaming changes out of this 
+> patch.
+> 
 
-Best Regards,
-Fabrice
+So, as I understand, you suggest separating renaming from moving and 
+putting it in separate patches, right?
+
+>> ? })
+>> +#define ARM_COMPAT_LR_OFFSET??? 0
+> 
+> Not sure this should be defined here. What's the meaning of compat for 
+> arch/arm ?
+> 
+
+Sure, I agree that the name is not very fortunate. I'll change it to 
+something like ARM_UPROBES_BRANCH_LR_OFFSET.
+
+>> @@ -39,7 +39,7 @@ struct arch_uprobe {
+>> ????? void (*posthandler)(struct arch_uprobe *auprobe,
+>> ????????????????? struct arch_uprobe_task *autask,
+>> ????????????????? struct pt_regs *regs);
+>> -??? struct arch_probes_insn asi;
+>> +??? struct arch_probes_insn api;
+> 
+> It would be easier to follow thing by making this change in its own 
+> patch. (Probably before you move arm32 code to lib/probes)
+> 
+
+Yup.
+
+
+>> +enum probes_insn {
+>> +??? INSN_REJECTED,
+>> +??? INSN_GOOD_NO_SLOT,
+>> +??? INSN_GOOD,
+>> +};
+> 
+> Why have two definitions of this enum rather than a common one in 
+> lib/probes?
+> 
+
+Will fix in v3.
+
+>> -typedef void (probes_handler_t) (u32 opcode,
+>> -?????????????? struct arch_probe_insn *api,
+>> +typedef void (probes_insn_handler_t) (u32 opcode,
+>> +?????????????? struct arch_probes_insn *api,
+> 
+> In the previous patch you were already aligning this handler the ARM32's 
+> equivalent. Why not fix the name (for the handler and struct 
+> arch_probes_insn) in the previous patch?
+> 
+
+OK.
+
+>> +
+>> +#define link_register(regs)??????????? ((regs)->compat_lr)
+>> +
+>> +static inline void link_register_set(struct pt_regs *regs,
+>> +?????????????????????? unsigned long val)
+>> +{
+>> +??? link_register(regs) = val;
+>> +}
+> 
+> pstate.h isn't really related to compat mode and whichever compat 
+> definition it contains the relations are made explicit through their names.
+> 
+> I don't think a macro "link_register" defined in arch/arm64 and visible 
+> to any file including ptrace.h (which is a lot) should return 
+> "compat_lr" instead of the actual link register.
+> 
+> I'd say have the link_register macro check whether "regs" refers to a 
+> compat mode context or not and provide the adequate link register.
+> 
+> Otherwise maybe you can get away with naming the macro 
+> "arm_link_register" and the macro "arm_link_register_set". But I would 
+> prefer the previous approach.
+> 
+
+OK.
+
+>> +#ifdef CONFIG_ARM64
+>> +#include <../../../arm/include/asm/opcodes.h>
+> 
+> Hmmm not sure this is something that is accepted.
+> 
+
+OK, I'll fix it.
+
+>> +/*
+>> + * based on arm kprobes implementation
+>> + */
+>> +static void __kprobes simulate_ldm1stm1(probes_opcode_t insn,
+>> +??????? struct arch_probes_insn *asi,
+> 
+> The whole asi/api mix become a bit confusing IMO.
+> Should we have api when the argument is of type "arch_probes_insn" and 
+> asi when the type is "arch_specific_insn"?
+> Should we have more coherent definitions of those structures between arm 
+> and arm64 if we are going to share functions between them?
+> 
+
+OK, I'll try to figure something out that's less confusing.
 
 > 
-> Best,
-> Gottfried
+> #ifdef CONFIG_ARM64
 > 
+>> +enum probes_insn
+>> +uprobe_decode_ldmstm_aarch64(probes_opcode_t insn,
+>> +???????? struct arch_probes_insn *asi,
+>> +???????? const struct decode_header *d)
+> 
+> Should be static.
+> 
+
+OK.
+
+Thanks again for the review. I'll rework the whole patchset to include 
+your remarks.
+
+
+Thank you,
+Maciej
