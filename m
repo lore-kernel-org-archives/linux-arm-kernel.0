@@ -1,60 +1,116 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  1 Oct 2018 15:24:47 +0100
-Subject: [PATCH 1/2] arm64: docs: Fix typos in ELF hwcaps
-In-Reply-To: <1538403888-13277-1-git-send-email-will.deacon@arm.com>
-References: <1538403888-13277-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1538403888-13277-2-git-send-email-will.deacon@arm.com>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Mon,  1 Oct 2018 14:49:34 +0200
+Subject: [PATCH] PCI: mvebu: Fix PCI I/O mapping creation sequence
+Message-ID: <20181001124934.7222-1-thomas.petazzoni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Giacomo Travaglini <Giacomo.Travaglini@arm.com>
+Commit ee1604381a371 ("PCI: mvebu: Only remap I/O space if
+configured") had the side effect that the PCI I/O mapping was created
+much earlier than before, at a point where the probe() of the driver
+could still fail. This is for example a problem if one gets an
+-EPROBE_DEFER at some point during probe(), after pci_ioremap_io() has
+been called.
 
-Fix some typos in our hwcap documentation, where we refer to the wrong
-ID register for some of the capabilities.
+Indeed, there is currently no function to undo what pci_ioremap_io()
+did, and switching to pci_remap_iospace() is not an option in
+pci-mvebu due to the need for special memory attributes on Armada 38x.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Giacomo Travaglini <giacomo.travaglini@arm.com>
-[will: fix amusing binary constants]
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+Reverting ee1604381a371 ("PCI: mvebu: Only remap I/O space if
+configured") would be a possibility, but it would require also
+reverting 42342073e38b5 ("PCI: mvebu: Convert to use pci_host_bridge
+directly"). So instead, we use an open-coded version of
+pci_host_probe() that creates the PCI I/O mapping at a point where we
+are guaranteed not to fail anymore.
+
+Reported-by: Jan Kundr?t <jan.kundrat@cesnet.cz>
+Fixes: ee1604381a371 ("PCI: mvebu: Only remap I/O space if configured")
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
 ---
- Documentation/arm64/elf_hwcaps.txt | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/pci/controller/pci-mvebu.c | 52 +++++++++++++++++++++++++++++++++++---
+ 1 file changed, 48 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/arm64/elf_hwcaps.txt b/Documentation/arm64/elf_hwcaps.txt
-index d6aff2c5e9e2..51ccfab408cc 100644
---- a/Documentation/arm64/elf_hwcaps.txt
-+++ b/Documentation/arm64/elf_hwcaps.txt
-@@ -78,11 +78,11 @@ HWCAP_EVTSTRM
+diff --git a/drivers/pci/controller/pci-mvebu.c b/drivers/pci/controller/pci-mvebu.c
+index 50eb0729385b..a41d79b8d46a 100644
+--- a/drivers/pci/controller/pci-mvebu.c
++++ b/drivers/pci/controller/pci-mvebu.c
+@@ -1145,7 +1145,6 @@ static int mvebu_pcie_parse_request_resources(struct mvebu_pcie *pcie)
+ {
+ 	struct device *dev = &pcie->pdev->dev;
+ 	struct device_node *np = dev->of_node;
+-	unsigned int i;
+ 	int ret;
  
- HWCAP_AES
+ 	INIT_LIST_HEAD(&pcie->resources);
+@@ -1179,13 +1178,58 @@ static int mvebu_pcie_parse_request_resources(struct mvebu_pcie *pcie)
+ 					 resource_size(&pcie->io) - 1);
+ 		pcie->realio.name = "PCI I/O";
  
--    Functionality implied by ID_AA64ISAR1_EL1.AES == 0b0001.
-+    Functionality implied by ID_AA64ISAR0_EL1.AES == 0b0001.
++		pci_add_resource(&pcie->resources, &pcie->realio);
++	}
++
++	return devm_request_pci_bus_resources(dev, &pcie->resources);
++}
++
++/*
++ * This is a copy of pci_host_probe(), except that it does the I/O
++ * remap as the last step, once we are sure we won't fail.
++ *
++ * It should be removed once the I/O remap error handling issue has
++ * been sorted out.
++ */
++static int mvebu_pci_host_probe(struct pci_host_bridge *bridge)
++{
++	struct mvebu_pcie *pcie;
++	struct pci_bus *bus, *child;
++	int ret;
++
++	ret = pci_scan_root_bus_bridge(bridge);
++	if (ret < 0) {
++		dev_err(bridge->dev.parent, "Scanning root bridge failed");
++		return ret;
++	}
++
++	pcie = pci_host_bridge_priv(bridge);
++	if (resource_size(&pcie->io) != 0) {
++		unsigned int i;
++
+ 		for (i = 0; i < resource_size(&pcie->realio); i += SZ_64K)
+ 			pci_ioremap_io(i, pcie->io.start + i);
++	}
  
- HWCAP_PMULL
+-		pci_add_resource(&pcie->resources, &pcie->realio);
++	bus = bridge->bus;
++
++	/*
++	 * We insert PCI resources into the iomem_resource and
++	 * ioport_resource trees in either pci_bus_claim_resources()
++	 * or pci_bus_assign_resources().
++	 */
++	if (pci_has_flag(PCI_PROBE_ONLY)) {
++		pci_bus_claim_resources(bus);
++	} else {
++		pci_bus_size_bridges(bus);
++		pci_bus_assign_resources(bus);
++
++		list_for_each_entry(child, &bus->children, node)
++			pcie_bus_configure_settings(child);
+ 	}
  
--    Functionality implied by ID_AA64ISAR1_EL1.AES == 0b0010.
-+    Functionality implied by ID_AA64ISAR0_EL1.AES == 0b0010.
+-	return devm_request_pci_bus_resources(dev, &pcie->resources);
++	pci_bus_add_devices(bus);
++	return 0;
+ }
  
- HWCAP_SHA1
+ static int mvebu_pcie_probe(struct platform_device *pdev)
+@@ -1268,7 +1312,7 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+ 	bridge->align_resource = mvebu_pcie_align_resource;
+ 	bridge->msi = pcie->msi;
  
-@@ -153,7 +153,7 @@ HWCAP_ASIMDDP
+-	return pci_host_probe(bridge);
++	return mvebu_pci_host_probe(bridge);
+ }
  
- HWCAP_SHA512
- 
--    Functionality implied by ID_AA64ISAR0_EL1.SHA2 == 0b0002.
-+    Functionality implied by ID_AA64ISAR0_EL1.SHA2 == 0b0010.
- 
- HWCAP_SVE
- 
-@@ -173,7 +173,7 @@ HWCAP_USCAT
- 
- HWCAP_ILRCPC
- 
--    Functionality implied by ID_AA64ISR1_EL1.LRCPC == 0b0002.
-+    Functionality implied by ID_AA64ISAR1_EL1.LRCPC == 0b0010.
- 
- HWCAP_FLAGM
- 
+ static const struct of_device_id mvebu_pcie_of_match_table[] = {
 -- 
-2.1.4
+2.14.4
