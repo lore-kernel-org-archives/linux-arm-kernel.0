@@ -1,74 +1,71 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 01 Oct 2018 17:49:56 +0100
-Subject: [PATCH v6 06/14] irqchip/irq-mvebu-icu: support ICU subnodes
-In-Reply-To: <20181001141358.31508-7-miquel.raynal@bootlin.com>
-References: <20181001141358.31508-1-miquel.raynal@bootlin.com>
- <20181001141358.31508-7-miquel.raynal@bootlin.com>
-Message-ID: <86k1n1vcgb.wl-marc.zyngier@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 1 Oct 2018 17:53:42 +0100
+Subject: [PATCH] ARM: disable ARMv6 for Clang older than 8.0
+In-Reply-To: <aa1fbf64fc1190674abb9ecae3ffe1a39e1e60c0.camel@perches.com>
+References: <20180930222230.24167-1-stefan@agner.ch>
+ <aa1fbf64fc1190674abb9ecae3ffe1a39e1e60c0.camel@perches.com>
+Message-ID: <20181001165342.GR30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 01 Oct 2018 15:13:50 +0100,
-Miquel Raynal <miquel.raynal@bootlin.com> wrote:
+On Sun, Sep 30, 2018 at 04:48:20PM -0700, Joe Perches wrote:
+> On Mon, 2018-10-01 at 00:22 +0200, Stefan Agner wrote:
+> > The kernel passes the ArmV6K architecture to the compiler when
+> > using the multi platform selection and enabling ARMv6. Clang
+> > older than version 8.0 emit assembly with an non-existing CPU,
+> > which then makes the assembler fail. Prevent the user from
+> > selecting ARMv6 when using Clang before 8.0.
+> > 
+> > Signed-off-by: Stefan Agner <stefan@agner.ch>
+> > Link: https://github.com/ClangBuiltLinux/linux/issues/55
+> > ---
+> >  arch/arm/Kconfig | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index e8cd55a5b04c..8da160757381 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -671,6 +671,7 @@ config ARCH_MULTI_V4_V5
+> >  
+> >  config ARCH_MULTI_V6
+> >  	bool "ARMv6 based platforms (ARM11)"
+> > +	depends on !CC_IS_CLANG || CLANG_VERSION>=80000
+> >  	select ARCH_MULTI_V6_V7
+> >  	select CPU_V6K
+> >  
 > 
-> The ICU can handle several type of interrupt, each of them being handled
-> differently on AP side. On CP side, the ICU should be able to make the
-> distinction between each interrupt group by pointing to the right parent.
-> 
-> This is done through the introduction of new bindings, presenting the ICU
-> node as the parent of multiple ICU sub-nodes, each of them being an
-> interrupt type with a different interrupt parent. ICU interrupt 'clients'
-> now directly point to the right sub-node, avoiding the need for the extra
-> ICU_GRP_* parameter.
-> 
-> ICU subnodes are probed automatically with devm_platform_populate(). If
-> the node as no child, the probe function for NSRs will still be called
-> 'manually' in order to preserve backward compatibility with DT using the
-> old binding.
-> 
-> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> Perhaps it'd be better to avoid this in selection
+> criteria in Kconfig and instead add this to
+> include/linux/compiler_clang.h
 > ---
->  drivers/irqchip/irq-mvebu-icu.c | 77 ++++++++++++++++++++++++++-------
->  1 file changed, 61 insertions(+), 16 deletions(-)
+>  include/linux/compiler-clang.h | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
-> diff --git a/drivers/irqchip/irq-mvebu-icu.c b/drivers/irqchip/irq-mvebu-icu.c
-> index d09f220a2701..c79d2cb787a0 100644
-> --- a/drivers/irqchip/irq-mvebu-icu.c
-> +++ b/drivers/irqchip/irq-mvebu-icu.c
-
-[...]
-
-> +static const struct of_device_id mvebu_icu_subset_of_match[] = {
-> +	{
-> +		.compatible = "marvell,cp110-icu-nsr",
-> +	},
-> +	{},
-> +};
-> +
->  static int mvebu_icu_subset_probe(struct platform_device *pdev)
->  {
->  	struct device_node *msi_parent_dn;
-> @@ -210,7 +224,14 @@ static int mvebu_icu_subset_probe(struct platform_device *pdev)
->  	struct irq_domain *irq_domain;
->  	struct mvebu_icu *icu;
+> diff --git a/include/linux/compiler-clang.h b/include/linux/compiler-clang.h
+> index b1ce500fe8b3..90fd16c85359 100644
+> --- a/include/linux/compiler-clang.h
+> +++ b/include/linux/compiler-clang.h
+> @@ -3,6 +3,10 @@
+>  #error "Please don't include <linux/compiler-clang.h> directly, include <linux/compiler.h> instead."
+>  #endif
 >  
-> -	icu = dev_get_drvdata(dev);
-> +	/*
-> +	 * Device data being populated means we are using the legacy bindings.
-> +	 * Using the parent device data means we are using the new bindings.
-> +	 */
-> +	if (dev_get_drvdata(dev))
-> +		icu = dev_get_drvdata(dev);
-> +	else
-> +		icu = dev_get_drvdata(dev->parent);
+> +#if defined(CONFIG_ARCH_MULTI_V6) && CLANG_VERSION < 80000
+> +# error Sorry, your compiler is too old - please upgrade it.
+> +#endif
 
-We now have a static key to determine which binding to use, and we
-should certainly have set it correctly by the time we start end up
-here. Why aren't you using it?
+(a) does it makes sense to have arch CONFIG_* in linux/*.h?  It could
+    instead go in arch/arm/kernel/asm-offsets.c, where we have the other
+    tests similar to this for GCC.
 
-Thanks,
+(b) do we get far enough that the #error will be generated before the
+    reported assembler error happens?  IOW, would the assembler error
+    mask this #error?
 
-	M.
+I think it needs confirmation that a #error for this problem results
+in the desired behaviour.
 
 -- 
-Jazz is not dead, it just smell funny.
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 14.8Mbps down 650kbps up
+According to speedtest.net: 13Mbps down 490kbps up
