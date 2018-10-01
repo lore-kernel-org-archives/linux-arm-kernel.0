@@ -1,132 +1,112 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Mon, 01 Oct 2018 20:06:51 +0900
-Subject: [PATCH v2 2/2] PCI: controller: dwc: add UniPhier PCIe host
- controller support
-In-Reply-To: <20180928110640.GA18840@e107981-ln.cambridge.arm.com>
-References: <20180927164426.ECD6.4A936039@socionext.com>
- <20180928110640.GA18840@e107981-ln.cambridge.arm.com>
-Message-ID: <20181001200651.368C.4A936039@socionext.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon,  1 Oct 2018 12:19:43 +0100
+Subject: [PATCH v3] arm64: Trap WFI executed in userspace
+Message-ID: <20181001111943.233042-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+It recently came to light that userspace can execute WFI, and that
+the arm64 kernel doesn't trap this event. This sounds rather benign,
+but the kernel should decide when it wants to wait for an interrupt,
+and not userspace.
 
-On Fri, 28 Sep 2018 12:06:40 +0100 <lorenzo.pieralisi@arm.com> wrote:
+Let's trap WFI and immediately return after having skipped the
+instruction. This effectively makes WFI a rather expensive NOP.
 
-> [+Murali, Marc]
-> 
-> On Thu, Sep 27, 2018 at 04:44:26PM +0900, Kunihiko Hayashi wrote:
-> > Hi Lorenzo, Gustavo,
-> > 
-> > On Wed, 26 Sep 2018 21:31:36 +0900 <hayashi.kunihiko@socionext.com> wrote:
-> > 
-> > > Hi Lorenzo, Gustavo,
-> > > 
-> > > Thank you for reviewing.
-> > > 
-> > > On Tue, 25 Sep 2018 18:53:01 +0100
-> > > Gustavo Pimentel <gustavo.pimentel@synopsys.com> wrote:
-> > > 
-> > > > On 25/09/2018 17:14, Lorenzo Pieralisi wrote:
-> > > > > [+Gustavo, please have a look at INTX/MSI management]
-> > > > > 
-> > > > > On Thu, Sep 06, 2018 at 06:40:32PM +0900, Kunihiko Hayashi wrote:
-> > > > >> This introduces specific glue layer for UniPhier platform to support
-> > > > >> PCIe host controller that is based on the DesignWare PCIe core, and
-> > > > >> this driver supports Root Complex (host) mode.
-> > > > > 
-> > > > > Please read this thread and apply it to next versions:
-> > > > > 
-> > > > > https://urldefense.proofpoint.com/v2/url?u=https-3A__marc.info_-3Fl-3Dlinux-2Dpci-26m-3D150905742808166-26w-3D2&d=DwIBAg&c=DPL6_X_6JkXFx7AXWqB0tg&r=bkWxpLoW-f-E3EdiDCCa0_h0PicsViasSlvIpzZvPxs&m=H8UNDDUGQnQnqfWr4CBios689dJcjxu4qeTTRGulLmU&s=CgcXc_2LThyOpW-4bCriJNo9H1lzROEdy_cG9p-Y5hU&e=
-> > > 
-> > > I also found this thread in previous linux-pci, and I think it's helpful for me.
-> > > I'll check it carefully.
-> > 
-> > [snip]
-> > 
-> > > > >> +	ret = devm_request_irq(dev, pp->irq, uniphier_pcie_irq_handler,
-> > > > >> +			       IRQF_SHARED, "pcie", priv);
-> > > > > 
-> > > > > This is wrong, you should set-up a chained IRQ for INTX.
-> > > > > 
-> > > > > I *think* that
-> > > > > 
-> > > > > ks_pcie_setup_interrupts()
-> > > > > 
-> > > > > is a good example to start with but I wonder whether it is worth
-> > > > > generalizing the INTX approach to designware as a whole as it was
-> > > > > done for MSIs.
-> > > > > 
-> > > > > Thoughts ?
-> > > > 
-> > > > From what I understood this is for legacy IRQ, right?
-> > > 
-> > > Yes. For legacy IRQ.
-> > > 
-> > > > Like you (Lorenzo) said there is 2 drivers (pci-keystone-dw.c and pci-dra7xx.c)
-> > > > that uses it and can be use as a template for handling this type of interrupts.
-> > > > 
-> > > > We can try to pass some kind of generic INTX function to the DesignWare host
-> > > > library to handling this, but this will require some help from keystone and
-> > > > dra7xx maintainers, since my setup doesn't have legacy IRQ HW support.
-> > > 
-> > > Now I think it's difficult to make a template for INTX function,
-> > > and at first, I'll try to re-write this part with reference to pci-keystone-dw.c.
-> > 
-> > I understand that there are 2 types of interrupt and the drivers.
-> > 
-> > One like pci-keystone-dw.c is:
-> > 
-> >  - there are 4 interrupts for legacy,
-> >  - invoke handlers for each interrupt, and handle the interrupt,
-> >  - call irq_set_chained_handler_and_data() to make a chain of the interrupts
-> >   when initializing
-> > 
-> > The other like pci-dra7xx.c is:
-> > 
-> >  - there is 1 IRQ for legacy as a parent,
-> >  - check an interrupt factor register, and handle the interrupt correspond
-> >    to the factor,
-> >  - call request_irq() for the parent IRQ and irq_domain_add_linear() for
-> >    the factor when initializing
-> > 
-> > The pcie-uniphier.c is the same type as the latter (like pci-dra7xx.c).
-> > 
-> > However, in pci-dra7xx.c, MSI and legacy IRQ share the same interrupt number,
-> > so the same handler is called and the handler divides these IRQs.
-> > (found in dra7xx_pcie_msi_irq_handler())
-> > 
-> > In pcie-uniphier.c, MSI and legacy IRQ are independent.
-> > Therefore it's necessary to prepare the handler for the legacy IRQ.
-> > 
-> > I think that it's difficult to apply the way of pci-keystone-dw.c, and
-> > uniphier_pcie_irq_handler() and calling devm_request_irq() are still
-> > necessary to handle legacy IRQ.
-> 
-> I do not think it is difficult, the difference is that keystone has
-> 1 GIC irq line allocated per legacy IRQ, your set-up has one for
-> all INTX.
-
-I read other drivers to handle INTX like pcie-mediatek.c, pcie-altera.c,
-and so forth, and understood the common way to rewrite it with chained IRQ.
-
-Using irq_set_chained_handler_and_data() instead of devm_request_irq()
-and adding chained_irq_{enter, exit}() to the handler can allow INTX
-to handle chained IRQ.
-
-Now I can rewrite INTX part with the above way in v3, though,
-I'm not sure whether there is a way to generalize INTX of all dwc drivers,
-because of the followings:
-
-- the handler needs to read SoC-dependent register to check which an IRQ line
-  of {0,1,2,3},
-- domain_ops functions are different for each driver
-  (using handle_simple_irq or handle_level_irq, etc.)
-- the way to get child interrupt-controller node might be different.
-
-Anyway I think we need to leave these topics until clarifying keystone's
-linear irq topic.
-
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
-Best Regards,
-Kunihiko Hayashi
+* From v2:
+  - Fixed commit message typo
+  - Added ESR_ELx_WFx_ISS_TI to match the ESR_ELx register description
+
+ arch/arm64/include/asm/esr.h    |  5 +++++
+ arch/arm64/include/asm/sysreg.h |  4 ++--
+ arch/arm64/kernel/entry.S       |  1 +
+ arch/arm64/kernel/traps.c       | 11 +++++++++++
+ 4 files changed, 19 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index ce70c3ffb993..22ebae91cad9 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -137,6 +137,8 @@
+ #define ESR_ELx_CV		(UL(1) << 24)
+ #define ESR_ELx_COND_SHIFT	(20)
+ #define ESR_ELx_COND_MASK	(UL(0xF) << ESR_ELx_COND_SHIFT)
++#define ESR_ELx_WFx_ISS_TI	(UL(1) << 0)
++#define ESR_ELx_WFx_ISS_WFI	(UL(0) << 0)
+ #define ESR_ELx_WFx_ISS_WFE	(UL(1) << 0)
+ #define ESR_ELx_xVC_IMM_MASK	((1UL << 16) - 1)
+ 
+@@ -148,6 +150,9 @@
+ #define DISR_EL1_ESR_MASK	(ESR_ELx_AET | ESR_ELx_EA | ESR_ELx_FSC)
+ 
+ /* ESR value templates for specific events */
++#define ESR_ELx_WFx_MASK	(ESR_ELx_EC_MASK | ESR_ELx_WFx_ISS_TI)
++#define ESR_ELx_WFx_WFI_VAL	((ESR_ELx_EC_WFx << ESR_ELx_EC_SHIFT) |	\
++				 ESR_ELx_WFx_ISS_WFI)
+ 
+ /* BRK instruction trap from AArch64 state */
+ #define ESR_ELx_VAL_BRK64(imm)					\
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index c1470931b897..5fbc0712a342 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -489,12 +489,12 @@
+ 
+ #define SCTLR_EL1_SET	(SCTLR_ELx_M    | SCTLR_ELx_C    | SCTLR_ELx_SA   |\
+ 			 SCTLR_EL1_SA0  | SCTLR_EL1_SED  | SCTLR_ELx_I    |\
+-			 SCTLR_EL1_DZE  | SCTLR_EL1_UCT  | SCTLR_EL1_NTWI |\
++			 SCTLR_EL1_DZE  | SCTLR_EL1_UCT  |		   \
+ 			 SCTLR_EL1_NTWE | SCTLR_ELx_IESB | SCTLR_EL1_SPAN |\
+ 			 ENDIAN_SET_EL1 | SCTLR_EL1_UCI  | SCTLR_EL1_RES1)
+ #define SCTLR_EL1_CLEAR	(SCTLR_ELx_A   | SCTLR_EL1_CP15BEN | SCTLR_EL1_ITD    |\
+ 			 SCTLR_EL1_UMA | SCTLR_ELx_WXN     | ENDIAN_CLEAR_EL1 |\
+-			 SCTLR_EL1_RES0)
++			 SCTLR_EL1_NTWI | SCTLR_EL1_RES0)
+ 
+ #if (SCTLR_EL1_SET ^ SCTLR_EL1_CLEAR) != 0xffffffffffffffff
+ #error "Inconsistent SCTLR_EL1 set/clear bits"
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 09dbea221a27..6c8e5dc695d2 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -665,6 +665,7 @@ el0_sync:
+ 	cmp	x24, #ESR_ELx_EC_FP_EXC64	// FP/ASIMD exception
+ 	b.eq	el0_fpsimd_exc
+ 	cmp	x24, #ESR_ELx_EC_SYS64		// configurable trap
++	ccmp	x24, #ESR_ELx_EC_WFx, #4, ne
+ 	b.eq	el0_sys
+ 	cmp	x24, #ESR_ELx_EC_SP_ALIGN	// stack alignment exception
+ 	b.eq	el0_sp_pc
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 039e9ff379cc..9d6b655529a1 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -496,6 +496,11 @@ static void cntfrq_read_handler(unsigned int esr, struct pt_regs *regs)
+ 	arm64_skip_faulting_instruction(regs, AARCH64_INSN_SIZE);
+ }
+ 
++static void wfi_handler(unsigned int esr, struct pt_regs *regs)
++{
++	arm64_skip_faulting_instruction(regs, AARCH64_INSN_SIZE);
++}
++
+ struct sys64_hook {
+ 	unsigned int esr_mask;
+ 	unsigned int esr_val;
+@@ -526,6 +531,12 @@ static struct sys64_hook sys64_hooks[] = {
+ 		.esr_val = ESR_ELx_SYS64_ISS_SYS_CNTFRQ,
+ 		.handler = cntfrq_read_handler,
+ 	},
++	{
++		/* Trap WFI instructions executed in userspace */
++		.esr_mask = ESR_ELx_WFx_MASK,
++		.esr_val = ESR_ELx_WFx_WFI_VAL,
++		.handler = wfi_handler,
++	},
+ 	{},
+ };
+ 
+-- 
+2.19.0
