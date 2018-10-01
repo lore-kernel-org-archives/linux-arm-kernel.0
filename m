@@ -1,171 +1,203 @@
-From: vabhav.sharma@nxp.com (Vabhav Sharma)
-Date: Mon, 1 Oct 2018 12:26:18 +0000
-Subject: [PATCH v3 6/6] arm64: dts: add LX2160ARDB board support
-In-Reply-To: <CADRPPNS1Zj=47M-yOBAJ=X=sjjxmh0k7tNcj1A8uY=cPM398tQ@mail.gmail.com>
-References: <1537747741-6245-1-git-send-email-vabhav.sharma@nxp.com>
- <1537747741-6245-7-git-send-email-vabhav.sharma@nxp.com>
- <CADRPPNS1Zj=47M-yOBAJ=X=sjjxmh0k7tNcj1A8uY=cPM398tQ@mail.gmail.com>
-Message-ID: <VI1PR04MB4800B14CE54CD5F45C4B3687F3EF0@VI1PR04MB4800.eurprd04.prod.outlook.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon,  1 Oct 2018 14:38:44 +0200
+Subject: [PATCH v6 6/7] drm/bridge/synopsys: dsi: add dual-dsi support
+In-Reply-To: <20181001123845.11818-1-heiko@sntech.de>
+References: <20181001123845.11818-1-heiko@sntech.de>
+Message-ID: <20181001123845.11818-7-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Nickey Yang <nickey.yang@rock-chips.com>
 
+Allow to also drive a slave dw-mipi-dsi controller in a dual-dsi
+setup. This will require additional implementation-specific
+code to look up the slave instance and do specific setup.
+Also will probably need code in the specific crtcs as dual-dsi
+does not equal two separate dsi outputs.
 
-> -----Original Message-----
-> From: devicetree-owner at vger.kernel.org <devicetree-owner@vger.kernel.org>
-> On Behalf Of Li Yang
-> Sent: Saturday, September 29, 2018 1:07 AM
-> To: Vabhav Sharma <vabhav.sharma@nxp.com>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>; Scott Wood <oss@buserror.net>;
-> lkml <linux-kernel@vger.kernel.org>; open list:OPEN FIRMWARE AND
-> FLATTENED DEVICE TREE BINDINGS <devicetree@vger.kernel.org>; Rob Herring
-> <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>; linuxppc-dev
-> <linuxppc-dev@lists.ozlabs.org>; moderated list:ARM/FREESCALE IMX / MXC
-> ARM ARCHITECTURE <linux-arm-kernel@lists.infradead.org>; Michael Turquette
-> <mturquette@baylibre.com>; sboyd at kernel.org; Rafael J. Wysocki
-> <rjw@rjwysocki.net>; Viresh Kumar <viresh.kumar@linaro.org>; linux-clk <linux-
-> clk at vger.kernel.org>; linux-pm at vger.kernel.org; linux-kernel-
-> owner at vger.kernel.org; Catalin Marinas <catalin.marinas@arm.com>; Will
-> Deacon <will.deacon@arm.com>; Greg Kroah-Hartman
-> <gregkh@linuxfoundation.org>; Arnd Bergmann <arnd@arndb.de>; Kate
-> Stewart <kstewart@linuxfoundation.org>; yamada.masahiro at socionext.com;
-> Udit Kumar <udit.kumar@nxp.com>; Priyanka Jain <priyanka.jain@nxp.com>;
-> Russell King <linux@armlinux.org.uk>; Varun Sethi <V.Sethi@nxp.com>; Sriram
-> Dash <sriram.dash@nxp.com>
-> Subject: Re: [PATCH v3 6/6] arm64: dts: add LX2160ARDB board support
-> 
-> On Mon, Sep 24, 2018 at 7:51 AM Vabhav Sharma <vabhav.sharma@nxp.com>
-> wrote:
-> >
-> > LX2160A reference design board (RDB) is a high-performance computing,
-> > evaluation, and development platform with LX2160A SoC.
-> 
-> Please send next version with Shawn Guo and me in the "to" recipient so that its
-> less likely we will miss it.
-My mistake, Not Sure how it's missed.
-> 
-> >
-> > Signed-off-by: Priyanka Jain <priyanka.jain@nxp.com>
-> > Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
-> > Signed-off-by: Vabhav Sharma <vabhav.sharma@nxp.com>
-> > ---
-> >  arch/arm64/boot/dts/freescale/Makefile            |  1 +
-> >  arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts | 88
-> > +++++++++++++++++++++++
-> >  2 files changed, 89 insertions(+)
-> >  create mode 100644 arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-> >
-> > diff --git a/arch/arm64/boot/dts/freescale/Makefile
-> > b/arch/arm64/boot/dts/freescale/Makefile
-> > index 86e18ad..445b72b 100644
-> > --- a/arch/arm64/boot/dts/freescale/Makefile
-> > +++ b/arch/arm64/boot/dts/freescale/Makefile
-> > @@ -13,3 +13,4 @@ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-
-> rdb.dtb
-> >  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
-> >  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-qds.dtb
-> >  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-rdb.dtb
-> > +dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-lx2160a-rdb.dtb
-> > diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-> > b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-> > new file mode 100644
-> > index 0000000..1bbe663
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-> > @@ -0,0 +1,88 @@
-> > +// SPDX-License-Identifier: (GPL-2.0 OR MIT) // // Device Tree file
-> > +for LX2160ARDB // // Copyright 2018 NXP
-> > +
-> > +/dts-v1/;
-> > +
-> > +#include "fsl-lx2160a.dtsi"
-> > +
-> > +/ {
-> > +       model = "NXP Layerscape LX2160ARDB";
-> > +       compatible = "fsl,lx2160a-rdb", "fsl,lx2160a";
-> > +
-> > +       chosen {
-> > +               stdout-path = "serial0:115200n8";
-> > +       };
-> > +};
-> > +
-> > +&uart0 {
-> > +       status = "okay";
-> > +};
-> > +
-> > +&uart1 {
-> > +       status = "okay";
-> > +};
-> > +
-> > +&i2c0 {
-> > +       status = "okay";
-> > +       i2c-mux at 77 {
-> > +               compatible = "nxp,pca9547";
-> > +               reg = <0x77>;
-> > +               #address-cells = <1>;
-> > +               #size-cells = <0>;
-> > +
-> > +               i2c at 2 {
-> > +                       #address-cells = <1>;
-> > +                       #size-cells = <0>;
-> > +                       reg = <0x2>;
-> > +
-> > +                       power-monitor at 40 {
-> > +                               compatible = "ti,ina220";
-> > +                               reg = <0x40>;
-> > +                               shunt-resistor = <1000>;
-> > +                       };
-> > +               };
-> > +
-> > +               i2c at 3 {
-> > +                       #address-cells = <1>;
-> > +                       #size-cells = <0>;
-> > +                       reg = <0x3>;
-> > +
-> > +                       temperature-sensor at 4c {
-> > +                               compatible = "nxp,sa56004";
-> > +                               reg = <0x4c>;
-> 
-> Need a vcc-supply property according to the binding.
-Ok
-> 
-> > +                       };
-> > +
-> > +                       temperature-sensor at 4d {
-> > +                               compatible = "nxp,sa56004";
-> > +                               reg = <0x4d>;
-> 
-> Ditto.
-Ok
-> 
-> > +                       };
-> > +               };
-> > +       };
-> > +};
-> > +
-> > +&i2c4 {
-> > +       status = "okay";
-> > +
-> > +       rtc at 51 {
-> > +               compatible = "nxp,pcf2129";
-> > +               reg = <0x51>;
-> > +               // IRQ10_B
-> > +               interrupts = <0 150 0x4>;
-> > +               };
-> > +
-> > +};
-> > +
-> > +&usb0 {
-> > +       status = "okay";
-> > +};
-> > +
-> > +&usb1 {
-> > +       status = "okay";
-> > +};
-> > +
-> > +&crypto {
-> > +       status = "okay";
-> > +};
-> > --
-> > 2.7.4
-> >
+To activate, the implementation-specific code should set the slave
+using dw_mipi_dsi_set_slave() before calling __dw_mipi_dsi_bind().
+
+v2:
+- expect real interface number of lanes
+- keep links to both master and slave
+v3:
+- remove unneeded separate variables
+- remove unneeded second slave settings
+- disable slave before master
+- lane-sum calculation comments
+
+Signed-off-by: Nickey Yang <nickey.yang@rock-chips.com>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Tested-by: Philippe Cornu <philippe.cornu@st.com>
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+---
+ drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c | 80 +++++++++++++++++--
+ include/drm/bridge/dw_mipi_dsi.h              |  1 +
+ 2 files changed, 75 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+index 3962e5d84e1e..2f4b145b73af 100644
+--- a/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
++++ b/drivers/gpu/drm/bridge/synopsys/dw-mipi-dsi.c
+@@ -230,9 +230,20 @@ struct dw_mipi_dsi {
+ 	u32 format;
+ 	unsigned long mode_flags;
+ 
++	struct dw_mipi_dsi *master; /* dual-dsi master ptr */
++	struct dw_mipi_dsi *slave; /* dual-dsi slave ptr */
++
+ 	const struct dw_mipi_dsi_plat_data *plat_data;
+ };
+ 
++/*
++ * Check if either a link to a master or slave is present
++ */
++static inline bool dw_mipi_is_dual_mode(struct dw_mipi_dsi *dsi)
++{
++	return dsi->slave || dsi->master;
++}
++
+ /*
+  * The controller should generate 2 frames before
+  * preparing the peripheral.
+@@ -456,10 +467,17 @@ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
+ 	}
+ 
+ 	dw_mipi_message_config(dsi, msg);
++	if (dsi->slave)
++		dw_mipi_message_config(dsi->slave, msg);
+ 
+ 	ret = dw_mipi_dsi_write(dsi, &packet);
+ 	if (ret)
+ 		return ret;
++	if (dsi->slave) {
++		ret = dw_mipi_dsi_write(dsi->slave, &packet);
++		if (ret)
++			return ret;
++	}
+ 
+ 	if (msg->rx_buf && msg->rx_len) {
+ 		ret = dw_mipi_dsi_read(dsi, msg);
+@@ -598,7 +616,11 @@ static void dw_mipi_dsi_video_packet_config(struct dw_mipi_dsi *dsi,
+ 	 * DSI_VNPCR.NPSIZE... especially because this driver supports
+ 	 * non-burst video modes, see dw_mipi_dsi_video_mode_config()...
+ 	 */
+-	dsi_write(dsi, DSI_VID_PKT_SIZE, VID_PKT_SIZE(mode->hdisplay));
++
++	dsi_write(dsi, DSI_VID_PKT_SIZE,
++		       dw_mipi_is_dual_mode(dsi) ?
++				VID_PKT_SIZE(mode->hdisplay / 2) :
++				VID_PKT_SIZE(mode->hdisplay));
+ }
+ 
+ static void dw_mipi_dsi_command_mode_config(struct dw_mipi_dsi *dsi)
+@@ -770,24 +792,43 @@ static void dw_mipi_dsi_bridge_post_disable(struct drm_bridge *bridge)
+ 	 */
+ 	dsi->panel_bridge->funcs->post_disable(dsi->panel_bridge);
+ 
++	if (dsi->slave) {
++		dw_mipi_dsi_disable(dsi->slave);
++		clk_disable_unprepare(dsi->slave->pclk);
++		pm_runtime_put(dsi->slave->dev);
++	}
+ 	dw_mipi_dsi_disable(dsi);
++
+ 	clk_disable_unprepare(dsi->pclk);
+ 	pm_runtime_put(dsi->dev);
+ }
+ 
+-static void dw_mipi_dsi_bridge_mode_set(struct drm_bridge *bridge,
+-					struct drm_display_mode *mode,
+-					struct drm_display_mode *adjusted_mode)
++static unsigned int dw_mipi_dsi_get_lanes(struct dw_mipi_dsi *dsi)
++{
++	/* this instance is the slave, so add the master's lanes */
++	if (dsi->master)
++		return dsi->master->lanes + dsi->lanes;
++
++	/* this instance is the master, so add the slave's lanes */
++	if (dsi->slave)
++		return dsi->lanes + dsi->slave->lanes;
++
++	/* single-dsi, so no other instance to consider */
++	return dsi->lanes;
++}
++
++static void dw_mipi_dsi_mode_set(struct dw_mipi_dsi *dsi,
++				struct drm_display_mode *adjusted_mode)
+ {
+-	struct dw_mipi_dsi *dsi = bridge_to_dsi(bridge);
+ 	const struct dw_mipi_dsi_phy_ops *phy_ops = dsi->plat_data->phy_ops;
+ 	void *priv_data = dsi->plat_data->priv_data;
+ 	int ret;
++	u32 lanes = dw_mipi_dsi_get_lanes(dsi);
+ 
+ 	clk_prepare_enable(dsi->pclk);
+ 
+ 	ret = phy_ops->get_lane_mbps(priv_data, adjusted_mode, dsi->mode_flags,
+-				     dsi->lanes, dsi->format, &dsi->lane_mbps);
++				     lanes, dsi->format, &dsi->lane_mbps);
+ 	if (ret)
+ 		DRM_DEBUG_DRIVER("Phy get_lane_mbps() failed\n");
+ 
+@@ -819,12 +860,25 @@ static void dw_mipi_dsi_bridge_mode_set(struct drm_bridge *bridge,
+ 	dw_mipi_dsi_set_mode(dsi, 0);
+ }
+ 
++static void dw_mipi_dsi_bridge_mode_set(struct drm_bridge *bridge,
++					struct drm_display_mode *mode,
++					struct drm_display_mode *adjusted_mode)
++{
++	struct dw_mipi_dsi *dsi = bridge_to_dsi(bridge);
++
++	dw_mipi_dsi_mode_set(dsi, adjusted_mode);
++	if (dsi->slave)
++		dw_mipi_dsi_mode_set(dsi->slave, adjusted_mode);
++}
++
+ static void dw_mipi_dsi_bridge_enable(struct drm_bridge *bridge)
+ {
+ 	struct dw_mipi_dsi *dsi = bridge_to_dsi(bridge);
+ 
+ 	/* Switch to video mode for panel-bridge enable & panel enable */
+ 	dw_mipi_dsi_set_mode(dsi, MIPI_DSI_MODE_VIDEO);
++	if (dsi->slave)
++		dw_mipi_dsi_set_mode(dsi->slave, MIPI_DSI_MODE_VIDEO);
+ }
+ 
+ static enum drm_mode_status
+@@ -961,6 +1015,20 @@ static void __dw_mipi_dsi_remove(struct dw_mipi_dsi *dsi)
+ 	pm_runtime_disable(dsi->dev);
+ }
+ 
++void dw_mipi_dsi_set_slave(struct dw_mipi_dsi *dsi, struct dw_mipi_dsi *slave)
++{
++	/* introduce controllers to each other */
++	dsi->slave = slave;
++	dsi->slave->master = dsi;
++
++	/* migrate settings for already attached displays */
++	dsi->slave->lanes = dsi->lanes;
++	dsi->slave->channel = dsi->channel;
++	dsi->slave->format = dsi->format;
++	dsi->slave->mode_flags = dsi->mode_flags;
++}
++EXPORT_SYMBOL_GPL(dw_mipi_dsi_set_slave);
++
+ /*
+  * Probe/remove API, used from platforms based on the DRM bridge API.
+  */
+diff --git a/include/drm/bridge/dw_mipi_dsi.h b/include/drm/bridge/dw_mipi_dsi.h
+index a9c03099cf3e..48a671e782ca 100644
+--- a/include/drm/bridge/dw_mipi_dsi.h
++++ b/include/drm/bridge/dw_mipi_dsi.h
+@@ -45,5 +45,6 @@ struct dw_mipi_dsi *dw_mipi_dsi_probe(struct platform_device *pdev,
+ void dw_mipi_dsi_remove(struct dw_mipi_dsi *dsi);
+ int dw_mipi_dsi_bind(struct dw_mipi_dsi *dsi, struct drm_encoder *encoder);
+ void dw_mipi_dsi_unbind(struct dw_mipi_dsi *dsi);
++void dw_mipi_dsi_set_slave(struct dw_mipi_dsi *dsi, struct dw_mipi_dsi *slave);
+ 
+ #endif /* __DW_MIPI_DSI__ */
+-- 
+2.18.0
