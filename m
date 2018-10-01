@@ -1,73 +1,37 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 1 Oct 2018 15:27:06 +0100
-Subject: [GIT PULL] iommu/arm-smmu: Updates for 4.20
-Message-ID: <20181001142706.GB9716@arm.com>
+Date: Mon, 1 Oct 2018 15:29:15 +0100
+Subject: [PATCH] arm_pmu: Delete incorrect cache event mapping for some
+ armv8_pmuv3 events.
+In-Reply-To: <20181001100707.16840-1-ganapatrao.kulkarni@cavium.com>
+References: <20181001100707.16840-1-ganapatrao.kulkarni@cavium.com>
+Message-ID: <20181001142914.GD9716@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg
+Hi Ganapat,
 
-Please pull these Arm SMMU updates for 4.20. The big thing here is the
-long-awaited "lazy" invalidation mode, using the generic timer-based
-infrastructure for moving TLB invalidation out of the fast-path. Thanks
-to Zhen Lei for the initial work here, and to Robin for getting it into
-shape for upstream.
+On Mon, Oct 01, 2018 at 10:07:43AM +0000, Kulkarni, Ganapatrao wrote:
+> Perf events L1-dcache-load-misses, L1-dcache-store-misses are mapped to
+> armv8_pmuv3 (both DT and ACPI) event L1D_CACHE_REFILL. This is incorrect,
+> since L1D_CACHE_REFILL counts both load and store misses.
+> Similarly the events L1-dcache-loads, L1-dcache-stores, dTLB-load-misses
+> and dTLB-loads are wrongly mapped. Hence Deleting all these cache events
+> from armv8_pmuv3 cache mapping.
+> 
+> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> ---
+>  arch/arm64/kernel/perf_event.c | 8 --------
+>  1 file changed, 8 deletions(-)
 
-We've also got some minor fixes dotted around, some of which address
-issues that were found by code inspection during the lazy invalidation
-code review.
+The "generic" events are really implemented on a best-effort basis, as
+they rarely tend to map exactly to what the hardware supports. I think
+they originally stemmed from the x86 CPU PMU, but that doesn't really
+help us.
 
-I didn't manage to queue Vivek's runtime PM patches this time around.
-This was partly because we ran out of review bandwidth earlier in the
-cycle but also because the interaction with the lazy invalidation is
-unclear at the moment.
-
-Cheers,
+I had a discussion with Ingo back when we originally implemented perf
+because I actually preferred not to implement the generic events at all.
+However, he was strongly of the opinion that a best-effort approach was
+sufficient to get casual users going with the tool, so that's what we went
+with.
 
 Will
-
---->8
-
-The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
-
-  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/updates
-
-for you to fetch changes up to 44f6876a00e83df5fd28681502b19b0f51e4a3c6:
-
-  iommu/arm-smmu: Support non-strict mode (2018-10-01 13:01:34 +0100)
-
-----------------------------------------------------------------
-John Garry (1):
-      iommu/arm-smmu-v3: Fix a couple of minor comment typos
-
-Robin Murphy (3):
-      iommu/io-pgtable-arm: Fix race handling in split_blk_unmap()
-      iommu/io-pgtable-arm-v7s: Add support for non-strict mode
-      iommu/arm-smmu: Support non-strict mode
-
-Will Deacon (1):
-      iommu/arm-smmu: Ensure that page-table updates are visible before TLBI
-
-Zhen Lei (7):
-      iommu/arm-smmu-v3: Fix unexpected CMD_SYNC timeout
-      iommu/arm-smmu-v3: Avoid back-to-back CMD_SYNC operations
-      iommu/arm-smmu-v3: Implement flush_iotlb_all hook
-      iommu/dma: Add support for non-strict mode
-      iommu: Add "iommu.strict" command line option
-      iommu/io-pgtable-arm: Add support for non-strict mode
-      iommu/arm-smmu-v3: Add support for non-strict mode
-
- Documentation/admin-guide/kernel-parameters.txt |  12 +++
- drivers/iommu/arm-smmu-v3.c                     | 115 +++++++++++++++++-------
- drivers/iommu/arm-smmu.c                        |  99 ++++++++++++++------
- drivers/iommu/dma-iommu.c                       |  32 ++++++-
- drivers/iommu/io-pgtable-arm-v7s.c              |  11 ++-
- drivers/iommu/io-pgtable-arm.c                  |  23 +++--
- drivers/iommu/io-pgtable.h                      |   5 ++
- drivers/iommu/iommu.c                           |  14 +++
- include/linux/iommu.h                           |   1 +
- 9 files changed, 243 insertions(+), 69 deletions(-)
