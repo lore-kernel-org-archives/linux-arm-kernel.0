@@ -1,20 +1,21 @@
 From: salyzyn@android.com (Mark Salyzyn)
-Date: Mon,  1 Oct 2018 10:58:37 -0700
-Subject: RESEND [PATCH] arm64: compat: Expose offset to registers in sigframes
+Date: Mon,  1 Oct 2018 10:58:39 -0700
+Subject: RESEND [PATCH 2/6] arm64: elf: Set AT_SYSINFO_EHDR in compat processes
 In-Reply-To: <20181001175845.168430-1-salyzyn@android.com>
 References: <20181001175845.168430-1-salyzyn@android.com>
-Message-ID: <20181001175845.168430-18-salyzyn@android.com>
+Message-ID: <20181001175845.168430-20-salyzyn@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kevin Brodsky <kevin.brodsky@arm.com>
 
-This will be needed to provide unwinding information in compat
-sigreturn trampolines, part of the future compat vDSO. There is no
-obvious header the compat_sig* struct's should be moved to, so let's
-put them in signal32.h.
+If the compat vDSO is enabled, we need to set AT_SYSINFO_EHDR in the
+auxiliary vector of compat processes to the address of the vDSO code
+page, so that the dynamic linker can find it (just like the regular vDSO).
 
-Also fix minor style issues reported by checkpatch.
+Note that we cast context.vdso to Elf64_Off, instead of elf_addr_t,
+because elf_addr_t is Elf32_Off in compat_binfmt_elf.c, and casting
+context.vdso to u32 would trigger a pointer narrowing warning.
 
 Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
 Signed-off-by: Mark Salyzyn <salyzyn@android.com>
@@ -31,176 +32,52 @@ Cc: Laura Abbott <labbott@redhat.com>
 Cc: Kees Cook <keescook@chromium.org>
 Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Cc: Andy Gross <andy.gross@linaro.org>
-Cc: Kevin Brodsky <kevin.brodsky@arm.com>
 Cc: Andrew Pinski <apinski@cavium.com>
 Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: linux-kernel at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: Dave Martin <Dave.Martin@arm.com>
-Cc: Eric W. Biederman <ebiederm@xmission.com>
 Cc: Jeremy Linton <Jeremy.Linton@arm.com>
 Cc: android-kernel at android.com
-
-NB:
-Basically unchanged as part of a vDSO32 effort through 4 revisions,
-Resubmitted as a standalone change for quicker approval.
 ---
- arch/arm64/include/asm/signal32.h | 46 +++++++++++++++++++++++++++++++
- arch/arm64/kernel/asm-offsets.c   | 13 +++++++++
- arch/arm64/kernel/signal32.c      | 46 -------------------------------
- 3 files changed, 59 insertions(+), 46 deletions(-)
+ arch/arm64/include/asm/elf.h | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/signal32.h b/arch/arm64/include/asm/signal32.h
-index 58e288aaf0ba..bcd0e139ee4a 100644
---- a/arch/arm64/include/asm/signal32.h
-+++ b/arch/arm64/include/asm/signal32.h
-@@ -20,6 +20,52 @@
- #ifdef CONFIG_COMPAT
- #include <linux/compat.h>
+diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+index 433b9554c6a1..bf4672a0491b 100644
+--- a/arch/arm64/include/asm/elf.h
++++ b/arch/arm64/include/asm/elf.h
+@@ -147,10 +147,10 @@ typedef struct user_fpsimd_state elf_fpregset_t;
+ })
  
-+struct compat_sigcontext {
-+	/* We always set these two fields to 0 */
-+	compat_ulong_t			trap_no;
-+	compat_ulong_t			error_code;
-+
-+	compat_ulong_t			oldmask;
-+	compat_ulong_t			arm_r0;
-+	compat_ulong_t			arm_r1;
-+	compat_ulong_t			arm_r2;
-+	compat_ulong_t			arm_r3;
-+	compat_ulong_t			arm_r4;
-+	compat_ulong_t			arm_r5;
-+	compat_ulong_t			arm_r6;
-+	compat_ulong_t			arm_r7;
-+	compat_ulong_t			arm_r8;
-+	compat_ulong_t			arm_r9;
-+	compat_ulong_t			arm_r10;
-+	compat_ulong_t			arm_fp;
-+	compat_ulong_t			arm_ip;
-+	compat_ulong_t			arm_sp;
-+	compat_ulong_t			arm_lr;
-+	compat_ulong_t			arm_pc;
-+	compat_ulong_t			arm_cpsr;
-+	compat_ulong_t			fault_address;
-+};
-+
-+struct compat_ucontext {
-+	compat_ulong_t			uc_flags;
-+	compat_uptr_t			uc_link;
-+	compat_stack_t			uc_stack;
-+	struct compat_sigcontext	uc_mcontext;
-+	compat_sigset_t			uc_sigmask;
-+	int __unused[32 - (sizeof(compat_sigset_t) / sizeof(int))];
-+	compat_ulong_t			uc_regspace[128] __aligned(8);
-+};
-+
-+struct compat_sigframe {
-+	struct compat_ucontext		uc;
-+	compat_ulong_t			retcode[2];
-+};
-+
-+struct compat_rt_sigframe {
-+	struct compat_siginfo		info;
-+	struct compat_sigframe		sig;
-+};
-+
- int compat_setup_frame(int usig, struct ksignal *ksig, sigset_t *set,
- 		       struct pt_regs *regs);
- int compat_setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 8938a4223690..a79507c5d845 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -29,6 +29,7 @@
- #include <asm/fixmap.h>
- #include <asm/thread_info.h>
- #include <asm/memory.h>
-+#include <asm/signal32.h>
- #include <asm/smp_plat.h>
- #include <asm/suspend.h>
- #include <asm/vdso_datapage.h>
-@@ -81,6 +82,18 @@ int main(void)
-   DEFINE(S_STACKFRAME,		offsetof(struct pt_regs, stackframe));
-   DEFINE(S_FRAME_SIZE,		sizeof(struct pt_regs));
-   BLANK();
-+#ifdef CONFIG_COMPAT
-+  DEFINE(COMPAT_SIGFRAME_REGS_OFFSET,
-+				offsetof(struct compat_sigframe, uc) +
-+				offsetof(struct compat_ucontext, uc_mcontext) +
-+				offsetof(struct compat_sigcontext, arm_r0));
-+  DEFINE(COMPAT_RT_SIGFRAME_REGS_OFFSET,
-+				offsetof(struct compat_rt_sigframe, sig) +
-+				offsetof(struct compat_sigframe, uc) +
-+				offsetof(struct compat_ucontext, uc_mcontext) +
-+				offsetof(struct compat_sigcontext, arm_r0));
-+  BLANK();
+ /* update AT_VECTOR_SIZE_ARCH if the number of NEW_AUX_ENT entries changes */
+-#define ARCH_DLINFO							\
++#define _SET_AUX_ENT_VDSO						\
+ do {									\
+ 	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
+-		    (elf_addr_t)current->mm->context.vdso);		\
++		    (Elf64_Off)current->mm->context.vdso);		\
+ 									\
+ 	/*								\
+ 	 * Should always be nonzero unless there's a kernel bug.	\
+@@ -162,6 +162,7 @@ do {									\
+ 	else								\
+ 		NEW_AUX_ENT(AT_IGNORE, 0);				\
+ } while (0)
++#define ARCH_DLINFO _SET_AUX_ENT_VDSO
+ 
+ #define ARCH_HAS_SETUP_ADDITIONAL_PAGES
+ struct linux_binprm;
+@@ -209,7 +210,11 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
+ ({									\
+ 	set_thread_flag(TIF_32BIT);					\
+  })
++#ifdef CONFIG_VDSO32
++#define COMPAT_ARCH_DLINFO	_SET_AUX_ENT_VDSO
++#else
+ #define COMPAT_ARCH_DLINFO
 +#endif
-   DEFINE(MM_CONTEXT_ID,		offsetof(struct mm_struct, context.id.counter));
-   BLANK();
-   DEFINE(VMA_VM_MM,		offsetof(struct vm_area_struct, vm_mm));
-diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-index 52f0d44417c8..6b421666b5b8 100644
---- a/arch/arm64/kernel/signal32.c
-+++ b/arch/arm64/kernel/signal32.c
-@@ -30,42 +30,6 @@
- #include <linux/uaccess.h>
- #include <asm/unistd.h>
- 
--struct compat_sigcontext {
--	/* We always set these two fields to 0 */
--	compat_ulong_t			trap_no;
--	compat_ulong_t			error_code;
--
--	compat_ulong_t			oldmask;
--	compat_ulong_t			arm_r0;
--	compat_ulong_t			arm_r1;
--	compat_ulong_t			arm_r2;
--	compat_ulong_t			arm_r3;
--	compat_ulong_t			arm_r4;
--	compat_ulong_t			arm_r5;
--	compat_ulong_t			arm_r6;
--	compat_ulong_t			arm_r7;
--	compat_ulong_t			arm_r8;
--	compat_ulong_t			arm_r9;
--	compat_ulong_t			arm_r10;
--	compat_ulong_t			arm_fp;
--	compat_ulong_t			arm_ip;
--	compat_ulong_t			arm_sp;
--	compat_ulong_t			arm_lr;
--	compat_ulong_t			arm_pc;
--	compat_ulong_t			arm_cpsr;
--	compat_ulong_t			fault_address;
--};
--
--struct compat_ucontext {
--	compat_ulong_t			uc_flags;
--	compat_uptr_t			uc_link;
--	compat_stack_t			uc_stack;
--	struct compat_sigcontext	uc_mcontext;
--	compat_sigset_t			uc_sigmask;
--	int		__unused[32 - (sizeof (compat_sigset_t) / sizeof (int))];
--	compat_ulong_t	uc_regspace[128] __attribute__((__aligned__(8)));
--};
--
- struct compat_vfp_sigframe {
- 	compat_ulong_t	magic;
- 	compat_ulong_t	size;
-@@ -92,16 +56,6 @@ struct compat_aux_sigframe {
- 	unsigned long			end_magic;
- } __attribute__((__aligned__(8)));
- 
--struct compat_sigframe {
--	struct compat_ucontext	uc;
--	compat_ulong_t		retcode[2];
--};
--
--struct compat_rt_sigframe {
--	struct compat_siginfo info;
--	struct compat_sigframe sig;
--};
--
- #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
- 
- static inline int put_sigset_t(compat_sigset_t __user *uset, sigset_t *set)
+ extern int aarch32_setup_vectors_page(struct linux_binprm *bprm,
+ 				      int uses_interp);
+ #define compat_arch_setup_additional_pages \
 -- 
 2.19.0.605.g01d371f741-goog
