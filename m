@@ -1,100 +1,44 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 1 Oct 2018 15:13:15 +0100
-Subject: [kvmtool PATCH v6 22/18] kvmtool: arm: Add support for creating
- VM with PA size
-In-Reply-To: <20180926163258.20218-23-suzuki.poulose@arm.com>
-References: <20180926163258.20218-1-suzuki.poulose@arm.com>
- <20180926163258.20218-23-suzuki.poulose@arm.com>
-Message-ID: <0efe3696-e6fd-531d-c473-9dedf6b9d057@arm.com>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Mon,  1 Oct 2018 16:13:47 +0200
+Subject: [PATCH v6 03/14] irqchip/irq-mvebu-icu: fix wrong private data
+ retrieval
+In-Reply-To: <20181001141358.31508-1-miquel.raynal@bootlin.com>
+References: <20181001141358.31508-1-miquel.raynal@bootlin.com>
+Message-ID: <20181001141358.31508-4-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/09/18 17:32, Suzuki K Poulose wrote:
-> Specify the physical size for the VM encoded in the vm type.
-> 
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->   arm/include/arm-common/kvm-arch.h |  6 +++++-
->   arm/kvm.c                         | 32 +++++++++++++++++++++++++++++++
->   2 files changed, 37 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arm/include/arm-common/kvm-arch.h b/arm/include/arm-common/kvm-arch.h
-> index b29b4b1..d77f3ac 100644
-> --- a/arm/include/arm-common/kvm-arch.h
-> +++ b/arm/include/arm-common/kvm-arch.h
-> @@ -44,7 +44,11 @@
->   
->   #define KVM_IRQ_OFFSET		GIC_SPI_IRQ_BASE
->   
-> -#define KVM_VM_TYPE		0
-> +extern unsigned long		kvm_arm_type;
-> +extern void kvm__arch_init_hyp(struct kvm *kvm);
-> +
-> +#define KVM_VM_TYPE		kvm_arm_type
-> +#define kvm__arch_init_hyp	kvm__arch_init_hyp
->   
->   #define VIRTIO_DEFAULT_TRANS(kvm)	\
->   	((kvm)->cfg.arch.virtio_trans_pci ? VIRTIO_PCI : VIRTIO_MMIO)
-> diff --git a/arm/kvm.c b/arm/kvm.c
-> index eac2ad2..c8db6b3 100644
-> --- a/arm/kvm.c
-> +++ b/arm/kvm.c
-> @@ -11,6 +11,8 @@
->   #include <linux/kvm.h>
->   #include <linux/sizes.h>
->   
-> +unsigned long kvm_arm_type;
-> +
->   struct kvm_ext kvm_req_ext[] = {
->   	{ DEFINE_KVM_EXT(KVM_CAP_IRQCHIP) },
->   	{ DEFINE_KVM_EXT(KVM_CAP_ONE_REG) },
-> @@ -18,6 +20,36 @@ struct kvm_ext kvm_req_ext[] = {
->   	{ 0, 0 },
->   };
->   
-> +#ifndef KVM_CAP_ARM_VM_IPA_SIZE
-> +#define KVM_CAP_ARM_VM_IPA_SIZE	159
-> +#endif
+The irq_domain structure has an host_data pointer that just stores
+private data. It is meant to not be touched by the IRQ core. However,
+when it comes to MSI, the MSI layer adds its own private data there
+with a structure that also has a host_data pointer.
 
-Note that when merged on top of 4.19-rc5, this is already 160. I assume 
-this will be even different once this lands in mainline.
+Because this IRQ domain is an MSI domain, to access private data we
+should do a d->host_data->host_data, also wrapped as
+'platform_msi_get_host_data()'.
 
-Thanks,
+This bug was lying there silently because the 'icu' structure retrieved
+this way was just called by dev_err(), only producing a
+'(NULL device *):' output on the console.
 
-	M.
+Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+---
+ drivers/irqchip/irq-mvebu-icu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> +
-> +#ifndef KVM_VM_TYPE_ARM_IPA_SIZE
-> +#define KVM_VM_TYPE_ARM_IPA_SIZE_MASK	0xffULL
-> +#define KVM_VM_TYPE_ARM_IPA_SIZE(x)	\
-> +	((x) & KVM_VM_TYPE_ARM_IPA_SIZE_MASK)
-> +#endif
-> +
-> +void kvm__arch_init_hyp(struct kvm *kvm)
-> +{
-> +	int max_ipa;
-> +
-> +	if (!kvm->cfg.arch.phys_shift)
-> +		kvm->cfg.arch.phys_shift = 40;
-> +	if (kvm->cfg.arch.phys_shift == 40)
-> +		return;
-> +	max_ipa = ioctl(kvm->sys_fd,
-> +			KVM_CHECK_EXTENSION, KVM_CAP_ARM_VM_IPA_SIZE);
-> +	if (!max_ipa)
-> +		die("Kernel doesn't support IPA size configuration\n");
-> +	if ((kvm->cfg.arch.phys_shift > max_ipa) ||
-> +	    (kvm->cfg.arch.phys_shift < 32))
-> +		die("Requested PA size (%u) is not supported by the host"
-> +		    " [32 - %u]bit\n",
-> +		    kvm->cfg.arch.phys_shift, max_ipa);
-> +	kvm_arm_type = KVM_VM_TYPE_ARM_IPA_SIZE(kvm->cfg.arch.phys_shift);
-> +}
-> +
->   bool kvm__arch_cpu_supports_vm(void)
->   {
->   	/* The KVM capability check is enough. */
-> 
-
-
+diff --git a/drivers/irqchip/irq-mvebu-icu.c b/drivers/irqchip/irq-mvebu-icu.c
+index 13063339b416..a2a3acd74491 100644
+--- a/drivers/irqchip/irq-mvebu-icu.c
++++ b/drivers/irqchip/irq-mvebu-icu.c
+@@ -105,7 +105,7 @@ static int
+ mvebu_icu_irq_domain_translate(struct irq_domain *d, struct irq_fwspec *fwspec,
+ 			       unsigned long *hwirq, unsigned int *type)
+ {
+-	struct mvebu_icu *icu = d->host_data;
++	struct mvebu_icu *icu = platform_msi_get_host_data(d);
+ 	unsigned int icu_group;
+ 
+ 	/* Check the count of the parameters in dt */
 -- 
-Jazz is not dead. It just smells funny...
+2.17.1
