@@ -1,54 +1,78 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Mon,  1 Oct 2018 13:27:47 -0700
-Subject: [PATCH i2c-next v4 2/3] i2c: aspeed: Add 'timeout' DT property
- reading code
-In-Reply-To: <20181001202748.8030-1-jae.hyun.yoo@linux.intel.com>
-References: <20181001202748.8030-1-jae.hyun.yoo@linux.intel.com>
-Message-ID: <20181001202748.8030-3-jae.hyun.yoo@linux.intel.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 2 Oct 2018 05:34:18 +0900
+Subject: [PATCH v4 6/9] kbuild: consolidate Devicetree dtb build rules
+In-Reply-To: <20181001152531.3385-7-robh@kernel.org>
+References: <20181001152531.3385-1-robh@kernel.org>
+ <20181001152531.3385-7-robh@kernel.org>
+Message-ID: <CAK7LNAQAG1pAOMbnrFd5VbmUfcN5337tcGdeFrRo92rPWkVWAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds reading code of the 'timeout' DT property to set
-bus timeout value in adapter configuration. This value still
-can be configured through an I2C_TIMEOUT ioctl on cdev too.
+2018?10?2?(?) 0:26 Rob Herring <robh@kernel.org>:
+>
+> There is nothing arch specific about building dtb files other than their
+> location under /arch/*/boot/dts/. Keeping each arch aligned is a pain.
+> The dependencies and supported targets are all slightly different.
+> Also, a cross-compiler for each arch is needed, but really the host
+> compiler preprocessor is perfectly fine for building dtbs. Move the
+> build rules to a common location and remove the arch specific ones. This
+> is done in a single step to avoid warnings about overriding rules.
+>
+> The build dependencies had been a mixture of 'scripts' and/or 'prepare'.
+> These pull in several dependencies some of which need a target compiler
+> (specifically devicetable-offsets.h) and aren't needed to build dtbs.
+> All that is really needed is dtc, so adjust the dependencies to only be
+> dtc.
+>
+> This change enables support 'dtbs_install' on some arches which were
+> missing the target.
+>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> Acked-by: Paul Burton <paul.burton@mips.com>
+> Acked-by: Ley Foon Tan <ley.foon.tan@intel.com>
+> Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
----
- drivers/i2c/busses/i2c-aspeed.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+Please change this to
 
-diff --git a/drivers/i2c/busses/i2c-aspeed.c b/drivers/i2c/busses/i2c-aspeed.c
-index 8dc9161ced38..6d31f54a6653 100644
---- a/drivers/i2c/busses/i2c-aspeed.c
-+++ b/drivers/i2c/busses/i2c-aspeed.c
-@@ -885,6 +885,7 @@ static int aspeed_i2c_probe_bus(struct platform_device *pdev)
- 	struct clk *parent_clk;
- 	struct resource *res;
- 	int irq, ret;
-+	u32 timeout_ms;
- 
- 	bus = devm_kzalloc(&pdev->dev, sizeof(*bus), GFP_KERNEL);
- 	if (!bus)
-@@ -918,6 +919,11 @@ static int aspeed_i2c_probe_bus(struct platform_device *pdev)
- 		bus->bus_frequency = 100000;
- 	}
- 
-+	ret = of_property_read_u32(pdev->dev.of_node, "timeout",
-+				   &timeout_ms);
-+	if (ret)
-+		timeout_ms = 0; /* then adap.timeout will be set by i2c-core */
-+
- 	match = of_match_node(aspeed_i2c_bus_of_table, pdev->dev.of_node);
- 	if (!match)
- 		bus->get_clk_reg_val = aspeed_i2c_24xx_get_clk_reg_val;
-@@ -930,7 +936,7 @@ static int aspeed_i2c_probe_bus(struct platform_device *pdev)
- 	init_completion(&bus->cmd_complete);
- 	bus->adap.owner = THIS_MODULE;
- 	bus->adap.retries = 0;
--	bus->adap.timeout = 5 * HZ;
-+	bus->adap.timeout = timeout_ms ? msecs_to_jiffies(timeout_ms) : 0;
- 	bus->adap.algo = &aspeed_i2c_algo;
- 	bus->adap.dev.parent = &pdev->dev;
- 	bus->adap.dev.of_node = pdev->dev.of_node;
+Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+
+
+Thanks.
+
+
+> Cc: Michal Marek <michal.lkml@markovi.net>
+> Cc: Vineet Gupta <vgupta@synopsys.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
+> Cc: Michal Simek <monstr@monstr.eu>
+> Cc: Ralf Baechle <ralf@linux-mips.org>
+> Cc: James Hogan <jhogan@kernel.org>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Paul Mackerras <paulus@samba.org>
+> Cc: Michael Ellerman <mpe@ellerman.id.au>
+> Cc: Chris Zankel <chris@zankel.net>
+> Cc: Max Filippov <jcmvbkbc@gmail.com>
+> Cc: linux-kbuild at vger.kernel.org
+> Cc: linux-snps-arc at lists.infradead.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: uclinux-h8-devel at lists.sourceforge.jp
+> Cc: linux-mips at linux-mips.org
+> Cc: nios2-dev at lists.rocketboards.org
+> Cc: linuxppc-dev at lists.ozlabs.org
+> Cc: linux-xtensa at linux-xtensa.org
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> ---
+> v4:
+>  - Make dtbs and %.dtb rules depend on arch/$ARCH/boot/dts path rather than
+>    CONFIG_OF_EARLY_FLATTREE
+>  - Fix install path missing kernel version for dtbs_install
+>  - Fix "make CONFIG_OF_ALL_DTBS=y" for arches like ARM which selectively
+>    enable CONFIG_OF (and therefore dtc)
+
+
+
+
 -- 
-2.19.0
+Best Regards
+Masahiro Yamada
