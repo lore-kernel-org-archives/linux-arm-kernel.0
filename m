@@ -1,58 +1,45 @@
-From: m.slodczyk2@partner.samsung.com (Maciej Slodczyk)
-Date: Mon, 1 Oct 2018 15:40:28 +0200
-Subject: [PATCH v2 7/7] arm64: uprobes - ARM32 instruction probing
-In-Reply-To: <89110505-da2e-3266-c2aa-6e5128c520a4@arm.com>
-References: <1537963925-25313-1-git-send-email-m.slodczyk2@partner.samsung.com>
- <CGME20180926121218eucas1p1b20a88cfec17c6403a35e4f23de96ade@eucas1p1.samsung.com>
- <1537963925-25313-8-git-send-email-m.slodczyk2@partner.samsung.com>
- <89110505-da2e-3266-c2aa-6e5128c520a4@arm.com>
-Message-ID: <20181001134031eucas1p20355222b5692ca99bbeb915b9dbc6818~Zf8TZ4bLI3108031080eucas1p2e@eucas1p2.samsung.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 1 Oct 2018 15:43:07 +0200
+Subject: [PATCH V2 23/27] mmc: mmci: add variant property to request a
+ reset
+In-Reply-To: <a956549b-a84e-2582-1fce-3b15495f208c@st.com>
+References: <1537523181-14578-1-git-send-email-ludovic.Barre@st.com>
+ <1537523181-14578-24-git-send-email-ludovic.Barre@st.com>
+ <CAPDyKFqxBuQcafS2KFqPDwb4=V1Jwoovb4+VsJZjAA5CeKs2kw@mail.gmail.com>
+ <a956549b-a84e-2582-1fce-3b15495f208c@st.com>
+Message-ID: <CAPDyKFpeifgeZcB45WE+nbRtOrGk+h0BqbNZgM2ivJiELkXJhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+[...]
 
-Thank you for having a look at my patchset.
+>>> @@ -1854,6 +1855,14 @@ static int mmci_probe(struct amba_device *dev,
+>>>
+>>>          dev_dbg(mmc_dev(mmc), "clocking block at %u Hz\n", mmc->f_max);
+>>>
+>>> +       if (variant->reset) {
+>>> +               host->rst = devm_reset_control_get_exclusive(&dev->dev,
+>>> NULL);
+>>
+>>
+>> As suggested, let's make this optional and not depending on the variant.
+>
+>
+> I done like that because is required for my variant (if no reset, no power
+> cycle for sdmmc).
 
-On 27.09.2018 19:01, Robin Murphy wrote:
-> On 26/09/18 13:12, Maciej Slodczyk wrote:
-> [...]
->> @@ -38,16 +78,44 @@ int arch_uprobe_analyze_insn(struct arch_uprobe 
->> *auprobe, struct mm_struct *mm,
->> ????????? unsigned long addr)
->> ? {
->> ????? probes_opcode_t insn;
->> +??? enum probes_insn retval;
->> +??? unsigned int bpinsn;
->> -??? /* TODO: Currently we do not support AARCH32 instruction probing */
->> -??? if (mm->context.flags & MMCF_AARCH32)
->> -??????? return -ENOTSUPP;
->> -??? else if (!IS_ALIGNED(addr, AARCH64_INSN_SIZE))
->> +??? insn = *(probes_opcode_t *)(&auprobe->insn[0]);
->> +
->> +??? if (!IS_ALIGNED(addr, AARCH64_INSN_SIZE))
->> ????????? return -EINVAL;
->> -??? insn = *(probes_opcode_t *)(&auprobe->insn[0]);
->> +??? /* check if AARCH32 */
->> +??? if (is_compat_task()) {
->> +
->> +??????? /* Thumb is not supported yet */
->> +??????? if (addr & 0x3)
-> 
-> I'm only skimming, so forgive me if I'm missing something which should 
-> be obvious, but this has a big red flag all over it. If "addr" is the 
-> actual instruction address (or even a branch target, for a 
-> non-interworking branch), plenty of Thumb instructions will just happen 
-> to lie at 4-byte-aligned addresses anyway.
-> 
-That's the same way Thumb instructions are filtered out in arch/arm 
-uprobes and kprobes code. I believe that at this point all Thumb 
-instruction have bit 0 set. Please correct me if I'm wrong.
+The point is, I think don't think it's correct to ties this to the
+variant, but rather I think it depends on the behavior of the SoC.
 
-> Furthermore, how would this check ever catch anything anyway given 
-> !IS_ALIGNED(addr, AARCH64_INSN_SIZE) above?
+>
+> If you prefer, I could move to optional with
+> "devm_reset_control_get_optional_exclusive"
+> And I add a comment in mmci dt binding to specify that not optional
+> for sdmmc. (see above)
 
-You're right, there's no point in checking it here. I'll fix it in v3.
+Alright, fair enough. Let' do that.
 
-Thank you,
-Maciej
+[...]
+
+Kind regards
+Uffe
