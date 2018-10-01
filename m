@@ -1,16 +1,12 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Mon, 01 Oct 2018 15:00:13 -0700
-Subject: [GIT PULL] Allwinner clock changes for 4.20
-In-Reply-To: <20180929150127.aky3bijls3ncyunt@flea>
-References: <20180929150127.aky3bijls3ncyunt@flea>
-Message-ID: <153843121361.119890.4708850852378442505@swboyd.mtv.corp.google.com>
+Date: Mon, 01 Oct 2018 15:04:00 -0700
+Subject: [PATCH v3 3/6] drivers: clk-qoriq: increase array size of
+ cmux_to_group
+In-Reply-To: <1537747741-6245-4-git-send-email-vabhav.sharma@nxp.com>
+References: <1537747741-6245-1-git-send-email-vabhav.sharma@nxp.com>
+ <1537747741-6245-4-git-send-email-vabhav.sharma@nxp.com>
+Message-ID: <153843144041.119890.5558230475983572666@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2018-09-29 08:01:27)
-> Hi Mike, Stephen,
-> 
-> Here are our usual set of changes for the next merge window.
-> 
-
-Thanks. Pulled into clk-next.
+Subject should be "clk: qoriq: increase array size ..."
