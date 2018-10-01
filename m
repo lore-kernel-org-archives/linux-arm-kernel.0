@@ -1,32 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 1 Oct 2018 17:58:06 +0200
-Subject: [GIT PULL 5/5] i.MX defconfig updates for 4.20
-In-Reply-To: <20181001072003.16238-5-shawnguo@kernel.org>
-References: <20181001072003.16238-1-shawnguo@kernel.org>
- <20181001072003.16238-5-shawnguo@kernel.org>
-Message-ID: <CAK8P3a1wMGK1TrquSw_g0TdugsET2o3MRKnx+dV96ZgY5yDqgw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 1 Oct 2018 16:56:19 +0100
+Subject: [PATCH v3] arm64: Trap WFI executed in userspace
+In-Reply-To: <20181001111943.233042-1-marc.zyngier@arm.com>
+References: <20181001111943.233042-1-marc.zyngier@arm.com>
+Message-ID: <20181001155619.GI25071@arrakis.emea.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 1, 2018 at 9:21 AM Shawn Guo <shawnguo@kernel.org> wrote:
->
->       ARM: imx_v6_v7_defconfig: Re-sync defconfig
->       ARM: mxs_defconfig: Re-sync defconfig
->       ARM: imx_v4_v5_defconfig: Re-sync defconfig
+On Mon, Oct 01, 2018 at 12:19:43PM +0100, Marc Zyngier wrote:
+> It recently came to light that userspace can execute WFI, and that
+> the arm64 kernel doesn't trap this event. This sounds rather benign,
+> but the kernel should decide when it wants to wait for an interrupt,
+> and not userspace.
+> 
+> Let's trap WFI and immediately return after having skipped the
+> instruction. This effectively makes WFI a rather expensive NOP.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Hi Shawn, Fabio,
+Queued for 4.20. Thanks.
 
-these patches introduce a couple of changes that should be split out
-from 'Re-sync defconfig':
-
--CONFIG_USB_CHIPIDEA_ULPI=y
--CONFIG_USB_ULPI_BUS=y
--# CONFIG_ARM_UNWIND is not set
--CONFIG_FRAMEBUFFER_CONSOLE=y
--# CONFIG_ARM_THUMB is not set
-
-Please add explanations for why we don't set those
-any more, and keep them separate from patches that
-just move options around.
-
-        Arnd
+-- 
+Catalin
