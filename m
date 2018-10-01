@@ -1,107 +1,92 @@
-From: leoyang.li@nxp.com (Li Yang)
-Date: Mon, 1 Oct 2018 16:50:22 -0500
-Subject: [PATCH v2 5/5] soc/fsl_qbman: export coalesce change API
-In-Reply-To: <1538124204-31406-6-git-send-email-madalin.bucur@nxp.com>
-References: <1538124204-31406-1-git-send-email-madalin.bucur@nxp.com>
- <1538124204-31406-6-git-send-email-madalin.bucur@nxp.com>
-Message-ID: <CADRPPNQgGAYTCmppyxPwQnnC433QLm21D5iq_4EvSj0LrsAxGQ@mail.gmail.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Mon, 1 Oct 2018 14:51:18 -0700
+Subject: [PATCH v9 2/8] dt-bindings: Introduce interconnect binding
+In-Reply-To: <20181001212608.GF31641@jcrouse-lnx.qualcomm.com>
+References: <20180831140151.13972-1-georgi.djakov@linaro.org>
+ <20180831140151.13972-3-georgi.djakov@linaro.org>
+ <20180925180215.GA12435@bogus>
+ <20180926143432.GH10761@jcrouse-lnx.qualcomm.com>
+ <1ae0a36a-1178-4db5-1ae9-8f19e561a18b@codeaurora.org>
+ <20181001212608.GF31641@jcrouse-lnx.qualcomm.com>
+Message-ID: <d9f3d732-0a70-f823-d8e0-2d1b10d82e00@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 28, 2018 at 3:45 AM Madalin Bucur <madalin.bucur@nxp.com> wrote:
->
-> Export the API required to control the QMan portal interrupt coalescing
-> settings.
 
-These are new APIs not just old APIs being exported.  What is the user
-of these APIs?  Is the user being submitted?  We cannot have APIs in
-kernel that has no users.
 
->
-> Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
-> ---
->  drivers/soc/fsl/qbman/qman.c | 31 +++++++++++++++++++++++++++++++
->  include/soc/fsl/qman.h       | 27 +++++++++++++++++++++++++++
->  2 files changed, 58 insertions(+)
->
-> diff --git a/drivers/soc/fsl/qbman/qman.c b/drivers/soc/fsl/qbman/qman.c
-> index 99d0f87889b8..8ab75bb44c4d 100644
-> --- a/drivers/soc/fsl/qbman/qman.c
-> +++ b/drivers/soc/fsl/qbman/qman.c
-> @@ -1012,6 +1012,37 @@ static inline void put_affine_portal(void)
->
->  static struct workqueue_struct *qm_portal_wq;
->
-> +void qman_dqrr_set_ithresh(struct qman_portal *portal, u8 ithresh)
-> +{
-> +       if (!portal)
-> +               return;
-> +
-> +       qm_dqrr_set_ithresh(&portal->p, ithresh);
-> +       portal->p.dqrr.ithresh = ithresh;
-> +}
-> +EXPORT_SYMBOL(qman_dqrr_set_ithresh);
-> +
-> +void qman_dqrr_get_ithresh(struct qman_portal *portal, u8 *ithresh)
-> +{
-> +       if (portal && ithresh)
-> +               *ithresh = portal->p.dqrr.ithresh;
-> +}
-> +EXPORT_SYMBOL(qman_dqrr_get_ithresh);
-> +
-> +void qman_portal_get_iperiod(struct qman_portal *portal, u32 *iperiod)
-> +{
-> +       if (portal && iperiod)
-> +               *iperiod = qm_in(&portal->p, QM_REG_ITPR);
-> +}
-> +EXPORT_SYMBOL(qman_portal_get_iperiod);
-> +
-> +void qman_portal_set_iperiod(struct qman_portal *portal, u32 iperiod)
-> +{
-> +       if (portal)
-> +               qm_out(&portal->p, QM_REG_ITPR, iperiod);
-> +}
-> +EXPORT_SYMBOL(qman_portal_set_iperiod);
-> +
->  int qman_wq_alloc(void)
->  {
->         qm_portal_wq = alloc_workqueue("qman_portal_wq", 0, 1);
-> diff --git a/include/soc/fsl/qman.h b/include/soc/fsl/qman.h
-> index d4dfefdee6c1..42f50eb51529 100644
-> --- a/include/soc/fsl/qman.h
-> +++ b/include/soc/fsl/qman.h
-> @@ -1186,4 +1186,31 @@ int qman_alloc_cgrid_range(u32 *result, u32 count);
->   */
->  int qman_release_cgrid(u32 id);
->
-> +/**
-> + * qman_dqrr_get_ithresh - Get coalesce interrupt threshold
-> + * @portal: portal to get the value for
-> + * @ithresh: threshold pointer
-> + */
-> +void qman_dqrr_get_ithresh(struct qman_portal *portal, u8 *ithresh);
-> +
-> +/**
-> + * qman_dqrr_set_ithresh - Set coalesce interrupt threshold
-> + * @portal: portal to set the new value on
-> + * @ithresh: new threshold value
-> + */
-> +void qman_dqrr_set_ithresh(struct qman_portal *portal, u8 ithresh);
-> +
-> +/**
-> + * qman_dqrr_get_iperiod - Get coalesce interrupt period
-> + * @portal: portal to get the value for
-> + * @iperiod: period pointer
-> + */
-> +void qman_portal_get_iperiod(struct qman_portal *portal, u32 *iperiod);
-> +/*
-> + * qman_dqrr_set_iperiod - Set coalesce interrupt period
-> + * @portal: portal to set the new value on
-> + * @ithresh: new period value
-> + */
-> +void qman_portal_set_iperiod(struct qman_portal *portal, u32 iperiod);
-> +
->  #endif /* __FSL_QMAN_H */
-> --
-> 2.1.0
->
+On 10/01/2018 02:26 PM, Jordan Crouse wrote:
+> On Mon, Oct 01, 2018 at 01:56:32PM -0700, Saravana Kannan wrote:
+>>
+>> On 09/26/2018 07:34 AM, Jordan Crouse wrote:
+>>> On Tue, Sep 25, 2018 at 01:02:15PM -0500, Rob Herring wrote:
+>>>> On Fri, Aug 31, 2018 at 05:01:45PM +0300, Georgi Djakov wrote:
+>>>>> This binding is intended to represent the relations between the interconnect
+>>>>> controllers (providers) and consumer device nodes. It will allow creating links
+>>>>> between consumers and interconnect paths (exposed by interconnect providers).
+>>>> As I mentioned in person, I want to see other SoC families using this
+>>>> before accepting. They don't have to be ready for upstream, but WIP
+>>>> patches or even just a "yes, this works for us and we're going to use
+>>>> this binding on X".
+>>>>
+>>>> Also, I think the QCom GPU use of this should be fully sorted out. Or
+>>>> more generically how this fits into OPP binding which seems to be never
+>>>> ending extended...
+>>> This is a discussion I wouldn't mind having now.  To jog memories, this is what
+>>> I posted a few weeks ago:
+>>>
+>>> https://patchwork.freedesktop.org/patch/246117/
+>>>
+>>> This seems like the easiest way to me to tie the frequency and the bandwidth
+>>> quota together for GPU devfreq scaling but I'm not married to the format and
+>>> I'll happily go a few rounds on the bikeshed if we can get something we can
+>>> be happy with.
+>>>
+>>> Jordan
+>> Been meaning to send this out for a while, but caught up with other stuff.
+>>
+>> That GPU BW patch is very specific to device to device mapping and
+>> doesn't work well for different use cases (Eg: those that? can
+>> calculate based on use case, etc).
+>>
+>> Interconnect paths have different BW (bandwidth) operating points
+>> that they can support. For example: 1 GB/s, 1.7 GB/s, 5GB/s, etc.
+>> Having a mapping from GPU or CPU to those are fine/necessary, but we
+>> still need a separate BW OPP table for interconnect paths to list
+>> what they can actually support.
+>>
+>> Two different ways we could represent BW OPP tables for interconnect paths:
+>> 1.? Represent interconnect paths (CPU to DDR, GPU to DDR, etc) as
+>> devices and have OPPs for those devices.
+>>
+>> 2. We can have a "interconnect-opp-tables" DT binding similar to
+>> "interconnects" and "interconnect-names". So if a device GPU or
+>> Video decoder or I2C device needs to vote on an interconnect path,
+>> they can also list the OPP tables that those paths can support.
+>>
+>> I know Rob doesn't like (1). But I'm hoping at least (2) is
+>> acceptable. I'm open to other suggestions too.
+>>
+>> Both (1) and (2) need BW OPP tables similar to frequency OPP tables.
+>> That should be easy to add and Viresh is open to that. I'm open to
+>> other options too, but the fundamental missing part is how to tie a
+>> list of BW OPPs to interconnect paths in DT.
+>>
+>> Once we have one of the above two options, we can use the
+>> required-opps field (already present in kernel) for the mapping
+>> between GPU to a particular BW need (suggested by Viresh during an
+>> in person conversation).
+> Assuming we are willing to maintain the bandwidth OPP tables and the
+> names / phandles needed to describe a 1:1 GPU -> bandwidth mapping
+> I'm okay with required-opps but for the sake of argument how would
+> required-opps work for a device that needs to vote multiple paths
+> for a given OPP?
+
+You can list multiple required-opps per device OPP. It's an array of 
+phandles to OPP entries in other tables.
+
+-Saravana
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
