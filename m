@@ -1,60 +1,82 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 1 Oct 2018 12:29:53 +0200
-Subject: [PATCH v3 0/3] Add Amlogic video decoder driver
-In-Reply-To: <20180928142816.4311-1-mjourdan@baylibre.com>
-References: <20180928142816.4311-1-mjourdan@baylibre.com>
-Message-ID: <cfb89cf9-4fce-7fab-48e1-a0311b80d993@xs4all.nl>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 1 Oct 2018 11:41:37 +0100
+Subject: [PATCH v5 5/6] arm64/mm: Populate the swapper_pg_dir by fixmap.
+In-Reply-To: <20180924163619.rx7bae67i5isq2fy@lakrids.cambridge.arm.com>
+References: <20180917044333.30051-1-yaojun8558363@gmail.com>
+ <20180917044333.30051-6-yaojun8558363@gmail.com>
+ <20180924163619.rx7bae67i5isq2fy@lakrids.cambridge.arm.com>
+Message-ID: <24c91d6c-85c8-afb4-74d1-202e4d780ab6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/28/2018 04:28 PM, Maxime Jourdan wrote:
-> Hi everyone,
-> 
-> This patch series adds support for the Amlogic video decoder,
-> as well as the corresponding dt bindings for GXBB/GXL/GXM chips.
-> 
-> It features decoding for the following formats:
-> - MPEG 1
-> - MPEG 2
-> 
-> The following formats will be added in future patches:
-> - MJPEG
-> - MPEG 4 (incl. Xvid, H.263)
-> - H.264
-> - HEVC (incl. 10-bit)
-> 
-> The following formats' development has still not started, but they are
-> supported by the hardware:
-> - VC1
-> - VP9
-> 
-> The code was made in such a way to allow easy inclusion of those formats
-> in the future.
-> 
-> The decoder is single instance.
-> 
-> Files:
->  - vdec.c handles the V4L2 M2M logic
->  - esparser.c manages the hardware bitstream parser
->  - vdec_helpers.c provides helpers to DONE the dst buffers as well as
->  various common code used by the codecs
->  - vdec_1.c manages the VDEC_1 block of the vdec IP
->  - codec_mpeg12.c enables decoding for MPEG 1/2.
->  - vdec_platform.c links codec units with vdec units
->  (e.g vdec_1 with codec_mpeg12) and lists all the available
->  src/dst formats and requirements (max width/height, etc.),
->  per compatible chip.
-> 
-> Firmwares are necessary to run the vdec. They can currently be found at:
-> https://github.com/chewitt/meson-firmware
+Hi Mark,
 
-Are you trying to get this into the linux-firmware repository?
+On 24/09/18 17:36, Mark Rutland wrote:
+> On Mon, Sep 17, 2018 at 12:43:32PM +0800, Jun Yao wrote:
+>> Since we will move the swapper_pg_dir to rodata section, we need a
+>> way to update it. The fixmap can handle it. When the swapper_pg_dir
+>> needs to be updated, we map it dynamically. The map will be
+>> canceled after the update is complete. In this way, we can defend
+>> against KSMA(Kernel Space Mirror Attack).
 
-I believe that Mauro requires that before he will merge this driver.
+>> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+>> index 71532bcd76c1..a8a60927f716 100644
+>> --- a/arch/arm64/mm/mmu.c
+>> +++ b/arch/arm64/mm/mmu.c
+>> @@ -67,6 +67,24 @@ static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
+>>  static pmd_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss __maybe_unused;
+>>  static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss __maybe_unused;
+>>  
+>> +static DEFINE_SPINLOCK(swapper_pgdir_lock);
+>> +
+>> +void set_swapper_pgd(pgd_t *pgdp, pgd_t pgd)
+>> +{
+>> +	pgd_t *fixmap_pgdp;
+>> +
+>> +	spin_lock(&swapper_pgdir_lock);
+>> +	fixmap_pgdp = pgd_set_fixmap(__pa(pgdp));
+>> +	WRITE_ONCE(*fixmap_pgdp, pgd);
+>> +	/*
+>> +	 * We need dsb(ishst) here to ensure the page-table-walker sees
+>> +	 * our new entry before set_p?d() returns. The fixmap's
+>> +	 * flush_tlb_kernel_range() via clear_fixmap() does this for us.
+>> +	 */
+>> +	pgd_clear_fixmap();
+>> +	spin_unlock(&swapper_pgdir_lock);
+>> +}
+> 
+> I'm rather worried that we could deadlock here.
 
-So I think this driver will be ready to be merged once v4 is posted,
-dt-bindings is Acked and the firmware is merged to the linux-firmware repo.
+We can use the irqsave versions if you're worried, but I think any code doing
+this is already broken.
 
-Regards,
+(I'd like to eventually depend on the init_mm.page_table_lock for this, but it
+isn't held when the vmemmap is being populated.)
 
-	Hans
+
+> Are we certain we never poke the kernel page tables in IRQ context?
+
+The RAS code was doing this, but was deemed unsafe, and changed to use the
+fixmap: https://lkml.org/lkml/2017/10/30/500
+The fixmap only ever touches the last level, so can't hit this.
+
+x86 can't do its IPI tlb-maintenance from IRQ context, so anything trying to
+unmap from irq context is already broken: https://lkml.org/lkml/2018/9/6/324
+
+vunmap()/vfree() is allowed from irq context, but it defers its work.
+
+I can't find any way to pass GFP_ATOMIC into ioremap(),
+I didn't think vmalloc() could either, ...  but now I spot __vmalloc() does...
+
+This __vmalloc() path is used by the percpu allocator, which starting from
+pcpu_alloc() can be passed something other than GFP_KERNEL, and uses
+spin_lock_irqsave(), so it is expecting to be called in irq context.
+
+... so yes it looks like this can happen.
+
+I'll post a fix
+
+
+Thanks!
+
+James
