@@ -1,56 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 1 Oct 2018 17:13:15 +0200
-Subject: [PATCH] ARM: makefile: pass -march=armv4 to assembler even on
- CPU32v3
-In-Reply-To: <20180930024904.14240-1-Jason@zx2c4.com>
-References: <20180930024904.14240-1-Jason@zx2c4.com>
-Message-ID: <CAK8P3a0grG5OBjwpTeH0fqzoFFBLDH6-oGM4ibzHypUKWedg3A@mail.gmail.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Mon, 1 Oct 2018 11:14:06 -0400
+Subject: [PATCH v3 1/4] DYNAMIC_FTRACE configurable with and without REGS
+In-Reply-To: <20181001151037.GB2634@lst.de>
+References: <20181001140910.086E768BC7@newverein.lst.de>
+ <20181001141643.331EE68BC7@newverein.lst.de>
+ <CAKv+Gu-ZtJ-BpfPWU=soDCb2+dAd81p8OtaarWhmTe+Fk6A8ig@mail.gmail.com>
+ <20181001150353.GA2634@lst.de>
+ <CAKv+Gu9tvbM=tb-LJVJtGaq5wD0woX2gtdST+22xJnjZmc_SxQ@mail.gmail.com>
+ <20181001151037.GB2634@lst.de>
+Message-ID: <20181001111406.0c799813@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 30, 2018 at 4:49 AM Jason A. Donenfeld <Jason@zx2c4.com> wrote:
+On Mon, 1 Oct 2018 17:10:37 +0200
+Torsten Duwe <duwe@lst.de> wrote:
+
+> On Mon, Oct 01, 2018 at 05:06:06PM +0200, Ard Biesheuvel wrote:
+> > On 1 October 2018 at 17:03, Torsten Duwe <duwe@lst.de> wrote:  
+> > > On Mon, Oct 01, 2018 at 04:52:27PM +0200, Ard Biesheuvel wrote:  
+> > >>
+> > >> I guess we now have Kbuild/Kconfig support for this, no? I mean, we
+> > >> can now show/hide options depending on the capabilities of the
+> > >> toolchain.  
+> > >
+> > > Config options depending on flags availability?
+> > >  
+> > Yes. Note that 'make menuconfig' now prints the compiler version at
+> > the top, and kconfig options can now 'depend' on compiler features,  
+> 
+> Ah, cool, got it. So unless anyone else thinks this patch is useful,
+> feel free to disregard it ;-) Point taken.
 >
-> Per the discussion about half-way down in [1], the kernel doesn't
-> actually support the ARMv3 ISA, but selects it for some ARMv4 ISA
-> hardware that benefits from ARMv3 code generation. Such a consideration,
-> then, only applies to the compiler but not to the assembler. This commit
-> passes -march=armv4 to the assembler in those cases, so that code
-> written for ARMv4 will continue to compile and run fine, without needing
-> module-specific asflags-y overrides.
->
-> [1] https://lore.kernel.org/lkml/CAKv+Gu9FoFQymp2-=rUeh14CkUKON389OCE7stYCOFwKZpaCrg at mail.gmail.com/
->
-> Signed-off-by: Jason A. Donenfeld <Jason@zx2c4.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> I don't have too much familiarity with hardware this old, nor access to
-> testing systems, so please do carefully evaluate the assertions above
-> before merging this, since I'm not sure I have a full understanding of
-> the Linux ARMv3 situation.
 
-I took a look at the original build problem. It seems that the issue
-here that your assembler implementation contains multiplication
-instructions that are part of ARMv3M and higher but not ARMv3.
+Yes, please don't apply this patch. Have the build system figure out if
+the tool chain can handle it or not.
 
-Since RPC/sa110 supports those instructions, should we maybe
-just build the kernel with -march-armv3 instead?
-
-Russell, does this make sense, or is there a reason we're not
-already doing the below?
-
-       Arnd
-
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 8c05ab53425a..445ae57ee3a1 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -81,7 +81,7 @@ endif
- arch-$(CONFIG_CPU_32v5)                =-D__LINUX_ARM_ARCH__=5 -march=armv5te
- arch-$(CONFIG_CPU_32v4T)       =-D__LINUX_ARM_ARCH__=4 -march=armv4t
- arch-$(CONFIG_CPU_32v4)                =-D__LINUX_ARM_ARCH__=4 $(call
-cc-option,-march=armv4,-march=armv4t)
--arch-$(CONFIG_CPU_32v3)                =-D__LINUX_ARM_ARCH__=3 -march=armv3
-+arch-$(CONFIG_CPU_32v3)                =-D__LINUX_ARM_ARCH__=3 -march=armv3m
-
- # Evaluate arch cc-option calls now
- arch-y := $(arch-y)
+-- Steve
