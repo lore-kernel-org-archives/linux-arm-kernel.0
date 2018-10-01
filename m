@@ -1,130 +1,26 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 1 Oct 2018 15:01:46 +0100
-Subject: [PATCH] PCI: mvebu: Fix PCI I/O mapping creation sequence
-In-Reply-To: <20181001124934.7222-1-thomas.petazzoni@bootlin.com>
-References: <20181001124934.7222-1-thomas.petazzoni@bootlin.com>
-Message-ID: <20181001140137.GA13049@red-moon>
+From: jwboyer@kernel.org (Josh Boyer)
+Date: Mon, 1 Oct 2018 10:03:15 -0400
+Subject: [PATCH] linux-firmware: mediatek: add firmware for mt7668u
+ Bluetooth
+In-Reply-To: <6fdc3e0ac48354760038988e0f9f3197cf611ccc.1537507210.git.sean.wang@mediatek.com>
+References: <6fdc3e0ac48354760038988e0f9f3197cf611ccc.1537507210.git.sean.wang@mediatek.com>
+Message-ID: <CA+5PVA6HZnFJthYrgicOki-BH1s_fXOru6RSs_AZ4md_M4YAxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 01, 2018 at 02:49:34PM +0200, Thomas Petazzoni wrote:
-> Commit ee1604381a371 ("PCI: mvebu: Only remap I/O space if
-> configured") had the side effect that the PCI I/O mapping was created
-> much earlier than before, at a point where the probe() of the driver
-> could still fail. This is for example a problem if one gets an
-> -EPROBE_DEFER at some point during probe(), after pci_ioremap_io() has
-> been called.
-> 
-> Indeed, there is currently no function to undo what pci_ioremap_io()
-> did, and switching to pci_remap_iospace() is not an option in
-> pci-mvebu due to the need for special memory attributes on Armada 38x.
-> 
-> Reverting ee1604381a371 ("PCI: mvebu: Only remap I/O space if
-> configured") would be a possibility, but it would require also
-> reverting 42342073e38b5 ("PCI: mvebu: Convert to use pci_host_bridge
-> directly"). So instead, we use an open-coded version of
-> pci_host_probe() that creates the PCI I/O mapping at a point where we
-> are guaranteed not to fail anymore.
-> 
-> Reported-by: Jan Kundr?t <jan.kundrat@cesnet.cz>
-> Fixes: ee1604381a371 ("PCI: mvebu: Only remap I/O space if configured")
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+On Fri, Sep 21, 2018 at 2:56 AM <sean.wang@mediatek.com> wrote:
+>
+> From: Sean Wang <sean.wang@mediatek.com>
+>
+> Add binary firmware for mt7668u based Bluetooth devices.
+>
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 > ---
->  drivers/pci/controller/pci-mvebu.c | 52 +++++++++++++++++++++++++++++++++++---
->  1 file changed, 48 insertions(+), 4 deletions(-)
+>  WHENCE                  |   2 ++
+>  mediatek/mt7668pr2h.bin | Bin 0 -> 170990 bytes
+>  2 files changed, 2 insertions(+)
+>  create mode 100755 mediatek/mt7668pr2h.bin
 
-Thank you Thomas.
+Applied and pushed out.
 
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-
-Bjorn, is it possible please to send this patch for -rc7 ? It is
-a regression we introduced in the last cycle.
-
-Thanks,
-Lorenzo
-
-> diff --git a/drivers/pci/controller/pci-mvebu.c b/drivers/pci/controller/pci-mvebu.c
-> index 50eb0729385b..a41d79b8d46a 100644
-> --- a/drivers/pci/controller/pci-mvebu.c
-> +++ b/drivers/pci/controller/pci-mvebu.c
-> @@ -1145,7 +1145,6 @@ static int mvebu_pcie_parse_request_resources(struct mvebu_pcie *pcie)
->  {
->  	struct device *dev = &pcie->pdev->dev;
->  	struct device_node *np = dev->of_node;
-> -	unsigned int i;
->  	int ret;
->  
->  	INIT_LIST_HEAD(&pcie->resources);
-> @@ -1179,13 +1178,58 @@ static int mvebu_pcie_parse_request_resources(struct mvebu_pcie *pcie)
->  					 resource_size(&pcie->io) - 1);
->  		pcie->realio.name = "PCI I/O";
->  
-> +		pci_add_resource(&pcie->resources, &pcie->realio);
-> +	}
-> +
-> +	return devm_request_pci_bus_resources(dev, &pcie->resources);
-> +}
-> +
-> +/*
-> + * This is a copy of pci_host_probe(), except that it does the I/O
-> + * remap as the last step, once we are sure we won't fail.
-> + *
-> + * It should be removed once the I/O remap error handling issue has
-> + * been sorted out.
-> + */
-> +static int mvebu_pci_host_probe(struct pci_host_bridge *bridge)
-> +{
-> +	struct mvebu_pcie *pcie;
-> +	struct pci_bus *bus, *child;
-> +	int ret;
-> +
-> +	ret = pci_scan_root_bus_bridge(bridge);
-> +	if (ret < 0) {
-> +		dev_err(bridge->dev.parent, "Scanning root bridge failed");
-> +		return ret;
-> +	}
-> +
-> +	pcie = pci_host_bridge_priv(bridge);
-> +	if (resource_size(&pcie->io) != 0) {
-> +		unsigned int i;
-> +
->  		for (i = 0; i < resource_size(&pcie->realio); i += SZ_64K)
->  			pci_ioremap_io(i, pcie->io.start + i);
-> +	}
->  
-> -		pci_add_resource(&pcie->resources, &pcie->realio);
-> +	bus = bridge->bus;
-> +
-> +	/*
-> +	 * We insert PCI resources into the iomem_resource and
-> +	 * ioport_resource trees in either pci_bus_claim_resources()
-> +	 * or pci_bus_assign_resources().
-> +	 */
-> +	if (pci_has_flag(PCI_PROBE_ONLY)) {
-> +		pci_bus_claim_resources(bus);
-> +	} else {
-> +		pci_bus_size_bridges(bus);
-> +		pci_bus_assign_resources(bus);
-> +
-> +		list_for_each_entry(child, &bus->children, node)
-> +			pcie_bus_configure_settings(child);
->  	}
->  
-> -	return devm_request_pci_bus_resources(dev, &pcie->resources);
-> +	pci_bus_add_devices(bus);
-> +	return 0;
->  }
->  
->  static int mvebu_pcie_probe(struct platform_device *pdev)
-> @@ -1268,7 +1312,7 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
->  	bridge->align_resource = mvebu_pcie_align_resource;
->  	bridge->msi = pcie->msi;
->  
-> -	return pci_host_probe(bridge);
-> +	return mvebu_pci_host_probe(bridge);
->  }
->  
->  static const struct of_device_id mvebu_pcie_of_match_table[] = {
-> -- 
-> 2.14.4
-> 
+josh
