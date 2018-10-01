@@ -1,44 +1,58 @@
-From: Ganapatrao.Kulkarni@cavium.com (Kulkarni, Ganapatrao)
-Date: Mon, 1 Oct 2018 10:07:43 +0000
-Subject: [PATCH] arm_pmu: Delete incorrect cache event mapping for some
- armv8_pmuv3 events.
-Message-ID: <20181001100707.16840-1-ganapatrao.kulkarni@cavium.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 01 Oct 2018 11:50:27 +0200
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.20 (#1)
+Message-ID: <87o9cenggs.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Perf events L1-dcache-load-misses, L1-dcache-store-misses are mapped to
-armv8_pmuv3 (both DT and ACPI) event L1D_CACHE_REFILL. This is incorrect,
-since L1D_CACHE_REFILL counts both load and store misses.
-Similarly the events L1-dcache-loads, L1-dcache-stores, dTLB-load-misses
-and dTLB-loads are wrongly mapped. Hence Deleting all these cache events
-from armv8_pmuv3 cache mapping.
+Hi,
 
-Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
----
- arch/arm64/kernel/perf_event.c | 8 --------
- 1 file changed, 8 deletions(-)
+Here is the first pull request for dt64 for mvebu for v4.20.
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 33147aacdafd..6a67ad22d1eb 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -207,17 +207,9 @@ static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
- 						[PERF_COUNT_HW_CACHE_RESULT_MAX] = {
- 	PERF_CACHE_MAP_ALL_UNSUPPORTED,
- 
--	[C(L1D)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1D_CACHE,
--	[C(L1D)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1D_CACHE_REFILL,
--	[C(L1D)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1D_CACHE,
--	[C(L1D)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1D_CACHE_REFILL,
--
- 	[C(L1I)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1I_CACHE,
- 	[C(L1I)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1I_CACHE_REFILL,
- 
--	[C(DTLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1D_TLB_REFILL,
--	[C(DTLB)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1D_TLB,
--
- 	[C(ITLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1I_TLB_REFILL,
- 	[C(ITLB)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1I_TLB,
- 
--- 
-2.18.0
+Gregory
+
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+
+  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+
+are available in the Git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.20-1
+
+for you to fetch changes up to 620cfb31bad4c5be7d9250f1e47a592750fc364b:
+
+  arm64: dts: marvell: armada-37xx: add nodes to support watchdog (2018-09-28 10:00:17 +0200)
+
+----------------------------------------------------------------
+mvebu dt64 for 4.20 (part 1)
+
+ - Add watchdog node on Armada 37xx
+ - Update PPv2 interrupts name
+ - Add support for the SolidRun Clearfog GT 8K (Armada 8040 based)
+ - Add thermal-zone nodes for Armada 7K/8K
+
+----------------------------------------------------------------
+Antoine Tenart (2):
+      arm64: dts: marvell: armada-cp110: change the PPv2 IRQ names
+      arm64: dts: marvell: armada-cp110: describe more PPv2 interrupts
+
+Baruch Siach (1):
+      arm64: dts: add support for SolidRun Clearfog GT 8K
+
+Marek Beh?n (1):
+      arm64: dts: marvell: armada-37xx: add nodes to support watchdog
+
+Miquel Raynal (4):
+      arm64: dts: marvell: move AP806/CP110 thermal nodes into a new syscon
+      arm64: dts: marvell: add thermal-zone node in ap806 DTSI file
+      arm64: dts: marvell: add macro to make distinction between node names
+      arm64: dts: marvell: add thermal-zone node in cp110 DTSI file
+
+ arch/arm64/boot/dts/marvell/Makefile               |   1 +
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |  13 +
+ .../dts/marvell/armada-8040-clearfog-gt-8k.dts     | 434 +++++++++++++++++++++
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi      |  74 +++-
+ arch/arm64/boot/dts/marvell/armada-common.dtsi     |   1 +
+ arch/arm64/boot/dts/marvell/armada-cp110.dtsi      |  64 ++-
+ 6 files changed, 571 insertions(+), 16 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-8040-clearfog-gt-8k.dts
