@@ -1,43 +1,93 @@
-From: duwe@lst.de (Torsten Duwe)
-Date: Mon,  1 Oct 2018 16:16:43 +0200 (CEST)
-Subject: [PATCH v3 1/4] DYNAMIC_FTRACE configurable with and without REGS
-In-Reply-To: <20181001140910.086E768BC7@newverein.lst.de>
-References: <20181001140910.086E768BC7@newverein.lst.de>
-Message-ID: <20181001141643.331EE68BC7@newverein.lst.de>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 1 Oct 2018 15:36:41 +0100
+Subject: [PATCH v5 1/9] PCI: mediatek: Using slot's devfn for compare to
+ fix mtk_pcie_find_port logic
+In-Reply-To: <1538129080-8206-2-git-send-email-honghui.zhang@mediatek.com>
+References: <1538129080-8206-1-git-send-email-honghui.zhang@mediatek.com>
+ <1538129080-8206-2-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <20181001143641.GB13049@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In commit 06aeaaeabf69da4, many ftrace-related config options are
-consolidated. By accident, I guess, the choice about DYNAMIC_FTRACE
-and DYNAMIC_FTRACE_WITH_REGS is no longer available explicitly but
-determined by the sole availability on the architecture.
+On Fri, Sep 28, 2018 at 06:04:32PM +0800, honghui.zhang at mediatek.com wrote:
+> From: Honghui Zhang <honghui.zhang@mediatek.com>
+> 
+> The Mediatek's host controller has two slots, each with it's own control
+> registers. The host driver need to identify which slot was connected
+> in order to access the device's configuration space. There's problem
+> for current host driver to find out which slot was connected to for
+> a given EP device.
+> 
+> Assuming each slot have connect with one EP device as below:
+> 
+>                 host bridge
+>   bus 0 --> __________|_______
+>            |                  |
+>            |                  |
+>          slot 0             slot 1
+>   bus 1 -->|        bus 2 --> |
+>            |                  |
+>          EP 0               EP 1
+> 
+> During PCI enumeration, system software will scan all the PCI device
+> starting from devfn 0. So it will get the proper port for slot0 and
+> slot1 device when using PCI_SLOT(devfn) for match. But it will get
+> the wrong slot for EP1: The devfn will be start from 0 when scanning
+> EP1 behind slot1, it will get port0 since the PCI_SLOT(EP1) is match
+> for port0's slot value. So the host driver should not using EP's devfn
+> but the slot's devfn(the slot which EP was connected to) for match.
+> 
+> This patch fix the mtk_pcie_find_port's logic by using the slot's
+> devfn for match if finding device connected to the subordinate bus.
+> 
+> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> ---
+>  drivers/pci/controller/pcie-mediatek.c | 17 ++++++++++++++++-
+>  1 file changed, 16 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
+> index 9999dae..264e03f 100644
+> --- a/drivers/pci/controller/pcie-mediatek.c
+> +++ b/drivers/pci/controller/pcie-mediatek.c
+> @@ -337,10 +337,25 @@ static struct mtk_pcie_port *mtk_pcie_find_port(struct pci_bus *bus,
+>  {
+>  	struct mtk_pcie *pcie = bus->sysdata;
+>  	struct mtk_pcie_port *port;
+> +	struct pci_dev *dev = NULL;
+> +
+> +	/*
+> +	 * Walk the bus hierarchy to get the devfn value
+> +	 * of the port in the root bus.
+> +	 */
+> +	while (bus && bus->number) {
+> +		dev = bus->self;
+> +		bus = dev->bus;
 
-This makes it hard to introduce DYNAMIC_FTRACE_WITH_REGS if it depends
-on new compiler features or other new properties of the toolchain
-without breaking existing configurations.
+If you add:
 
-This patch turns the def_bool into an actual choice. Should the toolchain
-not meet the requirements for _WITH_REGS it can be turned off.
+devfn = dev->devfn;
 
-Signed-off-by: Torsten Duwe <duwe@suse.de>
+here
 
+> +	}
+> +
+> +	list_for_each_entry(port, &pcie->ports, list) {
+> +		/* Using slot's devfn to compare for subordinary bus. */
+> +		if (dev)
+> +			devfn = dev->devfn;
 
---- a/kernel/trace/Kconfig
-+++ b/kernel/trace/Kconfig
-@@ -508,9 +508,15 @@ config DYNAMIC_FTRACE
- 	  otherwise has native performance as long as no tracing is active.
- 
- config DYNAMIC_FTRACE_WITH_REGS
--	def_bool y
-+	bool "Include register content tracking in dynamic ftrace facility"
-+	default y
- 	depends on DYNAMIC_FTRACE
- 	depends on HAVE_DYNAMIC_FTRACE_WITH_REGS
-+	help
-+	  This architecture supports the inspection of register contents,
-+	  as passed between functions, at the dynamic ftrace points.
-+	  This is also a prerequisite for Kernel Live Patching (KLP).
-+	  When in doubt, say Y.
- 
- config FUNCTION_PROFILER
- 	bool "Kernel function profiler"
+You can remove this ugly hunk altogether (and dev initialization
+to NULL).
+
+Lorenzo
+
+> -	list_for_each_entry(port, &pcie->ports, list)
+>  		if (port->slot == PCI_SLOT(devfn))
+>  			return port;
+> +	}
+>  
+>  	return NULL;
+>  }
+> -- 
+> 2.6.4
+> 
