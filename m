@@ -1,33 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 1 Oct 2018 16:00:27 +0200
-Subject: [GIT PULL] arm: actions: arm64 for v4.20 #1
-In-Reply-To: <20180930180715.25829-3-afaerber@suse.de>
-References: <20180930180715.25829-1-afaerber@suse.de>
- <20180930180715.25829-3-afaerber@suse.de>
-Message-ID: <CAK8P3a3CkTwvT0qHyQ_-8hsBebKn0ngTWHLf0kLbFskTZ3c3Yg@mail.gmail.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Mon, 01 Oct 2018 15:00:38 +0100
+Subject: [PATCH v7.1 9/9] KVM: arm64: Add support for creating PUD
+ hugepages at stage 2
+In-Reply-To: <20180925143731.27475-1-punit.agrawal@arm.com> (Punit Agrawal's
+ message of "Tue, 25 Sep 2018 15:37:31 +0100")
+References: <20180924174552.8387-10-punit.agrawal@arm.com>
+ <20180925143731.27475-1-punit.agrawal@arm.com>
+Message-ID: <87bm8dn4vt.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 30, 2018 at 8:07 PM Andreas F?rber <afaerber@suse.de> wrote:
->
-> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
->
->   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
->
-> are available in the Git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git tags/actions-arm64-soc-for-4.20
->
-> for you to fetch changes up to e0c27a1066a935671a00b1764385bc8118d8022c:
->
->   arm64: actions: Enable PINCTRL in platforms Kconfig (2018-09-30 19:11:33 +0200)
->
-> ----------------------------------------------------------------
-> Actions Semi arm64 SoC for v4.20
->
-> This updates and extends the MAINTAINERS entry, adding Mani.
-> It also selects PINCTRL in Kconfig.
+Punit Agrawal <punit.agrawal@arm.com> writes:
 
-Pulled into next/soc; thanks, and welcome Manivannan as a reviewer!
+> KVM only supports PMD hugepages at stage 2. Now that the various page
+> handling routines are updated, extend the stage 2 fault handling to
+> map in PUD hugepages.
+>
+> Addition of PUD hugepage support enables additional page sizes (e.g.,
+> 1G with 4K granule) which can be useful on cores that support mapping
+> larger block sizes in the TLB entries.
+>
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>
+> v7 -> v7.1
+>
+> * Added arm helper kvm_stage2_has_pud()
+> * Added check for PUD level present at stage 2
+> * Dropped redundant comment
+> * Fixed up kvm_pud_mkhuge() to complain on arm
+>
+>  arch/arm/include/asm/kvm_mmu.h         |  20 +++++
+>  arch/arm/include/asm/stage2_pgtable.h  |   5 ++
+>  arch/arm64/include/asm/kvm_mmu.h       |  16 ++++
+>  arch/arm64/include/asm/pgtable-hwdef.h |   2 +
+>  arch/arm64/include/asm/pgtable.h       |   2 +
+>  virt/kvm/arm/mmu.c                     | 106 +++++++++++++++++++++++--
+>  6 files changed, 145 insertions(+), 6 deletions(-)
+>
 
-      Arnd
+[...]
+
+> diff --git a/arch/arm/include/asm/stage2_pgtable.h b/arch/arm/include/asm/stage2_pgtable.h
+> index f6a7ea805232..ec1567d9eb4b 100644
+> --- a/arch/arm/include/asm/stage2_pgtable.h
+> +++ b/arch/arm/include/asm/stage2_pgtable.h
+> @@ -68,4 +68,9 @@ stage2_pmd_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
+>  #define stage2_pmd_table_empty(kvm, pmdp)	kvm_page_empty(pmdp)
+>  #define stage2_pud_table_empty(kvm, pudp)	false
+>  
+> +static inline bool kvm_stage2_has_pud(struct kvm *kvm)
+> +{
+> +	return KVM_VTCR_SL0 == VTCR_SL_L1;
+> +}
+> +
+
+Turns out this isn't quite the right check. On arm32, the maximum number
+of supported levels is 3 with LPAE - effectively the helper should
+always return false.
+
+I've updated the check locally to key off of CONFIG_PGTABLE_LEVELS. I'll
+post these patches later today.
+
+Thanks,
+Punit
