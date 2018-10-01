@@ -1,48 +1,77 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 1 Oct 2018 11:43:31 +0100
-Subject: [RESEND PATCH 0/2] Don't use SIGMINSTKSZ when enforcing
- alternative signal stack size for compat tasks
-In-Reply-To: <20180928131805.aunjzciyvaad7z5a@tack.einval.com>
-References: <1536158083-30166-1-git-send-email-will.deacon@arm.com>
- <20180926103627.b6kxzdmqqsj3545h@arm.com>
- <20180928131805.aunjzciyvaad7z5a@tack.einval.com>
-Message-ID: <20181001104330.GC131162@arrakis.emea.arm.com>
+From: Steve.Capper@arm.com (Steve Capper)
+Date: Mon, 1 Oct 2018 10:50:20 +0000
+Subject: [PATCH 2/5] arm64: mm: introduce 52-bit userspace support
+In-Reply-To: <20181001102815.GB131162@arrakis.emea.arm.com>
+References: <20180829124543.25314-1-steve.capper@arm.com>
+ <20180829124543.25314-3-steve.capper@arm.com>
+ <20180921174031.GD238853@arrakis.emea.arm.com>
+ <20180927135031.iwpszzerpbnubi2h@capper-debian.cambridge.arm.com>
+ <20180927144833.i5j7ma6ftf3g7bxu@capper-debian.cambridge.arm.com>
+ <20181001102815.GB131162@arrakis.emea.arm.com>
+Message-ID: <20181001105016.3xww2kagpv2irex3@capper-debian.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 28, 2018 at 02:18:11PM +0100, Steve McIntyre wrote:
-> On Wed, Sep 05, 2018 at 03:34:41PM +0100, Will Deacon wrote:
-> >Hi all,
-> >
-> >This is a resend of:
-> >
-> >  http://lists.infradead.org/pipermail/linux-arm-kernel/2018-July/593559.html
-> >
-> >now based on 4.19-rc2.
-> >
-> >The Debian folks have observed a failure in the 32-bit arm glibc testsuite
-> >when running under a 64-bit kernel. They tracked this down to sigaltstack(2)
-> >enforcing the alternative signal stack to be at least SIGMINSTKSZ bytes,
-> >which is higher for native arm64 tasks than compat 32-bit tasks.
-> >
-> >These patches resolve the issue by allowing an architecture to define
-> >COMPAT_SIGMINSTKSZ for compat tasks, which is then used by the sigaltstack
-> >checking code.
-> >
-> >Feedback welcome,
+On Mon, Oct 01, 2018 at 11:28:17AM +0100, Catalin Marinas wrote:
+> On Thu, Sep 27, 2018 at 02:48:43PM +0000, Steve Capper wrote:
+> > On Thu, Sep 27, 2018 at 02:50:32PM +0100, Steve Capper wrote:
+> > > On Fri, Sep 21, 2018 at 06:40:31PM +0100, Catalin Marinas wrote:
+> > > > > diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> > > > > index 1bdeca8918a6..8449e266cd46 100644
+> > > > > --- a/arch/arm64/include/asm/pgtable.h
+> > > > > +++ b/arch/arm64/include/asm/pgtable.h
+> > > > > @@ -577,11 +577,21 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
+> > > > >  #define pgd_ERROR(pgd)		__pgd_error(__FILE__, __LINE__, pgd_val(pgd))
+> > > > >  
+> > > > >  /* to find an entry in a page-table-directory */
+> > > > > -#define pgd_index(addr)		(((addr) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
+> > > > > +#define pgd_index(addr, ptrs)		(((addr) >> PGDIR_SHIFT) & ((ptrs) - 1))
+> > > > > +#define _pgd_offset_raw(pgd, addr, ptrs) ((pgd) + pgd_index(addr, ptrs))
+> > > > > +#define pgd_offset_raw(pgd, addr)	(_pgd_offset_raw(pgd, addr, PTRS_PER_PGD))
+> > > > >  
+> > > > > -#define pgd_offset_raw(pgd, addr)	((pgd) + pgd_index(addr))
+> > > > > +static inline pgd_t *pgd_offset(const struct mm_struct *mm, unsigned long addr)
+> > > > > +{
+> > > > > +	pgd_t *ret;
+> > > > > +
+> > > > > +	if (IS_ENABLED(CONFIG_ARM64_TRY_52BIT_VA) && (addr < TASK_SIZE))
+> > > > > +		ret = _pgd_offset_raw(mm->pgd, addr, 1ULL << (vabits_user - PGDIR_SHIFT));
+> > > > > +	else
+> > > > > +		ret = pgd_offset_raw(mm->pgd, addr);
+> > > > >  
+> > > > > -#define pgd_offset(mm, addr)	(pgd_offset_raw((mm)->pgd, (addr)))
+> > > > > +	return ret;
+> > > > > +}
+> > > > >  
+> > > > >  /* to find an entry in a kernel page-table-directory */
+> > > > >  #define pgd_offset_k(addr)	pgd_offset(&init_mm, addr)
+> > > > 
+> > > > We can decouple pgd_offset_k() from pgd_offset() and there wouldn't be a
+> > > > need to check the addr < TASK_SIZE. Do we have any case where
+> > > > pgd_offset() is used on a kernel address?
+> > > 
+> > > Unfortunately there are a few cases where pgd_offset is used instead of
+> > > pgd_offset_k, I'll see if I can fix these in a separate patch and that
+> > > would then simplify this patch.
+> > 
+> > So it turns out that __change_memory_common, calls apply_to_page_range
+> > which then calls pgd_offset...
 > 
-> Apologies for the delayed response here - conference travel etc . got
-> in the way... I've just tested and I can confirm that this patchset
-> fixes our reported bug (as in https://bugs.debian.org/904385). Thanks
-> Will!
+> Ah, James Morse had a plan to change apply_to_page_range() for other
+> reasons but I'm not sure whether that would have helped.
 > 
-> Tested-by: Steve McIntyre <93sam@debian.org>
+> > Is it worth changing __change_memory_common, or would it be better to
+> > introduce a check in pgd_offset (can also check the mm parameter)?
+> 
+> The problem here doesn't seem to be __change_memory_common() but rather
+> apply_to_page_range(). Since there are other users of this API (e.g.
+> alloc_vm_area()), I think we should just change pgd_offset(). Would a
+> check on the (mm == &init_mm) be sufficient? Otherwise, we could do a
+> test on bit 55 of the address.
+>
 
-Thanks for confirming Steve.
+Ahh okay, yes I can change pgd_offset to check for init_mm.
 
-As there is no functional change for other architectures, I'll queue
-both patches through the arm64 tree. If anyone objects, please let me
-know before the merging window.
-
+Cheers,
 -- 
-Catalin
+Steve
