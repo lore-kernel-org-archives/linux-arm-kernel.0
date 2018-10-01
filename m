@@ -1,20 +1,22 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 1 Oct 2018 16:28:38 +0100
-Subject: [PATCH 0/2] Fixup and extend hwcaps documentation
-In-Reply-To: <1538403888-13277-1-git-send-email-will.deacon@arm.com>
-References: <1538403888-13277-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20181001152837.GH25071@arrakis.emea.arm.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 1 Oct 2018 16:45:19 +0100
+Subject: [PATCH 1/2] KVM: arm/arm64: Rename kvm_arm_config_vm to
+ kvm_arm_setup_stage2
+In-Reply-To: <20181001130656.36999-2-marc.zyngier@arm.com>
+References: <20181001130656.36999-1-marc.zyngier@arm.com>
+ <20181001130656.36999-2-marc.zyngier@arm.com>
+Message-ID: <9f463e06-ae91-216c-10cd-6b3d023c59d0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 01, 2018 at 03:24:46PM +0100, Will Deacon wrote:
-> Giacomo Travaglini (1):
->   arm64: docs: Fix typos in ELF hwcaps
+On 10/01/2018 02:06 PM, Marc Zyngier wrote:
+> VM tends to be a very overloaded term in KVM, so let's keep it
+> to describe the virtual machine. For the virtual memory setup,
+> let's use the "stage2" suffix.
 > 
-> Will Deacon (1):
->   arm64: docs: Document SSBS HWCAP
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Queued for 4.20. Thanks.
+The intention was that the function would serve as the backend check
+for the vm_type argument. That said, I am fine with the changes, FWIW:
 
--- 
-Catalin
+Reviewed-by : Suzuki K Poulose <suzuki.poulose@arm.com>
