@@ -1,207 +1,71 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 1 Oct 2018 09:32:53 -0700
-Subject: [PATCH 0/4] Update am437x and am335x dts to probe with ti-sysc
-In-Reply-To: <305bf1c3-915d-dac1-95e4-4d32621247e1@ti.com>
-References: <20180925000545.22931-1-tony@atomide.com>
- <e9afe736-c2f0-6182-afd0-08279e09a35e@ti.com>
- <20180925144021.GN5662@atomide.com>
- <20180925175537.GQ5662@atomide.com>
- <d98aa7c1-5131-34c5-51e5-c7ef57cbc31e@ti.com>
- <20180926155911.GT5662@atomide.com>
- <20180926162303.GU5662@atomide.com>
- <cfc3f1db-9468-ed92-a673-882b51b4dec8@ti.com>
- <20180926233111.GY5662@atomide.com>
- <305bf1c3-915d-dac1-95e4-4d32621247e1@ti.com>
-Message-ID: <20181001163253.GW5662@atomide.com>
+From: gklkml16@gmail.com (Ganapatrao Kulkarni)
+Date: Mon, 1 Oct 2018 22:09:01 +0530
+Subject: [PATCH] arm_pmu: Delete incorrect cache event mapping for some
+ armv8_pmuv3 events.
+In-Reply-To: <20181001142914.GD9716@arm.com>
+References: <20181001100707.16840-1-ganapatrao.kulkarni@cavium.com>
+ <20181001142914.GD9716@arm.com>
+Message-ID: <CAKTKpr6SQUc9EgdYL2N32a=szUmSs82Mbb4y89htbVQhTPp2rQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Keerthy <j-keerthy@ti.com> [180927 05:00]:
-> Also tested on beaglebone black DS0 works fine. Although there seems to
-> be an additional warning which was not seen before:
-> 
-> "l4-wkup-clkctrl:0008:0: failed to disable"
-> 
-> log: https://pastebin.ubuntu.com/p/Ns2WRdVkXS/
+Hi Will,
 
-Can you test the following patch applied on top of the
-omap-for-v4.20/dt-ti-sysc-tmp-testing-v2 testing branch?
+On Mon, Oct 1, 2018 at 7:58 PM Will Deacon <will.deacon@arm.com> wrote:
+>
+> Hi Ganapat,
+>
+> On Mon, Oct 01, 2018 at 10:07:43AM +0000, Kulkarni, Ganapatrao wrote:
+> > Perf events L1-dcache-load-misses, L1-dcache-store-misses are mapped to
+> > armv8_pmuv3 (both DT and ACPI) event L1D_CACHE_REFILL. This is incorrect,
+> > since L1D_CACHE_REFILL counts both load and store misses.
+> > Similarly the events L1-dcache-loads, L1-dcache-stores, dTLB-load-misses
+> > and dTLB-loads are wrongly mapped. Hence Deleting all these cache events
+> > from armv8_pmuv3 cache mapping.
+> >
+> > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> > ---
+> >  arch/arm64/kernel/perf_event.c | 8 --------
+> >  1 file changed, 8 deletions(-)
+>
+> The "generic" events are really implemented on a best-effort basis, as
+> they rarely tend to map exactly to what the hardware supports. I think
+> they originally stemmed from the x86 CPU PMU, but that doesn't really
+> help us.
 
-Based on Grygorii's i2c-omap comments, I think we should also
-do the following in the ti-sysc driver becasuse the pm_runtime
-use count can be whatever.
+This works fairly well for DT based boots, since almost all SoCs have
+added remapping using custom dt object binding.
+However we have concluded in the past to drop SoC specific from the
+ACPI mapping and use json to add SoC/micro architecture specific
+events support.
+At present ,  When we boot with ACPI,  it is misleading for these events.
 
-Regards,
+In fact, this has been pointed internally from benchmark team and
+reported it as hardware bug!
+IMHO, it would be much simpler to delete these misleading events
+mapping rather explaining to perf tool users.
 
-Tony
+We already have proper mapping for these events,
+armv8_pmuv3_0/l1d_cache_refill/
+armv8_pmuv3_0/l1d_cache/
+[core imp def:]
+l1d_cache_rd
+l1d_cache_wr
+l1d_cache_refill_rd
+l1d_cache_refill_wr
 
-8< ----------------------
->From tony Mon Sep 17 00:00:00 2001
-From: Tony Lindgren <tony@atomide.com>
-Date: Mon, 1 Oct 2018 09:11:57 -0700
-Subject: [PATCH] bus: ti-sysc: Just use SET_NOIRQ_SYSTEM_SLEEP_PM_OPS
+>
+> I had a discussion with Ingo back when we originally implemented perf
+> because I actually preferred not to implement the generic events at all.
+> However, he was strongly of the opinion that a best-effort approach was
+> sufficient to get casual users going with the tool, so that's what we went
+> with.
 
-As Grygorii Strashko pointed out, the runtime PM use count of the
-children can be whatever at suspend and we should not use it. So
-let's just suspend ti-sysc at noirq level and get rid of some code.
+thanks for the background info, these generic mapping fairly works
+except these events.
 
-Let's also remove the PM_SLEEP ifdef and use __maybe_unused as the
-PM code already deals with the ifdefs.
+>
+> Will
 
-Suggested-by: Grygorii Strashko <grygorii.strashko@ti.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- drivers/bus/ti-sysc.c | 113 ++----------------------------------------
- 1 file changed, 4 insertions(+), 109 deletions(-)
-
-diff --git a/drivers/bus/ti-sysc.c b/drivers/bus/ti-sysc.c
---- a/drivers/bus/ti-sysc.c
-+++ b/drivers/bus/ti-sysc.c
-@@ -87,7 +87,6 @@ struct sysc {
- 	u32 revision;
- 	bool enabled;
- 	bool needs_resume;
--	unsigned int noirq_suspend:1;
- 	bool child_needs_resume;
- 	struct delayed_work idle_work;
- };
-@@ -702,75 +701,7 @@ static int __maybe_unused sysc_runtime_resume(struct device *dev)
- 	return error;
- }
- 
--#ifdef CONFIG_PM_SLEEP
--static int sysc_suspend(struct device *dev)
--{
--	struct sysc *ddata;
--	int error;
--
--	ddata = dev_get_drvdata(dev);
--
--	if (ddata->cfg.quirks & SYSC_QUIRK_LEGACY_IDLE)
--		return 0;
--
--	if (!ddata->enabled || ddata->noirq_suspend)
--		return 0;
--
--	dev_dbg(ddata->dev, "%s %s\n", __func__,
--		ddata->name ? ddata->name : "");
--
--	error = pm_runtime_put_sync_suspend(dev);
--	if (error == -EBUSY) {
--		dev_dbg(ddata->dev, "%s busy, tagging for noirq suspend %s\n",
--			__func__, ddata->name ? ddata->name : "");
--
--		ddata->noirq_suspend = true;
--
--		return 0;
--	} else if (error < 0) {
--		dev_warn(ddata->dev, "%s cannot suspend %i %s\n",
--			 __func__, error,
--			 ddata->name ? ddata->name : "");
--
--		return 0;
--	}
--
--	ddata->needs_resume = true;
--
--	return 0;
--}
--
--static int sysc_resume(struct device *dev)
--{
--	struct sysc *ddata;
--	int error;
--
--	ddata = dev_get_drvdata(dev);
--
--	if (ddata->cfg.quirks & SYSC_QUIRK_LEGACY_IDLE)
--		return 0;
--
--	if (!ddata->needs_resume || ddata->noirq_suspend)
--		return 0;
--
--	dev_dbg(ddata->dev, "%s %s\n", __func__,
--		ddata->name ? ddata->name : "");
--
--	error = pm_runtime_get_sync(dev);
--	if (error < 0) {
--		dev_err(ddata->dev, "%s  error %i %s\n",
--			__func__, error,
--			ddata->name ? ddata->name : "");
--
--		return error;
--	}
--
--	ddata->needs_resume = false;
--
--	return 0;
--}
--
--static int sysc_noirq_suspend(struct device *dev)
-+static int __maybe_unused sysc_noirq_suspend(struct device *dev)
- {
- 	struct sysc *ddata;
- 	int error;
-@@ -780,26 +711,10 @@ static int sysc_noirq_suspend(struct device *dev)
- 	if (ddata->cfg.quirks & SYSC_QUIRK_LEGACY_IDLE)
- 		return 0;
- 
--	if (!ddata->enabled || !ddata->noirq_suspend)
--		return 0;
--
--	dev_dbg(ddata->dev, "%s %s\n", __func__,
--		ddata->name ? ddata->name : "");
--
--	error = sysc_runtime_suspend(dev);
--	if (error) {
--		dev_warn(ddata->dev, "%s busy %i %s\n",
--			 __func__, error, ddata->name ? ddata->name : "");
--
--		return 0;
--	}
--
--	ddata->needs_resume = true;
--
--	return 0;
-+	return pm_runtime_force_suspend(dev);
- }
- 
--static int sysc_noirq_resume(struct device *dev)
-+static int __maybe_unused sysc_noirq_resume(struct device *dev)
- {
- 	struct sysc *ddata;
- 	int error;
-@@ -809,30 +724,10 @@ static int sysc_noirq_resume(struct device *dev)
- 	if (ddata->cfg.quirks & SYSC_QUIRK_LEGACY_IDLE)
- 		return 0;
- 
--	if (!ddata->needs_resume || !ddata->noirq_suspend)
--		return 0;
--
--	dev_dbg(ddata->dev, "%s %s\n", __func__,
--		ddata->name ? ddata->name : "");
--
--	error = sysc_runtime_resume(dev);
--	if (error) {
--		dev_warn(ddata->dev, "%s cannot resume %i %s\n",
--			 __func__, error,
--			 ddata->name ? ddata->name : "");
--
--		return error;
--	}
--
--	/* Maybe also reconsider clearing noirq_suspend at some point */
--	ddata->needs_resume = false;
--
--	return 0;
-+	return pm_runtime_force_resume(dev);
- }
--#endif
- 
- static const struct dev_pm_ops sysc_pm_ops = {
--	SET_SYSTEM_SLEEP_PM_OPS(sysc_suspend, sysc_resume)
- 	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(sysc_noirq_suspend, sysc_noirq_resume)
- 	SET_RUNTIME_PM_OPS(sysc_runtime_suspend,
- 			   sysc_runtime_resume,
--- 
-2.19.0
+thanks,
+Ganapat
