@@ -1,80 +1,72 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 1 Oct 2018 14:09:28 +0200
-Subject: [PATCH v3 2/3] media: meson: add v4l2 m2m video decoder driver
-In-Reply-To: <CAMO6naxoXMsb=SEH8mu=7YBhFW_-6YzvR0K3mMaHD1rZ-_UJxg@mail.gmail.com>
+From: mjourdan@baylibre.com (Maxime Jourdan)
+Date: Mon, 1 Oct 2018 14:15:53 +0200
+Subject: [PATCH v3 0/3] Add Amlogic video decoder driver
+In-Reply-To: <cfb89cf9-4fce-7fab-48e1-a0311b80d993@xs4all.nl>
 References: <20180928142816.4311-1-mjourdan@baylibre.com>
- <20180928142816.4311-3-mjourdan@baylibre.com>
- <6fb97945-e63a-b98b-bf07-0a5088ac7232@xs4all.nl>
- <CAMO6naxoXMsb=SEH8mu=7YBhFW_-6YzvR0K3mMaHD1rZ-_UJxg@mail.gmail.com>
-Message-ID: <10d8641a-f605-5693-676c-02ca023259da@xs4all.nl>
+ <cfb89cf9-4fce-7fab-48e1-a0311b80d993@xs4all.nl>
+Message-ID: <CAMO6nayt+3e7m5AkTbsJJHzO-uyc-Jh66i3kG97CX5FabwHUOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/01/2018 01:57 PM, Maxime Jourdan wrote:
-> Le lun. 1 oct. 2018 ? 12:26, Hans Verkuil <hverkuil@xs4all.nl> a ?crit :
->>
->> On 09/28/2018 04:28 PM, Maxime Jourdan wrote:
->>> +             }
->>> +
->>> +             return 0;
->>> +     }
->>> +
->>> +     switch (q->type) {
->>> +     case V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE:
->>> +             sizes[0] = amvdec_get_output_size(sess);
->>> +             *num_planes = 1;
->>> +             break;
->>> +     case V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE:
->>> +             switch (sess->pixfmt_cap) {
->>> +             case V4L2_PIX_FMT_NV12M:
->>> +                     sizes[0] = output_size;
->>> +                     sizes[1] = output_size / 2;
->>> +                     *num_planes = 2;
->>> +                     break;
->>> +             case V4L2_PIX_FMT_YUV420M:
->>> +                     sizes[0] = output_size;
->>> +                     sizes[1] = output_size / 4;
->>> +                     sizes[2] = output_size / 4;
->>> +                     *num_planes = 3;
->>> +                     break;
->>> +             default:
->>> +                     return -EINVAL;
->>> +             }
->>> +             *num_buffers = min(max(*num_buffers, fmt_out->min_buffers),
->>> +                                fmt_out->max_buffers);
->>
->> You can use clamp here. That's easier to read.
->>
-> 
-> Ack
-> 
->>> +             /* The HW needs all buffers to be configured during startup */
->>
->> Why? I kind of expected to see 'q->min_buffers_needed = fmt_out->min_buffers'
->> here. I think some more information is needed here in the comment.
->>
-> 
-> I'll extend the comments to reflect the following:
-> 
-> All codecs in the Amlogic vdec need the full available buffer list to
-> be configured at startup, i.e all buffer phy addrs must be written to
-> registers prior to decoding.
-> The firmwares then decide how they use those buffers and the
-> interrupts only tell me "the decoder has written a frame to buffer N?
-> X".
-> 
-> fmt_out->min_buffers and fmt_out->max_buffers refer to the min/max
-> amount of buffers that can be setup during initialization. In the case
-> of MPEG2, the firmware expects 8 buffers, no more no less, so both
-> min_buffers and max_buffers have the value "8".
-> 
-> But even if those values differ (as for H.264 that will come later),
-> the firmware still expects all allocated buffers to be setup in
-> registers. As such, q->min_buffers_needed must reflect the total
-> amount of CAPTURE buffers.
+Le lun. 1 oct. 2018 ? 12:29, Hans Verkuil <hverkuil@xs4all.nl> a ?crit :
+>
+> On 09/28/2018 04:28 PM, Maxime Jourdan wrote:
+> > Hi everyone,
+> >
+> > This patch series adds support for the Amlogic video decoder,
+> > as well as the corresponding dt bindings for GXBB/GXL/GXM chips.
+> >
+> > It features decoding for the following formats:
+> > - MPEG 1
+> > - MPEG 2
+> >
+> > The following formats will be added in future patches:
+> > - MJPEG
+> > - MPEG 4 (incl. Xvid, H.263)
+> > - H.264
+> > - HEVC (incl. 10-bit)
+> >
+> > The following formats' development has still not started, but they are
+> > supported by the hardware:
+> > - VC1
+> > - VP9
+> >
+> > The code was made in such a way to allow easy inclusion of those formats
+> > in the future.
+> >
+> > The decoder is single instance.
+> >
+> > Files:
+> >  - vdec.c handles the V4L2 M2M logic
+> >  - esparser.c manages the hardware bitstream parser
+> >  - vdec_helpers.c provides helpers to DONE the dst buffers as well as
+> >  various common code used by the codecs
+> >  - vdec_1.c manages the VDEC_1 block of the vdec IP
+> >  - codec_mpeg12.c enables decoding for MPEG 1/2.
+> >  - vdec_platform.c links codec units with vdec units
+> >  (e.g vdec_1 with codec_mpeg12) and lists all the available
+> >  src/dst formats and requirements (max width/height, etc.),
+> >  per compatible chip.
+> >
+> > Firmwares are necessary to run the vdec. They can currently be found at:
+> > https://github.com/chewitt/meson-firmware
+>
+> Are you trying to get this into the linux-firmware repository?
+>
+> I believe that Mauro requires that before he will merge this driver.
+>
+> So I think this driver will be ready to be merged once v4 is posted,
+> dt-bindings is Acked and the firmware is merged to the linux-firmware repo.
 
-That's much better, thank you! Now I understand why you do this :-)
+It was planned indeed to get the firmwares into linux-firmware, I'll
+speed this up.
 
-Regards,
+dt-bindings was reviewed by Rob but I forgot to add it in v3, I'll fix
+that in v4.
 
-	Hans
+Cheers,
+Maxime
+
+> Regards,
+>
+>         Hans
