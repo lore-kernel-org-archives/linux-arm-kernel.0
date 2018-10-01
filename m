@@ -1,41 +1,106 @@
-From: jan.kundrat@cesnet.cz (=?iso-8859-1?Q?Jan_Kundr=E1t?=)
-Date: Mon, 01 Oct 2018 16:44:44 +0200
-Subject: [PATCH] PCI: mvebu: Fix PCI I/O mapping creation sequence
-In-Reply-To: <20181001124934.7222-1-thomas.petazzoni@bootlin.com>
-References: <20181001124934.7222-1-thomas.petazzoni@bootlin.com>
-Message-ID: <afee5e1a-4b5a-47f6-91a9-dfe5d041a388@cesnet.cz>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 1 Oct 2018 23:48:00 +0900
+Subject: [PATCH v3 6/9] kbuild: consolidate Devicetree dtb build rules
+In-Reply-To: <CAL_JsqLPaX3GB1Esw3DhkQ+2fQLVG8=_UbyJC5RJ-6_s=v288g@mail.gmail.com>
+References: <20180910150403.19476-1-robh@kernel.org>
+ <20180910150403.19476-7-robh@kernel.org>
+ <CAL_Jsq+=VbdcVLiwXbOA5d+R2YY6=2Pw2bQpci-jj-JvereD1A@mail.gmail.com>
+ <CAK7LNAQFqhWw+LwDoypGG=OP6tH4qf2tT=LvtchK2GoiNyzDXg@mail.gmail.com>
+ <CAMuHMdWEnoh97_jiDWMq=ke4PrhSFbToYnx91CPLBuq3mOGzoQ@mail.gmail.com>
+ <CAK7LNATkkOiYPj2RLubcgZ_z59Bhz4GkgWqPMbnaHBk7EisXLg@mail.gmail.com>
+ <20180928154150.GA25013@bogus>
+ <CAK7LNATiSbwVfCRNsDOyksfq5wcv0pnNQYnMXdo2yRyE7fcn-Q@mail.gmail.com>
+ <CAL_JsqLPaX3GB1Esw3DhkQ+2fQLVG8=_UbyJC5RJ-6_s=v288g@mail.gmail.com>
+Message-ID: <CAK7LNASX+2iLbXmpgcsH9agrxkd5xeWbTZdh8hxL+zJm4L11gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On pond?l? 1. ??jna 2018 14:49:34 CEST, Thomas Petazzoni wrote:
-> Commit ee1604381a371 ("PCI: mvebu: Only remap I/O space if
-> configured") had the side effect that the PCI I/O mapping was created
-> much earlier than before, at a point where the probe() of the driver
-> could still fail. This is for example a problem if one gets an
-> -EPROBE_DEFER at some point during probe(), after pci_ioremap_io() has
-> been called.
+Hi Rob,
+
+
+2018?10?1?(?) 22:26 Rob Herring <robh@kernel.org>:
 >
-> Indeed, there is currently no function to undo what pci_ioremap_io()
-> did, and switching to pci_remap_iospace() is not an option in
-> pci-mvebu due to the need for special memory attributes on Armada 38x.
+> On Mon, Oct 1, 2018 at 12:49 AM Masahiro Yamada
+> <yamada.masahiro@socionext.com> wrote:
+> >
+> > Hi Rob,
+> >
+> >
+> > 2018?9?29?(?) 0:43 Rob Herring <robh@kernel.org>:
+> >
+> > > +#
+> > > ---------------------------------------------------------------------------
+> > > +# Devicetree files
+> > > +
+> > > +ifneq ($(wildcard $(srctree)/arch/$(SRCARCH)/boot/dts/),)
+> > > +dtstree := arch/$(SRCARCH)/boot/dts
+> > > +endif
+> > > +
+> > > +ifneq ($(dtstree),)
+> > > +
+> > > +%.dtb : scripts_dtc
+> >
+> > %.dtb: prepare3 prepare
 >
-> Reverting ee1604381a371 ("PCI: mvebu: Only remap I/O space if
-> configured") would be a possibility, but it would require also
-> reverting 42342073e38b5 ("PCI: mvebu: Convert to use pci_host_bridge
-> directly"). So instead, we use an open-coded version of
-> pci_host_probe() that creates the PCI I/O mapping at a point where we
-> are guaranteed not to fail anymore.
+> I assume you didn't mean to drop scripts_dtc as that doesn't work.
 >
-> Reported-by: Jan Kundr?t <jan.kundrat@cesnet.cz>
-> Fixes: ee1604381a371 ("PCI: mvebu: Only remap I/O space if configured")
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+> Why "prepare" here and not on dtbs?
 
-Tested-by: Jan Kundr?t <jan.kundrat@cesnet.cz>
 
-Just a rebuild-and-boot test. We don't use any PCIe devices yet, but I'll 
-grab an ugly eBay converter and try this patch with a normal PCIe card 
-later.
+Sorry, my mistake.
 
-Thanks!
 
-Jan
+%.dtb: prepare3 scripts_dtc
+
+is the correct one.
+
+
+
+> > because we need to make sure KERNELRELEASE
+> > is correctly defined before dtbs_install happens.
+>
+> Yes, indeed. With prepare3 added I get:
+>
+> cp: cannot create regular file
+> '/boot/dtbs/4.19.0-rc3-00009-g0afba9b7b2ea-dirty': No such file or
+> directory
+>
+> vs. with it:
+>
+> cp: cannot create regular file '/boot/dtbs/': Not a directory
+>
+> >
+> >
+> > > +       $(Q)$(MAKE) $(build)=$(dtstree) $(dtstree)/$@
+> > > +
+> > > +PHONY += dtbs dtbs_install
+> > > +dtbs: scripts_dtc
+> >
+> >
+> > dtbs: prepare3 scripts_dtc
+> >
+> >
+> >
+> > > +       $(Q)$(MAKE) $(build)=$(dtstree)
+> > > +
+> > > +dtbs_install: dtbs
+> >
+> >
+> > Please do not have dtbs_install to depend on dtbs.
+> >
+> > No install targets should ever trigger building anything
+> > in the source tree.
+> >
+> >
+> > For the background, see the commit log of
+> > 19514fc665ffbce624785f76ee7ad0ea6378a527
+>
+> Okay, thanks.
+>
+> Rob
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
