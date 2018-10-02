@@ -1,180 +1,208 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Tue, 2 Oct 2018 16:28:40 +0800
-Subject: [PATCH v4 01/11] drm/mediatek: add refcount for DPI power on/off
-In-Reply-To: <20181002081041.32629-2-bibby.hsieh@mediatek.com>
-References: <20181002081041.32629-1-bibby.hsieh@mediatek.com>
- <20181002081041.32629-2-bibby.hsieh@mediatek.com>
-Message-ID: <1538468920.24335.0.camel@mtksdaap41>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 2 Oct 2018 10:37:05 +0200
+Subject: [PATCH v6 18/18] kvm: arm64: Allow tuning the physical address
+ size for VM
+In-Reply-To: <20180926163258.20218-19-suzuki.poulose@arm.com>
+References: <20180926163258.20218-1-suzuki.poulose@arm.com>
+ <20180926163258.20218-19-suzuki.poulose@arm.com>
+Message-ID: <cfcfb86a-ffcc-bb1d-9e70-76e8df96ebb9@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Bibby:
+Hi,
 
-On Tue, 2018-10-02 at 16:10 +0800, Bibby Hsieh wrote:
-> From: chunhui dai <chunhui.dai@mediatek.com>
+On 9/26/18 6:32 PM, Suzuki K Poulose wrote:
+> Allow specifying the physical address size limit for a new
+> VM via the kvm_type argument for the KVM_CREATE_VM ioctl. This
+> allows us to finalise the stage2 page table as early as possible
+> and hence perform the right checks on the memory slots
+> without complication. The size is encoded as Log2(PA_Size) in
+> bits[7:0] of the type field. For backward compatibility the
+> value 0 is reserved and implies 40bits. Also, lift the limit
+> of the IPA to host limit and allow lower IPA sizes (e.g, 32).
 > 
-> After the kernel 4.4, the DRM disable flow was changed, if DPI was
-> disableed before CRTC, it will cause warning message as following:
+> The userspace could check the extension KVM_CAP_ARM_VM_IPA_SIZE
+> for the availability of this feature. The cap check returns the
+> maximum limit for the physical address shift supported by the host.
 > 
-> ------------[ cut here ]------------
-> WARNING: CPU: 0 PID: 1339 at ../../linux/linux-4.4.24-mtk/drivers/gpu/drm/drm_irq.c:1326 drm_wait_one_vblank+0x188/0x18c()
-> vblank wait timed out on crtc 0
-> Modules linked in: bridge mt8521p_ir_shim(O) i2c_eeprom(O) mtk_m4(O) fuse_ctrl(O) virtual_block(O) caamkeys(PO) chk(PO) amperctl(O) ledctl(O) apple_auth(PO) micctl(O) sensors(PO) lla(O) sdd(PO) ice40_fpga(O) psmon(O) event_queue(PO) utils(O) blackbox(O)
-> CPU: 0 PID: 1339 Comm: kworker/0:1 Tainted: P        W  O    4.4.24 #1
-> Hardware name: Mediatek Cortex-A7 (Device Tree)
-> Workqueue: events drm_mode_rmfb_work_fn
-> [<c001a710>] (unwind_backtrace) from [<c00151e4>] (show_stack+0x20/0x24)
-> [<c00151e4>] (show_stack) from [<c027961c>] (dump_stack+0x98/0xac)
-> [<c027961c>] (dump_stack) from [<c002ac54>] (warn_slowpath_common+0x94/0xc4)
-> [<c002ac54>] (warn_slowpath_common) from [<c002acc4>] (warn_slowpath_fmt+0x40/0x48)
-> [<c002acc4>] (warn_slowpath_fmt) from [<c03307ac>] (drm_wait_one_vblank+0x188/0x18c)
-> [<c03307ac>] (drm_wait_one_vblank) from [<c03307d8>] (drm_crtc_wait_one_vblank+0x28/0x2c)
-> [<c03307d8>] (drm_crtc_wait_one_vblank) from [<c034f48c>] (mtk_drm_crtc_disable+0x78/0x240)
-> [<c034f48c>] (mtk_drm_crtc_disable) from [<c03240d4>] (drm_atomic_helper_commit_modeset_disables+0x128/0x3b8)
-> [<c03240d4>] (drm_atomic_helper_commit_modeset_disables) from [<c0350a7c>] (mtk_atomic_complete+0x74/0xb4)
-> [<c0350a7c>] (mtk_atomic_complete) from [<c0350b24>] (mtk_atomic_commit+0x68/0x98)
-> [<c0350b24>] (mtk_atomic_commit) from [<c034ab48>] (drm_atomic_commit+0x54/0x74)
-> [<c034ab48>] (drm_atomic_commit) from [<c0325c4c>] (drm_atomic_helper_set_config+0x7c/0xa0)
-> [<c0325c4c>] (drm_atomic_helper_set_config) from [<c0338594>] (drm_mode_set_config_internal+0x68/0xe4)
-> [<c0338594>] (drm_mode_set_config_internal) from [<c033967c>] (drm_framebuffer_remove+0xe4/0x120)
-> [<c033967c>] (drm_framebuffer_remove) from [<c0339700>] (drm_mode_rmfb_work_fn+0x48/0x58)
-> [<c0339700>] (drm_mode_rmfb_work_fn) from [<c0043a38>] (process_one_work+0x154/0x50c)
-> [<c0043a38>] (process_one_work) from [<c0044074>] (worker_thread+0x284/0x568)
-> [<c0044074>] (worker_thread) from [<c0049dc4>] (kthread+0xec/0x104)
-> [<c0049dc4>] (kthread) from [<c0010678>] (ret_from_fork+0x14/0x3c)
-> ---[ end trace 12ae5358e992abd5 ]---
-> 
-> so, we add refcount for DPI power on/off to protect the flow.
-> 
-
-Reviewed-by: CK Hu <ck.hu@mediatek.com>
-
-> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
-> Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <cdall@kernel.org>
+> Cc: Peter Maydell <peter.maydell@linaro.org>
+> Cc: Paolo Bonzini <pbonzini@redhat.com>
+> Cc: Radim Kr?m?? <rkrcmar@redhat.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 > ---
->  drivers/gpu/drm/mediatek/mtk_dpi.c | 43 ++++++++++++--------------------------
->  1 file changed, 13 insertions(+), 30 deletions(-)
+> Changes since v5:
+>  - Rename the capability to KVM_CAP_ARM_VM_IPA_SIZE
+>  - Update Documentation of the API (Peter Maydell)
+>  - Fix comment/commit-description as spotted by Eric
+> Changes since v4:
+>  - Fold the introduction of the KVM_CAP_ARM_VM_PHYS_SHIFT to this
+>    patch to allow detection of the availability of the feature for
+>    userspace.
+>  - Document the API
+>  - Restrict the feature only to arm64.
+> Changes since V3:
+>  - Switch to a CAP, that can be checkd via EXTENSIONS on KVM device
+>    fd, rather than a dedicated ioctl.
+> ---
+>  Documentation/virtual/kvm/api.txt       | 31 +++++++++++++++++++++++++
+>  arch/arm64/include/asm/stage2_pgtable.h | 20 ----------------
+>  arch/arm64/kvm/reset.c                  | 17 ++++++++++----
+>  include/uapi/linux/kvm.h                | 10 ++++++++
+>  4 files changed, 54 insertions(+), 24 deletions(-)
 > 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
-> index 6c0ea39d5739..5ede1ddbaa1a 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_dpi.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
-> @@ -76,8 +76,7 @@ struct mtk_dpi {
->  	enum mtk_dpi_out_yc_map yc_map;
->  	enum mtk_dpi_out_bit_num bit_num;
->  	enum mtk_dpi_out_channel_swap channel_swap;
-> -	bool power_sta;
-> -	u8 power_ctl;
-> +	int refcount;
->  };
+> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> index c664064f76fb..54eb7c763c89 100644
+> --- a/Documentation/virtual/kvm/api.txt
+> +++ b/Documentation/virtual/kvm/api.txt
+> @@ -123,6 +123,37 @@ memory layout to fit in user mode), check KVM_CAP_MIPS_VZ and use the
+>  flag KVM_VM_MIPS_VZ.
 >  
->  static inline struct mtk_dpi *mtk_dpi_from_encoder(struct drm_encoder *e)
-> @@ -90,11 +89,6 @@ enum mtk_dpi_polarity {
->  	MTK_DPI_POLARITY_FALLING,
->  };
 >  
-> -enum mtk_dpi_power_ctl {
-> -	DPI_POWER_START = BIT(0),
-> -	DPI_POWER_ENABLE = BIT(1),
-> -};
+> +On arm64, the physical address size for a VM (IPA Size limit) is limited
+> +to 40bits by default. The limit can be configured if the host supports the
+> +extension KVM_CAP_ARM_VM_IPA_SIZE. When supported, use
+> +KVM_VM_TYPE_ARM_IPA_SIZE(IPA_Bits) to set the size in the machine type
+> +identifier, where IPA_Bits is the maximum width of any physical
+> +address used by the VM. The IPA_Bits is encoded in bits[7-0] of the
+> +machine type identifier.
+> +
+> +e.g, to configure a guest to use 48bit physical address size :
+> +
+> +    vm_fd = ioctl(dev_fd, KVM_CREATE_VM, KVM_VM_TYPE_ARM_IPA_SIZE(48));
+> +
+> +The requested size (IPA_Bits) must be :
+> +  0 - Implies default size, 40bits (for backward compatibility)
+> +
+> +  or
+> +
+> +  N - Implies N bits, where N is a positive integer such that,
+> +      32 <= N <= Host_IPA_Limit
+> +
+> +Host_IPA_Limit is the maximum possible value for IPA_Bits on the host and
+> +is dependent on the CPU capability and the kernel configuration. The limit can
+> +be retrieved using KVM_CAP_ARM_VM_IPA_SIZE of the KVM_CHECK_EXTENSION
+> +ioctl() at run-time.
+> +
+> +Please note that configuring the IPA size does not affect the capability
+> +exposed by the guest CPUs in ID_AA64MMFR0_EL1[PARange]. It only affects
+> +size of the address translated by the stage2 level (guest physical to
+nit: the size of the input address
+
+Besides
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
+
+Thanks
+
+Eric
+> +host physical address translations).
+> +
+> +
+>  4.3 KVM_GET_MSR_INDEX_LIST, KVM_GET_MSR_FEATURE_INDEX_LIST
+>  
+>  Capability: basic, KVM_CAP_GET_MSR_FEATURES for KVM_GET_MSR_FEATURE_INDEX_LIST
+> diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
+> index 2cce769ba4c6..d352f6df8d2c 100644
+> --- a/arch/arm64/include/asm/stage2_pgtable.h
+> +++ b/arch/arm64/include/asm/stage2_pgtable.h
+> @@ -42,28 +42,8 @@
+>   * the range (IPA_SHIFT, IPA_SHIFT - 4).
+>   */
+>  #define stage2_pgtable_levels(ipa)	ARM64_HW_PGTABLE_LEVELS((ipa) - 4)
+> -#define STAGE2_PGTABLE_LEVELS		stage2_pgtable_levels(KVM_PHYS_SHIFT)
+>  #define kvm_stage2_levels(kvm)		VTCR_EL2_LVLS(kvm->arch.vtcr)
+>  
+> -/*
+> - * With all the supported VA_BITs and 40bit guest IPA, the following condition
+> - * is always true:
+> - *
+> - *       STAGE2_PGTABLE_LEVELS <= CONFIG_PGTABLE_LEVELS
+> - *
+> - * We base our stage-2 page table walker helpers on this assumption and
+> - * fall back to using the host version of the helper wherever possible.
+> - * i.e, if a particular level is not folded (e.g, PUD) at stage2, we fall back
+> - * to using the host version, since it is guaranteed it is not folded at host.
+> - *
+> - * If the condition breaks in the future, we can rearrange the host level
+> - * definitions and reuse them for stage2. Till then...
+> - */
+> -#if STAGE2_PGTABLE_LEVELS > CONFIG_PGTABLE_LEVELS
+> -#error "Unsupported combination of guest IPA and host VA_BITS."
+> -#endif
 > -
->  struct mtk_dpi_polarities {
->  	enum mtk_dpi_polarity de_pol;
->  	enum mtk_dpi_polarity ck_pol;
-> @@ -367,40 +361,30 @@ static void mtk_dpi_config_color_format(struct mtk_dpi *dpi,
+> -
+>  /* stage2_pgdir_shift() is the size mapped by top-level stage2 entry for the VM */
+>  #define stage2_pgdir_shift(kvm)		pt_levels_pgdir_shift(kvm_stage2_levels(kvm))
+>  #define stage2_pgdir_size(kvm)		(1ULL << stage2_pgdir_shift(kvm))
+> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+> index f156e45760bc..95f28d5950e0 100644
+> --- a/arch/arm64/kvm/reset.c
+> +++ b/arch/arm64/kvm/reset.c
+> @@ -89,6 +89,9 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+>  	case KVM_CAP_VCPU_EVENTS:
+>  		r = 1;
+>  		break;
+> +	case KVM_CAP_ARM_VM_IPA_SIZE:
+> +		r = kvm_ipa_limit;
+> +		break;
+>  	default:
+>  		r = 0;
 >  	}
->  }
+> @@ -192,17 +195,23 @@ int kvm_arm_config_vm(struct kvm *kvm, unsigned long type)
+>  	u32 parange, phys_shift;
+>  	u8 lvls;
 >  
-> -static void mtk_dpi_power_off(struct mtk_dpi *dpi, enum mtk_dpi_power_ctl pctl)
-> +static void mtk_dpi_power_off(struct mtk_dpi *dpi)
->  {
-> -	dpi->power_ctl &= ~pctl;
-> -
-> -	if ((dpi->power_ctl & DPI_POWER_START) ||
-> -	    (dpi->power_ctl & DPI_POWER_ENABLE))
-> +	if (WARN_ON(dpi->refcount == 0))
->  		return;
+> -	if (type)
+> +	if (type & ~KVM_VM_TYPE_ARM_IPA_SIZE_MASK)
+>  		return -EINVAL;
 >  
-> -	if (!dpi->power_sta)
-> +	if (--dpi->refcount != 0)
->  		return;
+> +	phys_shift = KVM_VM_TYPE_ARM_IPA_SIZE(type);
+> +	if (phys_shift) {
+> +		if (phys_shift > kvm_ipa_limit ||
+> +		    phys_shift < 32)
+> +			return -EINVAL;
+> +	} else {
+> +		phys_shift = KVM_PHYS_SHIFT;
+> +	}
+> +
+>  	parange = read_sanitised_ftr_reg(SYS_ID_AA64MMFR0_EL1) & 7;
+>  	if (parange > ID_AA64MMFR0_PARANGE_MAX)
+>  		parange = ID_AA64MMFR0_PARANGE_MAX;
+>  	vtcr |= parange << VTCR_EL2_PS_SHIFT;
 >  
->  	mtk_dpi_disable(dpi);
->  	clk_disable_unprepare(dpi->pixel_clk);
->  	clk_disable_unprepare(dpi->engine_clk);
-> -	dpi->power_sta = false;
->  }
+> -	phys_shift = id_aa64mmfr0_parange_to_phys_shift(parange);
+> -	if (phys_shift > KVM_PHYS_SHIFT)
+> -		phys_shift = KVM_PHYS_SHIFT;
+>  	vtcr |= VTCR_EL2_T0SZ(phys_shift);
+>  	/*
+>  	 * Use a minimum 2 level page table to prevent splitting
+> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> index 07548de5c988..9b949efcfd32 100644
+> --- a/include/uapi/linux/kvm.h
+> +++ b/include/uapi/linux/kvm.h
+> @@ -750,6 +750,15 @@ struct kvm_ppc_resize_hpt {
 >  
-> -static int mtk_dpi_power_on(struct mtk_dpi *dpi, enum mtk_dpi_power_ctl pctl)
-> +static int mtk_dpi_power_on(struct mtk_dpi *dpi)
->  {
->  	int ret;
+>  #define KVM_S390_SIE_PAGE_OFFSET 1
 >  
-> -	dpi->power_ctl |= pctl;
-> -
-> -	if (!(dpi->power_ctl & DPI_POWER_START) &&
-> -	    !(dpi->power_ctl & DPI_POWER_ENABLE))
-> -		return 0;
-> -
-> -	if (dpi->power_sta)
-> +	if (++dpi->refcount != 1)
->  		return 0;
+> +/*
+> + * On arm64, machine type can be used to request the physical
+> + * address size for the VM. Bits[7-0] are reserved for the guest
+> + * PA size shift (i.e, log2(PA_Size)). For backward compatibility,
+> + * value 0 implies the default IPA size, 40bits.
+> + */
+> +#define KVM_VM_TYPE_ARM_IPA_SIZE_MASK	0xffULL
+> +#define KVM_VM_TYPE_ARM_IPA_SIZE(x)		\
+> +	((x) & KVM_VM_TYPE_ARM_IPA_SIZE_MASK)
+>  /*
+>   * ioctls for /dev/kvm fds:
+>   */
+> @@ -952,6 +961,7 @@ struct kvm_ppc_resize_hpt {
+>  #define KVM_CAP_S390_HPAGE_1M 156
+>  #define KVM_CAP_NESTED_STATE 157
+>  #define KVM_CAP_ARM_INJECT_SERROR_ESR 158
+> +#define KVM_CAP_ARM_VM_IPA_SIZE 159 /* returns maximum IPA bits for a VM */
 >  
->  	ret = clk_prepare_enable(dpi->engine_clk);
->  	if (ret) {
->  		dev_err(dpi->dev, "Failed to enable engine clock: %d\n", ret);
-> -		goto err_eng;
-> +		goto err_refcount;
->  	}
+>  #ifdef KVM_CAP_IRQ_ROUTING
 >  
->  	ret = clk_prepare_enable(dpi->pixel_clk);
-> @@ -410,13 +394,12 @@ static int mtk_dpi_power_on(struct mtk_dpi *dpi, enum mtk_dpi_power_ctl pctl)
->  	}
->  
->  	mtk_dpi_enable(dpi);
-> -	dpi->power_sta = true;
->  	return 0;
->  
->  err_pixel:
->  	clk_disable_unprepare(dpi->engine_clk);
-> -err_eng:
-> -	dpi->power_ctl &= ~pctl;
-> +err_refcount:
-> +	dpi->refcount--;
->  	return ret;
->  }
->  
-> @@ -552,14 +535,14 @@ static void mtk_dpi_encoder_disable(struct drm_encoder *encoder)
->  {
->  	struct mtk_dpi *dpi = mtk_dpi_from_encoder(encoder);
->  
-> -	mtk_dpi_power_off(dpi, DPI_POWER_ENABLE);
-> +	mtk_dpi_power_off(dpi);
->  }
->  
->  static void mtk_dpi_encoder_enable(struct drm_encoder *encoder)
->  {
->  	struct mtk_dpi *dpi = mtk_dpi_from_encoder(encoder);
->  
-> -	mtk_dpi_power_on(dpi, DPI_POWER_ENABLE);
-> +	mtk_dpi_power_on(dpi);
->  	mtk_dpi_set_display_mode(dpi, &dpi->mode);
->  }
->  
-> @@ -582,14 +565,14 @@ static void mtk_dpi_start(struct mtk_ddp_comp *comp)
->  {
->  	struct mtk_dpi *dpi = container_of(comp, struct mtk_dpi, ddp_comp);
->  
-> -	mtk_dpi_power_on(dpi, DPI_POWER_START);
-> +	mtk_dpi_power_on(dpi);
->  }
->  
->  static void mtk_dpi_stop(struct mtk_ddp_comp *comp)
->  {
->  	struct mtk_dpi *dpi = container_of(comp, struct mtk_dpi, ddp_comp);
->  
-> -	mtk_dpi_power_off(dpi, DPI_POWER_START);
-> +	mtk_dpi_power_off(dpi);
->  }
->  
->  static const struct mtk_ddp_comp_funcs mtk_dpi_funcs = {
+> 
