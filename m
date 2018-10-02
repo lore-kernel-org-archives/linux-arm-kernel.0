@@ -1,70 +1,106 @@
 From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Tue, 2 Oct 2018 16:10:35 +0800
-Subject: [PATCH v4 05/11] drm/mediatek: convert dpi driver to use
- drm_of_find_panel_or_bridge
+Date: Tue, 2 Oct 2018 16:10:32 +0800
+Subject: [PATCH v4 02/11] drm/mediatek: move hardware register to node data
 In-Reply-To: <20181002081041.32629-1-bibby.hsieh@mediatek.com>
 References: <20181002081041.32629-1-bibby.hsieh@mediatek.com>
-Message-ID: <20181002081041.32629-6-bibby.hsieh@mediatek.com>
+Message-ID: <20181002081041.32629-3-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: chunhui dai <chunhui.dai@mediatek.com>
 
-Convert dpi driver to use drm_of_find_panel_or_bridge.
-This changes some error messages to debug messages (in the graph core).
-Graph connections are often "no connects" depending on the particular
-board, so we want to avoid spurious messages. Plus the kernel is not a
-DT validator.
-related links:
-[1] https://lkml.org/lkml/2017/2/3/716
-[2] https://lkml.org/lkml/2017/2/3/719
+The address of register DPI_H_FRE_CON is different in different IC.
+Using of_node data to find this address.
 
+Reviewed-by: CK Hu <ck.hu@mediatek.com>
 Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_dpi.c | 16 ++++++----------
- 1 file changed, 6 insertions(+), 10 deletions(-)
+ drivers/gpu/drm/mediatek/mtk_dpi.c      | 19 ++++++++++++++++---
+ drivers/gpu/drm/mediatek/mtk_dpi_regs.h |  1 -
+ 2 files changed, 16 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
-index 0dbe9345fa2e..08915e1765f8 100644
+index 5ede1ddbaa1a..72aa43187731 100644
 --- a/drivers/gpu/drm/mediatek/mtk_dpi.c
 +++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
-@@ -14,6 +14,7 @@
- #include <drm/drmP.h>
- #include <drm/drm_crtc.h>
- #include <drm/drm_crtc_helper.h>
-+#include <drm/drm_of.h>
- #include <linux/kernel.h>
+@@ -18,6 +18,7 @@
  #include <linux/component.h>
  #include <linux/platform_device.h>
-@@ -668,7 +669,6 @@ static int mtk_dpi_probe(struct platform_device *pdev)
+ #include <linux/of.h>
++#include <linux/of_device.h>
+ #include <linux/of_graph.h>
+ #include <linux/interrupt.h>
+ #include <linux/types.h>
+@@ -72,6 +73,7 @@ struct mtk_dpi {
+ 	struct clk *tvd_clk;
+ 	int irq;
+ 	struct drm_display_mode mode;
++	const struct mtk_dpi_conf *conf;
+ 	enum mtk_dpi_out_color_format color_format;
+ 	enum mtk_dpi_out_yc_map yc_map;
+ 	enum mtk_dpi_out_bit_num bit_num;
+@@ -110,6 +112,10 @@ struct mtk_dpi_yc_limit {
+ 	u16 c_bottom;
+ };
+ 
++struct mtk_dpi_conf {
++	u32 reg_h_fre_con;
++};
++
+ static void mtk_dpi_mask(struct mtk_dpi *dpi, u32 offset, u32 val, u32 mask)
+ {
+ 	u32 tmp = readl(dpi->regs + offset) & ~mask;
+@@ -335,7 +341,7 @@ static void mtk_dpi_config_swap_input(struct mtk_dpi *dpi, bool enable)
+ 
+ static void mtk_dpi_config_2n_h_fre(struct mtk_dpi *dpi)
+ {
+-	mtk_dpi_mask(dpi, DPI_H_FRE_CON, H_FRE_2N, H_FRE_2N);
++	mtk_dpi_mask(dpi, dpi->conf->reg_h_fre_con, H_FRE_2N, H_FRE_2N);
+ }
+ 
+ static void mtk_dpi_config_color_format(struct mtk_dpi *dpi,
+@@ -639,6 +645,10 @@ static const struct component_ops mtk_dpi_component_ops = {
+ 	.unbind = mtk_dpi_unbind,
+ };
+ 
++static const struct mtk_dpi_conf mt8173_conf = {
++	.reg_h_fre_con = 0xe0,
++};
++
+ static int mtk_dpi_probe(struct platform_device *pdev)
+ {
  	struct device *dev = &pdev->dev;
- 	struct mtk_dpi *dpi;
- 	struct resource *mem;
--	struct device_node *bridge_node;
- 	int comp_id;
- 	int ret;
+@@ -653,6 +663,7 @@ static int mtk_dpi_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
  
-@@ -714,16 +714,12 @@ static int mtk_dpi_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
+ 	dpi->dev = dev;
++	dpi->conf = (struct mtk_dpi_conf *)of_device_get_match_data(dev);
  
--	bridge_node = of_graph_get_remote_node(dev->of_node, 0, 0);
--	if (!bridge_node)
--		return -ENODEV;
--
--	dev_info(dev, "Found bridge node: %pOF\n", bridge_node);
-+	ret = drm_of_find_panel_or_bridge(dev->of_node, 0, 0,
-+					  NULL, &dpi->bridge);
-+	if (ret)
-+		return ret;
+ 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	dpi->regs = devm_ioremap_resource(dev, mem);
+@@ -732,8 +743,10 @@ static int mtk_dpi_remove(struct platform_device *pdev)
+ }
  
--	dpi->bridge = of_drm_find_bridge(bridge_node);
--	of_node_put(bridge_node);
--	if (!dpi->bridge)
--		return -EPROBE_DEFER;
-+	dev_info(dev, "Found bridge node: %pOF\n", dpi->bridge->of_node);
+ static const struct of_device_id mtk_dpi_of_ids[] = {
+-	{ .compatible = "mediatek,mt8173-dpi", },
+-	{}
++	{ .compatible = "mediatek,mt8173-dpi",
++	  .data = &mt8173_conf,
++	},
++	{ },
+ };
  
- 	comp_id = mtk_ddp_comp_get_id(dev->of_node, MTK_DPI);
- 	if (comp_id < 0) {
+ struct platform_driver mtk_dpi_driver = {
+diff --git a/drivers/gpu/drm/mediatek/mtk_dpi_regs.h b/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
+index 4b6ad4751a31..040444d7718d 100644
+--- a/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
++++ b/drivers/gpu/drm/mediatek/mtk_dpi_regs.h
+@@ -223,6 +223,5 @@
+ #define ESAV_CODE2			(0xFFF << 0)
+ #define ESAV_CODE3_MSB			BIT(16)
+ 
+-#define DPI_H_FRE_CON		0xE0
+ #define H_FRE_2N			BIT(25)
+ #endif /* __MTK_DPI_REGS_H */
 -- 
 2.12.5.2.gbdf23ab
