@@ -1,81 +1,73 @@
 From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Tue, 2 Oct 2018 16:10:36 +0800
-Subject: [PATCH v4 06/11] drm/mediatek: add dpi driver for mt2701 and mt7623
+Date: Tue, 2 Oct 2018 16:10:34 +0800
+Subject: [PATCH v4 04/11] drm/mediatek: add clock factor for different IC
 In-Reply-To: <20181002081041.32629-1-bibby.hsieh@mediatek.com>
 References: <20181002081041.32629-1-bibby.hsieh@mediatek.com>
-Message-ID: <20181002081041.32629-7-bibby.hsieh@mediatek.com>
+Message-ID: <20181002081041.32629-5-bibby.hsieh@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: chunhui dai <chunhui.dai@mediatek.com>
 
-This patch adds dpi dirver suppot for both mt2701 and mt7623.
-And also support other (existing or future) chips that use
-the same binding and driver.
+different IC has different clock designed in HDMI, the factor for
+calculate clock should be different. Usinng the data in of_node
+to find this factor.
 
 Reviewed-by: CK Hu <ck.hu@mediatek.com>
 Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_dpi.c     | 21 +++++++++++++++++++++
- drivers/gpu/drm/mediatek/mtk_drm_drv.c |  2 ++
- 2 files changed, 23 insertions(+)
+ drivers/gpu/drm/mediatek/mtk_dpi.c | 24 +++++++++++++++---------
+ 1 file changed, 15 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
-index 08915e1765f8..62a9d47df948 100644
+index 0ce4b61efaeb..0dbe9345fa2e 100644
 --- a/drivers/gpu/drm/mediatek/mtk_dpi.c
 +++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
-@@ -659,11 +659,29 @@ static unsigned int mt8173_calculate_factor(int clock)
- 		return 3 << 1;
- }
+@@ -113,6 +113,7 @@ struct mtk_dpi_yc_limit {
+ };
  
-+static unsigned int mt2701_calculate_factor(int clock)
+ struct mtk_dpi_conf {
++	unsigned int (*cal_factor)(int clock);
+ 	u32 reg_h_fre_con;
+ 	bool edge_sel_en;
+ };
+@@ -431,15 +432,7 @@ static int mtk_dpi_set_display_mode(struct mtk_dpi *dpi,
+ 	unsigned int factor;
+ 
+ 	/* let pll_rate can fix the valid range of tvdpll (1G~2GHz) */
+-
+-	if (mode->clock <= 27000)
+-		factor = 3 << 4;
+-	else if (mode->clock <= 84000)
+-		factor = 3 << 3;
+-	else if (mode->clock <= 167000)
+-		factor = 3 << 2;
+-	else
+-		factor = 3 << 1;
++	factor = dpi->conf->cal_factor(mode->clock);
+ 	drm_display_mode_to_videomode(mode, &vm);
+ 	pll_rate = vm.pixelclock * factor;
+ 
+@@ -653,7 +646,20 @@ static const struct component_ops mtk_dpi_component_ops = {
+ 	.unbind = mtk_dpi_unbind,
+ };
+ 
++static unsigned int mt8173_calculate_factor(int clock)
 +{
-+	if (clock <= 64000)
-+		return 16;
-+	else if (clock <= 128000)
-+		return 8;
-+	else if (clock <= 256000)
-+		return 4;
++	if (clock <= 27000)
++		return 3 << 4;
++	else if (clock <= 84000)
++		return 3 << 3;
++	else if (clock <= 167000)
++		return 3 << 2;
 +	else
-+		return 2;
++		return 3 << 1;
 +}
 +
  static const struct mtk_dpi_conf mt8173_conf = {
- 	.cal_factor = mt8173_calculate_factor,
++	.cal_factor = mt8173_calculate_factor,
  	.reg_h_fre_con = 0xe0,
  };
  
-+static const struct mtk_dpi_conf mt2701_conf = {
-+	.cal_factor = mt2701_calculate_factor,
-+	.reg_h_fre_con = 0xb0,
-+	.edge_sel_en = true,
-+};
-+
- static int mtk_dpi_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-@@ -753,6 +771,9 @@ static int mtk_dpi_remove(struct platform_device *pdev)
- }
- 
- static const struct of_device_id mtk_dpi_of_ids[] = {
-+	{ .compatible = "mediatek,mt2701-dpi",
-+	  .data = &mt2701_conf,
-+	},
- 	{ .compatible = "mediatek,mt8173-dpi",
- 	  .data = &mt8173_conf,
- 	},
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-index 39721119713b..d961112fa2f5 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-@@ -424,6 +424,8 @@ static const struct of_device_id mtk_ddp_comp_dt_ids[] = {
- 	  .data = (void *)MTK_DSI },
- 	{ .compatible = "mediatek,mt8173-dsi",
- 	  .data = (void *)MTK_DSI },
-+	{ .compatible = "mediatek,mt2701-dpi",
-+	  .data = (void *)MTK_DPI },
- 	{ .compatible = "mediatek,mt8173-dpi",
- 	  .data = (void *)MTK_DPI },
- 	{ .compatible = "mediatek,mt2701-disp-mutex",
 -- 
 2.12.5.2.gbdf23ab
