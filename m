@@ -1,33 +1,46 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Mon, 1 Oct 2018 17:53:34 -0700
-Subject: [GIT PULL] Late arm64 fixes for 4.19
-In-Reply-To: <20181001174600.GB14755@arm.com>
-References: <20181001174600.GB14755@arm.com>
-Message-ID: <20181002005334.GC29284@kroah.com>
+From: Jason@zx2c4.com (Jason A. Donenfeld)
+Date: Tue, 2 Oct 2018 05:53:26 +0200
+Subject: [PATCH] ARM: makefile: pass -march=armv4 to assembler even on
+ CPU32v3
+In-Reply-To: <CAK8P3a0grG5OBjwpTeH0fqzoFFBLDH6-oGM4ibzHypUKWedg3A@mail.gmail.com>
+References: <20180930024904.14240-1-Jason@zx2c4.com>
+ <CAK8P3a0grG5OBjwpTeH0fqzoFFBLDH6-oGM4ibzHypUKWedg3A@mail.gmail.com>
+Message-ID: <CAHmME9rVbKCNJfVBEene0SvhBEm_g7N-XJ26ugoAab1Vj7G_ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 01, 2018 at 06:46:01PM +0100, Will Deacon wrote:
-> Hi Greg,
-> 
-> Please pull these late arm64 fixes for 4.19. Details in the tag, but we've
-> fixed a hugetlb livelock issue that was reported by Fujitsu as well as
-> removing some useless flexibility in our KVM SET_ONE_REG ioctl().
-> 
-> Cheers,
-> 
-> Will
-> 
-> --->8
-> 
-> The following changes since commit 6bf4ca7fbc85d80446ac01c0d1d77db4d91a6d84:
-> 
->   Linux 4.19-rc5 (2018-09-23 19:15:18 +0200)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
+Hi Arnd,
 
-Now pulled, thanks.
+Apologies for the delay in getting back to you. I had some MTA issues
+and stupidly assumed ARM developers were taking the day off instead...
 
-greg k-h
+On Tue, Oct 2, 2018 at 5:33 AM Arnd Bergmann <arnd@arndb.de> wrote:
+> -arch-$(CONFIG_CPU_32v3)                =-D__LINUX_ARM_ARCH__=3 -march=armv3
+> +arch-$(CONFIG_CPU_32v3)                =-D__LINUX_ARM_ARCH__=3 -march=armv3m
+
+Unfortunately this doesn't really cut it in my case, as it's not only
+those multiplications:
+chacha20-arm.S:402: Error: selected processor does not support `bxeq
+lr' in ARM mode
+
+I think we're going to wind up playing whack-a-mole in silly ways. The
+fact of the matter is that the ARM assembly I'm adding to the tree is
+for ARMv4 and up, and not for ARMv3.
+
+I think there are three options to work around this issue:
+
+1) Not build my assembly when CONFIG_CPU_32v3 via a Kconfig "depends".
+2) Set asflags-$(CONFIG_CPU_32v3) inside my module locally to select
+-march=armv4.
+3) This patch.
+
+My initial plan was (1). ArdB recommended I do (2) instead. I thought
+that was a bit too nuanced and submitted (3).
+
+It sounds like in light of the bus issues, (1) might be the best
+solution after all?
+
+Let me know, and I'll follow your direction.
+
+Regards,
+Jason
