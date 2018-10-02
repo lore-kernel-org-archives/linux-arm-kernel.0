@@ -1,37 +1,30 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Tue,  2 Oct 2018 22:49:00 +0200
-Subject: [PATCH 2/2] drm/sun4i: tcon: prevent tcon->panel dereference if null
-In-Reply-To: <20181002204900.82118-1-giulio.benetti@micronovasrl.com>
-References: <20181001093612.GA13672@mwanda>
- <20181002204900.82118-1-giulio.benetti@micronovasrl.com>
-Message-ID: <20181002204900.82118-2-giulio.benetti@micronovasrl.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue,  2 Oct 2018 23:10:01 +0200
+Subject: [PATCH] nvmem: lpc18xx_eeprom: remove an unused variable
+Message-ID: <20181002211016.2638186-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If using tcon with VGA, tcon->panel will be null(0), this will cause
-segmentation fault when trying to dereference tcon->panel->connector.
+drivers/nvmem/lpc18xx_eeprom.c: In function 'lpc18xx_eeprom_remove':
+drivers/nvmem/lpc18xx_eeprom.c:258:6: error: unused variable 'ret' [-Werror=unused-variable]
 
-Add tcon->panel null check before calling
-sun4i_tcon0_mode_set_dithering().
-
-Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+Fixes: 226014d13fa5 ("nvmem: lpc18xx_eeprom: use devm_nvmem_register()")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/nvmem/lpc18xx_eeprom.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index e4b3bd0307ef..f949287d926c 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -491,7 +491,8 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
- 	sun4i_tcon0_mode_set_common(tcon, mode);
+diff --git a/drivers/nvmem/lpc18xx_eeprom.c b/drivers/nvmem/lpc18xx_eeprom.c
+index b42dbaddb419..66cff1e2147a 100644
+--- a/drivers/nvmem/lpc18xx_eeprom.c
++++ b/drivers/nvmem/lpc18xx_eeprom.c
+@@ -255,7 +255,6 @@ static int lpc18xx_eeprom_probe(struct platform_device *pdev)
+ static int lpc18xx_eeprom_remove(struct platform_device *pdev)
+ {
+ 	struct lpc18xx_eeprom_dev *eeprom = platform_get_drvdata(pdev);
+-	int ret;
  
- 	/* Set dithering if needed */
--	sun4i_tcon0_mode_set_dithering(tcon, tcon->panel->connector);
-+	if (tcon->panel)
-+		sun4i_tcon0_mode_set_dithering(tcon, tcon->panel->connector);
+ 	clk_disable_unprepare(eeprom->clk);
  
- 	/* Adjust clock delay */
- 	clk_delay = sun4i_tcon_get_clk_delay(mode, 0);
 -- 
-2.17.1
+2.18.0
