@@ -1,25 +1,99 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 2 Oct 2018 09:56:23 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: Enable USB phys for UniPhier SoCs
-In-Reply-To: <1538381421-9171-1-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1538381421-9171-1-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <CAK8P3a2iHvV-Xb=jMc7NOGrjagwBpr5fAFmUcVX-TWfM38==sA@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 2 Oct 2018 16:59:40 +0900
+Subject: [PATCH v15 07/16] arm64: add image head flag definitions
+In-Reply-To: <20181001125225.7tlfzt5n25sckhyy@lakrids.cambridge.arm.com>
+References: <20180928064841.14117-1-takahiro.akashi@linaro.org>
+ <20180928064841.14117-8-takahiro.akashi@linaro.org>
+ <20181001125225.7tlfzt5n25sckhyy@lakrids.cambridge.arm.com>
+Message-ID: <20181002075939.GG32578@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 1, 2018 at 10:10 AM Kunihiko Hayashi
-<hayashi.kunihiko@socionext.com> wrote:
->
-> Enable the USB3 and USB2 phys implemented in UniPhier SoCs.
-> These phys are necessary for dwc3 and ehci controllers driving
-> the USB ports on Pro4 and PXs2 SoCs.
->
-> Since the USB host drivers are already built-in, so only the phy
-> driver are missing to allow booting with USB devices.
->
-> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> ---
+Hi Mark,
 
-Applied to next/defconfig with context changes.
+On Mon, Oct 01, 2018 at 01:52:26PM +0100, Mark Rutland wrote:
+> On Fri, Sep 28, 2018 at 03:48:32PM +0900, AKASHI Takahiro wrote:
+> > Those image head's flags will be used later by kexec_file loader.
+> > 
+> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Acked-by: James Morse <james.morse@arm.com>
+> > ---
+> >  arch/arm64/include/asm/boot.h | 15 +++++++++++++++
+> >  arch/arm64/kernel/head.S      |  2 +-
+> >  2 files changed, 16 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm64/include/asm/boot.h b/arch/arm64/include/asm/boot.h
+> > index 355e552a9175..0bab7eed3012 100644
+> > --- a/arch/arm64/include/asm/boot.h
+> > +++ b/arch/arm64/include/asm/boot.h
+> > @@ -5,6 +5,21 @@
+> >  
+> >  #include <asm/sizes.h>
+> >  
+> > +#define ARM64_MAGIC		"ARM\x64"
+> > +
+> > +#define HEAD_FLAG_BE_SHIFT		0
+> > +#define HEAD_FLAG_PAGE_SIZE_SHIFT	1
+> > +#define HEAD_FLAG_BE_MASK		0x1
+> > +#define HEAD_FLAG_PAGE_SIZE_MASK	0x3
+> > +
+> > +#define HEAD_FLAG_BE			1
+> 
+> These already exist in some form in arch/arm64/kernel/image.h; can we
+> please factor those out rather than duplicating them?
 
-      Arnd
+Sure.
+
+> I'd be happy if you'd update image.h to use the new HEAD_FLAG_* names,
+> and removed the old definitions.
+
+I want to make sure two things;
+
+1. Do you assume all the existing __HEAD_FLAG_xyz's NOT be renamed
+   (say, to HEAD_FLAG_xyz)?
+
+2. Do you mind removing this check in image.h?
+   (we also need to manage 'CONFIG_EFI' part of image.h.)
+
+>       #ifndef LINKER_SCRIPT
+>       #error This file should only be included in vmlinux.lds.S
+>       #endif
+
+
+Thanks,
+-Takahiro Akashi
+
+> > +#define HEAD_FLAG_PAGE_SIZE_4K		1
+> > +#define HEAD_FLAG_PAGE_SIZE_16K		2
+> > +#define HEAD_FLAG_PAGE_SIZE_64K		3
+> 
+> I appreciate these are new, since we didn't previously need definitions.
+> 
+> Thanks,
+> Mark.
+> 
+> > +
+> > +#define head_flag_field(flags, field) \
+> > +		(((flags) >> field##_SHIFT) & field##_MASK)
+> > +
+> >  /*
+> >   * arm64 requires the DTB to be 8 byte aligned and
+> >   * not exceed 2MB in size.
+> > diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> > index b0853069702f..8cbac6232ed1 100644
+> > --- a/arch/arm64/kernel/head.S
+> > +++ b/arch/arm64/kernel/head.S
+> > @@ -91,7 +91,7 @@ _head:
+> >  	.quad	0				// reserved
+> >  	.quad	0				// reserved
+> >  	.quad	0				// reserved
+> > -	.ascii	"ARM\x64"			// Magic number
+> > +	.ascii	ARM64_MAGIC			// Magic number
+> >  #ifdef CONFIG_EFI
+> >  	.long	pe_header - _head		// Offset to the PE header.
+> >  
+> > -- 
+> > 2.19.0
+> > 
