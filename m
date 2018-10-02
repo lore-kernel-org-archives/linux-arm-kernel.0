@@ -1,22 +1,32 @@
 From: gregkh@linuxfoundation.org (Greg KH)
-Date: Mon, 1 Oct 2018 17:53:22 -0700
-Subject: [GIT PULL] ARM: SoC fixes
-In-Reply-To: <20180930192343.erige7yfbrnvil2m@localhost>
-References: <20180930192343.erige7yfbrnvil2m@localhost>
-Message-ID: <20181002005322.GB29284@kroah.com>
+Date: Mon, 1 Oct 2018 17:53:34 -0700
+Subject: [GIT PULL] Late arm64 fixes for 4.19
+In-Reply-To: <20181001174600.GB14755@arm.com>
+References: <20181001174600.GB14755@arm.com>
+Message-ID: <20181002005334.GC29284@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 30, 2018 at 12:23:43PM -0700, Olof Johansson wrote:
-> Hi Linus, Greg,
+On Mon, Oct 01, 2018 at 06:46:01PM +0100, Will Deacon wrote:
+> Hi Greg,
 > 
-> The following changes since commit a132bb90414bfad4f8ee23cb45fe6946a89b167d:
+> Please pull these late arm64 fixes for 4.19. Details in the tag, but we've
+> fixed a hugetlb livelock issue that was reported by Fujitsu as well as
+> removing some useless flexibility in our KVM SET_ONE_REG ioctl().
 > 
->   Merge tag 'sunxi-fixes-for-4.19' of https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux into fixes (2018-09-08 10:04:37 -0700)
+> Cheers,
+> 
+> Will
+> 
+> --->8
+> 
+> The following changes since commit 6bf4ca7fbc85d80446ac01c0d1d77db4d91a6d84:
+> 
+>   Linux 4.19-rc5 (2018-09-23 19:15:18 +0200)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-fixes
+>   git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
 
 Now pulled, thanks.
 
