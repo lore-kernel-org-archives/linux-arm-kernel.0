@@ -1,80 +1,51 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Tue, 2 Oct 2018 11:56:56 -0700
-Subject: [PATCH v9 2/8] dt-bindings: Introduce interconnect binding
-In-Reply-To: <20181002111758.GC1086@e107155-lin>
-References: <20180831140151.13972-1-georgi.djakov@linaro.org>
- <20180831140151.13972-3-georgi.djakov@linaro.org>
- <20180925180215.GA12435@bogus>
- <b67253fb-d86d-2ddd-6c30-0833d6ed62ad@linaro.org>
- <20180926144830.GB25838@e107155-lin>
- <fa74c24f-1f22-f11f-60fe-5a4489d9c7c2@codeaurora.org>
- <20181002111758.GC1086@e107155-lin>
-Message-ID: <c17450ce-fc25-e792-b91b-51106f032542@codeaurora.org>
+From: leoyang.li@nxp.com (Li Yang)
+Date: Tue, 2 Oct 2018 14:45:32 -0500
+Subject: [PATCH v2 0/5] soc/fsl/qbman: DPAA QBMan fixes and additions
+In-Reply-To: <AM6PR04MB40080234BA68140933F6B733ECE80@AM6PR04MB4008.eurprd04.prod.outlook.com>
+References: <1538124204-31406-1-git-send-email-madalin.bucur@nxp.com>
+ <CADRPPNTn99q=6fungYr-xcwY6vFiw9KTUp8UCEQ2u0+sv7vd4Q@mail.gmail.com>
+ <AM6PR04MB40080234BA68140933F6B733ECE80@AM6PR04MB4008.eurprd04.prod.outlook.com>
+Message-ID: <CADRPPNQmCXwxP7xJh_md37TofRivU6w2EyX1rTTtZX4LGjj+ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 10/02/2018 04:17 AM, Sudeep Holla wrote:
-> On Mon, Oct 01, 2018 at 04:49:32PM -0700, Saravana Kannan wrote:
->> On 09/26/2018 07:48 AM, Sudeep Holla wrote:
->>> On Wed, Sep 26, 2018 at 05:42:15PM +0300, Georgi Djakov wrote:
->>>> Hi Rob,
->>>>
->>>> Thanks for the comments!
->>>>
->>>> On 09/25/2018 09:02 PM, Rob Herring wrote:
->>>>> On Fri, Aug 31, 2018 at 05:01:45PM +0300, Georgi Djakov wrote:
->>>>>> This binding is intended to represent the relations between the interconnect
->>>>>> controllers (providers) and consumer device nodes. It will allow creating links
->>>>>> between consumers and interconnect paths (exposed by interconnect providers).
->>>>> As I mentioned in person, I want to see other SoC families using this
->>>>> before accepting. They don't have to be ready for upstream, but WIP
->>>>> patches or even just a "yes, this works for us and we're going to use
->>>>> this binding on X".
->>>> Other than the 3 Qualcomm SoCs (msm8916, msm8996, sdm845) that are
->>>> currently using this binding, there is ongoing work from at least two
->>>> other vendors that would be using this same binding. I will check on
->>>> what is their progress so far.
->>>>
->>>>> Also, I think the QCom GPU use of this should be fully sorted out. Or
->>>>> more generically how this fits into OPP binding which seems to be never
->>>>> ending extended...
->>>> I see this as a further step. It could be OPP binding which include
->>>> bandwidth values or some separate DT property. Jordan has already
->>>> proposed something, do you have any initial comments on that?
->>> I am curious as how this fits into new systems which have firmware driven
->>> CPUFreq and other DVFS. I would like to avoid using this in such systems
->>> and leave it upto the firmware to scale the bus/interconnect based on the
->>> other components that are connected to it and active.
->>>
->> You've made the same point multiple times across different patch sets. Not
->> all FW can do arbitrary functions. A lot of them are very limited in their
->> capabilities. So, as much as you and I would like to let the FW do the work,
->> it's not always possible. So, in those cases, we do need to have support for
->> the kernel scaling the interconnects correctly. Hopefully this clears up
->> your questions about FW capabilities.
-> Yes, I do understand I have made the same point multiple time and it's
-> intentional. We need to get the fragmented f/w support story fixed.
-> Different ARM vendors are doing different things in f/w and ARM sees the
-> same fragmentation story as before. We have come up with new specification
-> and my annoying multiple emails are just to constantly remind the same.
+On Tue, Oct 2, 2018 at 1:29 AM Madalin-cristian Bucur
+<madalin.bucur@nxp.com> wrote:
 >
-> I do understand we have existing implementations to consider, but fixing
-> the functionality in arbitrary way is not a good design and it better
-> to get them fixed for future.
+> > -----Original Message-----
+> > From: Li Yang [mailto:leoyang.li at nxp.com]
+> > Sent: Tuesday, October 2, 2018 1:30 AM
+> > To: Madalin-cristian Bucur <madalin.bucur@nxp.com>
+> > Cc: Roy Pledge <roy.pledge@nxp.com>; Claudiu Manoil
+> > <claudiu.manoil@nxp.com>; Catalin Marinas <catalin.marinas@arm.com>; Scott
+> > Wood <oss@buserror.net>; moderated list:ARM/FREESCALE IMX / MXC ARM
+> > ARCHITECTURE <linux-arm-kernel@lists.infradead.org>; linuxppc-dev
+> > <linuxppc-dev@lists.ozlabs.org>; lkml <linux-kernel@vger.kernel.org>
+> > Subject: Re: [PATCH v2 0/5] soc/fsl/qbman: DPAA QBMan fixes and additions
+> >
+> > On Fri, Sep 28, 2018 at 3:44 AM Madalin Bucur <madalin.bucur@nxp.com>
+> > wrote:
+> > >
+> >
+> > Applied 1-4 to for-next while waiting for clarification on 5/5.   And
+> > updated the prefix to "soc: fsl:" style to be aligned with arm-soc
+> > convention.  Please try to use that style in the future for soc/fsl
+> > patches.
+>
+> Thank you, I've sent an email about the APIs.
+> I'm not sure we need to align the prefix to arm-soc as the soc/fsl does not
+> service only ARM but also PPC based SoCs and historically we've been using
+> the soc/* format.
 
-I believe the fragmentation you are referring to is? in the 
-interface/communication protocol. I see the benefit of standardizing 
-that as long as the standard actually turns out to be good. But that's 
-completely separate from what the FW can/can't do. Asking to standardize 
-what the FW can/can't do doesn't seem realistic as each chip vendor will 
-have different priorities - power, performance, cost, chip area, etc. 
-It's the conflation of these separate topics that doesn't help IMHO.
+There is no kernel wide guideline about the format of subsystem prefix
+in the patch subject. Different subsystems have their own
+preferrences.  Soc is not considered as a separate subsystem, so we
+followed the convention of the architectural subsystem that we merge
+patches through.  Since we normally get soc patches through the
+arm-soc tree right now, I think it would be better to follow the
+convention of arm-soc to make them not looking too different in the
+arm-soc pull requests.  Not sure how sensetive ARM-SOC maintainers
+feel about this though.
 
--Saravana
-
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Regards,
+Leo
