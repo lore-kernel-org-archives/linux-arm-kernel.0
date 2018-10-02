@@ -1,48 +1,62 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Tue, 2 Oct 2018 15:12:44 +0200
-Subject: [PATCH] ARM: makefile: pass -march=armv4 to assembler even on
- CPU32v3
-In-Reply-To: <CAKv+Gu8NXyfNAzk4Fe=J0QHEEV-txbRAoEcQmjG-6PgCyW5SZg@mail.gmail.com>
-References: <20180930024904.14240-1-Jason@zx2c4.com>
- <CAK8P3a0grG5OBjwpTeH0fqzoFFBLDH6-oGM4ibzHypUKWedg3A@mail.gmail.com>
- <CAHmME9rVbKCNJfVBEene0SvhBEm_g7N-XJ26ugoAab1Vj7G_ww@mail.gmail.com>
- <CAK8P3a3TE8HW0wD9ETCDWMf7quDRx94-2iS6goYDQ18JQ6r=rw@mail.gmail.com>
- <CAHmME9pFnuRx2F=xeyK8d3bwv3bJY+WvE1KZn__+2oFWS0RCnA@mail.gmail.com>
- <CAKv+Gu8NXyfNAzk4Fe=J0QHEEV-txbRAoEcQmjG-6PgCyW5SZg@mail.gmail.com>
-Message-ID: <CAHmME9oz2hFRjFeNSDLe59_pYn3HqB+5rWM5KsH7G_bUWaoy7Q@mail.gmail.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Tue,  2 Oct 2018 15:12:42 +0200
+Subject: [PATCH v7 7/8] arm64: update Documentation/arm64/tagged-pointers.txt
+In-Reply-To: <cover.1538485901.git.andreyknvl@google.com>
+References: <cover.1538485901.git.andreyknvl@google.com>
+Message-ID: <47a464307d4df3c0cb65f88d1fe83f9a741dd74b.1538485901.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Ard,
+Document the changes in Documentation/arm64/tagged-pointers.txt.
 
-On Tue, Oct 2, 2018 at 3:10 PM Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->
-> It builds but it doesn't run, at least not when built into the kernel
-> proper (which will be the case after random.c moves to this library)
->
-> Your toolchain is implicitly passing --fix-v4bx to the assembler,
-> which causes it to permit bx instructions in ARMv4 object code, but
-> tag them with special R_ARM_V4BX ELF relocations. The ARM module
-> loader does take these into account, so built as a module, it works.
-> However, when built into the core kernel, we have to rely on the
-> linker to patch this instruction into the ARMv4 equivalent, and a
-> quick check reveals that that is currently not the case.
->
-> Bottom line: let's not go there.
+Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
+---
+ Documentation/arm64/tagged-pointers.txt | 24 ++++++++++++++----------
+ 1 file changed, 14 insertions(+), 10 deletions(-)
 
-Oh, thanks a bunch for explaining that. Since I wrote the last email
-I've been playing around with as, readelf, and qemu and was slightly
-mystified.
-
->
-> > But anyway,
-> > I'll go with your primary suggestion and we therefore can move ahead
-> > with changing the global cflag to march=armv3m. Would you like me to
-> > submit the patch for this, or would yo like to handle it?
-> >
->
-> Yes please go ahead.
-
-Alright, incoming in a few minutes.
-
-Jason
+diff --git a/Documentation/arm64/tagged-pointers.txt b/Documentation/arm64/tagged-pointers.txt
+index a25a99e82bb1..ae877d185fdb 100644
+--- a/Documentation/arm64/tagged-pointers.txt
++++ b/Documentation/arm64/tagged-pointers.txt
+@@ -17,13 +17,21 @@ this byte for application use.
+ Passing tagged addresses to the kernel
+ --------------------------------------
+ 
+-All interpretation of userspace memory addresses by the kernel assumes
+-an address tag of 0x00.
++Some initial work for supporting non-zero address tags passed to the
++kernel has been done. As of now, the kernel supports tags in:
+ 
+-This includes, but is not limited to, addresses found in:
++  - user fault addresses
+ 
+- - pointer arguments to system calls, including pointers in structures
+-   passed to system calls,
++  - pointer arguments (including pointers in structures), which don't
++    describe virtual memory ranges, passed to system calls
++
++All other interpretations of userspace memory addresses by the kernel
++assume an address tag of 0x00. This includes, but is not limited to,
++addresses found in:
++
++ - pointer arguments (including pointers in structures), which describe
++   virtual memory ranges, passed to memory system calls (mmap, mprotect,
++   etc.)
+ 
+  - the stack pointer (sp), e.g. when interpreting it to deliver a
+    signal,
+@@ -33,11 +41,7 @@ This includes, but is not limited to, addresses found in:
+ 
+ Using non-zero address tags in any of these locations may result in an
+ error code being returned, a (fatal) signal being raised, or other modes
+-of failure.
+-
+-For these reasons, passing non-zero address tags to the kernel via
+-system calls is forbidden, and using a non-zero address tag for sp is
+-strongly discouraged.
++of failure. Using a non-zero address tag for sp is strongly discouraged.
+ 
+ Programs maintaining a frame pointer and frame records that use non-zero
+ address tags may suffer impaired or inaccurate debug and profiling
+-- 
+2.19.0.605.g01d371f741-goog
