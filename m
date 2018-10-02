@@ -1,43 +1,26 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 2 Oct 2018 23:22:00 +0200
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 2 Oct 2018 23:26:48 +0200
 Subject: [PATCH] nvmem: lpc18xx_eeprom: remove an unused variable
-In-Reply-To: <20181002211016.2638186-1-arnd@arndb.de>
+In-Reply-To: <CAMRc=MfOMp5qpZLBBLKHTrziBBV2kD1ZMv7OD4E3M85G=G++bQ@mail.gmail.com>
 References: <20181002211016.2638186-1-arnd@arndb.de>
-Message-ID: <CAMRc=MfOMp5qpZLBBLKHTrziBBV2kD1ZMv7OD4E3M85G=G++bQ@mail.gmail.com>
+ <CAMRc=MfOMp5qpZLBBLKHTrziBBV2kD1ZMv7OD4E3M85G=G++bQ@mail.gmail.com>
+Message-ID: <CAK8P3a1pyWGBX-gOufS196Bbgbvy7eAGN0SKe4edaiSuFVvgdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-wt., 2 pa? 2018 o 23:10 Arnd Bergmann <arnd@arndb.de> napisa?(a):
+On Tue, Oct 2, 2018 at 11:22 PM Bartosz Golaszewski <brgl@bgdev.pl> wrote:
 >
-> drivers/nvmem/lpc18xx_eeprom.c: In function 'lpc18xx_eeprom_remove':
-> drivers/nvmem/lpc18xx_eeprom.c:258:6: error: unused variable 'ret' [-Werror=unused-variable]
->
-> Fixes: 226014d13fa5 ("nvmem: lpc18xx_eeprom: use devm_nvmem_register()")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/nvmem/lpc18xx_eeprom.c | 1 -
->  1 file changed, 1 deletion(-)
->
-> diff --git a/drivers/nvmem/lpc18xx_eeprom.c b/drivers/nvmem/lpc18xx_eeprom.c
-> index b42dbaddb419..66cff1e2147a 100644
-> --- a/drivers/nvmem/lpc18xx_eeprom.c
-> +++ b/drivers/nvmem/lpc18xx_eeprom.c
-> @@ -255,7 +255,6 @@ static int lpc18xx_eeprom_probe(struct platform_device *pdev)
->  static int lpc18xx_eeprom_remove(struct platform_device *pdev)
->  {
->         struct lpc18xx_eeprom_dev *eeprom = platform_get_drvdata(pdev);
-> -       int ret;
->
->         clk_disable_unprepare(eeprom->clk);
->
-> --
-> 2.18.0
->
+> wt., 2 pa? 2018 o 23:10 Arnd Bergmann <arnd@arndb.de> napisa?(a):
 
-Hi Arnd,
+> Hi Arnd,
+>
+> I had already sent a fix for that with you in Cc:
+> https://lkml.org/lkml/2018/10/2/439
 
-I had already sent a fix for that with you in Cc:
-https://lkml.org/lkml/2018/10/2/439
+Ah, good. I had some vague memory of that, but couldn't find it in
+my mailbox when I sent out the other fixes for today's
+linux-next build regressions, so I included this as well.
 
-Best regards,
-Bartosz
+Please ignore my patch.
+
+      Arnd
