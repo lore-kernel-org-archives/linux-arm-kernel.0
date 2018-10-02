@@ -1,40 +1,41 @@
 From: anshuman.khandual@arm.com (Anshuman Khandual)
-Date: Tue,  2 Oct 2018 17:45:27 +0530
-Subject: [PATCH 0/4] arm64/mm: Enable HugeTLB migration
-Message-ID: <1538482531-26883-1-git-send-email-anshuman.khandual@arm.com>
+Date: Tue,  2 Oct 2018 17:45:30 +0530
+Subject: [PATCH 3/4] arm64/mm: Enable HugeTLB migration
+In-Reply-To: <1538482531-26883-1-git-send-email-anshuman.khandual@arm.com>
+References: <1538482531-26883-1-git-send-email-anshuman.khandual@arm.com>
+Message-ID: <1538482531-26883-4-git-send-email-anshuman.khandual@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series enables HugeTLB migration support for all supported
-huge page sizes at all levels including contiguous bit implementation.
-Following HugeTLB migration support matrix has been enabled with this
-patch series. All permutations have been tested except for the 16GB.
+Let arm64 subscribe to generic HugeTLB page migration framework. Right now
+this only works on the following PMD and PUD level HugeTLB page sizes with
+various kernel base page size combinations.
 
-         CONT PTE    PMD    CONT PMD    PUD
-         --------    ---    --------    ---
-4K:         64K     2M         32M     1G
-16K:         2M    32M          1G
-64K:         2M   512M         16G
+       CONT PTE    PMD    CONT PMD    PUD
+       --------    ---    --------    ---
+4K:         NA     2M         NA      1G
+16K:        NA    32M         NA
+64K:        NA   512M         NA
 
-First the series adds migration support for PUD based huge pages. It
-then adds a platform specific hook to query an architecture if a
-given huge page size is supported for migration while also providing
-a default fallback option preserving the existing semantics which just
-checks for (PMD|PUD|PGDIR)_SHIFT macros. The last two patches enables
-HugeTLB migration on arm64 and subscribe to this new platform specific
-hook by defining an override.
+Signed-off-by: Anshuman Khandual <anshuman.khandual@arm.com>
+---
+ arch/arm64/Kconfig | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Anshuman Khandual (4):
-  mm/hugetlb: Enable PUD level huge page migration
-  mm/hugetlb: Enable arch specific huge page size support for migration
-  arm64/mm: Enable HugeTLB migration
-  arm64/mm: Enable HugeTLB migration for contiguous bit HugeTLB pages
-
- arch/arm64/Kconfig               |  4 ++++
- arch/arm64/include/asm/hugetlb.h |  5 +++++
- arch/arm64/mm/hugetlbpage.c      | 20 ++++++++++++++++++++
- include/linux/hugetlb.h          | 18 +++++++++++++++---
- 4 files changed, 44 insertions(+), 3 deletions(-)
-
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 1b1a0e9..e54350f 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -1305,6 +1305,10 @@ config SYSVIPC_COMPAT
+ 	def_bool y
+ 	depends on COMPAT && SYSVIPC
+ 
++config ARCH_ENABLE_HUGEPAGE_MIGRATION
++	def_bool y
++	depends on HUGETLB_PAGE && MIGRATION
++
+ menu "Power management options"
+ 
+ source "kernel/power/Kconfig"
 -- 
 2.7.4
