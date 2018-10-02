@@ -1,33 +1,40 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Tue,  2 Oct 2018 10:43:40 +0200
-Subject: [PATCH 1/2] arm64: dts: meson-axg: s400: add missing emmc pwrseq
-In-Reply-To: <20181002084341.5487-1-jbrunet@baylibre.com>
-References: <20181002084341.5487-1-jbrunet@baylibre.com>
-Message-ID: <20181002084341.5487-2-jbrunet@baylibre.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 2 Oct 2018 09:50:41 +0100
+Subject: RESEND and REBASE arm+arm64+aarch32 vdso rewrite
+In-Reply-To: <8c09a380-7bc8-a353-aeb7-6591e6c57f68@android.com>
+References: <20181001175845.168430-1-salyzyn@android.com>
+ <CALAqxLWCbw0bmYeB9Vfi5wXJcnLRnE0TYxy1h5WkHLehHv8KFg@mail.gmail.com>
+ <8c09a380-7bc8-a353-aeb7-6591e6c57f68@android.com>
+Message-ID: <20181002085041.GV30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-eMMC pwrseq is defined in the s400 dts but not used in the emmc node.
-This is probably just a copy/paste error
+On Mon, Oct 01, 2018 at 01:44:52PM -0700, Mark Salyzyn wrote:
+> Despite the gain of 0.4% for screen-on battery life, where Android has a mix
+> of 64 and 32 bit applications, thus still relevant _today_ on 64 bit
+> architectures (providing vDSO32 for 32-bit applications).
 
-Fixes: 221cf34bac54 ("ARM64: dts: meson-axg: enable the eMMC controller")
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/meson-axg-s400.dts | 2 ++
- 1 file changed, 2 insertions(+)
+I don't think the issue is what you think it is.  0.4% gain is
+equivalent to almost (but not quite) 1 minute extra for a lifetime of
+4 hours.  Is that really noticable, and is it worth the churn from
+merging this series?
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-index d6467ac333ec..166ab598395e 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-@@ -493,6 +493,8 @@
- 	mmc-ddr-1_8v;
- 	mmc-hs200-1_8v;
- 
-+	mmc-pwrseq = <&emmc_pwrseq>;
-+
- 	vmmc-supply = <&vcc_3v3>;
- 	vqmmc-supply = <&vddio_boot>;
- };
+Given that the gain is so marginal, I can see why people find it
+difficult to get excited about this series to spend the time reviewing
+it.
+
+What I'm saying is that the reason that people should look at this
+series hasn't been "sold" particularly well.  How does it look from
+the system performance point of view - is there a speed-up there
+that's more significant?
+
+In any case, I suspect that if you compare the battery life from
+kernels from two years ago with modern kernels, you'll see a
+degredation over that period just because of the progressive
+increase in complexity, and especially things such as the Spectre
+work-arounds.
+
 -- 
-2.17.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
