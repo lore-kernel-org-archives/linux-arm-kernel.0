@@ -1,35 +1,52 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 2 Oct 2018 13:09:08 +0200
-Subject: [GIT PULL] ARM: defconfig update for v4.20
-In-Reply-To: <CAK8P3a1jtA77tunDWEjqAvYgNac-EFVdg07Va6neya4r2HSdQQ@mail.gmail.com>
-References: <8bb0af1d-8323-9833-ee1c-bbbb9d65a686@gmail.com>
- <CAK8P3a1jtA77tunDWEjqAvYgNac-EFVdg07Va6neya4r2HSdQQ@mail.gmail.com>
-Message-ID: <0e713ca2-b8e4-dbf1-8160-f8e40ab21558@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 2 Oct 2018 13:10:44 +0200
+Subject: [GIT PULL] ARM: dts updates for arm 32 bits for v4.20
+In-Reply-To: <9f0dd563-b921-8d31-c82c-327fea5c026f@gmail.com>
+References: <0195dc38-908e-c403-5f12-d266a037ca1b@gmail.com>
+ <CAK8P3a1AVrP_vrvUJrEHp1i_LrdDCwCmiVP_aRYpATwEK+B3Yg@mail.gmail.com>
+ <9f0dd563-b921-8d31-c82c-327fea5c026f@gmail.com>
+Message-ID: <CAK8P3a0dih9hFib05L2C31ONnraxN67H4wJAzQWD9gMg2Ek1Eg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Oct 2, 2018 at 12:34 PM Matthias Brugger <matthias.bgg@gmail.com> wrote:
+> On 02/10/2018 11:12, Arnd Bergmann wrote:
+> > On Sat, Sep 29, 2018 at 5:18 PM Matthias Brugger <matthias.bgg@gmail.com> wrote:
+> >
+> >> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+> >>
+> >>   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+> >>
+> >> are available in the Git repository at:
+> >>
+> >>   https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git/
+> >> tags/v4.19-next-dts32
+> >>
+> >> for you to fetch changes up to 5646a2f6d584e80bd4555c2ce3e286b35b9eaa61:
+> >>
+> >>   arm: dts: mt7623: add jpeg decoder device node (2018-09-25 17:44:35 +0200)
+> >>
+> >> ----------------------------------------------------------------
+> >> mt7623:
+> >> - add pmu node
+> >> - add subsystem clock>> - add nodes needed for iommu
+> >> - add node for the jpeg decoder
+> >
+> > None of these (aside from the pmu) seem to have DT bindings
+> > or drivers posted on the list. Can you explain why that is and what
+> > the plan is for supporting them?
+> >
+>
+> We rely on the fallback compatible here, as mt2701 and mt7623 are identically in
+> most of their components. If you require to get the bindings documented before
+> merging the DT, then I propose to drop the pull request for now.
+>
+> Other option would be to get the bindings documented in v4.21. AFAIK up to now
+> there haven't been sent any patches to update the bindings.
 
+Ok, I missed that the mt2701 strings are all documented and used in drivers,
+so I don't think it's a problem to merge your changes. How about you add
+another patch to your tree to update the respective bindings? I think that
+should be fine even for 4.20.
 
-On 01/10/2018 18:06, Arnd Bergmann wrote:
-> On Sat, Sep 29, 2018 at 5:16 PM Matthias Brugger <matthias.bgg@gmail.com> wrote:
-> 
->>
->> for you to fetch changes up to f718739d1c219decf2e4e4f0121753439850e5ab:
->>
->>   ARM: defconfig: add mediatek_v7_defconfig (2018-09-25 16:18:15 +0200)
->>
->> ----------------------------------------------------------------
->> - add arm32 defconfig for mediatek SoCs.
-> 
-> You probably don't want CONFIG_DEBUG_LL=y, or CONFIG_COMPILE_TEST=y
-> in there. Please review the file for additional options that might be incorrect.
-> 
-
-Correct. Apart I just realized that it only enabled mt7623 and leaves alone the
-other armv7 mediatek SoCs. So there is more work to be done here.
-
-I propose you drop the merge request for this release.
-
-Sorry for the inconvenience.
-
-Matthias
+        Arnd
