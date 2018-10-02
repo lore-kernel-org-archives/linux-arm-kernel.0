@@ -1,95 +1,113 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Tue,  2 Oct 2018 15:12:43 +0200
-Subject: [PATCH v7 8/8] selftests,
- arm64: add a selftest for passing tagged pointers to kernel
-In-Reply-To: <cover.1538485901.git.andreyknvl@google.com>
-References: <cover.1538485901.git.andreyknvl@google.com>
-Message-ID: <3a2c0a6b2499a328cc9471d4095ae36f0f05252d.1538485901.git.andreyknvl@google.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 2 Oct 2018 15:13:12 +0200
+Subject: [PATCH 1/2] arm64: dts: allwinner: Olimex A64-OLinuXino: enable
+ eMMC.
+In-Reply-To: <CAG7TQgGS7DkLpNVYqfCD-9vMZkeY6r+L-5oXKWef3x-OVbqjtw@mail.gmail.com>
+References: <20180919141815.18737-1-rodrigo@tjader.xyz>
+ <20180921142811.h5jraemk565alh3i@flea>
+ <CAG7TQgE_KU_cK_4E+NG8Qcw-QB2=C6YoqBYR2svmWxywFyySCw@mail.gmail.com>
+ <20180925090139.qbu6tqav5oth7zkw@flea>
+ <CAG7TQgFTsR4pf4jAcWMFoOmiP7AXYqjts60RP2kuJGU44AcQJQ@mail.gmail.com>
+ <20180927081711.llmwnvpu73loe5iv@flea>
+ <CAG7TQgGMkvBnNE_WEth8gscKxN3qN8a44mNMWz3QP-2+JKfOzg@mail.gmail.com>
+ <20180929154754.abz3byvrufvnf4dq@flea>
+ <CAG7TQgGS7DkLpNVYqfCD-9vMZkeY6r+L-5oXKWef3x-OVbqjtw@mail.gmail.com>
+Message-ID: <20181002131312.soqwybsohdifvso3@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a simple test, that calls the uname syscall with a
-tagged user pointer as an argument. Without the kernel accepting tagged
-user pointers the test fails with EFAULT.
+On Sat, Sep 29, 2018 at 01:51:02PM -0300, Rodrigo Exterck?tter Tj?der wrote:
+> On Sat, Sep 29, 2018 at 12:47 PM Maxime Ripard
+> <maxime.ripard@bootlin.com> wrote:
+> >
+> > On Thu, Sep 27, 2018 at 11:49:20AM -0300, Rodrigo Exterck?tter Tj?der wrote:
+> > > On Thu, Sep 27, 2018 at 5:17 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> > > >
+> > > > On Tue, Sep 25, 2018 at 02:47:59PM -0300, Rodrigo Exterck?tter Tj?der wrote:
+> > > > > On Tue, Sep 25, 2018 at 6:01 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> > > > > > We can't really do that, unfortunately. If the device tree name was to
+> > > > > > change for a given board, we'd break all the build systems, boot
+> > > > > > scripts and distros out there.
+> > > > >
+> > > > > What if we keep the device tree for the version without WiFi and eMMC
+> > > > > with the current name and create new device trees for the other two
+> > > > > versions?
+> > > >
+> > > > Wifi and Bluetooth should be dealt with with overlays in this case,
+> > > > and since the eMMC is already enabled, then there's nothing to do, I
+> > > > guess.
+> > >
+> > > It's WiFi that is already enabled, not eMMC. Only one of the three
+> > > variants has WiFi.
+> >
+> > Ah, right, sorry. In the board that doesn't have an emmc, are the pins
+> > usable for something else?
+> 
+> I don't have the variant without eMMC nor could I find pictures of it.
+> The schematics do mention that the A64 pins could be used to control
+> NAND flash, but you'd have to solder that yourself.
 
-Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
----
- tools/testing/selftests/arm64/.gitignore      |  1 +
- tools/testing/selftests/arm64/Makefile        | 11 +++++++++++
- .../testing/selftests/arm64/run_tags_test.sh  | 12 ++++++++++++
- tools/testing/selftests/arm64/tags_test.c     | 19 +++++++++++++++++++
- 4 files changed, 43 insertions(+)
- create mode 100644 tools/testing/selftests/arm64/.gitignore
- create mode 100644 tools/testing/selftests/arm64/Makefile
- create mode 100755 tools/testing/selftests/arm64/run_tags_test.sh
- create mode 100644 tools/testing/selftests/arm64/tags_test.c
+Ok.
 
-diff --git a/tools/testing/selftests/arm64/.gitignore b/tools/testing/selftests/arm64/.gitignore
-new file mode 100644
-index 000000000000..e8fae8d61ed6
---- /dev/null
-+++ b/tools/testing/selftests/arm64/.gitignore
-@@ -0,0 +1 @@
-+tags_test
-diff --git a/tools/testing/selftests/arm64/Makefile b/tools/testing/selftests/arm64/Makefile
-new file mode 100644
-index 000000000000..a61b2e743e99
---- /dev/null
-+++ b/tools/testing/selftests/arm64/Makefile
-@@ -0,0 +1,11 @@
-+# SPDX-License-Identifier: GPL-2.0
-+
-+# ARCH can be overridden by the user for cross compiling
-+ARCH ?= $(shell uname -m 2>/dev/null || echo not)
-+
-+ifneq (,$(filter $(ARCH),aarch64 arm64))
-+TEST_GEN_PROGS := tags_test
-+TEST_PROGS := run_tags_test.sh
-+endif
-+
-+include ../lib.mk
-diff --git a/tools/testing/selftests/arm64/run_tags_test.sh b/tools/testing/selftests/arm64/run_tags_test.sh
-new file mode 100755
-index 000000000000..745f11379930
---- /dev/null
-+++ b/tools/testing/selftests/arm64/run_tags_test.sh
-@@ -0,0 +1,12 @@
-+#!/bin/sh
-+# SPDX-License-Identifier: GPL-2.0
-+
-+echo "--------------------"
-+echo "running tags test"
-+echo "--------------------"
-+./tags_test
-+if [ $? -ne 0 ]; then
-+	echo "[FAIL]"
-+else
-+	echo "[PASS]"
-+fi
-diff --git a/tools/testing/selftests/arm64/tags_test.c b/tools/testing/selftests/arm64/tags_test.c
-new file mode 100644
-index 000000000000..1452ed7d33f9
---- /dev/null
-+++ b/tools/testing/selftests/arm64/tags_test.c
-@@ -0,0 +1,19 @@
-+// SPDX-License-Identifier: GPL-2.0
-+
-+#include <stdio.h>
-+#include <unistd.h>
-+#include <stdint.h>
-+#include <sys/utsname.h>
-+
-+#define SHIFT_TAG(tag)		((uint64_t)(tag) << 56)
-+#define SET_TAG(ptr, tag)	(((uint64_t)(ptr) & ~SHIFT_TAG(0xff)) | \
-+					SHIFT_TAG(tag))
-+
-+int main(void)
-+{
-+	struct utsname utsname;
-+	void *ptr = &utsname;
-+	void *tagged_ptr = (void *)SET_TAG(ptr, 0x42);
-+	int err = uname(tagged_ptr);
-+	return err;
-+}
+> > > We can't even remove a node from a device tree? Removing the WiFi node
+> > > from the current tree would make it correspond to the variant with the
+> > > least features.
+> >
+> > Not really. How pissed would you be if you were a user, had wifi
+> > running on your board, you upgrade your kernel, and then it's just
+> > gone? :)
+> 
+> That would suck, but what about someone who has the board with no wifi
+> and problems start happening because the wifi is enabled on the device
+> tree?
+
+Did that happen or is it a theoretical issue?
+
+> > > About device tree overlays, I read overlay-notes.txt, but I went
+> > > looking for an example with "git grep /plugin/ arch" and it came
+> > > empty. Is this approach not used for other boards?
+> >
+> > It is, it's simply not stored in the kernel, but through other third
+> > party repos.
+> 
+> So that would mean that it's up to every distro to support the boards
+> instead of relying on mainline support?
+
+Distros would have to integrate it either way. One would need to
+detect and / or ask for the board variant in order to load say the BT
+stack, or to know if you want to boot from the eMMC or from the SD
+card.
+
+> > > Does the overlay approach make the device available at boot time? That
+> > > is important for a storage device such as eMMC.
+> > >
+> > > I went with the separate dts approach because that's what I saw was
+> > > done for other similar cases, like Pine64 and Pine64+, OLinuXino-LIME2
+> > > and its variant with eMMC, among others.
+> >
+> > Yeah, but in all these cases, it was done from day one, not after the
+> > facts.
+> 
+> For the LIME2 the dts for the emmc variant was commited two years
+> after the base LIME2 dts.
+> 
+> What if instead of keeping the current dt for the least featureful
+> model we keep it for the most featureful model and create new dts for
+> the two less featureful models?
+
+This is a different story though. The LIME2 eMMC variant was created
+way after the original LIME2, with a separate name.
+
+Maxime
+
 -- 
-2.19.0.605.g01d371f741-goog
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181002/3eb11f33/attachment.sig>
