@@ -1,53 +1,41 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 2 Oct 2018 07:39:06 +0200
-Subject: [PATCH] ARM: makefile: pass -march=armv4 to assembler even on
- CPU32v3
-In-Reply-To: <CAHmME9rVbKCNJfVBEene0SvhBEm_g7N-XJ26ugoAab1Vj7G_ww@mail.gmail.com>
-References: <20180930024904.14240-1-Jason@zx2c4.com>
- <CAK8P3a0grG5OBjwpTeH0fqzoFFBLDH6-oGM4ibzHypUKWedg3A@mail.gmail.com>
- <CAHmME9rVbKCNJfVBEene0SvhBEm_g7N-XJ26ugoAab1Vj7G_ww@mail.gmail.com>
-Message-ID: <CAKv+Gu94x+pPp_CrPYj=3aFb6fDcZKM9MficvKkkfXhDib2sYg@mail.gmail.com>
+From: madalin.bucur@nxp.com (Madalin-cristian Bucur)
+Date: Tue, 2 Oct 2018 06:07:55 +0000
+Subject: [PATCH v2 5/5] soc/fsl_qbman: export coalesce change API
+In-Reply-To: <CADRPPNQgGAYTCmppyxPwQnnC433QLm21D5iq_4EvSj0LrsAxGQ@mail.gmail.com>
+References: <1538124204-31406-1-git-send-email-madalin.bucur@nxp.com>
+ <1538124204-31406-6-git-send-email-madalin.bucur@nxp.com>
+ <CADRPPNQgGAYTCmppyxPwQnnC433QLm21D5iq_4EvSj0LrsAxGQ@mail.gmail.com>
+Message-ID: <AM6PR04MB400877EC0C140A7D919AEF41ECE80@AM6PR04MB4008.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 October 2018 at 05:53, Jason A. Donenfeld <Jason@zx2c4.com> wrote:
-> Hi Arnd,
->
-> Apologies for the delay in getting back to you. I had some MTA issues
-> and stupidly assumed ARM developers were taking the day off instead...
->
-> On Tue, Oct 2, 2018 at 5:33 AM Arnd Bergmann <arnd@arndb.de> wrote:
->> -arch-$(CONFIG_CPU_32v3)                =-D__LINUX_ARM_ARCH__=3 -march=armv3
->> +arch-$(CONFIG_CPU_32v3)                =-D__LINUX_ARM_ARCH__=3 -march=armv3m
->
-> Unfortunately this doesn't really cut it in my case, as it's not only
-> those multiplications:
-> chacha20-arm.S:402: Error: selected processor does not support `bxeq
-> lr' in ARM mode
->
+> -----Original Message-----
+> From: Li Yang [mailto:leoyang.li at nxp.com]
+> Sent: Tuesday, October 2, 2018 12:50 AM
+> To: Madalin-cristian Bucur <madalin.bucur@nxp.com>
+> Cc: Roy Pledge <roy.pledge@nxp.com>; Claudiu Manoil
+> <claudiu.manoil@nxp.com>; Catalin Marinas <catalin.marinas@arm.com>; Scott
+> Wood <oss@buserror.net>; moderated list:ARM/FREESCALE IMX / MXC ARM
+> ARCHITECTURE <linux-arm-kernel@lists.infradead.org>; linuxppc-dev
+> <linuxppc-dev@lists.ozlabs.org>; lkml <linux-kernel@vger.kernel.org>
+> Subject: Re: [PATCH v2 5/5] soc/fsl_qbman: export coalesce change API
+> 
+> On Fri, Sep 28, 2018 at 3:45 AM Madalin Bucur <madalin.bucur@nxp.com>
+> wrote:
+> >
+> > Export the API required to control the QMan portal interrupt coalescing
+> > settings.
+> 
+> These are new APIs not just old APIs being exported.  What is the user
+> of these APIs?  Is the user being submitted?  We cannot have APIs in
+> kernel that has no users.
 
-We have a macro for doing function returns: just replace 'bxeq lr'
-with 'reteq lr' (and be sure to include <asm/assembler.h>)
+Hi,
 
+These are new APIs that will be used in the DPAA Ethernet driver.
+Changes for the DPAA QBMan and DPAA Ethernet follow different paths upstream
+so the Ethernet driver patch that makes use of these APIs will be sent when
+these changes reach the net-next/master tree.
 
-> I think we're going to wind up playing whack-a-mole in silly ways. The
-> fact of the matter is that the ARM assembly I'm adding to the tree is
-> for ARMv4 and up, and not for ARMv3.
->
-> I think there are three options to work around this issue:
->
-> 1) Not build my assembly when CONFIG_CPU_32v3 via a Kconfig "depends".
-> 2) Set asflags-$(CONFIG_CPU_32v3) inside my module locally to select
-> -march=armv4.
-> 3) This patch.
->
-> My initial plan was (1). ArdB recommended I do (2) instead. I thought
-> that was a bit too nuanced and submitted (3).
->
-> It sounds like in light of the bus issues, (1) might be the best
-> solution after all?
->
-> Let me know, and I'll follow your direction.
->
-> Regards,
-> Jason
+Regards,
+Madalin
