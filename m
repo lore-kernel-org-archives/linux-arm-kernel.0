@@ -1,47 +1,130 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 2 Oct 2018 15:28:35 +0200
-Subject: [PATCH] ARM: makefile: use ARMv3M mode for RiscPC
-In-Reply-To: <20181002132026.14931-1-Jason@zx2c4.com>
-References: <CAKv+Gu8NXyfNAzk4Fe=J0QHEEV-txbRAoEcQmjG-6PgCyW5SZg@mail.gmail.com>
- <20181002132026.14931-1-Jason@zx2c4.com>
-Message-ID: <CAKv+Gu_mwu+TFrbRPqDZ8i5csSqS26a534yzJ_wAQL_Y+W6F7w@mail.gmail.com>
+From: ville.syrjala@linux.intel.com (Ville =?iso-8859-1?Q?Syrj=E4l=E4?=)
+Date: Tue, 2 Oct 2018 16:28:49 +0300
+Subject: [PATCH v4 2/5] drm/dp: fix link probing for devices supporting
+ DP 1.4+
+In-Reply-To: <20181001092708.ow4rxgzp4haax76k@qschulz>
+References: <1537455288-20223-1-git-send-email-dkos@cadence.com>
+ <1537455288-20223-3-git-send-email-dkos@cadence.com>
+ <20180921075929.GA28323@intel.com>
+ <20181001092708.ow4rxgzp4haax76k@qschulz>
+Message-ID: <20181002132849.GR9144@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 October 2018 at 15:20, Jason A. Donenfeld <Jason@zx2c4.com> wrote:
-> The purpose of CONFIG_CPU_32v3 is to avoid ldrh/strh on the RiscPC,
-> which is pretty much an ARMv4 device, except its bus will choke on the
-> half-words. The way to make the C compiler not output ldrh/strh is with
-> -march=armv3, which doesn't support them in the ISA. However, this
-> prevents certain cryptography code from working that uses instructions
-> like umull. Fortunately there's also -march=armv3m that does support
-> those, making it possible to continue assembling optimized cryptography
-> routines for our beloved RiscPC.
->
-> Signed-off-by: Jason A. Donenfeld <Jason@zx2c4.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Arnd Bergmann <arnd@arndb.de>
+On Mon, Oct 01, 2018 at 11:27:08AM +0200, Quentin Schulz wrote:
+> Hi Manasi,
+> 
+> On Fri, Sep 21, 2018 at 12:59:30AM -0700, Manasi Navare wrote:
+> > Thanks for the patch. Verified with the DP 1.4 spec and looks good to me.
+> > Also look at the related patch that makes use of the correct extended capabilities:
+> > 
+> > https://patchwork.freedesktop.org/patch/249400/
+> > 
+> 
+> If I'm not mistaken, you could get rid of the patch in the Intel driver
+> when we have this one merged. Is there any reason not to, have I missed
+> something?
 
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+i915 (and most other drivers) don't use this code. Also as mentioned in
+that thread you should probably validate that the data in the extended
+caps looks sane, otherwise the entire point of having it for compatibility
+with older source devices is lost.
 
-> ---
->  arch/arm/Makefile | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index d1516f85f25d..7fd4bcaf0721 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -74,7 +74,7 @@ endif
->  arch-$(CONFIG_CPU_32v5)                =-D__LINUX_ARM_ARCH__=5 $(call cc-option,-march=armv5te,-march=armv4t)
->  arch-$(CONFIG_CPU_32v4T)       =-D__LINUX_ARM_ARCH__=4 -march=armv4t
->  arch-$(CONFIG_CPU_32v4)                =-D__LINUX_ARM_ARCH__=4 -march=armv4
-> -arch-$(CONFIG_CPU_32v3)                =-D__LINUX_ARM_ARCH__=3 -march=armv3
-> +arch-$(CONFIG_CPU_32v3)                =-D__LINUX_ARM_ARCH__=3 -march=armv3m
->
->  # Evaluate arch cc-option calls now
->  arch-y := $(arch-y)
-> --
-> 2.19.0
->
+> 
+> Thanks,
+> Quentin
+> 
+> > Reviewed-by: Manasi Navare <manasi.d.navare@intel.com>
+> > 
+> > Manasi
+> > 
+> > 
+> > On Thu, Sep 20, 2018 at 03:54:37PM +0100, Damian Kos wrote:
+> > > From: Quentin Schulz <quentin.schulz@free-electrons.com>
+> > > 
+> > > DP 1.4 introduced a DP_EXTENDED_RECEIVER_CAP_FIELD_PRESENT bit in
+> > > DP_TRAINING_AUX_RD_INTERVAL register. If set, DPCD registers from
+> > > DP_DPCD_REV to DP_ADAPTER_CAP should be retrieved starting from
+> > > DP_DPCD_REV_EXTENDED. All registers are copied except DP_DPCD_REV,
+> > > DP_MAX_LINK_RATE and DP_DOWNSTREAMPORT_PRESENT which represent the
+> > > "true capabilities" of DPRX device.
+> > > 
+> > > Original DP_DPCD_REV, DP_MAX_LINK_RATE and DP_DOWNSTREAMPORT_PRESENT
+> > > might falsely return lower capabilities to "avoid interoperability
+> > > issues with some of the existing DP Source devices that malfunction
+> > > when they discover the higher capabilities within those three
+> > > registers.".
+> > > 
+> > > Before DP 1.4, DP_EXTENDED_RECEIVER_CAP_FIELD_PRESENT bit was reserved
+> > > and read 0 so it's safe to check against it even if DP revision is
+> > > <1.4
+> > > 
+> > > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> > > Signed-off-by: Damian Kos <dkos@cadence.com>
+> > > ---
+> > >  drivers/gpu/drm/drm_dp_helper.c | 30 +++++++++++++++++++++++++++++-
+> > >  1 file changed, 29 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/drivers/gpu/drm/drm_dp_helper.c b/drivers/gpu/drm/drm_dp_helper.c
+> > > index 8c6b9fd89f8a..735ebde5c2f0 100644
+> > > --- a/drivers/gpu/drm/drm_dp_helper.c
+> > > +++ b/drivers/gpu/drm/drm_dp_helper.c
+> > > @@ -370,10 +370,38 @@ int drm_dp_link_probe(struct drm_dp_aux *aux, struct drm_dp_link *link)
+> > >  {
+> > >  	u8 values[3];
+> > >  	int err;
+> > > +	unsigned int addr;
+> > >  
+> > >  	memset(link, 0, sizeof(*link));
+> > >  
+> > > -	err = drm_dp_dpcd_read(aux, DP_DPCD_REV, values, sizeof(values));
+> > > +	/*
+> > > +	 * DP 1.4 introduced a DP_EXTENDED_RECEIVER_CAP_FIELD_PRESENT bit in
+> > > +	 * DP_TRAINING_AUX_RD_INTERVAL register. If set, DPCD registers from
+> > > +	 * DP_DPCD_REV to DP_ADAPTER_CAP should be retrieved starting from
+> > > +	 * DP_DPCD_REV_EXTENDED. All registers are copied except DP_DPCD_REV,
+> > > +	 * DP_MAX_LINK_RATE and DP_DOWNSTREAMPORT_PRESENT which represent the
+> > > +	 * "true capabilities" of DPRX device.
+> > > +	 *
+> > > +	 * Original DP_DPCD_REV, DP_MAX_LINK_RATE and DP_DOWNSTREAMPORT_PRESENT
+> > > +	 * might falsely return lower capabilities to "avoid interoperability
+> > > +	 * issues with some of the existing DP Source devices that malfunction
+> > > +	 * when they discover the higher capabilities within those three
+> > > +	 * registers.".
+> > > +	 *
+> > > +	 * Before DP 1.4, DP_EXTENDED_RECEIVER_CAP_FIELD_PRESENT bit was reserved
+> > > +	 * and read 0 so it's safe to check against it even if DP revision is
+> > > +	 * <1.4
+> > > +	 */
+> > > +	err = drm_dp_dpcd_readb(aux, DP_TRAINING_AUX_RD_INTERVAL, values);
+> > > +	if (err < 0)
+> > > +		return err;
+> > > +
+> > > +	if (values[0] & DP_EXTENDED_RECEIVER_CAP_FIELD_PRESENT)
+> > > +		addr = DP_DP13_DPCD_REV;
+> > > +	else
+> > > +		addr = DP_DPCD_REV;
+> > > +
+> > > +	err = drm_dp_dpcd_read(aux, addr, values, sizeof(values));
+> > >  	if (err < 0)
+> > >  		return err;
+> > >  
+> > > -- 
+> > > 2.17.1
+> > > 
+> > > _______________________________________________
+> > > dri-devel mailing list
+> > > dri-devel at lists.freedesktop.org
+> > > https://lists.freedesktop.org/mailman/listinfo/dri-devel
+
+
+
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+
+
+-- 
+Ville Syrj?l?
+Intel
