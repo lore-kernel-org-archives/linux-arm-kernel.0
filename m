@@ -1,46 +1,52 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Tue,  2 Oct 2018 09:30:05 -0500
-Subject: [GIT PULL] SoCFPGA DTS updates for v4.20, part 3
-Message-ID: <1538490605-26653-1-git-send-email-dinguyen@kernel.org>
+From: gregory.clement@bootlin.com (Gregory CLEMENT)
+Date: Tue, 02 Oct 2018 16:30:51 +0200
+Subject: [PATCH v6 00/14] Add System Error Interrupt support to Armada SoCs
+In-Reply-To: <86a7nwvcnn.wl-marc.zyngier@arm.com> (Marc Zyngier's message of
+ "Tue, 02 Oct 2018 11:57:48 +0100")
+References: <20181001141358.31508-1-miquel.raynal@bootlin.com>
+ <86a7nwvcnn.wl-marc.zyngier@arm.com>
+Message-ID: <875zyko1yc.fsf@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, and Olof:
+Hi Marc,
+ 
+ On mar., oct. 02 2018, Marc Zyngier <marc.zyngier@arm.com> wrote:
 
-Please pull in these additional patches for v4.20.
+> On Mon, 01 Oct 2018 15:13:44 +0100,
+> Miquel Raynal <miquel.raynal@bootlin.com> wrote:
+>> 
+>> The ICU is an IRQ chip found in Armada CP110. It currently has 207 wired
+>> inputs. Its purpose is to aggregate all CP interrupts and report them to
+>> the AP through MSIs. The ICU writes into GIC registers (AP side) by way
+>> of the interconnect. These interrupts can be of several groups:
+>> - SecuRe (SR);
+>> - Non-SecuRe (NSR);
+>> - System Error Interrupts (SEI);
+>> - RAM Error Interrupts (REI);
+>> - ...
+>> Each ICU wired interrupt can be of any of these groups. The group is
+>> encoded in the MSI payload.
+>
+> [...]
+>
+> I'm now ready to queue patches 1 through to 11 (with patches 6 and 9
+> as of v7). Who is picking up the DT patches (12 to 14)?
+
+I will do it.
 
 Thanks,
-Dinh
 
-The following changes since commit 20373e0cb8f7d540ae082a8026f5ae7c27cc6cb3:
+Gregory
+>
+> Thanks,
+>
+> 	M.
+>
+> -- 
+> Jazz is not dead, it just smell funny.
 
-  ARM: dts: socfpga: add timer resets for SoCFPGA platform (2018-09-17 10:11:28 -0500)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_updates_for_v4.20_part3
-
-for you to fetch changes up to 725fc0551c9d124abd032273f49963d7f3cc4fa3:
-
-  arm64: dts: stratix10: add ethernet aliases (2018-09-28 14:33:03 -0500)
-
-----------------------------------------------------------------
-SoCFPGA DTS updates for v4.20, part 3
-- Add ethernet aliases for Arria10 and Stratix10
-- Correct system manager register size for Stratix10
-- Correct SDRAM node address for Arria10
-
-----------------------------------------------------------------
-Dinh Nguyen (1):
-      arm64: dts: stratix10: add ethernet aliases
-
-Steffen Trumtrar (1):
-      ARM: dts: socfpga: arria10: add aliases for ethernet
-
-Thor Thayer (2):
-      ARM: dts: socfpga: Fix SDRAM node address for Arria10
-      arm64: dts: stratix10: Correct System Manager register size
-
- arch/arm/boot/dts/socfpga_arria10.dtsi            | 9 ++++++++-
- arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi | 8 +++++++-
- 2 files changed, 15 insertions(+), 2 deletions(-)
+-- 
+Gregory Clement, Bootlin
+Embedded Linux and Kernel engineering
+http://bootlin.com
