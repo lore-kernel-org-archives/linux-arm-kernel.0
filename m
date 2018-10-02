@@ -1,49 +1,42 @@
-From: ioana.ciornei@nxp.com (Ioana Ciornei)
-Date: Tue, 2 Oct 2018 12:16:17 +0000
-Subject: [PATCH] bus: fsl-mc: explicitly define the fsl_mc_command endianness
-Message-ID: <1538482550-7698-1-git-send-email-ioana.ciornei@nxp.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Tue,  2 Oct 2018 20:29:11 +0800
+Subject: [PATCH] clk: sunxi-ng: enable so-said LDOs for A64 SoC's pll-mipi
+ clock
+Message-ID: <20181002122911.22094-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both the header and the command parameters of the fsl_mc_command are
-64-bit little-endian words. Use the appropriate type to explicitly
-specify their endianness.
+In the user manual of A64 SoC, the bit 22 and 23 of pll-mipi control
+register is called "LDO{1,2}_EN", and according to the BSP source code
+from Allwinner , the LDOs are enabled during the clock's enabling
+process.
 
-Signed-off-by: Ioana Ciornei <ioana.ciornei@nxp.com>
+The clock failed to generate output if the two LDOs are not enabled.
+
+Add the two bits to the clock's gate bits, so that the LDOs are enabled
+when the PLL is enabled.
+
+Fixes: c6a0637460c2 ("clk: sunxi-ng: Add A64 clocks")
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- include/linux/fsl/mc.h | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+As PLL-MIPI is not used before 4.20~5.0, I decide not to target this patch
+on stable/mainline kernels.
 
-diff --git a/include/linux/fsl/mc.h b/include/linux/fsl/mc.h
-index f27cb14..96c54bb 100644
---- a/include/linux/fsl/mc.h
-+++ b/include/linux/fsl/mc.h
-@@ -210,8 +210,8 @@ struct mc_cmd_header {
- };
+ drivers/clk/sunxi-ng/ccu-sun50i-a64.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+index 5f80eb018014..f7d297368eb2 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
++++ b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+@@ -162,7 +162,7 @@ static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_gpu_clk, "pll-gpu",
+ #define SUN50I_A64_PLL_MIPI_REG		0x040
  
- struct fsl_mc_command {
--	u64 header;
--	u64 params[MC_CMD_NUM_OF_PARAMS];
-+	__le64 header;
-+	__le64 params[MC_CMD_NUM_OF_PARAMS];
- };
- 
- enum mc_cmd_status {
-@@ -238,11 +238,11 @@ enum mc_cmd_status {
- /* Command completion flag */
- #define MC_CMD_FLAG_INTR_DIS	0x01
- 
--static inline u64 mc_encode_cmd_header(u16 cmd_id,
--				       u32 cmd_flags,
--				       u16 token)
-+static inline __le64 mc_encode_cmd_header(u16 cmd_id,
-+					  u32 cmd_flags,
-+					  u16 token)
- {
--	u64 header = 0;
-+	__le64 header = 0;
- 	struct mc_cmd_header *hdr = (struct mc_cmd_header *)&header;
- 
- 	hdr->cmd_id = cpu_to_le16(cmd_id);
+ static struct ccu_nkm pll_mipi_clk = {
+-	.enable		= BIT(31),
++	.enable		= BIT(31) | BIT(23) | BIT(22),
+ 	.lock		= BIT(28),
+ 	.n		= _SUNXI_CCU_MULT(8, 4),
+ 	.k		= _SUNXI_CCU_MULT_MIN(4, 2, 2),
 -- 
-1.9.1
+2.18.0
