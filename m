@@ -1,54 +1,48 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 2 Oct 2018 12:01:14 +0100
-Subject: [PATCH v5 6/9] PCI: mediatek: Enable msi after clock enabled
-In-Reply-To: <1538129080-8206-7-git-send-email-honghui.zhang@mediatek.com>
-References: <1538129080-8206-1-git-send-email-honghui.zhang@mediatek.com>
- <1538129080-8206-7-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <20181002110114.GB27736@e107981-ln.cambridge.arm.com>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Tue, 2 Oct 2018 14:02:42 +0300
+Subject: [PATCH v9 5/8] interconnect: qcom: Add RPM communication
+In-Reply-To: <20180925181735.GA28385@bogus>
+References: <20180831140151.13972-1-georgi.djakov@linaro.org>
+ <20180831140151.13972-6-georgi.djakov@linaro.org>
+ <20180925181735.GA28385@bogus>
+Message-ID: <ab1db6d6-3eff-0fec-6647-3bc1910bc8b2@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 28, 2018 at 06:04:37PM +0800, honghui.zhang at mediatek.com wrote:
-> From: Honghui Zhang <honghui.zhang@mediatek.com>
-> 
-> The clocks was not enabled when enable MSI. This patch fix this
-> issue by calling mtk_pcie_enable_msi in mtk_pcie_startup_port_v2
-> since the clock was all enabled at that time.
-> 
-> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-> ---
->  drivers/pci/controller/pcie-mediatek.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
+Hi Rob,
 
-If this is a fix, and I think it is, I would appreciate a Fixes: tag
-so that we can actully pinpoint the faulty commit.
+On 09/25/2018 09:17 PM, Rob Herring wrote:
+> On Fri, Aug 31, 2018 at 05:01:48PM +0300, Georgi Djakov wrote:
+>> On some Qualcomm SoCs, there is a remote processor, which controls some of
+>> the Network-On-Chip interconnect resources. Other CPUs express their needs
+>> by communicating with this processor. Add a driver to handle communication
+>> with this remote processor.
+> 
+> I don't think you should have a binding nor a separate driver for this. 
+> It's not actually an interconnect provider, so it doesn't belong in 
+> bindings/interconnect. And it just looks like abuse of DT to instantiate 
+> some driver.
+
+The idea of this binding here is to represent the remote processor, that
+is also in control of some of the shared interconnect paths. The
+bandwidth needs of the DSPs and modem are also reported to this remote
+processor. It also takes over some of the bandwidth management while the
+application CPU is powered down. So yes, it is also a kind of an
+interconnect provider, so IMO it should be in DT.
+We already have similar DT sub-nodes for remote regulator and clock
+resources and this is just adding another sub-node for the interconnect
+bandwidth related subsystem.
+
+This, together with each separate NoC hardware block (in patch 6/8) are
+building up the whole topology. The configuration of interconnect paths
+consists of a combination of register writes, clock scaling and sending
+a message to the remote processor.
+
+> All the driver amounts to is a 1 function wrapper for RPM_KEY_BW 
+> messages. Can't this be part of the parent?
+
+I am re-using this part for other SoCs and have separated it to avoid
+duplication.
 
 Thanks,
-Lorenzo
-
-> diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
-> index d150be1..be38b38 100644
-> --- a/drivers/pci/controller/pcie-mediatek.c
-> +++ b/drivers/pci/controller/pcie-mediatek.c
-> @@ -572,8 +572,6 @@ static int mtk_pcie_init_irq_domain(struct mtk_pcie_port *port,
->  		ret = mtk_pcie_allocate_msi_domains(port);
->  		if (ret)
->  			return ret;
-> -
-> -		mtk_pcie_enable_msi(port);
->  	}
->  
->  	return 0;
-> @@ -694,6 +692,9 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
->  	val &= ~INTX_MASK;
->  	writel(val, port->base + PCIE_INT_MASK);
->  
-> +	if (IS_ENABLED(CONFIG_PCI_MSI))
-> +		mtk_pcie_enable_msi(port);
-> +
->  	/* Set AHB to PCIe translation windows */
->  	size = mem->end - mem->start;
->  	val = lower_32_bits(mem->start) | AHB2PCIE_SIZE(fls(size));
-> -- 
-> 2.6.4
-> 
+Georgi
