@@ -1,77 +1,49 @@
-From: anshuman.khandual@arm.com (Anshuman Khandual)
-Date: Tue,  2 Oct 2018 17:45:31 +0530
-Subject: [PATCH 4/4] arm64/mm: Enable HugeTLB migration for contiguous bit
- HugeTLB pages
-In-Reply-To: <1538482531-26883-1-git-send-email-anshuman.khandual@arm.com>
-References: <1538482531-26883-1-git-send-email-anshuman.khandual@arm.com>
-Message-ID: <1538482531-26883-5-git-send-email-anshuman.khandual@arm.com>
+From: ioana.ciornei@nxp.com (Ioana Ciornei)
+Date: Tue, 2 Oct 2018 12:16:17 +0000
+Subject: [PATCH] bus: fsl-mc: explicitly define the fsl_mc_command endianness
+Message-ID: <1538482550-7698-1-git-send-email-ioana.ciornei@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let arm64 subscribe to the previously added framework in which architecture
-can inform whether a given huge page size is supported for migration. This
-just overrides the default function arch_hugetlb_migration_supported() and
-enables migration for all possible HugeTLB page sizes on arm64. With this,
-HugeTLB migration support on arm64 now covers all possible HugeTLB options.
+Both the header and the command parameters of the fsl_mc_command are
+64-bit little-endian words. Use the appropriate type to explicitly
+specify their endianness.
 
-        CONT PTE    PMD    CONT PMD    PUD
-        --------    ---    --------    ---
-4K:        64K      2M        32M      1G
-16K:        2M     32M         1G
-64K:        2M    512M        16G
-
-Signed-off-by: Anshuman Khandual <anshuman.khandual@arm.com>
+Signed-off-by: Ioana Ciornei <ioana.ciornei@nxp.com>
 ---
- arch/arm64/include/asm/hugetlb.h |  5 +++++
- arch/arm64/mm/hugetlbpage.c      | 20 ++++++++++++++++++++
- 2 files changed, 25 insertions(+)
+ include/linux/fsl/mc.h | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/include/asm/hugetlb.h b/arch/arm64/include/asm/hugetlb.h
-index e73f685..656f70e 100644
---- a/arch/arm64/include/asm/hugetlb.h
-+++ b/arch/arm64/include/asm/hugetlb.h
-@@ -20,6 +20,11 @@
+diff --git a/include/linux/fsl/mc.h b/include/linux/fsl/mc.h
+index f27cb14..96c54bb 100644
+--- a/include/linux/fsl/mc.h
++++ b/include/linux/fsl/mc.h
+@@ -210,8 +210,8 @@ struct mc_cmd_header {
+ };
  
- #include <asm/page.h>
+ struct fsl_mc_command {
+-	u64 header;
+-	u64 params[MC_CMD_NUM_OF_PARAMS];
++	__le64 header;
++	__le64 params[MC_CMD_NUM_OF_PARAMS];
+ };
  
-+#ifdef CONFIG_ARCH_ENABLE_HUGEPAGE_MIGRATION
-+#define arch_hugetlb_migration_supported arch_hugetlb_migration_supported
-+extern bool arch_hugetlb_migration_supported(struct hstate *h);
-+#endif
-+
- static inline pte_t huge_ptep_get(pte_t *ptep)
+ enum mc_cmd_status {
+@@ -238,11 +238,11 @@ enum mc_cmd_status {
+ /* Command completion flag */
+ #define MC_CMD_FLAG_INTR_DIS	0x01
+ 
+-static inline u64 mc_encode_cmd_header(u16 cmd_id,
+-				       u32 cmd_flags,
+-				       u16 token)
++static inline __le64 mc_encode_cmd_header(u16 cmd_id,
++					  u32 cmd_flags,
++					  u16 token)
  {
- 	return READ_ONCE(*ptep);
-diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index 4eafd9f..28f4795 100644
---- a/arch/arm64/mm/hugetlbpage.c
-+++ b/arch/arm64/mm/hugetlbpage.c
-@@ -27,6 +27,26 @@
- #include <asm/tlbflush.h>
- #include <asm/pgalloc.h>
+-	u64 header = 0;
++	__le64 header = 0;
+ 	struct mc_cmd_header *hdr = (struct mc_cmd_header *)&header;
  
-+#ifdef CONFIG_ARCH_ENABLE_HUGEPAGE_MIGRATION
-+bool arch_hugetlb_migration_supported(struct hstate *h)
-+{
-+	size_t pagesize = huge_page_size(h);
-+
-+	switch (pagesize) {
-+#ifdef CONFIG_ARM64_4K_PAGES
-+	case PUD_SIZE:
-+#endif
-+	case PMD_SIZE:
-+	case CONT_PMD_SIZE:
-+	case CONT_PTE_SIZE:
-+		return true;
-+	}
-+	pr_warn("%s: unrecognized huge page size 0x%lx\n",
-+			__func__, pagesize);
-+	return false;
-+}
-+#endif
-+
- int pmd_huge(pmd_t pmd)
- {
- 	return pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT);
+ 	hdr->cmd_id = cpu_to_le16(cmd_id);
 -- 
-2.7.4
+1.9.1
