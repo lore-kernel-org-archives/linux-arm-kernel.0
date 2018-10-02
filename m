@@ -1,41 +1,48 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Tue,  2 Oct 2018 15:20:26 +0200
-Subject: [PATCH] ARM: makefile: use ARMv3M mode for RiscPC
-In-Reply-To: <CAKv+Gu8NXyfNAzk4Fe=J0QHEEV-txbRAoEcQmjG-6PgCyW5SZg@mail.gmail.com>
-References: <CAKv+Gu8NXyfNAzk4Fe=J0QHEEV-txbRAoEcQmjG-6PgCyW5SZg@mail.gmail.com>
-Message-ID: <20181002132026.14931-1-Jason@zx2c4.com>
+From: tudor.ambarus@microchip.com (Tudor Ambarus)
+Date: Tue, 2 Oct 2018 16:20:37 +0300
+Subject: [PATCH 3/4] ARM: dts: at91: sama5d3_xplained: even nand memory
+ partitions
+In-Reply-To: <20181002132038.27189-1-tudor.ambarus@microchip.com>
+References: <20181002132038.27189-1-tudor.ambarus@microchip.com>
+Message-ID: <20181002132038.27189-4-tudor.ambarus@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The purpose of CONFIG_CPU_32v3 is to avoid ldrh/strh on the RiscPC,
-which is pretty much an ARMv4 device, except its bus will choke on the
-half-words. The way to make the C compiler not output ldrh/strh is with
--march=armv3, which doesn't support them in the ISA. However, this
-prevents certain cryptography code from working that uses instructions
-like umull. Fortunately there's also -march=armv3m that does support
-those, making it possible to continue assembling optimized cryptography
-routines for our beloved RiscPC.
+sama5d3_xplained, sam9x5cm, sama5d2_ptc_ek and sama5d4_xplained nand
+flashes have a common memory map. Even the nand memory partitions to
+match our nand flash map available at:
 
-Signed-off-by: Jason A. Donenfeld <Jason@zx2c4.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Arnd Bergmann <arnd@arndb.de>
+http://www.at91.com/linux4sam/pub/Linux4SAM/SambaSubsections//demo_nandflash_map_lnx4sam5x.png
+
+Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
 ---
- arch/arm/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/at91-sama5d3_xplained.dts | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index d1516f85f25d..7fd4bcaf0721 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -74,7 +74,7 @@ endif
- arch-$(CONFIG_CPU_32v5)		=-D__LINUX_ARM_ARCH__=5 $(call cc-option,-march=armv5te,-march=armv4t)
- arch-$(CONFIG_CPU_32v4T)	=-D__LINUX_ARM_ARCH__=4 -march=armv4t
- arch-$(CONFIG_CPU_32v4)		=-D__LINUX_ARM_ARCH__=4 -march=armv4
--arch-$(CONFIG_CPU_32v3)		=-D__LINUX_ARM_ARCH__=3 -march=armv3
-+arch-$(CONFIG_CPU_32v3)		=-D__LINUX_ARM_ARCH__=3 -march=armv3m
+diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+index 02c1d2958d78..322a744e4363 100644
+--- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
++++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+@@ -297,12 +297,17 @@
  
- # Evaluate arch cc-option calls now
- arch-y := $(arch-y)
+ 						bootloader at 40000 {
+ 							label = "bootloader";
+-							reg = <0x40000 0x80000>;
++							reg = <0x40000 0xc0000>;
+ 						};
+ 
+-						bootloaderenv at c0000 {
++						bootloaderenvred at 100000 {
++							label = "bootloader env redundant";
++							reg = <0x100000 0x40000>;
++						};
++
++						bootloaderenv at 140000 {
+ 							label = "bootloader env";
+-							reg = <0xc0000 0xc0000>;
++							reg = <0x140000 0x40000>;
+ 						};
+ 
+ 						dtb at 180000 {
 -- 
-2.19.0
+2.9.4
