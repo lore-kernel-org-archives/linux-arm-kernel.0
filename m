@@ -1,103 +1,83 @@
-From: salyzyn@android.com (Mark Salyzyn)
-Date: Tue, 2 Oct 2018 08:09:17 -0700
-Subject: RESEND and REBASE arm+arm64+aarch32 vdso rewrite
-In-Reply-To: <20181002100056.GA225812@arrakis.emea.arm.com>
-References: <20181001175845.168430-1-salyzyn@android.com>
- <CALAqxLWCbw0bmYeB9Vfi5wXJcnLRnE0TYxy1h5WkHLehHv8KFg@mail.gmail.com>
- <8c09a380-7bc8-a353-aeb7-6591e6c57f68@android.com>
- <20181002100056.GA225812@arrakis.emea.arm.com>
-Message-ID: <5969f434-4fa2-b984-6014-456f208608b1@android.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 2 Oct 2018 17:27:44 +0200
+Subject: [PATCH] ARM: dts: sun7i: Disable OOB IRQ for brcm wifi on
+ Cubietruck and Banana Pro
+In-Reply-To: <20181001155704.dcqp637vsp2myyph@flea>
+References: <20180930150927.12076-1-hdegoede@redhat.com>
+ <20181001155704.dcqp637vsp2myyph@flea>
+Message-ID: <4b489dcb-e451-6f41-f583-5780bd25c800@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/2018 03:00 AM, Catalin Marinas wrote:
-> On Mon, Oct 01, 2018 at 01:44:52PM -0700, Mark Salyzyn wrote:
->> On 10/01/2018 11:49 AM, John Stultz wrote:
->>> On Mon, Oct 1, 2018 at 10:58 AM, Mark Salyzyn <salyzyn@android.com> wrote:
->>>> Last sent 23 Nov 2016.
->>>>
->>>> The following 23 patches are rebased and resent, and represent a
->>>> rewrite of the arm and arm64 vDSO into C, adding support for arch32
->>>> (32-bit user space hosted 64-bit kernels) and into a common library
->>>> that other (arm, or non-arm) architectures may utilize.
->>> So I feel like this has gone around a few times w/o much comment from
->>> the arm/arm64 maintainers. I'm not sure if there's a reason?
->> I am "forming an opinion"(tm) that ARM is not interested in any work on 32
->> bit arm architectures. They have no manpower that they are willing to devote
->> to this.
-> Actually, we are interested in this work but, TBH, I find it a bit hard
-> to read your series and have postponed looking into it in detail. Just
-> look at the patch numbering/versioning for example:
->
->> [PATCH v5 01/12] arm: vdso: rename vdso_datapage variables
->> [PATCH v5 02/12] arm: vdso: add include file defining __get_datapage()
->> [PATCH v5 03/12] arm: vdso: inline assembler operations to compiler.h
->> [PATCH v5 04/12] arm: vdso: do calculations outside reader loops
->> [PATCH v6 05/12] arm: vdso: Add support for CLOCK_MONOTONIC_RAW
->> [PATCH v5 06/12] arm: vdso: add support for clock_getres
->> [PATCH v5 07/12] arm: vdso: disable profiling
->> [PATCH v5 08/12] arm: vdso: Add ARCH_CLOCK_FIXED_MASK
->> [PATCH v5 09/12] arm: vdso: move vgettimeofday.c to lib/vdso/
->> [PATCH v5 10/12] arm64: vdso: replace gettimeofday.S with global vgettimeofday.C
->> [PATCH v6 11/12] lib: vdso: Add support for CLOCK_BOOTTIME
->> [PATCH v5 12/12] lib: vdso: do not expose gettimeofday, if no arch supported timer
->> [PATCH] lib: vdso: add support for time
->> [PATCH v2 1/3] arm64: compat: Split the sigreturn trampolines and kuser helpers (C sources)
->> [PATCH v2 2/3] arm64: compat: Split the sigreturn trampolines and kuser helpers (assembler sources)
->> [PATCH v2 3/3] arm64: compat: Add CONFIG_KUSER_HELPERS
->> [PATCH] arm64: compat: Expose offset to registers in sigframes
->> [PATCH 1/6] arm64: compat: Use vDSO sigreturn trampolines if available
->> [PATCH 2/6] arm64: elf: Set AT_SYSINFO_EHDR in compat processes
->> [PATCH 3/6] arm64: Refactor vDSO init/setup
->> [PATCH v2 4/6] arm64: compat: Add a 32-bit vDSO
->> [PATCH 5/6] arm64: compat: 32-bit vDSO setup
->> [PATCH 6/6] arm64: Wire up and expose the new compat vDSO
-> The above may look obvious to you as you've worked on it but not to
-> maintainers who have to read lots of other patchsets.
-Because the whole set was not taken, I split them into mostly orthogonal 
-pieces for divide and conquer as requested. I feel so betrayed by the 
-system ;-} :-)
+Hi Maxime,
 
-There is an order, but you will find at least
+On 01-10-18 17:57, Maxime Ripard wrote:
+> Hi Hans,
+> 
+> It's been a while :)
 
-[PATCH v2 1/3] arm64: compat: Split the sigreturn trampolines and kuser helpers (C sources)
-[PATCH v2 2/3] arm64: compat: Split the sigreturn trampolines and kuser helpers (assembler sources)
-[PATCH v2 3/3] arm64: compat: Add CONFIG_KUSER_HELPERS
+Yes it has.
 
-can go independently at first and standalone providing a much needed rework and added security by allowing control over the troublesome kuser helpers.
+> On Sun, Sep 30, 2018 at 05:09:27PM +0200, Hans de Goede wrote:
+>> While doing some brcmfmac driver work I needed to test this also on some
+>> devicetree based boards. So I fired up the good old Cubietruck and when
+>> that would not work a Banana Pro.
+>>
+>> With an unmodified 4.17 kernel both boards intermittently would come up
+>> with non working wifi with the following errors:
+>>
+>>   brcmfmac: brcmf_sdio_bus_rxctl: resumed on timeout
+>>   brcmfmac: brcmf_bus_started: failed: -110
+>>   brcmfmac: brcmf_attach: dongle is not responding: err=-110
+>>   brcmfmac: brcmf_sdio_firmware_callback: brcmf_attach failed
+>>
+>> They would come up this way more often then with actual working wifi,
+>> once this problem happens it seems to require a power-cycle to fix.
+>> Once things work one can safely reboot without hitting the issue.
+>>
+>> I've found that disabling OOB interrupts fixes this. This really is more
+>> of a workaround then a proper fix, but it makes the wifi reliable again
+>> and it does not have much of a downside.
+>>
+>> Using an OOB IRQ instead of the sdio-IRQ mechanism is mostly important to
+>> allow the MMC controller to go into runtime-suspend which is not really an
+>> issue on these boards since they are (usually) not battery powered.
+>>
+>> I've looked at recent brcmfmac and mmc-core changes which may explain this
+>> and I've not found anything. So the most likely culprit is the A20 external
+>> interrupt handling e.g. perhaps it is set to edge instead of level? Either
+>> way I do not have time to further investigate this.
+>>
+>> BugLink: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=908438
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> 
+> Unfortunately, I'd really prefer if we were fixing this properly.
 
->> Despite the gain of 0.4% for screen-on battery life, where Android has a mix
->> of 64 and 32 bit applications, thus still relevant _today_ on 64 bit
->> architectures (providing vDSO32 for 32-bit applications).
-> As Russell said, if that's the only gain, you may need other selling
-> points.
-0.4% screen on means all other components on the phone including the 
-backlight taking power, and _still_ had a measurable power impact adding 
-arm64 vDSO32 (32 arm) applications that are a subset of the phone 
-ecosystem. There are 64-bit phones that have only a 32-bit user space 
-that no doubt will take plenty more from this.
+I understand, but I really already have spend more time on this then
+I wanted to spend on it. If someone has an idea how to fix this I can
+*maybe* run some quick tests, but that is it.
 
-Microbenchmarks for arm32 application on arm64 report ~3-10 fold 
-improvement in performance (time() call being the ten fold improvement, 
-a gain for both arm32 and arm64 applications)
-> The main advantage I see is to avoid code duplication, hence a vdso
-> library that could be shared by arm/arm64/arm64-compat _and_ future or
-> existing architectures that need vdso support.
+> You
+> were saying that the regression has been introduced between 4.17 and
+> 4.18, have you been able to bisect which commit was actually creating
+> this regression?
 
-Thankfully added after being reviewed, but alas increased the complexity 
-of the set to fulfill.
->> ARM has complained that they want them all at one time because individually
->> they represent more work. So the whole set is here ready to go.
-> Having five separate series without a clear dependency between them was
-> worse than the current numbering scheme ;).
+Erm, no what I was trying to say is that I can reproduce the issue
+with 4.17, which is also the version mentioned in the Debian bug about
+the same problem. I've not tried older kernels then 4.17 so I do not
+know when this problem got introduced.
 
-For that I apologize, I allowed others to ask it to be split up and 
-complied.
-> Anyway, since I still think this series is important, some weeks ago I
-> assigned Vincenzo Frascino in my team the task of de-cluttering this
-> patchset and posting it to the list. So we may see a new series later
-> this month (and any feedback welcome).
+> As you suggested, one reason could be the runtime_pm
+> introduction. This can be pretty easily tested by adding a
+> pm_runtime_get_sync call in the probe.
 
-WooHoo (sorry for being so emotional)
+I assume you mean the runtime pm support in the sunxi mmc controller
+driver, right ? When was that first introduced?
 
--- Mark
+I myself actually suspect the external irq handling code, but I
+guess that the runtime pm support code also is a likely cause
+of this.
+
+Regards,
+
+Hans
