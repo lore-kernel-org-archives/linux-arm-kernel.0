@@ -1,88 +1,27 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 2 Oct 2018 09:58:27 +0200
-Subject: [PATCH v6 13/18] kvm: arm64: Switch to per VM IPA limit
-In-Reply-To: <20180926163258.20218-14-suzuki.poulose@arm.com>
-References: <20180926163258.20218-1-suzuki.poulose@arm.com>
- <20180926163258.20218-14-suzuki.poulose@arm.com>
-Message-ID: <ecaafbc4-ea70-d0e6-ced0-8ab90f445e4b@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 2 Oct 2018 10:00:03 +0200
+Subject: [GIT PULL] Allwinner drivers changes for 4.20
+In-Reply-To: <20180929141858.zt3z5lsahbqdhy4z@flea>
+References: <20180929141858.zt3z5lsahbqdhy4z@flea>
+Message-ID: <CAK8P3a3CFfe0m2RTdoRww4erSeT97T8GUc-==Uo9xsQVu7bq_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
-On 9/26/18 6:32 PM, Suzuki K Poulose wrote:
-> Now that we can manage the stage2 page table per VM, switch the
-> configuration details to per VM instance. The VTCR is updated
-> with the values specific to the VM based on the configuration.
-> We store the IPA size and the number of stage2 page table levels
-> for the guest already in VTCR. Decode it back from the vtcr
-> field wherever we need it.
-> 
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Christoffer Dall <cdall@kernel.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+On Sat, Sep 29, 2018 at 4:19 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
 
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
+>   https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-drivers-for-4.20
+>
+> for you to fetch changes up to 69a8c2452caae22008ee170d3ef66e97e9df391e:
+>
+>   dt-bindings: sunxi-sram: add binding for Allwinner H6 SRAM C (2018-09-12 22:40:26 +0800)
+>
+> ----------------------------------------------------------------
+> Allwinner drivers changes for 4.20
+>
+> The H6 is now supported in our SRAM driver bindings, and we have a small
+> Makefile change for the SRAM driver to build it without building the
+> ARCH_SUNXI architecture, especially relevant for the COMPILE_TEST case.
 
-Thanks
+Pulled into next/drivers, thanks!
 
-Eric
-> ---
->  arch/arm64/include/asm/kvm_arm.h        | 2 ++
->  arch/arm64/include/asm/kvm_mmu.h        | 2 +-
->  arch/arm64/include/asm/stage2_pgtable.h | 2 +-
->  arch/arm64/kvm/reset.c                  | 2 +-
->  4 files changed, 5 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-> index f913adb44f93..e4240568cc18 100644
-> --- a/arch/arm64/include/asm/kvm_arm.h
-> +++ b/arch/arm64/include/asm/kvm_arm.h
-> @@ -197,6 +197,8 @@
->  	VTCR_EL2_SL0_TO_LVLS(((vtcr) & VTCR_EL2_SL0_MASK) >> VTCR_EL2_SL0_SHIFT)
->  
->  #define VTCR_EL2_FLAGS			(VTCR_EL2_COMMON_BITS | VTCR_EL2_TGRAN)
-> +#define VTCR_EL2_IPA(vtcr)		(64 - ((vtcr) & VTCR_EL2_T0SZ_MASK))
-> +
->  /*
->   * ARM VMSAv8-64 defines an algorithm for finding the translation table
->   * descriptors in section D4.2.8 in ARM DDI 0487C.a.
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index ac3ca9690bad..77b1af9e64db 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -142,7 +142,7 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
->   */
->  #define KVM_PHYS_SHIFT	(40)
->  
-> -#define kvm_phys_shift(kvm)		KVM_PHYS_SHIFT
-> +#define kvm_phys_shift(kvm)		VTCR_EL2_IPA(kvm->arch.vtcr)
->  #define kvm_phys_size(kvm)		(_AC(1, ULL) << kvm_phys_shift(kvm))
->  #define kvm_phys_mask(kvm)		(kvm_phys_size(kvm) - _AC(1, ULL))
->  
-> diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
-> index 36a0a1165003..c62fe118a898 100644
-> --- a/arch/arm64/include/asm/stage2_pgtable.h
-> +++ b/arch/arm64/include/asm/stage2_pgtable.h
-> @@ -43,7 +43,7 @@
->   */
->  #define stage2_pgtable_levels(ipa)	ARM64_HW_PGTABLE_LEVELS((ipa) - 4)
->  #define STAGE2_PGTABLE_LEVELS		stage2_pgtable_levels(KVM_PHYS_SHIFT)
-> -#define kvm_stage2_levels(kvm)		stage2_pgtable_levels(kvm_phys_shift(kvm))
-> +#define kvm_stage2_levels(kvm)		VTCR_EL2_LVLS(kvm->arch.vtcr)
->  
->  /*
->   * With all the supported VA_BITs and 40bit guest IPA, the following condition
-> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-> index 1ced1e37374e..2bf41e007390 100644
-> --- a/arch/arm64/kvm/reset.c
-> +++ b/arch/arm64/kvm/reset.c
-> @@ -160,7 +160,7 @@ int kvm_arm_config_vm(struct kvm *kvm, unsigned long type)
->  	if (phys_shift > KVM_PHYS_SHIFT)
->  		phys_shift = KVM_PHYS_SHIFT;
->  	vtcr |= VTCR_EL2_T0SZ(phys_shift);
-> -	vtcr |= VTCR_EL2_LVLS_TO_SL0(kvm_stage2_levels(kvm));
-> +	vtcr |= VTCR_EL2_LVLS_TO_SL0(stage2_pgtable_levels(phys_shift));
->  
->  	/*
->  	 * Enable the Hardware Access Flag management, unconditionally
-> 
+     Arnd
