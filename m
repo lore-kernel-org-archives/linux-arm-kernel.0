@@ -1,141 +1,230 @@
-From: duwe@lst.de (Torsten Duwe)
-Date: Tue, 2 Oct 2018 12:02:23 +0200
-Subject: [PATCH v3 2/4] arm64: implement ftrace with regs
-In-Reply-To: <CAKv+Gu8ji7fz_-THmvd-wvod3LqrtBQq4g38UTuo+ke+NZfE9w@mail.gmail.com>
-References: <20181001140910.086E768BC7@newverein.lst.de>
- <20181001141648.1DBED68BDF@newverein.lst.de>
- <CAKv+Gu8ji7fz_-THmvd-wvod3LqrtBQq4g38UTuo+ke+NZfE9w@mail.gmail.com>
-Message-ID: <20181002100223.GA2398@lst.de>
+From: john.garry@huawei.com (John Garry)
+Date: Tue, 2 Oct 2018 11:20:46 +0100
+Subject: perf segmentation fault from NULL dereference
+In-Reply-To: <20180927030035.GF28040@tassilo.jf.intel.com>
+References: <712b7c31-f681-7737-71e7-c028b8d2bba5@huawei.com>
+ <20180927030035.GF28040@tassilo.jf.intel.com>
+Message-ID: <334a114a-bb59-9582-a913-efbb01bd68c5@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 01, 2018 at 05:57:52PM +0200, Ard Biesheuvel wrote:
-> > --- a/arch/arm64/include/asm/ftrace.h
-> > +++ b/arch/arm64/include/asm/ftrace.h
-> > @@ -16,6 +16,17 @@
-> >  #define MCOUNT_ADDR            ((unsigned long)_mcount)
-> >  #define MCOUNT_INSN_SIZE       AARCH64_INSN_SIZE
-> >
-> > +/* DYNAMIC_FTRACE_WITH_REGS is implemented by adding 2 NOPs at the beginning
-> > +   of each function, with the second NOP actually calling ftrace. In contrary
-> > +   to a classic _mcount call, the call instruction to be modified is thus
-> > +   the second one, and not the only one. */
-> 
-> OK, so the first slot will be patched unconditionally to do the 'mov x9, x30' ?
+On 27/09/2018 04:00, Andi Kleen wrote:
+>> Please me let me know if a valid issue so we can get a fix in.
+>
+> If it crashes it must be a valid issue of course.
+>
+> But I'm not sure about your bisect. Hard to see how my patch
+> could cause this. Sometimes bisects go wrong.
+> You verified by just reverting the patch?
 
-Right.
+It no longer reverts cleanly. And the previous patch - 4ca69ca9db3a - 
+did not have this crash:
+root at localhost:~# ./perf_debug_ record -e armv8_pmuv3_0/br_mis_pred/ sleep 1
+[ perf record: Woken up 1 times to write data ]
+[ perf record: Captured and wrote 0.001 MB perf.data (6 samples) ]
+root at localhost:~#
 
-> > +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-> > +#define ARCH_SUPPORTS_FTRACE_OPS 1
-> > +#define REC_IP_BRANCH_OFFSET AARCH64_INSN_SIZE
-> > +#else
-> > +#define REC_IP_BRANCH_OFFSET 0
-> > +#endif
+>
+> First thing I would also try is to run with valgrind or ASan and see if it
+> reports anything.
 
-The main reason for above comment was that a previous reviewer wondered
-about a magic value of "4" for the REC_IP_BRANCH_OFFSET, which is actually
-an insn size. The comment should leave no doubt. I'd leave the LR save
-explanation elsewhere.
+Here's the valgrind output:
+root at localhost:~#valgrind  --leak-check=yes  ./perf_debug_ record -e 
+armv8_pmuv3_0/br_mis_pred/ sleep 1
+==16025== Memcheck, a memory error detector
+==16025== Copyright (C) 2002-2015, and GNU GPL'd, by Julian Seward et al.
+==16025== Using Valgrind-3.11.0 and LibVEX; rerun with -h for copyright info
+==16025== Command: ./perf_debug_ record -e armv8_pmuv3_0/br_mis_pred/ 
+sleep 1
+==16025==
+--16025-- WARNING: unhandled arm64-linux syscall: 168
+--16025-- You may be able to write your own handler.
+--16025-- Read the file README_MISSING_SYSCALL_OR_IOCTL.
+--16025-- Nevertheless we consider this a bug.  Please report
+--16025-- it at http://valgrind.org/support/bug_reports.html.
+--16025-- WARNING: unhandled arm64-linux syscall: 241
+--16025-- You may be able to write your own handler.
+--16025-- Read the file README_MISSING_SYSCALL_OR_IOCTL.
+--16025-- Nevertheless we consider this a bug.  Please report
+--16025-- it at http://valgrind.org/support/bug_reports.html.
+perf_event_open(..., PERF_FLAG_FD_CLOEXEC) failed with unexpected error 
+38 (Function not implemented)
+--16025-- WARNING: unhandled arm64-linux syscall: 241
+--16025-- You may be able to write your own handler.
+--16025-- Read the file README_MISSING_SYSCALL_OR_IOCTL.
+--16025-- Nevertheless we consider this a bug.  Please report
+--16025-- it at http://valgrind.org/support/bug_reports.html.
+perf_event_open(..., 0) failed unexpectedly with error 38 (Function not 
+implemented)
+--16025-- WARNING: unhandled arm64-linux syscall: 241
+--16025-- You may be able to write your own handler.
+--16025-- Read the file README_MISSING_SYSCALL_OR_IOCTL.
+--16025-- Nevertheless we consider this a bug.  Please report
+--16025-- it at http://valgrind.org/support/bug_reports.html.
+--16025-- WARNING: unhandled arm64-linux syscall: 241
+--16025-- You may be able to write your own handler.
+--16025-- Read the file README_MISSING_SYSCALL_OR_IOCTL.
+--16025-- Nevertheless we consider this a bug.  Please report
+--16025-- it at http://valgrind.org/support/bug_reports.html.
+--16025-- WARNING: unhandled arm64-linux syscall: 241
+--16025-- You may be able to write your own handler.
+--16025-- Read the file README_MISSING_SYSCALL_OR_IOCTL.
+--16025-- Nevertheless we consider this a bug.  Please report
+--16025-- it at http://valgrind.org/support/bug_reports.html.
+--16025-- WARNING: unhandled arm64-linux syscall: 241
+--16025-- You may be able to write your own handler.
+--16025-- Read the file README_MISSING_SYSCALL_OR_IOCTL.
+--16025-- Nevertheless we consider this a bug.  Please report
+--16025-- it at http://valgrind.org/support/bug_reports.html.
+Error:
+The sys_perf_event_open() syscall returned with 38 (Function not 
+implemented) for event (armv8_pmuv3_0/br_mis_pred/).
+/bin/dmesg | grep -i perf may provide additional information.
 
-> >         mcount_exit
-> >  ENDPROC(ftrace_caller)
-> > +#else /* CC_USING_PATCHABLE_FUNCTION_ENTRY */
-> > +
-> > +/* Since no -pg or similar compiler flag is used, there should really be
-> > +   no reference to _mcount; so do not define one. Only a function address
-> > +   is needed in order to refer to it. */
-> > +ENTRY(_mcount)
-> > +       ret     /* just in case, prevent any fall through. */
-> > +ENDPROC(_mcount)
-> > +
-> > +ENTRY(ftrace_regs_caller)
-> > +       sub     sp, sp, #S_FRAME_SIZE
-> > +       stp     x29, x9, [sp, #-16]     /* FP/LR link */
-> > +
-> 
-> You cannot write below the stack pointer. So you are missing a
-> trailing ! here. Note that you can fold the sub
-> 
-> stp x29, x9, [sp, #-(S_FRAME_SIZE+16)]!
+==16059==
+==16059== Process terminating with default action of signal 15 (SIGTERM)
+==16059==    at 0x486F974: __read_nocancel (syscall-template.S:84)
+==16059==    by 0x48D02F: read (unistd.h:44)
+==16059==    by 0x48D02F: perf_evlist__prepare_workload (evlist.c:1471)
+==16059==    by 0x41AB0F: __cmd_record (builtin-record.c:898)
+==16059==    by 0x41AB0F: cmd_record (builtin-record.c:1873)
+==16059==    by 0x476C7F: run_builtin (perf.c:302)
+==16059==    by 0x476F37: handle_internal_command (perf.c:354)
+==16059==    by 0x407093: run_argv (perf.c:398)
+==16059==    by 0x407093: main (perf.c:520)
+==16059==
+==16059== HEAP SUMMARY:
+==16059==     in use at exit: 56,239 bytes in 226 blocks
+==16059==   total heap usage: 1,164 allocs, 938 frees, 2,238,979 bytes 
+allocated
+==16059==
+==16059== 12 bytes in 1 blocks are definitely lost in loss record 1 of 6
+==16059==    at 0x4844B88: malloc (in 
+/usr/lib/valgrind/vgpreload_memcheck-arm64-linux.so)
+==16059==
+==16059== 344 bytes in 5 blocks are possibly lost in loss record 3 of 6
+==16059==    at 0x4846CFC: calloc (in 
+/usr/lib/valgrind/vgpreload_memcheck-arm64-linux.so)
+==16059==
+==16059== 5,736 bytes in 125 blocks are possibly lost in loss record 4 of 6
+==16059==    at 0x4844B88: malloc (in 
+/usr/lib/valgrind/vgpreload_memcheck-arm64-linux.so)
+==16059==
+==16059== LEAK SUMMARY:
+==16059==    definitely lost: 12 bytes in 1 blocks
+==16059==    indirectly lost: 0 bytes in 0 blocks
+==16059==      possibly lost: 6,080 bytes in 130 blocks
+==16059==    still reachable: 50,147 bytes in 95 blocks
+==16059==         suppressed: 0 bytes in 0 blocks
+==16059== Reachable blocks (those to which a pointer was found) are not 
+shown.
+==16059== To see them, rerun with: --leak-check=full --show-leak-kinds=all
+==16059==
+==16059== For counts of detected and suppressed errors, rerun with: -v
+==16059== ERROR SUMMARY: 3 errors from 3 contexts (suppressed: 0 from 0)
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025== Warning: invalid file descriptor -1 in syscall close()
+==16025==
+==16025== HEAP SUMMARY:
+==16025==     in use at exit: 26,640 bytes in 209 blocks
+==16025==   total heap usage: 1,202 allocs, 993 frees, 2,455,112 bytes 
+allocated
+==16025==
+==16025== 328 bytes in 7 blocks are definitely lost in loss record 2 of 6
+==16025==    at 0x4844B88: malloc (in 
+/usr/lib/valgrind/vgpreload_memcheck-arm64-linux.so)
+==16025==
+==16025== 344 bytes in 5 blocks are possibly lost in loss record 3 of 6
+==16025==    at 0x4846CFC: calloc (in 
+/usr/lib/valgrind/vgpreload_memcheck-arm64-linux.so)
+==16025==
+==16025== 6,000 bytes in 126 blocks are possibly lost in loss record 5 of 6
+==16025==    at 0x4844B88: malloc (in 
+/usr/lib/valgrind/vgpreload_memcheck-arm64-linux.so)
+==16025==
+==16025== LEAK SUMMARY:
+==16025==    definitely lost: 328 bytes in 7 blocks
+==16025==    indirectly lost: 0 bytes in 0 blocks
+==16025==      possibly lost: 6,344 bytes in 131 blocks
+==16025==    still reachable: 19,968 bytes in 71 blocks
+==16025==         suppressed: 0 bytes in 0 blocks
+==16025== Reachable blocks (those to which a pointer was found) are not 
+shown.
+==16025== To see them, rerun with: --leak-check=full --show-leak-kinds=all
+==16025==
+==16025== For counts of detected and suppressed errors, rerun with: -v
+==16025== ERROR SUMMARY: 3 errors from 3 contexts (suppressed: 0 from 0)
+root at localhost:~#
 
-Very well, but...
+(pretty much the same as previous patch)
 
-> > +       stp     x10, x11, [sp, #S_X10]
-> > +       stp     x12, x13, [sp, #S_X12]
-> > +       stp     x14, x15, [sp, #112]
-> > +       stp     x16, x17, [sp, #128]
-> > +       stp     x18, x19, [sp, #144]
-> > +       stp     x20, x21, [sp, #160]
-> > +       stp     x22, x23, [sp, #176]
-> > +       stp     x24, x25, [sp, #192]
-> > +       stp     x26, x27, [sp, #208]
-> > +
-> 
-> All these will shift by 16 bytes though
-> 
-> I am now wondering if it wouldn't be better to create 2 stack frames:
-> one for the interrupted function, and one for this function.
-> 
-> So something like
-> 
-> stp x29, x9, [sp, #-16]!
-> mov x29, sp
+Cheers,
+John
 
-That's about the way it was before, when you criticised it was
-the wrong way ;-)
-
-> stp x29, x30, [sp, #-(S_FRAME_SIZE + 16]!
-> 
-> ... store all registers including x29 ...
-> 
-> and do another mov x29, sp before calling into the handler. That way
-> everything should be visible on the call stack when we do a backtrace.
-
-I'm not 100% sure, but I think it already is visible correctly. Note
-that the callee has in no way been called yet; control flow is
-immediately diverted to the ftrace_caller.
-
-About using SP as a pt_regs pointer: maybe I can free another register
-for that purpose and thus achieve conformance *and* pretty code.
-
-> 
-> > +       b       ftrace_common
-> > +ENDPROC(ftrace_regs_caller)
-> > +
-> > +ENTRY(ftrace_caller)
-> > +       sub     sp, sp, #S_FRAME_SIZE
-> > +       stp     x29, x9, [sp, #-16]     /* FP/LR link */
-> > +
-> 
-> Same as above
-
-Yes, Steven demanded 2 entry points :)
-
-> >  /*
-> > --- a/arch/arm64/kernel/ftrace.c
-> > +++ b/arch/arm64/kernel/ftrace.c
-> > @@ -65,18 +65,66 @@ int ftrace_update_ftrace_func(ftrace_fun
-> >         return ftrace_modify_code(pc, 0, new, false);
-> >  }
-> >
-> > +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-> > +/* Have the assembler generate a known "mov x9,x30" at compile time. */
-> > +static void notrace noinline __attribute__((used)) mov_x9_x30(void)
-> > +{
-> > +       asm(" .global insn_mov_x9_x30\n"
-> > +                    "insn_mov_x9_x30: mov x9,x30\n" : : : "x9");
-> > +}
-> 
-> You cannot rely on the compiler putting the mov at the beginning. I
-
-As you can see from the asm inline, I tried the more precise assembler
-label, but it didn't work out. With enough optimisation, the mov _is_
-first; but you're right, it's not a good idea to rely on that.
-
-> think some well commented #define should do for the opcode (or did you
-> just remove that?)
-
-Alas, yes I did. I had a define, then run-time generation, and now this
-assembler hack. Looking at the 3, the define would be best, I'd say.
-
-	Torsten
+>
+> -Andi
+>
+> .
+>
