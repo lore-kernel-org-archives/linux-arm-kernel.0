@@ -1,37 +1,48 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Tue,  2 Oct 2018 15:12:41 +0200
-Subject: [PATCH v7 6/8] fs, arm64: untag user address in copy_mount_options
-In-Reply-To: <cover.1538485901.git.andreyknvl@google.com>
-References: <cover.1538485901.git.andreyknvl@google.com>
-Message-ID: <c16db382982a7c2888e1241a455341118cd63b89.1538485901.git.andreyknvl@google.com>
+From: Jason@zx2c4.com (Jason A. Donenfeld)
+Date: Tue, 2 Oct 2018 15:12:44 +0200
+Subject: [PATCH] ARM: makefile: pass -march=armv4 to assembler even on
+ CPU32v3
+In-Reply-To: <CAKv+Gu8NXyfNAzk4Fe=J0QHEEV-txbRAoEcQmjG-6PgCyW5SZg@mail.gmail.com>
+References: <20180930024904.14240-1-Jason@zx2c4.com>
+ <CAK8P3a0grG5OBjwpTeH0fqzoFFBLDH6-oGM4ibzHypUKWedg3A@mail.gmail.com>
+ <CAHmME9rVbKCNJfVBEene0SvhBEm_g7N-XJ26ugoAab1Vj7G_ww@mail.gmail.com>
+ <CAK8P3a3TE8HW0wD9ETCDWMf7quDRx94-2iS6goYDQ18JQ6r=rw@mail.gmail.com>
+ <CAHmME9pFnuRx2F=xeyK8d3bwv3bJY+WvE1KZn__+2oFWS0RCnA@mail.gmail.com>
+ <CAKv+Gu8NXyfNAzk4Fe=J0QHEEV-txbRAoEcQmjG-6PgCyW5SZg@mail.gmail.com>
+Message-ID: <CAHmME9oz2hFRjFeNSDLe59_pYn3HqB+5rWM5KsH7G_bUWaoy7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In copy_mount_options a user address is being subtracted from TASK_SIZE.
-If the address is lower than TASK_SIZE, the size is calculated to not
-allow the exact_copy_from_user() call to cross TASK_SIZE boundary.
-However if the address is tagged, then the size will be calculated
-incorrectly.
+Hey Ard,
 
-Untag the address before subtracting.
+On Tue, Oct 2, 2018 at 3:10 PM Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>
+> It builds but it doesn't run, at least not when built into the kernel
+> proper (which will be the case after random.c moves to this library)
+>
+> Your toolchain is implicitly passing --fix-v4bx to the assembler,
+> which causes it to permit bx instructions in ARMv4 object code, but
+> tag them with special R_ARM_V4BX ELF relocations. The ARM module
+> loader does take these into account, so built as a module, it works.
+> However, when built into the core kernel, we have to rely on the
+> linker to patch this instruction into the ARMv4 equivalent, and a
+> quick check reveals that that is currently not the case.
+>
+> Bottom line: let's not go there.
 
-Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
----
- fs/namespace.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Oh, thanks a bunch for explaining that. Since I wrote the last email
+I've been playing around with as, readelf, and qemu and was slightly
+mystified.
 
-diff --git a/fs/namespace.c b/fs/namespace.c
-index 99186556f8d3..51f763fb9430 100644
---- a/fs/namespace.c
-+++ b/fs/namespace.c
-@@ -2672,7 +2672,7 @@ void *copy_mount_options(const void __user * data)
- 	 * the remainder of the page.
- 	 */
- 	/* copy_from_user cannot cross TASK_SIZE ! */
--	size = TASK_SIZE - (unsigned long)data;
-+	size = TASK_SIZE - (unsigned long)untagged_addr(data);
- 	if (size > PAGE_SIZE)
- 		size = PAGE_SIZE;
- 
--- 
-2.19.0.605.g01d371f741-goog
+>
+> > But anyway,
+> > I'll go with your primary suggestion and we therefore can move ahead
+> > with changing the global cflag to march=armv3m. Would you like me to
+> > submit the patch for this, or would yo like to handle it?
+> >
+>
+> Yes please go ahead.
+
+Alright, incoming in a few minutes.
+
+Jason
