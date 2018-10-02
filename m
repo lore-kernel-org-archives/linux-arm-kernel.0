@@ -1,43 +1,74 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 2 Oct 2018 10:31:10 +0200
-Subject: [GIT PULL] Allwinner H3/H5 changes for 4.20
-In-Reply-To: <CAK8P3a3gF3ywehL-9nkKaiP+JuFtDPXP4RoVo6kLBiEo+_QYgQ@mail.gmail.com>
-References: <20180929140729.gnu7i4q6jvv3dblm@flea>
- <CAK8P3a3gF3ywehL-9nkKaiP+JuFtDPXP4RoVo6kLBiEo+_QYgQ@mail.gmail.com>
-Message-ID: <20181002083110.ohsjkwizvyip7xop@flea>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 2 Oct 2018 10:30:56 +0200
+Subject: [GIT PULL] Renesas ARM64 Based SoC SoC Updates for v4.20
+In-Reply-To: <CAK8P3a0NreOTfL6L+w2WHnC5uf3jELf6ud_wdBZ7iAU3yuf4VA@mail.gmail.com>
+References: <cover.1538127537.git.horms+renesas@verge.net.au>
+ <CAK8P3a0NreOTfL6L+w2WHnC5uf3jELf6ud_wdBZ7iAU3yuf4VA@mail.gmail.com>
+Message-ID: <CAMuHMdWF2XwWbb0-f_RuSYnFfQzLKNW7Foq9XM7cha3QVU+kHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Arnd,
 
-On Tue, Oct 02, 2018 at 10:24:30AM +0200, Arnd Bergmann wrote:
-> On Sat, Sep 29, 2018 at 4:07 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > ----------------------------------------------------------------
-> > Allwinner H3 and H5 DT additions for 4.20
-> >
-> > This is our usual H3/H5 pull request
-> >
-> > The most notable changes are:
-> >   - the video decoding / encoding unit is finally enabled on the H3
-> >   - Mali support for the H5
-> >   - New boards: BananaPi M2+ v1.2, Orange Pi Zero Plus 2 H3 support
-> 
-> Good to see the video unit progress. Is the driver also coming for 4.20?
+On Fri, Sep 28, 2018 at 10:10 PM Arnd Bergmann <arnd@arndb.de> wrote:
+> On Fri, Sep 28, 2018 at 12:21 PM Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > * Add support for RZ/G2E (r8a774c0) and RZ/G2M (r8a774a1) SoCs
+> > * Enable Compare Match Timer (CMT) and Timer Unit (TMU)
+> >   for Renesas SoCs
+> > * Remove no longer needed ARCH_SHMOBILE Kconfig symbol
+>
+> The ARCH_SHMOBILE removal and cleanup is fine, but I wonder about
+> the newly added symbols for specific SoCs. I see you already have a
+> couple of those, but the other manufacturers don't.
+>
+> I think what happened here is that I tried to reject those additions
+> normally, but I never noticed yours. From what I see in drivers,
+> you have additional symbols depending on these in clk, pinctrl,
+> drivers/soc, and the dtb files, so at the very least we can't
+> just drop the config options, but I'd still like to see this work
+> more like other platforms.
 
-It's been merged through the media tree, yes. The only supported codec
-so far is MPEG2 though, but we have patches to enable H264 and H265
-decoding that have been submitted already.
+The main motivation for SoC-specific controls is to avoid including pinctrl
+and (to a lesser extent) clock tables for unused SoCs.  Each pinctrl driver
+consumes a few tens of KiB, each clock driver a few KiB.
+If we remove the SoC-specific ARCH_* controls, the user has to configure
+both pinctrl and clock driver selections, thus trading one user-visible
+symbol for two new user-visible symbols (except for RZ/A and RZ/N,
+where the pinctrl symbols are already visible, to allow reducing kernel
+size).
+Perhaps that is acceptable?
 
-Maxime
+For the smaller parts in drivers/soc/, removing SoC-specific dependencies
+may be viable for R-Car and RZ/G Socs, but not for e.g. RZ/A.  The latter
+may be used without external RAM, and can run with a few MiB of internal
+SRAM, and XIP (with a still out-of-tree patch).
+So at least a family-specific dependency is worth to keep.  For now, RZ/A
+is arm32 only, though.
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181002/37253705/attachment.sig>
+Note that on arm64, there are no family-specific Kconfig symbols yet.
+We just have ARCH_RENESAS, which is also set on arm32.
+So either we introduce e.g. ARCH_RCAR_GEN3 (cfr. ARCH_RCAR_GEN1 and
+ARCH_RCAR_GEN2 or arm32), or use "ARCH_RENESAS && ARM64" for e.g. RST_RCAR
+in drivers/soc/renesas/Kconfig, which currently depends on all R-Car Gen3
+(and RZ/G2) SoCs explicitly.
+Choosing the latter option means we may need to migrate to the former option
+later, once other families appear (e.g. RZ/A SoCs may start using
+Cortex-A53 instead of Cortex-A9 cores).
+
+For the DTB files, I believe we can just remove the dependencies, and
+always build all DTBs.
+
+What do you think?
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
