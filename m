@@ -1,99 +1,88 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 2 Oct 2018 16:59:40 +0900
-Subject: [PATCH v15 07/16] arm64: add image head flag definitions
-In-Reply-To: <20181001125225.7tlfzt5n25sckhyy@lakrids.cambridge.arm.com>
-References: <20180928064841.14117-1-takahiro.akashi@linaro.org>
- <20180928064841.14117-8-takahiro.akashi@linaro.org>
- <20181001125225.7tlfzt5n25sckhyy@lakrids.cambridge.arm.com>
-Message-ID: <20181002075939.GG32578@linaro.org>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 2 Oct 2018 09:58:27 +0200
+Subject: [PATCH v6 13/18] kvm: arm64: Switch to per VM IPA limit
+In-Reply-To: <20180926163258.20218-14-suzuki.poulose@arm.com>
+References: <20180926163258.20218-1-suzuki.poulose@arm.com>
+ <20180926163258.20218-14-suzuki.poulose@arm.com>
+Message-ID: <ecaafbc4-ea70-d0e6-ced0-8ab90f445e4b@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On Mon, Oct 01, 2018 at 01:52:26PM +0100, Mark Rutland wrote:
-> On Fri, Sep 28, 2018 at 03:48:32PM +0900, AKASHI Takahiro wrote:
-> > Those image head's flags will be used later by kexec_file loader.
-> > 
-> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Acked-by: James Morse <james.morse@arm.com>
-> > ---
-> >  arch/arm64/include/asm/boot.h | 15 +++++++++++++++
-> >  arch/arm64/kernel/head.S      |  2 +-
-> >  2 files changed, 16 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm64/include/asm/boot.h b/arch/arm64/include/asm/boot.h
-> > index 355e552a9175..0bab7eed3012 100644
-> > --- a/arch/arm64/include/asm/boot.h
-> > +++ b/arch/arm64/include/asm/boot.h
-> > @@ -5,6 +5,21 @@
-> >  
-> >  #include <asm/sizes.h>
-> >  
-> > +#define ARM64_MAGIC		"ARM\x64"
-> > +
-> > +#define HEAD_FLAG_BE_SHIFT		0
-> > +#define HEAD_FLAG_PAGE_SIZE_SHIFT	1
-> > +#define HEAD_FLAG_BE_MASK		0x1
-> > +#define HEAD_FLAG_PAGE_SIZE_MASK	0x3
-> > +
-> > +#define HEAD_FLAG_BE			1
+Hi Suzuki,
+On 9/26/18 6:32 PM, Suzuki K Poulose wrote:
+> Now that we can manage the stage2 page table per VM, switch the
+> configuration details to per VM instance. The VTCR is updated
+> with the values specific to the VM based on the configuration.
+> We store the IPA size and the number of stage2 page table levels
+> for the guest already in VTCR. Decode it back from the vtcr
+> field wherever we need it.
 > 
-> These already exist in some form in arch/arm64/kernel/image.h; can we
-> please factor those out rather than duplicating them?
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <cdall@kernel.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Sure.
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 
-> I'd be happy if you'd update image.h to use the new HEAD_FLAG_* names,
-> and removed the old definitions.
+Thanks
 
-I want to make sure two things;
-
-1. Do you assume all the existing __HEAD_FLAG_xyz's NOT be renamed
-   (say, to HEAD_FLAG_xyz)?
-
-2. Do you mind removing this check in image.h?
-   (we also need to manage 'CONFIG_EFI' part of image.h.)
-
->       #ifndef LINKER_SCRIPT
->       #error This file should only be included in vmlinux.lds.S
->       #endif
-
-
-Thanks,
--Takahiro Akashi
-
-> > +#define HEAD_FLAG_PAGE_SIZE_4K		1
-> > +#define HEAD_FLAG_PAGE_SIZE_16K		2
-> > +#define HEAD_FLAG_PAGE_SIZE_64K		3
+Eric
+> ---
+>  arch/arm64/include/asm/kvm_arm.h        | 2 ++
+>  arch/arm64/include/asm/kvm_mmu.h        | 2 +-
+>  arch/arm64/include/asm/stage2_pgtable.h | 2 +-
+>  arch/arm64/kvm/reset.c                  | 2 +-
+>  4 files changed, 5 insertions(+), 3 deletions(-)
 > 
-> I appreciate these are new, since we didn't previously need definitions.
+> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> index f913adb44f93..e4240568cc18 100644
+> --- a/arch/arm64/include/asm/kvm_arm.h
+> +++ b/arch/arm64/include/asm/kvm_arm.h
+> @@ -197,6 +197,8 @@
+>  	VTCR_EL2_SL0_TO_LVLS(((vtcr) & VTCR_EL2_SL0_MASK) >> VTCR_EL2_SL0_SHIFT)
+>  
+>  #define VTCR_EL2_FLAGS			(VTCR_EL2_COMMON_BITS | VTCR_EL2_TGRAN)
+> +#define VTCR_EL2_IPA(vtcr)		(64 - ((vtcr) & VTCR_EL2_T0SZ_MASK))
+> +
+>  /*
+>   * ARM VMSAv8-64 defines an algorithm for finding the translation table
+>   * descriptors in section D4.2.8 in ARM DDI 0487C.a.
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index ac3ca9690bad..77b1af9e64db 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -142,7 +142,7 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
+>   */
+>  #define KVM_PHYS_SHIFT	(40)
+>  
+> -#define kvm_phys_shift(kvm)		KVM_PHYS_SHIFT
+> +#define kvm_phys_shift(kvm)		VTCR_EL2_IPA(kvm->arch.vtcr)
+>  #define kvm_phys_size(kvm)		(_AC(1, ULL) << kvm_phys_shift(kvm))
+>  #define kvm_phys_mask(kvm)		(kvm_phys_size(kvm) - _AC(1, ULL))
+>  
+> diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
+> index 36a0a1165003..c62fe118a898 100644
+> --- a/arch/arm64/include/asm/stage2_pgtable.h
+> +++ b/arch/arm64/include/asm/stage2_pgtable.h
+> @@ -43,7 +43,7 @@
+>   */
+>  #define stage2_pgtable_levels(ipa)	ARM64_HW_PGTABLE_LEVELS((ipa) - 4)
+>  #define STAGE2_PGTABLE_LEVELS		stage2_pgtable_levels(KVM_PHYS_SHIFT)
+> -#define kvm_stage2_levels(kvm)		stage2_pgtable_levels(kvm_phys_shift(kvm))
+> +#define kvm_stage2_levels(kvm)		VTCR_EL2_LVLS(kvm->arch.vtcr)
+>  
+>  /*
+>   * With all the supported VA_BITs and 40bit guest IPA, the following condition
+> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+> index 1ced1e37374e..2bf41e007390 100644
+> --- a/arch/arm64/kvm/reset.c
+> +++ b/arch/arm64/kvm/reset.c
+> @@ -160,7 +160,7 @@ int kvm_arm_config_vm(struct kvm *kvm, unsigned long type)
+>  	if (phys_shift > KVM_PHYS_SHIFT)
+>  		phys_shift = KVM_PHYS_SHIFT;
+>  	vtcr |= VTCR_EL2_T0SZ(phys_shift);
+> -	vtcr |= VTCR_EL2_LVLS_TO_SL0(kvm_stage2_levels(kvm));
+> +	vtcr |= VTCR_EL2_LVLS_TO_SL0(stage2_pgtable_levels(phys_shift));
+>  
+>  	/*
+>  	 * Enable the Hardware Access Flag management, unconditionally
 > 
-> Thanks,
-> Mark.
-> 
-> > +
-> > +#define head_flag_field(flags, field) \
-> > +		(((flags) >> field##_SHIFT) & field##_MASK)
-> > +
-> >  /*
-> >   * arm64 requires the DTB to be 8 byte aligned and
-> >   * not exceed 2MB in size.
-> > diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> > index b0853069702f..8cbac6232ed1 100644
-> > --- a/arch/arm64/kernel/head.S
-> > +++ b/arch/arm64/kernel/head.S
-> > @@ -91,7 +91,7 @@ _head:
-> >  	.quad	0				// reserved
-> >  	.quad	0				// reserved
-> >  	.quad	0				// reserved
-> > -	.ascii	"ARM\x64"			// Magic number
-> > +	.ascii	ARM64_MAGIC			// Magic number
-> >  #ifdef CONFIG_EFI
-> >  	.long	pe_header - _head		// Offset to the PE header.
-> >  
-> > -- 
-> > 2.19.0
-> > 
