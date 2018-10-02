@@ -1,32 +1,92 @@
 From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Tue,  2 Oct 2018 20:11:58 +0900
-Subject: [PATCH 0/4] Add UniPhier USB3 controller and USB2 phy nodes
-Message-ID: <1538478722-20351-1-git-send-email-hayashi.kunihiko@socionext.com>
+Date: Tue,  2 Oct 2018 20:12:00 +0900
+Subject: [PATCH 2/4] ARM: dts: uniphier: Add USB2 phy nodes
+In-Reply-To: <1538478722-20351-1-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1538478722-20351-1-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <1538478722-20351-3-git-send-email-hayashi.kunihiko@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds the DT nodes for USB3 controllers and USB2 phys
-implemented on UniPhier SoCs.
+Add nodes of USB2 physical layer for UniPhier SoC. This supports Pro4.
 
-Kunihiko Hayashi (4):
-  ARM: dts: uniphier: Add USB3 controller nodes
-  ARM: dts: uniphier: Add USB2 phy nodes
-  arm64: dts: uniphier: Add USB3 controller nodes
-  arm64: dts: uniphier: Add USB2 phy nodes
+Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+---
+ arch/arm/boot/dts/uniphier-pro4.dtsi | 35 ++++++++++++++++++++++++++++++++++-
+ 1 file changed, 34 insertions(+), 1 deletion(-)
 
- arch/arm/boot/dts/uniphier-pro4-ace.dts            |   8 +
- arch/arm/boot/dts/uniphier-pro4-ref.dts            |   8 +
- arch/arm/boot/dts/uniphier-pro4.dtsi               | 127 +++++++++++
- arch/arm/boot/dts/uniphier-pxs2-gentil.dts         |   8 +
- arch/arm/boot/dts/uniphier-pxs2-vodka.dts          |   4 +
- arch/arm/boot/dts/uniphier-pxs2.dtsi               | 180 ++++++++++++++++
- arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi   |  27 +++
- .../boot/dts/socionext/uniphier-ld20-global.dts    |   4 +
- .../arm64/boot/dts/socionext/uniphier-ld20-ref.dts |   4 +
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi   | 194 +++++++++++++++++
- .../arm64/boot/dts/socionext/uniphier-pxs3-ref.dts |   8 +
- arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi   | 240 +++++++++++++++++++++
- 12 files changed, 812 insertions(+)
-
+diff --git a/arch/arm/boot/dts/uniphier-pro4.dtsi b/arch/arm/boot/dts/uniphier-pro4.dtsi
+index b994494..4b2e291 100644
+--- a/arch/arm/boot/dts/uniphier-pro4.dtsi
++++ b/arch/arm/boot/dts/uniphier-pro4.dtsi
+@@ -269,6 +269,8 @@
+ 				 <&mio_clk 12>;
+ 			resets = <&sys_rst 8>, <&mio_rst 7>, <&mio_rst 8>,
+ 				 <&mio_rst 12>;
++			phy-names = "usb";
++			phys = <&usb_phy0>;
+ 			has-transaction-translator;
+ 		};
+ 
+@@ -283,6 +285,8 @@
+ 				 <&mio_clk 13>;
+ 			resets = <&sys_rst 8>, <&mio_rst 7>, <&mio_rst 9>,
+ 				 <&mio_rst 13>;
++			phy-names = "usb";
++			phys = <&usb_phy1>;
+ 			has-transaction-translator;
+ 		};
+ 
+@@ -294,6 +298,34 @@
+ 			pinctrl: pinctrl {
+ 				compatible = "socionext,uniphier-pro4-pinctrl";
+ 			};
++
++			usb-phy {
++				compatible = "socionext,uniphier-pro4-usb2-phy";
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				usb_phy0: phy at 0 {
++					reg = <0>;
++					#phy-cells = <0>;
++				};
++
++				usb_phy1: phy at 1 {
++					reg = <1>;
++					#phy-cells = <0>;
++				};
++
++				usb_phy2: phy at 2 {
++					reg = <2>;
++					#phy-cells = <0>;
++					vbus-supply = <&usb0_vbus>;
++				};
++
++				usb_phy3: phy at 3 {
++					reg = <3>;
++					#phy-cells = <0>;
++					vbus-supply = <&usb1_vbus>;
++				};
++			};
+ 		};
+ 
+ 		soc-glue at 5f900000 {
+@@ -397,7 +429,7 @@
+ 			clock-names = "ref", "bus_early", "suspend";
+ 			clocks = <&sys_clk 12>, <&sys_clk 12>, <&sys_clk 12>;
+ 			resets = <&usb0_rst 4>;
+-			phys = <&usb0_ssphy>;
++			phys = <&usb_phy2>, <&usb0_ssphy>;
+ 			dr_mode = "host";
+ 		};
+ 
+@@ -450,6 +482,7 @@
+ 			clock-names = "ref", "bus_early", "suspend";
+ 			clocks = <&sys_clk 12>, <&sys_clk 12>, <&sys_clk 12>;
+ 			resets = <&usb1_rst 4>;
++			phys = <&usb_phy3>;
+ 			dr_mode = "host";
+ 		};
+ 
 -- 
 2.7.4
