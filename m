@@ -1,37 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 2 Oct 2018 11:59:25 +0200
-Subject: [GIT PULL] i.MX fixes for 4.19, round 2
-In-Reply-To: <20181001023923.GQ26692@dragon>
-References: <20181001023923.GQ26692@dragon>
-Message-ID: <CAK8P3a1e8+HMwsFjE5AJW1E8M309dTkXHLqQb0Dne1gO_n61vg@mail.gmail.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Tue,  2 Oct 2018 12:00:37 +0200
+Subject: [PATCH] nvmem: lpc18xx_eeprom: remove unused variable
+Message-ID: <20181002100037.32378-1-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 1, 2018 at 4:39 AM Shawn Guo <shawnguo@kernel.org> wrote:
->
-> The following changes since commit 57361846b52bc686112da6ca5368d11210796804:
->
->   Linux 4.19-rc2 (2018-09-02 14:37:30 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.19-2
->
-> for you to fetch changes up to 4d8d4712e47c028306149bda04b79f70325aefb0:
->
->   soc: imx: gpc: set DMA mask for PD platform devices (2018-09-26 10:38:38 +0800)
->
-> ----------------------------------------------------------------
-> i.MX fixes for 4.19, round 2:
->  - There appears an uninitialized DMA mask warning on i.MX GPC driver
->    with 4.19-rc kernel.  Set the DMA mask for powerdomain platform
->    device to fix the warning given by device core.
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-I don't think this is the right fix, we should generally not just make up a dma
-mask pointer.
+Remove a variable that's no longer used from lpc18xx_eeprom_remove().
 
-Lucas, do you have any more information regarding that warning?
-Are we trying to do DMA on a virtual device? What operation
-causes that warning?
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+ drivers/nvmem/lpc18xx_eeprom.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-      Arnd
+diff --git a/drivers/nvmem/lpc18xx_eeprom.c b/drivers/nvmem/lpc18xx_eeprom.c
+index b42dbaddb419..66cff1e2147a 100644
+--- a/drivers/nvmem/lpc18xx_eeprom.c
++++ b/drivers/nvmem/lpc18xx_eeprom.c
+@@ -255,7 +255,6 @@ static int lpc18xx_eeprom_probe(struct platform_device *pdev)
+ static int lpc18xx_eeprom_remove(struct platform_device *pdev)
+ {
+ 	struct lpc18xx_eeprom_dev *eeprom = platform_get_drvdata(pdev);
+-	int ret;
+ 
+ 	clk_disable_unprepare(eeprom->clk);
+ 
+-- 
+2.19.0
