@@ -1,42 +1,38 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 2 Oct 2018 11:28:16 +0200
-Subject: [GIT PULL] Allwinner arm64 DT changes for 4.20
-In-Reply-To: <CAK8P3a3qoz2rY2PLxBpLpr+7uFD9jwbWNAipD4RNC1bH9b9b_Q@mail.gmail.com>
-References: <20180929145659.73sto3j7235jg6b6@flea>
- <CAK8P3a3qoz2rY2PLxBpLpr+7uFD9jwbWNAipD4RNC1bH9b9b_Q@mail.gmail.com>
-Message-ID: <20181002092816.g42dlxegxm7j7qjk@flea>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 2 Oct 2018 11:41:13 +0200
+Subject: [GIT PULL 3/5] i.MX device tree updates for 4.20
+In-Reply-To: <20181001072003.16238-3-shawnguo@kernel.org>
+References: <20181001072003.16238-1-shawnguo@kernel.org>
+ <20181001072003.16238-3-shawnguo@kernel.org>
+Message-ID: <CAK8P3a11OXxQ-vf2fXTnr1Dqx5Bgvext26orEpM99ZTQJTGngg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 02, 2018 at 11:02:21AM +0200, Arnd Bergmann wrote:
-> On Sat, Sep 29, 2018 at 4:57 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> 
-> > ----------------------------------------------------------------
-> > Allwinner arm64 DT changes for 4.20
-> >
-> > Our usual set of DT changes for the arm64 Allwinner SoCs.
-> >
-> > The most notable things are:
-> >   - HDMI support on the A64
-> >   - New boards: OrangePi One Plus
-> 
-> I just had a look at the OrangePi One Plus, that seems to be a particularly
-> nice combination of low price and (possibly) low power consumption with
-> the 28nm CPU and LPDDR3 memory. How well does it work in practice?
+On Mon, Oct 1, 2018 at 9:20 AM Shawn Guo <shawnguo@kernel.org> wrote:
+>
+> ----------------------------------------------------------------
+> i.MX device tree update for 4.20:
+>  - New board support: Engicam's i.Core MX6 CPU module v1.5; ConnectCore
+>    6UL Single Board Computer (SBC) Pro; i.MX6 ULZ based EVK board.
+>  - Add Add SFF interface support for vf610-zii board.
+>  - Disable unneeded devices like VPU and internal watchdog for imx51-zii
+>    boards.
+>  - Add 'no-sdio' and 'no-sd' property for vf610-zii-cfu1 board.
+>  - Improve i.MX6 SLL GPIO support by adding gpio-ranges property and
+>    clocks information.
+>  - Update iomux header for i.MX7 Solo and i.MX6 ULL.
+>  - Enable GPIO buttons as wakeup source for imx7d-sdb and imx6sx-sdb.
+>  - Add GPIO keys and egalax touch screen support for imx6qdl-sabreauto.
+>  - Switch to use SPDX-License-Identifier for more boards - vf610-twr,
+>    imx7s-warp, Engicam boards.
+>  - Add device tree bindings of 'fsl,pmic-stby-poweroff' property and add
+>    the support for i.MX6 RIoTboard.
+>  - DTC has new checks for SPI buses which will be landed on 4.20.
+>    A patch from Rob to fix those 100+ warnings on i.MX boards. (Thanks!)
+>  - Switch i.MX7 device tree to use updated coresight binding for
+>    hardware ports.
+>  - Misc small or random update and cleanup.
 
-The support is really early at that point. There's basically only
-support for the UART and the MMC, but it definitely looks promising :)
+Pulled into next/dt, thanks!
 
-Maxime
-
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181002/32056b98/attachment.sig>
+      Arnd
