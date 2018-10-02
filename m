@@ -1,94 +1,43 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 2 Oct 2018 15:29:46 +0200
-Subject: [linux-sunxi] Re: [PATCH 08/12] drm/sun4i: sun6i_mipi_dsi:
- Refactor vertical video start delay
-In-Reply-To: <c6933daf-c445-ade4-a31b-f311ddae7256@openedev.com>
-References: <20180927114850.24565-1-jagan@amarulasolutions.com>
- <20180927114850.24565-9-jagan@amarulasolutions.com>
- <20180927171451.7iqt2nt2log5qojf@flea>
- <CAMty3ZDxpLwVDsgVMjX+6+uz89sQ1aZaXHHZ+-5aogrA4MHmqw@mail.gmail.com>
- <20180929152758.g3goxwjud2ym5rft@flea>
- <c6933daf-c445-ade4-a31b-f311ddae7256@openedev.com>
-Message-ID: <20181002132946.edwzz2bu3n563624@flea>
+From: tudor.ambarus@microchip.com (Tudor Ambarus)
+Date: Tue, 2 Oct 2018 16:20:35 +0300
+Subject: [PATCH 1/4] ARM: dts: at91: sama5d2_ptc_ek: fix bootloader env offsets
+In-Reply-To: <20181002132038.27189-1-tudor.ambarus@microchip.com>
+References: <20181002132038.27189-1-tudor.ambarus@microchip.com>
+Message-ID: <20181002132038.27189-2-tudor.ambarus@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 01, 2018 at 01:25:59PM +0530, Jagan Teki wrote:
-> On Saturday 29 September 2018 08:57 PM, Maxime Ripard wrote:
-> > On Thu, Sep 27, 2018 at 11:03:19PM +0530, Jagan Teki wrote:
-> > > On Thu, Sep 27, 2018 at 10:44 PM Maxime Ripard
-> > > <maxime.ripard@bootlin.com> wrote:
-> > > > 
-> > > > On Thu, Sep 27, 2018 at 05:18:46PM +0530, Jagan Teki wrote:
-> > > > > Accordingly to BPI-M64-bsp DE DSI code Video start delay
-> > > > > can be computed by subtracting total vertical timing with
-> > > > > front porch timing and with adding 1 delay line for TCON.
-> > > > 
-> > > > This is what the current code is doing as well.
-> > > 
-> > > The current code
-> > > return mode->vtotal - (mode->vsync_end - mode->vdisplay) + 1;
-> > > 
-> > > (mode->vsync_end - mode->vdisplay) = front porch + sync
-> > > 
-> > > but I'm updating here only front porch.
-> > > 
-> > > > 
-> > > > > This patch simply add the start_delay logic from BPI-M64-bsp,
-> > > > > w/o this new computation, the DSI on A64 encounter vblank time out.
-> > > > > 
-> > > > > [CRTC:36:crtc-0] vblank wait timed out
-> > > > > 
-> > > > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > > > > ---
-> > > > >   drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 12 +++++++++++-
-> > > > >   1 file changed, 11 insertions(+), 1 deletion(-)
-> > > > > 
-> > > > > diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > > > > index 9918fdb990ff..217db74c6dc3 100644
-> > > > > --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > > > > +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > > > > @@ -358,7 +358,17 @@ static void sun6i_dsi_inst_init(struct sun6i_dsi *dsi,
-> > > > >   static u16 sun6i_dsi_get_video_start_delay(struct sun6i_dsi *dsi,
-> > > > >                                           struct drm_display_mode *mode)
-> > > > >   {
-> > > > > -     return mode->vtotal - (mode->vsync_end - mode->vdisplay) + 1;
-> > > > > +     u32 vfp = mode->vsync_start - mode->vdisplay;
-> > > 
-> > > let me explain this.
-> > > 
-> > > Actual code from Allwinner
-> > > u32 vfp = panel->lcd_vt - panel->lcd_y - panel->lcd_vbp;
-> > > 
-> > > So,
-> > > 
-> > > => (panel->lcd_vt - panel->lcd_y) - (panel->lcd_vbp)
-> > > => (front porch + sync + back porch) - (back porch + sync)
-> > 
-> > Unless Allwinner is doing something fishy, in which case that should
-> > be mentionned, the back porch doesn't contain the sync pulse.
-> 
-> As per as I understand panel->lcd_vbp is not back porch timings value which
-> i used by drm. It is BSP DTS property value and actual back porch is
-> calculated as "panel->lcd_vbp - panel->sync"
-> 
-> timmings->ver_sync_time= panel_info->lcd_vspw;
-> timmings->ver_back_porch= panel_info->lcd_vbp-panel_info->lcd_vspw;
+The offsets for the bootloader environment and its redundant partition
+were inverted. Fix the addresses to match our nand flash map available at:
 
-Then this is what you should have started with in your commit
-log. Where is that code coming from? Have you been able to confirm
-that with an oscilloscope?
+http://www.at91.com/linux4sam/pub/Linux4SAM/SambaSubsections//demo_nandflash_map_lnx4sam5x.png
 
-Maxime
+Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
+---
+ arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts b/arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts
+index b10dccd0958f..bb08f8344128 100644
+--- a/arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts
++++ b/arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts
+@@ -91,13 +91,13 @@
+ 							reg = <0x40000 0xc0000>;
+ 						};
+ 
+-						bootloaderenv at 0x100000 {
+-							label = "bootloader env";
++						bootloaderenvred at 0x100000 {
++							label = "bootloader env redundant";
+ 							reg = <0x100000 0x40000>;
+ 						};
+ 
+-						bootloaderenvred at 0x140000 {
+-							label = "bootloader env redundant";
++						bootloaderenv at 0x140000 {
++							label = "bootloader env";
+ 							reg = <0x140000 0x40000>;
+ 						};
+ 
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181002/78dac671/attachment.sig>
+2.9.4
