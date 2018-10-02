@@ -1,49 +1,63 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue,  2 Oct 2018 11:43:50 +0200
-Subject: [PATCH v2] nvmem: fix nvmem_cell_get_from_lookup()
-Message-ID: <20181002094350.17649-1-brgl@bgdev.pl>
+From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
+Date: Tue,  2 Oct 2018 11:45:29 +0200
+Subject: [PATCH] ARM: OMAP1: ams-delta: Fix impossible .irq < 0
+In-Reply-To: <20181001102453.GA18947@mwanda>
+References: <20181001102453.GA18947@mwanda>
+Message-ID: <20181002094529.30564-1-jmkrzyszt@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Since the very beginning, unsigned int .irq member of struct
+plat_serial8250_port introduced by commit eff443df679e ("OMAP1:
+AMS_DELTA: add modem support") was statically initialized to a negative
+value -EINVAL.  Moreover, commit 0812db943748 ("ARM: OMAP1: ams-delta:
+assign MODEM IRQ from GPIO descriptor") has introduced some new code
+which checks for that member carrying a negative value which is
+impossible.
 
-We check if the pointer returned by __nvmem_device_get() is not NULL
-while we should actually check if it is not IS_ERR(nvmem). Fix it.
+Use IRQ_NOTCONNECTED instead of -EINVAL. Also, drop the valueless check
+and let the modem device be registered regardless of .irq value, and
+the value handled by "serial8250" driver.
 
-While we're at it: fix the next error path where we should assign an
-error value to cell before returning.
-
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Fixes: 0812db943748 ("ARM: OMAP1: ams-delta: assign MODEM IRQ from GPIO descriptor")
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
 ---
-v1 -> v2:
-- use ERR_CAST() instead of a direct pointer cast
+ arch/arm/mach-omap1/board-ams-delta.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
- drivers/nvmem/core.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index ad1227df1984..f49474e1ad49 100644
---- a/drivers/nvmem/core.c
-+++ b/drivers/nvmem/core.c
-@@ -952,9 +952,9 @@ nvmem_cell_get_from_lookup(struct device *dev, const char *con_id)
- 		    (strcmp(lookup->con_id, con_id) == 0)) {
- 			/* This is the right entry. */
- 			nvmem = __nvmem_device_get(NULL, lookup->nvmem_name);
--			if (!nvmem) {
-+			if (IS_ERR(nvmem)) {
- 				/* Provider may not be registered yet. */
--				cell = ERR_PTR(-EPROBE_DEFER);
-+				cell = ERR_CAST(nvmem);
- 				goto out;
- 			}
+diff --git a/arch/arm/mach-omap1/board-ams-delta.c b/arch/arm/mach-omap1/board-ams-delta.c
+index af318d958fd2..3d191fd52910 100644
+--- a/arch/arm/mach-omap1/board-ams-delta.c
++++ b/arch/arm/mach-omap1/board-ams-delta.c
+@@ -773,7 +773,7 @@ static struct plat_serial8250_port ams_delta_modem_ports[] = {
+ 	{
+ 		.membase	= IOMEM(MODEM_VIRT),
+ 		.mapbase	= MODEM_PHYS,
+-		.irq		= -EINVAL, /* changed later */
++		.irq		= IRQ_NOTCONNECTED, /* changed later */
+ 		.flags		= UPF_BOOT_AUTOCONF,
+ 		.irqflags	= IRQF_TRIGGER_RISING,
+ 		.iotype		= UPIO_MEM,
+@@ -864,8 +864,7 @@ static int __init modem_nreset_init(void)
  
-@@ -962,6 +962,7 @@ nvmem_cell_get_from_lookup(struct device *dev, const char *con_id)
- 						       lookup->cell_name);
- 			if (!cell) {
- 				__nvmem_device_put(nvmem);
-+				cell = ERR_PTR(-ENOENT);
- 				goto out;
- 			}
- 		}
+ 
+ /*
+- * This function expects MODEM IRQ number already assigned to the port
+- * and fails if it's not.
++ * This function expects MODEM IRQ number already assigned to the port.
+  * The MODEM device requires its RESET# pin kept high during probe.
+  * That requirement can be fulfilled in several ways:
+  * - with a descriptor of already functional modem_nreset regulator
+@@ -888,9 +887,6 @@ static int __init ams_delta_modem_init(void)
+ 	if (!machine_is_ams_delta())
+ 		return -ENODEV;
+ 
+-	if (ams_delta_modem_ports[0].irq < 0)
+-		return ams_delta_modem_ports[0].irq;
+-
+ 	omap_cfg_reg(M14_1510_GPIO2);
+ 
+ 	/* Initialize the modem_nreset regulator consumer before use */
 -- 
-2.19.0
+2.16.4
