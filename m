@@ -1,60 +1,35 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 2 Oct 2018 12:53:25 +0200
-Subject: [PATCH v3 2/4] firmware: xilinx: Add zynqmp IOCTL API for device
- control
-In-Reply-To: <CAOesGMixcQS605kmpW+n-yWBGWu4Dz5SXH396mrWCUfQjfcWcQ@mail.gmail.com>
-References: <1537985581-32164-1-git-send-email-jollys@xilinx.com>
- <1537985581-32164-3-git-send-email-jollys@xilinx.com>
- <CAOesGMhEcMB4caAPtCSq-m5zQBDc-8Z4f_xAkomnEwVaHyX2Mw@mail.gmail.com>
- <BL2PR02MB21308D0B6AF76A8094E70863B8EC0@BL2PR02MB2130.namprd02.prod.outlook.com>
- <CAOesGMiUnVrnW1VDh1CKRKGpkwAC9G8tiHjpb+7bss6LpPWU-A@mail.gmail.com>
- <2350f5c3-b59e-b37b-c679-5b0a36f9a79c@xilinx.com>
- <CAOesGMixcQS605kmpW+n-yWBGWu4Dz5SXH396mrWCUfQjfcWcQ@mail.gmail.com>
-Message-ID: <3b9ddd6a-7965-af51-cae5-4135f34de6c4@xilinx.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 02 Oct 2018 11:57:48 +0100
+Subject: [PATCH v6 00/14] Add System Error Interrupt support to Armada SoCs
+In-Reply-To: <20181001141358.31508-1-miquel.raynal@bootlin.com>
+References: <20181001141358.31508-1-miquel.raynal@bootlin.com>
+Message-ID: <86a7nwvcnn.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1.10.2018 19:26, Olof Johansson wrote:
-> On Mon, Oct 1, 2018 at 6:17 AM Michal Simek <michal.simek@xilinx.com> wrote:
->>
->> Hi,
->>
->> On 28.9.2018 23:12, Olof Johansson wrote:
->>> On Fri, Sep 28, 2018 at 10:15 AM Jolly Shah <JOLLYS@xilinx.com> wrote:
->>>>
->>>> Hi Olof,
->>>>
->>>> Thanks for the review. Pushed v4 with suggested fixes. Let us know if series looks good and we can create pull request for same.
->>>>
->>>> Thanks,
->>>> Jolly Shah
->>>
->>> I'm happy with this one, thanks for revising the patchset with the fixes.
->>>
->>> Feel free to add:
->>>
->>> Acked-by: Olof Johansson <olof@lixom.net>
->>>
->>> to the patches.
->>
->> Just for clarification. I have checked driver/clk and patches should
->> still go via Michael or Stephen.
->> Firmware code is already in arm-soc tree that's why I would expect
->> Michael/Stephen should review it and then it shouldn't be a problem to
->> take this via arm-soc tree.
->>
->> Olof: Please correct me if I am wrong and you are happy to take it via
->> arm-soc directly.
+On Mon, 01 Oct 2018 15:13:44 +0100,
+Miquel Raynal <miquel.raynal@bootlin.com> wrote:
 > 
-> Honestly it might be easiest for you to prepare one branch and send to
-> all parties in case you have contents you expect to go on top, but
-> besides that I'd be fine with merging through either tree.
+> The ICU is an IRQ chip found in Armada CP110. It currently has 207 wired
+> inputs. Its purpose is to aggregate all CP interrupts and report them to
+> the AP through MSIs. The ICU writes into GIC registers (AP side) by way
+> of the interconnect. These interrupts can be of several groups:
+> - SecuRe (SR);
+> - Non-SecuRe (NSR);
+> - System Error Interrupts (SEI);
+> - RAM Error Interrupts (REI);
+> - ...
+> Each ICU wired interrupt can be of any of these groups. The group is
+> encoded in the MSI payload.
 
-ok.
+[...]
 
-Stephen: Can you please take a look at 4/4?
-dt binding was already reviewed that's when we have ACK from 4/4 I will
-prepare that branch.
+I'm now ready to queue patches 1 through to 11 (with patches 6 and 9
+as of v7). Who is picking up the DT patches (12 to 14)?
 
 Thanks,
-Michal
+
+	M.
+
+-- 
+Jazz is not dead, it just smell funny.
