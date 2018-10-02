@@ -1,41 +1,50 @@
-From: david@lechnology.com (David Lechner)
-Date: Tue, 2 Oct 2018 10:28:44 -0500
-Subject: [PATCH v7 2/4] clk: davinci: kill
- davinci_clk_reset_assert/deassert()
-In-Reply-To: <CAMRc=McmwWt5OdCxGntDJ-5cxte+Ad2FJcnmWT8NxnBtzP40DA@mail.gmail.com>
-References: <20180621073706.22812-1-brgl@bgdev.pl>
- <20180621073706.22812-3-brgl@bgdev.pl>
- <160f4225-236c-af54-9693-120e834af578@lechnology.com>
- <CAMRc=McmwWt5OdCxGntDJ-5cxte+Ad2FJcnmWT8NxnBtzP40DA@mail.gmail.com>
-Message-ID: <159d6244-8077-e21f-36d9-ccb1eeb3ed78@lechnology.com>
+From: ville.syrjala@linux.intel.com (Ville =?iso-8859-1?Q?Syrj=E4l=E4?=)
+Date: Tue, 2 Oct 2018 18:34:56 +0300
+Subject: [Intel-gfx] [PATCH 09/18] drm/atmel: Drop transitional hooks
+In-Reply-To: <20181002133526.13685-10-daniel.vetter@ffwll.ch>
+References: <20181002133526.13685-1-daniel.vetter@ffwll.ch>
+ <20181002133526.13685-10-daniel.vetter@ffwll.ch>
+Message-ID: <20181002153456.GY9144@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/2018 10:08 AM, Bartosz Golaszewski wrote:
-> pt., 6 lip 2018 o 19:54 David Lechner <david@lechnology.com> napisa?(a):
->>
->> On 06/21/2018 02:37 AM, Bartosz Golaszewski wrote:
->>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>
->>> This code is no longer used. Remove it.
->>>
->>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>> Reviewed-by: David Lechner <david@lechnology.com>
->>> Acked-by: Stephen Boyd <sboyd@kernel.org>
->>> ---
->>
->> I've picked this up in clk-davinci-4.20, so it will just hang out
->> there for a while until the rest of this series gets merged.
->>
+On Tue, Oct 02, 2018 at 03:35:17PM +0200, Daniel Vetter wrote:
+> These do absolutely nothing for atomic drivers.
 > 
-> Hi David,
-> 
-> I don't see this patch in next yet. Is it queued for 4.20?
-> 
-> Thanks in advance,
-> Bartosz
-> 
+> Signed-off-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+> Cc: Boris Brezillon <boris.brezillon@bootlin.com>
+> Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
+> Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
+> Cc: linux-arm-kernel at lists.infradead.org
 
-This is currently the only clk-davinici patch I have queued, so it
-might be easier to just resend it and let Stephen/Mike pick it up
-directly instead of me sending a pull request for one patch.
+Reviewed-by: Ville Syrj?l? <ville.syrjala@linux.intel.com>
+
+> ---
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c | 2 --
+>  1 file changed, 2 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+> index 9e34bce089d0..96f4082671fe 100644
+> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
+> @@ -364,9 +364,7 @@ static void atmel_hlcdc_crtc_atomic_flush(struct drm_crtc *crtc,
+>  
+>  static const struct drm_crtc_helper_funcs lcdc_crtc_helper_funcs = {
+>  	.mode_valid = atmel_hlcdc_crtc_mode_valid,
+> -	.mode_set = drm_helper_crtc_mode_set,
+>  	.mode_set_nofb = atmel_hlcdc_crtc_mode_set_nofb,
+> -	.mode_set_base = drm_helper_crtc_mode_set_base,
+>  	.atomic_check = atmel_hlcdc_crtc_atomic_check,
+>  	.atomic_begin = atmel_hlcdc_crtc_atomic_begin,
+>  	.atomic_flush = atmel_hlcdc_crtc_atomic_flush,
+> -- 
+> 2.19.0.rc2
+> 
+> _______________________________________________
+> Intel-gfx mailing list
+> Intel-gfx at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/intel-gfx
+
+-- 
+Ville Syrj?l?
+Intel
