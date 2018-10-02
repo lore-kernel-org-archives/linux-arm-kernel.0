@@ -1,74 +1,180 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 2 Oct 2018 10:30:56 +0200
-Subject: [GIT PULL] Renesas ARM64 Based SoC SoC Updates for v4.20
-In-Reply-To: <CAK8P3a0NreOTfL6L+w2WHnC5uf3jELf6ud_wdBZ7iAU3yuf4VA@mail.gmail.com>
-References: <cover.1538127537.git.horms+renesas@verge.net.au>
- <CAK8P3a0NreOTfL6L+w2WHnC5uf3jELf6ud_wdBZ7iAU3yuf4VA@mail.gmail.com>
-Message-ID: <CAMuHMdWF2XwWbb0-f_RuSYnFfQzLKNW7Foq9XM7cha3QVU+kHg@mail.gmail.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Tue, 2 Oct 2018 16:28:40 +0800
+Subject: [PATCH v4 01/11] drm/mediatek: add refcount for DPI power on/off
+In-Reply-To: <20181002081041.32629-2-bibby.hsieh@mediatek.com>
+References: <20181002081041.32629-1-bibby.hsieh@mediatek.com>
+ <20181002081041.32629-2-bibby.hsieh@mediatek.com>
+Message-ID: <1538468920.24335.0.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi, Bibby:
 
-On Fri, Sep 28, 2018 at 10:10 PM Arnd Bergmann <arnd@arndb.de> wrote:
-> On Fri, Sep 28, 2018 at 12:21 PM Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > * Add support for RZ/G2E (r8a774c0) and RZ/G2M (r8a774a1) SoCs
-> > * Enable Compare Match Timer (CMT) and Timer Unit (TMU)
-> >   for Renesas SoCs
-> > * Remove no longer needed ARCH_SHMOBILE Kconfig symbol
->
-> The ARCH_SHMOBILE removal and cleanup is fine, but I wonder about
-> the newly added symbols for specific SoCs. I see you already have a
-> couple of those, but the other manufacturers don't.
->
-> I think what happened here is that I tried to reject those additions
-> normally, but I never noticed yours. From what I see in drivers,
-> you have additional symbols depending on these in clk, pinctrl,
-> drivers/soc, and the dtb files, so at the very least we can't
-> just drop the config options, but I'd still like to see this work
-> more like other platforms.
+On Tue, 2018-10-02 at 16:10 +0800, Bibby Hsieh wrote:
+> From: chunhui dai <chunhui.dai@mediatek.com>
+> 
+> After the kernel 4.4, the DRM disable flow was changed, if DPI was
+> disableed before CRTC, it will cause warning message as following:
+> 
+> ------------[ cut here ]------------
+> WARNING: CPU: 0 PID: 1339 at ../../linux/linux-4.4.24-mtk/drivers/gpu/drm/drm_irq.c:1326 drm_wait_one_vblank+0x188/0x18c()
+> vblank wait timed out on crtc 0
+> Modules linked in: bridge mt8521p_ir_shim(O) i2c_eeprom(O) mtk_m4(O) fuse_ctrl(O) virtual_block(O) caamkeys(PO) chk(PO) amperctl(O) ledctl(O) apple_auth(PO) micctl(O) sensors(PO) lla(O) sdd(PO) ice40_fpga(O) psmon(O) event_queue(PO) utils(O) blackbox(O)
+> CPU: 0 PID: 1339 Comm: kworker/0:1 Tainted: P        W  O    4.4.24 #1
+> Hardware name: Mediatek Cortex-A7 (Device Tree)
+> Workqueue: events drm_mode_rmfb_work_fn
+> [<c001a710>] (unwind_backtrace) from [<c00151e4>] (show_stack+0x20/0x24)
+> [<c00151e4>] (show_stack) from [<c027961c>] (dump_stack+0x98/0xac)
+> [<c027961c>] (dump_stack) from [<c002ac54>] (warn_slowpath_common+0x94/0xc4)
+> [<c002ac54>] (warn_slowpath_common) from [<c002acc4>] (warn_slowpath_fmt+0x40/0x48)
+> [<c002acc4>] (warn_slowpath_fmt) from [<c03307ac>] (drm_wait_one_vblank+0x188/0x18c)
+> [<c03307ac>] (drm_wait_one_vblank) from [<c03307d8>] (drm_crtc_wait_one_vblank+0x28/0x2c)
+> [<c03307d8>] (drm_crtc_wait_one_vblank) from [<c034f48c>] (mtk_drm_crtc_disable+0x78/0x240)
+> [<c034f48c>] (mtk_drm_crtc_disable) from [<c03240d4>] (drm_atomic_helper_commit_modeset_disables+0x128/0x3b8)
+> [<c03240d4>] (drm_atomic_helper_commit_modeset_disables) from [<c0350a7c>] (mtk_atomic_complete+0x74/0xb4)
+> [<c0350a7c>] (mtk_atomic_complete) from [<c0350b24>] (mtk_atomic_commit+0x68/0x98)
+> [<c0350b24>] (mtk_atomic_commit) from [<c034ab48>] (drm_atomic_commit+0x54/0x74)
+> [<c034ab48>] (drm_atomic_commit) from [<c0325c4c>] (drm_atomic_helper_set_config+0x7c/0xa0)
+> [<c0325c4c>] (drm_atomic_helper_set_config) from [<c0338594>] (drm_mode_set_config_internal+0x68/0xe4)
+> [<c0338594>] (drm_mode_set_config_internal) from [<c033967c>] (drm_framebuffer_remove+0xe4/0x120)
+> [<c033967c>] (drm_framebuffer_remove) from [<c0339700>] (drm_mode_rmfb_work_fn+0x48/0x58)
+> [<c0339700>] (drm_mode_rmfb_work_fn) from [<c0043a38>] (process_one_work+0x154/0x50c)
+> [<c0043a38>] (process_one_work) from [<c0044074>] (worker_thread+0x284/0x568)
+> [<c0044074>] (worker_thread) from [<c0049dc4>] (kthread+0xec/0x104)
+> [<c0049dc4>] (kthread) from [<c0010678>] (ret_from_fork+0x14/0x3c)
+> ---[ end trace 12ae5358e992abd5 ]---
+> 
+> so, we add refcount for DPI power on/off to protect the flow.
+> 
 
-The main motivation for SoC-specific controls is to avoid including pinctrl
-and (to a lesser extent) clock tables for unused SoCs.  Each pinctrl driver
-consumes a few tens of KiB, each clock driver a few KiB.
-If we remove the SoC-specific ARCH_* controls, the user has to configure
-both pinctrl and clock driver selections, thus trading one user-visible
-symbol for two new user-visible symbols (except for RZ/A and RZ/N,
-where the pinctrl symbols are already visible, to allow reducing kernel
-size).
-Perhaps that is acceptable?
+Reviewed-by: CK Hu <ck.hu@mediatek.com>
 
-For the smaller parts in drivers/soc/, removing SoC-specific dependencies
-may be viable for R-Car and RZ/G Socs, but not for e.g. RZ/A.  The latter
-may be used without external RAM, and can run with a few MiB of internal
-SRAM, and XIP (with a still out-of-tree patch).
-So at least a family-specific dependency is worth to keep.  For now, RZ/A
-is arm32 only, though.
-
-Note that on arm64, there are no family-specific Kconfig symbols yet.
-We just have ARCH_RENESAS, which is also set on arm32.
-So either we introduce e.g. ARCH_RCAR_GEN3 (cfr. ARCH_RCAR_GEN1 and
-ARCH_RCAR_GEN2 or arm32), or use "ARCH_RENESAS && ARM64" for e.g. RST_RCAR
-in drivers/soc/renesas/Kconfig, which currently depends on all R-Car Gen3
-(and RZ/G2) SoCs explicitly.
-Choosing the latter option means we may need to migrate to the former option
-later, once other families appear (e.g. RZ/A SoCs may start using
-Cortex-A53 instead of Cortex-A9 cores).
-
-For the DTB files, I believe we can just remove the dependencies, and
-always build all DTBs.
-
-What do you think?
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+> Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
+> ---
+>  drivers/gpu/drm/mediatek/mtk_dpi.c | 43 ++++++++++++--------------------------
+>  1 file changed, 13 insertions(+), 30 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
+> index 6c0ea39d5739..5ede1ddbaa1a 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_dpi.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
+> @@ -76,8 +76,7 @@ struct mtk_dpi {
+>  	enum mtk_dpi_out_yc_map yc_map;
+>  	enum mtk_dpi_out_bit_num bit_num;
+>  	enum mtk_dpi_out_channel_swap channel_swap;
+> -	bool power_sta;
+> -	u8 power_ctl;
+> +	int refcount;
+>  };
+>  
+>  static inline struct mtk_dpi *mtk_dpi_from_encoder(struct drm_encoder *e)
+> @@ -90,11 +89,6 @@ enum mtk_dpi_polarity {
+>  	MTK_DPI_POLARITY_FALLING,
+>  };
+>  
+> -enum mtk_dpi_power_ctl {
+> -	DPI_POWER_START = BIT(0),
+> -	DPI_POWER_ENABLE = BIT(1),
+> -};
+> -
+>  struct mtk_dpi_polarities {
+>  	enum mtk_dpi_polarity de_pol;
+>  	enum mtk_dpi_polarity ck_pol;
+> @@ -367,40 +361,30 @@ static void mtk_dpi_config_color_format(struct mtk_dpi *dpi,
+>  	}
+>  }
+>  
+> -static void mtk_dpi_power_off(struct mtk_dpi *dpi, enum mtk_dpi_power_ctl pctl)
+> +static void mtk_dpi_power_off(struct mtk_dpi *dpi)
+>  {
+> -	dpi->power_ctl &= ~pctl;
+> -
+> -	if ((dpi->power_ctl & DPI_POWER_START) ||
+> -	    (dpi->power_ctl & DPI_POWER_ENABLE))
+> +	if (WARN_ON(dpi->refcount == 0))
+>  		return;
+>  
+> -	if (!dpi->power_sta)
+> +	if (--dpi->refcount != 0)
+>  		return;
+>  
+>  	mtk_dpi_disable(dpi);
+>  	clk_disable_unprepare(dpi->pixel_clk);
+>  	clk_disable_unprepare(dpi->engine_clk);
+> -	dpi->power_sta = false;
+>  }
+>  
+> -static int mtk_dpi_power_on(struct mtk_dpi *dpi, enum mtk_dpi_power_ctl pctl)
+> +static int mtk_dpi_power_on(struct mtk_dpi *dpi)
+>  {
+>  	int ret;
+>  
+> -	dpi->power_ctl |= pctl;
+> -
+> -	if (!(dpi->power_ctl & DPI_POWER_START) &&
+> -	    !(dpi->power_ctl & DPI_POWER_ENABLE))
+> -		return 0;
+> -
+> -	if (dpi->power_sta)
+> +	if (++dpi->refcount != 1)
+>  		return 0;
+>  
+>  	ret = clk_prepare_enable(dpi->engine_clk);
+>  	if (ret) {
+>  		dev_err(dpi->dev, "Failed to enable engine clock: %d\n", ret);
+> -		goto err_eng;
+> +		goto err_refcount;
+>  	}
+>  
+>  	ret = clk_prepare_enable(dpi->pixel_clk);
+> @@ -410,13 +394,12 @@ static int mtk_dpi_power_on(struct mtk_dpi *dpi, enum mtk_dpi_power_ctl pctl)
+>  	}
+>  
+>  	mtk_dpi_enable(dpi);
+> -	dpi->power_sta = true;
+>  	return 0;
+>  
+>  err_pixel:
+>  	clk_disable_unprepare(dpi->engine_clk);
+> -err_eng:
+> -	dpi->power_ctl &= ~pctl;
+> +err_refcount:
+> +	dpi->refcount--;
+>  	return ret;
+>  }
+>  
+> @@ -552,14 +535,14 @@ static void mtk_dpi_encoder_disable(struct drm_encoder *encoder)
+>  {
+>  	struct mtk_dpi *dpi = mtk_dpi_from_encoder(encoder);
+>  
+> -	mtk_dpi_power_off(dpi, DPI_POWER_ENABLE);
+> +	mtk_dpi_power_off(dpi);
+>  }
+>  
+>  static void mtk_dpi_encoder_enable(struct drm_encoder *encoder)
+>  {
+>  	struct mtk_dpi *dpi = mtk_dpi_from_encoder(encoder);
+>  
+> -	mtk_dpi_power_on(dpi, DPI_POWER_ENABLE);
+> +	mtk_dpi_power_on(dpi);
+>  	mtk_dpi_set_display_mode(dpi, &dpi->mode);
+>  }
+>  
+> @@ -582,14 +565,14 @@ static void mtk_dpi_start(struct mtk_ddp_comp *comp)
+>  {
+>  	struct mtk_dpi *dpi = container_of(comp, struct mtk_dpi, ddp_comp);
+>  
+> -	mtk_dpi_power_on(dpi, DPI_POWER_START);
+> +	mtk_dpi_power_on(dpi);
+>  }
+>  
+>  static void mtk_dpi_stop(struct mtk_ddp_comp *comp)
+>  {
+>  	struct mtk_dpi *dpi = container_of(comp, struct mtk_dpi, ddp_comp);
+>  
+> -	mtk_dpi_power_off(dpi, DPI_POWER_START);
+> +	mtk_dpi_power_off(dpi);
+>  }
+>  
+>  static const struct mtk_ddp_comp_funcs mtk_dpi_funcs = {
