@@ -1,75 +1,37 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Tue, 2 Oct 2018 16:32:16 +0800
-Subject: [PATCH v4 05/11] drm/mediatek: convert dpi driver to use
- drm_of_find_panel_or_bridge
-In-Reply-To: <20181002081041.32629-6-bibby.hsieh@mediatek.com>
-References: <20181002081041.32629-1-bibby.hsieh@mediatek.com>
- <20181002081041.32629-6-bibby.hsieh@mediatek.com>
-Message-ID: <1538469136.24335.1.camel@mtksdaap41>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Tue,  2 Oct 2018 10:43:41 +0200
+Subject: [PATCH 2/2] arm64: dts: meson-axg: s400: disable emmc
+In-Reply-To: <20181002084341.5487-1-jbrunet@baylibre.com>
+References: <20181002084341.5487-1-jbrunet@baylibre.com>
+Message-ID: <20181002084341.5487-3-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Bibby:
+While it is possible to rework the s400 board to solder an eMMC on it,
+it is not the default option and most boards are fitted with a NAND
+instead.
 
-On Tue, 2018-10-02 at 16:10 +0800, Bibby Hsieh wrote:
-> From: chunhui dai <chunhui.dai@mediatek.com>
-> 
-> Convert dpi driver to use drm_of_find_panel_or_bridge.
-> This changes some error messages to debug messages (in the graph core).
-> Graph connections are often "no connects" depending on the particular
-> board, so we want to avoid spurious messages. Plus the kernel is not a
-> DT validator.
-> related links:
-> [1] https://lkml.org/lkml/2017/2/3/716
-> [2] https://lkml.org/lkml/2017/2/3/719
-> 
+Let's disable the emmc device by default to reflect this. The board
+equipped with an eMMC will just have to alter the DT in the
+bootloader, like we do for the reserved memory regions.
 
-Reviewed-by: CK Hu <ck.hu@mediatek.com>
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-axg-s400.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
-> ---
->  drivers/gpu/drm/mediatek/mtk_dpi.c | 16 ++++++----------
->  1 file changed, 6 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
-> index 0dbe9345fa2e..08915e1765f8 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_dpi.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
-> @@ -14,6 +14,7 @@
->  #include <drm/drmP.h>
->  #include <drm/drm_crtc.h>
->  #include <drm/drm_crtc_helper.h>
-> +#include <drm/drm_of.h>
->  #include <linux/kernel.h>
->  #include <linux/component.h>
->  #include <linux/platform_device.h>
-> @@ -668,7 +669,6 @@ static int mtk_dpi_probe(struct platform_device *pdev)
->  	struct device *dev = &pdev->dev;
->  	struct mtk_dpi *dpi;
->  	struct resource *mem;
-> -	struct device_node *bridge_node;
->  	int comp_id;
->  	int ret;
->  
-> @@ -714,16 +714,12 @@ static int mtk_dpi_probe(struct platform_device *pdev)
->  		return -EINVAL;
->  	}
->  
-> -	bridge_node = of_graph_get_remote_node(dev->of_node, 0, 0);
-> -	if (!bridge_node)
-> -		return -ENODEV;
-> -
-> -	dev_info(dev, "Found bridge node: %pOF\n", bridge_node);
-> +	ret = drm_of_find_panel_or_bridge(dev->of_node, 0, 0,
-> +					  NULL, &dpi->bridge);
-> +	if (ret)
-> +		return ret;
->  
-> -	dpi->bridge = of_drm_find_bridge(bridge_node);
-> -	of_node_put(bridge_node);
-> -	if (!dpi->bridge)
-> -		return -EPROBE_DEFER;
-> +	dev_info(dev, "Found bridge node: %pOF\n", dpi->bridge->of_node);
->  
->  	comp_id = mtk_ddp_comp_get_id(dev->of_node, MTK_DPI);
->  	if (comp_id < 0) {
+diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+index 166ab598395e..c74ff1efebb8 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+@@ -479,7 +479,7 @@
+ 
+ /* emmc storage */
+ &sd_emmc_c {
+-	status = "okay";
++	status = "disabled";
+ 	pinctrl-0 = <&emmc_pins>;
+ 	pinctrl-1 = <&emmc_clk_gate_pins>;
+ 	pinctrl-names = "default", "clk-gate";
+-- 
+2.17.1
