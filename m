@@ -1,39 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 2 Oct 2018 11:53:10 +0200
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.20 (#1)
-In-Reply-To: <87o9cenggs.fsf@bootlin.com>
-References: <87o9cenggs.fsf@bootlin.com>
-Message-ID: <CAK8P3a0Z1dYgfWPV-x4cuPyEatTLd4YDA0f5XhUbKKy7TEqk3g@mail.gmail.com>
+Date: Tue, 2 Oct 2018 11:59:25 +0200
+Subject: [GIT PULL] i.MX fixes for 4.19, round 2
+In-Reply-To: <20181001023923.GQ26692@dragon>
+References: <20181001023923.GQ26692@dragon>
+Message-ID: <CAK8P3a1e8+HMwsFjE5AJW1E8M309dTkXHLqQb0Dne1gO_n61vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 1, 2018 at 11:50 AM Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> Here is the first pull request for dt64 for mvebu for v4.20.
+On Mon, Oct 1, 2018 at 4:39 AM Shawn Guo <shawnguo@kernel.org> wrote:
 >
-> Gregory
+> The following changes since commit 57361846b52bc686112da6ca5368d11210796804:
 >
-> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+>   Linux 4.19-rc2 (2018-09-02 14:37:30 -0700)
 >
->   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+> are available in the git repository at:
 >
-> are available in the Git repository at:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.19-2
 >
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.20-1
+> for you to fetch changes up to 4d8d4712e47c028306149bda04b79f70325aefb0:
 >
-> for you to fetch changes up to 620cfb31bad4c5be7d9250f1e47a592750fc364b:
->
->   arm64: dts: marvell: armada-37xx: add nodes to support watchdog (2018-09-28 10:00:17 +0200)
+>   soc: imx: gpc: set DMA mask for PD platform devices (2018-09-26 10:38:38 +0800)
 >
 > ----------------------------------------------------------------
-> mvebu dt64 for 4.20 (part 1)
->
->  - Add watchdog node on Armada 37xx
->  - Update PPv2 interrupts name
->  - Add support for the SolidRun Clearfog GT 8K (Armada 8040 based)
->  - Add thermal-zone nodes for Armada 7K/8K
->
+> i.MX fixes for 4.19, round 2:
+>  - There appears an uninitialized DMA mask warning on i.MX GPC driver
+>    with 4.19-rc kernel.  Set the DMA mask for powerdomain platform
+>    device to fix the warning given by device core.
 
-Pulled into next/dt, thanks!
+I don't think this is the right fix, we should generally not just make up a dma
+mask pointer.
+
+Lucas, do you have any more information regarding that warning?
+Are we trying to do DMA on a virtual device? What operation
+causes that warning?
 
       Arnd
