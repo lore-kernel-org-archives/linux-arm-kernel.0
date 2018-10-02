@@ -1,39 +1,44 @@
-From: duwe@lst.de (Torsten Duwe)
-Date: Tue, 2 Oct 2018 14:18:17 +0200
-Subject: [PATCH v3 2/4] arm64: implement ftrace with regs
-In-Reply-To: <20181002112741.mvav4ar4v25gj46e@lakrids.cambridge.arm.com>
-References: <20181001140910.086E768BC7@newverein.lst.de>
- <20181001141648.1DBED68BDF@newverein.lst.de>
- <20181002112741.mvav4ar4v25gj46e@lakrids.cambridge.arm.com>
-Message-ID: <20181002121817.GB2398@lst.de>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Tue, 2 Oct 2018 14:36:26 +0200
+Subject: [PATCH 1/2] ARM: dts: at91: sama5d4_xplained: fix addresable
+ nand flash size
+In-Reply-To: <20181002112949.22961-1-tudor.ambarus@microchip.com>
+References: <20181002112949.22961-1-tudor.ambarus@microchip.com>
+Message-ID: <20181002123626.GC4088@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Tudor,
 
-thank you for your very detailed feedback, I'll incorporate it
-all into the next version, besides one issue:
+There is a typo is your subject line.I don't have any other comment ;)
 
-On Tue, Oct 02, 2018 at 12:27:41PM +0100, Mark Rutland wrote:
+On 02/10/2018 14:29:48+0300, Tudor Ambarus wrote:
+> sama5d4_xplained comes with a 4Gb NAND flash. Increase the rootfs
+> size to match this limit.
 > 
-> Please use the insn framework, as we do to generate all the other
-> instruction sequences in ftrace.
+> Signed-off-by: Tudor Ambarus <tudor.ambarus@microchip.com>
+> ---
+>  arch/arm/boot/dts/at91-sama5d4_xplained.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> MOV (register) is an alias of ORR (shifted register), i.e.
+> diff --git a/arch/arm/boot/dts/at91-sama5d4_xplained.dts b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
+> index 4b7c762d5f22..7d554b9ab27f 100644
+> --- a/arch/arm/boot/dts/at91-sama5d4_xplained.dts
+> +++ b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
+> @@ -252,7 +252,7 @@
+>  
+>  						rootfs at 800000 {
+>  							label = "rootfs";
+> -							reg = <0x800000 0x0f800000>;
+> +							reg = <0x800000 0x1f800000>;
+>  						};
+>  					};
+>  				};
+> -- 
+> 2.9.4
 > 
-> 	mov	<xd>, <xm>
-> 
-> ... is:
-> 
-> 	orr	<xd>, xzr, <xm>
-> 
-> ... and we have code to generate ORR, so we can add a trivial wrapper to
-> generate MOV.
 
-I had something similar in v2; but it was hardly any better to read or
-understand. My main question however is: how do you justify the runtime
-overhead of aarch64_insn_gen_logical_shifted_reg for every function that
-gets its tracing switched on or off? The result is always the same 4-byte
-constant, so why not use a macro and a comment that says what it does?
-
-	Torsten
+-- 
+Alexandre Belloni, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
