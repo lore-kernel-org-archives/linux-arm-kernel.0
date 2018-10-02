@@ -1,82 +1,141 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 2 Oct 2018 11:00:57 +0100
-Subject: RESEND and REBASE arm+arm64+aarch32 vdso rewrite
-In-Reply-To: <8c09a380-7bc8-a353-aeb7-6591e6c57f68@android.com>
-References: <20181001175845.168430-1-salyzyn@android.com>
- <CALAqxLWCbw0bmYeB9Vfi5wXJcnLRnE0TYxy1h5WkHLehHv8KFg@mail.gmail.com>
- <8c09a380-7bc8-a353-aeb7-6591e6c57f68@android.com>
-Message-ID: <20181002100056.GA225812@arrakis.emea.arm.com>
+From: duwe@lst.de (Torsten Duwe)
+Date: Tue, 2 Oct 2018 12:02:23 +0200
+Subject: [PATCH v3 2/4] arm64: implement ftrace with regs
+In-Reply-To: <CAKv+Gu8ji7fz_-THmvd-wvod3LqrtBQq4g38UTuo+ke+NZfE9w@mail.gmail.com>
+References: <20181001140910.086E768BC7@newverein.lst.de>
+ <20181001141648.1DBED68BDF@newverein.lst.de>
+ <CAKv+Gu8ji7fz_-THmvd-wvod3LqrtBQq4g38UTuo+ke+NZfE9w@mail.gmail.com>
+Message-ID: <20181002100223.GA2398@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 01, 2018 at 01:44:52PM -0700, Mark Salyzyn wrote:
-> On 10/01/2018 11:49 AM, John Stultz wrote:
-> > On Mon, Oct 1, 2018 at 10:58 AM, Mark Salyzyn <salyzyn@android.com> wrote:
-> > > Last sent 23 Nov 2016.
-> > > 
-> > > The following 23 patches are rebased and resent, and represent a
-> > > rewrite of the arm and arm64 vDSO into C, adding support for arch32
-> > > (32-bit user space hosted 64-bit kernels) and into a common library
-> > > that other (arm, or non-arm) architectures may utilize.
-> > So I feel like this has gone around a few times w/o much comment from
-> > the arm/arm64 maintainers. I'm not sure if there's a reason?
+On Mon, Oct 01, 2018 at 05:57:52PM +0200, Ard Biesheuvel wrote:
+> > --- a/arch/arm64/include/asm/ftrace.h
+> > +++ b/arch/arm64/include/asm/ftrace.h
+> > @@ -16,6 +16,17 @@
+> >  #define MCOUNT_ADDR            ((unsigned long)_mcount)
+> >  #define MCOUNT_INSN_SIZE       AARCH64_INSN_SIZE
+> >
+> > +/* DYNAMIC_FTRACE_WITH_REGS is implemented by adding 2 NOPs at the beginning
+> > +   of each function, with the second NOP actually calling ftrace. In contrary
+> > +   to a classic _mcount call, the call instruction to be modified is thus
+> > +   the second one, and not the only one. */
 > 
-> I am "forming an opinion"(tm) that ARM is not interested in any work on 32
-> bit arm architectures. They have no manpower that they are willing to devote
-> to this.
+> OK, so the first slot will be patched unconditionally to do the 'mov x9, x30' ?
 
-Actually, we are interested in this work but, TBH, I find it a bit hard
-to read your series and have postponed looking into it in detail. Just
-look at the patch numbering/versioning for example:
+Right.
 
-> [PATCH v5 01/12] arm: vdso: rename vdso_datapage variables
-> [PATCH v5 02/12] arm: vdso: add include file defining __get_datapage()
-> [PATCH v5 03/12] arm: vdso: inline assembler operations to compiler.h
-> [PATCH v5 04/12] arm: vdso: do calculations outside reader loops
-> [PATCH v6 05/12] arm: vdso: Add support for CLOCK_MONOTONIC_RAW
-> [PATCH v5 06/12] arm: vdso: add support for clock_getres
-> [PATCH v5 07/12] arm: vdso: disable profiling
-> [PATCH v5 08/12] arm: vdso: Add ARCH_CLOCK_FIXED_MASK
-> [PATCH v5 09/12] arm: vdso: move vgettimeofday.c to lib/vdso/
-> [PATCH v5 10/12] arm64: vdso: replace gettimeofday.S with global vgettimeofday.C
-> [PATCH v6 11/12] lib: vdso: Add support for CLOCK_BOOTTIME
-> [PATCH v5 12/12] lib: vdso: do not expose gettimeofday, if no arch supported timer
-> [PATCH] lib: vdso: add support for time
-> [PATCH v2 1/3] arm64: compat: Split the sigreturn trampolines and kuser helpers (C sources)
-> [PATCH v2 2/3] arm64: compat: Split the sigreturn trampolines and kuser helpers (assembler sources)
-> [PATCH v2 3/3] arm64: compat: Add CONFIG_KUSER_HELPERS
-> [PATCH] arm64: compat: Expose offset to registers in sigframes
-> [PATCH 1/6] arm64: compat: Use vDSO sigreturn trampolines if available
-> [PATCH 2/6] arm64: elf: Set AT_SYSINFO_EHDR in compat processes
-> [PATCH 3/6] arm64: Refactor vDSO init/setup
-> [PATCH v2 4/6] arm64: compat: Add a 32-bit vDSO
-> [PATCH 5/6] arm64: compat: 32-bit vDSO setup
-> [PATCH 6/6] arm64: Wire up and expose the new compat vDSO
+> > +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+> > +#define ARCH_SUPPORTS_FTRACE_OPS 1
+> > +#define REC_IP_BRANCH_OFFSET AARCH64_INSN_SIZE
+> > +#else
+> > +#define REC_IP_BRANCH_OFFSET 0
+> > +#endif
 
-The above may look obvious to you as you've worked on it but not to
-maintainers who have to read lots of other patchsets.
+The main reason for above comment was that a previous reviewer wondered
+about a magic value of "4" for the REC_IP_BRANCH_OFFSET, which is actually
+an insn size. The comment should leave no doubt. I'd leave the LR save
+explanation elsewhere.
 
-> Despite the gain of 0.4% for screen-on battery life, where Android has a mix
-> of 64 and 32 bit applications, thus still relevant _today_ on 64 bit
-> architectures (providing vDSO32 for 32-bit applications).
+> >         mcount_exit
+> >  ENDPROC(ftrace_caller)
+> > +#else /* CC_USING_PATCHABLE_FUNCTION_ENTRY */
+> > +
+> > +/* Since no -pg or similar compiler flag is used, there should really be
+> > +   no reference to _mcount; so do not define one. Only a function address
+> > +   is needed in order to refer to it. */
+> > +ENTRY(_mcount)
+> > +       ret     /* just in case, prevent any fall through. */
+> > +ENDPROC(_mcount)
+> > +
+> > +ENTRY(ftrace_regs_caller)
+> > +       sub     sp, sp, #S_FRAME_SIZE
+> > +       stp     x29, x9, [sp, #-16]     /* FP/LR link */
+> > +
+> 
+> You cannot write below the stack pointer. So you are missing a
+> trailing ! here. Note that you can fold the sub
+> 
+> stp x29, x9, [sp, #-(S_FRAME_SIZE+16)]!
 
-As Russell said, if that's the only gain, you may need other selling
-points.
+Very well, but...
 
-The main advantage I see is to avoid code duplication, hence a vdso
-library that could be shared by arm/arm64/arm64-compat _and_ future or
-existing architectures that need vdso support.
+> > +       stp     x10, x11, [sp, #S_X10]
+> > +       stp     x12, x13, [sp, #S_X12]
+> > +       stp     x14, x15, [sp, #112]
+> > +       stp     x16, x17, [sp, #128]
+> > +       stp     x18, x19, [sp, #144]
+> > +       stp     x20, x21, [sp, #160]
+> > +       stp     x22, x23, [sp, #176]
+> > +       stp     x24, x25, [sp, #192]
+> > +       stp     x26, x27, [sp, #208]
+> > +
+> 
+> All these will shift by 16 bytes though
+> 
+> I am now wondering if it wouldn't be better to create 2 stack frames:
+> one for the interrupted function, and one for this function.
+> 
+> So something like
+> 
+> stp x29, x9, [sp, #-16]!
+> mov x29, sp
 
-> ARM has complained that they want them all at one time because individually
-> they represent more work. So the whole set is here ready to go.
+That's about the way it was before, when you criticised it was
+the wrong way ;-)
 
-Having five separate series without a clear dependency between them was
-worse than the current numbering scheme ;).
+> stp x29, x30, [sp, #-(S_FRAME_SIZE + 16]!
+> 
+> ... store all registers including x29 ...
+> 
+> and do another mov x29, sp before calling into the handler. That way
+> everything should be visible on the call stack when we do a backtrace.
 
-Anyway, since I still think this series is important, some weeks ago I
-assigned Vincenzo Frascino in my team the task of de-cluttering this
-patchset and posting it to the list. So we may see a new series later
-this month (and any feedback welcome).
+I'm not 100% sure, but I think it already is visible correctly. Note
+that the callee has in no way been called yet; control flow is
+immediately diverted to the ftrace_caller.
 
--- 
-Catalin
+About using SP as a pt_regs pointer: maybe I can free another register
+for that purpose and thus achieve conformance *and* pretty code.
+
+> 
+> > +       b       ftrace_common
+> > +ENDPROC(ftrace_regs_caller)
+> > +
+> > +ENTRY(ftrace_caller)
+> > +       sub     sp, sp, #S_FRAME_SIZE
+> > +       stp     x29, x9, [sp, #-16]     /* FP/LR link */
+> > +
+> 
+> Same as above
+
+Yes, Steven demanded 2 entry points :)
+
+> >  /*
+> > --- a/arch/arm64/kernel/ftrace.c
+> > +++ b/arch/arm64/kernel/ftrace.c
+> > @@ -65,18 +65,66 @@ int ftrace_update_ftrace_func(ftrace_fun
+> >         return ftrace_modify_code(pc, 0, new, false);
+> >  }
+> >
+> > +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+> > +/* Have the assembler generate a known "mov x9,x30" at compile time. */
+> > +static void notrace noinline __attribute__((used)) mov_x9_x30(void)
+> > +{
+> > +       asm(" .global insn_mov_x9_x30\n"
+> > +                    "insn_mov_x9_x30: mov x9,x30\n" : : : "x9");
+> > +}
+> 
+> You cannot rely on the compiler putting the mov at the beginning. I
+
+As you can see from the asm inline, I tried the more precise assembler
+label, but it didn't work out. With enough optimisation, the mov _is_
+first; but you're right, it's not a good idea to rely on that.
+
+> think some well commented #define should do for the opcode (or did you
+> just remove that?)
+
+Alas, yes I did. I had a define, then run-time generation, and now this
+assembler hack. Looking at the 3, the define would be best, I'd say.
+
+	Torsten
