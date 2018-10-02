@@ -1,230 +1,48 @@
-From: john.garry@huawei.com (John Garry)
-Date: Tue, 2 Oct 2018 11:20:46 +0100
-Subject: perf segmentation fault from NULL dereference
-In-Reply-To: <20180927030035.GF28040@tassilo.jf.intel.com>
-References: <712b7c31-f681-7737-71e7-c028b8d2bba5@huawei.com>
- <20180927030035.GF28040@tassilo.jf.intel.com>
-Message-ID: <334a114a-bb59-9582-a913-efbb01bd68c5@huawei.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 2 Oct 2018 12:34:37 +0200
+Subject: [GIT PULL] ARM: dts updates for arm 32 bits for v4.20
+In-Reply-To: <CAK8P3a1AVrP_vrvUJrEHp1i_LrdDCwCmiVP_aRYpATwEK+B3Yg@mail.gmail.com>
+References: <0195dc38-908e-c403-5f12-d266a037ca1b@gmail.com>
+ <CAK8P3a1AVrP_vrvUJrEHp1i_LrdDCwCmiVP_aRYpATwEK+B3Yg@mail.gmail.com>
+Message-ID: <9f0dd563-b921-8d31-c82c-327fea5c026f@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/09/2018 04:00, Andi Kleen wrote:
->> Please me let me know if a valid issue so we can get a fix in.
->
-> If it crashes it must be a valid issue of course.
->
-> But I'm not sure about your bisect. Hard to see how my patch
-> could cause this. Sometimes bisects go wrong.
-> You verified by just reverting the patch?
 
-It no longer reverts cleanly. And the previous patch - 4ca69ca9db3a - 
-did not have this crash:
-root at localhost:~# ./perf_debug_ record -e armv8_pmuv3_0/br_mis_pred/ sleep 1
-[ perf record: Woken up 1 times to write data ]
-[ perf record: Captured and wrote 0.001 MB perf.data (6 samples) ]
-root at localhost:~#
 
->
-> First thing I would also try is to run with valgrind or ASan and see if it
-> reports anything.
+On 02/10/2018 11:12, Arnd Bergmann wrote:
+> On Sat, Sep 29, 2018 at 5:18 PM Matthias Brugger <matthias.bgg@gmail.com> wrote:
+> 
+>> The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+>>
+>>   Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+>>
+>> are available in the Git repository at:
+>>
+>>   https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git/
+>> tags/v4.19-next-dts32
+>>
+>> for you to fetch changes up to 5646a2f6d584e80bd4555c2ce3e286b35b9eaa61:
+>>
+>>   arm: dts: mt7623: add jpeg decoder device node (2018-09-25 17:44:35 +0200)
+>>
+>> ----------------------------------------------------------------
+>> mt7623:
+>> - add pmu node
+>> - add subsystem clock>> - add nodes needed for iommu
+>> - add node for the jpeg decoder
+> 
+> None of these (aside from the pmu) seem to have DT bindings
+> or drivers posted on the list. Can you explain why that is and what
+> the plan is for supporting them?
+> 
 
-Here's the valgrind output:
-root at localhost:~#valgrind  --leak-check=yes  ./perf_debug_ record -e 
-armv8_pmuv3_0/br_mis_pred/ sleep 1
-==16025== Memcheck, a memory error detector
-==16025== Copyright (C) 2002-2015, and GNU GPL'd, by Julian Seward et al.
-==16025== Using Valgrind-3.11.0 and LibVEX; rerun with -h for copyright info
-==16025== Command: ./perf_debug_ record -e armv8_pmuv3_0/br_mis_pred/ 
-sleep 1
-==16025==
---16025-- WARNING: unhandled arm64-linux syscall: 168
---16025-- You may be able to write your own handler.
---16025-- Read the file README_MISSING_SYSCALL_OR_IOCTL.
---16025-- Nevertheless we consider this a bug.  Please report
---16025-- it at http://valgrind.org/support/bug_reports.html.
---16025-- WARNING: unhandled arm64-linux syscall: 241
---16025-- You may be able to write your own handler.
---16025-- Read the file README_MISSING_SYSCALL_OR_IOCTL.
---16025-- Nevertheless we consider this a bug.  Please report
---16025-- it at http://valgrind.org/support/bug_reports.html.
-perf_event_open(..., PERF_FLAG_FD_CLOEXEC) failed with unexpected error 
-38 (Function not implemented)
---16025-- WARNING: unhandled arm64-linux syscall: 241
---16025-- You may be able to write your own handler.
---16025-- Read the file README_MISSING_SYSCALL_OR_IOCTL.
---16025-- Nevertheless we consider this a bug.  Please report
---16025-- it at http://valgrind.org/support/bug_reports.html.
-perf_event_open(..., 0) failed unexpectedly with error 38 (Function not 
-implemented)
---16025-- WARNING: unhandled arm64-linux syscall: 241
---16025-- You may be able to write your own handler.
---16025-- Read the file README_MISSING_SYSCALL_OR_IOCTL.
---16025-- Nevertheless we consider this a bug.  Please report
---16025-- it at http://valgrind.org/support/bug_reports.html.
---16025-- WARNING: unhandled arm64-linux syscall: 241
---16025-- You may be able to write your own handler.
---16025-- Read the file README_MISSING_SYSCALL_OR_IOCTL.
---16025-- Nevertheless we consider this a bug.  Please report
---16025-- it at http://valgrind.org/support/bug_reports.html.
---16025-- WARNING: unhandled arm64-linux syscall: 241
---16025-- You may be able to write your own handler.
---16025-- Read the file README_MISSING_SYSCALL_OR_IOCTL.
---16025-- Nevertheless we consider this a bug.  Please report
---16025-- it at http://valgrind.org/support/bug_reports.html.
---16025-- WARNING: unhandled arm64-linux syscall: 241
---16025-- You may be able to write your own handler.
---16025-- Read the file README_MISSING_SYSCALL_OR_IOCTL.
---16025-- Nevertheless we consider this a bug.  Please report
---16025-- it at http://valgrind.org/support/bug_reports.html.
-Error:
-The sys_perf_event_open() syscall returned with 38 (Function not 
-implemented) for event (armv8_pmuv3_0/br_mis_pred/).
-/bin/dmesg | grep -i perf may provide additional information.
+We rely on the fallback compatible here, as mt2701 and mt7623 are identically in
+most of their components. If you require to get the bindings documented before
+merging the DT, then I propose to drop the pull request for now.
 
-==16059==
-==16059== Process terminating with default action of signal 15 (SIGTERM)
-==16059==    at 0x486F974: __read_nocancel (syscall-template.S:84)
-==16059==    by 0x48D02F: read (unistd.h:44)
-==16059==    by 0x48D02F: perf_evlist__prepare_workload (evlist.c:1471)
-==16059==    by 0x41AB0F: __cmd_record (builtin-record.c:898)
-==16059==    by 0x41AB0F: cmd_record (builtin-record.c:1873)
-==16059==    by 0x476C7F: run_builtin (perf.c:302)
-==16059==    by 0x476F37: handle_internal_command (perf.c:354)
-==16059==    by 0x407093: run_argv (perf.c:398)
-==16059==    by 0x407093: main (perf.c:520)
-==16059==
-==16059== HEAP SUMMARY:
-==16059==     in use at exit: 56,239 bytes in 226 blocks
-==16059==   total heap usage: 1,164 allocs, 938 frees, 2,238,979 bytes 
-allocated
-==16059==
-==16059== 12 bytes in 1 blocks are definitely lost in loss record 1 of 6
-==16059==    at 0x4844B88: malloc (in 
-/usr/lib/valgrind/vgpreload_memcheck-arm64-linux.so)
-==16059==
-==16059== 344 bytes in 5 blocks are possibly lost in loss record 3 of 6
-==16059==    at 0x4846CFC: calloc (in 
-/usr/lib/valgrind/vgpreload_memcheck-arm64-linux.so)
-==16059==
-==16059== 5,736 bytes in 125 blocks are possibly lost in loss record 4 of 6
-==16059==    at 0x4844B88: malloc (in 
-/usr/lib/valgrind/vgpreload_memcheck-arm64-linux.so)
-==16059==
-==16059== LEAK SUMMARY:
-==16059==    definitely lost: 12 bytes in 1 blocks
-==16059==    indirectly lost: 0 bytes in 0 blocks
-==16059==      possibly lost: 6,080 bytes in 130 blocks
-==16059==    still reachable: 50,147 bytes in 95 blocks
-==16059==         suppressed: 0 bytes in 0 blocks
-==16059== Reachable blocks (those to which a pointer was found) are not 
-shown.
-==16059== To see them, rerun with: --leak-check=full --show-leak-kinds=all
-==16059==
-==16059== For counts of detected and suppressed errors, rerun with: -v
-==16059== ERROR SUMMARY: 3 errors from 3 contexts (suppressed: 0 from 0)
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025== Warning: invalid file descriptor -1 in syscall close()
-==16025==
-==16025== HEAP SUMMARY:
-==16025==     in use at exit: 26,640 bytes in 209 blocks
-==16025==   total heap usage: 1,202 allocs, 993 frees, 2,455,112 bytes 
-allocated
-==16025==
-==16025== 328 bytes in 7 blocks are definitely lost in loss record 2 of 6
-==16025==    at 0x4844B88: malloc (in 
-/usr/lib/valgrind/vgpreload_memcheck-arm64-linux.so)
-==16025==
-==16025== 344 bytes in 5 blocks are possibly lost in loss record 3 of 6
-==16025==    at 0x4846CFC: calloc (in 
-/usr/lib/valgrind/vgpreload_memcheck-arm64-linux.so)
-==16025==
-==16025== 6,000 bytes in 126 blocks are possibly lost in loss record 5 of 6
-==16025==    at 0x4844B88: malloc (in 
-/usr/lib/valgrind/vgpreload_memcheck-arm64-linux.so)
-==16025==
-==16025== LEAK SUMMARY:
-==16025==    definitely lost: 328 bytes in 7 blocks
-==16025==    indirectly lost: 0 bytes in 0 blocks
-==16025==      possibly lost: 6,344 bytes in 131 blocks
-==16025==    still reachable: 19,968 bytes in 71 blocks
-==16025==         suppressed: 0 bytes in 0 blocks
-==16025== Reachable blocks (those to which a pointer was found) are not 
-shown.
-==16025== To see them, rerun with: --leak-check=full --show-leak-kinds=all
-==16025==
-==16025== For counts of detected and suppressed errors, rerun with: -v
-==16025== ERROR SUMMARY: 3 errors from 3 contexts (suppressed: 0 from 0)
-root at localhost:~#
+Other option would be to get the bindings documented in v4.21. AFAIK up to now
+there haven't been sent any patches to update the bindings.
 
-(pretty much the same as previous patch)
-
-Cheers,
-John
-
->
-> -Andi
->
-> .
->
+Regards,
+Matthias
