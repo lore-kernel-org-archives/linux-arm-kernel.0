@@ -1,32 +1,80 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Tue, 2 Oct 2018 20:47:45 +0300
-Subject: [PATCH] ARM: OMAP1: ams-delta: Fix impossible .irq < 0
-In-Reply-To: <20181002094529.30564-1-jmkrzyszt@gmail.com>
-References: <20181001102453.GA18947@mwanda>
- <20181002094529.30564-1-jmkrzyszt@gmail.com>
-Message-ID: <20181002174745.GG3461@darkstar.musicnaut.iki.fi>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Tue, 2 Oct 2018 11:56:56 -0700
+Subject: [PATCH v9 2/8] dt-bindings: Introduce interconnect binding
+In-Reply-To: <20181002111758.GC1086@e107155-lin>
+References: <20180831140151.13972-1-georgi.djakov@linaro.org>
+ <20180831140151.13972-3-georgi.djakov@linaro.org>
+ <20180925180215.GA12435@bogus>
+ <b67253fb-d86d-2ddd-6c30-0833d6ed62ad@linaro.org>
+ <20180926144830.GB25838@e107155-lin>
+ <fa74c24f-1f22-f11f-60fe-5a4489d9c7c2@codeaurora.org>
+ <20181002111758.GC1086@e107155-lin>
+Message-ID: <c17450ce-fc25-e792-b91b-51106f032542@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Tue, Oct 02, 2018 at 11:45:29AM +0200, Janusz Krzysztofik wrote:
-> Since the very beginning, unsigned int .irq member of struct
-> plat_serial8250_port introduced by commit eff443df679e ("OMAP1:
-> AMS_DELTA: add modem support") was statically initialized to a negative
-> value -EINVAL.  Moreover, commit 0812db943748 ("ARM: OMAP1: ams-delta:
-> assign MODEM IRQ from GPIO descriptor") has introduced some new code
-> which checks for that member carrying a negative value which is
-> impossible.
-> 
-> Use IRQ_NOTCONNECTED instead of -EINVAL. Also, drop the valueless check
-> and let the modem device be registered regardless of .irq value, and
-> the value handled by "serial8250" driver.
-> 
-> Fixes: 0812db943748 ("ARM: OMAP1: ams-delta: assign MODEM IRQ from GPIO descriptor")
-> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-> Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
+On 10/02/2018 04:17 AM, Sudeep Holla wrote:
+> On Mon, Oct 01, 2018 at 04:49:32PM -0700, Saravana Kannan wrote:
+>> On 09/26/2018 07:48 AM, Sudeep Holla wrote:
+>>> On Wed, Sep 26, 2018 at 05:42:15PM +0300, Georgi Djakov wrote:
+>>>> Hi Rob,
+>>>>
+>>>> Thanks for the comments!
+>>>>
+>>>> On 09/25/2018 09:02 PM, Rob Herring wrote:
+>>>>> On Fri, Aug 31, 2018 at 05:01:45PM +0300, Georgi Djakov wrote:
+>>>>>> This binding is intended to represent the relations between the interconnect
+>>>>>> controllers (providers) and consumer device nodes. It will allow creating links
+>>>>>> between consumers and interconnect paths (exposed by interconnect providers).
+>>>>> As I mentioned in person, I want to see other SoC families using this
+>>>>> before accepting. They don't have to be ready for upstream, but WIP
+>>>>> patches or even just a "yes, this works for us and we're going to use
+>>>>> this binding on X".
+>>>> Other than the 3 Qualcomm SoCs (msm8916, msm8996, sdm845) that are
+>>>> currently using this binding, there is ongoing work from at least two
+>>>> other vendors that would be using this same binding. I will check on
+>>>> what is their progress so far.
+>>>>
+>>>>> Also, I think the QCom GPU use of this should be fully sorted out. Or
+>>>>> more generically how this fits into OPP binding which seems to be never
+>>>>> ending extended...
+>>>> I see this as a further step. It could be OPP binding which include
+>>>> bandwidth values or some separate DT property. Jordan has already
+>>>> proposed something, do you have any initial comments on that?
+>>> I am curious as how this fits into new systems which have firmware driven
+>>> CPUFreq and other DVFS. I would like to avoid using this in such systems
+>>> and leave it upto the firmware to scale the bus/interconnect based on the
+>>> other components that are connected to it and active.
+>>>
+>> You've made the same point multiple times across different patch sets. Not
+>> all FW can do arbitrary functions. A lot of them are very limited in their
+>> capabilities. So, as much as you and I would like to let the FW do the work,
+>> it's not always possible. So, in those cases, we do need to have support for
+>> the kernel scaling the interconnects correctly. Hopefully this clears up
+>> your questions about FW capabilities.
+> Yes, I do understand I have made the same point multiple time and it's
+> intentional. We need to get the fragmented f/w support story fixed.
+> Different ARM vendors are doing different things in f/w and ARM sees the
+> same fragmentation story as before. We have come up with new specification
+> and my annoying multiple emails are just to constantly remind the same.
+>
+> I do understand we have existing implementations to consider, but fixing
+> the functionality in arbitrary way is not a good design and it better
+> to get them fixed for future.
 
-Acked-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+I believe the fragmentation you are referring to is? in the 
+interface/communication protocol. I see the benefit of standardizing 
+that as long as the standard actually turns out to be good. But that's 
+completely separate from what the FW can/can't do. Asking to standardize 
+what the FW can/can't do doesn't seem realistic as each chip vendor will 
+have different priorities - power, performance, cost, chip area, etc. 
+It's the conflation of these separate topics that doesn't help IMHO.
 
-A.
+-Saravana
+
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
