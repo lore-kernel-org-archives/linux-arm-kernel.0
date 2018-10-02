@@ -1,59 +1,34 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Tue, 2 Oct 2018 13:12:44 +0000
-Subject: [PATCH] bus: fsl-mc: explicitly define the fsl_mc_command
- endianness
-In-Reply-To: <1538482550-7698-1-git-send-email-ioana.ciornei@nxp.com>
-References: <1538482550-7698-1-git-send-email-ioana.ciornei@nxp.com>
-Message-ID: <868a0ddc-4b80-c866-a91e-7d6bc3af34da@nxp.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Tue,  2 Oct 2018 15:12:36 +0200
+Subject: [PATCH v7 1/8] arm64: add type casts to untagged_addr macro
+In-Reply-To: <cover.1538485901.git.andreyknvl@google.com>
+References: <cover.1538485901.git.andreyknvl@google.com>
+Message-ID: <6a951a9d1cd38eac1e49591f70e3cb9410349823.1538485901.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch makes the untagged_addr macro accept all kinds of address types
+(void *, unsigned long, etc.) and allows not to specify type casts in each
+place where it is used. This is done by using __typeof__.
 
-On 02.10.2018 15:16, Ioana Ciornei wrote:
-> Both the header and the command parameters of the fsl_mc_command are
-> 64-bit little-endian words. Use the appropriate type to explicitly
-> specify their endianness.
-> 
-> Signed-off-by: Ioana Ciornei <ioana.ciornei@nxp.com>
-
-Reviewed-By: Laurentiu Tudor <laurentiu.tudor@nxp.com>
-
+Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
 ---
-Best Regards, Laurentiu
+ arch/arm64/include/asm/uaccess.h | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-> ---
->   include/linux/fsl/mc.h | 12 ++++++------
->   1 file changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/include/linux/fsl/mc.h b/include/linux/fsl/mc.h
-> index f27cb14..96c54bb 100644
-> --- a/include/linux/fsl/mc.h
-> +++ b/include/linux/fsl/mc.h
-> @@ -210,8 +210,8 @@ struct mc_cmd_header {
->   };
->   
->   struct fsl_mc_command {
-> -	u64 header;
-> -	u64 params[MC_CMD_NUM_OF_PARAMS];
-> +	__le64 header;
-> +	__le64 params[MC_CMD_NUM_OF_PARAMS];
->   };
->   
->   enum mc_cmd_status {
-> @@ -238,11 +238,11 @@ enum mc_cmd_status {
->   /* Command completion flag */
->   #define MC_CMD_FLAG_INTR_DIS	0x01
->   
-> -static inline u64 mc_encode_cmd_header(u16 cmd_id,
-> -				       u32 cmd_flags,
-> -				       u16 token)
-> +static inline __le64 mc_encode_cmd_header(u16 cmd_id,
-> +					  u32 cmd_flags,
-> +					  u16 token)
->   {
-> -	u64 header = 0;
-> +	__le64 header = 0;
->   	struct mc_cmd_header *hdr = (struct mc_cmd_header *)&header;
->   
->   	hdr->cmd_id = cpu_to_le16(cmd_id);
-> 
+diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+index e66b0fca99c2..2d6451cbaa86 100644
+--- a/arch/arm64/include/asm/uaccess.h
++++ b/arch/arm64/include/asm/uaccess.h
+@@ -102,7 +102,8 @@ static inline unsigned long __range_ok(const void __user *addr, unsigned long si
+  * up with a tagged userland pointer. Clear the tag to get a sane pointer to
+  * pass on to access_ok(), for instance.
+  */
+-#define untagged_addr(addr)		sign_extend64(addr, 55)
++#define untagged_addr(addr)		\
++	((__typeof__(addr))sign_extend64((__u64)(addr), 55))
+ 
+ #define access_ok(type, addr, size)	__range_ok(addr, size)
+ #define user_addr_max			get_fs
+-- 
+2.19.0.605.g01d371f741-goog
