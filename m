@@ -1,46 +1,32 @@
 From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Tue, 2 Oct 2018 05:53:26 +0200
+Date: Tue, 2 Oct 2018 05:56:47 +0200
 Subject: [PATCH] ARM: makefile: pass -march=armv4 to assembler even on
  CPU32v3
-In-Reply-To: <CAK8P3a0grG5OBjwpTeH0fqzoFFBLDH6-oGM4ibzHypUKWedg3A@mail.gmail.com>
+In-Reply-To: <CAKv+Gu9Z5AnT07_N0MCBMNKO7fd_42DS0qFGP-gubD9DxLiYDA@mail.gmail.com>
 References: <20180930024904.14240-1-Jason@zx2c4.com>
- <CAK8P3a0grG5OBjwpTeH0fqzoFFBLDH6-oGM4ibzHypUKWedg3A@mail.gmail.com>
-Message-ID: <CAHmME9rVbKCNJfVBEene0SvhBEm_g7N-XJ26ugoAab1Vj7G_ww@mail.gmail.com>
+ <20181001175622.GT30658@n2100.armlinux.org.uk>
+ <CAKv+Gu9Z5AnT07_N0MCBMNKO7fd_42DS0qFGP-gubD9DxLiYDA@mail.gmail.com>
+Message-ID: <CAHmME9ocfHx2BxCqor-hg0ida6mS7x9M3RU2rZdoaxk=s9bHTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Ard,
 
-Apologies for the delay in getting back to you. I had some MTA issues
-and stupidly assumed ARM developers were taking the day off instead...
+On Tue, Oct 2, 2018 at 5:54 AM Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> So Arnd's suggestion to switch to armv3-m would actually be feasible
+> then? The code in question does not use ldrh only umull, and so it
+> should build with armv3m as well. And we will even generate some
+> better code for RiscPC if we apply it to both the cflags and the
+> asflags.
 
-On Tue, Oct 2, 2018 at 5:33 AM Arnd Bergmann <arnd@arndb.de> wrote:
-> -arch-$(CONFIG_CPU_32v3)                =-D__LINUX_ARM_ARCH__=3 -march=armv3
-> +arch-$(CONFIG_CPU_32v3)                =-D__LINUX_ARM_ARCH__=3 -march=armv3m
+It turns out armv3m isn't a solution for the crypto code, since it
+does other armv4-isms. So we'll need to find another solution for
+that; I'm partial to my initial Kconfig one just doing "depends
+!CPU_32V3".
 
-Unfortunately this doesn't really cut it in my case, as it's not only
-those multiplications:
-chacha20-arm.S:402: Error: selected processor does not support `bxeq
-lr' in ARM mode
-
-I think we're going to wind up playing whack-a-mole in silly ways. The
-fact of the matter is that the ARM assembly I'm adding to the tree is
-for ARMv4 and up, and not for ARMv3.
-
-I think there are three options to work around this issue:
-
-1) Not build my assembly when CONFIG_CPU_32v3 via a Kconfig "depends".
-2) Set asflags-$(CONFIG_CPU_32v3) inside my module locally to select
--march=armv4.
-3) This patch.
-
-My initial plan was (1). ArdB recommended I do (2) instead. I thought
-that was a bit too nuanced and submitted (3).
-
-It sounds like in light of the bus issues, (1) might be the best
-solution after all?
-
-Let me know, and I'll follow your direction.
+With regards to RiscPC though, given that armv3 codegen might be
+better, it sounds like it's a good idea to set -march=armv3m anyway
+for the platform, irrespective of fixing the problem at hand here.
 
 Regards,
 Jason
