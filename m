@@ -1,42 +1,59 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 2 Oct 2018 12:46:27 +0100
-Subject: [PATCH v2] perf: xgene: Add CPU hotplug support
-In-Reply-To: <1537382649-17266-1-git-send-email-hoan.tran@amperecomputing.com>
-References: <1537382649-17266-1-git-send-email-hoan.tran@amperecomputing.com>
-Message-ID: <20181002114627.omsungd77lfmbqfj@lakrids.cambridge.arm.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 2 Oct 2018 12:49:55 +0100
+Subject: [PATCH] nvmem: only build nvmem_find_cell_by_index() if OF is
+ enabled
+In-Reply-To: <20181002110246.3175-1-brgl@bgdev.pl>
+References: <20181002110246.3175-1-brgl@bgdev.pl>
+Message-ID: <13b4b871-8f81-d007-ef37-eb697f984f01@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hoan,
 
-On Wed, Sep 19, 2018 at 06:44:30PM +0000, Hoan Tran wrote:
-> This patch adds CPU hotplug support where the PMU migrates the context to
-> another online CPU when its CPU is offline.
+
+On 02/10/18 12:02, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > 
-> It fixes the below issue where the user does offline the CPU which is assigned
-> to this PMU.
+> The following warning is produced when building nvmem core if
+> CONFIG_OF is disabled:
 > 
-> Assuming, CPU0 is assigned for this PMU. When the user does offline CPU0
-> [root@(none) ~]# echo 0 > /sys/devices/system/cpu/cpu0/online
-> This PMU does not work anymore and shows the below error.
-> [root@(none) ~]# perf stat -a -e l3c0/cycle-count/,l3c0/write/ sleep 1
-> Error:
-> The sys_perf_event_open() syscall returned with 19 (No such device) for event (l3c0/cycle-count/).
-> /bin/dmesg may provide additional information.
-> No CONFIG_PERF_EVENTS=y kernel support configured?
+> drivers/nvmem/core.c:496:1: warning: 'nvmem_find_cell_by_index' defined but not used [-Wunused-function]
+>   nvmem_find_cell_by_index(struct nvmem_device *nvmem, int index)
+>   ^~~~~~~~~~~~~~~~~~~~~~~~
 > 
-> With this patch, when CPU0 is offline, PMU migrates to another online CPU and
-> works on that CPU.
+> This is caused by the fact that the only caller of this routine is
+> under an ifdef depending on this option. Fix it by adding a relevant
+> ifdef to the function in question as well.
 > 
-> Signed-off-by: Hoan Tran <hoan.tran@amperecomputing.com>
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > ---
-> v2:
->  * Remove the cpuhp instance when unregistering the PMU
+>   drivers/nvmem/core.c | 2 ++
+>   1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+> index cc815bb2eebd..65f61cd0a687 100644
+> --- a/drivers/nvmem/core.c
+> +++ b/drivers/nvmem/core.c
+> @@ -492,6 +492,7 @@ static int nvmem_add_cells_from_table(struct nvmem_device *nvmem)
+>   	return rval;
+>   }
+>   
+> +#if IS_ENABLED(CONFIG_OF)
 
-Unfortunately, this has come through whitespae-damaged, with a
-disclaimer in the footer.
+You should probably attribute the function with "__maybe_unused"
+Instead of adding this condition.
 
-Could you please resend with those two details fixed?
+--srini
 
-Thanks,
-Mark.
+
+>   static struct nvmem_cell *
+>   nvmem_find_cell_by_index(struct nvmem_device *nvmem, int index)
+>   {
+> @@ -507,6 +508,7 @@ nvmem_find_cell_by_index(struct nvmem_device *nvmem, int index)
+>   
+>   	return cell;
+>   }
+> +#endif
+>   
+>   static struct nvmem_cell *
+>   nvmem_find_cell_by_name(struct nvmem_device *nvmem, const char *cell_id)
+> 
