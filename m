@@ -1,55 +1,78 @@
-From: hoan.tran@amperecomputing.com (Hoan Tran)
-Date: Tue, 2 Oct 2018 23:46:45 +0000
-Subject: [PATCH v2] perf: xgene: Add CPU hotplug support
-In-Reply-To: <20181002114627.omsungd77lfmbqfj@lakrids.cambridge.arm.com>
-References: <1537382649-17266-1-git-send-email-hoan.tran@amperecomputing.com>
- <20181002114627.omsungd77lfmbqfj@lakrids.cambridge.arm.com>
-Message-ID: <5B51DDE7-B248-474D-8787-8127E73D82B1@amperecomputing.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 3 Oct 2018 08:47:14 +0900
+Subject: [GIT PULL] ARM: dts: uniphier: UniPhier DT updates for v4.20
+Message-ID: <CAK7LNAQnPeNwmmKL_BWSnzEsUCq+MW+5c2TXWnuszOBi32iybg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Arnd, Olof,
 
-> On Oct 2, 2018, at 4:46 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> 
-> [NOTICE: This email originated from an external sender. Please be mindful of safe email handling and proprietary information protection practices.] ________________________________________________________________________________________________________________________
-> 
-> Hi Hoan,
-> 
-> On Wed, Sep 19, 2018 at 06:44:30PM +0000, Hoan Tran wrote:
->> This patch adds CPU hotplug support where the PMU migrates the context to
->> another online CPU when its CPU is offline.
->> 
->> It fixes the below issue where the user does offline the CPU which is assigned
->> to this PMU.
->> 
->> Assuming, CPU0 is assigned for this PMU. When the user does offline CPU0
->> [root@(none) ~]# echo 0 > /sys/devices/system/cpu/cpu0/online
->> This PMU does not work anymore and shows the below error.
->> [root@(none) ~]# perf stat -a -e l3c0/cycle-count/,l3c0/write/ sleep 1
->> Error:
->> The sys_perf_event_open() syscall returned with 19 (No such device) for event (l3c0/cycle-count/).
->> /bin/dmesg may provide additional information.
->> No CONFIG_PERF_EVENTS=y kernel support configured?
->> 
->> With this patch, when CPU0 is offline, PMU migrates to another online CPU and
->> works on that CPU.
->> 
->> Signed-off-by: Hoan Tran <hoan.tran@amperecomputing.com>
->> ---
->> v2:
->> * Remove the cpuhp instance when unregistering the PMU
-> 
-> Unfortunately, this has come through whitespae-damaged, with a
-> disclaimer in the footer.
-> 
-> Could you please resend with those two details fixed?
+Please pull UniPhier DT updates for the v4.20 MW.
 
-I?ll fix it and send you another version later.
+In this cycle, I queued up all arm/arm64 changes
+into a single branch to avoid build errors.
 
-Thanks and Regards
-Hoan
+Thanks!
 
-> 
-> Thanks,
-> Mark.
+
+
+
+
+The following changes since commit 5b394b2ddf0347bef56e50c69a58773c94343ff3:
+
+  Linux 4.19-rc1 (2018-08-26 14:11:59 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
+tags/uniphier-dt-v4.20
+
+for you to fetch changes up to 84a9c4d55907feece68c6012d3c030cf5c841ceb:
+
+  arm64: dts: uniphier: add SD controller nodes (2018-10-03 08:21:27 +0900)
+
+----------------------------------------------------------------
+UniPhier ARM SoC DT updates for v4.20
+
+- Add more clocks to NAND controller nodes
+
+- Add SPI controller nodes
+
+- Add SD controller nodes
+
+----------------------------------------------------------------
+Kunihiko Hayashi (3):
+      ARM: dts: uniphier: add SPI pin-mux node
+      ARM: dts: uniphier: add SPI node for UniPhier 32bit SoCs
+      arm64: dts: uniphier: add SPI node for LD20, LD11 and PXs3
+
+Masahiro Yamada (4):
+      ARM: uniphier: dts: add more clocks to Denali NAND controller node
+      arm64: uniphier: dts: add more clocks to Denali NAND controller node
+      ARM: dts: uniphier: add SD/eMMC controller nodes
+      arm64: dts: uniphier: add SD controller nodes
+
+ arch/arm/boot/dts/uniphier-ld4-ref.dts            |  4 ++
+ arch/arm/boot/dts/uniphier-ld4.dtsi               | 48 ++++++++++++++-
+ arch/arm/boot/dts/uniphier-ld6b-ref.dts           |  4 ++
+ arch/arm/boot/dts/uniphier-pinctrl.dtsi           | 25 ++++++++
+ arch/arm/boot/dts/uniphier-pro4-ace.dts           |  4 ++
+ arch/arm/boot/dts/uniphier-pro4-ref.dts           |  4 ++
+ arch/arm/boot/dts/uniphier-pro4-sanji.dts         |  4 ++
+ arch/arm/boot/dts/uniphier-pro4.dtsi              | 62 +++++++++++++++++++-
+ arch/arm/boot/dts/uniphier-pro5.dtsi              | 59 ++++++++++++++++++-
+ arch/arm/boot/dts/uniphier-pxs2-gentil.dts        |  4 ++
+ arch/arm/boot/dts/uniphier-pxs2-vodka.dts         |  4 ++
+ arch/arm/boot/dts/uniphier-pxs2.dtsi              | 59 ++++++++++++++++++-
+ arch/arm/boot/dts/uniphier-sld8-ref.dts           |  4 ++
+ arch/arm/boot/dts/uniphier-sld8.dtsi              | 48 ++++++++++++++-
+ arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi  | 25 +++++++-
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi  | 61 ++++++++++++++++++-
+ .../boot/dts/socionext/uniphier-pxs3-ref.dts      |  4 ++
+ arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi  | 43 +++++++++++++-
+ 18 files changed, 458 insertions(+), 8 deletions(-)
+
+
+-- 
+Best Regards
+Masahiro Yamada
