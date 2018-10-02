@@ -1,47 +1,79 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Tue, 2 Oct 2018 14:30:29 +0200
-Subject: [PATCH] ARM: makefile: pass -march=armv4 to assembler even on
- CPU32v3
-In-Reply-To: <CAK8P3a3TE8HW0wD9ETCDWMf7quDRx94-2iS6goYDQ18JQ6r=rw@mail.gmail.com>
-References: <20180930024904.14240-1-Jason@zx2c4.com>
- <CAK8P3a0grG5OBjwpTeH0fqzoFFBLDH6-oGM4ibzHypUKWedg3A@mail.gmail.com>
- <CAHmME9rVbKCNJfVBEene0SvhBEm_g7N-XJ26ugoAab1Vj7G_ww@mail.gmail.com>
- <CAK8P3a3TE8HW0wD9ETCDWMf7quDRx94-2iS6goYDQ18JQ6r=rw@mail.gmail.com>
-Message-ID: <CAHmME9pFnuRx2F=xeyK8d3bwv3bJY+WvE1KZn__+2oFWS0RCnA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 2 Oct 2018 14:18:29 +0200
+Subject: [GIT PULL] Renesas ARM64 Based SoC SoC Updates for v4.20
+In-Reply-To: <CAMuHMdWF2XwWbb0-f_RuSYnFfQzLKNW7Foq9XM7cha3QVU+kHg@mail.gmail.com>
+References: <cover.1538127537.git.horms+renesas@verge.net.au>
+ <CAK8P3a0NreOTfL6L+w2WHnC5uf3jELf6ud_wdBZ7iAU3yuf4VA@mail.gmail.com>
+ <CAMuHMdWF2XwWbb0-f_RuSYnFfQzLKNW7Foq9XM7cha3QVU+kHg@mail.gmail.com>
+Message-ID: <CAK8P3a22freS+j7hmB_bzFTq83eDrUidrV=mmaRYfYAV7gbwAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Tue, Oct 2, 2018 at 9:58 AM Arnd Bergmann <arnd@arndb.de> wrote:
-> > I think we're going to wind up playing whack-a-mole in silly ways. The
-> > fact of the matter is that the ARM assembly I'm adding to the tree is
-> > for ARMv4 and up, and not for ARMv3.
+On Tue, Oct 2, 2018 at 10:31 AM Geert Uytterhoeven <geert@linux-m68k.org> wrote:
 >
-> I don't see what issues remain. The 'reteq lr' that Ard mentioned
-> is definitely the correct way to return from assembly (you also need
-> that for plain armv4, as 'bx' was added in armv4t), and Russell
-> confirmed that using -march=armv3m is something we want
-> anyway for mach-rpc.
-
-I'll do that. I can confirm that after changing it to `reteq lr`,
-everything works well with armv3m.
-
-> > I think there are three options to work around this issue:
-> >
-> > 1) Not build my assembly when CONFIG_CPU_32v3 via a Kconfig "depends".
-> > 2) Set asflags-$(CONFIG_CPU_32v3) inside my module locally to select
-> > -march=armv4.
-> > 3) This patch.
-> >
-> > My initial plan was (1). ArdB recommended I do (2) instead. I thought
-> > that was a bit too nuanced and submitted (3).
+> Hi Arnd,
 >
-> I suspect all three of the above fail to work for armv4.
+> On Fri, Sep 28, 2018 at 10:10 PM Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Fri, Sep 28, 2018 at 12:21 PM Simon Horman
+> > <horms+renesas@verge.net.au> wrote:
+> > > * Add support for RZ/G2E (r8a774c0) and RZ/G2M (r8a774a1) SoCs
+> > > * Enable Compare Match Timer (CMT) and Timer Unit (TMU)
+> > >   for Renesas SoCs
+> > > * Remove no longer needed ARCH_SHMOBILE Kconfig symbol
+> >
+> > The ARCH_SHMOBILE removal and cleanup is fine, but I wonder about
+> > the newly added symbols for specific SoCs. I see you already have a
+> > couple of those, but the other manufacturers don't.
+> >
+> > I think what happened here is that I tried to reject those additions
+> > normally, but I never noticed yours. From what I see in drivers,
+> > you have additional symbols depending on these in clk, pinctrl,
+> > drivers/soc, and the dtb files, so at the very least we can't
+> > just drop the config options, but I'd still like to see this work
+> > more like other platforms.
+>
+> The main motivation for SoC-specific controls is to avoid including pinctrl
+> and (to a lesser extent) clock tables for unused SoCs.  Each pinctrl driver
+> consumes a few tens of KiB, each clock driver a few KiB.
+> If we remove the SoC-specific ARCH_* controls, the user has to configure
+> both pinctrl and clock driver selections, thus trading one user-visible
+> symbol for two new user-visible symbols (except for RZ/A and RZ/N,
+> where the pinctrl symbols are already visible, to allow reducing kernel
+> size).
+> Perhaps that is acceptable?
 
-Armv4 does actually work in this configuration, in fact. But anyway,
-I'll go with your primary suggestion and we therefore can move ahead
-with changing the global cflag to march=armv3m. Would you like me to
-submit the patch for this, or would yo like to handle it?
+It's definitely fine with me. I understand that this is less user friendly,
+but it does address my concern about consistency between the platforms.
 
-Jason
+> For the smaller parts in drivers/soc/, removing SoC-specific dependencies
+> may be viable for R-Car and RZ/G Socs, but not for e.g. RZ/A.  The latter
+> may be used without external RAM, and can run with a few MiB of internal
+> SRAM, and XIP (with a still out-of-tree patch).
+> So at least a family-specific dependency is worth to keep.  For now, RZ/A
+> is arm32 only, though.
+>
+> Note that on arm64, there are no family-specific Kconfig symbols yet.
+> We just have ARCH_RENESAS, which is also set on arm32.
+> So either we introduce e.g. ARCH_RCAR_GEN3 (cfr. ARCH_RCAR_GEN1 and
+> ARCH_RCAR_GEN2 or arm32), or use "ARCH_RENESAS && ARM64" for e.g. RST_RCAR
+> in drivers/soc/renesas/Kconfig, which currently depends on all R-Car Gen3
+> (and RZ/G2) SoCs explicitly.
+> Choosing the latter option means we may need to migrate to the former option
+> later, once other families appear (e.g. RZ/A SoCs may start using
+> Cortex-A53 instead of Cortex-A9 cores).
+
+Maybe introducing a hidden ARCH_RCAR_GEN3 makes sense here, and
+that can start out with the same value as ARCH_RENESAS. I think
+if we want to add 64-bit RZ/A support later, having a separate top-level
+symbol for that is also reasonable: as you explained this is rather
+sensitive to memory usage, and that is enough reason to deviate from
+what we do elsewhere.
+
+> For the DTB files, I believe we can just remove the dependencies, and
+> always build all DTBs.
+
+Yes, that seems best, and consistent with how we handle other
+manufacturers.
+
+> What do you think?
+> Thanks!
