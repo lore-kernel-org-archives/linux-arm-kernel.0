@@ -1,42 +1,47 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue,  2 Oct 2018 20:29:11 +0800
-Subject: [PATCH] clk: sunxi-ng: enable so-said LDOs for A64 SoC's pll-mipi
- clock
-Message-ID: <20181002122911.22094-1-icenowy@aosc.io>
+From: Jason@zx2c4.com (Jason A. Donenfeld)
+Date: Tue, 2 Oct 2018 14:30:29 +0200
+Subject: [PATCH] ARM: makefile: pass -march=armv4 to assembler even on
+ CPU32v3
+In-Reply-To: <CAK8P3a3TE8HW0wD9ETCDWMf7quDRx94-2iS6goYDQ18JQ6r=rw@mail.gmail.com>
+References: <20180930024904.14240-1-Jason@zx2c4.com>
+ <CAK8P3a0grG5OBjwpTeH0fqzoFFBLDH6-oGM4ibzHypUKWedg3A@mail.gmail.com>
+ <CAHmME9rVbKCNJfVBEene0SvhBEm_g7N-XJ26ugoAab1Vj7G_ww@mail.gmail.com>
+ <CAK8P3a3TE8HW0wD9ETCDWMf7quDRx94-2iS6goYDQ18JQ6r=rw@mail.gmail.com>
+Message-ID: <CAHmME9pFnuRx2F=xeyK8d3bwv3bJY+WvE1KZn__+2oFWS0RCnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the user manual of A64 SoC, the bit 22 and 23 of pll-mipi control
-register is called "LDO{1,2}_EN", and according to the BSP source code
-from Allwinner , the LDOs are enabled during the clock's enabling
-process.
+Hi Arnd,
 
-The clock failed to generate output if the two LDOs are not enabled.
+On Tue, Oct 2, 2018 at 9:58 AM Arnd Bergmann <arnd@arndb.de> wrote:
+> > I think we're going to wind up playing whack-a-mole in silly ways. The
+> > fact of the matter is that the ARM assembly I'm adding to the tree is
+> > for ARMv4 and up, and not for ARMv3.
+>
+> I don't see what issues remain. The 'reteq lr' that Ard mentioned
+> is definitely the correct way to return from assembly (you also need
+> that for plain armv4, as 'bx' was added in armv4t), and Russell
+> confirmed that using -march=armv3m is something we want
+> anyway for mach-rpc.
 
-Add the two bits to the clock's gate bits, so that the LDOs are enabled
-when the PLL is enabled.
+I'll do that. I can confirm that after changing it to `reteq lr`,
+everything works well with armv3m.
 
-Fixes: c6a0637460c2 ("clk: sunxi-ng: Add A64 clocks")
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
-As PLL-MIPI is not used before 4.20~5.0, I decide not to target this patch
-on stable/mainline kernels.
+> > I think there are three options to work around this issue:
+> >
+> > 1) Not build my assembly when CONFIG_CPU_32v3 via a Kconfig "depends".
+> > 2) Set asflags-$(CONFIG_CPU_32v3) inside my module locally to select
+> > -march=armv4.
+> > 3) This patch.
+> >
+> > My initial plan was (1). ArdB recommended I do (2) instead. I thought
+> > that was a bit too nuanced and submitted (3).
+>
+> I suspect all three of the above fail to work for armv4.
 
- drivers/clk/sunxi-ng/ccu-sun50i-a64.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Armv4 does actually work in this configuration, in fact. But anyway,
+I'll go with your primary suggestion and we therefore can move ahead
+with changing the global cflag to march=armv3m. Would you like me to
+submit the patch for this, or would yo like to handle it?
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-index 5f80eb018014..f7d297368eb2 100644
---- a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-@@ -162,7 +162,7 @@ static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_gpu_clk, "pll-gpu",
- #define SUN50I_A64_PLL_MIPI_REG		0x040
- 
- static struct ccu_nkm pll_mipi_clk = {
--	.enable		= BIT(31),
-+	.enable		= BIT(31) | BIT(23) | BIT(22),
- 	.lock		= BIT(28),
- 	.n		= _SUNXI_CCU_MULT(8, 4),
- 	.k		= _SUNXI_CCU_MULT_MIN(4, 2, 2),
--- 
-2.18.0
+Jason
