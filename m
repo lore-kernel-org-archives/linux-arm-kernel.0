@@ -1,50 +1,86 @@
-From: ville.syrjala@linux.intel.com (Ville =?iso-8859-1?Q?Syrj=E4l=E4?=)
-Date: Tue, 2 Oct 2018 18:34:56 +0300
-Subject: [Intel-gfx] [PATCH 09/18] drm/atmel: Drop transitional hooks
-In-Reply-To: <20181002133526.13685-10-daniel.vetter@ffwll.ch>
-References: <20181002133526.13685-1-daniel.vetter@ffwll.ch>
- <20181002133526.13685-10-daniel.vetter@ffwll.ch>
-Message-ID: <20181002153456.GY9144@intel.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Tue,  2 Oct 2018 17:48:17 +0200
+Subject: [RESEND PATCH] clk: davinci: kill davinci_clk_reset_assert/deassert()
+Message-ID: <20181002154817.10347-1-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 02, 2018 at 03:35:17PM +0200, Daniel Vetter wrote:
-> These do absolutely nothing for atomic drivers.
-> 
-> Signed-off-by: Daniel Vetter <daniel.vetter@ffwll.ch>
-> Cc: Boris Brezillon <boris.brezillon@bootlin.com>
-> Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
-> Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
-> Cc: linux-arm-kernel at lists.infradead.org
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Reviewed-by: Ville Syrj?l? <ville.syrjala@linux.intel.com>
+This code is no longer used. Remove it.
 
-> ---
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c | 2 --
->  1 file changed, 2 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-> index 9e34bce089d0..96f4082671fe 100644
-> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c
-> @@ -364,9 +364,7 @@ static void atmel_hlcdc_crtc_atomic_flush(struct drm_crtc *crtc,
->  
->  static const struct drm_crtc_helper_funcs lcdc_crtc_helper_funcs = {
->  	.mode_valid = atmel_hlcdc_crtc_mode_valid,
-> -	.mode_set = drm_helper_crtc_mode_set,
->  	.mode_set_nofb = atmel_hlcdc_crtc_mode_set_nofb,
-> -	.mode_set_base = drm_helper_crtc_mode_set_base,
->  	.atomic_check = atmel_hlcdc_crtc_atomic_check,
->  	.atomic_begin = atmel_hlcdc_crtc_atomic_begin,
->  	.atomic_flush = atmel_hlcdc_crtc_atomic_flush,
-> -- 
-> 2.19.0.rc2
-> 
-> _______________________________________________
-> Intel-gfx mailing list
-> Intel-gfx at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/intel-gfx
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Reviewed-by: David Lechner <david@lechnology.com>
+Acked-by: Stephen Boyd <sboyd@kernel.org>
+---
+Hi Stephen, Mike
 
+as suggested by David Lechner - could you pick this up directly
+for 4.20 instead of going through David's tree?
+
+Thanks in advance,
+Bart
+
+ arch/arm/mach-davinci/include/mach/clock.h | 21 ---------------------
+ drivers/clk/davinci/psc.c                  | 18 ------------------
+ 2 files changed, 39 deletions(-)
+ delete mode 100644 arch/arm/mach-davinci/include/mach/clock.h
+
+diff --git a/arch/arm/mach-davinci/include/mach/clock.h b/arch/arm/mach-davinci/include/mach/clock.h
+deleted file mode 100644
+index 42ed4f2f5ce4..000000000000
+--- a/arch/arm/mach-davinci/include/mach/clock.h
++++ /dev/null
+@@ -1,21 +0,0 @@
+-/*
+- * arch/arm/mach-davinci/include/mach/clock.h
+- *
+- * Clock control driver for DaVinci - header file
+- *
+- * Authors: Vladimir Barinov <source@mvista.com>
+- *
+- * 2007 (c) MontaVista Software, Inc. This file is licensed under
+- * the terms of the GNU General Public License version 2. This program
+- * is licensed "as is" without any warranty of any kind, whether express
+- * or implied.
+- */
+-#ifndef __ASM_ARCH_DAVINCI_CLOCK_H
+-#define __ASM_ARCH_DAVINCI_CLOCK_H
+-
+-struct clk;
+-
+-int davinci_clk_reset_assert(struct clk *c);
+-int davinci_clk_reset_deassert(struct clk *c);
+-
+-#endif
+diff --git a/drivers/clk/davinci/psc.c b/drivers/clk/davinci/psc.c
+index fffbed5e263b..5b69e24a224f 100644
+--- a/drivers/clk/davinci/psc.c
++++ b/drivers/clk/davinci/psc.c
+@@ -303,24 +303,6 @@ static int davinci_lpsc_clk_reset(struct clk *clk, bool reset)
+ 	return 0;
+ }
+ 
+-/*
+- * REVISIT: These exported functions can be removed after a non-DT lookup is
+- * added to the reset controller framework and the davinci-rproc driver is
+- * updated to use the generic reset controller framework.
+- */
+-
+-int davinci_clk_reset_assert(struct clk *clk)
+-{
+-	return davinci_lpsc_clk_reset(clk, true);
+-}
+-EXPORT_SYMBOL(davinci_clk_reset_assert);
+-
+-int davinci_clk_reset_deassert(struct clk *clk)
+-{
+-	return davinci_lpsc_clk_reset(clk, false);
+-}
+-EXPORT_SYMBOL(davinci_clk_reset_deassert);
+-
+ static int davinci_psc_reset_assert(struct reset_controller_dev *rcdev,
+ 				    unsigned long id)
+ {
 -- 
-Ville Syrj?l?
-Intel
+2.19.0
